@@ -29,6 +29,8 @@ results/*
 !results/issue-205/**
 !results/issue-206/
 !results/issue-206/**
+!results/bj229_divergence_profile_v1/
+!results/bj229_divergence_profile_v1/**
 runs/
 .cache/
 tmp/
@@ -42,6 +44,8 @@ temp/
 !results/issue-205/*.parquet
 !results/issue-206/*.csv
 !results/issue-206/*.parquet
+!results/bj229_divergence_profile_v1/**/*.csv
+!results/bj229_divergence_profile_v1/**/*.parquet
 *.feather
 *.h5
 *.hdf5

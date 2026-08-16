@@ -1,0 +1,4053 @@
+{
+  "package": "bj229_divergence_profile_v1",
+  "relationships": {
+    "causal_eligibility_to_inference": "one row per cell_key × representation",
+    "development_labels_to_inference": "physical cell_key FK; no upstream private map",
+    "feature_dictionary_to_inference": "feature is exactly one inference column"
+  },
+  "schema_version": "2.0",
+  "tables": {
+    "bj_raw_vs_calibrated_reconciliation": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 3
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n_overlap",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "mean_abs_diff",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "max_abs_diff",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "correlation",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/bj_raw_vs_calibrated_reconciliation.csv",
+      "primary_key": [],
+      "row_count": 3
+    },
+    "causal_eligibility": {
+      "cardinality": {
+        "distinct_primary_keys": 2146230,
+        "rows": 2146230
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cell_key",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "match_idx",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "3|1|0",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome_code",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "unavailable_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "cardinality": "many_to_one",
+          "column": "cell_key",
+          "columns": [
+            "cell_key"
+          ],
+          "references": "inference_cells.cell_key"
+        }
+      ],
+      "format": "parquet",
+      "path": "causal_eligibility.parquet",
+      "primary_key": [
+        "cell_key",
+        "representation"
+      ],
+      "row_count": 2146230
+    },
+    "census_by_cohort": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 10
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "year",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "issues",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "matches",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/census_by_cohort.csv",
+      "primary_key": [],
+      "row_count": 10
+    },
+    "chart_source_mapping": {
+      "cardinality": {
+        "distinct_primary_keys": 10,
+        "rows": 10
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "figure",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "source_table",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "scope",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "row_count",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/chart_source_mapping.csv",
+      "primary_key": [
+        "figure"
+      ],
+      "row_count": 10
+    },
+    "cohort_registry": {
+      "cardinality": {
+        "distinct_primary_keys": 419,
+        "rows": 419
+      },
+      "columns": [
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "year",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "cardinality": "one_to_many",
+          "column": "issue",
+          "columns": [
+            "issue"
+          ],
+          "references": "inference_cells.issue"
+        }
+      ],
+      "format": "csv",
+      "path": "cohort_registry.csv",
+      "primary_key": [
+        "issue"
+      ],
+      "row_count": 419
+    },
+    "complete_matches_per_n": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 12
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "eligible_issues",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "total_issues",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "fraction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/complete_matches_per_n.csv",
+      "primary_key": [],
+      "row_count": 12
+    },
+    "development_labels": {
+      "cardinality": {
+        "distinct_primary_keys": 243462,
+        "rows": 243462
+      },
+      "columns": [
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cell_join_key",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "match_id",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "is_winner",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "final_sp",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "final_sp_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "3|1|0",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome_code",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "match_idx",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "year",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue_instance",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cell_key",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [
+        {
+          "cardinality": "zero_or_one_to_one",
+          "column": "cell_key",
+          "columns": [
+            "cell_key"
+          ],
+          "references": "inference_cells.cell_key"
+        }
+      ],
+      "format": "parquet",
+      "path": "development_labels_through_2023.parquet",
+      "primary_key": [
+        "cell_key"
+      ],
+      "row_count": 243462
+    },
+    "development_only_calibration": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 43
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "year_namespace",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "bin",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "observed_freq",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "mean_prob",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "reliability_gap",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/development_only_calibration.csv",
+      "primary_key": [],
+      "row_count": 43
+    },
+    "direction_agreement_matrix": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 0
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_eu_direction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_power_direction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "table",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "divergence_eu_power_agreement",
+          "nullable": false,
+          "physical_type": "object",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/direction_agreement_matrix.csv",
+      "primary_key": [],
+      "row_count": 0
+    },
+    "divergence_magnitude_tail": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 1
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "quantile",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "field",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/divergence_magnitude_tail.csv",
+      "primary_key": [],
+      "row_count": 1
+    },
+    "drift_table": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 50
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "year",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "raw_present_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "causally_available_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "causal_coverage_fraction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/drift_table.csv",
+      "primary_key": [],
+      "row_count": 50
+    },
+    "eu_vs_bj_scatter_table": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 0
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "line",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "source_prob",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "qbj_prob",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/eu_vs_bj_scatter_table.csv",
+      "primary_key": [],
+      "row_count": 0
+    },
+    "evidence": {
+      "cardinality": {
+        "distinct_primary_keys": 10,
+        "rows": 10
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "requirement",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "name",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "evidence",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "pass",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reviewed_commit_sha",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "evidence/req_d_evidence.csv",
+      "primary_key": [
+        "requirement"
+      ],
+      "row_count": 10
+    },
+    "exclusion_ledger": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 71981
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": true,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "match_idx",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason_code",
+          "nullable": true,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "detail",
+          "nullable": true,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "year",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "total_cells",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "calibrated_available",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "calibrated_coverage",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "field",
+          "nullable": true,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "subset",
+          "nullable": true,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "cell_count",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "fraction_of_total",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/exclusion_ledger.csv",
+      "primary_key": [],
+      "row_count": 71981
+    },
+    "exclusion_summary": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 4
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason_code",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "count",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/exclusion_summary.csv",
+      "primary_key": [],
+      "row_count": 4
+    },
+    "feature_dictionary": {
+      "cardinality": {
+        "distinct_primary_keys": 84,
+        "rows": 84
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "feature",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "dtype",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "source",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "timestamp_rule",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "admissible_use",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "units",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "nullability",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "domain",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "key_role",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "feature_dictionary.csv",
+      "primary_key": [
+        "feature"
+      ],
+      "row_count": 84
+    },
+    "inference_cells": {
+      "cardinality": {
+        "distinct_primary_keys": 357705,
+        "rows": 357705
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cell_key",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue_instance",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "year",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "issue_order",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "match_idx",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "3|1|0",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome_code",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "DEVELOPMENT_CV|RETROSPECTIVE_TEST_LOCKED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "role",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "RETROSPECTIVE_PROXY_PCLOSE|RETROSPECTIVE_PROXY",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "source_grade",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "market_probability",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "native_handicap_line",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "goals (integer or half-goal)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "source_is_pclose",
+          "nullable": false,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "source_is_average_eu",
+          "nullable": false,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "market_proxy_complete",
+          "nullable": false,
+          "physical_type": "double",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "predicted_final_sp_input",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "bj203_identity_status",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "feature_cutoff_ts_utc",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj203_causal_tensor_v2",
+          "units": "UTC timestamp"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "kickoff_ts_utc",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj203_causal_tensor_v2",
+          "units": "UTC timestamp"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "identity_observed_ts_utc",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj203_causal_tensor_v2",
+          "units": "UTC timestamp"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "euro_1h_available_ts_utc",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj203_causal_tensor_v2",
+          "units": "UTC timestamp"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "predicted_sp_available_ts_utc",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj203_causal_tensor_v2",
+          "units": "UTC timestamp"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "CUTOFF_BOUND_IDENTITY|RETROSPECTIVE_IDENTITY_ONLY|TIMESTAMPED_IDENTITY_ONLY",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "identity_timing_status",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj203_causal_tensor_v2",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "AVAILABLE|UNAVAILABLE",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "availability_status",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj203_causal_tensor_v2",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "bj203_match_meta_status",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "devig_euro_probability",
+          "nullable": true,
+          "physical_type": "float",
+          "source": "bj203_causal_tensor_v2",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "market_uncertainty",
+          "nullable": true,
+          "physical_type": "float",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "dimensionless uncertainty"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "_mask_market_probability",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": [
+            3
+          ],
+          "logical_type": "probability_vector_3",
+          "name": "Q_BJ_CALIBRATED",
+          "nullable": true,
+          "physical_type": "list<item: double>",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "BJ_LINE_BOUNDARY",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "goals (integer or half-goal)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "qbj_source_identity",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "bj_line_source_identity",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "Q_BJ_CALIBRATED_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[ns, tz=UTC]",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "BJ_LINE_BOUNDARY_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[ns, tz=UTC]",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_BJ_CALIBRATED_producer_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "BJ_LINE_BOUNDARY_producer_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": [
+            3
+          ],
+          "logical_type": "probability_vector_3",
+          "name": "Q_BJ_SP_DEVIG",
+          "nullable": true,
+          "physical_type": "null",
+          "source": "bj214_decision_epoch_tensor_v1",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "Q_BJ_SP_DEVIG_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[ns, tz=UTC]",
+          "source": "bj214_decision_epoch_tensor_v1",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "sp_source_identity",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_BJ_SP_DEVIG_producer_reason",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "bj214_decision_epoch_tensor_v1",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": [
+            3
+          ],
+          "logical_type": "probability_vector_3",
+          "name": "Q_EU_RAW_1X2",
+          "nullable": true,
+          "physical_type": "list<item: double>",
+          "source": "bj203_devig_euro_probability (+ explicit Poisson translation)",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "Q_EU_RAW_1X2_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[ns, tz=UTC]",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "eu_source_identity",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_EU_RAW_1X2_producer_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": [
+            3
+          ],
+          "logical_type": "probability_vector_3",
+          "name": "Q_EU_BJLINE",
+          "nullable": true,
+          "physical_type": "list<item: double>",
+          "source": "bj203_devig_euro_probability (+ explicit Poisson translation)",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "eu_bjline_reason",
+          "nullable": true,
+          "physical_type": "string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_EU_BJLINE_producer_reason",
+          "nullable": true,
+          "physical_type": "string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "Q_EU_BJLINE_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[ns, tz=UTC]",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": [
+            3
+          ],
+          "logical_type": "probability_vector_3",
+          "name": "P_POWER_BJLINE",
+          "nullable": true,
+          "physical_type": "list<item: double>",
+          "source": "bj180_gate_a_preoutcome_v2",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "P_POWER_BJLINE_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[us, tz=UTC]",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "power_source_identity",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "P_POWER_BJLINE_producer_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "Q_BJ_SP_DEVIG_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "bj214_decision_epoch_tensor_v1",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_BJ_SP_DEVIG_unavailable_reason",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "bj214_decision_epoch_tensor_v1",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "Q_BJ_CALIBRATED_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_BJ_CALIBRATED_unavailable_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "Q_EU_RAW_1X2_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_EU_RAW_1X2_unavailable_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "Q_EU_BJLINE_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "Q_EU_BJLINE_unavailable_reason",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "P_POWER_BJLINE_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "P_POWER_BJLINE_unavailable_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "BJ_LINE_BOUNDARY_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "BJ_LINE_BOUNDARY_unavailable_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "predicted_final_sp_input_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[us, tz=UTC]",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "predicted_final_sp_input_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "predicted_final_sp_input_unavailable_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "utc_timestamp",
+          "name": "market_uncertainty_observed_at_utc",
+          "nullable": true,
+          "physical_type": "timestamp[us, tz=UTC]",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "boolean",
+          "name": "market_uncertainty_available",
+          "nullable": false,
+          "physical_type": "bool",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "market_uncertainty_unavailable_reason",
+          "nullable": true,
+          "physical_type": "large_string",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_eu_minus_qbj",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_power_minus_qbj",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_eu_logratio",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_power_logratio",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_eu_logodds",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_power_logodds",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_eu_direction",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_power_direction",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_magnitude",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "divergence_eu_power_agreement",
+          "nullable": true,
+          "physical_type": "null",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_eu_uncertainty_std",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "divergence_power_uncertainty_std",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "leg_q_times_sp_pre",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "leg_logq_plus_logsp",
+          "nullable": true,
+          "physical_type": "double",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "parquet",
+      "path": "inference_cells.parquet",
+      "primary_key": [
+        "cell_key"
+      ],
+      "row_count": 357705
+    },
+    "intersection_coverage": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 6
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "intersection",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "cell_count",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "fraction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/intersection_coverage.csv",
+      "primary_key": [],
+      "row_count": 6
+    },
+    "issue_count_distribution": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 3
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "issues",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "min",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "median",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "max",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "mean",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/issue_count_distribution.csv",
+      "primary_key": [],
+      "row_count": 3
+    },
+    "ledger_DQ01_duplicate_identity": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 1
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ01_duplicate_identity.csv",
+      "primary_key": [],
+      "row_count": 1
+    },
+    "ledger_DQ02_timestamp_checks": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 68298
+      },
+      "columns": [
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "match_idx",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason_code",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "detail",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ02_timestamp_checks.csv",
+      "primary_key": [],
+      "row_count": 68298
+    },
+    "ledger_DQ03_started_matches": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 15
+      },
+      "columns": [
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "match_idx",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason_code",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "detail",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ03_started_matches.csv",
+      "primary_key": [],
+      "row_count": 15
+    },
+    "ledger_DQ04_invalid_handicap_result_mapping": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 3648
+      },
+      "columns": [
+        {
+          "admissible_use": "development-label",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "issue",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "match_idx",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason_code",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "detail",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ04_invalid_handicap_result_mapping.csv",
+      "primary_key": [],
+      "row_count": 3648
+    },
+    "ledger_DQ05_invalid_probability_triplets": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 1
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ05_invalid_probability_triplets.csv",
+      "primary_key": [],
+      "row_count": 1
+    },
+    "ledger_DQ06_impossible_values": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 1
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ06_impossible_values.csv",
+      "primary_key": [],
+      "row_count": 1
+    },
+    "ledger_DQ07_source_provenance_conflicts": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 1
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ07_source_provenance_conflicts.csv",
+      "primary_key": [],
+      "row_count": 1
+    },
+    "ledger_DQ08_feature_label_overlap": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 1
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ08_feature_label_overlap.csv",
+      "primary_key": [],
+      "row_count": 1
+    },
+    "ledger_DQ09_support_drift": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 8
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "year",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "total_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "calibrated_available",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "calibrated_coverage",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ09_support_drift.csv",
+      "primary_key": [],
+      "row_count": 8
+    },
+    "ledger_DQ10_outlier_constant_fields": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 6
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "field",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason_code",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "detail",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ10_outlier_constant_fields.csv",
+      "primary_key": [],
+      "row_count": 6
+    },
+    "ledger_DQ11_matched_support_loss": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 6
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "subset",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "cell_count",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "fraction_of_total",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ11_matched_support_loss.csv",
+      "primary_key": [],
+      "row_count": 6
+    },
+    "ledger_DQ12_payout_factor_boundary": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 1
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "check",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "ledger/DQ12_payout_factor_boundary.csv",
+      "primary_key": [],
+      "row_count": 1
+    },
+    "line_league_year_distribution": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 35
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "dimension",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/line_league_year_distribution.csv",
+      "primary_key": [],
+      "row_count": 35
+    },
+    "missingness_matrix": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 5
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "raw_present",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "causally_available",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "unavailable",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "unavailable_fraction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "missing_fraction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/missingness_matrix.csv",
+      "primary_key": [],
+      "row_count": 5
+    },
+    "outcome_distribution": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 9
+      },
+      "columns": [
+        {
+          "admissible_use": "development-label",
+          "domain": "3|1|0",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome_code",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/outcome_distribution.csv",
+      "primary_key": [],
+      "row_count": 9
+    },
+    "outlier_heavy_tail": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 6
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "field",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason_code",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "detail",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/outlier_heavy_tail.csv",
+      "primary_key": [],
+      "row_count": 6
+    },
+    "power_vs_bj_scatter_table": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 0
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "line",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "source_prob",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "qbj_prob",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "probability [0,1]"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/power_vs_bj_scatter_table.csv",
+      "primary_key": [],
+      "row_count": 0
+    },
+    "predicted_sp_vs_settlement_sp": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 5
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "stat",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/predicted_sp_vs_settlement_sp.csv",
+      "primary_key": [],
+      "row_count": 5
+    },
+    "probability_distribution_eu_bjline": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 3
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "stat",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/probability_distribution_eu_bjline.csv",
+      "primary_key": [],
+      "row_count": 3
+    },
+    "probability_distribution_eu_raw": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 36
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "stat",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/probability_distribution_eu_raw.csv",
+      "primary_key": [],
+      "row_count": 36
+    },
+    "probability_distribution_power": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 36
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "stat",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/probability_distribution_power.csv",
+      "primary_key": [],
+      "row_count": 36
+    },
+    "probability_distribution_qbj_calibrated": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 36
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "stat",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/probability_distribution_qbj_calibrated.csv",
+      "primary_key": [],
+      "row_count": 36
+    },
+    "probability_distribution_sp_devig": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 3
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "stat",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "value",
+          "nullable": true,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "n",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/probability_distribution_sp_devig.csv",
+      "primary_key": [],
+      "row_count": 3
+    },
+    "probability_mapping_registry": {
+      "cardinality": {
+        "distinct_primary_keys": 5,
+        "rows": 5
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "definition",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "raw_present_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "causally_available_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "total_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "causal_coverage_fraction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "source_identity",
+          "nullable": false,
+          "physical_type": "object",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "kept_separate_from",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "probability_mapping_registry.csv",
+      "primary_key": [
+        "representation"
+      ],
+      "row_count": 5
+    },
+    "sealed_label_namespaces": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 3
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "namespace",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "status",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "upstream_rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "handoff_rows",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "sealed_label_namespaces.csv",
+      "primary_key": [],
+      "row_count": 3
+    },
+    "source_coverage_strata": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 5
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "representation",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "raw_present_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "causally_available_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "total_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "causal_coverage_fraction",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/source_coverage_strata.csv",
+      "primary_key": [],
+      "row_count": 5
+    },
+    "sp_and_implied_distribution": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 12
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "stat",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "predicted_final_sp_input",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "bj204_gate_a_preoutcome_v5",
+          "units": "decimal odds (>1)"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "field",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/sp_and_implied_distribution.csv",
+      "primary_key": [],
+      "row_count": 12
+    },
+    "supported_issues_per_year": {
+      "cardinality": {
+        "distinct_primary_keys": null,
+        "rows": 8
+      },
+      "columns": [
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "year",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "total_cells",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "calibrated_available",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "number",
+          "name": "calibrated_coverage",
+          "nullable": false,
+          "physical_type": "float64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        }
+      ],
+      "foreign_keys": [],
+      "format": "csv",
+      "path": "tables/supported_issues_per_year.csv",
+      "primary_key": [],
+      "row_count": 8
+    }
+  }
+}

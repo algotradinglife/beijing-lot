@@ -1,0 +1,10 @@
+outcome_code,cohort,cells
+0,RETROSPECTIVE_TEST_LOCKED,16990
+0,development,101221
+0,heldout,1024
+1,RETROSPECTIVE_TEST_LOCKED,16990
+1,development,101221
+1,heldout,1024
+3,RETROSPECTIVE_TEST_LOCKED,16990
+3,development,101221
+3,heldout,1024
