@@ -1,0 +1,82 @@
+{
+  "contract": "BJ-UNIFIED-POWER-FEATURE-SUPPORT-001",
+  "version": "bj237-power-feature-support-v1",
+  "decision_epoch": "issue-level feature_cutoff_ts_utc from bj203 issue_offsets",
+  "completion_embargo_minutes": 180,
+  "feature_engine": "scripts/bj180_team_matchup_core.py (accepted #180 core, TEAM_PRIMARY configuration)",
+  "outcome_domain": "3/1/0 (BJ native handicap result)",
+  "line_semantics": "native_handicap_line is the fixture's BJ handicap normalized line; probability vector maps to that line",
+  "tables": {
+    "power_features": {
+      "description": "long-form per (issue, match_idx, outcome_code)",
+      "key": [
+        "issue",
+        "match_idx",
+        "outcome_code"
+      ],
+      "columns": [
+        "issue",
+        "match_idx",
+        "match_id",
+        "kickoff_ts_utc",
+        "decision_epoch_utc",
+        "year",
+        "league",
+        "home_team_id",
+        "away_team_id",
+        "native_handicap_line",
+        "line_ok",
+        "unseen_mask",
+        "min_history_n",
+        "home_history_n",
+        "away_history_n",
+        "triplet_ok",
+        "uncertainty",
+        "outcome_code",
+        "power_probability"
+      ]
+    },
+    "power_feature_diagnostics": {
+      "description": "per-match diagnostics + masks",
+      "key": [
+        "issue",
+        "match_idx"
+      ],
+      "columns": [
+        "issue",
+        "match_idx",
+        "match_id",
+        "kickoff_ts_utc",
+        "decision_epoch_utc",
+        "year",
+        "league",
+        "home_team_id",
+        "away_team_id",
+        "native_handicap_line",
+        "line_ok",
+        "unseen_mask",
+        "min_history_n",
+        "home_history_n",
+        "away_history_n",
+        "triplet_ok",
+        "uncertainty",
+        "diag_home_elo",
+        "diag_away_elo",
+        "diag_elo_diff",
+        "diag_home_form_points",
+        "diag_away_form_points",
+        "diag_home_rest_hours",
+        "diag_away_rest_hours",
+        "diag_home_matches_7d",
+        "diag_away_matches_7d",
+        "diag_home_matches_21d",
+        "diag_away_matches_21d",
+        "diag_home_league_changes",
+        "diag_away_league_changes",
+        "diag_h2h_prior_n",
+        "diag_new_team_fallback",
+        "history_event_sha256"
+      ]
+    }
+  }
+}

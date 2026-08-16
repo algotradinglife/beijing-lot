@@ -1,0 +1,56 @@
+{
+  "contract": "BJ-UNIFIED-POWER-FEATURE-SUPPORT-001",
+  "version": "bj237-power-feature-support-v1",
+  "base_main_commit": "784a23badf38d51bb2aee6d7687479e425d1af80",
+  "built_at_utc": "2026-08-16T04:35:43.604356+00:00",
+  "source_receipt": {
+    "contract": "BJ-UNIFIED-POWER-FEATURE-SUPPORT-001",
+    "version": "bj237-power-feature-support-v1",
+    "base_main_commit": "784a23badf38d51bb2aee6d7687479e425d1af80",
+    "databases": {
+      "xlsm": {
+        "path": "derived/beidan_xlsm/beidan_xlsm.sqlite",
+        "sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+        "exists": true
+      },
+      "features": {
+        "path": "beidan_features.db",
+        "sha256": "48d73b868235a78d73ea2587d5a2cd9094a861b605bfcd6447604bb90a650bf7",
+        "exists": true
+      },
+      "history": {
+        "path": "beidan_history.db",
+        "sha256": "867e11452306c29e7b64b97af82f730ab0d96f7519d9950dc33ef1cd64f9ceaa",
+        "exists": true
+      },
+      "live": {
+        "path": "beidan_live.db",
+        "sha256": "1adbdb53bbb250868b1d46af6aa0f2cc5c533905e8f264dab379329d742adab9",
+        "exists": true
+      }
+    },
+    "external_football_data_dir": {
+      "path": "/home/drwho1985/workspace/soccer/beijing-lot/data/raw/football-data",
+      "files": 25
+    },
+    "completion_embargo_minutes": 180,
+    "embargo_rule": "historical scores usable only when kickoff <= epoch - 180min",
+    "decision_epoch_source": "bj203_causal_tensor_v2 issue_offsets (issue-level feature_cutoff_ts_utc)",
+    "sealed_label_policy": "2024+ outcomes never opened for design; development calibration uses <=2023 labels only",
+    "outputs": {
+      "published_cells": 306720,
+      "published_issues": 344,
+      "causal_publishable_cells": 305517,
+      "causal_publishable_issues": 344,
+      "support_groups": 3284,
+      "calibration_groups": 1899
+    }
+  },
+  "tables": {
+    "power_features": "power_features.parquet",
+    "power_feature_diagnostics": "power_feature_diagnostics.parquet",
+    "support_summary": "support_summary.parquet",
+    "calibration_through_2023": "calibration_through_2023.parquet",
+    "REPORT.md": "REPORT.md"
+  }
+}

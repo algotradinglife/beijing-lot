@@ -1,0 +1,11 @@
+metric,value
+cells_total,357705
+issues_total,419
+freeze_rows,1558
+freeze_issues,189
+freeze_complete_rows,1558
+merged_power_cells,4674
+line_matched_cells,4674
+published_cells,234
+published_issues,9
+published_issues_list,"['20062', '21064', '21071', '22064', '23024', '23092', '24031', '24083', '24105']"

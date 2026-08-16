@@ -1,0 +1,13 @@
+{
+  "REPORT.md": "5eca5b216518b6f780c74defd62e3736f4caf0e02fa4d79d78677c50d68358ec",
+  "calibration_through_2023.parquet": "c5c7fa4d24681729b0c07fcb67c53b37ab4c66345a6d6e664289afa766fcd486",
+  "external_football_data_census.csv": "25a12b4197dc00d37ae3c37090438a8919d30a23865947f5069bc7eda3e83eac",
+  "feature_schema.json": "4b3f5031df40b59e5d6f95e6a1f4025f99a20582d0994d358332f479bd814b13",
+  "manifest.json": "273a630dfdc65ecd11fcad084423ecb91a5bc0cb9d65a59284c1f1e0a7492a21",
+  "power_feature_diagnostics.parquet": "e9fa3dd010ffb016dc8893e5b141a3ea4a6be3a3c2eb5e8b407c0fd4714babd2",
+  "power_features.parquet": "f2ed15ea44b7015c390fef11501b1f8fef4c8c491eba6aef66c2bc497002a6a3",
+  "ppower_intersection_reconstruction.csv": "019d329792ada1b68b4012ee0050e37165eed5d78e101f855bc42a789da82d89",
+  "support_loss_waterfall.csv": "d4ca6b463615cf3ee898480fd400c22f549848ccb7aac9d5720325a6d00a6660",
+  "support_summary.parquet": "44d75cbc02b1bed53427e5419627e8c975375cc996db6852f69c1451ae8e2357",
+  "waterfall_receipt.json": "b21141663dad728dff1b2af9c091b0942373ca3c39da0646cf12814246b2b80a"
+}

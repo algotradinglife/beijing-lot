@@ -1,0 +1,15 @@
+stage,label,rows,issues,reason
+0.0,raw source rows,195269,701,
+1.0,identity ok (team ids + unique key),192703,701,
+2.0,league present,192703,701,
+3.0,decision epoch exists (#203),102243,344,
+,,2566,6,IDENTITY_MISSING_TEAM_ID
+,,0,0,IDENTITY_DUPLICATE_ISSUE_MATCHIDX
+,,0,0,IDENTITY_LEAGUE_BLANK
+,,90460,357,NO_DECISION_EPOCH
+,,1121,256,NOT_ELIGIBLE_HISTORY
+,,101122,344,HISTORY_ELIGIBLE_SCORE_PRESENT
+4.0,target not started at epoch (kickoff >= epoch),102240,344,
+5.0,native line present (target rows),101985,344,
+,,5,3,EMBARGO_EXCLUDED
+,,255,71,LINE_BLANK
