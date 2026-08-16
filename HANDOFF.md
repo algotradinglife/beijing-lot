@@ -1,99 +1,97 @@
-# HANDOFF — Issue #208 v10 minor rework (E1 rollback rename-fault closure)
+# HANDOFF — Issue #208 v11 minor rework (E1 BaseException boundary closure)
 
-- SESSION: 20260816_145531_b32d04
+- SESSION: 20260816_173919_ce1447
 - Issue: algotradinglife/beijing-lot #208 (BJ-UNIFIED-DYNAMIC-N-001)
-- PR: #230 (branch head advanced to `analyst/bj208-rework-r11` → pushed to
+- PR: #230 (branch head advanced on `analyst/bj208-rework-r11` → pushed to
   PR branch `analyst/bj208-rework-r1`)
 - Worktree: /home/drwho1985/workspace/soccer/beijing-lot-bj208-r11
 
 ## Current HEAD (worktree)
 
-- Base: `eeabd3036375f6a2e7d224c77bae292249ff2207` (audited v9 HEAD)
-- Local commit: v10 fix + replay artifacts (see git log)
+- Base: `819ef799e67534cc1feebbe0fa417745cee638ef` (audited v10 HEAD)
+- Fix commit: `8c43934f60c60c46aa82ff9a8721617b2dcb916d` (v11 fix: scripts,
+  tests, protocol log, sweep docs)
+- Artifacts commit: PENDING (this delivery — results, notebook, HANDOFF)
 
 ## What was done
 
-EV finalize REJECT (2026-08-16T06:48Z, `REWORK_TYPE=minor`) identified one
-blocking evidence defect at audited HEAD `eeabd30`:
+EV finalize REJECT (2026-08-16T09:34Z, `REWORK_TYPE=minor`) identified one
+blocking evidence defect at audited HEAD `819ef79`:
 
-- **E1 (publication atomicity / rollback state machine):** when the
-  post-publication verify fails and the rollback's `new→failed` rename
-  faults, the semantic-invalid new package stayed on the canonical path
-  (`visible_value=new-unverified`, `last_good_visible=false`), the old
-  last-good was orphaned in `.backup-*`, and a production retry left that
-  stale backup behind.  The v9 test encoded the wrong contract (asserted
-  unverified new visible) and manually called the private helper instead of
-  a real production retry; another test had `assert ... or True`.
+- **E1 (publication atomicity / BaseException boundary):** the rollback's
+  `output→failed` rename caught only `OSError`.  When a `KeyboardInterrupt`
+  or `SystemExit` was raised AT that rename (a single control interruption,
+  injected through the production `run()` entry after final canonical
+  verification rejected the new package), v10 skipped the
+  remove-invalid-tree/restore-backup path AND skipped the
+  `.PUBLICATION_INVALID` marker.  `run()` had already transferred backup
+  ownership, so the outer handler had no handle left.  EV observed:
+  `canonical_value=new-semantic-invalid`, `invalid_marker=false`,
+  `backup_values=[old-last-good]`, `last_good_visible=false`.
 
-Fix — three lines of defence:
+Fix — BaseException-bounded rollback with convergence-before-propagation:
 
-1. `_rollback_publish` never leaves the unverified new on canonical:
-   - `new→failed` rename fault → remove the invalid tree, restore old
-     last-good from backup (POSIX rename cannot replace a non-empty
-     directory target, so the tree is deleted first; an absent output is
-     fail-closed for any reader).
-   - removal also fails → mark the visible tree `.PUBLICATION_INVALID`
-     (fail-closed; readers/verifiers reject it) and keep the backup intact.
-   - first-publish branch likewise fail-closed via the marker.
-2. `run()` starts with `_recover_stale_transaction()`: restores any
-   leftover backup (or drops it when the visible tree verifies as a
-   complete last-good), removes stale `.failed-*`/`.staging-*` — a real
-   production retry converges with zero orphan artifacts.
-3. Tests: wrong-contract test rewritten (asserts restored last-good +
-   real production retry), tautology removed, new production-entry tests
-   for backup→output rename fault, cannot-clear-canonical fail-closed
-   marker path, and commit-cleanup stale-backup recovery-verify path.
+1. `_rollback_publish` `output→failed` rename (restore branch) is now
+   `except BaseException as fault:`; recovery (invalid-tree removal then
+   `backup→output` restore) is itself nested `BaseException`-bounded; if the
+   original fault is `OSError` the caller continues with its own VerifyError
+   (v10 contract preserved), otherwise the safe state is converged FIRST and
+   then the control interrupt re-propagates.
+2. First-publish branch (`backup is None`) has the same `BaseException`
+   boundary: cannot set aside → `.PUBLICATION_INVALID` marker + propagate.
+3. `_mark_publication_invalid` swallows any `BaseException` so a control
+   interrupt during marker writing never masks the caller's boundary fault.
+4. Safety invariant on every return path: last-good visible at canonical |
+   canonical absent | fail-closed marker + intact backup.  The forbidden
+   state (unmarked semantic-invalid canonical) is unreachable.
 
 ## Key decisions & rationale
 
-- Visibility restoration is the commit point: after last-good is visible at
-  canonical, fsync/cleanup faults are warnings, never a second rollback.
-- The `new→failed` fault sacrifices the `.failed-*` diagnostic copy when
-  the invalid tree must be removed to restore visibility (contract priority:
-  old last-good visible, no invalid final exposed, retry safe).
-- Recovery is verify-based: if the visible tree is a complete verified
-  package (commit succeeded, cleanup failed), it is kept and the stale
-  backup dropped — never roll a committed package back to obsolete bytes.
-- All fault probes are run()-level production-entry (monkeypatched
-  `_run_stages`/`verify_package`/`os.replace`/`shutil.rmtree`), so EV can
-  re-probe through the same entry point.
+- The `output→failed` rename decides canonical ownership, so it must be
+  BaseException-bounded; the v10 sweep only covered KI/SE at restore
+  parent-fsync (superseded — see v11 sweep doc and PROTOCOL-LOG #208-40).
+- Convergence-before-propagation: a control interrupt does NOT abort the
+  rollback mid-recovery; the transaction reaches a safe state first, then
+  the interrupt intent continues to the caller.
 - No scientific/model/grid/seed/selection change: E1 is purely the runner's
   transactional publication step; deterministic replay must produce
-  byte-identical science frames to v9.
+  byte-identical science frames to v10.
 
-## Replay results (completed 2026-08-16)
+## Tests & evidence (completed 2026-08-16)
 
-- `run --output results/issue-208`: EXIT=0, elapsed 1060.6s, COMPLETED.
-- Production verifier: `verify ok; tamper detected=26` (26/26 attacks).
-- Selection: `eligible=false`, median matched lift 0.0, positive folds 0,
-  candidate=frozen `N7/K8/MARKET_WOR/NATIVE_2_YUAN` (unchanged vs v9).
-- Handoff: candidate=fallback=FROZEN_N7_INCUMBENT; `2024_opened=false`.
-- Science frames byte-identical to v9: only COMPLETED.json, SHA256SUMS.json,
-  decision.json, provenance.json changed (elapsed / execution metadata —
-  the expected delta set; producer_code_commit now `0e7e27b` which contains
-  the v10 runner code). All 55 CSV/Parquet frames, 9 joblib models and the
-  remaining JSON artifacts are unchanged.
-- Fold endings reproduce EV exactly: CV_2022 99072.00/99072.00,
-  CV_2023 99245.37814957523/99245.37814957523.
+- 7 new production-entry tests: EV exact probes (KI/SE at `output→failed`
+  rename, healed real `run()` retry converges zero-orphan), KI+rmtree
+  double-fault marker path, first-publish KI marker path, and three
+  `_atomic_publish` inner-recovery KI boundaries (output→backup rename,
+  backup→output restore, output→staging move-back).
+- Focused suite: `106 passed` (99 retained + 7 new).
+- Ruff (touched runner/test), compileall, `git diff --check`: PASS.
+- Deterministic replay (bound to fix commit `8c43934`): EXIT=0 in ~1130s;
+  production verifier PASS 26/26 tamper; science frames byte-identical to
+  v10 — only COMPLETED/SHA256SUMS/decision/provenance metadata changed
+  (producer_code_commit now `8c43934f60c60c46aa82ff9a8721617b2dcb916d`).
 - Notebook rebuilt + executed: 20/20 code cells, 0 errors.
-- `method_preflight.py --worktree <r11>`: PASS.
+- Selection (unchanged vs v10): `eligible=false`, median matched lift 0.0,
+  positive folds 0, frozen `N7/K8/MARKET_WOR/native ¥2` incumbent for #209;
+  2024 not opened.
+- `method_preflight.py --worktree <r11>`: PASS (receipt hash
+  `d2a8c5345d67` exact match; holdout_isolated true).
 
 ## Known issues
 
-- `.PUBLICATION_INVALID` marker is only written when the invalid tree cannot
-  be removed at all (deeply broken filesystem); normal faults restore
-  last-good directly.
-- Recovery verify call is skipped for a marker-flagged tree (marker wins).
-- ood_fallback_census cosmetic note from v3–v9 remains (pre-existing
-  diagnostic-only, not part of this E1 closure).
+- Marker is only written when recovery cannot converge (rename fault + a
+  second removal/restore fault); normal KI/SE faults restore last-good
+  directly, which is the preferred safe state.
+- Recovery verify is skipped for a marker-flagged tree (marker wins).
 
 ## Next step
 
 EV independent finalize audit at the new exact PR #230 HEAD: fresh
-checkout, re-run production-entry fault probes (third verify fails + first
-rollback `new→failed` rename fault → old visible, retry converges), focused
-suite, preflight, package verify/tamper, notebook clean-run, replay
-comparison, REQ-208-01..09 evidence at the exact SHA.
+checkout, re-run production-entry fault probes (final verify fails + rollback
+`output→failed` rename raises KeyboardInterrupt/SystemExit → last-good
+restored, retry converges), focused suite, preflight, package verify/tamper,
+notebook clean-run, replay comparison, REQ-208-01..09 evidence at the exact
+SHA.
 
 ## 返工
 
