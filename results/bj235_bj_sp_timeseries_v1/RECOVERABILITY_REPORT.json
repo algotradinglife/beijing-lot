@@ -1,0 +1,1414 @@
+{
+  "waterfall_raw": {
+    "beidan_live_500_raw": 1495217,
+    "bjdc_500_xml_34_raw": 1632595,
+    "xlsm_label_snapshots_51M": 51551016,
+    "history_settlement_rows": 38463
+  },
+  "complete_triplets": {
+    "beidan_live_500": 900286,
+    "bjdc_500_xml_34": 260765,
+    "total_strict_causal_obs": 1161051
+  },
+  "issue_support": {
+    "by_cohort": {
+      "strict_historical": {
+        "issues": 116,
+        "fixtures_total": 32473,
+        "fixtures_complete_asof": 0
+      },
+      "prospective": {
+        "issues": 64,
+        "fixtures_total": 10763,
+        "fixtures_complete_asof": 11308
+      }
+    },
+    "per_issue": [
+      {
+        "issue_code": "24011",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 114,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24012",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 147,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24013",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 229,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24014",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 244,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24015",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 311,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24021",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 319,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24022",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 139,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24023",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 101,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24024",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 392,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24031",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 463,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24032",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 429,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24033",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 417,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24034",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 118,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24035",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 35,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24041",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 404,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24042",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 485,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24043",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 471,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24044",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 434,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24045",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 472,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24051",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 401,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24052",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 390,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24053",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 447,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24054",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 271,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24055",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 67,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24061",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 158,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24062",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 91,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24063",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 138,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24064",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 134,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24065",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 45,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24071",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 102,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24072",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 123,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24073",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 131,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24074",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 217,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24075",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 214,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24081",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 207,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24082",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 329,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24083",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 414,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24084",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 436,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24085",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 93,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24091",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 386,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24092",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 132,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24093",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 414,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24094",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 465,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24095",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 523,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24101",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 320,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24102",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 124,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24103",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 415,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24104",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 490,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24105",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 116,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24111",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 365,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24112",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 449,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24113",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 106,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24114",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 323,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24115",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 95,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24121",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 283,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24122",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 377,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24123",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 321,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24124",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 246,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "24125",
+        "year": 2024,
+        "cohort": "strict_historical",
+        "fixtures_total": 154,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25011",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 176,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25012",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 206,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25013",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 279,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25014",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 351,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25021",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 270,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25022",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 398,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25023",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 412,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25024",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 80,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25031",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 354,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25032",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 413,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25033",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 407,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25034",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 116,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25035",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 369,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25041",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 548,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25042",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 476,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25043",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 493,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25044",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 474,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25051",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 461,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25052",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 417,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25053",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 452,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25054",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 324,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25055",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 76,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25061",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 158,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25062",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 65,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25063",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 162,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25064",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 176,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25065",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 38,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25071",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 122,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25072",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 117,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25073",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 148,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25074",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 215,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25075",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 242,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25081",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 253,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25082",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 348,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25083",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 420,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25084",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 441,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25085",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 70,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25091",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 389,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25092",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 119,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25093",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 402,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25094",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 440,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25095",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 532,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25101",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 148,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25102",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 160,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25103",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 414,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25104",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 460,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25105",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 132,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25111",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 345,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25112",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 431,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25113",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 102,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25114",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 308,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25115",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 81,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25121",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 261,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25122",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 338,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25123",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 302,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25124",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 215,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "25125",
+        "year": 2025,
+        "cohort": "strict_historical",
+        "fixtures_total": 131,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26011",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 60,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26012",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 131,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26013",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 41,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26014",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 144,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26015",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 68,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26016",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 219,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26017",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 58,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26018",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 230,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26019",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 91,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26021",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 271,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26022",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 70,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26023",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 269,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26024",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 81,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26025",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 108,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26026",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 63,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26031",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 343,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26032",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 87,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26033",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 317,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26034",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 85,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26035",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 359,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26036",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 112,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26037",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 345,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26038",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 17,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26039",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 74,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26041",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 76,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26042",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 422,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26043",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 69,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26044",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 388,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26045",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 71,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26046",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 372,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26047",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 135,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26048",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 380,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26049",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 52,
+        "fixtures_complete_asof": 0
+      },
+      {
+        "issue_code": "26051",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 393,
+        "fixtures_complete_asof": 728
+      },
+      {
+        "issue_code": "26052",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 393,
+        "fixtures_complete_asof": 212
+      },
+      {
+        "issue_code": "26053",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 334,
+        "fixtures_complete_asof": 1177
+      },
+      {
+        "issue_code": "26054",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 334,
+        "fixtures_complete_asof": 391
+      },
+      {
+        "issue_code": "26055",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 297,
+        "fixtures_complete_asof": 1138
+      },
+      {
+        "issue_code": "26056",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 297,
+        "fixtures_complete_asof": 279
+      },
+      {
+        "issue_code": "26057",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 205,
+        "fixtures_complete_asof": 784
+      },
+      {
+        "issue_code": "26058",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 205,
+        "fixtures_complete_asof": 148
+      },
+      {
+        "issue_code": "26061",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 132,
+        "fixtures_complete_asof": 494
+      },
+      {
+        "issue_code": "26062",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 12,
+        "fixtures_complete_asof": 41
+      },
+      {
+        "issue_code": "26063",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 51,
+        "fixtures_complete_asof": 163
+      },
+      {
+        "issue_code": "26064",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 70,
+        "fixtures_complete_asof": 88
+      },
+      {
+        "issue_code": "26065",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 70,
+        "fixtures_complete_asof": 262
+      },
+      {
+        "issue_code": "26066",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 70,
+        "fixtures_complete_asof": 95
+      },
+      {
+        "issue_code": "26067",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 58,
+        "fixtures_complete_asof": 199
+      },
+      {
+        "issue_code": "26068",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 65,
+        "fixtures_complete_asof": 85
+      },
+      {
+        "issue_code": "26069",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 67,
+        "fixtures_complete_asof": 238
+      },
+      {
+        "issue_code": "26071",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 67,
+        "fixtures_complete_asof": 57
+      },
+      {
+        "issue_code": "26072",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 67,
+        "fixtures_complete_asof": 241
+      },
+      {
+        "issue_code": "26073",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 10,
+        "fixtures_complete_asof": 33
+      },
+      {
+        "issue_code": "26074",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 65,
+        "fixtures_complete_asof": 231
+      },
+      {
+        "issue_code": "26075",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 91,
+        "fixtures_complete_asof": 99
+      },
+      {
+        "issue_code": "26076",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 91,
+        "fixtures_complete_asof": 301
+      },
+      {
+        "issue_code": "26077",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 173,
+        "fixtures_complete_asof": 287
+      },
+      {
+        "issue_code": "26078",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 173,
+        "fixtures_complete_asof": 646
+      },
+      {
+        "issue_code": "26079",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 202,
+        "fixtures_complete_asof": 257
+      },
+      {
+        "issue_code": "26081",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 202,
+        "fixtures_complete_asof": 753
+      },
+      {
+        "issue_code": "26082",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 42,
+        "fixtures_complete_asof": 157
+      },
+      {
+        "issue_code": "26083",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 290,
+        "fixtures_complete_asof": 680
+      },
+      {
+        "issue_code": "26084",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 290,
+        "fixtures_complete_asof": 169
+      },
+      {
+        "issue_code": "26085",
+        "year": 2026,
+        "cohort": "prospective",
+        "fixtures_total": 339,
+        "fixtures_complete_asof": 875
+      }
+    ]
+  },
+  "historical": {
+    "strict_historical_sources_checked": [
+      {
+        "source_id": "beidan_xlsm_archive",
+        "admissible_use": "RETROSPECTIVE_PROXY",
+        "why_not_causal": "market_snapshots carry only label buckets initial/10h/1h/final; no exact observation clock"
+      },
+      {
+        "source_id": "beidan_features",
+        "admissible_use": "UNUSABLE",
+        "why_not_causal": "no observation clock at all (p_open/p_close only)"
+      },
+      {
+        "source_id": "beidan_history",
+        "admissible_use": "SETTLEMENT_ONLY",
+        "why_not_causal": "settlement rows; winning_sp is post-event"
+      },
+      {
+        "source_id": "nowscore_history",
+        "admissible_use": "RETROSPECTIVE_PROXY",
+        "why_not_causal": "third-party change-time archive; not a first-party verifiable fetch clock (contract source priority 4)"
+      },
+      {
+        "source_id": "okooo_prekick",
+        "admissible_use": "RETROSPECTIVE_PROXY",
+        "why_not_causal": "third-party archive; not a verifiable first-party clock"
+      }
+    ],
+    "prospective_source": "beidan_live_500 + bjdc_500_xml_34 (2026-05+)",
+    "prospective_clock": "trusted receive snapshot_ts/fetched_at plus native source_updatetime where supplied",
+    "strict_historical_causal_support": 0,
+    "disposition": "UNRECOVERABLE_HISTORICAL_BJ_SP",
+    "note": "no 2014-2025 source with a native, verifiable pre-event SP observation clock exists; backfill from settlement time, issue number or file mtime is prohibited by contract"
+  },
+  "asof_rule": "asof_latest_complete_pre_kickoff_v1",
+  "build_steps": {
+    "beidan_live": {
+      "fixtures": 5155,
+      "observations": 1495217,
+      "quotes": 4485651,
+      "exclusions": 0
+    },
+    "500_xml34": {
+      "fixtures": 1748,
+      "observations": 1632595,
+      "quotes": 4897785,
+      "exclusions": 0
+    },
+    "bundles": {
+      "batches": 5426,
+      "exclusions": 0
+    },
+    "settlement_history": {
+      "settlements": 38463,
+      "exclusions": 0
+    },
+    "decision_epochs": {
+      "epochs_created": 171796,
+      "fixtures_with_kickoff": 42949,
+      "rule": "asof_latest_complete_pre_kickoff_v1",
+      "max_staleness_seconds": 86400
+    },
+    "asof": {
+      "epochs": 171796,
+      "selected_complete": 12247,
+      "selected_incomplete": 126,
+      "no_observation": 159423,
+      "stale_rejected": 1466368,
+      "post_kickoff_rejected": 8670540,
+      "post_decision_rejected": 637208,
+      "incomplete_lost_explicit": 453
+    },
+    "probabilities": {
+      "probability_rows": 36732
+    },
+    "exclusions": {
+      "exclusion_rows": 38475
+    }
+  },
+  "xlsm_profile": {
+    "path": "/home/drwho1985/workspace/soccer/beijing-lot/data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "size_gb": 6.9,
+    "snapshot_labels": [
+      [
+        "initial",
+        12887754
+      ],
+      [
+        "final",
+        12887754
+      ],
+      [
+        "1h",
+        12887754
+      ],
+      [
+        "10h",
+        12887754
+      ]
+    ],
+    "markets": [
+      [
+        "asian_handicap",
+        14059368
+      ],
+      [
+        "over_under",
+        14059368
+      ],
+      [
+        "euro_1x2",
+        11716140
+      ],
+      [
+        "kelly_1x2",
+        11716140
+      ]
+    ],
+    "issue_range": [
+      "140101",
+      "25042",
+      701
+    ]
+  },
+  "wall_seconds": 474.1
+}
