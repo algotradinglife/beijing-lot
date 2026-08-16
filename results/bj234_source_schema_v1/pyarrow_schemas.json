@@ -1,0 +1,632 @@
+{
+ "source_registry": {
+  "table": "source_registry",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "source_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "provider",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "endpoint",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "acquisition_method",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "terms_status",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "timezone",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "clock_semantics",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "cadence_seconds",
+    "type": "int64",
+    "nullable": true,
+    "arrow": "pa.int64()"
+   },
+   {
+    "name": "parser_version",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "admissible_use",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "first_usable_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": true,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "last_usable_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": true,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "raw_content_sha256",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "coverage_grade",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "notes",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "ingestion_batch": {
+  "table": "ingestion_batch",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "batch_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "source_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "requested_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "received_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "raw_uri",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "raw_sha256",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "parser_version",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "row_count",
+    "type": "int64",
+    "nullable": false,
+    "arrow": "pa.int64()"
+   },
+   {
+    "name": "status",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "bookmaker": {
+  "table": "bookmaker",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "bookmaker_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "canonical_name",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "source_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "team": {
+  "table": "team",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "team_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "canonical_name",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "team_alias": {
+  "table": "team_alias",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "alias_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "source_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "source_team_key",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "team_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "valid_from_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "valid_to_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": true,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   }
+  ]
+ },
+ "competition": {
+  "table": "competition",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "competition_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "canonical_name",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "competition_alias": {
+  "table": "competition_alias",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "alias_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "source_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "source_competition_key",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "competition_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "valid_from_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "valid_to_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": true,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   }
+  ]
+ },
+ "fixture": {
+  "table": "fixture",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "fixture_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "issue_code",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "match_idx",
+    "type": "int64",
+    "nullable": false,
+    "arrow": "pa.int64()"
+   },
+   {
+    "name": "source_match_key",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "competition_id",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "home_team_id",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "away_team_id",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "kickoff_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "native_handicap_line",
+    "type": "float64",
+    "nullable": true,
+    "arrow": "pa.float64()"
+   },
+   {
+    "name": "sale_cutoff_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": true,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "identity_status",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "decision_epoch": {
+  "table": "decision_epoch",
+  "namespace": "capture",
+  "fields": [
+   {
+    "name": "decision_epoch_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "issue_code",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "decision_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "rule_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "roster_version",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "market_observation": {
+  "table": "market_observation",
+  "namespace": "inference",
+  "fields": [
+   {
+    "name": "observation_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "fixture_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "source_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "market_type",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "handicap_line",
+    "type": "float64",
+    "nullable": true,
+    "arrow": "pa.float64()"
+   },
+   {
+    "name": "observed_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "received_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "snapshot_kind",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "batch_id",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "market_quote": {
+  "table": "market_quote",
+  "namespace": "inference",
+  "fields": [
+   {
+    "name": "quote_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "observation_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "bookmaker_id",
+    "type": "string",
+    "nullable": true,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "outcome_code",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "decimal_odds",
+    "type": "float64",
+    "nullable": false,
+    "arrow": "pa.float64()"
+   },
+   {
+    "name": "quote_status",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "probability_estimate": {
+  "table": "probability_estimate",
+  "namespace": "inference",
+  "fields": [
+   {
+    "name": "estimate_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "fixture_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "decision_epoch_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "estimator_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "target_market",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "handicap_line",
+    "type": "float64",
+    "nullable": true,
+    "arrow": "pa.float64()"
+   },
+   {
+    "name": "outcome_code",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "probability",
+    "type": "float64",
+    "nullable": false,
+    "arrow": "pa.float64()"
+   },
+   {
+    "name": "uncertainty",
+    "type": "float64",
+    "nullable": true,
+    "arrow": "pa.float64()"
+   },
+   {
+    "name": "observed_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "calibration_version",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "provenance_hash",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ },
+ "settlement": {
+  "table": "settlement",
+  "namespace": "settlement",
+  "fields": [
+   {
+    "name": "settlement_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "fixture_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "result_code",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   },
+   {
+    "name": "winning_sp",
+    "type": "float64",
+    "nullable": true,
+    "arrow": "pa.float64()"
+   },
+   {
+    "name": "settled_at_utc",
+    "type": "timestamp[us, tz=UTC]",
+    "nullable": false,
+    "arrow": "pa.timestamp('us', tz='UTC')"
+   },
+   {
+    "name": "source_id",
+    "type": "string",
+    "nullable": false,
+    "arrow": "pa.string()"
+   }
+  ]
+ }
+}

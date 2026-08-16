@@ -1,0 +1,132 @@
+{
+ "audit_mode": "candidate",
+ "built_at_utc": "2026-08-16T04:45:58.227335+00:00",
+ "code_hash": "47525aaa0fc9a917aca481d533522fcba4f29dfb91eb113bc395bdbb4d88c991",
+ "contract_version": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001/v1",
+ "ddl_sha256": "62d246291a8238592cb944576579ce0a09a836f4d99cb488b7572c6285ec5cf0",
+ "disposition": "FROZEN_CONTRACT",
+ "environment": {
+  "numpy": "2.4.6",
+  "pandas": "3.0.3",
+  "pyarrow": "24.0.0"
+ },
+ "notebook_hash": "b4f87a4891a8ced44afe67c97cda7aed7c04e7d0609bb2652ed717c1aef4418b",
+ "notebook_hash_mode": "semantic_source_cells_v1",
+ "producer_commit_sha": "4747b60d6d21cae9b5756ca90a34771642c69abf",
+ "profile_summary": {
+  "500_bjdc.sqlite": {
+   "identity_dup": null,
+   "journal_mode": "wal",
+   "size_mb": 17032.3,
+   "tables": [
+    "adhoc_betting_request_ledger",
+    "fetch_log",
+    "issues",
+    "live_market_sp_snapshots",
+    "live_sp_snapshots",
+    "live_workflow_runs",
+    "live_workflow_steps",
+    "llm_decision_snapshots",
+    "market_sp_capture_batches",
+    "match_details_500",
+    "match_intel_digest",
+    "match_intel_sources",
+    "matches",
+    "multimarket_settlement_truth",
+    "natural_day_segment_publications",
+    "nowscore_bjdc_matches",
+    "nowscore_match_details",
+    "operations_alert_lifecycle",
+    "postmatch_review_issue_summary",
+    "postmatch_review_runs",
+    "postmatch_reviews",
+    "segment_decision_refresh_runs",
+    "segment_decision_windows",
+    "segment_recovery_publications",
+    "segment_recovery_windows",
+    "source_meta"
+   ]
+  },
+  "beidan_features.db": {
+   "identity_dup": "ERR",
+   "journal_mode": "delete",
+   "size_mb": 47.2,
+   "tables": [
+    "matches"
+   ]
+  },
+  "beidan_history.db": {
+   "identity_dup": 0,
+   "journal_mode": "delete",
+   "size_mb": 6.8,
+   "tables": [
+    "historical_matches",
+    "scrape_log"
+   ]
+  },
+  "beidan_live.db": {
+   "identity_dup": 0,
+   "journal_mode": "wal",
+   "size_mb": 261.9,
+   "tables": [
+    "matches",
+    "settlements",
+    "snapshots"
+   ]
+  },
+  "beidan_xlsm.sqlite": {
+   "identity_dup": 1,
+   "journal_mode": "delete",
+   "size_mb": 6872.9,
+   "tables": [
+    "action_candidates",
+    "action_definitions",
+    "exotic_odds",
+    "issue_list",
+    "line_lookup",
+    "market_consensus",
+    "market_snapshots",
+    "match_features",
+    "matches",
+    "official_500_settlements",
+    "outcome_features",
+    "source_meta"
+   ]
+  }
+ },
+ "raw_archive_hashes": {
+  "raw/beidan_full_3sp.csv": "e7256d96a34c2f41ede349c87b9cd1efc7a61b104657a657367daf9dd54ee8e2",
+  "raw/beidan_history_user.csv": "dfe2fe9860ad87ac13118f8457a53cb182c6ce8d07380da513471e08a59a5aef",
+  "raw/football-data/sample_files": [
+   "2021_D1.csv",
+   "2021_E0.csv",
+   "2021_F1.csv",
+   "2021_I1.csv",
+   "2021_SP1.csv",
+   "2122_D1.csv"
+  ]
+ },
+ "schema_sha256": "765259c2964ac113a56be0bf02667c6d4078d5bb15b8a38bdc2794303eea8ded",
+ "sha256sums": {
+  "README.md": "e69e07e8f01336c7a53d8bccdb3e8c9b81b94fe050396ac58a403c82fc21b2a3",
+  "SHA256SUMS.json": "c092c405d7768e2820d118c89443accca8add877427253a72c909cb5072ef4b1",
+  "contract.json": "0aee97590798590da36450da0d608a7cae47d57eb6fd6ad7b5aa39155f956cf6",
+  "domain_dictionary.csv": "53299af7d360045c8b9ca0a02c724b40b1619909cfbf47efb863f1a7421af3ee",
+  "identity_crosswalk.csv": "94f41a7ba1fd31a7b0641fe2b9b50d0f2762cadcd9e6708e6fb7f59ab8cc8896",
+  "identity_rule.json": "3381284fc5f7479befabc246e8c8ed6b00d8f9a85e52b08c9c7fc22f80446608",
+  "profile.json": "dff44e25175c7656b8119d544ccf9bf6ce72864a9ed8cb6d66d8bb4145d4e18a",
+  "pyarrow_schemas.json": "0fb8228007e386b87cec10159a92a2361b8eaa0c8e287f458996d5fdde788dc6",
+  "replacement_plan.json": "d293b5b2a7ecd6d83d64eeb6431575f7ba05b7d7f77943abffda7784a91662f2",
+  "schema.sql": "62d246291a8238592cb944576579ce0a09a836f4d99cb488b7572c6285ec5cf0",
+  "source_clock_classification.csv": "c7dbd5cbeb87cbd5c97505ed0e0c6441a86f40097b8098f8c722d009f4aa29d4",
+  "source_feasibility_matrix.csv": "1483550f95152fb59dcf505cf2b8e39cf4a2252160e30b35449ae0450d36c720"
+ },
+ "source_hashes": {
+  "results/bj203_causal_tensor_v2/MANIFEST.json": "52051e510f29194727950a561d16c65ba376bd4b45c4bd1fb09bf9672a975804",
+  "results/bj203_causal_tensor_v2/schema.json": "bc3c05669fd5b625284d5bc32491b477f250f017947751264b86bfe0c60ebb72",
+  "results/bj214_decision_epoch_tensor_v1/MANIFEST.json": "d529dfbbe1a1aadab8f8135962cca8075ab255df26856fa78c3f9fee27112432",
+  "results/bj214_decision_epoch_tensor_v1/schema.json": "e6fce49bd9e95a3e2edfda039f9dff99a3881229f32b50568290310bd9a01762",
+  "results/bj229_divergence_profile_v1/MANIFEST.json": "59d476e367c8d939db9726cfd03853c39b9b814527eedfbb78a57238382516c1",
+  "results/bj229_divergence_profile_v1/SHA256SUMS.json": "a3e00141be882e1058f0d4a29a83be6790c2446834cd55256de404c3cbd5f7f7"
+ }
+}

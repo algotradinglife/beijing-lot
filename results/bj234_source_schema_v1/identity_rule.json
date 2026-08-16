@@ -1,0 +1,11 @@
+{
+ "alias_requirement": "every source key binds via alias tables; silent fuzzy matching prohibited",
+ "example": "fix_25041_1_15302337593b03c6",
+ "identity_status": [
+  "CANONICAL",
+  "ALIAS_RESOLVED",
+  "UNRESOLVED"
+ ],
+ "rule": "fixture_id = fix_{issue_code}_{match_idx}_{sha256(issue:match)[:16]}",
+ "unique_within": "issue_code x match_idx"
+}

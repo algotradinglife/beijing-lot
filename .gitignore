@@ -31,6 +31,8 @@ results/*
 !results/issue-206/**
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
+!results/bj234_source_schema_v1/
+!results/bj234_source_schema_v1/**
 runs/
 .cache/
 tmp/
@@ -46,6 +48,8 @@ temp/
 !results/issue-206/*.parquet
 !results/bj229_divergence_profile_v1/**/*.csv
 !results/bj229_divergence_profile_v1/**/*.parquet
+!results/bj234_source_schema_v1/**/*.csv
+!results/bj234_source_schema_v1/**/*.parquet
 *.feather
 *.h5
 *.hdf5
@@ -117,3 +121,6 @@ evidence/bj_freeze_review_001/.publish.lock
 # BJ-N7-COMPRESS-001: audited, outcome-free projection committed for blind freeze.
 !evidence/bj_n7_compress_001/
 !evidence/bj_n7_compress_001/**
+
+# venv symlink to workspace interpreter — never commit
+.venv

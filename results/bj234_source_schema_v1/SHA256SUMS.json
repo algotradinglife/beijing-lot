@@ -1,0 +1,14 @@
+{
+ "README.md": "e69e07e8f01336c7a53d8bccdb3e8c9b81b94fe050396ac58a403c82fc21b2a3",
+ "SHA256SUMS.json": "15d9ba534f09b50d7993e848859c65d2ad71641aedf9e9803e540b5d4bda3925",
+ "contract.json": "0aee97590798590da36450da0d608a7cae47d57eb6fd6ad7b5aa39155f956cf6",
+ "domain_dictionary.csv": "53299af7d360045c8b9ca0a02c724b40b1619909cfbf47efb863f1a7421af3ee",
+ "identity_crosswalk.csv": "94f41a7ba1fd31a7b0641fe2b9b50d0f2762cadcd9e6708e6fb7f59ab8cc8896",
+ "identity_rule.json": "3381284fc5f7479befabc246e8c8ed6b00d8f9a85e52b08c9c7fc22f80446608",
+ "profile.json": "dff44e25175c7656b8119d544ccf9bf6ce72864a9ed8cb6d66d8bb4145d4e18a",
+ "pyarrow_schemas.json": "0fb8228007e386b87cec10159a92a2361b8eaa0c8e287f458996d5fdde788dc6",
+ "replacement_plan.json": "d293b5b2a7ecd6d83d64eeb6431575f7ba05b7d7f77943abffda7784a91662f2",
+ "schema.sql": "62d246291a8238592cb944576579ce0a09a836f4d99cb488b7572c6285ec5cf0",
+ "source_clock_classification.csv": "c7dbd5cbeb87cbd5c97505ed0e0c6441a86f40097b8098f8c722d009f4aa29d4",
+ "source_feasibility_matrix.csv": "1483550f95152fb59dcf505cf2b8e39cf4a2252160e30b35449ae0450d36c720"
+}

@@ -1,0 +1,76 @@
+{
+ "admissible_use_classes": [
+  "STRICT_CAUSAL",
+  "RETROSPECTIVE_PROXY",
+  "SETTLEMENT_ONLY",
+  "UNUSABLE"
+ ],
+ "canonical_identity": {
+  "alias_requirement": "every source key binds via alias tables; silent fuzzy matching prohibited",
+  "example": "fix_25041_1_15302337593b03c6",
+  "identity_status": [
+   "CANONICAL",
+   "ALIAS_RESOLVED",
+   "UNRESOLVED"
+  ],
+  "rule": "fixture_id = fix_{issue_code}_{match_idx}_{sha256(issue:match)[:16]}",
+  "unique_within": "issue_code x match_idx"
+ },
+ "clock_semantics": [
+  "NATIVE_PROVEN",
+  "TRUSTED_FETCH",
+  "LABELED_RELATIVE",
+  "FILE_MTIME",
+  "ABSENT"
+ ],
+ "contract_version": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001/v1",
+ "frozen_at_utc": "2026-08-16T00:00:00Z",
+ "outcome_codes": [
+  "3",
+  "1",
+  "0"
+ ],
+ "snapshot_kinds": [
+  "RAW_CAPTURE",
+  "RECOVERED_ARCHIVE",
+  "PROXY_LABEL",
+  "SETTLEMENT_CROSSCHECK"
+ ],
+ "source_families": {
+  "F1_BJ_FIRST_PARTY": {
+   "name": "Beijing first-party current fixtures / native handicap / instant SP",
+   "note": "Beijing Sports Lottery official interface; prospective capture with raw payload + trusted fetch clock."
+  },
+  "F2_INTERNAL_ARCHIVE": {
+   "name": "Existing internal historical workbooks/databases + recoverable raw archives",
+   "note": "Historical causality only when source clock provenance demonstrated."
+  },
+  "F3_EU_TIMESTAMPED": {
+   "name": "Timestamped European bookmaker feeds",
+   "note": "The Odds API historical snapshots (2020+, paid) and equivalent licensed providers; verify league/event coverage, timestamp, bookmaker, market."
+  },
+  "F4_FOOTBALL_DATA_CSV": {
+   "name": "Football-Data historical CSV",
+   "note": "Results/open-or-close odds proxy only where timestamp semantics insufficient; never decision-epoch truth."
+  },
+  "F5_RESULTS_POWER": {
+   "name": "Internal match results + accepted public football data",
+   "note": "Causal team/league power features; explicit competition coverage and identity mapping required."
+  }
+ },
+ "tables": [
+  "source_registry",
+  "ingestion_batch",
+  "bookmaker",
+  "team",
+  "team_alias",
+  "competition",
+  "competition_alias",
+  "fixture",
+  "decision_epoch",
+  "market_observation",
+  "market_quote",
+  "probability_estimate",
+  "settlement"
+ ]
+}

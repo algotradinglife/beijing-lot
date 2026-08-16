@@ -1,0 +1,57 @@
+{
+ "acceptance_binding": {
+  "REQ-DS01": "source_feasibility_matrix.csv (classification with evidence)",
+  "REQ-DS02": "fixture UNIQUE(issue_code, match_idx) + identity_crosswalk.csv",
+  "REQ-DS03": "market_observation.observed_at_utc vs received_at_utc vs fixture.kickoff_at_utc vs decision_epoch.decision_at_utc distinct columns with domain dictionary notes",
+  "REQ-DS04": "market_quote UNIQUE(observation_id, outcome_code) + CHECK outcome_code IN ('3','1','0')",
+  "REQ-DS05": "physical namespaces: capture / inference / settlement tables separate; settlement table physically separate",
+  "REQ-DS06": "SQLite WAL + PyArrow; scale/concurrency justification above",
+  "REQ-DS07": "MANIFEST.json + SHA256SUMS.json binding machine-readable outputs and source hashes",
+  "REQ-DS08": "handoff section in replacement_plan.md names exact interfaces for #235/#236/#237/#238"
+ },
+ "concurrency_justification": {
+  "engine": "SQLite WAL",
+  "rationale": "one-writer append-only capture/control tables; WAL allows concurrent readers during writes; measured 262 MB live DB with 1.49M snapshots operates fine today",
+  "research_snapshots": "immutable partitioned Parquet read by pandas/PyArrow \u2014 no JSON-blob probability vectors",
+  "scale_measurements": {
+   "beidan_live_db_size_mb": 262,
+   "decision": "Do not introduce a new service/database until measured concurrency requires it (issue contract).",
+   "snapshot_rows": 1494539,
+   "xlsm_snapshot_rows": 51551016
+  }
+ },
+ "contract": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001/v1",
+ "principle": "AGENTS.md principle 1 \u2014 no backward-compat tax. Obsolete ambiguous schemas are removed from the accepted interface, not wrapped in compatibility layers.",
+ "replaced_schemas": [
+  {
+   "legacy": "beidan_xlsm.sqlite market_snapshots.snapshot column",
+   "migration": "none \u2014 legacy column is not part of the canonical interface",
+   "problem": "holds labels (initial/10h/1h/final) not timestamps; cannot satisfy REQ-DS03 exact observed_at semantics",
+   "replacement": "market_observation.observed_at_utc (exact) OR snapshot_kind='PROXY_LABEL' with NULL observed_at and explicit proxy namespace"
+  },
+  {
+   "legacy": "beidan_features.db matches.kickoff mixed formats",
+   "migration": "none \u2014 parsed only into canonical fixture when identity resolves; otherwise UNRESOLVED",
+   "problem": "time-only strings ('08:00:00') sort before dates; no tz binding",
+   "replacement": "fixture.kickoff_at_utc (ISO-8601 Z, UTC)"
+  },
+  {
+   "legacy": "beidan_history.db historical_matches (no settled ts)",
+   "migration": "none \u2014 SETTLEMENT_ONLY rows are re-derived by #235/#238 from raw archives where clock exists, else excluded",
+   "problem": "settlement rows have no settled_at column; cannot distinguish settlement time from kickoff",
+   "replacement": "settlement.settled_at_utc + result_code + source_id"
+  },
+  {
+   "legacy": "beidan_xlsm.sqlite matches NULL issue/match_idx (2560 rows)",
+   "migration": "none \u2014 orphan rows are not migrated, they are rejected by the canonical constraint",
+   "problem": "identity broken; REQ-DS02 unique (issue, match_idx) violated",
+   "replacement": "fixture requires issue_code+match_idx NOT NULL with UNIQUE constraint; unresolved rows excluded"
+  },
+  {
+   "legacy": "probability vectors stored as wide columns (p_close_3/1/0, sp_3/1/0)",
+   "migration": "none \u2014 wide columns are not part of the canonical interface",
+   "problem": "not long-form; risks column-order drift and partial triplets",
+   "replacement": "market_quote / probability_estimate long-form outcome_code-scalar rows with UNIQUE (observation, outcome_code)"
+  }
+ ]
+}
