@@ -6,7 +6,7 @@
 
 - Branch: `engineer/bj250-rework-r1`, updating PR #255.
 - Base: `engineer/bj234-issue`.
-- Delivery HEAD: populated by the delivery commit.
+- Delivery HEAD: `b4bf700ce75f41c47b28b339ae99f4bb895c8a9f`.
 - Evidence package: `results/bj250_source_census_v2`.
 - Executed notebook: `notebooks/research/issue-250/bj250_source_census.ipynb`.
 - R4 same-class sweep: `docs/research/issue_250_r4_rework_audit.md`.
