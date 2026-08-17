@@ -1,0 +1,22 @@
+{
+  "MANIFEST.json": "6ca2cf6ad95ce00ea60c0672a60979f84beda0d4e2f8644bfaf039ccf7c11c04",
+  "REPORT.md": "3453da017e7a032d2720b991da62aa5c2425c790fbbefd6134901a6dbcfc4a63",
+  "evidence/req_sc_evidence.csv": "e6e50fb690f0490bbe5089630aaadbd10d3777d19c05dec1ec4aea4591bd577c",
+  "figures/m_per_issue.svg": "e735337a57f105970aa54b7b901e6eca8683b87a0e3f268cd40f29965c4c785b",
+  "figures/source_feature_heatmap.svg": "7bc232f38c7e71fad3f92cba41060648f9f5e202ff0351978847cf679db27104",
+  "figures/time_issue_coverage.svg": "28d56dbc16fd58645333efde3c0e3871e4124b9b4eef6126f3b99d8c6f8cbe7e",
+  "tables/coverage_by_period.csv": "7377794144a7b6ed2a7df30d294a2b43add7936b0f9feb1570545fc9fb6de641",
+  "tables/coverage_by_source.csv": "d066c2222236209eeb138c4fadb752bde9ff8cef039cb61b6951ecc87975ecbb",
+  "tables/duplicate_profile.csv": "b73ae38ace749a404185a3b8664a0d7d7600a089aaabc532c64941be9f1b4359",
+  "tables/field_inventory.csv": "9cbeccd64abdf33bc14277026ec1e48483433174a28e60791da6a0533a5422f3",
+  "tables/field_profile.csv": "ce96eda0ddf0ce3491c8d90649eec4144e1fcd74d06fe6995c38923b2721bc9d",
+  "tables/hist40_scope_overrides.csv": "f513218d53a83d201d12fb6c861fe22b3197de37cb5dadd698aaadc4bdd156f2",
+  "tables/intersection_levels.csv": "afac45d59d2db923f705ee622a4d7ec1576540472fd4e880938371361292e892",
+  "tables/m_per_issue_distribution.csv": "1e2cc9722c189d44cfe91e69bbc26504f0cc4a63fad51517296c79b8a0f3bed2",
+  "tables/proxy_coverage_by_period.csv": "998065c16456d72e33d9babec41abfc9921d53f69ed9f65427bbac664b425764",
+  "tables/proxy_surface_profile.csv": "863ce1670774a71096862747e1a780501ffc222a9c1dd7c1aa8680081b375855",
+  "tables/source_feature_availability.csv": "a4b3f4fcf582a0241c7a44a43e984d0ad04b8ef8ad79b5d33f64c56307ef9e6f",
+  "tables/source_inventory.csv": "9973e7a6e78af53713eeb6ccb3fef916d308bf342db2e9892ab5cc82081fc317",
+  "tables/source_role_matrix.csv": "71102db5599eacf9a35f5c3c2d683fd8c7f5bd83341692e48f619808dd56bb50",
+  "tables/unresolved_question_ledger.csv": "add6d301619bd9b8ec951a167a03100553e997b4eb595b71a93913c9cc23e1a9"
+}
