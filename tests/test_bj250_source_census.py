@@ -51,9 +51,51 @@ def test_lineage_deduplicates_same_root() -> None:
     assert rows[1]["independent_evidence"] is False
 
 
-def test_clean_fixture_verifies(tmp_path: Path) -> None:
+def test_p34_capture_full_match_key_uses_row_idx_not_playid() -> None:
+    columns = {"issue", "playid", "row_idx", "fetched_at", "match_id", "outcome_code"}
+    assert census.capture_match_key_columns(columns) == ("issue", "fetched_at", "row_idx")
+
+
+def test_historical_proxy_role_fails_closed_without_profiled_proxy_surface() -> None:
+    spec = next(item for item in census.SOURCES if item.source_id == "beidan_xlsm")
+    assert census.role_from_profile(
+        spec,
+        coverage_status="TABLE_MISSING",
+        usable_proxy_triplets=0,
+        source_clock_complete=False,
+        capture_clock_complete=False,
+    ) == "RECOVER"
+    assert census.role_from_profile(
+        spec,
+        coverage_status="PROFILED",
+        usable_proxy_triplets=0,
+        source_clock_complete=False,
+        capture_clock_complete=False,
+    ) == "RAW_ONLY"
+
+
+@pytest.mark.parametrize("table,column", [
+    ("official_500_settlements", "sp_home"),
+    ("match_features", "official_sp_3"),
+    ("match_features", "winning_sp"),
+    ("match_features", "finalsp"),
+    ("final_results", "home"),
+    ("settlements", "sp_home"),
+    ("outcome_features", "euro_final_p"),
+    ("matches", "is_winner"),
+    ("action_candidates", "net_return"),
+    ("matches", "total_goals"),
+    ("matches", "result_label"),
+])
+def test_terminal_and_final_sp_fields_are_never_inference_admissible(table: str, column: str) -> None:
+    assert census.field_admissible_use(table, column) == "SETTLEMENT_ONLY"
+
+
+def test_clean_fixture_requires_and_accepts_external_anchor(tmp_path: Path) -> None:
     package = census.build_fixture_package(tmp_path / "package")
-    assert census.verify_package(package)["verified"] is True
+    assert census.verify_package(package)["verified"] is False
+    assert census.verify_package(package)["problems"] == ["external trusted anchor required"]
+    assert census.verify_package(package, trusted_anchor=census.package_anchor(package))["verified"] is True
 
 
 @pytest.mark.parametrize(
@@ -103,3 +145,20 @@ def test_remanifested_manifest_issue_tamper_fails(tmp_path: Path) -> None:
     verdict = census.verify_package(attacked)
     assert verdict["verified"] is False
     assert "manifest issue mismatch" in verdict["problems"]
+
+
+def test_re_signed_manifest_attack_requires_external_trusted_anchor(tmp_path: Path) -> None:
+    package = census.build_fixture_package(tmp_path / "package")
+    anchor = census.package_anchor(package)
+    attacked = tmp_path / "attacked"
+    shutil.copytree(package, attacked)
+    artifact = attacked / "tables" / "intersection_levels.csv"
+    artifact.write_text(artifact.read_text(encoding="utf-8").replace("RAW_PRESENT", "FORGED_PRESENT", 1), encoding="utf-8")
+    manifest_path = attacked / "MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["semantic_hashes"]["tables/intersection_levels.csv"] = census.sha256_file(artifact)
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+    _remanifest(attacked)
+    verdict = census.verify_package(attacked, trusted_anchor=anchor)
+    assert verdict["verified"] is False
+    assert "trusted anchor mismatch: tables/intersection_levels.csv" in verdict["problems"]

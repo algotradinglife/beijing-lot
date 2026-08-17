@@ -25,7 +25,45 @@ HIST40_RELEASE = {
     "manifest_sha256": "ed16b29626b4af70e80cdfee3130d6d5e89cd79d09e06110d4d55570e217cdc8",
     "archive_sha256": "7de5e20d0a3b2185bcaf8e4229544c28100cd2d29c9cc315adbc6afe48f4a38d",
 }
-LABEL_TOKENS = ("result", "score", "winning", "settle", "payout", "hit", "profit", "roi", "fthg", "ftag")
+LABEL_TOKENS = (
+    "result", "score", "winning", "settle", "payout", "hit", "profit", "roi",
+    "fthg", "ftag", "official_sp", "final", "halftime", "half_", "total_goals",
+    "winner", "return",
+)
+TERMINAL_TABLES = {"official_500_settlements", "action_candidates"}
+
+
+def field_admissible_use(table: str, column: str, *, source_role: str | None = None) -> str:
+    """Classify every physical field before a source-level role can be consumed.
+
+    This is deliberately fail-closed for result-derived/final-price surfaces.  It
+    is an assessment lane, not a feature-schema or temporal-policy decision.
+    """
+    table_name, field = table.lower(), column.lower()
+    if source_role in {"EXCLUDE", "RECOVER"}:
+        return source_role
+    if source_role == "SETTLEMENT_ONLY" or table_name in TERMINAL_TABLES or any(token in table_name for token in ("settle", "result")):
+        return "SETTLEMENT_ONLY"
+    if any(token in field for token in LABEL_TOKENS):
+        return "SETTLEMENT_ONLY"
+    if source_role in {"RAW_ONLY", "MUTABLE_UNFROZEN"}:
+        return "RAW_ONLY"
+    return "HISTORICAL_PROXY_CANDIDATE"
+
+
+def capture_match_key_columns(columns: set[str]) -> tuple[str, ...]:
+    """p34 snapshot match identity; playid is a play type, never a match key."""
+    required = ("issue", "fetched_at", "row_idx")
+    return required if all(column in columns for column in required) else ()
+
+
+def _capture_logical_match_key_columns(columns: set[str]) -> tuple[str, ...]:
+    required = ("issue", "row_idx")
+    return required if all(column in columns for column in required) else ()
+
+
+def _key_expr(columns: tuple[str, ...]) -> str:
+    return " || '|' || ".join(f"CAST({_q(column)} AS TEXT)" for column in columns)
 
 
 class DataRootError(RuntimeError):
@@ -56,7 +94,7 @@ SOURCES = (
     SourceSpec("beidan_features", "beidan_features.db", "beidan_features", "derived", "identity_schedule_support", "RAW_ONLY", False, "matches", "issue", "match_id", "kickoff", None, None, ("issue", "match_id", "kickoff", "league", "home", "away", "home_id", "away_id", "beidan_hcap", "p_open_3", "p_open_1", "p_open_0", "p_close_3", "p_close_1", "p_close_0", "result_code"), "Identity/schedule support with no accepted source or capture observation clock."),
     SourceSpec("beidan_history", "beidan_history.db", "beidan_history", "derived", "settlement_label_truth", "SETTLEMENT_ONLY", False, "historical_matches", "issue", "match_idx", "kickoff_ts", None, None, ("issue", "match_idx", "kickoff_ts", "league", "home", "away", "handicap_line", "avg_eu_home", "avg_eu_draw", "avg_eu_away", "result_code", "winning_sp"), "Settlement/label truth must remain separate from inference."),
     SourceSpec("beidan_live", "beidan_live.db", "beidan_live", "raw_capture", "strict_forward_candidate", "STRICT_FORWARD_CANDIDATE", True, "matches", "issue", "match_idx", "kickoff_ts", None, "created_ts", ("match_id", "issue", "match_idx", "kickoff_ts", "league", "home", "away", "handicap_line", "created_ts"), "Mutable live collector; its existing clock is capture-only."),
-    SourceSpec("bjdc_500_capture", "derived/500_bjdc/500_bjdc.sqlite", "bjdc_500_capture", "raw_capture", "strict_forward_candidate", "STRICT_FORWARD_CANDIDATE", True, "live_market_sp_snapshots", "issue", "playid", "fetched_at_utc", "source_updated_at_hkt", "fetched_at_utc", ("issue", "playid", "market_key", "fetched_at_utc", "source_updated_at_hkt", "home", "away", "outcome_code", "sp", "sale_cutoff_hkt", "match_id"), "Raw p34 capture: both clocks need complete sealed source receipts before promotion."),
+    SourceSpec("bjdc_500_capture", "derived/500_bjdc/500_bjdc.sqlite", "bjdc_500_capture", "raw_capture", "strict_forward_candidate", "STRICT_FORWARD_CANDIDATE", True, "live_market_sp_snapshots", "issue", "row_idx", "fetched_at", "source_updated_at_hkt", "fetched_at_utc", ("issue", "playid", "row_idx", "market_key", "fetched_at", "source_updated_at_hkt", "fetched_at_utc", "home", "away", "outcome_code", "sp", "sale_cutoff_hkt", "match_id"), "Raw p34 capture: issue+fetched_at+row_idx identifies a snapshot match; playid is the p34 play type, never match identity. Strict promotion needs populated normalized source_updated_at_hkt and fetched_at_utc fields plus a sealed receipt; legacy fetched_at/source_updatetime fields only identify raw snapshot grain."),
     SourceSpec("beidan_modeling_plus", "derived/beidan_xlsm/beidan_modeling_plus_2026.sqlite", "beidan_xlsm", "derived", "derived_copy", "EXCLUDE", False, "matches", "issue", "match_idx", "kickoff_ts", None, None, ("issue", "match_idx", "kickoff_ts"), "Derived copy; not independent source evidence."),
     SourceSpec("beidan_nowscore", "derived/beidan_xlsm/beidan_nowscore_2026.sqlite", "beidan_xlsm", "derived", "derived_copy", "EXCLUDE", False, "matches", "issue", "match_idx", "kickoff_ts", None, None, ("issue", "match_idx", "kickoff_ts"), "Derived copy; not independent source evidence."),
 )
@@ -84,6 +122,22 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def sha256_file(path: Path) -> str:
+    """Public, deterministic digest used by independent anchor construction."""
+    return _sha256(path)
+
+
+def package_anchor(package: Path) -> dict[str, object]:
+    """Create an anchor to be stored outside the mutable package directory."""
+    manifest = json.loads((package / "MANIFEST.json").read_text(encoding="utf-8"))
+    return {
+        "issue": manifest.get("issue"),
+        "semantic_hashes": dict(manifest.get("semantic_hashes", {})),
+        "package": manifest.get("package", ""),
+        "implementation_sha256": manifest.get("implementation_sha256", ""),
+    }
+
+
 def _connect(path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
 
@@ -98,6 +152,19 @@ def _columns(c: sqlite3.Connection, table: str) -> list[tuple[str, str]]:
 
 def _is_label(name: str) -> bool:
     return any(token in name.lower() for token in LABEL_TOKENS)
+
+
+def _field_family(table: str, column: str) -> str:
+    if field_admissible_use(table, column) == "SETTLEMENT_ONLY":
+        return "label_settlement"
+    x = column.lower()
+    if x in {"issue", "match_idx", "playid", "row_idx", "match_id", "home", "away", "home_id", "away_id", "league"}:
+        return "identity_schedule"
+    if "clock" in x or "time" in x or "date" in x or x in {"kickoff", "kickoff_ts", "fetched_at", "fetched_at_utc", "created_ts", "source_updatetime", "source_updated_at_hkt"}:
+        return "timestamp"
+    if "sp" in x or "odds" in x or x.startswith("p_") or x in {"v1", "v2", "v3", "handicap_line", "beidan_hcap"}:
+        return "market_feature"
+    return "other"
 
 
 def _scope(spec: SourceSpec) -> str:
@@ -116,6 +183,30 @@ def strict_forward_role(*, source_clock_complete: bool, capture_clock_complete: 
     if not source_clock_complete or not capture_clock_complete:
         return "RAW_ONLY"
     return "MUTABLE_UNFROZEN" if mutable else "STRICT_FORWARD_CANDIDATE"
+
+
+def role_from_profile(
+    spec: SourceSpec,
+    *,
+    coverage_status: str,
+    usable_proxy_triplets: int,
+    source_clock_complete: bool,
+    capture_clock_complete: bool,
+) -> str:
+    """Return a disposition only when the observed profile supports it."""
+    if coverage_status != "PROFILED":
+        return "RECOVER"
+    if spec.layer == "derived" and spec.lineage_root != spec.source_id:
+        return "EXCLUDE"
+    if spec.lane == "historical_relative_time_proxy":
+        return "HISTORICAL_PROXY" if usable_proxy_triplets > 0 else "RAW_ONLY"
+    if spec.lane == "strict_forward_candidate":
+        return strict_forward_role(
+            source_clock_complete=source_clock_complete,
+            capture_clock_complete=capture_clock_complete,
+            mutable=spec.mutable,
+        )
+    return spec.intended_role
 
 
 def canonical_causal_intersection() -> str:
@@ -164,8 +255,9 @@ def _source_aggregate(c: sqlite3.Connection, spec: SourceSpec, columns: set[str]
         select.append(f"COUNT(DISTINCT {_q(spec.issue_column)}) AS issue_count")
     else:
         select.append("-1 AS issue_count")
-    if spec.issue_column in columns and spec.match_column in columns:
-        select.append(f"COUNT(DISTINCT CAST({_q(spec.issue_column)} AS TEXT) || '|' || CAST({_q(spec.match_column)} AS TEXT)) AS match_count")
+    match_keys = _capture_logical_match_key_columns(columns) if spec.source_id == "bjdc_500_capture" else tuple(key for key in (spec.issue_column, spec.match_column) if key and key in columns)
+    if len(match_keys) >= 2:
+        select.append(f"COUNT(DISTINCT {_key_expr(match_keys)}) AS match_count")
     else:
         select.append("-1 AS match_count")
     for i, field in enumerate(fields):
@@ -175,17 +267,8 @@ def _source_aggregate(c: sqlite3.Connection, spec: SourceSpec, columns: set[str]
     row = {"coverage_status": "PROFILED", "rows": int(values[0]), "issue_count": int(values[1]), "match_count": int(values[2])}
     profiles = []
     for i, field in enumerate(fields):
-        profiles.append({"source_id": spec.source_id, "table": spec.coverage_table, "field": field, "field_family": _field_family(field), "is_label_or_settlement": _is_label(field), "denominator_rows": int(values[0]), "null_or_blank_count": int(values[3 + 2 * i] or 0), "non_null_count": int(values[0]) - int(values[3 + 2 * i] or 0), "impossible_value_count": int(values[4 + 2 * i] or 0), "availability_used_for_role": not _is_label(field)})
+        profiles.append({"source_id": spec.source_id, "table": spec.coverage_table, "field": field, "field_family": _field_family(spec.coverage_table, field), "is_label_or_settlement": _is_label(field), "denominator_rows": int(values[0]), "null_or_blank_count": int(values[3 + 2 * i] or 0), "non_null_count": int(values[0]) - int(values[3 + 2 * i] or 0), "impossible_value_count": int(values[4 + 2 * i] or 0), "availability_used_for_role": not _is_label(field)})
     return row, profiles
-
-
-def _field_family(column: str) -> str:
-    x = column.lower()
-    if x in {"issue", "match_idx", "playid", "match_id", "home", "away", "home_id", "away_id", "league"}: return "identity_schedule"
-    if "clock" in x or "time" in x or "date" in x or x in {"kickoff", "kickoff_ts", "fetched_at", "fetched_at_utc", "created_ts", "source_updatetime", "source_updated_at_hkt"}: return "timestamp"
-    if "sp" in x or "odds" in x or x.startswith("p_") or x in {"v1", "v2", "v3", "handicap_line", "beidan_hcap"}: return "market_feature"
-    if _is_label(column): return "label_settlement"
-    return "other"
 
 
 def _coverage_strata(c: sqlite3.Connection, spec: SourceSpec, columns: set[str]) -> list[dict[str, object]]:
@@ -215,9 +298,9 @@ def _coverage_strata(c: sqlite3.Connection, spec: SourceSpec, columns: set[str])
 
 def _coverage_count_expr(spec: SourceSpec, columns: set[str]) -> tuple[str, str, str]:
     issue = f"COUNT(DISTINCT {_q(spec.issue_column)})" if spec.issue_column in columns else "-1"
-    match = f"COUNT(DISTINCT {_q(spec.match_column)})" if spec.match_column in columns else "-1"
-    cell = "COUNT(*)"
-    return issue, match, cell
+    match_keys = _capture_logical_match_key_columns(columns) if spec.source_id == "bjdc_500_capture" else tuple(key for key in (spec.issue_column, spec.match_column) if key and key in columns)
+    match = f"COUNT(DISTINCT {_key_expr(match_keys)})" if len(match_keys) >= 2 else "-1"
+    return issue, match, "COUNT(*)"
 
 
 def _coverage_row(c: sqlite3.Connection, spec: SourceSpec, columns: set[str], period: str, label: str, predicate: str, scope: str, base: int, expr: tuple[str, str, str]) -> dict[str, object]:
@@ -228,7 +311,7 @@ def _coverage_row(c: sqlite3.Connection, spec: SourceSpec, columns: set[str], pe
 
 def _duplicate_profile(c: sqlite3.Connection, spec: SourceSpec, columns: set[str]) -> dict[str, object]:
     if spec.source_id == "bjdc_500_capture":
-        keys = [key for key in ("issue", "playid", "fetched_at", "outcome_code") if key in columns]
+        keys = [key for key in ("issue", "playid", "fetched_at", "row_idx", "outcome_code") if key in columns]
     else:
         keys = [key for key in (spec.issue_column, spec.match_column) if key and key in columns]
     if len(keys) < 2:
@@ -241,11 +324,18 @@ def _duplicate_profile(c: sqlite3.Connection, spec: SourceSpec, columns: set[str
 
 
 def _m_per_issue(c: sqlite3.Connection, spec: SourceSpec, columns: set[str]) -> list[dict[str, object]]:
+    if spec.source_id == "bjdc_500_capture":
+        logical_keys = _capture_logical_match_key_columns(columns)
+        if not logical_keys:
+            return []
+        scope = _join_scope(_scope(spec), " AND ".join(f"{_q(key)} IS NOT NULL" for key in logical_keys))
+        rows = c.execute(f"SELECT {_q('issue')}, COUNT(DISTINCT {_q('row_idx')}) FROM {_q(spec.coverage_table)}{scope} GROUP BY {_q('issue')} ORDER BY {_q('issue')}").fetchall()
+        return [{"source_id": spec.source_id, "issue": str(issue), "m_matches": int(matches), "semantics": "P34_LOGICAL_MATCHES_BY_ISSUE_AND_ROW_IDX"} for issue, matches in rows]
     if spec.issue_column not in columns or spec.match_column not in columns:
         return []
     scope = _join_scope(_scope(spec), f"{_q(spec.issue_column)} IS NOT NULL AND {_q(spec.match_column)} IS NOT NULL")
     rows = c.execute(f"SELECT {_q(spec.issue_column)}, COUNT(DISTINCT {_q(spec.match_column)}) FROM {_q(spec.coverage_table)}{scope} GROUP BY {_q(spec.issue_column)} ORDER BY {_q(spec.issue_column)}").fetchall()
-    return [{"source_id": spec.source_id, "issue": str(issue), "m_matches": int(matches), "semantics": "P34_CAPTURE_PLAY_COUNT" if spec.source_id == "bjdc_500_capture" else "NATIVE_MATCH_COUNT"} for issue, matches in rows]
+    return [{"source_id": spec.source_id, "issue": str(issue), "m_matches": int(matches), "semantics": "NATIVE_MATCH_COUNT"} for issue, matches in rows]
 
 
 def _snapshot_completeness(c: sqlite3.Connection, spec: SourceSpec) -> list[dict[str, object]]:
@@ -254,9 +344,9 @@ def _snapshot_completeness(c: sqlite3.Connection, spec: SourceSpec) -> list[dict
         rows = c.execute("SELECT snapshot, market, COUNT(*) rows, COUNT(DISTINCT match_id) matches, SUM(CASE WHEN v1 IS NOT NULL AND v2 IS NOT NULL AND v3 IS NOT NULL THEN 1 ELSE 0 END) complete_triplet_rows FROM market_snapshots WHERE snapshot IN ('initial','10h','1h') GROUP BY snapshot, market ORDER BY snapshot, market").fetchall()
         out += [{"source_id": spec.source_id, "field_family": str(r[1]), "bucket": str(r[0]), "denominator_rows": int(r[2]), "denominator_matches": int(r[3]), "complete_outcome_triplet_rows": int(r[4]), "missing_or_invalid_triplet_rows": int(r[2]-r[4]), "semantics": "HISTORICAL_RELATIVE_TIME_PROXY"} for r in rows]
     if spec.source_id == "bjdc_500_capture" and "live_market_sp_snapshots" in tables:
-        rows = c.execute("SELECT COUNT(*) cells, COUNT(DISTINCT issue || '|' || playid || '|' || fetched_at) snapshots, SUM(CASE WHEN sp IS NULL OR sp <= 0 THEN 1 ELSE 0 END) bad_sp FROM live_market_sp_snapshots WHERE market_key='handicap_3way'").fetchone()
-        triples = c.execute("SELECT COUNT(*) FROM (SELECT issue,playid,fetched_at FROM live_market_sp_snapshots WHERE market_key='handicap_3way' GROUP BY issue,playid,fetched_at HAVING COUNT(DISTINCT outcome_code)=3 AND SUM(CASE WHEN sp IS NOT NULL AND sp>0 THEN 1 ELSE 0 END)=3)").fetchone()[0]
-        out.append({"source_id": spec.source_id, "field_family": "p34_sp", "bucket": "observed_capture", "denominator_rows": int(rows[0]), "denominator_matches": int(rows[1]), "complete_outcome_triplet_rows": int(triples), "missing_or_invalid_triplet_rows": int(rows[1]-triples), "semantics": "MUTABLE_UNFROZEN"})
+        rows = c.execute("SELECT COUNT(*) cells, COUNT(DISTINCT issue || '|' || fetched_at || '|' || row_idx) snapshots, SUM(CASE WHEN sp IS NULL OR sp <= 0 THEN 1 ELSE 0 END) bad_sp FROM live_market_sp_snapshots WHERE market_key='handicap_3way'").fetchone()
+        triples = c.execute("SELECT COUNT(*) FROM (SELECT issue, fetched_at, row_idx FROM live_market_sp_snapshots WHERE market_key='handicap_3way' GROUP BY issue, fetched_at, row_idx HAVING COUNT(DISTINCT outcome_code)=3 AND SUM(CASE WHEN sp IS NOT NULL AND sp > 0 THEN 1 ELSE 0 END)=3)").fetchone()[0]
+        out.append({"source_id": spec.source_id, "field_family": "p34_sp", "bucket": "observed_capture", "denominator_rows": int(rows[0]), "denominator_matches": int(rows[1]), "complete_outcome_triplet_rows": int(triples), "missing_or_invalid_triplet_rows": int(rows[1]-triples), "semantics": "MUTABLE_UNFROZEN_SNAPSHOT_KEY_ISSUE_FETCHED_AT_ROW_IDX"})
     return out
 
 
@@ -301,27 +391,76 @@ def _intersections(data_root: Path) -> list[dict[str, object]]:
 
 
 def profile(data_root: Path) -> dict[str, list[dict[str, object]]]:
-    inventory=[]; fields=[]; coverage=[]; periods=[]; duplicates=[]; triplets=[]; m_distribution=[]; schemas=[]
+    inventory: list[dict[str, object]] = []
+    fields: list[dict[str, object]] = []
+    coverage: list[dict[str, object]] = []
+    periods: list[dict[str, object]] = []
+    duplicates: list[dict[str, object]] = []
+    triplets: list[dict[str, object]] = []
+    m_distribution: list[dict[str, object]] = []
+    schemas: list[dict[str, object]] = []
     for spec in SOURCES:
-        path=data_root/spec.relative_path; record=asdict(spec); record.pop("decision_fields"); record.update({"hist40_binding":HIST40_RELEASE["tag"],"assessment_basis":"RECOMPUTED_CHANGED_OR_MUTABLE" if spec.mutable else "INHERITED_R8_AND_REPROFILED","relative_path":spec.relative_path})
+        path = data_root / spec.relative_path
+        record = asdict(spec)
+        record.pop("decision_fields")
+        record.update({"hist40_binding": HIST40_RELEASE["tag"], "assessment_basis": "RECOMPUTED_CHANGED_OR_MUTABLE" if spec.mutable else "INHERITED_R8_AND_REPROFILED", "relative_path": spec.relative_path})
         if not path.exists():
-            record.update({"exists":False,"content_sha256":"","consistency":"MISSING_UNREADABLE","role":"RECOVER","source_clock_complete":False,"capture_clock_complete":False}); inventory.append(record); continue
-        before=path.stat(); c=_connect(path)
+            record.update({"exists": False, "content_sha256": "", "consistency": "MISSING_UNREADABLE", "role": "RECOVER", "source_clock_complete": False, "capture_clock_complete": False})
+            inventory.append(record)
+            continue
+        before = path.stat()
+        connection = _connect(path)
         try:
-            tables=_tables(c); cols={n for n,_ in _columns(c,spec.coverage_table)} if spec.coverage_table in tables else set()
-            aggregate, fp=_source_aggregate(c,spec,cols); fields.extend(fp); coverage.append(dict(aggregate,source_id=spec.source_id,lane=spec.lane)); periods.extend(_coverage_strata(c,spec,cols)); duplicates.append(_duplicate_profile(c,spec,cols)); m_distribution.extend(_m_per_issue(c,spec,cols)); triplets.extend(_snapshot_completeness(c,spec))
+            tables = _tables(connection)
+            columns = {name for name, _ in _columns(connection, spec.coverage_table)} if spec.coverage_table in tables else set()
+            aggregate, source_fields = _source_aggregate(connection, spec, columns)
+            source_triplets = _snapshot_completeness(connection, spec)
+            source_clock_complete = bool(spec.source_clock_column and spec.source_clock_column in columns and next((row["null_or_blank_count"] for row in source_fields if row["field"] == spec.source_clock_column), 1) == 0)
+            capture_clock_complete = bool(spec.capture_clock_column and spec.capture_clock_column in columns and next((row["null_or_blank_count"] for row in source_fields if row["field"] == spec.capture_clock_column), 1) == 0)
+            usable_proxy_triplets = sum(int(row["complete_outcome_triplet_rows"]) for row in source_triplets if row["semantics"] == "HISTORICAL_RELATIVE_TIME_PROXY")
+            role = role_from_profile(
+                spec,
+                coverage_status=str(aggregate["coverage_status"]),
+                usable_proxy_triplets=usable_proxy_triplets,
+                source_clock_complete=source_clock_complete,
+                capture_clock_complete=capture_clock_complete,
+            )
+            fields.extend(source_fields)
+            coverage.append(dict(aggregate, source_id=spec.source_id, lane=spec.lane))
+            periods.extend(_coverage_strata(connection, spec, columns))
+            duplicates.append(_duplicate_profile(connection, spec, columns))
+            m_distribution.extend(_m_per_issue(connection, spec, columns))
+            triplets.extend(source_triplets)
             for table in tables:
-                for ordinal,(name,typ) in enumerate(_columns(c,table),1): schemas.append({"source_id":spec.source_id,"table":table,"ordinal":ordinal,"column":name,"sqlite_type":typ,"field_family":_field_family(name),"label_or_settlement_field":_is_label(name)})
-            src_complete=bool(spec.source_clock_column and spec.source_clock_column in cols and next((r["null_or_blank_count"] for r in fp if r["field"]==spec.source_clock_column),1)==0)
-            cap_complete=bool(spec.capture_clock_column and spec.capture_clock_column in cols and next((r["null_or_blank_count"] for r in fp if r["field"]==spec.capture_clock_column),1)==0)
-        finally: c.close()
-        after=path.stat(); stable=(before.st_size,before.st_mtime_ns)==(after.st_size,after.st_mtime_ns)
-        role=spec.intended_role
-        if spec.intended_role=="STRICT_FORWARD_CANDIDATE": role=strict_forward_role(source_clock_complete=src_complete,capture_clock_complete=cap_complete,mutable=spec.mutable)
-        if spec.layer=="derived" and spec.lineage_root!=spec.source_id: role="EXCLUDE"
-        record.update({"exists":True,"size_bytes":before.st_size,"mtime_ns":before.st_mtime_ns,"content_sha256":"MUTABLE_UNFROZEN_NO_HASH" if spec.mutable else _sha256(path),"consistency":"MUTABLE_UNFROZEN" if spec.mutable else ("CONSISTENT_READ" if stable else "MUTATED_DURING_READ"),"role":role,"source_clock_complete":src_complete,"capture_clock_complete":cap_complete})
+                for ordinal, (name, typ) in enumerate(_columns(connection, table), 1):
+                    schemas.append({
+                        "source_id": spec.source_id,
+                        "table": table,
+                        "ordinal": ordinal,
+                        "column": name,
+                        "sqlite_type": typ,
+                        "field_family": _field_family(table, name),
+                        "label_or_settlement_field": _is_label(name),
+                        "admissible_use": field_admissible_use(table, name, source_role=role),
+                        "terminal_denylisted": field_admissible_use(table, name, source_role=role) == "SETTLEMENT_ONLY",
+                    })
+        finally:
+            connection.close()
+        after = path.stat()
+        stable = (before.st_size, before.st_mtime_ns) == (after.st_size, after.st_mtime_ns)
+        record.update({
+            "exists": True,
+            "size_bytes": before.st_size,
+            "mtime_ns": before.st_mtime_ns,
+            "content_sha256": "MUTABLE_UNFROZEN_NO_HASH" if spec.mutable else _sha256(path),
+            "consistency": "MUTABLE_UNFROZEN" if spec.mutable else ("CONSISTENT_READ" if stable else "MUTATED_DURING_READ"),
+            "role": role,
+            "source_clock_complete": source_clock_complete,
+            "capture_clock_complete": capture_clock_complete,
+            "usable_proxy_triplets": usable_proxy_triplets,
+        })
         inventory.append(record)
-    return {"source_inventory":lineage_decisions(inventory),"field_inventory":schemas,"field_profile":fields,"coverage":coverage,"period_coverage":periods,"duplicate_profile":duplicates,"m_per_issue_distribution":m_distribution,"outcome_triplet_profile":triplets,"intersections":_intersections(data_root)}
+    return {"source_inventory": lineage_decisions(inventory), "field_inventory": schemas, "field_profile": fields, "coverage": coverage, "period_coverage": periods, "duplicate_profile": duplicates, "m_per_issue_distribution": m_distribution, "outcome_triplet_profile": triplets, "intersections": _intersections(data_root)}
 
 
 def _csv(path: Path, rows: list[dict[str, object]]) -> None:
@@ -364,11 +503,25 @@ def rewrite_checksums(package: Path) -> None:
 def _semantic_hash(package: Path, relative: str) -> str:return _sha256(package/relative)
 
 
-def verify_package(package: Path) -> dict[str,object]:
+def verify_package(package: Path, *, trusted_anchor: dict[str, object] | None = None) -> dict[str, object]:
     problems=[]
     try: manifest=json.loads((package/"MANIFEST.json").read_text(encoding="utf-8")); sums=json.loads((package/"SHA256SUMS.json").read_text(encoding="utf-8"))
     except Exception as err:return {"verified":False,"problems":[f"unreadable package: {err}"]}
     if manifest.get("issue")!=ISSUE: problems.append("manifest issue mismatch")
+    if trusted_anchor is None:
+        problems.append("external trusted anchor required")
+    else:
+        if trusted_anchor.get("issue") != ISSUE:
+            problems.append("trusted anchor issue mismatch")
+        if trusted_anchor.get("implementation_sha256", "") != manifest.get("implementation_sha256", ""):
+            problems.append("trusted anchor implementation mismatch")
+        anchored_hashes = trusted_anchor.get("semantic_hashes")
+        if not isinstance(anchored_hashes, dict):
+            problems.append("trusted anchor semantic hashes missing")
+        else:
+            for relative, expected in anchored_hashes.items():
+                if manifest.get("semantic_hashes", {}).get(relative) != expected:
+                    problems.append(f"trusted anchor mismatch: {relative}")
     observed={p.relative_to(package).as_posix():_sha256(p) for p in sorted(package.rglob("*")) if p.is_file() and p.name!="SHA256SUMS.json"}
     if sums!=observed: problems.append("checksum inventory mismatch")
     required=("tables/source_inventory.csv","tables/source_role_matrix.csv","tables/intersection_levels.csv","tables/field_profile.csv","tables/coverage_by_period.csv","tables/m_per_issue_distribution.csv","tables/outcome_triplet_profile.csv")
@@ -394,12 +547,19 @@ def build_package(repo_root: Path,data_root: Path,target: Path|None=None) -> Pat
     evidence=[{"requirement":f"REQ-SC{x:02d}","status":"PI_DECISION_PENDING" if x in {8,15} else "EVIDENCE_PRESENT","evidence":"machine-readable decision tables + report"} for x in range(1,16)]; _csv(stage/"evidence/req_sc_evidence.csv",evidence)
     _simple_svg(stage/"figures/source_feature_heatmap.svg","Source x field-family availability",availability,"source_id","non_null_count"); _simple_svg(stage/"figures/time_issue_coverage.svg","Time/issue coverage",data["period_coverage"],"year_or_range","stratum_rows"); _simple_svg(stage/"figures/m_per_issue.svg","M-per-issue distribution",data["m_per_issue_distribution"],"source_id","m_matches")
     report="# BJ-UNIFIED-SOURCE-CENSUS-001 R2\n\nThis assessment-only package profiles decision fields, label completeness separately, exact time/issue/match/cell denominators, native duplicates, invalid values, p34 triplets, and all four intersection levels. Candidate mappings are explicitly non-authoritative; canonical causal intersection remains deferred to #251/#252. Mutable sources are not frozen conclusions. See tables and `docs/research/issue_250_source_census.md`.\n"; (stage/"REPORT.md").write_text(report,encoding="utf-8")
-    semantic={f"tables/{name}.csv":_semantic_hash(stage,f"tables/{name}.csv") for name in ("source_inventory","source_role_matrix","intersection_levels","field_profile","coverage_by_period","m_per_issue_distribution","outcome_triplet_profile")}
-    manifest={"issue":ISSUE,"package":PACKAGE_NAME,"assessment_only":True,"data_root_supplied":True,"hist40_baseline":HIST40_RELEASE,"logical_sources":len(inventory),"roles":{r["source_id"]:r["role"] for r in inventory},"canonical_causal_intersection":canonical_causal_intersection(),"semantic_hashes":semantic,"implementation_source":"src/source_census/census.py","prohibitions":["no_crawl","no_backfill","no_imputation","no_model","no_roi","no_identity_or_temporal_policy_freeze"]}; (stage/"MANIFEST.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+    semantic = {
+        path.relative_to(stage).as_posix(): _sha256(path)
+        for path in sorted(stage.rglob("*"))
+        if path.is_file() and path.name not in {"MANIFEST.json", "SHA256SUMS.json"}
+    }
+    manifest={"issue":ISSUE,"package":PACKAGE_NAME,"assessment_only":True,"data_root_supplied":True,"hist40_baseline":HIST40_RELEASE,"logical_sources":len(inventory),"roles":{r["source_id"]:r["role"] for r in inventory},"canonical_causal_intersection":canonical_causal_intersection(),"semantic_hashes":semantic,"implementation_source":"src/source_census/census.py","implementation_sha256":_sha256(Path(__file__)),"prohibitions":["no_crawl","no_backfill","no_imputation","no_model","no_roi","no_identity_or_temporal_policy_freeze"]}; (stage/"MANIFEST.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     rewrite_checksums(stage)
-    if package.exists():shutil.rmtree(package)
-    os.replace(stage,package); verdict=verify_package(package)
-    if not verdict["verified"]:raise RuntimeError(str(verdict["problems"]))
+    if package.exists(): shutil.rmtree(package)
+    os.replace(stage, package)
+    # Build-time verification proves only internal consistency. Independent review
+    # must call verify_package with an anchor supplied outside this builder.
+    verdict = verify_package(package, trusted_anchor=package_anchor(package))
+    if not verdict["verified"]: raise RuntimeError(str(verdict["problems"]))
     return package
 
 
