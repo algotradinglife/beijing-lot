@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from source_census.census import build_package, resolve_data_root, verify_package  # noqa: E402
+from source_census.census import PACKAGE_NAME, build_package, resolve_data_root, verify_package  # noqa: E402
 
 
 def main() -> int:
@@ -18,7 +18,7 @@ def main() -> int:
     parser.add_argument("--data-root", type=Path, default=None)
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
-    package = ROOT / "results" / "bj250_source_census_v1"
+    package = ROOT / "results" / PACKAGE_NAME
     if args.verify_only:
         verdict = verify_package(package)
         print(f"VERIFIED={verdict['verified']}")

@@ -1,0 +1,20 @@
+{
+  "MANIFEST.json": "70444174e1e2acde373f450d543aa299c276e29ddf47a3a4177333b298e03876",
+  "REPORT.md": "22be2aa9fe91e7ba49dc684326fc9b69c71c93e0408aeba68a6dd4d2058f9d32",
+  "evidence/req_sc_evidence.csv": "deea81d91c2e21a72a45f528f927331de79e362f56bbf64c78510251643cf288",
+  "figures/m_per_issue.svg": "a9d991c7b28bf6460c3edc01417bf6a7fe2de1db6ff57009cb19e044bdf1288f",
+  "figures/source_feature_heatmap.svg": "3d8feee790b8817fa7d6c3c55b785eff4e519cb165f3a43ea75528b2abc17c3c",
+  "figures/time_issue_coverage.svg": "41c3dcc4e2db1565f3b0c70f2ce264bd4bc926a6b1df419615713ffdb17bb9d0",
+  "tables/coverage_by_period.csv": "189a96741f02a03ce2337609bea3f625ad648877d1cc02373f26beee7e52013e",
+  "tables/coverage_by_source.csv": "d497ae60ec798422b8f9623df14a21f1028a77c8a0171cab12217291d010d603",
+  "tables/duplicate_profile.csv": "81116d0705f87b954c79799363fa018a57413447dccc5fa3889c6a43196c9b04",
+  "tables/field_inventory.csv": "335f69b00caf27d94024b23d08a506b3bbd97847515628d104fcebecdfb210ac",
+  "tables/field_profile.csv": "6f69852df6e82d1dfcc6388d74e4d75a4fa5ff94457df0567d7a4a8d9bb502a4",
+  "tables/intersection_levels.csv": "afac45d59d2db923f705ee622a4d7ec1576540472fd4e880938371361292e892",
+  "tables/m_per_issue_distribution.csv": "b6e26daf8e3b6e519c1caf2a26a63c4d1d46ba9ad0edc0c0efd702e353ca8952",
+  "tables/outcome_triplet_profile.csv": "df7b340a19d08125268c76f4212273be4b7b510954de3627b0cd8d8d426713fb",
+  "tables/source_feature_availability.csv": "c60c24fcba840d6ec5fae401707f77b6553add3476331eae08f342ff9915f854",
+  "tables/source_inventory.csv": "d5ed297258f57ed3dba32bc1498635e55d073cb6c4a3d2c92d19af4b640744a9",
+  "tables/source_role_matrix.csv": "411d644fabb13c3388365b2a2ae074b09c3324ab5b49257f14baf52b0527e21d",
+  "tables/unresolved_question_ledger.csv": "add6d301619bd9b8ec951a167a03100553e997b4eb595b71a93913c9cc23e1a9"
+}

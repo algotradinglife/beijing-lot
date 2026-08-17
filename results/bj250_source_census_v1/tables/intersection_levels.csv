@@ -1,5 +1,0 @@
-authoritative,left_source,level,right_source,value
-True,beidan_xlsm,RAW_PRESENT,beidan_xlsm,initial/10h/1h fields profiled
-False,all,CANONICAL_CAUSAL_INTERSECTION,all,NOT_YET_EVALUATED
-True,beidan_live.matches,NATIVE_KEY_INTERSECTION,bjdc_500_capture.matches,1748
-False,beidan_xlsm,CANDIDATE_MAPPED_RANGE,beidan_features,NOT_COMPUTED_IDENTITY_POLICY_UNFROZEN

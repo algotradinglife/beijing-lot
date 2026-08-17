@@ -1,8 +1,0 @@
-capture_clock_null_count,coverage_status,first_date,issue_count,lane,last_date,match_count,role,rows,source_clock_null_count,source_id
--1,PROFILED,1899-12-30 08:00:00,701,historical_relative_time_proxy,2025-07-13 03:00:00,192709,HISTORICAL_PROXY,195269,-1,beidan_xlsm
--1,PROFILED,08:00:00,701,identity_schedule_support,2025-04-15T08:30:00,-1,RAW_ONLY,190746,-1,beidan_features
--1,PROFILED,2024-01-01 14:00:00,150,settlement_label_truth,2026-12-31 16:00:00,38463,SETTLEMENT_ONLY,38463,-1,beidan_history
-0,PROFILED,2026-04-30T19:30:00,31,strict_forward_candidate,2026-08-18T11:06:00,5155,RAW_ONLY,5155,-1,beidan_live
-1503,PROFILED,2026-07-16T13:05:41+00:00,13,strict_forward_candidate,2026-08-17T08:36:58+00:00,-1,RAW_ONLY,3964461,1503,bjdc_500_capture
--1,PROFILED,1899-12-30 08:00:00,735,derived_copy,2026-07-27 03:15:00,198710,EXCLUDE,201270,-1,beidan_modeling_plus
--1,PROFILED,2025-12-31 00:00:00,34,derived_copy,2026-07-27 03:15:00,6001,EXCLUDE,6001,-1,beidan_nowscore

@@ -1,49 +1,49 @@
-# Issue #250 — BJ-UNIFIED-SOURCE-CENSUS-001
+# Issue #250 — BJ-UNIFIED-SOURCE-CENSUS-001 R2
 
-## Scope and baseline
+## Scope, method, and baseline
 
-This is an assessment-only, incremental source-role decision input. It binds the accepted `HIST-DATA-CENSUS-001` R8 release (`hist-data-census-001-r8`, commit `97a9c0a78d2fce0004cb1240113a070b980403b9`, manifest SHA-256 `ed16b29626b4af70e80cdfee3130d6d5e89cd79d09e06110d4d55570e217cdc8`, archive SHA-256 `7de5e20d0a3b2185bcaf8e4229544c28100cd2d29c9cc315adbc6afe48f4a38d`).
+This is an incremental, assessment-only source-role decision input bound to `HIST-DATA-CENSUS-001 R8` (`hist-data-census-001-r8`, commit `97a9c0a78d2fce0004cb1240113a070b980403b9`, manifest SHA-256 `ed16b296…e217cdc8`). It profiles only seven declared logical source families through the externally supplied `BEIJING_LOT_DATA_ROOT` using URI read-only SQLite connections.
 
-The census opened named SQLite assets read-only through `BEIJING_LOT_DATA_ROOT`. It neither crawled, wrote source data, backfilled, imputed, trained, chose a model, nor read outcome/settlement values for feature admissibility. Tables and columns whose names indicate results, scores, settlement, payout, hit, profit, or ROI are schema-flagged rather than value-profiled.
+No source data was crawled, written, appended, normalized, imputed, backfilled, modeled, or used for profitability/ticket decisions. Labels/settlement fields are profiled separately for completeness and are never inputs to a feature-role decision. Mutable source results are explicitly `MUTABLE_UNFROZEN`, not a frozen conclusion.
 
 ## Decision input
 
-| Logical source | Role | Evidence and decision |
-| --- | --- | --- |
-| `beidan_xlsm` | `HISTORICAL_PROXY` | 192,709 native issue×match rows. `initial`, `10h`, and `1h` each have 12,887,754 rows. These are explicitly relative-time labels, not observation timestamps. Candidate historical p34 proxy backbone only. |
-| `beidan_features` | `RAW_ONLY` | 190,746 rows of schedule/identity support with no accepted observed/capture clock. It may inform later identity investigation, not causal inference. |
-| `beidan_history` | `SETTLEMENT_ONLY` | 38,463 rows. It remains label/settlement truth; never an inference feature source. |
-| `beidan_live` | `RAW_ONLY` | 5,155 mutable rows; its table has a capture clock but no source clock. It is not a strict-forward backbone until a sealed snapshot supplies both clock receipts. |
-| `bjdc_500_capture` | `RAW_ONLY` | 3,964,461 mutable p34 `handicap_3way` capture rows. Both clock fields exist, but 1,503 p34 rows are missing a source clock, so no source-wide strict promotion is permitted. |
-| `beidan_modeling_plus`, `beidan_nowscore` | `EXCLUDE` | Derived copies of `beidan_xlsm`; lineage deduplication prevents them inflating independence or coverage. |
+| Logical source | Disposition | Evidence / routing |
+|---|---|---|
+| `beidan_xlsm` | `HISTORICAL_PROXY` | Historical p34 proxy backbone candidate only. `initial`/`10h`/`1h` carry relative-time bucket semantics, not strict observed-at timestamps. Advance its identity questions to #251. |
+| `beidan_features` | `RAW_ONLY` | Identity/schedule and market-family support; no source/capture observation clock. Advance the proposed-mapping question to #251, not causal inference. |
+| `beidan_history` | `SETTLEMENT_ONLY` | Label/settlement truth. Completeness is measured but it remains outside inference. |
+| `beidan_live` | `RAW_ONLY` | Capture clock is present but source clock is absent; mutable/unfrozen. Advance sealing/clock criteria to #252. |
+| `bjdc_500_capture` | `RAW_ONLY` | p34 `handicap_3way` capture profiled for SP, triplets and clocks. Incomplete clocks and mutable storage prevent strict-forward promotion. Advance sealing/clock criteria to #252. |
+| `beidan_modeling_plus`, `beidan_nowscore` | `EXCLUDE` | Derived from `beidan_xlsm`, deliberately not independent evidence. |
 
-## Required period views
+## Required decision views and exact backing
 
-`tables/coverage_by_period.csv` records four profiling strata—not train/tune/test splits. It shows 16,192 `beidan_xlsm` match rows in calendar 2024, 1,024 from 2025-04 through 2026-04, and no prospective rows. `beidan_live` has 5,154 prospective rows, while the p34-filtered `bjdc_500_capture` table has 3,962,958 prospective capture rows. The full counts and every source's zero/unknown strata are committed rather than summarized only here.
+`results/bj250_source_census_v2/tables/` is the source of every count; all figures have committed CSV backing.
 
-The executed notebook exposes these backing tables together with `source_feature_availability.csv` (source × relative-time/clock availability) and `m_per_issue_distribution.csv`. The package includes the corresponding `figures/coverage_rows.svg` and `figures/m_per_issue.svg`; figures are derived views, never sole evidence.
+- `source_inventory.csv`: source path, layer, lineage, R8 basis, file hash for stable assets, and explicit mutable receipt state.
+- `field_inventory.csv` and `field_profile.csv`: all decision-facing keys, clocks, feature/price and label/settlement fields; denominator, null/blank and impossible-value counts.
+- `coverage_by_period.csv`: source-row denominator plus exact issue/match/cell counts for calendar 2024, 2025-01–03, 2025-04–2026-04, 2026-05 onward, null/unparseable dates, and each individual earlier calendar year actually present. This closes the formerly silent 2025 Q1/null-date gap.
+- `duplicate_profile.csv`: native-key duplicate groups and extra rows (or deterministic unavailable reason).
+- `outcome_triplet_profile.csv`: all `initial`/`10h`/`1h` market families and the p34 capture path, with triplet denominators and missing/invalid counts.
+- `intersection_levels.csv`: exactly the four declared levels. Native intersection is exact only. Candidate mapping gives a non-authoritative lower/upper range measured as `beidan_xlsm` rows having at least one candidate: lower uses issue + normalized home/away + calendar date, upper relaxes date. The canonical causal intersection is `NOT_YET_EVALUATED` pending #251 + #252.
+- `source_role_matrix.csv`: machine-routing has both strict-forward candidates advancing to #252 for sealing/clock criteria even though neither is currently promoted.
 
-## Intersections and lineage
+## Pi/user decision gate
 
-- `RAW_PRESENT`: p34 relative-time `initial`/`10h`/`1h` fields are present in `beidan_xlsm`.
-- `NATIVE_KEY_INTERSECTION`: exact `(issue, match_idx)` overlap between `beidan_live.matches` and `bjdc_500_capture.matches` is 1,748. No proposed mapping was used.
-- `CANDIDATE_MAPPED_RANGE`: not computed because canonical identity policy is intentionally unfrozen.
-- `CANONICAL_CAUSAL_INTERSECTION`: `NOT_YET_EVALUATED`, owned jointly by #251 and #252.
+1. Accept/reject `beidan_xlsm` as disclosed historical proxy backbone.
+2. Decide whether the measured non-authoritative candidate range justifies #251 identity work; it does not authorize a canonical join.
+3. Require #252 to define a sealed source/capture-clock receipt before either live lane can become strict-forward evidence.
+4. Retain `beidan_history` as settlement-only and derived copies as excluded.
+5. Review field-profile / outcome-triplet gap rows to route recovery needs to #235/#236/#237/#248; #250 makes no recovery change.
 
-## Downstream decision requests
-
-1. PI/user: accept or reject `beidan_xlsm` as the explicitly disclosed historical proxy backbone.
-2. #251: determine whether schedule/identity support can resolve candidate mappings; this census does not make or consume them.
-3. #252: define snapshot sealing and source/capture-clock criteria. Neither mutable current database is strict evidence now.
-4. #235/#236/#237/#248: decide whether the missing source-clock receipts and 19,903 incomplete 500-capture clock rows justify targeted recovery. This issue makes no recovery change.
-
-## Reproduction and verification
+## Reproduction and tamper verification
 
 ```bash
-BEIJING_LOT_DATA_ROOT=/path/to/external/data python scripts/build_bj250_source_census.py
+BEIJING_LOT_DATA_ROOT=/path/to/data python scripts/build_bj250_source_census.py
+BEIJING_LOT_DATA_ROOT=/path/to/data python scripts/execute_bj250_notebook.py
 python scripts/build_bj250_source_census.py --verify-only
-BEIJING_LOT_DATA_ROOT=/path/to/external/data python scripts/execute_bj250_notebook.py
 python -m pytest tests/test_bj250_source_census.py -q
 ```
 
-The package verifier checks full checksum closure and semantic bindings: manifest issue, source-inventory trace hash, and exact recomputation of source-role rows. The test suite remanifests role, source-trace, and manifest attacks; all must fail.
+The semantic verifier binds checksum closure and hashes of all decision-bearing tables: inventory, roles, intersections, field profile, time coverage, and outcome-triplet profile. The 13-test adversarial suite mutates each kind of conclusion artifact, the source trace, role decision and manifest while rewriting the checksum inventory; each attack must fail.

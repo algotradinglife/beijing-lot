@@ -1,8 +1,0 @@
-capture_clock_complete,relative_time_proxy_present,role,source_clock_complete,source_id
-False,True,HISTORICAL_PROXY,False,beidan_xlsm
-False,False,RAW_ONLY,False,beidan_features
-False,False,SETTLEMENT_ONLY,False,beidan_history
-True,False,RAW_ONLY,False,beidan_live
-False,False,RAW_ONLY,False,bjdc_500_capture
-False,False,EXCLUDE,False,beidan_modeling_plus
-False,False,EXCLUDE,False,beidan_nowscore
