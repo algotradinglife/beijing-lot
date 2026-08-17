@@ -1,0 +1,10 @@
+{
+  "README.md": "5d1a261ffef68b6e037f9c747a02357a3a18106e507359ad37f7d94443668ca6",
+  "m64_bootstrap.csv": "981aae81e0c10cd3a9dbadfcbda7b166df4f35c71db2cf5feb8a602bb2d9e89c",
+  "m64_issue_metrics.csv": "12b55ffd675960c1bc622df5330aecf0b4f250402e7db56095984653fad4e75e",
+  "m64_scope_metrics.csv": "b3ef7d6507cc6ff0d4d29081dd81436740ea146ad1824ecbfc809999ec2d6b12",
+  "source_census.csv": "1089e3e9dc26db7b91349af768069c48a82fe8340fc31442c616602def057884",
+  "validation_card.json": "0bf3b0efa0105d2de5173bb54bd4357dde00c3d1718097a78a1eecba3d0e812b",
+  "validation_runner.py": "0988ce52992e801ef3847964222703f49dffbf305eedf7c81892796d80430028",
+  "wor_dense_curve.csv": "a1ec269e4f845f737bde2d246bd9a5cb9dc069d2cec323204e88ada66b22a518"
+}

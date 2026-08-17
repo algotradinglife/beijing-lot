@@ -1,0 +1,102 @@
+{
+  "arms": [
+    {
+      "arm": "MARKET_BEST_FULL",
+      "definition": "exact #167 K_ALL COLD_FIRST rank; reproduces BEST_FULL K1",
+      "score_field": "market_percentile"
+    },
+    {
+      "arm": "FUNDAMENTALS_ONLY",
+      "definition": "strict pre-issue-cutoff rolling Elo/form/rest confidence",
+      "score_field": "fundamental_percentile"
+    },
+    {
+      "arm": "DECISION_CHAIN_ONLY",
+      "definition": "exact active_v3.3.3 core over frozen MODEL_P_CAL and reconstructed predicted-SP",
+      "score_field": "decision_percentile"
+    },
+    {
+      "arm": "FUNDAMENTALS_PLUS_DECISION",
+      "definition": "fixed 0.50 market + 0.25 rolling fundamental + 0.25 active_v3.3.3 percentile overlay",
+      "score_field": "combined_percentile"
+    }
+  ],
+  "candidate_universe": {
+    "candidate_count_range": [
+      0,
+      7
+    ],
+    "fixed_participation": true,
+    "frozen_no_bet_issues": 159,
+    "identity_count": 424,
+    "issue_census": 348,
+    "participating_issues": 189,
+    "selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K_ALL"
+  },
+  "contract": "BJ-HIST-FUNDAMENTAL-OVERLAY-N7-001",
+  "denominator": {
+    "ablation_count": 11,
+    "ablation_issue_rows": 3828,
+    "candidate_identity_rows": 424,
+    "candidate_role_rows": 2968,
+    "decision_trace_rows": 1558,
+    "issue_census": 348,
+    "issue_cutoff_rows": 189,
+    "issue_rows": 1392,
+    "no_bet_by_arm": {
+      "DECISION_CHAIN_ONLY": 159,
+      "FUNDAMENTALS_ONLY": 159,
+      "FUNDAMENTALS_PLUS_DECISION": 159,
+      "MARKET_BEST_FULL": 159
+    },
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "DECISION_CHAIN_ONLY": 189,
+      "FUNDAMENTALS_ONLY": 189,
+      "FUNDAMENTALS_PLUS_DECISION": 189,
+      "MARKET_BEST_FULL": 189
+    },
+    "unique_match_feature_rows": 1558
+  },
+  "gate_b_required": [
+    "pre-tax ROI primary and per-ticket tax secondary",
+    "participation/support/calibration/hit/GM expected SP",
+    "ablation and threshold frontiers",
+    "drawdown/concentration/largest-event/missing-data bias",
+    "pairwise identity overlap and diagnostic sleeve only after FULL"
+  ],
+  "gate_b_status": "NOT_AUTHORIZED_PENDING_PI_GATE_A_REVIEW",
+  "incumbent": {
+    "alias": "BEST_FULL",
+    "allocation": "FULL_ENUMERATED",
+    "attribution_only_common_full_roi": -0.0909,
+    "controlling_baseline_no_tax_roi": -0.0947,
+    "frozen_no_bet_issue_count": 159,
+    "selected_issue_count": 189,
+    "selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1",
+    "stake_yuan": 4374,
+    "tickets": 2187
+  },
+  "issue": 134,
+  "missing_data": "retain identity; neutral default team state and explicit missing fraction; no silent drop",
+  "outcome_boundary": "Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted",
+  "promotion_boundary": "historical research only; a positive result requires strict independent EV and held-out/forward validation; a negative result cannot demote BEST_FULL",
+  "scoring": {
+    "combined": "within-issue 0.50 market + 0.25 fundamental + 0.25 decision percentile",
+    "decision": "geometric mean of seven exact active_v3.3.3 decision confidence outputs using frozen reduced inputs",
+    "decision_input_reconstruction": "q=E_SP×q_weight and predicted_SP=q/p_model; exact core hash bound",
+    "fundamental": "geometric mean of seven strict pre-issue-cutoff rolling Elo/form/rest confidences; target rank excluded",
+    "market": "exact #167 K_ALL COLD_FIRST rank",
+    "rank_proxy_diagnostic": "rank-augmented construction with unstamped target home/away rank; timing proxy only and excluded from controlling arms",
+    "tie_break": "score descending then portfolio_id ascending"
+  },
+  "segments": "primary complete-issue denominator; year/fold/candidate-count/missingness are non-controlling diagnostics",
+  "stage": "REPLACEMENT_GATE_A_OUTCOME_UNEXPOSED_FOUR_ARM_K1_FULL_FREEZE",
+  "supersedes": {
+    "head": "f2e5d427a71d74b7b789a0e594eda1c55569ab73",
+    "pr": 158,
+    "reason": "obsolete #132 threshold surface; historical evidence only"
+  },
+  "thresholds": "primary K1 has no post-score rejection; secondary pre-registered score-quantile and fundamental data-quality thresholds are diagnostic only",
+  "version": "bj134-gate-a-v2r2"
+}

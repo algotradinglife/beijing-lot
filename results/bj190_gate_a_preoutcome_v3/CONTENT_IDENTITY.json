@@ -1,0 +1,31 @@
+{
+  "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
+  "counts": {
+    "canonical_numeric_issue_count": 344,
+    "eligible_match_count": 101970,
+    "excluded_missing_native_line_match_count": 252,
+    "source_b0_no_bet_issue_count": 155,
+    "source_b0_participating_issue_count": 189,
+    "source_issue_instance_count": 348
+  },
+  "detector_grid_sha256": "8cf1e752a9deba48857cfb1c532d41d6f49abbc2e41daa8134fb64b4ccbfd382",
+  "directional_allocation_input_catalog_sha256": "51348c26fd364fc8ca2566db575cb1401c87bfab1355478539870ef68e3a0e84",
+  "estimator_match_freeze_sha256": "d209f2a2f41be0caab4951d6b93c8cb19a270a9f762d7287fede2315acec9b3d",
+  "gate_a_card_sha256": "3eb686fc9b6b2d3345c2be774396012c5649805b5c4d7867057ed20e835af3c7",
+  "manifest_sha256": "26e9064e68267de42190f134fb51cad34fe27974de6d41b95ffa56a9392bced7",
+  "market_model_training_freeze_sha256": "00e07c605824d8d75d591324ea0c36e9828b6ba1229696d44deb31738062d116",
+  "outcome_access": false,
+  "package": "bj190_gate_a_preoutcome_v3",
+  "poisson_latent_reconciliation_sha256": "c2a05e94cb8200ae7aa3ddf2f4988700a35e7cbeed72f20ccc7690a077503713",
+  "policy_count": 2424,
+  "policy_issue_selection_shards": {
+    "policy_issue_selection_freeze_part_01_of_04.csv.gz": "d3290a0ccc55d7ca765c13191e8f427df9c51bcf5fa014e9fae850981c649565",
+    "policy_issue_selection_freeze_part_02_of_04.csv.gz": "bbe40983ca3019a8f138132be0cb3edcba91f693f8268aa7767d0f13b0f48665",
+    "policy_issue_selection_freeze_part_03_of_04.csv.gz": "43fcacb8f88af02722841c8c6d11b00cac8413cb5d7cf52c2f792778d9cef70d",
+    "policy_issue_selection_freeze_part_04_of_04.csv.gz": "99456fa2c898f7c2504ed3f49722944016cf562dd09a6ff5df8556f7cb1f6584"
+  },
+  "selection_row_count": 833856,
+  "source_binding_sha256": "8e16563a4372805a290127d162942ebe44a5003fced936bc1db619b9ff2a65a2",
+  "ticket_multiplicity_vector_catalog_sha256": "f65d6967e2ddf289ad03220599af13c3f823debf651930df4950be88852aa950",
+  "version": "bj190-gate-a-preoutcome-v3"
+}

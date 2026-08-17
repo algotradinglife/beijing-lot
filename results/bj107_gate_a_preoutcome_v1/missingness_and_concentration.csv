@@ -1,0 +1,11 @@
+grouping,group_value,pools,issues,available_segmentation_pools,upstream_no_signal_pools,other_segmentation_unavailable_pools,accepted_value_pocket_count,candidate_outcome_count,candidate_match_count,candidate_concentration_share
+pool_disposition,AVAILABLE,2462,325,2462,2462,0,0,0,0,
+pool_disposition,UNAVAILABLE_INSUFFICIENT_MATCHES,136,134,0,136,0,0,0,0,
+pool_disposition,UNAVAILABLE_NO_7_MATCH_WINDOW,61,61,0,61,0,0,0,0,
+year,2019,534,55,502,534,0,0,0,0,
+year,2020,297,45,278,297,0,0,0,0,
+year,2021,493,58,461,493,0,0,0,0,
+year,2022,463,59,432,463,0,0,0,0,
+year,2023,377,56,335,377,0,0,0,0,
+year,2024,390,60,359,390,0,0,0,0,
+year,2025,105,15,95,105,0,0,0,0,

@@ -1,0 +1,2 @@
+source,role,identity,sha256,rows,join_status
+bj133_gate_a_preoutcome_v1,accepted immutable complete-issue allocation and candidate freeze,SHA256SUMS.json,1fff3f904fcb9a5efed231771880be8ae0603b0d8f3c7d0365937fcfe9985e79,20880,all non-FULL Q_INFORMED_WOR_DISTINCT plans expand to the identical complete-issue/config/allocator/M/seed surface with WR only

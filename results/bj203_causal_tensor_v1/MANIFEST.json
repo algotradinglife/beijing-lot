@@ -1,0 +1,45 @@
+{
+  "contract_version": "bj203-causal-tensor-v1",
+  "heldout": {
+    "issues": [
+      "25041",
+      "25042"
+    ],
+    "label_status": "ABSENT_BY_CONTRACT",
+    "policy": "Whole-issue embargo beginning with 25041, the first canonical issue whose eligible match window begins in 2025-04.  No held-out result, final-SP or settlement row is emitted by this package."
+  },
+  "identity_extension_sha256": "0f45f442e60c4dd35950053ef7fb76b519352ef2123db4d7a54a0277fcc5caa0",
+  "implementation_hashes": {
+    "build_cli": "deff0a3265959d5e714d7509039cd9615874b9394fce23787db882462a8104fe",
+    "builder": "b65f53a331f59214526f6b988ac0979fbb07c7975ce0920331d186e82fb4a0fa",
+    "contract": "3e71c61799855b4b61aadbcf9b4d84b894236be1aab709b40217a05af847d949",
+    "environment_lock": "acf0b168cadb2956e7e4937901d067ef65cda1783016ec92bea7b5743d1add1c",
+    "inference_loader": "e52181349d471e02ea2620018dfeadf2635bb34a3994602559de07345011665e",
+    "label_loader": "a2fe1d15bede315a94196919059095f4c935392d4a12ab089323926e726bd775",
+    "notebook_executor": "6d4871bd63465b88a4b642839317a0e33eeba7bc30bfa4a48d235d9fc7079d0e"
+  },
+  "inference_namespace_manifest_sha256": "6598bd451081d088a0571fe0f3dc7ef34e05513d7057e62ad58debea9fcd2e32",
+  "issue": 203,
+  "label_namespace_manifest_sha256": "eaef18d7803802462fcd24da618a941a36a120a1b5c275a435ae7876873c5331",
+  "scientific_stack": {
+    "artifact_format": "Parquet 2.6 / Zstandard",
+    "device": "CPU",
+    "matplotlib": "3.10.9",
+    "nbclient": "0.10.2",
+    "nbformat": "5.10.4",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "python": "3.14.4",
+    "random_seed": "NOT_APPLICABLE_DETERMINISTIC_TRANSFORM"
+  },
+  "scope": "data capability only; no model, ranking, ROI or execution",
+  "source_hashes": {
+    "bj190_estimator_manifest": "490579f7813d260d11965377462f7aa3b20161dd4672e2b42b600b493d24f1bc",
+    "bj190_estimator_match_freeze": "fd0ee672ab8a98b64cf4e84f9352cd089a68fefe34130b19b46f970595953bb1",
+    "bj190_issue_census": "5054b3a3d0aa695f5f9ef51e79632e4a89757e4b11b7f965ced874c43ef8fc93",
+    "bj90_manifest": "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2",
+    "bj90_predicted_sp": "2375e5570a9fb964f1beb5f4a20e5019755f62213ebde1463a609d23d1e2807b",
+    "database": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+  }
+}

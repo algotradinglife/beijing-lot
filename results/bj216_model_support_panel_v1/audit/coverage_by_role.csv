@@ -1,0 +1,4 @@
+chronological_role,evaluated_issues,required_issues,candidate_matches,core_complete_matches,core_match_coverage,required_core_match_coverage,n7_passing_issues,n7_issue_pass_rate,required_n7_issue_pass_rate,role_gate_pass
+development,24,30,2156,1695,0.786178107607,0.8,20,0.833333333333,0.8,False
+chronological_evaluation,0,5,0,0,0,0.8,0,0,0.8,False
+prospective_confirmation,0,2,0,0,0,0.8,0,0,0.8,False

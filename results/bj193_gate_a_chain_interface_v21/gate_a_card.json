@@ -1,0 +1,20 @@
+{
+  "contract": "BJ-HIST-N7-REGIME-META-POLICY-001",
+  "counts": {
+    "actions": 963,
+    "classes": 8,
+    "coverage_rows": 19752,
+    "native_portfolios": 71704,
+    "pairs": 2377647,
+    "registry_rows": 47819
+  },
+  "gate_b_authorized_by_this_package": false,
+  "issue": 193,
+  "outcome_access": false,
+  "outcome_boundary": "Gate A outcome-unexposed: no result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence is read or emitted",
+  "parent_issue": 192,
+  "source_identity_policy": "P/Q source identities, weight_source=NA, mechanisms, singleton replicate and native M=1458 preserved exactly",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_STRUCTURAL_DELETE_AMENDMENT",
+  "status": "READY_FOR_PI_REVIEW_NO_GATE_B_AUTHORITY",
+  "version": "bj193-gate-a-chain-interface-v2.1"
+}

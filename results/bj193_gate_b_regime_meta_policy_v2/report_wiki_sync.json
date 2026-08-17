@@ -1,0 +1,8 @@
+{
+  "candidate_count": 0,
+  "contract": "BJ193_REPORT_WIKI_SYNC_V1",
+  "decision": "NO_PROMOTION",
+  "report_sha256": "b5b4d102ef791de29572879c027c775bcdf41926f17208b7c8e5bca460062bd4",
+  "research_wiki_entry_sha256": "8d184171dad267a0a0e2c8cd7dc73ddeb1c1929b8ce058bf841d0b13fa5e2e53",
+  "status": "PASS"
+}

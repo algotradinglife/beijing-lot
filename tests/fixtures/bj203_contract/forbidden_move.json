@@ -1,0 +1,11 @@
+{
+  "description": "Golden negative fixture: post-event fields must never move into inference cells.",
+  "forbidden_inference_fields": [
+    "result_code",
+    "final_sp",
+    "winning_sp",
+    "payout_after_65_units",
+    "tax_realized_yuan"
+  ],
+  "expected_result": "FAIL_CLOSED"
+}

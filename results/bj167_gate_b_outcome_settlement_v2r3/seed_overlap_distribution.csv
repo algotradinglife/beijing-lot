@@ -1,0 +1,2 @@
+M,seed_pair_count,identity_count,mean_shared_fraction,p10,p25,median,p75,p90,min,max,dependence_note
+64,6712200,1356,0.029709740286,0.000000000000,0.015625000000,0.031250000000,0.046875000000,0.062500000000,0.000000000000,0.187500000000,seed draws share frozen identities/q vectors and are not independent football histories

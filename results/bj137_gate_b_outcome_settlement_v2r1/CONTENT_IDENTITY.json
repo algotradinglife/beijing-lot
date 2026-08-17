@@ -1,0 +1,38 @@
+{
+  "contract_version": "bj137-gate-b-portable-content-v2",
+  "gzip_payloads": {
+    "interaction_surface.csv.gz": {
+      "canonical_decompressed_bytes": 91384697,
+      "canonical_decompressed_sha256": "00d9f72a087e4731ae160c41ca6c024dbad80e87fff98be7e0c5d56c1e9ecf9e"
+    },
+    "issue_policy_settlement.csv.gz": {
+      "canonical_decompressed_bytes": 1658390536,
+      "canonical_decompressed_sha256": "8c9fda1f9bb692d7a8e8b418d4284ddcfe46cfa0e31a9c700a912a37f7736fb6"
+    },
+    "sampler_lift.csv.gz": {
+      "canonical_decompressed_bytes": 90704660,
+      "canonical_decompressed_sha256": "686f42ba420de715104edf3a4f87c9bdf1a174db510ab895f18c396f3eb9ba36"
+    },
+    "selector_lift.csv.gz": {
+      "canonical_decompressed_bytes": 245421,
+      "canonical_decompressed_sha256": "338aa4ace4ed99721f423f8a05d1b78960de29fb44c394076ecc30f854b8d485"
+    },
+    "surface_summary.csv.gz": {
+      "canonical_decompressed_bytes": 117785755,
+      "canonical_decompressed_sha256": "af2492bfedc3235f56bcdede3082d2260af1d23683cff1ab7f0ed13dd70cfecc"
+    },
+    "ticket_tax_ledger.csv.gz": {
+      "canonical_decompressed_bytes": 963170557,
+      "canonical_decompressed_sha256": "1220b883856ddfad12a54629069dfc46a43f350353114c1974b0ae46ebed8e90"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "33336916e5bb1e6b7d665d3c85754bd6d32c491c06f8f42431f891978d367b7f",
+    "calibration_diagnostics.csv": "cc5c23a2f8e171f83b08dee40586d0e20d912f90c815980a3a2df166c7c2da22",
+    "decision.json": "41b930e42067a9d300cbe778f813f09950ebd962c1d3b6354bcf6bdcda82eb9c",
+    "settlement_card.json": "3d3fc6e432bf9ef38f5d0ae0728b5fd018c8c5f3f46db188d1b38e54a1fe1cac",
+    "settlement_runner.py": "3c6248874c25e0d4c4921285192027179692945ba714cd7e6cb5fb9048120c4f",
+    "source_census.csv": "dc9aba43ba3bccaf2d529ce384ae3851ac98e325cb9785424233aa0d53d9fc35",
+    "ticket_tax_reconciliation.csv": "30361db6c2488978c541fcd163d0cef3f427c099bdfe22d3ac00ab325bceb75e"
+  }
+}

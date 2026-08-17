@@ -1,0 +1,43 @@
+{
+  "contract": "BJ-HIST-N7-M-GRID-001",
+  "decision": {
+    "decision": "DESCRIPTIVE_SURFACE_ONLY",
+    "promotion_authorized": false,
+    "recommendation": "NO_STABLE_SWEET_SPOT",
+    "recommended_M_interval": [],
+    "rule": "A reported M interval requires positive pre-tax ROI in all three WR seeds and every YEAR/FOLD/LOYO view. Regardless of this descriptive screen, no result authorizes purchase, production, betting, or promotion; any candidate requires separate strict independent EV and validation."
+  },
+  "denominator": {
+    "full_delta_rows": 7524,
+    "issue_settlement_rows": 119364,
+    "primary_wr_bootstrap_rows": 342,
+    "surface_summary_rows": 7546,
+    "ticket_tax_reconciliation_rows": 343
+  },
+  "input_boundary": "Only the accepted immutable #148 Gate-A common-support/Q-role/dense-plan package and the canonical trusted final-SP outcome payload are read. No candidate selection, probability calibration, M grid, seed, stake cap, or ticket plan is recomputed. A frozen issue with any missing canonical outcome is retained as UNAVAILABLE_CANONICAL_OUTCOME at zero executed stake; it is never partially settled or replaced.",
+  "issue": 148,
+  "metrics": "Pre-tax ROI is primary. The full M surface reports tax reference, complete-issue hit/coverage, per-issue stake distribution, total stake/capital utilization, unique/duplicate curves, matched FULL deltas, YEAR/FOLD/LOYO summaries, and deterministic issue-bootstrap FULL deltas for all WR M/seed points.",
+  "outcome_completeness": {
+    "frozen_available_issue_rows": 343,
+    "frozen_complete_issue_rows": 348,
+    "rule": "Complete issue settlement only; unavailable rows have zero executed stake and remain in every M/seed/arm denominator.",
+    "settled_complete_issue_rows": 187,
+    "source_no_bet_issue_rows": 5,
+    "unavailable_canonical_outcome_issue_rows": 156
+  },
+  "provenance": {
+    "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "gate_a_cohort_sha256": "2bfb04194ffe5ac995c479d9d91b92abdfb05e08d2e0e54dfeec8e8731af3bc8",
+    "gate_a_content_identity_sha256": "dfd3ac234f95f28185a09a6bb2f69c3ff66ddb696ce1fe45a6a1215d932dcd0a",
+    "gate_a_identity_sha256": "0e5f96ab17ed041dc59fdbbddd1bebec3578d63e03412863c89f693f0060d63e",
+    "gate_a_manifest_sha256": "fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6",
+    "gate_a_role_sha256": "e08019cb591652ac87e296dc7f7681c7188704e4c7d59bc341d7d70941fbcbdc",
+    "gate_a_sampling_plan_sha256": "8523f6340ca13c30a71f76faae8791dc28ae12a6d63632635f109b9af61353e5",
+    "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
+  },
+  "runner_version": "bj148-gate-b-v1-ticket-tax-dense-surface",
+  "sampling": "WR is primary: each independent Q-weighted draw remains a separate \u00a52 ticket, including exact duplicates. WOR remains sensitivity. M=2187 is exact FULL enumeration.",
+  "scope": "historical paper research only; no purchase, production, betting, or promotion authority.",
+  "stage": "GATE_B_ONE_SHOT_DENSE_M_GRID_OUTCOME_SETTLEMENT",
+  "tax": "Tax is secondary and per individual winning ticket only: 20% iff that ticket gross is at least \u00a510,000. Issue, identity, arm, policy and aggregate receipts never cross the tax threshold. The winning-ticket ledger and reconciliation make this auditable."
+}

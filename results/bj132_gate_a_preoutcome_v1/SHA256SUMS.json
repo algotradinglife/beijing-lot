@@ -1,0 +1,10 @@
+{
+  "CONTENT_IDENTITY.json": "fa232d1c32023cfb39278b4c95b9033adf6194e322c3de66c353283d88e73933",
+  "README.md": "01350a5987ec85ad02123b0f264fe5e22100db077cf4abb23ca28d9e5cc93c88",
+  "gate_a_card.json": "daa711a6caad67332faecf67571173537d0e010ec364fe83915e9b3e90ea95f9",
+  "matched_delete_score_frontier.csv.gz": "361d0cba3fb702d68c3869b9459dc29c9ecf56c5933d9f025ce9430e3869d971",
+  "portfolio_role_assignments.csv.gz": "6a08531eaa6832a110af43cc7cab6a3a426ed501f8419898de066eed5c1a2eaf",
+  "ranker_disagreements.csv.gz": "623e7895b7f1fae5717ce317072870772ee3b4bd476c6cec7b1971305b2989ae",
+  "runner.py": "cb159753e5810a90afbf25394412a646569eab7dd813fe39086fb8ceeb9af553",
+  "threshold_census.csv": "3291a7c540ee2eec58e7da02d34c6bbf3823222dff6bc5d4af106b164924529a"
+}

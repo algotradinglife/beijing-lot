@@ -1,0 +1,115 @@
+{
+  "contract": "BJ-HIST-SELECTED-WOR-CROSS-N-001",
+  "denominator": {
+    "identity_count_by_n": {
+      "10": 1094,
+      "2": 38,
+      "3": 335,
+      "4": 648,
+      "5": 844,
+      "6": 937,
+      "7": 1005,
+      "8": 1042,
+      "9": 1077
+    },
+    "identity_rows": 7020,
+    "issue_count_by_n": {
+      "10": 205,
+      "2": 22,
+      "3": 108,
+      "4": 166,
+      "5": 190,
+      "6": 197,
+      "7": 201,
+      "8": 203,
+      "9": 204
+    },
+    "issue_instances": 348,
+    "native_issues": 344,
+    "native_pools": 2659,
+    "participation_rows": 3132,
+    "role_rows": 49519,
+    "sampling_plan_rows": 81,
+    "saturated_plan_rows": 21
+  },
+  "gate_b_requirements": [
+    "pre-tax no_tax_roi primary; tax-adjusted ROI secondary",
+    "nominal/effective M, actual draw count and stake; saturated cells are one allocation, not duplicate WOR",
+    "total stake/per-issue distribution/participation/identity count",
+    "complete-ticket hit rate/winning-ticket count/coverage/miss streak",
+    "GM expected SP/actual payout/tax-line share",
+    "YEAR/FOLD/LOYO/issue bootstrap",
+    "largest issue and ex-largest ROI",
+    "matched/common-support deltas vs N=7",
+    "complete N\u2192ROI/hit/capital/tax curves"
+  ],
+  "generator_version": "bj159-gate-a-v2",
+  "issue": 159,
+  "outcome_boundary": "No result, score, final SP, payout, tax, ROI, settlement or post-kickoff field is read or emitted. Gate B is NOT_RUN until this exact Gate-A package is accepted.",
+  "sampling": {
+    "allocator": "Q_INFORMED_WOR_DISTINCT",
+    "nominal_M_grid": [
+      32,
+      64,
+      128
+    ],
+    "probability_vector": "Q_WEIGHT = normalized outcome-unexposed q=p_cal\u00d7predicted_SP per leg",
+    "saturation_rule": "effective_M=min(nominal_M,3^N); coverage_fraction=effective_M/(3^N); nominal rows with FULL_SPACE_SATURATED share one actual full-space allocation per identity and seed",
+    "seeds": [
+      "137001",
+      "137002",
+      "137003"
+    ],
+    "tax": "Gate B only; each winning \u00a52 ticket is an independent tax unit; no issue/policy pooling",
+    "ticket_space": "3^N base-3 code order #137-compatible",
+    "unit_stake_yuan": 2
+  },
+  "scope": "historical paper-only research; no purchase, production, betting or promotion authority",
+  "selection": {
+    "analysis_unit": "complete lottery issue_instance issue@fold; native pool/segment retained only as provenance, never as a selection or settlement boundary",
+    "candidate_rule": "p_min <= 0.20, ranked by p_min then match_idx then match_id across complete issue_instance",
+    "candidate_search_cap": 32,
+    "companion_rule": "N-1 highest-E_SP other matches with E_SP >= 3.00 across the complete issue_instance",
+    "e_sp_min": 3.0,
+    "gm_e_sp_min": 3.05,
+    "identity_rule": "sort candidate plus companions by descending E_SP, ascending p_min, match_idx, match_id; deduplicate selected match-id tuples once per complete issue_instance",
+    "n7_bridge_audit": {
+      "bridge_status": "LEGACY_SEGMENT_BASELINE_NOT_EQUAL_COMPLETE_ISSUE_SELECTION",
+      "corrected_complete_issue_identity_count": 1005,
+      "corrected_identity_set_sha256": "156f9315de6e2c9b46a2b170dc32b4eefa4521a00cf1bbc30e815e71353ec4ac",
+      "corrected_only_count": 999,
+      "corrected_rule": "#159 candidates, companions, GM filter, and dedup applied once over complete issue_instance",
+      "exact_intersection_count": 6,
+      "legacy_identity_set_sha256": "65f963e6c1246306fecc538db6aebd3e02e14db4a245d6b999681b036640be14",
+      "legacy_only_count": 365,
+      "legacy_rule": "#127 accepted target identities selected within native pool/segment",
+      "legacy_segment_baseline_identity_count": 371,
+      "outcome_boundary": "No outcome/final-SP/payout/tax/ROI/settlement input read or emitted"
+    },
+    "n_grid": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "p_min_max": 0.2,
+    "variant": "ESP300_GM305_LOWP20"
+  },
+  "sources": {
+    "bj127_gate_a_preoutcome_v2": {
+      "manifest_sha256": "a8eeb50204bb9a2d69578538e28943a432bea11083661a63b950a5ab5a2481da",
+      "role": "frozen selector and p/E_SP/q vectors",
+      "variant": "ESP300_GM305_LOWP20"
+    },
+    "bj145_gate_a_preoutcome_v8": {
+      "manifest_sha256": "da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c",
+      "role": "fixed Q-informed WOR allocator contract"
+    }
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_SELECTED_BASELINE_CROSS_N_FREEZE"
+}

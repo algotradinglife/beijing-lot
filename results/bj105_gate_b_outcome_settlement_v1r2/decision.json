@@ -1,0 +1,5 @@
+{
+  "decision": "NO_PROMOTION",
+  "eligible_candidates": 0,
+  "rule": "Promotion requires positive tax-adjusted ALL, ex-best-payout, ex-best-issue, every annual and every leave-one-year-out ROI; a relative improvement with negative absolute ROI is not promotable."
+}

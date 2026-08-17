@@ -1,0 +1,3 @@
+source,role,identity,sha256,rows,join_status
+bj137_gate_a_preoutcome_v2,accepted fixed candidate definition: NO_GATE/K4 identities and Q vectors,SHA256SUMS.json,0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df,1356,all 348 source K4 rows retained; nine explicit insufficient-identity no-bets preserved
+bj148_gate_a_preoutcome_v1,accepted broader-pool dense-M comparator definition only; no settlement data read at Gate A,SHA256SUMS.json,fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6,58,identical dense M grid bound for Gate-B side-by-side reporting

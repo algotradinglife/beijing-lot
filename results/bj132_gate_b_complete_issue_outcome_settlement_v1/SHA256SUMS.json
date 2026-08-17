@@ -1,0 +1,16 @@
+{
+  "CONTENT_IDENTITY.json": "620087db9ec2784dced0dbfc04a32a4289a7afae34f6a1746d074972cafb0105",
+  "README.md": "331743758684de23ed4ce07822426aa63291506785c358c92c7210b2668007cf",
+  "arm_summary.csv": "0ac8ee52c41fa0bb4f886797775d858875ea7562d634f9f80879fbda51df5760",
+  "decision.json": "c964c9869597ef993d1dcfb9d51bce66afb2c78abd8e79ff2cc0ed141ff20815",
+  "deletion_strata.csv": "41f850759e960fd1cdddcbc4d756d8045f652a31e9615048b6a0f19fc2280fca",
+  "issue_policy_accounting.csv": "4b824bdae2e2c16c4fe78fab165d0132db85e4d14f2de9f155876c21cd44519b",
+  "matched_full_deltas.csv.gz": "27fbcc266b1665b5c964c3c7727a46a4ffe3a03896d627f399f64f344a4ffc01",
+  "portfolio_settlement.csv.gz": "3bde7413da331376f4ea94e82fe9d0cdeb68ee5a6d5d5d5c5a4b7559b684868f",
+  "q_minus_p_disagreement_deltas.csv.gz": "2c4495efa89e31065df39a5ec5480659ac073bb8f87b6c858b27e30006301bcd",
+  "ranker_comparison.csv": "192c6d47238df965aed30b88df0ac6c1e98e3f9b2a217bdd9ce0dac8bf73e9e1",
+  "robustness_summary.csv": "cec3f1e7757c303ca68287ed3810a749adb96e7c2567f3a37d53f66d1c0d6875",
+  "settlement_card.json": "28d5b4fe06d2c5045cf483976ec291bce58b9cc07b4718c22058506c99ceace8",
+  "settlement_runner.py": "c9bbc95b6aeacfb5f8e822a97faf92c4bfb20830d6990f4838f215d6f5668278",
+  "source_census.csv": "a72529754d17fa010438e1c729e90d05170d34f55465641be00b15ccb29ca500"
+}

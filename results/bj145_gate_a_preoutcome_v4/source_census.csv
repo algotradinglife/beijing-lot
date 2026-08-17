@@ -1,0 +1,4 @@
+source,role,identity,sha256,rows,join_status
+bj151_gate_a_preoutcome_v1,fixed controlling #151 NO_GATE/K4 identities and Q vectors,SHA256SUMS.json,3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6,1356,all 348 #151 issue rows retained; 339 available and nine explicit no-bets
+bj137_gate_a_preoutcome_v2,secondary ESP300_GM290/K8 sensitivity identities and vectors,SHA256SUMS.json,0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df,2184,all 348 K8 issue rows retained; 273 available and 75 explicit no-bets
+bj148_gate_a_preoutcome_v1,historical dense-M namespace reference only; no outcomes read,SHA256SUMS.json,fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6,58,definition reference only

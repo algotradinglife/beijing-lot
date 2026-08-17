@@ -1,0 +1,6 @@
+metric,denominator,definition,stage
+coverage,NATIVE,coverage/eligible/abstain counts and reasons,PREOUTCOME
+identity_change,MATCHED,M1 versus B0 identity changed,PREOUTCOME
+probability_calibration,MATCHED,B0 probability LogLoss/Brier/reliability on selected legs,POSTOUTCOME
+pre_tax_roi,NATIVE_AND_MATCHED,stake/gross/net/stake; B0 versus M1,POSTOUTCOME
+risk,NATIVE_AND_MATCHED,HHI/ex-largest/drawdown/time blocks,POSTOUTCOME

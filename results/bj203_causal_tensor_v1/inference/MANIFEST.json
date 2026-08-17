@@ -1,0 +1,13 @@
+{
+  "contract_version": "bj203-causal-tensor-v1",
+  "files": {
+    "cell_identity.parquet": "f213edcdc64245b0176e7d26f0540f0fbe2eab29f577624e937a795c3dd65662",
+    "feature_masks.parquet": "8f9e5e17236174bd3dafce417fdef158b290bac14a992fdbd23526827c0fbb48",
+    "feature_values.parquet": "f4ee031e4ed36c6c1847c622557657c1a8944b9d692cbaf9b28d8171bdeb907f",
+    "issue_offsets.parquet": "5bf1cdfc2ad0cd20702f8cdc202d6db814145366f5c6ad49bd1e9e347aa19670",
+    "league_dictionary.parquet": "f2a181dd08a39eda7d694ad0ec3906db22d576e1a93b5861cf2f608fcf249fa6",
+    "market_breadth_dictionary.parquet": "84f263be80697dc3a65960846f46ab88b5fd1826b76198b7940519c2ae1dc2ab",
+    "team_dictionary.parquet": "3b7ffb5abe54737ff5f6c7d51a2e11899713849b22fbf480d94b64b8c38c9dda"
+  },
+  "namespace": "outcome_unexposed_inference"
+}

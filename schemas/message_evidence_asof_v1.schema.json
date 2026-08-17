@@ -1,0 +1,453 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://algotradinglife.github.io/beijing-lot/schemas/message_evidence_asof_v1.schema.json",
+  "title": "Timestamped message evidence as-of export v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "as_of_utc",
+    "scope",
+    "matches",
+    "sources",
+    "entities",
+    "entity_aliases",
+    "captures",
+    "facts",
+    "relations",
+    "missingness",
+    "collection_observations",
+    "counts"
+  ],
+  "properties": {
+    "schema_version": {"const": "message_evidence_asof_v1"},
+    "as_of_utc": {"$ref": "#/$defs/timestamp"},
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "match_idx"],
+      "properties": {
+        "issue": {"type": ["string", "null"]},
+        "match_idx": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "matches": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/match"}
+    },
+    "sources": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "entities": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/entity"}
+    },
+    "entity_aliases": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/alias"}
+    },
+    "captures": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/capture"}
+    },
+    "facts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fact"}
+    },
+    "relations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/relation"}
+    },
+    "missingness": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/missingness"}
+    },
+    "collection_observations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/collectionObservation"}
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matches",
+        "entities",
+        "entity_aliases",
+        "captures",
+        "facts",
+        "active_facts",
+        "relations",
+        "missingness",
+        "collection_observations"
+      ],
+      "properties": {
+        "matches": {"type": "integer", "minimum": 0},
+        "entities": {"type": "integer", "minimum": 0},
+        "entity_aliases": {"type": "integer", "minimum": 0},
+        "captures": {"type": "integer", "minimum": 0},
+        "facts": {"type": "integer", "minimum": 0},
+        "active_facts": {"type": "integer", "minimum": 0},
+        "relations": {"type": "integer", "minimum": 0},
+        "missingness": {"type": "integer", "minimum": 0},
+        "collection_observations": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 160},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$"
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        {"$ref": "#/$defs/timestamp"},
+        {"type": "null"}
+      ]
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue",
+        "match_idx",
+        "match_id",
+        "kickoff_at_utc",
+        "home_team_id",
+        "away_team_id",
+        "competition_id",
+        "registered_at_utc",
+        "recorded_at_utc",
+        "effective_cutoff_utc",
+        "receipt_sequence",
+        "record_sha256",
+        "attestation_sha256"
+      ],
+      "properties": {
+        "issue": {"$ref": "#/$defs/id"},
+        "match_idx": {"type": "integer", "minimum": 1},
+        "match_id": {"$ref": "#/$defs/id"},
+        "kickoff_at_utc": {"$ref": "#/$defs/timestamp"},
+        "home_team_id": {"$ref": "#/$defs/id"},
+        "away_team_id": {"$ref": "#/$defs/id"},
+        "competition_id": {
+          "oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]
+        },
+        "registered_at_utc": {"$ref": "#/$defs/timestamp"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "name", "source_type", "provenance_tier", "base_url", "registered_at_utc", "recorded_at_utc", "effective_cutoff_utc", "receipt_sequence", "record_sha256", "attestation_sha256"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/id"},
+        "name": {"type": "string", "minLength": 1},
+        "source_type": {
+          "enum": [
+            "official_club",
+            "official_league",
+            "official_competition",
+            "primary_reporter",
+            "reliable_news",
+            "data_provider",
+            "other"
+          ]
+        },
+        "provenance_tier": {
+          "enum": [
+            "TIER_0_OFFICIAL",
+            "TIER_1_PRIMARY",
+            "TIER_2_RELIABLE",
+            "TIER_3_UNVERIFIED"
+          ]
+        },
+        "base_url": {"type": ["string", "null"], "format": "uri"},
+        "registered_at_utc": {"$ref": "#/$defs/timestamp"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity_id", "entity_type", "canonical_name", "registered_at_utc", "recorded_at_utc", "effective_cutoff_utc", "receipt_sequence", "record_sha256", "attestation_sha256"],
+      "properties": {
+        "entity_id": {"$ref": "#/$defs/id"},
+        "entity_type": {
+          "enum": ["team", "player", "coach", "competition", "venue", "other"]
+        },
+        "canonical_name": {"type": "string", "minLength": 1},
+        "registered_at_utc": {"$ref": "#/$defs/timestamp"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "alias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias_id", "entity_id", "source_id", "alias_text", "alias_key", "observed_at_utc", "recorded_at_utc", "effective_cutoff_utc", "receipt_sequence", "record_sha256", "attestation_sha256", "active"],
+      "properties": {
+        "alias_id": {"$ref": "#/$defs/sha256"},
+        "entity_id": {"$ref": "#/$defs/id"},
+        "source_id": {"$ref": "#/$defs/id"},
+        "alias_text": {"type": "string", "minLength": 1},
+        "alias_key": {"type": "string", "minLength": 1},
+        "observed_at_utc": {"$ref": "#/$defs/timestamp"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"},
+        "active": {"type": "boolean"}
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_id",
+        "source_id",
+        "source_url",
+        "published_at_utc",
+        "observed_at_utc",
+        "fetched_at_utc",
+        "recorded_at_utc",
+        "effective_cutoff_utc",
+        "latency_seconds",
+        "late_arriving",
+        "media_type",
+        "raw_sha256",
+        "receipt_sequence",
+        "record_sha256",
+        "attestation_sha256"
+      ],
+      "properties": {
+        "capture_id": {"$ref": "#/$defs/sha256"},
+        "source_id": {"$ref": "#/$defs/id"},
+        "source_url": {"type": "string", "format": "uri"},
+        "published_at_utc": {"$ref": "#/$defs/nullableTimestamp"},
+        "observed_at_utc": {"$ref": "#/$defs/timestamp"},
+        "fetched_at_utc": {"$ref": "#/$defs/timestamp"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "latency_seconds": {"type": ["number", "null"], "minimum": 0},
+        "late_arriving": {"type": ["boolean", "null"]},
+        "media_type": {"type": "string", "minLength": 1},
+        "raw_sha256": {"$ref": "#/$defs/sha256"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fact_id",
+        "capture_id",
+        "issue",
+        "match_idx",
+        "entity_id",
+        "fact_kind",
+        "assertion_state",
+        "value",
+        "confidence",
+        "effective_from_utc",
+        "effective_until_utc",
+        "observed_at_utc",
+        "recorded_at_utc",
+        "effective_cutoff_utc",
+        "source_id",
+        "source_url",
+        "published_at_utc",
+        "fetched_at_utc",
+        "raw_sha256",
+        "provenance_tier",
+        "active",
+        "conflicts_with",
+        "receipt_sequence",
+        "record_sha256",
+        "attestation_sha256"
+      ],
+      "properties": {
+        "fact_id": {"$ref": "#/$defs/sha256"},
+        "capture_id": {"$ref": "#/$defs/sha256"},
+        "issue": {"$ref": "#/$defs/id"},
+        "match_idx": {"type": "integer", "minimum": 1},
+        "entity_id": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "fact_kind": {
+          "enum": [
+            "injury",
+            "suspension",
+            "expected_lineup",
+            "confirmed_lineup",
+            "coach_change",
+            "schedule",
+            "travel",
+            "motivation"
+          ]
+        },
+        "assertion_state": {"enum": ["affirmed", "denied", "unknown"]},
+        "value": {"type": "object", "minProperties": 1},
+        "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "effective_from_utc": {"$ref": "#/$defs/nullableTimestamp"},
+        "effective_until_utc": {"$ref": "#/$defs/nullableTimestamp"},
+        "observed_at_utc": {"$ref": "#/$defs/timestamp"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "source_id": {"$ref": "#/$defs/id"},
+        "source_url": {"type": "string", "format": "uri"},
+        "published_at_utc": {"$ref": "#/$defs/nullableTimestamp"},
+        "fetched_at_utc": {"$ref": "#/$defs/timestamp"},
+        "raw_sha256": {"$ref": "#/$defs/sha256"},
+        "provenance_tier": {
+          "enum": [
+            "TIER_0_OFFICIAL",
+            "TIER_1_PRIMARY",
+            "TIER_2_RELIABLE",
+            "TIER_3_UNVERIFIED"
+          ]
+        },
+        "active": {"type": "boolean"},
+        "conflicts_with": {"type": "array", "items": {"$ref": "#/$defs/sha256"}},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation_id",
+        "source_fact_id",
+        "target_fact_id",
+        "relation_type",
+        "recorded_at_utc",
+        "effective_cutoff_utc",
+        "note",
+        "record_sha256",
+        "receipt_sequence",
+        "attestation_sha256"
+      ],
+      "properties": {
+        "relation_id": {"$ref": "#/$defs/sha256"},
+        "source_fact_id": {"$ref": "#/$defs/sha256"},
+        "target_fact_id": {"$ref": "#/$defs/sha256"},
+        "relation_type": {"enum": ["corrects", "contradicts", "retracts"]},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "note": {"type": "string"},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "missingness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missingness_id",
+        "capture_id",
+        "issue",
+        "match_idx",
+        "fact_kind",
+        "reason_code",
+        "detail",
+        "recorded_at_utc",
+        "effective_cutoff_utc",
+        "record_sha256",
+        "receipt_sequence",
+        "attestation_sha256"
+      ],
+      "properties": {
+        "missingness_id": {"$ref": "#/$defs/sha256"},
+        "capture_id": {"$ref": "#/$defs/sha256"},
+        "issue": {"$ref": "#/$defs/id"},
+        "match_idx": {"type": "integer", "minimum": 1},
+        "fact_kind": {
+          "enum": [
+            "injury",
+            "suspension",
+            "expected_lineup",
+            "confirmed_lineup",
+            "coach_change",
+            "schedule",
+            "travel",
+            "motivation"
+          ]
+        },
+        "reason_code": {
+          "enum": [
+            "not_published",
+            "fetch_failed",
+            "unresolved_entity",
+            "ambiguous",
+            "source_unavailable",
+            "not_applicable",
+            "other"
+          ]
+        },
+        "detail": {"type": "string"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "collectionObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "capture_id",
+        "issue",
+        "match_idx",
+        "fact_kind",
+        "status",
+        "expected_entity_ids",
+        "checked_source_ids",
+        "note",
+        "recorded_at_utc",
+        "effective_cutoff_utc",
+        "record_sha256",
+        "receipt_sequence",
+        "attestation_sha256"
+      ],
+      "properties": {
+        "observation_id": {"$ref": "#/$defs/sha256"},
+        "capture_id": {"$ref": "#/$defs/sha256"},
+        "issue": {"$ref": "#/$defs/id"},
+        "match_idx": {"type": "integer", "minimum": 1},
+        "fact_kind": {
+          "enum": ["injury", "suspension", "expected_lineup", "confirmed_lineup", "coach_change", "schedule", "travel", "motivation"]
+        },
+        "status": {"enum": ["complete", "partial"]},
+        "expected_entity_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "checked_source_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "note": {"type": "string"},
+        "recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"},
+        "record_sha256": {"$ref": "#/$defs/sha256"},
+        "receipt_sequence": {"type": "integer", "minimum": 1},
+        "attestation_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+stat,predicted_final_sp_input,field
+count,23520.0,predicted_final_sp_input
+mean,3.287971618386353,predicted_final_sp_input
+std,1.562280165622707,predicted_final_sp_input
+min,1.0075000524520874,predicted_final_sp_input
+1%,1.4825431501865387,predicted_final_sp_input
+5%,1.9228736817836762,predicted_final_sp_input
+25%,2.5718860030174255,predicted_final_sp_input
+50%,3.2733399868011475,predicted_final_sp_input
+75%,3.777871072292328,predicted_final_sp_input
+95%,4.386996865272522,predicted_final_sp_input
+99%,6.691678147315988,predicted_final_sp_input
+max,66.72222137451172,predicted_final_sp_input

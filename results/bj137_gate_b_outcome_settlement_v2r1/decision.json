@@ -1,0 +1,11 @@
+{
+  "all_seed_and_chronological_positive_sampler_candidates": 0,
+  "all_seed_global_positive_sampler_candidates": 461,
+  "chronologically_positive_selector_candidates": 0,
+  "decision": "NO_PROMOTION",
+  "global_positive_selector_candidates": 4,
+  "promotion_authorized": false,
+  "promotion_candidates": [],
+  "rule": "Promotion requires positive matched no-tax and actual-tax deltas across all three frozen seeds and every YEAR/FOLD/LOYO view. A one-seed, sparse-M, raw-ROI or tax-only maximum is not promotable.",
+  "strict_independent_ev_required": false
+}

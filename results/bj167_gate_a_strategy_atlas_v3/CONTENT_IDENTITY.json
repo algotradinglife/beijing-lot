@@ -1,0 +1,171 @@
+{
+  "contract_version": "bj167-gate-a-content-v3",
+  "controls": {
+    "README.md": "87cebf93fb370248fb1983de122d8a68b179549b8f96a65b6a4d96910af4da27",
+    "allocation_grid.csv": "9533aeee4e135a5215300c7868b07053fcfafa08bb2f24c9a665863ca05ce02e",
+    "baseline_registry.csv": "cf8cc9d327f94a7c6733fcb3ee17ebe34396a65a1166c7a5e54835f04e8770f6",
+    "freeze_runner.py": "60f477f132460347f14903b476ae83cecff4717cd1e5763991278db395cbc9db",
+    "gate_a_card.json": "7fd1b1f983c4b2119abf67b0aee48142989be0920d6b9e39d3961c8feb3b0e3a",
+    "selector_census.csv": "ca3626cc89c20b412c392929338b1e1b09b0b4276eba574cc9a69dd6cfb5de7b",
+    "selector_grid.csv": "123d26428df9d440772cacdb09329f84c4c561fe5c1a4a079c5da538bb337953",
+    "source_census.csv": "539ed0238f666f5a7c33fa2a5d5751c268c5116995862d04a43c6a38776b3943"
+  },
+  "gzip_payloads": {
+    "selector_identities-000.csv.gz": {
+      "canonical_compressed_sha256": "7cd2f45c276591dab2fae738c4782d657ed5b1a3e999f049089eeafccf85fbc4"
+    },
+    "selector_identities-001.csv.gz": {
+      "canonical_compressed_sha256": "c95ca5c3c10d2b4bb81ba6255e140e04502e8b2dcdddef3385a07ebaafd282c4"
+    },
+    "selector_identities-002.csv.gz": {
+      "canonical_compressed_sha256": "b6368a69c984419162d100cf09b991fc2bbc6e9f173ffad8dfa420bef179411c"
+    },
+    "selector_identities-003.csv.gz": {
+      "canonical_compressed_sha256": "7c13c66ce1ed1020fc138be613e7dd00945b1043fb1a96f2c57543b0b01ee273"
+    },
+    "selector_identities-004.csv.gz": {
+      "canonical_compressed_sha256": "10412a732a0205f69d54723262f085dc4e61e32d26d650b6cc6fd53974668d6a"
+    },
+    "selector_identities-005.csv.gz": {
+      "canonical_compressed_sha256": "637d49e4f8907145cca4f4fdc8d296c2892247fc93b6b2ed193995146abf4387"
+    },
+    "selector_identities-006.csv.gz": {
+      "canonical_compressed_sha256": "f2eddca6742a879d7ac583b0e3affa9f48d758ba02d2e22b20546c0fa5ae3de5"
+    },
+    "selector_role_vectors-000.csv.gz": {
+      "canonical_compressed_sha256": "0a66375c5cb512f8acbb22a95b1b9854ca103bd1fc79c8c905c998ac8f204f3e"
+    },
+    "selector_role_vectors-001.csv.gz": {
+      "canonical_compressed_sha256": "e8c03222c3c34184d05db9c3da0c64705c5e828be2ade5852ae6a705e55d48b4"
+    },
+    "selector_role_vectors-002.csv.gz": {
+      "canonical_compressed_sha256": "97f664aba6e65fa03be997daecd97886246dce4724219b869417c53c09e1e78f"
+    },
+    "selector_role_vectors-003.csv.gz": {
+      "canonical_compressed_sha256": "6832d1649d03cd3cb1954568f4f31be6f669684a6f0f51f240330be34cab7f1f"
+    },
+    "selector_role_vectors-004.csv.gz": {
+      "canonical_compressed_sha256": "ce62374ea6414ecbccdcbfad98bb5ba307ab7f99db647855bf0a2f163799d4f8"
+    },
+    "selector_role_vectors-005.csv.gz": {
+      "canonical_compressed_sha256": "aa28b128560d94065f56d924a9d3bc7ec88ea9fa0111cbeef8c895cf33be1695"
+    },
+    "selector_role_vectors-006.csv.gz": {
+      "canonical_compressed_sha256": "8d1d5e4ac5a95d1fef5f0b27af24b37377f0944f7a0d17f99c7d5f2857db713c"
+    },
+    "selector_role_vectors-007.csv.gz": {
+      "canonical_compressed_sha256": "87e892ce08552a3a85f5b1f724eb6015de9bee90bb275711aa998c85b1cb2e29"
+    },
+    "selector_role_vectors-008.csv.gz": {
+      "canonical_compressed_sha256": "36e184fd810ad31287d84aac4ba6c0473b4b67bbc64deeb4cd3ce49444e127b9"
+    },
+    "selector_role_vectors-009.csv.gz": {
+      "canonical_compressed_sha256": "e2d054eabc144d943ad3a04f60f42b9c75388c0138dec3e6d11bbd08df654138"
+    },
+    "selector_role_vectors-010.csv.gz": {
+      "canonical_compressed_sha256": "f8c2b22b84dea9b82fed25f13834be9893e9eb7a4f409ded84d3222ca92371d3"
+    },
+    "selector_role_vectors-011.csv.gz": {
+      "canonical_compressed_sha256": "8ab1fe3d80ba7a350eddc0fe43c1b66f9842c2058e975d763b631eed21369b13"
+    },
+    "selector_role_vectors-012.csv.gz": {
+      "canonical_compressed_sha256": "07e107eb5a19150f531936073f0100722ce85b0179050fabe3f80ef78c9daffd"
+    },
+    "selector_role_vectors-013.csv.gz": {
+      "canonical_compressed_sha256": "c8942388f19a154e764ed0f7984126f066627869184a02c9055463a59d504174"
+    },
+    "selector_role_vectors-014.csv.gz": {
+      "canonical_compressed_sha256": "f38a56d402a45f0711d7dbe0d38bcf721dd927d783b180c32abf73a5707e887c"
+    },
+    "selector_role_vectors-015.csv.gz": {
+      "canonical_compressed_sha256": "1f5a2c3d852ed56611df011a930a7827548883405e2cbcbac57c3570363e2f4b"
+    },
+    "selector_role_vectors-016.csv.gz": {
+      "canonical_compressed_sha256": "c2e99299327351f9cf8df9dd8d57669126e157176fcc93f081ad60ff666d0a62"
+    },
+    "selector_role_vectors-017.csv.gz": {
+      "canonical_compressed_sha256": "26045e7ebb224c3afe04c4b92552e0643f879a74175fa78d3e79e8167677f857"
+    },
+    "selector_role_vectors-018.csv.gz": {
+      "canonical_compressed_sha256": "68768586810874cb0a71a666199c87de2c154424a0ea99da66e392cb7c8e4713"
+    },
+    "selector_role_vectors-019.csv.gz": {
+      "canonical_compressed_sha256": "538f8cdf5a233a803e9a7f7705373eba143e6d20d033b8533cf9c6fb725b662c"
+    },
+    "selector_role_vectors-020.csv.gz": {
+      "canonical_compressed_sha256": "ab1f8861d496f285f189c4b88f59d0d460f58380c5adf64bce3fdb0de6fc048f"
+    },
+    "selector_role_vectors-021.csv.gz": {
+      "canonical_compressed_sha256": "bd5061e5e0593cc814cba2b50a915edbcab11d484837a9da345a8acb36c11ae1"
+    },
+    "selector_role_vectors-022.csv.gz": {
+      "canonical_compressed_sha256": "82b61a6ec17a66fad9b49e64688f7ac5d56e0a782969de33399109e198199fbf"
+    },
+    "selector_role_vectors-023.csv.gz": {
+      "canonical_compressed_sha256": "2da2fd6e58bc45ad4ff5d4b22e31e2133c0ac3f390cf1e9a28539703f91deabe"
+    },
+    "selector_role_vectors-024.csv.gz": {
+      "canonical_compressed_sha256": "8315f61017386e3da01345ffe1a1d6b7a2d9e859452f74f02f83b939f61ce0ab"
+    },
+    "selector_role_vectors-025.csv.gz": {
+      "canonical_compressed_sha256": "088e0f69e837eb885e969bff18de1680613d3b0cbd1d0567bcce6dead8ecc0fd"
+    },
+    "selector_role_vectors-026.csv.gz": {
+      "canonical_compressed_sha256": "820f171b2e8d707c86698bc1fb199613f485c16975c3b90a973d2c2aa1153168"
+    },
+    "selector_role_vectors-027.csv.gz": {
+      "canonical_compressed_sha256": "af29dbb97fa0f13b35569535ffaf5b5df9d9f3b3530980f9330e34691120d2b8"
+    },
+    "selector_role_vectors-028.csv.gz": {
+      "canonical_compressed_sha256": "c52f88cd8dca3cc0bf0e22dab23e4e77f3d2878fdd87c45ad19cfd891c8a94cb"
+    },
+    "selector_role_vectors-029.csv.gz": {
+      "canonical_compressed_sha256": "77acf83d2244f35b48552124e7e42a24f8ea3f5bf98916281f1ac2e114b8f83e"
+    },
+    "selector_role_vectors-030.csv.gz": {
+      "canonical_compressed_sha256": "63fa32126e7b39c4ecf0d7edc60b346f32e7f19f044cba1c6fa6166348d7f642"
+    },
+    "selector_role_vectors-031.csv.gz": {
+      "canonical_compressed_sha256": "38b4ee38975b075518ba90831777712dc63ec5dd5825ffea04c3d9d8496d40e3"
+    },
+    "selector_role_vectors-032.csv.gz": {
+      "canonical_compressed_sha256": "b435682d5fd2e6c8baa281e2e895c10179e130422089db44d213ea0fb2752021"
+    },
+    "selector_role_vectors-033.csv.gz": {
+      "canonical_compressed_sha256": "0a0504b606cc42332608f862f7ad88f4a09d32cf8a33e3aa636d5d69f2fc017f"
+    },
+    "selector_role_vectors-034.csv.gz": {
+      "canonical_compressed_sha256": "fa926f2beb13ec78c5defc1ec034c98c359b95a8d99e2d097244eca4e6793328"
+    },
+    "selector_role_vectors-035.csv.gz": {
+      "canonical_compressed_sha256": "62455bb0530fe5459399494abe9d07bc83d8e9617207d6ebdb8315da718d0e66"
+    },
+    "selector_role_vectors-036.csv.gz": {
+      "canonical_compressed_sha256": "948bb31c21fb7219610fdf02e44f896db735f71046f3a78ff6e147906877b689"
+    },
+    "selector_role_vectors-037.csv.gz": {
+      "canonical_compressed_sha256": "b15734618c83e3568b5d15e04e2bf9b9eb95b3b664c0dc33d19408ebf8c8e5e1"
+    },
+    "selector_role_vectors-038.csv.gz": {
+      "canonical_compressed_sha256": "393c746cf273d3e3a101e3ee6de7fd5897afc27aef8373bdae8d8b3979e04c8e"
+    },
+    "selector_role_vectors-039.csv.gz": {
+      "canonical_compressed_sha256": "93c6500e5b1a41837bf17a20a7fc51e20c9f66f32aeeaad37d58bb17ee21a675"
+    },
+    "selector_role_vectors-040.csv.gz": {
+      "canonical_compressed_sha256": "65bdf65e188af9a208cee3dec50b47354fbf5e99ac3d3f16667c5a3dcbe57034"
+    },
+    "selector_role_vectors-041.csv.gz": {
+      "canonical_compressed_sha256": "cf8f6126f58d458ad151ecd48d4f9485bb00d24be8b34034f65aa98c66cadd5e"
+    },
+    "selector_role_vectors-042.csv.gz": {
+      "canonical_compressed_sha256": "2598799679f965b02c76d0db4740b245df7e3b5a11ba57e2ce2fb22ac65d037b"
+    },
+    "selector_role_vectors-043.csv.gz": {
+      "canonical_compressed_sha256": "1cc4a6a90460460610472790ab726d8c2575da0a82ce1e2473226bb07fef0bf8"
+    },
+    "selector_role_vectors-044.csv.gz": {
+      "canonical_compressed_sha256": "45100efc4a253db7e477d08c38237bbe8942e2e068ac660b37989c995326df25"
+    }
+  }
+}

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="720" viewBox="0 0 1180 720">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:Arial,sans-serif;fill:#111827}.grid{stroke:#e5e7eb;stroke-width:1}.axis{stroke:#374151;stroke-width:1}.line{fill:none;stroke-width:2}.band{fill-opacity:.16}.legend{font-size:11px}</style>
+<text x="82" y="30" font-size="19" font-weight="bold">#145 matched pre-tax comparison versus FULL</text>
+<text x="82" y="50" font-size="12">Median candidate-minus-FULL ROI on identical arm/weight/scope support; zero means matched FULL parity.</text>
+<text x="82" y="70.0" font-size="14" font-weight="bold">PRIMARY_NO_GATE_K4</text>
+<line class="grid" x1="82" x2="1142" y1="336.0" y2="336.0"/>
+<text x="72" y="340.0" text-anchor="end" font-size="10">-0.88</text>
+<line class="grid" x1="82" x2="1142" y1="272.0" y2="272.0"/>
+<text x="72" y="276.0" text-anchor="end" font-size="10">-0.58</text>
+<line class="grid" x1="82" x2="1142" y1="208.0" y2="208.0"/>
+<text x="72" y="212.0" text-anchor="end" font-size="10">-0.27</text>
+<line class="grid" x1="82" x2="1142" y1="144.0" y2="144.0"/>
+<text x="72" y="148.0" text-anchor="end" font-size="10">0.03</text>
+<line class="grid" x1="82" x2="1142" y1="80.0" y2="80.0"/>
+<text x="72" y="84.0" text-anchor="end" font-size="10">0.33</text>
+<line x1="82" x2="1142" y1="150.5" y2="150.5" stroke="#111827" stroke-dasharray="4 4"/>
+<line class="axis" x1="82" x2="1142" y1="336.0" y2="336.0"/>
+<text x="82.0" y="354.0" text-anchor="middle" font-size="9">16</text>
+<text x="193.6" y="354.0" text-anchor="middle" font-size="9">48</text>
+<text x="305.2" y="354.0" text-anchor="middle" font-size="9">80</text>
+<text x="416.7" y="354.0" text-anchor="middle" font-size="9">112</text>
+<text x="528.3" y="354.0" text-anchor="middle" font-size="9">144</text>
+<text x="639.9" y="354.0" text-anchor="middle" font-size="9">176</text>
+<text x="751.5" y="354.0" text-anchor="middle" font-size="9">208</text>
+<text x="863.1" y="354.0" text-anchor="middle" font-size="9">240</text>
+<text x="974.6" y="354.0" text-anchor="middle" font-size="9">512</text>
+<text x="1030.4" y="354.0" text-anchor="middle" font-size="9">1024</text>
+<text x="1086.2" y="354.0" text-anchor="middle" font-size="9">1458</text>
+<text x="1142.0" y="354.0" text-anchor="middle" font-size="9">2187</text>
+<polyline class="line" stroke="#2563eb" points="82.0,188.3 137.8,155.8 193.6,147.1 249.4,161.6 305.2,161.7 360.9,154.3 416.7,153.3 472.5,152.4 528.3,155.3 584.1,161.2 639.9,162.1 695.7,166.7 751.5,167.9 807.3,164.7 863.1,163.3 918.8,162.2 974.6,144.0 1030.4,138.6 1086.2,143.6 1142.0,150.5"/>
+<polyline class="line" stroke="#dc2626" points="82.0,229.9 137.8,188.3 193.6,187.2 249.4,155.8 305.2,146.0 360.9,147.1 416.7,157.4 472.5,161.6 528.3,165.3 584.1,161.7 639.9,155.8 695.7,154.3 751.5,155.2 807.3,153.3 863.1,151.4 918.8,152.4 974.6,162.2 1030.4,144.0 1086.2,143.2 1142.0,137.8"/>
+<polyline class="line" stroke="#059669" points="82.0,217.0 137.8,229.9 193.6,218.1 249.4,188.3 305.2,180.1 360.9,187.2 416.7,170.0 472.5,155.8 528.3,145.7 584.1,146.0 639.9,133.0 695.7,147.1 751.5,150.5 807.3,157.4 863.1,157.9 918.8,161.6 974.6,152.4 1030.4,162.2 1086.2,143.3 1142.0,138.8"/>
+<polyline class="line" stroke="#d97706" points="82.0,253.0 137.8,217.0 193.6,242.7 249.4,229.9 305.2,239.0 360.9,218.1 416.7,201.1 472.5,188.3 528.3,190.7 584.1,180.1 639.9,183.6 695.7,187.2 751.5,178.6 807.3,170.0 863.1,165.3 918.8,155.8 974.6,161.6 1030.4,152.9 1086.2,159.9 1142.0,153.7"/>
+<polyline class="line" stroke="#7c3aed" points="82.0,188.3 137.8,155.8 193.6,147.1 249.4,161.6 305.2,161.7 360.9,154.3 416.7,152.8 472.5,152.4 528.3,155.3 584.1,161.2 639.9,162.1 695.7,166.7 751.5,167.9 807.3,164.7 863.1,163.3 918.8,162.2 974.6,144.0 1030.4,138.9 1086.2,143.6 1142.0,150.5"/>
+<polyline class="line" stroke="#0891b2" points="82.0,188.3 137.8,155.8 193.6,147.1 249.4,161.6 305.2,161.7 360.9,154.3 416.7,152.8 472.5,152.4 528.3,155.3 584.1,161.2 639.9,162.1 695.7,166.7 751.5,167.9 807.3,164.7 863.1,163.3 918.8,162.2 974.6,144.1 1030.4,138.4 1086.2,143.2 1142.0,155.8"/>
+<polyline class="line" stroke="#be123c" points="82.0,139.7 137.8,161.4 193.6,154.5 249.4,141.5 305.2,131.8 360.9,145.0 416.7,145.1 472.5,119.4 528.3,121.7 584.1,123.1 639.9,130.4 695.7,132.1 751.5,132.4 807.3,128.7 863.1,132.4 918.8,135.1 974.6,154.3 1030.4,143.7 1086.2,147.3 1142.0,150.5"/>
+<polyline class="line" stroke="#4b5563" points="82.0,183.3 137.8,159.1 193.6,166.5 249.4,167.0 305.2,164.9 360.9,164.9 416.7,163.8 472.5,170.3 528.3,162.9 584.1,156.2 639.9,160.4 695.7,159.7 751.5,156.8 807.3,156.0 863.1,153.9 918.8,154.4 974.6,152.4 1030.4,147.3 1086.2,148.2 1142.0,147.5"/>
+<text x="82" y="380.0" font-size="14" font-weight="bold">SECONDARY_ESP300_GM290_K8</text>
+<line class="grid" x1="82" x2="1142" y1="646.0" y2="646.0"/>
+<text x="72" y="650.0" text-anchor="end" font-size="10">-0.88</text>
+<line class="grid" x1="82" x2="1142" y1="582.0" y2="582.0"/>
+<text x="72" y="586.0" text-anchor="end" font-size="10">-0.58</text>
+<line class="grid" x1="82" x2="1142" y1="518.0" y2="518.0"/>
+<text x="72" y="522.0" text-anchor="end" font-size="10">-0.27</text>
+<line class="grid" x1="82" x2="1142" y1="454.0" y2="454.0"/>
+<text x="72" y="458.0" text-anchor="end" font-size="10">0.03</text>
+<line class="grid" x1="82" x2="1142" y1="390.0" y2="390.0"/>
+<text x="72" y="394.0" text-anchor="end" font-size="10">0.33</text>
+<line x1="82" x2="1142" y1="460.5" y2="460.5" stroke="#111827" stroke-dasharray="4 4"/>
+<line class="axis" x1="82" x2="1142" y1="646.0" y2="646.0"/>
+<text x="82.0" y="664.0" text-anchor="middle" font-size="9">16</text>
+<text x="193.6" y="664.0" text-anchor="middle" font-size="9">48</text>
+<text x="305.2" y="664.0" text-anchor="middle" font-size="9">80</text>
+<text x="416.7" y="664.0" text-anchor="middle" font-size="9">112</text>
+<text x="528.3" y="664.0" text-anchor="middle" font-size="9">144</text>
+<text x="639.9" y="664.0" text-anchor="middle" font-size="9">176</text>
+<text x="751.5" y="664.0" text-anchor="middle" font-size="9">208</text>
+<text x="863.1" y="664.0" text-anchor="middle" font-size="9">240</text>
+<text x="974.6" y="664.0" text-anchor="middle" font-size="9">512</text>
+<text x="1030.4" y="664.0" text-anchor="middle" font-size="9">1024</text>
+<text x="1086.2" y="664.0" text-anchor="middle" font-size="9">1458</text>
+<text x="1142.0" y="664.0" text-anchor="middle" font-size="9">2187</text>
+<polyline class="line" stroke="#2563eb" points="82.0,530.5 137.8,462.5 193.6,447.7 249.4,466.3 305.2,468.1 360.9,461.1 416.7,465.4 472.5,458.7 528.3,463.7 584.1,469.6 639.9,470.3 695.7,473.8 751.5,474.7 807.3,475.2 863.1,477.0 918.8,476.1 974.6,472.8 1030.4,460.0 1086.2,457.0 1142.0,460.5"/>
+<polyline class="line" stroke="#dc2626" points="82.0,561.7 137.8,530.5 193.6,510.4 249.4,462.5 305.2,452.5 360.9,447.7 416.7,459.6 472.5,466.3 528.3,463.9 584.1,468.1 639.9,460.0 695.7,461.1 751.5,465.2 807.3,465.4 863.1,465.8 918.8,458.7 974.6,476.1 1030.4,472.8 1086.2,471.1 1142.0,460.2"/>
+<polyline class="line" stroke="#059669" points="82.0,564.9 137.8,561.7 193.6,560.6 249.4,530.5 305.2,505.9 360.9,510.4 416.7,479.0 472.5,462.5 528.3,454.9 584.1,452.5 639.9,448.6 695.7,447.7 751.5,454.4 807.3,459.6 863.1,463.5 918.8,466.3 974.6,458.7 1030.4,476.1 1086.2,476.8 1142.0,471.2"/>
+<polyline class="line" stroke="#d97706" points="82.0,628.3 137.8,564.9 193.6,586.5 249.4,561.7 305.2,563.7 360.9,560.6 416.7,530.7 472.5,530.5 528.3,520.9 584.1,505.9 639.9,512.6 695.7,510.4 751.5,500.8 807.3,479.0 863.1,468.0 918.8,462.5 974.6,466.3 1030.4,458.7 1086.2,471.3 1142.0,468.5"/>
+<polyline class="line" stroke="#7c3aed" points="82.0,530.5 137.8,462.5 193.6,447.7 249.4,465.6 305.2,468.1 360.9,461.1 416.7,465.2 472.5,458.7 528.3,463.7 584.1,469.6 639.9,470.3 695.7,473.8 751.5,474.7 807.3,475.2 863.1,477.0 918.8,476.1 974.6,472.8 1030.4,460.0 1086.2,457.0 1142.0,460.5"/>
+<polyline class="line" stroke="#0891b2" points="82.0,530.5 137.8,462.5 193.6,447.7 249.4,465.6 305.2,468.1 360.9,461.1 416.7,465.2 472.5,458.7 528.3,463.7 584.1,469.6 639.9,470.3 695.7,473.8 751.5,474.7 807.3,475.2 863.1,477.0 918.8,476.1 974.6,472.8 1030.4,460.7 1086.2,457.8 1142.0,464.1"/>
+<polyline class="line" stroke="#be123c" points="82.0,433.1 137.8,407.7 193.6,437.9 249.4,436.2 305.2,425.6 360.9,424.9 416.7,436.9 472.5,433.3 528.3,436.7 584.1,435.1 639.9,439.2 695.7,441.4 751.5,443.1 807.3,445.9 863.1,449.5 918.8,451.8 974.6,456.7 1030.4,463.2 1086.2,460.3 1142.0,460.5"/>
+<polyline class="line" stroke="#4b5563" points="82.0,470.1 137.8,456.0 193.6,468.6 249.4,470.7 305.2,464.5 360.9,469.9 416.7,469.3 472.5,468.7 528.3,473.6 584.1,466.0 639.9,467.9 695.7,468.2 751.5,468.8 807.3,466.8 863.1,466.0 918.8,466.5 974.6,463.6 1030.4,464.4 1086.2,461.6 1142.0,462.5"/>
+<line x1="82" x2="101" y1="692" y2="692" stroke="#2563eb" stroke-width="3"/>
+<text class="legend" x="106" y="696">CAPPED cap=1</text>
+<line x1="211" x2="230" y1="692" y2="692" stroke="#dc2626" stroke-width="3"/>
+<text class="legend" x="235" y="696">CAPPED cap=2</text>
+<line x1="340" x2="359" y1="692" y2="692" stroke="#059669" stroke-width="3"/>
+<text class="legend" x="364" y="696">CAPPED cap=4</text>
+<line x1="469" x2="488" y1="692" y2="692" stroke="#d97706" stroke-width="3"/>
+<text class="legend" x="493" y="696">CAPPED cap=8</text>
+<line x1="598" x2="617" y1="692" y2="692" stroke="#7c3aed" stroke-width="3"/>
+<text class="legend" x="622" y="696">DETERMINISTIC_TOP_MASS</text>
+<line x1="797" x2="816" y1="692" y2="692" stroke="#0891b2" stroke-width="3"/>
+<text class="legend" x="821" y="696">RESIDUAL_SYSTEMATIC</text>
+<line x1="975" x2="994" y1="692" y2="692" stroke="#be123c" stroke-width="3"/>
+<text class="legend" x="999" y="696">WOR_DISTINCT</text>
+<line x1="82" x2="101" y1="707" y2="707" stroke="#4b5563" stroke-width="3"/>
+<text class="legend" x="106" y="711">WR_DUPLICATE_STAKE</text>
+<text x="18" y="380" transform="rotate(-90 18 380)" font-size="12">pre-tax ROI delta vs FULL</text>
+</svg>

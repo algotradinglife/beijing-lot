@@ -1,0 +1,458 @@
+{
+  "contract_version": "bj167-gate-a-content-v3r1",
+  "controls": {
+    "README.md": "d2db2020f1726860bae7c1fba9498f39fa89edc93a0907a8d1f441df0864a6d0",
+    "allocation_grid.csv": "8776f9f06b2301bc5f09d19984cb2bd8d3279e6779b11a6149e7933086fb9100",
+    "baseline_registry.csv": "1d6670ed7274eea81b6b78c3a4b1d8bc809219f360f2b43f8a7133c96ba5e435",
+    "freeze_runner.py": "15a7d1c16a7686c2d2164439c10fbc6e5927685afc905ed8c3028d91bb769a81",
+    "gate_a_card.json": "7d0e9a2c63d48290089d7bac1c8f22db1abcfa9e285ffcb108e2703b8c137210",
+    "selector_census.csv": "1744e0dfedf2111baf2b79060dcd9dd998f278ca2c54b39a0f3bfebcf6121a13",
+    "selector_grid.csv": "123d26428df9d440772cacdb09329f84c4c561fe5c1a4a079c5da538bb337953",
+    "shard_index.csv": "327ef4d27055a7109a86244b5a1c591bb76e6fa4ccab05c6f1e0b7f2a6e1a15c",
+    "source_census.csv": "2787e535f3932fd7e159e0d128e115f187d101951983bbb967b7f720902c0139",
+    "whole_ledger_reconciliation.json": "160907cdb8544455db2989acb27ddbf8a0b231f37a69e0273e5e2024e329f817"
+  },
+  "shards": {
+    "selector_identities-000.csv.gz": {
+      "canonical_compressed_sha256": "9cd333b6b0d7dffb764110e6152b83e351270f8da71f9bbc012464bcde181983",
+      "canonical_decompressed_sha256": "e0bf7e28289f8d5d93c8a102a003cbfb558a12e68c7dcc8bd68c2402a2f2e512",
+      "first_key": "S1_NO_GATE_K1|190101@OOS_2019|3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b|1",
+      "kind": "selector_identities",
+      "last_key": "S2_ESP280_GM290_P_MIN_LOWP25_VALUE_FIRST_K_ALL|22035@OOS_2022|815aa81cd48739054d06460aa1214817c41742b9fa5e0be0dcfb74b9ef6e8e4d|10",
+      "row_count": 200000
+    },
+    "selector_identities-001.csv.gz": {
+      "canonical_compressed_sha256": "933ec6e059c7b6607bcd4290c16e1891bb69950d0df47a7363ebbbe7f7ce6621",
+      "canonical_decompressed_sha256": "c5432c67e1bc072566cf1bfd12a9d79380eda8b5f74909d33af27da86948e476",
+      "first_key": "S2_ESP280_GM290_P_MIN_LOWP25_VALUE_FIRST_K_ALL|22035@OOS_2022|9c53ca83cd2b589cb57bc4b03579f26b180c7a7b78ee15d977aea5885a08d636|11",
+      "kind": "selector_identities",
+      "last_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K16|23035@OOS_2023|cabd1f1cc154531b2c001c9a90e681e4478e4ab2b235673772f20a18f76ef904|3",
+      "row_count": 200000
+    },
+    "selector_identities-002.csv.gz": {
+      "canonical_compressed_sha256": "dbe96a373339febd9202d86d829294b771b1c5a343bc0bfbf8a85030fcce261d",
+      "canonical_decompressed_sha256": "35e5b507040e48bb0dae25c5604c27707254140d7bc13c4e487fa43ad3fc99de",
+      "first_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|23035@OOS_2023|b60919362532f4269602de812d0e39cfd37b8bd709dc338945f65a49953bc1f3|1",
+      "kind": "selector_identities",
+      "last_key": "S2_ESP290_GM300_P_MIN_LOWP30_COLD_FIRST_K_ALL|20065@OOS_2020|9ca879c57d2aa03d1707e12893f412cd5c62f18419c5c1c6cdb8e5f136e3db5b|143",
+      "row_count": 200000
+    },
+    "selector_identities-003.csv.gz": {
+      "canonical_compressed_sha256": "c6b3bb62464159a5620c89400aa7085e1a18f5b6cb8349ec9266e3bc2bf2447f",
+      "canonical_decompressed_sha256": "ae514fd32e0358226f49e2e7402f14729b2dd061ef165df9e0a6a197a0c18274",
+      "first_key": "S2_ESP290_GM300_P_MIN_LOWP30_COLD_FIRST_K_ALL|20065@OOS_2020|a00ea94ba191a13193cc024149a070b0e1186b256278d3ec226114ab03bebc4c|144",
+      "kind": "selector_identities",
+      "last_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|24123@OOS_2024|809e9b143e596bffea486cdc6ce5b23ab7d65a0de9a63d6fa63ef4d644cf5b10|56",
+      "row_count": 200000
+    },
+    "selector_identities-004.csv.gz": {
+      "canonical_compressed_sha256": "5d5a4125eb48862f396ca15707a8f6c4f299deeb5a77a985324c19dd9fa9e993",
+      "canonical_decompressed_sha256": "8cbb57b4d038eb4a31cf53f918eeeaa8d62a1f75a8b21b8612fdab7c36d54458",
+      "first_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|24123@OOS_2024|f4cee1ae3d4cf18668b1acabac0320b5ccf02d2200a8d6d3483014bec4d531b5|57",
+      "kind": "selector_identities",
+      "last_key": "S2_ESP300_GM305_P_MIN_LOWP30_COLD_FIRST_K_ALL|22051@OOS_2022|0172f1245ac2c47b3e09cbae231e735911a4a31fa223453c0e07603e4667d3bf|110",
+      "row_count": 200000
+    },
+    "selector_identities-005.csv.gz": {
+      "canonical_compressed_sha256": "50049bc494b0862a018fd8bba7e8337ee9b62e9873e336445bf1765cda1d5909",
+      "canonical_decompressed_sha256": "c767d96b4d57829a89a900dbdeaea791ad128bdfec25399d6de218b544476206",
+      "first_key": "S2_ESP300_GM305_P_MIN_LOWP30_COLD_FIRST_K_ALL|22051@OOS_2022|b87366552d39e920fdea02042147de1ef777daf0b354b4e1ca7c7bfb945e20de|111",
+      "kind": "selector_identities",
+      "last_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP25_COLD_FIRST_K_ALL|24054@OOS_2024|3c31d158af906df597a0510027d02420f43b6767cbf607793050c3b1244d2070|25",
+      "row_count": 200000
+    },
+    "selector_identities-006.csv.gz": {
+      "canonical_compressed_sha256": "0d48fec9ac927bd62f4617512f3af8ac3acf8be19fe0e4564f0c2951d7135fc8",
+      "canonical_decompressed_sha256": "ed6f4d30e23385ff814befe62f32f501d8e5bec905da91bd85e49bacc382705c",
+      "first_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP25_COLD_FIRST_K_ALL|24054@OOS_2024|28b0d8e346552a95569f3bb6a5c199fb4833695967e601552cac49be6167715b|26",
+      "kind": "selector_identities",
+      "last_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|25042@OOS_2025|131897442e07ef911635fbda592831aac90ea5e3eea1cf2a177f6d5ca6423257|186",
+      "row_count": 106139
+    },
+    "selector_role_vectors-000.csv.gz": {
+      "canonical_compressed_sha256": "aaef2aff2a9ffe0d78cb0533e420cf701c81bdd04494bb8eef49eda32c470ecd",
+      "canonical_decompressed_sha256": "1561bdd0dab8267375239fd8049d590cf81ad7224ea7587c479788fb53bfe45b",
+      "first_key": "S1_NO_GATE_K1|190101@OOS_2019|3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b|1",
+      "kind": "selector_role_vectors",
+      "last_key": "S1_ESP280_GM290_K_ALL|21024@OOS_2021|80476f6091b9a959a355bbd3f80aa4d2df96f41744f98a8e7fd1fa232629fc1b|3",
+      "row_count": 200000
+    },
+    "selector_role_vectors-001.csv.gz": {
+      "canonical_compressed_sha256": "047ed76d47ac9a08978781f050cd93be85d219c910f1be11d8458f738faedb9c",
+      "canonical_decompressed_sha256": "f521ce0b7687168ba6d9394f03f978c451a95c59f7fb3eeb4aa9ab280e8d0556",
+      "first_key": "S1_ESP280_GM290_K_ALL|21024@OOS_2021|80476f6091b9a959a355bbd3f80aa4d2df96f41744f98a8e7fd1fa232629fc1b|4",
+      "kind": "selector_role_vectors",
+      "last_key": "S1_ESP280_GM305_K16|23071@OOS_2023|a8ffd1523980442b8210b2018495e2f891bbfcca24e3866a3fc42b38a73ece22|6",
+      "row_count": 200000
+    },
+    "selector_role_vectors-002.csv.gz": {
+      "canonical_compressed_sha256": "150a1cf80ab2f893357a94bd15f450daac7e29cfc4fde4bbc79b4130b55c2f6a",
+      "canonical_decompressed_sha256": "3bd5c352dd588b7645270065be88ee77c6d2acc12f1335320fd6a697a83691a7",
+      "first_key": "S1_ESP280_GM305_K16|23071@OOS_2023|a8ffd1523980442b8210b2018495e2f891bbfcca24e3866a3fc42b38a73ece22|7",
+      "kind": "selector_role_vectors",
+      "last_key": "S1_ESP290_GM300_K16|20012@OOS_2020|a8814ea1984144667bae2a3d94963817d0e8d5f796067c8b009dd86a41e78255|2",
+      "row_count": 200000
+    },
+    "selector_role_vectors-003.csv.gz": {
+      "canonical_compressed_sha256": "0f4caf7aa9e335f0be1c2a35724e9d33196a2e78014195875552a48070ef8190",
+      "canonical_decompressed_sha256": "aa2bd6c032479cd872f6a9e6bb05edf43d786ad8268f43cf9e6f03355ef60956",
+      "first_key": "S1_ESP290_GM300_K16|20012@OOS_2020|a8814ea1984144667bae2a3d94963817d0e8d5f796067c8b009dd86a41e78255|3",
+      "kind": "selector_role_vectors",
+      "last_key": "S1_ESP300_GM290_K4|23075@OOS_2023|f68a7e7eefee95f09b637ac86f8b356168cd791f189a608f65ae1422e8f85ae4|5",
+      "row_count": 200000
+    },
+    "selector_role_vectors-004.csv.gz": {
+      "canonical_compressed_sha256": "938ed0b4ff49161b96e878ae20edf294ae2857d659d027ed90f2031e88db9185",
+      "canonical_decompressed_sha256": "ec344a1b9175e49f8bf222d7004ffbf71f83c6466246b8dbec9034ddf09213a7",
+      "first_key": "S1_ESP300_GM290_K4|23075@OOS_2023|f68a7e7eefee95f09b637ac86f8b356168cd791f189a608f65ae1422e8f85ae4|6",
+      "kind": "selector_role_vectors",
+      "last_key": "S1_ESP300_GM300_K_ALL|25032@OOS_2025|a7cb7cf6ccc33edfcec162c5fed0d960293223a1b1d8727ac50df7773e882cca|1",
+      "row_count": 200000
+    },
+    "selector_role_vectors-005.csv.gz": {
+      "canonical_compressed_sha256": "e78b83a6bcf69538b1567827d819d6e145882e7a109271d536464e21000bd0fb",
+      "canonical_decompressed_sha256": "529de60769457439fc07123744e3f8f852122b3f7b6884ae44884bf8d6102c4f",
+      "first_key": "S1_ESP300_GM300_K_ALL|25032@OOS_2025|a7cb7cf6ccc33edfcec162c5fed0d960293223a1b1d8727ac50df7773e882cca|2",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_P_MIN_LOWP25_COLD_FIRST_K_ALL|20093@OOS_2020|fc490356041ddc6a0ba9a64378519fa178b687494bcedfd795299cbbf8451e0f|4",
+      "row_count": 200000
+    },
+    "selector_role_vectors-006.csv.gz": {
+      "canonical_compressed_sha256": "cf6705abf42459bea70d278921e7e77b73d58afe0b5ebd72b2dff930091df1a5",
+      "canonical_decompressed_sha256": "29a3a6772ceed04491f032fe6d888719d345867e2c17716882799cfdd1d56459",
+      "first_key": "S2_ESP280_GM290_P_MIN_LOWP25_COLD_FIRST_K_ALL|20093@OOS_2020|fc490356041ddc6a0ba9a64378519fa178b687494bcedfd795299cbbf8451e0f|5",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_P_MIN_LOWP25_VALUE_FIRST_K_ALL|22035@OOS_2022|815aa81cd48739054d06460aa1214817c41742b9fa5e0be0dcfb74b9ef6e8e4d|7",
+      "row_count": 200000
+    },
+    "selector_role_vectors-007.csv.gz": {
+      "canonical_compressed_sha256": "fdfb488505c90a0e152e81c8e3f4f0c52d54c05b6b85494980d2bbc9e42d6aa7",
+      "canonical_decompressed_sha256": "90eac048c1ee4106f16a8c77eba2532eccbd9d938e5a6563e0a9a809bd81dbd7",
+      "first_key": "S2_ESP280_GM290_P_MIN_LOWP25_VALUE_FIRST_K_ALL|22035@OOS_2022|9c53ca83cd2b589cb57bc4b03579f26b180c7a7b78ee15d977aea5885a08d636|1",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_P_MIN_LOWP30_COLD_FIRST_K_ALL|21122@OOS_2021|b59512b7e7a54912c09a935348176a83b6a370ef28ca3d61ce3ec1fa210d65fb|3",
+      "row_count": 200000
+    },
+    "selector_role_vectors-008.csv.gz": {
+      "canonical_compressed_sha256": "ef98f267ba42ae5644845d7ac495515f04edc6e7cdb532e05d4934b4b2c64e3f",
+      "canonical_decompressed_sha256": "4274bd51d1a4aaabda3349b2459d0f75a694cc5e9ef3f74ebe01862a9b6221ed",
+      "first_key": "S2_ESP280_GM290_P_MIN_LOWP30_COLD_FIRST_K_ALL|21122@OOS_2021|b59512b7e7a54912c09a935348176a83b6a370ef28ca3d61ce3ec1fa210d65fb|4",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_P_MIN_LOWP30_VALUE_FIRST_K16|20062@OOS_2020|f29acc25ed27980e6b1bb659423aaf4671ff2e8e4095bfc66ab9e832420442a9|6",
+      "row_count": 200000
+    },
+    "selector_role_vectors-009.csv.gz": {
+      "canonical_compressed_sha256": "4c8209c6c9a37dd9a486bfe6efd579b5354ad25ef3cf7e60f83d1a06663c9e30",
+      "canonical_decompressed_sha256": "e4ef8ecfb816ebf908a02d6d20f73f33b5e42c39f4dd660f3a95ff6d34cda7b6",
+      "first_key": "S2_ESP280_GM290_P_MIN_LOWP30_VALUE_FIRST_K16|20062@OOS_2020|f29acc25ed27980e6b1bb659423aaf4671ff2e8e4095bfc66ab9e832420442a9|7",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_P_MIN_LOWP30_VALUE_FIRST_K_ALL|23082@OOS_2023|851969c193cdccda782e5d42c270291266a7e70deb97c350a50992fe22499a33|2",
+      "row_count": 200000
+    },
+    "selector_role_vectors-010.csv.gz": {
+      "canonical_compressed_sha256": "f04f5696cd656eab82534d03fdd5bf50dd663af6ccf80d70eca097fd711293fc",
+      "canonical_decompressed_sha256": "328ab645095029ce5f765a7a1e109df1a9fc9342ba6b231014684beadd10628a",
+      "first_key": "S2_ESP280_GM290_P_MIN_LOWP30_VALUE_FIRST_K_ALL|23082@OOS_2023|851969c193cdccda782e5d42c270291266a7e70deb97c350a50992fe22499a33|3",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP25_COLD_FIRST_K16|24024@OOS_2024|b7c2ac37767fd632f96137e53465cc31eb25f26623e2814346679663ae920a38|5",
+      "row_count": 200000
+    },
+    "selector_role_vectors-011.csv.gz": {
+      "canonical_compressed_sha256": "c446502e95eb7025c4ed8324fd1c0825715d7e079fc5a2e273e62180ac9b7363",
+      "canonical_decompressed_sha256": "f299cf0e7a402f47ed48675beb056b7edbaf0d2fe21628a20da746d93f1cbdce",
+      "first_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP25_COLD_FIRST_K16|24024@OOS_2024|b7c2ac37767fd632f96137e53465cc31eb25f26623e2814346679663ae920a38|6",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K_ALL|21085@OOS_2021|fc55e8bb6ff7bfec9e9820352624d8b516a7560b2f39902b513bd2c767513217|1",
+      "row_count": 200000
+    },
+    "selector_role_vectors-012.csv.gz": {
+      "canonical_compressed_sha256": "9e22b50db8b82bf1fdea7251aff484efc02602b3ef430825d11b6fff2d4bcd34",
+      "canonical_decompressed_sha256": "f8bd8311a3df1a67ee9b45db2d2f99978d0c96cb5876a29a91216558cd12ecfd",
+      "first_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K_ALL|21085@OOS_2021|fc55e8bb6ff7bfec9e9820352624d8b516a7560b2f39902b513bd2c767513217|2",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K16|24125@OOS_2024|e5196ca553f235a9b125c8ed60ff1af734d29ca20b295c3e68279c8a9429215c|4",
+      "row_count": 200000
+    },
+    "selector_role_vectors-013.csv.gz": {
+      "canonical_compressed_sha256": "9bc9bee3ef42e0c1c8a3d4067d1df1ccf9c24e8667a9dae53fab3cd191abb91f",
+      "canonical_decompressed_sha256": "32892703bcf7dab1910b53b4680080b93a4233c0ff6fcd9fea3bd00f7ae4eb53",
+      "first_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K16|24125@OOS_2024|e5196ca553f235a9b125c8ed60ff1af734d29ca20b295c3e68279c8a9429215c|5",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K16|23035@OOS_2023|cabd1f1cc154531b2c001c9a90e681e4478e4ab2b235673772f20a18f76ef904|7",
+      "row_count": 200000
+    },
+    "selector_role_vectors-014.csv.gz": {
+      "canonical_compressed_sha256": "96a97f5cdda62fdd4a3fea7aeb86e8aa2d816cff48c804a0142ed19aa685fe37",
+      "canonical_decompressed_sha256": "8712f06e9f3886eda611a06b61290a1ed5313795a5542e966854c533a8a8d83d",
+      "first_key": "S2_ESP280_GM290_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|23035@OOS_2023|b60919362532f4269602de812d0e39cfd37b8bd709dc338945f65a49953bc1f3|1",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP25_COLD_FIRST_K16|22032@OOS_2022|f0b8d500cda0d66bacd501e469ce16d7be9c6a01c0a8d3703d83dab9cec3186d|3",
+      "row_count": 200000
+    },
+    "selector_role_vectors-015.csv.gz": {
+      "canonical_compressed_sha256": "b6a51107d362dc640f428692d8cd38af646b6e9152c3d7d6795b08ad7b1e215e",
+      "canonical_decompressed_sha256": "9ad1960fbbe8de5c00b3c0dd6c4fc3e367f44b4f3d7a76b509661d824ec6b748",
+      "first_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP25_COLD_FIRST_K16|22032@OOS_2022|f0b8d500cda0d66bacd501e469ce16d7be9c6a01c0a8d3703d83dab9cec3186d|4",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP25_VALUE_FIRST_K_ALL|25041@OOS_2025|d3b8d71f6e3d1f196d4e0589e467b78b0b8605e16bdaea5091e9ae71d125615a|6",
+      "row_count": 200000
+    },
+    "selector_role_vectors-016.csv.gz": {
+      "canonical_compressed_sha256": "16cdbee0bcdbf5738a50f78628dca7445911c6905f5bbeebf88d1d58212cba92",
+      "canonical_decompressed_sha256": "f3f5aba4174222626ae12e38c2b480f0fb5942154ed97701e0a1a5265a5ec618",
+      "first_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP25_VALUE_FIRST_K_ALL|25041@OOS_2025|d3b8d71f6e3d1f196d4e0589e467b78b0b8605e16bdaea5091e9ae71d125615a|7",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|23071@OOS_2023|05887803e71baf642ce651ebbe6fd31a7e9e2c72a41a6c1a923aead0ec465767|2",
+      "row_count": 200000
+    },
+    "selector_role_vectors-017.csv.gz": {
+      "canonical_compressed_sha256": "b790fbb4dedac0bdf64e9c02e833d436a9e3a00522f4c9a5a51ae20353dd61d7",
+      "canonical_decompressed_sha256": "e0b3ece6242bf02427ab16586c7909eed83f11f3e0add8628db9452e5b413fbd",
+      "first_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|23071@OOS_2023|05887803e71baf642ce651ebbe6fd31a7e9e2c72a41a6c1a923aead0ec465767|3",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|21102@OOS_2021|b95dc1e266ec0c8a3ec570237db4e2d6a07d61ef3fdf8d9745d03f96f13aed42|5",
+      "row_count": 200000
+    },
+    "selector_role_vectors-018.csv.gz": {
+      "canonical_compressed_sha256": "60ab5b81529af501bb7b2735af201b3501096507cacf16cf145b96064b0283f8",
+      "canonical_decompressed_sha256": "b86afd5de1a31d9f94d436721c3ccecd493923b56bf0f214d268bcae982b7da9",
+      "first_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|21102@OOS_2021|b95dc1e266ec0c8a3ec570237db4e2d6a07d61ef3fdf8d9745d03f96f13aed42|6",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|25032@OOS_2025|f8d97a4cd257e252f0fe3f1fdb87cf6c1d9d841208edabd37c1241d76a69a50f|1",
+      "row_count": 200000
+    },
+    "selector_role_vectors-019.csv.gz": {
+      "canonical_compressed_sha256": "0d4fefd56dacdd41cae7036eaf7db648647d5f6cdfb845032c8f9ddd0670a8da",
+      "canonical_decompressed_sha256": "14e70ba04dc6fd6bc329ef6371fbc65c21bc826eeca5a778b38d9914ef9a681c",
+      "first_key": "S2_ESP280_GM290_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|25032@OOS_2025|f8d97a4cd257e252f0fe3f1fdb87cf6c1d9d841208edabd37c1241d76a69a50f|2",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_P_MIN_LOWP25_COLD_FIRST_K16|23123@OOS_2023|234142e9be45086051f6e05566555c728012f854047675bc1afbbedfd66dd7d3|4",
+      "row_count": 200000
+    },
+    "selector_role_vectors-020.csv.gz": {
+      "canonical_compressed_sha256": "d6fc4fe2d3f4a57387da00293fa02be3de0014fc6be326f1f2630400eff25f4d",
+      "canonical_decompressed_sha256": "32761c7046377e8cfc99bfa302e9b64fb3faba98fc7521ada43d8013a78080f4",
+      "first_key": "S2_ESP290_GM300_P_MIN_LOWP25_COLD_FIRST_K16|23123@OOS_2023|234142e9be45086051f6e05566555c728012f854047675bc1afbbedfd66dd7d3|5",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_P_MIN_LOWP30_COLD_FIRST_K_ALL|20065@OOS_2020|9ca879c57d2aa03d1707e12893f412cd5c62f18419c5c1c6cdb8e5f136e3db5b|7",
+      "row_count": 200000
+    },
+    "selector_role_vectors-021.csv.gz": {
+      "canonical_compressed_sha256": "e70cb6a7c5f567f0684395ef10b66ea3183a3ad137129cae3b8a2de8953b368e",
+      "canonical_decompressed_sha256": "f1b35c2e1a2086fc7501a5c53c392a0d86cef772ee3a8127f2aae5eef4169202",
+      "first_key": "S2_ESP290_GM300_P_MIN_LOWP30_COLD_FIRST_K_ALL|20065@OOS_2020|a00ea94ba191a13193cc024149a070b0e1186b256278d3ec226114ab03bebc4c|1",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_P_MIN_LOWP30_COLD_FIRST_K_ALL|23091@OOS_2023|fdfdcf4fa52792c775b5c935550c34ade1ecbaaed7947bc7ec0756b105739f29|3",
+      "row_count": 200000
+    },
+    "selector_role_vectors-022.csv.gz": {
+      "canonical_compressed_sha256": "2931ddb01bef37b24ead561a2018fe1479286e779435a8586ef0b34d168c928c",
+      "canonical_decompressed_sha256": "caacbdd3e555b1eb501ddeee822c46fd190bed27af8535f95a587803536d0687",
+      "first_key": "S2_ESP290_GM300_P_MIN_LOWP30_COLD_FIRST_K_ALL|23091@OOS_2023|fdfdcf4fa52792c775b5c935550c34ade1ecbaaed7947bc7ec0756b105739f29|4",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_P_MIN_LOWP30_VALUE_FIRST_K_ALL|21115@OOS_2021|00a635217687a6ac2ec4608ceddb75e6589747ce5142b2b9e3d849ac97c332f9|6",
+      "row_count": 200000
+    },
+    "selector_role_vectors-023.csv.gz": {
+      "canonical_compressed_sha256": "9026fdb3e3d856cfa4b2c7e89b52bffef389cb3a441853f5d22d76d32814944f",
+      "canonical_decompressed_sha256": "2e111d52cffa2d63064152b243ef2f2b188a8af3851af03de15ced31c22f781e",
+      "first_key": "S2_ESP290_GM300_P_MIN_LOWP30_VALUE_FIRST_K_ALL|21115@OOS_2021|00a635217687a6ac2ec4608ceddb75e6589747ce5142b2b9e3d849ac97c332f9|7",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K4|20103@OOS_2020|ad5742ecf70f2e629524f3a0de77589065a3b62e7a8ab89cc6bca85dc2b771f2|2",
+      "row_count": 200000
+    },
+    "selector_role_vectors-024.csv.gz": {
+      "canonical_compressed_sha256": "11804b5b7f50bceb82440dde2895b0c4d9780dd308748593b45a005915452e52",
+      "canonical_decompressed_sha256": "aa79ad894b6e2dc113d866c8efcc317fe3849fdc1d9a23d7e506cadef7d51c66",
+      "first_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K4|20103@OOS_2020|ad5742ecf70f2e629524f3a0de77589065a3b62e7a8ab89cc6bca85dc2b771f2|3",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP25_VALUE_FIRST_K16|24091@OOS_2024|76363a790cbf394b3a61d8ec5a4ae7c6defbd52e24fc18e43e5b5bbe00e9f681|5",
+      "row_count": 200000
+    },
+    "selector_role_vectors-025.csv.gz": {
+      "canonical_compressed_sha256": "809f0e54ccbb04ae3f74e400c306c0a660d032f548fe103efa960bd136afcedd",
+      "canonical_decompressed_sha256": "41bf1b8a36646e0f8605a313b8dbfb090c57732ecd1329cd881c2fd0dd8d2d6b",
+      "first_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP25_VALUE_FIRST_K16|24091@OOS_2024|76363a790cbf394b3a61d8ec5a4ae7c6defbd52e24fc18e43e5b5bbe00e9f681|6",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K_ALL|23044@OOS_2023|3c66d46c64a03bcfb3aeabdc57ca4e4eb3547d6f1540f9a50ac7ac90fef7e3e8|1",
+      "row_count": 200000
+    },
+    "selector_role_vectors-026.csv.gz": {
+      "canonical_compressed_sha256": "2215a9d3052465b82b716c32de4596f3f231c5549daf1fee7a8dcdeec702cb9a",
+      "canonical_decompressed_sha256": "5bf28cef9b5812453e6fd8fe8c3e94112646de6e6496075c9bb88fd5b3186d98",
+      "first_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K_ALL|23044@OOS_2023|3c66d46c64a03bcfb3aeabdc57ca4e4eb3547d6f1540f9a50ac7ac90fef7e3e8|2",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|21084@OOS_2021|ca12caeaa86e3ad1e60e11e553a23603345a8bfa0f5855fdf0a0474c2c05af9e|4",
+      "row_count": 200000
+    },
+    "selector_role_vectors-027.csv.gz": {
+      "canonical_compressed_sha256": "1989c96cd412277abfe20897f6fff1ab7da250c9937f907beb35d732db34d82b",
+      "canonical_decompressed_sha256": "5cc1073e8bd60364857cf3d72fdbbaa747b69ab52eb1d53c9edb83bbfd82693f",
+      "first_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|21084@OOS_2021|ca12caeaa86e3ad1e60e11e553a23603345a8bfa0f5855fdf0a0474c2c05af9e|5",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|24123@OOS_2024|809e9b143e596bffea486cdc6ce5b23ab7d65a0de9a63d6fa63ef4d644cf5b10|7",
+      "row_count": 200000
+    },
+    "selector_role_vectors-028.csv.gz": {
+      "canonical_compressed_sha256": "fb38e7743a9dbd8112ecf2b999a76d2ef79be7f09cb922ccc0ee1ab25615ad0e",
+      "canonical_decompressed_sha256": "364ff2a0669296634531f627a8b1637b44880ef4713887dae8f1d716538c1b69",
+      "first_key": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|24123@OOS_2024|f4cee1ae3d4cf18668b1acabac0320b5ccf02d2200a8d6d3483014bec4d531b5|1",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP25_VALUE_FIRST_K_ALL|21051@OOS_2021|791cfc491cd0adfca5e4e28184afe24db1a121c647e35eb620a36dcfb5f14c52|3",
+      "row_count": 200000
+    },
+    "selector_role_vectors-029.csv.gz": {
+      "canonical_compressed_sha256": "966dd8fa2d509c571bd3a53147aee912280de5ced84c7f098bebe4884e774230",
+      "canonical_decompressed_sha256": "b6f0c676a7f56011b9a3571486ccf33efa889c71b21a0c3808e8bff1fe6a3de0",
+      "first_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP25_VALUE_FIRST_K_ALL|21051@OOS_2021|791cfc491cd0adfca5e4e28184afe24db1a121c647e35eb620a36dcfb5f14c52|4",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|21114@OOS_2021|84c1b51eef6387e8daa1dbf22537d91882bfddc9a0d5359d8f290ff42d6d64b0|6",
+      "row_count": 200000
+    },
+    "selector_role_vectors-030.csv.gz": {
+      "canonical_compressed_sha256": "3cd0c0ae8dd2efa9618150014d2af8eaf9d978229018bb0f367220d09664e2a6",
+      "canonical_decompressed_sha256": "1b6c39c3d93a15ea8322209a5497ee3297dd5da0b34735ccee8b1038b8a867ac",
+      "first_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|21114@OOS_2021|84c1b51eef6387e8daa1dbf22537d91882bfddc9a0d5359d8f290ff42d6d64b0|7",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP30_COLD_FIRST_K16|25042@OOS_2025|4c7528777b6deb429b7eb6e655e4a192ef523ce018d3ca8f652e411b8449f25c|2",
+      "row_count": 200000
+    },
+    "selector_role_vectors-031.csv.gz": {
+      "canonical_compressed_sha256": "951248889ed20f84a1365d261c39b350b324597377173d849ebc89e60a157ad9",
+      "canonical_decompressed_sha256": "645f84d28dc9c956dc4c2dd3d1c327feac337002bad5097555cc236933d9526c",
+      "first_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP30_COLD_FIRST_K16|25042@OOS_2025|4c7528777b6deb429b7eb6e655e4a192ef523ce018d3ca8f652e411b8449f25c|3",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K8|23071@OOS_2023|924fc34e4a3eae380fbc09b24d1fb3ff208fce07aaf5fb381be0146b2beb1b03|5",
+      "row_count": 200000
+    },
+    "selector_role_vectors-032.csv.gz": {
+      "canonical_compressed_sha256": "5f2c517c924c50e6ab74753f69bfea60c17c1fe813ed84b41c4979555ae536e0",
+      "canonical_decompressed_sha256": "28edd60b02b0930bbc37a0c35eb36ffb062f5c626d6b037c10f9e876df6ecae3",
+      "first_key": "S2_ESP290_GM300_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K8|23071@OOS_2023|924fc34e4a3eae380fbc09b24d1fb3ff208fce07aaf5fb381be0146b2beb1b03|6",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_P_MIN_LOWP25_COLD_FIRST_K_ALL|21033@OOS_2021|3b83380aa44121027dad1df62585f274a80234221b1ac8261ca3aab94ee058bf|1",
+      "row_count": 200000
+    },
+    "selector_role_vectors-033.csv.gz": {
+      "canonical_compressed_sha256": "7c152fbb9aefcb1ed86fe26ed69898aa27405525b00373157a9c0c13c6f04d49",
+      "canonical_decompressed_sha256": "238e309cabd5b2984f42f753bad7190bbbe183d2c04d2d4fa9acbf8402b904f2",
+      "first_key": "S2_ESP300_GM305_P_MIN_LOWP25_COLD_FIRST_K_ALL|21033@OOS_2021|3b83380aa44121027dad1df62585f274a80234221b1ac8261ca3aab94ee058bf|2",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_P_MIN_LOWP25_VALUE_FIRST_K_ALL|22111@OOS_2022|adf965c4147666cd585447bc25e3157a045fe8cbc6f1e045daa9f397823754a5|4",
+      "row_count": 200000
+    },
+    "selector_role_vectors-034.csv.gz": {
+      "canonical_compressed_sha256": "f0babeb3a55f44502a9cecdad8e40999a0be72b2eebce266087d00d34118a7aa",
+      "canonical_decompressed_sha256": "94106c331036259d3af78f1d6ff0628f166a2c4dae789fe37a26abbc5d83a940",
+      "first_key": "S2_ESP300_GM305_P_MIN_LOWP25_VALUE_FIRST_K_ALL|22111@OOS_2022|adf965c4147666cd585447bc25e3157a045fe8cbc6f1e045daa9f397823754a5|5",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_P_MIN_LOWP30_COLD_FIRST_K_ALL|22051@OOS_2022|0172f1245ac2c47b3e09cbae231e735911a4a31fa223453c0e07603e4667d3bf|7",
+      "row_count": 200000
+    },
+    "selector_role_vectors-035.csv.gz": {
+      "canonical_compressed_sha256": "6f97cfd2e3b8b3087873c99f136db246d3e1306609000819789113c8822d3754",
+      "canonical_decompressed_sha256": "9ab9d60e25b4100ef5448267468bd0686890e778c33c0e8bb28d9851091b2082",
+      "first_key": "S2_ESP300_GM305_P_MIN_LOWP30_COLD_FIRST_K_ALL|22051@OOS_2022|b87366552d39e920fdea02042147de1ef777daf0b354b4e1ca7c7bfb945e20de|1",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_P_MIN_LOWP30_VALUE_FIRST_K16|20111@OOS_2020|b75b9ef1f5d0d961180f616def16e8719b29629c902cada1110ed049a2154975|3",
+      "row_count": 200000
+    },
+    "selector_role_vectors-036.csv.gz": {
+      "canonical_compressed_sha256": "58bda155d9f1e94f1419113010136d3eb6ceba84f2ee661acb17ff68ed85a590",
+      "canonical_decompressed_sha256": "0f127c81afd3acabf8ea97a520f334146923422685400f940c61c4d997dacfa5",
+      "first_key": "S2_ESP300_GM305_P_MIN_LOWP30_VALUE_FIRST_K16|20111@OOS_2020|b75b9ef1f5d0d961180f616def16e8719b29629c902cada1110ed049a2154975|4",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_P_MIN_LOWP30_VALUE_FIRST_K_ALL|24015@OOS_2024|0a4ac6933d3a5fcb3b3af8a95de3ecda6bdafb211c9ee9c8adc0db1a49360d29|6",
+      "row_count": 200000
+    },
+    "selector_role_vectors-037.csv.gz": {
+      "canonical_compressed_sha256": "690b42f94073c30106efab35b736d40432a98bda2cabca9465b97bb6fd0fb747",
+      "canonical_decompressed_sha256": "2228dee5a046bbeaacd28bed05f6f61abd3ca05eb8b51f9e210cbe81a4b62867",
+      "first_key": "S2_ESP300_GM305_P_MIN_LOWP30_VALUE_FIRST_K_ALL|24015@OOS_2024|0a4ac6933d3a5fcb3b3af8a95de3ecda6bdafb211c9ee9c8adc0db1a49360d29|7",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP25_VALUE_FIRST_K16|21032@OOS_2021|4a98abce45ee3c8dcf9ee987e5874cf6549c9dbaf7dc8f382d8156865e7bae02|2",
+      "row_count": 200000
+    },
+    "selector_role_vectors-038.csv.gz": {
+      "canonical_compressed_sha256": "d40ed59e15761d9c4e46989c4d62177ff7f004405ae73627ed6c85f654e6fb23",
+      "canonical_decompressed_sha256": "d6cbfadbee246a22e2a72cd6f9b78e223407685cf9a1f6e6c28bdcced5734f06",
+      "first_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP25_VALUE_FIRST_K16|21032@OOS_2021|4a98abce45ee3c8dcf9ee987e5874cf6549c9dbaf7dc8f382d8156865e7bae02|3",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K_ALL|22043@OOS_2022|c76ae24430ecc6e9bd6e1a0f84b469dcfde6254dbd262ce57ab79d159a788cca|5",
+      "row_count": 200000
+    },
+    "selector_role_vectors-039.csv.gz": {
+      "canonical_compressed_sha256": "cb247542cb82859aa75523de3d234a56430c9bdea8c58bdf07c21e9f837ab15e",
+      "canonical_decompressed_sha256": "19d52f8e9a414b281b8e839f2049c02c604ccd231ac5edc02e74103ceda8a572",
+      "first_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP30_COLD_FIRST_K_ALL|22043@OOS_2022|c76ae24430ecc6e9bd6e1a0f84b469dcfde6254dbd262ce57ab79d159a788cca|6",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|20103@OOS_2020|0300b4c348906d46d27a21496f3fbe3ffda4d22aced8fc70af9485959c398ada|1",
+      "row_count": 200000
+    },
+    "selector_role_vectors-040.csv.gz": {
+      "canonical_compressed_sha256": "2ffdf39bc562340a3136c9a1e331b9bd657643d29fc00de27905ac93e5f45492",
+      "canonical_decompressed_sha256": "d2efdc5cab8f546a5d0021a7c8dafb85ce708334f6c7aeb231d13b093122d458",
+      "first_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|20103@OOS_2020|0300b4c348906d46d27a21496f3fbe3ffda4d22aced8fc70af9485959c398ada|2",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|23124@OOS_2023|1961b42c040ce6f121048c86aa9a6c8fa787f8ab6e529099976aff460c1e80f8|4",
+      "row_count": 200000
+    },
+    "selector_role_vectors-041.csv.gz": {
+      "canonical_compressed_sha256": "7ad80f4728889b4f3e25227c88917b98df8d1b423e49988bae91894abfe40f65",
+      "canonical_decompressed_sha256": "486ca566860b0ee03211644a6cdc3330647d2454035f3cc9ae9680960ce35c0c",
+      "first_key": "S2_ESP300_GM305_MARKET_WF_CAL_MIN_LOWP30_VALUE_FIRST_K_ALL|23124@OOS_2023|1961b42c040ce6f121048c86aa9a6c8fa787f8ab6e529099976aff460c1e80f8|5",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP25_COLD_FIRST_K_ALL|24054@OOS_2024|3c31d158af906df597a0510027d02420f43b6767cbf607793050c3b1244d2070|7",
+      "row_count": 200000
+    },
+    "selector_role_vectors-042.csv.gz": {
+      "canonical_compressed_sha256": "5543804e01a83710fc3a6d562c7167c2283f5bc08627fa81b92321591b3637d0",
+      "canonical_decompressed_sha256": "5a5f3de897baf2f8f6dd1df4bac27110b7f0a09a8082272a2cae77ed45838bb3",
+      "first_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP25_COLD_FIRST_K_ALL|24054@OOS_2024|28b0d8e346552a95569f3bb6a5c199fb4833695967e601552cac49be6167715b|1",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|21041@OOS_2021|ebc30dfc07bbf37d6670db8dc14af0d24040c863d3afd9e52a3df8a6711bb9ce|3",
+      "row_count": 200000
+    },
+    "selector_role_vectors-043.csv.gz": {
+      "canonical_compressed_sha256": "94a6733bbcf15f8eb9e02c7ac671eac17cc6b770d0c7dd23391be4bbe0905a72",
+      "canonical_decompressed_sha256": "0488a4a5e4d25aaf6c26e288eb96becb45a2ae9045c4baa10331b70c4185bda2",
+      "first_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|21041@OOS_2021|ebc30dfc07bbf37d6670db8dc14af0d24040c863d3afd9e52a3df8a6711bb9ce|4",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|24082@OOS_2024|d00d88cfe3af4f9b13a9faeafeaa361eaade4c8106af213d5fb33e1d798909a0|6",
+      "row_count": 200000
+    },
+    "selector_role_vectors-044.csv.gz": {
+      "canonical_compressed_sha256": "0fd8a8bc1b3e992b7149156adf1c162eb47d4ade7a9844119723c0b4efa8268f",
+      "canonical_decompressed_sha256": "0d474a0a06b5d25722ed52696a3887367e24b0e1f39183095fb3b0cbb7a9a621",
+      "first_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_COLD_FIRST_K_ALL|24082@OOS_2024|d00d88cfe3af4f9b13a9faeafeaa361eaade4c8106af213d5fb33e1d798909a0|7",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|22102@OOS_2022|e041646b5b5aea58fd53e4dec5f92fc9b014fb65f8b427e8a53798f9581401fd|2",
+      "row_count": 200000
+    },
+    "selector_role_vectors-045.csv.gz": {
+      "canonical_compressed_sha256": "b1be89032152cb4c21bde4c1a4eb0a5fc7558e9da9be69013b461cb8650656a1",
+      "canonical_decompressed_sha256": "b6c8be29dc5b99441f66bdd4587a2a9a4654719dd165248a6d4ad8176497c7eb",
+      "first_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|22102@OOS_2022|e041646b5b5aea58fd53e4dec5f92fc9b014fb65f8b427e8a53798f9581401fd|3",
+      "kind": "selector_role_vectors",
+      "last_key": "S2_ESP300_GM305_BLEND_A50_MIN_LOWP30_VALUE_FIRST_K_ALL|25042@OOS_2025|131897442e07ef911635fbda592831aac90ea5e3eea1cf2a177f6d5ca6423257|7",
+      "row_count": 142973
+    }
+  },
+  "whole_ledgers": {
+    "identity_rows_times_n_equals_role_rows": true,
+    "selector_identities": {
+      "canonical_decompressed_sha256": "0f6c2b2f96103470ad47ef402c02d21daf72c805d7153db6c492f69c13b57cd7",
+      "key_fields": "selector_id|issue_instance|portfolio_id|selector_rank",
+      "kind": "selector_identities",
+      "row_count": 1306139,
+      "shard_count": 7
+    },
+    "selector_role_vectors": {
+      "canonical_decompressed_sha256": "a8aff7e399c0f923f8b4bf2769374844a18271c14051711cb23b0b324a7e2d59",
+      "key_fields": "selector_id|issue_instance|portfolio_id|selection_rank",
+      "kind": "selector_role_vectors",
+      "row_count": 9142973,
+      "shard_count": 46
+    }
+  }
+}

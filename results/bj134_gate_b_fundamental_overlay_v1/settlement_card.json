@@ -1,0 +1,187 @@
+{
+  "active_issue_count": 189,
+  "arm_count": 9,
+  "bootstrap_draws": {
+    "ALL_189/B0_BEST_FULL": {
+      "issue_count": 163,
+      "replicates": 20000,
+      "seed": 134189,
+      "sha256": "443f6526f53b87b47e2195d78a158d01f9452030c40f612c9637a90851db2035"
+    },
+    "ALL_189/D1_DECISION_CHAIN_CORE": {
+      "issue_count": 157,
+      "replicates": 20000,
+      "seed": 134194,
+      "sha256": "e1b81d1d3f0cbe3f6d3e4b98af2243f4c3e9497dbf3c4dda08b0af95c002887d"
+    },
+    "ALL_189/F1_CORE_ALL": {
+      "issue_count": 158,
+      "replicates": 20000,
+      "seed": 134193,
+      "sha256": "224004468d1540cc5a37b583fa91a60b3b369a27b7655a410ec305e8ac0331ea"
+    },
+    "ALL_189/F_MINUS_L": {
+      "issue_count": 157,
+      "replicates": 20000,
+      "seed": 134195,
+      "sha256": "144ac3df78b9effc6ad3095173a5598da02000a8fddaaff7039d2e05fe96149b"
+    },
+    "ALL_189/F_MINUS_M": {
+      "issue_count": 159,
+      "replicates": 20000,
+      "seed": 134197,
+      "sha256": "4671ebacfe609ae962329a243991d00575fd11f20b4635b6469528b6496b5881"
+    },
+    "ALL_189/F_MINUS_T": {
+      "issue_count": 154,
+      "replicates": 20000,
+      "seed": 134196,
+      "sha256": "c3fdf7debf3057085e172ba9f7d3da625d34cb278ab169bd9dfc1dd75025ab93"
+    },
+    "ALL_189/L1_LEAGUE_CORE": {
+      "issue_count": 158,
+      "replicates": 20000,
+      "seed": 134190,
+      "sha256": "218b6d183349f682406415858ce83089c95c8f0caaa3a6ed2ab85b8b24344993"
+    },
+    "ALL_189/M1_MARKET_DYNAMICS": {
+      "issue_count": 156,
+      "replicates": 20000,
+      "seed": 134192,
+      "sha256": "7c4b0532cd1c43ccede896cbc11248303947c69c689972db81352322340ff0eb"
+    },
+    "ALL_189/T1_TEAM_CORE": {
+      "issue_count": 158,
+      "replicates": 20000,
+      "seed": 134191,
+      "sha256": "1670c4b71a7d950a4b5a6c4d76d0979a21e282ed6d872b1b73aa3ce870c9033f"
+    },
+    "CHOICE_113/B0_BEST_FULL": {
+      "issue_count": 106,
+      "replicates": 20000,
+      "seed": 134289,
+      "sha256": "8a9480a8eba6f4ff1c20decfcf86eacc8eab393fd088bc9fd694df7b0c2d4ea0"
+    },
+    "CHOICE_113/D1_DECISION_CHAIN_CORE": {
+      "issue_count": 100,
+      "replicates": 20000,
+      "seed": 134294,
+      "sha256": "9fff6850ffee626502bb0791d435bf7cf56b0afbfe514f4d0f2f906d380e2d55"
+    },
+    "CHOICE_113/F1_CORE_ALL": {
+      "issue_count": 101,
+      "replicates": 20000,
+      "seed": 134293,
+      "sha256": "f83eec5d50dc44b79519daa0906a907f5bbe9c5b32d5ae801b44bdea4fd95401"
+    },
+    "CHOICE_113/F_MINUS_L": {
+      "issue_count": 100,
+      "replicates": 20000,
+      "seed": 134295,
+      "sha256": "38fb5bf620ba7c21aa05e05d9454b247fddcbdca665d891c04309d1fe3b2f6c8"
+    },
+    "CHOICE_113/F_MINUS_M": {
+      "issue_count": 102,
+      "replicates": 20000,
+      "seed": 134297,
+      "sha256": "905658877cf28a80c86acd292383ab49dc00a0866c61b0a9909eff6c8f4162cf"
+    },
+    "CHOICE_113/F_MINUS_T": {
+      "issue_count": 97,
+      "replicates": 20000,
+      "seed": 134296,
+      "sha256": "6c70f10ef9576451200eae8f5ce325aebdc6221b4e83a62cdf6aa6f02f20d020"
+    },
+    "CHOICE_113/L1_LEAGUE_CORE": {
+      "issue_count": 101,
+      "replicates": 20000,
+      "seed": 134290,
+      "sha256": "cb7683e9c7d4906393bdcdb99987bbca7173b70e060dedd9f5846c769937becf"
+    },
+    "CHOICE_113/M1_MARKET_DYNAMICS": {
+      "issue_count": 99,
+      "replicates": 20000,
+      "seed": 134292,
+      "sha256": "beb0c5d8521bc3a5e75e9852d8ad03cdc2006964ccf7ff1b933ec381da8bf291"
+    },
+    "CHOICE_113/T1_TEAM_CORE": {
+      "issue_count": 101,
+      "replicates": 20000,
+      "seed": 134291,
+      "sha256": "01edb485aabb0959fac6348535578d997bf1a9ddeaa24ca83a541a0dd3cf50d5"
+    },
+    "INVARIANT_76/B0_BEST_FULL": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134389,
+      "sha256": "ad08e8d7ab7b33976724ba21f3654101224bbfb477d8635209096ca5f00155fa"
+    },
+    "INVARIANT_76/D1_DECISION_CHAIN_CORE": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134394,
+      "sha256": "b620c1f9760d44079486fe353ba7c9ceeb6bd85fb31fa3fa028c4a45466be32d"
+    },
+    "INVARIANT_76/F1_CORE_ALL": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134393,
+      "sha256": "6b0e160eb483400290de0befb6e006d731fb066baa7452d043739b0efd01615f"
+    },
+    "INVARIANT_76/F_MINUS_L": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134395,
+      "sha256": "44e9cbf7baf966bccee594a8abac65f6ec1cb8de92e19e32894b64f74fefe3c3"
+    },
+    "INVARIANT_76/F_MINUS_M": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134397,
+      "sha256": "b4d3bd5d18e0996e17da4686db13917fc532f9c1bddf8c3a28ca6eb2b06c660d"
+    },
+    "INVARIANT_76/F_MINUS_T": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134396,
+      "sha256": "eef0cd34ba959a03905bf470cbf5f3c4666172f7b216936af8471ca64260dafd"
+    },
+    "INVARIANT_76/L1_LEAGUE_CORE": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134390,
+      "sha256": "a0971614a9c9fc60bd9cafcb92e878bb074ca4eddf174f0eabf6869251ffcc0c"
+    },
+    "INVARIANT_76/M1_MARKET_DYNAMICS": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134392,
+      "sha256": "5c816a2bfdf03b8ef97415cc20c18ebaefe9688541d16ea6eaccfcc980a8f45d"
+    },
+    "INVARIANT_76/T1_TEAM_CORE": {
+      "issue_count": 57,
+      "replicates": 20000,
+      "seed": 134391,
+      "sha256": "b1811c53bcc8a5f663fcf270d8ceb69049a65fa9813fb1e8e673e5118b7783f5"
+    }
+  },
+  "bootstrap_replicates": 20000,
+  "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "canonical_outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "choice_issue_count": 113,
+  "contract": "BJ-HIST-FUNDAMENTAL-OVERLAY-N7-001",
+  "contribution_row_count": 1701,
+  "full_stake_per_issue_yuan": 4374.0,
+  "full_ticket_count": 2187,
+  "gate_a_content_identity_sha256": "3fe014f3decdbd589cdded52d8a9b2bac0f3cb988c2ae8e15cf79314a02eede1",
+  "gate_a_manifest_sha256": "0a7e4d673e7fc5fd4832c91e3b519afe5a2bc3211b99f4c95f57c691921b65fd",
+  "handicap_contradiction_candidate_count": 424,
+  "handicap_contradiction_leg_total": 0,
+  "invariant_issue_count": 76,
+  "payout_factor": 0.65,
+  "promotion_authority": false,
+  "stake_per_ticket_yuan": 2.0,
+  "tax_line_yuan_per_winning_ticket": 10000.0,
+  "tax_rate": 0.2,
+  "version": "bj134-gate-b-v1"
+}

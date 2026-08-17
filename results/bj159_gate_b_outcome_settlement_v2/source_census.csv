@@ -1,0 +1,3 @@
+source,role,identity,sha256,rows,join_status
+bj159_gate_a_preoutcome_v2r1,accepted immutable complete-issue identities and nominal/effective WOR plan,SHA256SUMS.json,a15c585fc1836da4f558d07ce19c925561bfd1c240e834b7e3e0da22701cd325,7020,all identities retained; no selection recomputation
+bj95_gate_b_outcome_settlement_v2r8,canonical trusted result/final-SP only,canonical_outcome_join.csv,13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89,46802,complete identity settlement; missing legs receive zero executed stake

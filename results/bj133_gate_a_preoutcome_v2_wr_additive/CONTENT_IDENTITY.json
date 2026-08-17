@@ -1,0 +1,10 @@
+{
+  "contract_version": "bj133-gate-a-v2-wr-additive-content-v1",
+  "non_compressed_controls": {
+    "README.md": "a5912e50f18dc081e78bd557b42149127fbad70ddb646e43321ddebcff35a109",
+    "freeze_runner.py": "150d2e21c156b4468309c5ce4b0859c7caeeea47506077b24302c30e6350751f",
+    "gate_a_v2_card.json": "7f152ddd168569a38eeb2a8bea2fbdb4e8977fb5b1962fa1f206d22315686ec2",
+    "source_census.csv": "3e77ff655a0fcfaa9fa2e60e50090e04e9857bd42ca4f640e666f1a45ccc8315",
+    "wr_sampler_plan.csv": "e9e800d1ff396acd975c508eb216f51b47aec3786a9033e61d64002726887fa2"
+  }
+}

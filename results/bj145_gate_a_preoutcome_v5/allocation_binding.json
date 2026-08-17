@@ -1,0 +1,24 @@
+{
+  "api": "allocate(mechanism, weights, M, seed, identity_signature, cap) -> integer multiplicities by base-3 ticket ordinal",
+  "binding_version": "bj145-allocation-binding-v1",
+  "engine_version": "bj145-allocation-engine-v1",
+  "golden_vectors_file": "allocation_golden_vectors.json",
+  "golden_vectors_sha256": "8bf47e18bf9db817e20a941380b72c1ee9bbf573f8d6e3ceae5a7a5d0e57d124",
+  "mechanisms": [
+    "WR_DUPLICATE_STAKE",
+    "WOR_DISTINCT",
+    "RESIDUAL_SYSTEMATIC",
+    "CAPPED_REPEAT",
+    "DETERMINISTIC_TOP_MASS",
+    "FULL_ENUMERATED"
+  ],
+  "module_file": "bj145_allocation_engine.py",
+  "module_sha256": "02b99044c01381fedd1084a1c11520b16c742a856635b130803c954124dfb281",
+  "outcome_boundary": "executable allocation only; no outcome/final-SP/payout/ROI/tax input accepted",
+  "ticket_space": {
+    "k": 2187,
+    "legs": 7,
+    "ordinal_order": "base-3 0000000..2222222",
+    "outcomes_per_leg": 3
+  }
+}

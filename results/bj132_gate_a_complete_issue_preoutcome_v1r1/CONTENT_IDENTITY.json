@@ -1,0 +1,27 @@
+{
+  "contract_version": "bj132-complete-issue-content-v1",
+  "gzip_payloads": {
+    "matched_delete_score_frontier.csv.gz": {
+      "canonical_decompressed_bytes": 105441865,
+      "canonical_decompressed_sha256": "a7bab77f4e91079c224ec963486cf8b2ba5c4e2790b6cfbac0d7fb0e703c93b3"
+    },
+    "portfolio_role_assignments.csv.gz": {
+      "canonical_decompressed_bytes": 116763295,
+      "canonical_decompressed_sha256": "dbf73447ac8f5d69bd84a8cebc73681c2dab42dcdec01b83f2e7fdcc6b71983e"
+    },
+    "ranker_disagreements.csv.gz": {
+      "canonical_decompressed_bytes": 10552053,
+      "canonical_decompressed_sha256": "6708a646c742dc8cf6f53db311ad1b7b383e98a465f7122da353bfd1c85529e8"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "58f8bb44f6b973bde284b0ad54bb10621ac739e7ac3c9fc7da99e3b81feb2acb",
+    "candidate_scatter.csv": "ed4cadbbd4fde22d99f05ad8545c53dcdf61e90202efece511da06e6ab44cb1c",
+    "gate_a_card.json": "8d35c8dc664f8665888cb1e9cbc019217347cfcb20eb6a62f1442cfa0599dad4",
+    "issue_accounting.csv": "9c359c6eea291878d480c02e2ece3b15cf586f7b72dc6e8fda88b02883751e10",
+    "issue_census.csv": "69d7463b6f83af4127059d6ea34095292646ec2a98abc39d56551b76d6ea6dd5",
+    "runner.py": "c13a908cd6109a3b453e2061d4aedc606781f2f7bce28b6c97515669b0f27c63",
+    "source_census.csv": "23bc7b6abfe72940849f5d96218c546f2e9ba872c32d2b82a072f751476c91d7",
+    "threshold_census.csv": "95fb92fbe5c91cb28c3b569115b5c60fdeeeeb32226f4b639f9c16eb14be2d0b"
+  }
+}

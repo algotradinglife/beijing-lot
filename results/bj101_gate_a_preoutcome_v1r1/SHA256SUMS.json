@@ -1,0 +1,9 @@
+{
+  "freeze_runner.py": "3bac055a1f68d12c0ee6a23dcd4983cc41d15114d77c496db5c8c611f1172f0c",
+  "frontier_summary.csv": "18afad082388bacee951d9e2a05bda7755ec8492f7b1fdd45d21dd14d8fd8606",
+  "gate_a_card.json": "252c3441cc05bd24d28b331c2161eca4f2c4dc54ec6d8963a417551c3d45e649",
+  "issue_pool_census.csv": "38c96ac4509801f68dd3e2469be619a8954ef06291faca2e9cd6d04cb7b6332a",
+  "issue_pool_membership.csv": "6b1361797956123eaeb9e2d015eae7bf7ef28ee020a902e710f12284442a7014",
+  "n7_cold_pruning_frontier.csv": "5498125d9a98b2005cea62da456e94b2b4e2736912e8b95624fc9a72c75e8b95",
+  "source_census.csv": "083a58bf6ab73b9dd412f1c3d5494f6bbdd4b1dd749281ae86f041b73a8ad891"
+}

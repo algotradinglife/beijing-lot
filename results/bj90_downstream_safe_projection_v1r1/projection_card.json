@@ -1,0 +1,46 @@
+{
+  "contract": "prediction-only projection for blocked #91; no outcome-derived columns are exported",
+  "forbidden_projection_substrings": [
+    "target",
+    "result",
+    "score",
+    "winning",
+    "error",
+    "coverage",
+    "roi",
+    "portfolio"
+  ],
+  "input_manifests": {
+    "diagnostics_v4r2": "bf6db4f3eeef5996b444698d750ea13a436bac453e61c7c13601f6d5b378e308",
+    "evaluator_v4r1": "180118dfc5f6393e9d2f478cc37d2606e8ac2caf612f3f2a75fb2f3a493703f0",
+    "gate_a_v4r1": "1832ae5e34cbd2d51a0cf0976aadcfbd0f67e48e9fd79b937388c636933ca2d6",
+    "ledger_v2r1": "80a888761fd39dd243d505698280bd151f23f3153dda2a3165507544c0319613"
+  },
+  "issue": 90,
+  "label": "RETROSPECTIVE_PRICE_TARGET; NOT_OBSERVED_PREBET_BJDC_QUOTE",
+  "oos_row_count": 100589,
+  "projection_schema": [
+    "match_id",
+    "issue",
+    "match_idx",
+    "year",
+    "fold",
+    "deployed_method",
+    "deployed_sp_3",
+    "deployed_sp_1",
+    "deployed_sp_0",
+    "m2_conservative_sp_3",
+    "m2_conservative_sp_1",
+    "m2_conservative_sp_0"
+  ],
+  "runner_hashes": {
+    "diagnostic_runner": "1f08ea7409f8754262594a2a8a468265942a2296a7fea68b02e756b48f7c68ae",
+    "evaluator_runner": "f64238568b0dc6777d6a8855c10908984d409cfc54cc6239c5d7328bdb93608c",
+    "gate_a_freeze_runner": "fd70b9156ab9c0e78dc3181d05690e92fcb6cea932c6844d697a4eb8cd8a19e3",
+    "gate_a_source_locator": "361d89358bf0c73450dbaadf60cfea7c2d2ec6d294ea9f8f30b4902f0f8b6145",
+    "ledger_runner": "f2d3139dbecfeea2ce150d8a648f8dcbad9db4d1318f265ad9f29dba61089636",
+    "ledger_source_locator": "361d89358bf0c73450dbaadf60cfea7c2d2ec6d294ea9f8f30b4902f0f8b6145"
+  },
+  "source_evaluator_output": "oos_predictions.csv; values are copied only after exact equality verification",
+  "stage": "DURABLE_OUTCOME_SAFE_DOWNSTREAM_OOS_PROJECTION"
+}

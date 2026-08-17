@@ -1,0 +1,33 @@
+{
+  "arm_count": 3,
+  "contract": "BJ-FWD-MESSAGE-CHAIN-N7-001",
+  "cross_field_validator": "decision_core.validate_decision_trace",
+  "decision_schema_version": "bj182-message-decision-v1",
+  "decision_trace_schema": "decision_trace.schema.json",
+  "existing_issue_count_excluded": 2,
+  "full_stake_yuan": 4374,
+  "full_tickets": 2187,
+  "gate_b_authorized": false,
+  "historical_message_backfill_permitted": false,
+  "minimum_issue_exclusive": 26082,
+  "optional_fact_kinds": [
+    "confirmed_lineup",
+    "schedule",
+    "travel"
+  ],
+  "outcome_accessed": false,
+  "production_authority": false,
+  "prospective_trace_builder": "decision_core.build_decision_trace",
+  "required_fact_kinds": [
+    "injury",
+    "suspension",
+    "expected_lineup",
+    "coach_change",
+    "motivation"
+  ],
+  "retuning_permitted": false,
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_PROTOCOL",
+  "stake_per_ticket_yuan": 2,
+  "status": "WAITING_FOR_PI_ACCEPTANCE_AND_POST_ACTIVATION_INPUT",
+  "version": "bj182-gate-a-forward-protocol-v1"
+}

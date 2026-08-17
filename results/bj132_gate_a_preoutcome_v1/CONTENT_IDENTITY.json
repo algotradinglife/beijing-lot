@@ -1,0 +1,23 @@
+{
+  "contract_version": "bj132-portable-content-v1",
+  "gzip_payloads": {
+    "matched_delete_score_frontier.csv.gz": {
+      "canonical_decompressed_bytes": 138241415,
+      "canonical_decompressed_sha256": "efb1c04cbff1987b8ebc271797025ee36b0e0174c45f40325b6deccbfc7009b6"
+    },
+    "portfolio_role_assignments.csv.gz": {
+      "canonical_decompressed_bytes": 643412597,
+      "canonical_decompressed_sha256": "7afc76e56f7ea43bd54b0071c0f417ca71d4c2d01537e51cd55b3b9938cc957e"
+    },
+    "ranker_disagreements.csv.gz": {
+      "canonical_decompressed_bytes": 22228306,
+      "canonical_decompressed_sha256": "18de9584f78f2c435cb25838af0184b8d251d5d03127bde53770d0668a6745fa"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "01350a5987ec85ad02123b0f264fe5e22100db077cf4abb23ca28d9e5cc93c88",
+    "gate_a_card.json": "daa711a6caad67332faecf67571173537d0e010ec364fe83915e9b3e90ea95f9",
+    "runner.py": "cb159753e5810a90afbf25394412a646569eab7dd813fe39086fb8ceeb9af553",
+    "threshold_census.csv": "3291a7c540ee2eec58e7da02d34c6bbf3823222dff6bc5d4af106b164924529a"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "choice_and_oracle": {
+    "causal_choice": "highest predicted utility above strongest matched prior-only comparator; otherwise deterministic fallback",
+    "causal_support": "retained seed-agnostic actions that are pre-event AVAILABLE on the issue plus mandatory comparators",
+    "global_oracle": "optional ceiling over the complete pre-event-available seed-aggregated catalog; label separately and never use as paired regret denominator",
+    "paired_oracle": "highest realized seed-aggregated utility over the exact same causal support for that fold/issue",
+    "seed_identity_allowed": false,
+    "tie_breaks": [
+      "higher utility",
+      "lower native stake",
+      "lower complexity",
+      "lexical seed-agnostic action identity"
+    ]
+  },
+  "contract": "BJ193_ACTION_LEARNING_EXECUTION_V1",
+  "forbidden_choice_inputs": [
+    "seed",
+    "seed_role",
+    "replay_allocation_row_id",
+    "realized outcome/SP/payout/tax/ROI from validation or test"
+  ],
+  "hierarchical_screen": {
+    "ATLAS167": {
+      "allocator_keep_per_selector": 64,
+      "allocator_score": "for each retained selector, exhaust all 963 seed-agnostic allocators and use aggregate sum pre-tax net / sum stake; minimum 20; higher is better",
+      "mandatory_additions": "FULL_ENUMERATED M2187 and B167 Q_WEIGHT/WOR_DISTINCT/M64 for every retained selector when supported, plus STATIC_BEST_FULL_FULL",
+      "selector_keep": 16,
+      "selector_reference_allocator": {
+        "M": "2187",
+        "cap": "NA",
+        "mechanism": "FULL_ENUMERATED",
+        "weight_source": "NA"
+      },
+      "selector_score": "aggregate sum pre-tax net / sum stake over active settled screen issues; minimum 20; higher is better"
+    },
+    "DIVERGENCE190": "retain every AVAILABLE selector crossed with all four deterministic arms; weak arms remain controls and cannot demote STATIC_BEST_FULL_FULL",
+    "STACK170": "retain all 3x3 fixed contextual actions",
+    "no_early_stop": true,
+    "rank_ties": [
+      "larger active support",
+      "lower native stake",
+      "lexical seed-agnostic action identity"
+    ],
+    "timing": "run on inner-train only during tuning; after model-family selection rerun identically on full outer-train before outer-test refit"
+  },
+  "model_topology": {
+    "action_inputs": "none inside fitted model; action identity is fixed by deterministic hierarchical screening",
+    "kind": "ONE_ACTION_SPECIFIC_MODEL_PER_RETAINED_SEED_AGNOSTIC_ACTION",
+    "loss": "unweighted mean squared error across active settled training issues for that action",
+    "minimum_action_support": 20,
+    "regime_inputs": "feature_contract.csv TIER_C_PRE_EVENT only",
+    "target": "seed-aggregated issue utility = aggregate pre-tax net / aggregate stake",
+    "tax": "pre-tax target is primary; tax-adjusted values are reporting-only",
+    "zero_stake": "exclude from model fit and keep explicit NO_BET zero-flow in policy path"
+  },
+  "nested_fit": {
+    "inner_train": "fit transforms, hierarchical screen and one action-specific model for each retained action",
+    "inner_validation": "simulate one policy path using only pre-event availability and predictions",
+    "outer_refit": "select one model configuration, rerun screen on full outer-train, refit transforms and action models on full outer-train, then evaluate untouched outer-test",
+    "primary_validation_score": "sum chosen-action pre_tax_net_yuan / sum chosen-action stake_yuan; blank/invalid when total stake is zero",
+    "random_state": 193001,
+    "randomized_subsampling": false,
+    "validation_ties": [
+      "lower maximum issue drawdown_yuan",
+      "lower total native stake_yuan",
+      "lower model complexity_rank",
+      "lexical model_id"
+    ]
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: no target result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence enters Tier-C features, transforms, action ranking, or tie-breaks",
+  "replay_unit": "exact frozen seed row retained in allocation_action_catalog.csv.gz",
+  "seed_aggregation": {
+    "availability": "if any required frozen replicate is unavailable or missing, the entire seed-agnostic issue-action is UNAVAILABLE and excluded from fit/ranking; never encode missing seed as losing stake",
+    "dispersion": "publish replicate-level ROI mean, sample SD, MCSE, q05/q50/q95, minimum, maximum and positive fraction separately; never optimize them except as a reported stability diagnostic",
+    "economics": "arithmetic mean replicate stake/gross/tax/net on identical issue/support represents one randomized-strategy action; never sum seed stakes as purchased exposure; deterministic singleton is identity",
+    "issue_identity": "namespace + selector + causal allocator + canonical issue",
+    "ordering": "sort exact numeric seed then replay row identity before accumulation",
+    "ranking_boundary": "aggregate before selector screening, allocator screening, model fitting, policy choice, oracle, regret or promotion",
+    "required_replicates": "exact replay_row_set_sha256 and frozen_seed_set_sha256 from causal_allocation_catalog.csv",
+    "target": "seed-aggregated issue utility = mean replicate pre-tax net / mean replicate stake, equivalently sum net / sum stake; blank when mean stake is zero"
+  },
+  "selection_unit": "seed-agnostic (namespace, selector_factor_id, causal_allocation_factor_id)",
+  "streaming": {
+    "chunk_invariance": "output identity and scores must be byte-identical for chunk sizes 1, 17, 256 and 4096",
+    "memory_boundary": "may stream issue-action rows; must not shrink any frozen source catalog or seed ensemble",
+    "screen_implementation": "complete streaming pass with fixed-size exact top-K heaps; compare full tie tuple; no sampling, adaptive pruning or outcome-dependent early stopping",
+    "sort_order": "namespace, selector_factor_id, causal_allocation_factor_id, canonical issue"
+  }
+}

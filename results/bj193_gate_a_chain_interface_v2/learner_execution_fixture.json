@@ -1,0 +1,74 @@
+{
+  "action_choice": {
+    "comparator_utility": 0.0,
+    "expected_action_identity": "X",
+    "expected_fallback_when_comparator": 0.03,
+    "input": [
+      {
+        "action_identity": "Y",
+        "complexity_rank": 1,
+        "native_stake_yuan": 64,
+        "predicted_utility": 0.03
+      },
+      {
+        "action_identity": "X",
+        "complexity_rank": 1,
+        "native_stake_yuan": 64,
+        "predicted_utility": 0.03
+      }
+    ]
+  },
+  "contract": "BJ193_STAGEWISE_LEARNER_FIXTURE_V3",
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "projection_hashes": {
+    "STAGE_1_SELECTION": "69245de8ce46d49585d93cba6b09f87c9e5033113c5cb10fa0fb28a4328a1ff3",
+    "STAGE_2_DIRECTION": "c32b14b45bb52a65dc50ab195fc90bc5104bf3a341f1fb15e23b5de4dc90fb45",
+    "STAGE_3_BET": "3b055fb88d3c07f29b805cd4d9446260eb23501a293eedce44016fb92cda4222"
+  },
+  "screen": {
+    "expected_action_order": [
+      "A",
+      "B"
+    ],
+    "input": [
+      {
+        "action_identity": "B",
+        "active_support": 30,
+        "native_stake_yuan": 64,
+        "screen_score": 0.1
+      },
+      {
+        "action_identity": "A",
+        "active_support": 30,
+        "native_stake_yuan": 64,
+        "screen_score": 0.1
+      },
+      {
+        "action_identity": "C",
+        "active_support": 29,
+        "native_stake_yuan": 32,
+        "screen_score": 0.1
+      }
+    ],
+    "keep": 2
+  },
+  "validation": {
+    "expected_model_id": "M1",
+    "input": [
+      {
+        "complexity_rank": 1,
+        "max_issue_drawdown_yuan": 100,
+        "model_id": "M2",
+        "native_stake_yuan": 64,
+        "validation_pre_tax_roi": 0.02
+      },
+      {
+        "complexity_rank": 1,
+        "max_issue_drawdown_yuan": 100,
+        "model_id": "M1",
+        "native_stake_yuan": 64,
+        "validation_pre_tax_roi": 0.02
+      }
+    ]
+  }
+}

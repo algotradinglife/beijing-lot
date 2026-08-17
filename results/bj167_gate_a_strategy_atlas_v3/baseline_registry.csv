@@ -1,0 +1,4 @@
+baseline_id,source_issue,manifest,cohort,selector,pre_tax_roi,matched_full_lift,evidence_grade,decision,reason
+B127_ESP300_GM305_LOWP20,#127,a8eeb50204bb9a2d69578538e28943a432bea11083661a63b950a5ab5a2481da,segment-scoped legacy reference,ESP300_GM305_LOWP20,-0.0835,,LEGACY_REFERENCE,reference_only,segment denominator; not comparable complete-issue FULL
+B137_151_DISCOVERY,#137/#151,3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6,NO_GATE/K4/Q-WOR/M64 three-seed anchor,NO_GATE/K4,0.1027,,DISCOVERY,challenger_not_baseline,three seeds; discovery not robust
+B159_TRANSFER,#159,a15c585fc1836da4f558d07ce19c925561bfd1c240e834b7e3e0da22701cd325,complete-issue ESP transfer,ESP transfer,-0.20,,DISCOVERY,diagnostic_only,transfer diagnostic; does not demote stronger scoped incumbent

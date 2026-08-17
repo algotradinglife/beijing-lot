@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620">
+<rect width="100%" height="100%" fill="white"/>
+<text x="600.0" y="35" text-anchor="middle" font-size="22" font-family="sans-serif">#170 common support</text>
+<line x1="100" y1="470.00" x2="1160" y2="470.00" stroke="#333"/>
+<text x="20" y="270.0" transform="rotate(-90 20 270.0)" text-anchor="middle" font-size="14" font-family="sans-serif">Fraction of frozen issues</text>
+<text x="276.67" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">Frozen</text>
+<rect x="257.77" y="70.00" width="37.80" height="400.00" fill="#6366f1"/>
+<text x="276.67" y="64.00" text-anchor="middle" font-size="10" font-family="sans-serif">100.0%</text>
+<text x="630.00" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">Settled</text>
+<rect x="611.10" y="151.36" width="37.80" height="318.64" fill="#6366f1"/>
+<text x="630.00" y="145.36" text-anchor="middle" font-size="10" font-family="sans-serif">79.7%</text>
+<text x="983.33" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">Unavailable</text>
+<rect x="964.43" y="388.64" width="37.80" height="81.36" fill="#6366f1"/>
+<text x="983.33" y="382.64" text-anchor="middle" font-size="10" font-family="sans-serif">20.3%</text>
+<rect x="100" y="575" width="16" height="16" fill="#6366f1"/><text x="122" y="588" font-size="13" font-family="sans-serif">Issue count / 177</text>
+</svg>

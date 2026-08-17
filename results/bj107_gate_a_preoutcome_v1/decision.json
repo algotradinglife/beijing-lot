@@ -1,0 +1,5 @@
+{
+  "decision": "NO_PROMOTION",
+  "gate": "ALL_NO_BET_UPSTREAM_NO_SIGNAL",
+  "reason": "#106 accepted zero promoted value pockets; no substitute signal permitted."
+}

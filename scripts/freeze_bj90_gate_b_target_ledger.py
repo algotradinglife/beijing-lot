@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+"""One authorized official-SP target read for #90 Gate B."""
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import os
+import shutil
+import sqlite3
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+from bj90_source_locator import add_source_argument, resolve_source
+
+
+def root() -> Path:
+    for candidate in (Path(__file__).resolve().parent, *Path(__file__).resolve().parents):
+        if (candidate / "AGENTS.md").is_file() and (candidate / "scripts").is_dir(): return candidate
+    raise RuntimeError("repository root unavailable")
+
+
+ROOT=root(); FREEZE=ROOT/"results/bj90_gate_a_preoutcome_v4r1"; OUT=ROOT/"results/bj90_gate_b_target_ledger_v2r1"
+
+
+def sha(path: Path) -> str:
+    h=hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda:f.read(1024*1024),b""): h.update(chunk)
+    return h.hexdigest()
+
+
+def read(path: Path) -> list[dict]:
+    with path.open(newline="",encoding="utf-8") as f:return list(csv.DictReader(f))
+
+
+def write(path: Path, rows: list[dict]) -> None:
+    with path.open("w",newline="",encoding="utf-8") as f:
+        w=csv.DictWriter(f,fieldnames=sorted({k for r in rows for k in r}));w.writeheader();w.writerows(rows)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser=argparse.ArgumentParser(description=__doc__)
+    add_source_argument(parser)
+    args=parser.parse_args(argv)
+    source=resolve_source(ROOT,args.source_db)
+    if OUT.exists(): raise SystemExit(f"refusing to overwrite immutable output: {OUT}")
+    stage=Path(tempfile.mkdtemp(prefix="bj90-target-ledger-",dir=OUT.parent))
+    try:
+        manifest=json.loads((FREEZE/"SHA256SUMS.json").read_text())
+        actual={p.name:sha(p) for p in FREEZE.iterdir() if p.is_file() and p.name!="SHA256SUMS.json"}
+        if actual != manifest: raise RuntimeError("Gate-A v4r1 manifest mismatch")
+        card=json.loads((FREEZE/"experiment_card.json").read_text())
+        if sha(source)!=card["source"]["sha256"]: raise RuntimeError("source bytes changed")
+        rows=read(FREEZE/"frozen_preoutcome_rows.csv"); ids=[int(r["match_id"]) for r in rows]
+        if len(ids) != len(set(ids)):
+            raise RuntimeError("Gate-A match_id is non-unique")
+        # Gate B's one and only target query. json_each binds all frozen
+        # identities in one statement, avoiding chunked target reads.
+        target={}; conn=sqlite3.connect(f"file:{source}?mode=ro",uri=True)
+        query="""
+          SELECT match_id,official_sp_3,official_sp_1,official_sp_0
+            FROM match_features
+           WHERE match_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
+        """
+        for mid,s3,s1,s0 in conn.execute(query, (json.dumps(ids),)):
+            target[int(mid)]=(s3,s1,s0)
+        conn.close(); ledger=[]
+        for r in rows:
+            mid=int(r["match_id"]); values=target.get(mid)
+            if values is None: reason="MISSING_ROW"; values=("","","")
+            elif any(v is None or float(v)<=0 for v in values): reason="NONPOSITIVE"; values=("","","")
+            else: reason="AVAILABLE_POSITIVE"
+            ledger.append({"match_id":mid,"issue":r["issue"],"match_idx":r["match_idx"],"year":r["year"],"fold":r["fold"],"target_reason":reason,"sp_3":values[0],"sp_1":values[1],"sp_0":values[2]})
+        if len(ledger) != len(rows) or {int(r["match_id"]) for r in ledger} != set(ids):
+            raise RuntimeError("target ledger does not cover frozen Gate-A identities")
+        write(stage/"official_sp_target_ledger.csv",ledger)
+        availability={}
+        for r in ledger:
+            key=(r["year"],r["target_reason"]); availability[key]=availability.get(key,0)+1
+        write(stage/"target_availability_by_year.csv",[
+            {"year":year,"target_reason":reason,"n":n}
+            for (year,reason),n in sorted(availability.items(), key=lambda x:(int(x[0][0]), x[0][1]))
+        ])
+        meta={"issue":90,"stage":"GATE_B_AUTHORIZED_OFFICIAL_SP_TARGET_LEDGER","created_at_utc":datetime.now(timezone.utc).isoformat(),"gate_a_manifest_sha256":sha(FREEZE/"SHA256SUMS.json"),"source_sha256":card["source"]["sha256"],"frozen_identity_n":len(ids),"target_read_statement":"one SELECT against match_features using json_each over all frozen match_id values","target_read_whitelist":["match_features.match_id","match_features.official_sp_3","match_features.official_sp_1","match_features.official_sp_0"],"target_statuses":["AVAILABLE_POSITIVE","MISSING_ROW","NONPOSITIVE"],"prohibited":["score","result_label","result_code","winning_sp","ROI","portfolio","N","K","stake"]}
+        (stage/"ledger_card.json").write_text(json.dumps(meta,indent=2,sort_keys=True)+"\n");shutil.copyfile(__file__,stage/"ledger_runner.py");shutil.copyfile(Path(__file__).with_name("bj90_source_locator.py"),stage/"bj90_source_locator.py")
+        m={p.name:sha(p) for p in sorted(stage.iterdir()) if p.is_file()};(stage/"SHA256SUMS.json").write_text(json.dumps(m,indent=2,sort_keys=True)+"\n")
+        os.replace(stage,OUT);print(json.dumps({"output":str(OUT),"n":len(ledger),"manifest_sha256":sha(OUT/"SHA256SUMS.json")},sort_keys=True));return 0
+    except Exception:
+        shutil.rmtree(stage,ignore_errors=True);raise
+
+
+if __name__=="__main__":sys.exit(main())

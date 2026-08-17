@@ -1,0 +1,131 @@
+{
+  "comparison_contract": {
+    "broader_pool": "#148 Gate-A common-support/K_ALL definition; its settled surface is joined only at Gate B",
+    "comparison": "report side-by-side candidate and #148 broader-pool M curves without altering the candidate's identities, vectors, seeds, or draw plan"
+  },
+  "contract": "BJ-HIST-N7-CANDIDATE-REPRO-001",
+  "denominator": {
+    "available_issue_rows": 339,
+    "complete_issue_rows": 348,
+    "dense_m_points": 58,
+    "fixed_candidate_identities": 1356,
+    "fixed_candidate_role_rows": 9492,
+    "no_bet_issue_rows": 9,
+    "sampled_m_points": 57,
+    "sampling_plan_rows": 119364,
+    "seed_count": 3
+  },
+  "fixed_candidate": {
+    "gate_id": "NO_GATE",
+    "historical_reference_M": 64,
+    "historical_reference_seeds": [
+      "137001",
+      "137002",
+      "137003"
+    ],
+    "identity_rule": "exact #137 Gate-A v2 selected_portfolio_ids; no outcome-directed selection, parameter scan, or candidate-pool expansion",
+    "probability_vector": "Q_WEIGHT",
+    "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+    "top_k_id": "K4"
+  },
+  "gate_b_requirements": {
+    "authorization": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_ACCEPTANCE",
+    "promotion": "No historical result authorizes purchase, production, betting, or promotion. A stable positive first requires separate strict independent EV."
+  },
+  "generator_version": "bj151-gate-a-v1",
+  "issue": 151,
+  "metrics_frozen_for_gate_b": [
+    "no_tax_roi primary; tax-adjusted ROI secondary",
+    "candidate ROI, matched K4 FULL ROI, and candidate-minus-FULL deltas",
+    "side-by-side #148 broader-pool M curve",
+    "three seeds, YEAR/FOLD/LOYO and issue bootstrap",
+    "issue stake distribution, duplicate rate, unique coverage, concentration, largest-issue sensitivity"
+  ],
+  "outcome_boundary": "No test outcome, score, final/winning SP, settlement, payout, ROI, tax realization, or post-kickoff input is read or emitted.",
+  "sampling_contract": {
+    "dense_m_grid": [
+      16,
+      32,
+      48,
+      64,
+      80,
+      96,
+      112,
+      128,
+      144,
+      160,
+      176,
+      192,
+      208,
+      224,
+      240,
+      256,
+      272,
+      288,
+      304,
+      320,
+      336,
+      352,
+      368,
+      384,
+      400,
+      416,
+      432,
+      448,
+      464,
+      480,
+      496,
+      512,
+      576,
+      640,
+      704,
+      768,
+      832,
+      896,
+      960,
+      1024,
+      1088,
+      1152,
+      1216,
+      1280,
+      1344,
+      1408,
+      1472,
+      1536,
+      1600,
+      1664,
+      1728,
+      1792,
+      1856,
+      1920,
+      1984,
+      2048,
+      2112,
+      2187
+    ],
+    "full_control": "M=2187 exact enumeration per selected identity",
+    "seeds": [
+      "137001",
+      "137002",
+      "137003"
+    ],
+    "wor_sensitivity": "Q_INFORMED_WOR_DISTINCT with the fixed #137 Q_WEIGHT vector",
+    "wr_primary": "Q_INFORMED_WR_DUPLICATE_STAKE with the fixed #137 Q_WEIGHT vector"
+  },
+  "scope": "historical paper research only; no purchase, production, betting, or promotion authority.",
+  "sources": {
+    "bj137_gate_a_v2": {
+      "content_identity_sha256": "36d6afcc33a5b5ceb3e4a990bfe6ec05503be115270c3489f4973dc3a59dd236",
+      "identity_payload_sha256": "1d87b3399b0e77a44998582a452e52860073ee90bc28f91bf9498609248e0496",
+      "manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+      "participation_payload_sha256": "e8fbcb1430d65e8d3c83c173b7d21b1deeb6463fd15d9f018c145923059f61d6",
+      "role_payload_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa"
+    },
+    "bj148_gate_a_v1": {
+      "content_identity_sha256": "dfd3ac234f95f28185a09a6bb2f69c3ff66ddb696ce1fe45a6a1215d932dcd0a",
+      "manifest_sha256": "fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6",
+      "role": "broader-pool comparator definition only"
+    }
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_FIXED_CANDIDATE_DENSE_M_FREEZE"
+}

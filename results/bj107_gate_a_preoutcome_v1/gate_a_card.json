@@ -1,0 +1,37 @@
+{
+  "candidate_definition": "Only #106 promoted value pockets qualify. #106 terminal nominated_strata=[]; therefore accepted pocket, candidate outcome and candidate match counts are all zero.",
+  "contract": "BJ-HIST-ISSUE-VALUE-GATE-001",
+  "decision": "NO_PROMOTION",
+  "denominator": {
+    "official_issues": 344,
+    "official_pools": 2659
+  },
+  "fallback": "Every official issue/pool remains in the denominator; select zero matches and emit explicit NO_BET.",
+  "gate_b": "NOT_REQUIRED: no staked policy exists when every candidate count is zero.",
+  "gate_family": [
+    {
+      "name": "ALL_NO_BET_UPSTREAM_NO_SIGNAL",
+      "thresholds": "none; #106 nominated_strata is exactly empty"
+    }
+  ],
+  "issue": 107,
+  "outcome_boundary": "No outcome rows, payout, tax, ROI, result, score, winning SP, q-atlas rows, or settlement payloads are opened. The #106 terminal settlement card is read only for its published no-signal disposition and empty nominated_strata boundary.",
+  "provenance": {
+    "input_manifests": {
+      "bj101": "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447",
+      "bj106_gate_a": "fb45cacccb4c9ab2b52c8a538f489fb3e3197fa138245f0d83cf98a3cbb0db5d",
+      "bj106_gate_b": "d112cc1f1c8b538b7a36e0c4b03de70aa9532f1cd2d9f38598afbd21b7223c86",
+      "bj89": "b22c33bddc71972e3c2a5e7b95955087ece2441b5728da6424d19b3de6f503e2",
+      "bj90": "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2"
+    },
+    "input_payloads": {
+      "bj101_pool_census": "38c96ac4509801f68dd3e2469be619a8954ef06291faca2e9cd6d04cb7b6332a",
+      "bj106_gate_a_card": "e1221b203b393c6cf9f9df3d06398298ad16096c423d07e2e426ef66d34c75cc",
+      "bj106_terminal_card": "d3aa8b10c9193b7302694d7b972614b7f520b662a1314938bfb43d3c69125a05",
+      "bj89_card": "b5ea85676936fd6523b9845998db5ba2e77a0c6c128be55a82eaab624dacaeef",
+      "bj90_card": "64f98c6863428aeb494c283022bc3af6e572329a4f688e41204f72c4cf464917"
+    }
+  },
+  "scope": "historical paper-only research; no purchase, production or frontend authority.",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_TERMINAL_NO_BET"
+}

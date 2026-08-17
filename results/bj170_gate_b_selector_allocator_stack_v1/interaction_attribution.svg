@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620">
+<rect width="100%" height="100%" fill="white"/>
+<text x="600.0" y="35" text-anchor="middle" font-size="22" font-family="sans-serif">#170 allocation lift and interaction</text>
+<line x1="100" y1="250.47" x2="1160" y2="250.47" stroke="#333"/>
+<text x="20" y="270.0" transform="rotate(-90 20 270.0)" text-anchor="middle" font-size="14" font-family="sans-serif">ROI difference</text>
+<text x="365.00" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">Q/M192</text>
+<rect x="301.10" y="250.47" width="37.80" height="22.06" fill="#2563eb"/>
+<text x="320.00" y="288.53" text-anchor="middle" font-size="10" font-family="sans-serif">-4.3%</text>
+<rect x="346.10" y="250.47" width="37.80" height="74.22" fill="#f59e0b"/>
+<text x="365.00" y="340.69" text-anchor="middle" font-size="10" font-family="sans-serif">-14.4%</text>
+<rect x="391.10" y="198.32" width="37.80" height="52.16" fill="#dc2626"/>
+<text x="410.00" y="192.32" text-anchor="middle" font-size="10" font-family="sans-serif">10.1%</text>
+<text x="895.00" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">MODEL/M512</text>
+<rect x="831.10" y="250.47" width="37.80" height="39.05" fill="#2563eb"/>
+<text x="850.00" y="305.53" text-anchor="middle" font-size="10" font-family="sans-serif">-7.6%</text>
+<rect x="876.10" y="70.00" width="37.80" height="180.47" fill="#f59e0b"/>
+<text x="895.00" y="64.00" text-anchor="middle" font-size="10" font-family="sans-serif">35.0%</text>
+<rect x="921.10" y="250.47" width="37.80" height="219.53" fill="#dc2626"/>
+<text x="940.00" y="486.00" text-anchor="middle" font-size="10" font-family="sans-serif">-42.5%</text>
+<rect x="100" y="575" width="16" height="16" fill="#2563eb"/><text x="122" y="588" font-size="13" font-family="sans-serif">BEST matched lift</text>
+<rect x="360" y="575" width="16" height="16" fill="#f59e0b"/><text x="382" y="588" font-size="13" font-family="sans-serif">SOURCE matched lift</text>
+<rect x="620" y="575" width="16" height="16" fill="#dc2626"/><text x="642" y="588" font-size="13" font-family="sans-serif">interaction</text>
+</svg>

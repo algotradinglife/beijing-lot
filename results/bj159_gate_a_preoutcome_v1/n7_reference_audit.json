@@ -1,0 +1,7 @@
+{
+  "n7_identity_count": "371",
+  "n7_identity_set_sha256": "65f963e6c1246306fecc538db6aebd3e02e14db4a245d6b999681b036640be14",
+  "outcome_boundary": "No outcome/final-SP/payout/tax/ROI/settlement input read or emitted",
+  "rule": "Generated N=7 selected match sets equal accepted #127 ESP300_GM305_LOWP20 role identity sets exactly",
+  "source_variant": "ESP300_GM305_LOWP20"
+}
