@@ -126,6 +126,9 @@ def test_r8_crosswalk_requires_the_bound_asset_hash_before_inheritance() -> None
     assert census.hist40_baseline_applies("beidan_xlsm", row["r8_content_sha256"]) is True
     assert census.hist40_baseline_applies("beidan_xlsm", "0" * 64) is False
     assert census.hist40_baseline_applies("bjdc_500_capture", row["r8_content_sha256"]) is False
+    assert census.hist40_field_baseline_applies(row, row["r8_content_sha256"]) is True
+    changed_field_hash = {**row, "r8_content_sha256": "different-field-asset"}
+    assert census.hist40_field_baseline_applies(changed_field_hash, row["r8_content_sha256"]) is False
 
 
 def test_profile_lane_uses_r8_row_only_when_the_asset_hash_is_bound() -> None:
