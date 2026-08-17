@@ -1,0 +1,16 @@
+evidence,requirement,status
+MANIFEST.json;REPLAY via scripts/build_bj250_source_census.py,REQ-SC01,EVIDENCE_PRESENT
+tables/source_inventory.csv,REQ-SC02,EVIDENCE_PRESENT
+tables/coverage_by_period.csv;tables/proxy_coverage_by_period.csv;tables/intersection_levels.csv,REQ-SC03,EVIDENCE_PRESENT
+tables/proxy_surface_profile.csv,REQ-SC04,EVIDENCE_PRESENT
+tables/field_inventory.csv;tables/hist40_scope_overrides.csv,REQ-SC05,EVIDENCE_PRESENT
+tables/source_role_matrix.csv;tables/unresolved_question_ledger.csv,REQ-SC06,EVIDENCE_PRESENT
+MANIFEST.json;SHA256SUMS.json,REQ-SC07,EVIDENCE_PRESENT
+independent EV required,REQ-SC08,EV_PENDING
+MANIFEST.json.hist40_baseline;tables/source_inventory.csv,REQ-SC09,EVIDENCE_PRESENT
+tables/proxy_surface_profile.csv;REPORT.md,REQ-SC10,EVIDENCE_PRESENT
+tables/source_inventory.csv.lineage_root,REQ-SC11,EVIDENCE_PRESENT
+tables/intersection_levels.csv,REQ-SC12,EVIDENCE_PRESENT
+MANIFEST.json.prohibitions,REQ-SC13,EVIDENCE_PRESENT
+tables/coverage_by_period.csv;tables/proxy_coverage_by_period.csv,REQ-SC14,EVIDENCE_PRESENT
+tables/source_role_matrix.csv;PI/user checkpoint required,REQ-SC15,PI_DECISION_PENDING

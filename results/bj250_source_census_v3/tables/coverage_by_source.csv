@@ -3,6 +3,6 @@ PROFILED,701,historical_relative_time_proxy,192709,195269,beidan_xlsm
 PROFILED,701,identity_schedule_support,190745,190746,beidan_features
 PROFILED,150,settlement_label_truth,38463,38463,beidan_history
 PROFILED,31,strict_forward_candidate,5155,5155,beidan_live
-PROFILED,13,strict_forward_candidate,1487,4008003,bjdc_500_capture
+PROFILED,13,strict_forward_candidate,1487,4026831,bjdc_500_capture
 PROFILED,735,derived_copy,198710,201270,beidan_modeling_plus
 PROFILED,34,derived_copy,6001,6001,beidan_nowscore

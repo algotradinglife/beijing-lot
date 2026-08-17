@@ -31,8 +31,8 @@ results/*
 !results/issue-206/**
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
-!results/bj250_source_census_v1/
-!results/bj250_source_census_v1/**
+!results/bj250_source_census_v3/
+!results/bj250_source_census_v3/**
 runs/
 .cache/
 tmp/
@@ -48,8 +48,8 @@ temp/
 !results/issue-206/*.parquet
 !results/bj229_divergence_profile_v1/**/*.csv
 !results/bj229_divergence_profile_v1/**/*.parquet
-!results/bj250_source_census_v1/**/*.csv
-!results/bj250_source_census_v1/**/*.parquet
+!results/bj250_source_census_v3/**/*.csv
+!results/bj250_source_census_v3/**/*.parquet
 *.feather
 *.h5
 *.hdf5

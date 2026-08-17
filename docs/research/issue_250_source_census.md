@@ -1,70 +1,107 @@
-# Issue #250 — BJ-UNIFIED-SOURCE-CENSUS-001 R3
+# Issue #250 — existing-source assessment and admissible-use decision
 
-## Scope and baseline
+## Decision summary
 
-This is an incremental, assessment-only source-role decision input bound to `HIST-DATA-CENSUS-001 R8` (`hist-data-census-001-r8`, commit `97a9c0a78d2fce0004cb1240113a070b980403b9`, manifest SHA-256 `ed16b296…e217cdc8`). It profiles seven declared logical source families through the externally supplied `BEIJING_LOT_DATA_ROOT`, with URI read-only SQLite connections.
+Issue #250 is an **assessment-only** census. It did not crawl, backfill, impute, train a model, construct tickets, or calculate ROI.
 
-The assessment does not crawl, purchase, append, normalize, impute, train, construct tickets, or compute ROI. It does not freeze identity, temporal policy, or physical schema. Mutable inputs are reported as `MUTABLE_UNFROZEN`; their counts are observations rather than frozen receipts.
+The historical `beidan_xlsm` source can proceed only as a **retrospective relative-time proxy**, not as strict decision-time evidence. Its role is supported by one coherent, same-source surface: native match identity and Beijing handicap line plus positive `euro_1x2` vectors at all three accepted relative horizons (`initial`, `10h`, `1h`). There are **189,587** matches satisfying that common gate.
 
-## p34 identity and evidence grain
+This does not yet make the data canonical model input. Native/candidate identity reconciliation remains #251 work, while causal availability and sealing remain #252 work. Both live sources remain `RAW_ONLY`.
 
-`playid=34` identifies the p34 play type; it is not a match identifier. The census uses these explicit, separate grains for `live_market_sp_snapshots`:
+## What R4 got wrong and the PI correction
 
-| Purpose | Identity |
-| --- | --- |
-| logical p34 match / M-per-issue | `issue + row_idx` |
-| observed match snapshot / triplet denominator | `issue + fetched_at + row_idx` |
-| source cell / duplicate check | `issue + playid + fetched_at + row_idx + outcome_code` |
+The rejected R4 package combined unrelated evidence:
 
-This prevents a single p34 play type from collapsing every issue to one match. The backing tables preserve issue, match, cell, and snapshot denominators separately.
+- it counted complete `market_snapshots.v1/v2/v3` rows across all markets;
+- it separately counted generic R8-eligible fields from other tables; and
+- it used those unrelated counts to grant the whole source a historical role.
 
-## Admissible-use lanes
+It also called every three-column vector an outcome triplet and copied source-row counts into a `cell_count` column. That obscured both market semantics and missingness.
 
-Every discovered table/field is in `tables/field_inventory.csv`, with an explicit `admissible_use` and `terminal_denylisted` value. For R8-covered immutable assets, the committed R8-derived field crosswalk is applied only after the current source SHA-256 matches the R8 inventory SHA-256; the table exposes the binding state and inherited R8 admissibility/timestamp grade. Unknown, changed, descriptive-only, mapping-only, unclassified, clock-unbound, and price-time-unbound fields fail closed to `RAW_ONLY`. Result, score, settlement, final/official SP, winning-SP, payout, hit, profit/ROI, and halftime surfaces are `SETTLEMENT_ONLY` even when they are co-resident with historical proxy data. The machine inventory therefore cannot elevate a whole SQLite container into an inference surface.
+The PI takeover replaces that logic with an Issue-250 scoped surface policy:
 
-The source role is fail-closed:
+| Surface | Actual semantics | Use in #250 |
+| --- | --- | --- |
+| `euro_1x2` | three mutually exclusive 1X2 prices | historical-proxy role gate |
+| `kelly_1x2` | derived three-value Kelly vector | descriptive only; not an independent price |
+| `asian_handicap` | two prices plus a handicap line | auxiliary; not a p34 outcome triplet |
+| `over_under` | two prices plus a totals line | auxiliary; not a p34 outcome triplet |
+| live `handicap_3way` | p34 outcome cells | raw/unfrozen until #252 |
 
-- a missing/unprofiled coverage table is `RECOVER`;
-- an historical proxy source without any complete relative-time proxy triplet **or without any R8-bound eligible field** is `RAW_ONLY`;
-- a strict-forward source without both complete source and capture clocks is `RAW_ONLY`;
-- a clock-complete mutable source is still `MUTABLE_UNFROZEN`;
-- derived copies sharing an upstream lineage root are `EXCLUDE` from independent evidence.
+The generic R8 field dictionary and the scoped proxy policy are reported separately. R8's two field-by-market prohibitions—`correct_score` and `total_goals` under `exotic_odds.odds`—are preserved explicitly rather than collapsed into a generic field row.
 
-`initial`, `10h`, and `1h` are historical relative-time proxy buckets, never strict observed-at fields. Label/settlement completeness is profiled separately and never decides feature availability or source admissibility.
+## Coverage at the correct grain
 
-## Required decision views
+The delivery now distinguishes:
 
-All committed figures have machine-readable backing under `results/bj250_source_census_v2/tables/`:
+1. logical matches;
+2. market-vector rows; and
+3. physical cells inside those vectors.
 
-- source inventory, R8 binding, lineage root, stable hash/mutable receipt, and disposition;
-- complete table/field inventory with terminal denylist;
-- decision-field nullness, invalid-value and denominator profiles;
-- issue/date/match/cell coverage for each earlier year present, calendar 2024, 2025-01–03, 2025-04–2026-04, prospective 2026-05 onward, and null/anomalous dates;
-- duplicate and p34 outcome-triplet profiles;
-- M-per-issue distribution at logical-match grain;
-- source × feature-family availability heatmap and time/issue coverage chart;
-- four-level intersection ledger: `RAW_PRESENT`, exact `NATIVE_KEY_INTERSECTION`, non-authoritative `CANDIDATE_MAPPED_RANGE`, and deferred `CANONICAL_CAUSAL_INTERSECTION`;
-- source-role matrix and unresolved-question ledger.
+The 2024 historical proxy panel is the audit anchor:
 
-Candidate mapping remains an explicitly non-authoritative range. It cannot authorise a join, training, or label propagation; #251 owns identity acceptance and #252 owns temporal/sealing acceptance.
+| Grain | Count |
+| --- | ---: |
+| Matches | 16,192 |
+| Market × snapshot vector rows | 3,206,016 |
+| Physical vector cells | 9,618,048 |
+| Non-null physical cells | 8,438,821 |
 
-## Integrity verification
+The earlier rejected report showed only `16,192` as if it were cell coverage. The corrected period table provides market × snapshot missingness for every represented year, calendar 2024, 2025-01–03, 2025-04–2026-04, 2026-05 onward, and null/unparseable dates.
 
-`SHA256SUMS.json` checks byte closure but is not a trust anchor. `MANIFEST.json` contains semantic hashes for every package payload, the producer implementation hash, and the R8 crosswalk hash. The verifier also recomputes each packaged field lane from source identity, source role, and the checked-out crosswalk; this is semantic consistency, not a claim that the package creates its own trust anchor. The builder deliberately does **not** write an anchor: an independent EV checkout must supply `--trusted-anchor /outside/package/expected-anchor.json` to `--verify-only`. A verifier without that argument fails closed. This separation rejects an attacker who changes a decision table, rewrites in-package semantic hashes, and regenerates checksums; an expected anchor generated by the same builder/package would not be evidence.
+Notable source-period facts:
 
-## PI/user decision gate
+- the historical proxy container has 195,269 rows across 701 issues, including 16,192 matches in 2024, 3,829 in 2025-01–03, and 1,024 in the 2025-04–2026-04 stratum;
+- it also has 2,566 rows with null/unparseable kickoff dates, requiring fail-closed treatment;
+- the settlement source covers 17,873 rows in 2025-04–2026-04 and 397 rows from 2026-05 onward, but settlement presence does not create feature availability;
+- the mutable p34 capture currently covers 13 issues and 1,487 logical matches; it is an observation, not a frozen receipt.
 
-1. Review whether the measured `beidan_xlsm` field-level proxy lane is sufficient as historical-proxy backbone candidate.
-2. Review whether candidate-map bounds justify #251 identity work; they never authorise a canonical join.
-3. Require #252 to define sealed source/capture-clock receipts before either live lane can be strict-forward evidence.
-4. Retain settlement/final-SP fields outside inference and derived copies outside independent source evidence.
-5. Use explicitly measured gaps to decide whether #235/#236/#237/#248 recovery work is warranted.
+## Identity and intersection findings
+
+The four levels remain deliberately distinct:
+
+- `RAW_PRESENT`: the historical relative-time surfaces physically exist;
+- `NATIVE_KEY_INTERSECTION`: 1,748 exact `(issue, match_idx)` matches between the two live lanes;
+- `CANDIDATE_MAPPED_RANGE`: 188,197–188,199 historical rows under a proposed normalized team/date mapping;
+- `CANONICAL_CAUSAL_INTERSECTION`: not yet evaluated.
+
+The candidate range is not permission to join, train, or propagate labels. #251 must decide identity; #252 must decide clock/sealing semantics.
+
+## Source dispositions
+
+| Source | Disposition | Reason |
+| --- | --- | --- |
+| `beidan_xlsm` | `HISTORICAL_PROXY` | 189,587 common valid Euro 1X2 matches across all three relative horizons |
+| `beidan_features` | `RAW_ONLY` | support data; no independently accepted causal lane |
+| `beidan_history` | `SETTLEMENT_ONLY` | result/SP truth, never inference input |
+| `beidan_live` | `RAW_ONLY` | clock/sealing policy incomplete |
+| `bjdc_500_capture` | `RAW_ONLY` | mutable and clock/sealing policy incomplete |
+| `beidan_modeling_plus` | `EXCLUDE` | derived copy, not independent evidence |
+| `beidan_nowscore` | `EXCLUDE` | derived copy, not independent evidence |
+
+## Integrity and reproducibility
+
+The package is write-once and published by staged atomic rename after file and directory `fsync`; an existing target is never deleted or replaced. The verifier binds **every** payload—including coverage, availability, duplicates, REQ evidence, report, and figures—to an externally held anchor. Rewriting a changed payload, manifest, and checksum file still fails against the original anchor.
+
+The executed notebook is [bj250_source_census.ipynb](../../notebooks/research/issue-250/bj250_source_census.ipynb). Machine-readable evidence is under `results/bj250_source_census_v3/`.
+
+## PI conclusion
+
+The useful outcome is not “all required data are ready.” It is narrower:
+
+- the large historical relative-time panel is sufficiently coherent to justify the next identity and temporal assessments;
+- its Euro proxy is useful for historical exploration but is not yet strict causal evidence;
+- market layouts must be translated explicitly before an M×3 p34 tensor is built;
+- recovery work should be driven by measured gaps after #251/#252, not by file presence alone.
+
+Therefore #250 can close after independent EV and user/PI acceptance of this source-role decision. It should unlock the assessment sequence, not authorize model training by itself.
 
 ## Reproduction
 
 ```bash
 BEIJING_LOT_DATA_ROOT=/path/to/data python scripts/build_bj250_source_census.py
-BEIJING_LOT_DATA_ROOT=/path/to/data python scripts/execute_bj250_notebook.py
+python scripts/render_bj250_notebook.py
+python scripts/execute_bj250_notebook.py
 python scripts/build_bj250_source_census.py --verify-only --trusted-anchor /outside/package/expected-anchor.json
 python -m pytest tests/test_bj250_source_census.py -q
 ```

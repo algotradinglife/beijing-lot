@@ -1,3 +1,0 @@
-# BJ-UNIFIED-SOURCE-CENSUS-001 R4
-
-This assessment-only package profiles decision fields, label completeness separately, exact time/issue/match/cell denominators, native duplicates, invalid values, p34 triplets, and all four intersection levels. Every field lane is recomputed from R8 field-level inheritance only when the R8 asset SHA is bound; unmatched or changed fields fail closed. Candidate mappings are explicitly non-authoritative; canonical causal intersection remains deferred to #251/#252. Mutable sources are not frozen conclusions. See tables and `docs/research/issue_250_source_census.md`.
