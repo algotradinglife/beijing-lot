@@ -67,6 +67,11 @@ def hist40_baseline_applies(source_id: str, content_sha256: str) -> bool:
     return row is not None and row["r8_content_sha256"] == content_sha256
 
 
+def hist40_field_baseline_applies(baseline: dict[str, str] | None, content_sha256: str) -> bool:
+    """Bind a lane to the exact R8 asset identity recorded for that field."""
+    return baseline is not None and baseline.get("r8_content_sha256", "") == content_sha256
+
+
 def field_admissible_use(
     table: str,
     column: str,
@@ -114,7 +119,7 @@ def profile_field_lane(
 ) -> str:
     """Resolve one observed field against R8 only when the asset is unchanged."""
     baseline = hist40_baseline_record(source_id, table, column)
-    if not hist40_baseline_applies(source_id, content_sha256):
+    if not hist40_field_baseline_applies(baseline, content_sha256):
         baseline = None
     return field_admissible_use(table, column, source_role=source_role, baseline=baseline)
 
