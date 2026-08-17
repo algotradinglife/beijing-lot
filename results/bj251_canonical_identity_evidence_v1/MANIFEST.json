@@ -1,0 +1,9 @@
+{
+  "contract_version": "BJ-UNIFIED-CANONICAL-IDENTITY-001-v1",
+  "disposition": "CANDIDATE_PENDING_PI_ACCEPTANCE",
+  "exception_count": 20909,
+  "external_full_package": "/home/drwho1985/workspace/soccer/beijing-lot/data/derived/bj251_canonical_identity_v1",
+  "external_sha256sums_sha256": "872c4a6ddc99360a87dae25ac49ddb8edd25992f110577c3dadfe357235cca6c",
+  "fixture_count": 214854,
+  "trace_count": 236327
+}
