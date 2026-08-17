@@ -1,0 +1,9 @@
+req,criterion,evidence,pass
+REQ-TS01,all strict selection rows carry temporal provenance and availability,tables/strict_selection.csv,True
+REQ-TS02,strict uses explicit observed_at UTC; proxy has no observed_at claim,tables/strict_selection.csv + tables/proxy_horizon_coverage.csv,True
+REQ-TS03,initial/10h/1h retained as separate source-relative labels,tables/proxy_horizon_coverage.csv,True
+REQ-TS04,common cutoffs select only observations at/before epoch and record staleness,tables/cutoff_coverage.csv + tables/strict_selection.csv,True
+REQ-TS05,local-date segment fallback applies identical cutoff rule,tables/segment_selection.csv,True
+REQ-TS06,coverage/drop curves emitted for declared candidate leads,tables/cutoff_coverage.csv + tables/drop_reasons.csv,True
+REQ-TS07,strict and proxy namespaces are separate files and semantic verifier rules,MANIFEST.json + TEMPORAL_VOCABULARY.md,True
+REQ-TS08,"boundary tests cover timezone, future observation, missing clock, and segment isolation",tests/test_bj252_temporal_semantics.py,True
