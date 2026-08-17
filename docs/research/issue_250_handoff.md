@@ -18,6 +18,7 @@
 5. Every payload is externally anchor-bound; non-selected evidence/report/figure tampering is covered.
 6. Publication is staged, fsynced, atomic, and write-once.
 7. The notebook now contains seven executable decision views instead of printing paths only.
+8. R5 EV routing blocker is closed with an explicit lane table: historical proxy and strict-forward lanes advance to #252; identity support only to #251; settlement/derived lanes to neither.
 
 ## Recomputed evidence
 
@@ -26,7 +27,7 @@
 - Live native-key intersection: 1,748.
 - Historical candidate-map range: 188,197–188,199, non-authoritative.
 - Canonical causal intersection: not yet evaluated.
-- Tests: 44 focused tests pass before independent EV.
+- Tests: 47 focused tests pass before independent EV.
 
 ## Required independent EV
 

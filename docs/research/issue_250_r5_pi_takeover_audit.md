@@ -10,5 +10,6 @@
 | Destructive publication | Staged fsync + write-once atomic rename | replacement-refusal test |
 | Notebook was a path printer | Seven executable pandas decision views | executed notebook |
 | PR scope polluted by superseded #234 work | Build clean replacement branch from `main` using only #250 commits | final PR diff inspection |
+| Historical proxy omitted from #252 routing | Explicit five-lane routing table, semantic verifier, seven-source regression | source-role matrix; routing tests; notebook |
 
 No source was modified. No crawl, backfill, imputation, model, ticket, ROI, identity-policy freeze, or temporal-policy freeze was introduced.

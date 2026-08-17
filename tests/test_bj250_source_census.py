@@ -262,6 +262,56 @@ def test_source_feature_availability_consumes_field_level_lanes() -> None:
     assert label["present"] is False
 
 
+def test_source_routing_truth_table_covers_all_seven_sources() -> None:
+    inventory = [
+        {
+            "source_id": spec.source_id,
+            "lane": spec.lane,
+            "role": spec.intended_role,
+        }
+        for spec in census.SOURCES
+    ]
+    rows = {row["source_id"]: row for row in census._roles(inventory)}
+
+    assert rows["beidan_xlsm"]["advance_to_251"] is True
+    assert rows["beidan_xlsm"]["advance_to_252"] is True
+    assert rows["beidan_features"]["advance_to_251"] is True
+    assert rows["beidan_features"]["advance_to_252"] is False
+    assert rows["beidan_history"]["advance_to_251"] is False
+    assert rows["beidan_history"]["advance_to_252"] is False
+    for source_id in ("beidan_live", "bjdc_500_capture"):
+        assert rows[source_id]["advance_to_251"] is True
+        assert rows[source_id]["advance_to_252"] is True
+    for source_id in ("beidan_modeling_plus", "beidan_nowscore"):
+        assert rows[source_id]["advance_to_251"] is False
+        assert rows[source_id]["advance_to_252"] is False
+
+    unknown = census._roles(
+        [{"source_id": "unknown", "lane": "unknown", "role": "RAW_ONLY"}]
+    )[0]
+    assert unknown["advance_to_251"] is False
+    assert unknown["advance_to_252"] is False
+    assert unknown["decision"] == "UNMAPPED_LANE_NO_ROUTING"
+
+
+def test_source_routing_verifier_rejects_tampered_historical_proxy() -> None:
+    inventory = [
+        {
+            "source_id": spec.source_id,
+            "lane": spec.lane,
+            "role": spec.intended_role,
+        }
+        for spec in census.SOURCES
+    ]
+    roles = census._roles(inventory)
+    assert census.verify_source_routing(inventory, roles) == []
+    historical = next(row for row in roles if row["source_id"] == "beidan_xlsm")
+    historical["advance_to_252"] = False
+    assert census.verify_source_routing(inventory, roles) == [
+        "source routing mismatch: beidan_xlsm:advance_to_252"
+    ]
+
+
 def test_field_lane_crosswalk_verifier_recomputes_against_r8_binding() -> None:
     baseline = census.hist40_baseline_record("beidan_xlsm", "matches", "handicap_line")
     assert baseline is not None

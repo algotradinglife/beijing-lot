@@ -47,7 +47,7 @@ print('Trust note: independent verification still requires an external anchor.')
 
 roles = table('source_role_matrix')
 print('SOURCE ROLES')
-print(roles[['source_id', 'lane', 'role', 'decision']].to_string(index=False))"""
+print(roles[['source_id', 'lane', 'role', 'advance_to_251', 'advance_to_252', 'decision']].to_string(index=False))"""
         ),
         nbformat.v4.new_code_cell(
             """surface = table('proxy_surface_profile')

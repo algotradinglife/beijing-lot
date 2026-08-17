@@ -107,6 +107,34 @@ HIST40_SCOPE_OVERRIDES = (
     },
 )
 
+SOURCE_ROUTING = {
+    "historical_relative_time_proxy": {
+        "advance_to_251": True,
+        "advance_to_252": True,
+        "decision": "ASSESS_IDENTITY_IN_251_AND_TEMPORAL_PROXY_IN_252",
+    },
+    "identity_schedule_support": {
+        "advance_to_251": True,
+        "advance_to_252": False,
+        "decision": "ASSESS_IDENTITY_SUPPORT_IN_251",
+    },
+    "settlement_label_truth": {
+        "advance_to_251": False,
+        "advance_to_252": False,
+        "decision": "SETTLEMENT_ONLY_NO_FEATURE_ROUTING",
+    },
+    "strict_forward_candidate": {
+        "advance_to_251": True,
+        "advance_to_252": True,
+        "decision": "ASSESS_IDENTITY_IN_251_AND_SEAL_CLOCKS_IN_252",
+    },
+    "derived_copy": {
+        "advance_to_251": False,
+        "advance_to_252": False,
+        "decision": "EXCLUDE_DERIVED_COPY",
+    },
+}
+
 
 def _hist40_baseline_records() -> dict[tuple[str, str, str], dict[str, str]]:
     global _HIST40_BASELINE
@@ -1572,17 +1600,20 @@ def _roles(inventory: list[dict[str, object]]) -> list[dict[str, object]]:
     for item in inventory:
         role = str(item["role"])
         lane = str(item["lane"])
+        routing = SOURCE_ROUTING.get(
+            lane,
+            {
+                "advance_to_251": False,
+                "advance_to_252": False,
+                "decision": "UNMAPPED_LANE_NO_ROUTING",
+            },
+        )
         rows.append(
             {
                 "source_id": item["source_id"],
                 "lane": lane,
                 "role": role,
-                "advance_to_251": role
-                in {"HISTORICAL_PROXY", "RAW_ONLY", "MUTABLE_UNFROZEN"},
-                "advance_to_252": lane == "strict_forward_candidate",
-                "decision": "SEAL_SOURCE_AND_CAPTURE_CLOCK_CRITERIA"
-                if lane == "strict_forward_candidate"
-                else "ASSESSMENT_ONLY_NO_POLICY_FREEZE",
+                **routing,
             }
         )
     return rows
@@ -1735,6 +1766,27 @@ def verify_proxy_role_gate(
         if source.get("role") == expected
         else ["historical proxy role gate recomputation mismatch"]
     )
+
+
+def verify_source_routing(
+    source_inventory: list[dict[str, str]], source_roles: list[dict[str, str]]
+) -> list[str]:
+    """Recompute all #251/#252 routing from the explicit source-lane contract."""
+    expected = {str(row["source_id"]): row for row in _roles(source_inventory)}
+    observed = {row["source_id"]: row for row in source_roles}
+    if set(expected) != set(observed):
+        return ["source routing key mismatch"]
+    problems: list[str] = []
+    for source_id, wanted in expected.items():
+        row = observed[source_id]
+        for column in ("lane", "role", "decision"):
+            if str(row.get(column, "")) != str(wanted[column]):
+                problems.append(f"source routing mismatch: {source_id}:{column}")
+        for column in ("advance_to_251", "advance_to_252"):
+            actual = str(row.get(column, "")).lower() == "true"
+            if actual is not bool(wanted[column]):
+                problems.append(f"source routing mismatch: {source_id}:{column}")
+    return problems
 
 
 def verify_field_lane_crosswalk(
@@ -1933,16 +1985,13 @@ def verify_package(
     if (package / "tables/source_inventory.csv").exists() and (
         package / "tables/source_role_matrix.csv"
     ).exists():
-        inv = {
-            r["source_id"]: r["role"]
-            for r in _read_csv(package / "tables/source_inventory.csv")
-        }
-        roles = {
-            r["source_id"]: r["role"]
-            for r in _read_csv(package / "tables/source_role_matrix.csv")
-        }
+        inventory_rows = _read_csv(package / "tables/source_inventory.csv")
+        role_rows = _read_csv(package / "tables/source_role_matrix.csv")
+        inv = {r["source_id"]: r["role"] for r in inventory_rows}
+        roles = {r["source_id"]: r["role"] for r in role_rows}
         if inv != roles:
             problems.append("role recomputation mismatch")
+        problems.extend(verify_source_routing(inventory_rows, role_rows))
     if (package / "tables/source_inventory.csv").exists() and (
         package / "tables/field_inventory.csv"
     ).exists():
@@ -2101,6 +2150,8 @@ Assessment only: no crawl, backfill, imputation, model, ticket or ROI work occur
 The historical source role is recomputed from one coherent surface under `{PROXY_POLICY_ID}`: same-source native identity + Beijing line + positive `euro_1x2` vectors at all of `initial/10h/1h`. It is not inferred by combining unrelated table counts. Common gate-valid matches: **{historical["proxy_gate_valid_matches"]}**; qualifying buckets: **{historical["proxy_gate_bucket_count"]}/3**.
 
 Match, vector-row and physical-cell denominators are separate. Generic R8 field decisions remain in `field_inventory.csv`; the two finer R8 field×market prohibitions remain intact in `hist40_scope_overrides.csv`. Candidate identity ranges are non-authoritative and canonical causal overlap remains deferred to #251/#252. Mutable forward sources remain raw/unfrozen until #252 defines and verifies clock/sealing rules.
+
+Downstream routing is explicit: the historical relative-time proxy and both strict-forward lanes advance to #252; identity support advances only to #251; settlement and derived copies advance to neither.
 """
         (stage / "REPORT.md").write_text(report, encoding="utf-8")
         semantic = {

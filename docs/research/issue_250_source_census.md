@@ -79,6 +79,8 @@ The candidate range is not permission to join, train, or propagate labels. #251 
 | `beidan_modeling_plus` | `EXCLUDE` | derived copy, not independent evidence |
 | `beidan_nowscore` | `EXCLUDE` | derived copy, not independent evidence |
 
+Downstream routing is equally explicit: `beidan_xlsm`, `beidan_live`, and `bjdc_500_capture` advance to #252 for proxy/clock semantics; `beidan_features` advances only to #251; settlement and derived sources advance to neither.
+
 ## Integrity and reproducibility
 
 The package is write-once and published by staged atomic rename after file and directory `fsync`; an existing target is never deleted or replaced. The verifier binds **every** payload—including coverage, availability, duplicates, REQ evidence, report, and figures—to an externally held anchor. Rewriting a changed payload, manifest, and checksum file still fails against the original anchor.
