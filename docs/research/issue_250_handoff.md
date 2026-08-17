@@ -6,7 +6,7 @@
 
 - Branch: `engineer/bj250-rework-r1`, updating PR #255.
 - Base: `engineer/bj234-issue`.
-- Delivery HEAD: `b4bf700ce75f41c47b28b339ae99f4bb895c8a9f`.
+- Delivery implementation commits: `b4bf700ce75f41c47b28b339ae99f4bb895c8a9f` plus exact-field repair `3c5275cb90fb465873b06d1708f1a01f843e2842`.
 - Evidence package: `results/bj250_source_census_v2`.
 - Executed notebook: `notebooks/research/issue-250/bj250_source_census.ipynb`.
 - R4 same-class sweep: `docs/research/issue_250_r4_rework_audit.md`.
@@ -37,7 +37,7 @@ build_bj250_source_census.py --verify-only --trusted-anchor <local external>   -
 
 The local verification anchor used only to exercise the command is outside the package at `/tmp/bj250-r4-local-verification-anchor.json`; it is not an independent EV trust anchor and is not committed.
 
-The current mutable p34 observation contains 4,005,168 scoped cells across 13 issues and 1,487 logical `(issue,row_idx)` matches. It is explicitly unfrozen. The executed R4 inventory has 8 `HISTORICAL_PROXY_CANDIDATE`, 515 `RAW_ONLY`, 158 `SETTLEMENT_ONLY`, and 328 `EXCLUDE` field rows; 564 fields are R8 exact-asset bound, 37 map to a changed R8 asset, and 408 have no R8 field record.
+The current mutable p34 observation contains 4,008,003 scoped cells across 13 issues and 1,487 logical `(issue,row_idx)` matches. It is explicitly unfrozen. The executed R4 inventory has 8 `HISTORICAL_PROXY_CANDIDATE`, 515 `RAW_ONLY`, 158 `SETTLEMENT_ONLY`, and 328 `EXCLUDE` field rows; 564 fields are R8 exact-asset bound, 37 map to a changed R8 asset, and 408 have no R8 field record.
 
 ## PI / EV decision inputs and risks
 
