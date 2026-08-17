@@ -72,6 +72,123 @@ def test_historical_proxy_role_fails_closed_without_profiled_proxy_surface() -> 
         source_clock_complete=False,
         capture_clock_complete=False,
     ) == "RAW_ONLY"
+    assert census.role_from_profile(
+        spec,
+        coverage_status="PROFILED",
+        usable_proxy_triplets=1,
+        admissible_proxy_field_count=0,
+        source_clock_complete=False,
+        capture_clock_complete=False,
+    ) == "RAW_ONLY"
+
+
+def test_historical_proxy_field_requires_explicit_r8_eligibility() -> None:
+    ineligible = {
+        "pre_match_feature_eligible": "false",
+        "terminal_value": "false",
+        "admissible_use": "descriptive_only",
+        "timestamp_grade": "UNCLASSIFIED",
+    }
+    eligible = {
+        "pre_match_feature_eligible": "true",
+        "terminal_value": "false",
+        "admissible_use": "historical_proxy;descriptive_only",
+        "timestamp_grade": "HISTORICAL_PROXY",
+    }
+    terminal = {**ineligible, "terminal_value": "true", "admissible_use": "settlement_only"}
+
+    assert census.field_admissible_use(
+        "market_snapshots", "v1", source_role="HISTORICAL_PROXY", baseline=ineligible
+    ) == "RAW_ONLY"
+    assert census.field_admissible_use(
+        "market_snapshots", "v1", source_role="HISTORICAL_PROXY", baseline=eligible
+    ) == "HISTORICAL_PROXY_CANDIDATE"
+    assert census.field_admissible_use(
+        "matches", "unknown_future_field", source_role="HISTORICAL_PROXY", baseline=None
+    ) == "RAW_ONLY"
+    assert census.field_admissible_use(
+        "anything", "anything", source_role="HISTORICAL_PROXY", baseline=terminal
+    ) == "SETTLEMENT_ONLY"
+
+
+def test_r8_crosswalk_exposes_existing_field_as_ineligible_without_upgrade() -> None:
+    row = census.hist40_baseline_record("beidan_xlsm", "market_snapshots", "v1")
+    assert row is not None
+    assert row["pre_match_feature_eligible"] == "false"
+    assert census.field_admissible_use(
+        "market_snapshots", "v1", source_role="HISTORICAL_PROXY", baseline=row
+    ) == "RAW_ONLY"
+
+
+def test_r8_crosswalk_requires_the_bound_asset_hash_before_inheritance() -> None:
+    row = census.hist40_baseline_record("beidan_xlsm", "matches", "handicap_line")
+    assert row is not None
+    assert census.hist40_baseline_applies("beidan_xlsm", row["r8_content_sha256"]) is True
+    assert census.hist40_baseline_applies("beidan_xlsm", "0" * 64) is False
+    assert census.hist40_baseline_applies("bjdc_500_capture", row["r8_content_sha256"]) is False
+
+
+def test_profile_lane_uses_r8_row_only_when_the_asset_hash_is_bound() -> None:
+    row = census.hist40_baseline_record("beidan_xlsm", "matches", "handicap_line")
+    assert row is not None
+    assert census.profile_field_lane(
+        "beidan_xlsm", "matches", "handicap_line", "HISTORICAL_PROXY", row["r8_content_sha256"]
+    ) == "HISTORICAL_PROXY_CANDIDATE"
+    assert census.profile_field_lane(
+        "beidan_xlsm", "matches", "handicap_line", "HISTORICAL_PROXY", "changed"
+    ) == "RAW_ONLY"
+
+
+def test_source_feature_availability_consumes_field_level_lanes() -> None:
+    inventory = [{"source_id": "fixture", "role": "HISTORICAL_PROXY"}]
+    fields = [
+        {"source_id": "fixture", "field_family": "market_feature", "admissible_use": "HISTORICAL_PROXY_CANDIDATE"},
+        {"source_id": "fixture", "field_family": "market_feature", "admissible_use": "RAW_ONLY"},
+        {"source_id": "fixture", "field_family": "label_settlement", "admissible_use": "SETTLEMENT_ONLY"},
+    ]
+    rows = census.source_feature_availability(fields, inventory)
+    market = next(row for row in rows if row["field_family"] == "market_feature")
+    label = next(row for row in rows if row["field_family"] == "label_settlement")
+    assert market["observed_field_count"] == 2
+    assert market["admissible_field_count"] == 1
+    assert market["present"] is True
+    assert label["observed_field_count"] == 1
+    assert label["admissible_field_count"] == 0
+    assert label["present"] is False
+
+
+def test_field_lane_crosswalk_verifier_recomputes_against_r8_binding() -> None:
+    baseline = census.hist40_baseline_record("beidan_xlsm", "matches", "handicap_line")
+    assert baseline is not None
+    inventory = [{
+        "source_id": "beidan_xlsm",
+        "content_sha256": baseline["r8_content_sha256"],
+        "role": "HISTORICAL_PROXY",
+    }]
+    fields = [{
+        "source_id": "beidan_xlsm",
+        "table": "matches",
+        "column": "handicap_line",
+        "admissible_use": "HISTORICAL_PROXY_CANDIDATE",
+    }]
+    assert census.verify_field_lane_crosswalk(fields, inventory) == []
+    fields[0]["admissible_use"] = "RAW_ONLY"
+    assert census.verify_field_lane_crosswalk(fields, inventory) == [
+        "field lane recomputation mismatch: beidan_xlsm.matches.handicap_line"
+    ]
+
+
+def test_decision_field_profiles_use_the_same_field_lane() -> None:
+    profiles = [{"source_id": "fixture", "table": "matches", "field": "price"}]
+    inventory = [{
+        "source_id": "fixture", "table": "matches", "column": "price",
+        "admissible_use": "RAW_ONLY",
+    }]
+    census.annotate_decision_field_profiles(profiles, inventory)
+    assert profiles == [{
+        "source_id": "fixture", "table": "matches", "field": "price",
+        "admissible_use": "RAW_ONLY", "availability_used_for_role": False,
+    }]
 
 
 @pytest.mark.parametrize("table,column", [
@@ -93,9 +210,11 @@ def test_terminal_and_final_sp_fields_are_never_inference_admissible(table: str,
 
 def test_clean_fixture_requires_and_accepts_external_anchor(tmp_path: Path) -> None:
     package = census.build_fixture_package(tmp_path / "package")
+    anchor = census.package_anchor(package)
+    assert anchor["crosswalk_sha256"] == census.sha256_file(census.HIST40_CROSSWALK)
     assert census.verify_package(package)["verified"] is False
     assert census.verify_package(package)["problems"] == ["external trusted anchor required"]
-    assert census.verify_package(package, trusted_anchor=census.package_anchor(package))["verified"] is True
+    assert census.verify_package(package, trusted_anchor=anchor)["verified"] is True
 
 
 @pytest.mark.parametrize(

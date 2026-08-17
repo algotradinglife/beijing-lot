@@ -31,24 +31,92 @@ LABEL_TOKENS = (
     "winner", "return",
 )
 TERMINAL_TABLES = {"official_500_settlements", "action_candidates"}
+HIST40_CROSSWALK = Path(__file__).with_name("resources") / "hist40_field_crosswalk.csv"
+_HIST40_BASELINE: dict[tuple[str, str, str], dict[str, str]] | None = None
 
 
-def field_admissible_use(table: str, column: str, *, source_role: str | None = None) -> str:
-    """Classify every physical field before a source-level role can be consumed.
+def _hist40_baseline_records() -> dict[tuple[str, str, str], dict[str, str]]:
+    global _HIST40_BASELINE
+    if _HIST40_BASELINE is None:
+        with HIST40_CROSSWALK.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+        _HIST40_BASELINE = {}
+        for row in rows:
+            key = (row["source_id"], row["table"].lower(), row["column"].lower())
+            if key in _HIST40_BASELINE:
+                raise RuntimeError(f"duplicate R8 field crosswalk key: {key}")
+            _HIST40_BASELINE[key] = row
+    return _HIST40_BASELINE
 
-    This is deliberately fail-closed for result-derived/final-price surfaces.  It
-    is an assessment lane, not a feature-schema or temporal-policy decision.
+
+def hist40_baseline_record(source_id: str, table: str, column: str) -> dict[str, str] | None:
+    """Read the committed, R8-derived per-field admissibility crosswalk."""
+    return _hist40_baseline_records().get((source_id, table.lower(), column.lower()))
+
+
+def hist40_baseline_applies(source_id: str, content_sha256: str) -> bool:
+    """True only if a declared source still has the exact R8 asset identity."""
+    row = next(
+        (
+            value
+            for (mapped_source, _, _), value in _hist40_baseline_records().items()
+            if mapped_source == source_id
+        ),
+        None,
+    )
+    return row is not None and row["r8_content_sha256"] == content_sha256
+
+
+def field_admissible_use(
+    table: str,
+    column: str,
+    *,
+    source_role: str | None = None,
+    baseline: dict[str, str] | None = None,
+) -> str:
+    """Return a field lane, fail-closed against the R8 admissibility record.
+
+    A historical-source container never authorizes fields by itself.  A field
+    needs an explicit R8 row that is non-terminal and pre-match eligible before
+    it becomes a historical-proxy candidate.  New/changed/unmapped fields stay
+    raw-only pending a future policy decision.
     """
     table_name, field = table.lower(), column.lower()
     if source_role in {"EXCLUDE", "RECOVER"}:
         return source_role
-    if source_role == "SETTLEMENT_ONLY" or table_name in TERMINAL_TABLES or any(token in table_name for token in ("settle", "result")):
-        return "SETTLEMENT_ONLY"
-    if any(token in field for token in LABEL_TOKENS):
+    if (
+        source_role == "SETTLEMENT_ONLY"
+        or table_name in TERMINAL_TABLES
+        or any(token in table_name for token in ("settle", "result"))
+        or any(token in field for token in LABEL_TOKENS)
+        or baseline is not None and baseline.get("terminal_value", "").lower() == "true"
+    ):
         return "SETTLEMENT_ONLY"
     if source_role in {"RAW_ONLY", "MUTABLE_UNFROZEN"}:
         return "RAW_ONLY"
-    return "HISTORICAL_PROXY_CANDIDATE"
+    if source_role == "HISTORICAL_PROXY":
+        if baseline is None:
+            return "RAW_ONLY"
+        if baseline.get("pre_match_feature_eligible", "").lower() != "true":
+            return "RAW_ONLY"
+        if "historical_proxy" not in baseline.get("admissible_use", "").lower():
+            return "RAW_ONLY"
+        return "HISTORICAL_PROXY_CANDIDATE"
+    return "RAW_ONLY"
+
+
+def profile_field_lane(
+    source_id: str,
+    table: str,
+    column: str,
+    source_role: str,
+    content_sha256: str,
+) -> str:
+    """Resolve one observed field against R8 only when the asset is unchanged."""
+    baseline = hist40_baseline_record(source_id, table, column)
+    if not hist40_baseline_applies(source_id, content_sha256):
+        baseline = None
+    return field_admissible_use(table, column, source_role=source_role, baseline=baseline)
 
 
 def capture_match_key_columns(columns: set[str]) -> tuple[str, ...]:
@@ -135,6 +203,7 @@ def package_anchor(package: Path) -> dict[str, object]:
         "semantic_hashes": dict(manifest.get("semantic_hashes", {})),
         "package": manifest.get("package", ""),
         "implementation_sha256": manifest.get("implementation_sha256", ""),
+        "crosswalk_sha256": _sha256(HIST40_CROSSWALK),
     }
 
 
@@ -154,8 +223,8 @@ def _is_label(name: str) -> bool:
     return any(token in name.lower() for token in LABEL_TOKENS)
 
 
-def _field_family(table: str, column: str) -> str:
-    if field_admissible_use(table, column) == "SETTLEMENT_ONLY":
+def _field_family(table: str, column: str, admissible_use: str | None = None) -> str:
+    if admissible_use == "SETTLEMENT_ONLY" or field_admissible_use(table, column) == "SETTLEMENT_ONLY":
         return "label_settlement"
     x = column.lower()
     if x in {"issue", "match_idx", "playid", "row_idx", "match_id", "home", "away", "home_id", "away_id", "league"}:
@@ -190,6 +259,7 @@ def role_from_profile(
     *,
     coverage_status: str,
     usable_proxy_triplets: int,
+    admissible_proxy_field_count: int | None = None,
     source_clock_complete: bool,
     capture_clock_complete: bool,
 ) -> str:
@@ -199,7 +269,11 @@ def role_from_profile(
     if spec.layer == "derived" and spec.lineage_root != spec.source_id:
         return "EXCLUDE"
     if spec.lane == "historical_relative_time_proxy":
-        return "HISTORICAL_PROXY" if usable_proxy_triplets > 0 else "RAW_ONLY"
+        if usable_proxy_triplets <= 0:
+            return "RAW_ONLY"
+        if admissible_proxy_field_count is not None and admissible_proxy_field_count <= 0:
+            return "RAW_ONLY"
+        return "HISTORICAL_PROXY"
     if spec.lane == "strict_forward_candidate":
         return strict_forward_role(
             source_clock_complete=source_clock_complete,
@@ -409,6 +483,8 @@ def profile(data_root: Path) -> dict[str, list[dict[str, object]]]:
             inventory.append(record)
             continue
         before = path.stat()
+        content_sha256 = "MUTABLE_UNFROZEN_NO_HASH" if spec.mutable else _sha256(path)
+        baseline_asset_bound = hist40_baseline_applies(spec.source_id, content_sha256)
         connection = _connect(path)
         try:
             tables = _tables(connection)
@@ -418,32 +494,55 @@ def profile(data_root: Path) -> dict[str, list[dict[str, object]]]:
             source_clock_complete = bool(spec.source_clock_column and spec.source_clock_column in columns and next((row["null_or_blank_count"] for row in source_fields if row["field"] == spec.source_clock_column), 1) == 0)
             capture_clock_complete = bool(spec.capture_clock_column and spec.capture_clock_column in columns and next((row["null_or_blank_count"] for row in source_fields if row["field"] == spec.capture_clock_column), 1) == 0)
             usable_proxy_triplets = sum(int(row["complete_outcome_triplet_rows"]) for row in source_triplets if row["semantics"] == "HISTORICAL_RELATIVE_TIME_PROXY")
-            role = role_from_profile(
+            provisional_role = role_from_profile(
                 spec,
                 coverage_status=str(aggregate["coverage_status"]),
                 usable_proxy_triplets=usable_proxy_triplets,
                 source_clock_complete=source_clock_complete,
                 capture_clock_complete=capture_clock_complete,
             )
+            schema_drafts: list[dict[str, object]] = []
+            for table in tables:
+                for ordinal, (name, typ) in enumerate(_columns(connection, table), 1):
+                    baseline = hist40_baseline_record(spec.source_id, table, name)
+                    lane = profile_field_lane(spec.source_id, table, name, provisional_role, content_sha256)
+                    schema_drafts.append({
+                        "source_id": spec.source_id,
+                        "table": table,
+                        "ordinal": ordinal,
+                        "column": name,
+                        "sqlite_type": typ,
+                        "baseline_r8_record": baseline is not None,
+                        "baseline_binding": "R8_EXACT_ASSET_BOUND" if baseline_asset_bound and baseline else ("R8_ASSET_CHANGED" if baseline else "NO_R8_FIELD_RECORD"),
+                        "baseline_pre_match_feature_eligible": baseline.get("pre_match_feature_eligible", "") if baseline else "",
+                        "baseline_admissible_use": baseline.get("admissible_use", "") if baseline else "",
+                        "baseline_timestamp_grade": baseline.get("timestamp_grade", "") if baseline else "",
+                        "admissible_use": lane,
+                        "terminal_denylisted": lane == "SETTLEMENT_ONLY",
+                    })
+            admissible_proxy_field_count = sum(row["admissible_use"] == "HISTORICAL_PROXY_CANDIDATE" for row in schema_drafts)
+            role = role_from_profile(
+                spec,
+                coverage_status=str(aggregate["coverage_status"]),
+                usable_proxy_triplets=usable_proxy_triplets,
+                admissible_proxy_field_count=admissible_proxy_field_count,
+                source_clock_complete=source_clock_complete,
+                capture_clock_complete=capture_clock_complete,
+            )
+            for row in schema_drafts:
+                lane = profile_field_lane(spec.source_id, str(row["table"]), str(row["column"]), role, content_sha256)
+                row["admissible_use"] = lane
+                row["terminal_denylisted"] = lane == "SETTLEMENT_ONLY"
+                row["field_family"] = _field_family(str(row["table"]), str(row["column"]), lane)
+                row["label_or_settlement_field"] = lane == "SETTLEMENT_ONLY"
+            annotate_decision_field_profiles(source_fields, schema_drafts)
             fields.extend(source_fields)
             coverage.append(dict(aggregate, source_id=spec.source_id, lane=spec.lane))
             periods.extend(_coverage_strata(connection, spec, columns))
             duplicates.append(_duplicate_profile(connection, spec, columns))
             m_distribution.extend(_m_per_issue(connection, spec, columns))
             triplets.extend(source_triplets)
-            for table in tables:
-                for ordinal, (name, typ) in enumerate(_columns(connection, table), 1):
-                    schemas.append({
-                        "source_id": spec.source_id,
-                        "table": table,
-                        "ordinal": ordinal,
-                        "column": name,
-                        "sqlite_type": typ,
-                        "field_family": _field_family(table, name),
-                        "label_or_settlement_field": _is_label(name),
-                        "admissible_use": field_admissible_use(table, name, source_role=role),
-                        "terminal_denylisted": field_admissible_use(table, name, source_role=role) == "SETTLEMENT_ONLY",
-                    })
+            schemas.extend(schema_drafts)
         finally:
             connection.close()
         after = path.stat()
@@ -452,12 +551,14 @@ def profile(data_root: Path) -> dict[str, list[dict[str, object]]]:
             "exists": True,
             "size_bytes": before.st_size,
             "mtime_ns": before.st_mtime_ns,
-            "content_sha256": "MUTABLE_UNFROZEN_NO_HASH" if spec.mutable else _sha256(path),
+            "content_sha256": content_sha256,
             "consistency": "MUTABLE_UNFROZEN" if spec.mutable else ("CONSISTENT_READ" if stable else "MUTATED_DURING_READ"),
+            "hist40_asset_bound": baseline_asset_bound,
             "role": role,
             "source_clock_complete": source_clock_complete,
             "capture_clock_complete": capture_clock_complete,
             "usable_proxy_triplets": usable_proxy_triplets,
+            "admissible_proxy_field_count": admissible_proxy_field_count,
         })
         inventory.append(record)
     return {"source_inventory": lineage_decisions(inventory), "field_inventory": schemas, "field_profile": fields, "coverage": coverage, "period_coverage": periods, "duplicate_profile": duplicates, "m_per_issue_distribution": m_distribution, "outcome_triplet_profile": triplets, "intersections": _intersections(data_root)}
@@ -481,12 +582,69 @@ def _roles(inventory: list[dict[str,object]]) -> list[dict[str,object]]:
     return rows
 
 
-def _availability(fields: list[dict[str,object]], inventory: list[dict[str,object]]) -> list[dict[str,object]]:
-    by={(str(r["source_id"]),str(r["field_family"])):r for r in fields}; out=[]
+def annotate_decision_field_profiles(
+    profiles: list[dict[str, object]], field_inventory: list[dict[str, object]]
+) -> None:
+    """Bind each decision-field nullness profile to its canonical field lane."""
+    lanes = {
+        (str(row["source_id"]), str(row["table"]), str(row["column"])): str(row["admissible_use"])
+        for row in field_inventory
+    }
+    for row in profiles:
+        lane = lanes.get((str(row["source_id"]), str(row["table"]), str(row["field"])), "RAW_ONLY")
+        row["admissible_use"] = lane
+        row["availability_used_for_role"] = lane == "HISTORICAL_PROXY_CANDIDATE"
+
+
+def source_feature_availability(
+    field_inventory: list[dict[str, object]], inventory: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    """Summarize field-family availability from the same lane inventory used downstream."""
+    out: list[dict[str, object]] = []
     for item in inventory:
-        for family in ("identity_schedule","timestamp","market_feature","label_settlement"):
-            row=by.get((str(item["source_id"]),family)); out.append({"source_id":item["source_id"],"field_family":family,"present":row is not None,"non_null_count":row["non_null_count"] if row else -1,"denominator_rows":row["denominator_rows"] if row else -1,"role":item["role"],"admissibility_note":"LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE" if family=="label_settlement" else "PROFILED_FOR_AVAILABILITY"})
+        source_id = str(item["source_id"])
+        for family in ("identity_schedule", "timestamp", "market_feature", "label_settlement"):
+            fields = [
+                row
+                for row in field_inventory
+                if str(row["source_id"]) == source_id and str(row["field_family"]) == family
+            ]
+            admissible = sum(row["admissible_use"] == "HISTORICAL_PROXY_CANDIDATE" for row in fields)
+            out.append({
+                "source_id": source_id,
+                "field_family": family,
+                "observed_field_count": len(fields),
+                "admissible_field_count": admissible,
+                "present": admissible > 0,
+                "role": item["role"],
+                "admissibility_note": "FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability",
+            })
     return out
+
+
+def verify_field_lane_crosswalk(
+    field_inventory: list[dict[str, str]], source_inventory: list[dict[str, str]]
+) -> list[str]:
+    """Independently recompute every packaged field lane from R8 + source identity."""
+    sources = {row["source_id"]: row for row in source_inventory}
+    problems: list[str] = []
+    for row in field_inventory:
+        source = sources.get(row["source_id"])
+        if source is None:
+            problems.append(f"field lane source missing: {row['source_id']}")
+            continue
+        expected = profile_field_lane(
+            row["source_id"],
+            row["table"],
+            row["column"],
+            source["role"],
+            source.get("content_sha256", ""),
+        )
+        if row.get("admissible_use") != expected:
+            problems.append(
+                f"field lane recomputation mismatch: {row['source_id']}.{row['table']}.{row['column']}"
+            )
+    return problems
 
 
 def _simple_svg(path: Path,title: str,rows: list[dict[str,object]],label: str,value: str) -> None:
@@ -508,6 +666,8 @@ def verify_package(package: Path, *, trusted_anchor: dict[str, object] | None = 
     try: manifest=json.loads((package/"MANIFEST.json").read_text(encoding="utf-8")); sums=json.loads((package/"SHA256SUMS.json").read_text(encoding="utf-8"))
     except Exception as err:return {"verified":False,"problems":[f"unreadable package: {err}"]}
     if manifest.get("issue")!=ISSUE: problems.append("manifest issue mismatch")
+    if manifest.get("crosswalk_sha256", "") != _sha256(HIST40_CROSSWALK):
+        problems.append("R8 crosswalk hash mismatch")
     if trusted_anchor is None:
         problems.append("external trusted anchor required")
     else:
@@ -515,6 +675,8 @@ def verify_package(package: Path, *, trusted_anchor: dict[str, object] | None = 
             problems.append("trusted anchor issue mismatch")
         if trusted_anchor.get("implementation_sha256", "") != manifest.get("implementation_sha256", ""):
             problems.append("trusted anchor implementation mismatch")
+        if trusted_anchor.get("crosswalk_sha256", "") != manifest.get("crosswalk_sha256", ""):
+            problems.append("trusted anchor crosswalk mismatch")
         anchored_hashes = trusted_anchor.get("semantic_hashes")
         if not isinstance(anchored_hashes, dict):
             problems.append("trusted anchor semantic hashes missing")
@@ -524,13 +686,18 @@ def verify_package(package: Path, *, trusted_anchor: dict[str, object] | None = 
                     problems.append(f"trusted anchor mismatch: {relative}")
     observed={p.relative_to(package).as_posix():_sha256(p) for p in sorted(package.rglob("*")) if p.is_file() and p.name!="SHA256SUMS.json"}
     if sums!=observed: problems.append("checksum inventory mismatch")
-    required=("tables/source_inventory.csv","tables/source_role_matrix.csv","tables/intersection_levels.csv","tables/field_profile.csv","tables/coverage_by_period.csv","tables/m_per_issue_distribution.csv","tables/outcome_triplet_profile.csv")
+    required=("tables/source_inventory.csv","tables/field_inventory.csv","tables/source_role_matrix.csv","tables/intersection_levels.csv","tables/field_profile.csv","tables/coverage_by_period.csv","tables/m_per_issue_distribution.csv","tables/outcome_triplet_profile.csv")
     for rel in required:
         if not (package/rel).exists(): problems.append(f"missing decision artifact: {rel}")
         elif manifest.get("semantic_hashes",{}).get(rel)!=_semantic_hash(package,rel): problems.append(f"semantic hash mismatch: {rel}")
     if (package/"tables/source_inventory.csv").exists() and (package/"tables/source_role_matrix.csv").exists():
         inv={r["source_id"]:r["role"] for r in _read_csv(package/"tables/source_inventory.csv")}; roles={r["source_id"]:r["role"] for r in _read_csv(package/"tables/source_role_matrix.csv")}
         if inv!=roles: problems.append("role recomputation mismatch")
+    if (package/"tables/source_inventory.csv").exists() and (package/"tables/field_inventory.csv").exists():
+        problems.extend(verify_field_lane_crosswalk(
+            _read_csv(package/"tables/field_inventory.csv"),
+            _read_csv(package/"tables/source_inventory.csv"),
+        ))
     if (package/"tables/intersection_levels.csv").exists():
         levels={r["level"] for r in _read_csv(package/"tables/intersection_levels.csv")}
         if levels!={"RAW_PRESENT","NATIVE_KEY_INTERSECTION","CANDIDATE_MAPPED_RANGE","CANONICAL_CAUSAL_INTERSECTION"}: problems.append("four-level intersection closure mismatch")
@@ -540,19 +707,19 @@ def verify_package(package: Path, *, trusted_anchor: dict[str, object] | None = 
 def build_package(repo_root: Path,data_root: Path,target: Path|None=None) -> Path:
     package=target or repo_root/"results"/PACKAGE_NAME; stage=package.parent/f".{package.name}.staging"
     if stage.exists():shutil.rmtree(stage)
-    stage.mkdir(parents=True); data=profile(data_root); inventory=data["source_inventory"]; roles=_roles(inventory); availability=_availability(data["field_profile"],inventory)
+    stage.mkdir(parents=True); data=profile(data_root); inventory=data["source_inventory"]; roles=_roles(inventory); availability=source_feature_availability(data["field_inventory"],inventory)
     names={"source_inventory":inventory,"field_inventory":data["field_inventory"],"field_profile":data["field_profile"],"coverage_by_source":data["coverage"],"coverage_by_period":data["period_coverage"],"duplicate_profile":data["duplicate_profile"],"m_per_issue_distribution":data["m_per_issue_distribution"],"outcome_triplet_profile":data["outcome_triplet_profile"],"intersection_levels":data["intersections"],"source_role_matrix":roles,"source_feature_availability":availability}
     for name,rows in names.items():_csv(stage/"tables"/f"{name}.csv",rows)
     unresolved=[{"question_id":"U1","question":"Which proposed mappings become canonical?","owner_issue":"#251","status":"DEFERRED"},{"question_id":"U2","question":"What sealing/source-clock rules promote forward evidence?","owner_issue":"#252","status":"DEFERRED"},{"question_id":"U3","question":"Which measured gaps justify recovery?","owner_issue":"#235/#236/#237/#248","status":"PI_DECISION_REQUIRED"}]; _csv(stage/"tables/unresolved_question_ledger.csv",unresolved)
     evidence=[{"requirement":f"REQ-SC{x:02d}","status":"PI_DECISION_PENDING" if x in {8,15} else "EVIDENCE_PRESENT","evidence":"machine-readable decision tables + report"} for x in range(1,16)]; _csv(stage/"evidence/req_sc_evidence.csv",evidence)
-    _simple_svg(stage/"figures/source_feature_heatmap.svg","Source x field-family availability",availability,"source_id","non_null_count"); _simple_svg(stage/"figures/time_issue_coverage.svg","Time/issue coverage",data["period_coverage"],"year_or_range","stratum_rows"); _simple_svg(stage/"figures/m_per_issue.svg","M-per-issue distribution",data["m_per_issue_distribution"],"source_id","m_matches")
-    report="# BJ-UNIFIED-SOURCE-CENSUS-001 R2\n\nThis assessment-only package profiles decision fields, label completeness separately, exact time/issue/match/cell denominators, native duplicates, invalid values, p34 triplets, and all four intersection levels. Candidate mappings are explicitly non-authoritative; canonical causal intersection remains deferred to #251/#252. Mutable sources are not frozen conclusions. See tables and `docs/research/issue_250_source_census.md`.\n"; (stage/"REPORT.md").write_text(report,encoding="utf-8")
+    _simple_svg(stage/"figures/source_feature_heatmap.svg","Source x field-family admissible availability",availability,"source_id","admissible_field_count"); _simple_svg(stage/"figures/time_issue_coverage.svg","Time/issue coverage",data["period_coverage"],"year_or_range","stratum_rows"); _simple_svg(stage/"figures/m_per_issue.svg","M-per-issue distribution",data["m_per_issue_distribution"],"source_id","m_matches")
+    report="# BJ-UNIFIED-SOURCE-CENSUS-001 R4\n\nThis assessment-only package profiles decision fields, label completeness separately, exact time/issue/match/cell denominators, native duplicates, invalid values, p34 triplets, and all four intersection levels. Every field lane is recomputed from R8 field-level inheritance only when the R8 asset SHA is bound; unmatched or changed fields fail closed. Candidate mappings are explicitly non-authoritative; canonical causal intersection remains deferred to #251/#252. Mutable sources are not frozen conclusions. See tables and `docs/research/issue_250_source_census.md`.\n"; (stage/"REPORT.md").write_text(report,encoding="utf-8")
     semantic = {
         path.relative_to(stage).as_posix(): _sha256(path)
         for path in sorted(stage.rglob("*"))
         if path.is_file() and path.name not in {"MANIFEST.json", "SHA256SUMS.json"}
     }
-    manifest={"issue":ISSUE,"package":PACKAGE_NAME,"assessment_only":True,"data_root_supplied":True,"hist40_baseline":HIST40_RELEASE,"logical_sources":len(inventory),"roles":{r["source_id"]:r["role"] for r in inventory},"canonical_causal_intersection":canonical_causal_intersection(),"semantic_hashes":semantic,"implementation_source":"src/source_census/census.py","implementation_sha256":_sha256(Path(__file__)),"prohibitions":["no_crawl","no_backfill","no_imputation","no_model","no_roi","no_identity_or_temporal_policy_freeze"]}; (stage/"MANIFEST.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+    manifest={"issue":ISSUE,"package":PACKAGE_NAME,"assessment_only":True,"data_root_supplied":True,"hist40_baseline":HIST40_RELEASE,"logical_sources":len(inventory),"roles":{r["source_id"]:r["role"] for r in inventory},"canonical_causal_intersection":canonical_causal_intersection(),"semantic_hashes":semantic,"implementation_source":"src/source_census/census.py","implementation_sha256":_sha256(Path(__file__)),"crosswalk_sha256":_sha256(HIST40_CROSSWALK),"prohibitions":["no_crawl","no_backfill","no_imputation","no_model","no_roi","no_identity_or_temporal_policy_freeze"]}; (stage/"MANIFEST.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n",encoding="utf-8")
     rewrite_checksums(stage)
     if package.exists(): shutil.rmtree(package)
     os.replace(stage, package)
@@ -565,7 +732,8 @@ def build_package(repo_root: Path,data_root: Path,target: Path|None=None) -> Pat
 
 def build_fixture_package(package: Path) -> Path:
     stage=package.parent/f".{package.name}.fixture"; shutil.rmtree(stage,ignore_errors=True); stage.mkdir(parents=True)
-    inv=lineage_decisions([{"source_id":"fixture","lineage_root":"fixture","lane":"historical_relative_time_proxy","role":"HISTORICAL_PROXY"}]); _csv(stage/"tables/source_inventory.csv",inv); _csv(stage/"tables/source_role_matrix.csv",_roles(inv))
+    inv=lineage_decisions([{"source_id":"fixture","lineage_root":"fixture","lane":"historical_relative_time_proxy","role":"HISTORICAL_PROXY","content_sha256":""}]); _csv(stage/"tables/source_inventory.csv",inv); _csv(stage/"tables/source_role_matrix.csv",_roles(inv))
+    _csv(stage/"tables/field_inventory.csv", [{"source_id":"fixture","table":"fixture_table","column":"fixture_field","admissible_use":"RAW_ONLY"}])
     for name in ("intersection_levels","field_profile","coverage_by_period","m_per_issue_distribution","outcome_triplet_profile"):_csv(stage/"tables"/f"{name}.csv", [{"level":name}] if name=="intersection_levels" else [{"status":"fixture"}])
     _csv(stage/"tables/intersection_levels.csv", [{"level":x} for x in ("RAW_PRESENT","NATIVE_KEY_INTERSECTION","CANDIDATE_MAPPED_RANGE","CANONICAL_CAUSAL_INTERSECTION")])
-    semantic={f"tables/{name}.csv":_semantic_hash(stage,f"tables/{name}.csv") for name in ("source_inventory","source_role_matrix","intersection_levels","field_profile","coverage_by_period","m_per_issue_distribution","outcome_triplet_profile")}; (stage/"MANIFEST.json").write_text(json.dumps({"issue":ISSUE,"semantic_hashes":semantic},sort_keys=True),encoding="utf-8"); rewrite_checksums(stage); shutil.rmtree(package,ignore_errors=True); os.replace(stage,package); return package
+    semantic={f"tables/{name}.csv":_semantic_hash(stage,f"tables/{name}.csv") for name in ("source_inventory","field_inventory","source_role_matrix","intersection_levels","field_profile","coverage_by_period","m_per_issue_distribution","outcome_triplet_profile")}; (stage/"MANIFEST.json").write_text(json.dumps({"issue":ISSUE,"crosswalk_sha256":_sha256(HIST40_CROSSWALK),"semantic_hashes":semantic},sort_keys=True),encoding="utf-8"); rewrite_checksums(stage); shutil.rmtree(package,ignore_errors=True); os.replace(stage,package); return package

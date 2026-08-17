@@ -1,46 +1,51 @@
-# Issue #250 R3 handoff
+# Issue #250 R4 handoff
 
-[SESSION] 20260817_184756_9b3b73
+[SESSION] 20260817_200202_6f8305
 
 ## Delivery state
 
 - Branch: `engineer/bj250-rework-r1`, updating PR #255.
-- Base: `engineer/bj234-issue`; prior rejected head: `75a2b83667de0dfbd2b2ca018937d4fd033a9ce1`.
+- Base: `engineer/bj234-issue`.
+- Delivery HEAD: populated by the delivery commit.
 - Evidence package: `results/bj250_source_census_v2`.
-- External verification input: an EV-supplied trusted-anchor JSON stored outside this worktree/package; it is intentionally not generated or committed by this builder.
 - Executed notebook: `notebooks/research/issue-250/bj250_source_census.ipynb`.
-- External data contract: `BEIJING_LOT_DATA_ROOT` is mandatory; each SQLite source is opened with URI `mode=ro`.
+- R4 same-class sweep: `docs/research/issue_250_r4_rework_audit.md`.
+- External data contract: `BEIJING_LOT_DATA_ROOT` is mandatory; all SQLite opens use URI `mode=ro` and mutable sources remain `MUTABLE_UNFROZEN`.
 
-## R2 reject: root-cause classes and complete class sweep
+## R3 closure
 
-| Defect class | R3 correction | Complete same-class sweep |
-| --- | --- | --- |
-| Key/grain collapse | Explicit p34 logical-match (`issue,row_idx`), snapshot (`issue,fetched_at,row_idx`), and cell (`issue,playid,fetched_at,row_idx,outcome_code`) primitives. | `_source_aggregate`, `_coverage_count_expr`, `_coverage_row`, `_duplicate_profile`, `_m_per_issue`, `_snapshot_completeness`, field tables, figures, report, notebook and verifier inputs. `playid` is no longer used as a match key. |
-| Role fail-open | `role_from_profile` returns `RECOVER` for unprofiled coverage and demotes an empty historical-proxy surface to `RAW_ONLY`. | All seven `SourceSpec` paths, missing-table path, proxy triplet path, strict clock path, derived-lineage path, source role matrix and downstream routing. |
-| Role collapse / leakage | `field_inventory.csv` now gives every discovered table/column `admissible_use` plus `terminal_denylisted`; final/official/winning SP and result-derived fields are `SETTLEMENT_ONLY`. | All table/column enumeration, field-family classifier, source-feature view, source-role matrix, decision report and terminal denylist tests. |
-| Verifier closure | A required, independently supplied trusted anchor binds all package payload semantic hashes and the producer implementation hash; the builder cannot create it. | Manifest, checksum inventory, all decision tables, evidence, figures, report and re-signed manifest mutation path. |
+The R3 blocker was an inheritance fail-open: fields inside an historical proxy container were promoted solely by the source role. R4 commits a 601-row crosswalk extracted read-only from the accepted `HIST-DATA-CENSUS-001 R8` evidence archive. For each discovered field in all seven logical sources, the build now:
 
-This assessment stays read-only and assessment-only. It does not use label values to choose feature availability, and it makes no identity/temporal/schema policy decision.
+1. binds R8 inheritance only when the current immutable source SHA equals the R8 source-inventory SHA;
+2. permits `HISTORICAL_PROXY_CANDIDATE` only for explicitly R8-eligible, non-terminal historical-proxy rows;
+3. keeps changed, unknown, descriptive, mapping/context, clock-unbound, and price-time-unbound fields `RAW_ONLY`;
+4. keeps terminal/result/final/winning/official SP and settlement surfaces `SETTLEMENT_ONLY`;
+5. makes the historical source role fail closed if it has no eligible proxy fields;
+6. derives decision-field availability and source×feature availability from the same field lanes; and
+7. recomputes every packaged field lane in the verifier from source identity + role + R8 crosswalk.
 
-## Key decisions / risks for PI and EV
+The crosswalk SHA is bound in both the package manifest and the external anchor along with implementation and payload hashes. This is semantic consistency checking; the external anchor is still required for package immutability and must be held/generated outside the worker worktree by EV.
 
-- `initial`/`10h`/`1h` remain historical relative-time proxies, not strict observations.
-- Final, official, winning-SP, score, result, settlement, payout, hit/profit/ROI and halftime fields are terminal-denylisted even when they coexist with proxy fields.
-- Candidate identity ranges remain non-authoritative pending #251; canonical causal overlap remains `NOT_YET_EVALUATED` pending #251 + #252.
-- Mutable live inputs remain `RAW_ONLY` or `MUTABLE_UNFROZEN`; a dynamic count is not a freeze receipt. #252 owns source/capture-clock sealing criteria.
-- The trusted anchor must be independently generated and held outside the builder/worktree. A verifier without it fails closed; a builder-generated anchor would not resist a full re-sign attack.
+## Executed evidence
 
-## Verification to rerun
-
-```bash
-BEIJING_LOT_DATA_ROOT=/home/drwho1985/workspace/soccer/beijing-lot/data \
-  /home/drwho1985/workspace/soccer/beijing-lot/.venv/bin/python scripts/build_bj250_source_census.py
-BEIJING_LOT_DATA_ROOT=/home/drwho1985/workspace/soccer/beijing-lot/data \
-  /home/drwho1985/workspace/soccer/beijing-lot/.venv/bin/python scripts/execute_bj250_notebook.py
-/home/drwho1985/workspace/soccer/beijing-lot/.venv/bin/python scripts/build_bj250_source_census.py --verify-only --trusted-anchor /outside/package/expected-anchor.json
-/home/drwho1985/workspace/soccer/beijing-lot/.venv/bin/python -m pytest tests/test_bj250_source_census.py -q
+```text
+pytest tests/test_bj250_source_census.py -q                                    -> 35 passed
+BEIJING_LOT_DATA_ROOT=<external> build_bj250_source_census.py                  -> INTERNAL_VERIFIED=True
+BEIJING_LOT_DATA_ROOT=<external> execute_bj250_notebook.py                     -> 2 code cells
+build_bj250_source_census.py --verify-only --trusted-anchor <local external>   -> VERIFIED=True
 ```
+
+The local verification anchor used only to exercise the command is outside the package at `/tmp/bj250-r4-local-verification-anchor.json`; it is not an independent EV trust anchor and is not committed.
+
+The current mutable p34 observation contains 4,005,168 scoped cells across 13 issues and 1,487 logical `(issue,row_idx)` matches. It is explicitly unfrozen. The executed R4 inventory has 8 `HISTORICAL_PROXY_CANDIDATE`, 515 `RAW_ONLY`, 158 `SETTLEMENT_ONLY`, and 328 `EXCLUDE` field rows; 564 fields are R8 exact-asset bound, 37 map to a changed R8 asset, and 408 have no R8 field record.
+
+## PI / EV decision inputs and risks
+
+- `beidan_xlsm` is a historical relative-time proxy candidate only; `initial`/`10h`/`1h` are never strict observed-at values.
+- `beidan_live` and `bjdc_500_capture` remain `RAW_ONLY` and advance to #252 only to define source/capture-clock sealing criteria.
+- Candidate mapping is non-authoritative pending #251; canonical causal intersection remains deferred to #251 + #252.
+- The decision artifact prevents container-level leakage, but it does not authorize any identity, temporal, schema, modeling, ticket, ROI, acquisition, or backfill decision.
 
 ## Next action
 
-After the external-root build and notebook finish successfully: inspect generated R3 package rows and anchor, commit all evidence, push the existing PR #255 head, post the delivery/handoff block, and self-transition #250 to `EV Review`.
+EV should use a fresh checkout, independently obtain/hold an anchor, rerun the external-root build and notebook, verify the R8 archive/crosswalk provenance, sample all field lanes (especially R8-ineligible fields), and repeat a complete re-sign attack. PI/user should then decide the historical-proxy backbone and recovery routing.
