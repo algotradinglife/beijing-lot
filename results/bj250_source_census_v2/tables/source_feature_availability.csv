@@ -1,29 +1,29 @@
-admissibility_note,denominator_rows,field_family,non_null_count,present,role,source_id
-PROFILED_FOR_AVAILABILITY,195269,identity_schedule,192709,True,HISTORICAL_PROXY,beidan_xlsm
-PROFILED_FOR_AVAILABILITY,195269,timestamp,192709,True,HISTORICAL_PROXY,beidan_xlsm
-PROFILED_FOR_AVAILABILITY,195269,market_feature,190115,True,HISTORICAL_PROXY,beidan_xlsm
-LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE,195269,label_settlement,192709,True,HISTORICAL_PROXY,beidan_xlsm
-PROFILED_FOR_AVAILABILITY,190746,identity_schedule,190744,True,RAW_ONLY,beidan_features
-PROFILED_FOR_AVAILABILITY,190746,timestamp,190746,True,RAW_ONLY,beidan_features
-PROFILED_FOR_AVAILABILITY,190746,market_feature,190511,True,RAW_ONLY,beidan_features
-LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE,190746,label_settlement,190746,True,RAW_ONLY,beidan_features
-PROFILED_FOR_AVAILABILITY,38463,identity_schedule,38463,True,SETTLEMENT_ONLY,beidan_history
-PROFILED_FOR_AVAILABILITY,38463,timestamp,38176,True,SETTLEMENT_ONLY,beidan_history
-PROFILED_FOR_AVAILABILITY,38463,market_feature,38463,True,SETTLEMENT_ONLY,beidan_history
-LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE,38463,label_settlement,37769,True,SETTLEMENT_ONLY,beidan_history
-PROFILED_FOR_AVAILABILITY,5155,identity_schedule,5155,True,RAW_ONLY,beidan_live
-PROFILED_FOR_AVAILABILITY,5155,timestamp,5155,True,RAW_ONLY,beidan_live
-PROFILED_FOR_AVAILABILITY,5155,market_feature,5155,True,RAW_ONLY,beidan_live
-LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE,-1,label_settlement,-1,False,RAW_ONLY,beidan_live
-PROFILED_FOR_AVAILABILITY,3992811,identity_schedule,3990807,True,RAW_ONLY,bjdc_500_capture
-PROFILED_FOR_AVAILABILITY,3992811,timestamp,3991308,True,RAW_ONLY,bjdc_500_capture
-PROFILED_FOR_AVAILABILITY,3992811,market_feature,1801033,True,RAW_ONLY,bjdc_500_capture
-LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE,-1,label_settlement,-1,False,RAW_ONLY,bjdc_500_capture
-PROFILED_FOR_AVAILABILITY,201270,identity_schedule,198710,True,EXCLUDE,beidan_modeling_plus
-PROFILED_FOR_AVAILABILITY,201270,timestamp,198710,True,EXCLUDE,beidan_modeling_plus
-PROFILED_FOR_AVAILABILITY,-1,market_feature,-1,False,EXCLUDE,beidan_modeling_plus
-LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE,-1,label_settlement,-1,False,EXCLUDE,beidan_modeling_plus
-PROFILED_FOR_AVAILABILITY,6001,identity_schedule,6001,True,EXCLUDE,beidan_nowscore
-PROFILED_FOR_AVAILABILITY,6001,timestamp,6001,True,EXCLUDE,beidan_nowscore
-PROFILED_FOR_AVAILABILITY,-1,market_feature,-1,False,EXCLUDE,beidan_nowscore
-LABEL_PROFILED_SEPARATELY_NOT_USED_FOR_FEATURE_ROLE,-1,label_settlement,-1,False,EXCLUDE,beidan_nowscore
+admissibility_note,admissible_field_count,field_family,observed_field_count,present,role,source_id
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,identity_schedule,20,False,HISTORICAL_PROXY,beidan_xlsm
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,timestamp,3,False,HISTORICAL_PROXY,beidan_xlsm
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,1,market_feature,9,True,HISTORICAL_PROXY,beidan_xlsm
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,label_settlement,83,False,HISTORICAL_PROXY,beidan_xlsm
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,identity_schedule,7,False,RAW_ONLY,beidan_features
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,timestamp,1,False,RAW_ONLY,beidan_features
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,market_feature,7,False,RAW_ONLY,beidan_features
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,label_settlement,1,False,RAW_ONLY,beidan_features
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,identity_schedule,0,False,SETTLEMENT_ONLY,beidan_history
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,timestamp,0,False,SETTLEMENT_ONLY,beidan_history
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,market_feature,0,False,SETTLEMENT_ONLY,beidan_history
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,label_settlement,19,False,SETTLEMENT_ONLY,beidan_history
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,identity_schedule,7,False,RAW_ONLY,beidan_live
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,timestamp,2,False,RAW_ONLY,beidan_live
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,market_feature,4,False,RAW_ONLY,beidan_live
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,label_settlement,12,False,RAW_ONLY,beidan_live
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,identity_schedule,54,False,RAW_ONLY,bjdc_500_capture
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,timestamp,21,False,RAW_ONLY,bjdc_500_capture
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,market_feature,16,False,RAW_ONLY,bjdc_500_capture
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,label_settlement,43,False,RAW_ONLY,bjdc_500_capture
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,identity_schedule,17,False,EXCLUDE,beidan_modeling_plus
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,timestamp,3,False,EXCLUDE,beidan_modeling_plus
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,market_feature,5,False,EXCLUDE,beidan_modeling_plus
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,label_settlement,57,False,EXCLUDE,beidan_modeling_plus
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,identity_schedule,20,False,EXCLUDE,beidan_nowscore
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,timestamp,3,False,EXCLUDE,beidan_nowscore
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,market_feature,9,False,EXCLUDE,beidan_nowscore
+FIELD_LEVEL_LANES_ONLY; settlement fields are not inference availability,0,label_settlement,80,False,EXCLUDE,beidan_nowscore
