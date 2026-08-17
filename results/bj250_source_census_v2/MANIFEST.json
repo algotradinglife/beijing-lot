@@ -8,9 +8,10 @@
     "manifest_sha256": "ed16b29626b4af70e80cdfee3130d6d5e89cd79d09e06110d4d55570e217cdc8",
     "tag": "hist-data-census-001-r8"
   },
+  "implementation_source": "src/source_census/census.py",
   "issue": 250,
   "logical_sources": 7,
-  "package": "bj250_source_census_v1",
+  "package": "bj250_source_census_v2",
   "prohibitions": [
     "no_crawl",
     "no_backfill",
@@ -28,5 +29,13 @@
     "beidan_xlsm": "HISTORICAL_PROXY",
     "bjdc_500_capture": "RAW_ONLY"
   },
-  "source_inventory_sha256": "5bf43f673477db4b6346205dcf2dcfb87018cb1803ef97f7a11caf657750e5f8"
+  "semantic_hashes": {
+    "tables/coverage_by_period.csv": "189a96741f02a03ce2337609bea3f625ad648877d1cc02373f26beee7e52013e",
+    "tables/field_profile.csv": "6f69852df6e82d1dfcc6388d74e4d75a4fa5ff94457df0567d7a4a8d9bb502a4",
+    "tables/intersection_levels.csv": "afac45d59d2db923f705ee622a4d7ec1576540472fd4e880938371361292e892",
+    "tables/m_per_issue_distribution.csv": "b6e26daf8e3b6e519c1caf2a26a63c4d1d46ba9ad0edc0c0efd702e353ca8952",
+    "tables/outcome_triplet_profile.csv": "df7b340a19d08125268c76f4212273be4b7b510954de3627b0cd8d8d426713fb",
+    "tables/source_inventory.csv": "d5ed297258f57ed3dba32bc1498635e55d073cb6c4a3d2c92d19af4b640744a9",
+    "tables/source_role_matrix.csv": "411d644fabb13c3388365b2a2ae074b09c3324ab5b49257f14baf52b0527e21d"
+  }
 }

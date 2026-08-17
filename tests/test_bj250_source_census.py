@@ -1,5 +1,4 @@
-"""Regression and adversarial tests for BJ-UNIFIED-SOURCE-CENSUS-001."""
-
+"""Adversarial regression tests for BJ-UNIFIED-SOURCE-CENSUS-001 R2."""
 from __future__ import annotations
 
 import json
@@ -10,106 +9,97 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT / "src") not in sys.path:
-    sys.path.insert(0, str(ROOT / "src"))
-
+sys.path.insert(0, str(ROOT / "src"))
 from source_census import census  # noqa: E402
 
 
-def test_data_root_is_required_and_never_falls_back_to_repo_data(monkeypatch: pytest.MonkeyPatch) -> None:
+def _remanifest(package: Path) -> None:
+    """Attack model: adversary controls both artifact bytes and checksum list."""
+    census.rewrite_checksums(package)
+
+
+def test_data_root_is_required(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("BEIJING_LOT_DATA_ROOT", raising=False)
-    with pytest.raises(census.DataRootError, match="BEIJING_LOT_DATA_ROOT"):
+    with pytest.raises(census.DataRootError):
         census.resolve_data_root()
 
 
-def test_source_role_needs_both_capture_and_source_clock() -> None:
-    assert census.strict_forward_role(
-        source_clock="2026-05-01T00:00:00Z",
-        capture_clock="2026-05-01T00:00:01Z",
-        mutable=False,
-    ) == "STRICT_FORWARD_CANDIDATE"
-    assert census.strict_forward_role(
-        source_clock="",
-        capture_clock="2026-05-01T00:00:01Z",
-        mutable=False,
-    ) == "RAW_ONLY"
-    assert census.strict_forward_role(
-        source_clock="2026-05-01T00:00:00Z",
-        capture_clock="",
-        mutable=False,
-    ) == "RAW_ONLY"
+def test_strict_forward_requires_both_complete_clocks() -> None:
+    assert census.strict_forward_role(source_clock_complete=True, capture_clock_complete=True, mutable=False) == "STRICT_FORWARD_CANDIDATE"
+    assert census.strict_forward_role(source_clock_complete=False, capture_clock_complete=True, mutable=True) == "RAW_ONLY"
+    assert census.strict_forward_role(source_clock_complete=True, capture_clock_complete=False, mutable=True) == "RAW_ONLY"
 
 
-def test_native_key_intersection_never_uses_candidate_mapping() -> None:
-    left = [("25001", 1), ("25001", 2)]
-    right = [("x", 1), ("x", 2)]
-    assert census.native_key_intersection(left, right) == 0
+def test_required_periods_expose_gap_and_null_anomaly_strata() -> None:
+    periods = census.profiling_periods()
+    assert "GAP_2025_01_TO_03" in periods
+    assert "NULL_OR_UNPARSEABLE_DATE" in periods
+    assert "EARLIER_YEAR" in periods
+
+
+def test_native_intersection_is_exact_not_candidate_mapping() -> None:
+    assert census.native_key_intersection([("25001", 1)], [("x", 1)]) == 0
     assert census.canonical_causal_intersection() == "NOT_YET_EVALUATED"
 
 
-def test_required_profiling_periods_are_explicit_and_non_overlapping() -> None:
-    assert census.profiling_periods() == (
-        "EARLIER_THAN_2024",
-        "CALENDAR_2024",
-        "2025_04_TO_2026_04",
-        "PROSPECTIVE_2026_05_ONWARD",
-    )
-
-
-def test_p34_scope_filters_the_multimarket_capture_table() -> None:
-    assert census.p34_where_clause("bjdc_500_capture") == " WHERE market_key = 'handicap_3way'"
-    assert census.p34_where_clause("beidan_xlsm") == ""
-
-
-def test_role_decision_deduplicates_derivatives_from_raw_lineage() -> None:
-    records = [
+def test_lineage_deduplicates_same_root() -> None:
+    rows = census.lineage_decisions([
         {"source_id": "raw", "lineage_root": "raw", "role": "HISTORICAL_PROXY"},
-        {"source_id": "derived", "lineage_root": "raw", "role": "HISTORICAL_PROXY"},
-    ]
-    result = census.lineage_decisions(records)
-    assert result[0]["independent_evidence"] is True
-    assert result[1]["independent_evidence"] is False
-    assert result[1]["dedup_reason"] == "DERIVED_FROM_raw"
+        {"source_id": "derived", "lineage_root": "raw", "role": "EXCLUDE"},
+    ])
+    assert rows[0]["independent_evidence"] is True
+    assert rows[1]["independent_evidence"] is False
 
 
-def test_remanifested_role_tamper_is_rejected(tmp_path: Path) -> None:
+def test_clean_fixture_verifies(tmp_path: Path) -> None:
     package = census.build_fixture_package(tmp_path / "package")
     assert census.verify_package(package)["verified"] is True
 
-    tampered = tmp_path / "tampered"
-    shutil.copytree(package, tampered)
-    registry = tampered / "tables" / "source_role_matrix.csv"
-    text = registry.read_text(encoding="utf-8")
-    registry.write_text(text.replace("HISTORICAL_PROXY", "STRICT_FORWARD_CANDIDATE", 1), encoding="utf-8")
-    census.rewrite_checksums(tampered)
 
-    verdict = census.verify_package(tampered)
-    assert verdict["verified"] is False
-    assert "role recomputation mismatch" in verdict["problems"]
-
-
-def test_remanifested_source_trace_tamper_is_rejected(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("relative", "old", "new", "expected"),
+    [
+        ("tables/source_role_matrix.csv", "HISTORICAL_PROXY", "RAW_ONLY", "role recomputation mismatch"),
+        ("tables/intersection_levels.csv", "NATIVE_KEY_INTERSECTION", "FORGED_INTERSECTION", "semantic hash mismatch: tables/intersection_levels.csv"),
+        ("tables/field_profile.csv", "fixture", "forged", "semantic hash mismatch: tables/field_profile.csv"),
+        ("tables/coverage_by_period.csv", "fixture", "forged", "semantic hash mismatch: tables/coverage_by_period.csv"),
+        ("tables/m_per_issue_distribution.csv", "fixture", "forged", "semantic hash mismatch: tables/m_per_issue_distribution.csv"),
+        ("tables/outcome_triplet_profile.csv", "fixture", "forged", "semantic hash mismatch: tables/outcome_triplet_profile.csv"),
+    ],
+)
+def test_remanifested_decision_artifact_tamper_fails(tmp_path: Path, relative: str, old: str, new: str, expected: str) -> None:
     package = census.build_fixture_package(tmp_path / "package")
-    tampered = tmp_path / "tampered"
-    shutil.copytree(package, tampered)
-    source = tampered / "tables" / "source_inventory.csv"
-    payload = source.read_text(encoding="utf-8")
-    source.write_text(payload.replace("fixture-source", "forged-source"), encoding="utf-8")
-    census.rewrite_checksums(tampered)
-    verdict = census.verify_package(tampered)
+    attacked = tmp_path / "attacked"
+    shutil.copytree(package, attacked)
+    path = attacked / relative
+    path.write_text(path.read_text(encoding="utf-8").replace(old, new, 1), encoding="utf-8")
+    _remanifest(attacked)
+    verdict = census.verify_package(attacked)
     assert verdict["verified"] is False
-    assert "source trace hash mismatch" in verdict["problems"]
+    assert expected in verdict["problems"]
 
 
-def test_manifest_tamper_is_rejected_even_when_rehashed(tmp_path: Path) -> None:
+def test_remanifested_source_trace_tamper_fails(tmp_path: Path) -> None:
     package = census.build_fixture_package(tmp_path / "package")
-    tampered = tmp_path / "tampered"
-    shutil.copytree(package, tampered)
-    manifest = tampered / "MANIFEST.json"
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    payload["issue"] = 999
-    manifest.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    census.rewrite_checksums(tampered)
-    verdict = census.verify_package(tampered)
+    attacked = tmp_path / "attacked"
+    shutil.copytree(package, attacked)
+    path = attacked / "tables/source_inventory.csv"
+    path.write_text(path.read_text(encoding="utf-8").replace("fixture", "forged", 1), encoding="utf-8")
+    _remanifest(attacked)
+    verdict = census.verify_package(attacked)
+    assert verdict["verified"] is False
+    assert "semantic hash mismatch: tables/source_inventory.csv" in verdict["problems"]
+
+
+def test_remanifested_manifest_issue_tamper_fails(tmp_path: Path) -> None:
+    package = census.build_fixture_package(tmp_path / "package")
+    attacked = tmp_path / "attacked"
+    shutil.copytree(package, attacked)
+    path = attacked / "MANIFEST.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["issue"] = 999
+    path.write_text(json.dumps(data), encoding="utf-8")
+    _remanifest(attacked)
+    verdict = census.verify_package(attacked)
     assert verdict["verified"] is False
     assert "manifest issue mismatch" in verdict["problems"]

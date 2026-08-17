@@ -1,0 +1,16 @@
+evidence,requirement,status
+machine-readable decision tables + report,REQ-SC01,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC02,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC03,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC04,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC05,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC06,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC07,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC08,PI_DECISION_PENDING
+machine-readable decision tables + report,REQ-SC09,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC10,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC11,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC12,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC13,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC14,EVIDENCE_PRESENT
+machine-readable decision tables + report,REQ-SC15,PI_DECISION_PENDING

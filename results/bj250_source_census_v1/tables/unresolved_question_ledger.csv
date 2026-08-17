@@ -1,4 +1,0 @@
-owner_issue,question,question_id,status
-#251,Which candidate mappings are canonical?,U1,DEFERRED
-#252,What temporal cutoff makes a forward snapshot admissible?,U2,DEFERRED
-#235/#236/#237/#248,Which gaps need acquisition/recovery work?,U3,PI_DECISION_REQUIRED
