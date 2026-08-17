@@ -1,49 +1,70 @@
-# Issue #250 — BJ-UNIFIED-SOURCE-CENSUS-001 R2
+# Issue #250 — BJ-UNIFIED-SOURCE-CENSUS-001 R3
 
-## Scope, method, and baseline
+## Scope and baseline
 
-This is an incremental, assessment-only source-role decision input bound to `HIST-DATA-CENSUS-001 R8` (`hist-data-census-001-r8`, commit `97a9c0a78d2fce0004cb1240113a070b980403b9`, manifest SHA-256 `ed16b296…e217cdc8`). It profiles only seven declared logical source families through the externally supplied `BEIJING_LOT_DATA_ROOT` using URI read-only SQLite connections.
+This is an incremental, assessment-only source-role decision input bound to `HIST-DATA-CENSUS-001 R8` (`hist-data-census-001-r8`, commit `97a9c0a78d2fce0004cb1240113a070b980403b9`, manifest SHA-256 `ed16b296…e217cdc8`). It profiles seven declared logical source families through the externally supplied `BEIJING_LOT_DATA_ROOT`, with URI read-only SQLite connections.
 
-No source data was crawled, written, appended, normalized, imputed, backfilled, modeled, or used for profitability/ticket decisions. Labels/settlement fields are profiled separately for completeness and are never inputs to a feature-role decision. Mutable source results are explicitly `MUTABLE_UNFROZEN`, not a frozen conclusion.
+The assessment does not crawl, purchase, append, normalize, impute, train, construct tickets, or compute ROI. It does not freeze identity, temporal policy, or physical schema. Mutable inputs are reported as `MUTABLE_UNFROZEN`; their counts are observations rather than frozen receipts.
 
-## Decision input
+## p34 identity and evidence grain
 
-| Logical source | Disposition | Evidence / routing |
-|---|---|---|
-| `beidan_xlsm` | `HISTORICAL_PROXY` | Historical p34 proxy backbone candidate only. `initial`/`10h`/`1h` carry relative-time bucket semantics, not strict observed-at timestamps. Advance its identity questions to #251. |
-| `beidan_features` | `RAW_ONLY` | Identity/schedule and market-family support; no source/capture observation clock. Advance the proposed-mapping question to #251, not causal inference. |
-| `beidan_history` | `SETTLEMENT_ONLY` | Label/settlement truth. Completeness is measured but it remains outside inference. |
-| `beidan_live` | `RAW_ONLY` | Capture clock is present but source clock is absent; mutable/unfrozen. Advance sealing/clock criteria to #252. |
-| `bjdc_500_capture` | `RAW_ONLY` | p34 `handicap_3way` capture profiled for SP, triplets and clocks. Incomplete clocks and mutable storage prevent strict-forward promotion. Advance sealing/clock criteria to #252. |
-| `beidan_modeling_plus`, `beidan_nowscore` | `EXCLUDE` | Derived from `beidan_xlsm`, deliberately not independent evidence. |
+`playid=34` identifies the p34 play type; it is not a match identifier. The census uses these explicit, separate grains for `live_market_sp_snapshots`:
 
-## Required decision views and exact backing
+| Purpose | Identity |
+| --- | --- |
+| logical p34 match / M-per-issue | `issue + row_idx` |
+| observed match snapshot / triplet denominator | `issue + fetched_at + row_idx` |
+| source cell / duplicate check | `issue + playid + fetched_at + row_idx + outcome_code` |
 
-`results/bj250_source_census_v2/tables/` is the source of every count; all figures have committed CSV backing.
+This prevents a single p34 play type from collapsing every issue to one match. The backing tables preserve issue, match, cell, and snapshot denominators separately.
 
-- `source_inventory.csv`: source path, layer, lineage, R8 basis, file hash for stable assets, and explicit mutable receipt state.
-- `field_inventory.csv` and `field_profile.csv`: all decision-facing keys, clocks, feature/price and label/settlement fields; denominator, null/blank and impossible-value counts.
-- `coverage_by_period.csv`: source-row denominator plus exact issue/match/cell counts for calendar 2024, 2025-01–03, 2025-04–2026-04, 2026-05 onward, null/unparseable dates, and each individual earlier calendar year actually present. This closes the formerly silent 2025 Q1/null-date gap.
-- `duplicate_profile.csv`: native-key duplicate groups and extra rows (or deterministic unavailable reason).
-- `outcome_triplet_profile.csv`: all `initial`/`10h`/`1h` market families and the p34 capture path, with triplet denominators and missing/invalid counts.
-- `intersection_levels.csv`: exactly the four declared levels. Native intersection is exact only. Candidate mapping gives a non-authoritative lower/upper range measured as `beidan_xlsm` rows having at least one candidate: lower uses issue + normalized home/away + calendar date, upper relaxes date. The canonical causal intersection is `NOT_YET_EVALUATED` pending #251 + #252.
-- `source_role_matrix.csv`: machine-routing has both strict-forward candidates advancing to #252 for sealing/clock criteria even though neither is currently promoted.
+## Admissible-use lanes
 
-## Pi/user decision gate
+Every discovered table/field is in `tables/field_inventory.csv`, with an explicit `admissible_use` and `terminal_denylisted` value. Result, score, settlement, final/official SP, winning-SP, payout, hit, profit/ROI, and halftime surfaces are `SETTLEMENT_ONLY` even when they are co-resident with historical proxy data. The machine inventory therefore cannot elevate a whole SQLite container into an inference surface.
 
-1. Accept/reject `beidan_xlsm` as disclosed historical proxy backbone.
-2. Decide whether the measured non-authoritative candidate range justifies #251 identity work; it does not authorize a canonical join.
-3. Require #252 to define a sealed source/capture-clock receipt before either live lane can become strict-forward evidence.
-4. Retain `beidan_history` as settlement-only and derived copies as excluded.
-5. Review field-profile / outcome-triplet gap rows to route recovery needs to #235/#236/#237/#248; #250 makes no recovery change.
+The source role is fail-closed:
 
-## Reproduction and tamper verification
+- a missing/unprofiled coverage table is `RECOVER`;
+- an historical proxy source without any complete relative-time proxy triplet is `RAW_ONLY`;
+- a strict-forward source without both complete source and capture clocks is `RAW_ONLY`;
+- a clock-complete mutable source is still `MUTABLE_UNFROZEN`;
+- derived copies sharing an upstream lineage root are `EXCLUDE` from independent evidence.
+
+`initial`, `10h`, and `1h` are historical relative-time proxy buckets, never strict observed-at fields. Label/settlement completeness is profiled separately and never decides feature availability or source admissibility.
+
+## Required decision views
+
+All committed figures have machine-readable backing under `results/bj250_source_census_v2/tables/`:
+
+- source inventory, R8 binding, lineage root, stable hash/mutable receipt, and disposition;
+- complete table/field inventory with terminal denylist;
+- decision-field nullness, invalid-value and denominator profiles;
+- issue/date/match/cell coverage for each earlier year present, calendar 2024, 2025-01–03, 2025-04–2026-04, prospective 2026-05 onward, and null/anomalous dates;
+- duplicate and p34 outcome-triplet profiles;
+- M-per-issue distribution at logical-match grain;
+- source × feature-family availability heatmap and time/issue coverage chart;
+- four-level intersection ledger: `RAW_PRESENT`, exact `NATIVE_KEY_INTERSECTION`, non-authoritative `CANDIDATE_MAPPED_RANGE`, and deferred `CANONICAL_CAUSAL_INTERSECTION`;
+- source-role matrix and unresolved-question ledger.
+
+Candidate mapping remains an explicitly non-authoritative range. It cannot authorise a join, training, or label propagation; #251 owns identity acceptance and #252 owns temporal/sealing acceptance.
+
+## Integrity verification
+
+`SHA256SUMS.json` checks byte closure but is not a trust anchor. `MANIFEST.json` contains semantic hashes for every package payload and the producer implementation hash. The builder deliberately does **not** write an anchor: an independent EV checkout must supply `--trusted-anchor /outside/package/expected-anchor.json` to `--verify-only`. A verifier without that argument fails closed. This separation rejects an attacker who changes a decision table, rewrites in-package semantic hashes, and regenerates checksums; an expected anchor generated by the same builder/package would not be evidence.
+
+## PI/user decision gate
+
+1. Review whether the measured `beidan_xlsm` field-level proxy lane is sufficient as historical-proxy backbone candidate.
+2. Review whether candidate-map bounds justify #251 identity work; they never authorise a canonical join.
+3. Require #252 to define sealed source/capture-clock receipts before either live lane can be strict-forward evidence.
+4. Retain settlement/final-SP fields outside inference and derived copies outside independent source evidence.
+5. Use explicitly measured gaps to decide whether #235/#236/#237/#248 recovery work is warranted.
+
+## Reproduction
 
 ```bash
 BEIJING_LOT_DATA_ROOT=/path/to/data python scripts/build_bj250_source_census.py
 BEIJING_LOT_DATA_ROOT=/path/to/data python scripts/execute_bj250_notebook.py
-python scripts/build_bj250_source_census.py --verify-only
+python scripts/build_bj250_source_census.py --verify-only --trusted-anchor /outside/package/expected-anchor.json
 python -m pytest tests/test_bj250_source_census.py -q
 ```
-
-The semantic verifier binds checksum closure and hashes of all decision-bearing tables: inventory, roles, intersections, field profile, time coverage, and outcome-triplet profile. The 13-test adversarial suite mutates each kind of conclusion artifact, the source trace, role decision and manifest while rewriting the checksum inventory; each attack must fail.

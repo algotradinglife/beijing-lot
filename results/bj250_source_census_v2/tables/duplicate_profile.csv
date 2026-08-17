@@ -3,6 +3,6 @@ duplicate_key_groups,duplicate_rows_beyond_first,key_definition,reason,source_id
 1,1,issue+match_id,NATIVE_KEY_DUPLICATE_PROFILE,beidan_features,matches
 0,0,issue+match_idx,NATIVE_KEY_DUPLICATE_PROFILE,beidan_history,historical_matches
 0,0,issue+match_idx,NATIVE_KEY_DUPLICATE_PROFILE,beidan_live,matches
-39873,3940791,issue+playid+fetched_at+outcome_code,NATIVE_KEY_DUPLICATE_PROFILE,bjdc_500_capture,live_market_sp_snapshots
+0,0,issue+playid+fetched_at+row_idx+outcome_code,NATIVE_KEY_DUPLICATE_PROFILE,bjdc_500_capture,live_market_sp_snapshots
 0,0,issue+match_idx,NATIVE_KEY_DUPLICATE_PROFILE,beidan_modeling_plus,matches
 0,0,issue+match_idx,NATIVE_KEY_DUPLICATE_PROFILE,beidan_nowscore,matches
