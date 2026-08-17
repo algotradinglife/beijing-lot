@@ -1,0 +1,32 @@
+{
+  "assessment_only": true,
+  "canonical_causal_intersection": "NOT_YET_EVALUATED",
+  "data_root_supplied": true,
+  "hist40_baseline": {
+    "archive_sha256": "7de5e20d0a3b2185bcaf8e4229544c28100cd2d29c9cc315adbc6afe48f4a38d",
+    "commit": "97a9c0a78d2fce0004cb1240113a070b980403b9",
+    "manifest_sha256": "ed16b29626b4af70e80cdfee3130d6d5e89cd79d09e06110d4d55570e217cdc8",
+    "tag": "hist-data-census-001-r8"
+  },
+  "issue": 250,
+  "logical_sources": 7,
+  "package": "bj250_source_census_v1",
+  "prohibitions": [
+    "no_crawl",
+    "no_backfill",
+    "no_imputation",
+    "no_model",
+    "no_roi",
+    "no_identity_or_temporal_policy_freeze"
+  ],
+  "roles": {
+    "beidan_features": "RAW_ONLY",
+    "beidan_history": "SETTLEMENT_ONLY",
+    "beidan_live": "RAW_ONLY",
+    "beidan_modeling_plus": "EXCLUDE",
+    "beidan_nowscore": "EXCLUDE",
+    "beidan_xlsm": "HISTORICAL_PROXY",
+    "bjdc_500_capture": "RAW_ONLY"
+  },
+  "source_inventory_sha256": "5bf43f673477db4b6346205dcf2dcfb87018cb1803ef97f7a11caf657750e5f8"
+}

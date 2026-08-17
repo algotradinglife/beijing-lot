@@ -1,0 +1,18 @@
+{
+  "MANIFEST.json": "78085f1104c6bcd75a0fa07f5821831ea5f8e6d4b16f452fed7b00f976f6a1ab",
+  "REPORT.md": "f12001ac38399005497467fda109fc39c940eaced3433e11c99f4b8f09c55800",
+  "evidence/req_sc_evidence.csv": "5dd2ac04f66738a45f38145c3ba22729b18ceb4749412b3b02b0ef5bd2650743",
+  "figures/coverage_rows.svg": "a5965cd1d96666a258c7df7a5485e8ea24805b31fdc0f06eb39aa539605817ee",
+  "figures/m_per_issue.svg": "f1c8a8900cca2f8e76d4b14ade0507213f6f773e793ab11be17fcb7a7a45ea29",
+  "figures/source_role_counts.svg": "ec8835c54a485009cea842f31dc625c221a7da9d342dc4cd4d09e3bfc7e5f810",
+  "tables/coverage_by_period.csv": "d046c53fb41fc82dd905704993bcf0a0e5ac8fe4e6eed28fb2b439d92c3ead22",
+  "tables/coverage_by_source.csv": "5a04181a12737977869607cdf5736a4d785a2513e6e3417f4908870fc840d87c",
+  "tables/field_inventory.csv": "b47989dfa079bc93c7c099548a980603e5d08912747a7c64924157da3e487038",
+  "tables/intersection_levels.csv": "0047fefdb1e362ebd60a2005535a65f4acb6de91ca772a5f8a46b60c9421895b",
+  "tables/m_per_issue_distribution.csv": "d2d29947017553f53c916e62f0303a92e83955997fa27b2856c9d26793babc65",
+  "tables/relative_time_bucket_coverage.csv": "3f153cb9cac0e1d58774284be8ea69de722b64b62f083f2d0c4801f697208684",
+  "tables/source_feature_availability.csv": "0efb3f07050f3b0671e65467847056b9d70beac28c536e49b6056d0160b098a4",
+  "tables/source_inventory.csv": "5bf43f673477db4b6346205dcf2dcfb87018cb1803ef97f7a11caf657750e5f8",
+  "tables/source_role_matrix.csv": "ab059dbcbc73e165bab218c74acf10dab914bb63c0a5ca20921aed344b53c599",
+  "tables/unresolved_question_ledger.csv": "036d6753429a67b1973f1fb44bd6d0dc4ebcc67c8b0c1ad8b71b9b4cd772ab60"
+}
