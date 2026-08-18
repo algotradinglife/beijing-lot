@@ -1,0 +1,57 @@
+{
+  "package": "bj235_bj_sp_timeseries_v2",
+  "contract": "BJ-UNIFIED-BJ-SP-TIMESERIES-001",
+  "amendment": "v2 2026-08-17 (relative-proxy positive delivery)",
+  "tables": {
+    "source_registry": {
+      "rows": 8,
+      "file": "source_registry.parquet"
+    },
+    "ingestion_batch": {
+      "rows": 1,
+      "file": "ingestion_batch.parquet"
+    },
+    "fixture": {
+      "rows": 192709,
+      "file": "fixture.parquet"
+    },
+    "market_observation": {
+      "rows": 0,
+      "file": "market_observation.parquet"
+    },
+    "market_quote": {
+      "rows": 0,
+      "file": "market_quote.parquet"
+    },
+    "decision_epoch": {
+      "rows": 0,
+      "file": "decision_epoch.parquet"
+    },
+    "as_of_selection": {
+      "rows": 0,
+      "file": "as_of_selection.parquet"
+    },
+    "probability_estimate": {
+      "rows": 0,
+      "file": "probability_estimate.parquet"
+    },
+    "settlement": {
+      "rows": 0,
+      "file": "settlement.parquet"
+    },
+    "exclusion_ledger": {
+      "rows": 1,
+      "file": "exclusion_ledger.parquet"
+    },
+    "relative_horizon_panel": {
+      "rows": 2312508,
+      "file": "relative_horizon_panel.parquet"
+    },
+    "relative_horizon_view": {
+      "rows": 2312508,
+      "file": "relative_horizon_view.parquet"
+    }
+  },
+  "asof_rule": "asof_latest_complete_pre_kickoff_v1",
+  "exported_at_utc": "2026-08-18T16:07:27Z"
+}

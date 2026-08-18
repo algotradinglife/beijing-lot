@@ -24,6 +24,7 @@ EXPORT_TABLES = (
     "probability_estimate",
     "settlement",
     "exclusion_ledger",
+    "relative_horizon_panel",
 )
 
 
@@ -42,13 +43,21 @@ def export_parquet(con: sqlite3.Connection, out_dir: str | Path) -> dict:
             written[name] = {"rows": 0, "file": None, "error": str(exc)}
             continue
         fp = tables / f"{name}.parquet"
-        df.to_parquet(fp, index=False)
+        df.to_parquet(fp, index=False, compression="zstd")
         written[name] = {"rows": len(df), "file": fp.name}
+
+    from .panel import relative_horizon_view_df
+
+    view = relative_horizon_view_df(con)
+    view_path = tables / "relative_horizon_view.parquet"
+    view.to_parquet(view_path, index=False, compression="zstd")
+    written["relative_horizon_view"] = {"rows": len(view), "file": view_path.name}
 
     # manifest
     manifest = {
-        "package": "bj235_bj_sp_timeseries_v1",
+        "package": "bj235_bj_sp_timeseries_v2",
         "contract": "BJ-UNIFIED-BJ-SP-TIMESERIES-001",
+        "amendment": "v2 2026-08-17 (relative-proxy positive delivery)",
         "tables": written,
         "asof_rule": "asof_latest_complete_pre_kickoff_v1",
         "exported_at_utc": _now_utc(),

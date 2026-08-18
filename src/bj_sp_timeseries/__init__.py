@@ -147,6 +147,29 @@ CREATE TABLE IF NOT EXISTS exclusion_ledger (
     raw_count          INTEGER,
     batch_id           TEXT
 );
+
+-- REQ-BJ09: historical proxy cells have a relative snapshot bucket rather
+-- than fabricated observed/received wall-clock timestamps.
+CREATE TABLE IF NOT EXISTS relative_horizon_panel (
+    panel_id             TEXT PRIMARY KEY,
+    fixture_id           TEXT NOT NULL REFERENCES fixture(fixture_id),
+    issue_code           TEXT NOT NULL,
+    match_idx            INTEGER NOT NULL,
+    native_handicap_line REAL,
+    snapshot_bucket      TEXT NOT NULL CHECK (snapshot_bucket IN
+        ('initial','10h','1h','final')),
+    outcome_code         TEXT NOT NULL CHECK (outcome_code IN ('3','1','0')),
+    decimal_odds         REAL,
+    availability         TEXT NOT NULL CHECK (availability IN ('present','missing')),
+    consensus_n          INTEGER,
+    market_type          TEXT NOT NULL,
+    source_id            TEXT NOT NULL REFERENCES source_registry(source_id),
+    batch_id             TEXT,
+    provenance_hash      TEXT NOT NULL,
+    UNIQUE(fixture_id, snapshot_bucket, outcome_code, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_panel_bucket ON relative_horizon_panel(snapshot_bucket);
+CREATE INDEX IF NOT EXISTS idx_panel_issue ON relative_horizon_panel(issue_code);
 """
 
 # Known first-party / internal sources with their clock semantics.

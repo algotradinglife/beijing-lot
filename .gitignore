@@ -41,6 +41,8 @@ results/*
 !results/bj254_schema_integration_v2/**
 !results/bj235_bj_sp_timeseries_v1/
 !results/bj235_bj_sp_timeseries_v1/**
+!results/bj235_bj_sp_timeseries_v2/
+!results/bj235_bj_sp_timeseries_v2/**
 runs/
 .cache/
 tmp/
@@ -65,6 +67,10 @@ temp/
 !results/bj235_bj_sp_timeseries_v1/**/*.parquet
 !results/bj235_bj_sp_timeseries_v1/**/*.json
 !results/bj235_bj_sp_timeseries_v1/**/*.md
+!results/bj235_bj_sp_timeseries_v2/**/*.csv
+!results/bj235_bj_sp_timeseries_v2/**/*.parquet
+!results/bj235_bj_sp_timeseries_v2/**/*.json
+!results/bj235_bj_sp_timeseries_v2/**/*.md
 *.feather
 *.h5
 *.hdf5

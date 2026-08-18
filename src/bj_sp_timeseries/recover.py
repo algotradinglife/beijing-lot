@@ -10,10 +10,6 @@ historical cohort has zero strict-causal support.
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
-from pathlib import Path
-
-from . import OUTCOME_DOMAIN
 
 # Reason codes used in exclusion_ledger and waterfalls.
 REASONS = {
@@ -41,6 +37,17 @@ def issue_year(issue_code: str) -> int:
 def cohort_name(year: int) -> str:
     if year >= 2026:
         return "prospective"
+    if year >= 2014:
+        return "strict_historical"
+    return "unknown"
+
+
+def cohort_name_v2(year: int, *, source_admissible_use: str) -> str:
+    """Classify v2 proxy support without relabelling it as strict causal."""
+    if year >= 2026 and source_admissible_use == "STRICT_CAUSAL":
+        return "prospective"
+    if year >= 2014 and source_admissible_use == "RETROSPECTIVE_PROXY":
+        return "retrospective_proxy"
     if year >= 2014:
         return "strict_historical"
     return "unknown"
@@ -74,10 +81,8 @@ def complete_triplet_count(con: sqlite3.Connection, source_id: str | None = None
 
 def issue_level_support(con: sqlite3.Connection, *,
                         rule_id: str = "asof_latest_complete_pre_kickoff_v1") -> dict:
-    """Issue-level support: for each issue, count fixtures with >=1 complete
-    as-of selection, by cohort (strict_historical / retrospective_proxy /
-    prospective)."""
-    rows = con.execute(
+    """Report strict and retrospective-proxy support in separate cohorts."""
+    strict_rows = con.execute(
         """SELECT f.issue_code,
                   COUNT(DISTINCT f.fixture_id) AS fixtures_total,
                   SUM(CASE WHEN s.observation_id IS NOT NULL AND s.complete=1
@@ -93,9 +98,16 @@ def issue_level_support(con: sqlite3.Connection, *,
            GROUP BY f.issue_code ORDER BY f.issue_code""",
         (rule_id,),
     ).fetchall()
+    proxy_rows = con.execute(
+        """SELECT issue_code, COUNT(DISTINCT fixture_id) AS fixtures_total,
+                  COUNT(DISTINCT CASE WHEN availability='present' THEN fixture_id END)
+                    AS fixtures_present
+           FROM relative_horizon_panel
+           GROUP BY issue_code ORDER BY issue_code"""
+    ).fetchall()
     by_cohort: dict[str, dict] = {}
     per_issue: list[dict] = []
-    for r in rows:
+    for r in strict_rows:
         yr = issue_year(r["issue_code"])
         cohort = cohort_name(yr)
         entry = by_cohort.setdefault(cohort, {"issues": 0, "fixtures_total": 0,
@@ -106,18 +118,26 @@ def issue_level_support(con: sqlite3.Connection, *,
         per_issue.append({"issue_code": r["issue_code"], "year": yr,
                           "cohort": cohort, "fixtures_total": r["fixtures_total"],
                           "fixtures_complete_asof": r["fixtures_complete_asof"] or 0})
+    for r in proxy_rows:
+        cohort = cohort_name_v2(issue_year(r["issue_code"]),
+                                source_admissible_use="RETROSPECTIVE_PROXY")
+        entry = by_cohort.setdefault(cohort, {"issues": 0, "fixtures_total": 0,
+                                              "fixtures_present": 0})
+        entry["issues"] += 1
+        entry["fixtures_total"] += r["fixtures_total"]
+        entry["fixtures_present"] += r["fixtures_present"] or 0
+        per_issue.append({"issue_code": r["issue_code"], "year": issue_year(r["issue_code"]),
+                          "cohort": cohort, "fixtures_total": r["fixtures_total"],
+                          "fixtures_present": r["fixtures_present"] or 0})
+    per_issue.sort(key=lambda row: (row["issue_code"], row["cohort"]))
     return {"by_cohort": by_cohort, "per_issue": per_issue}
 
 
 def historical_recoverability_evidence(con: sqlite3.Connection) -> dict:
-    """Evidence-backed UNRECOVERABLE_HISTORICAL_BJ_SP assessment.
+    """Return v2 positive proxy evidence without misrepresenting it as causal."""
+    from .panel import build_panel_evidence
 
-    Historical (2014-2025) sources: beidan_xlsm (label-only snapshots, no
-    exact clock), beidan_features (no observation clock), beidan_history
-    (settlement only), nowscore/okooo (third-party proxy). None can supply a
-    verifiable pre-event SP timestamp -> strict historical cohort is
-    UNRECOVERABLE. Prospective (2026-05+) is STRICT_CAUSAL.
-    """
+    panel = build_panel_evidence(con)
     evidence = {
         "strict_historical_sources_checked": [
             {"source_id": "beidan_xlsm_archive",
@@ -142,10 +162,12 @@ def historical_recoverability_evidence(con: sqlite3.Connection) -> dict:
         "prospective_clock": ("trusted receive snapshot_ts/fetched_at plus native "
                               "source_updatetime where supplied"),
         "strict_historical_causal_support": 0,
-        "disposition": "UNRECOVERABLE_HISTORICAL_BJ_SP",
-        "note": ("no 2014-2025 source with a native, verifiable pre-event SP "
-                 "observation clock exists; backfill from settlement time, issue "
-                 "number or file mtime is prohibited by contract"),
+        "historical_panel": panel.pop("by_bucket", {}),
+        "panel": panel,
+        "disposition": panel["disposition"],
+        "note": ("strict-causal historical support remains zero; the explicit "
+                 "RETROSPECTIVE_RELATIVE_PROXY M×3 panel is the v2 positive "
+                 "delivery and must not be used as an exact-clock replay"),
     }
     return evidence
 
@@ -170,16 +192,8 @@ def write_exclusion_ledger_from_analysis(con: sqlite3.Connection, *,
                       reason_code="SETTLEMENT_ONLY",
                       detail="settlement row is post-event; cannot supply pre-event SP")
         n += 1
-    # xlsm label-only rows: represent as aggregate exclusion rows (one per issue)
-    # rather than 51M rows; the notebook prints the label-only evidence.
-    for issue in ("140101", "150101", "160101", "170101", "180101", "190101",
-                  "200101", "210101", "220101", "230101", "240101", "250101"):
-        log_exclusion(con, fixture_id=None, source_id="beidan_xlsm_archive",
-                      issue_code=issue, season_year=issue_year(issue),
-                      native_handicap_line=None, reason_code="LABEL_ONLY",
-                      detail="beidan_xlsm market_snapshots label buckets have no exact clock",
-                      raw_count=51_551_016 // 12)
-        n += 1
+    # v2 panel ingestion records padding rows in the exclusion ledger and
+    # materializes unavailable quote cells directly as availability='missing'.
     con.commit()
     return {"exclusion_rows": n}
 

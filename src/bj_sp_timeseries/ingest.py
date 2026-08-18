@@ -17,7 +17,7 @@ import hashlib
 import json
 import sqlite3
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 from . import OUTCOME_DOMAIN, SCHEMA_SQL, SOURCE_REGISTRY
 

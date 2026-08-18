@@ -1,0 +1,17 @@
+{
+  "ISSUE_SUPPORT.csv": "837bdaa38514a8d7e79b5fcbd9bbb518a34be3fd12fac3604afba3ca267a2bc4",
+  "MANIFEST.json": "a6b66ae82008bdd7d599b74c03ce404b6a0f660c92518944cb08b03e941521d2",
+  "RECOVERABILITY_REPORT.json": "4df306f9c3455e6be199131ff27f9afb54d3a28ce8615ab3f12ad2a6e6822434",
+  "tables/as_of_selection.parquet": "4756d383e8b288d20d0ecfbf1bbcfc271c679acd81f99bc0a12bedb29945a456",
+  "tables/decision_epoch.parquet": "dd26133e3437ec531e96f77edd0ac1f3bfc636d30efebb8a10c7c716c778c614",
+  "tables/exclusion_ledger.parquet": "2532d1714199ebdc29c0f411f246d646e7711116e5f40aa17f3dd0eda00fc9fa",
+  "tables/fixture.parquet": "7df9cf6a89de5be47ecf0f0e9ed772f8a6afbd2f64e7fbd1a07cd3e355236576",
+  "tables/ingestion_batch.parquet": "9895b055b5e45453f753dffea45f3b5b7c084b71971a624eb815a02b57085c44",
+  "tables/market_observation.parquet": "4f95f5d661ae926113ce8d16e0da81ff878a87d805fd0ce3cbb1dc532c32243a",
+  "tables/market_quote.parquet": "d36ec5113729c63e7eeb057dc406459c3702a7ab4efba8a6424a7852502a8d5d",
+  "tables/probability_estimate.parquet": "a46290a5c5274af396d66f6cf9d3429c68397627fff89652f3a663f31166a03d",
+  "tables/relative_horizon_panel.parquet": "37d8cbd8ec6b7342e6a917f840734a1480b404c0917ea3c5842451540bbbda07",
+  "tables/relative_horizon_view.parquet": "3b34dee0f02ca8589146d97aae28c2ff69dd8d51940b58830efc81f6c331f0ab",
+  "tables/settlement.parquet": "9cbd9cee4b77abd40389e268e2a48abcf3215089f7010c68988091a104a3864b",
+  "tables/source_registry.parquet": "518ae0e64de9ad9f17758c032d76eec84d9150d28785d402015ad31d9b298b5d"
+}
