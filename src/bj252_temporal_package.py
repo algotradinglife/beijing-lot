@@ -15,8 +15,10 @@ from temporal_semantics import (
     ACCEPTED_PROXY_HORIZONS,
     POLL_GRADE,
     POLL_SEMANTICS,
+    POLL_NAMESPACE,
     POLL_SOURCE_ID,
     PROXY_GRADE,
+    PROXY_NAMESPACE,
     PROXY_SEMANTICS,
     PROXY_SOURCE_ID,
     build_issue_view,
@@ -54,6 +56,28 @@ DROP_REASONS = {
     "INVALID_VALUE",
     "CUTOFF_NOT_PRE_KICKOFF",
 }
+RECEIPT_COMPONENTS = ("main", "wal", "shm")
+SOURCE_LANE_RECEIPT_REQUIREMENTS = {
+    POLL_NAMESPACE: {
+        "source_id": POLL_SOURCE_ID,
+        "receipt_source_key": "beidan_live_db",
+        "required_receipt_keys": [
+            f"beidan_live_db:{component}" for component in RECEIPT_COMPONENTS
+        ],
+    },
+    PROXY_NAMESPACE: {
+        "source_id": PROXY_SOURCE_ID,
+        "receipt_source_key": "beidan_xlsm_workbook",
+        "required_receipt_keys": [
+            f"beidan_xlsm_workbook:{component}" for component in RECEIPT_COMPONENTS
+        ],
+    },
+}
+REQUIRED_RECEIPT_KEYS = frozenset(
+    key
+    for lane in SOURCE_LANE_RECEIPT_REQUIREMENTS.values()
+    for key in lane["required_receipt_keys"]
+)
 
 
 def _sha256(path: Path) -> str:
@@ -72,6 +96,30 @@ def rehash_package(package: Path) -> None:
         if path.is_file() and path.name != "SHA256SUMS.json"
     }
     publication.atomic_write_json(package / "SHA256SUMS.json", sums)
+
+
+def _validate_source_receipt(receipt: Mapping[str, str]) -> dict[str, str]:
+    """Fail closed unless each declared source lane has its exact receipt set.
+
+    This binds lane identity to the SQLite byte streams the profile can read.
+    It deliberately does not claim that a re-signed internal receipt authenticates
+    an external provider; it only rejects malformed or cross-lane evidence.
+    """
+    normalized = dict(receipt)
+    if set(normalized) != REQUIRED_RECEIPT_KEYS:
+        raise AssertionError("source receipt keys do not match declared source lanes")
+    for lane in SOURCE_LANE_RECEIPT_REQUIREMENTS.values():
+        required = lane["required_receipt_keys"]
+        if required[0].split(":", 1)[0] != lane["receipt_source_key"]:
+            raise AssertionError("source receipt lane requirement is inconsistent")
+        main_value = normalized[required[0]]
+        if not re.fullmatch(r"[0-9a-f]{64}", str(main_value)):
+            raise AssertionError("source receipt main database digest malformed")
+        for key in required[1:]:
+            value = normalized[key]
+            if value != "ABSENT" and not re.fullmatch(r"[0-9a-f]{64}", str(value)):
+                raise AssertionError("source receipt sidecar digest malformed")
+    return normalized
 
 
 def _selection_summary(selection: pd.DataFrame) -> pd.DataFrame:
@@ -161,6 +209,7 @@ def _populate(
     source_receipt: Mapping[str, str],
 ) -> None:
     (staging / "tables").mkdir(parents=True, exist_ok=True)
+    normalized_receipt = _validate_source_receipt(source_receipt)
     polls = validate_observations(poll_rows, namespace="poll_start_forward")
     tables = profile_tables(polls)
     one_hour = tables["cutoff_selection.csv"].loc[
@@ -222,7 +271,8 @@ def _populate(
         "poll_start_namespace": "poll_start_forward",
         "proxy_namespace": "historical_proxy_horizon_market_summary",
         "historical_proxy_observation_source_id": PROXY_SOURCE_ID,
-        "source_receipt": dict(source_receipt),
+        "source_lane_receipt_requirements": SOURCE_LANE_RECEIPT_REQUIREMENTS,
+        "source_receipt": normalized_receipt,
         "policy": "candidate leads 1/6/12/24h; segment fallback 1h",
         "schedule_authority": "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF",
         "clock_authority": "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED",
@@ -440,11 +490,12 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("source-authentication claim mismatch")
     if manifest.get("raw_cell_value_evidence") != "COUNTS_ONLY_NOT_FROZEN_RAW_CELL_AUTHORITY":
         raise AssertionError("raw-cell evidence claim mismatch")
+    if manifest.get("source_lane_receipt_requirements") != SOURCE_LANE_RECEIPT_REQUIREMENTS:
+        raise AssertionError("source receipt lane requirements mismatch")
     receipt = manifest.get("source_receipt")
-    if not isinstance(receipt, dict) or not receipt:
+    if not isinstance(receipt, dict):
         raise AssertionError("source receipt missing")
-    if any(value != "ABSENT" and not re.fullmatch(r"[0-9a-f]{64}", str(value)) for value in receipt.values()):
-        raise AssertionError("source receipt digest malformed")
+    _validate_source_receipt(receipt)
 
     tables = package / "tables"
     poll_snapshot_path = tables / "poll_start_input_snapshot.parquet"

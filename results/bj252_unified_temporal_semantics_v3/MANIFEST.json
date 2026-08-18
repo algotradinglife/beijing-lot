@@ -170,6 +170,26 @@
   "schedule_authority": "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF",
   "schema": "bj252_temporal_evidence_v3",
   "source_authentication": "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR",
+  "source_lane_receipt_requirements": {
+    "historical_proxy": {
+      "receipt_source_key": "beidan_xlsm_workbook",
+      "required_receipt_keys": [
+        "beidan_xlsm_workbook:main",
+        "beidan_xlsm_workbook:wal",
+        "beidan_xlsm_workbook:shm"
+      ],
+      "source_id": "beidan_xlsm_workbook"
+    },
+    "poll_start_forward": {
+      "receipt_source_key": "beidan_live_db",
+      "required_receipt_keys": [
+        "beidan_live_db:main",
+        "beidan_live_db:wal",
+        "beidan_live_db:shm"
+      ],
+      "source_id": "beidan_live_db_merged_unknown_cell_lineage"
+    }
+  },
   "source_receipt": {
     "beidan_live_db:main": "94f8cddcedef99e198eb0a4c6d49c23cad939d10969f84c04cdbee2c11b32f30",
     "beidan_live_db:shm": "74eead598ec6f944265b7bd90c2c0df64b9bd23b31e5aeaf164d90517ad1dfa9",

@@ -89,6 +89,21 @@ def _parse_utc(series: pd.Series, *, field: str, allow_null: bool) -> pd.Series:
     return parsed
 
 
+def _exact_match(series: pd.Series, expected: str) -> pd.Series:
+    """Return an explicit boolean equality mask where null is always false.
+
+    Pandas nullable StringDtype and Arrow string arrays propagate ``pd.NA``
+    through equality; ``Series.any()`` then skips it.  Lane-defining fields are
+    authorization boundaries, so a null is incompatible rather than unknown.
+    """
+    return series.eq(expected).fillna(False).astype(bool)
+
+
+def _exact_one_of(series: pd.Series, allowed: tuple[str, ...]) -> pd.Series:
+    """Return an explicit membership mask where null is always false."""
+    return series.isin(allowed).fillna(False).astype(bool)
+
+
 def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFrame:
     """Validate and normalise one explicitly named temporal namespace.
 
@@ -102,10 +117,10 @@ def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFram
     out = frame.copy()
     if namespace == POLL_NAMESPACE:
         incompatible = (
-            out["time_semantics"].ne(POLL_SEMANTICS)
-            | out["causal_grade"].ne(POLL_GRADE)
-            | out["source_id"].ne(POLL_SOURCE_ID)
-            | out["snapshot_horizon"].ne("poll")
+            ~_exact_match(out["time_semantics"], POLL_SEMANTICS)
+            | ~_exact_match(out["causal_grade"], POLL_GRADE)
+            | ~_exact_match(out["source_id"], POLL_SOURCE_ID)
+            | ~_exact_match(out["snapshot_horizon"], "poll")
         )
         if incompatible.any():
             raise TemporalSemanticsError(
@@ -116,15 +131,15 @@ def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFram
         )
     else:
         incompatible = (
-            out["time_semantics"].ne(PROXY_SEMANTICS)
-            | out["causal_grade"].ne(PROXY_GRADE)
-            | out["source_id"].ne(PROXY_SOURCE_ID)
+            ~_exact_match(out["time_semantics"], PROXY_SEMANTICS)
+            | ~_exact_match(out["causal_grade"], PROXY_GRADE)
+            | ~_exact_match(out["source_id"], PROXY_SOURCE_ID)
         )
         if incompatible.any():
             raise TemporalSemanticsError(
                 "historical_proxy cannot pool other clocks, grades, or source roles"
             )
-        if (~out["snapshot_horizon"].isin(ACCEPTED_PROXY_HORIZONS)).any():
+        if (~_exact_one_of(out["snapshot_horizon"], ACCEPTED_PROXY_HORIZONS)).any():
             raise TemporalSemanticsError(
                 "historical_proxy contains horizons outside accepted proxy horizons"
             )

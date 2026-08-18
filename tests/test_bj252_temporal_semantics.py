@@ -60,6 +60,28 @@ def _poll_rows() -> pd.DataFrame:
     )
 
 
+def _source_receipt() -> dict[str, str]:
+    """A complete internal receipt for both declared #252 source lanes."""
+    return {
+        "beidan_live_db:main": "a" * 64,
+        "beidan_live_db:wal": "ABSENT",
+        "beidan_live_db:shm": "ABSENT",
+        "beidan_xlsm_workbook:main": "b" * 64,
+        "beidan_xlsm_workbook:wal": "ABSENT",
+        "beidan_xlsm_workbook:shm": "ABSENT",
+    }
+
+
+def _proxy_observation() -> pd.DataFrame:
+    proxy = _poll_rows().iloc[[0]].copy()
+    proxy["snapshot_horizon"] = "initial"
+    proxy["time_semantics"] = "SOURCE_RELATIVE_LABEL"
+    proxy["causal_grade"] = "HISTORICAL_PROXY_LABEL_ONLY"
+    proxy["source_id"] = "beidan_xlsm_workbook"
+    proxy["poll_started_at_utc"] = pd.NaT
+    return proxy
+
+
 def _proxy_summary() -> pd.DataFrame:
     rows = []
     roles = {
@@ -116,6 +138,25 @@ def test_historical_proxy_requires_exact_source_role(source_id: object) -> None:
 
     with pytest.raises(TemporalSemanticsError, match="source roles"):
         validate_observations(proxy, namespace="historical_proxy")
+
+
+@pytest.mark.parametrize("namespace", ["poll_start_forward", "historical_proxy"])
+@pytest.mark.parametrize(
+    "column",
+    ["time_semantics", "causal_grade", "snapshot_horizon", "source_id"],
+)
+@pytest.mark.parametrize("representation", ["object", "string", "string[pyarrow]"])
+def test_lane_defining_fields_reject_null_for_all_pandas_representations(
+    namespace: str, column: str, representation: str
+) -> None:
+    """KE-252-R5-01: null must never bypass exact lane-domain checks."""
+    rows = _poll_rows() if namespace == "poll_start_forward" else _proxy_observation()
+    values = rows[column].astype(representation)
+    values.iloc[0] = None if representation == "object" else pd.NA
+    rows[column] = values
+
+    with pytest.raises(TemporalSemanticsError):
+        validate_observations(rows, namespace=namespace)
 
 
 def test_issue_cutoff_selects_latest_available_not_future_and_reports_staleness() -> None:
@@ -256,7 +297,7 @@ def test_semantic_verifier_rejects_remanifested_selection_ledger_and_manifest_ta
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     assert verify_package(package)["status"] == "PASS"
 
@@ -282,7 +323,7 @@ def test_verifier_rejects_remanifested_decision_table_mutations(tmp_path: Path) 
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
 
     cutoff_path = package / "tables" / "cutoff_coverage.csv"
@@ -301,7 +342,7 @@ def test_verifier_rejects_remanifested_issue_duration_mutation(
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     duration_path = package / "tables" / "issue_duration.csv"
     duration = pd.read_csv(duration_path)
@@ -321,7 +362,7 @@ def test_verifier_rejects_remanifested_proxy_and_boolean_mutations(tmp_path: Pat
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     proxy_path = package / "tables" / "proxy_horizon_market_summary.csv"
     proxy = pd.read_csv(proxy_path)
@@ -336,7 +377,7 @@ def test_verifier_rejects_remanifested_proxy_and_boolean_mutations(tmp_path: Pat
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     selection_path = package / "tables" / "cutoff_selection.csv"
     selection = pd.read_csv(selection_path)
@@ -353,7 +394,7 @@ def test_verifier_rejects_remanifested_proxy_source_role(tmp_path: Path) -> None
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     manifest_path = package / "MANIFEST.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -372,7 +413,7 @@ def test_verifier_rejects_resigned_source_snapshot_and_proxy_role_tampering(
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     snapshot_path = package / "tables" / "poll_start_input_snapshot.parquet"
     snapshot = pd.read_parquet(snapshot_path)
@@ -395,7 +436,7 @@ def test_verifier_rejects_resigned_source_snapshot_and_proxy_role_tampering(
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     proxy_path = package / "tables" / "proxy_horizon_market_summary.csv"
     proxy = pd.read_csv(proxy_path)
@@ -432,7 +473,7 @@ def test_verifier_rejects_dropped_row_domain_role_and_clock_tamper(
         tmp_path / "package",
         poll_rows=_poll_rows(),
         proxy_coverage=_proxy_summary(),
-        source_receipt={"beidan_live_db": "a" * 64},
+        source_receipt=_source_receipt(),
     )
     path = package / "tables" / "segment_selection.csv"
     frame = pd.read_csv(path)
@@ -450,4 +491,35 @@ def test_verifier_rejects_dropped_row_domain_role_and_clock_tamper(
     frame.to_csv(path, index=False)
     rehash_package(package)
     with pytest.raises(AssertionError, match=message):
+        verify_package(package)
+
+
+@pytest.mark.parametrize("attack", ["delete", "rename", "replace", "unrelated_only"])
+def test_verifier_rejects_resigned_proxy_receipt_key_attacks(
+    tmp_path: Path, attack: str
+) -> None:
+    """KE-252-R5-02: proxy lane requires exact main/WAL/SHM receipt keys."""
+    package = write_package(
+        tmp_path / "package",
+        poll_rows=_poll_rows(),
+        proxy_coverage=_proxy_summary(),
+        source_receipt=_source_receipt(),
+    )
+    manifest_path = package / "MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    receipt = manifest["source_receipt"]
+    if attack == "delete":
+        del receipt["beidan_xlsm_workbook:main"]
+    elif attack == "rename":
+        receipt["beidan_xlsm_workbook:renamed_main"] = receipt.pop(
+            "beidan_xlsm_workbook:main"
+        )
+    elif attack == "replace":
+        receipt["beidan_xlsm_workbook:main"] = "ABSENT"
+    else:
+        manifest["source_receipt"] = {"unrelated:main": "c" * 64}
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+    rehash_package(package)
+
+    with pytest.raises(AssertionError, match="source receipt"):
         verify_package(package)

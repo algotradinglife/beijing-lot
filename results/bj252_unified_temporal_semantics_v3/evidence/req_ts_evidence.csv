@@ -1,9 +1,9 @@
 req,criterion,evidence,pass
-REQ-TS01,poll-start rows distinguish storage presence from finite decimal SP >1 model validity,tables/poll_start_selection.csv,True
+REQ-TS01,"lane-defining fields reject null across object, nullable-string and Arrow-backed inputs; poll rows distinguish storage presence from finite decimal SP >1 model validity",src/temporal_semantics.py + tests/test_bj252_temporal_semantics.py,True
 REQ-TS02,poll-start clock is current-schedule descriptive and not received-at authority,tables/poll_start_selection.csv + MANIFEST.json,True
 REQ-TS03,initial/10h/1h retained by market and field role,tables/proxy_horizon_market_summary.csv,True
 REQ-TS04,common cutoffs select only polls at/before epoch and record fixture/cell poll age,tables/cutoff_coverage.csv + tables/cutoff_selection.csv,True
 REQ-TS05,local-date segment fallback applies identical cutoff rule,tables/segment_selection.csv,True
 REQ-TS06,fixture/cell coverage and mutually exclusive drop curves emitted per lead/segment,tables/cutoff_coverage.csv + tables/cutoff_drop_reasons.csv + tables/segment_drop_reasons.csv,True
-REQ-TS07,poll-start and proxy namespaces are separate and bounded,MANIFEST.json + TEMPORAL_VOCABULARY.md,True
+REQ-TS07,"poll-start and proxy namespaces are separate, bounded, and cross-bound to exact source-lane main/WAL/SHM receipt keys",MANIFEST.json + TEMPORAL_VOCABULARY.md + tests/test_bj252_temporal_semantics.py,True
 REQ-TS08,"boundary tests cover timezone, future observation, missing clock, and segment isolation",tests/test_bj252_temporal_semantics.py,True

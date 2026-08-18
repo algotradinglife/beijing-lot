@@ -25,6 +25,17 @@
 - Common-cutoff AVAILABLE fixtures/model cells: 1h `153/459`; 6h `153/459`; 12h `56/168`; 24h `0/0`.
 - Issue duration is multi-day: median 104.25 hours, maximum 201 hours. No universal fixed-offset assumption is accepted.
 
-## Downstream use
+## R6 method rework (2026-08-18)
 
-#253 may use this package only as a bounded temporal/profile input and must preserve its namespace, clock, lineage and raw-cell limitations. Row-grain physical storage, raw-cell lineage, source authentication and final snapshot cadence remain #253 or later collector work.
+- [SESSION] `20260818_183334_cc21fd`
+- Rework baseline: `86176c094dcdbbcaca6da26279d9586d8df0831d` (R5); PR #257 remains the delivery PR.
+- Closed `KE-252-R5-01`: all lane-defining `time_semantics`, `causal_grade`, `snapshot_horizon`, and `source_id` comparisons use explicit fail-closed equality/membership masks. Null is invalid across object, pandas nullable `string`, and Arrow-backed `string[pyarrow]` inputs.
+- Closed `KE-252-R5-02`: the manifest declares both poll and historical-proxy source lanes and their exact main/WAL/SHM receipt-key sets. The verifier rejects deleted, renamed, absent-main/replaced, and unrelated-only re-signed receipt sets. This remains an internal integrity/boundary check, not an external source-authentication claim.
+- Frozen poll-start snapshot and profile are unchanged: 1,598,178 rows; SHA256 `cea1459c4783ae7790870ca7c9ed2e643bc1818cf3da2eeaea1c13ca2f25465d`.
+- Generated package reports, vocabulary, manifest, REQ evidence and executed notebook were refreshed without rebuilding from mutable live polls.
+- Verification: focused #252 suite, #252 + #234 integration, semantic package replay, and notebook clean execution. Lint was attempted with `ruff`/`uvx ruff` but unavailable because the executable was absent and package download failed with a TLS EOF; Python compilation passed.
+
+## Known boundaries / next step
+
+- Preserve the #253 handoff limitations: poll-start is not exact available-at/reschedule-as-of authority, and frozen derived counts are not independently authenticated raw-cell truth.
+- Next: independent candidate-mode EV must bind the new PR HEAD and rerun nullable lane-field plus source-receipt mutation attacks.
