@@ -1,0 +1,17 @@
+{
+  "DECISION_REPORT.md": "0f5b30daf3804f793e779e8f06f1bd6d7faba42e3b53ef61a006dd5b6f53a95b",
+  "MANIFEST.json": "b0aa6305d28d792c6bdc58704bf41e7d6048b3a62476fced5079623339c95162",
+  "REPLAY.md": "fb57915415794e353e60ff7c9918646772c5bb1c86a372b99c1f076b7ffc1e84",
+  "TEMPORAL_VOCABULARY.md": "48be2764f0f84c10aafd75b12a90f27dd75bf3f476e5bf00ace6fc7f19a33b92",
+  "evidence/req_ts_evidence.csv": "0254039867dbd76282031844787b937ac10c8d6c5cefed6a8c71b52798242f05",
+  "tables/cutoff_coverage.csv": "54aca499f87ab6368f8b1293b14e71d5c7358140909b27f4f350035de8591c68",
+  "tables/cutoff_drop_reasons.csv": "48acf9ae39e00add495c5fee303f32f25b95a14a589c67ad9eb9150dc09aadf3",
+  "tables/cutoff_selection.csv": "8322fd287a81bbebbbeca1ad6b5e995d35984d53dde4f21def89c2371daad2d6",
+  "tables/issue_coverage.csv": "0553e9ae9b5c7e05a85740f7ffa5ff9a35a80794a595a174bfcab8ef8ce32f00",
+  "tables/issue_duration.csv": "cbe88ffbc9897c1cc06b40b1a904b830c6cdbd85aa76a1ab557334d7119ed562",
+  "tables/poll_start_input_snapshot.parquet": "cea1459c4783ae7790870ca7c9ed2e643bc1818cf3da2eeaea1c13ca2f25465d",
+  "tables/poll_start_selection.csv": "2bf59226856124489efd8223fe0873f64f1cea81cda68f48d0bc85807f6ccca8",
+  "tables/proxy_horizon_market_summary.csv": "204b0ecdb206b42e837a1c95f2d4bfaca5389ed2edc62d0a6c2f83e3f7529c16",
+  "tables/segment_drop_reasons.csv": "ae41a4ba023d2a5e11848d31539ded10511ca0d8aab7761f714484a93208d283",
+  "tables/segment_selection.csv": "1503106279948173d6d6feaf0ff151ba6e48bac33096d138174bad0a2dcea902"
+}

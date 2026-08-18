@@ -4,13 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 import sqlite3
 
+import numpy as np
 import pandas as pd
 
-from bj252_temporal_package import _populate, rehash_package, verify_package
+from bj252_temporal_package import PROXY_ROLES, _populate, rehash_package, verify_package
 from source_schema import census, publication, sources
-from temporal_semantics import STRICT_GRADE
+from temporal_semantics import POLL_GRADE, POLL_SEMANTICS, POLL_SOURCE_ID
 
-PACKAGE_NAME = "bj252_unified_temporal_semantics_v2"
+PACKAGE_NAME = "bj252_unified_temporal_semantics_v3"
 TIMEZONE_CONVENTION = "Asia/Shanghai local scheduled kickoff normalized to UTC"
 
 
@@ -22,7 +23,7 @@ def _live_path(root: Path) -> Path:
     return path
 
 
-def _strict_rows(root: Path, path: Path) -> pd.DataFrame:
+def _poll_rows(path: Path) -> pd.DataFrame:
     con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         frame = pd.read_sql_query(
@@ -36,28 +37,33 @@ def _strict_rows(root: Path, path: Path) -> pd.DataFrame:
     kickoff_local = pd.to_datetime(frame.pop("kickoff_ts"), errors="raise")
     frame["kickoff_at_utc"] = kickoff_local.dt.tz_localize("Asia/Shanghai", ambiguous="raise", nonexistent="raise").dt.tz_convert("UTC")
     frame["fixture_id"] = frame.pop("match_id")
-    frame["snapshot_horizon"] = "observed"
-    frame["time_semantics"] = "OBSERVED_AT_UTC"
-    frame["causal_grade"] = STRICT_GRADE
-    frame["source_id"] = "beidan_live_db"
+    frame["snapshot_horizon"] = "poll"
+    frame["time_semantics"] = POLL_SEMANTICS
+    frame["causal_grade"] = POLL_GRADE
+    frame["source_id"] = POLL_SOURCE_ID
+    prices = frame[["sp_3", "sp_1", "sp_0"]].apply(pd.to_numeric, errors="coerce")
+    present = prices.notna()
+    valid = present & np.isfinite(prices) & prices.gt(1.0)
+    poll_started = pd.to_datetime(frame["snapshot_ts"], utc=True, errors="raise")
+    frame["storage_present_cell_count"] = present.sum(axis=1)
+    frame["valid_sp_cell_count"] = valid.sum(axis=1)
     frame["availability_mask"] = (
-        frame[["sp_3", "sp_1", "sp_0"]].notna().all(axis=1)
-        & (pd.to_datetime(frame["snapshot_ts"], utc=True, errors="raise") < frame["kickoff_at_utc"])
+        frame["valid_sp_cell_count"].eq(3)
+        & (poll_started < frame["kickoff_at_utc"])
     )
-    frame["available_cell_count"] = frame[["sp_3", "sp_1", "sp_0"]].notna().sum(axis=1)
-    frame["observed_at_utc"] = frame.pop("snapshot_ts")
+    frame["poll_started_at_utc"] = frame.pop("snapshot_ts")
     return frame[
-        ["fixture_id", "issue_code", "match_idx", "snapshot_horizon", "time_semantics", "causal_grade", "source_id", "availability_mask", "available_cell_count", "observed_at_utc", "kickoff_at_utc"]
+        ["fixture_id", "issue_code", "match_idx", "snapshot_horizon", "time_semantics", "causal_grade", "source_id", "availability_mask", "storage_present_cell_count", "valid_sp_cell_count", "poll_started_at_utc", "kickoff_at_utc"]
     ]
 
 
-def _proxy_horizon_summary(root: Path) -> pd.DataFrame:
+def _proxy_horizon_market_summary(root: Path) -> pd.DataFrame:
     entry = next(item for item in census.DATABASE_INVENTORY if item["key"] == "beidan_xlsm")
     path = census._resolve_data_path(root, entry["path"])
     con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         return pd.read_sql_query(
-            """SELECT s.snapshot AS snapshot_horizon,
+            """SELECT s.snapshot AS snapshot_horizon, s.market,
                       COUNT(DISTINCT m.match_id) AS fixture_count,
                       COUNT(DISTINCT m.issue) AS issue_count,
                       COUNT(*) AS market_row_count,
@@ -67,7 +73,8 @@ def _proxy_horizon_summary(root: Path) -> pd.DataFrame:
                         + CASE WHEN s.v3_avg IS NOT NULL THEN 1 ELSE 0 END) AS available_value_cells
                  FROM matches m JOIN market_consensus s ON s.match_id=m.match_id
                  WHERE s.snapshot IN ('initial','10h','1h')
-                 GROUP BY s.snapshot ORDER BY CASE s.snapshot WHEN 'initial' THEN 1 WHEN '10h' THEN 2 WHEN '1h' THEN 3 END""",
+                 GROUP BY s.snapshot, s.market
+                 ORDER BY CASE s.snapshot WHEN 'initial' THEN 1 WHEN '10h' THEN 2 WHEN '1h' THEN 3 END, s.market""",
             con,
         )
     finally:
@@ -97,8 +104,14 @@ def build(root: Path, output: Path | None = None) -> Path:
         **_sqlite_receipt("beidan_live_db", live),
         **_sqlite_receipt("beidan_xlsm_workbook", xlsm),
     }
-    strict = _strict_rows(root, live)
-    proxy = _proxy_horizon_summary(root)
+    poll = _poll_rows(live)
+    proxy = _proxy_horizon_market_summary(root)
+    proxy["field_role"] = proxy["market"].map(
+        {market: role for market, (role, _) in PROXY_ROLES.items()}
+    )
+    if proxy["field_role"].isna().any():
+        raise ValueError("unclassified historical proxy market")
+    proxy["p34_m3_compatible"] = proxy["market"].eq("euro_1x2")
     after = {
         **_sqlite_receipt("beidan_live_db", live),
         **_sqlite_receipt("beidan_xlsm_workbook", xlsm),
@@ -107,21 +120,21 @@ def build(root: Path, output: Path | None = None) -> Path:
         raise RuntimeError("source changed during profiling; refusing to seal mutable input")
 
     def populate(staging: Path) -> None:
-        _populate(staging, strict, proxy, before)
+        _populate(staging, poll, proxy, before)
         (staging / "evidence").mkdir(parents=True, exist_ok=True)
         evidence = pd.DataFrame([
-            ("REQ-TS01", "all strict selection rows carry temporal provenance and availability", "tables/strict_selection.csv", True),
-            ("REQ-TS02", "observed-at rows use current schedule reference; proxy has no observed_at claim", "tables/strict_selection.csv + tables/proxy_horizon_summary.csv", True),
-            ("REQ-TS03", "initial/10h/1h retained as separate aggregate source-relative summaries", "tables/proxy_horizon_summary.csv", True),
-            ("REQ-TS04", "common cutoffs select only observations at/before epoch and record fixture/cell staleness", "tables/cutoff_coverage.csv + tables/cutoff_selection.csv", True),
+            ("REQ-TS01", "poll-start rows distinguish storage presence from finite decimal SP >1 model validity", "tables/poll_start_selection.csv", True),
+            ("REQ-TS02", "poll-start clock is current-schedule descriptive and not received-at authority", "tables/poll_start_selection.csv + MANIFEST.json", True),
+            ("REQ-TS03", "initial/10h/1h retained by market and field role", "tables/proxy_horizon_market_summary.csv", True),
+            ("REQ-TS04", "common cutoffs select only polls at/before epoch and record fixture/cell poll age", "tables/cutoff_coverage.csv + tables/cutoff_selection.csv", True),
             ("REQ-TS05", "local-date segment fallback applies identical cutoff rule", "tables/segment_selection.csv", True),
             ("REQ-TS06", "fixture/cell coverage and mutually exclusive drop curves emitted per lead/segment", "tables/cutoff_coverage.csv + tables/cutoff_drop_reasons.csv + tables/segment_drop_reasons.csv", True),
-            ("REQ-TS07", "strict and proxy namespaces are separate files and semantic verifier rules", "MANIFEST.json + TEMPORAL_VOCABULARY.md", True),
+            ("REQ-TS07", "poll-start and proxy namespaces are separate and bounded", "MANIFEST.json + TEMPORAL_VOCABULARY.md", True),
             ("REQ-TS08", "boundary tests cover timezone, future observation, missing clock, and segment isolation", "tests/test_bj252_temporal_semantics.py", True),
         ], columns=["req", "criterion", "evidence", "pass"])
         publication.atomic_write_csv(evidence, staging / "evidence" / "req_ts_evidence.csv")
-        publication.atomic_write_text(staging / "TEMPORAL_VOCABULARY.md", """# Temporal vocabulary\n\n- `historical_proxy`: `initial`, `10h`, `1h` are separate aggregate source-relative summaries, never a universal issue timestamp or row-level panel.\n- `strict_forward`: an explicit UTC observation clock evaluated against the currently stored schedule reference. It is not reschedule-as-of authority.\n- issue cutoff: earliest issue kickoff minus a declared lead; per-fixture and per-cell support is recorded.\n- segment fallback: Asia/Shanghai local kickoff-date segment; cutoff is that segment's earliest kickoff minus the same lead.\n- no model, ROI, ticket, or profitability claim is made.\n""")
-        publication.atomic_write_text(staging / "DECISION_REPORT.md", """# #252 decision input (candidate)\n\nThis package profiles fixture/cell coverage and staleness across 1/6/12/24h common issue cutoffs and a deterministic local-date segment fallback. It does **not** select a final lead or crawler cadence. Historical proxy consists of three aggregate horizon summaries, not a row-level panel, and remains physically separate from observed-at evidence.\n\nTimezone convention: Asia/Shanghai scheduled kickoff values are explicitly localized then converted to UTC. Without schedule history these curves are descriptive against the current schedule reference. `NO_OBSERVATION_BY_CUTOFF` is separate from `OBSERVATION_UNAVAILABLE_OR_INCOMPLETE`.\n\nInternal checksums establish package integrity, not external authenticity after arbitrary re-signing. The source receipt proves only that SQLite main/WAL/SHM bytes were stable across this build interval.\n""")
+        publication.atomic_write_text(staging / "TEMPORAL_VOCABULARY.md", """# Temporal vocabulary\n\n- `historical_proxy`: `initial`, `10h`, `1h` are separate horizon × market × field-role summaries, never a universal issue timestamp or row-level panel.\n- `poll_start_forward`: the local merged collector poll-start clock evaluated against the current schedule reference. It is not received-at, commit-at, per-cell lineage, or reschedule-as-of authority.\n- model-valid SP cell: stored, finite decimal SP strictly greater than 1.0.\n- issue cutoff: earliest issue kickoff minus a declared lead; per-fixture and per-cell support is recorded.\n- segment fallback: Asia/Shanghai local kickoff-date segment; cutoff is that segment's earliest kickoff minus the same lead.\n- no model, ROI, ticket, or profitability claim is made.\n""")
+        publication.atomic_write_text(staging / "DECISION_REPORT.md", """# #252 decision input (candidate)\n\nThis package profiles fixture/cell coverage and poll-start age across 1/6/12/24h common issue cutoffs and a deterministic local-date segment fallback. It does **not** select a final lead or crawler cadence. Historical proxy is stratified by horizon, market and field role rather than pooled into an M×3 denominator.\n\nTimezone convention: Asia/Shanghai scheduled kickoff values are explicitly localized then converted to UTC. The collector timestamp is poll-start, not data-received time; merged rows do not retain upstream per-cell lineage. Without schedule history these curves are descriptive against the current schedule reference. Missing snapshots, incomplete storage and invalid SP values are separate drop causes.\n\nInternal checksums establish package integrity, not external authenticity after arbitrary re-signing. The source receipt proves only that SQLite main/WAL/SHM bytes were stable across this build interval.\n""")
         publication.atomic_write_text(
             staging / "REPLAY.md",
             f"python scripts/build_bj252_temporal_semantics.py --root /path/to/beijing-lot --output results/{PACKAGE_NAME}\n"

@@ -3,7 +3,7 @@
 This module is intentionally small and data-source agnostic.  Adapters must
 normalise a source into the observation contract below before temporal analysis.
 It refuses to reinterpret labelled retrospective proxy rows as wall-clock
-snapshots and refuses unzoned timestamps for strict observations.
+snapshots and truthfully models the current collector clock as poll-start time.
 """
 from __future__ import annotations
 
@@ -12,12 +12,13 @@ from typing import Final
 
 import pandas as pd
 
-STRICT_NAMESPACE: Final = "strict_forward"
+POLL_NAMESPACE: Final = "poll_start_forward"
 PROXY_NAMESPACE: Final = "historical_proxy"
-STRICT_GRADE: Final = "OBSERVED_AGAINST_CURRENT_SCHEDULE_REFERENCE"
+POLL_GRADE: Final = "POLL_STARTED_AGAINST_CURRENT_SCHEDULE_REFERENCE"
 PROXY_GRADE: Final = "HISTORICAL_PROXY_LABEL_ONLY"
-STRICT_SEMANTICS: Final = "OBSERVED_AT_UTC"
+POLL_SEMANTICS: Final = "POLL_STARTED_AT_UTC"
 PROXY_SEMANTICS: Final = "SOURCE_RELATIVE_LABEL"
+POLL_SOURCE_ID: Final = "beidan_live_db_merged_unknown_cell_lineage"
 ACCEPTED_PROXY_HORIZONS: Final = ("initial", "10h", "1h")
 REQUIRED_COLUMNS: Final = (
     "fixture_id",
@@ -28,8 +29,9 @@ REQUIRED_COLUMNS: Final = (
     "causal_grade",
     "source_id",
     "availability_mask",
-    "available_cell_count",
-    "observed_at_utc",
+    "storage_present_cell_count",
+    "valid_sp_cell_count",
+    "poll_started_at_utc",
     "kickoff_at_utc",
 )
 
@@ -59,10 +61,13 @@ def _require_columns(frame: pd.DataFrame) -> None:
         raise TemporalSemanticsError("availability_mask is required")
     if not pd.api.types.is_bool_dtype(frame["availability_mask"].dtype):
         raise TemporalSemanticsError("availability_mask must use an exact boolean dtype")
-    cells = pd.to_numeric(frame["available_cell_count"], errors="coerce")
-    if cells.isna().any() or (~cells.isin([0, 1, 2, 3])).any():
-        raise TemporalSemanticsError("available_cell_count must be an integer in [0, 3]")
-    if (frame["availability_mask"] & cells.ne(3)).any():
+    present = pd.to_numeric(frame["storage_present_cell_count"], errors="coerce")
+    valid = pd.to_numeric(frame["valid_sp_cell_count"], errors="coerce")
+    if present.isna().any() or valid.isna().any() or (~present.isin([0, 1, 2, 3])).any() or (~valid.isin([0, 1, 2, 3])).any():
+        raise TemporalSemanticsError("cell counts must be integers in [0, 3]")
+    if (valid > present).any():
+        raise TemporalSemanticsError("valid SP cells cannot exceed stored cells")
+    if (frame["availability_mask"] & valid.ne(3)).any():
         raise TemporalSemanticsError("available observations require all three cells")
 
 
@@ -86,23 +91,27 @@ def _parse_utc(series: pd.Series, *, field: str, allow_null: bool) -> pd.Series:
 def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFrame:
     """Validate and normalise one explicitly named temporal namespace.
 
-    ``strict_forward`` is only for sealed, observed-at wall-clock rows;
+    ``poll_start_forward`` is only for current collector poll-start receipts;
     ``historical_proxy`` is only for the three source-relative labels.  The
     caller must choose one namespace, preventing silent pooled research panels.
     """
     _require_columns(frame)
-    if namespace not in {STRICT_NAMESPACE, PROXY_NAMESPACE}:
+    if namespace not in {POLL_NAMESPACE, PROXY_NAMESPACE}:
         raise TemporalSemanticsError(f"unknown namespace: {namespace}")
     out = frame.copy()
-    if namespace == STRICT_NAMESPACE:
+    if namespace == POLL_NAMESPACE:
         incompatible = (
-            out["time_semantics"].ne(STRICT_SEMANTICS)
-            | out["causal_grade"].ne(STRICT_GRADE)
+            out["time_semantics"].ne(POLL_SEMANTICS)
+            | out["causal_grade"].ne(POLL_GRADE)
+            | out["source_id"].ne(POLL_SOURCE_ID)
+            | out["snapshot_horizon"].ne("poll")
         )
         if incompatible.any():
-            raise TemporalSemanticsError("strict_forward cannot pool proxy or unsealed rows")
-        out["observed_at_utc"] = _parse_utc(
-            out["observed_at_utc"], field="observed_at_utc", allow_null=False
+            raise TemporalSemanticsError(
+                "poll_start_forward cannot pool other horizons, clocks, or source roles"
+            )
+        out["poll_started_at_utc"] = _parse_utc(
+            out["poll_started_at_utc"], field="poll_started_at_utc", allow_null=False
         )
     else:
         incompatible = (
@@ -115,14 +124,14 @@ def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFram
             raise TemporalSemanticsError(
                 "historical_proxy contains horizons outside accepted proxy horizons"
             )
-        if out["observed_at_utc"].notna().any():
-            raise TemporalSemanticsError("historical_proxy must not claim observed_at_utc")
-        out["observed_at_utc"] = pd.NaT
+        if out["poll_started_at_utc"].notna().any():
+            raise TemporalSemanticsError("historical_proxy must not claim poll_started_at_utc")
+        out["poll_started_at_utc"] = pd.NaT
     out["kickoff_at_utc"] = _parse_utc(
         out["kickoff_at_utc"], field="kickoff_at_utc", allow_null=False
     )
-    if namespace == STRICT_NAMESPACE and (
-        out.loc[out["availability_mask"], "observed_at_utc"]
+    if namespace == POLL_NAMESPACE and (
+        out.loc[out["availability_mask"], "poll_started_at_utc"]
         >= out.loc[out["availability_mask"], "kickoff_at_utc"]
     ).any():
         raise TemporalSemanticsError("available strict observation at or after kickoff")
@@ -130,73 +139,92 @@ def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFram
     inconsistent = out.groupby("fixture_id", dropna=False)[key_columns[1:]].nunique(dropna=False)
     if (inconsistent > 1).any().any():
         raise TemporalSemanticsError("fixture identity/kickoff is inconsistent across observations")
-    return out.sort_values(["fixture_id", "observed_at_utc"], kind="stable").reset_index(drop=True)
+    return out.sort_values(["fixture_id", "poll_started_at_utc"], kind="stable").reset_index(drop=True)
 
 
 def build_issue_view(
-    strict_rows: pd.DataFrame, *, issue_code: str, decision_at_utc: str | pd.Timestamp
+    poll_rows: pd.DataFrame, *, issue_code: str, decision_at_utc: str | pd.Timestamp
 ) -> pd.DataFrame:
     """Select the latest available strict snapshot per fixture at one epoch.
 
     Rows after the declared epoch are never considered; the result retains a
     fixture row and a reason even where no observation was available.
     """
-    rows = validate_observations(strict_rows, namespace=STRICT_NAMESPACE)
+    rows = validate_observations(poll_rows, namespace=POLL_NAMESPACE)
     decision = _parse_utc(pd.Series([decision_at_utc]), field="decision_at_utc", allow_null=False).iloc[0]
     subset = rows.loc[rows["issue_code"].astype(str).eq(str(issue_code))].copy()
     if subset.empty:
         raise TemporalSemanticsError(f"issue has no strict observations: {issue_code}")
     fixture_columns = ["fixture_id", "issue_code", "match_idx", "kickoff_at_utc"]
     fixtures = subset[fixture_columns].drop_duplicates("fixture_id").sort_values("match_idx")
-    eligible_by_clock = subset.loc[subset["observed_at_utc"].le(decision)].sort_values(
-        ["fixture_id", "observed_at_utc"], kind="stable"
+    eligible_by_clock = subset.loc[subset["poll_started_at_utc"].le(decision)].sort_values(
+        ["fixture_id", "poll_started_at_utc"], kind="stable"
     )
     latest_clock = eligible_by_clock.groupby("fixture_id", as_index=False).tail(1)
     latest_clock = latest_clock[
-        ["fixture_id", "observed_at_utc", "available_cell_count"]
+        ["fixture_id", "poll_started_at_utc", "storage_present_cell_count", "valid_sp_cell_count"]
     ].rename(
         columns={
-            "observed_at_utc": "latest_observed_at_utc_by_cutoff",
-            "available_cell_count": "observed_cell_count_by_cutoff",
+            "poll_started_at_utc": "latest_poll_started_at_utc_by_cutoff",
+            "storage_present_cell_count": "latest_storage_present_cell_count_by_cutoff",
+            "valid_sp_cell_count": "latest_valid_sp_cell_count_by_cutoff",
         }
     )
     selected = eligible_by_clock.loc[eligible_by_clock["availability_mask"]]
     selected = selected.groupby("fixture_id", as_index=False).tail(1)
     selected = selected[[
-        "fixture_id", "observed_at_utc", "snapshot_horizon", "time_semantics",
-        "causal_grade", "source_id", "availability_mask", "available_cell_count",
-    ]].rename(columns={"observed_at_utc": "selected_observed_at_utc"})
+        "fixture_id", "poll_started_at_utc", "snapshot_horizon", "time_semantics",
+        "causal_grade", "source_id", "availability_mask", "storage_present_cell_count",
+        "valid_sp_cell_count",
+    ]].rename(columns={"poll_started_at_utc": "selected_poll_started_at_utc"})
     out = fixtures.merge(latest_clock, on="fixture_id", how="left", validate="one_to_one")
     out = out.merge(selected, on="fixture_id", how="left", validate="one_to_one")
     out["availability_mask"] = out["availability_mask"].fillna(False).astype(bool)
-    out["available_cell_count"] = pd.to_numeric(
-        out["available_cell_count"], errors="coerce"
-    ).fillna(0).astype(int)
-    out["observed_cell_count_by_cutoff"] = pd.to_numeric(
-        out["observed_cell_count_by_cutoff"], errors="coerce"
-    ).fillna(0).astype(int)
+    for column in (
+        "storage_present_cell_count", "valid_sp_cell_count",
+        "latest_storage_present_cell_count_by_cutoff",
+        "latest_valid_sp_cell_count_by_cutoff",
+    ):
+        out[column] = pd.to_numeric(out[column], errors="coerce").fillna(0).astype(int)
+    out["snapshot_horizon"] = "poll"
+    out["time_semantics"] = POLL_SEMANTICS
+    out["causal_grade"] = POLL_GRADE
+    out["source_id"] = POLL_SOURCE_ID
     out["decision_at_utc"] = decision
-    out["staleness_minutes"] = (
-        (decision - out["selected_observed_at_utc"]).dt.total_seconds() / 60.0
+    out["poll_start_age_minutes"] = (
+        (decision - out["selected_poll_started_at_utc"]).dt.total_seconds() / 60.0
     )
     out["drop_reason"] = "AVAILABLE"
-    no_selected = out["selected_observed_at_utc"].isna()
+    no_selected = out["selected_poll_started_at_utc"].isna()
     out.loc[
-        no_selected & out["latest_observed_at_utc_by_cutoff"].notna(), "drop_reason"
+        no_selected
+        & out["latest_poll_started_at_utc_by_cutoff"].notna()
+        & out["latest_storage_present_cell_count_by_cutoff"].lt(3),
+        "drop_reason",
     ] = "OBSERVATION_UNAVAILABLE_OR_INCOMPLETE"
     out.loc[
-        no_selected & out["latest_observed_at_utc_by_cutoff"].isna(), "drop_reason"
+        no_selected
+        & out["latest_poll_started_at_utc_by_cutoff"].notna()
+        & out["latest_storage_present_cell_count_by_cutoff"].eq(3)
+        & out["latest_valid_sp_cell_count_by_cutoff"].lt(3),
+        "drop_reason",
+    ] = "INVALID_VALUE"
+    out.loc[
+        no_selected & out["latest_poll_started_at_utc_by_cutoff"].isna(), "drop_reason"
     ] = "NO_OBSERVATION_BY_CUTOFF"
     out.loc[decision >= out["kickoff_at_utc"], "drop_reason"] = "CUTOFF_NOT_PRE_KICKOFF"
-    out.loc[out["drop_reason"].ne("AVAILABLE"), "selected_observed_at_utc"] = pd.NaT
-    out.loc[out["drop_reason"].ne("AVAILABLE"), "staleness_minutes"] = float("nan")
+    dropped = out["drop_reason"].ne("AVAILABLE")
+    out.loc[dropped, "selected_poll_started_at_utc"] = pd.NaT
+    out.loc[dropped, "poll_start_age_minutes"] = float("nan")
+    out.loc[dropped, ["storage_present_cell_count", "valid_sp_cell_count"]] = 0
+    out["availability_mask"] = out["drop_reason"].eq("AVAILABLE")
     out["model_available_cell_count"] = 0
     out.loc[out["drop_reason"].eq("AVAILABLE"), "model_available_cell_count"] = 3
     return out.sort_values("match_idx", kind="stable").reset_index(drop=True)
 
 
 def build_segment_views(
-    strict_rows: pd.DataFrame,
+    poll_rows: pd.DataFrame,
     *,
     issue_code: str,
     lead_minutes: int,
@@ -211,7 +239,7 @@ def build_segment_views(
     """
     if lead_minutes < 0:
         raise TemporalSemanticsError("lead_minutes must be non-negative")
-    rows = validate_observations(strict_rows, namespace=STRICT_NAMESPACE)
+    rows = validate_observations(poll_rows, namespace=POLL_NAMESPACE)
     subset = rows.loc[rows["issue_code"].astype(str).eq(str(issue_code))].copy()
     if subset.empty:
         raise TemporalSemanticsError(f"issue has no strict observations: {issue_code}")

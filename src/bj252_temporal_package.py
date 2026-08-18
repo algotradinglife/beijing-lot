@@ -13,22 +13,44 @@ import pandas as pd
 from source_schema import publication
 from temporal_semantics import (
     ACCEPTED_PROXY_HORIZONS,
+    POLL_GRADE,
+    POLL_SEMANTICS,
+    POLL_SOURCE_ID,
     PROXY_GRADE,
     PROXY_SEMANTICS,
-    STRICT_GRADE,
-    STRICT_SEMANTICS,
     build_issue_view,
     build_segment_views,
     validate_observations,
 )
 
-CONTRACT_VERSION = "BJ-UNIFIED-TEMPORAL-SEMANTICS-001-v2"
-PACKAGE_SCHEMA = "bj252_temporal_evidence_v2"
+CONTRACT_VERSION = "BJ-UNIFIED-TEMPORAL-SEMANTICS-001-v3"
+PACKAGE_SCHEMA = "bj252_temporal_evidence_v3"
 LEAD_HOURS = (1, 6, 12, 24)
+POLL_SNAPSHOT_COLUMNS = (
+    "fixture_id",
+    "issue_code",
+    "match_idx",
+    "snapshot_horizon",
+    "time_semantics",
+    "causal_grade",
+    "source_id",
+    "availability_mask",
+    "storage_present_cell_count",
+    "valid_sp_cell_count",
+    "poll_started_at_utc",
+    "kickoff_at_utc",
+)
+PROXY_ROLES = {
+    "euro_1x2": ("EURO_1X2_OUTCOME_PROXY", "True"),
+    "kelly_1x2": ("KELLY_1X2_DIAGNOSTIC", "False"),
+    "asian_handicap": ("HANDICAP_LINE_TWO_PRICE_DIAGNOSTIC", "False"),
+    "over_under": ("TOTAL_LINE_TWO_PRICE_DIAGNOSTIC", "False"),
+}
 DROP_REASONS = {
     "AVAILABLE",
     "NO_OBSERVATION_BY_CUTOFF",
     "OBSERVATION_UNAVAILABLE_OR_INCOMPLETE",
+    "INVALID_VALUE",
     "CUTOFF_NOT_PRE_KICKOFF",
 }
 
@@ -58,9 +80,10 @@ def _selection_summary(selection: pd.DataFrame) -> pd.DataFrame:
             fixture_count=("fixture_id", "size"),
             available_fixture_count=("drop_reason", lambda value: int(value.eq("AVAILABLE").sum())),
             total_cell_count=("fixture_id", lambda value: int(len(value) * 3)),
-            observed_cell_count=("observed_cell_count_by_cutoff", "sum"),
+            storage_present_cell_count=("latest_storage_present_cell_count_by_cutoff", "sum"),
+            valid_sp_cell_count=("latest_valid_sp_cell_count_by_cutoff", "sum"),
             model_available_cell_count=("model_available_cell_count", "sum"),
-            median_staleness_minutes=("staleness_minutes", "median"),
+            median_poll_start_age_minutes=("poll_start_age_minutes", "median"),
         )
     )
 
@@ -71,16 +94,17 @@ def _drop_summary(selection: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
         .agg(
             fixture_count=("fixture_id", "size"),
             total_cell_count=("fixture_id", lambda value: int(len(value) * 3)),
-            observed_cell_count=("observed_cell_count_by_cutoff", "sum"),
+            storage_present_cell_count=("latest_storage_present_cell_count_by_cutoff", "sum"),
+            valid_sp_cell_count=("latest_valid_sp_cell_count_by_cutoff", "sum"),
             model_available_cell_count=("model_available_cell_count", "sum"),
         )
     )
 
 
-def profile_tables(strict_rows: pd.DataFrame) -> dict[str, pd.DataFrame]:
-    """Build all issue/segment fixture-cell curves from one strict namespace."""
-    strict = validate_observations(strict_rows, namespace="strict_forward")
-    fixtures = strict[
+def profile_tables(poll_rows: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Build issue/segment curves from the bounded poll-start namespace."""
+    polls = validate_observations(poll_rows, namespace="poll_start_forward")
+    fixtures = polls[
         ["fixture_id", "issue_code", "match_idx", "kickoff_at_utc"]
     ].drop_duplicates("fixture_id")
     issue_duration = (
@@ -97,7 +121,7 @@ def profile_tables(strict_rows: pd.DataFrame) -> dict[str, pd.DataFrame]:
     ).dt.total_seconds() / 3600
     cutoff_rows: list[pd.DataFrame] = []
     segment_rows: list[pd.DataFrame] = []
-    for issue_code, group in strict.groupby("issue_code", sort=True):
+    for issue_code, group in polls.groupby("issue_code", sort=True):
         for lead_hours in LEAD_HOURS:
             cutoff = group["kickoff_at_utc"].min() - pd.Timedelta(hours=lead_hours)
             view = build_issue_view(
@@ -131,13 +155,13 @@ def profile_tables(strict_rows: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
 def _populate(
     staging: Path,
-    strict_rows: pd.DataFrame,
+    poll_rows: pd.DataFrame,
     proxy_summary: pd.DataFrame,
     source_receipt: Mapping[str, str],
 ) -> None:
     (staging / "tables").mkdir(parents=True, exist_ok=True)
-    strict = validate_observations(strict_rows, namespace="strict_forward")
-    tables = profile_tables(strict)
+    polls = validate_observations(poll_rows, namespace="poll_start_forward")
+    tables = profile_tables(polls)
     one_hour = tables["cutoff_selection.csv"].loc[
         tables["cutoff_selection.csv"]["lead_hours"].eq(1)
     ].drop(columns="lead_hours")
@@ -150,13 +174,25 @@ def _populate(
         )
     )
     proxy = proxy_summary.copy()
-    required_proxy = {"snapshot_horizon", "fixture_count"}
+    required_proxy = {
+        "snapshot_horizon", "market", "field_role", "p34_m3_compatible", "fixture_count"
+    }
     if not required_proxy <= set(proxy.columns):
         raise ValueError(
             f"proxy summary missing columns: {sorted(required_proxy - set(proxy.columns))}"
         )
     if set(proxy["snapshot_horizon"]) != set(ACCEPTED_PROXY_HORIZONS):
-        raise ValueError("proxy summary must contain exactly initial/10h/1h")
+        raise ValueError("proxy summary must cover initial/10h/1h")
+    if proxy.duplicated(["snapshot_horizon", "market"]).any():
+        raise ValueError("proxy horizon-market summary must be unique")
+    if proxy[["market", "field_role"]].astype(str).apply(
+        lambda column: column.str.strip().eq("")
+    ).any().any():
+        raise ValueError("proxy market and field role are required")
+    compatibility = proxy["p34_m3_compatible"]
+    if not pd.api.types.is_bool_dtype(compatibility.dtype):
+        raise ValueError("p34_m3_compatible must use exact boolean dtype")
+    proxy["p34_m3_compatible"] = compatibility.map({True: "True", False: "False"})
     for column in (
         "issue_count",
         "market_row_count",
@@ -167,23 +203,36 @@ def _populate(
             proxy[column] = 0
     proxy["time_semantics"] = PROXY_SEMANTICS
     proxy["causal_grade"] = PROXY_GRADE
-    publication.atomic_write_csv(one_hour, staging / "tables" / "strict_selection.csv")
+    poll_snapshot = polls.loc[:, list(POLL_SNAPSHOT_COLUMNS)].copy()
+    for column in ("poll_started_at_utc", "kickoff_at_utc"):
+        poll_snapshot[column] = poll_snapshot[column].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    publication.atomic_write_parquet(
+        poll_snapshot,
+        staging / "tables" / "poll_start_input_snapshot.parquet",
+    )
+    publication.atomic_write_csv(one_hour, staging / "tables" / "poll_start_selection.csv")
     publication.atomic_write_csv(issue_coverage, staging / "tables" / "issue_coverage.csv")
-    publication.atomic_write_csv(proxy, staging / "tables" / "proxy_horizon_summary.csv")
+    publication.atomic_write_csv(proxy, staging / "tables" / "proxy_horizon_market_summary.csv")
     for filename, frame in tables.items():
         publication.atomic_write_csv(frame, staging / "tables" / filename)
     manifest = {
         "schema": PACKAGE_SCHEMA,
         "contract_version": CONTRACT_VERSION,
-        "strict_namespace": "strict_forward",
-        "proxy_namespace": "historical_proxy_aggregate_summary",
+        "poll_start_namespace": "poll_start_forward",
+        "proxy_namespace": "historical_proxy_horizon_market_summary",
         "source_receipt": dict(source_receipt),
         "policy": "candidate leads 1/6/12/24h; segment fallback 1h",
         "schedule_authority": "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF",
+        "clock_authority": "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED",
+        "cell_lineage": "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN",
         "source_authentication": "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR",
+        "poll_start_input_snapshot_rows": int(len(polls)),
+        "poll_start_input_snapshot_sha256": _sha256(
+            staging / "tables" / "poll_start_input_snapshot.parquet"
+        ),
         "proxy_summary_records": proxy.to_dict(orient="records"),
         "table_row_counts": {
-            "strict_selection": int(len(one_hour)),
+            "poll_start_selection": int(len(one_hour)),
             "cutoff_selection": int(len(tables["cutoff_selection.csv"])),
             "segment_selection": int(len(tables["segment_selection.csv"])),
         },
@@ -195,14 +244,14 @@ def _populate(
 def write_package(
     package: Path,
     *,
-    strict_rows: pd.DataFrame,
+    poll_rows: pd.DataFrame,
     proxy_coverage: pd.DataFrame,
     source_receipt: Mapping[str, str],
 ) -> Path:
     """Atomically publish a semantically verified candidate package."""
 
     def populate(staging: Path) -> None:
-        _populate(staging, strict_rows, proxy_coverage, source_receipt)
+        _populate(staging, poll_rows, proxy_coverage, source_receipt)
         verify_package(staging)
 
     return publication.atomic_publish_directory(package, populate, force=True)
@@ -228,15 +277,17 @@ def _read_selection(path: Path) -> pd.DataFrame:
     for column in (
         "kickoff_at_utc",
         "decision_at_utc",
-        "latest_observed_at_utc_by_cutoff",
-        "selected_observed_at_utc",
+        "latest_poll_started_at_utc_by_cutoff",
+        "selected_poll_started_at_utc",
     ):
         frame[column] = pd.to_datetime(frame[column], utc=True, errors="coerce")
     for column in (
-        "available_cell_count",
-        "observed_cell_count_by_cutoff",
+        "storage_present_cell_count",
+        "valid_sp_cell_count",
+        "latest_storage_present_cell_count_by_cutoff",
+        "latest_valid_sp_cell_count_by_cutoff",
         "model_available_cell_count",
-        "staleness_minutes",
+        "poll_start_age_minutes",
         "lead_hours",
         "segment_idx",
     ):
@@ -251,18 +302,20 @@ def _validate_selection(frame: pd.DataFrame) -> None:
         "issue_code",
         "kickoff_at_utc",
         "decision_at_utc",
-        "latest_observed_at_utc_by_cutoff",
-        "selected_observed_at_utc",
-        "observed_cell_count_by_cutoff",
+        "latest_poll_started_at_utc_by_cutoff",
+        "selected_poll_started_at_utc",
+        "latest_storage_present_cell_count_by_cutoff",
+        "latest_valid_sp_cell_count_by_cutoff",
         "model_available_cell_count",
-        "staleness_minutes",
+        "poll_start_age_minutes",
         "drop_reason",
         "snapshot_horizon",
         "time_semantics",
         "causal_grade",
         "source_id",
         "availability_mask",
-        "available_cell_count",
+        "storage_present_cell_count",
+        "valid_sp_cell_count",
     }
     if not required <= set(frame.columns):
         raise AssertionError("selection ledger schema mismatch")
@@ -273,48 +326,79 @@ def _validate_selection(frame: pd.DataFrame) -> None:
     ).any():
         raise AssertionError("selection ledger identity duplicate")
     available = frame["drop_reason"].eq("AVAILABLE")
-    if frame.loc[available, "selected_observed_at_utc"].isna().any():
+    if not frame["time_semantics"].eq(POLL_SEMANTICS).all():
+        raise AssertionError("selection row has non-poll time semantics")
+    if not frame["causal_grade"].eq(POLL_GRADE).all():
+        raise AssertionError("selection row has wrong poll-start grade")
+    if not frame["source_id"].eq(POLL_SOURCE_ID).all():
+        raise AssertionError("selection row has wrong merged-source lineage claim")
+    count_columns = (
+        "storage_present_cell_count", "valid_sp_cell_count",
+        "latest_storage_present_cell_count_by_cutoff",
+        "latest_valid_sp_cell_count_by_cutoff", "model_available_cell_count",
+    )
+    counts = frame.loc[:, count_columns].apply(pd.to_numeric, errors="coerce")
+    if counts.isna().any().any() or (~counts.isin([0, 1, 2, 3])).any().any():
+        raise AssertionError("selection cell count outside [0,3]")
+    if (counts["valid_sp_cell_count"] > counts["storage_present_cell_count"]).any():
+        raise AssertionError("selected valid cells exceed stored cells")
+    if (
+        counts["latest_valid_sp_cell_count_by_cutoff"]
+        > counts["latest_storage_present_cell_count_by_cutoff"]
+    ).any():
+        raise AssertionError("latest valid cells exceed stored cells")
+    latest = frame["latest_poll_started_at_utc_by_cutoff"]
+    if (latest.notna() & latest.gt(frame["decision_at_utc"])).any():
+        raise AssertionError("latest poll starts after decision cutoff")
+    if frame.loc[available, "selected_poll_started_at_utc"].isna().any():
         raise AssertionError("available selection lacks observation")
-    if (~available & frame["selected_observed_at_utc"].notna()).any():
+    if (~available & frame["selected_poll_started_at_utc"].notna()).any():
         raise AssertionError("dropped selection retains observation")
-    if not frame.loc[available, "availability_mask"].all():
+    if not frame["availability_mask"].eq(available).all():
         raise AssertionError("available selection has false availability mask")
-    if not pd.to_numeric(frame.loc[available, "available_cell_count"], errors="raise").eq(3).all():
+    if not counts.loc[available, "storage_present_cell_count"].eq(3).all():
+        raise AssertionError("available selection lacks three stored cells")
+    if not counts.loc[available, "valid_sp_cell_count"].eq(3).all():
         raise AssertionError("available selection lacks three cells")
-    if not pd.to_numeric(frame.loc[available, "model_available_cell_count"], errors="raise").eq(3).all():
+    if not counts.loc[available, "model_available_cell_count"].eq(3).all():
         raise AssertionError("available model-cell count mismatch")
-    if not pd.to_numeric(frame.loc[~available, "model_available_cell_count"], errors="raise").eq(0).all():
+    if not counts.loc[~available, [
+        "storage_present_cell_count", "valid_sp_cell_count", "model_available_cell_count"
+    ]].eq(0).all().all():
         raise AssertionError("dropped row retains model-available cells")
-    if not frame.loc[available, "time_semantics"].eq(STRICT_SEMANTICS).all():
-        raise AssertionError("available selection has non-strict time semantics")
-    if not frame.loc[available, "causal_grade"].eq(STRICT_GRADE).all():
-        raise AssertionError("available selection has wrong schedule-reference grade")
-    if (frame.loc[available, "selected_observed_at_utc"] > frame.loc[available, "decision_at_utc"]).any():
+    if (frame.loc[available, "selected_poll_started_at_utc"] > frame.loc[available, "decision_at_utc"]).any():
         raise AssertionError("future observation in selection")
     if (frame["decision_at_utc"] >= frame["kickoff_at_utc"]).any():
         raise AssertionError("cutoff is not pre-kickoff")
     expected_staleness = (
         frame.loc[available, "decision_at_utc"]
-        - frame.loc[available, "selected_observed_at_utc"]
+        - frame.loc[available, "selected_poll_started_at_utc"]
     ).dt.total_seconds() / 60.0
     observed_staleness = pd.to_numeric(
-        frame.loc[available, "staleness_minutes"], errors="raise"
+        frame.loc[available, "poll_start_age_minutes"], errors="raise"
     )
     if not expected_staleness.round(9).equals(observed_staleness.round(9)):
         raise AssertionError("staleness value disagrees with selected observation")
     incomplete = frame["drop_reason"].eq("OBSERVATION_UNAVAILABLE_OR_INCOMPLETE")
+    invalid_value = frame["drop_reason"].eq("INVALID_VALUE")
     no_observation = frame["drop_reason"].eq("NO_OBSERVATION_BY_CUTOFF")
-    if frame.loc[incomplete, "latest_observed_at_utc_by_cutoff"].isna().any():
+    if frame.loc[incomplete | invalid_value, "latest_poll_started_at_utc_by_cutoff"].isna().any():
         raise AssertionError("incomplete reason lacks an observed snapshot")
-    if frame.loc[no_observation, "latest_observed_at_utc_by_cutoff"].notna().any():
+    if frame.loc[no_observation, "latest_poll_started_at_utc_by_cutoff"].notna().any():
         raise AssertionError("no-observation reason retains an observed snapshot")
-    cells = pd.to_numeric(frame["observed_cell_count_by_cutoff"], errors="coerce").fillna(0)
-    if (~cells.isin([0, 1, 2, 3])).any():
-        raise AssertionError("observed cell count outside [0,3]")
+    if not counts.loc[incomplete, "latest_storage_present_cell_count_by_cutoff"].lt(3).all():
+        raise AssertionError("incomplete reason has three stored cells")
+    if not counts.loc[invalid_value, "latest_storage_present_cell_count_by_cutoff"].eq(3).all() or not counts.loc[
+        invalid_value, "latest_valid_sp_cell_count_by_cutoff"
+    ].lt(3).all():
+        raise AssertionError("invalid-value reason has inconsistent cell counts")
 
 
 def _normalize_for_compare(frame: pd.DataFrame) -> pd.DataFrame:
     value = frame.copy().reset_index(drop=True)
+    for column in ("fixture_id", "issue_code"):
+        if column in value:
+            value[column] = value[column].astype(str)
     for column in value.columns:
         if "_at_utc" in column:
             value[column] = pd.to_datetime(value[column], utc=True, errors="coerce")
@@ -341,6 +425,12 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("contract identity mismatch")
     if manifest.get("schedule_authority") != "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF":
         raise AssertionError("schedule-authority claim mismatch")
+    if manifest.get("clock_authority") != "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED":
+        raise AssertionError("clock-authority claim mismatch")
+    if manifest.get("cell_lineage") != "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN":
+        raise AssertionError("cell-lineage claim mismatch")
+    if manifest.get("poll_start_namespace") != "poll_start_forward":
+        raise AssertionError("poll-start namespace mismatch")
     if manifest.get("source_authentication") != "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR":
         raise AssertionError("source-authentication claim mismatch")
     receipt = manifest.get("source_receipt")
@@ -350,11 +440,30 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("source receipt digest malformed")
 
     tables = package / "tables"
-    strict = _read_selection(tables / "strict_selection.csv")
+    poll_snapshot_path = tables / "poll_start_input_snapshot.parquet"
+    poll_snapshot = pd.read_parquet(poll_snapshot_path)
+    if manifest.get("poll_start_input_snapshot_rows") != len(poll_snapshot):
+        raise AssertionError("poll-start input snapshot row count mismatch")
+    if manifest.get("poll_start_input_snapshot_sha256") != _sha256(poll_snapshot_path):
+        raise AssertionError("poll-start input snapshot digest mismatch")
+    if tuple(poll_snapshot.columns) != POLL_SNAPSHOT_COLUMNS:
+        raise AssertionError("poll-start input snapshot schema mismatch")
+    reconstructed = profile_tables(poll_snapshot)
+    poll_start = _read_selection(tables / "poll_start_selection.csv")
     cutoff = _read_selection(tables / "cutoff_selection.csv")
     segment = _read_selection(tables / "segment_selection.csv")
-    for frame in (strict, cutoff, segment):
+    for frame in (poll_start, cutoff, segment):
         _validate_selection(frame)
+    _assert_same(
+        cutoff,
+        reconstructed["cutoff_selection.csv"],
+        "cutoff selection source replay",
+    )
+    _assert_same(
+        segment,
+        reconstructed["segment_selection.csv"],
+        "segment selection source replay",
+    )
     if set(pd.to_numeric(cutoff["lead_hours"], errors="raise")) != set(LEAD_HOURS):
         raise AssertionError("candidate lead grid mismatch")
     monotonic = (
@@ -380,11 +489,11 @@ def verify_package(package: Path) -> dict[str, object]:
         "segment drop",
     )
     one_hour = cutoff.loc[cutoff["lead_hours"].eq(1)].drop(columns="lead_hours")
-    _assert_same(strict, one_hour.reset_index(drop=True), "one-hour strict selection")
+    _assert_same(poll_start, one_hour.reset_index(drop=True), "one-hour poll-start selection")
 
     issue_coverage = pd.read_csv(tables / "issue_coverage.csv")
     expected_issue = (
-        strict.assign(available=strict["drop_reason"].eq("AVAILABLE"))
+        poll_start.assign(available=poll_start["drop_reason"].eq("AVAILABLE"))
         .groupby(["issue_code", "decision_at_utc"], as_index=False)
         .agg(
             total_fixture_count=("fixture_id", "size"),
@@ -393,11 +502,46 @@ def verify_package(package: Path) -> dict[str, object]:
     )
     _assert_same(issue_coverage, expected_issue, "issue coverage")
 
-    proxy = pd.read_csv(tables / "proxy_horizon_summary.csv")
+    proxy = pd.read_csv(tables / "proxy_horizon_market_summary.csv")
+    expected_proxy_columns = {
+        "snapshot_horizon",
+        "market",
+        "fixture_count",
+        "issue_count",
+        "market_row_count",
+        "complete_consensus_rows",
+        "available_value_cells",
+        "field_role",
+        "p34_m3_compatible",
+        "time_semantics",
+        "causal_grade",
+    }
+    if set(proxy.columns) != expected_proxy_columns:
+        raise AssertionError("proxy summary schema mismatch")
     if set(proxy["snapshot_horizon"]) != set(ACCEPTED_PROXY_HORIZONS):
         raise AssertionError("proxy horizon outside frozen vocabulary")
     if not proxy["time_semantics"].eq(PROXY_SEMANTICS).all() or not proxy["causal_grade"].eq(PROXY_GRADE).all():
         raise AssertionError("proxy namespace semantics mismatch")
+    if proxy.duplicated(["snapshot_horizon", "market"]).any():
+        raise AssertionError("proxy horizon-market key duplicate")
+    if proxy[["market", "field_role"]].astype(str).apply(
+        lambda column: column.str.strip().eq("")
+    ).any().any():
+        raise AssertionError("proxy market/field role missing")
+    compatibility = proxy["p34_m3_compatible"].astype(str)
+    if not compatibility.isin({"True", "False"}).all():
+        raise AssertionError("proxy p34 compatibility must be canonical boolean text")
+    expected_role = proxy["market"].map(
+        {market: role for market, (role, _) in PROXY_ROLES.items()}
+    )
+    expected_compatibility = proxy["market"].map(
+        {market: compatible for market, (_, compatible) in PROXY_ROLES.items()}
+    )
+    if expected_role.isna().any() or not proxy["field_role"].eq(expected_role).all():
+        raise AssertionError("proxy field role disagrees with market")
+    if not compatibility.eq(expected_compatibility).all():
+        raise AssertionError("proxy p34 compatibility disagrees with market role")
+    proxy["p34_m3_compatible"] = compatibility
     numeric_proxy = proxy[
         [
             "fixture_count",
@@ -413,7 +557,7 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("proxy summary disagrees with manifest receipt")
     expected_rows = manifest.get("table_row_counts")
     if expected_rows != {
-        "strict_selection": len(strict),
+        "poll_start_selection": len(poll_start),
         "cutoff_selection": len(cutoff),
         "segment_selection": len(segment),
     }:
@@ -429,7 +573,7 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("issue duration mismatch")
     return {
         "status": "PASS",
-        "strict_selection_rows": len(strict),
+        "poll_start_selection_rows": len(poll_start),
         "cutoff_selection_rows": len(cutoff),
         "segment_selection_rows": len(segment),
         "proxy_summary_rows": len(proxy),
