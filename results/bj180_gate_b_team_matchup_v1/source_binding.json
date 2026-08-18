@@ -1,0 +1,18 @@
+{
+  "accepted_settlement_base": {
+    "script": "scripts/settle_bj179_hierarchical_league_gate_b.py",
+    "sha256": "548ec70e9bee7b4d2bab73dcde767594806a3b3e9cf32e94fc6b781c9d56ada5"
+  },
+  "gate_a": {
+    "content_identity_sha256": "6a0abe9cb36198dae11a5da06679d22b786cdf49f3619e6e34d7782f29915288",
+    "manifest_sha256": "96cbd2565f5d1f837700e476d7a7412225677581b5e4448a4f9bfac4c9220835",
+    "package": "bj180_gate_a_preoutcome_v2",
+    "payload_count": 19
+  },
+  "outcomes": {
+    "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "package": "bj95_gate_b_outcome_settlement_v2r8",
+    "row_count": 46802
+  }
+}

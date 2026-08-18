@@ -1,0 +1,7 @@
+subset,cell_count,fraction_of_total
+Q_BJ_CALIBRATED only,228,0.0006373967375351197
+Q_BJ + EU_BJLINE,0,0.0
+Q_BJ + POWER,0,0.0
+Q_BJ + EU + POWER,0,0.0
+Q_BJ + SP_DEVIG,0,0.0
+Q_BJ + EU + POWER + SP_DEVIG,0,0.0

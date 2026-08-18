@@ -1,0 +1,20 @@
+{
+  "contract": "BJ193_NATIVE_137_STRUCTURAL_DELETE_RECONCILIATION_V2_1",
+  "legacy_137_marker_diagnostic": {
+    "controlling": false,
+    "p_match_count": 71704,
+    "p_mismatch_count": 0,
+    "q_match_count": 70373,
+    "q_mismatch_count": 1331,
+    "tie_semantics": "legacy #137 marker used serialized-weight/match_idx ties; accepted #167 replay uses ordered leg/code ties"
+  },
+  "mismatch_count": 0,
+  "outcome_boundary": "Gate A outcome-unexposed: no result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence is read or emitted",
+  "p_anchor_match_count": 71704,
+  "portfolio_count": 71704,
+  "q_anchor_match_count": 71704,
+  "reconciliation_stream_sha256": "d04b149f7468c26d23b2a174b1f118ca85f2ce38218484f1464561b671e4c745",
+  "role_row_count": 501928,
+  "source_match_vector_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+  "source_role_vector_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa"
+}

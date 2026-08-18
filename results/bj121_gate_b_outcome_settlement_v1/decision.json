@@ -1,0 +1,8 @@
+{
+  "decision": "NO_PROMOTION",
+  "positive_after_ex_best_rows": 0,
+  "positive_all_rows": 0,
+  "promotion_authorized": false,
+  "rule": "Positive historical ROI freezes the result and requires strict independent EV; it never directly authorizes promotion.",
+  "strict_independent_ev_required": false
+}

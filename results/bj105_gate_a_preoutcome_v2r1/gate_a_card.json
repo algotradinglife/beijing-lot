@@ -1,0 +1,51 @@
+{
+  "accounting": "K=3^full*2^double. expected_portfolio_mass is H, the product of every role's retained probability. Thus FIXED/HASH/WEIGHTED m-double arms have K=2^m*3^(7-m) and H=product(1-p_deleted); JOINT_ROLE additionally includes its SINGLE probability. G_BE=[K/(0.65*H)]^(1/7) applies 0.65 exactly once and is only a first-order pre-tax diagnostic; exact tax-aware payout is Gate-B-only.",
+  "contract": "BJ-HIST-JOINT-N7-001",
+  "features": "E_SP=sum(p*s_hat); q=p*s_hat; D=q_argmin/mean(q_other_two); scatter contains p_min, E_SP, D, entropy and uncertainty.",
+  "gate_b": "UNAUTHORIZED pending independent EV and PI acceptance of this exact Gate-A package.",
+  "generator_version": "bj105-joint-analytic-v2",
+  "gm_gate": "Apply threshold to the geometric mean of seven E_SP values. Geometric mean of predicted top-code SP is diagnostic only.",
+  "grid": {
+    "arms": [
+      "FULL_COVER_CONTROL",
+      "FIXED_ARGMIN",
+      "HASH_DELETION_CONTROL",
+      "PROBABILITY_WEIGHTED_SAMPLING",
+      "JOINT_ROLE"
+    ],
+    "depths": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "gm_expected_sp_thresholds": [
+      2.9,
+      3.0,
+      3.1,
+      3.2
+    ],
+    "p_min_thresholds": [
+      0.05,
+      0.1,
+      0.15,
+      0.2
+    ]
+  },
+  "input_manifests": {
+    "bj101": "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447",
+    "bj90": "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2"
+  },
+  "issue": 105,
+  "outcome_boundary": "No result, winning SP, payout, tax, ROI, or settlement input is read or emitted.",
+  "output_rows": {
+    "candidate_scatter": 47819,
+    "portfolio_frontier": 512096,
+    "role_assignments": 415800
+  },
+  "roles": "FIXED/HASH/WEIGHTED use m DOUBLE plus 7-m FULL. JOINT_ROLE uses one deterministic SINGLE (highest p_max/q_max) plus m DOUBLE and remaining FULL; m=0 is represented by full-cover control.",
+  "scope": "paper-only historical research; no purchase, production, frontend, or ROI promotion.",
+  "selection": "Within each accepted #101 AVAILABLE pool, select seven highest joint_match_rank_value = q_max * (1 - entropy/log(3)); ties q_max descending then match_idx ascending.",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_JOINT_N7_FREEZE",
+  "upstream_boundary": "#106 is terminal NO_PROMOTION. Its q-atlas is not read, ranked, promoted, or used as a match, role, threshold, or portfolio signal in this Gate-A freeze."
+}

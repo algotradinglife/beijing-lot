@@ -1,0 +1,13 @@
+{
+  "correction": "User-facing reporting correction only: add primary M curve, secondary ESP300/GM/K8/Q/M128 sensitivity, vector/mechanism summaries, raw-max classification, and correct the ex-largest ROI wording.",
+  "invariants": [
+    "No Gate-A read",
+    "No ticket resampling",
+    "No v2r1 ledger change",
+    "No common-support matrix change",
+    "No candidate-rule change"
+  ],
+  "parent_content_identity_sha256": "be2012567f0aa1690be8e50711afe00233f8686fc5baa9423c400637e9a35f5f",
+  "parent_manifest_sha256": "fe55b7bdd8508a2b19bba2a57ecde9c7238feab1000a15a78ac24689cf89fb31",
+  "parent_package": "results/bj137_gate_b_outcome_settlement_v3_common_support"
+}

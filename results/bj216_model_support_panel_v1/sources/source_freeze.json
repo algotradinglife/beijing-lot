@@ -1,0 +1,66 @@
+{
+  "admissible_source_columns": {
+    "beidan_live.matches": [
+      "match_id",
+      "issue",
+      "match_idx",
+      "kickoff_ts",
+      "created_ts",
+      "handicap_line"
+    ],
+    "beidan_live.snapshots": [
+      "id",
+      "match_id",
+      "snapshot_ts",
+      "sp_3",
+      "sp_1",
+      "sp_0",
+      "eu_h",
+      "eu_d",
+      "eu_a",
+      "source"
+    ]
+  },
+  "bytes_at_read": 223948800,
+  "contract_version": "bj216-causal-p34-model-support-v1",
+  "excluded_source_classes": {
+    "500_live_p34_sp_only": "timestamped Beijing SP lacks a same-row three-way EURO vector; cross-source clock joins are not admitted by this v1 contract",
+    "feature_open_close_proxies": "open/close values have no source observation timestamp",
+    "history_average_or_final_odds": "terminal or average values have no admissible pre-decision observation clock",
+    "sale_or_parlay_metadata": "ticket-operability metadata is non-controlling for model-learning readiness",
+    "xlsm_named_snapshots": "initial/10h/1h/final names have no row-level source-observed or fetch clock binding the market value to the decision epoch"
+  },
+  "filename": "beidan_live.db",
+  "frozen_source_census": {
+    "matches": 4526,
+    "selected_snapshots": 3785
+  },
+  "logical_source": "beidan_live",
+  "outcome_namespace_read": false,
+  "prohibited_namespaces": [
+    "beidan_live.settlements",
+    "500_bjdc.matches.score",
+    "500_bjdc.matches.result_label",
+    "500_bjdc.matches.result_code",
+    "500_bjdc.matches.winning_sp",
+    "500_bjdc.multimarket_settlement_truth",
+    "beidan_history.historical_matches",
+    "beidan_features.matches",
+    "beidan_xlsm.matches.score",
+    "beidan_xlsm.matches.result_label",
+    "beidan_xlsm.outcome_features"
+  ],
+  "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+  "runtime_matches_read": 4526,
+  "runtime_snapshots_read": 1279457,
+  "schema_sha256": "e53cbf874fae69dc5e1a17810e69110dda8230c5c9da89565cdc9f492fdfa0c5",
+  "source_boundary_commit": "23db9d207b2b1d98772f18ae0762a904cb64e9d2",
+  "source_boundary_preregistered_at_utc": "2026-08-07T11:59:52Z",
+  "source_freeze_cutoff_utc": "2026-08-07T12:06:27Z",
+  "upstream_package": {
+    "contract_version": "bj214-decision-epoch-tensor-v1",
+    "live_match_identity_sha256": "97adedee27da34f316abd631ee71c3dca33876bcc9c7649d508bcb965999d172",
+    "manifest_sha256": "d529dfbbe1a1aadab8f8135962cca8075ab255df26856fa78c3f9fee27112432",
+    "sha256sums_sha256": "1327476a193c1dafcc9c311ff9b5aba241346a88b44fd3d28197f337e36875e7"
+  }
+}

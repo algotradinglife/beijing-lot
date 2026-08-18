@@ -1,0 +1,25 @@
+{
+  "contract_version": "bj137-gate-a-content-v1",
+  "gzip_payloads": {
+    "n7_identities.csv.gz": {
+      "canonical_decompressed_bytes": 33908798,
+      "canonical_decompressed_sha256": "60f6c2353cebae4fb648cf8111c85a991200117968ca20a1204e70cbdf9dfb7b"
+    },
+    "n7_role_vectors.csv.gz": {
+      "canonical_decompressed_bytes": 278519202,
+      "canonical_decompressed_sha256": "ddd18aa45b15aff60c54e22a9be536144f26b0186eefbc59e01de356851c3166"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "64e5d4ee6183985d2f32a7755db874444b65b4d84b0be3f22da7daa47e096d4f",
+    "freeze_runner.py": "226b23f671ad4f02ef521aaf21760325227b5e72e461982a633ee1652a21f51d",
+    "gate_a_card.json": "9f6fae2746632ac6bf7de2a26404ad49872cb346fcca761b05928cd54bbb891f",
+    "gate_issue_census.csv": "2aad38f0c94df0e3bf4424dc56823d2564b6ac5afa74281101e059ede4355618",
+    "issue_census.csv": "69d7463b6f83af4127059d6ea34095292646ec2a98abc39d56551b76d6ea6dd5",
+    "market_calibration_census.csv": "5f8b5a8abae6d9bcc08fc6a25eccab75dd2a0628e728f48539e323acaebd00b1",
+    "market_calibration_map.csv": "1f61e21092929317e08eea626e3d46ab9eb4192921da850052cd8a829ace74b4",
+    "match_vectors.csv": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+    "sampler_plan.csv": "556a4757bfb68d76e5fd9fc0d87336b14f321f57e63183e74210025c580b8ac3",
+    "source_census.csv": "338e1ccd687258036502886c3a3777541447ee4fd15a30f5cadbabaf686adfbe"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$id": "BJ-UNIFIED-N7-BANKROLL-LEARNING-001/STAGE4-HANDOFF/v1",
+  "activation_authority": false,
+  "downstream_issue": 208,
+  "downstream_state": "BLOCKED_PENDING_PI_TERMINAL_REVIEW_AND_EXPLICIT_ACTIVATION",
+  "frozen_learned_controller_choice": "BOUNDED_NEURAL",
+  "identity_fields": [
+    "policy",
+    "k",
+    "ticket_identity",
+    "capital_schedule_hash"
+  ],
+  "promoted": false,
+  "required_decisions": [
+    "ENGINE_VALID",
+    "ACTIVE_OVERLAY_EVIDENCE",
+    "DEPLOYABLE_POLICY"
+  ],
+  "research_only": true,
+  "terminal_evidentiary_split": "CV_2023"
+}

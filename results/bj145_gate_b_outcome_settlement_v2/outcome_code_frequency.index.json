@@ -1,0 +1,245 @@
+{
+  "codes_per_configuration": 2187,
+  "configuration_count": 2892,
+  "configuration_fields": [
+    "arm_id",
+    "weight_source",
+    "mechanism",
+    "sampling_role",
+    "cap",
+    "M",
+    "seed"
+  ],
+  "dataset": "bj145_complete_outcome_code_allocation_marginals_v2",
+  "fieldnames": [
+    "scope",
+    "scope_value",
+    "arm_id",
+    "weight_source",
+    "mechanism",
+    "sampling_role",
+    "cap",
+    "M",
+    "seed",
+    "ticket_code",
+    "settled_issue_count",
+    "identity_count",
+    "draw_count",
+    "target_mass_sum",
+    "target_mass_mean",
+    "allocated_draw_count",
+    "realized_frequency",
+    "frequency_delta",
+    "actual_outcome_identity_count",
+    "actual_outcome_hit_ticket_count",
+    "actual_hit_frequency",
+    "target_denominator_rule",
+    "realized_denominator_rule",
+    "actual_hit_rule"
+  ],
+  "logical_format": "one configuration-sorted CSV; concatenate parts in listed order and retain only the first header",
+  "part_count": 8,
+  "parts": [
+    {
+      "bytes": 24230767,
+      "configurations": 362,
+      "file": "outcome_code_frequency.part-01-of-08.csv.gz",
+      "first_configuration": [
+        "PRIMARY_NO_GATE_K4",
+        "BLEND_A25",
+        "CAPPED_REPEAT",
+        "CAPPED_PROPORTIONAL",
+        "1",
+        "16",
+        "NA"
+      ],
+      "last_configuration": [
+        "PRIMARY_NO_GATE_K4",
+        "BLEND_A50",
+        "RESIDUAL_SYSTEMATIC",
+        "RESIDUAL_PROPORTIONAL",
+        "NA",
+        "2187",
+        "NA"
+      ],
+      "rows": 791694,
+      "sha256": "1c70bfd2372e89c50cebde05b976725baa6d89ed501180e0c2f962fb40eb9a8e"
+    },
+    {
+      "bytes": 24777920,
+      "configurations": 362,
+      "file": "outcome_code_frequency.part-02-of-08.csv.gz",
+      "first_configuration": [
+        "PRIMARY_NO_GATE_K4",
+        "BLEND_A50",
+        "WOR_DISTINCT",
+        "PRIMARY_WEIGHTED_WOR",
+        "NA",
+        "16",
+        "137001"
+      ],
+      "last_configuration": [
+        "PRIMARY_NO_GATE_K4",
+        "MARKET_WF_CAL",
+        "CAPPED_REPEAT",
+        "CAPPED_PROPORTIONAL",
+        "1",
+        "16",
+        "NA"
+      ],
+      "rows": 791694,
+      "sha256": "cb3f38775425f42f3cedae5f8b4f4bf5c8d70b1e89fd9551dec2ae59bf75ba7a"
+    },
+    {
+      "bytes": 24305813,
+      "configurations": 362,
+      "file": "outcome_code_frequency.part-03-of-08.csv.gz",
+      "first_configuration": [
+        "PRIMARY_NO_GATE_K4",
+        "MARKET_WF_CAL",
+        "CAPPED_REPEAT",
+        "CAPPED_PROPORTIONAL",
+        "1",
+        "32",
+        "NA"
+      ],
+      "last_configuration": [
+        "PRIMARY_NO_GATE_K4",
+        "MODEL_P_CAL",
+        "WOR_DISTINCT",
+        "PRIMARY_WEIGHTED_WOR",
+        "NA",
+        "16",
+        "137001"
+      ],
+      "rows": 791694,
+      "sha256": "568dd85d12fb9e130a960c5165914238c7657a8d19dfa8ee53f7ea7e724258b8"
+    },
+    {
+      "bytes": 24280012,
+      "configurations": 362,
+      "file": "outcome_code_frequency.part-04-of-08.csv.gz",
+      "first_configuration": [
+        "PRIMARY_NO_GATE_K4",
+        "MODEL_P_CAL",
+        "WOR_DISTINCT",
+        "PRIMARY_WEIGHTED_WOR",
+        "NA",
+        "32",
+        "137001"
+      ],
+      "last_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "BLEND_A25",
+        "CAPPED_REPEAT",
+        "CAPPED_PROPORTIONAL",
+        "1",
+        "32",
+        "NA"
+      ],
+      "rows": 791694,
+      "sha256": "f8a60cae753b87b3b08326a6bc648341fd3a94073b1361b0fa7dba03efb74708"
+    },
+    {
+      "bytes": 24731485,
+      "configurations": 362,
+      "file": "outcome_code_frequency.part-05-of-08.csv.gz",
+      "first_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "BLEND_A25",
+        "CAPPED_REPEAT",
+        "CAPPED_PROPORTIONAL",
+        "1",
+        "48",
+        "NA"
+      ],
+      "last_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "BLEND_A50",
+        "WOR_DISTINCT",
+        "PRIMARY_WEIGHTED_WOR",
+        "NA",
+        "32",
+        "137001"
+      ],
+      "rows": 791694,
+      "sha256": "23b4fd8dfac62044f95902190118bf5a764dde024c72b9129d3344d0c3b96feb"
+    },
+    {
+      "bytes": 25422924,
+      "configurations": 362,
+      "file": "outcome_code_frequency.part-06-of-08.csv.gz",
+      "first_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "BLEND_A50",
+        "WOR_DISTINCT",
+        "PRIMARY_WEIGHTED_WOR",
+        "NA",
+        "48",
+        "137001"
+      ],
+      "last_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "MARKET_WF_CAL",
+        "CAPPED_REPEAT",
+        "CAPPED_PROPORTIONAL",
+        "1",
+        "48",
+        "NA"
+      ],
+      "rows": 791694,
+      "sha256": "1e6efcb709a1bcf62d8bc9506d5279bf66d215bd33e8ba37ee49a76c7714b904"
+    },
+    {
+      "bytes": 24848796,
+      "configurations": 362,
+      "file": "outcome_code_frequency.part-07-of-08.csv.gz",
+      "first_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "MARKET_WF_CAL",
+        "CAPPED_REPEAT",
+        "CAPPED_PROPORTIONAL",
+        "1",
+        "64",
+        "NA"
+      ],
+      "last_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "MODEL_P_CAL",
+        "WOR_DISTINCT",
+        "PRIMARY_WEIGHTED_WOR",
+        "NA",
+        "48",
+        "137001"
+      ],
+      "rows": 791694,
+      "sha256": "2d871de129b3feff0f87de6dd272e5345f64bf4afa2d826cd251f60297f65f41"
+    },
+    {
+      "bytes": 24646777,
+      "configurations": 358,
+      "file": "outcome_code_frequency.part-08-of-08.csv.gz",
+      "first_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "MODEL_P_CAL",
+        "WOR_DISTINCT",
+        "PRIMARY_WEIGHTED_WOR",
+        "NA",
+        "64",
+        "137001"
+      ],
+      "last_configuration": [
+        "SECONDARY_ESP300_GM290_K8",
+        "Q_WEIGHT",
+        "WR_DUPLICATE_STAKE",
+        "PRIMARY_WEIGHTED_WR",
+        "NA",
+        "2187",
+        "137003"
+      ],
+      "rows": 782946,
+      "sha256": "4eb99a5e84c7defbd0ba712afeff5b57fa1bae3f4fcd4aac54cca3153fb1a07c"
+    }
+  ],
+  "total_rows": 6324804
+}

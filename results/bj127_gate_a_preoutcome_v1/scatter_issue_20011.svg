@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" viewBox="0 0 720 440">
+<rect width="100%" height="100%" fill="white"/>
+<text x="60" y="22" font-family="sans-serif" font-size="16">Issue 20011 — outcome-unexposed p_min × E_SP</text>
+<line x1="60" y1="390" x2="690" y2="390" stroke="#333"/>
+<line x1="60" y1="40" x2="60" y2="390" stroke="#333"/>
+<line x1="600.00" y1="40" x2="600.00" y2="390" stroke="#a66" stroke-dasharray="4"/>
+<line x1="60" y1="156.67" x2="690" y2="156.67" stroke="#a66" stroke-dasharray="4"/>
+<text x="604.00" y="385" font-size="11">p_min=.30</text>
+<text x="64" y="152.67" font-size="11">E_SP=3.00</text>
+<circle cx="551.78" cy="133.00" r="5" fill="#d62728" fill-opacity=".75"><title>match 108160</title></circle>
+<circle cx="512.67" cy="155.62" r="5" fill="#d62728" fill-opacity=".75"><title>match 108161</title></circle>
+<circle cx="497.53" cy="184.42" r="5" fill="#d62728" fill-opacity=".75"><title>match 108162</title></circle>
+<circle cx="514.33" cy="165.32" r="5" fill="#d62728" fill-opacity=".75"><title>match 108166</title></circle>
+<circle cx="571.95" cy="152.35" r="5" fill="#d62728" fill-opacity=".75"><title>match 108167</title></circle>
+<circle cx="532.64" cy="138.07" r="5" fill="#d62728" fill-opacity=".75"><title>match 108169</title></circle>
+<circle cx="558.83" cy="135.37" r="5" fill="#d62728" fill-opacity=".75"><title>match 108170</title></circle>
+<circle cx="575.08" cy="139.19" r="5" fill="#d62728" fill-opacity=".75"><title>match 108171</title></circle>
+<circle cx="581.89" cy="138.22" r="5" fill="#d62728" fill-opacity=".75"><title>match 108172</title></circle>
+<circle cx="493.29" cy="149.06" r="5" fill="#d62728" fill-opacity=".75"><title>match 108175</title></circle>
+<circle cx="492.68" cy="173.61" r="5" fill="#d62728" fill-opacity=".75"><title>match 108176</title></circle>
+<circle cx="592.88" cy="141.87" r="5" fill="#d62728" fill-opacity=".75"><title>match 108184</title></circle>
+<circle cx="548.99" cy="141.78" r="5" fill="#d62728" fill-opacity=".75"><title>match 108188</title></circle>
+<circle cx="501.63" cy="152.62" r="5" fill="#d62728" fill-opacity=".75"><title>match 108189</title></circle>
+<circle cx="498.48" cy="174.65" r="5" fill="#d62728" fill-opacity=".75"><title>match 108190</title></circle>
+<circle cx="632.00" cy="140.91" r="5" fill="#d62728" fill-opacity=".75"><title>match 108192</title></circle>
+<circle cx="495.19" cy="159.69" r="5" fill="#d62728" fill-opacity=".75"><title>match 108193</title></circle>
+<circle cx="523.41" cy="149.82" r="5" fill="#d62728" fill-opacity=".75"><title>match 108195</title></circle>
+<circle cx="536.78" cy="149.43" r="5" fill="#d62728" fill-opacity=".75"><title>match 108197</title></circle>
+<circle cx="566.97" cy="146.67" r="5" fill="#d62728" fill-opacity=".75"><title>match 108199</title></circle>
+<circle cx="513.51" cy="167.08" r="5" fill="#d62728" fill-opacity=".75"><title>match 108200</title></circle>
+<circle cx="553.60" cy="139.61" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108201</title></circle>
+<circle cx="540.97" cy="149.13" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108214</title></circle>
+<circle cx="572.14" cy="143.32" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108219</title></circle>
+<circle cx="548.18" cy="145.38" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108226</title></circle>
+<circle cx="578.25" cy="135.99" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108227</title></circle>
+<circle cx="499.46" cy="158.06" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108228</title></circle>
+<circle cx="551.95" cy="140.21" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108229</title></circle>
+<circle cx="572.64" cy="149.35" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108231</title></circle>
+<circle cx="538.13" cy="148.14" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108232</title></circle>
+<circle cx="528.19" cy="147.13" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108233</title></circle>
+<circle cx="550.92" cy="133.08" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108236</title></circle>
+<circle cx="566.68" cy="133.75" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108237</title></circle>
+<circle cx="506.72" cy="160.79" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108239</title></circle>
+<circle cx="505.25" cy="150.21" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108242</title></circle>
+<circle cx="533.77" cy="144.47" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108245</title></circle>
+<circle cx="524.55" cy="148.33" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108250</title></circle>
+<circle cx="517.62" cy="149.66" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108251</title></circle>
+<circle cx="592.90" cy="131.10" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108252</title></circle>
+<circle cx="563.86" cy="147.44" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108253</title></circle>
+<circle cx="469.75" cy="162.16" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108254</title></circle>
+<circle cx="548.13" cy="139.70" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108256</title></circle>
+<circle cx="493.04" cy="161.31" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108258</title></circle>
+<circle cx="562.58" cy="142.98" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108261</title></circle>
+<circle cx="555.16" cy="139.39" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108262</title></circle>
+<circle cx="590.91" cy="143.35" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108267</title></circle>
+<circle cx="529.00" cy="147.15" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108271</title></circle>
+<circle cx="447.06" cy="170.00" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108272</title></circle>
+<circle cx="516.59" cy="154.75" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108273</title></circle>
+<circle cx="490.54" cy="173.12" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108276</title></circle>
+<circle cx="503.22" cy="158.64" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108278</title></circle>
+<circle cx="530.08" cy="136.36" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108282</title></circle>
+<circle cx="522.39" cy="139.44" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108284</title></circle>
+<circle cx="529.26" cy="153.54" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108285</title></circle>
+<circle cx="600.49" cy="137.12" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108288</title></circle>
+<circle cx="560.11" cy="148.22" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108289</title></circle>
+<circle cx="500.64" cy="153.25" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108290</title></circle>
+<circle cx="582.36" cy="140.99" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108293</title></circle>
+<circle cx="554.64" cy="141.87" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108297</title></circle>
+<circle cx="587.49" cy="149.56" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108299</title></circle>
+<circle cx="549.25" cy="149.63" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108300</title></circle>
+<circle cx="548.97" cy="124.76" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108301</title></circle>
+<circle cx="580.96" cy="132.92" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108302</title></circle>
+<circle cx="560.03" cy="147.51" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108304</title></circle>
+<circle cx="504.27" cy="156.37" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108308</title></circle>
+<circle cx="544.94" cy="146.74" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108309</title></circle>
+<circle cx="440.68" cy="176.53" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108310</title></circle>
+<circle cx="558.53" cy="148.58" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108311</title></circle>
+<circle cx="559.75" cy="145.99" r="3" fill="#4c78a8" fill-opacity=".75"><title>match 108315</title></circle>
+<text x="60" y="428" font-size="12">p_min</text><text x="8" y="220.00" font-size="12" transform="rotate(-90 8 220.00)">E_SP</text></svg>

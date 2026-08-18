@@ -1,0 +1,5 @@
+authoritative,decision,left_source,level,lower_bound,mapping_assumption,right_source,upper_bound
+True,HISTORICAL_PROXY_ONLY,beidan_xlsm.market_snapshots,RAW_PRESENT,initial/10h/1h field families profiled,native fields only,beidan_xlsm.matches,initial/10h/1h field families profiled
+True,EXACT_NATIVE_ONLY,beidan_live.matches,NATIVE_KEY_INTERSECTION,1748,identical native issue+match_idx,bjdc_500_capture.matches,1748
+False,NON_AUTHORITATIVE_PROPOSED_MAPPING_PENDING_251,beidan_xlsm.matches,CANDIDATE_MAPPED_RANGE,188197,lower=issue+normalized_home+normalized_away+calendar_date; upper=issue+normalized_home+normalized_away,beidan_features.matches,188199
+False,DEFERRED_TO_251_AND_252,all,CANONICAL_CAUSAL_INTERSECTION,NOT_YET_EVALUATED,frozen identity+temporal policy required,all,NOT_YET_EVALUATED

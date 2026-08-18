@@ -1,0 +1,19 @@
+{
+  "CONTENT_IDENTITY.json": "adc4d0f96628c784149da998a20e8830cde26db4001fe457eaf9ca4b7bb74223",
+  "README.md": "50883e7a83bdccd017e47a0123aebb8ba99a2aff1fb858358adf322ac5531f4b",
+  "allocation_registry.csv": "4bf20866abbe7591cb951bfb22061ab3772d4a27c500878738674259826cb170",
+  "exact_identity_support_membership.csv.gz": "91ef4616966687cb1fbf2baba55b7e3fdf923092896a7d090322de4d4d064b21",
+  "freeze_runner.py": "a2c5817aebf81f5b7364eadfdc59714d612ef5008dfeba7e0bb90c8411dc584c",
+  "gate_a_card.json": "024a0a176a5d8c252456f57f5d96f5490309600dcecc2ee50aedabb4bc114089",
+  "identity_allocation_digest.csv.gz": "525aa4431fe80621a205611a10f293005ecc6899b7a669fd191311415c1940e8",
+  "identity_freeze.csv.gz": "d57c967ee403d83fc2154eab57f57a49dcadd419611060c4789b3b38c67208ba",
+  "planned_issue_stake.csv": "0d83cf0632443a47f2806153e1a6a44b0ab89e39e1277ff136cf6f6743698fbc",
+  "role_vector_freeze.csv.gz": "85a43953262713bf8da68222257ce63cc4184039831ef46beb618ef303a007f7",
+  "selector_issue_participation.csv": "168df95f5cd47d2e33253d169453f9071dd885c3b2d6f04b51abd7d82176a9a7",
+  "selector_registry.csv": "9d240d197ee8307f90abd0e90633d67dfb382833c71ceb77f22b151a03e8327b",
+  "source_binding.json": "de755cb3ac155b0290f6f3dea61cf65c7175cd72813d57731e3e9c7dd126d72a",
+  "source_bridge_registry.csv": "8dd08e478fdfe96fc31fe9d5b9f2d8ac97584460a438a0afdcb58b494c32ba2c",
+  "support_contrast_registry.csv": "9c7f58cedbdf18be903639ccc8150a11269fd80c5b8f99a41b51912fd9747168",
+  "support_issue_membership.csv": "fd39de7c7ed8df855a097df2a95f1bd2dd5dac970711380ce15b8d3e6d29a9bc",
+  "support_view_registry.csv": "80401e906a39ad0588d77fd9360f47f77672b06af39f87873e2f2a5a8584535f"
+}

@@ -1,0 +1,26 @@
+{
+  "complete_comparable_rows": 20837,
+  "handicap_exact_rows": 20837,
+  "history_rows": 21091,
+  "history_without_official_identity_rows": 225,
+  "issue_range": [
+    24011,
+    25042
+  ],
+  "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid; reused p_close match_uid resolves by issue+match_uid",
+  "labels_opened": false,
+  "max_delta_gt_005_rows": 85,
+  "max_delta_gt_010_rows": 22,
+  "mean_absolute_error": 0.005532865897294611,
+  "missing_policy": "missing history triplet -> NO_BET_FROZEN; missing p_close reference -> history-proxy-only grade",
+  "official_identity_matched_rows": 20866,
+  "outcome_correlations": {
+    "0": 0.994467825471939,
+    "1": 0.9963315352646837,
+    "3": 0.99505270243424
+  },
+  "outlier_policy": "do not substitute p_close; retain normalized average-EU proxy with explicit source grade",
+  "p_close_duplicate_audit_rows": 0,
+  "p_close_duplicate_match_uid_count": 0,
+  "p_close_match_rows": 20851
+}

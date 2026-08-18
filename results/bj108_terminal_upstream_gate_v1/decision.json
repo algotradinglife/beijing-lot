@@ -1,0 +1,5 @@
+{
+  "decision": "NO_PROMOTION",
+  "reason": "#107 accepted periods=0; dynamic-N optimization and outcome settlement are not required.",
+  "status": "NOT_RUN_UPSTREAM_ALL_NO_BET"
+}

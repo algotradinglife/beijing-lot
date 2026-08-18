@@ -1,0 +1,38 @@
+{
+  "arms": {
+    "MATCHED_FULL_N7": {
+      "stake_yuan": 4374,
+      "tickets": 2187
+    },
+    "P_MIN_DELETE_N7": {
+      "stake_yuan": 2916,
+      "tickets": 1458
+    },
+    "Q_MIN_DELETE_N7": {
+      "stake_yuan": 2916,
+      "tickets": 1458
+    }
+  },
+  "contract": "BJ-HIST-DELETE-SCORE-N7-001",
+  "denominator": {
+    "frontier_rows": 294576,
+    "ranker_disagreements": 79549,
+    "role_rows": 1894515,
+    "source_rows": 114146
+  },
+  "generator_version": "bj132-gatea-v1",
+  "input": {
+    "files": {
+      "matched_frontier.csv.gz": "8ca1cafae728bd2c95e4bfda7c7d466402af970ddefc6edae5f2b4e1fc7586d7",
+      "portfolio_role_assignments.csv.gz": "1a689cb23a11628913ebe9208435f04bc2112311e157a511b529f33a1d6611aa",
+      "scatter_coordinates.csv.gz": "ea16ed1e757260258515d750958fede6e6603a3f593d8ec521e2378086d0448f"
+    },
+    "manifest_sha256": "a8eeb50204bb9a2d69578538e28943a432bea11083661a63b950a5ab5a2481da",
+    "package": "results/bj127_gate_a_preoutcome_v2"
+  },
+  "issue": 132,
+  "outcome_boundary": "No result, final SP, payout, tax, ROI, settlement source, or post-outcome artifact is read or emitted. Gate B is NOT_RUN and NOT_AUTHORIZED.",
+  "scope": "Historical paper-only research; no purchase, production, or promotion.",
+  "selection": "Copy each #127 available portfolio's exact seven match IDs and its p-min deletion. Compute q(code)=p_cal(code)*predicted_SP(code) from #127's outcome-unexposed scatter fields; q_min uses deterministic q, match_idx, code tie-breaks. No match is reselected.",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_MATCHED_FREEZE"
+}

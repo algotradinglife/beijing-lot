@@ -1,0 +1,152 @@
+{
+  "cohort": {
+    "evaluation_years": [
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "folds": 7,
+    "handicap_line_norm": 0,
+    "rows": 71857,
+    "warmup_year": 2018,
+    "years": [
+      2018,
+      2025
+    ]
+  },
+  "created_at_utc": "2026-07-30T17:26:09.467419+00:00",
+  "evidence_class": "RETROSPECTIVE_TIMING_PROXY",
+  "explicitly_not_read": [
+    "match_features",
+    "score",
+    "result",
+    "result_code",
+    "winning_sp",
+    "official_sp",
+    "outcome_features",
+    "action_candidates",
+    "settlement",
+    "final snapshot",
+    "Asian market"
+  ],
+  "issue": 89,
+  "methods": {
+    "RAW_DEVIG_EURO": {
+      "fit": "none",
+      "probability": "normalize reciprocal 10h EURO 1X2 consensus averages",
+      "status": "baseline"
+    },
+    "ROLLING_MULTINOMIAL_LOG_ODDS": {
+      "feature_transform": "none; raw log-odds are not standardised or otherwise fitted",
+      "features": [
+        "log(p3_raw/p0_raw)",
+        "log(p1_raw/p0_raw)"
+      ],
+      "fit": "per fold, expanding prior years only",
+      "model": "three-class softmax with a 3x3 coefficient matrix: intercept, log(p3_raw/p0_raw), log(p1_raw/p0_raw)",
+      "objective": "sum_i[-log softmax(X_i B)[y_i]] + ||B||_F^2/(2*C), minimized by deterministic L-BFGS-B from B=0",
+      "regularization": {
+        "l2_C": 0.1,
+        "penalize_intercept": true,
+        "selection": "fixed before outcome access; no C search"
+      }
+    },
+    "ROLLING_STRATIFIED_SHRINKAGE": {
+      "estimate": "for each stratum s, p_s=(class_count_s + 100*global_observed_class_frequency)/(n_s+100); every test row in s receives p_s",
+      "fallback": "n_s=0 in the same fixed formula, equal to the global prior",
+      "fit": "per fold, expanding prior years only",
+      "global_prior": "prior-fold empirical observed 3/1/0 class frequency",
+      "shrinkage_pseudocount": 100.0,
+      "strata": {
+        "confidence_bands": [
+          0.0,
+          0.4,
+          0.5,
+          0.6,
+          0.7,
+          1.0000001
+        ],
+        "predicted_outcome": "top1_code_raw"
+      }
+    }
+  },
+  "prohibited": [
+    "random split",
+    "held-out outcome threshold search",
+    "portfolio ROI",
+    "SP cap",
+    "N/K/stake",
+    "production/PDF"
+  ],
+  "quality_gate": {
+    "dispersion_categories": {
+      "HIGH": "mean relative range > 0.10",
+      "LOW": "mean relative range <= 0.10",
+      "MISSING": "one or more 10h relative ranges missing"
+    },
+    "fallback": "the same formula with stratum_n=0",
+    "fixed_coverage_arms": [
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "formula": "(stratum_top1_hits + 100*prior_fold_global_top1_hit_rate)/(stratum_n + 100)",
+    "gate": "within each fold, retain the first ceil(coverage*test_n) rows after score DESC, then kickoff_ts ASC, issue ASC, match_idx ASC, match_id ASC; the gate is identical across calibration methods",
+    "initial_to_10h_movement_categories": {
+      "HIGH": "movement > 0.15",
+      "LOW": "sum abs(log(p10h/pinitial)) <= 0.05",
+      "MEDIUM": "0.05 < movement <= 0.15",
+      "MISSING": "initial vector incomplete"
+    },
+    "learning_boundary": "all score estimates and score cutoffs use only the fold training years; held-out outcomes never set a gate",
+    "prior": "prior-fold global raw-devig Top1 hit rate",
+    "raw_entropy_bands": [
+      0.0,
+      0.8,
+      0.95,
+      1.05,
+      1.1000001
+    ],
+    "raw_top1_confidence_bands": [
+      0.0,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      1.0000001
+    ],
+    "score": "method-independent prior-fold smoothed RAW-devig Top1 correctness estimate; calibration changes the probability vector, while this separately learned match-quality gate uses only pre-outcome market state",
+    "selection_boundary": "Gate B reports all fixed arms. A later policy nomination is not permitted unless PI accepts a separately explicit chronological selector; this Gate-A card therefore does not select a winner using held-out outcomes",
+    "smoothing_pseudocount": 100.0,
+    "stratum": [
+      "raw_top1_code",
+      "raw_top1_confidence_band",
+      "raw_entropy_band",
+      "dispersion_category",
+      "initial_to_10h_movement_category"
+    ]
+  },
+  "source": {
+    "path": "/home/drwho1985/workspace/soccer/beijing-lot/data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+  },
+  "sql_read_whitelist": {
+    "market_consensus": [
+      "euro_1x2@10h averages/ranges/n_complete",
+      "euro_1x2@initial averages"
+    ],
+    "matches": [
+      "match_id",
+      "issue",
+      "match_idx",
+      "kickoff_ts",
+      "handicap_line_norm"
+    ]
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED"
+}

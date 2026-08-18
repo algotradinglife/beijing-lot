@@ -1,0 +1,12 @@
+{
+  "canonical_outcome_join.csv": "07bfc5e06742991b843c0e89f0c5fe9505d53e10dc3cd627240f838ba1658145",
+  "deleted_outcome_diagnostics.csv": "3bc5e54ffb50f56af1dae220385a81a19c2c25356de6ac5b78778ef5aca6b9a0",
+  "ex_best_payout_sensitivity.csv": "e6cbd7dd6cb49c3b8d29b281bba14d72111fcac217d0bd1457e0f32e95304c63",
+  "frontier_settlement.csv": "f5d72385c698cf70557159a2f100bfb9c51128dfb22f5c67c9099f003859c345",
+  "issue_portfolio_summary.csv": "1566eca4e9925b72d7fe8480aa2c71fc422a2809278026696e207cb6d10a47b7",
+  "leave_one_year_out.csv": "03232b138843485e9a7c7f416aab0521ae267aaaace62aa4fd94c4bc3705dafa",
+  "pool_failure_concentration.csv": "e8e03a6b9e6405fa679a91acc3ad7281debe06e70ca447aaba964421a1e8f1c6",
+  "settlement_card.json": "c72a1a696842a21d03d59e7354bbc2a01f8eba5852f60a26b870480cef50754d",
+  "settlement_runner.py": "7d527d91fd964c5d5bf6315b260300286af64e3a3643c7d565c7e55a204283aa",
+  "settlement_summary.csv": "c8671692c4ecc0c3a6336d0c4d46c8f59dd455d07402cc74a7b345ed2163c565"
+}

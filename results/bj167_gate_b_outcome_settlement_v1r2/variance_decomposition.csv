@@ -1,0 +1,4 @@
+M,allocator_seed_variance,allocator_seed_sd,issue_outcome_bootstrap_sd_proxy,variance_note
+32,0.098865116738,0.314428237819,0.457202709458,seed variation is Monte Carlo allocation uncertainty; issue bootstrap is historical outcome/issue uncertainty; seeds are not football histories
+64,0.044418954616,0.210758047570,0.264684518687,seed variation is Monte Carlo allocation uncertainty; issue bootstrap is historical outcome/issue uncertainty; seeds are not football histories
+128,0.026106045745,0.161573654243,0.148763453068,seed variation is Monte Carlo allocation uncertainty; issue bootstrap is historical outcome/issue uncertainty; seeds are not football histories

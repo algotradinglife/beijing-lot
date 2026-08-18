@@ -1,0 +1,7 @@
+{
+  "absolute_edge_rule": "candidate absolute pre-tax ROI, allocator MC lower bound, paired issue-bootstrap lower bound, and ex-largest issue/year controls must all remain positive; this package does not authorize promotion",
+  "next_step": "separate strict EV/forward validation only if the controlling PI boundary is satisfied; otherwise treat as descriptive evidence",
+  "primary_M": 64,
+  "promotion_authorized": false,
+  "terminal_state": "NO_STABLE_LIFT"
+}

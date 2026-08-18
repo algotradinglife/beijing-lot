@@ -1,0 +1,15 @@
+{
+  "contract_version": "bj137-gate-b-v3r1-reporting-v1",
+  "non_compressed_controls": {
+    "NUMERIC_LINEAGE.json": "5f2805dced33874eed6b6870eec295708d2b4fcbb9ce67a037cf5fd680aab240",
+    "README.md": "cd6d7ad08e9da021548927ecd9f180c1de88327b51de0e74a7a1d0121dec5300",
+    "attribution_summary.csv": "83615e025d79d04e026c1d841cce8410797a767653d3a5e2f8a5555e18b88fd6",
+    "mechanism_summary.csv": "507d964df2a0da4606061ba13587e2f643f63cca86cc7613abd8d75e9c0db59e",
+    "primary_candidate_curve.csv": "a36fbc5fc1a2474875280376bbadddf97d59b36aa1bd674091007ba0e9b20a19",
+    "reporting_interpretation.md": "f59cc568ccbbd4dfd88ffcd4fa119908feddee6ce22e0124a82430518b11f99f",
+    "reporting_runner.py": "164a93592ecb972a6ffcfe5bfbd0dbccd0d64aec36741bd75d6140e164fe168c",
+    "reporting_summary.json": "34f345cbdf74dd3c2e796112137310244264a344b8237e7e1b4dcb6e873f6609",
+    "secondary_esp300_k8_q_m128.csv": "bcf2f96c3a53d58700358c6010c1281c1eb3eea6653b18513d1ffe71304c186f",
+    "source_census.csv": "c341ad1910baaf187fa0a5636ce7fc944334a91a0a109209c7e163a707010291"
+  }
+}

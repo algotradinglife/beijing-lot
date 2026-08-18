@@ -1,0 +1,3 @@
+source,role,identity,sha256,rows,join_status
+bj151_gate_a_preoutcome_v1,"accepted exact #137 NO_GATE/K4 identities, roles and q vectors",SHA256SUMS.json,3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6,10848,copied without outcome exposure or re-selection
+bj137_gate_a_preoutcome_v2,underlying accepted candidate definition,SHA256SUMS.json,0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df,0,binding inherited from #151 Gate-A card

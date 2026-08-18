@@ -1,0 +1,8 @@
+{
+  "decision": "NO_PROMOTION",
+  "positive_all_rows": 0,
+  "primary_unit": "complete (issue, fold) instance",
+  "promotion_authorized": false,
+  "rule": "Only an ALL-scope positive primary complete-issue deletion arm can trigger strict independent EV; otherwise no promotion.",
+  "strict_independent_ev_required": false
+}

@@ -1,0 +1,31 @@
+{
+  "comparisons": "Primary effects are Q-delete exposure cap 1/2 minus CONCENTRATED_TOP_SCORE on exact complete-issue matched support at M64/M128 and the same allocator minus its exact-K4 FULL capital-normalized ROI reference. FULL raw stake is preserved separately; it is not a literal equal-ticket-budget comparator. Secondary ESP300_GM290 cap 1/2/4 rows are descriptive only.",
+  "contract": "BJ-HIST-DIVERSIFIED-N7-ALLOCATOR-001",
+  "decision": {
+    "decision": "NO_PROMOTION",
+    "primary_effect_comparisons": 24,
+    "primary_metric_tests_for_bonferroni": 48,
+    "promotion_authorized": false,
+    "rule": "A candidate must have positive no-tax and ticket-tax-adjusted deltas in every frozen seed, ALL/YEAR/FOLD/LOYO view, and Bonferroni-adjusted all-scope issue-bootstrap support before it can request strict independent EV. No result promotes purchase, production, or betting.",
+    "strict_ev_candidates": [],
+    "strict_independent_ev_required": false
+  },
+  "frontier": "All frozen cap rows are retained. Match/Jaccard/joint structural no-bets and identity-equivalent cap rows are controls, not independent strategies; their inability to diversify stems from the frozen six-shared-leg construction.",
+  "input_boundary": "Only immutable Gate-A allocation/candidate/Q-role inputs and the canonical trusted final-SP outcome payload are read. No candidate selection, cap, ticket budget, or upstream #137 result is recomputed or used as an economic edge.",
+  "issue": 133,
+  "metrics": "Pre-tax no_tax_roi precedes tax-adjusted ROI. Complete-issue participation, capital utilization, payout concentration, ex-largest issue, drawdown, YEAR/FOLD/LOYO, deterministic issue bootstrap, and a 24-comparison Bonferroni diagnostic are included.",
+  "provenance": {
+    "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "gate_a_content_identity_sha256": "68159b1adb428181874998a223121b4ee16e632071402eb56b0dd9326d233bb1",
+    "gate_a_identity_payload_sha256": "39f6d2a0e3b81da630275fc4dc43c308cb43512a97d70ad98bfcaf0d79200907",
+    "gate_a_manifest_sha256": "1fff3f904fcb9a5efed231771880be8ae0603b0d8f3c7d0365937fcfe9985e79",
+    "gate_a_plan_sha256": "df07591aa2bcbf8d73102d149eb8a7b257337544a15e56eb49c342b8927733c1",
+    "gate_a_role_payload_sha256": "3aaf08a97ad86c558d62955ebb0b8bfa1a1bbf7b1c076f4b03b7ba62a85606c9",
+    "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
+  },
+  "runner_version": "bj133-gate-b-v1-ticket-tax",
+  "sampling": "Q_INFORMED_WOR_DISTINCT uses deterministic exponential-race weighted sampling without replacement over the 3^7 ticket space, keyed by frozen gate/portfolio identity and frozen seed. EXACT_K4_FULL covers all 2187 sequences once. There are no duplicate selected tickets in the sampled arms.",
+  "scope": "historical paper research only; no purchase, production, betting, or promotion authority.",
+  "stage": "GATE_B_ONE_SHOT_COMPLETE_ISSUE_OUTCOME_SETTLEMENT",
+  "tax": "Tax is secondary to no_tax_roi and is applied per individual winning ticket: 20% iff that one ticket's gross is at least \u00a510,000. No issue, identity, arm, policy, draw count, or portfolio aggregate is used to cross the tax threshold. winning_ticket_tax_ledger.csv.gz and ticket_tax_reconciliation.csv make this auditable."
+}

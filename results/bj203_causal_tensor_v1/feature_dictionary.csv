@@ -1,0 +1,25 @@
+feature_order,feature,dtype,minimum,maximum,source,timing_rule,admissible_use,missingness
+0,outcome_code_numeric,float32,0,3,canonical outcome axis,immutable identity known before the issue cutoff,inference,never missing
+1,calibrated_market_probability,float32,0,1,#190 calibrated match-safe 1h market estimator,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,masked where unavailable or the 1h snapshot follows issue cutoff
+2,devig_euro_probability,float32,0,1,1h EURO consensus reciprocal odds normalized within match,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,masked unless all odds are valid and cutoff-safe
+3,euro_1h_odds,float32,1,,1h EURO consensus,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,"masked unless finite, >1 and cutoff-safe"
+4,fundamental_probability,float32,0,1,#190 independent T1 score-distribution estimator,source observation is available at or before feature_cutoff_ts_utc,inference,masked where the target-safe estimator is unavailable
+5,probability_residual,float32,-1,1,#190 calibrated probability minus its frozen target-safe consensus_p baseline (not package devig_euro_probability),1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,masked where calibrated or frozen consensus input is unavailable/cutoff-late
+6,probability_residual_z,float32,,,#190 calibrated residual standardized by frozen uncertainty,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,masked where unavailable or the 1h snapshot is cutoff-late
+7,predicted_final_sp,float32,1,,#90 chronological deployed 10h SP predictor,10h predictor input cutoff (kickoff_ts_utc - 10h) is at or before feature_cutoff_ts_utc,inference,"masked where unavailable, outside SP domain or cutoff-late"
+8,bj_sp_snapshot,float32,1,,timestamped pre-event Beijing SP snapshot,source observation is available at or before feature_cutoff_ts_utc,inference,all masked: historical source has no trustworthy snapshot timestamp
+9,bj_sp_snapshot_age_minutes,float32,0,,cutoff minus timestamped Beijing SP observation,source observation is available at or before feature_cutoff_ts_utc,inference,all masked with bj_sp_snapshot
+10,native_handicap_line,float32,-3,3,native Beijing handicap normalized by accepted source,immutable identity known before the issue cutoff,inference,masked and row retained when native line is absent
+11,line_residual_mu,float32,,,#190 expected raw margin plus native line,source observation is available at or before feature_cutoff_ts_utc,inference,masked where line or T1 distribution is unavailable
+12,line_residual_z,float32,,,#190 line residual standardized by frozen uncertainty,source observation is available at or before feature_cutoff_ts_utc,inference,masked where line residual is unavailable
+13,market_uncertainty,float32,0,,#190 frozen 1h market uncertainty proxy,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,masked where unavailable or the 1h snapshot is cutoff-late
+14,market_signature_breadth,float32,0,,deterministic sorted dictionary index of #190 1h breadth bucket,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,masked where unavailable or the 1h snapshot is cutoff-late
+15,market_signature_dispersion,float32,0,,ordinal encoding of #190 1h D_LOW/D_MID/D_HIGH,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,masked for unknown or cutoff-late dispersion strata
+16,history_training_rows_log1p,float32,0,,log1p of #190 strictly prior training-row count,source observation is available at or before feature_cutoff_ts_utc,inference,masked where chronological model state is unavailable
+17,min_history_n_log1p,float32,0,,log1p of minimum home/away prior history depth,source observation is available at or before feature_cutoff_ts_utc,inference,masked where team history state is unavailable
+18,league_index,float32,0,,deterministic sorted league dictionary,immutable identity known before the issue cutoff,inference,masked only for a blank league
+19,home_team_index,float32,0,,deterministic sorted team dictionary,immutable identity known before the issue cutoff,inference,masked only for a blank home team identity
+20,away_team_index,float32,0,,deterministic sorted team dictionary,immutable identity known before the issue cutoff,inference,masked only for a blank away team identity
+21,kickoff_delay_hours,float32,0,,kickoff_ts_utc minus issue feature_cutoff_ts_utc,immutable identity known before the issue cutoff,inference,masked if either timestamp is unavailable
+22,match_position_fraction,float32,0,1,"zero-based deterministic match order divided by max(J_i-1,1)",immutable identity known before the issue cutoff,inference,never missing
+23,calendar_year,float32,2018,2025,canonical reporting year,immutable identity known before the issue cutoff,inference,never missing

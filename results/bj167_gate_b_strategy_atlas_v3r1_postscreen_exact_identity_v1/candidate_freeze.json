@@ -1,0 +1,8 @@
+{
+  "candidate_count": 17135,
+  "candidate_freeze_sha256": "56d77536807e1d8ab0e71caf547685820db68b71755becf336aafe84969dc15a",
+  "candidate_total_screen_stake_yuan": "7033958580.000000",
+  "contract": "bj167-gate-b-v3r1-recovery-finalizer-v1",
+  "inclusion_rule": "union(absolute positive aggregate cells, raw Pareto cells, robust Pareto cells)",
+  "screen_checkpoint_sha256s": "06ad70bf0e003213d4ff2daa3d940fe9d35514b191da10d0b18905d9692dc78d"
+}

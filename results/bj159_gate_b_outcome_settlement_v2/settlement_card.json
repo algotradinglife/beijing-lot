@@ -1,0 +1,35 @@
+{
+  "contract": "BJ-HIST-SELECTED-WOR-CROSS-N-001",
+  "decision": {
+    "decision": "POSITIVE_REQUIRES_STRICT_INDEPENDENT_EV",
+    "positive_all_rows": 8,
+    "promotion_authorized": false,
+    "rule": "Pre-tax no_tax_roi is primary and tax-adjusted ROI secondary; same-window historical positives are descriptive and require strict independent EV plus held-out/forward validation; no purchase, production, betting or promotion authority.",
+    "strict_independent_ev_required": true
+  },
+  "issue": 159,
+  "output": {
+    "bootstrap_rows": 162,
+    "identity_settlement_rows": 63180,
+    "issue_settlement_rows": 28188,
+    "matched_delta_rows": 81,
+    "saturated_nominal_rows": 5301,
+    "surface_summary_rows": 1782
+  },
+  "provenance": {
+    "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "canonical_outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "gate_a_content_identity_sha256": "4ec52432ec6c1779bab33b0c4bdc4e381b0ae7434228637c509970291ed7361e",
+    "gate_a_identity_sha256": "f99dc073ce72b1dec79b6573d2756c06fd5295151c6387d1d0b2b720d6e1ac68",
+    "gate_a_manifest_sha256": "a15c585fc1836da4f558d07ce19c925561bfd1c240e834b7e3e0da22701cd325",
+    "gate_a_participation_sha256": "448190b8bb099189204f132c9ea0c4ca242fc3da3fa7a9fb00fe16f77509abf6",
+    "gate_a_role_sha256": "36902eafe30e28fa42021e7a01f4cee348a6beeeee6508991b72bc6f815c9b16"
+  },
+  "runner_version": "bj159-gate-b-v2",
+  "saturation_rule": "nominal_M is a reporting label; effective_M=min(nominal_M,3^N) controls actual draw count and stake; FULL_SPACE_SATURATED nominal rows share one allocation per identity/seed/effective_M and are not extra WR tickets.",
+  "scope": "historical paper-only research; no purchase, production, betting or promotion authority",
+  "settlement_rule": "Hit iff the frozen truth code is among the effective_M distinct Q-WOR tickets; gross=\u00a52\u00d70.65\u00d7product(trusted final winning SP) exactly once on hit.",
+  "stage": "GATE_B_CANONICAL_OUTCOME_SETTLEMENT",
+  "tax_rule": "20% is applied per individual winning \u00a52 ticket iff that ticket gross >= \u00a510,000; no issue/policy pooling or aggregation.",
+  "unit": "complete lottery issue; native pool is provenance only"
+}

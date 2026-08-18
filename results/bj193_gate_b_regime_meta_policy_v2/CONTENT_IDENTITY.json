@@ -1,0 +1,12 @@
+{
+  "best_fundable_100k_capital_path": "PRIOR_ONLY_BEST_FIXED",
+  "best_matched_pre_tax_roi_per_stake": "ALL_STATIC",
+  "candidate_count": 0,
+  "canonical_issue_count": 344,
+  "checkpoint_manifest_sha256": "4015ca353dff957a79958bf3e7aa73b8824f685c967a73e544d59bc437a3ca15",
+  "contract": "bj193-gate-b-three-stage-regime-meta-policy-v2",
+  "decision": "NO_PROMOTION",
+  "decision_objective_primary": "PRE_TAX_FINITE_BANKROLL_GROWTH_AND_FUNDABILITY_NATIVE_SUPPORT",
+  "decision_objective_secondary": "PRE_TAX_ROI_PER_STAKE_STRICT_FOUR_ARM_COMMON",
+  "strict_common_issue_count": 189
+}

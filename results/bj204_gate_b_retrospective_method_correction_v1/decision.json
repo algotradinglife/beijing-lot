@@ -1,0 +1,35 @@
+{
+  "approved_method_head": "adbf65134bbd7223bfea52d1ce453b025e06e3e7",
+  "decision": "RETROSPECTIVE_METHOD_CORRECTION_PENDING_PI_TERMINAL_REVIEW",
+  "execution_status": "RETROSPECTIVE_METHOD_CORRECTION",
+  "selection": [
+    {
+      "complexity_rank": 1,
+      "cv_rows": 152394,
+      "mean_cv_log_loss": 1.1477505721976968,
+      "model_id": "LOGISTIC_RESIDUAL",
+      "selected_for_primary": true
+    },
+    {
+      "complexity_rank": 2,
+      "cv_rows": 152394,
+      "mean_cv_log_loss": 1.1489988740664745,
+      "model_id": "HIST_GRADIENT_RESIDUAL",
+      "selected_for_primary": false
+    },
+    {
+      "complexity_rank": 0,
+      "cv_rows": 152394,
+      "mean_cv_log_loss": 1.1505302950691898,
+      "model_id": "MARKET_ONLY",
+      "selected_for_primary": false
+    },
+    {
+      "complexity_rank": 3,
+      "cv_rows": 152394,
+      "mean_cv_log_loss": 1.152227059551671,
+      "model_id": "ISSUE_CONTEXT_SUMMARY_MLP_RESIDUAL",
+      "selected_for_primary": false
+    }
+  ]
+}

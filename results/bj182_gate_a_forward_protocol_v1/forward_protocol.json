@@ -1,0 +1,128 @@
+{
+  "activation": {
+    "minimum_issue_exclusive": 26082,
+    "preexisting_issues_may_not_be_relabelled": true,
+    "required_timestamp_order": "acceptance <= baseline input as-of <= package creation <= freeze; acceptance <= latest evidence receipt <= cutoff <= freeze",
+    "rule": "A sample is valid only after PI accepts and merges this exact Gate-A package.",
+    "status": "PENDING_PI_GATE_A_ACCEPTANCE"
+  },
+  "arms": [
+    "B0_BASELINE_SHADOW",
+    "M0_MESSAGE_ANNOTATION",
+    "M1_MESSAGE_RISK_RERANK"
+  ],
+  "baseline_contract": {
+    "allocation": "FULL_ENUMERATED",
+    "arm": "B0_BEST_FULL",
+    "candidate_order": "frozen B0 score descending, portfolio_id ascending tie break",
+    "missing_baseline": "FAIL_CLOSED_NO_SAMPLE",
+    "n": 7,
+    "required_identity": [
+      "request_id",
+      "package_id",
+      "package_created_at_utc",
+      "input_as_of_utc",
+      "candidate_universe_sha256",
+      "candidate_order",
+      "selected_portfolio_id",
+      "selected_identity_fingerprint",
+      "selected_match_ids"
+    ],
+    "source": "externally supplied accepted outcome-unexposed B0 package for the target issue",
+    "stake_yuan": 4374,
+    "tickets": 2187
+  },
+  "contract": "BJ-FWD-MESSAGE-CHAIN-N7-001",
+  "decision_chain": {
+    "aggregation": "scan the exact frozen B0 candidate order and select the first fully covered identity without HIGH risk",
+    "confidence": "consumer HIGH/MEDIUM/LOW/NOT_ACTIONABLE from active state, contradiction state, producer confidence and provenance eligibility",
+    "cross_field_validator": "decision_core.validate_decision_trace must pass before a decision trace is frozen",
+    "decision_id": "SHA-256 of canonical trace JSON after removing only decision_id",
+    "fact_extraction": "strict schema: availability, role_class, severity, direction; immutable fact/raw IDs retained",
+    "forbidden": [
+      "probability retuning",
+      "selector threshold retuning",
+      "new candidates",
+      "M changes",
+      "allocator changes",
+      "ticket changes",
+      "stake scaling"
+    ],
+    "handicap_translation": "diagnostic direction only; probabilities and handicap line remain unchanged",
+    "prospective_trace_builder": "decision_core.build_decision_trace content-addresses and validates every admitted trace before persistence",
+    "risk_rule": "HIGH rejects identities containing that match; MEDIUM annotates only; CLEAR keeps B0 order"
+  },
+  "evidence_contract": {
+    "allowed_provenance_tiers": [
+      "TIER_0_OFFICIAL",
+      "TIER_1_PRIMARY",
+      "TIER_2_RELIABLE"
+    ],
+    "common_cutoff": "one timezone-aware cutoff shared by the issue decision; strictly before every selected match kickoff",
+    "consumer_api": "MessageEvidenceLedger.export_as_of plus one coverage report per required kind",
+    "direct_sql_access_permitted": false,
+    "incomplete_entity_or_collection_action": "ABSTAIN",
+    "late_or_stale_action": "ABSTAIN",
+    "latest_receipt_recorded_at_required": true,
+    "optional_kinds": [
+      "confirmed_lineup",
+      "schedule",
+      "travel"
+    ],
+    "required_kind_max_age_seconds": {
+      "coach_change": 604800,
+      "expected_lineup": 86400,
+      "injury": 604800,
+      "motivation": 259200,
+      "suspension": 604800
+    },
+    "tier_3_action": "AUDIT_ONLY_NOT_DECISION_ELIGIBLE",
+    "unresolved_conflict_action": "ABSTAIN"
+  },
+  "forward_horizon": {
+    "diagnostic_checkpoint": "5 matched message-eligible issues; descriptive only",
+    "insufficient_at_time_limit": "INSUFFICIENT_FORWARD_COVERAGE",
+    "outcome_join_before_checkpoint": false,
+    "primary_checkpoint": "20 matched message-eligible issues and at least 30 post-activation calendar issues",
+    "retuning_between_samples": false,
+    "time_limit_days": 180
+  },
+  "outcome_boundary": "No score, result, final SP, winning SP, payout, tax, ROI or settlement data may enter Gate A or a decision freeze.",
+  "outcome_settlement": {
+    "authorization": "SEPARATE_PI_GATE_REQUIRED",
+    "metrics": [
+      "coverage",
+      "abstention",
+      "identity changes",
+      "calibration",
+      "stake",
+      "gross payout",
+      "pre-tax ROI",
+      "matched lift",
+      "YEAR/time block",
+      "ex-largest issue",
+      "HHI",
+      "drawdown"
+    ],
+    "positive_claim": "strict independent EV plus further forward evidence required",
+    "pre_tax_primary": true,
+    "tax_reference_only": true,
+    "tax_rule": "per winning CNY2 ticket; no issue/person aggregation"
+  },
+  "participation_accounting": {
+    "coverage": "report ledger coverage, abstention and each error reason separately from selection lift",
+    "matched": "restrict B0 and M1 to identical issue set; compare equal CNY4374 issue stakes",
+    "native": "report B0 on every valid baseline issue and message arms only when their policy selects",
+    "no_bet": "zero executed tickets and zero stake; never a losing bet"
+  },
+  "production_authority": false,
+  "sample_selector": {
+    "issue_id_reuse": false,
+    "minimum_candidate_match_count": 7,
+    "one_freeze_per_issue": true,
+    "primary": "first integer issue strictly greater than minimum_issue_exclusive with a content-addressed B0 package and cutoff-safe message exports created after activation",
+    "same_issue_regeneration_as_new_sample": false
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_PROTOCOL",
+  "version": "bj182-gate-a-forward-protocol-v1"
+}

@@ -1,0 +1,4 @@
+support_stage,issue_count,definition,support_hash
+GATE_A_PREOUTCOME,177,THREE_WAY_ALL frozen issue intersection,d4b6bed20db88c9f153c7ecff2a02dcc050f511fa0475b75b8fa8118c6f61be7
+GATE_B_SETTLED_COMMON,141,all three selector policies have complete trusted outcomes,bc4ffb84be179f2cd88ea7ef482de6d57064e460ebf7002dc636722040e72f52
+GATE_B_UNAVAILABLE_COMMON,36,at least one selector policy lacks a canonical outcome; all nine cells execute zero stake,c45e6270f6521e19cd5f6451d7b47521f9aa71a72e39b1a4df102c4090982685

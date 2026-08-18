@@ -1,0 +1,11 @@
+{
+  "checkpoint": ".scratch/bj193_gate_b_chain_checkpoint_v2",
+  "checkpoint_issue_policy_flows_sha256": "70a20d2474632b9ea42daa41aa546d7fc002bb30942cd3270af3e3cf145de759",
+  "checkpoint_manifest_sha256": "4015ca353dff957a79958bf3e7aa73b8824f685c967a73e544d59bc437a3ca15",
+  "checkpoint_stage3_direction_settlement_sha256": "dbbb8587a4544e4b2d423e01a1304b26da82714e8e2e7b50b6efbd402898c433",
+  "checkpoint_stage3_dynamic_path_sha256": "eef6744c6d2a4dee97bd99ca6cc8ec1e396997a1cf11ee3a7d847e0230c2022f",
+  "contract": "bj193-gate-b-oracle-fold-join-correction-v1",
+  "correction_chain_sha256": "f54b178ed47556b3a14c63f2ee1cd52a3da113a3e32e4ee1d7730ee777766695",
+  "correction_git_head": "224bfa7f45d34c156e5172ab2c089c00a15e167c",
+  "correction_runner_sha256": "3d3b8fbe48f5598243f922df8106bbf93c9283cc10d26ed2e5f6cafbbd94ff18"
+}

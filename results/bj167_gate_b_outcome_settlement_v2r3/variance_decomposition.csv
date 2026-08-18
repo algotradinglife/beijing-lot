@@ -1,0 +1,4 @@
+M,candidate_allocator_seed_sd,candidate_allocator_seed_variance,candidate_mcse,candidate_bootstrap_sd_proxy,lift_allocator_seed_sd,lift_mcse,lift_bootstrap_sd_proxy,variance_note
+32,0.308252006938,0.095019299781,0.030825200694,0.058257868466,0.308252006938,0.030825200694,0.028030291023,allocator seed variation and historical issue/outcome bootstrap are separate; seeds are not football histories
+64,0.214022598830,0.045805672810,0.021402259883,0.060207031361,0.214022598830,0.021402259883,0.025709304898,allocator seed variation and historical issue/outcome bootstrap are separate; seeds are not football histories
+128,0.150917756299,0.022776169166,0.015091775630,0.051383952733,0.150917756299,0.015091775630,0.020885202998,allocator seed variation and historical issue/outcome bootstrap are separate; seeds are not football histories

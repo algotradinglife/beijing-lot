@@ -1,0 +1,39 @@
+{
+  "accepted_model_independence_probability": 0.00027716145897895293,
+  "configuration_axis_sha256": "06d721ede1c2ff803d4f1919fc6137b332670285836602cc8002af013ffe3442",
+  "configuration_index": 1711,
+  "expected_pre_tax_net": -0.101328450532024,
+  "fallback_applied": true,
+  "formula": "0.65 * joint_probability * predicted_sp_product - 1",
+  "inherited_joint_probability": 0.000366078406125253,
+  "inherited_joint_vector_sha256": "55bfe28621594ed8905bc483515d24ce45425df544f3ec4660e3b16104357581",
+  "inherited_scorer": "MARKET_INDEPENDENCE",
+  "issue": "25043",
+  "market_independence_probability": 0.000366078406125253,
+  "market_joint_vector_sha256": "55bfe28621594ed8905bc483515d24ce45425df544f3ec4660e3b16104357581",
+  "match_indices": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "outcome_axis": [
+    "3",
+    "1",
+    "0"
+  ],
+  "predicted_sp_product": 3776.7090094166133,
+  "realized_ticket_identity": [
+    "0",
+    "1",
+    "3",
+    "3",
+    "1",
+    "3",
+    "1"
+  ],
+  "version": "bj205-joint-n7-value-matrix-v2"
+}

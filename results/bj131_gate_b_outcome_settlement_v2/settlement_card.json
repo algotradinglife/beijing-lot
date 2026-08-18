@@ -1,0 +1,23 @@
+{
+  "contract": "BJ-HIST-SOFT-COVER-N7-001",
+  "denominator": {
+    "active_base_rows": 90215,
+    "logical_active_rows": 1894515,
+    "logical_no_bet_rows": 502551,
+    "no_bet_base_rows": 23931,
+    "seed_count": 3,
+    "sleeve_count": 7
+  },
+  "issue": 131,
+  "outcome_boundary": "The outcome join is opened only after Gate-A and canonical-outcome manifests validate. No portfolio, seed, or sleeve is regenerated.",
+  "provenance": {
+    "canonical_outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "gate_a_content_identity_sha256": "5fbbee454b8886a3d1c572563b91183b243564e98b2fc9cc02c967ef00d003eb",
+    "gate_a_manifest_sha256": "79d722a7919afb03916d0be57dd72c51c5ef2174fbf6b27cea2042ed6a65e53c",
+    "outcome_source_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
+  },
+  "runner_version": "bj131-gateb-v2",
+  "settlement": "one \u00a52 sequence pays \u00a52\u00d70.65\u00d7product(final winning SP) iff coverage includes the truth",
+  "stage": "GATE_B_SOFT_COVER_CANONICAL_OUTCOME_SETTLEMENT",
+  "tax": "20% of winning gross when same issue+variant+seed+sleeve gross reaches \u00a510,000; otherwise zero"
+}

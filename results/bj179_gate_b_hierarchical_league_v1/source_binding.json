@@ -1,0 +1,19 @@
+{
+  "gate_a": {
+    "content_identity_sha256": "2e8314f00b8774501ecf0ed2cb6ede73a9e7a60c7422dd5dc0d464e1470b740b",
+    "manifest_sha256": "5839f5c03c94ef903472b64fffa3ad1462ec006717875d0a3903ecdfdc2aa056",
+    "package": "bj179_gate_a_preoutcome_v2",
+    "payload_count": 19
+  },
+  "outcomes": {
+    "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "package": "bj95_gate_b_outcome_settlement_v2r8",
+    "row_count": 46802
+  },
+  "probability_frontier": {
+    "arm_count": 14,
+    "parameter_frontier_rows": 12,
+    "row_count": 1558
+  }
+}

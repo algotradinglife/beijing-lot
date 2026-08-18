@@ -1,0 +1,38 @@
+{
+  "bootstrap": {
+    "replicates": 20000,
+    "shared_draw_seed": 167137,
+    "unit": "issue_instance"
+  },
+  "candidate_freeze_count": 17135,
+  "candidate_rule": "exact recovered union(absolute positive, raw Pareto, robust Pareto)",
+  "contract": "bj167-gate-b-v3r1-postscreen-exact",
+  "exact_replay": "frozen #145 native allocator; accepted tie behavior",
+  "execution_provenance": "execution_provenance.json",
+  "full_search_family_count": 473796,
+  "historical_screening_execution": {
+    "git_head": "d1717395a2ca5fc5e16554756723f296ec6053e8",
+    "native_wrapper_sha256": "db6960d5a81ccde49f0bcb62a7c4424174feae1a4e754e64ef01de88a8b47829",
+    "runner_sha256": "4d9ee1313ac66df5cf5f41d8db12a39352c626459c7c4d55af3d5074cc560f32"
+  },
+  "postscreen_execution_head": "12af2564dad1546764c9660ed88f13b76efab786",
+  "primary_metric": "pre-tax no_tax_roi",
+  "promotion_authorized": false,
+  "recovered_candidate_freeze_sha256": "56d77536807e1d8ab0e71caf547685820db68b71755becf336aafe84969dc15a",
+  "screen_replay_adaptive_tolerance": {
+    "boundary_rule": "absolute delta <= metric-specific tolerance; outside fails closed",
+    "candidate_roi": "money_quantum_per_seed * seed_count / exact_candidate_stake + ratio_quantum",
+    "matched_full_lift": "candidate_roi_tolerance + matched_full_roi_tolerance + ratio_quantum",
+    "matched_full_roi": "money_quantum_per_seed * seed_count / exact_matched_full_stake + ratio_quantum",
+    "money_quantum_per_seed_yuan": "0.000001",
+    "per_candidate_evidence": "candidate_checkpoint_reconciliation.csv",
+    "ratio_serialization_quantum": "1E-12",
+    "seed_scope_multiplier": {
+      "DETERMINISTIC": 1,
+      "ENSEMBLE_100": 100
+    },
+    "stake_rule": "candidate stake must equal frozen screen stake at six decimals; both ROI denominators must be positive and finite"
+  },
+  "screening_manifest_sha256": "6c71760e23bd670098e364cb89ed26aaea556359eb9ab84a883e88b408d527a1",
+  "screening_package": "bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"
+}

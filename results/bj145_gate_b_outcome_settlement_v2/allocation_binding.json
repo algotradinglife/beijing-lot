@@ -1,0 +1,30 @@
+{
+  "api": "allocate(mechanism, weights, M, seed, identity_signature, cap) -> integer multiplicities by #137 base-3 ticket ordinal",
+  "binding_version": "bj145-allocation-binding-v2",
+  "engine_version": "bj145-allocation-engine-v2",
+  "golden_vectors_file": "allocation_golden_vectors.json",
+  "golden_vectors_sha256": "06038d0f62317f0c5e22ba562eff6baf806f51741668d5ac22cd9266e7365875",
+  "identity_signature_rule": "exact selected_match_ids pipe string from frozen identity row; no portfolio_id substitution",
+  "mechanisms": [
+    "WR_DUPLICATE_STAKE",
+    "WOR_DISTINCT",
+    "RESIDUAL_SYSTEMATIC",
+    "CAPPED_REPEAT",
+    "DETERMINISTIC_TOP_MASS",
+    "FULL_ENUMERATED"
+  ],
+  "module_file": "bj145_allocation_engine.py",
+  "module_sha256": "5b1ac6631ce22a447d883d514ed73e6795584c89d514e6be7562b2fd91bfa4ce",
+  "outcome_boundary": "executable allocation only; no outcome/final-SP/payout/ROI/tax input accepted",
+  "ticket_space": {
+    "codes": [
+      "3",
+      "1",
+      "0"
+    ],
+    "k": 2187,
+    "legs": 7,
+    "ordinal_order": "#137 product order",
+    "outcomes_per_leg": 3
+  }
+}

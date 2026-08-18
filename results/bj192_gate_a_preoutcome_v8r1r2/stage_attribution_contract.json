@@ -1,0 +1,31 @@
+{
+  "allowed_exact_fields": [
+    "native_requested_ticket_count",
+    "normalization_multiplier",
+    "portfolio_weight",
+    "actual_ticket_count",
+    "retained_cash_yuan",
+    "same_ticket_stage4_funding_delta_yuan"
+  ],
+  "key": [
+    "portfolio_id",
+    "mode",
+    "position_fraction",
+    "weight_method",
+    "normalization_method",
+    "deployment_replicate_bundle_id",
+    "calendar_index",
+    "issue_instance",
+    "sleeve_id",
+    "stage_id"
+  ],
+  "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+  "prohibited": "do not recreate selection/direction/ticket counterfactuals or assign their P&L contribution without an immutable source contribution bridge",
+  "stages": {
+    "STAGE_1_SELECTION": "immutable selector trace only; realized contribution is NOT_IDENTIFIABLE_WITHOUT_SPLICE",
+    "STAGE_2_DIRECTION": "immutable direction/role trace only; realized contribution is NOT_IDENTIFIABLE_WITHOUT_SPLICE",
+    "STAGE_3_TICKET_CONSTRUCTION": "immutable allocation digest/ticket multiplicity only; realized contribution is NOT_IDENTIFIABLE_WITHOUT_SPLICE",
+    "STAGE_4_POSITIONING": "exactly identifiable: native request, normalization multiplier, weight target, rounded funded tickets, retained cash and resulting same-ticket funding delta"
+  },
+  "upstream_trace_registry_sha256": "059e44f06a571b199d89aa0b4a8297c6767c46ce587d12263353734519a2bfa4"
+}

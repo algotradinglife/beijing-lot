@@ -1,0 +1,2 @@
+policy_id,failure_code,oracle_opportunity_present,causal_mapping_stable,support_sufficient,action_noise_excessive,causal_outperformance_present,evidence,disposition
+FULL_DYNAMIC_CHAIN,CAUSAL_GENERALIZATION_FAILURE,True,False,True,True,False,strict common support plus paired 20k bootstrap and baseline ladder,NO_PROMOTION

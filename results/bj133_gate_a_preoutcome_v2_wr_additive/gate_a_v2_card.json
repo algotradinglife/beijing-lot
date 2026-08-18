@@ -1,0 +1,32 @@
+{
+  "contract": "BJ-HIST-DIVERSIFIED-N7-ALLOCATOR-001",
+  "controls_retained": [
+    "Q_INFORMED_WOR_DISTINCT remains an unchanged v1 sensitivity arm",
+    "Q_DELETE, MATCH_EXPOSURE and JACCARD allocation rows remain explicit controls on the same selected-identity surface",
+    "EXACT_K4_FULL remains the v1 capital-normalized economic reference and is not resampled"
+  ],
+  "denominator": {
+    "seed_set": [
+      "133001",
+      "133002",
+      "133003"
+    ],
+    "v1_allocation_rows": 20880,
+    "wr_sampler_rows": 46980
+  },
+  "frozen_arm": {
+    "coverage": "Every non-FULL Gate-A v1 row, with identical complete-issue identities, gate, K, M, selected portfolio IDs, allocation status, and seed set.",
+    "definition": "For each selected identity and frozen seed, M independent Q-weighted draws are made with replacement over its 3^7 ticket space. Every draw is a separate \u00a52 ticket. Exact duplicate code vectors are retained as separate paid stakes and separate individual tax units.",
+    "ticket_mechanism": "Q_INFORMED_WR_DUPLICATE_STAKE"
+  },
+  "generator_version": "bj133-gate-a-v2-wr-additive",
+  "issue": 133,
+  "outcome_boundary": "No test outcome, score, final/winning SP, settlement, payout, ROI, tax realization, or post-kickoff input is read or emitted.",
+  "scope": "historical paper research only; no purchase, production, betting, or promotion authority.",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_WR_DUPLICATE_STAKE_ADDITIVE_FREEZE",
+  "v1_binding": {
+    "allocation_plan_sha256": "df07591aa2bcbf8d73102d149eb8a7b257337544a15e56eb49c342b8927733c1",
+    "manifest_sha256": "1fff3f904fcb9a5efed231771880be8ae0603b0d8f3c7d0365937fcfe9985e79",
+    "path": "results/bj133_gate_a_preoutcome_v1"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "canonical_outcome_manifest": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "canonical_outcome_payload": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "contract": "BJ-HIST-N7-SEED-ENSEMBLE-002",
+  "gate_a_content_identity": "0c4c3a6103d37e94707ac4837480af16d8e1bbc27472821edc106920fd66288f",
+  "gate_a_manifest": "7d6698705a61c416387ae6aee713751b05f337147943e9d781a46252317076d4",
+  "issue": 167,
+  "reference_151_gate_b_manifest": "7b88be8af887674875f831f2da0951a1bf7664041f40c10be00d09194ce6fbe2",
+  "runner_head": "559fa975844b233d9406ebafb26158c71a92c589"
+}

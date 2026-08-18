@@ -1,0 +1,7 @@
+field,reason_code,detail
+native_handicap_line,OUTLIER_REFERENCE,outliers(|z|>5)=12 kurtosis=1.41 heavy_tail=False
+market_proxy_complete,OUTLIER_REFERENCE,outliers(|z|>5)=3714 kurtosis=91.32 heavy_tail=True
+predicted_final_sp_input,OUTLIER_REFERENCE,outliers(|z|>5)=98 kurtosis=457.13 heavy_tail=True
+BJ_LINE_BOUNDARY,OUTLIER_REFERENCE,outliers(|z|>5)=12 kurtosis=1.41 heavy_tail=False
+native_handicap_line~BJ_LINE_BOUNDARY,OUTLIER_REFERENCE,high redundancy |r|=1.0000
+source_is_pclose~source_is_average_eu,OUTLIER_REFERENCE,high redundancy |r|=-1.0000

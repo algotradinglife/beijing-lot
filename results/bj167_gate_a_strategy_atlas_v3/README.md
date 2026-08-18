@@ -1,0 +1,1 @@
+#167 Gate A v3 freezes the complete finite N7 selector × allocation atlas. It contains no outcomes. Selector identities are complete-issue and are not reselected at Gate B. Every ¥2 ticket/repeat remains an independent future tax unit; no issue/policy pooling is allowed. Gate B must consume this package exactly. Temporary staging is under results/.scratch, never /tmp.

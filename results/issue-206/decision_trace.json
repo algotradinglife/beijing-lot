@@ -1,0 +1,20 @@
+{
+  "control_joint_probability": null,
+  "expected_pre_tax_net": null,
+  "fallback_applied": true,
+  "fallback_reason": "ACCEPTED_TICKET_BASELINE_UNRESOLVED_NO_BET",
+  "formula": "0.65 * product(control_probability) * product(predicted_final_sp) - 1",
+  "gate_path": "NO_BET",
+  "issue": "25043",
+  "labels_used": false,
+  "ood_flag": false,
+  "ood_score": 0.7327320420747889,
+  "ood_threshold": 7.549834435270783,
+  "predicted_sp_product": null,
+  "requested_stake": 0,
+  "selected_match_subset": [],
+  "selected_outcomes": [],
+  "source_cells": [],
+  "ticket_identity": null,
+  "version": "bj206-fixed-n7-ticket-policy-v4"
+}

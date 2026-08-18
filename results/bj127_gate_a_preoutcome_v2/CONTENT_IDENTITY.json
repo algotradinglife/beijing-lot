@@ -1,0 +1,27 @@
+{
+  "contract_version": "bj127-portable-content-v2",
+  "gzip_payloads": {
+    "matched_frontier.csv.gz": {
+      "canonical_decompressed_bytes": 88008743,
+      "canonical_decompressed_sha256": "6003e2e2c426530a32b7573aba579d090bbe99906a964406200e04f681222ae2"
+    },
+    "portfolio_role_assignments.csv.gz": {
+      "canonical_decompressed_bytes": 151921950,
+      "canonical_decompressed_sha256": "fde4c032dc6bd01e8f7cfe71b991cdd05e9e4a340afe44ae31726a58b629916a"
+    },
+    "scatter_coordinates.csv.gz": {
+      "canonical_decompressed_bytes": 11450876,
+      "canonical_decompressed_sha256": "0800c278f3b41c47c170944229a7e927b2e7134ea85fa4b3c647a9d57d49b945"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "ed82f43974ebf336eb5e4720942cfb61cefc0ae848cac3d9e44779cbea117766",
+    "gate_a_card.json": "fc916cdfd6dc1cc92f92b001281cfe4259649222e77847eef323eda067d128f5",
+    "runner.py": "3c47aa2870c9c0d1dc733183a9d5aac2ccd4948f290420c7fccaa6b3012854cb",
+    "scatter_hexbin_density.csv": "41a09a81829ed5bb3e04f6cd39fe2d3e409ef14007ca5692d4feeb854863e4db",
+    "scatter_issue_20011.svg": "4784a97612eff0c9c1f1199f4e4fb7f15730537c96df5b9fd6275a5cbeb44b27",
+    "scatter_issue_22091.svg": "fbb4dfc482276f53c49cd1592bbfadf8366d9ad9750fa3f4f9c8c7d8263ca43d",
+    "scatter_issue_25042.svg": "8bcc09c39397428c704a9a9143647c6cb43ee807bc0ef7784d67ae2a166e6c1a",
+    "threshold_census.csv": "bfcacda939aa88cdd95636e9d7b86850bb6ac0d09e4726465f9a82b94fdb050c"
+  }
+}

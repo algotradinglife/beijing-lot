@@ -1,0 +1,23 @@
+{
+  "contract": "BJ-HIST-N7-SEED-ENSEMBLE-001",
+  "files": {
+    "README.md": "365a83772f8e842790746a7f747fe89b9c1f93511e0d5a42fc32f027f08fdf4d",
+    "ensemble_summary.csv": "c7587751bf3e534dce66e860316357d56e0b83936e84d0110d677d91f6643f70",
+    "identity_settlement.csv.gz": "47408147d5e6cd285377d0fbdd3893de3c0939516fc53901bf74a2474ed23fcc",
+    "interpretation.md": "d05256f840294e1888fc9306b452644280b9a9714e8257aacda27a4d088b7fd3",
+    "issue_cluster_bootstrap.csv": "b75a07c187ac453de5b3eb965b1e0174de72c306082b27a2e2495ca68b27b240",
+    "issue_settlement.csv": "200ff68f27c2ee313a0349feee52ab9919bdbfdd524144a80b09be5484d25bf6",
+    "prefix_convergence.csv": "58b1e8bc0138dc7412a747d7b998d5cea626f0a551ee6017b5618d02a4c21e3f",
+    "prefix_convergence.svg": "f14cd67c25b8c7175bd62c9240650d8b008ddc5a9bc2f053524ab591dbc00dc1",
+    "seed_ensemble_roi.svg": "5ab662a1af0b2f42a440c2979f33936961d109322c8556328ba40bb55abe4148",
+    "seed_overlap_summary.csv": "ea42bf316758f28cd484bcce324ec8319c8c60edb320c8a7ac32ef9e6313d80e",
+    "seed_summary.csv": "b3ac0bc5184b09550998a7fdc43e3f839bd6c84da17ee63a4bb700424cd608b0",
+    "settlement_runner.py": "e79b6a56a23420841543e89f3279da8159d7773f3371c882cc4e1d170e7b56d0",
+    "source_binding.json": "cd52729bd2bc837406c0603c1010d24730869a40b4010653b2ab69f0a6f2aacd",
+    "three_vs_hundred_seed_delta.csv": "272df3b5b1d3900dc2997da69f62d8f6051737578c7567bc141a120ddc485a0a",
+    "truth_rank_distribution.csv": "909210ecaf6a4d7fc2268ca2ad0230deb73ebaa0debf185127ed489d4bb84cde",
+    "validation_card.json": "c3193734b9eea5293082cfd8ad3b33a2e30f6d0241ccb65aff72411e9de08208",
+    "variance_decomposition.csv": "e68a2752dd1e681004c0ceeeec95e363e202c8be3300c6a12a48554742d65d25"
+  },
+  "package": "bj167_gate_b_outcome_settlement_v1r1"
+}

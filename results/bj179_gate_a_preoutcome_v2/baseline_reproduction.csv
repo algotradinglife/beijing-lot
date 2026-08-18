@@ -1,0 +1,3 @@
+target_arm,source_arm,selected_identity_count,identity_set_sha256,reproduction_status,outcome_boundary
+B0_BEST_FULL,B0_BEST_FULL,189,cc50e351dfb6aeea0f72cfefa29b3356e38cfcfea76bc54d284fa1a0457523c3,PASS,Gate A outcome-unexposed: target match result/final-SP/payout/tax/ROI/settlement fields are never read by target probability construction or identity ranking
+Q1_QUICK_LEAGUE,L1_LEAGUE_CORE,189,0e296d3e8c445b0a3017eddc2c59a874d9a57570292d0554a2679d1d257612bb,PASS,Gate A outcome-unexposed: target match result/final-SP/payout/tax/ROI/settlement fields are never read by target probability construction or identity ranking

@@ -1,0 +1,16 @@
+{
+  "copied_ledgers": {
+    "identity_settlement.csv.gz": "d7cd0363fbb569257f9325e3a672a3dc9c2723719a9b4c11cdb7e9f65edf6daa",
+    "issue_settlement.csv.gz": "af8edfd941dc7cda0ece7c8dea69de64eee0bc1952e84efab59135f5232a9913",
+    "winning_ticket_tax_ledger.csv.gz": "e0d48bf4db99ea1c8b201d983e2bf78d3b57f080207f98f2e70a3bc00f2b7ab9"
+  },
+  "inode_independent_copy": true,
+  "source_content_identity_sha256": "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08",
+  "source_ledger_hashes": {
+    "identity_settlement.csv.gz": "d7cd0363fbb569257f9325e3a672a3dc9c2723719a9b4c11cdb7e9f65edf6daa",
+    "issue_settlement.csv.gz": "af8edfd941dc7cda0ece7c8dea69de64eee0bc1952e84efab59135f5232a9913",
+    "winning_ticket_tax_ledger.csv.gz": "e0d48bf4db99ea1c8b201d983e2bf78d3b57f080207f98f2e70a3bc00f2b7ab9"
+  },
+  "source_manifest_sha256": "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917",
+  "source_package": "results/bj159_gate_b_outcome_settlement_v2"
+}

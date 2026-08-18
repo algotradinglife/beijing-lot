@@ -1,0 +1,3 @@
+source,role,identity,sha256,rows,join_status
+bj148_gate_a_preoutcome_v1,"accepted immutable complete-issue common-support, Q-role, dense-M and WR/WOR/FULL plan freeze",SHA256SUMS.json,fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6,119364,"all frozen issue/arm/M/seed rows retained; no candidate, probability, M, seed, stake or sampler rule recomputed"
+bj95_gate_b_outcome_settlement_v2r8,canonical trusted final-SP truth for the already-frozen N7 role match IDs,canonical_outcome_join.csv,13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89,46802,trusted result and final SP only; no pre-outcome selection input changed

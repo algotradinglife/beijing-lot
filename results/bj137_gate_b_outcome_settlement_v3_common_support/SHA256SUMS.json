@@ -1,0 +1,15 @@
+{
+  "CONTENT_IDENTITY.json": "be2012567f0aa1690be8e50711afe00233f8686fc5baa9423c400637e9a35f5f",
+  "NUMERIC_LINEAGE.json": "80b7cf3fc4a576bb878a823dfa32369e89ab2881e9fc51bfa8378f8a50711963",
+  "README.md": "09eefb2432322c011b083e9ea58e1d75cd2994bfe9e42dc404189f2fefcf0dc4",
+  "calibration_diagnostics_corrected.csv": "78ced441ab83d808c2c09e9817692f83c88c113a371cb64a5f4c9876270261c8",
+  "candidate_fragility.csv": "7d55486ecf8ca923fac665b3a0dfefbfea78a28d0e9f8089d80ad4d25e546a67",
+  "common_support_effects.csv.gz": "474cd79908f55d7d32679994ffc2cf623c648094b0236484c8632f3aeefd6428",
+  "common_support_runner.py": "ce9eb9b9d7d812676b69fb285494b1e39a7c5aa97ac2b8771f6bbb9f6fcfccb9",
+  "decision.json": "8a92d57a0e659e6530ec06cd3870fbf6c61748c2e8151a2eef703ab6955e42dc",
+  "largest_event_tax_sensitivity.csv": "9670fbd4e26d400eabd7cff32842c5115b7cacdf8d78cedbafa99a2fbd608912",
+  "parameter_surface_interpretation.md": "a5d03bd7cb0563c96628d2f74947837b5ea6f90a87b4c5fbda95cb3b66e10cb4",
+  "settlement_card.json": "fad96bbd99520043712538b9f95b712dd1f221b0e723a418181e5b4be793b5b1",
+  "source_census.csv": "36738f96dce5a4a055f1448f95a5dd32a67542dc0c29333aca9479b529b60b1d",
+  "stability_diagnostics.csv": "b075b354a322256062541e8b5721b42607fd94765d255814f0c7da7bdac4d257"
+}

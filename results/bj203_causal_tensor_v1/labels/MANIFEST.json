@@ -1,0 +1,17 @@
+{
+  "contract_version": "bj203-causal-tensor-v1",
+  "files": {
+    "development_labels.parquet": "9e4ed09295ea6c43efa151ba058ad8ed3eeb28d810bc71b803bd1d2042fdaac1"
+  },
+  "heldout_issues": [
+    "25041",
+    "25042"
+  ],
+  "heldout_label_status": "ABSENT_BY_CONTRACT",
+  "namespace": "development_only_settlement_labels",
+  "settlement_contract": {
+    "payout_factor": "0.65 applied exactly once",
+    "tax": "20% only when one realized ticket gross reaches CNY 10,000; cell labels cannot realize ticket-level aggregation, so tax stays masked",
+    "winning_zero_return": "winning_sp for winning outcome, otherwise zero"
+  }
+}

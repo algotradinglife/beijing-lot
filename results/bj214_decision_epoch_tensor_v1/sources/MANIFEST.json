@@ -1,0 +1,12 @@
+{
+  "contract_version": "bj214-decision-epoch-tensor-v1",
+  "files": {
+    "base_match_capability.parquet": "f5d488b7aebe92bbefe08a671b2e629492c1c966003b02047e43dc9af09ca40d",
+    "live_match_identity.parquet": "97adedee27da34f316abd631ee71c3dca33876bcc9c7649d508bcb965999d172",
+    "segment_windows.parquet": "07c8f1ce8db3f2fb1ca8db07d8f596e5d19b43161958d0c92d09040a07a2f66e",
+    "selected_eligibility_observations.parquet": "93dedfc463fb40035fe82e76220d3b96a1883836ae08dfcd4a29208ce623a966",
+    "selected_market_observations.parquet": "d1258d9828e795d668e31d0c96bd8dcf574321983e3005b387de93887b3fffb7",
+    "source_freeze.json": "36e3ea22197a9dd2ef21f78ed5bc94db068bfac1d8bf508ceaeb45c67936972a"
+  },
+  "namespace": "frozen_source_whitelists"
+}

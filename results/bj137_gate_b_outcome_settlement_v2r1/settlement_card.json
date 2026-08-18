@@ -1,0 +1,33 @@
+{
+  "accounting": "M is per selected N7. Issue draws and stake are selected_identity_count\u00d7M and selected_identity_count\u00d7M\u00d7\u00a52. K/M are frozen outputs rather than rejection gates. Frozen no-bets are retained separately from unavailable canonical outcomes. ticket_tax_ledger.csv.gz records each winning portfolio/draw multiplicity with its individual ticket gross and per-ticket tax; ticket_tax_reconciliation.csv proves its total exactly matches the issue ledger.",
+  "contract": "BJ-HIST-PROB-SAMPLING-N7-001",
+  "decision": {
+    "all_seed_and_chronological_positive_sampler_candidates": 0,
+    "all_seed_global_positive_sampler_candidates": 461,
+    "chronologically_positive_selector_candidates": 0,
+    "decision": "NO_PROMOTION",
+    "global_positive_selector_candidates": 4,
+    "promotion_authorized": false,
+    "promotion_candidates": [],
+    "rule": "Promotion requires positive matched no-tax and actual-tax deltas across all three frozen seeds and every YEAR/FOLD/LOYO view. A one-seed, sparse-M, raw-ROI or tax-only maximum is not promotable.",
+    "strict_independent_ev_required": false
+  },
+  "input_boundary": "Only accepted Gate-A v2 and canonical final-SP settlement input are read. Gate-A v3/post-acceptance material is not read.",
+  "issue": 137,
+  "metrics": "surface_summary.csv.gz contains ALL/YEAR/FOLD/LOYO; issue_policy_settlement is the issue-level ledger. Selector lift uses same-gate K_ALL FULL; sampler lift uses exact selected-K FULL; interaction uses K_ALL FULL. Overlap, duplicate/unique ticket coverage, concentration, drawdown, miss streak and largest-event sensitivity are retained.",
+  "provenance": {
+    "gate_a_content_identity_sha256": "36d6afcc33a5b5ceb3e4a990bfe6ec05503be115270c3489f4973dc3a59dd236",
+    "gate_a_manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+    "gate_a_participation_sha256": "e8fbcb1430d65e8d3c83c173b7d21b1deeb6463fd15d9f018c145923059f61d6",
+    "gate_a_role_vectors_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa",
+    "gate_a_sampler_plan_sha256": "6131fef80bb04e18d37acf6a3f89b0d06e8a8c92ddecba87fcf45ae115258422",
+    "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "outcome_snapshot_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
+  },
+  "runner_version": "bj137-gate-b-v2r1-ticket-tax-audit",
+  "sampling_replay": "The accepted Gate-A hash-based samplers are replayed exactly. Each ordered selected_match_ids tuple is its sampler key; duplicate draws retain stake, while WOR/top/delete arms are distinct-ticket mechanisms.",
+  "scope": "historical paper research only; no purchase, production, or promotion authority.",
+  "settlement": "Each selected ticket pays \u00a52\u00d70.65\u00d7product(canonical final winning SP) per hit. The ticket itself is the only tax unit: 20% applies only where that one ticket's gross is at least \u00a510,000. No issue, N7 identity, sampler draw, M replicate, strategy arm or ticket count is pooled to determine the threshold. A duplicate WR hit is represented as an independent ticket count at the same per-ticket gross.",
+  "stage": "GATE_B_COMPLETE_ISSUE_OUTCOME_SETTLEMENT"
+}

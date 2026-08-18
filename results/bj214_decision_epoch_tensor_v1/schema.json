@@ -1,0 +1,60 @@
+{
+  "cohorts": [
+    "development",
+    "historical_model_unseen",
+    "post_203_operational_observational",
+    "prospective_post_activation"
+  ],
+  "contract_version": "bj214-decision-epoch-tensor-v1",
+  "controlling_representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+  "epoch_rules": [
+    "ISSUE_START",
+    "FIRST_KICKOFF_MINUS_10H",
+    "MEDIAN_KICKOFF_MINUS_10H",
+    "LAST_KICKOFF_MINUS_10H",
+    "FIRST_KICKOFF_MINUS_1H",
+    "MEDIAN_KICKOFF_MINUS_1H",
+    "LAST_KICKOFF_MINUS_1H",
+    "PUBLISHED_SEGMENT_FREEZE",
+    "PROSPECTIVE_ACTIVATION"
+  ],
+  "feature_order": [
+    "outcome_code_numeric",
+    "calibrated_market_probability",
+    "devig_euro_probability",
+    "euro_1h_odds",
+    "fundamental_probability",
+    "probability_residual",
+    "probability_residual_z",
+    "predicted_final_sp",
+    "bj_sp_snapshot",
+    "bj_sp_snapshot_age_minutes",
+    "native_handicap_line",
+    "line_residual_mu",
+    "line_residual_z",
+    "market_uncertainty",
+    "market_signature_breadth",
+    "market_signature_dispersion",
+    "history_training_rows_log1p",
+    "min_history_n_log1p",
+    "league_index",
+    "home_team_index",
+    "away_team_index",
+    "kickoff_delay_hours",
+    "match_position_fraction",
+    "calendar_year"
+  ],
+  "labels": "PHYSICALLY_ABSENT",
+  "masked_value": "NaN with mask=false",
+  "model_readiness_dependency": "model_learning_gate_pass AND no causal violations",
+  "object": "X_i,t[J_i,t x 3 x F]",
+  "outcome_order": [
+    "3",
+    "1",
+    "0"
+  ],
+  "representative_rule_rationale": "Schedule-only median-kickoff anchor with a ten-hour operational planning lead; common to every cohort and frozen without using outcomes or observed coverage. All other epoch rules are sensitivity evidence only.",
+  "strict_roster_definition": "identity observed by t AND kickoff after t AND sale_status=open AND parlay_allowed=allowed AND complete timestamped 3-way EURO/BJ SP",
+  "ticket_operability_dependency": "separate later-stage gate; never gates model_ready_for_204",
+  "upstream_contract_version": "bj203-causal-tensor-v2"
+}

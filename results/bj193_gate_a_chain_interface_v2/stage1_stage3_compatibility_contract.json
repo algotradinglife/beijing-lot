@@ -1,0 +1,60 @@
+{
+  "adequacy": {
+    "minimum_folds": 5,
+    "minimum_selected_outputs": 20,
+    "na": "unit weight needs no registry but still requires chronological Stage-1 support",
+    "non_na": "requires 100% exact seven-match coverage by the complete-match registry"
+  },
+  "class_count": 7,
+  "complete_match_weight_registry": {
+    "artifact": "stage3_complete_match_weight_registry.csv.gz",
+    "field_mapping": {
+      "p_blend_a25_0": "blend_a25_0",
+      "p_blend_a25_1": "blend_a25_1",
+      "p_blend_a25_3": "blend_a25_3",
+      "p_blend_a50_0": "blend_a50_0",
+      "p_blend_a50_1": "blend_a50_1",
+      "p_blend_a50_3": "blend_a50_3",
+      "p_blend_a75_0": "blend_a75_0",
+      "p_blend_a75_1": "blend_a75_1",
+      "p_blend_a75_3": "blend_a75_3",
+      "p_market_cal0": "market_cal0",
+      "p_market_cal1": "market_cal1",
+      "p_market_cal3": "market_cal3",
+      "p_model0": "p0",
+      "p_model1": "p1",
+      "p_model3": "p3",
+      "q_weight0": "q_weight0",
+      "q_weight1": "q_weight1",
+      "q_weight3": "q_weight3"
+    },
+    "row_count": 47819,
+    "row_identity": "conditional_chain_adapter.complete_match_weight_row_identity",
+    "source_file": "match_vectors.csv",
+    "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+    "source_package": "bj137_gate_a_preoutcome_v2"
+  },
+  "contract": "BJ193_STAGE1_STAGE3_COMPATIBILITY_V1",
+  "coverage_row_count": 17283,
+  "native_137_reconciliation": {
+    "complete_match_registry_row_count": 47819,
+    "contract": "BJ193_NATIVE_137_COMPLETE_MATCH_RECONCILIATION_V1",
+    "matched_role_row_count": 501928,
+    "mismatched_role_row_count": 0,
+    "missing_role_row_count": 0,
+    "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+    "reconciliation_stream_sha256": "1e0431284bc03906752184859ae8e62acae91fe6207f2d3ba63291af2b6ae65f",
+    "role_row_count": 501928,
+    "source_match_vector_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+    "source_role_vector_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa"
+  },
+  "normalized_join": {
+    "complete_pair_rule": "join Stage-3 action compatibility_class_key to the exact Stage-1 action/class row; this covers every 2,377,647 action pair without denormalized duplication",
+    "pair_count": 2377647,
+    "stage1_action_to_class_coverage": "stage1_stage3_coverage_registry.csv.gz",
+    "stage3_action_to_class": "stage3_compatibility_class_registry.csv"
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "screen_order": "compatibility_status==COMPATIBLE before Stage-3 outcome screen/model fit/action choice",
+  "unsupported": "no silent role-vector lookup, probability substitution, ALLOW_ALL conversion, losing stake, or partial-match fallback"
+}
