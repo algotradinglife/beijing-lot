@@ -81,12 +81,12 @@ def _connect_readonly(path: Path) -> sqlite3.Connection:
     return connection
 
 
-def _historical_source_rows(path: Path) -> pd.DataFrame:
+def _historical_source_rows(path: Path, *, multi_year: bool = False) -> pd.DataFrame:
     with _connect_readonly(path) as connection:
-        candidates = pd.read_sql_query(
-            """
+        eligible_sql = """
             WITH eligible AS (
-                SELECT m.issue, m.match_idx
+                SELECT m.issue, m.match_idx,
+                       CAST(substr(CAST(m.issue AS TEXT), 1, 2) AS INTEGER) AS issue_year
                 FROM matches AS m
                 JOIN market_consensus AS c ON c.match_id = m.match_id
                 JOIN official_500_settlements AS o
@@ -99,11 +99,32 @@ def _historical_source_rows(path: Path) -> pd.DataFrame:
                 GROUP BY m.issue, m.match_idx
                 HAVING COUNT(DISTINCT c.snapshot) = 3
             )
-            SELECT issue, match_idx
-            FROM eligible
-            ORDER BY issue, match_idx
-            LIMIT 4
-            """,
+        """
+        if multi_year:
+            candidate_sql = eligible_sql + """
+                , ranked AS (
+                    SELECT issue, match_idx, issue_year,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY issue_year
+                               ORDER BY CAST(issue AS INTEGER), match_idx
+                           ) AS year_rank
+                    FROM eligible
+                )
+                SELECT issue, match_idx
+                FROM ranked
+                WHERE year_rank = 1
+                ORDER BY issue_year
+                LIMIT 4
+            """
+        else:
+            candidate_sql = eligible_sql + """
+                SELECT issue, match_idx
+                FROM eligible
+                ORDER BY issue, match_idx
+                LIMIT 4
+            """
+        candidates = pd.read_sql_query(
+            candidate_sql,
             connection,
             dtype={"issue": "string", "match_idx": "int64"},
         )
@@ -207,9 +228,11 @@ def _identity_rows(path: Path, pairs: pd.DataFrame) -> pd.DataFrame:
     return selected
 
 
-def extract_representative_sources(root: Path) -> dict[str, pd.DataFrame]:
+def extract_representative_sources(
+    root: Path, *, multi_year_proxy: bool = False
+) -> dict[str, pd.DataFrame]:
     """Read a deterministic, small real-data slice from the external root."""
-    proxy = _historical_source_rows(root / XLSM_RELATIVE)
+    proxy = _historical_source_rows(root / XLSM_RELATIVE, multi_year=multi_year_proxy)
     strict = _strict_source_rows(root / LIVE_RELATIVE)
     pairs = pd.concat(
         [proxy[["issue_code", "match_idx"]], strict[["issue_code", "match_idx"]]],
@@ -603,11 +626,12 @@ def build_representative_package(
     *,
     output: str | Path | None = None,
     force: bool = True,
+    multi_year_proxy: bool = False,
 ) -> Path:
     """Build the real-data representative package outside Git."""
     root = resolve_data_root(data_root)
     target = Path(output).resolve() if output is not None else root / PACKAGE_RELATIVE
-    sources = extract_representative_sources(root)
+    sources = extract_representative_sources(root, multi_year_proxy=multi_year_proxy)
     slots, observations, features = _observations_and_features(
         sources["proxy"], sources["strict"], sources["identity"]
     )

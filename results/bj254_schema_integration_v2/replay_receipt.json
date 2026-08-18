@@ -1,0 +1,11 @@
+{
+  "byte_deterministic_replay": true,
+  "historical_proxy_years": [
+    2014,
+    2015,
+    2016,
+    2017
+  ],
+  "restore_copy_verified": true,
+  "strict_forward_feature_cells": 24
+}

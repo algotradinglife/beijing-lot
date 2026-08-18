@@ -37,6 +37,8 @@ results/*
 !results/bj234_source_schema_contract_v1/**
 !results/bj250_source_census_v3/
 !results/bj250_source_census_v3/**
+!results/bj254_schema_integration_v2/
+!results/bj254_schema_integration_v2/**
 runs/
 .cache/
 tmp/
@@ -56,6 +58,7 @@ temp/
 !results/bj234_source_schema_contract_v1/**/*.parquet
 !results/bj250_source_census_v3/**/*.csv
 !results/bj250_source_census_v3/**/*.parquet
+!results/bj254_schema_integration_v2/**/*.csv
 *.feather
 *.h5
 *.hdf5

@@ -1,0 +1,18 @@
+{
+  "available_feature_cells": 58,
+  "feature_cells": 60,
+  "feature_name_cells": {
+    "bj_sp": 12,
+    "eu_decimal_odds": 48
+  },
+  "issue_slots": 8,
+  "issues": 6,
+  "missing_feature_cells": 2,
+  "namespace_feature_cells": {
+    "historical_proxy": 36,
+    "strict_forward": 24
+  },
+  "observations": 16,
+  "settlement_labels": 4,
+  "status": "PASS"
+}
