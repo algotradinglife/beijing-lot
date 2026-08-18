@@ -15,7 +15,30 @@ from . import aliases as alias_contract
 from . import mapping, profile
 
 
-PACKAGE_NAME = "bj251_canonical_identity_v2"
+PACKAGE_NAME = "bj251_canonical_identity_v3"
+
+TABLE_SCHEMAS = {
+    "source_input_snapshot.csv": set(mapping.SOURCE_INPUT_COLUMNS),
+    "issue_identity.csv": {"issue_id", "issue_code", "rule_version"},
+    "issue_slot_identity.csv": {
+        "issue_slot_id", "issue_id", "issue_code", "match_idx",
+        "fixture_entity_id", "slot_identity_status", "fixture_entity_status",
+        "source_count", "rule_version",
+    },
+    "play_identity.csv": {"play_id", "issue_slot_id", "play_code", "rule_version"},
+    "outcome_cell_identity.csv": {
+        "outcome_cell_id", "play_id", "issue_slot_id", "outcome_code", "rule_version",
+    },
+    "source_trace.csv": set(mapping.TRACE_COLUMNS),
+    "ambiguity_ledger.csv": set(mapping.LEDGER_COLUMNS),
+    "coverage.csv": {
+        "source_id", "year", "source_competition_key", "causal_grade", "rows",
+        "exact_slot_rows", "diagnostic_label_agreement_fields",
+        "source_local_entity_fields", "settlement_only_entity_fields",
+        "conflicting_entity_fields", "unidentified_entity_fields", "unmatched_slot_rows",
+    },
+    "temporal_aliases.csv": set(alias_contract.ALIAS_COLUMNS),
+}
 
 
 def _sha256(path: Path) -> str:
@@ -78,6 +101,7 @@ def build_package(
     try:
         profile.validate_identity_tables(result)
         alias_contract.validate_alias_intervals(aliases)
+        _write_csv(result.source_inputs, staging / "tables" / "source_input_snapshot.csv")
         _write_csv(result.issues, staging / "tables" / "issue_identity.csv")
         _write_csv(result.slots, staging / "tables" / "issue_slot_identity.csv")
         _write_csv(result.plays, staging / "tables" / "play_identity.csv")
@@ -91,10 +115,12 @@ def build_package(
             "package": PACKAGE_NAME,
             "issue_slot_identity_rule": "exact issue_code + match_idx; issue-local only",
             "fixture_entity_rule": "nullable unless provenance-backed stable event key exists",
-            "entity_resolution_rule": "exact cross-source equality or unresolved/source-local",
+            "entity_resolution_rule": "canonical entity disabled; source-local or diagnostic equality only",
+            "source_input_snapshot_sha256": _sha256(staging / "tables" / "source_input_snapshot.csv"),
             "outcome_exposed_inputs": False,
             "fuzzy_auto_acceptance": False,
             "issue_count": int(len(result.issues)),
+            "source_input_count": int(len(result.source_inputs)),
             "issue_slot_count": int(len(result.slots)),
             "play_count": int(len(result.plays)),
             "outcome_cell_count": int(len(result.outcome_cells)),
@@ -139,43 +165,53 @@ def verify_package(package_path: Path, *, trusted_anchor: str | None = None) -> 
         raise AssertionError("unexpected issue-slot mapping rule")
     if manifest.get("fixture_entity_rule") != "nullable unless provenance-backed stable event key exists":
         raise AssertionError("unexpected fixture-entity rule")
+    if manifest.get("entity_resolution_rule") != "canonical entity disabled; source-local or diagnostic equality only":
+        raise AssertionError("unexpected entity-resolution rule")
     if manifest.get("outcome_exposed_inputs") is not False or manifest.get("fuzzy_auto_acceptance") is not False:
         raise AssertionError("identity boundary violation")
     read_csv = lambda name: pd.read_csv(  # noqa: E731
         package_path / "tables" / name, dtype=str, keep_default_na=False
     )
+    frames = {name: read_csv(name) for name in TABLE_SCHEMAS}
+    for name, expected in TABLE_SCHEMAS.items():
+        if set(frames[name].columns) != expected:
+            raise AssertionError(f"unexpected table schema: {name}")
+    if _sha256(package_path / "tables" / "source_input_snapshot.csv") != manifest.get(
+        "source_input_snapshot_sha256"
+    ):
+        raise AssertionError("source input snapshot identity mismatch")
     result = mapping.MappingResult(
-        issues=read_csv("issue_identity.csv"),
-        slots=read_csv("issue_slot_identity.csv"),
-        plays=read_csv("play_identity.csv"),
-        outcome_cells=read_csv("outcome_cell_identity.csv"),
-        traces=read_csv("source_trace.csv"),
-        ledger=read_csv("ambiguity_ledger.csv"),
+        source_inputs=frames["source_input_snapshot.csv"],
+        issues=frames["issue_identity.csv"],
+        slots=frames["issue_slot_identity.csv"],
+        plays=frames["play_identity.csv"],
+        outcome_cells=frames["outcome_cell_identity.csv"],
+        traces=frames["source_trace.csv"],
+        ledger=frames["ambiguity_ledger.csv"],
     )
-    coverage = read_csv("coverage.csv")
-    alias_rows = read_csv("temporal_aliases.csv")
+    coverage = frames["coverage.csv"]
+    alias_rows = frames["temporal_aliases.csv"]
     try:
         profile.validate_identity_tables(result)
         alias_contract.validate_alias_intervals(alias_rows)
     except ValueError as error:
         raise AssertionError(f"identity semantic verification failed: {error}") from error
     traces = result.traces
-    prohibited = {"result_code", "winning_sp", "outcome_code", "payout"}
-    all_headers = set().union(
-        *(set(frame.columns) for frame in (
-            result.issues,
-            result.slots,
-            result.plays,
-            result.traces,
-            result.ledger,
-            coverage,
-            alias_rows,
-        ))
+    prohibited = {"result_code", "winning_sp", "payout"}
+    all_headers = set().union(*(set(frame.columns) for frame in frames.values()))
+    outcome_code_elsewhere = any(
+        "outcome_code" in frame.columns
+        for name, frame in frames.items()
+        if name != "outcome_cell_identity.csv"
     )
-    if prohibited & all_headers:
+    if prohibited & all_headers or outcome_code_elsewhere:
         raise AssertionError("outcome-exposed trace columns are forbidden")
     if traces.duplicated(["source_id", "issue_slot_id"]).any():
         raise AssertionError("duplicate source slot escaped quarantine")
+    if traces[["source_id", "source_key"]].astype(str).apply(
+        lambda column: column.str.strip().eq("")
+    ).any().any() or traces.duplicated(["source_id", "source_key"]).any():
+        raise AssertionError("invalid source-record lineage escaped quarantine")
     for _, row in result.issues.iterrows():
         if row["issue_id"] != mapping.issue_id(str(row["issue_code"])):
             raise AssertionError("issue identity formula mismatch")
@@ -199,22 +235,44 @@ def verify_package(package_path: Path, *, trusted_anchor: str | None = None) -> 
         )
         if invalid.any():
             raise AssertionError("missing entity label was promoted to an identity")
-    rebuilt_coverage = profile.coverage_table(result).astype(str)
+    canonical_columns = [
+        "canonical_competition_id", "canonical_home_team_id", "canonical_away_team_id"
+    ]
+    if traces[canonical_columns].astype(str).apply(lambda column: column.str.strip().ne("")).any().any():
+        raise AssertionError("canonical entity promotion is disabled")
+
+    recomputed = mapping.map_records(mapping.records_from_snapshot(result.source_inputs))
+    rebuilt_coverage = profile.coverage_table(recomputed).astype(str)
+    output_pairs = (
+        ("issue identity", result.issues, recomputed.issues),
+        ("issue-slot identity", result.slots, recomputed.slots),
+        ("play identity", result.plays, recomputed.plays),
+        ("outcome-cell identity", result.outcome_cells, recomputed.outcome_cells),
+        ("source trace", result.traces, recomputed.traces),
+        ("ambiguity ledger", result.ledger, recomputed.ledger),
+    )
     try:
+        for label, published, expected in output_pairs:
+            pd.testing.assert_frame_equal(
+                published.astype(str).reset_index(drop=True),
+                expected.astype(str).reset_index(drop=True),
+                check_dtype=False,
+            )
         pd.testing.assert_frame_equal(
             coverage.astype(str).reset_index(drop=True),
             rebuilt_coverage.reset_index(drop=True),
             check_dtype=False,
         )
-        rebuilt_aliases = profile.derive_temporal_aliases(traces).astype(str)
+        rebuilt_aliases = profile.derive_temporal_aliases(recomputed.traces).astype(str)
         pd.testing.assert_frame_equal(
             alias_rows.astype(str).reset_index(drop=True),
             rebuilt_aliases.reset_index(drop=True),
             check_dtype=False,
         )
     except AssertionError as error:
-        raise AssertionError("coverage or alias reconciliation failed") from error
+        raise AssertionError("source-snapshot semantic reconciliation failed") from error
     expected_counts = {
+        "source_input_count": len(result.source_inputs),
         "issue_count": len(result.issues),
         "issue_slot_count": len(result.slots),
         "play_count": len(result.plays),

@@ -25,6 +25,7 @@ class SourceSpec:
     away_column: str
     kickoff_column: str
     causal_grade: str
+    status_column: str | None = None
 
 
 @dataclass
@@ -60,14 +61,18 @@ def _records(specification: SourceSpec) -> tuple[list[mapping.IdentityRecord], t
         missing = set(fields) - available
         if missing:
             raise ValueError(f"{specification.source_id} missing identity columns: {sorted(missing)}")
-        query = "SELECT " + ", ".join(_identifier(field) for field in fields) + f" FROM {_identifier(specification.table)}"
+        selected_fields = fields + ((specification.status_column,) if specification.status_column else ())
+        missing = set(selected_fields) - available
+        if missing:
+            raise ValueError(f"{specification.source_id} missing identity columns: {sorted(missing)}")
+        query = "SELECT " + ", ".join(_identifier(field) for field in selected_fields) + f" FROM {_identifier(specification.table)}"
         frame = pd.read_sql_query(query, connection)
     finally:
         connection.close()
     result = [
         mapping.IdentityRecord(
             source_id=specification.source_id,
-            source_key=str(row[specification.key_column]),
+            source_key="" if pd.isna(row[specification.key_column]) else str(row[specification.key_column]),
             issue_code=None if pd.isna(row[specification.issue_column]) else str(row[specification.issue_column]),
             match_idx=None if pd.isna(row[specification.match_idx_column]) else int(row[specification.match_idx_column]),
             competition_alias=None if pd.isna(row[specification.competition_column]) else str(row[specification.competition_column]),
@@ -75,10 +80,16 @@ def _records(specification: SourceSpec) -> tuple[list[mapping.IdentityRecord], t
             away_alias=None if pd.isna(row[specification.away_column]) else str(row[specification.away_column]),
             kickoff_at_utc=None if pd.isna(row[specification.kickoff_column]) else str(row[specification.kickoff_column]),
             causal_grade=specification.causal_grade,
+            source_record_status=(
+                None
+                if specification.status_column is None
+                or pd.isna(row[specification.status_column])
+                else str(row[specification.status_column])
+            ),
         )
         for _, row in frame.iterrows()
     ]
-    return result, fields
+    return result, selected_fields
 
 
 def coverage_table(result: mapping.MappingResult) -> pd.DataFrame:
@@ -93,8 +104,9 @@ def coverage_table(result: mapping.MappingResult) -> pd.DataFrame:
                 "causal_grade",
                 "rows",
                 "exact_slot_rows",
-                "resolved_entity_fields",
+                "diagnostic_label_agreement_fields",
                 "source_local_entity_fields",
+                "settlement_only_entity_fields",
                 "conflicting_entity_fields",
                 "unidentified_entity_fields",
                 "unmatched_slot_rows",
@@ -111,8 +123,8 @@ def coverage_table(result: mapping.MappingResult) -> pd.DataFrame:
         "away_team_resolution_status",
     )
     for output, status in (
-        ("resolved_entity_fields", "EXACT_CROSS_SOURCE"),
         ("source_local_entity_fields", "SOURCE_LOCAL_ONLY"),
+        ("settlement_only_entity_fields", "SETTLEMENT_LABEL_ONLY"),
         ("conflicting_entity_fields", "UNRESOLVED_CONFLICT"),
         ("unidentified_entity_fields", "UNIDENTIFIED"),
     ):
@@ -120,6 +132,22 @@ def coverage_table(result: mapping.MappingResult) -> pd.DataFrame:
         values[output] = sum(traces[column].eq(status).astype(int) for column in status_columns)
         counts = values.groupby(axes, dropna=False)[output].sum().reset_index()
         rows = rows.merge(counts, on=axes, how="left", validate="one_to_one")
+    agreement_columns = (
+        "competition_label_agreement",
+        "home_team_label_agreement",
+        "away_team_label_agreement",
+    )
+    agreement = traces.loc[:, axes].copy()
+    agreement["diagnostic_label_agreement_fields"] = sum(
+        traces[column].eq("SAME_SLOT_EXACT_LABEL").astype(int)
+        for column in agreement_columns
+    )
+    agreement = (
+        agreement.groupby(axes, dropna=False)["diagnostic_label_agreement_fields"]
+        .sum()
+        .reset_index()
+    )
+    rows = rows.merge(agreement, on=axes, how="left", validate="one_to_one")
     quarantined = result.ledger.loc[result.ledger["disposition"].eq("QUARANTINED")]
     rows["unmatched_slot_rows"] = 0
     # A quarantined row has no trustworthy event/competition stratum.  Emit it
@@ -136,8 +164,9 @@ def coverage_table(result: mapping.MappingResult) -> pd.DataFrame:
                 "causal_grade": source_grades.get(source_id, "UNKNOWN"),
                 "rows": 0,
                 "exact_slot_rows": 0,
-                "resolved_entity_fields": 0,
+                "diagnostic_label_agreement_fields": 0,
                 "source_local_entity_fields": 0,
+                "settlement_only_entity_fields": 0,
                 "conflicting_entity_fields": 0,
                 "unidentified_entity_fields": 0,
                 "unmatched_slot_rows": int(count),
@@ -211,14 +240,14 @@ def derive_temporal_aliases(traces: pd.DataFrame) -> pd.DataFrame:
     result["valid_from_utc"] = result["min"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     result["valid_to_utc"] = result["max"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     result["validity_semantics"] = "OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE"
-    result["provenance"] = "observed_identity_trace:v2"
+    result["provenance"] = "observed_identity_trace:v3"
     return result.drop(columns=["min", "max"]).sort_values(
         ["alias_kind", "source_id", "source_alias"], kind="stable"
     ).reset_index(drop=True)
 
 
 def exceptional_case_policy() -> pd.DataFrame:
-    """Explicit required dispositions; no status/outcome field is consumed."""
+    """Explicit dispositions bounded by whether a source exposes case status."""
     return pd.DataFrame(
         [
             {"case_class": "RESCHEDULED", "disposition": "MANUAL_REVIEW", "rule": "retain issue slot but require provenance-bound schedule amendment"},
@@ -227,6 +256,8 @@ def exceptional_case_policy() -> pd.DataFrame:
             {"case_class": "DUPLICATE", "disposition": "QUARANTINED", "rule": "multiple source rows for one source and exact slot block automatic acceptance"},
             {"case_class": "NEUTRAL_VENUE", "disposition": "CANONICAL_NO_TEAM_REWRITE", "rule": "venue does not alter home/away team identity; record venue only in a later fixture attribute"},
             {"case_class": "RENAMED_ENTITY", "disposition": "MANUAL_REVIEW", "rule": "only a provenance-bound temporal alias may connect renamed labels"},
+            {"case_class": "STATUS_UNOBSERVABLE", "disposition": "IDENTITY_ONLY", "rule": "record the missing status authority; no inference-eligibility claim"},
+            {"case_class": "OBSERVED_NON_OPEN", "disposition": "QUARANTINED", "rule": "non-open source status blocks automatic identity output"},
         ]
     )
 
@@ -287,6 +318,8 @@ def validate_identity_tables(result: mapping.MappingResult) -> None:
     if not set(result.slots["issue_id"]).issubset(issue_ids):
         raise ValueError("slot references unknown issue")
     slot_ids = set(result.slots["issue_slot_id"])
+    for slot_id in slot_ids:
+        mapping.parse_issue_slot_id(str(slot_id))
     if set(result.plays["issue_slot_id"]) != slot_ids:
         raise ValueError("play/slot coverage mismatch")
     if set(result.outcome_cells["issue_slot_id"]) != slot_ids:

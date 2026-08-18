@@ -1,0 +1,21 @@
+alias_kind,source_id,source_alias,entity_id,valid_from_utc,valid_to_utc,validity_semantics,provenance
+competition,beidan_live_db,J1联赛,source:beidan_live_db:competition:j1联赛,2026-05-02T11:55:00Z,2026-08-15T18:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,J2联赛,source:beidan_live_db:competition:j2联赛,2026-08-08T13:45:00Z,2026-08-16T18:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,K1联赛,source:beidan_live_db:competition:k1联赛,2026-05-02T13:00:00Z,2026-08-16T18:30:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,K2联赛,source:beidan_live_db:competition:k2联赛,2026-05-03T13:00:00Z,2026-08-16T18:30:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,世界杯,source:beidan_live_db:competition:世界杯,2026-06-12T03:00:00Z,2026-07-20T03:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,中北美冠,source:beidan_live_db:competition:中北美冠,2026-05-06T09:30:00Z,2026-05-31T08:05:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,丹甲,source:beidan_live_db:competition:丹甲,2026-05-01T00:00:00Z,2026-08-21T01:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,丹超,source:beidan_live_db:competition:丹超,2026-05-02T01:00:00Z,2026-08-18T01:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,丹麦杯,source:beidan_live_db:competition:丹麦杯,2026-05-14T23:00:00Z,2026-08-05T00:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+competition,beidan_live_db,丹麦甲,source:beidan_live_db:competition:丹麦甲,2026-05-03T18:55:00Z,2026-08-16T19:55:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,A F S,source:beidan_live_db:team:a f s,2026-05-02T22:30:00Z,2026-08-18T01:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,AB格莱萨,source:beidan_live_db:team:ab格莱萨,2026-08-08T21:55:00Z,2026-08-16T19:55:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,AB格莱萨克瑟,source:beidan_live_db:team:ab格莱萨克瑟,2026-07-24T00:00:00Z,2026-08-16T20:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,AC奥卢,source:beidan_live_db:team:ac奥卢,2026-05-02T00:00:00Z,2026-08-16T22:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,AC米兰,source:beidan_live_db:team:ac米兰,2026-05-03T20:55:00Z,2026-05-25T02:45:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,AFC伯恩茅斯,source:beidan_live_db:team:afc伯恩茅斯,2026-05-03T21:00:00Z,2026-05-24T23:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,AFC温布尔登,source:beidan_live_db:team:afc温布尔登,2026-05-02T22:00:00Z,2026-08-15T22:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,AIK索尔纳,source:beidan_live_db:team:aik索尔纳,2026-05-03T22:30:00Z,2026-08-16T20:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,B 93,source:beidan_live_db:team:b 93,2026-05-02T00:30:00Z,2026-05-30T21:00:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3
+team,beidan_live_db,B93哥本,source:beidan_live_db:team:b93哥本,2026-05-23T19:55:00Z,2026-05-23T19:55:00Z,OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE,observed_identity_trace:v3

@@ -26,7 +26,7 @@ from canonical_identity import package, profile  # noqa: E402
 from source_schema import publication  # noqa: E402
 
 
-EVIDENCE_PACKAGE = "bj251_canonical_identity_evidence_v2"
+EVIDENCE_PACKAGE = "bj251_canonical_identity_evidence_v3"
 
 
 def _sha256(path: Path) -> str:
@@ -86,7 +86,8 @@ def _specifications(data_root: Path) -> list[profile.SourceSpec]:
             home_column="home",
             away_column="away",
             kickoff_column="kickoff_ts",
-            causal_grade="STRICT_CAUSAL",
+            causal_grade="LIVE_RAW_CURRENT_SCHEDULE",
+            status_column="status",
         ),
     ]
 
@@ -149,11 +150,15 @@ def _write_evidence(
         }
         publication.atomic_write_json(staging / "READ_BOUNDARY.json", read_boundary)
         manifest = {
-            "contract_version": "BJ-UNIFIED-CANONICAL-IDENTITY-001-v2",
+            "contract_version": "BJ-UNIFIED-CANONICAL-IDENTITY-001-v3",
             "external_data_root_env": "BEIJING_LOT_DATA_ROOT",
             "external_package_relative": f"derived/{package.PACKAGE_NAME}",
             "external_sha256sums_sha256": external_sums,
+            "source_input_snapshot_sha256": _sha256(
+                built / "tables" / "source_input_snapshot.csv"
+            ),
             "issue_count": int(len(result.mapping.issues)),
+            "source_input_count": int(len(result.mapping.source_inputs)),
             "issue_slot_count": int(len(result.mapping.slots)),
             "play_count": int(len(result.mapping.plays)),
             "outcome_cell_count": int(len(result.mapping.outcome_cells)),

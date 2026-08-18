@@ -1,8 +1,6 @@
-"""Temporal, provenance-bound team and competition alias resolution."""
+"""Diagnostic, provenance-bound team and competition alias observations."""
 
 from __future__ import annotations
-
-from dataclasses import dataclass
 
 import pandas as pd
 
@@ -17,16 +15,6 @@ ALIAS_COLUMNS = (
     "validity_semantics",
     "provenance",
 )
-
-
-@dataclass(frozen=True)
-class AliasResolution:
-    status: str
-    entity_id: str | None
-    alias_kind: str
-    source_id: str
-    source_alias: str
-    asof_utc: str
 
 
 def _timestamps(frame: pd.DataFrame) -> pd.DataFrame:
@@ -64,37 +52,3 @@ def validate_alias_intervals(frame: pd.DataFrame) -> None:
             if previous_end is not None and start <= previous_end:
                 raise ValueError(f"overlapping aliases for {(alias_kind, source_id, source_alias)}")
             previous_end = end
-
-
-def resolve_alias(
-    frame: pd.DataFrame,
-    alias_kind: str,
-    source_id: str,
-    source_alias: str,
-    asof_utc: str,
-) -> AliasResolution:
-    """Resolve one exact, kind-aware source-local alias observation."""
-    validate_alias_intervals(frame)
-    value = _timestamps(frame)
-    asof = pd.Timestamp(asof_utc)
-    if asof.tzinfo is None:
-        raise ValueError("asof_utc must be timezone-aware")
-    rows = value.loc[
-        value["alias_kind"].eq(alias_kind)
-        & value["source_id"].eq(source_id)
-        & value["source_alias"].eq(source_alias)
-        & value["valid_from_utc"].le(asof)
-        & (value["valid_to_utc"].isna() | value["valid_to_utc"].ge(asof))
-    ]
-    if len(rows) != 1:
-        return AliasResolution(
-            "UNIDENTIFIED", None, alias_kind, source_id, source_alias, asof.isoformat()
-        )
-    return AliasResolution(
-        "SOURCE_LOCAL",
-        str(rows.iloc[0]["entity_id"]),
-        alias_kind,
-        source_id,
-        source_alias,
-        asof.isoformat(),
-    )

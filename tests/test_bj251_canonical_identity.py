@@ -1,4 +1,4 @@
-"""Acceptance and adversarial tests for #251 identity-grain candidate v2."""
+"""Acceptance and adversarial tests for #251 identity-grain candidate v3."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ def record(
     away: str | None = "Away FC",
     kickoff_at_utc: str | None = "2026-06-01T12:00:00Z",
     causal_grade: str = "STRICT_CAUSAL",
+    source_record_status: str | None = None,
 ) -> mapping.IdentityRecord:
     return mapping.IdentityRecord(
         source_id=source_id,
@@ -39,6 +40,7 @@ def record(
         away_alias=away,
         kickoff_at_utc=kickoff_at_utc,
         causal_grade=causal_grade,
+        source_record_status=source_record_status,
     )
 
 
@@ -87,7 +89,7 @@ def test_duplicate_source_slot_is_removed_from_automatic_outputs() -> None:
     assert set(result.ledger["disposition"]) == {"QUARANTINED"}
 
 
-def test_exact_cross_source_labels_create_provenance_bounded_canonical_entities() -> None:
+def test_exact_cross_source_labels_are_diagnostic_not_canonical_entities() -> None:
     result = mapping.map_records(
         [
             record(source_id="history", source_key="h-1"),
@@ -95,8 +97,19 @@ def test_exact_cross_source_labels_create_provenance_bounded_canonical_entities(
         ]
     )
     assert len(result.slots) == 1
-    assert set(result.traces["home_team_resolution_status"]) == {"EXACT_CROSS_SOURCE"}
-    assert set(result.traces["canonical_home_team_id"]) == {"team:home fc"}
+    assert set(result.traces["home_team_label_agreement"]) == {"SAME_SLOT_EXACT_LABEL"}
+    assert set(result.traces["canonical_home_team_id"]) == {""}
+
+
+def test_settlement_labels_never_create_source_local_or_canonical_identity() -> None:
+    result = mapping.map_records(
+        [record(source_id="history", causal_grade="SETTLEMENT_ONLY")]
+    )
+    trace = result.traces.iloc[0]
+    assert trace["source_home_team_entity_id"] == ""
+    assert trace["canonical_home_team_id"] == ""
+    assert trace["home_team_resolution_status"] == "SETTLEMENT_LABEL_ONLY"
+    assert trace["entity_evidence_role"] == "RAW_SETTLEMENT_PROVENANCE_ONLY"
 
 
 def test_conflicting_cross_source_entity_stays_null_and_is_ledgered() -> None:
@@ -160,16 +173,12 @@ def test_null_or_invalid_outcome_grain_fails_closed() -> None:
         profile.validate_outcome_cells(missing)
 
 
-def test_alias_contract_is_kind_aware() -> None:
+def test_alias_contract_is_kind_aware_and_diagnostic_only() -> None:
     team = alias_row(kind="team")
     competition = alias_row(kind="competition", entity="source:s:competition:a")
     table = pd.DataFrame([team, competition])
     aliases.validate_alias_intervals(table)
-    resolution = aliases.resolve_alias(
-        table, "team", "s", "A", "2025-06-01T00:00:00Z"
-    )
-    assert resolution.entity_id == "source:s:team:a"
-    assert resolution.status == "SOURCE_LOCAL"
+    assert not hasattr(aliases, "resolve_alias")
 
 
 def test_alias_overlap_within_kind_is_rejected() -> None:
@@ -189,6 +198,7 @@ def test_coverage_separates_slot_and_entity_resolution() -> None:
     )
     coverage = profile.coverage_table(result)
     assert coverage["exact_slot_rows"].sum() == 2
+    assert coverage["diagnostic_label_agreement_fields"].sum() == 4
     assert coverage["conflicting_entity_fields"].sum() == 2
     assert coverage["unmatched_slot_rows"].sum() == 0
 
@@ -239,7 +249,7 @@ def test_package_semantically_rejects_remanifested_coverage_tamper(tmp_path: Pat
     frame.loc[0, "exact_slot_rows"] = 999
     frame.to_csv(path, index=False)
     remanifest(built)
-    with pytest.raises(AssertionError, match="coverage or alias"):
+    with pytest.raises(AssertionError, match="source-snapshot semantic"):
         package.verify_package(built)
 
 
@@ -268,10 +278,83 @@ def test_package_rejects_rehashed_outcome_column(tmp_path: Path) -> None:
         profile.coverage_table(result),
         profile.derive_temporal_aliases(result.traces),
     )
+    cell_path = built / "tables" / "outcome_cell_identity.csv"
+    cells = pd.read_csv(cell_path)
+    cells["payout"] = 9999.0
+    cells.to_csv(cell_path, index=False)
+    remanifest(built)
+    with pytest.raises(AssertionError, match="unexpected table schema"):
+        package.verify_package(built)
+
+
+def test_blank_and_reused_source_keys_are_quarantined() -> None:
+    result = mapping.map_records(
+        [
+            record(source_key="", match_idx=1),
+            record(source_key="same", match_idx=2),
+            record(source_key="same", match_idx=3),
+        ]
+    )
+    assert result.traces.empty
+    assert set(result.ledger["exception_class"]) == {
+        "MISSING_SOURCE_RECORD_KEY",
+        "DUPLICATE_SOURCE_RECORD_KEY",
+    }
+
+
+def test_non_open_status_is_quarantined_and_missing_status_is_explicit() -> None:
+    quarantined = mapping.map_records([record(source_record_status="abandoned")])
+    assert quarantined.traces.empty
+    assert quarantined.ledger.loc[0, "exception_class"] == "NON_OPEN_SOURCE_STATUS"
+    unobservable = mapping.map_records([record(source_record_status=None)])
+    assert unobservable.traces.loc[0, "case_disposition"] == "CASE_STATUS_UNOBSERVABLE"
+
+
+def test_strict_issue_slot_parser_rejects_prefix_only_shape() -> None:
+    with pytest.raises(ValueError, match="invalid issue_slot_id"):
+        mapping.play_id("bjslot:not-an-issue:not-a-slot")
+
+
+def test_package_rejects_rehashed_missing_conflict_ledger(tmp_path: Path) -> None:
+    result = mapping.map_records(
+        [
+            record(source_id="a", source_key="a", home="Home"),
+            record(source_id="b", source_key="b", home="Other"),
+        ]
+    )
+    built = package.build_package(
+        tmp_path,
+        result,
+        profile.coverage_table(result),
+        profile.derive_temporal_aliases(result.traces),
+    )
+    ledger_path = built / "tables" / "ambiguity_ledger.csv"
+    ledger = pd.read_csv(ledger_path)
+    ledger = ledger.loc[
+        ~ledger["exception_class"].eq("CROSS_SOURCE_ENTITY_ALIAS_CONFLICT")
+    ]
+    ledger.to_csv(ledger_path, index=False)
+    manifest_path = built / "MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["exception_count"] = len(ledger)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    remanifest(built)
+    with pytest.raises(AssertionError, match="source-snapshot semantic"):
+        package.verify_package(built)
+
+
+def test_package_rejects_rehashed_canonical_promotion(tmp_path: Path) -> None:
+    result = mapping.map_records([record()])
+    built = package.build_package(
+        tmp_path,
+        result,
+        profile.coverage_table(result),
+        profile.derive_temporal_aliases(result.traces),
+    )
     trace_path = built / "tables" / "source_trace.csv"
-    trace = pd.read_csv(trace_path)
-    trace["payout"] = 9999.0
+    trace = pd.read_csv(trace_path, keep_default_na=False)
+    trace.loc[0, "canonical_home_team_id"] = "team:forged"
     trace.to_csv(trace_path, index=False)
     remanifest(built)
-    with pytest.raises(AssertionError, match="outcome-exposed"):
+    with pytest.raises(AssertionError, match="canonical entity promotion"):
         package.verify_package(built)

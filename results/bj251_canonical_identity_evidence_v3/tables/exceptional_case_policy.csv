@@ -5,3 +5,5 @@ ABANDONED,EXCLUDE_FROM_INFERENCE,retain source trace; never create a settlement 
 DUPLICATE,QUARANTINED,multiple source rows for one source and exact slot block automatic acceptance
 NEUTRAL_VENUE,CANONICAL_NO_TEAM_REWRITE,venue does not alter home/away team identity; record venue only in a later fixture attribute
 RENAMED_ENTITY,MANUAL_REVIEW,only a provenance-bound temporal alias may connect renamed labels
+STATUS_UNOBSERVABLE,IDENTITY_ONLY,record the missing status authority; no inference-eligibility claim
+OBSERVED_NON_OPEN,QUARANTINED,non-open source status blocks automatic identity output

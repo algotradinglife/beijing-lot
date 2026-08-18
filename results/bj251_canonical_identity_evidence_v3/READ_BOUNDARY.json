@@ -24,7 +24,8 @@
       "league",
       "home",
       "away",
-      "kickoff_ts"
+      "kickoff_ts",
+      "status"
     ],
     "beidan_xlsm_workbook": [
       "match_id",
