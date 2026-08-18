@@ -276,6 +276,7 @@ def _populate(
         "policy": "candidate leads 1/6/12/24h; segment fallback 1h",
         "schedule_authority": "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF",
         "clock_authority": "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED",
+        "identity_authority": "COLLECTOR_URL_EXPECT_BUCKET_NOT_CANONICAL_FIXTURE_IDENTITY",
         "cell_lineage": "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN",
         "source_authentication": "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR",
         "raw_cell_value_evidence": "COUNTS_ONLY_NOT_FROZEN_RAW_CELL_AUTHORITY",
@@ -480,6 +481,10 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("schedule-authority claim mismatch")
     if manifest.get("clock_authority") != "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED":
         raise AssertionError("clock-authority claim mismatch")
+    if manifest.get("identity_authority") != (
+        "COLLECTOR_URL_EXPECT_BUCKET_NOT_CANONICAL_FIXTURE_IDENTITY"
+    ):
+        raise AssertionError("identity-authority claim mismatch")
     if manifest.get("cell_lineage") != "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN":
         raise AssertionError("cell-lineage claim mismatch")
     if manifest.get("poll_start_namespace") != "poll_start_forward":

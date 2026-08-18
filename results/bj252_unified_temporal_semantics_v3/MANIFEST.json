@@ -1,6 +1,7 @@
 {
   "cell_lineage": "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN",
   "clock_authority": "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED",
+  "identity_authority": "COLLECTOR_URL_EXPECT_BUCKET_NOT_CANONICAL_FIXTURE_IDENTITY",
   "contract_version": "BJ-UNIFIED-TEMPORAL-SEMANTICS-001-v3",
   "historical_proxy_observation_source_id": "beidan_xlsm_workbook",
   "policy": "candidate leads 1/6/12/24h; segment fallback 1h",

@@ -18,6 +18,7 @@
 - Merged poll rows do not retain upstream per-cell lineage. The committed Parquet freezes derived presence/validity counts, not raw SP cell values, so it is not independent raw-value or source-authenticity evidence.
 - Internal checksums prove package integrity. The SQLite main/WAL/SHM receipt proves only a stable build interval.
 - Historical `initial`/`10h`/`1h` evidence is bound to exact source lane `beidan_xlsm_workbook`, remains a source-relative proxy summary, and is never represented as a row-level strict panel or universal issue-time snapshot.
+- Collector `issue_code` and `fixture_id` values are URL-expect-derived synthetic buckets, not canonical physical fixture/issue identity. Current bucket counts are descriptive only; #251 must resolve cross-issue aliases before #253 integration.
 
 ## Current profile
 
@@ -39,3 +40,9 @@
 
 - Preserve the #253 handoff limitations: poll-start is not exact available-at/reschedule-as-of authority, and frozen derived counts are not independently authenticated raw-cell truth.
 - Next: independent candidate-mode EV must bind the new PR HEAD and rerun nullable lane-field plus source-receipt mutation attacks.
+
+## R7 PI narrow closure (2026-08-18)
+
+- The observation boundary now rejects null/blank `issue_code` and null `match_idx` before any pandas grouping, including object, nullable `string`, and Arrow-backed string inputs. This closes the R6 silent-row-loss finding without changing the frozen input or profile counts.
+- The R6 cross-issue alias finding is assigned to canonical-identity Issue #251, which already blocks #253. This package now machine-declares `COLLECTOR_URL_EXPECT_BUCKET_NOT_CANONICAL_FIXTURE_IDENTITY`; its 5,494/32 figures must not be promoted to canonical fixture/issue truth.
+- Focused verification: 68 tests passed; Ruff clean.
