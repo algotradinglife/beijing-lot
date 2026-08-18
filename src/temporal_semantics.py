@@ -56,8 +56,12 @@ def _require_columns(frame: pd.DataFrame) -> None:
         raise TemporalSemanticsError(f"observation contract missing columns: {', '.join(missing)}")
     if frame.empty:
         raise TemporalSemanticsError("observation contract is empty")
-    if frame["fixture_id"].isna().any() or frame["fixture_id"].astype(str).eq("").any():
-        raise TemporalSemanticsError("fixture_id is required")
+    for column in ("fixture_id", "issue_code"):
+        values = frame[column].astype("string")
+        if values.isna().any() or values.str.strip().eq("").fillna(False).any():
+            raise TemporalSemanticsError(f"{column} is required")
+    if frame["match_idx"].isna().any():
+        raise TemporalSemanticsError("match_idx is required")
     if frame["availability_mask"].isna().any():
         raise TemporalSemanticsError("availability_mask is required")
     if not pd.api.types.is_bool_dtype(frame["availability_mask"].dtype):

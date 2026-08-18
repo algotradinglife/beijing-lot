@@ -124,6 +124,29 @@ def test_strict_and_proxy_namespaces_cannot_pool_silently() -> None:
         validate_observations(pd.concat([strict, proxy]), namespace="poll_start_forward")
 
 
+@pytest.mark.parametrize("namespace", ["poll_start_forward", "historical_proxy"])
+@pytest.mark.parametrize("dtype", ["object", "string", "string[pyarrow]"])
+@pytest.mark.parametrize("value", [None, "", "   "])
+def test_issue_code_is_required_without_nullable_dtype_fail_open(
+    namespace: str, dtype: str, value: object
+) -> None:
+    rows = _poll_rows().iloc[[0]].copy() if namespace == "poll_start_forward" else _proxy_observation()
+    try:
+        rows["issue_code"] = pd.Series([value], dtype=dtype)
+    except (ImportError, TypeError):
+        pytest.skip(f"pandas dtype unavailable: {dtype}")
+    with pytest.raises(TemporalSemanticsError, match="issue_code is required"):
+        validate_observations(rows, namespace=namespace)
+
+
+@pytest.mark.parametrize("namespace", ["poll_start_forward", "historical_proxy"])
+def test_match_idx_is_required(namespace: str) -> None:
+    rows = _poll_rows().iloc[[0]].copy() if namespace == "poll_start_forward" else _proxy_observation()
+    rows["match_idx"] = pd.Series([pd.NA], dtype="Int64")
+    with pytest.raises(TemporalSemanticsError, match="match_idx is required"):
+        validate_observations(rows, namespace=namespace)
+
+
 @pytest.mark.parametrize(
     "source_id",
     [None, "", "beidan_live_db_merged_unknown_cell_lineage", "another_proxy"],
