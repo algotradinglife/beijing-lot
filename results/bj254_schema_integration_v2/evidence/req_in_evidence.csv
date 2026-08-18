@@ -1,0 +1,9 @@
+requirement,status,evidence
+REQ-IN01,PASS,"four predecessor accepted HEADs, merge commits, artifacts and SHA-256 values bound"
+REQ-IN02,PASS,"deterministic representative proxy years=[2014, 2015, 2016, 2017] plus strict-forward sample"
+REQ-IN03,PASS,"combined physical verifier covers identity grain, temporal namespace, missingness and label isolation"
+REQ-IN04,PASS,five-consumer machine-readable execution/model-data readiness matrix
+REQ-IN05,PASS,"historical_proxy and strict_forward stay separate in schema, receipt and report"
+REQ-IN06,PASS,absolute external-root build and clean isolated restore-copy verification
+REQ-IN07,PASS,executed notebook plus PI decision report and data dictionary
+REQ-IN08,PENDING_EV,focused adversarial tests complete; independent EV requested at final PR HEAD

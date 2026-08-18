@@ -1,0 +1,4 @@
+owner_issue,question,question_id,status
+#251,Which proposed mappings become canonical?,U1,DEFERRED
+#252,What sealing/source-clock rules promote forward evidence?,U2,DEFERRED
+#235/#236/#237/#248,Which measured gaps justify recovery?,U3,PI_DECISION_REQUIRED
