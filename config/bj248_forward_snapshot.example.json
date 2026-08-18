@@ -1,0 +1,12 @@
+{
+  "contract": "BJ-UNIFIED-FORWARD-SNAPSHOT-001",
+  "source": "nowscore_bj_sp_change_typeid5",
+  "cadence_seconds": 300,
+  "per_request_min_interval_seconds": 1.0,
+  "relative_horizons_minutes": [600, 60],
+  "common_epoch_schedule_buffer_minutes": 120,
+  "data_root_env": "BEIJING_LOT_DATA_ROOT",
+  "historical_backfill": false,
+  "cross_check_sources": ["500", "ZGZCW"],
+  "untrusted_sources": ["bjlot.cn"]
+}
