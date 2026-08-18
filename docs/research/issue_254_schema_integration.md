@@ -17,6 +17,12 @@
 python scripts/build_bj254_schema_integration.py --data-root "$BEIJING_LOT_DATA_ROOT"
 python scripts/build_bj254_schema_integration.py --data-root "$BEIJING_LOT_DATA_ROOT" --verify-only
 pytest -q tests/test_bj254_schema_integration.py
+jupyter nbconvert --to notebook --execute --inplace notebooks/research/issue-254/bj254_schema_integration.ipynb
 ```
 
-The external root is intentionally mandatory. Bulk SQLite and Parquet snapshots are never committed to Git.
+The external root is intentionally mandatory. It must expose `beidan_live.db`,
+`derived/beidan_xlsm/beidan_xlsm.sqlite`, and
+`derived/bj251_canonical_identity_v3/tables/issue_slot_identity.csv`. The
+committed #254 notebook was clean-executed against that declared layout and
+records the PASS receipt. Bulk SQLite and Parquet snapshots are never committed
+to Git.

@@ -1,37 +1,51 @@
-# Issue #254 implementation handoff — external-data replay pending
+# Issue #254 delivery handoff — external replay verified
 
-[SESSION] 20260818_223541_cfcaf2
+[SESSION] 20260818_225058_234960
 
 ## Current HEAD and completed work
 
-- Branch: `engineer/bj254-issue`; HEAD includes accepted #250 (`99701cf`), #251 (`63729bc`), #252 (`17be9fd`) and #253 (`a086c47`) predecessor surfaces.
-- Added `src/schema_integration/` and `scripts/build_bj254_schema_integration.py`.
-  The integration package binds all four accepted predecessor manifests and SHAs,
-  atomically builds a nested normalized SQLite/Parquet snapshot, verifies the
-  physical M×3 and label-isolation invariants, and emits an exact five-consumer
-  readiness matrix for #235/#236/#237/#248/#249.
-- Added `tests/test_bj254_schema_integration.py`: normal replay plus adversarial
-  re-signed predecessor rewrite, missing downstream contract, and label-column
-  leak attacks. Focused #253+#254 suite passed: `10 passed`.
+- Branch: `engineer/bj254-issue`; inherited HEAD `79b1dc5` binds accepted #250
+  (`99701cf`), #251 (`63729bc`), #252 (`17be9fd`) and #253 (`a086c47`)
+  predecessor artifacts.
+- `src/schema_integration/` atomically builds a nested normalized SQLite/Parquet
+  snapshot, validates all predecessor bindings, M×3 and label-isolation
+  invariants, and writes the exact five-consumer #235/#236/#237/#248/#249
+  readiness matrix.
+- `tests/test_bj254_schema_integration.py` covers normal replay, re-signed
+  predecessor rewrite, downstream-contract deletion, and label-column leak.
+- Added `notebooks/research/issue-254/bj254_schema_integration.ipynb`; it was
+  clean-executed against the declared external root and committed with outputs.
 
-## Key decisions
+## Resolved blocked prerequisite
 
-- #253's issue-local `issue_code × match_idx × 3/1/0` key, proxy/strict
-  namespace split, and physical settlement isolation are inherited unchanged.
-- The readiness matrix preserves data limits: #235–#237 are `BLOCKED`; #248 and
-  #249 are `READY_INTERFACE` only, with their own collection/portability gates.
-- No external path is hard-coded; `BEIJING_LOT_DATA_ROOT` is mandatory.
+The earlier blocker was a root-layout discovery error, not an unavailable input.
+A temporary external root was assembled by symlinking the existing declared
+inputs into the contract layout without copying bulk data:
 
-## Blocking condition / next step
+- `beidan_live.db`;
+- `derived/beidan_xlsm/beidan_xlsm.sqlite`;
+- `derived/bj251_canonical_identity_v3/tables/issue_slot_identity.csv`.
 
-This host has no declared data root and neither checked candidate root contains
-the three required predecessor inputs: `derived/beidan_xlsm/beidan_xlsm.sqlite`,
-`beidan_live.db`, and `derived/bj251_canonical_identity_v3/tables/issue_slot_identity.csv`.
-Supply an absolute mounted root containing those inputs, then run the #254 CLI,
-execute the final notebook, and attach the real replay receipt before EV Review.
+The actual replay returned `PASS`: 4 predecessor bindings, 5 downstream
+contracts, 8 issue slots, 16 observations, 60 feature cells (58 available,
+2 explicit missing), 36 historical-proxy cells, 24 strict-forward cells, and
+4 physically isolated settlement labels. Re-running `--verify-only` returned
+the same PASS receipt.
 
-## Known verification note
+## Verification
 
-`python -m ruff` is unavailable in the active runtime; `uvx ruff` retried and
-failed because PyPI TLS negotiation ended with EOF. Python compilation and
-focused tests completed successfully.
+- `pytest tests/test_bj254_schema_integration.py tests/test_bj253_physical_schema.py -q` → `10 passed`.
+- CLI real external-root build + verify → `status: PASS`.
+- Notebook execution → same PASS receipt and the #250/#251/#252/#253 binding list.
+
+## Key boundaries and next step
+
+- Historical proxy and strict-forward rows share M×3 shape but remain separate
+  namespaces; settlement remains physically separate from feature readers.
+- #235/#236/#237 remain `BLOCKED` by their source/identity evidence gaps;
+  #248/#249 are `READY_INTERFACE` only and retain their own evidence gates.
+- No raw database, Parquet, or source payload is committed to Git.
+
+Next: EV should use a clean checkout, run the 10 focused tests, provide an
+external root in the declared three-input layout, run the CLI and execute the
+#254 notebook, then repeat the adversarial re-sign and label-leak cases.

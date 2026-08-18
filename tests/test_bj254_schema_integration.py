@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -14,8 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from schema_integration import IntegrationError, build_integration_package, verify_integration_package
-from test_bj253_physical_schema import _make_live, _make_xlsm
+from schema_integration import (  # noqa: E402
+    IntegrationError,
+    build_integration_package,
+    verify_integration_package,
+)
+from test_bj253_physical_schema import _make_live, _make_xlsm  # noqa: E402
 
 
 def _hash(path: Path) -> str:
