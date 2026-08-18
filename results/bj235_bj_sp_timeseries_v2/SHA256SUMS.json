@@ -1,0 +1,7 @@
+{
+  "MANIFEST.json": "cfe640dbe41387138c139dc80b69f6b48489724feab3e1ec4df9b2109cdc5684",
+  "README.md": "9ecd8015e6836b82d5050b102fc00cbe6330abdce7b478ed33ca3bfd60064d15",
+  "RECOVERABILITY_REPORT.json": "595dc01a154d1e4d4ab182c82afa25f94dca0e8f3c4d2f9730f1e8c9857a4d76",
+  "tables/coverage_by_issue_horizon.csv": "1c2b13fb6549bdb79b517907533fa088ffb7027426f0eba3024070c120dcfb0e",
+  "tables/historical_proxy_cells.parquet": "1ebab7ba96aa348952d3cb8c801e2f6056030c27411a7e43f3afcbc9fd67ef37"
+}

@@ -1,0 +1,19 @@
+{
+  "prospective": {
+    "accepted_cells": 0,
+    "reason": "NOT_CAPTURED_BY_THIS_HISTORICAL_PACKAGE"
+  },
+  "retrospective_proxy": {
+    "accepted_cells": 1725153,
+    "horizons": [
+      "initial",
+      "10h",
+      "1h"
+    ],
+    "source": "beidan_xlsm_workbook"
+  },
+  "strict_historical": {
+    "accepted_cells": 0,
+    "reason": "NO_EXACT_HISTORICAL_CLOCK"
+  }
+}

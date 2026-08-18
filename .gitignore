@@ -39,6 +39,8 @@ results/*
 !results/bj250_source_census_v3/**
 !results/bj254_schema_integration_v2/
 !results/bj254_schema_integration_v2/**
+!results/bj235_bj_sp_timeseries_v2/
+!results/bj235_bj_sp_timeseries_v2/**
 runs/
 .cache/
 tmp/
@@ -59,6 +61,8 @@ temp/
 !results/bj250_source_census_v3/**/*.csv
 !results/bj250_source_census_v3/**/*.parquet
 !results/bj254_schema_integration_v2/**/*.csv
+!results/bj235_bj_sp_timeseries_v2/**/*.csv
+!results/bj235_bj_sp_timeseries_v2/**/*.parquet
 *.feather
 *.h5
 *.hdf5
