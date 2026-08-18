@@ -1,58 +1,116 @@
-# #251 canonical identity decision report
+# #251 identity-grain decision report — v2
 
-## Candidate decision
+## Decision summary
 
-`BJ-UNIFIED-CANONICAL-IDENTITY-001-v1` proposes the stable, outcome-unexposed fixture key:
+The data proves a stable identity for an **issue-local presentation slot**, not
+for a real-world fixture across refreshes, replacements or reschedules.  The
+accepted key is therefore:
 
-`fixture_id = bjfi:<issue_code>:<match_idx padded to 3 digits>`
+`issue_slot_id = bjslot:<issue_code>:<match_idx padded to 3 digits>`
 
-Only a populated numeric `(issue_code, match_idx)` can create that key.  Team/competition labels, kickoff times and fuzzy similarity are never used to create an automatic fixture match.  `issue_code` and `match_idx` are identity fields, not presentation-only fields, pending the PI acceptance checkpoint requested in #251.
+`fixture_entity_id` is a separate nullable field.  It stays null until a
+source-stable event key or provenance-backed lineage is available.  Downstream
+code must not reinterpret `issue_slot_id` as that entity key.
+
+The complete deterministic identity chain for the current M×3 foundation is:
+
+`issue_id → issue_slot_id → play_id(BJ_HANDICAP_3WAY) → outcome_cell_id(3/1/0)`
+
+No outcome, winning-SP, payout or settlement-value field enters the mapping.
 
 ## Executed source evidence
 
-The read-only build used only identity columns from the accepted #250 lanes:
+The v2 rebuild produced:
 
-| Source | causal grade | valid source rows | quarantined rows | automatic fixture ambiguity |
-|---|---:|---:|---:|---:|
-| `beidan_xlsm_workbook` | `RETROSPECTIVE_PROXY` | 192,709 | 2,560 | 0 |
-| `beidan_history_db` | `SETTLEMENT_ONLY` | 38,463 | 0 | 0 |
-| `beidan_live_db` | `STRICT_CAUSAL` | 5,155 | 0 | 0 |
+| Identity surface | Rows |
+|---|---:|
+| Issues | 808 |
+| Issue-local slots | 215,193 |
+| Source traces | 236,666 |
+| Play identities | 215,193 |
+| Outcome-cell identities | 645,579 |
+| Observed source-local temporal aliases | 6,785 |
 
-The evidence package contains 214,854 canonical fixture IDs and 236,327 source traces.  The historical workbook’s 2,560 missing-slot records (1.311% of 195,269 input rows) are explicitly quarantined.  Its 18,349 exact-slot rows with cross-source team/competition label differences (8.5402% of canonical fixtures) are `MANUAL_REVIEW` temporal-alias cases—not fuzzy fixture matches and not discarded fixtures.
+The historical workbook still has 2,560 rows without a valid issue slot. They
+are quarantined rather than fuzzy-matched.  Entity evidence is reported
+separately across the 709,998 competition/home/away fields:
 
-The full regenerable source trace is external to Git at the path bound in `results/bj251_canonical_identity_evidence_v1/MANIFEST.json`; committed summaries bind its `SHA256SUMS.json` hash.  No outcome/result, payout, or winning-SP field was selected; the exact selected columns are frozen in `READ_BOUNDARY.json`.
+| Entity disposition | Fields |
+|---|---:|
+| Exact label agreement across at least two sources | 63,948 |
+| Source-local only | 581,925 |
+| Cross-source conflict | 61,144 |
+| Missing / unidentified | 2,981 |
 
-## Required exceptional-case dispositions
+The 30,572 conflict-ledger records are entity-kind-specific instances. They do
+not invalidate the exact issue-slot mapping, but their canonical entity IDs
+remain null. Missing labels also remain null; no shared pseudo-identity such as
+`team:unidentified` is created.
+
+## Entity and alias policy
+
+- A source-local entity key is deterministic and may support source-local
+  modeling.
+- A canonical cross-source entity key is populated only when at least two
+  sources agree exactly on a nonblank normalized label for the same slot.
+- Conflicting or missing fields are `UNRESOLVED_CONFLICT` or `UNIDENTIFIED` and
+  retain source provenance.
+- Observed first/last alias dates are diagnostic bounds with
+  `OBSERVED_FIRST_LAST_NOT_AUTHORITATIVE`; they are not declared validity
+  periods.
+- Alias collision checks are keyed by
+  `(alias_kind, source_id, source_alias)`, so a team and competition may share
+  text without becoming the same entity.
+- Fuzzy candidates remain review evidence and never become mappings.
+
+## Exceptional cases
 
 | Case | Disposition |
 |---|---|
-| Rescheduled / postponed | `MANUAL_REVIEW`; provenance-bound schedule amendment/replacement required |
-| Abandoned | `EXCLUDE_FROM_INFERENCE`; preserve trace only |
-| Duplicate source row | `QUARANTINED` |
-| Neutral venue | `CANONICAL_NO_TEAM_REWRITE` |
-| Renamed entity | `MANUAL_REVIEW`; provenance-bound temporal alias only |
+| Missing/invalid issue slot | Quarantine |
+| Duplicate source rows for one issue slot | Quarantine all duplicates from automatic outputs |
+| Rescheduled/replaced fixture | Keep slot evidence; `fixture_entity_id` remains unresolved without lineage |
+| Postponed fixture | Manual review; no inferred replacement |
+| Abandoned fixture | Preserve trace, exclude from inference |
+| Missing entity label | Null entity ID plus `UNIDENTIFIED` ledger reason |
+| Renamed entity | Provenance-backed kind-aware alias only |
 
 ## REQ-to-evidence
 
-| Requirement | Evidence |
+| Requirement | v2 evidence |
 |---|---|
-| REQ-ID01 | `src/canonical_identity/mapping.py`; deterministic-key test; full `source_trace.csv` hash bound by evidence manifest |
-| REQ-ID02 | `src/canonical_identity/aliases.py`, `tables/temporal_aliases.csv` (6,785 observed bounded aliases), temporal-alias adversarial tests |
-| REQ-ID03 | `reject_fuzzy_candidates()` writes `MANUAL_REVIEW`, never an accepted mapping; test proves this boundary |
-| REQ-ID04 | `validate_fixture_outcome_cells()` and tests reject duplicate/missing 3/1/0 cells; #234 DDL retains `UNIQUE(issue_code, match_idx)` |
-| REQ-ID05 | `tables/exceptional_case_policy.csv` and machine-readable `ambiguity_ledger.csv` |
-| REQ-ID06 | `tables/coverage.csv`, stratified by source/year/competition/causal grade, including an explicit unknown bucket for quarantined rows |
-| REQ-ID07 | external full `tables/source_trace.csv` records source key, slot, canonical IDs, causal grade and rule version; checksum bound in committed manifest |
-| REQ-ID08 | tests cover forged source trace, fuzzy candidate, duplicate cell, missing canonical slot, cross-source alias collision, and temporal alias overlap |
+| REQ-ID01 | Separate `issue_slot_id` and nullable `fixture_entity_id`; report explicitly bounds refresh/reschedule claims |
+| REQ-ID02 | Kind-aware observed alias table with provenance and diagnostic validity semantics |
+| REQ-ID03 | Exact slot mapping and `reject_fuzzy_candidates()` manual-review boundary |
+| REQ-ID04 | Explicit issue, slot, play and 3/1/0 cell tables plus formula/non-null/uniqueness validators |
+| REQ-ID05 | Enforced duplicate quarantine and machine-readable exceptional-case policy/ledger |
+| REQ-ID06 | Coverage separates slot, cross-source resolved, source-local, conflict, unidentified and unmatched counts by source/year/competition/causal grade |
+| REQ-ID07 | Source trace retains source keys, issue slot, entity status, causal grade and rule version |
+| REQ-ID08 | Adversarial tests cover null grain, duplicate quarantine, missing entities, cross-kind aliases, conflicting entities, remanifested coverage and outcome-column tampering |
 
-## PI decision inputs / known risks
+## Machine-verification boundary
 
-1. Accept or revise `(issue_code, match_idx)` as the fixture key; this delivery treats it as canonical following #234 but requires #251’s explicit PI/user confirmation.
-2. Choose the acceptable 1.311% unmatched threshold for `beidan_xlsm_workbook`; current policy quarantines all 2,560 rows.
-3. Decide owner and SLA for the 18,349 temporal team/competition alias conflicts.  They do not alter fixture IDs, but their entity aliases cannot be automatically promoted.
-4. Confirm the listed reschedule/postponed/abandoned policies before an ingestion branch writes canonical fixture attributes.
-5. `beidan_history_db` remains `SETTLEMENT_ONLY`; its identity labels cannot be consumed as inference features.  The proxy workbook remains `RETROSPECTIVE_PROXY`.
+The full regenerable package is stored under the external data root and bound
+by the committed evidence manifest. The verifier checks the complete identity
+chain, formulas, non-null keys, duplicate quarantine, missing-entity routing,
+kind-aware alias intervals, outcome-field exclusion, coverage/ledger counts and
+manifest totals. Internal checksums establish package integrity; they are not
+an external authenticity oracle for a mutable upstream SQLite source.
 
-## Review request
+## Downstream permissions and limits
 
-EV: fresh checkout, run `python -m pytest tests/test_bj251_canonical_identity.py -q`, rebuild with an external `BEIJING_LOT_DATA_ROOT`, then independently tamper the full trace, alias interval and evidence manifest.  Verify that any duplicate/missing 3/1/0 cells fail and no outcome-bearing fields enter `READ_BOUNDARY.json`.
+Allowed for #253 after EV:
+
+- use `issue_slot_id` as the issue-local physical key;
+- retain source-local entity keys for explicitly source-local features;
+- preserve nullable canonical/entity fields and resolution status;
+- build the M×3 play/outcome-cell foreign-key chain.
+
+Not allowed:
+
+- cross-refresh/reschedule joins on `issue_slot_id` as if it were a fixture
+  entity;
+- cross-source joins through unresolved, missing or source-local-only entities;
+- silent fuzzy mapping or promotion of diagnostic alias intervals;
+- use of `beidan_history_db` identity labels as inference features (it remains
+  settlement-only).

@@ -26,7 +26,7 @@ from canonical_identity import package, profile  # noqa: E402
 from source_schema import publication  # noqa: E402
 
 
-EVIDENCE_PACKAGE = "bj251_canonical_identity_evidence_v1"
+EVIDENCE_PACKAGE = "bj251_canonical_identity_evidence_v2"
 
 
 def _sha256(path: Path) -> str:
@@ -102,9 +102,44 @@ def _write_evidence(
 
     def populate(staging: Path) -> None:
         (staging / "tables").mkdir(parents=True)
+        ledger_summary = (
+            result.mapping.ledger.groupby(
+                ["exception_class", "disposition", "source_id", "entity_kind"],
+                dropna=False,
+                as_index=False,
+            )
+            .size()
+            .rename(columns={"size": "rows"})
+        )
+        ledger_sample = (
+            result.mapping.ledger.sort_values(
+                ["exception_class", "source_id", "source_key"], kind="stable"
+            )
+            .groupby("exception_class", group_keys=False)
+            .head(10)
+            .reset_index(drop=True)
+        )
+        alias_summary = (
+            aliases.groupby(["alias_kind", "source_id"], as_index=False)
+            .agg(
+                observed_alias_rows=("source_alias", "size"),
+                unique_source_aliases=("source_alias", "nunique"),
+                unique_source_entities=("entity_id", "nunique"),
+            )
+        )
+        alias_sample = (
+            aliases.sort_values(
+                ["alias_kind", "source_id", "source_alias"], kind="stable"
+            )
+            .groupby(["alias_kind", "source_id"], group_keys=False)
+            .head(10)
+            .reset_index(drop=True)
+        )
         publication.atomic_write_csv(result.coverage, staging / "tables" / "coverage.csv")
-        publication.atomic_write_csv(result.mapping.ledger, staging / "tables" / "ambiguity_ledger.csv")
-        publication.atomic_write_csv(aliases, staging / "tables" / "temporal_aliases.csv")
+        publication.atomic_write_csv(ledger_summary, staging / "tables" / "ambiguity_summary.csv")
+        publication.atomic_write_csv(ledger_sample, staging / "tables" / "ambiguity_sample.csv")
+        publication.atomic_write_csv(alias_summary, staging / "tables" / "temporal_alias_summary.csv")
+        publication.atomic_write_csv(alias_sample, staging / "tables" / "temporal_alias_sample.csv")
         publication.atomic_write_csv(policy, staging / "tables" / "exceptional_case_policy.csv")
         read_boundary = {
             "source_columns_read": {key: list(value) for key, value in result.read_columns.items()},
@@ -114,10 +149,14 @@ def _write_evidence(
         }
         publication.atomic_write_json(staging / "READ_BOUNDARY.json", read_boundary)
         manifest = {
-            "contract_version": "BJ-UNIFIED-CANONICAL-IDENTITY-001-v1",
-            "external_full_package": str(built),
+            "contract_version": "BJ-UNIFIED-CANONICAL-IDENTITY-001-v2",
+            "external_data_root_env": "BEIJING_LOT_DATA_ROOT",
+            "external_package_relative": f"derived/{package.PACKAGE_NAME}",
             "external_sha256sums_sha256": external_sums,
-            "fixture_count": int(len(result.mapping.fixtures)),
+            "issue_count": int(len(result.mapping.issues)),
+            "issue_slot_count": int(len(result.mapping.slots)),
+            "play_count": int(len(result.mapping.plays)),
+            "outcome_cell_count": int(len(result.mapping.outcome_cells)),
             "trace_count": int(len(result.mapping.traces)),
             "exception_count": int(len(result.mapping.ledger)),
             "disposition": "CANDIDATE_PENDING_PI_ACCEPTANCE",
@@ -143,7 +182,7 @@ def build(data_root: Path, evidence_root: Path) -> tuple[Path, Path]:
     return full, evidence
 
 
-def verify_evidence(evidence: Path) -> None:
+def verify_evidence(evidence: Path, data_root: Path) -> None:
     """Verify committed evidence plus the externally regenerated full trace."""
     recorded = json.loads((evidence / "SHA256SUMS.json").read_text(encoding="utf-8"))
     actual = {
@@ -154,13 +193,60 @@ def verify_evidence(evidence: Path) -> None:
     if recorded != actual:
         raise AssertionError("evidence package hash verification failed")
     manifest = json.loads((evidence / "MANIFEST.json").read_text(encoding="utf-8"))
+    external = data_root / str(manifest["external_package_relative"])
     package.verify_package(
-        Path(manifest["external_full_package"]),
+        external,
         trusted_anchor=str(manifest["external_sha256sums_sha256"]),
     )
     boundary = json.loads((evidence / "READ_BOUNDARY.json").read_text(encoding="utf-8"))
     if boundary.get("outcome_exposed_inputs") is not False or boundary.get("fuzzy_auto_acceptance") is not False:
         raise AssertionError("identity boundary verification failed")
+    prohibited = set(boundary.get("prohibited_outcome_columns", []))
+    if prohibited != {"result_code", "winning_sp", "outcome_code", "payout"}:
+        raise AssertionError("unexpected prohibited-outcome contract")
+    read_columns = boundary.get("source_columns_read")
+    if not isinstance(read_columns, dict) or any(
+        prohibited & set(columns) for columns in read_columns.values()
+    ):
+        raise AssertionError("outcome-exposed source column entered the identity read boundary")
+    full_ledger = pd.read_csv(
+        external / "tables" / "ambiguity_ledger.csv", dtype=str, keep_default_na=False
+    )
+    expected_ledger_summary = (
+        full_ledger.groupby(
+            ["exception_class", "disposition", "source_id", "entity_kind"],
+            dropna=False,
+            as_index=False,
+        )
+        .size()
+        .rename(columns={"size": "rows"})
+    )
+    committed_ledger_summary = pd.read_csv(
+        evidence / "tables" / "ambiguity_summary.csv", keep_default_na=False
+    )
+    full_aliases = pd.read_csv(
+        external / "tables" / "temporal_aliases.csv", dtype=str, keep_default_na=False
+    )
+    expected_alias_summary = (
+        full_aliases.groupby(["alias_kind", "source_id"], as_index=False)
+        .agg(
+            observed_alias_rows=("source_alias", "size"),
+            unique_source_aliases=("source_alias", "nunique"),
+            unique_source_entities=("entity_id", "nunique"),
+        )
+    )
+    committed_alias_summary = pd.read_csv(
+        evidence / "tables" / "temporal_alias_summary.csv", keep_default_na=False
+    )
+    for label, committed, expected in (
+        ("coverage", pd.read_csv(evidence / "tables" / "coverage.csv"), pd.read_csv(external / "tables" / "coverage.csv")),
+        ("ambiguity summary", committed_ledger_summary, expected_ledger_summary),
+        ("temporal alias summary", committed_alias_summary, expected_alias_summary),
+    ):
+        try:
+            pd.testing.assert_frame_equal(committed, expected, check_dtype=False)
+        except AssertionError as error:
+            raise AssertionError(f"evidence/full-package mismatch: {label}") from error
 
 
 def main() -> None:
@@ -172,7 +258,7 @@ def main() -> None:
     evidence_root = args.evidence_root.resolve()
     if args.verify_only:
         evidence = evidence_root / EVIDENCE_PACKAGE
-        verify_evidence(evidence)
+        verify_evidence(evidence, _data_root(args.data_root))
         print(f"VERIFIED {evidence}")
         return
     full, evidence = build(_data_root(args.data_root), evidence_root)

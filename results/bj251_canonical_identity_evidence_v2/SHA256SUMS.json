@@ -1,0 +1,10 @@
+{
+  "MANIFEST.json": "557f18d9f209dc059568f289f6df4438a64c14149a461480508804f921091ebe",
+  "READ_BOUNDARY.json": "6315c8814ff5f7aff7f5a2c7c1c53b089eeb070cd62770ab049aee9ea284cc83",
+  "tables/ambiguity_sample.csv": "8e656eea9d5d2322e5b2c00dfd2f252b96533b74cd90a9d5247450004c8acd96",
+  "tables/ambiguity_summary.csv": "2e0837ab9cf49d3a970feb7c469af215cdc5064522a841ae779bf9a70d54a373",
+  "tables/coverage.csv": "9ea6b6639e81199999ebb0e56f15731a4d81a3c37df400abf38d3607aa154103",
+  "tables/exceptional_case_policy.csv": "a43a50c63cac03ac9b9351de8e5e0a155935452b08e3cba6018a2b0e00a8f260",
+  "tables/temporal_alias_sample.csv": "cb9075724df726aa86f23308704e6f7c2d62eccde23a366a32d29f29886edb15",
+  "tables/temporal_alias_summary.csv": "ec1bc845b28e2397780f1f0b7e493d35daba09d759ab2666fdcec09d2e15d340"
+}

@@ -1,0 +1,13 @@
+{
+  "contract_version": "BJ-UNIFIED-CANONICAL-IDENTITY-001-v2",
+  "disposition": "CANDIDATE_PENDING_PI_ACCEPTANCE",
+  "exception_count": 36113,
+  "external_data_root_env": "BEIJING_LOT_DATA_ROOT",
+  "external_package_relative": "derived/bj251_canonical_identity_v2",
+  "external_sha256sums_sha256": "44daf5904efc8e13b1099e4efc4a8e5aa826e47a3ca2906030d4fc9184ac66b0",
+  "issue_count": 808,
+  "issue_slot_count": 215193,
+  "outcome_cell_count": 645579,
+  "play_count": 215193,
+  "trace_count": 236666
+}
