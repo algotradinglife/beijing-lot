@@ -1,0 +1,9 @@
+requirement,status,evidence
+REQ-PS01,PASS,"shared long feature schema with explicit historical_proxy/strict_forward namespace"
+REQ-PS02,PASS,"resolve_data_root + CLI/notebook use only BEIJING_LOT_DATA_ROOT"
+REQ-PS03,PASS,"external package freezes raw representative slices and hash-bound derived files"
+REQ-PS04,PASS,"SQLite keys/foreign keys plus exact 3/1/0 triplet verifier and tests"
+REQ-PS05,PASS,"nullable values require availability mask and explicit missing_reason"
+REQ-PS06,PASS,"separate label SQLite/Parquet; model-facing reader rejects label columns"
+REQ-PS07,PASS,"Git tracks code/notebook/report/manifest only; bulk package remains external"
+REQ-PS08,PENDING_EV,"focused adversarial tests implemented; independent EV requested at PR HEAD"

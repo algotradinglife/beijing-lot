@@ -1,0 +1,12 @@
+metric,value
+issue_slots,8
+issues,3
+observations,16
+feature_cells,60
+available_feature_cells,58
+missing_feature_cells,2
+historical_proxy_feature_cells,36
+strict_forward_feature_cells,24
+bj_sp_feature_cells,12
+eu_decimal_odds_feature_cells,48
+settlement_labels,4

@@ -1,0 +1,40 @@
+{
+  "fuzzy_auto_acceptance": false,
+  "outcome_exposed_inputs": false,
+  "prohibited_outcome_columns": [
+    "result_code",
+    "winning_sp",
+    "outcome_code",
+    "payout"
+  ],
+  "source_columns_read": {
+    "beidan_history_db": [
+      "id",
+      "issue",
+      "match_idx",
+      "league",
+      "home",
+      "away",
+      "kickoff_ts"
+    ],
+    "beidan_live_db": [
+      "match_id",
+      "issue",
+      "match_idx",
+      "league",
+      "home",
+      "away",
+      "kickoff_ts",
+      "status"
+    ],
+    "beidan_xlsm_workbook": [
+      "match_id",
+      "issue",
+      "match_idx",
+      "league",
+      "home",
+      "away",
+      "kickoff_ts"
+    ]
+  }
+}

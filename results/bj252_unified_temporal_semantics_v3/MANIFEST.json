@@ -1,0 +1,207 @@
+{
+  "cell_lineage": "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN",
+  "clock_authority": "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED",
+  "identity_authority": "COLLECTOR_URL_EXPECT_BUCKET_NOT_CANONICAL_FIXTURE_IDENTITY",
+  "contract_version": "BJ-UNIFIED-TEMPORAL-SEMANTICS-001-v3",
+  "historical_proxy_observation_source_id": "beidan_xlsm_workbook",
+  "policy": "candidate leads 1/6/12/24h; segment fallback 1h",
+  "poll_start_input_snapshot_rows": 1598178,
+  "poll_start_input_snapshot_sha256": "cea1459c4783ae7790870ca7c9ed2e643bc1818cf3da2eeaea1c13ca2f25465d",
+  "poll_start_namespace": "poll_start_forward",
+  "proxy_namespace": "historical_proxy_horizon_market_summary",
+  "proxy_summary_records": [
+    {
+      "available_value_cells": 577693,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 192338,
+      "field_role": "HANDICAP_LINE_TWO_PRICE_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "asian_handicap",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "initial",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 577602,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 192409,
+      "field_role": "EURO_1X2_OUTCOME_PROXY",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "euro_1x2",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "True",
+      "snapshot_horizon": "initial",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 407205,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 135429,
+      "field_role": "KELLY_1X2_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "kelly_1x2",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "initial",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 577713,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 192286,
+      "field_role": "TOTAL_LINE_TWO_PRICE_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "over_under",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "initial",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 573818,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 190634,
+      "field_role": "HANDICAP_LINE_TWO_PRICE_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "asian_handicap",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "10h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 577035,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 192297,
+      "field_role": "EURO_1X2_OUTCOME_PROXY",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "euro_1x2",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "True",
+      "snapshot_horizon": "10h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 406355,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 135417,
+      "field_role": "KELLY_1X2_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "kelly_1x2",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "10h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 575942,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 191689,
+      "field_role": "TOTAL_LINE_TWO_PRICE_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "over_under",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "10h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 577665,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 192550,
+      "field_role": "HANDICAP_LINE_TWO_PRICE_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "asian_handicap",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "1h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 577332,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 192441,
+      "field_role": "EURO_1X2_OUTCOME_PROXY",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "euro_1x2",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "True",
+      "snapshot_horizon": "1h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 406781,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 135521,
+      "field_role": "KELLY_1X2_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "kelly_1x2",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "1h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    },
+    {
+      "available_value_cells": 577704,
+      "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+      "complete_consensus_rows": 192564,
+      "field_role": "TOTAL_LINE_TWO_PRICE_DIAGNOSTIC",
+      "fixture_count": 195269,
+      "issue_count": 701,
+      "market": "over_under",
+      "market_row_count": 195269,
+      "p34_m3_compatible": "False",
+      "snapshot_horizon": "1h",
+      "time_semantics": "SOURCE_RELATIVE_LABEL"
+    }
+  ],
+  "raw_cell_value_evidence": "COUNTS_ONLY_NOT_FROZEN_RAW_CELL_AUTHORITY",
+  "schedule_authority": "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF",
+  "schema": "bj252_temporal_evidence_v3",
+  "source_authentication": "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR",
+  "source_lane_receipt_requirements": {
+    "historical_proxy": {
+      "receipt_source_key": "beidan_xlsm_workbook",
+      "required_receipt_keys": [
+        "beidan_xlsm_workbook:main",
+        "beidan_xlsm_workbook:wal",
+        "beidan_xlsm_workbook:shm"
+      ],
+      "source_id": "beidan_xlsm_workbook"
+    },
+    "poll_start_forward": {
+      "receipt_source_key": "beidan_live_db",
+      "required_receipt_keys": [
+        "beidan_live_db:main",
+        "beidan_live_db:wal",
+        "beidan_live_db:shm"
+      ],
+      "source_id": "beidan_live_db_merged_unknown_cell_lineage"
+    }
+  },
+  "source_receipt": {
+    "beidan_live_db:main": "94f8cddcedef99e198eb0a4c6d49c23cad939d10969f84c04cdbee2c11b32f30",
+    "beidan_live_db:shm": "74eead598ec6f944265b7bd90c2c0df64b9bd23b31e5aeaf164d90517ad1dfa9",
+    "beidan_live_db:wal": "05e00708ec42609adf0c5ae4404b12eee27124f59cda011b0ff5da6ef3d73655",
+    "beidan_xlsm_workbook:main": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "beidan_xlsm_workbook:shm": "ABSENT",
+    "beidan_xlsm_workbook:wal": "ABSENT"
+  },
+  "table_row_counts": {
+    "cutoff_selection": 21976,
+    "poll_start_selection": 5494,
+    "segment_selection": 5494
+  }
+}
