@@ -1,0 +1,8 @@
+database_key,table,row_count,distinct_identity,duplicate_identity_rows,uniqueness_verdict,contract_rule
+beidan_xlsm,match_features,195269,192709,2560,DUPLICATE_DEFECT,"UNIQUE(issue_code, match_idx)"
+beidan_xlsm,matches,195269,192709,2560,DUPLICATE_DEFECT,"UNIQUE(issue_code, match_idx)"
+beidan_xlsm,official_500_settlements,74295,74295,0,UNIQUE,"UNIQUE(issue_code, match_idx)"
+beidan_xlsm,outcome_features,585807,192709,393098,DUPLICATE_DEFECT,"UNIQUE(issue_code, match_idx)"
+beidan_history,historical_matches,38463,38463,0,UNIQUE,"UNIQUE(issue_code, match_idx)"
+beidan_live,matches,5155,5155,0,UNIQUE,"UNIQUE(issue_code, match_idx)"
+beidan_live,settlements,3349,3349,0,UNIQUE,"UNIQUE(issue_code, match_idx)"

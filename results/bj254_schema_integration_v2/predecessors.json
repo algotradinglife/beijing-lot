@@ -1,0 +1,30 @@
+[
+  {
+    "accepted_head": "60a2edc3b45ba092dd6eff2e9d1b177d0c096222",
+    "artifact": "results/bj250_source_census_v3/MANIFEST.json",
+    "artifact_sha256": "6ca2cf6ad95ce00ea60c0672a60979f84beda0d4e2f8644bfaf039ccf7c11c04",
+    "issue": 250,
+    "merge_commit": "99701cf984797db2646033c03467e404bfd8ecc8"
+  },
+  {
+    "accepted_head": "277dc11140bf2694dd1383f9f05957558c697da6",
+    "artifact": "results/bj251_canonical_identity_evidence_v3/MANIFEST.json",
+    "artifact_sha256": "26b6d40b6c4dabfbd80c349b975f61b91d03e903d49a6188e9e213f01d575bbe",
+    "issue": 251,
+    "merge_commit": "63729bc01c830f9a651ae55861c22b32a58bf3e6"
+  },
+  {
+    "accepted_head": "596d044cfb178710d3b533f66e0c439f50d3faf5",
+    "artifact": "results/bj252_unified_temporal_semantics_v3/MANIFEST.json",
+    "artifact_sha256": "678f0b097d06b772e748540c041e188ec16624121bae761bdcbc8dc2c23c6b4e",
+    "issue": 252,
+    "merge_commit": "17be9fdaef38e682ff88bd4d5f03f86771e920e1"
+  },
+  {
+    "accepted_head": "a086c4750b678f24f578c2fa8ee3032bdb9c02e2",
+    "artifact": "results/bj253_physical_schema_v1/MANIFEST.json",
+    "artifact_sha256": "a49d89c55cffbd85230fad49142442876354920100b85e7b00f9b8ffffc6c77b",
+    "issue": 253,
+    "merge_commit": "82fba7ed95354a5cf1f1087e3b640cfa28f46e4f"
+  }
+]

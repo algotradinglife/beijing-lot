@@ -1,0 +1,33 @@
+{
+  "canonical_entity_policy": "UNAVAILABLE_NULL_NO_LABEL_INFERENCE",
+  "contract_version": "BJ-UNIFIED-PHYSICAL-SCHEMA-001-v1",
+  "data_root_interface": "BEIJING_LOT_DATA_ROOT",
+  "external_package_relative": "derived/bj253_physical_schema_v1",
+  "external_profile": {
+    "available_feature_cells": 58,
+    "feature_cells": 60,
+    "issue_slots": 8,
+    "issues": 3,
+    "missing_feature_cells": 2,
+    "observations": 16,
+    "settlement_labels": 4
+  },
+  "label_separation": "SEPARATE_SQLITE_AND_PARQUET_NAMESPACE",
+  "namespaces": [
+    "historical_proxy",
+    "strict_forward"
+  ],
+  "outcome_codes": [
+    "3",
+    "1",
+    "0"
+  ],
+  "row_grain": "issue_code × match_idx × outcome_code × observation × feature_name",
+  "schema": "bj253_physical_schema_v1",
+  "tracked_delivery": {
+    "decision_report": "docs/research/issue_253_decision_report.md",
+    "handoff": "docs/research/issue_253_handoff.md",
+    "notebook": "notebooks/research/issue-253/bj253_physical_schema.ipynb",
+    "schema_source": "src/physical_schema/contract.py"
+  }
+}
