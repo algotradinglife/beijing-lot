@@ -165,6 +165,7 @@
       "time_semantics": "SOURCE_RELATIVE_LABEL"
     }
   ],
+  "raw_cell_value_evidence": "COUNTS_ONLY_NOT_FROZEN_RAW_CELL_AUTHORITY",
   "schedule_authority": "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF",
   "schema": "bj252_temporal_evidence_v3",
   "source_authentication": "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR",

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -18,16 +19,17 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
+from bj252_build import _poll_rows as _read_poll_rows  # noqa: E402
+from bj252_temporal_package import (  # noqa: E402
+    rehash_package,
+    verify_package,
+    write_package,
+)
 from temporal_semantics import (  # noqa: E402
     TemporalSemanticsError,
     build_issue_view,
     build_segment_views,
     validate_observations,
-)
-from bj252_temporal_package import (  # noqa: E402
-    rehash_package,
-    verify_package,
-    write_package,
 )
 
 
@@ -195,6 +197,43 @@ def test_invalid_decimal_sp_is_not_model_available_and_earlier_valid_poll_can_wi
     )
 
 
+def test_sqlite_non_null_invalid_sp_is_present_but_not_model_valid(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "live.sqlite"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """CREATE TABLE matches (
+                issue TEXT, match_idx INTEGER, match_id TEXT, kickoff_ts TEXT
+            )"""
+        )
+        connection.execute(
+            """CREATE TABLE snapshots (
+                match_id TEXT, snapshot_ts TEXT,
+                sp_3 REAL, sp_1 REAL, sp_0 REAL
+            )"""
+        )
+        connection.execute(
+            "INSERT INTO matches VALUES (?, ?, ?, ?)",
+            ("I1", 1, "M1", "2026-01-01 12:00:00"),
+        )
+        connection.execute(
+            "INSERT INTO snapshots VALUES (?, ?, ?, ?, ?)",
+            ("M1", "2026-01-01T00:00:00Z", "bad", 2.0, 3.0),
+        )
+
+    rows = _read_poll_rows(database)
+    assert rows.loc[0, "storage_present_cell_count"] == 3
+    assert rows.loc[0, "valid_sp_cell_count"] == 2
+    assert bool(rows.loc[0, "availability_mask"]) is False
+    view = build_issue_view(
+        rows,
+        issue_code="I1",
+        decision_at_utc="2026-01-01T01:00:00Z",
+    )
+    assert view.loc[0, "drop_reason"] == "INVALID_VALUE"
+
+
 def test_semantic_verifier_rejects_remanifested_selection_ledger_and_manifest_tampering(tmp_path: Path) -> None:
     """REQ-E06: SHA rehash cannot launder a changed causal selection receipt."""
     package = write_package(
@@ -236,6 +275,28 @@ def test_verifier_rejects_remanifested_decision_table_mutations(tmp_path: Path) 
     cutoff.to_csv(cutoff_path, index=False)
     rehash_package(package)
     with pytest.raises(AssertionError, match="cutoff coverage"):
+        verify_package(package)
+
+
+def test_verifier_rejects_remanifested_issue_duration_mutation(
+    tmp_path: Path,
+) -> None:
+    package = write_package(
+        tmp_path / "package",
+        poll_rows=_poll_rows(),
+        proxy_coverage=_proxy_summary(),
+        source_receipt={"beidan_live_db": "a" * 64},
+    )
+    duration_path = package / "tables" / "issue_duration.csv"
+    duration = pd.read_csv(duration_path)
+    duration.loc[0, "fixture_count"] = 999999
+    duration.loc[0, "first_kickoff_at_utc"] = "2026-01-02T00:00:00Z"
+    duration.loc[0, "last_kickoff_at_utc"] = "2026-01-03T00:00:00Z"
+    duration.loc[0, "issue_duration_hours"] = 24.0
+    duration.to_csv(duration_path, index=False)
+    rehash_package(package)
+
+    with pytest.raises(AssertionError, match="issue duration source replay"):
         verify_package(package)
 
 

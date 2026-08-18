@@ -226,6 +226,7 @@ def _populate(
         "clock_authority": "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED",
         "cell_lineage": "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN",
         "source_authentication": "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR",
+        "raw_cell_value_evidence": "COUNTS_ONLY_NOT_FROZEN_RAW_CELL_AUTHORITY",
         "poll_start_input_snapshot_rows": int(len(polls)),
         "poll_start_input_snapshot_sha256": _sha256(
             staging / "tables" / "poll_start_input_snapshot.parquet"
@@ -433,6 +434,8 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("poll-start namespace mismatch")
     if manifest.get("source_authentication") != "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR":
         raise AssertionError("source-authentication claim mismatch")
+    if manifest.get("raw_cell_value_evidence") != "COUNTS_ONLY_NOT_FROZEN_RAW_CELL_AUTHORITY":
+        raise AssertionError("raw-cell evidence claim mismatch")
     receipt = manifest.get("source_receipt")
     if not isinstance(receipt, dict) or not receipt:
         raise AssertionError("source receipt missing")
@@ -564,6 +567,11 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("selection row counts disagree with manifest receipt")
 
     duration = pd.read_csv(tables / "issue_duration.csv")
+    _assert_same(
+        duration,
+        reconstructed["issue_duration.csv"],
+        "issue duration source replay",
+    )
     first = pd.to_datetime(duration["first_kickoff_at_utc"], utc=True, errors="raise")
     last = pd.to_datetime(duration["last_kickoff_at_utc"], utc=True, errors="raise")
     expected_hours = (last - first).dt.total_seconds() / 3600

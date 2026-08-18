@@ -4,4 +4,4 @@ This package profiles fixture/cell coverage and poll-start age across 1/6/12/24h
 
 Timezone convention: Asia/Shanghai scheduled kickoff values are explicitly localized then converted to UTC. The collector timestamp is poll-start, not data-received time; merged rows do not retain upstream per-cell lineage. Without schedule history these curves are descriptive against the current schedule reference. Missing snapshots, incomplete storage and invalid SP values are separate drop causes.
 
-Internal checksums establish package integrity, not external authenticity after arbitrary re-signing. The source receipt proves only that SQLite main/WAL/SHM bytes were stable across this build interval.
+Internal checksums establish package integrity, not external authenticity after arbitrary re-signing. The source receipt proves only that SQLite main/WAL/SHM bytes were stable across this build interval. The frozen Parquet contains derived presence/validity counts rather than raw SP cell values, so downstream users cannot promote it to independently authenticated raw-value evidence.
