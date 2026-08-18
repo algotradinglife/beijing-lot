@@ -1,0 +1,24 @@
+{
+  "causal_grade": "HISTORICAL_PROXY_LABEL_ONLY",
+  "contract_version": "BJ-UNIFIED-BJ-SP-TIMESERIES-001-v2",
+  "forbidden_inputs": [
+    "final",
+    "settlement",
+    "outcome",
+    "winning_sp",
+    "0.65"
+  ],
+  "horizons": [
+    "initial",
+    "10h",
+    "1h"
+  ],
+  "schema": "bj235_historical_relative_proxy_v2",
+  "source_id": "beidan_xlsm_workbook",
+  "source_main_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "table_rows": {
+    "coverage_by_issue_horizon": 2103,
+    "historical_proxy_cells": 1734381
+  },
+  "time_semantics": "SOURCE_RELATIVE_LABEL"
+}
