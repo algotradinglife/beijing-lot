@@ -37,9 +37,10 @@ def _strict_rows() -> pd.DataFrame:
             "match_idx": [1, 1, 2],
             "snapshot_horizon": ["observed", "observed", "observed"],
             "time_semantics": ["OBSERVED_AT_UTC"] * 3,
-            "causal_grade": ["STRICT_OBSERVED_SEALED"] * 3,
+            "causal_grade": ["OBSERVED_AGAINST_CURRENT_SCHEDULE_REFERENCE"] * 3,
             "source_id": ["beidan_live_db"] * 3,
             "availability_mask": [True] * 3,
+            "available_cell_count": [3] * 3,
             "observed_at_utc": [
                 "2026-01-01T00:00:00Z",
                 "2026-01-01T01:30:00Z",
@@ -118,6 +119,27 @@ def test_boundary_inputs_fail_closed() -> None:
     with pytest.raises(TemporalSemanticsError, match="accepted proxy horizons"):
         validate_observations(proxy, namespace="historical_proxy")
 
+    string_mask = _strict_rows()
+    string_mask["availability_mask"] = ["False", "True", "True"]
+    with pytest.raises(TemporalSemanticsError, match="exact boolean"):
+        validate_observations(string_mask, namespace="strict_forward")
+
+
+def test_incomplete_snapshot_is_distinct_from_no_snapshot() -> None:
+    strict = _strict_rows()
+    strict.loc[strict["fixture_id"].eq("I1_02"), "availability_mask"] = False
+    strict.loc[strict["fixture_id"].eq("I1_02"), "available_cell_count"] = 2
+    view = build_issue_view(
+        strict, issue_code="I1", decision_at_utc="2026-01-01T01:00:00Z"
+    ).set_index("fixture_id")
+    assert view.loc["I1_02", "drop_reason"] == "OBSERVATION_UNAVAILABLE_OR_INCOMPLETE"
+    assert view.loc["I1_02", "observed_cell_count_by_cutoff"] == 2
+
+    early = build_issue_view(
+        _strict_rows(), issue_code="I1", decision_at_utc="2025-12-31T23:00:00Z"
+    )
+    assert set(early["drop_reason"]) == {"NO_OBSERVATION_BY_CUTOFF"}
+
 
 def test_semantic_verifier_rejects_remanifested_selection_ledger_and_manifest_tampering(tmp_path: Path) -> None:
     """REQ-E06: SHA rehash cannot launder a changed causal selection receipt."""
@@ -145,4 +167,66 @@ def test_semantic_verifier_rejects_remanifested_selection_ledger_and_manifest_ta
     manifest.write_text(text.replace("BJ-UNIFIED-TEMPORAL-SEMANTICS-001", "FORGED"), encoding="utf-8")
     rehash_package(package)
     with pytest.raises(AssertionError, match="contract"):
+        verify_package(package)
+
+
+def test_verifier_rejects_remanifested_decision_table_mutations(tmp_path: Path) -> None:
+    package = write_package(
+        tmp_path / "package",
+        strict_rows=_strict_rows(),
+        proxy_coverage=pd.DataFrame(
+            {
+                "snapshot_horizon": ["initial", "10h", "1h"],
+                "fixture_count": [2, 2, 2],
+                "issue_count": [1, 1, 1],
+                "market_row_count": [6, 6, 6],
+                "complete_consensus_rows": [6, 6, 6],
+                "available_value_cells": [18, 18, 18],
+            }
+        ),
+        source_receipt={"beidan_live_db": "a" * 64},
+    )
+
+    cutoff_path = package / "tables" / "cutoff_coverage.csv"
+    cutoff = pd.read_csv(cutoff_path)
+    cutoff.loc[0, "available_fixture_count"] = 999
+    cutoff.to_csv(cutoff_path, index=False)
+    rehash_package(package)
+    with pytest.raises(AssertionError, match="cutoff coverage"):
+        verify_package(package)
+
+
+def test_verifier_rejects_remanifested_proxy_and_boolean_mutations(tmp_path: Path) -> None:
+    package = write_package(
+        tmp_path / "package",
+        strict_rows=_strict_rows(),
+        proxy_coverage=pd.DataFrame(
+            {"snapshot_horizon": ["initial", "10h", "1h"], "fixture_count": [2, 2, 2]}
+        ),
+        source_receipt={"beidan_live_db": "a" * 64},
+    )
+    proxy_path = package / "tables" / "proxy_horizon_summary.csv"
+    proxy = pd.read_csv(proxy_path)
+    proxy.loc[0, "fixture_count"] = 999999
+    proxy.to_csv(proxy_path, index=False)
+    rehash_package(package)
+    with pytest.raises(AssertionError, match="proxy summary"):
+        verify_package(package)
+
+    # Rebuild, then attack the serialized boolean domain.
+    package = write_package(
+        tmp_path / "package",
+        strict_rows=_strict_rows(),
+        proxy_coverage=pd.DataFrame(
+            {"snapshot_horizon": ["initial", "10h", "1h"], "fixture_count": [2, 2, 2]}
+        ),
+        source_receipt={"beidan_live_db": "a" * 64},
+    )
+    selection_path = package / "tables" / "cutoff_selection.csv"
+    selection = pd.read_csv(selection_path)
+    selection["availability_mask"] = selection["availability_mask"].astype(object)
+    selection.loc[0, "availability_mask"] = "NOT_A_BOOLEAN"
+    selection.to_csv(selection_path, index=False)
+    rehash_package(package)
+    with pytest.raises(AssertionError, match="canonical boolean"):
         verify_package(package)

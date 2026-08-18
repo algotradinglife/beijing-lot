@@ -14,7 +14,7 @@ import pandas as pd
 
 STRICT_NAMESPACE: Final = "strict_forward"
 PROXY_NAMESPACE: Final = "historical_proxy"
-STRICT_GRADE: Final = "STRICT_OBSERVED_SEALED"
+STRICT_GRADE: Final = "OBSERVED_AGAINST_CURRENT_SCHEDULE_REFERENCE"
 PROXY_GRADE: Final = "HISTORICAL_PROXY_LABEL_ONLY"
 STRICT_SEMANTICS: Final = "OBSERVED_AT_UTC"
 PROXY_SEMANTICS: Final = "SOURCE_RELATIVE_LABEL"
@@ -28,6 +28,7 @@ REQUIRED_COLUMNS: Final = (
     "causal_grade",
     "source_id",
     "availability_mask",
+    "available_cell_count",
     "observed_at_utc",
     "kickoff_at_utc",
 )
@@ -56,6 +57,13 @@ def _require_columns(frame: pd.DataFrame) -> None:
         raise TemporalSemanticsError("fixture_id is required")
     if frame["availability_mask"].isna().any():
         raise TemporalSemanticsError("availability_mask is required")
+    if not pd.api.types.is_bool_dtype(frame["availability_mask"].dtype):
+        raise TemporalSemanticsError("availability_mask must use an exact boolean dtype")
+    cells = pd.to_numeric(frame["available_cell_count"], errors="coerce")
+    if cells.isna().any() or (~cells.isin([0, 1, 2, 3])).any():
+        raise TemporalSemanticsError("available_cell_count must be an integer in [0, 3]")
+    if (frame["availability_mask"] & cells.ne(3)).any():
+        raise TemporalSemanticsError("available observations require all three cells")
 
 
 def _parse_utc(series: pd.Series, *, field: str, allow_null: bool) -> pd.Series:
@@ -114,8 +122,8 @@ def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFram
         out["kickoff_at_utc"], field="kickoff_at_utc", allow_null=False
     )
     if namespace == STRICT_NAMESPACE and (
-        out.loc[out["availability_mask"].astype(bool), "observed_at_utc"]
-        >= out.loc[out["availability_mask"].astype(bool), "kickoff_at_utc"]
+        out.loc[out["availability_mask"], "observed_at_utc"]
+        >= out.loc[out["availability_mask"], "kickoff_at_utc"]
     ).any():
         raise TemporalSemanticsError("available strict observation at or after kickoff")
     key_columns = ["fixture_id", "issue_code", "match_idx", "kickoff_at_utc"]
@@ -140,24 +148,50 @@ def build_issue_view(
         raise TemporalSemanticsError(f"issue has no strict observations: {issue_code}")
     fixture_columns = ["fixture_id", "issue_code", "match_idx", "kickoff_at_utc"]
     fixtures = subset[fixture_columns].drop_duplicates("fixture_id").sort_values("match_idx")
-    selected = subset.loc[
-        subset["availability_mask"].astype(bool) & subset["observed_at_utc"].le(decision)
-    ].sort_values(["fixture_id", "observed_at_utc"], kind="stable")
+    eligible_by_clock = subset.loc[subset["observed_at_utc"].le(decision)].sort_values(
+        ["fixture_id", "observed_at_utc"], kind="stable"
+    )
+    latest_clock = eligible_by_clock.groupby("fixture_id", as_index=False).tail(1)
+    latest_clock = latest_clock[
+        ["fixture_id", "observed_at_utc", "available_cell_count"]
+    ].rename(
+        columns={
+            "observed_at_utc": "latest_observed_at_utc_by_cutoff",
+            "available_cell_count": "observed_cell_count_by_cutoff",
+        }
+    )
+    selected = eligible_by_clock.loc[eligible_by_clock["availability_mask"]]
     selected = selected.groupby("fixture_id", as_index=False).tail(1)
     selected = selected[[
         "fixture_id", "observed_at_utc", "snapshot_horizon", "time_semantics",
-        "causal_grade", "source_id", "availability_mask",
+        "causal_grade", "source_id", "availability_mask", "available_cell_count",
     ]].rename(columns={"observed_at_utc": "selected_observed_at_utc"})
-    out = fixtures.merge(selected, on="fixture_id", how="left", validate="one_to_one")
+    out = fixtures.merge(latest_clock, on="fixture_id", how="left", validate="one_to_one")
+    out = out.merge(selected, on="fixture_id", how="left", validate="one_to_one")
+    out["availability_mask"] = out["availability_mask"].fillna(False).astype(bool)
+    out["available_cell_count"] = pd.to_numeric(
+        out["available_cell_count"], errors="coerce"
+    ).fillna(0).astype(int)
+    out["observed_cell_count_by_cutoff"] = pd.to_numeric(
+        out["observed_cell_count_by_cutoff"], errors="coerce"
+    ).fillna(0).astype(int)
     out["decision_at_utc"] = decision
     out["staleness_minutes"] = (
         (decision - out["selected_observed_at_utc"]).dt.total_seconds() / 60.0
     )
     out["drop_reason"] = "AVAILABLE"
-    out.loc[out["selected_observed_at_utc"].isna(), "drop_reason"] = "NO_OBSERVATION_BY_CUTOFF"
+    no_selected = out["selected_observed_at_utc"].isna()
+    out.loc[
+        no_selected & out["latest_observed_at_utc_by_cutoff"].notna(), "drop_reason"
+    ] = "OBSERVATION_UNAVAILABLE_OR_INCOMPLETE"
+    out.loc[
+        no_selected & out["latest_observed_at_utc_by_cutoff"].isna(), "drop_reason"
+    ] = "NO_OBSERVATION_BY_CUTOFF"
     out.loc[decision >= out["kickoff_at_utc"], "drop_reason"] = "CUTOFF_NOT_PRE_KICKOFF"
     out.loc[out["drop_reason"].ne("AVAILABLE"), "selected_observed_at_utc"] = pd.NaT
     out.loc[out["drop_reason"].ne("AVAILABLE"), "staleness_minutes"] = float("nan")
+    out["model_available_cell_count"] = 0
+    out.loc[out["drop_reason"].eq("AVAILABLE"), "model_available_cell_count"] = 3
     return out.sort_values("match_idx", kind="stable").reset_index(drop=True)
 
 

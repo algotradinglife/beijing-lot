@@ -1,0 +1,16 @@
+{
+  "DECISION_REPORT.md": "1e421302f72d8bc9f120b138ebc789ac687531a5bbc8771d7dc77ef5c4aae1d5",
+  "MANIFEST.json": "5b11f13c09ee05833351c8034097e3c87d1845385b1c16a60780ee1f90986fa4",
+  "REPLAY.md": "0570c1d63ffd3806aa55060e084f47a234698976319fcb7a57e8fe509276a680",
+  "TEMPORAL_VOCABULARY.md": "dc08b29f01f18d7e444a12079394fd20b2595088edd343919baccb384001e66d",
+  "evidence/req_ts_evidence.csv": "fb4b4f3d8a508f825bf0f79e8ae985ac4a0c9ce4663db8efadd9959d77e9158a",
+  "tables/cutoff_coverage.csv": "7fba20b4bce95cc70a3eb55a51ea4f576d108a93e1c1484f1f5e3e75030e9e5e",
+  "tables/cutoff_drop_reasons.csv": "905b178e25a62f40c3de4f7770fd4c3a589769a155e2191aebc243a33d056e3d",
+  "tables/cutoff_selection.csv": "4ed87d9bd3a3a2504e3318c404c83a42c3cb148828dd6ef90f8e85dc6fd38a0d",
+  "tables/issue_coverage.csv": "0553e9ae9b5c7e05a85740f7ffa5ff9a35a80794a595a174bfcab8ef8ce32f00",
+  "tables/issue_duration.csv": "cbe88ffbc9897c1cc06b40b1a904b830c6cdbd85aa76a1ab557334d7119ed562",
+  "tables/proxy_horizon_summary.csv": "0018efcf16563f46dab8ad0ddda73b1a20c35ef38b35b86c4a73283ca6a62c1e",
+  "tables/segment_drop_reasons.csv": "355e47558f406909e00fac120c540e9651a78864a666a50fb08eaed3dee02866",
+  "tables/segment_selection.csv": "98b8f80daf664fc56693f43313ce56f46d35a5fa472053798341b7cb5e5756db",
+  "tables/strict_selection.csv": "24c5fc5a0e406d81db1dea351230f7850fd7fcd20eecabe94ec782a16b897e8a"
+}
