@@ -19,6 +19,7 @@ PROXY_GRADE: Final = "HISTORICAL_PROXY_LABEL_ONLY"
 POLL_SEMANTICS: Final = "POLL_STARTED_AT_UTC"
 PROXY_SEMANTICS: Final = "SOURCE_RELATIVE_LABEL"
 POLL_SOURCE_ID: Final = "beidan_live_db_merged_unknown_cell_lineage"
+PROXY_SOURCE_ID: Final = "beidan_xlsm_workbook"
 ACCEPTED_PROXY_HORIZONS: Final = ("initial", "10h", "1h")
 REQUIRED_COLUMNS: Final = (
     "fixture_id",
@@ -117,9 +118,12 @@ def validate_observations(frame: pd.DataFrame, *, namespace: str) -> pd.DataFram
         incompatible = (
             out["time_semantics"].ne(PROXY_SEMANTICS)
             | out["causal_grade"].ne(PROXY_GRADE)
+            | out["source_id"].ne(PROXY_SOURCE_ID)
         )
         if incompatible.any():
-            raise TemporalSemanticsError("historical_proxy cannot pool strict rows")
+            raise TemporalSemanticsError(
+                "historical_proxy cannot pool other clocks, grades, or source roles"
+            )
         if (~out["snapshot_horizon"].isin(ACCEPTED_PROXY_HORIZONS)).any():
             raise TemporalSemanticsError(
                 "historical_proxy contains horizons outside accepted proxy horizons"

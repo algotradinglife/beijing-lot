@@ -102,6 +102,22 @@ def test_strict_and_proxy_namespaces_cannot_pool_silently() -> None:
         validate_observations(pd.concat([strict, proxy]), namespace="poll_start_forward")
 
 
+@pytest.mark.parametrize(
+    "source_id",
+    [None, "", "beidan_live_db_merged_unknown_cell_lineage", "another_proxy"],
+)
+def test_historical_proxy_requires_exact_source_role(source_id: object) -> None:
+    proxy = _poll_rows().iloc[[0]].copy()
+    proxy["snapshot_horizon"] = "initial"
+    proxy["time_semantics"] = "SOURCE_RELATIVE_LABEL"
+    proxy["causal_grade"] = "HISTORICAL_PROXY_LABEL_ONLY"
+    proxy["source_id"] = source_id
+    proxy["poll_started_at_utc"] = pd.NaT
+
+    with pytest.raises(TemporalSemanticsError, match="source roles"):
+        validate_observations(proxy, namespace="historical_proxy")
+
+
 def test_issue_cutoff_selects_latest_available_not_future_and_reports_staleness() -> None:
     view = build_issue_view(
         _poll_rows(),
@@ -329,6 +345,23 @@ def test_verifier_rejects_remanifested_proxy_and_boolean_mutations(tmp_path: Pat
     selection.to_csv(selection_path, index=False)
     rehash_package(package)
     with pytest.raises(AssertionError, match="canonical boolean"):
+        verify_package(package)
+
+
+def test_verifier_rejects_remanifested_proxy_source_role(tmp_path: Path) -> None:
+    package = write_package(
+        tmp_path / "package",
+        poll_rows=_poll_rows(),
+        proxy_coverage=_proxy_summary(),
+        source_receipt={"beidan_live_db": "a" * 64},
+    )
+    manifest_path = package / "MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["historical_proxy_observation_source_id"] = "another_proxy"
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+    rehash_package(package)
+
+    with pytest.raises(AssertionError, match="source-role claim"):
         verify_package(package)
 
 

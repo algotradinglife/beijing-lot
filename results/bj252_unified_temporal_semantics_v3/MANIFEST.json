@@ -2,6 +2,7 @@
   "cell_lineage": "LOCAL_MERGED_UPSTREAM_CELL_SOURCE_UNKNOWN",
   "clock_authority": "POLL_STARTED_NOT_RECEIVED_OR_COMMITTED",
   "contract_version": "BJ-UNIFIED-TEMPORAL-SEMANTICS-001-v3",
+  "historical_proxy_observation_source_id": "beidan_xlsm_workbook",
   "policy": "candidate leads 1/6/12/24h; segment fallback 1h",
   "poll_start_input_snapshot_rows": 1598178,
   "poll_start_input_snapshot_sha256": "cea1459c4783ae7790870ca7c9ed2e643bc1818cf3da2eeaea1c13ca2f25465d",

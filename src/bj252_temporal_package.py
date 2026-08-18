@@ -18,6 +18,7 @@ from temporal_semantics import (
     POLL_SOURCE_ID,
     PROXY_GRADE,
     PROXY_SEMANTICS,
+    PROXY_SOURCE_ID,
     build_issue_view,
     build_segment_views,
     validate_observations,
@@ -220,6 +221,7 @@ def _populate(
         "contract_version": CONTRACT_VERSION,
         "poll_start_namespace": "poll_start_forward",
         "proxy_namespace": "historical_proxy_horizon_market_summary",
+        "historical_proxy_observation_source_id": PROXY_SOURCE_ID,
         "source_receipt": dict(source_receipt),
         "policy": "candidate leads 1/6/12/24h; segment fallback 1h",
         "schedule_authority": "CURRENT_SCHEDULE_REFERENCE_NOT_RESCHEDULE_ASOF",
@@ -432,6 +434,8 @@ def verify_package(package: Path) -> dict[str, object]:
         raise AssertionError("cell-lineage claim mismatch")
     if manifest.get("poll_start_namespace") != "poll_start_forward":
         raise AssertionError("poll-start namespace mismatch")
+    if manifest.get("historical_proxy_observation_source_id") != PROXY_SOURCE_ID:
+        raise AssertionError("historical-proxy source-role claim mismatch")
     if manifest.get("source_authentication") != "STABLE_BUILD_INTERVAL_NOT_EXTERNAL_TRUST_ANCHOR":
         raise AssertionError("source-authentication claim mismatch")
     if manifest.get("raw_cell_value_evidence") != "COUNTS_ONLY_NOT_FROZEN_RAW_CELL_AUTHORITY":

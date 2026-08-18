@@ -17,7 +17,7 @@
 - The collector clock is poll-start against the current schedule reference. It is not received-at, commit-at, exact available-at or reschedule-as-of authority.
 - Merged poll rows do not retain upstream per-cell lineage. The committed Parquet freezes derived presence/validity counts, not raw SP cell values, so it is not independent raw-value or source-authenticity evidence.
 - Internal checksums prove package integrity. The SQLite main/WAL/SHM receipt proves only a stable build interval.
-- Historical `initial`/`10h`/`1h` evidence remains a source-relative proxy summary and is never represented as a row-level strict panel or universal issue-time snapshot.
+- Historical `initial`/`10h`/`1h` evidence is bound to exact source lane `beidan_xlsm_workbook`, remains a source-relative proxy summary, and is never represented as a row-level strict panel or universal issue-time snapshot.
 
 ## Current profile
 
