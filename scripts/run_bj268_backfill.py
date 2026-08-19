@@ -27,6 +27,7 @@ from src.eu_proxy_backfill.backfill import aggregate_quote_parquet_parts  # noqa
 from src.eu_proxy_backfill.inventory import InventoryPaths, build_inventory, inventory_summary  # noqa: E402
 from src.eu_proxy_backfill.probe import ISSUE_URL, TITAN_URL  # noqa: E402
 from src.eu_proxy_backfill.runner import IssueRecovery, recover_issue  # noqa: E402
+from src.eu_proxy_backfill.sqlite_store import build_recovery_sqlite  # noqa: E402
 from src.source_schema import publication  # noqa: E402
 
 
@@ -331,6 +332,11 @@ def main() -> int:
         action="store_true",
         help="consume only existing DONE issue parts; never construct a network client or fetch raw payloads",
     )
+    parser.add_argument(
+        "--recovery-sqlite",
+        type=Path,
+        help="zero-network target for the versioned recovery SQLite store",
+    )
     args = parser.parse_args()
     if args.aggregate_only and not args.resume:
         raise ValueError("--aggregate-only requires --resume and an existing immutable staging root")
@@ -380,10 +386,30 @@ def main() -> int:
             print(f"[{number}/{len(selected)}] {issue}: {recovery.issue_disposition}", flush=True)
 
     aggregation = _aggregate_parts(staging, selected)
+    sqlite_summary = None
+    if args.recovery_sqlite is not None:
+        sqlite_summary = build_recovery_sqlite(staging, args.recovery_sqlite)
     receipts = pd.read_csv(staging / "AGGREGATION" / "ACQUISITION_RECEIPTS.csv")
-    after = _source_hashes(paths)
-    if start["source_sha256_before"] != after:
-        raise RuntimeError("source hash changed during recovery; staging cannot advance")
+    # Gate 3 consumes only the frozen inventory and immutable DONE/raw parts.
+    # The historical/live SQLite family recorded by the superseded Gate-start
+    # receipt is not read during checkpoint replay and therefore cannot be a
+    # before/after stability gate.  Gate 2 still reads those databases directly
+    # and retains the original fail-closed comparison.
+    if start["inventory_kind"] == "RECONCILED_267_FROZEN_GATE3":
+        after: dict[str, str] = {}
+        source_stability = {
+            "classification": "NOT_CONSUMED_BY_GATE3_REPLAY",
+            "frozen_inventory_sha256": _sha256(staging / "FROZEN_INVENTORY.parquet"),
+        }
+    else:
+        after = _source_hashes(paths)
+        if start["source_sha256_before"] != after:
+            raise RuntimeError("source hash changed during recovery; staging cannot advance")
+        source_stability = {
+            "classification": "CONSUMED_LIVE_CACHE_GATE2",
+            "source_sha256_before": start["source_sha256_before"],
+            "source_sha256_after": after,
+        }
     quote_summary = aggregation["raw_quote_aggregation"]
     report = {
         "contract": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
@@ -391,8 +417,7 @@ def main() -> int:
         "inventory_summary": start["inventory_summary"],
         "selected_issue_count": len(selected),
         "selected_issue_codes": selected,
-        "source_sha256_before": start["source_sha256_before"],
-        "source_sha256_after": after,
+        "input_lineage": source_stability,
         "terminal_receipt_count": len(receipts),
         "raw_quote_count": quote_summary["selected_row_count"],
         "raw_quote_input_count": quote_summary["input_row_count"],
@@ -404,6 +429,7 @@ def main() -> int:
         "aggregation": "PART_AT_A_TIME_HASH_PARTITIONED_NO_FULL_QUOTE_CONCAT",
         "aggregate_only": args.aggregate_only,
         "publication": "DISABLED_STAGING_ONLY",
+        "recovery_sqlite": sqlite_summary,
     }
     publication.atomic_write_json(staging / "GATE_REPORT.json", report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
