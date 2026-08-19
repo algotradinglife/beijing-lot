@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib.util
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
-from src.eu_proxy_backfill.runner import recover_issue
+from src.eu_proxy_backfill.runner import IssueRecovery, recover_issue
 
 
 ISSUE = b"""
@@ -109,3 +111,32 @@ def test_recovery_rejects_a_source_matrix_that_differs_from_the_frozen_authorita
         {"snapshot_kind": "10h", "disposition": "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH"},
         {"snapshot_kind": "1h", "disposition": "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH"},
     ]
+
+
+def test_completed_issue_part_rejects_any_tamper_before_resume(tmp_path: Path) -> None:
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "run_bj268_backfill.py"
+    spec = importlib.util.spec_from_file_location("bj268_runner_script", script_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    recovery = IssueRecovery(
+        issue_code="25043",
+        issue_disposition="RECOVERED",
+        receipts=[{"source_kind": "issue_page", "source_key": "25043", "acquisition_result": "SUCCESS"}],
+        quote_rows=[{
+            "issue_code": "25043", "match_idx": 1, "source_match_id": "25043:001:12345",
+            "snapshot_kind": "initial", "bookmaker_id": "A", "v1": 2.0, "v2": 3.0,
+            "v3": 4.0, "payload_sha256": "a" * 64,
+        }],
+        fixture_horizon_dispositions=pd.DataFrame([{
+            "issue_code": "25043", "match_idx": 1, "provider_match_id": "12345",
+            "snapshot_kind": "initial", "disposition": "RECOVERED_RAW_QUOTE", "detail": "ok",
+        }]),
+    )
+    module._write_issue_part(tmp_path, "25043", recovery)
+    assert module._completed(tmp_path, "25043")
+
+    receipt = tmp_path / "issue_parts" / "25043" / "receipts.csv"
+    receipt.write_text(receipt.read_text(encoding="utf-8") + "tamper\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="hash mismatch"):
+        module._completed(tmp_path, "25043")

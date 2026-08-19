@@ -39,7 +39,15 @@ def _sha256(path: Path) -> str:
 
 
 def _source_hashes(paths: InventoryPaths) -> dict[str, str]:
-    return {name: _sha256(Path(value)) for name, value in asdict(paths).items()}
+    """Hash every read-visible SQLite component, including WAL sidecars."""
+    hashes: dict[str, str] = {}
+    for name, value in asdict(paths).items():
+        database = Path(value)
+        for suffix in ("", "-wal", "-shm"):
+            component = Path(f"{database}{suffix}")
+            if component.is_file():
+                hashes[f"{name}{suffix}"] = _sha256(component)
+    return hashes
 
 
 def _client() -> requests.Session:
@@ -115,6 +123,8 @@ def _start_or_resume(
     paths: InventoryPaths,
     selected: list[str] | None,
     frozen_inventory: Path | None,
+    max_issues: int | None,
+    max_fixtures_per_issue: int | None,
     resume: bool,
 ) -> tuple[pd.DataFrame, dict[str, object], list[str]]:
     """Create exactly one frozen inventory, or reopen it without rereading SQLite."""
@@ -123,6 +133,8 @@ def _start_or_resume(
     if resume:
         if frozen_inventory is not None:
             raise ValueError("--frozen-inventory is only valid when creating a new staging root")
+        if max_issues is not None or max_fixtures_per_issue is not None:
+            raise ValueError("resume cannot change frozen recovery limits")
         if not gate_start.is_file() or not inventory_path.is_file():
             raise ValueError("--resume requires immutable GATE_START.json and FROZEN_INVENTORY.parquet")
         start = json.loads(gate_start.read_text(encoding="utf-8"))
@@ -151,6 +163,10 @@ def _start_or_resume(
     unknown = sorted(set(use) - set(known), key=int)
     if unknown:
         raise ValueError(f"requested issues are not in the frozen recovery inventory: {unknown}")
+    if max_issues is not None:
+        if max_issues < 1:
+            raise ValueError("max_issues must be positive")
+        use = use[:max_issues]
     if not use:
         raise ValueError("no unresolved issue selected")
     publication.atomic_write_parquet(inventory, staging / "FROZEN_INVENTORY.parquet")
@@ -161,6 +177,10 @@ def _start_or_resume(
         "inventory_kind": inventory_kind,
         "inventory_summary": summary,
         "selected_issue_codes": use,
+        "run_parameters": {
+            "max_issues": max_issues,
+            "max_fixtures_per_issue": max_fixtures_per_issue,
+        },
         "source_sha256_before": before,
         "resume_protocol": "issue DONE marker is the only eligible completion boundary",
     }
@@ -181,8 +201,16 @@ def _completed(staging: Path, issue: str) -> bool:
     payload = json.loads(marker.read_text(encoding="utf-8"))
     required = {"receipts.csv", "raw_quotes.parquet", "fixture_horizon_dispositions.parquet", "issue_disposition.json"}
     found = {str(value) for value in payload.get("files", [])}
-    if found != required or any(not (_issue_dir(staging, issue) / item).is_file() for item in required):
+    declared_hashes = payload.get("sha256")
+    if payload.get("issue_code") != issue or found != required or not isinstance(declared_hashes, dict):
         raise ValueError(f"invalid issue completion marker: {marker}")
+    if set(declared_hashes) != required:
+        raise ValueError(f"incomplete issue completion hashes: {marker}")
+    for name in sorted(required):
+        part = _issue_dir(staging, issue) / name
+        expected = declared_hashes[name]
+        if not part.is_file() or not isinstance(expected, str) or len(expected) != 64 or _sha256(part) != expected:
+            raise ValueError(f"issue completion part hash mismatch: {part}")
     return True
 
 
@@ -252,14 +280,10 @@ def main() -> int:
         paths=paths,
         selected=requested,
         frozen_inventory=args.frozen_inventory,
+        max_issues=args.max_issues,
+        max_fixtures_per_issue=args.max_fixtures_per_issue,
         resume=args.resume,
     )
-    if args.max_issues is not None:
-        if args.resume:
-            raise ValueError("--max-issues cannot alter a frozen staging selection on resume")
-        selected = selected[: args.max_issues]
-        start["selected_issue_codes"] = selected
-        publication.atomic_write_json(staging / "GATE_START.json", start)
     if not selected:
         raise ValueError("no unresolved issue selected")
 
