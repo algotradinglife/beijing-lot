@@ -464,6 +464,51 @@ def _copy_recovery_lane(connection: sqlite3.Connection, recovery_path: Path) -> 
         connection.execute("DETACH DATABASE recovered")
 
 
+def _complete_disposition_matrix(
+    connection: sqlite3.Connection, *, accepted_sha256: str, extension_sha256: str
+) -> None:
+    """Represent every frozen fixture×horizon, including pre-existing lanes."""
+    with connection:
+        connection.execute(
+            """
+            INSERT INTO issue_dispositions (issue_code, disposition, done_manifest_sha256)
+            SELECT DISTINCT issue_code, 'IMPORTED_FROZEN_SOURCE_LANE',
+                   CASE reconciled_source
+                       WHEN 'ACCEPTED_236' THEN ?
+                       WHEN 'AVAILABLE_EXTENSION' THEN ?
+                   END
+            FROM inventory
+            WHERE reconciled_source IN ('ACCEPTED_236', 'AVAILABLE_EXTENSION')
+            """,
+            (accepted_sha256, extension_sha256),
+        )
+        connection.execute(
+            """
+            WITH horizons(snapshot_kind) AS (
+                VALUES ('initial'), ('10h'), ('1h')
+            ), quote_counts AS (
+                SELECT issue_code, match_idx, snapshot_kind, COUNT(*) AS quote_rows
+                FROM raw_quote_observations
+                WHERE source_lane IN ('ACCEPTED_236', 'AVAILABLE_EXTENSION')
+                GROUP BY issue_code, match_idx, snapshot_kind
+            )
+            INSERT INTO fixture_horizon_dispositions (
+                issue_code, match_idx, provider_match_id, snapshot_kind, disposition, detail
+            )
+            SELECT i.issue_code, i.match_idx, i.provider_match_id, h.snapshot_kind,
+                   CASE WHEN q.quote_rows IS NULL
+                        THEN 'UNAVAILABLE_NO_SOURCE_HORIZON'
+                        ELSE 'IMPORTED_RAW_QUOTE' END,
+                   'raw_bookmaker_rows=' || COALESCE(CAST(q.quote_rows AS TEXT), '0')
+            FROM inventory AS i CROSS JOIN horizons AS h
+            LEFT JOIN quote_counts AS q
+              ON q.issue_code=i.issue_code AND q.match_idx=i.match_idx
+             AND q.snapshot_kind=h.snapshot_kind
+            WHERE i.reconciled_source IN ('ACCEPTED_236', 'AVAILABLE_EXTENSION')
+            """
+        )
+
+
 def build_full_candidate_sqlite(
     *,
     inventory_path: Path,
@@ -497,6 +542,11 @@ def build_full_candidate_sqlite(
         )
         recovery_counts = _copy_recovery_lane(connection, recovery_source)
         _resolve_duplicates(connection)
+        _complete_disposition_matrix(
+            connection,
+            accepted_sha256=source_hashes[accepted_source.name],
+            extension_sha256=source_hashes[extension_source.name],
+        )
         with connection:
             connection.execute(
                 """
@@ -536,8 +586,17 @@ def build_full_candidate_sqlite(
             "resolved_quote_rows": connection.execute("SELECT COUNT(*) FROM resolved_quotes").fetchone()[0],
             "duplicate_ledger_rows": connection.execute("SELECT COUNT(*) FROM duplicate_resolution_ledger").fetchone()[0],
             "market_snapshot_rows": connection.execute("SELECT COUNT(*) FROM market_snapshots").fetchone()[0],
+            "issue_disposition_rows": connection.execute("SELECT COUNT(*) FROM issue_dispositions").fetchone()[0],
+            "fixture_horizon_disposition_rows": connection.execute(
+                "SELECT COUNT(*) FROM fixture_horizon_dispositions"
+            ).fetchone()[0],
         }
-        if counts["inventory_rows"] != 213_263 or counts["issue_count"] != 808:
+        if (
+            counts["inventory_rows"] != 213_263
+            or counts["issue_count"] != 808
+            or counts["issue_disposition_rows"] != 808
+            or counts["fixture_horizon_disposition_rows"] != 213_263 * 3
+        ):
             raise RuntimeError(f"full candidate denominator mismatch: {counts}")
         if connection.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise RuntimeError("full candidate SQLite integrity check failed")

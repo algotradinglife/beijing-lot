@@ -52,6 +52,10 @@ def main() -> int:
             "raw_quotes": connection.execute("SELECT COUNT(*) FROM raw_quote_observations").fetchone()[0],
             "resolved_quotes": connection.execute("SELECT COUNT(*) FROM resolved_quotes").fetchone()[0],
             "market_snapshots": connection.execute("SELECT COUNT(*) FROM market_snapshots").fetchone()[0],
+            "issue_dispositions": connection.execute("SELECT COUNT(*) FROM issue_dispositions").fetchone()[0],
+            "fixture_horizon_dispositions": connection.execute(
+                "SELECT COUNT(*) FROM fixture_horizon_dispositions"
+            ).fetchone()[0],
         }
         coverage = pd.read_sql_query(
             """
@@ -75,7 +79,13 @@ def main() -> int:
             for row in connection.execute(f"PRAGMA table_info({table})")
             if any(token in str(row[1]).lower() for token in ("score", "result", "settlement", "winning", "payout"))
         }
-    if integrity != "ok" or counts["issues"] != 808 or counts["fixtures"] != 213_263:
+    if (
+        integrity != "ok"
+        or counts["issues"] != 808
+        or counts["fixtures"] != 213_263
+        or counts["issue_dispositions"] != 808
+        or counts["fixture_horizon_dispositions"] != 213_263 * 3
+    ):
         raise AssertionError(f"candidate SQLite invariant failed: {integrity=}, {counts=}")
     if forbidden:
         raise AssertionError(f"forbidden outcome-derived columns: {sorted(forbidden)}")

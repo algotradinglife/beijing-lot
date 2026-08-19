@@ -41,7 +41,8 @@ The complete SQLite candidate contains:
 - 9,596,835 raw quote observations;
 - 9,596,835 deterministic resolved quotes;
 - 9,596,835 rows in the #236-compatible `market_snapshots` interface;
-- 14,626 terminal acquisition receipts and 43,659 fixture-horizon dispositions for the recovered lane.
+- 14,626 terminal acquisition receipts;
+- 808 issue dispositions and 639,789 explicit fixture-horizon dispositions across all three lanes.
 
 The Parquet analysis view contains:
 
