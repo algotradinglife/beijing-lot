@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-20 00:18 HKT (#268 complete 808-issue proxy backfill accepted; #238 has no open native blocker and awaits PI activation)**
+Updated: **2026-08-20 01:05 HKT (#238 chronological handicap-probability mapping accepted; #232 awaits terminal modelability discussion before #209 activation)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -106,7 +106,7 @@ PI interpretation and does not replace those edges or Project states.
   ├─ #237 power features (Human)
   ├─ #248 prospective multi-timepoint snapshots (Ready)
   ├─ #249 database portability (In Progress)
-  └─ #238 divergence materializer (Blocked state; all native predecessors closed)
+  └─ #238 divergence materializer (Done; three historical proxy horizons accepted)
              |
              v
 #209 full-cycle historical ablation and baseline ladder (Blocked)
@@ -127,8 +127,8 @@ PI interpretation and does not replace those edges or Project states.
 | 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
 | 6 | [#208] dynamic N×K frontier | Open / In Progress | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
-| 8 | [#232] divergence-support remediation | Open / In Progress | M1 | Decomposed into native subissues | #268 extends the retrospective proxy to the complete 808-issue denominator; #238 has no open native blocker and awaits PI activation |
-| 9 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #232; #229 closed | Chronological ablations and accepted baseline ladder; activation requires PI modelability review, not merely one positive cell |
+| 8 | [#232] divergence-support remediation | Open / In Progress | M1 | Native `blockedBy #238` is closed | #238 creates a stable historical EU-plus-line feature but not actual Beijing-SP divergence; terminal PI/user modelability discussion is next |
+| 9 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #232; #229 closed | Freeze the value-learning objective, baseline and 2024+ holdout before activation; consume #238 probabilities as separate features, not as a profitability claim |
 | 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
 | 11 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
@@ -162,9 +162,9 @@ PI interpretation and does not replace those edges or Project states.
   distribution. #238 must retain raw line, normalized line, provenance and the
   translation mask, and must not overclaim the upstream large-code
   normalization as fully closed raw-provider truth.
-- #236 is now a satisfied native predecessor of #238. #238 remains `Blocked`
-  only as an unreviewed lifecycle state; its current native predecessors #235,
-  #236 and #268 are all terminal.
+- #236 is a satisfied native predecessor of #238. #238 subsequently learned
+  and confirmed a separate historical non-zero-line translator while retaining
+  this upstream proxy boundary.
 
 ### #268 complete historical proxy backfill decision
 
@@ -183,7 +183,29 @@ PI interpretation and does not replace those edges or Project states.
   odds without loading the full quote union into pandas.
 - `initial`, `10h` and `1h` remain `RETROSPECTIVE_RELATIVE_PROXY`. #268 removes
   the historical coverage blocker but does not create strict common-decision-
-  epoch evidence. #238 must preserve this boundary in its modelability report.
+  epoch evidence. #238 preserves this boundary in its modelability report.
+
+### #238 chronological divergence-materializer decision
+
+- PR #272 was PI-reviewed and merged at exact HEAD
+  `97b7767a0ac371fed5d2b1bcca4e923b1ec8a981`. It materializes 638,792
+  fixture×horizon European triplets (1,916,376 M×3 cells) across all 808
+  issues; 636,632 fixture×horizon rows have a supported native-line mapping.
+- The fixed EU-plus-line logistic translator beats the chronological line-only
+  control on log loss, Brier and ECE at `initial`, `10h` and `1h` in both 2022
+  tune and untouched 2023 confirmation. Every issue-blocked log-loss/Brier
+  bootstrap interval is below zero.
+- This is a positive **representation** result, not positive EV. The line-only
+  control is a coarse handicap prior; actual historical pre-event
+  `Q_BJ_SP_DEVIG` remains unavailable. Half-lines and sparse ±4/±5 rows are
+  masked rather than extrapolated.
+- All 808 issues retain N7 capacity at every horizon, but neither N=7 nor ticket
+  overlap is fixed by this data result. #209 may learn from raw EU probability,
+  line-only prior, translated native probability and their signed divergence as
+  separate inputs.
+- 2024+ contains 188 issues / 43,531 inventory fixtures and remains physically
+  feature-only. Its outcomes cannot be opened until #209 freezes the learning
+  loss, accepted baseline, ablations and fallback constraint.
 
 ### #205 terminal decision and downstream contract
 
