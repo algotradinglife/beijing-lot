@@ -2,8 +2,16 @@
   "contract": "BJ-UNIFIED-EU-PROXY-BACKFILL-POC-001",
   "files": {
     "COVERAGE_REPORT.json": {
-      "bytes": 2310,
-      "sha256": "a82b97ba415de10a0cd1f8dcff77758ed8d23dbbbba9590a8d39d9b4b42b6753"
+      "bytes": 16841,
+      "sha256": "230ec2f1265f09ec3cd8d0787a088b3b2bfaebc7bb9b1a07527805c24ca89d9e"
+    },
+    "EXTENSION_NORMALIZED_PARITY.json": {
+      "bytes": 12632,
+      "sha256": "6ea0471336766848f0c49cf7cbb540ae32da4807d9c015112a61998852b6ea11"
+    },
+    "EXTENSION_UNMATCHED_FIXTURES.csv": {
+      "bytes": 146,
+      "sha256": "9fd4d3e7a5b582a65c2536dd03422134093cc52522a8a234acc9d60707a02b18"
     },
     "ISSUE_INVENTORY.csv": {
       "bytes": 18370,
@@ -11,7 +19,7 @@
     },
     "ISSUE_PROBE_RESULTS.csv": {
       "bytes": 10035,
-      "sha256": "4ecd1958c52ea2b6ba2d489d8f29022a5ea29b64d6cd1086dba70aa7168ec3e5"
+      "sha256": "e252c5f34bc2c3862204d403786473453edc133c33b3b4cbc6b3092d312434b2"
     },
     "LOCAL_CACHE_EXCLUSIONS.csv": {
       "bytes": 295,

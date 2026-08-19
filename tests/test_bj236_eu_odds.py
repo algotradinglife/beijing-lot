@@ -116,6 +116,45 @@ def test_workbook_reader_uses_only_euro_rows_and_quarantines_duplicate_issue_slo
     }]
 
 
+def test_workbook_reader_accepts_explicit_nowscore_update_provenance(tmp_path: Path) -> None:
+    path = tmp_path / "nowscore.sqlite"
+    con = sqlite3.connect(path)
+    con.execute(
+        "CREATE TABLE matches (match_id INTEGER, issue TEXT, match_idx INTEGER, "
+        "handicap_line REAL, handicap_line_norm REAL, handicap_norm_source TEXT)"
+    )
+    con.execute(
+        "CREATE TABLE market_snapshots (match_id INTEGER, market TEXT, bookmaker TEXT, "
+        "snapshot TEXT, v1 REAL, v2 REAL, v3 REAL)"
+    )
+    con.execute("CREATE TABLE source_meta (key TEXT, value TEXT)")
+    con.executemany(
+        "INSERT INTO source_meta VALUES (?, ?)",
+        [
+            ("nowscore_update_last_run", "2026-08-19T00:00:00Z"),
+            ("nowscore_update_issues", "26052"),
+        ],
+    )
+    con.execute("INSERT INTO matches VALUES (1, '26052', 1, 0, 0, 'provider_zero')")
+    con.execute(
+        "INSERT INTO market_snapshots VALUES "
+        "(1, 'euro_1x2', 'A', 'initial', 2.0, 3.0, 4.0)"
+    )
+    con.commit()
+    con.close()
+
+    rows, ledger = load_workbook_proxy(path)
+    assert len(rows) == 1
+    assert ledger.empty
+
+    con = sqlite3.connect(path)
+    con.execute("DELETE FROM source_meta")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="provenance"):
+        load_workbook_proxy(path)
+
+
 def test_package_verifier_rejects_remanifested_probability_manifest_and_label_tamper(tmp_path: Path) -> None:
     package = build_proxy_package(tmp_path / "package", _quotes(), source_sha256="a" * 64)
     verify_proxy_package(package, expected_source_sha256="a" * 64)

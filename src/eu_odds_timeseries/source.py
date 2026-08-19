@@ -45,9 +45,16 @@ def _assert_layout(con: sqlite3.Connection) -> None:
         missing = expected - got
         if missing:
             raise ValueError(f"source workbook {table} missing columns: {sorted(missing)}")
-    source_path = con.execute("SELECT value FROM source_meta WHERE key='source_path'").fetchone()
-    if source_path is None or not str(source_path[0]).lower().endswith("beidan.xlsm"):
-        raise ValueError("source workbook lacks the required beidan.xlsm provenance receipt")
+    receipts = dict(con.execute("SELECT key, value FROM source_meta"))
+    workbook = str(receipts.get("source_path", "")).lower().endswith("beidan.xlsm")
+    nowscore_update = bool(
+        str(receipts.get("nowscore_update_last_run", "")).strip()
+        and str(receipts.get("nowscore_update_issues", "")).strip()
+    )
+    if not workbook and not nowscore_update:
+        raise ValueError(
+            "source lacks either beidan.xlsm or Nowscore update provenance receipts"
+        )
 
 
 def _duplicate_slot_ledger(con: sqlite3.Connection) -> pd.DataFrame:

@@ -1,0 +1,537 @@
+{
+  "domain_checks": {
+    "availability_mask_one": true,
+    "causal_grade_retrospective_proxy": true,
+    "horizons_initial_10h_1h": true,
+    "market_euro_1x2": true,
+    "outcome_codes_3_1_0": true,
+    "probability_range": true,
+    "probability_triplets_sum_one": true,
+    "source_role_nowscore_titan": true
+  },
+  "domain_parity": true,
+  "exclusion_rows": 42400,
+  "matched_fixture_count": 6000,
+  "probability_rows": 54000,
+  "schema_parity": true,
+  "schemas": {
+    "exclusion_ledger": {
+      "canonical": [
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_match_id",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "bookmaker_id",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "reason",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "detail",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ],
+      "extension": [
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_match_id",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "bookmaker_id",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "reason",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "detail",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ]
+    },
+    "probabilities": {
+      "canonical": [
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "issue_code",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "match_idx",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "probability",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "outcome_code",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_match_ids",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_role",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "market_type",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "causal_grade",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "n_available_books",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "availability_mask",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "aggregation_grade",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "translation_status",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "translation_availability_mask",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "required_additional_input",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ],
+      "extension": [
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "issue_code",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "match_idx",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "probability",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "outcome_code",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_match_ids",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_role",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "market_type",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "causal_grade",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "n_available_books",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "availability_mask",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "aggregation_grade",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "translation_status",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "translation_availability_mask",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "required_additional_input",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ]
+    },
+    "source_trace": {
+      "canonical": [
+        {
+          "name": "issue_code",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "match_idx",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "source_match_id",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "native_handicap_line_raw",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "native_handicap_line",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "handicap_norm_source",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "raw_bookmaker_rows",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "valid_bookmaker_rows",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_role",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "market_type",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "causal_grade",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ],
+      "extension": [
+        {
+          "name": "issue_code",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "match_idx",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "source_match_id",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "native_handicap_line_raw",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "native_handicap_line",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "handicap_norm_source",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "raw_bookmaker_rows",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "valid_bookmaker_rows",
+          "nullable": true,
+          "type": "int64"
+        },
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_role",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "market_type",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "causal_grade",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ]
+    },
+    "translation_readiness": {
+      "canonical": [
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "native_handicap_line_raw",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "native_handicap_line",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "handicap_norm_source",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_match_ids",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_role",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "market_type",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "causal_grade",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "availability_mask",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "required_additional_input",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "translation_probability_json",
+          "nullable": true,
+          "type": "string"
+        },
+        {
+          "name": "translation_status",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ],
+      "extension": [
+        {
+          "name": "canonical_fixture_key",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "snapshot_kind",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "native_handicap_line_raw",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "native_handicap_line",
+          "nullable": true,
+          "type": "double"
+        },
+        {
+          "name": "handicap_norm_source",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_match_ids",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "source_role",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "market_type",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "causal_grade",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "availability_mask",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "required_additional_input",
+          "nullable": true,
+          "type": "large_string"
+        },
+        {
+          "name": "translation_probability_json",
+          "nullable": true,
+          "type": "string"
+        },
+        {
+          "name": "translation_status",
+          "nullable": true,
+          "type": "large_string"
+        }
+      ]
+    }
+  },
+  "source_sha256": "f480b7f5458cb489d3812b9de1fbf2713dd1d4a4d0562e0f1fe27521fc4071bb",
+  "strict_forward_rows": 0,
+  "trace_rows": 18003,
+  "translation_rows": 18000,
+  "unmatched_fixture_count": 1,
+  "unmatched_fixture_dispositions": [
+    {
+      "canonical_fixture_key": "bjslot:26051:331",
+      "disposition": "UNAVAILABLE_NO_VALID_EURO_1X2_HORIZON",
+      "issue_code": "26051",
+      "match_idx": 331,
+      "provider_match_id": "2924541"
+    }
+  ]
+}

@@ -7,6 +7,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from scripts.profile_bj267_eu_proxy_backfill import (
+    create_sqlite_snapshot,
+    overlaps_protected,
+)
 from src.eu_proxy_backfill.inventory import (
     InventoryPaths,
     build_inventory,
@@ -138,6 +142,33 @@ def test_inventory_rejects_duplicate_slots_inside_one_source(tmp_path: Path) -> 
         raise AssertionError("duplicate source slots must fail closed")
 
 
+def test_live_sqlite_snapshot_is_consistent_and_independent(tmp_path: Path) -> None:
+    source = tmp_path / "live.db"
+    snapshot = tmp_path / "staging/live.snapshot.sqlite"
+    connection = sqlite3.connect(source)
+    connection.execute("CREATE TABLE values_table(value INTEGER)")
+    connection.execute("INSERT INTO values_table VALUES (1)")
+    connection.commit()
+    connection.close()
+
+    create_sqlite_snapshot(source, snapshot)
+    connection = sqlite3.connect(source)
+    connection.execute("INSERT INTO values_table VALUES (2)")
+    connection.commit()
+    connection.close()
+
+    with sqlite3.connect(snapshot) as frozen:
+        assert frozen.execute("SELECT value FROM values_table").fetchall() == [(1,)]
+
+
+def test_output_and_staging_overlap_guard_covers_both_directions(tmp_path: Path) -> None:
+    protected_file = (tmp_path / "data/source.sqlite").resolve()
+    protected = {protected_file}
+    assert overlaps_protected(tmp_path / "data", protected)
+    assert overlaps_protected(tmp_path / "data/source.sqlite/child", protected)
+    assert not overlaps_protected(tmp_path / "staging", protected)
+
+
 ISSUE_HTML = """
 <table><tr id="row1" matchid="1" gamename="Test League" polygoal="0">
 <td>1</td><td>Test League</td><td></td><td></td>
@@ -239,10 +270,12 @@ def test_staged_probe_rejects_tampered_payload(tmp_path: Path) -> None:
     issue_payload = next((staging / "raw" / "issue_page").glob("*.html"))
     issue_payload.write_bytes(b"tampered")
     try:
-        StagedProbeClient(staging).fetch(
-            "issue_page",
+        probe_issue(
+            StagedProbeClient(staging),
             "25043",
-            "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=5&issueNum=25043",
+            expected,
+            staging,
+            titan_samples=1,
         )
     except ValueError as exc:
         assert "mismatch" in str(exc)

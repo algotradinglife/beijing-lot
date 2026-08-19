@@ -52,6 +52,10 @@ class ProbeResult:
     status: str
 
 
+class StagedPayloadError(ValueError):
+    """A staged payload or receipt failed its immutable replay contract."""
+
+
 class ProbeClient:
     """Small requests-based client that records every response before parsing."""
 
@@ -121,10 +125,14 @@ class StagedProbeClient:
     def fetch(self, source_kind: str, source_key: str, url: str) -> tuple[bytes, FetchReceipt]:
         key = (str(source_kind), str(source_key))
         if key not in self.receipts:
-            raise ValueError(f"staged receipt unavailable: {source_kind}/{source_key}")
+            raise StagedPayloadError(
+                f"staged receipt unavailable: {source_kind}/{source_key}"
+            )
         values = self.receipts[key]
         if values["source_url"] != url:
-            raise ValueError(f"staged URL mismatch for {source_kind}/{source_key}")
+            raise StagedPayloadError(
+                f"staged URL mismatch for {source_kind}/{source_key}"
+            )
         receipt = FetchReceipt(
             source_kind=values["source_kind"],
             source_key=values["source_key"],
@@ -145,9 +153,9 @@ class StagedProbeClient:
         )
         payload = path.read_bytes()
         if len(payload) != receipt.payload_bytes:
-            raise ValueError(f"staged payload size mismatch: {path}")
+            raise StagedPayloadError(f"staged payload size mismatch: {path}")
         if hashlib.sha256(payload).hexdigest() != receipt.payload_sha256:
-            raise ValueError(f"staged payload hash mismatch: {path}")
+            raise StagedPayloadError(f"staged payload hash mismatch: {path}")
         return payload, receipt
 
 
@@ -224,6 +232,8 @@ def probe_issue(
                     "status": "AVAILABLE",
                 }
             )
+        except StagedPayloadError:
+            raise
         except (requests.RequestException, ValueError) as exc:
             titan_rows.append(
                 {
