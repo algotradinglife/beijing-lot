@@ -6,7 +6,7 @@ from typing import Iterable
 
 import pandas as pd
 
-from .store import SnapshotStore, _iso, _utc
+from .store import SnapshotStore, _canonical_utc, _iso, _utc
 
 
 VIEW_COLUMNS = [
@@ -19,6 +19,8 @@ VIEW_COLUMNS = [
 def _eligible_vectors(store: SnapshotStore, *, issue: str, match_idx: int,
                       decision_at_utc: str, kickoff_at_utc: str) -> list[dict]:
     """Return complete vectors whose source *and receive* clocks are causal."""
+    decision_at_utc = _canonical_utc(decision_at_utc)
+    kickoff_at_utc = _canonical_utc(kickoff_at_utc)
     rows = store.conn.execute("""
         SELECT r.capture_key,r.fixture_key,r.native_handicap_line,r.sale_status,
                r.trusted_received_at_utc,v.source_changed_at_utc,v.outcome_code,v.sp
@@ -87,6 +89,7 @@ def materialize_common_epoch_view(store: SnapshotStore, *, decision_epochs: dict
         epoch = passed.get(issue) or _schedule_only_epoch(store, issue)
         if not epoch:
             continue
+        epoch = _canonical_utc(epoch)
         for current_issue, match_idx, kickoff in (row for row in _fixtures(store) if row[0] == issue):
             # A shared issue epoch cannot ever be at/after an individual kickoff.
             if _utc(epoch) >= _utc(kickoff):

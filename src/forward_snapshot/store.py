@@ -14,6 +14,7 @@ import os
 import sqlite3
 import tempfile
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -55,6 +56,22 @@ def _iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _canonical_utc(value: str) -> str:
+    """Normalize every persisted/comparison time to one sortable UTC spelling."""
+    return _iso(_utc(value))
+
+
+def validate_history_url(source_url: str, *, issue: str, match_idx: int) -> str:
+    """Allow only the exact Nowscore TypeID=5 history route for this fixture."""
+    parts = urlsplit(source_url)
+    expected_path = f"/sp/danchang/{issue}_{match_idx}_5.html"
+    if (parts.scheme, parts.hostname, parts.port, parts.username, parts.password, parts.path, parts.fragment) != (
+        "https", "cp.nowscore.com", None, None, None, expected_path, ""
+    ):
+        raise ValueError("history URL is not an allowlisted Nowscore TypeID=5 endpoint")
+    return source_url
+
+
 def _source_time(text: str, kickoff_at_utc: str) -> str:
     try:
         month, day = (int(part) for part in text.split()[0].split("-"))
@@ -77,7 +94,7 @@ def _source_time(text: str, kickoff_at_utc: str) -> str:
 
 
 def parse_nowscore_sp_history(payload: bytes, *, issue: str, match_idx: int,
-                               kickoff_at_utc: str) -> ParsedHistory:
+                               kickoff_at_utc: str, source_url: str) -> ParsedHistory:
     """Fail closed unless the page is the exact 3/1/0 Sp值变化表 shape."""
     soup = BeautifulSoup(payload.decode("utf-8", errors="replace"), "html.parser")
     title = soup.title.get_text(" ", strip=True) if soup.title else ""
@@ -121,8 +138,11 @@ def parse_nowscore_sp_history(payload: bytes, *, issue: str, match_idx: int,
     )
     if not deduped or len(deduped) % 3:
         raise ValueError("Nowscore TypeID=5 complete 3/1/0 vector required")
-    source_url = f"https://cp.nowscore.com/sp/danchang/{issue}_{match_idx}_5.html"
-    return ParsedHistory(FORWARD_SOURCE_ID, source_url, deduped)
+    return ParsedHistory(
+        FORWARD_SOURCE_ID,
+        validate_history_url(source_url, issue=issue, match_idx=match_idx),
+        deduped,
+    )
 
 
 def _sha(payload: bytes) -> str:
@@ -171,7 +191,9 @@ class SnapshotStore:
             CREATE TABLE IF NOT EXISTS capture_receipt (
               capture_key TEXT PRIMARY KEY, source_id TEXT NOT NULL,
               issue_code TEXT NOT NULL, match_idx INTEGER NOT NULL,
-              fixture_key TEXT NOT NULL, source_url TEXT NOT NULL,
+              fixture_key TEXT NOT NULL,
+              issue_capture_key TEXT NOT NULL REFERENCES issue_capture_receipt(capture_key),
+              source_url TEXT NOT NULL,
               raw_sha256 TEXT NOT NULL, raw_path TEXT NOT NULL,
               requested_at_utc TEXT NOT NULL, trusted_received_at_utc TEXT NOT NULL,
               parser_version TEXT NOT NULL, acquisition_result TEXT NOT NULL,
@@ -213,12 +235,23 @@ class SnapshotStore:
                           requested_at_utc: str, trusted_received_at_utc: str,
                           parser_version: str, acquisition_result: str, rows_parsed: int) -> bool:
         """Record the raw TypeID=5 issue-page state for every poll, append-only."""
+        requested_at_utc = _canonical_utc(requested_at_utc)
+        trusted_received_at_utc = _canonical_utc(trusted_received_at_utc)
         if _utc(requested_at_utc) > _utc(trusted_received_at_utc):
             raise ValueError("requested time cannot follow trusted receive time")
-        if self.conn.execute("SELECT 1 FROM issue_capture_receipt WHERE capture_key=?", (capture_key,)).fetchone():
-            return False
         raw_sha = _sha(payload)
         raw_rel = f"{raw_sha[:2]}/{raw_sha}.html"
+        expected = (FORWARD_SOURCE_ID, issue, source_url, raw_sha, raw_rel, requested_at_utc,
+                    trusted_received_at_utc, parser_version, acquisition_result, rows_parsed)
+        existing = self.conn.execute("""
+            SELECT source_id,issue_code,source_url,raw_sha256,raw_path,requested_at_utc,
+                   trusted_received_at_utc,parser_version,acquisition_result,rows_parsed
+            FROM issue_capture_receipt WHERE capture_key=?
+        """, (capture_key,)).fetchone()
+        if existing:
+            if tuple(existing) == expected:
+                return False
+            raise ValueError(f"capture key collision for issue page: {capture_key}")
         _atomic_bytes(self.raw_dir / raw_rel, payload)
         with self.conn:
             self.conn.execute("""
@@ -231,34 +264,61 @@ class SnapshotStore:
 
     def record_history(self, *, capture_key: str, payload: bytes, issue: str, match_idx: int,
                        kickoff_at_utc: str, native_handicap_line: float | None,
-                       sale_status: str, issue_url: str, requested_at_utc: str,
+                       sale_status: str, issue_capture_key: str, source_url: str, requested_at_utc: str,
                        trusted_received_at_utc: str, parser_version: str,
                        acquisition_result: str) -> RecordResult:
-        """Append one complete raw capture. Same capture_key is an idempotent retry."""
+        """Append one complete raw capture; collisions are never silently discarded."""
         if not capture_key or not issue or match_idx <= 0:
             raise ValueError("capture key, issue and positive match index are required")
+        requested_at_utc = _canonical_utc(requested_at_utc)
+        trusted_received_at_utc = _canonical_utc(trusted_received_at_utc)
+        kickoff_at_utc = _canonical_utc(kickoff_at_utc)
         if _utc(requested_at_utc) > _utc(trusted_received_at_utc):
             raise ValueError("requested time cannot follow trusted receive time")
         if _utc(trusted_received_at_utc) >= _utc(kickoff_at_utc):
             raise ValueError("post-kickoff receipt cannot enter forward store")
+        issue_receipt = self.conn.execute("""
+            SELECT issue_code,acquisition_result,raw_sha256,raw_path,trusted_received_at_utc
+            FROM issue_capture_receipt WHERE capture_key=?
+        """, (issue_capture_key,)).fetchone()
+        if issue_receipt is None or issue_receipt[:2] != (issue, "OK"):
+            raise ValueError("history receipt requires its successful raw issue-page receipt")
+        _, _, issue_raw_sha, issue_raw_path, issue_received = issue_receipt
+        issue_path = self.raw_dir / issue_raw_path
+        if not issue_path.exists() or _sha(issue_path.read_bytes()) != issue_raw_sha:
+            raise ValueError("history receipt source trace raw issue evidence is unavailable")
+        from scripts.scrape_nowscore_bjdc import parse_rows
+        issue_rows = parse_rows(issue, issue_path.read_bytes().decode("utf-8", errors="replace"), issue_received)
+        if (match_idx, source_url) not in {(int(row["match_idx"]), str(row["sp_url"])) for row in issue_rows}:
+            raise ValueError("history receipt source trace is absent from its linked raw issue page")
         parsed = parse_nowscore_sp_history(payload, issue=issue, match_idx=match_idx,
-                                            kickoff_at_utc=kickoff_at_utc)
+                                            kickoff_at_utc=kickoff_at_utc, source_url=source_url)
         if any(_utc(vector.source_changed_at_utc) > _utc(trusted_received_at_utc)
                for vector in parsed.vectors):
             raise ValueError("source change time cannot follow trusted receive time")
         raw_sha = _sha(payload)
         raw_rel = f"{raw_sha[:2]}/{raw_sha}.html"
-        existing = self.conn.execute("SELECT 1 FROM capture_receipt WHERE capture_key=?", (capture_key,)).fetchone()
-        if existing:
-            return RecordResult(0)
-        _atomic_bytes(self.raw_dir / raw_rel, payload)
         fixture_key = f"{issue}:{match_idx}"
+        expected = (parsed.source_id, issue, match_idx, fixture_key, issue_capture_key, parsed.source_url,
+                    raw_sha, raw_rel, requested_at_utc, trusted_received_at_utc, parser_version,
+                    acquisition_result, sale_status, native_handicap_line, kickoff_at_utc)
+        existing = self.conn.execute("""
+            SELECT source_id,issue_code,match_idx,fixture_key,issue_capture_key,source_url,raw_sha256,
+                   raw_path,requested_at_utc,trusted_received_at_utc,parser_version,acquisition_result,
+                   sale_status,native_handicap_line,kickoff_at_utc
+            FROM capture_receipt WHERE capture_key=?
+        """, (capture_key,)).fetchone()
+        if existing:
+            if tuple(existing) == expected:
+                return RecordResult(0)
+            raise ValueError(f"capture key collision for history receipt: {capture_key}")
+        _atomic_bytes(self.raw_dir / raw_rel, payload)
         with self.conn:
             self.conn.execute("""
-                INSERT INTO capture_receipt VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (capture_key, parsed.source_id, issue, match_idx, fixture_key, parsed.source_url,
-                  raw_sha, raw_rel, requested_at_utc, trusted_received_at_utc, parser_version,
-                  acquisition_result, sale_status, native_handicap_line, kickoff_at_utc))
+                INSERT INTO capture_receipt VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (capture_key, parsed.source_id, issue, match_idx, fixture_key, issue_capture_key,
+                  parsed.source_url, raw_sha, raw_rel, requested_at_utc, trusted_received_at_utc,
+                  parser_version, acquisition_result, sale_status, native_handicap_line, kickoff_at_utc))
             self.conn.executemany("""
                 INSERT INTO sp_change_vector(capture_key,source_changed_at_utc,outcome_code,sp)
                 VALUES(?,?,?,?)
@@ -268,7 +328,7 @@ class SnapshotStore:
         return RecordResult(len(parsed.vectors))
 
     def _manifest_payload(self) -> bytes:
-        receipts = [dict(zip(("capture_key", "source_id", "issue_code", "match_idx", "fixture_key", "source_url", "raw_sha256", "raw_path", "requested_at_utc", "trusted_received_at_utc", "parser_version", "acquisition_result", "sale_status", "native_handicap_line", "kickoff_at_utc"), row))
+        receipts = [dict(zip(("capture_key", "source_id", "issue_code", "match_idx", "fixture_key", "issue_capture_key", "source_url", "raw_sha256", "raw_path", "requested_at_utc", "trusted_received_at_utc", "parser_version", "acquisition_result", "sale_status", "native_handicap_line", "kickoff_at_utc"), row))
                     for row in self.conn.execute("SELECT * FROM capture_receipt ORDER BY capture_key")]
         vectors = [dict(zip(("capture_key", "source_changed_at_utc", "outcome_code", "sp"), row))
                    for row in self.conn.execute("SELECT * FROM sp_change_vector ORDER BY capture_key,source_changed_at_utc,outcome_code")]
@@ -286,7 +346,9 @@ class SnapshotStore:
 
 
 def verify_store(store: SnapshotStore, *, trusted_manifest_sha256: str) -> list[str]:
-    """Rebuild every vector from raw evidence and check an external manifest anchor."""
+    """Rebuild vectors and source traces from raw evidence plus an external anchor."""
+    from scripts.scrape_nowscore_bjdc import parse_rows
+
     problems: list[str] = []
     if not store.manifest_path.exists():
         return ["manifest missing"]
@@ -294,31 +356,44 @@ def verify_store(store: SnapshotStore, *, trusted_manifest_sha256: str) -> list[
         problems.append("manifest does not match trusted anchor")
     if store.manifest_path.read_bytes() != store._manifest_payload():
         problems.append("semantic payload mismatch: manifest does not match control ledger")
-    for key, sha, raw_path in store.conn.execute(
-        "SELECT capture_key,raw_sha256,raw_path FROM issue_capture_receipt ORDER BY capture_key"
-    ):
+
+    issue_traces: dict[str, tuple[str, set[tuple[int, str]]]] = {}
+    for key, issue, sha, raw_path, received, result in store.conn.execute("""
+        SELECT capture_key,issue_code,raw_sha256,raw_path,trusted_received_at_utc,acquisition_result
+        FROM issue_capture_receipt ORDER BY capture_key
+    """):
         path = store.raw_dir / raw_path
         if not path.exists() or _sha(path.read_bytes()) != sha:
             problems.append(f"raw issue evidence mismatch: {key}")
+            continue
+        if result != "OK":
+            continue
+        rows = parse_rows(issue, path.read_bytes().decode("utf-8", errors="replace"), received)
+        issue_traces[key] = (issue, {(int(row["match_idx"]), str(row["sp_url"])) for row in rows})
+
     for row in store.conn.execute("""
-        SELECT capture_key,issue_code,match_idx,kickoff_at_utc,source_url,raw_sha256,raw_path
+        SELECT capture_key,issue_code,match_idx,kickoff_at_utc,issue_capture_key,source_url,
+               raw_sha256,raw_path
         FROM capture_receipt ORDER BY capture_key
     """):
-        key, issue, index, kickoff, url, sha, raw_path = row
+        key, issue, index, kickoff, issue_key, url, sha, raw_path = row
+        trace = issue_traces.get(issue_key)
+        if trace is None or trace[0] != issue or (index, url) not in trace[1]:
+            problems.append(f"semantic payload mismatch: source trace {key}")
         path = store.raw_dir / raw_path
         if not path.exists() or _sha(path.read_bytes()) != sha:
             problems.append(f"raw evidence mismatch: {key}")
             continue
         try:
             parsed = parse_nowscore_sp_history(path.read_bytes(), issue=issue, match_idx=index,
-                                                kickoff_at_utc=kickoff)
+                                                kickoff_at_utc=kickoff, source_url=url)
         except ValueError as exc:
             problems.append(f"semantic payload mismatch: {key}: {exc}")
             continue
-        if parsed.source_url != url:
-            problems.append(f"semantic payload mismatch: source trace {key}")
         expected = {(v.source_changed_at_utc, v.outcome_code, v.sp) for v in parsed.vectors}
-        actual = set(store.conn.execute("SELECT source_changed_at_utc,outcome_code,sp FROM sp_change_vector WHERE capture_key=?", (key,)))
+        actual = set(store.conn.execute(
+            "SELECT source_changed_at_utc,outcome_code,sp FROM sp_change_vector WHERE capture_key=?", (key,)
+        ))
         if expected != actual:
             problems.append(f"semantic payload mismatch: vectors {key}")
     return problems

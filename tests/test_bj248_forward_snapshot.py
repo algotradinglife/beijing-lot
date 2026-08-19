@@ -33,12 +33,36 @@ def _history(*rows: tuple[str, str, str, str]) -> bytes:
     ).encode("utf-8")
 
 
+def _record_history(store: SnapshotStore, **kwargs):
+    """Build the mandatory raw issue-page trace for direct store boundary tests."""
+    issue = str(kwargs["issue"])
+    match_idx = int(kwargs["match_idx"])
+    source_url = kwargs.pop("source_url", f"https://cp.nowscore.com/sp/danchang/{issue}_{match_idx}_5.html")
+    kwargs.pop("issue_url", None)
+    issue_key = f"issue-{kwargs['capture_key']}"
+    issue_url = f"https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum={issue}"
+    page = (
+        "<table><tr id='row_%d' cansale='true' name='2026-05-01' gamename='L' polygoal='0'>"
+        "<td>1</td><td>L</td><td>12:00</td><td>未开</td><td>Home</td><td>0</td><td>-</td>"
+        "<td>Away</td><td>-</td><td><a href='Panlu.aspx?id=1'>x</a>"
+        "<a href='%s'>sp</a></td></tr></table>" % (match_idx, source_url)
+    ).encode()
+    store.record_issue_page(
+        capture_key=issue_key, issue=issue, payload=page, source_url=issue_url,
+        requested_at_utc=str(kwargs["requested_at_utc"]),
+        trusted_received_at_utc=str(kwargs["trusted_received_at_utc"]),
+        parser_version=str(kwargs["parser_version"]), acquisition_result="OK", rows_parsed=1,
+    )
+    return store.record_history(issue_capture_key=issue_key, source_url=source_url, **kwargs)
+
+
 def test_parser_accepts_only_complete_typeid5_history_before_kickoff() -> None:
     parsed = parse_nowscore_sp_history(
         _history(("2.1", "3.2", "3.8", "05-01 10:00")),
         issue="26051",
         match_idx=7,
         kickoff_at_utc="2026-05-01T04:00:00Z",
+        source_url="https://cp.nowscore.com/sp/danchang/26051_7_5.html",
     )
     assert parsed.source_id == FORWARD_SOURCE_ID
     assert parsed.source_url == "https://cp.nowscore.com/sp/danchang/26051_7_5.html"
@@ -49,6 +73,7 @@ def test_parser_accepts_only_complete_typeid5_history_before_kickoff() -> None:
         parse_nowscore_sp_history(
             _history(("2.1", "", "3.8", "05-01 10:00")),
             issue="26051", match_idx=7, kickoff_at_utc="2026-05-01T04:00:00Z",
+            source_url="https://cp.nowscore.com/sp/danchang/26051_7_5.html",
         )
 
 
@@ -62,9 +87,9 @@ def test_append_is_retry_idempotent_and_preserves_distinct_source_states(tmp_pat
         parser_version="bj248-test", acquisition_result="OK",
     )
     first = _history(("2.1", "3.2", "3.8", "04-30 08:00"))
-    same = store.record_history(capture_key="capture-1", payload=first, **common)
-    retry = store.record_history(capture_key="capture-1", payload=first, **common)
-    second = store.record_history(
+    same = _record_history(store,capture_key="capture-1", payload=first, **common)
+    retry = _record_history(store,capture_key="capture-1", payload=first, **common)
+    second = _record_history(store,
         capture_key="capture-2", payload=_history(("2.2", "3.1", "3.7", "04-30 09:00")),
         **{**common, "trusted_received_at_utc": "2026-04-30T01:00:03Z"},
     )
@@ -73,7 +98,7 @@ def test_append_is_retry_idempotent_and_preserves_distinct_source_states(tmp_pat
     assert second.inserted_vectors == 3
     assert store.count("capture_receipt") == 2       # poll retry is not rewritten
     assert store.count("sp_change_vector") == 6      # distinct change states are retained
-    assert store.raw_payload_count() == 2
+    assert store.raw_payload_count() == 3  # two history bodies plus their traced issue page
 
 
 def test_views_require_both_source_and_trusted_receive_time_before_epoch(tmp_path: Path) -> None:
@@ -86,12 +111,12 @@ def test_views_require_both_source_and_trusted_receive_time_before_epoch(tmp_pat
     )
     # Source state at 10:00 HKT (=02:00Z), but not received until 03:00Z: it
     # must not be visible at a 02:30Z decision epoch.
-    store.record_history(
+    _record_history(store,
         capture_key="late-receipt", payload=_history(("2.1", "3.2", "3.8", "05-01 10:00")),
         trusted_received_at_utc="2026-05-01T03:00:00Z", **common,
     )
     # Earlier complete state is visible and therefore selected.
-    store.record_history(
+    _record_history(store,
         capture_key="eligible", payload=_history(("2.3", "3.3", "3.9", "05-01 09:00")),
         trusted_received_at_utc="2026-05-01T01:30:00Z", **common,
     )
@@ -110,7 +135,7 @@ def test_views_require_both_source_and_trusted_receive_time_before_epoch(tmp_pat
 
 def test_semantic_verifier_detects_quote_and_receipt_trace_tampering(tmp_path: Path) -> None:
     store = SnapshotStore.open(tmp_path)
-    store.record_history(
+    _record_history(store,
         capture_key="clean", payload=_history(("2.1", "3.2", "3.8", "05-01 09:00")),
         issue="26051", match_idx=7, kickoff_at_utc="2026-05-01T04:00:00Z",
         native_handicap_line=0.0, sale_status="OPEN",
@@ -126,7 +151,7 @@ def test_semantic_verifier_detects_quote_and_receipt_trace_tampering(tmp_path: P
     assert any("semantic payload mismatch" in problem for problem in problems)
 
     store = SnapshotStore.open(tmp_path / "trace")
-    store.record_history(
+    _record_history(store,
         capture_key="clean", payload=_history(("2.1", "3.2", "3.8", "05-01 09:00")),
         issue="26051", match_idx=7, kickoff_at_utc="2026-05-01T04:00:00Z",
         native_handicap_line=0.0, sale_status="OPEN",
@@ -157,7 +182,7 @@ def test_collector_retains_issue_page_and_per_match_change_table(tmp_path: Path)
 
 def test_manifest_rewrite_and_postkickoff_source_time_fail_closed(tmp_path: Path) -> None:
     store = SnapshotStore.open(tmp_path)
-    store.record_history(
+    _record_history(store,
         capture_key="clean", payload=_history(("2.1", "3.2", "3.8", "05-01 09:00")),
         issue="26051", match_idx=7, kickoff_at_utc="2026-05-01T04:00:00Z",
         native_handicap_line=0.0, sale_status="OPEN",
@@ -173,4 +198,5 @@ def test_manifest_rewrite_and_postkickoff_source_time_fail_closed(tmp_path: Path
         parse_nowscore_sp_history(
             _history(("2.1", "3.2", "3.8", "05-01 13:00")),
             issue="26051", match_idx=7, kickoff_at_utc="2026-05-01T04:00:00Z",
+            source_url="https://cp.nowscore.com/sp/danchang/26051_7_5.html",
         )

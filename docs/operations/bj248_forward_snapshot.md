@@ -25,11 +25,16 @@ No source file contains either host path.
 
 ## Restart and idempotency
 
-The collector key is issue + poll timestamp + match. A retry of the same key is
-a no-op. A later poll, even with identical bytes, receives a distinct receipt;
+The collector key is issue + poll timestamp + match. A retry is a no-op only
+when the raw SHA-256 and all immutable receipt metadata are identical. Reusing
+a key with a different payload, URL, time, sale status, parser version or other
+receipt field fails explicitly as a collision; it never silently drops a new
+state. A later poll, even with identical bytes, receives a distinct receipt;
 the raw body remains content-addressed once while every capture receipt and its
-complete source table are retained. Writes are temp-file + file fsync + rename
-+ directory fsync. SQLite uses WAL, foreign keys, and `synchronous=FULL`.
+complete source table are retained. All persisted clocks are normalized to
+canonical UTC `Z` instants before SQLite comparison. Writes are temp-file +
+file fsync + rename + directory fsync. SQLite uses WAL, foreign keys, and
+`synchronous=FULL`.
 
 `collector_failures.jsonl` records fetch/parser failures. A failure is never
 coerced to a zero quote or a completed vector. Inspect it before assuming a gap
@@ -50,9 +55,12 @@ than the decision epoch and strictly before kickoff. Settlement, outcome and
 Call `store.seal_manifest()` after a controlled capture window and retain its
 returned SHA-256 in an external release/operations record. Verify against that
 external anchor with `verify_store`; this detects remanifesting as well as
-quote, source-trace, raw-payload, and schema-ledger tampering. The raw issue
-page, every raw history page, receipt ledger, and source-change vectors are
-sufficient to rebuild the normalized views in a future store migration.
+quote, source-trace, raw-payload, and schema-ledger tampering. Each history
+receipt preserves the exact fetched allowlisted Nowscore URL and references the
+raw issue-page receipt from which that exact fixture URL was parsed. The raw
+issue page, every accepted raw history page, receipt ledger, and source-change
+vectors are sufficient to rebuild the normalized views in a future store
+migration.
 
 ## Service wrapper
 

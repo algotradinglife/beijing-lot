@@ -1,42 +1,65 @@
-# Issue #248 handoff
+# Issue #248 handoff — PI rework
 
-[SESSION] 20260819_015701_617a7f
+[SESSION] 20260819_235658_96e389
 
 ## Current HEAD
 
-`HEAD` on `engineer/bj248-issue` (the commit carrying this handoff).
+`engineer/bj248-issue`; the commit carrying this handoff is the rework delivery
+head. Resolve its exact SHA with `git rev-parse HEAD` after checkout.
 
-## Completed
+## Completed rework
 
-- Claimed GitHub Issue #248 and moved it from Ready to In Progress.
-- Replaced an uncommitted stale 500/ZGZCW draft with a Nowscore TypeID=5-only
-  prospective lane.
-- Added append-only raw issue/history capture, idempotency keyed by capture,
-  source + trusted-receive temporal gating, deterministic relative/common epoch
-  views, an externally anchored semantic verifier, collector/materializer CLIs,
-  operations/source-probe documentation and an executed notebook.
-- Focused test suite: 6 passed; legacy Nowscore history suite: 5 passed.
+- Claimed #248 from `Ready` to `In Progress` after confirming its sole native
+  predecessor (#234) is closed.
+- Fixed **KE-248-01**: a history receipt now stores the exact fetched URL,
+  rejects anything outside the HTTPS `cp.nowscore.com` fixture-specific
+  TypeID=5 route before fetch, and references the raw issue-page receipt whose
+  parsed row supplied that exact URL. The semantic verifier rebuilds this
+  source trace from raw issue evidence.
+- Fixed **KE-248-02**: an unrecognized active-page shape is recorded as
+  `PARSE_ERROR`, logged, and makes the CLI non-zero. A recognized explicit
+  no-sale marker is instead `EMPTY_PROVEN`, never silently `OK` with zero rows.
+- Fixed **KE-248-03**: reusing a capture key succeeds only for an identical raw
+  SHA and complete immutable receipt metadata. A changed payload or metadata
+  now raises an explicit collision in both issue-page and history receipt paths.
+- Fixed **KE-248-04**: requested, trusted-receive, kickoff, and supplied
+  decision-epoch times are canonical UTC `Z` instants before persistence or
+  SQLite lexical comparison. An offset epoch can no longer admit a later UTC
+  receipt.
+- Repaired the standalone collector CLI's import bootstrap and updated the
+  executed notebook for mandatory issue-page→history trace linkage.
 
-## Key decisions
+## Evidence
 
-- Nowscore is the primary source; 500/ZGZCW are documented only as future
-  cross-checks. No historical backfill occurs.
-- Repeated raw bytes use one content-addressed file, while every distinct poll
-  retains an immutable receipt and complete source table.
-- A view requires `source_changed_at_utc <= decision_at_utc` and
-  `trusted_received_at_utc <= decision_at_utc`, both strictly before kickoff.
-- A manifest SHA must be retained in an external release/operations record;
-  the verifier recomputes vectors from raw evidence and refuses a remanifested
-  or source-trace/quote-tampered ledger against that trusted anchor.
+- Focused suite: `python -m pytest tests/test_bj248_forward_snapshot.py
+  tests/test_bj248_rework.py tests/scripts/test_nowscore_bjdc_sp_history.py -q`
+  → `21 passed`.
+- Tamper-focused subset → `4 passed`: altered quote/vector, raw-source trace,
+  remanifest/external-anchor path, and offset/future-receipt gate fail closed.
+- Notebook: `/home/drwho1985/work/beijing-lot-206/.venv/bin/python
+  scripts/execute_bj248_notebook.py` → `EXECUTED`.
+- Manual read-only shadow probe of issue 26086 is documented in
+  `docs/research/bj248_manual_shadow_capture.md`. It verified the live page and
+  URL shape but admitted no forward vector: all 80 history outcomes were
+  explicitly rejected (42 post-kickoff, 38 invalid SP domain), not zero-filled.
 
-## Known limits / next steps
+## Known limits / decision input
 
-- No live collection was started: the operator must explicitly choose and set
-  `BEIJING_LOT_DATA_ROOT` before invoking the collector.
-- The compact notebook is an executed offline operational-shape demonstration,
-  not evidence that a live sample is sufficient for learning.
-- The full `tests/decision_api/test_nowscore_status.py` could not collect in
-  this interpreter because its pre-existing dependency `flask` is absent;
-  focused #248 and standalone Nowscore history tests pass.
-- Before delivery: complete independent staged-diff review, commit/push, open
-  evidence PR, post the PI acceptance table, then self-move #248 to EV Review.
+- The shadow issue's `cansale=true` rows had stale/past schedule evidence; this
+  does not qualify active-sale truth, retention, cadence or successful forward
+  collection. **Do not enable unattended scheduling** until a fresh issue has a
+  demonstrably future source schedule and at least one complete causal vector.
+- PI accepted notebook byte determinism and cross-store crash recovery as
+  exploration debt; this delivery intentionally does not expand into them.
+- Full repository pytest collection remains unavailable in both available
+  interpreters because of unrelated missing/incomplete dependencies and a
+  legacy macOS absolute input path. The focused #248 tests and notebook above
+  are the applicable passing evidence.
+
+## Next steps
+
+1. EV: rerun the focused suite and notebook in a fresh checkout; inspect the
+   allowlist/source-trace verifier and retry-collision paths.
+2. PI: decide whether the negative live shadow probe is sufficient to retain
+   the no-scheduler restriction or whether a later fresh-issue shadow probe is
+   required before activating operations.
