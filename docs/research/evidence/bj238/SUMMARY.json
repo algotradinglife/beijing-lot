@@ -1,0 +1,18 @@
+{
+  "accepted_nonzero_mapping_horizons": [
+    "initial",
+    "10h",
+    "1h"
+  ],
+  "common_epoch_rows": 0,
+  "contract": "BJ-UNIFIED-DIVERGENCE-MATERIALIZER-001/v4",
+  "development_label_fixture_count": 167134,
+  "disposition": "READY_FOR_209_PI_MODELABILITY_REVIEW",
+  "frozen_issue_count": 808,
+  "inference_cell_count": 1916376,
+  "proxy_fixture_horizon_count": 638792,
+  "q_bj_sp_devig_available_cells": 0,
+  "rejected_nonzero_mapping_horizons": [],
+  "scientific_boundary": "line-only control is a coarse handicap prior, not a de-vigged Beijing SP probability",
+  "sealed_label_rows_read": 0
+}
