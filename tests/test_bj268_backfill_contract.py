@@ -11,6 +11,7 @@ import requests
 from src.eu_proxy_backfill.backfill import (
     AcquisitionResult,
     acquire_terminal,
+    aggregate_quote_parquet_parts,
     parse_declared_issue_payload,
     write_content_addressed_payload,
 )
@@ -121,4 +122,53 @@ def test_duplicate_bookmaker_rows_are_ledgered_deterministically_not_last_write_
             "reason": "CONFLICTING_DUPLICATE_SOURCE_QUOTE",
             "payload_sha256": "a" * 64 + "," + "b" * 64,
         }
+    ]
+
+
+def test_bounded_quote_aggregation_matches_semantics_across_input_partitions(tmp_path: Path) -> None:
+    """A duplicate split across parts must use the same rule as a small full union."""
+    base = {
+        "issue_code": "25043", "match_idx": 1, "snapshot_kind": "initial", "bookmaker_id": "A",
+        "v1": 2.0, "v2": 3.0, "v3": 4.0,
+    }
+    first = pd.DataFrame([
+        base | {"payload_sha256": "b" * 64},
+        base | {"bookmaker_id": "B", "v1": 2.2, "payload_sha256": "c" * 64},
+    ])
+    second = pd.DataFrame([
+        base | {"payload_sha256": "a" * 64},  # exact duplicate in another input part
+        base | {"bookmaker_id": "B", "v1": 2.3, "payload_sha256": "d" * 64},  # conflict in another input part
+        base | {"bookmaker_id": "C", "payload_sha256": "e" * 64},
+    ])
+    first_path, second_path = tmp_path / "first.parquet", tmp_path / "second.parquet"
+    first.to_parquet(first_path, index=False)
+    second.to_parquet(second_path, index=False)
+
+    manifest = aggregate_quote_parquet_parts([first_path, second_path], tmp_path / "aggregate", partition_count=2)
+    selected_paths = sorted((tmp_path / "aggregate" / "selected").glob("*.parquet"))
+    selected = pd.concat([pd.read_parquet(path) for path in selected_paths], ignore_index=True)
+    ledger_paths = sorted((tmp_path / "aggregate" / "duplicate_ledger").glob("*.csv"))
+    ledger = pd.concat([pd.read_csv(path) for path in ledger_paths], ignore_index=True)
+
+    assert manifest["input_row_count"] == 5
+    assert manifest["selected_row_count"] == 2
+    assert set(selected.bookmaker_id) == {"A", "C"}
+    assert selected.loc[selected.bookmaker_id.eq("A"), "payload_sha256"].item() == "a" * 64
+    assert ledger.to_dict("records") == [
+        {
+            "issue_code": 25043,
+            "match_idx": 1,
+            "snapshot_kind": "initial",
+            "bookmaker_id": "A",
+            "reason": "EXACT_DUPLICATE_SOURCE_QUOTE",
+            "payload_sha256": "a" * 64 + "," + "b" * 64,
+        },
+        {
+            "issue_code": 25043,
+            "match_idx": 1,
+            "snapshot_kind": "initial",
+            "bookmaker_id": "B",
+            "reason": "CONFLICTING_DUPLICATE_SOURCE_QUOTE",
+            "payload_sha256": "c" * 64 + "," + "d" * 64,
+        },
     ]

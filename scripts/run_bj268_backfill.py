@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from src.eu_proxy_backfill.backfill import resolve_duplicate_quotes  # noqa: E402
+from src.eu_proxy_backfill.backfill import aggregate_quote_parquet_parts  # noqa: E402
 from src.eu_proxy_backfill.inventory import InventoryPaths, build_inventory, inventory_summary  # noqa: E402
 from src.eu_proxy_backfill.probe import ISSUE_URL, TITAN_URL  # noqa: E402
 from src.eu_proxy_backfill.runner import IssueRecovery, recover_issue  # noqa: E402
@@ -245,18 +245,74 @@ def _write_issue_part(staging: Path, issue: str, recovery: IssueRecovery) -> Non
     )
 
 
-def _collect_parts(staging: Path, selected: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _collect_small_parts(staging: Path, selected: list[str]) -> tuple[pd.DataFrame, list[Path], pd.DataFrame, pd.DataFrame]:
+    """Load only bounded receipt/disposition metadata and retain quote paths.
+
+    Quote parts can collectively exceed host memory.  They remain paths until
+    the hash-partitioned external duplicate resolver consumes them one at a time.
+    """
     if not all(_completed(staging, issue) for issue in selected):
         missing = [issue for issue in selected if not _completed(staging, issue)]
         raise RuntimeError(f"cannot finalize unfinished issue parts: {missing}")
     parts = [_issue_dir(staging, issue) for issue in selected]
     receipts = pd.concat([pd.read_csv(part / "receipts.csv") for part in parts], ignore_index=True)
-    quotes = pd.concat([pd.read_parquet(part / "raw_quotes.parquet") for part in parts], ignore_index=True)
+    quote_paths = [part / "raw_quotes.parquet" for part in parts]
     dispositions = pd.concat([pd.read_parquet(part / "fixture_horizon_dispositions.parquet") for part in parts], ignore_index=True)
     issue_rows = pd.DataFrame([json.loads((part / "issue_disposition.json").read_text(encoding="utf-8")) for part in parts])
     if receipts.duplicated(["source_kind", "source_key"], keep=False).any():
         raise RuntimeError("logical acquisition keys are not unique")
-    return receipts, quotes, dispositions, issue_rows
+    return receipts, quote_paths, dispositions, issue_rows
+
+
+def _aggregation_manifest(staging: Path, selected: list[str]) -> dict[str, object]:
+    """Return the completed aggregate receipt or fail closed on a partial root."""
+    aggregation = staging / "AGGREGATION"
+    manifest_path = aggregation / "MANIFEST.json"
+    if not aggregation.exists():
+        return {}
+    if not manifest_path.is_file():
+        raise RuntimeError("aggregation directory exists without a terminal manifest")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("selected_issue_codes") != selected:
+        raise RuntimeError("aggregation manifest selected issue set differs from frozen staging selection")
+    required = {
+        "ACQUISITION_RECEIPTS.csv",
+        "FIXTURE_HORIZON_DISPOSITIONS.parquet",
+        "ISSUE_DISPOSITIONS.csv",
+        "RECOVERED_RAW_QUOTES/MANIFEST.json",
+    }
+    missing = sorted(name for name in required if not (aggregation / name).is_file())
+    if missing:
+        raise RuntimeError(f"aggregation manifest is incomplete: {missing}")
+    return manifest
+
+
+def _aggregate_parts(staging: Path, selected: list[str]) -> dict[str, object]:
+    """Atomically publish the staging-only Gate 3 aggregation from DONE parts."""
+    existing = _aggregation_manifest(staging, selected)
+    if existing:
+        return existing
+    receipts, quote_paths, dispositions, issue_rows = _collect_small_parts(staging, selected)
+    aggregation = staging / "AGGREGATION"
+
+    def populate(root: Path) -> None:
+        publication.atomic_write_csv(receipts, root / "ACQUISITION_RECEIPTS.csv")
+        publication.atomic_write_parquet(dispositions, root / "FIXTURE_HORIZON_DISPOSITIONS.parquet")
+        publication.atomic_write_csv(issue_rows, root / "ISSUE_DISPOSITIONS.csv")
+        quote_manifest = aggregate_quote_parquet_parts(quote_paths, root / "RECOVERED_RAW_QUOTES")
+        publication.atomic_write_json(
+            root / "MANIFEST.json",
+            {
+                "algorithm": "BJ268_PART_AT_A_TIME_GATE3_AGGREGATION_V1",
+                "selected_issue_codes": selected,
+                "terminal_receipt_count": len(receipts),
+                "fixture_horizon_disposition_count": len(dispositions),
+                "raw_quote_aggregation": quote_manifest,
+            },
+        )
+
+    publication.atomic_publish_directory(aggregation, populate)
+    return _aggregation_manifest(staging, selected)
 
 
 def main() -> int:
@@ -270,7 +326,16 @@ def main() -> int:
     parser.add_argument("--attempts", type=int, default=4)
     parser.add_argument("--frozen-inventory", type=Path)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--aggregate-only",
+        action="store_true",
+        help="consume only existing DONE issue parts; never construct a network client or fetch raw payloads",
+    )
     args = parser.parse_args()
+    if args.aggregate_only and not args.resume:
+        raise ValueError("--aggregate-only requires --resume and an existing immutable staging root")
+    if args.aggregate_only and (args.frozen_inventory is not None or args.max_issues is not None or args.max_fixtures_per_issue is not None):
+        raise ValueError("--aggregate-only cannot alter the frozen staging inventory or limits")
     data_root = args.data_root.expanduser().resolve()
     paths = _paths(data_root)
     staging = args.staging_root.expanduser().resolve()
@@ -291,38 +356,35 @@ def main() -> int:
         unresolved, _ = _recovery_inventory(inventory)
     else:
         unresolved = inventory.loc[inventory.proxy_status.eq("UNRESOLVED_SOURCE_RECOVERY")].copy()
-    client = _client()
-    for number, issue in enumerate(selected, start=1):
-        if _completed(staging, issue):
-            print(f"[{number}/{len(selected)}] {issue}: already durable", flush=True)
-            continue
-        issue_expected = unresolved.loc[unresolved.issue_code.astype(str).eq(issue)].copy()
-        if args.max_fixtures_per_issue is not None:
-            issue_expected = issue_expected.head(args.max_fixtures_per_issue)
-        recovery = recover_issue(
-            client,
-            issue_code=issue,
-            expected=issue_expected,
-            staging_root=staging,
-            issue_url=ISSUE_URL.format(issue=issue),
-            titan_url_template=TITAN_URL,
-            timeout=args.timeout,
-            attempts=args.attempts,
-            max_fixtures=args.max_fixtures_per_issue,
-        )
-        _write_issue_part(staging, issue, recovery)
-        print(f"[{number}/{len(selected)}] {issue}: {recovery.issue_disposition}", flush=True)
+    if not args.aggregate_only:
+        client = _client()
+        for number, issue in enumerate(selected, start=1):
+            if _completed(staging, issue):
+                print(f"[{number}/{len(selected)}] {issue}: already durable", flush=True)
+                continue
+            issue_expected = unresolved.loc[unresolved.issue_code.astype(str).eq(issue)].copy()
+            if args.max_fixtures_per_issue is not None:
+                issue_expected = issue_expected.head(args.max_fixtures_per_issue)
+            recovery = recover_issue(
+                client,
+                issue_code=issue,
+                expected=issue_expected,
+                staging_root=staging,
+                issue_url=ISSUE_URL.format(issue=issue),
+                titan_url_template=TITAN_URL,
+                timeout=args.timeout,
+                attempts=args.attempts,
+                max_fixtures=args.max_fixtures_per_issue,
+            )
+            _write_issue_part(staging, issue, recovery)
+            print(f"[{number}/{len(selected)}] {issue}: {recovery.issue_disposition}", flush=True)
 
-    receipts, all_quotes, dispositions, issue_rows = _collect_parts(staging, selected)
-    resolved, duplicate_ledger = resolve_duplicate_quotes(all_quotes) if not all_quotes.empty else (all_quotes, pd.DataFrame())
-    publication.atomic_write_csv(receipts, staging / "ACQUISITION_RECEIPTS.csv")
-    publication.atomic_write_parquet(resolved, staging / "RECOVERED_RAW_QUOTES.parquet")
-    publication.atomic_write_parquet(dispositions, staging / "FIXTURE_HORIZON_DISPOSITIONS.parquet")
-    publication.atomic_write_csv(duplicate_ledger, staging / "DUPLICATE_RESOLUTION_LEDGER.csv")
-    publication.atomic_write_csv(issue_rows, staging / "ISSUE_DISPOSITIONS.csv")
+    aggregation = _aggregate_parts(staging, selected)
+    receipts = pd.read_csv(staging / "AGGREGATION" / "ACQUISITION_RECEIPTS.csv")
     after = _source_hashes(paths)
     if start["source_sha256_before"] != after:
         raise RuntimeError("source hash changed during recovery; staging cannot advance")
+    quote_summary = aggregation["raw_quote_aggregation"]
     report = {
         "contract": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
         "logical_namespace": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
@@ -332,11 +394,15 @@ def main() -> int:
         "source_sha256_before": start["source_sha256_before"],
         "source_sha256_after": after,
         "terminal_receipt_count": len(receipts),
-        "raw_quote_count": len(resolved),
-        "fixture_horizon_disposition_count": len(dispositions),
+        "raw_quote_count": quote_summary["selected_row_count"],
+        "raw_quote_input_count": quote_summary["input_row_count"],
+        "duplicate_ledger_row_count": quote_summary["duplicate_ledger_row_count"],
+        "fixture_horizon_disposition_count": aggregation["fixture_horizon_disposition_count"],
         "successful_issue_pages": int((receipts.source_kind.eq("issue_page") & receipts.acquisition_result.eq("SUCCESS")).sum()),
         "successful_titan_acquisitions": int((receipts.source_kind.eq("titan_1x2") & receipts.acquisition_result.eq("SUCCESS")).sum()),
         "failed_acquisitions": int(receipts.acquisition_result.ne("SUCCESS").sum()),
+        "aggregation": "PART_AT_A_TIME_HASH_PARTITIONED_NO_FULL_QUOTE_CONCAT",
+        "aggregate_only": args.aggregate_only,
         "publication": "DISABLED_STAGING_ONLY",
     }
     publication.atomic_write_json(staging / "GATE_REPORT.json", report)
