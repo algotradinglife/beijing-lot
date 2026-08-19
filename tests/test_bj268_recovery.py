@@ -84,3 +84,28 @@ def test_issue_page_failure_is_an_explicit_denominator_disposition(tmp_path: Pat
         {"snapshot_kind": "10h", "disposition": "UNAVAILABLE_ISSUE_PAGE_REQUEST_ERROR"},
         {"snapshot_kind": "1h", "disposition": "UNAVAILABLE_ISSUE_PAGE_REQUEST_ERROR"},
     ]
+
+
+def test_recovery_rejects_a_source_matrix_that_differs_from_the_frozen_authoritative_matrix(tmp_path: Path) -> None:
+    issue_url = "https://issue.test/25043"
+    expected = pd.DataFrame(
+        [{"issue_code": "25043", "match_idx": 1, "provider_match_id": "99999"}]
+    )
+    result = recover_issue(
+        _Client({issue_url: ISSUE}),
+        issue_code="25043",
+        expected=expected,
+        staging_root=tmp_path,
+        issue_url=issue_url,
+        titan_url_template="https://titan.test/{provider_match_id}",
+        timeout=1.0,
+        attempts=1,
+    )
+
+    assert result.issue_disposition == "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH"
+    assert len(result.receipts) == 1
+    assert result.fixture_horizon_dispositions[["snapshot_kind", "disposition"]].to_dict("records") == [
+        {"snapshot_kind": "initial", "disposition": "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH"},
+        {"snapshot_kind": "10h", "disposition": "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH"},
+        {"snapshot_kind": "1h", "disposition": "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH"},
+    ]

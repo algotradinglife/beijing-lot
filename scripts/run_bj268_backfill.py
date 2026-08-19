@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Execute #268 Gate 2/3 recovery into an isolated immutable staging root.
 
-This script never opens the accepted #236 package or source SQLite inputs writable.
-It records every logical request and every fixture×horizon disposition before a
-later candidate materialization/publish step may consume the staging namespace.
+The recovery lane is resumable at the logical-issue boundary.  Each completed
+issue receives immutable receipt/quote/disposition parts and a final DONE
+marker; only marked issue parts are eligible for final aggregation.  This
+prevents a killed long crawl from silently losing a denominator member or
+reusing unreceipted raw payloads.
 """
 from __future__ import annotations
 
@@ -24,7 +26,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from src.eu_proxy_backfill.backfill import resolve_duplicate_quotes  # noqa: E402
 from src.eu_proxy_backfill.inventory import InventoryPaths, build_inventory, inventory_summary  # noqa: E402
 from src.eu_proxy_backfill.probe import ISSUE_URL, TITAN_URL  # noqa: E402
-from src.eu_proxy_backfill.runner import recover_issue  # noqa: E402
+from src.eu_proxy_backfill.runner import IssueRecovery, recover_issue  # noqa: E402
 from src.source_schema import publication  # noqa: E402
 
 
@@ -42,72 +44,234 @@ def _source_hashes(paths: InventoryPaths) -> dict[str, str]:
 
 def _client() -> requests.Session:
     session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        "Connection": "close",
-    })
+    session.headers.update(
+        {
+            "User-Agent": "Mozilla/5.0",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Connection": "close",
+        }
+    )
     return session
 
 
-def _assert_new_staging(root: Path, protected: list[Path]) -> None:
-    location = root.expanduser().resolve()
-    if location.exists() and any(location.iterdir()):
-        raise ValueError(f"staging root must be new/empty for this immutable run: {location}")
-    if any(location == item or location in item.parents or item in location.parents for item in protected):
+def _paths(data_root: Path) -> InventoryPaths:
+    return InventoryPaths(
+        base_proxy=data_root / "derived/beidan_xlsm/beidan_xlsm.sqlite",
+        extension_2026=data_root / "derived/beidan_xlsm/beidan_nowscore_2026.sqlite",
+        history=data_root / "beidan_history.db",
+        live=data_root / "beidan_live.db",
+    )
+
+
+def _new_staging(root: Path, protected: list[Path]) -> None:
+    if root.exists():
+        raise FileExistsError(f"staging root already exists; use --resume: {root}")
+    if any(root == item or root in item.parents or item in root.parents for item in protected):
         raise ValueError("staging root overlaps a protected source or accepted package")
+    root.mkdir(parents=True, exist_ok=False)
+
+
+def _recovery_inventory(inventory: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, int | str]]:
+    """Return the frozen authoritative #267 issue-page matrix for Gate 3.
+
+    Directly rebuilding from a mutable live cache is permitted only for bounded
+    Gate 2.  A complete run must instead consume the reconciled 213,263-fixture
+    snapshot whose 14,553 issue-page cells were already identity-resolved.
+    """
+    required = {
+        "issue_code", "match_idx", "provider_match_id", "kickoff_ts", "league",
+        "home", "away", "native_handicap_line", "reconciled_source",
+    }
+    if not required <= set(inventory.columns):
+        raise ValueError("Gate 3 requires a reconciled #267 frozen inventory, not a live-cache inventory")
+    counts = inventory.reconciled_source.value_counts().to_dict()
+    expected = {"ACCEPTED_236": 192709, "AVAILABLE_EXTENSION": 6001, "NOWSCORE_ISSUE_PAGE": 14553}
+    if {str(key): int(value) for key, value in counts.items()} != expected:
+        raise ValueError(f"frozen reconciled inventory count mismatch: {counts}")
+    if len(inventory) != 213263 or inventory.issue_code.astype(str).nunique() != 808:
+        raise ValueError("frozen reconciled inventory cardinality is not the #267 accepted denominator")
+    recovery = inventory.loc[inventory.reconciled_source.eq("NOWSCORE_ISSUE_PAGE")].copy()
+    digest = hashlib.sha256(
+        inventory.sort_values(["issue_code", "match_idx"], kind="stable")
+        .to_csv(index=False, lineterminator="\n", na_rep="").encode("utf-8")
+    ).hexdigest()
+    summary: dict[str, int | str] = {
+        "inventory_sha256": digest,
+        "known_issue_count": 808,
+        "known_fixture_count": 213263,
+        "accepted_236_issue_count": 701,
+        "extension_issue_count": 34,
+        "unresolved_issue_count": int(recovery.issue_code.astype(str).nunique()),
+        "accepted_236_fixture_count": 192709,
+        "extension_fixture_count": 6001,
+        "unresolved_fixture_count": 14553,
+    }
+    return recovery, summary
+
+
+def _start_or_resume(
+    *,
+    staging: Path,
+    paths: InventoryPaths,
+    selected: list[str] | None,
+    frozen_inventory: Path | None,
+    resume: bool,
+) -> tuple[pd.DataFrame, dict[str, object], list[str]]:
+    """Create exactly one frozen inventory, or reopen it without rereading SQLite."""
+    gate_start = staging / "GATE_START.json"
+    inventory_path = staging / "FROZEN_INVENTORY.parquet"
+    if resume:
+        if frozen_inventory is not None:
+            raise ValueError("--frozen-inventory is only valid when creating a new staging root")
+        if not gate_start.is_file() or not inventory_path.is_file():
+            raise ValueError("--resume requires immutable GATE_START.json and FROZEN_INVENTORY.parquet")
+        start = json.loads(gate_start.read_text(encoding="utf-8"))
+        inventory = pd.read_parquet(inventory_path)
+        frozen_selected = [str(value) for value in start["selected_issue_codes"]]
+        if selected is not None and selected != frozen_selected:
+            raise ValueError("resume selection differs from frozen staging selection")
+        return inventory, start, frozen_selected
+
+    _new_staging(staging, [*map(Path, asdict(paths).values()), paths.base_proxy.parent.parent / "bj236/eu_odds_proxy_v1"])
+    before = _source_hashes(paths)
+    if frozen_inventory is None:
+        inventory = build_inventory(paths)
+        summary = inventory_summary(inventory)
+        unresolved = inventory.loc[inventory.proxy_status.eq("UNRESOLVED_SOURCE_RECOVERY")]
+        inventory_kind = "LIVE_CACHE_GATE2_ONLY"
+    else:
+        supplied = frozen_inventory.expanduser().resolve()
+        if not supplied.is_file():
+            raise FileNotFoundError(supplied)
+        inventory = pd.read_parquet(supplied)
+        unresolved, summary = _recovery_inventory(inventory)
+        inventory_kind = "RECONCILED_267_FROZEN_GATE3"
+    known = sorted(unresolved.issue_code.astype(str).unique(), key=int)
+    use = selected if selected is not None else known
+    unknown = sorted(set(use) - set(known), key=int)
+    if unknown:
+        raise ValueError(f"requested issues are not in the frozen recovery inventory: {unknown}")
+    if not use:
+        raise ValueError("no unresolved issue selected")
+    publication.atomic_write_parquet(inventory, staging / "FROZEN_INVENTORY.parquet")
+    start = {
+        "gate": "Gate 3 full recovery" if frozen_inventory is not None and len(use) == len(known) else "Gate 2 bounded staging",
+        "contract": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
+        "logical_namespace": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
+        "inventory_kind": inventory_kind,
+        "inventory_summary": summary,
+        "selected_issue_codes": use,
+        "source_sha256_before": before,
+        "resume_protocol": "issue DONE marker is the only eligible completion boundary",
+    }
+    publication.atomic_write_json(gate_start, start)
+    return inventory, start, use
+
+
+def _issue_dir(staging: Path, issue: str) -> Path:
+    if not issue.isdigit():
+        raise ValueError(f"unsafe issue code: {issue!r}")
+    return staging / "issue_parts" / issue
+
+
+def _completed(staging: Path, issue: str) -> bool:
+    marker = _issue_dir(staging, issue) / "DONE.json"
+    if not marker.is_file():
+        return False
+    payload = json.loads(marker.read_text(encoding="utf-8"))
+    required = {"receipts.csv", "raw_quotes.parquet", "fixture_horizon_dispositions.parquet", "issue_disposition.json"}
+    found = {str(value) for value in payload.get("files", [])}
+    if found != required or any(not (_issue_dir(staging, issue) / item).is_file() for item in required):
+        raise ValueError(f"invalid issue completion marker: {marker}")
+    return True
+
+
+def _write_issue_part(staging: Path, issue: str, recovery: IssueRecovery) -> None:
+    """Durably complete one issue before any later issue may start.
+
+    A prior partially written issue has no DONE marker and must be investigated,
+    rather than overwritten or silently considered recovered on resume.
+    """
+    part = _issue_dir(staging, issue)
+    if part.exists():
+        raise FileExistsError(f"incomplete issue part requires investigation, not overwrite: {part}")
+    part.mkdir(parents=True, exist_ok=False)
+    receipts = pd.DataFrame(recovery.receipts)
+    quotes = pd.DataFrame(recovery.quote_rows)
+    dispositions = recovery.fixture_horizon_dispositions
+    publication.atomic_write_csv(receipts, part / "receipts.csv")
+    publication.atomic_write_parquet(quotes, part / "raw_quotes.parquet")
+    publication.atomic_write_parquet(dispositions, part / "fixture_horizon_dispositions.parquet")
+    publication.atomic_write_json(
+        part / "issue_disposition.json",
+        {"issue_code": issue, "issue_disposition": recovery.issue_disposition},
+    )
+    files = ["receipts.csv", "raw_quotes.parquet", "fixture_horizon_dispositions.parquet", "issue_disposition.json"]
+    publication.atomic_write_json(
+        part / "DONE.json",
+        {
+            "issue_code": issue,
+            "files": files,
+            "sha256": {name: _sha256(part / name) for name in files},
+        },
+    )
+
+
+def _collect_parts(staging: Path, selected: list[str]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    if not all(_completed(staging, issue) for issue in selected):
+        missing = [issue for issue in selected if not _completed(staging, issue)]
+        raise RuntimeError(f"cannot finalize unfinished issue parts: {missing}")
+    parts = [_issue_dir(staging, issue) for issue in selected]
+    receipts = pd.concat([pd.read_csv(part / "receipts.csv") for part in parts], ignore_index=True)
+    quotes = pd.concat([pd.read_parquet(part / "raw_quotes.parquet") for part in parts], ignore_index=True)
+    dispositions = pd.concat([pd.read_parquet(part / "fixture_horizon_dispositions.parquet") for part in parts], ignore_index=True)
+    issue_rows = pd.DataFrame([json.loads((part / "issue_disposition.json").read_text(encoding="utf-8")) for part in parts])
+    if receipts.duplicated(["source_kind", "source_key"], keep=False).any():
+        raise RuntimeError("logical acquisition keys are not unique")
+    return receipts, quotes, dispositions, issue_rows
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path, required=True)
     parser.add_argument("--staging-root", type=Path, required=True)
-    parser.add_argument("--issues", nargs="*", default=[])
+    parser.add_argument("--issues", nargs="*", default=None)
     parser.add_argument("--max-issues", type=int)
     parser.add_argument("--max-fixtures-per-issue", type=int)
     parser.add_argument("--timeout", type=float, default=20.0)
     parser.add_argument("--attempts", type=int, default=4)
+    parser.add_argument("--frozen-inventory", type=Path)
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     data_root = args.data_root.expanduser().resolve()
-    paths = InventoryPaths(
-        base_proxy=data_root / "derived/beidan_xlsm/beidan_xlsm.sqlite",
-        extension_2026=data_root / "derived/beidan_xlsm/beidan_nowscore_2026.sqlite",
-        history=data_root / "beidan_history.db",
-        live=data_root / "beidan_live.db",
-    )
-    protected = [*map(Path, asdict(paths).values()), data_root / "derived/bj236/eu_odds_proxy_v1"]
+    paths = _paths(data_root)
     staging = args.staging_root.expanduser().resolve()
-    _assert_new_staging(staging, protected)
-    staging.mkdir(parents=True, exist_ok=False)
-
-    before = _source_hashes(paths)
-    inventory = build_inventory(paths)
-    summary = inventory_summary(inventory)
-    unresolved = inventory.loc[inventory.proxy_status.eq("UNRESOLVED_SOURCE_RECOVERY")].copy()
-    known = sorted(unresolved.issue_code.astype(str).unique(), key=int)
-    selected = [str(value) for value in args.issues] or known
-    unknown = sorted(set(selected) - set(known), key=int)
-    if unknown:
-        raise SystemExit(f"requested issues are not unresolved frozen inventory: {unknown}")
+    requested = [str(value) for value in args.issues] if args.issues else None
+    inventory, start, selected = _start_or_resume(
+        staging=staging,
+        paths=paths,
+        selected=requested,
+        frozen_inventory=args.frozen_inventory,
+        resume=args.resume,
+    )
     if args.max_issues is not None:
-        selected = selected[:args.max_issues]
+        if args.resume:
+            raise ValueError("--max-issues cannot alter a frozen staging selection on resume")
+        selected = selected[: args.max_issues]
+        start["selected_issue_codes"] = selected
+        publication.atomic_write_json(staging / "GATE_START.json", start)
     if not selected:
-        raise SystemExit("no unresolved issue selected")
+        raise ValueError("no unresolved issue selected")
 
-    publication.atomic_write_parquet(inventory, staging / "FROZEN_INVENTORY.parquet")
-    publication.atomic_write_json(staging / "GATE_START.json", {
-        "gate": "Gate 2 bounded staging" if len(selected) < len(known) else "Gate 3 full recovery",
-        "logical_namespace": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
-        "inventory_summary": summary,
-        "selected_issue_codes": selected,
-        "source_sha256_before": before,
-    })
+    if start["inventory_kind"] == "RECONCILED_267_FROZEN_GATE3":
+        unresolved, _ = _recovery_inventory(inventory)
+    else:
+        unresolved = inventory.loc[inventory.proxy_status.eq("UNRESOLVED_SOURCE_RECOVERY")].copy()
     client = _client()
-    receipts: list[dict[str, object]] = []
-    quote_frames: list[pd.DataFrame] = []
-    disposition_frames: list[pd.DataFrame] = []
-    issue_rows: list[dict[str, object]] = []
     for number, issue in enumerate(selected, start=1):
+        if _completed(staging, issue):
+            print(f"[{number}/{len(selected)}] {issue}: already durable", flush=True)
+            continue
         issue_expected = unresolved.loc[unresolved.issue_code.astype(str).eq(issue)].copy()
         if args.max_fixtures_per_issue is not None:
             issue_expected = issue_expected.head(args.max_fixtures_per_issue)
@@ -122,42 +286,33 @@ def main() -> int:
             attempts=args.attempts,
             max_fixtures=args.max_fixtures_per_issue,
         )
-        receipts.extend(recovery.receipts)
-        if recovery.quote_rows:
-            quote_frames.append(pd.DataFrame(recovery.quote_rows))
-        disposition_frames.append(recovery.fixture_horizon_dispositions)
-        issue_rows.append({"issue_code": issue, "issue_disposition": recovery.issue_disposition})
+        _write_issue_part(staging, issue, recovery)
         print(f"[{number}/{len(selected)}] {issue}: {recovery.issue_disposition}", flush=True)
-    all_quotes = pd.concat(quote_frames, ignore_index=True) if quote_frames else pd.DataFrame(
-        columns=["issue_code", "match_idx", "source_match_id", "snapshot_kind", "bookmaker_id", "v1", "v2", "v3", "payload_sha256"]
-    )
+
+    receipts, all_quotes, dispositions, issue_rows = _collect_parts(staging, selected)
     resolved, duplicate_ledger = resolve_duplicate_quotes(all_quotes) if not all_quotes.empty else (all_quotes, pd.DataFrame())
-    dispositions = pd.concat(disposition_frames, ignore_index=True) if disposition_frames else pd.DataFrame()
-    receipt_frame = pd.DataFrame(receipts)
-    if receipt_frame.duplicated(["source_kind", "source_key"], keep=False).any():
-        raise RuntimeError("logical acquisition keys are not unique")
-    publication.atomic_write_csv(receipt_frame, staging / "ACQUISITION_RECEIPTS.csv")
+    publication.atomic_write_csv(receipts, staging / "ACQUISITION_RECEIPTS.csv")
     publication.atomic_write_parquet(resolved, staging / "RECOVERED_RAW_QUOTES.parquet")
     publication.atomic_write_parquet(dispositions, staging / "FIXTURE_HORIZON_DISPOSITIONS.parquet")
     publication.atomic_write_csv(duplicate_ledger, staging / "DUPLICATE_RESOLUTION_LEDGER.csv")
-    publication.atomic_write_csv(pd.DataFrame(issue_rows), staging / "ISSUE_DISPOSITIONS.csv")
+    publication.atomic_write_csv(issue_rows, staging / "ISSUE_DISPOSITIONS.csv")
     after = _source_hashes(paths)
-    if before != after:
-        raise RuntimeError("read-only source hash changed during recovery; staging cannot advance")
+    if start["source_sha256_before"] != after:
+        raise RuntimeError("source hash changed during recovery; staging cannot advance")
     report = {
         "contract": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
         "logical_namespace": "BJ-UNIFIED-EU-PROXY-BACKFILL-001",
-        "inventory_summary": summary,
+        "inventory_summary": start["inventory_summary"],
         "selected_issue_count": len(selected),
         "selected_issue_codes": selected,
-        "source_sha256_before": before,
+        "source_sha256_before": start["source_sha256_before"],
         "source_sha256_after": after,
-        "terminal_receipt_count": len(receipt_frame),
+        "terminal_receipt_count": len(receipts),
         "raw_quote_count": len(resolved),
         "fixture_horizon_disposition_count": len(dispositions),
-        "successful_issue_pages": int((receipt_frame.source_kind.eq("issue_page") & receipt_frame.acquisition_result.eq("SUCCESS")).sum()),
-        "successful_titan_acquisitions": int((receipt_frame.source_kind.eq("titan_1x2") & receipt_frame.acquisition_result.eq("SUCCESS")).sum()),
-        "failed_acquisitions": int(receipt_frame.acquisition_result.ne("SUCCESS").sum()),
+        "successful_issue_pages": int((receipts.source_kind.eq("issue_page") & receipts.acquisition_result.eq("SUCCESS")).sum()),
+        "successful_titan_acquisitions": int((receipts.source_kind.eq("titan_1x2") & receipts.acquisition_result.eq("SUCCESS")).sum()),
+        "failed_acquisitions": int(receipts.acquisition_result.ne("SUCCESS").sum()),
         "publication": "DISABLED_STAGING_ONLY",
     }
     publication.atomic_write_json(staging / "GATE_REPORT.json", report)

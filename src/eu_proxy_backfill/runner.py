@@ -121,6 +121,29 @@ def recover_issue(
     quote_rows: list[dict[str, object]] = []
     dispositions: list[dict[str, object]] = []
     expected_slots = {int(value) for value in issue_expected.match_idx}
+    expected_matrix = (
+        {
+            (int(str(item.match_idx)), str(item.provider_match_id))
+            for item in issue_expected.itertuples(index=False)
+            if pd.notna(item.provider_match_id) and str(item.provider_match_id).strip()
+        }
+        if "provider_match_id" in issue_expected.columns
+        else set()
+    )
+    source_matrix = {
+        (int(row["match_idx"]), str(row["provider_match_id"]))
+        for row in parsed.rows
+    }
+    # Gate 3 consumes a #267-frozen authoritative issue-page matrix.  A later
+    # changed/fallback page must not add, remove, or relabel frozen fixtures.
+    if expected_matrix and source_matrix != expected_matrix:
+        return IssueRecovery(
+            issue,
+            "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH",
+            receipts,
+            [],
+            _all_unavailable(issue_expected, "UNAVAILABLE_ISSUE_PAGE_MATRIX_MISMATCH"),
+        )
     source_slots: set[int] = set()
     source_rows = parsed.rows if max_fixtures is None else parsed.rows[:max_fixtures]
     for row in source_rows:
