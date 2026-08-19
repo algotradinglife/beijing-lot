@@ -1,0 +1,67 @@
+{
+  "all_issue_pages_authoritative": true,
+  "all_titan_samples_available": true,
+  "canonical_write_performed": false,
+  "contract": "BJ-UNIFIED-EU-PROXY-BACKFILL-POC-001",
+  "decision": "FULL_BACKFILL_EXECUTABLE",
+  "execution_mode": "REPLAY",
+  "extension_profile": {
+    "fixture_count": 6001,
+    "horizon_counts": [
+      {
+        "complete_rows": 75981,
+        "market": "euro_1x2",
+        "raw_rows": 90015,
+        "snapshot": "initial"
+      },
+      {
+        "complete_rows": 75734,
+        "market": "euro_1x2",
+        "raw_rows": 90015,
+        "snapshot": "10h"
+      },
+      {
+        "complete_rows": 75933,
+        "market": "euro_1x2",
+        "raw_rows": 90015,
+        "snapshot": "1h"
+      }
+    ],
+    "issue_count": 34,
+    "required_columns_missing": {
+      "market_snapshots": [],
+      "matches": [],
+      "source_meta": []
+    },
+    "schema_compatible": true
+  },
+  "inventory": {
+    "accepted_236_fixture_count": 192709,
+    "accepted_236_issue_count": 701,
+    "extension_fixture_count": 6001,
+    "extension_issue_count": 34,
+    "inventory_sha256": "0e7ec5d3c6115e3b8f5140b031312858aea5f483c6b874cca4ff9dfdf1e8e310",
+    "known_fixture_count": 215193,
+    "known_issue_count": 808,
+    "unresolved_fixture_count": 16483,
+    "unresolved_issue_count": 73
+  },
+  "local_cache_excluded_fixture_count": 1930,
+  "protected_source_sha256_after": {
+    "base_proxy": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "extension_2026": "3948176d42e7799a986e406a75266fe840eadf977c21d8331146eabf31b86927",
+    "history": "867e11452306c29e7b64b97af82f730ab0d96f7519d9950dc33ef1cd64f9ceaa",
+    "live": "04e2d11b81f3225c83b79de0fb8503896673676a7b32b5a30877b89bc256b392"
+  },
+  "protected_source_sha256_before": {
+    "base_proxy": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "extension_2026": "3948176d42e7799a986e406a75266fe840eadf977c21d8331146eabf31b86927",
+    "history": "867e11452306c29e7b64b97af82f730ab0d96f7519d9950dc33ef1cd64f9ceaa",
+    "live": "04e2d11b81f3225c83b79de0fb8503896673676a7b32b5a30877b89bc256b392"
+  },
+  "reconciled_fixture_count": 213263,
+  "reconciled_issue_count": 808,
+  "selected_issue_count": 73,
+  "source_recovered_fixture_count": 14553,
+  "staging_namespace": "bj267_eu_proxy_backfill_poc_v3"
+}

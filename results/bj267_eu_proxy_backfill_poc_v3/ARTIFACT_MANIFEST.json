@@ -1,0 +1,33 @@
+{
+  "contract": "BJ-UNIFIED-EU-PROXY-BACKFILL-POC-001",
+  "files": {
+    "COVERAGE_REPORT.json": {
+      "bytes": 2310,
+      "sha256": "a82b97ba415de10a0cd1f8dcff77758ed8d23dbbbba9590a8d39d9b4b42b6753"
+    },
+    "ISSUE_INVENTORY.csv": {
+      "bytes": 18370,
+      "sha256": "aeb9a5376434e864f7f5f209ace0f91e670758d33c9dfc56ab030ae269764e7d"
+    },
+    "ISSUE_PROBE_RESULTS.csv": {
+      "bytes": 10035,
+      "sha256": "4ecd1958c52ea2b6ba2d489d8f29022a5ea29b64d6cd1086dba70aa7168ec3e5"
+    },
+    "LOCAL_CACHE_EXCLUSIONS.csv": {
+      "bytes": 295,
+      "sha256": "af00835e67216e7263f00b4c13c3649a713c348b976195b3530eeccee832b645"
+    },
+    "RECONCILED_SOURCE_COUNTS.csv": {
+      "bytes": 125,
+      "sha256": "a6e49da6ed0be4a0e99bf63260ac7f9c352424bce2d6bf5b53f4ecd611a02a94"
+    },
+    "TITAN_SAMPLE_RESULTS.csv": {
+      "bytes": 4141,
+      "sha256": "d897ffc856f17ce4efcbe613faf62a0edcee02d44f5d69c2f20ede98c71db0f9"
+    },
+    "UNRESOLVED_ISSUES.csv": {
+      "bytes": 1843,
+      "sha256": "4a01e0e6ebc2fff1af5f5685ce3fa4a8d97ef1ef05c7f3e056538a0a3a9af5ba"
+    }
+  }
+}

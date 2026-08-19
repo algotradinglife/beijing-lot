@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.convert_beidan_xlsm_to_sqlite import create_schema, make_indexes
+from scripts.convert_beidan_xlsm_to_sqlite import create_schema, make_indexes  # noqa: E402
 
 
 BOOKS_1X2 = [
@@ -268,6 +268,12 @@ def parse_score(score: str | None) -> tuple[str | None, int | None]:
 def parse_cp_issue(s: requests.Session, issue: str) -> list[dict[str, object]]:
     url = f"https://cp.nowscore.com/buy/DanChang.aspx?TypeID=5&issueNum={issue}"
     text = http_get(s, url)
+    return parse_cp_issue_html(text, issue)
+
+
+def _parse_cp_issue_table(text: str, issue: str) -> list[dict[str, object]]:
+    """Parse the visible table rows, which may omit settled or cancelled fixtures."""
+
     rows: list[dict[str, object]] = []
     for part in text.split('<tr id="')[1:]:
         row_html = '<tr id="' + part.split("</tr>", 1)[0] + "</tr>"
@@ -309,6 +315,113 @@ def parse_cp_issue(s: requests.Session, issue: str) -> list[dict[str, object]]:
     return rows
 
 
+def _parse_js_string(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        quote = value[0]
+        body = value[1:-1]
+        body = body.replace(r"\\", "\\")
+        body = body.replace(rf"\{quote}", quote)
+        return clean_text(body)
+    return clean_text(value)
+
+
+def _parse_js_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    match = re.fullmatch(
+        r"new\s+Date\((\d{4}),(\d{1,2}),(\d{1,2}),(\d{1,2}),(\d{1,2}),(\d{1,2})\)",
+        value.strip(),
+    )
+    if not match:
+        return None
+    year, zero_based_month, day, hour, minute, second = map(int, match.groups())
+    try:
+        return datetime(year, zero_based_month + 1, day, hour, minute, second)
+    except ValueError:
+        return None
+
+
+def _parse_cp_issue_matrix(text: str, issue: str) -> list[dict[str, object]]:
+    """Parse Nowscore's complete ``M[row][field]`` issue membership matrix.
+
+    The visible HTML table can omit already settled or cancelled fixtures. The
+    embedded matrix retains their provider IDs and therefore defines the
+    authoritative issue membership for historical recovery.
+    """
+
+    matrix: dict[int, dict[int, str]] = {}
+    for outer, field, value in re.findall(
+        r"M\[(\d+)\]\[(\d+)\]\s*=\s*(.*?);", text, flags=re.S
+    ):
+        matrix.setdefault(int(outer), {})[int(field)] = value.strip()
+
+    rows: list[dict[str, object]] = []
+    seen_slots: set[int] = set()
+    seen_providers: set[str] = set()
+    for outer in sorted(matrix):
+        fields = matrix[outer]
+        match_idx = to_int(fields.get(16)) or outer
+        provider_match_id = _parse_js_string(fields.get(0))
+        if match_idx is None or not provider_match_id:
+            continue
+        if match_idx in seen_slots:
+            raise ValueError(f"duplicate Nowscore issue slot {issue}/{match_idx}")
+        if provider_match_id in seen_providers:
+            raise ValueError(
+                f"duplicate Nowscore provider id {provider_match_id} in issue {issue}"
+            )
+        seen_slots.add(match_idx)
+        seen_providers.add(provider_match_id)
+        handicap_line = to_float(fields.get(4))
+        if handicap_line is not None and abs(handicap_line) >= 90:
+            handicap_line = None
+        rows.append(
+            {
+                "issue": str(issue),
+                "match_idx": match_idx,
+                "provider_match_id": provider_match_id,
+                "league": None,
+                "issue_deadline_ts": dt_text(_parse_js_date(fields.get(3))),
+                "home": _parse_js_string(fields.get(17)),
+                "away": _parse_js_string(fields.get(20)),
+                "score": None,
+                "halftime_score": None,
+                "handicap_line": handicap_line,
+            }
+        )
+    return rows
+
+
+def parse_cp_issue_html(text: str, issue: str) -> list[dict[str, object]]:
+    """Parse one archived Beijing issue page without performing network I/O.
+
+    Complete membership comes from the embedded JavaScript matrix. Visible
+    rows only enrich fields such as league and score. Legacy pages without an
+    ``M`` matrix continue to use their visible rows.
+    """
+
+    visible_rows = _parse_cp_issue_table(text, issue)
+    matrix_rows = _parse_cp_issue_matrix(text, issue)
+    if not matrix_rows:
+        return visible_rows
+
+    visible_by_slot = {int(row["match_idx"]): row for row in visible_rows}
+    merged: list[dict[str, object]] = []
+    for matrix_row in matrix_rows:
+        visible = visible_by_slot.get(int(matrix_row["match_idx"]), {})
+        row = dict(matrix_row)
+        for key in ("league", "home", "away", "score", "halftime_score"):
+            if visible.get(key) not in (None, ""):
+                row[key] = visible[key]
+        if visible.get("handicap_line") is not None:
+            row["handicap_line"] = visible["handicap_line"]
+        merged.append(row)
+    return merged
+
+
 def parse_titan_1x2(s: requests.Session, provider_match_id: str) -> tuple[dict[str, object], list[tuple], list[tuple]]:
     url = f"https://1x2d.titan007.com/{provider_match_id}.js"
     text = http_get(
@@ -317,6 +430,11 @@ def parse_titan_1x2(s: requests.Session, provider_match_id: str) -> tuple[dict[s
         referer=f"https://live.nowscore.com/1x2/{provider_match_id}.htm",
         no_cache=False,
     )
+    return parse_titan_1x2_text(text)
+
+
+def parse_titan_1x2_text(text: str) -> tuple[dict[str, object], list[tuple], list[tuple]]:
+    """Parse a Titan Euro history payload without performing network I/O."""
     match_time_raw = first_regex(text, r'MatchTime="([^"]+)"')
     kickoff = parse_titan_match_time(match_time_raw or "")
     ts_10h = kickoff - timedelta(hours=10) if kickoff else None
