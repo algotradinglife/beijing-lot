@@ -1,0 +1,13 @@
+snapshot_kind,handicap_norm_source,fixture_horizon_count
+10h,history_join_missing_raw,1871
+10h,missing_raw,709
+10h,vendor_large_code_to_zero,112814
+10h,vendor_small_line,76903
+1h,history_join_missing_raw,1871
+1h,missing_raw,713
+1h,vendor_large_code_to_zero,112904
+1h,vendor_small_line,76950
+initial,history_join_missing_raw,1871
+initial,missing_raw,711
+initial,vendor_large_code_to_zero,112891
+initial,vendor_small_line,76933

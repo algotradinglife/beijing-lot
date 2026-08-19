@@ -1,0 +1,154 @@
+{
+  "causal_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+  "contract": "BJ-UNIFIED-EU-ODDS-TIMESERIES-001",
+  "facts": {
+    "causal_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+    "exclusion_rows": 1516720,
+    "market_type": "euro_1x2",
+    "matched_fixture_count": 192443,
+    "probability_rows": 1731423,
+    "proxy_rows": 1731423,
+    "source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "strict_forward_rows": 0,
+    "trace_rows": 578127,
+    "translation_rows": 577141
+  },
+  "horizon_coverage": [
+    {
+      "available_books_median": 11.0,
+      "available_books_p05": 7.0,
+      "available_books_p95": 15.0,
+      "eligible_fixture_count": 192709,
+      "matched_fixture_count": 192406,
+      "probability_rows": 577218,
+      "snapshot_kind": "initial",
+      "source_matrix_fixture_count": 192709,
+      "source_matrix_row_rate": 1.0,
+      "valid_proxy_match_rate": 0.9984276811150491
+    },
+    {
+      "available_books_median": 13.0,
+      "available_books_p05": 10.0,
+      "available_books_p95": 15.0,
+      "eligible_fixture_count": 192709,
+      "matched_fixture_count": 192297,
+      "probability_rows": 576891,
+      "snapshot_kind": "10h",
+      "source_matrix_fixture_count": 192709,
+      "source_matrix_row_rate": 1.0,
+      "valid_proxy_match_rate": 0.9978620614501658
+    },
+    {
+      "available_books_median": 13.0,
+      "available_books_p05": 11.0,
+      "available_books_p95": 15.0,
+      "eligible_fixture_count": 192709,
+      "matched_fixture_count": 192438,
+      "probability_rows": 577314,
+      "snapshot_kind": "1h",
+      "source_matrix_fixture_count": 192709,
+      "source_matrix_row_rate": 1.0,
+      "valid_proxy_match_rate": 0.9985937345946478
+    }
+  ],
+  "market_type": "euro_1x2",
+  "nonzero_line_decision": "UNAVAILABLE: requires an explicit score/goal-difference distribution",
+  "profile_summary": {
+    "bookmaker_count": 15,
+    "calendar_year_max": 2025,
+    "calendar_year_min": 2014,
+    "eligible_unique_issue_slots": 192709,
+    "matched_issue_count": 701,
+    "matched_proxy_issue_slots": 192443,
+    "unknown_year_fixture_count": 99
+  },
+  "profile_tables": {
+    "auxiliary_market_support": "AUXILIARY_MARKET_SUPPORT.csv",
+    "bookmaker_coverage": "BOOKMAKER_COVERAGE.csv",
+    "horizon_coverage": "HORIZON_COVERAGE.csv",
+    "issue_coverage": "ISSUE_COVERAGE.csv",
+    "line_availability": "LINE_AVAILABILITY.csv",
+    "line_provenance": "LINE_PROVENANCE.csv",
+    "missingness": "MISSINGNESS.csv",
+    "odds_distribution": "ODDS_DISTRIBUTION.csv",
+    "probability_distribution": "PROBABILITY_DISTRIBUTION.csv",
+    "year_coverage": "YEAR_COVERAGE.csv"
+  },
+  "source_role": "Nowscore_Titan_historical_market_proxy",
+  "source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "strict_forward_decision": "UNAVAILABLE: relative provider labels lack exact shared observation clocks",
+  "translation_readiness": [
+    {
+      "fixture_horizon_count": 113951,
+      "snapshot_kind": "10h",
+      "translation_status": "AVAILABLE_ZERO_LINE_IDENTITY",
+      "within_horizon_rate": 0.5925781473449924
+    },
+    {
+      "fixture_horizon_count": 3,
+      "snapshot_kind": "10h",
+      "translation_status": "UNAVAILABLE_INVALID_NATIVE_LINE",
+      "within_horizon_rate": 1.5600867408227896e-05
+    },
+    {
+      "fixture_horizon_count": 709,
+      "snapshot_kind": "10h",
+      "translation_status": "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE",
+      "within_horizon_rate": 0.0036870049974778597
+    },
+    {
+      "fixture_horizon_count": 77634,
+      "snapshot_kind": "10h",
+      "translation_status": "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE",
+      "within_horizon_rate": 0.40371924679012156
+    },
+    {
+      "fixture_horizon_count": 114041,
+      "snapshot_kind": "1h",
+      "translation_status": "AVAILABLE_ZERO_LINE_IDENTITY",
+      "within_horizon_rate": 0.5926116463484343
+    },
+    {
+      "fixture_horizon_count": 3,
+      "snapshot_kind": "1h",
+      "translation_status": "UNAVAILABLE_INVALID_NATIVE_LINE",
+      "within_horizon_rate": 1.5589436597761358e-05
+    },
+    {
+      "fixture_horizon_count": 713,
+      "snapshot_kind": "1h",
+      "translation_status": "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE",
+      "within_horizon_rate": 0.0037050894314012827
+    },
+    {
+      "fixture_horizon_count": 77681,
+      "snapshot_kind": "1h",
+      "translation_status": "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE",
+      "within_horizon_rate": 0.40366767478356663
+    },
+    {
+      "fixture_horizon_count": 114028,
+      "snapshot_kind": "initial",
+      "translation_status": "AVAILABLE_ZERO_LINE_IDENTITY",
+      "within_horizon_rate": 0.5926426410818789
+    },
+    {
+      "fixture_horizon_count": 3,
+      "snapshot_kind": "initial",
+      "translation_status": "UNAVAILABLE_INVALID_NATIVE_LINE",
+      "within_horizon_rate": 1.5592029354593933e-05
+    },
+    {
+      "fixture_horizon_count": 711,
+      "snapshot_kind": "initial",
+      "translation_status": "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE",
+      "within_horizon_rate": 0.003695310957038762
+    },
+    {
+      "fixture_horizon_count": 77664,
+      "snapshot_kind": "initial",
+      "translation_status": "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE",
+      "within_horizon_rate": 0.4036464559317277
+    }
+  ]
+}

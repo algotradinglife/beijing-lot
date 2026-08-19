@@ -1,0 +1,4 @@
+snapshot_kind,matched_fixture_count,probability_rows,available_books_median,available_books_p05,available_books_p95,source_matrix_fixture_count,eligible_fixture_count,source_matrix_row_rate,valid_proxy_match_rate
+initial,192406,577218,11.0,7.0,15.0,192709,192709,1.0,0.9984276811150491
+10h,192297,576891,13.0,10.0,15.0,192709,192709,1.0,0.9978620614501658
+1h,192438,577314,13.0,11.0,15.0,192709,192709,1.0,0.9985937345946478
