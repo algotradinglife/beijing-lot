@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "BJ-UNIFIED-EU-ODDS-TIMESERIES-001.json",
+  "title": "#236 historical European market proxy handoff",
+  "type": "object",
+  "required": ["canonical_fixture_key", "snapshot_kind", "source_role", "market_type", "causal_grade", "availability_mask", "translation_status"],
+  "properties": {
+    "canonical_fixture_key": {"type": "string", "pattern": "^bjslot:[^:]+:[0-9]{3,}$"},
+    "snapshot_kind": {"enum": ["initial", "10h", "1h"]},
+    "source_role": {"const": "Nowscore_Titan_historical_market_proxy"},
+    "market_type": {"const": "euro_1x2"},
+    "causal_grade": {"const": "RETROSPECTIVE_RELATIVE_PROXY"},
+    "availability_mask": {"const": "1"},
+    "translation_status": {
+      "enum": [
+        "AVAILABLE_ZERO_LINE_IDENTITY",
+        "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE",
+        "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE",
+        "UNAVAILABLE_INVALID_NATIVE_LINE"
+      ]
+    },
+    "required_additional_input": {"type": "string"}
+  },
+  "additionalProperties": true
+}

@@ -39,6 +39,9 @@ results/*
 !results/bj250_source_census_v3/**
 !results/bj254_schema_integration_v2/
 !results/bj254_schema_integration_v2/**
+!results/bj236_eu_odds_timeseries_v1/
+!results/bj236_eu_odds_timeseries_v1/**
+!results/bj236_eu_odds_timeseries_v1/**/*.csv
 runs/
 .cache/
 tmp/

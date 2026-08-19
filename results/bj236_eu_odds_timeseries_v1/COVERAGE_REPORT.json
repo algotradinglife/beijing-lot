@@ -1,0 +1,50 @@
+{
+  "causal_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+  "contract": "BJ-UNIFIED-EU-ODDS-TIMESERIES-001",
+  "facts": {
+    "causal_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+    "exclusion_rows": 986,
+    "market_type": "euro_1x2",
+    "matched_fixture_count": 192443,
+    "probability_rows": 1731423,
+    "proxy_rows": 1731423,
+    "source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "strict_forward_rows": 0,
+    "trace_rows": 578127,
+    "translation_rows": 577141
+  },
+  "horizon_coverage": [
+    {
+      "available_books_median": 11.0,
+      "matched_fixture_count": 192406,
+      "probability_rows": 577218,
+      "snapshot_kind": "initial"
+    },
+    {
+      "available_books_median": 13.0,
+      "matched_fixture_count": 192297,
+      "probability_rows": 576891,
+      "snapshot_kind": "10h"
+    },
+    {
+      "available_books_median": 13.0,
+      "matched_fixture_count": 192438,
+      "probability_rows": 577314,
+      "snapshot_kind": "1h"
+    }
+  ],
+  "market_type": "euro_1x2",
+  "nonzero_line_decision": "UNAVAILABLE: requires an explicit score/goal-difference distribution",
+  "source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "strict_forward_decision": "UNAVAILABLE: relative provider labels lack exact shared observation clocks",
+  "translation_readiness": [
+    {
+      "fixture_horizon_count": 7746,
+      "translation_status": "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE"
+    },
+    {
+      "fixture_horizon_count": 569395,
+      "translation_status": "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE"
+    }
+  ]
+}
