@@ -71,4 +71,4 @@ The first Gate-start receipt recorded hashes for mutable live SQLite files. That
 
 This is `COMPLETE_808_ISSUES`, not `INCOMPLETE_SOURCE_GAP`. The result makes the full historical proxy surface available to #238 and later modeling, but it does **not** upgrade retrospective `initial/10h/1h` labels into strict decision-time evidence. The live multi-snapshot collector remains the path for accumulating true causal history.
 
-The executable analysis is [Issue-268-Historical-Proxy-Backfill.ipynb](../../notebooks/Issue-268-Historical-Proxy-Backfill.ipynb). Bulk SQLite, raw payloads and Parquet remain outside Git under `data/derived/bj268/eu_proxy_backfill_v2/`; Git stores code, the executed notebook, compact report and figure.
+The executable analysis is [Issue-268-Historical-Proxy-Backfill.ipynb](../../notebooks/Issue-268-Historical-Proxy-Backfill.ipynb). Bulk SQLite, raw payloads and Parquet remain outside Git under `data/derived/bj268/eu_proxy_backfill_v3/`; Git stores code, the executed notebook, compact report and figure.
