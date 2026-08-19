@@ -2,15 +2,82 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "BJ-UNIFIED-EU-ODDS-TIMESERIES-001.json",
   "title": "#236 historical European market proxy handoff",
-  "type": "object",
-  "required": ["canonical_fixture_key", "snapshot_kind", "source_role", "market_type", "causal_grade", "availability_mask", "translation_status"],
-  "properties": {
-    "canonical_fixture_key": {"type": "string", "pattern": "^bjslot:[^:]+:[0-9]{3,}$"},
-    "snapshot_kind": {"enum": ["initial", "10h", "1h"]},
-    "source_role": {"const": "Nowscore_Titan_historical_market_proxy"},
-    "market_type": {"const": "euro_1x2"},
-    "causal_grade": {"const": "RETROSPECTIVE_RELATIVE_PROXY"},
-    "availability_mask": {"const": "1"},
+  "oneOf": [
+    {"$ref": "#/$defs/probability_row"},
+    {"$ref": "#/$defs/translation_row"}
+  ],
+  "$defs": {
+    "common": {
+      "type": "object",
+      "required": [
+        "canonical_fixture_key",
+        "snapshot_kind",
+        "source_role",
+        "source_match_ids",
+        "market_type",
+        "causal_grade"
+      ],
+      "properties": {
+        "canonical_fixture_key": {"type": "string", "pattern": "^bjslot:[^:]+:[0-9]{3,}$"},
+        "snapshot_kind": {"enum": ["initial", "10h", "1h"]},
+        "source_role": {"const": "Nowscore_Titan_historical_market_proxy"},
+        "source_match_ids": {"type": "string", "minLength": 1},
+        "market_type": {"const": "euro_1x2"},
+        "causal_grade": {"const": "RETROSPECTIVE_RELATIVE_PROXY"}
+      }
+    },
+    "probability_row": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "required": [
+            "outcome_code",
+            "probability",
+            "availability_mask",
+            "aggregation_grade",
+            "n_available_books",
+            "translation_status",
+            "translation_availability_mask",
+            "required_additional_input"
+          ],
+          "properties": {
+            "outcome_code": {"enum": ["3", "1", "0"]},
+            "probability": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+            "availability_mask": {"const": "1"},
+            "aggregation_grade": {"const": "BOOKMAKER_DE_VIG_MEAN"},
+            "n_available_books": {"type": "integer", "minimum": 1},
+            "translation_status": {"$ref": "#/$defs/translation_status"},
+            "translation_availability_mask": {"enum": ["0", "1"]},
+            "required_additional_input": {"type": "string"}
+          }
+        }
+      ]
+    },
+    "translation_row": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "required": [
+            "native_handicap_line_raw",
+            "native_handicap_line",
+            "handicap_norm_source",
+            "translation_status",
+            "availability_mask",
+            "required_additional_input"
+          ],
+          "properties": {
+            "native_handicap_line_raw": {"type": ["number", "null"]},
+            "native_handicap_line": {"type": ["number", "null"]},
+            "handicap_norm_source": {"type": "string"},
+            "translation_status": {"$ref": "#/$defs/translation_status"},
+            "availability_mask": {"enum": ["0", "1"]},
+            "required_additional_input": {"type": "string"}
+          }
+        }
+      ]
+    },
     "translation_status": {
       "enum": [
         "AVAILABLE_ZERO_LINE_IDENTITY",
@@ -18,8 +85,6 @@
         "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE",
         "UNAVAILABLE_INVALID_NATIVE_LINE"
       ]
-    },
-    "required_additional_input": {"type": "string"}
-  },
-  "additionalProperties": true
+    }
+  }
 }

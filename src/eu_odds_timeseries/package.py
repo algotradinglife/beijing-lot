@@ -78,14 +78,46 @@ def _verify_closure(package: Path, manifest: dict) -> None:
 
 
 def _wide_raw(raw_quotes: pd.DataFrame) -> pd.DataFrame:
-    expected = {"canonical_fixture_key", "issue_code", "match_idx", "source_match_id", "snapshot_kind", "bookmaker_id", "outcome_code", "decimal_odds", "native_handicap_line", "market_type", "causal_grade", "source_role", "quote_status"}
+    expected = {
+        "canonical_fixture_key",
+        "issue_code",
+        "match_idx",
+        "source_match_id",
+        "snapshot_kind",
+        "bookmaker_id",
+        "outcome_code",
+        "decimal_odds",
+        "native_handicap_line_raw",
+        "native_handicap_line",
+        "handicap_norm_source",
+        "market_type",
+        "causal_grade",
+        "source_role",
+        "quote_status",
+    }
     assert expected <= set(raw_quotes.columns), "semantic raw quote schema mismatch"
     assert set(raw_quotes.market_type) == {MARKET_TYPE}, "semantic market label mismatch"
     assert set(raw_quotes.causal_grade) == {CAUSAL_GRADE}, "semantic causal grade mismatch"
     assert set(raw_quotes.source_role) == {SOURCE_ROLE}, "semantic source role mismatch"
-    pivot = raw_quotes.pivot(index=["issue_code", "match_idx", "source_match_id", "snapshot_kind", "bookmaker_id", "native_handicap_line"], columns="outcome_code", values="decimal_odds").reset_index()
+    identity = [
+        "issue_code",
+        "match_idx",
+        "source_match_id",
+        "snapshot_kind",
+        "bookmaker_id",
+    ]
+    line_fields = ["native_handicap_line_raw", "native_handicap_line", "handicap_norm_source"]
+    line_metadata = raw_quotes[[*identity, *line_fields]].drop_duplicates()
+    assert not line_metadata.duplicated(identity, keep=False).any(), "conflicting line metadata"
+    pivot = raw_quotes.pivot(
+        index=identity,
+        columns="outcome_code",
+        values="decimal_odds",
+    ).reset_index()
     assert set(("3", "1", "0")) <= set(pivot.columns), "semantic raw quote outcome triplet missing"
-    return pivot.rename(columns={"3": "v1", "1": "v2", "0": "v3"})
+    return pivot.merge(line_metadata, on=identity, validate="one_to_one").rename(
+        columns={"3": "v1", "1": "v2", "0": "v3"}
+    )
 
 
 def verify_proxy_package(package: Path, *, expected_source_sha256: str) -> None:

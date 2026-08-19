@@ -28,7 +28,15 @@ def _write_part(frame: pd.DataFrame, directory: Path, number: int) -> None:
 
 def _process_chunk(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Vectorized de-vig/aggregation for complete ordered source groups."""
-    group_cols = ["issue_code", "match_idx", "source_match_id", "snapshot_kind", "native_handicap_line"]
+    group_cols = [
+        "issue_code",
+        "match_idx",
+        "source_match_id",
+        "snapshot_kind",
+        "native_handicap_line_raw",
+        "native_handicap_line",
+        "handicap_norm_source",
+    ]
     work = frame.copy()
     odds = work[["v1", "v2", "v3"]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
     valid = np.isfinite(odds).all(axis=1) & (odds > 1.0).all(axis=1)
@@ -41,9 +49,27 @@ def _process_chunk(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.
     trace["source_role"] = SOURCE_ROLE
     trace["market_type"] = MARKET_TYPE
     trace["causal_grade"] = CAUSAL_GRADE
-    invalid = trace.loc[trace.valid_bookmaker_rows.eq(0), ["canonical_fixture_key", "snapshot_kind", "source_match_id"]].copy()
-    invalid["reason"] = "NO_VALID_BOOKMAKER_TRIPLET"
-    invalid["detail"] = "all raw bookmaker triplets had missing, non-finite, or decimal odds <= 1"
+    invalid_books = work.loc[
+        ~work.is_valid_book,
+        ["issue_code", "match_idx", "snapshot_kind", "source_match_id", "bookmaker_id"],
+    ].copy()
+    invalid_books["canonical_fixture_key"] = [
+        f"bjslot:{str(issue).strip()}:{int(slot):03d}"
+        for issue, slot in zip(invalid_books.issue_code, invalid_books.match_idx)
+    ]
+    invalid_books["reason"] = "INVALID_DECIMAL_ODDS"
+    invalid_books["detail"] = "requires finite decimal odds strictly greater than one for all 3/1/0 cells"
+    invalid = invalid_books[
+        ["canonical_fixture_key", "snapshot_kind", "source_match_id", "bookmaker_id", "reason", "detail"]
+    ]
+    no_valid = trace.loc[
+        trace.valid_bookmaker_rows.eq(0),
+        ["canonical_fixture_key", "snapshot_kind", "source_match_id"],
+    ].copy()
+    no_valid["bookmaker_id"] = ""
+    no_valid["reason"] = "NO_VALID_BOOKMAKER_TRIPLET"
+    no_valid["detail"] = "all raw bookmaker triplets had missing, non-finite, or decimal odds <= 1"
+    invalid = pd.concat([invalid, no_valid], ignore_index=True)
     good = work.loc[work.is_valid_book].copy()
     if good.empty:
         return pd.DataFrame(), trace, invalid, pd.DataFrame()
@@ -67,14 +93,38 @@ def _process_chunk(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.
     probability["availability_mask"] = "1"
     probability["aggregation_grade"] = "BOOKMAKER_DE_VIG_MEAN"
     probability = probability.drop(columns=["_cell", "source_match_id"])
-    readiness = aggregated[["canonical_fixture_key", "snapshot_kind", "native_handicap_line"]].copy()
+    readiness = aggregated[
+        [
+            "canonical_fixture_key",
+            "snapshot_kind",
+            "source_match_id",
+            "native_handicap_line_raw",
+            "native_handicap_line",
+            "handicap_norm_source",
+        ]
+    ].copy()
+    readiness["source_match_ids"] = readiness.pop("source_match_id").astype(str)
     readiness["source_role"] = SOURCE_ROLE
     readiness["market_type"] = MARKET_TYPE
-    readiness["required_additional_input"] = ""
+    readiness["causal_grade"] = CAUSAL_GRADE
+    readiness["availability_mask"] = "0"
+    readiness["required_additional_input"] = "score_goal_difference_distribution"
     readiness["translation_probability_json"] = None
     readiness["translation_status"] = "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE"
     missing = readiness.native_handicap_line.isna()
     readiness.loc[missing, "translation_status"] = "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE"
+    readiness.loc[missing, "required_additional_input"] = "normalized_native_handicap_line"
+    invalid_line = (
+        ~missing
+        & (
+            ~np.isfinite(readiness.native_handicap_line.astype(float))
+            | readiness.native_handicap_line.astype(float).mod(1).ne(0)
+            | readiness.native_handicap_line.astype(float).lt(-3.0)
+            | readiness.native_handicap_line.astype(float).gt(3.0)
+        )
+    )
+    readiness.loc[invalid_line, "translation_status"] = "UNAVAILABLE_INVALID_NATIVE_LINE"
+    readiness.loc[invalid_line, "required_additional_input"] = "valid_integer_native_handicap_line"
     zero = readiness.native_handicap_line.eq(0)
     if zero.any():
         wide = aggregated.loc[zero, ["canonical_fixture_key", "snapshot_kind", "p3", "p1", "p0"]]
@@ -82,8 +132,27 @@ def _process_chunk(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.
         mask = readiness.index[zero]
         readiness.loc[mask, "translation_status"] = "AVAILABLE_ZERO_LINE_IDENTITY"
         readiness.loc[mask, "translation_probability_json"] = [lookup[(readiness.loc[i, "canonical_fixture_key"], readiness.loc[i, "snapshot_kind"])] for i in mask]
+        readiness.loc[mask, "availability_mask"] = "1"
         readiness.loc[mask, "required_additional_input"] = ""
-    readiness.loc[~zero & ~missing, "required_additional_input"] = "score_goal_difference_distribution"
+    handoff = readiness[
+        [
+            "canonical_fixture_key",
+            "snapshot_kind",
+            "source_match_ids",
+            "translation_status",
+            "availability_mask",
+            "required_additional_input",
+        ]
+    ].rename(columns={"availability_mask": "translation_availability_mask"})
+    probability = probability.merge(
+        handoff,
+        on=["canonical_fixture_key", "snapshot_kind"],
+        validate="many_to_one",
+        suffixes=("", "_translation"),
+    )
+    if not probability.source_match_ids.eq(probability.source_match_ids_translation).all():
+        raise ValueError("probability and translation source fixture coordinates differ")
+    probability = probability.drop(columns="source_match_ids_translation")
     return probability, trace, invalid, readiness
 
 
@@ -137,7 +206,16 @@ def materialize_proxy_view(workbook: Path, target: Path, *, source_sha256: str, 
         facts = {**counts, "matched_fixture_count": len(fixtures), "strict_forward_rows": 0, "proxy_rows": counts["probability_rows"], "source_sha256": source_sha256, "market_type": MARKET_TYPE, "causal_grade": CAUSAL_GRADE}
         publication.atomic_write_json(staging / "report_facts.json", facts)
         hashes = {str(p.relative_to(staging)): _hash(p) for p in sorted(staging.rglob("*.parquet"))}
-        publication.atomic_write_json(staging / "MANIFEST.json", {"contract": "BJ-UNIFIED-EU-ODDS-TIMESERIES-001", **facts, "parts": hashes})
+        publication.atomic_write_json(
+            staging / "MANIFEST.json",
+            {
+                "contract": "BJ-UNIFIED-EU-ODDS-TIMESERIES-001",
+                "source_role": SOURCE_ROLE,
+                **facts,
+                "report_facts_sha256": _hash(staging / "report_facts.json"),
+                "parts": hashes,
+            },
+        )
 
     publication.atomic_publish_directory(target, publish, force=True)
     return {**counts, "matched_fixture_count": len(fixtures), "target": str(target)}

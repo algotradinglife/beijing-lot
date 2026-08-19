@@ -13,7 +13,14 @@ from pathlib import Path
 import pandas as pd
 
 _REQUIRED = {
-    "matches": {"match_id", "issue", "match_idx", "handicap_line"},
+    "matches": {
+        "match_id",
+        "issue",
+        "match_idx",
+        "handicap_line",
+        "handicap_line_norm",
+        "handicap_norm_source",
+    },
     "market_snapshots": {"match_id", "market", "bookmaker", "snapshot", "v1", "v2", "v3"},
     "source_meta": {"key", "value"},
 }
@@ -83,7 +90,9 @@ def _read_query() -> str:
     SELECT CAST(m.issue AS TEXT) AS issue_code, m.match_idx,
            m.match_id AS source_match_id, s.snapshot AS snapshot_kind,
            s.bookmaker AS bookmaker_id, s.v1, s.v2, s.v3,
-           m.handicap_line AS native_handicap_line
+           m.handicap_line AS native_handicap_line_raw,
+           m.handicap_line_norm AS native_handicap_line,
+           m.handicap_norm_source
     FROM market_snapshots AS s
     JOIN unique_quotes AS q
       ON q.match_id = s.match_id AND q.market = s.market

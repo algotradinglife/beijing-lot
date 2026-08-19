@@ -24,6 +24,7 @@ from eu_odds_timeseries.package import (  # noqa: E402
     verify_proxy_package,
 )
 from eu_odds_timeseries.materialize import materialize_proxy_view  # noqa: E402
+from eu_odds_timeseries.profiling import build_profiles  # noqa: E402
 
 
 def _quotes() -> pd.DataFrame:
@@ -32,15 +33,18 @@ def _quotes() -> pd.DataFrame:
             # valid bookmaker triplet, canonical issue-slot identity
             {"issue_code": "25042", "match_idx": 1, "source_match_id": 7,
              "snapshot_kind": "initial", "bookmaker_id": "A", "v1": 2.0, "v2": 3.0, "v3": 6.0,
-             "native_handicap_line": 0.0},
+             "native_handicap_line_raw": 99.0, "native_handicap_line": 0.0,
+             "handicap_norm_source": "vendor_large_code_to_zero"},
             # invalid decimal odds remains in the exclusion ledger; it cannot feed consensus
             {"issue_code": "25042", "match_idx": 1, "source_match_id": 7,
              "snapshot_kind": "initial", "bookmaker_id": "B", "v1": 1.0, "v2": 3.1, "v3": 5.5,
-             "native_handicap_line": 0.0},
+             "native_handicap_line_raw": 99.0, "native_handicap_line": 0.0,
+             "handicap_norm_source": "vendor_large_code_to_zero"},
             # a non-zero native line cannot be inferred from a straight-1X2 triplet
             {"issue_code": "25042", "match_idx": 2, "source_match_id": 8,
              "snapshot_kind": "10h", "bookmaker_id": "A", "v1": 2.5, "v2": 3.2, "v3": 3.0,
-             "native_handicap_line": -0.5},
+             "native_handicap_line_raw": -1.0, "native_handicap_line": -1.0,
+             "handicap_norm_source": "vendor_small_line"},
         ]
     )
 
@@ -69,6 +73,9 @@ def test_translation_declares_zero_line_identity_and_nonzero_unavailable() -> No
     zero = readiness.loc[readiness["canonical_fixture_key"].eq("bjslot:25042:001")].iloc[0]
     assert zero["translation_status"] == "AVAILABLE_ZERO_LINE_IDENTITY"
     assert zero["translation_probability_json"]
+    assert zero["native_handicap_line_raw"] == 99.0
+    assert zero["native_handicap_line"] == 0.0
+    assert zero["handicap_norm_source"] == "vendor_large_code_to_zero"
 
     nonzero = readiness.loc[readiness["canonical_fixture_key"].eq("bjslot:25042:002")].iloc[0]
     assert nonzero["translation_status"] == "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE"
@@ -78,14 +85,17 @@ def test_translation_declares_zero_line_identity_and_nonzero_unavailable() -> No
 def test_workbook_reader_uses_only_euro_rows_and_quarantines_duplicate_issue_slot(tmp_path: Path) -> None:
     path = tmp_path / "workbook.sqlite"
     con = sqlite3.connect(path)
-    con.execute("CREATE TABLE matches (match_id INTEGER, issue TEXT, match_idx INTEGER, handicap_line REAL)")
+    con.execute(
+        "CREATE TABLE matches (match_id INTEGER, issue TEXT, match_idx INTEGER, "
+        "handicap_line REAL, handicap_line_norm REAL, handicap_norm_source TEXT)"
+    )
     con.execute("CREATE TABLE market_snapshots (match_id INTEGER, market TEXT, bookmaker TEXT, snapshot TEXT, v1 REAL, v2 REAL, v3 REAL)")
     con.execute("CREATE TABLE source_meta (key TEXT, value TEXT)")
     con.execute("INSERT INTO source_meta VALUES ('source_path', 'C:/archive/beidan.xlsm')")
-    con.executemany("INSERT INTO matches VALUES (?, ?, ?, ?)", [
-        (1, "25042", 1, 0.0),
-        (2, "25042", 2, -0.5),
-        (3, "25042", 2, -0.5),  # ambiguous canonical slot: must not silently join
+    con.executemany("INSERT INTO matches VALUES (?, ?, ?, ?, ?, ?)", [
+        (1, "25042", 1, 99.0, 0.0, "vendor_large_code_to_zero"),
+        (2, "25042", 2, -1.0, -1.0, "vendor_small_line"),
+        (3, "25042", 2, -1.0, -1.0, "vendor_small_line"),  # ambiguous canonical slot
     ])
     con.executemany("INSERT INTO market_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)", [
         (1, "euro_1x2", "A", "initial", 2.0, 3.0, 6.0),
@@ -146,15 +156,42 @@ def test_package_verifier_rejects_remanifested_probability_manifest_and_label_ta
         verify_proxy_package(package, expected_source_sha256="a" * 64)
 
 
+def test_package_verifier_preserves_missing_normalized_line_metadata(tmp_path: Path) -> None:
+    raw = _quotes().iloc[[2]].copy()
+    raw["native_handicap_line_raw"] = None
+    raw["native_handicap_line"] = None
+    raw["handicap_norm_source"] = "missing_raw"
+
+    package = build_proxy_package(tmp_path / "missing-line", raw, source_sha256="b" * 64)
+    verify_proxy_package(package, expected_source_sha256="b" * 64)
+    readiness = pd.read_parquet(package / "tables" / "translation_readiness.parquet")
+    assert readiness.loc[0, "translation_status"] == "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE"
+    assert pd.isna(readiness.loc[0, "native_handicap_line"])
+
+
 def test_streamed_materializer_writes_external_rebuildable_views(tmp_path: Path) -> None:
     workbook = tmp_path / "workbook.sqlite"
     con = sqlite3.connect(workbook)
-    con.execute("CREATE TABLE matches (match_id INTEGER, issue TEXT, match_idx INTEGER, handicap_line REAL)")
+    con.execute(
+        "CREATE TABLE matches (match_id INTEGER, issue TEXT, match_idx INTEGER, "
+        "handicap_line REAL, handicap_line_norm REAL, handicap_norm_source TEXT, kickoff_ts TEXT)"
+    )
     con.execute("CREATE TABLE market_snapshots (match_id INTEGER, market TEXT, bookmaker TEXT, snapshot TEXT, v1 REAL, v2 REAL, v3 REAL)")
     con.execute("CREATE TABLE source_meta (key TEXT, value TEXT)")
     con.execute("INSERT INTO source_meta VALUES ('source_path', 'C:/archive/beidan.xlsm')")
-    con.execute("INSERT INTO matches VALUES (1, '25042', 1, 0.0)")
-    con.execute("INSERT INTO market_snapshots VALUES (1, 'euro_1x2', 'A', 'initial', 2.0, 3.0, 6.0)")
+    con.execute(
+        "INSERT INTO matches VALUES (1, '25042', 1, 99.0, 0.0, "
+        "'vendor_large_code_to_zero', '2025-07-01 10:00:00')"
+    )
+    con.executemany(
+        "INSERT INTO market_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+            (1, "euro_1x2", "A", "initial", 2.0, 3.0, 6.0),
+            (1, "euro_1x2", "B", "initial", 1.0, 3.0, 6.0),
+            (1, "asian_handicap", "A", "initial", 0.9, -0.5, 0.9),
+            (1, "over_under", "A", "initial", 0.9, 2.5, 0.9),
+        ],
+    )
     con.commit()
     con.close()
 
@@ -164,4 +201,25 @@ def test_streamed_materializer_writes_external_rebuildable_views(tmp_path: Path)
     assert (tmp_path / "view" / "MANIFEST.json").is_file()
     assert (tmp_path / "view" / "probabilities" / "part-00000.parquet").is_file()
     assert (tmp_path / "view" / "source_trace" / "part-00000.parquet").is_file()
-    assert pd.read_parquet(tmp_path / "view" / "translation_readiness" / "part-00000.parquet").loc[0, "translation_status"] == "AVAILABLE_ZERO_LINE_IDENTITY"
+    readiness = pd.read_parquet(tmp_path / "view" / "translation_readiness" / "part-00000.parquet")
+    assert readiness.loc[0, "translation_status"] == "AVAILABLE_ZERO_LINE_IDENTITY"
+    assert readiness.loc[0, "native_handicap_line_raw"] == 99.0
+    assert readiness.loc[0, "native_handicap_line"] == 0.0
+    ledger = pd.read_parquet(tmp_path / "view" / "exclusion_ledger" / "part-00000.parquet")
+    assert "INVALID_DECIMAL_ODDS" in set(ledger["reason"])
+    raw, _ = load_workbook_proxy(workbook)
+    expected, _, _ = derive_proxy_probabilities(raw)
+    actual = pd.read_parquet(tmp_path / "view" / "probabilities" / "part-00000.parquet")
+    pd.testing.assert_frame_equal(
+        actual[["canonical_fixture_key", "snapshot_kind", "outcome_code", "probability"]]
+        .sort_values("outcome_code")
+        .reset_index(drop=True),
+        expected[["canonical_fixture_key", "snapshot_kind", "outcome_code", "probability"]]
+        .sort_values("outcome_code")
+        .reset_index(drop=True),
+    )
+    profiles = build_profiles(workbook, tmp_path / "view")
+    assert profiles["summary"]["eligible_unique_issue_slots"] == 1
+    auxiliary = profiles["auxiliary_market_support"]
+    assert set(auxiliary["market_type"]) == {"asian_handicap", "over_under"}
+    assert auxiliary["valid_native_fixture_rate"].eq(1.0).all()

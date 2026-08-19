@@ -18,9 +18,34 @@ OUTCOMES = ("3", "1", "0")
 MARKET_TYPE = "euro_1x2"
 CAUSAL_GRADE = "RETROSPECTIVE_RELATIVE_PROXY"
 SOURCE_ROLE = "Nowscore_Titan_historical_market_proxy"
+PROBABILITY_COLUMNS = (
+    "canonical_fixture_key", "issue_code", "match_idx", "snapshot_kind",
+    "source_role", "market_type", "causal_grade", "outcome_code",
+    "probability", "n_available_books", "availability_mask",
+    "aggregation_grade", "raw_group_sha256", "source_match_ids",
+)
+RAW_QUOTE_COLUMNS = (
+    "canonical_fixture_key", "issue_code", "match_idx", "source_match_id",
+    "snapshot_kind", "source_role", "market_type", "causal_grade",
+    "bookmaker_id", "outcome_code", "decimal_odds",
+    "native_handicap_line_raw", "native_handicap_line",
+    "handicap_norm_source", "quote_status",
+)
+LEDGER_COLUMNS = (
+    "canonical_fixture_key", "snapshot_kind", "source_match_id",
+    "bookmaker_id", "reason", "detail",
+)
+TRANSLATION_COLUMNS = (
+    "canonical_fixture_key", "snapshot_kind", "source_role",
+    "source_match_ids", "market_type", "causal_grade", "availability_mask",
+    "native_handicap_line_raw", "native_handicap_line",
+    "handicap_norm_source", "translation_status",
+    "translation_probability_json", "required_additional_input",
+)
 REQUIRED_COLUMNS = {
     "issue_code", "match_idx", "source_match_id", "snapshot_kind",
-    "bookmaker_id", "v1", "v2", "v3", "native_handicap_line",
+    "bookmaker_id", "v1", "v2", "v3", "native_handicap_line_raw",
+    "native_handicap_line", "handicap_norm_source",
 }
 
 
@@ -139,7 +164,9 @@ def derive_proxy_probabilities(raw_rows: pd.DataFrame) -> tuple[pd.DataFrame, pd
                     "bookmaker_id": str(row.bookmaker_id),
                     "outcome_code": outcome,
                     "decimal_odds": None if pd.isna(numeric) else float(numeric),
+                    "native_handicap_line_raw": row.native_handicap_line_raw,
                     "native_handicap_line": row.native_handicap_line,
+                    "handicap_norm_source": row.handicap_norm_source,
                     "quote_status": status,
                 })
         if not valid_vectors:
@@ -175,13 +202,17 @@ def derive_proxy_probabilities(raw_rows: pd.DataFrame) -> tuple[pd.DataFrame, pd
                 "raw_group_sha256": digest,
                 "source_match_ids": ",".join(sorted({str(value) for value in group["source_match_id"]})),
             })
-    return (pd.DataFrame(probability_rows), pd.DataFrame(raw_quote_rows), pd.DataFrame(ledger_rows))
+    return (
+        pd.DataFrame(probability_rows, columns=PROBABILITY_COLUMNS),
+        pd.DataFrame(raw_quote_rows, columns=RAW_QUOTE_COLUMNS),
+        pd.DataFrame(ledger_rows, columns=LEDGER_COLUMNS),
+    )
 
 
 def translation_readiness(probabilities: pd.DataFrame, raw_rows: pd.DataFrame) -> pd.DataFrame:
     """Emit an honest #238-facing decision for the BJ-line translation family."""
     if probabilities.empty:
-        return pd.DataFrame(columns=["canonical_fixture_key", "translation_status", "translation_probability_json"])
+        return pd.DataFrame(columns=TRANSLATION_COLUMNS)
     required = {"canonical_fixture_key", "snapshot_kind", "outcome_code", "probability"}
     if required - set(probabilities.columns):
         raise ValueError("probabilities lack required translation columns")
@@ -195,23 +226,40 @@ def translation_readiness(probabilities: pd.DataFrame, raw_rows: pd.DataFrame) -
         vector = group.set_index("outcome_code")["probability"].reindex(OUTCOMES)
         if vector.isna().any():
             raise ValueError("partial probability triplet cannot be translated")
-        candidates = lines.loc[lines.canonical_fixture_key.eq(fixture_key), "native_handicap_line"].dropna().unique()
+        fixture_lines = lines.loc[lines.canonical_fixture_key.eq(fixture_key)]
+        candidates = fixture_lines["native_handicap_line"].dropna().unique()
+        raw_candidates = fixture_lines["native_handicap_line_raw"].dropna().unique()
+        norm_sources = fixture_lines["handicap_norm_source"].dropna().astype(str).unique()
+        source_match_ids = ",".join(
+            sorted({str(value) for value in fixture_lines["source_match_id"]})
+        )
+        line_value = float(candidates[0]) if len(candidates) == 1 else None
         if len(candidates) != 1:
             status, payload = "UNAVAILABLE_MISSING_OR_CONFLICTING_NATIVE_LINE", None
-        elif not np.isfinite(float(candidates[0])):
+            required_input = "normalized_native_handicap_line"
+        elif not np.isfinite(line_value) or not line_value.is_integer() or not -3.0 <= line_value <= 3.0:
             status, payload = "UNAVAILABLE_INVALID_NATIVE_LINE", None
-        elif float(candidates[0]) == 0.0:
+            required_input = "valid_integer_native_handicap_line"
+        elif line_value == 0.0:
             status = "AVAILABLE_ZERO_LINE_IDENTITY"
             payload = json.dumps([float(vector[x]) for x in OUTCOMES], separators=(",", ":"))
+            required_input = ""
         else:
             status, payload = "UNAVAILABLE_NONZERO_LINE_REQUIRES_GOAL_DIFFERENCE", None
+            required_input = "score_goal_difference_distribution"
         rows.append({
             "canonical_fixture_key": fixture_key,
             "snapshot_kind": horizon,
             "source_role": SOURCE_ROLE,
+            "source_match_ids": source_match_ids,
             "market_type": MARKET_TYPE,
+            "causal_grade": CAUSAL_GRADE,
+            "availability_mask": "1" if payload is not None else "0",
+            "native_handicap_line_raw": float(raw_candidates[0]) if len(raw_candidates) == 1 else None,
+            "native_handicap_line": line_value,
+            "handicap_norm_source": str(norm_sources[0]) if len(norm_sources) == 1 else "",
             "translation_status": status,
             "translation_probability_json": payload,
-            "required_additional_input": "score_goal_difference_distribution" if payload is None else "",
+            "required_additional_input": required_input,
         })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=TRANSLATION_COLUMNS)
