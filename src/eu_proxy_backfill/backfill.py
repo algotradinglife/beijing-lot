@@ -214,7 +214,10 @@ def resolve_duplicate_quotes(quotes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Dat
     # Preserve the historic string-comparison semantics (including nulls) while
     # avoiding per-group DataFrame allocation and a terminal concat of millions
     # of one-row frames.
-    ordered["_quote_values"] = ordered[["v1", "v2", "v3"]].astype(str).agg("\x1f".join, axis=1)
+    value_strings = ordered[["v1", "v2", "v3"]].astype(str)
+    ordered["_quote_values"] = (
+        value_strings["v1"] + "\x1f" + value_strings["v2"] + "\x1f" + value_strings["v3"]
+    )
     groups = ordered.groupby(QUOTE_KEYS, dropna=False, sort=False)
     summary = groups.agg(
         _group_size=("payload_sha256", "size"),
