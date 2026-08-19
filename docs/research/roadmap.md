@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-16 11:43 HKT (#229 negative readiness accepted; #232 data remediation activated)**
+Updated: **2026-08-19 10:53 HKT (#236 historical European proxy accepted; #232 remediation remains active)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -93,12 +93,19 @@ PI interpretation and does not replace those edges or Project states.
              v
 #207 ¥100k active bankroll + separate NO_BET safety lane (Done; no overlay Edge)
 
-#208 dynamic N×K risk-conditioned frontier (independent line; EV Review)
+#208 dynamic N×K risk-conditioned frontier (independent line; In Progress)
 
 #229 divergence causal-data profile (Done; BLOCKED_DATA_DEFECT)
              |
              v
-#232 restore causal SP-backed divergence support (Ready)
+#232 restore causal SP-backed divergence support (In Progress)
+  ├─ #234 source/schema freeze (Done)
+  ├─ #235 historical native-SP recovery (Cancelled)
+  ├─ #236 historical European proxy (Done)
+  ├─ #237 power features (Human)
+  ├─ #248 prospective multi-timepoint snapshots (Ready)
+  ├─ #249 database portability (In Progress)
+  └─ #238 divergence materializer (Blocked by #237 and #248)
              |
              v
 #209 full-cycle historical ablation and baseline ladder (Blocked)
@@ -117,9 +124,9 @@ PI interpretation and does not replace those edges or Project states.
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
 | 4 | [#206] fixed-N7 ticket generator | Closed / Done | M3 | #205 closed | Learned challenger rejected; no comparable accepted ticket baseline is bound, so all locked issues route to `NO_BET` |
 | 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
-| 6 | [#208] dynamic N×K frontier | Open / EV Review | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
+| 6 | [#208] dynamic N×K frontier | Open / In Progress | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
-| 8 | [#232] divergence-support remediation | Open / Ready | M1 | No native blocker | Recover provenance-valid SP-backed BJ×EU/POWER support, close #229 evidence debt and prove issue-level chronological modelability |
+| 8 | [#232] divergence-support remediation | Open / In Progress | M1 | Decomposed into native subissues | #236 supplies a broad retrospective European proxy; #238 remains blocked by open #237 and #248 |
 | 9 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #232; #229 closed | Chronological ablations and accepted baseline ladder; activation requires PI modelability review, not merely one positive cell |
 | 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
 | 11 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
@@ -139,6 +146,23 @@ PI interpretation and does not replace those edges or Project states.
 - Any future support greater than zero is necessary but not sufficient. PI must
   review issue-level sample adequacy and supported N/action scope before #209
   may enter `Ready`.
+
+### #236 historical European proxy decision
+
+- PR #265 was accepted and merged at exact reviewed HEAD
+  `db5b613e2976b25aeb326a4ad370c11d8b92debe`. The hash-bound Nowscore/Titan
+  lane covers 192,443 of 192,709 eligible issue slots across 701 issues and
+  emits 1,731,423 de-vig 3/1/0 probability rows.
+- `initial`, `10h` and `1h` remain `RETROSPECTIVE_RELATIVE_PROXY`; they are not
+  exact common-epoch observations, Beijing SP movement or strict-forward
+  evidence. Settlement, result, payout and the 0.65 factor remain excluded.
+- Normalized line 0 permits 342,020 fixture-horizon identity translations
+  (59.26%). Non-zero lines remain masked pending a score/goal-difference
+  distribution. #238 must retain raw line, normalized line, provenance and the
+  translation mask, and must not overclaim the upstream large-code
+  normalization as fully closed raw-provider truth.
+- #236 is now a satisfied native predecessor of #238. #238 remains `Blocked`
+  because #237 and #248 are still open; #235 is closed as `Cancelled`.
 
 ### #205 terminal decision and downstream contract
 
@@ -228,6 +252,13 @@ retrospective feature.
 [#218]: https://github.com/algotradinglife/beijing-lot/issues/218
 [#229]: https://github.com/algotradinglife/beijing-lot/issues/229
 [#232]: https://github.com/algotradinglife/beijing-lot/issues/232
+[#234]: https://github.com/algotradinglife/beijing-lot/issues/234
+[#235]: https://github.com/algotradinglife/beijing-lot/issues/235
+[#236]: https://github.com/algotradinglife/beijing-lot/issues/236
+[#237]: https://github.com/algotradinglife/beijing-lot/issues/237
+[#238]: https://github.com/algotradinglife/beijing-lot/issues/238
+[#248]: https://github.com/algotradinglife/beijing-lot/issues/248
+[#249]: https://github.com/algotradinglife/beijing-lot/issues/249
 
 ---
 
