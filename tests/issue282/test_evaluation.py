@@ -4,6 +4,7 @@ from issue282.evaluation import (
     build_attribution_ledger,
     capital_path_metrics,
     choose_actions,
+    choose_actions_with_baseline_guard,
 )
 
 
@@ -41,6 +42,29 @@ def test_capital_metrics_are_issue_level_and_matched() -> None:
     assert metrics["changed_action_issues"] == 6
     assert metrics["matched_lift_cny"] == 17.0
     assert metrics["ex_largest_matched_lift_cny"] == -3.0
+
+
+def test_baseline_guard_requires_predicted_lift_and_can_keep_cash() -> None:
+    labels = pd.DataFrame(
+        {
+            "issue": ["A", "A", "B", "B"],
+            "issue_year": [2023] * 4,
+            "action_key": ["BASE", "MODEL", "BASE", "MODEL"],
+            "pnl_cny_mean": [-2.0, 10.0, -2.0, 10.0],
+            "stake_cny_mean": [2.0] * 4,
+        }
+    )
+    selected = choose_actions_with_baseline_guard(
+        labels,
+        [2.0, 1.0, -1.0, -2.0],
+        policy_name="GUARDED",
+        fallback_action_key="BASE",
+    )
+    assert selected["action_key"].tolist() == ["BASE", "NO_BET"]
+    assert selected["guard_reason"].tolist() == [
+        "FROZEN_BASELINE_FALLBACK",
+        "CASH_FALLBACK",
+    ]
 
 
 def test_attribution_keeps_oracle_diagnostic_out_of_policy_input() -> None:

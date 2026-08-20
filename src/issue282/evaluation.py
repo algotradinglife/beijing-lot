@@ -50,6 +50,55 @@ def fixed_action_ledger(
     return selected.sort_values(["issue_year", "issue"]).reset_index(drop=True)
 
 
+def choose_actions_with_baseline_guard(
+    labels: pd.DataFrame,
+    scores: pd.Series | np.ndarray,
+    *,
+    policy_name: str,
+    fallback_action_key: str,
+    cash_score: float = 0.0,
+) -> pd.DataFrame:
+    """Deviate only when the predicted action beats both baseline and cash."""
+
+    if len(labels) != len(scores):
+        raise ValueError("labels and scores must align")
+    frame = labels.copy()
+    frame["predicted_score"] = np.asarray(scores, dtype=float)
+    rows: list[pd.Series] = []
+    for _issue, issue_frame in frame.groupby("issue", sort=True):
+        ranked = issue_frame.sort_values(
+            ["predicted_score", "action_key"],
+            ascending=[False, True],
+            kind="stable",
+        )
+        best = ranked.iloc[0].copy()
+        fallback_rows = issue_frame[issue_frame["action_key"].eq(fallback_action_key)]
+        if len(fallback_rows) != 1:
+            raise ValueError(
+                f"fallback action {fallback_action_key} is not unique per issue"
+            )
+        fallback = fallback_rows.iloc[0].copy()
+        best["requested_action_key"] = best["action_key"]
+        best["fallback_action_key"] = fallback_action_key
+        if best["predicted_score"] > max(cash_score, fallback["predicted_score"]):
+            best["guard_reason"] = "MODEL_PREDICTED_LIFT"
+            selected = best
+        elif fallback["predicted_score"] > cash_score:
+            fallback["requested_action_key"] = best["requested_action_key"]
+            fallback["fallback_action_key"] = fallback_action_key
+            fallback["guard_reason"] = "FROZEN_BASELINE_FALLBACK"
+            selected = fallback
+        else:
+            best["action_key"] = "NO_BET"
+            best["pnl_cny_mean"] = 0.0
+            best["stake_cny_mean"] = 0.0
+            best["guard_reason"] = "CASH_FALLBACK"
+            selected = best
+        selected["policy"] = policy_name
+        rows.append(selected)
+    return pd.DataFrame(rows).sort_values(["issue_year", "issue"]).reset_index(drop=True)
+
+
 def capital_path_metrics(
     ledger: pd.DataFrame,
     *,

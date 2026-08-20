@@ -102,8 +102,10 @@ streams and actions are nested observations, not independent samples.
 Five model initialization seeds are reported without selecting the best seed.
 Sixteen deterministic ticket streams quantify proposal randomness inside each
 issue/action. The primary Deep Sets policy uses the median prediction across
-model seeds and an explicit downside penalty; it funds cash when the resulting
-score is nonpositive.
+model seeds and an explicit downside penalty. It deviates only when that score
+strictly exceeds both the frozen N7/K8 control's score and cash; otherwise it
+uses the frozen control when positive, then cash. This is an ex-ante prediction
+guard, never a realized-outcome fallback.
 
 ## Baselines and evaluation
 

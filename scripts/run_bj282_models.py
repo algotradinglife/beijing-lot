@@ -22,7 +22,7 @@ from issue282.evaluation import (  # noqa: E402
     add_capital_curve,
     build_attribution_ledger,
     capital_path_metrics,
-    choose_actions,
+    choose_actions_with_baseline_guard,
     fixed_action_ledger,
 )
 from issue282.features import ISSUE_STATE_FEATURES, build_action_feature_frame  # noqa: E402
@@ -162,27 +162,34 @@ def main() -> int:
         name: fixed_action_ledger(test_labels, action_key=key, policy_name=name)
         for name, key in fixed_keys.items()
     }
-    ledgers["LINEAR"] = choose_actions(
+    frozen_guard_key = fixed_keys["FIXED_N7_K8_TOP_VALUE"]
+    ledgers["LINEAR"] = choose_actions_with_baseline_guard(
         test_labels,
         control_predictions["linear_expected_value"],
         policy_name="LINEAR",
+        fallback_action_key=frozen_guard_key,
     )
-    ledgers["HGB"] = choose_actions(
+    ledgers["HGB"] = choose_actions_with_baseline_guard(
         test_labels,
         control_predictions["hgb_expected_value"],
         policy_name="HGB",
+        fallback_action_key=frozen_guard_key,
     )
-    ledgers["DEEP_ENSEMBLE"] = choose_actions(
+    ledgers["DEEP_ENSEMBLE"] = choose_actions_with_baseline_guard(
         test_labels,
         predictions["deep_policy_score"],
         policy_name="DEEP_ENSEMBLE",
+        fallback_action_key=frozen_guard_key,
     )
     for seed in MODEL_SEEDS:
         score = predictions[f"deep_expected_value_seed{seed}"] + 0.25 * predictions[
             f"deep_q10_seed{seed}"
         ].clip(upper=0.0)
-        ledgers[f"DEEP_SEED_{seed}"] = choose_actions(
-            test_labels, score, policy_name=f"DEEP_SEED_{seed}"
+        ledgers[f"DEEP_SEED_{seed}"] = choose_actions_with_baseline_guard(
+            test_labels,
+            score,
+            policy_name=f"DEEP_SEED_{seed}",
+            fallback_action_key=frozen_guard_key,
         )
 
     fixed_metrics = {
