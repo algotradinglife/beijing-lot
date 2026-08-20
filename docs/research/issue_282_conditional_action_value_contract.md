@@ -109,11 +109,13 @@ guard, never a realized-outcome fallback.
 
 ## Baselines and evaluation
 
-Matched controls on identical issue support include cash, fixed N7/K8
-TOP_VALUE, fixed N7/K8 WR and fixed N7/K8 WOR. The frozen #209 policy and the
-historical BEST_FULL ladder are reported separately whenever their ticket
-semantics or issue support are not exactly reproducible; incompatibility must
-not be hidden by substituting a weaker baseline.
+Matched controls on identical issue support include cash; fixed N7/K8
+TOP_VALUE under each of the market, p×SP and divergence-value surfaces; and
+fixed N7/K8 WR/WOR under p×SP. The fallback control is selected once using
+2014–2022 total P&L and frozen before any 2023 outcome is evaluated. The frozen
+#209 policy and the historical BEST_FULL ladder are reported separately whenever
+their ticket semantics or issue support are not exactly reproducible;
+incompatibility must not be hidden by substituting a weaker baseline.
 
 The primary outcome is the CNY100,000 issue-by-issue pre-tax capital path. The
 report also includes turnover, positive/bet issues, maximum percentage drawdown,

@@ -131,6 +131,9 @@ def main() -> int:
                     "n",
                     "generator",
                     "k",
+                    "normalized_pnl_cny100",
+                    "pnl_cny_mean",
+                    "stake_cny_mean",
                 ]
             ],
             control_predictions,
@@ -152,17 +155,81 @@ def main() -> int:
         0.25 * predictions["deep_q10_median"].clip(upper=0.0)
     )
     predictions.to_parquet(output / "predictions_2023.parquet", index=False)
+    parameter_dimensions = [
+        "selector",
+        "outcome_weight_mode",
+        "n",
+        "generator",
+        "k",
+    ]
+    parameter_performance = (
+        test_labels.groupby(parameter_dimensions, as_index=False)
+        .agg(
+            issues=("issue", "nunique"),
+            turnover_cny=("stake_cny_mean", "sum"),
+            pnl_cny=("pnl_cny_mean", "sum"),
+            positive_issues=("pnl_cny_mean", lambda values: int((values > 0).sum())),
+            median_return_per_cny=("return_per_cny_mean", "median"),
+        )
+    )
+    parameter_performance["return_per_cny"] = np.divide(
+        parameter_performance["pnl_cny"],
+        parameter_performance["turnover_cny"],
+        out=np.zeros(len(parameter_performance)),
+        where=parameter_performance["turnover_cny"].to_numpy() > 0,
+    )
+    parameter_performance.to_csv(
+        output / "parameter_performance_2023.csv", index=False
+    )
+    yearly_performance = (
+        labels.groupby(["issue_year", *parameter_dimensions], as_index=False)
+        .agg(
+            issues=("issue", "nunique"),
+            turnover_cny=("stake_cny_mean", "sum"),
+            pnl_cny=("pnl_cny_mean", "sum"),
+        )
+    )
+    yearly_performance["return_per_cny"] = np.divide(
+        yearly_performance["pnl_cny"],
+        yearly_performance["turnover_cny"],
+        out=np.zeros(len(yearly_performance)),
+        where=yearly_performance["turnover_cny"].to_numpy() > 0,
+    )
+    yearly_performance.to_csv(output / "parameter_performance_by_year.csv", index=False)
 
     fixed_keys = {
-        "FIXED_N7_K8_TOP_VALUE": "SALL_OVALUE_N7_TOP_VALUE_K8",
-        "FIXED_N7_K8_WR": "SALL_OVALUE_N7_WEIGHTED_WR_K8",
-        "FIXED_N7_K8_WOR": "SALL_OVALUE_N7_WEIGHTED_WOR_K8",
+        "FIXED_N7_K8_TOP_CELL_VALUE": "SALL_OVALUE_N7_TOP_VALUE_K8",
+        "FIXED_N7_K8_TOP_MARKET": "SALL_OMARKET_N7_TOP_VALUE_K8",
+        "FIXED_N7_K8_TOP_DIVERGENCE": "SALL_ODIVVALUE_N7_TOP_VALUE_K8",
+        "FIXED_N7_K8_WR_CELL_VALUE": "SALL_OVALUE_N7_WEIGHTED_WR_K8",
+        "FIXED_N7_K8_WOR_CELL_VALUE": "SALL_OVALUE_N7_WEIGHTED_WOR_K8",
     }
+    development_fixed_performance = (
+        labels.loc[development & labels["action_key"].isin(fixed_keys.values())]
+        .groupby("action_key", as_index=False)
+        .agg(
+            development_turnover_cny=("stake_cny_mean", "sum"),
+            development_pnl_cny=("pnl_cny_mean", "sum"),
+        )
+    )
+    development_fixed_performance["development_return_per_cny"] = np.divide(
+        development_fixed_performance["development_pnl_cny"],
+        development_fixed_performance["development_turnover_cny"],
+    )
+    development_fixed_performance = development_fixed_performance.sort_values(
+        ["development_pnl_cny", "action_key"], ascending=[False, True]
+    )
+    frozen_guard_key = str(development_fixed_performance.iloc[0]["action_key"])
+    frozen_guard_name = next(
+        name for name, key in fixed_keys.items() if key == frozen_guard_key
+    )
+    development_fixed_performance.to_csv(
+        output / "development_fixed_baseline_selection.csv", index=False
+    )
     ledgers = {
         name: fixed_action_ledger(test_labels, action_key=key, policy_name=name)
         for name, key in fixed_keys.items()
     }
-    frozen_guard_key = fixed_keys["FIXED_N7_K8_TOP_VALUE"]
     ledgers["LINEAR"] = choose_actions_with_baseline_guard(
         test_labels,
         control_predictions["linear_expected_value"],
@@ -192,13 +259,8 @@ def main() -> int:
             fallback_action_key=frozen_guard_key,
         )
 
-    fixed_metrics = {
-        name: capital_path_metrics(ledger) for name, ledger in ledgers.items() if name.startswith("FIXED")
-    }
-    strongest_fixed_name = max(
-        fixed_metrics, key=lambda name: fixed_metrics[name]["ending_capital_cny"]
-    )
-    strongest_fixed = ledgers[strongest_fixed_name]
+    strongest_fixed_name = frozen_guard_name
+    strongest_fixed = ledgers[frozen_guard_name]
     metrics = []
     for name, ledger in ledgers.items():
         comparison = None if name == strongest_fixed_name else strongest_fixed
@@ -276,6 +338,7 @@ def main() -> int:
         "test_year": 2023,
         "sealed_years_opened": [],
         "strongest_matched_fixed_baseline": strongest_fixed_name,
+        "baseline_selected_using": "2014_2022_DEVELOPMENT_TOTAL_PNL_BEFORE_2023",
         "deep_positive_brier_all_nested_action_rows": positive_brier,
         "positive_model_seed_count": seed_positive,
         "holdout_criteria": criteria,
