@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-20 19:12 HKT (#279 action-aware targets and 2023 pre-outcome attribution accepted; #210 remains blocked only by open #218)**
+Updated: **2026-08-20 23:30 HKT (#282 conditional-policy prototype settled; learned policy abstains and no held-out candidate is promoted)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -115,7 +115,10 @@ PI interpretation and does not replace those edges or Project states.
 #279 action-aware feature factory + 2023 issue attribution (Done)
              |
              v
-#210 held-out/prospective validation  <--- #279 satisfied; blocked by open #218
+#282 conditional M×3 action-value and distinct-ticket policy (Done; no learned Edge)
+             |
+             v
+#210 held-out/prospective validation  <--- no candidate; also blocked by #218
              |
              v
 #211 timestamped message overlay     <--- #182 message evidence
@@ -132,9 +135,29 @@ PI interpretation and does not replace those edges or Project states.
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
 | 8 | [#232] divergence-support remediation | Closed / Done | M1 | Native `blockedBy #238` is closed | Dual-track data handoff accepted: complete historical proxy, prospective interface and portable snapshot path; actual historical Beijing three-way SP remains unavailable |
 | 9 | [#209] full-cycle historical evaluation | Closed / Done | M3 | #232 and #229 closed | Learned state-action policy is dynamic but fails 2023 matched capital (-0.316pp vs fixed N7/K8); retain control, keep 2024 sealed |
-| 10 | [#279] action-aware feature factory | Closed / Done | M3 | Parent #202; satisfied predecessor of #210 | Budget-matched distributional targets, action features and complete 2023 pre-outcome cell/ticket/leg traces |
-| 11 | [#210] held-out/forward validation | Open | M4 | #279/#209 closed; blocked by open #218 | Do not spend holdout until a dynamic candidate beats the frozen control pre-2024 |
-| 12 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 10 | [#279] action-aware feature factory | Closed / Done | M3 | Parent #202; satisfied predecessor of #282/#210 | Budget-matched distributional targets, action features and complete 2023 pre-outcome cell/ticket/leg traces |
+| 11 | [#282] conditional action-value policy | Closed / Done | M3 | #279 closed; native successor #210 | End-to-end Deep Sets prototype complete; cash-only learned result, no holdout handoff; retain N8 regime hypothesis for development |
+| 12 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
+| 13 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+
+### #282 conditional-policy prototype decision
+
+- The complete `M×3 → (S,O,N,G,K,R,W) → distinct tickets → CNY100k capital`
+  path runs with 432 feasible action identities, 16 common ticket streams and
+  5 neural initialization seeds. The frozen-2022 replay never opens 2024+.
+- The primary Deep Sets ensemble funds zero model-selected deviations in all 53
+  2023 issues and ends at cash CNY100,000. Its apparent improvement over the
+  current-tensor N7/K8 market control (CNY99,719.69) is pure abstention, not a
+  learned betting Edge. Linear and HGB controls also fail matched promotion.
+- 2018–2022 expanding-window OOF confirms underactivity: Deep funds only two
+  deviations and has aggregate matched lift CNY−2,394.25. The #210 handoff gate
+  therefore fails and the outcome seal remains intact.
+- A post-outcome N8 weighted-sampling cluster is retained only as hypothesis.
+  `CELL_VALUE/N8/K512` is +17.56% in 2023 and +2.82% over 2014–2022, but the
+  development aggregate depends on 2014 and turns negative without it. Any next
+  model must learn a preregistered causal regime relation rather than promote
+  the scanned row.
+- Decision report: [`issue_282_conditional_policy_report.md`](issue_282_conditional_policy_report.md).
 
 ### #279 action-aware target and attribution decision
 

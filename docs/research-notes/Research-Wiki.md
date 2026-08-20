@@ -967,6 +967,34 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - PI 对抗性结论：SIMPLE/K16 正向路径、低暴露和上游票选择均不能归因于 Stage 4；
   因此接受负结论并推进 N 与 K 分离学习，而不是把固定 N7 解释为 Edge。
 
+## #282 M×3 条件动作价值与动态票策略原型（2026-08-20）
+
+#282 首次把逐期可变 `M×3` 赛前张量、完整动作 `(S,O,N,G,K,R,W)`、不同 N、
+distinct-ticket WR/WOR/TOP 生成器、一次性 0.65 整票结算、CNY100,000 资金路径和
+PyTorch Deep Sets 条件价值模型串成端到端原型。2014–2022 用于开发，2023 为冻结
+回放；2024+ 赛果未打开。432 个可行动作通过 16 条 common-random ticket streams
+形成 267,768 个嵌套动作行，但独立统计单位仍是 620 期。
+
+主结论是 `NO_LEARNED_EDGE / EFFECTIVE_ABSTENTION`。五 seed Deep ensemble 在 2023
+的 53 期全部选择现金：终值 CNY100,000、零 turnover、零 drawdown；冻结的当前张量
+N7/K8 market TOP 控制终值 CNY99,719.69。超过这个弱控制全部来自不下注，并非学到
+盈利参数。Linear/HGB 分别为 CNY97,616.17/CNY99,289.97。2018–2022 expanding OOF
+中 Deep 仅有 2 次真正模型偏离，合计 P&L +CNY38.09，但相对当年冻结控制的 matched
+lift 为 −CNY2,394.25；HGB 虽 3/5 年绝对为正，aggregate matched lift 仍为
+−CNY4,057.37。因此 #282 不具备打开 #210 held-out 的资格。
+
+post-outcome 参数诊断发现值得后续解释、但尚不可晋级的 N8 状态簇：
+`ALL × CELL_VALUE × N8 × WR/WOR × K512` 在 2023 税前 +17.56%，2014–2022 汇总
++2.82%，但开发利润主要来自 2014；去掉 2014 后转负，且 2018/2021/2022 分别为
+−27.59%/−13.36%/−25.24%。`MARKET × N8 × WR/WOR × K128` 的 2023 +57.20%
+在 2014–2022 则为 −5.84%。这说明下一轮应预注册并学习可观察的 regime → 参数关系，
+不能把 N8 或 2023 最优行直接固定成新基线。
+
+详细模型、资本路径、OOF、完整参数表、对抗性反证与下一步见
+[`issue_282_conditional_policy_report`](../research/issue_282_conditional_policy_report.md)，
+执行版 notebook 位于
+[`bj282_conditional_policy.ipynb`](../../notebooks/research/issue-282/bj282_conditional_policy.ipynb)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]

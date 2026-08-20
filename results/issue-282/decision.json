@@ -1,0 +1,34 @@
+{
+  "contract": "BJ-UNIFIED-CONDITIONAL-POLICY-001/v1",
+  "primary_replay": "FROZEN_AT_2022_YEAR_END_EXECUTED_ON_2023",
+  "development_years": [
+    2014,
+    2022
+  ],
+  "test_year": 2023,
+  "sealed_years_opened": [],
+  "strongest_matched_fixed_baseline": "FIXED_N7_K8_TOP_MARKET",
+  "baseline_selected_using": "2014_2022_DEVELOPMENT_TOTAL_PNL_BEFORE_2023",
+  "deep_positive_brier_all_nested_action_rows": 0.13244060569692628,
+  "positive_model_seed_count_vs_cash": 0,
+  "funded_model_deviation_issues": 0,
+  "holdout_criteria": {
+    "ending_capital_above_cash": false,
+    "ending_capital_above_frozen_active_baseline": true,
+    "ex_largest_matched_lift_nonnegative": true,
+    "max_drawdown_no_worse": true,
+    "rolling10_worst_no_worse": true,
+    "funded_model_deviation_issues_at_least_15": false,
+    "largest_issue_positive_lift_share_at_most_half": true,
+    "model_seeds_positive_vs_cash_at_least_3_of_5": false,
+    "calibration_gate_preregistered_and_passed": false,
+    "causal_and_seal_checks": true
+  },
+  "holdout_eligible": false,
+  "promotion_authority": false,
+  "notes": [
+    "WR and WOR have identical funded tickets under equal distinct-ticket stakes; proposal frequency differs and is reserved for Stage 4.",
+    "BEST_FULL legacy -9.47% is reported separately because its historical support is not identical to the current Mx3 tensor.",
+    "Prototype debt: no causal 2023 online-update diagnostic, no separately pretrained cell head, and no committed ticket-identity/marginal-K trace; these cannot be treated as promotion evidence."
+  ]
+}

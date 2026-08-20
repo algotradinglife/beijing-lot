@@ -29,6 +29,13 @@ pytest==9.0.3
 ruff==0.12.9  # repository lint baseline; newer rule sets require an explicit migration
 jsonschema==4.25.1  # Operations Status v2 API contract validation
 scikit-learn==1.9.0  # frozen #204/#205 scientific model environment
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0+cpu  # #282 Deep Sets conditional action-value model
+filelock==3.32.3  # PyTorch runtime dependency
+fsspec==2026.7.0  # PyTorch runtime dependency
+networkx==3.6.1  # PyTorch runtime dependency
+sympy==1.14.0  # PyTorch optimizer/dynamo runtime dependency
+mpmath==1.3.0  # SymPy runtime dependency
 nbformat==5.10.4  # executed research notebook contract
 nbclient==0.10.2  # clean-run notebook validation
 jupyter-client==8.6.3  # pinned nbclient kernel protocol
