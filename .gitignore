@@ -33,6 +33,17 @@ results/*
 !results/issue-209/**
 !results/issue-279/
 !results/issue-279/**
+!results/issue-282/
+results/issue-282/*
+!results/issue-282/decision.json
+!results/issue-282/training_receipts.json
+!results/issue-282/policy_metrics_2023.csv
+!results/issue-282/development_fixed_baseline_selection.csv
+!results/issue-282/parameter_performance_2023.csv
+!results/issue-282/parameter_performance_by_year.csv
+!results/issue-282/expanding_oof_metrics.csv
+!results/issue-282/static_action_robustness_2023.csv
+!results/issue-282/capital_path_*.csv
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
 !results/bj229_divergence_profile_v1/**/*.csv
@@ -58,6 +69,7 @@ temp/
 !results/issue-209/*.parquet
 !results/issue-279/*.csv
 !results/issue-279/*.parquet
+!results/issue-282/*.csv
 !results/issue-205/*.csv
 !results/issue-205/*.parquet
 !results/issue-206/*.csv

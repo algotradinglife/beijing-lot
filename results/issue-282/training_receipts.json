@@ -1,0 +1,42 @@
+[
+  {
+    "seed": 282101,
+    "epochs": 16,
+    "actions_per_issue_per_epoch": 48,
+    "target_scale": 100.0,
+    "target_clip_scaled": 11.236461639404297,
+    "final_epoch_loss": 0.8739244190739913
+  },
+  {
+    "seed": 282102,
+    "epochs": 16,
+    "actions_per_issue_per_epoch": 48,
+    "target_scale": 100.0,
+    "target_clip_scaled": 11.236461639404297,
+    "final_epoch_loss": 0.8703172760950008
+  },
+  {
+    "seed": 282103,
+    "epochs": 16,
+    "actions_per_issue_per_epoch": 48,
+    "target_scale": 100.0,
+    "target_clip_scaled": 11.236461639404297,
+    "final_epoch_loss": 0.8496560437578551
+  },
+  {
+    "seed": 282104,
+    "epochs": 16,
+    "actions_per_issue_per_epoch": 48,
+    "target_scale": 100.0,
+    "target_clip_scaled": 11.236461639404297,
+    "final_epoch_loss": 0.886854027358579
+  },
+  {
+    "seed": 282105,
+    "epochs": 16,
+    "actions_per_issue_per_epoch": 48,
+    "target_scale": 100.0,
+    "target_clip_scaled": 11.236461639404297,
+    "final_epoch_loss": 0.8578470844618031
+  }
+]

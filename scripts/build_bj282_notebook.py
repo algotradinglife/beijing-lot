@@ -46,6 +46,8 @@ parameters=pd.read_csv(R/'parameter_performance_2023.csv')
 yearly=pd.read_csv(R/'parameter_performance_by_year.csv')
 predictions=pd.read_parquet(R/'predictions_2023.parquet')
 ledger=pd.read_parquet(R/'deep_ensemble_ledger_2023.parquet')
+oof=pd.read_csv(R/'expanding_oof_metrics.csv')
+robustness=pd.read_csv(R/'static_action_robustness_2023.csv')
 print(json.dumps(decision,indent=2)); display(baseline_selection); display(metrics)""",
     ),
     cell(
@@ -84,6 +86,22 @@ plt.tight_layout(); plt.savefig(F/'bj282_2023_capital_paths.png',dpi=170); plt.s
     ),
     cell(
         "markdown",
+        """## Expanding-window out-of-fold check
+
+Each validation year is predicted by models fitted only on earlier years. This separates a genuinely learned dynamic policy from a single favorable 2023 path. Cash/fallback decisions do not count as model deviations.""",
+    ),
+    cell(
+        "code",
+        """display(oof)
+fig,ax=plt.subplots(figsize=(11,5))
+for policy,g in oof.groupby('policy'):
+    ax.plot(g.validation_year,g.total_pnl_cny,marker='o',label=policy)
+ax.axhline(0,color='black',lw=.8); ax.set(xlabel='OOF validation year',ylabel='Pre-tax P&L (CNY)',title='Annual expanding-window learned-policy P&L'); ax.legend()
+plt.tight_layout(); plt.savefig(F/'bj282_expanding_oof.png',dpi=170); plt.show()
+display(oof.groupby('policy').agg(total_pnl=('total_pnl_cny','sum'),funded_deviations=('funded_model_deviations','sum'),positive_years=('total_pnl_cny',lambda x:int((x>0).sum()))))""",
+    ),
+    cell(
+        "markdown",
         """## Parameter-performance surface
 
 These are fixed-policy 2023 slices, not independently validated discoveries. They reveal where selector, outcome direction, N, generator and K interact before the learned policy chooses among them.""",
@@ -101,6 +119,19 @@ ax.axhline(0,color='black',lw=.8); ax.set_xlabel('N'); ax.set_ylabel('Pre-tax re
 ax.set_title('2023 pooled N curve by outcome proposal surface'); ax.legend()
 plt.tight_layout(); plt.savefig(F/'bj282_2023_n_surface.png',dpi=170); plt.show()
 display(parameters.sort_values('return_per_cny',ascending=False).head(25))""",
+    ),
+    cell(
+        "markdown",
+        """## Post-outcome static-policy hypothesis scan
+
+This table is diagnostic only. It ranks fixed actions on 2023 outcomes, then displays their untouched 2014–2022 history beside them. A positive 2023 row is not a frozen Edge when the same action loses over development years.""",
+    ),
+    cell(
+        "code",
+        """cols=['action_key','test_return_per_cny','test_pnl_cny','test_ex_largest_pnl_cny','test_positive_issues','development_return_per_cny','development_positive_years','development_worst_year_return']
+display(robustness[cols].head(25))
+candidate=robustness[robustness.action_key.eq('SALL_OMARKET_N8_WEIGHTED_WR_K128')]
+display(candidate[cols])""",
     ),
     cell(
         "markdown",

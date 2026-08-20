@@ -18,6 +18,7 @@ from issue209.data import build_tensor  # noqa: E402
 from issue209.models import build_match_units  # noqa: E402
 from issue279.traces import build_cell_trace  # noqa: E402
 from issue282.data import pack_issue_cells  # noqa: E402
+from issue282.contract import CELL_FEATURES, FIXED_BASELINE_KEYS, MODEL_SEEDS  # noqa: E402
 from issue282.evaluation import (  # noqa: E402
     add_capital_curve,
     build_attribution_ledger,
@@ -33,23 +34,6 @@ from issue282.training import (  # noqa: E402
     predict_deep_set,
     prepare_arrays,
 )
-
-MODEL_SEEDS = tuple(282_101 + offset for offset in range(5))
-CELL_FEATURES = (
-    "native_handicap_line",
-    "n_available_books",
-    "mapping_accepted",
-    "probability",
-    "cell_value",
-    "value_q10",
-    "value_q90",
-    "divergence",
-    "predicted_sp_proxy",
-    "cell_value_rank",
-    "match_best_value",
-    "match_value_rank",
-)
-
 
 def main() -> int:
     output = ROOT / "results/issue-282"
@@ -197,13 +181,7 @@ def main() -> int:
     )
     yearly_performance.to_csv(output / "parameter_performance_by_year.csv", index=False)
 
-    fixed_keys = {
-        "FIXED_N7_K8_TOP_CELL_VALUE": "SALL_OVALUE_N7_TOP_VALUE_K8",
-        "FIXED_N7_K8_TOP_MARKET": "SALL_OMARKET_N7_TOP_VALUE_K8",
-        "FIXED_N7_K8_TOP_DIVERGENCE": "SALL_ODIVVALUE_N7_TOP_VALUE_K8",
-        "FIXED_N7_K8_WR_CELL_VALUE": "SALL_OVALUE_N7_WEIGHTED_WR_K8",
-        "FIXED_N7_K8_WOR_CELL_VALUE": "SALL_OVALUE_N7_WEIGHTED_WOR_K8",
-    }
+    fixed_keys = FIXED_BASELINE_KEYS
     development_fixed_performance = (
         labels.loc[development & labels["action_key"].isin(fixed_keys.values())]
         .groupby("action_key", as_index=False)
