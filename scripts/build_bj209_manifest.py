@@ -20,12 +20,24 @@ FILES = [
     "decision.json",
     "schema.json",
     "DECISION_REPORT.md",
+    "dynamic_issue_states.csv",
+    "dynamic_action_counterfactuals.parquet",
+    "dynamic_policy_predictions.parquet",
+    "dynamic_selected_actions.csv",
+    "dynamic_calibration_actions.csv",
+    "dynamic_calibration_safe_actions.csv",
+    "dynamic_matched_capital_paths.csv",
+    "dynamic_decision.json",
+    "dynamic_policy.joblib",
 ]
 EXTRA_ROOT = Path(".")  # files rooted at repo root, referenced by their relative path
 EXTRA = [
     "method.yaml",
     "notebooks/research/issue-209/bj209_gate_a.ipynb",
     "docs/research/issue_209_unified_learning_gate_a.md",
+    "docs/research/figures/bj209_dynamic_family_selection.png",
+    "docs/research/figures/bj209_dynamic_action_frequency.png",
+    "docs/research/figures/bj209_dynamic_matched_capital.png",
     "docs/handoffs/bj209-gate-a-to-210.md",
 ]
 
@@ -47,4 +59,4 @@ for f in FILES:
 dst = ROOT / "SHA256SUMS.txt"
 dst.write_text("\n".join(lines) + "\n")
 print(f"SHA256SUMS.txt files: {len(lines)}")
-print("\n".join("  " + l.split()[-1] for l in lines))
+print("\n".join("  " + line.split()[-1] for line in lines))

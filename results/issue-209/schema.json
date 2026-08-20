@@ -1,5 +1,5 @@
 {
-  "contract": "BJ-UNIFIED-FULL-CYCLE-HIST-001/v3-gate-a",
+  "contract": "BJ-UNIFIED-FULL-CYCLE-HIST-001/v3-dynamic-method-rework",
   "gate_a": "development through 2023; 2024 sealed",
   "gate_b": "NOT_OPENED - terminal 2024 sealed until PI authorization",
   "artifacts": {
@@ -8,7 +8,13 @@
     "cell_value_distribution.parquet": "per-outcome raw value R_RAW=P_win*SP with q10/q50/q90",
     "dryrun_issue_results.csv": "per-issue 2023 ticket/stake/gross dry-run",
     "dryrun_capital_path.csv": "CNY100k pre-tax equity path over 2023 issues",
-    "decision.json": "Gate-A decision fields + calibration support + seal"
+    "decision.json": "controlling dynamic-policy decision, upstream probability receipt and seal",
+    "dynamic_issue_states.csv": "one pre-event state vector per development issue",
+    "dynamic_action_counterfactuals.parquet": "seed-aggregated issue/action learning targets",
+    "dynamic_policy_predictions.parquet": "2022/2023 state-action model predictions",
+    "dynamic_selected_actions.csv": "frozen active and safe action selections",
+    "dynamic_matched_capital_paths.csv": "matched CNY100k pre-tax capital paths",
+    "dynamic_policy.joblib": "frozen scikit-learn two-part action model bundle"
   },
   "seal": {
     "sealed_before": 2024,

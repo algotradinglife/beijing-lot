@@ -5,18 +5,20 @@
 # authorized until Gate A is PI-reviewed and frozen. 2024 labels stay sealed.
 # Protocol deltas appended in PROTOCOL-LOG; never edited in place.
 
-protocol_version: bj209-gate-a-protocol-v1
+protocol_version: bj209-gate-a-protocol-v2-dynamic-policy
 
 candidate_pool:
   description: "divergence-aware M×3 distributional value model on the #238 surface"
   source: "data/derived/bj238_divergence_materializer_v4r3 (inference view + pre-2024 labels)"
-  probability_families: [MARKET_ONLY_CELL, CALIBRATED_LOGISTIC, PYTORCH_MLP]
+  probability_families: [MARKET_ONLY_CELL, CALIBRATED_LOGISTIC, SKLEARN_MLP]
   sp_quantiles: [q10, q50, q90]
-  n_range: [3, 4, 5, 6, 7, 8]
-  k_range: [1, 4, 8, 16]
-  horizons: [initial, 10h, 1h]
+  dynamic_action_n_anchors: [3, 5, 7, 8]
+  dynamic_action_k_anchors: [8, 32, 128, 512]
+  dynamic_generators: [TOP_VALUE, WEIGHTED_WR, WEIGHTED_WOR, NO_BET]
+  action_boundary: "experimental anchors; K is not an operational stake cap"
+  horizon: 10h
   seed_count: 3
-  seed_rule: "hash-derived sha256('bj209-seed-<i>'); seed never a feature"
+  seed_rule: "stable deterministic 32-bit mixer of issue/action/base-seed; seed never a feature"
 
 splits:
   selection_split: "tune_2022"
@@ -35,10 +37,14 @@ terminal_access:
 selection_algorithm:
   preregistered: true
   rule:
-    - "probability-family selection on tune (2022) issue-block log-loss only"
-    - "untouched 2023 calibration block is confirmation, never selection"
+    - "probability identity inherited from the accepted Gate-A market-only result"
+    - "fit action-conditioned two-part learners through 2021"
+    - "select LOGISTIC_TWO_PART vs MLP_TWO_PART on 2022 issue-level capital utility"
+    - "refit the selected family through 2022 and freeze all 2023 actions pre-outcome"
+    - "2023 is untouched policy confirmation, never action or model-family selection"
     - "2024 terminal evaluation sealed until PI authorizes Gate B"
-    - "all stochastic mechanisms use pre-registered seeds; no seed is a policy action"
+    - "seed replications are aggregated within issue/action; seed is never a policy action"
+    - "safe arm may choose NO_BET; active arm diagnoses whether a dynamic mapping exists"
 
 metrics:
   - name: tune_issue_block_log_loss
@@ -48,7 +54,7 @@ metrics:
     definition: "2023 untouched calibration log loss; confirmation of chosen family"
     golden_test: "tests/issue209/test_bj209_metrics.py::test_calibration_confirmation"
   - name: matched_ending_capital_lift
-    definition: "candidate CNY100k pre-tax ending capital minus frozen #207 N7/K8 incumbent ending capital on matched 2023 support"
+    definition: "candidate CNY100k pre-tax ending capital relative to fixed N7/K8 TOP_VALUE control on identical 2023 issue support"
     golden_test: "tests/issue209/test_bj209_metrics.py::test_matched_lift_definition"
   - name: payout_65_single_application
     definition: "winning N-fold gross = 0.65 * product(SP_i); 0.65 applied once, never 0.65^N"
@@ -75,6 +81,13 @@ required_artifacts:
   - results/issue-209/cell_value_distribution.parquet
   - results/issue-209/SHA256SUMS.txt
   - results/issue-209/dryrun_capital_path.csv
+  - results/issue-209/dynamic_issue_states.csv
+  - results/issue-209/dynamic_action_counterfactuals.parquet
+  - results/issue-209/dynamic_policy_predictions.parquet
+  - results/issue-209/dynamic_selected_actions.csv
+  - results/issue-209/dynamic_matched_capital_paths.csv
+  - results/issue-209/dynamic_decision.json
+  - results/issue-209/dynamic_policy.joblib
 
 schema_ref: results/issue-209/schema.json
 
@@ -110,30 +123,33 @@ stages:
       - "forbidden: settlement SP, winning SP, pW, Y, result as features"
       - "horizon one-hot (no ordinal encoding of categorical actions)"
   - name: model_selection
-    deliverable: "fit (through 2021) + tune (2022) probability/SP/value fits + selection receipt"
+    deliverable: "fit (through 2021) + tune (2022) action-conditioned policy-family selection receipt"
     skill: experiment-tracking
     constraints:
-      - "chronological issue-block splits only; selection on tune 2022 log-loss"
-      - "distributional losses: cross-entropy+Brier+ECE for prob; quantile/Huber for SP"
-      - "market-only and calibrated-logistic baselines vs bounded PyTorch MLP challenger"
-      - "no unlimited architecture/grid; model budget frozen"
+      - "chronological issue-block splits only; policy-family selection on 2022 issue-level capital utility"
+      - "two-part target: probability of positive issue PnL plus conditional positive payoff/nonpositive loss"
+      - "maintained scikit-learn LogisticRegression/MLPClassifier and HistGradientBoostingRegressor"
+      - "features are pre-event issue state plus explicit N/K/generator action parameters"
+      - "no unlimited architecture/grid; action and model budgets frozen"
   - name: terminal_evaluation
-    deliverable: "2023 untouched calibration confirmation + 2023 dry-run ticket/bankroll path + decision.json"
+    deliverable: "2023 frozen dynamic-policy replay + matched fixed-control capital paths + decision.json"
     skill: model-card
     constraints:
-      - "2023 used as untouched confirmation; exactly-once ticket/policy dry-run"
+      - "2023 used as untouched confirmation; actions selected only from model predictions"
       - "0.65 applied once per winning N-fold ticket"
       - "2024 terminal evaluation sealed; Gate B NOT opened"
       - "matched lift vs frozen #207 N7/K8 incumbent; no lower-turnover alpha"
 
 models:
-  primary: "CalibratedLogistic or PyTorch MLP (whichever wins tune 2022 log-loss)"
+  upstream_probability: "MARKET_ONLY_CELL inherited from accepted Gate-A probability comparison"
+  primary: "LOGISTIC_TWO_PART or MLP_TWO_PART (selected on 2022 issue-level policy utility)"
   primary_params:
-    hidden: [64, 64]
-    max_epochs: 30
-    lr: 1.0e-3
-    seed_count: 3
+    mlp_hidden: [64, 32]
+    mlp_alpha: 0.01
+    mlp_max_iter: 300
+    downside_quantile: 0.10
+    nuisance_seed_count: 3
   control_market: "MARKET_ONLY_CELL (mapped EU-BJ probability, label-free)"
   sp_model: "HistGradientBoosting quantile (q10/q50/q90)"
-  target: "distributional value = P(Y=1|X) * SP with uncertainty"
-  inference: "dynamic N/K ticket policy from learned value; 0.65 once per winning ticket"
+  target: "risk-adjusted pre-tax log-capital increment for each issue/action"
+  inference: "learned per-issue N/K/generator/NO_BET action; 0.65 once per winning ticket"

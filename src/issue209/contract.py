@@ -8,6 +8,8 @@ losses, ticket economics and the Gate-A freeze identity. 2024+ labels stay seale
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Final
 
 CONTRACT_VERSION: Final = "BJ-UNIFIED-FULL-CYCLE-HIST-001/v3-gate-a"
@@ -17,13 +19,14 @@ AUDIT_MODE: Final = "exploration"  # exploration: [EVIDENCE] debt trackable; [CO
 # ---------------------------------------------------------------------------
 # Source surface (accepted #268/#238)
 # ---------------------------------------------------------------------------
-DATA_ROOT: Final = (
-    "/home/drwho1985/workspace/soccer/beijing-lot/data/derived"
-)
-BJ238_PACKAGE: Final = DATA_ROOT + "/bj238_divergence_materializer_v4r3"
-INFERENCE_VIEW: Final = BJ238_PACKAGE + "/inference/relative_horizon_view.parquet"
-LABELS_PRE2024: Final = BJ238_PACKAGE + "/development/labels_pre2024.parquet"
-LABELS_SQLITE: Final = DATA_ROOT + "/beidan_xlsm/beidan_xlsm.sqlite"
+REPOSITORY_ROOT: Final = Path(
+    os.environ.get("BEIJING_LOT_RUNTIME_ROOT", Path(__file__).resolve().parents[2])
+).resolve()
+DATA_ROOT: Final = REPOSITORY_ROOT / "data/derived"
+BJ238_PACKAGE: Final = DATA_ROOT / "bj238_divergence_materializer_v4r3"
+INFERENCE_VIEW: Final = BJ238_PACKAGE / "inference/relative_horizon_view.parquet"
+LABELS_PRE2024: Final = BJ238_PACKAGE / "development/labels_pre2024.parquet"
+LABELS_SQLITE: Final = DATA_ROOT / "beidan_xlsm/beidan_xlsm.sqlite"
 
 OUTCOMES: Final = ("3", "1", "0")          # Beijing native handicap W/D/L
 HORIZONS: Final = ("initial", "10h", "1h")  # relative-horizon EU proxies
@@ -86,8 +89,8 @@ MODEL_BUDGET: Final = {
 INITIAL_BANKROLL: Final = 100_000.0
 TICKET_STAKE: Final = 2.0                # CNY2 granularity
 TAX_FACTOR: Final = 0.65                 # applied ONCE per winning N-fold ticket
-N_RANGE: Final = (3, 8)                  # dynamic parlay length (REQ-209-05)
-K_RANGE: Final = (1, 16)                 # dynamic ticket count / sampling depth
+N_RANGE: Final = (3, 5, 7, 8)            # bounded experimental action anchors
+K_RANGE: Final = (8, 32, 128, 512)       # anchors, not an operational stake cap
 POLICIES: Final = (
     "DIV_LEARNED_VALUE",
     "MARKET_ONLY_CELL",

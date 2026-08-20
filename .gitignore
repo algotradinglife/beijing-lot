@@ -52,6 +52,8 @@ temp/
 !docs/research-notes/evidence/issue-83-continuous-market-metrics.csv
 *.tsv
 *.parquet
+!results/issue-209/*.csv
+!results/issue-209/*.parquet
 !results/issue-205/*.csv
 !results/issue-205/*.parquet
 !results/issue-206/*.csv

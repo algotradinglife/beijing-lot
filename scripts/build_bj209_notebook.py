@@ -1,115 +1,188 @@
 #!/usr/bin/env python3
-"""Programmatically build the issue-209 Gate A notebook (thin orchestration)."""
+"""Build the executed-analysis notebook for issue #209 dynamic Gate A."""
+
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 
 OUT = Path("notebooks/research/issue-209/bj209_gate_a.ipynb")
 
 
-def md(src): return {"cell_type": "markdown", "metadata": {}, "source": ["\n".join(src)]}
-def code(src):
-    return {"cell_type": "code", "execution_count": None,
-            "metadata": {}, "outputs": [],
-            "source": ["\n".join(src)]}
+def md(source: str) -> dict[str, object]:
+    return {"cell_type": "markdown", "metadata": {}, "source": source.splitlines(True)}
+
+
+def code(source: str) -> dict[str, object]:
+    return {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": source.splitlines(True),
+    }
 
 
 cells = [
-    md([
-        "# Issue #209 — Unified Learning Gate A: divergence-aware M×3 value model",
-        "",
-        "**Contract:** BJ-UNIFIED-FULL-CYCLE-HIST-001/v3 (PI amendment 2026-08-20, accepted #238 interface).",
-        "**Audit mode:** exploration. **Scope:** Gate A development through 2023. **2024 labels stay sealed** (Gate B not opened).",
-        "",
-        "Pipeline: tensor → census → distributional probability → SP quantiles → cell value → ticket/policy → bankroll → freeze identity.",
-        "",
-        "Reusable package-first code under `src/issue209/`; this notebook is a thin orchestration layer.",
-    ]),
-    code([
-        "import sys, warnings",
-        'warnings.filterwarnings("ignore")',
-        'sys.path.insert(0, "../..")',
-        "from issue209.data import build_tensor, build_census",
-        "from issue209.models import (",
-        "    build_match_units, market_only_probabilities, fit_calibrated_logistic,",
-        "    fit_mlp_challenger, predict_logistic, predict_mlp, evaluate_calibration, _compute_losses,",
-        ")",
-        "from issue209.value import fit_sp_quantile_model, predict_sp_quantiles, cell_value_distribution",
-        "from issue209.ticket import select_ticket_panel, settle_ticket",
-        "from issue209.bankroll import simulate_bankroll, summarize_capital",
-        "import numpy as np, pandas as pd, json",
-    ]),
-    md(["## Stage 0/1 — tensor + census (REQ-209-01/02/07)"]),
-    code([
-        "tensor = build_tensor()",
-        'sealed = int((tensor["issue_year"] >= 2024).sum()) + int(tensor["issue"].astype(str).str.match(r"^24").sum())',
-        'print("tensor rows:", len(tensor), "| sealed 2024 rows:", sealed, "(must be 0)")',
-        "census = build_census(tensor)",
-        "display(census)",
-    ]),
-    md(["## Stage 2 — distributional probability learning (REQ-209-04, -03)"]),
-    code([
-        "units = build_match_units(tensor)",
-        "market = market_only_probabilities(units)",
-        "logistic = fit_calibrated_logistic(units)",
-        "mlp = fit_mlp_challenger(units)",
-        "pred_l = predict_logistic(logistic, units)",
-        "pred_m = predict_mlp(mlp, units)",
-        'tune_idx = np.where(units["temporal_role"].isin(["tune"]))[0]',
-        'yt = units["realized_outcome"].astype(str).iloc[tune_idx]',
-        "tune = {",
-        '  "market_only": _compute_losses(yt, market.iloc[tune_idx])["log_loss"],',
-        '  "logistic": _compute_losses(yt, pred_l.iloc[tune_idx])["log_loss"],',
-        '  "mlp": _compute_losses(yt, pred_m.iloc[tune_idx])["log_loss"],',
-        "}",
-        'print("tune 2022 log-loss:", json.dumps(tune, indent=2))',
-        "chosen = min(tune, key=tune.get)",
-        'print("frozen candidate family:", chosen)',
-    ]),
-    md(["## Stage 3 — SP quantiles + cell-value distribution (REQ-209-04)"]),
-    code([
-        "sp = fit_sp_quantile_model(units)",
-        "sp_q = predict_sp_quantiles(sp, units)",
-        'prob_chosen = market if chosen == "market_only" else (pred_m if chosen == "mlp" else pred_l)',
-        "value = cell_value_distribution(prob_chosen, sp_q, units)",
-        'print("cell value columns:", [c for c in value.columns])',
-        'display(value[["ev_raw_3","ev_raw_1","ev_raw_0"]].head())',
-    ]),
-    md(["## Stage 4 — ticket/policy + bankroll on 2023 dry-run (REQ-209-05/06/08)"]),
-    code([
-        'cal = units[units["temporal_role"].isin(["calibration"])].copy()',
-        "res = []",
-        'for issue in sorted(cal["issue"].unique()):',
-        '    panel = select_ticket_panel(cal, value, issue, "10h", n=7, k=8, seed=209003)',
-        "    if panel.empty:",
-        '        res.append({"issue":issue,"n_tickets":0,"stake_total":0.0,"realized_gross":0.0}); continue',
-        "    gross = 0.0",
-        "    for _, r in panel.iterrows():",
-        '        ti = tensor[tensor["issue"].astype(str)==str(issue)]',
-        '        gross += settle_ticket(r["matches"], r["outcomes"], ti)["gross_multiple"] * 2.0',
-        '    res.append({"issue":issue,"n_tickets":len(panel),"stake_total":len(panel)*2.0,"realized_gross":gross})',
-        "issue_res = pd.DataFrame(res)",
-        "path = simulate_bankroll(issue_res)",
-        "summary = summarize_capital(path)",
-        'print("2023 dry-run:", json.dumps(summary, indent=2))',
-    ]),
-    md(["## Gate A decision (REQ-209-11: 2024 sealed; Gate B not opened)"]),
-    code([
-        'print("GATE_A_FROZEN_IDENTITY:", chosen)',
-        'print("Gate B (2024 terminal): NOT_OPENED — sealed until PI authorizes")',
-    ]),
+    md(
+        """# Issue #209 — learned dynamic N/K/ticket policy
+
+This executed notebook is the decision-facing analysis for the method rework.
+The experimental unit is one Beijing issue.  The policy learns from pre-event
+issue state and explicit N/K/generator parameters.  Seeds are aggregated
+within an issue/action and are never policy inputs.  The 2024 outcome namespace
+remains sealed.
+"""
+    ),
+    code(
+        """from pathlib import Path
+import json
+import matplotlib.pyplot as plt
+import pandas as pd
+
+ROOT = Path.cwd()
+RESULTS = ROOT / "results/issue-209"
+FIGURES = ROOT / "docs/research/figures"
+FIGURES.mkdir(parents=True, exist_ok=True)
+
+decision = json.loads((RESULTS / "dynamic_decision.json").read_text())
+states = pd.read_csv(RESULTS / "dynamic_issue_states.csv", dtype={"issue": str})
+selected = pd.read_csv(RESULTS / "dynamic_selected_actions.csv", dtype={"issue": str})
+paths = pd.read_csv(RESULTS / "dynamic_matched_capital_paths.csv", dtype={"issue": str})
+
+print("development issues:", states.issue.nunique())
+print("2024 outcomes opened:", decision["seal"]["rows_opened_2024"])
+print("selected family:", decision["GATE_A_DYNAMIC_POLICY_FAMILY"])
+print("disposition:", decision["GATE_A_DISPOSITION"])
+"""
+    ),
+    md(
+        """## Frozen design
+
+Fit is through 2021, model-family selection is 2022, and the selected family is
+refit through 2022 before choosing 2023 actions.  The active arm cannot choose
+NO_BET and tests whether a dynamic mapping exists.  The safe arm can hold cash.
+N={3,5,7,8}; K={8,32,128,512}; generator={TOP_VALUE, WR, WOR, NO_BET}.
+"""
+    ),
+    code(
+        """surface = pd.DataFrame({
+    "N anchors": [str(decision["action_surface"]["n"])],
+    "K anchors": [str(decision["action_surface"]["k"])],
+    "generators": [str(decision["action_surface"]["generators"])],
+    "actions": [decision["action_surface"]["action_count"]],
+})
+display(surface)
+"""
+    ),
+    md("## 2022 model-family selection"),
+    code(
+        """family = pd.DataFrame(decision["model_family_selection_2022"]).T
+display(family)
+ax = family["total_selected_pnl"].plot.bar(color=["#777777", "#3478bf"])
+ax.axhline(0, color="black", linewidth=0.8)
+ax.set_ylabel("Selected policy PnL (CNY)")
+ax.set_title("2022 out-of-time model-family selection")
+plt.tight_layout()
+plt.savefig(FIGURES / "bj209_dynamic_family_selection.png", dpi=160)
+plt.show()
+"""
+    ),
+    md(
+        """The MLP result remains positive after removing its largest winning
+issue, but this is only model-family selection evidence.  It is not a terminal
+profitability result.
+"""
+    ),
+    code(
+        """diag = pd.DataFrame({
+    "2022 tune": decision["tune_2022_selection_diagnostics"],
+    "2023 calibration": decision["calibration_2023_selection_diagnostics"],
+}).T.drop(columns="action_counts")
+display(diag)
+"""
+    ),
+    md("## 2023 action choices and state conditioning"),
+    code(
+        """cal = selected[
+    (selected.evaluation_role == "CALIBRATION_2023_OUT_OF_TIME")
+    & (selected.policy_arm == "LEARNED_ACTIVE_POLICY")
+].copy()
+counts = cal.action_key.value_counts().sort_values()
+display(counts.rename("issues").to_frame())
+ax = counts.plot.barh(color="#5b8c5a")
+ax.set_xlabel("2023 issues selected")
+ax.set_title("Frozen dynamic policy: action frequency")
+plt.tight_layout()
+plt.savefig(FIGURES / "bj209_dynamic_action_frequency.png", dpi=160)
+plt.show()
+"""
+    ),
+    code(
+        """state_choice = cal.merge(states, on="issue", validate="one_to_one")
+display(state_choice.groupby("action_key").agg(
+    issues=("issue", "size"),
+    mean_matches=("n_matches", "mean"),
+    mean_abs_divergence=("divergence_abs_mean", "mean"),
+    mean_best_value=("value_best_mean", "mean"),
+    realized_pnl=("mean_pnl", "sum"),
+))
+"""
+    ),
+    md("## Matched CNY100k capital paths"),
+    code(
+        """summary = pd.DataFrame({
+    "learned_dynamic": decision["dynamic_capital_2023"],
+    "fixed_N7_K8": decision["fixed_control_capital_2023"],
+    "capital_safe": decision["capital_safe_policy_2023"],
+}).T
+display(summary[["ending_capital", "capital_return_pct", "funded_turnover", "max_drawdown_pct", "max_consecutive_losses"]])
+print("matched lift vs fixed control:", decision["matched_lift_vs_fixed_control"]["matched_lift"], "percentage points")
+
+fig, ax = plt.subplots(figsize=(10, 5))
+for arm, frame in paths.groupby("arm", sort=False):
+    ax.plot(range(1, len(frame) + 1), frame["equity_after"], label=arm)
+ax.axhline(100000, color="black", linestyle="--", linewidth=0.8)
+ax.set_xlabel("2023 issue sequence")
+ax.set_ylabel("Pre-tax capital (CNY)")
+ax.set_title("#209 matched issue-level capital paths")
+ax.legend()
+plt.tight_layout()
+plt.savefig(FIGURES / "bj209_dynamic_matched_capital.png", dpi=160)
+plt.show()
+"""
+    ),
+    md(
+        """## Decision
+
+The learned mapping is genuinely dynamic (six actions), but its 2023 capital is
+lower than the matched fixed control.  The safe arm's all-NO_BET choice is a
+fallback, not alpha.  Therefore the disposition is
+`RETAIN_FIXED_CONTROL_NO_PROMOTION`; 2024 stays sealed.  The next iteration
+should enrich the state and regularize action choice toward the accepted
+baseline, not merely widen a hindsight parameter grid.
+"""
+    ),
 ]
 
-nb = {
+for index, cell in enumerate(cells):
+    payload = f"bj209:{index}:{''.join(cell['source'])}".encode("utf-8")
+    cell["id"] = hashlib.sha1(payload).hexdigest()[:12]
+
+notebook = {
     "cells": cells,
     "metadata": {
-        "kernelspec": {"display_name": "Python 3 (issue209)", "language": "python", "name": "python3"},
-        "language_info": {"name": "python", "version": "3.11.15"},
+        "kernelspec": {
+            "display_name": "Python 3 (beijing-lot)",
+            "language": "python",
+            "name": "python3",
+        },
+        "language_info": {"name": "python", "version": "3.11"},
     },
     "nbformat": 4,
     "nbformat_minor": 5,
 }
 OUT.parent.mkdir(parents=True, exist_ok=True)
-OUT.write_text(json.dumps(nb, indent=1))
+OUT.write_text(json.dumps(notebook, indent=1), encoding="utf-8")
 print("wrote", OUT)

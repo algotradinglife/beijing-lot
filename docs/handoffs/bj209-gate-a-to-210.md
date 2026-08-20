@@ -8,8 +8,13 @@ boundary (REQ-209-12) and grants no automatic production claim.
 
 - Candidate: **MARKET_ONLY_CELL** probability on the frozen #238 M×3 tensor
   (learned logistic/MLP did not beat the market control on 2022 tune).
-- Ticket layer: **dynamic N ∈ [3,8], K ∈ [1,16]** policy surface; delivered
-  dry-run used N7/K8 for the matched 2023 reference.
+- Ticket layer tested a learned action-conditioned surface over
+  N={3,5,7,8}, K={8,32,128,512}, TOP_VALUE/WR/WOR and NO_BET.  The frozen
+  2023 mapping selected six configurations, but ended at CNY98,838.66 versus
+  CNY99,152.00 for fixed N7/K8 TOP_VALUE (matched lift -0.316pp).
+- Disposition: **RETAIN_FIXED_CONTROL_NO_PROMOTION**.  The dynamic interface is
+  valid, but the candidate failed out-of-time generalization and is not the
+  frozen #210 policy.
 - Payout economics: **0.65 applied exactly once** per winning N-fold ticket's
   SP product (never 0.65^N) — REQ-209-06.
 
@@ -17,14 +22,14 @@ boundary (REQ-209-12) and grants no automatic production claim.
 
 - **2024+ (issue codes 24xxx and later): sealed.** No 2024 label was opened in
   Gate A. `TERMINAL_2024_*` are all `None` / `NOT_OPENED_GATE_B_SEALED`.
-- Gate B (one-shot 2024 terminal) requires an **independent PI authorization**
-  after the Gate-A freeze review; it is a separate authorization, not automatic.
+- Gate B (one-shot 2024 terminal) remains unauthorized.  The failed 2023
+  candidate does not spend the terminal holdout.
 
 ## Boundary for #210
 
-- #210 (held-out/forward validation) must receive the Gate-A frozen identity
-  and the reserved outcome boundary; no post-development outcome is consumed by
-  the Gate-A fit/tune/calibration path.
+- #210 may start only after a future candidate beats the frozen control on an
+  untouched pre-2024 block.  It must receive that exact identity and the
+  reserved outcome boundary; #209 itself supplies no promoted dynamic policy.
 - Prospective `initial/10h/1h` channels are `RETROSPECTIVE_RELATIVE_PROXY` and
   are not strict-forward claims; #210 proceedings must keep studying causal
   forward accumulation separately (#248).
