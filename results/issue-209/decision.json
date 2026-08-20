@@ -1,0 +1,82 @@
+{
+  "GATE_A_FROZEN_IDENTITY": "MARKET_ONLY_CELL (learned failed to beat simple control on tune)",
+  "GATE_A_MODEL_VALID": true,
+  "TERMINAL_2024_ABSOLUTE_CAPITAL": null,
+  "TERMINAL_2024_DISPOSITION": "NOT_OPENED_GATE_B_SEALED",
+  "TERMINAL_2024_ENGINE_VALID": null,
+  "TERMINAL_2024_HOLDING_FEASIBILITY": null,
+  "TERMINAL_2024_MATCHED_LIFT": null,
+  "capital_dryrun_2023": {
+    "active_support_return_pct": -100.0,
+    "capital_return_pct": -0.8480000000000043,
+    "ending_capital": 99152.0,
+    "funded_turnover": 848.0,
+    "max_consecutive_losses": 53,
+    "max_drawdown_pct": 0.848,
+    "n_issues": 53,
+    "retained_cash": 99152.0,
+    "ruin": false
+  },
+  "contract": "BJ-UNIFIED-FULL-CYCLE-HIST-001/v3-gate-a",
+  "frozen_candidate_family": "market_only",
+  "gate_a_calibration_support_2023": {
+    "chosen": {
+      "brier": 0.21569320043021625,
+      "ece_per_outcome": {
+        "0": 0.011343567990494947,
+        "1": 0.011014093565631673,
+        "3": 0.006804317314638742
+      },
+      "log_loss": 1.1443313336511594
+    },
+    "logistic": {
+      "brier": 0.2156733142135782,
+      "ece_per_outcome": {
+        "0": 0.01145930787424726,
+        "1": 0.012768701355296931,
+        "3": 0.00604196264113471
+      },
+      "log_loss": 1.1462631788447097
+    },
+    "market_only": {
+      "brier": 0.21569320043021625,
+      "ece_per_outcome": {
+        "0": 0.011343567990494947,
+        "1": 0.011014093565631673,
+        "3": 0.006804317314638742
+      },
+      "log_loss": 1.1443313336511594
+    },
+    "mlp": {
+      "brier": 0.2156357109279927,
+      "ece_per_outcome": {
+        "0": 0.012537619472356699,
+        "1": 0.008718684300574894,
+        "3": 0.008240103138810578
+      },
+      "log_loss": 1.144167147617154
+    }
+  },
+  "matched_lift_vs_incumbent": {
+    "baseline_ending_capital": 90532.1,
+    "candidate_ending_capital": 99152.0,
+    "candidate_max_dd_pct": 0.848,
+    "matched_lift": 9.521374186614473
+  },
+  "promotion_rule": {
+    "no_ruin": true,
+    "non_worse_dd": true,
+    "positive_matched_lift": true,
+    "preserved_funding": true,
+    "promote": true
+  },
+  "seal": {
+    "rows_opened_2024": 0,
+    "sealed_before": 2024
+  },
+  "tune_compare": {
+    "logistic": 1.147185290733812,
+    "market_only": 1.1449365368814135,
+    "mlp": 1.1461928510520318
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "contract": "BJ-UNIFIED-FULL-CYCLE-HIST-001/v3-gate-a",
+  "gate_a": "development through 2023; 2024 sealed",
+  "gate_b": "NOT_OPENED - terminal 2024 sealed until PI authorization",
+  "artifacts": {
+    "census.csv": "role/year/horizon census: issues, fixtures, cells, label_rate, sp_rate, n7_issues",
+    "market_only_probabilities.parquet": "MARKET_ONLY_CELL 3-way match-unit probabilities (label-free)",
+    "cell_value_distribution.parquet": "per-outcome raw value R_RAW=P_win*SP with q10/q50/q90",
+    "dryrun_issue_results.csv": "per-issue 2023 ticket/stake/gross dry-run",
+    "dryrun_capital_path.csv": "CNY100k pre-tax equity path over 2023 issues",
+    "decision.json": "Gate-A decision fields + calibration support + seal"
+  },
+  "seal": {
+    "sealed_before": 2024,
+    "opened_2024": 0
+  },
+  "payout": "0.65 applied once per winning N-fold ticket (never 0.65^N)"
+}
