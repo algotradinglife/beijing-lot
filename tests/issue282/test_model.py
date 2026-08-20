@@ -1,6 +1,10 @@
 import torch
 
-from issue282.model import DeepSetActionValueModel, distributional_loss
+from issue282.model import (
+    DeepSetActionValueModel,
+    distributional_loss,
+    within_issue_ranking_loss,
+)
 
 
 def _model_and_inputs():
@@ -19,7 +23,14 @@ def test_issue_encoding_is_permutation_invariant() -> None:
     with torch.no_grad():
         original = model(cells, mask, actions)
         shuffled = model(cells[:, permutation], mask[:, permutation], actions)
-    for name in ("positive_logit", "positive_magnitude", "q10", "q50", "q90"):
+    for name in (
+        "positive_logit",
+        "positive_magnitude",
+        "expected_value",
+        "q10",
+        "q50",
+        "q90",
+    ):
         assert torch.allclose(original[name], shuffled[name], atol=1e-6)
 
 
@@ -33,3 +44,11 @@ def test_quantile_heads_are_ordered_and_loss_is_finite() -> None:
     loss = distributional_loss(prediction, target, issue_weight=weight)
     assert torch.isfinite(loss)
     loss.backward()
+
+
+def test_within_issue_ranking_loss_rewards_correct_order() -> None:
+    target = torch.tensor([10.0, 0.0, -10.0, 5.0, -5.0])
+    issues = torch.tensor([0, 0, 0, 1, 1])
+    correct = within_issue_ranking_loss(target, target, issues)
+    reversed_order = within_issue_ranking_loss(-target, target, issues)
+    assert correct < reversed_order
