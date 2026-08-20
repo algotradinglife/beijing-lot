@@ -1,32 +1,65 @@
-# Issue #254 PI handoff
+# Issue #248 handoff — PI rework
 
-## Scope completed
+[SESSION] 20260819_235658_96e389
 
-- Bound accepted #250–#253 review HEADs, merge commits, manifest paths and
-  manifest SHA-256 values.
-- Built the v2 external integration package with a 2014–2017 historical proxy
-  sample and a strict-forward sample.
-- Verified M×3 grain, temporal namespace separation, missingness, provenance,
-  settlement isolation, byte-deterministic replay and isolated restore copy.
-- Generated a physical data dictionary, downstream readiness matrix,
-  REQ-to-evidence table, decision report and executed #254 notebook.
+## Current HEAD
 
-## Replay
+`engineer/bj248-issue`; the commit carrying this handoff is the rework delivery
+head. Resolve its exact SHA with `git rev-parse HEAD` after checkout.
 
-```bash
-export BEIJING_LOT_DATA_ROOT=/absolute/path/to/data
-python scripts/build_bj254_schema_integration.py --data-root "$BEIJING_LOT_DATA_ROOT"
-python scripts/build_bj254_schema_integration.py --data-root "$BEIJING_LOT_DATA_ROOT" --verify-only
-python scripts/execute_bj254_notebook.py --data-root "$BEIJING_LOT_DATA_ROOT"
-python -m pytest -q tests/test_bj254_schema_integration.py
-```
+## Completed rework
 
-The bulk package lives at
-`$BEIJING_LOT_DATA_ROOT/derived/bj254_schema_integration_v2` and is not committed
-to Git.  Git carries code, the executed notebook, reports and compact evidence.
+- Claimed #248 from `Ready` to `In Progress` after confirming its sole native
+  predecessor (#234) is closed.
+- Fixed **KE-248-01**: a history receipt now stores the exact fetched URL,
+  rejects anything outside the HTTPS `cp.nowscore.com` fixture-specific
+  TypeID=5 route before fetch, and references the raw issue-page receipt whose
+  parsed row supplied that exact URL. The semantic verifier rebuilds this
+  source trace from raw issue evidence.
+- Fixed **KE-248-02**: an unrecognized active-page shape is recorded as
+  `PARSE_ERROR`, logged, and makes the CLI non-zero. A recognized explicit
+  no-sale marker is instead `EMPTY_PROVEN`, never silently `OK` with zero rows.
+- Fixed **KE-248-03**: reusing a capture key succeeds only for an identical raw
+  SHA and complete immutable receipt metadata. A changed payload or metadata
+  now raises an explicit collision in both issue-page and history receipt paths.
+- Fixed **KE-248-04**: requested, trusted-receive, kickoff, and supplied
+  decision-epoch times are canonical UTC `Z` instants before persistence or
+  SQLite lexical comparison. An offset epoch can no longer admit a later UTC
+  receipt.
+- Repaired the standalone collector CLI's import bootstrap and updated the
+  executed notebook for mandatory issue-page→history trace linkage.
 
-## Decision boundary
+## Evidence
 
-#254 accepts the interface, not full data readiness.  #235/#236 remain recovery
-work, #237 needs an entity-identity scope decision, and #248/#249 may consume the
-interface under their own evidence gates.
+- Focused suite: `python -m pytest tests/test_bj248_forward_snapshot.py
+  tests/test_bj248_rework.py tests/scripts/test_nowscore_bjdc_sp_history.py -q`
+  → `21 passed`.
+- Tamper-focused subset → `4 passed`: altered quote/vector, raw-source trace,
+  remanifest/external-anchor path, and offset/future-receipt gate fail closed.
+- Notebook: `/home/drwho1985/work/beijing-lot-206/.venv/bin/python
+  scripts/execute_bj248_notebook.py` → `EXECUTED`.
+- Manual read-only shadow probe of issue 26086 is documented in
+  `docs/research/bj248_manual_shadow_capture.md`. It verified the live page and
+  URL shape but admitted no forward vector: all 80 history outcomes were
+  explicitly rejected (42 post-kickoff, 38 invalid SP domain), not zero-filled.
+
+## Known limits / decision input
+
+- The shadow issue's `cansale=true` rows had stale/past schedule evidence; this
+  does not qualify active-sale truth, retention, cadence or successful forward
+  collection. **Do not enable unattended scheduling** until a fresh issue has a
+  demonstrably future source schedule and at least one complete causal vector.
+- PI accepted notebook byte determinism and cross-store crash recovery as
+  exploration debt; this delivery intentionally does not expand into them.
+- Full repository pytest collection remains unavailable in both available
+  interpreters because of unrelated missing/incomplete dependencies and a
+  legacy macOS absolute input path. The focused #248 tests and notebook above
+  are the applicable passing evidence.
+
+## Next steps
+
+1. EV: rerun the focused suite and notebook in a fresh checkout; inspect the
+   allowlist/source-trace verifier and retry-collision paths.
+2. PI: decide whether the negative live shadow probe is sufficient to retain
+   the no-scheduler restriction or whether a later fresh-issue shadow probe is
+   required before activating operations.
