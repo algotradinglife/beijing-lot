@@ -128,8 +128,8 @@ PI interpretation and does not replace those edges or Project states.
 | 6 | [#208] dynamic N×K frontier | Open / In Progress | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
 | 8 | [#232] divergence-support remediation | Closed / Done | M1 | Native `blockedBy #238` is closed | Dual-track data handoff accepted: complete historical proxy, prospective interface and portable snapshot path; actual historical Beijing three-way SP remains unavailable |
-| 9 | [#209] full-cycle historical evaluation | Open / Ready | M3 | #232 and #229 closed | Freeze the value-learning objective, baseline and 2024+ holdout; first cycle consumes #238 EU-versus-line-prior features while POWER remains optional/deferred |
-| 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
+| 9 | [#209] full-cycle historical evaluation | Open / In Progress | M3 | #232 and #229 closed | Learned state-action policy is dynamic but fails 2023 matched capital (-0.316pp vs fixed N7/K8); retain control, keep 2024 sealed |
+| 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Do not spend holdout until a dynamic candidate beats the frozen control pre-2024 |
 | 11 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #229 terminal data-readiness decision and #232 handoff

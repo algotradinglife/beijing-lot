@@ -29,6 +29,8 @@ results/*
 !results/issue-205/**
 !results/issue-206/
 !results/issue-206/**
+!results/issue-209/
+!results/issue-209/**
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
 !results/bj229_divergence_profile_v1/**/*.csv
@@ -50,6 +52,8 @@ temp/
 !docs/research-notes/evidence/issue-83-continuous-market-metrics.csv
 *.tsv
 *.parquet
+!results/issue-209/*.csv
+!results/issue-209/*.parquet
 !results/issue-205/*.csv
 !results/issue-205/*.parquet
 !results/issue-206/*.csv

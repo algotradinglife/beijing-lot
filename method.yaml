@@ -1,0 +1,155 @@
+# Issue #209 method protocol — BJ-UNIFIED-FULL-CYCLE-HIST-001 / v3 (Gate A)
+# Frozen preregistrations; worker must not silently modify.
+# Accepted #238 interface (2026-08-20 PI amendment). Audit mode: exploration.
+# Scope: Gate A development + pre-2024 freeze. Gate B (2024 terminal) is NOT
+# authorized until Gate A is PI-reviewed and frozen. 2024 labels stay sealed.
+# Protocol deltas appended in PROTOCOL-LOG; never edited in place.
+
+protocol_version: bj209-gate-a-protocol-v2-dynamic-policy
+
+candidate_pool:
+  description: "divergence-aware M×3 distributional value model on the #238 surface"
+  source: "data/derived/bj238_divergence_materializer_v4r3 (inference view + pre-2024 labels)"
+  probability_families: [MARKET_ONLY_CELL, CALIBRATED_LOGISTIC, SKLEARN_MLP]
+  sp_quantiles: [q10, q50, q90]
+  dynamic_action_n_anchors: [3, 5, 7, 8]
+  dynamic_action_k_anchors: [8, 32, 128, 512]
+  dynamic_generators: [TOP_VALUE, WEIGHTED_WR, WEIGHTED_WOR, NO_BET]
+  action_boundary: "experimental anchors; K is not an operational stake cap"
+  horizon: 10h
+  seed_count: 3
+  seed_rule: "stable deterministic 32-bit mixer of issue/action/base-seed; seed never a feature"
+
+splits:
+  selection_split: "tune_2022"
+  terminal_split: "calibration_2023"
+  holdout_isolated: true
+  folds:
+    - train: "fit_through_2021"
+      tune: "2022"
+      calibration: "2023 (untouched confirmation)"
+  protocol_delta_209_1: "2024+ is the sealed feature-only namespace; Gate B not opened in this cycle"
+
+terminal_access:
+  model_selection: forbidden
+  terminal_evaluation: exactly_once
+
+selection_algorithm:
+  preregistered: true
+  rule:
+    - "probability identity inherited from the accepted Gate-A market-only result"
+    - "fit action-conditioned two-part learners through 2021"
+    - "select LOGISTIC_TWO_PART vs MLP_TWO_PART on 2022 issue-level capital utility"
+    - "refit the selected family through 2022 and freeze all 2023 actions pre-outcome"
+    - "2023 is untouched policy confirmation, never action or model-family selection"
+    - "2024 terminal evaluation sealed until PI authorizes Gate B"
+    - "seed replications are aggregated within issue/action; seed is never a policy action"
+    - "safe arm may choose NO_BET; active arm diagnoses whether a dynamic mapping exists"
+
+metrics:
+  - name: tune_issue_block_log_loss
+    definition: "multiclass log loss on 2022 tune block, issue-block resampled; selection-only"
+    golden_test: "tests/issue209/test_bj209_metrics.py::test_tune_log_loss_definition"
+  - name: calibration_log_loss_2023
+    definition: "2023 untouched calibration log loss; confirmation of chosen family"
+    golden_test: "tests/issue209/test_bj209_metrics.py::test_calibration_confirmation"
+  - name: matched_ending_capital_lift
+    definition: "candidate CNY100k pre-tax ending capital relative to fixed N7/K8 TOP_VALUE control on identical 2023 issue support"
+    golden_test: "tests/issue209/test_bj209_metrics.py::test_matched_lift_definition"
+  - name: payout_65_single_application
+    definition: "winning N-fold gross = 0.65 * product(SP_i); 0.65 applied once, never 0.65^N"
+    golden_test: "tests/issue209/test_bj209_metrics.py::test_payout_65_applied_once"
+  - name: max_drawdown_pct
+    definition: "percentage max drawdown from running peak of the CNY100k pre-tax equity path"
+    golden_test: "tests/issue209/test_bj209_metrics.py::test_drawdown_definition"
+  - name: no_ruin
+    definition: "ending capital > 0 across the path"
+    golden_test: "tests/issue209/test_bj209_metrics.py::test_no_ruin"
+
+budget:
+  target_hours: 12
+  hard_stop_hours: 24
+  max_cpu_hours: 64
+  max_peak_rss_gib: 32
+  max_temp_gib: 50
+
+required_artifacts:
+  - method.yaml
+  - results/issue-209/decision.json
+  - results/issue-209/census.csv
+  - results/issue-209/market_only_probabilities.parquet
+  - results/issue-209/cell_value_distribution.parquet
+  - results/issue-209/SHA256SUMS.txt
+  - results/issue-209/dryrun_capital_path.csv
+  - results/issue-209/dynamic_issue_states.csv
+  - results/issue-209/dynamic_action_counterfactuals.parquet
+  - results/issue-209/dynamic_policy_predictions.parquet
+  - results/issue-209/dynamic_selected_actions.csv
+  - results/issue-209/dynamic_matched_capital_paths.csv
+  - results/issue-209/dynamic_decision.json
+  - results/issue-209/dynamic_policy.joblib
+
+schema_ref: results/issue-209/schema.json
+
+receipt:
+  bind_to: results/issue-209/SHA256SUMS.txt
+
+stages:
+  - name: data_stats
+    deliverable: "results/issue-209/census.csv"
+    skill: eda-checklist
+    constraints:
+      - "census by role/year/horizon: issues, fixtures, cells, label_rate, sp_rate, n7_issues"
+      - "0 sealed 2024+ rows; issue-code year heuristics forbidden"
+      - "settlement SP joined from #238 label source (~99% dev coverage)"
+  - name: preprocessing
+    deliverable: "results/issue-209/tensor.parquet + match_units.parquet"
+    skill: data-preprocessing
+    constraints:
+      - "M×3 cells complete; malformed cells fail closed; duplicate issue keys deduped"
+      - "2024+ settlement rows filtered unconditionally from dev path"
+      - "labels physically separated from inference features"
+  - name: eda
+    deliverable: "census + source-availability summary"
+    skill: eda-checklist
+    constraints:
+      - "report probability-channel availability, mapping acceptance, line support"
+      - "outcome fields never enter inference features"
+  - name: feature_engineering
+    deliverable: "probability_features + sp_features frames"
+    skill: data-preprocessing
+    constraints:
+      - "explicit EU-vs-line disagreement channels; no dense pre-blend of sources"
+      - "forbidden: settlement SP, winning SP, pW, Y, result as features"
+      - "horizon one-hot (no ordinal encoding of categorical actions)"
+  - name: model_selection
+    deliverable: "fit (through 2021) + tune (2022) action-conditioned policy-family selection receipt"
+    skill: experiment-tracking
+    constraints:
+      - "chronological issue-block splits only; policy-family selection on 2022 issue-level capital utility"
+      - "two-part target: probability of positive issue PnL plus conditional positive payoff/nonpositive loss"
+      - "maintained scikit-learn LogisticRegression/MLPClassifier and HistGradientBoostingRegressor"
+      - "features are pre-event issue state plus explicit N/K/generator action parameters"
+      - "no unlimited architecture/grid; action and model budgets frozen"
+  - name: terminal_evaluation
+    deliverable: "2023 frozen dynamic-policy replay + matched fixed-control capital paths + decision.json"
+    skill: model-card
+    constraints:
+      - "2023 used as untouched confirmation; actions selected only from model predictions"
+      - "0.65 applied once per winning N-fold ticket"
+      - "2024 terminal evaluation sealed; Gate B NOT opened"
+      - "matched lift vs frozen #207 N7/K8 incumbent; no lower-turnover alpha"
+
+models:
+  upstream_probability: "MARKET_ONLY_CELL inherited from accepted Gate-A probability comparison"
+  primary: "LOGISTIC_TWO_PART or MLP_TWO_PART (selected on 2022 issue-level policy utility)"
+  primary_params:
+    mlp_hidden: [64, 32]
+    mlp_alpha: 0.01
+    mlp_max_iter: 300
+    downside_quantile: 0.10
+    nuisance_seed_count: 3
+  control_market: "MARKET_ONLY_CELL (mapped EU-BJ probability, label-free)"
+  sp_model: "HistGradientBoosting quantile (q10/q50/q90)"
+  target: "risk-adjusted pre-tax log-capital increment for each issue/action"
+  inference: "learned per-issue N/K/generator/NO_BET action; 0.65 once per winning ticket"

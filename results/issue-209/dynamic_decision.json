@@ -1,0 +1,214 @@
+{
+  "GATE_A_DISPOSITION": "RETAIN_FIXED_CONTROL_NO_PROMOTION",
+  "GATE_A_DYNAMIC_MAPPING_VALID": true,
+  "GATE_A_DYNAMIC_POLICY_FAMILY": "MLP_TWO_PART",
+  "GATE_A_DYNAMIC_POLICY_IDENTITY": "ACTION_CONDITIONED_MLP_TWO_PART_N_K_GENERATOR_WITH_NO_BET",
+  "GATE_A_DYNAMIC_POLICY_PROMOTED": false,
+  "action_surface": {
+    "action_count": 49,
+    "generators": [
+      "NO_BET",
+      "TOP_VALUE",
+      "WEIGHTED_WOR",
+      "WEIGHTED_WR"
+    ],
+    "k": [
+      8,
+      32,
+      128,
+      512
+    ],
+    "k_boundary": "EXPERIMENTAL_ANCHORS_NOT_OPERATIONAL_STAKE_CAP",
+    "n": [
+      3,
+      5,
+      7,
+      8
+    ]
+  },
+  "calibration_2023_selection_diagnostics": {
+    "action_counts": {
+      "N3_K8_WEIGHTED_WOR": 5,
+      "N5_K128_TOP_VALUE": 2,
+      "N5_K8_WEIGHTED_WOR": 7,
+      "N5_K8_WEIGHTED_WR": 6,
+      "N7_K8_WEIGHTED_WOR": 1,
+      "N7_K8_WEIGHTED_WR": 32
+    },
+    "ex_largest_total_pnl": -1197.200048079189,
+    "issues": 53,
+    "largest_issue": "23011",
+    "largest_issue_pnl": 35.856648033730785,
+    "positive_issues": 4,
+    "total_pnl": -1161.343400045458
+  },
+  "capital_safe_policy_2023": {
+    "active_support_return_pct": 0.0,
+    "capital_return_pct": 0.0,
+    "ending_capital": 100000.0,
+    "funded_turnover": 0.0,
+    "max_consecutive_losses": 0,
+    "max_drawdown_pct": 0.0,
+    "n_issues": 53,
+    "retained_cash": 100000.0,
+    "ruin": false
+  },
+  "contract": "BJ-UNIFIED-FULL-CYCLE-HIST-001/v3-dynamic-method-rework",
+  "dynamic_capital_2023": {
+    "active_support_return_pct": -87.45055723233762,
+    "capital_return_pct": -1.1613434000454448,
+    "ending_capital": 98838.65659995456,
+    "funded_turnover": 1328.0,
+    "max_consecutive_losses": 26,
+    "max_drawdown_pct": 1.1693808655870477,
+    "n_issues": 53,
+    "retained_cash": 98672.0,
+    "ruin": false
+  },
+  "feature_columns": [
+    "n_matches",
+    "n_accepted",
+    "accepted_fraction",
+    "books_mean",
+    "line_abs_mean",
+    "line_std",
+    "prob_entropy_mean",
+    "prob_top_mean",
+    "prob_top_q90",
+    "value_best_mean",
+    "value_best_std",
+    "value_best_q50",
+    "value_best_q90",
+    "value_margin_mean",
+    "value_interval_mean",
+    "divergence_abs_mean",
+    "divergence_abs_q90",
+    "divergence_signed_mean",
+    "action_n",
+    "action_log2_k",
+    "action_stake_fraction",
+    "n_x_entropy",
+    "n_x_value",
+    "n_x_divergence",
+    "k_x_breadth",
+    "k_x_uncertainty",
+    "generator_NO_BET",
+    "generator_NO_BET_x_divergence",
+    "generator_TOP_VALUE",
+    "generator_TOP_VALUE_x_divergence",
+    "generator_WEIGHTED_WR",
+    "generator_WEIGHTED_WR_x_divergence",
+    "generator_WEIGHTED_WOR",
+    "generator_WEIGHTED_WOR_x_divergence"
+  ],
+  "fixed_control_capital_2023": {
+    "active_support_return_pct": -100.0,
+    "capital_return_pct": -0.8480000000000043,
+    "ending_capital": 99152.0,
+    "funded_turnover": 848.0,
+    "max_consecutive_losses": 53,
+    "max_drawdown_pct": 0.848,
+    "n_issues": 53,
+    "retained_cash": 99152.0,
+    "ruin": false
+  },
+  "horizon": "10h",
+  "independent_unit": "Beijing_issue",
+  "matched_lift_vs_fixed_control": {
+    "baseline_ending_capital": 99152.0,
+    "candidate_ending_capital": 98838.65659995456,
+    "candidate_max_dd_pct": 1.1693808655870477,
+    "matched_lift": -0.31602327743811554
+  },
+  "model_family_selection_2022": {
+    "LOGISTIC_TWO_PART": {
+      "active_fraction": 1.0,
+      "issues": 62.0,
+      "mean_selected_utility_bps": -1.6001280136549718,
+      "total_selected_pnl": -992.0
+    },
+    "MLP_TWO_PART": {
+      "active_fraction": 1.0,
+      "issues": 62.0,
+      "mean_selected_utility_bps": 3.4266589254023625,
+      "total_selected_pnl": 2151.272982497089
+    }
+  },
+  "oracle_diagnostic_only": {
+    "mean_oracle_pnl": 3371.668345157205,
+    "mean_selected_pnl": -21.91213962349921,
+    "not_policy_input": true
+  },
+  "probability_identity_inherited": "MARKET_ONLY_CELL",
+  "seal": {
+    "gate_b_authorized": false,
+    "rows_opened_2024": 0
+  },
+  "seed_semantics": "NUISANCE_REPLICATION_AGGREGATED_WITHIN_ISSUE_ACTION",
+  "selected_action_entropy_2023": 1.2399341650306661,
+  "selected_action_unique_count_2023": 6,
+  "selected_active_fraction_2023": 1.0,
+  "tune_2022_selection_diagnostics": {
+    "action_counts": {
+      "N3_K8_WEIGHTED_WOR": 9,
+      "N3_K8_WEIGHTED_WR": 1,
+      "N5_K8_WEIGHTED_WOR": 4,
+      "N5_K8_WEIGHTED_WR": 14,
+      "N7_K32_WEIGHTED_WR": 1,
+      "N7_K8_WEIGHTED_WOR": 12,
+      "N7_K8_WEIGHTED_WR": 21
+    },
+    "ex_largest_total_pnl": 1113.1940278408265,
+    "issues": 62,
+    "largest_issue": "22111",
+    "largest_issue_pnl": 1038.0789546562626,
+    "positive_issues": 12,
+    "total_pnl": 2151.272982497089
+  },
+  "upstream_probability_gate_a": {
+    "calibration_support_2023": {
+      "chosen": {
+        "brier": 0.21569320043021625,
+        "ece_per_outcome": {
+          "0": 0.011343567990494947,
+          "1": 0.011014093565631673,
+          "3": 0.006804317314638742
+        },
+        "log_loss": 1.1443313336511594
+      },
+      "logistic": {
+        "brier": 0.2156733142135782,
+        "ece_per_outcome": {
+          "0": 0.01145930787424726,
+          "1": 0.012768701355296931,
+          "3": 0.00604196264113471
+        },
+        "log_loss": 1.1462631788447097
+      },
+      "market_only": {
+        "brier": 0.21569320043021625,
+        "ece_per_outcome": {
+          "0": 0.011343567990494947,
+          "1": 0.011014093565631673,
+          "3": 0.006804317314638742
+        },
+        "log_loss": 1.1443313336511594
+      },
+      "mlp": {
+        "brier": 0.2156357109279927,
+        "ece_per_outcome": {
+          "0": 0.012537619472356699,
+          "1": 0.008718684300574894,
+          "3": 0.008240103138810578
+        },
+        "log_loss": 1.144167147617154
+      }
+    },
+    "frozen_identity": "MARKET_ONLY_CELL (learned failed to beat simple control on tune)",
+    "tune_compare": {
+      "logistic": 1.147185290733812,
+      "market_only": 1.1449365368814135,
+      "mlp": 1.1461928510520318
+    }
+  }
+}
