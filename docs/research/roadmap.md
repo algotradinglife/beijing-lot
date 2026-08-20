@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-20 12:45 HKT (#232 data remediation closed after #268/#238/#248/#249 acceptance; #209 activated on the historical proxy model line)**
+Updated: **2026-08-20 19:12 HKT (#279 action-aware targets and 2023 pre-outcome attribution accepted; #210 remains blocked only by open #218)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -112,10 +112,10 @@ PI interpretation and does not replace those edges or Project states.
 #209 learned action-conditioned policy (Done; dynamic mapping, no promotion)
              |
              v
-#279 action-aware feature factory + 2023 issue attribution (In Progress)
+#279 action-aware feature factory + 2023 issue attribution (Done)
              |
              v
-#210 held-out/prospective validation  <--- blocked by #279 and #218
+#210 held-out/prospective validation  <--- #279 satisfied; blocked by open #218
              |
              v
 #211 timestamped message overlay     <--- #182 message evidence
@@ -132,9 +132,29 @@ PI interpretation and does not replace those edges or Project states.
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
 | 8 | [#232] divergence-support remediation | Closed / Done | M1 | Native `blockedBy #238` is closed | Dual-track data handoff accepted: complete historical proxy, prospective interface and portable snapshot path; actual historical Beijing three-way SP remains unavailable |
 | 9 | [#209] full-cycle historical evaluation | Closed / Done | M3 | #232 and #229 closed | Learned state-action policy is dynamic but fails 2023 matched capital (-0.316pp vs fixed N7/K8); retain control, keep 2024 sealed |
-| 10 | [#279] action-aware feature factory | Open / In Progress | M3 | Parent #202; blocks #210 | Freeze four-stage feature/interface contract and diagnose every 2023 issue before joint learning |
-| 11 | [#210] held-out/forward validation | Open | M4 | Blocked by #279 and #218 (#209 closed) | Do not spend holdout until a dynamic candidate beats the frozen control pre-2024 |
+| 10 | [#279] action-aware feature factory | Closed / Done | M3 | Parent #202; satisfied predecessor of #210 | Budget-matched distributional targets, action features and complete 2023 pre-outcome cell/ticket/leg traces |
+| 11 | [#210] held-out/forward validation | Open | M4 | #279/#209 closed; blocked by open #218 | Do not spend holdout until a dynamic candidate beats the frozen control pre-2024 |
 | 12 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+
+### #279 action-aware target and attribution decision
+
+- PR #280 was PI-reviewed and merged at exact HEAD
+  `a8c9e516471021026ed7abefd638609c040b20c4`.  It materializes 30,368
+  action-conditioned feature/target rows for 620 independent issues while
+  opening zero 2024+ outcome rows.
+- Every active action is rescaled to a common CNY16 reference budget.  The
+  issue-level budget-matched maximum is distributed across K8/32/128/512 at
+  20.3%/27.3%/30.3%/20.5%, rather than collapsing to K512.  Parameters remain
+  functions of issue Data; these outcome-aware maxima are diagnostics, not
+  hard policy labels.
+- Returns remain rare-hit dominated.  The best all-development mean candidate,
+  N5/K8 WEIGHTED_WR, has +CNY7.24 mean but -CNY16 median, only 13.1% positive
+  issues, and -CNY2.92 ex-largest mean.  Successor learning must model the
+  conditional distribution, downside and positive-return probability.
+- The 2023 replay freezes 43,599 cells, 265 Top-B actions, 3,264 tickets and
+  20,208 legs before settlement.  It exposes final-portfolio structural
+  differences, but Stage 1/2 versus Stage 3 and additive causal PnL remain
+  unidentified.  No strategy was promoted.
 
 ### #229 terminal data-readiness decision and #232 handoff
 
