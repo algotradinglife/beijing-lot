@@ -22,7 +22,7 @@
   "oracle_bias_warning": "RAW_ARGMAX_CONFOUNDED_BY_K_EXPOSURE_AND_MULTIPLE_ACTION_HINDSIGHT",
   "budget_matched_targets_valid_for_learning": true,
   "marginal_k_diagnostic": "OBSERVED_NOISY_NON_NESTED_ANCHORS",
-  "2023_selection_outcome_attribution": "STRUCTURAL_TRACE_ONLY_NONADDITIVE_CAUSAL_EFFECT_NOT_IDENTIFIED",
+  "2023_selection_outcome_attribution": "PORTFOLIO_STRUCTURE_ONLY_STAGE1_2_VS_STAGE3_AND_CAUSAL_EFFECT_NOT_IDENTIFIED",
   "seal": {
     "rows_opened_2024_plus": 0
   },

@@ -68,7 +68,7 @@ plt.tight_layout(); plt.savefig(F/'bj279_2023_failure_stages.png',dpi=160); plt.
 print('Selection attribution:',ledger.selection_attribution.unique().tolist()); print('Outcome attribution:',ledger.outcome_attribution.unique().tolist())"""),
     cell("markdown", """## Pre-outcome structural attribution
 
-The replay now persists all 2023 cell values, Top-B action alternatives, complete ticket identities and every ticket leg before outcomes are joined. Match, outcome and ticket Jaccard scores show where the learned action structurally diverges from fixed N7/K8 TOP_VALUE. These scores do not pretend that nonlinear N-fold PnL can be additively assigned to individual stages."""),
+The replay now persists all 2023 cell values, Top-B action alternatives, complete ticket identities and every ticket leg before outcomes are joined. Match, outcome and ticket Jaccard scores show where the learned final portfolio structurally diverges from fixed N7/K8 TOP_VALUE. They are not pure Stage-1/Stage-2 attribution because WR/WOR and K at Stage 3 also change coverage, and they do not pretend that nonlinear N-fold PnL can be additively assigned to individual stages."""),
     cell("code", """display(ledger[['issue','action_key','lift_pnl_vs_fixed','match_set_jaccard','leg_identity_jaccard','ticket_identity_jaccard','shared_match_modal_outcome_disagreement']].head(20))
 fig,ax=plt.subplots(figsize=(9,5)); ax.scatter(ledger.match_set_jaccard,ledger.lift_pnl_vs_fixed,alpha=.75)
 ax.axhline(0,color='black',lw=.8); ax.set_xlabel('Chosen vs fixed match-set Jaccard'); ax.set_ylabel('Realized matched PnL lift (CNY)'); ax.set_title('2023 structural divergence and realized lift')
@@ -78,7 +78,7 @@ print('Pre-outcome artifacts:', {'Top-B rows':len(topb),'issues':trace_summary.i
 
 The first feature slice is action-aware and leakage-safe. Budget matching removes the raw-oracle K exposure artifact, but the resulting targets remain extremely skewed: most action/issue outcomes lose the full CNY16 reference budget and a few large hits dominate means. Therefore the next model must learn conditional return distributions and downside probabilities, not regress a single mean or imitate a hindsight argmax.
 
-The new trace makes match-selection and outcome-direction changes observable, while their separate causal PnL contributions remain non-identifiable because a ticket pays only when all N legs hit. 2023 remains development evidence and grants no promotion authority."""),
+The new trace makes final-portfolio match and outcome changes observable, while Stage 1/2 versus Stage 3 effects and their separate causal PnL contributions remain non-identifiable because a ticket pays only when all N legs hit. 2023 remains development evidence and grants no promotion authority."""),
 ]
 nb={"cells":cells,"metadata":{"kernelspec":{"display_name":"Python 3 (beijing-lot)","language":"python","name":"python3"},"language_info":{"name":"python","version":"3.11"}},"nbformat":4,"nbformat_minor":5}
 OUT.parent.mkdir(parents=True, exist_ok=True)

@@ -112,14 +112,14 @@ def main() -> int:
     ledger["k_changed"] = ledger["k"].ne(8)
     ledger["generator_changed"] = ledger["generator"].ne("TOP_VALUE")
     ledger["selection_attribution"] = np.where(
-        ledger["selection_structure_changed"],
-        "STRUCTURAL_MATCH_SET_CHANGED_NONADDITIVE",
-        "MATCH_SET_UNCHANGED",
+        ledger["portfolio_match_set_changed"],
+        "PORTFOLIO_MATCH_SET_CHANGED_STAGE1_VS_STAGE3_NOT_SEPARABLE",
+        "PORTFOLIO_MATCH_SET_UNCHANGED",
     )
     ledger["outcome_attribution"] = np.where(
-        ledger["outcome_structure_changed"],
-        "STRUCTURAL_OUTCOME_MIX_CHANGED_NONADDITIVE",
-        "OUTCOME_MIX_UNCHANGED",
+        ledger["portfolio_outcome_mix_changed"],
+        "PORTFOLIO_OUTCOME_MIX_CHANGED_STAGE2_VS_STAGE3_NOT_SEPARABLE",
+        "PORTFOLIO_OUTCOME_MIX_UNCHANGED",
     )
     ledger["failure_stage"] = "NO_FAILURE_VS_FIXED"
     lost = ledger["lift_pnl_vs_fixed"].lt(0)
@@ -154,7 +154,7 @@ def main() -> int:
         "oracle_bias_warning": "RAW_ARGMAX_CONFOUNDED_BY_K_EXPOSURE_AND_MULTIPLE_ACTION_HINDSIGHT",
         "budget_matched_targets_valid_for_learning": True,
         "marginal_k_diagnostic": "OBSERVED_NOISY_NON_NESTED_ANCHORS",
-        "2023_selection_outcome_attribution": "STRUCTURAL_TRACE_ONLY_NONADDITIVE_CAUSAL_EFFECT_NOT_IDENTIFIED",
+        "2023_selection_outcome_attribution": "PORTFOLIO_STRUCTURE_ONLY_STAGE1_2_VS_STAGE3_AND_CAUSAL_EFFECT_NOT_IDENTIFIED",
         "seal": {"rows_opened_2024_plus": 0},
         "promotion_authority": False,
     }

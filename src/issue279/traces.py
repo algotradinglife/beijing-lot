@@ -297,8 +297,8 @@ def _summarize_structural_difference(
                 "shared_match_modal_outcome_disagreement": (
                     float(np.mean(disagreement)) if disagreement else np.nan
                 ),
-                "selection_structure_changed": bool(match_jaccard < 1.0),
-                "outcome_structure_changed": bool(leg_jaccard < 1.0),
+                "portfolio_match_set_changed": bool(match_jaccard < 1.0),
+                "portfolio_outcome_mix_changed": bool(leg_jaccard < 1.0),
             }
         )
     return pd.DataFrame(rows).sort_values("issue").reset_index(drop=True)

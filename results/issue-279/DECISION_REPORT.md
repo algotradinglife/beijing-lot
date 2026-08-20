@@ -22,9 +22,11 @@
 - 2023 now has 43,599 cell rows, 265 Top-B action rows, 3,264 complete ticket
   rows and 20,208 leg rows frozen without settlement fields.  Chosen and fixed
   ticket structures can be compared directly.
-- The new trace identifies structural match/outcome changes, but separate
-  causal PnL attribution remains non-additive: one N-fold ticket pays only when
-  every leg hits.
+- The new trace identifies final-portfolio match/outcome changes.  It does not
+  call these pure Stage-1/Stage-2 effects because WR/WOR and K also change the
+  portfolio coverage at Stage 3.  Separate stage effects and causal PnL remain
+  non-identifiable/non-additive: one N-fold ticket pays only when every leg
+  hits.
 
 Decision: #279's data and target contract is ready for PI review.  The next
 joint model should learn a conditional return distribution, positive-return

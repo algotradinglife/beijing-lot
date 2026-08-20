@@ -1,4 +1,4 @@
-issue,chosen_unique_matches,fixed_unique_matches,match_set_jaccard,leg_identity_jaccard,ticket_identity_jaccard,shared_match_modal_outcome_disagreement,selection_structure_changed,outcome_structure_changed
+issue,chosen_unique_matches,fixed_unique_matches,match_set_jaccard,leg_identity_jaccard,ticket_identity_jaccard,shared_match_modal_outcome_disagreement,portfolio_match_set_changed,portfolio_outcome_mix_changed
 22112,65,7,0.014084507042253521,0.0,0.0,1.0,True,True
 22114,75,7,0.06493506493506493,0.038834951456310676,0.0,0.2,True,True
 22123,60,7,0.09836065573770492,0.041666666666666664,0.0,0.3333333333333333,True,True

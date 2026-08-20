@@ -198,6 +198,8 @@ distribution, downside quantile and positive-return probability; a mean-only
 regressor or hard oracle class is rejected.
 
 The 2023 replay now persists 43,599 pre-outcome cells, 265 Top-B action rows,
-3,264 complete tickets and 20,208 ticket legs.  This makes match-set and outcome
-mix changes structurally observable.  Their separate causal PnL effects remain
-non-identifiable and non-additive because an N-fold ticket settles jointly.
+3,264 complete tickets and 20,208 ticket legs.  This makes final-portfolio
+match-set and outcome-mix changes structurally observable.  It does not identify
+pure Stage-1/Stage-2 effects because generator and K choices at Stage 3 also
+change portfolio coverage.  Separate causal PnL effects remain non-identifiable
+and non-additive because an N-fold ticket settles jointly.
