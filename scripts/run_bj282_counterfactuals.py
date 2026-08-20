@@ -25,6 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=ROOT / "results/issue-282")
     parser.add_argument("--batch-issues", type=int, default=10)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--years", type=int, nargs="+")
     return parser.parse_args()
 
 
@@ -52,6 +53,10 @@ def main() -> int:
         .assign(issue=lambda frame: frame["issue"].astype(str))
         .sort_values(["issue_year", "issue"])
     )
+    if args.years:
+        issue_meta = issue_meta["issue_year"].isin(set(args.years))
+        if issue_meta.empty:
+            raise ValueError("--years did not select any development issue")
     for year, year_meta in issue_meta.groupby("issue_year", sort=True):
         destination = output / f"counterfactual_labels_{int(year)}.parquet"
         if args.resume and destination.exists():
@@ -86,8 +91,10 @@ def main() -> int:
     metadata = {
         "contract": "BJ-UNIFIED-CONDITIONAL-POLICY-001/v1",
         "source": "#209 pre-2024 Mx3 tensor plus settlement labels",
-        "years": sorted(int(year) for year in issue_meta["issue_year"].unique()),
-        "issues": int(issue_meta["issue"].nunique()),
+        "years_this_invocation": sorted(
+            int(year) for year in issue_meta["issue_year"].unique()
+        ),
+        "issues_this_invocation": int(issue_meta["issue"].nunique()),
         "actions_per_fully_supported_issue": len(catalog),
         "ticket_stream_seeds": list(TICKET_STREAM_SEEDS),
         "k_semantics": "DISTINCT_TICKET_IDENTITIES",
@@ -96,9 +103,11 @@ def main() -> int:
         "payout_application": "ONCE_PER_WINNING_N_FOLD_TICKET",
         "sealed_years_opened": [],
     }
-    temporary = output / "counterfactual_metadata.tmp.json"
+    year_token = f"{metadata['years_this_invocation'][0]}_{metadata['years_this_invocation'][-1]}"
+    metadata_path = output / f"counterfactual_metadata_{year_token}.json"
+    temporary = output / f"counterfactual_metadata_{year_token}.tmp.json"
     temporary.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-    temporary.replace(output / "counterfactual_metadata.json")
+    temporary.replace(metadata_path)
     print(json.dumps(metadata, indent=2), flush=True)
     return 0
 
