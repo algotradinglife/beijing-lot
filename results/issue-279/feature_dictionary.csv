@@ -1,0 +1,13 @@
+feature,stage,formula,earliest_availability,leakage_class
+stage1_candidate_density,selection,accepted_fraction,decision_epoch,SAFE
+stage2_probability_concentration,outcome,1-entropy/log(3),decision_epoch,SAFE
+stage2_divergence_confidence,outcome,mean_abs_divergence/(value_interval+eps),decision_epoch,SAFE
+stage3_n_fraction,ticket,N/M,decision_epoch,SAFE
+stage3_log2_k,ticket,log2(K),action,SAFE
+stage3_requested_turnover,ticket,2*K CNY,action,SAFE
+stage4_requested_capital_fraction,capital,2*K/prior_capital,decision_epoch,SAFE
+stage3_effective_coefficient_per_leg,ticket,"0.65^(1/N), comparison only",action,SAFE
+stage3_log_match_combinations,ticket,"log choose(M,N)",decision_epoch,SAFE
+stage3_repeat_pressure_proxy,ticket,K/exp(N*mean_entropy),decision_epoch,SAFE_PROXY
+stage3_n_x_value,ticket,N*mean_best_value,decision_epoch,SAFE
+stage3_n_x_divergence,ticket,N*mean_abs_divergence,decision_epoch,SAFE

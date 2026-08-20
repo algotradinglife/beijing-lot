@@ -93,7 +93,7 @@ PI interpretation and does not replace those edges or Project states.
              v
 #207 ¥100k active bankroll + separate NO_BET safety lane (Done; no overlay Edge)
 
-#208 dynamic N×K risk-conditioned frontier (independent line; In Progress)
+#208 dynamic N×K risk-conditioned frontier (Cancelled; superseded by #209)
 
 #229 divergence causal-data profile (Done; BLOCKED_DATA_DEFECT)
              |
@@ -109,10 +109,13 @@ PI interpretation and does not replace those edges or Project states.
   └─ #238 divergence materializer (Done; three historical proxy horizons accepted)
              |
              v
-#209 full-cycle historical ablation and baseline ladder (Ready)
+#209 learned action-conditioned policy (Done; dynamic mapping, no promotion)
              |
              v
-#210 held-out/prospective validation  <--- #218 causal support accumulation
+#279 action-aware feature factory + 2023 issue attribution (In Progress)
+             |
+             v
+#210 held-out/prospective validation  <--- blocked by #279 and #218
              |
              v
 #211 timestamped message overlay     <--- #182 message evidence
@@ -125,12 +128,13 @@ PI interpretation and does not replace those edges or Project states.
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
 | 4 | [#206] fixed-N7 ticket generator | Closed / Done | M3 | #205 closed | Learned challenger rejected; no comparable accepted ticket baseline is bound, so all locked issues route to `NO_BET` |
 | 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
-| 6 | [#208] dynamic N×K frontier | Open / In Progress | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
+| 6 | [#208] dynamic N×K frontier | Closed / Cancelled | M3 | Superseded by #209 | Scientific null retained; obsolete conflicting publication-infrastructure PR closed without merge |
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
 | 8 | [#232] divergence-support remediation | Closed / Done | M1 | Native `blockedBy #238` is closed | Dual-track data handoff accepted: complete historical proxy, prospective interface and portable snapshot path; actual historical Beijing three-way SP remains unavailable |
 | 9 | [#209] full-cycle historical evaluation | Closed / Done | M3 | #232 and #229 closed | Learned state-action policy is dynamic but fails 2023 matched capital (-0.316pp vs fixed N7/K8); retain control, keep 2024 sealed |
-| 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Do not spend holdout until a dynamic candidate beats the frozen control pre-2024 |
-| 11 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 10 | [#279] action-aware feature factory | Open / In Progress | M3 | Parent #202; blocks #210 | Freeze four-stage feature/interface contract and diagnose every 2023 issue before joint learning |
+| 11 | [#210] held-out/forward validation | Open | M4 | Blocked by #279 and #218 (#209 closed) | Do not spend holdout until a dynamic candidate beats the frozen control pre-2024 |
+| 12 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #229 terminal data-readiness decision and #232 handoff
 
@@ -319,6 +323,7 @@ retrospective feature.
 [#207]: https://github.com/algotradinglife/beijing-lot/issues/207
 [#208]: https://github.com/algotradinglife/beijing-lot/issues/208
 [#209]: https://github.com/algotradinglife/beijing-lot/issues/209
+[#279]: https://github.com/algotradinglife/beijing-lot/issues/279
 [#210]: https://github.com/algotradinglife/beijing-lot/issues/210
 [#211]: https://github.com/algotradinglife/beijing-lot/issues/211
 [#218]: https://github.com/algotradinglife/beijing-lot/issues/218
