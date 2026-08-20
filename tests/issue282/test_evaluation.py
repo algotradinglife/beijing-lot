@@ -1,6 +1,10 @@
 import pandas as pd
 
-from issue282.evaluation import capital_path_metrics, choose_actions
+from issue282.evaluation import (
+    build_attribution_ledger,
+    capital_path_metrics,
+    choose_actions,
+)
 
 
 def test_choose_actions_uses_cash_when_every_score_is_nonpositive() -> None:
@@ -37,3 +41,28 @@ def test_capital_metrics_are_issue_level_and_matched() -> None:
     assert metrics["changed_action_issues"] == 6
     assert metrics["matched_lift_cny"] == 17.0
     assert metrics["ex_largest_matched_lift_cny"] == -3.0
+
+
+def test_attribution_keeps_oracle_diagnostic_out_of_policy_input() -> None:
+    actions = pd.DataFrame(
+        {
+            "issue": ["A", "A"],
+            "issue_year": [2023, 2023],
+            "action_key": ["BASE", "MODEL"],
+            "selector": ["ALL", "TOP_HALF_VALUE"],
+            "outcome_weight_mode": ["CELL_VALUE", "DIVERGENCE_VALUE"],
+            "n": [7, 5],
+            "generator": ["TOP_VALUE", "WEIGHTED_WR"],
+            "k": [8, 32],
+            "pnl_cny_mean": [-10.0, 20.0],
+            "stake_cny_mean": [16.0, 64.0],
+        }
+    )
+    chosen = actions[actions.action_key.eq("MODEL")].assign(
+        predicted_score=1.0, policy="MODEL"
+    )
+    baseline = actions[actions.action_key.eq("BASE")]
+    ledger = build_attribution_ledger(chosen, baseline, actions)
+    assert ledger.loc[0, "matched_lift_cny"] == 30.0
+    assert ledger.loc[0, "oracle_regret_cny_diagnostic"] == 0.0
+    assert ledger.loc[0, "changed_stage_count"] == 5

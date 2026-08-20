@@ -20,6 +20,7 @@ from issue279.traces import build_cell_trace  # noqa: E402
 from issue282.data import pack_issue_cells  # noqa: E402
 from issue282.evaluation import (  # noqa: E402
     add_capital_curve,
+    build_attribution_ledger,
     capital_path_metrics,
     choose_actions,
     fixed_action_ledger,
@@ -201,7 +202,30 @@ def main() -> int:
         )
     metrics_frame = pd.DataFrame(metrics)
     metrics_frame.to_csv(output / "policy_metrics_2023.csv", index=False)
-    ledgers["DEEP_ENSEMBLE"].to_parquet(
+    deep_attribution = build_attribution_ledger(
+        ledgers["DEEP_ENSEMBLE"], strongest_fixed, test_labels
+    )
+    deep_attribution = deep_attribution.merge(
+        predictions[
+            [
+                "issue",
+                "action_key",
+                "deep_positive_probability_median",
+                "deep_positive_magnitude_median",
+                "deep_expected_value_median",
+                "deep_q10_median",
+                "deep_q50_median",
+                "deep_q90_median",
+                "deep_policy_score",
+            ]
+        ],
+        left_on=["issue", "requested_action_key"],
+        right_on=["issue", "action_key"],
+        how="left",
+        validate="one_to_one",
+        suffixes=("", "_prediction"),
+    )
+    deep_attribution.to_parquet(
         output / "deep_ensemble_ledger_2023.parquet", index=False
     )
 

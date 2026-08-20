@@ -27,6 +27,7 @@ def choose_actions(
         kind="stable",
     )
     selected = frame.groupby("issue", sort=True, as_index=False).first()
+    selected["requested_action_key"] = selected["action_key"]
     no_bet = selected["predicted_score"].le(no_bet_threshold)
     selected.loc[no_bet, "action_key"] = "NO_BET"
     selected.loc[no_bet, "pnl_cny_mean"] = 0.0
@@ -125,6 +126,90 @@ def add_capital_curve(
     result = ledger.sort_values(["issue_year", "issue"]).reset_index(drop=True).copy()
     result["capital_cny"] = initial_capital_cny + result["pnl_cny_mean"].cumsum()
     return result
+
+
+def build_attribution_ledger(
+    chosen: pd.DataFrame,
+    baseline: pd.DataFrame,
+    all_actions: pd.DataFrame,
+) -> pd.DataFrame:
+    """Attach matched baseline, hindsight regret and stage-change diagnostics."""
+
+    baseline_columns = [
+        "issue",
+        "action_key",
+        "pnl_cny_mean",
+        "selector",
+        "outcome_weight_mode",
+        "n",
+        "generator",
+        "k",
+    ]
+    result = chosen.merge(
+        baseline[baseline_columns],
+        on="issue",
+        validate="one_to_one",
+        suffixes=("", "_baseline"),
+    )
+    oracle = (
+        all_actions.sort_values(
+            ["issue", "pnl_cny_mean", "action_key"],
+            ascending=[True, False, True],
+        )
+        .groupby("issue", as_index=False)
+        .first()[["issue", "action_key", "pnl_cny_mean"]]
+        .rename(
+            columns={
+                "action_key": "oracle_action_key_diagnostic",
+                "pnl_cny_mean": "oracle_pnl_cny_diagnostic",
+            }
+        )
+    )
+    result = result.merge(oracle, on="issue", validate="one_to_one")
+    result["matched_lift_cny"] = (
+        result["pnl_cny_mean"] - result["pnl_cny_mean_baseline"]
+    )
+    result["oracle_regret_cny_diagnostic"] = (
+        result["oracle_pnl_cny_diagnostic"] - result["pnl_cny_mean"]
+    )
+    for field, stage in (
+        ("selector", "stage1_changed"),
+        ("outcome_weight_mode", "stage2_changed"),
+        ("n", "stage3_n_changed"),
+        ("generator", "stage3_generator_changed"),
+        ("k", "stage3_k_changed"),
+    ):
+        result[stage] = result[field].ne(result[f"{field}_baseline"])
+    result["fallback_reason"] = np.where(
+        result["action_key"].eq("NO_BET"),
+        "PREDICTED_SCORE_NONPOSITIVE",
+        "FUNDED_MODEL_ACTION",
+    )
+    changed_fields = [
+        "stage1_changed",
+        "stage2_changed",
+        "stage3_n_changed",
+        "stage3_generator_changed",
+        "stage3_k_changed",
+    ]
+    result["changed_stage_count"] = result[changed_fields].sum(axis=1)
+    result["matched_failure_attribution"] = "NO_NEGATIVE_MATCHED_LIFT"
+    negative = result["matched_lift_cny"].lt(0)
+    result.loc[negative & result["changed_stage_count"].gt(1), "matched_failure_attribution"] = (
+        "JOINT_STAGE_CHANGE"
+    )
+    for field, label in (
+        ("stage1_changed", "STAGE1_SELECTION_ONLY"),
+        ("stage2_changed", "STAGE2_OUTCOME_ONLY"),
+        ("stage3_n_changed", "STAGE3_N_ONLY"),
+        ("stage3_generator_changed", "STAGE3_GENERATOR_ONLY"),
+        ("stage3_k_changed", "STAGE3_K_ONLY"),
+    ):
+        result.loc[
+            negative & result["changed_stage_count"].eq(1) & result[field],
+            "matched_failure_attribution",
+        ] = label
+    return add_capital_curve(result)
 
 
 def _max_consecutive(condition: np.ndarray) -> int:
