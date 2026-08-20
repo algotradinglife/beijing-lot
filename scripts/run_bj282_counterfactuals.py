@@ -54,7 +54,7 @@ def main() -> int:
         .sort_values(["issue_year", "issue"])
     )
     if args.years:
-        issue_meta = issue_meta["issue_year"].isin(set(args.years))
+        issue_meta = issue_meta[issue_meta["issue_year"].isin(set(args.years))]
         if issue_meta.empty:
             raise ValueError("--years did not select any development issue")
     for year, year_meta in issue_meta.groupby("issue_year", sort=True):
