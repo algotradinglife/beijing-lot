@@ -81,6 +81,7 @@ def build_action_features(
     frame = states.merge(catalog, on="_join", how="inner").drop(columns="_join")
     active = frame["generator"].ne("NO_BET")
     frame = frame.loc[~active | frame["n"].between(1, frame["n_matches"])].copy()
+    active = frame["generator"].ne("NO_BET")
 
     n = frame["n"].astype(float)
     k = frame["k"].astype(float)

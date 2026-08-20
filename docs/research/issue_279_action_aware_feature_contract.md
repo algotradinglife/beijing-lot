@@ -160,3 +160,30 @@ reproducibility and 2023 failure attribution.
   winning seed.
 - Any improvement must be decomposed into selection, direction, construction,
   capital and exposure effects.
+
+## Initial executable profile findings
+
+The first implementation materializes 30,368 lawful action-feature rows for
+620 independent development issues (2014–2023) and a complete 53-issue 2023
+attribution ledger.  It opens zero 2024+ outcome rows.
+
+The inherited #209 2023 policy loses CNY1,161.34 versus CNY848.00 for fixed
+N7/K8 TOP_VALUE, an incremental loss of CNY313.34.  The two N5/K128
+TOP_VALUE decisions account for CNY480 of negative matched delta.  Issues where
+N changed but K remained 8 contribute a positive CNY166.66 delta as a group;
+generator-only changes at N7/K8 have zero realized delta because both arms lose
+the same CNY16 stake in those issues.  These are development diagnostics, not
+causal component effects.
+
+The raw outcome-aware oracle selects N7 and K512 in nearly every conditional
+bin.  This is not evidence for a universal parameter.  Taking the maximum over
+many actions rewards the largest hindsight opportunity set and confounds K
+with exposure.  Therefore raw oracle argmax is rejected as a supervised
+parameter label.  The next joint-model target must use matched risk budgets,
+conditional return distributions and marginal K stopping; oracle remains only
+a regret ceiling.
+
+The aggregate #209 trace cannot identify match-selection versus
+outcome-direction attribution.  The next ticket materializer must persist the
+pre-outcome Top-B pools, leg/outcome weights and complete ticket identities
+before those stages can be modeled jointly.

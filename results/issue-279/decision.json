@@ -1,0 +1,22 @@
+{
+  "contract": "BJ-UNIFIED-ACTION-FEATURES-001/v1",
+  "development_years": [
+    2014,
+    2023
+  ],
+  "development_issues": 620,
+  "action_feature_rows": 30368,
+  "independent_unit": "Beijing_issue",
+  "2023_issues": 53,
+  "2023_dynamic_pnl": -1161.343400045458,
+  "2023_fixed_pnl": -848.0,
+  "2023_lift_pnl": -313.3434000454581,
+  "2023_mean_oracle_regret_pnl": 3393.5804847807044,
+  "oracle_parameter_label_valid": false,
+  "oracle_bias_warning": "RAW_ARGMAX_CONFOUNDED_BY_K_EXPOSURE_AND_MULTIPLE_ACTION_HINDSIGHT",
+  "2023_selection_outcome_attribution": "NOT_IDENTIFIABLE_WITH_CURRENT_AGGREGATE_TRACE",
+  "seal": {
+    "rows_opened_2024_plus": 0
+  },
+  "promotion_authority": false
+}

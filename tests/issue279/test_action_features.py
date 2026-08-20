@@ -54,3 +54,10 @@ def test_effective_coefficient_is_feature_only_and_dictionary_is_stage_addressab
     assert n7["stage3_effective_coefficient_per_leg"] == pytest.approx(0.65 ** (1 / 7))
     dictionary = feature_dictionary()
     assert {"selection", "outcome", "ticket", "capital"}.issubset(set(dictionary["stage"]))
+
+
+def test_infeasible_n_is_filtered_without_misaligned_action_arrays() -> None:
+    states = _states().assign(n_matches=6)
+    frame = build_action_features(states, _actions())
+    assert "N7_K8_WR" not in set(frame["action_key"])
+    assert {"N5_K2048_WOR", "NO_BET"} == set(frame["action_key"])
