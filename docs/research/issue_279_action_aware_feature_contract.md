@@ -183,7 +183,21 @@ parameter label.  The next joint-model target must use matched risk budgets,
 conditional return distributions and marginal K stopping; oracle remains only
 a regret ceiling.
 
-The aggregate #209 trace cannot identify match-selection versus
-outcome-direction attribution.  The next ticket materializer must persist the
-pre-outcome Top-B pools, leg/outcome weights and complete ticket identities
-before those stages can be modeled jointly.
+The second implementation slice removes the raw-oracle exposure artifact by
+rescaling every action to the same CNY16 reference budget.  The issue-level
+budget-matched maximum is no longer concentrated at K512: K8/32/128/512
+represent 20.3%/27.3%/30.3%/20.5% of maxima, and 10 of 620 issues prefer
+NO_BET.  This is consistent with the owner's hypothesis that the parameter is a
+function of issue Data, not a stable calendar-year marginal distribution.
+
+The matched surface is still dominated by rare hits.  N5/K8 WEIGHTED_WR has
+the best all-development mean (+CNY7.24 at the CNY16 reference budget), but its
+median is -CNY16, only 13.1% of issues are positive, and the ex-largest mean is
+-CNY2.92.  The learning target must therefore retain the full conditional
+distribution, downside quantile and positive-return probability; a mean-only
+regressor or hard oracle class is rejected.
+
+The 2023 replay now persists 43,599 pre-outcome cells, 265 Top-B action rows,
+3,264 complete tickets and 20,208 ticket legs.  This makes match-set and outcome
+mix changes structurally observable.  Their separate causal PnL effects remain
+non-identifiable and non-additive because an N-fold ticket settles jointly.

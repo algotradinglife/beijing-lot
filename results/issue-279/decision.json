@@ -12,9 +12,17 @@
   "2023_fixed_pnl": -848.0,
   "2023_lift_pnl": -313.3434000454581,
   "2023_mean_oracle_regret_pnl": 3393.5804847807044,
+  "budget_match_reference_stake_cny": 16.0,
+  "budget_matched_target_rows": 30368,
+  "2023_preoutcome_cell_rows": 43599,
+  "2023_preoutcome_ticket_rows": 3264,
+  "2023_preoutcome_leg_rows": 20208,
+  "2023_topb_action_rows": 265,
   "oracle_parameter_label_valid": false,
   "oracle_bias_warning": "RAW_ARGMAX_CONFOUNDED_BY_K_EXPOSURE_AND_MULTIPLE_ACTION_HINDSIGHT",
-  "2023_selection_outcome_attribution": "NOT_IDENTIFIABLE_WITH_CURRENT_AGGREGATE_TRACE",
+  "budget_matched_targets_valid_for_learning": true,
+  "marginal_k_diagnostic": "OBSERVED_NOISY_NON_NESTED_ANCHORS",
+  "2023_selection_outcome_attribution": "STRUCTURAL_TRACE_ONLY_NONADDITIVE_CAUSAL_EFFECT_NOT_IDENTIFIED",
   "seal": {
     "rows_opened_2024_plus": 0
   },
