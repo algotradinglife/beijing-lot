@@ -61,6 +61,9 @@ def materialize_action_labels(
         cell_value = values.reindex(index)[
             [f"ev_raw_{outcome}" for outcome in OUTCOMES]
         ].to_numpy(dtype=float)
+        divergence = group[
+            [f"eu_vs_line_divergence_{outcome}" for outcome in OUTCOMES]
+        ].to_numpy(dtype=float)
         realized = np.array(
             [
                 OUTCOME_TO_POSITION.get(
@@ -82,11 +85,17 @@ def materialize_action_labels(
             eligible = _eligible_match_positions(cell_value, selector=selector, n=n)
             local_probability = probability[eligible]
             local_value = cell_value[eligible]
-            proposal_surface = (
-                local_value
-                if outcome_mode == "CELL_VALUE"
-                else local_probability
-            )
+            local_divergence = divergence[eligible]
+            if outcome_mode == "CELL_VALUE":
+                proposal_surface = local_value
+            elif outcome_mode == "MARKET_PROBABILITY":
+                proposal_surface = local_probability
+            elif outcome_mode == "DIVERGENCE_VALUE":
+                proposal_surface = divergence_value_surface(
+                    local_value, local_probability, local_divergence
+                )
+            else:
+                raise ValueError(f"unsupported outcome mode: {outcome_mode}")
             local_realized = realized[eligible]
             local_sp = winning_sp[eligible]
             requested_ks = sorted({action.k for action in group_catalog})
@@ -177,6 +186,31 @@ def materialize_action_labels(
     return result.sort_values(["issue_year", "issue", "action_key"]).reset_index(
         drop=True
     )
+
+
+def divergence_value_surface(
+    cell_value: np.ndarray,
+    european_probability: np.ndarray,
+    eu_minus_bj_line: np.ndarray,
+) -> np.ndarray:
+    """Tilt p×SP toward the independent market's positive line disagreement.
+
+    ``q_bj_line = q_eu - divergence`` reconstructs the normalized Beijing-line
+    anchor.  The bounded ratio is directional and remains pre-event; it is not
+    a fitted outcome coefficient or a settlement-derived value.
+    """
+
+    value = np.asarray(cell_value, dtype=float)
+    eu = np.asarray(european_probability, dtype=float)
+    divergence = np.asarray(eu_minus_bj_line, dtype=float)
+    if value.shape != eu.shape or value.shape != divergence.shape:
+        raise ValueError("value, probability and divergence surfaces must align")
+    bj_line = np.clip(eu - divergence, 1e-6, None)
+    bj_line /= bj_line.sum(axis=1, keepdims=True)
+    normalized_eu = np.clip(eu, 1e-6, None)
+    normalized_eu /= normalized_eu.sum(axis=1, keepdims=True)
+    ratio = np.clip(normalized_eu / bj_line, 0.25, 4.0)
+    return np.clip(value, 1e-12, None) * ratio
 
 
 def _eligible_match_positions(

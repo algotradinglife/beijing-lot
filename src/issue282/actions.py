@@ -9,7 +9,11 @@ N_VALUES = tuple(range(3, 9))
 K_ANCHORS = (8, 32, 128, 512)
 GENERATORS = ("TOP_VALUE", "WEIGHTED_WR", "WEIGHTED_WOR")
 SELECTORS = ("ALL", "TOP_HALF_VALUE")
-OUTCOME_WEIGHT_MODES = ("CELL_VALUE", "MARKET_PROBABILITY")
+OUTCOME_WEIGHT_MODES = (
+    "CELL_VALUE",
+    "MARKET_PROBABILITY",
+    "DIVERGENCE_VALUE",
+)
 
 
 @dataclass(frozen=True)
@@ -39,7 +43,11 @@ class PrototypeAction:
     @property
     def key(self) -> str:
         selector = "ALL" if self.selector == "ALL" else "TOP50"
-        outcome = "VALUE" if self.outcome_weight_mode == "CELL_VALUE" else "MARKET"
+        outcome = {
+            "CELL_VALUE": "VALUE",
+            "MARKET_PROBABILITY": "MARKET",
+            "DIVERGENCE_VALUE": "DIVVALUE",
+        }[self.outcome_weight_mode]
         return f"S{selector}_O{outcome}_N{self.n}_{self.generator}_K{self.k}"
 
 

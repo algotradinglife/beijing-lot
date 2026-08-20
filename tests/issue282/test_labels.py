@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from issue282.actions import PrototypeAction
-from issue282.labels import materialize_action_labels
+from issue282.labels import divergence_value_surface, materialize_action_labels
 
 
 def _inputs(matches: int = 5):
@@ -13,6 +13,9 @@ def _inputs(matches: int = 5):
             "snapshot_kind": ["10h"] * matches,
             "issue_year": [2023] * matches,
             "temporal_role": ["calibration"] * matches,
+            "eu_vs_line_divergence_3": [0.05] * matches,
+            "eu_vs_line_divergence_1": [-0.02] * matches,
+            "eu_vs_line_divergence_0": [-0.03] * matches,
         }
     )
     probabilities = pd.DataFrame(
@@ -77,3 +80,13 @@ def test_selector_changes_available_match_pool() -> None:
         ]
         == 4
     )
+
+
+def test_divergence_value_tilts_toward_eu_probability_above_bj_line() -> None:
+    value = np.ones((1, 3))
+    eu = np.array([[0.50, 0.30, 0.20]])
+    divergence = np.array([[0.10, -0.05, -0.05]])
+    tilted = divergence_value_surface(value, eu, divergence)
+    assert tilted[0, 0] > 1.0
+    assert tilted[0, 1] < 1.0
+    assert tilted[0, 2] < 1.0

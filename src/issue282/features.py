@@ -101,7 +101,11 @@ def build_action_feature_frame(
     )
     for selector in ("ALL", "TOP_HALF_VALUE"):
         result[f"selector_{selector}"] = frame["selector"].eq(selector).astype(float)
-    for outcome_mode in ("CELL_VALUE", "MARKET_PROBABILITY"):
+    for outcome_mode in (
+        "CELL_VALUE",
+        "MARKET_PROBABILITY",
+        "DIVERGENCE_VALUE",
+    ):
         result[f"outcome_{outcome_mode}"] = (
             frame["outcome_weight_mode"].eq(outcome_mode).astype(float)
         )
