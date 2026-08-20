@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-20 01:05 HKT (#238 chronological handicap-probability mapping accepted; #232 awaits terminal modelability discussion before #209 activation)**
+Updated: **2026-08-20 12:45 HKT (#232 data remediation closed after #268/#238/#248/#249 acceptance; #209 activated on the historical proxy model line)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -98,18 +98,18 @@ PI interpretation and does not replace those edges or Project states.
 #229 divergence causal-data profile (Done; BLOCKED_DATA_DEFECT)
              |
              v
-#232 restore causal SP-backed divergence support (In Progress)
+#232 restore causal SP-backed divergence support (Done; proxy handoff accepted)
   ├─ #234 source/schema freeze (Done)
   ├─ #235 historical native-SP recovery (Cancelled)
   ├─ #236 historical European proxy (Done)
   ├─ #268 complete historical proxy backfill (Done)
-  ├─ #237 power features (Human)
-  ├─ #248 prospective multi-timepoint snapshots (Ready)
-  ├─ #249 database portability (In Progress)
+  ├─ #237 power features (Inbox; deferred optional model input)
+  ├─ #248 prospective multi-timepoint snapshots (Done; accumulating forward evidence)
+  ├─ #249 database portability (Done)
   └─ #238 divergence materializer (Done; three historical proxy horizons accepted)
              |
              v
-#209 full-cycle historical ablation and baseline ladder (Blocked)
+#209 full-cycle historical ablation and baseline ladder (Ready)
              |
              v
 #210 held-out/prospective validation  <--- #218 causal support accumulation
@@ -127,8 +127,8 @@ PI interpretation and does not replace those edges or Project states.
 | 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
 | 6 | [#208] dynamic N×K frontier | Open / In Progress | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
-| 8 | [#232] divergence-support remediation | Open / In Progress | M1 | Native `blockedBy #238` is closed | #238 creates a stable historical EU-plus-line feature but not actual Beijing-SP divergence; terminal PI/user modelability discussion is next |
-| 9 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #232; #229 closed | Freeze the value-learning objective, baseline and 2024+ holdout before activation; consume #238 probabilities as separate features, not as a profitability claim |
+| 8 | [#232] divergence-support remediation | Closed / Done | M1 | Native `blockedBy #238` is closed | Dual-track data handoff accepted: complete historical proxy, prospective interface and portable snapshot path; actual historical Beijing three-way SP remains unavailable |
+| 9 | [#209] full-cycle historical evaluation | Open / Ready | M3 | #232 and #229 closed | Freeze the value-learning objective, baseline and 2024+ holdout; first cycle consumes #238 EU-versus-line-prior features while POWER remains optional/deferred |
 | 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
 | 11 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
@@ -206,6 +206,35 @@ PI interpretation and does not replace those edges or Project states.
 - 2024+ contains 188 issues / 43,531 inventory fixtures and remains physically
   feature-only. Its outcomes cannot be opened until #209 freezes the learning
   loss, accepted baseline, ablations and fallback constraint.
+
+### #249 portability and #232 terminal data handoff
+
+- PR #275 was PI-reviewed and merged at exact HEAD
+  `d454f1ae92d5a6ee46e5484c4807277e7e0bc104`. The first complete external
+  snapshot contains 464 assets / 35,538,877,815 bytes and is bound by manifest
+  SHA-256 `fada8656907ebe4dcb9f2b493e06699c52b095e22159bf23b9a26af4c45f3d6f`.
+- Independent external read-back and a real isolated ext4 restore both passed.
+  Live SQLite stays on ext4; the removable drive is versioned snapshot storage,
+  addressed through `BEIJING_LOT_DATA_ROOT`.
+- #232 is terminally closed under its v2 dual-track rule. #268 supplies the
+  complete retrospective proxy panel, #238 supplies the accepted EU-plus-line
+  representation, #248 supplies the prospective collection interface and #249
+  supplies portability. None of these results fabricates historical Beijing
+  three-way SP or upgrades relative-horizon proxies to strict causal evidence.
+- Per the user-approved scope, #237 POWER features remain a later optional
+  model input. #209 is active without waiting for POWER or for prospective
+  sample accumulation.
+
+### #209 first-cycle activation boundary
+
+- The first historical model cycle uses `Q_EU_RAW_1X2`,
+  `Q_LINE_ONLY_CONTROL`, `Q_EU_BJLINE`, signed EU-versus-line divergence and
+  their horizon/availability/provenance masks as separate channels.
+- The line-only prior is not observed Beijing three-way capital probability;
+  historical `Q_BJ_SP_DEVIG` remains null. POWER is optional and masked.
+- `initial/10h/1h` retain `RETROSPECTIVE_RELATIVE_PROXY` grade. All 2024
+  outcomes stay sealed until the Gate-A loss, model budget, baselines,
+  ablations, policy and fallback are frozen and PI-reviewed.
 
 ### #205 terminal decision and downstream contract
 
