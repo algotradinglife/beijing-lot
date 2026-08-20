@@ -320,6 +320,7 @@ def main() -> int:
         "model_seeds_positive_vs_cash_at_least_3_of_5": (
             seed_positive_vs_cash >= 3
         ),
+        "calibration_gate_preregistered_and_passed": False,
         "causal_and_seal_checks": True,
     }
     decision = {
@@ -339,6 +340,7 @@ def main() -> int:
         "notes": [
             "WR and WOR have identical funded tickets under equal distinct-ticket stakes; proposal frequency differs and is reserved for Stage 4.",
             "BEST_FULL legacy -9.47% is reported separately because its historical support is not identical to the current Mx3 tensor.",
+            "Prototype debt: no causal 2023 online-update diagnostic, no separately pretrained cell head, and no committed ticket-identity/marginal-K trace; these cannot be treated as promotion evidence.",
         ],
     }
     (output / "training_receipts.json").write_text(

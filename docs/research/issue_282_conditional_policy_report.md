@@ -203,6 +203,26 @@ transition. It must be preregistered before fitting, compare against cash,
 frozen N7 and the static N8/K512 candidate, and require genuine funded model
 deviations. It should not add another unconstrained grid or tune against 2024+.
 
+### Accepted prototype debt
+
+The PI review accepts three contract deviations only because every primary
+promotion gate is already negative and none can turn this result into a
+candidate:
+
+- the secondary causal-online 2023 update was not run; it is not allowed to
+  replace the negative frozen-2022 primary result;
+- the compact Deep Sets model was trained jointly rather than receiving a
+  separately persisted cell-head pretraining phase;
+- action-level summaries, overlap/HHI/ESS and requested/funded actions are
+  persisted, but a separate committed ticket-identity ledger and full marginal-K
+  continuation trace are not. Those would be mandatory before any candidate or
+  finalize-mode handoff.
+
+The contract also did not preregister a numeric calibration acceptance
+threshold. The decision therefore marks calibration promotion as failed rather
+than inventing a post-outcome cutoff. These debts explain why #282 can close as
+an informative prototype but cannot authorize #210.
+
 ## 8. Artifacts
 
 - Executed notebook: `notebooks/research/issue-282/bj282_conditional_policy.ipynb`
