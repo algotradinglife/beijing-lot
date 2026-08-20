@@ -56,3 +56,23 @@ Entry points and documentation:
 - [Manual shadow-capture report](docs/research/bj248_manual_shadow_capture.md)
 - [Source-retention probe](docs/research/bj248_source_retention_probe.md)
 - [Operational notebook](notebooks/research/issue-248/bj248_forward_snapshot.ipynb)
+
+## External snapshots and restore
+
+Issue [#249](https://github.com/algotradinglife/beijing-lot/issues/249)
+protects the local research databases and source files before host migration.
+Runtime SQLite databases stay on Linux ext4; the removable drive stores only
+versioned snapshots.
+
+```bash
+export BEIJING_LOT_DATA_ROOT=/mnt/f/beijing-lot-data
+python scripts/manage_bj249_data_snapshot.py snapshot \
+  --config config/bj249_data_snapshot.json \
+  --source-root /absolute/path/to/beijing-lot \
+  --snapshot-id bj249-core-YYYYMMDDTHHMMSSZ
+```
+
+- [Snapshot, verification, and restore CLI](scripts/manage_bj249_data_snapshot.py)
+- [Canonical asset configuration](config/bj249_data_snapshot.json)
+- [Snapshot and restore runbook](docs/operations/bj249_data_snapshot_restore.md)
+- [Portability notebook](notebooks/research/issue-249/bj249_data_portability.ipynb)
