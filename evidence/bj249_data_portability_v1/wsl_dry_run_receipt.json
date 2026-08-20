@@ -1,0 +1,20 @@
+{
+  "contract": "BJ-UNIFIED-DATA-PORTABILITY-001",
+  "external_location": "$BEIJING_LOT_DATA_ROOT/snapshots/bj249-core-20260820-v1",
+  "manifest_sha256": "fada8656907ebe4dcb9f2b493e06699c52b095e22159bf23b9a26af4c45f3d6f",
+  "restore_location": "isolated-ext4-restore-target",
+  "restore_verification": {
+    "restored_asset_count": 464,
+    "restored_at_utc": "2026-08-20T04:34:59Z",
+    "status": "PASS"
+  },
+  "snapshot_id": "bj249-core-20260820-v1",
+  "snapshot_verification": {
+    "asset_count": 464,
+    "manifest_sha256": "fada8656907ebe4dcb9f2b493e06699c52b095e22159bf23b9a26af4c45f3d6f",
+    "status": "PASS",
+    "total_bytes": 35538877815,
+    "verified_at_utc": "2026-08-20T04:34:59Z"
+  },
+  "source_mutation_check": "PASS_BY_READ_ONLY_URI_AND_FOCUSED_TEST"
+}

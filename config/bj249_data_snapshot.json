@@ -1,0 +1,50 @@
+{
+  "contract": "BJ-UNIFIED-DATA-PORTABILITY-001",
+  "assets": [
+    {
+      "kind": "sqlite",
+      "path": "data/derived/500_bjdc/500_bjdc.sqlite",
+      "time_columns": [
+        {"table": "matches", "column": "schedule_date"},
+        {"table": "live_market_sp_snapshots", "column": "fetched_at_utc"}
+      ]
+    },
+    {
+      "kind": "sqlite",
+      "path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+      "time_columns": [{"table": "matches", "column": "kickoff_ts"}]
+    },
+    {
+      "kind": "sqlite",
+      "path": "data/derived/beidan_xlsm/beidan_modeling_plus_2026.sqlite",
+      "time_columns": [{"table": "matches", "column": "kickoff_ts"}]
+    },
+    {
+      "kind": "sqlite",
+      "path": "data/derived/bj268/eu_proxy_backfill_v3/candidate.sqlite",
+      "time_columns": [{"table": "matches", "column": "kickoff_ts"}]
+    },
+    {
+      "kind": "sqlite",
+      "path": "data/beidan_live.db",
+      "time_columns": [
+        {"table": "matches", "column": "kickoff_ts"},
+        {"table": "snapshots", "column": "snapshot_ts"}
+      ]
+    },
+    {
+      "kind": "sqlite",
+      "path": "data/beidan_features.db",
+      "time_columns": [{"table": "matches", "column": "kickoff"}]
+    },
+    {
+      "kind": "sqlite",
+      "path": "data/beidan_history.db",
+      "time_columns": [{"table": "historical_matches", "column": "kickoff_ts"}]
+    },
+    {"kind": "sqlite", "path": "data/webui.db", "time_columns": []},
+    {"kind": "tree", "path": "data/raw"},
+    {"kind": "tree", "path": "data/derived/bj238_divergence_materializer_v4"},
+    {"kind": "tree", "path": "data/derived/bj268/eu_proxy_backfill_v3/eu_odds_proxy_v3"}
+  ]
+}
