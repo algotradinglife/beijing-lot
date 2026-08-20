@@ -131,12 +131,13 @@ input.
 
 ## Holdout handoff
 
-#210 remains blocked unless the frozen-2022 replay beats the strongest matched
-baseline in ending capital; has nonnegative ex-largest lift; does not worsen
-drawdown or the worst rolling-10 window; changes at least 15 issues; keeps the
-largest issue below half of positive lift; is acceptably calibrated; produces
-positive matched lift for at least three of five model seeds; and passes causal,
-settlement and 2024-seal checks.
+#210 remains blocked unless the frozen-2022 replay ends above both CNY100,000
+cash and the frozen active control; has nonnegative ex-largest lift; does not
+worsen active-control drawdown or the worst rolling-10 window; funds a genuinely
+model-selected deviation on at least 15 issues (cash/fallback does not count);
+keeps the largest issue below half of positive lift; is acceptably calibrated;
+produces positive P&L versus cash for at least three of five model seeds; and
+passes causal, settlement and 2024-seal checks.
 
 A scientifically informative negative result completes #282 but does not unlock
 the held-out outcome labels.

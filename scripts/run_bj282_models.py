@@ -230,6 +230,13 @@ def main() -> int:
         name: fixed_action_ledger(test_labels, action_key=key, policy_name=name)
         for name, key in fixed_keys.items()
     }
+    cash = ledgers[frozen_guard_name].copy()
+    cash["action_key"] = "NO_BET"
+    cash["pnl_cny_mean"] = 0.0
+    cash["stake_cny_mean"] = 0.0
+    cash["predicted_score"] = 0.0
+    cash["policy"] = "CASH_NO_BET"
+    ledgers["CASH_NO_BET"] = cash
     ledgers["LINEAR"] = choose_actions_with_baseline_guard(
         test_labels,
         control_predictions["linear_expected_value"],
@@ -300,9 +307,9 @@ def main() -> int:
 
     primary = metrics_frame.set_index("policy").loc["DEEP_ENSEMBLE"]
     baseline = metrics_frame.set_index("policy").loc[strongest_fixed_name]
-    seed_positive = int(
+    seed_positive_vs_cash = int(
         sum(
-            metrics_frame.set_index("policy").loc[f"DEEP_SEED_{seed}", "matched_lift_cny"]
+            metrics_frame.set_index("policy").loc[f"DEEP_SEED_{seed}", "total_pnl_cny"]
             > 0
             for seed in MODEL_SEEDS
         )
@@ -310,8 +317,12 @@ def main() -> int:
     positive_actual = test_labels["normalized_pnl_cny100"].gt(0).to_numpy(dtype=float)
     positive_predicted = predictions["deep_positive_probability_median"].to_numpy()
     positive_brier = float(np.mean(np.square(positive_predicted - positive_actual)))
+    funded_model_deviations = int(
+        ledgers["DEEP_ENSEMBLE"]["guard_reason"].eq("MODEL_PREDICTED_LIFT").sum()
+    )
     criteria = {
-        "ending_capital_above_strongest_fixed": bool(
+        "ending_capital_above_cash": bool(primary["ending_capital_cny"] > 100_000.0),
+        "ending_capital_above_frozen_active_baseline": bool(
             primary["ending_capital_cny"] > baseline["ending_capital_cny"]
         ),
         "ex_largest_matched_lift_nonnegative": bool(
@@ -324,11 +335,13 @@ def main() -> int:
             primary["rolling_10_worst_pnl_cny"]
             >= baseline["rolling_10_worst_pnl_cny"]
         ),
-        "changed_issues_at_least_15": bool(primary["changed_action_issues"] >= 15),
+        "funded_model_deviation_issues_at_least_15": funded_model_deviations >= 15,
         "largest_issue_positive_lift_share_at_most_half": bool(
             primary["largest_issue_positive_lift_share"] <= 0.5
         ),
-        "model_seeds_positive_at_least_3_of_5": seed_positive >= 3,
+        "model_seeds_positive_vs_cash_at_least_3_of_5": (
+            seed_positive_vs_cash >= 3
+        ),
         "causal_and_seal_checks": True,
     }
     decision = {
@@ -340,7 +353,8 @@ def main() -> int:
         "strongest_matched_fixed_baseline": strongest_fixed_name,
         "baseline_selected_using": "2014_2022_DEVELOPMENT_TOTAL_PNL_BEFORE_2023",
         "deep_positive_brier_all_nested_action_rows": positive_brier,
-        "positive_model_seed_count": seed_positive,
+        "positive_model_seed_count_vs_cash": seed_positive_vs_cash,
+        "funded_model_deviation_issues": funded_model_deviations,
         "holdout_criteria": criteria,
         "holdout_eligible": all(criteria.values()),
         "promotion_authority": False,
