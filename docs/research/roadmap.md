@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-21 18:29 HKT (#286 joint selective-protection learning settled; protection ranking clue retained but no funded Edge)**
+Updated: **2026-08-21 19:43 HKT (#291 rare-event value heads isolated a base Top-64 candidate; protection remains rejected and #292 awaits scope review)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -127,6 +127,12 @@ PI interpretation and does not replace those edges or Project states.
 #286 joint base-ticket + selective-protection learning (Done; no protection Edge)
              |
              v
+#291 decomposed rare-event probability/payoff heads (Done; base candidate signal)
+             |
+             v
+#292 calibrated dynamic joint optimizer (Inbox; held for PI/user scope review)
+             |
+             v
 #210 held-out/prospective validation  <--- no candidate; also blocked by #218
              |
              v
@@ -149,8 +155,10 @@ PI interpretation and does not replace those edges or Project states.
 | 12 | [#284] issue-normalized subset and joint-action atlas | Closed / Done | M3 | #282 closed; parent #202 | Qualified diagnostic only: subset augmentation stabilizes expected surfaces; +1.80pp is versus internal fixed K512, while Full-HGB is −5.29pp versus the live named N7/TOP/K8 control |
 | 13 | [#285] near-miss and protection atlas | Closed / Done | M3 | Parent #284; blocks #286 until merge | Equal-issue adverse-divergence localization is about +4pp versus random; dense blanket protection and corrected chronological paths are worse; advance only bounded selective learning |
 | 14 | [#286] joint selective-protection policy | Closed / Done | M3 | #285 closed | Label-free 620-issue joint action interface complete; learned protection ranks better than funded controls but loses to no protection and is not promoted |
-| 15 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
-| 16 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 15 | [#291] decomposed rare-event value heads | Closed / Done | M3 | Parent #202; predecessor of #292 | Separate hit probability, conditional gross and direct-P&L ranking; preserve a base Top-64 candidate signal but no protection promotion |
+| 16 | [#292] calibrated dynamic joint optimizer | Open / Inbox | M3 | Native blockedBy #291 until this PR lands | Confirm the candidate across nuisance replicas, then make cash/baseline/continuation and action parameters true competing choices |
+| 17 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
+| 18 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
 
@@ -192,6 +200,26 @@ PI interpretation and does not replace those edges or Project states.
   improve and a new policy shows positive ex-largest incremental P&L versus
   cash.
 - Report: [`Issue-286-Joint-Selective-Protection.md`](Issue-286-Joint-Selective-Protection.md).
+
+### #291 rare-event value-head decision
+
+- Issue-normalized expanding OOF separates hit probability, conditional winning
+  gross and direct P&L on the #286 physical ticket surface. Data-linear average
+  precision is 3.58× the base event rate and 2.86× the protection event rate,
+  but conditional-gross error remains large and decomposed protection EV fails.
+- Protection remains `NO_PROMOTION`. Its positive totals reverse ex-largest or
+  remain bootstrap-negative; `NO_PROTECTION` stays controlling.
+- A base `DATA_LOGIT_RIDGE / DIRECT_PNL / Top-64` candidate produces
+  CNY+103,270.26 on CNY34,432 stake, CNY+61,116.73 ex-largest and four positive
+  OOF years. Its bootstrap lower ROI bound is still −2.37%, and it has a
+  112-issue losing streak, so classification is candidate signal only.
+- The candidate allocates 74.0% to N9, 54.9% to K64, 59.0% to
+  divergence-weighted subsets and 92.1% to weighted-WR; profitable tickets also
+  occur at N7/N8. Preserve dynamic N rather than freezing N9.
+- Before #292 runs, require nuisance/seed/subset confirmation and true
+  cash/no-protection/continuation/frozen-baseline competition with a
+  conservative lower-bound gate. Keep #210 sealed.
+- Report: [`Issue-291-Rare-Event-Value-Heads.md`](Issue-291-Rare-Event-Value-Heads.md).
 
 ### #282 conditional-policy prototype decision
 
@@ -433,6 +461,8 @@ retrospective feature.
 [#248]: https://github.com/algotradinglife/beijing-lot/issues/248
 [#249]: https://github.com/algotradinglife/beijing-lot/issues/249
 [#286]: https://github.com/algotradinglife/beijing-lot/issues/286
+[#291]: https://github.com/algotradinglife/beijing-lot/issues/291
+[#292]: https://github.com/algotradinglife/beijing-lot/issues/292
 
 ---
 

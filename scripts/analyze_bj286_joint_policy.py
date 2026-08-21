@@ -84,6 +84,7 @@ def main() -> int:
             annual_rows.append(annual)
             formal = frame["formal_baseline_pnl_cny"].to_numpy(float)
             lift = pnl - formal
+            completed_recovery, open_underwater = _recovery_diagnostics(capital)
             summary_rows.append(
                 {
                     "model": model,
@@ -105,7 +106,8 @@ def main() -> int:
                     "worst_rolling_5_pnl_cny": float(pd.Series(pnl).rolling(5).sum().min()),
                     "worst_rolling_10_pnl_cny": float(pd.Series(pnl).rolling(10).sum().min()),
                     "worst_rolling_20_pnl_cny": float(pd.Series(pnl).rolling(20).sum().min()),
-                    "maximum_recovery_issues": _maximum_recovery_issues(capital),
+                    "maximum_completed_recovery_issues": completed_recovery,
+                    "open_terminal_underwater_issues": open_underwater,
                     "matched_lift_vs_formal_cny": float(lift.sum()),
                     "ex_largest_matched_lift_cny": float(lift.sum() - lift.max()),
                 }
@@ -238,7 +240,9 @@ def _longest_loss_streak(pnl: np.ndarray) -> int:
     return longest
 
 
-def _maximum_recovery_issues(capital: np.ndarray) -> int:
+def _recovery_diagnostics(capital: np.ndarray) -> tuple[int, int]:
+    """Separate completed recovery time from terminal right-censoring."""
+
     path = np.r_[100_000.0, capital]
     peak = path[0]
     underwater_start: int | None = None
@@ -251,9 +255,8 @@ def _maximum_recovery_issues(capital: np.ndarray) -> int:
             peak = value
         elif underwater_start is None:
             underwater_start = index
-    if underwater_start is not None:
-        longest = max(longest, len(path) - underwater_start)
-    return longest
+    open_underwater = len(path) - underwater_start if underwater_start is not None else 0
+    return longest, open_underwater
 
 
 def _sha256(path: Path) -> str:
