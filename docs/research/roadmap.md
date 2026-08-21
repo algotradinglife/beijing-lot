@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 00:04 HKT (#296 candidate-warm expert mixture implemented; validation fallback retained, no promotion, 2024+ remains sealed)**
+Updated: **2026-08-22 00:30 HKT (#296 closed/Done; validation fallback retained, no promotion, 2024+ remains sealed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -134,7 +134,7 @@ PI interpretation and does not replace those edges or Project states.
      low-N core fails and high-N tail is one-jackpot dependent; no promotion)
              |
              v
-#296 candidate-warm expert mixture (PI Review; raw 2023 positive but unstable,
+#296 candidate-warm expert mixture (Done; raw 2023 positive but unstable,
      validation fallback retains frozen static control; no promotion)
              |
              v
@@ -162,8 +162,8 @@ PI interpretation and does not replace those edges or Project states.
 | 14 | [#286] joint selective-protection policy | Closed / Done | M3 | #285 closed | Label-free 620-issue joint action interface complete; learned protection ranks better than funded controls but loses to no protection and is not promoted |
 | 15 | [#291] decomposed rare-event value heads | Closed / Done | M3 | Parent #202; predecessor of #292 | Separate hit probability, conditional gross and direct-P&L ranking; preserve a base Top-64 candidate signal but no protection promotion |
 | 16 | [#292] calibrated dynamic joint optimizer | Closed / Done | M3 | #291 closed; no open blocker | Full N3–N10/K8–512 development OOF complete: dynamic and low-N core lose to cash; tail/barbell are one-jackpot dependent; retain architecture, no promotion |
-| 17 | [#296] candidate-warm expert mixture | Open / PI Review | M3 | #292 closed; blocks #210 | Learned expert/cash weights are meaningful, but 2022 validation fails, warm start trails both initialization controls, and all seeds are negative ex-largest; safety gate falls back to static control |
-| 18 | [#210] held-out/forward validation | Open / Blocked | M4 | #296 and #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
+| 17 | [#296] candidate-warm expert mixture | Closed / Done | M3 | #292 closed; blocks #210 | Learned expert/cash weights are meaningful, but 2022 validation fails, warm start trails both initialization controls, and all seeds are negative ex-largest; safety gate falls back to static control |
+| 18 | [#210] held-out/forward validation | Open / Blocked | M4 | #296 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 19 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
