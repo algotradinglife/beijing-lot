@@ -1,0 +1,27 @@
+{
+  "contract": "BJ-UNIFIED-CALIBRATED-JOINT-OPTIMIZER-001/analysis-v1",
+  "independent_unit": "BEIJING_ISSUE",
+  "sealed_years_opened": [],
+  "input_sha256": {
+    "receipt": "45b47f9cc20ba1a35783808f2f77583bbf88e3f1728fe8c653b3e8845d125b04",
+    "summary": "b04ca718d7cd9a4263d25c72b191315c01fa1cc5969964bf61ac0cadc6427911",
+    "paths": "1f7c91643c67fdc26ea5138a274bd9cecf5a95954cfc9e832efb5dad68bf89d3",
+    "decisions": "9ce3b428953cea631719610f7c09077d4399ddcfd75ef74b8bd5cc991504630f",
+    "surface": "3ce8eacf389e5c0de6b2ac5e15ba9d3cdd95a6c41436044a27b26dca251d156b",
+    "shortlist_seed_receipt": "959cdb3f49f32e47f3b292fec195527bced4cac1b33749957d5125b313c549be",
+    "shortlist_seed_summary": "9ec27fd302df00ea96db596a437c8fc103c0d351686b460c1eb665b18a5b7633"
+  },
+  "output_sha256": {
+    "policy_summary": "29aca0ca4251e640ace498bb366d95fe30c90b05497d042a530ebcc315d7d779",
+    "policy_annual": "583611b212015e729efba42754b18e592dddaf183d02bb05fdebed3b5478e383",
+    "policy_paths": "af6f4ece8e4a2934db0505297745120cc1ee33835a0f2bbb7b5f1c5fb178634f",
+    "dynamic_action_distribution": "b51fd47b27223ef455f4c7fadbab250ec28a8772ec7d4c0896a374e9664b7be1",
+    "fixed_n_summary": "c124e6f89b0d9fa7cc79f33fa5f6f3a0310ce3cd7f312f494e8ded152a77861f",
+    "barbell_sensitivity": "2b14abd0caa924bda52c215252737c552afe54ca86d077e7947e32c00e0371d9",
+    "family_selection": "de1e52a99eb9759d11d9b126320d2ba2eb4450994fbd88bef0068bae8c0f3a91",
+    "shortlist_seed_summary": "4c52ab9c02f828a3a5bde15d50f2e4083d320288d08502087f2f8819eac3a6ce",
+    "execution_receipt": "45b47f9cc20ba1a35783808f2f77583bbf88e3f1728fe8c653b3e8845d125b04",
+    "shortlist_seed_receipt": "959cdb3f49f32e47f3b292fec195527bced4cac1b33749957d5125b313c549be"
+  },
+  "figure_sha256": "5a376a5505f0aa0c062ef4be7cbe9aa9f07e867d44d69987b6d3cc57253f8268"
+}

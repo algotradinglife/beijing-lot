@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-21 19:43 HKT (#291 rare-event value heads isolated a base Top-64 candidate; protection remains rejected and #292 awaits scope review)**
+Updated: **2026-08-21 22:03 HKT (#292 dynamic N/K and low-N/tail barbell completed development OOF; no promotion, 2024+ remains sealed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -130,7 +130,8 @@ PI interpretation and does not replace those edges or Project states.
 #291 decomposed rare-event probability/payoff heads (Done; base candidate signal)
              |
              v
-#292 calibrated dynamic joint optimizer (Inbox; held for PI/user scope review)
+#292 calibrated dynamic joint optimizer (In Progress; development OOF complete,
+     low-N core fails and high-N tail is one-jackpot dependent; no promotion)
              |
              v
 #210 held-out/prospective validation  <--- no candidate; also blocked by #218
@@ -156,7 +157,7 @@ PI interpretation and does not replace those edges or Project states.
 | 13 | [#285] near-miss and protection atlas | Closed / Done | M3 | Parent #284; blocks #286 until merge | Equal-issue adverse-divergence localization is about +4pp versus random; dense blanket protection and corrected chronological paths are worse; advance only bounded selective learning |
 | 14 | [#286] joint selective-protection policy | Closed / Done | M3 | #285 closed | Label-free 620-issue joint action interface complete; learned protection ranks better than funded controls but loses to no protection and is not promoted |
 | 15 | [#291] decomposed rare-event value heads | Closed / Done | M3 | Parent #202; predecessor of #292 | Separate hit probability, conditional gross and direct-P&L ranking; preserve a base Top-64 candidate signal but no protection promotion |
-| 16 | [#292] calibrated dynamic joint optimizer | Open / Inbox | M3 | Native blockedBy #291 until this PR lands | Confirm the candidate across nuisance replicas, then make cash/baseline/continuation and action parameters true competing choices |
+| 16 | [#292] calibrated dynamic joint optimizer | Open / In Progress | M3 | #291 closed; no open blocker | Full N3–N10/K8–512 development OOF complete: dynamic and low-N core lose to cash; tail/barbell are one-jackpot dependent; retain architecture, no promotion |
 | 17 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 18 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
@@ -220,6 +221,26 @@ PI interpretation and does not replace those edges or Project states.
   cash/no-protection/continuation/frozen-baseline competition with a
   conservative lower-bound gate. Keep #210 sealed.
 - Report: [`Issue-291-Rare-Event-Value-Heads.md`](Issue-291-Rare-Event-Value-Heads.md).
+
+### #292 dynamic joint-optimizer decision
+
+- The complete feasible action surface spans N3–N10, seven K anchors and
+  TOP/WR/WOR ticket generation, with cash as an explicit choice. Expanding
+  2019–2023 OOF and 2024+ sealing are preserved.
+- The learned low-N N3–N6 core is not near break-even: the always-active row is
+  −92.17%, while predicted-mean gates from −5% to 0% are about −99% to −100%.
+- The high-N tail returns +265.39% in total but has one positive year, a
+  217-issue losing run, bootstrap p2.5 of −100%, and ex-largest P&L of
+  −CNY4,288. The best 20%-cap barbell returns +8.03%, but ex-largest is
+  −CNY14,406.71 because the core remains structurally negative.
+- Post-hoc fixed N6/N7/N8/N10 clues reverse across the five nuisance ticket
+  streams. N6/K8/WOR is positive in only one seed; N7/K16/WR and N8/K32/WR are
+  positive in three seeds but positive ex-largest in only two and one,
+  respectively. No fixed action becomes a baseline.
+- Retain the two-sleeve architecture, but make sparse activation and
+  ticket-level hit/payoff calibration the next development target. Do not open
+  #210/2024+ until a learned policy beats cash and its matched control.
+- Report: [`Issue-292-Dynamic-Joint-Optimizer.md`](Issue-292-Dynamic-Joint-Optimizer.md).
 
 ### #282 conditional-policy prototype decision
 

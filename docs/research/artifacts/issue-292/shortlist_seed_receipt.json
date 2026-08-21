@@ -1,0 +1,25 @@
+{
+  "contract": "BJ-UNIFIED-CALIBRATED-JOINT-OPTIMIZER-001/shortlist-v1",
+  "shortlist_is_posthoc_diagnostic": true,
+  "nuisance_seeds": [
+    292001,
+    292002,
+    292003,
+    292004,
+    292005
+  ],
+  "actions": [
+    "N6_K8_WEIGHTED_WOR",
+    "N7_K16_WEIGHTED_WR",
+    "N8_K32_WEIGHTED_WR",
+    "N10_K512_WEIGHTED_WR"
+  ],
+  "oof_years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "sealed_years_opened": []
+}
