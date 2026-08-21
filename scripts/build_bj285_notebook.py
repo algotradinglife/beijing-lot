@@ -109,22 +109,38 @@ expanded to four subsets and five seeds."""
         ),
         _markdown("## Dense N8 confirmation"),
         _code(
-            """dense[[
+            """display(dense[[
     'n','k','rule','marginal_protection_roi','ex_largest_marginal_roi',
     'protection_excess_roi_vs_continuation',
     'missed_leg_localization_rate','single_flip_rescue_rate','positive_years',
     'bootstrap_marginal_roi_p025','bootstrap_marginal_roi_p975',
     'bootstrap_adverse_minus_random_p025',
     'bootstrap_adverse_minus_random_p975'
-]]"""
+]])
+issue_localization = dense_panel.groupby(
+    ['issue','issue_year','k','rule'], as_index=False
+).agg(
+    localized=('localized_near_miss_tickets','mean'),
+    near_miss=('near_miss_tickets','mean'),
+)
+issue_localization = issue_localization.loc[issue_localization.near_miss.gt(0)]
+issue_localization['issue_rate'] = (
+    issue_localization.localized / issue_localization.near_miss
+)
+issue_localization.groupby(['k','rule'], as_index=False).agg(
+    eligible_issues=('issue','nunique'),
+    equal_issue_localization=('issue_rate','mean'),
+)"""
         ),
         _code(
             """issue = dense_panel.groupby(
     ['issue','issue_year','k','rule'], as_index=False
 ).mean(numeric_only=True)
+issue['issue_number'] = pd.to_numeric(issue.issue, errors='raise')
 fig, ax = plt.subplots(figsize=(12,5))
 for (k, rule), group in issue.groupby(['k','rule'], sort=True):
-    group = group.sort_values('issue')
+    group = group.sort_values(['issue_year','issue_number'])
+    assert group.issue_year.is_monotonic_increasing
     capital = 100_000 + group.protection_lift_cny.cumsum()
     ax.plot(
         range(1, len(group)+1), capital,
@@ -148,10 +164,11 @@ ax.legend(); plt.tight_layout()"""
 
 Blanket protection does not advance: dense N8/K16 is −13.21% on incremental
 capital and N8/K64 is −4.87%; both ex-largest results remain negative and both
-issue-bootstrap intervals cross zero. Yet adverse-divergence localization is
-about 20% versus 11% for random, and the correct single flip is about 12–13%
-versus 6–7%. The information signal survives while the fixed-cost policy does
-not.
+issue-bootstrap intervals cross zero. Under equal issue weight,
+adverse-divergence localization is 15.16%/15.29% for K16/K64 versus
+11.23%/11.13% for random, a positive difference of about four percentage
+points. The prior near-twofold magnitude was ticket-weighted and is withdrawn.
+The information signal survives while the fixed-cost policy does not.
 
 The justified successor is a selective-protection learner. Its target must be
 the counterfactual incremental P&L of protecting a ticket, not a conditional

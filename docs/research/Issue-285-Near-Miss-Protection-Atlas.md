@@ -7,10 +7,11 @@ scientifically justified.
 ## Executive conclusion
 
 The user's near-miss intuition contains useful information, but the profitable
-object is not “buy one protection ticket for every base ticket.” A rule based
-on the selected outcome's adverse signed divergence identifies the eventual
-wrong leg roughly twice as often as random. Its fixed blanket implementation,
-however, still loses money after paying for all added tickets.
+object is not “buy one protection ticket for every base ticket.” Under the
+required equal-issue estimand, a rule based on the selected outcome's adverse
+signed divergence identifies the eventual wrong leg about four percentage
+points more often than random. Its fixed blanket implementation still loses
+money after paying for all added tickets.
 
 This separates two claims:
 
@@ -88,7 +89,7 @@ The retained cells were expanded to four independently sampled subsets and
 five fixed stream seeds. Replicas were averaged inside each issue/action before
 statistics were computed.
 
-| K | Rule | Added-capital ROI | Ex-largest | Excess vs unprotected continuation | Missed-leg localization | Correct single flip | Positive years |
+| K | Rule | Added-capital ROI | Ex-largest | Excess vs unprotected continuation | Ticket-weighted localization (diagnostic) | Correct single flip (diagnostic) | Positive years |
 |---:|---|---:|---:|---:|---:|---:|---:|
 | 16 | adverse divergence | **−13.21%** | −18.42% | +3.29% | 19.72% | 11.92% | 3/10 |
 | 16 | random | −10.79% | −21.89% | +1.65% | 11.42% | 6.41% | 3/10 |
@@ -102,10 +103,24 @@ The issue-block intervals remain wide:
 - K64 adverse-minus-random: **[−25.92%, +31.14%]**;
 - K64 protection-minus-continuation: **[−12.03%, +32.46%]**.
 
-The fixed policy therefore fails the economic test. Its localization signal,
-however, survives nuisance expansion: adverse divergence approximately doubles
-both wrong-leg localization and correct replacement frequency relative to
-random.
+The fixed policy therefore fails the economic test. The table's localization
+rates weight tickets and are not the primary contract estimand. Giving every
+eligible Beijing issue equal weight yields:
+
+- K16: **15.16%** adverse versus **11.23%** random, difference +3.93pp,
+  paired issue-bootstrap interval **[+0.60pp, +7.27pp]**;
+- K64: **15.29%** versus **11.13%**, difference +4.16pp,
+  interval **[+2.11pp, +6.26pp]**.
+
+The localization direction survives, but the previous near-twofold magnitude
+is withdrawn. In addition, adverse and random portfolios were not matched on
+their final post-dedup unique-ticket stake, so adverse-minus-random monetary
+comparisons are not equal-budget evidence.
+
+The originally plotted issue path was lexicographically rather than
+chronologically ordered. Correct `(issue_year, numeric issue)` replay shows the
+protected K16/K64 paths have worse drawdown and worst rolling-10 P&L than their
+base portfolios. This strengthens the blanket-protection rejection.
 
 ## Why a “near-miss model” alone would be wrong
 
@@ -136,9 +151,10 @@ Edge:
 5. localization lift is not automatically monetizable because protection
    nearly doubles the ticket count.
 
-These objections reject blanket promotion but do not erase the twofold
-localization difference. That difference is precisely the information a
-selective, fallback-constrained learner should test next.
+These objections reject blanket promotion but do not erase the smaller,
+positive issue-weighted localization difference. That difference is precisely
+the information a selective, fallback-constrained learner may test next as a
+bounded exploration.
 
 ## Next model boundary
 
