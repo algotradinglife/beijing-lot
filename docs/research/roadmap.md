@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-21 22:03 HKT (#292 dynamic N/K and low-N/tail barbell completed development OOF; no promotion, 2024+ remains sealed)**
+Updated: **2026-08-21 22:16 HKT (#292 closed Done after dynamic N/K and low-N/tail barbell development OOF; no promotion, 2024+ remains sealed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -130,7 +130,7 @@ PI interpretation and does not replace those edges or Project states.
 #291 decomposed rare-event probability/payoff heads (Done; base candidate signal)
              |
              v
-#292 calibrated dynamic joint optimizer (In Progress; development OOF complete,
+#292 calibrated dynamic joint optimizer (Done; development OOF complete,
      low-N core fails and high-N tail is one-jackpot dependent; no promotion)
              |
              v
@@ -157,7 +157,7 @@ PI interpretation and does not replace those edges or Project states.
 | 13 | [#285] near-miss and protection atlas | Closed / Done | M3 | Parent #284; blocks #286 until merge | Equal-issue adverse-divergence localization is about +4pp versus random; dense blanket protection and corrected chronological paths are worse; advance only bounded selective learning |
 | 14 | [#286] joint selective-protection policy | Closed / Done | M3 | #285 closed | Label-free 620-issue joint action interface complete; learned protection ranks better than funded controls but loses to no protection and is not promoted |
 | 15 | [#291] decomposed rare-event value heads | Closed / Done | M3 | Parent #202; predecessor of #292 | Separate hit probability, conditional gross and direct-P&L ranking; preserve a base Top-64 candidate signal but no protection promotion |
-| 16 | [#292] calibrated dynamic joint optimizer | Open / In Progress | M3 | #291 closed; no open blocker | Full N3–N10/K8–512 development OOF complete: dynamic and low-N core lose to cash; tail/barbell are one-jackpot dependent; retain architecture, no promotion |
+| 16 | [#292] calibrated dynamic joint optimizer | Closed / Done | M3 | #291 closed; no open blocker | Full N3–N10/K8–512 development OOF complete: dynamic and low-N core lose to cash; tail/barbell are one-jackpot dependent; retain architecture, no promotion |
 | 17 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 18 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
