@@ -1,0 +1,21 @@
+{
+  "contract": "BJ-UNIFIED-JOINT-PROTECTION-001/analysis-v1",
+  "independent_unit": "BEIJING_ISSUE",
+  "primary_capital": "ACTUAL_CNY2_PER_UNIQUE_TICKET",
+  "bootstrap_draws": 5000,
+  "bootstrap_seed": 286999,
+  "chronology": "ISSUE_YEAR_THEN_NUMERIC_ISSUE",
+  "formal_baseline_causality_note": "SELECTED_ON_2014_2022; ONLY_2023_IS_FROZEN_HOLDOUT",
+  "input_sha256": {
+    "selected_actions": "c68e190a5a3d87a888d9253bd848ad39c4d8653ce1bbea8f50f53b451a2eda4b",
+    "candidate_labels": "87c07c0005c3d8def9c9d8e43a694f7159f901a70375e230fa5558c2a48b64e1"
+  },
+  "output_sha256": {
+    "comparison": "2088be14ccbf3df593bc642848c51cbb5a6420a2ea626a08168a49843cd47355",
+    "annual": "940853cca056df9ee20ac102606b0681a1977e46ca20f377c5b5ffe707cf063e",
+    "capital_paths": "902b5560ca22f7720ad5882fb6978e2c89b8616cfcc8f17212329448b05e3e2c",
+    "protection": "d6717ed5f3eeac76170efeef1bf23a63299327580c5b0a4de353de86ccb10a6e",
+    "action_distribution": "c7de2f484f7074c7848e77e5362ad9c73d14e65d1d7829171a435b6d48bbb100",
+    "candidate_universe": "ff59a191c430dec999f5420131d4c71b64257fec89e5966a62fd181a788b4c22"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "contract": "BJ-UNIFIED-JOINT-PROTECTION-001/oof-v1",
+  "oof_years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "models": [
+    "ACTION_RIDGE",
+    "DATA_HGB"
+  ],
+  "protection_shares": [
+    0.0,
+    0.1,
+    0.25,
+    0.5,
+    1.0
+  ],
+  "candidate_negative_sample_per_issue_action": 24,
+  "candidate_sample_rows": 717779,
+  "issue_weighting": "EACH_TRAINING_ISSUE_SUMS_TO_ONE",
+  "maximum_base_issue_weight_error": 0.0,
+  "maximum_candidate_issue_weight_error": 0.0,
+  "formal_baseline": "SALL_OMARKET_N7_TOP_VALUE_K8",
+  "cash_action": true,
+  "settlement_fields_in_inputs": [],
+  "input_sha256": {
+    "settlement_labels": {
+      "base": "18774f7e1fb84311dfff5e616ecc5d6d15fdaf52c4f2d82450b17343432a7c06",
+      "candidate": "87c07c0005c3d8def9c9d8e43a694f7159f901a70375e230fa5558c2a48b64e1",
+      "continuation": "2a06bbf9c3abccb45663522f4e1fc24bfaf51c780ad555bd771b06f2ae6695e2"
+    },
+    "formal_baseline": "11f065964eae32d6d29a6f935a848443e489285f5090b908a8c73f08b8bf6456",
+    "candidate_training_sample": "f2b3dddb10d62621b33b19ba46fff0c2f493f9af77e3831ec13389db03e78f97"
+  },
+  "output_sha256": {
+    "selected_actions": "c68e190a5a3d87a888d9253bd848ad39c4d8653ce1bbea8f50f53b451a2eda4b",
+    "capital_paths": "7300a2133c3179c1ec5db21a017f070aa81bdcead7dc89aae4248e3880205ca9",
+    "metrics": "cd884522752be3c57b22880e33280551a50ec8e4b0ed2c14ce744db21fbd9422"
+  }
+}

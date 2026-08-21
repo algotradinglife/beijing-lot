@@ -1,0 +1,51 @@
+{
+  "contract": "BJ-UNIFIED-JOINT-PROTECTION-001/label-free-manifest-v1",
+  "horizon": "10h",
+  "issues_requested": 620,
+  "issues_materialized": 620,
+  "rows": {
+    "base": 1188800,
+    "candidate": 12801489,
+    "continuation": 1188800
+  },
+  "action_cells_materialized": 29720,
+  "expected_full_action_cells": 29760,
+  "fully_supported_48_action_issues": 619,
+  "partial_action_support": {
+    "20031": 8
+  },
+  "action_levels": {
+    "n": [
+      7,
+      8,
+      9
+    ],
+    "k": [
+      16,
+      64
+    ],
+    "selectors": [
+      "UNIFORM",
+      "DIVERGENCE_WEIGHTED"
+    ],
+    "outcome_modes": [
+      "MARKET_PROBABILITY",
+      "DIVERGENCE_VALUE"
+    ],
+    "generators": [
+      "TOP_VALUE",
+      "WEIGHTED_WR"
+    ]
+  },
+  "settlement_columns_opened": [],
+  "source_sha256": {
+    "relative_horizon_view": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+    "subset_profile": "3d8fc9a10dc7539d7223460fd10cb5ad3d828a1754b02e28b65c8c966d9a3894"
+  },
+  "manifest_sha256": {
+    "base": "0d9268e8be1b5f100ab900d9db41bd3b936bf5e67ccd6108e2c218a08d107914",
+    "candidate": "c885b187d2687d33a672cce6d48da1f9b370fef87bf2a4b2e582c62718ca9f0a",
+    "continuation": "61032975dc3a70e2c9c87e8dd597f6ef8a6135ceca52d18f5e81a38f73423f49"
+  },
+  "exclusions": 0
+}

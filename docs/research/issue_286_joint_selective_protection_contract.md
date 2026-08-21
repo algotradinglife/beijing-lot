@@ -12,8 +12,8 @@ Can the unified model jointly choose the base-ticket parameters and a sparse
 set of protection actions from pre-event Data, such that protection improves
 matched issue-level capital after its full incremental cost?
 
-Issue #285 found that adverse signed divergence approximately doubles wrong-leg
-localization and correct single-flip frequency relative to random, while a
+Issue #285 found an equal-issue wrong-leg localization lift of about four
+percentage points for adverse signed divergence relative to random, while a
 blanket protection policy remains negative. The successor therefore learns
 **when not to protect**, as well as what to protect.
 
