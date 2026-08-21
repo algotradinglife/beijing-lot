@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 01:08 HKT (#299 BEST_FULL-residual replay complete; relative lift found, no dynamic promotion, 2024+ remains sealed)**
+Updated: **2026-08-22 01:36 HKT (#299 closed/Done; relative lift retained as development evidence, no dynamic promotion, 2024+ remains sealed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -138,7 +138,7 @@ PI interpretation and does not replace those edges or Project states.
      validation fallback retains frozen static control; no promotion)
              |
              v
-#299 exact BEST_FULL + learned residual (PI Review; +11.65pp matched 2023
+#299 exact BEST_FULL + learned residual (Done; +11.65pp matched 2023
      lift, but still negative and below exposure-matched random median)
              |
              v
@@ -167,8 +167,8 @@ PI interpretation and does not replace those edges or Project states.
 | 15 | [#291] decomposed rare-event value heads | Closed / Done | M3 | Parent #202; predecessor of #292 | Separate hit probability, conditional gross and direct-P&L ranking; preserve a base Top-64 candidate signal but no protection promotion |
 | 16 | [#292] calibrated dynamic joint optimizer | Closed / Done | M3 | #291 closed; no open blocker | Full N3–N10/K8–512 development OOF complete: dynamic and low-N core lose to cash; tail/barbell are one-jackpot dependent; retain architecture, no promotion |
 | 17 | [#296] candidate-warm expert mixture | Closed / Done | M3 | #292 closed; blocks #210 | Learned expert/cash weights are meaningful, but 2022 validation fails, warm start trails both initialization controls, and all seeds are negative ex-largest; safety gate falls back to static control |
-| 18 | [#299] BEST_FULL-anchored residual optimizer | Open / PI Review | M3 | #296 closed; blocks #210 | Exact matched residual learning improves 2023 BEST_FULL from -20.75% to -9.10%, but remains below cash and only the 38.3rd percentile of exposure-matched random placement; retain architecture, no promotion |
-| 19 | [#210] held-out/forward validation | Open / Blocked | M4 | #299 and #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
+| 18 | [#299] BEST_FULL-anchored residual optimizer | Closed / Done | M3 | #296 closed; blocks #210 | Exact matched residual learning improves 2023 BEST_FULL from -20.75% to -9.10%, but remains below cash and only the 38.3rd percentile of exposure-matched random placement; retain architecture, no promotion |
+| 19 | [#210] held-out/forward validation | Open / Blocked | M4 | #299 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 20 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
