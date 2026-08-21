@@ -1,0 +1,44 @@
+{
+  "contract": "BJ-UNIFIED-RARE-EVENT-VALUE-001/oof-v1",
+  "independent_unit": "BEIJING_ISSUE",
+  "development_years": [
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "oof_years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "calibration": "PREVIOUS_YEAR_PLATT_ONLY",
+  "negative_per_issue_action": 24,
+  "issue_weighting": "EACH_TRAINING_AND_TEST_ISSUE_SUMS_TO_ONE",
+  "sealed_years_opened": [],
+  "input_sha256": {
+    "base_labels": "18774f7e1fb84311dfff5e616ecc5d6d15fdaf52c4f2d82450b17343432a7c06",
+    "candidate_labels": "87c07c0005c3d8def9c9d8e43a694f7159f901a70375e230fa5558c2a48b64e1",
+    "issue286_settlement_receipt": "ec757b13b793d5763d47959de5ad24638d693a4e6a35ed4512ae3d037b67eb9a"
+  },
+  "training_sample_sha256": {
+    "BASE": "f6db9cf34557b56012f3d44afa519cba8d7c0c0e79fbcf45583bcee1a580b412",
+    "PROTECTION": "9bbb3cd23926f0235e3ce57b9236ae742305e3e2d2cd088dab0fcc6e9f95cd8d"
+  },
+  "output_sha256": {
+    "model_metrics": "4096b4cba0f4641a9b10b17c3ca4d448835e77af119034382d466236109a623a",
+    "reliability": "35e2fb323d2ea2367ab6a36b939760aa371e0b47cb685a2de280f5530a6ef9f1",
+    "ranking": "6f3aa512ea6e7e04424bd1648d57e89a6e777c3b1ca6b64bbfbd2c1259fc671a",
+    "ranking_paths": "c98c34c88efac2bc49681085260580bc63d7c0b7ce796baca0a7f27f6ab36c6b",
+    "ranking_tickets": "4765e6f3293727387b50708062849c6534f9d2ba66f199ceb78cbbc84d97a160",
+    "attribution_2023": "cd302e421ade66f69c43ddbf0f9b3b71d7c6d6897c4142f6f2401b2da87bec6c"
+  }
+}
