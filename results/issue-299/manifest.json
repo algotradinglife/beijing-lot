@@ -1,0 +1,125 @@
+{
+  "issue": 299,
+  "files": [
+    {
+      "path": "results/issue-299/action_attribution_2023.csv",
+      "bytes": 321,
+      "sha256": "de486ab7335d00006275a872a6ccf9c60f2e66305155c7619de55f8cb4dc8d47"
+    },
+    {
+      "path": "results/issue-299/action_attribution_2023.png",
+      "bytes": 44789,
+      "sha256": "2b69a4556614b47c847a6c258c79b11bcbeed8d7466d7c18384d7c71a77edda2"
+    },
+    {
+      "path": "results/issue-299/baseline_reproduction.json",
+      "bytes": 165,
+      "sha256": "178da677f98a0a63a645c906da0c788684736e087f57d43984b31198762aaf0b"
+    },
+    {
+      "path": "results/issue-299/capital_paths_2019_2023.csv",
+      "bytes": 341409,
+      "sha256": "624d070a8656b155df552dce6a617cc5e9cb1074ffe1f8ca0a7ef163513743eb"
+    },
+    {
+      "path": "results/issue-299/capital_paths_2023.png",
+      "bytes": 143762,
+      "sha256": "427cd0ddcc9607b91b0519240b81f51badf366ccf0cadd930c605cef7ab9e0fe"
+    },
+    {
+      "path": "results/issue-299/decision.json",
+      "bytes": 1862,
+      "sha256": "96a2c894e034580725c0c6d08db36c419c1737e74c4a50234b2d404670bdbcfd"
+    },
+    {
+      "path": "results/issue-299/exposure_matched_permutation.csv",
+      "bytes": 162663,
+      "sha256": "4c718da7b8bcc59c077e8e910ff613bce913ed36a2c610ddc2fe1f9d6b6660ae"
+    },
+    {
+      "path": "results/issue-299/fit_receipts.csv",
+      "bytes": 7450,
+      "sha256": "c420bd23bf7281b183fac2f935e6c93df8ca6b8a7266cc006c0a20eb3d036b30"
+    },
+    {
+      "path": "results/issue-299/guarded_decisions.csv",
+      "bytes": 16112,
+      "sha256": "142f6a6fd65071e777d015f1193ec585c35e6a35fe907d568ad1b0d3f69492ef"
+    },
+    {
+      "path": "results/issue-299/learned_minus_best_full_2023.csv",
+      "bytes": 6579,
+      "sha256": "838a7b931a7315c0f1ace4110bd4c979dec245b567d633672af70a07906a24b3"
+    },
+    {
+      "path": "results/issue-299/learned_minus_best_full_2023.png",
+      "bytes": 69396,
+      "sha256": "1469d94303ba293406dedc48fa3e28d73be08a84e9455b0a026ed553d6d819f5"
+    },
+    {
+      "path": "results/issue-299/matched_issue_features.csv",
+      "bytes": 95809,
+      "sha256": "834ac2ebe2b20e01489c0e7ec8acc8be02607269bedf7a3aa5e8084cfb0ca6b7"
+    },
+    {
+      "path": "results/issue-299/policy_decisions.csv",
+      "bytes": 118074,
+      "sha256": "85b4c405650bfe13a2c535a90d2c91360df92c158c34869648ab91cba3d30ba4"
+    },
+    {
+      "path": "results/issue-299/policy_summary_by_year.csv",
+      "bytes": 17486,
+      "sha256": "512084022634e8b56496acd268d4a40f3f2006176a16fc9255a446f253ba9743"
+    },
+    {
+      "path": "results/issue-299/residual_action_ledger.csv",
+      "bytes": 113903,
+      "sha256": "2e0ae21d3b2a5cb43872d5b9c16c7e1f3452e10e35007b0dfff772e7eef77ea1"
+    },
+    {
+      "path": "results/issue-299/residual_calibration.csv",
+      "bytes": 4035,
+      "sha256": "da6b15949a895ec1fedccaf4233946d487edb08e021fd264ed0632e7697df1df"
+    },
+    {
+      "path": "results/issue-299/residual_calibration.png",
+      "bytes": 106573,
+      "sha256": "4e621bc64306e68432884be94702ef254f4117fd3a351403435547ddb0da7f7b"
+    },
+    {
+      "path": "results/issue-299/residual_predictions.csv",
+      "bytes": 510734,
+      "sha256": "e1f94d32b3aa42c3c0f92271ca5f5ea0f9d18fa9db3b6c14c6223ac4675ea582"
+    },
+    {
+      "path": "results/issue-299/residual_seed_predictions.csv",
+      "bytes": 2030497,
+      "sha256": "610c5c04061d049c039198f2e55a6b719eb74556e82023f7cd4dc2f07a9120f4"
+    },
+    {
+      "path": "results/issue-299/seed_decisions.csv",
+      "bytes": 83479,
+      "sha256": "bc48c183fbec693d0017bf68ab775514deb3e0beb5a3dee48f41a4891d7c17e0"
+    },
+    {
+      "path": "results/issue-299/seed_summary.csv",
+      "bytes": 5368,
+      "sha256": "a840bc435af5c99b96d61859810fc9f87e1af31e272c4e571baa4a9885aa9891"
+    },
+    {
+      "path": "results/issue-299/static_residual_frontier.csv",
+      "bytes": 3555,
+      "sha256": "a31e8f7899f4083939c27264948103b24996922d0eea2465f0ddb854c7145e57"
+    },
+    {
+      "path": "results/issue-299/support_receipt.csv",
+      "bytes": 11038,
+      "sha256": "a7fb0d17a359994c404643cbeb293f4c2f7bbcd0739af2402bd228aebe8c885d"
+    },
+    {
+      "path": "results/issue-299/validation_gate.json",
+      "bytes": 3607,
+      "sha256": "4f4039a665098ccbe15ca7cb3c3d9b2c7d37c203d9b0b9c0812eea1d69c7598b"
+    }
+  ]
+}

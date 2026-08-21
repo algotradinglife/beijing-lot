@@ -1,0 +1,57 @@
+{
+  "issue": 299,
+  "development_only": true,
+  "train_years": [
+    2019,
+    2020,
+    2021
+  ],
+  "validation_year": 2022,
+  "test_year": 2023,
+  "sealed_years": "2024+ not read by model runner",
+  "baseline_identity": "accepted #167/#170 B0_BEST_FULL",
+  "actions": {
+    "BASELINE_ONLY": [],
+    "BASELINE_SCALE_DOWN": [
+      "CASH_OVERRIDE"
+    ],
+    "BASELINE_PLUS_CORE": [
+      "SMOOTH_M512"
+    ],
+    "BASELINE_PLUS_TAIL": [
+      "RARE_LOGIT_TOP64"
+    ],
+    "BASELINE_PLUS_DIVERGENCE": [
+      "DIVERGENCE_Z100_K1"
+    ],
+    "BASELINE_PLUS_MIXED": [
+      "SMOOTH_M512",
+      "RARE_LOGIT_TOP64"
+    ]
+  },
+  "decision": {
+    "verdict": "RELATIVE_BASELINE_SIGNAL_NO_PROMOTION",
+    "promotable": false,
+    "relative_baseline_signal": true,
+    "validation_gate_accepted": true,
+    "guarded_source": "LEARNED_RESIDUAL",
+    "matched_support_issues": 227,
+    "excluded_no_exact_baseline": 42,
+    "static_train_action": "BASELINE_PLUS_MIXED",
+    "baseline_2023_capital_growth_pct": -20.751038032000004,
+    "raw_learned_2023_capital_growth_pct": -9.10435953136689,
+    "raw_learned_matched_lift_cny": 11646.678500633105,
+    "guarded_2023_capital_growth_pct": -9.10435953136689,
+    "learned_2023_activation_rate": 0.625,
+    "learned_2023_action_label_change_rate": 0.9375,
+    "learned_2023_ex_largest_pnl_cny": -14278.99169236689,
+    "baseline_2023_ex_largest_pnl_cny": -31647.371945000006,
+    "identity_shuffled_2023_capital_growth_pct": -16.346631875999996,
+    "oracle_2023_capital_growth_pct": 106.56768636060576,
+    "static_residual_2023_capital_growth_pct": 2.28296049636012,
+    "selection_only_2023_capital_growth_pct": -13.468279482,
+    "ridge_control_2023_capital_growth_pct": -0.6442449489999946,
+    "exposure_matched_permutation_median_capital_cny": 95005.37759411667,
+    "learned_vs_permutation_percentile": 0.383
+  }
+}

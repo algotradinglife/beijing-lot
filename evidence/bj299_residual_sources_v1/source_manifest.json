@@ -1,0 +1,37 @@
+{
+  "issue": 299,
+  "source": "results/bj190_gate_b_sparse_divergence_v1/issue_arm_settlement_b0_best_full.csv.gz",
+  "source_sha256": "f6f788f84980aee2f08759ef3232eb8ffea3545b7ad0a4f872c2c60b61d37e81",
+  "projection": "evidence/bj299_residual_sources_v1/best_full_2019_2023.csv",
+  "projection_sha256": "cd8734ae95a3b7065739d03ab833d12d45e80904a294cf7acd05a44e1cce9422",
+  "rows": 270,
+  "active_rows": 142,
+  "years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "identity": "accepted #167/#170 B0_BEST_FULL reproduced by #134/#190",
+  "residual_sources": [
+    {
+      "expert_id": "SMOOTH_M512",
+      "path": "evidence/bj296_expert_sources_v1/issue176_experts_2019_2023.csv",
+      "filter": "expert_id == SMOOTH_M512",
+      "sha256": "9b25bfe97d0020a5e64d5237b9b39c298ad06e7495b4ed504b43fbf1a144d48f"
+    },
+    {
+      "expert_id": "DIVERGENCE_Z100_K1",
+      "path": "evidence/bj296_expert_sources_v1/issue190_z100_k1_2019_2023.csv",
+      "filter": "expert_id == DIVERGENCE_Z100_K1",
+      "sha256": "bc34ee07f4adc4122311fa69f9e68dd5e42b91963dd62627db73e8993baff5d7"
+    },
+    {
+      "expert_id": "RARE_LOGIT_TOP64",
+      "path": "docs/research/artifacts/issue-291/ranking_issue_paths.csv",
+      "filter": "domain == BASE; model == DATA_LOGIT_RIDGE; score == DIRECT_PNL; ticket_budget_per_issue == 64",
+      "sha256": "dac3b77a70ca0232781b5cc16a5c93e7e250af0aa5d6251357c6491f7a1e12e1"
+    }
+  ]
+}
