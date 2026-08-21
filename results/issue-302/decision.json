@@ -1,0 +1,39 @@
+{
+  "issue": 302,
+  "baseline": "#299 exact B0_BEST_FULL atomic N7",
+  "experts": [
+    "SMOOTH_M512",
+    "Q_TAIL_M192",
+    "DIVERGENCE_Z100_K1",
+    "RARE_LOGIT_TOP64"
+  ],
+  "model": "shared action-conditioned MLP with expanding chronological refits",
+  "decision": {
+    "verdict": "RELATIVE_SIGNAL",
+    "promotable": false,
+    "development_only": true,
+    "matched_support_issues": 227,
+    "prediction_years": [
+      2021,
+      2022,
+      2023
+    ],
+    "sealed_years": "2024+ not read",
+    "primary_2023_terminal_capital_cny": 102633.13936700001,
+    "primary_2023_capital_growth_pct": 2.6331393670000036,
+    "baseline_2023_terminal_capital_cny": 79248.96196799999,
+    "baseline_2023_capital_growth_pct": -20.751038032000015,
+    "matched_lift_cny": 23384.177399000022,
+    "matched_lift_pp": 23.384177399000016,
+    "keep_skip_lift_cny": 23384.177399000022,
+    "expert_allocation_increment_cny": 0.0,
+    "causally_selected_2023_expert_funding_scale": 0.0,
+    "outcome_exposed_best_2023_funding_scale": 0.6309573444801936,
+    "outcome_exposed_best_2023_terminal_capital_cny": 3047871.2140462,
+    "static_2023_terminal_capital_cny": 84.88459400000283,
+    "identity_shuffled_2023_terminal_capital_cny": 174851.63121109744,
+    "placement_vs_permutation_percentile": 0.811,
+    "dynamic_placement_signal": false,
+    "absolute_edge": true
+  }
+}

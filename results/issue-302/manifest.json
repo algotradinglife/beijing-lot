@@ -1,0 +1,77 @@
+{
+  "issue": 302,
+  "files": {
+    "action_ledger.csv": {
+      "bytes": 73659,
+      "sha256": "0d7a0ae5cc0bab0088d67c06d75ffe7c2f276a6c724ef12bbee5cc1bac4c6f23"
+    },
+    "action_value_predictions.csv": {
+      "bytes": 619631,
+      "sha256": "c835f966558c34eaf00769b1e2971557add4b2bc43a3085c019ed02ee76f6584"
+    },
+    "capital_paths.csv": {
+      "bytes": 203229,
+      "sha256": "73960ffeda5a94bd04a3ae4c1f4c71bfe5e33891da38bc2ca2d3bf128db826fc"
+    },
+    "capital_paths_2023.png": {
+      "bytes": 99638,
+      "sha256": "c9390d1f2c13f2dca0cb09bb7fdc90403dd505714b2db8592c0909ff6d7b64d3"
+    },
+    "decision.json": {
+      "bytes": 1366,
+      "sha256": "6316fe4c94957a3f0502e62e753f4afd0fd3160d0ed7e92c15821b3182956f38"
+    },
+    "dynamic_weights_2023.png": {
+      "bytes": 48439,
+      "sha256": "c352abacea570e96574107926516a42a9575cc58212d93af3ccda911c2884af0"
+    },
+    "exposure_matched_permutation_2023.csv": {
+      "bytes": 440975,
+      "sha256": "8d409c312e69aa5804de56b978ecbcd001de3f51c853fbf9d5c7d994a8cab6eb"
+    },
+    "fit_receipts.csv": {
+      "bytes": 3713,
+      "sha256": "fbcf6c76c772a53cb4783df35e9470841e55d59898f0e0faebc34bfccf16994e"
+    },
+    "funding_scale_receipt.csv": {
+      "bytes": 308,
+      "sha256": "4c60db9d894e3eaec6855a7f16a49cdad3b428374417c83cce668fe3738c9c25"
+    },
+    "matched_issue_features.csv": {
+      "bytes": 95809,
+      "sha256": "834ac2ebe2b20e01489c0e7ec8acc8be02607269bedf7a3aa5e8084cfb0ca6b7"
+    },
+    "outcome_exposed_funding_curve_2023.csv": {
+      "bytes": 29588,
+      "sha256": "c88db5f48ca82a1fcb6cb4ade0549775df116062eb94feebcf6f6ccf05ec3517"
+    },
+    "outcome_exposed_funding_curve_2023.png": {
+      "bytes": 56868,
+      "sha256": "72cabfaedcd00082ca456b73ac2312b6db1772a57672ec24eeb7846a6e285ac2"
+    },
+    "policy_decisions.csv": {
+      "bytes": 125981,
+      "sha256": "3e2097bba3a9208de0ae63a7c111213af5c000a65182cb3d132b149c99cb4314"
+    },
+    "policy_summary.csv": {
+      "bytes": 10496,
+      "sha256": "00df85cf84a6fdea4299c9c5fc0126f949acf99cfdf0f55698b18e0815c5b42c"
+    },
+    "seed_action_value_predictions.csv": {
+      "bytes": 1777844,
+      "sha256": "16e219382558337d260e63d4370d860cdccaa78ba5f98053bc4088880a12d270"
+    },
+    "stage_attribution_2023.csv": {
+      "bytes": 803,
+      "sha256": "f3c0a9b744b1145af576646f6228f9bb5221f23a3c3e8e6a741a16f7a50ac430"
+    },
+    "stage_attribution_2023.png": {
+      "bytes": 56867,
+      "sha256": "c4f6a1ddece9a6e3bbad18effe5db9ba2d2a1b294fba6ec6381fe4efb42c77f3"
+    },
+    "value_calibration.csv": {
+      "bytes": 4994,
+      "sha256": "5f37e2a3f6db1828c031e10f3c5280964243230b8efd68918c805af01e68c0ff"
+    }
+  }
+}
