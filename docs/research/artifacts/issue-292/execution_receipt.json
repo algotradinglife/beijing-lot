@@ -1,0 +1,72 @@
+{
+  "contract": "BJ-UNIFIED-CALIBRATED-JOINT-OPTIMIZER-001/oof-v1",
+  "independent_unit": "BEIJING_ISSUE",
+  "n_values": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "k_values": [
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512
+  ],
+  "generators": [
+    "TOP_VALUE",
+    "WEIGHTED_WR",
+    "WEIGHTED_WOR"
+  ],
+  "nuisance_seeds": [
+    292001,
+    292002,
+    292003,
+    292004,
+    292005
+  ],
+  "model_seeds": [
+    292101,
+    292102,
+    292103
+  ],
+  "oof_years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "sealed_years_opened": [],
+  "input_sha256": {
+    "probabilities": "b3ca05d33035bbb64ba6fe75ee6743fcb41492885fdeb990005807c897d63ca2",
+    "cell_values": "37c2acc09117b80f5256a49bddcb1e6bd0c80434b51000b7b8f7fc939e12e554",
+    "issue291_oof": "36a991bc6ace8d0579c57f9887a60fb0925bd9c1da68c2204c782e855378c1ec"
+  },
+  "producer_sha256": {
+    "runner": "51cf9e3b4b20dbc75e8b34afd1c9ba2bcdf2e0b343c674ce6195fe1520ab16d3",
+    "policy": "210d2b96f45079f4ad6685274975991cc9fdfb00be3fce5a6a6953ac88ce6cd9",
+    "action_engine": "b59aa71154b4723cc81adff7bed54a2ffc8cceb2063405841bd52884dd0e53fd"
+  },
+  "environment": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scikit_learn": "1.9.0"
+  },
+  "output_sha256": {
+    "surface": "3ce8eacf389e5c0de6b2ac5e15ba9d3cdd95a6c41436044a27b26dca251d156b",
+    "states": "626c3c3eec45fdadc02f63cc952cedf7a079e2626dcf040264afd063ba09bf95",
+    "predictions": "877442a1413697dd993273d5f4e625631ae70294a2726867bcbd2e57ab12a56f",
+    "decisions": "9ce3b428953cea631719610f7c09077d4399ddcfd75ef74b8bd5cc991504630f",
+    "paths": "1f7c91643c67fdc26ea5138a274bd9cecf5a95954cfc9e832efb5dad68bf89d3",
+    "summary": "b04ca718d7cd9a4263d25c72b191315c01fa1cc5969964bf61ac0cadc6427911",
+    "families": "de1e52a99eb9759d11d9b126320d2ba2eb4450994fbd88bef0068bae8c0f3a91"
+  }
+}
