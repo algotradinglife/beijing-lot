@@ -1,0 +1,45 @@
+{
+  "issue": 296,
+  "development_only": true,
+  "sealed_source_rows": "2024+ not opened",
+  "candidate_identity_warning": "candidate identities are historically outcome-informed priors; 2023 is a development replay, not an unbiased held-out result",
+  "cross_expert_identity_status": "aggregated source ledgers do not expose a common ticket-identity namespace; exact cross-expert duplicate consolidation is unverified and promotion is barred",
+  "train_years": [
+    2019,
+    2020,
+    2021
+  ],
+  "validation_year": 2022,
+  "test_year": 2023,
+  "expert_ids": [
+    "FULL_CONTROL",
+    "SMOOTH_M512",
+    "Q_TAIL_M192",
+    "Q_WOR_M64",
+    "DIVERGENCE_Z100_K1",
+    "RARE_LOGIT_TOP64"
+  ],
+  "static_allocation": {
+    "FULL_CONTROL": 1.6971951589238815e-17,
+    "SMOOTH_M512": 0.013406665896631817,
+    "Q_TAIL_M192": 0.02753089366442499,
+    "Q_WOR_M64": 0.0,
+    "DIVERGENCE_Z100_K1": 0.0,
+    "RARE_LOGIT_TOP64": 0.020989373774764244
+  },
+  "decision": {
+    "verdict": "NO_PROMOTION",
+    "warm_2023_capital_growth_pct": 207.81109099962606,
+    "neutral_2023_capital_growth_pct": 54.10637864143606,
+    "shuffled_2023_capital_growth_pct": 29.071098448363685,
+    "warm_identity_lift_pp": 153.70471235819,
+    "guarded_2023_capital_growth_pct": 4.142898046793775,
+    "guarded_fell_back": true,
+    "warm_seed_growth_min_pct": 44.583935786419374,
+    "warm_seed_growth_median_pct": 93.17755772254412,
+    "warm_seed_positive_fraction": 1.0,
+    "best_2023_control": "STATIC_TRAIN_LOG_GROWTH",
+    "best_2023_control_growth_pct": 4.142898046793775,
+    "promotable": false
+  }
+}
