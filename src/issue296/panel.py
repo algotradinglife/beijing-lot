@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-FEATURE_PATH = Path("results/issue-209/dynamic_issue_states.csv")
+FEATURE_PATH = Path("evidence/bj296_expert_sources_v1/issue209_features_2019_2023.csv")
 
 EXPERTS = (
     {
@@ -82,9 +82,8 @@ def load_issue_features(root: str | Path) -> pd.DataFrame:
     frame = pd.read_csv(root / FEATURE_PATH)
     frame["issue"] = pd.to_numeric(frame["issue"], errors="raise").astype(int)
     frame["issue_year"] = pd.to_numeric(frame["issue_year"], errors="raise").astype(int)
-    frame = frame[frame["issue_year"].between(2019, 2023)].copy()
-    if frame["issue_year"].ge(2024).any():
-        raise AssertionError("Issue #296 must not open 2024+ feature rows")
+    if not frame["issue_year"].between(2019, 2023).all():
+        raise AssertionError("Issue #296 feature projection is outside 2019-2023")
     if frame["issue"].duplicated().any():
         raise ValueError("issue feature panel must be unique by issue")
     return frame.sort_values(["issue_year", "issue"]).reset_index(drop=True)
@@ -122,6 +121,17 @@ def build_expert_panel(root: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     panel["available"] = panel["stake_unit_cny"].notna()
     for column in ["stake_unit_cny", "pnl_unit_cny", "gross_unit_cny", "hit_count"]:
         panel[column] = panel[column].fillna(0.0).astype(float)
+    invalid_zero_stake = (
+        panel["available"]
+        & panel["stake_unit_cny"].eq(0.0)
+        & (
+            panel["pnl_unit_cny"].ne(0.0)
+            | panel["gross_unit_cny"].ne(0.0)
+            | panel["hit_count"].ne(0.0)
+        )
+    )
+    if invalid_zero_stake.any():
+        raise AssertionError("a zero-stake expert row carries settlement economics")
     panel = panel.merge(
         eligible[["expert_id", "role", "source_issue", "estimand"]],
         on="expert_id",
@@ -146,71 +156,13 @@ def build_expert_panel(root: str | Path) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def _load_176(root: Path) -> pd.DataFrame:
-    path = root / "results/bj176_issue_equity_risk_v1/issue_time_series.csv.gz"
-    frame = pd.read_csv(path)
-    mapping = {
-        "BEST_FULL_FULL": "FULL_CONTROL",
-        "MODEL_SOURCE_MODEL_CAP1_M512": "SMOOTH_M512",
-        "Q_SOURCE_Q_TOP_MASS_M192": "Q_TAIL_M192",
-    }
-    frame = frame[
-        frame["support_view"].eq("NATIVE_SELECTOR") & frame["arm_id"].isin(mapping)
-    ].copy()
-    frame["expert_id"] = frame["arm_id"].map(mapping)
-    return frame.rename(
-        columns={
-            "year": "issue_year",
-            "stake_yuan": "stake_unit_cny",
-            "pre_tax_net_yuan": "pnl_unit_cny",
-            "gross_pre_tax_yuan": "gross_unit_cny",
-            "hit_ticket_count": "hit_count",
-        }
-    )[
-        [
-            "issue",
-            "issue_year",
-            "expert_id",
-            "stake_unit_cny",
-            "pnl_unit_cny",
-            "gross_unit_cny",
-            "hit_count",
-        ]
-    ]
+    path = root / "evidence/bj296_expert_sources_v1/issue176_experts_2019_2023.csv"
+    return _read_projection(path)
 
 
 def _load_151_seed_ledger(root: Path) -> pd.DataFrame:
-    path = (
-        root
-        / "results/bj151_gate_b_outcome_settlement_v1/issue_m_grid_settlement.csv.gz"
-    )
-    frame = pd.read_csv(path, low_memory=False)
-    mask = (
-        frame["sampling_role"].eq("SENSITIVITY_WOR_FIXED_CANDIDATE")
-        & frame["ticket_mechanism"].eq("Q_INFORMED_WOR_DISTINCT")
-        & frame["M"].eq(64)
-    )
-    frame = frame.loc[mask].copy()
-    frame["expert_id"] = "Q_WOR_M64"
-    return frame.rename(
-        columns={
-            "year": "issue_year",
-            "planned_stake_yuan": "stake_unit_cny",
-            "pre_tax_net_yuan": "pnl_unit_cny",
-            "gross_pre_tax_yuan": "gross_unit_cny",
-            "hit_ticket_count": "hit_count",
-        }
-    )[
-        [
-            "issue",
-            "issue_year",
-            "expert_id",
-            "seed",
-            "stake_unit_cny",
-            "pnl_unit_cny",
-            "gross_unit_cny",
-            "hit_count",
-        ]
-    ]
+    path = root / "evidence/bj296_expert_sources_v1/issue151_wor_m64_2019_2023.csv"
+    return _read_projection(path)
 
 
 def _load_151(root: Path) -> pd.DataFrame:
@@ -221,28 +173,15 @@ def _load_151(root: Path) -> pd.DataFrame:
 
 
 def _load_190(root: Path) -> pd.DataFrame:
-    path = (
-        root
-        / "results/bj190_gate_b_sparse_divergence_v1/issue_arm_settlement_d_direction_only.csv.gz"
-    )
-    frame = pd.read_csv(path, low_memory=False)
-    frame = frame[frame["policy_id"].eq("DP_5970cc7b2874743a5698")].copy()
-    frame["expert_id"] = "DIVERGENCE_Z100_K1"
-    return (
-        frame.rename(columns={"year": "issue_year"})
-        .groupby(["issue", "issue_year", "expert_id"], as_index=False)
-        .agg(
-            stake_unit_cny=("stake_yuan", "sum"),
-            pnl_unit_cny=("pre_tax_net_yuan", "sum"),
-            gross_unit_cny=("gross_pre_tax_yuan", "sum"),
-            hit_count=("hit_ticket_count", "sum"),
-        )
-    )
+    path = root / "evidence/bj296_expert_sources_v1/issue190_z100_k1_2019_2023.csv"
+    return _read_projection(path)
 
 
 def _load_291(root: Path) -> pd.DataFrame:
     path = root / "docs/research/artifacts/issue-291/ranking_issue_paths.csv"
     frame = pd.read_csv(path)
+    if pd.to_numeric(frame["oof_year"], errors="raise").gt(2023).any():
+        raise AssertionError("Issue #291 source carries a sealed row")
     mask = (
         frame["domain"].eq("BASE")
         & frame["model"].eq("DATA_LOGIT_RIDGE")
@@ -267,3 +206,10 @@ def _load_291(root: Path) -> pd.DataFrame:
             "hit_count",
         ]
     ]
+
+
+def _read_projection(path: Path) -> pd.DataFrame:
+    frame = pd.read_csv(path)
+    if pd.to_numeric(frame["issue_year"], errors="raise").gt(2023).any():
+        raise AssertionError(f"pre-2024 projection contains a sealed row: {path}")
+    return frame

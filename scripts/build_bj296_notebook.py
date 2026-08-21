@@ -29,10 +29,10 @@ expert gate, applies the frozen validation fallback, and presents the 2023
 CNY100,000 issue-level capital paths. The runner refuses to open 2024+ rows.
 
 Primary conclusion: **NO_PROMOTION**. The raw warm-start ensemble is positive
-for all five seeds in the 2023 development replay, but fails 2022 validation
-and every seed is negative after removing its largest issue. The implementation
-safety constraint therefore falls back to the frozen static control before the
-2023 path is read."""
+for only three of five seeds in the 2023 development replay, fails 2022
+validation, trails neutral and identity-shuffled controls, and every seed is
+negative after removing its largest issue. The implementation safety constraint
+therefore falls back to the frozen static control before the 2023 path is read."""
         ),
         nbf.v4.new_code_cell(
             """from pathlib import Path

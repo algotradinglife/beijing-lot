@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from issue296.model import fit_gate_ensemble, predict_weights
+from issue296.model import fit_gate_ensemble, fit_predict_ridge_gate, predict_weights
 
 
 def _table() -> pd.DataFrame:
@@ -76,3 +76,13 @@ def test_gate_rejects_opening_sealed_rows() -> None:
         assert "2024+" in str(error)
     else:
         raise AssertionError("sealed rows must fail closed")
+
+
+def test_ridge_control_is_a_cash_backed_simplex() -> None:
+    table = _table()
+    predicted = fit_predict_ridge_gate(
+        table, feature_columns=["x"], expert_ids=["A", "B"]
+    )
+    columns = ["weight_A", "weight_B", "weight_CASH"]
+    assert np.allclose(predicted[columns].sum(axis=1), 1.0)
+    assert predicted["weight_CASH"].gt(0).all()

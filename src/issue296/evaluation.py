@@ -42,9 +42,21 @@ def capital_path(
 ) -> pd.DataFrame:
     """Apply predicted weights with whole-bundle rounding and no stake cap."""
 
+    weight_columns = [f"weight_{expert}" for expert in expert_ids] + ["weight_CASH"]
+    missing_weights = sorted(set(weight_columns) - set(weights.columns))
+    if missing_weights:
+        raise ValueError(f"capital weights missing columns: {missing_weights}")
+    if (weights[weight_columns] < -1e-10).any(axis=None):
+        raise ValueError("capital weights must be non-negative")
+    if not np.allclose(weights[weight_columns].sum(axis=1), 1.0, atol=1e-8):
+        raise ValueError("capital weights must sum to one")
     merged = issue_table.merge(
         weights, on=["issue", "issue_year"], how="inner", validate="one_to_one"
     ).sort_values(["issue_year", "issue"])
+    if len(merged) != len(issue_table) or len(weights) != len(issue_table):
+        raise ValueError(
+            "issue table and capital weights do not have identical support"
+        )
     capital = float(initial_capital_cny)
     rows = []
     for row in merged.itertuples(index=False):
@@ -92,6 +104,10 @@ def capital_path(
                 "hit_ticket_count": hit_total,
                 "closing_capital_cny": capital,
                 "cash_weight": float(row.weight_CASH),
+                "deployed_capital_fraction": stake_total / opening if opening else 0.0,
+                "effective_cash_fraction": 1.0 - stake_total / opening
+                if opening
+                else 1.0,
                 **allocations,
             }
         )
@@ -215,6 +231,8 @@ def summarize_path(path: pd.DataFrame) -> dict[str, object]:
     peak = np.maximum.accumulate(np.r_[opening, closing])
     drawdown = 1.0 - np.r_[opening, closing] / peak
     annual = path.groupby("issue_year")["pnl_cny"].sum()
+    active = path["stake_cny"].to_numpy(float) > 0
+    payout = path["gross_cny"].to_numpy(float) > 0
     positive = np.clip(pnl, 0.0, None)
     contribution = (
         positive / positive.sum() if positive.sum() else np.zeros(len(positive))
@@ -233,14 +251,24 @@ def summarize_path(path: pd.DataFrame) -> dict[str, object]:
         "turnover_roi_pct": float(100.0 * pnl.sum() / stake.sum())
         if stake.sum()
         else 0.0,
+        "mean_deployed_capital_fraction": float(
+            path["deployed_capital_fraction"].mean()
+        ),
+        "mean_effective_cash_fraction": float(path["effective_cash_fraction"].mean()),
         "max_drawdown_pct": float(100.0 * drawdown.max()),
         "max_drawdown_cny": float((peak - np.r_[opening, closing]).max()),
         "longest_losing_issue_streak": _longest_streak(pnl < 0),
-        "longest_no_payout_issue_streak": _longest_streak(
-            path["gross_cny"].to_numpy(float) <= 0
-        ),
-        "payout_issue_rate": float(path["gross_cny"].gt(0).mean()),
-        "profitable_issue_rate": float(path["pnl_cny"].gt(0).mean()),
+        "longest_active_losing_issue_streak": _longest_streak(pnl[active] < 0),
+        "longest_calendar_no_payout_issue_streak": _longest_streak(~payout),
+        "longest_active_no_payout_issue_streak": _longest_streak(~payout[active]),
+        "calendar_payout_issue_rate": float(payout.mean()),
+        "active_payout_issue_rate": float(payout[active].mean())
+        if active.any()
+        else 0.0,
+        "calendar_profitable_issue_rate": float((pnl > 0).mean()),
+        "active_profitable_issue_rate": float((pnl[active] > 0).mean())
+        if active.any()
+        else 0.0,
         "worst_rolling_5_pnl_cny": _rolling_min(pnl, 5),
         "worst_rolling_10_pnl_cny": _rolling_min(pnl, 10),
         "worst_rolling_20_pnl_cny": _rolling_min(pnl, 20),

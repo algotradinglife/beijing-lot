@@ -202,6 +202,8 @@ def candidate_prior_diagnostics(
         values = train.loc[
             train[f"available_{expert}"].astype(bool), f"return_{expert}"
         ].to_numpy(float)
+        if len(values) == 0:
+            raise ValueError(f"candidate prior has no training support for {expert}")
         positive = np.clip(values, 0.0, None)
         concentration = (
             float(positive.max() / positive.sum()) if positive.sum() else 1.0
@@ -235,10 +237,10 @@ def candidate_prior_diagnostics(
         )
     result = pd.DataFrame(rows)
     logits = np.r_[np.clip(result["conservative_utility"], -2.0, 2.0), 0.0] / 0.5
-    probabilities = np.exp(logits - logits.max())
-    probabilities /= probabilities.sum()
-    result["initial_weight"] = probabilities[:-1]
-    result.attrs["cash_initial_weight"] = float(probabilities[-1])
+    expert_probability = np.exp(logits[:-1] - logits[:-1].max())
+    expert_probability /= expert_probability.sum()
+    result["initial_weight"] = 0.5 * expert_probability
+    result.attrs["cash_initial_weight"] = 0.5
     return result
 
 

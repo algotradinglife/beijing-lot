@@ -162,7 +162,7 @@ PI interpretation and does not replace those edges or Project states.
 | 14 | [#286] joint selective-protection policy | Closed / Done | M3 | #285 closed | Label-free 620-issue joint action interface complete; learned protection ranks better than funded controls but loses to no protection and is not promoted |
 | 15 | [#291] decomposed rare-event value heads | Closed / Done | M3 | Parent #202; predecessor of #292 | Separate hit probability, conditional gross and direct-P&L ranking; preserve a base Top-64 candidate signal but no protection promotion |
 | 16 | [#292] calibrated dynamic joint optimizer | Closed / Done | M3 | #291 closed; no open blocker | Full N3–N10/K8–512 development OOF complete: dynamic and low-N core lose to cash; tail/barbell are one-jackpot dependent; retain architecture, no promotion |
-| 17 | [#296] candidate-warm expert mixture | Open / PI Review | M3 | #292 closed; blocks #210 | Learned expert/cash weights are meaningful, but 2022 validation fails and all 5/5 positive warm seeds are negative ex-largest; safety gate falls back to static control |
+| 17 | [#296] candidate-warm expert mixture | Open / PI Review | M3 | #292 closed; blocks #210 | Learned expert/cash weights are meaningful, but 2022 validation fails, warm start trails both initialization controls, and all seeds are negative ex-largest; safety gate falls back to static control |
 | 18 | [#210] held-out/forward validation | Open / Blocked | M4 | #296 and #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 19 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
@@ -256,11 +256,11 @@ PI interpretation and does not replace those edges or Project states.
   2019–2021, uses 2022 only for validation/fallback, and replays 2023 without
   opening any 2024+ rows. Candidate-warm, neutral, identity-shuffled and
   scikit-learn Ridge controls use the same causal state.
-- The raw warm ensemble reaches CNY307,811 from CNY100,000 in 2023 (+207.81%)
-  versus +54.11% neutral and +29.07% identity-shuffled, but it fails 2022
-  validation (-94.52%), has 77.03% 2023 max drawdown, and is negative
-  ex-largest (-CNY68,484). All 5/5 warm seeds are positive, but every seed is
-  negative ex-largest; median seed growth is +93.18%.
+- The raw warm ensemble reaches CNY128,864 from CNY100,000 in 2023 (+28.86%)
+  versus +54.11% neutral and +88.69% identity-shuffled. It fails 2022
+  validation (-38.68%), has 61.08% 2023 max drawdown, and is negative
+  ex-largest (-CNY118,016). Only 3/5 warm seeds are positive, every seed is
+  negative ex-largest, and median seed growth is +17.39%.
 - The hard worst-case fallback therefore rejects all neural allocations before
   opening the 2023 replay and retains the frozen static control. Its independent
   2023 path ends at CNY104,143 (+4.14%), with 52.70% max drawdown and negative

@@ -236,6 +236,10 @@ def run_experiment(root: str | Path, output: str | Path) -> dict[str, object]:
         "issue": 296,
         "development_only": True,
         "sealed_source_rows": "2024+ not opened",
+        "source_projection_note": (
+            "the model runner consumes committed 2019-2023 projections only; "
+            "the PI preprocessing session inspected aggregate source files to create them"
+        ),
         "candidate_identity_warning": (
             "candidate identities are historically outcome-informed priors; "
             "2023 is a development replay, not an unbiased held-out result"
@@ -243,6 +247,10 @@ def run_experiment(root: str | Path, output: str | Path) -> dict[str, object]:
         "cross_expert_identity_status": (
             "aggregated source ledgers do not expose a common ticket-identity namespace; "
             "exact cross-expert duplicate consolidation is unverified and promotion is barred"
+        ),
+        "tax_adjusted_status": (
+            "not recomputed in exploration mode; primary evidence is pre-tax and "
+            "the policy is not promoted"
         ),
         "train_years": [2019, 2020, 2021],
         "validation_year": 2022,
@@ -507,12 +515,11 @@ def _plot_drawdown(paths: pd.DataFrame, target: Path) -> None:
 
 def _write_manifest(root: Path, output: Path) -> None:
     input_paths = [
-        root / "results/issue-209/dynamic_issue_states.csv",
-        root / "results/bj176_issue_equity_risk_v1/issue_time_series.csv.gz",
-        root
-        / "results/bj151_gate_b_outcome_settlement_v1/issue_m_grid_settlement.csv.gz",
-        root
-        / "results/bj190_gate_b_sparse_divergence_v1/issue_arm_settlement_d_direction_only.csv.gz",
+        root / "evidence/bj296_expert_sources_v1/issue209_features_2019_2023.csv",
+        root / "evidence/bj296_expert_sources_v1/issue176_experts_2019_2023.csv",
+        root / "evidence/bj296_expert_sources_v1/issue151_wor_m64_2019_2023.csv",
+        root / "evidence/bj296_expert_sources_v1/issue190_z100_k1_2019_2023.csv",
+        root / "evidence/bj296_expert_sources_v1/manifest.json",
         root / "docs/research/artifacts/issue-291/ranking_issue_paths.csv",
         root / "docs/research/artifacts/issue-292/shortlist_seed_summary.csv",
     ]

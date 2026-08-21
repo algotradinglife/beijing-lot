@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
+import pytest
+
+from issue296 import panel as panel_module
 from issue296.panel import (
     build_expert_panel,
     build_expert_registry,
@@ -34,3 +38,10 @@ def test_panel_distinguishes_no_bet_from_missing_support() -> None:
     assert unavailable["DIVERGENCE_Z100_K1"] == 42
     assert "RARE_LOGIT_TOP64" not in unavailable
     assert nuisance["seed"].nunique() == 3
+
+
+def test_projection_rejects_sealed_row(tmp_path: Path) -> None:
+    path = tmp_path / "projection.csv"
+    pd.DataFrame({"issue_year": [2024]}).to_csv(path, index=False)
+    with pytest.raises(AssertionError, match="sealed row"):
+        panel_module._read_projection(path)

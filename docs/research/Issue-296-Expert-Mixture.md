@@ -7,16 +7,16 @@ strategy construction as a learned portfolio problem instead of choosing one
 fixed parameter tuple.
 
 The raw candidate-warm neural ensemble grew a CNY100,000 bankroll to
-**CNY307,811 in the 2023 development replay (+207.81%)**. That headline cannot be
+**CNY128,864 in the 2023 development replay (+28.86%)**. That headline cannot be
 used as an Edge claim:
 
-- the same frozen model reduced CNY100,000 to **CNY5,478 in 2022 validation**;
-- all five fixed model seeds were positive in 2023, but every seed was negative
-  after removing its largest issue; median seed growth was **+93.18%**;
-- the raw ensemble's maximum drawdown was **77.03%** and its longest losing run
+- the same frozen model reduced CNY100,000 to **CNY61,321 in 2022 validation**;
+- only three of five fixed model seeds were positive in 2023, and every seed was
+  negative after removing its largest issue; median seed growth was **+17.39%**;
+- the raw ensemble's maximum drawdown was **61.08%** and its longest losing run
   was **20 issues**;
 - after removing its largest winning issue, cumulative 2023 P&L was
-  **-CNY68,484**.
+  **-CNY118,016**.
 
 The user-mandated safety rule therefore worked: when the neural proposal failed
 the pre-2023 validation comparison, the executable policy fell back to the
@@ -24,11 +24,11 @@ frozen static allocation. That guarded path ended 2023 at **CNY104,143
 (+4.14%)**, equal to the static control. It did not adopt the lucky raw neural
 path.
 
-This is a useful negative result rather than a dead end. Candidate identity
-carried a strong development signal—the raw warm ensemble beat neutral
-initialization by **153.70 percentage points**, while identity-shuffled
-initialization returned **+29.07%**—but the signal reverses in validation and is
-too concentrated to fund.
+This is a useful negative result rather than a dead end. Candidate identity did
+not improve learning: the raw warm ensemble trailed neutral initialization by
+**25.24 percentage points** and identity-shuffled initialization by **59.83
+points**. The model interface is useful, but historical candidate identity is
+not a reliable initialization signal under the conservative prior.
 
 ## Question and experimental unit
 
@@ -42,7 +42,10 @@ nested observations. The chronology is:
 - train: 2019–2021;
 - validation and fallback decision: 2022;
 - frozen development replay: 2023;
-- 2024+ rows: unopened by the #296 runner.
+- 2024+ rows: unopened by the #296 model runner, which consumes committed
+  2019–2023 expert projections only. The PI preprocessing session inspected the
+  aggregate source files once to create those projections, so this remains a
+  development experiment rather than a fresh operational holdout.
 
 Historical candidate identities were themselves found using outcomes. They are
 therefore explicitly treated as outcome-informed priors. The 2023 replay is a
@@ -106,29 +109,31 @@ that rule and fell back before 2023 was read.
 |---|---:|---:|---:|---:|---:|
 | Cash | CNY100,000 | 0.00% | 0.00% | 0 | CNY0 |
 | Static train-log-growth | CNY104,143 | +4.14% | 52.70% | 19 | -CNY98,019 |
-| Raw candidate-warm | CNY307,811 | +207.81% | 77.03% | 20 | -CNY68,484 |
+| Raw candidate-warm | CNY128,864 | +28.86% | 61.08% | 20 | -CNY118,016 |
 | Raw neutral | CNY154,106 | +54.11% | 76.52% | 10 | -CNY157,760 |
-| Raw identity-shuffled | CNY129,071 | +29.07% | 75.79% | 18 | -CNY157,882 |
+| Raw identity-shuffled | CNY188,693 | +88.69% | 54.87% | 20 | -CNY50,124 |
 | Guarded candidate-warm | CNY104,143 | +4.14% | 52.70% | 19 | -CNY98,019 |
 
-The raw candidate-warm ensemble retained an average **63.70% cash** in 2023.
-The remaining mean weights were 11.64% FULL, 10.51% sparse divergence, 6.06%
-smooth core, 4.00% Q tail, 2.08% WOR and 2.01% rare-event tail. Thus the model
-did not simply put the whole bankroll into the historical jackpot candidate.
+The raw candidate-warm ensemble assigned an average **78.31% explicit cash
+weight** in 2023. Actual effective cash is also reported after bundle rounding
+and experts' own NO_BET decisions; it averaged **89.11%**. The remaining mean
+weights were 5.65% sparse divergence, 4.91% FULL, 4.54% smooth core, 2.96% Q
+tail, 2.26% rare-event tail and 1.37% WOR. Thus the model did not simply put the
+whole bankroll into the historical jackpot candidate.
 
-Its largest issue was 23061, contributing approximately **CNY276,295**. FULL
+Its largest issue was 23061, contributing approximately **CNY146,880**. FULL
 and the rare-event expert supplied most of that gain. Removing that one issue
 turns the entire raw path negative, so the result fails the preregistered
 concentration test.
 
 ### Initialization stability
 
-Candidate-warm individual seed growth was approximately **+93.18%, +606.56%,
-+78.09%, +44.58%, and +136.49%**. The apparent cross-seed sign stability is a
-real improvement over earlier experiments, but every seed remains negative
-after removing its largest issue, and the 2022 validation path loses 94.52%.
-More seeds would measure tail sensitivity more precisely; they would not cure
-the chronology reversal.
+Candidate-warm individual seed growth was approximately **+41.97%, +17.39%,
+-6.38%, -35.80%, and +71.73%**. Three positive seeds are not enough because
+every seed remains negative after removing its largest issue, the shuffled
+control is stronger, and the 2022 validation path loses 38.68%. More seeds
+would measure tail sensitivity more precisely; they would not cure the
+chronology reversal.
 
 ### Core–tail and dependence findings
 
@@ -156,6 +161,10 @@ Edge:
 6. source ledgers are aggregated, so exact cross-expert ticket-identity
    consolidation cannot be reconstructed for every expert. Linear repeated
    stakes are economically represented, but identity-level proof is absent.
+7. tax-adjusted paths were not recomputed in this exploration run. Primary
+   evidence follows the owner-mandated pre-tax convention, and no candidate is
+   promoted; tax reference remains a documented debt rather than a hidden
+   assumption.
 
 The strongest defensible statement is therefore: **candidate-aware dynamic
 allocation contains a potentially useful direction, but the current mapping is
@@ -186,6 +195,10 @@ next contract.
 PYTHONPATH=src python scripts/run_bj296_expert_mixture.py
 PYTHONPATH=src pytest tests/issue296 -q
 ```
+
+The committed source projections can be rebuilt separately with
+`scripts/freeze_bj296_expert_sources.py`; that preprocessing command is not part
+of the modeling runner because it reads the broader aggregate source ledgers.
 
 The executed notebook is
 `notebooks/research/issue-296/bj296_expert_mixture.ipynb`. Compact machine

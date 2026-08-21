@@ -156,3 +156,6 @@ evidence/bj_freeze_review_001/.publish.lock
 # BJ-N7-COMPRESS-001: audited, outcome-free projection committed for blind freeze.
 !evidence/bj_n7_compress_001/
 !evidence/bj_n7_compress_001/**
+!evidence/bj296_expert_sources_v1/
+!evidence/bj296_expert_sources_v1/**
+!evidence/bj296_expert_sources_v1/*.csv
