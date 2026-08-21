@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-21 14:15 HKT (#284 subset/joint-action atlas settled; #285 blanket protection rejected and selective protection handed to #286)**
+Updated: **2026-08-21 18:29 HKT (#286 joint selective-protection learning settled; protection ranking clue retained but no funded Edge)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -124,7 +124,7 @@ PI interpretation and does not replace those edges or Project states.
 #285 near-miss/protection atlas (Done; blanket protection rejected)
              |
              v
-#286 joint base-ticket + selective-protection learning (Ready)
+#286 joint base-ticket + selective-protection learning (Done; no protection Edge)
              |
              v
 #210 held-out/prospective validation  <--- no candidate; also blocked by #218
@@ -148,7 +148,7 @@ PI interpretation and does not replace those edges or Project states.
 | 11 | [#282] conditional action-value policy | Closed / Done | M3 | #279 closed; native successor #210 | End-to-end Deep Sets prototype complete; cash-only learned result, no holdout handoff; retain N8 regime hypothesis for development |
 | 12 | [#284] issue-normalized subset and joint-action atlas | Closed / Done | M3 | #282 closed; parent #202 | Qualified diagnostic only: subset augmentation stabilizes expected surfaces; +1.80pp is versus internal fixed K512, while Full-HGB is −5.29pp versus the live named N7/TOP/K8 control |
 | 13 | [#285] near-miss and protection atlas | Closed / Done | M3 | Parent #284; blocks #286 until merge | Equal-issue adverse-divergence localization is about +4pp versus random; dense blanket protection and corrected chronological paths are worse; advance only bounded selective learning |
-| 14 | [#286] joint selective-protection policy | Open / Ready | M3 | Native blockedBy #285 until closure | Learn `(N, selector, outcome mode, generator, K, protection policy)` jointly with no-protection and frozen-base fallbacks |
+| 14 | [#286] joint selective-protection policy | Closed / Done | M3 | #285 closed | Label-free 620-issue joint action interface complete; learned protection ranks better than funded controls but loses to no protection and is not promoted |
 | 15 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 16 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
@@ -173,6 +173,25 @@ PI interpretation and does not replace those edges or Project states.
   near-miss classification is auxiliary, and no-protection remains explicit.
 - Reports: [`Issue-284-Parameter-Reliability-Pilot.md`](Issue-284-Parameter-Reliability-Pilot.md)
   and [`Issue-285-Near-Miss-Protection-Atlas.md`](Issue-285-Near-Miss-Protection-Atlas.md).
+
+### #286 joint selective-protection decision
+
+- A physically label-free 10h manifest freezes 1,188,800 base tickets,
+  12,801,489 unique single-flip candidates and 1,188,800 same-stream
+  continuation tickets across 620 issues before a separate settlement process
+  opens 2014–2023 outcomes. 2024+ stays sealed.
+- DATA-HGB base selection produces +CNY17,186.63 in expanding-year OOF, but
+  one 2019 issue contributes +CNY34,383.29; ex-largest P&L is −CNY17,196.65.
+  This is a tail clue, not stable Edge.
+- Learned protection ranks better than exact-budget adverse, continuation and
+  random controls, but adds −CNY7,210.65 on CNY15,806 incremental stake
+  (−45.62%) relative to no protection. It also chooses 100% protection on 142
+  of 269 OOF issues, violating the intended sparse behavior.
+- Retain `NO_PROTECTION` and the protection score as an auxiliary feature. Do
+  not expand the protection grid until base-action value and tail calibration
+  improve and a new policy shows positive ex-largest incremental P&L versus
+  cash.
+- Report: [`Issue-286-Joint-Selective-Protection.md`](Issue-286-Joint-Selective-Protection.md).
 
 ### #282 conditional-policy prototype decision
 
@@ -413,6 +432,7 @@ retrospective feature.
 [#238]: https://github.com/algotradinglife/beijing-lot/issues/238
 [#248]: https://github.com/algotradinglife/beijing-lot/issues/248
 [#249]: https://github.com/algotradinglife/beijing-lot/issues/249
+[#286]: https://github.com/algotradinglife/beijing-lot/issues/286
 
 ---
 

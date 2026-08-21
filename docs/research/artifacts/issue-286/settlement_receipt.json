@@ -1,0 +1,37 @@
+{
+  "contract": "BJ-UNIFIED-JOINT-PROTECTION-001/settlement-v1",
+  "verified_manifest_sha256": {
+    "base": "0d9268e8be1b5f100ab900d9db41bd3b936bf5e67ccd6108e2c218a08d107914",
+    "candidate": "c885b187d2687d33a672cce6d48da1f9b370fef87bf2a4b2e582c62718ca9f0a",
+    "continuation": "61032975dc3a70e2c9c87e8dd597f6ef8a6135ceca52d18f5e81a38f73423f49"
+  },
+  "settlement_rows": {
+    "base": 1188800,
+    "candidate": 12801489,
+    "continuation": 1188800
+  },
+  "settlement_output_sha256": {
+    "base": "18774f7e1fb84311dfff5e616ecc5d6d15fdaf52c4f2d82450b17343432a7c06",
+    "candidate": "87c07c0005c3d8def9c9d8e43a694f7159f901a70375e230fa5558c2a48b64e1",
+    "continuation": "2a06bbf9c3abccb45663522f4e1fc24bfaf51c780ad555bd771b06f2ae6695e2"
+  },
+  "development_years": [
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "sealed_years_opened": [],
+  "ticket_stake_cny": 2.0,
+  "payout_coefficient": 0.65,
+  "payout_application": "ONCE_PER_WINNING_COMPLETE_N_FOLD",
+  "invalid_action_count": 664,
+  "formal_baseline": "SALL_OMARKET_N7_TOP_VALUE_K8",
+  "formal_baseline_rows": 620
+}
