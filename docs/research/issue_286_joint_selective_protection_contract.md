@@ -106,6 +106,37 @@ may be funded. There is no obligation to use the protection budget.
 Issue-normalized training weights prevent issues with more matches, tickets or
 candidate flips from becoming artificial extra history.
 
+## #284 inheritance guard
+
+The post-merge #284 audit is binding on this successor:
+
+- the primary matched control is the live Issue-named #282
+  `N7/K8 MARKET TOP` action; K128/K512 rows are diagnostic controls only;
+- CASH/NO_PROTECTION is an explicit lawful action, not a funded fallback;
+- primary capital paths use actual CNY2-per-unique-ticket stake, including
+  protection; standardized CNY100 paths are secondary and separately labeled;
+- subsets with non-finite winning SP are excluded until authoritative
+  settlement semantics exist;
+- the source snapshot and every upstream artifact are content-hash bound;
+- compact action labels, OOF selected-action rows, issue attribution and
+  receipts are retained for asynchronous replay.
+
+The post-merge #285 audit adds a second inheritance guard:
+
+- localization rates and uncertainty use equal issue weight; ticket-weighted
+  rates are auxiliary only;
+- the inherited adverse-divergence effect is approximately +3.93pp at K16 and
+  +4.16pp at K64 versus random, not a twofold effect and not economic Edge;
+- monetary random and continuation controls match exact final unique-ticket
+  stake after deduplication;
+- capital paths are ordered by `(issue_year, numeric issue)` with a monotonicity
+  assertion;
+- a label-free base/protection manifest is frozen and hashed before a separate
+  outcome/SP settlement join; outcome/SP mutation cannot change pre-settlement
+  identities;
+- this Issue is a bounded exploration authorized by the later PI amendment. It
+  does not inherit satisfaction of #285 candidate predicates.
+
 ## Required controls
 
 - frozen unprotected base policy;

@@ -146,8 +146,8 @@ PI interpretation and does not replace those edges or Project states.
 | 9 | [#209] full-cycle historical evaluation | Closed / Done | M3 | #232 and #229 closed | Learned state-action policy is dynamic but fails 2023 matched capital (-0.316pp vs fixed N7/K8); retain control, keep 2024 sealed |
 | 10 | [#279] action-aware feature factory | Closed / Done | M3 | Parent #202; satisfied predecessor of #282/#210 | Budget-matched distributional targets, action features and complete 2023 pre-outcome cell/ticket/leg traces |
 | 11 | [#282] conditional action-value policy | Closed / Done | M3 | #279 closed; native successor #210 | End-to-end Deep Sets prototype complete; cash-only learned result, no holdout handoff; retain N8 regime hypothesis for development |
-| 12 | [#284] issue-normalized subset and joint-action atlas | Closed / Done | M3 | #282 closed; parent #202 | Subset augmentation stabilizes expected surfaces but not realized argmax; equal-weight Full-HGB exposes a K256/K512 conditional clue (+1.80pp vs fixed K512, interval crosses zero) |
-| 13 | [#285] near-miss and protection atlas | Closed / Done | M3 | Parent #284; blocks #286 until merge | Adverse-divergence leg localization is about twice random, but dense blanket protection remains negative; advance only selective protection learning |
+| 12 | [#284] issue-normalized subset and joint-action atlas | Closed / Done | M3 | #282 closed; parent #202 | Qualified diagnostic only: subset augmentation stabilizes expected surfaces; +1.80pp is versus internal fixed K512, while Full-HGB is −5.29pp versus the live named N7/TOP/K8 control |
+| 13 | [#285] near-miss and protection atlas | Closed / Done | M3 | Parent #284; blocks #286 until merge | Equal-issue adverse-divergence localization is about +4pp versus random; dense blanket protection and corrected chronological paths are worse; advance only bounded selective learning |
 | 14 | [#286] joint selective-protection policy | Open / Ready | M3 | Native blockedBy #285 until closure | Learn `(N, selector, outcome mode, generator, K, protection policy)` jointly with no-protection and frozen-base fallbacks |
 | 15 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 16 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
@@ -160,13 +160,14 @@ PI interpretation and does not replace those edges or Project states.
   reproducible.
 - After enforcing equal aggregate issue weight in every estimator, Full-HGB
   chooses N7/TOP/K512 in 295/328 OOF issues and K256 in 33. It adds +1.80pp
-  over fixed K512 (+0.80pp ex-largest), but the paired bootstrap interval
-  crosses zero. Retain this as a conditional-K clue, not a new baseline.
+  over internal fixed K512 (+0.80pp ex-largest), but the paired bootstrap
+  interval crosses zero. Against the live Issue-named N7/TOP/K8 control it is
+  −5.29pp. Retain only a conditional-K clue, not baseline progress.
 - N8 blanket single-flip protection remains negative after four-subset,
   five-seed nuisance integration: −13.21% at K16 and −4.87% at K64 on added
-  capital. Adverse signed divergence nevertheless localizes the wrong leg at
-  about 20%, versus about 11% for random, and roughly doubles correct single
-  flips.
+  capital. Under equal issue weight, adverse signed divergence localizes the
+  wrong leg at 15.16%/15.29% for K16/K64 versus 11.23%/11.13% for random. The
+  positive difference is about four points, not a twofold effect.
 - Protection therefore becomes a joint action parameter in #286. The tradable
   target is counterfactual incremental P&L after added stake and deduplication;
   near-miss classification is auxiliary, and no-protection remains explicit.

@@ -3,6 +3,27 @@
 Date: 2026-08-21
 Status: exploratory method result; not a frozen candidate and not holdout evidence.
 
+## Post-merge EV qualification
+
+The asynchronous audit of merge `231fa13478dff880d2009e11f69471c52529f385`
+identified three interpretation defects. They do not reverse this report's
+NO_PROMOTION conclusion, but they narrow the numerical claims:
+
+- the reported +9.33pp Full-HGB lift is against the internal
+  `N7/WEIGHTED/K128/ENSEMBLE` diagnostic, not the live Issue-named
+  `N7/TOP/K8 MARKET` control. Full-HGB is −9.24% absolute and therefore
+  **−5.29pp** versus that −3.94% named control;
+- the joint-policy action set is funded-action-only. Its q10 fallback is a
+  funded baseline, not CASH/NO_BET, so it provides no abstention evidence;
+- the CNY100,000 figures are standardized CNY100-per-issue paths, not actual
+  `W=2K` bankroll paths. They cannot support cross-K drawdown or bankroll
+  comparisons.
+
+The +1.80pp Full-HGB versus fixed K512 result may remain an internal
+conditional-K clue only. Unbound source inputs and unresolved missing-SP
+semantics prohibit freezing any #284 number as a candidate or accepted
+baseline.
+
 ## Decision summary
 
 Enumerating `N=3,…,10` is feasible and preferable to asking one joint head to
