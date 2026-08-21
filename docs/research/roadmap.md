@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-20 23:30 HKT (#282 conditional-policy prototype settled; learned policy abstains and no held-out candidate is promoted)**
+Updated: **2026-08-21 14:15 HKT (#284 subset/joint-action atlas settled; #285 blanket protection rejected and selective protection handed to #286)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -118,6 +118,15 @@ PI interpretation and does not replace those edges or Project states.
 #282 conditional M×3 action-value and distinct-ticket policy (Done; no learned Edge)
              |
              v
+#284 issue-normalized N×3 subset and joint-action atlas (Done; conditional-K clue)
+             |
+             v
+#285 near-miss/protection atlas (Done; blanket protection rejected)
+             |
+             v
+#286 joint base-ticket + selective-protection learning (Ready)
+             |
+             v
 #210 held-out/prospective validation  <--- no candidate; also blocked by #218
              |
              v
@@ -137,8 +146,32 @@ PI interpretation and does not replace those edges or Project states.
 | 9 | [#209] full-cycle historical evaluation | Closed / Done | M3 | #232 and #229 closed | Learned state-action policy is dynamic but fails 2023 matched capital (-0.316pp vs fixed N7/K8); retain control, keep 2024 sealed |
 | 10 | [#279] action-aware feature factory | Closed / Done | M3 | Parent #202; satisfied predecessor of #282/#210 | Budget-matched distributional targets, action features and complete 2023 pre-outcome cell/ticket/leg traces |
 | 11 | [#282] conditional action-value policy | Closed / Done | M3 | #279 closed; native successor #210 | End-to-end Deep Sets prototype complete; cash-only learned result, no holdout handoff; retain N8 regime hypothesis for development |
-| 12 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
-| 13 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 12 | [#284] issue-normalized subset and joint-action atlas | Closed / Done | M3 | #282 closed; parent #202 | Subset augmentation stabilizes expected surfaces but not realized argmax; equal-weight Full-HGB exposes a K256/K512 conditional clue (+1.80pp vs fixed K512, interval crosses zero) |
+| 13 | [#285] near-miss and protection atlas | Closed / Done | M3 | Parent #284; blocks #286 until merge | Adverse-divergence leg localization is about twice random, but dense blanket protection remains negative; advance only selective protection learning |
+| 14 | [#286] joint selective-protection policy | Open / Ready | M3 | Native blockedBy #285 until closure | Learn `(N, selector, outcome mode, generator, K, protection policy)` jointly with no-protection and frozen-base fallbacks |
+| 15 | [#210] held-out/forward validation | Open | M4 | #282/#279/#209 closed; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
+| 16 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+
+### #284/#285 subset and selective-protection decision
+
+- Sampling many `N×3` subsets is useful data augmentation, but the Beijing
+  issue remains the independent unit. More subsets stabilize the pre-event
+  expected surface; they do not make the realized best N or exact subset
+  reproducible.
+- After enforcing equal aggregate issue weight in every estimator, Full-HGB
+  chooses N7/TOP/K512 in 295/328 OOF issues and K256 in 33. It adds +1.80pp
+  over fixed K512 (+0.80pp ex-largest), but the paired bootstrap interval
+  crosses zero. Retain this as a conditional-K clue, not a new baseline.
+- N8 blanket single-flip protection remains negative after four-subset,
+  five-seed nuisance integration: −13.21% at K16 and −4.87% at K64 on added
+  capital. Adverse signed divergence nevertheless localizes the wrong leg at
+  about 20%, versus about 11% for random, and roughly doubles correct single
+  flips.
+- Protection therefore becomes a joint action parameter in #286. The tradable
+  target is counterfactual incremental P&L after added stake and deduplication;
+  near-miss classification is auxiliary, and no-protection remains explicit.
+- Reports: [`Issue-284-Parameter-Reliability-Pilot.md`](Issue-284-Parameter-Reliability-Pilot.md)
+  and [`Issue-285-Near-Miss-Protection-Atlas.md`](Issue-285-Near-Miss-Protection-Atlas.md).
 
 ### #282 conditional-policy prototype decision
 
