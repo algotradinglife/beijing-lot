@@ -44,6 +44,8 @@ results/issue-282/*
 !results/issue-282/expanding_oof_metrics.csv
 !results/issue-282/static_action_robustness_2023.csv
 !results/issue-282/capital_path_*.csv
+!results/issue-296/
+!results/issue-296/**
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
 !results/bj229_divergence_profile_v1/**/*.csv
@@ -70,6 +72,7 @@ temp/
 !results/issue-279/*.csv
 !results/issue-279/*.parquet
 !results/issue-282/*.csv
+!results/issue-296/*.csv
 !results/issue-205/*.csv
 !results/issue-205/*.parquet
 !results/issue-206/*.csv
@@ -153,3 +156,6 @@ evidence/bj_freeze_review_001/.publish.lock
 # BJ-N7-COMPRESS-001: audited, outcome-free projection committed for blind freeze.
 !evidence/bj_n7_compress_001/
 !evidence/bj_n7_compress_001/**
+!evidence/bj296_expert_sources_v1/
+!evidence/bj296_expert_sources_v1/**
+!evidence/bj296_expert_sources_v1/*.csv
