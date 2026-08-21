@@ -46,6 +46,8 @@ results/issue-282/*
 !results/issue-282/capital_path_*.csv
 !results/issue-296/
 !results/issue-296/**
+!results/issue-299/
+!results/issue-299/**
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
 !results/bj229_divergence_profile_v1/**/*.csv
@@ -73,6 +75,7 @@ temp/
 !results/issue-279/*.parquet
 !results/issue-282/*.csv
 !results/issue-296/*.csv
+!results/issue-299/*.csv
 !results/issue-205/*.csv
 !results/issue-205/*.parquet
 !results/issue-206/*.csv
@@ -159,3 +162,6 @@ evidence/bj_freeze_review_001/.publish.lock
 !evidence/bj296_expert_sources_v1/
 !evidence/bj296_expert_sources_v1/**
 !evidence/bj296_expert_sources_v1/*.csv
+!evidence/bj299_residual_sources_v1/
+!evidence/bj299_residual_sources_v1/**
+!evidence/bj299_residual_sources_v1/*.csv
