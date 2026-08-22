@@ -1,13 +1,15 @@
 {
-  "MANIFEST.json": "261c7dcaaf731affed2ff2eb26ccec8dbc0127787cb8b4fe65f61e6c2e0006a2",
-  "coverage_by_issue.csv": "7863b4ba81ff5a84c3e16757b009a65817bf02aa8162969a2eb98dc6a456523f",
-  "coverage_by_partition.png": "d4bf56077781e26e7575082acae6395465abb0e9c7a291d434ea8bfcb012a808",
-  "decision.json": "b12792b5faeb2841b90ec982186d6169cde36f3ed56b42a1a672993bff12e4d0",
-  "exclusion_ledger.parquet": "f0fd4c7cbf1c6a49caccc377ab75804b291e7ef0004c6961240f0cf4065874e7",
-  "graded_cells.parquet": "fe641ab1ef0f393b93a34b7af14bd6695bfec9c179cfb8453b059b5340709ea7",
-  "overlap_metrics.csv": "6aa7de5152ec0493201b2276844826ede4df51729ee29f54eed820aee4fad6f9",
-  "price_error_by_horizon.png": "7810c305482feaea4778e0f61f8f411c001b69f87464f3f4b057754da1e4ab80",
-  "q_distortion.png": "afcdf8e293037c2d4a026bfd5f932b6169a4ac53ddcd969dbb8e1a341a588d79",
-  "source_inventory.csv": "7dc1e7f69388e63bf62453cf35719f471c52dc67edffa0b4e2302d33b7a79af0",
-  "top2_top7_agreement.png": "326c6f9f8ceeac9eef459b306bf3b2bb9fea58ffca48ce211915eed9f40232fd"
+  "MANIFEST.json": "144096904442a57d506faa986887ea628d051c6952b3af1d3c71cf8b8509a15b",
+  "coverage_by_issue.csv": "2c3a4d90cc186adc2e53804a16f0f020a5c2878265df0d16af4ea565a77e0edc",
+  "coverage_by_partition.png": "e61b751dd80c4a4a3a4e44737d5bf73edbb5c1ebac5627c2d4da06fbba522541",
+  "decision.json": "36848786747cd61e53f05b34ae8e060c06c4fe34c13a5da76ad1f1a56fb97e7a",
+  "exclusion_ledger.parquet": "c6d38a4228e41f54cc7bc84032fcdad3790fcf7c69135f491c63692fd64f8ebb",
+  "graded_cells.parquet": "bb6fa0176d1c4e9163e25056e92f52a0c1d95d0d13f1a14720d5d5a12042acc4",
+  "issue_overlap_diagnostics.csv": "62b084f7b723b996a7215489a5158f106a375a27cf7054335a9eeafac0f3fb8a",
+  "overlap_cells.parquet": "a7ed0d794627114a82ac0cf0763be89fc4bfde289f7c97b2272fd3b289533790",
+  "overlap_metrics.csv": "321dedb077753b7e18187f6e0374756d040badfa7c0b197dfac3934b3fe30d73",
+  "price_error_by_horizon.png": "b8ff2d9a06b43e235e63e63a6da2f1c0512bf567dfd371f7acc6d2c98c3cd139",
+  "q_distortion.png": "86d813937472e63090abe4e8f60fdd16060b3923af9625b578e7de32a352be6c",
+  "source_inventory.csv": "3539fdfe8e5b6d19b3056810ae3cf20b758610ab593d08cb2a56fa63312d9fba",
+  "top2_top7_agreement.png": "37b9111c986da54d0a1f5b4e0bd828d14cab9affd7eddbcd2c78ab2681bdc669"
 }

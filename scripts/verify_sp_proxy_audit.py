@@ -22,7 +22,13 @@ def main() -> int:
     args = parser.parse_args()
     if args.expected_manifest_sha256 == "UNSET":
         raise ValueError("no trusted manifest anchor is configured")
-    print(json.dumps(validate_package(args.package, args.expected_manifest_sha256), indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            validate_package(args.package, args.expected_manifest_sha256),
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 
