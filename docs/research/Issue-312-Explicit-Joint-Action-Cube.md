@@ -176,6 +176,18 @@ ex-largest 同时恶化。继续围绕该 MLP 调层数或学习率属于错误�
 9. **回退约束。** 任一 learned policy 在开发 OOS 不满足 matched baseline
    与路径门槛时，必须回退到 frozen control；#312 不打开 #210 或 2024+。
 
+### 下一轮时间切分
+
+#312 不能在已经观察 2023 后临时追加 2024，否则会破坏本轮冻结边界。下一轮
+MoE 应把 2019–2021 用于训练、2022 用于 gate 与 CORE/TAIL 约束调参、已暴露
+的 2023 用于 validation 和归因诊断；所有 experts、权重规则、目标函数与回退
+门槛提交冻结后，2024 才做一次性 terminal held-out。主要报告并列展示 2023
+validation 与 2024 held-out，但任何 promotion 只以 2024 为准。2025+ 继续保留。
+
+在开启 2024 前，必须先构建与历史面板相同字段的 2024 共同支持 receipt；不能
+直接套用止于 2023 的 #299 exact-B0 receipt。#210 可作为这一 held-out 接口，
+但需要按新的 CORE/TAIL MoE 契约重构后再激活。
+
 ## 交付索引
 
 - Notebook: `notebooks/research/issue-312/bj312_explicit_joint_action_cube.ipynb`
