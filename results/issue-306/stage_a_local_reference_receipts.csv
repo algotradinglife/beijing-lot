@@ -1,0 +1,16 @@
+seed,prediction_year,train_end_year,active_train_issues,active_test_issues,features,mean_iterations,downside_iterations,mean_converged,downside_converged,expert_label_inputs
+306001,2021,2020,16,39,18,49,15,True,True,0
+306002,2021,2020,16,39,18,44,16,True,True,0
+306003,2021,2020,16,39,18,48,13,True,True,0
+306004,2021,2020,16,39,18,52,15,True,True,0
+306005,2021,2020,16,39,18,44,14,True,True,0
+306001,2022,2021,55,32,18,145,58,True,True,0
+306002,2022,2021,55,32,18,89,78,True,True,0
+306003,2022,2021,55,32,18,87,55,True,True,0
+306004,2022,2021,55,32,18,88,76,True,True,0
+306005,2022,2021,55,32,18,74,62,True,True,0
+306001,2023,2022,87,35,18,110,57,True,True,0
+306002,2023,2022,87,35,18,108,65,True,True,0
+306003,2023,2022,87,35,18,113,64,True,True,0
+306004,2023,2022,87,35,18,120,67,True,True,0
+306005,2023,2022,87,35,18,151,55,True,True,0

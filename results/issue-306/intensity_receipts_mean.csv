@@ -1,0 +1,4 @@
+condition,objective,prediction_year,train_end_year,train_issues,test_issues,alpha,mean_predicted_intensity,zero_intensity_fraction
+DYNAMIC_INTENSITY,mean,2021,2020,77,49,5.0,0.0,1.0
+DYNAMIC_INTENSITY,mean,2022,2021,126,53,5.0,0.0,1.0
+DYNAMIC_INTENSITY,mean,2023,2022,179,48,5.0,0.03787806462347824,0.4583333333333333

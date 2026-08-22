@@ -50,6 +50,8 @@ results/issue-282/*
 !results/issue-299/**
 !results/issue-302/
 !results/issue-302/**
+!results/issue-306/
+!results/issue-306/**
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
 !results/bj229_divergence_profile_v1/**/*.csv
@@ -76,6 +78,9 @@ temp/
 !results/issue-279/*.csv
 !results/issue-279/*.parquet
 !results/issue-282/*.csv
+!results/issue-302/**/*.csv
+!results/issue-306/**/*.csv
+!results/issue-306/**/*.parquet
 !results/issue-296/*.csv
 !results/issue-299/*.csv
 !results/issue-302/*.csv

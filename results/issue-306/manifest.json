@@ -1,0 +1,113 @@
+{
+  "issue": 306,
+  "files": {
+    "action_ledger.csv": {
+      "bytes": 86116,
+      "sha256": "94aaabdadf57b53ebf3780695ab2ca306dc83cba63a07cb15188257875c42f7f"
+    },
+    "action_value_predictions.csv": {
+      "bytes": 542858,
+      "sha256": "08e41863961e850308cda507131ded55717949b35f96f1480777178e1d8e9c6d"
+    },
+    "capital_paths.csv": {
+      "bytes": 267208,
+      "sha256": "dc895a2aedd7f5e8afe8a283da603c330b6e8615d594ef8feff30e78727b50ed"
+    },
+    "capital_paths_2023.png": {
+      "bytes": 117500,
+      "sha256": "55b42a25192fa09a8690d8105cd7a39a9a316b8bdc225741cca71dfe00c84eef"
+    },
+    "composition_downside.csv": {
+      "bytes": 15688,
+      "sha256": "4745b9693c0583dd6119d1b6abe9bcf7aea82f69f86363d0d1006010301f2915"
+    },
+    "composition_log_wealth.csv": {
+      "bytes": 16236,
+      "sha256": "3cd66e0fff129927cc62e2d54c06a99a2cb166dc9671c80bc4f87f998c2b9ecb"
+    },
+    "composition_mean.csv": {
+      "bytes": 14940,
+      "sha256": "313a5bf2ae5f6b45b6d55284d55de3506e8cc94bad51c7d6e6a6f3b26dde8062"
+    },
+    "decision.json": {
+      "bytes": 913,
+      "sha256": "714625f99bfd3e095400ddb390275bcb874e46f1e43d34d356c4d73877cf7976"
+    },
+    "exact_exposure_null_2023.csv": {
+      "bytes": 11005,
+      "sha256": "36dbe30177aa86bc602a9ef455565d8d645c5b5af432775f9b43efea6bace919"
+    },
+    "expert_issue_features.csv": {
+      "bytes": 84594,
+      "sha256": "ded69be1413ed628375ead2c319599dc2c3d33eff835fca921c87e9844f4c1b7"
+    },
+    "fit_receipts.csv": {
+      "bytes": 2513,
+      "sha256": "d7d52e5d45edd4d9be14de1f6717d2eecbbca4113739d0c576a28263daf3a20d"
+    },
+    "funding_intensity_2021_2023.png": {
+      "bytes": 40207,
+      "sha256": "5c37bd340e0d41aba1094e945f94839ebb42f1c982fd1fb8079c521c2b4996ef"
+    },
+    "funding_response_curve_2023.csv": {
+      "bytes": 10800,
+      "sha256": "3f23c5bee55d348bafeb5593c5db0f6a955c1d91bc226fa0aa16022b131a040a"
+    },
+    "intensity_downside.csv": {
+      "bytes": 7808,
+      "sha256": "3ebd1112f39f33b573a6332bb30364590c804a73e2d3f5df42ca2f575d5ad7df"
+    },
+    "intensity_log_wealth.csv": {
+      "bytes": 8408,
+      "sha256": "174ac30f0f151edc54b2560e9bc424524a05e30a3f30b738fec848f4c0af5d62"
+    },
+    "intensity_mean.csv": {
+      "bytes": 6608,
+      "sha256": "a6c2bf513c8c9222492049c9ae5226dbea6c7b16fc07076b458a6de051f9dc65"
+    },
+    "intensity_receipts_downside.csv": {
+      "bytes": 329,
+      "sha256": "7957dde7e5e212c2ba9acac9cdc3a0fe062fba67e91703bf06ed7b64d18652f2"
+    },
+    "intensity_receipts_log_wealth.csv": {
+      "bytes": 335,
+      "sha256": "2edb56e852b252de6eb7db149ce603cd0ef12087114da85d8869d18735e117e5"
+    },
+    "intensity_receipts_mean.csv": {
+      "bytes": 317,
+      "sha256": "5c5cf04018a72cecc5577348e08be602e691a9b6e2e367228c66c137e27ffd63"
+    },
+    "matched_issue_features.csv": {
+      "bytes": 95809,
+      "sha256": "834ac2ebe2b20e01489c0e7ec8acc8be02607269bedf7a3aa5e8084cfb0ca6b7"
+    },
+    "objective_selection.csv": {
+      "bytes": 266,
+      "sha256": "f287b3bfede13da66ef6319978ec32dbf78bf7ae62062b12bcef8f2ba10026b8"
+    },
+    "policy_summary.csv": {
+      "bytes": 18768,
+      "sha256": "bb37ba0fa337cbaf7153ed19790f58d9a67dc2890be13cc5abc7df66f58d2059"
+    },
+    "seed_action_value_predictions.csv": {
+      "bytes": 2526612,
+      "sha256": "19f9e53381f35423c808bb9cd38dae9396a7521fb6391220de72594bf6b1e467"
+    },
+    "stage_a_keep_skip_decisions.csv": {
+      "bytes": 17477,
+      "sha256": "73bb70fca7e69b12e99815db3b192e772f28c644ea18d89996088166fadb1507"
+    },
+    "stage_a_local_reference_receipts.csv": {
+      "bytes": 840,
+      "sha256": "0da44436454edc74ca2bf2864808112cc9ec466baeb8f7b62f8e95c08ab6dd05"
+    },
+    "stage_a_local_reference_scores.csv": {
+      "bytes": 13046,
+      "sha256": "481806690c42406ae8c4197575422039f43c2e71b13c7033f3916db364bda4af"
+    },
+    "wide_issue_ledger.csv": {
+      "bytes": 31393,
+      "sha256": "d6ba764a744a006cdc834b693e7f464c08a5bf4f945e956c8c55a7784a524af2"
+    }
+  }
+}
