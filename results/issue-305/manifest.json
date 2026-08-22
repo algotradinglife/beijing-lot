@@ -1,0 +1,65 @@
+{
+  "issue": 305,
+  "files": {
+    "baseline_value_predictions.csv": {
+      "bytes": 70645,
+      "sha256": "8eae74dcc768babdc6763b448957debf132ae19f852e752d8a3b220467f76583"
+    },
+    "capital_paths.csv": {
+      "bytes": 143543,
+      "sha256": "a073e9d78cff6e2ff70812b431ac5afeb6e96cb5c523db45a814e40fa7469f15"
+    },
+    "capital_paths_2023.png": {
+      "bytes": 110831,
+      "sha256": "7025314dbbf661eff2c823b947ed310ad77dc31d5518adea96c8b0b28fce42b0"
+    },
+    "decision.json": {
+      "bytes": 1147,
+      "sha256": "3f690bbddcceeb708dceda2bdd23eea0a71925dc59270941884aaae27096c137"
+    },
+    "exact_exposure_null_2023.json": {
+      "bytes": 504,
+      "sha256": "d725e2af9a5e298f2572b220219f7e6cd03e13c1d6f465fbd1ff0a0533d9f3e8"
+    },
+    "exact_exposure_null_2023.png": {
+      "bytes": 47349,
+      "sha256": "939a7d4e276b436ef412a6ed433eda4fe5744a73eebdd89b1eb60830af658cfb"
+    },
+    "exact_exposure_null_histogram_2023.csv": {
+      "bytes": 13554,
+      "sha256": "7d04f2c66a96bf55b85e96717c89caa8091c5d0ab900560b717f0424e5eea3eb"
+    },
+    "fit_receipts.csv": {
+      "bytes": 4744,
+      "sha256": "975a3a8f7e4910d26fc4310c23e87eb1a462146556838b5c689646e5028293dc"
+    },
+    "legacy_302_exact_null.json": {
+      "bytes": 503,
+      "sha256": "81c241520d2cdcd53421ff9de60d94ddfd680e3bbe1abe251354109ba544e2b7"
+    },
+    "matched_issue_features.csv": {
+      "bytes": 95809,
+      "sha256": "834ac2ebe2b20e01489c0e7ec8acc8be02607269bedf7a3aa5e8084cfb0ca6b7"
+    },
+    "policy_decisions.csv": {
+      "bytes": 103825,
+      "sha256": "561eb632a83edfe4765628065447c9ffbbaef0c035d195985e4cb858b9a7d942"
+    },
+    "policy_summary.csv": {
+      "bytes": 9250,
+      "sha256": "4305d26f15ad9f21fb262333deb831683c9dce92a05ec2b8571e577b773c1fd3"
+    },
+    "seed_baseline_value_predictions.csv": {
+      "bytes": 272213,
+      "sha256": "9df8eca293c5f55e9f133af672490505bc4ca256d71573fbf36c81c3a933bc53"
+    },
+    "sensitivity_2023.csv": {
+      "bytes": 550,
+      "sha256": "725f94dbc1129bdadf4d33b4eeb503bd3316d67d1c4e2e4a0fc7467096d99517"
+    },
+    "sensitivity_2023.png": {
+      "bytes": 46758,
+      "sha256": "6445c83570098e2e81eec3e10cb0bc8b2de4722a16402d08866ce35e547d261e"
+    }
+  }
+}

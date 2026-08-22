@@ -1,0 +1,16 @@
+{
+  "year": 2023,
+  "active_destination_issues": 35,
+  "funded_count": 6,
+  "stake_per_funded_issue_cny": 4374.0,
+  "total_stake_cny": 26244.0,
+  "combination_count": 1623160,
+  "distinct_terminal_values": 1219949,
+  "histogram_bins": 219,
+  "observed_terminal_capital_cny": 102633.14,
+  "exact_percentile": 0.785127159368146,
+  "null_p05_terminal_capital_cny": 85408.54,
+  "null_median_terminal_capital_cny": 95523.05,
+  "null_p95_terminal_capital_cny": 110638.43,
+  "histogram_bin_width_cny": 250.0
+}
