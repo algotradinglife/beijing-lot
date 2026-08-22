@@ -1,0 +1,47 @@
+{
+  "features": [
+    "q_eu",
+    "q_line",
+    "divergence",
+    "abs_divergence",
+    "native_handicap_line",
+    "n_available_books",
+    "mapping_accepted",
+    "issue_matches",
+    "issue_books_mean",
+    "issue_line_abs_mean",
+    "issue_entropy_mean",
+    "issue_divergence_abs_mean",
+    "outcome_3",
+    "outcome_1",
+    "outcome_0"
+  ],
+  "fit_years": [
+    2020,
+    2021,
+    2022
+  ],
+  "model_seeds": [
+    33401,
+    33402,
+    33403,
+    33404,
+    33405
+  ],
+  "models_in_diagnostics": [
+    "ANCHOR_SHRINK_A000",
+    "ANCHOR_SHRINK_A025",
+    "ANCHOR_SHRINK_A050",
+    "ANCHOR_SHRINK_A075",
+    "ANCHOR_SHRINK_A100",
+    "BASELINE",
+    "LINEAR",
+    "MLP32_A010",
+    "MLP32_A010_LABEL_SHUFFLED"
+  ],
+  "selected_arm": "S1O0",
+  "selected_model": "MLP32_A010",
+  "selection_year": 2023,
+  "terminal_rows_seen_during_selection": 0,
+  "terminal_year": 2024
+}

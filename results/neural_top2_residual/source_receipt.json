@@ -1,0 +1,33 @@
+{
+  "cells": 247557,
+  "external_sources_committed_to_git": false,
+  "feature_columns": [
+    "q_eu",
+    "q_line",
+    "divergence",
+    "abs_divergence",
+    "native_handicap_line",
+    "n_available_books",
+    "mapping_accepted",
+    "issue_matches",
+    "issue_books_mean",
+    "issue_line_abs_mean",
+    "issue_entropy_mean",
+    "issue_divergence_abs_mean",
+    "outcome_3",
+    "outcome_1",
+    "outcome_0"
+  ],
+  "feature_projection_sha256": "0d089b5743383ed55cf9c762c93df2d6d6b18b9c38099abff4c4c41b78dfecf3",
+  "inference_path": "data/derived/bj238_divergence_materializer_v4r3/inference/relative_horizon_view.parquet",
+  "issues": 282,
+  "matches": 82519,
+  "settlement_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+  "years": [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ]
+}
