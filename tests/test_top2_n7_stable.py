@@ -6,7 +6,14 @@ import numpy as np
 import pandas as pd
 
 from src.top2_n7_stable.contract import PAYOUT_FACTOR
-from src.top2_n7_stable.pipeline import _fixture_table, _seed, construct_preoutcome, settle
+from src.top2_n7_stable.pipeline import (
+    _chronological,
+    _fixture_table,
+    _risk,
+    _seed,
+    construct_preoutcome,
+    settle,
+)
 
 
 def surface(fixtures: int = 8) -> pd.DataFrame:
@@ -15,6 +22,7 @@ def surface(fixtures: int = 8) -> pd.DataFrame:
         for code, probability in zip(("3", "1", "0"), (.5, .3, .2), strict=True):
             rows.append({"canonical_fixture_key": f"bjslot:23001:{index:03d}", "issue_code": "23001",
                          "issue_year": 2023, "snapshot_kind": "10h", "match_idx": index,
+                         "issue_anchor_ts": "2023-01-02T12:00:00+00:00",
                          "outcome_code": code, "q_eu_bjline": probability,
                          "native_handicap_line": 0.0, "eu_vs_line_divergence": 0.01,
                          "n_available_books": 10, "causal_grade": "TEST"})
@@ -99,3 +107,39 @@ def test_missing_settlement_is_unobservable_not_scored_as_loss() -> None:
     assert bundles.iloc[0].settlement_status == "UNOBSERVABLE_SETTLEMENT"
     assert np.isnan(bundles.iloc[0].pnl)
     assert tickets.gross.isna().all()
+
+
+def test_recovery_diagnostics_distinguish_completed_and_open_drawdowns() -> None:
+    recovered_then_open = pd.DataFrame({
+        "pnl": [-100.0, 100.0, -50.0, -25.0],
+        "gross": [0.0, 200.0, 0.0, 0.0],
+        "capital_after": [99_900.0, 100_000.0, 99_950.0, 99_925.0],
+    })
+    diagnostics = _risk(recovered_then_open)
+    assert diagnostics["completed_recovery_episode_count"] == 1
+    assert diagnostics["max_completed_recovery_issues"] == 1
+    assert diagnostics["open_underwater_issues"] == 2
+
+
+def test_open_drawdown_is_not_reported_as_completed_recovery() -> None:
+    open_only = pd.DataFrame({
+        "pnl": [-100.0, -50.0],
+        "gross": [0.0, 0.0],
+        "capital_after": [99_900.0, 99_850.0],
+    })
+    diagnostics = _risk(open_only)
+    assert diagnostics["completed_recovery_episode_count"] == 0
+    assert diagnostics["max_completed_recovery_issues"] == 0
+    assert diagnostics["open_underwater_issues"] == 2
+
+
+def test_issue_path_uses_event_timestamp_not_issue_code() -> None:
+    frame = pd.DataFrame({
+        "issue_code": ["23001", "23002", "23003"],
+        "issue_anchor_ts": [
+            "2023-01-03T00:00:00+00:00",
+            "2023-01-01T00:00:00+00:00",
+            "2023-01-01T00:00:00+00:00",
+        ],
+    })
+    assert _chronological(frame).issue_code.tolist() == ["23002", "23003", "23001"]

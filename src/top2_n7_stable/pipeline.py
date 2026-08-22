@@ -36,7 +36,7 @@ from .contract import (
 
 
 PREOUTCOME_BUNDLE_COLUMNS = [
-    "issue_code", "issue_year", "horizon", "arm", "gate", "seed",
+    "issue_code", "issue_year", "issue_anchor_ts", "horizon", "arm", "gate", "seed",
     "status_preoutcome", "selected_fixture_keys", "support_json",
     "retained_mass_mean", "retained_mass_min", "ticket_count", "planned_stake",
 ]
@@ -120,6 +120,7 @@ def _fixture_table(frame: pd.DataFrame) -> pd.DataFrame:
         representative = group.iloc[0]
         rows.append({
             "issue_code": str(key[0]), "issue_year": int(key[1]), "horizon": str(key[2]),
+            "issue_anchor_ts": pd.Timestamp(representative.issue_anchor_ts).isoformat(),
             "canonical_fixture_key": str(key[3]), "match_idx": int(key[4]),
             "support": tuple(x[0] for x in top2),
             "retained_mass": float(sum(x[1] for x in top2)),
@@ -138,6 +139,7 @@ def _bundle_row(group: pd.DataFrame, arm: str, seed: int, selected: pd.DataFrame
     return {
         "issue_code": str(group.iloc[0]["issue_code"]),
         "issue_year": int(group.iloc[0]["issue_year"]),
+        "issue_anchor_ts": str(group.iloc[0]["issue_anchor_ts"]),
         "horizon": str(group.iloc[0]["horizon"]),
         "arm": arm, "gate": "NONE", "seed": seed,
         "status_preoutcome": "ACTIVE",
@@ -164,6 +166,7 @@ def construct_preoutcome(feature: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFr
                 for gate in GM_GATES:
                     bundle_rows.append({
                         "issue_code": issue, "issue_year": int(group.iloc[0]["issue_year"]),
+                        "issue_anchor_ts": str(group.iloc[0]["issue_anchor_ts"]),
                         "horizon": str(group.iloc[0]["horizon"]), "arm": arm, "gate": gate,
                         "seed": -1, "status_preoutcome": "NO_BET_INSUFFICIENT_FIXTURES",
                         "selected_fixture_keys": "", "support_json": "{}",
@@ -175,6 +178,7 @@ def construct_preoutcome(feature: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFr
                 for gate in GM_GATES:
                     bundle_rows.append({
                         "issue_code": issue, "issue_year": int(group.iloc[0]["issue_year"]),
+                        "issue_anchor_ts": str(group.iloc[0]["issue_anchor_ts"]),
                         "horizon": str(group.iloc[0]["horizon"]), "arm": arm, "gate": gate,
                         "seed": -1, "status_preoutcome": "NO_BET_PRICE_DATA_INSUFFICIENT",
                         "selected_fixture_keys": "", "support_json": "{}",
@@ -208,6 +212,7 @@ def construct_preoutcome(feature: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFr
             for gate in GM_GATES[1:]:
                 bundle_rows.append({
                     "issue_code": issue, "issue_year": int(group.iloc[0]["issue_year"]),
+                    "issue_anchor_ts": str(group.iloc[0]["issue_anchor_ts"]),
                     "horizon": str(group.iloc[0]["horizon"]), "arm": arm, "gate": gate,
                     "seed": -1, "status_preoutcome": "NO_BET_PRICE_DATA_INSUFFICIENT",
                     "selected_fixture_keys": "", "support_json": "{}",
@@ -218,6 +223,7 @@ def construct_preoutcome(feature: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFr
         for arm in PRICE_BLOCKED_ARMS:
             bundle_rows.append({
                 "issue_code": issue, "issue_year": int(group.iloc[0]["issue_year"]),
+                "issue_anchor_ts": str(group.iloc[0]["issue_anchor_ts"]),
                 "horizon": str(group.iloc[0]["horizon"]), "arm": arm, "gate": "NONE",
                 "seed": -1, "status_preoutcome": "NO_BET_PRICE_DATA_INSUFFICIENT",
                 "selected_fixture_keys": "", "support_json": "{}",
@@ -324,15 +330,14 @@ def _risk(path: pd.DataFrame) -> dict:
         no_payout_current = no_payout_current + 1 if flag else 0
         no_payout_longest = max(no_payout_longest, no_payout_current)
     underwater = capital < np.maximum.accumulate(np.r_[STARTING_CAPITAL, capital])[:-1]
-    max_recovery = recovery_current = 0
+    completed_recovery_lengths: list[int] = []
+    underwater_current = 0
     for flag in underwater:
-        recovery_current = recovery_current + 1 if flag else 0
-        max_recovery = max(max_recovery, recovery_current)
-    ending_underwater = 0
-    for flag in underwater[::-1]:
-        if not flag:
-            break
-        ending_underwater += 1
+        if flag:
+            underwater_current += 1
+        elif underwater_current:
+            completed_recovery_lengths.append(underwater_current)
+            underwater_current = 0
     rolling = {}
     for width in (5, 10, 20):
         rolling[f"worst_{width}_issue_pnl"] = float(pd.Series(pnl).rolling(width).sum().min()) if len(pnl) >= width else np.nan
@@ -341,7 +346,9 @@ def _risk(path: pd.DataFrame) -> dict:
     ex_largest_pnl = float(pnl.sum() - pnl.max()) if pnl.size else np.nan
     return {"max_drawdown": float(drawdowns.max()), "max_drawdown_pct": float((drawdowns / peaks).max()),
             "longest_losing_run": int(longest), "longest_no_payout_run": int(no_payout_longest),
-            "max_recovery_issues": int(max_recovery), "ending_underwater_issues": int(ending_underwater),
+            "completed_recovery_episode_count": len(completed_recovery_lengths),
+            "max_completed_recovery_issues": max(completed_recovery_lengths, default=0),
+            "open_underwater_issues": int(underwater_current),
             "ex_largest_issue_pnl": ex_largest_pnl, "payout_hhi": payout_hhi, **rolling}
 
 
@@ -358,6 +365,11 @@ def _block_bootstrap_means(values: np.ndarray, rng: np.random.Generator, draws: 
     return output
 
 
+def _chronological(frame: pd.DataFrame) -> pd.DataFrame:
+    """Order issue paths by event time, never by display-oriented issue code."""
+    return frame.sort_values(["issue_anchor_ts", "issue_code"], kind="stable")
+
+
 def summarize(bundles: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     settled = bundles[(bundles["settlement_status"] == "SETTLED") & (bundles["gate"] == "NONE")].copy()
     paths: list[pd.DataFrame] = []
@@ -365,16 +377,17 @@ def summarize(bundles: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.Dat
     risks: list[dict] = []
     keys = ["horizon", "issue_year", "arm", "seed"]
     for key, group in settled.groupby(keys, sort=True):
-        group = group.sort_values("issue_code", kind="stable").copy()
+        group = _chronological(group).copy()
         group["capital_before"] = STARTING_CAPITAL + group["pnl"].cumsum().shift(fill_value=0)
         group["capital_after"] = STARTING_CAPITAL + group["pnl"].cumsum()
         group["path_id"] = f"{key[0]}:{key[1]}:{key[2]}:{key[3]}"
-        paths.append(group[["path_id", "issue_code", "issue_year", "horizon", "arm", "seed", "stake", "gross", "pnl", "hit", "capital_before", "capital_after"]])
+        paths.append(group[["path_id", "issue_code", "issue_year", "issue_anchor_ts", "horizon", "arm", "seed", "stake", "gross", "pnl", "hit", "capital_before", "capital_after"]])
         total_stake = float(group["stake"].sum())
         total_gross = float(group["gross"].sum())
         row = {"horizon": key[0], "issue_year": key[1], "arm": key[2], "seed": key[3],
                "active_issues": len(group), "total_stake": total_stake, "total_gross": total_gross,
                "turnover_roi": total_gross / total_stake - 1, "ending_capital": float(group["capital_after"].iloc[-1]),
+               "capital_return": float(group["capital_after"].iloc[-1] / STARTING_CAPITAL - 1),
                "bundle_hit_rate": float(group["hit"].mean()), "mean_retained_mass": float(group["retained_mass_mean"].mean())}
         summaries.append(row)
         risks.append({**{k: row[k] for k in ["horizon", "issue_year", "arm", "seed"]}, **_risk(group)})
@@ -387,7 +400,8 @@ def summarize(bundles: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.Dat
     median_rows = random.groupby(["horizon", "issue_year"], as_index=False).agg(
         active_issues=("active_issues", "median"), total_stake=("total_stake", "median"),
         total_gross=("total_gross", "median"), turnover_roi=("turnover_roi", "median"),
-        ending_capital=("ending_capital", "median"), bundle_hit_rate=("bundle_hit_rate", "median"),
+        ending_capital=("ending_capital", "median"), capital_return=("capital_return", "median"),
+        bundle_hit_rate=("bundle_hit_rate", "median"),
         mean_retained_mass=("mean_retained_mass", "median"),
     )
     median_rows["arm"] = "RANDOM_MATCH_P_TOP2_SEED_MEDIAN"
@@ -418,6 +432,7 @@ def summarize(bundles: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.Dat
     )["pnl"].median().rename(columns={"pnl": "random_seed_median_pnl"})
     paired = primary.merge(rnd, on=["issue_code", "issue_year", "horizon"], validate="one_to_one")
     paired["lift_vs_random"] = paired["pnl"] - paired["random_seed_median_pnl"]
+    paired = paired.sort_values(["horizon", "issue_anchor_ts", "issue_code"], kind="stable")
     rng = np.random.default_rng(319)
     bootstrap = {}
     for horizon in HORIZONS:
@@ -446,7 +461,7 @@ def _write_notebook(repo_root: Path, output: Path) -> None:
         nbformat.v4.new_markdown_cell("# Issue #319 — Probability Top-2 N7 stable center\n\nExecuted decision notebook; paths are repository-relative."),
         nbformat.v4.new_code_cell("from pathlib import Path\nimport json\nimport pandas as pd\nimport matplotlib.pyplot as plt\nROOT=Path.cwd().parents[2]\nOUT=ROOT/'results/top2_n7_stable'"),
         nbformat.v4.new_code_cell("decision=json.loads((OUT/'decision.json').read_text())\nperformance=pd.read_csv(OUT/'matched_performance.csv')\ndecision"),
-        nbformat.v4.new_code_cell("performance[(performance.horizon=='10h') & (performance.seed.isin([-1,-2]))][['issue_year','arm','active_issues','ending_capital','turnover_roi','bundle_hit_rate']]"),
+        nbformat.v4.new_code_cell("performance[(performance.horizon=='10h') & (performance.seed.isin([-1,-2]))][['issue_year','arm','active_issues','ending_capital','capital_return','turnover_roi','bundle_hit_rate']]"),
         nbformat.v4.new_code_cell("paths=pd.read_csv(OUT/'capital_paths.csv')\nfor key,g in paths[(paths.horizon=='10h') & (paths.arm=='P_TOP2_NO_GATE')].groupby('issue_year'):\n    plt.plot(range(len(g)),g.capital_after,label=str(key))\nplt.axhline(100000,color='black',lw=.8); plt.legend(); plt.title('Primary capital paths'); plt.show()"),
     ], metadata={"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}})
     nbformat.write(nb, path)
@@ -456,7 +471,13 @@ def _write_notebook(repo_root: Path, output: Path) -> None:
     nbformat.write(executed, path)
 
 
-def _write_docs(repo_root: Path, decision: dict, performance: pd.DataFrame, selector_lift: pd.DataFrame) -> None:
+def _write_docs(
+    repo_root: Path,
+    decision: dict,
+    performance: pd.DataFrame,
+    selector_lift: pd.DataFrame,
+    risk: pd.DataFrame,
+) -> None:
     fig_dir = repo_root / "docs/research/figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
     paths = pd.read_csv(repo_root / "results/top2_n7_stable/capital_paths.csv")
@@ -471,13 +492,22 @@ def _write_docs(repo_root: Path, decision: dict, performance: pd.DataFrame, sele
     plt.close(fig)
     view = performance[(performance.horizon == "10h") & performance.seed.isin([-1, -2])]
     rows = "\n".join(
-        f"| {int(r.issue_year)} | {r.arm} | {int(r.active_issues)} | {r.ending_capital:,.2f} | {r.turnover_roi:.2%} | {r.bundle_hit_rate:.2%} |"
+        f"| {int(r.issue_year)} | {r.arm} | {int(r.active_issues)} | {r.ending_capital:,.2f} | {r.capital_return:.2%} | {r.bundle_hit_rate:.2%} |"
         for r in view.itertuples()
     )
     lift_view = selector_lift[selector_lift.horizon == "10h"]
     lift_rows = "\n".join(
         f"| {int(r.issue_year)} | {int(r.matched_issues_min)}–{int(r.matched_issues_median)} | {r.median_total_lift:,.2f} | {r.positive_seed_fraction:.1%} |"
         for r in lift_view.itertuples()
+    )
+    risk_view = risk[
+        (risk.horizon == "10h") & (risk.arm == "P_TOP2_NO_GATE") & (risk.seed == -1)
+    ]
+    risk_rows = "\n".join(
+        f"| {int(r.issue_year)} | {r.max_drawdown:,.2f} | {r.max_drawdown_pct:.2%} | "
+        f"{int(r.longest_losing_run)} | {int(r.longest_no_payout_run)} | "
+        f"{int(r.max_completed_recovery_issues)} | {int(r.open_underwater_issues)} |"
+        for r in risk_view.itertuples()
     )
     text = f"""# Issue #319 — Probability Top-2 N7 stable center
 
@@ -490,13 +520,24 @@ value, q and numeric GM gates fail closed rather than using leaked settlement pr
 
 ## Primary 10h results (pre-tax)
 
-| Year | Arm | observable issues | ending capital | turnover ROI | bundle hit rate |
+| Year | Arm | observable issues | ending capital | capital return | bundle hit rate |
 |---|---|---:|---:|---:|---:|
 {rows}
 
 Every active issue enumerates all 128 distinct Top-2 N7 tickets at CNY2, for CNY256
 planned exposure. Beijing's 0.65 factor is applied exactly once to the complete winning
-ticket. Thirty-one random seeds are nuisance repeats and do not inflate the issue count.
+ticket. Capital return (ending capital / CNY100,000 - 1) is the primary performance
+measure; turnover ROI is retained only as a secondary unit-economics diagnostic.
+Thirty-one random seeds are nuisance repeats and do not inflate the issue count.
+
+Capital paths and moving-block bootstrap inputs are ordered by the event timestamp
+`issue_anchor_ts`, with `issue_code` used only as a deterministic tie-breaker.
+
+| Year | max drawdown | max drawdown % | longest losing | longest no-payout | max completed recovery | open underwater tail |
+|---|---:|---:|---:|---:|---:|---:|
+{risk_rows}
+
+An open underwater tail is right-censored and is not mislabeled as a completed recovery.
 
 The descriptive table above is not itself a matched claim because missing trusted
 settlements differ by selected fixtures. The exact CNY256-vs-CNY256 paired comparison is:
@@ -640,7 +681,7 @@ def build_package(repo_root: Path, output: Path, data_root: Path | None = None) 
     (output / "MANIFEST.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     sums = {path.name: sha256_file(path) for path in sorted(output.iterdir()) if path.is_file() and path.name != "SHA256SUMS.json"}
     (output / "SHA256SUMS.json").write_text(json.dumps(sums, indent=2, sort_keys=True) + "\n")
-    _write_docs(repo_root, decision, performance, selector_lift)
+    _write_docs(repo_root, decision, performance, selector_lift, risk)
     _write_notebook(repo_root, output)
     return decision
 

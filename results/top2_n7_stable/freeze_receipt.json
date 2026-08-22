@@ -15,7 +15,7 @@
   ],
   "issue": 319,
   "planned_stake_per_active_bundle": 256.0,
-  "preoutcome_bundle_sha256": "74e043a61d651b246c355b87d9d979ab049b68646a3ee7662fd763561bfc736b",
+  "preoutcome_bundle_sha256": "8f5e05b100e8a55f9a462e8168decc8b5c3d84038de059bbce86ff6facaa8716",
   "preoutcome_ticket_sha256": "21ee5784900d226fa6879544f34cc46b7f5ed8a9843ae14ba83a36338c87dba1",
   "price_blocked_arms": [
     "P_TOP2_VALUE_RANK",
