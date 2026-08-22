@@ -10,8 +10,8 @@
       "sha256": "3270e12d6b94a66cbddc93cfc70884da370ee0342d26bf23db5535f76702bc92"
     },
     "decision.json": {
-      "bytes": 4672,
-      "sha256": "c60657d92313df1e881992b8b720e36078899062e0d0cbb5eb2e1295f8ae2bed"
+      "bytes": 5111,
+      "sha256": "749c562824067ca294f43855ab43c0624ffd09b2e33038c9a06f56ebc4a49529"
     },
     "freeze_receipt.json": {
       "bytes": 951,
@@ -30,8 +30,8 @@
       "sha256": "7a86628e0025bd66065603f1c0bc87ef9e6ce0464a65e99ce7910a0b023d3415"
     },
     "risk_diagnostics.csv": {
-      "bytes": 21918,
-      "sha256": "766bfe4f8917ae61cf99b51b042c3d1ddd66387e9aa4b7793555469db160e85e"
+      "bytes": 29347,
+      "sha256": "7e37d2394d21e30bcaf6ae7fd902f034c05e97c9d3e1962c5ae2e273768bd458"
     },
     "selector_lift.csv": {
       "bytes": 717,
@@ -40,6 +40,10 @@
     "tickets.parquet": {
       "bytes": 16976056,
       "sha256": "cbbbcc13091f894da857c194c861ab1f27be0ee8669112b86bde8ff4493cdc17"
+    },
+    "year_contribution.csv": {
+      "bytes": 7055,
+      "sha256": "7da2ea0f3385696c1ce8c2e77f88791c69142cd5f2af393db62127cdc2ebfb49"
     }
   }
 }

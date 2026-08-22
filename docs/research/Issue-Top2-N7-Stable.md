@@ -54,19 +54,6 @@ stable Edge, not a reason to select the favorable aggregation.
 5. A future value-selector test requires genuine decision-epoch SP or a separately
    accepted proxy; probability-only performance cannot unlock forward validation.
 
-## Requirement evidence
-
-| Requirement | Evidence | Result |
-|---|---|---|
-| REQ-TOP2-01 | `freeze_receipt.json`; pre-outcome bundle/ticket SHA before settlement load | PASS |
-| REQ-TOP2-02 | `tickets.parquet`; verifier checks 128 unique tickets and CNY256 | PASS |
-| REQ-TOP2-03 | exact ticket/bundle gross reconciliation and factor-once tests | PASS |
-| REQ-TOP2-04 | `issue_bundles.parquet`; all arms/gates and explicit no-bet reasons | PASS |
-| REQ-TOP2-05 | `matched_performance.csv`, `selector_lift.csv`, paired trace | PASS |
-| REQ-TOP2-06 | every price-dependent lane fails closed; no proxy promotion | PASS |
-| REQ-TOP2-07 | package code, 8 focused tests, executed notebook, hashes | PASS |
-| REQ-TOP2-08 | `attribution.parquet`; issue/seed miss distance and reason | PASS |
-
 ## Artifacts
 
 - Notebook: `notebooks/research/top2-n7-stable/top2_n7_stable.ipynb`

@@ -299,9 +299,26 @@ def _risk(path: pd.DataFrame) -> dict:
     rolling = {}
     for width in (5, 10, 20):
         rolling[f"worst_{width}_issue_pnl"] = float(pd.Series(pnl).rolling(width).sum().min()) if len(pnl) >= width else np.nan
+    positive_gross = path.loc[path["gross"] > 0, "gross"].to_numpy(float)
+    payout_hhi = float(np.square(positive_gross / positive_gross.sum()).sum()) if positive_gross.size else np.nan
+    ex_largest_pnl = float(pnl.sum() - pnl.max()) if pnl.size else np.nan
     return {"max_drawdown": float(drawdowns.max()), "max_drawdown_pct": float((drawdowns / peaks).max()),
             "longest_losing_run": int(longest), "longest_no_payout_run": int(no_payout_longest),
-            "max_recovery_issues": int(max_recovery), "ending_underwater_issues": int(ending_underwater), **rolling}
+            "max_recovery_issues": int(max_recovery), "ending_underwater_issues": int(ending_underwater),
+            "ex_largest_issue_pnl": ex_largest_pnl, "payout_hhi": payout_hhi, **rolling}
+
+
+def _block_bootstrap_means(values: np.ndarray, rng: np.random.Generator, draws: int = 2000, block: int = 5) -> np.ndarray:
+    """Circular moving-block bootstrap preserving short issue-path dependence."""
+    n = len(values)
+    starts_per_draw = math.ceil(n / block)
+    offsets = np.arange(block)
+    output = np.empty(draws)
+    for draw in range(draws):
+        starts = rng.integers(0, n, size=starts_per_draw)
+        indices = ((starts[:, None] + offsets) % n).ravel()[:n]
+        output[draw] = values[indices].mean()
+    return output
 
 
 def summarize(bundles: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
@@ -372,9 +389,10 @@ def summarize(bundles: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.Dat
                                    ("2023", paired[(paired["horizon"] == horizon) & (paired["issue_year"] == 2023)]),
                                    ("2024", paired[(paired["horizon"] == horizon) & (paired["issue_year"] == 2024)])):
             values = subset["lift_vs_random"].to_numpy(float)
-            draws = np.array([rng.choice(values, size=len(values), replace=True).mean() for _ in range(2000)])
+            draws = _block_bootstrap_means(values, rng)
             bootstrap[horizon][year_label] = {
-                "n_issues": int(len(values)), "mean_lift_per_issue": float(values.mean()),
+                "n_issues": int(len(values)), "block_size": 5, "draws": 2000,
+                "mean_lift_per_issue": float(values.mean()),
                 "bootstrap_median": float(np.median(draws)), "ci95_low": float(np.quantile(draws, .025)),
                 "ci95_high": float(np.quantile(draws, .975)),
             }
@@ -548,6 +566,16 @@ def build_package(repo_root: Path, output: Path, data_root: Path | None = None) 
     performance.to_csv(output / "matched_performance.csv", index=False)
     selector_lift.to_csv(output / "selector_lift.csv", index=False)
     paired.to_parquet(output / "paired_selector_lift.parquet", index=False)
+    year_contribution = paths.groupby(["horizon", "arm", "seed", "issue_year"], as_index=False)["pnl"].sum()
+    combined_year_rows = []
+    for key, group in year_contribution.groupby(["horizon", "arm", "seed"], sort=True):
+        combined_year_rows.append({
+            "horizon": key[0], "arm": key[1], "seed": key[2], "years": len(group),
+            "total_pnl": float(group.pnl.sum()),
+            "ex_best_year_pnl": float(group.pnl.sum() - group.pnl.max()),
+            "best_year": int(group.loc[group.pnl.idxmax(), "issue_year"]),
+        })
+    pd.DataFrame(combined_year_rows).to_csv(output / "year_contribution.csv", index=False)
     paths.to_csv(output / "capital_paths.csv", index=False)
     risk.to_csv(output / "risk_diagnostics.csv", index=False)
     attribution.to_parquet(output / "attribution.parquet", index=False)

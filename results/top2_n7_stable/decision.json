@@ -2,69 +2,87 @@
   "bootstrap_lift_vs_random": {
     "10h": {
       "2023": {
-        "bootstrap_median": 110.20673269651783,
-        "ci95_high": 208.17407286648438,
-        "ci95_low": 36.09561523784147,
+        "block_size": 5,
+        "bootstrap_median": 112.6095911448259,
+        "ci95_high": 205.0162541044162,
+        "ci95_low": 41.51140363168538,
+        "draws": 2000,
         "mean_lift_per_issue": 114.1832778449875,
         "n_issues": 43
       },
       "2024": {
-        "bootstrap_median": 313.55909925608614,
-        "ci95_high": 479.7002343690104,
-        "ci95_low": 173.331323095056,
+        "block_size": 5,
+        "bootstrap_median": 314.31644637678096,
+        "ci95_high": 442.68915266240555,
+        "ci95_low": 203.5918215184016,
+        "draws": 2000,
         "mean_lift_per_issue": 317.5051190045787,
         "n_issues": 58
       },
       "combined": {
-        "bootstrap_median": 229.1030746687462,
-        "ci95_high": 342.9866232963217,
-        "ci95_low": 137.38700341079027,
+        "block_size": 5,
+        "bootstrap_median": 229.78385659754656,
+        "ci95_high": 323.44778818469393,
+        "ci95_low": 146.88136911947376,
+        "draws": 2000,
         "mean_lift_per_issue": 230.94235494653492,
         "n_issues": 101
       }
     },
     "1h": {
       "2023": {
-        "bootstrap_median": 222.6588593196194,
-        "ci95_high": 466.7577878605087,
-        "ci95_low": 67.65062490532212,
+        "block_size": 5,
+        "bootstrap_median": 228.82080494603503,
+        "ci95_high": 473.91543745637034,
+        "ci95_low": 60.07847964667878,
+        "draws": 2000,
         "mean_lift_per_issue": 234.66532587735134,
         "n_issues": 42
       },
       "2024": {
-        "bootstrap_median": 217.28969414778436,
-        "ci95_high": 353.1388324953176,
-        "ci95_low": 107.05339510653866,
+        "block_size": 5,
+        "bootstrap_median": 219.69710179790343,
+        "ci95_high": 327.71378084521365,
+        "ci95_low": 126.62098514955258,
+        "draws": 2000,
         "mean_lift_per_issue": 222.10960644544897,
         "n_issues": 57
       },
       "combined": {
-        "bootstrap_median": 225.85113260686012,
-        "ci95_high": 351.2993271381042,
-        "ci95_low": 125.63845791557522,
+        "block_size": 5,
+        "bootstrap_median": 224.04956627971973,
+        "ci95_high": 343.15506154409456,
+        "ci95_low": 133.9526640320585,
+        "draws": 2000,
         "mean_lift_per_issue": 227.43627529534697,
         "n_issues": 99
       }
     },
     "initial": {
       "2023": {
-        "bootstrap_median": 140.55912403412503,
-        "ci95_high": 279.5968724520394,
-        "ci95_low": 40.84921681591561,
+        "block_size": 5,
+        "bootstrap_median": 142.9173915811278,
+        "ci95_high": 263.50315411228297,
+        "ci95_low": 49.09592040823944,
+        "draws": 2000,
         "mean_lift_per_issue": 145.13891031083074,
         "n_issues": 44
       },
       "2024": {
-        "bootstrap_median": 203.0283256517509,
-        "ci95_high": 346.31510147774145,
-        "ci95_low": 99.53629396956666,
+        "block_size": 5,
+        "bootstrap_median": 206.3519220852108,
+        "ci95_high": 338.70141663049606,
+        "ci95_low": 103.34134309309145,
+        "draws": 2000,
         "mean_lift_per_issue": 212.47554114517652,
         "n_issues": 60
       },
       "combined": {
-        "bootstrap_median": 181.2525564190973,
-        "ci95_high": 285.6265209130214,
-        "ci95_low": 103.00088713553959,
+        "block_size": 5,
+        "bootstrap_median": 182.46577104220216,
+        "ci95_high": 262.5450110108841,
+        "ci95_low": 107.98177938710211,
+        "draws": 2000,
         "mean_lift_per_issue": 183.98696656141482,
         "n_issues": 104
       }
