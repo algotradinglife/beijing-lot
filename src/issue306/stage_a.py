@@ -60,15 +60,24 @@ class StageAFit:
 
 
 def load_frozen_stage_a(root: str | Path) -> pd.DataFrame | None:
-    """Return the Issue #305 frozen keep/skip frame if it exists, else None."""
+    """Return the Issue #305 frozen keep/skip frame if it exists, else None.
+
+    The delivered #305 file is one multi-condition prediction table; the
+    frozen Stage A head is the DEDICATED_MLP condition with its own
+    keep_baseline decision, one row per issue.
+    """
 
     path = Path(root) / STAGE_A_OUTPUT_PATH
     if not path.exists():
         return None
     frame = pd.read_csv(path)
+    if "condition" in frame.columns:
+        frame = frame[frame["condition"].eq("DEDICATED_MLP")].copy()
     required = {"issue", "issue_year", "keep_baseline"}
     if not required.issubset(frame.columns):
         raise AssertionError(f"#305 output missing columns: {required - set(frame.columns)}")
+    if frame.duplicated(["issue", "issue_year"]).any():
+        raise AssertionError("#305 DEDICATED_MLP output is not unique by issue")
     return frame
 
 

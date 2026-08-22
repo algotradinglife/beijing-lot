@@ -5,26 +5,25 @@
 The experiment returns **EXPERT_VALUE_SIGNAL / NO PROMOTION**.
 
 The state-dependent dynamic policy (Stage A keep/skip + Stage C composition +
-Stage C intensity) takes CNY100,000 to **CNY109,091.87 (+9.09%)** on the 2023
+Stage C intensity) takes CNY100,000 to **CNY112,357.91 (+12.36%)** on the 2023
 matched support, versus **CNY79,248.96 (-20.75%)** for exact `B0_BEST_FULL`.
-The matched improvement is **CNY29,842.90 / +29.84 percentage points**, and the
+The matched improvement is **CNY33,108.94 / +33.11 percentage points**, and the
 policy also beats cash, the #299 learned residual, the train-only static
 mixture, issue-block shuffle and expert-identity shuffle on identical support.
 
 Decomposition shows where the lift lives:
 
-- **Stage A keep/skip alone: +10,373 CNY** — the frozen expert-label-invariant
-  BEST_FULL head funds 11 of 35 active 2023 issues and beats always-keep by
-  +10.4k. (Stage A is a local reference fit with identical semantics until #305
-  delivers its frozen output; the tag is explicit in every artifact.)
+- **Stage A keep/skip alone: +13,639 CNY** — the #305 frozen
+  expert-label-invariant BEST_FULL head funds 8 of 35 active 2023 issues and
+  beats always-keep by +13.6k, reproducing the delivered #305 -7.11% path.
 - **Composition at a fixed intensity: +0 CNY** — the fixed funding fraction
   selected on earlier expanding OOF folds collapses to 0%, exactly reproducing
   the #302 finding that a global static funding scalar has no causal value.
 - **Dynamic intensity: +19,470 CNY** — the state-dependent intensity function
-  deploys a positive fraction on favorable issues (46% of 2023 issues receive
-  non-zero funding) and is the increment that makes the expert layer valuable.
+  deploys a positive fraction on favorable issues and is the increment that
+  makes the expert layer valuable.
 
-Falsification is honest: the primary policy is at the **75th percentile** of the
+Falsification is honest: the primary policy is at the **75.8th percentile** of the
 exact executed-exposure null, below the 95% barrier. Random placement of the
 same bundle copies slightly beats it in the tail, so the dynamic expert claim is
 not yet promotable. Verdict is therefore `EXPERT_VALUE_SIGNAL` — mechanism
@@ -48,9 +47,8 @@ shuffle, exact executed-exposure null, and an oracle diagnostic.
 ## Frozen hierarchy and support
 
 - **Stage A** — frozen expert-label-invariant BEST_FULL keep/skip (Issue #305
-  contract). The loader prefers `results/issue-305/keep_skip_predictions.csv`;
-  until #305 delivers, a local reference fit with byte-invariance to expert
-  labels is used and tagged `LOCAL_REFERENCE_FIT_PENDING_305`. No module
+  delivered output). Loaded from `results/issue-305/policy_decisions.csv`
+  (DEDICATED_MLP condition) and tagged `FROM_305_OUTPUT`. No module
   back-propagates into Stage A decisions.
 - **Stage B** — shared action-conditioned value over four realizable whole-bundle
   ledgers: SMOOTH_M512, Q_TAIL_M192, DIVERGENCE_Z100_K1, RARE_LOGIT_TOP64.
@@ -76,14 +74,14 @@ shuffle, exact executed-exposure null, and an oracle diagnostic.
 | 1 | cash | 100,000.00 | 0.00% | 0 | no-bet reference |
 | 2 | exact B0_BEST_FULL | 79,248.96 | -20.75% | 35 | always-keep baseline |
 | 3 | #299 learned residual | 90,895.64 | -9.10% | 10 | prior residual path |
-| 4 | Stage A keep/skip | 89,622.24 | -10.38% | 11 | frozen dedicated keep/skip |
+| 4 | Stage A keep/skip | 92,888.28 | -7.11% | 8 | #305 frozen dedicated keep/skip |
 | 5 | train-only static mixture | 32.00 | -99.97% | 3 | full-bankroll static mix (ruined) |
-| 6 | composition, fixed intensity | 89,622.24 | -10.38% | 11 | fixed intensity selected on OOF = 0 |
-| 7 | intensity, fixed composition | 7,830.24 | -92.17% | 32 | dynamic intensity on static mix (ruined) |
-| 8 | **fully dynamic (primary)** | **109,091.87** | **+9.09%** | **24** | composition + intensity |
-| 9 | issue-state block shuffle | 87,549.08 | -12.45% | 23 | state signal destroyed |
-| 10 | expert-identity shuffle | 56,221.26 | -43.78% | 26 | expert identity destroyed |
-| 11 | exact executed-exposure null | p75 = 105,851 | — | — | primary percentile 0.75 < 0.95 |
+| 6 | composition, fixed intensity | 92,888.28 | -7.11% | 8 | fixed intensity selected on OOF = 0 |
+| 7 | intensity, fixed composition | 10,456.28 | -89.54% | 29 | dynamic intensity on static mix (ruined) |
+| 8 | **fully dynamic (primary)** | **112,357.91** | **+12.36%** | **21** | composition + intensity |
+| 9 | issue-state block shuffle | 91,912.25 | -8.09% | 20 | state signal destroyed |
+| 10 | expert-identity shuffle | 59,487.30 | -40.51% | 23 | expert identity destroyed |
+| 11 | exact executed-exposure null | p75 = 105,851 | — | — | primary percentile 0.758 < 0.95 |
 | 12 | oracle diagnostic | 137,198.79 | +37.20% | 11 | upper bound only |
 
 Controls 5 and 7 are full-bankroll expert placements by construction (#302's
@@ -116,11 +114,10 @@ value of learned state-dependent intensity, not an artifact.
 
 ## Deliberate limits and decision input for PI
 
-1. **Stage A is NOT #305's frozen output yet.** `stage_a_source =
-   LOCAL_REFERENCE_FIT_PENDING_305`; the loader will switch to
-   `results/issue-305/keep_skip_predictions.csv` when #305 delivers. Re-running
-   this experiment after #305 merges is cheap (≈40 s) and will replace the
-   reference with the frozen head.
+1. **Stage A now uses the #305 frozen output** (`stage_a_source =
+   FROM_305_OUTPUT`, loaded from `results/issue-305/policy_decisions.csv`,
+   DEDICATED_MLP condition). The primary result reflects the real frozen head.
+   If #305 is later superseded, re-run is ≈35 s.
 2. Composition at the fixed-intensity margin adds zero separately from
    keep/skip; dynamic intensity is where the expert layer adds value. This
    isolates the promising lever for a follow-up: learn intensity with better

@@ -10,12 +10,12 @@
       "sha256": "08e41863961e850308cda507131ded55717949b35f96f1480777178e1d8e9c6d"
     },
     "capital_paths.csv": {
-      "bytes": 267208,
-      "sha256": "dc895a2aedd7f5e8afe8a283da603c330b6e8615d594ef8feff30e78727b50ed"
+      "bytes": 260467,
+      "sha256": "b4bd5711ff0bd4384334c3d9277f9f60746c32db11f98840c72d4edc6830e749"
     },
     "capital_paths_2023.png": {
-      "bytes": 117500,
-      "sha256": "55b42a25192fa09a8690d8105cd7a39a9a316b8bdc225741cca71dfe00c84eef"
+      "bytes": 112574,
+      "sha256": "dc3006e1ae0f03ca068f8c87a4446ed8968b7e26035d3af3db97e7109a287ac6"
     },
     "composition_downside.csv": {
       "bytes": 15688,
@@ -30,12 +30,12 @@
       "sha256": "313a5bf2ae5f6b45b6d55284d55de3506e8cc94bad51c7d6e6a6f3b26dde8062"
     },
     "decision.json": {
-      "bytes": 913,
-      "sha256": "714625f99bfd3e095400ddb390275bcb874e46f1e43d34d356c4d73877cf7976"
+      "bytes": 897,
+      "sha256": "fe7a05391609d7dbc03d1b573f7a16e2eec61b52420494785f0f3a38b971aafb"
     },
     "exact_exposure_null_2023.csv": {
-      "bytes": 11005,
-      "sha256": "36dbe30177aa86bc602a9ef455565d8d645c5b5af432775f9b43efea6bace919"
+      "bytes": 10999,
+      "sha256": "e924fa548425134b6dc37a9d5358436128487d6c4e10121d1a502693ad099979"
     },
     "expert_issue_features.csv": {
       "bytes": 84594,
@@ -50,8 +50,8 @@
       "sha256": "5c37bd340e0d41aba1094e945f94839ebb42f1c982fd1fb8079c521c2b4996ef"
     },
     "funding_response_curve_2023.csv": {
-      "bytes": 10800,
-      "sha256": "3f23c5bee55d348bafeb5593c5db0f6a955c1d91bc226fa0aa16022b131a040a"
+      "bytes": 10792,
+      "sha256": "8aced664143c5d90b443d9789e20c88b711362042c8cb348cd65102c36e4f6ed"
     },
     "intensity_downside.csv": {
       "bytes": 7808,
@@ -86,16 +86,16 @@
       "sha256": "f287b3bfede13da66ef6319978ec32dbf78bf7ae62062b12bcef8f2ba10026b8"
     },
     "policy_summary.csv": {
-      "bytes": 18768,
-      "sha256": "bb37ba0fa337cbaf7153ed19790f58d9a67dc2890be13cc5abc7df66f58d2059"
+      "bytes": 14499,
+      "sha256": "70eedb6a26256e965f8299e5188b6144346c72d9ee2e4c54fafa9d5f4d9787ea"
     },
     "seed_action_value_predictions.csv": {
       "bytes": 2526612,
       "sha256": "19f9e53381f35423c808bb9cd38dae9396a7521fb6391220de72594bf6b1e467"
     },
     "stage_a_keep_skip_decisions.csv": {
-      "bytes": 17477,
-      "sha256": "73bb70fca7e69b12e99815db3b192e772f28c644ea18d89996088166fadb1507"
+      "bytes": 12459,
+      "sha256": "9159d1cfcc96489685b2119a9d86a53c5e2e7d24a08ae0563c26ea18c011bb8e"
     },
     "stage_a_local_reference_receipts.csv": {
       "bytes": 840,

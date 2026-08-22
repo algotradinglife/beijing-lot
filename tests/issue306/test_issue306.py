@@ -51,11 +51,19 @@ def test_stage_a_expert_label_invariance(panel_data):
 
 
 def test_stage_a_source_tag(panel_data):
+    """The contract layer tags its source: frozen #305 when delivered."""
+    from issue306.stage_a import SOURCE_TAG_FROZEN, load_frozen_stage_a
+
     _, issue_table, _ = panel_data
-    fit = fit_local_reference(issue_table, feature_columns=FEATURE_COLUMNS)
-    assert fit.source == "LOCAL_REFERENCE_FIT_PENDING_305"
-    decisions = stage_a_decisions(issue_table, fit)
-    assert (decisions["stage_a_source"] == "LOCAL_REFERENCE_FIT_PENDING_305").all()
+    frozen = load_frozen_stage_a(".")
+    if frozen is not None:
+        decisions = stage_a_decisions(issue_table, frozen)
+        assert (decisions["stage_a_source"] == SOURCE_TAG_FROZEN).all()
+    else:
+        fit = fit_local_reference(issue_table, feature_columns=FEATURE_COLUMNS)
+        assert fit.source == "LOCAL_REFERENCE_FIT_PENDING_305"
+        decisions = stage_a_decisions(issue_table, fit)
+        assert (decisions["stage_a_source"] == "LOCAL_REFERENCE_FIT_PENDING_305").all()
     assert set(decisions["keep_baseline"].unique()) <= {True, False}
 
 
