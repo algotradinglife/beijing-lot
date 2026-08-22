@@ -360,7 +360,9 @@ PI interpretation and does not replace those edges or Project states.
 - #312 evaluates explicit N, K, match selector, candidate pool, outcome
   direction, TOP/WR/WOR and bounded protection actions. The 2023 primary ends
   at CNY70,795.72 versus CNY87,984.27 for fixed N7/K512/WOR, with only 5/31
-  paired seed wins and a 13.6th same-exposure permutation percentile.
+  paired seed wins and a 13.6th same-exposure permutation percentile. The
+  difference of seed medians is CNY−17,188.55; the correctly paired-seed median
+  lift is CNY−18,163.94.
 - The action-conditioned MLP retains weak average ranking information but hard
   argmax amplifies top-action error and long-tail winner's curse. It is rejected
   as the decision rule; this does not reject M×3 learning or soft expert mixing.
@@ -371,6 +373,11 @@ PI interpretation and does not replace those edges or Project states.
 - Protection adds a weak paired clue but is not independent Edge. #285 already
   rejected blanket protection, so #314 learns selective depth-1/2 coverage and
   retains no protection plus same-budget random protection as controls.
+- Post-merge EV narrowed the matched factor claim: #312 reset only selector,
+  outcome direction and protection. N/K, generator and candidate-pool marginals
+  are descriptive only. #314 therefore requires complete matched resets, separates
+  source and experiment temporal roles, and binds its external source plus ticket-
+  level replay receipt without committing the large databases.
 - #314 replaces fixed K512 with learned dynamic K/exposure under natural
   bankroll, uniqueness and marginal-value limits. It uses a soft CORE/TAIL MoE,
   excludes three-result full coverage, validates on 2023, freezes, then runs a
