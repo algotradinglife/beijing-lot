@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#302 development result: dynamic BEST_FULL keep/skip positive in 2022/2023; expert funding not identified, no promotion, 2024+ remains sealed)**
+Updated: **2026-08-22 (#305 exact-null correction: keep/skip lift is exposure reduction, not issue-selection Edge; next learn within-issue ticket construction at matched exposure)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -146,6 +146,14 @@ PI interpretation and does not replace those edges or Project states.
      keep/skip +2.63%, but causal expert funding scale is 0%; no promotion)
              |
              v
+#305 dedicated keep/skip correction (Done; 2023 -7.11% vs FULL -20.75%,
+     but exact same-exposure placement percentile 42.71%; no selection Edge)
+             |
+             v
+#306 matched-exposure within-issue ticket composition (In Progress;
+     no learned issue skip; optimize N/K/WR/WOR/outcome/protection/expert mix)
+             |
+             v
 #210 held-out/prospective validation  <--- no candidate; also blocked by #218
              |
              v
@@ -173,8 +181,10 @@ PI interpretation and does not replace those edges or Project states.
 | 17 | [#296] candidate-warm expert mixture | Closed / Done | M3 | #292 closed; blocks #210 | Learned expert/cash weights are meaningful, but 2022 validation fails, warm start trails both initialization controls, and all seeds are negative ex-largest; safety gate falls back to static control |
 | 18 | [#299] BEST_FULL-anchored residual optimizer | Closed / Done | M3 | #296 closed; blocks #210 | Exact matched residual learning improves 2023 BEST_FULL from -20.75% to -9.10%, but remains below cash and only the 38.3rd percentile of exposure-matched random placement; retain architecture, no promotion |
 | 19 | [#302] hierarchical dynamic expert mixture | Closed / Done | M3 | #299 closed; blocks #210 | Expanding keep/skip ends 2023 +2.63% versus exact BEST_FULL -20.75%; expert funding adds zero under the causal OOF gate and placement misses falsification, so retain only development evidence |
-| 20 | [#210] held-out/forward validation | Open / Blocked | M4 | #302 open; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
-| 21 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 20 | [#305] dedicated keep/skip correction | Closed / Done | M3 | #302 closed; blocks #306 | Independent keep/skip ends 2023 at -7.11%, but its eight funded issues rank only 42.71% among 23,535,820 exact same-exposure placements and change materially with alpha; classify as exposure reduction, not issue-selection Edge |
+| 21 | [#306] matched-exposure within-issue ticket composition | Open / In Progress | M3 | #305 closed; blocks #210 | Every pre-event eligible issue remains active; learn N/K, match and outcome direction, WR/WOR, selective protection and expert composition without a learned issue-level skip or zero-funding escape |
+| 22 | [#210] held-out/forward validation | Open / Blocked | M4 | #306 open; #218 open; no promoted candidate | Do not spend holdout until an intra-issue dynamic candidate beats the frozen baseline and matched-exposure controls pre-2024 |
+| 23 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
 
@@ -297,6 +307,30 @@ PI interpretation and does not replace those edges or Project states.
   next learner into incumbent keep/skip and conditional sleeve value heads.
   Keep #210 and 2024+ sealed.
 - Report: [`Issue-299-BEST-FULL-Residual.md`](Issue-299-BEST-FULL-Residual.md).
+
+### #302/#305 issue-selection attribution correction
+
+- #302's shared action-conditioned hierarchy ended 2023 at +2.63% while exact
+  BEST_FULL ended at -20.75%, but causal OOF expert funding was 0%. The full
+  lift therefore came from sparse BEST_FULL exposure, not expert allocation.
+- #305 refit a genuinely expert-label-invariant keep/skip head. It ended 2023
+  at -7.11% after funding 8 of 35 active issues, a +13.64pp matched lift versus
+  FULL and materially lower drawdown.
+- That lift does not identify issue selection. The selected eight issues rank
+  at only the 42.71st percentile of all 23,535,820 exact same-exposure
+  placements; the null median terminal capital is higher than the model. Alpha
+  sensitivity changes the funded set from 10 issues to none. #302's legacy six
+  funded issues rank at the corrected exact 78.51st percentile, also below the
+  95% signal boundary.
+- Controlling interpretation: reducing exposure to a negative FULL baseline
+  reduces loss, but neither model learns which issue to bet. Do not pass this
+  as selection alpha or allow a future model to win by choosing cash.
+- #306 therefore keeps every mechanically eligible issue active and moves the
+  learning target inside each issue: N/K, match subset, outcome direction,
+  WR/WOR, selective protection and complementary expert/ticket composition at
+  matched exposure. Stage-4 bankroll sizing remains separate.
+- Reports: [`Issue-302-Hierarchical-Dynamic-Expert-Mixture.md`](Issue-302-Hierarchical-Dynamic-Expert-Mixture.md)
+  and [`Issue-305-Dedicated-Keep-Skip-Correction.md`](Issue-305-Dedicated-Keep-Skip-Correction.md).
 
 ### #282 conditional-policy prototype decision
 
