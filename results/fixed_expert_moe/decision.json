@@ -1,0 +1,36 @@
+{
+  "accepted_top2_baseline_beaten": false,
+  "accepted_top2_matched_lift": {
+    "2023": {
+      "ex_largest_lift_cny": -3006.8765146256205,
+      "matched_issues": 43,
+      "matched_lift_cny": 1364.2468422645275
+    },
+    "2024": {
+      "ex_largest_lift_cny": -50391.42956782084,
+      "matched_issues": 58,
+      "matched_lift_cny": -48666.079540834
+    }
+  },
+  "bootstrap_positive": false,
+  "claim_boundary": "HISTORICAL_EXPANDING_DIAGNOSTIC_2020_2024",
+  "contract_id": "BJ-UNIFIED-FIXED-EXPERT-MOE-001/v1",
+  "current_beats_static": false,
+  "disposition": "NO_EXPERT_MIX_SIGNAL",
+  "evaluation_seeds": 11,
+  "interpretation": "Dense hit and near-miss structure is learnable, but it does not map to stable payout value through this fixed expert library. The lagged soft mixture has only a small raw 2023 lift against accepted Top-2 (1364 CNY) that becomes -3007 CNY ex-largest, then trails it by 48666 CNY in 2024. This falsifies more capacity on the same mixture-weight interface. The next experiment will keep the accepted Top-2 N7 baseline and learn residual match/outcome/ticket value directly.",
+  "issue": 332,
+  "lag_beats_static": false,
+  "lag_consistent": false,
+  "lag_vs_current_ex_largest_lift_cny": {
+    "2022": -511.903727090782,
+    "2023": -1803.0009295562515,
+    "2024": -1566.0140747899407
+  },
+  "next_interface": "NEURAL_TOP2_RESIDUAL_ACTION_VALUE",
+  "payout_application": "ONCE_PER_WINNING_COMPLETE_TICKET",
+  "payout_factor": 0.65,
+  "promotion": false,
+  "static_diversifies": false,
+  "unlock_210": false
+}
