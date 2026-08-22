@@ -29,6 +29,25 @@ but assigns zero return to unresolved settlement as a sensitivity bound; it is n
 | 2024 | S1O1A0 | 60/66 | 116,708.29 | 16.71% | 15.17% | 11.67% |
 | 2024 | S1O1A1 | 60/66 | 124,822.52 | 24.82% | 23.29% | 11.67% |
 
+## Baseline-relative risk/return decision table
+
+All paired values are `2023 / 2024`. Two-year matched lift is the sum of each
+year's exact common-support lift versus `S0O0A0`; it is the primary strategy
+comparison. `Recovery/open tail` reports the longest completed recovery episode
+and the still-underwater issue count at year end. HHI measures payout
+concentration, where larger values mean greater dependence on fewer winning issues.
+
+| Cell | Strategy | capital return | two-year matched lift | max drawdown | longest losing | longest no-payout | recovery/open tail | payout HHI |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `S0O0A0` | Top-2 control | -6.10% / +3.57% | CNY+0 | 7.02% / 3.37% | 12 / 7 | 12 / 7 | 0/42 / 15/29 | 0.175 / 0.080 |
+| `S0O0A1` | value allocator | -6.10% / +10.64% | CNY+6,811 | 7.02% / 1.95% | 12 / 7 | 12 / 7 | 0/42 / 27/0 | 0.175 / 0.095 |
+| `S0O1A0` | support compression | -7.74% / +13.24% | CNY+7,256 | 7.74% / 3.41% | 24 / 15 | 24 / 15 | 0/43 / 32/0 | 0.778 / 0.145 |
+| `S0O1A1` | compression + value allocator | -9.27% / +15.89% | CNY+7,855 | 9.27% / 3.36% | 24 / 15 | 24 / 15 | 0/43 / 32/0 | 0.706 / 0.127 |
+| `S1O0A0` | learned selector | +0.75% / -1.71% | CNY+2,186 | 3.44% / 4.80% | 10 / 12 | 10 / 12 | 4/36 / 3/52 | 0.182 / 0.095 |
+| `S1O0A1` | selector + value allocator | +0.75% / +0.56% | CNY+4,455 | 3.44% / 4.47% | 10 / 13 | 10 / 13 | 4/36 / 13/26 | 0.182 / 0.129 |
+| `S1O1A0` | selector + compression | +2.28% / +16.71% | CNY+20,540 | 3.32% / 3.44% | 12 / 13 | 12 / 13 | 10/36 / 11/22 | 0.361 / 0.165 |
+| `S1O1A1` | full joint stack | +2.01% / +24.82% | CNY+28,381 | 3.33% / 3.22% | 12 / 13 | 12 / 13 | 10/36 / 11/22 | 0.373 / 0.192 |
+
 ## Model diagnostics on 2022 tuning issues
 
 Skill is `1 - model MSE / fit-mean baseline MSE`; it describes target prediction,
