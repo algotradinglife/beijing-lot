@@ -110,12 +110,12 @@ def generate_tickets(
             {"natural_support": 0},
         )
     pool = np.argsort(-match_score, kind="stable")[:pool_size]
-    support = _support_map(market, divergence, branch, pool, spec)
-    natural = _natural_support(support, spec.n)
-    target_unique = min(k if unique_cap is None else unique_cap, natural)
     rng = np.random.default_rng(
         _derived_seed(seed, str(group["issue"].iloc[0]), spec.name)
     )
+    support = _support_map(market, divergence, branch, pool, spec, rng=rng)
+    natural = _natural_support(support, spec.n)
+    target_unique = min(k if unique_cap is None else unique_cap, natural)
     matches: list[np.ndarray] = []
     outcomes: list[np.ndarray] = []
     identities: set[tuple[tuple[int, int], ...]] = set()
@@ -234,10 +234,14 @@ def settle_tickets(
     valid = available[matches].all(axis=1)
     correct = (outcomes == selected_realized).sum(axis=1)
     wins = valid & (correct == matches.shape[1])
+    miss = matches.shape[1] - correct
+    # Missing or untrusted settlement is not evidence that a ticket missed by a
+    # particular distance.  Keep it outside d=1/d=2 attribution with a sentinel.
+    miss[~valid] = matches.shape[1] + 1
     gross = np.zeros(len(matches), dtype=float)
     if wins.any():
         gross[wins] = 2.0 * 0.65 * np.prod(sp[matches[wins]], axis=1)
-    return gross, correct, matches.shape[1] - correct
+    return gross, correct, miss
 
 
 def _branch_weight(
@@ -279,6 +283,8 @@ def _support_map(
     branch: np.ndarray,
     pool: np.ndarray,
     spec: ExpertSpec,
+    *,
+    rng: np.random.Generator,
 ) -> dict[int, np.ndarray]:
     support = {int(pos): np.argsort(-branch[pos], kind="stable")[:1] for pos in pool}
     if spec.protected_leg_count == 0:
@@ -297,8 +303,10 @@ def _support_map(
             ]
         ]
     elif spec.protection == "RANDOM":
-        # Stable negative-control placement; never informed by the realized outcome.
-        protected = pool[: spec.protected_leg_count]
+        # Seeded negative-control placement; never informed by the realized outcome.
+        protected = rng.choice(
+            pool, size=spec.protected_leg_count, replace=False
+        )
     else:
         raise ValueError("protection count requires an explicit protection rule")
     for pos in protected:

@@ -4,8 +4,9 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from issue314.data import OUTCOMES, issue_features
+from issue314.data import OUTCOMES, issue_features, settlement_available_mask
 from issue314.experiment import (
     _integer_counts,
     _has_structural_signal,
@@ -96,6 +97,32 @@ def test_payout_factor_is_applied_once_to_complete_ticket() -> None:
     assert miss.tolist() == [0]
 
 
+def test_untrusted_ticket_is_excluded_from_near_miss_distance() -> None:
+    group = _units(matches=3)
+    settlement = pd.DataFrame(
+        {
+            "match_idx": [1, 2, 3],
+            "result_code": ["3", "3", "3"],
+            "settlement_sp": [2.0, 2.0, 2.0],
+            "settlement_available": [True, True, False],
+        }
+    )
+    matches = np.array([[0, 1, 2]])
+    outcomes = np.array([[0, 0, 1]])
+    gross, _, miss = settle_tickets(matches, outcomes, group, settlement)
+    assert gross.tolist() == [0.0]
+    assert miss.tolist() == [4]
+
+
+def test_settlement_requires_trusted_positive_canonical_row() -> None:
+    available = settlement_available_mask(
+        pd.Series(["3", "1", "0", "3"]),
+        pd.Series([2.0, 1.0, 0.0, 2.0]),
+        pd.Series([1, 0, 1, None]),
+    )
+    assert available.tolist() == [True, False, False, False]
+
+
 def test_soft_gate_is_continuous_and_integer_funding_reconciles() -> None:
     local = pd.DataFrame(
         {
@@ -129,8 +156,12 @@ def test_random_protection_is_preoutcome_deterministic() -> None:
     spec = ExpertSpec("TEST", "CORE", 7, "GLOBAL", "MARKET", "WOR", 8, "RANDOM", 1)
     first = generate_tickets(_units(), spec, k=64, seed=7)
     second = generate_tickets(_units(), spec, k=64, seed=7)
+    third = generate_tickets(_units(), spec, k=64, seed=8)
     np.testing.assert_array_equal(first[0], second[0])
     np.testing.assert_array_equal(first[1], second[1])
+    first_protected = set(first[2].loc[first[2]["coverage_depth"].eq(2), "match_idx"])
+    third_protected = set(third[2].loc[third[2]["coverage_depth"].eq(2), "match_idx"])
+    assert first_protected != third_protected
 
 
 def test_dynamic_exposure_extends_beyond_legacy_512_anchor() -> None:
@@ -177,11 +208,26 @@ def test_exact_issue312_control_is_bound_to_31_seeds_and_48_issues() -> None:
 def test_any_stable_positive_factor_is_a_structural_signal() -> None:
     attribution = pd.DataFrame(
         {
+            "reset": ["RESET_N", "RESET_GENERATOR"],
             "median_seed_lift_cny": [2_000.0, 1_000.0],
             "positive_seed_fraction": [0.58, 0.81],
         }
     )
     assert _has_structural_signal(attribution)
+
+
+def test_protection_requires_no_protection_and_random_controls() -> None:
+    attribution = pd.DataFrame(
+        {
+            "reset": [
+                "RESET_COVERAGE_PROTECTION",
+                "RANDOM_PROTECTION_CONTROL",
+            ],
+            "median_seed_lift_cny": [1_000.0, -500.0],
+            "positive_seed_fraction": [0.81, 0.45],
+        }
+    )
+    assert not _has_structural_signal(attribution)
 
 
 def test_terminal_diagnostic_correction_cannot_touch_primary(tmp_path, monkeypatch) -> None:
@@ -202,6 +248,20 @@ def test_terminal_diagnostic_correction_cannot_touch_primary(tmp_path, monkeypat
     assert sum(json.loads(corrected.iloc[1]["expert_counts"]).values()) == 512
     assert receipt["outcome_columns_used"] == []
     assert not receipt["primary_policy_changed"]
+
+
+def test_terminal_diagnostic_correction_fails_without_target(tmp_path, monkeypatch) -> None:
+    frozen = tmp_path / "frozen_allocations_2024.jsonl"
+    frozen.write_text("frozen\n")
+    monkeypatch.setattr("issue314.experiment.OUTPUT", tmp_path)
+    frame = pd.DataFrame(
+        {
+            "condition": ["RAW_LEARNED_MOE"],
+            "expert_counts": [json.dumps({"A": 512})],
+        }
+    )
+    with pytest.raises(AssertionError, match="diagnostic is missing"):
+        apply_terminal_diagnostic_correction(frame)
 
 
 def test_underwater_metrics_separate_completed_and_open_runs() -> None:

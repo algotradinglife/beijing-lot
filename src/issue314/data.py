@@ -133,9 +133,11 @@ def load_settlement(issues: set[str]) -> pd.DataFrame:
         )
     frame["settlement_sp"] = pd.to_numeric(frame["winning_sp"], errors="coerce")
     frame["settlement_sp"] = frame["settlement_sp"].fillna(fallback)
-    frame["settlement_available"] = frame["result_code"].isin(OUTCOMES) & frame[
-        "settlement_sp"
-    ].gt(0)
+    frame["settlement_available"] = settlement_available_mask(
+        frame["result_code"],
+        frame["settlement_sp"],
+        frame["has_trusted_settlement"],
+    )
     if not set(frame["issue"]).issubset(issues):
         raise AssertionError("settlement query escaped frozen issue set")
     return frame[
@@ -220,6 +222,18 @@ def source_receipt(
         payload["settlement_available_rows"] = int(available.sum())
         payload["settlement_available_rate"] = float(available.mean())
     return payload
+
+
+def settlement_available_mask(
+    result_code: pd.Series, settlement_sp: pd.Series, trusted: pd.Series
+) -> pd.Series:
+    """Accept only canonical outcomes with positive SP and trusted provenance."""
+
+    return (
+        pd.to_numeric(trusted, errors="coerce").eq(1)
+        & result_code.astype("string").isin(OUTCOMES)
+        & pd.to_numeric(settlement_sp, errors="coerce").gt(0)
+    )
 
 
 def _apply_support(units: pd.DataFrame) -> pd.DataFrame:

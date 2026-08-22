@@ -110,10 +110,8 @@ def freeze() -> dict[str, object]:
     training.to_parquet(OUTPUT / "development_action_labels.parquet", index=False)
 
     candidate_rows = []
-    fitted: dict[str, object] = {}
     for family in ("RIDGE", "HGB", "MLP"):
         model = fit_model(training[training["issue_year"].le(2021)], family)
-        fitted[family] = model
         predictions = predict_action_rows(
             model,
             features[features["issue_year"].eq(2022)],
@@ -608,6 +606,8 @@ def apply_terminal_diagnostic_correction(
 
     corrected = allocations.copy()
     mask = corrected["condition"].eq("FIXED_EXPOSURE_512_DIAGNOSTIC")
+    if not mask.any():
+        raise AssertionError("frozen fixed-exposure diagnostic is missing")
     before = corrected.loc[mask, "expert_counts"].map(
         lambda value: sum(json.loads(value).values())
     )
@@ -654,6 +654,10 @@ def evaluate_allocations(
         group = units[units["issue"].eq(str(allocation.issue))].reset_index(drop=True)
         local_settlement = settlement[settlement["issue"].eq(str(allocation.issue))]
         counts = json.loads(allocation.expert_counts)
+        if sum(counts.values()) != int(allocation.total_k):
+            raise AssertionError(
+                f"expert counts do not reconcile for {allocation.condition}"
+            )
         for seed in seeds:
             stake = gross_total = hits = miss_one = miss_two = 0.0
             reason_outside = reason_sampling = 0
@@ -861,7 +865,9 @@ def factor_attribution(paths: pd.DataFrame) -> pd.DataFrame:
     ].rename(columns={"pnl_cny": "primary"})
     rows = []
     for condition in sorted(
-        value for value in paths["condition"].unique() if value.startswith("RESET_")
+        value
+        for value in paths["condition"].unique()
+        if value.startswith("RESET_") or value == "RANDOM_PROTECTION_CONTROL"
     ):
         control = paths[paths["condition"].eq(condition)][
             ["issue", "seed", "pnl_cny"]
@@ -1108,14 +1114,25 @@ def _paired_median(paths: pd.DataFrame, primary: str, control: str) -> float:
 
 
 def _has_structural_signal(attribution: pd.DataFrame) -> bool:
-    """Accept any factor meeting both lift and paired-seed stability gates."""
+    """Require a positive stable reset and, for protection, a random control.
 
-    return bool(
-        (
-            attribution["median_seed_lift_cny"].gt(0)
-            & attribution["positive_seed_fraction"].ge(0.60)
-        ).any()
+    Beating no protection alone can mean that any extra branch helps.  It does not
+    establish that the learned protection placement contains information.
+    """
+
+    passed = attribution.assign(
+        passed=attribution["median_seed_lift_cny"].gt(0)
+        & attribution["positive_seed_fraction"].ge(0.60)
+    ).set_index("reset")["passed"]
+    non_protection = passed.drop(
+        ["RESET_COVERAGE_PROTECTION", "RANDOM_PROTECTION_CONTROL"],
+        errors="ignore",
+    ).any()
+    protection = bool(
+        passed.get("RESET_COVERAGE_PROTECTION", False)
+        and passed.get("RANDOM_PROTECTION_CONTROL", False)
     )
+    return bool(non_protection or protection)
 
 
 def _longest(mask: Iterable[bool]) -> int:

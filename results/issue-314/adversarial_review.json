@@ -2,7 +2,7 @@
   "issue": 314,
   "review_role": "PI",
   "review_type": "ADVERSARIAL_SCIENTIFIC",
-  "decision": "ACCEPT_STRUCTURAL_SIGNAL_NO_PROMOTION",
+  "decision": "ACCEPT_NO_LEARNABLE_INCREMENT_NO_PROMOTION",
   "challenges": [
     {
       "challenge": "Could the 2024 raw result be rescued by its slightly better turnover ROI?",
@@ -14,7 +14,7 @@
     },
     {
       "challenge": "Is the positive protection reset independent Edge?",
-      "answer": "No. The +CNY1048.49 median paired lift and 80.65% positive seeds are a local 2024 structural clue. Seeds are nested nuisance draws, not independent issues, and cross-year replication is absent."
+      "answer": "No. It beats no protection by CNY1048.49 with 80.65% positive seeds, but loses to same-budget random protection by CNY594.31 at the paired median and is positive in only 45.16% of seeds. The placement rule has not learned information."
     },
     {
       "challenge": "Is the 2024 portable baseline identical to the accepted #312 control?",
@@ -22,7 +22,7 @@
     },
     {
       "challenge": "Could settlement gaps explain the learned loss?",
-      "answer": "The feature-side settlement coverage is about 99.15% and all matched arms share the same fail-closed boundary. Gaps may affect absolute returns but cannot explain the large matched underperformance alone."
+      "answer": "The feature-side trusted settlement coverage is about 99.13% and all matched arms share the same fail-closed boundary. Gaps may affect absolute returns but cannot explain the large matched underperformance alone."
     },
     {
       "challenge": "Could a post-freeze diagnostic repair have altered the conclusion?",

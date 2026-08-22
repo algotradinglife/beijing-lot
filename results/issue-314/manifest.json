@@ -3,16 +3,16 @@
   "stage": "terminal",
   "files": {
     "adversarial_review.json": {
-      "bytes": 2577,
-      "sha256": "61afdad59c3b84a390e50f357fe214a59b889740b677f036a5f2e50a40d9c755"
+      "bytes": 2631,
+      "sha256": "00bd039565365a94316796b4c6c135df6ed7008d0fd059e2e1732db6ea52f097"
     },
     "capital_paths_2024.png": {
       "bytes": 126375,
       "sha256": "41688d1810b5de5e9af7a95c05f8ebf8cb129c75f992c9387d000f79437498f1"
     },
     "decision.json": {
-      "bytes": 722,
-      "sha256": "3a372934db671f47adfbe74645dddb6197c4cd2bd0c804876c1771a6ff28cdb5"
+      "bytes": 728,
+      "sha256": "2a338781b13ef5fa161a168be6377c2c0c23a99ed5a4f3b8c83def74d5fcd60b"
     },
     "development_action_labels.parquet": {
       "bytes": 185968,
@@ -67,12 +67,12 @@
       "sha256": "de5220f7ebe174649edad704e2a29f5669674de025bc481a52195de34da385ca"
     },
     "matched_factor_attribution_2024.csv": {
-      "bytes": 403,
-      "sha256": "51dd5e2e45236c99452abcf477ac3de18072d9bacdbaa3785b1aab5cfc802dff"
+      "bytes": 474,
+      "sha256": "4ed7e9e6204f6dacbe2b31033bfcac673f49c2d5ab90990f09900ab2dd0365c5"
     },
     "near_miss_attribution_2024.png": {
-      "bytes": 65805,
-      "sha256": "9193387acbef40a0e492339744a3868dd5a789e9979bde0a8da179d099c5b7d0"
+      "bytes": 65849,
+      "sha256": "3f89933f15d031e6d1421c0768b039f5ff1a82ea06575ab11d95c425cde1d5ad"
     },
     "pre_event_source_receipt.json": {
       "bytes": 445,
@@ -80,11 +80,11 @@
     },
     "requirement_evidence.csv": {
       "bytes": 1775,
-      "sha256": "69aa6ea69b76f1b46f28f06d61407f081aef1f3e1269352817e28aa11cb544d0"
+      "sha256": "3962dc0c45fd1a5d9dfc4a8c979152abf1251272f1628ae40bd6ef5ee5602baa"
     },
     "risk_return_frontier_2024.png": {
-      "bytes": 81960,
-      "sha256": "3eb37b1a344911467d0f62004356bb6788f53423493d7b55d28412ac271ddb68"
+      "bytes": 80203,
+      "sha256": "317db258a477f814238b120c4183e566f4609c7b153a5f92ce8e336eaa854fb1"
     },
     "screening_2022.csv": {
       "bytes": 2046,
@@ -95,24 +95,24 @@
       "sha256": "788ab0a9504bf9c6759efc7df678c50a31dfaab4393589f09695b63eed6fceed"
     },
     "terminal_capital_paths_2024.csv": {
-      "bytes": 2720872,
-      "sha256": "46c94c089285d5fe4a98198ba9e8cbd9d2ff9f772b2d5bf750c8dcc39fb47e2c"
+      "bytes": 2719671,
+      "sha256": "b3161abad142b55e57f0aeb4a189ae2334922f3c92367b620807742c3d1f6740"
     },
     "terminal_diagnostic_correction_receipt.json": {
       "bytes": 476,
       "sha256": "1643ecdb8709b464b8656250ec015ef69e906f1c7e44bdfb5d8fdcd2c23a4495"
     },
     "terminal_near_miss_2024.parquet": {
-      "bytes": 133043,
-      "sha256": "8dea98ec524c6983f39c4ea69052252b8ff05d21208ff39f97b1aba904efd46a"
+      "bytes": 129995,
+      "sha256": "7bfaab6c3c4d3fd2a8df7498f1e87c27b202ed04e483db1c8eacd358ef1270c2"
     },
     "terminal_source_receipt.json": {
       "bytes": 613,
-      "sha256": "a53a71be633aad37ebf0fe5435af7160c8a60ea66d090a7e4b2aef8e9a03ec4c"
+      "sha256": "a616457177bb4868ce89cf4016054f298c3d7295da25522473d78ca2fb74b709"
     },
     "terminal_summary_2024.csv": {
-      "bytes": 3961,
-      "sha256": "ebda2c4570419c51ded55c755273f0edbc414cd76fcd2eda59e3a7c3993c5d7d"
+      "bytes": 3962,
+      "sha256": "c2682d4c895b38aa4c7330a857429e71f240c57ecd235dacfe45538ca7b35db8"
     },
     "ticket_replay_receipt.json": {
       "bytes": 244,

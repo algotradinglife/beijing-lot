@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#314 CORE/TAIL soft-MoE closed STRUCTURAL_SIGNAL / NO_PROMOTION; selective protection retained as a weak factor, learned selector/direction/K rejected)**
+Updated: **2026-08-22 (#314 CORE/TAIL soft-MoE closed NO_LEARNABLE_INCREMENT / NO_PROMOTION; learned selector/direction/protection/K rejected)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -192,7 +192,7 @@ PI interpretation and does not replace those edges or Project states.
 | 20 | [#305] dedicated keep/skip correction | Closed / Done | M3 | #302 closed; blocks #306 | Independent keep/skip ends 2023 at -7.11%, but its eight funded issues rank only 42.71% among 23,535,820 exact same-exposure placements and change materially with alpha; classify as exposure reduction, not issue-selection Edge |
 | 21 | [#306] matched-exposure within-issue ticket composition | Closed / Done | M3 | #305 closed; predecessor of #312 | Interface and matched-exposure mechanics retained. Post-merge EV found broader-support drift; on inherited exact-B0 support the selected family changes and positive `ACTION_VALUE_SIGNAL` does not reproduce |
 | 22 | [#312] explicit joint action cube | Closed / Done | M3 | #306 closed; blocks #314 | Exact-support 2023 JOINT_PRIMARY CNY70,795.72 versus fixed N7/K512/WOR CNY87,984.27; hard action-conditioned MLP/argmax is rejected, while protection remains a weak parameter clue. Label-safe five-year replay changed no result |
-| 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Closed / Done | M3 | #312 closed; blocks #210 | Full MoE rejected: 2023 validation loses 31/31 seeds and 2024 raw ends CNY34,373.99 versus portable fixed CNY81,882.32. Protection contributes a weak +CNY1,048.49 median matched lift in 80.65% of seeds, so retain only `STRUCTURAL_SIGNAL`; no promotion |
+| 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Closed / Done | M3 | #312 closed; blocks #210 | Full MoE rejected: 2023 validation loses 31/31 seeds and 2024 raw ends CNY34,373.99 versus portable fixed CNY81,882.32. Protection beats no-protection (+CNY1,048.49) but loses to matched random placement (−CNY594.31); `NO_LEARNABLE_INCREMENT`, no promotion |
 | 24 | [#210] held-out/forward validation | Open / Blocked | M4 | #314 closed without candidate; #218 remains open | Do not spend prospective evidence: #314 did not produce a promotable candidate and explicitly retains its strongest control |
 | 25 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
@@ -399,8 +399,9 @@ PI interpretation and does not replace those edges or Project states.
   not find Edge; it amplified an unstable K boundary.
 - Fully matched factor resets reject the learned selector and outcome direction.
   Selective depth-1/2 protection is the only stable local signal: median paired
-  lift +CNY1,048.49 with 80.65% positive seeds. This warrants
-  `STRUCTURAL_SIGNAL`, not candidate promotion.
+  lift +CNY1,048.49 with 80.65% positive seeds, but it loses to same-budget random
+  placement by CNY594.31 at the paired median (45.16% positive). This is
+  `NO_LEARNABLE_INCREMENT`, not evidence that protection placement was learned.
 - #210 remains Blocked because #314 is non-promotable and prospective support
   #218 is still open. The next model iteration should isolate pre-event
   protection targeting and constrain marginal K instead of enlarging MoE

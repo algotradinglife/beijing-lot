@@ -8,8 +8,8 @@
   "inference_schema_sha256": "6cd0d07d88843a78347fa14e9870268cf03f24d71a451b64f25443cb520e7afc",
   "external_sources_committed_to_git": false,
   "access": "BEIJING_LOT_RUNTIME_ROOT/data/derived; see README data operations",
-  "settlement_projection_sha256": "f0b0595bcda2b04e93519f833f713956dacaf155e13866596d753ae598935dcf",
+  "settlement_projection_sha256": "17bc563f7ad1d3408674305b02795328ee9727b6c8e33ef6b09ecc8ef3f18fd3",
   "settlement_rows": 18122,
-  "settlement_available_rows": 17966,
-  "settlement_available_rate": 0.9913916786226685
+  "settlement_available_rows": 17963,
+  "settlement_available_rate": 0.9912261339807968
 }

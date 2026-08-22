@@ -2,7 +2,7 @@
 
 ## 五分钟结论
 
-本轮终审结论是 `STRUCTURAL_SIGNAL`，但 **不可推广**。它没有找到优于冻结
+本轮终审结论是 `NO_LEARNABLE_INCREMENT`，且 **不可推广**。它没有找到优于冻结
 控制的完整 learned MoE：
 
 - 2023 model-unseen 验证中，`RAW_LEARNED_MOE` 的中位期末资金为
@@ -14,17 +14,18 @@
 - raw challenger 的 2024 总投入是 CNY270,336，是固定控制 CNY67,584 的四倍；
   它不是因缩小暴露而失败，而是动态 K 学到了错误的放大方向：66/66 期都选
   K2048。
-- 完整策略失败不等于所有局部结构都无信息。matched reset 显示，显式选择性
-  保护相对 no-protection 的中位 seed lift 为 **+CNY1,048.49**，31 个 seed 中
-  **80.65%** 为正，达到预设 `STRUCTURAL_SIGNAL` 门槛；但量级远不足以挽救
-  整体亏损。
+- 选择性保护相对 no-protection 的中位 seed lift 为 **+CNY1,048.49**，31 个
+  seed 中 **80.65%** 为正；但对抗性终审发现，它相对同预算随机保护的配对
+  中位 lift 为 **−CNY594.31**，仅 **45.16%** seeds 为正。因此只能说明“增加
+  一个分支可能有机械收益”，不能证明模型学会了保护哪一腿，不能判为
+  `STRUCTURAL_SIGNAL`。
 - 场次 selector 和赛果 direction 是主要负贡献。把 selector 重置为简单
   GLOBAL 后，控制终值升至 CNY89,179.26；raw 相对它少 CNY54,361.13。把
   outcome direction 重置为 MARKET 后也改善约 CNY5,494.11。
 
 因此本轮真正的认知不是“MoE 可用”，而是：**软权重解决了硬 argmax 的形式
-问题，却没有解决长尾 ROI 标签和动态 exposure 外推的不稳定性；选择性保护是
-可以保留的弱结构，而当前 learned selector、direction 和 K 映射应被拒绝。**
+问题，却没有解决长尾 ROI 标签和动态 exposure 外推的不稳定性；当前 learned
+selector、direction、保护定位和 K 映射均应被拒绝。**
 #210 继续保持 Blocked，不继承 #314 候选。
 
 ## 时间与因果边界
@@ -42,8 +43,9 @@
 Gate A 提交 `d240b01` 在打开 2024 结算前冻结了模型、66 期共同支持、31 个
 nuisance seeds、2024 allocations 与 SHA。`freeze_receipt.json` 明确记录
 `2024_outcome_columns_opened=[]`。2024 是 model-unseen，不宣称 human-unseen。
-终局 18,090 个 feature-side match keys 中 17,936 个具有可用赛果与中奖 SP，
-覆盖率 99.15%。缺失结算会使包含该场的票 fail closed；所有 matched 条件共享
+终局 18,090 个 feature-side match keys 中 17,933 个具有可信可用赛果与中奖 SP，
+覆盖率 99.13%。缺失或不可信结算会使包含该场的票 fail closed，且不进入 d=1/d=2
+归因；所有 matched 条件共享
 同一数据边界，因此不会单独偏袒 learned arm，但绝对收益仍受该缺口影响。
 
 ## 输入与专家
@@ -96,6 +98,7 @@ portable control 与 #312 原始控制只差约 CNY90 的中位终值，说明 N
 | portable N7/K512/WOR / guarded | 81,882.32 | 67,584 | −26.81% | 27,301.51 | −27,609.38 |
 | equal CORE mixture | 74,402.89 | 67,584 | −37.87% | 28,842.22 | −33,981.62 |
 | fixed CORE/TAIL 90/10 | 71,321.24 | 67,584 | −42.43% | 31,122.70 | −36,150.16 |
+| random protection control | 33,640.95 | 270,336 | −24.55% | 87,657.38 | −102,243.89 |
 | raw learned MoE | 34,373.99 | 270,336 | −24.28% | 86,134.19 | −101,679.39 |
 
 raw 的 turnover ROI 看似略优于固定控制，但这是不同暴露规模下的比率，不能
@@ -114,15 +117,16 @@ factor reset 的 lift 定义为 `RAW_LEARNED_MOE − RESET`；正值表示 learn
 
 | 因子重置 | median paired lift | 正 lift seed 比例 | 解读 |
 |---|---:|---:|---|
-| coverage/protection → none | +1,048.49 | 80.65% | 小而较稳定的保护增量 |
+| coverage/protection → none | +1,048.49 | 80.65% | 多加一个分支相对不保护有收益 |
+| learned protection → random | −594.31 | 45.16% | 保护位置没有学出优于随机的增量 |
 | K unique structure → 512 | +1,980.15 | 58.06% | 未达到 60% 稳定门槛 |
-| generator → WOR | 0.00 | 48.39% | 无可辨增量 |
+| generator → WOR | 0.00 | 45.16% | 无可辨增量 |
 | N → 7 | −668.20 | 32.26% | 动态 N 没有证明价值 |
 | outcome direction → MARKET | −5,494.11 | 0% | learned direction 明显伤害 |
 | selector → GLOBAL | −54,361.13 | 0% | learned selector 是最大失败源 |
 
-因而 `STRUCTURAL_SIGNAL` 只指向“当前选择性保护有局部价值”，绝不等于完整
-MoE 或动态 K 可候选化。
+因而没有因子同时满足信息性对照和稳定性门槛，终审降为
+`NO_LEARNABLE_INCREMENT`。尤其不能把“优于不保护”误读成“学会了保护位置”。
 
 ## Near-miss 的正确读法
 
@@ -139,8 +143,9 @@ support 内但有限抽样没有形成中奖 identity。portable control 的 d=1
 
 如果我是挑战者，会提出以下反驳：
 
-1. **保护 lift 可能只是 2024 的局部幸运。** 31 seeds 只改变抽样噪声，不能把
-   66 期变成 2046 个独立样本；需要跨年或新 held-out 期验证。
+1. **保护 lift 可能只是增加分支的机械效果。** 相对随机保护为负已经推翻
+   “当前规则学会保护位置”的解释；31 seeds 也只是抽样噪声，不能把 66 期变成
+   2046 个独立样本。
 2. **reset 不是完整重训练。** 它回答的是冻结 allocation 下改变一个构造因子的
    局部反事实，不证明重新训练后的全局最优策略会得到相同 lift。
 3. **raw exposure 失败可能来自 K 外推，而非 MoE 权重本身。** 这正是本轮发现：
@@ -151,8 +156,8 @@ support 内但有限抽样没有形成中奖 identity。portable control 的 d=1
 5. **分歧仍是粗代理。** 当前 `q_eu_bjline − q_line_only_control` 不等于独立战力
    模型与资本均线的完整分歧。
 
-这些反驳不推翻 `NO_PROMOTION`，反而限定了可保留的正面信息只有“小而稳定的
-选择性保护 lift”。
+这些反驳把结论进一步收紧为 `NO_LEARNABLE_INCREMENT / NO_PROMOTION`。可以
+保留“保护腿值得重新建模”这一研究问题，但不能保留当前保护规则为有效结构。
 
 ## 后续方向
 
@@ -164,7 +169,8 @@ support 内但有限抽样没有形成中奖 identity。portable control 的 d=1
    禁止开发期 K64 到验证期全 K2048 的边界塌缩；
 3. selector 先退回 GLOBAL/简单市场控制，再逐项加入独立战力分歧，任何改进都
    同时报告绝对资金路径和 matched lift；
-4. 在新的时间切片确认保护增量前，不解锁 #210。
+4. 只有新的赛前保护模型同时击败 no-protection 和 random-protection，才可称为
+   保护增量；在此之前不解锁 #210。
 
 ## 可复核入口
 

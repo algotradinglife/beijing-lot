@@ -1,7 +1,7 @@
 {
   "issue": 314,
   "decision": {
-    "verdict": "STRUCTURAL_SIGNAL",
+    "verdict": "NO_LEARNABLE_INCREMENT",
     "promotable": false,
     "guarded_source": "PORTABLE_N7_K512_WOR",
     "validation_pass": false,
@@ -9,7 +9,7 @@
     "guarded_terminal_capital_cny": 81882.32251719973,
     "raw_learned_terminal_capital_cny": 34373.99223376185,
     "fixed_n7_terminal_capital_cny": 81882.32251719973,
-    "paired_seed_median_lift_raw_vs_fixed_cny": -45972.6079137097,
+    "paired_seed_median_lift_raw_vs_fixed_cny": -45972.60791370971,
     "raw_learned_median_stake_cny": 270336.0,
     "fixed_n7_median_stake_cny": 67584.0,
     "lower_exposure_explanation": false,
