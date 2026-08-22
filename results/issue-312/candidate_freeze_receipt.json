@@ -1,0 +1,24 @@
+{
+  "issue": 312,
+  "stage": "PRE_2023_OUTCOME_CANDIDATE_FREEZE",
+  "candidate_actions": 48,
+  "primary_family": "TAIL",
+  "development_years": [
+    2019,
+    2020,
+    2021,
+    2022
+  ],
+  "support_contract": "ISSUE_299_EXACT_B0_COMMON_SUPPORT",
+  "development_common_support_issues": 179,
+  "development_common_support_by_year": {
+    "2019": 47,
+    "2020": 30,
+    "2021": 49,
+    "2022": 53
+  },
+  "physical_seeds": 11,
+  "independent_unit": "BEIJING_ISSUE",
+  "frozen_registry_sha256": "50f9f1a5cab9edd496b7b7bb9cb3dcce1edb7ed38e77efe43c0dc7d06327ecb9",
+  "sealed_years": "2023 outcomes not read by selection; 2024+ sealed"
+}

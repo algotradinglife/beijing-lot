@@ -1,0 +1,28 @@
+{
+  "issue": 312,
+  "stage": "PRE_2023_OUTCOME_POLICY_FREEZE",
+  "primary_family": "TAIL",
+  "conditions": [
+    "ABLATE_OUTCOME",
+    "ABLATE_PROTECTION",
+    "ABLATE_SELECTOR",
+    "BEST_STATIC_ACTION",
+    "FIXED_N7_K512_WOR",
+    "IDENTITY_SHUFFLED",
+    "ISSUE306_PRIMARY",
+    "ISSUE_BLOCK_SHUFFLED",
+    "JOINT_MEAN",
+    "JOINT_PRIMARY",
+    "JOINT_TAIL"
+  ],
+  "issues": 48,
+  "support_contract": "ISSUE_299_EXACT_B0_COMMON_SUPPORT",
+  "tickets_per_condition_issue": 512,
+  "stake_per_condition_issue_cny": 1024.0,
+  "best_static_action_key": "N10_K8_SGLOBAL_VALUE_ALL_ORAW_VALUE_GWEIGHTED_WR_RNONE",
+  "evaluation_actions": 71,
+  "allocations_sha256": "b52429e60416f3db161e4e63ac3a3cb8b532ddb35831d3b0788e456fee7bb3ae",
+  "registry_sha256": "780569c338d542918dad6a13cdc49e40c078e7cc69ad2d216e56a368696da825",
+  "settlement_fields_read": [],
+  "sealed_years": "2023 outcomes not read; 2024+ sealed"
+}

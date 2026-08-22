@@ -1,0 +1,194 @@
+{
+  "issue": 312,
+  "files": {
+    "action_design_marginals.csv": {
+      "bytes": 1270,
+      "sha256": "8af877db8ad043916db1e1b8f293f0c78eff56c554086fc30759a6f7ce995e10"
+    },
+    "action_design_pairwise_coverage.csv": {
+      "bytes": 731,
+      "sha256": "7da385de51d4ca020cd9e4f9c12ce3d922639ad114e061a5d0a9dc38711f6f57"
+    },
+    "action_registry.csv": {
+      "bytes": 23920,
+      "sha256": "6f4aadd88eed70b11495e8aca2541f8f3c9311f4ae37ca5729ca9fdf06494dd1"
+    },
+    "action_registry_receipt.json": {
+      "bytes": 379,
+      "sha256": "d6a5878dc9d0b296a757b1271ca04cc69f2a817bccdbf78b7ef9504dc8bbe4b1"
+    },
+    "candidate_freeze_receipt.json": {
+      "bytes": 634,
+      "sha256": "711184a212afaae1589c91c4306250836e78451e485a2e478d7bc05735dcaccc"
+    },
+    "capital_paths.csv": {
+      "bytes": 2210886,
+      "sha256": "56f16d3b361c044ac5ee395aa2f8b71fccac4d10f610e83237125f1dabb28b87"
+    },
+    "capital_paths_2023.png": {
+      "bytes": 164759,
+      "sha256": "2be027dd237ae2cccedcb550bb114005bf491ba2ec7bf6e0c3cc4186a1b2b321"
+    },
+    "causal_replay_receipt.json": {
+      "bytes": 3690,
+      "sha256": "0210d615e4301f2415a8bf3fc129529cd024ea74cdada814debec7eca7ae6385"
+    },
+    "decision.json": {
+      "bytes": 1637,
+      "sha256": "b6b6bd7d1f6cb50514edf4e18a547e0c7cde6d8b41a46423ab1d46ef74cde1f4"
+    },
+    "development_action_availability_2019.csv": {
+      "bytes": 811452,
+      "sha256": "5b56b80243ff05a138e6ff65c45082a0bd8ad739227ed8e72ade08e3d961f6a9"
+    },
+    "development_action_availability_2020.csv": {
+      "bytes": 576818,
+      "sha256": "29283f05c2e0ae03a9da2eae88abe7a678f241cc0772dfdeec139ba20d4f7955"
+    },
+    "development_action_availability_2021.csv": {
+      "bytes": 952406,
+      "sha256": "23496db3ff3d48689205e614985aa7b45a2dfbcf64a4f0633672d64c6a60e43f"
+    },
+    "development_action_availability_2022.csv": {
+      "bytes": 937289,
+      "sha256": "a04066360147f8a3ef3ede0e99e1f0a8cc98191a2d4c45bfde4054d72760b083"
+    },
+    "development_action_labels.parquet": {
+      "bytes": 765473,
+      "sha256": "3afc8239245ed8b4a2562157d6d4ad9eb8b54b93e1a86d68a470a064a5aa52af"
+    },
+    "development_coverage_2019.csv": {
+      "bytes": 1621,
+      "sha256": "b792f5ca993393cb2996b3ba9824ee803bf616aae9598c800f661360da905924"
+    },
+    "development_coverage_2020.csv": {
+      "bytes": 1152,
+      "sha256": "9f2f069e605ad71a5fea678c2d982ac821a8adeef461dc061fccdd551cec7d0b"
+    },
+    "development_coverage_2021.csv": {
+      "bytes": 1848,
+      "sha256": "115d7d967daaa2bc414e9a1c4cce25fcf9c13222eb103514e237f45d5b5798c3"
+    },
+    "development_coverage_2022.csv": {
+      "bytes": 1814,
+      "sha256": "b58df7b20706a06b33a37eba396bf4183d566d97cce695b689eea5c9d13ab155"
+    },
+    "development_fit_receipts.csv": {
+      "bytes": 2494,
+      "sha256": "c2d0f39766d644ee1197039aafbaf6a4dbb9eb1486a99ea950844a1c2c73f939"
+    },
+    "development_oof_predictions.parquet": {
+      "bytes": 3489700,
+      "sha256": "1f087d0cbf2b339467425031c363ee80e9b460a412616a5ec89d00ddc8347ad5"
+    },
+    "development_policy_selection.csv": {
+      "bytes": 124,
+      "sha256": "d2128f35e643b5e1304c99f86f1d6eb3954bcbd00e03b8e891cdaf9c7572ea7d"
+    },
+    "development_seed_action_ledger_2019.parquet": {
+      "bytes": 562676,
+      "sha256": "a84b76650828930c381c299204a79dfe552f1f36843225d04fde139e46208e4b"
+    },
+    "development_seed_action_ledger_2020.parquet": {
+      "bytes": 387893,
+      "sha256": "f8c27a35b460ff5bc8cfbd6a664ac03f33d3e2aeb7e655ab5557a25f9c26da8e"
+    },
+    "development_seed_action_ledger_2021.parquet": {
+      "bytes": 648911,
+      "sha256": "e0a3a79c99318b0b5f2519822399d7965ea1f5d46d2646bfd53e09919dea23d0"
+    },
+    "development_seed_action_ledger_2022.parquet": {
+      "bytes": 629511,
+      "sha256": "07f7657f41bce56247e1bb2b6a86464a2ae1fd6f4cf838101503209ca5d9916b"
+    },
+    "evaluation_action_availability_2023.csv": {
+      "bytes": 270851,
+      "sha256": "5c507ccbe0a18f0e5308e942adb957e97ff8b45d566fc223c1112bacf0c58174"
+    },
+    "evaluation_action_registry.csv": {
+      "bytes": 8295,
+      "sha256": "780569c338d542918dad6a13cdc49e40c078e7cc69ad2d216e56a368696da825"
+    },
+    "evaluation_coverage_2023.csv": {
+      "bytes": 1331,
+      "sha256": "d3c162da4ff1d4c0db20483043483fcf671fd5a46ae2676197273317c9bca321"
+    },
+    "evaluation_seed_action_ledger_2023.parquet": {
+      "bytes": 745874,
+      "sha256": "0d94c318a37c2faa2aa487dd38fa691431d0c0198ad140045c7534cfefcdb05e"
+    },
+    "exact_b0_reference_2023.csv": {
+      "bytes": 243,
+      "sha256": "6abcd7b0770740dd8461095770d18ab6216666e826eed67c2ad362695f107d32"
+    },
+    "factor_attribution.csv": {
+      "bytes": 449,
+      "sha256": "4594c1edcefcf7df328ccf52d89e308cfe378ed977e62a14d8219d2dbce66065"
+    },
+    "frozen_candidate_registry.csv": {
+      "bytes": 6363,
+      "sha256": "50f9f1a5cab9edd496b7b7bb9cb3dcce1edb7ed38e77efe43c0dc7d06327ecb9"
+    },
+    "policy_summary.csv": {
+      "bytes": 4468,
+      "sha256": "ba8a5ba534e8e5c3cbfd74576edfb9c2ffb1e133a01ef869c4ac722515da3699"
+    },
+    "policy_summary_by_seed.csv": {
+      "bytes": 118268,
+      "sha256": "f56daf43a7d3eb86dab19e3c798dd9b176aa06ad9288f1b0e5f68c7f6a692211"
+    },
+    "pre2023_action_predictions.parquet": {
+      "bytes": 411490,
+      "sha256": "a354b4538a39329a56acf0666d852fd971fec048448bfb67aa3d34ee3872a1c3"
+    },
+    "pre2023_fit_receipts.csv": {
+      "bytes": 1320,
+      "sha256": "5de9584566179802d0657c42603ee02566d6c5a24d8be72fb7e0c80c4254c05a"
+    },
+    "pre2023_policy_allocations.csv": {
+      "bytes": 75500,
+      "sha256": "b52429e60416f3db161e4e63ac3a3cb8b532ddb35831d3b0788e456fee7bb3ae"
+    },
+    "pre2023_policy_freeze_receipt.json": {
+      "bytes": 910,
+      "sha256": "88effed451871f5b0eed6df66b12eb2192520006aa188c53427e6b518df8babb"
+    },
+    "prediction_diagnostics_2023.csv": {
+      "bytes": 329,
+      "sha256": "a5fd423e72b02ca435a2034e1e1f382b4dc25fa206d2d6ac7ddc6fc8cbb028b2"
+    },
+    "prediction_realized_2023.csv": {
+      "bytes": 355031,
+      "sha256": "e406bb848f4dd160b8961102662e247b8d1264dceddcde0c456e2b29c01b369c"
+    },
+    "prediction_vs_realized_2023.png": {
+      "bytes": 75940,
+      "sha256": "7d2b6e692f8da96f98aa50486233e2d69ecf551c65fef613cdbcda1af9af4ec7"
+    },
+    "primary_parameter_distribution.csv": {
+      "bytes": 1029,
+      "sha256": "56236de5706a41cec620629f55694a6a4471a170b48793a0ddc88fc091e3180e"
+    },
+    "primary_parameter_distribution.png": {
+      "bytes": 82817,
+      "sha256": "43ad17188ecb70a003a0ba22119be7683325656bd9832400d6b6b91b157d8de9"
+    },
+    "realized_factor_marginals_2023.csv": {
+      "bytes": 3390,
+      "sha256": "498ba1efea4c271d6723bd94da80ee7775a2fc05e227aea68402c71846c4b4e4"
+    },
+    "risk_tail_frontier_2023.png": {
+      "bytes": 71682,
+      "sha256": "231c105156b0babae438c056536a4a21d9c45f3132f22480d905d0c5aede2347"
+    },
+    "same_exposure_permutation_2023.csv": {
+      "bytes": 1165163,
+      "sha256": "6737b2473e386fb95c722204fdd175147d24be53770868c6f43b1620ce6f5626"
+    },
+    "static_rank_transfer.csv": {
+      "bytes": 305,
+      "sha256": "209d8e0278cb82d8f7a515e44a4f2772e822153c76b914dc144c248c4781e63d"
+    }
+  },
+  "excluded_local_caches": []
+}

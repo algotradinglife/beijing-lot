@@ -1,0 +1,132 @@
+{
+  "causal_reads_by_year": {
+    "2019": {
+      "future_label_identity_columns_opened": [
+        "issue_code",
+        "match_idx"
+      ],
+      "future_outcome_label_rows_opened": 0,
+      "future_outcome_columns_opened": [],
+      "label_max_year_opened": 2019,
+      "label_predicate": "issue_year <= 2019",
+      "output_alignment": "FEATURE_PLUS_IDENTITY_INDEX_VERIFIED",
+      "requested_years": [
+        2019
+      ],
+      "sqlite_issue_count": 404,
+      "target_issue_count": 53,
+      "target_unit_count": 48327
+    },
+    "2020": {
+      "future_label_identity_columns_opened": [
+        "issue_code",
+        "match_idx"
+      ],
+      "future_outcome_label_rows_opened": 0,
+      "future_outcome_columns_opened": [],
+      "label_max_year_opened": 2020,
+      "label_predicate": "issue_year <= 2020",
+      "output_alignment": "FEATURE_PLUS_IDENTITY_INDEX_VERIFIED",
+      "requested_years": [
+        2020
+      ],
+      "sqlite_issue_count": 442,
+      "target_issue_count": 38,
+      "target_unit_count": 28531
+    },
+    "2021": {
+      "future_label_identity_columns_opened": [
+        "issue_code",
+        "match_idx"
+      ],
+      "future_outcome_label_rows_opened": 0,
+      "future_outcome_columns_opened": [],
+      "label_max_year_opened": 2021,
+      "label_predicate": "issue_year <= 2021",
+      "output_alignment": "FEATURE_PLUS_IDENTITY_INDEX_VERIFIED",
+      "requested_years": [
+        2021
+      ],
+      "sqlite_issue_count": 505,
+      "target_issue_count": 63,
+      "target_unit_count": 62135
+    },
+    "2022": {
+      "future_label_identity_columns_opened": [
+        "issue_code",
+        "match_idx"
+      ],
+      "future_outcome_label_rows_opened": 0,
+      "future_outcome_columns_opened": [],
+      "label_max_year_opened": 2022,
+      "label_predicate": "issue_year <= 2022",
+      "output_alignment": "FEATURE_PLUS_IDENTITY_INDEX_VERIFIED",
+      "requested_years": [
+        2022
+      ],
+      "sqlite_issue_count": 567,
+      "target_issue_count": 62,
+      "target_unit_count": 56794
+    },
+    "2023": {
+      "future_label_identity_columns_opened": [
+        "issue_code",
+        "match_idx"
+      ],
+      "future_outcome_label_rows_opened": 0,
+      "future_outcome_columns_opened": [],
+      "label_max_year_opened": 2023,
+      "label_predicate": "issue_year <= 2023",
+      "output_alignment": "FEATURE_PLUS_IDENTITY_INDEX_VERIFIED",
+      "requested_years": [
+        2023
+      ],
+      "sqlite_issue_count": 620,
+      "target_issue_count": 48,
+      "target_unit_count": 41179
+    }
+  },
+  "check": "LABEL_SAFE_CAUSAL_REPLAY",
+  "comparisons": [
+    {
+      "availability_rows": 10176,
+      "byte_semantic_identity": "PASS",
+      "issue_count": 53,
+      "ledger_rows": 110748,
+      "year": 2019
+    },
+    {
+      "availability_rows": 7296,
+      "byte_semantic_identity": "PASS",
+      "issue_count": 38,
+      "ledger_rows": 78628,
+      "year": 2020
+    },
+    {
+      "availability_rows": 12096,
+      "byte_semantic_identity": "PASS",
+      "issue_count": 63,
+      "ledger_rows": 131670,
+      "year": 2021
+    },
+    {
+      "availability_rows": 11904,
+      "byte_semantic_identity": "PASS",
+      "issue_count": 62,
+      "ledger_rows": 129580,
+      "year": 2022
+    },
+    {
+      "availability_rows": 3408,
+      "byte_semantic_identity": "PASS",
+      "issue_count": 48,
+      "ledger_rows": 105648,
+      "year": 2023
+    }
+  ],
+  "frozen_allocation_sha256": "b52429e60416f3db161e4e63ac3a3cb8b532ddb35831d3b0788e456fee7bb3ae",
+  "issue": 312,
+  "scientific_result_changed": false,
+  "terminal_decision_sha256": "b6b6bd7d1f6cb50514edf4e18a547e0c7cde6d8b41a46423ab1d46ef74cde1f4",
+  "verdict": "PASS"
+}
