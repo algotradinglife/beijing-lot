@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#324 Top-2 selector × support × allocator factorial completed; #319 control retained)**
+Updated: **2026-08-23 (#328 learned allocator mixture completed; endpoint A1 retained as an exploratory expert, #319 control remains the accepted baseline)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -175,6 +175,10 @@ PI interpretation and does not replace those edges or Project states.
      (Done; NO_INCREMENT, joint point signal is largest-issue-dependent)
              |
              v
+#328 learned S1O1 allocator mixture
+     (Done; ENDPOINT_RETAINED, memoryless dynamic lambda collapses to A0)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -208,9 +212,10 @@ PI interpretation and does not replace those edges or Project states.
 | 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Closed / Done | M3 | #312 closed; blocks #210 | Full MoE rejected: 2023 validation loses 31/31 seeds and 2024 raw ends CNY34,373.99 versus portable fixed CNY81,882.32. Protection beats no-protection (+CNY1,048.49) but loses to matched random placement (−CNY594.31); `NO_LEARNABLE_INCREMENT`, no promotion |
 | 24 | [#318] historical Beijing-SP/proxy audit | Closed / Done | M1 | No open blocker; predecessor of #319 | All six frozen sources consumed. Historical SP is timestamp-unproven; strict/proxy overlap is only one 2026 issue and fails every fidelity threshold. `NO_CAUSAL_PRICE_SUPPORT`; #319 must be probability-only |
 | 25 | [#319] probability-only Top-2 N7 stable center | Closed / Done | M3 | #318 closed | Exact 128-ticket/CNY256 center executed. Primary 10h ends 2023 CNY93,901.88 (capital return -6.10%) and 2024 CNY103,567.30 (+3.57%). Post-merge correction orders paths by event timestamp and separates completed recovery from the open underwater tail; capital totals and `PRICE_DATA_INSUFFICIENT` are unchanged |
-| 26 | [#324] Top-2 selector × support × allocator factorial | Closed / Done | M3 | Parent #202; blocks #210 | Exact #319 control parity. Joint `S1O1A0/A1` raw lift is positive in 2023–2024, but 2023 turns negative ex-largest; no standalone factor is robust both years. Predicted-SP is learnable, while selector/compression skill is near zero. `NO_INCREMENT`; retain #319 control |
-| 27 | [#210] held-out/forward validation | Open / Blocked | M4 | #324 and other historical predecessors closed; #218 remains open | Do not spend prospective evidence: #324 produced no promotable value candidate and strict prospective support still depends on #218 |
-| 28 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 26 | [#324] Top-2 selector × support × allocator factorial | Closed / Done | M3 | Parent #202; predecessor of #328; blocks #210 | Post-merge EV corrected the calendar-year settlement join: primary common support is 45/54, and corrected two-year matched lifts are CNY+16,800 for `S1O1A0` and CNY+24,642 for `S1O1A1`. Routing remains `NO_INCREMENT`; old 2023 denominator and metrics are quarantined |
+| 27 | [#328] learned S1O1 allocator mixture | Closed / Done | M3 | Parent #202; predecessor of #210 | Corrected endpoint parity passes. Static lambda lift rises toward A1, but Ridge/HGBR issue-only lambdas collapse near zero and reproduce A0. The OOF allocator response has only one positive-delta issue in each of 2021/2022; retain A0/A1 as fixed experts and add lagged regime state before another MoE. `ENDPOINT_RETAINED`; no promotion |
+| 28 | [#210] held-out/forward validation | Open / Blocked | M4 | #328 and other historical predecessors closed after landing; #218 remains open | Do not spend prospective evidence: no historical issue has produced a promotable candidate and strict prospective support still depends on #218 |
+| 29 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
 

@@ -1,0 +1,23 @@
+[
+  {
+    "active_s1o1_issue_count": 38,
+    "prediction_issue_count": 38,
+    "prediction_year": 2020,
+    "training_issue_count": 399,
+    "training_year_max": 2019
+  },
+  {
+    "active_s1o1_issue_count": 63,
+    "prediction_issue_count": 63,
+    "prediction_year": 2021,
+    "training_issue_count": 437,
+    "training_year_max": 2020
+  },
+  {
+    "active_s1o1_issue_count": 62,
+    "prediction_issue_count": 62,
+    "prediction_year": 2022,
+    "training_issue_count": 500,
+    "training_year_max": 2021
+  }
+]

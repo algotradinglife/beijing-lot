@@ -1,0 +1,20 @@
+{
+  "best_learned_arm": "DYN_RIDGE",
+  "best_static_interior": "L075",
+  "claim_boundary": "RETROSPECTIVE_BASELINE_RELATIVE_EXPLORATION",
+  "contract": "BJ-UNIFIED-DYNAMIC-ALLOCATOR-001/v1",
+  "disposition": "ENDPOINT_RETAINED",
+  "issue": 328,
+  "promotion": false,
+  "risk_gate_pass": true,
+  "two_year_matched_lift": {
+    "DYN_HGBR": 16800.45649012561,
+    "DYN_RIDGE": 16800.45649012561,
+    "L000": 16800.45649012561,
+    "L025": 18193.630903224628,
+    "L050": 21695.01772587704,
+    "L075": 23248.522987825392,
+    "L100": 24641.697400924404
+  },
+  "unlock_210": false
+}

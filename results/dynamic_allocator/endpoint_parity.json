@@ -1,0 +1,26 @@
+{
+  "contract": "BJ-UNIFIED-DYNAMIC-ALLOCATOR-001/v1",
+  "endpoints": {
+    "L000": {
+      "action_equal": true,
+      "actual_action_sha256": "b15c3cb8ff3683c262dbab1d0a15011e0085677f7387e4089b78fe496b79dbb3",
+      "actual_ticket_rows": 6240,
+      "expected_action_sha256": "b15c3cb8ff3683c262dbab1d0a15011e0085677f7387e4089b78fe496b79dbb3",
+      "expected_ticket_rows": 6240,
+      "settlement_numeric_equal": true,
+      "settlement_status_equal": true,
+      "source_cell": "S1O1A0"
+    },
+    "L100": {
+      "action_equal": true,
+      "actual_action_sha256": "c25ed916a931d3734583cde754e6e3e8e849da62f00b1961293ac3202c07dc91",
+      "actual_ticket_rows": 6189,
+      "expected_action_sha256": "c25ed916a931d3734583cde754e6e3e8e849da62f00b1961293ac3202c07dc91",
+      "expected_ticket_rows": 6189,
+      "settlement_numeric_equal": true,
+      "settlement_status_equal": true,
+      "source_cell": "S1O1A1"
+    }
+  },
+  "status": "PASS"
+}
