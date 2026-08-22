@@ -1,0 +1,19 @@
+{
+  "accepted_baseline_parity.csv": "45d5cecda464f675e2cd1d745ae600f64c119930967deb65d269b225c6fb34be",
+  "allocation_audit.csv": "b358c72306f48f294fcadc1e371409cb2b62c39497c35980a0e467450b378a6c",
+  "anchor_component_attribution.csv": "ca97e954b0b0a48ee21e9d9c8e2f376b4f5b51dcdba1cf5b853a0ca0c74b08c5",
+  "anchor_selection.csv": "b2c9d14a1f8e6c384658403bc94c61520ade43cc7bc65e061c29597a345fb464",
+  "arm_selection.csv": "1223c3ecee27fa8fd46420de913726fa02fd3b6bcda78caa5881fe487581a7f7",
+  "bootstrap_lift.csv": "955b7c76944d5106b7ad4387bf5ed3a2c4e5265721f13f48b9058534a28e72bf",
+  "capital_paths.parquet": "b330a532d1fad9b2cf6c9ab97f042379636ab5be431e3cc017036902f61e523c",
+  "cell_coverage.csv": "d05ab11aacec3f97dec761a6997a999e05c26358ba872c33b9bf733ead0bf16d",
+  "config_selection.csv": "f90034bfeab978cbcd9f9f73ccaa8e746810f1bd78b2b4d027b004d5bc188617",
+  "decision.json": "5a52588c81a65a8b297e83c3ea1e83cd07031c01397c1844bec17dd3ba31348c",
+  "factorial_attribution.csv": "71fc954146578f89f14975a990e169a54413018fcd5f092d50459e1ba6c25968",
+  "issue_policies.parquet": "a2eb711383440a617a0de596af3800ec868bd1103a2b43397b9b67d3804fe03d",
+  "model_diagnostics.csv": "cf73e83cea37f09243164b6b51abbd493a6ffb8663365fe09b21ab2a91e8ca9d",
+  "model_receipt.json": "732d256dce0b04ba57dbd7d7f7d3c2e42f2fda5d1e93f0aa555f44ef60e41a15",
+  "performance.csv": "cb9742033573312ec090db1a9e035c1b28e47d2c2e23a6b59f2eb10316c11858",
+  "risk_diagnostics.csv": "1dfbc76c5e7c01baed1d0c8110a6db8b1a23713f0a3d7c1cbab70abaee6ccd6c",
+  "source_receipt.json": "52acec6f1409aac7b23391a335f0244489c4d9718e89fad3cea38b80d1fdfdff"
+}

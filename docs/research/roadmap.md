@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#332 fixed-expert causal MoE completed; fixed mixture interface rejected, accepted Top-2 retained for direct residual value learning)**
+Updated: **2026-08-23 (#334 neural residual completed; neural selection rejected, but q_eu/q_line value-ranked Top-2 support becomes the first cross-2023/2024 positive replication candidate)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -187,6 +187,10 @@ PI interpretation and does not replace those edges or Project states.
      (Done; NO_EXPERT_MIX_SIGNAL, accepted Top-2 baseline retained)
              |
              v
+#334 neural Top-2 residual action-value learner
+     (Done; neural arm rejected, value-anchor support signal retained for replication)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -224,8 +228,34 @@ PI interpretation and does not replace those edges or Project states.
 | 27 | [#328] learned S1O1 allocator mixture | Closed / Done | M3 | Parent #202; predecessor of #210 | Corrected endpoint parity passes. Static lambda lift rises toward A1, but Ridge/HGBR issue-only lambdas collapse near zero and reproduce A0. The OOF allocator response has only one positive-delta issue in each of 2021/2022; retain A0/A1 as fixed experts and add lagged regime state before another MoE. `ENDPOINT_RETAINED`; no promotion |
 | 28 | [#330] causal lagged regime state ledger | Closed / Done | M2 | Parent #202; predecessor of #332; blocks #210 | 282 issue-level rows establish stable European calibration and a very sparse A1-A0 response. Post-merge EV quarantines its current settlement-availability feature and anchor-surrogate lag timestamps; #332 rebuilds only the usable targets behind a conservative latest-kickoff+4h availability gate. Retain `SPARSE_RESPONSE_REDESIGN`, not the original causal feature artifact |
 | 29 | [#332] fixed-expert causal multitask MoE | Closed / Done | M3 | Parent #202; predecessor of the next direct-value learner; blocks #210 | Eight frozen N7-N10 experts, 512 matched tickets and 11 nuisance seeds. Dense hit/near-miss labels are moderately learnable, but lagged/current/static mixtures all fail the strongest fixed and accepted Top-2 controls. Against accepted Top-2, lagged MoE is +CNY1,364 raw but −CNY3,007 ex-largest in 2023, then −CNY48,666 in 2024. `NO_EXPERT_MIX_SIGNAL`; retain Top-2 and learn residual match/outcome/ticket value directly |
-| 30 | [#210] held-out/forward validation | Open / Blocked | M4 | #332 and other historical predecessors closed after landing; #218 remains open | Do not spend prospective evidence: no historical issue has produced a promotable candidate and strict prospective support still depends on #218 |
-| 31 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 30 | [#334] neural Top-2 residual action-value learner | Closed / Done | M3 | Parent #202; blocks #210 | The 2023-selected neural match selector is +CNY7,941 raw / +CNY2,579 ex-largest, but reverses to −CNY35,278 / −CNY31,787 on frozen 2024 and is rejected. The interpretable `q_eu/q_line` value anchor produces a distinct long-tail clue: support-only lift is +CNY50,723 in 2023 and +CNY49,393 in 2024; 2024 ex-largest remains +CNY23,919, while 2023 ex-largest is −CNY1,158. Retain as `ANCHOR_SHRINKAGE_SIGNAL_NOT_YET_PROMOTED`, with exact #319 Top-2 as fallback |
+| 31 | [#210] held-out/forward validation | Open / Blocked | M4 | #334 and other historical predecessors close after landing; #218 remains open | Do not spend prospective Cohort-B evidence yet. Revise the frozen candidate identity from obsolete #209 to the #334 value-ranked Top-2 support replication candidate, while preserving #319 as incumbent; strict prospective support still depends on #218 |
+| 32 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+
+### #334 neural residual and value-anchor decision
+
+- A bounded MLP learns a development-year match-selection lane, but it does not
+  generalize: the 2023 `S1O0` median lift of CNY7,940.53 becomes
+  −CNY35,277.96 on frozen 2024; its Brier score is also slightly worse than the
+  European-market baseline. Neural capacity is therefore not the current Edge.
+- The adversarial label-shuffle unexpectedly exposed a simpler mechanism. The
+  causal value anchor `q_eu / q_line` ranks outcomes by European fair-market
+  probability relative to the Beijing handicap-line probability. On the exact
+  #319 matches, retaining the top two outcomes by this ratio and keeping equal
+  funding yields +CNY50,722.52 in 2023 and +CNY49,393.45 in 2024 versus the
+  matched probability Top-2 baseline.
+- This is a long-tail candidate, not a stable center: it pays on 7/47 and 13/58
+  issues, and the 2023 ex-largest lift is −CNY1,157.66 even though frozen 2024
+  ex-largest is +CNY23,919.12. Issue-cluster bootstrap positivity is 70.5% and
+  82.0%, respectively. It has not crossed the promotion gate.
+- Allocation-only is smaller but directionally stable (+CNY2,074/+CNY6,068
+  raw; +CNY4,339/+CNY7,972 ex-largest). Combining support replacement and
+  value-weighted allocation is weaker than support replacement alone. Selection,
+  outcome support and allocation must therefore remain separately attributable.
+- Next scientific action: freeze the simple value-ranked support rule, retain
+  exact #319 Top-2 as fallback, and replicate without neural fitting. #210 must
+  not inherit the obsolete #209 policy identity.
+- Report: [`Issue-Neural-Top2-Residual.md`](Issue-Neural-Top2-Residual.md).
 
 ### #284/#285 subset and selective-protection decision
 
@@ -683,6 +713,10 @@ retrospective feature.
 [#318]: https://github.com/algotradinglife/beijing-lot/issues/318
 [#319]: https://github.com/algotradinglife/beijing-lot/issues/319
 [#324]: https://github.com/algotradinglife/beijing-lot/issues/324
+[#328]: https://github.com/algotradinglife/beijing-lot/issues/328
+[#330]: https://github.com/algotradinglife/beijing-lot/issues/330
+[#332]: https://github.com/algotradinglife/beijing-lot/issues/332
+[#334]: https://github.com/algotradinglife/beijing-lot/issues/334
 
 ---
 
