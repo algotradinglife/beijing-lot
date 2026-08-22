@@ -9,16 +9,28 @@ value, q and numeric GM gates fail closed rather than using leaked settlement pr
 
 ## Primary 10h results (pre-tax)
 
-| Year | Arm | observable issues | ending capital | turnover ROI | bundle hit rate |
+| Year | Arm | observable issues | ending capital | capital return | bundle hit rate |
 |---|---|---:|---:|---:|---:|
-| 2023 | P_TOP2_NO_GATE | 43 | 93,901.88 | -55.40% | 18.60% |
-| 2024 | P_TOP2_NO_GATE | 58 | 103,567.30 | 24.03% | 34.48% |
-| 2023 | RANDOM_MATCH_P_TOP2_SEED_MEDIAN | 46 | 98,010.04 | -16.54% | 12.50% |
-| 2024 | RANDOM_MATCH_P_TOP2_SEED_MEDIAN | 63 | 97,688.83 | -14.11% | 12.90% |
+| 2023 | P_TOP2_NO_GATE | 43 | 93,901.88 | -6.10% | 18.60% |
+| 2024 | P_TOP2_NO_GATE | 58 | 103,567.30 | 3.57% | 34.48% |
+| 2023 | RANDOM_MATCH_P_TOP2_SEED_MEDIAN | 46 | 98,010.04 | -1.99% | 12.50% |
+| 2024 | RANDOM_MATCH_P_TOP2_SEED_MEDIAN | 63 | 97,688.83 | -2.31% | 12.90% |
 
 Every active issue enumerates all 128 distinct Top-2 N7 tickets at CNY2, for CNY256
 planned exposure. Beijing's 0.65 factor is applied exactly once to the complete winning
-ticket. Thirty-one random seeds are nuisance repeats and do not inflate the issue count.
+ticket. Capital return (ending capital / CNY100,000 - 1) is the primary performance
+measure; turnover ROI is retained only as a secondary unit-economics diagnostic.
+Thirty-one random seeds are nuisance repeats and do not inflate the issue count.
+
+Capital paths and moving-block bootstrap inputs are ordered by the event timestamp
+`issue_anchor_ts`, with `issue_code` used only as a deterministic tie-breaker.
+
+| Year | max drawdown | max drawdown % | longest losing | longest no-payout | max completed recovery | open underwater tail |
+|---|---:|---:|---:|---:|---:|---:|
+| 2023 | 7,020.65 | 7.02% | 12 | 12 | 0 | 42 |
+| 2024 | 3,551.04 | 3.37% | 7 | 7 | 15 | 29 |
+
+An open underwater tail is right-censored and is not mislabeled as a completed recovery.
 
 The descriptive table above is not itself a matched claim because missing trusted
 settlements differ by selected fixtures. The exact CNY256-vs-CNY256 paired comparison is:
