@@ -1,0 +1,171 @@
+{
+  "bootstrap_lift_vs_random": {
+    "10h": {
+      "2023": {
+        "block_size": 5,
+        "bootstrap_median": 112.6095911448259,
+        "ci95_high": 205.0162541044162,
+        "ci95_low": 41.51140363168538,
+        "draws": 2000,
+        "mean_lift_per_issue": 114.1832778449875,
+        "n_issues": 43
+      },
+      "2024": {
+        "block_size": 5,
+        "bootstrap_median": 314.31644637678096,
+        "ci95_high": 442.68915266240555,
+        "ci95_low": 203.5918215184016,
+        "draws": 2000,
+        "mean_lift_per_issue": 317.5051190045787,
+        "n_issues": 58
+      },
+      "combined": {
+        "block_size": 5,
+        "bootstrap_median": 229.78385659754656,
+        "ci95_high": 323.44778818469393,
+        "ci95_low": 146.88136911947376,
+        "draws": 2000,
+        "mean_lift_per_issue": 230.94235494653492,
+        "n_issues": 101
+      }
+    },
+    "1h": {
+      "2023": {
+        "block_size": 5,
+        "bootstrap_median": 228.82080494603503,
+        "ci95_high": 473.91543745637034,
+        "ci95_low": 60.07847964667878,
+        "draws": 2000,
+        "mean_lift_per_issue": 234.66532587735134,
+        "n_issues": 42
+      },
+      "2024": {
+        "block_size": 5,
+        "bootstrap_median": 219.69710179790343,
+        "ci95_high": 327.71378084521365,
+        "ci95_low": 126.62098514955258,
+        "draws": 2000,
+        "mean_lift_per_issue": 222.10960644544897,
+        "n_issues": 57
+      },
+      "combined": {
+        "block_size": 5,
+        "bootstrap_median": 224.04956627971973,
+        "ci95_high": 343.15506154409456,
+        "ci95_low": 133.9526640320585,
+        "draws": 2000,
+        "mean_lift_per_issue": 227.43627529534697,
+        "n_issues": 99
+      }
+    },
+    "initial": {
+      "2023": {
+        "block_size": 5,
+        "bootstrap_median": 142.9173915811278,
+        "ci95_high": 263.50315411228297,
+        "ci95_low": 49.09592040823944,
+        "draws": 2000,
+        "mean_lift_per_issue": 145.13891031083074,
+        "n_issues": 44
+      },
+      "2024": {
+        "block_size": 5,
+        "bootstrap_median": 206.3519220852108,
+        "ci95_high": 338.70141663049606,
+        "ci95_low": 103.34134309309145,
+        "draws": 2000,
+        "mean_lift_per_issue": 212.47554114517652,
+        "n_issues": 60
+      },
+      "combined": {
+        "block_size": 5,
+        "bootstrap_median": 182.46577104220216,
+        "ci95_high": 262.5450110108841,
+        "ci95_low": 107.98177938710211,
+        "draws": 2000,
+        "mean_lift_per_issue": 183.98696656141482,
+        "n_issues": 104
+      }
+    }
+  },
+  "disposition": "PRICE_DATA_INSUFFICIENT",
+  "fixed_context": {
+    "2023_exact_issue312_fixed_n7_k512_wor_ending_capital": 87984.26791061989,
+    "2024_portable_n7_k512_wor_ending_capital": 81882.32,
+    "matched": false
+  },
+  "issue": 319,
+  "paired_seed_selector_lift": [
+    {
+      "horizon": "10h",
+      "issue_year": 2023,
+      "lift_max": 3604.461023926493,
+      "lift_min": -16993.12369159379,
+      "matched_issues_median": 41.0,
+      "matched_issues_min": 37,
+      "median_total_lift": -4700.665850254187,
+      "nuisance_seeds": 31,
+      "positive_seed_fraction": 0.22580645161290322
+    },
+    {
+      "horizon": "10h",
+      "issue_year": 2024,
+      "lift_max": 16028.442724149825,
+      "lift_min": -12858.996746212273,
+      "matched_issues_median": 56.0,
+      "matched_issues_min": 54,
+      "median_total_lift": 5968.921883812883,
+      "nuisance_seeds": 31,
+      "positive_seed_fraction": 0.8064516129032258
+    },
+    {
+      "horizon": "1h",
+      "issue_year": 2023,
+      "lift_max": 7955.8275344358935,
+      "lift_min": -10892.353222052656,
+      "matched_issues_median": 40.0,
+      "matched_issues_min": 36,
+      "median_total_lift": 149.49345723661338,
+      "nuisance_seeds": 31,
+      "positive_seed_fraction": 0.5161290322580645
+    },
+    {
+      "horizon": "1h",
+      "issue_year": 2024,
+      "lift_max": 7851.160854422161,
+      "lift_min": -13503.729150837233,
+      "matched_issues_median": 55.0,
+      "matched_issues_min": 53,
+      "median_total_lift": 176.6518708291161,
+      "nuisance_seeds": 31,
+      "positive_seed_fraction": 0.5161290322580645
+    },
+    {
+      "horizon": "initial",
+      "issue_year": 2023,
+      "lift_max": 5444.946616129706,
+      "lift_min": -10422.125897273543,
+      "matched_issues_median": 42.0,
+      "matched_issues_min": 38,
+      "median_total_lift": -619.4290625205415,
+      "nuisance_seeds": 31,
+      "positive_seed_fraction": 0.41935483870967744
+    },
+    {
+      "horizon": "initial",
+      "issue_year": 2024,
+      "lift_max": 9948.619407361133,
+      "lift_min": -12713.329068084246,
+      "matched_issues_median": 58.0,
+      "matched_issues_min": 56,
+      "median_total_lift": -2416.82666396466,
+      "nuisance_seeds": 31,
+      "positive_seed_fraction": 0.45161290322580644
+    }
+  ],
+  "probability_center_executed": true,
+  "promotion": false,
+  "reason": "#318 found no admissible historical decision-epoch Beijing SP; value/q/GM arms are non-executable.",
+  "unlock_210": false,
+  "value_selector_executed": false
+}

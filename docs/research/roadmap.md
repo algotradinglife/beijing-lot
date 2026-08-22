@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#318 historical SP/proxy audit completed; #319 inherits a probability-only stable-center boundary)**
+Updated: **2026-08-22 (#319 probability-only Top-2 N7 stable-center experiment completed; no value/forward promotion)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -166,10 +166,11 @@ PI interpretation and does not replace those edges or Project states.
      (Done; NO_CAUSAL_PRICE_SUPPORT)
              |
              v
-#319 probability-only Top-2 N7 stable center (Ready)
+#319 probability-only Top-2 N7 stable center
+     (Done; PRICE_DATA_INSUFFICIENT, temporally unstable selector lift)
              |
              v
-#210 held-out/prospective validation  <--- blocked by #319 and #218
+#210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
 #211 timestamped message overlay     <--- #182 message evidence
@@ -201,8 +202,8 @@ PI interpretation and does not replace those edges or Project states.
 | 22 | [#312] explicit joint action cube | Closed / Done | M3 | #306 closed; blocks #314 | Exact-support 2023 JOINT_PRIMARY CNY70,795.72 versus fixed N7/K512/WOR CNY87,984.27; hard action-conditioned MLP/argmax is rejected, while protection remains a weak parameter clue. Label-safe five-year replay changed no result |
 | 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Closed / Done | M3 | #312 closed; blocks #210 | Full MoE rejected: 2023 validation loses 31/31 seeds and 2024 raw ends CNY34,373.99 versus portable fixed CNY81,882.32. Protection beats no-protection (+CNY1,048.49) but loses to matched random placement (−CNY594.31); `NO_LEARNABLE_INCREMENT`, no promotion |
 | 24 | [#318] historical Beijing-SP/proxy audit | Closed / Done | M1 | No open blocker; predecessor of #319 | All six frozen sources consumed. Historical SP is timestamp-unproven; strict/proxy overlap is only one 2026 issue and fails every fidelity threshold. `NO_CAUSAL_PRICE_SUPPORT`; #319 must be probability-only |
-| 25 | [#319] probability-only Top-2 N7 stable center | Open / Ready | M3 | #318 closed | Test the stable-center reset without historical SP value ranking; preserve exact probability provenance and matched controls |
-| 26 | [#210] held-out/forward validation | Open / Blocked | M4 | #319 and #218 remain open | Do not spend prospective evidence until the probability-only stable-center candidate and strict prospective support satisfy native prerequisites |
+| 25 | [#319] probability-only Top-2 N7 stable center | Closed / Done | M3 | #318 closed | Exact 128-ticket/CNY256 center executed. Primary 10h ends 2023 CNY93,901.88 and 2024 CNY103,567.30; matched lift versus random flips from negative median total lift in 2023 to positive in 2024. Historical value/q/GM lanes remain unavailable, so `PRICE_DATA_INSUFFICIENT`, no promotion |
+| 26 | [#210] held-out/forward validation | Open / Blocked | M4 | #319 closed; #218 remains open | Do not spend prospective evidence: #319 produced no promotable value candidate and strict prospective support still depends on #218 |
 | 27 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
