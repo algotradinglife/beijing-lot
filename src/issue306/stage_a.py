@@ -33,7 +33,7 @@ from sklearn.preprocessing import StandardScaler
 
 from issue306 import PREDICTION_YEARS, SEEDS
 
-STAGE_A_OUTPUT_PATH = Path("results/issue-305/keep_skip_predictions.csv")
+STAGE_A_OUTPUT_PATH = Path("results/issue-305/policy_decisions.csv")
 SOURCE_TAG_LOCAL = "LOCAL_REFERENCE_FIT_PENDING_305"
 SOURCE_TAG_FROZEN = "FROM_305_OUTPUT"
 
@@ -204,15 +204,21 @@ def stage_a_decisions(
         condition = "STAGE_A_305"
         source = SOURCE_TAG_FROZEN
     result = issues[["issue", "issue_year", "baseline_active"]].merge(
-        scores[["issue", "issue_year", "predicted_utility_cny"]],
+        scores[["issue", "issue_year", "predicted_utility_cny", "keep_baseline"]],
         on=["issue", "issue_year"],
         how="left",
         validate="one_to_one",
     )
     result["condition"] = condition
-    result["keep_baseline"] = (
-        result["baseline_active"].eq(1)
-        & result["predicted_utility_cny"].fillna(-np.inf).gt(0)
-    )
+    # A frozen #305 row carries its own keep_baseline; a local reference has
+    # utility only and recomputes the decision from the positive-utility rule.
+    if "keep_baseline" in result.columns and result["keep_baseline"].notna().any():
+        result["keep_baseline"] = result["keep_baseline"].fillna(False).astype(bool)
+        result["keep_baseline"] = result["keep_baseline"] & result["baseline_active"].eq(1)
+    else:
+        result["keep_baseline"] = (
+            result["baseline_active"].eq(1)
+            & result["predicted_utility_cny"].fillna(-np.inf).gt(0)
+        )
     result["stage_a_source"] = source
     return result.drop(columns="baseline_active")

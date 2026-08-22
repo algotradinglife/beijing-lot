@@ -1,0 +1,32 @@
+{
+  "issue": 305,
+  "baseline": "#299/#302 exact atomic B0_BEST_FULL",
+  "model": "dedicated expert-label-invariant expanding BEST_FULL keep/skip",
+  "decision": {
+    "verdict": "SHARED_HEAD_EXPOSURE_REDUCTION_ONLY",
+    "promotable": false,
+    "development_signal_accepted": false,
+    "matched_support_issues": 227,
+    "prediction_years": [
+      2021,
+      2022,
+      2023
+    ],
+    "sealed_years": "2024+ not read",
+    "primary_2023_terminal_capital_cny": 92888.277325,
+    "primary_2023_capital_growth_pct": -7.111722674999998,
+    "baseline_2023_terminal_capital_cny": 79248.96196799999,
+    "baseline_2023_capital_growth_pct": -20.751038032000015,
+    "cash_2023_terminal_capital_cny": 100000.0,
+    "matched_lift_cny": 13639.315357000014,
+    "matched_lift_pp": 13.639315357000015,
+    "funded_2023_issues": 8,
+    "exact_executed_exposure_percentile": 0.4270622395990452,
+    "exact_null_combination_count": 23535820,
+    "legacy_302_exact_percentile": 0.785127159368146,
+    "all_primary_sensitivity_fits_converged": true,
+    "alpha_lift_sign_stable": true,
+    "alpha_decision_stable": false,
+    "expert_label_inputs": 0
+  }
+}
