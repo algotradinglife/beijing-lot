@@ -1,0 +1,4 @@
+prediction_year,calibration_years,selected_objective,rule
+2021,NONE,log_wealth,no-prior default log_wealth
+2022,2021,mean,max prior expanding-OOF log terminal; ties prefer log_wealth
+2023,"2021,2022",mean,max prior expanding-OOF log terminal; ties prefer log_wealth

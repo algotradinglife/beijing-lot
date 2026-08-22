@@ -1,0 +1,24 @@
+{
+  "issue": 306,
+  "stage_a_source": "FROM_305_OUTPUT",
+  "selected_objective": "mean",
+  "decision": {
+    "verdict": "EXPERT_VALUE_SIGNAL",
+    "promotable": false,
+    "development_only": true,
+    "primary_2023_terminal_capital_cny": 112357.90664749216,
+    "primary_2023_capital_growth_pct": 12.357906647492168,
+    "baseline_2023_terminal_capital_cny": 79248.96196799999,
+    "baseline_2023_capital_growth_pct": -20.751038032000015,
+    "matched_lift_cny": 33108.94467949217,
+    "matched_lift_pp": 33.10894467949218,
+    "keep_skip_lift_cny": 13639.315357000014,
+    "composition_increment_cny": 0.0,
+    "intensity_increment_cny": 19469.629322492154,
+    "static_2023_terminal_capital_cny": 32.0,
+    "identity_shuffled_2023_terminal_capital_cny": 59487.29699068709,
+    "dynamic_placement_signal": false,
+    "placement_vs_permutation_percentile": 0.758,
+    "absolute_edge": true
+  }
+}

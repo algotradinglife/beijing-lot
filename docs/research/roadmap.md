@@ -70,7 +70,11 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#305 exact-null correction: keep/skip lift is exposure reduction, not issue-selection Edge; next learn within-issue ticket construction at matched exposure)**
+Updated: **2026-08-22 (#305 exact-null correction shipped: keep/skip lift is
+exposure reduction, not issue-selection Edge; #306 state-dependent expert
+mixture then shows dynamic intensity adds +19.5k over fixed-intensity zero in
+2023; exact exposure null at 75th percentile so expert placement remains
+EXPERT_VALUE_SIGNAL only, no promotion, 2024+ remains sealed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -150,8 +154,9 @@ PI interpretation and does not replace those edges or Project states.
      but exact same-exposure placement percentile 42.71%; no selection Edge)
              |
              v
-#306 matched-exposure within-issue ticket composition (In Progress;
-     no learned issue skip; optimize N/K/WR/WOR/outcome/protection/expert mix)
+#306 state-dependent expert composition + dynamic funding intensity (In
+     Progress; dynamic intensity adds +19.5k in 2023 over fixed-intensity
+     zero, exact-null 75th percentile, EXPERT_VALUE_SIGNAL only; no promotion)
              |
              v
 #210 held-out/prospective validation  <--- no candidate; also blocked by #218
@@ -182,8 +187,8 @@ PI interpretation and does not replace those edges or Project states.
 | 18 | [#299] BEST_FULL-anchored residual optimizer | Closed / Done | M3 | #296 closed; blocks #210 | Exact matched residual learning improves 2023 BEST_FULL from -20.75% to -9.10%, but remains below cash and only the 38.3rd percentile of exposure-matched random placement; retain architecture, no promotion |
 | 19 | [#302] hierarchical dynamic expert mixture | Closed / Done | M3 | #299 closed; blocks #210 | Expanding keep/skip ends 2023 +2.63% versus exact BEST_FULL -20.75%; expert funding adds zero under the causal OOF gate and placement misses falsification, so retain only development evidence |
 | 20 | [#305] dedicated keep/skip correction | Closed / Done | M3 | #302 closed; blocks #306 | Independent keep/skip ends 2023 at -7.11%, but its eight funded issues rank only 42.71% among 23,535,820 exact same-exposure placements and change materially with alpha; classify as exposure reduction, not issue-selection Edge |
-| 21 | [#306] matched-exposure within-issue ticket composition | Open / In Progress | M3 | #305 closed; blocks #210 | Every pre-event eligible issue remains active; learn N/K, match and outcome direction, WR/WOR, selective protection and expert composition without a learned issue-level skip or zero-funding escape |
-| 22 | [#210] held-out/forward validation | Open / Blocked | M4 | #306 open; #218 open; no promoted candidate | Do not spend holdout until an intra-issue dynamic candidate beats the frozen baseline and matched-exposure controls pre-2024 |
+| 21 | [#306] state-dependent expert composition + dynamic funding intensity | Open / In Progress | M3 | #305 closed; PR #309 under review | Delivered per issue contract (BJ-UNIFIED-DYNAMIC-MOE-001): dynamic composition + intensity uses the frozen #305 keep/skip as Stage A; 2023 +12.36% vs B0 -20.75% (+33.11pp); decomposition keep/skip +13.6k, dynamic intensity +19.5k, fixed-intensity scalar collapses to zero; exact executed-exposure null 75.8th percentile misses the 95% bar; verdict EXPERT_VALUE_SIGNAL / no promotion. PI direction note (#308) proposes within-issue ticket composition — differs from the issue-body contract; PI adjudication requested |
+| 22 | [#210] held-out/forward validation | Open / Blocked | M4 | #302 open; #218 open; no promoted candidate | Do not spend holdout until a dynamic candidate beats cash and the frozen matched control pre-2024 |
 | 23 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
