@@ -1,8 +1,28 @@
 # Issue #318 handoff
 
-- SESSION: `20260822_162749_6e2ba8`
-- Base HEAD: `5ed9670dfc0b03cbe9fd7b8f44a17d690ce7288b`
+- SESSION: `20260822_165040_89f076`
+- Original delivery HEAD: `4c36b3d23845afb8ede308a60db22dfe6c0c513e`
 - Branch: `engineer/bj318-sp-proxy-audit`
+
+## Follow-on source-boundary correction
+
+The frozen #238 receipt names the exact candidate SQLite successor and its
+accepted SHA-256. Replay now resolves only that receipt-named file when the
+worktree-relative path is absent, hashes it, and fails closed with
+`MANIFEST_MISMATCH` on a binding failure rather than calling it missing. The
+verified successor hash is
+`a51bdca8f3b0ef20a31ef606399daea82760a5230a8fc844ea5917178f1078d4`.
+
+The other worktree-relative mandatory paths remain `SOURCE_MISSING` in this
+package. Although the receipt names mutable label and registry locations, it
+supplies no approved source-file hash for either; this follow-on intentionally
+does not treat an unhashed external path as an admissible successor. The terminal
+cap is therefore unchanged. The verified candidate successor is bound as an
+input receipt only—it is not used to invent a historical SP vector or timestamp.
+Focused tests: 8 passed; replay and package verifier passed. The repository-wide
+pytest collection remains unavailable in this sparse/runtime environment
+(missing external source paths and optional Flask/Matplotlib/nbformat modules),
+not due to this package.
 
 ## Completed
 

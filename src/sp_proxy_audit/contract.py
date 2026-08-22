@@ -2,4 +2,4 @@
 
 # Set after deterministic replay.  A verifier never trusts a package-supplied
 # manifest as its own root of trust.
-EXPECTED_MANIFEST_SHA256 = "ac150126896aeb137e5b68d5c405d3a876f2bbc38c6878ad8c571bb064a8433c"
+EXPECTED_MANIFEST_SHA256 = "261c7dcaaf731affed2ff2eb26ccec8dbc0127787cb8b4fe65f61e6c2e0006a2"

@@ -110,6 +110,29 @@ def test_remanifested_price_or_source_trace_tamper_is_rejected(tmp_path: Path) -
         validate_package(package, expected_manifest_sha256=original_manifest)
 
 
+def test_manifest_referenced_candidate_successor_is_hashed_and_not_silently_marked_missing(tmp_path: Path) -> None:
+    """A receipt-approved successor is part of the closed discovery boundary."""
+    source = tmp_path / "sources"
+    candidate = tmp_path / "external-candidate.sqlite"
+    candidate.write_bytes(b"immutable candidate bytes")
+    receipt = source / "docs/research/evidence/bj238/SOURCE_RECEIPT.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(
+        json.dumps({
+            "candidate_sqlite": str(candidate),
+            "candidate_sqlite_sha256_from_accepted_268_verification": _sha256(candidate),
+        }, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    package = tmp_path / "package"
+    build_package(source, package)
+    inventory = pd.read_csv(package / "source_inventory.csv")
+    candidate_record = inventory.loc[inventory.source_id.eq("eu_proxy_backfill")].iloc[0]
+    assert candidate_record.availability == "PRESENT"
+    assert candidate_record.sha256 == _sha256(candidate)
+
+
 def _remanifest(package: Path) -> None:
     manifest_path = package / "MANIFEST.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

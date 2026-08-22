@@ -74,8 +74,8 @@ def validate_package(root: Path, expected_manifest_sha256: str | None = None) ->
             raise ValueError("accepted cell has exclusion reason")
     if decision.get("terminal_disposition") not in {"STRICT_HISTORY_AVAILABLE", "PROXY_USABLE_FOR_EXPLORATION", "NO_CAUSAL_PRICE_SUPPORT"}:
         raise ValueError("invalid terminal disposition")
-    if inventory.availability.eq("SOURCE_MISSING").any() and decision.get("terminal_disposition") != "NO_CAUSAL_PRICE_SUPPORT":
-        raise ValueError("source-missing package elevated terminal disposition")
+    if inventory.availability.ne("PRESENT").any() and decision.get("terminal_disposition") != "NO_CAUSAL_PRICE_SUPPORT":
+        raise ValueError("incomplete-or-mismatched-source package elevated terminal disposition")
     if not coverage.empty and not set(coverage.columns).issuperset({"partition", "issue_code", "source_id", "source_grade", "snapshot_kind", "feasible_n7"}):
         raise ValueError("coverage key/schema mismatch")
     if not exclusion.empty and not set(exclusion.exclusion_reason.dropna()).issubset({"SOURCE_MISSING", "MANIFEST_MISMATCH", "TIMESTAMP_UNPROVEN", "POST_DECISION", "POST_KICKOFF", "INCOMPLETE_TRIPLET", "IDENTITY_MISMATCH", "DUPLICATE_CONFLICT", "SETTLEMENT_ONLY", "NONFINITE_PRICE", "NONPOSITIVE_PRICE"}):

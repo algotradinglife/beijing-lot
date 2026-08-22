@@ -54,18 +54,38 @@ def _json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _receipt_successors(source_root: Path) -> dict[str, tuple[Path, str | None]]:
+    """Resolve only the exact successor named by the frozen #238 receipt."""
+    receipt_path = source_root / "docs/research/evidence/bj238/SOURCE_RECEIPT.json"
+    if not receipt_path.is_file():
+        return {}
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    candidate = receipt.get("candidate_sqlite")
+    expected = receipt.get("candidate_sqlite_sha256_from_accepted_268_verification")
+    if not isinstance(candidate, str) or not isinstance(expected, str):
+        return {}
+    return {"eu_proxy_backfill": (Path(candidate), expected)}
+
+
 def _inventory(source_root: Path) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
+    successors = _receipt_successors(source_root)
     for source_id, relative, kind in SOURCE_SPECS:
         path = source_root / relative
+        expected_successor_hash: str | None = None
+        if not path.exists() and source_id in successors:
+            path, expected_successor_hash = successors[source_id]
         available = path.exists()
         digest_path = path if available and path.is_file() else path / "MANIFEST.json"
         digest = sha256(digest_path) if digest_path.is_file() else pd.NA
+        availability = "PRESENT" if available else "SOURCE_MISSING"
+        if available and expected_successor_hash is not None and digest != expected_successor_hash:
+            availability = "MANIFEST_MISMATCH"
         record: dict[str, object] = {
             "source_id": source_id,
             "relative_path": relative,
             "kind": kind,
-            "availability": "PRESENT" if available else "SOURCE_MISSING",
+            "availability": availability,
             "sha256": digest,
             "bytes": path.stat().st_size if available and path.is_file() else pd.NA,
             "schema_or_provenance": "",
@@ -170,8 +190,8 @@ def _coverage(cells: pd.DataFrame) -> pd.DataFrame:
 
 def _exclusions(cells: pd.DataFrame, inventory: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    for row in inventory.loc[inventory.availability.eq("SOURCE_MISSING")].itertuples(index=False):
-        rows.append({"source_id": row.source_id, "exclusion_reason": "SOURCE_MISSING", "cell_count": 0, "vector_count": 0, "denominator_note": "named mandatory source path absent"})
+    for row in inventory.loc[inventory.availability.ne("PRESENT")].itertuples(index=False):
+        rows.append({"source_id": row.source_id, "exclusion_reason": row.availability, "cell_count": 0, "vector_count": 0, "denominator_note": "named mandatory source path absent or receipt hash mismatch"})
     if not cells.empty:
         bad = cells.loc[cells.exclusion_reason.notna()].groupby(["source_id", "exclusion_reason"], dropna=False).agg(cell_count=("outcome_code", "size"), vector_count=("fixture_identity", "nunique")).reset_index()
         rows.extend({**item, "denominator_note": "graded candidate cells"} for item in bad.to_dict("records"))
@@ -220,7 +240,7 @@ def build_package(source_root: Path, output: Path) -> dict[str, object]:
     coverage = _coverage(cells)
     exclusions = _exclusions(cells, inventory)
     overlap = pd.DataFrame(columns=["proxy_source_id", "snapshot_kind", "partition", "issue_count", "fixture_count", "price_bias_issue_equal", "spearman_issue_equal", "top2_agreement_issue_equal", "top7_jaccard_issue_equal", "q_distortion_issue_equal", "bootstrap_p025", "bootstrap_p50", "bootstrap_p975"])
-    missing_mandatory = inventory.availability.eq("SOURCE_MISSING").any()
+    missing_mandatory = inventory.availability.ne("PRESENT").any()
     decision = {
         "contract_version": CONTRACT,
         "source_hashes": {row.source_id: row.sha256 if pd.notna(row.sha256) else None for row in inventory.itertuples(index=False)},

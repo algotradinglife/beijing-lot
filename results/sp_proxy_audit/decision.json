@@ -14,7 +14,7 @@
     "bj216_strict_panel": "eb89f3eeafb0f25946c21edcd4c9b9326217b0b674ea6d716ca304bd070589b2",
     "bj238_materializer": null,
     "bj238_source_receipt": "d7adb8cbca9bf5d67f7ae402969bd3dfea171209bb1cadb815410b0a33f126f6",
-    "eu_proxy_backfill": null,
+    "eu_proxy_backfill": "a51bdca8f3b0ef20a31ef606399daea82760a5230a8fc844ea5917178f1078d4",
     "issue_registry": null
   },
   "terminal_disposition": "NO_CAUSAL_PRICE_SUPPORT",

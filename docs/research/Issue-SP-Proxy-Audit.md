@@ -9,9 +9,12 @@ python scripts/run_sp_proxy_audit.py --output results/sp_proxy_audit
 python scripts/verify_sp_proxy_audit.py --package results/sp_proxy_audit
 ```
 
-The runner reads only the six contract-named source paths. It uses read-only
-source logic, records a deterministic `SOURCE_MISSING` receipt where a named
-path is unavailable, and never searches for replacement databases.
+The runner reads only the six contract-named source paths plus the exact #238
+receipt-named candidate successor, and verifies that successor against the
+receipt's accepted SHA-256 before classifying it as present. It records a
+deterministic `SOURCE_MISSING` or `MANIFEST_MISMATCH` receipt where a mandatory
+input is unavailable or its approved binding fails; it never searches for
+replacement databases.
 
 ## Decision boundary
 
