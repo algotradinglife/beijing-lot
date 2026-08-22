@@ -82,12 +82,13 @@ def run_experiment(output: str | Path) -> dict[str, object]:
     percentile = float(
         (permutation["median_terminal_capital_cny"] <= observed).mean()
     )
-    seed_pivot = seed_summary[
-        seed_summary["condition"].isin(["JOINT_PRIMARY", *control_conditions])
-    ].pivot(index="seed", columns="condition", values="terminal_capital_cny")
-    paired_control = seed_pivot[control_conditions].max(axis=1)
-    paired_wins = int((seed_pivot["JOINT_PRIMARY"] > paired_control).sum())
-    required_seed_wins = math.ceil(0.60 * len(seed_pivot))
+    paired = paired_control_diagnostics(
+        seed_summary,
+        primary_condition="JOINT_PRIMARY",
+        control_condition=str(strongest["condition"]),
+    )
+    paired_wins = int(paired["paired_seed_wins"])
+    required_seed_wins = math.ceil(0.60 * int(paired["paired_seed_count"]))
     beats_controls = observed > float(strongest["median_terminal_capital_cny"])
     ex_largest_not_worse = float(primary["median_ex_largest_pnl_cny"]) >= float(
         strongest["median_ex_largest_pnl_cny"]
@@ -149,8 +150,12 @@ def run_experiment(output: str | Path) -> dict[str, object]:
         "strongest_control_median_terminal_capital_cny": float(
             strongest["median_terminal_capital_cny"]
         ),
-        "matched_lift_vs_strongest_control_cny": observed
-        - float(strongest["median_terminal_capital_cny"]),
+        "difference_of_seed_medians_vs_strongest_control_cny": float(
+            paired["difference_of_seed_medians_cny"]
+        ),
+        "paired_seed_median_lift_vs_strongest_control_cny": float(
+            paired["paired_seed_median_lift_cny"]
+        ),
         "same_exposure_permutation_percentile": percentile,
         "paired_seed_wins_vs_strongest_control": paired_wins,
         "paired_seed_win_requirement": required_seed_wins,
@@ -361,6 +366,31 @@ def _exact_b0_reference(output: Path) -> pd.DataFrame:
 
 def _row(summary: pd.DataFrame, condition: str) -> dict[str, object]:
     return summary[summary["condition"].eq(condition)].iloc[0].to_dict()
+
+
+def paired_control_diagnostics(
+    seed_summary: pd.DataFrame,
+    *,
+    primary_condition: str,
+    control_condition: str,
+) -> dict[str, float | int]:
+    """Compare one policy with one named control on identical physical seeds."""
+
+    local = seed_summary[
+        seed_summary["condition"].isin([primary_condition, control_condition])
+    ].pivot(index="seed", columns="condition", values="terminal_capital_cny")
+    required = {primary_condition, control_condition}
+    if not required.issubset(local.columns) or local[list(required)].isna().any().any():
+        raise AssertionError("primary and named control must share complete seed support")
+    lift = local[primary_condition] - local[control_condition]
+    return {
+        "paired_seed_count": int(len(local)),
+        "difference_of_seed_medians_cny": float(
+            local[primary_condition].median() - local[control_condition].median()
+        ),
+        "paired_seed_median_lift_cny": float(lift.median()),
+        "paired_seed_wins": int((lift > 0).sum()),
+    }
 
 
 def _plot_capital(paths: pd.DataFrame, target: Path) -> None:

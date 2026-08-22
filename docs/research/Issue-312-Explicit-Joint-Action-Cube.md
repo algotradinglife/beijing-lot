@@ -5,7 +5,8 @@
 本轮没有找到可接受的增量策略，终审结论为 `NO_INCREMENT`。在冻结的
 exact-B0 共同支持上，2023 年 48 期每期固定投入 512 注、CNY1,024，开发期
 选定的 `JOINT_TAIL` 中位终值为 CNY70,795.72；最强同资金控制
-`FIXED_N7_K512_WOR` 为 CNY87,984.27，matched lift 为 -CNY17,188.55。
+`FIXED_N7_K512_WOR` 为 CNY87,984.27。两个 seed 中位终值之差为
+-CNY17,188.55，而先逐 seed 配对再取中位数的 lift 为 -CNY18,163.94。
 31 个物理 seed 中只赢 5 个，低于预设的 19 个门槛；同暴露 permutation
 百分位只有 13.6%，且 ex-largest P&L 为 -CNY35,974.61。
 
@@ -156,9 +157,31 @@ exact B0/BEST_FULL one-bundle 在相同 48 期总投入 CNY153,090，P&L 为
 而 pooled/within-issue 相关为正，说明换损失或决策层可能挽救信号。这个反驳
 成立，因此本轮不能证明“神经网络永远无效”。
 
-但它不能挽救当前策略：预注册的 primary 在 31/31 seeds 都没有正终值，落后
-最强控制 CNY17,188.55，permutation 位于 13.6th percentile，且路径与
+但它不能挽救当前策略：预注册的 primary 在 31/31 seeds 都没有正终值；其
+中位终值比最强控制低 CNY17,188.55，paired-seed median lift 为
+-CNY18,163.94，permutation 位于 13.6th percentile，且路径与
 ex-largest 同时恶化。继续围绕该 MLP 调层数或学习率属于错误层级的优化。
+
+## Post-merge EV 解释边界
+
+异步 EV 对 merge commit `c7d09b8` 的独立复算不改变 `NO_INCREMENT`，但修正
+并收窄了三处解释：
+
+- 上述 CNY17,188.55 是两个 seed 中位数之差，不是 paired-seed median lift；
+  后者是 -CNY18,163.94。配对胜场严格针对已命名的最强控制，不再使用逐 seed
+  从多个控制中取最大值的复合门槛。
+- 冻结的 matched 单因子 reset 只覆盖 selector、outcome direction 和
+  protection。N/K、generator、candidate pool 的表格是 outcome-exposed
+  描述性边际，不能据此断言这些因素没有增量，也不能用于 retain/delete 决策。
+- 2023 ledger 的 `temporal_role=calibration` 是继承自 #209 的来源角色，而在
+  #312 实验中 2023 是 terminal evaluation。当前计算按年份执行，不影响本轮
+  结论；下游必须拆分 source role 与 experiment role，避免接口误读。
+
+fresh checkout 缺少外置的原始 Parquet/SQLite 与 ticket-leg primitives，因此
+EV 没有从原始源独立重建每张票的 gross。已确认的边界包括 47 个 manifest
+payload、共同支持、聚合账本、因果重拟合和代码中整票仅乘一次 0.65。原始数据
+不提交 Git；下一轮必须提供可定位的 source manifest 与 ticket-level replay
+receipt。这是 exploration 可接受的可移植性边界，不是已完成的独立源复算。
 
 ## 下一步模型架构
 

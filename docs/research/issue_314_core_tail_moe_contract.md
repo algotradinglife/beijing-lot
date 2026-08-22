@@ -51,6 +51,9 @@ control on identical issue support.
 - 2024: one-shot terminal historical holdout. It is model-unseen, not necessarily
   human-unseen. No 2024 result may retune the frozen policy.
 - 2025+ remains outside this Issue.
+- Persist `source_temporal_role` and `experiment_role` as separate fields. A role
+  inherited from a source contract may never stand in for this experiment's role;
+  the overloaded legacy name `temporal_role` is not part of the #314 interface.
 
 ## Model inputs
 
@@ -145,7 +148,10 @@ Do not run an unbounded Cartesian grid.
 1. Use a reproducible space-filling/fractional design to screen interactions among N,
    selector, outcome direction, coverage depth, protected-leg count, WR/WOR, expert
    identity and log exposure.
-2. Preserve fixed anchors and one-factor ablations for interpretation.
+2. Preserve fixed anchors and fully matched one-factor resets for N, K/exposure,
+   generator, candidate pool/selector, outcome direction and coverage/protection.
+   Each reset must hold issue, seed, budget and every other factor fixed. Descriptive
+   outcome-exposed marginals are labeled post-hoc and cannot replace these resets.
 3. Fit regularized linear/stacking and maintained tree models as simple controls.
 4. Fit a neural gate only as a challenger. It receives weight only if chronological
    OOS evidence beats the simpler gate.
@@ -226,13 +232,20 @@ must identify which stage failed and the next evidence-bounded improvement direc
 - **REQ-314-04:** Deliver interpretable CORE/TAIL experts, simple gates and a neural
   challenger with soft weights; prohibit hard full-cube argmax.
 - **REQ-314-05:** Every learned arm reports absolute capital and matched lift versus
-  the strongest frozen baseline on identical support/exposure semantics.
+  the strongest frozen baseline on identical support/exposure semantics. Deliver
+  matched single-factor attribution for N, K/exposure, generator, candidate pool/
+  selector, outcome direction and coverage/protection; uncovered factors cannot be
+  interpreted as zero increment.
 - **REQ-314-06:** 2023 validation and frozen 2024 terminal remain separate; 2024 never
-  retunes the model.
+  retunes the model. Persist separate `source_temporal_role` and `experiment_role`
+  fields and enforce their cross-table consistency.
 - **REQ-314-07:** Deliver complete 2023–2024 d=1/d=2 staged attribution and funded
   protection/marginal-K counterfactuals.
 - **REQ-314-08:** Deliver package-first Python, focused tests, an executed Jupyter
-  notebook, compact results/figures, manifest and a decision report.
+  notebook, compact results/figures, manifest and a decision report. Bind external
+  source snapshots by path-independent manifest and provide ticket-level replay
+  primitives/receipt plus access instructions; large source databases remain outside
+  Git.
 
 ## Resource and delivery boundary
 

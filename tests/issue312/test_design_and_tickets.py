@@ -6,6 +6,7 @@ import pandas as pd
 from issue209.dynamic_policy import ActionSpec, generate_tickets
 from issue209.dynamic_policy import settle_ticket_arrays
 from issue312.design import CubeAction, build_action_registry, registry_diagnostics
+from issue312.experiment import paired_control_diagnostics
 from issue312.policy import select_policy_allocations
 from issue312.tickets import generate_cube_tickets
 
@@ -153,3 +154,32 @@ def test_policy_allocations_reject_mismatched_issue_support() -> None:
             issue306_allocations=issue306,
             development_labels=labels,
         )
+
+
+def test_paired_diagnostics_use_named_control_and_pair_before_median() -> None:
+    rows = []
+    values = {
+        "PRIMARY": [0.0, 100.0, 101.0],
+        "NAMED_CONTROL": [50.0, 51.0, 200.0],
+        "OTHER_CONTROL": [500.0, 0.0, 0.0],
+    }
+    for condition, terminals in values.items():
+        for seed, terminal in enumerate(terminals):
+            rows.append(
+                {
+                    "condition": condition,
+                    "seed": seed,
+                    "terminal_capital_cny": terminal,
+                }
+            )
+    diagnostics = paired_control_diagnostics(
+        pd.DataFrame(rows),
+        primary_condition="PRIMARY",
+        control_condition="NAMED_CONTROL",
+    )
+    assert diagnostics == {
+        "paired_seed_count": 3,
+        "difference_of_seed_medians_cny": 49.0,
+        "paired_seed_median_lift_cny": -50.0,
+        "paired_seed_wins": 1,
+    }
