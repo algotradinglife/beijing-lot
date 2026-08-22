@@ -1,0 +1,134 @@
+{
+  "issue": 314,
+  "stage": "terminal",
+  "files": {
+    "adversarial_review.json": {
+      "bytes": 2631,
+      "sha256": "00bd039565365a94316796b4c6c135df6ed7008d0fd059e2e1732db6ea52f097"
+    },
+    "capital_paths_2024.png": {
+      "bytes": 126375,
+      "sha256": "41688d1810b5de5e9af7a95c05f8ebf8cb129c75f992c9387d000f79437498f1"
+    },
+    "decision.json": {
+      "bytes": 728,
+      "sha256": "2a338781b13ef5fa161a168be6377c2c0c23a99ed5a4f3b8c83def74d5fcd60b"
+    },
+    "development_action_labels.parquet": {
+      "bytes": 185968,
+      "sha256": "f2f7567241663bda5ee2142d4d065516222ba25a71f5e4537e96b62f414530f1"
+    },
+    "development_expert_surface.parquet": {
+      "bytes": 451114,
+      "sha256": "489f2e1c7aeee1759d7f5b6dcc16dee90bde6e308313187cb989c761f781bd65"
+    },
+    "development_expert_surface_2019.parquet": {
+      "bytes": 116880,
+      "sha256": "6f0ca1735bdbaefadccc5ef46eea85d1763fadb730e88b85b28ed7d41c129070"
+    },
+    "development_expert_surface_2020.parquet": {
+      "bytes": 61062,
+      "sha256": "64577ea3ef15363351509efa33b6f4a42a3f1fa562832fa79bc81ffcd5fcb216"
+    },
+    "development_expert_surface_2021.parquet": {
+      "bytes": 109782,
+      "sha256": "bc2b623cc217389e4aeca5dbc8227f7f9ae041d4804c6654e95c95d07a4b9fa0"
+    },
+    "development_expert_surface_2022.parquet": {
+      "bytes": 118639,
+      "sha256": "4663c73feeeee63091e98a279815c10f83600376bae823ec3ad5c326ef5b83cc"
+    },
+    "development_expert_surface_2023.parquet": {
+      "bytes": 103604,
+      "sha256": "a06c18d8abd301b60c90fdcc930600f03926bd07035d6fea6049d9154749af8d"
+    },
+    "expert_registry.csv": {
+      "bytes": 545,
+      "sha256": "293a2418f1e9373b2cd44b2e7dfdf13f3c2eefc48129abc665e606d134fafcd8"
+    },
+    "freeze_receipt.json": {
+      "bytes": 1132,
+      "sha256": "879f695837684286e601ca45101794929ddc12b56d4ba260d749f623475469a6"
+    },
+    "frozen_action_predictions.parquet": {
+      "bytes": 76587,
+      "sha256": "49967877da9457602bf1ef64e364f0e2c917357dd83f75322ca886d71b767cbb"
+    },
+    "frozen_allocations_2024.jsonl": {
+      "bytes": 310134,
+      "sha256": "88211b8fc5616649bac39ea45b12aff7d38e05bece5bbf313ef7b05b6d69637d"
+    },
+    "frozen_gate.joblib": {
+      "bytes": 4044,
+      "sha256": "114d65baa0efdaf9169c503a8c82d6f48d7bd2cc9e198a6ae4a45bf830d8a0f7"
+    },
+    "issue_features_2019_2024.csv": {
+      "bytes": 73235,
+      "sha256": "de5220f7ebe174649edad704e2a29f5669674de025bc481a52195de34da385ca"
+    },
+    "matched_factor_attribution_2024.csv": {
+      "bytes": 474,
+      "sha256": "4ed7e9e6204f6dacbe2b31033bfcac673f49c2d5ab90990f09900ab2dd0365c5"
+    },
+    "near_miss_attribution_2024.png": {
+      "bytes": 65849,
+      "sha256": "3f89933f15d031e6d1421c0768b039f5ff1a82ea06575ab11d95c425cde1d5ad"
+    },
+    "pre_event_source_receipt.json": {
+      "bytes": 445,
+      "sha256": "55d2cb5f0a39acbe2c7813a7e98c8701a6f3386dab5132921b985eed6d0584da"
+    },
+    "requirement_evidence.csv": {
+      "bytes": 1775,
+      "sha256": "3962dc0c45fd1a5d9dfc4a8c979152abf1251272f1628ae40bd6ef5ee5602baa"
+    },
+    "risk_return_frontier_2024.png": {
+      "bytes": 80203,
+      "sha256": "317db258a477f814238b120c4183e566f4609c7b153a5f92ce8e336eaa854fb1"
+    },
+    "screening_2022.csv": {
+      "bytes": 2046,
+      "sha256": "f1e918357af8191b35207ca2158027f89641c8fcfdc541617170004dc7d86135"
+    },
+    "support_receipt.csv": {
+      "bytes": 252,
+      "sha256": "788ab0a9504bf9c6759efc7df678c50a31dfaab4393589f09695b63eed6fceed"
+    },
+    "terminal_capital_paths_2024.csv": {
+      "bytes": 2719671,
+      "sha256": "b3161abad142b55e57f0aeb4a189ae2334922f3c92367b620807742c3d1f6740"
+    },
+    "terminal_diagnostic_correction_receipt.json": {
+      "bytes": 476,
+      "sha256": "1643ecdb8709b464b8656250ec015ef69e906f1c7e44bdfb5d8fdcd2c23a4495"
+    },
+    "terminal_near_miss_2024.parquet": {
+      "bytes": 129995,
+      "sha256": "7bfaab6c3c4d3fd2a8df7498f1e87c27b202ed04e483db1c8eacd358ef1270c2"
+    },
+    "terminal_source_receipt.json": {
+      "bytes": 613,
+      "sha256": "a616457177bb4868ce89cf4016054f298c3d7295da25522473d78ca2fb74b709"
+    },
+    "terminal_summary_2024.csv": {
+      "bytes": 3962,
+      "sha256": "c2682d4c895b38aa4c7330a857429e71f240c57ecd235dacfe45538ca7b35db8"
+    },
+    "ticket_replay_receipt.json": {
+      "bytes": 244,
+      "sha256": "4e663e24fc916af5b1cdbec93120daafa896248a2ae4ecdd44accbb911a6cb0c"
+    },
+    "validation_capital_paths_2023.csv": {
+      "bytes": 671963,
+      "sha256": "ae22a81e235e17686624dd7da6c2ac528e3a47a084b612ee0ac36c9c09bfa770"
+    },
+    "validation_near_miss_2023.parquet": {
+      "bytes": 88169,
+      "sha256": "3fd8f2a8197ff6a699056d84f0baf32f50b5b59af38503dcfae4a4e128e85183"
+    },
+    "validation_summary_2023.csv": {
+      "bytes": 1773,
+      "sha256": "ead4a32f535ad0d1201332aa613cba159cbf10605e724d1251099c13a17793a1"
+    }
+  }
+}

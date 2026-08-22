@@ -1,0 +1,9 @@
+requirement,status,evidence,pi_read
+REQ-314-01,PASS,"freeze_receipt.json; Gate-A commit d240b01; frozen allocation/model hashes; 2024_outcome_columns_opened=[]","2024 policy was frozen before settlement"
+REQ-314-02,PASS,"expert_registry.csv; tests/issue314/test_core_tail.py","learned experts use explicit depth 1/2 and protected-leg identities; inherited control is separately exempt"
+REQ-314-03,PARTIAL,"frozen_action_predictions.parquet; frozen_allocations_2024.jsonl; terminal_summary_2024.csv","K is dynamic beyond 512 but all terminal predictions hit the predeclared K2048 screening boundary; no optimum-K claim is permitted"
+REQ-314-04,PASS,"expert_registry.csv; screening_2022.csv; frozen_gate.joblib","eight interpretable experts plus Ridge/HGB/MLP challengers; Ridge selected and expert allocation remains soft"
+REQ-314-05,PASS,"validation_summary_2023.csv; terminal_summary_2024.csv; matched_factor_attribution_2024.csv","exact #312 2023 anchor, clearly named 2024 portable control, and matched N/K/generator/selector/direction/protection resets"
+REQ-314-06,PASS,"issue_features_2019_2024.csv; freeze_receipt.json; terminal_source_receipt.json","source and experiment roles are separate; 2023 validation failed and forced pre-outcome fallback before 2024 settlement"
+REQ-314-07,PASS,"validation_near_miss_2023.parquet; terminal_near_miss_2024.parquet; near_miss_attribution_2024.png","d=1/d=2 staged attribution and CNY2 funded one-more-protection oracle upper bound are explicit"
+REQ-314-08,PASS,"src/issue314; scripts/run_bj314.py; notebooks/research/issue-314/bj314_core_tail_moe.ipynb; Issue-314-Core-Tail-MoE.md; manifest.json","package-first code, 42 focused/regression tests, executed notebook, report, figures, manifest, source and ticket replay receipts"

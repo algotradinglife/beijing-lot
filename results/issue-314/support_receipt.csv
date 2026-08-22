@@ -1,0 +1,7 @@
+issue_year,experiment_role,issues,minimum_matches,median_matches,maximum_matches
+2019,train,47,23,302.0,678
+2020,train,30,11,220.0,571
+2021,train,49,13,322.0,631
+2022,screen,53,16,294.0,567
+2023,validation,48,22,337.5,495
+2024,terminal,66,35,285.5,523
