@@ -1,0 +1,31 @@
+{
+  "active_arms": [
+    "P_TOP2_NO_GATE",
+    "RANDOM_MATCH_P_TOP2"
+  ],
+  "contract": "BJ-UNIFIED-TOP2-N7-STABLE-001/v1",
+  "horizons": [
+    "10h",
+    "initial",
+    "1h"
+  ],
+  "issue": 319,
+  "planned_stake_per_active_bundle": 256.0,
+  "preoutcome_bundle_sha256": "74e043a61d651b246c355b87d9d979ab049b68646a3ee7662fd763561bfc736b",
+  "preoutcome_ticket_sha256": "21ee5784900d226fa6879544f34cc46b7f5ed8a9843ae14ba83a36338c87dba1",
+  "price_blocked_arms": [
+    "P_TOP2_VALUE_RANK",
+    "Q_TOP2_VALUE_SUPPORT"
+  ],
+  "price_disposition": "NO_CAUSAL_PRICE_SUPPORT",
+  "probability_source": "BJ238_Q_EU_BJLINE",
+  "probability_source_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+  "random_seed_count": 31,
+  "roles_source_sha256": "b73644183a1ef3ddadffdce85358fc01452f86fded8ee210f08fd85fc2db438e",
+  "settlement_opened_before_freeze": false,
+  "tickets_per_active_bundle": 128,
+  "years": [
+    2023,
+    2024
+  ]
+}
