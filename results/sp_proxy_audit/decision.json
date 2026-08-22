@@ -1,0 +1,75 @@
+{
+  "conflict_cells": 5991,
+  "contract_version": "BJ-UNIFIED-SP-PROXY-AUDIT-001/v1",
+  "failed_thresholds": [
+    "strict 2019-2024 partition thresholds not met",
+    "no strict-overlap proxy lane met all frozen thresholds",
+    "5991 leakage/time/identity-conflict cells"
+  ],
+  "observed_metrics": {
+    "graded_cells": 2724201,
+    "overlap_cells": 2466,
+    "overlap_issues": 1,
+    "proxy_accepted_cells": 1916376,
+    "strict_accepted_cells": 822
+  },
+  "proxy_lane_decisions": [
+    {
+      "partition": "outside_contract",
+      "passes": false,
+      "proxy_source_id": "eu_consensus_fair_odds_268",
+      "snapshot_kind": "10h"
+    },
+    {
+      "partition": "outside_contract",
+      "passes": false,
+      "proxy_source_id": "eu_consensus_fair_odds_268",
+      "snapshot_kind": "1h"
+    },
+    {
+      "partition": "outside_contract",
+      "passes": false,
+      "proxy_source_id": "eu_consensus_fair_odds_268",
+      "snapshot_kind": "initial"
+    }
+  ],
+  "recommendation": "Do not use historical Beijing SP or its current proxy for value ranking; #319 may proceed probability-only while #218 accumulates strict prospective support.",
+  "source_hashes": {
+    "beidan_xlsm": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "bj216_strict_panel": "eb89f3eeafb0f25946c21edcd4c9b9326217b0b674ea6d716ca304bd070589b2",
+    "bj238_materializer": "392f1e6c022efd9ff90e8e37ab4ed4cae8555f2e6131d7ad00fc1e56fb7b3ca1",
+    "bj238_source_receipt": "d7adb8cbca9bf5d67f7ae402969bd3dfea171209bb1cadb815410b0a33f126f6",
+    "eu_proxy_backfill": "a51bdca8f3b0ef20a31ef606399daea82760a5230a8fc844ea5917178f1078d4",
+    "issue_registry": "3c0556abd15a0afcaabd99bcc2c1bd57b43407604b9180437c8aadf78805b452"
+  },
+  "strict_partition_support": {
+    "development": {
+      "accepted_vectors": 0,
+      "issues": 0,
+      "n7_issue_rate": 0.0
+    },
+    "terminal": {
+      "accepted_vectors": 0,
+      "issues": 0,
+      "n7_issue_rate": 0.0
+    },
+    "validation": {
+      "accepted_vectors": 0,
+      "issues": 0,
+      "n7_issue_rate": 0.0
+    }
+  },
+  "terminal_disposition": "NO_CAUSAL_PRICE_SUPPORT",
+  "thresholds": {
+    "bootstrap_resamples": 2000,
+    "bootstrap_seed": 3182026,
+    "proxy_max_median_abs_log_price_error": 0.15,
+    "proxy_min_overlap_fixtures": 500,
+    "proxy_min_overlap_issues": 20,
+    "proxy_min_spearman": 0.75,
+    "proxy_min_top2": 0.85,
+    "proxy_min_top7_jaccard": 0.7,
+    "strict_min_issues_per_partition": 30,
+    "strict_min_n7_rate": 0.8
+  }
+}

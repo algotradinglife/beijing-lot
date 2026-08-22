@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#314 CORE/TAIL soft-MoE closed NO_LEARNABLE_INCREMENT / NO_PROMOTION; learned selector/direction/protection/K rejected)**
+Updated: **2026-08-22 (#318 historical SP/proxy audit completed; #319 inherits a probability-only stable-center boundary)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -159,10 +159,17 @@ PI interpretation and does not replace those edges or Project states.
              |
              v
 #314 CORE/TAIL soft-MoE + explicit depth-1/2 coverage + dynamic exposure
-     (In Progress; 2023 validation and frozen 2024 terminal attribution)
+     (Done; NO_LEARNABLE_INCREMENT)
              |
              v
-#210 held-out/prospective validation  <--- blocked by #314 and #218
+#318 historical Beijing-SP/proxy admissibility audit
+     (Done; NO_CAUSAL_PRICE_SUPPORT)
+             |
+             v
+#319 probability-only Top-2 N7 stable center (Ready)
+             |
+             v
+#210 held-out/prospective validation  <--- blocked by #319 and #218
              |
              v
 #211 timestamped message overlay     <--- #182 message evidence
@@ -193,8 +200,10 @@ PI interpretation and does not replace those edges or Project states.
 | 21 | [#306] matched-exposure within-issue ticket composition | Closed / Done | M3 | #305 closed; predecessor of #312 | Interface and matched-exposure mechanics retained. Post-merge EV found broader-support drift; on inherited exact-B0 support the selected family changes and positive `ACTION_VALUE_SIGNAL` does not reproduce |
 | 22 | [#312] explicit joint action cube | Closed / Done | M3 | #306 closed; blocks #314 | Exact-support 2023 JOINT_PRIMARY CNY70,795.72 versus fixed N7/K512/WOR CNY87,984.27; hard action-conditioned MLP/argmax is rejected, while protection remains a weak parameter clue. Label-safe five-year replay changed no result |
 | 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Closed / Done | M3 | #312 closed; blocks #210 | Full MoE rejected: 2023 validation loses 31/31 seeds and 2024 raw ends CNY34,373.99 versus portable fixed CNY81,882.32. Protection beats no-protection (+CNY1,048.49) but loses to matched random placement (−CNY594.31); `NO_LEARNABLE_INCREMENT`, no promotion |
-| 24 | [#210] held-out/forward validation | Open / Blocked | M4 | #314 closed without candidate; #218 remains open | Do not spend prospective evidence: #314 did not produce a promotable candidate and explicitly retains its strongest control |
-| 25 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 24 | [#318] historical Beijing-SP/proxy audit | Closed / Done | M1 | No open blocker; predecessor of #319 | All six frozen sources consumed. Historical SP is timestamp-unproven; strict/proxy overlap is only one 2026 issue and fails every fidelity threshold. `NO_CAUSAL_PRICE_SUPPORT`; #319 must be probability-only |
+| 25 | [#319] probability-only Top-2 N7 stable center | Open / Ready | M3 | #318 closed | Test the stable-center reset without historical SP value ranking; preserve exact probability provenance and matched controls |
+| 26 | [#210] held-out/forward validation | Open / Blocked | M4 | #319 and #218 remain open | Do not spend prospective evidence until the probability-only stable-center candidate and strict prospective support satisfy native prerequisites |
+| 27 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
 
@@ -649,6 +658,8 @@ retrospective feature.
 [#286]: https://github.com/algotradinglife/beijing-lot/issues/286
 [#291]: https://github.com/algotradinglife/beijing-lot/issues/291
 [#292]: https://github.com/algotradinglife/beijing-lot/issues/292
+[#318]: https://github.com/algotradinglife/beijing-lot/issues/318
+[#319]: https://github.com/algotradinglife/beijing-lot/issues/319
 
 ---
 
