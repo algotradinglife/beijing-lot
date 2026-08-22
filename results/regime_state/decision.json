@@ -1,0 +1,14 @@
+{
+  "allocator_nonzero_issues": 9,
+  "allocator_observable_issues": 252,
+  "allocator_positive_issues": 5,
+  "bootstrap_positive_calibration_slices": 0,
+  "claim_boundary": "HISTORICAL_WALK_FORWARD_DIAGNOSTIC",
+  "consistent_calibration_targets": 0,
+  "disposition": "SPARSE_RESPONSE_REDESIGN",
+  "issue": 330,
+  "max_abs_calibration_lag1": 0.11680207722618192,
+  "next_moe_interface": "MULTITASK_LAGGED_CALIBRATION_STATE",
+  "promotion": false,
+  "unlock_210": false
+}

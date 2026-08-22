@@ -1,0 +1,53 @@
+{
+  "contract": "BJ-UNIFIED-REGIME-STATE-001/v1",
+  "files": {
+    "annual_summary.csv": {
+      "bytes": 858,
+      "sha256": "957cc3bc750b1caed43b82f77038454a288cba4cb60dda4a9f9b30e5a5081b9b"
+    },
+    "bootstrap_increment.csv": {
+      "bytes": 1518,
+      "sha256": "dc0febcc4afc59d8c61decbbcb307966fbd395b6b547bfccbcfb763064a3ffe7"
+    },
+    "chronology_receipt.json": {
+      "bytes": 3243,
+      "sha256": "70f65bcdaf220ee7b7432f5fa15aef22d8528dae91146d528802c4fe481af6aa"
+    },
+    "decision.json": {
+      "bytes": 470,
+      "sha256": "ddf157a5736836a57d89470475102dbf7d971d3fc4d48e2afb0cab846e94b7f7"
+    },
+    "freeze_receipt.json": {
+      "bytes": 8771,
+      "sha256": "ce091ea969f7d70c36c51e516438cc92886ff74898eeaa73899c21430082fc70"
+    },
+    "model_receipt.json": {
+      "bytes": 148076,
+      "sha256": "1c5b8a3a2a3d35aaff6a9ddaa80c263e4a271dd8934a90fa3ac297343037c8d5"
+    },
+    "oof_predictions.parquet": {
+      "bytes": 59697,
+      "sha256": "635fc9032ea4632d988ffc756257d4d1242f120906492cf03a338ee47a74efc7"
+    },
+    "persistence.csv": {
+      "bytes": 2138,
+      "sha256": "51afd779a2cdff6368d581e7fd8d3b3b2c03f3770c91e70950bcc41fb24d93e5"
+    },
+    "prediction_metrics.csv": {
+      "bytes": 13339,
+      "sha256": "f76307ae175989611678ef4c93e583dbb7485c47b21493e80b0a99b2d02ebcef"
+    },
+    "state_ledger.parquet": {
+      "bytes": 517170,
+      "sha256": "ebf3a4f15a3c6d044402a531ce4abb3ce7c3df8d9b282f8331e5b87ddd903393"
+    },
+    "state_schema.json": {
+      "bytes": 8013,
+      "sha256": "f4d3da0a016de564084fdc11e57825a72e4d82c7864253c846c26f892835db6a"
+    },
+    "window_sensitivity.csv": {
+      "bytes": 1870,
+      "sha256": "3a2253f1895b595b704f58706ba8377853afe15ea6a15c0bb1958c87873ef573"
+    }
+  }
+}
