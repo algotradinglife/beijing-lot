@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#306 matched-exposure ticket learning: causal 2023 action-value signal, but seed and ex-largest stability barriers remain)**
+Updated: **2026-08-22 (#312 exact-support joint action cube closed NO_INCREMENT; #314 CORE/TAIL soft-MoE, explicit depth-1/2 coverage, dynamic exposure and 2023–2024 attribution active)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -150,11 +150,19 @@ PI interpretation and does not replace those edges or Project states.
      but exact same-exposure placement percentile 42.71%; no selection Edge)
              |
              v
-#306 matched-exposure within-issue ticket composition (Done; learned
-     N/K/generator mapping +1.41%, 98.4th placement percentile; no promotion)
+#306 matched-exposure within-issue ticket composition (Done; interface retained,
+     post-merge exact-support correction withdraws positive action-value claim)
              |
              v
-#210 held-out/prospective validation  <--- no promotable candidate; blocked by #218
+#312 explicit selector/outcome/protection action cube (Done; NO_INCREMENT;
+     hard action-MLP argmax loses to exact-support fixed N7/WOR)
+             |
+             v
+#314 CORE/TAIL soft-MoE + explicit depth-1/2 coverage + dynamic exposure
+     (In Progress; 2023 validation and frozen 2024 terminal attribution)
+             |
+             v
+#210 held-out/prospective validation  <--- blocked by #314 and #218
              |
              v
 #211 timestamped message overlay     <--- #182 message evidence
@@ -182,9 +190,11 @@ PI interpretation and does not replace those edges or Project states.
 | 18 | [#299] BEST_FULL-anchored residual optimizer | Closed / Done | M3 | #296 closed; blocks #210 | Exact matched residual learning improves 2023 BEST_FULL from -20.75% to -9.10%, but remains below cash and only the 38.3rd percentile of exposure-matched random placement; retain architecture, no promotion |
 | 19 | [#302] hierarchical dynamic expert mixture | Closed / Done | M3 | #299 closed; blocks #210 | Expanding keep/skip ends 2023 +2.63% versus exact BEST_FULL -20.75%; expert funding adds zero under the causal OOF gate and placement misses falsification, so retain only development evidence |
 | 20 | [#305] dedicated keep/skip correction | Closed / Done | M3 | #302 closed; blocks #306 | Independent keep/skip ends 2023 at -7.11%, but its eight funded issues rank only 42.71% among 23,535,820 exact same-exposure placements and change materially with alpha; classify as exposure reduction, not issue-selection Edge |
-| 21 | [#306] matched-exposure within-issue ticket composition | Closed / Done | M3 | #305 closed; blocks #210 | Fixed 512-ticket/CNY1,024 exposure on every eligible issue: development-selected N/K/generator head ends 2023 +1.41% versus fixed N7/WOR -1.78% and reaches the 98.4th same-exposure placement percentile; retain `ACTION_VALUE_SIGNAL`, not promotion |
-| 22 | [#210] held-out/forward validation | Open / Blocked | M4 | #306 closed; #218 open; no promoted candidate | Do not spend holdout until the intra-issue signal clears paired-seed and ex-largest stability or another candidate meets the frozen gate |
-| 23 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 21 | [#306] matched-exposure within-issue ticket composition | Closed / Done | M3 | #305 closed; predecessor of #312 | Interface and matched-exposure mechanics retained. Post-merge EV found broader-support drift; on inherited exact-B0 support the selected family changes and positive `ACTION_VALUE_SIGNAL` does not reproduce |
+| 22 | [#312] explicit joint action cube | Closed / Done | M3 | #306 closed; blocks #314 | Exact-support 2023 JOINT_PRIMARY CNY70,795.72 versus fixed N7/K512/WOR CNY87,984.27; hard action-conditioned MLP/argmax is rejected, while protection remains a weak parameter clue. Label-safe five-year replay changed no result |
+| 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Open / In Progress | M3 | Native `blockedBy #312` is closed; blocks #210 | Learn soft expert weights, N, depth-1/2 coverage, protected legs and dynamic K/exposure; validate on 2023, freeze, then terminally evaluate and attribute 2024 without full three-result coverage |
+| 24 | [#210] held-out/forward validation | Open / Blocked | M4 | #314 and #218 open | Do not spend prospective evidence until #314 yields a frozen candidate or explicitly retains its strongest control |
+| 25 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
 
@@ -334,25 +344,40 @@ PI interpretation and does not replace those edges or Project states.
 
 ### #306 matched-exposure ticket-composition signal
 
-- #306 removes issue abstention completely: all 53 eligible 2023 issues receive
-  exactly 512 CNY2 tickets. The learner can change N, K and TOP/WR/WOR ticket
-  generation, but cannot reduce issue coverage or committed exposure.
-- The policy family is frozen from 2021–2022 expanding OOS paths. The selected
-  mean/downside head ends 2023 at +1.41%, versus -1.78% for fixed N7/K512 WOR
-  and -15.27% for the static tail mixture. Its +CNY3,192.84 lift over the
-  strongest control is at the 98.4th percentile of 2,000 physical
-  same-exposure issue/action permutations.
-- The secondary long-tail head ends at +6.57% and the 97.9th permutation
-  percentile, but was not the development-selected primary. The forced
-  multi-sleeve policy loses 17.49%, so diversity is not automatically useful.
-- This is an `ACTION_VALUE_SIGNAL`, not a `DYNAMIC_TICKET_SIGNAL`: the primary
-  beats the paired strongest control in only 2/5 ticket seeds, has negative
-  ex-largest P&L, and the earlier absolute paths are negative. Keep 2024+
-  sealed and do not restart issue keep/skip.
-- Next development should expand the same fixed-exposure action cube with
-  explicit match-selector, outcome-direction and selective-protection
-  parameters, increase physical ticket seeds, and preserve the exact null.
+- #306 removes issue abstention and provides a useful physical N/K/generator
+  interface, but its post-merge EV found that the apparent positive mapping
+  used a broader #209 support set rather than inherited exact-B0 common support.
+- On the correct 2023 support the selected family changes and the positive
+  matched-lift result does not reproduce. `ACTION_VALUE_SIGNAL` is withdrawn;
+  #306 is retained only as interface/mechanics evidence.
+- #312 absorbed the correction instead of reopening the historical PR. Its
+  development and terminal selection use exact-B0 support, while #306 appears
+  only as a secondary interface comparator.
 - Report: [`Issue-306-Matched-Exposure-Ticket-Composition.md`](Issue-306-Matched-Exposure-Ticket-Composition.md).
+
+### #312 joint-action decision and #314 successor
+
+- #312 evaluates explicit N, K, match selector, candidate pool, outcome
+  direction, TOP/WR/WOR and bounded protection actions. The 2023 primary ends
+  at CNY70,795.72 versus CNY87,984.27 for fixed N7/K512/WOR, with only 5/31
+  paired seed wins and a 13.6th same-exposure permutation percentile.
+- The action-conditioned MLP retains weak average ranking information but hard
+  argmax amplifies top-action error and long-tail winner's curse. It is rejected
+  as the decision rule; this does not reject M×3 learning or soft expert mixing.
+- PI review found a read-before-filter implementation defect. Parquet year
+  predicate pushdown and issue-restricted SQLite reads replaced it before merge;
+  a complete 2019–2023 replay reproduced all 556,274 action×seed ledger rows,
+  the frozen allocation SHA and the terminal decision SHA.
+- Protection adds a weak paired clue but is not independent Edge. #285 already
+  rejected blanket protection, so #314 learns selective depth-1/2 coverage and
+  retains no protection plus same-budget random protection as controls.
+- #314 replaces fixed K512 with learned dynamic K/exposure under natural
+  bankroll, uniqueness and marginal-value limits. It uses a soft CORE/TAIL MoE,
+  excludes three-result full coverage, validates on 2023, freezes, then runs a
+  model-unseen 2024 terminal evaluation with issue-level d=1/d=2 failure
+  attribution. #210 now waits on #314 rather than #312.
+- Reports: [`Issue-312-Explicit-Joint-Action-Cube.md`](Issue-312-Explicit-Joint-Action-Cube.md)
+  and [`issue_314_core_tail_moe_contract.md`](issue_314_core_tail_moe_contract.md).
 
 ### #282 conditional-policy prototype decision
 
