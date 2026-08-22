@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#305 exact-null correction: keep/skip lift is exposure reduction, not issue-selection Edge; next learn within-issue ticket construction at matched exposure)**
+Updated: **2026-08-22 (#306 matched-exposure ticket learning: causal 2023 action-value signal, but seed and ex-largest stability barriers remain)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -150,11 +150,11 @@ PI interpretation and does not replace those edges or Project states.
      but exact same-exposure placement percentile 42.71%; no selection Edge)
              |
              v
-#306 matched-exposure within-issue ticket composition (In Progress;
-     no learned issue skip; optimize N/K/WR/WOR/outcome/protection/expert mix)
+#306 matched-exposure within-issue ticket composition (Done; learned
+     N/K/generator mapping +1.41%, 98.4th placement percentile; no promotion)
              |
              v
-#210 held-out/prospective validation  <--- no candidate; also blocked by #218
+#210 held-out/prospective validation  <--- no promotable candidate; blocked by #218
              |
              v
 #211 timestamped message overlay     <--- #182 message evidence
@@ -182,8 +182,8 @@ PI interpretation and does not replace those edges or Project states.
 | 18 | [#299] BEST_FULL-anchored residual optimizer | Closed / Done | M3 | #296 closed; blocks #210 | Exact matched residual learning improves 2023 BEST_FULL from -20.75% to -9.10%, but remains below cash and only the 38.3rd percentile of exposure-matched random placement; retain architecture, no promotion |
 | 19 | [#302] hierarchical dynamic expert mixture | Closed / Done | M3 | #299 closed; blocks #210 | Expanding keep/skip ends 2023 +2.63% versus exact BEST_FULL -20.75%; expert funding adds zero under the causal OOF gate and placement misses falsification, so retain only development evidence |
 | 20 | [#305] dedicated keep/skip correction | Closed / Done | M3 | #302 closed; blocks #306 | Independent keep/skip ends 2023 at -7.11%, but its eight funded issues rank only 42.71% among 23,535,820 exact same-exposure placements and change materially with alpha; classify as exposure reduction, not issue-selection Edge |
-| 21 | [#306] matched-exposure within-issue ticket composition | Open / In Progress | M3 | #305 closed; blocks #210 | Every pre-event eligible issue remains active; learn N/K, match and outcome direction, WR/WOR, selective protection and expert composition without a learned issue-level skip or zero-funding escape |
-| 22 | [#210] held-out/forward validation | Open / Blocked | M4 | #306 open; #218 open; no promoted candidate | Do not spend holdout until an intra-issue dynamic candidate beats the frozen baseline and matched-exposure controls pre-2024 |
+| 21 | [#306] matched-exposure within-issue ticket composition | Closed / Done | M3 | #305 closed; blocks #210 | Fixed 512-ticket/CNY1,024 exposure on every eligible issue: development-selected N/K/generator head ends 2023 +1.41% versus fixed N7/WOR -1.78% and reaches the 98.4th same-exposure placement percentile; retain `ACTION_VALUE_SIGNAL`, not promotion |
+| 22 | [#210] held-out/forward validation | Open / Blocked | M4 | #306 closed; #218 open; no promoted candidate | Do not spend holdout until the intra-issue signal clears paired-seed and ex-largest stability or another candidate meets the frozen gate |
 | 23 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
@@ -331,6 +331,28 @@ PI interpretation and does not replace those edges or Project states.
   matched exposure. Stage-4 bankroll sizing remains separate.
 - Reports: [`Issue-302-Hierarchical-Dynamic-Expert-Mixture.md`](Issue-302-Hierarchical-Dynamic-Expert-Mixture.md)
   and [`Issue-305-Dedicated-Keep-Skip-Correction.md`](Issue-305-Dedicated-Keep-Skip-Correction.md).
+
+### #306 matched-exposure ticket-composition signal
+
+- #306 removes issue abstention completely: all 53 eligible 2023 issues receive
+  exactly 512 CNY2 tickets. The learner can change N, K and TOP/WR/WOR ticket
+  generation, but cannot reduce issue coverage or committed exposure.
+- The policy family is frozen from 2021–2022 expanding OOS paths. The selected
+  mean/downside head ends 2023 at +1.41%, versus -1.78% for fixed N7/K512 WOR
+  and -15.27% for the static tail mixture. Its +CNY3,192.84 lift over the
+  strongest control is at the 98.4th percentile of 2,000 physical
+  same-exposure issue/action permutations.
+- The secondary long-tail head ends at +6.57% and the 97.9th permutation
+  percentile, but was not the development-selected primary. The forced
+  multi-sleeve policy loses 17.49%, so diversity is not automatically useful.
+- This is an `ACTION_VALUE_SIGNAL`, not a `DYNAMIC_TICKET_SIGNAL`: the primary
+  beats the paired strongest control in only 2/5 ticket seeds, has negative
+  ex-largest P&L, and the earlier absolute paths are negative. Keep 2024+
+  sealed and do not restart issue keep/skip.
+- Next development should expand the same fixed-exposure action cube with
+  explicit match-selector, outcome-direction and selective-protection
+  parameters, increase physical ticket seeds, and preserve the exact null.
+- Report: [`Issue-306-Matched-Exposure-Ticket-Composition.md`](Issue-306-Matched-Exposure-Ticket-Composition.md).
 
 ### #282 conditional-policy prototype decision
 
