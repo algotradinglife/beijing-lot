@@ -1,0 +1,33 @@
+{
+  "issue": 312,
+  "question": "explicit within-issue selector, outcome and protection joint action value",
+  "decision": {
+    "verdict": "NO_INCREMENT",
+    "promotable": false,
+    "eligible_issue_policy": "ALL_ISSUES_ACTIVE_NO_LEARNED_SKIP",
+    "committed_tickets_per_issue": 512,
+    "committed_stake_per_issue_cny": 1024.0,
+    "evaluation_physical_seeds": 31,
+    "primary_2023_median_terminal_capital_cny": 70795.71844827884,
+    "primary_2023_median_growth_pct": -29.204281551721156,
+    "primary_2023_median_turnover_roi_pct": -59.416262922609775,
+    "primary_2023_median_max_drawdown_pct": 30.179676271489207,
+    "primary_2023_median_ex_largest_pnl_cny": -35974.61427429434,
+    "issue306_2023_median_terminal_capital_cny": 88557.96561706233,
+    "issue306_role": "INTERFACE_ONLY_SECONDARY_COMPARATOR",
+    "exact_b0_reference_terminal_capital_cny": 79248.96196799999,
+    "exact_b0_reference_turnover_roi_pct": -13.554796545822722,
+    "exact_b0_reference_matched_budget_translation": "UNAVAILABLE_NO_COMMITTED_TICKET_IDENTITIES",
+    "strongest_control": "FIXED_N7_K512_WOR",
+    "strongest_control_median_terminal_capital_cny": 87984.26791061989,
+    "matched_lift_vs_strongest_control_cny": -17188.54946234105,
+    "same_exposure_permutation_percentile": 0.136,
+    "paired_seed_wins_vs_strongest_control": 5,
+    "paired_seed_win_requirement": 19,
+    "ex_largest_not_worse_than_strongest_fixed_static": false,
+    "primary_fits_converged": true,
+    "predicted_mean_roi_pooled_spearman": 0.3086029888345677,
+    "static_action_rank_transfer_spearman": 0.16667869254635978,
+    "sealed_years": "2024+ not read"
+  }
+}

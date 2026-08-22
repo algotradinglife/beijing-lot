@@ -1,0 +1,176 @@
+# Issue #312 — 显式场次、赛果与保护联合动作立方体
+
+## 五分钟结论
+
+本轮没有找到可接受的增量策略，终审结论为 `NO_INCREMENT`。在冻结的
+exact-B0 共同支持上，2023 年 48 期每期固定投入 512 注、CNY1,024，开发期
+选定的 `JOINT_TAIL` 中位终值为 CNY70,795.72；最强同资金控制
+`FIXED_N7_K512_WOR` 为 CNY87,984.27，matched lift 为 -CNY17,188.55。
+31 个物理 seed 中只赢 5 个，低于预设的 19 个门槛；同暴露 permutation
+百分位只有 13.6%，且 ex-largest P&L 为 -CNY35,974.61。
+
+这不是“联合参数没有价值”，而是对当前建模方式的否定：小型 MLP 直接从
+期级特征与完整 action identity 预测高噪声、长尾的 action ROI，再做硬
+`argmax`，会把有限的排序误差放大成错误动作。模型对平均 ROI 的 pooled
+Spearman 仍有 0.309、期内中位 Spearman 有 0.443，但这些弱排序能力不足以
+可靠识别最优尾部动作。下一步应把神经网络降为候选专家，把学习目标下沉到
+M×3 cell 的概率、价值与不确定性，再由受约束的组合优化器完成 N、场次、
+赛果和保护配置。
+
+## 为什么本轮重做了共同支持
+
+#306 的 post-merge EV 发现其正向 `ACTION_VALUE_SIGNAL` 使用了更宽的 #209
+支持集，而非契约要求的 inherited exact-B0 共同支持。将 2023 限制到正确的
+48 期后，#306 的开发选择与正向 matched-lift 结论均不能复现。因此 #312：
+
+- 只继承 #306 的票生成接口，不继承其正向科学结论；
+- 开发排序限定在 #299 `MATCHED_BASELINE_AND_FEATURES` 支持：2019–2022
+  分别 47、30、49、53 期；
+- 2023 终评固定为 48 期；
+- #306 策略仅作为接口型次要对照，不参与最强控制判定；
+- 额外报告 exact B0/BEST_FULL one-bundle 经济结果，但由于其投入规模不同，
+  不把它伪装成同资金比较。
+
+## 冻结设计
+
+### 动作空间
+
+在读取 2023 赛果之前冻结 192 个开发动作，再由 2021/2022 expanding OOF
+冻结 48 个终评候选。动作向量显式包含：
+
+- `N=3..10`；
+- `K=8/32/128/512`，最终每期通过重复 bundle 固定为 512 注；
+- 场次 selector：global value、best value、low entropy、cold excludable、
+  divergence、hybrid；
+- candidate pool：N、N+2、N+4、全部可用场次；
+- 赛果方向：market probability、raw value、signed divergence、hybrid；
+- 票生成：TOP、WR、WOR；
+- 保护：none、uncertainty、divergence、5%/15% soft re-entry。
+
+每张中奖 N 串 1 的结算为：
+
+```text
+gross = CNY2 × 0.65 × product(SP_SETTLE legs)
+```
+
+`0.65` 只在整张票上应用一次，不按腿重复折扣。
+
+### 时间与资金边界
+
+- 2019–2022：开发；2021/2022 为 expanding OOF 选择窗口；
+- 2023：一次性终评；2024+ 未读取；
+- 每个条件在完全相同的 48 期上，每期 512 注 / CNY1,024；
+- 开发 11 个物理 seed，终评 31 个物理 seed；
+- action registry、候选表与 2023 allocation 分别在赛果读取前提交并绑定 SHA。
+
+## 主要结果
+
+| 条件 | 2023 中位终值 | 本金增长 | 周转 ROI | 最大回撤 | 正收益期率 | 任意返奖率 | ex-largest P&L |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| IDENTITY_SHUFFLED | 95,807.81 | -4.19% | -8.53% | 15.24% | 20.83% | 41.67% | -17,838.96 |
+| #306 interface comparator | 88,557.97 | -11.44% | -23.28% | 16.97% | 18.75% | 54.17% | -17,283.99 |
+| FIXED_N7_K512_WOR | 87,984.27 | -12.02% | -24.45% | 16.13% | 20.83% | 29.17% | -19,141.39 |
+| ABLATE_OUTCOME | 75,231.50 | -24.77% | -50.39% | 27.32% | 10.42% | 14.58% | -33,119.29 |
+| JOINT_MEAN | 73,961.63 | -26.04% | -52.98% | 26.04% | 10.42% | 47.92% | -30,070.28 |
+| JOINT_PRIMARY / TAIL | 70,795.72 | -29.20% | -59.42% | 30.18% | 10.42% | 12.50% | -35,974.61 |
+| ABLATE_SELECTOR | 68,261.35 | -31.74% | -64.57% | 31.74% | 10.42% | 10.42% | -37,463.17 |
+| ABLATE_PROTECTION | 68,163.07 | -31.84% | -64.77% | 33.16% | 8.33% | 10.42% | -39,934.51 |
+| BEST_STATIC_ACTION | 50,848.00 | -49.15% | -100.00% | 49.15% | 0.00% | 0.00% | -48,128.00 |
+
+exact B0/BEST_FULL one-bundle 在相同 48 期总投入 CNY153,090，P&L 为
+-CNY20,751.04，周转 ROI -13.55%，终值 CNY79,248.96。它不是每期 CNY1,024
+的 matched control，不能与上表直接比较绝对终值优劣。
+
+## 风险路径
+
+`JOINT_PRIMARY` 的中位最长连续亏损期为 18，最长无返奖为 15；最差滚动
+5/10/20 期 P&L 分别为 -CNY5,120、-CNY10,240、-CNY19,096.91。31 个 seed
+没有一个终值超过初始 CNY100,000，且中位路径直到样本末端仍处于水下。
+因此，即使忽略相对基线，它也不具备用户要求的可持有性。
+
+固定 N7/WOR 的中位最长亏损期为 9、最长无返奖为 7，路径风险明显较小；
+但其终值仍为负。它继续是安全控制，不是可投产正 Edge。
+
+## MLP 到底学到了什么
+
+模型不是完全随机：
+
+| 目标 | pooled Spearman | 期内中位 Spearman | 期内相关为正比例 |
+|---|---:|---:|---:|
+| mean ROI | 0.309 | 0.443 | 72.92% |
+| positive probability | 0.413 | 0.546 | 89.58% |
+| 5x tail probability | 0.347 | 0.402 | 93.75% |
+
+但“平均排序有信息”不等于“最顶部 action 可选”。硬 `argmax` 专门选择预测
+误差最大的尾部，形成 winner's curse。55 个同时存在于开发与终评的静态动作，
+开发—2023 排名 Spearman 只有 0.167，证明 action 排名的跨期迁移很弱。
+
+最典型的是开发期最佳静态动作 `N10/K8/GLOBAL_VALUE/RAW_VALUE/WR/NONE`：
+31 个终评 seed 中 30 个终值都是 CNY50,848，只有 1 个 seed 命中特大回报，
+最大终值 CNY5,136,275.62。其 seed 中位数是全损、均值却为 CNY214,894.05。
+这正是不能用均值 ROI 直接训练并 argmax 的原因。
+
+`IDENTITY_SHUFFLED` 的中位终值较好也不能当策略：它是负对照，不是可部署
+规则；其均值同样被单一大奖 seed 拉到 CNY266,752.73，ex-largest 仍为负。
+它只能说明当前 learned identity mapping 不优于一个偶然的、较分散的动作映射。
+
+## 各因素的可解释信号
+
+配对 ablation 给出的窄结论是：
+
+- protection 相对完全去保护，中位 seed lift +CNY4,359.35，80.65% seeds
+  为正；但 ex-largest lift 为 -CNY1,308.88，且联合策略整体仍显著落后控制。
+  因此它是值得保留的参数，不是独立 Edge。
+- selector 相对 global reset，中位 lift +CNY583.51，54.84% seeds 为正，
+  但 ex-largest lift -CNY3,337.81，证据很弱。
+- outcome direction 相对 raw-value reset，中位 lift -CNY807.66，只有 38.71%
+  seeds 为正；当前 divergence/hybrid outcome 学习是负贡献。
+
+结果暴露后的全动作边际表中，WR 的平均 ROI 好于 WOR，TOP 最差；N7/N8
+比 N3–N6 稳定，N10 均值则完全由极少大奖驱动。这些边际不是随机化的 matched
+因果比较，只能用于提出下一轮假设，不能直接挑参数。
+
+## 对抗性解释
+
+如果挑战本轮结论，最强反驳是：训练期数仍少、2023 可能发生 regime shift，
+而 pooled/within-issue 相关为正，说明换损失或决策层可能挽救信号。这个反驳
+成立，因此本轮不能证明“神经网络永远无效”。
+
+但它不能挽救当前策略：预注册的 primary 在 31/31 seeds 都没有正终值，落后
+最强控制 CNY17,188.55，permutation 位于 13.6th percentile，且路径与
+ex-largest 同时恶化。继续围绕该 MLP 调层数或学习率属于错误层级的优化。
+
+## 下一步模型架构
+
+1. **先做纯 MoE soft mixture。** 把可解释的 N7/WOR、value-WR、保护型与
+   少量长尾生成器作为 experts；gate 每期把 512 注按连续权重分给多个专家，
+   而不是硬选唯一 action。第一版使用正则化线性 stacking/softmax gate，
+   同时保留等权与固定权重混合作为简单控制。
+2. **显式拆成 CORE 与 TAIL 两类专家。** CORE 占大部分资金，目标是打平或
+   微赢，必须通过中位/截尾收益、ex-largest、亏损连段和滚动窗口门槛；
+   TAIL 只占小 sleeve，允许一两年才出现一次大奖，但要求长期贡献可解释、
+   最大持续拖累有界，并与 CORE 及其他 tail 路径低相关。第一版冻结
+   CORE 85%–95%、TAIL 5%–15% 的小网格，禁止一次尾部预测接管全部资金。
+3. **先优化保守价值而非长尾。** CORE 主目标使用 shrinkage 后期望净收益
+   或 log-capital growth，并以正收益期率、最坏窗口和下行风险为约束。
+   不能只最大化命中率，因为低赔率高命中仍可能稳定亏损；TAIL 另用长期
+   贡献、尾部命中间隔和组合分散价值评价，不能套用 CORE 的中位收益门槛。
+4. **学习对象下沉到 M×3 cell。** 分别估计校准胜率、条件返奖、市场—模型
+   divergence 与不确定性，避免直接拿极稀疏的整套 action ROI 当主标签。
+5. **模型并列而非 MLP 独占。** 用 regularized linear、成熟树模型和 MLP
+   作为专家；神经网络只有在时序 OOS 明确优于简单模型时才获得权重。
+6. **组合层采用受约束优化。** 输入 cell 分布和协方差，在固定 512 注下决定
+   N、场次子集、赛果、WR/WOR 与选择性保护；禁止无保护的硬 argmax。
+7. **先寻找真正的 CORE frontier。** 当前 exact-support N7/WOR 本金增长仍为
+   -12.02%，只能作为风险控制，尚不能称为打平 CORE。应先从专家库与简单
+   混合中找到接近 0 的稳定前沿，再优化 tail sleeve 占比。
+8. **回退约束。** 任一 learned policy 在开发 OOS 不满足 matched baseline
+   与路径门槛时，必须回退到 frozen control；#312 不打开 #210 或 2024+。
+
+## 交付索引
+
+- Notebook: `notebooks/research/issue-312/bj312_explicit_joint_action_cube.ipynb`
+- 冻结收据与结果：`results/issue-312/`
+- 核心代码：`src/issue312/`
+- 可重建入口：`scripts/build_bj312_action_registry.py` 至
+  `scripts/run_bj312_experiment.py`

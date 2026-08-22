@@ -8,6 +8,7 @@ import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from .evaluation import (
@@ -17,6 +18,7 @@ from .evaluation import (
     factor_attribution,
     physical_permutation,
 )
+from .surface import aggregate_action_labels
 
 
 def run_experiment(output: str | Path) -> dict[str, object]:
@@ -49,11 +51,27 @@ def run_experiment(output: str | Path) -> dict[str, object]:
         as_index=False,
     ).agg(issues=("issue", "nunique"), allocated_tickets=("allocated_tickets", "sum"))
     parameter_distribution.to_csv(output / "primary_parameter_distribution.csv", index=False)
+    diagnostics = _model_diagnostics(output, allocations, ledger)
+    diagnostics["prediction"].to_csv(
+        output / "prediction_diagnostics_2023.csv", index=False
+    )
+    diagnostics["transfer"].to_csv(
+        output / "static_rank_transfer.csv", index=False
+    )
+    diagnostics["factor"].to_csv(
+        output / "realized_factor_marginals_2023.csv", index=False
+    )
+    diagnostics["rows"].to_csv(
+        output / "prediction_realized_2023.csv", index=False
+    )
     baseline = _exact_b0_reference(output)
     baseline.to_csv(output / "exact_b0_reference_2023.csv", index=False)
     _plot_capital(paths, output / "capital_paths_2023.png")
     _plot_frontier(summary, output / "risk_tail_frontier_2023.png")
     _plot_parameters(primary_allocations, output / "primary_parameter_distribution.png")
+    _plot_prediction_transfer(
+        diagnostics["rows"], output / "prediction_vs_realized_2023.png"
+    )
 
     primary = _row(summary, "JOINT_PRIMARY")
     issue306 = _row(summary, "ISSUE306_PRIMARY")
@@ -140,6 +158,15 @@ def run_experiment(output: str | Path) -> dict[str, object]:
         "primary_fits_converged": bool(
             fit_receipts.loc[fit_receipts["condition"].eq("LEARNED"), "converged"].all()
         ),
+        "predicted_mean_roi_pooled_spearman": float(
+            diagnostics["prediction"].loc[
+                diagnostics["prediction"]["target"].eq("mean_roi"),
+                "pooled_spearman",
+            ].iloc[0]
+        ),
+        "static_action_rank_transfer_spearman": float(
+            diagnostics["transfer"].iloc[0]["development_vs_2023_spearman"]
+        ),
         "sealed_years": "2024+ not read",
     }
     payload = {
@@ -153,6 +180,146 @@ def run_experiment(output: str | Path) -> dict[str, object]:
     )
     write_manifest(output)
     return payload
+
+
+def _model_diagnostics(
+    output: Path, allocations: pd.DataFrame, ledger: pd.DataFrame
+) -> dict[str, pd.DataFrame]:
+    """Diagnose whether learned action scores transfer without changing the verdict."""
+
+    actual = aggregate_action_labels(ledger)
+    predictions = pd.read_parquet(output / "pre2023_action_predictions.parquet")
+    predictions = predictions[predictions["condition"].eq("LEARNED")].copy()
+    columns = [
+        "issue",
+        "action_key",
+        "predicted_mean_roi",
+        "predicted_positive_probability",
+        "predicted_tail_5x_probability",
+    ]
+    rows = predictions[columns].merge(
+        actual[
+            [
+                "issue",
+                "action_key",
+                "mean_roi",
+                "positive_probability",
+                "tail_5x_probability",
+            ]
+        ],
+        on=["issue", "action_key"],
+        validate="one_to_one",
+    )
+    primary = allocations[allocations["condition"].eq("JOINT_PRIMARY")][
+        ["issue", "action_key"]
+    ].assign(selected_primary=True)
+    rows = rows.merge(primary, on=["issue", "action_key"], how="left")
+    rows["selected_primary"] = rows["selected_primary"].fillna(False).astype(bool)
+    diagnostics = []
+    for target, prediction in (
+        ("mean_roi", "predicted_mean_roi"),
+        ("positive_probability", "predicted_positive_probability"),
+        ("tail_5x_probability", "predicted_tail_5x_probability"),
+    ):
+        within = []
+        for _, group in rows.groupby("issue"):
+            correlation = group[prediction].corr(group[target], method="spearman")
+            if pd.notna(correlation):
+                within.append(float(correlation))
+        diagnostics.append(
+            {
+                "target": target,
+                "rows": len(rows),
+                "issues": rows["issue"].nunique(),
+                "pooled_spearman": rows[prediction].corr(rows[target], method="spearman"),
+                "median_within_issue_spearman": float(np.median(within)),
+                "positive_within_issue_fraction": float(np.mean(np.array(within) > 0)),
+            }
+        )
+    development = pd.read_parquet(output / "development_action_labels.parquet")
+    development = development[development["issue_year"].isin((2021, 2022))]
+    dev_rank = development.groupby("action_key", as_index=False).agg(
+        development_mean_roi=("mean_roi", "mean"),
+        development_issues=("issue", "nunique"),
+    )
+    test_rank = actual.groupby("action_key", as_index=False).agg(
+        evaluation_mean_roi=("mean_roi", "mean"),
+        evaluation_issues=("issue", "nunique"),
+    )
+    transfer_rows = dev_rank.merge(test_rank, on="action_key", validate="one_to_one")
+    transfer = pd.DataFrame(
+        [
+            {
+                "actions": len(transfer_rows),
+                "development_vs_2023_spearman": transfer_rows[
+                    "development_mean_roi"
+                ].corr(transfer_rows["evaluation_mean_roi"], method="spearman"),
+                "development_top_action": str(
+                    transfer_rows.sort_values("development_mean_roi", ascending=False)
+                    .iloc[0]["action_key"]
+                ),
+                "development_top_2023_mean_roi": float(
+                    transfer_rows.sort_values("development_mean_roi", ascending=False)
+                    .iloc[0]["evaluation_mean_roi"]
+                ),
+                "evaluation_top_action": str(
+                    transfer_rows.sort_values("evaluation_mean_roi", ascending=False)
+                    .iloc[0]["action_key"]
+                ),
+                "evaluation_top_mean_roi": float(
+                    transfer_rows["evaluation_mean_roi"].max()
+                ),
+            }
+        ]
+    )
+    factors = []
+    for factor in (
+        "n",
+        "k",
+        "match_selector",
+        "pool_excess",
+        "outcome_direction",
+        "generator",
+        "protection",
+    ):
+        for level, group in actual.groupby(factor, dropna=False):
+            factors.append(
+                {
+                    "factor": factor,
+                    "level": level,
+                    "issue_action_rows": len(group),
+                    "actions": group["action_key"].nunique(),
+                    "mean_realized_roi": group["mean_roi"].mean(),
+                    "median_realized_roi": group["mean_roi"].median(),
+                    "positive_issue_action_fraction": group["mean_roi"].gt(0).mean(),
+                    "mean_tail_5x_probability": group["tail_5x_probability"].mean(),
+                }
+            )
+    return {
+        "prediction": pd.DataFrame(diagnostics),
+        "transfer": transfer,
+        "factor": pd.DataFrame(factors),
+        "rows": rows,
+    }
+
+
+def _plot_prediction_transfer(rows: pd.DataFrame, target: Path) -> None:
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.scatter(
+        rows["predicted_mean_roi"],
+        rows["mean_roi"],
+        s=np.where(rows["selected_primary"], 28, 8),
+        alpha=np.where(rows["selected_primary"], 0.9, 0.25),
+    )
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set(
+        title="#312 predicted vs realized action ROI (2023)",
+        xlabel="pre-outcome predicted mean ROI",
+        ylabel="31-seed realized mean ROI",
+    )
+    fig.tight_layout()
+    fig.savefig(target, dpi=160)
+    plt.close(fig)
 
 
 def _exact_b0_reference(output: Path) -> pd.DataFrame:

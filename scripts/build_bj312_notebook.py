@@ -86,6 +86,22 @@ null = pd.read_csv(OUTPUT / 'same_exposure_permutation_2023.csv')
 display(null.median_terminal_capital_cny.describe(percentiles=[.05,.5,.95]))
 display(Image(filename=str(OUTPUT / 'primary_parameter_distribution.png')))"""
         ),
+        nbf.v4.new_markdown_cell("## Prediction transfer and long-tail seed stability"),
+        nbf.v4.new_code_cell(
+            """display(pd.read_csv(OUTPUT / 'prediction_diagnostics_2023.csv'))
+display(pd.read_csv(OUTPUT / 'static_rank_transfer.csv'))
+seed_summary = pd.read_csv(OUTPUT / 'policy_summary_by_seed.csv')
+display(seed_summary[seed_summary.condition.isin([
+    'JOINT_PRIMARY','IDENTITY_SHUFFLED','FIXED_N7_K512_WOR','BEST_STATIC_ACTION'
+])].groupby('condition').terminal_capital_cny.describe(percentiles=[.05,.5,.95]))
+display(Image(filename=str(OUTPUT / 'prediction_vs_realized_2023.png')))"""
+        ),
+        nbf.v4.new_markdown_cell("## Outcome-exposed factor diagnostics"),
+        nbf.v4.new_code_cell(
+            """factor = pd.read_csv(OUTPUT / 'realized_factor_marginals_2023.csv')
+for name in ['match_selector','outcome_direction','generator','protection','n','k']:
+    display(factor[factor.factor.eq(name)].sort_values('mean_realized_roi', ascending=False))"""
+        ),
         nbf.v4.new_markdown_cell(
             """## Decision boundary
 
