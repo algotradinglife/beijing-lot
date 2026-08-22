@@ -1,0 +1,1 @@
+proxy_source_id,snapshot_kind,partition,issue_count,fixture_count,price_bias_issue_equal,spearman_issue_equal,top2_agreement_issue_equal,top7_jaccard_issue_equal,q_distortion_issue_equal,bootstrap_p025,bootstrap_p50,bootstrap_p975

@@ -1,0 +1,13 @@
+{
+  "MANIFEST.json": "ac150126896aeb137e5b68d5c405d3a876f2bbc38c6878ad8c571bb064a8433c",
+  "coverage_by_issue.csv": "7863b4ba81ff5a84c3e16757b009a65817bf02aa8162969a2eb98dc6a456523f",
+  "coverage_by_partition.png": "d4bf56077781e26e7575082acae6395465abb0e9c7a291d434ea8bfcb012a808",
+  "decision.json": "b7b62cb225dfc8a745eb67adac313d2b0e2e19086cec2035ac0a0550f806035e",
+  "exclusion_ledger.parquet": "1cf57d7e96a2be83e5aaa1c75cd3aa8debf1cb09d70f1fa2e108a82a5b95debe",
+  "graded_cells.parquet": "73f8adc0d408a079028a26c52f1cb1c4df7b435726220fd28878f9a617c530e9",
+  "overlap_metrics.csv": "6aa7de5152ec0493201b2276844826ede4df51729ee29f54eed820aee4fad6f9",
+  "price_error_by_horizon.png": "7810c305482feaea4778e0f61f8f411c001b69f87464f3f4b057754da1e4ab80",
+  "q_distortion.png": "afcdf8e293037c2d4a026bfd5f932b6169a4ac53ddcd969dbb8e1a341a588d79",
+  "source_inventory.csv": "91f3b60e2464befd3edba40b4e3ade2127ac301d6182d6e5a600f00dcdff4573",
+  "top2_top7_agreement.png": "326c6f9f8ceeac9eef459b306bf3b2bb9fea58ffca48ce211915eed9f40232fd"
+}
