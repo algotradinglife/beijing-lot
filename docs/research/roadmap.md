@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-22 (#312 exact-support joint action cube closed NO_INCREMENT; #314 CORE/TAIL soft-MoE, explicit depth-1/2 coverage, dynamic exposure and 2023–2024 attribution active)**
+Updated: **2026-08-22 (#314 CORE/TAIL soft-MoE closed STRUCTURAL_SIGNAL / NO_PROMOTION; selective protection retained as a weak factor, learned selector/direction/K rejected)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -192,8 +192,8 @@ PI interpretation and does not replace those edges or Project states.
 | 20 | [#305] dedicated keep/skip correction | Closed / Done | M3 | #302 closed; blocks #306 | Independent keep/skip ends 2023 at -7.11%, but its eight funded issues rank only 42.71% among 23,535,820 exact same-exposure placements and change materially with alpha; classify as exposure reduction, not issue-selection Edge |
 | 21 | [#306] matched-exposure within-issue ticket composition | Closed / Done | M3 | #305 closed; predecessor of #312 | Interface and matched-exposure mechanics retained. Post-merge EV found broader-support drift; on inherited exact-B0 support the selected family changes and positive `ACTION_VALUE_SIGNAL` does not reproduce |
 | 22 | [#312] explicit joint action cube | Closed / Done | M3 | #306 closed; blocks #314 | Exact-support 2023 JOINT_PRIMARY CNY70,795.72 versus fixed N7/K512/WOR CNY87,984.27; hard action-conditioned MLP/argmax is rejected, while protection remains a weak parameter clue. Label-safe five-year replay changed no result |
-| 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Open / In Progress | M3 | Native `blockedBy #312` is closed; blocks #210 | Learn soft expert weights, N, depth-1/2 coverage, protected legs and dynamic K/exposure; validate on 2023, freeze, then terminally evaluate and attribute 2024 without full three-result coverage |
-| 24 | [#210] held-out/forward validation | Open / Blocked | M4 | #314 and #218 open | Do not spend prospective evidence until #314 yields a frozen candidate or explicitly retains its strongest control |
+| 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Closed / Done | M3 | #312 closed; blocks #210 | Full MoE rejected: 2023 validation loses 31/31 seeds and 2024 raw ends CNY34,373.99 versus portable fixed CNY81,882.32. Protection contributes a weak +CNY1,048.49 median matched lift in 80.65% of seeds, so retain only `STRUCTURAL_SIGNAL`; no promotion |
+| 24 | [#210] held-out/forward validation | Open / Blocked | M4 | #314 closed without candidate; #218 remains open | Do not spend prospective evidence: #314 did not produce a promotable candidate and explicitly retains its strongest control |
 | 25 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
@@ -384,7 +384,27 @@ PI interpretation and does not replace those edges or Project states.
   model-unseen 2024 terminal evaluation with issue-level d=1/d=2 failure
   attribution. #210 now waits on #314 rather than #312.
 - Reports: [`Issue-312-Explicit-Joint-Action-Cube.md`](Issue-312-Explicit-Joint-Action-Cube.md)
-  and [`issue_314_core_tail_moe_contract.md`](issue_314_core_tail_moe_contract.md).
+  and [`Issue-314-Core-Tail-MoE.md`](Issue-314-Core-Tail-MoE.md).
+
+### #314 CORE/TAIL MoE terminal decision
+
+- The 2022 screen selected Ridge with a 5% TAIL sleeve at low exposure, but the
+  refit mapped every 2023/2024 issue to K2048. On exact #312 support the 2023
+  raw MoE ends at CNY−57.78 versus CNY87,984.27 for the frozen N7/K512/WOR
+  control, with zero paired seed wins. The mandatory fallback was therefore
+  frozen before 2024 settlement.
+- On 66 terminal 2024 issues the unauthorized raw challenger ends at
+  CNY34,373.99 after CNY270,336 turnover. The guarded portable N7/K512/WOR
+  control ends at CNY81,882.32 after CNY67,584 turnover. Dynamic exposure did
+  not find Edge; it amplified an unstable K boundary.
+- Fully matched factor resets reject the learned selector and outcome direction.
+  Selective depth-1/2 protection is the only stable local signal: median paired
+  lift +CNY1,048.49 with 80.65% positive seeds. This warrants
+  `STRUCTURAL_SIGNAL`, not candidate promotion.
+- #210 remains Blocked because #314 is non-promotable and prospective support
+  #218 is still open. The next model iteration should isolate pre-event
+  protection targeting and constrain marginal K instead of enlarging MoE
+  capacity.
 
 ### #282 conditional-policy prototype decision
 

@@ -1,0 +1,16 @@
+{
+  "scope": "FIXED_EXPOSURE_512_DIAGNOSTIC_ONLY",
+  "reason": "frozen total_k was 512 while expert_counts retained raw K",
+  "rows_corrected": 66,
+  "expert_count_total_before": [
+    2048
+  ],
+  "expert_count_total_after": [
+    512
+  ],
+  "outcome_columns_used": [],
+  "primary_policy_changed": false,
+  "guarded_policy_changed": false,
+  "portable_control_changed": false,
+  "frozen_allocation_sha256": "88211b8fc5616649bac39ea45b12aff7d38e05bece5bbf313ef7b05b6d69637d"
+}

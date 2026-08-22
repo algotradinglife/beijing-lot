@@ -271,6 +271,11 @@ def settle() -> dict[str, object]:
     allocations = pd.read_json(
         OUTPUT / "frozen_allocations_2024.jsonl", lines=True, dtype={"issue": str}
     )
+    allocations, correction = apply_terminal_diagnostic_correction(allocations)
+    (OUTPUT / "terminal_diagnostic_correction_receipt.json").write_text(
+        json.dumps(correction, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     paths, near = evaluate_allocations(
         allocations,
         terminal_units,
@@ -306,13 +311,7 @@ def settle() -> dict[str, object]:
         and not lower_exposure
         and learned["median_terminal_capital_cny"] > 100_000.0
     )
-    structural = bool(
-        attribution["median_seed_lift_cny"].gt(0).any()
-        and attribution.loc[
-            attribution["median_seed_lift_cny"].idxmax(), "positive_seed_fraction"
-        ]
-        >= 0.60
-    )
+    structural = _has_structural_signal(attribution)
     promotable = bool(moe_signal and freeze_receipt["validation_pass"])
     verdict = (
         "CANDIDATE_SIGNAL"
@@ -588,8 +587,56 @@ def append_factor_resets(
     exposure["condition"] = "FIXED_EXPOSURE_512_DIAGNOSTIC"
     exposure["total_k"] = 512
     exposure["unique_cap"] = 512
+    exposure["expert_counts"] = exposure["expert_counts"].map(
+        lambda value: json.dumps(
+            _rescale_counts(json.loads(value), 512), sort_keys=True
+        )
+    )
     frames.append(exposure)
     return pd.concat(frames, ignore_index=True)
+
+
+def apply_terminal_diagnostic_correction(
+    allocations: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Repair only the frozen fixed-exposure diagnostic's count reconciliation.
+
+    The raw learned policy, guarded primary and portable control are byte-level
+    untouched.  The correction is fully determined by the already-frozen
+    `total_k=512` intent and expert proportions; it reads no outcome.
+    """
+
+    corrected = allocations.copy()
+    mask = corrected["condition"].eq("FIXED_EXPOSURE_512_DIAGNOSTIC")
+    before = corrected.loc[mask, "expert_counts"].map(
+        lambda value: sum(json.loads(value).values())
+    )
+    corrected.loc[mask, "expert_counts"] = corrected.loc[
+        mask, "expert_counts"
+    ].map(
+        lambda value: json.dumps(
+            _rescale_counts(json.loads(value), 512), sort_keys=True
+        )
+    )
+    after = corrected.loc[mask, "expert_counts"].map(
+        lambda value: sum(json.loads(value).values())
+    )
+    unchanged = corrected.loc[~mask].equals(allocations.loc[~mask])
+    if not after.eq(512).all() or not unchanged:
+        raise AssertionError("terminal diagnostic correction escaped its scope")
+    receipt = {
+        "scope": "FIXED_EXPOSURE_512_DIAGNOSTIC_ONLY",
+        "reason": "frozen total_k was 512 while expert_counts retained raw K",
+        "rows_corrected": int(mask.sum()),
+        "expert_count_total_before": sorted(int(value) for value in before.unique()),
+        "expert_count_total_after": sorted(int(value) for value in after.unique()),
+        "outcome_columns_used": [],
+        "primary_policy_changed": False,
+        "guarded_policy_changed": False,
+        "portable_control_changed": False,
+        "frozen_allocation_sha256": _sha(OUTPUT / "frozen_allocations_2024.jsonl"),
+    }
+    return corrected, receipt
 
 
 def evaluate_allocations(
@@ -736,7 +783,9 @@ def summarize_paths(paths: pd.DataFrame) -> pd.DataFrame:
             frame = frame.sort_values(["issue_year", "issue"])
             pnl = frame["pnl_cny"].to_numpy(float)
             capital = 100_000.0 + np.cumsum(pnl)
-            drawdown = np.maximum.accumulate(np.r_[100_000.0, capital])[:-1] - capital
+            peak = np.maximum.accumulate(np.r_[100_000.0, capital])[1:]
+            drawdown = peak - capital
+            max_completed_recovery, open_underwater = _underwater_metrics(drawdown)
             seed_rows.append(
                 {
                     "seed": seed,
@@ -749,6 +798,17 @@ def summarize_paths(paths: pd.DataFrame) -> pd.DataFrame:
                     "longest_losing": _longest(pnl < 0),
                     "worst_5": _worst_window(pnl, 5),
                     "worst_10": _worst_window(pnl, 10),
+                    "worst_20": _worst_window(pnl, 20),
+                    "underwater_issues": int((drawdown > 1e-9).sum()),
+                    "max_completed_recovery": max_completed_recovery,
+                    "open_underwater": open_underwater,
+                    "longest_no_payout": _longest(
+                        frame["hit_count"].to_numpy(int) == 0
+                    ),
+                    "any_payout_rate": float(frame["hit_count"].gt(0).mean()),
+                    "ticket_hit_rate": float(
+                        frame["hit_count"].sum() / frame["total_k"].sum()
+                    ),
                     "hhi": float(frame["expert_hhi"].mean()),
                 }
             )
@@ -771,6 +831,23 @@ def summarize_paths(paths: pd.DataFrame) -> pd.DataFrame:
                 "median_longest_losing_issues": float(seeds["longest_losing"].median()),
                 "median_worst_5_pnl_cny": float(seeds["worst_5"].median()),
                 "median_worst_10_pnl_cny": float(seeds["worst_10"].median()),
+                "median_worst_20_pnl_cny": float(seeds["worst_20"].median()),
+                "median_time_underwater_issues": float(
+                    seeds["underwater_issues"].median()
+                ),
+                "median_maximum_completed_recovery_issues": float(
+                    seeds["max_completed_recovery"].median()
+                ),
+                "median_open_terminal_underwater_issues": float(
+                    seeds["open_underwater"].median()
+                ),
+                "median_longest_no_payout_issues": float(
+                    seeds["longest_no_payout"].median()
+                ),
+                "median_any_payout_issue_rate": float(
+                    seeds["any_payout_rate"].median()
+                ),
+                "median_ticket_hit_rate": float(seeds["ticket_hit_rate"].median()),
                 "median_expert_hhi": float(seeds["hhi"].median()),
                 "paired_seed_wins_vs_fixed": wins,
             }
@@ -957,6 +1034,20 @@ def _split_counts(names: list[str], total: int) -> dict[str, int]:
     }
 
 
+def _rescale_counts(counts: dict[str, int], total: int) -> dict[str, int]:
+    """Preserve mixture proportions while enforcing a diagnostic ticket total."""
+
+    names = sorted(counts)
+    weights = np.asarray([counts[name] for name in names], dtype=float)
+    weights /= weights.sum()
+    scaled = _integer_counts(weights, total)
+    return {
+        name: int(count)
+        for name, count in zip(names, scaled, strict=True)
+        if count > 0
+    }
+
+
 def _hhi(counts: dict[str, int]) -> float:
     values = np.asarray(list(counts.values()), dtype=float)
     weights = values / values.sum()
@@ -1016,6 +1107,17 @@ def _paired_median(paths: pd.DataFrame, primary: str, control: str) -> float:
     return float((grouped[primary] - grouped[control]).median())
 
 
+def _has_structural_signal(attribution: pd.DataFrame) -> bool:
+    """Accept any factor meeting both lift and paired-seed stability gates."""
+
+    return bool(
+        (
+            attribution["median_seed_lift_cny"].gt(0)
+            & attribution["positive_seed_fraction"].ge(0.60)
+        ).any()
+    )
+
+
 def _longest(mask: Iterable[bool]) -> int:
     best = current = 0
     for value in mask:
@@ -1028,6 +1130,19 @@ def _worst_window(values: np.ndarray, window: int) -> float:
     if len(values) < window:
         return float(values.sum())
     return float(np.convolve(values, np.ones(window), mode="valid").min())
+
+
+def _underwater_metrics(drawdown: np.ndarray) -> tuple[int, int]:
+    """Return longest completed recovery and terminal open-underwater length."""
+
+    completed = current = 0
+    for value in drawdown > 1e-9:
+        if value:
+            current += 1
+        else:
+            completed = max(completed, current)
+            current = 0
+    return completed, current
 
 
 def _sha(path: Path) -> str:

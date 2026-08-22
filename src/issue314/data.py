@@ -216,6 +216,9 @@ def source_receipt(
             ).values.tobytes()
         ).hexdigest()
         payload["settlement_rows"] = int(len(settlement))
+        available = settlement["settlement_available"].fillna(False).astype(bool)
+        payload["settlement_available_rows"] = int(available.sum())
+        payload["settlement_available_rate"] = float(available.mean())
     return payload
 
 

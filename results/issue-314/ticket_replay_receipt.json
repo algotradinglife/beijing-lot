@@ -1,0 +1,9 @@
+{
+  "ticket_rows": 38759424,
+  "path_rows": 26598,
+  "stake_reconciliation_max_abs_cny": 0.0,
+  "accounting_reconciliation_max_abs_cny": 0.0,
+  "payout_factor": 0.65,
+  "payout_application": "once per complete winning ticket",
+  "pass": true
+}

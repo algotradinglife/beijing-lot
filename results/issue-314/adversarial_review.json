@@ -1,0 +1,40 @@
+{
+  "issue": 314,
+  "review_role": "PI",
+  "review_type": "ADVERSARIAL_SCIENTIFIC",
+  "decision": "ACCEPT_STRUCTURAL_SIGNAL_NO_PROMOTION",
+  "challenges": [
+    {
+      "challenge": "Could the 2024 raw result be rescued by its slightly better turnover ROI?",
+      "answer": "No. It spends four times as much, ends about CNY47.5k below the portable control and has more than triple the drawdown. Capital path and matched lift dominate an unmatched ROI ratio."
+    },
+    {
+      "challenge": "Does K2048 prove that high exposure is optimal?",
+      "answer": "No. Every issue hitting the largest screening anchor is a boundary-collapse diagnostic. It invalidates the learned exposure component and cannot establish an optimum."
+    },
+    {
+      "challenge": "Is the positive protection reset independent Edge?",
+      "answer": "No. The +CNY1048.49 median paired lift and 80.65% positive seeds are a local 2024 structural clue. Seeds are nested nuisance draws, not independent issues, and cross-year replication is absent."
+    },
+    {
+      "challenge": "Is the 2024 portable baseline identical to the accepted #312 control?",
+      "answer": "No. The exact #312 fitted ticket identities do not exist for 2024. The 2023 exact path is the accepted ladder anchor; the terminal portable control is named and limited separately."
+    },
+    {
+      "challenge": "Could settlement gaps explain the learned loss?",
+      "answer": "The feature-side settlement coverage is about 99.15% and all matched arms share the same fail-closed boundary. Gaps may affect absolute returns but cannot explain the large matched underperformance alone."
+    },
+    {
+      "challenge": "Could a post-freeze diagnostic repair have altered the conclusion?",
+      "answer": "No. The receipt confines proportional count rescaling to FIXED_EXPOSURE_512_DIAGNOSTIC. Raw, guarded and portable-control allocations remain unchanged; the correction uses no outcome column."
+    }
+  ],
+  "evidence_debt": [
+    "The K surface stops at the predeclared 2048 screening anchor; a natural-funding marginal-K optimum was not identified.",
+    "Issue-state and action-identity shuffles were not rerun on 2024. They are not needed to reject the learned policy, but would be required before any future positive promotion claim.",
+    "The one-more-protection counterfactual is outcome-exposed oracle attribution, not an executable strategy return.",
+    "The 2024 control is a portable same-input extension, not byte-identical #312 ticket identity replay."
+  ],
+  "promotion": false,
+  "unlock_issue_210": false
+}
