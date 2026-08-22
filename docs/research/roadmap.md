@@ -167,7 +167,7 @@ PI interpretation and does not replace those edges or Project states.
              |
              v
 #319 probability-only Top-2 N7 stable center
-     (In Progress; post-merge chronology/recovery correction, terminal
+     (Done; chronology/recovery correction merged, terminal
      PRICE_DATA_INSUFFICIENT and capital totals unchanged)
              |
              v
@@ -203,8 +203,8 @@ PI interpretation and does not replace those edges or Project states.
 | 22 | [#312] explicit joint action cube | Closed / Done | M3 | #306 closed; blocks #314 | Exact-support 2023 JOINT_PRIMARY CNY70,795.72 versus fixed N7/K512/WOR CNY87,984.27; hard action-conditioned MLP/argmax is rejected, while protection remains a weak parameter clue. Label-safe five-year replay changed no result |
 | 23 | [#314] CORE/TAIL soft-MoE, coverage and exposure | Closed / Done | M3 | #312 closed; blocks #210 | Full MoE rejected: 2023 validation loses 31/31 seeds and 2024 raw ends CNY34,373.99 versus portable fixed CNY81,882.32. Protection beats no-protection (+CNY1,048.49) but loses to matched random placement (−CNY594.31); `NO_LEARNABLE_INCREMENT`, no promotion |
 | 24 | [#318] historical Beijing-SP/proxy audit | Closed / Done | M1 | No open blocker; predecessor of #319 | All six frozen sources consumed. Historical SP is timestamp-unproven; strict/proxy overlap is only one 2026 issue and fails every fidelity threshold. `NO_CAUSAL_PRICE_SUPPORT`; #319 must be probability-only |
-| 25 | [#319] probability-only Top-2 N7 stable center | Open / In Progress | M3 | #318 closed | Exact 128-ticket/CNY256 center executed. Primary 10h ends 2023 CNY93,901.88 (capital return -6.10%) and 2024 CNY103,567.30 (+3.57%). Post-merge correction orders paths by event timestamp and separates completed recovery from the open underwater tail; capital totals and `PRICE_DATA_INSUFFICIENT` are unchanged |
-| 26 | [#210] held-out/forward validation | Open / Blocked | M4 | #319 open; #218 remains open | Do not spend prospective evidence: #319 produced no promotable value candidate and strict prospective support still depends on #218 |
+| 25 | [#319] probability-only Top-2 N7 stable center | Closed / Done | M3 | #318 closed | Exact 128-ticket/CNY256 center executed. Primary 10h ends 2023 CNY93,901.88 (capital return -6.10%) and 2024 CNY103,567.30 (+3.57%). Post-merge correction orders paths by event timestamp and separates completed recovery from the open underwater tail; capital totals and `PRICE_DATA_INSUFFICIENT` are unchanged |
+| 26 | [#210] held-out/forward validation | Open / Blocked | M4 | #319 closed; #218 remains open | Do not spend prospective evidence: #319 produced no promotable value candidate and strict prospective support still depends on #218 |
 | 27 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
