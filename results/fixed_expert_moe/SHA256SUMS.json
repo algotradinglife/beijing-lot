@@ -1,0 +1,20 @@
+{
+  "accepted_baseline_comparison.csv": "7910e2df73b964505d9526669fb235847200a5cd45050044e00b75f10f70e87f",
+  "allocation_attribution.csv": "bd6f9a50ef93317fb22210cde4642a862c0632bc5165dfb065fba731d27451ad",
+  "allocations.parquet": "bfc254b72f08285c231fee58e8c192038d00d3a5930255e93a738d4345cb1763",
+  "auxiliary_metrics.csv": "28414d3fa9242dc2b57cf692f3884dd2e5d60003665b7760fbc587d4a9a88499",
+  "bootstrap_lift.csv": "9c5e52b874cc21ba33f9fbe752cf38c408a65508a4475d83ee09ce7cc4b8efa2",
+  "capital_paths.parquet": "3419aef4df27941b4f6e0c4c8595594866a610619d429a3bcb06692835113aa0",
+  "decision.json": "77da5d243b5dbf8a77e7bf988edf322e7f59e7f0935e9ce48d9450b6aa2937fa",
+  "evaluation_surface.parquet": "b54973d945782709ba699ce57e086f28f0ac17d8e15c1356359128f7360a568a",
+  "expert_labels.parquet": "ee1cbfe5476cfc346fcdda1383399ca9d23bcce75ae9b8279f489f6f875c9d91",
+  "expert_registry.csv": "293a2418f1e9373b2cd44b2e7dfdf13f3c2eefc48129abc665e606d134fafcd8",
+  "freeze_receipt.json": "9328a09e2e998cf3844b7f1ee97c1c0f7da6c65f133e8bd5cf5fa7a836f59ad6",
+  "learning_panel.parquet": "b6eae9e77fc50428c3b6d7da47279b109dac6d831caeb0d6d30f658485e028d3",
+  "model_receipt.json": "9a1f8150ed7b7f23bd0deff07c322afda5a67272b8400ce75c205b9cb4396cf2",
+  "model_surface.parquet": "60992eb42b68c56a92e82b94e2612c7332765afe55f5ae537f398d1321bfddb7",
+  "oof_predictions.parquet": "c3fdc1e85c8b48452c7ec91426f59bd72fb840c547f0c130c7707f72be6863ce",
+  "paired_lifts.csv": "dfa6cc249436ce43f99063d934de8ebdb293012efe50fa8f3146045a39cca956",
+  "policy_summary.csv": "715b2766348038d8d1ce07ffbf5b038d7192e1c765455a0aa8e84bdaecd6d021",
+  "settlement.parquet": "fe0636fbe596f3d40444b4b8b2435a11bd0cff31e9224bc8f78c31fd9ae82e88"
+}

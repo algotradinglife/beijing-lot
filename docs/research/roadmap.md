@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#330 causal lagged regime ledger completed; direct expert-PnL gating rejected, multitask state interface retained)**
+Updated: **2026-08-23 (#332 fixed-expert causal MoE completed; fixed mixture interface rejected, accepted Top-2 retained for direct residual value learning)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -183,6 +183,10 @@ PI interpretation and does not replace those edges or Project states.
      (Done; SPARSE_RESPONSE_REDESIGN, fast regime gate not established)
              |
              v
+#332 fixed-expert causal multitask MoE
+     (Done; NO_EXPERT_MIX_SIGNAL, accepted Top-2 baseline retained)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -218,9 +222,10 @@ PI interpretation and does not replace those edges or Project states.
 | 25 | [#319] probability-only Top-2 N7 stable center | Closed / Done | M3 | #318 closed | Exact 128-ticket/CNY256 center executed. Primary 10h ends 2023 CNY93,901.88 (capital return -6.10%) and 2024 CNY103,567.30 (+3.57%). Post-merge correction orders paths by event timestamp and separates completed recovery from the open underwater tail; capital totals and `PRICE_DATA_INSUFFICIENT` are unchanged |
 | 26 | [#324] Top-2 selector × support × allocator factorial | Closed / Done | M3 | Parent #202; predecessor of #328; blocks #210 | Post-merge EV corrected the calendar-year settlement join: primary common support is 45/54, and corrected two-year matched lifts are CNY+16,800 for `S1O1A0` and CNY+24,642 for `S1O1A1`. Routing remains `NO_INCREMENT`; old 2023 denominator and metrics are quarantined |
 | 27 | [#328] learned S1O1 allocator mixture | Closed / Done | M3 | Parent #202; predecessor of #210 | Corrected endpoint parity passes. Static lambda lift rises toward A1, but Ridge/HGBR issue-only lambdas collapse near zero and reproduce A0. The OOF allocator response has only one positive-delta issue in each of 2021/2022; retain A0/A1 as fixed experts and add lagged regime state before another MoE. `ENDPOINT_RETAINED`; no promotion |
-| 28 | [#330] causal lagged regime state ledger | Closed / Done | M2 | Parent #202; predecessor of the next fixed-expert MoE; blocks #210 | 282 issue-level rows with strict prior-only 5/10/20/40 and EWMA state. European calibration is stable and consistently better than the line-only control; no lagged model gives consistent 2023/2024 incremental prediction. A1-A0 is nonzero on only 9/252 observable issues and positive on 5. `SPARSE_RESPONSE_REDESIGN`: use calibration/coverage as auxiliary state, not direct expert PnL as the sole gate label |
-| 29 | [#210] held-out/forward validation | Open / Blocked | M4 | #330 and other historical predecessors closed after landing; #218 remains open | Do not spend prospective evidence: no historical issue has produced a promotable candidate and strict prospective support still depends on #218 |
-| 30 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 28 | [#330] causal lagged regime state ledger | Closed / Done | M2 | Parent #202; predecessor of #332; blocks #210 | 282 issue-level rows establish stable European calibration and a very sparse A1-A0 response. Post-merge EV quarantines its current settlement-availability feature and anchor-surrogate lag timestamps; #332 rebuilds only the usable targets behind a conservative latest-kickoff+4h availability gate. Retain `SPARSE_RESPONSE_REDESIGN`, not the original causal feature artifact |
+| 29 | [#332] fixed-expert causal multitask MoE | Closed / Done | M3 | Parent #202; predecessor of the next direct-value learner; blocks #210 | Eight frozen N7-N10 experts, 512 matched tickets and 11 nuisance seeds. Dense hit/near-miss labels are moderately learnable, but lagged/current/static mixtures all fail the strongest fixed and accepted Top-2 controls. Against accepted Top-2, lagged MoE is +CNY1,364 raw but −CNY3,007 ex-largest in 2023, then −CNY48,666 in 2024. `NO_EXPERT_MIX_SIGNAL`; retain Top-2 and learn residual match/outcome/ticket value directly |
+| 30 | [#210] held-out/forward validation | Open / Blocked | M4 | #332 and other historical predecessors closed after landing; #218 remains open | Do not spend prospective evidence: no historical issue has produced a promotable candidate and strict prospective support still depends on #218 |
+| 31 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #284/#285 subset and selective-protection decision
 

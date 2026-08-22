@@ -1,0 +1,39 @@
+{
+  "contract_id": "BJ-UNIFIED-FIXED-EXPERT-MOE-001/v1",
+  "decision": "NO_EXPERT_MIX_SIGNAL",
+  "evaluation_seeds": [
+    312101,
+    312102,
+    312103,
+    312104,
+    312105,
+    312106,
+    312107,
+    312108,
+    312109,
+    312110,
+    312111
+  ],
+  "issues": 246,
+  "model_seeds": [
+    31401,
+    31402,
+    31403,
+    31404,
+    31405
+  ],
+  "source_hashes": {
+    "expert_code": "6cb5626e5c96eebbc2628403e382df35e105b391ff2167f1a5862379d01632d3",
+    "market_panel": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+    "regime_state": "ebf3a4f15a3c6d044402a531ce4abb3ce7c3df8d9b282f8331e5b87ddd903393",
+    "settlement": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+  },
+  "state_issues": 282,
+  "years": [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ]
+}
