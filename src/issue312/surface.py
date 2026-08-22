@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+import sqlite3
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 
+from issue209.contract import INFERENCE_VIEW, LABELS_PRE2024, LABELS_SQLITE
 from issue209.dynamic_policy import OUTCOMES, OUTCOME_TO_INDEX, _derived_seed, settle_ticket_arrays
 from issue209.models import build_match_units
 
@@ -17,6 +20,182 @@ from .tickets import generate_cube_tickets
 DEVELOPMENT_YEARS = (2019, 2020, 2021, 2022)
 DEVELOPMENT_SEEDS = tuple(range(312001, 312012))
 EVALUATION_SEEDS = tuple(range(312101, 312132))
+
+
+def _read_tensor_through_year(max_year: int) -> pd.DataFrame:
+    """Load labels only through ``max_year`` and query SP for those issues.
+
+    PyArrow applies the year predicate before materializing either Parquet file.
+    The SQLite query is restricted to the issue identifiers exposed by that
+    filtered label projection.  This prevents the development runner from
+    opening 2023 settlement labels and filtering them only afterwards.
+    """
+
+    if max_year >= 2024:
+        raise AssertionError("2024+ settlement labels are sealed")
+    view = pq.read_table(
+        INFERENCE_VIEW,
+        filters=[("issue_year", "<=", max_year)],
+    ).to_pandas()
+    labels = pq.read_table(
+        LABELS_PRE2024,
+        filters=[("issue_year", "<=", max_year)],
+    ).to_pandas()
+    if view.empty or labels.empty:
+        raise AssertionError(f"no causal rows available through {max_year}")
+    if pd.to_numeric(view["issue_year"], errors="raise").max() > max_year:
+        raise AssertionError("inference predicate was not enforced")
+    if pd.to_numeric(labels["issue_year"], errors="raise").max() > max_year:
+        raise AssertionError("label predicate was not enforced")
+
+    view["issue_code"] = view["issue_code"].astype(str)
+    view["outcome_code"] = view["outcome_code"].astype(str)
+    labels["issue_code"] = labels["issue_code"].astype(str)
+    issue_ids = sorted(labels["issue_code"].dropna().unique().tolist())
+    placeholders = ",".join("?" for _ in issue_ids)
+    database = Path(LABELS_SQLITE).resolve()
+    if not database.is_file():
+        raise FileNotFoundError(database)
+    with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as connection:
+        connection.execute("PRAGMA query_only=ON")
+        sp = pd.read_sql_query(
+            f"""
+            SELECT CAST(issue AS TEXT) AS issue, match_idx,
+                   winning_sp, result_code
+            FROM match_features
+            WHERE CAST(issue AS TEXT) IN ({placeholders})
+            """,
+            connection,
+            params=issue_ids,
+        )
+    sp["issue"] = sp["issue"].astype(str)
+    if not set(sp["issue"]).issubset(set(issue_ids)):
+        raise AssertionError("SQLite issue predicate was not enforced")
+
+    lab = labels[["issue_code", "match_idx", "target_outcome"]].rename(
+        columns={"issue_code": "issue", "target_outcome": "realized_outcome"}
+    )
+    spk = sp.dropna(subset=["issue", "match_idx"]).drop_duplicates(
+        ["issue", "match_idx"], keep="first"
+    )
+    merged = view.merge(
+        lab,
+        left_on=["issue_code", "match_idx"],
+        right_on=["issue", "match_idx"],
+        how="left",
+        validate="many_to_one",
+    )
+    merged["has_label"] = merged["realized_outcome"].notna().astype(int)
+    merged["Y"] = 0
+    labeled = merged["has_label"].eq(1)
+    merged.loc[labeled, "Y"] = (
+        merged.loc[labeled, "outcome_code"]
+        == merged.loc[labeled, "realized_outcome"]
+    ).astype(int)
+    merged = merged.merge(
+        spk[["issue", "match_idx", "winning_sp", "result_code"]],
+        on=["issue", "match_idx"],
+        how="left",
+        validate="many_to_one",
+    )
+    merged["SP_SETTLE"] = np.where(
+        merged["Y"].eq(1), merged["winning_sp"], np.nan
+    )
+    merged["SP_AVAILABLE"] = merged["SP_SETTLE"].notna().astype(int)
+    merged["R_RAW"] = merged["Y"] * merged["SP_SETTLE"].fillna(0.0)
+    tensor = merged[merged["has_label"].eq(1)].copy()
+    if tensor.columns.duplicated().any():
+        tensor = tensor.loc[:, ~tensor.columns.duplicated()].copy()
+    tensor["issue"] = tensor["issue"].combine_first(tensor["issue_code"])
+    tensor = tensor.drop(columns=["issue_code"])
+    if pd.to_numeric(tensor["issue_year"], errors="raise").max() > max_year:
+        raise AssertionError("settlement boundary drifted after joins")
+    return tensor.reset_index(drop=True)
+
+
+def load_causal_issue209_inputs(
+    probabilities_path: str | Path,
+    values_path: str | Path,
+    *,
+    years: tuple[int, ...],
+    issues: set[str] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, object]]:
+    """Load a causal tensor and its position-aligned frozen #209 outputs.
+
+    The #209 outputs predate an explicit unit-key column.  We reconstruct their
+    complete unit-key index from pre-event inference rows plus the label table's
+    identity columns only.  PyArrow never materializes ``target_outcome`` for a
+    future year; realized outcomes are loaded separately only through the
+    requested year boundary.
+    """
+
+    if not years:
+        raise ValueError("at least one year is required")
+    max_year = max(years)
+    tensor_prefix = _read_tensor_through_year(max_year)
+    probabilities_all = pd.read_parquet(probabilities_path).reset_index(drop=True)
+    values_all = pd.read_parquet(values_path).reset_index(drop=True)
+    if len(probabilities_all) != len(values_all):
+        raise AssertionError("#209 probability/value row counts differ")
+    feature_identity = pq.read_table(
+        INFERENCE_VIEW,
+        filters=[("issue_year", "<", 2024)],
+        columns=["issue_code", "match_idx", "snapshot_kind", "issue_year"],
+    ).to_pandas()
+    label_identity = pq.read_table(
+        LABELS_PRE2024,
+        columns=["issue_code", "match_idx"],
+    ).to_pandas()
+    feature_identity["issue_code"] = feature_identity["issue_code"].astype(str)
+    label_identity["issue_code"] = label_identity["issue_code"].astype(str)
+    label_identity = label_identity.drop_duplicates(["issue_code", "match_idx"])
+    output_index = feature_identity.merge(
+        label_identity,
+        on=["issue_code", "match_idx"],
+        how="inner",
+        validate="many_to_one",
+    )
+    output_index = (
+        output_index.rename(columns={"issue_code": "issue"})
+        .groupby(["issue", "match_idx", "snapshot_kind"], as_index=False)
+        .agg(issue_year=("issue_year", "first"))
+    )
+    if len(output_index) != len(probabilities_all):
+        raise AssertionError("reconstructed #209 output identity row count drifted")
+
+    target = output_index["issue_year"].isin(years)
+    if issues is not None:
+        target &= output_index["issue"].astype(str).isin(issues)
+    probabilities = probabilities_all.loc[target].reset_index(drop=True)
+    values = values_all.loc[target].reset_index(drop=True)
+    tensor = tensor_prefix[
+        tensor_prefix["issue_year"].isin(years)
+        & (
+            tensor_prefix["issue"].astype(str).isin(issues)
+            if issues is not None
+            else True
+        )
+    ].reset_index(drop=True)
+    target_units = build_match_units(tensor).reset_index(drop=True)
+    keys = ["issue", "match_idx", "snapshot_kind"]
+    expected_keys = output_index.loc[target, keys].reset_index(drop=True)
+    if not target_units[keys].equals(expected_keys):
+        raise AssertionError("causal tensor and #209 output keys are misaligned")
+    if not (len(target_units) == len(probabilities) == len(values)):
+        raise AssertionError("causal model input row counts differ")
+    receipt = {
+        "requested_years": list(years),
+        "label_max_year_opened": max_year,
+        "label_predicate": f"issue_year <= {max_year}",
+        "sqlite_issue_count": int(tensor_prefix["issue"].nunique()),
+        "target_issue_count": int(target_units["issue"].nunique()),
+        "target_unit_count": int(len(target_units)),
+        "future_outcome_label_rows_opened": 0,
+        "future_label_identity_columns_opened": ["issue_code", "match_idx"],
+        "future_outcome_columns_opened": [],
+        "output_alignment": "FEATURE_PLUS_IDENTITY_INDEX_VERIFIED",
+    }
+    return tensor, probabilities, values, receipt
 
 
 def build_seed_action_ledger(

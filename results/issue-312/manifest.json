@@ -29,6 +29,10 @@
       "bytes": 164759,
       "sha256": "2be027dd237ae2cccedcb550bb114005bf491ba2ec7bf6e0c3cc4186a1b2b321"
     },
+    "causal_replay_receipt.json": {
+      "bytes": 3690,
+      "sha256": "0210d615e4301f2415a8bf3fc129529cd024ea74cdada814debec7eca7ae6385"
+    },
     "decision.json": {
       "bytes": 1637,
       "sha256": "b6b6bd7d1f6cb50514edf4e18a547e0c7cde6d8b41a46423ab1d46ef74cde1f4"
