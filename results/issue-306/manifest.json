@@ -1,0 +1,117 @@
+{
+  "issue": 306,
+  "files": {
+    "action_distribution.csv": {
+      "bytes": 31488,
+      "sha256": "2387a54d5e788367149e61c92410373a1dbc0a310f1e0e8b4e1bac2594a9cc58"
+    },
+    "action_labels.parquet": {
+      "bytes": 453054,
+      "sha256": "1ce98915c54b18f0ea9a6a39a675974f9cc10eb6e01f29e66a332f743d1abc9f"
+    },
+    "action_surface_coverage.csv": {
+      "bytes": 6837,
+      "sha256": "8a3040b6dc503229ff6199f2ef642ef49795df6e928545dd79b09912ad1ca24a"
+    },
+    "action_surface_coverage_2019.csv": {
+      "bytes": 1462,
+      "sha256": "a86fccba50244b27e91c2b92b69167ec9fc8a52d865ea550a6988eaf1dea8cd6"
+    },
+    "action_surface_coverage_2020.csv": {
+      "bytes": 1038,
+      "sha256": "659788132f4f117dde0686c05cb625bf3ae7d9273c8c87d3d2b16527cc9ba95e"
+    },
+    "action_surface_coverage_2021.csv": {
+      "bytes": 1659,
+      "sha256": "d1ef9ef3c7335497bb610a185c40b2e4bf4423a2ec60b7be8f7511182730ffc8"
+    },
+    "action_surface_coverage_2022.csv": {
+      "bytes": 1628,
+      "sha256": "31e813e91de37e96f14ecd1fab9427812aaf8524065af64c8228e9b05a5772b5"
+    },
+    "action_surface_coverage_2023.csv": {
+      "bytes": 1406,
+      "sha256": "bf6dfaec6dde024d3a7e91c21cc4a8b61ce585bbaec931254ac63e20d1c55ea9"
+    },
+    "action_value_predictions.parquet": {
+      "bytes": 4090840,
+      "sha256": "722e3ea4e77e9fe8570e6ffe434b98032b126451df00f03ac8bdd98b0c3b4aed"
+    },
+    "capital_paths.csv": {
+      "bytes": 1339173,
+      "sha256": "1544ce74857cf813acde3b2324318ec9c6dc2f9436ce8188606967a7f3aaf668"
+    },
+    "capital_paths_2023.png": {
+      "bytes": 168653,
+      "sha256": "8d885fc79d53a37cbedc160648361ed850e70ee4c8426d345e3d6088d29b9480"
+    },
+    "decision.json": {
+      "bytes": 1825,
+      "sha256": "89cdc8955f59d245076a31324f523ef2e8c813e526deaa1015dce1890849daff"
+    },
+    "fit_receipts.csv": {
+      "bytes": 5605,
+      "sha256": "9632915d7600359c72978ca88e5ae9983fc2b66d7289ecc8dde4640704dee864"
+    },
+    "learned_action_distribution.png": {
+      "bytes": 48534,
+      "sha256": "0c632e17ca9b738ea8c73e2cca735e98f3e9f2e92dbae246e2088488e51fe386"
+    },
+    "policy_allocations.csv": {
+      "bytes": 614668,
+      "sha256": "74ef35b750999c7969bf69c5f468a65d9f8d192554d30e2086b244866dea23a2"
+    },
+    "policy_summary.csv": {
+      "bytes": 11242,
+      "sha256": "0b175b4a3b48d165efa4384d847e5c2107a8898a3f82216fbdf961e9f42032a8"
+    },
+    "policy_summary_by_seed.csv": {
+      "bytes": 55695,
+      "sha256": "101d3c505381923ff3658d21f16c902eae4450a42ac4e9a2cbf74d12425fb72d"
+    },
+    "same_exposure_permutation_2023.csv": {
+      "bytes": 824198,
+      "sha256": "773780bc5f4ceffd53cd332d175a7223e44a6008f6da1897e5a227b47ba601d6"
+    },
+    "seed_action_ledger.parquet": {
+      "bytes": 639138,
+      "sha256": "c12cd219848b400da607757b27af48c27cff627b7cdf31617eb2ae3ca030371e"
+    },
+    "seed_action_ledger_2019.parquet": {
+      "bytes": 133318,
+      "sha256": "5e0a70c845c1830d00f346de4fb72327a324f46cb553a70c71968aafbf2a58b7"
+    },
+    "seed_action_ledger_2020.parquet": {
+      "bytes": 94746,
+      "sha256": "4ea973802a91937a74e0d03d7a92d0961c1550fdf3c88fe726e62bbe94d69a9c"
+    },
+    "seed_action_ledger_2021.parquet": {
+      "bytes": 153690,
+      "sha256": "ab64fb2181d8102ddf904605506c8a62d02883bf0fdf4c53a64a678e1139c00f"
+    },
+    "seed_action_ledger_2022.parquet": {
+      "bytes": 151245,
+      "sha256": "a3d8b2a2fea109f1ef0dffe89858da90cff49fff96c78f9988311561ac55e069"
+    },
+    "seed_action_ledger_2023.parquet": {
+      "bytes": 131759,
+      "sha256": "7b44d7b63bd89e71f2ccafcd9ca93bd0c08a6bed7c1ba5bdd82ed386740ea1f5"
+    },
+    "seed_action_value_predictions.parquet": {
+      "bytes": 10449568,
+      "sha256": "bfcea2e41950ccdbde46bb5629d5521e7357b1dcfc1dff3c1be53426f7cdf28c"
+    },
+    "selected_action_dependence.csv": {
+      "bytes": 28555,
+      "sha256": "4cec0d958a8c91eb4023d164fef93211822f2c32bfb53fdf3fb0da4dc36fa8a1"
+    },
+    "surface_receipt.json": {
+      "bytes": 955,
+      "sha256": "dfaa5d551dc1b9dc771d0a3e7ca128e03c85fdafecb8fb182e0dfa1e43f6eebd"
+    },
+    "tail_risk_frontier_2023.png": {
+      "bytes": 75838,
+      "sha256": "a88975cfa2b2ef46d7ebcf95f08ca45e21704ca77a460fb9c3b19a24889af8eb"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "issue": 306,
+  "question": "within-issue ticket construction at fixed issue coverage and exposure",
+  "decision": {
+    "verdict": "ACTION_VALUE_SIGNAL",
+    "promotable": false,
+    "development_signal": true,
+    "dynamic_ticket_signal": false,
+    "eligible_issue_policy": "ALL_ISSUES_ACTIVE_NO_LEARNED_SKIP",
+    "committed_tickets_per_issue": 512,
+    "committed_stake_per_issue_cny": 1024.0,
+    "development_selected_primary": "LEARNED_MEAN_DETERMINISTIC",
+    "development_selection_metric": "median cumulative 2021-2022 physical PnL across nuisance seeds",
+    "development_candidate_pnl_cny": {
+      "LEARNED_MEAN_DETERMINISTIC": -24983.854423494544,
+      "LEARNED_TAIL_MIXTURE": -27545.045273934385,
+      "LEARNED_TAIL_DETERMINISTIC": -37259.0604187107
+    },
+    "primary_2023_median_terminal_capital_cny": 101409.52998451988,
+    "primary_2023_median_growth_pct": 1.409529984519886,
+    "primary_2023_median_turnover_roi_pct": 2.5971587273729964,
+    "primary_2023_median_max_drawdown_pct": 12.630201316165158,
+    "primary_2023_median_tail_5x_rate": 0.05660377358490566,
+    "static_mixture_2023_median_terminal_capital_cny": 84730.16438748888,
+    "best_fixed_2023_condition": "FIXED_N7_K512_WEIGHTED_WOR",
+    "best_fixed_2023_median_terminal_capital_cny": 98216.68780040141,
+    "matched_lift_vs_strongest_control_cny": 3192.842184118461,
+    "same_exposure_permutation_percentile": 0.984,
+    "positive_vs_strongest_control_nuisance_seeds": 2,
+    "primary_model_fits_converged": true,
+    "all_model_and_control_fits_converged": false,
+    "tail_diagnostic_2023_median_terminal_capital_cny": 106574.01813680382,
+    "tail_diagnostic_2023_permutation_percentile": 0.979,
+    "tail_diagnostic_status": "SECONDARY_PREDECLARED_HEAD_NOT_DEVELOPMENT_SELECTED",
+    "sealed_years": "2024+ not read"
+  }
+}

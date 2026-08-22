@@ -1,0 +1,52 @@
+{
+  "issue": 306,
+  "years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "sealed_years_opened": [],
+  "n_values": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "k_values": [
+    8,
+    32,
+    128,
+    512
+  ],
+  "generators": [
+    "TOP_VALUE",
+    "WEIGHTED_WR",
+    "WEIGHTED_WOR"
+  ],
+  "match_and_outcome_selection": "cell-value-weighted inside TOP/WR/WOR generators",
+  "protection_surface": "NO_PROTECTION_ONLY",
+  "unavailable_dimensions": [
+    "explicit selector-family counterfactual ledger",
+    "selective-protection counterfactual ledger on the same 512-ticket budget"
+  ],
+  "nuisance_seeds": [
+    306001,
+    306002,
+    306003,
+    306004,
+    306005
+  ],
+  "issues": 269,
+  "requested_actions": 96,
+  "fully_supported_issues": 268,
+  "ledger_rows": 128940,
+  "independent_unit": "BEIJING_ISSUE",
+  "payout_factor": 0.65,
+  "payout_application": "once per winning N-fold ticket in upstream settlement"
+}
