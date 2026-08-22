@@ -811,6 +811,42 @@ def _write_report(
         f"{row.total_lift:,.2f} | {row.ex_largest_lift:,.2f} | {row.positive_issue_fraction:.1%} |"
         for row in matched_view.itertuples()
     )
+    strategy_names = {
+        "S0O0A0": "Top-2 control",
+        "S0O0A1": "value allocator",
+        "S0O1A0": "support compression",
+        "S0O1A1": "compression + value allocator",
+        "S1O0A0": "learned selector",
+        "S1O0A1": "selector + value allocator",
+        "S1O1A0": "selector + compression",
+        "S1O1A1": "full joint stack",
+    }
+    risk_view = outputs["risk"]
+    risk_view = risk_view[risk_view.horizon.eq(PRIMARY_HORIZON)]
+    risk_summary = []
+    for cell in strategy_names:
+        cell_performance = primary[primary.cell.eq(cell)].set_index("issue_year")
+        cell_risk = risk_view[risk_view.cell.eq(cell)].set_index("issue_year")
+        cell_matched = matched_view[matched_view.cell.eq(cell)]
+        risk_summary.append(
+            f"| `{cell}` | {strategy_names[cell]} | "
+            f"{cell_performance.at[2023, 'capital_return']:+.2%} / "
+            f"{cell_performance.at[2024, 'capital_return']:+.2%} | "
+            f"CNY{cell_matched.total_lift.sum():+,.0f} | "
+            f"{cell_risk.at[2023, 'max_drawdown_pct']:.2%} / "
+            f"{cell_risk.at[2024, 'max_drawdown_pct']:.2%} | "
+            f"{int(cell_risk.at[2023, 'longest_losing_run'])} / "
+            f"{int(cell_risk.at[2024, 'longest_losing_run'])} | "
+            f"{int(cell_risk.at[2023, 'longest_no_payout_run'])} / "
+            f"{int(cell_risk.at[2024, 'longest_no_payout_run'])} | "
+            f"{int(cell_risk.at[2023, 'max_completed_recovery_issues'])}/"
+            f"{int(cell_risk.at[2023, 'open_underwater_issues'])} / "
+            f"{int(cell_risk.at[2024, 'max_completed_recovery_issues'])}/"
+            f"{int(cell_risk.at[2024, 'open_underwater_issues'])} | "
+            f"{cell_risk.at[2023, 'payout_hhi']:.3f} / "
+            f"{cell_risk.at[2024, 'payout_hhi']:.3f} |"
+        )
+    risk_summary_rows = "\n".join(risk_summary)
     model_rows = "\n".join(
         f"| {row['horizon']} | {row['selector_skill_vs_mean']:.2%} | "
         f"{row['action_delta_skill_vs_mean']:.2%} | "
@@ -875,6 +911,18 @@ but assigns zero return to unresolved settlement as a sensitivity bound; it is n
 | Year | Cell | observable/active | ending capital | capital return | conservative return | hit rate |
 |---|---|---:|---:|---:|---:|---:|
 {rows}
+
+## Baseline-relative risk/return decision table
+
+All paired values are `2023 / 2024`. Two-year matched lift is the sum of each
+year's exact common-support lift versus `S0O0A0`; it is the primary strategy
+comparison. `Recovery/open tail` reports the longest completed recovery episode
+and the still-underwater issue count at year end. HHI measures payout
+concentration, where larger values mean greater dependence on fewer winning issues.
+
+| Cell | Strategy | capital return | two-year matched lift | max drawdown | longest losing | longest no-payout | recovery/open tail | payout HHI |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+{risk_summary_rows}
 
 ## Model diagnostics on 2022 tuning issues
 
