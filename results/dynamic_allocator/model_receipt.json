@@ -1,0 +1,321 @@
+[
+  {
+    "candidates": [
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.2713187456715923,
+        "params": {
+          "alpha": 1.0
+        },
+        "scale_multiplier": 0.5,
+        "tune_mse": 141974.65341759476,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.14776907978772896,
+        "params": {
+          "alpha": 1.0
+        },
+        "scale_multiplier": 1.0,
+        "tune_mse": 141974.65341759476,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.07388453989386448,
+        "params": {
+          "alpha": 1.0
+        },
+        "scale_multiplier": 2.0,
+        "tune_mse": 141974.65341759476,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.15917357306046998,
+        "params": {
+          "alpha": 10.0
+        },
+        "scale_multiplier": 0.5,
+        "tune_mse": 140105.9577523021,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.08091485394200641,
+        "params": {
+          "alpha": 10.0
+        },
+        "scale_multiplier": 1.0,
+        "tune_mse": 140105.9577523021,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.040457426971003206,
+        "params": {
+          "alpha": 10.0
+        },
+        "scale_multiplier": 2.0,
+        "tune_mse": 140105.9577523021,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.027472080356993785,
+        "params": {
+          "alpha": 100.0
+        },
+        "scale_multiplier": 0.5,
+        "tune_mse": 139495.78204811233,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.013736040178496892,
+        "params": {
+          "alpha": 100.0
+        },
+        "scale_multiplier": 1.0,
+        "tune_mse": 139495.78204811233,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "RIDGE",
+        "mean_lambda": 0.006868020089248446,
+        "params": {
+          "alpha": 100.0
+        },
+        "scale_multiplier": 2.0,
+        "tune_mse": 139495.78204811233,
+        "tune_total_pnl": 9006.723608116943
+      }
+    ],
+    "family": "RIDGE",
+    "feature_columns": [
+      "eligible_fixtures",
+      "selector_mean",
+      "selector_std",
+      "selector_cutoff_margin",
+      "action_mean",
+      "action_std",
+      "positive_action_count",
+      "retained_mean",
+      "retained_std",
+      "entropy_mean",
+      "entropy_std",
+      "divergence_abs_mean",
+      "divergence_abs_std",
+      "line_abs_mean",
+      "books_mean",
+      "ticket_value_cv",
+      "ticket_value_max_share",
+      "a1_hhi",
+      "a0_a1_l1"
+    ],
+    "final_scale": 530.0241352572519,
+    "final_training_years": [
+      2020,
+      2021,
+      2022
+    ],
+    "meta_train_years": [
+      2020,
+      2021
+    ],
+    "meta_tune_year": 2022,
+    "selected": {
+      "family": "RIDGE",
+      "mean_lambda": 0.006868020089248446,
+      "params": {
+        "alpha": 100.0
+      },
+      "scale_multiplier": 2.0,
+      "tune_mse": 139495.78204811233,
+      "tune_total_pnl": 9006.723608116943
+    },
+    "training_issue_count": 142
+  },
+  {
+    "candidates": [
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.09572774933434317,
+        "params": {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 5
+        },
+        "scale_multiplier": 0.5,
+        "tune_mse": 139923.29420433837,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.04786387466717158,
+        "params": {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 5
+        },
+        "scale_multiplier": 1.0,
+        "tune_mse": 139923.29420433837,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.02393193733358579,
+        "params": {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 5
+        },
+        "scale_multiplier": 2.0,
+        "tune_mse": 139923.29420433837,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.04882960025682075,
+        "params": {
+          "l2_regularization": 20.0,
+          "max_leaf_nodes": 5
+        },
+        "scale_multiplier": 0.5,
+        "tune_mse": 140186.19518869187,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.024414800128410376,
+        "params": {
+          "l2_regularization": 20.0,
+          "max_leaf_nodes": 5
+        },
+        "scale_multiplier": 1.0,
+        "tune_mse": 140186.19518869187,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.012207400064205188,
+        "params": {
+          "l2_regularization": 20.0,
+          "max_leaf_nodes": 5
+        },
+        "scale_multiplier": 2.0,
+        "tune_mse": 140186.19518869187,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.09572774933434317,
+        "params": {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 10
+        },
+        "scale_multiplier": 0.5,
+        "tune_mse": 139923.29420433837,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.04786387466717158,
+        "params": {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 10
+        },
+        "scale_multiplier": 1.0,
+        "tune_mse": 139923.29420433837,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.02393193733358579,
+        "params": {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 10
+        },
+        "scale_multiplier": 2.0,
+        "tune_mse": 139923.29420433837,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.04882960025682075,
+        "params": {
+          "l2_regularization": 20.0,
+          "max_leaf_nodes": 10
+        },
+        "scale_multiplier": 0.5,
+        "tune_mse": 140186.19518869187,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.024414800128410376,
+        "params": {
+          "l2_regularization": 20.0,
+          "max_leaf_nodes": 10
+        },
+        "scale_multiplier": 1.0,
+        "tune_mse": 140186.19518869187,
+        "tune_total_pnl": 9006.723608116943
+      },
+      {
+        "family": "HGBR",
+        "mean_lambda": 0.012207400064205188,
+        "params": {
+          "l2_regularization": 20.0,
+          "max_leaf_nodes": 10
+        },
+        "scale_multiplier": 2.0,
+        "tune_mse": 140186.19518869187,
+        "tune_total_pnl": 9006.723608116943
+      }
+    ],
+    "family": "HGBR",
+    "feature_columns": [
+      "eligible_fixtures",
+      "selector_mean",
+      "selector_std",
+      "selector_cutoff_margin",
+      "action_mean",
+      "action_std",
+      "positive_action_count",
+      "retained_mean",
+      "retained_std",
+      "entropy_mean",
+      "entropy_std",
+      "divergence_abs_mean",
+      "divergence_abs_std",
+      "line_abs_mean",
+      "books_mean",
+      "ticket_value_cv",
+      "ticket_value_max_share",
+      "a1_hhi",
+      "a0_a1_l1"
+    ],
+    "final_scale": 530.0241352572519,
+    "final_training_years": [
+      2020,
+      2021,
+      2022
+    ],
+    "meta_train_years": [
+      2020,
+      2021
+    ],
+    "meta_tune_year": 2022,
+    "selected": {
+      "family": "HGBR",
+      "mean_lambda": 0.012207400064205188,
+      "params": {
+        "l2_regularization": 20.0,
+        "max_leaf_nodes": 5
+      },
+      "scale_multiplier": 2.0,
+      "tune_mse": 140186.19518869187,
+      "tune_total_pnl": 9006.723608116943
+    },
+    "training_issue_count": 142
+  }
+]

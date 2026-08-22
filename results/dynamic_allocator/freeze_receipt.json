@@ -1,0 +1,59 @@
+{
+  "allocation_sha256": "4567533dc8065302c187cdd377b2684720efdd89269235791a8567fca7f5967a",
+  "arms": [
+    "L000",
+    "L025",
+    "L050",
+    "L075",
+    "L100",
+    "DYN_RIDGE",
+    "DYN_HGBR"
+  ],
+  "contract": "BJ-UNIFIED-DYNAMIC-ALLOCATOR-001/v1",
+  "eval_settlement_opened_before_freeze": false,
+  "eval_years": [
+    2023,
+    2024
+  ],
+  "excluded_years": [
+    2025,
+    2026
+  ],
+  "feature_columns": [
+    "eligible_fixtures",
+    "selector_mean",
+    "selector_std",
+    "selector_cutoff_margin",
+    "action_mean",
+    "action_std",
+    "positive_action_count",
+    "retained_mean",
+    "retained_std",
+    "entropy_mean",
+    "entropy_std",
+    "divergence_abs_mean",
+    "divergence_abs_std",
+    "line_abs_mean",
+    "books_mean",
+    "ticket_value_cv",
+    "ticket_value_max_share",
+    "a1_hhi",
+    "a0_a1_l1"
+  ],
+  "funded_units": 128,
+  "issue": 328,
+  "oof_years": [
+    2020,
+    2021,
+    2022
+  ],
+  "policy_sha256": "821ba0d25691f07a6e08e0869fd49712fb34808688edd8047868c18db36e559a",
+  "source_324_manifest_sha256": "1a6af17537c0d783f8c4404ee66f4153d44ebbe999c71fc6bf6504d9d99b1705",
+  "static_lambdas": [
+    0.0,
+    0.25,
+    0.5,
+    0.75,
+    1.0
+  ]
+}

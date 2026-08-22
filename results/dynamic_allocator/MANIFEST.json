@@ -1,0 +1,89 @@
+{
+  "contract": "BJ-UNIFIED-DYNAMIC-ALLOCATOR-001/v1",
+  "files": {
+    "allocations.parquet": {
+      "bytes": 131384,
+      "sha256": "780473041e5538d06cd1c1f27e646af07186d8ef25d0a977a503443148ba9579"
+    },
+    "capital_paths.csv": {
+      "bytes": 98823,
+      "sha256": "692cd3678662eaa0b926890c3ba06da898dc1cf9bf19aca54836f20cad9e9685"
+    },
+    "decision.json": {
+      "bytes": 579,
+      "sha256": "199adc83028c2ce7fa5e3b5e81b048a41f245c7313ce92c750cd456a0919e644"
+    },
+    "endpoint_parity.json": {
+      "bytes": 949,
+      "sha256": "acf5555b58154b8191710f10d283ad6a8f038588ad727017d27f1fe5cc11a5d6"
+    },
+    "feature_attribution.csv": {
+      "bytes": 3456,
+      "sha256": "f133ca3260558fc698f339eb4eed7a6c75a3c816fb92fa333a069bb26acc0f38"
+    },
+    "freeze_receipt.json": {
+      "bytes": 1187,
+      "sha256": "fa809b591ea40449dcc2220a87a7d4f1ed74805526e35cf2c21b1ea1968f0e16"
+    },
+    "issue_features.parquet": {
+      "bytes": 30918,
+      "sha256": "8c563046a82867b53c890234519267f7efbd9fe39318bfd7c066226bfec6195d"
+    },
+    "matched_issue_effects.parquet": {
+      "bytes": 19114,
+      "sha256": "a408f51dde986addbfc8946d7a2e11fa891dd9239a4e587c09655ca40398f44b"
+    },
+    "matched_performance.csv": {
+      "bytes": 2009,
+      "sha256": "bc8f1bab21f5cf6682e907ff7ef87176349c0937ec9c3ad5b79be3d2a70f5233"
+    },
+    "model_calibration.csv": {
+      "bytes": 1967,
+      "sha256": "502b43a9d1ef2b5594b3dc97e9ed93a33dd395ab95bc94150feedb953e7e0d2e"
+    },
+    "model_receipt.json": {
+      "bytes": 8057,
+      "sha256": "ab23384a53fa339cf2a627fb79032d723c9509fbb70a16feb0b0c858eeb0dbe9"
+    },
+    "models.joblib": {
+      "bytes": 38816,
+      "sha256": "263f90505443b67bc7a621b1d13521b19c3b560a3b314fa790e6a6da0b9f73ee"
+    },
+    "oof_issue_features.parquet": {
+      "bytes": 37065,
+      "sha256": "43e5d878c242f44c943bdfe71fa616d678bde56d7eb15a85ee8f364ca9c14080"
+    },
+    "oof_receipt.json": {
+      "bytes": 513,
+      "sha256": "2653d90f0be433923dc165f1d307ac271df7311f7f785b56b30db09eeeb7fb41"
+    },
+    "oof_static_settlement.parquet": {
+      "bytes": 9664,
+      "sha256": "65d4d2bd977d13d8b060f2eb8530b2523ba545b1cc492eba098eaf214f358e85"
+    },
+    "oracle_diagnostics.csv": {
+      "bytes": 232,
+      "sha256": "34a1d154f3b84cf4b9b6cd4eaffcbab43bcbccb6c2509889448d0fb48896f7c6"
+    },
+    "performance.csv": {
+      "bytes": 2368,
+      "sha256": "e81303efff64f494c6a0f6cd392cc9b12e0cefe4dd43e23ec4c6105e7b5d41f5"
+    },
+    "policies.parquet": {
+      "bytes": 4993,
+      "sha256": "7fbd40596b19a00b6f49ca53c5b6cb78b9330bcf4835e8e4f3ad56c43d842cf3"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 1633,
+      "sha256": "22c040f9eba8c2c244a18db546204abb97483c617b64227809ec20f10a64033e"
+    },
+    "settlement.parquet": {
+      "bytes": 13109,
+      "sha256": "fba3a33e3916a1b6f52902240c93d49341318eebe0f51ff0968cf3cbee8d025d"
+    },
+    "settlement_reason_ledger.csv": {
+      "bytes": 175371,
+      "sha256": "00fad01ff7c4d565b3ac5e59e8d5bf4bae054cb24945579121a0e6a1f99d3d4d"
+    }
+  }
+}
