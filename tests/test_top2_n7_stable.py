@@ -43,6 +43,15 @@ def test_price_arms_and_numeric_gates_fail_closed() -> None:
     assert not blocked.gate.eq("NONE").all()
 
 
+def test_fewer_than_seven_fixtures_is_explicit_no_bet() -> None:
+    bundles, tickets = construct_preoutcome(surface(6))
+    assert tickets.empty
+    probability = bundles[bundles.arm.isin(["P_TOP2_NO_GATE", "RANDOM_MATCH_P_TOP2"])]
+    assert probability.status_preoutcome.eq("NO_BET_INSUFFICIENT_FIXTURES").all()
+    price = bundles[bundles.arm.isin(["P_TOP2_VALUE_RANK", "Q_TOP2_VALUE_SUPPORT"])]
+    assert price.status_preoutcome.eq("NO_BET_PRICE_DATA_INSUFFICIENT").all()
+
+
 def test_random_seed_is_deterministic_and_issue_specific() -> None:
     assert _seed("23001", 0) == _seed("23001", 0)
     assert _seed("23001", 0) != _seed("23002", 0)

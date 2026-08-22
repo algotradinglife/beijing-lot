@@ -1,9 +1,9 @@
 {
-  "MANIFEST.json": "1317ea0231254bd9da01a838b3565794c68b745000ba5e7ceb91eb6fae23def0",
+  "MANIFEST.json": "90b146f591d064ad28d4e8457286e0f5bc9f8d1adf2759fa6569648026dedddd",
   "attribution.parquet": "3544834c66c809d8ec28d65d450684e07c2c51ed0ed6bc83c98d7c3f9f6792e9",
   "capital_paths.csv": "3270e12d6b94a66cbddc93cfc70884da370ee0342d26bf23db5535f76702bc92",
   "decision.json": "749c562824067ca294f43855ab43c0624ffd09b2e33038c9a06f56ebc4a49529",
-  "freeze_receipt.json": "b741dbc0dea928ca817aaed5aa5290e100c75670e5dccc65806fbc010c6e4340",
+  "freeze_receipt.json": "6040e778150813682ff66c6bdd3a21bef60cf029558857b1093a21269b66800d",
   "issue_bundles.parquet": "babc497888d9ec2c9c9d3a47457f6571f216ea603037bbec467fb70e20cd790d",
   "matched_performance.csv": "ee8ac6a4d886f994be4cf03a423585304dfcbbb3c35f7373c27070a31a806cd1",
   "paired_selector_lift.parquet": "7a86628e0025bd66065603f1c0bc87ef9e6ce0464a65e99ce7910a0b023d3415",

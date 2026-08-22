@@ -89,6 +89,21 @@ def _feature_surface(path: Path) -> pd.DataFrame:
     return frame
 
 
+def _validate_roles(path: Path, feature: pd.DataFrame) -> dict[str, int]:
+    roles = pd.read_csv(path, dtype={"issue_code": str})
+    roles = roles[roles["issue_year"].isin([2023, 2024])].copy()
+    expected = {2023: "calibration", 2024: "sealed_feature_only"}
+    for year, role in expected.items():
+        observed = set(roles.loc[roles.issue_year == year, "temporal_role"])
+        if observed != {role}:
+            raise ValueError(f"unexpected temporal role for {year}: {sorted(observed)}")
+    feature_issues = set(feature["issue_code"].astype(str))
+    role_issues = set(roles["issue_code"])
+    if not feature_issues.issubset(role_issues):
+        raise ValueError(f"feature issues missing frozen roles: {sorted(feature_issues - role_issues)[:10]}")
+    return {str(year): int(roles.loc[roles.issue_year == year, "issue_code"].nunique()) for year in expected}
+
+
 def _fixture_table(frame: pd.DataFrame) -> pd.DataFrame:
     order = {code: i for i, code in enumerate(OUTCOME_ORDER)}
     rows: list[dict] = []
@@ -145,6 +160,28 @@ def construct_preoutcome(feature: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFr
     for _, group in fixtures.groupby(["issue_code", "issue_year", "horizon"], sort=True):
         issue = str(group.iloc[0]["issue_code"])
         if len(group) < N_LEGS:
+            for arm in ACTIVE_ARMS:
+                for gate in GM_GATES:
+                    bundle_rows.append({
+                        "issue_code": issue, "issue_year": int(group.iloc[0]["issue_year"]),
+                        "horizon": str(group.iloc[0]["horizon"]), "arm": arm, "gate": gate,
+                        "seed": -1, "status_preoutcome": "NO_BET_INSUFFICIENT_FIXTURES",
+                        "selected_fixture_keys": "", "support_json": "{}",
+                        "retained_mass_mean": np.nan, "retained_mass_min": np.nan,
+                        "ticket_count": 0, "planned_stake": 0.0, "line_abs_mean": np.nan,
+                        "divergence_abs_mean": np.nan, "available_books_mean": np.nan,
+                    })
+            for arm in PRICE_BLOCKED_ARMS:
+                for gate in GM_GATES:
+                    bundle_rows.append({
+                        "issue_code": issue, "issue_year": int(group.iloc[0]["issue_year"]),
+                        "horizon": str(group.iloc[0]["horizon"]), "arm": arm, "gate": gate,
+                        "seed": -1, "status_preoutcome": "NO_BET_PRICE_DATA_INSUFFICIENT",
+                        "selected_fixture_keys": "", "support_json": "{}",
+                        "retained_mass_mean": np.nan, "retained_mass_min": np.nan,
+                        "ticket_count": 0, "planned_stake": 0.0, "line_abs_mean": np.nan,
+                        "divergence_abs_mean": np.nan, "available_books_mean": np.nan,
+                    })
             continue
         probability = group.sort_values(
             ["retained_mass", "canonical_fixture_key"], ascending=[False, True], kind="stable"
@@ -494,6 +531,19 @@ stable Edge, not a reason to select the favorable aggregation.
 5. A future value-selector test requires genuine decision-epoch SP or a separately
    accepted proxy; probability-only performance cannot unlock forward validation.
 
+## Requirement evidence
+
+| Requirement | Evidence | Result |
+|---|---|---|
+| REQ-TOP2-01 | `freeze_receipt.json`; role/source binding and pre-outcome hashes | PASS |
+| REQ-TOP2-02 | `tickets.parquet`; 128 unique tickets and CNY256 reconciliation | PASS |
+| REQ-TOP2-03 | exact ticket/bundle gross reconciliation and factor-once tests | PASS |
+| REQ-TOP2-04 | all arms/gates and explicit `NO_BET` reasons in bundle ledger | PASS |
+| REQ-TOP2-05 | absolute performance, exact paired lift and risk tables | PASS |
+| REQ-TOP2-06 | price-dependent lanes fail closed; no proxy promotion | PASS |
+| REQ-TOP2-07 | package code, focused tests, executed notebook and hashes | PASS |
+| REQ-TOP2-08 | issue/seed miss-distance and failure-reason attribution | PASS |
+
 ## Artifacts
 
 - Notebook: `notebooks/research/top2-n7-stable/top2_n7_stable.ipynb`
@@ -514,6 +564,7 @@ def build_package(repo_root: Path, output: Path, data_root: Path | None = None) 
     settlement_path = source_root / "derived/beidan_xlsm/beidan_xlsm.sqlite"
 
     feature = _feature_surface(probability_path)
+    role_counts = _validate_roles(roles_path, feature)
     bundles_pre, tickets_pre = construct_preoutcome(feature)
     freeze = {
         "contract": "BJ-UNIFIED-TOP2-N7-STABLE-001/v1", "issue": 319,
@@ -522,6 +573,7 @@ def build_package(repo_root: Path, output: Path, data_root: Path | None = None) 
         "preoutcome_bundle_sha256": stable_frame_sha(bundles_pre, PREOUTCOME_BUNDLE_COLUMNS),
         "preoutcome_ticket_sha256": stable_frame_sha(tickets_pre, PREOUTCOME_TICKET_COLUMNS),
         "probability_source_sha256": sha256_file(probability_path), "roles_source_sha256": sha256_file(roles_path),
+        "frozen_role_counts": role_counts,
         "active_arms": list(ACTIVE_ARMS), "price_blocked_arms": list(PRICE_BLOCKED_ARMS),
         "random_seed_count": len(RANDOM_SEEDS), "tickets_per_active_bundle": TICKETS_PER_BUNDLE,
         "planned_stake_per_active_bundle": ISSUE_STAKE,

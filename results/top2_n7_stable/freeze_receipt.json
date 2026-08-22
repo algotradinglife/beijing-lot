@@ -4,6 +4,10 @@
     "RANDOM_MATCH_P_TOP2"
   ],
   "contract": "BJ-UNIFIED-TOP2-N7-STABLE-001/v1",
+  "frozen_role_counts": {
+    "2023": 53,
+    "2024": 66
+  },
   "horizons": [
     "10h",
     "initial",

@@ -14,8 +14,8 @@
       "sha256": "749c562824067ca294f43855ab43c0624ffd09b2e33038c9a06f56ebc4a49529"
     },
     "freeze_receipt.json": {
-      "bytes": 951,
-      "sha256": "b741dbc0dea928ca817aaed5aa5290e100c75670e5dccc65806fbc010c6e4340"
+      "bytes": 1013,
+      "sha256": "6040e778150813682ff66c6bdd3a21bef60cf029558857b1093a21269b66800d"
     },
     "issue_bundles.parquet": {
       "bytes": 831647,
