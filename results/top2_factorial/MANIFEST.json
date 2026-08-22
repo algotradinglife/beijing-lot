@@ -1,0 +1,77 @@
+{
+  "contract": "BJ-UNIFIED-TOP2-FACTORIAL-001/v1",
+  "files": {
+    "baseline_parity.json": {
+      "bytes": 614,
+      "sha256": "b41bf7ec52020ecbfe28831d7c8b2000a7ff82941bdf8a586d0f3a9418bc8a10"
+    },
+    "capital_paths.csv": {
+      "bytes": 296726,
+      "sha256": "28ad49cc7a9298e131e3cd336e8e2e4f1a4fda0ba5af31cc5bf26ce185e64924"
+    },
+    "cell_lift_bootstrap.csv": {
+      "bytes": 3915,
+      "sha256": "6ca87996f76c0b7cecd9d45f9a3a1f0701dfd1233802b4890cae9140630582eb"
+    },
+    "cells.parquet": {
+      "bytes": 106194,
+      "sha256": "201c905888c6cdeec382bca722a2390a8d8a0ebaba9a55b7deb804eaa2bdedb9"
+    },
+    "coverage.csv": {
+      "bytes": 2951,
+      "sha256": "70fb3723e636a20a81381453463fef70a2488cf8dd93aa80f0fb1d118efd4266"
+    },
+    "decision.json": {
+      "bytes": 393,
+      "sha256": "fcc8903df7754425617fd1a0cdfd50ee03ecbb59d69bd6471fef3d4a04ad34ea"
+    },
+    "factorial_effects.csv": {
+      "bytes": 3694,
+      "sha256": "1ca8225e3b5b988cd0ebcaed0ec38daf91d4378e01716a0a3d78b6811a75f1d9"
+    },
+    "fixture_predictions.parquet": {
+      "bytes": 13678859,
+      "sha256": "24781d6449bcc407e614b6051715f937d42cc27440b650445463b3edcede2a9c"
+    },
+    "freeze_receipt.json": {
+      "bytes": 950,
+      "sha256": "c46c90c37ab4c1bf2f32484bd6cf4ac990df70e55b5540b92cc1b362cf182e3c"
+    },
+    "matched_issue_effects.parquet": {
+      "bytes": 31104,
+      "sha256": "4b51e3b5f7b3c223faa608613bfdf12d20753e119eaa1fa7388f6a49305ca9f7"
+    },
+    "matched_performance.csv": {
+      "bytes": 7092,
+      "sha256": "1efc1071a3b8d3029841f92e06a126110f42919d65f4c64ec9ec2988cb7ae6bc"
+    },
+    "mechanism_diagnostics.csv": {
+      "bytes": 136569,
+      "sha256": "11a69ba0c0a4d19e67986b49a1830bef5cdf3a102903f0c8a61a99e81336d4f6"
+    },
+    "model_receipt.json": {
+      "bytes": 5496,
+      "sha256": "365c4164e1c59b00b6b42a73a70beb1c5bb770eaa3c4a62c80f29d66cd705e74"
+    },
+    "models.joblib": {
+      "bytes": 1356684,
+      "sha256": "50f57e431a8c22c73883e25e3aadae827c2b09ca2567ffe82dfb44720e1a2ba1"
+    },
+    "native_cost_sensitivity.csv": {
+      "bytes": 145153,
+      "sha256": "c46b81e46d5f219452c5c004f497827888f37a8ad8838ef94f32daeca627dd53"
+    },
+    "performance.csv": {
+      "bytes": 8630,
+      "sha256": "5ef789e8ba8f95b53b5b754d734e67d314223f82dfa9c0ffcd064eeeea60a5c9"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 5124,
+      "sha256": "9443409d3569880c4c43b6c9addd4c16d99cb859df4e6e4804fc93e089a66313"
+    },
+    "tickets.parquet": {
+      "bytes": 3658196,
+      "sha256": "6cf6c069d8d47fd846ac96f4a683328b3240a4253ccb68b40a3b15139f1545fe"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "claim_boundary": "RETROSPECTIVE_COMPLETE_CASE_EXPLORATION",
+  "contract": "BJ-UNIFIED-TOP2-FACTORIAL-001/v1",
+  "descriptive_joint_positive_both_years": [
+    "S1O1A0",
+    "S1O1A1"
+  ],
+  "disposition": "NO_INCREMENT",
+  "ex_largest_required": true,
+  "issue": 324,
+  "joint_positive_both_years": [],
+  "promotion": false,
+  "standalone_positive_both_years": [],
+  "unlock_210": false
+}

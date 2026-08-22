@@ -1,0 +1,221 @@
+[
+  {
+    "action_delta_baseline_mse": 1.5579774794743797,
+    "action_delta_mse": 1.55756365068221,
+    "action_delta_skill_vs_mean": 0.00026561923880275007,
+    "feature_columns": [
+      "q3",
+      "q1",
+      "q0",
+      "line_q3",
+      "line_q1",
+      "line_q0",
+      "div3",
+      "div1",
+      "div0",
+      "retained_mass",
+      "entropy",
+      "q_gap",
+      "native_handicap_line",
+      "abs_handicap_line",
+      "n_available_books",
+      "issue_retained_mean",
+      "issue_retained_std",
+      "issue_div_abs_mean",
+      "retained_pct_rank"
+    ],
+    "final_training_issue_count": 562,
+    "fit_issue_count": 500,
+    "horizon": "10h",
+    "selected_params": {
+      "l2_regularization": 1.0,
+      "max_leaf_nodes": 15
+    },
+    "selector_baseline_mse": 2.005730739465677,
+    "selector_skill_vs_mean": -0.000113659367330321,
+    "sp_diagnostics": {
+      "0": {
+        "baseline_log_mse": 0.04961368490237134,
+        "log_mse": 0.012505189755125976,
+        "skill_vs_mean": 0.7479487810725327,
+        "tune_rows": 18941
+      },
+      "1": {
+        "baseline_log_mse": 0.010822642968613105,
+        "log_mse": 0.006565419540483044,
+        "skill_vs_mean": 0.3933626416834125,
+        "tune_rows": 18941
+      },
+      "3": {
+        "baseline_log_mse": 0.04138576599180078,
+        "log_mse": 0.010532064201011772,
+        "skill_vs_mean": 0.7455148177492148,
+        "tune_rows": 18941
+      }
+    },
+    "tune_issue_count": 62,
+    "tuning": [
+      {
+        "l2_regularization": 1.0,
+        "max_leaf_nodes": 7,
+        "mse": 2.0060818420893334
+      },
+      {
+        "l2_regularization": 1.0,
+        "max_leaf_nodes": 15,
+        "mse": 2.0059587095525595
+      },
+      {
+        "l2_regularization": 5.0,
+        "max_leaf_nodes": 15,
+        "mse": 2.006018812275422
+      }
+    ]
+  },
+  {
+    "action_delta_baseline_mse": 1.5635615839274033,
+    "action_delta_mse": 1.5624364695825625,
+    "action_delta_skill_vs_mean": 0.000719584285266639,
+    "feature_columns": [
+      "q3",
+      "q1",
+      "q0",
+      "line_q3",
+      "line_q1",
+      "line_q0",
+      "div3",
+      "div1",
+      "div0",
+      "retained_mass",
+      "entropy",
+      "q_gap",
+      "native_handicap_line",
+      "abs_handicap_line",
+      "n_available_books",
+      "issue_retained_mean",
+      "issue_retained_std",
+      "issue_div_abs_mean",
+      "retained_pct_rank"
+    ],
+    "final_training_issue_count": 562,
+    "fit_issue_count": 500,
+    "horizon": "initial",
+    "selected_params": {
+      "l2_regularization": 1.0,
+      "max_leaf_nodes": 7
+    },
+    "selector_baseline_mse": 2.060453698582514,
+    "selector_skill_vs_mean": -8.370226903031686e-05,
+    "sp_diagnostics": {
+      "0": {
+        "baseline_log_mse": 0.049605364148107345,
+        "log_mse": 0.019790568202742012,
+        "skill_vs_mean": 0.6010397556269707,
+        "tune_rows": 18949
+      },
+      "1": {
+        "baseline_log_mse": 0.010823938852149412,
+        "log_mse": 0.007117446451887825,
+        "skill_vs_mean": 0.342434713544742,
+        "tune_rows": 18949
+      },
+      "3": {
+        "baseline_log_mse": 0.04138187956285747,
+        "log_mse": 0.017174153513412668,
+        "skill_vs_mean": 0.5849837248855313,
+        "tune_rows": 18949
+      }
+    },
+    "tune_issue_count": 62,
+    "tuning": [
+      {
+        "l2_regularization": 1.0,
+        "max_leaf_nodes": 7,
+        "mse": 2.060626163232317
+      },
+      {
+        "l2_regularization": 1.0,
+        "max_leaf_nodes": 15,
+        "mse": 2.0609054506384235
+      },
+      {
+        "l2_regularization": 5.0,
+        "max_leaf_nodes": 15,
+        "mse": 2.0608920766734893
+      }
+    ]
+  },
+  {
+    "action_delta_baseline_mse": 1.566744355221103,
+    "action_delta_mse": 1.566530227542403,
+    "action_delta_skill_vs_mean": 0.00013667046444842956,
+    "feature_columns": [
+      "q3",
+      "q1",
+      "q0",
+      "line_q3",
+      "line_q1",
+      "line_q0",
+      "div3",
+      "div1",
+      "div0",
+      "retained_mass",
+      "entropy",
+      "q_gap",
+      "native_handicap_line",
+      "abs_handicap_line",
+      "n_available_books",
+      "issue_retained_mean",
+      "issue_retained_std",
+      "issue_div_abs_mean",
+      "retained_pct_rank"
+    ],
+    "final_training_issue_count": 562,
+    "fit_issue_count": 500,
+    "horizon": "1h",
+    "selected_params": {
+      "l2_regularization": 1.0,
+      "max_leaf_nodes": 15
+    },
+    "selector_baseline_mse": 1.9931725192944094,
+    "selector_skill_vs_mean": 4.262163945811803e-05,
+    "sp_diagnostics": {
+      "0": {
+        "baseline_log_mse": 0.04960521330959071,
+        "log_mse": 0.011176478600651558,
+        "skill_vs_mean": 0.7746914516646037,
+        "tune_rows": 18949
+      },
+      "1": {
+        "baseline_log_mse": 0.010825910713926242,
+        "log_mse": 0.0063169604773475364,
+        "skill_vs_mean": 0.4164961596051665,
+        "tune_rows": 18949
+      },
+      "3": {
+        "baseline_log_mse": 0.041383589291563334,
+        "log_mse": 0.009575803758742972,
+        "skill_vs_mean": 0.7686086701837836,
+        "tune_rows": 18949
+      }
+    },
+    "tune_issue_count": 62,
+    "tuning": [
+      {
+        "l2_regularization": 1.0,
+        "max_leaf_nodes": 7,
+        "mse": 1.993105934508729
+      },
+      {
+        "l2_regularization": 1.0,
+        "max_leaf_nodes": 15,
+        "mse": 1.9930875670139143
+      },
+      {
+        "l2_regularization": 5.0,
+        "max_leaf_nodes": 15,
+        "mse": 1.9932303858569678
+      }
+    ]
+  }
+]

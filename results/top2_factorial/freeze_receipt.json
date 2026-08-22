@@ -1,0 +1,45 @@
+{
+  "cell_freeze_sha256": "44485f9a9688af380c9c3197e66c2f409f9a8ea6d8ad0c7f9b36f4a6d4433ec2",
+  "cells": [
+    "S0O0A0",
+    "S0O0A1",
+    "S0O1A0",
+    "S0O1A1",
+    "S1O0A0",
+    "S1O0A1",
+    "S1O1A0",
+    "S1O1A1"
+  ],
+  "contract": "BJ-UNIFIED-TOP2-FACTORIAL-001/v1",
+  "evaluation_years": [
+    2023,
+    2024
+  ],
+  "excluded_years": [
+    2025,
+    2026
+  ],
+  "fit_years": [
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "funded_units": 128,
+  "horizons": [
+    "10h",
+    "initial",
+    "1h"
+  ],
+  "issue": 324,
+  "issue_stake": 256.0,
+  "probability_source_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+  "settlement_opened_for_eval_before_freeze": false,
+  "ticket_freeze_sha256": "4314428dd122fe29caff7f0df0b8c8bd624f28af6daf0071c916aeee979b98fd",
+  "training_label_sha256": "600a9cc69db2629bfcaba3c4cf260044d42fbd2f58abdf9d14d51609259a787a",
+  "tune_year": 2022
+}

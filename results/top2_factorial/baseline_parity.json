@@ -1,0 +1,17 @@
+{
+  "cell_count_current": 357,
+  "cell_count_prior": 357,
+  "performance_max_abs_diff": {
+    "capital_return": 4.85722573273506e-17,
+    "ending_capital": 1.4551915228366852e-11,
+    "hit_rate": 8.326672684688674e-17,
+    "turnover_roi": 5.551115123125783e-17
+  },
+  "performance_parity": true,
+  "prior_issue": 319,
+  "selected_fixture_parity": true,
+  "support_parity": true,
+  "ticket_identity_parity": true,
+  "ticket_identity_sha_current": "1cc794c8d01d7f1c4ebe779fea9a02e1939e9c8a9c0b9ec79312f59deaa21be9",
+  "ticket_identity_sha_prior": "1cc794c8d01d7f1c4ebe779fea9a02e1939e9c8a9c0b9ec79312f59deaa21be9"
+}
