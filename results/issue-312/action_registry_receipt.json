@@ -1,0 +1,11 @@
+{
+  "issue": 312,
+  "stage": "PRE_SETTLEMENT_ACTION_REGISTRY_FREEZE",
+  "design": "SCIPY_QMC_DISCRETE_LATIN_HYPERCUBE_PLUS_EXACT_306_ANCHORS",
+  "design_seed": 312001,
+  "actions": 192,
+  "anchors": 96,
+  "settlement_fields_read": [],
+  "registry_sha256": "6f4aadd88eed70b11495e8aca2541f8f3c9311f4ae37ca5729ca9fdf06494dd1",
+  "sealed_years": "2023 outcomes and 2024+ not read"
+}
