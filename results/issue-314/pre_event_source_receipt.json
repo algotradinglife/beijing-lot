@@ -1,0 +1,16 @@
+{
+  "feature_projection_sha256": "917c728f93e7e27f19ed40a7ac4cd2e36d4b8324172222cabde9a806b1a33938",
+  "feature_rows": 84379,
+  "issues": 293,
+  "years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ],
+  "inference_schema_sha256": "6cd0d07d88843a78347fa14e9870268cf03f24d71a451b64f25443cb520e7afc",
+  "external_sources_committed_to_git": false,
+  "access": "BEIJING_LOT_RUNTIME_ROOT/data/derived; see README data operations"
+}

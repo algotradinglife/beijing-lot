@@ -1,0 +1,82 @@
+{
+  "issue": 314,
+  "stage": "freeze",
+  "files": {
+    "development_action_labels.parquet": {
+      "bytes": 185968,
+      "sha256": "f2f7567241663bda5ee2142d4d065516222ba25a71f5e4537e96b62f414530f1"
+    },
+    "development_expert_surface.parquet": {
+      "bytes": 451114,
+      "sha256": "489f2e1c7aeee1759d7f5b6dcc16dee90bde6e308313187cb989c761f781bd65"
+    },
+    "development_expert_surface_2019.parquet": {
+      "bytes": 116880,
+      "sha256": "6f0ca1735bdbaefadccc5ef46eea85d1763fadb730e88b85b28ed7d41c129070"
+    },
+    "development_expert_surface_2020.parquet": {
+      "bytes": 61062,
+      "sha256": "64577ea3ef15363351509efa33b6f4a42a3f1fa562832fa79bc81ffcd5fcb216"
+    },
+    "development_expert_surface_2021.parquet": {
+      "bytes": 109782,
+      "sha256": "bc2b623cc217389e4aeca5dbc8227f7f9ae041d4804c6654e95c95d07a4b9fa0"
+    },
+    "development_expert_surface_2022.parquet": {
+      "bytes": 118639,
+      "sha256": "4663c73feeeee63091e98a279815c10f83600376bae823ec3ad5c326ef5b83cc"
+    },
+    "development_expert_surface_2023.parquet": {
+      "bytes": 103604,
+      "sha256": "a06c18d8abd301b60c90fdcc930600f03926bd07035d6fea6049d9154749af8d"
+    },
+    "expert_registry.csv": {
+      "bytes": 545,
+      "sha256": "293a2418f1e9373b2cd44b2e7dfdf13f3c2eefc48129abc665e606d134fafcd8"
+    },
+    "freeze_receipt.json": {
+      "bytes": 1132,
+      "sha256": "879f695837684286e601ca45101794929ddc12b56d4ba260d749f623475469a6"
+    },
+    "frozen_action_predictions.parquet": {
+      "bytes": 76587,
+      "sha256": "49967877da9457602bf1ef64e364f0e2c917357dd83f75322ca886d71b767cbb"
+    },
+    "frozen_allocations_2024.jsonl": {
+      "bytes": 310134,
+      "sha256": "88211b8fc5616649bac39ea45b12aff7d38e05bece5bbf313ef7b05b6d69637d"
+    },
+    "frozen_gate.joblib": {
+      "bytes": 4044,
+      "sha256": "114d65baa0efdaf9169c503a8c82d6f48d7bd2cc9e198a6ae4a45bf830d8a0f7"
+    },
+    "issue_features_2019_2024.csv": {
+      "bytes": 73235,
+      "sha256": "de5220f7ebe174649edad704e2a29f5669674de025bc481a52195de34da385ca"
+    },
+    "pre_event_source_receipt.json": {
+      "bytes": 445,
+      "sha256": "55d2cb5f0a39acbe2c7813a7e98c8701a6f3386dab5132921b985eed6d0584da"
+    },
+    "screening_2022.csv": {
+      "bytes": 2046,
+      "sha256": "f1e918357af8191b35207ca2158027f89641c8fcfdc541617170004dc7d86135"
+    },
+    "support_receipt.csv": {
+      "bytes": 252,
+      "sha256": "788ab0a9504bf9c6759efc7df678c50a31dfaab4393589f09695b63eed6fceed"
+    },
+    "validation_capital_paths_2023.csv": {
+      "bytes": 671963,
+      "sha256": "ae22a81e235e17686624dd7da6c2ac528e3a47a084b612ee0ac36c9c09bfa770"
+    },
+    "validation_near_miss_2023.parquet": {
+      "bytes": 88169,
+      "sha256": "3fd8f2a8197ff6a699056d84f0baf32f50b5b59af38503dcfae4a4e128e85183"
+    },
+    "validation_summary_2023.csv": {
+      "bytes": 1182,
+      "sha256": "e8da13bf9743b347a642231920db662628c0cfec9b9596e6c8c4f500c93e94c4"
+    }
+  }
+}
