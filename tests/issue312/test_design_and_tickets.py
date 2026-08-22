@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 
 from issue209.dynamic_policy import ActionSpec, generate_tickets
+from issue209.dynamic_policy import settle_ticket_arrays
 from issue312.design import CubeAction, build_action_registry, registry_diagnostics
+from issue312.policy import select_policy_allocations
 from issue312.tickets import generate_cube_tickets
 
 
@@ -85,3 +88,68 @@ def test_soft_reentry_and_alt_protection_do_not_add_tickets() -> None:
         for match, outcome in zip(matches, outcomes, strict=True)
     }
     assert len(identities) == 128
+
+
+def test_beijing_factor_is_applied_once_per_winning_nfold_ticket() -> None:
+    ticket_matches = np.repeat(np.array([[0, 1, 2]]), 8, axis=0)
+    ticket_outcomes = np.zeros((8, 3), dtype=int)
+    realized = np.zeros(3, dtype=int)
+    winning_sp = np.full(3, 2.0)
+    pnl, hit_rate = settle_ticket_arrays(
+        ticket_matches, ticket_outcomes, realized, winning_sp
+    )
+    expected_gross = 8 * 2.0 * 0.65 * (2.0**3)
+    assert np.isclose(pnl, expected_gross - 16.0)
+    assert hit_rate == 1.0
+
+
+def test_policy_allocations_reject_mismatched_issue_support() -> None:
+    predictions = pd.DataFrame(
+        {
+            "issue": ["A"],
+            "issue_year": [2023],
+            "action_key": ["N7_K512_SGLOBAL_VALUE_ALL_ORAW_VALUE_GWEIGHTED_WOR_RNONE"],
+            "n": [7],
+            "k": [512],
+            "match_selector": ["GLOBAL_VALUE"],
+            "pool_excess": [-1],
+            "outcome_direction": ["RAW_VALUE"],
+            "generator": ["WEIGHTED_WOR"],
+            "protection": ["NONE"],
+            "effective_k": [512],
+            "predicted_mean_roi": [0.0],
+            "predicted_positive_probability": [0.0],
+            "predicted_tail_5x_probability": [0.0],
+            "predicted_mean_downside_roi": [0.0],
+            "predicted_conditional_log_gross": [0.0],
+            "predicted_mean_roi_std": [0.0],
+        }
+    )
+    issue306 = pd.DataFrame(
+        {
+            "issue": ["B"],
+            "issue_year": [2023],
+            "condition": ["LEARNED_MEAN_DETERMINISTIC"],
+            "n": [7],
+            "k": [512],
+            "generator": ["WEIGHTED_WOR"],
+            "copies": [1],
+            "allocated_tickets": [512],
+        }
+    )
+    labels = pd.DataFrame(
+        {
+            "issue": ["D"],
+            "issue_year": [2021],
+            "action_key": [predictions.iloc[0]["action_key"]],
+            "k": [512],
+            "mean_pnl_cny": [0.0],
+        }
+    )
+    with np.testing.assert_raises(AssertionError):
+        select_policy_allocations(
+            {name: predictions for name in ("LEARNED", "ISSUE_BLOCK_SHUFFLED", "IDENTITY_SHUFFLED")},
+            primary_family="MEAN",
+            issue306_allocations=issue306,
+            development_labels=labels,
+        )
