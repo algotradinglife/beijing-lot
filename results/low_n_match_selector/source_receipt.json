@@ -1,0 +1,15 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-MATCH-SELECTOR-001/v1",
+  "implementation_hashes": {
+    "scripts/run_low_n_match_selector.py": "f51ca90bf6f5f0eb99df7b0936f983ea26ce022b9877ecd0d8db03fc28c27b0f",
+    "scripts/verify_low_n_match_selector.py": "4b3b9b8323c488b06ad79f0026183ee17463e790d4bd818bdc32d7d1bc9a7a38",
+    "src/low_n_match_selector/__init__.py": "c9db4f593eb9a4af82f8ecac7b5708d0ea7833baabc84d6da9dd4d112d1f57df",
+    "src/low_n_match_selector/contract.py": "0e6ebfac453fe20f1f3ef1152d6215d03c44e2ce830c88d477c2c55bd5e2809b",
+    "src/low_n_match_selector/pipeline.py": "e3652ccc6201efc1576f5eda6b3bb8d40bf271b268ab42b26525603e0d1e6e37",
+    "tests/scripts/test_low_n_match_selector.py": "9636e1569236c9e73b603972107f49f564bbce8dfa125b90d273044248e970e7"
+  },
+  "settlement_semantic_sha256": "2b26784eb34ab4c39f520a5d1c4dfa153a6bbe5f94b88662629a285e61da0e85",
+  "upstream_feature_file_sha256": "458eca1d98a38350017d58c16ccda33d05eda9d7f0e275f68ef4253fa539f1da",
+  "upstream_freeze_file_sha256": "8ce2dd0c75c124d727ef535ae472bd0ff9cfe113095afa2a56ae766464fd00a7",
+  "upstream_label_file_sha256": "5e3298846ac3db56059f4d9f9d957caa13932625e7ed17c73294ff420cf3991e"
+}
