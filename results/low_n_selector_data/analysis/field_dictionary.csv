@@ -1,9 +1,14 @@
 artifact,field,dtype,availability
 features,issue,str,PRE_OUTCOME
 features,issue_year,int64,PRE_OUTCOME
-features,issue_anchor_ts,datetime64[us],PRE_OUTCOME
+features,issue_anchor_ts,"datetime64[us, UTC]",PRE_OUTCOME
+features,issue_latest_kickoff_ts,"datetime64[us, UTC]",PRE_OUTCOME
 features,match_idx,int64,PRE_OUTCOME
+features,fixture_kickoff_ts,"datetime64[us, UTC]",PRE_OUTCOME
+features,fixture_decision_ts,"datetime64[us, UTC]",PRE_OUTCOME
+features,training_label_available_max_ts,"datetime64[us, UTC]",PRE_OUTCOME
 features,prediction_role,str,PRE_OUTCOME
+features,selector_role,str,PRE_OUTCOME
 features,train_year_max,int64,PRE_OUTCOME
 features,baseline_support,str,PRE_OUTCOME
 features,omitted_outcome,str,PRE_OUTCOME
@@ -21,7 +26,6 @@ features,n_available_books,int64,PRE_OUTCOME
 features,causal_grade,str,PRE_OUTCOME
 features,handicap_norm_source,str,PRE_OUTCOME
 features,issue_date_source,str,PRE_OUTCOME
-features,temporal_role,str,PRE_OUTCOME
 features,inventory_fixtures,int64,PRE_OUTCOME
 features,input_missing_count,int64,PRE_OUTCOME
 features,divergence_l1,float64,PRE_OUTCOME
@@ -66,6 +70,30 @@ features,issue_retained_max,float64,PRE_OUTCOME
 features,retained_gap_to_n3_cutoff,float64,PRE_OUTCOME
 features,retained_gap_to_n4_cutoff,float64,PRE_OUTCOME
 features,retained_gap_to_n5_cutoff,float64,PRE_OUTCOME
+cells,issue,str,PRE_OUTCOME
+cells,issue_year,int64,PRE_OUTCOME
+cells,issue_anchor_ts,"datetime64[us, UTC]",PRE_OUTCOME
+cells,match_idx,int64,PRE_OUTCOME
+cells,fixture_kickoff_ts,"datetime64[us, UTC]",PRE_OUTCOME
+cells,fixture_decision_ts,"datetime64[us, UTC]",PRE_OUTCOME
+cells,prediction_role,str,PRE_OUTCOME
+cells,selector_role,str,PRE_OUTCOME
+cells,train_year_max,int64,PRE_OUTCOME
+cells,training_label_available_max_ts,"datetime64[us, UTC]",PRE_OUTCOME
+cells,baseline_support,str,PRE_OUTCOME
+cells,omitted_outcome,str,PRE_OUTCOME
+cells,native_handicap_line,float64,PRE_OUTCOME
+cells,n_available_books,int64,PRE_OUTCOME
+cells,causal_grade,str,PRE_OUTCOME
+cells,handicap_norm_source,str,PRE_OUTCOME
+cells,issue_date_source,str,PRE_OUTCOME
+cells,outcome_code,str,PRE_OUTCOME
+cells,q_candidate,float64,PRE_OUTCOME
+cells,q_raw_eu,float64,PRE_OUTCOME
+cells,q_line,float64,PRE_OUTCOME
+cells,divergence,float64,PRE_OUTCOME
+cells,in_baseline_support,bool,PRE_OUTCOME
+cells,is_omitted,bool,PRE_OUTCOME
 labels,issue,str,POST_OUTCOME_SEPARATE
 labels,issue_year,int64,POST_OUTCOME_SEPARATE
 labels,match_idx,int64,POST_OUTCOME_SEPARATE

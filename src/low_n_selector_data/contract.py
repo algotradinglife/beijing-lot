@@ -1,9 +1,9 @@
-"""Frozen scientific contract for Issue #354."""
+"""Corrected scientific contract for Issues #354/#360."""
 
 from __future__ import annotations
 
-CONTRACT_ID = "BJ-UNIFIED-LOWN-SELECTOR-DATA-001/v1"
-ISSUE_NUMBER = 354
+CONTRACT_ID = "BJ-UNIFIED-LOWN-CHRONOLOGY-CORRECTION-001/v2"
+ISSUE_NUMBER = 360
 HORIZON = "10h"
 OUTCOMES = ("3", "1", "0")
 OUTCOME_ORDER = {"3": 0, "1": 1, "0": 2}
@@ -30,4 +30,5 @@ ACCEPTED_238_RELATIVE = (
 )
 
 FEATURE_KEY = ("issue", "issue_year", "issue_anchor_ts", "match_idx")
+CELL_KEY = ("issue", "match_idx", "outcome_code")
 LABEL_KEY = ("issue", "match_idx")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Issue #354 strictly-prior low-N selector data."""
+"""Build the Issue #360 chronology-corrected low-N selector data."""
 
 from __future__ import annotations
 
