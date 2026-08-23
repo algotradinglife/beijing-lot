@@ -1,0 +1,109 @@
+{
+  "contract": "BJ-UNIFIED-VALUE-VETO-R3-N7-001/v2",
+  "files": {
+    "docs/research/Issue-342-Value-Veto-R3-N7.md": {
+      "bytes": 8453,
+      "sha256": "b3d2a19d6dd09a438b2454c74f1724d2c910c264f542b41d0ae310794b63781c"
+    },
+    "docs/research/figures/issue_342_value_veto_capital.png": {
+      "bytes": 136635,
+      "sha256": "90487061da0a85de89dcc39df3bf285e618364613551f8950e0701f11855e206"
+    },
+    "docs/research/figures/issue_342_value_veto_lift.png": {
+      "bytes": 47613,
+      "sha256": "97eb15b219ecc9c61b0e904176e05504eb2d4c2d773f8195700a8860c6fcb65b"
+    },
+    "docs/research/figures/issue_342_veto_uncertainty.png": {
+      "bytes": 122549,
+      "sha256": "e3031476a9f844a1e3f4c92131ba800c49e965d65ad57bcd6de60efd9ab0b281"
+    },
+    "notebooks/research/value-veto-r3-n7/value_veto_r3_n7.ipynb": {
+      "bytes": 220128,
+      "sha256": "9adb36cb2dbb6318e5076b6d811c68e76d86f97d2693e95ebb90a4a766459dc8"
+    },
+    "results/value_veto_r3_n7/baseline_parity.json": {
+      "bytes": 239,
+      "sha256": "aafb8ed062d16584f7743eafae968e4ec6d3568778e526295d7fd655ab1184c9"
+    },
+    "results/value_veto_r3_n7/calibration_residuals.parquet": {
+      "bytes": 576989,
+      "sha256": "e91f7b56939b4a461c56efacb680aec5e3942b123cd0c5099969f335497eb7cc"
+    },
+    "results/value_veto_r3_n7/capital_paths.csv": {
+      "bytes": 28788,
+      "sha256": "f95dd78cf517e439ead54ccdab59f0f5333bc8364ad67a07da6c615946dc1d70"
+    },
+    "results/value_veto_r3_n7/contrasts.csv": {
+      "bytes": 941,
+      "sha256": "7019641d106a1388b71fd24a45c0c5ec7980330f136cf0e9b6f06d9d00b5bce3"
+    },
+    "results/value_veto_r3_n7/coverage.csv": {
+      "bytes": 126,
+      "sha256": "83b54fc85ac1c65a24b8d083cd2193ea6792268eca27d6b6d6e1434255d3f7e0"
+    },
+    "results/value_veto_r3_n7/decision.json": {
+      "bytes": 384,
+      "sha256": "abb47dd0a907926aaec6850ea7ef1f82fdee336c6be655f7b8ce48a82e92fcd6"
+    },
+    "results/value_veto_r3_n7/evaluation_labels.parquet": {
+      "bytes": 349149,
+      "sha256": "0fdf2f972817c55a13ff8fd4432058faaf0e3de6b8b37339faa449e3decce96f"
+    },
+    "results/value_veto_r3_n7/evaluation_sp_predictions.parquet": {
+      "bytes": 1164613,
+      "sha256": "5829be822d1a2f80db3b691b092eb406b627302c997668f5fafbaa02beb8642f"
+    },
+    "results/value_veto_r3_n7/freeze_receipt.json": {
+      "bytes": 883,
+      "sha256": "1cc89137dcd0e38464ef3b9003a494d4501cb0498e71546d2e47cd4d0ade70cd"
+    },
+    "results/value_veto_r3_n7/issue_bundles.parquet": {
+      "bytes": 39200,
+      "sha256": "56d4e3eb8d1b2ad00afbabfb3867081b370c38eb32b61319bc055d70703e3d6a"
+    },
+    "results/value_veto_r3_n7/performance.csv": {
+      "bytes": 1099,
+      "sha256": "6f184218e2d60cc8e69a7084a2f0dd918ae3e4e4e3598153b98a666cdbe01063"
+    },
+    "results/value_veto_r3_n7/preoutcome_bundles.parquet": {
+      "bytes": 38536,
+      "sha256": "8391fb8f32ba9327011acffbcc6f616e3c3a813f10207887ba658a239d4693d9"
+    },
+    "results/value_veto_r3_n7/replacement_ledger.parquet": {
+      "bytes": 6555,
+      "sha256": "5f99e9b8a40ccdfc08f981ccf7286ddac70f6747779e9a16c3f155b6158cb601"
+    },
+    "results/value_veto_r3_n7/risk_diagnostics.csv": {
+      "bytes": 979,
+      "sha256": "fcd5a2d0195111e603847cc367c5b586403082689a4774fda200d53e5cc3ee77"
+    },
+    "results/value_veto_r3_n7/settlement_coverage_ledger.csv": {
+      "bytes": 4389,
+      "sha256": "5bfab73ba159d3f5263889beb6a57f5ba30ff9f7d81493aed75b26d25463ed6c"
+    },
+    "results/value_veto_r3_n7/settlement_source_receipt.json": {
+      "bytes": 524,
+      "sha256": "a77846f6dd4dd29216fbb9f5a569082f6dc336dc2c97a01206123f435b6865d2"
+    },
+    "results/value_veto_r3_n7/sp_interval_receipt.json": {
+      "bytes": 3656,
+      "sha256": "ef77ef11260690e003a27a9ffbfe822912bd0335adc6143cf2f49e84a948ff8c"
+    },
+    "results/value_veto_r3_n7/support_attribution.parquet": {
+      "bytes": 21672,
+      "sha256": "6a3a3cba91c0d244fbe30dfe4a02e5666e3398640f375043397c923440373ac9"
+    },
+    "results/value_veto_r3_n7/tickets.parquet": {
+      "bytes": 52177,
+      "sha256": "24173bd633ff7d9c3890a9c2859eb0a9641434b60b53634d5c409ff20d17e456"
+    },
+    "results/value_veto_r3_n7/value_surface.parquet": {
+      "bytes": 5561327,
+      "sha256": "55f88c3f13cd1885e7b9a57dcd3619ed09aa0c4a81d67038f3647d8e3cc5e69c"
+    },
+    "results/value_veto_r3_n7/veto_opportunity_ledger.parquet": {
+      "bytes": 45961,
+      "sha256": "b676b9e2d4a1126aed41fdae6ab00f223a72ced4db31145586cf2c896f5e7f3a"
+    }
+  }
+}
