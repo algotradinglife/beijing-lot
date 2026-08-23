@@ -99,6 +99,7 @@ def main() -> None:
             "assert set(features.issue_year) == set(range(2017, 2025))\n"
             "assert (features.train_year_max < features.issue_year).all()\n"
             "assert set(features.loc[features.issue_year >= 2022, 'train_year_max']) == {2021}\n"
+            "assert set(features.loc[features.issue_year >= 2022, 'calibration_history_max_year']) == {2021}\n"
             "assert not {'result_code','top2_hit','winning_sp','settlement_sp'} & set(features.columns)\n"
             "assert features.isna().sum().sum() == 0\n"
             "'All notebook assertions passed.'"

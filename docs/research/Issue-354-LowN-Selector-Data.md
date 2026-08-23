@@ -17,6 +17,8 @@ chosen and no 2022–2024 outcome has been used to tune a model.
   every row's `train_year_max` is strictly smaller than its `issue_year`.
 - 2022–2024: one model fitted through 2021 and applied unchanged before the
   transfer labels are opened.
+- All prior-calibration summary features for 2022–2024 are likewise frozen at
+  the 2017–2021 history; 2022/2023 outcomes never update later transfer rows.
 - 2019–2021 are the only years eligible for later selector-family selection.
 - 2022, 2023 and 2024 remain exposed historical transfer evidence.
 
@@ -49,7 +51,8 @@ The panel includes:
   entropy and concentration;
 - native handicap structure and line-only probabilities;
 - signed and absolute European-vs-line divergence;
-- book count and causal quality fields;
+- book count, source/temporal grades, source inventory and explicit input
+  missingness count;
 - strictly-prior calibration summaries;
 - within-issue ranks, percentiles, dispersion and N3/N4/N5 cutoff gaps.
 

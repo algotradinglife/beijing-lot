@@ -19,6 +19,11 @@ features,native_handicap_line,float64,PRE_OUTCOME
 features,abs_native_handicap_line,float64,PRE_OUTCOME
 features,n_available_books,int64,PRE_OUTCOME
 features,causal_grade,str,PRE_OUTCOME
+features,handicap_norm_source,str,PRE_OUTCOME
+features,issue_date_source,str,PRE_OUTCOME
+features,temporal_role,str,PRE_OUTCOME
+features,inventory_fixtures,int64,PRE_OUTCOME
+features,input_missing_count,int64,PRE_OUTCOME
 features,divergence_l1,float64,PRE_OUTCOME
 features,divergence_max_abs,float64,PRE_OUTCOME
 features,divergence_omitted,float64,PRE_OUTCOME
@@ -36,6 +41,7 @@ features,q_raw_eu_0,float64,PRE_OUTCOME
 features,q_line_0,float64,PRE_OUTCOME
 features,divergence_0,float64,PRE_OUTCOME
 features,mass_bin,Int64,PRE_OUTCOME
+features,calibration_history_max_year,int64,PRE_OUTCOME
 features,prior_global_count,int64,PRE_OUTCOME
 features,prior_global_hit_rate,float64,PRE_OUTCOME
 features,prior_global_residual,float64,PRE_OUTCOME

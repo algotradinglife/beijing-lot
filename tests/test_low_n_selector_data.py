@@ -5,6 +5,7 @@ import pytest
 
 from src.low_n_selector_data.pipeline import (
     ContractError,
+    _attach_prior_calibration,
     _attach_issue_relative,
     _fixture_features,
     _mass_bin,
@@ -24,6 +25,10 @@ def _predicted() -> pd.DataFrame:
                 "native_handicap_line": 0,
                 "n_available_books": 12,
                 "causal_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+                "handicap_norm_source": "INTEGER_LINE",
+                "issue_date_source": "ISSUE_REGISTRY",
+                "temporal_role": "EXPOSED_TRANSFER",
+                "inventory_fixtures": 20,
                 "q_candidate_3": 0.5,
                 "q_candidate_1": 0.3,
                 "q_candidate_0": 0.2,
@@ -78,3 +83,29 @@ def test_strict_boolean_contract_is_not_truthy_string() -> None:
     values = pd.Series([True, False, "True"])
     observed = set(values.dropna().unique().tolist())
     assert not observed.issubset({True, False})
+
+
+def test_transfer_calibration_state_is_frozen_through_2021() -> None:
+    base = _fixture_features(_predicted())
+    frames = []
+    for year, issue in (
+        (2021, "21001"),
+        (2022, "22001"),
+        (2023, "23001"),
+        (2024, "24001"),
+    ):
+        row = base.copy()
+        row["issue_year"] = year
+        row["issue"] = issue
+        frames.append(row)
+    features = pd.concat(frames, ignore_index=True)
+    labels = features[["issue", "match_idx"]].copy()
+    labels["label_available"] = True
+    labels["top2_hit"] = pd.array([True, False, False, False], dtype="boolean")
+
+    calibrated = _attach_prior_calibration(features, labels)
+    transfer = calibrated[calibrated["issue_year"].ge(2022)]
+
+    assert set(transfer["calibration_history_max_year"].dropna().astype(int)) == {2021}
+    assert transfer["prior_global_count"].nunique() == 1
+    assert transfer["prior_global_hit_rate"].nunique() == 1

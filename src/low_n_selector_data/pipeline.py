@@ -192,6 +192,11 @@ def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str,
         panel["snapshot_kind"].eq(HORIZON)
         & panel["issue_year"].isin((*WARMUP_YEARS, *PANEL_YEARS))
     ].copy()
+    supported_values = set(panel["native_line_supported"].dropna().unique().tolist())
+    if panel["native_line_supported"].isna().any() or not supported_values.issubset(
+        {True, False}
+    ):
+        raise ContractError("native_line_supported is not strict boolean")
     panel["issue_year"] = pd.to_numeric(panel["issue_year"], errors="raise").astype(int)
     development_issues = set(
         panel.loc[panel["issue_year"].le(max(OOF_YEARS)), "issue_code"].astype(str)
@@ -199,7 +204,6 @@ def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str,
     labels = load_development_labels(labels_path, development_issues)
     development = attach_native_labels(panel, labels)
     source_hashes = {
-        "candidate_sqlite_sha256": sha256_file(candidate),
         "proxy_manifest_sha256": sha256_file(proxy / "MANIFEST.json"),
         "consumed_issue_roles_sha256": stable_frame_sha(roles),
         "consumed_development_labels_sha256": stable_frame_sha(labels),
@@ -319,6 +323,22 @@ def _fixture_features(predicted: pd.DataFrame) -> pd.DataFrame:
             "abs_native_handicap_line": abs(float(row.native_handicap_line)),
             "n_available_books": int(row.n_available_books),
             "causal_grade": str(row.causal_grade),
+            "handicap_norm_source": str(row.handicap_norm_source),
+            "issue_date_source": str(row.issue_date_source),
+            "temporal_role": str(row.temporal_role),
+            "inventory_fixtures": int(row.inventory_fixtures),
+            "input_missing_count": int(
+                sum(
+                    pd.isna(value)
+                    for value in (
+                        *q.values(),
+                        *raw.values(),
+                        *line.values(),
+                        row.native_handicap_line,
+                        row.n_available_books,
+                    )
+                )
+            ),
             "divergence_l1": sum(abs(value) for value in divergence.values()),
             "divergence_max_abs": max(abs(value) for value in divergence.values()),
             "divergence_omitted": divergence[omitted],
@@ -335,27 +355,27 @@ def _fixture_features(predicted: pd.DataFrame) -> pd.DataFrame:
     features = pd.DataFrame(rows)
     if features.duplicated(list(FEATURE_KEY)).any():
         raise ContractError("fixture features are not unique")
-    q_columns = [f"q_candidate_{code}" for code in OUTCOMES]
-    values = features[q_columns].to_numpy(float)
-    if not np.isfinite(values).all() or (values <= 0).any():
-        raise ContractError("fixture probability surface is invalid")
-    if not np.allclose(values.sum(axis=1), 1.0, rtol=0, atol=PROBABILITY_ATOL):
-        raise ContractError("fixture probability triplets are not normalized")
+    for prefix in ("q_candidate", "q_raw_eu", "q_line"):
+        columns = [f"{prefix}_{code}" for code in OUTCOMES]
+        values = features[columns].to_numpy(float)
+        if not np.isfinite(values).all() or (values <= 0).any():
+            raise ContractError(f"{prefix} probability surface is invalid")
+        if not np.allclose(values.sum(axis=1), 1.0, rtol=0, atol=PROBABILITY_ATOL):
+            raise ContractError(f"{prefix} probability triplets are not normalized")
     return features
 
 
-def _load_label_frame(
-    data_root: Path,
-    features: pd.DataFrame,
-    development: pd.DataFrame,
-) -> pd.DataFrame:
-    development_labels = development[
+def _development_results(development: pd.DataFrame) -> pd.DataFrame:
+    results = development[
         development["issue_year"].isin(OOF_YEARS)
         & development["target_outcome"].notna()
     ][["issue_code", "match_idx", "target_outcome"]].drop_duplicates()
-    development_labels = development_labels.rename(
+    return results.rename(
         columns={"issue_code": "issue", "target_outcome": "result_code"}
     )
+
+
+def _load_transfer_results(data_root: Path, features: pd.DataFrame) -> pd.DataFrame:
     transfer_issues = sorted(
         features.loc[features["issue_year"].isin(TRANSFER_YEARS), "issue"].unique()
     )
@@ -377,11 +397,15 @@ def _load_label_frame(
     transfer = transfer[
         transfer["trusted"].eq(1) & transfer["result_code"].isin(OUTCOMES)
     ][["issue", "match_idx", "result_code"]]
-    labels = pd.concat([development_labels, transfer], ignore_index=True)
-    labels["issue"] = labels["issue"].astype(str)
-    labels["result_code"] = labels["result_code"].astype(str)
+    return transfer
+
+
+def _label_frame(features: pd.DataFrame, results: pd.DataFrame) -> pd.DataFrame:
+    results = results.copy()
+    results["issue"] = results["issue"].astype(str)
+    results["result_code"] = results["result_code"].astype(str)
     labels = features[["issue", "issue_year", "match_idx", "baseline_support"]].merge(
-        labels,
+        results,
         on=["issue", "match_idx"],
         how="left",
         validate="one_to_one",
@@ -427,6 +451,9 @@ def _attach_prior_calibration(features: pd.DataFrame, labels: pd.DataFrame) -> p
     for year in PANEL_YEARS:
         current = merged[merged["issue_year"].eq(year)].copy()
         available = history[history["label_available"].eq(True)].copy()
+        current["calibration_history_max_year"] = (
+            0 if available.empty else int(available["issue_year"].max())
+        )
         if available.empty:
             current["prior_global_count"] = 0
             current["prior_global_hit_rate"] = current["retained_mass"]
@@ -478,8 +505,14 @@ def _attach_prior_calibration(features: pd.DataFrame, labels: pd.DataFrame) -> p
                     columns=["group_count", "group_hits", "group_expected"]
                 )
         output.append(current)
-        history = pd.concat([history, merged[merged["issue_year"].eq(year)]], ignore_index=True)
+        if year <= max(OOF_YEARS):
+            history = pd.concat(
+                [history, merged[merged["issue_year"].eq(year)]], ignore_index=True
+            )
     result = pd.concat(output, ignore_index=True)
+    result["calibration_history_max_year"] = result[
+        "calibration_history_max_year"
+    ].astype(int)
     return result.drop(columns=["top2_hit", "label_available"])
 
 
@@ -530,7 +563,7 @@ def _parity_with_accepted(data_root: Path, features: pd.DataFrame) -> pd.DataFra
         ],
     ).to_pandas()
     accepted = accepted[accepted["native_line_supported"].eq(True)].copy()
-    candidate = features.melt(
+    candidate = features[features["issue_year"].isin(TRANSFER_YEARS)].melt(
         id_vars=["issue", "match_idx"],
         value_vars=[f"q_candidate_{code}" for code in OUTCOMES],
         var_name="candidate_column",
@@ -542,9 +575,13 @@ def _parity_with_accepted(data_root: Path, features: pd.DataFrame) -> pd.DataFra
         accepted,
         left_on=["issue", "match_idx", "outcome_code"],
         right_on=["issue_code", "match_idx", "outcome_code"],
-        how="inner",
+        how="outer",
         validate="one_to_one",
+        indicator=True,
     )
+    if not merged["_merge"].eq("both").all():
+        counts = merged["_merge"].value_counts().to_dict()
+        raise ContractError(f"accepted probability surface key mismatch: {counts}")
     candidate_delta = (
         merged["q_candidate"] - merged["q_eu_bjline_candidate_diagnostic"]
     ).abs()
@@ -630,9 +667,16 @@ def _scientific_frames(repo_root: Path, data_root: Path) -> dict[str, Any]:
     panel, development, source_hashes = _input_panel(data_root)
     predicted, model_receipts = _predict_years(panel, development)
     features = _fixture_features(predicted)
-    labels = _load_label_frame(data_root, features, development)
-    features = _attach_prior_calibration(features, labels)
+    development_results = _development_results(development)
+    development_labels = _label_frame(features, development_results)
+    features = _attach_prior_calibration(features, development_labels)
     features = _attach_issue_relative(features)
+    preoutcome_feature_hash = stable_frame_sha(features)
+    transfer_results = _load_transfer_results(data_root, features)
+    labels = _label_frame(
+        features,
+        pd.concat([development_results, transfer_results], ignore_index=True),
+    )
     coverage = _coverage(features, labels)
     parity = _parity_with_accepted(data_root, features)
     dictionary = _field_dictionary(features, labels)
@@ -645,7 +689,7 @@ def _scientific_frames(repo_root: Path, data_root: Path) -> dict[str, Any]:
         "transfer_years": list(TRANSFER_YEARS),
         "transfer_role": "EXPOSED_HISTORICAL_TRANSFER_ONLY",
         "model_selection_outcomes_allowed_through": 2021,
-        "feature_frame_sha256": stable_frame_sha(features),
+        "feature_frame_sha256": preoutcome_feature_hash,
         "feature_rows": int(len(features)),
         "label_frame_sha256": stable_frame_sha(labels),
         "label_rows": int(len(labels)),
@@ -716,6 +760,22 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     expected_files = manifest.get("files")
     if not isinstance(expected_files, dict) or not expected_files:
         raise AssertionError("manifest file table is empty")
+    required_files = {
+        "FREEZE_RECEIPT.json",
+        "SOURCE_RECEIPT.json",
+        "analysis/accepted_surface_parity.csv",
+        "analysis/coverage.csv",
+        "analysis/field_dictionary.csv",
+        "features/selector_features.parquet",
+        "labels/selector_labels.parquet",
+    }
+    actual_files = {
+        str(path.relative_to(target))
+        for path in target.rglob("*")
+        if path.is_file() and path.name != "MANIFEST.json"
+    }
+    if set(expected_files) != required_files or actual_files != required_files:
+        raise AssertionError("manifest package file set is incomplete or contains stale files")
     manifest_hashes = all(
         (target / relative).is_file()
         and sha256_file(target / relative) == digest
@@ -747,10 +807,21 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     )
     if not semantic_hashes:
         raise AssertionError("scientific frames do not replay from sources")
-    temporal = (
+    temporal = bool(
         set(features["issue_year"].unique()) == set(PANEL_YEARS)
         and (features["train_year_max"] < features["issue_year"]).all()
         and set(features.loc[features["issue_year"].isin(TRANSFER_YEARS), "train_year_max"]) == {2021}
+        and set(
+            features.loc[
+                features["issue_year"].isin(TRANSFER_YEARS),
+                "calibration_history_max_year",
+            ].dropna()
+        )
+        == {2021}
+        and (
+            features["calibration_history_max_year"].fillna(0)
+            < features["issue_year"]
+        ).all()
     )
     if not temporal:
         raise AssertionError("temporal contract failed")
