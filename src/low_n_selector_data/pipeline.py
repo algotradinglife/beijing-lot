@@ -74,8 +74,39 @@ def sha256_file(path: Path) -> str:
 
 def stable_frame_sha(frame: pd.DataFrame) -> str:
     columns = sorted(frame.columns)
-    ordered = frame.loc[:, columns].sort_values(columns, kind="stable").reset_index(drop=True)
-    payload = ordered.to_csv(index=False, lineterminator="\n", float_format="%.17g")
+    projected = frame.loc[:, columns]
+    row_hashes = np.sort(
+        pd.util.hash_pandas_object(
+            projected,
+            index=False,
+            categorize=False,
+        ).to_numpy(dtype=np.uint64)
+    )
+    schema = [(column, str(projected[column].dtype)) for column in columns]
+    digest = hashlib.sha256(
+        json.dumps(schema, separators=(",", ":")).encode("utf-8")
+    )
+    digest.update(row_hashes.tobytes())
+    return digest.hexdigest()
+
+
+def _verify_proxy_parts(proxy_root: Path) -> str:
+    manifest = _read_json(proxy_root / "MANIFEST.json")
+    parts = manifest.get("parts")
+    if not isinstance(parts, dict) or not parts:
+        raise ContractError("proxy manifest has no part hashes")
+    consumed = {
+        relative: digest
+        for relative, digest in parts.items()
+        if relative.startswith(("probabilities/", "translation_readiness/"))
+    }
+    if not consumed:
+        raise ContractError("proxy manifest lacks consumed probability parts")
+    for relative, expected in sorted(consumed.items()):
+        path = proxy_root / relative
+        if not path.is_file() or sha256_file(path) != expected:
+            raise ContractError(f"proxy source part hash mismatch: {relative}")
+    payload = json.dumps(consumed, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -187,7 +218,8 @@ def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str,
     proxy = data_root / PROXY_RELATIVE
     labels_path = data_root / LABEL_SQLITE_RELATIVE
     roles = load_issue_roles(candidate, registry)
-    panel = load_proxy_panel(proxy, roles)
+    proxy_parts_sha256 = _verify_proxy_parts(proxy)
+    panel = load_proxy_panel(proxy, roles, horizons=(HORIZON,))
     panel = panel[
         panel["snapshot_kind"].eq(HORIZON)
         & panel["issue_year"].isin((*WARMUP_YEARS, *PANEL_YEARS))
@@ -204,7 +236,7 @@ def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str,
     labels = load_development_labels(labels_path, development_issues)
     development = attach_native_labels(panel, labels)
     source_hashes = {
-        "proxy_manifest_sha256": sha256_file(proxy / "MANIFEST.json"),
+        "consumed_proxy_parts_receipt_sha256": proxy_parts_sha256,
         "consumed_issue_roles_sha256": stable_frame_sha(roles),
         "consumed_development_labels_sha256": stable_frame_sha(labels),
         "accepted_238_probability_sha256": sha256_file(data_root / ACCEPTED_238_RELATIVE),
@@ -656,6 +688,7 @@ def _implementation_hashes(repo_root: Path) -> dict[str, str]:
         repo_root / "src/low_n_selector_data/__init__.py",
         repo_root / "src/low_n_selector_data/contract.py",
         repo_root / "src/low_n_selector_data/pipeline.py",
+        repo_root / "src/divergence_materializer/data.py",
         repo_root / "scripts/run_low_n_selector_data.py",
         repo_root / "scripts/verify_low_n_selector_data.py",
         repo_root / "scripts/build_low_n_selector_data_notebook.py",
@@ -752,6 +785,43 @@ def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _verify_delivery_artifacts(
+    repo_root: Path,
+    *,
+    feature_hash: str,
+    label_hash: str,
+) -> bool:
+    report = repo_root / "docs/research/Issue-354-LowN-Selector-Data.md"
+    notebook_path = (
+        repo_root
+        / "notebooks/research/low-n-selector-data/low_n_selector_data_profile.ipynb"
+    )
+    figures = (
+        repo_root / "docs/research/figures/issue_354_top2_calibration.png",
+        repo_root / "docs/research/figures/issue_354_panel_profile.png",
+    )
+    required = (report, notebook_path, *figures)
+    if any(not path.is_file() or path.stat().st_size == 0 for path in required):
+        raise AssertionError("required report, notebook or figure is missing")
+    report_text = report.read_text(encoding="utf-8")
+    if feature_hash not in report_text or label_hash not in report_text:
+        raise AssertionError("decision report is not bound to the frozen data frames")
+    notebook = _read_json(notebook_path)
+    code_cells = [cell for cell in notebook.get("cells", []) if cell.get("cell_type") == "code"]
+    if not code_cells or any(cell.get("execution_count") is None for cell in code_cells):
+        raise AssertionError("profiling notebook is not fully executed")
+    if any(
+        output.get("output_type") == "error"
+        for cell in code_cells
+        for output in cell.get("outputs", [])
+    ):
+        raise AssertionError("profiling notebook contains an execution error")
+    notebook_text = notebook_path.read_text(encoding="utf-8")
+    if feature_hash not in notebook_text:
+        raise AssertionError("profiling notebook output is not bound to the feature frame")
+    return True
+
+
 def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | None = None) -> dict[str, bool]:
     repo_root = Path(repo_root).resolve()
     target = Path(target).resolve()
@@ -799,14 +869,21 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     features = pq.read_table(target / "features/selector_features.parquet").to_pandas()
     labels = pq.read_table(target / "labels/selector_labels.parquet").to_pandas()
     freeze = _read_json(target / "FREEZE_RECEIPT.json")
+    feature_hash = stable_frame_sha(features)
+    label_hash = stable_frame_sha(labels)
     semantic_hashes = (
-        freeze.get("feature_frame_sha256") == stable_frame_sha(features)
-        and freeze.get("label_frame_sha256") == stable_frame_sha(labels)
-        and stable_frame_sha(features) == stable_frame_sha(current["features"])
-        and stable_frame_sha(labels) == stable_frame_sha(current["labels"])
+        freeze.get("feature_frame_sha256") == feature_hash
+        and freeze.get("label_frame_sha256") == label_hash
+        and feature_hash == current["freeze_receipt"]["feature_frame_sha256"]
+        and label_hash == current["freeze_receipt"]["label_frame_sha256"]
     )
     if not semantic_hashes:
         raise AssertionError("scientific frames do not replay from sources")
+    delivery = _verify_delivery_artifacts(
+        repo_root,
+        feature_hash=feature_hash,
+        label_hash=label_hash,
+    )
     temporal = bool(
         set(features["issue_year"].unique()) == set(PANEL_YEARS)
         and (features["train_year_max"] < features["issue_year"]).all()
@@ -836,6 +913,7 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
         "implementation_hashes": True,
         "source_bound_replay": source_bound,
         "semantic_frame_replay": semantic_hashes,
+        "delivery_artifacts": delivery,
         "strict_temporal_lineage": temporal,
         "label_separation": label_separation,
         "probability_simplex": True,

@@ -113,14 +113,24 @@ def load_issue_roles(
     ]
 
 
-def load_proxy_panel(proxy_root: Path, roles: pd.DataFrame) -> pd.DataFrame:
+def load_proxy_panel(
+    proxy_root: Path,
+    roles: pd.DataFrame,
+    *,
+    horizons: tuple[str, ...] = HORIZONS,
+) -> pd.DataFrame:
     """Load #268's compact consensus triplets and normalized native line."""
+
+    if not horizons or not set(horizons).issubset(HORIZONS):
+        raise DataContractError(f"unexpected requested horizons: {horizons}")
+    horizon_filter = pads.field("snapshot_kind").isin(list(horizons))
 
     probability_root = proxy_root / "probabilities"
     readiness_root = proxy_root / "translation_readiness"
     probability = (
         pads.dataset(probability_root, format="parquet")
         .to_table(
+            filter=horizon_filter,
             columns=[
                 "canonical_fixture_key",
                 "issue_code",
@@ -137,6 +147,7 @@ def load_proxy_panel(proxy_root: Path, roles: pd.DataFrame) -> pd.DataFrame:
     readiness = (
         pads.dataset(readiness_root, format="parquet")
         .to_table(
+            filter=horizon_filter,
             columns=[
                 "canonical_fixture_key",
                 "snapshot_kind",
@@ -147,7 +158,7 @@ def load_proxy_panel(proxy_root: Path, roles: pd.DataFrame) -> pd.DataFrame:
         )
         .to_pandas()
     )
-    if not probability["snapshot_kind"].isin(HORIZONS).all():
+    if not probability["snapshot_kind"].isin(horizons).all():
         raise DataContractError("unexpected relative horizon")
     if not probability["outcome_code"].isin(OUTCOMES).all():
         raise DataContractError("unexpected outcome code")

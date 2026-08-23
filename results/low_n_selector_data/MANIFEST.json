@@ -1,8 +1,8 @@
 {
   "contract": "BJ-UNIFIED-LOWN-SELECTOR-DATA-001/v1",
   "files": {
-    "FREEZE_RECEIPT.json": "f2a58201d48eabcc5f6770db3b3654ddf02177f13383bc1a71d62ce5746daae1",
-    "SOURCE_RECEIPT.json": "d5fdc317f9b44eed36b7f1b71922290adff09e260058947972e92a21cab88812",
+    "FREEZE_RECEIPT.json": "ee3596a65872a33fca1941101f9c9772ee9be4ccd44f6aa2da5e6b0650a8a0bb",
+    "SOURCE_RECEIPT.json": "4d95cdcfe0b52d556b852c5469a4f01f91b76b8f170390bb89c48dbe141b3b47",
     "analysis/accepted_surface_parity.csv": "10fc25a8b5969cac3dd68edde754fd1ed567b204a35f5f01a7ec95d901b33c33",
     "analysis/coverage.csv": "273dfb39b9977572c8ddf6c007acdfabae666b3f809b3cd0e4c88c6e2239a3de",
     "analysis/field_dictionary.csv": "d465ef2a95a27c6c80b999b14d84e399f8f6541ac61b6fdac3e0a9839f688c3b",
@@ -13,8 +13,9 @@
     "scripts/build_low_n_selector_data_notebook.py": "2219de555f3685bad6fe0d4bc097b60259d6d70b1f84582d3fd46de62076e27f",
     "scripts/run_low_n_selector_data.py": "11348f49b38bfb0e1d4db7252a2af386da11ce72a974fdf8694afb413905deaa",
     "scripts/verify_low_n_selector_data.py": "9ed24cbc71ef13114db589b53b6d6b10b4e4b56f277c732f841c51911fdad325",
+    "src/divergence_materializer/data.py": "d748046b03e2e17d2de56229925c425698121d6bd1dc88e9bb27a1cc370a3884",
     "src/low_n_selector_data/__init__.py": "23fe8d6f3894f94e7bcff3e7bfed6b6c412d149dc19bc0e975f5f6b4ca1e6395",
     "src/low_n_selector_data/contract.py": "72088a31964f60cc31691053775efd614893d884d8f75dc5292ec0822239e617",
-    "src/low_n_selector_data/pipeline.py": "da140d7a9bdfd7e876a4c53f76296898d6576d00028b720bfa133d55f70dc105"
+    "src/low_n_selector_data/pipeline.py": "e91592bf830c8092d53b72516126810d928dd38600ab7ce242701aeeac2f49f4"
   }
 }

@@ -1,8 +1,8 @@
 {
   "accepted_238_probability_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
-  "consumed_development_labels_sha256": "f4a650b93b92b669a1bd2e94517013c351289f6c6d00d070ab278ae425d81315",
-  "consumed_issue_roles_sha256": "c354ce0a1fd1debc13da1dfdb36a97a6c9702b3354c6284d183b6f636086f169",
+  "consumed_development_labels_sha256": "dea0e768eaced27e8dd925efdba65871947f2cde660038ed553a03f51f70650f",
+  "consumed_issue_roles_sha256": "ee52410215be065a37f032ab99b83cbaed6b00fdf20803f35b5764c1b06e7f25",
+  "consumed_proxy_parts_receipt_sha256": "03ce615d2acc0d7711bf889a3a0301ddd844fa1f7cab62d23c6fb7491f1e542a",
   "contract": "BJ-UNIFIED-LOWN-SELECTOR-DATA-001/v1",
-  "data_root_disclosed_at_build": "/home/drwho1985/workspace/soccer/beijing-lot/data",
-  "proxy_manifest_sha256": "a9659d40dfc832eb0e3ecef9c049290dae206d0696caaec1361219979cc7e2a6"
+  "data_root_disclosed_at_build": "/home/drwho1985/workspace/soccer/beijing-lot/data"
 }

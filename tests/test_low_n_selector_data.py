@@ -9,6 +9,7 @@ from src.low_n_selector_data.pipeline import (
     _attach_issue_relative,
     _fixture_features,
     _mass_bin,
+    stable_frame_sha,
 )
 
 
@@ -109,3 +110,13 @@ def test_transfer_calibration_state_is_frozen_through_2021() -> None:
     assert set(transfer["calibration_history_max_year"].dropna().astype(int)) == {2021}
     assert transfer["prior_global_count"].nunique() == 1
     assert transfer["prior_global_hit_rate"].nunique() == 1
+
+
+def test_semantic_frame_hash_is_row_order_invariant_and_value_sensitive() -> None:
+    frame = pd.DataFrame({"key": ["b", "a"], "value": [2.0, 1.0]})
+    shuffled = frame.iloc[::-1].reset_index(drop=True)
+    changed = frame.copy()
+    changed.loc[0, "value"] = 3.0
+
+    assert stable_frame_sha(frame) == stable_frame_sha(shuffled)
+    assert stable_frame_sha(frame) != stable_frame_sha(changed)

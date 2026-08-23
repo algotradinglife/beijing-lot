@@ -77,6 +77,8 @@ remains historical transfer evidence rather than a holdout.
 - Build: `scripts/run_low_n_selector_data.py`
 - Verify: `scripts/verify_low_n_selector_data.py`
 - Package: `results/low_n_selector_data/`
+- Frozen feature frame: `43e3b0b47a54e4eb41d6fb4103a0adea9af3b2e11d3e9992a5fb1912f5f0d98b`
+- Separate label frame: `12c2746b25be824c19fbb1b618a29c5d2abef39156ab1e62107290e32801b2c8`
 - Notebook: `notebooks/research/low-n-selector-data/low_n_selector_data_profile.ipynb`
 - Figures:
   - `docs/research/figures/issue_354_top2_calibration.png`
