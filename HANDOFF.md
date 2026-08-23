@@ -1,41 +1,65 @@
-# HANDOFF — Issue #358
+# Issue #248 handoff — PI rework
 
-[SESSION] 20260824_002447_5a30b9
+[SESSION] 20260819_235658_96e389
 
-## Current handoff point
+## Current HEAD
 
-- Source-package HEAD: `ac20b0cf9ad9e050ce0e629bf164244eeddf9fbe`
-- Branch: `engineer/bj358-eu-value`
-- Evidence package: `results/low_n_eu_value_proxy/`
+`engineer/bj248-issue`; the commit carrying this handoff is the rework delivery
+head. Resolve its exact SHA with `git rev-parse HEAD` after checkout.
 
-## Completed
+## Completed rework
 
-- Materialized 404,466 long European-average-odds value cells (134,822 fixtures × 3 outcomes) for 2017–2024 using the frozen #354 pre-outcome feature payload.
-- Preserved outcome identity/order `3/1/0`; records raw average odds, implied probability, overround, two explicitly named de-vig semantics, #354 calibrated probability, `p × odds`, coverage/quality/provenance, and Top-2 ingredients.
-- Bound raw source SQLite bytes to the accepted #236 hash and fail-closed on non-empty SQLite WAL/SHM sidecars.
-- Added N3/N4/N5 full-cartesian accounting recipe: 8/16/32 tickets respectively and one `0.65` factor per complete ticket. No fixture selector or strategy was chosen.
-- Generated and executed the profiling notebook and committed its output, report, schema, receipts, and source-bound semantic verifier.
+- Claimed #248 from `Ready` to `In Progress` after confirming its sole native
+  predecessor (#234) is closed.
+- Fixed **KE-248-01**: a history receipt now stores the exact fetched URL,
+  rejects anything outside the HTTPS `cp.nowscore.com` fixture-specific
+  TypeID=5 route before fetch, and references the raw issue-page receipt whose
+  parsed row supplied that exact URL. The semantic verifier rebuilds this
+  source trace from raw issue evidence.
+- Fixed **KE-248-02**: an unrecognized active-page shape is recorded as
+  `PARSE_ERROR`, logged, and makes the CLI non-zero. A recognized explicit
+  no-sale marker is instead `EMPTY_PROVEN`, never silently `OK` with zero rows.
+- Fixed **KE-248-03**: reusing a capture key succeeds only for an identical raw
+  SHA and complete immutable receipt metadata. A changed payload or metadata
+  now raises an explicit collision in both issue-page and history receipt paths.
+- Fixed **KE-248-04**: requested, trusted-receive, kickoff, and supplied
+  decision-epoch times are canonical UTC `Z` instants before persistence or
+  SQLite lexical comparison. An offset epoch can no longer admit a later UTC
+  receipt.
+- Repaired the standalone collector CLI's import bootstrap and updated the
+  executed notebook for mandatory issue-page→history trace linkage.
 
-## Key decisions / reasons
+## Evidence
 
-- `10h` is represented as `RETROSPECTIVE_RELATIVE_PROXY`, with a null exact source timestamp and explicit `RELATIVE_10H_LABEL_NO_EXACT_OBSERVATION_TIMESTAMP`; the source has a relative horizon label, not a strict common observation clock.
-- European decimal odds remain a proxy and are never labelled Beijing official SP or used as Beijing payout calibration.
-- `source_consensus_devig_probability` is the #354-compatible mean of independently de-vigged bookmaker triplets. `average_odds_devig_probability` is retained separately, because de-vigging arithmetic-average odds is a different transformation.
+- Focused suite: `python -m pytest tests/test_bj248_forward_snapshot.py
+  tests/test_bj248_rework.py tests/scripts/test_nowscore_bjdc_sp_history.py -q`
+  → `21 passed`.
+- Tamper-focused subset → `4 passed`: altered quote/vector, raw-source trace,
+  remanifest/external-anchor path, and offset/future-receipt gate fail closed.
+- Notebook: `/home/drwho1985/work/beijing-lot-206/.venv/bin/python
+  scripts/execute_bj248_notebook.py` → `EXECUTED`.
+- Manual read-only shadow probe of issue 26086 is documented in
+  `docs/research/bj248_manual_shadow_capture.md`. It verified the live page and
+  URL shape but admitted no forward vector: all 80 history outcomes were
+  explicitly rejected (42 post-kickoff, 38 invalid SP domain), not zero-filled.
 
-## Verification evidence
+## Known limits / decision input
 
-- `python scripts/run_low_n_eu_value.py --source-sqlite … --force` — completed; value-cell semantic hash `6adc99a6c001f01b155314cc0dbca0694eddf055187dea6cbfd22200c50b6bb1`.
-- `python scripts/build_low_n_eu_value_notebook.py` — completed; six executed code cells, no errors.
-- `python scripts/verify_low_n_eu_value.py --source-sqlite …` — PASS for manifest closure, implementation hashes, source-bound replay, semantic replay, temporal boundary, outcome identity, and N3–N5 boundary.
-- `pytest -q tests/test_low_n_eu_value.py tests/test_low_n_eu_value_verifier.py` — 12 passed.
-- Tamper coverage remanifests changed payout/value field, `0.65` field, raw ledger/source trace, future temporal label, calibrated probability while preserving local `p×odds`, and source receipt; verifier rejects every case.
+- The shadow issue's `cansale=true` rows had stale/past schedule evidence; this
+  does not qualify active-sale truth, retention, cadence or successful forward
+  collection. **Do not enable unattended scheduling** until a fresh issue has a
+  demonstrably future source schedule and at least one complete causal vector.
+- PI accepted notebook byte determinism and cross-store crash recovery as
+  exploration debt; this delivery intentionally does not expand into them.
+- Full repository pytest collection remains unavailable in both available
+  interpreters because of unrelated missing/incomplete dependencies and a
+  legacy macOS absolute input path. The focused #248 tests and notebook above
+  are the applicable passing evidence.
 
-## Known limitations
+## Next steps
 
-- The `10h` data is a retrospective relative horizon, not strict-forward evidence.
-- This package supplies inputs only; #359 must make any low-N selection/frontier decision under its own protocol.
-- `ruff` was unavailable in the active Hermes Python environment (`No module named ruff`); syntax compilation, focused tests, full source-bound verifier, and notebook execution did run successfully.
-
-## PI / EV request
-
-Please independently re-run the verifier against the declared external SQLite and inspect the explicit proxy-time boundary. Verify that no result/settlement column exists in `value_cells.parquet`, then review whether the transparent European `p × odds` diagnostic is acceptable as an input to #359 without being interpreted as Beijing payout calibration.
+1. EV: rerun the focused suite and notebook in a fresh checkout; inspect the
+   allowlist/source-trace verifier and retry-collision paths.
+2. PI: decide whether the negative live shadow probe is sufficient to retain
+   the no-scheduler restriction or whether a later fresh-issue shadow probe is
+   required before activating operations.
