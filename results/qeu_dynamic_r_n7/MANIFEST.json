@@ -1,0 +1,104 @@
+{
+  "contract": "BJ-UNIFIED-QEU-DYNAMIC-R-N7-001/v1",
+  "decision_verdict": "FIXED_R3_REMAINS_BEST",
+  "files": {
+    "docs/research/Issue-QEU-Dynamic-R-N7.md": {
+      "bytes": 10164,
+      "sha256": "2fcd0f32c7305cdb4cd0d0e520ae3fa8c1dcd5d8de55baa877696a8a2db82e59"
+    },
+    "docs/research/figures/issue_340_dynamic_r_capital.png": {
+      "bytes": 160457,
+      "sha256": "a8b5629f2d1f247b4cf1caf95e634051af1afe26821c0efc38cf92f3824f9534"
+    },
+    "docs/research/figures/issue_340_dynamic_r_curve.png": {
+      "bytes": 98848,
+      "sha256": "a742548ac13d6e927f8eab295fdd911ff3e5db32cfef07f9eb16e8e399a25f67"
+    },
+    "notebooks/research/qeu-dynamic-r-n7/qeu_dynamic_r_n7.ipynb": {
+      "bytes": 34704,
+      "sha256": "901f4a4693a946b1c56d2b5a071611599d97c4600bf0eee1be987fe9b37b6690"
+    },
+    "results/qeu_dynamic_r_n7/action_predictions.parquet": {
+      "bytes": 70005,
+      "sha256": "9ab7bde4b262e30ffe9cc9de9db8e76a4ec56820498c13822e7b1149b49fac02"
+    },
+    "results/qeu_dynamic_r_n7/action_receipts.parquet": {
+      "bytes": 3833868,
+      "sha256": "b84f553007af89926e769c8d00122e39a95df668ed903053ff87aef43f0b62ee"
+    },
+    "results/qeu_dynamic_r_n7/baseline_parity.csv": {
+      "bytes": 3362,
+      "sha256": "adbb9c4a078e76d8c0cef02780f04590573750324c7129d40e8d9a4598a9a989"
+    },
+    "results/qeu_dynamic_r_n7/bootstrap_lift.csv": {
+      "bytes": 4918,
+      "sha256": "07e8a632cb812e7dac23772cfaa0f342be61c9ab3e023ee3d2bc2a507bcc8c2a"
+    },
+    "results/qeu_dynamic_r_n7/capital_paths.csv": {
+      "bytes": 182490,
+      "sha256": "7b0511cab9ee4251ac952fc03bc0cda2cfa96b6a6d4d62c060759aa020d00c21"
+    },
+    "results/qeu_dynamic_r_n7/coverage_ledger.csv": {
+      "bytes": 3529,
+      "sha256": "eaf11bfd3d3191863468b4ab7f39588ed4946da93b9c78c07650e18795467f75"
+    },
+    "results/qeu_dynamic_r_n7/decision.json": {
+      "bytes": 1312,
+      "sha256": "5d5819fa07d76cffa4f3a72795fcb7c1df31b08074690852b30c0278659220d9"
+    },
+    "results/qeu_dynamic_r_n7/dynamic_issue_attribution.csv": {
+      "bytes": 12170,
+      "sha256": "2b85fa23b9dc749bd6778e7fa37f5370e211dee527c1b0952a07b409ad3e9372"
+    },
+    "results/qeu_dynamic_r_n7/dynamic_selections.parquet": {
+      "bytes": 9340,
+      "sha256": "ff12ef94c09ec298b02b300bf78b7d9a923b1230e0bcfd025f90aeea09dfa517"
+    },
+    "results/qeu_dynamic_r_n7/feature_importance.csv": {
+      "bytes": 1654,
+      "sha256": "b31e34a3f1521fd0bf5ac855c54386e6c060737e621bc709577b47e154eb1a74"
+    },
+    "results/qeu_dynamic_r_n7/issue_action_features.parquet": {
+      "bytes": 66393,
+      "sha256": "d5bd35a491239e7353e7d3c785fc7a501a94ebc9d83da9e86fea83ed721ac2bc"
+    },
+    "results/qeu_dynamic_r_n7/issue_bundles.parquet": {
+      "bytes": 40676,
+      "sha256": "a7079576f49a2672c64b2edd9645a4ca5d8c9ced7d7869ca433c6e2997590f8e"
+    },
+    "results/qeu_dynamic_r_n7/model_contract.json": {
+      "bytes": 1224,
+      "sha256": "ae79ce47baf848ce2304596d50770ceba832bdd369b1b86572bae2118654a5f7"
+    },
+    "results/qeu_dynamic_r_n7/performance.csv": {
+      "bytes": 9902,
+      "sha256": "3728ae885efa0e26768ceea6b0d6abd73984b29e4434092387f1366ec5f04a0f"
+    },
+    "results/qeu_dynamic_r_n7/risk_diagnostics.csv": {
+      "bytes": 3166,
+      "sha256": "2884cffebf400ca0d4157105ab4c22beb148c93d8469e77f474555dd46229136"
+    },
+    "results/qeu_dynamic_r_n7/seed_stability.csv": {
+      "bytes": 2997,
+      "sha256": "f05f6d457b76aad47be45f6018d8eeab1a89268a82b8d90673649d6e0ed253d6"
+    },
+    "results/qeu_dynamic_r_n7/selected_match_receipts.parquet": {
+      "bytes": 115043,
+      "sha256": "af2e0a6054c1398357e887ec489009516682ec21c754cd5931e2a75d06bf8823"
+    },
+    "results/qeu_dynamic_r_n7/source_receipt.json": {
+      "bytes": 802,
+      "sha256": "52acec6f1409aac7b23391a335f0244489c4d9718e89fad3cea38b80d1fdfdff"
+    },
+    "results/qeu_dynamic_r_n7/support_attribution.parquet": {
+      "bytes": 75774,
+      "sha256": "a238d7328c5980e85801b0fcb314563382b0abc8a783e86577d6abd4705dc09b"
+    },
+    "results/qeu_dynamic_r_n7/ticket_receipts.parquet": {
+      "bytes": 142230,
+      "sha256": "a45a0d532f6da8803e33a3ffef8e151aafdcc8e9d07130507e7745b1562dad2a"
+    }
+  },
+  "issue": 340,
+  "source_feature_projection_sha256": "0d089b5743383ed55cf9c762c93df2d6d6b18b9c38099abff4c4c41b78dfecf3"
+}

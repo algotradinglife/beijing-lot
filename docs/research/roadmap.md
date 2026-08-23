@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#338 fixed-N7 threshold atlas completed; universal raw/z cutoffs fail, while issue-relative R3 remains the historical challenger)**
+Updated: **2026-08-23 (#340 causal dynamic-R cycle completed; learned within-issue depth cannot beat fixed R3 and 2023 apparent R0 lift is cold-start attribution)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -200,6 +200,11 @@ PI interpretation and does not replace those edges or Project states.
      (Done; every absolute threshold loses in 2023; R3 remains the relative rule)
              |
              v
+#340 QEU within-issue dynamic support depth R
+     (Done; prequential RF learns mostly R0/R1, improves R0 but loses to R3;
+     fixed R3 remains the historical challenger)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -240,8 +245,9 @@ PI interpretation and does not replace those edges or Project states.
 | 30 | [#334] neural Top-2 residual action-value learner | Closed / Done | M3 | Parent #202; blocks #210 | The 2023-selected neural match selector is +CNY7,941 raw / +CNY2,579 ex-largest, but reverses to −CNY35,278 / −CNY31,787 on frozen 2024 and is rejected. The interpretable `q_eu/q_line` value anchor produces a distinct long-tail clue: support-only lift is +CNY50,723 in 2023 and +CNY49,393 in 2024; 2024 ex-largest remains +CNY23,919, while 2023 ex-largest is −CNY1,158. Retain as `ANCHOR_SHRINKAGE_SIGNAL_NOT_YET_PROMOTED`, with exact #319 Top-2 as fallback |
 | 31 | [#336] QEU support-depth attribution | Closed / Done | M3 | Parent #202; closed predecessor of #338/#210 | On 105 exact-common settled issues, 2023 selects R3. Matched lift is CNY+61,344 in 2023 and +66,812 in 2024; 2024 ex-largest remains +29,498 with 88.55% positive issue-bootstrap draws. But 2023 ex-largest is only +406 (0.66% of raw lift), so classify `QEU_TAIL_ONLY`. Post-merge audit found a formula/domain implementation error; #338 independently recomputes the written `1e-4` rule and shows no action difference on the current 2023/2024 panel |
 | 32 | [#338] QEU threshold activation on fixed N7 | Closed / Done | M3 | Parent #202; native predecessor #336; not a #210 blocker | All fourteen raw/z/dual candidates lose to R0 in 2023. The selected failed candidate `RAW_Q80` is CNY−12,899 vs R0 in 2023 and −24,916 in 2024. R3 remains materially stronger because it is issue-relative; no threshold replaces or unblocks #210 |
-| 33 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 34 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 33 | [#340] within-issue dynamic QEU R | Closed / Done | M3 | Parent #202; native predecessor #338; not a #210 blocker | Eleven strictly-prior RF seeds learn a per-issue R from ranks/gaps/dispersion. The full policy is +CNY45,950/+27,788 vs R0, but 2023 learned decisions alone are CNY−2,080 vs R0 and the apparent gain comes from R3 cold start. It loses to fixed R3 by CNY−15,395/−39,024; ex-largest is also negative. `FIXED_R3_REMAINS_BEST` |
+| 34 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 35 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -297,6 +303,32 @@ warning remains material and prevents candidate promotion.
 - Verdict: `FIXED_R3_REMAINS_BEST`. Keep N7 and R3 as historical forward-test
   identities; do not add #338 as a #210 dependency and do not reopen N.
   Report: [`Issue-QEU-Threshold-N7.md`](Issue-QEU-Threshold-N7.md).
+
+### #340 causal within-issue dynamic-R decision
+
+- The experiment retains exact #319 N7 matches, probability Top-2 support,
+  128 distinct tickets and CNY1,024 exposure. It completes the fixed R0–R7
+  curve and learns only the number of issue-relative QEU support swaps.
+- Eleven shallow random forests use ranks, within-issue percentiles, adjacent
+  gaps, cutoff cliffs, dispersion, prefix pressure and strictly-prior expanding
+  z context. The first 16 issues use an explicit R3 cold start; all 89 later
+  predictions are fitted only on earlier settled issues. Eight R
+  counterfactual rows retain total issue weight one.
+- The full ensemble policy appears to beat R0 by CNY45,950 in 2023, but the
+  first 16 R3 cold-start issues supply CNY48,030; learned 2023 decisions are
+  actually CNY2,080 below R0. The all-learned 2024 path is CNY27,788 above R0.
+  It loses to R3 by CNY15,395 and CNY39,024 respectively. Ex-largest lift versus
+  R3 is also negative (CNY−6,249/−4,373), with bootstrap positivity only
+  8.2%/18.1%. None of the 11 seeds has positive raw lift versus R3 in either
+  year.
+- The learner mostly selects R0/R1 after cold start; the simple prior mean-by-R
+  control selects R3 and reproduces R3 exactly. This is evidence that the
+  current issue-shape features do not add reliable timing information beyond
+  the unconditional interior R3 sweet spot. Lower learned R improves 2024
+  drawdown and losing-run risk, but gives up too much capital.
+- `FIXED_R3_REMAINS_BEST`. Dynamic-R architecture remains a useful interface,
+  but there is no historical candidate to rebind or unlock #210. Report:
+  [`Issue-QEU-Dynamic-R-N7.md`](Issue-QEU-Dynamic-R-N7.md).
 
 ### #334 neural residual and value-anchor decision
 
@@ -784,6 +816,8 @@ retrospective feature.
 [#332]: https://github.com/algotradinglife/beijing-lot/issues/332
 [#334]: https://github.com/algotradinglife/beijing-lot/issues/334
 [#336]: https://github.com/algotradinglife/beijing-lot/issues/336
+[#338]: https://github.com/algotradinglife/beijing-lot/issues/338
+[#340]: https://github.com/algotradinglife/beijing-lot/issues/340
 
 ---
 

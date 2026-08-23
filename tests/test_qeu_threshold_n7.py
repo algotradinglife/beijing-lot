@@ -195,3 +195,11 @@ def test_committed_paths_and_action_counts_are_complete():
     counts = pd.read_csv(package / "action_count_distribution.csv")
     for _, group in counts.groupby(["arm", "issue_year"]):
         assert set(group.activated_changes) == set(range(8))
+
+
+def test_threshold_verifier_boolean_guard_rejects_strings():
+    from pathlib import Path
+    source = Path(__file__).resolve().parents[1] / "src/qeu_threshold_n7/pipeline.py"
+    text = source.read_text()
+    assert "is_bool_dtype(parity[column])" in text
+    assert ".astype(bool).all()" not in text[text.index("def verify_package"):]

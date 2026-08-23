@@ -80,9 +80,9 @@ def prepare_match_actions(cells: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("non-finite probability triplet")
     if (q_eu <= 0).any() or (q_line <= 0).any():
         raise ValueError("non-positive probability triplet")
-    if not np.allclose(q_eu.sum(axis=1), 1.0, atol=1e-6):
+    if not np.allclose(q_eu.sum(axis=1), 1.0, atol=1e-6, rtol=0.0):
         raise ValueError("q_eu triplets are not normalized")
-    if not np.allclose(q_line.sum(axis=1), 1.0, atol=1e-6):
+    if not np.allclose(q_line.sum(axis=1), 1.0, atol=1e-6, rtol=0.0):
         raise ValueError("q_line triplets are not normalized")
 
     rank = np.broadcast_to(np.arange(len(OUTCOMES)), q_eu.shape)
@@ -1187,7 +1187,7 @@ def verify_package(repo_root: Path, package: Path) -> dict[str, Any]:
         failures.append("decision-contract")
     parity = pd.read_csv(package / "baseline_parity.csv")
     for column in ["match_identity_parity", "support_parity"]:
-        if not parity[column].astype(bool).all():
+        if not pd.api.types.is_bool_dtype(parity[column]) or not parity[column].all():
             failures.append(f"parity:{column}")
     bundles = pd.read_parquet(package / "issue_bundles.parquet")
     if not bundles["ticket_count"].eq(TICKETS).all():
@@ -1229,7 +1229,10 @@ def verify_package(repo_root: Path, package: Path) -> dict[str, Any]:
     numeric = ["actions", "median", "mad", "scaled_mad"]
     if (
         len(rebuilt_summary) != len(published_summary)
-        or not np.allclose(rebuilt_summary[numeric], published_summary[numeric], equal_nan=True)
+        or not np.allclose(
+            rebuilt_summary[numeric], published_summary[numeric],
+            atol=1e-8, rtol=0.0, equal_nan=True,
+        )
     ):
         failures.append("reference-summary")
 
@@ -1252,7 +1255,10 @@ def verify_package(repo_root: Path, package: Path) -> dict[str, Any]:
         and set(row.qeu_support) == set(row.qeu_support_rebuilt), axis=1,
     ).all():
         failures.append("action-support-semantics")
-    if not np.allclose(joined["support_pressure"], joined["support_pressure_rebuilt"], atol=1e-12):
+    if not np.allclose(
+        joined["support_pressure"], joined["support_pressure_rebuilt"],
+        atol=1e-12, rtol=0.0,
+    ):
         failures.append("action-pressure-semantics")
 
     attribution = pd.read_parquet(package / "support_attribution.parquet")
@@ -1268,7 +1274,9 @@ def verify_package(repo_root: Path, package: Path) -> dict[str, Any]:
         bundles[["issue", "issue_year", "arm", "gross_cny"]],
         on=["issue", "issue_year", "arm"], validate="one_to_one",
     )
-    if not np.allclose(payout["rebuilt_gross"], payout["gross_cny"], atol=1e-8):
+    if not np.allclose(
+        payout["rebuilt_gross"], payout["gross_cny"], atol=1e-8, rtol=0.0,
+    ):
         failures.append("ticket-payout-semantics")
 
     performance = pd.read_csv(package / "performance.csv")
@@ -1287,7 +1295,9 @@ def verify_package(repo_root: Path, package: Path) -> dict[str, Any]:
         numeric = left.select_dtypes(include="number").columns
         other = left.columns.difference(numeric)
         return bool(
-            np.allclose(left[numeric], right[numeric], atol=1e-8, equal_nan=True)
+            np.allclose(
+                left[numeric], right[numeric], atol=1e-6, rtol=0.0, equal_nan=True,
+            )
             and left[other].fillna("<NA>").astype(str).eq(
                 right[other].fillna("<NA>").astype(str)
             ).all().all()
