@@ -1,0 +1,73 @@
+{
+  "changes_210_or_218": false,
+  "changes_349_selection": false,
+  "chronology_clean_claim": false,
+  "conditional_on_exposed_2023_translator_gate": true,
+  "contract": "BJ-UNIFIED-MULTIN-R-DIAGNOSTIC-001/v1",
+  "diagnostic_only": true,
+  "frozen_349_receipt_path": "results/multin_fixed_rn/freeze_receipt.json",
+  "frozen_349_receipt_sha256": "7e771b86896d051a205582150eb333434722105433cda5d79c79a1903a9aea41",
+  "frozen_349_selected_r": {
+    "10": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 3,
+    "8": 0,
+    "9": 1
+  },
+  "issue": 352,
+  "period_roles": {
+    "2022": "DEVELOPMENT_DIAGNOSTIC",
+    "2023": "EXPOSED_HISTORICAL_EVALUATION",
+    "2024": "EXPOSED_HISTORICAL_EVALUATION",
+    "ALL_2022_2024": "DESCRIPTIVE_ONLY"
+  },
+  "pooled_reselection_performed": false,
+  "r_grid": {
+    "3": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "4": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "5": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "6": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "row_count": 88,
+  "target_n": [
+    3,
+    4,
+    5,
+    6
+  ],
+  "verdict": "DESCRIPTIVE_DIAGNOSTIC_COMPLETE_NO_RESELECTION",
+  "years": [
+    2022,
+    2023,
+    2024
+  ]
+}
