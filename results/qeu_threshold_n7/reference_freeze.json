@@ -1,0 +1,26 @@
+{
+  "contract": "BJ-UNIFIED-QEU-THRESHOLD-N7-001/v1",
+  "feature_projection_sha256": "e9936300621809525a252f8cb178feb40b9ca6411fa9cd7881edddab99080ae9",
+  "global_mad": 0.06324805782890844,
+  "global_median": 0.13072608078841338,
+  "mad_scale": 1.4826,
+  "min_stratum_actions": 100,
+  "raw_quantiles": {
+    "Q50": 0.13072608078841338,
+    "Q60": 0.15568754219540268,
+    "Q70": 0.18769768930359537,
+    "Q75": 0.2044369529815513,
+    "Q80": 0.22306941036379507,
+    "Q85": 0.245111822114056,
+    "Q90": 0.2697853182317174,
+    "Q95": 0.3075980331873884
+  },
+  "reference_actions": 29974,
+  "reference_issues": 163,
+  "reference_max_anchor": "2022-12-27T04:00:00+00:00",
+  "reference_years": [
+    2020,
+    2021,
+    2022
+  ]
+}
