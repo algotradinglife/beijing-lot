@@ -1,0 +1,13 @@
+{
+  "feature_surface_sha256": "51dff12faf55ea0a2cdd29ec25a6486b6937e5380408ed3deb25d4b0468b0899",
+  "probability_path": "derived/bj238_divergence_materializer_v4r3/inference/relative_horizon_view.parquet",
+  "probability_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+  "proxy_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+  "settlement_path": "derived/beidan_xlsm/beidan_xlsm.sqlite",
+  "settlement_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "years": [
+    2022,
+    2023,
+    2024
+  ]
+}

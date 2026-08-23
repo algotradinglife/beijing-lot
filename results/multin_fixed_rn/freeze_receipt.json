@@ -1,0 +1,23 @@
+{
+  "contract": "BJ-UNIFIED-MULTIN-RN-001/v1",
+  "development_curve_sha256": "39f0b2a22cecedb234970dfc376da17fbec72d30caf26ecdc7ccafcd8feebfd6",
+  "development_year": 2022,
+  "evaluation_labels_opened_after_this_receipt": true,
+  "evaluation_preoutcome_sha256": "5c0dac5cf901e22f10768f0550a27331b770826f8a3ea8e97f9ec3a32e318a42",
+  "evaluation_years": [
+    2023,
+    2024
+  ],
+  "n7_r": 3,
+  "n7_source": "ACCEPTED_FIXED_R3",
+  "selected_r_by_n": {
+    "10": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 3,
+    "8": 0,
+    "9": 1
+  }
+}

@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#348 native multi-N R0 baselines completed; Phase B support-depth comparison follows under #349)**
+Updated: **2026-08-23 (#349 development-frozen multi-N support-depth cycle completed; no new non-N7 fixed-R increment transfers)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -259,8 +259,9 @@ PI interpretation and does not replace those edges or Project states.
 | 34 | [#342] conservative value veto × fixed R3 | Closed / Done | M3 | Parent #202; native predecessor #340; not a #210 blocker | Exact #338 R0/R3 parity on 105 issues. 2023/2024 contain 342/371 and 420/462 point-positive leg challengers, but 0/833 pass the deliberately over-conservative paired-tail screen; `NO_INCREMENT`, fixed R3 unchanged |
 | 35 | [#345] paired value selection × fixed R3 | Closed / Done | M3 | Parent #202; no open blockers; not a #210 blocker | Same-issue 2022 paired SP-value errors replace #342's unfair marginal-tail comparison. All six predeclared selectors act, but none beats S0R3 in both years on raw and ex-largest lift. On 96 exact-all-cell common issues S0R3 ends at CNY232,211 with 17.46% max drawdown and 19 consecutive losing issues; `PAIR_L10R3` ends at CNY193,741 with 28.94% drawdown and 18 losses. `NO_INCREMENT`; preserve R3 and carry paired value only as a diagnostic/risk feature into the planned N3–N10 baseline scan |
 | 36 | [#348] native multi-N probability Top-2 R0 baselines | Closed / Done | M3 | Parent #202; native predecessor of #349; not a #210 blocker | Fixed CNY1,024/issue and ticket-level-once 0.65 establish N3–N10 centers. N3 is the smoothest (62.62% hit, −10.11% capital, 20.48% drawdown, 5-loss run); N7 is near break-even (+0.74%, 25.96% drawdown, 12-loss run). N9's +5.23% is dominated by one payout (52.08% share) and a 44-loss run; N10 collapses. These are risk baselines, not a raw-capital cross-N ranking |
-| 37 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 38 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 37 | [#349] development-frozen multi-N support depth | Closed / Done | M3 | Parent #202; blockedBy closed #348; not a #210 blocker | Complete 2022 R=0..N curves freeze R0 for N3–N6/N8/N10, accepted R3 for N7, and R1 for N9. N9's development +CNY14,729 raw/armwise-ex-largest reverses to −69,409 in 2023 and −7,281 in 2024. Only the already accepted N7 R3 is positive in both exposed years; no new non-N7 fixed-R increment. Phase A exact parity and #338 R3 parity both pass |
+| 38 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 39 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -884,6 +885,7 @@ retrospective feature.
 [#342]: https://github.com/algotradinglife/beijing-lot/issues/342
 [#345]: https://github.com/algotradinglife/beijing-lot/issues/345
 [#348]: https://github.com/algotradinglife/beijing-lot/issues/348
+[#349]: https://github.com/algotradinglife/beijing-lot/issues/349
 
 ---
 

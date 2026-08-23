@@ -1,0 +1,109 @@
+{
+  "contract": "BJ-UNIFIED-MULTIN-RN-001/v1",
+  "files": {
+    "docs/research/Issue-349-MultiN-Fixed-RN.md": {
+      "bytes": 20185,
+      "sha256": "04723475ddff8709cb19427851c1235a056cfb70db2f7bc7a8f4d4e889eb38a1"
+    },
+    "docs/research/figures/issue_349_multin_rn_capital.png": {
+      "bytes": 286620,
+      "sha256": "82ac02b01ce7ca567befb3d5279752ff50e8dd287b0b4a058bf93f5ab6b04334"
+    },
+    "docs/research/figures/issue_349_multin_rn_development.png": {
+      "bytes": 113279,
+      "sha256": "28c098300e54848f47fb4d2862187d2a57a5e5437d226f2baef1051f5d4eb103"
+    },
+    "notebooks/research/multin-fixed-rn/multin_fixed_rn.ipynb": {
+      "bytes": 53421,
+      "sha256": "3bd19d69548deec342a020bedf1bc60f69ffbb5cc59eb0e9f1608836acec90ee"
+    },
+    "results/multin_fixed_rn/bootstrap_lift.csv": {
+      "bytes": 1147,
+      "sha256": "3b440128f67cf4cfb89c4bd627699bff2968798ad678f3f495ec9f7055a409bf"
+    },
+    "results/multin_fixed_rn/capital_paths.csv": {
+      "bytes": 192118,
+      "sha256": "7605d894fb56cb66144f30501c1478c4cc3c1bdd9e46f49566eacd2a32273afb"
+    },
+    "results/multin_fixed_rn/coverage_ledger.csv": {
+      "bytes": 51199,
+      "sha256": "8f4672925992aedce2799611a0e589f8493ab05d97d50e389c534482d7ee4fc4"
+    },
+    "results/multin_fixed_rn/decision.json": {
+      "bytes": 515,
+      "sha256": "e09fd7275059b018b5602af5d57e4a76ef395d23c40f185788a102e29d2253fe"
+    },
+    "results/multin_fixed_rn/development_attribution.parquet": {
+      "bytes": 80421,
+      "sha256": "18db825b72faac2238a8dc1f569e617f6f06bed8231118478aeb6d82118a6168"
+    },
+    "results/multin_fixed_rn/development_bundles.parquet": {
+      "bytes": 48555,
+      "sha256": "6fb1bc1ced3370e8bc2cfe9431e4846053c0cad41d6bdd76bfcf74964a499efd"
+    },
+    "results/multin_fixed_rn/development_curve.csv": {
+      "bytes": 9973,
+      "sha256": "39f0b2a22cecedb234970dfc376da17fbec72d30caf26ecdc7ccafcd8feebfd6"
+    },
+    "results/multin_fixed_rn/development_preoutcome.parquet": {
+      "bytes": 40898,
+      "sha256": "27befd72dfc970d808177ce43655ce4fee2377e99ddd0bd03915c193798b2214"
+    },
+    "results/multin_fixed_rn/development_selection.csv": {
+      "bytes": 1840,
+      "sha256": "1bed8db2565bcf67fbfc6e9e94c9c19d5a971b9f6d6b07d720d447fb75f648d0"
+    },
+    "results/multin_fixed_rn/evaluation_attribution.parquet": {
+      "bytes": 67176,
+      "sha256": "8cbdf18cc43d4f4a1b7a7b09ccd59a28a05b6cdee89d2819ec07ee20c14845ea"
+    },
+    "results/multin_fixed_rn/evaluation_bundles.parquet": {
+      "bytes": 52203,
+      "sha256": "00d127acf80438736b5b63911c26c426a0efe01674d54ccf16179d1d3b4d5688"
+    },
+    "results/multin_fixed_rn/evaluation_preoutcome.parquet": {
+      "bytes": 42674,
+      "sha256": "03b7428d21e5ae1e5a0953041366f116c684254dbd7b4fae6bf834289e52b40f"
+    },
+    "results/multin_fixed_rn/freeze_receipt.json": {
+      "bytes": 552,
+      "sha256": "7e771b86896d051a205582150eb333434722105433cda5d79c79a1903a9aea41"
+    },
+    "results/multin_fixed_rn/match_support.parquet": {
+      "bytes": 950637,
+      "sha256": "ba0619a167ac97abc7caa218dec7dffba80d4a35377a86dd08a32eb46d41651c"
+    },
+    "results/multin_fixed_rn/matched_contrasts.csv": {
+      "bytes": 4855,
+      "sha256": "7fd414eee58901129a9fdfa4aedb54b15fd036b5825838e1bf485b76753ff785"
+    },
+    "results/multin_fixed_rn/n7_r3_parity.json": {
+      "bytes": 114,
+      "sha256": "3a12015915f10173317ce3e89dd27c0a97a3add1c7194d97c43d61b7a285993b"
+    },
+    "results/multin_fixed_rn/performance.csv": {
+      "bytes": 7779,
+      "sha256": "5e3ca1dd222f299543726299bf97b053d19e03438e55407cc166f17f4ec62d4e"
+    },
+    "results/multin_fixed_rn/phase_a_parity.csv": {
+      "bytes": 268,
+      "sha256": "a58ac80066220d4f4bd83a0f339ee0f0b75e4a21d3c244d76e7c635913d9b3d7"
+    },
+    "results/multin_fixed_rn/risk_diagnostics.csv": {
+      "bytes": 7545,
+      "sha256": "0bcd375e62ed33efd2fabcb22942c2b9f0f78662ddc14b8bde87ed011ccec0a1"
+    },
+    "results/multin_fixed_rn/settlement_coverage.csv": {
+      "bytes": 181937,
+      "sha256": "727540e649fdc39faf17b4ec5aaa1a870ab32aed34bdf7f56c43d960750bf3ac"
+    },
+    "results/multin_fixed_rn/source_receipt.json": {
+      "bytes": 549,
+      "sha256": "14cf7190b39bfe74a1b258dee6f382be38c7561acc982b8fffe367e7b1dbff46"
+    },
+    "results/multin_fixed_rn/ticket_design_receipt.csv": {
+      "bytes": 769,
+      "sha256": "64e6bbc591f1975a75d034453fa4cd9a41054032bea61c3b04bf860d3903d369"
+    }
+  }
+}

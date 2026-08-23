@@ -1,0 +1,9 @@
+n,rows,match_parity,support_parity,gross_parity,pnl_parity
+3,107,True,True,True,True
+4,106,True,True,True,True
+5,106,True,True,True,True
+6,105,True,True,True,True
+7,105,True,True,True,True
+8,104,True,True,True,True
+9,103,True,True,True,True
+10,102,True,True,True,True
