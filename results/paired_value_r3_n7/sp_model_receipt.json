@@ -1,0 +1,153 @@
+{
+  "calibration_issues": 62,
+  "calibration_residual_frame_sha256": "75794d3a2a7ce1c894fd03d30b6b37f389ab90b409dd87460d246a09ddeae752",
+  "calibration_year": 2022,
+  "calibration_year_used_for_model_selection": false,
+  "contract": "BJ-UNIFIED-VALUE-VETO-R3-N7-001/v2",
+  "evaluation_prediction_frame_sha256": "b663eed396281a252a7dde990701bf128a9f95f80711399903b179860bbbb70b",
+  "evaluation_years_unopened": [
+    2023,
+    2024
+  ],
+  "final_training_issues": 562,
+  "final_training_through_year": 2022,
+  "fit_issues": 500,
+  "fit_years": [
+    2014,
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "interval_quantiles": [
+    0.1,
+    0.9
+  ],
+  "intervals": {
+    "0": {
+      "empirical_coverage": 0.800010559104588,
+      "high": 0.1257913963736983,
+      "low": -0.1506140755389649,
+      "rows": 18941
+    },
+    "1": {
+      "empirical_coverage": 0.800010559104588,
+      "high": 0.10255017483381534,
+      "low": -0.10408141010610161,
+      "rows": 18941
+    },
+    "3": {
+      "empirical_coverage": 0.800010559104588,
+      "high": 0.13534858092369584,
+      "low": -0.1206313850421008,
+      "rows": 18941
+    }
+  },
+  "model_architecture": "top2_factorial HistGradientBoostingRegressor",
+  "model_selection": {
+    "0": {
+      "candidate_scores": [
+        {
+          "l2_regularization": 1.0,
+          "max_leaf_nodes": 7,
+          "mse_log1p_sp": 0.013175474191152578
+        },
+        {
+          "l2_regularization": 1.0,
+          "max_leaf_nodes": 15,
+          "mse_log1p_sp": 0.01317398070718154
+        },
+        {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 15,
+          "mse_log1p_sp": 0.013133329021856663
+        }
+      ],
+      "selected_params": {
+        "l2_regularization": 5.0,
+        "max_leaf_nodes": 15
+      },
+      "selection_fit_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020
+      ],
+      "selection_tune_year": 2021
+    },
+    "1": {
+      "candidate_scores": [
+        {
+          "l2_regularization": 1.0,
+          "max_leaf_nodes": 7,
+          "mse_log1p_sp": 0.007512277710156744
+        },
+        {
+          "l2_regularization": 1.0,
+          "max_leaf_nodes": 15,
+          "mse_log1p_sp": 0.007512774975721289
+        },
+        {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 15,
+          "mse_log1p_sp": 0.007509166277494699
+        }
+      ],
+      "selected_params": {
+        "l2_regularization": 5.0,
+        "max_leaf_nodes": 15
+      },
+      "selection_fit_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020
+      ],
+      "selection_tune_year": 2021
+    },
+    "3": {
+      "candidate_scores": [
+        {
+          "l2_regularization": 1.0,
+          "max_leaf_nodes": 7,
+          "mse_log1p_sp": 0.011525196798661342
+        },
+        {
+          "l2_regularization": 1.0,
+          "max_leaf_nodes": 15,
+          "mse_log1p_sp": 0.01149160952453488
+        },
+        {
+          "l2_regularization": 5.0,
+          "max_leaf_nodes": 15,
+          "mse_log1p_sp": 0.01152482463110712
+        }
+      ],
+      "selected_params": {
+        "l2_regularization": 1.0,
+        "max_leaf_nodes": 15
+      },
+      "selection_fit_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020
+      ],
+      "selection_tune_year": 2021
+    }
+  },
+  "probability_source_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+  "training_settlement_source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+}

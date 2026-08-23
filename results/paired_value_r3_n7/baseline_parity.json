@@ -1,0 +1,10 @@
+{
+  "accepted_full_rows": 210,
+  "expected_common_rows": 192,
+  "gross_identity_rtol0_atol1e_8": true,
+  "match_identity": true,
+  "pass": true,
+  "rows": 192,
+  "rows_excluded_by_all_cell_common_support": 18,
+  "support_identity": true
+}
