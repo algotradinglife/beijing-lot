@@ -1,0 +1,23 @@
+{
+  "bundle_freeze_sha256": "3b8801b3f7b0091dd6b7130d30518ca5a6a2f049971a2693bebd3a2ddb84b56e",
+  "cells": [
+    "S0R0A0",
+    "S0R3A0",
+    "SVR0A0",
+    "SVR3A0"
+  ],
+  "contract": "BJ-UNIFIED-VALUE-VETO-R3-N7-001/v2",
+  "corrected_action_source_sha256": "bd3fc343f6fe7f75f518e373e0c13c90d3a91bbe03d17728393f4ab52b104fcd",
+  "dominance_margin": 1e-12,
+  "evaluation_outcomes_opened_before_freeze": false,
+  "evaluation_sp_prediction_sha256": "5829be822d1a2f80db3b691b092eb406b627302c997668f5fafbaa02beb8642f",
+  "frozen_bundle_rows": 476,
+  "funded_units": 512,
+  "issue_stake_cny": 1024.0,
+  "max_retained_mass_drop": 0.05,
+  "n": 7,
+  "sp_model_lineage": "same outcome-specific params for 2022 residuals and through-2022 refit",
+  "tickets": 128,
+  "value_surface_frame_sha256": "56e2d6281818f423ac829d54a40a12a78aac88cd4495ba63851e8769d3df485e",
+  "value_surface_rows": 32765
+}

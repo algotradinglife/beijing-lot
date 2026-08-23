@@ -178,3 +178,8 @@ evidence/bj_freeze_review_001/.publish.lock
 !evidence/bj299_residual_sources_v1/
 !evidence/bj299_residual_sources_v1/**
 !evidence/bj299_residual_sources_v1/*.csv
+
+# Issue #342 compact, replayable historical decision package.
+!results/
+!results/value_veto_r3_n7/
+!results/value_veto_r3_n7/**

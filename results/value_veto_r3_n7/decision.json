@@ -1,0 +1,14 @@
+{
+  "contract": "BJ-UNIFIED-VALUE-VETO-R3-N7-001/v2",
+  "historical_only": true,
+  "issue": 342,
+  "modifies_218": false,
+  "payout_factor_application": "ticket_level_once",
+  "promotable_to_210": false,
+  "r3_robust_under_veto": true,
+  "replacement_issues": 0,
+  "replacement_rows": 0,
+  "verdict": "NO_INCREMENT",
+  "veto_robust_under_r0": false,
+  "veto_robust_under_r3": false
+}

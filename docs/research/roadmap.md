@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#340 causal dynamic-R cycle completed; learned within-issue depth cannot beat fixed R3 and 2023 apparent R0 lift is cold-start attribution)**
+Updated: **2026-08-23 (#342 conservative value-veto cycle completed; fixed R3 remains frozen and SP uncertainty blocks every hard-veto replacement)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -205,6 +205,11 @@ PI interpretation and does not replace those edges or Project states.
      fixed R3 remains the historical challenger)
              |
              v
+#342 conservative pre-event value veto × fixed R3
+     (Done; 0/833 incumbent legs satisfy strict interval dominance;
+     point-value clues remain descriptive, fixed R3 unchanged)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -246,8 +251,9 @@ PI interpretation and does not replace those edges or Project states.
 | 31 | [#336] QEU support-depth attribution | Closed / Done | M3 | Parent #202; closed predecessor of #338/#210 | On 105 exact-common settled issues, 2023 selects R3. Matched lift is CNY+61,344 in 2023 and +66,812 in 2024; 2024 ex-largest remains +29,498 with 88.55% positive issue-bootstrap draws. But 2023 ex-largest is only +406 (0.66% of raw lift), so classify `QEU_TAIL_ONLY`. Post-merge audit found a formula/domain implementation error; #338 independently recomputes the written `1e-4` rule and shows no action difference on the current 2023/2024 panel |
 | 32 | [#338] QEU threshold activation on fixed N7 | Closed / Done | M3 | Parent #202; native predecessor #336; not a #210 blocker | All fourteen raw/z/dual candidates lose to R0 in 2023. The selected failed candidate `RAW_Q80` is CNY−12,899 vs R0 in 2023 and −24,916 in 2024. R3 remains materially stronger because it is issue-relative; no threshold replaces or unblocks #210 |
 | 33 | [#340] within-issue dynamic QEU R | Closed / Done | M3 | Parent #202; native predecessor #338; not a #210 blocker | Eleven strictly-prior RF seeds learn a per-issue R from ranks/gaps/dispersion. The full policy is +CNY45,950/+27,788 vs R0, but 2023 learned decisions alone are CNY−2,080 vs R0 and the apparent gain comes from R3 cold start. It loses to fixed R3 by CNY−15,395/−39,024; ex-largest is also negative. `FIXED_R3_REMAINS_BEST` |
-| 34 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 35 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 34 | [#342] conservative value veto × fixed R3 | PI Review | M3 | Parent #202; native predecessor #340; not a #210 blocker | Exact #338 R0/R3 parity on 105 issues. 2023/2024 contain 342/371 and 420/462 point-positive leg challengers, but 0/833 pass the deliberately over-conservative paired-tail screen; `NO_INCREMENT`, fixed R3 unchanged |
+| 35 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 36 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -329,6 +335,27 @@ warning remains material and prevents candidate promotion.
 - `FIXED_R3_REMAINS_BEST`. Dynamic-R architecture remains a useful interface,
   but there is no historical candidate to rebind or unlock #210. Report:
   [`Issue-QEU-Dynamic-R-N7.md`](Issue-QEU-Dynamic-R-N7.md).
+
+### #342 conservative value-veto × fixed-R3 decision
+
+- The four-cell design reproduces the exact corrected #338 R0 and R3 actions,
+  supports and gross settlement on all 105 issues. N7, 128 distinct tickets,
+  CNY1,024 exposure and A0 equal allocation remain fixed.
+- Hyperparameters use 2014–2020/2021 selection, SP models fit through 2021 and
+  use 2022 only for out-of-fit residual calibration. A match may replace a #319-selected leg only if its expected-leg
+  lower bound exceeds the incumbent upper bound and Top-2 retained mass falls
+  by no more than five percentage points.
+- Point estimates contain many value clues: 342/371 incumbent legs in 2023 and
+  420/462 in 2024 have an admissible higher-point-value challenger. But none of
+  the 833 legs has positive robust margin; the closest is still −0.1551. The
+  hard veto therefore makes zero replacements and all SV cells equal S0.
+- Verdict: `NO_INCREMENT`. This rejects the current worst-candidate-versus-best-
+  incumbent marginal screen, not relative value ranking itself. The screen
+  ignores within-issue paired error correlation and is too conservative for a
+  fair value comparison. Keep fixed R3 and do not change #210/#218. The next
+  causal experiment should model the paired `candidate - incumbent` difference,
+  or use its probability as a relative/soft value weight. Report:
+  [`Issue-342-Value-Veto-R3-N7.md`](Issue-342-Value-Veto-R3-N7.md).
 
 ### #334 neural residual and value-anchor decision
 
