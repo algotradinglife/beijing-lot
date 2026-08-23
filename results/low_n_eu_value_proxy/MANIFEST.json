@@ -1,0 +1,19 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v1",
+  "files": {
+    "FREEZE_RECEIPT.json": "9aeb19272173b6043d1db181668cd32fcb0b29f3c55a933d7dcd49db03089ba4",
+    "SOURCE_RECEIPT.json": "6855976a2edecda3083666a5809473d0828e9543bb38638b024a8d2fe1c56db1",
+    "n3_n5_full_cartesian_recipe.csv": "607ec504cbf8eb61f5fa7bbd6d476e997bb4175eb29955951ff53c6fcaf0e81c",
+    "quality_by_fixture.csv": "a935104f2faa1f8a22c382789421a254001bf0ba81e1e1924268c6b300efab9b",
+    "value_cells.parquet": "9a60b47e4d2f9b32a94996729d883ba1da8cab0e79698d14501bb27098c59647",
+    "year_profile.csv": "b84b9b6a4f11666f700a31419f346a06e5690c5ae368806adac513aafde42435"
+  },
+  "implementation_files": {
+    "scripts/build_low_n_eu_value_notebook.py": "7e200814fc986dab122150f38f7e76af75a53f349b0bbdca6f13c66ab952ed4c",
+    "scripts/run_low_n_eu_value.py": "06939d6fa3a384b1c22ee65c21dd51afa1328d1e1c99d7bea868fb2e9f99c1bd",
+    "scripts/verify_low_n_eu_value.py": "0d99f48dc1701350261fb3997214afdbb74e590e9d61ebe819885ffa04cef206",
+    "src/low_n_eu_value/__init__.py": "86c023c5b07e20c8e4ab801efe8279eca11a463430012d030f70d63481698a59",
+    "src/low_n_eu_value/contract.py": "1ae6403aab9bf01de676a6ca2f53765005538f6de5ff93a434f2de2e95dae8de",
+    "src/low_n_eu_value/pipeline.py": "fa013c54fbb7104873dd5b202e7651999d1961dd171d5f871465cc609bbc44b1"
+  }
+}

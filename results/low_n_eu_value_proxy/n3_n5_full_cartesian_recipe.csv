@@ -1,0 +1,4 @@
+n,outcomes_per_fixture,full_cartesian_ticket_count,ticket_level_payout_factor,payout_factor_application,gross_multiplier_formula,fixture_selection_performed,interpretation
+3,2,8,0.65,ONCE_PER_COMPLETE_TICKET,0.65 * product(top2_full_cartesian_contribution_i),False,ingredient only; no fixture subset or strategy is selected
+4,2,16,0.65,ONCE_PER_COMPLETE_TICKET,0.65 * product(top2_full_cartesian_contribution_i),False,ingredient only; no fixture subset or strategy is selected
+5,2,32,0.65,ONCE_PER_COMPLETE_TICKET,0.65 * product(top2_full_cartesian_contribution_i),False,ingredient only; no fixture subset or strategy is selected

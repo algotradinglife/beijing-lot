@@ -1,0 +1,17 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v1",
+  "fixture_selection_performed": false,
+  "horizon": "10h",
+  "n_recipe_sha256": "097c2d30f7136be72e68adb11d7ba21e0adb173775c58e558a056409f8242fd2",
+  "outcome_order": [
+    "3",
+    "1",
+    "0"
+  ],
+  "payout_factor": 0.65,
+  "quality_sha256": "49cccb3a36db793d6ed3343dfe37d9e003db826eee8b0ff6d2419179457b3fc5",
+  "source_timestamp_semantics": "RELATIVE_10H_LABEL_NO_EXACT_OBSERVATION_TIMESTAMP",
+  "value_cell_count": 404466,
+  "value_cells_sha256": "6adc99a6c001f01b155314cc0dbca0694eddf055187dea6cbfd22200c50b6bb1",
+  "year_profile_sha256": "4b22d0700934ffbdddcaf94e875659adc66b052fdc2f2a8fe77d52f0f10191e1"
+}

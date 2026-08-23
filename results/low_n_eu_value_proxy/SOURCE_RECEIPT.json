@@ -1,0 +1,10 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v1",
+  "raw_european_sqlite_path": "/home/drwho1985/workspace/soccer/beijing-lot/data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+  "raw_european_sqlite_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "selector_feature_frame_sha256": "43e3b0b47a54e4eb41d6fb4103a0adea9af3b2e11d3e9992a5fb1912f5f0d98b",
+  "selector_feature_path": "/home/drwho1985/worktrees/bj358/results/low_n_selector_data/features/selector_features.parquet",
+  "selector_feature_sha256": "3fbb9f316ca7542c3310a0e6bf2cafb565b99d87b4c2d8feed9ffe789ddbf592",
+  "source_meta_sha256": "c04f3d385a075700ab9c3f9c9f7169e82402b638d37a19543506c4dd759d8b41",
+  "trusted_workbook_source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001 value-cell contract",
+  "type": "object",
+  "required": ["contract", "outcome_order", "horizon", "source_timestamp_semantics", "payout_factor", "fixture_selection_performed"],
+  "properties": {
+    "contract": {"const": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v1"},
+    "outcome_order": {"const": ["3", "1", "0"]},
+    "horizon": {"const": "10h"},
+    "source_timestamp_semantics": {"const": "RELATIVE_10H_LABEL_NO_EXACT_OBSERVATION_TIMESTAMP"},
+    "payout_factor": {"const": 0.65},
+    "fixture_selection_performed": {"const": false},
+    "value_cells_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": true,
+  "$comment": "value_cells.parquet is long at (issue, match_idx, outcome_code), with outcome_code ordered 3/1/0. average_european_decimal_odds is a raw European proxy, never Beijing SP; source_timestamp_utc is deliberately null because 10h is a relative source label."
+}
