@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#334 neural residual completed; neural selection rejected, but q_eu/q_line value-ranked Top-2 support becomes the first cross-2023/2024 positive replication candidate)**
+Updated: **2026-08-23 (#336 support-depth replication completed; R3 is the frozen forward challenger, while concentration keeps exact #319 Top-2 as incumbent)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -191,6 +191,11 @@ PI interpretation and does not replace those edges or Project states.
      (Done; neural arm rejected, value-anchor support signal retained for replication)
              |
              v
+#336 QEU support-depth attribution
+     (Done; R3 transfers positively but is classified QEU_TAIL_ONLY because
+     2023 development lift is almost entirely one issue; freeze for forward test)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -229,8 +234,32 @@ PI interpretation and does not replace those edges or Project states.
 | 28 | [#330] causal lagged regime state ledger | Closed / Done | M2 | Parent #202; predecessor of #332; blocks #210 | 282 issue-level rows establish stable European calibration and a very sparse A1-A0 response. Post-merge EV quarantines its current settlement-availability feature and anchor-surrogate lag timestamps; #332 rebuilds only the usable targets behind a conservative latest-kickoff+4h availability gate. Retain `SPARSE_RESPONSE_REDESIGN`, not the original causal feature artifact |
 | 29 | [#332] fixed-expert causal multitask MoE | Closed / Done | M3 | Parent #202; predecessor of the next direct-value learner; blocks #210 | Eight frozen N7-N10 experts, 512 matched tickets and 11 nuisance seeds. Dense hit/near-miss labels are moderately learnable, but lagged/current/static mixtures all fail the strongest fixed and accepted Top-2 controls. Against accepted Top-2, lagged MoE is +CNY1,364 raw but −CNY3,007 ex-largest in 2023, then −CNY48,666 in 2024. `NO_EXPERT_MIX_SIGNAL`; retain Top-2 and learn residual match/outcome/ticket value directly |
 | 30 | [#334] neural Top-2 residual action-value learner | Closed / Done | M3 | Parent #202; blocks #210 | The 2023-selected neural match selector is +CNY7,941 raw / +CNY2,579 ex-largest, but reverses to −CNY35,278 / −CNY31,787 on frozen 2024 and is rejected. The interpretable `q_eu/q_line` value anchor produces a distinct long-tail clue: support-only lift is +CNY50,723 in 2023 and +CNY49,393 in 2024; 2024 ex-largest remains +CNY23,919, while 2023 ex-largest is −CNY1,158. Retain as `ANCHOR_SHRINKAGE_SIGNAL_NOT_YET_PROMOTED`, with exact #319 Top-2 as fallback |
-| 31 | [#210] held-out/forward validation | Open / Blocked | M4 | #334 and other historical predecessors close after landing; #218 remains open | Do not spend prospective Cohort-B evidence yet. Revise the frozen candidate identity from obsolete #209 to the #334 value-ranked Top-2 support replication candidate, while preserving #319 as incumbent; strict prospective support still depends on #218 |
-| 32 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 31 | [#336] QEU support-depth attribution | Closed / Done | M3 | Parent #202; blocks #210 until landing | On 105 exact-common settled issues, 2023 selects R3. Matched lift is CNY+61,344 in 2023 and +66,812 in 2024; 2024 ex-largest remains +29,498 with 88.55% positive issue-bootstrap draws. But 2023 ex-largest is only +406 (0.66% of raw lift), so classify `QEU_TAIL_ONLY`: freeze R3 as a forward challenger, not an accepted replacement for #319 |
+| 32 | [#210] held-out/forward validation | Open / Blocked | M4 | #336 closes after landing; #218 remains open | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 33 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+
+### #336 QEU support-depth attribution decision
+
+- The experiment isolates outcome-support depth: every arm uses the exact same
+  #319-selected seven matches, 128 distinct tickets, 512 CNY2 units and
+  CNY1,024 per issue. Only the top-R matches by label-free QEU support pressure
+  switch from probability Top-2 to `log(q_eu/q_line)` Top-2.
+- The curve has a real interior sweet spot. R1/R2 do not improve reliably; R3
+  reaches matched lift CNY+61,344 in 2023 and CNY+66,812 in 2024. Expanding to
+  R4/R7 remains positive but adds no further lift. This supports the user's
+  view that divergence belongs in the shared feature layer and should alter
+  selected support depth rather than replace every outcome decision.
+- The adversarial qualification is important: one 2023 issue contributes
+  CNY60,938 of R3's CNY61,344 lift, leaving only CNY406 ex-largest. In 2024 the
+  evidence is broader: ex-largest lift is CNY29,498 and 88.55% of 2,000
+  issue-cluster bootstrap draws are positive. Historical evidence therefore
+  identifies a plausible R3 challenger but does not establish a stable Edge.
+- #190 Z100/K1 and QEU are the same broad divergence hypothesis but not the
+  same policy. They use different match denominators and actions; the overlap
+  diagnostic must not be presented as an independent replication.
+- Forward disposition: keep R0 as incumbent, freeze R3 without further tuning,
+  and compare them in #210 only after #218's genuine prospective support is
+  available. Report: [`Issue-QEU-Support-Depth.md`](Issue-QEU-Support-Depth.md).
 
 ### #334 neural residual and value-anchor decision
 
@@ -717,6 +746,7 @@ retrospective feature.
 [#330]: https://github.com/algotradinglife/beijing-lot/issues/330
 [#332]: https://github.com/algotradinglife/beijing-lot/issues/332
 [#334]: https://github.com/algotradinglife/beijing-lot/issues/334
+[#336]: https://github.com/algotradinglife/beijing-lot/issues/336
 
 ---
 

@@ -1,0 +1,123 @@
+{
+  "contract": "BJ-UNIFIED-QEU-SUPPORT-DEPTH-001/v1",
+  "decision": {
+    "baseline_transfer_max_drawdown_fraction": 0.11638735634616461,
+    "causal_caveat": "2024 was previously inspected and is historical transfer, not a sealed holdout",
+    "concentration_acceptable": false,
+    "contract": "BJ-UNIFIED-QEU-SUPPORT-DEPTH-001/v1",
+    "development_ex_largest_fraction": 0.006615766146193204,
+    "development_ex_largest_lift_cny": 405.83902143167506,
+    "development_lift_cny": 61344.22113230227,
+    "freeze_as_210_forward_challenger": true,
+    "issue": 336,
+    "path_risk_acceptable": false,
+    "payout_factor_application": "ticket_level_once",
+    "promotable_to_210": false,
+    "selected_r_on_2023": 3,
+    "transfer_bootstrap_positive_fraction": 0.8855,
+    "transfer_ex_largest_fraction": 0.441501203646198,
+    "transfer_ex_largest_lift_cny": 29497.660625713565,
+    "transfer_lift_cny": 66812.18620040694,
+    "transfer_max_drawdown_fraction": 0.19796998875016783,
+    "verdict": "QEU_TAIL_ONLY"
+  },
+  "files": {
+    "docs/research/Issue-QEU-Support-Depth.md": {
+      "bytes": 12032,
+      "sha256": "93a7c042e6aa865e71470da8b6c830911ceccba3483219814484bd15385877d5"
+    },
+    "docs/research/figures/issue_336_qeu_selected_capital.png": {
+      "bytes": 102570,
+      "sha256": "0254bfec1427cfe224eb2aea01bd2b3ae04acc555fa6e4a35d18b8a313d1a2a3"
+    },
+    "docs/research/figures/issue_336_qeu_support_depth_curve.png": {
+      "bytes": 90900,
+      "sha256": "294356e35e709a7713f73346353d2c0842fe6870e275fc1b841d06c38ca4e6b6"
+    },
+    "notebooks/research/qeu-support-depth/qeu_support_depth.ipynb": {
+      "bytes": 54648,
+      "sha256": "da0623c5d36e2236809a23c8c0108cca10605d86b2dd9590954a14f1ab41f23b"
+    },
+    "results/qeu_support_depth/baseline_parity.csv": {
+      "bytes": 13514,
+      "sha256": "b2cb1cfb7bf24813ecd95b29101e2a61b8dfbea3acf8388b3d005ff2494538b4"
+    },
+    "results/qeu_support_depth/bootstrap_lift.csv": {
+      "bytes": 765,
+      "sha256": "94acd5821de23c96d81ea4a1a434261ceb28f7014db25fc56f8b61edc3452b4a"
+    },
+    "results/qeu_support_depth/capital_paths.csv": {
+      "bytes": 50322,
+      "sha256": "26bbf4ad8481ab55c402557abf9b6d208982ce5c38652128ecb36dbf95ea2506"
+    },
+    "results/qeu_support_depth/decision.json": {
+      "bytes": 909,
+      "sha256": "f2eaf3404c98ae12c701b5db0e5a741887bc26396645e53c40c53f8939dd5d66"
+    },
+    "results/qeu_support_depth/development_selection.csv": {
+      "bytes": 1380,
+      "sha256": "931760ab6fdbd42c518ff63be02bf356d501205a021824bb2fec73b2e16193d1"
+    },
+    "results/qeu_support_depth/issue_bundles.parquet": {
+      "bytes": 30431,
+      "sha256": "86c06048f896cc7f8cbcf0aec888961406701023ea2ed7f73e5ef0d836f321d1"
+    },
+    "results/qeu_support_depth/match_support.parquet": {
+      "bytes": 1902161,
+      "sha256": "d7608d2338ac648345c74f0d623a0e3c3f65a5f049b7123aef0dfbd81385bdc5"
+    },
+    "results/qeu_support_depth/performance.csv": {
+      "bytes": 2399,
+      "sha256": "c2b53434a3f9feb5c716f3ee2bb0f2d5020cdd6d0ad30327b386edb278b66bdf"
+    },
+    "results/qeu_support_depth/risk_diagnostics.csv": {
+      "bytes": 940,
+      "sha256": "1409495d42db712eb37210bcd52f4b1a576a08d348e43625f19cb9e6b517546f"
+    },
+    "results/qeu_support_depth/source_receipt.json": {
+      "bytes": 802,
+      "sha256": "52acec6f1409aac7b23391a335f0244489c4d9718e89fad3cea38b80d1fdfdff"
+    },
+    "results/qeu_support_depth/support_attribution.parquet": {
+      "bytes": 31838,
+      "sha256": "c5b4b434435abd870f8f5850621302b4189e37c426675b9c20011649611658f8"
+    },
+    "results/qeu_support_depth/z100_diagnostic.csv": {
+      "bytes": 532,
+      "sha256": "cced744d8810df9e8b5654c8bd04499cd13159c2d5b2e36857cf1586d219c865"
+    }
+  },
+  "source_receipt": {
+    "cells": 247557,
+    "external_sources_committed_to_git": false,
+    "feature_columns": [
+      "q_eu",
+      "q_line",
+      "divergence",
+      "abs_divergence",
+      "native_handicap_line",
+      "n_available_books",
+      "mapping_accepted",
+      "issue_matches",
+      "issue_books_mean",
+      "issue_line_abs_mean",
+      "issue_entropy_mean",
+      "issue_divergence_abs_mean",
+      "outcome_3",
+      "outcome_1",
+      "outcome_0"
+    ],
+    "feature_projection_sha256": "0d089b5743383ed55cf9c762c93df2d6d6b18b9c38099abff4c4c41b78dfecf3",
+    "inference_path": "data/derived/bj238_divergence_materializer_v4r3/inference/relative_horizon_view.parquet",
+    "issues": 282,
+    "matches": 82519,
+    "settlement_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "years": [
+      2020,
+      2021,
+      2022,
+      2023,
+      2024
+    ]
+  }
+}

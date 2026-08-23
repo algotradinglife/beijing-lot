@@ -1,0 +1,21 @@
+{
+  "baseline_transfer_max_drawdown_fraction": 0.11638735634616461,
+  "causal_caveat": "2024 was previously inspected and is historical transfer, not a sealed holdout",
+  "concentration_acceptable": false,
+  "contract": "BJ-UNIFIED-QEU-SUPPORT-DEPTH-001/v1",
+  "development_ex_largest_fraction": 0.006615766146193204,
+  "development_ex_largest_lift_cny": 405.83902143167506,
+  "development_lift_cny": 61344.22113230227,
+  "freeze_as_210_forward_challenger": true,
+  "issue": 336,
+  "path_risk_acceptable": false,
+  "payout_factor_application": "ticket_level_once",
+  "promotable_to_210": false,
+  "selected_r_on_2023": 3,
+  "transfer_bootstrap_positive_fraction": 0.8855,
+  "transfer_ex_largest_fraction": 0.441501203646198,
+  "transfer_ex_largest_lift_cny": 29497.660625713565,
+  "transfer_lift_cny": 66812.18620040694,
+  "transfer_max_drawdown_fraction": 0.19796998875016783,
+  "verdict": "QEU_TAIL_ONLY"
+}
