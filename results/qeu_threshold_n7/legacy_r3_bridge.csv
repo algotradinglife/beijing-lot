@@ -1,0 +1,5 @@
+scope,issue_year,rows,baseline_support_differences,qeu_support_differences,pressure_differences_gt_1e12,max_pressure_abs_diff
+ALL_COMPLETE_ACTIONS,2023,14675,0,0,0,0
+ALL_COMPLETE_ACTIONS,2024,18090,0,0,0,0
+SETTLED_R3_BUNDLES,2023,47,0,0,,
+SETTLED_R3_BUNDLES,2024,58,0,0,,

@@ -1,0 +1,172 @@
+{
+  "contract": "BJ-UNIFIED-QEU-THRESHOLD-N7-001/v1",
+  "decision": {
+    "causal_caveat": "2024 is previously exposed historical transfer evidence",
+    "contract": "BJ-UNIFIED-QEU-THRESHOLD-N7-001/v1",
+    "development_ex_largest_fraction": null,
+    "development_ex_largest_lift_r0_cny": -3841.202962379859,
+    "development_lift_r0_cny": -12899.402778030752,
+    "development_lift_r3_cny": -74243.62391033303,
+    "excluded_issues": 14,
+    "excluded_r3_action_different_issues": 13,
+    "full_schedule_coverage": false,
+    "issue": 338,
+    "n_frozen": 7,
+    "payout_factor_application": "ticket_level_once",
+    "promotable_to_210": false,
+    "robustness_improved_vs_r3": false,
+    "schedule_issues": 119,
+    "selected_threshold_on_2023": "RAW_Q80",
+    "settled_issues": 105,
+    "transfer_bootstrap_positive_fraction": 0.0885,
+    "transfer_ex_largest_fraction": null,
+    "transfer_ex_largest_lift_r0_cny": -13076.08496453296,
+    "transfer_lift_r0_cny": -24916.285545313644,
+    "transfer_lift_r3_cny": -91728.47174572057,
+    "transfer_path_not_worse_than_r3": true,
+    "verdict": "FIXED_R3_REMAINS_BEST"
+  },
+  "files": {
+    "docs/research/Issue-QEU-Threshold-N7.md": {
+      "bytes": 20677,
+      "sha256": "52e6b7b75bae411ec4977ac384b69c8ce75a0b2e358b921c2a12793506fad64b"
+    },
+    "docs/research/figures/issue_338_qeu_threshold_atlas.png": {
+      "bytes": 131329,
+      "sha256": "ab8e5e4ff641453283b2d22af889e61cab534bbfccc690fbd0f66126f53bca74"
+    },
+    "docs/research/figures/issue_338_qeu_threshold_capital.png": {
+      "bytes": 138435,
+      "sha256": "7103a6fe646548e2080cd339c0d57660548c33ebc93168e7ded901d065166bad"
+    },
+    "notebooks/research/qeu-threshold-n7/qeu_threshold_n7.ipynb": {
+      "bytes": 48246,
+      "sha256": "9305d0ad3d842c5c0102e99c67d54465856ba8c1c6c6e623490279b724f69a5a"
+    },
+    "results/qeu_threshold_n7/action_count_distribution.csv": {
+      "bytes": 4828,
+      "sha256": "6357d712e23093b6af3b8e6a65df37b79ca93be92a5995a3cb6beb8cbcce7d72"
+    },
+    "results/qeu_threshold_n7/action_profile.csv": {
+      "bytes": 3131,
+      "sha256": "7b4266ce88ff7a4e15314feec0d59e13b8c0d865b665e0a38a6601df3258cf8b"
+    },
+    "results/qeu_threshold_n7/action_receipts.parquet": {
+      "bytes": 3789692,
+      "sha256": "bd3fc343f6fe7f75f518e373e0c13c90d3a91bbe03d17728393f4ab52b104fcd"
+    },
+    "results/qeu_threshold_n7/arm_definitions.csv": {
+      "bytes": 480,
+      "sha256": "c6a150507153a2f7cfa83e9b8b60e9168bd32ffbdd2284c9efc4e4425dc72d09"
+    },
+    "results/qeu_threshold_n7/baseline_parity.csv": {
+      "bytes": 3362,
+      "sha256": "adbb9c4a078e76d8c0cef02780f04590573750324c7129d40e8d9a4598a9a989"
+    },
+    "results/qeu_threshold_n7/bootstrap_lift.csv": {
+      "bytes": 3783,
+      "sha256": "007bb894b3006a546e520d3a86d54c735cdaacb7e7b5d742a1ec826be3ad870f"
+    },
+    "results/qeu_threshold_n7/capital_paths.csv": {
+      "bytes": 133278,
+      "sha256": "38da85ef5bcd02b397c8b015d78dbea6fb3999b6222ef9ab7d5933cfccc030cb"
+    },
+    "results/qeu_threshold_n7/coverage_ledger.csv": {
+      "bytes": 3529,
+      "sha256": "eaf11bfd3d3191863468b4ab7f39588ed4946da93b9c78c07650e18795467f75"
+    },
+    "results/qeu_threshold_n7/decision.json": {
+      "bytes": 1008,
+      "sha256": "ac9df9fc0563e1ccfdf8ac32b982d2a3c65c8fdf3b2a0716b2db9ef04a1d81c2"
+    },
+    "results/qeu_threshold_n7/development_selection.csv": {
+      "bytes": 4035,
+      "sha256": "44ddb4ee4ec57282657a3158a13bcc4fa7fdece3c5ebe0b035358790a9a415cb"
+    },
+    "results/qeu_threshold_n7/issue_bundles.parquet": {
+      "bytes": 35167,
+      "sha256": "a1ae57e8f5641e1a7b4154bce207eaa517acf74fe46ba2b5e0b992ba8e0bfe98"
+    },
+    "results/qeu_threshold_n7/legacy_r3_bridge.csv": {
+      "bytes": 272,
+      "sha256": "e752a3fdc8c6d1ee49684290019211ce25a332b80ea4c6c5cd8c872ed008b8be"
+    },
+    "results/qeu_threshold_n7/performance.csv": {
+      "bytes": 7452,
+      "sha256": "ecabf7d180505f812ad5dc581e00d14aaa7042da6180c9026bf6936b3a2771bd"
+    },
+    "results/qeu_threshold_n7/pressure_drift.csv": {
+      "bytes": 409,
+      "sha256": "18891c1515c617a716b637d5f29de2109c83d7c21bbad46c26f48de52d3d7459"
+    },
+    "results/qeu_threshold_n7/reference_action_receipts.parquet": {
+      "bytes": 3341334,
+      "sha256": "1c41351a3ee258eef0b66b0baea70d07683f2214d8f35ae85862610246b17e07"
+    },
+    "results/qeu_threshold_n7/reference_freeze.json": {
+      "bytes": 729,
+      "sha256": "db0d792a3badafec587ff53c84b0ffde5d3d071f8ce0cd42ed0a54b2448bd9de"
+    },
+    "results/qeu_threshold_n7/reference_summary.csv": {
+      "bytes": 431,
+      "sha256": "f674e90c2b30fe3eadd24786b9dc3954689066b2e903be7f2ffd099f9d32252e"
+    },
+    "results/qeu_threshold_n7/risk_diagnostics.csv": {
+      "bytes": 2387,
+      "sha256": "4eda3da91f00ea91a11d7c468a4fd2dd0ea38bcbba3c150c951aaf2a2f9c24f3"
+    },
+    "results/qeu_threshold_n7/source_receipt.json": {
+      "bytes": 802,
+      "sha256": "52acec6f1409aac7b23391a335f0244489c4d9718e89fad3cea38b80d1fdfdff"
+    },
+    "results/qeu_threshold_n7/support_attribution.parquet": {
+      "bytes": 55318,
+      "sha256": "7ec852166e3270b845dc6be36f306f4f9e95f5b379ad82edb7a87006a7774626"
+    },
+    "results/qeu_threshold_n7/tail_issue_diagnostic.csv": {
+      "bytes": 1164,
+      "sha256": "d3c4b3b26703e3e6f9be74721cab5d3e676462a8d94d3c1fb5590959a4031298"
+    },
+    "results/qeu_threshold_n7/threshold_tie_sensitivity.csv": {
+      "bytes": 386,
+      "sha256": "32a0a04690f6565de6845a844bdf1a7cf6a08442739d56015fcf746b2ce857db"
+    },
+    "results/qeu_threshold_n7/ticket_receipts.parquet": {
+      "bytes": 100639,
+      "sha256": "6d1effd55900cfdf367c8d19fba46d62b34dcbb4bda049dcaa17894000badc44"
+    }
+  },
+  "source_receipt": {
+    "cells": 247557,
+    "external_sources_committed_to_git": false,
+    "feature_columns": [
+      "q_eu",
+      "q_line",
+      "divergence",
+      "abs_divergence",
+      "native_handicap_line",
+      "n_available_books",
+      "mapping_accepted",
+      "issue_matches",
+      "issue_books_mean",
+      "issue_line_abs_mean",
+      "issue_entropy_mean",
+      "issue_divergence_abs_mean",
+      "outcome_3",
+      "outcome_1",
+      "outcome_0"
+    ],
+    "feature_projection_sha256": "0d089b5743383ed55cf9c762c93df2d6d6b18b9c38099abff4c4c41b78dfecf3",
+    "inference_path": "data/derived/bj238_divergence_materializer_v4r3/inference/relative_horizon_view.parquet",
+    "issues": 282,
+    "matches": 82519,
+    "settlement_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "years": [
+      2020,
+      2021,
+      2022,
+      2023,
+      2024
+    ]
+  }
+}

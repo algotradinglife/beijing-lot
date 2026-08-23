@@ -1,0 +1,17 @@
+arm,exact_boundary_rows,exact_boundary_issues,inclusive_threshold_material
+R0,0,0,False
+R3_CORRECTED,0,0,False
+RAW_Q50,0,0,False
+RAW_Q60,0,0,False
+RAW_Q70,0,0,False
+RAW_Q80,0,0,False
+RAW_Q90,0,0,False
+RAW_Q95,0,0,False
+Z_GE_0P0,0,0,False
+Z_GE_0P5,0,0,False
+Z_GE_1P0,0,0,False
+Z_GE_1P5,0,0,False
+Z_GE_2P0,0,0,False
+DUAL_Q75_Z1P0,0,0,False
+DUAL_Q85_Z1P0,0,0,False
+DUAL_Q75_Z1P5,0,0,False

@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#336 support-depth replication completed; R3 is the frozen forward challenger, while concentration keeps exact #319 Top-2 as incumbent)**
+Updated: **2026-08-23 (#338 fixed-N7 threshold atlas completed; universal raw/z cutoffs fail, while issue-relative R3 remains the historical challenger)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -196,6 +196,10 @@ PI interpretation and does not replace those edges or Project states.
      2023 development lift is almost entirely one issue; freeze for forward test)
              |
              v
+#338 QEU raw/z threshold activation on fixed N7
+     (Done; every absolute threshold loses in 2023; R3 remains the relative rule)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -234,9 +238,10 @@ PI interpretation and does not replace those edges or Project states.
 | 28 | [#330] causal lagged regime state ledger | Closed / Done | M2 | Parent #202; predecessor of #332; blocks #210 | 282 issue-level rows establish stable European calibration and a very sparse A1-A0 response. Post-merge EV quarantines its current settlement-availability feature and anchor-surrogate lag timestamps; #332 rebuilds only the usable targets behind a conservative latest-kickoff+4h availability gate. Retain `SPARSE_RESPONSE_REDESIGN`, not the original causal feature artifact |
 | 29 | [#332] fixed-expert causal multitask MoE | Closed / Done | M3 | Parent #202; predecessor of the next direct-value learner; blocks #210 | Eight frozen N7-N10 experts, 512 matched tickets and 11 nuisance seeds. Dense hit/near-miss labels are moderately learnable, but lagged/current/static mixtures all fail the strongest fixed and accepted Top-2 controls. Against accepted Top-2, lagged MoE is +CNY1,364 raw but −CNY3,007 ex-largest in 2023, then −CNY48,666 in 2024. `NO_EXPERT_MIX_SIGNAL`; retain Top-2 and learn residual match/outcome/ticket value directly |
 | 30 | [#334] neural Top-2 residual action-value learner | Closed / Done | M3 | Parent #202; blocks #210 | The 2023-selected neural match selector is +CNY7,941 raw / +CNY2,579 ex-largest, but reverses to −CNY35,278 / −CNY31,787 on frozen 2024 and is rejected. The interpretable `q_eu/q_line` value anchor produces a distinct long-tail clue: support-only lift is +CNY50,723 in 2023 and +CNY49,393 in 2024; 2024 ex-largest remains +CNY23,919, while 2023 ex-largest is −CNY1,158. Retain as `ANCHOR_SHRINKAGE_SIGNAL_NOT_YET_PROMOTED`, with exact #319 Top-2 as fallback |
-| 31 | [#336] QEU support-depth attribution | Closed / Done | M3 | Parent #202; blocks #210 until landing | On 105 exact-common settled issues, 2023 selects R3. Matched lift is CNY+61,344 in 2023 and +66,812 in 2024; 2024 ex-largest remains +29,498 with 88.55% positive issue-bootstrap draws. But 2023 ex-largest is only +406 (0.66% of raw lift), so classify `QEU_TAIL_ONLY`: freeze R3 as a forward challenger, not an accepted replacement for #319 |
-| 32 | [#210] held-out/forward validation | Open / Blocked | M4 | #336 closes after landing; #218 remains open | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 33 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 31 | [#336] QEU support-depth attribution | Closed / Done | M3 | Parent #202; closed predecessor of #338/#210 | On 105 exact-common settled issues, 2023 selects R3. Matched lift is CNY+61,344 in 2023 and +66,812 in 2024; 2024 ex-largest remains +29,498 with 88.55% positive issue-bootstrap draws. But 2023 ex-largest is only +406 (0.66% of raw lift), so classify `QEU_TAIL_ONLY`. Post-merge audit found a formula/domain implementation error; #338 independently recomputes the written `1e-4` rule and shows no action difference on the current 2023/2024 panel |
+| 32 | [#338] QEU threshold activation on fixed N7 | Closed / Done | M3 | Parent #202; native predecessor #336; not a #210 blocker | All fourteen raw/z/dual candidates lose to R0 in 2023. The selected failed candidate `RAW_Q80` is CNY−12,899 vs R0 in 2023 and −24,916 in 2024. R3 remains materially stronger because it is issue-relative; no threshold replaces or unblocks #210 |
+| 33 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 34 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -260,6 +265,38 @@ PI interpretation and does not replace those edges or Project states.
 - Forward disposition: keep R0 as incumbent, freeze R3 without further tuning,
   and compare them in #210 only after #218's genuine prospective support is
   available. Report: [`Issue-QEU-Support-Depth.md`](Issue-QEU-Support-Depth.md).
+
+The asynchronous post-merge audit found that the #336 implementation clipped
+both probability sources at `1e-9` instead of clipping only `q_line` at the
+written `1e-4`, omitted strict positive-domain checks and used the wrong exact-
+pressure tie source. #338 corrects all three before settlement and commits the
+outcome-cell probability primitives. On the actual 32,765 complete 2023/2024
+match actions, the corrected and legacy supports/pressures are identical, so
+the current 105-issue R3 totals do not change. The audit's 105/119 complete-case
+warning remains material and prevents candidate promotion.
+
+### #338 fixed-N7 QEU threshold decision
+
+- N, matches, support width, tickets and funding remain frozen: exact #319 N7,
+  128 distinct tickets and CNY1,024 per issue. Only QEU activation changes.
+- A 29,974-action 2020–2022 causal reference freezes raw pressure quantiles and
+  robust `(lost outcome, gained outcome)` z scores. Six raw, five z and three
+  dual thresholds are selected on 2023 only and read through on 2024.
+- Every absolute threshold candidate loses to R0 in 2023. The lexicographic
+  best-of-failed candidate, `RAW_Q80` (`pressure >= 0.22307`), is CNY−12,899
+  versus R0 in 2023 and CNY−24,916 in 2024; its ex-largest lifts are also
+  negative and only 8.85% of transfer bootstrap draws are positive.
+- Some 2024-only rows look positive (`RAW_Q90` raw lift +CNY13,587 and
+  `Z_GE_1P5` +CNY4,134), but both are negative after removing their largest
+  issue. They cannot overturn the frozen development failure.
+- The mechanism is informative. The decisive 2023 R3 issue required three
+  issue-relative actions with pressures 0.1766, 0.1225 and 0.1131. A global
+  Q50 cutoff (0.1307) kept only one; stricter thresholds kept none. Thus the
+  evidence supports **relative within-issue divergence rank**, not a universal
+  raw/z magnitude threshold.
+- Verdict: `FIXED_R3_REMAINS_BEST`. Keep N7 and R3 as historical forward-test
+  identities; do not add #338 as a #210 dependency and do not reopen N.
+  Report: [`Issue-QEU-Threshold-N7.md`](Issue-QEU-Threshold-N7.md).
 
 ### #334 neural residual and value-anchor decision
 
