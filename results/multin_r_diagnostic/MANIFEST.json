@@ -1,0 +1,61 @@
+{
+  "contract": "BJ-UNIFIED-MULTIN-R-DIAGNOSTIC-001/v1",
+  "files": {
+    "docs/research/Issue-352-MultiN-R-Annual-Diagnostic.md": {
+      "bytes": 33547,
+      "sha256": "a1ebfecb5279a065a0a3de026ec960d9e7b08804e1d3ff68122414e022290cd9"
+    },
+    "docs/research/figures/issue_352_multin_r_annual_lift.png": {
+      "bytes": 213311,
+      "sha256": "3dd0b023a35fe1027a1c90c114fd3c0ee51a7df6325cd076e106765f166455a5"
+    },
+    "docs/research/figures/issue_352_multin_r_annual_risk.png": {
+      "bytes": 202205,
+      "sha256": "d6fed6145a4e4231d752c2a571ff529567f20a023496b410fd500302854ae1bb"
+    },
+    "notebooks/research/multin-r-diagnostic/multin_r_diagnostic.ipynb": {
+      "bytes": 45913,
+      "sha256": "359e3c77063b8956273284337467679bcf2e1ec3f36311928b825324ab7f436f"
+    },
+    "results/multin_r_diagnostic/annual_diagnostic_matrix.csv": {
+      "bytes": 26395,
+      "sha256": "55f2da44496a19f74efac723182fb7cadb6bf2cae3399c9140b862aa5310913d"
+    },
+    "results/multin_r_diagnostic/capital_paths.csv": {
+      "bytes": 554696,
+      "sha256": "e284342df751f798a8ca0f47466133012e293c945dbad274114ef4d1551bcaae"
+    },
+    "results/multin_r_diagnostic/coverage_ledger.csv": {
+      "bytes": 33984,
+      "sha256": "772e0ef479d4ad3b868103ef6eace2368828880234b4cf54c9ea0328a15ee611"
+    },
+    "results/multin_r_diagnostic/diagnostic_receipt.json": {
+      "bytes": 1256,
+      "sha256": "1dbef879c7b7e5d971e01309e6dac2c36cd7f0ddbd92edcb02487b9b4fab0b36"
+    },
+    "results/multin_r_diagnostic/match_support.parquet": {
+      "bytes": 950637,
+      "sha256": "ba0619a167ac97abc7caa218dec7dffba80d4a35377a86dd08a32eb46d41651c"
+    },
+    "results/multin_r_diagnostic/preoutcome_bundles.parquet": {
+      "bytes": 48561,
+      "sha256": "87488f5de87b1c6ac2189d653e45fa11d59642b73d15af354e402c5979f531d2"
+    },
+    "results/multin_r_diagnostic/replacement_signal_diagnostic.csv": {
+      "bytes": 9727,
+      "sha256": "cb802c712244fbcdca9f366a1df13b87ddf045467fcad0beeee20a13c07dd8a7"
+    },
+    "results/multin_r_diagnostic/settled_bundles.parquet": {
+      "bytes": 68224,
+      "sha256": "25408e113aa138a7c13de7bc1cc53e9064fc895e70a9572b044da35b5639d2d6"
+    },
+    "results/multin_r_diagnostic/source_receipt.json": {
+      "bytes": 894,
+      "sha256": "15df4c5b93a56879378be25693eff70d811b835698c098cc30e42180fbe45465"
+    },
+    "results/multin_r_diagnostic/support_attribution.parquet": {
+      "bytes": 86075,
+      "sha256": "b290c2e338e17c137f3b2661ea7d1f4efa2d7b823dd87b5e41119add41511681"
+    }
+  }
+}
