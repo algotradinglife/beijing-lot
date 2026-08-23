@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#345 paired-value selection cycle completed; fixed R3 remains frozen and no value selector improves the matched capital/risk frontier)**
+Updated: **2026-08-23 (#348 native multi-N R0 baselines completed; Phase B support-depth comparison follows under #349)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -258,8 +258,9 @@ PI interpretation and does not replace those edges or Project states.
 | 33 | [#340] within-issue dynamic QEU R | Closed / Done | M3 | Parent #202; native predecessor #338; not a #210 blocker | Eleven strictly-prior RF seeds learn a per-issue R from ranks/gaps/dispersion. The full policy is +CNY45,950/+27,788 vs R0, but 2023 learned decisions alone are CNY−2,080 vs R0 and the apparent gain comes from R3 cold start. It loses to fixed R3 by CNY−15,395/−39,024; ex-largest is also negative. `FIXED_R3_REMAINS_BEST` |
 | 34 | [#342] conservative value veto × fixed R3 | Closed / Done | M3 | Parent #202; native predecessor #340; not a #210 blocker | Exact #338 R0/R3 parity on 105 issues. 2023/2024 contain 342/371 and 420/462 point-positive leg challengers, but 0/833 pass the deliberately over-conservative paired-tail screen; `NO_INCREMENT`, fixed R3 unchanged |
 | 35 | [#345] paired value selection × fixed R3 | Closed / Done | M3 | Parent #202; no open blockers; not a #210 blocker | Same-issue 2022 paired SP-value errors replace #342's unfair marginal-tail comparison. All six predeclared selectors act, but none beats S0R3 in both years on raw and ex-largest lift. On 96 exact-all-cell common issues S0R3 ends at CNY232,211 with 17.46% max drawdown and 19 consecutive losing issues; `PAIR_L10R3` ends at CNY193,741 with 28.94% drawdown and 18 losses. `NO_INCREMENT`; preserve R3 and carry paired value only as a diagnostic/risk feature into the planned N3–N10 baseline scan |
-| 36 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 37 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 36 | [#348] native multi-N probability Top-2 R0 baselines | Closed / Done | M3 | Parent #202; native predecessor of #349; not a #210 blocker | Fixed CNY1,024/issue and ticket-level-once 0.65 establish N3–N10 centers. N3 is the smoothest (62.62% hit, −10.11% capital, 20.48% drawdown, 5-loss run); N7 is near break-even (+0.74%, 25.96% drawdown, 12-loss run). N9's +5.23% is dominated by one payout (52.08% share) and a 44-loss run; N10 collapses. These are risk baselines, not a raw-capital cross-N ranking |
+| 37 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 38 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -376,8 +377,9 @@ warning remains material and prevents candidate promotion.
 - No value selector advances the matched capital frontier. `S0R3` ends at
   CNY232,211 with 17.46% maximum drawdown and 19 consecutive losing issues.
   The closest stack, `PAIR_L10R3`, ends at CNY193,741 with 28.94% drawdown and
-  18 consecutive losses. It is CNY−38,471 raw versus S0R3, although ex-largest
-  lift is CNY+22,468; that reversal is a tail-shape clue, not a promotion.
+  18 consecutive losses. It is CNY−38,471 raw versus S0R3. The legacy
+  largest-absolute-paired-delta sensitivity is CNY+22,468, while literal
+  armwise ex-largest-payout lift is CNY−72,820; neither supports promotion.
 - `P70R3` lowers maximum drawdown to 13.54% and the longest losing run to 13,
   but terminal capital falls to CNY113,324. No selector dominates S0R3 jointly
   on capital, drawdown and losing runs.
@@ -881,6 +883,7 @@ retrospective feature.
 [#340]: https://github.com/algotradinglife/beijing-lot/issues/340
 [#342]: https://github.com/algotradinglife/beijing-lot/issues/342
 [#345]: https://github.com/algotradinglife/beijing-lot/issues/345
+[#348]: https://github.com/algotradinglife/beijing-lot/issues/348
 
 ---
 

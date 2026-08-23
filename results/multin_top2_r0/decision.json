@@ -1,0 +1,26 @@
+{
+  "changes_210_or_218": false,
+  "contract": "BJ-UNIFIED-MULTIN-R0-001/v1",
+  "evaluation_status": "EXPOSED_HISTORICAL",
+  "issue": 348,
+  "issue_stake_cny": 1024.0,
+  "n_values": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "payout_factor_application": "ticket_level_once",
+  "phase_b_authorized": true,
+  "phase_c_or_d_authorized": false,
+  "promotable_to_210": false,
+  "verdict": "BASELINES_ESTABLISHED",
+  "years": [
+    2023,
+    2024
+  ]
+}

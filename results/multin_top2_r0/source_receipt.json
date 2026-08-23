@@ -1,0 +1,19 @@
+{
+  "contract": "BJ-UNIFIED-MULTIN-R0-001/v1",
+  "feature_cells": 98295,
+  "frozen_bundles_sha256": "aefeb3c594ab8a70ab4c6bb023c21f1bfefcef36215e9a2161be21a4053ea424",
+  "horizon": "10h",
+  "issues": 119,
+  "match_surface_sha256": "88e7049d701604532488ca74e26c485f6011897cf75fc120e9c862e14505b4e8",
+  "matches": 32765,
+  "probability_path": "derived/bj238_divergence_materializer_v4r3/inference/relative_horizon_view.parquet",
+  "probability_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+  "proxy_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+  "settlement_path": "derived/beidan_xlsm/beidan_xlsm.sqlite",
+  "settlement_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "tickets_sha256": "5fe8d3b99c42a612d20f9b669bbfb2e0fbb87541d795d97f67d2fdf5f1c3fef2",
+  "years": [
+    2023,
+    2024
+  ]
+}

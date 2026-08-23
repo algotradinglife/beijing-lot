@@ -124,10 +124,10 @@ baseline improvement.
    denominator: `R3_UNDER_S0` adds CNY 140550, and
    its issue-bootstrap p05 is CNY 8697.
 2. `PAIR_L10` is the least damaging selector under R3, but it still loses CNY
-   38471 against `S0R3`. Removing each
-   arm's largest payout reverses that comparison to CNY
-   22468; this is a tail-shape
-   observation, not evidence of superior expected capital.
+   38471 against `S0R3`. The committed CNY +22468 sensitivity removes the one
+   issue with the largest absolute paired P&L delta; it is **not** an armwise
+   ex-largest-payout statistic. Removing each arm's own largest payout instead
+   gives CNY -72820. Both views confirm a tail-sensitive, non-promotable result.
 3. R3 still adds CNY 112227 inside `PAIR_L10`, while
    the selector×R3 interaction is CNY -28322 and
    its bootstrap interval crosses zero. Selection and outcome support therefore
