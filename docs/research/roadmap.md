@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#352 N3–N6 annual fixed-R diagnostic completed; #349 selections remain frozen)**
+Updated: **2026-08-24 (#355 low-N coverage selector settled; European-value proxy split into #358 → #359)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -227,6 +227,23 @@ PI interpretation and does not replace those edges or Project states.
      (Done; exposed N6 payoff signal is year-dependent; no R reselection)
              |
              v
+#354 strictly-prior low-N selector panel
+     (Done; 134,822 causal rows, transfer calibration frozen through 2021)
+             |
+             v
+#355 low-N fixed-Top2 coverage selector
+     (Done; logistic selection changes matches but does not improve both OOF
+     calibration scores; N4 financial clue is bootstrap-uncertain; no promotion)
+       |                         |
+       v                         v
+#358 causal 10h European      #359 coverage × value selector
+average-odds proxy (Ready)    (Ready; blocked by #355 and #358)
+       \_________________________/
+                    |
+                    v
+#356 selective third-outcome protection (Inbox; waits for #359)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -275,9 +292,12 @@ PI interpretation and does not replace those edges or Project states.
 | 38 | [#352] N3–N6 full-R annual diagnostic | Closed / Done | M3 | Parent #202; no dependency or routing changes | Complete 88-row N×R×period matrix preserves #349 construction and receipt. Every nonzero R reduces realized leg inclusion versus probability Top-2, but N6/R3 raises exposed capital by CNY27,265 in 2023 and CNY37,462 in 2024 while lowering hit rate, showing a payoff/tail rather than accuracy signal. Its 2022 lift is CNY−16,015. The inherited candidate gate was confirmed with 2023 labels, so all rows are conditional retrospective evidence, not chronology-clean; no pooled reselection and #349/#210/#218 remain unchanged |
 | 39 | [#354] strictly-prior low-N selector data | Closed / Done; chronology superseded | M1 | Parent #202; historical handoff to #355 | Post-merge EV found that latest-kickoff year routing shifted 62 issues and admitted future labels. Probability arithmetic remains descriptive, but the original annual/causal handoff is superseded by #360 |
 | 40 | [#360] low-N chronology and outcome-grain correction | Closed / Done | M1 | Parent #202; corrective blocker for #355/#358 | Registry-year routing, explicit 10h decision and conservative label-availability timestamps, issue-unit coverage and exact M×3 cells close all three #354 known errors. The corrected 132,408-fixture panel is the only authorized #355 input |
-| 41 | [#355] fixed-Top2 low-N match selector | Open / next after #360 | M3 | Parent #202; #360 correction must be merged first | Replay S0–S3 from scratch on the corrected panel; quarantine all pre-correction family/ROI observations |
-| 42 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 43 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 41 | [#355] fixed-Top2 low-N match selector | Closed / Done | M3 | Parent #202; #354/#360 closed; blocks #359/#356 | Corrected replay keeps S2 only by tiny OOF calibration gains. On 151 matched N4 issues its all-transfer lift is CNY+2,308, but annual lift reverses to CNY−7,683 in 2024, bootstrap p05 is negative, and matched drawdown/loss run worsens from 27.35%/8 to 27.69%/13. N3/N5 lifts are negative. `NO_PROMOTION`; preserve S0 and carry only the weak value clue into #358/#359 |
+| 42 | [#358] causal 10h European-average-odds value proxy | Open / Ready | M1 | Parent #202; #360 closed; blocks #359 | Build `EUROPEAN_AVERAGE_ODDS_PROXY` with timestamp/bookmaker/overround/devig/missingness receipts. It is an expected-return proxy, never official Beijing SP or an exact payout claim |
+| 43 | [#359] low-N coverage × European-value frontier | Open / Ready | M3 | Parent #202; blockedBy #355 and #358; blocks #356 | Compare S0, frozen #355 coverage-only, value-only and combined coverage/value selectors. Apply 0.65 once at complete-ticket expectation and keep outcome support fixed for attributable match-selection evidence |
+| 44 | [#356] selective third-outcome protection | Open / Inbox | M3 | Parent #202; blockedBy #355 and #359 | Test additive protection only after the match selector/value frontier is frozen, so match selection and outcome support remain separately attributable |
+| 45 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 46 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -409,6 +429,34 @@ warning remains material and prevents candidate promotion.
   compare N3–N10, each against its own probability Top-2/R3 baseline, before
   constructing a multi-N MoE. Report:
   [`Issue-Paired-Value-R3-N7.md`](Issue-Paired-Value-R3-N7.md).
+
+### #354/#355 low-N coverage-selector decision
+
+- #354 freezes a strictly temporal 10h panel with 134,822 fixture rows. The
+  2019–2021 expanding predictions see only earlier labels; the 2022–2024
+  transfer model and all prior-calibration features are frozen through 2021.
+  Annual Top-2 coverage remains close to 74–75%, so coverage reliability is a
+  legitimate model target, but the data package itself does not prove Edge.
+- #355 compares raw retained Top-2 mass, monotone calibration, logistic and
+  shallow HGB selectors while keeping q_eu Top-2/R0 support, full Cartesian
+  tickets, CNY1,024 per issue and ticket-level-once 0.65 fixed. Logistic wins
+  the predeclared log-loss ordering (0.570336 versus 0.570583 for raw mass) but
+  slightly loses on Brier (0.191271 versus 0.191257), so calibration evidence
+  is mixed.
+- On matched 2022–2024 issues, logistic selection lifts issue-hit rate by
+  +1.88pp/+0.64pp/+1.29pp for N3/N4/N5. The N4 capital result is the strongest
+  clue: matched stake ROI moves from −12.78% to approximately 0.00%, a
+  CNY20,555 lift. It is not robust enough to promote: the issue-bootstrap mean
+  lift p05 is CNY−65.79, and maximum drawdown/longest losing run worsen from
+  25.42%/9 to 27.96%/12 on the armwise full path.
+- Verdict: `NO_PROMOTION`, not “selection is useless.” Freeze raw-mass S0 as
+  the safe coverage baseline. Separate the missing return axis into #358 and
+  #359: causal 10h European average odds may proxy value only under the label
+  `EUROPEAN_AVERAGE_ODDS_PROXY`; it is not Beijing official SP or an exact
+  deployable payout calibration. #356 waits until that two-axis selector is
+  settled. #210 and #218 remain untouched.
+- Reports: [`Issue-354-LowN-Selector-Data.md`](Issue-354-LowN-Selector-Data.md)
+  and [`Issue-355-LowN-Match-Selector.md`](Issue-355-LowN-Match-Selector.md).
 
 ### #334 neural residual and value-anchor decision
 
@@ -903,6 +951,11 @@ retrospective feature.
 [#348]: https://github.com/algotradinglife/beijing-lot/issues/348
 [#349]: https://github.com/algotradinglife/beijing-lot/issues/349
 [#352]: https://github.com/algotradinglife/beijing-lot/issues/352
+[#354]: https://github.com/algotradinglife/beijing-lot/issues/354
+[#355]: https://github.com/algotradinglife/beijing-lot/issues/355
+[#356]: https://github.com/algotradinglife/beijing-lot/issues/356
+[#358]: https://github.com/algotradinglife/beijing-lot/issues/358
+[#359]: https://github.com/algotradinglife/beijing-lot/issues/359
 
 ---
 
