@@ -1,0 +1,18 @@
+{
+  "calibration_issues": 62,
+  "calibration_year": 2022,
+  "candidate_definition": "outside_retained_mass_top7",
+  "contract": "BJ-UNIFIED-PAIRED-VALUE-R3-N7-001/v1",
+  "each_issue_total_weight": 0.016129032258064516,
+  "fit_through_year": 2021,
+  "incumbent_definition": "retained_mass_top7",
+  "max_retained_mass_drop": 0.05,
+  "pair_calibration_frame_sha256": "3059a1cb9401d0f39f70a3e2533db6a9ccd524209d56d1ff708385ce6ee41e51",
+  "pair_rows": 32390,
+  "paired_residual_q10": -0.09096526489476606,
+  "probability_source_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+  "proxy_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+  "same_issue_pairs_only": true,
+  "settlement_source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "total_weight": 1.0
+}

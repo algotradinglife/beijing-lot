@@ -1,0 +1,11 @@
+{
+  "accepted_baseline_rows": 735,
+  "accepted_source_sha256": "7ec852166e3270b845dc6be36f306f4f9e95f5b379ad82edb7a87006a7774626",
+  "combined_rows": 32023,
+  "database_rows": 31995,
+  "database_source_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "evaluation_label_frame_sha256": "de7c7b77c9de647e35217230a95d7cbb5b3e165fe400e10c317fa28b548e3091",
+  "precedence": "accepted_338_baseline_then_current_sqlite_candidate_fill",
+  "trusted_overlap_conflicts": 0,
+  "trusted_overlap_rows": 707
+}

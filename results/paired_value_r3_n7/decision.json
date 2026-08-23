@@ -1,0 +1,58 @@
+{
+  "candidate_selectors": [],
+  "contract": "BJ-UNIFIED-PAIRED-VALUE-R3-N7-001/v1",
+  "historical_only": true,
+  "issue": 345,
+  "modifies_218": false,
+  "payout_factor_application": "ticket_level_once",
+  "promotable_to_210": false,
+  "proxy_grade": "RETROSPECTIVE_RELATIVE_PROXY",
+  "replacement_issues": 119,
+  "replacement_rows": 3201,
+  "selector_diagnostics": [
+    {
+      "action_fraction_of_frozen_issues": 1.0,
+      "action_issues": 119,
+      "ex_largest_lift_positive_both_years": false,
+      "raw_lift_positive_both_years": false,
+      "selector": "POINT"
+    },
+    {
+      "action_fraction_of_frozen_issues": 1.0,
+      "action_issues": 119,
+      "ex_largest_lift_positive_both_years": false,
+      "raw_lift_positive_both_years": false,
+      "selector": "P50"
+    },
+    {
+      "action_fraction_of_frozen_issues": 1.0,
+      "action_issues": 119,
+      "ex_largest_lift_positive_both_years": false,
+      "raw_lift_positive_both_years": false,
+      "selector": "P60"
+    },
+    {
+      "action_fraction_of_frozen_issues": 0.9915966386554622,
+      "action_issues": 118,
+      "ex_largest_lift_positive_both_years": false,
+      "raw_lift_positive_both_years": false,
+      "selector": "P70"
+    },
+    {
+      "action_fraction_of_frozen_issues": 0.9915966386554622,
+      "action_issues": 118,
+      "ex_largest_lift_positive_both_years": false,
+      "raw_lift_positive_both_years": false,
+      "selector": "P80"
+    },
+    {
+      "action_fraction_of_frozen_issues": 0.8403361344537815,
+      "action_issues": 100,
+      "ex_largest_lift_positive_both_years": false,
+      "raw_lift_positive_both_years": false,
+      "selector": "PAIR_L10"
+    }
+  ],
+  "tail_only_selectors": [],
+  "verdict": "NO_INCREMENT"
+}

@@ -1,0 +1,109 @@
+{
+  "contract": "BJ-UNIFIED-PAIRED-VALUE-R3-N7-001/v1",
+  "files": {
+    "docs/research/Issue-Paired-Value-R3-N7.md": {
+      "bytes": 16367,
+      "sha256": "fe16d92dba874f76fe53782c2d5a1160e171a72f06c6de4606be34940ed447fe"
+    },
+    "docs/research/figures/issue_345_paired_value_capital.png": {
+      "bytes": 163406,
+      "sha256": "a325e429ff745024cda7fcbc1c6ff7c0de6d71bf673c681efdd5affbe0728526"
+    },
+    "docs/research/figures/issue_345_paired_value_curve.png": {
+      "bytes": 77308,
+      "sha256": "4630b7b0b002860ce9fc846cdce3aa14a078adde077bd78f27659cc9c25dc900"
+    },
+    "notebooks/research/paired-value-r3-n7/paired_value_r3_n7.ipynb": {
+      "bytes": 375683,
+      "sha256": "eafcd0b8f2a2b7ae56342cefa7be801ad689a6da7596c129c4d7b499a7873357"
+    },
+    "results/paired_value_r3_n7/baseline_parity.json": {
+      "bytes": 239,
+      "sha256": "083c50a2fd06cbb188d52e16a0b6661c6131f2416cae268a7a3ef1de40b3c195"
+    },
+    "results/paired_value_r3_n7/capital_paths.csv": {
+      "bytes": 211602,
+      "sha256": "19d2392483de3297781079db089977313d006f78804993c2209524215d0acf2f"
+    },
+    "results/paired_value_r3_n7/contrasts.csv": {
+      "bytes": 12089,
+      "sha256": "46a1e95edd2f82f6370f0a960d956bbf7515b6d2f0a7df51b3d4bdec26cf2def"
+    },
+    "results/paired_value_r3_n7/decision.json": {
+      "bytes": 1738,
+      "sha256": "ba93381acae684f79fce770e76fb2f4d592e2f202ebe9f286d70691f240b70d7"
+    },
+    "results/paired_value_r3_n7/evaluation_labels.parquet": {
+      "bytes": 349149,
+      "sha256": "0fdf2f972817c55a13ff8fd4432058faaf0e3de6b8b37339faa449e3decce96f"
+    },
+    "results/paired_value_r3_n7/evaluation_sp_predictions.parquet": {
+      "bytes": 1164613,
+      "sha256": "5829be822d1a2f80db3b691b092eb406b627302c997668f5fafbaa02beb8642f"
+    },
+    "results/paired_value_r3_n7/freeze_receipt.json": {
+      "bytes": 1216,
+      "sha256": "b8f221ab9253b9736388941641b64a8e081e6c7d96444bbe6170256c2c1f350b"
+    },
+    "results/paired_value_r3_n7/issue_bundles.parquet": {
+      "bytes": 71241,
+      "sha256": "a48d018ef34d6765de25aa4fc67dd0e609b1f530a5f60feca318738c8a951ae6"
+    },
+    "results/paired_value_r3_n7/pair_calibration.parquet": {
+      "bytes": 1569292,
+      "sha256": "7ace9b2d10d31f86008193ec63e348516391581e9ebf0ee9afccb946ee382f84"
+    },
+    "results/paired_value_r3_n7/pair_calibration_receipt.json": {
+      "bytes": 804,
+      "sha256": "4b45e2cd2b0c7900cdcecd6ed94213ad14b683e97fecbb628b6c35300ad69be5"
+    },
+    "results/paired_value_r3_n7/pair_opportunities.parquet": {
+      "bytes": 3476026,
+      "sha256": "0a0b04b3b113b3bb9a7b8b26eb731a398d1b83c4131a8a6ce0fe44d38084f98c"
+    },
+    "results/paired_value_r3_n7/performance.csv": {
+      "bytes": 6972,
+      "sha256": "a21d48e3035a568957fa122d56cb26a52d2ea3032a4e119670ebf96d6dd5ed37"
+    },
+    "results/paired_value_r3_n7/preoutcome_bundles.parquet": {
+      "bytes": 78738,
+      "sha256": "a2c86540135cc61180e92de40db2a4e84db720599d9ef953bd731a5fce4e5e38"
+    },
+    "results/paired_value_r3_n7/replacement_ledger.parquet": {
+      "bytes": 104540,
+      "sha256": "e69b80a0ad34f26f8bb4039f429a5dc675b9a3b829c1ba604fe2fc0f2016e474"
+    },
+    "results/paired_value_r3_n7/risk_diagnostics.csv": {
+      "bytes": 4965,
+      "sha256": "e283adcecae819552da6b7aeddd94e649b0352d6e61f80b0cc9545b010ed385b"
+    },
+    "results/paired_value_r3_n7/settlement_coverage_ledger.csv": {
+      "bytes": 4717,
+      "sha256": "ca5e2b8893c72a2b53d3caa5710c3cfbe6549376cdea2a559f1cd62d2fa0509d"
+    },
+    "results/paired_value_r3_n7/settlement_source_receipt.json": {
+      "bytes": 524,
+      "sha256": "a77846f6dd4dd29216fbb9f5a569082f6dc336dc2c97a01206123f435b6865d2"
+    },
+    "results/paired_value_r3_n7/sp_calibration_residuals.parquet": {
+      "bytes": 576989,
+      "sha256": "e91f7b56939b4a461c56efacb680aec5e3942b123cd0c5099969f335497eb7cc"
+    },
+    "results/paired_value_r3_n7/sp_model_receipt.json": {
+      "bytes": 3656,
+      "sha256": "ef77ef11260690e003a27a9ffbfe822912bd0335adc6143cf2f49e84a948ff8c"
+    },
+    "results/paired_value_r3_n7/support_attribution.parquet": {
+      "bytes": 46599,
+      "sha256": "9ae71b14e66ea140e7ba22fe9bb0f58ee83a393812c3d8bb1becc5e8805eef2d"
+    },
+    "results/paired_value_r3_n7/tickets.parquet": {
+      "bytes": 140709,
+      "sha256": "ff8bf4b135770b4bef0fda19293d95c49f91e0c46c13031a7c261e8e5bfd9e4b"
+    },
+    "results/paired_value_r3_n7/value_surface.parquet": {
+      "bytes": 3055053,
+      "sha256": "3a64808eec957b2ee9a8ba7f943fbd52eabac5dfd052a0905bd2c375bcbcaac0"
+    }
+  }
+}
