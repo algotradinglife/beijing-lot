@@ -1,21 +1,23 @@
 {
-  "contract": "BJ-UNIFIED-LOWN-SELECTOR-DATA-001/v1",
+  "contract": "BJ-UNIFIED-LOWN-CHRONOLOGY-CORRECTION-001/v2",
   "files": {
-    "FREEZE_RECEIPT.json": "ee3596a65872a33fca1941101f9c9772ee9be4ccd44f6aa2da5e6b0650a8a0bb",
-    "SOURCE_RECEIPT.json": "4d95cdcfe0b52d556b852c5469a4f01f91b76b8f170390bb89c48dbe141b3b47",
-    "analysis/accepted_surface_parity.csv": "10fc25a8b5969cac3dd68edde754fd1ed567b204a35f5f01a7ec95d901b33c33",
-    "analysis/coverage.csv": "273dfb39b9977572c8ddf6c007acdfabae666b3f809b3cd0e4c88c6e2239a3de",
-    "analysis/field_dictionary.csv": "d465ef2a95a27c6c80b999b14d84e399f8f6541ac61b6fdac3e0a9839f688c3b",
-    "features/selector_features.parquet": "3fbb9f316ca7542c3310a0e6bf2cafb565b99d87b4c2d8feed9ffe789ddbf592",
-    "labels/selector_labels.parquet": "a94a87d875ecefef01c0a9671aed5013cb5cfa16950f2241ae30cba267f2afc0"
+    "FREEZE_RECEIPT.json": "8ce2dd0c75c124d727ef535ae472bd0ff9cfe113095afa2a56ae766464fd00a7",
+    "SOURCE_RECEIPT.json": "c10740f71cd9e10f7128400af86113c7566e95561d4f3ff59c53e2f71e5cd7ce",
+    "analysis/accepted_surface_comparison.csv": "3592b81cb79f14277b78cb8ec88731747d29aef41aecd3a660a7c84d6645e569",
+    "analysis/coverage.csv": "9010edb59504b97fae95c252765e8744769343817e87276d67916e4366acc3d6",
+    "analysis/field_dictionary.csv": "7d29f3deecef51bc1ae4eb3b99405a24eb4dc6d637f747ca8bcafe5b38aa1ce9",
+    "features/selector_cells.parquet": "c30e67d90146ac09ad2b6e0078a479942c8c0a15b05b9310e835455e3e177893",
+    "features/selector_features.parquet": "458eca1d98a38350017d58c16ccda33d05eda9d7f0e275f68ef4253fa539f1da",
+    "labels/selector_labels.parquet": "5e3298846ac3db56059f4d9f9d957caa13932625e7ed17c73294ff420cf3991e"
   },
   "implementation_files": {
-    "scripts/build_low_n_selector_data_notebook.py": "2219de555f3685bad6fe0d4bc097b60259d6d70b1f84582d3fd46de62076e27f",
-    "scripts/run_low_n_selector_data.py": "11348f49b38bfb0e1d4db7252a2af386da11ce72a974fdf8694afb413905deaa",
+    "scripts/build_low_n_selector_data_notebook.py": "2aa55cb602fc4e9875e0e9fd6fd9ad5192fe7a9aab91e3c07f1543922587d1aa",
+    "scripts/run_low_n_selector_data.py": "ee137f974db9a618192e367c2f7cc6f2e8620e254e4e866d9434bda646e3cf4c",
     "scripts/verify_low_n_selector_data.py": "9ed24cbc71ef13114db589b53b6d6b10b4e4b56f277c732f841c51911fdad325",
-    "src/divergence_materializer/data.py": "d748046b03e2e17d2de56229925c425698121d6bd1dc88e9bb27a1cc370a3884",
+    "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
     "src/low_n_selector_data/__init__.py": "23fe8d6f3894f94e7bcff3e7bfed6b6c412d149dc19bc0e975f5f6b4ca1e6395",
-    "src/low_n_selector_data/contract.py": "72088a31964f60cc31691053775efd614893d884d8f75dc5292ec0822239e617",
-    "src/low_n_selector_data/pipeline.py": "e91592bf830c8092d53b72516126810d928dd38600ab7ce242701aeeac2f49f4"
+    "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+    "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+    "tests/test_low_n_selector_data.py": "da361752eb20921e3e5fbda52a54effe1c186226b7c14e6755b4ef37914f32a1"
   }
 }

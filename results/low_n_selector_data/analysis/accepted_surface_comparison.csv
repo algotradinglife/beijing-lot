@@ -1,0 +1,2 @@
+years,compared_cells,max_abs_delta_vs_candidate_diagnostic,exact_cells_vs_candidate_diagnostic,nonzero_cells,nonzero_max_abs_delta_vs_candidate_diagnostic,nonzero_exact_cells_vs_candidate_diagnostic,max_abs_delta_vs_accepted_q_eu_bjline,exact_cells_vs_accepted_q_eu_bjline,interpretation
+2022-2024,145974,0.05262832670690307,0,58257,0.00881785705510596,0,0.00881785705510596,87717,chronology-corrected refit of the frozen architecture; deltas versus the accepted #238 surface are disclosed rather than claimed as parity because the accepted model used the superseded year routing
