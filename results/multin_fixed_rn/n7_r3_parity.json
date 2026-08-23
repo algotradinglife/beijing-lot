@@ -1,0 +1,7 @@
+{
+  "gross_parity": true,
+  "match_parity": true,
+  "pnl_parity": true,
+  "rows": 105,
+  "support_parity": true
+}

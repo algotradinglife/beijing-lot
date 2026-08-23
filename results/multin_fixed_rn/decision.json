@@ -1,0 +1,25 @@
+{
+  "changes_210_or_218": false,
+  "contract": "BJ-UNIFIED-MULTIN-RN-001/v1",
+  "evaluation_status": "EXPOSED_HISTORICAL_PRIMARY_AND_TRANSFER",
+  "issue": 349,
+  "n7_fixed_r": 3,
+  "n7_retuned": false,
+  "new_non_n7_stable_positive_n": [],
+  "phase_c_or_d_authorized": false,
+  "promotable_to_210": false,
+  "selected_r_by_n": {
+    "10": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 3,
+    "8": 0,
+    "9": 1
+  },
+  "stable_positive_n": [
+    7
+  ],
+  "verdict": "NO_NEW_NON_N7_FIXED_R_INCREMENT"
+}
