@@ -1,0 +1,4 @@
+n,full_cartesian_ticket_count,gross_expectation_formula,ticket_payout_factor,payout_factor_application,expected_payout_formula,selection_status
+3,8,product(selected_fixture.top2_expected_gross_factor),0.65,APPLY_ONCE_PER_WINNING_N_FOLD_TICKET,0.65 * product(selected_fixture.top2_expected_gross_factor),NO_SELECTOR_OR_ODDS_FILTER_APPLIED
+4,16,product(selected_fixture.top2_expected_gross_factor),0.65,APPLY_ONCE_PER_WINNING_N_FOLD_TICKET,0.65 * product(selected_fixture.top2_expected_gross_factor),NO_SELECTOR_OR_ODDS_FILTER_APPLIED
+5,32,product(selected_fixture.top2_expected_gross_factor),0.65,APPLY_ONCE_PER_WINNING_N_FOLD_TICKET,0.65 * product(selected_fixture.top2_expected_gross_factor),NO_SELECTOR_OR_ODDS_FILTER_APPLIED

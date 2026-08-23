@@ -1,0 +1,21 @@
+{
+  "cell_frame_sha256": "1f4661bef9d1511376bb932c4472fb05d24941e904133933222b9f8f3e3a2455",
+  "cell_rows": 404466,
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v1",
+  "fixture_rows": 134822,
+  "labels_opened": false,
+  "payout_65_semantics": "0.65_APPLIED_ONCE_PER_WINNING_N_FOLD_TICKET",
+  "raw_odds_filter": "NONE; ALL_VALID_BOOKMAKER_TRIPLETS_AVERAGED",
+  "selection_policy": "NONE; DATA_INGREDIENTS_ONLY",
+  "top2_policy": "INHERIT_FIXED_354_TOP2_SUPPORT_NO_REPLACEMENT",
+  "years": [
+    2017,
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ]
+}
