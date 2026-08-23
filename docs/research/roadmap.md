@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-23 (#342 conservative value-veto cycle completed; fixed R3 remains frozen and SP uncertainty blocks every hard-veto replacement)**
+Updated: **2026-08-23 (#345 paired-value selection cycle completed; fixed R3 remains frozen and no value selector improves the matched capital/risk frontier)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -210,6 +210,11 @@ PI interpretation and does not replace those edges or Project states.
      point-value clues remain descriptive, fixed R3 unchanged)
              |
              v
+#345 paired candidate-incumbent value selection × fixed R3
+     (Done; fair paired uncertainty produces actions but every selector loses
+     to S0R3 on the primary matched capital comparison; fixed R3 unchanged)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -252,8 +257,9 @@ PI interpretation and does not replace those edges or Project states.
 | 32 | [#338] QEU threshold activation on fixed N7 | Closed / Done | M3 | Parent #202; native predecessor #336; not a #210 blocker | All fourteen raw/z/dual candidates lose to R0 in 2023. The selected failed candidate `RAW_Q80` is CNY−12,899 vs R0 in 2023 and −24,916 in 2024. R3 remains materially stronger because it is issue-relative; no threshold replaces or unblocks #210 |
 | 33 | [#340] within-issue dynamic QEU R | Closed / Done | M3 | Parent #202; native predecessor #338; not a #210 blocker | Eleven strictly-prior RF seeds learn a per-issue R from ranks/gaps/dispersion. The full policy is +CNY45,950/+27,788 vs R0, but 2023 learned decisions alone are CNY−2,080 vs R0 and the apparent gain comes from R3 cold start. It loses to fixed R3 by CNY−15,395/−39,024; ex-largest is also negative. `FIXED_R3_REMAINS_BEST` |
 | 34 | [#342] conservative value veto × fixed R3 | Closed / Done | M3 | Parent #202; native predecessor #340; not a #210 blocker | Exact #338 R0/R3 parity on 105 issues. 2023/2024 contain 342/371 and 420/462 point-positive leg challengers, but 0/833 pass the deliberately over-conservative paired-tail screen; `NO_INCREMENT`, fixed R3 unchanged |
-| 35 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 36 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 35 | [#345] paired value selection × fixed R3 | Closed / Done | M3 | Parent #202; no open blockers; not a #210 blocker | Same-issue 2022 paired SP-value errors replace #342's unfair marginal-tail comparison. All six predeclared selectors act, but none beats S0R3 in both years on raw and ex-largest lift. On 96 exact-all-cell common issues S0R3 ends at CNY232,211 with 17.46% max drawdown and 19 consecutive losing issues; `PAIR_L10R3` ends at CNY193,741 with 28.94% drawdown and 18 losses. `NO_INCREMENT`; preserve R3 and carry paired value only as a diagnostic/risk feature into the planned N3–N10 baseline scan |
+| 36 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 37 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -356,6 +362,34 @@ warning remains material and prevents candidate promotion.
   causal experiment should model the paired `candidate - incumbent` difference,
   or use its probability as a relative/soft value weight. Report:
   [`Issue-342-Value-Veto-R3-N7.md`](Issue-342-Value-Veto-R3-N7.md).
+
+### #345 paired-value selection × fixed-R3 decision
+
+- The experiment implements the fair follow-up requested after #342: 2022
+  supplies an issue-balanced distribution of same-issue candidate-minus-
+  incumbent log-value error. Six frozen selectors (`POINT`, P50–P80 and
+  `PAIR_L10`) first replace matches one-for-one, then corrected R3 is recomputed
+  only inside the final seven matches.
+- The accepted #338 R0/R3 actions and gross settlement reproduce exactly on
+  the 96-issue all-cell common denominator. The original 105-issue baseline is
+  reported separately, so denominator shrink is not mislabeled as improvement.
+- No value selector advances the matched capital frontier. `S0R3` ends at
+  CNY232,211 with 17.46% maximum drawdown and 19 consecutive losing issues.
+  The closest stack, `PAIR_L10R3`, ends at CNY193,741 with 28.94% drawdown and
+  18 consecutive losses. It is CNY−38,471 raw versus S0R3, although ex-largest
+  lift is CNY+22,468; that reversal is a tail-shape clue, not a promotion.
+- `P70R3` lowers maximum drawdown to 13.54% and the longest losing run to 13,
+  but terminal capital falls to CNY113,324. No selector dominates S0R3 jointly
+  on capital, drawdown and losing runs.
+- R3 itself remains material: it adds CNY140,550 over S0R0 on the matched
+  denominator and its issue-bootstrap p05 is positive. Even inside `PAIR_L10`,
+  R3 adds CNY112,227. This confirms that value selection and outcome support
+  are interacting layers, not additive improvements.
+- Verdict: `NO_INCREMENT`. Freeze R3, do not change #210/#218, and do not tune
+  a replacement cap after outcomes. The next near-term historical cycle should
+  compare N3–N10, each against its own probability Top-2/R3 baseline, before
+  constructing a multi-N MoE. Report:
+  [`Issue-Paired-Value-R3-N7.md`](Issue-Paired-Value-R3-N7.md).
 
 ### #334 neural residual and value-anchor decision
 
@@ -845,6 +879,8 @@ retrospective feature.
 [#336]: https://github.com/algotradinglife/beijing-lot/issues/336
 [#338]: https://github.com/algotradinglife/beijing-lot/issues/338
 [#340]: https://github.com/algotradinglife/beijing-lot/issues/340
+[#342]: https://github.com/algotradinglife/beijing-lot/issues/342
+[#345]: https://github.com/algotradinglife/beijing-lot/issues/345
 
 ---
 
