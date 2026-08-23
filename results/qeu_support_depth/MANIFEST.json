@@ -23,8 +23,8 @@
   },
   "files": {
     "docs/research/Issue-QEU-Support-Depth.md": {
-      "bytes": 12032,
-      "sha256": "93a7c042e6aa865e71470da8b6c830911ceccba3483219814484bd15385877d5"
+      "bytes": 12025,
+      "sha256": "f9fa441e9f6cc1d5b3d04d97de97ba2a7143b776c38c0b25db521a2db15b4a20"
     },
     "docs/research/figures/issue_336_qeu_selected_capital.png": {
       "bytes": 102570,
@@ -36,7 +36,7 @@
     },
     "notebooks/research/qeu-support-depth/qeu_support_depth.ipynb": {
       "bytes": 54648,
-      "sha256": "da0623c5d36e2236809a23c8c0108cca10605d86b2dd9590954a14f1ab41f23b"
+      "sha256": "d64a4676c6e392e57b8d2c20c4b6193e0072d29c924ae576a016131ece157278"
     },
     "results/qeu_support_depth/baseline_parity.csv": {
       "bytes": 13514,
@@ -83,8 +83,8 @@
       "sha256": "c5b4b434435abd870f8f5850621302b4189e37c426675b9c20011649611658f8"
     },
     "results/qeu_support_depth/z100_diagnostic.csv": {
-      "bytes": 532,
-      "sha256": "cced744d8810df9e8b5654c8bd04499cd13159c2d5b2e36857cf1586d219c865"
+      "bytes": 525,
+      "sha256": "38e5cb9f7acf23190fc79538b51324cfdb210a77c837ae5714dd93ca0a415ad6"
     }
   },
   "source_receipt": {

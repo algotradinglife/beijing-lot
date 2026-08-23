@@ -410,7 +410,8 @@ def _z100_diagnostic(
     ].astype(str))
     usecols = [
         "policy_id", "issue", "year", "policy_status", "strongest_match_id",
-        "strongest_omitted_code", "strongest_abs_z",
+        "strongest_omitted_code", "strongest_abs_z", "inherited_b0_status",
+        "b0_direction_status",
     ]
     selections = pd.concat(
         [pd.read_csv(path, usecols=usecols) for path in part_paths], ignore_index=True
@@ -420,6 +421,8 @@ def _z100_diagnostic(
         selections["policy_id"].isin(comparison_ids)
         & selections["year"].isin(YEARS)
         & selections["policy_status"].eq("SELECTED_PREOUTCOME")
+        & selections["inherited_b0_status"].eq("SELECTED_PREOUTCOME")
+        & selections["b0_direction_status"].eq("AVAILABLE")
     ].copy()
     estimator = pd.read_csv(
         required[1], usecols=["match_id", "issue", "match_idx"],

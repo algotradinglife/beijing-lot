@@ -79,8 +79,8 @@ For each match, the incumbent support retains the two largest calibrated Europea
 
 | diagnostic | policies | action_rows | issues | actions_in_qeu_issue_support | actions_in_incumbent_n7 | exact_r1_action_overlaps | median_support_pressure_on_join | median_abs_delta_on_join | denominator_warning |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| other Z100/K1 policies | 90.0000 | 5076.0000 | 114.0000 | 5064.0000 | 1087.0000 | 128.0000 | 0.0732 | 0.0412 | #190 selects different matches/issues; overlap is diagnostic, not policy replication |
-| #190 positive representatives | 6.0000 | 684.0000 | 114.0000 | 684.0000 | 257.0000 | 40.0000 | 0.0689 | 0.0381 | #190 selects different matches/issues; overlap is diagnostic, not policy replication |
+| other Z100/K1 policies | 42.0000 | 547.0000 | 34.0000 | 547.0000 | 176.0000 | 43.0000 | 0.0421 | 0.0313 | #190 selects different matches/issues; overlap is diagnostic, not policy replication |
+| #190 positive representatives | 6.0000 | 153.0000 | 34.0000 | 153.0000 | 56.0000 | 13.0000 | 0.0538 | 0.0313 | #190 selects different matches/issues; overlap is diagnostic, not policy replication |
 
 The zero/low exact overlap is not a contradiction: #190 selects a different N7 match identity and deletes one code only on its strongest signal, whereas this experiment preserves #319 matches and changes Top-2 support on R pressure-ranked matches. They share the divergence hypothesis, not an execution identity.
 
