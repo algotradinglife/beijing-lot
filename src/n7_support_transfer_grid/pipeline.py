@@ -443,6 +443,9 @@ def evaluate_grid(bundles: pd.DataFrame) -> dict[str, pd.DataFrame]:
                     "scope": scope, "cell": cell, "contraction_count": int(group["contraction_count"].iloc[0]),
                     "expansion_count": int(group["expansion_count"].iloc[0]),
                     "issues": int(len(group)), "ticket_count_per_issue": int(group["ticket_count"].iloc[0]),
+                    "average_ticket_stake_cny": float(
+                        ISSUE_STAKE_CNY / group["ticket_count"].iloc[0]
+                    ),
                     "total_tickets": int(group["ticket_count"].sum()),
                     "ticket_hit_rate": float(group["ticket_hit"].sum() / group["ticket_count"].sum()),
                     "issue_gross_positive_rate": float(group["issue_gross_positive"].mean()),
@@ -925,6 +928,10 @@ def build_notebook_and_report(repo_root: Path, package: Path) -> None:
             "risk[risk.scope.eq('ALL')].merge(runs[runs.scope.eq('ALL')],on=['scope','cell'])"
         ),
         nbformat.v4.new_code_cell(
+            "annual_path=risk[risk.scope.ne('ALL')].merge("
+            "runs[runs.scope.ne('ALL')],on=['scope','cell'])\nannual_path"
+        ),
+        nbformat.v4.new_code_cell(
             "lift=pd.read_csv(OUT/'moving_block_lift_bootstrap.csv')\nlift[lift.scope.eq('ALL')]"
         ),
         nbformat.v4.new_code_cell(
@@ -969,6 +976,9 @@ def build_notebook_and_report(repo_root: Path, package: Path) -> None:
         all_runs, on=["scope", "cell"]
     )
     annual = perf[perf["scope"].ne("ALL")].pivot(index="cell", columns="scope", values="pnl_cny").reset_index()
+    annual_path = risk[risk["scope"].ne("ALL")].merge(
+        runs[runs["scope"].ne("ALL")], on=["scope", "cell"], validate="one_to_one"
+    )
 
     figure = repo_root / "docs/research/figures/issue_373_support_transfer_frontier.png"
     figure.parent.mkdir(parents=True, exist_ok=True)
@@ -1024,6 +1034,10 @@ Contract: `{CONTRACT_ID}`
 
 {_markdown_table(annual)}
 
+## Annual path and payout risk
+
+{_markdown_table(annual_path)}
+
 ## Priority hypothesis cells
 
 {_markdown_table(priority)}
@@ -1034,7 +1048,13 @@ Contract: `{CONTRACT_ID}`
 
 ## Moving-block path distributions
 
+### Full sample
+
 {_markdown_table(path_boot[path_boot['scope'].eq('ALL')])}
+
+### Annual
+
+{_markdown_table(path_boot[path_boot['scope'].ne('ALL')])}
 
 ## Rolling 20/30/50-issue behavior
 

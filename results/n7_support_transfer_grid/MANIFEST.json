@@ -1,9 +1,9 @@
 {
   "contract": "BJ-UNIFIED-N7-SUPPORT-TRANSFER-GRID-001/v1",
   "delivery": {
-    "docs/research/Issue-373-N7-Support-Transfer-Grid.md": "0cb564cab3e96a3e8d91534deddcf0a6ecb8e369551bddfda34da691a62eb56a",
+    "docs/research/Issue-373-N7-Support-Transfer-Grid.md": "7ac8ad6ee9dfbefe016549e9a94034adb6ff0640f368ffd3b2e348dcde96c238",
     "docs/research/figures/issue_373_support_transfer_frontier.png": "491ddee5092dd868200ec6f7947ba7d4c19512c75d93514c839f26bbf95c955c",
-    "notebooks/research/n7-support-transfer-grid/n7_support_transfer_grid.ipynb": "4bd4d1f2e58b0b3d573194926468f8671fc1fab4f4b2e75dafd6662122efc616"
+    "notebooks/research/n7-support-transfer-grid/n7_support_transfer_grid.ipynb": "a69b5a213c563c6c8cbaf0d7bed71c437b6b96f334fe4c98c401fd7f02dc3792"
   },
   "files": {
     "anchor_parity.parquet": {
@@ -63,12 +63,12 @@
       "sha256": "3d149b4a5aa51d083845dd93adac3e9a5937bfdf92ae1a817098d0f67ec5975f"
     },
     "pareto_frontier.csv": {
-      "bytes": 4535,
-      "sha256": "b7d24c96898103f627701a333764f0ba367a6219fa744dd3efe4a8dc97860ea4"
+      "bytes": 4742,
+      "sha256": "ee60a618fbfd9a5dfd338017a6a4c3c2f463da9bfe6c6f430224c714dd15bffc"
     },
     "performance.csv": {
-      "bytes": 12769,
-      "sha256": "dab3a28eee2cfc74226abaebdcbfeed662799ba6476ed5e949984272c2834294"
+      "bytes": 13522,
+      "sha256": "f4a61431c8258c812b6f23832c39ab4d33538432f5ff5e1efc3eeb130c0ccef8"
     },
     "risk_diagnostics.csv": {
       "bytes": 3558,
@@ -102,10 +102,10 @@
     "development_gate": "d5203e8f802c60d4d371ee62f621e24413a3b379b4638a368174ee514fdac3f3",
     "gate": "ac5f5ede14d3ab58de3bf8039dcf8bc7a9b0d615af75204d3def91fc076d6a35",
     "lift_bootstrap": "0a4ef5f435e24cae64d47943ab474b2fd3db2a6e11f20b83c289d33b52ef4c72",
-    "pareto": "8032ae64aa3d0e086efc538d5d7c395a49f223d6f91c5791a60fb26a0be7cb8e",
+    "pareto": "7700840c03bbd0d04df022581ac085e89c92d9ffe007ecfc08681781cc25376a",
     "path_bootstrap": "6725df81ef3ed825054e19e315eb0e09012149d5cd620c6cc3db24fc9b29abf5",
     "paths": "62649d7b177ee55b14584b13c4eacaaf8b21d768754e74ccb37a92d52f4aa081",
-    "performance": "0742ec2793390d3a5fa07010882bf394c2dc04658525f415b40337f0db93bfa7",
+    "performance": "8fab5b1e5c16361e821e53abfcdbe81a831187472af29a13a4f85bc690c5eed1",
     "risk": "b292b37e31f2571530a015d01d43c69017737134a3e8021b6d096ff939ebb1c6",
     "rolling": "610e184ac04a709a7813bad54c4c13dd0cdea017a52eee0588cee75343b0580f",
     "runs": "2ef77a65e0b3868a9007ef371dd16d0381ad3715937efbed7dccf2afbd52e966",
@@ -115,7 +115,7 @@
   },
   "implementation": {
     "contract.py": "2d6fe840ce5b6acd4ca4b64410ebdc25427834759ac73f0f8df28b1f65a646f3",
-    "pipeline.py": "547b9b4413ec7de6eaf1730c4e52f86a303d4dc891719514ef57b0baaf732f32",
+    "pipeline.py": "0a99bb5b447c89a740c252d3a50f3986ada5f259b45c103276a09fbf6b0acdeb",
     "src/n7_support_shape/contract.py": "00bc1cf7024084a8755c77f178acc3ecf77ff1c3ed986daf2ea331df56ea7cd6",
     "src/n7_support_shape/pipeline.py": "8a05ae4f95eff97af3e0844a28545736a854e1b1deeec65e3b310fc61715abc7"
   }
