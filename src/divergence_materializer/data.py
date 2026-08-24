@@ -37,17 +37,25 @@ def load_issue_roles(
     candidate_sqlite: Path,
     issue_registry_sqlite: Path,
 ) -> pd.DataFrame:
-    """Assign whole issues to temporal roles using source timestamps, never IDs."""
+    """Assign issue roles from the authoritative registry year.
+
+    Kickoff extrema remain descriptive timing fields.  They never override the
+    registry partition because an issue can legitimately span a year boundary.
+    """
 
     with _connect_read_only(candidate_sqlite) as connection:
         issues = pd.read_sql_query(
             """
             SELECT CAST(issue_code AS TEXT) AS issue_code,
                    COUNT(*) AS inventory_fixtures,
+                   MIN(CASE
+                         WHEN kickoff_ts >= '2013-01-01 00:00:00'
+                         THEN kickoff_ts
+                       END) AS issue_anchor_ts,
                    MAX(CASE
                          WHEN kickoff_ts >= '2013-01-01 00:00:00'
                          THEN kickoff_ts
-                       END) AS issue_anchor_ts
+                       END) AS issue_latest_kickoff_ts
             FROM inventory
             GROUP BY issue_code
             ORDER BY issue_code
@@ -72,13 +80,22 @@ def load_issue_roles(
     result["issue_anchor_ts"] = pd.to_datetime(
         result["issue_anchor_ts"], errors="coerce"
     )
-    anchor_year = result["issue_anchor_ts"].dt.year.astype("Int64")
+    result["issue_latest_kickoff_ts"] = pd.to_datetime(
+        result["issue_latest_kickoff_ts"], errors="coerce"
+    )
     registry_year = pd.to_numeric(result["registry_year"], errors="coerce").astype(
         "Int64"
     )
-    result["issue_year"] = anchor_year.fillna(registry_year)
+    fallback_year = result["issue_anchor_ts"].dt.year.astype("Int64")
+    result["issue_year"] = registry_year.fillna(fallback_year)
     result["issue_date_source"] = np.where(
-        anchor_year.notna(), "MAX_VALID_FIXTURE_KICKOFF", "SOURCE_ISSUE_REGISTRY_YEAR"
+        registry_year.notna(),
+        "SOURCE_ISSUE_REGISTRY_YEAR",
+        np.where(
+            fallback_year.notna(),
+            "FALLBACK_EARLIEST_VALID_KICKOFF_YEAR",
+            "MISSING_ISSUE_REGISTRY_YEAR",
+        ),
     )
 
     def role(year: object, anchor: object) -> str:
@@ -106,6 +123,7 @@ def load_issue_roles(
             "issue_code",
             "inventory_fixtures",
             "issue_anchor_ts",
+            "issue_latest_kickoff_ts",
             "issue_year",
             "issue_date_source",
             "temporal_role",

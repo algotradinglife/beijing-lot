@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sqlite3
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -8,9 +11,11 @@ from src.low_n_selector_data.pipeline import (
     _attach_prior_calibration,
     _attach_issue_relative,
     _fixture_features,
+    _cell_features,
     _mass_bin,
     stable_frame_sha,
 )
+from src.divergence_materializer.data import load_issue_roles
 
 
 def _predicted() -> pd.DataFrame:
@@ -20,7 +25,13 @@ def _predicted() -> pd.DataFrame:
                 "issue_code": "22001",
                 "issue_year": 2022,
                 "issue_anchor_ts": pd.Timestamp("2022-01-01", tz="UTC"),
+                "issue_latest_kickoff_ts": pd.Timestamp("2022-01-02", tz="UTC"),
                 "match_idx": 1,
+                "fixture_kickoff_ts": pd.Timestamp("2022-01-01 10:00", tz="UTC"),
+                "fixture_decision_ts": pd.Timestamp("2022-01-01", tz="UTC"),
+                "training_label_available_max_ts": pd.Timestamp(
+                    "2021-12-31", tz="UTC"
+                ),
                 "prediction_role": "FROZEN_THROUGH_2021_TRANSFER",
                 "train_year_max": 2021,
                 "native_handicap_line": 0,
@@ -28,7 +39,6 @@ def _predicted() -> pd.DataFrame:
                 "causal_grade": "RETROSPECTIVE_RELATIVE_PROXY",
                 "handicap_norm_source": "INTEGER_LINE",
                 "issue_date_source": "ISSUE_REGISTRY",
-                "temporal_role": "EXPOSED_TRANSFER",
                 "inventory_fixtures": 20,
                 "q_candidate_3": 0.5,
                 "q_candidate_1": 0.3,
@@ -57,6 +67,40 @@ def test_fixture_features_reject_non_simplex() -> None:
     broken.loc[0, "q_candidate_0"] = 0.3
     with pytest.raises(ContractError, match="normalized"):
         _fixture_features(broken)
+
+
+def test_long_form_cell_grain_is_exact_m_times_3() -> None:
+    features = _fixture_features(_predicted())
+    cells = _cell_features(features)
+    assert len(cells) == 3 * len(features)
+    assert not cells.duplicated(["issue", "match_idx", "outcome_code"]).any()
+    assert cells["in_baseline_support"].sum() == 2
+    assert cells["is_omitted"].sum() == 1
+
+
+def test_registry_year_cannot_be_overridden_by_late_kickoff(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate.sqlite"
+    registry = tmp_path / "registry.sqlite"
+    with sqlite3.connect(candidate) as connection:
+        connection.execute(
+            "CREATE TABLE inventory(issue_code TEXT, match_idx INTEGER, kickoff_ts TEXT)"
+        )
+        rows = [("x", 1, "2018-12-31 16:00:00"), ("x", 2, "2020-09-08 21:00:00")]
+        rows.extend(
+            (f"z{index:03d}", 1, "2019-01-01 12:00:00")
+            for index in range(807)
+        )
+        connection.executemany("INSERT INTO inventory VALUES (?,?,?)", rows)
+    with sqlite3.connect(registry) as connection:
+        connection.execute("CREATE TABLE issues(issue TEXT, year INTEGER)")
+        rows = [("x", 2019)] + [(f"z{index:03d}", 2019) for index in range(807)]
+        connection.executemany("INSERT INTO issues VALUES (?,?)", rows)
+    roles = load_issue_roles(candidate, registry)
+    row = roles[roles["issue_code"].eq("x")].iloc[0]
+    assert row["issue_year"] == 2019
+    assert row["issue_date_source"] == "SOURCE_ISSUE_REGISTRY_YEAR"
+    assert row["issue_anchor_ts"] == pd.Timestamp("2018-12-31 16:00:00")
+    assert row["issue_latest_kickoff_ts"] == pd.Timestamp("2020-09-08 21:00:00")
 
 
 def test_fixed_mass_bins_cover_boundaries() -> None:
@@ -98,6 +142,10 @@ def test_transfer_calibration_state_is_frozen_through_2021() -> None:
         row = base.copy()
         row["issue_year"] = year
         row["issue"] = issue
+        kickoff = pd.Timestamp(f"{year}-01-02 10:00", tz="UTC")
+        row["fixture_kickoff_ts"] = kickoff
+        row["fixture_decision_ts"] = kickoff - pd.Timedelta(hours=10)
+        row["issue_anchor_ts"] = kickoff - pd.Timedelta(hours=10)
         frames.append(row)
     features = pd.concat(frames, ignore_index=True)
     labels = features[["issue", "match_idx"]].copy()

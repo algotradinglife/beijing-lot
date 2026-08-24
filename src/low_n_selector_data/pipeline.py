@@ -40,6 +40,7 @@ from .contract import (
     ACCEPTED_238_RELATIVE,
     CALIBRATION_PRIOR_STRENGTH,
     CANDIDATE_SQLITE_RELATIVE,
+    CELL_KEY,
     CONTRACT_ID,
     FEATURE_KEY,
     HORIZON,
@@ -134,6 +135,28 @@ def _connect_read_only(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _fixture_timing(candidate_sqlite: Path) -> pd.DataFrame:
+    with _connect_read_only(candidate_sqlite) as connection:
+        timing = pd.read_sql_query(
+            """
+            SELECT CAST(issue_code AS TEXT) AS issue_code, match_idx, kickoff_ts
+            FROM inventory
+            ORDER BY issue_code, match_idx
+            """,
+            connection,
+        )
+    if timing.duplicated(["issue_code", "match_idx"]).any():
+        raise ContractError("fixture timing keys are not unique")
+    timing["fixture_kickoff_ts"] = pd.to_datetime(
+        timing.pop("kickoff_ts"), errors="coerce", utc=True
+    )
+    valid = timing["fixture_kickoff_ts"].ge(pd.Timestamp("2013-01-01", tz="UTC"))
+    timing.loc[~valid, "fixture_kickoff_ts"] = pd.NaT
+    timing["fixture_decision_ts"] = timing["fixture_kickoff_ts"] - pd.Timedelta(hours=10)
+    timing["label_available_ts"] = timing["fixture_kickoff_ts"] + pd.Timedelta(hours=4)
+    return timing
+
+
 def _model() -> Pipeline:
     numeric = [
         "q_eu_3",
@@ -218,17 +241,43 @@ def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str,
     proxy = data_root / PROXY_RELATIVE
     labels_path = data_root / LABEL_SQLITE_RELATIVE
     roles = load_issue_roles(candidate, registry)
+    if not roles["issue_date_source"].eq("SOURCE_ISSUE_REGISTRY_YEAR").all():
+        missing = roles.loc[
+            ~roles["issue_date_source"].eq("SOURCE_ISSUE_REGISTRY_YEAR"),
+            "issue_code",
+        ].tolist()
+        raise ContractError(f"selector chronology lacks registry years: {missing[:5]}")
     proxy_parts_sha256 = _verify_proxy_parts(proxy)
     panel = load_proxy_panel(proxy, roles, horizons=(HORIZON,))
     panel = panel[
         panel["snapshot_kind"].eq(HORIZON)
         & panel["issue_year"].isin((*WARMUP_YEARS, *PANEL_YEARS))
     ].copy()
+    timing = _fixture_timing(candidate)
+    panel = panel.merge(
+        timing,
+        on=["issue_code", "match_idx"],
+        how="left",
+        validate="one_to_one",
+    )
+    if panel[["fixture_kickoff_ts", "fixture_decision_ts", "label_available_ts"]].isna().any().any():
+        raise ContractError("supported proxy panel lacks valid fixture timing")
+    panel["issue_latest_kickoff_ts"] = pd.to_datetime(
+        panel["issue_latest_kickoff_ts"], utc=True
+    )
     supported_values = set(panel["native_line_supported"].dropna().unique().tolist())
     if panel["native_line_supported"].isna().any() or not supported_values.issubset(
         {True, False}
     ):
         raise ContractError("native_line_supported is not strict boolean")
+    supported_anchor = (
+        panel.loc[panel["native_line_supported"].eq(True)]
+        .groupby("issue_code", observed=True)["fixture_decision_ts"]
+        .min()
+    )
+    panel["issue_anchor_ts"] = panel["issue_code"].map(supported_anchor)
+    if panel.loc[panel["native_line_supported"].eq(True), "issue_anchor_ts"].isna().any():
+        raise ContractError("supported issue lacks a common 10h decision anchor")
     panel["issue_year"] = pd.to_numeric(panel["issue_year"], errors="raise").astype(int)
     development_issues = set(
         panel.loc[panel["issue_year"].le(max(OOF_YEARS)), "issue_code"].astype(str)
@@ -238,6 +287,7 @@ def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str,
     source_hashes = {
         "consumed_proxy_parts_receipt_sha256": proxy_parts_sha256,
         "consumed_issue_roles_sha256": stable_frame_sha(roles),
+        "consumed_fixture_timing_sha256": stable_frame_sha(timing),
         "consumed_development_labels_sha256": stable_frame_sha(labels),
         "accepted_238_probability_sha256": sha256_file(data_root / ACCEPTED_238_RELATIVE),
     }
@@ -267,10 +317,18 @@ def _predict_years(
     target_groups = [([year], year - 1) for year in OOF_YEARS]
     target_groups.append((list(TRANSFER_YEARS), max(OOF_YEARS)))
     for target_years, train_year_max in target_groups:
+        target = panel[
+            panel["issue_year"].isin(target_years)
+            & panel["native_line_supported"].eq(True)
+        ].copy()
+        if target.empty:
+            raise ContractError(f"no supported target rows for {target_years}")
+        target_decision_min = target["issue_anchor_ts"].min()
         train = development[
             development["issue_year"].le(train_year_max)
             & development["target_outcome"].notna()
             & development["native_line_supported"].eq(True)
+            & development["label_available_ts"].lt(target_decision_min)
         ].copy()
         if int(train["issue_year"].min()) > min(WARMUP_YEARS):
             raise ContractError("warm-up years escaped the training partition")
@@ -282,12 +340,9 @@ def _predict_years(
         control = _control_model()
         experimental.fit(train, train["target_outcome"].astype(str))
         control.fit(train, train["target_outcome"].astype(str))
-        target = panel[
-            panel["issue_year"].isin(target_years)
-            & panel["native_line_supported"].eq(True)
-        ].copy()
-        if target.empty:
-            raise ContractError(f"no supported target rows for {target_years}")
+        training_label_available_max = train["label_available_ts"].max()
+        if not training_label_available_max < target_decision_min:
+            raise ContractError("training label availability crosses target decision time")
         q_candidate = _ordered_probability(experimental, target)
         q_line = _ordered_probability(control, target)
         zero_line = target["native_handicap_line"].eq(0).to_numpy()
@@ -304,11 +359,16 @@ def _predict_years(
             "FROZEN_THROUGH_2021_TRANSFER",
         )
         target["train_year_max"] = train_year_max
+        target["training_label_available_max_ts"] = training_label_available_max
         predictions.append(target)
         receipt = _model_receipt(
             experimental,
             target_years=target_years,
             train_year_max=train_year_max,
+        )
+        receipt["target_decision_min_ts"] = target_decision_min.isoformat()
+        receipt["training_label_available_max_ts"] = (
+            training_label_available_max.isoformat()
         )
         receipt["control"] = _model_receipt(
             control,
@@ -321,6 +381,10 @@ def _predict_years(
         raise ContractError("prediction years are incomplete")
     if not (predicted["train_year_max"] < predicted["issue_year"]).all():
         raise ContractError("target year leaked into model training")
+    if not (
+        predicted["training_label_available_max_ts"] < predicted["fixture_decision_ts"]
+    ).all():
+        raise ContractError("future event label leaked into target prediction")
     return predicted, receipts
 
 
@@ -338,8 +402,15 @@ def _fixture_features(predicted: pd.DataFrame) -> pd.DataFrame:
             "issue": str(row.issue_code),
             "issue_year": int(row.issue_year),
             "issue_anchor_ts": pd.Timestamp(row.issue_anchor_ts),
+            "issue_latest_kickoff_ts": pd.Timestamp(row.issue_latest_kickoff_ts),
             "match_idx": int(row.match_idx),
+            "fixture_kickoff_ts": pd.Timestamp(row.fixture_kickoff_ts),
+            "fixture_decision_ts": pd.Timestamp(row.fixture_decision_ts),
+            "training_label_available_max_ts": pd.Timestamp(
+                row.training_label_available_max_ts
+            ),
             "prediction_role": str(row.prediction_role),
+            "selector_role": str(row.prediction_role),
             "train_year_max": int(row.train_year_max),
             "baseline_support": f"{top1}{top2}",
             "omitted_outcome": omitted,
@@ -357,7 +428,6 @@ def _fixture_features(predicted: pd.DataFrame) -> pd.DataFrame:
             "causal_grade": str(row.causal_grade),
             "handicap_norm_source": str(row.handicap_norm_source),
             "issue_date_source": str(row.issue_date_source),
-            "temporal_role": str(row.temporal_role),
             "inventory_fixtures": int(row.inventory_fixtures),
             "input_missing_count": int(
                 sum(
@@ -395,6 +465,48 @@ def _fixture_features(predicted: pd.DataFrame) -> pd.DataFrame:
         if not np.allclose(values.sum(axis=1), 1.0, rtol=0, atol=PROBABILITY_ATOL):
             raise ContractError(f"{prefix} probability triplets are not normalized")
     return features
+
+
+def _cell_features(features: pd.DataFrame) -> pd.DataFrame:
+    identity = [
+        "issue",
+        "issue_year",
+        "issue_anchor_ts",
+        "match_idx",
+        "fixture_kickoff_ts",
+        "fixture_decision_ts",
+        "prediction_role",
+        "selector_role",
+        "train_year_max",
+        "training_label_available_max_ts",
+        "baseline_support",
+        "omitted_outcome",
+        "native_handicap_line",
+        "n_available_books",
+        "causal_grade",
+        "handicap_norm_source",
+        "issue_date_source",
+    ]
+    rows: list[pd.DataFrame] = []
+    for outcome in OUTCOMES:
+        cell = features[identity].copy()
+        cell["outcome_code"] = outcome
+        cell["q_candidate"] = features[f"q_candidate_{outcome}"].to_numpy(float)
+        cell["q_raw_eu"] = features[f"q_raw_eu_{outcome}"].to_numpy(float)
+        cell["q_line"] = features[f"q_line_{outcome}"].to_numpy(float)
+        cell["divergence"] = features[f"divergence_{outcome}"].to_numpy(float)
+        cell["in_baseline_support"] = features["baseline_support"].str.contains(
+            outcome, regex=False
+        )
+        cell["is_omitted"] = features["omitted_outcome"].eq(outcome)
+        rows.append(cell)
+    cells = pd.concat(rows, ignore_index=True)
+    if cells.duplicated(list(CELL_KEY)).any() or len(cells) != 3 * len(features):
+        raise ContractError("long-form outcome cells violate exact M x 3 grain")
+    return cells.sort_values(
+        ["issue_year", "issue_anchor_ts", "issue", "match_idx", "outcome_code"],
+        kind="stable",
+    ).reset_index(drop=True)
 
 
 def _development_results(development: pd.DataFrame) -> pd.DataFrame:
@@ -479,10 +591,19 @@ def _attach_prior_calibration(features: pd.DataFrame, labels: pd.DataFrame) -> p
     )
     merged["mass_bin"] = _mass_bin(merged["retained_mass"])
     output: list[pd.DataFrame] = []
-    history = merged.iloc[0:0].copy()
     for year in PANEL_YEARS:
         current = merged[merged["issue_year"].eq(year)].copy()
-        available = history[history["label_available"].eq(True)].copy()
+        if current.empty:
+            continue
+        current_decision_min = current["issue_anchor_ts"].min()
+        available = merged[
+            merged["issue_year"].lt(year)
+            & merged["issue_year"].le(max(OOF_YEARS))
+            & merged["label_available"].eq(True)
+            & merged["fixture_kickoff_ts"].add(pd.Timedelta(hours=4)).lt(
+                current_decision_min
+            )
+        ].copy()
         current["calibration_history_max_year"] = (
             0 if available.empty else int(available["issue_year"].max())
         )
@@ -537,10 +658,6 @@ def _attach_prior_calibration(features: pd.DataFrame, labels: pd.DataFrame) -> p
                     columns=["group_count", "group_hits", "group_expected"]
                 )
         output.append(current)
-        if year <= max(OOF_YEARS):
-            history = pd.concat(
-                [history, merged[merged["issue_year"].eq(year)]], ignore_index=True
-            )
     result = pd.concat(output, ignore_index=True)
     result["calibration_history_max_year"] = result[
         "calibration_history_max_year"
@@ -580,10 +697,10 @@ def _attach_issue_relative(features: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-def _parity_with_accepted(data_root: Path, features: pd.DataFrame) -> pd.DataFrame:
+def _comparison_with_accepted(data_root: Path, features: pd.DataFrame) -> pd.DataFrame:
     accepted = pq.read_table(
         data_root / ACCEPTED_238_RELATIVE,
-        filters=[("snapshot_kind", "=", HORIZON), ("issue_year", "in", list(TRANSFER_YEARS))],
+        filters=[("snapshot_kind", "=", HORIZON)],
         columns=[
             "issue_code",
             "match_idx",
@@ -595,7 +712,10 @@ def _parity_with_accepted(data_root: Path, features: pd.DataFrame) -> pd.DataFra
         ],
     ).to_pandas()
     accepted = accepted[accepted["native_line_supported"].eq(True)].copy()
-    candidate = features[features["issue_year"].isin(TRANSFER_YEARS)].melt(
+    transfer_features = features[features["issue_year"].isin(TRANSFER_YEARS)]
+    transfer_issues = set(transfer_features["issue"].astype(str))
+    accepted = accepted[accepted["issue_code"].astype(str).isin(transfer_issues)].copy()
+    candidate = transfer_features.melt(
         id_vars=["issue", "match_idx"],
         value_vars=[f"q_candidate_{code}" for code in OUTCOMES],
         var_name="candidate_column",
@@ -636,9 +756,9 @@ def _parity_with_accepted(data_root: Path, features: pd.DataFrame) -> pd.DataFra
                 "max_abs_delta_vs_accepted_q_eu_bjline": float(accepted_delta.max()),
                 "exact_cells_vs_accepted_q_eu_bjline": int(accepted_delta.eq(0).sum()),
                 "interpretation": (
-                    "same frozen architecture refit through 2021; nonzero-line candidate "
-                    "diagnostic parity and full accepted-surface numeric parity are reported, "
-                    "without inheriting the outcome-confirmed mapping_accepted gate"
+                    "chronology-corrected refit of the frozen architecture; deltas versus the "
+                    "accepted #238 surface are disclosed rather than claimed as parity because "
+                    "the accepted model used the superseded year routing"
                 ),
             }
         ]
@@ -652,23 +772,50 @@ def _coverage(features: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
         how="left",
         validate="one_to_one",
     )
-    return (
+    summary = (
         merged.groupby(["issue_year", "prediction_role"], observed=True, sort=True)
         .agg(
             issues=("issue", "nunique"),
             fixtures=("match_idx", "size"),
-            median_fixtures_per_issue=("issue_fixture_count", "median"),
             label_available=("label_available", "sum"),
             mean_books=("n_available_books", "mean"),
             mean_retained_mass=("retained_mass", "mean"),
         )
         .reset_index()
     )
+    issue_sizes = (
+        merged.groupby(
+            ["issue_year", "prediction_role", "issue"], observed=True, sort=True
+        )["match_idx"]
+        .size()
+        .rename("fixtures_in_issue")
+        .reset_index()
+    )
+    medians = (
+        issue_sizes.groupby(["issue_year", "prediction_role"], observed=True)[
+            "fixtures_in_issue"
+        ]
+        .median()
+        .rename("median_fixtures_per_issue")
+        .reset_index()
+    )
+    return summary.merge(
+        medians,
+        on=["issue_year", "prediction_role"],
+        how="left",
+        validate="one_to_one",
+    )
 
 
-def _field_dictionary(features: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
+def _field_dictionary(
+    features: pd.DataFrame, cells: pd.DataFrame, labels: pd.DataFrame
+) -> pd.DataFrame:
     rows: list[dict[str, str]] = []
-    for artifact, frame in (("features", features), ("labels", labels)):
+    for artifact, frame in (
+        ("features", features),
+        ("cells", cells),
+        ("labels", labels),
+    ):
         for column in frame.columns:
             rows.append(
                 {
@@ -692,6 +839,7 @@ def _implementation_hashes(repo_root: Path) -> dict[str, str]:
         repo_root / "scripts/run_low_n_selector_data.py",
         repo_root / "scripts/verify_low_n_selector_data.py",
         repo_root / "scripts/build_low_n_selector_data_notebook.py",
+        repo_root / "tests/test_low_n_selector_data.py",
     ]
     return {str(path.relative_to(repo_root)): sha256_file(path) for path in paths}
 
@@ -700,6 +848,7 @@ def _scientific_frames(repo_root: Path, data_root: Path) -> dict[str, Any]:
     panel, development, source_hashes = _input_panel(data_root)
     predicted, model_receipts = _predict_years(panel, development)
     features = _fixture_features(predicted)
+    cells = _cell_features(features)
     development_results = _development_results(development)
     development_labels = _label_frame(features, development_results)
     features = _attach_prior_calibration(features, development_labels)
@@ -711,8 +860,8 @@ def _scientific_frames(repo_root: Path, data_root: Path) -> dict[str, Any]:
         pd.concat([development_results, transfer_results], ignore_index=True),
     )
     coverage = _coverage(features, labels)
-    parity = _parity_with_accepted(data_root, features)
-    dictionary = _field_dictionary(features, labels)
+    comparison = _comparison_with_accepted(data_root, features)
+    dictionary = _field_dictionary(features, cells, labels)
     freeze_receipt = {
         "contract": CONTRACT_ID,
         "primary_horizon": HORIZON,
@@ -724,15 +873,18 @@ def _scientific_frames(repo_root: Path, data_root: Path) -> dict[str, Any]:
         "model_selection_outcomes_allowed_through": 2021,
         "feature_frame_sha256": preoutcome_feature_hash,
         "feature_rows": int(len(features)),
+        "cell_frame_sha256": stable_frame_sha(cells),
+        "cell_rows": int(len(cells)),
         "label_frame_sha256": stable_frame_sha(labels),
         "label_rows": int(len(labels)),
         "model_receipts": model_receipts,
     }
     return {
         "features": features,
+        "cells": cells,
         "labels": labels,
         "coverage": coverage,
-        "parity": parity,
+        "comparison": comparison,
         "dictionary": dictionary,
         "source_receipt": {
             "contract": CONTRACT_ID,
@@ -757,9 +909,13 @@ def build_package(
 
     def populate(staging: Path) -> None:
         atomic_write_parquet(frames["features"], staging / "features" / "selector_features.parquet")
+        atomic_write_parquet(frames["cells"], staging / "features" / "selector_cells.parquet")
         atomic_write_parquet(frames["labels"], staging / "labels" / "selector_labels.parquet")
         atomic_write_csv(frames["coverage"], staging / "analysis" / "coverage.csv")
-        atomic_write_csv(frames["parity"], staging / "analysis" / "accepted_surface_parity.csv")
+        atomic_write_csv(
+            frames["comparison"],
+            staging / "analysis" / "accepted_surface_comparison.csv",
+        )
         atomic_write_csv(frames["dictionary"], staging / "analysis" / "field_dictionary.csv")
         atomic_write_json(staging / "SOURCE_RECEIPT.json", frames["source_receipt"])
         atomic_write_json(staging / "FREEZE_RECEIPT.json", frames["freeze_receipt"])
@@ -789,22 +945,27 @@ def _verify_delivery_artifacts(
     repo_root: Path,
     *,
     feature_hash: str,
+    cell_hash: str,
     label_hash: str,
 ) -> bool:
-    report = repo_root / "docs/research/Issue-354-LowN-Selector-Data.md"
+    report = repo_root / "docs/research/Issue-360-LowN-Chronology-Correction.md"
     notebook_path = (
         repo_root
         / "notebooks/research/low-n-selector-data/low_n_selector_data_profile.ipynb"
     )
     figures = (
-        repo_root / "docs/research/figures/issue_354_top2_calibration.png",
-        repo_root / "docs/research/figures/issue_354_panel_profile.png",
+        repo_root / "docs/research/figures/issue_360_top2_calibration.png",
+        repo_root / "docs/research/figures/issue_360_panel_profile.png",
     )
     required = (report, notebook_path, *figures)
     if any(not path.is_file() or path.stat().st_size == 0 for path in required):
         raise AssertionError("required report, notebook or figure is missing")
     report_text = report.read_text(encoding="utf-8")
-    if feature_hash not in report_text or label_hash not in report_text:
+    if (
+        feature_hash not in report_text
+        or cell_hash not in report_text
+        or label_hash not in report_text
+    ):
         raise AssertionError("decision report is not bound to the frozen data frames")
     notebook = _read_json(notebook_path)
     code_cells = [cell for cell in notebook.get("cells", []) if cell.get("cell_type") == "code"]
@@ -822,6 +983,56 @@ def _verify_delivery_artifacts(
     return True
 
 
+def _independent_temporal_oracle(data_root: Path, features: pd.DataFrame) -> bool:
+    with _connect_read_only(data_root / ISSUE_REGISTRY_RELATIVE) as connection:
+        registry = pd.read_sql_query(
+            "SELECT CAST(issue AS TEXT) AS issue, year AS registry_year FROM issues",
+            connection,
+        )
+    with _connect_read_only(data_root / CANDIDATE_SQLITE_RELATIVE) as connection:
+        timing = pd.read_sql_query(
+            """
+            SELECT CAST(issue_code AS TEXT) AS issue, match_idx, kickoff_ts
+            FROM inventory
+            ORDER BY issue_code, match_idx
+            """,
+            connection,
+        )
+    registry = registry.drop_duplicates("issue")
+    timing = timing.drop_duplicates(["issue", "match_idx"])
+    timing["oracle_kickoff_ts"] = pd.to_datetime(
+        timing.pop("kickoff_ts"), errors="coerce", utc=True
+    )
+    valid = timing["oracle_kickoff_ts"].ge(pd.Timestamp("2013-01-01", tz="UTC"))
+    timing.loc[~valid, "oracle_kickoff_ts"] = pd.NaT
+    timing["oracle_decision_ts"] = timing["oracle_kickoff_ts"] - pd.Timedelta(
+        hours=10
+    )
+    oracle = features.merge(registry, on="issue", how="left", validate="many_to_one")
+    oracle = oracle.merge(
+        timing,
+        on=["issue", "match_idx"],
+        how="left",
+        validate="one_to_one",
+    )
+    oracle["oracle_issue_anchor_ts"] = oracle.groupby("issue", observed=True)[
+        "oracle_decision_ts"
+    ].transform("min")
+    return bool(
+        oracle["registry_year"].notna().all()
+        and oracle["oracle_kickoff_ts"].notna().all()
+        and oracle["issue_year"].eq(oracle["registry_year"].astype(int)).all()
+        and oracle["fixture_kickoff_ts"].eq(oracle["oracle_kickoff_ts"]).all()
+        and oracle["fixture_decision_ts"].eq(oracle["oracle_decision_ts"]).all()
+        and oracle["issue_anchor_ts"].eq(oracle["oracle_issue_anchor_ts"]).all()
+        and (oracle["train_year_max"] < oracle["issue_year"]).all()
+        and (
+            oracle["training_label_available_max_ts"]
+            < oracle["fixture_decision_ts"]
+        ).all()
+    )
+
+
 def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | None = None) -> dict[str, bool]:
     repo_root = Path(repo_root).resolve()
     target = Path(target).resolve()
@@ -833,9 +1044,10 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     required_files = {
         "FREEZE_RECEIPT.json",
         "SOURCE_RECEIPT.json",
-        "analysis/accepted_surface_parity.csv",
+        "analysis/accepted_surface_comparison.csv",
         "analysis/coverage.csv",
         "analysis/field_dictionary.csv",
+        "features/selector_cells.parquet",
         "features/selector_features.parquet",
         "labels/selector_labels.parquet",
     }
@@ -867,14 +1079,18 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     if not source_bound:
         raise AssertionError("canonical source hashes changed")
     features = pq.read_table(target / "features/selector_features.parquet").to_pandas()
+    cells = pq.read_table(target / "features/selector_cells.parquet").to_pandas()
     labels = pq.read_table(target / "labels/selector_labels.parquet").to_pandas()
     freeze = _read_json(target / "FREEZE_RECEIPT.json")
     feature_hash = stable_frame_sha(features)
+    cell_hash = stable_frame_sha(cells)
     label_hash = stable_frame_sha(labels)
     semantic_hashes = (
         freeze.get("feature_frame_sha256") == feature_hash
+        and freeze.get("cell_frame_sha256") == cell_hash
         and freeze.get("label_frame_sha256") == label_hash
         and feature_hash == current["freeze_receipt"]["feature_frame_sha256"]
+        and cell_hash == current["freeze_receipt"]["cell_frame_sha256"]
         and label_hash == current["freeze_receipt"]["label_frame_sha256"]
     )
     if not semantic_hashes:
@@ -882,6 +1098,7 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     delivery = _verify_delivery_artifacts(
         repo_root,
         feature_hash=feature_hash,
+        cell_hash=cell_hash,
         label_hash=label_hash,
     )
     temporal = bool(
@@ -902,6 +1119,9 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     )
     if not temporal:
         raise AssertionError("temporal contract failed")
+    independent_temporal = _independent_temporal_oracle(data_root, features)
+    if not independent_temporal:
+        raise AssertionError("independent registry/time oracle failed")
     label_separation = not any(
         column in features.columns
         for column in ("result_code", "top2_hit", "winning_sp", "settlement_sp")
@@ -915,6 +1135,7 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
         "semantic_frame_replay": semantic_hashes,
         "delivery_artifacts": delivery,
         "strict_temporal_lineage": temporal,
+        "independent_registry_time_oracle": independent_temporal,
         "label_separation": label_separation,
         "probability_simplex": True,
     }

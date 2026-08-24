@@ -1,0 +1,101 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-MATCH-SELECTOR-001/v1",
+  "files": {
+    "docs/research/Issue-355-LowN-Match-Selector.md": {
+      "bytes": 12224,
+      "sha256": "303bb54a542188488496910842739e0ab1d4ee40eea8f4963d635f9352abb65f"
+    },
+    "docs/research/figures/issue_355_low_n_capital.png": {
+      "bytes": 159151,
+      "sha256": "397943e65e8cd73244d99b99ee69e30f559247dd7b2a3c57cfd78ced1f6bad1e"
+    },
+    "docs/research/figures/issue_355_selector_models.png": {
+      "bytes": 58518,
+      "sha256": "0db6cc60e9c4c8716c5f4fd002edca8db4e7d8ca1acbf3783f9817f5ec1f985c"
+    },
+    "notebooks/research/low-n-match-selector/low_n_match_selector.ipynb": {
+      "bytes": 73982,
+      "sha256": "d969dd267c227fb97343d681b2d696697174e336ebff3af530786117b991363f"
+    },
+    "results/low_n_match_selector/capital_paths.csv": {
+      "bytes": 242556,
+      "sha256": "ea677d5d826cd2fad7b1d506300299561f939d49173040b8d364b8c47b2eb855"
+    },
+    "results/low_n_match_selector/decision.json": {
+      "bytes": 484,
+      "sha256": "7e727a2eda34b5818717c6cb2ddcb43503121e37bdd04432cc8fc97047f46812"
+    },
+    "results/low_n_match_selector/development_oof_predictions.parquet": {
+      "bytes": 1444542,
+      "sha256": "8112b5c460b411fc96d9df4f9c849dec795df8c34601dc8fb79f841bf5f43e5e"
+    },
+    "results/low_n_match_selector/fixture_selection_attribution.parquet": {
+      "bytes": 5468481,
+      "sha256": "3dac62d2a42705f74ab6c5e3bacca4b6a81ee6794ead5be7ef1bae934f82980a"
+    },
+    "results/low_n_match_selector/freeze_receipt.json": {
+      "bytes": 5114,
+      "sha256": "e49a269148e351167036fb8447008c5d89767742b7fd18a5f6bff01a267ba3d3"
+    },
+    "results/low_n_match_selector/issue_bundles.parquet": {
+      "bytes": 78933,
+      "sha256": "5931041aecd14ffb2035e68f6e7af9d8d484c20649b9865fcdcc8289f2db859c"
+    },
+    "results/low_n_match_selector/matched_contrasts.csv": {
+      "bytes": 8127,
+      "sha256": "b83f4cd6a94abbb0f9ae557bd1f7842ecb43cdb380a18b986a4389a6d034a340"
+    },
+    "results/low_n_match_selector/model_diagnostics.csv": {
+      "bytes": 502,
+      "sha256": "ec7de70e93da8889822e39e843eff21f6c6eb8d85c69de9e71bd3d603655ce92"
+    },
+    "results/low_n_match_selector/performance.csv": {
+      "bytes": 9319,
+      "sha256": "a4a51b6183f9fe7cb70a83f5a71aba02e0f180ef8dfdf4ce7b05b611295a59ff"
+    },
+    "results/low_n_match_selector/preoutcome_bundles.parquet": {
+      "bytes": 58137,
+      "sha256": "53eb5c4500f6d1c6d1a7e925aa0115564503f50df1efe32a022d8455c9847a0e"
+    },
+    "results/low_n_match_selector/risk_diagnostics.csv": {
+      "bytes": 3316,
+      "sha256": "7a4021318223e68ebe68da5e721064bf9fb7d2f67251010f72508eb03bdabd5c"
+    },
+    "results/low_n_match_selector/score_surface.parquet": {
+      "bytes": 3094541,
+      "sha256": "40a5ce501169ad51f400d2f022f70ae346fca1c9c3a721b1a53b7cae45a23629"
+    },
+    "results/low_n_match_selector/selection_hit_contrasts.csv": {
+      "bytes": 1772,
+      "sha256": "6b664bce84351ec8ac06ffedf62001e04e18497fa7ed4a427ac7d70145716585"
+    },
+    "results/low_n_match_selector/selection_overlap.csv": {
+      "bytes": 27977,
+      "sha256": "d4661b714089bc3449c608286765f5102e30825d8ffa82aeaf1dd2577021d927"
+    },
+    "results/low_n_match_selector/selection_summary.csv": {
+      "bytes": 4106,
+      "sha256": "0bbd8d94e6f41db21f8eba35252da6fcde95c5bff2f0137c660cce3349fb8627"
+    },
+    "results/low_n_match_selector/selections.parquet": {
+      "bytes": 89475,
+      "sha256": "0a9988fd7a3c9ba1303bb1f265f1f600af92390502270482e7c8477399c49eab"
+    },
+    "results/low_n_match_selector/source_receipt.json": {
+      "bytes": 1173,
+      "sha256": "3571c026602c272ecbefa3740bb7bfec47d1ff873a84a705bacb4c507e1aff22"
+    },
+    "results/low_n_match_selector/support_attribution.parquet": {
+      "bytes": 52306,
+      "sha256": "e34afae6612fee8bdf6ddaeec982ca4c7acd7cdd50240cc6d95e571eb6c0b54e"
+    },
+    "results/low_n_match_selector/tickets.parquet": {
+      "bytes": 296608,
+      "sha256": "09f3787c511cd79b0b0401173c909b23a59d5102abbecbef802a3453e576be34"
+    },
+    "results/low_n_match_selector/transfer_predictions.parquet": {
+      "bytes": 510132,
+      "sha256": "2432b1e5f33ba9a003b007a1a59e36ae82c25ef5c32e2e26ead7f62c24227137"
+    }
+  }
+}

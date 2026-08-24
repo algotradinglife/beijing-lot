@@ -1,0 +1,13 @@
+{
+  "changes_210_or_218": false,
+  "contract": "BJ-UNIFIED-LOWN-MATCH-SELECTOR-001/v1",
+  "development_n_with_positive_hit_lift": 2,
+  "improved_oof_calibration_vs_s0": true,
+  "issue": 355,
+  "no_catastrophic_transfer_reversal": false,
+  "production_or_holdout_authorized": false,
+  "real_selection_changes": true,
+  "selected_family": "S2_LOGISTIC",
+  "transfer_reversal_definition": "no N has negative paired hit lift in 2 or more of 2022/2023/2024",
+  "verdict": "NO_PROMOTION"
+}

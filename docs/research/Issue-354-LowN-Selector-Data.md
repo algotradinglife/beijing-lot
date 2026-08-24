@@ -1,5 +1,12 @@
 # Issue #354 — Strictly-prior low-N Top-2 selector data
 
+> **Superseded chronology:** the post-merge EV audit found that this version
+> used an issue's latest kickoff to derive its year, allowing future-label
+> influence for cross-year issues.  Issue #360 rebuilds the panel using the
+> authoritative registry year, explicit decision/label timestamps and exact
+> M×3 outcome grain.  Do not use the hashes or annual routing below for new
+> selector work; consume the #360 package instead.
+
 ## Decision summary
 
 The data prerequisite for low-N match-selection research is ready. The package

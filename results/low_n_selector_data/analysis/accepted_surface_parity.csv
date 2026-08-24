@@ -1,2 +1,0 @@
-years,compared_cells,max_abs_delta_vs_candidate_diagnostic,exact_cells_vs_candidate_diagnostic,nonzero_cells,nonzero_max_abs_delta_vs_candidate_diagnostic,nonzero_exact_cells_vs_candidate_diagnostic,max_abs_delta_vs_accepted_q_eu_bjline,exact_cells_vs_accepted_q_eu_bjline,interpretation
-2022-2024,155751,0.05262832670690307,62259,62259,0.0,62259,0.0,155751,"same frozen architecture refit through 2021; nonzero-line candidate diagnostic parity and full accepted-surface numeric parity are reported, without inheriting the outcome-confirmed mapping_accepted gate"
