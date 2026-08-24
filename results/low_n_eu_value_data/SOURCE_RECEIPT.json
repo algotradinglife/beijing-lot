@@ -1,9 +1,9 @@
 {
   "candidate_sqlite_sha256": "a51bdca8f3b0ef20a31ef606399daea82760a5230a8fc844ea5917178f1078d4",
-  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v1",
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v2",
   "input_horizon": "10h",
   "labels_opened": false,
-  "selector_feature_sha256": "3fbb9f316ca7542c3310a0e6bf2cafb565b99d87b4c2d8feed9ffe789ddbf592",
-  "selector_freeze_receipt_sha256": "ee3596a65872a33fca1941101f9c9772ee9be4ccd44f6aa2da5e6b0650a8a0bb",
+  "selector_feature_sha256": "458eca1d98a38350017d58c16ccda33d05eda9d7f0e275f68ef4253fa539f1da",
+  "selector_freeze_receipt_sha256": "8ce2dd0c75c124d727ef535ae472bd0ff9cfe113095afa2a56ae766464fd00a7",
   "source_time_semantics": "RELATIVE_HORIZON_LABEL_NO_OBSERVED_TIMESTAMP"
 }

@@ -1,8 +1,8 @@
 """Causal 10h European-average-odds value inputs for Issue #358.
 
 The panel retains raw European bookmaker consensus as a retrospective 10h
-proxy and joins it to #354's strictly-prior calibrated probability surface.
-It never opens #354's physically separate settlement labels.
+proxy and joins it to the #360-corrected strictly-prior calibrated probability
+surface.  It never opens the physically separate settlement labels.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from src.source_schema.publication import (
     atomic_write_parquet,
 )
 
-CONTRACT_ID = "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v1"
+CONTRACT_ID = "BJ-UNIFIED-LOWN-EU-VALUE-DATA-001/v2"
 OUTCOMES = ("3", "1", "0")
 OUTCOME_ORDER = {outcome: index for index, outcome in enumerate(OUTCOMES)}
 HORIZON = "10h"
@@ -142,7 +142,7 @@ def _require_columns(frame: pd.DataFrame, columns: set[str], name: str) -> None:
 
 
 def build_value_cells(selector_features: pd.DataFrame, odds: pd.DataFrame) -> pd.DataFrame:
-    """Join #354 calibration to raw 10h average odds and derive no-label value cells."""
+    """Join #360-corrected calibration to 10h odds and derive no-label value cells."""
 
     selector_required = {
         "issue", "issue_year", "issue_anchor_ts", "match_idx", "baseline_support",
@@ -169,18 +169,18 @@ def build_value_cells(selector_features: pd.DataFrame, odds: pd.DataFrame) -> pd
         raise ContractError("raw odds aggregate keys are not unique")
     merged = features.merge(source, on=["issue", "match_idx"], how="left", validate="one_to_one")
     if merged["contributing_bookmaker_count"].isna().any():
-        raise ContractError("#354 selector feature escaped the 10h raw-odds source")
+        raise ContractError("#360-corrected selector feature escaped the 10h raw-odds source")
     merged["contributing_bookmaker_count"] = merged["contributing_bookmaker_count"].astype(int)
     if not merged["contributing_bookmaker_count"].eq(merged["n_available_books"].astype(int)).all():
-        raise ContractError("raw bookmaker count does not match #354 contributing bookmaker count")
+        raise ContractError("raw bookmaker count does not match corrected selector bookmaker count")
     records: list[dict[str, object]] = []
     for row in merged.itertuples(index=False):
         calibrated = {outcome: float(getattr(row, f"q_candidate_{outcome}")) for outcome in OUTCOMES}
         if not np.isfinite(list(calibrated.values())).all() or not np.isclose(sum(calibrated.values()), 1.0, atol=1e-10):
-            raise ContractError("#354 calibrated probability is not a finite simplex")
+            raise ContractError("corrected calibrated probability is not a finite simplex")
         support = "".join(sorted(OUTCOMES, key=lambda code: (-calibrated[code], OUTCOME_ORDER[code]))[:2])
         if str(row.baseline_support) != support:
-            raise ContractError("#354 Top-2 support is inconsistent with calibrated probability")
+            raise ContractError("corrected Top-2 support is inconsistent with calibrated probability")
         odds_by_outcome = {outcome: float(getattr(row, f"average_decimal_odds_{outcome}")) for outcome in OUTCOMES}
         if not np.isfinite(list(odds_by_outcome.values())).all() or min(odds_by_outcome.values()) <= 1.0:
             raise ContractError("average European decimal odds are invalid")
@@ -191,6 +191,7 @@ def build_value_cells(selector_features: pd.DataFrame, odds: pd.DataFrame) -> pd
         devig = {outcome: implied[outcome] / overround for outcome in OUTCOMES}
         contributions = {outcome: calibrated[outcome] * odds_by_outcome[outcome] for outcome in OUTCOMES}
         top2_factor = sum(contributions[outcome] for outcome in support)
+        top2_return_per_stake = top2_factor / 2.0
         for outcome in OUTCOMES:
             records.append(
                 {
@@ -222,6 +223,7 @@ def build_value_cells(selector_features: pd.DataFrame, odds: pd.DataFrame) -> pd
                     "top2_included": outcome in support,
                     "top2_coverage_reliability": sum(calibrated[outcome] for outcome in support),
                     "top2_expected_gross_factor": top2_factor,
+                    "top2_expected_return_per_stake_factor": top2_return_per_stake,
                     "ticket_level_once_65_factor": PAYOUT_FACTOR,
                     "quality_grade": "COMPLETE_VALID_10H_AVERAGE_EU_PROXY",
                     "missingness_reason": "COMPLETE",
@@ -234,15 +236,15 @@ def build_value_cells(selector_features: pd.DataFrame, odds: pd.DataFrame) -> pd
     return output
 
 
-def nfold_cartesian_expected_payout(top2_expected_gross_factors: list[float]) -> float:
-    """Return the N-fold Cartesian expectation with the 0.65 burden once."""
+def nfold_cartesian_expected_return_factor(top2_expected_gross_factors: list[float]) -> float:
+    """Return expected gross per total stake for an equal-stake Top-2 portfolio."""
 
     values = np.asarray(top2_expected_gross_factors, dtype=float)
     if values.ndim != 1 or len(values) not in {3, 4, 5}:
         raise ContractError("N-fold Cartesian expectation is defined only for N3-N5")
     if not np.isfinite(values).all() or (values <= 0).any():
         raise ContractError("Top-2 gross factors must be finite and positive")
-    return PAYOUT_FACTOR * float(np.prod(values))
+    return PAYOUT_FACTOR * float(np.prod(values / 2.0))
 
 
 def verify_cell_frame(cells: pd.DataFrame) -> None:
@@ -256,6 +258,7 @@ def verify_cell_frame(cells: pd.DataFrame) -> None:
         "average_decimal_odds", "raw_implied_probability", "overround", "devig_probability",
         "calibrated_probability", "p_times_odds", "top2_support", "top2_included",
         "top2_coverage_reliability", "top2_expected_gross_factor",
+        "top2_expected_return_per_stake_factor",
         "ticket_level_once_65_factor", "quality_grade", "missingness_reason",
     }
     _require_columns(cells, required, "value cell frame")
@@ -264,6 +267,8 @@ def verify_cell_frame(cells: pd.DataFrame) -> None:
         raise ContractError("value cell keys are empty or non-unique")
     if set(cells.outcome_code.astype(str)) != set(OUTCOMES):
         raise ContractError("value cells lack canonical 3/1/0 outcomes")
+    if not pd.api.types.is_bool_dtype(cells["top2_included"].dtype):
+        raise ContractError("top2_included must be a strict boolean")
     if not cells["source_horizon"].eq(HORIZON).all() or not cells["source_time_status"].eq(
         "RELATIVE_HORIZON_LABEL_NO_OBSERVED_TIMESTAMP"
     ).all():
@@ -273,7 +278,7 @@ def verify_cell_frame(cells: pd.DataFrame) -> None:
     if not (cells["train_year_max"].astype(int) < cells["issue_year"].astype(int)).all() or not (
         cells["calibration_history_max_year"].astype(int) < cells["issue_year"].astype(int)
     ).all():
-        raise ContractError("strictly-prior #354 lineage is invalid")
+        raise ContractError("strictly-prior corrected selector lineage is invalid")
     transfer = cells["issue_year"].astype(int).ge(2022)
     if not cells.loc[transfer, "prediction_role"].eq("FROZEN_THROUGH_2021_TRANSFER").all() or not (
         cells.loc[transfer, ["train_year_max", "calibration_history_max_year"]].eq(2021).all().all()
@@ -319,6 +324,13 @@ def verify_cell_frame(cells: pd.DataFrame) -> None:
             raise ContractError("Top-2 coverage reliability identity failed")
         if not np.allclose(ordered.top2_expected_gross_factor.to_numpy(float), expected_factor, rtol=0, atol=1e-12):
             raise ContractError("Top-2 full-Cartesian gross factor identity failed")
+        if not np.allclose(
+            ordered.top2_expected_return_per_stake_factor.to_numpy(float),
+            expected_factor / 2.0,
+            rtol=0,
+            atol=1e-12,
+        ):
+            raise ContractError("Top-2 expected return per-stake identity failed")
         if not np.allclose(ordered.ticket_level_once_65_factor.to_numpy(float), PAYOUT_FACTOR, rtol=0, atol=0):
             raise ContractError("ticket-level 0.65 factor identity failed")
 
@@ -332,6 +344,9 @@ def _analysis_frames(cells: pd.DataFrame) -> dict[str, pd.DataFrame]:
         min_contributing_bookmakers=("contributing_bookmaker_count", "min"),
         mean_top2_coverage_reliability=("top2_coverage_reliability", "mean"),
         mean_top2_expected_gross_factor=("top2_expected_gross_factor", "mean"),
+        mean_top2_expected_return_per_stake_factor=(
+            "top2_expected_return_per_stake_factor", "mean"
+        ),
     ).reset_index()
     missingness = fixture.groupby(["issue_year", "source_horizon", "source_time_status", "quality_grade", "missingness_reason"], sort=True).agg(
         fixtures=("match_idx", "size"),
@@ -342,10 +357,11 @@ def _analysis_frames(cells: pd.DataFrame) -> dict[str, pd.DataFrame]:
             {
                 "n": n,
                 "full_cartesian_ticket_count": 2**n,
-                "gross_expectation_formula": "product(selected_fixture.top2_expected_gross_factor)",
+                "gross_expectation_per_unit_per_ticket_formula": "product(selected_fixture.top2_expected_gross_factor)",
                 "ticket_payout_factor": PAYOUT_FACTOR,
                 "payout_factor_application": "APPLY_ONCE_PER_WINNING_N_FOLD_TICKET",
-                "expected_payout_formula": "0.65 * product(selected_fixture.top2_expected_gross_factor)",
+                "expected_return_per_total_stake_formula": "0.65 * product(selected_fixture.top2_expected_return_per_stake_factor)",
+                "equal_leg_break_even_floor": (1.0 / PAYOUT_FACTOR) ** (1.0 / n),
                 "selection_status": "NO_SELECTOR_OR_ODDS_FILTER_APPLIED",
             }
             for n in (3, 4, 5)
@@ -403,7 +419,7 @@ def _scientific_frames(repo_root: Path, data_root: Path) -> dict[str, Any]:
         "cell_rows": int(len(cells)),
         "fixture_rows": int(cells[["issue", "match_idx"]].drop_duplicates().shape[0]),
         "cell_frame_sha256": stable_frame_sha(cells),
-        "top2_policy": "INHERIT_FIXED_354_TOP2_SUPPORT_NO_REPLACEMENT",
+        "top2_policy": "INHERIT_360_CORRECTED_FIXED_TOP2_SUPPORT_NO_REPLACEMENT",
         "selection_policy": "NONE; DATA_INGREDIENTS_ONLY",
         "raw_odds_filter": "NONE; ALL_VALID_BOOKMAKER_TRIPLETS_AVERAGED",
         "payout_65_semantics": "0.65_APPLIED_ONCE_PER_WINNING_N_FOLD_TICKET",
@@ -445,7 +461,7 @@ def build_package(repo_root: Path, target: Path, explicit_data_root: Path | None
 
 def render_report_text(freeze: dict[str, Any], coverage: pd.DataFrame) -> str:
     coverage_rows = "\n".join(
-        f"| {int(row.issue_year)} | {int(row.issues)} | {int(row.fixtures)} | {row.mean_contributing_bookmakers:.2f} | {row.mean_top2_coverage_reliability:.4f} | {row.mean_top2_expected_gross_factor:.4f} |"
+        f"| {int(row.issue_year)} | {int(row.issues)} | {int(row.fixtures)} | {row.mean_contributing_bookmakers:.2f} | {row.mean_top2_coverage_reliability:.4f} | {row.mean_top2_expected_gross_factor:.4f} | {row.mean_top2_expected_return_per_stake_factor:.4f} |"
         for row in coverage.itertuples(index=False)
     )
     return f"""# Issue #358 — causal 10h European-average-odds value proxy
@@ -454,7 +470,7 @@ Contract: `{CONTRACT_ID}`
 
 ## Decision boundary
 
-This package provides pre-outcome, retrospective-relative 10h European-average-odds inputs for low-N research. It is **not** Beijing official SP, does not calibrate Beijing payouts, applies no raw-odds filter, and selects no fixtures or strategy. It inherits #354's frozen strictly-prior calibrated probabilities and fixed Top-2 support; it does not read #354 labels.
+This package provides pre-outcome, retrospective-relative 10h European-average-odds inputs for low-N research. It is **not** Beijing official SP, does not calibrate Beijing payouts, applies no raw-odds filter, and selects no fixtures or strategy. It inherits the #360-corrected strictly-prior calibrated probabilities and fixed Top-2 support; it does not read settlement labels.
 
 The provider's `10h` field is a relative snapshot label, not an observed quote timestamp. `source_observed_at_utc` therefore remains null and `source_time_status` explicitly records `RELATIVE_HORIZON_LABEL_NO_OBSERVED_TIMESTAMP` rather than fabricating a time.
 
@@ -468,15 +484,15 @@ The provider's `10h` field is a relative snapshot label, not an observed quote t
 
 ## Annual 10h profile
 
-| Year | Issues | Fixtures | Mean contributing books | Mean Top-2 reliability | Mean Top-2 gross factor |
-|---:|---:|---:|---:|---:|---:|
+| Year | Issues | Fixtures | Mean contributing books | Mean Top-2 reliability | Mean Top-2 gross factor | Mean per-stake factor |
+|---:|---:|---:|---:|---:|---:|---:|
 {coverage_rows}
 
 ## Low-N ingredients (N=3–5)
 
-Each cell records average European decimal odds, raw implied probability, fixture overround, de-vig probability, #354 calibrated probability and `p_times_odds`. For each fixed Top-2 fixture support, `top2_coverage_reliability` is the calibrated Top-2 mass and `top2_expected_gross_factor` is the sum of `p_times_odds` across its two supported outcomes.
+Each cell records average European decimal odds, raw implied probability, fixture overround, de-vig probability, corrected calibrated probability and `p_times_odds`. For each fixed Top-2 fixture support, `top2_coverage_reliability` is the calibrated Top-2 mass and `top2_expected_gross_factor` is the sum of `p_times_odds` across its two supported outcomes. Because the fixed budget is spread equally over two supported outcomes per leg, `top2_expected_return_per_stake_factor = top2_expected_gross_factor / 2`.
 
-For any later selected N-fixture set, the full Cartesian portfolio has `2^N` tickets and expected gross is the product of these fixture factors. The Beijing 0.65 burden is represented as a **single ticket-level factor**, never compounded across legs: `0.65 × product(odds of the winning N legs)`.
+For any later selected N-fixture set, the full Cartesian portfolio has `2^N` tickets. Its European-proxy expected gross per total stake is `0.65 × product(top2_expected_return_per_stake_factor)`. This divides by the `2^N` tickets exactly once and applies the Beijing 0.65 burden **once per complete winning ticket**, never once per leg. The equal-leg descriptive break-even floor is `(1 / 0.65) ** (1/N)`; decisions remain full-ticket calculations.
 
 ## Reproduction
 
@@ -486,7 +502,7 @@ python scripts/build_low_n_eu_value_notebook.py
 python scripts/verify_low_n_eu_value_data.py --data-root /absolute/path/to/data
 ```
 
-The semantic verifier checks package closure, implementation and source hashes, independently rebuilds every cell from the #354 pre-outcome frame and #268 raw bookmaker source, and rejects tampered values, Top-2 labels, provenance, or remanifested output.
+The semantic verifier checks package closure, implementation and source hashes, independently rebuilds every cell from the #360-corrected pre-outcome frame and #268 raw bookmaker source, and rejects tampered values, Top-2 labels, provenance, or remanifested output.
 """
 
 

@@ -83,6 +83,7 @@ def main() -> None:
                 "assert cells.source_observed_at_utc.isna().all()\n"
                 "assert set(cells.source_horizon) == {'10h'}\n"
                 "assert set(cells.ticket_level_once_65_factor) == {0.65}\n"
+                "assert (cells.top2_expected_return_per_stake_factor == cells.top2_expected_gross_factor / 2).all()\n"
                 "assert not {'result_code', 'payout', 'winning_sp', 'settlement_sp'} & set(cells.columns)\n"
                 "'All causal and value-identity assertions passed.'",
                 "'All causal and value-identity assertions passed.'",

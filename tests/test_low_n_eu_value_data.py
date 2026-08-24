@@ -11,7 +11,7 @@ from src.low_n_eu_value_data import pipeline
 from src.low_n_eu_value_data.pipeline import (
     ContractError,
     build_value_cells,
-    nfold_cartesian_expected_payout,
+    nfold_cartesian_expected_return_factor,
     stable_frame_sha,
     verify_cell_frame,
 )
@@ -70,9 +70,10 @@ def test_build_value_cells_preserves_outcome_order_and_cartesian_math() -> None:
     assert cells.top2_coverage_reliability.nunique() == 1
     assert cells.top2_coverage_reliability.iloc[0] == pytest.approx(0.8)
     assert cells.top2_expected_gross_factor.iloc[0] == pytest.approx(2.2)
+    assert cells.top2_expected_return_per_stake_factor.iloc[0] == pytest.approx(1.1)
     assert set(cells.ticket_level_once_65_factor) == {0.65}
-    assert nfold_cartesian_expected_payout([2.0, 2.0, 2.0]) == pytest.approx(5.2)
-    assert nfold_cartesian_expected_payout([2.0, 2.0, 2.0]) != pytest.approx(0.65**3 * 8.0)
+    assert nfold_cartesian_expected_return_factor([2.0, 2.0, 2.0]) == pytest.approx(0.65)
+    assert nfold_cartesian_expected_return_factor([2.0, 2.0, 2.0]) != pytest.approx(0.65**3)
     verify_cell_frame(cells)
 
 
@@ -89,6 +90,7 @@ def test_verifier_rejects_tampered_value_label_and_provenance() -> None:
 
     for column, value in (
         ("p_times_odds", 99.0),
+        ("top2_expected_return_per_stake_factor", 99.0),
         ("top2_support", "30"),
         ("source_match_ids", "future-source"),
         ("source_observed_at_utc", pd.Timestamp("2022-01-01T12:00:01")),
@@ -97,6 +99,11 @@ def test_verifier_rejects_tampered_value_label_and_provenance() -> None:
         tampered.loc[0, column] = value
         with pytest.raises(ContractError):
             verify_cell_frame(tampered)
+
+    tampered_bool = cells.copy()
+    tampered_bool["top2_included"] = tampered_bool["top2_included"].astype(str)
+    with pytest.raises(ContractError, match="strict boolean"):
+        verify_cell_frame(tampered_bool)
 
 
 def test_source_bound_verifier_rejects_remanifested_provenance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

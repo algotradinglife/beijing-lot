@@ -1,7 +1,7 @@
 artifact,field,dtype,availability
 cells,issue,str,PRE_OUTCOME_PROXY
 cells,issue_year,int64,PRE_OUTCOME_PROXY
-cells,issue_anchor_ts,datetime64[us],PRE_OUTCOME_PROXY
+cells,issue_anchor_ts,"datetime64[us, UTC]",PRE_OUTCOME_PROXY
 cells,match_idx,int64,PRE_OUTCOME_PROXY
 cells,outcome_code,str,PRE_OUTCOME_PROXY
 cells,outcome_order,int64,PRE_OUTCOME_PROXY
@@ -27,6 +27,7 @@ cells,top2_support,str,PRE_OUTCOME_PROXY
 cells,top2_included,bool,PRE_OUTCOME_PROXY
 cells,top2_coverage_reliability,float64,PRE_OUTCOME_PROXY
 cells,top2_expected_gross_factor,float64,PRE_OUTCOME_PROXY
+cells,top2_expected_return_per_stake_factor,float64,PRE_OUTCOME_PROXY
 cells,ticket_level_once_65_factor,float64,PRE_OUTCOME_PROXY
 cells,quality_grade,str,PRE_OUTCOME_PROXY
 cells,missingness_reason,str,PRE_OUTCOME_PROXY
