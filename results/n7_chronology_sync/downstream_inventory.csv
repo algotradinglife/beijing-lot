@@ -1,0 +1,9 @@
+issue,package,disposition,reason
+319,top2_n7_stable,REBUILT,match selection/year/path depend on legacy anchor
+336,qeu_support_depth,REBUILT_FIXED_R0_R3,accepted fixed-R3 definition retained
+338,qeu_threshold_n7,REBUILT_FIXED_R3_ONLY,absolute-threshold atlas remains exposed legacy diagnostic
+340,qeu_dynamic_r_n7,NON_CANONICAL_NOT_REPLAYED,negative dynamic-R branch is not a future expert
+342,value_veto_r3_n7,NON_CANONICAL_NOT_REPLAYED,negative veto branch is not inherited
+345,paired_value_r3_n7,NON_CANONICAL_NOT_REPLAYED,legacy paired-value branch is not inherited
+348,multin_top2_r0,N7_ROW_NON_CANONICAL,future cross-N comparison must consume corrected expert interface
+349,multin_fixed_rn,N7_ROW_NON_CANONICAL,future cross-N comparison must consume corrected expert interface
