@@ -1,0 +1,10 @@
+column,rows,same_nan_mask,maximum_absolute_difference,exact_at_1e_12
+q_line_3,48658,True,0,True
+q_candidate_3,48658,True,0,True
+q_mapped_3,48658,True,0,True
+q_line_1,48658,True,0,True
+q_candidate_1,48658,True,0,True
+q_mapped_1,48658,True,0,True
+q_line_0,48658,True,0,True
+q_candidate_0,48658,True,0,True
+q_mapped_0,48658,True,0,True

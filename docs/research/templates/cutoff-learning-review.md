@@ -6,16 +6,19 @@ Record evidence for every item:
 1. Which transitive functions learn, calibrate, tune, select, rank, gate, or optimize?
 2. Which explicit cutoff does each receive?
 3. What are the maximum admitted source and label-availability timestamps/issues?
+   Is the exact target issue excluded independently of those timestamps?
 4. Are all fit/tune/calibration partitions derived inside the admitted window?
 5. Can a later cache, parameter, acceptance flag, or imported artifact reach an earlier cutoff?
 6. Does post-cutoff label mutation leave model, parameters, selection, support, tickets, routing, and bankroll actions invariant?
 7. Are source hashes and all decision-facing helper implementation hashes receipt-bound?
+   Does this cover the transitive local import closure and package versions?
 8. Do equivalent year/last-issue cutoffs reproduce identical scientific output?
 9. Does missing chronology or insufficient prior history fail closed?
 10. Does every issue-level artifact admit current-year labels only after their
     actual availability and remain identical after later labels settle?
 11. Are recency weights monotone as declared, reconciled to their ledger and
-    effective sample size, and protected by a retained long-history prior?
+    effective sample size, and protected by a retained long-history prior? For a
+    blend, do the long/recent component masses separately equal `1-alpha`/`alpha`?
 12. Can an issue `t+1` cache/model ever serve issue `t`, or can a refit cadence
     silently introduce later information?
 13. Does a synthetic regime shift show bounded adaptation without pre-shift
@@ -24,6 +27,10 @@ Record evidence for every item:
     than recreate cutoff/filter/partition/weight/cache/receipt/runner logic?
 15. Are direct model fit calls inside a shared learning context, with the
     client limited to domain-specific fitting and prediction?
+16. Is the availability evidence class explicit, and is any historical proxy
+    prevented from authorizing prospective use?
+17. Does static enforcement scan both `src/` and `scripts/`, and are legacy
+    exceptions exact occurrence counts rather than whole-file exemptions?
 
 The evidence table must include a machine receipt handle, independent replay
 command, exact checked HEAD, and separate conclusion-impacting findings from

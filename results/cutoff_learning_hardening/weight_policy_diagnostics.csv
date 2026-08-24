@@ -1,0 +1,4 @@
+policy,rows,effective_sample_size,long_history_mass,recent_state_mass,target_rows_seen,target_rows_excluded
+EXPANDING_EQUAL,288,288,1.0000000000000002,0,3,3
+EXPANDING_EXPONENTIAL,288,185.03978923139618,1,0,3,3
+RECENT_STATE_BLEND,288,200.34782608695659,0.75,0.25,3,3

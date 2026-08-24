@@ -99,8 +99,15 @@ The primary adaptive mode is issue-level walk-forward. For a target issue, the
 cutoff is its fixture-relative decision epoch; prior-year history and only those
 current-year issues whose labels were actually available strictly before that
 epoch may be admitted. The target issue, future issues, and unsettled labels are
-excluded. Each target issue gets an immutable cutoff-keyed artifact before its
+excluded by both timestamp and exact target-issue identity. Timestamp filtering
+alone is insufficient even when a bad source claims the target settled early.
+Each target issue gets an immutable cutoff-keyed artifact before its
 settlement is opened; later labels must never rewrite it.
+
+Every availability claim must name its evidence class. Observed availability
+and a documented conservative safe boundary may authorize prospective use;
+historical timestamp proxies may support diagnostics only and must never be
+promoted into a prospective availability claim.
 
 Recency weighting is itself historical learning. Equal expansion, explicit
 time/issue decay, bounded recent-state blends, change detectors, refit cadence,
@@ -111,6 +118,11 @@ policy parameters. Sparse recent evidence must fail closed or shrink to the
 frozen long-history prior. A later issue model/cache may never serve an earlier
 issue.
 
+A recent-state blend is a convex mixture of two normalized distributions:
+`(1-alpha) * long_history + alpha * recent_state`. The receipt must reconcile
+both component masses separately; multiplying only recent rows inside one
+global normalization is not an accepted blend implementation.
+
 All of this chronology machinery must come from the shared
 `src/temporal_learning` library. Research modules are clients: they supply only
 domain-specific fit/predict/select callbacks and must not copy cutoff,
@@ -118,3 +130,5 @@ availability, partition, weighting, ESS, cache, receipt, runner, or replay
 utilities. New direct historical fitting outside a shared learning context and
 duplicated temporal helpers fail repository governance checks. Migrations delete
 or replace obsolete implementations; they do not add compatibility wrappers.
+Static enforcement scans both `src/` and `scripts/` and permits legacy debt only
+by exact AST occurrence fingerprint and count, never by exempting a whole file.

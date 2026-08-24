@@ -1,62 +1,1190 @@
 {
-  "hidden_temporal_global_paths": [
-    "src/divergence_materializer/contract.py",
-    "src/issue209/contract.py",
-    "src/paired_value_r3_n7/contract.py",
-    "src/top2_factorial/contract.py",
-    "src/value_veto_r3_n7/contract.py"
+  "description": "Exact AST occurrence baseline for historical-only code; no whole-file exemption.",
+  "legacy_occurrences": [
+    {
+      "count": 1,
+      "fingerprint": "d1345453e66da3ee3de125767fb6c385638bd0a8c411150ac062f2abf43177af",
+      "path": "scripts/analyze_high_n_directional_ml.py",
+      "rule": "direct_historical_fit",
+      "scope": "evaluate_model",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "a1233f27cebfb32db7a992aabf6b96b2e8c3d362f149d0b6a527536fec7151d2",
+      "path": "scripts/bj193_chain_gate_b_v2.py",
+      "rule": "direct_historical_fit",
+      "scope": "_conditional_predictions",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "2267c6463a28334d7bec55d02fc80253a7fc3158cc8d91db1c3f9a05d6c16b19",
+      "path": "scripts/bj193_chain_gate_b_v2.py",
+      "rule": "direct_historical_fit",
+      "scope": "_transform_stage1",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "0220e1380d2ee28483240d8b440b5333f77ad271c752446c3fd7e7afeadf7d60",
+      "path": "scripts/bj193_chain_gate_b_v2.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "ef24d25e7981e15b3b189b5108129fe4edd3d343c995fffe3bbfa9acd438fd5b",
+      "path": "scripts/check_cutoff_governance.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "visit_Attribute",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 2,
+      "fingerprint": "5512fe719830ce346c29259b03feb88cbf6b0ad598e6f62dafa70589a008a617",
+      "path": "scripts/check_cutoff_governance.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "visit_Constant",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "a422e58dbf506cc9171258be12d4c76143c6752351e272f5e0d2876c3251aec2",
+      "path": "scripts/check_cutoff_governance.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "visit_Name",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "69159b09d04b660fd3392aeeb28523561dddb1fd87ed7be3c72d7dab1b183a4a",
+      "path": "scripts/profile_bj284_subset_sampler.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "main",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "efe855db616c1a110b62516bad66d7b3d33fd604ff6a88a55b0a1d36efb80ef5",
+      "path": "scripts/run_bj284_activity_pilot.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_calibrator",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "1f6e749cd2bfb5f0c1b7d9d0edad95971e9ce9c96c1c6dc6edd24bce955579d7",
+      "path": "scripts/run_bj284_divergence_mode_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c124859933bfc3016a4b2a95d4510a2c18340e1e9bf44f5fdb6b23e692173297",
+      "path": "scripts/run_bj284_divergence_mode_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "84c466bb3228c2b5a0b1f9335c97198208303399e9d52f0da13acb4722430ccf",
+      "path": "scripts/run_bj284_issue_n_residual_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "0d7ed1a6c7369941f8fb7c3e580c8efb46976a26d8b91ea152315194336d9351",
+      "path": "scripts/run_bj284_joint_policy_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "28acdb6231324da98b39cc7845968d8a940308968c8108b5976661ecc1e7f955",
+      "path": "scripts/run_bj284_joint_policy_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "cb0549a4bd66073e1e908dd18fe67441e587c3ffa5dc935ae47a13b3e5cd3740",
+      "path": "scripts/run_bj284_joint_policy_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "fff8f85c8b0bdfb0cb3ee41146375630c3fb83ddc379d04887263a63813bff4f",
+      "path": "scripts/run_bj284_joint_policy_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "50e9091fbe049cb5a89b4627de3750ca8cd04ba3ec9a3414e7f48b798f7a5164",
+      "path": "scripts/run_bj286_joint_policy_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "87d8f2708df0e5d60ca0a1cacec3fb79ce7e43ac248e40bb68b277ba5aba13a1",
+      "path": "scripts/run_bj286_joint_policy_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "45d9d537a0aadda2598cfa415657aed38866a239c6d4eb0b9df63492818002e7",
+      "path": "scripts/run_bj291_decomposed_value_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "66374cde58e7ddc96ef44273afb3037def1afe6a4fcd9a19b2a2feab8cf7d137",
+      "path": "scripts/run_bj291_decomposed_value_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "bd02ba2a5d9421c0f4d86bb55c085152bbeedba507d8e83a0a68719461dfeab1",
+      "path": "scripts/run_bj291_decomposed_value_oof.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "76373776ce1d4347e1b7c36b9e60cc171dcfb3506516d23ad76de904b630bb06",
+      "path": "scripts/run_track_b_model.py",
+      "rule": "direct_historical_fit",
+      "scope": "main",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "cf31f518877417af01657f048bb23d695ad858de02d258cd047154c78a797dcf",
+      "path": "src/bankroll_policy/fixed_n7.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_controllers",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "ea440423b85b6fb683bd1725115bba67a14387e614aec8bbd7cda4759ff05063",
+      "path": "src/bankroll_policy/fixed_n7.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_controllers",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "fddf0107339c7259d67346e5fd0543bf0de70b8bddd0598bd063a6ea3c5264ed",
+      "path": "src/divergence_materializer/builder.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "_issue_capacity",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "aa4c409c613ef3d5bf5cdd3ab902302765a5a85e9ffe644f7f2c46b8f665c9b5",
+      "path": "src/divergence_materializer/builder.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "_long_inference",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "efc0ccc2375096676e521b7dfe5c25e000bbf796d396a5a8b00914f60a538d4a",
+      "path": "src/divergence_materializer/builder.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "_support_summary",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "d4ab13a9ef832af4a27d4a70a6543ac84c99c895c536af461e00aebf58a25dfd",
+      "path": "src/divergence_materializer/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "FIT_END"
+    },
+    {
+      "count": 1,
+      "fingerprint": "d79152bc7a8dbb36fb074f368f6472f54412882b8027c1a3694c7dc2d3f3d9f6",
+      "path": "src/divergence_materializer/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "TUNE_YEAR"
+    },
+    {
+      "count": 1,
+      "fingerprint": "e8f6a9f82513f583b0e39eb793c773a065e1f2d6e744fb6bea61d219c7580567",
+      "path": "src/divergence_materializer/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "CALIBRATION_YEAR"
+    },
+    {
+      "count": 2,
+      "fingerprint": "24621ab45657553c2165259c3811079efcba3d8beb0a3243dbf3c775b0e9a7ae",
+      "path": "src/divergence_materializer/model.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "predict_panel",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "176cf1e2c920300175a3c0216dc7a12760296f2201b17d02856cc17b5968d213",
+      "path": "src/divergence_materializer/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_horizon_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "853679bfff31a33d5c4aaff92da2b05d3d4da237af4eb2ec372b08d544eddeee",
+      "path": "src/divergence_materializer/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_horizon_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 2,
+      "fingerprint": "7be7a5f6db98c352b7c9b641024719c93a0bf2237e55e60af83eb0b601709941",
+      "path": "src/divergence_materializer/validate.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "validate_package",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "5d2772e0c7dab47cffb21f52c96d07368e430cd1798245e0e53100e4ae26c5e3",
+      "path": "src/dynamic_allocator/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_base_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "878389431e3232c59f5e6ee5a494a20b241ae460660ce29b4057cdbcbd2f9235",
+      "path": "src/dynamic_allocator/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_base_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "cb869a8b42ff6dfc83e46b4bbdcf3a9e2c1778f19154af7fd1677d00fb7ad16f",
+      "path": "src/dynamic_allocator/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_base_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "44d9ce5337d28f4aa80d04cb5ac9d72bc2ba2ed01e4a35472dd8bd600bc02ca7",
+      "path": "src/dynamic_allocator/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_meta_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "70bb96321398d8e6e92204ad1ef2e3aea6b3761ebb80080d1ede177187c06e0d",
+      "path": "src/dynamic_allocator/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_meta_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "2f93b23a7b4911da32ac50d30ccd487bb56775a8869430ce85d7244009a2f781",
+      "path": "src/fixed_expert_moe/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_stacked_multitask",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "8deb1f3e88f5e1689bb62277f22717b5298163c23c9a64d9ae2b867c5cd9aeb9",
+      "path": "src/fixed_expert_moe/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_stacked_multitask",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c123d8d4d8c1118ba9634812888a8a77a55bac1590e360aaf0b281ab2c7cc267",
+      "path": "src/fixed_expert_moe/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_stacked_multitask",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "5ce8b903199b5d983766c287510d4e5e28ba93826a7f980f0f70fe5c69e2ebf1",
+      "path": "src/issue209/contract.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "<module>",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "1df64e0fe26d0389e74d74d77f99ae33912f12581738460a4a9bfe18b6105dee",
+      "path": "src/issue209/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "CALIBRATION_YEAR"
+    },
+    {
+      "count": 1,
+      "fingerprint": "4a0f1da8d151f6819cb6c7c66baa0e642b177545152ff4d62ffe259b607ed1ee",
+      "path": "src/issue209/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "TUNE_YEAR"
+    },
+    {
+      "count": 1,
+      "fingerprint": "5f5bf0451b62871a50264d8a43d1757df18db5a2e3163d155f027e2dfb218aa4",
+      "path": "src/issue209/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "FIT_END"
+    },
+    {
+      "count": 1,
+      "fingerprint": "e0963dbdbe8600f3e3c23f3ff1c38e658c3eb37c08b33ab1f3fd10293221fce9",
+      "path": "src/issue209/dynamic_policy.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "build_issue_states",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "0c4b207f65a0cbf0be78f37ccc7d20f0499cc2cdc1884c80543189800137c75d",
+      "path": "src/issue209/dynamic_policy.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_action_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "20baacde86a5212398025d66c8f98e37723cbc58851f1c712792a03fe1c233bd",
+      "path": "src/issue209/dynamic_policy.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_action_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "522806cfe9ea45a1295f83a285a5538cd753bbc7ed98d919a869f00ddfde8e45",
+      "path": "src/issue209/dynamic_policy.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_action_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "9125fcfc61816320503afe218fed5f6ef47b7b30bcac58eb570139d2f17ac6be",
+      "path": "src/issue209/dynamic_policy.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_action_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "e05e9e34b1373a33600d3ad9ea2919e830c6ebdf61b2de73bc1d72686f322c8a",
+      "path": "src/issue209/dynamic_policy.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_action_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "f2562709a24843283c0ccbbaff009c52396c90f39478e37c165ed3c8f6fc1864",
+      "path": "src/issue209/dynamic_policy.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_action_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "4338f621992bf5bf276840e7a0a739e2e9c82f95b247f821369670716e92536c",
+      "path": "src/issue209/models.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "build_match_units",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "59b69041c4acc5a2d7224b01fb9ab663f1506c5e6673a3b4956acc305d901177",
+      "path": "src/issue209/models.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "market_only_probabilities",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 2,
+      "fingerprint": "b224cceb02d5bc5035093d6e18910580c2b5111c299f3283ab225dc1e98a1521",
+      "path": "src/issue209/models.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "probability_features",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "46edb67e53cbf86aa93e7a150e18158ba74e23c6e495b11d560196bd87be1253",
+      "path": "src/issue209/models.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_calibrated_logistic",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "e4041f92b2e0b492db8169036817ff1291ef478fbf6d122f7480e2398126cb6a",
+      "path": "src/issue209/models.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_calibrated_logistic",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "047c88e4c8b55d1d1d4a7244d4c9bac136a7ecc8202611629b1266560aaf5554",
+      "path": "src/issue209/models.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_mlp_challenger",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "6c22d7a79a3ba2cb308d844159b2a6975c527900a306ec8f6dfc730b71e3a826",
+      "path": "src/issue209/models.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_mlp_challenger",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "19b1f61f8215f969fd343bcb50b4bde7743418541f05e5850423a7777ea99df7",
+      "path": "src/issue209/ticket.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "select_ticket_panel",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 2,
+      "fingerprint": "865ef5e964c4a38b3e29fe6f684a3c570df312970dfcddc552531de4f84205ce",
+      "path": "src/issue209/value.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "sp_features",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "17e366c10747505fdbbbd713241ca9f0d3a01ba6531b39b2448f11c40cfefe57",
+      "path": "src/issue209/value.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_sp_quantile_model",
+      "symbol": "fit"
+    },
+    {
+      "count": 2,
+      "fingerprint": "96034a6359b36dcb61e328fe246996644a46fbaeb2298e13398c66cb226f4ef3",
+      "path": "src/issue279/traces.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "build_cell_trace",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "629d60ff5b63b873527993110fec6ef1a55f875fd262c40231d3f050c2ab6cf9",
+      "path": "src/issue282/contract.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "<module>",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "81c3423ff0da788f2731ec98cfcf1326da80f389801f5921d3b2dfde27307c20",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_controls",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "82666cf672f6f5984f85587c1bb0f2f3b35e302a522dbfc9253e1aba4096ce60",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_controls",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "9874b4f43e757a91cb9a8e2e845be98a9800dc41935eefab96798160c0585bad",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_controls",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "eb9e2acca30f3c597f5c5b95a80a167419220a9d111e941966ed11ccb22bca76",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_controls",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "ef9b78ddf598a1586a7845d4ac73a88e6e0f5b754603cd469906f62a886c99f2",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_controls",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "086cbd7bc77514d2975107cf4b5390e792f277312e9aaa4b7a724779f80a490d",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_arrays",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "3367f8cdfeff00356ffb59f21cce7161cdce4a6b04c2017326e745458625883c",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_arrays",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "8ebc40e147c35055f6a0bb3abc08b3d97a828f02af3b82590e65a5e904d516c5",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_arrays",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "fdbc923d38ff1437e44a3350bf75991155ab5ed81af30b577675afb42651229d",
+      "path": "src/issue282/training.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_arrays",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "15f2fd9f9c00cbc8b3e2fdb875a152ad51ad85544cfffffba1b109ddce858cd5",
+      "path": "src/issue284/pilot.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_subset_arrays",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "1db70c0725b9b91bf50f70f47469d085b377e515e47d98649e29dcf5553195f3",
+      "path": "src/issue284/pilot.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_subset_arrays",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "5178ffe124e048d09b007db2355a158cadace193fd55410abbeed7a417699264",
+      "path": "src/issue284/pilot.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_subset_arrays",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "f5e7490ffcd46e1b348c451acddbdc38e68a291512389c8adadd8675ca2fd1ad",
+      "path": "src/issue284/pilot.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_subset_arrays",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "e3850bf776d2991f5519a51da6a1067c3b1fc19eca3aa974ea7f2e6b7aea3e77",
+      "path": "src/issue286/manifest.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "_market_probability",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 2,
+      "fingerprint": "2636772935c5251d4b1a84ca28812a1a1d42ced3b272696ed1af70e715e7a00e",
+      "path": "src/issue286/manifest.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "prepare_horizon_surface",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "042b2d0f04283ad37f93507e9d5bb87970d892f4c995d232ea76ea7ef996987b",
+      "path": "src/issue291/modeling.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_platt_calibrator",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "fcbd12b30e423684f4dae0444f50eef70c56cc4b7f9570160a49aaded9e0b83d",
+      "path": "src/issue296/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_predict_ridge_gate",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "5614300139692f229851333298bd9f0a2f641d77cf6b6b9121d8634e22369ea4",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_predict_ridge_scores",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "8f5e994111231d29ec47e7ea5a2359ccaf9c72363c38235b58525171b9c1f46b",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_predict_ridge_scores",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "ae9e3b1a82287584aa2535a45d0095f46e10db90e806959f71cd0eebf2cb6758",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_predict_ridge_scores",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "d1ee73f02dd3e9809c6a6e2aec42314ae1a403b2947b66167997a5d9235c2d60",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_predict_ridge_scores",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "0ebbdb51a6c0c64c75873a49dc562a3fd132163a3ddfe4d92b28fa02c8fd720b",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_residual_ensemble",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "2bc4a2866cdd52f82711827bf3edaaf2ea03bca092207a1029733dc52708959d",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_residual_ensemble",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "3499c9baf947782b6b749c71f0092bde9ad8c114fccec03eb3971b5bbebdddf2",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_residual_ensemble",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "e5e615d0d31b7ba4ffa469fda4329fada9d1f9766a13b8f14d8473b3dbaad674",
+      "path": "src/issue299/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_residual_ensemble",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "1072caa1590b553ce7b15bc6c666ebf3c00e8f2739f23e78c3c3e942bae38e5a",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "11610e1aac8f25cb046c7618dbf8d4957d0c9bfb51c674c49ac445ff5c8ccfe3",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "44edd5a4e2132884d2c9e56d5df0c0502ff893f4f5b77972ca3ef408f09f042f",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "45a729f8fb2c0df53e90db5b0241f0e65e0dccf5fe3e5c9112998c53ea0e60c1",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "4b37d053f6e2e60f2f3a7978fad97dfbf65478b0fc77ba489c0b46dd938f0de5",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "8dc8fa1e26a10843a208dcd56723239534e8d17d0eca94db6212fb6bed32b56e",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "9366521cf5482d5cd6605ce152de7b52ff2f3ac36a02c97abbebff6aec5dede3",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "99ac8cc688bf7cf7dfbc41b07e5bb989b820dc2d2f4adf4d691283e7b096ae46",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "bc0b971b3728b306548463f3d393c2a5775c93bc17ff8bad980ff9870e344907",
+      "path": "src/issue302/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "02a6cf9ab52c36d3228fa86abb83c771893ab333cb3b43b18e9a0468eae4bbfe",
+      "path": "src/issue305/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "67a0fcb40f0b1fb69fcb12b3eca6c0c8860cd9fe7e5cc80efb1c0b6b67734edb",
+      "path": "src/issue305/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "8dfe1941683d1ba7b90a09a6d5f38d23e16f3ef41d499e15daed695691a3b534",
+      "path": "src/issue305/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "e8f0198f448355b7fb7915272be597614bfbea5ec84a4d14bfcbc8bf63f23956",
+      "path": "src/issue306/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_predict_expanding",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "1376e30fe7293b26761738ae2c13fac591c78c3c320e84927203d34d89220d26",
+      "path": "src/issue312/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_predict",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "103e635df3f033b896b950e5aa00f8cf5ef324c63fc4000a58d4c4f1f6f04cd2",
+      "path": "src/issue314/data.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "issue_features",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 2,
+      "fingerprint": "50991c95ec45fe36a5647e55df63277f381b2accb2253f2c475bfd4648329ed2",
+      "path": "src/issue314/data.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "load_pre_event_units",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "8df49f1c7defa8fbe961ce3c7ca90ac6c31d9bf766263288accfb1d0b6da32c9",
+      "path": "src/issue314/experiment.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_model",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "8bd4297eb18b14a4dfd507bcf7fa134120290542c42fd577077ef8b166eedb4f",
+      "path": "src/low_n_match_selector/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_model",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "9dd11169ddd60c7dc9ef23c5781cd32a290bd6c1d41d24aeceeb6d273002e9ee",
+      "path": "src/low_n_match_selector/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_model",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c0fd9ed7647bab48b4d8d9c83763c00ef79501fe918dcd1db36df727c3afc1fd",
+      "path": "src/low_n_selector_data/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_predict_years",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c34cf26cc6e2d2b6038f019ea06ee1c388ee232fbb4a9bc4735cefe3ed4e2ca8",
+      "path": "src/low_n_selector_data/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_predict_years",
+      "symbol": "fit"
+    },
+    {
+      "count": 3,
+      "fingerprint": "da08f535d12f59c8830b2dee6a19e93789a076bfaf740627f19a94a0cecae20a",
+      "path": "src/multin_top2_r0/pipeline.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "load_causal_cells",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "f680e4f7ae13f7840a0b161739d155e69337521721b456c69ac19bbb685b6b26",
+      "path": "src/neural_top2_residual/contract.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "<module>",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 4,
+      "fingerprint": "981d58382571c9a65dc079beb592c8d6c28b19ed3d68fbb6e72564d3bca1a6b4",
+      "path": "src/neural_top2_residual/data.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "load_causal_cells",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "89c696589250e853f90b5bbd91e19b258eaf3f3473d6d77c2f81b4b72b8f5a2a",
+      "path": "src/neural_top2_residual/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_linear_predictions",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c4c6806c9c9303803c3c96d7b6a49ed32260591a0a5b5e45ccab3b8ffe1e91f4",
+      "path": "src/neural_top2_residual/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_mlp_predictions",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "4e073d1515326f5ee9a6b08e21606ef29c23714404d020d8361c41492e58b918",
+      "path": "src/neural_top2_residual/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_training",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "b7cb6ddd656a15b095533df3b64445864800393c58700d885b72d2e9b291acfd",
+      "path": "src/neural_top2_residual/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_training",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c4b3a60aa76514c5c9782050c2892068580f7c1cbec5e5b9c23010fecd64c1a2",
+      "path": "src/neural_top2_residual/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "prepare_training",
+      "symbol": "fit_transform"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c9d2eb3e36bcc9fdaf0daba08db87d0eae7dcf4bd5d0a575da65ce8f26caf9e8",
+      "path": "src/paired_value_r3_n7/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "CALIBRATION_YEAR"
+    },
+    {
+      "count": 2,
+      "fingerprint": "db4379acce483e969bf0443c12ca2dfe48355ecd457a1244c5af4777637f6af3",
+      "path": "src/paired_value_r3_n7/pipeline.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "attach_evaluation_proxy_context",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 2,
+      "fingerprint": "a9d777b8c4ffc970f37410c2dd49bc980958b7f8bcd6d278492703d6ef051d92",
+      "path": "src/paired_value_r3_n7/pipeline.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "build_pair_calibration",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "74f7f21b64917f1ff4939e9862ede1148caf773359c1f313c1a2de24af0b6050",
+      "path": "src/paired_value_r3_n7/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "build_pair_calibration",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "978354de3fb9a49cca8a242e56db31c5b520adfc5d70fa4f9191900b517c032f",
+      "path": "src/qeu_dynamic_r_n7/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "learn_dynamic_r",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "5346509911f532c49fe388b033776d8fa63a0d665986323870606de7ce6a5260",
+      "path": "src/regime_state/data.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "load_market_rows",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "dfe8ec6895a970b5ca9debdf0c53cbc458656c81857ef282a132d98817ba184a",
+      "path": "src/regime_state/data.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "load_market_rows",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "19884047d99ef3fb7d5c8e37509d4bc70120045ef4ef0c560fe06e55a498f304",
+      "path": "src/regime_state/model.py",
+      "rule": "direct_historical_fit",
+      "scope": "chronological_predictions",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c8e0febfd6b8a44e24aa42681e0d6e656040271de2e68aa3e55a99b8b022f614",
+      "path": "src/sp_proxy_audit/data.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "load_proxy_cells",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "bdc53f03c6b0b4326d0d0178fe5fb587efb5223347d08048bef27553df7992ff",
+      "path": "src/ticket_policy/fixed_n7.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_logistic_model",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "cf72705fa3d38ce597f6246e759c14136728e581a8a13c06cae7455fcce1d1eb",
+      "path": "src/ticket_policy/fixed_n7.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_model",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "848145c365423c8fc25d788984f1460d11ab246122dbf355b7ce9d17517f295e",
+      "path": "src/ticket_policy/fixed_n7.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_ood_gate",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "4cec54f5fe710cdcaba9315a40180ba69dafc4692321b08846d2895a7c4b12ea",
+      "path": "src/top2_factorial/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "TUNE_YEAR"
+    },
+    {
+      "count": 2,
+      "fingerprint": "89b70c6412fe055949e0039dcde84e70c680931246cf01b749f17d8be0df0b9a",
+      "path": "src/top2_factorial/pipeline.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "_load_probability",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "025bc27b9ef78f07e5a3fe392c852d81b02483ade594cd2ecbef12ee687625ae",
+      "path": "src/top2_factorial/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "1a401e42767ea064878bc8c6078e541a0a69c2956be13291e61f0d7c82551bf3",
+      "path": "src/top2_factorial/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "602bc161f5afc4bbdaee5ef5394145eed7bfdc7bb4952de2122906d6878c1234",
+      "path": "src/top2_factorial/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "b6530c7d4897483edf9c12a166afcae22d7aa6fa630e0a103e391e0bde36f9ac",
+      "path": "src/top2_factorial/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "cb402f8df1559ba8e8552aa9c11d7df5d733ac71b0c4f61b449a0ea63410c505",
+      "path": "src/top2_factorial/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "d89b042b74f7baeb4daff4c389ffed194677b27dda583f4947acabf2e865b987",
+      "path": "src/top2_factorial/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_models",
+      "symbol": "fit"
+    },
+    {
+      "count": 2,
+      "fingerprint": "a8597016bea06362a6c2d28f7e8e45c6809c2cc5f4d8367a4ef3cdd9450ef95f",
+      "path": "src/top2_n7_stable/pipeline.py",
+      "rule": "detached_mapping_accepted",
+      "scope": "_feature_surface",
+      "symbol": "mapping_accepted"
+    },
+    {
+      "count": 1,
+      "fingerprint": "484cdde4f6f4bde7a509a4ac8fe1bb8675f3cb843a3d565648a1de10be8bb8f4",
+      "path": "src/unified_model/gate_b.py",
+      "rule": "direct_historical_fit",
+      "scope": "_evaluate_family",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "833594dac76ba7080a628845fc52ddfadbc56af7233a571cc45bda2d49a186f6",
+      "path": "src/unified_model/gate_b.py",
+      "rule": "direct_historical_fit",
+      "scope": "_fit_sp_heads",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "b59146dca9645905eedffb85814a940c0af669324d161d264ad6278fd65dae6c",
+      "path": "src/unified_model/gate_b.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "f68e35874ae2d1ca223b379e6ebc90e9af044ab6b654c90491906cf15a1b6ecb",
+      "path": "src/unified_value/joint_n7.py",
+      "rule": "direct_historical_fit",
+      "scope": "_latent_fit",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "afb694a25a8c9a2e0a6a226cd784c307a11bc72d1485e3bcb44fedd365bf0508",
+      "path": "src/value_veto_r3_n7/contract.py",
+      "rule": "hidden_temporal_global",
+      "scope": "<module>",
+      "symbol": "CALIBRATION_YEAR"
+    },
+    {
+      "count": 1,
+      "fingerprint": "9e90fe11ad8a35df109790e512bc5fb8342d4ba15b8150ae129b6aa2e813cf4d",
+      "path": "src/value_veto_r3_n7/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_oof_sp_intervals",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "c9001a993f7a06ccd1444260790787143a5cff7c88ff2c6d5c3c4024a0cba83f",
+      "path": "src/value_veto_r3_n7/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_oof_sp_intervals",
+      "symbol": "fit"
+    },
+    {
+      "count": 1,
+      "fingerprint": "dd06cf083e8e9c2cecbcec49baf2c58e0d20224f2a78d739048457d16a58b115",
+      "path": "src/value_veto_r3_n7/pipeline.py",
+      "rule": "direct_historical_fit",
+      "scope": "fit_oof_sp_intervals",
+      "symbol": "fit"
+    }
   ],
-  "detached_mapping_accepted_paths": [
-    "src/divergence_materializer/builder.py",
-    "src/divergence_materializer/model.py",
-    "src/divergence_materializer/validate.py",
-    "src/issue209/contract.py",
-    "src/issue209/dynamic_policy.py",
-    "src/issue209/models.py",
-    "src/issue209/ticket.py",
-    "src/issue209/value.py",
-    "src/issue279/traces.py",
-    "src/issue282/contract.py",
-    "src/issue286/manifest.py",
-    "src/issue314/data.py",
-    "src/low_n_selector_data/pipeline.py",
-    "src/multin_top2_r0/pipeline.py",
-    "src/neural_top2_residual/contract.py",
-    "src/neural_top2_residual/data.py",
-    "src/paired_value_r3_n7/pipeline.py",
-    "src/regime_state/data.py",
-    "src/sp_proxy_audit/data.py",
-    "src/top2_factorial/pipeline.py",
-    "src/top2_n7_stable/pipeline.py"
-  ],
-  "direct_historical_fit_paths": [
-    "src/bankroll_policy/fixed_n7.py",
-    "src/divergence_materializer/model.py",
-    "src/dynamic_allocator/pipeline.py",
-    "src/fixed_expert_moe/model.py",
-    "src/issue209/dynamic_policy.py",
-    "src/issue209/models.py",
-    "src/issue209/value.py",
-    "src/issue282/training.py",
-    "src/issue284/pilot.py",
-    "src/issue291/modeling.py",
-    "src/issue296/model.py",
-    "src/issue299/model.py",
-    "src/issue302/model.py",
-    "src/issue305/model.py",
-    "src/issue306/model.py",
-    "src/issue312/model.py",
-    "src/issue314/experiment.py",
-    "src/low_n_match_selector/pipeline.py",
-    "src/low_n_selector_data/pipeline.py",
-    "src/neural_top2_residual/model.py",
-    "src/paired_value_r3_n7/pipeline.py",
-    "src/qeu_dynamic_r_n7/pipeline.py",
-    "src/regime_state/model.py",
-    "src/ticket_policy/fixed_n7.py",
-    "src/top2_factorial/pipeline.py",
-    "src/unified_model/gate_b.py",
-    "src/unified_value/joint_n7.py",
-    "src/value_veto_r3_n7/pipeline.py"
-  ]
+  "schema_version": 2
 }

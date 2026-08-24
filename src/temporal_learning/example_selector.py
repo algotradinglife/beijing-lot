@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping
 
 import numpy as np
@@ -10,6 +11,8 @@ import pandas as pd
 
 from .core import (
     Cutoff,
+    AvailabilityFilter,
+    AvailabilityPolicy,
     PartitionPolicy,
     WeightingPolicy,
     prepare_learning_context,
@@ -27,10 +30,13 @@ def select_cutoff_threshold(
     history: pd.DataFrame,
     cutoff: Cutoff,
     *,
+    repository_root: Path,
+    implementation_modules: tuple[str, ...],
     score_column: str,
     binary_label_column: str,
     source_hashes: Mapping[str, str],
-    implementation_hashes: Mapping[str, str],
+    availability_policy: AvailabilityPolicy,
+    intended_use: str,
     weighting_policy: WeightingPolicy = WeightingPolicy.expanding_equal(),
 ) -> ThresholdSelection:
     """Select one score threshold on tune, then verify direction on calibration."""
@@ -39,7 +45,15 @@ def select_cutoff_threshold(
         history,
         cutoff,
         source_hashes=source_hashes,
-        implementation_hashes=implementation_hashes,
+        repository_root=repository_root,
+        implementation_modules=tuple(
+            dict.fromkeys(
+                ("src.temporal_learning.example_selector", *implementation_modules)
+            )
+        ),
+        implementation_distributions=("numpy", "pandas"),
+        availability=AvailabilityFilter(policy=availability_policy),
+        intended_use=intended_use,
         partition_policy=PartitionPolicy(),
         weighting_policy=weighting_policy,
     )
@@ -50,7 +64,9 @@ def select_cutoff_threshold(
     )
     if not {score_column, binary_label_column}.issubset(history):
         raise ValueError("threshold client lacks score or binary label")
-    candidates = np.unique(fit[score_column].quantile([0.2, 0.4, 0.6, 0.8]).to_numpy(float))
+    candidates = np.unique(
+        fit[score_column].quantile([0.2, 0.4, 0.6, 0.8]).to_numpy(float)
+    )
     if not len(candidates):
         raise ValueError("threshold client has no candidate")
 
@@ -62,18 +78,24 @@ def select_cutoff_threshold(
     selected, tune_accuracy = max(tune_rows, key=lambda item: (item[1], -item[0]))
     calibration_accuracy = accuracy(calibration, selected)
     receipt = dict(context.receipt.payload)
-    receipt.update({
-        "client": "REPRESENTATIVE_THRESHOLD_SELECTION",
-        "selected_parameters": {"threshold": selected},
-        "metrics": {
-            "tune_accuracy": tune_accuracy,
-            "calibration_accuracy": calibration_accuracy,
-        },
-        "gate_predicates": {"calibration_at_least_chance": calibration_accuracy >= 0.5},
-        "selection_identity": stable_json_hash({
-            "threshold": selected,
-            "tune_accuracy": tune_accuracy,
-            "calibration_accuracy": calibration_accuracy,
-        }),
-    })
+    receipt.update(
+        {
+            "client": "REPRESENTATIVE_THRESHOLD_SELECTION",
+            "selected_parameters": {"threshold": selected},
+            "metrics": {
+                "tune_accuracy": tune_accuracy,
+                "calibration_accuracy": calibration_accuracy,
+            },
+            "gate_predicates": {
+                "calibration_at_least_chance": calibration_accuracy >= 0.5
+            },
+            "selection_identity": stable_json_hash(
+                {
+                    "threshold": selected,
+                    "tune_accuracy": tune_accuracy,
+                    "calibration_accuracy": calibration_accuracy,
+                }
+            ),
+        }
+    )
     return ThresholdSelection(selected, receipt)
