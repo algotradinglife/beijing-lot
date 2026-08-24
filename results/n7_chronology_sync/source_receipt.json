@@ -1,0 +1,24 @@
+{
+  "cells": 145974,
+  "chronology": "SOURCE_ISSUE_REGISTRY_YEAR + FIXTURE_RELATIVE_10H",
+  "consumed_settlement_sha256": "41970b40df0962eeba96865cabeaeaaabf97a5a63e0645088220986f8be418cf",
+  "contract": "BJ-UNIFIED-N7-CHRONOLOGY-SYNC-001/v1",
+  "corrected_cells_sha256": "fad0598d2319dd9948204029ed47660c523e02677ea939dc428b5a8d064f4000",
+  "corrected_labels_sha256": "5279746f72a7fdc23160587dacbb413046ea92336599a93b632d0ea1619de134",
+  "corrected_source_contract": "BJ-UNIFIED-LOWN-CHRONOLOGY-CORRECTION-001/v2",
+  "external_data_root_committed": false,
+  "fixtures": 48658,
+  "issues": 172,
+  "upstream_files": {
+    "FREEZE_RECEIPT.json": "8ce2dd0c75c124d727ef535ae472bd0ff9cfe113095afa2a56ae766464fd00a7",
+    "SOURCE_RECEIPT.json": "c10740f71cd9e10f7128400af86113c7566e95561d4f3ff59c53e2f71e5cd7ce",
+    "features/selector_cells.parquet": "c30e67d90146ac09ad2b6e0078a479942c8c0a15b05b9310e835455e3e177893",
+    "features/selector_features.parquet": "458eca1d98a38350017d58c16ccda33d05eda9d7f0e275f68ef4253fa539f1da",
+    "labels/selector_labels.parquet": "5e3298846ac3db56059f4d9f9d957caa13932625e7ed17c73294ff420cf3991e"
+  },
+  "years": [
+    2022,
+    2023,
+    2024
+  ]
+}

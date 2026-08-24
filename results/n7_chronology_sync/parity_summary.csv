@@ -1,0 +1,4 @@
+layer,old_rows,new_rows,common_rows,exact_rows,year_exact_rows,fixture_exact_rows,support_exact_rows,settlement_exact_rows,score_exact_rows
+issue_arm,210,302,208,136,192.0,152.0,145.0,186.0,
+ticket,26880,44032,26880,20764,,,,,
+action,32765,48658,32765,0,30061.0,,32618.0,,0.0
