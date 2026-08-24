@@ -1,0 +1,116 @@
+{
+  "contract": "BJ-UNIFIED-N6-CORRECTED-ALL-R-001/v2",
+  "delivery": {
+    "docs/research/Issue-381-N6-Corrected-All-R.md": "59040e4bef7717070b899ebdc40257350ebd7d394d222553e90f203dce3322b1",
+    "docs/research/figures/issue_381_n6_corrected_all_r.png": "f7db349a5217edabd39fae1020cbc0f9df8981b8d1d28f21aa6a1ea109711e16",
+    "notebooks/research/n6-corrected-all-r/n6_corrected_all_r.ipynb": "b746b2e018bf7b646356ab7bb6220d05de4ac0deb2c8204530bb69cdad58f8ae"
+  },
+  "files": {
+    "action_receipts.parquet": {
+      "bytes": 5993249,
+      "sha256": "7240d92f45937d53f0a61606654d474af70b8de0a1397327f78134c66aafd385"
+    },
+    "capital_paths.parquet": {
+      "bytes": 29906,
+      "sha256": "cda22caec06847872258b82ddfd5069e7de7a6915542072bf1bf82f01186d299"
+    },
+    "coverage_ledger.csv": {
+      "bytes": 9331,
+      "sha256": "3aaa1f79fd95e0f5d8a638cb02671509ca51b2902161ee24c41c43942e7305a3"
+    },
+    "decision.json": {
+      "bytes": 375,
+      "sha256": "3116a6bfd8d463549400e10bfe62be8178cc1cbca71a34b58dae22d5354149d9"
+    },
+    "decisions.parquet": {
+      "bytes": 26385,
+      "sha256": "64bf51133f23deee60a7d4ee35af96cc4fc33de914adc73dc3cfc1ea49aba973"
+    },
+    "issue_bootstrap.csv": {
+      "bytes": 1781,
+      "sha256": "dfee2df9cb8708c4059b9108f019887c6975904e3dc8f097d4c6c99df61fbbb6"
+    },
+    "issue_bundles.parquet": {
+      "bytes": 26601,
+      "sha256": "4ba096285d5f73dc847c6b1929ac0b2a6e1aaf15aff295f777296ee792bfef58"
+    },
+    "legacy_issue_r_comparison.parquet": {
+      "bytes": 42894,
+      "sha256": "2596a24f51f7a141d9540e9d0f932f5524915362ac4bf6f529cb62da84f6743d"
+    },
+    "legacy_summary.csv": {
+      "bytes": 512,
+      "sha256": "468bba318ebf1021b445f0ba3a0014b577cf81755d2c1275429f0eb6520f8ec4"
+    },
+    "matched_contrasts.csv": {
+      "bytes": 2501,
+      "sha256": "6a002959a8177854624acd2889335b002ac974b5aa66a6d71f0267dca13bc626"
+    },
+    "moving_block_bootstrap.csv": {
+      "bytes": 1878,
+      "sha256": "f956b7a21b1731355b031dfd6580a54392e7e752dc1d491215cc1c43b58e937a"
+    },
+    "performance.csv": {
+      "bytes": 5616,
+      "sha256": "a4cbcf0be09ca7cff1af3229ae9e01ccdbc24c5d8a8dc9f63aef931f87c699c6"
+    },
+    "r0_r3_parity.parquet": {
+      "bytes": 43789,
+      "sha256": "581845a4633ff666d11ca3da1ba5580cad7f9b3be197175ec19af0d968b91b11"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 2110,
+      "sha256": "62ddbadc5fcb01b5aa94098c732d8bb1bfc8a1da0d7cbc4311ffade739a249bf"
+    },
+    "rolling_windows.csv": {
+      "bytes": 1482,
+      "sha256": "68136ab547540ac09596192c584ce16187b0892dcf0e5a71d9b1aba8fccc18d0"
+    },
+    "source_receipt.json": {
+      "bytes": 1433,
+      "sha256": "2de95e1c9b851fa6558ef45f7d30de1c2a451baf80f3e307ec85e5fcac51a3b6"
+    },
+    "support_attribution.parquet": {
+      "bytes": 42718,
+      "sha256": "c0a024287e6b5445017deb45780b88aba905a98e80efe8581146a1a9db7e1bfe"
+    },
+    "support_saturation.parquet": {
+      "bytes": 16960,
+      "sha256": "c0258684349297d2804929dfd8f3f650479808959c341b1f53f3827e7793f4ac"
+    },
+    "support_saturation_summary.csv": {
+      "bytes": 2208,
+      "sha256": "472f9170c9f9c2dc35f6299da555489ff17ef13832c798bbd39c3d1f1c05ad10"
+    },
+    "tickets.parquet": {
+      "bytes": 39022,
+      "sha256": "7b624391796df9c8f807d24e6c4946bb7b0e9943dd23e238fc8b4fff91a3eb41"
+    }
+  },
+  "frame_hashes": {
+    "actions": "68b7686752d2c046f399b38ff9bf50cf96c5f6c44da12f01932481b87e54815d",
+    "attribution": "c5337f25425395edd8c3e41101c60be9b4b5d3cf5c8b92f3612feaba285bfee3",
+    "block_bootstrap": "0a353ef08aa8522fa1548c1975f0c6d6f8d5bcd7a528ad7e86cc52a7bde0ce74",
+    "bundles": "1c5fd8532d60f62ff8a1b3adc1c0b91dbe16b2f3316092b5b227d2ce8aaf1791",
+    "contrasts": "6f2e8c337c56712d410073565d08e428b4ac8eef68846e0be969387521b1c910",
+    "coverage": "919e5825e74c9ab97054568c07f44da87b62b2a5884b6bb02cea877937ce4bc2",
+    "decisions": "6a09d2b6d6196164412ca83af82c2dcf5b8afdf252e4d612ed0eb63e184a840a",
+    "issue_bootstrap": "87e137811c7b93df1f1dd98f5a99c2309cc1003cb389630e94d5eb606d5bca8b",
+    "legacy_rows": "5b9336aefece4a8c087eed13fa0fc01f8a3c9369f170fd93259f2c316b811309",
+    "legacy_summary": "097505e1adb3718a16a15b45f0717f5bd2141ad5e62bd5f0039d845c459614be",
+    "paths": "526b2b977133636ff71880f2fb3c16d1d338968235e1aced11dcc40386f23348",
+    "performance": "3836eca8865848429c225aa7ea6cc02b8d8797062c45bb45738f8c23b9d01b4b",
+    "r0_r3_parity": "c7058b001af37feb7872f598203f4a330032af2712051a017f68c5f4293d89aa",
+    "risk": "9d557e84a31e3b589db79d4bbb767920b1301be6c1bd9104ed1aa32b2abe3fb6",
+    "rolling": "957be087bdbbd7e336cb7a8f0553691473b751629ce519a3bdf0d7fdee9f25b6",
+    "saturation": "301bcfd4aa607ead1ad0e1533a6e642b403e3bb08abfe35e732223d009153001",
+    "saturation_summary": "00115cdd8af9a1eec278ff96b62fe66c64fa6b199853f05b64bd53028e8c66c4",
+    "tickets": "b685b9de685fbca35decf145c5022f4fafd30e2e6869b890e0f06f4fdd8b0010"
+  },
+  "implementation": {
+    "contract.py": "f015342266bb5926a7ada526ddec99237bd4dc55f36540aea38d5e0b2ed16a86",
+    "cutoff_mapping/api.py": "a06408791cbaa4317f6b670338cc8f7d0c4fd2c476cc2be9782f754adbbfbba8",
+    "pipeline.py": "b5f8c330dd9a879df4a2279b56698ea1864a2fba7d506fdfa77d1b3f36fdf112",
+    "temporal_learning/core.py": "71329fae84d6f039d9f30edb99822fa069d16a8c301dce19e2714200549f8a1b"
+  }
+}

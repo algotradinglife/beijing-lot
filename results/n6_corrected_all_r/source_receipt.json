@@ -1,0 +1,31 @@
+{
+  "action_surface_frame_sha256": "68b7686752d2c046f399b38ff9bf50cf96c5f6c44da12f01932481b87e54815d",
+  "chronology": "SOURCE_ISSUE_REGISTRY_YEAR + FIXTURE_RELATIVE_10H",
+  "contract": "BJ-UNIFIED-N6-CORRECTED-ALL-R-001/v2",
+  "cutoff_cache_key": "0fdae1f42caab29b2c41bda72708117919041431b8d4807db3bff80d7e6ed65d",
+  "cutoff_contract": "BJ-UNIFIED-CUTOFF-LEARNING-001/v2",
+  "cutoff_identity": "EVALUATION_YEAR_2022",
+  "cutoff_manifest_sha256": "e81c1a971974823ab111ccc2b6a9fbee6b0b79ebeae409034c84b5b0fbedd10e",
+  "cutoff_maximum_training_label_timestamp": "2021-12-31T09:00:00+00:00",
+  "cutoff_model_identity": "d44d214e22def2c5f6598062a71b9a18e987e88e551613637108b696ad938096",
+  "cutoff_probability_parity_exact_rows": 48658,
+  "cutoff_probability_parity_rows": 48658,
+  "cutoff_ts": "2021-12-31T11:00:00+00:00",
+  "evaluation_role": "EXPOSED_RETROSPECTIVE_COMPLETE_R_DIAGNOSTIC",
+  "legacy_manifest_sha256": "de1da07545fe8052fc07db2bceb9e662336f3cea475a04ff1104b3645164349c",
+  "no_r_reselection": true,
+  "payout_factor_application": "0.65_ONCE_PER_COMPLETE_WINNING_TICKET",
+  "r_grid": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "selection": "EXACT_#376_TOP6_RETAINED_MASS",
+  "ticket_design": "64_COMPLETE_CARTESIAN; 8_CNY2_UNITS_EACH; CNY1024",
+  "upstream_contract": "BJ-UNIFIED-N6-CHRONOLOGY-SYNC-001/v1",
+  "upstream_manifest_sha256": "eac6e99b37f0f55cf72a4f884623f6c1e14d9441de88396de5a2cd75bd002538"
+}
