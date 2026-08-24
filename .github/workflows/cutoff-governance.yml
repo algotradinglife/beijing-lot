@@ -18,7 +18,7 @@ jobs:
             AGENTS.md
             config/cutoff_governance_legacy_allowlist.json
             docs/research/temporal-function-inventory.csv
-            scripts/check_cutoff_governance.py
+            scripts
             src
-      - name: Reject hidden or duplicated temporal learning
+      - name: Reject hidden, duplicated, or bypass temporal learning
         run: python scripts/check_cutoff_governance.py
