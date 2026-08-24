@@ -1,0 +1,2 @@
+year_cutoff_identity,last_issue_cutoff_identity,cutoff_ts,same_model_identity,same_scientific_output,cache_keys_distinct
+EVALUATION_YEAR_2022,LAST_AVAILABLE_ISSUE_21125,2021-12-31T11:00:00+00:00,True,True,True
