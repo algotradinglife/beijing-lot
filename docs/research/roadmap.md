@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-24 (#356 selective third-outcome protection settled)**
+Updated: **2026-08-24 (#376 corrected N6 canonical interface settled; #377 active)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -301,8 +301,11 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
 | 46 | [#367] corrected N4 versus N7 expert diagnostic | Open / Blocked | M3 | Parent #202; blocked by #366 and closed #359 | Recompute complementarity only from corrected-N7 evidence. The legacy-anchor temporary correlation is non-canonical and cannot authorize MoE membership |
 | 47 | [#369] corrected N7 support-shape factorial | Closed / Done | M3 | Parent #202; #366 closed | Eight-cell replay preserves CNY1,024 and exact #366 CONTROL parity. R3 BOTH ends at CNY170,886 versus CONTROL CNY132,689; its actual lift is CNY38,197 and ideal-fractional lift CNY24,644. The interaction is positive but borderline: actual-unit bootstrap p05 CNY6,576 versus ideal-fractional p05 only about CNY141 (effectively zero at Monte Carlo resolution). BOTH lift bootstrap p05 is CNY−115,247, so no new arm passes standalone-positive robustness admission. This is a useful historical synergy mechanism, not a new expert or #210 promotion |
 | 48 | [#373] corrected N7 R3 support-transfer count grid | Closed / Done | M3 | Parent #202; #369 closed; not a #210 blocker | Full C0–C2 × E0–E3 retrospective mechanism map under complete Cartesian coverage and fixed CNY1,024. C1E3 ends at CNY132,798 versus CONTROL CNY132,689, while reducing observed max drawdown from 33.17% to 21.90% and longest profitable-issue losing run from 19 to 7. Its matched-lift moving-block p05 remains CNY−135,691, so no cell enters the expert pool; C1E2/C1E3 remain future-freeze mechanism hypotheses only |
-| 49 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 50 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 49 | [#376] corrected N6 chronology synchronization | Closed / Done | M3 | Parent #202; #360 closed; blocks #377 | Rebuilt N6 R0/R3 from the corrected registry-year and fixture-relative 10h source instead of reusing #352. On 152 settled issues R3 improves R0 by CNY21,211, but remains standalone-negative at CNY−12,300; ex-largest lift is CNY−3,473 and bootstrap p02.5 is CNY−45,895. Twenty-seven of 304 common legacy issue-arm PnLs change. This is the canonical N6 interface, not an admitted expert |
+| 50 | [#377] corrected N6 R3 support-transfer count grid | Open / In Progress | M3 | Parent #202; blockedBy closed #376; blocks #378 | Frozen C0–C2 × E0–E4 mechanism map with complete Cartesian coverage, fixed CNY1,024, deterministic integer allocation and ideal-fractional counterfactual. Admission remains standalone-positive and robustness-gated |
+| 51 | [#378] corrected N6 versus N7 portfolio diagnostic | Open / Ready | M3 | Parent #202; blockedBy #377 and closed #373 | Will compare corrected controls and only retained positive standalone mechanisms on exact-common/shared calendars, with preregistered 50/50 and transparent full-sleeve 1:1 paths. Diversification cannot substitute for Edge |
+| 52 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 53 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -1014,6 +1017,9 @@ retrospective feature.
 [#367]: https://github.com/algotradinglife/beijing-lot/issues/367
 [#369]: https://github.com/algotradinglife/beijing-lot/issues/369
 [#373]: https://github.com/algotradinglife/beijing-lot/issues/373
+[#376]: https://github.com/algotradinglife/beijing-lot/issues/376
+[#377]: https://github.com/algotradinglife/beijing-lot/issues/377
+[#378]: https://github.com/algotradinglife/beijing-lot/issues/378
 
 ---
 

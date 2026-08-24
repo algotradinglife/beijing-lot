@@ -1,0 +1,15 @@
+cell,standalone_positive,standalone_ex_largest_positive,matched_lift_positive,matched_ex_largest_positive,moving_block_lift_p05_nonnegative,drawdown_no_worse_than_control,losing_run_no_worse_than_19,two_positive_annual_pnl,two_positive_annual_lifts,development_diagnostics_valid,control_keysets_valid,historical_gate_pass,expert_admitted,future_frozen_candidate_required
+C0E1,False,False,False,False,False,False,True,False,False,True,True,False,False,False
+C0E2,False,False,False,False,False,True,True,False,False,True,True,False,False,False
+C0E3,False,False,False,False,False,False,True,False,False,True,True,False,False,False
+C0E4,False,False,False,False,False,False,True,False,False,True,True,False,False,False
+C1E0,True,False,True,True,False,False,False,False,True,True,True,False,False,False
+C1E1,False,False,False,True,False,False,True,False,True,True,True,False,False,False
+C1E2,False,False,True,True,False,True,True,False,True,True,True,False,False,False
+C1E3,False,False,True,True,False,True,True,True,True,True,True,False,False,False
+C1E4,False,False,False,True,False,True,True,False,False,True,True,False,False,False
+C2E0,True,False,True,False,False,False,False,False,False,True,True,False,False,False
+C2E1,True,False,True,False,False,False,True,False,False,True,True,False,False,False
+C2E2,False,False,True,True,False,True,True,False,True,True,True,False,False,False
+C2E3,False,False,False,True,False,True,True,True,False,True,True,False,False,False
+C2E4,False,False,False,True,False,True,True,False,False,True,True,False,False,False

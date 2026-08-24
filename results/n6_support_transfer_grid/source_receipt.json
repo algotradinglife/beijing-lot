@@ -1,0 +1,22 @@
+{
+  "bootstrap_draws": 5000,
+  "bootstrap_seed": 377001,
+  "contract": "BJ-UNIFIED-N6-SUPPORT-TRANSFER-GRID-001/v1",
+  "control_keyset_gate": true,
+  "decision_facing_imports": {
+    "src/n6_support_shape/contract.py": "58add59f502871e3d879d8026bd35632e72a76d79eafdbb24510142b9bfec931",
+    "src/n6_support_shape/pipeline.py": "410fc736d24e9886ba7f1e7dbe3de324beadca1b11e1140ac8aae073e13d6c42"
+  },
+  "development_diagnostic_gate": true,
+  "evaluation_role": "EXPOSED_RETROSPECTIVE_MECHANISM_MAP",
+  "evaluation_years": [
+    2022,
+    2023,
+    2024
+  ],
+  "issue_budget_cny": 1024.0,
+  "moving_block_length": 10,
+  "payout_factor_application": "ONCE_PER_COMPLETE_WINNING_TICKET",
+  "upstream_contract": "BJ-UNIFIED-N6-CHRONOLOGY-SYNC-001/v1",
+  "upstream_manifest_sha256": "eac6e99b37f0f55cf72a4f884623f6c1e14d9441de88396de5a2cd75bd002538"
+}
