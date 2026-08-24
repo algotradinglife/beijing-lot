@@ -1,0 +1,9 @@
+arm,legacy_rows,corrected_rows,common_issues,exact_rows,changed_pnl_rows,year_routing_changed_rows,legacy_only_issue_arm_rows,corrected_only_issue_arm_rows,attribution_common_legs,attribution_exact_legs,legacy_only_unique_issues,corrected_only_unique_issues
+R0,159,152,152,96,16,8,7,0,975,950,,
+R1,159,152,152,95,13,8,7,0,975,934,,
+R2,159,152,152,94,14,8,7,0,975,930,,
+R3,159,152,152,95,11,8,7,0,975,939,,
+R4,159,152,152,94,9,8,7,0,975,938,,
+R5,159,152,152,95,8,8,7,0,975,941,,
+R6,159,152,152,95,8,8,7,0,975,941,,
+ALL,1113,1064,1064,664,79,56,49,0,6825,6573,7.0,0.0

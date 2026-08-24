@@ -1,0 +1,45 @@
+{
+  "arms": [
+    "R0",
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6"
+  ],
+  "consumers": {
+    "210": "unchanged",
+    "218": "unchanged",
+    "378": "non-R3 comparator admitted as exposed diagnostic evidence only"
+  },
+  "contract": "BJ-UNIFIED-N6-CORRECTED-ALL-R-001/v1",
+  "corrected_r0_pnl_cny": -33511.091628594215,
+  "corrected_r3_lift_r0_cny": 21211.10198703047,
+  "corrected_r3_pnl_cny": -12299.989641563741,
+  "evidence_boundary": "EXPOSED_HISTORICAL_DIAGNOSTIC_ONLY",
+  "legacy_changed_pnl_rows": 79,
+  "legacy_common_issue_arm_rows": 1064,
+  "non_r3_positive_standalone_arms": [],
+  "promotable_to_210": false,
+  "r0_r3_exact_parity_376": true,
+  "r3_canonical_unchanged": true,
+  "r_grid": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "replacement_disclosure": {
+    "candidate_set_size_max": 1,
+    "dropped_probability_first_legs": 166,
+    "noop_activated_legs_total": 1969,
+    "protocol_log": "docs/research/Issue-381-PROTOCOL-LOG.md entry 001",
+    "replaced_legs_total": 1643,
+    "saturated_legs": 0
+  },
+  "verdict": "FIXED_R_GRID_EXPOSED_DIAGNOSTIC_COMPLETE"
+}

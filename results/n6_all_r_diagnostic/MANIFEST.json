@@ -1,0 +1,130 @@
+{
+  "contract": "BJ-UNIFIED-N6-CORRECTED-ALL-R-001/v1",
+  "delivery": {
+    "docs/research/Issue-381-N6-All-R-Diagnostic.md": "3d99edcf7dca8a7e3b1ef59c1dd208fd2871ebfdb13d57b827308248f5d4ba15",
+    "docs/research/Issue-381-PROTOCOL-LOG.md": "aa69069f7a21ebc95298ef9936ee4b4afd31a3463ba890fac68750c001514e45",
+    "docs/research/figures/issue_381_n6_all_r_capital.png": "9d5db5bd227c7315270ec30c98a5f1f167672dba91ecde50a50d0f1b01d9e5c5",
+    "docs/research/figures/issue_381_n6_all_r_lift.png": "0cb5102e66e84d2f8c48c23459b2e84bb7ade9c4ccd6e4f1af9f38a3b3cf5ed7",
+    "notebooks/research/n6-all-r-diagnostic/n6_all_r_diagnostic.ipynb": "cc6872e8f179b35a5ea83d69b15bc0c1a51953cba4f8532efe801d9f865df0d0"
+  },
+  "files": {
+    "action_receipts.parquet": {
+      "bytes": 5993249,
+      "sha256": "7240d92f45937d53f0a61606654d474af70b8de0a1397327f78134c66aafd385"
+    },
+    "capital_paths.csv": {
+      "bytes": 201300,
+      "sha256": "e1790e92bc8aa412c67360f74e4e4ba88e26bedd8579f8b753db4f540a8c1e8b"
+    },
+    "coverage_ledger.csv": {
+      "bytes": 9331,
+      "sha256": "3aaa1f79fd95e0f5d8a638cb02671509ca51b2902161ee24c41c43942e7305a3"
+    },
+    "decision.json": {
+      "bytes": 1109,
+      "sha256": "504725d30e8903d4e9972a5421591f8782815e5884b36d2fa9bb148aacc75ac0"
+    },
+    "decisions.parquet": {
+      "bytes": 23048,
+      "sha256": "9f09f51c0a148478dc8696c0422b9a035914bd650464db8bdbcb0c3b34797daa"
+    },
+    "depth_saturation.csv": {
+      "bytes": 28994,
+      "sha256": "d9e54deecb953cf3dcc9c28e26658bf25c9f7e179d07ad6dc1516e5fabed7b92"
+    },
+    "issue_bundles.parquet": {
+      "bytes": 24988,
+      "sha256": "2e6cc7936857d835761d19f38ac0453a0c19057b4f4bd670f39ac37254d1fe15"
+    },
+    "legacy_action_ledger.parquet": {
+      "bytes": 6942464,
+      "sha256": "f4e455d463f010442f1f7e0c1c1a8c873981e9f2bed86ab89f78efbd7d24f6c6"
+    },
+    "legacy_attribution_ledger.parquet": {
+      "bytes": 78827,
+      "sha256": "0ab26587b438d6489b13eea5f40747e6d126d66e16b32c4902e76e843c09305a"
+    },
+    "legacy_issue_ledger.parquet": {
+      "bytes": 60356,
+      "sha256": "9937a7a6553a5bf93072c2ca0160e9bb3faa23e813acfc602861c10f7805392e"
+    },
+    "legacy_summary.csv": {
+      "bytes": 566,
+      "sha256": "042babd5e0e51113ae96c130315bac5ba1e54ac1d6edbafc3029a3b1da952c74"
+    },
+    "legacy_ticket_ledger.parquet": {
+      "bytes": 8808,
+      "sha256": "768dee9d3b35606f0b59f117b958ed8d8841a38b4fe98fa1e234db6a3c3b23b7"
+    },
+    "legacy_year_routing.csv": {
+      "bytes": 1216,
+      "sha256": "4baf8ae2f6facce00a2256dc85033d7a9b9fdee01e049d94de14428e849525ba"
+    },
+    "losing_run_diagnostics.csv": {
+      "bytes": 1053,
+      "sha256": "16039d6aff65c010ef7b5ad013922d7abb43c850269067cab9c3f4e53f8d34ab"
+    },
+    "matched_contrasts.csv": {
+      "bytes": 4889,
+      "sha256": "516b9ab71386d7f610595080bea976d1edc88359a9a2278be51a7aade4f99d08"
+    },
+    "n6_parity.json": {
+      "bytes": 2845,
+      "sha256": "ff4e87e32ea436f00e13ef6edc9d9b8085d7b2224a35bdbbd94ec6814c15ee49"
+    },
+    "path_bootstrap.csv": {
+      "bytes": 3136,
+      "sha256": "e1f6cf46132c496af053a26d3a56ef6e70a58dd7dcd2e0f8efab49f066552348"
+    },
+    "performance.csv": {
+      "bytes": 6475,
+      "sha256": "999282471a783ba53255f9e73049c669b909348795a1e6a55575dc94554b1901"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 2235,
+      "sha256": "cd330bc38d8ef3da1a5ac0d7215e86bbdc8a417f240205b23d192cbc376d3067"
+    },
+    "rolling_windows.csv": {
+      "bytes": 1958,
+      "sha256": "ce3ff71cf875abd13b6b383d72ae184a6250f7e21ee4b9f6aee57c3647a19541"
+    },
+    "source_receipt.json": {
+      "bytes": 2981,
+      "sha256": "5c1b2700490e92bdfc1f88cd3b21077ffa016bba87cc0364c873c61fb39bc4a6"
+    },
+    "support_attribution.parquet": {
+      "bytes": 61008,
+      "sha256": "5c05472f4262eb249313664469b9d94fbcdb448b413f4dad8254a74e623c43e1"
+    },
+    "tickets.parquet": {
+      "bytes": 38865,
+      "sha256": "5a0021342631a151ab377d052c68ece1b50d1b8016ad5a60f6427c7ccdff7950"
+    }
+  },
+  "frame_hashes": {
+    "action_ledger": "516bd822d389775d6126d14386ea67c8625e1d35be6996dc5ad5d7edde3f5421",
+    "actions": "68b7686752d2c046f399b38ff9bf50cf96c5f6c44da12f01932481b87e54815d",
+    "attribution": "64e18b8c28d16cc6f8808269bdd55bd931fdbd8294caf5020d8a24a7c73217e7",
+    "attribution_ledger": "ada5dcb16ede0c9b7d34c8d0e07124542ee12c4fe9efea8f4e9066c020381d8c",
+    "contrasts": "85f2890f7abf16bebce25da72e94fa69fc361772bdce938a5018cbb27ba4e29d",
+    "coverage": "919e5825e74c9ab97054568c07f44da87b62b2a5884b6bb02cea877937ce4bc2",
+    "decisions": "6af07da4f1295e1118480df7d96f83d945bb8ee7e2c3b9c77e552ee27b0c5f8c",
+    "issue_ledger": "59ee9b1761369f254afe0ab6fc274271b1c01ac6c5a45551778006636063728a",
+    "legacy_summary": "f9881aaaf466d52a2abbd8d08798271f40141a2debe1db9bb893dfcb6796eae8",
+    "path_bootstrap": "a1a2b864e4e5b3d75547d96ffddb371870fc2ca0cd9ed240faf46b4501788ad5",
+    "paths": "f6d090f897413c61df0b6917092005b22ec27e0d6d75f59118285c7b6a995613",
+    "performance": "93dbc9888519940c335c2b58b5a6481d0fc7ab7c0d24a224ba68c362c92187e7",
+    "risk": "11115d47cfa809f469b19532388880aa7447da3582deaa0a37210eb1e783318f",
+    "rolling": "c56ddf7c900b0d486acd37db0d1fc3aca48edf7c2b5ed807a98633764ecbb174",
+    "runs": "50b7c731ae9c42a813dd219038370a327ed49f9493d4141af013e1c912723288",
+    "saturation": "db559a05f35965b2beff41937aff33d18684d16e27c4779de25f1d5fdfd7797a",
+    "settled": "05cb5775d89f339a6f1faad33a1eefa53e74bdd24efbee963f6a85dfbaf8824a",
+    "ticket_ledger": "12f7523574596d4b78724392fca0051d108ed2b5d66734b2f8ac58442e107bc9",
+    "tickets": "0bea351ad42fba15d4b3822efec5ce55b08a4b74d11f71be6a7c04f19715757f",
+    "year_routing": "91d57b26d7c1d3a8d399ccecd9706a4e086781c71a4e793051bfec4f025900d3"
+  },
+  "implementation": {
+    "contract.py": "e84133d5d9790633b6546a2acb43068fdc862b22691210886e2cbabbaa9ee390",
+    "pipeline.py": "92954504139d4912389e32012ac5cb4bcde474a720161da342515286accec1f3"
+  }
+}
