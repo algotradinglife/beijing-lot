@@ -375,7 +375,7 @@ def _circular_block_indices(length: int, draws: int, rng: np.random.Generator) -
 
 
 def correlation_diagnostics(cal: pd.DataFrame, upstream: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    common = cal[cal[f"{N7_ARM_C0E0}_pnl_cny"] != 0].copy()  # exact-common 151
+    common = cal[cal[f"{N7_ARM_C0E0}_stake_cny"] > 0].copy()  # exact-common 151
     rows: list[dict[str, Any]] = []
     for left, right, kind in [
         (N6_ARM_R3, N7_ARM_C0E0, "pool"),
@@ -414,7 +414,7 @@ def _maximal_common_hits(
 
 
 def association_rates(cal: pd.DataFrame, upstream: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    common = cal[cal[f"{N7_ARM_C0E0}_pnl_cny"] != 0].copy()
+    common = cal[cal[f"{N7_ARM_C0E0}_stake_cny"] > 0].copy()
     lf = join_arm(common, upstream, N6_ARM_R3)
     rf = join_arm(common, upstream, N7_ARM_C0E0)
     p6 = lf["pnl_cny"].to_numpy(dtype=float) > 0
@@ -449,7 +449,7 @@ def association_rates(cal: pd.DataFrame, upstream: dict[str, pd.DataFrame]) -> p
 
 
 def losing_dependence(cal: pd.DataFrame, upstream: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    common = cal[cal[f"{N7_ARM_C0E0}_pnl_cny"] != 0].copy()
+    common = cal[cal[f"{N7_ARM_C0E0}_stake_cny"] > 0].copy()
     lf = join_arm(common, upstream, N6_ARM_R3)
     rf = join_arm(common, upstream, N7_ARM_C0E0)
     x = lf["pnl_cny"].to_numpy(dtype=float)
@@ -489,7 +489,7 @@ def losing_dependence(cal: pd.DataFrame, upstream: dict[str, pd.DataFrame]) -> p
 
 
 def tail_overlap(cal: pd.DataFrame, upstream: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    common = cal[cal[f"{N7_ARM_C0E0}_pnl_cny"] != 0].copy()
+    common = cal[cal[f"{N7_ARM_C0E0}_stake_cny"] > 0].copy()
     lf = join_arm(common, upstream, N6_ARM_R3)
     rf = join_arm(common, upstream, N7_ARM_C0E0)
     rows: list[dict[str, Any]] = []

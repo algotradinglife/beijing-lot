@@ -260,6 +260,16 @@ def test_correlation_matches_frozen_hand_computation():
     assert sanity["spearman_rho"] == pytest.approx(1.0, abs=1e-12)
 
 
+def test_exact_common_denominator_uses_activity_not_nonzero_pnl():
+    upstream = load_upstream(REPO_ROOT)
+    calendar = build_expert_calendar(upstream)
+    active = calendar[f"{C.N7_ARM_C0E0}_stake_cny"].gt(0)
+    issue = calendar.loc[active, "issue"].iloc[0]
+    calendar.loc[calendar["issue"].eq(issue), f"{C.N7_ARM_C0E0}_pnl_cny"] = 0.0
+    diagnostics = correlation_diagnostics(calendar, upstream)
+    assert set(diagnostics["issues"]) == {C.EXPECTED_COMMON_ISSUES}
+
+
 def test_full_build_and_verify_roundtrip():
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "package"
