@@ -1,0 +1,146 @@
+{
+  "consumed_settlement_sha256": "41970b40df0962eeba96865cabeaeaaabf97a5a63e0645088220986f8be418cf",
+  "contract": "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1",
+  "dev_years": [
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "external_data_root_committed": false,
+  "fixtures": 1057,
+  "issues": 151,
+  "upstream_actions_sha256": "68b7686752d2c046f399b38ff9bf50cf96c5f6c44da12f01932481b87e54815d",
+  "upstream_contract": "BJ-UNIFIED-N7-CHRONOLOGY-SYNC-001/v1",
+  "upstream_decisions_sha256": "469cb42e5bcaa8f20116f211f9ec649118a2573a598c3338d789448c894328d7",
+  "upstream_manifest": {
+    "contract": "BJ-UNIFIED-N7-CHRONOLOGY-SYNC-001/v1",
+    "delivery": {
+      "docs/research/Issue-366-N7-Chronology-Sync.md": "3d0bec84de207d71d10408339147ced82eecf1e454a1343997e54b7095b73ec7",
+      "docs/research/figures/issue_366_corrected_n7_capital.png": "056f51c6a92d488d2c576b2ecd6ff90d764099ca4336696439ea26471045abba",
+      "notebooks/research/n7-chronology-sync/n7_chronology_sync.ipynb": "01003ac5bac22a09a4e7cffacead33c6c68cb01fe75028a362c6e3361b5ab421"
+    },
+    "files": {
+      "action_receipts.parquet": {
+        "bytes": 5993249,
+        "sha256": "7240d92f45937d53f0a61606654d474af70b8de0a1397327f78134c66aafd385"
+      },
+      "bootstrap_lift.csv": {
+        "bytes": 515,
+        "sha256": "bb3174f92012cf56f81a1d335b423fe7c9386272e42dde4d0d03dd8f6dae2f8f"
+      },
+      "capital_paths.csv": {
+        "bytes": 45730,
+        "sha256": "168c31cb8c2c6d8c76d4f18d1dbd043f289dc3921cb96d6fcd74e3d8ba1aaa61"
+      },
+      "coverage_ledger.csv": {
+        "bytes": 9354,
+        "sha256": "255ec225e039d2c8a8e1bdd7c86f971b2e225b900aadd052fc666a3de3daf96f"
+      },
+      "decision.json": {
+        "bytes": 492,
+        "sha256": "bd4aab0428112a36475880bc17ee762bbd5a263d3c92296d3c60f472ce5a3c1a"
+      },
+      "decisions.parquet": {
+        "bytes": 21294,
+        "sha256": "2ca728027dde24fd9a95c395a18a71f2a2b8ea5b1a4398ee28a250afbb99c532"
+      },
+      "downstream_inventory.csv": {
+        "bytes": 782,
+        "sha256": "6bed6b63d34819606d98aef2bf4763434716dbbb1b33efbbb87e0590f69b3eea"
+      },
+      "issue_bundles.parquet": {
+        "bytes": 22481,
+        "sha256": "a4220a25ffcf57c4dd14b1af2f3d207a54b19d9a04b37da5643cc09635f8de37"
+      },
+      "legacy_action_parity.parquet": {
+        "bytes": 9760262,
+        "sha256": "05ba52514659f2b1a3c6321a7c7c667cff426aa28dc0072fef912471da639a91"
+      },
+      "legacy_issue_parity.parquet": {
+        "bytes": 52795,
+        "sha256": "fb83e911ad26a46d2650d2d5e363266a4ca2c6253362a88d929f718cc05b3df3"
+      },
+      "legacy_ticket_parity.parquet": {
+        "bytes": 104471,
+        "sha256": "a3382e88e4efeb9277413d1690a4818782b4049e9099eeaa622c14a5272bf68e"
+      },
+      "parity_summary.csv": {
+        "bytes": 276,
+        "sha256": "3bb8a88f1212a5059ab136e388e1535d18b4c756aab9e8c70e24443acbd2e1c6"
+      },
+      "performance.csv": {
+        "bytes": 1179,
+        "sha256": "4e40f41171d2b898d649ce01902bb0b824a48a0054a9b9ad2fcfa457a77a3f5d"
+      },
+      "risk_diagnostics.csv": {
+        "bytes": 683,
+        "sha256": "782e8167d60c7145e243f861c04041fda7808015e31c8576ffa167a4b9d77276"
+      },
+      "source_receipt.json": {
+        "bytes": 1182,
+        "sha256": "05ea3b9a6d2a6772f638ce4bfc63fac9d288db9b2d680638da05313eeaae1c62"
+      },
+      "support_attribution.parquet": {
+        "bytes": 47667,
+        "sha256": "6f66eaf7db745817654a6226812869652193a589a9c6832bde522c294b5c1f60"
+      },
+      "tickets.parquet": {
+        "bytes": 58423,
+        "sha256": "124c4c13c1cd75502f521c57e4691782f5b192847a4c7f20545607cf77ab6209"
+      }
+    },
+    "frame_hashes": {
+      "action_parity": "629b81d5f6cdff32c4a81afdb84d5fb445ad580deeff55201216101461e1c7eb",
+      "actions": "68b7686752d2c046f399b38ff9bf50cf96c5f6c44da12f01932481b87e54815d",
+      "attribution": "d8e20579e13ac14a144f9ca074a7f03819465ba1c143d443891968b2d6b618ea",
+      "bootstrap": "e2523d6281b97076e07bf73bcdec244d092fdde82d21a3711aab6e708e5c5c13",
+      "coverage": "c7020f010c4f4d9909af70862fc719a7f8f4e2c4ecf9f4908765ba82cf0351cd",
+      "decisions": "469cb42e5bcaa8f20116f211f9ec649118a2573a598c3338d789448c894328d7",
+      "downstream": "bf9a0d7081bc72c62bc70123fcdcbcff8aefc3566e2454fec8816b65da04bb8c",
+      "issue_parity": "80f5c473f481f75135be7dad417db728b6ebfc241fb384cad7461c1e73de5a99",
+      "parity_summary": "921575a340d76c1f8d0ca754e8b635ae94aebaee81d798ef21177ecfcb4c61bb",
+      "paths": "2671cc8ce4a504939acc5592fc680a846fd91cc49e9216ca0841df73f9b0e16a",
+      "performance": "43d228a40b5ec8dc235fca1d1f12d2fbaa7046a9eb85e25167eb0ac282590d0a",
+      "risk": "48884851c5ca938b9c2d18911fe0e6174a1aad33b29038602ac896a390559691",
+      "settled": "18c6f7b4f5150a301f9ff9afb7aa6b9aba06113e9e6f689ef1ce60efccd5bdb7",
+      "ticket_parity": "72b74ab231cfb2bfb36eb241476b2c02b590bb672bd0dae546727bc46d2285c4",
+      "tickets": "6a57489ef6c5ee677341f041463e703291c3aa257042bc911fd7f203a1fde81b"
+    },
+    "implementation": {
+      "contract.py": "4f228bb7bd67115bb3e30e1d543f4ef373e40072f518b32b818c32b84a31c86e",
+      "pipeline.py": "b816718f2f9d4f37de3377fa21c5c7cd6989e5c99bbdfa7fec11548abb58a5d4"
+    }
+  },
+  "upstream_package": "results/n7_chronology_sync",
+  "upstream_source_receipt": {
+    "cells": 145974,
+    "chronology": "SOURCE_ISSUE_REGISTRY_YEAR + FIXTURE_RELATIVE_10H",
+    "consumed_settlement_sha256": "41970b40df0962eeba96865cabeaeaaabf97a5a63e0645088220986f8be418cf",
+    "contract": "BJ-UNIFIED-N7-CHRONOLOGY-SYNC-001/v1",
+    "corrected_cells_sha256": "fad0598d2319dd9948204029ed47660c523e02677ea939dc428b5a8d064f4000",
+    "corrected_labels_sha256": "5279746f72a7fdc23160587dacbb413046ea92336599a93b632d0ea1619de134",
+    "corrected_source_contract": "BJ-UNIFIED-LOWN-CHRONOLOGY-CORRECTION-001/v2",
+    "external_data_root_committed": false,
+    "fixtures": 48658,
+    "issues": 172,
+    "upstream_files": {
+      "FREEZE_RECEIPT.json": "8ce2dd0c75c124d727ef535ae472bd0ff9cfe113095afa2a56ae766464fd00a7",
+      "SOURCE_RECEIPT.json": "c10740f71cd9e10f7128400af86113c7566e95561d4f3ff59c53e2f71e5cd7ce",
+      "features/selector_cells.parquet": "c30e67d90146ac09ad2b6e0078a479942c8c0a15b05b9310e835455e3e177893",
+      "features/selector_features.parquet": "458eca1d98a38350017d58c16ccda33d05eda9d7f0e275f68ef4253fa539f1da",
+      "labels/selector_labels.parquet": "5e3298846ac3db56059f4d9f9d957caa13932625e7ed17c73294ff420cf3991e"
+    },
+    "years": [
+      2022,
+      2023,
+      2024
+    ]
+  },
+  "years": [
+    2022,
+    2023,
+    2024
+  ]
+}

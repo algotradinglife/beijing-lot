@@ -1,0 +1,21 @@
+{
+  "check_count": 4,
+  "contract": "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1",
+  "dev_fixtures": 714,
+  "dev_issues": 102,
+  "dev_years": [
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ],
+  "pass": false,
+  "pre_registered_thresholds": {
+    "calibration_bin_abs_tol": 0.1,
+    "calibration_global_abs_tol": 0.05,
+    "min_bin_n": 50,
+    "min_bins": 8,
+    "monotone_spearman_min": 0.8
+  }
+}

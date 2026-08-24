@@ -1,0 +1,82 @@
+{
+  "contract": "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1",
+  "files": {
+    "capital_paths.csv": {
+      "bytes": 258435,
+      "sha256": "75ea2073e535714fc34745d0895f1d1f73c25e310efb3414b217f7cf0686fcd0"
+    },
+    "contrasts.csv": {
+      "bytes": 1416,
+      "sha256": "d87fa5a92cd81375b54833bfa034808a821f286cb3827abf9056274f69e0e2f4"
+    },
+    "decision.json": {
+      "bytes": 781,
+      "sha256": "8bcd85c6ee7e50f5a638b3efa1fe1e14cb85a547c6bf8ec7e0c6e8ec290cbbdc"
+    },
+    "decisions.parquet": {
+      "bytes": 16894,
+      "sha256": "cac583da9e26e2ac5ebe556e0ea9d6c8da6d245025d5952b2ae63344f7953d09"
+    },
+    "dev_diagnostic.json": {
+      "bytes": 394,
+      "sha256": "01ee90e01c46e0f39510633b8c463d7f09d63d008caf41c8d93f8d8bb78aeb1d"
+    },
+    "dev_diagnostic.parquet": {
+      "bytes": 8770,
+      "sha256": "556141106f26668c66962a4b44ab0593c8dc69e79774ddc53a57d442fb08720b"
+    },
+    "expert_gate.csv": {
+      "bytes": 1525,
+      "sha256": "8ece1af73d8dd735f85800b6c484a39f7c9fbae1b26632ddbab290f5834d4405"
+    },
+    "issue_bundles.parquet": {
+      "bytes": 20731,
+      "sha256": "8054c1bbb6b7fc0ac3390135d57fb788a539055504df8456aaef3869e5974a46"
+    },
+    "mechanism.csv": {
+      "bytes": 942,
+      "sha256": "f4663761659c0b7bc3b301dbbbd09a9d0728a46c3770511a3738ed3b0bb7d24c"
+    },
+    "performance.csv": {
+      "bytes": 6321,
+      "sha256": "6a41782dfb3234aab5ff831d9e4114d3f7a32c0b9df4cb348d3617e64d5f9a62"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 3079,
+      "sha256": "34511a9f822b120a74e6a1f734fa1b21a9b2e14afb8f90dcbbb01d0bc3e616f0"
+    },
+    "source_receipt.json": {
+      "bytes": 6544,
+      "sha256": "42aaa239e1ee171e4c8ce6489d69508c6e384269f8dae1f44585b614b7419d8a"
+    },
+    "support_features.parquet": {
+      "bytes": 92621,
+      "sha256": "e932cc0bd2902cca026d99376808df3c253618c045988628604234bd9796a9bd"
+    },
+    "tickets.parquet": {
+      "bytes": 9783316,
+      "sha256": "8a26f44102ad1efa506d80547a25e0c84212eff2422a40b5c23b5c7537bd530e"
+    }
+  },
+  "frame_hashes": {
+    "bundles": "07b8ad3a8e3ed4c723def2ea2a394d3036368c03d9c79db90fdbd6ecb54ccbc7",
+    "contrasts": "80cfcb5440b26c933cac37eda67352c1f70061a2416e362ecb0342ca893e4432",
+    "decisions": "e268894b87a40f85d337d830b19a5e8da8c62ebfcd4e4ee365670d8bc8a08e7f",
+    "dev_check": "8536a9b87a424fc81a4348e0d9e30a4baa45f8b405eeea6afc8dcbffe461266d",
+    "expert_gate": "571c0fba62bf24eed6f83a58085176edf5fe5a5eb5d7f0e52e68b0b88e5cb86c",
+    "mechanism": "f5f5861c94b1fd502231a78d797f3a25237cb594e6e9984db229fcc209faac1b",
+    "paths": "7f7be087b9c0204bacb3dab4111067dba53aa884b1c8d9a9faa9142487bd48d1",
+    "performance": "60b28ba25cb7acbb045e043b261fad6f9434f91a7a809cdd3cb1d0f9eb3128ca",
+    "risk": "29d8128333892f537c2c65532f3bfdd70325ac0cfd2a303c920e545719337f1c",
+    "support_features": "a171c53db479967ecd1e9ba91d89c305c8ca147af8f051d07f542dee486d276a",
+    "tickets": "2bd4b888df33ed7861916dc25fd69318f8fd27ac3ed6793a702591800c1dbf0d"
+  },
+  "implementation": {
+    "contract.py": "7dfb9d293209daedc84e109a2687d5564a734ab11a077298c683460bc19a880f",
+    "pipeline.py": "fd16834148aca8a06d98aeb87c3d5504efafe3f195215b366cfb26ce3a48f17b"
+  },
+  "upstream": {
+    "manifest_sha256": "f0a592fdcb7ebc8292c913cedbb0f3472f1ecb04d94cde3712b22a9e8fbbe271",
+    "package": "results/n7_chronology_sync"
+  }
+}

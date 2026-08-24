@@ -1,0 +1,40 @@
+"""Frozen constants for BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1 (Issue #369)."""
+
+from pathlib import Path
+
+CONTRACT_ID = "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1"
+ISSUE_NUMBER = 369
+N_LEGS = 7
+OUTCOMES = ("3", "1", "0")
+YEARS = (2022, 2023, 2024)
+DEV_YEARS = (2017, 2018, 2019, 2020, 2021)
+BASES = ("R0_CORRECTED", "R3_CORRECTED")
+SHAPES = ("CONTROL", "CONTRACTION_ONLY", "EXPANSION_ONLY", "BOTH")
+TREATMENT_SHAPES = ("CONTRACTION_ONLY", "EXPANSION_ONLY", "BOTH")
+BASE_ARM_OF = {"R0_CORRECTED": "R0", "R3_CORRECTED": "R3"}
+
+# Ticket cartesian sizes and unit tables (frozen by the contract).
+TICKETS_PER_SHAPE = {"CONTROL": 128, "CONTRACTION_ONLY": 64, "EXPANSION_ONLY": 192, "BOTH": 96}
+# Base units every ticket receives before deterministic extra-unit assignment.
+BASE_UNITS = {"CONTROL": 4, "CONTRACTION_ONLY": 8, "EXPANSION_ONLY": 2, "BOTH": 5}
+# Number of tickets that receive one extra unit (lowest SHA-256 identities).
+EXTRA_UNIT_TICKETS = {"CONTROL": 0, "CONTRACTION_ONLY": 0, "EXPANSION_ONLY": 128, "BOTH": 32}
+
+FUNDED_UNITS = 512
+STAKE_PER_UNIT_CNY = 2.0
+ISSUE_STAKE_CNY = FUNDED_UNITS * STAKE_PER_UNIT_CNY  # 1_024.0
+PAYOUT_FACTOR = 0.65
+STARTING_CAPITAL_CNY = 100_000.0
+BOOTSTRAP_DRAWS = 2_000
+BOOTSTRAP_SEED = 369_001
+
+UPSTREAM_PACKAGE = Path("results/n7_chronology_sync")
+SELECTOR_PACKAGE = Path("results/low_n_selector_data")
+RESULT_PACKAGE = Path("results/n7_support_shape")
+
+# OOF 2017–2021 development diagnostic pre-registered thresholds.
+DIAG_MIN_BINS = 8
+DIAG_MIN_BIN_N = 50
+DIAG_MONOTONE_SPEARMAN_MIN = 0.80
+DIAG_CALIBRATION_BIN_ABS_TOL = 0.10
+DIAG_CALIBRATION_GLOBAL_ABS_TOL = 0.05

@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.n7_support_shape.pipeline import verify_package
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--data-root", type=Path)
+    parser.add_argument("--package", type=Path)
+    args = parser.parse_args()
+    root = args.repo_root.resolve()
+    package = (args.package or root / "results/n7_support_shape").resolve()
+    checks = verify_package(root, package, args.data_root)
+    print(
+        json_dumps({"contract": "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1", "checks": checks, "status": "PASS"})
+    )
+
+
+def json_dumps(value: object) -> str:
+    import json
+    return json.dumps(value, indent=2, sort_keys=True)
+
+
+if __name__ == "__main__":
+    main()
