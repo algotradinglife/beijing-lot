@@ -183,3 +183,7 @@ evidence/bj_freeze_review_001/.publish.lock
 !results/
 !results/value_veto_r3_n7/
 !results/value_veto_r3_n7/**
+
+# Issue #383 source-bound walk-forward diagnostic package.
+!results/cutoff_walkforward/
+!results/cutoff_walkforward/**
