@@ -1,0 +1,9 @@
+{
+  "admitted_experts": [],
+  "contract": "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1",
+  "control_parity_exact": true,
+  "expert_pool_rule": "STANDALONE_POSITIVE_AND_ROBUST_ONLY",
+  "notes": "Exposed historical support-shape evidence; does not alter #210/#218.",
+  "promotable_to_210": false,
+  "verdict": "NO_PROMOTION"
+}

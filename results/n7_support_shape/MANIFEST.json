@@ -1,0 +1,104 @@
+{
+  "contract": "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1",
+  "delivery": {
+    "docs/research/Issue-369-N7-Support-Shape.md": "b24348adbc9fd09850fc3694a70a8d677e86932889a4306b75093eff9515620e",
+    "docs/research/figures/issue_369_support_shape_capital.png": "4373c1a7b91b1bc277908fb1ec292e0f4c61a5cd1bd574afc51a88b8bf8273f5",
+    "notebooks/research/n7-support-shape/n7_support_shape.ipynb": "fbfcb6f25ee654acb54e965006e1068f24b437774bf2e108c4afd3e29f9a5be6"
+  },
+  "files": {
+    "bootstrap.csv": {
+      "bytes": 12001,
+      "sha256": "b0cc0009b8e496078db2b68ac9529de6a01f12ffac4aac3b4adc5d022fe3d8aa"
+    },
+    "capital_paths.csv": {
+      "bytes": 233644,
+      "sha256": "f472cd3aa7b4599eea6f66087fe799715069582aa7d1e6d06aae713438507ed6"
+    },
+    "contrasts.csv": {
+      "bytes": 6439,
+      "sha256": "2cc523a9341f42d6aa045d1633928e1560fb3c6102eda497e1d7c118dfd97276"
+    },
+    "control_parity.parquet": {
+      "bytes": 19696,
+      "sha256": "5b7a5d308aeabdbd015952f9f3b29d731d628df30c34ce4115bdca165547dfaf"
+    },
+    "coverage_ledger.csv": {
+      "bytes": 9343,
+      "sha256": "3faf1f85cc7a3375ecee5178e058bafb9c71edcbfbcd988cfad3e5933b9878c9"
+    },
+    "decision.json": {
+      "bytes": 316,
+      "sha256": "6e5f978f6e59402590f5f5e487b8b5bc06d2df861292ea985da8aedd5521c7e5"
+    },
+    "decisions.parquet": {
+      "bytes": 38108,
+      "sha256": "13ef264220d271dd282b3bb7f514e918ee4bb9a4adb2e52125d462dbed4895ce"
+    },
+    "development_score_bins.csv": {
+      "bytes": 3042,
+      "sha256": "fb5c0c45f5f2c56f497b672523a7f497442f86873a08b8caf4bdcb4bcc990027"
+    },
+    "development_score_summary.csv": {
+      "bytes": 534,
+      "sha256": "aedcd7303f0e60b7f95c7c545d1e16b55fa51aeefeadc34faf969dc61a61f332"
+    },
+    "expert_admission.csv": {
+      "bytes": 571,
+      "sha256": "cd80d9cde3c4f90cb399ac47a6b2921168a113d7cb04a3d1f4f48d78304ab43a"
+    },
+    "integer_allocation_effect.csv": {
+      "bytes": 2696,
+      "sha256": "6453b2f5d55e109d1b0e4c4cae51f5b1f3c674258781b92c8c93947ff8621312"
+    },
+    "issue_bundles.parquet": {
+      "bytes": 22909,
+      "sha256": "45f98183bab26b231481d8e2214ea98ae0351d1815badef2d39df578a00df829"
+    },
+    "performance.csv": {
+      "bytes": 6350,
+      "sha256": "b140f1219c1f88dd3cb700adaa1a1e36239b5f5143d195e6ee6d703fee07a88c"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 3079,
+      "sha256": "34511a9f822b120a74e6a1f734fa1b21a9b2e14afb8f90dcbbb01d0bc3e616f0"
+    },
+    "shape_pair_receipts.parquet": {
+      "bytes": 47816,
+      "sha256": "1bb3b30549b5a3b8d8e72de43cf2c1203b8d13e0efcd73457baecf78b7937baf"
+    },
+    "source_receipt.json": {
+      "bytes": 754,
+      "sha256": "be124885309098fe386ee39257bce47d9a8ebee0bef471c61ab0602f9307516c"
+    },
+    "support_attribution.parquet": {
+      "bytes": 105815,
+      "sha256": "87a0dc56ee4795d8de146f2aaf08d00eb32a08c0c71adebc3e260408528f5e7e"
+    },
+    "tickets.parquet": {
+      "bytes": 214716,
+      "sha256": "8b85a163000c49b3c006f1c2561beda06c8fb723d3254163a21ddffd0ba3ceef"
+    }
+  },
+  "frame_hashes": {
+    "admission": "972c54b45d0c2c952cd9391e1f6139944e4950e6735e6c869b891e2d88a70e54",
+    "attribution": "cb29f521a2f602fd4782f34f05232ed609cad91d6f892f5aacaad8386926f11e",
+    "bootstrap": "a52b0d306c239af9d88e01e3ba2615f57d7d641cf1deabe6ae729dfcfc1efead",
+    "bundles": "678a23e75e7f5c042730df2366192a8bd6581840a622de12ff27ba61d1990aad",
+    "contrasts": "14c08df8d8e8eb49023fce12279da88bb6c7684ccf47d521bc84f7ecb60c5065",
+    "control_parity": "424b1b837fd07b8fee15c8f17a6a043e7ee1c91a7bd2b9a664652029c2a0991e",
+    "coverage": "bf7bf588ddb69cf9efb2f5e0d9f010ef1fdc2362f46659fc84cb5a589d9d7fb3",
+    "decisions": "3430bb0e181822222e22029204b4ffea4b38342a882f911916fe7ec3731e6ae9",
+    "dev_bins": "2391f43305237361dc78fef039ae96e6a5ba2df3675cf0171aa7ca83d24bb5dc",
+    "dev_summary": "d5203e8f802c60d4d371ee62f621e24413a3b379b4638a368174ee514fdac3f3",
+    "integer": "3a4ad2f0379d18569d8fb0c02f8a4feadc8a092d6f1d6f01955b091f7c125cdd",
+    "pair_receipts": "89d1c6faf21da201bbe0c5129c6a62c2df36842439501c679b9fb05e288148fa",
+    "paths": "93da95239e8a3cff7cf53aff066be5dde58640d3546be92d35db7d23b037ca68",
+    "performance": "fd19070e253ee8c6fd697efc83894ca558702266fbcc292eabcb52a54eff721b",
+    "risk": "29d8128333892f537c2c65532f3bfdd70325ac0cfd2a303c920e545719337f1c",
+    "tickets": "68067beac6e53a665ec90be16c40e38b56a87c7660f900e772fda550ab1e1403"
+  },
+  "implementation": {
+    "contract.py": "00bc1cf7024084a8755c77f178acc3ecf77ff1c3ed986daf2ea331df56ea7cd6",
+    "pipeline.py": "8a05ae4f95eff97af3e0844a28545736a854e1b1deeec65e3b310fc61715abc7"
+  }
+}
