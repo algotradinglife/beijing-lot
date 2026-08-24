@@ -1,0 +1,13 @@
+{
+  "bootstrap_p025_cny": -45894.80301775735,
+  "contract": "BJ-UNIFIED-N6-CHRONOLOGY-SYNC-001/v1",
+  "corrected_r0_pnl_cny": -33511.091628594215,
+  "corrected_r3_lift_r0_cny": 21211.10198703047,
+  "corrected_r3_pnl_cny": -12299.989641563741,
+  "evidence_boundary": "EXPOSED_HISTORICAL_CHRONOLOGY_SYNCHRONIZATION",
+  "legacy_changed_pnl_rows": 27,
+  "legacy_common_issue_arm_rows": 304,
+  "legacy_conclusion_changed": true,
+  "promotable_to_210": false,
+  "verdict": "CORRECTED_R3_CANONICAL"
+}

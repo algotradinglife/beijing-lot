@@ -1,0 +1,4 @@
+layer,old_rows,new_rows,common_rows,exact_rows,year_exact_rows,fixture_exact_rows,support_exact_rows,settlement_exact_rows,score_exact_rows
+issue_arm,318,304,304,10,288.0,206.0,12.0,277.0,
+ticket_design,362,344,344,344,,,,,
+action,51917,48658,48658,8630,45954.0,,22489.0,,14442.0

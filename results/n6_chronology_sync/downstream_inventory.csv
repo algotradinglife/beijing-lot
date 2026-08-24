@@ -1,0 +1,5 @@
+issue,package,disposition,reason
+348,multin_top2_r0,N6_ROW_SUPERSEDED,legacy anchor and year routing are non-canonical
+349,multin_fixed_rn,N6_ROW_SUPERSEDED,legacy candidate surface is chronology-exposed
+352,multin_r_diagnostic,COMPARISON_ONLY,descriptive old-anchor N6 rows cannot feed future experts
+376,n6_chronology_sync,CANONICAL_R0_R3,direct corrected-source rebuild

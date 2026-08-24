@@ -1,0 +1,99 @@
+{
+  "contract": "BJ-UNIFIED-N6-CHRONOLOGY-SYNC-001/v1",
+  "delivery": {
+    "docs/research/Issue-376-N6-Chronology-Sync.md": "a11f8f096cbd418f608a7c2819d7ff2dbb02c5ba8959e3b10b1a4bbbaf2cbc55",
+    "docs/research/figures/issue_376_corrected_n6_capital.png": "7ee6a1c24d60c01c45b6d04a5594d4983c374ee7dd4f3cb9dac3842b83f38494",
+    "notebooks/research/n6-chronology-sync/n6_chronology_sync.ipynb": "b60d9504ad27e0a16a525d68d892390198028fc24762d690b1fe807673773106"
+  },
+  "files": {
+    "action_receipts.parquet": {
+      "bytes": 5993249,
+      "sha256": "7240d92f45937d53f0a61606654d474af70b8de0a1397327f78134c66aafd385"
+    },
+    "bootstrap_lift.csv": {
+      "bytes": 519,
+      "sha256": "4a6488722a340cbcd18e64e6729eed116f75e2251b794994092ef145d55afbc9"
+    },
+    "capital_paths.csv": {
+      "bytes": 46351,
+      "sha256": "75f4a92a31680390ce0516d78226edd3d19db1c6c4739e08ca76bea57066cc38"
+    },
+    "coverage_ledger.csv": {
+      "bytes": 9331,
+      "sha256": "3aaa1f79fd95e0f5d8a638cb02671509ca51b2902161ee24c41c43942e7305a3"
+    },
+    "decision.json": {
+      "bytes": 494,
+      "sha256": "4b0447420c4dc7f36fe93a289c7748fb3798fe730a4acb49a80640bc7d6fb8ac"
+    },
+    "decisions.parquet": {
+      "bytes": 19936,
+      "sha256": "1ba1ef95734a8a918537019a5d36450d205a4a9e7bab6cad1a613d120191f316"
+    },
+    "downstream_inventory.csv": {
+      "bytes": 373,
+      "sha256": "2d42657823ef16bf97d99ec31a06639e91f3b67a9d54c77dfb87c13abb7578ed"
+    },
+    "issue_bundles.parquet": {
+      "bytes": 21353,
+      "sha256": "a033222ecb041168929f681efff19ed20e153786db526fa91e33d961961f114f"
+    },
+    "legacy_action_parity.parquet": {
+      "bytes": 6953477,
+      "sha256": "ea02a8b6d11e8c8268b6179925363306b9f6cfb307f5d19735193403fc4f676e"
+    },
+    "legacy_issue_parity.parquet": {
+      "bytes": 51985,
+      "sha256": "9119582b043fbc838bbbfa0b6930451da16bc7d1a9672e70eb6c8d00a6ef6009"
+    },
+    "legacy_ticket_parity.parquet": {
+      "bytes": 8365,
+      "sha256": "f29b4343f36ef1b1d519fbf5d540ae4d34cb34310fcfa58a894b2c6bc1140175"
+    },
+    "parity_summary.csv": {
+      "bytes": 280,
+      "sha256": "70f8ea1bf30eb173c312229198424becbba93eeaf70cfa61d5afd594dd9dad0e"
+    },
+    "performance.csv": {
+      "bytes": 1186,
+      "sha256": "c2fca41be27aea6807cd045d0c7457517724fb9d16fae6e44512811d6b40d34a"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 681,
+      "sha256": "52c63a275fdcc766cda23b68a7a1ae851443007579d7f1e66426a92f711e04c7"
+    },
+    "source_receipt.json": {
+      "bytes": 1856,
+      "sha256": "0a796ba98fcec94bb434143661910a13500cc3b31c0523b7546be6c526d33cab"
+    },
+    "support_attribution.parquet": {
+      "bytes": 41974,
+      "sha256": "974666500453fdab4ac6e3892c33790440213375583c621a557a7b15ff1738ba"
+    },
+    "tickets.parquet": {
+      "bytes": 22473,
+      "sha256": "49a791e8c29cb6e290698a2d175276eecdd1299718bea02e153fa3080f818ea2"
+    }
+  },
+  "frame_hashes": {
+    "action_parity": "74c0cfe8e9a3a3d8d41c39a279768b3f337d393794b31ba43370c5fb8bed798f",
+    "actions": "68b7686752d2c046f399b38ff9bf50cf96c5f6c44da12f01932481b87e54815d",
+    "attribution": "c3bc5faa3390d6824f58aba79927902869eb777523b34de921585d73ebc24c9d",
+    "bootstrap": "f883eae87595a410e50e2860a80fe7600b07b1de91208c0c87931facbdf3ab77",
+    "coverage": "919e5825e74c9ab97054568c07f44da87b62b2a5884b6bb02cea877937ce4bc2",
+    "decisions": "ce6a6c8e4fd9349882844ee342f35f96babde7aad2e7101ca48a7fe947ce3cc9",
+    "downstream": "3827ef1ac1c5a0ab2023b5d06c4177f5e0ad7d9e2169f009bd4b7c93f5e3e76d",
+    "issue_parity": "ed1b6fbe59431e8e9b2eb7f28a1efb66a0f555ef63f28b3ca75a7b5af9b6cfe1",
+    "parity_summary": "92e4e5bf0f7713cf13f5f8e67db2bd492adaa0f74448d9cc8fc610e4b08ed13b",
+    "paths": "986b20804c189b87c12f81de698bd198b86c918a6b6088f4d6f16b90bd2e319f",
+    "performance": "06055873b0bda69f6a9922d1d3db449581d6d3c68edc24e2d89b7960dfd0b517",
+    "risk": "8656d7e06ec7750f2e01fb638ab77154592ec2c6e97f2a57d6836c7f3084ec02",
+    "settled": "8b402019100409bdbe7d2fe9ea99fefd1d092eaf618d004b3ce453e491bd19cc",
+    "ticket_parity": "f6e2a9a5e0b518d4cd95b5135e1ed3e3dc623bde37812f6160dc14ce42352e92",
+    "tickets": "78ddd42f279212ea0895d591b5e6158726cc28f9d32d920b7df3e8ef41b97fe3"
+  },
+  "implementation": {
+    "contract.py": "89735a50b16ab631932c29be83bf6f211d2df1466b8bbdf23bd10281a1653f87",
+    "pipeline.py": "a4767748488830720fd93a576da3a85dee23eb781c531a147b272b66e5702d2c"
+  }
+}
