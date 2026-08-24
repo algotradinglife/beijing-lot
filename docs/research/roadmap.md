@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-24 (#355 low-N coverage selector settled; European-value proxy split into #358 → #359)**
+Updated: **2026-08-24 (#358 European-value proxy and #359 low-N selector factorial settled)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -237,7 +237,7 @@ PI interpretation and does not replace those edges or Project states.
        |                         |
        v                         v
 #358 causal 10h European      #359 coverage × value selector
-average-odds proxy (Ready)    (Ready; blocked by #355 and #358)
+average-odds proxy (Done)     (Done; historical signal, no deployment claim)
        \_________________________/
                     |
                     v
@@ -293,8 +293,8 @@ average-odds proxy (Ready)    (Ready; blocked by #355 and #358)
 | 39 | [#354] strictly-prior low-N selector data | Closed / Done; chronology superseded | M1 | Parent #202; historical handoff to #355 | Post-merge EV found that latest-kickoff year routing shifted 62 issues and admitted future labels. Probability arithmetic remains descriptive, but the original annual/causal handoff is superseded by #360 |
 | 40 | [#360] low-N chronology and outcome-grain correction | Closed / Done | M1 | Parent #202; corrective blocker for #355/#358 | Registry-year routing, explicit 10h decision and conservative label-availability timestamps, issue-unit coverage and exact M×3 cells close all three #354 known errors. The corrected 132,408-fixture panel is the only authorized #355 input |
 | 41 | [#355] fixed-Top2 low-N match selector | Closed / Done | M3 | Parent #202; #354/#360 closed; blocks #359/#356 | Corrected replay keeps S2 only by tiny OOF calibration gains. On 151 matched N4 issues its all-transfer lift is CNY+2,308, but annual lift reverses to CNY−7,683 in 2024, bootstrap p05 is negative, and matched drawdown/loss run worsens from 27.35%/8 to 27.69%/13. N3/N5 lifts are negative. `NO_PROMOTION`; preserve S0 and carry only the weak value clue into #358/#359 |
-| 42 | [#358] causal 10h European-average-odds value proxy | Open / Ready | M1 | Parent #202; #360 closed; blocks #359 | Build `EUROPEAN_AVERAGE_ODDS_PROXY` with timestamp/bookmaker/overround/devig/missingness receipts. It is an expected-return proxy, never official Beijing SP or an exact payout claim |
-| 43 | [#359] low-N coverage × European-value frontier | Open / Ready | M3 | Parent #202; blockedBy #355 and #358; blocks #356 | Compare S0, frozen #355 coverage-only, value-only and combined coverage/value selectors. Apply 0.65 once at complete-ticket expectation and keep outcome support fixed for attributable match-selection evidence |
+| 42 | [#358] causal 10h European-average-odds value proxy | Closed / Done | M1 | Parent #202; #360 closed; predecessor of #359 | Corrected `EUROPEAN_AVERAGE_ODDS_PROXY` uses `sum_Top2(p×odds)/2` per-stake leg contribution and applies 0.65 once to the complete N-fold proxy. All 397,224 M×3 cells carry source/quality receipts; it is not official Beijing SP or an exact payout claim |
+| 43 | [#359] low-N coverage × European-value frontier | Closed / Done | M3 | Parent #202; #355/#358 closed; blocks #356 | Exact S0 and #355 diagnostic parity. N3 value-only lifts matched 2022–2024 PnL by CNY4,792; N4 coverage+value lifts by CNY6,663 and remains +CNY8,086 ex-largest. Both bootstrap p05 values cross zero and absolute capital remains below CNY100k. `HISTORICAL_SIGNAL`, not deployable Edge; gap-only has no repeatable increment |
 | 44 | [#356] selective third-outcome protection | Open / Inbox | M3 | Parent #202; blockedBy #355 and #359 | Test additive protection only after the match selector/value frontier is frozen, so match selection and outcome support remain separately attributable |
 | 45 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
 | 46 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
@@ -443,12 +443,11 @@ warning remains material and prevents candidate promotion.
   the predeclared log-loss ordering (0.570336 versus 0.570583 for raw mass) but
   slightly loses on Brier (0.191271 versus 0.191257), so calibration evidence
   is mixed.
-- On matched 2022–2024 issues, logistic selection lifts issue-hit rate by
-  +1.88pp/+0.64pp/+1.29pp for N3/N4/N5. The N4 capital result is the strongest
-  clue: matched stake ROI moves from −12.78% to approximately 0.00%, a
-  CNY20,555 lift. It is not robust enough to promote: the issue-bootstrap mean
-  lift p05 is CNY−65.79, and maximum drawdown/longest losing run worsen from
-  25.42%/9 to 27.96%/12 on the armwise full path.
+- On the corrected exact-common settlement denominator, coverage-only lift is
+  CNY−452/+2,308/−5,914 for N3/N4/N5. N4 is the only positive clue, but its
+  2024 lift is CNY−7,683, issue-bootstrap p05 remains below zero, and path risk
+  worsens from 26.50%/8 to 27.69%/13. This supersedes the earlier provisional
+  CNY20,555 figure, which was produced before the chronology/settlement repair.
 - Verdict: `NO_PROMOTION`, not “selection is useless.” Freeze raw-mass S0 as
   the safe coverage baseline. Separate the missing return axis into #358 and
   #359: causal 10h European average odds may proxy value only under the label
@@ -457,6 +456,32 @@ warning remains material and prevents candidate promotion.
   settled. #210 and #218 remain untouched.
 - Reports: [`Issue-354-LowN-Selector-Data.md`](Issue-354-LowN-Selector-Data.md)
   and [`Issue-355-LowN-Match-Selector.md`](Issue-355-LowN-Match-Selector.md).
+
+### #358/#359 low-N European-value selector decision
+
+- #358 turns calibrated outcome probability and causal 10h European average
+  odds into a per-stake Top-2 leg factor `sum_Top2(p×odds)/2`. The complete
+  N-fold screen is `0.65 × product(leg factor)`, so the 0.65 burden is applied
+  once per complete winning ticket, never once per leg. The source remains a
+  European proxy with retrospective-relative timing, not Beijing official SP.
+- #359 keeps Top-2/R0 outcome support fixed and tests the complete C×V×G
+  factorial for N3–N5. `C0V0G0` exactly reproduces #355 S0; `C1V0G0` exactly
+  reproduces the #355 coverage diagnostic. This isolates match selection from
+  outcome replacement.
+- Two exposed-history signals survive the preregistered screen. N3 value-only
+  (`C0V1G0`) adds CNY4,792 versus S0 over matched 2022–2024 issues and remains
+  +CNY7,618 after each arm's largest payout is removed. N4 coverage+value
+  (`C1V1G0`) adds CNY6,663 and remains +CNY8,086 ex-largest; it is positive in
+  2022/2023 but loses CNY9,018 versus S0 in 2024. Their issue-bootstrap p05
+  values are negative, and absolute ending capital remains below CNY100,000.
+- N5's largest raw clue is concentrated in 2023 and fails cross-year and
+  largest-paired-delta stability. The gap factor has no repeatable standalone
+  increment at the frozen cutoffs. Verdict: `HISTORICAL_SIGNAL`, not a
+  deployable Edge. Preserve S0, carry N3 value-only and N4 coverage+value as
+  explicitly exposed candidates into later design work, and keep #210/#218
+  unchanged.
+- Reports: [`Issue-358-LowN-European-Value-Data.md`](Issue-358-LowN-European-Value-Data.md)
+  and [`Issue-359-LowN-European-Value-Selector.md`](Issue-359-LowN-European-Value-Selector.md).
 
 ### #334 neural residual and value-anchor decision
 
