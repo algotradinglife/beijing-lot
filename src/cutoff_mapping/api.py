@@ -20,6 +20,7 @@ from src.temporal_learning import (
     TemporalContractError,
     WalkForwardRunner,
     WeightingPolicy,
+    implementation_closure,
     prepare_learning_context,
 )
 from src.temporal_learning.core import stable_frame_hash, stable_json_hash, utc
@@ -35,6 +36,26 @@ from .contract import (
 
 CutoffContractError = TemporalContractError
 
+# #388: the mapping pilot's label availability is the deterministic proxy
+# `kickoff + 4h`, not an observed settlement time. It is declared PROXY with a
+# preregistered conservative safe boundary of +4h over the maximum admissible
+# source time; receipts bind the policy identity and margin-to-cutoff.
+def mapping_availability(cutoff: Cutoff) -> AvailabilityFilter:
+    """Availability filter for the mapping client at a given cutoff.
+
+    The pilot is a frozen historical proxy (kickoff+4h); its preregistered
+    conservative safe boundary is the cutoff itself, so every admitted row
+    (strictly before the cutoff) satisfies the boundary. Prospective-capable
+    reuse must pass observed availability or a tighter preregistered boundary
+    through `prospective_capable=True`.
+    """
+    return AvailabilityFilter(
+        label_available_column="label_available_ts",
+        data_available_column="fixture_decision_ts",
+        policy_identity="PROXY_KICKOFF_PLUS_4H",
+        proxy_safe_boundary_ts=cutoff.cutoff_ts,
+    )
+
 
 @dataclass
 class MappingResult:
@@ -47,11 +68,14 @@ class MappingResult:
     receipt: dict[str, Any]
 
 
-def _implementation_hash() -> str:
-    return stable_json_hash({
-        path.name: path.read_text(encoding="utf-8")
-        for path in [Path(__file__), Path(__file__).with_name("contract.py")]
-    })
+def _implementation_closure() -> dict[str, dict[str, str]]:
+    """Transitive closure of the mapping client for receipt binding."""
+    root = Path(__file__).resolve().parents[2]
+    closure = implementation_closure(
+        root,
+        [Path(__file__), Path(__file__).with_name("contract.py")],
+    )
+    return closure.receipt()
 
 
 def _pipeline(*, experimental: bool) -> Pipeline:
@@ -135,8 +159,14 @@ def fit_cutoff_mapping(
     source_hashes: Mapping[str, str],
     weighting_policy: WeightingPolicy | None = None,
     helper_hashes: Mapping[str, str] | None = None,
+    prospective_capable: bool = False,
 ) -> MappingResult:
-    """Fit, gate, refit and map using labels strictly available before cutoff."""
+    """Fit, gate, refit and map using labels strictly available before cutoff.
+
+    `prospective_capable=True` fails closed unless availability is observed or
+    a tighter preregistered conservative boundary is supplied (the frozen
+    kickoff+4h pilot is historical-only and must not be claimed prospective).
+    """
 
     development, target = development.copy(), target.copy()
     _validate_inputs(development, target, cutoff)
@@ -148,21 +178,24 @@ def fit_cutoff_mapping(
     ].copy()
     weighting_policy = weighting_policy or WeightingPolicy.expanding_equal()
     helper_hashes = dict(sorted((helper_hashes or {}).items()))
+    # #388: bind the transitive imported closure (client + contract + every
+    # repo module they reach) plus helper hashes. Mutation of any imported
+    # blob changes the cache key and invalidates replay.
+    closure = _implementation_closure()
     implementation_hashes = {
-        "cutoff_mapping.client": _implementation_hash(),
-        "temporal_learning.core": stable_json_hash(
-            (Path(__file__).parents[1] / "temporal_learning/core.py").read_text(encoding="utf-8")
-        ),
+        "cutoff_mapping.closure": stable_json_hash(closure),
         **helper_hashes,
     }
+    availability = mapping_availability(cutoff)
     context = prepare_learning_context(
         admissible_history,
         cutoff,
         source_hashes=source_hashes,
         implementation_hashes=implementation_hashes,
-        availability=AvailabilityFilter(data_available_column="fixture_decision_ts"),
+        availability=availability,
         partition_policy=PartitionPolicy(),
         weighting_policy=weighting_policy,
+        prospective_capable=prospective_capable,
     )
     eligible, weights = context.eligible, context.weights
     fit = context.partitions["fit"]

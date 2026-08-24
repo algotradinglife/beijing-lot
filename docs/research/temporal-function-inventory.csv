@@ -16,3 +16,7 @@ src/regime_state/pipeline.py,build_regime_state,regime definition from lagged hi
 src/neural_top2_residual/pipeline.py,fit_residual_models,neural residual fitting,contract-specific chronological folds,HISTORICAL_REVIEW_REQUIRED,contract-specific,package replay,P2
 src/n6_corrected_all_r/pipeline.py,scientific_frames,fixed R diagnostic only,blocked on #382 migration,IN_PROGRESS_REBIND,common explicit 2021 cutoff required,source-bound replay planned,P0
 src/n6_n7_portfolio/pipeline.py,scientific_frames,fixed exposed portfolio arithmetic,no learned parameter allowed,DESCRIPTIVE_ONLY,no labels used for tuning,source-bound replay planned,P0
+src/temporal_learning/core.py,Cutoff.decision_epoch,target identity exclusion,structured target_identity on Cutoff,MIGRATED,all target issue rows excluded before partitions,target_exclusion receipt count,replay verified,P0
+src/temporal_learning/core.py,AvailabilityFilter,explicit availability policy identity,observed/proxy policy + safe boundary,MIGRATED,margin-to-cutoff bound in receipt,availability_policy receipt block,P0
+src/temporal_learning/core.py,_weight_ledger,recency convex mixture weighting,RECENT_STATE_MIXTURE (0,0.5],MIGRATED,long-part mass >= recent-part mass,aggregate mass/ESS/issue mass in weight receipt,replaces per-row RECENT_STATE_BLEND,P0
+src/temporal_learning/closure.py,implementation_closure,transitive implementation closure hashing,closure over decision-facing imports,MIGRATED,imported blob mutation invalidates cache key,closure receipt + MANIFEST implementation,P0

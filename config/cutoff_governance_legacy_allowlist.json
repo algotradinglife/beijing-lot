@@ -1,62 +1,402 @@
 {
-  "hidden_temporal_global_paths": [
-    "src/divergence_materializer/contract.py",
-    "src/issue209/contract.py",
-    "src/paired_value_r3_n7/contract.py",
-    "src/top2_factorial/contract.py",
-    "src/value_veto_r3_n7/contract.py"
-  ],
   "detached_mapping_accepted_paths": [
-    "src/divergence_materializer/builder.py",
-    "src/divergence_materializer/model.py",
-    "src/divergence_materializer/validate.py",
-    "src/issue209/contract.py",
-    "src/issue209/dynamic_policy.py",
-    "src/issue209/models.py",
-    "src/issue209/ticket.py",
-    "src/issue209/value.py",
-    "src/issue279/traces.py",
-    "src/issue282/contract.py",
-    "src/issue286/manifest.py",
-    "src/issue314/data.py",
-    "src/low_n_selector_data/pipeline.py",
-    "src/multin_top2_r0/pipeline.py",
-    "src/neural_top2_residual/contract.py",
-    "src/neural_top2_residual/data.py",
-    "src/paired_value_r3_n7/pipeline.py",
-    "src/regime_state/data.py",
-    "src/sp_proxy_audit/data.py",
-    "src/top2_factorial/pipeline.py",
-    "src/top2_n7_stable/pipeline.py"
+    {
+      "baseline_sha256": "b1f5262c040ce615de7dae88bba3647105e7be300c14f60f2db352c8f4188f5e",
+      "path": "src/divergence_materializer/builder.py"
+    },
+    {
+      "baseline_sha256": "9bfa76193c591b63dc4f57f876bd8a6d62a69cb8e27796f961de215c1e6f62f7",
+      "path": "src/divergence_materializer/model.py"
+    },
+    {
+      "baseline_sha256": "e75db4bab77a62062e3603e58d48d375d6eea1fa9cb7c05a60a28c3fbf9421b7",
+      "path": "src/divergence_materializer/validate.py"
+    },
+    {
+      "baseline_sha256": "ccab733cefde37a5b2ae243d4d0e3d70f1197ded4a359e97ff0aa4fca99a5906",
+      "path": "src/issue209/contract.py"
+    },
+    {
+      "baseline_sha256": "b59aa71154b4723cc81adff7bed54a2ffc8cceb2063405841bd52884dd0e53fd",
+      "path": "src/issue209/dynamic_policy.py"
+    },
+    {
+      "baseline_sha256": "34b8a3f3b035d9c7b83ab2796884956523efd7643afc65d75ffef59a5a323e7e",
+      "path": "src/issue209/models.py"
+    },
+    {
+      "baseline_sha256": "d9bb25087a4025d15de450d77ed5aa7816a37be8b1eed0ccc00c8b1c4ba054b5",
+      "path": "src/issue209/ticket.py"
+    },
+    {
+      "baseline_sha256": "18790838f422df5f5a51adad725ebd2bbb5982c2f202d8bd9e1c496b32de44f5",
+      "path": "src/issue209/value.py"
+    },
+    {
+      "baseline_sha256": "1e5a14f0b5ba257f32420a95d6848153f6847ae5b93735d20d23659214d25a70",
+      "path": "src/issue279/traces.py"
+    },
+    {
+      "baseline_sha256": "7ef4ee83e3e45b6096375597484aeabffd37812b73eb7352551812d8ed723e3c",
+      "path": "src/issue282/contract.py"
+    },
+    {
+      "baseline_sha256": "7cbe0d03a3b16321485786eb1e79757bdc84281f9fabde3a80afce168107937b",
+      "path": "src/issue286/manifest.py"
+    },
+    {
+      "baseline_sha256": "34e4875cbded138d5cf2c6bd99be0d8a03dbb4faa2751a864acc0254d5777d42",
+      "path": "src/issue314/data.py"
+    },
+    {
+      "baseline_sha256": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "path": "src/low_n_selector_data/pipeline.py"
+    },
+    {
+      "baseline_sha256": "71fda4b6d998b6ebe38278080d548d4f5c1cf8c3ae760deea04f16da4e8f8da9",
+      "path": "src/multin_top2_r0/pipeline.py"
+    },
+    {
+      "baseline_sha256": "f7b670e5e02432e272ba6009904debe02ab9e4a63943e0ea5c20e58a03f2ecfd",
+      "path": "src/neural_top2_residual/contract.py"
+    },
+    {
+      "baseline_sha256": "a35629124dad9679c7360c4106e1fd35326b7e0c2b8541565ef22ed2c246e7fe",
+      "path": "src/neural_top2_residual/data.py"
+    },
+    {
+      "baseline_sha256": "81e959bd99a9e8fef711948ade93f4b6f80bdb7e70bb36e72438721c1461103f",
+      "path": "src/paired_value_r3_n7/pipeline.py"
+    },
+    {
+      "baseline_sha256": "659b9a74b0b91f30100e5dc49d9df247f798b96074c9c3aaf10738844b87091c",
+      "path": "src/regime_state/data.py"
+    },
+    {
+      "baseline_sha256": "2e50851454e9913e6ff95b5791b07859eeebf2d0dba417abe47458bdd1e887b9",
+      "path": "src/sp_proxy_audit/data.py"
+    },
+    {
+      "baseline_sha256": "f854c94266b13669124f0e5344cb9a2e4b354dae1f9cdb890b7ee6129fb4d6ea",
+      "path": "src/top2_factorial/pipeline.py"
+    },
+    {
+      "baseline_sha256": "95d1f6bbcfb699f66bd3a30ebc8adb427813164477e64bc5b72e0444015bfc89",
+      "path": "src/top2_n7_stable/pipeline.py"
+    }
   ],
   "direct_historical_fit_paths": [
-    "src/bankroll_policy/fixed_n7.py",
-    "src/divergence_materializer/model.py",
-    "src/dynamic_allocator/pipeline.py",
-    "src/fixed_expert_moe/model.py",
-    "src/issue209/dynamic_policy.py",
-    "src/issue209/models.py",
-    "src/issue209/value.py",
-    "src/issue282/training.py",
-    "src/issue284/pilot.py",
-    "src/issue291/modeling.py",
-    "src/issue296/model.py",
-    "src/issue299/model.py",
-    "src/issue302/model.py",
-    "src/issue305/model.py",
-    "src/issue306/model.py",
-    "src/issue312/model.py",
-    "src/issue314/experiment.py",
-    "src/low_n_match_selector/pipeline.py",
-    "src/low_n_selector_data/pipeline.py",
-    "src/neural_top2_residual/model.py",
-    "src/paired_value_r3_n7/pipeline.py",
-    "src/qeu_dynamic_r_n7/pipeline.py",
-    "src/regime_state/model.py",
-    "src/ticket_policy/fixed_n7.py",
-    "src/top2_factorial/pipeline.py",
-    "src/unified_model/gate_b.py",
-    "src/unified_value/joint_n7.py",
-    "src/value_veto_r3_n7/pipeline.py"
+    {
+      "baseline_sha256": "7b891238d59483e25da8817ac302300dc10bd01b80e1e76d9d9e1d8024d4c539",
+      "occurrences": [
+        "_fit_controllers"
+      ],
+      "path": "src/bankroll_policy/fixed_n7.py"
+    },
+    {
+      "baseline_sha256": "9bfa76193c591b63dc4f57f876bd8a6d62a69cb8e27796f961de215c1e6f62f7",
+      "occurrences": [
+        "fit_horizon_models"
+      ],
+      "path": "src/divergence_materializer/model.py"
+    },
+    {
+      "baseline_sha256": "d260bcb4113db339384a2f7b923509611086cd9176f60fde893d57dba9749337",
+      "occurrences": [
+        "_fit_base_models",
+        "fit_meta_models"
+      ],
+      "path": "src/dynamic_allocator/pipeline.py"
+    },
+    {
+      "baseline_sha256": "5991e7279a34dd115295e559de37b4729b4caf364566307e898aa0bdc821bf27",
+      "occurrences": [
+        "fit_stacked_multitask"
+      ],
+      "path": "src/fixed_expert_moe/model.py"
+    },
+    {
+      "baseline_sha256": "b59aa71154b4723cc81adff7bed54a2ffc8cceb2063405841bd52884dd0e53fd",
+      "occurrences": [
+        "fit_action_models"
+      ],
+      "path": "src/issue209/dynamic_policy.py"
+    },
+    {
+      "baseline_sha256": "34b8a3f3b035d9c7b83ab2796884956523efd7643afc65d75ffef59a5a323e7e",
+      "occurrences": [
+        "fit_calibrated_logistic",
+        "fit_mlp_challenger"
+      ],
+      "path": "src/issue209/models.py"
+    },
+    {
+      "baseline_sha256": "18790838f422df5f5a51adad725ebd2bbb5982c2f202d8bd9e1c496b32de44f5",
+      "occurrences": [
+        "fit_sp_quantile_model"
+      ],
+      "path": "src/issue209/value.py"
+    },
+    {
+      "baseline_sha256": "209861f27841071b1fa487b464b5d37528c3ffe7189cf150c96cdec93814fc71",
+      "occurrences": [
+        "fit_controls",
+        "prepare_arrays"
+      ],
+      "path": "src/issue282/training.py"
+    },
+    {
+      "baseline_sha256": "9bd62c314f23dd53d71a88ab31966880be38655d7dcb40bb9fc22a50a8e61612",
+      "occurrences": [
+        "prepare_subset_arrays"
+      ],
+      "path": "src/issue284/pilot.py"
+    },
+    {
+      "baseline_sha256": "f418057e03cac996dad3265ef65ed81dc851bd77b09b7f617d906076fd524d74",
+      "occurrences": [
+        "fit_platt_calibrator"
+      ],
+      "path": "src/issue291/modeling.py"
+    },
+    {
+      "baseline_sha256": "cc8c8061e49a1749278262ad4d6c65754c29a35d9ac7421e9aca5416843b55d8",
+      "occurrences": [
+        "fit_predict_ridge_gate"
+      ],
+      "path": "src/issue296/model.py"
+    },
+    {
+      "baseline_sha256": "c7c8f7cfc60ac495ee0f12ed6ed3d551b431b2e69479517b5744226ae48e6651",
+      "occurrences": [
+        "fit_predict_ridge_scores",
+        "fit_residual_ensemble"
+      ],
+      "path": "src/issue299/model.py"
+    },
+    {
+      "baseline_sha256": "c4127345eb020caa842a499e49d19895882f8f6658fd0d6b1c85b48c77fdbebd",
+      "occurrences": [
+        "_fit"
+      ],
+      "path": "src/issue302/model.py"
+    },
+    {
+      "baseline_sha256": "b987b3cb1a966da58ed1c9dff6a2bc2d16c1f63579cd89a5486376f8dea5e2c6",
+      "occurrences": [
+        "_fit"
+      ],
+      "path": "src/issue305/model.py"
+    },
+    {
+      "baseline_sha256": "63355304100b88129aaa6f8dbbc0d32b080ec8836a7aa6378b3c356e53c2b51e",
+      "occurrences": [
+        "fit_predict_expanding"
+      ],
+      "path": "src/issue306/model.py"
+    },
+    {
+      "baseline_sha256": "070c40998ef0d77818ebb10df82e84729ea5f4a9fcf4b9beda98fd77992c83bf",
+      "occurrences": [
+        "_fit_predict"
+      ],
+      "path": "src/issue312/model.py"
+    },
+    {
+      "baseline_sha256": "aebf9f71b96f989f95a1ca88c86bc5a7baba0ebbfeb1e8e71e5b1278230ae452",
+      "occurrences": [
+        "fit_model"
+      ],
+      "path": "src/issue314/experiment.py"
+    },
+    {
+      "baseline_sha256": "e3652ccc6201efc1576f5eda6b3bb8d40bf271b268ab42b26525603e0d1e6e37",
+      "occurrences": [
+        "_fit_model"
+      ],
+      "path": "src/low_n_match_selector/pipeline.py"
+    },
+    {
+      "baseline_sha256": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "occurrences": [
+        "_predict_years"
+      ],
+      "path": "src/low_n_selector_data/pipeline.py"
+    },
+    {
+      "baseline_sha256": "9ceb2c2f48fb20b288b32aeba1d3e25745b931cb5123358125f982378dc794d3",
+      "occurrences": [
+        "fit_linear_predictions",
+        "fit_mlp_predictions",
+        "prepare_training"
+      ],
+      "path": "src/neural_top2_residual/model.py"
+    },
+    {
+      "baseline_sha256": "81e959bd99a9e8fef711948ade93f4b6f80bdb7e70bb36e72438721c1461103f",
+      "occurrences": [
+        "build_pair_calibration"
+      ],
+      "path": "src/paired_value_r3_n7/pipeline.py"
+    },
+    {
+      "baseline_sha256": "54d3fd9df83903e43207a5db3a0e9dbef9b64e706f9034c6201359be9275733f",
+      "occurrences": [
+        "learn_dynamic_r"
+      ],
+      "path": "src/qeu_dynamic_r_n7/pipeline.py"
+    },
+    {
+      "baseline_sha256": "624045dbaa946e31d2708d3489bfc71494d75e51b477136d525e2ef205e151c3",
+      "occurrences": [
+        "chronological_predictions"
+      ],
+      "path": "src/regime_state/model.py"
+    },
+    {
+      "baseline_sha256": "537bad165d464877d4a98236ab2a55b229fe82e6225354b069c76e8ea63c70cc",
+      "occurrences": [
+        "_fit_logistic_model",
+        "_fit_model",
+        "_fit_ood_gate"
+      ],
+      "path": "src/ticket_policy/fixed_n7.py"
+    },
+    {
+      "baseline_sha256": "f854c94266b13669124f0e5344cb9a2e4b354dae1f9cdb890b7ee6129fb4d6ea",
+      "occurrences": [
+        "_fit_models"
+      ],
+      "path": "src/top2_factorial/pipeline.py"
+    },
+    {
+      "baseline_sha256": "3bec9162c7cd1159fe984784c653a1d0d838f30d2448f100905b133676fc02cc",
+      "occurrences": [
+        "_evaluate_family",
+        "_fit_sp_heads",
+        "fit"
+      ],
+      "path": "src/unified_model/gate_b.py"
+    },
+    {
+      "baseline_sha256": "44a23d7b20247782896ee2b11acfa37d8ef6d2a0b14dc0de858feef21556c623",
+      "occurrences": [
+        "_latent_fit"
+      ],
+      "path": "src/unified_value/joint_n7.py"
+    },
+    {
+      "baseline_sha256": "ebf7fde315cac46878895be5cc8ef317bcb3a14d31969b279f48f826feb29700",
+      "occurrences": [
+        "fit_oof_sp_intervals"
+      ],
+      "path": "src/value_veto_r3_n7/pipeline.py"
+    },
+    {
+      "baseline_sha256": "386061e76217c25b42e8e42666b54c7e8a16fb944061c3a467ec1428266e03da",
+      "occurrences": [
+        "evaluate_model"
+      ],
+      "path": "scripts/analyze_high_n_directional_ml.py"
+    },
+    {
+      "baseline_sha256": "f54b178ed47556b3a14c63f2ee1cd52a3da113a3e32e4ee1d7730ee777766695",
+      "occurrences": [
+        "_conditional_predictions",
+        "_transform_stage1",
+        "fit"
+      ],
+      "path": "scripts/bj193_chain_gate_b_v2.py"
+    },
+    {
+      "baseline_sha256": "c6222e8925cfdf628b12e939085de4b17cd4f61410127f2a034cbeb1a9fbb615",
+      "occurrences": [
+        "_fit_calibrator"
+      ],
+      "path": "scripts/run_bj284_activity_pilot.py"
+    },
+    {
+      "baseline_sha256": "073e240df1575241aca0efbffde35c0888be88c0cb2224a931b0e0445e4fed22",
+      "occurrences": [
+        "main"
+      ],
+      "path": "scripts/run_bj284_divergence_mode_oof.py"
+    },
+    {
+      "baseline_sha256": "77627def5fdc45a4a508dabf873181d90360dfeb9a7034b6bcc071bbd74f61d5",
+      "occurrences": [
+        "main"
+      ],
+      "path": "scripts/run_bj284_issue_n_residual_oof.py"
+    },
+    {
+      "baseline_sha256": "d45a67879809da08fd34e90c147a68f17c4606831c91eb4e5e9b62fc787c8086",
+      "occurrences": [
+        "main"
+      ],
+      "path": "scripts/run_bj284_joint_policy_oof.py"
+    },
+    {
+      "baseline_sha256": "a5923e3ab42209902e9c5d3eb50a4917d6ba727bac12e4c17944c7cd7c29562b",
+      "occurrences": [
+        "main"
+      ],
+      "path": "scripts/run_bj286_joint_policy_oof.py"
+    },
+    {
+      "baseline_sha256": "0e631821691a4eba3a97cc4811a93fedc189be398d5322a09993ed9ab5e974a8",
+      "occurrences": [
+        "main"
+      ],
+      "path": "scripts/run_bj291_decomposed_value_oof.py"
+    },
+    {
+      "baseline_sha256": "ef07d1ca7ca9fe6e6567973717afdc97a25dcdb315a0c676f6ae96d4ac7c806a",
+      "occurrences": [
+        "main"
+      ],
+      "path": "scripts/run_track_b_model.py"
+    }
+  ],
+  "hidden_temporal_global_paths": [
+    {
+      "baseline_sha256": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "occurrences": [
+        "CALIBRATION_YEAR",
+        "FIT_END",
+        "TUNE_YEAR"
+      ],
+      "path": "src/divergence_materializer/contract.py"
+    },
+    {
+      "baseline_sha256": "ccab733cefde37a5b2ae243d4d0e3d70f1197ded4a359e97ff0aa4fca99a5906",
+      "occurrences": [
+        "CALIBRATION_YEAR",
+        "FIT_END",
+        "TUNE_YEAR"
+      ],
+      "path": "src/issue209/contract.py"
+    },
+    {
+      "baseline_sha256": "bee0c5bbafb9e8c09b4b9348082a7582a0974871beeff6c6be8f9db59f4d7595",
+      "occurrences": [
+        "CALIBRATION_YEAR"
+      ],
+      "path": "src/paired_value_r3_n7/contract.py"
+    },
+    {
+      "baseline_sha256": "ebf2f31e2145066ffc99eda0296985958a2483d2869a6d0f014ce30da70e024f",
+      "occurrences": [
+        "TUNE_YEAR"
+      ],
+      "path": "src/top2_factorial/contract.py"
+    },
+    {
+      "baseline_sha256": "5e2125b5e3065906e236b8f4c474f500831c74f0f6e7537e38d1bb7c055ba2b1",
+      "occurrences": [
+        "CALIBRATION_YEAR"
+      ],
+      "path": "src/value_veto_r3_n7/contract.py"
+    }
   ]
 }

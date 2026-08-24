@@ -1,5 +1,10 @@
 """Shared cutoff-driven historical-learning protocol."""
 
+from .closure import (
+    ImplementationClosure,
+    implementation_closure,
+    closure_receipt,
+)
 from .core import (
     AvailabilityFilter,
     Cutoff,
@@ -22,6 +27,7 @@ __all__ = [
     "Cutoff",
     "EffectiveSamplePolicy",
     "FitResult",
+    "ImplementationClosure",
     "LearningContext",
     "LearningReceipt",
     "PartitionPolicy",
@@ -30,6 +36,8 @@ __all__ = [
     "ThresholdSelection",
     "WeightingPolicy",
     "WalkForwardRunner",
+    "closure_receipt",
+    "implementation_closure",
     "prepare_learning_context",
     "select_cutoff_threshold",
     "temporal_cache_key",

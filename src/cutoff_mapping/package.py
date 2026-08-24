@@ -12,7 +12,7 @@ import pandas as pd
 
 from src.low_n_selector_data.pipeline import _input_panel, locate_data_root
 from src.source_schema.publication import atomic_publish_directory
-from src.temporal_learning import Cutoff, WeightingPolicy
+from src.temporal_learning import Cutoff, WeightingPolicy, implementation_closure
 
 from .api import (
     CutoffContractError,
@@ -172,20 +172,23 @@ def build_package(repo_root: Path, target: Path, explicit_data_root: Path | None
     def populate(staging: Path) -> None:
         for relative, key in PACKAGE_FILES.items():
             _write(staging / relative, frames[key])
+        # #388 transitive closure: bind every repo module the decision-facing
+        # client imports (client, contract and shared temporal_learning tree).
+        closure = implementation_closure(
+            repo_root,
+            [
+                Path(__file__).with_name("api.py"),
+                Path(__file__).with_name("contract.py"),
+            ],
+        )
         manifest = {
             "contract": CONTRACT_ID,
             "files": {name: {"sha256": sha256_file(staging / name), "bytes": (staging / name).stat().st_size} for name in sorted(PACKAGE_FILES)},
             "implementation": {
-                "api.py": sha256_file(Path(__file__).with_name("api.py")),
-                "contract.py": sha256_file(Path(__file__).with_name("contract.py")),
+                **{f"module:{module}": digest for module, digest in sorted(closure.modules.items())},
                 "package.py": sha256_file(Path(__file__)),
-                "temporal_learning/core.py": sha256_file(
-                    repo_root / "src/temporal_learning/core.py"
-                ),
-                "temporal_learning/example_selector.py": sha256_file(
-                    repo_root / "src/temporal_learning/example_selector.py"
-                ),
             },
+            "implementation_closure": closure.receipt(),
             "deliveries": {
                 name: sha256_file(repo_root / name) for name in DELIVERY_FILES
             },
@@ -195,33 +198,44 @@ def build_package(repo_root: Path, target: Path, explicit_data_root: Path | None
     return frames["decision"]
 
 
-def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | None = None) -> dict[str, bool]:
-    repo_root, target = repo_root.resolve(), target.resolve()
-    data_root = locate_data_root(repo_root, explicit_data_root)
-    manifest = _read_json(target / "MANIFEST.json")
+def verify_manifest(repo_root: Path, target: Path) -> None:
+    """Verify manifest contract/files/implementation/deliveries without data.
+
+    #388: this is the source-bound verifier for the immutable package. It does
+    not depend on the data frames, so tamper tests can attack the manifest and
+    the source-bound implementation closure deterministically.
+    """
+    root, package = repo_root.resolve(), target.resolve()
+    manifest = _read_json(package / "MANIFEST.json")
     if manifest.get("contract") != CONTRACT_ID or set(manifest.get("files", {})) != set(PACKAGE_FILES):
         raise CutoffContractError("manifest contract/file set mismatch")
     for relative, item in manifest["files"].items():
-        if not (target / relative).is_file() or sha256_file(target / relative) != item["sha256"]:
+        if not (package / relative).is_file() or sha256_file(package / relative) != item["sha256"]:
             raise CutoffContractError(f"manifest mismatch: {relative}")
+    closure = implementation_closure(
+        root,
+        [
+            Path(__file__).with_name("api.py"),
+            Path(__file__).with_name("contract.py"),
+        ],
+    )
     expected_implementation = {
-        "api.py": sha256_file(Path(__file__).with_name("api.py")),
-        "contract.py": sha256_file(Path(__file__).with_name("contract.py")),
+        **{f"module:{module}": digest for module, digest in sorted(closure.modules.items())},
         "package.py": sha256_file(Path(__file__)),
-        "temporal_learning/core.py": sha256_file(
-            repo_root / "src/temporal_learning/core.py"
-        ),
-        "temporal_learning/example_selector.py": sha256_file(
-            repo_root / "src/temporal_learning/example_selector.py"
-        ),
     }
     if manifest.get("implementation") != expected_implementation:
         raise CutoffContractError("implementation hashes differ")
     expected_deliveries = {
-        name: sha256_file(repo_root / name) for name in DELIVERY_FILES
+        name: sha256_file(root / name) for name in DELIVERY_FILES
     }
     if manifest.get("deliveries") != expected_deliveries:
         raise CutoffContractError("delivery hashes differ")
+
+
+def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | None = None) -> dict[str, bool]:
+    repo_root, target = repo_root.resolve(), target.resolve()
+    data_root = locate_data_root(repo_root, explicit_data_root)
+    verify_manifest(repo_root, target)
     expected = scientific_frames(repo_root, data_root)
     for relative, key in PACKAGE_FILES.items():
         path, value = target / relative, expected[key]

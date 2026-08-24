@@ -1,4 +1,17 @@
-"""Generic chronology, partition, weighting, receipt, cache and runner primitives."""
+"""Generic chronology, partition, weighting, receipt, cache and runner primitives.
+
+#388 hardening:
+- Cutoff carries a structured target_identity; decision-epoch learning must
+  exclude every row of the target issue, not merely rows whose availability
+  timestamp precedes the cutoff.
+- AvailabilityFilter declares a policy identity and a conservative safe
+  boundary for proxy policies; receipts bind policy identity and
+  margin-to-cutoff, and prospective proxy claims fail closed without one.
+- RECENT_STATE_BLEND (per-row boost) is replaced by RECENT_STATE_MIXTURE, a
+  long-history/recent-state convex mixture with aggregate mass, row/issue
+  mass, ESS and shrinkage bound in the weight receipt. No compatibility
+  wrapper.
+"""
 
 from __future__ import annotations
 
@@ -20,11 +33,16 @@ class Cutoff:
     identity: str
     cutoff_ts: pd.Timestamp
     kind: str
+    target_identity: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "cutoff_ts", utc(self.cutoff_ts))
         if not self.identity or not self.kind:
             raise TemporalContractError("cutoff identity and kind are required")
+        if self.kind == "DECISION_EPOCH" and not self.target_identity:
+            raise TemporalContractError("decision-epoch cutoff requires a target identity")
+        if self.target_identity is not None and str(self.target_identity).strip() == "":
+            raise TemporalContractError("cutoff target identity must not be blank")
 
     @classmethod
     def evaluation_year(cls, year: int, cutoff_ts: object) -> "Cutoff":
@@ -36,7 +54,12 @@ class Cutoff:
 
     @classmethod
     def decision_epoch(cls, issue: str, cutoff_ts: object) -> "Cutoff":
-        return cls(f"DECISION_EPOCH_{issue}", utc(cutoff_ts), "DECISION_EPOCH")
+        return cls(
+            f"DECISION_EPOCH_{issue}",
+            utc(cutoff_ts),
+            "DECISION_EPOCH",
+            target_identity=str(issue),
+        )
 
 
 @dataclass(frozen=True)
@@ -45,6 +68,31 @@ class AvailabilityFilter:
     data_available_column: str | None = None
     source_issue_column: str = "issue_code"
     issue_year_column: str = "issue_year"
+    # #388: explicit availability policy identity. OBSERVED_* means availability
+    # was actually observed; PROXY_* means a deterministic proxy policy (e.g.
+    # kickoff+4h) that must carry a preregistered conservative safe boundary.
+    policy_identity: str = "OBSERVED_LABEL_AVAILABILITY"
+    proxy_safe_boundary_ts: pd.Timestamp | None = None
+
+    def __post_init__(self) -> None:
+        identity = self.policy_identity.strip()
+        object.__setattr__(self, "policy_identity", identity)
+        if not identity:
+            raise TemporalContractError("availability policy identity is required")
+        if not identity.startswith("OBSERVED_") and not identity.startswith("PROXY_"):
+            raise TemporalContractError(
+                "availability policy identity must start with OBSERVED_ or PROXY_"
+            )
+        if identity.startswith("PROXY_"):
+            if self.proxy_safe_boundary_ts is None:
+                raise TemporalContractError(
+                    "proxy availability policy requires a conservative safe boundary"
+                )
+            object.__setattr__(
+                self,
+                "proxy_safe_boundary_ts",
+                utc(self.proxy_safe_boundary_ts),
+            )
 
 
 @dataclass(frozen=True)
@@ -84,15 +132,21 @@ class WeightingPolicy:
         )
 
     @classmethod
-    def recent_state_blend(
+    def recent_state_mixture(
         cls,
         rolling_window_issues: int,
         recent_blend: float,
         *,
         minimum_ess: float = 100.0,
     ) -> "WeightingPolicy":
+        """Long-history/recent-state convex mixture.
+
+        alpha = recent_blend must lie in (0, 0.5], so the long-history prior
+        carries at least as much aggregate mass as the recent state. This
+        replaces the old per-row RECENT_STATE_BLEND boost.
+        """
         return cls(
-            "RECENT_STATE_BLEND",
+            "RECENT_STATE_MIXTURE",
             rolling_window_issues=int(rolling_window_issues),
             recent_blend=float(recent_blend),
             effective_sample=EffectiveSamplePolicy(minimum_ess),
@@ -162,6 +216,7 @@ def temporal_cache_key(
         "cutoff": {
             "identity": cutoff.identity,
             "kind": cutoff.kind,
+            "target_identity": cutoff.target_identity,
             "cutoff_ts": cutoff.cutoff_ts.isoformat(),
         },
         "source_hashes": dict(sorted(source_hashes.items())),
@@ -176,7 +231,7 @@ def _weight_ledger(
     cutoff: Cutoff,
     availability: AvailabilityFilter,
     policy: WeightingPolicy,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     columns = [availability.source_issue_column, availability.label_available_column]
     frame = eligible[columns].copy()
     frame[availability.label_available_column] = pd.to_datetime(
@@ -185,17 +240,29 @@ def _weight_ledger(
     age_days = (
         cutoff.cutoff_ts - frame[availability.label_available_column]
     ).dt.total_seconds().to_numpy(float) / 86_400
+    issue_ids = frame[availability.source_issue_column].astype(str).to_numpy()
+    alpha: float = 0.0
+    long_part_mass: float = 0.0
+    recent_part_mass: float = 0.0
+    recent_rows: np.ndarray = np.zeros(len(frame), dtype=bool)
+    recent_count: int = 0
+    mixture: dict[str, Any] | None = None
     if policy.kind == "EXPANDING_EQUAL":
         raw = np.ones(len(frame), dtype=float)
     elif policy.kind == "EXPANDING_EXPONENTIAL":
         if policy.half_life_days is None or policy.half_life_days <= 0:
             raise TemporalContractError("exponential weighting requires positive half life")
         raw = np.power(0.5, age_days / policy.half_life_days)
-    elif policy.kind == "RECENT_STATE_BLEND":
+    elif policy.kind == "RECENT_STATE_MIXTURE":
         if policy.rolling_window_issues is None or policy.rolling_window_issues <= 0:
-            raise TemporalContractError("recent-state blend requires a positive issue window")
-        if policy.recent_blend is None or not 0 < policy.recent_blend < 1:
-            raise TemporalContractError("recent-state blend must retain long and recent history")
+            raise TemporalContractError("recent-state mixture requires a positive issue window")
+        alpha = policy.recent_blend
+        if alpha is None or not 0.0 < alpha <= 0.5:
+            raise TemporalContractError(
+                "recent-state mixture blend must lie in (0, 0.5] so the long-history "
+                "prior retains at least as much aggregate mass as the recent state"
+            )
+        alpha = float(alpha)
         issue_order = (
             frame.groupby(availability.source_issue_column, as_index=False)[availability.label_available_column]
             .max()
@@ -207,9 +274,18 @@ def _weight_ledger(
         recent = set(
             issue_order.tail(policy.rolling_window_issues)[availability.source_issue_column].astype(str)
         )
-        raw = np.full(len(frame), 1.0 - policy.recent_blend, dtype=float)
-        mask = frame[availability.source_issue_column].astype(str).isin(recent).to_numpy()
-        raw[mask] += policy.recent_blend
+        recent_rows = np.isin(issue_ids, list(recent))
+        recent_count = int(recent_rows.sum())
+        if recent_count == 0:
+            raise TemporalContractError("recent-state mixture has no recent rows")
+        # Mathematically explicit convex mixture w = (1-alpha)*u + alpha*v,
+        # u uniform over every eligible row, v uniform over recent-state rows.
+        # Raw scale sums to one (mass); mean-normalization to a weight scale
+        # preserves the exact (1-alpha):alpha aggregate mass split.
+        raw = np.full(len(frame), (1.0 - alpha) / len(frame), dtype=float)
+        raw[recent_rows] += alpha / recent_count
+        recent_part_mass = alpha
+        long_part_mass = 1.0 - alpha
     else:
         raise TemporalContractError(f"unsupported weighting policy: {policy.kind}")
     if not np.isfinite(raw).all() or (raw <= 0).any():
@@ -222,12 +298,79 @@ def _weight_ledger(
         raise TemporalContractError(
             f"effective sample size {ess:.3f} below floor {policy.effective_sample.minimum:.3f}"
         )
-    return frame.assign(
+    issue_mass = (
+        pd.Series(weights, index=issue_ids)
+        .groupby(level=0)
+        .sum()
+        .to_dict()
+    )
+    if policy.kind == "RECENT_STATE_MIXTURE":
+        # Mean-normalization multiplies every raw mass by rows/1, so the
+        # normalized recent-part aggregate mass is alpha * rows. To bind the
+        # declared coefficient exactly, report the raw mass split (which sums
+        # to 1.0) alongside the normalized row aggregate.
+        mixture = {
+            "declared_recent_blend": alpha,
+            "long_part_mass": round(long_part_mass, 12),
+            "recent_part_mass": round(recent_part_mass, 12),
+            "mass_sum": round(float(raw.sum()), 12),
+            "normalized_recent_row_aggregate": float(weights[recent_rows].sum()),
+            "recent_rows": recent_count,
+            "long_rows": int(len(frame) - recent_count),
+            "ess": ess,
+            "shrinkage_toward_long_prior": round(float(long_part_mass), 12),
+        }
+    else:
+        mixture = None
+    ledger = frame.assign(
         cutoff_identity=cutoff.identity,
         cutoff_ts=cutoff.cutoff_ts,
         age_days=age_days,
         weight=weights,
     )
+    meta = {"mixture": mixture, "issue_mass": issue_mass}
+    return ledger, meta
+
+
+def _excluded_target_rows(
+    admitted: pd.DataFrame,
+    cutoff: Cutoff,
+    availability: AvailabilityFilter,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Exclude every row of the target issue, receipting the count.
+
+    Fail-closed on ambiguous identity: when a decision-epoch cutoff names a
+    target issue, the history must unambiguously identify rows by that issue,
+    otherwise admissibility cannot be proven.
+    """
+    if cutoff.target_identity is None:
+        return admitted, {"enabled": False, "target_identity": None, "excluded_rows": 0}
+    column = availability.source_issue_column
+    if column not in admitted:
+        raise TemporalContractError(
+            "decision-epoch target exclusion requires a source issue column"
+        )
+    codes = admitted[column].astype(str)
+    if codes.isna().any() or codes.str.strip().eq("").any():
+        raise TemporalContractError(
+            "ambiguous target identity: history contains blank or missing issue codes"
+        )
+    target = str(cutoff.target_identity)
+    mask = codes.eq(target)
+    excluded = int(mask.sum())
+    if excluded == 0:
+        # The target issue may legitimately be absent from history, but a
+        # decision-epoch cutoff cannot prove exclusion of a missing target;
+        # fail closed rather than silently admit a neighbour row.
+        raise TemporalContractError(
+            f"decision-epoch cutoff {cutoff.identity} names target issue {target} "
+            "but history contains no such row; cannot prove target exclusion"
+        )
+    return admitted.loc[~mask].copy(), {
+        "enabled": True,
+        "target_identity": target,
+        "excluded_rows": excluded,
+    }
 
 
 def prepare_learning_context(
@@ -239,8 +382,16 @@ def prepare_learning_context(
     availability: AvailabilityFilter = AvailabilityFilter(),
     partition_policy: PartitionPolicy = PartitionPolicy(),
     weighting_policy: WeightingPolicy = WeightingPolicy.expanding_equal(),
+    prospective_capable: bool = False,
 ) -> LearningContext:
-    """Filter, partition, weight and receipt-bind historical observations."""
+    """Filter, partition, weight and receipt-bind historical observations.
+
+    #388: `prospective_capable=True` fails closed unless the availability
+    policy is OBSERVED or a conservative proxy safe boundary sits strictly
+    before the cutoff. The frozen kickoff+4h proxy pilot is historical-only and
+    cannot claim prospective readiness through the default boundary (which
+    equals the cutoff).
+    """
 
     required = {
         availability.label_available_column,
@@ -251,6 +402,18 @@ def prepare_learning_context(
         required.add(availability.data_available_column)
     if not required.issubset(history):
         raise TemporalContractError("history lacks availability columns")
+    if prospective_capable:
+        if availability.policy_identity.startswith("PROXY_"):
+            boundary = availability.proxy_safe_boundary_ts
+            if boundary is None or not boundary < cutoff.cutoff_ts:
+                raise TemporalContractError(
+                    "prospective claim requires observed availability or a "
+                    "preregistered conservative safe boundary strictly before cutoff"
+                )
+        elif not availability.policy_identity.startswith("OBSERVED_"):
+            raise TemporalContractError(
+                "prospective claim requires an observed or proxy availability policy"
+            )
     admitted = history.copy()
     admitted[availability.label_available_column] = pd.to_datetime(
         admitted[availability.label_available_column], utc=True
@@ -265,7 +428,10 @@ def prepare_learning_context(
         if admitted[availability.data_available_column].isna().any():
             raise TemporalContractError("history has missing data availability")
         admitted_mask &= admitted[availability.data_available_column].lt(cutoff.cutoff_ts)
-    eligible = admitted[admitted_mask].copy()
+    admitted = admitted[admitted_mask].copy()
+    # #388: target identity exclusion before any partition is derived.
+    admitted, target_exclusion = _excluded_target_rows(admitted, cutoff, availability)
+    eligible = admitted.copy()
     if eligible.empty:
         raise TemporalContractError("cutoff admits no prior observations")
     if not eligible[availability.label_available_column].lt(cutoff.cutoff_ts).all():
@@ -294,7 +460,7 @@ def prepare_learning_context(
     }
     if any(frame.empty for frame in partitions.values()):
         raise TemporalContractError("derived partition is empty")
-    ledger = _weight_ledger(eligible, cutoff, availability, weighting_policy)
+    ledger, weight_meta = _weight_ledger(eligible, cutoff, availability, weighting_policy)
     weights = pd.Series(ledger["weight"].to_numpy(float), index=eligible.index)
     implementation_hashes = dict(sorted(implementation_hashes.items()))
     cache_key = temporal_cache_key(
@@ -310,10 +476,34 @@ def prepare_learning_context(
         if availability.data_available_column is not None
         else eligible[availability.label_available_column].max()
     )
+    margin_days = (
+        cutoff.cutoff_ts - eligible[availability.label_available_column]
+    ).dt.total_seconds().to_numpy(float) / 86_400
+    if availability.data_available_column is not None:
+        data_margin = (
+            cutoff.cutoff_ts - eligible[availability.data_available_column]
+        ).dt.total_seconds().to_numpy(float) / 86_400
+        margin_days = np.minimum(margin_days, data_margin)
     receipt = LearningReceipt({
         "cutoff_identity": cutoff.identity,
         "cutoff_kind": cutoff.kind,
+        "cutoff_target_identity": cutoff.target_identity,
         "cutoff_ts": cutoff.cutoff_ts.isoformat(),
+        "availability_policy": {
+            "identity": availability.policy_identity,
+            "proxy_safe_boundary_ts": (
+                availability.proxy_safe_boundary_ts.isoformat()
+                if availability.proxy_safe_boundary_ts is not None
+                else None
+            ),
+            "prospective_capable": prospective_capable,
+        },
+        "margin_to_cutoff_days": {
+            "minimum": float(np.min(margin_days)),
+            "maximum": float(np.max(margin_days)),
+            "median": float(np.median(margin_days)),
+        },
+        "target_exclusion": target_exclusion,
         "maximum_source_issue": str(max_row[availability.source_issue_column]),
         "maximum_source_time": maximum_source_time.isoformat(),
         "maximum_training_label_timestamp": max_row[availability.label_available_column].isoformat(),
@@ -336,6 +526,8 @@ def prepare_learning_context(
             "maximum": float(ledger["weight"].max()),
             "effective_sample_size": effective_sample_size(ledger["weight"].to_numpy(float)),
             "weight_frame_sha256": stable_frame_hash(ledger),
+            "mixture": weight_meta["mixture"],
+            "issue_mass": dict(sorted(weight_meta["issue_mass"].items(), key=lambda item: str(item[0]))),
         },
         "cache_key": cache_key,
     })
