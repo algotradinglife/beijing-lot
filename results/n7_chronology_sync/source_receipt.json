@@ -9,6 +9,14 @@
   "external_data_root_committed": false,
   "fixtures": 48658,
   "issues": 172,
+  "legacy_parity_source": {
+    "consumed_files": {
+      "results/qeu_threshold_n7/action_receipts.parquet": "bd3fc343f6fe7f75f518e373e0c13c90d3a91bbe03d17728393f4ab52b104fcd",
+      "results/qeu_threshold_n7/issue_bundles.parquet": "a1ae57e8f5641e1a7b4154bce207eaa517acf74fe46ba2b5e0b992ba8e0bfe98",
+      "results/qeu_threshold_n7/ticket_receipts.parquet": "6d1effd55900cfdf367c8d19fba46d62b34dcbb4bda049dcaa17894000badc44"
+    },
+    "manifest_sha256": "d102f0ecdd2d4778d79ddf0262b97cf4f12b0b08a335bf9740a9b21c30e1f83d"
+  },
   "upstream_files": {
     "FREEZE_RECEIPT.json": "8ce2dd0c75c124d727ef535ae472bd0ff9cfe113095afa2a56ae766464fd00a7",
     "SOURCE_RECEIPT.json": "c10740f71cd9e10f7128400af86113c7566e95561d4f3ff59c53e2f71e5cd7ce",

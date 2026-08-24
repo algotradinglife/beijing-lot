@@ -1,9 +1,9 @@
 {
   "contract": "BJ-UNIFIED-N7-CHRONOLOGY-SYNC-001/v1",
   "delivery": {
-    "docs/research/Issue-366-N7-Chronology-Sync.md": "3d0bec84de207d71d10408339147ced82eecf1e454a1343997e54b7095b73ec7",
+    "docs/research/Issue-366-N7-Chronology-Sync.md": "1cd933748e889a3d078dca9100262b9cf20a89fa5ae2be995e608557d73e3a90",
     "docs/research/figures/issue_366_corrected_n7_capital.png": "056f51c6a92d488d2c576b2ecd6ff90d764099ca4336696439ea26471045abba",
-    "notebooks/research/n7-chronology-sync/n7_chronology_sync.ipynb": "01003ac5bac22a09a4e7cffacead33c6c68cb01fe75028a362c6e3361b5ab421"
+    "notebooks/research/n7-chronology-sync/n7_chronology_sync.ipynb": "4dfc41e800f57b3fae0e83b36ca17a3a745bac0bcafda6e45f421f7124d2c486"
   },
   "files": {
     "action_receipts.parquet": {
@@ -63,8 +63,8 @@
       "sha256": "782e8167d60c7145e243f861c04041fda7808015e31c8576ffa167a4b9d77276"
     },
     "source_receipt.json": {
-      "bytes": 1182,
-      "sha256": "05ea3b9a6d2a6772f638ce4bfc63fac9d288db9b2d680638da05313eeaae1c62"
+      "bytes": 1711,
+      "sha256": "f0882943dc6d291900765997779207c0957f5eb3321394e12eba38e4dbd460c1"
     },
     "support_attribution.parquet": {
       "bytes": 47667,
@@ -93,7 +93,7 @@
     "tickets": "6a57489ef6c5ee677341f041463e703291c3aa257042bc911fd7f203a1fde81b"
   },
   "implementation": {
-    "contract.py": "4f228bb7bd67115bb3e30e1d543f4ef373e40072f518b32b818c32b84a31c86e",
-    "pipeline.py": "b816718f2f9d4f37de3377fa21c5c7cd6989e5c99bbdfa7fec11548abb58a5d4"
+    "contract.py": "7f322be3574fc4f8bd0d1c8528ad0bfe3562e190b336291d91991301f33f6ba1",
+    "pipeline.py": "ec7a0c27a3e720d89a5eca33c0c5b81dd1a65740c0cbc8273bd3e074001d93e5"
   }
 }

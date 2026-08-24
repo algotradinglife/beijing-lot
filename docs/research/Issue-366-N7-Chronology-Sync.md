@@ -34,6 +34,30 @@ Legacy scientific conclusion changed: **True**. Common legacy issue-arm rows wit
 | ALL | R0 | 0.3023 | 14 | 151 | 0.0953 | 0.0420 |
 | ALL | R3 | 0.3317 | 19 | 1 | 0.3253 | 0.1368 |
 
+## Matched R3 minus R0 stability
+
+| scope | issues | matched_lift_cny | ex_largest_lift_cny | bootstrap_p025_cny | bootstrap_median_cny | bootstrap_p975_cny |
+|---|---|---|---|---|---|---|
+| 2022 | 51 | -23115.9193 | -9910.1791 | -61338.9442 | -22555.5342 | 9140.0188 |
+| 2023 | 46 | 58735.4759 | -2202.9062 | -26392.0824 | 54819.7632 | 198290.8020 |
+| 2024 | 54 | 13063.5109 | -5418.8061 | -46801.1131 | 11163.4247 | 83314.8014 |
+| ALL | 151 | 48683.0675 | -12255.3147 | -67786.2632 | 39643.0936 | 216261.9343 |
+
+The all-period point lift is positive, but the ex-largest lift and bootstrap lower bound are negative. The corrected R3 therefore remains a historical long-tail challenger, not a stable standalone promotion.
+
+## Settlement coverage
+
+| issue_year | settlement_complete | issues |
+|---|---|---|
+| 2022 | False | 7 |
+| 2022 | True | 51 |
+| 2023 | False | 9 |
+| 2023 | True | 46 |
+| 2024 | False | 5 |
+| 2024 | True | 54 |
+
+The corrected registry contains **172** issues. Exactly **151** are settled for both fixed arms; **21** are excluded because at least one selected leg lacks trusted settlement.
+
 ## Old-to-corrected parity
 
 | layer | old_rows | new_rows | common_rows | exact_rows | year_exact_rows | fixture_exact_rows | support_exact_rows | settlement_exact_rows | score_exact_rows |

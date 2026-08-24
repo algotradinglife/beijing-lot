@@ -297,8 +297,11 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
 | 42 | [#358] causal 10h European-average-odds value proxy | Closed / Done | M1 | Parent #202; #360 closed; predecessor of #359 | Corrected `EUROPEAN_AVERAGE_ODDS_PROXY` uses `sum_Top2(p×odds)/2` per-stake leg contribution and applies 0.65 once to the complete N-fold proxy. All 397,224 M×3 cells carry source/quality receipts; it is not official Beijing SP or an exact payout claim |
 | 43 | [#359] low-N coverage × European-value frontier | Closed / Done | M3 | Parent #202; #355/#358 closed; blocks #356 | Exact S0 and #355 diagnostic parity. N3 value-only lifts matched 2022–2024 PnL by CNY4,792; N4 coverage+value lifts by CNY6,663 and remains +CNY8,086 ex-largest. Both bootstrap p05 values cross zero and absolute capital remains below CNY100k. `HISTORICAL_SIGNAL`, not deployable Edge; gap-only has no repeatable increment |
 | 44 | [#356] selective third-outcome protection | Closed / Done | M3 | Parent #202; #355/#359 closed | Development-frozen additive P fails transfer: every primary S0 P>0 arm loses matched 2022–2024 capital; recovered miss payouts are smaller than incumbent-hit dilution. `NO_INCREMENT`; retain P0 |
-| 45 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 46 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 45 | [#366] corrected N7 chronology synchronization | Closed / Done | M3 | Parent #202; #360 closed; blocks #367/#369 | Rebuilt fixed R0/R3 from corrected registry-year and fixture-relative 10h inputs. R3 ends at CNY132,689 versus R0 CNY84,006 on 151 settled issues, but its CNY48,683 lift becomes CNY−12,255 ex-largest and bootstrap p02.5 is CNY−67,786. Twenty-two of 208 common legacy issue-arm PnLs change. Corrected R3 is the canonical historical long-tail challenger, not a stable promotion |
+| 46 | [#367] corrected N4 versus N7 expert diagnostic | Open / Blocked | M3 | Parent #202; blocked by #366 and closed #359 | Recompute complementarity only from corrected-N7 evidence. The legacy-anchor temporary correlation is non-canonical and cannot authorize MoE membership |
+| 47 | [#369] corrected N7 support-shape factorial | Open / Ready; dependency wait | M3 | Parent #202; blocked by #366 | Test R0/R3 × control/contraction/expansion/both under fixed CNY1,024. The experiment isolates easy-leg compression, hard-leg third-outcome protection, their interaction and integer-unit allocation. Only positive standalone and robust arms may enter a future expert pool |
+| 48 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 49 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -1005,6 +1008,10 @@ retrospective feature.
 [#356]: https://github.com/algotradinglife/beijing-lot/issues/356
 [#358]: https://github.com/algotradinglife/beijing-lot/issues/358
 [#359]: https://github.com/algotradinglife/beijing-lot/issues/359
+[#360]: https://github.com/algotradinglife/beijing-lot/issues/360
+[#366]: https://github.com/algotradinglife/beijing-lot/issues/366
+[#367]: https://github.com/algotradinglife/beijing-lot/issues/367
+[#369]: https://github.com/algotradinglife/beijing-lot/issues/369
 
 ---
 

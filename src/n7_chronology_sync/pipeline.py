@@ -28,6 +28,7 @@ from .contract import (
     CORRECTED_PACKAGE,
     FUNDED_UNITS,
     ISSUE_STAKE_CNY,
+    LEGACY_MANIFEST_SHA256,
     LEGACY_PACKAGE,
     N_LEGS,
     OUTCOMES,
@@ -100,6 +101,33 @@ def _verify_upstream_package(repo_root: Path) -> dict[str, str]:
     return {relative: files[relative] for relative in sorted(required)}
 
 
+def _verify_legacy_package(repo_root: Path) -> dict[str, Any]:
+    package = repo_root / LEGACY_PACKAGE
+    manifest_path = package / "MANIFEST.json"
+    if sha256_file(manifest_path) != LEGACY_MANIFEST_SHA256:
+        raise ContractError("legacy N7 manifest is not the accepted frozen source")
+    manifest = _read_json(manifest_path)
+    required = {
+        f"{LEGACY_PACKAGE}/action_receipts.parquet",
+        f"{LEGACY_PACKAGE}/issue_bundles.parquet",
+        f"{LEGACY_PACKAGE}/ticket_receipts.parquet",
+    }
+    files = manifest.get("files", {})
+    if not required.issubset(files):
+        raise ContractError("legacy N7 manifest lacks required parity inputs")
+    consumed: dict[str, str] = {}
+    for relative in sorted(required):
+        path = repo_root / relative
+        expected = files[relative].get("sha256")
+        if not path.is_file() or sha256_file(path) != expected:
+            raise ContractError(f"legacy N7 source hash mismatch: {relative}")
+        consumed[relative] = str(expected)
+    return {
+        "manifest_sha256": LEGACY_MANIFEST_SHA256,
+        "consumed_files": consumed,
+    }
+
+
 def _settlement_frame(data_root: Path, issues: list[str]) -> pd.DataFrame:
     path = data_root / "derived/beidan_xlsm/beidan_xlsm.sqlite"
     placeholders = ",".join("?" for _ in issues)
@@ -152,6 +180,7 @@ def load_corrected_cells(
     repo_root: Path, data_root: Path
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     upstream_hashes = _verify_upstream_package(repo_root)
+    legacy_source = _verify_legacy_package(repo_root)
     package = repo_root / CORRECTED_PACKAGE
     cells = pd.read_parquet(package / "features/selector_cells.parquet")
     labels = pd.read_parquet(package / "labels/selector_labels.parquet")
@@ -199,6 +228,7 @@ def load_corrected_cells(
         "contract": CONTRACT_ID,
         "corrected_source_contract": _read_json(package / "FREEZE_RECEIPT.json").get("contract"),
         "upstream_files": upstream_hashes,
+        "legacy_parity_source": legacy_source,
         "corrected_cells_sha256": stable_frame_sha(cells),
         "corrected_labels_sha256": stable_frame_sha(labels),
         "consumed_settlement_sha256": stable_frame_sha(settlement),
@@ -761,10 +791,17 @@ def build_notebook_and_report(repo_root: Path, package: Path) -> None:
             "from pathlib import Path\nimport pandas as pd\nimport matplotlib.pyplot as plt\nROOT=Path.cwd().parents[2]\nOUT=ROOT/'results/n7_chronology_sync'"
         ),
         nbformat.v4.new_code_cell(
-            "performance=pd.read_csv(OUT/'performance.csv')\nrisk=pd.read_csv(OUT/'risk_diagnostics.csv')\nparity=pd.read_csv(OUT/'parity_summary.csv')\nperformance"
+            "performance=pd.read_csv(OUT/'performance.csv')\nrisk=pd.read_csv(OUT/'risk_diagnostics.csv')\nbootstrap=pd.read_csv(OUT/'bootstrap_lift.csv')\ncoverage=pd.read_csv(OUT/'coverage_ledger.csv')\nparity=pd.read_csv(OUT/'parity_summary.csv')\nissue_parity=pd.read_parquet(OUT/'legacy_issue_parity.parquet')\nperformance"
         ),
         nbformat.v4.new_code_cell("risk"),
+        nbformat.v4.new_code_cell("bootstrap"),
+        nbformat.v4.new_code_cell(
+            "coverage_summary=(coverage.groupby(['issue_year','settlement_complete'],dropna=False).size().rename('issues').reset_index())\ncoverage_summary"
+        ),
         nbformat.v4.new_code_cell("parity"),
+        nbformat.v4.new_code_cell(
+            "changed=issue_parity[(issue_parity['_merge']=='both') & (~issue_parity['exact_issue_arm'])]\nchanged[['issue','arm','old_issue_year','new_issue_year','exact_selected_match_ids','exact_support_json','exact_pnl_cny']].head(20)"
+        ),
         nbformat.v4.new_code_cell(
             "paths=pd.read_csv(OUT/'capital_paths.csv')\nfig,ax=plt.subplots(figsize=(9,4))\nfor arm,g in paths[paths.scope.eq('ALL')].groupby('arm'):\n    ax.plot(g.issue_order,g.capital_cny,label=arm)\nax.axhline(100000,color='black',lw=.8); ax.legend(); ax.set_title('Corrected chronology N7 capital'); plt.show()"
         ),
@@ -773,6 +810,8 @@ def build_notebook_and_report(repo_root: Path, package: Path) -> None:
     nbformat.write(nb, notebook_path)
     performance = pd.read_csv(package / "performance.csv")
     risk = pd.read_csv(package / "risk_diagnostics.csv")
+    bootstrap = pd.read_csv(package / "bootstrap_lift.csv")
+    coverage = pd.read_csv(package / "coverage_ledger.csv")
     parity = pd.read_csv(package / "parity_summary.csv")
     decision = _read_json(package / "decision.json")
     figure = repo_root / "docs/research/figures/issue_366_corrected_n7_capital.png"
@@ -812,6 +851,18 @@ Legacy scientific conclusion changed: **{decision['legacy_conclusion_changed']}*
 ## Corrected path risk
 
 {table(risk)}
+
+## Matched R3 minus R0 stability
+
+{table(bootstrap)}
+
+The all-period point lift is positive, but the ex-largest lift and bootstrap lower bound are negative. The corrected R3 therefore remains a historical long-tail challenger, not a stable standalone promotion.
+
+## Settlement coverage
+
+{table(coverage.groupby(['issue_year', 'settlement_complete'], dropna=False).size().rename('issues').reset_index())}
+
+The corrected registry contains **{coverage['issue'].nunique()}** issues. Exactly **{int(coverage['settlement_complete'].sum())}** are settled for both fixed arms; **{int((~coverage['settlement_complete']).sum())}** are excluded because at least one selected leg lacks trusted settlement.
 
 ## Old-to-corrected parity
 

@@ -19,4 +19,7 @@ BOOTSTRAP_SEED = 366_001
 
 CORRECTED_PACKAGE = "results/low_n_selector_data"
 LEGACY_PACKAGE = "results/qeu_threshold_n7"
+LEGACY_MANIFEST_SHA256 = (
+    "d102f0ecdd2d4778d79ddf0262b97cf4f12b0b08a335bf9740a9b21c30e1f83d"
+)
 RESULT_PACKAGE = "results/n7_chronology_sync"
