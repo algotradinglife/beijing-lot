@@ -1,0 +1,47 @@
+{
+  "contract": "BJ-UNIFIED-CUTOFF-LEARNING-001/v2",
+  "deliveries": {
+    "docs/research/Issue-382-Cutoff-Learning.md": "bed4c36d1bd4a2378c66245fc4ac6f28867c9cc3f6097e9e1160516c29a13d1c",
+    "docs/research/templates/cutoff-learning-contract.md": "860360bb5127ac4b4d03bc953ed3a1c47635e9f668b3e1f418d0d34572bac058",
+    "docs/research/templates/cutoff-learning-review.md": "4fccc30dcc8ee95b2b83daca986f768e3e8464b97a4fb2789cd2f7658d76c526",
+    "docs/research/temporal-function-inventory.csv": "8e35416cf9351b0e8d45ebca2ee0ce0c82597aab04aa7ce99fe418c9862e6df0",
+    "notebooks/research/cutoff-learning/Issue-382-Cutoff-Learning.ipynb": "11fa210c224929a1aff151095e840ed155d7927de1371eb5ff04a753e63c06c0"
+  },
+  "files": {
+    "accepted_354_parity.parquet": {
+      "bytes": 4698568,
+      "sha256": "4b80393f0ce8b8b800271701c854a144da39f95e1957c87a9d3cb5dacd4c5796"
+    },
+    "decision.json": {
+      "bytes": 314,
+      "sha256": "2e374d3a5ac89c026fc83e35794039b438642c902f3c85575a50cffe4ca16692"
+    },
+    "equivalent_cutoff_receipt.csv": {
+      "bytes": 210,
+      "sha256": "4c52380ecd29347df2de11af7516b900eb3c0167651e66779adcda354050d7f7"
+    },
+    "mapped_probabilities.parquet": {
+      "bytes": 3185979,
+      "sha256": "1d86af05f12d3e1e2f215c97f5a4a48552a9cf30a55ed7562eb8f1ee7e1ebdc4"
+    },
+    "mapping_receipt.json": {
+      "bytes": 11531,
+      "sha256": "ea582b13587c410e9698cd6c8c9d17ed7b44ea5e89a5d5ef8dddeeb90963a711"
+    },
+    "source_receipt.json": {
+      "bytes": 1057,
+      "sha256": "20bf3f1ba75d77746f19a06b029b683e5b0ea9b7b54834e3d5d9a371985f6c97"
+    },
+    "weight_ledger.parquet": {
+      "bytes": 874126,
+      "sha256": "3646ffaf959127c9d581c1beaf5d87a3671fd5805399a0f2af4b12c7e1c0ca69"
+    }
+  },
+  "implementation": {
+    "api.py": "a06408791cbaa4317f6b670338cc8f7d0c4fd2c476cc2be9782f754adbbfbba8",
+    "contract.py": "c9d3e49b6b0292ed09f407b7d87403ed47e3bb65d9c573ce0c09c0708c153177",
+    "package.py": "fc33ed86d4c72bdd85c57311143399827727496c7e2043c8ee1ee72be44e9c85",
+    "temporal_learning/core.py": "71329fae84d6f039d9f30edb99822fa069d16a8c301dce19e2714200549f8a1b",
+    "temporal_learning/example_selector.py": "06de157657e88db28bf8a4d3958f457df5c621d485822b89ba8e5e82c396a839"
+  }
+}

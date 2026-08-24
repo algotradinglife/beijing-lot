@@ -1,0 +1,10 @@
+{
+  "cache_keys_cutoff_bound": true,
+  "contract": "BJ-UNIFIED-CUTOFF-LEARNING-001/v2",
+  "equivalent_cutoffs_same_science": true,
+  "exact_354_rows": 48658,
+  "future_consumers_must_pass_cutoff_explicitly": true,
+  "mapping_accepted": true,
+  "parity_rows": 48658,
+  "verdict": "CUTOFF_MAPPING_INTERFACE_READY"
+}

@@ -1,0 +1,22 @@
+{
+  "accepted_354_manifest_sha256": "33e85a609c7d860be2c944c0c5417b6d6bbb1dc3bcf87a7e3bce3ddc816e584b",
+  "contract": "BJ-UNIFIED-CUTOFF-LEARNING-001/v2",
+  "evaluation_years": [
+    2022,
+    2023,
+    2024
+  ],
+  "helper_hashes": {
+    "divergence_materializer.data": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+    "low_n_selector_data.pipeline": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca"
+  },
+  "source_hashes": {
+    "accepted_238_probability_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+    "consumed_development_labels_sha256": "1e5742221f1b6b8d02a1c66e4cd413d1b21c855650fa659cbadd10203996259b",
+    "consumed_fixture_timing_sha256": "b2d1138979b3b4022b7ef677c8cd2485ac26428ff3d286b1dfea1487ecd01d4b",
+    "consumed_issue_roles_sha256": "f99b6f11e416b0026d5b381c0b772cfc8bf5973624362d828a933682ca6ffa58",
+    "consumed_proxy_parts_receipt_sha256": "03ce615d2acc0d7711bf889a3a0301ddd844fa1f7cab62d23c6fb7491f1e542a"
+  },
+  "target_issues": 172,
+  "target_rows": 48658
+}
