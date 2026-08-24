@@ -1,0 +1,23 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-THIRD-OUTCOME-PROTECTION-001/v1",
+  "implementation_hashes": {
+    "scripts/build_low_n_third_outcome_protection_notebook.py": "e20e17d415b36fe8fc63d9f3652c50ec28c29855f172a8109cf0ec0af9630977",
+    "scripts/run_low_n_third_outcome_protection.py": "9e43944c3b82a8989894ddd1b3b42bfc3939bc265201943c0128fdfaf5abfc45",
+    "scripts/verify_low_n_third_outcome_protection.py": "f191f172459c50aca174808ba55ab16c196ca89320497b2e0dc8bbb266ce1021",
+    "src/low_n_third_outcome_protection/__init__.py": "2fe2f3637ce702e4e1415ab4e0a7e51c1940de956b596e0ccde52e79c637926b",
+    "src/low_n_third_outcome_protection/contract.py": "8296c6b377ed1091ae55b588df1858679755313fa7f26f68ff6bc3b3dbed85db",
+    "src/low_n_third_outcome_protection/pipeline.py": "5aa0faf3e21f47a9bc738deb482fe3dbb3d5cbd847507f8e137c1bce46beb252",
+    "tests/test_low_n_third_outcome_protection.py": "b01001e9ff5e8902a0f4cd3b44fe333c78288a9086110cf0d66680c2ec615373"
+  },
+  "s0_bundles_sha256": "53eb5c4500f6d1c6d1a7e925aa0115564503f50df1efe32a022d8455c9847a0e",
+  "score_surface_sha256": "40a5ce501169ad51f400d2f022f70ae346fca1c9c3a721b1a53b7cae45a23629",
+  "settlement_semantic_sha256": "2b26784eb34ab4c39f520a5d1c4dfa153a6bbe5f94b88662629a285e61da0e85",
+  "upstream_decisions_sha256": "cd4a1f53314779b7b4b9ef562bd78c9eafbdc56d115c194191a23dbd9163b067",
+  "upstream_freeze_sha256": "b3c58a9835c13b16026b68cf1f4929a0e2f81126fe0eb8f090c9cd6e2949c00f",
+  "upstream_manifest_sha256": "5758e5f3e5dda0cea79b57b0e1af1d02aea1c8d10bd1cb0fef0f6065d9929b5d",
+  "upstream_preoutcome_sha256": "5bb1b8a0ecb728cc8e1cdc4f74eb6ea95768e533cbb0250618e4252e0453ee7d",
+  "upstream_selections_sha256": "1b3a8f7ccb2dd920f38428071a411245dd0c8e62a94926ec079fd335037cfb9e",
+  "upstream_source_sha256": "b4230b63cfaeae9260302bc0a1fd7dc816e50f6f742cd13de6ba7ae8aa5c4bb7",
+  "upstream_tickets_sha256": "c4ecca5dc3d6f31e2022261743c4f29054163402ac0e188fd4e0ef58cf717eff",
+  "value_cells_sha256": "9b08ece2fa1fa0a7e20e2929495db3f9fee65812a13edccaad529f8a44137a70"
+}

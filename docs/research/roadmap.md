@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-24 (#358 European-value proxy and #359 low-N selector factorial settled)**
+Updated: **2026-08-24 (#356 selective third-outcome protection settled)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -241,7 +241,8 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
        \_________________________/
                     |
                     v
-#356 selective third-outcome protection (Inbox; waits for #359)
+#356 selective third-outcome protection
+     (Done; added coverage raises hit rate but loses matched capital)
              |
              v
 #210 held-out/prospective validation  <--- still blocked by open #218
@@ -295,7 +296,7 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
 | 41 | [#355] fixed-Top2 low-N match selector | Closed / Done | M3 | Parent #202; #354/#360 closed; blocks #359/#356 | Corrected replay keeps S2 only by tiny OOF calibration gains. On 151 matched N4 issues its all-transfer lift is CNY+2,308, but annual lift reverses to CNY−7,683 in 2024, bootstrap p05 is negative, and matched drawdown/loss run worsens from 27.35%/8 to 27.69%/13. N3/N5 lifts are negative. `NO_PROMOTION`; preserve S0 and carry only the weak value clue into #358/#359 |
 | 42 | [#358] causal 10h European-average-odds value proxy | Closed / Done | M1 | Parent #202; #360 closed; predecessor of #359 | Corrected `EUROPEAN_AVERAGE_ODDS_PROXY` uses `sum_Top2(p×odds)/2` per-stake leg contribution and applies 0.65 once to the complete N-fold proxy. All 397,224 M×3 cells carry source/quality receipts; it is not official Beijing SP or an exact payout claim |
 | 43 | [#359] low-N coverage × European-value frontier | Closed / Done | M3 | Parent #202; #355/#358 closed; blocks #356 | Exact S0 and #355 diagnostic parity. N3 value-only lifts matched 2022–2024 PnL by CNY4,792; N4 coverage+value lifts by CNY6,663 and remains +CNY8,086 ex-largest. Both bootstrap p05 values cross zero and absolute capital remains below CNY100k. `HISTORICAL_SIGNAL`, not deployable Edge; gap-only has no repeatable increment |
-| 44 | [#356] selective third-outcome protection | Open / Inbox | M3 | Parent #202; blockedBy #355 and #359 | Test additive protection only after the match selector/value frontier is frozen, so match selection and outcome support remain separately attributable |
+| 44 | [#356] selective third-outcome protection | Closed / Done | M3 | Parent #202; #355/#359 closed | Development-frozen additive P fails transfer: every primary S0 P>0 arm loses matched 2022–2024 capital; recovered miss payouts are smaller than incumbent-hit dilution. `NO_INCREMENT`; retain P0 |
 | 45 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
 | 46 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
@@ -482,6 +483,29 @@ warning remains material and prevents candidate promotion.
   unchanged.
 - Reports: [`Issue-358-LowN-European-Value-Data.md`](Issue-358-LowN-European-Value-Data.md)
   and [`Issue-359-LowN-European-Value-Selector.md`](Issue-359-LowN-European-Value-Selector.md).
+
+### #356 selective third-outcome protection decision
+
+- #356 keeps each frozen N3/N4/N5 match set and Top-2 support unchanged, then
+  appends the omitted outcome on P=0..N fixtures in strictly-prior predicted
+  miss order. It enumerates the full `2^(N-P) × 3^P` support while preserving
+  exactly CNY1,024 per BET issue and applying 0.65 once per winning ticket.
+- The 2019–2021 gate selects P2/P3/P5 for the primary S0 N3/N4/N5 lanes, but
+  all three reverse on exposed 2022–2024 transfer: matched lift is
+  CNY−19,871/CNY−17,008/CNY−39,011. Their maximum drawdown rises from
+  28.32%/26.50%/26.53% at P0 to 40.20%/32.74%/53.43%, and longest losing runs
+  rise from 15/8/8 to 21/16/18.
+- Protection works mechanically but not economically. The selected arms
+  recover CNY57,192/CNY82,437/CNY84,235 on baseline misses, while dilution of
+  already-winning Top-2 tickets costs CNY77,063/CNY99,445/CNY123,246. Even the
+  closest shallow transfer arms, N4/P2 and N5/P2, remain CNY−3,507 and
+  CNY−1,382 versus P0 and are negative after largest-payout removal.
+- The frozen rank does not order transfer misses monotonically: rank 1 has the
+  highest predicted miss probability but a lower realized miss rate than rank
+  2 in every primary N lane. Verdict: `NO_INCREMENT`. Keep P0 as the stable
+  center; do not reinterpret higher support-hit rate as better capital return,
+  and do not change #210/#218.
+- Report: [`Issue-356-LowN-Third-Outcome-Protection.md`](Issue-356-LowN-Third-Outcome-Protection.md).
 
 ### #334 neural residual and value-anchor decision
 
