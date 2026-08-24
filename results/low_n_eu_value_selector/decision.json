@@ -1,0 +1,209 @@
+{
+  "baseline": "C0V0G0",
+  "best_observed_candidate": {
+    "all_transfer_lift_cny": 6663.212205226984,
+    "arm": "C1V1G0",
+    "armwise_ex_largest_lift_cny": 8085.520450542659,
+    "historical_signal": true,
+    "n": 4,
+    "path_risk_gate": true,
+    "positive_transfer_years": 2
+  },
+  "changes_210_or_218": false,
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-SELECTOR-001/v1",
+  "coverage_diagnostic": "C1V0G0",
+  "historical_candidates": [
+    {
+      "all_transfer_lift_cny": -5254.8329654487425,
+      "arm": "C0V0G1",
+      "armwise_ex_largest_lift_cny": -4335.797565912253,
+      "historical_signal": false,
+      "n": 3,
+      "path_risk_gate": true,
+      "positive_transfer_years": 0
+    },
+    {
+      "all_transfer_lift_cny": 4792.305254360251,
+      "arm": "C0V1G0",
+      "armwise_ex_largest_lift_cny": 7618.055009096126,
+      "historical_signal": true,
+      "n": 3,
+      "path_risk_gate": true,
+      "positive_transfer_years": 2
+    },
+    {
+      "all_transfer_lift_cny": 4792.305254360251,
+      "arm": "C0V1G1",
+      "armwise_ex_largest_lift_cny": 7618.055009096126,
+      "historical_signal": true,
+      "n": 3,
+      "path_risk_gate": true,
+      "positive_transfer_years": 2
+    },
+    {
+      "all_transfer_lift_cny": -451.89967310003465,
+      "arm": "C1V0G0",
+      "armwise_ex_largest_lift_cny": 2536.0991782510464,
+      "historical_signal": false,
+      "n": 3,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -451.89967310003465,
+      "arm": "C1V0G1",
+      "armwise_ex_largest_lift_cny": 2536.0991782510464,
+      "historical_signal": false,
+      "n": 3,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -31622.48324549886,
+      "arm": "C1V1G0",
+      "armwise_ex_largest_lift_cny": -28461.77865463322,
+      "historical_signal": false,
+      "n": 3,
+      "path_risk_gate": false,
+      "positive_transfer_years": 0
+    },
+    {
+      "all_transfer_lift_cny": -31622.48324549886,
+      "arm": "C1V1G1",
+      "armwise_ex_largest_lift_cny": -28461.77865463322,
+      "historical_signal": false,
+      "n": 3,
+      "path_risk_gate": false,
+      "positive_transfer_years": 0
+    },
+    {
+      "all_transfer_lift_cny": -11055.56807456166,
+      "arm": "C0V0G1",
+      "armwise_ex_largest_lift_cny": -10879.981380410594,
+      "historical_signal": false,
+      "n": 4,
+      "path_risk_gate": false,
+      "positive_transfer_years": 0
+    },
+    {
+      "all_transfer_lift_cny": 4487.302127458444,
+      "arm": "C0V1G0",
+      "armwise_ex_largest_lift_cny": 6397.51753621241,
+      "historical_signal": false,
+      "n": 4,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -2339.957631942326,
+      "arm": "C0V1G1",
+      "armwise_ex_largest_lift_cny": -2164.3709377912564,
+      "historical_signal": false,
+      "n": 4,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": 2308.3812259447195,
+      "arm": "C1V0G0",
+      "armwise_ex_largest_lift_cny": 2973.9384148805657,
+      "historical_signal": false,
+      "n": 4,
+      "path_risk_gate": false,
+      "positive_transfer_years": 2
+    },
+    {
+      "all_transfer_lift_cny": 2308.3812259447195,
+      "arm": "C1V0G1",
+      "armwise_ex_largest_lift_cny": 2973.9384148805657,
+      "historical_signal": false,
+      "n": 4,
+      "path_risk_gate": false,
+      "positive_transfer_years": 2
+    },
+    {
+      "all_transfer_lift_cny": 6663.212205226984,
+      "arm": "C1V1G0",
+      "armwise_ex_largest_lift_cny": 8085.520450542659,
+      "historical_signal": true,
+      "n": 4,
+      "path_risk_gate": true,
+      "positive_transfer_years": 2
+    },
+    {
+      "all_transfer_lift_cny": -26269.000129510765,
+      "arm": "C1V1G1",
+      "armwise_ex_largest_lift_cny": -28125.154308824385,
+      "historical_signal": false,
+      "n": 4,
+      "path_risk_gate": false,
+      "positive_transfer_years": 0
+    },
+    {
+      "all_transfer_lift_cny": 5524.396766094535,
+      "arm": "C0V0G1",
+      "armwise_ex_largest_lift_cny": 1952.531263573259,
+      "historical_signal": false,
+      "n": 5,
+      "path_risk_gate": false,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -12617.16149350818,
+      "arm": "C0V1G0",
+      "armwise_ex_largest_lift_cny": -12798.385181177458,
+      "historical_signal": false,
+      "n": 5,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": 10613.08760408548,
+      "arm": "C0V1G1",
+      "armwise_ex_largest_lift_cny": 6150.679017118251,
+      "historical_signal": false,
+      "n": 5,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -5913.825753078795,
+      "arm": "C1V0G0",
+      "armwise_ex_largest_lift_cny": -8473.999010360196,
+      "historical_signal": false,
+      "n": 5,
+      "path_risk_gate": false,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -10039.21091774344,
+      "arm": "C1V0G1",
+      "armwise_ex_largest_lift_cny": -12599.38417502484,
+      "historical_signal": false,
+      "n": 5,
+      "path_risk_gate": false,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -8510.534933076236,
+      "arm": "C1V1G0",
+      "armwise_ex_largest_lift_cny": -15728.229628425477,
+      "historical_signal": false,
+      "n": 5,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    },
+    {
+      "all_transfer_lift_cny": -7318.311902643269,
+      "arm": "C1V1G1",
+      "armwise_ex_largest_lift_cny": -14536.006597992517,
+      "historical_signal": false,
+      "n": 5,
+      "path_risk_gate": true,
+      "positive_transfer_years": 1
+    }
+  ],
+  "issue": 359,
+  "production_or_holdout_authorized": false,
+  "verdict": "HISTORICAL_SIGNAL"
+}

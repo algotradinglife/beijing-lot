@@ -1,0 +1,21 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-SELECTOR-001/v1",
+  "implementation_hashes": {
+    "scripts/build_low_n_eu_value_selector_notebook.py": "60d8f32c7b47976081ed0dc9efd65886a702f85a268869f8052d557b3888fb6e",
+    "scripts/run_low_n_eu_value_selector.py": "c55f8b5da688941b7f6f87ab68d9764a56b95ceae67b7fd3cfeb8de216e69518",
+    "scripts/verify_low_n_eu_value_selector.py": "fafa29dddb89bd4053e67f3c12ace4e722f798cd9095013d28156ecb1d89bddf",
+    "src/low_n_eu_value_selector/__init__.py": "c08762943db5a1e3b56285e559ba5ee56147f892bec2d15019a9dc2800c2a9db",
+    "src/low_n_eu_value_selector/contract.py": "26389b0b2080789d6ae6d90ec15338fa6f7756bc01575555b33a535e0d7df7ac",
+    "src/low_n_eu_value_selector/pipeline.py": "5ad472a85c521ee885063febba9140b6965036083ee146d0f2487127c4b4241e",
+    "src/low_n_match_selector/pipeline.py": "e3652ccc6201efc1576f5eda6b3bb8d40bf271b268ab42b26525603e0d1e6e37",
+    "tests/test_low_n_eu_value_selector.py": "b45f95849ee2ec6110f5063692d6ad218950ed2bd9acf82b739d2f8a367afac9"
+  },
+  "label_sha256": "5e3298846ac3db56059f4d9f9d957caa13932625e7ed17c73294ff420cf3991e",
+  "s0_bundles_sha256": "53eb5c4500f6d1c6d1a7e925aa0115564503f50df1efe32a022d8455c9847a0e",
+  "s0_freeze_sha256": "e49a269148e351167036fb8447008c5d89767742b7fd18a5f6bff01a267ba3d3",
+  "score_surface_sha256": "40a5ce501169ad51f400d2f022f70ae346fca1c9c3a721b1a53b7cae45a23629",
+  "settlement_semantic_sha256": "2b26784eb34ab4c39f520a5d1c4dfa153a6bbe5f94b88662629a285e61da0e85",
+  "value_cells_sha256": "9b08ece2fa1fa0a7e20e2929495db3f9fee65812a13edccaad529f8a44137a70",
+  "value_freeze_sha256": "b9fb175c0acb126a95a5798dca074cb5617128c936299eeb406cb8b6bc3bf70d",
+  "value_source_sha256": "a2f5ed6dd0d11201fa31e1ee22e6e9c371ff34e11288ad5afe14008984a0d326"
+}

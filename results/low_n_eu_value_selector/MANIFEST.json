@@ -1,0 +1,24 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-EU-VALUE-SELECTOR-001/v1",
+  "files": {
+    "contrasts.csv": "a491deb0f0ca8ac9815dd146658620135d9eda5e9a89a403eeb0eec32c48c0d8",
+    "decision.json": "97e78670f920e094eb1237b80d34137dcce121215d46e48e83dcdee5e02fa377",
+    "decisions.parquet": "cd4a1f53314779b7b4b9ef562bd78c9eafbdc56d115c194191a23dbd9163b067",
+    "delivery_receipt.json": "ca645626a326bea307ccb5ffc1ebc8e16c61c388467f305d74a74e798f1e76ae",
+    "factorial.csv": "dbe1df03a10d730f8270bb83b6d18abcc8872c981c7ba712284f9ba8542bc47f",
+    "floors.csv": "3a9cf001b958039e540d03b703d8c1e048c1ac9e45fc60f1f6e8a2206e8833a8",
+    "freeze_receipt.json": "b3c58a9835c13b16026b68cf1f4929a0e2f81126fe0eb8f090c9cd6e2949c00f",
+    "grid.csv": "a83eeb2b6920985a815cb6c42997a616cd21ef06d35bee33c96603803434f5e4",
+    "paths.parquet": "db2fcab58b8b6fc0c4e5769aef9e53988a85ef34705f9a9732e0db84d8f85d77",
+    "performance.csv": "ab0fef1230c09915b12444ecefbe9e313707d9c570bd8f97a9be12de51f7f257",
+    "preoutcome.parquet": "5bb1b8a0ecb728cc8e1cdc4f74eb6ea95768e533cbb0250618e4252e0453ee7d",
+    "risk.csv": "00658d6bf9ec66f6af4c91f915e61146b580496eccea4d83fca77d317cd7f32a",
+    "selection_summary.csv": "a88c71d804df6c80894d43e01b22409b69b38c19d8a76039bab913382a86b8e3",
+    "selections.parquet": "1b3a8f7ccb2dd920f38428071a411245dd0c8e62a94926ec079fd335037cfb9e",
+    "settled_bundles.parquet": "44c71bd845b9559a394c3248b8056c7d4b0345c139a6a17164b368e94bd5f123",
+    "source_receipt.json": "b4230b63cfaeae9260302bc0a1fd7dc816e50f6f742cd13de6ba7ae8aa5c4bb7",
+    "support_attribution.parquet": "4a08094cf3a00592d58aa7694a982eb2c3c86f247a2f4e7eccbef1a23fc5decf",
+    "surface.parquet": "9ddb065c8590f982d0760f83a7a592a1dabcee31b831e89e5f90e1d30398d8c1",
+    "tickets.parquet": "c4ecca5dc3d6f31e2022261743c4f29054163402ac0e188fd4e0ef58cf717eff"
+  }
+}
