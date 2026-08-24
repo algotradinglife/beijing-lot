@@ -1,0 +1,11 @@
+{
+  "changes_to_210_or_218": false,
+  "contract": "BJ-UNIFIED-N6-CORRECTED-ALL-R-001/v2",
+  "eligible_for_378_as_exposed_comparator": [],
+  "expert_admitted_r": [],
+  "fixed_r3_replaced": false,
+  "positive_standalone_point_estimate_r": [],
+  "promotable_to_210": false,
+  "prospective_shadow_started": false,
+  "verdict": "COMPLETE_CORRECTED_N6_R_SURFACE_DIAGNOSTIC_ONLY"
+}
