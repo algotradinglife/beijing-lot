@@ -1,0 +1,28 @@
+{
+  "availability_evidence": "HISTORICAL_PROXY_NOT_OBSERVED",
+  "availability_policy": "KICKOFF_PLUS_4H_HISTORICAL_PROXY_V1",
+  "contract": "BJ-UNIFIED-CUTOFF-WALKFORWARD-001/v1",
+  "downstream": "N6_PROBABILITY_TOP2_R0;64_COMPLETE_CARTESIAN;CNY1024;0.65_TICKET_LEVEL_ONCE",
+  "history_issues": 686,
+  "history_rows": 185061,
+  "intended_use": "HISTORICAL_DIAGNOSTIC",
+  "prospective_authorized": false,
+  "source_hashes": {
+    "accepted_238_probability_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+    "consumed_development_labels_sha256": "1e5742221f1b6b8d02a1c66e4cd413d1b21c855650fa659cbadd10203996259b",
+    "consumed_fixture_timing_sha256": "b2d1138979b3b4022b7ef677c8cd2485ac26428ff3d286b1dfea1487ecd01d4b",
+    "consumed_issue_roles_sha256": "f99b6f11e416b0026d5b381c0b772cfc8bf5973624362d828a933682ca6ffa58",
+    "consumed_proxy_parts_receipt_sha256": "03ce615d2acc0d7711bf889a3a0301ddd844fa1f7cab62d23c6fb7491f1e542a",
+    "hardening_manifest_sha256": "5a6dd0f9856e98660be354de267609bafb1c3a6e7ab9ac46aaf0246bce3a62b9",
+    "settlement_file_sha256": "7240d92f45937d53f0a61606654d474af70b8de0a1397327f78134c66aafd385",
+    "settlement_frame_sha256": "ea7f790b652d62e1d3a5a3b59559cd67b3ac34f58993fb4864ae0e7576e961e1",
+    "transfer_results_frame_sha256": "a016369cd53fd3936f0b8efa6f5414ba93cdb082e62c9cf1214fdee9a9235231"
+  },
+  "target_issues": 172,
+  "target_rows": 48658,
+  "target_years": [
+    2022,
+    2023,
+    2024
+  ]
+}

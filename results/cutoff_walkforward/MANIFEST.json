@@ -1,0 +1,118 @@
+{
+  "contract": "BJ-UNIFIED-CUTOFF-WALKFORWARD-001/v1",
+  "deliveries": {
+    "docs/research/Issue-383-Cutoff-Walkforward.md": "2733ac2082d872799bf7f64dd53ec2d8c605a98fad78be2a5755ae6f3baf5450",
+    "notebooks/research/cutoff-learning/Issue-383-Cutoff-Walkforward.ipynb": "3ee3d6b98e22afcef96a8b67d7cc251b2bc860b3568fbe389f5a3ca3e545e412"
+  },
+  "files": {
+    "action_turnover.csv": {
+      "bytes": 25180,
+      "sha256": "b26da05cde9cc2e23371d58ade3ae929b2d12d83df40ff5429eb9a7c78738695"
+    },
+    "calibration.csv": {
+      "bytes": 925,
+      "sha256": "b477c0d8924b5b3037975cebf91ce373583035b91531f896f1b1fade2b6afd5b"
+    },
+    "capital_paths.parquet": {
+      "bytes": 20097,
+      "sha256": "49377da7f4bc1c044ada595cc5b4676bef087f828dc74a0eefeb43dccfb3d948"
+    },
+    "decision.json": {
+      "bytes": 771,
+      "sha256": "00da66661f954273f078444c7a8c1b510a55dee78530f57113e873962e06e15c"
+    },
+    "decision_table.csv": {
+      "bytes": 1455,
+      "sha256": "55286b6de4d6b47c44bb58d53b25397a5aeb1177557634ec59b752337fd3c4b3"
+    },
+    "mapped_probabilities.parquet": {
+      "bytes": 9394348,
+      "sha256": "960f7e673b356b79417bd66628d0c2068abce32de4417757da9261bdd3c7aa17"
+    },
+    "matched_contrasts.csv": {
+      "bytes": 1431,
+      "sha256": "cbc210d8fa947bc33086c9d4d90e963c122b421df6438e3589ab285b884693f4"
+    },
+    "model_turnover.csv": {
+      "bytes": 32035,
+      "sha256": "2ec80ed107ee3178a43a83d6092795dfef37c5c6200152c0e093109be37fd9bc"
+    },
+    "per_issue_receipts.json.gz": {
+      "bytes": 818328,
+      "sha256": "48aac14e962fb47de0b272f6ba904cb58d96db6b32f2ef8d1373c77e04a9d20b"
+    },
+    "performance.csv": {
+      "bytes": 2446,
+      "sha256": "ef40ed506f6f342f96e618b71232d2988e9c0d6bbe3c1c1f8804bc9dd50a7ab6"
+    },
+    "probability_turnover.csv": {
+      "bytes": 31308,
+      "sha256": "aae6331b91919b0d34be067046e32e2bfbb6af5a2969fd8517c8c632c3590bbf"
+    },
+    "receipt_summary.parquet": {
+      "bytes": 616278,
+      "sha256": "05320ee272dd0e37d5e638ac259671ae3fd9ce07af971d91b995be8cb2e6e3ca"
+    },
+    "risk_diagnostics.csv": {
+      "bytes": 1206,
+      "sha256": "32098d52f0b6b4d521da09b5118b494a7f173203148939a7f0f6692f3313948f"
+    },
+    "selected_actions.parquet": {
+      "bytes": 57012,
+      "sha256": "37276162f37e64b8874130470cb5aa7888ed15684df577d780924a77acf0853d"
+    },
+    "settled_bundles.parquet": {
+      "bytes": 32118,
+      "sha256": "403f91223427a1cc04c0f797dfd06133719485c1eb8f5db8714d2d85a4575053"
+    },
+    "settlement_coverage.csv": {
+      "bytes": 44894,
+      "sha256": "385bd919f80decb48cfc3ff427e3e9ef817d5d8ef02a86c89a7b1c504f0ba3b0"
+    },
+    "source_receipt.json": {
+      "bytes": 1472,
+      "sha256": "7b38e7f19d51c7ed225ce902ccfd3a7bdb35d761bf08bde77a4acd68fcd195a6"
+    },
+    "synthetic_shift_paths.csv": {
+      "bytes": 8461,
+      "sha256": "b2cf01532a03cdb283f0b1e631cd484d011114e822320e9adec40b0013cd1d98"
+    },
+    "synthetic_shift_summary.csv": {
+      "bytes": 383,
+      "sha256": "05d96c8a35158692426a943046d7220d27b76ccb9e03976948750bf330a96e9a"
+    },
+    "tickets.parquet": {
+      "bytes": 258100,
+      "sha256": "ad1d3c66282fb8d882b1c078179d1da3ef25ec555041cbdf3f8e1e03673f1132"
+    }
+  },
+  "implementation": {
+    "closure_sha256": "e21ccf0fc3131563899bf1d1720e035a5bf25b20d5490d2e6322e032b5b59595",
+    "distributions": {
+      "nbclient": "0.10.2",
+      "nbformat": "5.10.4",
+      "numpy": "2.4.6",
+      "pandas": "3.0.3",
+      "scikit-learn": "1.9.0"
+    },
+    "files": {
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_walkforward/contract.py": "1a57b8193c34b5442883037605382516d181dac834bb5fd76f803720e66e5d84",
+      "src/cutoff_walkforward/fitting.py": "108be8fd4a58283d3bcd0866bdfbc02b1a51a7bfaf6d80a2bbf51dc23384d611",
+      "src/cutoff_walkforward/pipeline.py": "b44bb8c8ce96af2b55aa45e8aba5e6fc070bb216876a413a524364ac6d032dce",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
+    },
+    "root_modules": [
+      "src.cutoff_walkforward.pipeline"
+    ]
+  }
+}

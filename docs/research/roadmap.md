@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-25 (#378 N6/N7 portfolio closed; #388 cutoff hardening ready to land; #383 next)**
+Updated: **2026-08-25 (#388 cutoff hardening and #383 walk-forward recency diagnostic completed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -305,9 +305,9 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
 | 50 | [#377] corrected N6 R3 support-transfer count grid | Closed / Done | M3 | Parent #202; #376 closed | No arm passes standalone-positive robustness admission; retained only as exposed mechanism evidence |
 | 51 | [#382] shared cutoff-driven historical learning | Closed / Done | M2 | Parent #202; #354 closed; blocks #381/#383 | Generic cutoff/availability/partition/weight/ESS/cache/receipt/walk-forward library landed; mapping and non-mapping clients; static governance and adversarial evidence |
 | 52 | [#381] corrected N6 complete R0–R6 surface | Closed / Done | M3 | Parent #202; blockedBy closed #382/#376; blocks #378 | Rebuilt through shared cutoff client with 48,658-cell exact parity. All R0–R6 are standalone-negative; best point estimate R1 is CNY−5,447, fixed R3 remains CNY−12,300, and no R is admitted or replaces R3 |
-| 53 | [#378] corrected N6 versus N7 portfolio diagnostic | Open / PI Review | M3 | Parent #202; blockedBy closed #381/#373/#377 | Complete #381 surface confirms no positive N6 expert. N6 R3 and N7 CONTROL are strongly synchronized (Pearson 0.754; both lose 76.2%); 50/50 PnL CNY10,195 is pure dilution versus N7-only stake reduction, so no N6 arm enters the expert pool |
+| 53 | [#378] corrected N6 versus N7 portfolio diagnostic | Closed / Done | M3 | Parent #202; blockedBy closed #381/#373/#377 | Complete #381 surface confirms no positive N6 expert. N6 R3 and N7 CONTROL are strongly synchronized (Pearson 0.754; both lose 76.2%); 50/50 PnL CNY10,195 is pure dilution versus N7-only stake reduction, so no N6 arm enters the expert pool |
 | 54 | [#388] shared cutoff-learning hardening | Closed / Done | M2 | Parent #202; blockedBy closed #382; blocks #383 | Shared API now excludes exact target identity, binds transitive imports, enforces exact AST occurrences in `src/`/`scripts/`, separates diagnostic proxies from prospective availability, and implements a true convex recent-state blend; #382 mapping parity remains exact across 48,658 rows |
-| 55 | [#383] issue-level walk-forward recency diagnostic | Open / Blocked | M2 | Parent #202; blockedBy #388 and closed #382 | Compare equal expansion, exponential recency and bounded recent-state blend through the hardened shared API before prospective adaptive reuse |
+| 55 | [#383] issue-level walk-forward recency diagnostic | Closed / Done | M2 | Parent #202; blockedBy closed #388/#382 | Exact 172-issue walk-forward compared equal expansion, 730-day exponential decay and a true 75/25 long-history/recent-12-issue blend. The recent blend is a positive but unstable historical mechanism signal (PnL CNY1,211; matched lift CNY15,703; ex-largest lift CNY6,333; max drawdown 24.55% versus 43.28%), but annual PnL changes sign, bootstrap p05 lift is CNY-22,263 and calibration is slightly worse. Verdict NO_RECENCY_INCREMENT; equal expansion remains default, no strategy promotion, #210/#218 unchanged |
 | 56 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
 | 57 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 

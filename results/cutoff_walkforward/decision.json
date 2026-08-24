@@ -1,0 +1,30 @@
+{
+  "availability_evidence": "HISTORICAL_PROXY_NOT_OBSERVED",
+  "contract": "BJ-UNIFIED-CUTOFF-WALKFORWARD-001/v1",
+  "descriptive_historical_signal_policies": [
+    "RECENT_STATE_BLEND"
+  ],
+  "exact_common_settled_issues": 149,
+  "mapped_rows": 145974,
+  "policy_predicates": {
+    "EXPANDING_EXPONENTIAL": {
+      "path_nonworse": false,
+      "predictive_nonworse": false,
+      "robust_positive_lift": false
+    },
+    "RECENT_STATE_BLEND": {
+      "path_nonworse": true,
+      "predictive_nonworse": false,
+      "robust_positive_lift": false
+    }
+  },
+  "preserved_issues": [
+    210,
+    218
+  ],
+  "prospective_authorized": false,
+  "strategy_promoted": false,
+  "useful_recency_policies": [],
+  "verdict": "NO_RECENCY_INCREMENT",
+  "walkforward_issues": 172
+}
