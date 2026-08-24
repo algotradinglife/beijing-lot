@@ -1,7 +1,7 @@
-"""BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1 — corrected N6 vs corrected-N7
+"""BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2 — corrected N6 vs corrected-N7
 expert complementarity and fixed portfolio-path diagnostic.
 
-Consumes ONLY the frozen accepted surfaces (#376/#377/#373). No prospective
+Consumes ONLY the frozen accepted surfaces (#381/#377/#373). No prospective
 evidence. Metric definitions mirror the frozen upstream grid protocol
 (circular moving-block bootstrap, path metrics, rolling windows, payout
 concentration) so every output is directly comparable to the accepted grids.
@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import shutil
 from typing import Any
 
 import numpy as np
@@ -24,6 +25,7 @@ from .contract import (
     BOOTSTRAP_SEED,
     BOOTSTRAP_SEED_ASYNC,
     CONTRACT_ID,
+    EXPECTED_UPSTREAM_MANIFEST_SHA256,
     EXPECTED_COMMON_ISSUES,
     EXPECTED_EXCLUSIVE_N6_ISSUES,
     EXPECTED_N6_ISSUES,
@@ -31,7 +33,6 @@ from .contract import (
     FUNDED_UNITS,
     ISSUE_NUMBER,
     ISSUE_STAKE_CNY,
-    MECHANISM_PAIRS,
     MOVING_BLOCK_LENGTH,
     N6_ARM_R0,
     N6_ARM_R3,
@@ -49,7 +50,7 @@ from .contract import (
     SLEEVE_STAKE_CNY,
     STAKE_PER_UNIT_CNY,
     STARTING_CAPITAL_CNY,
-    UPSTREAM_N6_CHRONOLOGY,
+    UPSTREAM_N6_ALL_R,
     UPSTREAM_N6_GRID,
     UPSTREAM_N7_GRID,
     YEARS,
@@ -73,21 +74,43 @@ def _read_json(path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
+def verify_upstream_packages(repo_root: Path) -> None:
+    """Bind this descriptive package to the exact accepted upstream manifests."""
+
+    for relative, expected_manifest_hash in EXPECTED_UPSTREAM_MANIFEST_SHA256.items():
+        package = repo_root / relative
+        manifest_path = package / "MANIFEST.json"
+        if not manifest_path.is_file() or sha256_file(manifest_path) != expected_manifest_hash:
+            raise ContractError(f"accepted upstream manifest mismatch: {relative}")
+        manifest = _read_json(manifest_path)
+        files = manifest.get("files")
+        if not isinstance(files, dict) or not files:
+            raise ContractError(f"accepted upstream manifest has no file inventory: {relative}")
+        for name, receipt in files.items():
+            path = package / name
+            if (
+                not path.is_file()
+                or path.stat().st_size != int(receipt["bytes"])
+                or sha256_file(path) != receipt["sha256"]
+            ):
+                raise ContractError(f"accepted upstream payload mismatch: {relative}/{name}")
+
+
 # ---------------------------------------------------------------------------
 # Upstream loading and validation
 # ---------------------------------------------------------------------------
 
-SURFACE_PACKAGES = (UPSTREAM_N6_CHRONOLOGY, UPSTREAM_N6_GRID, UPSTREAM_N7_GRID)
+SURFACE_PACKAGES = (UPSTREAM_N6_ALL_R, UPSTREAM_N6_GRID, UPSTREAM_N7_GRID)
 
 
-def load_upstream(repo_root: Path) -> dict[str, pd.DataFrame]:
+def load_upstream(repo_root: Path) -> dict[str, Any]:
     root = repo_root
-    n6_bundles = pd.read_parquet(root / UPSTREAM_N6_CHRONOLOGY / "issue_bundles.parquet")
+    n6_bundles = pd.read_parquet(root / UPSTREAM_N6_ALL_R / "issue_bundles.parquet")
     n6_grid_bundles = pd.read_parquet(root / UPSTREAM_N6_GRID / "issue_bundles.parquet")
     n7_bundles = pd.read_parquet(root / UPSTREAM_N7_GRID / "issue_bundles.parquet")
-    n6_perf = pd.read_csv(root / UPSTREAM_N6_CHRONOLOGY / "performance.csv")
+    n6_perf = pd.read_csv(root / UPSTREAM_N6_ALL_R / "performance.csv")
     n7_perf = pd.read_csv(root / UPSTREAM_N7_GRID / "performance.csv")
-    n6_risk = pd.read_csv(root / UPSTREAM_N6_CHRONOLOGY / "risk_diagnostics.csv")
+    n6_risk = pd.read_csv(root / UPSTREAM_N6_ALL_R / "risk_diagnostics.csv")
     n7_risk = pd.read_csv(root / UPSTREAM_N7_GRID / "risk_diagnostics.csv")
     return {
         "n6_bundles": n6_bundles,
@@ -97,10 +120,12 @@ def load_upstream(repo_root: Path) -> dict[str, pd.DataFrame]:
         "n7_perf": n7_perf,
         "n6_risk": n6_risk,
         "n7_risk": n7_risk,
+        "n6_decision": _read_json(root / UPSTREAM_N6_ALL_R / "decision.json"),
+        "n6_grid_decision": _read_json(root / UPSTREAM_N6_GRID / "decision.json"),
     }
 
 
-def validate_upstream(upstream: dict[str, pd.DataFrame]) -> None:
+def validate_upstream(upstream: dict[str, Any]) -> None:
     """Frozen source-bound checks against the accepted surfaces."""
     n6 = upstream["n6_bundles"]
     n6g = upstream["n6_grid_bundles"]
@@ -127,7 +152,7 @@ def validate_upstream(upstream: dict[str, pd.DataFrame]) -> None:
     if len(n6_issues & n7_issues) != EXPECTED_COMMON_ISSUES:
         raise ContractError("exact-common denominator mismatch")
 
-    # Cross-package parity: #376 N6 R3 == #377 N6 C0E0 exactly.
+    # Cross-package parity: #381 N6 R3 == #377 N6 C0E0 exactly.
     merged = n6_r3[["issue", "pnl_cny"]].merge(
         n6g_c0[["issue", "pnl_cny"]], on="issue", how="outer",
         suffixes=("_n6r3", "_grid"),
@@ -144,14 +169,31 @@ def validate_upstream(upstream: dict[str, pd.DataFrame]) -> None:
         if not np.allclose(frame["funded_units"], FUNDED_UNITS, rtol=0, atol=0):
             raise ContractError(f"{label} funded units != {FUNDED_UNITS}")
 
+    # #381 closes the complete R0-R6 search without selecting or admitting an R.
+    complete = upstream["n6_perf"]
+    all_r = complete[complete["scope"].eq("ALL")]
+    if set(all_r["r"].astype(int)) != set(range(7)):
+        raise ContractError("#381 does not contain the complete corrected R0-R6 surface")
+    if all_r["pnl_cny"].gt(0).any():
+        raise ContractError("#381 unexpectedly contains a positive standalone N6 R")
+    n6_decision = upstream["n6_decision"]
+    if (
+        n6_decision.get("positive_standalone_point_estimate_r") != []
+        or n6_decision.get("expert_admitted_r") != []
+        or n6_decision.get("fixed_r3_replaced") is not False
+    ):
+        raise ContractError("#381 no-reselection/no-admission decision changed")
+    if upstream["n6_grid_decision"].get("expert_admitted_cells") not in (None, []):
+        raise ContractError("#377 unexpectedly admitted an N6 mechanism arm")
+
     # Aggregation parity vs accepted performance.csv (exact).
     n6_perf = upstream["n6_perf"]
-    alloc = n6_perf[n6_perf["scope"].eq("ALL")].set_index("arm")
-    for arm in (N6_ARM_R0, N6_ARM_R3):
+    alloc = n6_perf[n6_perf["scope"].eq("ALL")].set_index("r")
+    for arm, r_value in ((N6_ARM_R0, 0), (N6_ARM_R3, 3)):
         group = n6[n6["arm"].eq(_upstream_key(arm))]
         for field in ("stake_cny", "gross_cny", "pnl_cny"):
             value = float(group[field].sum())
-            if not math.isclose(value, float(alloc.loc[_upstream_key(arm), field]), rel_tol=0, abs_tol=1e-6):
+            if not math.isclose(value, float(alloc.loc[r_value, field]), rel_tol=0, abs_tol=1e-6):
                 raise ContractError(f"N6 {arm} aggregation {field} mismatch")
     n7_perf = upstream["n7_perf"]
     p7 = n7_perf[n7_perf["scope"].eq("ALL")].set_index("cell")
@@ -192,7 +234,7 @@ def build_expert_calendar(upstream: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 EXCLUSIONS_BY_SURFACE = {
-    "n6_chronology_sync_#376": (
+    "n6_corrected_all_r_#381": (
         "22011", "22012", "22014", "22022", "22031", "22032", "22124",
         "23031", "23043", "23073", "23083", "23091", "23121", "23122", "23125",
         "24014", "24024", "24033", "24054", "24091",
@@ -768,8 +810,8 @@ def dilution_attribution(
 
 def build_decision(frames: dict[str, pd.DataFrame], upstream: dict[str, pd.DataFrame]) -> dict[str, Any]:
     n6_perf = upstream["n6_perf"]
-    n6_r3 = n6_perf[(n6_perf["scope"].eq("ALL")) & (n6_perf["arm"].eq(_upstream_key(N6_ARM_R3)))].iloc[0]
-    n6_r0 = n6_perf[(n6_perf["scope"].eq("ALL")) & (n6_perf["arm"].eq(_upstream_key(N6_ARM_R0)))].iloc[0]
+    n6_r3 = n6_perf[(n6_perf["scope"].eq("ALL")) & (n6_perf["r"].eq(3))].iloc[0]
+    n6_r0 = n6_perf[(n6_perf["scope"].eq("ALL")) & (n6_perf["r"].eq(0))].iloc[0]
     n6r3_pnl = float(n6_r3["pnl_cny"])
     r3_pnl_array = frames[N6_ARM_R3]["pnl_cny"].to_numpy(dtype=float)
     n6r3_ex = float(r3_pnl_array.sum() - r3_pnl_array.max())
@@ -789,6 +831,13 @@ def build_decision(frames: dict[str, pd.DataFrame], upstream: dict[str, pd.DataF
             "n6_r0_standalone_pnl_cny": float(n6_r0["pnl_cny"]),
             "required": "No N6 arm enters the expert pool unless standalone-positive robustness gates pass.",
         },
+        "n6_complete_r_surface_positive_rows": upstream["n6_decision"][
+            "positive_standalone_point_estimate_r"
+        ],
+        "n6_complete_r_surface_expert_admitted": upstream["n6_decision"][
+            "expert_admitted_r"
+        ],
+        "n6_complete_r_surface_verdict": upstream["n6_decision"]["verdict"],
         "n6_grid_retained_hypotheses": [],
         "n6_grid_verdict": "HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS (#377)",
         "n7_mechanism_hypotheses": ["C1E2", "C1E3"],
@@ -798,8 +847,9 @@ def build_decision(frames: dict[str, pd.DataFrame], upstream: dict[str, pd.DataF
         "portfolio_pnl_cny": float(frames[PATH_PORTFOLIO]["pnl_cny"].sum()),
         "portfolio_capital_return": float(frames[PATH_PORTFOLIO]["pnl_cny"].sum() / STARTING_CAPITAL_CNY),
         "notes": (
-            "Corrected N6 canonical arms are NOT standalone-positive in the frozen surface "
-            "(#376 R0 -33,511, R3 -12,300 over 2022-2024) and #377 retained no grid cell; "
+            "The complete corrected N6 R0-R6 surface is NOT standalone-positive "
+            "(#381; R0 -33,511, R3 -12,300 and best R1 -5,447 over 2022-2024), "
+            "and #377 retained no mechanism cell; "
             "therefore no N6 arm enters the expert pool (low correlation is diversification, "
             "not Edge). The preregistered 50/50 portfolio dilutes the only positive standalone "
             "expert (corrected-N7 R3 CONTROL) by CNY6,150 via the N6 sleeve and cannot improve "
@@ -827,8 +877,11 @@ def build_package(
     output = (output or repo_root / RESULT_PACKAGE).resolve()
     if output.exists() and not force:
         raise ContractError(f"output exists: {output}; pass force=True to rebuild")
+    if output.exists():
+        shutil.rmtree(output)
     output.mkdir(parents=True, exist_ok=True)
 
+    verify_upstream_packages(repo_root)
     upstream = load_upstream(repo_root)
     validate_upstream(upstream)
 
@@ -862,9 +915,18 @@ def build_package(
     source_receipt = {
         "contract": CONTRACT_ID,
         "upstreams": {
-            UPSTREAM_N6_CHRONOLOGY: {"package": UPSTREAM_N6_CHRONOLOGY, "upstream_issue": 376},
+            UPSTREAM_N6_ALL_R: {"package": UPSTREAM_N6_ALL_R, "upstream_issue": 381},
             UPSTREAM_N6_GRID: {"package": UPSTREAM_N6_GRID, "upstream_issue": 377},
             UPSTREAM_N7_GRID: {"package": UPSTREAM_N7_GRID, "upstream_issue": 373},
+        },
+        "upstream_manifest_sha256": EXPECTED_UPSTREAM_MANIFEST_SHA256,
+        "n6_complete_r_surface": {
+            "r_values": list(range(7)),
+            "positive_standalone_point_estimate_r": upstream["n6_decision"][
+                "positive_standalone_point_estimate_r"
+            ],
+            "expert_admitted_r": upstream["n6_decision"]["expert_admitted_r"],
+            "fixed_r3_replaced": upstream["n6_decision"]["fixed_r3_replaced"],
         },
         "issue_budget_cny": ISSUE_STAKE_CNY,
         "funded_units": FUNDED_UNITS,
@@ -897,7 +959,10 @@ def _write_json(path: Path, value: Any) -> None:
 def _write_manifest(repo_root: Path, output: Path) -> None:
     files = {
         name: {"bytes": (output / name).stat().st_size, "sha256": sha256_file(output / name)}
-        for name in sorted(p.name for p in output.iterdir() if p.is_file())
+        for name in sorted(
+            p.name for p in output.iterdir()
+            if p.is_file() and p.name != "MANIFEST.json"
+        )
     }
     manifest = {
         "contract": CONTRACT_ID,
@@ -931,6 +996,7 @@ def _implementation_hashes(repo_root: Path) -> dict[str, str]:
 
 def verify_package(repo_root: Path, output: Path | None = None, check_replay: bool = True) -> dict[str, Any]:
     output = (output or repo_root / RESULT_PACKAGE).resolve()
+    verify_upstream_packages(repo_root)
     upstream = load_upstream(repo_root)
     validate_upstream(upstream)
     cal = build_expert_calendar(upstream)
@@ -1045,9 +1111,11 @@ Contract: `{decision["contract"]}`
 
 ## Five-minute interpretation
 
-- **There is no positive standalone N6 payoff source in the frozen evidence**:
-  corrected N6 R0 ends at CNY-33,511 and corrected N6 R3 at CNY-12,300 over
-  2022-2024, and #377 retained no N6 grid cell (its own verdict
+- **There is no positive standalone N6 payoff source in the complete corrected
+  surface**: #381 evaluates every R0-R6 on one source-bound denominator. R1 is
+  the best point estimate at CNY-5,447, while R0 ends at CNY-33,511 and R3 at
+  CNY-12,300 over 2022-2024; none is positive, and #377 retained no N6 grid cell
+  (its own verdict
   `HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS`). The portfolio question's
   premise therefore fails before any weighting: a 50/50 fixed portfolio cannot
   improve holding risk without diluting return, because the N6 sleeve is a
@@ -1222,7 +1290,7 @@ def build_notebook_and_report(repo_root: Path, package: Path) -> str:
             nbf.new_markdown_cell(
                 f"# #378 corrected N6 vs corrected-N7 portfolio diagnostic\n\n"
                 f"Contract: `{decision['contract']}`. Executed notebook over the frozen "
-                f"accepted surfaces (#376/#377/#373). All values deterministic."
+                f"accepted surfaces (#381/#377/#373). All values deterministic."
             ),
             nbf.new_code_cell(
                 "import pandas as pd, numpy as np\n"
@@ -1243,8 +1311,9 @@ def build_notebook_and_report(repo_root: Path, package: Path) -> str:
             nbf.new_code_cell("pd.read_csv(OUT/'dilution_attribution.csv')", ),
             nbf.new_code_cell("pd.read_csv(OUT/'rolling_windows.csv')", ),
             nbf.new_markdown_cell(
-                "## Conclusion\n\nNo N6 arm is standalone-positive in the frozen surface "
-                "(#376 R0 -33,511, R3 -12,300; #377 retained no grid cell). Worse, the "
+                "## Conclusion\n\nNo N6 arm is standalone-positive in the complete corrected "
+                "#381 R0-R6 surface (best R1 -5,447; R0 -33,511; R3 -12,300); "
+                "#377 retained no mechanism cell. Worse, the "
                 "payoff sources are synchronized, not asynchronous: issue-PnL Pearson "
                 "r=0.75, both lose together on 76% of shared issues, and the drawdown "
                 "bootstrap delta vs the pure stake-reduction counterfactual is entirely "

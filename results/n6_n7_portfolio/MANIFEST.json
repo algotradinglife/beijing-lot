@@ -1,9 +1,9 @@
 {
-  "contract": "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1",
+  "contract": "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2",
   "delivery": {
-    "docs/research/Issue-378-N6-N7-Portfolio.md": "257066747f3b210b27ef992249531eb317db143204b9f7a479772924223f8dde",
+    "docs/research/Issue-378-N6-N7-Portfolio.md": "d86ffbc65c1f8c63d18fa2837a3d2bb24bbfb000e19a69b2473aaa465524ad61",
     "docs/research/figures/issue_378_n6_n7_portfolio.png": "5216cf279be8f014379e26ae4395309bf46c4576bff1d3d68f78a651623e170d",
-    "notebooks/research/n6-n7-portfolio/n6_n7_portfolio.ipynb": "c38b80323bd7fff32f78c020420cf9ef6d6834230c7f0a30b915bfefc1bb5ba6"
+    "notebooks/research/n6-n7-portfolio/n6_n7_portfolio.ipynb": "b61c6ad6aca12c607ed1e732dd7f6c5c58428c46a56d78583501ed4144701340"
   },
   "files": {
     "association_rates.csv": {
@@ -19,8 +19,8 @@
       "sha256": "943e649840ef5cd53749e3562c64959b3de2e4beebf3e3337778ce5ddd269851"
     },
     "decision.json": {
-      "bytes": 1577,
-      "sha256": "a3ebbd5f1a6f9066638f4e4cb3b37aa7dddbdbde45d7ca175ee3531f96f30740"
+      "bytes": 1770,
+      "sha256": "92188ceb0f0978184374e2e672101d5436a40bf7b727bb7d416bdea5b943d11e"
     },
     "dilution_attribution.csv": {
       "bytes": 1157,
@@ -28,7 +28,7 @@
     },
     "disclosure.csv": {
       "bytes": 806,
-      "sha256": "edad87ed6d04e32a79903e683b61bdea9db6048997666758b7403f0ecf28bde2"
+      "sha256": "1998d4f6c8a10b4bd7b74603261de13fb74943768eabc8af90a37b0ee1b2a086"
     },
     "expert_calendar.parquet": {
       "bytes": 9741,
@@ -63,8 +63,8 @@
       "sha256": "ed206c2ae60cdab88c0cd682ea88296f308d3e332a013c54c9a05b688946ca5e"
     },
     "source_receipt.json": {
-      "bytes": 960,
-      "sha256": "5f395bebf5f73f82b25783971624512fdf50a117ae120ca7015e40c74b481a67"
+      "bytes": 1543,
+      "sha256": "70c526a76daeda509a09eb43f06082f772a85db39508fcf805292162d9601052"
     },
     "tail_overlap.csv": {
       "bytes": 403,
@@ -72,10 +72,10 @@
     }
   },
   "implementation": {
-    "src/n6_n7_portfolio/contract.py": "35309f036a4bd6afd8d8a7a5eef52159447c0053f9a217ffd685f8fbe582f14b",
-    "src/n6_n7_portfolio/pipeline.py": "8011909045b826881d1f329d7c20cdc02ae3759276e43feb5588640862855776",
-    "scripts/run_n6_n7_portfolio.py": "9a51535be6cc4c98ceb00eb7b7691240de84d0f7dfc53df09e77db5f620035db",
-    "scripts/verify_n6_n7_portfolio.py": "b93aee56d78b270ad1f4f0a75930a0a38dcb0256a218acee1cd9e6813d9c4afd",
-    "tests/test_n6_n7_portfolio.py": "2ced1bba97f9ff0b28f65ffb4d54a3b43b2b6d43e83be00b2ef5a6639fb7bf45"
+    "src/n6_n7_portfolio/contract.py": "69f269272d01c11d76c31fb4ffcd9c601b3fb3c34dc6e517b1b734029c3a403a",
+    "src/n6_n7_portfolio/pipeline.py": "bb63896e101a824fcc5784fe91d98eca280291d392360cfcd5ed71668ea28a7a",
+    "scripts/run_n6_n7_portfolio.py": "f3036bc90391ae7bd8292220aa1891a480a32f00fe5bebe8a1762fb61502bb1b",
+    "scripts/verify_n6_n7_portfolio.py": "a485b509061ffc51c9718cf51afe247db0d1f1ad07fde1db95fe5a96a7e4ef10",
+    "tests/test_n6_n7_portfolio.py": "1f7189ee65dac3bfc1f01f2598b708bfb5eae0ad68c2b9e7b8c4641562a01c7b"
   }
 }

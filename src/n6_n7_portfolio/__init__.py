@@ -1,4 +1,4 @@
-"""BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1 package."""
+"""BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2 package."""
 
 from . import contract  # noqa: F401
 from .pipeline import (  # noqa: F401

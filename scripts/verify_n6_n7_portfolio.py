@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source-bound verifier for the BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1 package."""
+"""Source-bound verifier for the BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2 package."""
 from __future__ import annotations
 
 import argparse

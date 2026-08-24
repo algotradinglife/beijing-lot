@@ -1,4 +1,4 @@
-# HANDOFF — Issue #378 (BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1)
+# HANDOFF — Issue #378 (BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2)
 
 [SESSION] 20260824_224756_4cf93f
 
@@ -11,8 +11,10 @@
 
 ## Completed
 - Claimed #378 (In Progress) via claim.py; session above.
-- Identified the frozen expert surface from #376 (results/n6_chronology_sync),
-  #377 (results/n6_support_transfer_grid), #373 (results/n7_support_transfer_grid).
+- Identified the complete corrected N6 R0-R6 surface from #381
+  (`results/n6_corrected_all_r`), plus #377
+  (`results/n6_support_transfer_grid`) and #373
+  (`results/n7_support_transfer_grid`).
 - Full diagnostic package delivered under `results/n6_n7_portfolio/`:
   - shared corrected calendar (152 issues union; exact-common 151; exclusion 23032
     NO_BET zero flow; 20/21 UNTRUSTED_SELECTED_LEG exclusions disclosed)
@@ -25,8 +27,9 @@
 - Executed notebook (12/12 cells), report, figure committed under docs/notebooks.
 
 ## Key decisions and rationale
-1. N6 side of the pool = #376 canonical controls ONLY (R0/R3). #377 retained no
-   grid cell (its decision.json verdict is HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS,
+1. N6 side of the pool = #381 canonical controls R0/R3 after confirming every
+   R0-R6 arm is standalone-negative. #377 retained no grid cell (its
+   decision.json verdict is HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS,
    expert_admitted_cells=[]), so no N6 support-transfer arm enters the pool.
 2. N7 side = #373 corrected R3 CONTROL C0E0 (positive standalone +32,689);
    C1E2/C1E3 exposed only as mechanism hypotheses (per #373 decision.json), never
@@ -40,7 +43,7 @@
 4. Metric definitions mirror the frozen upstream protocol exactly
    (_path_metrics, _run_summary, _payout_concentration, circular moving-block
    with block=10/draws=5000, rolling 20/30/50). Golden tests pin N6-R3 and
-   N7-C0E0 risk values to #376/#373 risk_diagnostics.csv.
+   N7-C0E0 risk values to #381/#373 risk_diagnostics.csv.
 5. Bootstrap seeds: 378_001 (contrasts), 378_002 (async deltas) — the upstream
    convention `{issue}_00K` per stream.
 6. Verifier is source-bound: recomputes from upstream bundles/performance.csv,

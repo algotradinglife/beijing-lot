@@ -1,4 +1,4 @@
-"""Adversarial and golden tests for BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1 (#378).
+"""Adversarial and golden tests for BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2 (#378).
 
 REQ-E06 tamper self-test: every mutation below MUST fail the corresponding
 check. A tamper that passes is a delivery defect.
@@ -14,8 +14,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
 
 from src.n6_n7_portfolio import contract as C
 from src.n6_n7_portfolio.pipeline import (
@@ -33,13 +31,15 @@ from src.n6_n7_portfolio.pipeline import (
     _run_lengths,
 )
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 
 def _key(label: str) -> str:
     return label.split("_", 1)[-1]
 
 
 # ---------------------------------------------------------------------------
-# Golden metric-definition lock (values frozen from #376/#377/#373)
+# Golden metric-definition lock (values frozen from #381/#377/#373)
 # ---------------------------------------------------------------------------
 
 
@@ -67,6 +67,17 @@ def test_golden_upstream_pnl_values():
         ("C0E0", C.GOLDEN_N7_C0E0_PNL), ("C1E2", C.GOLDEN_N7_C1E2_PNL), ("C1E3", C.GOLDEN_N7_C1E3_PNL),
     ]:
         assert n7[n7["cell"].eq(label)]["pnl_cny"].sum() == pytest.approx(expected, abs=1e-6)
+
+
+def test_complete_corrected_n6_surface_has_no_admitted_expert():
+    upstream = load_upstream(REPO_ROOT)
+    performance = upstream["n6_perf"]
+    all_rows = performance[performance["scope"].eq("ALL")]
+    assert set(all_rows["r"].astype(int)) == set(range(7))
+    assert not all_rows["pnl_cny"].gt(0).any()
+    assert upstream["n6_decision"]["positive_standalone_point_estimate_r"] == []
+    assert upstream["n6_decision"]["expert_admitted_r"] == []
+    assert upstream["n6_decision"]["fixed_r3_replaced"] is False
 
 
 def test_run_lengths_and_path_metrics_units():

@@ -1,24 +1,31 @@
-"""Frozen constants for BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1 (issue #378).
+"""Frozen constants for BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2 (issue #378).
 
 Consumes ONLY the frozen accepted surfaces:
-- #376 results/n6_chronology_sync  (corrected N6 R0/R3 canonical arms)
-- #377 results/n6_support_transfer_grid (corrected N6 grid; C0E0 == #376 R3 control)
+- #381 results/n6_corrected_all_r (corrected N6 complete R0-R6 surface;
+  R0/R3 are the canonical comparison arms and no R is standalone-positive)
+- #377 results/n6_support_transfer_grid (corrected N6 grid; C0E0 == #381 R3 control)
 - #373 results/n7_support_transfer_grid (corrected N7 R3 CONTROL C0E0; C1E2/C1E3
   are explicitly exposed mechanism hypotheses, never admitted experts)
 
-Metric definitions mirror the frozen #376/#377/#373 protocol implementations
+Metric definitions mirror the frozen #381/#377/#373 protocol implementations
 (path metrics, circular moving-block bootstrap, rolling windows, payout
 concentration) so that every number quoted here is comparable to the accepted
 grid packages.
 """
 
-CONTRACT_ID = "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1"
+CONTRACT_ID = "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2"
 ISSUE_NUMBER = 378
 RESULT_PACKAGE = "results/n6_n7_portfolio"
 
-UPSTREAM_N6_CHRONOLOGY = "results/n6_chronology_sync"          # #376
+UPSTREAM_N6_ALL_R = "results/n6_corrected_all_r"               # #381
 UPSTREAM_N6_GRID = "results/n6_support_transfer_grid"          # #377
 UPSTREAM_N7_GRID = "results/n7_support_transfer_grid"          # #373
+
+EXPECTED_UPSTREAM_MANIFEST_SHA256 = {
+    UPSTREAM_N6_ALL_R: "2fd3d3cdd05233145a0e65e4d39110ac094948fc7db46fe7f6ffdde338634eb1",
+    UPSTREAM_N6_GRID: "ef7c6aab409d86b090ff76d5e12e18ac22d78b011223a01644fd931db8ec5930",
+    UPSTREAM_N7_GRID: "61bbaa679a3081284b325c26ab26c40dfe8d149ceb27aa4b5c7129b44acc73a7",
+}
 
 YEARS = (2022, 2023, 2024)
 
@@ -44,8 +51,8 @@ MOVING_BLOCK_LENGTH = 10
 ROLLING_WINDOWS = (20, 30, 50)
 
 # Facing labels.
-N6_ARM_R0 = "N6_R0"                # #376 corrected N6 R0 canonical (benchmark)
-N6_ARM_R3 = "N6_R3"                # #376 corrected N6 R3 canonical control
+N6_ARM_R0 = "N6_R0"                # #381 corrected N6 R0 canonical (benchmark)
+N6_ARM_R3 = "N6_R3"                # #381 corrected N6 R3 canonical control
 N7_ARM_C0E0 = "N7_C0E0"            # #373 corrected N7 R3 CONTROL
 N7_ARM_C1E2 = "N7_C1E2"            # #373 mechanism hypothesis (no admission)
 N7_ARM_C1E3 = "N7_C1E3"            # #373 mechanism hypothesis (no admission)

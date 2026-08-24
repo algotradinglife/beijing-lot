@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1 package build (#378)."""
+"""Run the BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2 package build (#378)."""
 from __future__ import annotations
 
 import argparse
@@ -8,7 +8,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.n6_n7_portfolio.pipeline import build_package, build_notebook_and_report
+from src.n6_n7_portfolio.pipeline import build_package
 
 
 def main() -> None:

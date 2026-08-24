@@ -1,9 +1,9 @@
 {
-  "contract": "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1",
+  "contract": "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2",
   "upstreams": {
-    "results/n6_chronology_sync": {
-      "package": "results/n6_chronology_sync",
-      "upstream_issue": 376
+    "results/n6_corrected_all_r": {
+      "package": "results/n6_corrected_all_r",
+      "upstream_issue": 381
     },
     "results/n6_support_transfer_grid": {
       "package": "results/n6_support_transfer_grid",
@@ -13,6 +13,25 @@
       "package": "results/n7_support_transfer_grid",
       "upstream_issue": 373
     }
+  },
+  "upstream_manifest_sha256": {
+    "results/n6_corrected_all_r": "2fd3d3cdd05233145a0e65e4d39110ac094948fc7db46fe7f6ffdde338634eb1",
+    "results/n6_support_transfer_grid": "ef7c6aab409d86b090ff76d5e12e18ac22d78b011223a01644fd931db8ec5930",
+    "results/n7_support_transfer_grid": "61bbaa679a3081284b325c26ab26c40dfe8d149ceb27aa4b5c7129b44acc73a7"
+  },
+  "n6_complete_r_surface": {
+    "r_values": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "positive_standalone_point_estimate_r": [],
+    "expert_admitted_r": [],
+    "fixed_r3_replaced": false
   },
   "issue_budget_cny": 1024.0,
   "funded_units": 512,

@@ -1,7 +1,7 @@
 # Issue #378 — corrected N6 versus corrected-N7 expert complementarity
 and fixed portfolio paths
 
-Contract: `BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1`
+Contract: `BJ-UNIFIED-N6-N7-PORTFOLIO-001/v2`
 
 ## Decision
 
@@ -10,9 +10,11 @@ Contract: `BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1`
 
 ## Five-minute interpretation
 
-- **There is no positive standalone N6 payoff source in the frozen evidence**:
-  corrected N6 R0 ends at CNY-33,511 and corrected N6 R3 at CNY-12,300 over
-  2022-2024, and #377 retained no N6 grid cell (its own verdict
+- **There is no positive standalone N6 payoff source in the complete corrected
+  surface**: #381 evaluates every R0-R6 on one source-bound denominator. R1 is
+  the best point estimate at CNY-5,447, while R0 ends at CNY-33,511 and R3 at
+  CNY-12,300 over 2022-2024; none is positive, and #377 retained no N6 grid cell
+  (its own verdict
   `HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS`). The portfolio question's
   premise therefore fails before any weighting: a 50/50 fixed portfolio cannot
   improve holding risk without diluting return, because the N6 sleeve is a
