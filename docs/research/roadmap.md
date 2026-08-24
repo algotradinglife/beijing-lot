@@ -300,8 +300,9 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
 | 45 | [#366] corrected N7 chronology synchronization | Closed / Done | M3 | Parent #202; #360 closed; blocks #367/#369 | Rebuilt fixed R0/R3 from corrected registry-year and fixture-relative 10h inputs. R3 ends at CNY132,689 versus R0 CNY84,006 on 151 settled issues, but its CNY48,683 lift becomes CNY−12,255 ex-largest and bootstrap p02.5 is CNY−67,786. Twenty-two of 208 common legacy issue-arm PnLs change. Corrected R3 is the canonical historical long-tail challenger, not a stable promotion |
 | 46 | [#367] corrected N4 versus N7 expert diagnostic | Open / Blocked | M3 | Parent #202; blocked by #366 and closed #359 | Recompute complementarity only from corrected-N7 evidence. The legacy-anchor temporary correlation is non-canonical and cannot authorize MoE membership |
 | 47 | [#369] corrected N7 support-shape factorial | Closed / Done | M3 | Parent #202; #366 closed | Eight-cell replay preserves CNY1,024 and exact #366 CONTROL parity. R3 BOTH ends at CNY170,886 versus CONTROL CNY132,689; its actual lift is CNY38,197 and ideal-fractional lift CNY24,644. The interaction is positive but borderline: actual-unit bootstrap p05 CNY6,576 versus ideal-fractional p05 only about CNY141 (effectively zero at Monte Carlo resolution). BOTH lift bootstrap p05 is CNY−115,247, so no new arm passes standalone-positive robustness admission. This is a useful historical synergy mechanism, not a new expert or #210 promotion |
-| 48 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 49 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 48 | [#373] corrected N7 R3 support-transfer count grid | Open / In Progress | M3 | Parent #202; #369 closed; not a #210 blocker | Full C0–C2 × E0–E3 retrospective mechanism map under complete Cartesian coverage and fixed CNY1,024. C1E3 preserves CONTROL economics while materially reducing observed drawdown and profitable-issue losing runs; robustness and lifecycle review remain pending |
+| 49 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 50 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 
@@ -1012,6 +1013,7 @@ retrospective feature.
 [#366]: https://github.com/algotradinglife/beijing-lot/issues/366
 [#367]: https://github.com/algotradinglife/beijing-lot/issues/367
 [#369]: https://github.com/algotradinglife/beijing-lot/issues/369
+[#373]: https://github.com/algotradinglife/beijing-lot/issues/373
 
 ---
 

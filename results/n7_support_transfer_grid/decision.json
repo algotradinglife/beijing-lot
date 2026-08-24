@@ -1,0 +1,15 @@
+{
+  "contract": "BJ-UNIFIED-N7-SUPPORT-TRANSFER-GRID-001/v1",
+  "control_keyset_gate": true,
+  "development_diagnostic_gate": true,
+  "expert_admitted_cells": [],
+  "historical_gate_pass_cells": [],
+  "notes": "No exposed grid cell enters the expert pool; #210/#218 unchanged.",
+  "promotable_to_210": false,
+  "requires_future_frozen_evidence": true,
+  "retained_mechanism_hypotheses": [
+    "C1E2",
+    "C1E3"
+  ],
+  "verdict": "HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS"
+}
