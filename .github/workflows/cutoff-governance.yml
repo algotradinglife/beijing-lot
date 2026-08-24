@@ -10,8 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            AGENTS.md
+            config/cutoff_governance_legacy_allowlist.json
+            docs/research/temporal-function-inventory.csv
+            scripts/check_cutoff_governance.py
+            src
       - name: Reject hidden or duplicated temporal learning
         run: python scripts/check_cutoff_governance.py
