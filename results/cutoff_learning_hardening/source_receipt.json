@@ -1,0 +1,64 @@
+{
+  "availability_claim": "KICKOFF_PLUS_4H_HISTORICAL_PROXY_ONLY",
+  "contract": "BJ-UNIFIED-CUTOFF-HARDENING-001/v1",
+  "historical_382_manifest_sha256": "e81c1a971974823ab111ccc2b6a9fbee6b0b79ebeae409034c84b5b0fbedd10e",
+  "real_mapping_source": {
+    "accepted_354_manifest_sha256": "33e85a609c7d860be2c944c0c5417b6d6bbb1dc3bcf87a7e3bce3ddc816e584b",
+    "availability": {
+      "admissibility_boundary_ts": "2021-12-31T11:00:00+00:00",
+      "data_available_column": "fixture_decision_ts",
+      "intended_use": "HISTORICAL_DIAGNOSTIC",
+      "label_available_column": "label_available_ts",
+      "minimum_label_margin_to_cutoff_seconds": 7200.0,
+      "minimum_source_margin_to_cutoff_seconds": 7200.0,
+      "policy": {
+        "identity": "KICKOFF_PLUS_4H_HISTORICAL_PROXY_V1",
+        "kind": "HISTORICAL_PROXY",
+        "prospective_capable": false,
+        "safety_margin_seconds": 0.0
+      }
+    },
+    "contract": "BJ-UNIFIED-CUTOFF-LEARNING-001/v3",
+    "evaluation_years": [
+      2022,
+      2023,
+      2024
+    ],
+    "implementation": {
+      "closure_sha256": "566a9b6bee8f3c762cd69748f15f7ca32efbd7aab5ced35388695f15546f50ee",
+      "distributions": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.3",
+        "scikit-learn": "1.9.0"
+      },
+      "files": {
+        "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+        "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+        "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+        "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+        "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+        "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+        "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+        "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+        "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+        "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+        "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+        "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      },
+      "root_modules": [
+        "src.cutoff_mapping.api",
+        "src.cutoff_mapping.package"
+      ]
+    },
+    "source_hashes": {
+      "accepted_238_probability_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+      "consumed_development_labels_sha256": "1e5742221f1b6b8d02a1c66e4cd413d1b21c855650fa659cbadd10203996259b",
+      "consumed_fixture_timing_sha256": "b2d1138979b3b4022b7ef677c8cd2485ac26428ff3d286b1dfea1487ecd01d4b",
+      "consumed_issue_roles_sha256": "f99b6f11e416b0026d5b381c0b772cfc8bf5973624362d828a933682ca6ffa58",
+      "consumed_proxy_parts_receipt_sha256": "03ce615d2acc0d7711bf889a3a0301ddd844fa1f7cab62d23c6fb7491f1e542a"
+    },
+    "target_issues": 172,
+    "target_rows": 48658
+  },
+  "synthetic_history_sha256": "5b12722608afa064bcb364b3527d20da93f54cf2f91345d8270f0c8075426713"
+}

@@ -1,0 +1,18 @@
+{
+  "availability_claim": "KICKOFF_PLUS_4H_HISTORICAL_PROXY_ONLY",
+  "blocks_issue": 383,
+  "contract": "BJ-UNIFIED-CUTOFF-HARDENING-001/v1",
+  "mapping_parity_all": true,
+  "preserved_issues": [
+    210,
+    218
+  ],
+  "prospective_authorized": false,
+  "real_mapping_rows": 48658,
+  "recent_blend_mass_reconciled": true,
+  "same_target_mutation_invariant": true,
+  "static_governance_pass": true,
+  "target_identity_exclusion": true,
+  "transitive_closure_complete": true,
+  "verdict": "SHARED_CUTOFF_HARDENING_READY"
+}

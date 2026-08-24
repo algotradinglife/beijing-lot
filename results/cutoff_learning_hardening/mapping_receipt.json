@@ -1,0 +1,486 @@
+{
+  "admitted_history_sha256": "1db991c3be3cb56b6ed23ab2b8fc42b28a1091873ecc6c2a5c74cef4f7f5c22e",
+  "availability": {
+    "admissibility_boundary_ts": "2021-12-31T11:00:00+00:00",
+    "data_available_column": "fixture_decision_ts",
+    "intended_use": "HISTORICAL_DIAGNOSTIC",
+    "label_available_column": "label_available_ts",
+    "minimum_label_margin_to_cutoff_seconds": 7200.0,
+    "minimum_source_margin_to_cutoff_seconds": 7200.0,
+    "policy": {
+      "identity": "KICKOFF_PLUS_4H_HISTORICAL_PROXY_V1",
+      "kind": "HISTORICAL_PROXY",
+      "prospective_capable": false,
+      "safety_margin_seconds": 0.0
+    }
+  },
+  "cache_key": "1aebba44adc8fa620b3b508ad20dee331211ca3a1eb5c3759d43232d4659326e",
+  "contract": "BJ-UNIFIED-CUTOFF-LEARNING-001/v3",
+  "cutoff_identity": "EVALUATION_YEAR_2022",
+  "cutoff_kind": "EVALUATION_YEAR",
+  "cutoff_ts": "2021-12-31T11:00:00+00:00",
+  "final_model_states": {
+    "control": {
+      "classes": [
+        "0",
+        "1",
+        "3"
+      ],
+      "coef": [
+        [
+          0.07711526959160495,
+          0.32331102715239823,
+          0.15075746808218463,
+          -0.09258823924791268,
+          -0.10264245312767907,
+          -0.25995490695388795,
+          -0.0062148259340207256
+        ],
+        [
+          -0.2136623727938847,
+          -0.11120929528060794,
+          0.03421172724990604,
+          0.11372318020565694,
+          -0.01005555121698475,
+          -0.025147443853250694,
+          -0.045377922228624704
+        ],
+        [
+          0.1365471032022798,
+          -0.21210173187179135,
+          -0.1849691953321066,
+          -0.02113494095770837,
+          0.11269800434467066,
+          0.2851023508071391,
+          0.05159274816264542
+        ]
+      ],
+      "experimental": false,
+      "intercept": [
+        0.09058476671634477,
+        -0.2596375248398744,
+        0.16905275812455028
+      ],
+      "line_categories": [
+        -3.0,
+        -2.0,
+        -1.0,
+        0.0,
+        1.0,
+        2.0,
+        3.0
+      ],
+      "n_iter": [
+        24
+      ],
+      "numeric_features": [],
+      "state_sha256": "8f44fc7f2f4ff3a103286ac35a589c0632ae19afe18a620b73d27f0591374ea7"
+    },
+    "experimental": {
+      "classes": [
+        "0",
+        "1",
+        "3"
+      ],
+      "coef": [
+        [
+          0.3065809173379262,
+          0.14218119664747014,
+          -0.16493362613911852,
+          -0.24632325907778774,
+          -0.10357295115208179,
+          -0.034377167557863124,
+          0.3499190244323297,
+          -0.20402979085652262,
+          -0.06688580851783166,
+          0.24584874251378797,
+          0.0246125994683567,
+          -0.34016378992748547,
+          -0.1770957475602134
+        ],
+        [
+          -0.5997339447370481,
+          -0.11342295863598882,
+          0.25622103588382444,
+          0.4169934534802689,
+          0.2273833909297101,
+          -0.06408104838106869,
+          -0.5986944809214801,
+          -0.007293548064132762,
+          0.142118277511779,
+          -0.03463788027347123,
+          -0.23824754750396418,
+          0.0030072043222349586,
+          0.17105983007015613
+        ],
+        [
+          0.29315302739911103,
+          -0.028758238011474698,
+          -0.09128740974470306,
+          -0.17067019440246384,
+          -0.1238104397776331,
+          0.0984582159389245,
+          0.24877545648915442,
+          0.21132333892067026,
+          -0.07523246899394109,
+          -0.2112108622403296,
+          0.2136349480356104,
+          0.33715658560524797,
+          0.006035917490070747
+        ]
+      ],
+      "experimental": true,
+      "intercept": [
+        0.2595521801453679,
+        -0.4957557342456108,
+        0.23620355410000154
+      ],
+      "line_categories": [
+        -3.0,
+        -2.0,
+        -1.0,
+        0.0,
+        1.0,
+        2.0,
+        3.0
+      ],
+      "n_iter": [
+        90
+      ],
+      "numeric_features": [
+        "q_eu_3",
+        "q_eu_1",
+        "q_eu_0",
+        "line_x_q_eu_3",
+        "line_x_q_eu_1",
+        "line_x_q_eu_0"
+      ],
+      "numeric_mean": [
+        0.4350938676309088,
+        0.26181360023385086,
+        0.3030925321352404,
+        -0.2260032321693363,
+        -0.05952814529675302,
+        0.008249275928842927
+      ],
+      "numeric_scale": [
+        0.15319967335756193,
+        0.04160861774595112,
+        0.13846043305171107,
+        0.44623240774854084,
+        0.16139466427667087,
+        0.2747064193641937
+      ],
+      "state_sha256": "8546f28ee472499997fd4d9219aea5293dc06f8fbaa6a7fb9ecd3c0e6cb39e13"
+    }
+  },
+  "gate_model_states": {
+    "control": {
+      "classes": [
+        "0",
+        "1",
+        "3"
+      ],
+      "coef": [
+        [
+          0.15788304146162338,
+          0.3037018843291822,
+          0.1471685743218021,
+          -0.11970259221588651,
+          -0.1407729128589102,
+          -0.27492287136621646,
+          0.03664468015446233
+        ],
+        [
+          -0.23747343826013287,
+          -0.08468265037102295,
+          0.04572401690931272,
+          0.11630460291364707,
+          -0.02013288315010362,
+          -0.028594888634353725,
+          -0.052167865334512266
+        ],
+        [
+          0.07959039679850942,
+          -0.2190192339581593,
+          -0.1928925912311334,
+          0.003397989302263392,
+          0.16090579600901525,
+          0.3035177600005707,
+          0.01552318518004996
+        ]
+      ],
+      "experimental": false,
+      "intercept": [
+        0.11121069346390532,
+        -0.26397455862945013,
+        0.15276386516582477
+      ],
+      "line_categories": [
+        -3.0,
+        -2.0,
+        -1.0,
+        0.0,
+        1.0,
+        2.0,
+        3.0
+      ],
+      "n_iter": [
+        23
+      ],
+      "numeric_features": [],
+      "state_sha256": "09c164f823ec0131b7ce519daa52dcbd717f1d3c163327f5413c4ea219da9475"
+    },
+    "experimental": {
+      "classes": [
+        "0",
+        "1",
+        "3"
+      ],
+      "coef": [
+        [
+          0.13653651548263623,
+          0.06582261430675139,
+          -0.08054570833438524,
+          -0.08246735288984432,
+          0.019825103512119496,
+          -0.056984901166531675,
+          0.13597859776010612,
+          -0.1980516341762006,
+          -0.07343696327463156,
+          0.24278848413439388,
+          -0.02448393349727718,
+          -0.3766574910220594,
+          -0.12239288479700337
+        ],
+        [
+          -0.3187160370581116,
+          0.023717593578373483,
+          0.16796983888329367,
+          0.1531508454721707,
+          -0.06278140564629578,
+          -0.15971375418342984,
+          -0.10122319472394817,
+          -0.00887674445791747,
+          0.14421039049886514,
+          -0.03335429780091573,
+          -0.16459623034225332,
+          0.07813603513594095,
+          0.10104361589175916
+        ],
+        [
+          0.1821795215754747,
+          -0.08954020788512407,
+          -0.08742413054890844,
+          -0.07068349258232699,
+          0.04295630213417647,
+          0.21669865534996116,
+          -0.034755403036158795,
+          0.20692837863411803,
+          -0.07077342722423298,
+          -0.20943418633347613,
+          0.18908016383953227,
+          0.2985214558861173,
+          0.021349268905243992
+        ]
+      ],
+      "experimental": true,
+      "intercept": [
+        0.1414477080932753,
+        -0.30469163256088994,
+        0.16324392446795122
+      ],
+      "line_categories": [
+        -3.0,
+        -2.0,
+        -1.0,
+        0.0,
+        1.0,
+        2.0,
+        3.0
+      ],
+      "n_iter": [
+        60
+      ],
+      "numeric_features": [
+        "q_eu_3",
+        "q_eu_1",
+        "q_eu_0",
+        "line_x_q_eu_3",
+        "line_x_q_eu_1",
+        "line_x_q_eu_0"
+      ],
+      "numeric_mean": [
+        0.4395404612253759,
+        0.2624282826357057,
+        0.29803125613891845,
+        -0.23619726481461598,
+        -0.06514266755931428,
+        0.0005417311372804642
+      ],
+      "numeric_scale": [
+        0.1513353775935178,
+        0.040716411201768075,
+        0.1357655349786735,
+        0.45250199485385184,
+        0.1632398099787727,
+        0.2679379797350082
+      ],
+      "state_sha256": "203f5cdfd54badebdcbcfccd374c0b94e270de7b7082001714c7da884bd4bd4f"
+    }
+  },
+  "gate_predicates": {
+    "calibration_brier_nonworse": true,
+    "calibration_log_loss_nonworse": true,
+    "tune_brier_nonworse": true,
+    "tune_log_loss_nonworse": true
+  },
+  "implementation": {
+    "closure_sha256": "566a9b6bee8f3c762cd69748f15f7ca32efbd7aab5ced35388695f15546f50ee",
+    "distributions": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.3",
+      "scikit-learn": "1.9.0"
+    },
+    "files": {
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+    },
+    "root_modules": [
+      "src.cutoff_mapping.api",
+      "src.cutoff_mapping.package"
+    ]
+  },
+  "implementation_hashes": {
+    "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+    "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+    "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+    "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+    "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+    "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+    "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+    "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+    "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+    "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+    "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+    "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+  },
+  "mapping_accepted": true,
+  "maximum_source_issue": "21125",
+  "maximum_source_time": "2021-12-31T09:00:00+00:00",
+  "maximum_training_label_timestamp": "2021-12-31T09:00:00+00:00",
+  "metrics": {
+    "calibration": {
+      "control_brier": 0.6474488159768899,
+      "control_log_loss": 1.069561154451878,
+      "experimental_brier": 0.63644080914592,
+      "experimental_log_loss": 1.0547415234729909,
+      "experimental_minus_control_brier": -0.011008006830969808,
+      "experimental_minus_control_log_loss": -0.014819630978887055
+    },
+    "tune": {
+      "control_brier": 0.6499500497119693,
+      "control_log_loss": 1.073734995152184,
+      "experimental_brier": 0.6387695873436563,
+      "experimental_log_loss": 1.0596704689730734,
+      "experimental_minus_control_brier": -0.011180462368313049,
+      "experimental_minus_control_log_loss": -0.014064526179110581
+    }
+  },
+  "model_identity": "d44d214e22def2c5f6598062a71b9a18e987e88e551613637108b696ad938096",
+  "partition": {
+    "calibration_rows": 11737,
+    "calibration_rows_nonzero_line": 4728,
+    "calibration_years": [
+      2020
+    ],
+    "eligible_years": [
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021
+    ],
+    "final_refit_rows": 136738,
+    "fit_rows": 88950,
+    "fit_years": [
+      2014,
+      2015,
+      2016,
+      2017,
+      2018
+    ],
+    "tune_rows": 17494,
+    "tune_rows_nonzero_line": 7310,
+    "tune_years": [
+      2019
+    ]
+  },
+  "partition_policy": {
+    "calibration_years": 1,
+    "kind": "COMPLETE_PRIOR_YEARS",
+    "minimum_fit_years": 1,
+    "tune_years": 1
+  },
+  "scientific_output_sha256": "09c5f061022e93eb660a6e69f82e47d4486ee3c75260004fbb057126f62cb618",
+  "selected_parameters": {
+    "estimator": "sklearn.linear_model.LogisticRegression",
+    "max_iter": 1000,
+    "random_state": 382001,
+    "solver": "lbfgs",
+    "weighting_policy": {
+      "effective_sample": {
+        "minimum": 100.0,
+        "on_insufficient": "FAIL_CLOSED"
+      },
+      "half_life_days": null,
+      "kind": "EXPANDING_EQUAL",
+      "recent_blend": null,
+      "rolling_window_issues": null
+    }
+  },
+  "source_hashes": {
+    "accepted_238_probability_sha256": "5ae5bb5ebcb56c10fdfb27ef624c5b34d8b89cc04ddc4dcbbde478e5af84855e",
+    "consumed_development_labels_sha256": "1e5742221f1b6b8d02a1c66e4cd413d1b21c855650fa659cbadd10203996259b",
+    "consumed_fixture_timing_sha256": "b2d1138979b3b4022b7ef677c8cd2485ac26428ff3d286b1dfea1487ecd01d4b",
+    "consumed_issue_roles_sha256": "f99b6f11e416b0026d5b381c0b772cfc8bf5973624362d828a933682ca6ffa58",
+    "consumed_proxy_parts_receipt_sha256": "03ce615d2acc0d7711bf889a3a0301ddd844fa1f7cab62d23c6fb7491f1e542a"
+  },
+  "target_issue": null,
+  "target_rows_excluded": 0,
+  "target_rows_seen": 0,
+  "weight_receipt": {
+    "effective_sample_size": 136738.0,
+    "issue_mass_sha256": "58855154a61d65dce6ebf0991c9a7ac2da64d285086a0fab4b896eeed84ec850",
+    "long_history_mass": 0.9999999999999997,
+    "maximum": 1.0,
+    "minimum": 1.0,
+    "policy": {
+      "effective_sample": {
+        "minimum": 100.0,
+        "on_insufficient": "FAIL_CLOSED"
+      },
+      "half_life_days": null,
+      "kind": "EXPANDING_EQUAL",
+      "recent_blend": null,
+      "rolling_window_issues": null
+    },
+    "recent_state_mass": 0.0,
+    "rows": 136738,
+    "sum": 136738.0,
+    "weight_frame_sha256": "1055c5c5d631be9e95788e2f6e5694a5165b777dc4905faf47cfba38b54514d5"
+  }
+}

@@ -14,5 +14,6 @@ src/value_veto_r3_n7/pipeline.py,fit_oof_sp_intervals,model fitting plus calibra
 src/dynamic_allocator/pipeline.py,fit_meta_policy,allocator and hyperparameter selection,hidden meta tune year,HISTORICAL_ONLY,contract-specific,package replay,P1
 src/regime_state/pipeline.py,build_regime_state,regime definition from lagged history,contract-specific temporal filters,HISTORICAL_REVIEW_REQUIRED,contract-specific,package replay,P2
 src/neural_top2_residual/pipeline.py,fit_residual_models,neural residual fitting,contract-specific chronological folds,HISTORICAL_REVIEW_REQUIRED,contract-specific,package replay,P2
-src/n6_corrected_all_r/pipeline.py,scientific_frames,fixed R diagnostic only,blocked on #382 migration,IN_PROGRESS_REBIND,common explicit 2021 cutoff required,source-bound replay planned,P0
+src/n6_corrected_all_r/pipeline.py,scientific_frames,fixed R diagnostic only,shared cutoff client through #381,MIGRATED,common explicit 2021 cutoff,source-bound replay complete,P0
 src/n6_n7_portfolio/pipeline.py,scientific_frames,fixed exposed portfolio arithmetic,no learned parameter allowed,DESCRIPTIVE_ONLY,no labels used for tuning,source-bound replay planned,P0
+src/cutoff_hardening/package.py,scientific_frames,shared cutoff and governance verification,explicit cutoff clients,MIGRATED,target identity plus historical diagnostic proxy,source-bound replay plus adversarial package verifier,P0

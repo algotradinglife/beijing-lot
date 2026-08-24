@@ -1,0 +1,70 @@
+{
+  "contract": "BJ-UNIFIED-CUTOFF-HARDENING-001/v1",
+  "deliveries": {
+    "docs/research/Issue-388-Cutoff-Learning-Hardening.md": "1686d264da7e70a32d4563dccc8d391ce71b32d0c226cf5acab332bbcfcaa71a",
+    "notebooks/research/cutoff-learning/Issue-388-Cutoff-Hardening.ipynb": "14bc6506dc9d706ad9880c9ca284173748d899cb7022bb80b15d3273fd6ad0be"
+  },
+  "files": {
+    "context_receipts.json": {
+      "bytes": 18415,
+      "sha256": "7d2a0d15b6219f9c42f1e04a6f1d2e0c1148217ce6df69816a716d02999fb263"
+    },
+    "decision.json": {
+      "bytes": 522,
+      "sha256": "3267241cf0c38ba23ddeb4f4333bea04bdc37a65754f948dc7f5cc3e8037dbde"
+    },
+    "governance_receipt.json": {
+      "bytes": 1896,
+      "sha256": "cbfd2b2e47e7687da52875ddb03de3173ecad2af917712b49d0778c52a6129f8"
+    },
+    "mapping_parity.csv": {
+      "bytes": 333,
+      "sha256": "110759e29c88dfa4298f0bb18dadb7723253163d8ebd0bd21b426d3efc93b068"
+    },
+    "mapping_receipt.json": {
+      "bytes": 14889,
+      "sha256": "af5b8cd1831bab6c798c7ef9cf43184b823de7be34425b059e293cfd581c2043"
+    },
+    "selector_receipt.json": {
+      "bytes": 6237,
+      "sha256": "6867d9ebd741fe76b68fe31c9912a212148fd9e0722343050dcbd88a8eadab08"
+    },
+    "source_receipt.json": {
+      "bytes": 3491,
+      "sha256": "0d32083b77e60435c91ce758bb8db7395569f650b5d40f8d89c42260a54cd037"
+    },
+    "weight_policy_diagnostics.csv": {
+      "bytes": 266,
+      "sha256": "233e3f8acd60a899aaac7e1801b0f157fb78f8082f39a377c58fb244d8a52946"
+    }
+  },
+  "implementation": {
+    "closure_sha256": "1adcbf5b98745b135712f9ed7e7868d46941150a01bb86efe6790acc15f80b9e",
+    "distributions": {
+      "nbclient": "0.10.2",
+      "nbformat": "5.10.4",
+      "numpy": "2.4.6",
+      "pandas": "3.0.3",
+      "scikit-learn": "1.9.0"
+    },
+    "files": {
+      "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
+      "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+    },
+    "root_modules": [
+      "src.cutoff_hardening.package"
+    ]
+  }
+}

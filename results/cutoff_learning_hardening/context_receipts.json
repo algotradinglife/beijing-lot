@@ -1,0 +1,392 @@
+{
+  "EXPANDING_EQUAL": {
+    "admitted_history_sha256": "9e9b878bfec05e9e83e6ba925a86709cfab238d1a7c389b2333f9944aca9d663",
+    "availability": {
+      "admissibility_boundary_ts": "2022-03-01T00:00:00+00:00",
+      "data_available_column": null,
+      "intended_use": "HISTORICAL_DIAGNOSTIC",
+      "label_available_column": "label_available_ts",
+      "minimum_label_margin_to_cutoff_seconds": 22636680.0,
+      "minimum_source_margin_to_cutoff_seconds": 22636680.0,
+      "policy": {
+        "identity": "SYNTHETIC_OBSERVED_SETTLEMENT_TS",
+        "kind": "OBSERVED_AVAILABILITY",
+        "prospective_capable": true,
+        "safety_margin_seconds": 0.0
+      }
+    },
+    "cache_key": "d72490942671ebd57eb75ae8834d3ee39e6dacd1b0e68017246f1cc24e2646d8",
+    "cutoff_identity": "DECISION_EPOCH_2022-001",
+    "cutoff_kind": "DECISION_EPOCH",
+    "cutoff_ts": "2022-03-01T00:00:00+00:00",
+    "implementation": {
+      "closure_sha256": "3322ff0ffdb91dccdcdf4f4cb570157146515c56e08afe69e4ab2cb29330a204",
+      "distributions": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.3",
+        "scikit-learn": "1.9.0"
+      },
+      "files": {
+        "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
+        "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
+        "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+        "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+        "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+        "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+        "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+        "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+        "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+        "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+        "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+        "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+        "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+        "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      },
+      "root_modules": [
+        "src.cutoff_hardening.package"
+      ]
+    },
+    "implementation_hashes": {
+      "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
+      "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+    },
+    "maximum_source_issue": "2021-011",
+    "maximum_source_time": "2021-06-12T00:02:00+00:00",
+    "maximum_training_label_timestamp": "2021-06-12T00:02:00+00:00",
+    "partition": {
+      "calibration_rows": 36,
+      "calibration_years": [
+        2021
+      ],
+      "eligible_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021
+      ],
+      "final_refit_rows": 288,
+      "fit_rows": 216,
+      "fit_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019
+      ],
+      "tune_rows": 36,
+      "tune_years": [
+        2020
+      ]
+    },
+    "partition_policy": {
+      "calibration_years": 1,
+      "kind": "COMPLETE_PRIOR_YEARS",
+      "minimum_fit_years": 1,
+      "tune_years": 1
+    },
+    "source_hashes": {
+      "synthetic_history": "5b12722608afa064bcb364b3527d20da93f54cf2f91345d8270f0c8075426713"
+    },
+    "target_issue": "2022-001",
+    "target_rows_excluded": 3,
+    "target_rows_seen": 3,
+    "weight_receipt": {
+      "effective_sample_size": 288.0,
+      "issue_mass_sha256": "e8629993c82d89d46c6595b32d533e39b44beceb25c946266e5821bc8a058d33",
+      "long_history_mass": 1.0000000000000002,
+      "maximum": 1.0,
+      "minimum": 1.0,
+      "policy": {
+        "effective_sample": {
+          "minimum": 20,
+          "on_insufficient": "FAIL_CLOSED"
+        },
+        "half_life_days": null,
+        "kind": "EXPANDING_EQUAL",
+        "recent_blend": null,
+        "rolling_window_issues": null
+      },
+      "recent_state_mass": 0.0,
+      "rows": 288,
+      "sum": 288.0,
+      "weight_frame_sha256": "298a1ad0a5234182e03538816ded96289fbe467c16a9def5e781de72af9ac9ec"
+    }
+  },
+  "EXPANDING_EXPONENTIAL": {
+    "admitted_history_sha256": "9e9b878bfec05e9e83e6ba925a86709cfab238d1a7c389b2333f9944aca9d663",
+    "availability": {
+      "admissibility_boundary_ts": "2022-03-01T00:00:00+00:00",
+      "data_available_column": null,
+      "intended_use": "HISTORICAL_DIAGNOSTIC",
+      "label_available_column": "label_available_ts",
+      "minimum_label_margin_to_cutoff_seconds": 22636680.0,
+      "minimum_source_margin_to_cutoff_seconds": 22636680.0,
+      "policy": {
+        "identity": "SYNTHETIC_OBSERVED_SETTLEMENT_TS",
+        "kind": "OBSERVED_AVAILABILITY",
+        "prospective_capable": true,
+        "safety_margin_seconds": 0.0
+      }
+    },
+    "cache_key": "6928641da81377b3f811fffe8435da81050a6fa206fc250f0099a08a6469d9bb",
+    "cutoff_identity": "DECISION_EPOCH_2022-001",
+    "cutoff_kind": "DECISION_EPOCH",
+    "cutoff_ts": "2022-03-01T00:00:00+00:00",
+    "implementation": {
+      "closure_sha256": "3322ff0ffdb91dccdcdf4f4cb570157146515c56e08afe69e4ab2cb29330a204",
+      "distributions": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.3",
+        "scikit-learn": "1.9.0"
+      },
+      "files": {
+        "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
+        "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
+        "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+        "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+        "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+        "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+        "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+        "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+        "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+        "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+        "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+        "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+        "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+        "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      },
+      "root_modules": [
+        "src.cutoff_hardening.package"
+      ]
+    },
+    "implementation_hashes": {
+      "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
+      "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+    },
+    "maximum_source_issue": "2021-011",
+    "maximum_source_time": "2021-06-12T00:02:00+00:00",
+    "maximum_training_label_timestamp": "2021-06-12T00:02:00+00:00",
+    "partition": {
+      "calibration_rows": 36,
+      "calibration_years": [
+        2021
+      ],
+      "eligible_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021
+      ],
+      "final_refit_rows": 288,
+      "fit_rows": 216,
+      "fit_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019
+      ],
+      "tune_rows": 36,
+      "tune_years": [
+        2020
+      ]
+    },
+    "partition_policy": {
+      "calibration_years": 1,
+      "kind": "COMPLETE_PRIOR_YEARS",
+      "minimum_fit_years": 1,
+      "tune_years": 1
+    },
+    "source_hashes": {
+      "synthetic_history": "5b12722608afa064bcb364b3527d20da93f54cf2f91345d8270f0c8075426713"
+    },
+    "target_issue": "2022-001",
+    "target_rows_excluded": 3,
+    "target_rows_seen": 3,
+    "weight_receipt": {
+      "effective_sample_size": 185.03978923139618,
+      "issue_mass_sha256": "92d8dc7222b648b0cca3faaef40e246327ddd19a071a107768906e73956491dd",
+      "long_history_mass": 1.0,
+      "maximum": 2.513702463607167,
+      "minimum": 0.21945602323412017,
+      "policy": {
+        "effective_sample": {
+          "minimum": 20,
+          "on_insufficient": "FAIL_CLOSED"
+        },
+        "half_life_days": 730.0,
+        "kind": "EXPANDING_EXPONENTIAL",
+        "recent_blend": null,
+        "rolling_window_issues": null
+      },
+      "recent_state_mass": 0.0,
+      "rows": 288,
+      "sum": 287.99999999999994,
+      "weight_frame_sha256": "72be38bacb8397ab3a1f91f085dc5b79b29469a5828f6dc883df0c824a49f05a"
+    }
+  },
+  "RECENT_STATE_BLEND": {
+    "admitted_history_sha256": "9e9b878bfec05e9e83e6ba925a86709cfab238d1a7c389b2333f9944aca9d663",
+    "availability": {
+      "admissibility_boundary_ts": "2022-03-01T00:00:00+00:00",
+      "data_available_column": null,
+      "intended_use": "HISTORICAL_DIAGNOSTIC",
+      "label_available_column": "label_available_ts",
+      "minimum_label_margin_to_cutoff_seconds": 22636680.0,
+      "minimum_source_margin_to_cutoff_seconds": 22636680.0,
+      "policy": {
+        "identity": "SYNTHETIC_OBSERVED_SETTLEMENT_TS",
+        "kind": "OBSERVED_AVAILABILITY",
+        "prospective_capable": true,
+        "safety_margin_seconds": 0.0
+      }
+    },
+    "cache_key": "bd51f5e660e62422c59f59f13668b97aa4a7ec20a1e90f45586d3e19bdadeabb",
+    "cutoff_identity": "DECISION_EPOCH_2022-001",
+    "cutoff_kind": "DECISION_EPOCH",
+    "cutoff_ts": "2022-03-01T00:00:00+00:00",
+    "implementation": {
+      "closure_sha256": "3322ff0ffdb91dccdcdf4f4cb570157146515c56e08afe69e4ab2cb29330a204",
+      "distributions": {
+        "numpy": "2.4.6",
+        "pandas": "3.0.3",
+        "scikit-learn": "1.9.0"
+      },
+      "files": {
+        "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
+        "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
+        "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+        "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+        "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+        "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+        "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+        "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+        "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+        "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+        "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+        "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+        "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+        "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      },
+      "root_modules": [
+        "src.cutoff_hardening.package"
+      ]
+    },
+    "implementation_hashes": {
+      "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
+      "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_mapping/package.py": "8886253eed0d6e2496ff326beebfc26daf3c9519a2ef1fe4da876afcab276f2f",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+    },
+    "maximum_source_issue": "2021-011",
+    "maximum_source_time": "2021-06-12T00:02:00+00:00",
+    "maximum_training_label_timestamp": "2021-06-12T00:02:00+00:00",
+    "partition": {
+      "calibration_rows": 36,
+      "calibration_years": [
+        2021
+      ],
+      "eligible_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021
+      ],
+      "final_refit_rows": 288,
+      "fit_rows": 216,
+      "fit_years": [
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019
+      ],
+      "tune_rows": 36,
+      "tune_years": [
+        2020
+      ]
+    },
+    "partition_policy": {
+      "calibration_years": 1,
+      "kind": "COMPLETE_PRIOR_YEARS",
+      "minimum_fit_years": 1,
+      "tune_years": 1
+    },
+    "source_hashes": {
+      "synthetic_history": "5b12722608afa064bcb364b3527d20da93f54cf2f91345d8270f0c8075426713"
+    },
+    "target_issue": "2022-001",
+    "target_rows_excluded": 3,
+    "target_rows_seen": 3,
+    "weight_receipt": {
+      "effective_sample_size": 200.3478260869566,
+      "issue_mass_sha256": "94a9e952a5487f3b50800d11eae5f6ad81a69f55511124122619f9efebd2fd35",
+      "long_history_mass": 0.75,
+      "maximum": 2.7499999999999996,
+      "minimum": 0.75,
+      "policy": {
+        "effective_sample": {
+          "minimum": 20,
+          "on_insufficient": "FAIL_CLOSED"
+        },
+        "half_life_days": null,
+        "kind": "RECENT_STATE_BLEND",
+        "recent_blend": 0.25,
+        "rolling_window_issues": 12
+      },
+      "recent_state_mass": 0.25,
+      "rows": 288,
+      "sum": 288.0,
+      "weight_frame_sha256": "6c2aae1b0796de9737c81e9f686daa4f3134957d68b24e93fd995818cba72c1e"
+    }
+  }
+}
