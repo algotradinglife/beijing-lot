@@ -1,0 +1,7 @@
+base,shape,standalone_positive,standalone_ex_largest_positive,matched_lift_positive,matched_ex_largest_positive,bootstrap_p05_nonnegative,at_least_two_positive_annual_lifts,admitted
+R0_CORRECTED,CONTRACTION_ONLY,True,False,True,True,False,True,False
+R0_CORRECTED,EXPANSION_ONLY,False,False,False,False,False,False,False
+R0_CORRECTED,BOTH,False,False,False,True,False,False,False
+R3_CORRECTED,CONTRACTION_ONLY,True,False,False,True,False,True,False
+R3_CORRECTED,EXPANSION_ONLY,True,False,False,False,False,True,False
+R3_CORRECTED,BOTH,True,True,True,True,False,True,False

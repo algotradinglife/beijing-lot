@@ -1,0 +1,28 @@
+{
+  "contract": "BJ-UNIFIED-N7-SUPPORT-SHAPE-001/v1",
+  "corrected_chronology": "SOURCE_ISSUE_REGISTRY_YEAR + FIXTURE_RELATIVE_10H",
+  "development": {
+    "available_rows": 3562,
+    "issues": 263,
+    "no_2022_2024_selection": true,
+    "role": "STRICTLY_OOF_DEVELOPMENT_DIAGNOSTIC_ONLY",
+    "rows": 3682,
+    "years": [
+      2017,
+      2018,
+      2019,
+      2020,
+      2021
+    ]
+  },
+  "evaluation_role": "EXPOSED_HISTORICAL",
+  "evaluation_years": [
+    2022,
+    2023,
+    2024
+  ],
+  "issue_budget_cny": 1024.0,
+  "payout_factor_application": "ONCE_PER_COMPLETE_WINNING_TICKET",
+  "upstream_contract": "BJ-UNIFIED-N7-CHRONOLOGY-SYNC-001/v1",
+  "upstream_manifest_sha256": "93b80bd63fd7b0ba3f4c040b48f670944eabb215d5c99f165b07a204c6a06bf2"
+}
