@@ -1,0 +1,8 @@
+k,table,intersection,jaccard,issue_n6,issue_n7,n6_gross_cny,n7_gross_cny,n6_also_gross_positive_on_n7_largest,n7_also_gross_positive_on_n6_largest
+5,gross,3,0.428571428571,,,,,,
+5,pnl,3,0.428571428571,,,,,,
+10,gross,5,0.333333333333,,,,,,
+10,pnl,5,0.333333333333,,,,,,
+20,gross,14,0.538461538462,,,,,,
+20,pnl,14,0.538461538462,,,,,,
+1,largest_payout,1,,23021,23021,24683.7066445,60938.3821109,True,True

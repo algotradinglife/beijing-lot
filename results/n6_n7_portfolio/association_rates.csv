@@ -1,0 +1,14 @@
+metric,value
+common_issues,151
+n6_profitable_rate,0.218543046358
+n7_profitable_rate,0.158940397351
+both_profitable_rate,0.139072847682
+n6_only_profitable_rate,0.0794701986755
+n7_only_profitable_rate,0.0198675496689
+neither_profitable_rate,0.761589403974
+phi_profitable_association,0.6905402332
+chi2_p,2.14792300223e-17
+both_gross_positive_rate,0.158940397351
+both_ticket_hit_rate,0.158940397351
+n6_ticket_hit_rate,0.238410596026
+n7_ticket_hit_rate,0.172185430464

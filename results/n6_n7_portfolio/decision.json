@@ -1,0 +1,32 @@
+{
+  "contract": "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1",
+  "issue": 378,
+  "mode": "exploration_diagnostic",
+  "verdict": "NO_N6_POSITIVE_STANDALONE_PORTFOLIO_DILUTIVE",
+  "n6_admission_gate": {
+    "standalone_pnl_cny": -12299.98964156374,
+    "standalone_positive": false,
+    "standalone_ex_largest_pnl_cny": -35959.69628605631,
+    "standalone_ex_largest_positive": false,
+    "pass": false,
+    "n6_r0_standalone_pnl_cny": -33511.091628594215,
+    "required": "No N6 arm enters the expert pool unless standalone-positive robustness gates pass."
+  },
+  "n6_grid_retained_hypotheses": [],
+  "n6_grid_verdict": "HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS (#377)",
+  "n7_mechanism_hypotheses": [
+    "C1E2",
+    "C1E3"
+  ],
+  "n7_mechanism_verdict": "explicitly exposed mechanism hypotheses only; no expert admission implied (#373)",
+  "expert_pool_after_diagnostic": {
+    "admitted_new": [],
+    "existing": [
+      "N7_C0E0"
+    ]
+  },
+  "portfolio_verdict": "NOT_PROMOTABLE_DILUTIVE",
+  "portfolio_pnl_cny": 10194.56829400496,
+  "portfolio_capital_return": 0.10194568294004959,
+  "notes": "Corrected N6 canonical arms are NOT standalone-positive in the frozen surface (#376 R0 -33,511, R3 -12,300 over 2022-2024) and #377 retained no grid cell; therefore no N6 arm enters the expert pool (low correlation is diversification, not Edge). The preregistered 50/50 portfolio dilutes the only positive standalone expert (corrected-N7 R3 CONTROL) by CNY6,150 via the N6 sleeve and cannot improve holding risk without diluting return. All 2022-2024 evidence is exposed historical."
+}

@@ -1,65 +1,82 @@
-# Issue #248 handoff — PI rework
+# HANDOFF — Issue #378 (BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1)
 
-[SESSION] 20260819_235658_96e389
+[SESSION] 20260824_224756_4cf93f
 
 ## Current HEAD
+- Branch: `analyst/bj378-n6-n7-portfolio` (from `origin/main` 4509c9b)
+- Worktree: `/home/drwho1985/workspace/soccer/beijing-lot-bj378`
+- Rebuild: `python3 scripts/run_n6_n7_portfolio.py --force`
+- Verify:  `python3 scripts/verify_n6_n7_portfolio.py` (deterministic byte-replay)
+- Tests:  `python3 -m pytest tests/test_n6_n7_portfolio.py -q` (15 passed)
 
-`engineer/bj248-issue`; the commit carrying this handoff is the rework delivery
-head. Resolve its exact SHA with `git rev-parse HEAD` after checkout.
+## Completed
+- Claimed #378 (In Progress) via claim.py; session above.
+- Identified the frozen expert surface from #376 (results/n6_chronology_sync),
+  #377 (results/n6_support_transfer_grid), #373 (results/n7_support_transfer_grid).
+- Full diagnostic package delivered under `results/n6_n7_portfolio/`:
+  - shared corrected calendar (152 issues union; exact-common 151; exclusion 23032
+    NO_BET zero flow; 20/21 UNTRUSTED_SELECTED_LEG exclusions disclosed)
+  - correlation/association/losing-dependence/tail-overlap diagnostics (151 issues)
+  - standalone + preregistered 50/50 portfolio + N7-halved dilution counterfactual +
+    parallel 1:1 scale diagnostic + mechanical weighted-average identity
+  - matched contrasts with circular moving-block bootstrap (block 10, 5000 draws)
+  - async-contribution bootstrap (portfolio vs N7_HALVED risk deltas)
+  - return-dilution attribution; decision.json; source_receipt.json; MANIFEST.json
+- Executed notebook (12/12 cells), report, figure committed under docs/notebooks.
 
-## Completed rework
+## Key decisions and rationale
+1. N6 side of the pool = #376 canonical controls ONLY (R0/R3). #377 retained no
+   grid cell (its decision.json verdict is HISTORICAL_MECHANISM_FRONTIER_NO_GATE_PASS,
+   expert_admitted_cells=[]), so no N6 support-transfer arm enters the pool.
+2. N7 side = #373 corrected R3 CONTROL C0E0 (positive standalone +32,689);
+   C1E2/C1E3 exposed only as mechanism hypotheses (per #373 decision.json), never
+   portfolio members.
+3. Portfolio = preregistered 50/50: sleeve pnl = 0.5 x standalone pnl; NO_BET
+   zero flow where an expert is inactive; capital CNY100,000. Mechanical
+   weighted average IDENTICAL to the portfolio by construction (verified).
+   N7_HALVED (0.5 x N7) is the pure stake-reduction counterfactual that makes
+   dilution attribution crisp; PARALLEL_1_1 (both sleeves CNY1,024) is the
+   transparent scale diagnostic, not a tuned weight.
+4. Metric definitions mirror the frozen upstream protocol exactly
+   (_path_metrics, _run_summary, _payout_concentration, circular moving-block
+   with block=10/draws=5000, rolling 20/30/50). Golden tests pin N6-R3 and
+   N7-C0E0 risk values to #376/#373 risk_diagnostics.csv.
+5. Bootstrap seeds: 378_001 (contrasts), 378_002 (async deltas) — the upstream
+   convention `{issue}_00K` per stream.
+6. Verifier is source-bound: recomputes from upstream bundles/performance.csv,
+   checks N6-R3 vs N6-C0E0 cross-package parity (exact), financial invariants
+   (CNY1,024 / 512 units), aggregation parity, portfolio/mechanical identity,
+   MANIFEST hashes, and byte-exact deterministic replay into a temp dir.
+   Replay is the check INDEPENDENT of MANIFEST (attacker who rewrites MANIFEST
+   still fails byte-replay against the frozen upstream sources).
 
-- Claimed #248 from `Ready` to `In Progress` after confirming its sole native
-  predecessor (#234) is closed.
-- Fixed **KE-248-01**: a history receipt now stores the exact fetched URL,
-  rejects anything outside the HTTPS `cp.nowscore.com` fixture-specific
-  TypeID=5 route before fetch, and references the raw issue-page receipt whose
-  parsed row supplied that exact URL. The semantic verifier rebuilds this
-  source trace from raw issue evidence.
-- Fixed **KE-248-02**: an unrecognized active-page shape is recorded as
-  `PARSE_ERROR`, logged, and makes the CLI non-zero. A recognized explicit
-  no-sale marker is instead `EMPTY_PROVEN`, never silently `OK` with zero rows.
-- Fixed **KE-248-03**: reusing a capture key succeeds only for an identical raw
-  SHA and complete immutable receipt metadata. A changed payload or metadata
-  now raises an explicit collision in both issue-page and history receipt paths.
-- Fixed **KE-248-04**: requested, trusted-receive, kickoff, and supplied
-  decision-epoch times are canonical UTC `Z` instants before persistence or
-  SQLite lexical comparison. An offset epoch can no longer admit a later UTC
-  receipt.
-- Repaired the standalone collector CLI's import bootstrap and updated the
-  executed notebook for mandatory issue-page→history trace linkage.
+## Findings (honest negative result)
+- No positive standalone N6 payoff source: R0 -33,511 / R3 -12,300; no retained
+  grid cell. So no N6 arm enters the expert pool (contract #6).
+- Payoffs are SYNCHRONIZED, not asynchronous: Pearson r=0.754 (pool pair),
+  both-losing on 76.2% of 151 shared issues, both-underwater 96.7%, top-10 gross
+  sets overlap 5/10, largest payout of BOTH experts on the same issue (23021).
+- Portfolio dilutes: 50/50 PnL CNY10,195 = N7_half (16,345) + N6-half (-6,150);
+  max DD 32.3% vs N7_HALVED 16.6%; async DD delta bootstrap CI [+0.051,+0.351]
+  entirely positive — the N6 sleeve never reduces drawdown vs pure stake
+  reduction. Risk-adjusted return/DD ~0.32 vs N7 full ~0.99.
+- Verdict: NO_N6_POSITIVE_STANDALONE_PORTFOLIO_DILUTIVE; portfolio NOT
+  PROMOTABLE; #210/#218 untouched; no prospective evidence consumed.
 
-## Evidence
+## Known issues
+- Pyright LSP warnings on optional imports (matplotlib/nbformat/nbclient) and
+  bool ndarray attribute inference — environment analysis artifacts, not
+  runtime defects; pytest + verify + replay all green.
+- results/n6_n7_portfolio/ is force-tracked (repo .gitignore ignores results/*
+  by default); upstream packages are tracked the same way.
 
-- Focused suite: `python -m pytest tests/test_bj248_forward_snapshot.py
-  tests/test_bj248_rework.py tests/scripts/test_nowscore_bjdc_sp_history.py -q`
-  → `21 passed`.
-- Tamper-focused subset → `4 passed`: altered quote/vector, raw-source trace,
-  remanifest/external-anchor path, and offset/future-receipt gate fail closed.
-- Notebook: `/home/drwho1985/work/beijing-lot-206/.venv/bin/python
-  scripts/execute_bj248_notebook.py` → `EXECUTED`.
-- Manual read-only shadow probe of issue 26086 is documented in
-  `docs/research/bj248_manual_shadow_capture.md`. It verified the live page and
-  URL shape but admitted no forward vector: all 80 history outcomes were
-  explicitly rejected (42 post-kickoff, 38 invalid SP domain), not zero-filled.
-
-## Known limits / decision input
-
-- The shadow issue's `cansale=true` rows had stale/past schedule evidence; this
-  does not qualify active-sale truth, retention, cadence or successful forward
-  collection. **Do not enable unattended scheduling** until a fresh issue has a
-  demonstrably future source schedule and at least one complete causal vector.
-- PI accepted notebook byte determinism and cross-store crash recovery as
-  exploration debt; this delivery intentionally does not expand into them.
-- Full repository pytest collection remains unavailable in both available
-  interpreters because of unrelated missing/incomplete dependencies and a
-  legacy macOS absolute input path. The focused #248 tests and notebook above
-  are the applicable passing evidence.
-
-## Next steps
-
-1. EV: rerun the focused suite and notebook in a fresh checkout; inspect the
-   allowlist/source-trace verifier and retry-collision paths.
-2. PI: decide whether the negative live shadow probe is sufficient to retain
-   the no-scheduler restriction or whether a later fresh-issue shadow probe is
-   required before activating operations.
+## Next
+- Codex self-check (EV lens): PASS after 3 rounds. Findings fixed: (1) _path_metrics
+  public contract trimmed to the frozen 3 keys (internal _path_state extracted);
+  (2) verify_package now enforces exact artifact-set equality vs MANIFEST and
+  FAILS on missing MANIFEST; (3) replay loop is symmetric (stored vs replay
+  file-set equality + byte compare) so coordinated artifact+manifest-entry
+  deletion is caught. 17/17 tests pass.
+- Commit all; push analyst/bj378-n6-n7-portfolio; open PR with Closes #378;
+  post_handoff; finalize_delivery (In Progress -> PI Review per deployed
+  tooling; EV is optional post-merge advisory per d0fc7fc).

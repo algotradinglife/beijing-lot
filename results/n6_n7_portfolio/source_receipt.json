@@ -1,0 +1,34 @@
+{
+  "contract": "BJ-UNIFIED-N6-N7-PORTFOLIO-001/v1",
+  "upstreams": {
+    "results/n6_chronology_sync": {
+      "package": "results/n6_chronology_sync",
+      "upstream_issue": 376
+    },
+    "results/n6_support_transfer_grid": {
+      "package": "results/n6_support_transfer_grid",
+      "upstream_issue": 377
+    },
+    "results/n7_support_transfer_grid": {
+      "package": "results/n7_support_transfer_grid",
+      "upstream_issue": 373
+    }
+  },
+  "issue_budget_cny": 1024.0,
+  "funded_units": 512,
+  "stake_per_unit_cny": 2.0,
+  "portfolio_weight": 0.5,
+  "sleeve_stake_cny": 512.0,
+  "parallel_sleeve_stake_cny": 1024.0,
+  "starting_capital_cny": 100000.0,
+  "moving_block_length": 10,
+  "bootstrap_draws": 5000,
+  "bootstrap_seed": 378001,
+  "bootstrap_seed_async": 378002,
+  "evaluation_role": "EXPOSED_RETROSPECTIVE_DIAGNOSTIC",
+  "exact_common_active_denominator": 151,
+  "shared_calendar_issues": 152,
+  "exclusive_n6_issues": [
+    "23032"
+  ]
+}

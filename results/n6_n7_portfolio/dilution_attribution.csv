@@ -1,0 +1,15 @@
+component,pnl_cny,capital_return,note
+n7_full_expert,32689.1262296,0.326891262296,only positive standalone payoff source
+n7_halved_dilution_counterfactual,16344.5631148,0.163445631148,pure stake reduction of N7
+n6_r3_half_sleeve,-6149.99482078,-0.0614999482078,N6 sleeve contribution to portfolio
+portfolio_50_50,10194.568294,0.10194568294,preregistered 0.5/0.5 path
+mechanical_weighted_average,10194.568294,0.10194568294,0.5*N6 + 0.5*N7 over shared calendar (identical to portfolio)
+dilution_vs_n7_full,-22494.5579356,-0.224945579356,portfolio minus N7 full
+n6_sleeve_drag_vs_n7_halved,-6149.99482078,-0.0614999482078,exactly 0.5*N6 (negative)
+risk_portfolio_maxdd,,0.32253327774,portfolio max drawdown fraction
+risk_n7_halved_maxdd,,0.16582506714,stake-reduction-only max drawdown
+risk_n7_full_maxdd,,0.33165013428,expert standalone max drawdown
+async_maxdd_delta_p05,,0.0512420834059,bootstrap p05 of portfolio minus N7-HALVED max DD
+async_maxdd_delta_p95,,0.351133229066,bootstrap p95 of portfolio minus N7-HALVED max DD
+async_run_delta_p05,,-12,bootstrap p05 of longest losing run delta
+async_run_delta_p95,,0,bootstrap p95 of longest losing run delta
