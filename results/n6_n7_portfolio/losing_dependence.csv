@@ -1,0 +1,2 @@
+common_issues,both_losing_issues,both_losing_rate,joint_losing_run_max,joint_losing_run_count,joint_losing_run_p75,both_losing_pearson_r,n6_underwater_issues,n7_underwater_issues,both_underwater_issues,both_underwater_rate,underwater_jaccard,drawdown_depth_overlap_ratio
+151,115,0.761589403974,18,27,4.5,0.931425570694,151,147,147,0.967105263158,0.973509933775,0.619736532197
