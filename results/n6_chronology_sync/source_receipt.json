@@ -1,0 +1,33 @@
+{
+  "cells": 145974,
+  "chronology": "SOURCE_ISSUE_REGISTRY_YEAR + FIXTURE_RELATIVE_10H",
+  "consumed_settlement_sha256": "41970b40df0962eeba96865cabeaeaaabf97a5a63e0645088220986f8be418cf",
+  "contract": "BJ-UNIFIED-N6-CHRONOLOGY-SYNC-001/v1",
+  "corrected_cells_sha256": "fad0598d2319dd9948204029ed47660c523e02677ea939dc428b5a8d064f4000",
+  "corrected_labels_sha256": "5279746f72a7fdc23160587dacbb413046ea92336599a93b632d0ea1619de134",
+  "corrected_source_contract": "BJ-UNIFIED-LOWN-CHRONOLOGY-CORRECTION-001/v2",
+  "external_data_root_committed": false,
+  "fixtures": 48658,
+  "issues": 172,
+  "legacy_parity_source": {
+    "consumed_files": {
+      "results/multin_r_diagnostic/match_support.parquet": "ba0619a167ac97abc7caa218dec7dffba80d4a35377a86dd08a32eb46d41651c",
+      "results/multin_r_diagnostic/preoutcome_bundles.parquet": "87488f5de87b1c6ac2189d653e45fa11d59642b73d15af354e402c5979f531d2",
+      "results/multin_r_diagnostic/settled_bundles.parquet": "25408e113aa138a7c13de7bc1cc53e9064fc895e70a9572b044da35b5639d2d6",
+      "results/multin_r_diagnostic/support_attribution.parquet": "b290c2e338e17c137f3b2661ea7d1f4efa2d7b823dd87b5e41119add41511681"
+    },
+    "manifest_sha256": "de1da07545fe8052fc07db2bceb9e662336f3cea475a04ff1104b3645164349c"
+  },
+  "upstream_files": {
+    "FREEZE_RECEIPT.json": "8ce2dd0c75c124d727ef535ae472bd0ff9cfe113095afa2a56ae766464fd00a7",
+    "SOURCE_RECEIPT.json": "c10740f71cd9e10f7128400af86113c7566e95561d4f3ff59c53e2f71e5cd7ce",
+    "features/selector_cells.parquet": "c30e67d90146ac09ad2b6e0078a479942c8c0a15b05b9310e835455e3e177893",
+    "features/selector_features.parquet": "458eca1d98a38350017d58c16ccda33d05eda9d7f0e275f68ef4253fa539f1da",
+    "labels/selector_labels.parquet": "5e3298846ac3db56059f4d9f9d957caa13932625e7ed17c73294ff420cf3991e"
+  },
+  "years": [
+    2022,
+    2023,
+    2024
+  ]
+}
