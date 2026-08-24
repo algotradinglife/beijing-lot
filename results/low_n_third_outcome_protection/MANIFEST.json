@@ -1,0 +1,25 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-THIRD-OUTCOME-PROTECTION-001/v1",
+  "files": {
+    "budget.csv": "b315e1f9df0e4cf4d15efed64c9f9a14131394a00771c67b02e7c0f62f5603b9",
+    "contrasts.csv": "bb3ee15e73750b7ab3b287f15eaceeae37e55ae800242bb581dfb3bbc389d752",
+    "decision.json": "dd1acaa8c553cba098982bf4c33ca69457a3be8c7f842d69720b766b34002bf8",
+    "decisions.parquet": "3791bad1ef0b4f31a88adc75cb32c7312210ba90ebfbd111a870cf423f5927f9",
+    "delivery_receipt.json": "26943c6d3d2f5514b49eb71bd14ec1f33ef4586f5d945b8507eaea0868448327",
+    "development_contrasts.csv": "10dd7ef117f54b7614c3921ce3bcb5c56dd37a5fa9faed09ec1a49b0ae894344",
+    "freeze_receipt.json": "528d32f0a99e617fe43e01e707c9463c995dc3110d73380ca5d3ca392c5b3680",
+    "input_selections.parquet": "2d8023d3b38276e28031b5fee3af8a80a41bd708afbc5df3bf531075f4056fe7",
+    "paths.parquet": "4a3baf5cdfe840e6fc9c641ceb2afca679eeb310daeaebc5acc86eb87de369bd",
+    "performance.csv": "8c6be710b785c1bd67dcf56185ec57c1f254b250bd4e7ae60e9c6ec3645348c9",
+    "preoutcome.parquet": "53cbd398243622cc9e3cc1bb2bbfa9c1894abfd868a820c99dd88843b4b10470",
+    "protection_attribution.csv": "b78fe7ad6c2e872ac7aec48b6db31cf3abb448cee718da0cde6b4a24f3cce604",
+    "rank_diagnostics.csv": "6a5870b1332a455e4a12a2047599ca96d0a6c7f0302744229304e1c4f7824fd8",
+    "risk.csv": "9252e9bbff341a7601b8cf96c8bca7259385bdf0c1c3ed834911853761c5573e",
+    "selected_p.csv": "d7767aeecb6bd039e8a636a5d0714cb6ff0129e5d604d5cb09f3f10d81dfa530",
+    "selections.parquet": "25e719b493767569eea16a83d9fb9acc83245871ea2b36c05b4d022fc6cd4642",
+    "settled_bundles.parquet": "815fe17f22ddd7a3b83a7db4e3f2b0a26b68d3dac0649804a21f4caff1b15845",
+    "source_receipt.json": "5dc22b600c57e34463627672d5acc3a028fbfbc74b234707741496e4ab2b0693",
+    "support_attribution.parquet": "f267be4ef13fbd3829afed2703bbbfaa3682e5d1464274c13bc35d13eb88c3e3",
+    "tickets.parquet": "76858e6f4cd915e61d52b49af972b95bc73fa4800aae6200e2de7a7b4ed0132e"
+  }
+}

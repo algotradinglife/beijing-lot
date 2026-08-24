@@ -1,0 +1,85 @@
+{
+  "contract": "BJ-UNIFIED-LOWN-THIRD-OUTCOME-PROTECTION-001/v1",
+  "decisions_sha256": "723cda8296943021a3fd0e20be6e41eaf296979ea9d6473e092ab1051c07bcb7",
+  "development_contrasts_sha256": "ca1051e249fac6f5fdde4e4fb3a9411fd94c8f642daabd9249d7b924ea409b70",
+  "development_years": [
+    2019,
+    2020,
+    2021
+  ],
+  "payout_65_semantics": "TICKET_LEVEL_ONCE",
+  "preoutcome_bundles_sha256": "65df5e8c63f8982ad12c1a25939c2500979bb82f52ca73e617c51bbfb4a9ccaa",
+  "protection_priority": "1_MINUS_STRICT_PRIOR_COVERAGE_SCORE",
+  "selected_p": [
+    {
+      "development_ex_largest_lift_cny": 10187.545964633027,
+      "development_gate_pass": true,
+      "development_hit_rate_lift": 0.30534351145038163,
+      "development_lift_cny": 6259.068379118082,
+      "development_positive_years": 2,
+      "development_risk_gate": true,
+      "lane": "S0_N3",
+      "n": 3,
+      "p": 2,
+      "primary_lane": true
+    },
+    {
+      "development_ex_largest_lift_cny": 25291.561507915678,
+      "development_gate_pass": true,
+      "development_hit_rate_lift": 0.40625,
+      "development_lift_cny": 26412.184348022034,
+      "development_positive_years": 3,
+      "development_risk_gate": true,
+      "lane": "S0_N4",
+      "n": 4,
+      "p": 3,
+      "primary_lane": true
+    },
+    {
+      "development_ex_largest_lift_cny": 28192.40710629311,
+      "development_gate_pass": true,
+      "development_hit_rate_lift": 0.64,
+      "development_lift_cny": 29014.632040677316,
+      "development_positive_years": 3,
+      "development_risk_gate": true,
+      "lane": "S0_N5",
+      "n": 5,
+      "p": 5,
+      "primary_lane": true
+    },
+    {
+      "development_ex_largest_lift_cny": 0.0,
+      "development_gate_pass": false,
+      "development_hit_rate_lift": 0.0,
+      "development_lift_cny": 0.0,
+      "development_positive_years": 0,
+      "development_risk_gate": true,
+      "lane": "N3_VALUE",
+      "n": 3,
+      "p": 0,
+      "primary_lane": false
+    },
+    {
+      "development_ex_largest_lift_cny": 13276.0015764653,
+      "development_gate_pass": true,
+      "development_hit_rate_lift": 0.5803571428571428,
+      "development_lift_cny": 11907.02849111153,
+      "development_positive_years": 3,
+      "development_risk_gate": true,
+      "lane": "N4_COVERAGE_VALUE",
+      "n": 4,
+      "p": 4,
+      "primary_lane": false
+    }
+  ],
+  "selection_surface_sha256": "25af0f6fef66044605fbbd79ef0bebc3ed593c67032b9a642207e0597833995d",
+  "ticket_allocation": "EVEN_INTEGER_WITH_ISSUE_BOUND_ROTATION",
+  "tickets_sha256": "e111ded757752ef3bf82a53cde77daac155806673baecda38b3d6021832c5020",
+  "tie_break": "OMITTED_PROBABILITY_DESC_MATCH_IDX_ASC",
+  "transfer_labels_opened_at_freeze": false,
+  "transfer_years": [
+    2022,
+    2023,
+    2024
+  ]
+}

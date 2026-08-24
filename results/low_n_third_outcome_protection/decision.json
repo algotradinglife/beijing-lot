@@ -1,0 +1,81 @@
+{
+  "changes_210_or_218": false,
+  "contract": "BJ-UNIFIED-LOWN-THIRD-OUTCOME-PROTECTION-001/v1",
+  "diagnostic_sleeves_are_exposed": true,
+  "issue": 356,
+  "primary_decision_only_s0": true,
+  "production_or_holdout_authorized": false,
+  "selected_p_results": [
+    {
+      "bootstrap_mean_lift_p05_cny": -302.124066445924,
+      "development_gate_pass": true,
+      "historical_signal": false,
+      "lane": "S0_N3",
+      "n": 3,
+      "path_risk_gate": false,
+      "primary_lane": true,
+      "robust_historical_signal": false,
+      "selected_p": 2,
+      "transfer_ex_largest_lift_cny": -18273.926624611886,
+      "transfer_lift_cny": -19871.358464507837,
+      "transfer_positive_years": 0
+    },
+    {
+      "bootstrap_mean_lift_p05_cny": -333.85571374738043,
+      "development_gate_pass": true,
+      "historical_signal": false,
+      "lane": "S0_N4",
+      "n": 4,
+      "path_risk_gate": false,
+      "primary_lane": true,
+      "robust_historical_signal": false,
+      "selected_p": 3,
+      "transfer_ex_largest_lift_cny": -16695.872738812242,
+      "transfer_lift_cny": -17008.408516829186,
+      "transfer_positive_years": 1
+    },
+    {
+      "bootstrap_mean_lift_p05_cny": -518.9399478086159,
+      "development_gate_pass": true,
+      "historical_signal": false,
+      "lane": "S0_N5",
+      "n": 5,
+      "path_risk_gate": false,
+      "primary_lane": true,
+      "robust_historical_signal": false,
+      "selected_p": 5,
+      "transfer_ex_largest_lift_cny": -33820.8846974618,
+      "transfer_lift_cny": -39011.16206810842,
+      "transfer_positive_years": 1
+    },
+    {
+      "bootstrap_mean_lift_p05_cny": 0.0,
+      "development_gate_pass": false,
+      "historical_signal": false,
+      "lane": "N3_VALUE",
+      "n": 3,
+      "path_risk_gate": true,
+      "primary_lane": false,
+      "robust_historical_signal": false,
+      "selected_p": 0,
+      "transfer_ex_largest_lift_cny": 0.0,
+      "transfer_lift_cny": 0.0,
+      "transfer_positive_years": 0
+    },
+    {
+      "bootstrap_mean_lift_p05_cny": -373.19713864962,
+      "development_gate_pass": true,
+      "historical_signal": false,
+      "lane": "N4_COVERAGE_VALUE",
+      "n": 4,
+      "path_risk_gate": false,
+      "primary_lane": false,
+      "robust_historical_signal": false,
+      "selected_p": 4,
+      "transfer_ex_largest_lift_cny": -32083.71568721119,
+      "transfer_lift_cny": -32681.236383825395,
+      "transfer_positive_years": 0
+    }
+  ],
+  "verdict": "NO_INCREMENT"
+}

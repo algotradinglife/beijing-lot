@@ -1,0 +1,6 @@
+lane,n,p,primary_lane,development_positive_years,development_lift_cny,development_ex_largest_lift_cny,development_hit_rate_lift,development_risk_gate,development_gate_pass
+S0_N3,3,2,True,2,6259.0683791180818,10187.545964633027,0.30534351145038163,True,True
+S0_N4,4,3,True,3,26412.184348022034,25291.561507915678,0.40625,True,True
+S0_N5,5,5,True,3,29014.632040677316,28192.407106293111,0.64000000000000001,True,True
+N3_VALUE,3,0,False,0,0,0,0,True,False
+N4_COVERAGE_VALUE,4,4,False,3,11907.02849111153,13276.0015764653,0.58035714285714279,True,True
