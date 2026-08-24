@@ -62,7 +62,9 @@ def _local_imports(
                 for alias in node.names:
                     candidates.append(f"{base}.{alias.name}")
         for candidate in candidates:
-            if candidate.startswith("src.") and _module_path(repo_root, candidate):
+            if candidate.startswith(("src.", "scripts.")) and _module_path(
+                repo_root, candidate
+            ):
                 imports.add(candidate)
     return imports
 

@@ -53,9 +53,9 @@ def _function_calls_shared_context(
 
 
 def _occurrence(
-    *, rule: str, path: str, scope: str, symbol: str, node: ast.AST
+    *, rule: str, path: str, scope: str, symbol: str, node: ast.AST, source: str
 ) -> dict[str, Any]:
-    node_identity = ast.dump(node, annotate_fields=True, include_attributes=False)
+    node_identity = (ast.get_source_segment(source, node) or symbol).strip()
     fingerprint = _digest("|".join([rule, path, scope, symbol, node_identity]))
     return {
         "fingerprint": fingerprint,
@@ -68,8 +68,9 @@ def _occurrence(
 
 
 class _OccurrenceVisitor(ast.NodeVisitor):
-    def __init__(self, relative: str) -> None:
+    def __init__(self, relative: str, source: str) -> None:
         self.relative = relative
+        self.source = source
         self.scope: list[str] = []
         self.temporal_client_depth = 0
         self.occurrences: list[dict[str, Any]] = []
@@ -113,6 +114,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
                         scope=self.scope_name,
                         symbol=target.id,
                         node=node,
+                        source=self.source,
                     )
                 )
         self.generic_visit(node)
@@ -127,6 +129,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
                     scope=self.scope_name,
                     symbol=target.id,
                     node=node,
+                    source=self.source,
                 )
             )
         self.generic_visit(node)
@@ -144,6 +147,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
                     scope=self.scope_name,
                     symbol=node.func.attr,
                     node=node,
+                    source=self.source,
                 )
             )
         self.generic_visit(node)
@@ -159,6 +163,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
                     scope=self.scope_name,
                     symbol=node.id,
                     node=node,
+                    source=self.source,
                 )
             )
 
@@ -173,6 +178,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
                     scope=self.scope_name,
                     symbol=node.attr,
                     node=node,
+                    source=self.source,
                 )
             )
         self.generic_visit(node)
@@ -188,6 +194,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
                     scope=self.scope_name,
                     symbol="mapping_accepted",
                     node=node,
+                    source=self.source,
                 )
             )
 
@@ -199,11 +206,12 @@ def collect_occurrences(root: Path = ROOT) -> tuple[list[dict[str, Any]], list[s
         for path in sorted(directory.rglob("*.py")):
             relative = path.relative_to(root).as_posix()
             try:
-                tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=relative)
             except (SyntaxError, UnicodeDecodeError) as error:
                 hard.append(f"{relative}: cannot parse for cutoff governance: {error}")
                 continue
-            visitor = _OccurrenceVisitor(relative)
+            visitor = _OccurrenceVisitor(relative, source)
             visitor.visit(tree)
             occurrences.extend(visitor.occurrences)
             hard.extend(visitor.hard_violations)

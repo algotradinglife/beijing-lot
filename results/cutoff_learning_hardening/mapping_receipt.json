@@ -14,7 +14,7 @@
       "safety_margin_seconds": 0.0
     }
   },
-  "cache_key": "1aebba44adc8fa620b3b508ad20dee331211ca3a1eb5c3759d43232d4659326e",
+  "cache_key": "4e5b67d692d544197565729209b3aa18284b69491fe0b4deb673b8e39f8cae71",
   "contract": "BJ-UNIFIED-CUTOFF-LEARNING-001/v3",
   "cutoff_identity": "EVALUATION_YEAR_2022",
   "cutoff_kind": "EVALUATION_YEAR",
@@ -336,7 +336,7 @@
     "tune_log_loss_nonworse": true
   },
   "implementation": {
-    "closure_sha256": "566a9b6bee8f3c762cd69748f15f7ca32efbd7aab5ced35388695f15546f50ee",
+    "closure_sha256": "6901f443e96716ef34ecffef77b08b56130ea577af9c0aa16550996d3cd18c31",
     "distributions": {
       "numpy": "2.4.6",
       "pandas": "3.0.3",
@@ -354,7 +354,7 @@
       "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
       "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
       "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
     },
     "root_modules": [
       "src.cutoff_mapping.api",
@@ -373,7 +373,7 @@
     "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
     "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
     "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-    "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+    "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
   },
   "mapping_accepted": true,
   "maximum_source_issue": "21125",

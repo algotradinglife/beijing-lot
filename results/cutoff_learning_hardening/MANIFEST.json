@@ -2,12 +2,12 @@
   "contract": "BJ-UNIFIED-CUTOFF-HARDENING-001/v1",
   "deliveries": {
     "docs/research/Issue-388-Cutoff-Learning-Hardening.md": "1686d264da7e70a32d4563dccc8d391ce71b32d0c226cf5acab332bbcfcaa71a",
-    "notebooks/research/cutoff-learning/Issue-388-Cutoff-Hardening.ipynb": "14bc6506dc9d706ad9880c9ca284173748d899cb7022bb80b15d3273fd6ad0be"
+    "notebooks/research/cutoff-learning/Issue-388-Cutoff-Hardening.ipynb": "26f8a86485aee8f02a4ec4ab7648f30a14f27dc94c5d13ba8b35861be5e4cf45"
   },
   "files": {
     "context_receipts.json": {
-      "bytes": 18415,
-      "sha256": "7d2a0d15b6219f9c42f1e04a6f1d2e0c1148217ce6df69816a716d02999fb263"
+      "bytes": 19093,
+      "sha256": "68a72b22ea6de426c487f83ec7cd99565eaebc90f7fc86f678f8c65a7c7e9ccb"
     },
     "decision.json": {
       "bytes": 522,
@@ -15,7 +15,7 @@
     },
     "governance_receipt.json": {
       "bytes": 1896,
-      "sha256": "cbfd2b2e47e7687da52875ddb03de3173ecad2af917712b49d0778c52a6129f8"
+      "sha256": "9013984b99f34c88a277d41c5adcec0ee25fb4f0d9dfa8aaf6e1769638e8a410"
     },
     "mapping_parity.csv": {
       "bytes": 333,
@@ -23,15 +23,15 @@
     },
     "mapping_receipt.json": {
       "bytes": 14889,
-      "sha256": "af5b8cd1831bab6c798c7ef9cf43184b823de7be34425b059e293cfd581c2043"
+      "sha256": "cddea58c9c546351827d86afc7d57265b179becaf739e15cc0b28cdcb77f5e38"
     },
     "selector_receipt.json": {
-      "bytes": 6237,
-      "sha256": "6867d9ebd741fe76b68fe31c9912a212148fd9e0722343050dcbd88a8eadab08"
+      "bytes": 6459,
+      "sha256": "1d0e6491492b03a9c6f070b74ecc8b5011570813e58f4236665d3d3860a239a7"
     },
     "source_receipt.json": {
       "bytes": 3491,
-      "sha256": "0d32083b77e60435c91ce758bb8db7395569f650b5d40f8d89c42260a54cd037"
+      "sha256": "e63ad18d119e0956f37a3d82c690326b25e2758d1634c2cd29a6edcc71554b5f"
     },
     "weight_policy_diagnostics.csv": {
       "bytes": 266,
@@ -39,7 +39,7 @@
     }
   },
   "implementation": {
-    "closure_sha256": "1adcbf5b98745b135712f9ed7e7868d46941150a01bb86efe6790acc15f80b9e",
+    "closure_sha256": "41f12d7702e469945affbfedfe4c098ae3c0080f36b2871fa3339192747147d5",
     "distributions": {
       "nbclient": "0.10.2",
       "nbformat": "5.10.4",
@@ -48,6 +48,7 @@
       "scikit-learn": "1.9.0"
     },
     "files": {
+      "scripts/check_cutoff_governance.py": "3d4f8332906a84059812ed8c3ef1b2b617bddfdda50b78f8b4755dde0157ba3e",
       "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
       "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
       "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
@@ -61,7 +62,7 @@
       "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
       "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
       "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
     },
     "root_modules": [
       "src.cutoff_hardening.package"

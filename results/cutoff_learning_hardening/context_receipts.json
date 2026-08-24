@@ -15,18 +15,19 @@
         "safety_margin_seconds": 0.0
       }
     },
-    "cache_key": "d72490942671ebd57eb75ae8834d3ee39e6dacd1b0e68017246f1cc24e2646d8",
+    "cache_key": "d2a30a11d98670e289c1868882451c6447b9bcf200d51a887c1ae98253130780",
     "cutoff_identity": "DECISION_EPOCH_2022-001",
     "cutoff_kind": "DECISION_EPOCH",
     "cutoff_ts": "2022-03-01T00:00:00+00:00",
     "implementation": {
-      "closure_sha256": "3322ff0ffdb91dccdcdf4f4cb570157146515c56e08afe69e4ab2cb29330a204",
+      "closure_sha256": "911b5cb683fe69493c2b50af15f2c523200719204f07e74b8adf2a60f54a7a84",
       "distributions": {
         "numpy": "2.4.6",
         "pandas": "3.0.3",
         "scikit-learn": "1.9.0"
       },
       "files": {
+        "scripts/check_cutoff_governance.py": "3d4f8332906a84059812ed8c3ef1b2b617bddfdda50b78f8b4755dde0157ba3e",
         "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
         "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
         "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
@@ -40,13 +41,14 @@
         "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
         "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
         "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-        "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+        "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
       },
       "root_modules": [
         "src.cutoff_hardening.package"
       ]
     },
     "implementation_hashes": {
+      "scripts/check_cutoff_governance.py": "3d4f8332906a84059812ed8c3ef1b2b617bddfdda50b78f8b4755dde0157ba3e",
       "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
       "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
       "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
@@ -60,7 +62,7 @@
       "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
       "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
       "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
     },
     "maximum_source_issue": "2021-011",
     "maximum_source_time": "2021-06-12T00:02:00+00:00",
@@ -145,18 +147,19 @@
         "safety_margin_seconds": 0.0
       }
     },
-    "cache_key": "6928641da81377b3f811fffe8435da81050a6fa206fc250f0099a08a6469d9bb",
+    "cache_key": "882644d83d1ac4d5949d9d93f2743365af8bc1f0c7e91343588e7b98d503005f",
     "cutoff_identity": "DECISION_EPOCH_2022-001",
     "cutoff_kind": "DECISION_EPOCH",
     "cutoff_ts": "2022-03-01T00:00:00+00:00",
     "implementation": {
-      "closure_sha256": "3322ff0ffdb91dccdcdf4f4cb570157146515c56e08afe69e4ab2cb29330a204",
+      "closure_sha256": "911b5cb683fe69493c2b50af15f2c523200719204f07e74b8adf2a60f54a7a84",
       "distributions": {
         "numpy": "2.4.6",
         "pandas": "3.0.3",
         "scikit-learn": "1.9.0"
       },
       "files": {
+        "scripts/check_cutoff_governance.py": "3d4f8332906a84059812ed8c3ef1b2b617bddfdda50b78f8b4755dde0157ba3e",
         "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
         "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
         "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
@@ -170,13 +173,14 @@
         "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
         "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
         "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-        "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+        "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
       },
       "root_modules": [
         "src.cutoff_hardening.package"
       ]
     },
     "implementation_hashes": {
+      "scripts/check_cutoff_governance.py": "3d4f8332906a84059812ed8c3ef1b2b617bddfdda50b78f8b4755dde0157ba3e",
       "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
       "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
       "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
@@ -190,7 +194,7 @@
       "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
       "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
       "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
     },
     "maximum_source_issue": "2021-011",
     "maximum_source_time": "2021-06-12T00:02:00+00:00",
@@ -275,18 +279,19 @@
         "safety_margin_seconds": 0.0
       }
     },
-    "cache_key": "bd51f5e660e62422c59f59f13668b97aa4a7ec20a1e90f45586d3e19bdadeabb",
+    "cache_key": "7c6149ea2294d4ac3ead95a481704843143125ff7aece3cc885ecb6bbe6d3391",
     "cutoff_identity": "DECISION_EPOCH_2022-001",
     "cutoff_kind": "DECISION_EPOCH",
     "cutoff_ts": "2022-03-01T00:00:00+00:00",
     "implementation": {
-      "closure_sha256": "3322ff0ffdb91dccdcdf4f4cb570157146515c56e08afe69e4ab2cb29330a204",
+      "closure_sha256": "911b5cb683fe69493c2b50af15f2c523200719204f07e74b8adf2a60f54a7a84",
       "distributions": {
         "numpy": "2.4.6",
         "pandas": "3.0.3",
         "scikit-learn": "1.9.0"
       },
       "files": {
+        "scripts/check_cutoff_governance.py": "3d4f8332906a84059812ed8c3ef1b2b617bddfdda50b78f8b4755dde0157ba3e",
         "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
         "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
         "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
@@ -300,13 +305,14 @@
         "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
         "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
         "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-        "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+        "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
       },
       "root_modules": [
         "src.cutoff_hardening.package"
       ]
     },
     "implementation_hashes": {
+      "scripts/check_cutoff_governance.py": "3d4f8332906a84059812ed8c3ef1b2b617bddfdda50b78f8b4755dde0157ba3e",
       "src/cutoff_hardening/contract.py": "2b83ff4e63d755cc05554481f97006a30192ce8f0f99154b9d1293991b974841",
       "src/cutoff_hardening/package.py": "69190a6afc90cba4072861250ca5ed66571c982ade580c89d63a997914801a20",
       "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
@@ -320,7 +326,7 @@
       "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
       "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
       "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
-      "src/temporal_learning/provenance.py": "6e15af37060a368a410cfcb761a79369fb6961ee5186b28a87a615fe1e54b7ef"
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
     },
     "maximum_source_issue": "2021-011",
     "maximum_source_time": "2021-06-12T00:02:00+00:00",
