@@ -82,6 +82,8 @@ def test_issue_to_year():
 
 
 def test_kickoff_iso():
-    assert _kickoff_iso(2026, "04-29 00:45") == "2026-04-29 00:45:00"
-    assert _kickoff_iso(2024, "12-30 23:59") == "2024-12-30 23:59:00"
-    assert _kickoff_iso(2026, "garbage") is None
+    assert _kickoff_iso("26041", "04-29 00:45") == "2026-04-29 00:45:00"
+    assert _kickoff_iso("24125", "12-30 23:59") == "2024-12-30 23:59:00"
+    assert _kickoff_iso("25011", "12-31 16:00") == "2024-12-31 16:00:00"
+    assert _kickoff_iso("24125", "01-01 00:30") == "2025-01-01 00:30:00"
+    assert _kickoff_iso("26041", "garbage") is None

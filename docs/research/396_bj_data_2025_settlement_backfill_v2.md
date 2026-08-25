@@ -38,7 +38,7 @@ hit count, winning-SP capability, admissible use, and result:
 |---|---:|---|
 | 500.com kaijiang | 23 | `SP=-` for these rows; canonical only where native SP is published |
 | `beidan_live.settlements` | 0 | exhausted; no additional settlement evidence |
-| frozen XLSM/BJ268 | 0 | census/crosscheck only; no source-native Beijing SP receipt |
+| frozen XLSM/BJ268 | 7 | exact fixture-identity corroborations only; no source-native Beijing SP receipt |
 | `official_500_settlements` | 0 | exhausted derived duplicate of the 500 lane, not independent raw evidence |
 | Nowscore issue/provider | 23 | exclusion classification only; never a Beijing winning-SP source |
 
@@ -47,16 +47,18 @@ hit count, winning-SP capability, admissible use, and result:
   authority.
 - **Nowscore issue/provider lane:** 16 UTF-8 issue-page snapshots were captured
   for the exact 23 formerly unresolved issue/slot keys. The package records URL,
-  filesystem capture timestamp, byte count, SHA-256, provider match ID, status,
+  immutable receipted capture timestamp, byte count, SHA-256, provider match ID, status,
   score/result code, native handicap, and provider SP URL in
   `nowscore_probe_ledger.csv`. Each snapshot is copied under
   `raw/nowscore_issue_pages/` and is semantically re-parsed by the verifier.
 - **Local `beidan_live.settlements`:** a read-only/WAL-aware exact
   `(issue, match_idx)` audit returned 0/23 records, therefore no final score or
   native SP. The source SHA-256 is recorded in the source-probe receipt.
-- **Local XLSM/BJ268 lane:** it remains a legacy/crosscheck lane and was not
-  promoted into the canonical settlement table; its source hash and 0/23
-  source-native settlement readback are receipted.
+- **Local XLSM/BJ268 lane:** seven of the 23 keys have exact fixture-identity
+  corroboration, frozen in `xlsm_identity_probe_ledger.csv`. The lane remains
+  a legacy/crosscheck source and is not promoted into the canonical settlement
+  table: none of the seven rows has an admissible source-native Beijing
+  winning-SP receipt.
 - **`official_500_settlements`:** a downstream SQLite materialization shape,
   not an independent raw lane. Its exact-key audit produced 0/23 records and
   its source hash/observation are explicit in the receipt.
@@ -73,6 +75,8 @@ modifying its raw 500 pages or v1 exclusion ledger. New v2 artifacts are:
 - `source_probe_receipts_v2.csv` — every contractually declared source lane,
   exact-23-key coverage, hash/absence evidence, native-SP capability and
   admissible-use conclusion;
+- `xlsm_identity_probe_ledger.csv` — the seven exact XLSM/BJ268 identity hits,
+  explicitly marked identity-only and not winning-SP admissible;
 - `residual_disposition_v2.csv` — 120-row admissible-exclusion ledger;
 - v2 `issue_ledger.csv` — 57 downstream-eligible issues with fixture-level
   exclusions kept separate; and updated `decision.json` / `MANIFEST.json`.
@@ -87,6 +91,12 @@ source-probe fact, or re-manifested package.
 The 16 Nowscore page hashes are additionally pinned in the verifier's frozen v2
 contract, so an attacker cannot replace a raw snapshot and simply rewrite the
 package manifest/derived ledger.
+
+Capture timestamps are likewise frozen contract receipts; they are never
+reconstructed from filesystem mtimes, so verification is invariant to a fresh
+Git checkout. The issue-aware parser also resolves New-Year rollover: issue
+`25011` matches 1 and 2 are correctly dated `2024-12-31`, while their fixture
+identity, outcome and winning SP remain unchanged.
 
 ## Reproduction
 

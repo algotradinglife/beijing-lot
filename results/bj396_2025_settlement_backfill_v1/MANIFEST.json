@@ -2,10 +2,10 @@
   "contract": "BJ-DATA-2025-SETTLEMENT-BACKFILL-001/v1",
   "disposition": "BLOCKED_RESIDUAL_2025_SETTLEMENT_GAPS",
   "files": {
-    "canonical_settlements.parquet": "f62961f2c2174534fd6bf77298fc02eeea8ef39996fc1ea0b95849dcf943a0dd",
+    "canonical_settlements.parquet": "c96a769f34269e3622737da6f9a4292eaecfad8bd41bbd93043a57086cb22de1",
     "decision.json": "5c3feef42d69ea2abb9c3603261c5e58469dd901cf709b6b4022f6bd1f4ee9aa",
     "exclusion_ledger.csv": "1d35a54dea173d71fef958ec1faeaa7a3655425f157cf996be046d4c4e616255",
-    "issue_ledger.csv": "451e1e7fd0c7422093729f1f4386df1d0a318bac373717b429c6a84d61f97a15",
+    "issue_ledger.csv": "335c57523703adc79226aed3d2d87d5cc86d4f8deda86b44a53751fd2da5f28c",
     "raw/acquisition_receipts.csv": "7e906359b1a14ae674468d513a3a178d791915f4870202b1ed310292c5b1f915",
     "raw/pages/25011.html": "0dbc030bd1a0f27eb8bb52e9f9ff2c33d5c94ed49c1165dec11a93405ba24170",
     "raw/pages/25012.html": "dd3ce8db4b772c21609b62023b00d899839fadd1fac6bd506528f30f9faad452",
@@ -66,5 +66,5 @@
     "raw/pages/25125.html": "86628366f2083d3b85be1391a570dd1e8fa7de22d4a9fdd84785238c0636320e",
     "source_inventory.csv": "a6b6b028e5ad5bf77c3107f92e7e4394fa6e908a726c5f327deb1cc08eaf70d7"
   },
-  "implementation_sha256": "a7d8f717e8d75093188a728a3aa24c2de6d8247f56c051f2fc5ac9377f4d3920"
+  "implementation_sha256": "b8cb733618165e16ff63b57318fab9ecc24ee5ed380c0502e226411cb9e5631a"
 }

@@ -75,12 +75,29 @@ def _issue_to_year(issue: str) -> int:
     return 2000 + yy
 
 
-def _kickoff_iso(year: int, mmdd_hhmm: str) -> str | None:
-    """Build an ISO timestamp from a 'MM-DD HH:MM' cell + a year hint."""
+def _kickoff_iso(issue: str, mmdd_hhmm: str) -> str | None:
+    """Build kickoff time from the issue month and the displayed month/day.
+
+    A Beijing issue can straddle New Year (for example issue 25011 starts on
+    2024-12-31).  Resolve a displayed month more than six months away from the
+    issue month onto the adjacent calendar year instead of blindly assigning
+    the two-digit issue year to every row.
+    """
     try:
+        issue = str(issue)
+        year = _issue_to_year(issue)
+        issue_month = int(issue[2:4])
+        event_month = int(mmdd_hhmm.strip()[:2])
+        delta = event_month - issue_month
+        if delta > 6:
+            year -= 1
+        elif delta < -6:
+            year += 1
         # The displayed time is Beijing local (UTC+8), but for our purposes
         # we just preserve naive local time as ISO.
-        dt = datetime.strptime(mmdd_hhmm.strip(), "%m-%d %H:%M").replace(year=year)
+        dt = datetime.strptime(
+            f"{year}-{mmdd_hhmm.strip()}", "%Y-%m-%d %H:%M"
+        )
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         return None
@@ -88,7 +105,6 @@ def _kickoff_iso(year: int, mmdd_hhmm: str) -> str | None:
 
 def parse_issue_html(html: str, issue: str) -> list[MatchRow]:
     """Parse the kaijiang.php HTML for one issue, return all match rows."""
-    year = _issue_to_year(issue)
     out: list[MatchRow] = []
 
     for m in _ROW_RE.finditer(html):
@@ -101,7 +117,7 @@ def parse_issue_html(html: str, issue: str) -> list[MatchRow]:
         league = league_m.group(1)
 
         time_m = _TIME_RE.search(body)
-        kickoff_ts = _kickoff_iso(year, time_m.group(1)) if time_m else None
+        kickoff_ts = _kickoff_iso(issue, time_m.group(1)) if time_m else None
 
         home_m = _HOME_RE.search(body)
         away_m = _AWAY_RE.search(body)
