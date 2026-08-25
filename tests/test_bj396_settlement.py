@@ -1,5 +1,6 @@
 """Adversarial tests for the #396 source-bound settlement package."""
 from __future__ import annotations
+import json
 from pathlib import Path
 import shutil
 import pandas as pd
@@ -67,4 +68,102 @@ def test_result_identity_mutation_fails_even_if_manifest_rewritten(tmp_path, mon
     manifest = pipeline._manifest(package, implementation_sha=pipeline._sha256(Path(pipeline.__file__)), disposition=pipeline.DISPOSITION_READY)
     pipeline._write_json(package / "MANIFEST.json", manifest)
     with pytest.raises(pipeline.SettlementError):
+        pipeline.verify_package(package)
+
+
+def test_strategy_execution_authorization_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
+    package = _package(tmp_path, monkeypatch)
+    decision_path = package / "decision.json"
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    decision["strategy_execution_authorized"] = True
+    pipeline._write_json(decision_path, decision)
+    manifest = pipeline._manifest(package, implementation_sha=pipeline._sha256(Path(pipeline.__file__)), disposition=decision["disposition"])
+    pipeline._write_json(package / "MANIFEST.json", manifest)
+    with pytest.raises(pipeline.SettlementError, match="must not authorize"):
+        pipeline.verify_package(package)
+
+
+def test_issue_ledger_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
+    package = _package(tmp_path, monkeypatch)
+    ledger_path = package / "issue_ledger.csv"
+    ledger = pd.read_csv(ledger_path, dtype=str)
+    ledger.loc[0, "included_fixture_count"] = "999999"
+    ledger.to_csv(ledger_path, index=False)
+    manifest = pipeline._manifest(package, implementation_sha=pipeline._sha256(Path(pipeline.__file__)), disposition=pipeline.DISPOSITION_READY)
+    pipeline._write_json(package / "MANIFEST.json", manifest)
+    with pytest.raises(pipeline.SettlementError, match="issue ledger"):
+        pipeline.verify_package(package)
+
+
+def test_frozen_nowscore_source_trace_tamper_fails():
+    with pytest.raises(pipeline.SettlementError, match="frozen receipt"):
+        pipeline._check_v2_nowscore_freeze("25012", b"forged Nowscore source trace")
+    with pytest.raises(pipeline.SettlementError, match="frozen receipt"):
+        pipeline._check_v2_nowscore_freeze("25011", b"unknown issue")
+
+
+def test_nowscore_probe_classifies_only_direct_cancel_or_finished_no_native_sp():
+    residuals = pd.DataFrame([
+        {"issue": "25011", "match_idx": 1, "exclusion_reason": "UNRESOLVED_NATIVE_SETTLEMENT_ABSENT_ON_500_PAGE", "source_row_evidence": "1 L H 0 A -"},
+        {"issue": "25011", "match_idx": 2, "exclusion_reason": "UNRESOLVED_NATIVE_SETTLEMENT_ABSENT_ON_500_PAGE", "source_row_evidence": "2 L H 0 A -"},
+        {"issue": "25011", "match_idx": 3, "exclusion_reason": "UNRESOLVED_NATIVE_SETTLEMENT_ABSENT_ON_500_PAGE", "source_row_evidence": "3 L H 0 A -"},
+    ])
+    probes = pd.DataFrame([
+        {"issue": "25011", "match_idx": 1, "identity_status": "EXACT_ISSUE_SLOT", "nowscore_status": "closed", "nowscore_status_text": "取消", "nowscore_score": "", "nowscore_result_code": "", "nowscore_sp_url": "https://example/sp/1"},
+        {"issue": "25011", "match_idx": 2, "identity_status": "EXACT_ISSUE_SLOT", "nowscore_status": "finished", "nowscore_status_text": "完场", "nowscore_score": "2-1", "nowscore_result_code": "3", "nowscore_sp_url": "https://example/sp/2"},
+        {"issue": "25011", "match_idx": 3, "identity_status": "MISSING_OR_AMBIGUOUS", "nowscore_status": "finished", "nowscore_status_text": "完场", "nowscore_score": "2-1", "nowscore_result_code": "3", "nowscore_sp_url": ""},
+    ])
+    actual = pipeline.classify_residuals_with_nowscore(residuals, probes)
+    assert actual["exclusion_reason"].tolist() == [
+        "POSTPONED_OR_CANCELLED",
+        "NEVER_SETTLED_OFFICIAL_NO_SP",
+        "UNRESOLVED_NATIVE_SETTLEMENT_GAP",
+    ]
+    assert actual.loc[1, "nowscore_result_code"] == "3"
+
+
+def test_v2_residual_label_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
+    raw = _raw(tmp_path, monkeypatch)
+    incomplete = MatchRow(issue="25011", match_idx=1, league="L", kickoff_ts="2025-01-01 01:00:00", home="H", away="A", handicap_line=0, fthg=None, ftag=None, result_code=None, winning_sp=None, avg_eu_home=2.0, avg_eu_draw=3.0, avg_eu_away=4.0)
+    monkeypatch.setattr(pipeline, "parse_issue_html", lambda html, issue: [incomplete])
+    monkeypatch.setattr(pipeline, "_raw_row_text", lambda *args: "fixture -")
+    baseline = tmp_path / "baseline"
+    pipeline.build_package(raw, baseline, issues=ISSUES)
+    probe_root = tmp_path / "nowscore"; probe_root.mkdir(); (probe_root / "25011.html").write_text("snapshot", encoding="utf-8")
+    probes = pd.DataFrame([{
+        "issue": "25011", "match_idx": 1, "nowscore_issue_url": "https://example/issue", "nowscore_payload_sha256": "x" * 64, "nowscore_payload_bytes": 8,
+        "identity_status": "EXACT_ISSUE_SLOT", "provider_match_id": "p", "nowscore_status": "finished", "nowscore_status_text": "完场", "nowscore_score": "1-0", "nowscore_result_code": "3", "nowscore_handicap_line": "0", "nowscore_home": "H", "nowscore_away": "A", "nowscore_sp_url": "https://example/sp", "nowscore_raw_row_hash": "r",
+    }])
+    monkeypatch.setattr(pipeline, "_nowscore_probe_ledger", lambda *_args: probes)
+    package = tmp_path / "v2"
+    pipeline.extend_package_amendment_v2(baseline, probe_root, package)
+    assert pipeline.verify_package(package)["disposition"] == pipeline.DISPOSITION_READY
+    path = package / "residual_disposition_v2.csv"
+    frame = pd.read_csv(path, dtype=str); frame.loc[0, "exclusion_reason"] = "POSTPONED_OR_CANCELLED"; frame.to_csv(path, index=False)
+    manifest = pipeline._manifest(package, implementation_sha=pipeline._sha256(Path(pipeline.__file__)), disposition=pipeline.DISPOSITION_READY)
+    manifest["contract"] = pipeline.CONTRACT_AMENDMENT_V2
+    pipeline._write_json(package / "MANIFEST.json", manifest)
+    with pytest.raises(pipeline.SettlementError, match="residual disposition"):
+        pipeline.verify_package(package)
+
+
+def test_v2_nowscore_source_trace_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
+    raw = _raw(tmp_path, monkeypatch)
+    incomplete = MatchRow(issue="25011", match_idx=1, league="L", kickoff_ts="2025-01-01 01:00:00", home="H", away="A", handicap_line=0, fthg=None, ftag=None, result_code=None, winning_sp=None, avg_eu_home=2.0, avg_eu_draw=3.0, avg_eu_away=4.0)
+    monkeypatch.setattr(pipeline, "parse_issue_html", lambda html, issue: [incomplete])
+    monkeypatch.setattr(pipeline, "_raw_row_text", lambda *args: "fixture -")
+    baseline = tmp_path / "baseline"; pipeline.build_package(raw, baseline, issues=ISSUES)
+    probe_root = tmp_path / "nowscore"; probe_root.mkdir(); (probe_root / "25011.html").write_text("snapshot", encoding="utf-8")
+    probes = pd.DataFrame([{
+        "issue": "25011", "match_idx": 1, "nowscore_issue_url": "https://example/issue", "nowscore_captured_at_utc": "2026-01-01T00:00:00+00:00", "nowscore_payload_sha256": "x" * 64, "nowscore_payload_bytes": 8,
+        "identity_status": "EXACT_ISSUE_SLOT", "provider_match_id": "p", "nowscore_status": "finished", "nowscore_status_text": "完场", "nowscore_score": "1-0", "nowscore_result_code": "3", "nowscore_handicap_line": "0", "nowscore_home": "H", "nowscore_away": "A", "nowscore_sp_url": "https://example/sp", "nowscore_raw_row_hash": "r",
+    }])
+    monkeypatch.setattr(pipeline, "_nowscore_probe_ledger", lambda *_args: probes)
+    package = tmp_path / "v2"; pipeline.extend_package_amendment_v2(baseline, probe_root, package)
+    path = package / "nowscore_probe_ledger.csv"
+    frame = pd.read_csv(path, dtype=str); frame.loc[0, "nowscore_payload_sha256"] = "f" * 64; frame.to_csv(path, index=False)
+    manifest = pipeline._manifest(package, implementation_sha=pipeline._sha256(Path(pipeline.__file__)), disposition=pipeline.DISPOSITION_READY)
+    manifest["contract"] = pipeline.CONTRACT_AMENDMENT_V2
+    pipeline._write_json(package / "MANIFEST.json", manifest)
+    with pytest.raises(pipeline.SettlementError, match="probe ledger"):
         pipeline.verify_package(package)

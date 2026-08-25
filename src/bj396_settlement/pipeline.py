@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime, timezone
 from hashlib import sha256
+from io import StringIO
 import json
 from pathlib import Path
 import shutil
@@ -26,6 +27,31 @@ from src.backfill.scraper import KAIJIANG_URL, DEFAULT_UA
 CONTRACT_VERSION = "BJ-DATA-2025-SETTLEMENT-BACKFILL-001/v1"
 DISPOSITION_READY = "READY_FOR_394_FULL_2025_REPLAY"
 DISPOSITION_BLOCKED = "BLOCKED_RESIDUAL_2025_SETTLEMENT_GAPS"
+CONTRACT_AMENDMENT_V2 = "BJ-DATA-2025-SETTLEMENT-BACKFILL-001/v2"
+# v1 was published before the v2 verifier extension.  Its exact source hash is
+# retained so the known frozen v1 package remains independently replayable.
+V1_PUBLISHED_IMPLEMENTATION_SHA256 = "a7d8f717e8d75093188a728a3aa24c2de6d8247f56c051f2fc5ac9377f4d3920"
+# Pinned source receipts for the frozen v2 amendment.  This is the trusted
+# external anchor that keeps a raw-page + manifest rewrite from becoming a new
+# settlement truth claim.
+V2_NOWSCORE_PAGE_SHA256 = {
+    "25012": "f765b509998ebbae220d00dd32faf7aea71532cff87b8b6237acb3e99281ab31",
+    "25014": "c594a92d54a3ccc4541e6bcb9b966595a2e2eed0ef7c84312d1e946b7ab8628a",
+    "25023": "bf97e19fc01f658ab05b0f24cb84be05b8d1c9f59a3c15dea7dbb633f286380b",
+    "25031": "7aa90c4e1cbad5d042b65b440f48006e7d96e6a816072462a65b57e884de1c42",
+    "25032": "4f281478f5180bece4d7b59cd816955acb01ce3cdc955a4f263e7398787fbe20",
+    "25043": "2708dc0060e4e3295d83ee5e8e6a49b5972b346b372bb77a3f4d427e29544351",
+    "25085": "f2eacfe0e9386f7a69defb6966166814cf7d65cfc596201ab157a6212c6b6c78",
+    "25092": "c32feb69854a8c2da2a455054b0d9972ff0c5fa472527f6843e3c0880eb66c72",
+    "25093": "ca6ea3078c2cc78279c74bfa10f7682af85be0a8341f7775885d23b7dfbe6f7b",
+    "25094": "a5483561c29d6802fe8d70197240948c0d231f877f9c56a2afb52f805e41e1b8",
+    "25102": "060c2418804f506a41441daf0c4c699a700ac7fa808fedbd013a041ad406803a",
+    "25103": "4378424b94fe8973e1268eec082a46ec61e55aa68c2591363275328d834a44cd",
+    "25104": "c303273b4f59a955867ad7f423e3553247906bb9c726764198a1d52e4f2283da",
+    "25105": "f38c07a5de0f9a405a9697e182eb8db5f6de28562551b2af20c7c7a437a58404",
+    "25111": "1d72ff3e32af29e6b541765728af839aaf1d5babc7e8d273987a326671c56296",
+    "25121": "576db55fd5b6c88f7c08db2c640795a0b8c67e8590c22a6820064ea238ef2fe7",
+}
 TARGET_ISSUES = tuple(
     f"25{suffix:03d}"
     for suffix in (
@@ -256,6 +282,50 @@ def _partition_settlements(all_rows: pd.DataFrame, raw_root: Path, issues: list[
     return included, exclusions
 
 
+def classify_residuals_with_nowscore(residuals: pd.DataFrame, probes: pd.DataFrame) -> pd.DataFrame:
+    """Classify only source-bound unresolved rows from exact Nowscore issue/slot probes.
+
+    A finished score is evidence of final result only.  It never creates a
+    winning SP; therefore finished rows remain excluded as
+    ``NEVER_SETTLED_OFFICIAL_NO_SP``.  Cancellation requires the provider's
+    direct cancellation status and an exact issue/slot identity.
+    """
+    required_residual = {"issue", "match_idx", "exclusion_reason", "source_row_evidence"}
+    required_probe = {
+        "issue", "match_idx", "identity_status", "nowscore_status",
+        "nowscore_status_text", "nowscore_score", "nowscore_result_code",
+        "nowscore_sp_url",
+    }
+    if not required_residual.issubset(residuals.columns):
+        raise SettlementError("residual ledger missing nowscore classification keys")
+    if not required_probe.issubset(probes.columns):
+        raise SettlementError("nowscore probe ledger missing required fields")
+    left = residuals.copy()
+    left["issue"] = left["issue"].astype(str)
+    left["match_idx"] = pd.to_numeric(left["match_idx"], errors="raise").astype(int)
+    right = probes.copy()
+    right["issue"] = right["issue"].astype(str)
+    right["match_idx"] = pd.to_numeric(right["match_idx"], errors="raise").astype(int)
+    if right.duplicated(["issue", "match_idx"]).any():
+        raise SettlementError("nowscore probe duplicate issue/slot identity")
+    merged = left.merge(right, on=["issue", "match_idx"], how="left", validate="one_to_one")
+    for column in required_probe - {"issue", "match_idx"}:
+        merged[column] = merged[column].fillna("").astype(str)
+    unresolved = merged["exclusion_reason"].eq("UNRESOLVED_NATIVE_SETTLEMENT_ABSENT_ON_500_PAGE")
+    exact = merged["identity_status"].eq("EXACT_ISSUE_SLOT")
+    cancelled = exact & merged["nowscore_status_text"].str.contains("取消", regex=False)
+    finished = (
+        exact
+        & merged["nowscore_status"].eq("finished")
+        & merged["nowscore_result_code"].isin(["3", "1", "0"])
+        & merged["nowscore_score"].str.fullmatch(r"\d+[-:]\d+")
+    )
+    merged.loc[unresolved & cancelled, "exclusion_reason"] = "POSTPONED_OR_CANCELLED"
+    merged.loc[unresolved & finished, "exclusion_reason"] = "NEVER_SETTLED_OFFICIAL_NO_SP"
+    merged.loc[unresolved & ~(cancelled | finished), "exclusion_reason"] = "UNRESOLVED_NATIVE_SETTLEMENT_GAP"
+    return merged
+
+
 def _manifest(root: Path, *, implementation_sha: str, disposition: str) -> dict:
     files = {}
     for path in sorted(root.rglob("*")):
@@ -267,6 +337,20 @@ def _manifest(root: Path, *, implementation_sha: str, disposition: str) -> dict:
         "implementation_sha256": implementation_sha,
         "files": files,
     }
+
+
+def _issue_ledger(settlements: pd.DataFrame, exclusions: pd.DataFrame, issue_list: list[str]) -> pd.DataFrame:
+    included_counts = settlements.groupby("issue", sort=False).agg(
+        included_fixture_count=("match_idx", "size"),
+        first_kickoff_ts=("kickoff_ts", "min"),
+        last_kickoff_ts=("kickoff_ts", "max"),
+        maximum_settlement_availability_ts=("settlement_availability_ts", "max"),
+    )
+    excluded_counts = exclusions.groupby("issue", sort=False).size().rename("excluded_fixture_count")
+    ledger = pd.DataFrame({"issue": issue_list}).join(included_counts, on="issue").join(excluded_counts, on="issue").fillna({"included_fixture_count": 0, "excluded_fixture_count": 0})
+    ledger["inclusion_status"] = ledger["excluded_fixture_count"].map(lambda n: "INCLUDED" if int(n) == 0 else "PARTIAL_BLOCKED")
+    ledger["reason"] = ledger["inclusion_status"].map({"INCLUDED": "COMPLETE_500_NATIVE_SETTLEMENT", "PARTIAL_BLOCKED": "SEE_EXCLUSION_LEDGER"})
+    return ledger
 
 
 def build_package(raw_root: str | Path, package_root: str | Path, *, issues: Iterable[str] = TARGET_ISSUES) -> Path:
@@ -288,16 +372,7 @@ def build_package(raw_root: str | Path, package_root: str | Path, *, issues: Ite
         receipts.to_csv(staging / "raw" / "acquisition_receipts.csv", index=False, encoding="utf-8")
         settlements.to_parquet(staging / "canonical_settlements.parquet", index=False)
         exclusions.to_csv(staging / "exclusion_ledger.csv", index=False, encoding="utf-8")
-        included_counts = settlements.groupby("issue", sort=False).agg(
-            included_fixture_count=("match_idx", "size"),
-            first_kickoff_ts=("kickoff_ts", "min"),
-            last_kickoff_ts=("kickoff_ts", "max"),
-            maximum_settlement_availability_ts=("settlement_availability_ts", "max"),
-        )
-        excluded_counts = exclusions.groupby("issue", sort=False).size().rename("excluded_fixture_count")
-        issue_ledger = pd.DataFrame({"issue": issue_list}).join(included_counts, on="issue").join(excluded_counts, on="issue").fillna({"included_fixture_count": 0, "excluded_fixture_count": 0})
-        issue_ledger["inclusion_status"] = issue_ledger["excluded_fixture_count"].map(lambda n: "INCLUDED" if int(n) == 0 else "PARTIAL_BLOCKED")
-        issue_ledger["reason"] = issue_ledger["inclusion_status"].map({"INCLUDED": "COMPLETE_500_NATIVE_SETTLEMENT", "PARTIAL_BLOCKED": "SEE_EXCLUSION_LEDGER"})
+        issue_ledger = _issue_ledger(settlements, exclusions, issue_list)
         issue_ledger.to_csv(staging / "issue_ledger.csv", index=False, encoding="utf-8")
         inventory = pd.DataFrame([
             {"source_id": "500_kaijiang", "classification": "AUTHORITATIVE_PUBLIC_RESULT_PAGE", "admissible_use": "CANONICAL_NATIVE_SETTLEMENT", "coverage": "all 57 target issues", "notes": "native handicap, final score, 3/1/0 result and winning SP"},
@@ -305,7 +380,7 @@ def build_package(raw_root: str | Path, package_root: str | Path, *, issues: Ite
             {"source_id": "bj268_nowscore_titan", "classification": "IMMUTABLE_ODDS_RECOVERY", "admissible_use": "FIXTURE_IDENTITY_CROSSCHECK_ONLY", "coverage": "25043-25125", "notes": "does not supply native winning SP settlement"},
         ])
         inventory.to_csv(staging / "source_inventory.csv", index=False, encoding="utf-8")
-        maximum = settlements["settlement_availability_ts"].max()
+        maximum = None if settlements.empty else str(settlements["settlement_availability_ts"].max())
         decision = {
             "contract": CONTRACT_VERSION,
             "disposition": disposition,
@@ -331,6 +406,115 @@ def build_package(raw_root: str | Path, package_root: str | Path, *, issues: Ite
     return destination
 
 
+def _check_v2_nowscore_freeze(issue: str, payload: bytes) -> str:
+    """Return a pinned payload digest or fail closed outside amendment-v2 receipts."""
+    expected = V2_NOWSCORE_PAGE_SHA256.get(str(issue))
+    actual = sha256(payload).hexdigest()
+    if expected is None or actual != expected:
+        raise SettlementError(f"Nowscore snapshot hash differs from frozen receipt for issue {issue}")
+    return actual
+
+
+def _nowscore_probe_ledger(raw_root: Path, residuals: pd.DataFrame) -> pd.DataFrame:
+    """Parse immutable Nowscore issue snapshots for precisely the v1 gap set."""
+    from scripts.scrape_nowscore_bjdc import NOWSCORE_URL, parse_rows
+
+    targets = residuals.loc[
+        residuals["exclusion_reason"].eq("UNRESOLVED_NATIVE_SETTLEMENT_ABSENT_ON_500_PAGE"),
+        ["issue", "match_idx"],
+    ].copy()
+    targets["issue"] = targets["issue"].astype(str)
+    targets["match_idx"] = pd.to_numeric(targets["match_idx"], errors="raise").astype(int)
+    if targets.duplicated(["issue", "match_idx"]).any():
+        raise SettlementError("baseline residual ledger has duplicate issue/slot")
+    target_issues = set(targets["issue"].unique())
+    if target_issues != set(V2_NOWSCORE_PAGE_SHA256):
+        raise SettlementError("v2 Nowscore probe issue census differs from frozen contract")
+    records: list[dict[str, object]] = []
+    for issue in sorted(target_issues):
+        page = raw_root / f"{issue}.html"
+        if not page.is_file():
+            raise SettlementError(f"missing Nowscore issue snapshot: {issue}")
+        payload = page.read_bytes()
+        payload_sha256 = _check_v2_nowscore_freeze(issue, payload)
+        captured_at = datetime.fromtimestamp(page.stat().st_mtime, timezone.utc).replace(microsecond=0).isoformat()
+        parsed = {
+            int(row["match_idx"]): row
+            for row in parse_rows(issue, payload.decode("utf-8", errors="strict"), "FROZEN_IN_RECEIPT")
+        }
+        for target in targets.loc[targets["issue"].eq(issue)].to_dict("records"):
+            row = parsed.get(int(target["match_idx"]))
+            fields = {
+                "issue": issue,
+                "match_idx": int(target["match_idx"]),
+                "nowscore_issue_url": NOWSCORE_URL.format(issue=issue),
+                "nowscore_captured_at_utc": captured_at,
+                "nowscore_payload_sha256": payload_sha256,
+                "nowscore_payload_bytes": len(payload),
+                "identity_status": "MISSING_OR_AMBIGUOUS" if row is None else "EXACT_ISSUE_SLOT",
+                "provider_match_id": "", "nowscore_status": "", "nowscore_status_text": "",
+                "nowscore_score": "", "nowscore_result_code": "", "nowscore_handicap_line": "",
+                "nowscore_home": "", "nowscore_away": "", "nowscore_sp_url": "", "nowscore_raw_row_hash": "",
+            }
+            if row is not None:
+                fields.update({
+                    "provider_match_id": str(row["provider_match_id"]),
+                    "nowscore_status": str(row["status"]),
+                    "nowscore_status_text": str(row["status_text"]),
+                    "nowscore_score": str(row["score"]),
+                    "nowscore_result_code": str(row["result_code"] or ""),
+                    "nowscore_handicap_line": "" if row["handicap_line"] is None else str(row["handicap_line"]),
+                    "nowscore_home": str(row["home"]), "nowscore_away": str(row["away"]),
+                    "nowscore_sp_url": str(row["sp_url"]), "nowscore_raw_row_hash": str(row["raw_row_hash"]),
+                })
+            records.append(fields)
+    probes = pd.DataFrame(records)
+    if len(probes) != len(targets) or probes.duplicated(["issue", "match_idx"]).any():
+        raise SettlementError("Nowscore probe coverage does not equal unresolved baseline rows")
+    return probes.sort_values(["issue", "match_idx"], kind="stable").reset_index(drop=True)
+
+
+def extend_package_amendment_v2(baseline_root: str | Path, nowscore_raw_root: str | Path, package_root: str | Path) -> Path:
+    """Extend, never overwrite, the v1 package with receipted source-lane probes."""
+    baseline = Path(baseline_root)
+    destination = Path(package_root)
+    if destination.exists() or not (baseline / "MANIFEST.json").is_file():
+        raise SettlementError("v2 requires an existing v1 baseline and an absent destination")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix="bj396-v2-", dir=str(destination.parent)))
+    try:
+        shutil.copytree(baseline, staging, dirs_exist_ok=True)
+        shutil.copy2(staging / "MANIFEST.json", staging / "baseline_manifest_v1.json")
+        baseline_exclusions = pd.read_csv(staging / "exclusion_ledger.csv", dtype=str).fillna("")
+        probes = _nowscore_probe_ledger(Path(nowscore_raw_root), baseline_exclusions)
+        (staging / "raw" / "nowscore_issue_pages").mkdir(parents=True)
+        for issue in sorted(probes["issue"].unique()):
+            shutil.copy2(Path(nowscore_raw_root) / f"{issue}.html", staging / "raw" / "nowscore_issue_pages" / f"{issue}.html")
+        probes.to_csv(staging / "nowscore_probe_ledger.csv", index=False, encoding="utf-8")
+        revised = classify_residuals_with_nowscore(baseline_exclusions, probes)
+        revised.loc[revised["exclusion_reason"].eq("POSTPONED_ON_500_PAGE_NO_NATIVE_SETTLEMENT"), "exclusion_reason"] = "POSTPONED_OR_CANCELLED"
+        revised.loc[revised["exclusion_reason"].eq("CANCELLED_ON_500_PAGE_NO_NATIVE_SETTLEMENT"), "exclusion_reason"] = "POSTPONED_OR_CANCELLED"
+        unresolved = revised["exclusion_reason"].eq("UNRESOLVED_NATIVE_SETTLEMENT_GAP")
+        disposition = DISPOSITION_BLOCKED if unresolved.any() else DISPOSITION_READY
+        revised.to_csv(staging / "residual_disposition_v2.csv", index=False, encoding="utf-8")
+        decision = json.loads((staging / "decision.json").read_text(encoding="utf-8"))
+        decision.update({
+            "contract": CONTRACT_AMENDMENT_V2, "disposition": disposition,
+            "nowscore_probed_fixture_count": int(len(probes)),
+            "postponed_or_cancelled_fixture_count": int(revised["exclusion_reason"].eq("POSTPONED_OR_CANCELLED").sum()),
+            "never_settled_official_no_sp_count": int(revised["exclusion_reason"].eq("NEVER_SETTLED_OFFICIAL_NO_SP").sum()),
+            "unresolved_native_settlement_count": int(unresolved.sum()),
+            "strategy_execution_authorized": False,
+        })
+        _write_json(staging / "decision.json", decision)
+        _write_json(staging / "MANIFEST.json", _manifest(staging, implementation_sha=_sha256(Path(__file__)), disposition=disposition) | {"contract": CONTRACT_AMENDMENT_V2})
+        _atomic_replace(staging, destination)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return destination
+
+
 def verify_package(package_root: str | Path) -> dict:
     """Verify all content hashes and independently reconstruct settlements from raw pages."""
     root = Path(package_root)
@@ -338,9 +522,14 @@ def verify_package(package_root: str | Path) -> dict:
     if not manifest_path.is_file():
         raise SettlementError("missing package manifest")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("contract") != CONTRACT_VERSION or manifest.get("disposition") not in {DISPOSITION_READY, DISPOSITION_BLOCKED}:
+    contract = manifest.get("contract")
+    if contract not in {CONTRACT_VERSION, CONTRACT_AMENDMENT_V2} or manifest.get("disposition") not in {DISPOSITION_READY, DISPOSITION_BLOCKED}:
         raise SettlementError("manifest contract/disposition mismatch")
-    if manifest.get("implementation_sha256") != _sha256(Path(__file__)):
+    implementation_hash = manifest.get("implementation_sha256")
+    allowed_implementation_hashes = {_sha256(Path(__file__))}
+    if contract == CONTRACT_VERSION:
+        allowed_implementation_hashes.add(V1_PUBLISHED_IMPLEMENTATION_SHA256)
+    if implementation_hash not in allowed_implementation_hashes:
         raise SettlementError("implementation binding mismatch")
     expected_files = manifest.get("files")
     actual_files = {p.relative_to(root).as_posix(): _sha256(p) for p in root.rglob("*") if p.is_file() and p.name != "MANIFEST.json"}
@@ -349,10 +538,12 @@ def verify_package(package_root: str | Path) -> dict:
     decision = json.loads((root / "decision.json").read_text(encoding="utf-8"))
     if decision.get("disposition") != manifest.get("disposition"):
         raise SettlementError("decision/manifest disposition mismatch")
+    if decision.get("strategy_execution_authorized") is not False:
+        raise SettlementError("settlement package must not authorize strategy execution")
     all_rows, _ = _parse_frozen_raw(root / "raw", list(TARGET_ISSUES))
     replay, expected_exclusions = _partition_settlements(all_rows, root / "raw", list(TARGET_ISSUES))
     expected_disposition = DISPOSITION_READY if expected_exclusions.empty else DISPOSITION_BLOCKED
-    if expected_disposition != decision.get("disposition"):
+    if contract == CONTRACT_VERSION and expected_disposition != decision.get("disposition"):
         raise SettlementError("disposition does not match source recovery state")
     emitted = pd.read_parquet(root / "canonical_settlements.parquet")
     emitted = _validate_settlements(emitted, list(TARGET_ISSUES), require_all_issues=False)
@@ -363,10 +554,59 @@ def verify_package(package_root: str | Path) -> dict:
     if list(exclusions.columns) != list(expected_exclusions.columns) or not exclusions.equals(expected_exclusions):
         raise SettlementError("exclusion ledger differs from raw source evidence")
     ledger = pd.read_csv(root / "issue_ledger.csv", dtype=str).fillna("")
+    expected_ledger = _issue_ledger(replay, expected_exclusions, list(TARGET_ISSUES))
+    expected_ledger = pd.read_csv(StringIO(expected_ledger.to_csv(index=False)), dtype=str).fillna("")
+    if list(ledger.columns) != list(expected_ledger.columns) or not ledger.equals(expected_ledger):
+        raise SettlementError("issue ledger differs from source recovery state")
     if ledger["issue"].tolist() != list(TARGET_ISSUES):
         raise SettlementError("issue ledger does not exactly represent target census")
-    if int(decision.get("settlement_record_count", -1)) != len(emitted) or int(decision.get("excluded_fixture_count", -1)) != len(exclusions):
-        raise SettlementError("decision count mismatch")
-    if decision.get("disposition") == DISPOSITION_READY and not exclusions.empty:
+    expected_decision_counts = {
+        "target_issue_count": len(TARGET_ISSUES),
+        "included_issue_count": int(emitted["issue"].astype(str).nunique()),
+        "excluded_issue_count": int(exclusions["issue"].astype(str).nunique()),
+        "source_row_count": len(all_rows),
+        "settlement_record_count": len(emitted),
+        "excluded_fixture_count": len(exclusions),
+    }
+    for key, expected in expected_decision_counts.items():
+        if int(decision.get(key, -1)) != expected:
+            raise SettlementError(f"decision count mismatch: {key}")
+    if decision.get("first_issue") != TARGET_ISSUES[0] or decision.get("last_issue") != TARGET_ISSUES[-1]:
+        raise SettlementError("decision target bounds mismatch")
+    expected_maximum_timestamp = None if emitted.empty else str(emitted["settlement_availability_ts"].max())
+    if decision.get("maximum_settlement_availability_timestamp") != expected_maximum_timestamp:
+        raise SettlementError("decision settlement availability timestamp mismatch")
+    if decision.get("disposition") == DISPOSITION_READY and contract == CONTRACT_VERSION and not exclusions.empty:
         raise SettlementError("ready disposition contains excluded fixtures")
-    return {"status": "PASS", "disposition": decision["disposition"], "files": len(actual_files), "settlement_records": len(emitted), "excluded_records": len(exclusions), "issues": len(TARGET_ISSUES)}
+    if contract == CONTRACT_AMENDMENT_V2:
+        baseline_manifest = json.loads((root / "baseline_manifest_v1.json").read_text(encoding="utf-8"))
+        if baseline_manifest.get("contract") != CONTRACT_VERSION:
+            raise SettlementError("missing immutable v1 baseline receipt")
+        probes = _nowscore_probe_ledger(root / "raw" / "nowscore_issue_pages", exclusions)
+        emitted_probes = pd.read_csv(root / "nowscore_probe_ledger.csv", dtype=str).fillna("")
+        expected_probes = probes.astype(str).fillna("")
+        if list(emitted_probes.columns) != list(expected_probes.columns) or not emitted_probes.equals(expected_probes):
+            raise SettlementError("Nowscore probe ledger differs from immutable source pages")
+        revised = classify_residuals_with_nowscore(exclusions, probes)
+        revised.loc[revised["exclusion_reason"].eq("POSTPONED_ON_500_PAGE_NO_NATIVE_SETTLEMENT"), "exclusion_reason"] = "POSTPONED_OR_CANCELLED"
+        revised.loc[revised["exclusion_reason"].eq("CANCELLED_ON_500_PAGE_NO_NATIVE_SETTLEMENT"), "exclusion_reason"] = "POSTPONED_OR_CANCELLED"
+        expected_revised = revised.astype(str).fillna("")
+        emitted_revised = pd.read_csv(root / "residual_disposition_v2.csv", dtype=str).fillna("")
+        if list(emitted_revised.columns) != list(expected_revised.columns) or not emitted_revised.equals(expected_revised):
+            raise SettlementError("v2 residual disposition differs from source evidence")
+        allowed = {"POSTPONED_OR_CANCELLED", "NEVER_SETTLED_OFFICIAL_NO_SP"}
+        unresolved = ~emitted_revised["exclusion_reason"].isin(allowed)
+        expected_disposition = DISPOSITION_BLOCKED if unresolved.any() else DISPOSITION_READY
+        if decision.get("disposition") != expected_disposition:
+            raise SettlementError("v2 disposition does not match residual evidence")
+        if int(decision.get("nowscore_probed_fixture_count", -1)) != len(probes):
+            raise SettlementError("v2 Nowscore probe count mismatch")
+        if int(decision.get("unresolved_native_settlement_count", -1)) != int(unresolved.sum()):
+            raise SettlementError("v2 unresolved count mismatch")
+        for key, reason in {
+            "postponed_or_cancelled_fixture_count": "POSTPONED_OR_CANCELLED",
+            "never_settled_official_no_sp_count": "NEVER_SETTLED_OFFICIAL_NO_SP",
+        }.items():
+            if int(decision.get(key, -1)) != int(emitted_revised["exclusion_reason"].eq(reason).sum()):
+                raise SettlementError(f"v2 residual category count mismatch: {key}")
+    return {"status": "PASS", "contract": contract, "disposition": decision["disposition"], "files": len(actual_files), "settlement_records": len(emitted), "excluded_records": len(exclusions), "issues": len(TARGET_ISSUES)}
