@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-25 (#392 corrected-N7 walk-forward temporal-policy diagnostic completed)**
+Updated: **2026-08-26 (#394 full-history frozen N7 mixture diagnostic completed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -245,6 +245,10 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
      (Done; added coverage raises hit rate but loses matched capital)
              |
              v
+#394 frozen corrected-N7 R3/C1E3 50/50 full-history extension
+     (Done; complete 2025 denominator, extension NO_INCREMENT)
+             |
+             v
 #210 held-out/prospective validation  <--- still blocked by open #218
              |
              v
@@ -309,8 +313,9 @@ average-odds proxy (Done)     (Done; historical signal, no deployment claim)
 | 54 | [#388] shared cutoff-learning hardening | Closed / Done | M2 | Parent #202; blockedBy closed #382; blocks #383 | Shared API now excludes exact target identity, binds transitive imports, enforces exact AST occurrences in `src/`/`scripts/`, separates diagnostic proxies from prospective availability, and implements a true convex recent-state blend; #382 mapping parity remains exact across 48,658 rows |
 | 55 | [#383] issue-level walk-forward recency diagnostic | Closed / Done | M2 | Parent #202; blockedBy closed #388/#382 | Exact 172-issue walk-forward compared equal expansion, 730-day exponential decay and a true 75/25 long-history/recent-12-issue blend. The recent blend is a positive but unstable historical mechanism signal (PnL CNY1,211; matched lift CNY15,703; ex-largest lift CNY6,333; max drawdown 24.55% versus 43.28%), but annual PnL changes sign, bootstrap p05 lift is CNY-22,263 and calibration is slightly worse. Verdict NO_RECENCY_INCREMENT; equal expansion remains default, no strategy promotion, #210/#218 unchanged |
 | 56 | [#392] corrected-N7 cutoff walk-forward temporal policy | Closed / Done | M2 | Parent #202; blockedBy closed #366/#373/#383/#388; not a #210 blocker | On 148 exact-common issues, equal expansion R3 ends at CNY157,743, while 730-day exponential ends at CNY90,143 (matched lift CNY−67,600) and the 75/25 recent-state blend at CNY49,587 (lift CNY−108,156). Both recency arms worsen aggregate calibration, tail-removed economics, bootstrap lift and path risk, with annual reversals. `NO_N7_RECENCY_INCREMENT`; retain expanding equal, no expert admission, #210/#218 unchanged |
-| 57 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
-| 58 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 57 | [#394] frozen corrected-N7 mixed full-history extension | Closed / Done | M3 | Parent #202; blockedBy closed #396/#392/#388/#373/#366; not a #210 blocker | Complete 57-issue 2025 calendar yields 56 settled issues and one selected-fixture exclusion. Fixed CNY1,024 50/50 R3/C1E3 earns CNY−12,447 in 2025 and +11,349 in 2026; the extension totals CNY−1,099 and CNY−14,174 ex-largest. Full history remains CNY+51,568, but annual reversal, negative extension robustness, 24.46% extension drawdown and 106-issue underwater duration give `NO_MIXED_N7_EXTENSION_INCREMENT`. The 2025–2026 range is now consumed retrospective evidence; no promotion, #210/#218 unchanged |
+| 58 | [#210] held-out/forward validation | Open / Blocked | M4 | #218 remains the only open blocker | Preserve #319 probability Top-2 R0 as incumbent and bind QEU support-depth R3 as the sole historical challenger. Do not spend prospective Cohort-B evidence until #218 supplies genuine support |
+| 59 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #336 QEU support-depth attribution decision
 

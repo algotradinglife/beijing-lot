@@ -52,6 +52,26 @@ V2_NOWSCORE_PAGE_SHA256 = {
     "25111": "1d72ff3e32af29e6b541765728af839aaf1d5babc7e8d273987a326671c56296",
     "25121": "576db55fd5b6c88f7c08db2c640795a0b8c67e8590c22a6820064ea238ef2fe7",
 }
+# Git does not preserve filesystem mtimes. Capture timestamps are immutable
+# source-receipt fields, not properties of a particular checkout.
+V2_NOWSCORE_CAPTURED_AT_UTC = {
+    "25012": "2026-08-25T12:54:16+00:00",
+    "25014": "2026-08-25T12:54:17+00:00",
+    "25023": "2026-08-25T12:54:18+00:00",
+    "25031": "2026-08-25T12:54:19+00:00",
+    "25032": "2026-08-25T12:54:20+00:00",
+    "25043": "2026-08-25T12:54:22+00:00",
+    "25085": "2026-08-25T12:54:22+00:00",
+    "25092": "2026-08-25T12:54:23+00:00",
+    "25093": "2026-08-25T12:54:24+00:00",
+    "25094": "2026-08-25T12:54:25+00:00",
+    "25102": "2026-08-25T12:54:25+00:00",
+    "25103": "2026-08-25T12:54:26+00:00",
+    "25104": "2026-08-25T12:54:27+00:00",
+    "25105": "2026-08-25T12:54:28+00:00",
+    "25111": "2026-08-25T12:54:29+00:00",
+    "25121": "2026-08-25T12:54:29+00:00",
+}
 V2_SOURCE_PROBE_RECEIPT_COLUMNS = (
     "source_id", "source_identity", "probe_path_or_url", "observed_at_utc",
     "sha256_or_absence_evidence", "exact_key_predicate",
@@ -64,9 +84,18 @@ V2_SOURCE_PROBE_RECEIPT_COLUMNS = (
 V2_SOURCE_PROBE_RECEIPT_ROWS = (
     ("500_kaijiang", "500.com authoritative result/native-SP issue pages", "raw/pages/*.html + raw/acquisition_receipts.csv", "2026-08-25T12:27:17+00:00", "7e906359b1a14ae674468d513a3a178d791915f4870202b1ed310292c5b1f915", "baseline unresolved (issue,match_idx) exact join", 23, "NO_NATIVE_SP_FOR_EXACT_23", "CANONICAL_NATIVE_SETTLEMENT_FOR_COMPLETE_ROWS", "23 exact baseline rows have official result/SP=- and remain non-settleable"),
     ("beidan_live_settlements", "local beidan_live.settlements SQLite materialization", "/home/drwho1985/workspace/soccer/beijing-lot/data/beidan_live.db:settlements", "2026-08-25T13:34:02+00:00", "c6b4ea52ed3d26b9d0b030f28125cb441afcc7f500bf236645be5f9352a12090", "INNER JOIN requested USING(issue,match_idx)", 0, "NO_EXACT_23_HITS", "EXHAUSTED_NO_ADDITIONAL_SETTLEMENT_EVIDENCE", "read-only/WAL-aware exact-key probe returned zero rows"),
-    ("beidan_xlsm_bj268", "frozen local Beidan XLSM / BJ268 lineage", "/home/drwho1985/workspace/soccer/beijing-lot/data/raw/beidan.xlsm", "2026-08-25T13:34:02+00:00", "f825020658f2b0e95715659381107c246a24ec36b87801eebb63233921072d59", "conservative fixture identity probe for 23 baseline keys", 0, "NO_SOURCE_NATIVE_BEIJING_SP_RECEIPT", "CENSUS_AND_CROSSCHECK_ONLY", "no source-native Beijing settlement receipt for any exact residual"),
+    ("beidan_xlsm_bj268", "frozen local Beidan XLSM / BJ268 lineage", "/home/drwho1985/workspace/soccer/beijing-lot/data/raw/beidan.xlsm", "2026-08-25T13:34:02+00:00", "f825020658f2b0e95715659381107c246a24ec36b87801eebb63233921072d59", "conservative fixture identity probe for 23 baseline keys", 7, "NO_SOURCE_NATIVE_BEIJING_SP_RECEIPT", "CENSUS_AND_CROSSCHECK_ONLY", "7 exact fixture-identity hits; no source-native Beijing winning-SP receipt for any residual"),
     ("official_500_settlements", "local derived official_500_settlements SQLite table", "/home/drwho1985/workspace/soccer/beijing-lot/data/derived/beidan_xlsm/beidan_xlsm.sqlite:official_500_settlements", "2026-08-25T13:35:04+00:00", "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f", "INNER JOIN requested USING(issue,match_idx)", 0, "NO_EXACT_23_HITS", "EXHAUSTED_DERIVED_DUPLICATE_OF_500_LANE", "read-only exact-key probe returned zero rows; table is not an independent raw source"),
     ("nowscore_issue_provider", "frozen Nowscore issue/provider snapshots", "raw/nowscore_issue_pages/*.html", "2026-08-25T12:54:16+00:00", "PER_PAGE_SHA256_PINNED_IN_V2_NOWSCORE_PAGE_SHA256", "INNER JOIN requested USING(issue,match_idx)", 23, "NO_NATIVE_BEIJING_WINNING_SP", "EXCLUSION_CLASSIFICATION_ONLY", "5 exact cancellations and 18 finished/no-native-SP rows; no payout or SP is inferred"),
+)
+V2_XLSM_IDENTITY_HITS = (
+    ("25012", 81),
+    ("25012", 98),
+    ("25012", 118),
+    ("25014", 252),
+    ("25023", 24),
+    ("25031", 315),
+    ("25032", 341),
 )
 TARGET_ISSUES = tuple(
     f"25{suffix:03d}"
@@ -395,8 +424,41 @@ def _validate_v2_source_probe_receipts(receipts: pd.DataFrame) -> pd.DataFrame:
         raise SettlementError("v2 source-probe receipt differs from frozen source-lane audit")
     if actual["source_id"].duplicated().any() or len(actual) != 5:
         raise SettlementError("v2 source-probe receipt must represent each declared lane exactly once")
-    if actual["exact_23_key_hit_count"].astype(int).tolist() != [23, 0, 0, 0, 23]:
+    if actual["exact_23_key_hit_count"].astype(int).tolist() != [23, 0, 7, 0, 23]:
         raise SettlementError("v2 source-probe receipt exact-key coverage mismatch")
+    return actual
+
+
+def _v2_xlsm_identity_probe_ledger() -> pd.DataFrame:
+    """Freeze the seven exact XLSM/BJ268 fixture-identity corroborations.
+
+    These rows prove identity only. They deliberately carry no winning SP and
+    cannot make an otherwise excluded fixture settleable.
+    """
+    return pd.DataFrame(
+        [
+            {
+                "issue": issue,
+                "match_idx": match_idx,
+                "source_id": "beidan_xlsm_bj268",
+                "source_sha256": "f825020658f2b0e95715659381107c246a24ec36b87801eebb63233921072d59",
+                "evidence_class": "FIXTURE_IDENTITY_ONLY",
+                "native_winning_sp_admissible": False,
+            }
+            for issue, match_idx in V2_XLSM_IDENTITY_HITS
+        ]
+    )
+
+
+def _validate_v2_xlsm_identity_probe_ledger(ledger: pd.DataFrame) -> pd.DataFrame:
+    expected = _v2_xlsm_identity_probe_ledger().astype(str).fillna("")
+    actual = ledger.copy().astype(str).fillna("")
+    if list(actual.columns) != list(expected.columns) or not actual.equals(expected):
+        raise SettlementError("v2 XLSM identity-probe ledger differs from frozen evidence")
+    if actual.duplicated(["issue", "match_idx"]).any() or len(actual) != 7:
+        raise SettlementError("v2 XLSM identity-probe ledger key census mismatch")
+    if actual["native_winning_sp_admissible"].str.lower().ne("false").any():
+        raise SettlementError("XLSM identity evidence must not authorize winning SP")
     return actual
 
 
@@ -488,6 +550,8 @@ def _nowscore_probe_ledger(raw_root: Path, residuals: pd.DataFrame) -> pd.DataFr
     target_issues = set(targets["issue"].unique())
     if target_issues != set(V2_NOWSCORE_PAGE_SHA256):
         raise SettlementError("v2 Nowscore probe issue census differs from frozen contract")
+    if target_issues != set(V2_NOWSCORE_CAPTURED_AT_UTC):
+        raise SettlementError("v2 Nowscore capture-time census differs from frozen contract")
     records: list[dict[str, object]] = []
     for issue in sorted(target_issues):
         page = raw_root / f"{issue}.html"
@@ -495,7 +559,7 @@ def _nowscore_probe_ledger(raw_root: Path, residuals: pd.DataFrame) -> pd.DataFr
             raise SettlementError(f"missing Nowscore issue snapshot: {issue}")
         payload = page.read_bytes()
         payload_sha256 = _check_v2_nowscore_freeze(issue, payload)
-        captured_at = datetime.fromtimestamp(page.stat().st_mtime, timezone.utc).replace(microsecond=0).isoformat()
+        captured_at = V2_NOWSCORE_CAPTURED_AT_UTC[issue]
         parsed = {
             int(row["match_idx"]): row
             for row in parse_rows(issue, payload.decode("utf-8", errors="strict"), "FROZEN_IN_RECEIPT")
@@ -560,6 +624,14 @@ def extend_package_amendment_v2(baseline_root: str | Path, nowscore_raw_root: st
         issue_ledger.to_csv(staging / "issue_ledger.csv", index=False, encoding="utf-8")
         source_probe_receipts = _validate_v2_source_probe_receipts(_v2_source_probe_receipts())
         source_probe_receipts.to_csv(staging / "source_probe_receipts_v2.csv", index=False, encoding="utf-8")
+        xlsm_identity = _validate_v2_xlsm_identity_probe_ledger(
+            _v2_xlsm_identity_probe_ledger()
+        )
+        xlsm_identity.to_csv(
+            staging / "xlsm_identity_probe_ledger.csv",
+            index=False,
+            encoding="utf-8",
+        )
         decision = json.loads((staging / "decision.json").read_text(encoding="utf-8"))
         decision.pop("excluded_issue_count", None)
         decision.update({
@@ -659,6 +731,10 @@ def verify_package(package_root: str | Path) -> dict:
             raise SettlementError("missing immutable v1 baseline receipt")
         emitted_source_probes = pd.read_csv(root / "source_probe_receipts_v2.csv", dtype=str).fillna("")
         _validate_v2_source_probe_receipts(emitted_source_probes)
+        emitted_xlsm_identity = pd.read_csv(
+            root / "xlsm_identity_probe_ledger.csv", dtype=str
+        ).fillna("")
+        _validate_v2_xlsm_identity_probe_ledger(emitted_xlsm_identity)
         if tuple(TARGET_ISSUES) == FROZEN_TARGET_ISSUES:
             _validate_v2_500_receipt_anchor(emitted_source_probes, root / "raw")
         probes = _nowscore_probe_ledger(root / "raw" / "nowscore_issue_pages", exclusions)

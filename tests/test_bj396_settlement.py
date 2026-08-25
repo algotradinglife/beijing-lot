@@ -2,6 +2,7 @@
 from __future__ import annotations
 import csv
 import json
+import os
 from pathlib import Path
 import shutil
 import pandas as pd
@@ -175,7 +176,7 @@ def test_v2_source_probe_receipts_fail_closed_on_semantic_rewrite():
         "official_500_settlements",
         "nowscore_issue_provider",
     }
-    assert receipts["exact_23_key_hit_count"].astype(int).tolist() == [23, 0, 0, 0, 23]
+    assert receipts["exact_23_key_hit_count"].astype(int).tolist() == [23, 0, 7, 0, 23]
     attacked = receipts.copy()
     attacked.loc[0, "admissible_use"] = "FABRICATED_PAYOUT_SOURCE"
     with pytest.raises(pipeline.SettlementError, match="source-probe receipt"):
@@ -189,6 +190,14 @@ def test_v2_500_receipt_anchor_rejects_rewritten_raw_receipt(tmp_path):
     receipt.write_text("rewritten source receipt\n", encoding="utf-8")
     with pytest.raises(pipeline.SettlementError, match="frozen 500 acquisition receipt"):
         pipeline._validate_v2_500_receipt_anchor(pipeline._v2_source_probe_receipts(), raw)
+
+
+def test_v2_xlsm_hits_are_identity_only():
+    ledger = pipeline._validate_v2_xlsm_identity_probe_ledger(
+        pipeline._v2_xlsm_identity_probe_ledger()
+    )
+    assert len(ledger) == 7
+    assert ledger["native_winning_sp_admissible"].astype(str).str.lower().eq("false").all()
 
 
 @pytest.mark.filterwarnings("ignore:Parsing dates involving a day of month without a year specified:DeprecationWarning")
@@ -254,3 +263,20 @@ def test_v2_nowscore_source_trace_tamper_fails_even_if_manifest_rewritten(tmp_pa
     pipeline._write_json(package / "MANIFEST.json", manifest)
     with pytest.raises(pipeline.SettlementError, match="probe ledger"):
         pipeline.verify_package(package)
+
+
+def test_v2_verifier_is_invariant_to_checkout_mtime(tmp_path):
+    """Fresh Git checkouts assign new mtimes; source provenance must remain
+    content/receipt-bound and must not require mutating tracked raw files."""
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "results/bj396_2025_settlement_backfill_v2"
+    )
+    package = tmp_path / "v2"
+    shutil.copytree(source, package)
+    for ordinal, page in enumerate(
+        sorted((package / "raw/nowscore_issue_pages").glob("*.html"))
+    ):
+        timestamp = 1_700_000_000 + ordinal
+        os.utime(page, (timestamp, timestamp))
+    assert pipeline.verify_package(package)["status"] == "PASS"

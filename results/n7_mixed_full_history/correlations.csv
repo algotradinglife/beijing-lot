@@ -1,0 +1,2 @@
+scope,issues,pearson_issue_pnl,spearman_issue_pnl,downside_issues,pearson_downside_pnl,simultaneous_profit_rate,simultaneous_loss_rate,underwater_state_overlap_rate,top5_payout_issue_overlap,top10_payout_issue_overlap
+ALL,268,0.075955829977047667,0.36623255203390076,241,-0.043189906541749597,0.10074626865671642,0.69029850746268662,0.93283582089552242,0.20000000000000001,0.20000000000000001
