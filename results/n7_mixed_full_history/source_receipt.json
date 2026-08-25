@@ -1,0 +1,51 @@
+{
+  "comparator_downstream": "CORRECTED_N7_R0_CONTROL;128_COMPLETE_TICKETS;CNY1024;0.65_TICKET_LEVEL_ONCE",
+  "contract": "BJ-UNIFIED-N7-MIXED-FULL-HISTORY-001/v1",
+  "core_mapping_issues": 172,
+  "core_mapping_rows": 48658,
+  "core_years": [
+    2022,
+    2023,
+    2024
+  ],
+  "evidence_cutoff_receipt": {
+    "EVIDENCE_QUERY_CUTOFF_TS": "2026-08-25T07:50:00+00:00",
+    "contract": "BJ-UNIFIED-N7-MIXED-FULL-HISTORY-001/v1",
+    "frozen_at_execution_start": true,
+    "rule": "any future prospective/shadow contract must start strictly after this cutoff; settlement rows admitted only when the trusted settlement-availability timestamp is strictly earlier"
+  },
+  "exposed_historical_only": true,
+  "extension_mapping_issues": 80,
+  "extension_mapping_receipts": 80,
+  "extension_mapping_rows": 14024,
+  "extension_max_availability_ts": "2026-08-21T03:10:24+00:00",
+  "extension_max_fixture_decision_ts": "2026-08-20T22:30:00+00:00",
+  "extension_settlement_rows": 14027,
+  "extension_target_issues": 80,
+  "extension_timing_source_policy": "MODELING_PLUS_2026 for <26051; RUNTIME_BEIDAN_LIVE for >=26051; never mixed per key; runtime self-consistency gated; disclosure only",
+  "extension_years": [
+    2025,
+    2026
+  ],
+  "history_issues": 686,
+  "history_max_fixture_decision_ts": "2024-12-30T18:15:00+00:00",
+  "history_max_label_available_ts": "2024-12-31T08:15:00+00:00",
+  "history_rows": 185061,
+  "material_overlap_disagreements_26051": 26,
+  "mixed_portfolio": "FIXED_50_50;R3_CNY512+C1E3_CNY512;TOTAL_CNY1024;0.65_TICKET_LEVEL_ONCE",
+  "pre_extension_boundary_ts": "2024-12-31T06:00:00+00:00",
+  "primary_downstream": "CORRECTED_N7_R3_CONTROL;128_COMPLETE_TICKETS;CNY1024;0.65_TICKET_LEVEL_ONCE",
+  "prospective_authorized": false,
+  "secondary_downstream": "CORRECTED_N7_C1E3_SECONDARY;216_COMPLETE_TICKETS;CNY1024;0.65_TICKET_LEVEL_ONCE",
+  "settlement_without_proxy_issues": [
+    "26087"
+  ],
+  "shared_temporal_client": "src.cutoff_walkforward.fitting",
+  "temporal_policy": "EXPANDING_EQUAL",
+  "upstream_hashes": {
+    "cutoff_walkforward_manifest_sha256": "c03ad540ee0e6d134a734cdf329f1a328f73375518759c4144810b12cd7daca0",
+    "n7_chronology_manifest_sha256": "93b80bd63fd7b0ba3f4c040b48f670944eabb215d5c99f165b07a204c6a06bf2",
+    "n7_cutoff_walkforward_manifest_sha256": "25e95a37b2d6ee7c8ad24cd797531cd1c9124310e2a07a243952259cb25e548d",
+    "n7_support_transfer_manifest_sha256": "61bbaa679a3081284b325c26ab26c40dfe8d149ceb27aa4b5c7129b44acc73a7"
+  }
+}

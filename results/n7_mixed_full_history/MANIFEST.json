@@ -1,0 +1,107 @@
+{
+  "contract": "BJ-UNIFIED-N7-MIXED-FULL-HISTORY-001/v1",
+  "deliveries": {
+    "docs/research/Issue-394-N7-Mixed-Full-History.md": "c4d892c909a93fd35623042c02677e42097e2e24c8d96dabfec3be2ed5071055",
+    "docs/research/figures/issue_394_n7_mixed_full_history.png": "5cb63dbc45dde2136bcc6f04d3ac8a991b427d0a8dec4431a036fd695c2fdeb9",
+    "notebooks/research/n7-mixed-full-history/Issue-394-N7-Mixed-Full-History.ipynb": "1fbdf205ba4c6254a3c8faf00c22e5b070f1a2822769607db3ba29472922193d"
+  },
+  "evidence_cutoff_ts": "2026-08-25T07:50:00Z",
+  "files": {
+    "bundles.parquet": {
+      "bytes": 49468,
+      "sha256": "39a5af41f9ed584dce5c1ac48a9f42557308c255e3fc0531c77045ba15ca7106"
+    },
+    "capital_paths.parquet": {
+      "bytes": 39795,
+      "sha256": "0c4240c8685a0b59cacb3f01b9608c8d59a75655b426831e71ffb4e5c13a9a5f"
+    },
+    "correlations.csv": {
+      "bytes": 393,
+      "sha256": "fd8979b4a8050bd1d25fba2a5739f12cd0509622373562f709013071e1f2172f"
+    },
+    "decision.json": {
+      "bytes": 1971,
+      "sha256": "5c1531b116772c122290070d15c3561edef5011c5b01908f900a339a97f24ea1"
+    },
+    "decision_gates.csv": {
+      "bytes": 962,
+      "sha256": "4d05abaf9e07383b2fa5442138c0f4674890080a62e0364c0db739005dc2055a"
+    },
+    "extension_history.parquet": {
+      "bytes": 10771902,
+      "sha256": "6ef655fcf7af087e3113c09abbbdbc4bd5377bb7fa0df51a193766897ea4df91"
+    },
+    "extension_per_issue_receipts.json.gz": {
+      "bytes": 15652,
+      "sha256": "d98e7c48f65327c7b4145a4c6620cb44f0a3acb74de0b3a8a673c849e60eb3bb"
+    },
+    "extension_settlement.parquet": {
+      "bytes": 278925,
+      "sha256": "aab5d24f05aa35302c9acdcc1a07656bf21ef5c9e818ab0466d47b2bab2525fa"
+    },
+    "integer_fractional_reconciliation.csv": {
+      "bytes": 830,
+      "sha256": "083f3ca5ebf433e94a6ec28d71f0bea4b0bd45c8cab6306daf992dcf04bdc4cd"
+    },
+    "issue_ledger.csv": {
+      "bytes": 19536,
+      "sha256": "dc109ccb0ae5fcf9e3a2775ad303b9be5c33dadbbe9a84ff9011527f1e75d2dd"
+    },
+    "matched_contrasts.csv": {
+      "bytes": 1665,
+      "sha256": "1fb0e298600818008bc82f22ce2d670e7ea85049f2c999062f2193062770d320"
+    },
+    "performance.csv": {
+      "bytes": 36560,
+      "sha256": "eea3fb3086acb82348a82d80c3d6959373751b2a4ab25c8aca4646237d4c3e79"
+    },
+    "source_receipt.json": {
+      "bytes": 2482,
+      "sha256": "0f810a4fd5cdae70eaa22899bf89b14df9fb6a4e7ee5899c42db78e765a3937a"
+    }
+  },
+  "implementation": {
+    "closure_sha256": "2756bf2270aae6355111b13aee0970e7ba1309f36306364cac7c3db1af115375",
+    "distributions": {
+      "matplotlib": "3.10.9",
+      "nbclient": "0.10.2",
+      "nbformat": "5.10.4",
+      "numpy": "2.4.6",
+      "pandas": "3.0.3",
+      "scipy": "1.17.1"
+    },
+    "files": {
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_walkforward/contract.py": "1a57b8193c34b5442883037605382516d181dac834bb5fd76f803720e66e5d84",
+      "src/cutoff_walkforward/fitting.py": "108be8fd4a58283d3bcd0866bdfbc02b1a51a7bfaf6d80a2bbf51dc23384d611",
+      "src/cutoff_walkforward/pipeline.py": "b44bb8c8ce96af2b55aa45e8aba5e6fc070bb216876a413a524364ac6d032dce",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/n7_chronology_sync/contract.py": "7f322be3574fc4f8bd0d1c8528ad0bfe3562e190b336291d91991301f33f6ba1",
+      "src/n7_chronology_sync/pipeline.py": "ec7a0c27a3e720d89a5eca33c0c5b81dd1a65740c0cbc8273bd3e074001d93e5",
+      "src/n7_cutoff_walkforward/contract.py": "4c984ae929403cde56066e4e9987159873ea06fc2b157ea084cb1008b89b87db",
+      "src/n7_cutoff_walkforward/pipeline.py": "1d8166bfd03919c5b0552cc1ae10c516a8c43792accf2c62c63c6bc6bacf77c5",
+      "src/n7_mixed_full_history/contract.py": "552735f441bf01aea5ddfde328edac8db23ad549f72f728fa12003d0f35a67a7",
+      "src/n7_mixed_full_history/pipeline.py": "1b5bf810d3aba0ea49964f8494d956c023a7ed1cbee6268f2f13f400f68b9026",
+      "src/n7_support_shape/contract.py": "00bc1cf7024084a8755c77f178acc3ecf77ff1c3ed986daf2ea331df56ea7cd6",
+      "src/n7_support_shape/pipeline.py": "8a05ae4f95eff97af3e0844a28545736a854e1b1deeec65e3b310fc61715abc7",
+      "src/n7_support_transfer_grid/contract.py": "2d6fe840ce5b6acd4ca4b64410ebdc25427834759ac73f0f8df28b1f65a646f3",
+      "src/n7_support_transfer_grid/pipeline.py": "0a99bb5b447c89a740c252d3a50f3986ada5f259b45c103276a09fbf6b0acdeb",
+      "src/neural_top2_residual/contract.py": "f7b670e5e02432e272ba6009904debe02ab9e4a63943e0ea5c20e58a03f2ecfd",
+      "src/neural_top2_residual/data.py": "a35629124dad9679c7360c4106e1fd35326b7e0c2b8541565ef22ed2c246e7fe",
+      "src/qeu_threshold_n7/contract.py": "bf5de2dadc2d76456b63096790b4d57869e3aec597113f1f175c892eb5f9cd30",
+      "src/qeu_threshold_n7/pipeline.py": "1885d2b15b67520a293bea2ad6506722f53dcd1ffda64f870595c1ab3fc648fc",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
+    },
+    "root_modules": [
+      "src.n7_mixed_full_history.pipeline"
+    ]
+  }
+}
