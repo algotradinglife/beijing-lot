@@ -1,0 +1,19 @@
+{
+  "contract": "BJ-DATA-2025-SETTLEMENT-BACKFILL-001/v2",
+  "disposition": "READY_FOR_394_FULL_2025_REPLAY",
+  "downstream_eligible_issue_count": 57,
+  "excluded_fixture_count": 120,
+  "first_issue": "25011",
+  "included_issue_count": 57,
+  "issues_with_admissible_fixture_exclusions": 36,
+  "last_issue": "25125",
+  "maximum_settlement_availability_timestamp": "2026-08-25T12:27:17+00:00",
+  "never_settled_official_no_sp_count": 18,
+  "nowscore_probed_fixture_count": 23,
+  "postponed_or_cancelled_fixture_count": 102,
+  "settlement_record_count": 16117,
+  "source_row_count": 16237,
+  "strategy_execution_authorized": false,
+  "target_issue_count": 57,
+  "unresolved_native_settlement_count": 0
+}
