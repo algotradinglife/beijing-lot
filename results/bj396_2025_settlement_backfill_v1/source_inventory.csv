@@ -1,0 +1,4 @@
+source_id,classification,admissible_use,coverage,notes
+500_kaijiang,AUTHORITATIVE_PUBLIC_RESULT_PAGE,CANONICAL_NATIVE_SETTLEMENT,all 57 target issues,"native handicap, final score, 3/1/0 result and winning SP"
+beidan_xlsm,LOCAL_LEGACY_LINEAGE,CENSUS_AND_CROSSCHECK_ONLY,25011-25042 only,absence after 25042 is not an exclusion reason
+bj268_nowscore_titan,IMMUTABLE_ODDS_RECOVERY,FIXTURE_IDENTITY_CROSSCHECK_ONLY,25043-25125,does not supply native winning SP settlement

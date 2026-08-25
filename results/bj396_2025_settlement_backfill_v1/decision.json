@@ -1,0 +1,15 @@
+{
+  "contract": "BJ-DATA-2025-SETTLEMENT-BACKFILL-001/v1",
+  "disposition": "BLOCKED_RESIDUAL_2025_SETTLEMENT_GAPS",
+  "excluded_fixture_count": 120,
+  "excluded_issue_count": 36,
+  "first_issue": "25011",
+  "included_issue_count": 57,
+  "last_issue": "25125",
+  "maximum_settlement_availability_timestamp": "2026-08-25T12:27:17+00:00",
+  "settlement_record_count": 16117,
+  "source_row_count": 16237,
+  "strategy_execution_authorized": false,
+  "target_issue_count": 57,
+  "unresolved_native_settlement_count": 23
+}
