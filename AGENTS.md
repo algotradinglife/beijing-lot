@@ -33,6 +33,22 @@ The PI owns issue contracts, graph edges, Project routing, final review, issue
 closure, and PR merges. Executors may report evidence and propose graph changes,
 but must not silently redefine the graph.
 
+## PI Observability Boundary
+
+The PI monitors and governs work exclusively through the live GitHub Issue
+Graph and the Issue's associated pull requests and independent review evidence.
+Implementation-side transport and scheduling mechanisms are opaque to the PI.
+
+The PI must not inspect, create, modify, reconcile, or stop execution cards,
+worker processes, sessions, queues, or other dispatcher implementation details.
+The PI must not coordinate work through those mechanisms. Setting and verifying
+native GitHub Issue Graph relationships and Project lifecycle states remains
+within the PI role.
+
+When following progress, the PI reads the Issue Graph and associated PR state.
+How an executor is awakened or carries out the implementation is outside the
+PI's scope and must not be used as a source of planning or completion truth.
+
 ## Local Research OS Files
 
 `.research/graph.yaml` and `.research/tasks/*.yaml` are derived caches or
