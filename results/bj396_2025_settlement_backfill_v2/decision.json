@@ -1,10 +1,11 @@
 {
   "contract": "BJ-DATA-2025-SETTLEMENT-BACKFILL-001/v2",
   "disposition": "READY_FOR_394_FULL_2025_REPLAY",
+  "downstream_eligible_issue_count": 57,
   "excluded_fixture_count": 120,
-  "excluded_issue_count": 36,
   "first_issue": "25011",
   "included_issue_count": 57,
+  "issues_with_admissible_fixture_exclusions": 36,
   "last_issue": "25125",
   "maximum_settlement_availability_timestamp": "2026-08-25T12:27:17+00:00",
   "never_settled_official_no_sp_count": 18,

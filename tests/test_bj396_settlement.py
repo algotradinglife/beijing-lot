@@ -1,5 +1,6 @@
 """Adversarial tests for the #396 source-bound settlement package."""
 from __future__ import annotations
+import csv
 import json
 from pathlib import Path
 import shutil
@@ -124,14 +125,14 @@ def test_nowscore_probe_classifies_only_direct_cancel_or_finished_no_native_sp()
 
 def test_v2_residual_label_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
     raw = _raw(tmp_path, monkeypatch)
-    incomplete = MatchRow(issue="25011", match_idx=1, league="L", kickoff_ts="2025-01-01 01:00:00", home="H", away="A", handicap_line=0, fthg=None, ftag=None, result_code=None, winning_sp=None, avg_eu_home=2.0, avg_eu_draw=3.0, avg_eu_away=4.0)
-    monkeypatch.setattr(pipeline, "parse_issue_html", lambda html, issue: [incomplete])
+    incomplete = MatchRow(issue="25011", match_idx=2, league="L", kickoff_ts="2025-01-01 01:00:00", home="H", away="A", handicap_line=0, fthg=None, ftag=None, result_code=None, winning_sp=None, avg_eu_home=2.0, avg_eu_draw=3.0, avg_eu_away=4.0)
+    monkeypatch.setattr(pipeline, "parse_issue_html", lambda html, issue: [_row(issue), incomplete])
     monkeypatch.setattr(pipeline, "_raw_row_text", lambda *args: "fixture -")
     baseline = tmp_path / "baseline"
     pipeline.build_package(raw, baseline, issues=ISSUES)
     probe_root = tmp_path / "nowscore"; probe_root.mkdir(); (probe_root / "25011.html").write_text("snapshot", encoding="utf-8")
     probes = pd.DataFrame([{
-        "issue": "25011", "match_idx": 1, "nowscore_issue_url": "https://example/issue", "nowscore_payload_sha256": "x" * 64, "nowscore_payload_bytes": 8,
+        "issue": "25011", "match_idx": 2, "nowscore_issue_url": "https://example/issue", "nowscore_payload_sha256": "x" * 64, "nowscore_payload_bytes": 8,
         "identity_status": "EXACT_ISSUE_SLOT", "provider_match_id": "p", "nowscore_status": "finished", "nowscore_status_text": "完场", "nowscore_score": "1-0", "nowscore_result_code": "3", "nowscore_handicap_line": "0", "nowscore_home": "H", "nowscore_away": "A", "nowscore_sp_url": "https://example/sp", "nowscore_raw_row_hash": "r",
     }])
     monkeypatch.setattr(pipeline, "_nowscore_probe_ledger", lambda *_args: probes)
@@ -147,15 +148,101 @@ def test_v2_residual_label_tamper_fails_even_if_manifest_rewritten(tmp_path, mon
         pipeline.verify_package(package)
 
 
-def test_v2_nowscore_source_trace_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
+def test_v2_issue_ledger_keeps_admissibly_partial_issues_downstream_eligible():
+    settlements = pd.DataFrame([
+        {"issue": "25011", "match_idx": 1, "kickoff_ts": "2025-01-01 01:00:00", "settlement_availability_ts": "2026-01-01T00:00:00+00:00"},
+        {"issue": "25012", "match_idx": 1, "kickoff_ts": "2025-01-02 01:00:00", "settlement_availability_ts": "2026-01-02T00:00:00+00:00"},
+    ])
+    exclusions = pd.DataFrame([
+        {"issue": "25011", "match_idx": 2, "exclusion_reason": "POSTPONED_OR_CANCELLED"},
+    ])
+    ledger = pipeline._v2_issue_ledger(settlements, exclusions, ["25011", "25012"])
+    assert ledger["issue"].tolist() == ["25011", "25012"]
+    assert ledger["downstream_eligible"].tolist() == [True, True]
+    assert ledger["inclusion_status"].tolist() == [
+        "INCLUDED_WITH_ADMISSIBLE_FIXTURE_EXCLUSIONS",
+        "INCLUDED",
+    ]
+    assert ledger.loc[0, "reason"] == "SEE_RESIDUAL_DISPOSITION_V2"
+
+
+def test_v2_source_probe_receipts_fail_closed_on_semantic_rewrite():
+    receipts = pipeline._v2_source_probe_receipts()
+    assert set(receipts["source_id"]) == {
+        "500_kaijiang",
+        "beidan_live_settlements",
+        "beidan_xlsm_bj268",
+        "official_500_settlements",
+        "nowscore_issue_provider",
+    }
+    assert receipts["exact_23_key_hit_count"].astype(int).tolist() == [23, 0, 0, 0, 23]
+    attacked = receipts.copy()
+    attacked.loc[0, "admissible_use"] = "FABRICATED_PAYOUT_SOURCE"
+    with pytest.raises(pipeline.SettlementError, match="source-probe receipt"):
+        pipeline._validate_v2_source_probe_receipts(attacked)
+
+
+def test_v2_500_receipt_anchor_rejects_rewritten_raw_receipt(tmp_path):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    receipt = raw / "acquisition_receipts.csv"
+    receipt.write_text("rewritten source receipt\n", encoding="utf-8")
+    with pytest.raises(pipeline.SettlementError, match="frozen 500 acquisition receipt"):
+        pipeline._validate_v2_500_receipt_anchor(pipeline._v2_source_probe_receipts(), raw)
+
+
+@pytest.mark.filterwarnings("ignore:Parsing dates involving a day of month without a year specified:DeprecationWarning")
+def test_v2_500_receipt_rewrite_with_manifest_rewrite_fails_closed(tmp_path):
+    package = tmp_path / "package"
+    source = Path(__file__).resolve().parents[1] / "results/bj396_2025_settlement_backfill_v2"
+    shutil.copytree(source, package)
+    receipt_path = package / "raw/acquisition_receipts.csv"
+    with receipt_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+        fieldnames = list(rows[0])
+    rows[0]["requested_at_utc"] = "1999-01-01T00:00:00+00:00"
+    with receipt_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    manifest = pipeline._manifest(package, implementation_sha=pipeline._sha256(Path(pipeline.__file__)), disposition=pipeline.DISPOSITION_READY)
+    manifest["contract"] = pipeline.CONTRACT_AMENDMENT_V2
+    pipeline._write_json(package / "MANIFEST.json", manifest)
+    with pytest.raises(pipeline.SettlementError, match="frozen 500 acquisition receipt"):
+        pipeline.verify_package(package)
+
+
+def test_v2_source_probe_receipt_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
     raw = _raw(tmp_path, monkeypatch)
-    incomplete = MatchRow(issue="25011", match_idx=1, league="L", kickoff_ts="2025-01-01 01:00:00", home="H", away="A", handicap_line=0, fthg=None, ftag=None, result_code=None, winning_sp=None, avg_eu_home=2.0, avg_eu_draw=3.0, avg_eu_away=4.0)
-    monkeypatch.setattr(pipeline, "parse_issue_html", lambda html, issue: [incomplete])
+    incomplete = MatchRow(issue="25011", match_idx=2, league="L", kickoff_ts="2025-01-01 01:00:00", home="H", away="A", handicap_line=0, fthg=None, ftag=None, result_code=None, winning_sp=None, avg_eu_home=2.0, avg_eu_draw=3.0, avg_eu_away=4.0)
+    monkeypatch.setattr(pipeline, "parse_issue_html", lambda html, issue: [_row(issue), incomplete])
     monkeypatch.setattr(pipeline, "_raw_row_text", lambda *args: "fixture -")
     baseline = tmp_path / "baseline"; pipeline.build_package(raw, baseline, issues=ISSUES)
     probe_root = tmp_path / "nowscore"; probe_root.mkdir(); (probe_root / "25011.html").write_text("snapshot", encoding="utf-8")
     probes = pd.DataFrame([{
-        "issue": "25011", "match_idx": 1, "nowscore_issue_url": "https://example/issue", "nowscore_captured_at_utc": "2026-01-01T00:00:00+00:00", "nowscore_payload_sha256": "x" * 64, "nowscore_payload_bytes": 8,
+        "issue": "25011", "match_idx": 2, "nowscore_issue_url": "https://example/issue", "nowscore_captured_at_utc": "2026-01-01T00:00:00+00:00", "nowscore_payload_sha256": "x" * 64, "nowscore_payload_bytes": 8,
+        "identity_status": "EXACT_ISSUE_SLOT", "provider_match_id": "p", "nowscore_status": "finished", "nowscore_status_text": "完场", "nowscore_score": "1-0", "nowscore_result_code": "3", "nowscore_handicap_line": "0", "nowscore_home": "H", "nowscore_away": "A", "nowscore_sp_url": "https://example/sp", "nowscore_raw_row_hash": "r",
+    }])
+    monkeypatch.setattr(pipeline, "_nowscore_probe_ledger", lambda *_args: probes)
+    package = tmp_path / "v2"; pipeline.extend_package_amendment_v2(baseline, probe_root, package)
+    path = package / "source_probe_receipts_v2.csv"
+    frame = pd.read_csv(path, dtype=str); frame.loc[0, "exact_23_key_hit_count"] = "999"; frame.to_csv(path, index=False)
+    manifest = pipeline._manifest(package, implementation_sha=pipeline._sha256(Path(pipeline.__file__)), disposition=pipeline.DISPOSITION_READY)
+    manifest["contract"] = pipeline.CONTRACT_AMENDMENT_V2
+    pipeline._write_json(package / "MANIFEST.json", manifest)
+    with pytest.raises(pipeline.SettlementError, match="source-probe receipt"):
+        pipeline.verify_package(package)
+
+
+def test_v2_nowscore_source_trace_tamper_fails_even_if_manifest_rewritten(tmp_path, monkeypatch):
+    raw = _raw(tmp_path, monkeypatch)
+    incomplete = MatchRow(issue="25011", match_idx=2, league="L", kickoff_ts="2025-01-01 01:00:00", home="H", away="A", handicap_line=0, fthg=None, ftag=None, result_code=None, winning_sp=None, avg_eu_home=2.0, avg_eu_draw=3.0, avg_eu_away=4.0)
+    monkeypatch.setattr(pipeline, "parse_issue_html", lambda html, issue: [_row(issue), incomplete])
+    monkeypatch.setattr(pipeline, "_raw_row_text", lambda *args: "fixture -")
+    baseline = tmp_path / "baseline"; pipeline.build_package(raw, baseline, issues=ISSUES)
+    probe_root = tmp_path / "nowscore"; probe_root.mkdir(); (probe_root / "25011.html").write_text("snapshot", encoding="utf-8")
+    probes = pd.DataFrame([{
+        "issue": "25011", "match_idx": 2, "nowscore_issue_url": "https://example/issue", "nowscore_captured_at_utc": "2026-01-01T00:00:00+00:00", "nowscore_payload_sha256": "x" * 64, "nowscore_payload_bytes": 8,
         "identity_status": "EXACT_ISSUE_SLOT", "provider_match_id": "p", "nowscore_status": "finished", "nowscore_status_text": "完场", "nowscore_score": "1-0", "nowscore_result_code": "3", "nowscore_handicap_line": "0", "nowscore_home": "H", "nowscore_away": "A", "nowscore_sp_url": "https://example/sp", "nowscore_raw_row_hash": "r",
     }])
     monkeypatch.setattr(pipeline, "_nowscore_probe_ledger", lambda *_args: probes)

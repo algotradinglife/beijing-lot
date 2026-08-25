@@ -4,9 +4,9 @@
   "files": {
     "baseline_manifest_v1.json": "e68d1c266f81b32eabc64a609c7e729e2f29cb1157ee32b788cec5eb2b585a23",
     "canonical_settlements.parquet": "f62961f2c2174534fd6bf77298fc02eeea8ef39996fc1ea0b95849dcf943a0dd",
-    "decision.json": "341f53faf7b7be0fb4a91f7610dd69680b2a9ee24b68900fdf0449333355b51d",
+    "decision.json": "311760db3c867c67c15ec8886289c797779a99b8e828a78e2b629605f0ec2014",
     "exclusion_ledger.csv": "1d35a54dea173d71fef958ec1faeaa7a3655425f157cf996be046d4c4e616255",
-    "issue_ledger.csv": "451e1e7fd0c7422093729f1f4386df1d0a318bac373717b429c6a84d61f97a15",
+    "issue_ledger.csv": "13534806bd2dad41ea3d9528cd8602e9ab5d4c79ec1b31eae24a3b837a308b2d",
     "nowscore_probe_ledger.csv": "2ee5e8b2662865d79e5236bc96b01dad775275b99e8b77feba129592cdb11928",
     "raw/acquisition_receipts.csv": "7e906359b1a14ae674468d513a3a178d791915f4870202b1ed310292c5b1f915",
     "raw/nowscore_issue_pages/25012.html": "f765b509998ebbae220d00dd32faf7aea71532cff87b8b6237acb3e99281ab31",
@@ -83,7 +83,8 @@
     "raw/pages/25124.html": "23dae6a4ff6597b14fb159930cb9b2a13b0abc3c4e3e82cebcd73cbd23911d55",
     "raw/pages/25125.html": "86628366f2083d3b85be1391a570dd1e8fa7de22d4a9fdd84785238c0636320e",
     "residual_disposition_v2.csv": "185da271f3ff3c1d7cf42ab4cebf17bf53883dc2001712f81ca863159449c527",
-    "source_inventory.csv": "a6b6b028e5ad5bf77c3107f92e7e4394fa6e908a726c5f327deb1cc08eaf70d7"
+    "source_inventory.csv": "a6b6b028e5ad5bf77c3107f92e7e4394fa6e908a726c5f327deb1cc08eaf70d7",
+    "source_probe_receipts_v2.csv": "284de3c03251e7411751400305206bc22bcadb3d81f127e8fa17edaf28754167"
   },
-  "implementation_sha256": "cd01bbc378d9f27114ac9f30c7d1c59a9dcc2f06c9cd5f0ac2dfdb980047b096"
+  "implementation_sha256": "3fff296a25c7a5b6f222042cbcb00c3416a3c34973c5c62db0917b071343cc2e"
 }

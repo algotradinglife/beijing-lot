@@ -8,6 +8,11 @@ Contract: `BJ-DATA-2025-SETTLEMENT-BACKFILL-001/v2`
 It does not run, select, tune, rank, weight, allocate, or otherwise authorize a
 strategy. `strategy_execution_authorized=false` remains bound in the package.
 
+The v2 issue ledger explicitly marks all 57 calendar issues
+`downstream_eligible=true`. The 36 issues with one or more admissibly excluded
+fixtures use `INCLUDED_WITH_ADMISSIBLE_FIXTURE_EXCLUSIONS`; only the individual
+fixture exclusions reside in `residual_disposition_v2.csv`.
+
 The v1 recovery froze 57 authoritative 500.com issue pages for the complete
 2025 calendar (`25011`–`25125`) and reconstructed 16,237 source rows. 16,117
 rows have the native handicap result and a positive native winning SP and are in
@@ -24,6 +29,19 @@ provenance. It is never converted into a Beijing winning SP or ticket payout.
 
 ## Source-lane readback
 
+`source_probe_receipts_v2.csv` is the machine-readable, verifier-bound receipt
+for the exact 23 former no-SP `(issue, match_idx)` keys. It records each lane's
+identity/path, observation timestamp, SHA-256 or per-page pinned hash, exact-key
+hit count, winning-SP capability, admissible use, and result:
+
+| Lane | Exact 23-key hits | Native-SP capability / admissible use |
+|---|---:|---|
+| 500.com kaijiang | 23 | `SP=-` for these rows; canonical only where native SP is published |
+| `beidan_live.settlements` | 0 | exhausted; no additional settlement evidence |
+| frozen XLSM/BJ268 | 0 | census/crosscheck only; no source-native Beijing SP receipt |
+| `official_500_settlements` | 0 | exhausted derived duplicate of the 500 lane, not independent raw evidence |
+| Nowscore issue/provider | 23 | exclusion classification only; never a Beijing winning-SP source |
+
 - **500.com kaijiang:** 57 GB18030 pages and one terminal receipt per issue are
   carried forward unchanged from v1. They remain the canonical result/native-SP
   authority.
@@ -35,18 +53,13 @@ provenance. It is never converted into a Beijing winning SP or ticket payout.
   `raw/nowscore_issue_pages/` and is semantically re-parsed by the verifier.
 - **Local `beidan_live.settlements`:** a read-only/WAL-aware exact
   `(issue, match_idx)` audit returned 0/23 records, therefore no final score or
-  native SP. DB SHA-256: `e532397f84eff1ba1e0eb4850d9e45faf4c59a4654440e599e3d438cbc795036`.
-- **Local XLSM/BJ268 lane:** `历史数据` has 365,161 rows × 75 columns; the audit
-  found three weak fixture candidates but 0 source-native Beijing settlement
-  receipts. Workbook SHA-256:
-  `f2b1d7df6c431d4f3d2974e975dbd51f2945f34fabb2e2e1bdbf3087948fee22`.
-  It remains a legacy/crosscheck lane and was not promoted into the canonical
-  settlement table.
-- **`official_500_settlements`:** a downstream SQLite materialization shape, not
-  an independent raw lane. Its exact-key audit produced 0/23 records; expected
-  local derived files were absent at the active workspace path at delivery, which
-  is recorded as absence rather than manufactured source data. Its importer reads
-  the same 500 source database and cannot provide a second source for a residual.
+  native SP. The source SHA-256 is recorded in the source-probe receipt.
+- **Local XLSM/BJ268 lane:** it remains a legacy/crosscheck lane and was not
+  promoted into the canonical settlement table; its source hash and 0/23
+  source-native settlement readback are receipted.
+- **`official_500_settlements`:** a downstream SQLite materialization shape,
+  not an independent raw lane. Its exact-key audit produced 0/23 records and
+  its source hash/observation are explicit in the receipt.
 
 ## Evidence package
 
@@ -57,13 +70,20 @@ modifying its raw 500 pages or v1 exclusion ledger. New v2 artifacts are:
 - `raw/nowscore_issue_pages/*.html` — 16 immutable probe snapshots;
 - `nowscore_probe_ledger.csv` — one exact issue/slot provider probe per former
   unresolved fixture, with URL, SHA-256 and capture timestamp;
+- `source_probe_receipts_v2.csv` — every contractually declared source lane,
+  exact-23-key coverage, hash/absence evidence, native-SP capability and
+  admissible-use conclusion;
 - `residual_disposition_v2.csv` — 120-row admissible-exclusion ledger;
-- updated `decision.json` and package-wide `MANIFEST.json`.
+- v2 `issue_ledger.csv` — 57 downstream-eligible issues with fixture-level
+  exclusions kept separate; and updated `decision.json` / `MANIFEST.json`.
 
 The verifier checks the full file census and hashes, reparses all 57 500 pages,
-reconstructs canonical settlements and the v1 ledger, reparses every Nowscore
-snapshot, recomputes all 120 v2 dispositions, and rejects a changed winning SP,
-result identity, ledger label, source row, source trace, or re-manifested package.
+reconstructs canonical settlements and the v1 ledger, verifies the v2 issue
+eligibility semantics and five-lane source-probe receipt (including a direct
+SHA-256 binding from the 500 probe row to `raw/acquisition_receipts.csv`),
+reparses every Nowscore snapshot, recomputes all 120 v2 dispositions, and rejects
+a changed winning SP, result identity, ledger label, source row, source trace,
+source-probe fact, or re-manifested package.
 The 16 Nowscore page hashes are additionally pinned in the verifier's frozen v2
 contract, so an attacker cannot replace a raw snapshot and simply rewrite the
 package manifest/derived ledger.

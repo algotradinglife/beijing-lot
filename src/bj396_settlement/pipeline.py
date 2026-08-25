@@ -52,6 +52,22 @@ V2_NOWSCORE_PAGE_SHA256 = {
     "25111": "1d72ff3e32af29e6b541765728af839aaf1d5babc7e8d273987a326671c56296",
     "25121": "576db55fd5b6c88f7c08db2c640795a0b8c67e8590c22a6820064ea238ef2fe7",
 }
+V2_SOURCE_PROBE_RECEIPT_COLUMNS = (
+    "source_id", "source_identity", "probe_path_or_url", "observed_at_utc",
+    "sha256_or_absence_evidence", "exact_key_predicate",
+    "exact_23_key_hit_count", "native_winning_sp_capability",
+    "admissible_use", "probe_result",
+)
+# Read-only amendment-v2 source-lane probes for the exact 23 v1 no-SP keys.
+# Local materialization hashes are audit receipts, not an elevation of a mutable
+# database to independent settlement authority.
+V2_SOURCE_PROBE_RECEIPT_ROWS = (
+    ("500_kaijiang", "500.com authoritative result/native-SP issue pages", "raw/pages/*.html + raw/acquisition_receipts.csv", "2026-08-25T12:27:17+00:00", "7e906359b1a14ae674468d513a3a178d791915f4870202b1ed310292c5b1f915", "baseline unresolved (issue,match_idx) exact join", 23, "NO_NATIVE_SP_FOR_EXACT_23", "CANONICAL_NATIVE_SETTLEMENT_FOR_COMPLETE_ROWS", "23 exact baseline rows have official result/SP=- and remain non-settleable"),
+    ("beidan_live_settlements", "local beidan_live.settlements SQLite materialization", "/home/drwho1985/workspace/soccer/beijing-lot/data/beidan_live.db:settlements", "2026-08-25T13:34:02+00:00", "c6b4ea52ed3d26b9d0b030f28125cb441afcc7f500bf236645be5f9352a12090", "INNER JOIN requested USING(issue,match_idx)", 0, "NO_EXACT_23_HITS", "EXHAUSTED_NO_ADDITIONAL_SETTLEMENT_EVIDENCE", "read-only/WAL-aware exact-key probe returned zero rows"),
+    ("beidan_xlsm_bj268", "frozen local Beidan XLSM / BJ268 lineage", "/home/drwho1985/workspace/soccer/beijing-lot/data/raw/beidan.xlsm", "2026-08-25T13:34:02+00:00", "f825020658f2b0e95715659381107c246a24ec36b87801eebb63233921072d59", "conservative fixture identity probe for 23 baseline keys", 0, "NO_SOURCE_NATIVE_BEIJING_SP_RECEIPT", "CENSUS_AND_CROSSCHECK_ONLY", "no source-native Beijing settlement receipt for any exact residual"),
+    ("official_500_settlements", "local derived official_500_settlements SQLite table", "/home/drwho1985/workspace/soccer/beijing-lot/data/derived/beidan_xlsm/beidan_xlsm.sqlite:official_500_settlements", "2026-08-25T13:35:04+00:00", "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f", "INNER JOIN requested USING(issue,match_idx)", 0, "NO_EXACT_23_HITS", "EXHAUSTED_DERIVED_DUPLICATE_OF_500_LANE", "read-only exact-key probe returned zero rows; table is not an independent raw source"),
+    ("nowscore_issue_provider", "frozen Nowscore issue/provider snapshots", "raw/nowscore_issue_pages/*.html", "2026-08-25T12:54:16+00:00", "PER_PAGE_SHA256_PINNED_IN_V2_NOWSCORE_PAGE_SHA256", "INNER JOIN requested USING(issue,match_idx)", 23, "NO_NATIVE_BEIJING_WINNING_SP", "EXCLUSION_CLASSIFICATION_ONLY", "5 exact cancellations and 18 finished/no-native-SP rows; no payout or SP is inferred"),
+)
 TARGET_ISSUES = tuple(
     f"25{suffix:03d}"
     for suffix in (
@@ -61,6 +77,7 @@ TARGET_ISSUES = tuple(
         104, 105, 111, 112, 113, 114, 115, 121, 122, 123, 124, 125,
     )
 )
+FROZEN_TARGET_ISSUES = TARGET_ISSUES
 
 
 class SettlementError(RuntimeError):
@@ -353,6 +370,47 @@ def _issue_ledger(settlements: pd.DataFrame, exclusions: pd.DataFrame, issue_lis
     return ledger
 
 
+def _v2_issue_ledger(settlements: pd.DataFrame, exclusions: pd.DataFrame, issue_list: list[str]) -> pd.DataFrame:
+    """Emit v2 eligibility without elevating fixture exclusions to issue blocks."""
+    ledger = _issue_ledger(settlements, exclusions, issue_list).copy()
+    if (ledger["included_fixture_count"] <= 0).any():
+        raise SettlementError("v2 issue eligibility requires canonical settlement rows for every census issue")
+    partial = ledger["excluded_fixture_count"].astype(int).gt(0)
+    ledger["downstream_eligible"] = True
+    ledger.loc[partial, "inclusion_status"] = "INCLUDED_WITH_ADMISSIBLE_FIXTURE_EXCLUSIONS"
+    ledger.loc[partial, "reason"] = "SEE_RESIDUAL_DISPOSITION_V2"
+    return ledger
+
+
+def _v2_source_probe_receipts() -> pd.DataFrame:
+    """Return the frozen amendment-v2 source-lane probe receipt in canonical order."""
+    return pd.DataFrame(V2_SOURCE_PROBE_RECEIPT_ROWS, columns=V2_SOURCE_PROBE_RECEIPT_COLUMNS)
+
+
+def _validate_v2_source_probe_receipts(receipts: pd.DataFrame) -> pd.DataFrame:
+    """Reject semantic changes to the all-lane exact-23 source audit receipt."""
+    expected = _v2_source_probe_receipts().astype(str).fillna("")
+    actual = receipts.copy().astype(str).fillna("")
+    if list(actual.columns) != list(expected.columns) or not actual.equals(expected):
+        raise SettlementError("v2 source-probe receipt differs from frozen source-lane audit")
+    if actual["source_id"].duplicated().any() or len(actual) != 5:
+        raise SettlementError("v2 source-probe receipt must represent each declared lane exactly once")
+    if actual["exact_23_key_hit_count"].astype(int).tolist() != [23, 0, 0, 0, 23]:
+        raise SettlementError("v2 source-probe receipt exact-key coverage mismatch")
+    return actual
+
+
+def _validate_v2_500_receipt_anchor(receipts: pd.DataFrame, raw_root: Path) -> None:
+    """Bind the 500 source-probe receipt to the immutable acquisition ledger bytes."""
+    source = receipts.loc[receipts["source_id"].eq("500_kaijiang")]
+    if len(source) != 1:
+        raise SettlementError("v2 source-probe receipt lacks a unique 500 lane")
+    expected = str(source.iloc[0]["sha256_or_absence_evidence"])
+    receipt_path = raw_root / "acquisition_receipts.csv"
+    if not receipt_path.is_file() or _sha256(receipt_path) != expected:
+        raise SettlementError("frozen 500 acquisition receipt differs from source-probe anchor")
+
+
 def build_package(raw_root: str | Path, package_root: str | Path, *, issues: Iterable[str] = TARGET_ISSUES) -> Path:
     """Build a portable, replayable package solely from immutable raw receipts."""
     issue_list = _check_target_issues(issues)
@@ -497,9 +555,17 @@ def extend_package_amendment_v2(baseline_root: str | Path, nowscore_raw_root: st
         unresolved = revised["exclusion_reason"].eq("UNRESOLVED_NATIVE_SETTLEMENT_GAP")
         disposition = DISPOSITION_BLOCKED if unresolved.any() else DISPOSITION_READY
         revised.to_csv(staging / "residual_disposition_v2.csv", index=False, encoding="utf-8")
+        settlements = pd.read_parquet(staging / "canonical_settlements.parquet")
+        issue_ledger = _v2_issue_ledger(settlements, revised, list(TARGET_ISSUES))
+        issue_ledger.to_csv(staging / "issue_ledger.csv", index=False, encoding="utf-8")
+        source_probe_receipts = _validate_v2_source_probe_receipts(_v2_source_probe_receipts())
+        source_probe_receipts.to_csv(staging / "source_probe_receipts_v2.csv", index=False, encoding="utf-8")
         decision = json.loads((staging / "decision.json").read_text(encoding="utf-8"))
+        decision.pop("excluded_issue_count", None)
         decision.update({
             "contract": CONTRACT_AMENDMENT_V2, "disposition": disposition,
+            "downstream_eligible_issue_count": int(issue_ledger["downstream_eligible"].sum()),
+            "issues_with_admissible_fixture_exclusions": int(issue_ledger["excluded_fixture_count"].astype(int).gt(0).sum()),
             "nowscore_probed_fixture_count": int(len(probes)),
             "postponed_or_cancelled_fixture_count": int(revised["exclusion_reason"].eq("POSTPONED_OR_CANCELLED").sum()),
             "never_settled_official_no_sp_count": int(revised["exclusion_reason"].eq("NEVER_SETTLED_OFFICIAL_NO_SP").sum()),
@@ -554,7 +620,8 @@ def verify_package(package_root: str | Path) -> dict:
     if list(exclusions.columns) != list(expected_exclusions.columns) or not exclusions.equals(expected_exclusions):
         raise SettlementError("exclusion ledger differs from raw source evidence")
     ledger = pd.read_csv(root / "issue_ledger.csv", dtype=str).fillna("")
-    expected_ledger = _issue_ledger(replay, expected_exclusions, list(TARGET_ISSUES))
+    ledger_builder = _v2_issue_ledger if contract == CONTRACT_AMENDMENT_V2 else _issue_ledger
+    expected_ledger = ledger_builder(replay, expected_exclusions, list(TARGET_ISSUES))
     expected_ledger = pd.read_csv(StringIO(expected_ledger.to_csv(index=False)), dtype=str).fillna("")
     if list(ledger.columns) != list(expected_ledger.columns) or not ledger.equals(expected_ledger):
         raise SettlementError("issue ledger differs from source recovery state")
@@ -563,11 +630,19 @@ def verify_package(package_root: str | Path) -> dict:
     expected_decision_counts = {
         "target_issue_count": len(TARGET_ISSUES),
         "included_issue_count": int(emitted["issue"].astype(str).nunique()),
-        "excluded_issue_count": int(exclusions["issue"].astype(str).nunique()),
         "source_row_count": len(all_rows),
         "settlement_record_count": len(emitted),
         "excluded_fixture_count": len(exclusions),
     }
+    if contract == CONTRACT_AMENDMENT_V2:
+        expected_decision_counts.update({
+            "downstream_eligible_issue_count": len(TARGET_ISSUES),
+            "issues_with_admissible_fixture_exclusions": int(exclusions["issue"].astype(str).nunique()),
+        })
+        if "excluded_issue_count" in decision:
+            raise SettlementError("v2 decision must not label admissibly partial issues as excluded")
+    else:
+        expected_decision_counts["excluded_issue_count"] = int(exclusions["issue"].astype(str).nunique())
     for key, expected in expected_decision_counts.items():
         if int(decision.get(key, -1)) != expected:
             raise SettlementError(f"decision count mismatch: {key}")
@@ -582,6 +657,10 @@ def verify_package(package_root: str | Path) -> dict:
         baseline_manifest = json.loads((root / "baseline_manifest_v1.json").read_text(encoding="utf-8"))
         if baseline_manifest.get("contract") != CONTRACT_VERSION:
             raise SettlementError("missing immutable v1 baseline receipt")
+        emitted_source_probes = pd.read_csv(root / "source_probe_receipts_v2.csv", dtype=str).fillna("")
+        _validate_v2_source_probe_receipts(emitted_source_probes)
+        if tuple(TARGET_ISSUES) == FROZEN_TARGET_ISSUES:
+            _validate_v2_500_receipt_anchor(emitted_source_probes, root / "raw")
         probes = _nowscore_probe_ledger(root / "raw" / "nowscore_issue_pages", exclusions)
         emitted_probes = pd.read_csv(root / "nowscore_probe_ledger.csv", dtype=str).fillna("")
         expected_probes = probes.astype(str).fillna("")
