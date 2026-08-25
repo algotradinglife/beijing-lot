@@ -1,0 +1,3 @@
+policy,standalone_positive,standalone_ex_largest_positive,matched_lift_positive,matched_ex_largest_positive,annual_non_reversal,max_drawdown_nonworse,losing_run_nonworse,underwater_nonworse,moving_block_p05_nonnegative,calibration_logloss_nonworse,calibration_brier_nonworse,mechanism_gate_pass
+EXPANDING_EXPONENTIAL,False,False,False,False,False,False,False,False,False,False,False,False
+RECENT_STATE_BLEND,False,False,False,False,False,False,False,False,False,False,False,False

@@ -1,0 +1,14 @@
+{
+  "contract": "BJ-UNIFIED-N7-CUTOFF-WALKFORWARD-001/v1",
+  "exposed_historical_only": true,
+  "passing_primary_temporal_policies": [],
+  "preserved_issues": [
+    210,
+    218
+  ],
+  "primary_arm": "R3_CONTROL",
+  "prospective_authorized": false,
+  "secondary_arm": "C1E3_SECONDARY",
+  "strategy_promoted": false,
+  "verdict": "NO_N7_RECENCY_INCREMENT"
+}
