@@ -2,6 +2,13 @@
 
 Research, data, and decision tooling for the Beijing single-match lottery.
 
+## Start here after the Ubuntu migration
+
+Read the [Ubuntu migration and project continuation handoff](docs/handoffs/ubuntu-migration-project-handoff.md)
+before restoring data or starting new research. It records the current N7 evidence,
+GitHub control-plane state, external-data snapshot boundary, verified restore steps,
+and the planned transition into fundamental-data collection and modeling.
+
 ## Forward market snapshots
 
 Issue [#248](https://github.com/algotradinglife/beijing-lot/issues/248)
