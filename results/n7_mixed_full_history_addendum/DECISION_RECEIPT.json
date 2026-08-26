@@ -1,0 +1,12 @@
+{
+  "contract": "BJ-UNIFIED-N7-MIXED-CLOSEOUT-001/v1",
+  "deprecated_field_never_decision_driving": "the merged `matched_ex_largest_lift_cny` appears only in the descriptive matched-contrasts table of the frozen pipeline; the terminal decision gates used native-denominator `ex_largest_pnl_cny` and `moving_block_p05_lift_cny` only",
+  "original_decision_file_sha256": "4e45f74a5ff717db8ba82c72cb7c649212aa773b8e9e61ea90bf1dc11f99db9c",
+  "preserved_issues": [
+    210,
+    218
+  ],
+  "prospective_authorized_unchanged": false,
+  "strategy_promoted_unchanged": false,
+  "verdict_unchanged": "NO_MIXED_N7_EXTENSION_INCREMENT"
+}

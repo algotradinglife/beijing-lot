@@ -1,0 +1,27 @@
+{
+  "added_fields": {
+    "armwise_ex_largest_lift_cny": "subject_ex_largest_pnl_cny - reference_ex_largest_pnl_cny; each arm removes its own largest gross-payout issue",
+    "largest_absolute_paired_delta_sensitivity_cny": "sum(paired_delta) - paired_delta[argmax(abs(paired_delta))]"
+  },
+  "contract": "BJ-UNIFIED-N7-MIXED-CLOSEOUT-001/v1",
+  "deprecation": {
+    "deprecated_field": "matched_ex_largest_lift_cny",
+    "merged_value_semantics": "delta.sum() - delta[argmax(abs(delta))] on the exact-common issue set (paired-delta sensitivity), not armwise ex-largest",
+    "statement": "The merged #394 field `matched_ex_largest_lift_cny` is DEPRECATED and MUST NOT be consumed as an armwise ex-largest lift. It was computed as the paired-delta sensitivity `delta.sum() - delta[argmax(abs(delta))]` on the exact-common issue set, not as an armwise ex-largest removal. Consumers must use `armwise_ex_largest_lift_cny` for armwise ex-largest semantics and `largest_absolute_paired_delta_sensitivity_cny` for the paired-delta sensitivity semantics.",
+    "status": "DEPRECATED"
+  },
+  "deterministic_regeneration_only": true,
+  "evidence_cutoff_ts": "2026-08-25T14:10:00Z",
+  "issue": 399,
+  "parent_issue": 394,
+  "source": {
+    "original_bj396_manifest_sha256": "4fbd57bd4299ebefeaa31e32f71a5175035690f2f00ebd23fc93526c1257ac87",
+    "original_evidence_cutoff_ts": "2026-08-25T14:10:00Z",
+    "original_package_manifest_bytes": 6728,
+    "original_package_manifest_sha256": "022d9e26fd21a210884c1c13fb12d5bbf21c6d6d35075c8dea5c88c00b4f1187",
+    "original_source_contract": "BJ-UNIFIED-N7-MIXED-FULL-HISTORY-001/v1",
+    "source_merge_pr": 398,
+    "source_merge_sha": "5457afbff6582b9f204e176e4f4a7e2943977914",
+    "source_package": "results/n7_mixed_full_history"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "contract": "BJ-UNIFIED-N7-MIXED-CLOSEOUT-001/v1",
+  "deliverables": {
+    "docs/research/Issue-399-N7-Mixed-Closeout-Addendum.md": "684dfdd968662e7e6a6336b155a741552020c7d522a1d9ac8950d680f96fc5eb",
+    "notebooks/research/n7-mixed-full-history/Issue-399-N7-Mixed-Closeout-Addendum.ipynb": "045a9c9098f2bfced7fd739ce519522536da6ae4842ad8594aa95795f20de81f",
+    "scripts/build_n7_mixed_closeout_addendum.py": "36785a098fe385b90f1168629f80a2ce339bdaa74baa735b3776d8827e837c01",
+    "scripts/verify_n7_mixed_closeout_addendum.py": "1b92f2f269e810cb1ee66924eb0453c59ab19804e4a38b7e9b9a0adb2e1b934e",
+    "tests/test_bj399_n7_mixed_closeout_addendum.py": "cf3e9e2ed53cc86df0f6b595b10532bc76034284051cc00bedc9079ac18bf654"
+  },
+  "files": {
+    "ADDENDUM_RECEIPT.json": {
+      "bytes": 1776,
+      "sha256": "c2cc0051c71c5d39f413f1ed4e30c6d1493e2830f7017d55ad442256ca8f7f8e"
+    },
+    "DECISION_RECEIPT.json": {
+      "bytes": 627,
+      "sha256": "37bf90d8217f966cd30546ac9267b13a6455fba19c8c81b727e8faab85c7b358"
+    },
+    "matched_contrasts_corrected.csv": {
+      "bytes": 2508,
+      "sha256": "9da9ed44a79009dcbc54c2487652004c11ce5691d3d087f362377258def8797d"
+    },
+    "moving_block_metadata.json": {
+      "bytes": 1797,
+      "sha256": "f97c327a849f1338930111ab6f28ce2f29ffb63cee971a68762b18c9e6bb41d5"
+    },
+    "paired_delta_frame.csv": {
+      "bytes": 156658,
+      "sha256": "a73f0564fdb3aaaa89d4b1dbc21409af8f7888d82d02d43e20631beebd4751f2"
+    },
+    "semantic_counterexamples.csv": {
+      "bytes": 1087,
+      "sha256": "03385008f113264c4819ba1174d97fa59ff796a87591d64e79ad6576aaec00f5"
+    }
+  },
+  "implementation": {
+    "closure_sha256": "de73c79d8dde628950ba953622158141974f047bbd16b1af4052b8da287c4cf2",
+    "distributions": {
+      "nbclient": "0.10.2",
+      "nbformat": "5.10.4",
+      "numpy": "2.4.6",
+      "pandas": "3.0.3"
+    },
+    "files": {
+      "scripts/scrape_nowscore_bjdc.py": "59c5a2fca137ad474abd80d1102ccf0e7315cf2fe7102179f2cbc35693f82451",
+      "src/backfill/parser.py": "821543f52a866b819cb950ff741cfbe30f1dbb388cb57638733154b08c6d590e",
+      "src/backfill/scraper.py": "e9e17dcb5aa3af76ed71dac3dda33daff6e2dd34e54f2d9331fae08f55d603bf",
+      "src/bj396_settlement/pipeline.py": "b8cb733618165e16ff63b57318fab9ecc24ee5ed380c0502e226411cb9e5631a",
+      "src/cutoff_mapping/api.py": "d61a048a732ba93578603bde5a3c940313df81535194c4517654ec6ab413fc69",
+      "src/cutoff_mapping/contract.py": "4e1a62cad6a9b6ca653ae15721abd10265ee28450d83db6394f02349a60ead08",
+      "src/cutoff_walkforward/contract.py": "1a57b8193c34b5442883037605382516d181dac834bb5fd76f803720e66e5d84",
+      "src/cutoff_walkforward/fitting.py": "108be8fd4a58283d3bcd0866bdfbc02b1a51a7bfaf6d80a2bbf51dc23384d611",
+      "src/cutoff_walkforward/pipeline.py": "b44bb8c8ce96af2b55aa45e8aba5e6fc070bb216876a413a524364ac6d032dce",
+      "src/divergence_materializer/contract.py": "8029c62224209023c5854963ed318aff6478f64afda5b91aa48cd6119f34486b",
+      "src/divergence_materializer/data.py": "c66a50362457ba2f98581cd4cac2f7372331c5b3eb9ee082584acca10d0371ea",
+      "src/low_n_selector_data/contract.py": "e7b8ab35649b83f647f9bbe21848903b539c4792edb0c5e75eb07a27f0eeacef",
+      "src/low_n_selector_data/pipeline.py": "666d14cf53fb09af024cb32999ce23b8a3a5afa6788a49c3d533c6a96a8f4bca",
+      "src/n7_chronology_sync/contract.py": "7f322be3574fc4f8bd0d1c8528ad0bfe3562e190b336291d91991301f33f6ba1",
+      "src/n7_chronology_sync/pipeline.py": "ec7a0c27a3e720d89a5eca33c0c5b81dd1a65740c0cbc8273bd3e074001d93e5",
+      "src/n7_cutoff_walkforward/contract.py": "4c984ae929403cde56066e4e9987159873ea06fc2b157ea084cb1008b89b87db",
+      "src/n7_cutoff_walkforward/pipeline.py": "1d8166bfd03919c5b0552cc1ae10c516a8c43792accf2c62c63c6bc6bacf77c5",
+      "src/n7_mixed_full_history/closeout.py": "99735c96b9d4eb97b8252a5f47f6a39f0ffd57b86868cab6162941662e68f23e",
+      "src/n7_mixed_full_history/contract.py": "b76e15d9c1f32f62264080edc8e408d2678031ffdf778ad7748e4015c8c3a078",
+      "src/n7_mixed_full_history/pipeline.py": "0e88fd15195d365952367852f08b774cd8efa388521927f0d16a50b015fdedbe",
+      "src/n7_support_shape/contract.py": "00bc1cf7024084a8755c77f178acc3ecf77ff1c3ed986daf2ea331df56ea7cd6",
+      "src/n7_support_shape/pipeline.py": "8a05ae4f95eff97af3e0844a28545736a854e1b1deeec65e3b310fc61715abc7",
+      "src/n7_support_transfer_grid/contract.py": "2d6fe840ce5b6acd4ca4b64410ebdc25427834759ac73f0f8df28b1f65a646f3",
+      "src/n7_support_transfer_grid/pipeline.py": "0a99bb5b447c89a740c252d3a50f3986ada5f259b45c103276a09fbf6b0acdeb",
+      "src/neural_top2_residual/contract.py": "f7b670e5e02432e272ba6009904debe02ab9e4a63943e0ea5c20e58a03f2ecfd",
+      "src/neural_top2_residual/data.py": "a35629124dad9679c7360c4106e1fd35326b7e0c2b8541565ef22ed2c246e7fe",
+      "src/qeu_threshold_n7/contract.py": "bf5de2dadc2d76456b63096790b4d57869e3aec597113f1f175c892eb5f9cd30",
+      "src/qeu_threshold_n7/pipeline.py": "1885d2b15b67520a293bea2ad6506722f53dcd1ffda64f870595c1ab3fc648fc",
+      "src/source_schema/publication.py": "4200b80dca966a5c76c6494f8c256cfb578732bc9ee21319bfc36143d8a41e45",
+      "src/sqlite_runtime.py": "b5552f2364205a032e847e34eb26184e60bcd1c097bf15382f51bb876e14e8ff",
+      "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "src/temporal_learning/core.py": "4936abae75716c5c9d3f5dc54b7a10fd167570f154606f07202b555f81d6864c",
+      "src/temporal_learning/example_selector.py": "a0e7913db48e8ef806aa8bfcf1bc3550064dc26129dca34c95675084f4bedf46",
+      "src/temporal_learning/provenance.py": "8cec2087336b9f89f53a85a5a75d7c218e2d8910c25c9e086e6147e5f1cd847f"
+    },
+    "root_modules": [
+      "src.n7_mixed_full_history.closeout"
+    ]
+  },
+  "source_binding": {
+    "original_bj396_manifest_sha256": "4fbd57bd4299ebefeaa31e32f71a5175035690f2f00ebd23fc93526c1257ac87",
+    "original_evidence_cutoff_ts": "2026-08-25T14:10:00Z",
+    "original_package_manifest_bytes": 6728,
+    "original_package_manifest_sha256": "022d9e26fd21a210884c1c13fb12d5bbf21c6d6d35075c8dea5c88c00b4f1187",
+    "original_source_contract": "BJ-UNIFIED-N7-MIXED-FULL-HISTORY-001/v1",
+    "source_merge_pr": 398,
+    "source_merge_sha": "5457afbff6582b9f204e176e4f4a7e2943977914",
+    "source_package": "results/n7_mixed_full_history"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "block_length": 10,
+  "draw_count": 5000,
+  "estimand": "paired_mean_cny_per_issue",
+  "reconciles_to_producer_config": true,
+  "rows": [
+    {
+      "contrast": "vs_C1E3",
+      "issues": 268,
+      "moving_block_p05_lift_cny_per_issue": -273.7617736396171,
+      "scope": "ALL"
+    },
+    {
+      "contrast": "vs_R0",
+      "issues": 268,
+      "moving_block_p05_lift_cny_per_issue": -246.72890929203663,
+      "scope": "ALL"
+    },
+    {
+      "contrast": "vs_R3",
+      "issues": 268,
+      "moving_block_p05_lift_cny_per_issue": -328.6746792602363,
+      "scope": "ALL"
+    },
+    {
+      "contrast": "vs_C1E3",
+      "issues": 117,
+      "moving_block_p05_lift_cny_per_issue": -207.48987752945897,
+      "scope": "EXTENSION_2025_2026"
+    },
+    {
+      "contrast": "vs_R0",
+      "issues": 117,
+      "moving_block_p05_lift_cny_per_issue": -756.6615889609543,
+      "scope": "EXTENSION_2025_2026"
+    },
+    {
+      "contrast": "vs_R3",
+      "issues": 117,
+      "moving_block_p05_lift_cny_per_issue": -209.16697648375236,
+      "scope": "EXTENSION_2025_2026"
+    },
+    {
+      "contrast": "vs_C1E3",
+      "issues": 151,
+      "moving_block_p05_lift_cny_per_issue": -440.12208841135,
+      "scope": "PRE_2025"
+    },
+    {
+      "contrast": "vs_R0",
+      "issues": 151,
+      "moving_block_p05_lift_cny_per_issue": -82.08216270584633,
+      "scope": "PRE_2025"
+    },
+    {
+      "contrast": "vs_R3",
+      "issues": 151,
+      "moving_block_p05_lift_cny_per_issue": -581.6461225691472,
+      "scope": "PRE_2025"
+    }
+  ],
+  "seed": 394001,
+  "semantics": "moving-block bootstrap of the per-issue paired mean lift (CNY); p05 = 5th percentile over draws of the resampled per-issue mean; the p05 value is PER-ISSUE scale (CNY_PER_ISSUE), not total lift",
+  "unit": "CNY_PER_ISSUE"
+}
