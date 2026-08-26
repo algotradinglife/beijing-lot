@@ -242,10 +242,14 @@ SP drift 文档/图、三份 structured decision chain 文档、`normalized/`、
 
 ```bash
 git status --short --branch
-git diff --binary > /mnt/f/beijing-lot-data/wsl-working-tree-$(date +%Y%m%dT%H%M%S).patch
+git diff --binary HEAD > /mnt/f/beijing-lot-data/wsl-working-tree-$(date +%Y%m%dT%H%M%S).patch
 git ls-files --others --exclude-standard -z | \
-  tar --null -T - -czf /mnt/f/beijing-lot-data/wsl-untracked-$(date +%Y%m%dT%H%M%S).tar.gz
+  tar --null -czf /mnt/f/beijing-lot-data/wsl-untracked-$(date +%Y%m%dT%H%M%S).tar.gz -T -
+git bundle create /mnt/f/beijing-lot-data/beijing-lot-all-refs-$(date +%Y%m%dT%H%M%S).bundle --all
 ```
+
+对 bundle 再运行 `git bundle verify <bundle-path>`。tracked patch、untracked tar 和 bundle
+分别保护工作树差异、未跟踪文件和未推送 Git refs，三者不能互相替代。
 
 不要在不了解内容时运行 `git reset --hard`、`git clean` 或递归删除。
 
