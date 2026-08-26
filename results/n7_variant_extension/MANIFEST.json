@@ -3,7 +3,7 @@
   "deliveries": {
     "docs/research/Issue-400-N7-Variant-Extension.md": "72593ccd372ce1a049cd072fce35642bc26209458f80603d2bd6320038e1a416",
     "docs/research/figures/issue_400_n7_variant_extension.png": "aa382dbd55b01ec2bc60e9e9ba5472b950ecce340817039457ea2e24e47ecc7b",
-    "notebooks/research/n7-variant-extension/Issue-400-N7-Variant-Extension.ipynb": "db2af919766ae5a82ba4aed45dc8a0f6c8ca2d4fb09e3f384f2c1f56d1fc5dac"
+    "notebooks/research/n7-variant-extension/Issue-400-N7-Variant-Extension.ipynb": "f31ee352baf820f0a43849d41108eb81f704357b0082fdcaf7dd9b9fb9bfa4dc"
   },
   "files": {
     "action_ticket_turnover.csv": {
@@ -28,11 +28,11 @@
     },
     "mapping_receipts.json.gz": {
       "bytes": 478358,
-      "sha256": "c34beb5ce51478a2e59b025ae1cbd1633d7628e76a62a515d9fddffd1dfb5284"
+      "sha256": "85c03e3ad1895bbe27da6871c6645c544e8119ef341d8c10b36724df2fd6e251"
     },
     "mapping_summary.csv": {
-      "bytes": 149514,
-      "sha256": "b92ead0b07324a08716e782da408699012edc4cc88045492dfedfbd8257990dd"
+      "bytes": 149517,
+      "sha256": "2a9b374a2a78c549efeb8d89bd1716d2b8fd795e4d4683b2b09b3904741be376"
     },
     "matched_contrasts.csv": {
       "bytes": 87932,
@@ -77,7 +77,7 @@
   },
   "implementation": {
     "contract_sha256": "4c5b86e63e8764d4063e266c3ff8477e948b63992fd0f31f1a6d1f6aceacef8a",
-    "pipeline_sha256": "2baff496451bec09a638636d0712e6218af865763c536ddd188146085ef8e17e",
+    "pipeline_sha256": "0744ce037dc5888c1e0046ed78aa9c6810f56fa1cf81ce70e86234a7678b905e",
     "runner_sha256": "845155cef09ea571c61fdf713412f732c365c6e4e9e19bece862bf0f2036c979",
     "tests_sha256": "23ffd7fafff844ba23abbbf4a24ca9f2f6041f9db2b8e072e84331e64f78314b",
     "verifier_sha256": "ae748e93b33b6020ffdbbbd70e95cd0cb82ca060f150a7e286716d292ea9428d"

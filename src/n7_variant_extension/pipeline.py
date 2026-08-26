@@ -226,7 +226,7 @@ def _fit_policy_surface(
             )
             if stable_frame_sha(result_mapped) != stable_frame_sha(replayed):
                 raise ContractError("checkpoint mapped probabilities differ")
-            accepted = bool(result_receipt["mapping_accepted"])
+            accepted = bool(all(result_receipt["gate_predicates"].values()))
         else:
             with threadpool_limits(limits=FIT_THREAD_LIMIT):
                 result = fit_issue_mapping(
@@ -1400,7 +1400,9 @@ def _mapping_summary(receipts: list[dict[str, Any]]) -> pd.DataFrame:
                 "maximum_source_issue": receipt["maximum_source_issue"],
                 "admitted_history_sha256": receipt["admitted_history_sha256"],
                 "cache_key": receipt["cache_key"],
-                "mapping_accepted": bool(receipt["mapping_accepted"]),
+                "mapping_gate_passed": bool(
+                    all(receipt["gate_predicates"].values())
+                ),
                 "effective_sample_size": float(
                     receipt["weight_receipt"]["effective_sample_size"]
                 ),
