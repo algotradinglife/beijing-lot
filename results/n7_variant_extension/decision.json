@@ -1,0 +1,15 @@
+{
+  "best_extension_pnl_variant": "R3_C2E0_EQUAL",
+  "contract": "BJ-UNIFIED-N7-VARIANT-EXTENSION-001/v1",
+  "descriptive_positive_annual_nonreversal_variants": [],
+  "evidence_status": "CONSUMED_RETROSPECTIVE_2025_2026",
+  "exact_common_issues": 262,
+  "expert_admission_authorized": false,
+  "issue": 400,
+  "promotion_authorized": false,
+  "prospective_authorized": false,
+  "selection_or_promotion_from_extension_forbidden": true,
+  "source_merge_sha": "5457afbff6582b9f204e176e4f4a7e2943977914",
+  "terminal_394_decision_preserved": "NO_MIXED_N7_EXTENSION_INCREMENT",
+  "verdict": "N7_VARIANT_2025_2026_RETROSPECTIVE_DIAGNOSTIC_NO_PROMOTION"
+}
