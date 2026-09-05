@@ -27,8 +27,11 @@ snapshot_long <- function(data_root, project_root, python, fixture_ids = NULL, l
 
 snapshot_wide <- function(data_root, project_root, python, fixture_ids = NULL, limit = NULL) {
   table <- snapshot_long(data_root, project_root, python, fixture_ids, limit)
+  kinds <- c("initial", "final", "10h", "1h")
+  stopifnot(all(table$kind %in% kinds))
+  table$kind <- factor(table$kind, levels = kinds)
   result <- tidyr::pivot_wider(table, id_cols = c(fixture_id, quote_key), names_from = kind,
-    values_from = c(home_odds, draw_odds, away_odds, market_time))
+    values_from = c(home_odds, draw_odds, away_odds, market_time), names_expand = TRUE)
   attr(result, "receipts") <- attr(table, "receipts")
   result
 }

@@ -19,4 +19,6 @@ Imports:
     rmarkdown,
     testthat,
     withr,
+    vctrs,
+    purrr,
     renv

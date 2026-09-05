@@ -101,3 +101,22 @@ testthat::test_that('500 parsing refuses malformed candidate identity instead of
   testthat::expect_error(parse_500(sub("homeTeam:'[^']*'", "homeTeam:''", html), '120711'), 'identity')
   testthat::expect_equal(attr(parse_500(html, '120711'), 'excluded_rows')$count, 0)
 })
+
+testthat::test_that('500 source issue and nonempty date conversions are validated', {
+  html <- readr::read_file(testthat::test_path('..', 'fixtures', 'mapping', '500.html'))
+  testthat::expect_error(parse_500(sub('value="120711"', 'value="120712"', html), '120711'), 'declared issue')
+  testthat::expect_error(parse_500(sub('endTime:', 'missingTime:', html), '120712'), 'declared issue')
+  testthat::expect_error(parse_500(sub('2012-07-30 20:45', 'not-a-date', html, fixed=TRUE), '120711'), 'cutoff date')
+  testthat::expect_error(parse_schedule_date('not-a-date'), 'schedule date')
+  testthat::expect_true(all(is.na(parse_cutoff(c(NA_character_, '')))))
+  testthat::expect_true(all(is.na(parse_schedule_date(c(NA_character_, '')))))
+})
+
+testthat::test_that('an all-cancelled 500 membership returns a typed empty table', {
+  html <- readr::read_file(testthat::test_path('..', 'fixtures', 'mapping', '500.html'))
+  populated <- parse_500(html, '120711')
+  empty <- parse_500(sub('fid="123"', 'fid="-1"', html, fixed=TRUE), '120711')
+  testthat::expect_equal(nrow(empty), 0)
+  testthat::expect_identical(lapply(empty, class), lapply(populated, class))
+  testthat::expect_identical(attr(empty, 'excluded_rows')$count, 1L)
+})

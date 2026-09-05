@@ -74,9 +74,7 @@ decode_source <- function(payload, encoding) {
 }
 
 extract_first <- function(text, pattern) {
-  hit <- regexec(pattern, text, perl = TRUE)
-  m <- regmatches(text, hit)[[1]]
-  if (length(m) < 2L) NA_character_ else m[[2]]
+  stringr::str_match(text, pattern)[, 2]
 }
 
 parse_js_datetime <- function(x, tz = "Asia/Shanghai") {
@@ -86,13 +84,25 @@ parse_js_datetime <- function(x, tz = "Asia/Shanghai") {
                           as.integer(pieces[,6]), as.integer(pieces[,7]), tz = tz)
 }
 
-parse_cutoff <- function(x) lubridate::ymd_hm(x, tz = "Asia/Shanghai", quiet = TRUE)
-parse_schedule_date <- function(x) lubridate::ymd(x, quiet = TRUE)
+parse_cutoff <- function(x) {
+  out <- lubridate::ymd_hm(x, tz = "Asia/Shanghai", quiet = TRUE)
+  if (any(!is.na(x) & nzchar(x) & is.na(out))) stop("invalid mapping cutoff date")
+  out
+}
+parse_schedule_date <- function(x) {
+  out <- lubridate::ymd(x, quiet = TRUE)
+  if (any(!is.na(x) & nzchar(x) & is.na(out))) stop("invalid mapping schedule date")
+  out
+}
 
 # ---------------------------------------------------------------- 解析 500 ----
 
 parse_500 <- function(html, issue) {
   doc <- rvest::read_html(html, encoding = "UTF-8")
+  selected <- rvest::html_elements(doc, "select#expect_select option[selected]")
+  if (length(selected) != 1L) stop("500 payload-declared issue is absent or ambiguous")
+  declared <- rvest::html_attr(selected, "value")
+  if (is.na(declared) || declared != issue) stop("500 payload-declared issue differs from requested issue")
   nodes <- rvest::html_elements(doc, "tr.vs_lines")
   if (length(nodes) == 0L) stop("500 membership rows are absent")
   value_attr <- rvest::html_attr(nodes, "value")
@@ -103,7 +113,6 @@ parse_500 <- function(html, issue) {
 
   result <- tibble(value_attr = value_attr, fid_500 = fid) %>%
     filter(!is.na(fid_500), fid_500 > 0L, !is.na(value_attr)) %>%
-    rowwise() %>%
     transmute(
       issue = issue,
       slot = suppressWarnings(as.integer(extract_first(value_attr, "index:'(\\d+)'"))),

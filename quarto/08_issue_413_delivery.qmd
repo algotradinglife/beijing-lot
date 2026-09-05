@@ -39,7 +39,7 @@ knitr::kable(dplyr::select(report$data, issue, slot, fid_500, provider_id,
 | `r/mapping_engine.R`：限速、抓取、解码、两源解析、状态、对齐、行转换、写库编排 | `test-mapping-engine.R`、`test-mapping-regression.R` |
 | `r/mapping_report.R`：保存页面到 tibble / 输入哈希 | `test-mapping-regression.R`；本 QMD 和 QMD 03 |
 | `r/python_bridge.R`、`r/snapshots.R`：显式解释器、空表、ID、空值、UTC、receipt | `test-analysis-interfaces.R`、`test-mapping-regression.R` |
-| `r/quarto_helpers.R`：数据根、只读连接、标识符、JSON、结算表 | `test-analysis-interfaces.R` |
+| `r/quarto_helpers.R`：数据根、只读连接、标识符、JSON、结算表、带类型查询与 discovery 汇总 | `test-analysis-interfaces.R` |
 | `historical_id_map.py`：解析、标准化、原始字节、事务、映射、隔离、导出 | `test_historical_id_map.py`、`test_mapping_capture.py`；R 实际桥接测试 |
 | `snapshots.py`：日期解析、诊断切片、receipt、只读批次读取 | `test_snapshots.py`；R 实际桥接测试 |
 | `scripts/scrape_500_bjdc.py`：取消行不得跨行匹配 | `test_historical_id_map.py` 回归用例 |
@@ -63,6 +63,8 @@ codex review -c sandbox_mode='"workspace-write"' -c sandbox_workspace_write.netw
 - 补充边界检查：provider ID 保留前导零及大整数原文；非法数字、重复矩阵字段、冲突 void 和非一对一映射拒绝入库。
 - 第二轮 review 的 2 项 P2 已修复：有效映射与隔离状态不得并存，切换必须显式原子重建；每行球队与日期字段必须完整。500 候选身份同样严格校验。
 - 联网复审的 2 项 P2 已修复：非空非法赔率时间直接报错；8 份搬迁文档恢复为原文，避免误改括号内代码。原只读沙箱无法读 GitHub 的一次 review 不计作通过。
+- 后续复审的 3 项 P2 已修复：500 页面必须声明请求期次；非空非法日期拒绝转换；discovery 空表通过显式 prototype 保持类型。CI 增加空数据库 QMD 01 渲染。
+- Python 模块来源必须属于显式项目根；snapshot 宽表在空输入或缺少切片时保持完整类型与列名。
 - 提交 `6c653748` 的[远程分析 CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33978532497)已通过全部环境恢复、测试及三份 QMD 渲染；修复后的最终版本仍需复审和对应提交 CI。
 - 新增代码只处理确定性解析、身份映射和诊断报告；未引入历史拟合、调参、学习或决策选择函数。
 - Python 快照时间为 `HISTORICAL_PROXY`，不证明赛前可用；决策学习仍必须经过 `src/temporal_learning`。

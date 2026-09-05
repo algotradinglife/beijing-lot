@@ -6,6 +6,7 @@ source(file.path(project_root, "r", "mapping_engine.R"))
 
 fixture_500 <- function() {
   paste0(
+    "<select id='expect_select'><option value='120711' selected>120711</option></select>",
     "<table>",
     "<tr class='vs_lines' value=\"{index:'1',leagueName:'英超',homeTeam:'主队',guestTeam:'客队',",
     "endTime:'2012-07-30 20:45',scheduleDate:'2012-07-30',rangqiuNum:'-1'}\" fid='123'><td>x</td></tr>",

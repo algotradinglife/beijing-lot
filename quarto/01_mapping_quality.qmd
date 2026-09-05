@@ -6,52 +6,25 @@ format: html
 ```{r}
 source("r/quarto_helpers.R")
 con <- connect_discovery()
+summaries <- discovery_summaries(con)
+DBI::dbDisconnect(con)
 ```
 
 ## 覆盖摘要
 
 ```{r}
-issues <- DBI::dbGetQuery(con, "
-  SELECT
-    COUNT(DISTINCT issue_code) AS mapped_issues,
-    COUNT(*) AS mapped_slots,
-    COUNT(DISTINCT nowscore_provider_match_id) AS unique_titan_ids
-  FROM issue_slot_nowscore_map
-") |> tibble::as_tibble()
-isolated <- DBI::dbGetQuery(con, "
-  SELECT isolation_reason, COUNT(*) AS rows
-  FROM conflict_isolated_slot
-  GROUP BY isolation_reason
-  ORDER BY rows DESC
-") |> tibble::as_tibble()
-issues
-isolated
+knitr::kable(summaries$coverage)
+knitr::kable(summaries$isolated)
 ```
 
 ## 期次范围
 
 ```{r}
-DBI::dbGetQuery(con, "
-  SELECT
-    CASE WHEN length(issue_code) = 6 THEN '2010-2019（6位）' ELSE '2020+（5位）' END AS period,
-    COUNT(DISTINCT issue_code) AS issues,
-    COUNT(*) AS slots
-  FROM issue_slot_nowscore_map
-  GROUP BY period
-") |> tibble::as_tibble()
+knitr::kable(summaries$periods)
 ```
 
 ## 人工跟进
 
 ```{r}
-DBI::dbGetQuery(con, "
-  SELECT issue_code, COUNT(*) AS attempts
-  FROM mapping_failure
-  GROUP BY issue_code
-  ORDER BY issue_code
-") |> tibble::as_tibble()
-```
-
-```{r}
-DBI::dbDisconnect(con)
+knitr::kable(summaries$failures)
 ```

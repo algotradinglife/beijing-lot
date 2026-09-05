@@ -76,6 +76,9 @@ jobs:
           .venv/bin/python scripts/check_cutoff_governance.py
       - name: Clean offline QMD render
         run: |
+          export BEIJING_LOT_DATA_ROOT="$RUNNER_TEMP/analysis-input"
+          .venv/bin/python -c 'import os; from src.titan_clean.historical_id_map import HistoricalIdMapStore; HistoricalIdMapStore.open(os.environ["BEIJING_LOT_DATA_ROOT"]).close()'
+          quarto render quarto/01_mapping_quality.qmd --execute --no-cache
           quarto render quarto/03_500_nowscore_datatable_demo.qmd --execute --no-cache
           quarto render quarto/07_delivery_contract.qmd --execute --no-cache
           quarto render quarto/08_issue_413_delivery.qmd --execute --no-cache
