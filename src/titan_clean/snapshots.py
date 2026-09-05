@@ -5,8 +5,8 @@ Derives four diagnostic historical snapshots; prospective use is prohibited.
 Produces snapshots per fixture from the
 captured long table:
 
-  * ``initial``  — ordinal 0 of each company (first visible record)
-  * ``final``    — largest ordinal of each company (last visible record)
+  * ``initial``  — first timestamped pre-kickoff record of each company
+  * ``final``    — last timestamped pre-kickoff record of each company
   * ``10h`` / ``1h`` — as-of slices taken 10 hours / 1 hour before kickoff,
     using each company's latest visible market time strictly before the
     target instant (fail-closed if none)
@@ -16,9 +16,9 @@ Time model:
     ``YYYY,M-D,DD,HH,MM,SS`` string — no year inference needed.
   * Modern payloads: ``market_time_source_raw`` is ``MM-DD HH:MM`` and the
     year is inferred from ``kickoff_source_raw`` (``YYYY,M-D,DD,HH,MM,SS``):
-    if the market month/day is *after* the kickoff month/day, it belongs to
-    the previous year (cross-year pre-match odds, e.g. kickoff 01-02 with a
-    12-31 market stamp).
+    rollover is inferred only across adjacent December/January months.
+    Other future dates stay in the kickoff year and are excluded, never
+    shifted into prior history. These inferred times are diagnostic only.
 
 Everything is derived read-only from the capture tables; nothing here writes
 to the control database.  The output carries a source-binding receipt so a
@@ -28,15 +28,13 @@ snapshot cannot be replayed against a different capture set.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-
-# Asia/Shanghai wall clock without tz database dependency: HKT is fixed UTC+8.
-SHANGHAI_OFFSET = timedelta(hours=8)
 
 # kickoff/legacy 时间戳两种写法：`YYYY,MM-?,DD,HH,MM,SS`（带破折号月-周标记）
 # 与 `YYYY,M,D,HH,MM,SS`（纯逗号、数字无前导零）。月后破折号数字忽略。
@@ -45,6 +43,7 @@ _MODERN_TIME_RE = re.compile(r"^(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2})$")
 _LEGACY_TIME_RE = re.compile(r"^(\d{4}),(\d{1,2})(?:-\d{1,2})?,(\d{1,2}),(\d{1,2}),(\d{1,2}),(\d{1,2})$")
 
 SNAPSHOT_KINDS = ("initial", "final", "10h", "1h")
+_IMPLEMENTATION_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
 class TitanSnapshotError(ValueError):
@@ -65,7 +64,7 @@ def parse_market_time(raw: str | None, *, kickoff: datetime | None) -> datetime 
     """Parse a market_time_source_raw into a naive Shanghai wall clock.
 
     Legacy format carries a full year; modern format infers the year from the
-    fixture kickoff (month/day after kickoff => previous year).
+    fixture kickoff, with rollover only across December/January.
     """
     if not raw:
         return None
@@ -81,8 +80,10 @@ def parse_market_time(raw: str | None, *, kickoff: datetime | None) -> datetime 
     if kickoff is None:
         return None
     year = kickoff.year
-    if (month, day) > (kickoff.month, kickoff.day):
+    if kickoff.month == 1 and month == 12:
         year -= 1
+    elif kickoff.month == 12 and month == 1:
+        year += 1
     return datetime(year, month, day, hour, minute)
 
 
@@ -116,6 +117,7 @@ class SnapshotSet:
             "kickoff_source_raw": self.kickoff.isoformat() if self.kickoff else None,
             "snapshot_kinds": list(SNAPSHOT_KINDS),
             "source_binding_sha256": self.source_binding_sha256,
+            "implementation_sha256": _IMPLEMENTATION_SHA256,
             "captured_quote_count": self.captured_quote_count,
             "derived_snapshot_count": self.derived_snapshot_count,
             "availability_policy": "HISTORICAL_PROXY",
@@ -132,11 +134,14 @@ def _sha256(text: str) -> str:
 def _fixture_source_binding(con: sqlite3.Connection, batch_id: str) -> str:
     """Bind a fixture's snapshots to its exact captured quote set."""
     rows = con.execute(
-        "SELECT company_source_id, record_source_id, ordinal, home_odds, draw_odds, away_odds, market_time_source_raw "
-        "FROM historical_euro_1x2_quote WHERE batch_id=? ORDER BY record_source_id, ordinal",
+        "SELECT company_source_id, bookmaker_source_name, record_source_id, ordinal, home_odds, draw_odds, away_odds, market_time_source_raw "
+        "FROM historical_euro_1x2_quote WHERE batch_id=? ORDER BY company_source_id, bookmaker_source_name, record_source_id, ordinal",
         (batch_id,),
     ).fetchall()
-    canonical = "\n".join("|".join("" if v is None else str(v) for v in row) for row in rows)
+    chronology = con.execute(
+        "SELECT kickoff_source_raw FROM historical_fixture_observation WHERE batch_id=?", (batch_id,),
+    ).fetchall()
+    canonical = json.dumps([batch_id, chronology, rows], ensure_ascii=False, separators=(",", ":"))
     return _sha256(canonical)
 
 
@@ -228,7 +233,7 @@ def derive_batch_snapshots(
 
     Read-only: opens the Titan control DB, derives, and closes.  Returns the
     snapshot sets with their binding receipts; the caller decides how to
-    persist them (e.g. R data.table or a pinned release).
+    persist them (e.g. an R tibble and its diagnostic receipts).
     """
     database = Path(data_root).resolve() / "control" / "titan" / "control.sqlite"
     con = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)

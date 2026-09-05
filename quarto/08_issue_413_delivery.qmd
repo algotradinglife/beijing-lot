@@ -58,7 +58,10 @@ codex review --base main -c sandbox_mode='"read-only"'
 ```
 
 - 环境由 `DESCRIPTION`、`renv.lock` 和分析 CI 固定；渲染之前完成安装。
-- 独立目录初检：3 个 R 测试文件通过；Python 27 个测试通过。最终审查及远程 CI 证据将在验收时补充。
+- 独立目录验证：3 个 R 测试文件通过；Python 38 个测试通过；cutoff governance 通过。
+- 首轮完整 `codex review` 发现 3 项 P2，均已增加回归用例并修复：赛后日期误归上一年、snapshot receipt 绑定不完整、整期 void 无法入库隔离。
+- 补充边界检查：provider ID 保留前导零及大整数原文；非法数字、重复矩阵字段、冲突 void 和非一对一映射拒绝入库。
+- 提交 `6c653748` 的[远程分析 CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33978532497)已通过全部环境恢复、测试及三份 QMD 渲染；修复后的最终版本仍需复审和对应提交 CI。
 - 新增代码只处理确定性解析、身份映射和诊断报告；未引入历史拟合、调参、学习或决策选择函数。
 - Python 快照时间为 `HISTORICAL_PROXY`，不证明赛前可用；决策学习仍必须经过 `src/temporal_learning`。
 - 外部数据库 QMD 00–02 需显式数据根，不以生产数据渲染；其边界由临时 SQLite 测试覆盖。

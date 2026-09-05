@@ -3,7 +3,7 @@
 # 职责边界：
 #   * 抓取（curl，UA 与 Python 采集器一致）+ 滚动限速（120/min）
 #   * 解析 500 / Nowscore 页面 → tibble（rvest / stringr / 正则）
-#   * 对齐（same-slot / exact-remap / ordered fallback / 翻译容差）
+#   * 对齐（same-slot / exact-remap / 翻译容差）
 #   * void 行（provider<=0，取消/推迟/中断）识别与隔离
 #   * 写库经 reticulate 调 Python 的 HistoricalIdMapStore —— 写库契约的
 #     单一权威是 src/titan_clean/historical_id_map.py，R 侧不再有双份实现
@@ -133,15 +133,17 @@ parse_nowscore <- function(html, issue) {
   missing <- setdiff(required, names(wide))
   if (length(missing) > 0L) stop(glue("Nowscore matrix missing fields: {paste(missing, collapse=',')}"))
 
-  slot_col <- as.integer(wide[["16"]])
-  provider_col <- wide[["0"]]
-  provider_num <- suppressWarnings(as.numeric(gsub('^"|"$', "", provider_col)))
-  valid <- !is.na(provider_num) & provider_num >= 1 & !is.na(slot_col) & slot_col >= 1
-  void_slots <- slot_col[!is.na(slot_col) & !is.na(provider_num) & provider_num < 1] %>% unique() %>% sort()
+  provider_col <- strip_quotes(wide[["0"]])
+  if (anyNA(provider_col) || any(!grepl('^-?[0-9]+$', provider_col))) stop("invalid Nowscore provider ID")
+  slot_col <- suppressWarnings(as.integer(wide[["16"]]))
+  if (anyNA(slot_col) || any(slot_col < 1L) || anyDuplicated(slot_col) ||
+      any(!grepl('^[0-9]+$', wide[["16"]]))) stop("invalid or duplicate Nowscore slot")
+  valid <- !grepl('^-|^0+$', provider_col)
+  void_slots <- sort(slot_col[!valid])
 
   candidates <- tibble(
     issue = issue, slot = slot_col[valid],
-    provider_id = sprintf("%.0f", provider_num[valid])
+    provider_id = provider_col[valid]
   )
   team_pairs <- tibble(
     issue = issue, slot = slot_col[!is.na(slot_col)],
@@ -152,7 +154,7 @@ parse_nowscore <- function(html, issue) {
   list(candidates = candidates, void_slots = void_slots, team_pairs = team_pairs)
 }
 
-strip_quotes <- function(x) gsub('^"|"$', "", x)
+strip_quotes <- function(x) sub("^(['\"])(.*)\\1$", "\\2", x)
 
 # ---------------------------------------------------------------- 解析 Nowscore 状态 ----
 

@@ -8,7 +8,6 @@ Imports:
     tidyverse,
     jsonlite,
     digest,
-    data.table,
     rvest,
     xml2,
     lubridate,
@@ -19,4 +18,5 @@ Imports:
     knitr,
     rmarkdown,
     testthat,
+    withr,
     renv

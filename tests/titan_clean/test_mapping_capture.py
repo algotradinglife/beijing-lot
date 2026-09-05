@@ -58,3 +58,17 @@ def test_capture_rejects_key_reuse_and_duplicate_alignment(tmp_path):
         assert store.connection.execute("SELECT COUNT(*) FROM source_receipt").fetchone()[0] == 2
     finally:
         store.close()
+
+
+def test_all_void_capture_rebuild_is_recorded_and_idempotent(tmp_path):
+    store = HistoricalIdMapStore.open(tmp_path)
+    try:
+        capture(store)
+        receipt = capture(store, key="void", provider="0", rebuild=True)
+        assert store.mappings() == ()
+        assert receipt["mapped_slots"] == 0
+        assert [row[1] for row in store.conflicts()] == [28, 29]
+        assert capture(store, key="void", provider="0", rebuild=True) == receipt
+        assert store.connection.execute("SELECT COUNT(*) FROM source_receipt").fetchone()[0] == 4
+    finally:
+        store.close()

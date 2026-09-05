@@ -150,3 +150,33 @@ def test_snapshot_fails_closed_without_prior_timestamped_quotes():
             derive_fixture_snapshot(con,'b','00123')
     finally:
         con.close()
+
+
+def test_modern_post_kickoff_dates_are_not_shifted_into_previous_year():
+    assert parse_market_time("06-02 00:15", kickoff=datetime(2026, 6, 1, 23)) == datetime(2026, 6, 2, 0, 15)
+    assert parse_market_time("01-01 00:15", kickoff=datetime(2025, 12, 31, 23)) == datetime(2026, 1, 1, 0, 15)
+    con = _mock_con()
+    try:
+        con.execute("INSERT INTO historical_fixture_observation VALUES('b','2026,6,1,23,00,00')")
+        con.execute("INSERT INTO historical_euro_1x2_quote VALUES('b','1','Book','r',0,9,5,2,'06-02 00:15',NULL,NULL,NULL)")
+        with pytest.raises(TitanSnapshotError, match='no timestamped pre-kickoff'):
+            derive_fixture_snapshot(con, 'b', '00123')
+    finally:
+        con.close()
+
+
+def test_receipt_binds_kickoff_bookmaker_and_implementation():
+    con = _mock_con()
+    try:
+        con.execute("INSERT INTO historical_fixture_observation VALUES('b','2026,6,1,23,00,00')")
+        con.execute("INSERT INTO historical_euro_1x2_quote VALUES('b','1','Book','r',0,2,3,4,'06-01 20:00',NULL,NULL,NULL)")
+        a = derive_fixture_snapshot(con, 'b', '00123').receipt()
+        con.execute("UPDATE historical_euro_1x2_quote SET bookmaker_source_name='Other'")
+        b = derive_fixture_snapshot(con, 'b', '00123').receipt()
+        assert a['source_binding_sha256'] != b['source_binding_sha256']
+        con.execute("UPDATE historical_fixture_observation SET kickoff_source_raw='2026,6,2,23,00,00'")
+        c = derive_fixture_snapshot(con, 'b', '00123').receipt()
+        assert b['source_binding_sha256'] != c['source_binding_sha256']
+        assert len(c['implementation_sha256']) == 64
+    finally:
+        con.close()

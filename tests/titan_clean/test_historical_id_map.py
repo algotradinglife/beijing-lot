@@ -139,6 +139,24 @@ def test_nowscore_negative_provider_never_becomes_one() -> None:
     assert nowscore_void_slots(payload, issue_code="110711") == frozenset({13})
 
 
+@pytest.mark.parametrize("provider", ["00123", "9007199254740993"])
+def test_provider_identifiers_preserve_exact_digits(provider):
+    payload = f'<input id="issueNum" value="120711">M[0][0]="{provider}";M[0][16]=1;'.encode()
+    assert parse_nowscore_provider_ids(payload, issue_code="120711") == ((1, provider),)
+
+
+@pytest.mark.parametrize("matrix", [
+    'M[0][0]="abc123";M[0][16]=1;',
+    'M[0][0]=1.2;M[0][16]=1;',
+    'M[0][0]=123;M[0][0]=456;M[0][16]=1;',
+    'M[0][0]=123;M[0][16]=1;M[1][0]=-1;M[1][16]=1;',
+    'M[0][0]=-1;M[0][16]=0;',
+])
+def test_membership_matrix_rejects_malformed_and_conflicting_rows(matrix):
+    with pytest.raises(HistoricalIdMapError):
+        parse_nowscore_provider_ids(('<input id="issueNum" value="120711">'+matrix).encode(), issue_code="120711")
+
+
 def test_nowscore_tail_extra_is_aligned_onto_500_slots(tmp_path) -> None:
     store = HistoricalIdMapStore.open(tmp_path)
     try:
@@ -252,6 +270,21 @@ def test_mapping_failure_is_recorded_and_excluded_from_completed(tmp_path) -> No
     try:
         store.record_failure(issue_code="20048", attempted_at_utc=NOW, error=RuntimeError("HTTP 500"))
         assert store.connection.execute("SELECT COUNT(*) FROM mapping_failure").fetchone()[0] == 1
+        assert store.mappings() == ()
+    finally:
+        store.close()
+
+
+def test_low_level_mapping_rejects_invalid_voids_and_colliding_targets(tmp_path):
+    store = HistoricalIdMapStore.open(tmp_path)
+    try:
+        store.record_500_coverage(batch_id='500', issue_code='120711', source_url='https://example.test/500',
+            payload=b'500', trusted_received_at_utc=NOW, parser_version='test', rows=((1, 1), (2, 2)))
+        for kwargs in ({'void_nowscore_slots': {1}}, {'void_nowscore_slots': {0}}, {'slot_map': {1: 1, 2: 1}}):
+            with pytest.raises(HistoricalIdMapError):
+                store.record_nowscore_mapping(coverage_500_batch_id='500', batch_id='ns', issue_code='120711',
+                    source_url='https://example.test/ns', payload=b'ns', trusted_received_at_utc=NOW,
+                    parser_version='test', rows=((1, '00123'), (2, '456')), **kwargs)
         assert store.mappings() == ()
     finally:
         store.close()

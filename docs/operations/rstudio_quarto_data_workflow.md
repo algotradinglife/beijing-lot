@@ -19,7 +19,7 @@ export TZ=UTC
 
 - `.Rprofile` only adds the existing project R library for interactive use; it no longer supplies personal data paths or changes PATH.
 - Put `quarto` on PATH during setup. On the current Ubuntu host it is available at `/usr/lib/rstudio-server/bin/quarto/bin/quarto`.
-- Restore Python dependencies into `.venv` using the existing `requirements.txt`; do not replace that environment with a system interpreter.
+- For offline analysis, create `.venv` with Python 3.14.4 and install `requirements-analysis.txt`; production services retain their separate `requirements.txt` environment.
 
 ## Reports
 

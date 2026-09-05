@@ -2,7 +2,7 @@
 
 - Contract: [#413](https://github.com/algotradinglife/beijing-lot/issues/413), BJ Data Platform. Read native Issue Graph fields for current lifecycle; this document is execution evidence only.
 - Owner explicitly authorized PI repair/organization and required migration documents to remain available across sessions.
-- Work is in the shared working tree; it has not been committed, pushed, or merged by this session. Unrelated existing changes belong to other ongoing work.
+- Initial 2026-09-05 work was uncommitted in the shared working tree. For the 2026-09-06 continuation and publication state, read the appended section below; unrelated changes remain owned by their tasks.
 
 ## Continuation entry points
 
@@ -57,3 +57,17 @@
 - `fundamentals-census.yml`, its new modules, and the #406 child graph belong to concurrent fundamentals work; do not overwrite them from this handoff.
 - Review and commit the intended files with their existing prerequisites; do not blanket-stage the shared dirty tree.
 - Before lifecycle changes, re-read #413 graph fields. Do not close the issue solely because these local checks passed.
+
+## 2026-09-06 continuation
+
+- Active delivery: [PR #414](https://github.com/algotradinglife/beijing-lot/pull/414), branch `codex/issue-413-r-qmd-delivery`.
+- Work was isolated at `/tmp/beijing-413-delivery` from base `626e8449`; the original shared checkout and unrelated service/settlement/fundamentals changes remain intact.
+- The isolated manifest includes QMD 00–03, 07–08 and the mapping/snapshot dependencies; QMD 04–06 and their unrelated modules/tests remain with their ongoing tasks.
+- `scripts/scrape_500_bjdc.py` includes only the cancelled-row parser correction required by the mapping regression test. No service or collection configuration is included.
+- Three R files and 38 Python tests pass in the isolated checkout; the earlier seven-file / 44-test counts describe the larger shared tree, not this PR.
+- First complete `codex review --base main -c sandbox_mode='"read-only"'` found three P2 issues. Regression tests first reproduced all three, then passed after correcting year rollover, complete receipt binding, and all-void capture handling.
+- Legacy automatic schema rewriting was removed from the delivered store. Existing databases are not silently migrated; restore an operator-selected compatible snapshot before use.
+- Added strict ID/matrix validation without floating-point provider-ID conversions; documented Python verification dependencies in `requirements-analysis.txt`.
+- Analysis CI uses a sparse checkout of declared inputs, avoiding the unrelated multi-gigabyte research bundles.
+- Runtime restore, R/Python tests, and all three offline QMD renders passed remotely for `6c653748`; final reviewed revision and CI evidence are recorded in QMD 08 / PR #414 when acceptance completes.
+- QMD 08 is the #413 delivery. Original migration/root handoff files retain their five recorded SHA-256 hashes.

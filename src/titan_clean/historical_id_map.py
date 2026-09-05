@@ -73,7 +73,9 @@ def parse_nowscore_provider_ids(payload: bytes, *, issue_code: str) -> tuple[tup
     candidates; use :func:`nowscore_void_slots` to learn which slots were
     void so they can be isolated instead of mapped.
     """
-    valid, _void = _parse_nowscore_matrix(payload, issue_code=issue_code)
+    valid, void = _parse_nowscore_matrix(payload, issue_code=issue_code)
+    if not valid and void:
+        return ()
     return _normal_nowscore_rows(valid)
 
 
@@ -106,27 +108,36 @@ def _parse_nowscore_matrix(payload: bytes, *, issue_code: str) -> tuple[list[tup
         raise HistoricalIdMapError("Nowscore payload-declared issue differs from requested issue")
     matrix: dict[int, dict[int, str]] = {}
     for row, field, value in re.findall(r"M\[(\d+)\]\[(\d+)\]\s*=\s*(.*?);", text, flags=re.S):
-        matrix.setdefault(int(row), {})[int(field)] = value.strip()
+        fields = matrix.setdefault(int(row), {})
+        if int(field) in fields:
+            raise HistoricalIdMapError("duplicate Nowscore matrix field")
+        fields[int(field)] = value.strip()
     if not matrix:
         raise HistoricalIdMapError("Nowscore complete membership matrix is absent")
     valid: list[tuple[int, str]] = []
     void: set[int] = set()
+    seen_slots: set[int] = set()
     for outer in sorted(matrix):
         fields = matrix[outer]
         slot_raw = fields.get(16, "")
         provider_raw = fields.get(0, "")
+        if len(provider_raw) >= 2 and provider_raw[0] == provider_raw[-1] and provider_raw[0] in "\"'":
+            provider_raw = provider_raw[1:-1]
         try:
             slot = int(slot_raw)
-            provider_match = re.search(r"-?\d+", provider_raw)
+            provider_match = re.fullmatch(r"-?[0-9]+", provider_raw)
         except ValueError:
             raise HistoricalIdMapError("Nowscore matrix row lacks a numeric slot or provider ID") from None
         if provider_match is None:
             raise HistoricalIdMapError("Nowscore matrix row lacks a provider ID")
+        if slot < 1 or slot in seen_slots:
+            raise HistoricalIdMapError("Nowscore matrix has an invalid or duplicate slot")
+        seen_slots.add(slot)
         provider_id = int(provider_match.group())
         if provider_id < 1:
             void.add(slot)
             continue
-        valid.append((slot, str(provider_id)))
+        valid.append((slot, provider_raw))
     return valid, frozenset(void)
 
 
@@ -286,8 +297,11 @@ class HistoricalIdMapStore:
     ) -> str:
         if not _valid_issue(issue_code):
             raise HistoricalIdMapError("invalid Nowscore issue code")
-        parsed_rows = _normal_nowscore_rows(rows)
         void_slots = set(void_nowscore_slots or ())
+        supplied_rows = tuple(rows)
+        parsed_rows = _normal_nowscore_rows(supplied_rows) if supplied_rows or not void_slots else ()
+        if any(not isinstance(slot, int) or slot < 1 for slot in void_slots) or void_slots.intersection(slot for slot, _ in parsed_rows):
+            raise HistoricalIdMapError("invalid or conflicting void slots")
         coverage = self.connection.execute(
             "SELECT issue_slot,local_500_fid FROM coverage_500_slot WHERE batch_id=? AND issue_code=? ORDER BY issue_slot",
             (coverage_500_batch_id, issue_code),
@@ -297,6 +311,8 @@ class HistoricalIdMapStore:
         provider_by_slot = dict(parsed_rows)
         coverage_slots = {slot for slot, _ in coverage}
         if slot_map is not None:
+            if len(set(slot_map.values())) != len(slot_map):
+                raise HistoricalIdMapError("slot map must be one-to-one")
             if set(slot_map) != coverage_slots:
                 raise HistoricalIdMapError("slot map does not cover every 500 slot")
             unmapped = sorted(ns_slot for ns_slot in slot_map.values() if ns_slot not in provider_by_slot and ns_slot not in void_slots)

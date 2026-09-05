@@ -75,3 +75,13 @@ testthat::test_that('R capture bridge preserves bytes and supports idempotent re
   on.exit(DBI::dbDisconnect(con), add=TRUE)
   testthat::expect_equal(DBI::dbGetQuery(con,'SELECT COUNT(*) AS n FROM source_receipt')$n, 2)
 })
+
+testthat::test_that('Nowscore identifiers retain digits and invalid matrix values fail', {
+  html <- readr::read_file(testthat::test_path('..', 'fixtures', 'mapping', 'nowscore.html'))
+  for (id in c('00123', '9007199254740993')) {
+    changed <- sub('M\\[1\\]\\[0\\]\\s*=\\s*[^;]+;', paste0('M[1][0]="', id, '";'), html)
+    testthat::expect_identical(parse_nowscore(changed, '120711')$candidates$provider_id, id)
+  }
+  malformed <- sub('M\\[1\\]\\[0\\]\\s*=\\s*[^;]+;', 'M[1][0]="bad123";', html)
+  testthat::expect_error(parse_nowscore(malformed, '120711'), 'provider')
+})
