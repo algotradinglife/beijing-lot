@@ -1,0 +1,117 @@
+---
+title: "Titan 历史快照：赔率与基本面试点"
+params:
+  fixture_ids: ["356275", "1784028"]
+format: html
+---
+
+```{r}
+source("r/quarto_helpers.R")
+source("r/python_bridge.R")
+project_root <- Sys.getenv("BEIJING_LOT_PROJECT_ROOT")
+python <- Sys.getenv("BEIJING_LOT_VENV_PYTHON")
+data_root <- beijing_data_root()
+con <- connect_titan()
+```
+
+## 抓取进度
+
+```{r}
+DBI::dbGetQuery(con, "
+  SELECT
+    (SELECT COUNT(*) FROM historical_fixture_capture) AS fixtures,
+    (SELECT COUNT(*) FROM historical_euro_1x2_quote) AS euro_quote_rows,
+    (SELECT COUNT(*) FROM historical_aux_capture WHERE endpoint_kind = 'analysis') AS analysis_raw,
+    (SELECT COUNT(*) FROM historical_aux_capture WHERE endpoint_kind = 'handicap') AS handicap_raw,
+    (SELECT COUNT(*) FROM historical_fundamental WHERE fundamentals_available = 1) AS fundamentals
+") |> tibble::as_tibble()
+```
+
+## 基本面样本
+
+```{r}
+fundamental <- DBI::dbGetQuery(con, "
+  SELECT
+    source_fixture_id, venue, weather, temperature, standings_link,
+    home_form_json, away_form_json, h2h_json,
+    home_season_stats_json, away_season_stats_json
+  FROM historical_fundamental
+  WHERE fundamentals_available = 1
+  ORDER BY source_fixture_id
+  LIMIT 1
+") |> tibble::as_tibble()
+fundamental %>% select(source_fixture_id, venue, weather, temperature, standings_link)
+```
+
+```{r}
+if (nrow(fundamental) == 1) {
+  cat("主队近况原始序列：\n", substr(fundamental$home_form_json[[1]], 1, 1000), "\n")
+  cat("\n交锋原始序列：\n", substr(fundamental$h2h_json[[1]], 1, 1000), "\n")
+  cat("\n主队赛季统计原始块：\n", fundamental$home_season_stats_json[[1]], "\n")
+}
+```
+
+## 欧赔历史长表样本
+
+```{r}
+DBI::dbGetQuery(con, "
+  SELECT
+    q.batch_id, q.company_source_id, q.bookmaker_source_name,
+    q.ordinal, q.home_odds, q.draw_odds, q.away_odds,
+    q.market_time_source_raw, q.home_kelly, q.draw_kelly, q.away_kelly
+  FROM historical_euro_1x2_quote q
+  ORDER BY q.batch_id, q.company_source_id, q.ordinal
+  LIMIT 30
+") |> tibble::as_tibble()
+```
+
+## 使用提示
+
+- `ordinal = 0` 为该公司在该场的第一条可见记录（initial 标记）；开赛前最大时间戳为 final 标记。
+- 诊断切片：按 `market_time_source_raw` 做 as-of 取值；不证明赛前可用性。
+- 倒计时节点：结合 fixture 的 `kickoff_source_raw`，取 initial / 10h / 1h / final。
+- 亚盘 raw 已存于 `historical_aux_capture(endpoint_kind='handicap')`，解析表结构在确认试点后单独固化。
+
+## 快照横截面派生（r/snapshots.R）
+
+权威派生在 `src/titan_clean/snapshots.py`（时间解析、initial/final/10h/1h 语义、
+source-binding receipt），R 经 reticulate 调用转 tibble 供检查。
+
+```{r}
+source("r/snapshots.R")
+snap_long <- snapshot_long(
+  data_root, project_root, python, fixture_ids = unlist(params$fixture_ids)
+)
+snap_long %>% filter(kind %in% c("initial", "final")) %>%
+  select(fixture_id, kind, quote_key, home_odds, draw_odds, away_odds, market_time) %>%
+  arrange(fixture_id, quote_key, kind)
+```
+
+2010 legacy 快照（356275）每公司有 initial（开盘）与 final（即时）两值共享同一更新时间；
+现代快照（1784028）有完整四切片，final 严格取开赛前最后一条可见记录。
+
+## 快照宽表
+
+```{r}
+snap_wide <- snapshot_wide(
+  data_root, project_root, python, fixture_ids = unlist(params$fixture_ids)
+)
+snap_wide %>% select(any_of(c("quote_key", "home_odds_initial", "home_odds_10h",
+  "home_odds_1h", "home_odds_final", "market_time_initial", "market_time_final")))
+```
+
+## 派生进度（全量采集期间）
+
+```{r}
+DBI::dbGetQuery(con, "
+  SELECT
+    (SELECT COUNT(*) FROM historical_fixture_capture) AS fixtures,
+    (SELECT COUNT(*) FROM historical_euro_1x2_quote) AS euro_quote_rows,
+    (SELECT COUNT(*) FROM historical_aux_capture WHERE endpoint_kind = 'analysis') AS analysis_raw,
+    (SELECT COUNT(*) FROM historical_fundamental WHERE fundamentals_available = 1) AS fundamentals
+") |> tibble::as_tibble()
+```
+
+```{r}
+DBI::dbDisconnect(con)
+```

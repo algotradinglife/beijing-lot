@@ -128,11 +128,12 @@ DEFAULT_UA = (
 EXPECT_SELECT_RE = re.compile(r'<select[^>]+id="expect_select"[^>]*>(?P<body>.*?)</select>', re.S | re.I)
 OPTION_RE = re.compile(r'<option\s+value="(?P<issue>\d+)"(?P<attrs>[^>]*)>(?P<label>.*?)</option>', re.S | re.I)
 ROW_RE = re.compile(
-    r'<tr\s+class="(?P<class>[^"]*\bvs_lines\b[^"]*)"[^>]*?'
-    r'value="(?P<value>\{.*?\})"\s+fid="(?P<fid>\d+)"[^>]*>'
+    r'<tr\s+class="(?P<class>[^"]*\bvs_lines\b[^"]*)"(?P<attrs>[^>]*)>'
     r'(?P<body>.*?)</tr>',
     re.S | re.I,
 )
+VALUE_ATTR_RE = re.compile(r'value="(?P<value>\{[^}]*\})"', re.I)
+FID_ATTR_RE = re.compile(r'fid="(?P<fid>-?\d+)"', re.I)
 VALUE_PAIR_RE = re.compile(r"(\w+):(?:'([^']*)'|([^,}]+))")
 SCORE_RE = re.compile(r'class="[^"]*\bred\b[^"]*\beng\b[^"]*"[^>]*>\s*([^<]+?)\s*</a>', re.S | re.I)
 PJOZ_RE = re.compile(r'<span\s+class="[^"]*\bpjoz\b[^"]*"[^>]*>\s*([^<]+?)\s*</span>', re.S | re.I)
@@ -270,7 +271,16 @@ def infer_result_label(score: str, handicap_line: float | None) -> str | None:
 def parse_issue_rows(issue: str, text: str, *, fetched_at: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for m in ROW_RE.finditer(text):
-        raw_value = html.unescape(m.group("value"))
+        value_match = VALUE_ATTR_RE.search(m.group("attrs"))
+        fid_match = FID_ATTR_RE.search(m.group("attrs"))
+        if value_match is None or fid_match is None:
+            continue
+        fid = as_int(fid_match.group("fid"))
+        # Old 6-digit pages retain canceled placeholders (fid=-1); never let
+        # a row regex spill into the next valid row to compensate for them.
+        if fid is None or fid <= 0:
+            continue
+        raw_value = html.unescape(value_match.group("value"))
         info = parse_value_object(raw_value)
         body = m.group("body")
         pjoz = [as_float(x) for x in PJOZ_RE.findall(body)]
@@ -290,7 +300,7 @@ def parse_issue_rows(issue: str, text: str, *, fetched_at: str) -> list[dict[str
             {
                 "issue": issue,
                 "match_idx": as_int(info.get("index")),
-                "fid": as_int(m.group("fid")),
+                "fid": fid,
                 "league": info.get("leagueName", ""),
                 "home": info.get("homeTeam", ""),
                 "away": info.get("guestTeam", ""),

@@ -1,0 +1,26 @@
+---
+title: "Titan 历史数据：环境与数据根"
+format: html
+---
+
+```{r}
+source("r/quarto_helpers.R")
+cat("R version:", R.version.string, "\n")
+cat("Data root:", beijing_data_root(), "\n")
+cat(snapshot_window_note(), "\n")
+```
+
+## 说明
+
+- Python/no-agent 服务负责受限的 Titan 抓取与 receipt 审计。
+- 本 Quarto 链只读 SQLite 与 content-addressed raw，负责检查、清洗和报告。
+- 历史源时间仅用于诊断；任何决策学习必须始终遵守共享 cutoff 和可用性证据约束。
+
+```{r}
+con <- connect_titan()
+DBI::dbGetQuery(con, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name") |> tibble::as_tibble()
+```
+
+```{r}
+DBI::dbDisconnect(con)
+```

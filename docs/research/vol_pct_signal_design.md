@@ -44,7 +44,7 @@ For each match option (home=3, draw=1, away=0) and the last snapshot before kick
 ```python
 # De-vigged EU probability (Shin / margin-removed)
 eu_raw  = [1/eu_h, 1/eu_d, 1/eu_a]   # raw implied probs
-overround = sum(eu_raw)
+overround = sum(../../doc/eu_raw)
 eu_p3 = eu_raw[0] / overround          # normalised: home
 eu_p1 = eu_raw[1] / overround          # draw
 eu_p0 = eu_raw[2] / overround          # away
@@ -74,7 +74,7 @@ Use the **last snapshot ≤ 2h before kickoff** for each match. Rationale:
 
 ```python
 def last_snapshot_before(match_id, kickoff_ts, conn, window_hours=2.0):
-    cutoff = kickoff_ts - timedelta(hours=window_hours)
+    cutoff = kickoff_ts - timedelta(../../doc/hours=window_hours)
     # SELECT * FROM snapshots WHERE match_id=? AND snapshot_ts <= cutoff
     # ORDER BY snapshot_ts DESC LIMIT 1
 ```
@@ -155,14 +155,14 @@ kelly_effective = min(kelly_effective, kelly_base * 1.5)  # cap at 1.5×
 **Pros**: continuous, doesn't hard-filter legs, allows "confidence weighting"  
 **Cons**: more complexity, harder to backtest cleanly, multiplies implementation risk
 
-**Recommendation**: start with Hard Filter (5.1) — cleaner signal, testable with existing backtest infrastructure.
+**Recommendation**: start with Hard Filter (../../doc/5.1) — cleaner signal, testable with existing backtest infrastructure.
 
 ### 5.3 N-Leg Interaction
 
 For N=4/5, the signal compounds:
 - If `div > 0` for all N legs → joint expectation is reinforced
 - Require minimum `div_raw > 0` for all N legs (equivalent to: sharps all agree with crowd on direction at minimum)
-- Bonus: require `sum(div) > N × div_threshold` for the full combo to pass
+- Bonus: require `sum(../../doc/div) > N × div_threshold` for the full combo to pass
 
 ---
 
@@ -176,7 +176,7 @@ For N=4/5, the signal compounds:
 | Filter threshold sweep | div_threshold ∈ {−0.05, 0, 0.02, 0.05, 0.10} | Negative = no filter; positive = sharps agree |
 | Strategy base | S4 (N=4, Kelly=1/8) and S11 (N=4+5 blend) | Current production strategies |
 | Metric priority | Calmar → Sharpe → ROI (consistent with strategy selection) | Per S5 "Calmar 王" philosophy |
-| Control | Run without signal filter; compare hit rate per threshold | δ(hit_rate) is the cleanest outcome measure |
+| Control | Run without signal filter; compare hit rate per threshold | δ(../../doc/hit_rate) is the cleanest outcome measure |
 
 ---
 
@@ -227,7 +227,7 @@ If signal has no power:
 
 From 692k snapshots with EU odds populated:
 
-| Metric | home (div3) | draw (div1) | away (div0) |
+| Metric | home (../../doc/div3) | draw (../../doc/div1) | away (../../doc/div0) |
 |---|---|---|---|
 | Mean | +0.200 | — | — |
 | Std | 0.188 | — | — |
@@ -237,11 +237,11 @@ Note: raw correlation is expected to be weak because it pools all matches, not j
 
 ---
 
-## 11. Post-Investigation Conclusions (2026-05-31)
+## 11. Post-Investigation Conclusions (../../doc/2026-05-31)
 
-### Track A: EU-vs-SP divergence — CLOSED (redundant)
+### Track A: EU-vs-SP divergence — CLOSED (../../doc/redundant)
 
-Phase 1 backtest run on 9 issues (2026-05). Key finding:
+Phase 1 backtest run on 9 issues (../../doc/2026-05). Key finding:
 
 - 69% of niche-qualified candidates already have `div_raw > 0.10` — niche rules implicitly select high-divergence legs (p_hat > 0.65/SP is a div threshold by another name)
 - Adding a hard filter at any threshold showed inconsistent per-issue effects (some issues improve, others degrade)
@@ -271,7 +271,7 @@ The `trade.500.com/bjdc/` page serves `--` for all `<span class="tzbl">` fields 
 | `lottery.gov.cn` | 403 |
 | `jss.lottery.gov.cn` | DNS resolution failure |
 
-**To obtain pool_total in future:** Would require either (a) authenticated 500.com session scraped at betting time, or (b) reverse-engineering the mobile app API. Neither is attempted here.
+**To obtain pool_total in future:** Would require either (../../doc/a) authenticated 500.com session scraped at betting time, or (../../doc/b) reverse-engineering the mobile app API. Neither is attempted here.
 
 ### What This Means for Strategy
 

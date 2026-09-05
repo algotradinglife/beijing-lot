@@ -1,0 +1,22 @@
+Package: beijinglot.analysis
+Title: Beijing Lot Analysis Environment
+Version: 0.1.0
+Description: Project dependency declaration for R and Quarto analysis.
+Imports:
+    DBI,
+    RSQLite,
+    tidyverse,
+    jsonlite,
+    digest,
+    data.table,
+    rvest,
+    xml2,
+    lubridate,
+    curl,
+    reticulate,
+    R6,
+    glue,
+    knitr,
+    rmarkdown,
+    testthat,
+    renv

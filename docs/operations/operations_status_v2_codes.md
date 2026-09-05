@@ -50,7 +50,7 @@
 ## 公共诊断边界
 
 异常、数据库错误和健康探针错误属于不可信自由文本。Operations API 会将其中
-的 HTTP(S) URL、Authorization/Bearer、token、API key、password、cookie
+的 HTTP(../ops/S) URL、Authorization/Bearer、token、API key、password、cookie
 及绝对文件路径替换为脱敏标记。运行时兼容字段只暴露状态白名单，不透传原始
 command、diagnostics 或 URL 快照。
 

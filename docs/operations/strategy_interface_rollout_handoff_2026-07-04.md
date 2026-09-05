@@ -87,7 +87,7 @@ pytest -q tests/decision_api
 npm --prefix apps/decision-dashboard test -- --run
 npm --prefix apps/decision-dashboard run build
 git diff --check
-git ls-files | rg '(^data/|\.(db|sqlite|sqlite3|xlsm|xlsx)$)' || true
+git ls-files | rg '(^data/|\.(../ops/db|sqlite|sqlite3|xlsm|xlsx)$)' || true
 ```
 
 ## Reviewer Status

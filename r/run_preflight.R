@@ -1,0 +1,17 @@
+# Explicit one-issue preflight; captures source responses but does not write a database.
+# Rscript r/run_preflight.R ISSUE OUTPUT_DIR PROJECT_ROOT
+args <- commandArgs(trailingOnly = TRUE)
+if (length(args) != 3L) stop("Required: ISSUE OUTPUT_DIR PROJECT_ROOT")
+source(file.path(args[3], "r", "mapping_engine.R"))
+source(file.path(args[3], "r", "mapping_report.R"))
+if (dir.exists(args[2])) stop("Use a new output directory to preserve earlier captures")
+rl <- RateLimiter$new()
+a <- fetch_raw(sprintf(TRADE_URL_500, args[1]), "GB18030", rate_limiter = rl)
+b <- fetch_raw(sprintf(NOWSCORE_URL, args[1]), "UTF-8", rate_limiter = rl)
+dir.create(args[2], recursive = TRUE)
+writeBin(a$payload, file.path(args[2], "500.html"))
+writeBin(b$payload, file.path(args[2], "nowscore.html"))
+report <- mapping_report(file.path(args[2], "500.html"), file.path(args[2], "nowscore.html"), args[1])
+readr::write_csv(report$data, file.path(args[2], "preflight.csv"))
+readr::write_csv(report$inputs, file.path(args[2], "inputs.csv"))
+print(report$data)

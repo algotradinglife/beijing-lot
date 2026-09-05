@@ -4,6 +4,8 @@
 
 # === 数据：必须出仓到外置盘 ===
 data/
+!docs/data/
+!docs/data/**
 !apps/decision-dashboard/src/data/
 !apps/decision-dashboard/src/data/**
 datasets/
@@ -16,6 +18,13 @@ models/
 checkpoints/
 training-data/
 source-materials/
+
+# === R / Quarto 本地环境与渲染缓存 ===
+r_lib/
+_freeze/
+_output/
+quarto/_freeze/
+quarto/_output/
 
 # === 运行时产物 ===
 logs/
@@ -187,3 +196,11 @@ evidence/bj_freeze_review_001/.publish.lock
 # Issue #383 source-bound walk-forward diagnostic package.
 !results/cutoff_walkforward/
 !results/cutoff_walkforward/**
+
+/.quarto/
+**/*.quarto_ipynb
+.Rproj.user
+
+# Saved offline mapping response fixtures
+!tests/fixtures/mapping/
+!tests/fixtures/mapping/*.html

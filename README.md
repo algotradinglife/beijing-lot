@@ -7,7 +7,25 @@ Research, data, and decision tooling for the Beijing single-match lottery.
 Read the [Ubuntu migration and project continuation handoff](docs/handoffs/ubuntu-migration-project-handoff.md)
 before restoring data or starting new research. It records the current N7 evidence,
 GitHub control-plane state, external-data snapshot boundary, verified restore steps,
-and the planned transition into fundamental-data collection and modeling.
+and the planned transition into fundamental-data collection and modeling. The
+[2026-08-27 migration acceptance record](docs/handoffs/ubuntu-migration-acceptance-2026-08-27.md)
+documents the restored 2026-08-20 rollback boundary and its remaining limitations.
+
+## R / Quarto analysis
+
+- [Documentation index](docs/README.md): architecture, data contracts, operations, and historical evidence.
+- [Environment and analysis commands](docs/operations/rstudio_quarto_data_workflow.md): locked R setup, explicit paths, tests, and rendering.
+- [Architecture](docs/architecture.md): R analysis, Python storage, and shared temporal-learning boundaries.
+- [Session handoff for #413](docs/handoffs/r-qmd-structure-413-2026-09-05.md): repaired interfaces, moved paths, validation, and continuation notes.
+- Migration and restore documents above remain at their original paths. Read them before restoring data; re-read GitHub for current lifecycle and dependencies.
+
+Offline report from repository root after environment setup:
+
+```bash
+R_LIBS_USER="$PWD/r_lib" TZ=UTC quarto render quarto/03_500_nowscore_datatable_demo.qmd --execute --no-cache
+```
+
+The default report uses synthetic saved response fixtures, performs no network requests, and writes no database.
 
 ## Forward market snapshots
 

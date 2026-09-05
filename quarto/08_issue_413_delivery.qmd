@@ -1,0 +1,65 @@
+---
+title: "#413：R / QMD 工作流交付与验收"
+date: "2026-09-06"
+format: html
+execute:
+  freeze: false
+  cache: false
+  error: false
+---
+
+## 范围与输入
+
+- 实时任务契约：[GitHub #413](https://github.com/algotradinglife/beijing-lot/issues/413)。
+- 修复 R 抓取、解析、映射和 reticulate 写库接口；Python 是事务和存储契约的唯一实现。
+- 整理 R / QMD 环境、数据契约、文档入口；保留原迁移文件及其内容。
+- 本报告使用已保存的合成页面，不代表历史比赛证据，不访问网络或生产数据库。
+- QMD 04–06 和其他任务的采集服务未纳入本次独立提交；原共享工作区保留它们。
+
+## 可重现结果
+
+```{r}
+source("r/mapping_engine.R")
+source("r/mapping_report.R")
+report <- mapping_report("tests/fixtures/mapping/500.html",
+                         "tests/fixtures/mapping/nowscore.html", "120711")
+stopifnot(inherits(report$data, "tbl_df"), nrow(report$data) == 1L,
+          report$data$merge_status == "exact_team",
+          report$data$status == "finished", report$data$cutoff_gap_minutes == 0)
+knitr::kable(report$inputs, caption = "原始输入与 SHA-256")
+knitr::kable(dplyr::select(report$data, issue, slot, fid_500, provider_id,
+                          status, merge_status, cutoff_gap_minutes),
+             caption = "一行一个期次槽位；截止时间差单位：分钟")
+```
+
+## 函数与测试
+
+| 实现 | 对应自动化验证 |
+|---|---|
+| `r/mapping_engine.R`：限速、抓取、解码、两源解析、状态、对齐、行转换、写库编排 | `test-mapping-engine.R`、`test-mapping-regression.R` |
+| `r/mapping_report.R`：保存页面到 tibble / 输入哈希 | `test-mapping-regression.R`；本 QMD 和 QMD 03 |
+| `r/python_bridge.R`、`r/snapshots.R`：显式解释器、空表、ID、空值、UTC、receipt | `test-analysis-interfaces.R`、`test-mapping-regression.R` |
+| `r/quarto_helpers.R`：数据根、只读连接、标识符、JSON、结算表 | `test-analysis-interfaces.R` |
+| `historical_id_map.py`：解析、标准化、原始字节、事务、映射、隔离、导出 | `test_historical_id_map.py`、`test_mapping_capture.py`；R 实际桥接测试 |
+| `snapshots.py`：日期解析、诊断切片、receipt、只读批次读取 | `test_snapshots.py`；R 实际桥接测试 |
+| `scripts/scrape_500_bjdc.py`：取消行不得跨行匹配 | `test_historical_id_map.py` 回归用例 |
+
+## 验证命令
+
+```bash
+Rscript --vanilla tests/testthat.R
+.venv/bin/python -m pytest tests/titan_clean -q
+.venv/bin/python scripts/check_cutoff_governance.py
+quarto render quarto/03_500_nowscore_datatable_demo.qmd --execute --no-cache
+quarto render quarto/07_delivery_contract.qmd --execute --no-cache
+quarto render quarto/08_issue_413_delivery.qmd --execute --no-cache
+git diff --check
+codex review --base main -c sandbox_mode='"read-only"'
+```
+
+- 环境由 `DESCRIPTION`、`renv.lock` 和分析 CI 固定；渲染之前完成安装。
+- 独立目录初检：3 个 R 测试文件通过；Python 27 个测试通过。最终审查及远程 CI 证据将在验收时补充。
+- 新增代码只处理确定性解析、身份映射和诊断报告；未引入历史拟合、调参、学习或决策选择函数。
+- Python 快照时间为 `HISTORICAL_PROXY`，不证明赛前可用；决策学习仍必须经过 `src/temporal_learning`。
+- 外部数据库 QMD 00–02 需显式数据根，不以生产数据渲染；其边界由临时 SQLite 测试覆盖。
+- 迁移连续性及后续接手见 [交接文档](../docs/handoffs/r-qmd-structure-413-2026-09-05.md)。
