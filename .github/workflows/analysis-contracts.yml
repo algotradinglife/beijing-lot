@@ -27,6 +27,26 @@ jobs:
       RENV_CONFIG_CONSENT: 'TRUE'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /AGENTS.md
+            /DESCRIPTION
+            /.Rprofile
+            /renv.lock
+            /_quarto.yml
+            /r/
+            /quarto/
+            /src/
+            /scripts/
+            /tests/testthat.R
+            /tests/testthat/
+            /tests/titan_clean/
+            /tests/fixtures/mapping/
+            /config/cutoff_governance_legacy_allowlist.json
+            /docs/research/temporal-function-inventory.csv
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14.4'
