@@ -70,3 +70,17 @@ codex review -c sandbox_mode='"workspace-write"' -c sandbox_workspace_write.netw
 - Python 快照时间为 `HISTORICAL_PROXY`，不证明赛前可用；决策学习仍必须经过 `src/temporal_learning`。
 - 外部数据库 QMD 00–02 需显式数据根，不以生产数据渲染；其边界由临时 SQLite 测试覆盖。
 - 迁移连续性及后续接手见 [交接文档](../docs/handoffs/r-qmd-structure-413-2026-09-05.md)。
+
+## PI 验收记录
+
+- 完整审查版本：`81e53800ad1df457dc49a3794cfd82fc1391f643`；基线：`626e8449231a47e047a7f3230f4758ac3f6c2cf3`。
+- 工具：Codex CLI 0.153.4，`gpt-6-astra`；实际命令及完整提示见上方命令和 `docs/reviews/issue-413-review-prompt.txt`。
+- 审查已读取实时 Issue Graph，结论为 **no blocking findings**；没有根据退出码替代结论。
+- 独立审查实际通过：全部 3 个 R 测试文件、42 个交付 Python 测试、19 个既有采集器回归测试、cutoff governance、差异检查、QMD 00–03 / 07–08 的六次干净渲染及内容检查。
+- 审查中的采集器回归命令：`.venv/bin/python -m pytest -p no:cacheprovider tests/scripts/test_live_upsert_regression.py tests/scripts/test_multimarket_p0.py tests/scripts/test_multimarket_sp_collection.py -q`。
+- 对应版本的[远程分析 CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33980997731)和 [cutoff CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33980997750)均通过；分析 CI 包括空库 QMD 01 和离线 QMD 03 / 07 / 08。
+- 8 份搬迁文档与原路径 main 版本逐字节一致；5 份迁移/根交接文档的路径与内容哈希保持不变。
+- PI 接受本任务的离线基础设施交付。生产数据检查、实时采集和生产重建不属于本次验收，未执行。
+- 审查后仅追加本验收记录、交接说明和文档入口；实现及测试保持被审查版本不变。发布时仍须核对最终提交 CI 与实时关系，合并状态以 [PR #414](https://github.com/algotradinglife/beijing-lot/pull/414) 和 #413 的原生状态为准。
+
+> Reviewed 81e53800ad1df457dc49a3794cfd82fc1391f643 against main: no blocking findings; live Issue Graph read and all eight moved documents verified byte-identical.

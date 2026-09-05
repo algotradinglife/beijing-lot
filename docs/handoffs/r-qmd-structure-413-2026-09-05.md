@@ -77,3 +77,12 @@
 - Network-enabled review verified the earlier fixes and found two additional P2 issues: malformed nonempty quote timestamps were dropped, and relocation had altered non-link parentheses. The parser now rejects malformed timestamps; all eight moved tracked documents preserve their original bytes. Only their paths and incoming navigation links change.
 - Further review required the 500 payload issue declaration, strict nonempty date conversion, and stable discovery-summary schemas. These are implemented with regression tests; QMD 01 now uses `discovery_summaries()` / `query_tibble()` and renders against an empty authoritative store in CI.
 - Snapshot wide tables retain all typed columns when empty; the bridge rejects cached modules originating outside the explicitly requested project root.
+
+## Final PI acceptance evidence
+
+- Complete `codex review` accepted `81e53800ad1df457dc49a3794cfd82fc1391f643` with **no blocking findings**, after reading the live graph. The reviewer independently passed 3 R test files, 42 delivered Python tests, 19 collector regressions, cutoff governance, diff checks, and six QMD renders with output inspection.
+- Remote analysis CI: https://github.com/algotradinglife/beijing-lot/actions/runs/33980997731 ; cutoff CI: https://github.com/algotradinglife/beijing-lot/actions/runs/33980997750 . Both passed for that exact implementation revision.
+- PI accepts the offline infrastructure scope. No production database validation, scrape, rebuild, or service mutation was performed or required by #413's acceptance contract.
+- Only QMD acceptance text, this handoff, and the documentation entry link are appended after review; implementation and tests are unchanged. The final PR revision still requires its own green CI before merge.
+- Delivery and complete evidence: `quarto/08_issue_413_delivery.qmd`. Check native [#413](https://github.com/algotradinglife/beijing-lot/issues/413) / [PR #414](https://github.com/algotradinglife/beijing-lot/pull/414) for the authoritative final lifecycle state.
+- The original shared checkout remains on its existing main baseline with concurrent uncommitted work. Do not reset/clean it or blanket-stage it to reconcile the merged PR. Match selected #413 changes against the PR; preserve QMD 04–06, their tests, and other tasks' modules/services.
