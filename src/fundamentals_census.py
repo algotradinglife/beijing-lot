@@ -198,9 +198,10 @@ def normalize_schedule_rows(rows: list[list[str]], *, source: str, fixture_local
             if match is None:
                 raise ValueError("invalid Titan schedule date")
             try:
-                event_date = fixture_local_date.replace(month=int(match[1]), day=int(match[2]))
-                if event_date < fixture_local_date:
-                    event_date = event_date.replace(year=event_date.year + 1)
+                month, day = int(match[1]), int(match[2])
+                candidate_year = fixture_local_date.year + int(
+                    (month, day) < (fixture_local_date.month, fixture_local_date.day))
+                event_date = date(candidate_year, month, day)
             except ValueError as exc:
                 raise ValueError("invalid Titan schedule date") from exc
             separator = r"\s+-\s+"

@@ -118,6 +118,26 @@ def test_audits_bind_both_sources_and_reject_unknown_upstream(bundle, tmp_path):
             pipeline.validate_audits(bundle, releases)
 
 
+def test_audits_reject_empty_independent_evidence_body(bundle, tmp_path):
+    releases = {}
+    for scope in pipeline.SCOPES:
+        output = tmp_path / scope
+        from src.fundamentals_census import build_outputs
+        build_outputs(bundle / f"raw_{scope}", output, generated_at_utc="2026-09-05T12:00:00Z")
+        releases[scope] = pipeline.read_normalized_release(output)
+    audit_path = bundle / "independent-cases.v1.json"
+    reviews = json.loads(audit_path.read_text())
+    evidence_path = bundle / reviews[0]["independent_evidence"][0]["file"]
+    receipt = json.loads(evidence_path.read_text())
+    empty_hash = hashlib.sha256(b"").hexdigest()
+    receipt.update(body_base64="", byte_count=0, sha256=empty_hash)
+    evidence_path.write_text(canonical(receipt), encoding="utf-8")
+    reviews[0]["independent_evidence"][0]["sha256"] = empty_hash
+    audit_path.write_text(canonical(reviews), encoding="utf-8")
+    with pytest.raises(ValueError, match="evidence body is empty"):
+        pipeline.validate_audits(bundle, releases)
+
+
 def test_validated_negative_spotcheck_uses_history_id_and_rejects_null_fixture_identity(bundle, tmp_path):
     from src.fundamentals_census import build_outputs
     releases = {}
@@ -472,7 +492,7 @@ def test_identity_discrepancy_cannot_claim_resolution_without_canonical_identity
     assert result["facts"] == []
 
 
-def test_pipeline_replay_freezes_release_and_rolls_back_failures(bundle, tmp_path):
+def test_pipeline_replay_freezes_release_and_rolls_back_failures(bundle, tmp_path, monkeypatch):
     first = tmp_path / "release-a"
     second = tmp_path / "release-b"
     kwargs = {"generated_at_utc": "2026-09-05T12:00:00Z", "release_id": "fixture-v1"}
@@ -510,4 +530,27 @@ def test_pipeline_replay_freezes_release_and_rolls_back_failures(bundle, tmp_pat
     with pytest.raises(ValueError, match="source hash"):
         pipeline.run_pipeline(bad_bundle, failed, **kwargs)
     assert not failed.exists()
+    assert not list(tmp_path.glob(".fundamentals-408-*"))
+
+    mutable_bundle = tmp_path / "mutable-bundle"
+    shutil.copytree(bundle, mutable_bundle)
+    original_validate = pipeline.validate_bundle
+    calls = 0
+
+    def validate_then_mutate(path):
+        nonlocal calls
+        result = original_validate(path)
+        calls += 1
+        if calls == 1:
+            audit_path = mutable_bundle / "independent-cases.v1.json"
+            reviews = json.loads(audit_path.read_text())
+            reviews[0]["disposition"] = "TIME_SEMANTICS_UNRESOLVED"
+            audit_path.write_text(canonical(reviews), encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(pipeline, "validate_bundle", validate_then_mutate)
+    changed_input = tmp_path / "changed-input"
+    with pytest.raises(ValueError, match="bundle file hash mismatch"):
+        pipeline.run_pipeline(mutable_bundle, changed_input, **kwargs)
+    assert not changed_input.exists()
     assert not list(tmp_path.glob(".fundamentals-408-*"))

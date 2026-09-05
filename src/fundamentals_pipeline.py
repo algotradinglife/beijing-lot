@@ -313,9 +313,11 @@ def validate_audits(bundle_dir: str | Path, releases: dict[str, dict]) -> list[d
                 evidence_path = (root / str(evidence.get("file", ""))).resolve()
                 if not evidence_path.is_relative_to(root):
                     raise ValueError("unsafe independent evidence path")
-                metadata, _ = read_response(evidence_path)
+                metadata, evidence_bytes = read_response(evidence_path)
                 if metadata["status"] != 200 or metadata["url"] != evidence.get("url") or metadata["final_url"] != evidence.get("final_url", evidence.get("url")):
                     raise ValueError("independent evidence transport mismatch")
+                if not evidence_bytes:
+                    raise ValueError("independent evidence body is empty")
                 if metadata["sha256"] != evidence.get("sha256"):
                     raise ValueError("independent evidence hash mismatch")
                 evidence_rows.append({"url": metadata["final_url"], "sha256": metadata["sha256"],
@@ -666,6 +668,8 @@ def run_pipeline(bundle_dir: str | Path, output_dir: str | Path, *, generated_at
         }
         for name, rows in tables.items():
             write_rows(stage / f"{name}.csv", rows, columns[name])
+        if validate_bundle(bundle_root) != bundle:
+            raise ValueError("source bundle identity changed during release")
         if implementation_hashes != {path.name: sha256_file(path) for path in implementation_paths}:
             raise ValueError("implementation changed during release")
         generated_files = sorted(path for path in stage.rglob("*") if path.is_file())

@@ -344,6 +344,9 @@ def test_source_schedule_layouts_normalize_to_same_typed_facts_and_reject_bad_ro
     assert nowscore == titan == [{
         'event_date': '2025-05-21', 'competition': '日职联',
         'home': '川崎前锋', 'away': '浦和红钻', 'published_lead_days': 4}]
+    assert census.normalize_schedule_rows(
+        [['02-29', '联赛', '甲 - 乙', '', '', '60 天']],
+        source='titan', fixture_local_date=datetime.date(2023, 12, 31))[0]['event_date'] == '2024-02-29'
     with pytest.raises(ValueError, match='Titan schedule row'):
         census.normalize_schedule_rows(
             [['05-21', '日职联', '川崎前锋 - 浦和红钻', '', 'unexpected', '4 天']],
