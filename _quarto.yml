@@ -1,0 +1,26 @@
+project:
+  type: default
+  execute-dir: project
+  output-dir: quarto/_output
+  render:
+    - quarto/00_environment.qmd
+    - quarto/01_mapping_quality.qmd
+    - quarto/02_snapshot_quality.qmd
+    - quarto/03_500_nowscore_datatable_demo.qmd
+    - quarto/04_mapping_rerun.qmd
+    - quarto/05_nowscore_internal_audit.qmd
+    - quarto/06_fundamentals_census.qmd
+    - quarto/07_fundamentals_pipeline.qmd
+
+execute:
+  freeze: false
+  echo: true
+  warning: true
+  error: false
+
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    embed-resources: false

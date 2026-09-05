@@ -1,0 +1,51 @@
+source(file.path("..", "..", "r", "fundamentals_pipeline.R"))
+
+test_that("reticulate runs #408 and R validates the frozen release", {
+  python <- Sys.getenv("FUNDAMENTALS_PYTHON", unset = Sys.which("python3"))
+  bundle <- Sys.getenv("FUNDAMENTALS_PIPELINE_TEST_BUNDLE")
+  skip_if(!nzchar(bundle) || !dir.exists(bundle), "integration bundle must be materialized by test setup")
+  module_dir <- normalizePath(file.path("..", "..", "src"))
+  output <- tempfile("fundamentals-408-r-")
+  on.exit(unlink(output, recursive = TRUE), add = TRUE)
+  receipt <- run_fundamentals_pipeline(
+    bundle, output, "2026-09-05T12:00:00Z", "r-integration-v1", python, module_dir)
+  expect_identical(receipt$schema, "bj408_fundamentals_audit_v1")
+  release <- read_fundamentals_pipeline_release(output)
+  expect_identical(release$receipt$release_id, "r-integration-v1")
+  expect_true(all(c("canonical_identity", "discrepancy_queue", "adjudications", "facts", "quarantine") %in% names(release)))
+  expect_true(nrow(release$facts) > 0L)
+  expect_true(all(release$facts$verification_status == "AGREED_UNVERIFIED"))
+  expect_true(all(c("review_id", "evidence_json") %in% names(release$facts)))
+  expect_true(all(release$canonical_identity$provider_id == "1870517"))
+  expect_s3_class(release$adjudications$reviewed_at_utc, "POSIXct")
+  summary <- summarize_fundamentals_pipeline(release)
+  expect_identical(summary$measure, c("identity decisions", "discrepancies", "adjudications", "facts", "quarantine rows"))
+  expect_identical(summary$rows[[4]], nrow(release$facts))
+  reviews <- fundamentals_evidence_links(release$adjudications)
+  expect_true(all(reviews$evidence_urls == "https://club.example/match-report"))
+  expect_true(all(reviews$target_fields == "event_instance_semantics"))
+  empty_reviews <- fundamentals_evidence_links(release$adjudications[0, ])
+  expect_identical(empty_reviews$evidence_urls, character())
+  expect_identical(empty_reviews$target_fields, character())
+  write("tampered", file.path(output, "facts.csv"))
+  expect_error(read_fundamentals_pipeline_release(output), "hash mismatch")
+})
+
+test_that("explicit parameters fail before Python or filesystem mutation", {
+  expect_error(run_fundamentals_pipeline("", "", "", "", "", ""), "Declare an existing")
+  expect_error(run_fundamentals_pipeline(NA_character_, "x", "x", "x", "x", "x"), "Declare an existing")
+  expect_error(run_fundamentals_pipeline(c("a", "b"), "x", "x", "x", "x", "x"), "Declare an existing")
+  expect_false(dir.exists(""))
+})
+
+test_that("RETICULATE_PYTHON cannot override the explicit interpreter", {
+  python <- Sys.getenv("FUNDAMENTALS_PYTHON", unset = Sys.which("python3"))
+  bundle <- Sys.getenv("FUNDAMENTALS_PIPELINE_TEST_BUNDLE")
+  skip_if(!nzchar(bundle) || !dir.exists(bundle), "integration bundle must be materialized by test setup")
+  prior <- Sys.getenv("RETICULATE_PYTHON", unset = NA_character_)
+  on.exit(if (is.na(prior)) Sys.unsetenv("RETICULATE_PYTHON") else Sys.setenv(RETICULATE_PYTHON = prior))
+  Sys.setenv(RETICULATE_PYTHON = file.path(tempdir(), "wrong-python"))
+  expect_error(run_fundamentals_pipeline(
+    bundle, tempfile("wrong-python-output-"), "2026-09-05T12:00:00Z", "wrong-python",
+    python, normalizePath(file.path("..", "..", "src"))), "RETICULATE_PYTHON conflicts")
+})

@@ -1,0 +1,63 @@
+name: Fundamentals census offline contracts
+on:
+  pull_request:
+    paths:
+      - 'src/fundamentals_census.py'
+      - 'src/fundamentals_capture.py'
+      - 'src/fundamentals_pipeline.py'
+      - 'src/nowscore_settlement.py'
+      - 'src/nowscore_bjdc_sp_history.py'
+      - 'src/multimarket_p0.py'
+      - 'r/fundamentals_census.R'
+      - 'r/fundamentals_pipeline.R'
+      - 'quarto/06_fundamentals_census.qmd'
+      - 'quarto/07_fundamentals_pipeline.qmd'
+      - 'scripts/*fundamentals_census*'
+      - 'scripts/materialize_fundamentals_pipeline_fixture.py'
+      - 'tests/test_fundamentals_census.py'
+      - 'tests/test_fundamentals_capture.py'
+      - 'tests/test_fundamentals_pipeline.py'
+      - 'tests/test_nowscore_settlement.py'
+      - 'tests/fixtures/fundamentals_census/**'
+      - 'tests/testthat/test-fundamentals-census.R'
+      - 'tests/testthat/test-fundamentals-pipeline.R'
+      - 'config/fundamentals_census_runtime.json'
+      - '.github/workflows/fundamentals-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.4'
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.10.18'
+      - name: Install declared dependencies during setup
+        run: |
+          python -m pip install beautifulsoup4==4.15.0 json5==0.15.0 requests==2.34.2 pytest==9.0.3
+          Rscript -e 'install.packages(c("remotes", "jsonlite"), repos="https://cloud.r-project.org"); versions <- jsonlite::read_json("config/fundamentals_census_runtime.json")$r_direct; for (p in names(versions)) remotes::install_version(p, version=versions[[p]], repos="https://cloud.r-project.org", upgrade="never")'
+      - name: Python contracts and cutoff governance
+        run: |
+          python -m pytest tests/test_fundamentals_census.py tests/test_fundamentals_capture.py tests/test_fundamentals_pipeline.py tests/test_nowscore_settlement.py -q
+          python scripts/check_cutoff_governance.py
+      - name: Materialize sealed integration bundle
+        run: python scripts/materialize_fundamentals_pipeline_fixture.py --output-dir /tmp/fundamentals-pipeline-bundle
+      - name: R census contracts
+        env:
+          FUNDAMENTALS_PIPELINE_TEST_BUNDLE: /tmp/fundamentals-pipeline-bundle
+          FUNDAMENTALS_PYTHON: ${{ env.pythonLocation }}/bin/python
+        run: Rscript -e 'testthat::test_file("tests/testthat/test-fundamentals-census.R", stop_on_failure=TRUE); testthat::test_file("tests/testthat/test-fundamentals-pipeline.R", stop_on_failure=TRUE)'
+      - name: Saved-response replay and clean report
+        run: |
+          python scripts/materialize_fundamentals_census_fixture.py --output-dir /tmp/census-fixture
+          python scripts/replay_fundamentals_census.py --input-dir /tmp/census-fixture --output-dir /tmp/census-output --generated-at-utc 2026-09-05T12:00:00Z
+          quarto render quarto/06_fundamentals_census.qmd --execute --no-cache -P input_dir:/tmp/census-output
+          quarto render quarto/07_fundamentals_pipeline.qmd --execute --no-cache -P bundle_dir:/tmp/fundamentals-pipeline-bundle -P output_dir:/tmp/fundamentals-pipeline-qmd-release -P generated_at_utc:2026-09-05T12:00:00Z -P release_id:ci-qmd-v1 -P python:${{ env.pythonLocation }}/bin/python
