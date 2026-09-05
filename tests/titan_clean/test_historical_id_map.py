@@ -288,3 +288,20 @@ def test_low_level_mapping_rejects_invalid_voids_and_colliding_targets(tmp_path)
         assert store.mappings() == ()
     finally:
         store.close()
+
+
+def test_duplicate_isolation_cannot_leave_old_active_mappings(tmp_path):
+    store = HistoricalIdMapStore.open(tmp_path)
+    try:
+        store.record_500_coverage(batch_id='500', issue_code='120711', source_url='https://example.test/500',
+            payload=b'500', trusted_received_at_utc=NOW, parser_version='test', rows=((1, 1), (2, 2)))
+        kwargs = dict(coverage_500_batch_id='500', issue_code='120711', source_url='https://example.test/ns',
+                      payload=b'ns', trusted_received_at_utc=NOW, parser_version='test')
+        store.record_nowscore_mapping(batch_id='original', rows=((1, '100'), (2, '200')), **kwargs)
+        before = store.mappings()
+        with pytest.raises(HistoricalIdMapError, match='conflict'):
+            store.record_nowscore_mapping(batch_id='duplicate', rows=((1, '100'), (2, '100')), **kwargs)
+        assert store.mappings() == before
+        assert store.conflicts() == ()
+    finally:
+        store.close()

@@ -72,3 +72,19 @@ def test_all_void_capture_rebuild_is_recorded_and_idempotent(tmp_path):
         assert store.connection.execute("SELECT COUNT(*) FROM source_receipt").fetchone()[0] == 4
     finally:
         store.close()
+
+
+@pytest.mark.parametrize('first,second', [('100', '0'), ('0', '100')])
+def test_capture_cannot_switch_active_and_isolated_without_rebuild(tmp_path, first, second):
+    store = HistoricalIdMapStore.open(tmp_path)
+    try:
+        capture(store, provider=first)
+        before = (store.mappings(), store.conflicts())
+        with pytest.raises(HistoricalIdMapError, match='conflict'):
+            capture(store, key='changed', provider=second)
+        assert (store.mappings(), store.conflicts()) == before
+        assert store.connection.execute('SELECT COUNT(*) FROM source_receipt').fetchone()[0] == 2
+        capture(store, key='rebuilt', provider=second, rebuild=True)
+        assert len(store.mappings()) == (0 if second == '0' else 1)
+    finally:
+        store.close()

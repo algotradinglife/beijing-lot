@@ -85,3 +85,19 @@ testthat::test_that('Nowscore identifiers retain digits and invalid matrix value
   malformed <- sub('M\\[1\\]\\[0\\]\\s*=\\s*[^;]+;', 'M[1][0]="bad123";', html)
   testthat::expect_error(parse_nowscore(malformed, '120711'), 'provider')
 })
+
+testthat::test_that('each membership row requires complete identity and date fields', {
+  html <- readr::read_file(testthat::test_path('..', 'fixtures', 'mapping', 'nowscore.html'))
+  incomplete <- paste0(html, '<script>M[2][0]=123;M[2][16]=2;M[2][3]=new Date(2012,6,30,20,45,00);</script>')
+  testthat::expect_error(parse_nowscore(incomplete, '120711'), 'required.*row')
+  testthat::expect_error(parse_nowscore(sub('"Alpha"', '""', html), '120711'), 'team')
+  testthat::expect_error(parse_nowscore(sub('new Date\\([^)]*\\)', 'null', html), '120711'), 'datetime')
+})
+
+testthat::test_that('500 parsing refuses malformed candidate identity instead of dropping it', {
+  html <- readr::read_file(testthat::test_path('..', 'fixtures', 'mapping', '500.html'))
+  testthat::expect_error(parse_500('<html>unavailable</html>', '120711'), 'absent')
+  testthat::expect_error(parse_500(sub('fid="[0-9]+"', 'fid="bad"', html), '120711'), 'fixture ID')
+  testthat::expect_error(parse_500(sub("homeTeam:'[^']*'", "homeTeam:''", html), '120711'), 'identity')
+  testthat::expect_equal(attr(parse_500(html, '120711'), 'excluded_rows')$count, 0)
+})

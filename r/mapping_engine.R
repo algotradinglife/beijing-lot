@@ -94,10 +94,14 @@ parse_schedule_date <- function(x) lubridate::ymd(x, quiet = TRUE)
 parse_500 <- function(html, issue) {
   doc <- rvest::read_html(html, encoding = "UTF-8")
   nodes <- rvest::html_elements(doc, "tr.vs_lines")
+  if (length(nodes) == 0L) stop("500 membership rows are absent")
   value_attr <- rvest::html_attr(nodes, "value")
-  fid <- suppressWarnings(as.integer(rvest::html_attr(nodes, "fid")))
+  fid_text <- rvest::html_attr(nodes, "fid")
+  fid <- suppressWarnings(as.integer(fid_text))
+  if (anyNA(fid) || any(!grepl('^-?[0-9]+$', fid_text))) stop("invalid 500 fixture ID")
+  if (anyNA(value_attr[fid > 0L])) stop("500 candidate identity fields are absent")
 
-  tibble(value_attr = value_attr, fid_500 = fid) %>%
+  result <- tibble(value_attr = value_attr, fid_500 = fid) %>%
     filter(!is.na(fid_500), fid_500 > 0L, !is.na(value_attr)) %>%
     rowwise() %>%
     transmute(
@@ -112,6 +116,11 @@ parse_500 <- function(html, issue) {
       handicap_500 = suppressWarnings(as.numeric(extract_first(value_attr, "rangqiuNum:'(-?\\d+)'")))
     ) %>%
     ungroup()
+  if (anyNA(result[c("slot", "home_500", "away_500")]) || any(result$slot < 1L) ||
+      any(!nzchar(trimws(result$home_500))) || any(!nzchar(trimws(result$away_500))) ||
+      anyDuplicated(result$slot)) stop("invalid or duplicate 500 candidate identity")
+  attr(result, "excluded_rows") <- tibble(reason = "non_positive_fid", count = sum(fid <= 0L))
+  result
 }
 
 # ---------------------------------------------------------------- 解析 Nowscore ----
@@ -132,6 +141,11 @@ parse_nowscore <- function(html, issue) {
   required <- c("0", "3", "16", "17", "20")
   missing <- setdiff(required, names(wide))
   if (length(missing) > 0L) stop(glue("Nowscore matrix missing fields: {paste(missing, collapse=',')}"))
+  if (anyNA(wide[required])) stop("Nowscore required field absent from a membership row")
+  if (any(!nzchar(trimws(strip_quotes(wide[["17"]])))) ||
+      any(!nzchar(trimws(strip_quotes(wide[["20"]]))))) stop("Nowscore team identity is empty")
+  deadlines <- parse_js_datetime(wide[["3"]])
+  if (anyNA(deadlines)) stop("invalid Nowscore datetime")
 
   provider_col <- strip_quotes(wide[["0"]])
   if (anyNA(provider_col) || any(!grepl('^-?[0-9]+$', provider_col))) stop("invalid Nowscore provider ID")
@@ -149,7 +163,7 @@ parse_nowscore <- function(html, issue) {
     issue = issue, slot = slot_col[!is.na(slot_col)],
     home_ns = strip_quotes(wide[["17"]][!is.na(slot_col)]),
     away_ns = strip_quotes(wide[["20"]][!is.na(slot_col)]),
-    deadline_ns = parse_js_datetime(wide[["3"]][!is.na(slot_col)])
+    deadline_ns = deadlines
   )
   list(candidates = candidates, void_slots = void_slots, team_pairs = team_pairs)
 }

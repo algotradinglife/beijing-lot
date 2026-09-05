@@ -373,6 +373,10 @@ class HistoricalIdMapStore:
                     (batch_id, *expected[:1], "ID_DISCOVERY_ONLY", *expected[1:]),
                 )
             for mapping in mappings:
+                if self.connection.execute(
+                    "SELECT 1 FROM conflict_isolated_slot WHERE issue_code=? AND issue_slot=?", mapping[:2],
+                ).fetchone() is not None:
+                    raise HistoricalIdMapError("mapping conflicts with existing isolation; explicit rebuild required")
                 previous = self.connection.execute(
                     "SELECT local_500_fid,nowscore_provider_match_id,coverage_500_batch_id,nowscore_batch_id FROM issue_slot_nowscore_map WHERE issue_code=? AND issue_slot=?",
                     mapping[:2],
@@ -381,9 +385,19 @@ class HistoricalIdMapStore:
                     self.connection.execute("INSERT INTO issue_slot_nowscore_map VALUES(?,?,?,?,?,?,?)", mapping)
                 elif tuple(previous) != (mapping[2], mapping[3], mapping[4], mapping[5]):
                     raise HistoricalIdMapError("historical issue-slot mapping conflict")
-            self.connection.executemany(
-                "INSERT OR REPLACE INTO conflict_isolated_slot VALUES(?,?,?,?,?)", isolated
-            )
+            for isolation in isolated:
+                if self.connection.execute(
+                    "SELECT 1 FROM issue_slot_nowscore_map WHERE issue_code=? AND issue_slot=?", isolation[:2],
+                ).fetchone() is not None:
+                    raise HistoricalIdMapError("isolation conflicts with existing mapping; explicit rebuild required")
+                previous = self.connection.execute(
+                    "SELECT local_500_fid,nowscore_provider_match_id,isolation_reason FROM conflict_isolated_slot WHERE issue_code=? AND issue_slot=?",
+                    isolation[:2],
+                ).fetchone()
+                if previous is None:
+                    self.connection.execute("INSERT INTO conflict_isolated_slot VALUES(?,?,?,?,?)", isolation)
+                elif tuple(previous) != isolation[2:]:
+                    raise HistoricalIdMapError("historical issue-slot isolation conflict; explicit rebuild required")
         return digest
 
     def record_capture(
