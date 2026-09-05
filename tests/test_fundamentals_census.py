@@ -103,8 +103,30 @@ def test_analysis_failure(raw, source, identity):
 
 
 def test_wrong_document_identity(pages):
-    with pytest.raises(ValueError, match='fixture ID mismatch'):
+    with pytest.raises(ValueError, match='fixture ID'):
         census.analysis_record(pages['nowscore'], source='nowscore', provider_id='999')
+    with pytest.raises(ValueError, match='fixture ID'):
+        census.analysis_record(pages['titan'], source='titan', provider_id='999')
+    without_embedded_id = pages['titan'].replace(b'var scheduleID = 1870517;', b'')
+    assert without_embedded_id != pages['titan']
+    with pytest.raises(ValueError, match='fixture ID'):
+        census.analysis_record(without_embedded_id, source='titan', provider_id='1870517')
+
+
+@pytest.mark.parametrize('source,home_id,away_id', [
+    ('nowscore', 0, 2), ('nowscore', 3, 3), ('titan', 0, 2), ('titan', 3, 3)])
+def test_history_requires_positive_distinct_team_identities(source, home_id, away_id):
+    history_id_column = 20 if source == 'nowscore' else 15
+    row = [''] * (history_id_column + 1)
+    row[0], row[4], row[5], row[6], row[7] = '26-08-01', home_id, '甲', away_id, '乙'
+    row[8], row[9], row[10], row[history_id_column] = 1, 0, '1-0', 99
+    embedded = ('<input id="hide_scheduleId" value="123">' if source == 'nowscore'
+                else '<script>var scheduleID=123;</script>')
+    raw = (f'<html><title>分析</title>{embedded}<input id="hide_matchTime" value="2026-09-05 20:00">'
+           '<script>var hometeam="甲";var guestteam="乙";var h2h_home=1;var h2h_away=2;'
+           f'var h_data={census.canonical([row])};var a_data=[];var v_data=[];</script></html>').encode()
+    with pytest.raises(ValueError, match='invalid history integer'):
+        census.analysis_record(raw, source=source, provider_id='123')
 
 
 def test_conflicts_preserve_original_values(pair):
@@ -271,6 +293,7 @@ def test_absent_schedule_and_lineup_sections_are_not_published_empty(corpus, tmp
         __import__('zoneinfo').ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')
     raw = (f'<html><title>分析</title><input id="hide_scheduleId" value="1870517">'
            f'<input id="hide_matchTime" value="{local}"><script>'
+           'var scheduleID=1870517;'
            'var hometeam="埃克塞特城";var guestteam="科切斯特联";'
            'var h2h_home=1356;var h2h_away=376;var h_data=[];var a_data=[];var v_data=[];'
            '</script></html>').encode()

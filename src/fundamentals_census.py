@@ -236,8 +236,16 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
     if home_id == away_id:
         raise ValueError("same home and away team identity")
     hidden = soup.select_one("#hide_scheduleId")
-    if hidden and hidden.get("value") != provider_id:
-        raise ValueError("response fixture ID mismatch")
+    if hidden is not None:
+        embedded_id = hidden.get("value")
+    elif source == "titan":
+        embedded_id = js_value(text, "scheduleID")
+    else:
+        active_ids = {match[1] for node in soup.select("li.uu_on a[href]")
+                      if (match := re.fullmatch(r"/analysis/(\d+)(?:cn)?\.html?", node.get("href", ""), re.I))}
+        embedded_id = active_ids.pop() if len(active_ids) == 1 else None
+    if str(embedded_id) != provider_id:
+        raise ValueError("missing or mismatched response fixture ID")
     time_node = soup.select_one("#hide_matchTime")
     time_raw = time_node.get("value") if time_node else js_value(text, "strTime")
     if source == "nowscore" and not time_raw:
@@ -270,7 +278,9 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
     history = []
     for block, records in blocks.items():
         for ordinal, row in enumerate(records or []):
-            if not all(type(row[i]) is int and row[i] >= 0 for i in (4, 6, 8, 9, history_id_column)):
+            if (not all(type(row[i]) is int for i in (4, 6, 8, 9, history_id_column)) or
+                    any(row[i] <= 0 for i in (4, 6, history_id_column)) or row[4] == row[6] or
+                    any(row[i] < 0 for i in (8, 9))):
                 raise ValueError(f"invalid history integer in {block}")
             halftime_raw = str(row[10]).strip()
             halftime_match = re.fullmatch(r"(\d+)\s*[-:]\s*(\d+)", halftime_raw)
