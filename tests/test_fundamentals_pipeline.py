@@ -411,6 +411,26 @@ def test_adjudication_resolves_only_its_exact_discrepancy_target():
     assert resolved_fact["verification_status"] == "INDEPENDENTLY_RESOLVED"
     assert resolved_fact["review_id"] == standings["review_id"]
     assert json.loads(resolved_fact["evidence_json"])[0]["url"] == "https://club.example"
+    assert resolved_fact["availability_class"] == "HISTORICAL_PROXY"
+
+    for row in release["tables"]["fields"]:
+        if row["field"] == "season_tables":
+            row["evidence_class"] = "HISTORICAL_PROXY"
+    observed_review = audit("STANDINGS_CORROBORATED", targets=[target])
+    observed_review["availability_class"] = "OBSERVED"
+    conservative = pipeline.derive_release_tables("r2b", {"main": release}, [observed_review])
+    conservative_fact = next(row for row in conservative["facts"]
+                             if row["fact_type"] == "standings_snapshot")
+    assert conservative_fact["availability_class"] == "HISTORICAL_PROXY"
+
+    for row in release["tables"]["fields"]:
+        if row["field"] == "season_tables":
+            row["evidence_class"] = "OBSERVED"
+    observed_review["availability_class"] = "DOCUMENTED_CONSERVATIVE_SAFE_BOUNDARY"
+    safe_boundary = pipeline.derive_release_tables("r2c", {"main": release}, [observed_review])
+    safe_boundary_fact = next(row for row in safe_boundary["facts"]
+                              if row["fact_type"] == "standings_snapshot")
+    assert safe_boundary_fact["availability_class"] == "DOCUMENTED_CONSERVATIVE_SAFE_BOUNDARY"
 
     wrong_teams = resolved_standings.replace('0010', '9999').replace('0020', '8888')
     with pytest.raises(ValueError, match="standings teams do not match"):

@@ -612,9 +612,15 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                             expected_teams = {"home": identity_value["home_id"], "away": identity_value["away_id"]}
                             if {row["side"]: row["team_id"] for row in standings} != expected_teams:
                                 raise ValueError("standings teams do not match canonical fixture identity")
-                        availability = (review["availability_class"] if review else
-                                        "OBSERVED" if all(row["evidence_class"] == "OBSERVED" for row in rows)
-                                        else "HISTORICAL_PROXY")
+                        availability_evidence = [row["evidence_class"] for row in rows]
+                        if review:
+                            availability_evidence.append(review["availability_class"])
+                        availability = (
+                            "HISTORICAL_PROXY" if "HISTORICAL_PROXY" in availability_evidence else
+                            "DOCUMENTED_CONSERVATIVE_SAFE_BOUNDARY"
+                            if "DOCUMENTED_CONSERVATIVE_SAFE_BOUNDARY" in availability_evidence else
+                            "OBSERVED"
+                        )
                         facts.append({"release_id": release_id, "scope": scope, "issue": fixture[0], "slot": fixture[1],
                                       "provider_id": fixture[2], "fact_type": "standings_snapshot" if field == "season_tables" else "adjacent_schedule",
                                       "fact_key": field, "value_json": value_json,
