@@ -75,7 +75,7 @@ def parse_market_time(raw: str | None, *, kickoff: datetime | None) -> datetime 
         return datetime(year, month, day, hour, minute, second)
     modern = _MODERN_TIME_RE.match(text)
     if modern is None:
-        return None
+        raise TitanSnapshotError(f"malformed market timestamp: {raw!r}")
     month, day, hour, minute = map(int, modern.groups())
     if kickoff is None:
         return None

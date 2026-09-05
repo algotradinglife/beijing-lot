@@ -8,7 +8,7 @@
 
 ## 回测对比结果（修复后）
 
-| 指标 | S1 稳健 (../../doc/λ=0) | S9 跨N多样化 (../../doc/λ=0.5) | Delta |
+| 指标 | S1 稳健 (λ=0) | S9 跨N多样化 (λ=0.5) | Delta |
 |------|--------------|---------------------|-------|
 | 总盈利 | -1,079,597 元 | -1,059,027 元 | **+20,571 元** |
 | 总下注额 | 3,671,456 元 | 3,671,364 元 | -92 元 |
@@ -32,7 +32,7 @@
 # 修复前（每一张票的每一条腿都加入）
 for plan in sub_plans:
     for leg in plan.combo.legs:
-        cross_n_used.add(../../doc/f"{leg.match_id}:{leg.selection}")
+        cross_n_used.add(f"{leg.match_id}:{leg.selection}")
 ```
 
 每期 top_k=14 候选，N=2 生成 60 张票（每张 2 腿），60 张票覆盖全部 14 个场次。
@@ -49,7 +49,7 @@ for plan in sub_plans:
 cross_n_used.update(_top_freq_leg_ids(sub_plans, _CROSS_N_TOP_LEGS))  # _CROSS_N_TOP_LEGS=5
 ```
 
-`_top_freq_leg_ids` 用 `Counter.most_common(../../doc/top_k)` 实现，零歧义：
+`_top_freq_leg_ids` 用 `Counter.most_common(top_k)` 实现，零歧义：
 
 ```python
 def _top_freq_leg_ids(sub_plans: List[TicketPlan], top_k: int) -> set:
@@ -58,7 +58,7 @@ def _top_freq_leg_ids(sub_plans: List[TicketPlan], top_k: int) -> set:
         for plan in sub_plans
         for leg in plan.combo.legs
     )
-    return {lid for lid, _ in freq.most_common(../../doc/top_k)}
+    return {lid for lid, _ in freq.most_common(top_k)}
 ```
 
 修复后，N=3/N=4 只有使用了那 5 个"核心"场次的 combo 受到惩罚，其余 9 个场次无惩罚，排名出现差异，选择结果不同。
@@ -95,7 +95,7 @@ def _top_freq_leg_ids(sub_plans: List[TicketPlan], top_k: int) -> set:
   - 新增 `from collections import Counter`
   - 新增常量 `_CROSS_N_TOP_LEGS = 5`
   - 新增函数 `_top_freq_leg_ids(sub_plans, top_k) -> set`
-  - `simulate_issue()` 内用 `cross_n_used.update(_top_freq_leg_ids(../../doc/...))` 替换原循环
+  - `simulate_issue()` 内用 `cross_n_used.update(_top_freq_leg_ids(...))` 替换原循环
 
 - `src/webui/services.py`
   - 新增 `from collections import Counter`

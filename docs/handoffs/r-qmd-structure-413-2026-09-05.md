@@ -64,7 +64,7 @@
 - Work was isolated at `/tmp/beijing-413-delivery` from base `626e8449`; the original shared checkout and unrelated service/settlement/fundamentals changes remain intact.
 - The isolated manifest includes QMD 00–03, 07–08 and the mapping/snapshot dependencies; QMD 04–06 and their unrelated modules/tests remain with their ongoing tasks.
 - `scripts/scrape_500_bjdc.py` includes only the cancelled-row parser correction required by the mapping regression test. No service or collection configuration is included.
-- Three R files and 41 Python tests pass in the isolated checkout; the earlier seven-file / 44-test counts describe the larger shared tree, not this PR.
+- Three R files and 42 Python tests pass in the isolated checkout; the earlier seven-file / 44-test counts describe the larger shared tree, not this PR.
 - First complete `codex review --base main -c sandbox_mode='"read-only"'` found three P2 issues. Regression tests first reproduced all three, then passed after correcting year rollover, complete receipt binding, and all-void capture handling.
 - Legacy automatic schema rewriting was removed from the delivered store. Existing databases are not silently migrated; restore an operator-selected compatible snapshot before use.
 - Added strict ID/matrix validation without floating-point provider-ID conversions; documented Python verification dependencies in `requirements-analysis.txt`.
@@ -73,3 +73,5 @@
 - QMD 08 is the #413 delivery. Original migration/root handoff files retain their five recorded SHA-256 hashes.
 - Second review found two further P2 issues: stale active mappings could coexist with isolation, and incomplete per-row identity evidence could pass parsing. Both now fail explicitly; regression tests prove rollback and successful explicit rebuild, including reverse isolation-to-active transitions.
 - QMD 00–02 additionally executed and rendered against a temporary synthetic SQLite database. Set `XDG_CACHE_HOME` to an explicitly writable cache directory when the host's default Quarto cache is restricted.
+- A review blocked by the read-only sandbox's disabled network did not pass acceptance. Subsequent review explicitly enables network for live graph reads while prohibiting file/Git/GitHub mutations; its complete prompt is `docs/reviews/issue-413-review-prompt.txt`.
+- Network-enabled review verified the earlier fixes and found two additional P2 issues: malformed nonempty quote timestamps were dropped, and relocation had altered non-link parentheses. The parser now rejects malformed timestamps; all eight moved tracked documents preserve their original bytes. Only their paths and incoming navigation links change.

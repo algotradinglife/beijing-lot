@@ -180,3 +180,15 @@ def test_receipt_binds_kickoff_bookmaker_and_implementation():
         assert len(c['implementation_sha256']) == 64
     finally:
         con.close()
+
+
+def test_malformed_time_cannot_disappear_from_an_otherwise_valid_snapshot():
+    con = _mock_con()
+    try:
+        con.execute("INSERT INTO historical_fixture_observation VALUES('b','2026,6,1,23,00,00')")
+        con.execute("INSERT INTO historical_euro_1x2_quote VALUES('b','1','Book','r',0,2,3,4,'06-01 20:00',NULL,NULL,NULL)")
+        con.execute("INSERT INTO historical_euro_1x2_quote VALUES('b','1','Book','r',1,9,3,4,'unparseable',NULL,NULL,NULL)")
+        with pytest.raises(TitanSnapshotError, match='malformed market timestamp'):
+            derive_fixture_snapshot(con, 'b', '00123')
+    finally:
+        con.close()

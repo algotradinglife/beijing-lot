@@ -54,14 +54,15 @@ quarto render quarto/03_500_nowscore_datatable_demo.qmd --execute --no-cache
 quarto render quarto/07_delivery_contract.qmd --execute --no-cache
 quarto render quarto/08_issue_413_delivery.qmd --execute --no-cache
 git diff --check
-codex review --base main -c sandbox_mode='"read-only"'
+codex review -c sandbox_mode='"workspace-write"' -c sandbox_workspace_write.network_access=true "$(cat docs/reviews/issue-413-review-prompt.txt)"
 ```
 
 - 环境由 `DESCRIPTION`、`renv.lock` 和分析 CI 固定；渲染之前完成安装。
-- 独立目录验证：3 个 R 测试文件通过；Python 41 个测试通过；cutoff governance 通过。
+- 独立目录验证：3 个 R 测试文件通过；Python 42 个测试通过；cutoff governance 通过。
 - 首轮完整 `codex review` 发现 3 项 P2，均已增加回归用例并修复：赛后日期误归上一年、snapshot receipt 绑定不完整、整期 void 无法入库隔离。
 - 补充边界检查：provider ID 保留前导零及大整数原文；非法数字、重复矩阵字段、冲突 void 和非一对一映射拒绝入库。
 - 第二轮 review 的 2 项 P2 已修复：有效映射与隔离状态不得并存，切换必须显式原子重建；每行球队与日期字段必须完整。500 候选身份同样严格校验。
+- 联网复审的 2 项 P2 已修复：非空非法赔率时间直接报错；8 份搬迁文档恢复为原文，避免误改括号内代码。原只读沙箱无法读 GitHub 的一次 review 不计作通过。
 - 提交 `6c653748` 的[远程分析 CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33978532497)已通过全部环境恢复、测试及三份 QMD 渲染；修复后的最终版本仍需复审和对应提交 CI。
 - 新增代码只处理确定性解析、身份映射和诊断报告；未引入历史拟合、调参、学习或决策选择函数。
 - Python 快照时间为 `HISTORICAL_PROXY`，不证明赛前可用；决策学习仍必须经过 `src/temporal_learning`。

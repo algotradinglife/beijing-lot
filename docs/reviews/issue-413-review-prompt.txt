@@ -1,0 +1,9 @@
+Review the complete issue #413 diff against main at current HEAD and report the reviewed commit. This is a read-only code review: do not modify repository files, git state, or GitHub state, do not post messages, and do not install packages. Do not run shipping or planning workflows.
+
+Read the live Issue Graph with gh issue view 413 --json state,body,blockedBy,blocking,parent,subIssues,issueType,projectItems. Network is enabled for these authoritative reads. Review all delivered R/Python functions, tests, QMD, CI, data contracts, and documentation for actionable defects against AGENTS.md.
+
+Previous rounds fixed snapshot year rollover, complete snapshot input/code binding, all-void capture handling, active-versus-isolated state conflicts, per-row identity validation, malformed quote timestamps, and accidental changes to non-link documentation content. Verify the fixes and examine the complete diff for regressions. The eight moved tracked documents must preserve their original main-branch bytes.
+
+Use the installed environment given by R_LIBS_USER and BEIJING_LOT_VENV_PYTHON. Tests and renders may use temporary files under /tmp. The PI will append final review and CI attestation after the review; that pending attestation must not claim acceptance prematurely.
+
+Return severity and precise locations for actionable defects. If the completed review supports it, explicitly state no blocking findings and the actual verification performed. Do not infer success solely from command exit status.
