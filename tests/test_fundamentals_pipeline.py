@@ -318,6 +318,38 @@ def test_cross_block_history_conflict_quarantines_every_occurrence():
     assert not any(row["fact_type"] == "prior_match" for row in resolved["facts"])
 
 
+def test_concordant_cross_scope_history_resolutions_export_facts():
+    main = synthetic_release()
+    main["tables"]["history"][1]["home_score"] = "2"
+    left = '[["2026-08-01","0010","0030",0,1,0,0,"SOURCE_PUBLISHED_FULL_TIME"]]'
+    right = '[["2026-08-01","0010","0030",2,1,0,0,"SOURCE_PUBLISHED_FULL_TIME"]]'
+    finding = {"issue": "001", "slot": "1", "provider_id": "00023",
+               "field": "h_data:00009", "left": left, "right": right,
+               "disposition": "UNRESOLVED"}
+    main["tables"]["findings"] = [finding]
+    regression = copy.deepcopy(main)
+    target = {"field": finding["field"], "left": left, "right": right,
+              "resolved_value": left}
+    main_review = audit("PRIOR_MATCH_CORROBORATED", scope="main", targets=[target])
+    regression_review = audit("PRIOR_MATCH_CORROBORATED", scope="regression", targets=[target])
+    regression_review["review_id"] = "2" * 64
+    tables = pipeline.derive_release_tables(
+        "r1", {"main": main, "regression": regression}, [main_review, regression_review])
+    prior = [row for row in tables["facts"] if row["fact_type"] == "prior_match"]
+    assert len(prior) == 2
+    assert {row["scope"] for row in prior} == {"main", "regression"}
+    assert {row["verification_status"] for row in prior} == {"INDEPENDENTLY_RESOLVED"}
+    assert not any(row["reason"] == "CROSS_CONTEXT_HISTORY_CONFLICT"
+                   for row in tables["quarantine"])
+
+    regression_review["targets"][0]["resolved_value"] = right
+    conflicting = pipeline.derive_release_tables(
+        "r2", {"main": main, "regression": regression}, [main_review, regression_review])
+    assert not any(row["fact_type"] == "prior_match" for row in conflicting["facts"])
+    assert sum(row["reason"] == "CROSS_CONTEXT_HISTORY_CONFLICT"
+               for row in conflicting["quarantine"]) == 2
+
+
 def test_reschedule_and_replay_reviews_quarantine_while_period_review_can_resolve():
     release = synthetic_release()
     for disposition in ("RESCHEDULED_EVENT_INSTANCE_QUARANTINED", "RESTART_EVENT_INSTANCE_QUARANTINED",

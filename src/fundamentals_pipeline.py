@@ -399,6 +399,25 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
             audits_by_fixture[(audit.get("scope", ""), audit["issue"], audit["slot"], audit["provider_id"])].append(audit)
         elif audit["review_kind"] == "AGREEMENT_SPOTCHECK" and audit["target_history_id"]:
             spotcheck_chains[audit["target_history_id"]].append(audit)
+    cross_context_resolutions = defaultdict(lambda: defaultdict(list))
+    for fixture_context, fixture_audits in audits_by_fixture.items():
+        revision_chains = defaultdict(list)
+        for audit in fixture_audits:
+            revision_chains[target_set_key(audit.get("targets", []))].append(audit)
+        for audit in (max(chain, key=lambda row: row["revision"])
+                      for chain in revision_chains.values()):
+            for target in audit.get("targets", []):
+                if (HISTORY_FIELD_PATTERN.fullmatch(target["field"]) and
+                        corroborates_target(audit["disposition"], target["field"])):
+                    block, history_id = target["field"].split(":", 1)
+                    context = (*fixture_context, block)
+                    cross_context_resolutions[history_id][context].append(resolved_json(target))
+    reconciled_history_ids = {
+        history_id for history_id in cross_context_history_conflicts
+        if set(cross_context_resolutions[history_id]) == set(history_signatures[history_id])
+        and all(len(values) == 1 for values in cross_context_resolutions[history_id].values())
+        and len({values[0] for values in cross_context_resolutions[history_id].values()}) == 1
+    }
     latest_spotchecks = {history_id: max(chain, key=lambda row: row["revision"])
                          for history_id, chain in spotcheck_chains.items()}
     identities = []
@@ -549,7 +568,8 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                 for row in rows:
                     by_source[row["source"]].append({field: row.get(field, "") for field in value_fields})
                 spotcheck = latest_spotchecks.get(history_id)
-                if history_id in cross_context_history_conflicts:
+                if (history_id in cross_context_history_conflicts and
+                        history_id not in reconciled_history_ids):
                     quarantine.append({"release_id": release_id, "scope": scope, "issue": fixture[0], "slot": fixture[1],
                                        "provider_id": fixture[2], "field": history_field,
                                        "reason": "CROSS_CONTEXT_HISTORY_CONFLICT",
