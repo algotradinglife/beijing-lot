@@ -101,9 +101,18 @@ def resolved_json(target: dict) -> str:
             raise ValueError("resolved standings value has invalid shape")
     if field == "schedules":
         if (not isinstance(parsed, list) or
-                any(not isinstance(row, list) or not row or
-                    any(not isinstance(value, str) or not value.strip() for value in row) for row in parsed)):
+                any(not isinstance(row, dict) or set(row) != {
+                        "event_date", "competition", "home", "away", "published_lead_days"} or
+                    any(not isinstance(row[name], str) or not row[name].strip()
+                        for name in ("competition", "home", "away")) or
+                    type(row["published_lead_days"]) is not int or row["published_lead_days"] < 0
+                    for row in parsed)):
             raise ValueError("resolved schedule value has invalid shape")
+        for row in parsed:
+            try:
+                datetime.strptime(row["event_date"], "%Y-%m-%d")
+            except (TypeError, ValueError) as exc:
+                raise ValueError("resolved schedule value has invalid event date") from exc
     if HISTORY_FIELD_PATTERN.fullmatch(field):
         if not isinstance(parsed, list) or any(not isinstance(row, list) or len(row) != 8 for row in parsed):
             raise ValueError("resolved history value has invalid shape")
@@ -591,9 +600,11 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                 by_source = {row["source"]: row for row in rows}
                 if set(by_source) == {"nowscore", "titan"} and all(row["field_state"] == "POPULATED" for row in rows):
                     resolved = resolved_findings.get(field)
-                    if resolved or by_source["nowscore"]["observed_value"] == by_source["titan"]["observed_value"]:
+                    source_values = ({source: resolved_json({"field": field, "resolved_value": row["observed_value"]})
+                                      for source, row in by_source.items()} if not resolved else {})
+                    if resolved or source_values["nowscore"] == source_values["titan"]:
                         target, review = resolved if resolved else ({}, None)
-                        value_json = resolved_json(target) if review else by_source["nowscore"]["observed_value"]
+                        value_json = resolved_json(target) if review else source_values["nowscore"]
                         if field == "season_tables":
                             standings = json.loads(value_json)
                             expected_teams = {"home": identity_value["home_id"], "away": identity_value["away_id"]}

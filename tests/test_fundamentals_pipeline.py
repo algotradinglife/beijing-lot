@@ -196,7 +196,8 @@ def synthetic_release(*, swapped=False, kickoff_changed=False, missing_history=F
              "observed_value": '[{"side":"home","state":"POPULATED","team_id":"0010","values":[1,1,0,0,2,0,2,3,1]},{"side":"away","state":"POPULATED","team_id":"0020","values":[1,1,0,0,2,0,2,3,1]}]',
              "evidence_class": "OBSERVED"},
             {"issue": "001", "slot": "1", "provider_id": "00023", "source": source,
-             "field": "schedules", "field_state": "POPULATED", "observed_value": '[["09-06","甲-丙"]]',
+             "field": "schedules", "field_state": "POPULATED",
+             "observed_value": '[{"away":"丙","competition":"联赛","event_date":"2026-09-06","home":"甲","published_lead_days":1}]',
              "evidence_class": "OBSERVED"},
         ])
     return {"receipt": {}, "tables": {"panel": [{"issue": "001", "slot": "1", "provider_id": "00023"}],
@@ -427,6 +428,10 @@ def test_resolved_discrepancy_requires_canonical_value_and_exports_history():
         {"field": "season_tables",
          "resolved_value": '[{"side":"home","state":"POPULATED","team_id":"10","values":[10,2,2,6,8,20,-12,8,17]},{"side":"away","state":"POPULATED","team_id":"20","values":[10,2,2,6,8,20,-12,8,17]}]'}) == \
         '[{"side":"home","state":"POPULATED","team_id":"10","values":[10,2,2,6,8,20,-12,8,17]},{"side":"away","state":"POPULATED","team_id":"20","values":[10,2,2,6,8,20,-12,8,17]}]'
+    schedule_value = '[{"away":"丙","competition":"联赛","event_date":"2026-09-06","home":"甲","published_lead_days":1}]'
+    assert pipeline.resolved_json({"field": "schedules", "resolved_value": schedule_value}) == schedule_value
+    with pytest.raises(ValueError, match="schedule value"):
+        pipeline.resolved_json({"field": "schedules", "resolved_value": '[["09-06","甲-丙"]]'})
     target = {**incomplete, "resolved_value": left_value}
     tables = pipeline.derive_release_tables(
         "r2", {"main": release}, [audit("PRIOR_MATCH_CORROBORATED", targets=[target])])

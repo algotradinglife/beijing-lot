@@ -12,7 +12,7 @@ import json
 import os
 import re
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from importlib.metadata import version
 from urllib.parse import urlparse
@@ -165,6 +165,56 @@ def plain_text(html: str) -> str:
     return " ".join(BeautifulSoup(html, "html.parser").get_text(" ", strip=True).split())
 
 
+def normalize_schedule_rows(rows: list[list[str]], *, source: str, fixture_local_date: date) -> list[dict]:
+    """Map source-specific future-schedule cells to one typed comparison contract.
+
+    ``fixture_local_date`` is the analysis fixture's Asia/Shanghai calendar date.
+    Nowscore publishes a full date while Titan publishes month/day only; Titan's
+    year is therefore the first matching calendar date on or after the fixture.
+    Empty link/display cells are source presentation and are deliberately omitted.
+    The caller retains ``rows`` separately as raw source-cell evidence. Malformed
+    shapes, dates, team separators, or lead-day labels raise ``ValueError``.
+    """
+    if source not in {"nowscore", "titan"} or type(fixture_local_date) is not date:
+        raise ValueError("invalid schedule normalization context")
+    normalized = []
+    for row in rows:
+        if not isinstance(row, list) or any(not isinstance(value, str) for value in row):
+            raise ValueError("malformed schedule row")
+        if source == "nowscore":
+            if len(row) != 4:
+                raise ValueError("malformed Nowscore schedule row")
+            competition, date_raw, teams_raw, lead_raw = row
+            try:
+                event_date = datetime.strptime(date_raw, "%Y-%m-%d").date()
+            except ValueError as exc:
+                raise ValueError("invalid Nowscore schedule date") from exc
+            separator = r"\s+VS\s+"
+        else:
+            if len(row) != 6 or row[4] or row[3] not in {"", "分析"}:
+                raise ValueError("malformed Titan schedule row")
+            date_raw, competition, teams_raw, _, _, lead_raw = row
+            match = re.fullmatch(r"(\d{2})-(\d{2})", date_raw)
+            if match is None:
+                raise ValueError("invalid Titan schedule date")
+            try:
+                event_date = fixture_local_date.replace(month=int(match[1]), day=int(match[2]))
+                if event_date < fixture_local_date:
+                    event_date = event_date.replace(year=event_date.year + 1)
+            except ValueError as exc:
+                raise ValueError("invalid Titan schedule date") from exc
+            separator = r"\s+-\s+"
+        teams = re.split(separator, teams_raw.strip(), maxsplit=1)
+        lead = re.fullmatch(r"(\d+)\s*天", lead_raw.strip())
+        if (len(teams) != 2 or not all(teams) or not competition.strip() or lead is None or
+                event_date < fixture_local_date or (event_date - fixture_local_date).days > 370):
+            raise ValueError("invalid future schedule semantics")
+        normalized.append({"event_date": event_date.isoformat(), "competition": competition.strip(),
+                           "home": teams[0].strip(), "away": teams[1].strip(),
+                           "published_lead_days": int(lead[1])})
+    return normalized
+
+
 def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw: bytes | None = None) -> dict:
     """Parse factual analysis identity, data arrays and actual table cells.
 
@@ -268,7 +318,7 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
                                                   "team_id": str(home_id if side == "home" else away_id),
                                                   "state": "ABSENT", "values": None})
                      for side in ("home", "away")]
-    injuries, previous_lineup, schedules = [], [], []
+    injuries, previous_lineup, schedule_source_rows = [], [], []
     injury_section_present = False
     previous_lineup_section_present = False
     schedule_section_present = False
@@ -293,7 +343,10 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
             previous_lineup.extend(row[0] + " " + row[1] for row in rows if len(row) >= 2 and row[0].isdigit() and row[1])
         if any(("日期" in row or "时间" in row) and "对阵" in row for row in rows):
             schedule_section_present = True
-            schedules.extend(row for row in rows if any(re.fullmatch(r"(?:\d{2,4}-)?\d{2}-\d{2}", c) for c in row))
+            schedule_source_rows.extend(row for row in rows if any(re.fullmatch(r"(?:\d{2,4}-)?\d{2}-\d{2}", c) for c in row))
+    schedules = normalize_schedule_rows(
+        schedule_source_rows, source=source,
+        fixture_local_date=dt.replace(tzinfo=ZoneInfo("Asia/Shanghai")).date())
     top_text = plain_text(str(soup))[:1800]
     venue_match = re.search(r"场地[：:]\s*(.*?)\s*天气[：:]", top_text)
     weather_match = re.search(r"天气[：:]\s*(.*?)\s*温度[：:]", top_text)
@@ -306,7 +359,8 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
             "history": history, "season_tables": season_tables,
             "injuries": injuries, "injury_section_present": injury_section_present,
             "previous_lineup": previous_lineup, "previous_lineup_section_present": previous_lineup_section_present,
-            "schedules": schedules, "schedule_section_present": schedule_section_present,
+            "schedules": schedules, "schedule_source_rows": schedule_source_rows,
+            "schedule_section_present": schedule_section_present,
             "venue": venue_match[1].strip() or None if venue_match else None,
             "weather": weather_match[1].strip() or None if weather_match else None,
             "temperature": temperature_match[1] if temperature_match else None,
@@ -477,7 +531,8 @@ def build_outputs(root: Path, output: Path, *, generated_at_utc: str) -> dict:
             record = parsed[source]
             identity_rows.append({**key, **{k: record[k] for k in ("home", "away", "home_id", "away_id", "kickoff_utc", "season_links")},
                                   "roster_kickoff_equal": record["kickoff_utc"] == selected["kickoff_utc"]})
-            for field in ("h_data", "a_data", "v_data", "season_tables", "injuries", "previous_lineup", "schedules", "venue", "weather", "temperature"):
+            for field in ("h_data", "a_data", "v_data", "season_tables", "injuries", "previous_lineup",
+                          "schedules", "schedule_source_rows", "venue", "weather", "temperature"):
                 value = record["blocks"].get(field) if field in record["blocks"] else record[field]
                 n = len(value) if isinstance(value, list) else int(value is not None)
                 state = "POPULATED" if n else "PUBLISHED_NO_DATA"
@@ -485,7 +540,8 @@ def build_outputs(root: Path, output: Path, *, generated_at_utc: str) -> dict:
                     state = "PARTIAL"
                 section_absent = ((field == "injuries" and not record["injury_section_present"]) or
                                   (field == "previous_lineup" and not record["previous_lineup_section_present"]) or
-                                  (field == "schedules" and not record["schedule_section_present"]))
+                                  (field in {"schedules", "schedule_source_rows"} and
+                                   not record["schedule_section_present"]))
                 if value is None or section_absent:
                     state = "ABSENT"
                 from_auxiliary = field in record["blocks"] and record["blocks_from_auxiliary"]

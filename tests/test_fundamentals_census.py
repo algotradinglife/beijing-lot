@@ -2,6 +2,7 @@
 import base64
 import copy
 import csv
+import datetime
 import gzip
 import hashlib
 import json
@@ -332,6 +333,23 @@ def test_schedule_difference_is_queued_and_missing_schedule_is_coverage(pair):
     assert census.compare_pair(left, right)[0]['disposition'] == 'COVERAGE_DIFFERENCE'
 
 
+def test_source_schedule_layouts_normalize_to_same_typed_facts_and_reject_bad_rows():
+    fixture_date = datetime.date(2025, 5, 17)
+    nowscore = census.normalize_schedule_rows(
+        [['日职联', '2025-05-21', '川崎前锋 VS 浦和红钻', '4 天']],
+        source='nowscore', fixture_local_date=fixture_date)
+    titan = census.normalize_schedule_rows(
+        [['05-21', '日职联', '川崎前锋 - 浦和红钻', '分析', '', '4 天']],
+        source='titan', fixture_local_date=fixture_date)
+    assert nowscore == titan == [{
+        'event_date': '2025-05-21', 'competition': '日职联',
+        'home': '川崎前锋', 'away': '浦和红钻', 'published_lead_days': 4}]
+    with pytest.raises(ValueError, match='Titan schedule row'):
+        census.normalize_schedule_rows(
+            [['05-21', '日职联', '川崎前锋 - 浦和红钻', '', 'unexpected', '4 天']],
+            source='titan', fixture_local_date=fixture_date)
+
+
 def test_roster_uses_authoritative_parser(corpus, monkeypatch):
     path = corpus/'raw-browser/nowscore-1870517.json'
     record = json.loads(path.read_text())
@@ -499,9 +517,18 @@ def test_actual_future_schedule_and_separate_lineup_tables():
         auxiliary=gzip.decompress((FIXTURES/'nowscore-js-2701744.gz').read_bytes()) if source=='nowscore' else None
         data=census.analysis_record(raw,source=source,provider_id='2701744',auxiliary_raw=auxiliary)
         assert len(data['schedules'])==10
+        assert len(data['schedule_source_rows'])==10
         assert len(data['previous_lineup'])==expected_lineup
         assert len(data['injuries'])==3
         assert data['previous_lineup'][0]=='16 牲川步见'
+    findings = census.compare_pair(
+        census.analysis_record(
+            gzip.decompress((FIXTURES/'nowscore-2701744.gz').read_bytes()), source='nowscore',
+            provider_id='2701744', auxiliary_raw=gzip.decompress((FIXTURES/'nowscore-js-2701744.gz').read_bytes())),
+        census.analysis_record(
+            gzip.decompress((FIXTURES/'titan-2701744.gz').read_bytes()), source='titan',
+            provider_id='2701744'))
+    assert not any(finding['field'] == 'schedules' for finding in findings)
 
 
 def test_implementation_change_aborts_publish(corpus,tmp_path,monkeypatch):

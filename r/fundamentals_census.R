@@ -70,7 +70,8 @@ summarize_fundamentals_access <- function(census) {
 read_fundamentals_review <- function(audit_dir) {
   path <- file.path(audit_dir, "independent-cases.v1.json")
   records <- jsonlite::read_json(path, simplifyVector = FALSE)
-  result <- list()
+  result <- list(tibble::tibble(issue = character(), slot = integer(), provider_id = character(),
+                                disposition = character(), rationale = character()))
   for (record in records) {
     if (!identical(record$schema, "bj407_independent_audit_v1") ||
         !identical(record$revision, 1L) || !nzchar(record$reviewer) || !nzchar(record$rationale) ||

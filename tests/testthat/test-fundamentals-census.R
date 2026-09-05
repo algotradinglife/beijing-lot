@@ -75,3 +75,17 @@ test_that("independent review binds original bytes without granting admission", 
   jsonlite::write_json(receipt, file.path(root, "official.json"), auto_unbox = TRUE)
   expect_error(read_fundamentals_review(root), "receipt mismatch")
 })
+
+test_that("empty independent review keeps the reporting table schema", {
+  root <- tempfile("census-empty-review-")
+  dir.create(root)
+  on.exit(unlink(root, recursive = TRUE))
+  writeLines("[]", file.path(root, "independent-cases.v1.json"))
+  result <- read_fundamentals_review(root)
+  expect_identical(names(result), c("issue", "slot", "provider_id", "disposition", "rationale"))
+  expect_identical(nrow(result), 0L)
+  expect_type(result$slot, "integer")
+  rendered_table <- dplyr::transmute(
+    result, case = paste(issue, slot, provider_id, sep = "/"), disposition, rationale)
+  expect_identical(nrow(rendered_table), 0L)
+})

@@ -87,7 +87,7 @@ knitr::kable(utils::head(dplyr::select(prior_matches, scope, issue, slot, provid
                                        availability_class), 20))
 ```
 
-逐场历史记录保留日期、主客队 ID、全场比分、半场比分和比分语义；积分榜的主客角色与球队 ID 明确绑定，任一侧缺失即隔离；相邻赛程保留来源发布值。独立裁决值以 `INDEPENDENTLY_RESOLVED` 导出，并通过 `review_id` 和证据 JSON 绑定裁决；一致性抽查只支持明确检查的子字段，因此其整行仍标记 `AGREED_UNVERIFIED`。`HISTORICAL_PROXY` 只说明当前回采可见，不能证明当时赛前可用。该事实表不会写入 #405 结算，也不执行投注、ROI 或模型调参。
+逐场历史记录保留日期、主客队 ID、全场比分、半场比分和比分语义；积分榜的主客角色与球队 ID 明确绑定，任一侧缺失即隔离；相邻赛程按日期、赛事、主客队和来源发布的间隔天数做语义比较，同时在标准化输出中另存两源原始表格单元格。独立裁决值以 `INDEPENDENTLY_RESOLVED` 导出，并通过 `review_id` 和证据 JSON 绑定裁决；一致性抽查只支持明确检查的子字段，因此其整行仍标记 `AGREED_UNVERIFIED`。`HISTORICAL_PROXY` 只说明当前回采可见，不能证明当时赛前可用。该事实表不会写入 #405 结算，也不执行投注、ROI 或模型调参。
 
 ## 隔离清单
 
