@@ -1,0 +1,84 @@
+name: R and Python analysis contracts
+on:
+  pull_request:
+    paths:
+      - 'r/**'
+      - 'AGENTS.md'
+      - 'scripts/scrape_500_bjdc.py'
+      - '.Rprofile'
+      - 'quarto/**'
+      - 'src/titan_clean/**'
+      - 'tests/testthat/**'
+      - 'tests/testthat.R'
+      - 'tests/titan_clean/**'
+      - 'tests/fixtures/mapping/**'
+      - 'DESCRIPTION'
+      - 'renv.lock'
+      - 'requirements-analysis.txt'
+      - '_quarto.yml'
+      - '.github/workflows/analysis-contracts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-analysis:
+    runs-on: ubuntu-latest
+    env:
+      TZ: UTC
+      RENV_CONFIG_CONSENT: 'TRUE'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /AGENTS.md
+            /DESCRIPTION
+            /.Rprofile
+            /renv.lock
+            /requirements-analysis.txt
+            /_quarto.yml
+            /r/
+            /quarto/
+            /src/
+            /scripts/
+            /tests/testthat.R
+            /tests/testthat/
+            /tests/titan_clean/
+            /tests/fixtures/mapping/
+            /config/cutoff_governance_legacy_allowlist.json
+            /docs/research/temporal-function-inventory.csv
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.4'
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.10.18'
+      - name: Install analysis system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libfontconfig1-dev libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff-dev libjpeg-dev
+      - name: Restore declared analysis environment
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements-analysis.txt
+          Rscript --vanilla r/bootstrap.R
+          echo "R_LIBS_USER=$GITHUB_WORKSPACE/r_lib" >> "$GITHUB_ENV"
+          echo "BEIJING_LOT_VENV_PYTHON=$GITHUB_WORKSPACE/.venv/bin/python" >> "$GITHUB_ENV"
+      - name: Offline function and data contracts
+        run: |
+          Rscript --vanilla tests/testthat.R
+          .venv/bin/python -m pytest tests/titan_clean/test_historical_id_map.py tests/titan_clean/test_mapping_capture.py tests/titan_clean/test_snapshots.py -q
+          .venv/bin/python scripts/check_cutoff_governance.py
+      - name: Clean offline QMD render
+        run: |
+          export BEIJING_LOT_DATA_ROOT="$RUNNER_TEMP/analysis-input"
+          .venv/bin/python -c 'import os; from src.titan_clean.historical_id_map import HistoricalIdMapStore; HistoricalIdMapStore.open(os.environ["BEIJING_LOT_DATA_ROOT"]).close()'
+          quarto render quarto/01_mapping_quality.qmd --execute --no-cache
+          quarto render quarto/03_500_nowscore_datatable_demo.qmd --execute --no-cache
+          quarto render quarto/07_delivery_contract.qmd --execute --no-cache
+          quarto render quarto/08_issue_413_delivery.qmd --execute --no-cache

@@ -1,134 +1,140 @@
 # Repository Agent Governance
 
-## GitHub Issue Graph Is the Control-Plane Source of Truth
+## GitHub Issue Graph
 
-All planning, routing, dependency resolution, dispatch, review, and completion
-decisions must be derived from the live GitHub Issue Graph.
-
-The authoritative fields are:
-
-- `blockedBy` / `blocking` for execution dependencies;
-- `parent` / `subIssues` for work decomposition;
-- `issueType` for the kind of work;
-- GitHub Project `Status` for lifecycle state;
-- GitHub Project membership for functional ownership. The Project determines
-  the responsible role.
-
-Issue bodies and comments may explain intent, methods, evidence, and decisions,
-but they are not authoritative for dependency or lifecycle state. Text such as
-`Depends on #...`, labels that imitate state, local task files, and chat history
-must not be used to reconstruct or override the Issue Graph.
-
-Before planning or dispatching work, read the relevant graph fields with
-`gh issue view` or `gh issue list` JSON output. Before declaring work blocked,
-ready, reviewable, or complete, read them again. When a relationship changes,
-update the native GitHub relationship first and verify both directions
-(`blockedBy` and `blocking`) by reading it back.
-
-If GitHub cannot be read or updated, fail closed: report that the control-plane
-state is unavailable. Do not manufacture a substitute graph from prose or local
-files.
-
-The PI owns issue contracts, graph edges, Project routing, final review, issue
-closure, and PR merges. Executors may report evidence and propose graph changes,
-but must not silently redefine the graph.
-
-## Local Research OS Files
-
-`.research/graph.yaml` and `.research/tasks/*.yaml` are derived caches or
-execution notes only. They may mirror GitHub for local tooling, but they must
-never lead, contradict, or replace the live GitHub Issue Graph. Any mismatch is
-resolved in favor of GitHub, then the local mirror is refreshed.
+- Use the live GitHub Issue Graph for all planning, routing, dependencies, dispatch, review, and completion decisions.
+- Dependencies: `blockedBy` / `blocking`; decomposition: `parent` / `subIssues`; work kind: `issueType`.
+- Lifecycle: GitHub Project `Status`; responsible role: GitHub Project membership.
+- Read relevant fields with `gh issue view` or `gh issue list` JSON before planning or dispatch and again before lifecycle decisions.
+- Update native relationships first; read back both `blockedBy` and `blocking` to verify changes.
+- Bodies, comments, labels, chat, and local files cannot override or reconstruct graph state.
+- If GitHub cannot be read or updated, fail closed and report unavailable control-plane state.
+- PI owns contracts, graph edges, Project routing, final review, issue closure, and PR merges.
+- Executors report evidence and propose graph changes; they must not silently redefine the graph.
+- `.research/graph.yaml` and `.research/tasks/*.yaml` are derived caches or notes only; resolve mismatches in GitHub's favor and refresh them.
 
 ## Engineering principles (owner-mandated)
 
-1. **No backward-compat tax.** Delete obsolete code outright. No compat layers,
-   no migrations, no fallbacks for old behavior — if it's outdated, remove it.
-2. **Simplest implementation that satisfies the current need.** No speculative
-   abstraction, no gratuitous config layers.
-3. **Layered system — build thin first.** Get a minimal end-to-end version
-   running, then add on top. Never rip out working code for unimplemented
-   complexity.
-4. **Modular components, separation of concerns.** Keep pieces decoupled and
-   single-purpose.
-5. **Prefer mature, maintained libraries.** No reinventing the wheel without a
-   clear reason.
-6. **Check existing dependencies first.** Before adding a package or writing
-   your own, see what the project already has and what it can do. Don't assume
-   the library is missing.
-7. **Architecture decisions are made long-term.** No "ship it now, fix later"
-   stopgaps — an accepted design is expected to persist.
-8. **Learn from mature products.** See how established products solve the same
-   problem and use proven patterns; don't invent from scratch.
+- Delete obsolete code; no compatibility layers, migrations for old behavior, or fallback paths.
+- Implement the simplest solution for current needs; avoid speculative abstractions and configuration.
+- Build a minimal end-to-end version first, then extend it; preserve working code until its replacement works.
+- Keep components decoupled, single-purpose, and independently testable.
+- R and Python must use mainstream, mature, maintained libraries when suitable; do not recreate their capabilities.
+- Check existing dependencies and public APIs before adding packages or implementing functionality.
+- If no library fits, document evaluated options and the gap; implement only the missing capability.
+- Make durable architecture decisions; avoid temporary designs that require later repair.
+- Learn from mature products and proven patterns.
+- Every project function requires corresponding automated tests.
+- Preserve raw data, enforce executable data contracts, and make analysis reproducible.
+- Require relevant automated checks to pass before merging.
+
+## R / Quarto and code organization
+
+- Every delivery must include a reproducible Quarto (`.qmd`) document as its delivery and acceptance entry point.
+- Use R for analysis; the delivery QMD records scope, inputs, results, validation evidence, and limitations.
+- All R analysis tables must use `tibble`; manipulate them with tidyverse and appropriate related libraries.
+- Convert database, Python, and Rcpp tabular outputs to validated tibbles at the R boundary, including typed empty tables.
+- Follow tidy data: variables in columns, observations in rows, each type of observational unit in its own table.
+- Put R functions in `r/`, Python modules in `src/`, QMD in `quarto/`, and keep command entry points thin.
+- QMD declares inputs, organizes analysis, and presents results; extract reusable functions into modules.
+- Develop reusable functions in R, Python called through `reticulate`, or C++ exposed through `Rcpp` wrappers.
+- Keep reusable implementations outside QMD; use one authoritative implementation per business/storage contract.
+- Rcpp wrappers follow the same mainstream-library, data-contract, testing, and chronology requirements as R and Python functions.
+- Module imports must not trigger scraping or database writes.
+- Document function inputs, outputs, units, missing values, errors, and side effects where applicable.
+- Pass paths, connections, and parameters explicitly; avoid hidden mutable session state.
+
+## Dependencies and reproducibility
+
+- Record direct dependencies, reproducible versions, and required R/Python/Quarto runtimes in project configuration.
+- Install dependencies during environment setup, never during function execution or QMD rendering.
+- Select the project Python interpreter explicitly for R/Python calls; fail clearly on incorrect environments.
+- Render QMD from a clean session with declared inputs and parameters, independent of RStudio globals or manual execution order.
+- Do not depend on undeclared local files, personal paths, or restored workspaces.
+
+## Data contracts and provenance
+
+- Define row meaning, columns, types, unique keys, nullable fields, categories, units, and relationship cardinalities.
+- Validate contracts at data boundaries; stop on critical failures.
+- Preserve identifiers and leading zeros; distinguish missing values, zero, empty strings, and empty results.
+- Make conversions explicit; never silently turn parsing failures into missing values.
+- Use typed dates/timestamps and explicit timezones; distinguish event, collection, and label-availability times.
+- Declare join keys/cardinality; check unmatched keys and unexpected row multiplication.
+- Record filtering/deduplication reasons and counts; do not silently choose between conflicting records.
+- Test database/R/Python/Rcpp conversions for nulls, integer precision, identifiers, timestamps, column types, and empty tibble schemas.
+- Preserve original bytes, encoding, source identity, and collection timestamps separately from cleaned data.
+- Bind derived outputs to input identities/hashes, code identity, parameters, and generation time.
+- Apply the stronger cutoff receipt rules below to historical-learning outputs.
+
+## Scraping and database interaction
+
+- Separate fetching, parsing, validation, and persistence into testable functions.
+- Use explicit timeouts, bounded transient retries, and existing source-specific rate limits.
+- Preserve raw responses for offline parsing replay; distinguish empty results from request/parser failures.
+- Inject credentials through environment configuration; exclude them from code, QMD, logs, and fixtures.
+- Parameterize SQL values; use the authoritative storage API for writes.
+- Use transactions; define conflicts, duplicate handling, repeated-run behavior, and rollback.
+- Test rollback and repeated execution; release connections/resources on both success and failure.
+
+## Tests and acceptance
+
+- Use `testthat` in `tests/testthat/` and `pytest` in the relevant `tests/` area.
+- Map every project function to tests, including helpers and functions defined in QMD; untested existing functions remain gaps.
+- Add/update and run corresponding tests with each function change; bug fixes require regression tests.
+- Test observable behavior and contracts: normal inputs, relevant boundaries/missing/empty inputs, and failure paths.
+- Test third-party integration contracts; dependency internals remain the dependency's responsibility.
+- Exercise test helpers through the tests they support; avoid recursive tests of tests.
+- Keep routine tests deterministic with saved responses and temporary databases; separate live integration checks.
+- Run R tests with `Rscript tests/testthat.R`; run Python tests with the project interpreter's `-m pytest`.
+- Test Rcpp functions through their exported R wrappers, including conversion boundaries and failure paths.
+- Verify key QMD in a fresh process with declared inputs, execution enabled, cache/freeze bypassed, and errors fatal.
+- Rendering does not replace function tests; HTML containing execution errors fails acceptance.
+- Inspect key rendered tables/figures for missing content, units, and labels; identify input snapshots and parameters.
+- CI must cover affected function tests, data contracts, key QMD renders, and applicable cutoff governance checks.
+- Report changed behavior, function/test mapping, exact check commands/results, and reasons for skipped checks.
+- Every delivery must pass `codex review` covering its QMD, reusable implementation, tests, and data contracts before PI acceptance.
+- Record the reviewed revision or file hashes, review command, findings, and resolutions in the delivery QMD; a successful process exit alone is not acceptance.
+- Fix blocking findings and rerun review after relevant changes; PI verifies the final reviewed artifact before closure or merge.
+- Skipped or failed required checks do not pass; documentation alone does not prove implementation or enforcement.
+- Report compliance gaps with evidence and route remediation through the live Issue Graph.
 
 ## Cutoff-driven historical learning (owner-mandated)
 
-Every decision-facing operation that learns, calibrates, tunes, selects, ranks,
-gates, or optimizes from historical data must be behind a function that accepts
-an explicit cutoff object. This includes learned preprocessing, thresholds,
-support depth, hyperparameters, seeds, expert admission, routing, allocation,
-bankroll gates, league/team effects, regimes, embeddings, priors, shrinkage,
-imputation, normalization, and historically derived availability gates.
+### Scope and chronology
 
-The function must filter on actual data and label availability strictly before
-the cutoff, derive every internal fit/tune/calibration partition inside that
-prior window, fail closed on missing chronology or insufficient history, and
-return the learned artifact together with a machine-readable receipt. The
-receipt must bind cutoff identity/time, maximum source and label-availability
-time, partitions, selected parameters, metrics, gate predicates, source hashes,
-transitive implementation hashes, model identity, and a cutoff-bound cache key.
-Independent replay is mandatory. A cache from another cutoff, source, or
-implementation may never be reused.
+- Every decision-facing historical learning, calibration, tuning, selection, ranking, gate, or optimization function must accept an explicit cutoff object.
+- This includes preprocessing, thresholds, support depth, hyperparameters, seeds, expert admission, routing, allocation, bankroll gates, league/team effects, regimes, embeddings, priors, shrinkage, imputation, normalization, and availability gates.
+- Admit actual source data and available labels strictly before cutoff; derive every fit/tune/calibration partition within that prior window.
+- Fail closed on missing chronology or insufficient history.
+- Use issue-level walk-forward with the target fixture-relative decision epoch as cutoff.
+- Admit prior-year history and current-year issues only when their labels were actually available before cutoff.
+- Exclude target/future issues and unsettled labels by both timestamp and exact target-issue identity, even if a bad source claims early target settlement.
+- Freeze an immutable cutoff-keyed artifact before opening target settlement; later labels must never rewrite it.
+- Name availability evidence classes: observed availability or documented conservative safe boundaries may authorize prospective use; historical timestamp proxies are diagnostic only.
+- Hidden globals such as `FIT_END`, `TUNE_YEAR`, `CALIBRATION_YEAR`, or detached acceptance booleans must not control new target periods.
+- Pre-rule historical packages may remain only as inventoried evidence, not reusable clean interfaces.
+- Pass business constants explicitly: fixed N, CNY1,024, CNY2 units, and one ticket-level 0.65 payout factor.
 
-Hidden temporal globals such as `FIT_END`, `TUNE_YEAR`, and
-`CALIBRATION_YEAR`, or a detached persisted acceptance boolean, must not control
-a new target period. Historical packages that predate this rule may remain only
-as explicitly inventoried historical evidence; they are not clean reusable
-interfaces. Business constants such as fixed N, CNY1,024, CNY2 units, and one
-ticket-level 0.65 payout factor are explicit contract inputs rather than learned
-parameters.
+### Receipts, caches, and review
 
-Every research contract and PI/adversarial review must inventory the transitive
-historical-learning functions and answer: cutoff received, maximum admitted
-source/label time, partition derivation, cross-cutoff cache exclusion,
-post-cutoff mutation invariance through selection/support/tickets/routing, and
-receipt binding of imported helpers. A label-free final artifact is not by
-itself evidence of causality.
+- Return the learned artifact with a machine-readable receipt; independent replay is mandatory.
+- Bind cutoff identity/time, maximum source/label-availability times, partitions, selected parameters, metrics, and gate predicates.
+- Bind source hashes, transitive implementation hashes, model identity, imported helpers, and a cutoff-bound cache key.
+- Never reuse caches across cutoffs, sources, or implementations; later issue models/caches cannot serve earlier issues.
+- Every research contract and PI/adversarial review must inventory transitive historical-learning functions.
+- Review cutoff receipt, maximum admitted times, partition derivation, cross-cutoff cache exclusion, and imported-helper bindings.
+- Verify post-cutoff mutation invariance through selection, support, tickets, and routing; label-free final output alone does not prove causality.
 
-The primary adaptive mode is issue-level walk-forward. For a target issue, the
-cutoff is its fixture-relative decision epoch; prior-year history and only those
-current-year issues whose labels were actually available strictly before that
-epoch may be admitted. The target issue, future issues, and unsettled labels are
-excluded by both timestamp and exact target-issue identity. Timestamp filtering
-alone is insufficient even when a bad source claims the target settled early.
-Each target issue gets an immutable cutoff-keyed artifact before its
-settlement is opened; later labels must never rewrite it.
+### Recency and shared implementation
 
-Every availability claim must name its evidence class. Observed availability
-and a documented conservative safe boundary may authorize prospective use;
-historical timestamp proxies may support diagnostics only and must never be
-promoted into a prospective availability claim.
-
-Recency weighting is itself historical learning. Equal expansion, explicit
-time/issue decay, bounded recent-state blends, change detectors, refit cadence,
-half-life, window, blend, threshold, and effective-sample-size floors must be
-passed explicitly and selected only inside a prior cutoff window. Receipts must
-bind the full weight ledger, effective sample size, long-history shrinkage, and
-policy parameters. Sparse recent evidence must fail closed or shrink to the
-frozen long-history prior. A later issue model/cache may never serve an earlier
-issue.
-
-A recent-state blend is a convex mixture of two normalized distributions:
-`(1-alpha) * long_history + alpha * recent_state`. The receipt must reconcile
-both component masses separately; multiplying only recent rows inside one
-global normalization is not an accepted blend implementation.
-
-All of this chronology machinery must come from the shared
-`src/temporal_learning` library. Research modules are clients: they supply only
-domain-specific fit/predict/select callbacks and must not copy cutoff,
-availability, partition, weighting, ESS, cache, receipt, runner, or replay
-utilities. New direct historical fitting outside a shared learning context and
-duplicated temporal helpers fail repository governance checks. Migrations delete
-or replace obsolete implementations; they do not add compatibility wrappers.
-Static enforcement scans both `src/` and `scripts/` and permits legacy debt only
-by exact AST occurrence fingerprint and count, never by exempting a whole file.
+- Treat recency weighting as learning: pass policies explicitly and select them only inside prior cutoff windows.
+- Policies include equal expansion, time/issue decay, bounded recent-state blends, change detectors, refit cadence, half-life, window, blend, threshold, and ESS floors.
+- Receipts must bind the full weight ledger, effective sample size (ESS), long-history shrinkage, and policy parameters.
+- Sparse recent evidence must fail closed or shrink to the frozen long-history prior.
+- Recent-state blends must equal `(1-alpha) * long_history + alpha * recent_state`, with both distributions normalized and component masses reconciled separately.
+- Multiplying recent rows within one global normalization is not an accepted blend.
+- All chronology machinery must come from `src/temporal_learning`, including R/QMD and imported-function usage.
+- Research clients supply domain fit/predict/select callbacks only; do not copy cutoff, availability, partition, weighting, ESS, cache, receipt, runner, or replay utilities.
+- New direct historical fitting outside shared learning contexts and duplicated temporal helpers fail governance checks.
+- Replace/delete obsolete implementations without compatibility wrappers.
+- Static enforcement scans `src/` and `scripts/`; allow legacy debt only by exact AST occurrence fingerprint and count, never whole-file exemptions.

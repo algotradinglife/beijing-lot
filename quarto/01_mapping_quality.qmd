@@ -1,0 +1,30 @@
+---
+title: "Titan 历史映射：覆盖与质量"
+format: html
+---
+
+```{r}
+source("r/quarto_helpers.R")
+con <- connect_discovery()
+summaries <- discovery_summaries(con)
+DBI::dbDisconnect(con)
+```
+
+## 覆盖摘要
+
+```{r}
+knitr::kable(summaries$coverage)
+knitr::kable(summaries$isolated)
+```
+
+## 期次范围
+
+```{r}
+knitr::kable(summaries$periods)
+```
+
+## 人工跟进
+
+```{r}
+knitr::kable(summaries$failures)
+```

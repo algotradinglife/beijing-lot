@@ -9,7 +9,7 @@ decision-chain artifacts for the decision dashboard.
 
 It complements:
 
-- `docs/ops/strategy_release_manifest_contract_2026-07-04.md`
+- `docs/operations/strategy_release_manifest_contract_2026-07-04.md`
 - `schemas/strategy_release_registry_v1.schema.json`
 - `docs/strategy/decision_chain_v4_semantic_contract_2026-07-04.md`
 

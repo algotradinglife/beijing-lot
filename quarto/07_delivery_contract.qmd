@@ -1,0 +1,46 @@
+---
+title: "交付规范：QMD、codex review 与 tibble"
+date: "2026-09-06"
+format: html
+execute:
+  freeze: false
+  cache: false
+  error: false
+---
+
+## 本次交付
+
+- 范围：更新仓库 `AGENTS.md` 的交付和复用函数规范。
+- 每次交付包含可重现的 QMD，说明范围、输入、结果、验证和限制。
+- 每次交付必须通过 `codex review`，由 PI 验收最终审查版本。
+- 复用函数支持 R、经 reticulate 调用的 Python，以及 Rcpp 封装。
+- R 分析表格统一为 tibble，使用 tidyverse 及相应库操作。
+- 数据库、Python 和 Rcpp 表格输出在 R 边界转换并校验类型、键及空表结构。
+- Rcpp 导出函数同样需要测试，并遵循现有历史学习和共享时序库规则。
+
+## 验证与限制
+
+- 本次仅更新规范及其 QMD 交付说明，没有修改分析算法或数据库。
+- 文档检查：`git diff --check`。
+- 渲染：`quarto render quarto/07_delivery_contract.qmd --execute --no-cache`。
+- 审查证据见下方；历史交付是否合规须按对应 Issue 单独验收。
+
+## 审查证据
+
+- 审查工具：`codex review`；模型：`gpt-6-astra`；沙箱：`read-only`。
+- 结果：无阻断发现；PI 核对规则保留现有测试义务、时序约束与最终验收职责。
+- 被审查 `AGENTS.md` SHA-256：`835a602118bf5a66ea7106ad8eb83175424f6860a3a770b25f226b89828ef8c2`。
+- 被审查 QMD SHA-256：`0e0d03d15c484576e07ca3f23e77d154ac429925898c41e291ffc5ad07771276`（追加本审查记录之前的版本）。
+- 审查后仅补充此证据记录；被审查的规范和交付要求未改动。
+- 文档差异检查与 QMD 渲染通过；本次未运行业务测试，因未变更函数或算法。
+
+<details>
+<summary>实际审查命令与结果</summary>
+
+```bash
+codex review -c sandbox_mode='"read-only"' 'Review only the current AGENTS.md and quarto/07_delivery_contract.qmd for this owner-requested governance change: every delivery requires a reproducible QMD and codex review acceptance; reusable functions may be R, Python through reticulate, or Rcpp wrappers; all R analysis tables must be tibble manipulated with tidyverse and related libraries. Check consistency with existing PI, testing, and temporal-learning rules. Read-only review: do not modify files, run code, or inspect unrelated worktree changes. The QMD review-evidence placeholder will be filled by the PI using this review output, so do not treat the pending attestation as a finding. Return actionable findings with severity and locations, or explicitly state no blocking findings.'
+```
+
+> No blocking findings in the two-file governance review. The QMD, codex review, reusable-function, and tibble requirements preserve PI authority, testing obligations, and shared temporal-learning rules. No code or checks were executed; live Issue Graph state was not verified, and the pending PI attestation was excluded as requested.
+
+</details>

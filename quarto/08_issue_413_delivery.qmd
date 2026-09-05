@@ -1,0 +1,86 @@
+---
+title: "#413：R / QMD 工作流交付与验收"
+date: "2026-09-06"
+format: html
+execute:
+  freeze: false
+  cache: false
+  error: false
+---
+
+## 范围与输入
+
+- 实时任务契约：[GitHub #413](https://github.com/algotradinglife/beijing-lot/issues/413)。
+- 修复 R 抓取、解析、映射和 reticulate 写库接口；Python 是事务和存储契约的唯一实现。
+- 整理 R / QMD 环境、数据契约、文档入口；保留原迁移文件及其内容。
+- 本报告使用已保存的合成页面，不代表历史比赛证据，不访问网络或生产数据库。
+- QMD 04–06 和其他任务的采集服务未纳入本次独立提交；原共享工作区保留它们。
+
+## 可重现结果
+
+```{r}
+source("r/mapping_engine.R")
+source("r/mapping_report.R")
+report <- mapping_report("tests/fixtures/mapping/500.html",
+                         "tests/fixtures/mapping/nowscore.html", "120711")
+stopifnot(inherits(report$data, "tbl_df"), nrow(report$data) == 1L,
+          report$data$merge_status == "exact_team",
+          report$data$status == "finished", report$data$cutoff_gap_minutes == 0)
+knitr::kable(report$inputs, caption = "原始输入与 SHA-256")
+knitr::kable(dplyr::select(report$data, issue, slot, fid_500, provider_id,
+                          status, merge_status, cutoff_gap_minutes),
+             caption = "一行一个期次槽位；截止时间差单位：分钟")
+```
+
+## 函数与测试
+
+| 实现 | 对应自动化验证 |
+|---|---|
+| `r/mapping_engine.R`：限速、抓取、解码、两源解析、状态、对齐、行转换、写库编排 | `test-mapping-engine.R`、`test-mapping-regression.R` |
+| `r/mapping_report.R`：保存页面到 tibble / 输入哈希 | `test-mapping-regression.R`；本 QMD 和 QMD 03 |
+| `r/python_bridge.R`、`r/snapshots.R`：显式解释器、空表、ID、空值、UTC、receipt | `test-analysis-interfaces.R`、`test-mapping-regression.R` |
+| `r/quarto_helpers.R`：数据根、只读连接、标识符、JSON、结算表、带类型查询与 discovery 汇总 | `test-analysis-interfaces.R` |
+| `historical_id_map.py`：解析、标准化、原始字节、事务、映射、隔离、导出 | `test_historical_id_map.py`、`test_mapping_capture.py`；R 实际桥接测试 |
+| `snapshots.py`：日期解析、诊断切片、receipt、只读批次读取 | `test_snapshots.py`；R 实际桥接测试 |
+| `scripts/scrape_500_bjdc.py`：取消行不得跨行匹配 | `test_historical_id_map.py` 回归用例 |
+
+## 验证命令
+
+```bash
+Rscript --vanilla tests/testthat.R
+.venv/bin/python -m pytest tests/titan_clean -q
+.venv/bin/python scripts/check_cutoff_governance.py
+quarto render quarto/03_500_nowscore_datatable_demo.qmd --execute --no-cache
+quarto render quarto/07_delivery_contract.qmd --execute --no-cache
+quarto render quarto/08_issue_413_delivery.qmd --execute --no-cache
+git diff --check
+codex review -c sandbox_mode='"workspace-write"' -c sandbox_workspace_write.network_access=true "$(cat docs/reviews/issue-413-review-prompt.txt)"
+```
+
+- 环境由 `DESCRIPTION`、`renv.lock` 和分析 CI 固定；渲染之前完成安装。
+- 独立目录验证：3 个 R 测试文件通过；Python 42 个测试通过；cutoff governance 通过。
+- 首轮完整 `codex review` 发现 3 项 P2，均已增加回归用例并修复：赛后日期误归上一年、snapshot receipt 绑定不完整、整期 void 无法入库隔离。
+- 补充边界检查：provider ID 保留前导零及大整数原文；非法数字、重复矩阵字段、冲突 void 和非一对一映射拒绝入库。
+- 第二轮 review 的 2 项 P2 已修复：有效映射与隔离状态不得并存，切换必须显式原子重建；每行球队与日期字段必须完整。500 候选身份同样严格校验。
+- 联网复审的 2 项 P2 已修复：非空非法赔率时间直接报错；8 份搬迁文档恢复为原文，避免误改括号内代码。原只读沙箱无法读 GitHub 的一次 review 不计作通过。
+- 后续复审的 3 项 P2 已修复：500 页面必须声明请求期次；非空非法日期拒绝转换；discovery 空表通过显式 prototype 保持类型。CI 增加空数据库 QMD 01 渲染。
+- Python 模块来源必须属于显式项目根；snapshot 宽表在空输入或缺少切片时保持完整类型与列名。
+- 提交 `6c653748` 的[远程分析 CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33978532497)已通过全部环境恢复、测试及三份 QMD 渲染；修复后的最终版本仍需复审和对应提交 CI。
+- 新增代码只处理确定性解析、身份映射和诊断报告；未引入历史拟合、调参、学习或决策选择函数。
+- Python 快照时间为 `HISTORICAL_PROXY`，不证明赛前可用；决策学习仍必须经过 `src/temporal_learning`。
+- 外部数据库 QMD 00–02 需显式数据根，不以生产数据渲染；其边界由临时 SQLite 测试覆盖。
+- 迁移连续性及后续接手见 [交接文档](../docs/handoffs/r-qmd-structure-413-2026-09-05.md)。
+
+## PI 验收记录
+
+- 完整审查版本：`81e53800ad1df457dc49a3794cfd82fc1391f643`；基线：`626e8449231a47e047a7f3230f4758ac3f6c2cf3`。
+- 工具：Codex CLI 0.153.4，`gpt-6-astra`；实际命令及完整提示见上方命令和 `docs/reviews/issue-413-review-prompt.txt`。
+- 审查已读取实时 Issue Graph，结论为 **no blocking findings**；没有根据退出码替代结论。
+- 独立审查实际通过：全部 3 个 R 测试文件、42 个交付 Python 测试、19 个既有采集器回归测试、cutoff governance、差异检查、QMD 00–03 / 07–08 的六次干净渲染及内容检查。
+- 审查中的采集器回归命令：`.venv/bin/python -m pytest -p no:cacheprovider tests/scripts/test_live_upsert_regression.py tests/scripts/test_multimarket_p0.py tests/scripts/test_multimarket_sp_collection.py -q`。
+- 对应版本的[远程分析 CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33980997731)和 [cutoff CI](https://github.com/algotradinglife/beijing-lot/actions/runs/33980997750)均通过；分析 CI 包括空库 QMD 01 和离线 QMD 03 / 07 / 08。
+- 8 份搬迁文档与原路径 main 版本逐字节一致；5 份迁移/根交接文档的路径与内容哈希保持不变。
+- PI 接受本任务的离线基础设施交付。生产数据检查、实时采集和生产重建不属于本次验收，未执行。
+- 审查后仅追加本验收记录、交接说明和文档入口；实现及测试保持被审查版本不变。发布时仍须核对最终提交 CI 与实时关系，合并状态以 [PR #414](https://github.com/algotradinglife/beijing-lot/pull/414) 和 #413 的原生状态为准。
+
+> Reviewed 81e53800ad1df457dc49a3794cfd82fc1391f643 against main: no blocking findings; live Issue Graph read and all eight moved documents verified byte-identical.

@@ -32,7 +32,7 @@ python3 scripts/manage_decision_dashboard.py restart \
   --configure-tailscale-serve
 ```
 
-完整运维手册见 [docs/ops/decision_dashboard_runbook.md](../../docs/ops/decision_dashboard_runbook.md)。
+完整运维手册见 [docs/operations/decision_dashboard_runbook.md](../../docs/operations/decision_dashboard_runbook.md)。
 
 先刷新 500.com 当前期并写入 SQLite：
 

@@ -1,0 +1,35 @@
+---
+title: "北单同一期：500 + Nowscore 数据契约检查"
+params:
+  issue: "120711"
+  raw_500: "tests/fixtures/mapping/500.html"
+  raw_nowscore: "tests/fixtures/mapping/nowscore.html"
+format: html
+---
+
+- 默认输入为明确标记的合成测试响应，仅用于离线验证，不代表真实比赛。
+- 实际分析请通过参数传入已保存的原始响应及对应期号。
+- 本报告不抓取网络、不写数据库；历史时间字段不证明赛前可用性。
+
+```{r}
+source("r/mapping_engine.R")
+source("r/mapping_report.R")
+report <- mapping_report(params$raw_500, params$raw_nowscore, params$issue)
+report$inputs %>% knitr::kable()
+```
+
+## 来源合并
+
+```{r}
+report$data %>% knitr::kable()
+```
+
+## 对齐与状态摘要
+
+```{r}
+report$data %>% count(merge_status, status) %>% knitr::kable()
+```
+
+- 保留双边原始队名；不一致时标记人工核查。
+- 同一期 slot 连接用于质量诊断，不授权写回映射。
+- 时间差保留分钟单位，缺失时间不填零。
