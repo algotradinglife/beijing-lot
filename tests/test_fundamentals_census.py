@@ -383,13 +383,10 @@ def test_external_asset_provenance_and_latest_availability(corpus, tmp_path):
 
 
 def test_inline_history_ignores_unreferenced_auxiliary_provenance(corpus, tmp_path):
-    raw = b'var h_data = [];'
     url = 'https://live.nowscore.com/analysisJs/data1870517.js'
     (corpus / 'raw-browser' / 'nowscore-js-1870517.json').write_text(json.dumps({
-        'url': url, 'final_url': url, 'status': 200, 'content_type': 'application/javascript',
         'started_at_utc': '2026-09-05T11:00:00Z', 'received_at_utc': '2026-09-05T11:00:01Z',
-        'byte_count': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
-        'body_base64': base64.b64encode(raw).decode(),
+        'url': url, 'attempts': 3, 'error': 'Timeout: auxiliary URL unavailable',
     }))
     census.build_outputs(corpus, tmp_path / 'inline-result', generated_at_utc='2026-09-05T12:00:00Z')
     with (tmp_path / 'inline-result' / 'responses.csv').open() as stream:
@@ -401,6 +398,8 @@ def test_inline_history_ignores_unreferenced_auxiliary_provenance(corpus, tmp_pa
     assert history['raw_sha256'] == response['sha256']
     assert history['received_at_utc'] == '2026-09-05T10:00:01+00:00'
     assert response['received_at_utc'] == '2026-09-05T10:00:01+00:00'
+    assert response['parse_state'] == 'PARSED'
+    assert response['auxiliary_sha256'] == ''
 
 
 def test_auxiliary_transport_failure_is_explicit_parser_failure(corpus, tmp_path):

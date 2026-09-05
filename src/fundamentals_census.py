@@ -444,23 +444,25 @@ def build_outputs(root: Path, output: Path, *, generated_at_utc: str) -> dict:
                             auxiliary_path = root / "raw-browser" / f"nowscore-js-{provider_id}.json"
                             if source == "nowscore" and auxiliary_path.exists():
                                 source_hashes[str(auxiliary_path.relative_to(root))] = hashlib.sha256(auxiliary_path.read_bytes()).hexdigest()
-                                auxiliary_document = json.loads(auxiliary_path.read_text())
-                                if "error" in auxiliary_document:
-                                    raise ValueError(f"auxiliary transport failure: {auxiliary_document['error']}")
-                                auxiliary_meta, auxiliary_raw = read_response(auxiliary_path)
-                                response.update(auxiliary_url=auxiliary_meta["final_url"],
-                                                auxiliary_sha256=auxiliary_meta["sha256"],
-                                                auxiliary_received_at_utc=auxiliary_meta["received_at_utc"],
-                                                auxiliary_status=auxiliary_meta["status"])
-                                expected_url = f"https://live.nowscore.com/analysisJs/data{provider_id}.js"
-                                if auxiliary_meta["status"] != 200 or auxiliary_meta["final_url"] != expected_url or auxiliary_meta["url"] != expected_url:
-                                    raise ValueError("auxiliary response failed or identity mismatch")
-                                auxiliary_received = datetime.fromisoformat(auxiliary_meta["received_at_utc"].replace("Z", "+00:00"))
-                                auxiliary_evidence_class = "OBSERVED" if auxiliary_received < datetime.fromisoformat(selected["kickoff_utc"]) else "HISTORICAL_PROXY"
-                                # Availability is no earlier than the last required response.
-                                if auxiliary_received > received:
-                                    response["received_at_utc"] = auxiliary_meta["received_at_utc"]
-                                    response["evidence_class"] = auxiliary_evidence_class
+                                primary_soup = BeautifulSoup(raw.decode("utf-8-sig", errors="strict"), "html.parser")
+                                if primary_soup.select('script[src*="/analysisJs/data"]'):
+                                    auxiliary_document = json.loads(auxiliary_path.read_text())
+                                    if "error" in auxiliary_document:
+                                        raise ValueError(f"auxiliary transport failure: {auxiliary_document['error']}")
+                                    auxiliary_meta, auxiliary_raw = read_response(auxiliary_path)
+                                    response.update(auxiliary_url=auxiliary_meta["final_url"],
+                                                    auxiliary_sha256=auxiliary_meta["sha256"],
+                                                    auxiliary_received_at_utc=auxiliary_meta["received_at_utc"],
+                                                    auxiliary_status=auxiliary_meta["status"])
+                                    expected_url = f"https://live.nowscore.com/analysisJs/data{provider_id}.js"
+                                    if auxiliary_meta["status"] != 200 or auxiliary_meta["final_url"] != expected_url or auxiliary_meta["url"] != expected_url:
+                                        raise ValueError("auxiliary response failed or identity mismatch")
+                                    auxiliary_received = datetime.fromisoformat(auxiliary_meta["received_at_utc"].replace("Z", "+00:00"))
+                                    auxiliary_evidence_class = "OBSERVED" if auxiliary_received < datetime.fromisoformat(selected["kickoff_utc"]) else "HISTORICAL_PROXY"
+                                    # Availability is no earlier than the last required response.
+                                    if auxiliary_received > received:
+                                        response["received_at_utc"] = auxiliary_meta["received_at_utc"]
+                                        response["evidence_class"] = auxiliary_evidence_class
                             data = analysis_record(raw, source=source, provider_id=provider_id, auxiliary_raw=auxiliary_raw)
                             if not data["blocks_from_auxiliary"]:
                                 response["received_at_utc"] = primary_received_at_utc

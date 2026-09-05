@@ -7,8 +7,6 @@ project:
     - quarto/01_mapping_quality.qmd
     - quarto/02_snapshot_quality.qmd
     - quarto/03_500_nowscore_datatable_demo.qmd
-    - quarto/04_mapping_rerun.qmd
-    - quarto/05_nowscore_internal_audit.qmd
     - quarto/06_fundamentals_census.qmd
     - quarto/07_fundamentals_pipeline.qmd
 
