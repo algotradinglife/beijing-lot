@@ -7,7 +7,9 @@ project:
     - quarto/01_mapping_quality.qmd
     - quarto/02_snapshot_quality.qmd
     - quarto/03_500_nowscore_datatable_demo.qmd
+    - quarto/06_fundamentals_census.qmd
     - quarto/07_delivery_contract.qmd
+    - quarto/07_fundamentals_pipeline.qmd
     - quarto/08_issue_413_delivery.qmd
 
 execute:

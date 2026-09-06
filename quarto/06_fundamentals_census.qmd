@@ -1,0 +1,86 @@
+---
+title: "Nowscore / Titan 基本面数据普查 · #407"
+params:
+  input_dir: null
+  audit_dir: null
+execute:
+  freeze: false
+  cache: false
+  error: false
+  warning: true
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+```{r}
+#| include: false
+if (is.null(params$input_dir) || !nzchar(params$input_dir)) stop("Declare input_dir")
+source("r/fundamentals_census.R")
+census <- read_fundamentals_census(params$input_dir)
+```
+
+本报告是数据采集与一致性诊断，不产生模型特征或修改结算。双源一致不能证明独立真实性；未完成独立核验的差异保留待核验状态，身份歧义影响整场比赛。
+
+<style>
+.census-review table { table-layout: fixed; width: 100%; }
+.census-review th, .census-review td { overflow-wrap: anywhere; }
+.census-review th:nth-child(1) { width: 18%; }
+.census-review th:nth-child(2) { width: 27%; }
+.census-review th:nth-child(3) { width: 55%; }
+</style>
+
+## 输入与样本
+
+输入目录：`r params$input_dir`。生成时间（UTC）：`r census$receipt$generated_at_utc`。
+数据与代码身份绑定在该目录的 `receipt.json`；读取时校验全部输出文件的 SHA-256。
+
+```{r}
+knitr::kable(dplyr::count(census$panel, panel_kind, period, league, name = "fixtures"))
+knitr::kable(dplyr::count(census$denominator, reason, name = "candidates"))
+```
+
+## 请求与解析
+
+HTTP 成功、解析成功和字段存在分别计数。历史页面的当前抓取只能证明当前可见，不证明赛前可用。
+
+```{r}
+knitr::kable(summarize_fundamentals_access(census))
+```
+
+## 字段覆盖率
+
+分母为对应来源与历史/未开赛分组的全部样本页面。`ABSENT` 表示未发现字段，`PUBLISHED_NO_DATA` 表示发布空值，`POPULATED` 表示有内容；解析失败不会变成空数据。上一场阵容并非本场确认首发。
+
+```{r}
+knitr::kable(summarize_fundamentals_coverage(census), digits = 3)
+```
+
+## 差异清单
+
+此处只展示身份、积分统计及历史交锋/近期比赛记录的逐项比较。覆盖差异与数值冲突分别保留；独立来源核验结论另存证据清单。
+
+```{r}
+knitr::kable(dplyr::count(census$findings, disposition, name = "differences"))
+knitr::kable(dplyr::select(dplyr::filter(census$findings, disposition != "COVERAGE_DIFFERENCE"), provider_id, field, left, right))
+```
+
+完整原值在 `findings.csv`，原始响应在采集证据目录，比赛清单在 `panel.csv`，1082 场候选的筛选理由在完整运行的 `denominator.csv`。
+
+## 独立来源核验
+
+::: {.census-review}
+
+```{r}
+if (!is.null(params$audit_dir)) {
+  reviews <- read_fundamentals_review(params$audit_dir)
+  knitr::kable(dplyr::transmute(reviews, case = paste(issue, slot, provider_id, sep = "/"), disposition, rationale))
+} else {
+  cat("本次渲染未指定独立核验目录；不能据此声称已完成独立核验。")
+}
+```
+
+:::
+
+核验表保留原始来源、审阅理由和未决状态。官方公布时间不等于实际开球时间，重赛或延期实例不能替换原期号的历史快照。所有历史核验均为诊断证据，不自动授权模型特征或彩票结算写入。

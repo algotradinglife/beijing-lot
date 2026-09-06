@@ -8,6 +8,7 @@ Imports:
     tidyverse,
     jsonlite,
     digest,
+    data.table,
     rvest,
     xml2,
     lubridate,

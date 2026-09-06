@@ -11,6 +11,7 @@ numpy==2.4.6
 scipy==1.17.1
 matplotlib==3.10.9
 requests==2.34.2
+pyyaml==6.0.3  # scripts/live_sp_refresh_loop.py runtime configuration
 beautifulsoup4==4.15.0
 lxml==6.1.1
 openpyxl==3.1.5
@@ -40,3 +41,4 @@ nbformat==5.10.4  # executed research notebook contract
 nbclient==0.10.2  # clean-run notebook validation
 jupyter-client==8.6.3  # pinned nbclient kernel protocol
 ipykernel==6.30.1  # pinned Python notebook kernel
+json5==0.15.0
