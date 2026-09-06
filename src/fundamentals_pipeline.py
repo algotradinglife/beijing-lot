@@ -620,22 +620,34 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                     if not isinstance(selected, list) or any(not isinstance(row, list) or len(row) != len(history_value_fields)
                                                              for row in selected):
                         raise ValueError("resolved history value has invalid shape")
-                    selected = [{field: "" if item is None else str(item)
-                                 for field, item in zip(history_value_fields, row)} for row in selected]
                     verification_status = "INDEPENDENTLY_RESOLVED"
                     review_id = review["review_id"]
                     evidence_json = canonical(review["evidence"])
                     source_count = 2
                 elif (not related_dispute and set(by_source) == {"nowscore", "titan"} and
                       by_source["nowscore"] == by_source["titan"]):
-                    selected = by_source["nowscore"]
+                    selected = []
+                    for row in by_source["nowscore"]:
+                        try:
+                            selected.append([
+                                row["event_date"], row["home_id"], row["away_id"],
+                                int(row["home_score"]), int(row["away_score"]),
+                                None if row["halftime_home_score"] == "" else int(row["halftime_home_score"]),
+                                None if row["halftime_away_score"] == "" else int(row["halftime_away_score"]),
+                                row["score_scope"],
+                            ])
+                        except (TypeError, ValueError) as exc:
+                            raise ValueError("normalized history value violates typed fact contract") from exc
+                    selected = json.loads(resolved_json({
+                        "field": history_field, "resolved_value": canonical(selected)}))
                     verification_status = "AGREED_UNVERIFIED"
                     review_id = spotcheck["review_id"] if spotcheck else ""
                     evidence_json = canonical(spotcheck["evidence"]) if spotcheck else "[]"
                     source_count = 2
                 else:
                     selected = []
-                for occurrence, value in enumerate(selected, start=1):
+                for occurrence, row in enumerate(selected, start=1):
+                    value = dict(zip(history_value_fields, row))
                     facts.append({"release_id": release_id, "scope": scope, "issue": fixture[0], "slot": fixture[1],
                                   "provider_id": fixture[2], "fact_type": "prior_match",
                                   "fact_key": f"{block}:{history_id}:{occurrence}", "value_json": canonical(value),

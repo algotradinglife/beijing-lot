@@ -263,9 +263,18 @@ def test_missing_is_not_zero_and_coverage_is_quarantined():
     tables = pipeline.derive_release_tables("r1", {"main": release}, [])
     assert not any(row["fact_type"] == "prior_match" for row in tables["facts"])
     assert tables["discrepancy_queue"][0]["status"] == "QUARANTINED_MISSINGNESS"
-    exact = pipeline.derive_release_tables("r2", {"main": synthetic_release()}, [])
+    exact_release = synthetic_release()
+    for row in exact_release["tables"]["history"]:
+        row["halftime_home_score"] = ""
+        row["halftime_away_score"] = ""
+    exact = pipeline.derive_release_tables("r2", {"main": exact_release}, [])
     prior = next(row for row in exact["facts"] if row["fact_type"] == "prior_match")
-    assert json.loads(prior["value_json"])["home_score"] == "0"
+    prior_value = json.loads(prior["value_json"])
+    assert prior_value["home_score"] == 0
+    assert prior_value["away_score"] == 1
+    assert prior_value["halftime_home_score"] is None
+    assert prior_value["halftime_away_score"] is None
+    assert prior_value["home_id"] == "0010" and prior_value["away_id"] == "0030"
     assert {row["fact_type"] for row in exact["facts"]} >= {"fixture_identity", "standings_snapshot", "adjacent_schedule"}
 
 
@@ -317,9 +326,9 @@ def test_cross_block_history_conflict_quarantines_every_occurrence():
     prior = [row for row in reconciled["facts"] if row["fact_type"] == "prior_match"]
     assert len(prior) == 2
     assert {row["value_json"] for row in prior} == {
-        '{"away_id":"0030","away_score":"1","event_date":"2026-08-01",'
-        '"halftime_away_score":"0","halftime_home_score":"0","home_id":"0010",'
-        '"home_score":"0","score_scope":"SOURCE_PUBLISHED_FULL_TIME"}'}
+        '{"away_id":"0030","away_score":1,"event_date":"2026-08-01",'
+        '"halftime_away_score":0,"halftime_home_score":0,"home_id":"0010",'
+        '"home_score":0,"score_scope":"SOURCE_PUBLISHED_FULL_TIME"}'}
     assert not any(row["reason"] == "CROSS_CONTEXT_HISTORY_CONFLICT"
                    for row in reconciled["quarantine"])
 
@@ -522,9 +531,25 @@ def test_resolved_discrepancy_requires_canonical_value_and_exports_history():
     tables = pipeline.derive_release_tables(
         "r2", {"main": release}, [audit("PRIOR_MATCH_CORROBORATED", targets=[target])])
     fact = next(row for row in tables["facts"] if row["fact_key"] == "h_data:00009:1")
-    assert json.loads(fact["value_json"])["home_score"] == "0"
+    assert json.loads(fact["value_json"])["home_score"] == 0
     assert fact["verification_status"] == "INDEPENDENTLY_RESOLVED"
     assert fact["review_id"] == tables["discrepancy_queue"][0]["review_id"]
+    for row in release["tables"]["history"]:
+        row["halftime_home_score"] = ""
+        row["halftime_away_score"] = ""
+    left_null = left_value.replace(',0,0,"SOURCE_PUBLISHED', ',null,null,"SOURCE_PUBLISHED')
+    right_null = right_value.replace(',0,0,"SOURCE_PUBLISHED', ',null,null,"SOURCE_PUBLISHED')
+    release["tables"]["findings"] = [{"issue": "001", "slot": "1", "provider_id": "00023",
+                                       "field": "h_data:00009", "left": left_null,
+                                       "right": right_null, "disposition": "UNRESOLVED"}]
+    null_target = {"field": "h_data:00009", "left": left_null, "right": right_null,
+                   "resolved_value": left_null}
+    null_tables = pipeline.derive_release_tables(
+        "r2-null", {"main": release}, [audit("PRIOR_MATCH_CORROBORATED", targets=[null_target])])
+    null_fact = next(row for row in null_tables["facts"] if row["fact_key"] == "h_data:00009:1")
+    null_value = json.loads(null_fact["value_json"])
+    assert null_value["home_score"] == 0 and null_value["away_score"] == 1
+    assert null_value["halftime_home_score"] is None and null_value["halftime_away_score"] is None
     assert pipeline.target_key({"scope": "main", "issue": "001", "slot": "1", "provider_id": "00023", **target}) == pipeline.target_key(
         {"scope": "main", "issue": "001", "slot": "1", "provider_id": "00023", **incomplete})
 
