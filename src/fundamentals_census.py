@@ -84,6 +84,7 @@ def roster_records(path: Path, issue: str) -> list[dict]:
             dt += timedelta(days=1)
         output.append({"issue": issue, "slot": row["slot"], "provider_id": row["native_match_id"],
                        "league": row["league"], "roster_home": row["home"], "roster_away": row["away"],
+                       "roster_home_id": row["home_id"], "roster_away_id": row["away_id"],
                        "kickoff_utc": dt.replace(tzinfo=ZoneInfo("Asia/Shanghai")).astimezone(timezone.utc).isoformat(),
                        "status": row["status"], "roster_sha256": meta["sha256"],
                        "roster_group_date": row["schedule_date"], "roster_clock": row["kickoff_time"],
@@ -450,20 +451,29 @@ def build_outputs(root: Path, output: Path, *, generated_at_utc: str) -> dict:
     fixture_keys = [(r["issue"], r["slot"]) for r in panel]
     keys = [(r["issue"], r["slot"], r["provider_id"]) for r in panel]
     if (not panel or len(fixture_keys) != len(set(fixture_keys)) or
+            any(not isinstance(r.get(field), str) or not r[field].strip()
+                for r in panel for field in ("roster_home", "roster_away")) or
             len({r["provider_id"] for r in panel}) != len(panel)):
-        raise ValueError("empty or duplicate panel identity")
+        raise ValueError("empty, incomplete, or duplicate panel identity")
     counts = {k: sum((r["issue"], r["slot"], r["provider_id"]) == k for r in denominator) for k in keys}
     if any(n != 1 for n in counts.values()):
         raise ValueError("panel to denominator must be one-to-one")
     response_rows, identity_rows, field_rows, history_rows, findings = [], [], [], [], []
+    roster_by_fixture = {}
     source_hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest()
                      for name in ("panel.json", "denominator.json")}
-    for issue in sorted({row["issue"] for row in panel if "roster_sha256" in row}):
+    if any(not re.fullmatch(r"[0-9a-f]{64}", str(row.get("roster_sha256", ""))) for row in panel):
+        raise ValueError("panel requires roster provenance")
+    for issue in sorted({row["issue"] for row in panel}):
         roster_path = root / f"roster-{issue}.json"
         roster_meta, _ = read_response(roster_path)
         if any(row["roster_sha256"] != roster_meta["sha256"] for row in denominator if row["issue"] == issue):
             raise ValueError("roster provenance differs from denominator")
         source_hashes[roster_path.name] = hashlib.sha256(roster_path.read_bytes()).hexdigest()
+        for row in roster_records(roster_path, issue):
+            roster_by_fixture[(row["issue"], row["slot"], row["provider_id"])] = row
+    if any((row["issue"], row["slot"], row["provider_id"]) not in roster_by_fixture for row in panel):
+        raise ValueError("panel fixture absent from authoritative roster")
     revision_path = root / "sampling-revision.json"
     if revision_path.exists():
         revision = json.loads(revision_path.read_text())
@@ -473,6 +483,7 @@ def build_outputs(root: Path, output: Path, *, generated_at_utc: str) -> dict:
     for selected in panel:
         parsed = {}
         provider_id = selected["provider_id"]
+        roster = roster_by_fixture[(selected["issue"], selected["slot"], provider_id)]
         for source in ("nowscore", "titan"):
             key = {"issue": selected["issue"], "slot": selected["slot"], "provider_id": provider_id,
                    "source": source, "league": selected["league"], "period": selected["period"],
@@ -541,7 +552,9 @@ def build_outputs(root: Path, output: Path, *, generated_at_utc: str) -> dict:
                 continue
             record = parsed[source]
             identity_rows.append({**key, **{k: record[k] for k in ("home", "away", "home_id", "away_id", "kickoff_utc", "season_links")},
-                                  "roster_kickoff_equal": record["kickoff_utc"] == selected["kickoff_utc"]})
+                                  "roster_home_id_equal": record["home_id"] == roster["roster_home_id"],
+                                  "roster_away_id_equal": record["away_id"] == roster["roster_away_id"],
+                                  "roster_kickoff_equal": record["kickoff_utc"] == roster["kickoff_utc"]})
             for field in ("h_data", "a_data", "v_data", "season_tables", "injuries", "previous_lineup",
                           "schedules", "schedule_source_rows", "venue", "weather", "temperature"):
                 value = record["blocks"].get(field) if field in record["blocks"] else record[field]
@@ -562,22 +575,28 @@ def build_outputs(root: Path, output: Path, *, generated_at_utc: str) -> dict:
                                    "received_at_utc": response["auxiliary_received_at_utc"] if from_auxiliary else primary_received_at_utc,
                                    "raw_sha256": response["auxiliary_sha256"] if from_auxiliary else response["sha256"]})
             history_rows.extend({**key, **row} for row in record["history"])
-        if len(parsed) == 2:
-            pair_findings = compare_pair(parsed["nowscore"], parsed["titan"])
-            for record in parsed.values():
-                if record["kickoff_utc"] != selected["kickoff_utc"]:
-                    pair_findings.append({"field": f"roster_kickoff:{record['source']}", "left": selected["kickoff_utc"],
-                                          "right": record["kickoff_utc"], "disposition": "IDENTITY_AMBIGUOUS"})
-            for finding in pair_findings:
-                findings.append({"issue": selected["issue"], "slot": selected["slot"], "provider_id": provider_id,
-                                 "league": selected["league"], "panel_kind": selected["panel_kind"], **finding})
+        pair_findings = compare_pair(parsed["nowscore"], parsed["titan"]) if len(parsed) == 2 else []
+        for field in ("roster_home", "roster_away", "kickoff_utc"):
+            if selected[field] != roster[field]:
+                pair_findings.append({"field": f"panel_{field}", "left": roster[field],
+                                      "right": selected[field], "disposition": "IDENTITY_AMBIGUOUS"})
+        for record in parsed.values():
+            for field, roster_field in (("home_id", "roster_home_id"), ("away_id", "roster_away_id"),
+                                        ("kickoff_utc", "kickoff_utc")):
+                if record[field] != roster[roster_field]:
+                    pair_findings.append({"field": f"roster_{field}:{record['source']}",
+                                          "left": roster[roster_field], "right": record[field],
+                                          "disposition": "IDENTITY_AMBIGUOUS"})
+        for finding in pair_findings:
+            findings.append({"issue": selected["issue"], "slot": selected["slot"], "provider_id": provider_id,
+                             "league": selected["league"], "panel_kind": selected["panel_kind"], **finding})
     output.parent.mkdir(parents=True, exist_ok=True)
     base_columns = ["issue", "slot", "provider_id", "source", "league", "period", "panel_kind"]
     with tempfile.TemporaryDirectory(dir=output.parent, prefix=".census-build-") as tmp:
         stage = Path(tmp) / "release"
         stage.mkdir()
         write_rows(stage / "responses.csv", response_rows, base_columns + ["status", "received_at_utc", "sha256", "byte_count", "final_url", "content_type", "capture_state", "parse_state", "error", "evidence_class", "auxiliary_url", "auxiliary_sha256", "auxiliary_received_at_utc", "auxiliary_status"])
-        write_rows(stage / "identity.csv", identity_rows, base_columns + ["home", "away", "home_id", "away_id", "kickoff_utc", "season_links", "roster_kickoff_equal"])
+        write_rows(stage / "identity.csv", identity_rows, base_columns + ["home", "away", "home_id", "away_id", "kickoff_utc", "season_links", "roster_home_id_equal", "roster_away_id_equal", "roster_kickoff_equal"])
         write_rows(stage / "fields.csv", field_rows, base_columns + ["field", "field_state", "record_count", "observed_value", "evidence_class", "received_at_utc", "raw_sha256"])
         write_rows(stage / "history.csv", history_rows, base_columns + ["block", "ordinal", "history_id", "event_date", "home_id", "away_id", "home_score", "away_score", "halftime_home_score", "halftime_away_score", "score_scope", "home_text", "away_text"])
         write_rows(stage / "findings.csv", findings, ["issue", "slot", "provider_id", "league", "panel_kind", "field", "left", "right", "disposition"])

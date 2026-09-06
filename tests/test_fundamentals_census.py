@@ -16,6 +16,31 @@ from src import fundamentals_census as census
 FIXTURES = Path(__file__).parent / 'fixtures' / 'fundamentals_census'
 
 
+def write_roster_capture(root, row, *, home_id, away_id):
+    kickoff = datetime.datetime.fromisoformat(row['kickoff_utc'].replace('Z', '+00:00')).astimezone(
+        datetime.timezone(datetime.timedelta(hours=8)))
+    deadline = kickoff - datetime.timedelta(minutes=5)
+    issue, slot, provider_id = row['issue'], row['slot'], row['provider_id']
+    raw = f'''<html><title>让球胜平负</title><script>M[{slot}][0]={provider_id};</script>
+      <select id="dropIssueNum"><option selected value="{issue}">{issue}</option></select><table>
+      <tr id="row_{slot}" matchid="{slot}" polygoal="0" cansale="false"
+          name="{kickoff:%Y-%m-%d}" gamename="{row['league']}">
+      <td>{slot}</td><td>{row['league']}</td><td>{kickoff:%H:%M}</td>
+      <td title="截止时间：{deadline:%Y-%m-%d %H:%M}">未</td>
+      <td><a id="HomeTeam_{provider_id}" onmouseover="getMyHTML2('/temp/{provider_id}_{home_id}.htm')">{row['roster_home']}</a></td>
+      <td>0</td><td>-</td>
+      <td><a id="GuestTeam_{provider_id}" onmouseover="getMyHTML2('/temp/{provider_id}_{away_id}.htm')">{row['roster_away']}</a></td>
+      <td>-</td><td><a href="/sp/danchang/{issue}_{slot}_5.html">SP</a></td>
+      </tr></table></html>'''.encode()
+    url = f'https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum={issue}'
+    receipt = dict(url=url, final_url=url, status=200, content_type='text/html',
+                   started_at_utc='2026-09-05T09:59:00+00:00',
+                   received_at_utc='2026-09-05T09:59:01+00:00', byte_count=len(raw),
+                   sha256=hashlib.sha256(raw).hexdigest(), body_base64=base64.b64encode(raw).decode())
+    (root / f'roster-{issue}.json').write_text(json.dumps(receipt))
+    row['roster_sha256'] = receipt['sha256']
+
+
 @pytest.fixture
 def pages():
     return {source: gzip.decompress((FIXTURES / f'{source}-1870517.html.gz').read_bytes())
@@ -34,7 +59,9 @@ def corpus(tmp_path, pages, pair):
     (root / 'raw-browser').mkdir(parents=True)
     row = dict(issue='20064', slot=24, provider_id='1870517', league='英乙',
                period='historical', panel_kind='regression',
+               roster_home=pair['nowscore']['home'], roster_away=pair['nowscore']['away'],
                kickoff_utc=pair['nowscore']['kickoff_utc'])
+    write_roster_capture(root, row, home_id='1356', away_id='376')
     (root / 'panel.json').write_text(json.dumps([row]))
     (root / 'denominator.json').write_text(json.dumps([row]))
     for source, raw in pages.items():
@@ -273,6 +300,58 @@ def test_panel_provider_identity_must_match_denominator(corpus, tmp_path):
     assert not (tmp_path / 'mismatch').exists()
 
 
+def test_roster_team_or_orientation_conflict_quarantines_fixture(corpus, tmp_path):
+    for name in ('panel', 'denominator'):
+        path = corpus / f'{name}.json'
+        rows = json.loads(path.read_text())
+        rows[0]['roster_home'], rows[0]['roster_away'] = rows[0]['roster_away'], rows[0]['roster_home']
+        path.write_text(json.dumps(rows))
+    output = tmp_path / 'roster-conflict'
+    census.build_outputs(corpus, output, generated_at_utc='2026-09-05T12:00:00Z')
+    with (output / 'findings.csv').open() as stream:
+        findings = list(csv.DictReader(stream))
+    assert {(row['field'], row['disposition']) for row in findings} == {
+        ('panel_roster_home', 'IDENTITY_AMBIGUOUS'),
+        ('panel_roster_away', 'IDENTITY_AMBIGUOUS'),
+    }
+    from src.fundamentals_pipeline import derive_release_tables, read_normalized_release
+    tables = derive_release_tables('roster-conflict', {'main': read_normalized_release(output)}, [])
+    assert tables['canonical_identity'][0]['identity_status'] == 'QUARANTINED'
+    assert tables['facts'] == []
+
+
+def test_analysis_sources_agreeing_on_wrong_team_ids_are_quarantined(corpus, pair, tmp_path, monkeypatch):
+    wrong = copy.deepcopy(pair)
+    for record in wrong.values():
+        record['home_id'], record['away_id'] = '999', '998'
+    monkeypatch.setattr(census, 'analysis_record',
+                        lambda raw, *, source, provider_id, auxiliary_raw=None: wrong[source])
+    output = tmp_path / 'wrong-analysis-teams'
+    census.build_outputs(corpus, output, generated_at_utc='2026-09-05T12:00:00Z')
+    with (output / 'findings.csv').open() as stream:
+        findings = list(csv.DictReader(stream))
+    assert {(row['field'], row['disposition']) for row in findings
+            if row['field'].startswith('roster_')} == {
+        ('roster_home_id:nowscore', 'IDENTITY_AMBIGUOUS'),
+        ('roster_away_id:nowscore', 'IDENTITY_AMBIGUOUS'),
+        ('roster_home_id:titan', 'IDENTITY_AMBIGUOUS'),
+        ('roster_away_id:titan', 'IDENTITY_AMBIGUOUS'),
+    }
+    from src.fundamentals_pipeline import derive_release_tables, read_normalized_release
+    tables = derive_release_tables('wrong-analysis-teams', {'main': read_normalized_release(output)}, [])
+    assert tables['canonical_identity'][0]['identity_status'] == 'QUARANTINED'
+    assert tables['facts'] == []
+
+
+def test_panel_requires_roster_team_identity(corpus, tmp_path):
+    path = corpus / 'panel.json'
+    rows = json.loads(path.read_text())
+    del rows[0]['roster_home']
+    path.write_text(json.dumps(rows))
+    with pytest.raises(ValueError, match='incomplete'):
+        census.build_outputs(corpus, tmp_path / 'missing-roster', generated_at_utc='2026-09-05T12:00:00Z')
+
+
 def test_build_explicit_missing_and_http_failure(corpus, tmp_path):
     (corpus/'raw-browser/nowscore-1870517.json').unlink()
     path = corpus/'raw-browser/titan-1870517.json'
@@ -382,7 +461,7 @@ def test_roster_uses_authoritative_parser(corpus, monkeypatch):
     record['final_url']='https://cp.nowscore.com/buy/DanChang.aspx'
     path.write_text(json.dumps(record))
     parsed = dict(schedule_date='2026-09-05',kickoff_time='20:00',slot=1,
-                  native_match_id='00123',league='英乙',home='甲',away='乙',status='未',
+                  native_match_id='00123',league='英乙',home='甲',away='乙',home_id='11',away_id='22',status='未',
                   cutoff_text='截止时间：2026-09-05 19:55')
     with monkeypatch.context() as patch:
         patch.setattr(census,'parse_page',lambda raw,issue,kind:[parsed])
@@ -390,6 +469,7 @@ def test_roster_uses_authoritative_parser(corpus, monkeypatch):
         assert rows[0]['provider_id']=='00123'
         assert rows[0]['kickoff_utc']=='2026-09-05T12:00:00+00:00'
         assert rows[0]['issue']=='001'
+        assert (rows[0]['roster_home_id'], rows[0]['roster_away_id']) == ('11', '22')
         patch.setattr(census,'parse_page',lambda raw,issue,kind:[parsed,parsed])
         with pytest.raises(ValueError,match='duplicate'):
             census.roster_records(path,'001')
@@ -409,8 +489,10 @@ def test_external_asset_provenance_and_latest_availability(corpus, tmp_path):
         # Offset strings cannot be compared lexicographically for chronology.
         record['received_at_utc']='2026-09-05T13:00:00+02:00' if name=='nowscore-js' else '2026-09-05T10:00:01Z'
         (corpus/'raw-browser'/f'{name}-{identity}.json').write_text(json.dumps(record))
-    row=dict(issue='001',slot=1,provider_id=identity,league='英甲',period='upcoming',
-             panel_kind='stratified',kickoff_utc='2026-09-05T10:30:00Z')
+    row=dict(issue='00001',slot=1,provider_id=identity,league='英甲',period='upcoming',
+             panel_kind='stratified',roster_home='科里蒂巴',roster_away='米拉索',
+             kickoff_utc='2026-09-05T10:30:00Z')
+    write_roster_capture(corpus, row, home_id='350', away_id='7429')
     for name in ('panel','denominator'):
         (corpus/f'{name}.json').write_text(json.dumps([row]))
     census.build_outputs(corpus,tmp_path/'asset-result',generated_at_utc='2026-09-05T12:00:00Z')
@@ -460,8 +542,10 @@ def test_auxiliary_transport_failure_is_explicit_parser_failure(corpus, tmp_path
     titan_receipt = json.loads((FIXTURES / f'titan-{identity}.provenance.json').read_text())
     titan_receipt['body_base64'] = base64.b64encode(titan_raw).decode()
     (corpus / 'raw-browser' / f'titan-{identity}.json').write_text(json.dumps(titan_receipt))
-    row = dict(issue='001', slot=1, provider_id=identity, league='英甲', period='historical',
-               panel_kind='regression', kickoff_utc='2026-09-05T10:30:00+00:00')
+    row = dict(issue='00001', slot=1, provider_id=identity, league='英甲', period='historical',
+               panel_kind='regression', roster_home='科里蒂巴', roster_away='米拉索',
+               kickoff_utc='2026-09-05T10:30:00+00:00')
+    write_roster_capture(corpus, row, home_id='350', away_id='7429')
     for name in ('panel', 'denominator'):
         (corpus / f'{name}.json').write_text(json.dumps([row]))
     census.build_outputs(corpus, tmp_path / 'aux-failure', generated_at_utc='2026-09-05T12:00:00Z')

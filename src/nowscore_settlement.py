@@ -106,10 +106,16 @@ def parse_page(payload: bytes, issue: str, typeid: int) -> list[dict]:
         native_id = home["id"].removeprefix("HomeTeam_")
         if not native_id.isdigit() or away["id"] != f"GuestTeam_{native_id}":
             raise ValueError("home/away native identity mismatch")
+        team_ids = []
+        for side in (home, away):
+            matches = re.findall(rf"/temp/{re.escape(native_id)}_(\d+)\.htm", side.get("onmouseover", ""), re.I)
+            team_ids.append(matches[0] if len(matches) == 1 and int(matches[0]) > 0 else None)
         links = [x.get("href", "") for x in tr.select("a[href]")]
         if f"/sp/danchang/{issue}_{slot}_{typeid}.html" not in links:
             raise ValueError("row SP link identity mismatch")
         errors = []
+        if None in team_ids or team_ids[0] == team_ids[1]:
+            errors.append("missing_or_invalid_native_team_identity")
         line_text = tr.get("polygoal", "")
         line = int(line_text) if re.fullmatch(r"[+-]?\d+", line_text) else None
         if typeid == 5 and line is None:
@@ -157,6 +163,7 @@ def parse_page(payload: bytes, issue: str, typeid: int) -> list[dict]:
         row = {
             "issue": issue, "slot": slot, "typeid": typeid, "play": PLAYS[typeid],
             "native_match_id": native_id, "home": home.get_text(strip=True), "away": away.get_text(strip=True),
+            "home_id": team_ids[0], "away_id": team_ids[1],
             "league": tr.get("gamename", ""), "schedule_date": tr.get("name", ""),
             "kickoff_time": td[2].get_text(strip=True), "status": td[3].get_text(strip=True),
             "cutoff_text": td[3].get("title", ""), "can_sale": tr.get("cansale", ""),

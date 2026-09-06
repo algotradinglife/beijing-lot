@@ -27,7 +27,7 @@ def page(typeid=6, status="完场", ft="3-1", ht="1-0", values=None):
     handicap = "<td>0</td>" if typeid == 5 else ""
     row = f'''<tr id="row_1" matchid="1" polygoal="0" cansale="false" name="2025-05-13" gamename="测试">
       <td>1</td><td>测试</td><td>23:30</td><td title="截止时间：2025-05-13 23:25">{status}</td>
-      <td><a id="HomeTeam_123">主队</a></td>{handicap}<td>{ft}</td><td><a id="GuestTeam_123">客队</a></td><td>{ht}</td>
+      <td><a id="HomeTeam_123" onmouseover="getMyHTML2('/temp/123_456.htm')">主队</a></td>{handicap}<td>{ft}</td><td><a id="GuestTeam_123" onmouseover="getMyHTML2('/temp/123_789.htm')">客队</a></td><td>{ht}</td>
       <td><a href="/sp/danchang/25053_1_{typeid}.html">SP</a></td>{odds if typeid != 8 else ''}</tr>'''
     extra = f'<tr id="tr_1"><td><table><tr>{odds}</tr></table></td></tr>' if typeid == 8 else ""
     return f'<html><title>{TITLE[typeid]}</title><script>M[1][0]=123;</script><select id="dropIssueNum"><option selected value="25053">25053</option></select><table>{row}{extra}</table></html>'.encode()
@@ -41,6 +41,7 @@ def codes(row):
 def test_all_five_label_mapping(typeid, option):
     row = parse_page(page(typeid, values={option:"3.753"}), "25053", typeid)[0]
     assert row["parse_errors"] == []
+    assert (row["home_id"], row["away_id"]) == ("456", "789")
     assert expected_option(row) == option
     assert len(row["options"]) == len(TYPEID_LABELS[typeid])
     assert codes(row) == set()
@@ -87,6 +88,8 @@ def test_wrong_issue_or_play_rejected():
         parse_page(page().replace(b'25053_1_6.html',b'25053_2_6.html'),"25053",6)
     with pytest.raises(ValueError, match="roster"):
         parse_page(page().replace(b'M[1][0]=123;',b'M[1][0]=123; M[2][0]=999;'),"25053",6)
+    invalid_team = parse_page(page().replace(b"/temp/123_456.htm", b"/temp/123_789.htm"), "25053", 6)[0]
+    assert "missing_or_invalid_native_team_identity" in invalid_team["parse_errors"]
 
 
 def test_missing_handicap_not_zero_and_bq_missing_half():
