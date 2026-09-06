@@ -79,8 +79,15 @@ read_fundamentals_review <- function(audit_dir) {
     if (!identical(record$schema, "bj407_independent_audit_v1") ||
         !valid_revision || !nzchar(record$reviewer) || !nzchar(record$rationale) ||
         isTRUE(record$model_admission) || isTRUE(record$settlement_mutation)) stop("Invalid diagnostic review")
-    if (!length(record$independent_evidence)) stop("Missing independent evidence")
-    for (evidence in record$independent_evidence) {
+    evidence_records <- record$independent_evidence
+    if (!length(evidence_records)) stop("Missing independent evidence")
+    if (all(c("file", "url", "sha256") %in% names(evidence_records))) {
+      evidence_records <- list(evidence_records)
+    }
+    if (!all(vapply(evidence_records, function(evidence) {
+      is.list(evidence) && all(c("file", "url", "sha256") %in% names(evidence))
+    }, logical(1)))) stop("Invalid independent evidence")
+    for (evidence in evidence_records) {
       receipt <- jsonlite::read_json(file.path(audit_dir, evidence$file))
       bytes <- jsonlite::base64_dec(receipt$body_base64)
       actual <- digest::digest(bytes, algo = "sha256", serialize = FALSE)

@@ -71,6 +71,10 @@ test_that("independent review binds original bytes without granting admission", 
   result <- read_fundamentals_review(root)
   expect_identical(result$provider_id, "00023")
   expect_identical(result$disposition, "TIME_SEMANTICS_UNRESOLVED")
+  review$independent_evidence <- review$independent_evidence[[1]]
+  jsonlite::write_json(list(review), file.path(root, "independent-cases.v1.json"), auto_unbox = TRUE)
+  expect_identical(read_fundamentals_review(root)$provider_id, "00023")
+  review$independent_evidence <- list(review$independent_evidence)
   review$revision <- 2L
   jsonlite::write_json(list(review), file.path(root, "independent-cases.v1.json"), auto_unbox = TRUE)
   expect_identical(read_fundamentals_review(root)$provider_id, "00023")
