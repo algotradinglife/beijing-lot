@@ -275,8 +275,19 @@ def test_quarantined_fixture_identity_blocks_matching_prior_history_id():
     assert not any(row["fact_type"] == "prior_match" and ":00009:" in row["fact_key"]
                    for row in tables["facts"])
     assert any(row["provider_id"] == "00023" and row["field"] == "h_data:00009" and
-               row["reason"] == "RELATED_HISTORY_ID_DISCREPANCY"
+               row["reason"] == "RELATED_QUARANTINED_FIXTURE_IDENTITY"
                for row in tables["quarantine"])
+    release["tables"]["history"][1]["home_score"] = "2"
+    left = '[["2026-08-01","0010","0030",0,1,0,0,"SOURCE_PUBLISHED_FULL_TIME"]]'
+    right = '[["2026-08-01","0010","0030",2,1,0,0,"SOURCE_PUBLISHED_FULL_TIME"]]'
+    release["tables"]["findings"].append({
+        "issue": "001", "slot": "1", "provider_id": "00023", "field": "h_data:00009",
+        "left": left, "right": right, "disposition": "UNRESOLVED"})
+    score_review = audit("PRIOR_MATCH_CORROBORATED", revision=2, targets=[{
+        "field": "h_data:00009", "left": left, "right": right, "resolved_value": left}])
+    reviewed = pipeline.derive_release_tables("r2", {"main": release}, [review, score_review])
+    assert not any(row["fact_type"] == "prior_match" and ":00009:" in row["fact_key"]
+                   for row in reviewed["facts"])
 
 
 def test_missing_is_not_zero_and_coverage_is_quarantined():
@@ -542,6 +553,10 @@ def test_resolved_discrepancy_requires_canonical_value_and_exports_history():
                      "resolved_value": '[["2026-08-01","0010","0030",-1,1,0,0,"garbage"]]'}
     with pytest.raises(ValueError, match="typed fact contract"):
         pipeline.resolved_json(invalid_score)
+    contradictory = {**incomplete,
+                     "resolved_value": left_value[:-1] + ',' + right_value[1:]}
+    with pytest.raises(ValueError, match="invalid shape"):
+        pipeline.resolved_json(contradictory)
     assert pipeline.resolved_json(
         {"field": "season_tables",
          "resolved_value": '[{"side":"home","state":"POPULATED","team_id":"10","values":[10,2,2,6,8,20,-12,8,17]},{"side":"away","state":"POPULATED","team_id":"20","values":[10,2,2,6,8,20,-12,8,17]}]'}) == \

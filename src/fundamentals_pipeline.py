@@ -114,7 +114,8 @@ def resolved_json(target: dict) -> str:
             except (TypeError, ValueError) as exc:
                 raise ValueError("resolved schedule value has invalid event date") from exc
     if HISTORY_FIELD_PATTERN.fullmatch(field):
-        if not isinstance(parsed, list) or any(not isinstance(row, list) or len(row) != 8 for row in parsed):
+        if (not isinstance(parsed, list) or len(parsed) != 1 or
+                any(not isinstance(row, list) or len(row) != 8 for row in parsed)):
             raise ValueError("resolved history value has invalid shape")
         for row in parsed:
             try:
@@ -613,6 +614,12 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                 for row in rows:
                     by_source[row["source"]].append({field: row.get(field, "") for field in history_value_fields})
                 spotcheck = latest_spotchecks.get(history_id)
+                if history_id in quarantined_fixture_ids:
+                    quarantine.append({"release_id": release_id, "scope": scope, "issue": fixture[0], "slot": fixture[1],
+                                       "provider_id": fixture[2], "field": history_field,
+                                       "reason": "RELATED_QUARANTINED_FIXTURE_IDENTITY",
+                                       "review_ids_json": "[]"})
+                    continue
                 if (history_id in cross_context_history_conflicts and
                         history_id not in reconciled_history_ids):
                     quarantine.append({"release_id": release_id, "scope": scope, "issue": fixture[0], "slot": fixture[1],
