@@ -440,6 +440,60 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
     }
     latest_spotchecks = {history_id: max(chain, key=lambda row: row["revision"])
                          for history_id, chain in spotcheck_chains.items()}
+    identity_states = {}
+    for scope, release in releases.items():
+        identity_groups = defaultdict(list)
+        finding_groups = defaultdict(list)
+        for row in release["tables"]["identity"]:
+            identity_groups[(row["issue"], row["slot"], row["provider_id"])].append(row)
+        for row in release["tables"]["findings"]:
+            finding_groups[(row["issue"], row["slot"], row["provider_id"])].append(row)
+        for context, synthetic_findings in cross_context_findings.items():
+            if context[0] != scope:
+                continue
+            fixture = context[1:]
+            existing_fields = {row["field"] for row in finding_groups[fixture]}
+            finding_groups[fixture].extend(
+                row for row in synthetic_findings if row["field"] not in existing_fields)
+        for panel in release["tables"]["panel"]:
+            fixture = (panel["issue"], panel["slot"], panel["provider_id"])
+            source_map = {row["source"]: row for row in identity_groups[fixture]}
+            identity_fields = ("home", "away", "home_id", "away_id", "kickoff_utc")
+            exact = set(source_map) == {"nowscore", "titan"} and all(
+                source_map["nowscore"][field] == source_map["titan"][field] for field in identity_fields)
+            revision_chains = defaultdict(list)
+            for audit in audits_by_fixture[(scope, *fixture)]:
+                revision_chains[target_set_key(audit.get("targets", []))].append(audit)
+            latest_audits = sorted(
+                (max(chain, key=lambda row: row["revision"]) for chain in revision_chains.values()),
+                key=lambda row: (row["reviewed_at_utc"], row["review_id"]),
+            )
+            identity_field_names = {"home", "away", "home_id", "away_id", "kickoff_utc",
+                                    "event_instance_semantics"}
+            identity_audits = [audit for audit in latest_audits
+                               if not audit.get("targets") or
+                               all(target["field"] in identity_field_names or
+                                   target["field"].startswith("roster_") or
+                                   target["field"].startswith("panel_roster_")
+                                   for target in audit["targets"])]
+            identity_findings = [row for row in finding_groups[fixture]
+                                 if row["disposition"] == "IDENTITY_AMBIGUOUS" or
+                                 row["field"].startswith("roster_") or
+                                 row["field"].startswith("panel_roster_")]
+            semantic_quarantine = any(
+                not all(corroborates_target(audit["disposition"], target["field"])
+                        for target in audit["targets"])
+                for audit in identity_audits)
+            quarantined = not exact or bool(identity_findings) or semantic_quarantine
+            identity_states[(scope, *fixture)] = {
+                "source_map": source_map, "identity_fields": identity_fields, "exact": exact,
+                "latest_audits": latest_audits, "identity_audits": identity_audits,
+                "findings": finding_groups[fixture], "quarantined": quarantined,
+            }
+    quarantined_fixture_ids = {
+        context[3] for context, state in identity_states.items() if state["quarantined"]
+    }
+    disputed_history_ids |= quarantined_fixture_ids
     identities = []
     queue = []
     adjudications = []
@@ -456,55 +510,19 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                               "evidence_json": canonical(audit["evidence"])})
     for scope, release in releases.items():
         tables = release["tables"]
-        identity_groups = defaultdict(list)
         field_groups = defaultdict(list)
         history_groups = defaultdict(lambda: defaultdict(list))
-        finding_groups = defaultdict(list)
-        for row in tables["identity"]:
-            identity_groups[(row["issue"], row["slot"], row["provider_id"])].append(row)
         for row in tables["fields"]:
             field_groups[(row["issue"], row["slot"], row["provider_id"], row["field"])].append(row)
         for row in tables["history"]:
             fixture = (row["issue"], row["slot"], row["provider_id"])
             history_groups[fixture][(row["block"], row["history_id"])].append(row)
-        for row in tables["findings"]:
-            finding_groups[(row["issue"], row["slot"], row["provider_id"])].append(row)
-        for context, synthetic_findings in cross_context_findings.items():
-            if context[0] != scope:
-                continue
-            fixture = context[1:]
-            existing_fields = {row["field"] for row in finding_groups[fixture]}
-            finding_groups[fixture].extend(
-                row for row in synthetic_findings if row["field"] not in existing_fields)
         for panel in tables["panel"]:
             fixture = (panel["issue"], panel["slot"], panel["provider_id"])
-            source_identity = identity_groups[fixture]
-            source_map = {row["source"]: row for row in source_identity}
-            identity_fields = ("home", "away", "home_id", "away_id", "kickoff_utc")
-            exact = set(source_map) == {"nowscore", "titan"} and all(
-                source_map["nowscore"][field] == source_map["titan"][field] for field in identity_fields)
-            fixture_audits = audits_by_fixture[(scope, *fixture)]
-            revision_chains = defaultdict(list)
-            for audit in fixture_audits:
-                revision_chains[target_set_key(audit.get("targets", []))].append(audit)
-            latest_audits = sorted(
-                (max(chain, key=lambda row: row["revision"]) for chain in revision_chains.values()),
-                key=lambda row: (row["reviewed_at_utc"], row["review_id"]),
-            )
-            identity_field_names = {"home", "away", "home_id", "away_id", "kickoff_utc",
-                                    "event_instance_semantics"}
-            identity_audits = [audit for audit in latest_audits
-                               if not audit.get("targets") or
-                               all(target["field"] in identity_field_names or
-                                   target["field"].startswith("roster_kickoff")
-                                   for target in audit["targets"])]
-            identity_findings = [row for row in finding_groups[fixture]
-                                 if row["disposition"] == "IDENTITY_AMBIGUOUS" or row["field"].startswith("roster_kickoff")]
-            semantic_quarantine = any(
-                not all(corroborates_target(audit["disposition"], target["field"])
-                        for target in audit["targets"])
-                for audit in identity_audits)
-            quarantined = not exact or bool(identity_findings) or semantic_quarantine
+            state = identity_states[(scope, *fixture)]
+            source_map, identity_fields, exact = state["source_map"], state["identity_fields"], state["exact"]
+            latest_audits, identity_audits = state["latest_audits"], state["identity_audits"]
+            fixture_findings, quarantined = state["findings"], state["quarantined"]
             identity_value = {field: source_map["nowscore"][field] for field in identity_fields} if exact else {}
             identities.append({"release_id": release_id, "scope": scope, "issue": fixture[0], "slot": fixture[1],
                                "provider_id": fixture[2], "identity_status": "QUARANTINED" if quarantined else "REVIEWED_CANONICAL",
@@ -525,7 +543,7 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                               "review_id": "", "evidence_json": "[]"})
             matched_targets = set()
             resolved_findings = {}
-            for finding in finding_groups[fixture]:
+            for finding in fixture_findings:
                 category = "COVERAGE_DIFFERENCE" if finding["disposition"] == "COVERAGE_DIFFERENCE" else "GENUINE_DISCREPANCY"
                 discrepancy_target = {"scope": scope, "issue": fixture[0], "slot": fixture[1],
                                       "provider_id": fixture[2], "field": finding["field"],
@@ -540,7 +558,9 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                     matched_targets.add(discrepancy_key)
                 if category == "COVERAGE_DIFFERENCE":
                     status = "QUARANTINED_MISSINGNESS"
-                elif latest:
+                elif (latest and not (HISTORY_FIELD_PATTERN.fullmatch(finding["field"]) and
+                                      finding["field"].split(":", 1)[1] in cross_context_history_conflicts and
+                                      finding["field"].split(":", 1)[1] not in reconciled_history_ids)):
                     status = ("INDEPENDENTLY_RESOLVED" if corroborates_target(latest["disposition"], finding["field"])
                               else "QUARANTINED_REVIEWED")
                 else:
@@ -607,7 +627,7 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                                        "review_ids_json": canonical([spotcheck["review_id"]])})
                     continue
                 resolved = resolved_findings.get(history_field)
-                unresolved = any(finding["field"] == history_field for finding in finding_groups[fixture])
+                unresolved = any(finding["field"] == history_field for finding in fixture_findings)
                 related_dispute = history_id in disputed_history_ids
                 if related_dispute and not unresolved and not resolved:
                     quarantine.append({"release_id": release_id, "scope": scope, "issue": fixture[0], "slot": fixture[1],

@@ -258,6 +258,27 @@ def test_identity_variants_quarantine_entire_fixture(changed):
     assert any(row["field"] == "*" for row in tables["quarantine"])
 
 
+def test_quarantined_fixture_identity_blocks_matching_prior_history_id():
+    release = synthetic_release()
+    quarantined_fixture = synthetic_release()
+    for rows in quarantined_fixture["tables"].values():
+        for row in rows:
+            row["slot"], row["provider_id"] = "2", "00009"
+    quarantined_fixture["tables"]["history"] = []
+    for name, rows in quarantined_fixture["tables"].items():
+        release["tables"][name].extend(rows)
+    review = audit("TIME_SEMANTICS_UNRESOLVED")
+    review["slot"], review["provider_id"] = "2", "00009"
+    for target in review["targets"]:
+        target["slot"], target["provider_id"] = "2", "00009"
+    tables = pipeline.derive_release_tables("r1", {"main": release}, [review])
+    assert not any(row["fact_type"] == "prior_match" and ":00009:" in row["fact_key"]
+                   for row in tables["facts"])
+    assert any(row["provider_id"] == "00023" and row["field"] == "h_data:00009" and
+               row["reason"] == "RELATED_HISTORY_ID_DISCREPANCY"
+               for row in tables["quarantine"])
+
+
 def test_missing_is_not_zero_and_coverage_is_quarantined():
     release = synthetic_release(missing_history=True)
     tables = pipeline.derive_release_tables("r1", {"main": release}, [])
@@ -369,6 +390,8 @@ def test_concordant_cross_scope_history_resolutions_export_facts():
     conflicting = pipeline.derive_release_tables(
         "r2", {"main": main, "regression": regression}, [main_review, regression_review])
     assert not any(row["fact_type"] == "prior_match" for row in conflicting["facts"])
+    assert {row["status"] for row in conflicting["discrepancy_queue"]
+            if row["field"] == "h_data:00009"} == {"UNRESOLVED_QUARANTINED"}
     assert sum(row["reason"] == "CROSS_CONTEXT_HISTORY_CONFLICT"
                for row in conflicting["quarantine"]) == 2
 
