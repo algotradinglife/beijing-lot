@@ -73,8 +73,11 @@ read_fundamentals_review <- function(audit_dir) {
   result <- list(tibble::tibble(issue = character(), slot = integer(), provider_id = character(),
                                 disposition = character(), rationale = character()))
   for (record in records) {
+    valid_revision <- length(record$revision) == 1L && is.numeric(record$revision) &&
+      !is.na(record$revision) && is.finite(record$revision) && record$revision >= 1 &&
+      record$revision == floor(record$revision) && record$revision <= .Machine$integer.max
     if (!identical(record$schema, "bj407_independent_audit_v1") ||
-        !identical(record$revision, 1L) || !nzchar(record$reviewer) || !nzchar(record$rationale) ||
+        !valid_revision || !nzchar(record$reviewer) || !nzchar(record$rationale) ||
         isTRUE(record$model_admission) || isTRUE(record$settlement_mutation)) stop("Invalid diagnostic review")
     if (!length(record$independent_evidence)) stop("Missing independent evidence")
     for (evidence in record$independent_evidence) {

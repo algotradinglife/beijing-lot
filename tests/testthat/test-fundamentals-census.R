@@ -71,6 +71,17 @@ test_that("independent review binds original bytes without granting admission", 
   result <- read_fundamentals_review(root)
   expect_identical(result$provider_id, "00023")
   expect_identical(result$disposition, "TIME_SEMANTICS_UNRESOLVED")
+  review$revision <- 2L
+  jsonlite::write_json(list(review), file.path(root, "independent-cases.v1.json"), auto_unbox = TRUE)
+  expect_identical(read_fundamentals_review(root)$provider_id, "00023")
+  for (invalid_revision in list(0L, 1.5, NA_integer_)) {
+    review$revision <- invalid_revision
+    jsonlite::write_json(list(review), file.path(root, "independent-cases.v1.json"), auto_unbox = TRUE,
+                         na = "null")
+    expect_error(read_fundamentals_review(root), "Invalid diagnostic review")
+  }
+  review$revision <- 2L
+  jsonlite::write_json(list(review), file.path(root, "independent-cases.v1.json"), auto_unbox = TRUE)
   receipt$body_base64 <- jsonlite::base64_enc(charToRaw("tampered"))
   jsonlite::write_json(receipt, file.path(root, "official.json"), auto_unbox = TRUE)
   expect_error(read_fundamentals_review(root), "receipt mismatch")

@@ -374,18 +374,38 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
     """
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", release_id):
         raise ValueError("invalid release ID")
+    history_value_fields = ("event_date", "home_id", "away_id", "home_score", "away_score",
+                            "halftime_home_score", "halftime_away_score", "score_scope")
     history_signatures = defaultdict(lambda: defaultdict(set))
     for scope, release in releases.items():
         for row in release["tables"]["history"]:
             context = (scope, row["issue"], row["slot"], row["provider_id"], row["block"])
             history_signatures[row["history_id"]][context].add(tuple(
-                row.get(field, "") for field in
-                ("event_date", "home_id", "away_id", "home_score", "away_score",
-                 "halftime_home_score", "halftime_away_score", "score_scope")))
+                row.get(field, "") for field in history_value_fields))
     cross_context_history_conflicts = {
         history_id for history_id, contexts in history_signatures.items()
         if len(contexts) > 1 and len(set().union(*contexts.values())) > 1
     }
+    cross_context_findings = defaultdict(list)
+    for history_id in cross_context_history_conflicts:
+        contexts = history_signatures[history_id]
+        for context, signatures in contexts.items():
+            scope, issue, slot, provider_id, block = context
+            other_contexts = []
+            for other_context, other_signatures in sorted(contexts.items()):
+                if other_context == context:
+                    continue
+                other_contexts.append({
+                    "scope": other_context[0], "issue": other_context[1], "slot": other_context[2],
+                    "provider_id": other_context[3], "block": other_context[4],
+                    "values": [list(value) for value in sorted(other_signatures)],
+                })
+            cross_context_findings[(scope, issue, slot, provider_id)].append({
+                "issue": issue, "slot": slot, "provider_id": provider_id,
+                "field": f"{block}:{history_id}",
+                "left": canonical([list(value) for value in sorted(signatures)]),
+                "right": canonical(other_contexts), "disposition": "UNRESOLVED",
+            })
     disputed_history_ids = cross_context_history_conflicts | {
         finding["field"].split(":", 1)[1]
         for release in releases.values()
@@ -449,6 +469,13 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
             history_groups[fixture][(row["block"], row["history_id"])].append(row)
         for row in tables["findings"]:
             finding_groups[(row["issue"], row["slot"], row["provider_id"])].append(row)
+        for context, synthetic_findings in cross_context_findings.items():
+            if context[0] != scope:
+                continue
+            fixture = context[1:]
+            existing_fields = {row["field"] for row in finding_groups[fixture]}
+            finding_groups[fixture].extend(
+                row for row in synthetic_findings if row["field"] not in existing_fields)
         for panel in tables["panel"]:
             fixture = (panel["issue"], panel["slot"], panel["provider_id"])
             source_identity = identity_groups[fixture]
@@ -563,10 +590,8 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
             for (block, history_id), rows in history_groups[fixture].items():
                 by_source = defaultdict(list)
                 history_field = f"{block}:{history_id}"
-                value_fields = ("event_date", "home_id", "away_id", "home_score", "away_score",
-                                "halftime_home_score", "halftime_away_score", "score_scope")
                 for row in rows:
-                    by_source[row["source"]].append({field: row.get(field, "") for field in value_fields})
+                    by_source[row["source"]].append({field: row.get(field, "") for field in history_value_fields})
                 spotcheck = latest_spotchecks.get(history_id)
                 if (history_id in cross_context_history_conflicts and
                         history_id not in reconciled_history_ids):
@@ -592,11 +617,11 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                 if resolved:
                     target, review = resolved
                     selected = json.loads(resolved_json(target))
-                    if not isinstance(selected, list) or any(not isinstance(row, list) or len(row) != len(value_fields)
+                    if not isinstance(selected, list) or any(not isinstance(row, list) or len(row) != len(history_value_fields)
                                                              for row in selected):
                         raise ValueError("resolved history value has invalid shape")
                     selected = [{field: "" if item is None else str(item)
-                                 for field, item in zip(value_fields, row)} for row in selected]
+                                 for field, item in zip(history_value_fields, row)} for row in selected]
                     verification_status = "INDEPENDENTLY_RESOLVED"
                     review_id = review["review_id"]
                     evidence_json = canonical(review["evidence"])

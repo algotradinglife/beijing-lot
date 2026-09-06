@@ -309,6 +309,20 @@ def test_cross_block_history_conflict_quarantines_every_occurrence():
     assert {row["field"] for row in conflicts} == {"h_data:00009", "v_data:00009"}
     left = '[["2026-08-01","0010","0030",0,1,0,0,"SOURCE_PUBLISHED_FULL_TIME"]]'
     right = '[["2026-08-01","0010","0030",2,1,0,0,"SOURCE_PUBLISHED_FULL_TIME"]]'
+    targets = [{"field": row["field"], "left": row["left_value"], "right": row["right_value"],
+                "resolved_value": left}
+               for row in tables["discrepancy_queue"] if row["field"] in {"h_data:00009", "v_data:00009"}]
+    reconciled_review = audit("PRIOR_MATCH_CORROBORATED", targets=targets)
+    reconciled = pipeline.derive_release_tables("r1b", {"main": release}, [reconciled_review])
+    prior = [row for row in reconciled["facts"] if row["fact_type"] == "prior_match"]
+    assert len(prior) == 2
+    assert {row["value_json"] for row in prior} == {
+        '{"away_id":"0030","away_score":"1","event_date":"2026-08-01",'
+        '"halftime_away_score":"0","halftime_home_score":"0","home_id":"0010",'
+        '"home_score":"0","score_scope":"SOURCE_PUBLISHED_FULL_TIME"}'}
+    assert not any(row["reason"] == "CROSS_CONTEXT_HISTORY_CONFLICT"
+                   for row in reconciled["quarantine"])
+
     release["tables"]["findings"] = [{"issue": "001", "slot": "1", "provider_id": "00023",
                                         "field": "v_data:00009", "left": left, "right": right,
                                         "disposition": "UNRESOLVED"}]
