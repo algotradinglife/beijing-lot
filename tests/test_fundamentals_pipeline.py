@@ -138,6 +138,39 @@ def test_audits_reject_empty_independent_evidence_body(bundle, tmp_path):
         pipeline.validate_audits(bundle, releases)
 
 
+def test_audits_reject_adjudicated_source_hosts_and_response_hashes(bundle, tmp_path):
+    from src.fundamentals_census import build_outputs
+    releases = {}
+    for scope in pipeline.SCOPES:
+        output = tmp_path / scope
+        build_outputs(bundle / f"raw_{scope}", output, generated_at_utc="2026-09-05T12:00:00Z")
+        releases[scope] = pipeline.read_normalized_release(output)
+    audit_path = bundle / "independent-cases.v1.json"
+    records = json.loads(audit_path.read_text())
+    evidence = records[0]["independent_evidence"][0]
+    evidence_path = bundle / evidence["file"]
+    official_receipt = json.loads(evidence_path.read_text())
+    source_path = bundle / "raw_regression" / "raw-browser" / "nowscore-1870517.json"
+    source_receipt = json.loads(source_path.read_text())
+
+    source_url = source_receipt["final_url"]
+    official_receipt.update(url=source_url, final_url=source_url)
+    evidence_path.write_text(canonical(official_receipt), encoding="utf-8")
+    evidence.update(url=source_url, final_url=source_url)
+    audit_path.write_text(canonical(records), encoding="utf-8")
+    with pytest.raises(ValueError, match="adjudicated source cannot be independent"):
+        pipeline.validate_audits(bundle, releases)
+
+    source_receipt.update(url="https://club.example/match-report",
+                          final_url="https://club.example/match-report")
+    evidence_path.write_text(canonical(source_receipt), encoding="utf-8")
+    evidence.update(url=source_receipt["url"], final_url=source_receipt["final_url"],
+                    sha256=source_receipt["sha256"])
+    audit_path.write_text(canonical(records), encoding="utf-8")
+    with pytest.raises(ValueError, match="adjudicated source cannot be independent"):
+        pipeline.validate_audits(bundle, releases)
+
+
 def test_validated_negative_spotcheck_uses_history_id_and_rejects_null_fixture_identity(bundle, tmp_path):
     from src.fundamentals_census import build_outputs
     releases = {}
@@ -288,6 +321,22 @@ def test_quarantined_fixture_identity_blocks_matching_prior_history_id():
     reviewed = pipeline.derive_release_tables("r2", {"main": release}, [review, score_review])
     assert not any(row["fact_type"] == "prior_match" and ":00009:" in row["fact_key"]
                    for row in reviewed["facts"])
+
+
+def test_cross_scope_fixture_identity_conflict_quarantines_every_instance():
+    main = synthetic_release()
+    regression = copy.deepcopy(main)
+    for row in regression["tables"]["identity"]:
+        row.update(home="其他队", home_id="0099")
+    tables = pipeline.derive_release_tables(
+        "r1", {"main": main, "regression": regression}, [])
+    assert {row["identity_status"] for row in tables["canonical_identity"]} == {"QUARANTINED"}
+    assert tables["facts"] == []
+    conflicts = [row for row in tables["discrepancy_queue"]
+                 if row["field"] == "cross_scope_fixture_identity"]
+    assert len(conflicts) == 2
+    assert {row["scope"] for row in conflicts} == {"main", "regression"}
+    assert {row["status"] for row in conflicts} == {"UNRESOLVED_QUARANTINED"}
 
 
 def test_missing_is_not_zero_and_coverage_is_quarantined():

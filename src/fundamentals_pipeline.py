@@ -16,6 +16,7 @@ import tempfile
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from src.fundamentals_census import build_outputs, canonical, read_response, write_rows
 
@@ -25,6 +26,7 @@ AUDIT_SCHEMA = "bj407_independent_audit_v1"
 SCOPES = ("main", "regression")
 INDEPENDENCE_REJECT_TERMS = ("UNKNOWN", "SHARED")
 ADJUDICATED_SOURCE_TERMS = ("NOWSCORE", "TITAN")
+ADJUDICATED_SOURCE_DOMAINS = ("nowscore.com", "titan007.com")
 INDEPENDENCE_CLASSES = frozenset({
     "ORIGINAL_ORGANIZER_CLUB_OR_VENUE_DOCUMENT",
     "ORIGINAL_PARTICIPATING_CLUB_NARRATIVE",
@@ -223,6 +225,16 @@ def validate_audits(bundle_dir: str | Path, releases: dict[str, dict]) -> list[d
             source_rows.append({**row, "scope": scope})
         for row in release["tables"]["history"]:
             history_rows.append({**row, "scope": scope})
+    adjudicated_source_hashes = {
+        value for row in source_rows
+        for value in (row.get("sha256"), row.get("auxiliary_sha256"))
+        if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value)
+    }
+    adjudicated_source_hosts = {
+        urlparse(value).hostname or "" for row in source_rows
+        for value in (row.get("final_url"), row.get("auxiliary_url"))
+        if isinstance(value, str) and value
+    }
     results = []
     for filename, default_kind in (("independent-cases.v1.json", "DISCREPANCY_REVIEW"),
                                    ("agreement-spotchecks.v1.json", "AGREEMENT_SPOTCHECK")):
@@ -321,6 +333,14 @@ def validate_audits(bundle_dir: str | Path, releases: dict[str, dict]) -> list[d
                     raise ValueError("independent evidence body is empty")
                 if metadata["sha256"] != evidence.get("sha256"):
                     raise ValueError("independent evidence hash mismatch")
+                evidence_hosts = {
+                    urlparse(metadata[field]).hostname or "" for field in ("url", "final_url")
+                }
+                if (metadata["sha256"] in adjudicated_source_hashes or
+                        bool(evidence_hosts & adjudicated_source_hosts) or
+                        any(host == domain or host.endswith("." + domain)
+                            for host in evidence_hosts for domain in ADJUDICATED_SOURCE_DOMAINS)):
+                    raise ValueError("adjudicated source cannot be independent evidence")
                 evidence_rows.append({"url": metadata["final_url"], "sha256": metadata["sha256"],
                                       "received_at_utc": metadata["received_at_utc"],
                                       "independence": independence, "statistical_upstream": upstream})
@@ -491,6 +511,30 @@ def derive_release_tables(release_id: str, releases: dict[str, dict], audits: li
                 "latest_audits": latest_audits, "identity_audits": identity_audits,
                 "findings": finding_groups[fixture], "quarantined": quarantined,
             }
+    identity_contexts = defaultdict(list)
+    cross_scope_identity_fields = ("home_id", "away_id", "kickoff_utc")
+    for context, state in identity_states.items():
+        if state["exact"]:
+            identity_contexts[context[3]].append((context, {
+                field: state["source_map"]["nowscore"][field]
+                for field in cross_scope_identity_fields
+            }))
+    for provider_id, contexts in identity_contexts.items():
+        if len(contexts) < 2 or len({canonical(identity) for _, identity in contexts}) == 1:
+            continue
+        for context, identity in contexts:
+            other_contexts = [
+                {"scope": other[0], "issue": other[1], "slot": other[2],
+                 "provider_id": other[3], "identity": other_identity}
+                for other, other_identity in contexts if other != context
+            ]
+            state = identity_states[context]
+            state["findings"].append({
+                "issue": context[1], "slot": context[2], "provider_id": provider_id,
+                "field": "cross_scope_fixture_identity", "left": canonical(identity),
+                "right": canonical(other_contexts), "disposition": "IDENTITY_AMBIGUOUS",
+            })
+            state["quarantined"] = True
     quarantined_fixture_ids = {
         context[3] for context, state in identity_states.items() if state["quarantined"]
     }
