@@ -1,0 +1,100 @@
+---
+title: "Nowscore / Titan 基本面事实与独立核验 · #408"
+params:
+  bundle_dir: null
+  output_dir: null
+  generated_at_utc: null
+  release_id: null
+  python: null
+  module_dir: src
+execute:
+  freeze: false
+  cache: false
+  error: false
+  warning: true
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+```{r}
+#| include: false
+required <- c("bundle_dir", "output_dir", "generated_at_utc", "release_id", "python", "module_dir")
+if (any(vapply(required, function(name) is.null(params[[name]]) || !nzchar(params[[name]]), logical(1)))) {
+  stop("Declare bundle_dir, output_dir, generated_at_utc, release_id and python")
+}
+source("r/fundamentals_pipeline.R")
+pipeline_receipt <- run_fundamentals_pipeline(
+  params$bundle_dir, params$output_dir, params$generated_at_utc, params$release_id,
+  params$python, params$module_dir)
+release <- read_fundamentals_pipeline_release(params$output_dir)
+if (!identical(pipeline_receipt$release_id, release$receipt$release_id)) stop("reticulate receipt conversion mismatch")
+```
+
+本报告执行完整的离线采集回放、标准化、身份审核、差异排队、独立证据裁决与事实导出。Nowscore 与 Titan 一致仅标记为 `AGREED_UNVERIFIED`；真实冲突没有独立证据时不得结案。身份、时间语义或比赛实例仍不确定时，整场比赛及依赖事实进入隔离区。
+
+## 运行身份
+
+```{r}
+knitr::kable(tibble::tibble(
+  item = c("release", "generation UTC", "source bundle SHA-256", "learning", "admission"),
+  value = c(release$receipt$release_id, release$receipt$generated_at_utc,
+            release$receipt$source_bundle_manifest_sha256, release$receipt$historical_learning,
+            release$receipt$admission)))
+knitr::kable(summarize_fundamentals_pipeline(release))
+```
+
+输入语料：`r params$bundle_dir`。冻结输出：`r params$output_dir`。Python 回执已通过 `reticulate` 转为 R 对象，并与 R 重新校验的 release ID 一致。所有原始响应、标准化表、实现代码和导出表均由 SHA-256 绑定；本流程声明历史学习为 `NONE`。
+
+## 比赛身份
+
+```{r}
+knitr::kable(dplyr::count(release$canonical_identity, scope, identity_status, verification_status, name = "fixtures"))
+knitr::kable(dplyr::select(dplyr::filter(release$canonical_identity, identity_status == "QUARANTINED"),
+                           scope, issue, slot, provider_id, identity_status, rationale))
+```
+
+`REVIEWED_CANONICAL` 表示两源的球队方向、球队 ID 与时间完全一致并经过规则审核，但不把两源一致误称为独立真值。延期、恢复、重赛、时区或比赛实例含义没有解决时，状态为 `QUARANTINED`。
+
+## 差异队列
+
+```{r}
+knitr::kable(dplyr::count(release$discrepancy_queue, category, status, name = "differences"))
+knitr::kable(utils::head(dplyr::select(release$discrepancy_queue,
+  scope, issue, slot, provider_id, field, category, status), 30))
+```
+
+覆盖差异、数值冲突和身份语义分别保留。缺失值不转换为零或一致；所有未解决记录均出现在隔离清单，且不会进入事实导出。
+
+## 独立核验
+
+```{r}
+reviews <- fundamentals_evidence_links(release$adjudications)
+knitr::kable(dplyr::select(reviews, review_kind, scope, issue, slot, provider_id,
+                           revision, target_fields, disposition, reviewer, evidence_urls, rationale))
+```
+
+证据必须保存原始响应字节、URL、最终 URL、采集时间和哈希。裁决以 scope、期号、场次、provider、字段及两侧原值组成的目标键精确绑定；比赛实例审计使用明确的 `event_instance_semantics` 目标。原赛事组织方、协会或参赛俱乐部材料只支持其目标字段；未知、未声明或共享统计上游没有独立投票权。后续裁决只能生成新 release，不能改写本次冻结输出。
+
+## 事实导出
+
+```{r}
+knitr::kable(dplyr::count(release$facts, scope, fact_type, verification_status, name = "facts"))
+prior_matches <- dplyr::filter(release$facts, fact_type == "prior_match")
+knitr::kable(utils::head(dplyr::select(prior_matches, scope, issue, slot, provider_id,
+                                       fact_key, value_json, verification_status, review_id,
+                                       availability_class), 20))
+```
+
+逐场历史记录保留日期、主客队 ID、全场比分、半场比分和比分语义；积分榜的主客角色与球队 ID 明确绑定，任一侧缺失即隔离；相邻赛程按日期、赛事、主客队和来源发布的间隔天数做语义比较，同时在标准化输出中另存两源原始表格单元格。独立裁决值以 `INDEPENDENTLY_RESOLVED` 导出，并通过 `review_id` 和证据 JSON 绑定裁决；一致性抽查只支持明确检查的子字段，因此其整行仍标记 `AGREED_UNVERIFIED`。`HISTORICAL_PROXY` 只说明当前回采可见，不能证明当时赛前可用。该事实表不会写入 #405 结算，也不执行投注、ROI 或模型调参。
+
+## 隔离清单
+
+```{r}
+knitr::kable(dplyr::count(release$quarantine, scope, reason, name = "rows"))
+knitr::kable(utils::head(dplyr::select(release$quarantine,
+  scope, issue, slot, provider_id, field, reason), 30))
+```
+
+隔离记录及其依赖事实必须由新版本独立证据裁决后才能进入新的事实 release；已冻结版本保持不变。

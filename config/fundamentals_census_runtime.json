@@ -1,0 +1,29 @@
+{
+  "python": "3.14.4",
+  "R": "4.6.1",
+  "quarto": "1.10.18",
+  "python_direct": {
+    "beautifulsoup4": "4.15.0",
+    "json5": "0.15.0",
+    "requests": "2.34.2",
+    "pytest": "9.0.3"
+  },
+  "r_direct": {
+    "dplyr": "1.2.1",
+    "readr": "2.2.0",
+    "jsonlite": "2.0.0",
+    "digest": "0.6.39",
+    "testthat": "3.3.2",
+    "knitr": "1.51",
+    "rmarkdown": "2.31",
+    "tibble": "3.3.1",
+    "reticulate": "1.46.0"
+  },
+  "capture_runtime": {
+    "chrome": "152.0.7977.82",
+    "chrome-devtools-mcp": "1.8.0",
+    "requests": "2.34.2"
+  },
+  "purpose": "Pure diagnostic capture/parse/report; historical learning NONE. Install dependencies only during setup.",
+  "local_r_library": "r_lib (explicit R_LIBS_USER during clean render; populated during setup)"
+}
