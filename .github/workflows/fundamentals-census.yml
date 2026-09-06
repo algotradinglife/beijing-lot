@@ -28,7 +28,7 @@ permissions:
   contents: read
 jobs:
   offline-replay:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,8 +42,10 @@ jobs:
           version: '1.10.18'
       - name: Install declared dependencies during setup
         run: |
+          sudo apt-get update
+          sudo apt-get install --yes libuv1-dev libpng-dev
           python -m pip install beautifulsoup4==4.15.0 json5==0.15.0 requests==2.34.2 pytest==9.0.3
-          Rscript -e 'install.packages(c("remotes", "jsonlite"), repos="https://cloud.r-project.org"); versions <- jsonlite::read_json("config/fundamentals_census_runtime.json")$r_direct; for (p in names(versions)) remotes::install_version(p, version=versions[[p]], repos="https://cloud.r-project.org", upgrade="never")'
+          Rscript -e 'install.packages(c("remotes", "jsonlite"), repos="https://cloud.r-project.org"); versions <- jsonlite::read_json("config/fundamentals_census_runtime.json")$r_direct; for (p in names(versions)) remotes::install_version(p, version=versions[[p]], repos="https://cloud.r-project.org", upgrade="never"); actual <- vapply(names(versions), function(p) as.character(utils::packageVersion(p)), character(1)); if (!identical(unname(actual), unname(unlist(versions)))) stop("R dependency version mismatch")'
       - name: Python contracts and cutoff governance
         run: |
           python -m pytest tests/test_fundamentals_census.py tests/test_fundamentals_capture.py tests/test_fundamentals_pipeline.py tests/test_nowscore_settlement.py -q
