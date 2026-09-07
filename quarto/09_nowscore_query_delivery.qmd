@@ -1,0 +1,109 @@
+---
+title: "Nowscore 结算查询：交付与验收"
+date: "2026-09-08"
+format: html
+execute:
+  freeze: false
+  cache: false
+  error: false
+---
+
+## 范围与输入
+
+本交付对应 [PR #418](https://github.com/algotradinglife/beijing-lot/pull/418)，
+为 #405 构建的结算观测库提供 R 查询入口，不修改其数据或任务状态。
+本报告固定使用仓库内声明的合成夹具，在临时 SQLite 文件上执行；
+不联网，不读取实际比赛库，不上传历史页面或个人路径。
+合成数据故意包含缺失、非法 SP 和只有审计发现的隔离槽位，不能作为实际比赛证据。
+
+## 可重现查询结果
+
+```{r}
+source("r/nowscore_query.R")
+source("tests/testthat/helper-nowscore-query.R")
+query_db <- tempfile(fileext = ".sqlite")
+nowscore_query_fixture(query_db)
+input_sha256 <- digest::digest(file = query_db, algo = "sha256")
+result <- query_nowscore_settlement(query_db, "00123", slot = 1L)
+empty <- query_nowscore_settlement(query_db, "99999")
+quarantined <- query_nowscore_settlement(query_db, "00123", slot = 3L)
+stopifnot(
+  inherits(result$settlement, "tbl_df"), nrow(result$settlement) == 4L,
+  identical(result$settlement$issue, rep("00123", 4L)),
+  identical(result$settlement$raw_sp, c("1.00", "", "bad", "0.00")),
+  identical(result$settlement$sp, c(1, NA_real_, NA_real_, 0)),
+  identical(dplyr::bind_rows(empty$settlement, result$settlement), result$settlement),
+  nrow(quarantined$settlement) == 0L, nrow(quarantined$findings) == 1L,
+  identical(digest::digest(file = query_db, algo = "sha256"), input_sha256)
+)
+knitr::kable(result$settlement[c("issue", "slot", "play", "home", "away",
+  "status", "score", "option", "raw_sp", "sp")],
+  caption = "合成查询明细：每行一个比赛玩法选项；SP 为无量纲倍率")
+knitr::kable(quarantined$findings,
+  caption = "合成隔离记录：有审计发现，没有入库结算观测")
+knitr::kable(tibble::tibble(input = "synthetic-query-fixture-v1",
+  sha256 = input_sha256, issue = "00123", slot = 1L),
+  caption = "本次执行的合成输入身份与参数")
+unlink(query_db)
+```
+
+## 函数、测试和契约
+
+| 实现 | 自动化测试及边界 |
+|---|---|
+| `query_nowscore_settlement()` | `test-nowscore-query.R`：单场、整期、指定玩法、非法参数、重复键、缺失凭证、空结果、只读和重复执行 |
+| `nowscore_query_fixture()` | 同一测试文件及本报告：临时库创建、禁止覆盖已有文件、合成夹具被实际查询 |
+
+- 明细键为 `observation_id + option`；没有选项时保留 NA 选项行。
+- `raw_sp` 保留空字符串和非法原文；`sp` 保留 NA 与零的区别。
+- `expected_option` 是比分推导，不是官方中奖标记；参考 SP 不能直接当中奖结果。
+- `received_at` 保留来源 ISO-8601 时间文字，不作为赛前可用性证据。
+- 源 URL、SHA256 和构建 receipt 保留供溯源；本报告的合成标记不是有效抓取凭证。
+- 没有新增历史拟合、调参、策略选择或收益结算；历史学习函数清单为空。
+
+## 干净会话验证
+
+环境按 `DESCRIPTION`、`renv.lock` 和现有分析 CI 安装，渲染期间不安装依赖。
+从项目根目录执行：
+
+```bash
+export TZ=UTC
+export R_LIBS_USER="$PWD/r_lib"
+export BEIJING_LOT_VENV_PYTHON="$PWD/.venv/bin/python"
+Rscript --vanilla tests/testthat.R
+quarto render quarto/09_nowscore_query_delivery.qmd --execute --no-cache
+```
+
+CI 显式执行本报告；上面的断言失败会中止渲染。
+基本面流水线的外部集成夹具不属于本查询功能，缺失时的跳过不能记作通过。
+
+## 审核证据
+
+- `codex review --commit c1d52acb` 发现空查询 JSON 列类型不稳定的 P2。
+- `2d759f2c` 固定字符列并增加空表合并与全 NA 回归；对应复审无新增发现。
+- 完整复审版本：`a6ff084e510a41687cabe2800b24af260a3ec54a`；
+  基线：`4c7229a51951353377bdd313d3bc51f8cf73e6ef`。
+- 审核命令为 `codex review`，自然语言参数限定上述两个修订之间的查询实现、
+  共享夹具、测试、本 QMD、使用说明及 CI 配置；要求读取提交内容和实时 Issue Graph，
+  不读取其他未提交改动、不改写代码或 GitHub 状态。参数中的本机路径不对外发布。
+- Codex CLI `0.153.4` / `gpt-6-astra` 结论：**No actionable defects found**。
+  复审实际通过 56 项查询断言；完整 R 测试无失败，两个基本面外部夹具测试跳过并明确不计通过。
+- 本 QMD 在 R `4.6.1` / Quarto `1.10.18` 的干净会话中执行成功，禁用 cache/freeze；
+  五张表分别包含 4、1、1、2、3 行，列标签、倍率单位和输入/代码哈希已检查，没有执行错误。
+- 复审后的唯一变更是追加本审核记录；实现、夹具、测试、CI 和 QMD 执行代码均保持被审查版本。
+  最终提交仍须通过远程 CI 后由 PI 合并；GitHub PR 原生状态才是合并状态依据。
+
+```{r}
+delivery_files <- c("r/nowscore_query.R", "tests/testthat/helper-nowscore-query.R",
+  "tests/testthat/test-nowscore-query.R")
+knitr::kable(tibble::tibble(file = delivery_files,
+  sha256 = vapply(delivery_files, digest::digest, character(1),
+                  algo = "sha256", file = TRUE)),
+  caption = "当前执行的实现及测试 SHA-256；不是独立审核通过声明")
+```
+
+## 实际数据使用
+
+在 Positron 中按[查询说明](../docs/operations/nowscore_settlement_queries.md)
+显式传入本地数据库路径，再使用 `View(x$settlement)` 或 `View(x$findings)`。
+本次交付不部署服务，不切换生产消费者，不修改比分或 SP。
