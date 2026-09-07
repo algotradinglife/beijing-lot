@@ -11,6 +11,7 @@ project:
     - quarto/07_delivery_contract.qmd
     - quarto/07_fundamentals_pipeline.qmd
     - quarto/08_issue_413_delivery.qmd
+    - quarto/09_nowscore_query_delivery.qmd
 
 execute:
   freeze: false

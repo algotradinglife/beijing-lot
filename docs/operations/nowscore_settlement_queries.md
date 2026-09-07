@@ -30,3 +30,6 @@ x$receipt
 - 函数自动以只读方式连接并释放连接，不修改数据库，不计算投注收益。
 
 实现：`r/nowscore_query.R`；对应自动化测试：`tests/testthat/test-nowscore-query.R`。
+
+可执行交付与验收入口：[查询交付 QMD](../../quarto/09_nowscore_query_delivery.qmd)。
+该报告只使用合成临时库；实际结算数据库不随 Git 仓库分发。
