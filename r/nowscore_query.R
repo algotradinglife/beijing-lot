@@ -54,6 +54,11 @@ query_nowscore_settlement <- function(path, issue, slot = NULL, play = NULL) {
     "p.option, p.raw_sp, p.sp, o.source_url, o.source_sha256, o.received_at",
     "FROM selected o LEFT JOIN option_sp p USING (observation_id)",
     "ORDER BY o.slot, o.play, p.option"), params = params))
+  # SQLite expressions have no declared type when zero rows (or only NULLs)
+  # are returned. Keep the text schema stable for binding separate queries.
+  for (field in c("home", "away", "handicap_raw")) {
+    settlement[[field]] <- as.character(settlement[[field]])
+  }
   if (anyDuplicated(settlement[c("observation_id", "option")])) {
     stop("Duplicate option keys in selection")
   }

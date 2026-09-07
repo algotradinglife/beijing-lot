@@ -47,6 +47,10 @@ testthat::test_that("queries preserve source cells, keys and missing options rea
   testthat::expect_equal(nrow(empty$findings), 0)
   testthat::expect_type(empty$settlement$issue, "character")
   testthat::expect_type(empty$settlement$sp, "double")
+  for (field in c("home", "away", "handicap_raw")) {
+    testthat::expect_type(empty$settlement[[field]], "character")
+  }
+  testthat::expect_identical(dplyr::bind_rows(empty$settlement, x$settlement), x$settlement)
   testthat::expect_identical(tools::md5sum(path), before)
 })
 
@@ -77,6 +81,12 @@ testthat::test_that("receipt, schema and duplicate failures release the connecti
   DBI::dbExecute(con, "INSERT INTO observation SELECT * FROM observation LIMIT 1")
   testthat::expect_error(query_nowscore_settlement(path, "00123"), "Duplicate observation")
   DBI::dbExecute(con, "DELETE FROM observation WHERE rowid=(SELECT MAX(rowid) FROM observation)")
+  DBI::dbExecute(con, "UPDATE observation SET payload_json='{}'")
+  missing <- query_nowscore_settlement(path, "00123")$settlement
+  for (field in c("home", "away", "handicap_raw")) {
+    testthat::expect_type(missing[[field]], "character")
+    testthat::expect_true(all(is.na(missing[[field]])))
+  }
   DBI::dbExecute(con, "UPDATE receipt SET payload_json='{}'")
   testthat::expect_error(query_nowscore_settlement(path, "00123"), "Nowscore")
   DBI::dbExecute(con, "DELETE FROM receipt")
