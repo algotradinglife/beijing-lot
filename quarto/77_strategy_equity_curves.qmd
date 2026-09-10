@@ -1,0 +1,126 @@
+---
+title: "十万元本金：纯基线与专家的逐期资金曲线"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/new48-pure-baseline-report-v2"
+  archived_report: false
+  initial_capital_cny: 100000
+  output_dir: "data/derived/fundamentals_417/equity-curves-100k-v1"
+---
+
+初始本金 **100,000 元**，每期预算 **1,024 元**，实际下注沿用上一轮已冻结的方案，
+余款留在账户，不追加本金、不按盈利加仓、没有比分保护。
+同一批100402–100607共48期、2561场比赛，每个模型72个变种。
+每条线都是独立账户，不是把资金在多个策略之间拆分。
+纯基线不使用专家；专家沿用让平1.1.0、高净球0.1.0、权重各0.5。
+这是已查看赛果后的描述性报告，不重新训练、调参或选择部署策略。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+periods <- bind_rows(mutate(tibble::as_tibble(verified$result$rows),model='纯基线'),
+                    mutate(tibble::as_tibble(verified$result$before),model='专家'))
+periods$model <- factor(periods$model,levels=c('纯基线','专家'))
+# Six-digit IDs in this fixed cohort sort in issue order, not collection order.
+issue_order <- sort(unique(periods$issue))
+stopifnot(length(issue_order)==48,all(nchar(issue_order)==6),all(periods$budget_cny==1024))
+curves <- strategy_equity_curves(periods,issue_order,params$initial_capital_cny)
+stopifnot(nrow(curves)==144*49)
+summary <- curves |> group_by(model,policy,case,rule) |>
+ summarise(final_capital_cny=last(equity_cny),net_cny=last(cumulative_net_cny),
+  capital_ROI_percent=last(capital_return_percent),
+  budget_ROI_percent=100*last(cumulative_net_cny)/sum(budget_cny),
+  max_drawdown_cny=max(drawdown_cny),minimum_capital_cny=min(equity_cny),
+  stopped=any(stopped),.groups='drop')
+# Exactly the six examples already discussed, not a new best-in-sample selector.
+examples <- tibble::tribble(~policy,~label,
+ 'D2_TOP2_FREE_BASE','压2／概率排序／不替换',
+ 'D2_COMPRESSED_FREE_BASE','压2／压缩后排序／不替换',
+ 'D2_TOP2_FREE_GAP02','压2／概率排序／差距≤2%',
+ 'D2_COMPRESSED_STRICT_GAP05','压2／严格复用／差距≤5%',
+ 'D2_TOP2_FREE_GAP10','压2／概率排序／差距≤10%',
+ 'D1_TOP2_STRICT_GAP05','压1／严格复用／差距≤5%')
+main <- inner_join(curves,examples,by='policy',relationship='many-to-one')
+stopifnot(nrow(main)==12*49)
+dir.create(params$output_dir,recursive=TRUE,showWarnings=FALSE)
+main_plot <- plot_strategy_equity(main,'funded',params$initial_capital_cny)+
+ labs(title='十万元本金 · 每期预算 1,024 元',
+      subtitle='同一批48期｜六个已讨论方案｜虚线为初始本金')
+ggsave(file.path(params$output_dir,'strategy-equity.png'),main_plot,width=13,height=7,dpi=160,type='cairo-png')
+ggsave(file.path(params$output_dir,'strategy-equity.svg'),main_plot,width=13,height=7,device=grDevices::svg)
+```
+
+账户资金＝初始本金＋截至当期的累计净收益；净收益＝返奖－实际下注金额。
+期内未下注的预算不会被扣除，返奖系数0.65已在上游结算中计算，本报告不再扣一次。
+每期完成结算后再进入下一期，因此图是**逐期期末**走势，未模拟不同期比赛重叠时的资金占用。
+资金不足以支付某期完整原方案时停止下注并永久持有余额，不部分下注、不借款。
+
+## 已讨论方案的资金走势
+
+```{r}
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 13
+#| fig-height: 7
+main_plot
+```
+
+```{r}
+summary |> inner_join(examples,by='policy',relationship='many-to-one') |>
+ select(model,label,final_capital_cny,net_cny,capital_ROI_percent,budget_ROI_percent,max_drawdown_cny) |>
+ knitr::kable(digits=2)
+cat('全部144条曲线中，因资金不足停止的策略数：',sum(summary$stopped),'。\n')
+```
+
+本金收益率分母是100,000元；预算收益率分母是48×1,024＝49,152元。
+改变初始本金不会改变原方案的下注和绝对盈亏，只会改变资金水平及本金收益率；
+资金不足时实际执行曲线才会与完整历史参考曲线分开。
+
+## 全部变种
+
+每个小图为一种压缩与复用组合，颜色区分九种替换规则，左右对照模型。
+BASE表示不替换重叠双选，并不表示不使用专家。
+FREE放宽复用限制，STRICT保持每场最多两组、两组最多重叠两场；
+TOP2按原双选概率排序，COMPRESSED按压缩后的概率排序。
+
+```{r}
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 13
+#| fig-height: 19
+all_plot <- plot_strategy_equity(mutate(curves,label=rule),'funded',params$initial_capital_cny)+
+ facet_grid(case~model)+guides(colour=guide_legend(nrow=1))
+all_plot
+ggsave(file.path(params$output_dir,'all-strategy-equity.png'),all_plot,width=13,height=19,dpi=150,type='cairo-png')
+```
+
+## 逐期数据及可重放身份
+
+```{r}
+curves |> select(model,policy,issue,period,opening_cny,funded_stake_cny,
+ funded_net_cny,equity_cny,cumulative_net_cny,drawdown_cny,stopped) |> glimpse()
+curves |> filter(period>0) |> head(6) |>
+ select(model,policy,issue,funded_stake_cny,funded_net_cny,equity_cny,drawdown_cny) |> knitr::kable(digits=2)
+summary |> arrange(model,case,rule) |> knitr::kable(digits=2)
+readr::write_csv(curves,file.path(params$output_dir,'equity-ledger.csv'))
+readr::write_csv(summary,file.path(params$output_dir,'equity-summary.csv'))
+bindings <- c('quarto/77_strategy_equity_curves.qmd','r/fundamentals_equity_curves.R',
+ 'r/fundamentals_pure_report.R',file.path(params$study,'results.json'),file.path(params$study,'plans-frozen.json'))
+hashes <- vapply(bindings,digest::digest,character(1),algo='sha256',file=TRUE)
+jsonlite::write_json(list(scope='DESCRIPTIVE_FROZEN_RETURNS_NO_LEARNING',
+ generated_at=format(Sys.time(),tz='UTC',usetz=TRUE),initial_capital_cny=params$initial_capital_cny,
+ budget_per_issue_cny=1024,issue_order=issue_order,source_hashes=as.list(hashes),
+ accounting='settle each issue before next; no deposits; stop if full plan unaffordable',
+ archived_report=params$archived_report),file.path(params$output_dir,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+输入结算及冻结概率沿用第76号报告的校验收据；本报告只进行资金会计和绘图。
+重新渲染时可设置输出目录，不需要RDS或手工准备R会话变量。
