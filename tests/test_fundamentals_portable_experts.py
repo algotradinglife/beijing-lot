@@ -15,7 +15,7 @@ def portable(frozen):
     bundle=source/'bundle';(bundle/'draw').mkdir(parents=True)
     shutil.copytree(source/'draw-expert',bundle/'draw/draw-expert')
     for name in ['signal-rates.json','signal-rates.pkl','rate-cv.json']:shutil.copyfile(source/name,bundle/'draw'/name)
-    history=pd.DataFrame(dict(issue_code='100101',slot=range(30),provider_id=[str(i) for i in range(30)],issue_year=2010,data_available_ts='2010-01-01T00:00:00Z',label_available_ts='2010-01-02T00:00:00Z',handicap=-2,x=range(30),cover_target=[0,1]*15))
+    history=pd.DataFrame(dict(issue_code='100101',slot=range(30),provider_id=[str(i) for i in range(30)],issue_year=2010,data_available_ts='2010-01-01T00:00:00Z',predictor_clock_ts='2009-12-31T00:00:00Z',label_available_ts='2010-01-02T00:00:00Z',handicap=-2,x=range(30),cover_target=[0,1]*15))
     source_file=source/'source.json'
     high=fit_experts(history,cutoff,features={'high':['x']},training_issues=['100101'],source_hashes={str(source_file):hashlib.sha256(source_file.read_bytes()).hexdigest()},repository_root=root,depths={'high':1},minimum_leaf=5,minimum_ess=10,bounds=[.2,.6],seed=417)
     save_frozen_experts(high,bundle/'high/high-expert')

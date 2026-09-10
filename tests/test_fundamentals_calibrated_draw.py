@@ -21,7 +21,7 @@ from src.temporal_learning.provenance import implementation_closure
 def frozen(tmp_path):
     root=Path(__file__).resolve().parents[1]
     history=pd.DataFrame(dict(issue_code='100101',slot=range(30),provider_id=[str(i) for i in range(30)],
-        issue_year=2010,data_available_ts='2010-01-01T00:00:00Z',
+        issue_year=2010,data_available_ts='2010-01-01T00:00:00Z',predictor_clock_ts='2009-12-31T00:00:00Z',
         label_available_ts='2010-01-02T00:00:00Z',handicap=-1,x=range(30),
         draw_signal=['POSITIVE']*10+['NEGATIVE']*10+['ABSTAIN']*10,
         draw_target=[1]*7+[0]*3+[1]*2+[0]*8+[1]*3+[0]*7))

@@ -6,7 +6,7 @@ The shared learning context owns admission, weights, ESS and provenance.
 from pathlib import Path
 from numbers import Real
 import math
-from src.temporal_learning.replay import prediction_scope
+from src.temporal_learning.replay import prediction_scope,validate_model_chronology
 
 import numpy as np
 import pandas as pd
@@ -14,7 +14,7 @@ import pandas as pd
 from src.temporal_learning import (AvailabilityFilter, AvailabilityPolicy, Cutoff,
     PartitionPolicy, WeightingPolicy, prepare_learning_context, temporal_client)
 from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.predictor_clock import require_prior_predictor_clock
+from src.temporal_learning.predictor_clock import require_prior_predictor_clock,validate_training_predictor_clocks
 
 
 @temporal_client
@@ -45,6 +45,7 @@ def fit_signal_rates(history, cutoff, *, shrinkage_n, minimum_ess,
         partition_policy=PartitionPolicy('FIXED_PRIOR_FIT', 0, 0, 1),
         weighting_policy=WeightingPolicy.expanding_equal(minimum_ess=minimum_ess))
     rows = context.partitions['fit'].copy()
+    predictor_max = validate_training_predictor_clocks(rows,cutoff)
     if (rows.draw_signal.isna().any() or
         not set(rows.draw_signal).issubset({'POSITIVE', 'NEGATIVE', 'ABSTAIN'}) or
         rows.draw_target.isna().any() or not set(rows.draw_target).issubset({0, 1}) or
@@ -63,7 +64,7 @@ def fit_signal_rates(history, cutoff, *, shrinkage_n, minimum_ess,
             estimates.append(dict(band=band, signal=signal, band_n=n,
                 band_draws=hits, reference_rate=prior, n=count, draws=positive,
                 raw_rate=positive/count if count else None, probability=p))
-    receipt = dict(context.receipt.payload, estimates=estimates,
+    receipt = dict(context.receipt.payload, estimates=estimates, maximum_predictor_clock=predictor_max,
         training_issues=sorted(rows.issue_code.unique().tolist()),
         shrinkage_n=shrinkage_n, minimum_ess=minimum_ess,
         band_definition='ABS_HANDICAP_0_1_2PLUS', prior='BAND_JEFFREYS_HALF',
@@ -99,6 +100,7 @@ def predict_signal_rates(artifact, frame, cutoff, *, blend_weight, abstain_boost
     receipt = artifact['receipt']
     if stable_json_hash(receipt) != artifact['seal']:
         raise ValueError('Frozen rate artifact changed')
+    validate_model_chronology(artifact["cutoff"],[receipt],receipt["training_issues"])
     blend_weight=validate_draw_weight(blend_weight)
     if (not isinstance(cutoff, Cutoff) or abstain_boost not in [0., .02, .05]):
         raise ValueError('Explicit supported prediction cutoff and calibration policy required')

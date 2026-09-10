@@ -19,6 +19,7 @@ def experiment():
         "provider_id": [str(i) for i in range(n)], "issue_year": [2010] * n,
         "label_available_ts": ["2010-01-02T12:00:00Z"] * n,
         "data_available_ts": ["2010-01-02T00:00:00Z"] * n,
+        "predictor_clock_ts": ["2010-01-01T00:00:00Z"] * n,
         "handicap": [-2] * n, "x": list(range(n)),
         "draw_target": [i < 10 for i in range(n)], "cover_target": [i >= 20 for i in range(n)]})
     kwargs = dict(cutoff=Cutoff.decision_epoch("100105", "2010-01-12T00:00:00Z"),
@@ -144,3 +145,18 @@ def test_model_publish_rolls_back_failed_serialization(experiment, tmp_path, mon
     with pytest.raises(OSError, match='simulated'):
         save_frozen_experts(artifact, tmp_path/'run')
     assert list(tmp_path.iterdir()) == []
+
+
+def test_training_clocks_and_replay_metadata_fail_closed(experiment,tmp_path):
+    from src.fundamentals_retrained_experts import save_frozen_experts
+    history,kwargs=experiment
+    for bad in [None,'2026-01-01T00:00:00Z','2010-01-02T00:00:00Z']:
+        with pytest.raises(ValueError,match='clock'):fit_experts(history.assign(predictor_clock_ts=bad),**kwargs)
+    with pytest.raises(ValueError,match='clock'):fit_experts(history.drop(columns='predictor_clock_ts'),**kwargs)
+    model=fit_experts(history,**kwargs)
+    assert model['receipt']['draw']['maximum_predictor_clock']=='2010-01-01T00:00:00+00:00'
+    target=history.assign(issue_code='100105')
+    for key,value in [('training_issues',[]),('cutoff',Cutoff.decision_epoch('100105','2009-01-01T00:00:00Z'))]:
+        broken=deepcopy(model);broken[key]=value
+        with pytest.raises(ValueError,match='chronology|membership'):predict_experts(broken,target,kwargs['cutoff'])
+        with pytest.raises(ValueError,match='chronology|membership'):save_frozen_experts(broken,tmp_path/'broken')

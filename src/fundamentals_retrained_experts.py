@@ -18,6 +18,8 @@ from src.temporal_learning import (
     WeightingPolicy, prepare_learning_context, temporal_client,
 )
 from src.temporal_learning.core import stable_json_hash
+from src.temporal_learning.predictor_clock import validate_training_predictor_clocks
+from src.temporal_learning.replay import validate_model_chronology
 from src.temporal_learning.provenance import verify_implementation_closure
 
 
@@ -89,6 +91,7 @@ def fit_experts(history, cutoff, *, features, training_issues, source_hashes,
             weighting_policy=WeightingPolicy.expanding_equal(minimum_ess=minimum_ess),
         )
         admitted = context.partitions["fit"]
+        predictor_max = validate_training_predictor_clocks(admitted, cutoff)
         eligible = np.ones(len(admitted), dtype=bool) if name == "draw" else admitted.handicap.abs().ge(2).to_numpy()
         x = admitted[features[name]].astype(float)
         complete = np.isfinite(x).all(axis=1).to_numpy()
@@ -111,6 +114,7 @@ def fit_experts(history, cutoff, *, features, training_issues, source_hashes,
         result["leaves"][name] = leaves
         result["receipt"][name] = {
             **context.receipt.payload, "weight_ledger": context.weight_ledger.to_json(orient="records", date_format="iso"),
+            "maximum_predictor_clock": predictor_max,
             "training_issues": sorted(set(admitted.loc[at, "issue_code"])),
             "expert_rows": int(at.sum()), "expert_ess": int(at.sum()),
             "scope_excluded": int((~eligible).sum()),
@@ -124,7 +128,7 @@ def fit_experts(history, cutoff, *, features, training_issues, source_hashes,
         }
     result["bounds"] = list(bounds)
     result["cutoff"] = cutoff
-    result["training_issues"] = list(training_issues)
+    result["training_issues"] = sorted(validate_model_chronology(cutoff,list(result["receipt"].values())))
     result["seal"] = stable_json_hash(result["receipt"])
     return result
 
@@ -145,6 +149,7 @@ def predict_experts(artifact, frame, cutoff):
         raise ValueError("Explicit target decision cutoff required")
     if frame.duplicated(["issue_code", "slot", "provider_id"]).any() or not frame.issue_code.eq(cutoff.target_issue).all():
         raise ValueError("Target identity mismatch")
+    validate_model_chronology(artifact["cutoff"],list(artifact["receipt"].values()),artifact["training_issues"])
     scope = prediction_scope(cutoff, artifact["training_issues"], artifact["cutoff"])
     out = frame[["issue_code", "slot", "provider_id"]].copy()
     for name in artifact["features"]:
@@ -209,6 +214,7 @@ def save_frozen_experts(artifact, directory):
     import shutil
     if stable_json_hash(artifact["receipt"]) != artifact["seal"]:
         raise ValueError("Frozen receipt changed")
+    validate_model_chronology(artifact["cutoff"],list(artifact["receipt"].values()),artifact["training_issues"])
     for name, receipt in artifact["receipt"].items():
         if (tree_identity(artifact["models"][name]) != receipt["model_sha256"] or
             artifact["features"][name] != receipt["features"] or

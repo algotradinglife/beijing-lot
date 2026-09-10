@@ -11,10 +11,10 @@
       }
     },
     "manifest_path": "config/expert_versions/portable-2.0.0.json",
-    "manifest_sha256": "43325ff044cccd5cdf1f5068ef862eb8cdf26febddf6991b595ee58cfd4a0b57",
+    "manifest_sha256": "462bb1af29354d7f873bb87331ea32da1ad7c5c37784a9f74f8ee591f9ceadc8",
     "model_root": "data/derived/fundamentals_417/expert-refresh-96-v2",
     "source_root": ".",
-    "provenance_root": "."
+    "provenance_root": "data/derived/fundamentals_417/expert-refresh-96-v2/training-runtime"
   },
-  "seal": "8923fff791e65cd4ad8e118ef2e9980867f09a72eda86841da6dd0217d831632"
+  "seal": "65cc33a58d12556e4f86b042c506484aa385d5fcba389d1da8ad7134a51aa0a7"
 }

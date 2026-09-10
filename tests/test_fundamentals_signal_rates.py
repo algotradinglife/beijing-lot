@@ -12,7 +12,7 @@ from src.temporal_learning import Cutoff
 def test_conditional_rates_shrinkage_boost_and_missing_support():
     history = pd.DataFrame(dict(issue_code=['100101']*30,slot=range(30),
         provider_id=[str(i) for i in range(30)],issue_year=2010,
-        data_available_ts='2010-01-01T00:00:00Z',label_available_ts='2010-01-02T00:00:00Z',
+        data_available_ts='2010-01-01T00:00:00Z',predictor_clock_ts='2009-12-31T00:00:00Z',label_available_ts='2010-01-02T00:00:00Z',
         handicap=-1,draw_signal=['POSITIVE']*10+['NEGATIVE']*10+['ABSTAIN']*10,
         draw_target=[1]*7+[0]*3+[1]*2+[0]*8+[1]*3+[0]*7))
     cutoff = Cutoff.decision_epoch('100102','2010-01-03T00:00:00Z')
@@ -46,3 +46,9 @@ def test_conditional_rates_shrinkage_boost_and_missing_support():
         predict_signal_rates(artifact,target.assign(predictor_clock_ts=cutoff.cutoff_ts),cutoff,blend_weight=1.,abstain_boost=0.)
     with pytest.raises(ValueError,match='draw_weight'):
         predict_signal_rates(artifact,target,cutoff,blend_weight=1.3,abstain_boost=0.)
+
+    broken=deepcopy(artifact);broken['cutoff']=Cutoff.decision_epoch('100102','2009-01-01T00:00:00Z')
+    with pytest.raises(ValueError,match='chronology'):
+        predict_signal_rates(broken,target,cutoff,blend_weight=1.,abstain_boost=0.)
+    with pytest.raises(ValueError,match='clock'):
+        fit_signal_rates(history.assign(predictor_clock_ts='2026-01-01T00:00:00Z'),cutoff,**kwargs)

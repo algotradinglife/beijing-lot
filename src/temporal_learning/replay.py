@@ -26,3 +26,22 @@ def prediction_scope(cutoff, training_issues, model_cutoff):
         return 'OUT_OF_SAMPLE'
     warnings.warn(message, HistoricalReplayWarning, stacklevel=2)
     return scope
+
+
+def validate_model_chronology(model_cutoff, receipts, training_issues=None):
+    """Check duplicate runtime chronology against sealed model receipts.
+
+    Caller verifies receipt seals first. Every cutoff field must match; optional
+    training membership must equal the admitted weight ledger issue union.
+    Returns authenticated membership; no fitting, label access or writes.
+    """
+    import json
+    if not isinstance(model_cutoff,Cutoff) or not receipts:raise ValueError('Frozen model chronology changed')
+    issues=set()
+    for receipt in receipts:
+        if (receipt['cutoff_identity']!=model_cutoff.identity or receipt['cutoff_ts']!=model_cutoff.cutoff_ts.isoformat() or
+            receipt['cutoff_kind']!=model_cutoff.kind or receipt['target_issue']!=model_cutoff.target_issue):
+            raise ValueError('Frozen model chronology changed')
+        issues.update(row['issue_code'] for row in json.loads(receipt['weight_ledger']))
+    if training_issues is not None and set(training_issues)!=issues:raise ValueError('Frozen training membership changed')
+    return issues

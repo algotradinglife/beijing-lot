@@ -32,3 +32,20 @@ def require_prior_predictor_clock(clock, cutoff):
     parsed = utc(clock)
     if not isinstance(cutoff, Cutoff) or pd.isna(parsed) or parsed >= cutoff.cutoff_ts:
         raise TemporalContractError('Predictor clock must precede prediction cutoff')
+
+
+def validate_training_predictor_clocks(rows, cutoff):
+    """Validate admitted predictors before their fixture and fit cutoffs.
+
+    Requires explicit predictor_clock_ts and data_available_ts (fixture decision
+    boundary). Returns the maximum admitted predictor time for the fit receipt.
+    Empty or missing chronology fails; no inference or source mutation.
+    """
+    if rows.empty or 'predictor_clock_ts' not in rows:
+        raise TemporalContractError('Missing training predictor clock')
+    clocks=[]
+    for row in rows.itertuples():
+        require_prior_predictor_clock(row.predictor_clock_ts,cutoff)
+        require_prior_predictor_clock(row.predictor_clock_ts,Cutoff.decision_epoch(row.issue_code,row.data_available_ts))
+        clocks.append(utc(row.predictor_clock_ts))
+    return max(clocks).isoformat()
