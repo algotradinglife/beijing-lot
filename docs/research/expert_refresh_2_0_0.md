@@ -29,6 +29,11 @@ Use a **new output directory** when reproducing training. The ordered steps are:
    Exact-version catalogs are isolated to this study, not registered as latest.
 7. `scripts/replay_expert_refresh_inputs.py --study ...` independently rebuilds
    this study's nominated source inputs; source/feature/label changes fail.
+   Evaluation also freezes `report-inputs.json`, binding settlement, training
+   exclusions and all four prediction files. For an existing audited evaluation,
+   explicitly call `freeze_refresh_report_inputs(study)` once to establish this
+   retrospective snapshot; this does not certify earlier file history. Subsequent
+   changes fail verification and require a new evaluation directory.
 8. Render QMD with execution enabled, clean session, cache/freeze disabled.
 
 ## Prediction

@@ -9,6 +9,7 @@ import pickle
 from pathlib import Path
 from src.temporal_learning.core import stable_json_hash
 from src.temporal_learning.provenance import implementation_closure,verify_implementation_closure
+from src.temporal_learning.predictor_clock import require_prior_predictor_clock
 from src.fundamentals_calibrated_draw import predict_calibrated_draw
 from src.fundamentals_retrained_experts import predict_experts
 
@@ -125,6 +126,8 @@ def predict_portable_expert(artifacts, expert, frame, *, cutoff, draw_weight=Non
     if (stable_json_hash(artifacts['binding'])!=artifacts['seal'] or artifacts['binding']!=dict(version=artifacts['version'],release_seal=artifacts['release_seal'],draw_seal=artifacts['draw']['seal'],high_seal=artifacts['high']['seal'])):raise ValueError('Portable model binding changed')
     if expert not in ['draw','high'] or artifacts['version']!='2.0.0':raise ValueError('Unknown portable expert/version')
     if expert=='high' and draw_weight is not None:raise ValueError('draw_weight applies only to draw')
+    if 'predictor_clock_ts' not in frame:raise ValueError('Missing predictor clock')
+    for clock in frame.predictor_clock_ts:require_prior_predictor_clock(clock,cutoff)
     if expert=='draw':result=predict_calibrated_draw(artifacts['draw'],frame,cutoff,draw_weight=draw_weight)
     else:result=predict_experts(artifacts['high'],frame,cutoff)
     result['expert_version']=artifacts['version']

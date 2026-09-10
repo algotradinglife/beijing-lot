@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from src.temporal_learning.core import stable_json_hash
-from src.fundamentals_refresh_predictions import save_refresh_prediction,verify_refresh_predictions,refresh_input_hash,validate_refresh_candidate
+from src.fundamentals_refresh_predictions import save_refresh_prediction,verify_refresh_predictions,refresh_input_hash,validate_refresh_candidate,freeze_refresh_report_inputs
 
 
 def test_compact_receipts_reject_probability_version_input_and_cutoff_mutations(tmp_path,monkeypatch):
@@ -13,6 +13,8 @@ def test_compact_receipts_reject_probability_version_input_and_cutoff_mutations(
     (root/'meta.json').write_text(json.dumps(dict(receipt={'high':dict(features=['baseline_draw'])})))
     for name,x in [('test-features.json',f),('contract.json',dict(cutoffs={'002':{'1':'2010-01-01T00:00:00Z'}})),('models-frozen.json',dict(files={}))]:
         (study/name).write_text(json.dumps(x))
+    (study/'test-labels.json').write_text('{}')
+    (study/'training-data.json').write_text('[]')
     versions={v:dict(version=v,backend='RAW_TREE',files={},models={'002':str(root/'meta.pkl')}) for v in ['2.0.0','1.1.0','0.1.0']}
     rc=dict(versions=versions);catalog=root/'catalog.json';catalog.write_text(json.dumps(dict(receipt=rc,seal=stable_json_hash(rc))))
     for name,v in [('new_draw','2.0.0'),('new_high','2.0.0'),('old_draw','1.1.0'),('old_high','0.1.0')]:
@@ -23,6 +25,12 @@ def test_compact_receipts_reject_probability_version_input_and_cutoff_mutations(
         save_refresh_prediction(result,path,version=v,catalog_path=catalog,study=study,repository_root=root)
         with pytest.raises(FileExistsError):save_refresh_prediction(result,path,version=v,catalog_path=catalog,study=study,repository_root=root)
         with pytest.raises(ValueError,match='mismatch'):save_refresh_prediction(result,path,version='bad',catalog_path=catalog,study=study,repository_root=root)
+    freeze_refresh_report_inputs(study)
+    freeze_refresh_report_inputs(study)
+    (study/'test-labels.json').write_text('{"changed":true}')
+    with pytest.raises(ValueError,match='snapshot changed'):verify_refresh_predictions(study,repository_root=root)
+    with pytest.raises(ValueError,match='snapshot changed'):freeze_refresh_report_inputs(study)
+    (study/'test-labels.json').write_text('{}')
     assert verify_refresh_predictions(study,repository_root=root)==dict(new_draw=1,new_high=1,old_draw=1,old_high=1)
     path=study/'evaluation/new_draw.json';raw=path.read_text();x=json.loads(raw);x['rows'][0]['probability']=.8;path.write_text(json.dumps(x))
     with pytest.raises(ValueError,match='seal'):verify_refresh_predictions(study,repository_root=root)

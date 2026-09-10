@@ -91,4 +91,31 @@ def verify_refresh_predictions(study,*,repository_root):
         if refresh_input_hash(study,catalog['entry'],repository_root=repository_root)!=r['input_sha256']:raise ValueError('Router input hash mismatch')
         if name.startswith('new_'):validate_refresh_candidate(catalog['entry'],name.split('_')[1],study,frozen)
         counts[name]=len(x['rows'])
+    binding=json.loads((study/'report-inputs.json').read_text())
+    if stable_json_hash(binding['receipt'])!=binding['seal'] or set(binding['receipt']['files'])!=set(REPORT_INPUTS):
+        raise ValueError('Report input snapshot seal mismatch')
+    for name,digest in binding['receipt']['files'].items():
+        if hashlib.sha256((study/name).read_bytes()).hexdigest()!=digest:raise ValueError('Report input snapshot changed: '+name)
     return counts
+
+
+REPORT_INPUTS = ('test-labels.json', 'training-data.json', 'contract.json', 'test-features.json',
+                 'evaluation/new_draw.json', 'evaluation/new_high.json',
+                 'evaluation/old_draw.json', 'evaluation/old_high.json')
+
+
+def freeze_refresh_report_inputs(study):
+    """Seal exact settlement, exclusion and prediction bytes after evaluation.
+
+    Reads saved inputs only; no fitting or label availability inference. Writes
+    report-inputs.json once. An identical repeat is harmless; changed inputs
+    require a separate evaluation directory and never rewrite the old receipt.
+    """
+    study=Path(study)
+    receipt=dict(files={name:hashlib.sha256((study/name).read_bytes()).hexdigest() for name in REPORT_INPUTS})
+    payload=dict(receipt=receipt,seal=stable_json_hash(receipt));path=study/'report-inputs.json'
+    if path.exists():
+        if json.loads(path.read_text())!=payload:raise ValueError('Report input snapshot changed')
+    else:
+        with path.open('x') as handle:json.dump(payload,handle,indent=2)
+    return path

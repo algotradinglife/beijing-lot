@@ -49,6 +49,11 @@ def test_portable_preflights_before_pickle_and_rejects_tampering(portable,monkey
     with pytest.raises(FileExistsError):freeze_portable_experts(source/'bundle',output_path=manifest,source_root=source,provenance_root=source/'runtime',repository_root=root,version='2.0.0')
     a=load_portable_experts(manifest,**args)
     with pytest.raises(ValueError,match='only to draw'):predict_portable_expert(a,'high',frame,cutoff=cutoff,draw_weight=.5)
+    for bad in [None,cutoff.cutoff_ts.isoformat()]:
+        with pytest.raises(ValueError,match='clock'):
+            predict_portable_expert(a,'high',frame.assign(predictor_clock_ts=bad),cutoff=cutoff)
+    with pytest.raises(ValueError,match='clock'):
+        predict_portable_expert(a,'high',frame.drop(columns='predictor_clock_ts'),cutoff=cutoff)
     a['release_seal']='wrong'
     with pytest.raises(ValueError,match='binding'):predict_portable_expert(a,'draw',frame,cutoff=cutoff)
     for path in ['../outside','/absolute']:

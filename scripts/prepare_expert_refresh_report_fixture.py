@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from src.temporal_learning.core import stable_json_hash
-from src.fundamentals_refresh_predictions import save_refresh_prediction,refresh_input_hash,verify_refresh_predictions
+from src.fundamentals_refresh_predictions import save_refresh_prediction,refresh_input_hash,verify_refresh_predictions,freeze_refresh_report_inputs
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args();s=Path(a.output);s.mkdir()
  (s/'evaluation').mkdir()
@@ -33,4 +33,5 @@ if __name__=='__main__':
   r=dict(version=v,input_sha256=refresh_input_hash(s,entry,repository_root=Path.cwd()),prediction_sha256=stable_json_hash(result.to_json(orient='records')),catalog_seal=stable_json_hash(rc),model_receipts={},cutoffs=['2010-01-01T00:00:00+00:00']*4)
   result.attrs=dict(prediction_receipt=r,prediction_seal=stable_json_hash(r))
   save_refresh_prediction(result,s/'evaluation'/f'{name}.json',version=v,catalog_path=catalog,study=s,repository_root=Path.cwd())
+ freeze_refresh_report_inputs(s)
  print(verify_refresh_predictions(s,repository_root=Path.cwd()))

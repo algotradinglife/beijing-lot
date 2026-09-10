@@ -7,7 +7,7 @@ from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
 from src.temporal_learning.provenance import implementation_closure
 from src.fundamentals_draw_versions import predict_draw_version
-from src.fundamentals_refresh_predictions import save_refresh_prediction
+from src.fundamentals_refresh_predictions import save_refresh_prediction,freeze_refresh_report_inputs
 
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--python',required=True);p.add_argument('--only',nargs='+',choices=['new_draw','new_high','old_draw','old_high']);a=p.parse_args()
@@ -43,3 +43,5 @@ if __name__=='__main__':
   result=predict_draw_version(version,f,cutoffs=cuts,catalog_path=catalog,repository_root=root,python=a.python,timeout_seconds=3600)
   save_refresh_prediction(result,path,version=version,catalog_path=catalog,study=study,repository_root=root)
   print('PREDICTED',name,len(result),flush=True)
+
+ if all((out/(n+".json")).exists() for n in ["new_draw","new_high","old_draw","old_high"]):freeze_refresh_report_inputs(study)
