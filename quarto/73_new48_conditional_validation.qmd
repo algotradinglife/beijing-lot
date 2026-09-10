@@ -1,0 +1,129 @@
+---
+title: "#419：新增48期采集完备性与条件替换验证"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/new48-conditional-validation-v2/report"
+  archived_report: false
+---
+
+## 冻结规则与新数据
+
+新增范围100402–100607，共48期、3149场、3146个原生比赛ID。采用已裁决的new48-verified-v2清理快照，
+Titan为主源，Nowscore仅交叉核对和补缺；不重新解析未清理旧页覆盖裁决。整合历史181980条，原字节及隔离记录保留。
+
+可用盘口必须身份对应、名义开球一致，欧赔和大小球报价严格早于原场次cutoff。
+不把HTTP200、PARSED或公司末赔直接当作赛前可用。750场出现同公司同一分钟不同大小球报价、17场出现月日时钟边界问题；
+本轮沿用旧门禁，不擅自选取其中一条。上述观察次数按场次计，未断言原始数据必错。
+
+沿用原比分基线及让平1.1.0、高净球0.1.0固定前32期模型，权重各0.5；不重训、不调门槛。
+1,886个建模/盘口共同可用比赛ID与旧40期无交集，本轮内部也无重复原生ID。
+阈值固定为第二与第三让球赛果概率绝对差≤2/5/10个百分点，另设不替换和无条件替换。
+只改后续重叠双选为Top1+Top3；单选、首现、组集合与角色不变，第三次及以后不交替。
+压一场/两场 × TOP2/COMPRESSED选组 × STRICT/FREE重叠限制，8环境共40策略。
+
+**每期固定预算1024元**，CNY2基本票，整张中奖七串1只乘一次0.65；现金保留，无比分保护。
+旧40期采用变动预算55,040元，不能直接对比两批净收益金额；本报告只对同一新数据和预算作配对比较。
+少于七场可用则不下注，不根据随后比赛结果补选。全部组合冻结后才打开完场标签与R/SQLite中奖SP；
+未完场/身份分歧或中奖SP缺失保持待核验，不按零收益处理。
+
+零让球核对：980场在SQLite的让球原字段为空字符串，但同场原北单页面明确为0。仅这种有明确原页面证据的记录通过核对，审计表保留EXPLICIT_ROSTER_ZERO_DB_FIELD_BLANK标记；没有把一般缺失值补成0，也未改数据库。
+
+这是新期的冻结规则历史验证。原始页面收集于事后，历史日期/报价时间仍是代理证据；
+并非2026年的前瞻验证，也不构成#419完整跨年因果验收。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+source('r/fundamentals_repeated_double.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+stopifnot(identical(result$freeze_seal,frozen$seal))
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files,as.list(result$source_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY')
+ bindings <- archive$hashes
+ cat('归档仅重放保存的报告，不代表原数据、模型和SQLite全链重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+ready <- tibble::as_tibble(result$readiness)
+stopifnot(nrow(x)==1920,n_distinct(x$issue)==48,!anyDuplicated(x[c('issue','policy')]),nrow(ready)==3149)
+scope <- x |> group_by(issue) |> summarise(strategies=n(),complete=sum(status=='COMPLETE'),no_bet=sum(status=='NO_BET'),pending=sum(!status %in% c('COMPLETE','NO_BET')),.groups='drop')
+common <- scope$issue[scope$pending==0]
+z <- filter(x,issue %in% common)
+all <- list()
+for(rule in c('GAP02','GAP05','GAP10','ALL')) {
+ q <- z |> filter(.data$rule %in% c('BASE',.env$rule)) |>
+   mutate(action=if_else(.data$rule=='BASE','BASE','ADJUSTED'),kind=if_else(.data$rule=='BASE','OLD','ADJUSTED'))
+ s <- repeated_double_summary(q,100000)
+ s$rule <- ifelse(s$action=='BASE','BASE',rule)
+ if(rule!='GAP02') s <- filter(s,action!='BASE')
+ all[[rule]] <- s
+}
+s <- bind_rows(all) |> mutate(budget_ROI_percent=100*budget_return,stake_ROI_percent=100*roi)
+tibble(all_issues=48,ready_fixtures=sum(ready$ready),bet_issues=sum(scope$complete+scope$pending>0),
+ no_bet_issues=sum(scope$no_bet==40),common_settled_issues=length(common),pending_issues=sum(scope$pending>0),
+ draw_version='1.1.0',draw_weight=.5,high_weight=.5) |> knitr::kable()
+```
+
+## 每期数据及结算完备性
+
+ready是同一场同时通过基本面与盘口门禁。共同结算样本要求该期全部40策略可核算（包括未下注现金期），
+避免不同策略用不同期次比较；待核验期仍保留全额投入及缺失收益，不进入共同收益汇总。
+
+```{r}
+ready |> group_by(issue) |> summarise(roster=n(),form_ready=sum(form_status=='OK_DIAGNOSTIC'),market_ready=sum(market_status=='READY'),
+ usable=sum(ready),.groups='drop') |> left_join(scope,by='issue',relationship='one-to-one') |> knitr::kable()
+```
+
+```{r}
+count(ready,form_status,market_status,name='fixtures') |> arrange(desc(fixtures)) |> knitr::kable()
+```
+
+## 共同样本：收益率及最大回撤
+
+预算分母包含共同样本中持有的现金；另列实际投注回报率。最大回撤按10万元初始资金的逐期净收益路径计算。
+不自动晋升表现最高门槛，所有预设结果完整展示。
+
+```{r}
+s |> arrange(depth,quality,overlap,rule) |> select(depth,quality,overlap,rule,issues,stake_cny,cash_cny,net_cny,
+ budget_ROI_percent,stake_ROI_percent,max_drawdown_cny,matched_lift,winning_groups,groups) |> knitr::kable(digits=2)
+```
+
+原压两场TOP2/STRICT：不替换净收益−5629.95元；2个百分点条件替换为−6005.12元，
+未复现旧40期的改善。5个百分点为−4935.26元，改善694.68元但仍亏损。
+FREE环境存在正收益组合，因此不能概括为所有策略都亏损；也不据此把本批表现最高组合自动升为默认策略。
+
+## 改善是否集中在个别期
+
+```{r}
+s |> arrange(case,rule) |> select(case,rule,changed_legs,gained_groups,lost_groups,model_union,
+ matched_lift,ex_largest_issue,ex_largest_net,ex_largest_matched_lift,ex_largest_lift_issue,ex_largest_lift,
+ longest_losing_run,worst_5_loss,worst_10_loss,worst_20_loss) |> knitr::kable(digits=2)
+```
+
+## 每期：原压两场TOP2/STRICT的五个对照
+
+```{r}
+x |> filter(case=='D2_TOP2_STRICT') |> mutate(budget_ROI_percent=100*budget_return,stake_ROI_percent=100*roi) |>
+ arrange(issue,rule) |> select(issue,rule,status,stake,cash_cny,groups,hits,net,budget_ROI_percent,stake_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 每期所有策略
+
+```{r}
+x |> mutate(budget_ROI_percent=100*budget_return,stake_ROI_percent=100*roi) |> arrange(issue,case,rule) |>
+ select(issue,case,rule,status,stake,cash_cny,groups,hits,net,budget_ROI_percent,stake_ROI_percent) |> knitr::kable(digits=2)
+```
+
+模块：src/fundamentals_clean_validation.py从已裁决快照生成共享窗口、报价及诊断时钟；
+r/fundamentals_clean_validation.R调用已有比分/市场/特征接口；原专家版本接口负责预测。
+plan_clean_validation.py复用已有分组和替换函数；r/fundamentals_clean_settlement.R仅绑定SPF查询结果，
+真正返奖仍调用settle_breadth_bundle。check_clean_validation.py重放原分组、独立核验新支持、共享情景及返奖。
+本QMD仅消费冻结结果，不联网、不训练、不改SQL或原始数据。
