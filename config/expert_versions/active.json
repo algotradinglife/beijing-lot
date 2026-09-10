@@ -1,0 +1,18 @@
+{
+  "receipt": {
+    "scope": "RETROSPECTIVE_HISTORY",
+    "experts": {
+      "draw": {
+        "version": "2.0.0",
+        "catalog_path": "data/derived/fundamentals_417/expert-refresh-96-v2/draw-catalog.json",
+        "catalog_sha256": "d0b91bcdb68bf061260d10b01fe192d96464df630004e0f0ac69946a05997cd3"
+      },
+      "high": {
+        "version": "2.0.0",
+        "catalog_path": "data/derived/fundamentals_417/expert-refresh-96-v2/high-catalog.json",
+        "catalog_sha256": "4255becdd52e81aaab2d20d66416981c8e0134f0af1e0b4282e944a1f75c3aab"
+      }
+    }
+  },
+  "seal": "74f5f8c782fe0755fb4b8a37f25946183b61b968552f75f83f4d4cc537e06666"
+}

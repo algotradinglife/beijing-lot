@@ -1,0 +1,79 @@
+---
+title: "基本面专家 2.0.0：72 期 CV 与 24 期固定测试"
+format: html
+params:
+  study: data/derived/fundamentals_417/expert-refresh-96-v2
+  python: ""
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+```{r}
+#| label: setup
+source('r/fundamentals_expert_refresh_report.R')
+contract <- jsonlite::read_json(file.path(params$study,'contract.json'))
+results <- summarize_expert_refresh(params$study,python=params$python)
+if(isTRUE(contract$synthetic)) cat('CI 合成数据：仅验证报告结构及凭据接口，不代表模型实测结果。')
+list(study=params$study,
+     contract_sha256=digest::digest(file=file.path(params$study,'contract.json'),algo='sha256'),
+     feature_sha256=digest::digest(file=file.path(params$study,'test-features.json'),algo='sha256'),
+     model_freeze_sha256=digest::digest(file=file.path(params$study,'models-frozen.json'),algo='sha256'))
+```
+
+本次以 Titan 为主源、Nowscore 为核对及补缺，使用已清理的历史数据。前 72 期（100101–100504）用于训练及滚动 CV，后 24 期（100505–100607）为固定保留测试集。测试期此前已被其他研究查看，因此这里是**回顾性固定测试**，不是首次盲测，也不是实盘验证。历史可得时间采用诊断代理，不授权前瞻使用。
+
+让平树先在前 48 期内选择参数（前 32 期暖启动）；固定参数后，对第 49–72 期逐期生成 OOF 预测，以前 8 期初始化、后 16 期滚动选择校准权重及默认概率调整。高净球树使用前 32 期暖启动、其后 40 期滚动 CV。最后两棵树都在前 72 期重拟合。模型冻结后才读取测试结算，测试结果不参与参数调整。
+
+```{r}
+#| label: cv-policies
+draw_cv <- jsonlite::read_json(file.path(params$study,'draw/tree-cv.json'),simplifyVector=TRUE)
+high_cv <- jsonlite::read_json(file.path(params$study,'high/tree-cv.json'),simplifyVector=TRUE)
+rate_cv <- jsonlite::read_json(file.path(params$study,'draw/rate-cv.json'),simplifyVector=TRUE)
+list(draw=draw_cv$selected,high=high_cv$selected,calibration=rate_cv$selected)
+knitr::kable(draw_cv$metrics,digits=4)
+knitr::kable(high_cv$metrics,digits=4)
+knitr::kable(rate_cv$metrics,digits=4)
+rm(draw_cv,high_cv,rate_cv)
+```
+
+模型版本为 **2.0.0**，让平推理接口仍为 **1.1.0**。旧模型与版本目录保留，未覆盖旧版。新让平与高净球分别通过本次目录的 `draw-catalog.json`、`high-catalog.json` 调用已有 `predict_draw_version()` 路由（显式传入版本 `2.0.0`、逐场 cutoff 和项目 Python）。让平 `draw_weight=NULL` 使用 CV 冻结权重，可显式传入 0–1；返回的 `draw_target_probability` 已混合基线，投射比分时不得再次乘权重。高净球输出保持原有三态信号与条件概率。
+
+```{r}
+#| label: holdout-eligibility
+results$exclusions
+results$availability
+```
+
+以下比较限于新旧专家共同可预测的完场比赛，排除训练与测试间重复比赛 ID。Brier 越低越好；覆盖率为该信号占共同可评估样本的比例。POSITIVE 精度为事件发生率，NEGATIVE 精度为事件不发生率，ABSTAIN 不视为押中或押错。让平校准后的概率与原始树信号分别报告。
+
+```{r}
+#| label: holdout-comparison
+knitr::kable(results$summary,digits=4)
+knitr::kable(results$signals,digits=4)
+```
+
+```{r}
+#| label: per-issue-comparison
+knitr::kable(results$per_issue,digits=4)
+```
+
+本次没有添加比分保护或重新选择下注策略，概率指标不等同于收益改善。测试结果只作为新版候选模型的诊断证据。
+
+两个专家现已按用户决定同时选用 **2.0.0**。统一入口为
+`src.fundamentals_active_experts.predict_active_experts()`，显式传入
+`config/expert_versions/active.json`、逐场 `cutoffs`、项目根目录和 Python。
+返回 `draw`、`high` 两张独立表；`draw_weight` 只控制让平专家与基线的混合。
+此前测试结果和风险判断保持有效，旧版目录及版本登记均保留。
+
+```{python}
+#| eval: false
+from src.fundamentals_active_experts import predict_active_experts
+signals = predict_active_experts(
+    features, cutoffs=cutoffs,
+    selection_path="config/expert_versions/active.json",
+    repository_root=repository_root, python=python,
+    draw_weight=None,  # 使用 CV 冻结的 50% 权重
+)
+```

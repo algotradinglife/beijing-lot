@@ -1,0 +1,53 @@
+name: Frozen expert refresh contracts
+on:
+  pull_request:
+    paths:
+      - 'src/fundamentals*exper*.py'
+      - 'src/fundamentals*draw*.py'
+      - 'src/fundamentals*signal_rate*.py'
+      - 'src/fundamentals_refresh_predictions.py'
+      - 'src/temporal_learning/**'
+      - 'r/fundamentals_expert_refresh*.R'
+      - 'scripts/*expert_refresh*'
+      - 'scripts/predict_draw_version_worker.py'
+      - 'tests/test_fundamentals*exper*.py'
+      - 'tests/test_fundamentals*draw*.py'
+      - 'tests/test_fundamentals*signal_rate*.py'
+      - 'tests/test_fundamentals_refresh_predictions.py'
+      - 'tests/scripts/test_fixed_prior_fit.py'
+      - 'tests/testthat/test-fundamentals-expert-refresh*.R'
+      - 'config/expert_versions/**'
+      - 'quarto/76_expert_refresh.qmd'
+      - '.github/workflows/expert-refresh.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.4'
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.10.18'
+      - name: Install pinned dependencies during setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libuv1-dev libpng-dev libicu-dev
+          python -c 'import json,subprocess,sys; p=json.load(open("config/expert_versions/runtime.json"))["python_direct"]; subprocess.check_call([sys.executable,"-m","pip","install",*[k+"=="+v for k,v in p.items()]])'
+          Rscript --vanilla -e 'install.packages(c("remotes","jsonlite"),repos="https://cloud.r-project.org"); p <- jsonlite::read_json("config/expert_versions/runtime.json")$r_direct; for(n in names(p)) remotes::install_version(n,version=p[[n]],repos="https://cloud.r-project.org",upgrade="never")'
+      - name: Expert and temporal contracts
+        run: |
+          python -m pytest tests/test_fundamentals_active_experts.py tests/test_fundamentals_expert_refresh.py tests/test_fundamentals_refresh_predictions.py tests/test_fundamentals_cv_experts.py tests/test_fundamentals_calibrated_draw.py tests/test_fundamentals_signal_rate_cv.py tests/test_fundamentals_signal_rates.py tests/test_fundamentals_draw_versions.py tests/test_fundamentals_retrained_experts.py tests/test_fundamentals_training_replay.py tests/test_fundamentals_draw_weight.py tests/scripts/test_fixed_prior_fit.py -q
+          python scripts/check_cutoff_governance.py
+          Rscript --vanilla -e 'testthat::test_file("tests/testthat/test-fundamentals-expert-refresh.R",stop_on_failure=TRUE); testthat::test_file("tests/testthat/test-fundamentals-expert-refresh-report.R",stop_on_failure=TRUE)'
+      - name: Render authenticated offline QMD
+        run: |
+          python scripts/prepare_expert_refresh_report_fixture.py --output /tmp/expert-refresh-ci
+          quarto render quarto/76_expert_refresh.qmd --execute-dir . --execute --no-cache -P study:/tmp/expert-refresh-ci -P python:"$(command -v python)"
