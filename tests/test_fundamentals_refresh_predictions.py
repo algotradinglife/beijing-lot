@@ -94,3 +94,27 @@ def test_legacy_catalog_roots_are_explicit_and_preserve_worker_pin(tmp_path):
     assert original['receipt']['versions']['old']['model_dir']=='model'
     assert bound['seal']==stable_json_hash(bound['receipt'])
     with pytest.raises(ValueError,match='seal'):bind_legacy_catalog_roots({**original,'seal':'bad'},tmp_path)
+
+
+def test_relative_freeze_catalog_candidate_roundtrip(tmp_path,monkeypatch):
+    import runpy,sys
+    from src.fundamentals_refresh_predictions import frozen_candidate_files
+    script=Path('scripts/freeze_expert_refresh.py').resolve()
+    study=tmp_path/'study';(study/'draw').mkdir(parents=True);(study/'high/high-expert').mkdir(parents=True)
+    (study/'contract.json').write_text(json.dumps(dict(api_version='1.1.0',model_version='2.0.0')))
+    (study/'draw/fixture').write_bytes(b'draw')
+    raw=b'high';(study/'high/high-expert/model.pkl').write_bytes(raw);rc={'high':{}}
+    (study/'high/high-expert/model.json').write_text(json.dumps(dict(receipt=rc,seal=stable_json_hash(rc),model_sha256=hashlib.sha256(raw).hexdigest())))
+    monkeypatch.setattr('src.fundamentals_calibrated_draw.load_calibrated_draw',lambda *args,**kwargs:None)
+    monkeypatch.chdir(tmp_path);monkeypatch.setattr(sys,'argv',['freeze','--study','study'])
+    runpy.run_path(str(script),run_name='__main__')
+    frozen=json.loads((study/'models-frozen.json').read_text())
+    assert all(Path(k).is_absolute() for k in frozen['files'])
+    files=frozen_candidate_files('study','high',frozen)
+    entry=dict(backend='RAW_TREE',models={'002':str(study/'high/high-expert/model.pkl')},files=files)
+    validate_refresh_candidate(entry,'high',study,frozen)
+    relative=dict(files={str(Path(k).relative_to(tmp_path)):v for k,v in frozen['files'].items()})
+    assert frozen_candidate_files(study,'high',relative)==files
+    validate_refresh_candidate(entry,'high','study',relative)
+    with pytest.raises(ValueError,match='Missing frozen'):frozen_candidate_files('absent','high',frozen)
+    with pytest.raises(ValueError,match='Unknown'):frozen_candidate_files(study,'bad',frozen)

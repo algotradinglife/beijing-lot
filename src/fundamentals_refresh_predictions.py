@@ -28,12 +28,13 @@ def validate_refresh_candidate(entry,expert,study,frozen):
     """Require version routing to name this study's exact frozen expert files."""
     study=Path(study)
     if expert=='draw':
-        if entry['backend']!='CALIBRATED' or Path(entry['model_dir']).absolute()!=(study/'draw').absolute():raise ValueError('Wrong frozen candidate')
+        if entry['backend']!='CALIBRATED' or Path(entry['model_dir']).resolve()!=(study/'draw').resolve():raise ValueError('Wrong frozen candidate')
     else:
-        expected=(study/'high/high-expert/model.pkl').absolute()
-        if entry['backend']!='RAW_TREE' or not entry['models'] or any(Path(p).absolute()!=expected for p in entry['models'].values()):raise ValueError('Wrong frozen candidate')
-    files={k:v for k,v in frozen['files'].items() if str(study/expert)+'/' in k}
-    if not files or any(entry['files'].get(k)!=v for k,v in files.items()):raise ValueError('Frozen candidate file binding differs')
+        expected=(study/'high/high-expert/model.pkl').resolve()
+        if entry['backend']!='RAW_TREE' or not entry['models'] or any(Path(p).resolve()!=expected for p in entry['models'].values()):raise ValueError('Wrong frozen candidate')
+    files=frozen_candidate_files(study,expert,frozen)
+    actual={str(Path(k).resolve()):v for k,v in entry['files'].items()}
+    if any(actual.get(k)!=v for k,v in files.items()):raise ValueError('Frozen candidate file binding differs')
 
 
 def save_refresh_prediction(result,path,*,version,catalog_path,study,repository_root):
@@ -165,3 +166,17 @@ def verify_refresh_input_snapshots(study, *, prior, experiment, clean_study):
     pd.testing.assert_frame_equal(rows,pd.DataFrame(json.loads((study/'training-data.json').read_text())),check_dtype=False)
     if excluded.to_dict('records')!=json.loads((study/'training-exclusions.json').read_text()):raise ValueError('Exclusion replay differs')
     return rebuilt['source_hashes']
+
+
+def frozen_candidate_files(study, expert, frozen):
+    """Select a nonempty expert file set using normalized filesystem identities.
+
+    Relative paths are resolved from the explicit command working directory;
+    absolute and equivalent dot-segment paths identify the same frozen files.
+    Returns absolute locators with unchanged hashes. No reads or writes.
+    """
+    if expert not in ['draw','high']:raise ValueError('Unknown expert')
+    base=(Path(study)/expert).resolve()
+    files={str(Path(name).resolve()):digest for name,digest in frozen['files'].items() if Path(name).resolve().is_relative_to(base)}
+    if not files:raise ValueError('Missing frozen candidate files')
+    return files

@@ -7,7 +7,7 @@ from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
 from src.temporal_learning.provenance import implementation_closure
 from src.fundamentals_draw_versions import predict_draw_version
-from src.fundamentals_refresh_predictions import save_refresh_prediction,freeze_refresh_report_inputs,bind_legacy_catalog_roots
+from src.fundamentals_refresh_predictions import save_refresh_prediction,freeze_refresh_report_inputs,bind_legacy_catalog_roots,frozen_candidate_files
 
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--python',required=True);p.add_argument('--legacy-root',required=True);p.add_argument('--only',nargs='+',choices=['new_draw','new_high','old_draw','old_high']);a=p.parse_args()
@@ -27,7 +27,7 @@ if __name__=='__main__':
  files=implementation_closure(root,['src.fundamentals_calibrated_draw','src.fundamentals_retrained_experts'])['files']
  files.update({x:hashlib.sha256(Path(x).read_bytes()).hexdigest() for x in ['scripts/predict_draw_version_worker.py','src/fundamentals_draw_versions.py']})
  for expert in ['draw','high']:
-  model_files={k:v for k,v in frozen['files'].items() if str(study/expert)+'/' in k}
+  model_files=frozen_candidate_files(study,expert,frozen)
   entry=dict(version='2.0.0',runtime_root='.',files={**files,**model_files},description='72 issue trained model; retrospective holdout only')
   if expert=='draw':entry.update(backend='CALIBRATED',model_dir=str(study/'draw'),implementation_version='1.1.0',supports_draw_weight=True,probability_semantics='FINAL_HANDICAP_DRAW_MASS')
   else:entry.update(backend='RAW_TREE',models={i:str(study/'high/high-expert/model.pkl') for i in contract['train_issues']+contract['test_issues']},probability_semantics='RAW_EXPERT_PROBABILITY')
