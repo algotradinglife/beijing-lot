@@ -38,7 +38,7 @@ def diversify_n7_outcomes(base, *, cutoffs, rule):
     return dict(**plan,seal=stable_json_hash(plan))
 
 
-def replace_repeated_double_tail(base, *, cutoffs):
+def replace_repeated_double_tail(base, *, cutoffs, max_gap=1.0):
     """On later fixture appearances replace Top2 with Top1+Top3, singles fixed.
 
     Process frozen group order; any earlier appearance (single or double)
@@ -48,10 +48,16 @@ def replace_repeated_double_tail(base, *, cutoffs):
     Top1, ties W,D,L. Each group has seven distinct fixtures and uniform positive
     integer ticket units. Same group sets, roles, unit allocation, stake/cash,
     p/q and cutoffs. No fitting, labels, I/O or reallocation of remaining money.
+    max_gap is the inclusive absolute probability-point gap p(second)-p(third),
+    in probability units (0.05 means five percentage points); default 1 permits
+    all repeated doubles. Zero permits exact ties only. A 1e-12 arithmetic
+    tolerance applies at the boundary. Fixed policy input, never fitted here.
     Return full new tickets and per-leg before/after ledger. Recompute support
     probabilities/proxy gross; remove stale candidate-surface metric bindings.
     Existing design_receipt records the original group-selection provenance.
     """
+    if isinstance(max_gap,bool) or not isinstance(max_gap,(int,float)) or not math.isfinite(max_gap) or not 0<=max_gap<=1:
+        raise ValueError('max_gap must be a finite probability difference in [0,1]')
     plan=limit_decision_chain_plan(base,groups=base['groups'],cutoffs=cutoffs)
     if base.get('single_count') not in (1,2) or base['groups']<1 or base['unit_cny']!=2 or base['payout_factor']!=.65:
         raise ValueError('Positive C1/C2 plan with CNY2 and once-only0.65 required')
@@ -77,10 +83,11 @@ def replace_repeated_double_tail(base, *, cutoffs):
             order=sorted('WDL',key=lambda d:(-r['p_'+d],'WDL'.index(d)));expected={dict(W='3',D='1',L='0')[d] for d in order[:len(r['support'])]}
             if set(r['support'])!=expected:raise ValueError('Original Top1/Top2 supports required; do not reapply transformation')
             before=r['support'];prior=seen[r['slot']]
-            if prior and len(before)==2:
+            gap=r['p_'+order[1]]-r['p_'+order[2]]
+            if prior and len(before)==2 and gap<=max_gap+1e-12:
                 support={order[0],order[2]};r['support']=''.join(dict(W='3',D='1',L='0')[d] for d in 'WDL' if d in support)
             ledger.append(dict(group=group,slot=r['slot'],provider_id=r['provider_id'],prior_appearances=prior,
-                source_support=before,selected_support=r['support'],changed=r['support']!=before,
+                source_support=before,selected_support=r['support'],changed=r['support']!=before,second_third_gap=gap,
                 original_mass=sum(r['p_'+d] for d,c in zip('WDL','310') if c in before),
                 selected_mass=sum(r['p_'+d] for d,c in zip('WDL','310') if c in r['support'])))
             seen[r['slot']]+=1
@@ -93,7 +100,7 @@ def replace_repeated_double_tail(base, *, cutoffs):
     if sum(t['units']*2 for t in plan['tickets'])!=base['stake']:raise ValueError('Source stake/ticket units mismatch')
     for key in ['surface_seal','selected_candidates','candidate_count','source_pool_hash']:
         plan.pop(key,None)
-    plan.update(diversity_rule='REPEATED_DOUBLE_TOP1_TOP3_SINGLE_UNCHANGED',diversity_ledger=ledger,
+    plan.update(diversity_rule='REPEATED_DOUBLE_TOP1_TOP3_SINGLE_UNCHANGED',max_gap=max_gap,diversity_ledger=ledger,
         source_support_plan_seal=base['seal'],group_probability=masses,group_units=group_units,model_proxy_gross=proxy,
         unique_tickets=len(plan['tickets']),paid_ticket_units=sum(t['units'] for t in plan['tickets']),
         repeat_units=sum(t['units']-1 for t in plan['tickets']))

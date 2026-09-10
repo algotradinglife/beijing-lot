@@ -78,3 +78,38 @@ def test_units_ties_and_failure_contracts(source):
  tied['seal']=stable_json_hash({k:v for k,v in tied.items() if k!='seal'})
  q=replace_repeated_double_tail(tied,cutoffs=c)
  assert all(l['selected_support']=='30' for l in q['diversity_ledger'] if l['changed'])
+
+
+@pytest.mark.parametrize('depth',[1,2])
+def test_conditional_gap_filter_and_boundaries(source,depth):
+ f,c,plans=source;b=copy.deepcopy(plans[depth])
+ for r in b['legs']:
+  r.update(p_W=.6,p_D=.2+.003*r['slot'],p_L=.2-.003*r['slot'])
+ b['seal']=stable_json_hash({k:v for k,v in b.items() if k!='seal'})
+ changed=[]
+ for threshold in [0,.02,.05,.10,1]:
+  p=replace_repeated_double_tail(b,cutoffs=c,max_gap=threshold)
+  keys=set()
+  for l in p['diversity_ledger']:
+   eligible=l['prior_appearances']>0 and len(l['source_support'])==2 and l['second_third_gap']<=threshold+1e-12
+   assert l['changed']==eligible
+   if eligible:keys.add((l['group'],l['slot']))
+  changed.append(keys)
+  assert p['max_gap']==threshold
+  for k in ['stake','cash_cny','budget_cny','groups','single_count','group_units']:assert p[k]==b[k]
+ assert not changed[0] and changed[-1]
+ assert all(a<=z for a,z in zip(changed,changed[1:]))
+ assert any(a<z for a,z in zip(changed,changed[1:]))
+ # Original fixture probabilities have a 13-point second/third gap.
+ original=plans[depth]
+ boundary=replace_repeated_double_tail(original,cutoffs=c,max_gap=.13)
+ assert boundary['tickets']==replace_repeated_double_tail(original,cutoffs=c)['tickets']
+ below=replace_repeated_double_tail(original,cutoffs=c,max_gap=.13-1e-9)
+ assert below['tickets']==original['tickets']
+ assert evaluate_fixed_supports(f,below,cutoffs=c,seed=41902,draws=128)['metrics']==evaluate_fixed_supports(f,original,cutoffs=c,seed=41902,draws=128)['metrics']
+ tied=copy.deepcopy(original)
+ for r in tied['legs']:r.update(p_W=.6,p_D=.2,p_L=.2)
+ tied['seal']=stable_json_hash({k:v for k,v in tied.items() if k!='seal'})
+ assert any(l['changed'] for l in replace_repeated_double_tail(tied,cutoffs=c,max_gap=0)['diversity_ledger'])
+ for invalid in [-.1,1.1,float('nan'),float('inf'),True,None,'0.05']:
+  with pytest.raises(ValueError):replace_repeated_double_tail(original,cutoffs=c,max_gap=invalid)

@@ -10,12 +10,12 @@ from src.temporal_learning.core import stable_json_hash
 from src.temporal_learning.provenance import implementation_closure,verify_implementation_closure
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--parent',required=True);p.add_argument('--output',required=True);a=p.parse_args();parent=Path(a.parent);out=Path(a.output)
+ p=argparse.ArgumentParser();p.add_argument('--parent',required=True);p.add_argument('--output',required=True);p.add_argument('--max-gap',type=float,default=1.0);a=p.parse_args();parent=Path(a.parent);out=Path(a.output)
  if out.exists():raise FileExistsError('Immutable new output required')
  old=json.loads((parent/'plans-frozen.json').read_text());assert stable_json_hash(old['receipt'])==old['seal'];sources=dict(old['receipt']['source_hashes'])
  for path,h in sources.items():assert hashlib.sha256(Path(path).read_bytes()).hexdigest()==h,path
  inputs=json.loads(Path(next(k for k in sources if k.endswith('/inputs.json'))).read_text());frame=pd.DataFrame(inputs['rows']);frame=frame[frame.weight.eq(.5)].drop(columns='weight')
- contract=dict(scope='EXPOSED_40_ISSUES_REPEATED_DOUBLE_TOP1_TOP3',depths=[1,2],quality=['TOP2','COMPRESSED'],overlap=['STRICT','FREE'],preserve_prefix=True,cash_policy='HOLD',support_rule='FIRST_USE_TOP2_LATER_DOUBLE_TOP1_TOP3_ALL_SINGLES_FIXED',same_fixture_counts_even_if_previous_single=True,third_use='TOP1_TOP3_NOT_ALTERNATING',evaluation_seed=41902,evaluation_draws=8192,unit_cny=2,payout_factor=.65,learning='NONE',draw_version='1.1.0',draw_weight=.5,high_weight=.5)
+ contract=dict(scope='EXPOSED_40_ISSUES_REPEATED_DOUBLE_TOP1_TOP3',max_gap=a.max_gap,threshold_policy='FIXED_DIAGNOSTIC_NOT_FITTED',depths=[1,2],quality=['TOP2','COMPRESSED'],overlap=['STRICT','FREE'],preserve_prefix=True,cash_policy='HOLD',support_rule='FIRST_USE_TOP2_LATER_DOUBLE_TOP1_TOP3_ALL_SINGLES_FIXED',same_fixture_counts_even_if_previous_single=True,third_use='TOP1_TOP3_NOT_ALTERNATING',evaluation_seed=41902,evaluation_draws=8192,unit_cny=2,payout_factor=.65,learning='NONE',draw_version='1.1.0',draw_weight=.5,high_weight=.5)
  closure=implementation_closure(Path.cwd(),['src.fundamentals_n7_diversity','scripts.run_repeated_double'],distributions=['numpy','pandas','scipy','scikit-learn'])
  out.mkdir(parents=True);(out/'plans').mkdir();plan_hashes={}
  for issue,f in frame.groupby('issue',sort=True):
@@ -23,7 +23,7 @@ if __name__=='__main__':
   for depth in (1,2):
    for quality in ['TOP2','COMPRESSED']:
     for overlap in ['STRICT','FREE']:
-     source_policy=f'D{depth}_P1_{quality}_{overlap}_HOLD';base=previous[source_policy]['plan'];case=f'D{depth}_{quality}_{overlap}';adjusted=replace_repeated_double_tail(base,cutoffs=cuts)
+     source_policy=f'D{depth}_P1_{quality}_{overlap}_HOLD';base=previous[source_policy]['plan'];case=f'D{depth}_{quality}_{overlap}';adjusted=replace_repeated_double_tail(base,cutoffs=cuts,max_gap=a.max_gap)
      for action,plan in [('BASE',base),('ADJUSTED',adjusted)]:
       evaluation=evaluate_fixed_supports(f,plan,cutoffs=cuts,seed=41902,draws=8192)
       if action=='BASE':assert evaluation['metrics']==previous[source_policy]['metrics']

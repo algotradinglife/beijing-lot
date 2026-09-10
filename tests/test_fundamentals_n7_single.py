@@ -70,7 +70,7 @@ def test_overlap_timeout_is_not_reported_as_cash_infeasibility(sample,monkeypatc
     with pytest.raises(RuntimeError,match='optimality'):next_overlap_group(f,[],cutoffs=c,max_uses=2,max_pair_overlap=2)
 
 
-@pytest.mark.parametrize('fixture,count',[('n7_single_report',120),('n7_compression_report',360),('n7_c2_relax_report',480),('compression_bridge_report',1440),('repeated_double_report',640)])
+@pytest.mark.parametrize('fixture,count',[('n7_single_report',120),('n7_compression_report',360),('n7_c2_relax_report',480),('compression_bridge_report',1440),('repeated_double_report',640),('conditional_gap02_report',640),('conditional_gap05_report',640),('conditional_gap10_report',640),('conditional_gapall_report',640)])
 def test_report_archive_restore(tmp_path,fixture,count):
     import subprocess,sys,json,hashlib
     from pathlib import Path
