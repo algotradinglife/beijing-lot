@@ -49,3 +49,11 @@ quarto render quarto/70_compression_bridge.qmd --execute-dir . --execute --no-ca
 依赖在config/compression_breadth_runtime.json固定。上轮远端CI缺少导入链matplotlib导致测试收集失败，本轮补齐matplotlib/nbformat/nbclient/pyarrow/PyYAML，并用隔离Python环境只安装声明依赖执行检查。独立工作流compression-breadth.yml增加新路径、测试及归档QMD；其他会话尚未提交的fundamentals-census.yml扩展不纳入当前commit，HEAD中的该工作流并不运行这些新测试。
 
 所有本地独立核验和审核证据置于研究输出目录；远端CI须另记实际状态。全仓R套件未执行，范围限定新增函数和受影响投注接口。无风险阈值拟合、默认策略晋升或历史分区重命名。
+
+## 分区限制与最终本地复审
+
+两场方案余款加倍的增益集中在原TRAINING24（净收益53,309.77元，对照10,000.05元）；VALIDATION8净收益8,354.98元，比对照少2,240元；TEST8净亏1,788.15元，比对照少2,880元。不能用全40期高收益自动晋升此策略。QMD的原24/8/8表提供全量对应数字。
+
+最终Codex审核在f8a26f2c上无P1/P2：独立核对1440计划、160旧/新直接对照、144汇总、256因素上下文、16600个HTML数值和640个现金配对。重复资金不改变支持或覆盖已核验。审核明确回撤上升和单年度暴露限制。待提交代码的独立快照在仅安装已声明Python依赖的隔离环境中93项测试通过；受影响R合计53断言（新桥接19、前次20、C2计14）及归档渲染通过。原数据、完整实现快照、初审与最终审核均保存在本地研究目录。
+
+远端CI已通过：[f8a26f2c](https://github.com/algotradinglife/beijing-lot/actions/runs/34475713652)。验证93项Python测试、53项受影响R断言、cutoff检查及QMD68/69/70三份归档报告渲染；修复了上一轮缺少传递导入依赖造成的收集失败。此CI绑定实现提交；后续仅追加本验收说明。
