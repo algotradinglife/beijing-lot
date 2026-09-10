@@ -1,0 +1,103 @@
+---
+title: "纯基线与专家：压一场、压两场的收益对照"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/new48-pure-baseline-report-v2"
+  archived_report: false
+---
+
+本轮固定上一轮的100402–100607共48期、2561场可用比赛和市场报价。
+**纯基线**直接投影保存的原始主客历史比分分布，不调用让平或高净球专家。
+对照为上一轮冻结的让平1.1.0与高净球0.1.0、权重各0.5的专家方案。
+这里的BASE只表示“不替换重叠双选”，与“是否使用专家”是两个不同维度。
+
+每期预算1024元，基本票2元，每票返奖系数0.65只计算一次，没有比分保护。
+纯基线按自己的概率重新选场、分组和确定单选位置；市场概率q与专家版逐场一致。
+这是对完整下注流程的配对比较，不是把专家选好的分组固定后仅替换概率。
+**赛果已被查看，结果属于回顾诊断；本轮没有训练或调参，也不自动推广收益最高的变种。**
+历史时间戳仍为代理证据。同一分钟报价的页面顺序假设及±31天排除规则沿用上一轮，未吸收其他会话正在补充的新数据。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+source('r/fundamentals_repeated_double.R')
+source('r/fundamentals_expanded_comparison.R')
+source('r/fundamentals_pure_report.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+result <- verified$result
+if(isTRUE(params$archived_report)) {
+ cat('归档只重放报告，不代表源页面、模型或SQLite全链重放。\n')
+}
+pure <- tibble::as_tibble(result$rows)
+expert <- tibble::as_tibble(result$before)
+stopifnot(nrow(pure)==3456,nrow(expert)==3456,n_distinct(pure$issue)==48,n_distinct(pure$policy)==72)
+# Shared descriptive helper: BEFORE means expert, AFTER means pure here, not dates.
+paired <- expanded_variant_comparison(expert,pure,100000)
+s <- paired$summary |> rename(pure_net=net_cny,pure_budget_ROI_percent=budget_ROI_percent,
+ pure_stake_ROI_percent=stake_ROI_percent,expert_net=before_net_cny,expert_budget_ROI_percent=before_budget_ROI_percent,
+ pure_minus_expert=net_change,pure_max_drawdown=max_drawdown_cny,expert_max_drawdown=before_max_drawdown_cny)
+stopifnot(length(paired$common_issues)==48)
+```
+
+## 规则与分母
+
+D1每组七场中压一场单选，每组128元；D2压两场单选，每组64元。
+TOP2按原双选覆盖概率排序，COMPRESSED按压缩后的组概率排序。
+STRICT要求每场最多两组、任意两组最多重叠两场；FREE放开这两项限制，但不重复同一七场集合。
+先保留不重叠分组再扩组，余款持有现金。各模型内所有替换规则保持原分组和投入不变。
+
+GAP02/05/10在第二、第三概率差不超过2/5/10个百分点时，调整后续重叠双选；ALL无条件调整。
+TAIL05要求市场对模型第三方向的支持比第二方向至少高5个百分点；TV10/15/20再要求总变差距离至少0.10/0.15/0.20。
+替换时保留第一方向，将第二改为第三，单选不变。市场q由赛前欧赔＋大小球比分映射到同一让球胜平负。
+
+预算ROI分母为48×1024=49152元，包含现金；投注ROI分母为实际投入。
+最大回撤按逐期期末净收益计算，初始资金10万元，不代表比赛期间回撤。
+
+## 压一场：纯基线与专家
+
+```{r}
+s |> filter(depth==1) |> arrange(quality,overlap,rule) |>
+ select(case,rule,stake_cny,cash_cny,pure_net,pure_budget_ROI_percent,pure_stake_ROI_percent,
+ pure_max_drawdown,winning_groups,groups,expert_net,expert_budget_ROI_percent,pure_minus_expert) |> knitr::kable(digits=2)
+```
+
+## 压两场：纯基线与专家
+
+```{r}
+s |> filter(depth==2) |> arrange(quality,overlap,rule) |>
+ select(case,rule,stake_cny,cash_cny,pure_net,pure_budget_ROI_percent,pure_stake_ROI_percent,
+ pure_max_drawdown,winning_groups,groups,expert_net,expert_budget_ROI_percent,pure_minus_expert) |> knitr::kable(digits=2)
+```
+
+## 收益集中度和回撤
+
+ex_largest_net为剔除纯基线本变种最大盈利期后的剩余净收益。
+pure_minus_expert比较相同规则下两个模型的完整流程，不表示固定同一组选场的专家贡献。
+
+```{r}
+s |> group_by(depth) |> summarise(variants=n(),pure_positive=sum(pure_net>0),expert_positive=sum(expert_net>0),
+ pure_better=sum(pure_minus_expert>0),pure_positive_without_largest=sum(ex_largest_net>0),.groups='drop') |> knitr::kable()
+s |> arrange(depth,quality,overlap,rule) |>
+ select(case,rule,pure_net,expert_net,pure_minus_expert,pure_max_drawdown,expert_max_drawdown,
+ ex_largest_issue,ex_largest_net,winning_groups,before_winning_groups,groups,before_groups) |> knitr::kable(digits=2)
+```
+
+## 每期全部收益及表结构
+
+```{r}
+periods <- paired$periods |> mutate(pure_budget_ROI_percent=100*net_after/budget_cny_after,
+ expert_budget_ROI_percent=100*net_before/budget_cny_before)
+glimpse(periods)
+head(periods,6) |> select(issue,case,rule,net_after,pure_budget_ROI_percent,net_before,expert_budget_ROI_percent) |> knitr::kable(digits=2)
+periods |> arrange(issue,depth,quality,overlap,rule) |>
+ select(issue,case,rule,status_after,stake_after,cash_cny_after,groups_after,hits_after,
+ net_after,pure_budget_ROI_percent,net_before,expert_budget_ROI_percent,net_change) |> knitr::kable(digits=2)
+```
+
+输入身份、固定参数、代码及报告实现哈希见报告目录的`plans-frozen.json`。
+纯基线概率函数为`r/fundamentals_pure_baseline.R`，组合与结算函数为`src/fundamentals_compression_variants.py`；均复用已有选场和票级结算实现。
