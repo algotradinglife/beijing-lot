@@ -20,7 +20,7 @@ def next_overlap_group(frame, existing_groups, *, cutoffs, max_uses, max_pair_ov
     fail closed, never interpreted as lack of feasible groups. Empty slots only
     for proved infeasibility. No global claim about future-group optimality.
     """
-    if type(max_uses) is not int or max_uses not in {2,3,4,6} or max_pair_overlap!=2:raise ValueError('Explicit owner reuse caps required')
+    if type(max_uses) is not int or max_uses not in {2,3,4,6} or type(max_pair_overlap) is not int or max_pair_overlap not in {2,3,4}:raise ValueError('Explicit owner reuse caps required')
     ranked,_=rank_double_candidates(frame,cutoffs=cutoffs)
     ranked=ranked.sort_values(['slot','provider_id']);slots=list(ranked.slot)
     if any(len(g)!=7 or len(set(g))!=7 or not set(g)<=set(slots) for g in existing_groups):

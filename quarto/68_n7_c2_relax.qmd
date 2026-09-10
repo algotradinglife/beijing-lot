@@ -1,0 +1,118 @@
+---
+title: "两场单选：固定预算下放宽复用与重叠限制"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-c2-relax-v1"
+  archived_report: false
+---
+
+## 比较口径
+
+保持原40期逐期预算不变，总预算55,040元；预算不是实际投注。原两场单选方案投注38,912元，现金16,128元。
+本轮保留每期原有全部组、票据与下注金额，仅动用剩余预算追加完整组，不能超预算，不能加倍购买原组。
+
+每组七场：两场单选、五场双选，32张基本票×2元＝64元，无比分保护。
+冻结让平专家1.1.0及同一高净胜球专家，权重各0.5，不重训练。原比分分布投射后的p与欧赔＋大小球市场q均不变。
+单选角色继续按每组Top1概率最高的两场确定，取最高方向；其余取Top2方向。
+
+U表示同一场最多使用的组数（2、3、4、6），P表示任意两组最多重叠的场次（2、3、4）。
+U2_P2为原方案，其他11个分支各自从同一原方案开始，只追加，不从其他分支接续，也不重新安排旧组。
+新组按原双选覆盖概率乘积逐组选择（log相加，slot秩1e−10处理并列），不是多组联合全局最优。
+使用SciPy MILP，30秒须证明最优或不可行；超时抛错，不解释为无组可买。不能再添加合法完整组则持现。
+
+40期均已揭示，训练24／验证8／测试8为历史回顾分区，不是本轮的新样本外验证。
+每次规划通过共享Cutoff验证，保存全部计划后才由本轮程序读取历史结算，但不声称此前没有见过这些结果。
+不自动启用表现最好的分支。赛前SP代理是固定1/q；最终SP仅用于结算，票级0.65系数乘一次，未模拟税费或奖金上限。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_n7_c2_relax.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+stopifnot(identical(result$freeze_seal,frozen$seal))
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY');bindings <- archive$hashes
+ cat('CI归档报告渲染，不是原始数据或模型重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==480,!anyDuplicated(x[c('issue','policy')]),all(x$stake+x$cash_cny==x$budget_cny),
+ all(x$cash_cny>=0),all(x$added_stake>=0),all(x$added_groups*64==x$added_stake),all(x$added_hits>=0))
+y <- bind_rows(x,mutate(x,partition='ALL40'))
+s <- integration_weight_summary(y)
+e <- n7_relaxation_totals(y)
+s <- left_join(s,e,by=c('partition','policy'),relationship='one-to-one') |>
+ mutate(budget_return_percent=100*net_cny/budget_cny,stake_ROI_percent=100*roi,
+ marginal_ROI_percent=if_else(added_stake>0,100*added_net/added_stake,NA_real_))
+tibble(receipt=result$freeze_seal,learning='NONE',issues=n_distinct(x$issue),scope='EXPOSED_40_ISSUE_DIAGNOSTIC') |> knitr::kable()
+```
+
+## 全40期：预算、投入、收益和回撤
+
+预算回报率＝净收益÷分配预算；投注ROI＝净收益÷实际投注。现金不是收益。
+最大回撤按期号顺序从0起算，为累计净收益从高点回落的金额。
+命中组数是完整七串一命中；命中不一定覆盖该期全部投入。
+
+```{r}
+s |> filter(partition=='ALL40') |>
+ select(policy,budget_cny,stake_cny,cash_cny,net_cny,budget_return_percent,stake_ROI_percent,max_drawdown_cny,
+ groups,winning_groups,any_hit_issues,profitable_issues) |> knitr::kable(digits=2)
+```
+
+## 新增投注本身贡献多少
+
+所有旧组保持不变，因此新增净收益可以归因于追加投注。
+边际ROI＝新增净收益÷新增投注金额，不能用整个方案的ROI替代。
+各分支都从原U2_P2独立扩展；更宽档位之间可能选了不同的新组，不声称相互嵌套。
+
+```{r}
+s |> filter(partition=='ALL40') |> select(policy,added_groups,added_stake,added_hits,added_net,marginal_ROI_percent,cash_issues,full_loss_issues) |> knitr::kable(digits=2)
+```
+
+## 训练／验证／测试分区
+
+```{r}
+s |> filter(partition!='ALL40') |> select(partition,policy,stake_cny,cash_cny,net_cny,budget_return_percent,
+ max_drawdown_cny,groups,winning_groups,profitable_issues) |> knitr::kable(digits=2)
+```
+
+## 如何理解结果
+
+本轮12分支中，U6_P2（每场最多6组、两组重叠仍≤2场）的全40期预算回报最高：54.62%，
+原U2_P2为39.40%。实际投入54,656元，仍保留384元现金；相对原组追加15,744元，增加净收益8,378.18元，
+边际ROI为53.22%。最大回撤由3,248.79元增至4,464.79元。
+
+改善不均匀：训练24期预算回报从31.25%降至17.18%，验证8期由88.06%升至97.24%，
+测试8期由9.92%升至116.90%。100319单期贡献新增净收益9,387.72元，超过全40期净增益；
+若仅诊断性排除该期，其他39期新增投注合计净亏1,009.54元。这是收益集中度说明，不是排除某期后重新选策略。
+
+将两组重叠上限进一步放宽到3或4，未带来更好结果。U6_P3／U6_P4虽然用完预算，
+全40期预算回报只有30.43%／34.38%，低于原方案。因为各分支都重新选择新增组，
+不是U6_P2之上继续追加，不能把这些差异解释成单纯多买6组的效果。
+
+因此保留“增加场次复用、维持较低组间重叠”为候选方向，尚不升级默认；新48期还未纳入验证。
+
+```{r}
+x |> filter(policy=='U6_P2') |> arrange(desc(added_net)) |> slice_head(n=6) |>
+ select(issue,partition,added_stake,added_groups,added_hits,added_net) |> knitr::kable(digits=2)
+```
+
+## 每期完整结果
+
+```{r}
+x |> arrange(issue,policy) |> mutate(budget_return_percent=100*budget_return) |>
+ select(partition,issue,policy,budget_cny,stake,cash_cny,groups,hits,net,budget_return_percent,added_groups,added_net) |>
+ knitr::kable(digits=2)
+```
+
+规划复用 `src/fundamentals_n7_reuse_extension.py`、`src/fundamentals_n7_single.py`；结算复用 `settle_n7_single`，
+R汇总复用 `integration_weight_summary`。新增测试 `tests/test_fundamentals_n7_c2_relax.py` 覆盖预算、原组前缀、
+两单选五双选、完整32票、无重复、复用／重叠限制、失败边界及标签变化不影响规划。
+独立枚举 `scripts/check_n7_c2_relax.py` 核对480计划、现金、追加贡献及最终SP返奖。

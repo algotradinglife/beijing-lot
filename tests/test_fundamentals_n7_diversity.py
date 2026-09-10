@@ -56,14 +56,14 @@ def test_invalid_reuse_cap(sample,cap):
 def test_nested_extension_preserves_groups_and_identity(sample):
     f,c=sample;p=n7_single_plan(f,cutoffs=c,budget_cny=1024,single_rule='MAX_SINGLE',single_count=3,max_uses=2,unit_cny=2,payout_factor=.65,allocation_seed=0)
     for cap in [3,4,6]:
-        q=extend_n7_reuse_plan(p,f,cutoffs=c,max_uses=cap)
+        q=extend_n7_reuse_plan(p,f,cutoffs=c,max_uses=cap,max_pair_overlap=2)
         assert q['legs'][:len(p['legs'])]==p['legs'] and q['tickets'][:len(p['tickets'])]==p['tickets']
         assert q['stake']>=p['stake'] and q['cash_cny']<=p['cash_cny']
         groups=[{r['slot'] for r in q['legs'] if r['group']==g} for g in range(1,q['groups']+1)]
         assert max(Counter(s for g in groups for s in g).values())<=cap
         assert all(len(a&b)<=2 for a,b in itertools.combinations(groups,2))
-        assert q==extend_n7_reuse_plan(p,f,cutoffs=c,max_uses=cap)
+        assert q==extend_n7_reuse_plan(p,f,cutoffs=c,max_uses=cap,max_pair_overlap=2)
         p=q
-    with pytest.raises(ValueError):extend_n7_reuse_plan(p,f,cutoffs=c,max_uses=6)
+    with pytest.raises(ValueError):extend_n7_reuse_plan(p,f,cutoffs=c,max_uses=6,max_pair_overlap=2)
     bad=f.copy();bad.loc[0,'p_W']=.54;bad.loc[0,'p_D']=.31
-    with pytest.raises(ValueError):extend_n7_reuse_plan(n7_single_plan(f,cutoffs=c,budget_cny=1024,single_rule='MAX_SINGLE',single_count=3,max_uses=2,unit_cny=2,payout_factor=.65,allocation_seed=0),bad,cutoffs=c,max_uses=3)
+    with pytest.raises(ValueError):extend_n7_reuse_plan(n7_single_plan(f,cutoffs=c,budget_cny=1024,single_rule='MAX_SINGLE',single_count=3,max_uses=2,unit_cny=2,payout_factor=.65,allocation_seed=0),bad,cutoffs=c,max_uses=3,max_pair_overlap=2)

@@ -31,7 +31,7 @@ if __name__=='__main__':
   path=parent/'plans'/f'{issue}.json.gz';raw=path.read_bytes();h=hashlib.sha256(raw).hexdigest();assert old['receipt']['plan_hashes'][str(path)]==h;sources[str(path)]=h
   prior=json.loads(gzip.decompress(raw));fixed=prior['CAP2_FIXED'];budget=fixed['budget_cny']
   for cap in caps:
-   fixed=extend_n7_reuse_plan(fixed,f,cutoffs=cuts,max_uses=cap)
+   fixed=extend_n7_reuse_plan(fixed,f,cutoffs=cuts,max_uses=cap,max_pair_overlap=2)
    bundle[f'NESTED_CAP{cap}_FIXED']=fixed
    bundle[f'NESTED_CAP{cap}_DIVERSE']=diversify_n7_outcomes(fixed,cutoffs=cuts,rule=rule)
   path=out/'plans'/f'{issue}.json.gz';path.write_bytes(gzip.compress(json.dumps(bundle,separators=(',',':')).encode(),mtime=0));hashes[str(path)]=hashlib.sha256(path.read_bytes()).hexdigest();print('FROZEN',issue,flush=True)
