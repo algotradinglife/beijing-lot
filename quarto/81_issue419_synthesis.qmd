@@ -1,0 +1,190 @@
+---
+title: "#419 阶段分析：赛果压缩、组合扩展与复用限制"
+format:
+  html:
+    toc: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/reuse-cap-grid-v1"
+  archived_report: false
+---
+
+## 研究结论
+
+**压缩两场可以释放组合容量，但收益取决于选场、重复持仓和资金安排，不能只看新增组数。**
+当前48期纯基线回顾中，限制同一场进入不同组合的次数，比普遍替换赛果更值得继续检验。
+收益优先候选为单场最多6组、任意两组最多重叠5场；降低回撤的候选为单场最多2组、
+任意两组最多重叠4场。它们是本次已暴露样本上的候选，不是已获得前瞻证据的默认策略。
+
+本报告收束已经完成的实验，逐项说明原合同的验收缺口。
+**#419 的严格时序、跨年份验收尚未完成，不将本报告当作关闭全部原合同的依据。**
+原合同见 [GitHub Issue #419](https://github.com/algotradinglife/beijing-lot/issues/419)。
+用户明确采用 QMD/R 交付，替代原合同中的 Jupyter 格式要求。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_reuse_caps.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows)
+stopifnot(nrow(rows)==3552,n_distinct(rows$issue)==48,
+          all(rows$budget_cny==1024),all(rows$status=='COMPLETE'))
+comparison <- reuse_cap_summary(rows,100000)
+s <- comparison$summary |> filter(kind=='CAPPED')
+labels <- tibble::tribble(
+  ~policy, ~label,
+  'U16_P6_CAPPED','原放宽方案 U16/P6',
+  'U2_P2_CAPPED','原严格方案 U2/P2',
+  'U6_P5_CAPPED','收益候选 U6/P5',
+  'U6_P4_CAPPED','折中候选 U6/P4',
+  'U2_P4_CAPPED','低回撤候选 U2/P4',
+  'U1_P0_CAPPED','完全不重叠 U1/P0')
+featured <- labels |> left_join(s,by='policy',relationship='one-to-one')
+stopifnot(nrow(s)==37,!anyNA(featured$net_cny))
+```
+
+## 实验如何演进，以及哪些结果不能直接相比
+
+|阶段|输入与实验|主要发现|证据入口|
+|---|---|---|---|
+|等额压缩矩阵|原40期、冻结专家整合概率；每方案总实际投入55,040元；深度0–3、五类压缩规则、四类扩组方法及固定随机种子|压一场概率扩组净收益31,181.03元；压两场同类扩组仅615.46元；提高模型并集覆盖并不保证经济收益|QMD69、compression_breadth_diagnostic.md|
+|旧／新方法桥接|同40期；分离保留原不重叠组、概率排序方式、现金再投入和复用限制|“压两场最好”和“压一场最好”来自不同组合与资金合同，不能只按单选场数归因|QMD70、compression_bridge_diagnostic.md|
+|补全后48期模型对照|100402–100607，2,561场；纯基线与冻结专家分别独立选场；每期预算1,024元|纯基线72个变种中62个优于对应专家；压一场仅2/36为正且剔除最大盈利期后转负，压两场22/36为正|QMD75–76、new48_pure_baseline_variants.md|
+|固定分组改变赛果|同48期纯基线；保持分组、单选位置、投入，仅在后续重复场次替换|75%单选替换增益集中于100514；剔除同一期后比原方案少赚约8,037元。50%阈值没有触发，不能解释为有效改进|QMD78–79|
+|本次复用限制|同48期纯基线；保持原Top1单选和Top2双选；37组条件及37个等投入对照|存在比原放宽方案收益更高且回撤更低的观察点；U2/P4在前后半段均盈利|QMD80及本报告|
+
+这些阶段不能合并成同一统计样本。40期与48期的模型、预算及构造规则不同；
+同一期中的多组、基本票和随机种子也不构成独立比赛或独立期次。
+旧报告中的 TRAINING/VALIDATION/TEST 是原分区名称，规则反复比较后都已暴露。
+本报告不将后24期改称新的测试集。
+
+## 当前比较的共同合同
+
+固定 N=7、每组两场单选与五场双选，共32张不同基本票，每张2元，每组64元。
+每期预算1,024元，最多16组，未使用部分留现金；起始本金100,000元。
+不使用专家或比分保护，不改变已有模型概率，不根据最终SP选场。
+纯基线概率来自保存的主客历史比分分布，再投射到北单让球胜平负；它不是直接照抄平均欧赔。
+市场概率来自欧赔和大小球映射，但本轮选组依据纯基线Top2覆盖概率。
+结算沿用已验收的R/SQLite来源审计，0.65在每张命中基本票的七场SP乘积后只计算一次。
+
+U表示同一场最多进入几组七场复式，P表示任意两组最多共有几场。
+U不是基本票中的出现次数：每组内同一场会随32张基本票重复，不能拿这个次数代替组间复用。
+37个条件为U∈{2,3,4,6,8,16}与P∈{1,2,3,4,5,6}的36种组合，另加U1/P0。
+先保留原不重叠组，再在同一有限候选池中按原概率顺序添加满足限制的组。
+U16/P6等同原放宽方案，U2/P2等同原严格方案；七场集合不能完全重复。
+顺序贪心存在路径依赖，放宽一个限制不保证最终组数单调增加，也不代表穷尽所有七场组合。
+
+## 收益、投入和最大回撤
+
+```{r}
+featured |> select(label,stake_cny,cash_cny,net_cny,budget_ROI_percent,
+                    stake_ROI_percent,max_drawdown_cny,groups,hits,profitable_issues) |>
+  knitr::kable(digits=2)
+```
+
+预算收益率＝净收益÷49,152元；投注收益率＝净收益÷实际投入。
+现金不是盈利，减少投入也不能单独证明选组更好。
+回撤为按期结算后账户资金相对于此前峰值的下降。
+各策略独立账户，不追加本金；假定本期结算完再进入下一期。
+未模拟跨期比赛重叠占款、奖金封顶、税费或取整。
+
+```{r}
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 11
+#| fig-height: 6
+shown <- comparison$curves |>
+  filter(kind=='CAPPED',policy %in% c('U16_P6_CAPPED','U6_P5_CAPPED','U6_P4_CAPPED','U2_P4_CAPPED')) |>
+  left_join(labels,by='policy',relationship='many-to-one') |>
+  mutate(model='同48期纯基线／各自预算1,024元')
+plot_strategy_equity(shown,'funded',100000)+
+  labs(title='复用限制改变后的资金走势',subtitle='回顾诊断；没有新增投入或比分保护')
+```
+
+## 低回撤是否只是因为少买了
+
+每个受限方案当期买K组，等投入对照便保留原放宽方案的前K组；两者当期实际投入严格相同。
+对照不重排、不加倍，也不宣称是等投入方案中的最优配置。
+
+```{r}
+featured |> select(label,net_vs_same_stake,drawdown_vs_same_stake,
+                   without_best_net,best_issue,first24_net,last24_net,longest_losing_run) |>
+  knitr::kable(digits=2)
+```
+
+U2/P4相对等投入原方案多赚2,771.09元、最大回撤减少2,447.62元，说明改善不完全由现金解释。
+它的前24期净收益10,014.26元、后24期5,522.64元；剔除自身最大盈利期仍有10,648.40元。
+U6/P5的总收益最高，但后24期净亏3,090.04元；U6/P4后24期净亏5,360.97元。
+因此总收益冠军与较低回撤、较均衡分段表现并不是同一个条件。
+各方案剔除的最大盈利期可能不同，这项指标不能代替剔除同一期的配对增益检查。
+
+## 为什么复用限制值得研究
+
+一场被多组复用时，该场落空会同时击穿多组。限制U可以降低这种共同失效的暴露；
+限制P可以控制任意两组的共享场次，但只限制P仍可能允许同一强势单选散布在很多组中。
+两种限制作用不同，必须一起看。
+
+这是结构上的解释，不是对本次收益提升的完整因果归因。
+限制也会改变选组路径和入选比赛，可能迫使策略纳入较低概率的组合；过严限制又会留出大量现金。
+实际例子是U2/P2净收益7,467.28元、回撤6,527.71元，而U2/P4分别为15,536.90元和3,747.41元。
+限制越严并不必然越稳；放宽到U2/P6则净亏139.00元。
+37组事后比较存在选择偏差，不能用孤立峰值拟合一条“越大越好”的规律。
+
+## 原合同验收矩阵与收尾边界
+
+|原合同要求|当前证据|验收状态|
+|---|---|---|
+|r=0/1/2/3与压缩、重复、质量、并集、随机对照|QMD69完整114策略×40期矩阵；随机种子全部报告|回顾实验完成|
+|压缩保留率、熵、让球、分歧与命中分层|QMD69分层表；QMD70单因素／交互检查|回顾描述完成，未证明稳定规律|
+|实际票据、重复合并、共享事件并集概率、持仓集中度|QMD69–70及独立语义检查器；本轮3,552计划重放|已验证相应历史工件|
+|同额资金、回撤、尾部集中与现金影响|QMD69风险表；QMD76模型对照；QMD80等投入、分段及最大期剔除|回顾会计完成；单年度无法给出有效剔除最大年份检验|
+|QMD、可复用函数、测试与报告|本报告及QMD69–80；函数在r/和src/；CI可重放归档|本地通过；远端状态须按提交另行核验|
+|严格赛前可用数据、逐期cutoff学习、跨cutoff排除与完整可重放收据|当前是旧历史输入及时间代理；已有显式cutoff／哈希不等于实际可用性证明|未完成原合同因果验收|
+|开发期内定规则，跨年份转移、剔除最大年份、独立确认|本批2010年且已经暴露；48期最优只能生成后续候选|未完成|
+
+**PI结论：接受本阶段回顾分析交付，保留#419的完整验收为未完成。**
+不能授予 COMPRESSION_BREADTH_SIGNAL：尚无满足合同的跨期因果转移证据。
+同样不能把未验证直接归为 NO_USEFUL_EXCHANGE，或因历史高收益就忽略时序缺口。
+剩余验收已整理为 [#421](https://github.com/algotradinglife/beijing-lot/issues/421)。
+拟将其关联为#419的原生子任务和阻塞项；该图变更被自动审批拒绝，当前尚未建立，不能将本报告的链接当作原生关系。
+完成验收并核实原生图后再复核#419的关闭条件；不修改#210/#218或生产策略。
+
+下一阶段应先验证实际来源和标签可用时间，复用`src/temporal_learning`逐期cutoff与收据；
+将本报告的原方案、U2/P4、U6/P4、U6/P5作为明确的历史候选，而非重新在目标期选择最优。
+开发窗口内完成规则选择后封存，目标结算仅用于评分；如使用已经看过的跨年份数据，仍须注明历史转移诊断。
+评估继续保留同预算／同实际投入对照、命中与资金路径、最大盈利期和年份剔除、5/10/20期亏损窗口、
+回撤与恢复、持仓与返奖集中度，不仅比较ROI。
+
+## 可复现输入与逐期结果
+
+```{r}
+tibble(scope=verified$result$scope,
+       plan_freeze_seal=verified$result$upstream_freeze_seal,
+       result_sha256=verified$receipt$result_sha256,
+       archived_report=params$archived_report,
+       issues=n_distinct(rows$issue),conditions=nrow(s),plans=nrow(rows)) |>
+  knitr::kable()
+```
+
+上游结果由封存收据绑定。本报告复用既有读取、汇总、资金曲线函数，没有新增学习或选组实现。
+归档模式只重放报告，不能宣称重做了采集、概率拟合或前瞻验证。
+原始方案完整重放使用各自原提交和输入；实现升级导致哈希不同，不应改写旧收据。
+
+```{r}
+rows |> filter(kind=='CAPPED',policy %in% labels$policy) |>
+  left_join(labels,by='policy',relationship='many-to-one') |>
+  mutate(budget_ROI_percent=100*net/budget_cny,
+         stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_)) |>
+  arrange(issue,policy) |>
+  select(issue,label,stake,cash_cny,groups,hits,net,budget_ROI_percent,stake_ROI_percent) |>
+  knitr::kable(digits=2)
+```
+
+全部37组及其等投入对照见[QMD80](80_reuse_cap_grid.qmd)。
+历史来源与复现命令见[收尾分析文档](../docs/research/issue419_synthesis.md)。

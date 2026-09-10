@@ -70,6 +70,18 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
+### #419 compression/breadth evidence update
+
+[The stage synthesis](issue419_synthesis.md) and
+[executable QMD81](../../quarto/81_issue419_synthesis.qmd) consolidate the exposed
+40-issue depth/breadth matrix and the later 48-issue pure-baseline variants.
+The fixed reuse-cap grid identifies U2/P4 as a lower-drawdown historical candidate
+and U6/P5 as the highest-profit observed cell; neither is promoted to a default.
+The original strictly-prior, cross-year acceptance remains incomplete. Native
+Issue Graph acceptance work must be resolved before #419 can close; this note
+does not change Project or Milestone status. See the synthesis acceptance matrix
+for source-availability, cutoff replay, transfer-year and tail-risk requirements.
+
 Updated: **2026-08-26 (#400 corrected-N7 2025–2026 variant atlas completed)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
