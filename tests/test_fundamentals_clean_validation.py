@@ -48,7 +48,10 @@ def test_clean_market_gates_and_clock(sample):
   bad=copy.deepcopy(m);next(r for r in bad if r['market']==market)['quote_identity_status']='QUARANTINED_WRONG_TEAM_ID'
   assert clean_validation_market(p,bad,**kw)['rows'][0]['status']=='QUARANTINED_IDENTITY'
  bad=copy.deepcopy(m);bad[1]['parsed']['changes'].append(dict(bad[1]['parsed']['changes'][0],quote_id='1/C',line=3))
- assert clean_validation_market(p,bad,**kw)['rows'][0]['status']=='QUOTE_CLOCK_CONFLICT'
+ z=clean_validation_market(p,bad,**kw)
+ assert z['rows'][0]['status']=='READY'
+ assert z['selected'][0]['quote_id']=='0/C'
+ assert z['receipts'][0]['total']['policy']['tie_ledger']
  bad=copy.deepcopy(m);bad[0]['parsed']['quotes'][0]['quoted_at']=c['1']
  assert clean_validation_market(p,bad,**kw)['rows'][0]['status']=='NO_PRIOR_QUOTES'
  bad=copy.deepcopy(m);bad[1]['parsed']['home_team_id']='X'

@@ -1,0 +1,119 @@
+---
+title: "补齐数据后：压一场与压两场的全部变种"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/new48-expanded-comparison-v1"
+  archived_report: false
+---
+
+比较同一批100402–100607共48期、72个既有策略。**目标赛果已被查看，本轮是补齐输入后的回顾诊断，不是新的独立测试。**
+冻结让平专家1.1.0、高净球专家0.1.0，权重各0.5；没有重新训练、改阈值或增加预算。
+每期预算1024元、基本票2元、票级返奖系数0.65只计算一次，无比分保护。
+
+本次可用数据增加包含已确认的盘口选择规则调整：同公司同一分钟报价取页面数值行序最前一条
+（页面按新到旧排列的假设）；超出比赛锚点前后31天的有效报价不参与选择，但保留原始数据和排除记录。
+历史时间戳仍是诊断代理，不能视为已证明的赛前可获得性。主源仍为Titan。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+source('r/fundamentals_repeated_double.R')
+source('r/fundamentals_expanded_comparison.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+stopifnot(identical(result$freeze_seal,frozen$seal),
+ frozen$receipt$scope=='UPDATED_INPUTS_POST_EXPOSURE_RETROSPECTIVE')
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$implementation$files,
+ frozen$receipt$report_files)
+if(isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY')
+ bindings <- archive$hashes
+ cat('归档只重放已验收报告，不代表模型、原始页面或SQLite全链重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+before <- tibble::as_tibble(result$before)
+after <- tibble::as_tibble(result$rows)
+stopifnot(nrow(before)==3456,nrow(after)==3456,n_distinct(after$issue)==48,n_distinct(after$policy)==72)
+comparison <- expanded_variant_comparison(before,after,frozen$receipt$initial_capital_cny)
+s <- comparison$summary
+```
+
+## 数据与可比范围
+
+财务汇总只使用前后两版、所有策略均可结算的共同期次；未完成期仍在逐期表中展示，不当作亏损或零收益。
+未投注期持有现金计入预算分母。新增可用场次会改变排序、分组和单选角色，所以这是全量重跑，不能解释成只追加新增场次。
+
+```{r}
+readiness <- bind_rows(mutate(tibble::as_tibble(result$readiness_before),version='BEFORE'),
+ mutate(tibble::as_tibble(result$readiness_after),version='AFTER'))
+coverage <- readiness |> group_by(version,issue) |> summarise(fixtures=n(),ready=sum(ready),.groups='drop')
+coverage |> group_by(version) |> summarise(issues=n(),fixtures=sum(fixtures),ready=sum(ready),
+ issues_with_seven=sum(ready>=7),.groups='drop') |> knitr::kable()
+cat('财务共同可比期数：',length(comparison$common_issues),'；生成时间：',frozen$receipt$generated_at,'\n')
+comparison$scope |> group_by(partition) |> summarise(pending_results=sum(pending),cash_results=sum(no_bet),.groups='drop') |> knitr::kable()
+coverage |> tidyr::pivot_wider(names_from=version,values_from=c(fixtures,ready)) |> arrange(issue) |> knitr::kable()
+```
+
+## 规则说明
+
+每组固定七场。D1压一场为单选、其余六场双选，每组128元；D2压两场、其余五场双选，每组64元。
+TOP2按原双选覆盖概率优选分组；COMPRESSED按实际压缩后的组概率优选。
+STRICT要求每场最多两组且任意两组最多重叠两场；FREE放开这两项限制，但不重复同一七场集合。
+先保留既有不重叠分组再扩组，余款持有现金。
+
+BASE不替换；GAP02/05/10只在第二、第三方向概率差不超过2/5/10个百分点时替换；ALL无条件替换。
+TAIL05要求市场对模型第三方向的支持比第二方向高至少5个百分点；TV10/15/20另外要求两分布总变差距离至少0.10/0.15/0.20。
+替换仅针对后续重叠双选：保留最高方向，将第二方向改成第三方向；单选不变。
+市场概率来自赛前欧赔＋大小球映射的比分分布，再投影到同一北单让球胜平负。
+
+## 压一场：36种组合
+
+预算回报率=净收益/全部可比期预算；投注回报率=净收益/实际投入。最大回撤按期末结算净收益计算，初始资金10万元。
+这不是期内按比赛时间计算的回撤。前版与新版均使用相同的可比期次。
+
+```{r}
+s |> filter(depth==1) |> arrange(quality,overlap,rule) |>
+ select(case,rule,stake_cny,cash_cny,net_cny,budget_ROI_percent,stake_ROI_percent,max_drawdown_cny,
+ winning_groups,groups,before_net_cny,before_budget_ROI_percent,net_change) |> knitr::kable(digits=2)
+```
+
+## 压两场：36种组合
+
+```{r}
+s |> filter(depth==2) |> arrange(quality,overlap,rule) |>
+ select(case,rule,stake_cny,cash_cny,net_cny,budget_ROI_percent,stake_ROI_percent,max_drawdown_cny,
+ winning_groups,groups,before_net_cny,before_budget_ROI_percent,net_change) |> knitr::kable(digits=2)
+```
+
+## 收益集中度与变化
+
+ex_largest_net是去掉本策略最大净收益期后的合计净收益；ex_largest_lift是相对同组BASE的改善，去掉改善最大期后的剩余改善。
+这些是描述性敏感性检查，不据此重新选择阈值或推广赢家。
+
+```{r}
+s |> group_by(depth) |> summarise(variants=n(),positive=sum(net_cny>0),
+ positive_after_largest_removed=sum(ex_largest_net>0),.groups='drop') |> knitr::kable()
+s |> arrange(depth,quality,overlap,rule) |>
+ select(case,rule,net_cny,ex_largest_issue,ex_largest_net,matched_lift,ex_largest_lift_issue,ex_largest_lift,
+ max_drawdown_cny,before_max_drawdown_cny,winning_groups,before_winning_groups) |> knitr::kable(digits=2)
+```
+
+## 每期全部表现
+
+```{r}
+periods <- comparison$periods |> mutate(budget_ROI_percent=100*net_after/budget_cny_after,
+ before_budget_ROI_percent=100*net_before/budget_cny_before)
+glimpse(periods)
+periods |> arrange(issue,depth,quality,overlap,rule) |>
+ select(issue,case,rule,status_after,groups_after,hits_after,stake_after,cash_cny_after,net_after,
+ budget_ROI_percent,net_before,before_budget_ROI_percent,net_change) |> knitr::kable(digits=2)
+```
+
+输入及实现哈希在报告目录的`plans-frozen.json`中；前版来自已发布的报告归档，新版来自独立重放检查通过的计划与结算。
+新旧报告共享的BASE/GAP02/GAP05先核对逐字段一致再去重，因此不会重复计算对照组。
