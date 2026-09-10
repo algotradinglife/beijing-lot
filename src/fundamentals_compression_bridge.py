@@ -47,12 +47,16 @@ def bridge_surface(frame, pool, references, *, cutoffs, depth):
 
 
 def bridge_plan(frame, surface, design, reference, *, cutoffs, preserve_prefix, quality,
-                overlap, cash_policy, budget_cny, unit_cny, payout_factor):
+                overlap, cash_policy, budget_cny, unit_cny, payout_factor,
+                max_uses=None, max_pair_overlap=None):
     """Create complete tickets for one fixed factorial cell, without labels.
 
-    preserve_prefix bool; quality TOP2/COMPRESSED; overlap STRICT/FREE;
+    preserve_prefix bool; quality TOP2/COMPRESSED; overlap STRICT/FREE/CAPPED;
     cash_policy HOLD/REPEAT_BEST. STRICT limits fixture reuse2 and pair overlap2.
     FREE still forbids duplicate seven-fixture sets before funding. Remaining
+    CAPPED requires explicit max_uses (positive integer) and max_pair_overlap
+    (integer0..6); both caps include the preserved disjoint prefix. Other modes
+    reject cap arguments. Candidate pool and probability order are unchanged.
     cash under REPEAT_BEST buys complete extra units of the highest compressed
     probability selected group; original group choices never change with cash.
     Budget must match reference; CNY2 units, single ticket-level0.65 explicit.
@@ -67,8 +71,16 @@ def bridge_plan(frame, surface, design, reference, *, cutoffs, preserve_prefix, 
         raise ValueError('Original input/cutoff identity required')
     if surface['pool']['reference_seals'][str(surface['depth'])] != reference['seal']:
         raise ValueError('Original reference required')
-    if type(preserve_prefix) is not bool or quality not in ('TOP2','COMPRESSED') or overlap not in ('STRICT','FREE') or cash_policy not in ('HOLD','REPEAT_BEST'):
+    if type(preserve_prefix) is not bool or quality not in ('TOP2','COMPRESSED') or overlap not in ('STRICT','FREE','CAPPED') or cash_policy not in ('HOLD','REPEAT_BEST'):
         raise ValueError('Explicit fixed factors required')
+    if overlap=='CAPPED':
+        if type(max_uses) is not int or max_uses<1 or type(max_pair_overlap) is not int or not 0<=max_pair_overlap<=6:
+            raise ValueError('Positive reuse cap and pair-overlap cap0..6 required')
+        if cash_policy!='HOLD':raise ValueError('Capped comparison requires HOLD cash policy')
+        use_cap,pair_cap=max_uses,max_pair_overlap
+    else:
+        if max_uses is not None or max_pair_overlap is not None:raise ValueError('Caps require explicit CAPPED mode')
+        use_cap,pair_cap=(2,2) if overlap=='STRICT' else (None,None)
     if type(budget_cny) is not int or budget_cny != reference['budget_cny'] or unit_cny != 2 or payout_factor != .65:
         raise ValueError('Matched budget, CNY2 and once-only0.65 required')
     candidates = surface['pool']['groups']; count = len(candidates); depth = surface['depth']; cost = unit_cny*2**(7-depth)
@@ -80,11 +92,13 @@ def bridge_plan(frame, surface, design, reference, *, cutoffs, preserve_prefix, 
     selected = list(surface['prefix']) if preserve_prefix else []
     if len(selected)>budget_cny//cost:raise ValueError('Prefix exceeds budget')
     uses = Counter(i for g in selected for i in candidates[g]); sets = [set(candidates[g]) for g in selected]
+    if use_cap is not None and (any(n>use_cap for n in uses.values()) or any(len(a&b)>pair_cap for a,b in itertools.combinations(sets,2))):
+        raise ValueError('Preserved prefix violates requested caps')
     for i in order:
         if len(selected)==budget_cny//cost:break
         if i in selected:continue
         group = set(candidates[i])
-        if overlap=='STRICT' and (any(uses[j]>=2 for j in group) or any(len(group&s)>2 for s in sets)):continue
+        if use_cap is not None and (any(uses[j]>=use_cap for j in group) or any(len(group&s)>pair_cap for s in sets)):continue
         selected.append(i); sets.append(group); uses.update(group)
     units = [1]*len(selected); cash = budget_cny-len(selected)*cost
     if cash_policy=='REPEAT_BEST' and selected:
@@ -109,6 +123,9 @@ def bridge_plan(frame, surface, design, reference, *, cutoffs, preserve_prefix, 
         design_receipt={k:v for k,v in design.items() if k!='hits'},parent_seal=reference['seal'],
         factors=dict(preserve_prefix=preserve_prefix,quality=quality,overlap=overlap,cash_policy=cash_policy),
         model_proxy_gross=unit_cny*payout_factor*sum(u*surface['value_factor'][i] for i,u in zip(selected,units)))
+    if overlap=='CAPPED':
+        plan['factors'].update(max_uses=max_uses,max_pair_overlap=max_pair_overlap)
+        plan.update(max_uses=max_uses,max_pair_overlap=max_pair_overlap)
     return dict(**plan,seal=stable_json_hash(plan))
 
 

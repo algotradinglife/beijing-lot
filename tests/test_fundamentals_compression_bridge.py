@@ -70,3 +70,29 @@ def test_identity_failures(data):
     with pytest.raises(ValueError):bind_bridge_reference(refs[2],s,design,cutoffs=c)
     changed=f.copy();changed['p_W']+=.01;changed['p_D']-=.01
     with pytest.raises(ValueError):bridge_plan(changed,s,design,refs[1],**kwargs)
+
+
+def test_explicit_caps_match_endpoints_and_respect_all_constraints(data):
+    f,c,refs,pool=data;s=bridge_surface(f,pool,refs,cutoffs=c,depth=2)
+    design=breadth_scenarios(f,s,cutoffs=c,seed=41901,draws=128)
+    kw=dict(cutoffs=c,preserve_prefix=True,quality='TOP2',cash_policy='HOLD',budget_cny=512,unit_cny=2,payout_factor=.65)
+    for uses,pair in [(1,0),(2,1),(2,2),(3,3),(4,4),(6,5),(8,6)]:
+        plan=bridge_plan(f,s,design,refs[2],overlap='CAPPED',max_uses=uses,max_pair_overlap=pair,**kw)
+        groups=[{l['slot'] for l in plan['legs'] if l['group']==g} for g in range(1,plan['groups']+1)]
+        assert max(Counter(i for g in groups for i in g).values())<=uses
+        assert all(len(a&b)<=pair for a,b in itertools.combinations(groups,2))
+        assert plan['selected_candidates'][:len(s['prefix'])]==s['prefix']
+        assert plan['stake']+plan['cash_cny']==512
+        for g in range(1,plan['groups']+1):
+            legs=[l for l in plan['legs'] if l['group']==g];ts=[t for t in plan['tickets'] if t['group']==g]
+            assert sorted(len(l['support']) for l in legs)==[1,1,2,2,2,2,2]
+            assert len(ts)==32 and {t['code'] for t in ts}=={''.join(z) for z in itertools.product(*(l['support'] for l in legs))}
+        if (uses,pair) in [(2,2),(8,6)]:
+            old=bridge_plan(f,s,design,refs[2],overlap='STRICT' if uses==2 else 'FREE',**kw)
+            for key in ['legs','tickets','selected_candidates','stake','cash_cny']:assert plan[key]==old[key]
+    for uses,pair in [(0,2),(True,2),(2,-1),(2,7),(2,1.5),(2,True),(None,None)]:
+        with pytest.raises(ValueError):bridge_plan(f,s,design,refs[2],overlap='CAPPED',max_uses=uses,max_pair_overlap=pair,**kw)
+    with pytest.raises(ValueError):bridge_plan(f,s,design,refs[2],overlap='FREE',max_uses=2,max_pair_overlap=2,**kw)
+    with pytest.raises(ValueError):bridge_plan(f,s,design,refs[2],overlap='CAPPED',max_uses=2,max_pair_overlap=2,**dict(kw,cash_policy='REPEAT_BEST'))
+    earlier={k:Cutoff.decision_epoch('100101','2009-01-01T00:00:00Z') for k in c}
+    with pytest.raises(ValueError):bridge_plan(f,s,design,refs[2],overlap='CAPPED',max_uses=2,max_pair_overlap=2,**dict(kw,cutoffs=earlier))

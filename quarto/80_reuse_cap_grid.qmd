@@ -1,0 +1,100 @@
+---
+title: "纯基线压两场：复用次数与组间重叠上限"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/reuse-cap-grid-v1"
+  archived_report: false
+---
+
+固定100402–100607共48期的纯基线概率、同一候选组池和排序，压两场、双选不替换，
+不使用专家或比分保护。初始本金100,000元，每期预算1,024元，每组64元，余款留现金。
+每个策略是独立账户，每期先结算再进入下一期，未模拟跨期比赛重叠的资金占用。
+
+预先固定37个条件：单场上限U为2、3、4、6、8、16，组间重叠上限P为1至6，
+另加U1/P0完全不重叠。先保留原有不重叠组，再按原双选覆盖概率排序扩组。
+U16/P6等同原放宽方案（最多16组且七场集合不能完全重复），U2/P2等同原严格方案。
+这是固定候选池中的顺序选组，不能声称找到所有可能组合的全局最优。
+
+**所有条件均是已暴露48期上的回顾比较。** 本轮没有概率模型训练、阈值拟合或自动部署。
+“非劣边界”只表示在本批结果中，没有另一个条件同时收益不低、回撤不高且至少一项更好。
+前24期／后24期均已查看过赛果，不是独立训练／测试划分。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_reuse_caps.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows)
+stopifnot(nrow(rows)==3552,n_distinct(rows$issue)==48)
+comparison <- reuse_cap_summary(rows,100000)
+s <- comparison$summary |> filter(kind=='CAPPED')
+stopifnot(nrow(s)==37)
+```
+
+## 全部条件：收益及现金
+
+```{r}
+s |> arrange(max_uses,max_pair_overlap) |>
+ select(max_uses,max_pair_overlap,stake_cny,cash_cny,net_cny,budget_ROI_percent,stake_ROI_percent,
+ max_drawdown_cny,groups,hits,profitable_issues) |> knitr::kable(digits=2)
+```
+
+预算收益率分母为48×1,024＝49,152元，投注收益率分母为实际投入。
+较小回撤可能只是少下注，因此同时生成原放宽方案的“等投入对照”：
+若某条件当期能买K组，对照只保留原方案的前K组，金额完全相同。
+这比较的是本次排序下的组合构成差异，不代表所有等投入配置的最优结果。
+
+## 收益与最大回撤
+
+```{r}
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 11
+#| fig-height: 7
+ggplot(s,aes(max_drawdown_cny,net_cny,colour=factor(max_uses)))+
+ geom_point(aes(size=stake_cny),alpha=.8)+
+ geom_text(data=filter(s,non_dominated),aes(label=paste0('U',max_uses,'/P',max_pair_overlap)),
+ vjust=-.8,show.legend=FALSE)+
+ labs(x='最大回撤（元）',y='净收益（元）',colour='单场复用上限',size='总实际投入',
+ title='固定37个条件的收益—回撤关系',subtitle='标注仅为本样本的非劣条件，不代表前瞻最优')+
+ theme_minimal(base_family='Noto Sans CJK SC')
+```
+
+```{r}
+s |> filter(non_dominated) |> arrange(max_drawdown_cny) |>
+ select(max_uses,max_pair_overlap,net_cny,budget_ROI_percent,max_drawdown_cny,net_per_drawdown,
+ stake_cny,net_vs_same_stake,drawdown_vs_same_stake,without_best_net,first24_net,last24_net) |>
+ knitr::kable(digits=2)
+```
+
+## 等投入对照与尾部检查
+
+净收益差＝受限方案−同投入原方案；回撤差为负代表受限方案回撤更小。
+剔除最大盈利期是每个方案各自剔除，不能据此直接归因方案之间的收益差。
+
+```{r}
+s |> arrange(max_uses,max_pair_overlap) |>
+ select(max_uses,max_pair_overlap,net_vs_same_stake,drawdown_vs_same_stake,without_best_net,
+ best_issue,first24_net,last24_net,longest_losing_run,worst_5_loss) |> knitr::kable(digits=2)
+```
+
+## 逐期结果
+
+```{r}
+rows |> filter(kind=='CAPPED') |> arrange(issue,max_uses,max_pair_overlap) |>
+ select(issue,max_uses,max_pair_overlap,stake,cash_cny,groups,hits,net) |> knitr::kable(digits=2)
+```
+
+选组直接扩展已有`bridge_plan`的CAPPED模式，无第二套候选排序或票级结算实现。
+函数与测试对应：`bridge_plan`由`tests/test_fundamentals_compression_bridge.py`覆盖；
+`reuse_cap_summary`由`tests/testthat/test-fundamentals-reuse-caps.R`覆盖。
+新建计划、结算、报告字节及源码哈希见冻结收据。原方案作为已封存历史证据输入，
+本轮逐期验证FREE端点与其完整计划一致。旧研究若因实现升级无法在当前代码全链重放，
+应使用其原提交或归档报告；不得修改旧收据。历史源时间代理仍不构成前瞻可用性证明。
