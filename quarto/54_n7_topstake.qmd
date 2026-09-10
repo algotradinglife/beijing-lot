@@ -1,0 +1,77 @@
+---
+title: "最高概率七串一组加倍：收益与回撤"
+format: html
+params:
+  study: data/derived/fundamentals_417/n7-topstake-v1
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+保留原48期的概率优选、集中七串一双选，每期最多6组，不增加新组合或比分保护。
+以七场双选覆盖概率的乘积选最高概率组；同概率时取最小组号。BASE所有组单倍，
+TOP2只把最高概率组买两倍，TOP3买三倍。该组128个基本组合全部等倍，不挑单个赛果。
+每提高一倍多投入256元，有组的一期最高投入分别1536、1792、2048元；没有完整组则不投入。
+
+加倍不增加独立组合数、命中组数或中票期数，只改变回款与亏损。
+最高概率组的单倍回报由TOP2减BASE计算，与后续结算无关的选择先冻结。
+0.65在每张中奖基本票只乘一次，理论税前值。保持原生逐场cutoff，整期组合不保证
+在同一个赛前时点可执行；全部历史已暴露，仅作为回顾诊断，不重新训练或晋升策略。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_n7_baseline.R')
+source('r/fundamentals_n7_twocover.R')
+source('r/fundamentals_n7_topstake.R')
+y <- n7_topstake_report(params$study,getwd())
+```
+
+## 收益与回撤
+
+最大回撤以按期累计净收益从前高回落的元数表示，包括初始零点；没有假设初始本金，
+因此不将其冒充账户回撤百分比。最长未盈利期数包含持平，不等于最长水下期。
+至少中一组不代表当期盈利。各方案投入不同，需同时观察独立最高概率组的边际ROI。最长水下期按期末累计净收益严格低于此前前高的连续期数计算，恢复到前高即结束，包含末尾未恢复区间。
+
+```{r}
+y$summary |> filter(partition=='ALL') |> mutate(ROI百分比=100*roi) |>
+  select(strategy,issues,stake,net,ROI百分比,max_drawdown_cny,longest_nonprofitable_run,
+         longest_underwater_periods,worst_issue_net,any_hit_issues,profitable_issues,group_hits,groups) |> knitr::kable(digits=2)
+```
+
+## 最高概率组的独立表现
+
+```{r}
+y$top_summary |> mutate(命中率百分比=100*hit_rate,ROI百分比=100*roi,
+  模型平均概率百分比=100*mean_model_probability) |> knitr::kable(digits=2)
+y$top_per_issue |> mutate(ROI百分比=100*roi) |>
+  select(issue,status,top_group,top_probability,stake,gross,net,ROI百分比,hit) |> knitr::kable(digits=2)
+```
+
+## 分段与每期
+
+前32期和后16期均已暴露；分段只是稳定性诊断，不称为新测试集。
+
+```{r}
+y$summary |> filter(partition!='ALL') |> mutate(ROI百分比=100*roi) |> knitr::kable(digits=2)
+y$per_issue |> arrange(issue,strategy) |> mutate(ROI百分比=100*roi) |>
+  select(issue,strategy,status,groups,hits,stake,net,ROI百分比) |> knitr::kable(digits=2)
+```
+
+## 数据与复现
+
+缺失结算保留未知，同期任一方案待结算则整期不纳入共同汇总，不将其视为零收益。
+
+```{r}
+y$common_issues |> count(ready) |> knitr::kable()
+str(jsonlite::read_json(file.path(params$study,'contract.json')),max.level=1)
+sessionInfo()
+```
+
+在配置好的R/Python环境，从仓库根目录运行，输出应为新目录：
+
+```bash
+PYTHONPATH=. "$RETICULATE_PYTHON" scripts/run_fundamentals_n7_topstake.py --output "$STUDY"
+Rscript scripts/settle_fundamentals_n7_topstake.R "$STUDY" "$DB_PATH" "$RETICULATE_PYTHON"
+quarto render quarto/54_n7_topstake.qmd --execute-dir . --execute --no-cache -P study:"$STUDY"
+```

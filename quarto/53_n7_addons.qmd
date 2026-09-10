@@ -1,0 +1,80 @@
+---
+title: "概率集中七串一：增加一组或两组"
+format: html
+params:
+  study: data/derived/fundamentals_417/n7-addons-v2
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+沿用原48期归档比分概率投射的北单让球胜平负分布，固定双选，不加比分保护。
+BASE按双选覆盖概率排序，每连续7场集中成组，最多6组。ADD1保留BASE增加一组；
+ADD2保留ADD1再加一组，每组128个基本组合，每注2元，增加256元。
+
+新增组从该期全部可用场次中优选，与任何已有组最多重叠3场，每场最多进入2组。
+以各场双选概率乘积为目标，使用SciPy/HiGHS整数优化；第二组是在第一组已固定的条件下
+优选，并非联合搜索两组的全局最优。无可行组合则不加注，求解未证明最优则报错。
+每期原方案完全不变；不依据结算调整选择。最多投入2048元（6+2组）。
+
+0.65在每张中奖基本票只乘一次，收益为理论税前值。所有历史已暴露，原生逐场cutoff
+保持不变，但不保证整期组合可在同一赛前时点执行，仅作回顾诊断，不晋升策略。
+组合共用比赛，联合概率使用容斥处理重复事件，仍假设比赛之间独立。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_n7_baseline.R')
+source('r/fundamentals_n7_twocover.R')
+y <- n7_twocover_report(params$study,getwd())
+```
+
+## 收益与回撤
+
+最大回撤以按期累计净收益从前高回落的元数表示，包括初始零点；没有假设初始本金，
+因此不将其冒充账户回撤百分比。最长未盈利期数包含持平，不等于最长水下期。
+至少中一组不代表当期盈利。新增方案投入不同，另列相对BASE的新增投入和净收益。
+
+```{r}
+y$summary |> filter(partition=='ALL') |> mutate(ROI百分比=100*roi) |>
+  select(strategy,issues,stake,net,ROI百分比,max_drawdown_cny,longest_nonprofitable_run,
+         worst_issue_net,any_hit_issues,profitable_issues,group_hits,groups) |> knitr::kable(digits=2)
+```
+
+## 新增投入的回报
+
+```{r}
+base <- y$summary |> filter(partition=='ALL',strategy=='BASE')
+y$summary |> filter(partition=='ALL',strategy!='BASE') |>
+  mutate(新增投入=stake-base$stake,新增净收益=net-base$net,
+         新增投入ROI百分比=100*新增净收益/新增投入) |>
+  select(strategy,新增投入,新增净收益,新增投入ROI百分比) |> knitr::kable(digits=2)
+```
+
+## 分段与每期
+
+前32期和后16期均已暴露；分段只是稳定性诊断，不称为新测试集。
+
+```{r}
+y$summary |> filter(partition!='ALL') |> mutate(ROI百分比=100*roi) |> knitr::kable(digits=2)
+y$per_issue |> arrange(issue,strategy) |> mutate(ROI百分比=100*roi) |>
+  select(issue,strategy,status,groups,hits,stake,net,ROI百分比) |> knitr::kable(digits=2)
+```
+
+## 数据与复现
+
+缺失结算保留未知，同期任一方案待结算则整期不纳入共同汇总，不将其视为零收益。
+
+```{r}
+y$common_issues |> count(ready) |> knitr::kable()
+str(jsonlite::read_json(file.path(params$study,'contract.json')),max.level=1)
+sessionInfo()
+```
+
+在配置好的R/Python环境，从仓库根目录运行，输出应为新目录：
+
+```bash
+PYTHONPATH=. "$RETICULATE_PYTHON" scripts/run_fundamentals_n7_addons.py --output "$STUDY"
+Rscript scripts/settle_fundamentals_n7_addons.R "$STUDY" "$DB_PATH" "$RETICULATE_PYTHON"
+quarto render quarto/53_n7_addons.qmd --execute-dir . --execute --no-cache -P study:"$STUDY"
+```

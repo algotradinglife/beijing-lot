@@ -1,0 +1,124 @@
+---
+title: "六串一与七串一叠加：收益和命中对照"
+format: html
+params:
+  study: data/derived/fundamentals_417/n67-overlay-v1
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 固定方案
+
+沿用比分模型投射到北单让球胜平负的概率，每场取最高两种方向，再按双选覆盖概率排序。
+七串一最多6组、六串一最多7组，各自最多使用前42场；不足时按能组成的完整组数购买。
+**每场最多进入一组六串一和一组七串一。**不加比分保护，不重新训练或改变概率。
+
+| strategy | 内容 |
+|---|---|
+| N7 | 只买七串一，按排名每连续7场组成一组 |
+| N6 | 只买六串一，按排名每连续6场组成一组 |
+| DIRECT | 直接叠加上述两套 |
+| CROSS | 七串一不变，同一批六串一比赛按排名轮流分配到各组 |
+
+42场时，CROSS的一组六串一分别从六组七串一各取一场，两种串关的任意两组最多共享一场。
+DIRECT则可能共享六场。交叉分组改变的是六串一的组合，入选比赛和每场双选保持不变。
+
+## 资金口径
+
+UNIT每个基本组合一注2元，六串一64注、每组128元；七串一128注、每组256元。
+42场时，直接或交叉叠加投入为 $7\times128+6\times256=2432$ 元。
+
+MATCHED四种策略都使用该期叠加方案的UNIT预算。完整支持先均分整数注，
+余注按事先固定的哈希顺序分配，种子417；不依据结果挑余注。倍数不增加组数或重复选场。
+若没有可投注组则保留现金，ROI以实际投入为分母。缺少结算的收益保留为空。
+
+还提供**理想等额分配净收益**：把该期一注式回款按实际投入比例缩放。
+它允许小数注，只用于识别整数余注的影响，不是可实际下单的方案。
+所有中奖基本注只乘一次0.65计奖系数，金额为理论税前值。
+
+## 历史和概率边界
+
+使用此前48期共同市场可用归档样本，保持原来的基线对照。全部历史已经暴露，
+每场保留原生决策时点，但整期组合不保证在同一时点可执行，因此仅作回顾诊断。
+前32期与后16期分别呈现，不进行本轮调参或自动晋升。
+
+联合命中概率按各比赛双选命中事件独立的假设，用容斥计算所有组的并集；
+交集中的共享比赛只计一次。它不是把六串一和七串一当作独立事件相乘，
+但仍依赖比赛间独立和模型概率准确，不保证实际命中率。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_n7_baseline.R')
+source('r/fundamentals_n67_overlay.R')
+y <- n67_overlay_report(params$study,getwd())
+```
+
+## 原始投入比较
+
+“至少命中一组的期数”不等于盈利期数；总命中组数可能包含同一期多组中奖。
+
+```{r}
+y$summary |> filter(partition=='ALL',funding=='UNIT') |>
+  mutate(ROI百分比=100*roi,至少命中一期比例=100*any_hit_issues/issues) |>
+  select(strategy,issues,stake,net,ROI百分比,group_hits,groups,any_hit_issues,至少命中一期比例,profitable_issues) |>
+  knitr::kable(digits=2)
+```
+
+## 同预算比较与整数分配影响
+
+必须同时观察实际整数下注和理想等额分配。单个固定种子的余注分配优势不能当作稳定的策略增量。
+
+```{r}
+y$summary |> filter(partition=='ALL',funding=='MATCHED') |>
+  mutate(实际ROI百分比=100*roi,理想等额ROI百分比=100*ideal_equal_net/stake) |>
+  select(strategy,stake,net,实际ROI百分比,ideal_equal_net,理想等额ROI百分比,any_hit_issues,profitable_issues) |>
+  knitr::kable(digits=2)
+```
+
+## 风险与命中概率
+
+最大回撤单位元，按从零开始的累计净收益计算；最长不盈利连期包含持平期。
+去最大回款期净收益是每个方案分别剔除自身回款最高一期，不是配对增量。
+
+```{r}
+y$summary |> filter(partition=='ALL') |>
+  mutate(模型平均联合命中率=100*mean_model_any_hit,实际至少中一组比例=100*any_hit_issues/issues) |>
+  select(strategy,funding,max_drawdown_cny,longest_nonprofitable_run,ex_largest_payout_net,
+         模型平均联合命中率,实际至少中一组比例) |> knitr::kable(digits=2)
+```
+
+## 分段结果
+
+```{r}
+y$summary |> filter(partition!='ALL') |> mutate(ROI百分比=100*roi) |>
+  select(partition,strategy,funding,issues,stake,net,ROI百分比,any_hit_issues,profitable_issues) |>
+  knitr::kable(digits=2)
+```
+
+## 每期收益、ROI与命中
+
+```{r}
+y$per_issue |> arrange(issue,funding,strategy) |> mutate(ROI百分比=100*roi,模型联合命中率=100*model_any_hit) |>
+  select(issue,strategy,funding,status,groups,n6_hits,n7_hits,budget,stake,cash,net,ROI百分比,模型联合命中率,max_pair_overlap) |>
+  knitr::kable(digits=2)
+```
+
+## 复现证据
+
+```{r}
+y$common_issues |> count(ready) |> knitr::kable()
+contract <- jsonlite::read_json(file.path(params$study,'contract.json'))
+str(contract,max.level=1)
+sessionInfo()
+```
+
+从仓库根目录执行，使用已配置的项目R依赖和Python，冻结目录必须是新目录：
+
+```bash
+PYTHONPATH=. "$RETICULATE_PYTHON" scripts/run_fundamentals_n67_overlay.py --output "$STUDY"
+Rscript scripts/settle_fundamentals_n67_overlay.R "$STUDY" "$DB_PATH" "$RETICULATE_PYTHON"
+python3 scripts/replay_n67_overlay.py "$STUDY"
+quarto render quarto/51_n67_overlay.qmd --execute-dir . --execute --no-cache -P study:"$STUDY"
+```

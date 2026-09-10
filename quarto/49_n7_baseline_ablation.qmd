@@ -1,0 +1,112 @@
+---
+title: "48期7串1：选场、覆盖与预算对照"
+format: html
+params:
+  study: data/derived/fundamentals_417/n7-baseline-ablation-v1
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 口径
+
+冻结基线比分概率，比较覆盖率选场（COVERAGE）与市场相对价值选场（VALUE）。
+每期最多六组，每组七场，组间比赛不重合，不加比分保护。
+市场概率由已归档欧赔与大小球映射；结算 SP 只用于事后计奖。
+
+本轮沿用历史研究的有限覆盖转移机制：C0E0 为七场双选、128注；
+C1E2 为一场单选、两场三选、四场双选、144注；
+C1E3 为一场单选、三场三选、三场双选、216注。
+UNIT 每注2元，每组分别256、288、432元；MATCHED 三种方案均每组432元，
+以整数注均分，余注按预先固定的哈希顺序分配。另报告理想等额分配净收益，检查余注影响。
+每张中奖彩票仅乘一次0.65计奖系数。
+
+这是已暴露历史数据的回顾诊断。每场使用原归档决策时点，但整期拼组未保证可在同一时点投注；
+不构成前瞻验证，也不据此自动晋升策略。前32期与后16期分别展示，后16期同样已被查看过。
+历史研究依据与限制见 [基线研究记录](48_baseline_research.qmd)。
+
+```{r}
+library(dplyr)
+library(tibble)
+source('r/fundamentals_n7_baseline.R')
+x <- jsonlite::read_json(file.path(params$study,'settlement.json'),simplifyVector=TRUE)
+stopifnot(identical(as.list(x$r_implementation),n7_baseline_r_receipt(getwd())))
+stopifnot(identical(x$plans_sha256,digest::digest(file=file.path(params$study,'plans.json'),algo='sha256')),
+          identical(x$inputs_sha256,digest::digest(file=file.path(params$study,'inputs.json'),algo='sha256')))
+training <- jsonlite::read_json('data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/contract.json')$training_issues
+y <- n7_baseline_summary(as_tibble(x$results),unlist(training),getwd())
+```
+
+## 全部48期
+
+提高命中组数并不必然改善收益。覆盖率选场的普通双选仍是本轮保留对照；
+C1E2与C1E3未显示收益增量。相对价值选场也未胜过覆盖率选场。
+以下ROI为净收益／实际投入。资金回撤以累计净收益计算，单位元，无假定初始资金。
+
+```{r}
+y$summary |> filter(partition=='ALL') |>
+  mutate(ROI百分比=round(100*roi,2)) |>
+  select(selector,shape,funding,issues,stake,net,ROI百分比,group_hits,groups,
+         max_drawdown_cny,ex_largest_payout_net,ideal_equal_net) |> knitr::kable(digits=2)
+```
+
+`ex_largest_payout_net`：每个方案各自去掉回款最高的一期后的净收益；
+不是配对增量检验。`ideal_equal_net`：允许小数注的理想等额分配敏感性，不是实际投注。
+
+## 同预算增量
+
+下表固定同一选场器、同一组数和每组432元，比较覆盖转移相对普通双选的变化。
+命中组数增量与净收益增量分别列出，避免将两者混为一谈。
+
+```{r}
+matched <- y$summary |> filter(partition=='ALL',funding=='MATCHED')
+control <- matched |> filter(shape=='C0E0') |>
+  select(selector,base_net=net,base_roi=roi,base_hits=group_hits,base_stake=stake)
+matched |> left_join(control,by='selector',relationship='many-to-one') |>
+  mutate(净收益增量=net-base_net,ROI增量百分点=100*(roi-base_roi),命中组数增量=group_hits-base_hits) |>
+  select(selector,shape,stake,base_stake,净收益增量,ROI增量百分点,命中组数增量) |>
+  knitr::kable(digits=2)
+```
+
+## 前32期与后16期
+
+```{r}
+y$summary |> filter(partition!='ALL') |> mutate(ROI百分比=100*roi) |>
+  select(partition,selector,shape,funding,issues,stake,net,ROI百分比,group_hits,
+         profitable_issues,longest_nonprofitable_run) |> knitr::kable(digits=2)
+```
+
+## 每期表现
+
+保留全部冻结方案及实际投入；如出现待核验或中奖彩票SP缺失，收益保持缺失，
+共同样本汇总排除整期，不将其计为亏损或零收益。
+
+```{r}
+y$per_issue |> arrange(issue,selector,funding,shape) |>
+  mutate(ROI百分比=100*roi) |>
+  select(issue,selector,shape,funding,status,groups,hits,stake,gross,net,ROI百分比) |>
+  knitr::kable(digits=2)
+```
+
+## 数据与可复现证据
+
+```{r}
+y$common_issues |> count(ready) |> knitr::kable()
+contract <- jsonlite::read_json(file.path(params$study,'contract.json'))
+str(contract,max.level=1)
+cat('Plans SHA256:',x$plans_sha256,'\nInputs SHA256:',x$inputs_sha256)
+sessionInfo()
+```
+
+原始计划、输入标识及结算审计保存在声明的 study 目录。计划先冻结，再由R调用
+SQLite查询接口读取结算；Python仅投射概率、构建组合并计奖。代码已通过最终Codex review：首轮两项P2问题已修复，第二轮无剩余可操作问题；数据重算和渲染由本地独立检查验证。
+
+复现命令（从仓库根目录执行，环境变量指向已配置的项目运行环境）：
+
+```bash
+# 新建输出目录；冻结命令拒绝覆盖已有计划。
+PYTHONPATH=. "$RETICULATE_PYTHON" scripts/run_fundamentals_n7_baseline.py --output "$STUDY"
+Rscript scripts/settle_fundamentals_n7_baseline.R "$STUDY" "$DB_PATH" "$RETICULATE_PYTHON"
+quarto render quarto/49_n7_baseline_ablation.qmd --execute-dir . --execute --no-cache -P study:"$STUDY"
+```

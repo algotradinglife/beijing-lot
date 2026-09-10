@@ -1,0 +1,70 @@
+---
+title: "概率集中七串一：每场最多两组"
+format: html
+params:
+  study: data/derived/fundamentals_417/n7-twocover-v1
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+采用原48期归档比分模型投射的北单让球胜平负概率，固定双选，不加比分保护。
+按双选覆盖概率排序，每连续7场集中成组，最多6组。所有历史已暴露，保持原生逐场cutoff，
+仅作回顾诊断；不保证整期组合可在同一赛前时点执行，不重新学习或晋升策略。
+
+BASE为原始单倍；DOUBLE_STAKE把相同组合买两倍；TWO_COVER增加一层组合，
+交换相邻组边界上的两场（上一组最低排名与下一组最高排名）。每场最多进入两组，
+每组仍有7场且两层没有完全相同的组合。同一选场池、同一双选方向，保持概率集中，
+不把强弱比赛全面均摊。边界交换规则事先固定，未按结算挑选。
+
+每组128个基本组合，每注2元即256元，最多12组即3072元。若不足两组，后两方案均不加码。
+DOUBLE_STAKE和TWO_COVER每期投入相同；BASE投入较少。0.65只在每张中奖基本票乘一次，
+收益是理论税前值。共享比赛的组不独立，联合命中概率通过容斥计算，但仍假设比赛间独立。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_n7_baseline.R')
+source('r/fundamentals_n7_twocover.R')
+y <- n7_twocover_report(params$study,getwd())
+```
+
+## 收益与回撤
+
+最大回撤以按期累计净收益从前高回落的元数表示，包括初始零点；没有假设初始本金，
+因此不将其冒充账户回撤百分比。最长未盈利期数包含持平，不等于最长水下期。
+至少中一组不代表当期盈利。先比较同预算两方案，避免把新增投入当作收益提升。
+
+```{r}
+y$summary |> filter(partition=='ALL') |> mutate(ROI百分比=100*roi) |>
+  select(strategy,issues,stake,net,ROI百分比,max_drawdown_cny,longest_nonprofitable_run,
+         worst_issue_net,any_hit_issues,profitable_issues,group_hits,groups) |> knitr::kable(digits=2)
+```
+
+## 分段与每期
+
+前32期和后16期均已暴露；分段只是稳定性诊断，不称为新测试集。
+
+```{r}
+y$summary |> filter(partition!='ALL') |> mutate(ROI百分比=100*roi) |> knitr::kable(digits=2)
+y$per_issue |> arrange(issue,strategy) |> mutate(ROI百分比=100*roi) |>
+  select(issue,strategy,status,groups,hits,stake,net,ROI百分比) |> knitr::kable(digits=2)
+```
+
+## 数据与复现
+
+缺失结算保留未知，同期任一方案待结算则整期不纳入共同汇总，不将其视为零收益。
+
+```{r}
+y$common_issues |> count(ready) |> knitr::kable()
+str(jsonlite::read_json(file.path(params$study,'contract.json')),max.level=1)
+sessionInfo()
+```
+
+在配置好的R/Python环境，从仓库根目录运行，输出应为新目录：
+
+```bash
+PYTHONPATH=. "$RETICULATE_PYTHON" scripts/run_fundamentals_n7_twocover.py --output "$STUDY"
+Rscript scripts/settle_fundamentals_n7_twocover.R "$STUDY" "$DB_PATH" "$RETICULATE_PYTHON"
+quarto render quarto/52_n7_twocover.qmd --execute-dir . --execute --no-cache -P study:"$STUDY"
+```

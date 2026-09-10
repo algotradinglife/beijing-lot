@@ -1,0 +1,130 @@
+---
+title: "7串1：预期收益选场与分组对照"
+format: html
+params:
+  study: data/derived/fundamentals_417/n7-selection-v1
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 问题与固定条件
+
+这轮只改变选场和分组。每场保留基线概率最高的两个让球赛果，
+每组七场、128个基本组合，每注2元，每组256元。每期最多六组，
+比赛不重合；四个方案的组数和实际投入相同，不加比分保护。
+
+| 选场 | 集中分组 CONCENTRATED | 均衡分组 SNAKE |
+|---|---|---|
+| COVERAGE：双选覆盖概率从高到低 | 相邻七名组成一组 | 每轮每组一场，下一轮反向分配，共七轮 |
+| VALUE：双选预期回报分数从高到低 | 相邻七名组成一组 | 同样的往返分配，入选比赛及双选完全不变 |
+
+SNAKE只是预先固定的均衡启发式，不保证达到全局最优。
+
+## 预期收益如何定义
+
+对每场固定双选集合 $S_i$，使用模型概率 $p$ 与归档赛前欧赔＋大小球映射的
+市场概率 $q$：
+
+$$C_i=\sum_{r\in S_i}p_{ir},\qquad V_i=\sum_{r\in S_i}p_{ir}/q_{ir}.$$
+
+这里 $1/q$ 是估算SP的代理，**不是观测到的北单SP，也不是已校准的北单SP预测**。
+市场概率不包含北单真实资金池的投注分布，因此VALUE只能检验这一代理假设下的选场。
+计奖系数0.65仅在整张中奖票上乘一次；最终SP不参与选场。
+
+在场次独立假设下，七场完整双选的预期净收益为：
+
+$$E[\mathrm{net}]=2\times0.65\times\prod_{i=1}^7V_i-256.$$
+
+每场和每组的成本固定，按预期净收益和预期ROI排序等价。
+所有选场、分组和预期值先冻结，之后才读取SQLite结算。
+预期至少中一组概率与预期波动同样依赖独立性及概率准确性；不代表保本保证。
+
+## 数据边界
+
+使用此前48期已暴露历史归档的共同市场可用样本。各场保留原始决策时点，
+整期分组不是同一时刻可执行的投注组合。这是回顾机制诊断，非前瞻验收。
+前32期和后16期只用于分段呈现，本轮不拟合、不调参，不自动晋升策略。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_n7_baseline.R')
+source('r/fundamentals_n7_selection.R')
+y <- n7_selection_report(params$study,getwd())
+```
+
+## 总体结果与风险
+
+ROI为净收益／实际投入。最大回撤单位元，以累计净收益计算；
+去最大回款期净收益是各方案分别剔除自身回款最高的一期，并非配对差值。
+
+```{r}
+y$summary |> filter(partition=='ALL') |> mutate(ROI百分比=100*roi) |>
+  select(selector,grouping,issues,stake,net,ROI百分比,group_hits,groups,
+         profitable_issues,max_drawdown_cny,longest_nonprofitable_run,ex_largest_payout_net) |>
+  knitr::kable(digits=2)
+```
+
+## 代理预期与实际收益是否一致
+
+下面将冻结的预期净收益按实际投入汇总，与实际净收益比较。偏差同时包含模型概率误差、
+SP代理误差和有限样本波动；本实验没有将三者分离，因此不能把失败归结为某一个因素。
+
+```{r}
+y$per_issue |> group_by(selector,grouping) |>
+  summarise(stake=sum(stake),预期净收益=sum(expected_net),实际净收益=sum(net),.groups='drop') |>
+  mutate(预期ROI百分比=100*预期净收益/stake,实际ROI百分比=100*实际净收益/stake) |> knitr::kable(digits=2)
+```
+
+## 分开看选场和分组增量
+
+选场增量固定分组方式，比较VALUE减COVERAGE。分组增量固定选场，比较SNAKE减CONCENTRATED。
+
+```{r}
+a <- y$summary |> filter(partition=='ALL')
+control <- a |> filter(selector=='COVERAGE') |> select(grouping,base_net=net,base_roi=roi)
+a |> filter(selector=='VALUE') |> left_join(control,by='grouping',relationship='one-to-one') |>
+  transmute(grouping,选场净收益增量=net-base_net,选场ROI增量百分点=100*(roi-base_roi)) |> knitr::kable(digits=2)
+control <- a |> filter(grouping=='CONCENTRATED') |> select(selector,base_net=net,base_roi=roi)
+a |> filter(grouping=='SNAKE') |> left_join(control,by='selector',relationship='one-to-one') |>
+  transmute(selector,分组净收益增量=net-base_net,分组ROI增量百分点=100*(roi-base_roi)) |> knitr::kable(digits=2)
+```
+
+## 前32期与后16期
+
+```{r}
+y$summary |> filter(partition!='ALL') |> mutate(ROI百分比=100*roi) |>
+  select(partition,selector,grouping,issues,stake,net,ROI百分比,group_hits,groups) |> knitr::kable(digits=2)
+```
+
+## 每期表现与预期对照
+
+待核验或中奖SP缺失时保留投入，收益保持缺失；共同汇总排除整期。
+预期ROI与实际ROI并排展示，可以直接看出代理估值是否偏乐观。
+
+```{r}
+y$per_issue |> arrange(issue,selector,grouping) |>
+  mutate(实际ROI百分比=100*roi,预期ROI百分比=100*expected_roi,预期至少中一组百分比=100*any_hit_probability) |>
+  select(issue,selector,grouping,status,groups,hits,stake,net,实际ROI百分比,expected_net,预期ROI百分比,预期至少中一组百分比) |>
+  knitr::kable(digits=2)
+```
+
+## 复现与证据
+
+```{r}
+contract <- jsonlite::read_json(file.path(params$study,'contract.json'))
+str(contract,max.level=1)
+y$common_issues |> count(ready) |> knitr::kable()
+sessionInfo()
+```
+
+从仓库根目录执行，先设置项目Python、R依赖和数据库路径：
+
+```bash
+PYTHONPATH=. "$RETICULATE_PYTHON" scripts/run_fundamentals_n7_selection.py --output "$STUDY"
+Rscript scripts/settle_fundamentals_n7_selection.R "$STUDY" "$DB_PATH" "$RETICULATE_PYTHON"
+quarto render quarto/50_n7_selection.qmd --execute-dir . --execute --no-cache -P study:"$STUDY"
+```
+
+冻结命令拒绝覆盖已有目录。源文件哈希、原始决策时点、计划封印、R/Python实现身份和结算审计随产物保留。
