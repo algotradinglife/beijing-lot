@@ -1,6 +1,6 @@
 # Expert models 2.0.0 (historical candidate)
 
-Study: `data/derived/fundamentals_417/expert-refresh-96-v2`.
+Study: `data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final`.
 Report: `quarto/76_expert_refresh.qmd`.
 The model identity is 2.0.0; the calibrated inference API remains 1.1.0.
 Old catalogs and model directories are unchanged. This is retrospective fixed
@@ -25,7 +25,7 @@ Use a **new output directory** when reproducing training. The ordered steps are:
 5. Run `scripts/freeze_expert_refresh.py --study ...` to freeze both model
    directories before querying test labels. Keep this immutable receipt.
 6. Query the `test` partition using the same R entry point; then run
-   `scripts/evaluate_expert_refresh.py --study ... --python ...`.
+   `scripts/evaluate_expert_refresh.py --study ... --python ... --legacy-root ...`.
    Exact-version catalogs are isolated to this study, not registered as latest.
 7. `scripts/replay_expert_refresh_inputs.py --study ...` independently rebuilds
    this study's nominated source inputs; source/feature/label changes fail.
@@ -102,3 +102,15 @@ those original paths, resolve files during loading. The exact-version legacy
 router remains for archived rollback; it is not the current portable entry.
 Relocation tests move models, sources and runtime together, remove their old
 location, compare both predictions and reject subsequent source tampering.
+
+## Reviewed clock repair
+
+The original candidate omitted predictor clocks for 364 warmup rows. Existing
+context/quote snapshots reconstruct all 364 strictly before fixture decisions.
+`prepare_expert_refresh.py --repair-study ORIGINAL --clock-audit AUDIT
+--source-root SNAPSHOT --output NEW_STUDY` verifies source hashes, replays shared
+clock receipts and preserves all 4,195 rows and numeric features. Refit using the
+unchanged policies, freeze, then evaluate and run `replay_expert_refresh_inputs.py`.
+Both tree identities, leaf counts/probabilities and calibration estimates remain
+identical. The reviewed manifest pins these newly validated receipts; the old
+candidate remains archived. No new issues or target outcomes enter selection.

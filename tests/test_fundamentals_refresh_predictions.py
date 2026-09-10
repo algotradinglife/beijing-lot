@@ -80,3 +80,17 @@ def test_catalog_must_name_frozen_candidate(tmp_path):
     entry=dict(backend='RAW_TREE',models={'002':model},files={model:'sha'})
     validate_refresh_candidate(entry,'high',tmp_path,frozen)
     with pytest.raises(ValueError,match='candidate'):validate_refresh_candidate({**entry,'models':{'002':'other'}},'high',tmp_path,frozen)
+
+
+def test_legacy_catalog_roots_are_explicit_and_preserve_worker_pin(tmp_path):
+    from src.fundamentals_refresh_predictions import bind_legacy_catalog_roots
+    receipt=dict(versions={'old':dict(runtime_root='runtime',model_dir='model',models={'001':'model.pkl'},files={'source':'sha','scripts/predict_draw_version_worker.py':'worker'})})
+    original=dict(receipt=receipt,seal=stable_json_hash(receipt))
+    bound=bind_legacy_catalog_roots(original,tmp_path)
+    entry=bound['receipt']['versions']['old']
+    assert entry['model_dir']==str(tmp_path/'model')
+    assert entry['models']['001']==str(tmp_path/'model.pkl')
+    assert entry['files']=={str(tmp_path/'source'):'sha','scripts/predict_draw_version_worker.py':'worker'}
+    assert original['receipt']['versions']['old']['model_dir']=='model'
+    assert bound['seal']==stable_json_hash(bound['receipt'])
+    with pytest.raises(ValueError,match='seal'):bind_legacy_catalog_roots({**original,'seal':'bad'},tmp_path)

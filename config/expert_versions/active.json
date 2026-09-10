@@ -11,10 +11,10 @@
       }
     },
     "manifest_path": "config/expert_versions/portable-2.0.0.json",
-    "manifest_sha256": "462bb1af29354d7f873bb87331ea32da1ad7c5c37784a9f74f8ee591f9ceadc8",
-    "model_root": "data/derived/fundamentals_417/expert-refresh-96-v2",
+    "manifest_sha256": "b3b2b650be24fd74a612faa30de8e1de386a6435ee35ba261a00df68ee559f51",
+    "model_root": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final",
     "source_root": ".",
-    "provenance_root": "data/derived/fundamentals_417/expert-refresh-96-v2/training-runtime"
+    "provenance_root": "."
   },
-  "seal": "65cc33a58d12556e4f86b042c506484aa385d5fcba389d1da8ad7134a51aa0a7"
+  "seal": "05cd82664699ec7df08be5a182a02e9f465607cf87195335bc7a35f4e156251c"
 }

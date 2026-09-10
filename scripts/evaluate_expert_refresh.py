@@ -7,11 +7,11 @@ from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
 from src.temporal_learning.provenance import implementation_closure
 from src.fundamentals_draw_versions import predict_draw_version
-from src.fundamentals_refresh_predictions import save_refresh_prediction,freeze_refresh_report_inputs
+from src.fundamentals_refresh_predictions import save_refresh_prediction,freeze_refresh_report_inputs,bind_legacy_catalog_roots
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--python',required=True);p.add_argument('--only',nargs='+',choices=['new_draw','new_high','old_draw','old_high']);a=p.parse_args()
- study=Path(a.study);root=Path.cwd();contract=json.loads((study/'contract.json').read_text())
+ p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--python',required=True);p.add_argument('--legacy-root',required=True);p.add_argument('--only',nargs='+',choices=['new_draw','new_high','old_draw','old_high']);a=p.parse_args()
+ study=Path(a.study).absolute();root=Path.cwd();contract=json.loads((study/'contract.json').read_text())
  frozen=json.loads((study/'models-frozen.json').read_text())
  for name,h in frozen['files'].items():
   if hashlib.sha256(Path(name).read_bytes()).hexdigest()!=h:raise ValueError('Frozen model changed: '+name)
@@ -20,6 +20,7 @@ if __name__=='__main__':
  old=copy.deepcopy(old);entry=old['receipt']['versions']['0.1.0']
  entry['models']={i:'data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/models/100305/frozen-experts.pkl' for i in contract['test_issues']}
  old['seal']=stable_json_hash(old['receipt'])
+ old=bind_legacy_catalog_roots(old,a.legacy_root)
  path=out/'old-catalog.json'
  if path.exists() and json.loads(path.read_text())!=old:raise ValueError('Existing old catalog differs')
  if not path.exists():path.write_text(json.dumps(old))

@@ -3,726 +3,802 @@
     "format": "PORTABLE_EXPERTS_V1",
     "version": "2.0.0",
     "files": {
-      "draw/draw-expert/model.json": "b32e884a60bfb945b5dfff22c6ff7652f0ab4e8b773a51a5275a418ae9d4fbf5",
-      "draw/draw-expert/model.pkl": "a313e23d1ac5adc5d40d537370ba8964b9b61b93c67bd9bdb72be0d1e287df86",
-      "draw/signal-rates.json": "b5ffba7cbbe9a042d502ad76b621447e05cafe9fd1afa0aec199fa2fdbf5dfd2",
-      "draw/signal-rates.pkl": "8becb277e85ee41fc7ba06d2eb75470cb9b2533b17b3907e7a4e46d9694daa42",
-      "draw/rate-cv.json": "8c83dcab57b238f76982b170b4290d63c41fa0a474d5385fdb50c66cb3e05f60",
-      "high/high-expert/model.json": "9f66a3f26a02287da06f63583b901de8db50429dfdc38311c40b5a412f9ca7bf",
-      "high/high-expert/model.pkl": "a898fb153ab7768f0478379354f107285bc30df54d37aa576542422c67eab01a"
+      "draw/draw-expert/model.json": "f1ecfd18903d3962b9224112535c760ad8a3588e6a5d3657be3dc16b991d5e26",
+      "draw/draw-expert/model.pkl": "9043b80fc5a7905a6b941862f4864e2fd64475dd84ebdb4f5055d5ff5bfba6f5",
+      "draw/signal-rates.json": "ca580aec2fc1f5b39b4091e1a4c01a0b2c778c654860b1510fba5ab34508815e",
+      "draw/signal-rates.pkl": "aea365aeaf7715d939a388139904b64faa4cb449d7d9524a25b4bb165c09c556",
+      "draw/rate-cv.json": "ffe35970963c60b3db2498398a36049f4f4530204a04fcdb16aace98c1eb0fa1",
+      "high/high-expert/model.json": "a5f31b561c30c74cb78de83862f32c79fa92c286eec24c28ace3ad7d65f9200a",
+      "high/high-expert/model.pkl": "5c06ef2d5ed6cd10c6b0cc658c5cfe4c1bd5717950af6434b16d45383e7c7ac5"
     },
     "sources": {
-      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/scripts/fit_expert_refresh.py": {
-        "path": "scripts/fit_expert_refresh.py",
-        "sha256": "c13539c37cbffd242b1430b9302b5fc344eb34e2c40b6981565d0f5c1e94f51f"
-      },
-      "data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/predictions.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/predictions.json": {
         "path": "data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/predictions.json",
         "sha256": "68a6baa338714377cde28394a682eb338f22c3384c43167c8632d74c7cb27c3a"
       },
-      "data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/training.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/training.json": {
         "path": "data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1/training.json",
         "sha256": "7ae297d936e6b5d45cf7a289164e9f2e11cb5831a17d2d5f8a6b7e198dd2f774"
       },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/contract.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/contract.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/contract.json",
+        "sha256": "1e9435e81ff06fc10fa63545a157af3e9f8657dec4f7ac823fc92cf4baba021c"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/draw/expert-oof.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/draw/expert-oof.json",
+        "sha256": "625a888437be4f9274b1a44a7e2069d8261400c302f7cc4ba6ca59e685efedcb"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/draw/tree-cv.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/draw/tree-cv.json",
+        "sha256": "17d25ff6e4b1ba0c552926fbd8f5bda5f20f6bda6c1f9a163926a55380429f89"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/fit-policy.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/fit-policy.json",
+        "sha256": "6cfb97ef94503a01bfe12da6187f42aa7ca3e9f1e18421f5d2c3b8bfbf9bfdb4"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/input-receipt.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/input-receipt.json",
+        "sha256": "cd57ac5576e4e523df81c8f6c4f40a3ad09e7f0c33332b6838766e2a1d5c9ce0"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/train-features.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/train-features.json",
+        "sha256": "feff071092237bf86ce7af6e8c55ceee4cd2f5a2aa5b68424d0fdce5d416ab72"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/train-labels.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/train-labels.json",
+        "sha256": "4efc6d67dd52066a9d06aa8a2aeb010cd02a15e9f3d5a037f46e510161bfd690"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/training-data.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/training-data.json",
+        "sha256": "5dc8a904f617bc91e30d25c5e151426474ac49b6d69de47b07e7b1063a6b77de"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../contract.json": {
         "path": "data/derived/fundamentals_417/expert-refresh-96-v2/contract.json",
         "sha256": "1e9435e81ff06fc10fa63545a157af3e9f8657dec4f7ac823fc92cf4baba021c"
       },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/draw/expert-oof.json": {
-        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/draw/expert-oof.json",
-        "sha256": "b7bcc64756247ede15a27e2079eb4bf6559d8cae6cf1e38e1bec325053d0acc8"
-      },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/draw/tree-cv.json": {
-        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/draw/tree-cv.json",
-        "sha256": "8f95edcbc22ef07bc4c772e0c90ecde232ffc1806de1d4e75d93be50b6ef9ead"
-      },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/fit-policy.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../fit-policy.json": {
         "path": "data/derived/fundamentals_417/expert-refresh-96-v2/fit-policy.json",
         "sha256": "6cfb97ef94503a01bfe12da6187f42aa7ca3e9f1e18421f5d2c3b8bfbf9bfdb4"
       },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/input-receipt.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../input-receipt.json": {
         "path": "data/derived/fundamentals_417/expert-refresh-96-v2/input-receipt.json",
         "sha256": "f136d71653681578514159dd10f4ebe3f34846c40e2277fc4532075541aa899a"
       },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/train-features.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../missing-clock-audit.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/missing-clock-audit.json",
+        "sha256": "3b4406ea7bce2e447067542d8399d0f1c555e39cc1a0cf2330a9ce074b10bc49"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../test-features.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/test-features.json",
+        "sha256": "11adf89363b1d1fbb70cedf1636da1e0d0033643faa8d2a9b3194de7ef10b678"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../train-features.json": {
         "path": "data/derived/fundamentals_417/expert-refresh-96-v2/train-features.json",
         "sha256": "49a3ee1da95563f7562720578c89c464d10d91207082a2db72ccb69294b942ab"
       },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/train-labels.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../train-labels.json": {
         "path": "data/derived/fundamentals_417/expert-refresh-96-v2/train-labels.json",
         "sha256": "4efc6d67dd52066a9d06aa8a2aeb010cd02a15e9f3d5a037f46e510161bfd690"
       },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/training-data.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../training-data.json": {
         "path": "data/derived/fundamentals_417/expert-refresh-96-v2/training-data.json",
         "sha256": "eff22101b7834c53e02fe638a757624dd5e156bfee59374cd1f3f185a9a49bcf"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v1/100418.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../training-exclusions.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/training-exclusions.json",
+        "sha256": "a6eb777c33a2ea4999a5129eec9ec1086aeaec7501b98008a002deaa37316f87"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/r/fundamentals_expert_refresh.R": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/r/fundamentals_expert_refresh.R",
+        "sha256": "8d2bc10dc16e873a5cc78bb848d3504a7777c1a21ac107ada5d88197d9aef2bc"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/scripts/fit_expert_refresh.py": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/scripts/fit_expert_refresh.py",
+        "sha256": "944f7a85849e060671a4bdac8dd0102fcde9c734540389d268f40d3ff01300b0"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/scripts/prepare_expert_refresh.py": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/scripts/prepare_expert_refresh.py",
+        "sha256": "b9404e2e6cc521afaf46081d106e74af5f5d141a492a382e329369d26b54db21"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/src/fundamentals_expert_refresh.py": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/src/fundamentals_expert_refresh.py",
+        "sha256": "066e14417da5c71e55adbee9918ff8ed3f124c5d55bcae79afcdc3c215041fb5"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v1/100418.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v1/100418.json",
         "sha256": "a4525fd1b6a909daba5845dd660ea4ddadd2b4bb5633e2c152fa5f89450a01df"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v1/100503.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v1/100503.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v1/100503.json",
         "sha256": "0e6c976c38a8f8fe1f3ee38b6bfd54d64130e388cce7512f3d39f9d847386707"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100403.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100403.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100403.json",
         "sha256": "27d3decdced176d56e9f0fc80a49ccb89c9a53cab36baf18886a4352ca06d03a"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100405.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100405.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100405.json",
         "sha256": "bbbffa0dbfea96f1e7d5c6448af0b75b9501ccf0cac865a7352f897f9f90ff06"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100406.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100406.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100406.json",
         "sha256": "9bdd8826d06845c016b26431329bb48e808913c4d3e25101d5d65feefe721309"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100409.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100409.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100409.json",
         "sha256": "ea9c2a01b4b758717f3598befe4c25be953ef3c582ea38f496e33d5d0b0c97c2"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100411.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100411.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100411.json",
         "sha256": "cce4922177f89af2918842a134437f9a4101fd0ff2058f1d7ac29e4c1e6b3fe2"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100414.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100414.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100414.json",
         "sha256": "9fbf92ed41ed2a2880514b0156d2f908118edbc802ba2af54783145783b41b99"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100416.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100416.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100416.json",
         "sha256": "e7e85f2e928ef29946be7d5026fcb227eb86b94b34235e965d1c97ab78fee010"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100419.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100419.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100419.json",
         "sha256": "d2ac6b3c017e0913f0fef149bc5f696257c33f134a5d321107dd5fae9f126928"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100420.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100420.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100420.json",
         "sha256": "e2bd85fe416e414ab1a5c9103f9c19f40d93bbf48dec5940019c891afdc1ee74"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100421.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100421.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100421.json",
         "sha256": "61c27e90ae7f9bdb9b05cfad4b41d5a457bce85baad1b2cc64b0fd49f0774c7b"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100509.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100509.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100509.json",
         "sha256": "eb858cb91644e6be2b0324c6f9604f24d78ebeebcba92bebc6199f25b11f99f6"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100510.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100510.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100510.json",
         "sha256": "b35a3c9fdf5d50124c71773a436c8873385de03f56daa2070ce4c0cb9aab3663"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100512.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100512.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100512.json",
         "sha256": "04628e12febfac3bb73e422a732f6ca9f0918852c73136ba96c1f5418fd40607"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100515.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100515.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100515.json",
         "sha256": "606e91c2cc7d48c285d280f90c6f36ffeef24b546171213f536bfd7bd905bc4d"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100516.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100516.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100516.json",
         "sha256": "bdb0f4ab9368cd7846f548755707d8aa4ff3e9e98bc838572aa18cdd4a38de7f"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100517.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100517.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100517.json",
         "sha256": "261542c02f586a4b28ed8e00702a39245d1bdfeb987baa0890dfec585ae63153"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100518.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100518.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100518.json",
         "sha256": "cd6d0f7eb758157cb64d29fd039ce6f96f97a8c3eba07efd9ac9ff48aa57282e"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100519.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100519.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100519.json",
         "sha256": "14908a09b1c753a355807ec2e34a91f40c7a826bbecba04b5e72c647565a46ad"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100520.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100520.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100520.json",
         "sha256": "afbdeb5054db66552c727133214eab17b718467ba0951aeb817a8628fbaefe49"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100521.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100521.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100521.json",
         "sha256": "fda9a5a38942ea0c0a1059ce185d01b4034a66ba48dde47d00475948910fadc8"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100601.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100601.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100601.json",
         "sha256": "6e9ad31d8b4db1d29a106b7555cc2ad9a745553db0d4797669cac8a6f54aafe8"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100602.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100602.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100602.json",
         "sha256": "5e7cfdb1ca421203536f5e7a7205fcde656cef9c5c11ffdd862a4a9475b02654"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100603.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100603.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100603.json",
         "sha256": "23b3349463c123f3ab275efe2e20c3bd80c2694cb046e7cfd588af40b3ad547b"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100604.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100604.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100604.json",
         "sha256": "68cb71548df4b32a40ec2137773e5d9f9c043aea7d0439dea5c65e6a5c63ca9b"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100605.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100605.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100605.json",
         "sha256": "77dc450057479a8d2414296408e29430016993eae658bf74c80abfaa2986d28c"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100606.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100606.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100606.json",
         "sha256": "c474f17363a5eaa1ecf11299e2912e6423846f9382b29afffc485c115b4c6005"
       },
-      "data/derived/fundamentals_417/new48-adjudicated-v2-final/100607.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-adjudicated-v2-final/100607.json": {
         "path": "data/derived/fundamentals_417/new48-adjudicated-v2-final/100607.json",
         "sha256": "e3acc65f4259e7f7b568f5fd8a611e7123054ab5261866b35cd4b39878a58702"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100402.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100402.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100402.json",
         "sha256": "fe3bf8248440dea71dd39bf037d1a509117d7ef582c3b8238a4a508fd0a6a871"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100404.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100404.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100404.json",
         "sha256": "4551573cdc5f91d25efaf34507ab92e799ee37969b277253affc3aae3d4699bc"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100407.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100407.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100407.json",
         "sha256": "0192791513e571146efdc991b6df218e83818549915e21ccb8200c976d9c16e8"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100408.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100408.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100408.json",
         "sha256": "66d92b6f619bca0c8cdbb9a17a296903d0936b2bf2d995cf9958205988bb8365"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100412.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100412.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100412.json",
         "sha256": "39e73baa4ca076ee88e98285808430f8c6cdab52e3fe500e13e7a3ce3256cdd6"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100413.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100413.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100413.json",
         "sha256": "4e313cc34a41f0ba819345593a814b7637b5ea42f8d0a6a337a05048cc67198c"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100415.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100415.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100415.json",
         "sha256": "db7682da6b14162ff3d0b9bb56d01ade59364f9c5fe4c67b11f10e91c164cb40"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100417.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100417.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100417.json",
         "sha256": "d779ef4c793804ccac961318d3f75dbbac7ac61ec87bb929dabaed9c37628f1f"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100501.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100501.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100501.json",
         "sha256": "4dc9e24615c6f5d48c38ce2e36f82dc6ecdb19973081a3e7eb326cc0fed2909f"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100502.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100502.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100502.json",
         "sha256": "3468c7924ff44884eac5f01b7a5eee5b15a4a6816e8e8dd6157c8f7835816e1f"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100504.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100504.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100504.json",
         "sha256": "3ce48abd9241d0aa47ed724c9b8e03fe9c0dc9867081dd71cd9760caf5e66e5e"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100505.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100505.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100505.json",
         "sha256": "1687536f42cde21cc2b4d7ff0891a98bc8a5f04b53853c220d7159b07820ae63"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100506.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100506.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100506.json",
         "sha256": "0e5742a023116f925334a8cf8dc19f096fe1169c81a6df8ca2807e0e17d549d3"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100507.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100507.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100507.json",
         "sha256": "474a1d09f7c98f7e5d4184e16d6208f8e48c47ee5c9e2c3329a7a382eaa52cb5"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100508.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100508.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100508.json",
         "sha256": "48e10dfcb088d4c34f2a6e6b13c16ac29c82f14242df28d19754ca0830f6a3b8"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100511.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100511.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100511.json",
         "sha256": "6db8b573c297966e36d04de86ec714fa0457bf3f6285c26444f8adab2dcdb07f"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100513.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100513.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/100513.json",
         "sha256": "67811ac5166cb74649571d02eb34a49bb6b89bb04b1058d267726e5ac55e8243"
       },
-      "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/inventories.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/inventories.json": {
         "path": "data/derived/fundamentals_417/new48-cleanup-v1/analysis-final/inventories.json",
         "sha256": "613d601dae2bf9ad7bd5c9b8359cd4c7f29b7d34aa27b622f98c7e5fb1d12a7c"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/prepared.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/prepared.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/prepared.json",
         "sha256": "c81fd3457eb5478ada4a47ff0abb50d4067c965dfe14f784f01bb9d3f0fa18c3"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100402.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100402.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100402.json",
         "sha256": "8ebd9d7e481cff8d2929212f005acc6c5605c3151049a6ad5256db50380f1634"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100403.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100403.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100403.json",
         "sha256": "18a37592cb4a0276c41594e4cd2ac02a85e8666f6461abeb6d8877f00b542e39"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100404.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100404.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100404.json",
         "sha256": "b56e3f8f05c1adf2f648519e9460df76a4ca46f05688333e5aa0a8e40bca4c81"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100405.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100405.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100405.json",
         "sha256": "7b28b968d1f0b6724dd8eec17b481a0dc98110994dd3fa5feab4283def5614d9"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100406.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100406.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100406.json",
         "sha256": "31f9a672eb440ff5039a8ecfa809cccb700d8d50010119493e3fa2d237992034"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100407.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100407.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100407.json",
         "sha256": "0e5953690e6e47e3f37deefb442ea5b63808cafa9f92c03e8847937b0723f5f2"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100408.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100408.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100408.json",
         "sha256": "9821f32f76d16fb4ab82e689cefe7a022397e82940ddc746147ebccf2d61612c"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100409.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100409.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100409.json",
         "sha256": "cfec72d5f8699b7ef19bbfb76ee6823cc40729a0d1bf8852f6a9475e0bc601e2"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100410.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100410.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100410.json",
         "sha256": "85ca760e283e6d349fa1a051d4d5b9ef3c966de75d8c4694fe16ced1c31ef85c"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100411.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100411.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100411.json",
         "sha256": "b98c0b1e12f82a2f15c035200d0bd816b4929e50653093b758bd9de73a4400fc"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100412.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100412.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100412.json",
         "sha256": "b3f782d60f50f400b9e10237eb4a0df66642796d078619cde55e53e944ad117d"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100413.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100413.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100413.json",
         "sha256": "6c1a72f1c594fa2e70efe7c27826825037f03b37e19b0c90ce7b9143eded6582"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100414.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100414.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100414.json",
         "sha256": "669bbb7c5ea75c22af4018471783c0052ad107c956f1b25aca0d329767e7dbec"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100415.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100415.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100415.json",
         "sha256": "f92739a311073292b9e2ffbf11aa7abd10097acb7d6b37e02a15c4965cf86af7"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100416.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100416.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100416.json",
         "sha256": "d53e74fa8b446caea748fcbb3a916469fe0f6fa34f5de5a949230ddb32b5c3de"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100417.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100417.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100417.json",
         "sha256": "be0559e2f45c3a7c66757e38f4bbe3d85a00d2aa46f92ecc5cb5ac9d8bf7a845"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100418.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100418.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100418.json",
         "sha256": "bbdf45d079a649e4dc6724ee02cbce1ca89290c0c30488235126d730c5b12b93"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100419.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100419.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100419.json",
         "sha256": "403ce4a6fac07f3aff787b58d9017e7754d883c757d619b8ea8e6bee9f1c7fa9"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100420.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100420.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100420.json",
         "sha256": "70f01a8142ffe56e0cfb7d13c72efb9a19f510b59092b51aa96f37a6cc86e956"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100421.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100421.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100421.json",
         "sha256": "110a80c92f10af00577be7db615a4e0fb59d6615cdd13bd32c17bd3716ccae40"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100501.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100501.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100501.json",
         "sha256": "f5318510bcbde2bab9a90238851819954bf3268227985505c756ab513f671c39"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100502.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100502.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100502.json",
         "sha256": "24450a67c8e70fe6e800cccf182c18e6a55f5dcd51499cc77777aad9a7133485"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100503.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100503.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100503.json",
         "sha256": "6a93811473af0f3f11c5735cdc56c101d81a1fc52a5a63c73527ad43892130a9"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100504.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100504.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100504.json",
         "sha256": "11f7aee61e496f91267e0711fc38a9154a860583ea274cbfbc26c59a84cf7904"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100505.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100505.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100505.json",
         "sha256": "f3d1c8e1a8f66a9b206fd6abf63e3c6b87dd385b4a3c957ece09cf111d7efc6e"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100506.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100506.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100506.json",
         "sha256": "8c85851081632789371857f83c4d592cc71d7f34f551262953607971bee18e1f"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100507.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100507.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100507.json",
         "sha256": "edad2b1cba70247223a117b99f486408b7d229c3c68f10df15b23cb894a53397"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100508.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100508.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100508.json",
         "sha256": "09d43cfcc0a14c3eb0194c34ded449c24c54cafdeb37ba65802e7b4ba38042cf"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100509.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100509.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100509.json",
         "sha256": "d49ffc2dbfba0dd7db49744cc8248ec0773a01350cc71b7d40e8df7d9debb86e"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100510.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100510.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100510.json",
         "sha256": "8c1890cb7436e358c830181e6b508a43bb27a8f08b6076cce635c9f9d21a7bbb"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100511.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100511.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100511.json",
         "sha256": "a0e58fcb0398901cd99b5dc194a4fb5ae85f89d35a3dd3db8222520c71090d05"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100512.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100512.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100512.json",
         "sha256": "ff33f67c3ca086545aea1f48fe80f8f10312c887fcc47b8689b7578e44773f17"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100513.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100513.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100513.json",
         "sha256": "4a357a4a4c73f461992c40ddee420c84b9a09d86be3c3e016750fca95f938318"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100514.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100514.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100514.json",
         "sha256": "211a0a8024f56cbad8dc686305200745af0b6a3602761425606b14078a75a523"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100515.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100515.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100515.json",
         "sha256": "63f191400b8c705347dbbc9835eeb1ca7baf205bdef789815e3b07ec9d5019aa"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100516.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100516.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100516.json",
         "sha256": "07cff7587bf37e99a37e7efd76d021f210666389d237724c90012f602fd2984a"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100517.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100517.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100517.json",
         "sha256": "84859cdcafdfad1601683d02ee92cd6cddd7e9325c7b927581f259d8bce7fdba"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100518.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100518.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100518.json",
         "sha256": "224f1f90473bb674fab98940d9c5f31b3ddfe3c386214b23b32237d93e7ce569"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100519.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100519.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100519.json",
         "sha256": "e6c0dc4e78b767df8bb641eeeb7879e6f48a0070aab9bef37a0dd91b0e6ee07f"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100520.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100520.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100520.json",
         "sha256": "fdd252b9e76b3a3c2b22f4a73a3f2fb4540b1fdbf60dcbd2384bebb26b79351a"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100521.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100521.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100521.json",
         "sha256": "93df4ac900f5ab0df961a0ef3f0837841e6c8b7b27de48e6a3a384fe530b422e"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100601.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100601.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100601.json",
         "sha256": "15ca53e89a76f61d1036ce580cb0c57bf41b6e5e45200ebb1628b4ab061221c6"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100602.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100602.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100602.json",
         "sha256": "f117b055d71d21e5412aa74a42448b4993ad2ec68a2f31b1e81fd77ce774f426"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100603.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100603.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100603.json",
         "sha256": "b7964b176cccc4b2be88d8c522946cc9a77e1ae5518a49c7f19bf2bb163140b6"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100604.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100604.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100604.json",
         "sha256": "926ab6125d5fd79f6b926cd365e4d56e58276bcfbade6671c8f58543d3d63666"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100605.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100605.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100605.json",
         "sha256": "dffc403fcc1f0bba84fdb4af43be96d70c6466393a3c2dd850556f074c4ff78b"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100606.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100606.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100606.json",
         "sha256": "657a1fab6e2bbb1c4d88518067205528fe8c95e0562d365062811f7c30fd54b0"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100607.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100607.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/100607.json",
         "sha256": "4a9b97ec599187ae2f09f7112ecd58f09174e70f3e6c0e745d60188259aca68f"
       },
-      "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/receipt.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-expanded-validation-v1/projected/receipt.json": {
         "path": "data/derived/fundamentals_417/new48-expanded-validation-v1/projected/receipt.json",
         "sha256": "fb918db58e11e0d654be46ba1821b6bca2e75f893df139811845a330474defae"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100402.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100402.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100402.json.gz",
         "sha256": "c75d82d48aed2561e19c8d30d9ca07d97ec145f068b82ac4f99345171c8f8a66"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100403.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100403.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100403.json.gz",
         "sha256": "7c0e52516e3d0ed3d46f59983c88ec9cf0d803023879a812a605d29c6f6c6e4e"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100404.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100404.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100404.json.gz",
         "sha256": "378b7ecfd63c19f7db0fc194e82d0073ca992cfec60e66d5216602986209c404"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100405.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100405.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100405.json.gz",
         "sha256": "a714a2db44800657e7668ef6683f5d5ba31cf4b4e4caba17f661abd5b2337bbc"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100406.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100406.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100406.json.gz",
         "sha256": "72517b7386803073e957f032aba2dfa816e1de7def5104775343f5ee9c0ce93d"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100407.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100407.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100407.json.gz",
         "sha256": "5dba216fd4654951216e8681c1da29ef9491733a62c3f303de53897af9be53a9"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100408.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100408.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100408.json.gz",
         "sha256": "93513a07cd178a11f5c7fe0b6d7029d81a5765920a2de869c91bc1ecd7a2717d"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100409.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100409.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100409.json.gz",
         "sha256": "b445fd90474f77930b98253d0ed2501348d41dca39961ba6bb14672393154709"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100410.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100410.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100410.json.gz",
         "sha256": "30512fafa9ec9f0fc98bec388c46410ecac9b13ea6ebf62b7e424e982e600ca9"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100411.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100411.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100411.json.gz",
         "sha256": "8bc8284472ea71463ae3ead211259fdc31c0c6a2496a35db550c4e3f55b77499"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100412.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100412.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100412.json.gz",
         "sha256": "e21a1cc6456bbcb0f12ef9f9730c4b33a148de0a2778b33fff17d4eb5b65a997"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100413.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100413.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100413.json.gz",
         "sha256": "64f31b5cc3bf7e5b84bba65b2f39017f0532a5d027d16ff010b9986bd2028428"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100414.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100414.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100414.json.gz",
         "sha256": "7a25db02567fd8e997ed737fffbea41e7751f48cfb833f2532303f99a9d47094"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100415.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100415.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100415.json.gz",
         "sha256": "68724bf1b610cea7d2072ecc114fb02f5510be5cd829ed9a59c722bd4b6f9718"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100416.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100416.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100416.json.gz",
         "sha256": "43b45e2bfa265c0913231dd6684e42aa517bb40403582c834549baf01dc26bb6"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100417.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100417.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100417.json.gz",
         "sha256": "a3c3ccc0ac8c55eca37a222036942545754a17067d8ebcfec73ea4b00cf70eee"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100418.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100418.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100418.json.gz",
         "sha256": "5dc5940226acefdb593b6d87e108be8e87ef713e0d4122962bc70254a5984c33"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100419.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100419.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100419.json.gz",
         "sha256": "3d6c072e0ffb12db8e083fe012db727e9992429c4a2283b051db7c49ae448d8c"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100420.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100420.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100420.json.gz",
         "sha256": "810303e737f515a4a04d516cb85c0169cadf9c3f7a36b0c72cfd31ac922ab65e"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100421.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100421.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100421.json.gz",
         "sha256": "b3f3207b93c50e20cd9237582d8dd887f4f88692f102846addf9b0eaf32eb452"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100501.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100501.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100501.json.gz",
         "sha256": "fd800960d74a75e4b4fde8436a1b2771f7e77eeb1d137df718ae33eaeabef520"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100502.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100502.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100502.json.gz",
         "sha256": "32b995cd15778aff2d0e5054691b27cd33eff521e16397a49697f728b41ffc9e"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100503.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100503.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100503.json.gz",
         "sha256": "f8d14a551dd1b87f9e4fdbf8375db5e78de834b982ce20e3dd1af3b3db98ae2b"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100504.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100504.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100504.json.gz",
         "sha256": "5ec95d8a07b1ffb10a72cd6a4160c09dd891b1bbf69b56002d51cca97b8e1fbd"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100505.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100505.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100505.json.gz",
         "sha256": "9ed48ad35e30dbe01c1b04cf6a28cf47421c8cd7e6f6bbdf009bdeec8899e117"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100506.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100506.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100506.json.gz",
         "sha256": "42e05ec8924251a63936ce4da36835f120f31f69f964fc4e4cf3fe3fd5839dbf"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100507.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100507.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100507.json.gz",
         "sha256": "9908706baaa03285e7ce3c5bb5a0e89876e4be4f809fa7fb85e4201370fa9a64"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100508.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100508.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100508.json.gz",
         "sha256": "051c1b2200146f3f6af03d0b538fb9427b2082243efa97ba3a3312949c72e191"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100509.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100509.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100509.json.gz",
         "sha256": "cd19ac7e196e960e71e840ce35231dc012bb05e8e84c17ba371045bc80fdf444"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100510.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100510.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100510.json.gz",
         "sha256": "acc4b0ccb63750072591cd5230718612a16b4826b721d06fa7576e73a0dfbf40"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100511.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100511.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100511.json.gz",
         "sha256": "f96e2b002dd38f635bdaed14b9b4662e714d66e3d29409c4d2731770c0dd2196"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100512.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100512.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100512.json.gz",
         "sha256": "99ee5d2496aa6ce441791c105a4eb664b59cfc1687983837556a8881120bd6ac"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100513.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100513.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100513.json.gz",
         "sha256": "bc289fab057d2142bfff845307c517982cef2d1a9b8082fe78a9bd57a47fd9f2"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100514.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100514.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100514.json.gz",
         "sha256": "f5a8f5942c09a2ed85b0a24d22fca777701b763c331d66ff9e78aa22c661cbd0"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100515.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100515.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100515.json.gz",
         "sha256": "663d6d8884bd741148330b7c2f3240b3edaee010c012411d3d192faa86f83e0d"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100516.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100516.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100516.json.gz",
         "sha256": "9df3aee06fa9fd9df66e9b9f0dcc8faacf1e25057705ee51a0741ee83fbdf269"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100517.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100517.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100517.json.gz",
         "sha256": "8283910aa33693261557332f6243e5e665f11af648dd07fcc407d8194b037b87"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100518.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100518.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100518.json.gz",
         "sha256": "0ef511dc93849e41c2800d7a7d82badf51b2b0302a0545b406865a2c262257b2"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100519.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100519.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100519.json.gz",
         "sha256": "8f302c12d8f42ae175de331e8d12d76285267c34d562fc966a87a8157bd41492"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100520.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100520.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100520.json.gz",
         "sha256": "bae6af71067036cf444aaaa29ce4634331ca5b2556d3fe1d23a1f02bbbd25636"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100521.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100521.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100521.json.gz",
         "sha256": "f68ec9c0a696bd455aafd9ab6ec2b6890689739a5f1db66d6fa05da1fdd6d1c4"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100601.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100601.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100601.json.gz",
         "sha256": "c1e26ff888b936456b226dc2487be3ba03f71f96943f5d511d4947644d8a0c7f"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100602.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100602.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100602.json.gz",
         "sha256": "037130b6f41c4d76aecc879029856c310949f529633b57fc5d54bc0277022422"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100603.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100603.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100603.json.gz",
         "sha256": "664aca3ab36e150b8ba0dbc7786e316148b58d4f2fe2d141569852a3ba1fddad"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100604.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100604.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100604.json.gz",
         "sha256": "83aff6c1b2103b5fc663677b0782c2585c523597ea31cca7fbb44d6b0b2467f3"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100605.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100605.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100605.json.gz",
         "sha256": "de4f2875758089774927a48cb64a6ead0cdec5c3e3183a6038bc082d07cf67e3"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100606.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100606.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100606.json.gz",
         "sha256": "0c889f3d3aa270b80177bc9cd160383709285334bb3694234a8abc0d3ae1ce4f"
       },
-      "data/derived/fundamentals_417/new48-source-order-v2/inputs/100607.json.gz": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-source-order-v2/inputs/100607.json.gz": {
         "path": "data/derived/fundamentals_417/new48-source-order-v2/inputs/100607.json.gz",
         "sha256": "68ddde17f91635f7a422e3bf176df524076489c492fbf3718fa69c2cae19a0df"
       },
-      "data/derived/fundamentals_417/new48-verified-v2/100410.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-verified-v2/100410.json": {
         "path": "data/derived/fundamentals_417/new48-verified-v2/100410.json",
         "sha256": "f49fc9d9d83a14f249c7e533682f81b8a7b20b24e724a23343a3267e3ad8f47e"
       },
-      "data/derived/fundamentals_417/new48-verified-v2/100514.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-verified-v2/100514.json": {
         "path": "data/derived/fundamentals_417/new48-verified-v2/100514.json",
         "sha256": "4de8b3f2b84b7359a78793e963209945ca0a5e7a8a1252ada7f1b8e916390978"
       },
-      "data/derived/fundamentals_417/new48-verified-v2/cleanup-manifest.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/new48-verified-v2/cleanup-manifest.json": {
         "path": "data/derived/fundamentals_417/new48-verified-v2/cleanup-manifest.json",
         "sha256": "1f2104ec103bcdda540263c3f6cbec7700c15f6898a201802964040665fe900c"
       },
-      "data/derived/fundamentals_417/signal-rates-v1/predictions.json": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/next-issue-100104-v1/context.json": {
+        "path": "data/derived/fundamentals_417/next-issue-100104-v1/context.json",
+        "sha256": "e069f996d99aae413f615ada04ace0223efc1ce3b11fa4fc35c4b44ddd3a88b1"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/next-issue-100104-v1/predictions.json": {
+        "path": "data/derived/fundamentals_417/next-issue-100104-v1/predictions.json",
+        "sha256": "b158e71de8168fce73c72db2dad08a311b6442c9143ce7428ca76c7efa39bde7"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/retrain-four-v1/market/euro.json": {
+        "path": "data/derived/fundamentals_417/retrain-four-v1/market/euro.json",
+        "sha256": "1ccd307571b1b6a76e756d321adc26af03e6c5041518d58df57def52a6119716"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/retrain-four-v1/market/total.json": {
+        "path": "data/derived/fundamentals_417/retrain-four-v1/market/total.json",
+        "sha256": "ec28e36e2a0f4ccf01bf7af8c338a160870702704940129ed2bff234be9b0c42"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/retrain-four-v1/new-context.json": {
+        "path": "data/derived/fundamentals_417/retrain-four-v1/new-context.json",
+        "sha256": "92f39f5a51cf955b43627efe037d0a2df1e51c2d5bfc1e697628b05e8625b376"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/retrain-four-v1/new-inputs-internal.rds": {
+        "path": "data/derived/fundamentals_417/retrain-four-v1/new-inputs-internal.rds",
+        "sha256": "7f0f5d95a191dc77298cee1a2c68ba2566340180c33532d9f1da22553422e0f0"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/retrain-four-v1/predictions.json": {
+        "path": "data/derived/fundamentals_417/retrain-four-v1/predictions.json",
+        "sha256": "728130a9fa4461e292817a9317e64f932d5e6f485864633e5f533f1dec791653"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/signal-rates-v1/predictions.json": {
         "path": "data/derived/fundamentals_417/signal-rates-v1/predictions.json",
         "sha256": "043b44cc27ea2af2b851776a58bea78870ae043e0ce61e6829011d3aaa453e21"
       },
-      "r/eight_issue_holdout.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/three-issue-experts-v1/comparison.json": {
+        "path": "data/derived/fundamentals_417/three-issue-experts-v1/comparison.json",
+        "sha256": "c4805dc6f036142699fccbbbfcddc684b60abfeeddeeb1bc2bc9aa64cb4c74ab"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/three-issue-experts-v1/context.json": {
+        "path": "data/derived/fundamentals_417/three-issue-experts-v1/context.json",
+        "sha256": "8f9eb35dad294e85f407bd6c118f04920010635282f27740ce25592250b1b836"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/train-eight-test-eight-v2/training.json": {
+        "path": "data/derived/fundamentals_417/train-eight-test-eight-v2/training.json",
+        "sha256": "8a3109b26cd944eec22f5ae5ed778d4cf6c3e1079bebf2d8573a432acd1c8381"
+      },
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/eight_issue_holdout.R": {
         "path": "r/eight_issue_holdout.R",
         "sha256": "4446c3d46567f11edb1b13aeeebbd520c976af50f346989c4cce1e4c5588a643"
       },
-      "r/fundamentals_clean_validation.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_clean_validation.R": {
         "path": "r/fundamentals_clean_validation.R",
         "sha256": "3a0441bf5fafe59c179b46ea69e7c8bd356111bb4a694f7d47e7461e82cd3b71"
       },
-      "r/fundamentals_expert_refresh.R": {
-        "path": "r/fundamentals_expert_refresh.R",
-        "sha256": "8d2bc10dc16e873a5cc78bb848d3504a7777c1a21ac107ada5d88197d9aef2bc"
-      },
-      "r/fundamentals_high_margin.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_high_margin.R": {
         "path": "r/fundamentals_high_margin.R",
         "sha256": "d11c519a6e7a5f715273cebcff18d32c927b3c9d73ff106687a1c558b6e4c79c"
       },
-      "r/fundamentals_home_away.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_home_away.R": {
         "path": "r/fundamentals_home_away.R",
         "sha256": "5caa49f8bea845556df8b6544370bf34414a09c672db7b9771e35a196d9b359e"
       },
-      "r/fundamentals_market_comparison.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_market_comparison.R": {
         "path": "r/fundamentals_market_comparison.R",
         "sha256": "98beb89101b9a0b0f38f5c731ee3aec3b4183d758bb9594a35fc2f5d596ba965"
       },
-      "r/fundamentals_retraining.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_retraining.R": {
         "path": "r/fundamentals_retraining.R",
         "sha256": "5a53c051d9e67e2f6ec7d77b7b80133582b83c5155a1efa5f6f867e93f5b712d"
       },
-      "r/fundamentals_score_diagnostic.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_score_diagnostic.R": {
         "path": "r/fundamentals_score_diagnostic.R",
         "sha256": "7f06727b86149176f9054e162c96dfe6c68bbc4561cb4430ee19b6c67c45cbcd"
       },
-      "r/fundamentals_score_shape.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_score_shape.R": {
         "path": "r/fundamentals_score_shape.R",
         "sha256": "bea42b1d03fc83690c3c77596d8f8cd177355dcbe194118f62c7dd1b12fd96be"
       },
-      "r/fundamentals_three_issue_experts.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_three_issue_experts.R": {
         "path": "r/fundamentals_three_issue_experts.R",
         "sha256": "119cf7ca57cb95a31d3f92d657e5b97ba8ddaae39315bea0a106c044cc91b3e0"
       },
-      "r/fundamentals_total_market.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/fundamentals_total_market.R": {
         "path": "r/fundamentals_total_market.R",
         "sha256": "f7ce68735f7da4495cff0ac47a22058c730de696885e62c06ed7376810bda13f"
       },
-      "r/goal_distribution_experiment.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/goal_distribution_experiment.R": {
         "path": "r/goal_distribution_experiment.R",
         "sha256": "d05ff94c297d1629353a0d9e43beb52686d3332df5f0f95814770a5fccc724aa"
       },
-      "r/probability_exploration.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/r/probability_exploration.R": {
         "path": "r/probability_exploration.R",
         "sha256": "317076564f47febaeb5ae92f101f0da61483b2acacfc10fbf1d08e4891f394ed"
       },
-      "scripts/prepare_expert_refresh.py": {
-        "path": "scripts/prepare_expert_refresh.py",
-        "sha256": "165216dc0c2ff931318b4d27b3e3dc9cc32efd641c95ed26501480d4ff31ba43"
-      },
-      "scripts/project_clean_validation.R": {
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/scripts/project_clean_validation.R": {
         "path": "scripts/project_clean_validation.R",
         "sha256": "dcce6a0673d61169665442f39dfd62b435371d99335bd04915086c5e996f530c"
       },
-      "src/fundamentals_expert_refresh.py": {
-        "path": "src/fundamentals_expert_refresh.py",
-        "sha256": "c044d15be848bc910dc1a928dd95dae091365b9b2033848adc7550f885c44b75"
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/draw/rate-cv.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/draw/rate-cv.json",
+        "sha256": "ffe35970963c60b3db2498398a36049f4f4530204a04fcdb16aace98c1eb0fa1"
       },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/draw/rate-cv.json": {
-        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/draw/rate-cv.json",
-        "sha256": "8c83dcab57b238f76982b170b4290d63c41fa0a474d5385fdb50c66cb3e05f60"
-      },
-      "data/derived/fundamentals_417/expert-refresh-96-v2/high/tree-cv.json": {
-        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/high/tree-cv.json",
-        "sha256": "5ce58cd6be768a6dfd01a5e888082002cba6d7b5b65e79b6754f7a27af144dab"
+      "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/../clock-verified-final/high/tree-cv.json": {
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/high/tree-cv.json",
+        "sha256": "d1dedb120509a0b45ba4f61f94632ffda8d92d3696874316293fb6ec22dfc71b"
       }
     },
     "implementation": {
@@ -731,7 +807,7 @@
       ],
       "files": {
         "src/fundamentals_calibrated_draw.py": "4e15b22175477cf2416bc1c001052cc516be0276830b3096d328f450eded85dd",
-        "src/fundamentals_portable_experts.py": "4c83599483c6433426e58ce0ad6432b3205e467cf94991d74f818404c241ba8f",
+        "src/fundamentals_portable_experts.py": "d51ac68592252b8044644cba38188db4a70d4d7ea764b8cb638d2ac790f352d4",
         "src/fundamentals_retrained_experts.py": "1d511944a5ddd63b732084dd83def58d5e9011407eecf641c8eff4259ccbf2ca",
         "src/fundamentals_signal_rates.py": "fcbcdbd1193de56efe22fcad0cbce7815830f313028b7311a53102feb7371918",
         "src/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
@@ -742,8 +818,8 @@
         "src/temporal_learning/replay.py": "ff9a3890404a87484283ddd10b3960762397942c92af9231b9417cf081ddb61a"
       },
       "distributions": {},
-      "closure_sha256": "02473b7061c57c84be1b059d20b01d8b12ab4a8cc6d7b27e8047fe05c01c5d60"
+      "closure_sha256": "3d7a5247c8cecd1c084507672adc89a8cb28ea3ba790f29e043801f8c828025c"
     }
   },
-  "seal": "377eb3f422c3aea459adeb5463228d48b7d4d245730c9cfeaaee890828587239"
+  "seal": "eb230eaceb279de42531b16b09b52cb015041fea58a9e4fe27d678921134caf4"
 }

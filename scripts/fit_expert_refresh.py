@@ -14,13 +14,14 @@ from src.fundamentals_expert_refresh import calibration_rows
 
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--study',required=True);p.add_argument('--expert',choices=['draw','high'],required=True);a=p.parse_args()
- study=Path(a.study);out=study/a.expert
+ study=Path(a.study).absolute();out=study/a.expert
  if out.exists():raise FileExistsError('Immutable expert directory required')
  out.mkdir();contract=json.loads((study/'contract.json').read_text());policy=json.loads((study/'fit-policy.json').read_text())
  history=pd.DataFrame(json.loads((study/'training-data.json').read_text()))
  cutoff=Cutoff.decision_epoch(contract['cutoff_issue'],contract['cutoff_ts']);order=contract['train_issues']
  source_paths=[study/'training-data.json',study/'train-labels.json',study/'contract.json',study/'fit-policy.json',
      study/'input-receipt.json',study/'train-features.json',Path('scripts/prepare_expert_refresh.py'),Path(__file__),Path('src/fundamentals_expert_refresh.py'),Path('r/fundamentals_expert_refresh.R')]
+ source_paths=[path.absolute() for path in source_paths]
  sources={str(path):hashlib.sha256(path.read_bytes()).hexdigest() for path in source_paths}
  provenance=json.loads((study/'input-receipt.json').read_text())
  if stable_json_hash(provenance['receipt'])!=provenance['seal'] or provenance['receipt']['contract']!=contract:raise ValueError('Input provenance changed')

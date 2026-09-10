@@ -3,11 +3,22 @@ import argparse,json,hashlib,sys
 from pathlib import Path
 import pandas as pd
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from src.fundamentals_expert_refresh import read_refresh_features,attach_refresh_labels
+from src.fundamentals_expert_refresh import read_refresh_features,attach_refresh_labels,repair_refresh_training_clocks
 from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--study',required=True);a=p.parse_args();study=Path(a.study)
+ if (study/'clock-repair.json').exists():
+  import tempfile
+  info=json.loads((study/'clock-repair.json').read_text())
+  names=['contract.json','fit-policy.json','train-labels.json','test-features.json','training-exclusions.json','train-features.json','training-data.json','input-receipt.json']
+  with tempfile.TemporaryDirectory(dir=study.parent) as temporary:
+   rebuilt=repair_refresh_training_clocks(info['study'],info['audit_path'],Path(temporary)/'replay',source_root=info['source_root'])
+   for name in names:
+    if (rebuilt/name).read_bytes()!=(study/name).read_bytes():raise ValueError('Clock repair replay differs: '+name)
+  files={str(study/name):hashlib.sha256((study/name).read_bytes()).hexdigest() for name in names}
+  (study/'input-replay.json').write_text(json.dumps(dict(status='PASS',files=files,implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()),indent=2))
+  print('CLOCK_REPAIR_REPLAY_PASS');sys.exit(0)
  c=json.loads((study/'contract.json').read_text());r=json.loads((study/'input-receipt.json').read_text())
  if stable_json_hash(r['receipt'])!=r['seal']:raise ValueError('Input receipt changed')
  x=read_refresh_features('data/derived/fundamentals_417/cv-thirtytwo-test-sixteen-v1',

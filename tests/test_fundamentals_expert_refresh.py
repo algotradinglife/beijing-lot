@@ -72,3 +72,30 @@ def test_snapshot_split_is_label_free_and_hash_bound(tmp_path):
     p.write_text('{}')
     with pytest.raises(ValueError,match='source changed'):
         read_refresh_features(prior,exp,clean,train_count=3,test_count=1,initial_issues=1)
+
+
+def test_clock_repair_preserves_inputs_and_rejects_drift(tmp_path):
+    from src.fundamentals_expert_refresh import repair_refresh_training_clocks
+    from src.temporal_learning.predictor_clock import diagnostic_predictor_clock
+    root=tmp_path;study=root/'old';study.mkdir();raw=root/'source.json';raw.write_text('source')
+    sources={'source.json':hashlib.sha256(raw.read_bytes()).hexdigest()}
+    c=dict(cutoff_issue='002',cutoff_ts='2010-01-03T00:00:00Z')
+    row=dict(issue_code='001',slot=1,provider_id='a',data_available_ts='2010-01-01T00:00:00Z',predictor_clock_ts=None,x=3.)
+    for name,value in [('contract.json',c),('fit-policy.json',{}),('train-labels.json',{}),('test-features.json',[]),('training-exclusions.json',[]),('train-features.json',[row]),('training-data.json',[row])]:
+        (study/name).write_text(json.dumps(value))
+    (study/'test-labels.json').write_text('MUST NOT READ OR COPY')
+    prior=dict(contract=c,source_hashes=sources);(study/'input-receipt.json').write_text(json.dumps(dict(receipt=prior,seal=stable_json_hash(prior))))
+    clock=diagnostic_predictor_clock(['2009-12-30'],[],cutoff=Cutoff.decision_epoch('001',row['data_available_ts']),timezone='Asia/Shanghai',source_hashes=sources)
+    audit=dict(failed=0,failures=[],valid=1,source_hashes=sources,ledger=[dict(issue='001',slot=1,provider_id='a',decision=row['data_available_ts'],event_dates=['2009-12-30'],quote_times=[],clock=clock)])
+    path=root/'audit.json';path.write_text(json.dumps(audit));out=root/'new'
+    repair_refresh_training_clocks(study,path,out,source_root=root)
+    changed=json.loads((out/'training-data.json').read_text())[0]
+    assert changed['predictor_clock_ts']==clock['receipt']['maximum_predictor_clock']
+    assert {**changed,'predictor_clock_ts':None}==row
+    assert not (out/'test-labels.json').exists()
+    assert json.loads((study/'training-data.json').read_text())==[row]
+    with pytest.raises(FileExistsError):repair_refresh_training_clocks(study,path,out,source_root=root)
+    audit['ledger'][0]['event_dates']=['2009-12-29'];path.write_text(json.dumps(audit))
+    with pytest.raises(ValueError,match='replay'):repair_refresh_training_clocks(study,path,root/'bad',source_root=root)
+    raw.write_text('changed')
+    with pytest.raises(ValueError,match='source'):repair_refresh_training_clocks(study,path,root/'bad',source_root=root)

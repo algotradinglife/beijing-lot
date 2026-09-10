@@ -61,12 +61,12 @@ def freeze_portable_experts(model_root, *, output_path, source_root, provenance_
     Returns manifest path. Existing output fails; no fitting or label changes.
     """
     if version!='2.0.0':raise ValueError('Exact model version 2.0.0 required')
-    root=Path(model_root);source_root=Path(source_root).absolute()
+    root=Path(model_root);source_root=Path(source_root).resolve()
     _,_,receipts,sources=_portable_metadata(root);bindings={}
     for source,expected in sources.items():
         p=Path(source)
         if p.is_absolute():
-            try:p=p.relative_to(source_root)
+            try:p=p.resolve().relative_to(source_root)
             except ValueError:raise ValueError('Source outside explicit publication root: '+source)
         file=_portable_path(source_root,str(p))
         if hashlib.sha256(file.read_bytes()).hexdigest()!=expected:raise ValueError('Portable source changed: '+source)

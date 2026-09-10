@@ -2,7 +2,7 @@
 title: "基本面专家 2.0.0：72 期 CV 与 24 期固定测试"
 format: html
 params:
-  study: data/derived/fundamentals_417/expert-refresh-96-v2
+  study: data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final
   python: ""
 execute:
   cache: false
@@ -77,3 +77,5 @@ signals = predict_active_experts(
     draw_weight=None,  # 使用 CV 冻结的 50% 权重
 )
 ```
+
+发布审核补充：原训练预热期 364 条缺失信息时间已从原基本面和盘口快照重建。独立修复目录保留全部 4,195 条训练记录，只补时钟；共用时间校验后重新生成冻结产物。两棵树、叶节点概率、校准估计和选定参数均与原候选完全一致，原候选数据与模型保留。时间证据仍是历史代理，不代表真实观测可用性。

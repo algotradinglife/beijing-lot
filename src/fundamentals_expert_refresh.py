@@ -151,3 +151,57 @@ def calibration_rows(cv, training, *, cutoff):
     ready=joined.draw_signal.isin(['POSITIVE','NEGATIVE','ABSTAIN']) & joined.draw_probability.notna()
     exclusions=joined.loc[~ready,keys].assign(reason='MISSING_EXPERT_PREDICTOR')
     return joined.loc[ready].copy(),exclusions
+
+
+def repair_refresh_training_clocks(study, audit_path, output, *, source_root):
+    """Create an independent training snapshot with verified missing clocks.
+
+    Preserve every feature, label, policy and issue; only absent predictor clocks
+    may be supplied by sealed shared diagnostic-clock receipts. Verify all
+    original/audit source bytes and independently replay each clock. Never open
+    test labels, overwrite a study, or fit. Return the new study directory.
+    """
+    from src.temporal_learning.predictor_clock import diagnostic_predictor_clock,validate_training_predictor_clocks
+    study=Path(study);output=Path(output);source_root=Path(source_root)
+    if output.exists():raise FileExistsError(output)
+    prior=json.loads((study/'input-receipt.json').read_text());audit=json.loads(Path(audit_path).read_text())
+    if stable_json_hash(prior['receipt'])!=prior['seal'] or audit['failed'] or audit['failures'] or audit['valid']!=len(audit['ledger']):
+        raise ValueError('Invalid clock repair inputs')
+    sources={}
+    for ledger in [prior['receipt']['source_hashes'],audit['source_hashes']]:
+        for name,digest in ledger.items():
+            path=Path(name) if Path(name).is_absolute() else source_root/name
+            if hashlib.sha256(path.read_bytes()).hexdigest()!=digest:raise ValueError('Clock repair source changed')
+            sources[str(path.absolute())]=digest
+    features=json.loads((study/'train-features.json').read_text());training=json.loads((study/'training-data.json').read_text())
+    keys=lambda row:(row['issue_code'],row['slot'],row['provider_id'])
+    patches={}
+    for entry in audit['ledger']:
+        key=(entry['issue'],entry['slot'],entry['provider_id'])
+        if key in patches:raise ValueError('Duplicate clock repair identity')
+        rc=entry['clock']['receipt'];cut=Cutoff.decision_epoch(entry['issue'],entry['decision'])
+        rebuilt=diagnostic_predictor_clock(entry['event_dates'],entry['quote_times'],cutoff=cut,timezone='Asia/Shanghai',source_hashes=rc['source_hashes'])
+        if rebuilt!=entry['clock'] or any(audit['source_hashes'].get(k)!=v for k,v in rc['source_hashes'].items()):
+            raise ValueError('Clock repair replay differs')
+        patches[key]=(cut.cutoff_ts,rc['maximum_predictor_clock'])
+    missing={keys(r) for r in training if pd.isna(r.get('predictor_clock_ts'))}
+    if missing!=set(patches):raise ValueError('Clock repair scope mismatch')
+    for rows in [features,training]:
+        for row in rows:
+            if keys(row) in patches:
+                decision,clock=patches[keys(row)]
+                if not pd.isna(row.get('predictor_clock_ts')) or utc(row['data_available_ts'])!=decision:raise ValueError('Clock repair would alter known data')
+                row['predictor_clock_ts']=clock
+    contract=json.loads((study/'contract.json').read_text())
+    maximum=validate_training_predictor_clocks(pd.DataFrame(training),Cutoff.decision_epoch(contract['cutoff_issue'],contract['cutoff_ts']))
+    copy_names=['contract.json','fit-policy.json','train-labels.json','test-features.json','training-exclusions.json']
+    for path in [study/n for n in copy_names+['train-features.json','training-data.json','input-receipt.json']]+[Path(audit_path)]:
+        sources[str(path.absolute())]=hashlib.sha256(path.read_bytes()).hexdigest()
+    receipt=dict(prior['receipt'],source_hashes=sources,clock_repair=dict(rows=len(patches),maximum_predictor_clock=maximum,scope='HISTORICAL_PROXY_DIAGNOSTIC_ONLY'))
+    output.mkdir(parents=True)
+    for name in copy_names:(output/name).write_bytes((study/name).read_bytes())
+    for name,rows in [('train-features.json',features),('training-data.json',training)]:
+        (output/name).write_text(json.dumps(rows))
+    (output/'input-receipt.json').write_text(json.dumps(dict(receipt=receipt,seal=stable_json_hash(receipt)),indent=2))
+    (output/'clock-repair.json').write_text(json.dumps(dict(study=str(study.absolute()),audit_path=str(Path(audit_path).absolute()),source_root=str(source_root.absolute()))))
+    return output

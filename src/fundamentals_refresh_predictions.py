@@ -119,3 +119,22 @@ def freeze_refresh_report_inputs(study):
     else:
         with path.open('x') as handle:json.dump(payload,handle,indent=2)
     return path
+
+
+def bind_legacy_catalog_roots(catalog, legacy_root):
+    """Pin archived data/runtime paths to an explicit audit snapshot root.
+
+    Returns a deep-copied sealed catalog. Preserves version/file hashes and the
+    relative worker pin, whose identical implementation is checked by the router.
+    No fallback, fitting, file access or mutation of the original catalog.
+    """
+    import copy
+    root=Path(legacy_root).resolve();result=copy.deepcopy(catalog)
+    if stable_json_hash(result['receipt'])!=result['seal']:raise ValueError('Legacy catalog seal changed')
+    for entry in result['receipt']['versions'].values():
+        for name in ['runtime_root','model_dir']:
+            if name in entry:entry[name]=str(root/entry[name])
+        if 'models' in entry:entry['models']={k:str(root/v) for k,v in entry['models'].items()}
+        entry['files']={k if k=='scripts/predict_draw_version_worker.py' else str(root/k):v for k,v in entry['files'].items()}
+    result['seal']=stable_json_hash(result['receipt'])
+    return result
