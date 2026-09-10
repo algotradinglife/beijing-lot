@@ -138,3 +138,30 @@ def bind_legacy_catalog_roots(catalog, legacy_root):
         entry['files']={k if k=='scripts/predict_draw_version_worker.py' else str(root/k):v for k,v in entry['files'].items()}
     result['seal']=stable_json_hash(result['receipt'])
     return result
+
+
+def verify_refresh_input_snapshots(study, *, prior, experiment, clean_study):
+    """Independently reconstruct features and label admission from named sources.
+
+    Runs in the explicitly selected source snapshot working directory when its
+    receipts contain relative locators. Returns verified source hashes; raises
+    on drift, inconsistent features, targets, labels or exclusion inventories.
+    No fitting, model loading or writes.
+    """
+    from src.fundamentals_expert_refresh import read_refresh_features,attach_refresh_labels
+    from src.temporal_learning import Cutoff
+    study=Path(study);contract=json.loads((study/'contract.json').read_text())
+    payload=json.loads((study/'input-receipt.json').read_text())
+    if stable_json_hash(payload['receipt'])!=payload['seal']:raise ValueError('Input receipt changed')
+    rebuilt=read_refresh_features(prior,experiment,clean_study,train_count=len(contract['train_issues']),
+        test_count=len(contract['test_issues']),initial_issues=contract['initial_issues'])
+    if rebuilt['contract']!=contract or rebuilt['source_hashes']!=payload['receipt']['source_hashes']:
+        raise ValueError('Source/contract replay differs')
+    for part in ['train','test']:
+        if json.loads(rebuilt[part].to_json(orient='records',double_precision=15))!=json.loads((study/f'{part}-features.json').read_text()):
+            raise ValueError('Feature replay differs')
+    labels=pd.DataFrame(json.loads((study/'train-labels.json').read_text())['labels'])
+    rows,excluded=attach_refresh_labels(rebuilt['train'],labels,cutoff=Cutoff.decision_epoch(contract['cutoff_issue'],contract['cutoff_ts']),label_delay_hours=contract['label_delay_hours'])
+    pd.testing.assert_frame_equal(rows,pd.DataFrame(json.loads((study/'training-data.json').read_text())),check_dtype=False)
+    if excluded.to_dict('records')!=json.loads((study/'training-exclusions.json').read_text()):raise ValueError('Exclusion replay differs')
+    return rebuilt['source_hashes']

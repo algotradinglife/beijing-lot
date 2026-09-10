@@ -19,6 +19,7 @@ if __name__=='__main__':
  (out/'contract.json').write_text(json.dumps(data['contract'],indent=2))
  for part in ['train','test']:
   (out/f'{part}-features.json').write_text(data[part].to_json(orient='records',double_precision=15))
- receipt=dict(source_hashes=data['source_hashes'],readiness=data['readiness'],contract=data['contract'])
+ receipt=dict(source_hashes=data['source_hashes'],readiness=data['readiness'],contract=data['contract'],
+     preparation=dict(prior=a.prior,experiment=a.experiment,clean_study=a.clean_study,source_root=str(Path.cwd().resolve())))
  (out/'input-receipt.json').write_text(json.dumps(dict(receipt=receipt,seal=stable_json_hash(receipt)),indent=2))
  print('FEATURES',len(data['train']),len(data['test']),flush=True)

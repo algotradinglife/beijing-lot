@@ -97,7 +97,7 @@
         "sha256": "944f7a85849e060671a4bdac8dd0102fcde9c734540389d268f40d3ff01300b0"
       },
       "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/scripts/prepare_expert_refresh.py": {
-        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/scripts/prepare_expert_refresh.py",
+        "path": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final/source-code-archive/scripts/prepare_expert_refresh.py",
         "sha256": "b9404e2e6cc521afaf46081d106e74af5f5d141a492a382e329369d26b54db21"
       },
       "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/expert-refresh-96-v2/ship-checkout/src/fundamentals_expert_refresh.py": {
@@ -821,5 +821,5 @@
       "closure_sha256": "3d7a5247c8cecd1c084507672adc89a8cb28ea3ba790f29e043801f8c828025c"
     }
   },
-  "seal": "eb230eaceb279de42531b16b09b52cb015041fea58a9e4fe27d678921134caf4"
+  "seal": "8d5c87571cc6043e462af6316cff4543a68e7298bd7639b982331cc8973eedcd"
 }

@@ -114,3 +114,17 @@ unchanged policies, freeze, then evaluate and run `replay_expert_refresh_inputs.
 Both tree identities, leaf counts/probabilities and calibration estimates remain
 identical. The reviewed manifest pins these newly validated receipts; the old
 candidate remains archived. No new issues or target outcomes enter selection.
+
+Preparation records its nominated source locations in the input receipt. Replay
+uses those locations in an explicit source-snapshot process. For older archives
+without these records, supply `--prior`, `--experiment`, `--clean-study` and
+`--source-root` explicitly. Clock-repair replay first reconstructs the original
+features and label admission, then independently reapplies the clock ledger.
+The exact preparation code used by this build is retained in its data-side
+`source-code-archive`; the portable manifest maps its immutable source identifier
+to that archived file. Current preparation code can then record replay locations
+without invalidating the historical build's source identity.
+
+All 1,087 holdout predictions for each refreshed expert are exactly unchanged
+(maximum absolute probability difference 0). The actual-data QMD render and
+full source/label replay both pass.

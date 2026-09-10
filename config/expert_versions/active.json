@@ -11,10 +11,10 @@
       }
     },
     "manifest_path": "config/expert_versions/portable-2.0.0.json",
-    "manifest_sha256": "b3b2b650be24fd74a612faa30de8e1de386a6435ee35ba261a00df68ee559f51",
+    "manifest_sha256": "068d084042344b76541ae399e72f2aeba5ace404defe933b4121705056717e9b",
     "model_root": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final",
     "source_root": ".",
     "provenance_root": "."
   },
-  "seal": "05cd82664699ec7df08be5a182a02e9f465607cf87195335bc7a35f4e156251c"
+  "seal": "185985ecd3ab8b9c745e60882fd366d7253e448f2e55e4282d32f2badea68c35"
 }

@@ -67,6 +67,23 @@ def test_snapshot_split_is_label_free_and_hash_bound(tmp_path):
     result=read_refresh_features(prior,exp,clean,train_count=3,test_count=1,initial_issues=1)
     assert len(result['train'])==3 and len(result['test'])==1 and 'draw_target' not in result['train']
     assert result['contract']['test_issues']==['100104']
+    from src.fundamentals_refresh_predictions import verify_refresh_input_snapshots
+    study=tmp_path/'independent-study';study.mkdir()
+    c=result['contract'];train=result['train']
+    labels=train[['issue_code','slot','provider_id']].assign(actual_home=1,actual_away=1,label_status='COMPLETED')
+    admitted,excluded=attach_refresh_labels(train,labels,cutoff=Cutoff.decision_epoch(c['cutoff_issue'],c['cutoff_ts']),label_delay_hours=c['label_delay_hours'])
+    rc=dict(contract=c,source_hashes=result['source_hashes'])
+    for name,value in [('contract.json',c),('input-receipt.json',dict(receipt=rc,seal=stable_json_hash(rc))),('train-labels.json',dict(labels=labels.to_dict('records'))),('training-exclusions.json',excluded.to_dict('records'))]:
+        (study/name).write_text(json.dumps(value))
+    for name,frame in [('train-features.json',train),('test-features.json',result['test']),('training-data.json',admitted)]:
+        (study/name).write_text(frame.to_json(orient='records',double_precision=15))
+    options=dict(prior=prior,experiment=exp,clean_study=clean)
+    verify_refresh_input_snapshots(study,**options)
+    original=(study/'training-data.json').read_text();broken=json.loads(original);broken[0]['draw_target']=False
+    (study/'training-data.json').write_text(json.dumps(broken))
+    with pytest.raises(AssertionError):verify_refresh_input_snapshots(study,**options)
+    (study/'training-data.json').write_text(original)
+
     with pytest.raises(ValueError,match='counts'):
         read_refresh_features(prior,exp,clean,train_count=4,test_count=1,initial_issues=1)
     p.write_text('{}')
