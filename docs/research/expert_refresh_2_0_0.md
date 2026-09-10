@@ -33,13 +33,16 @@ Use a **new output directory** when reproducing training. The ordered steps are:
 
 ## Prediction
 
-Call the authoritative `src.fundamentals_draw_versions.predict_draw_version`
-with `version='2.0.0'`, explicit `cutoffs` (one shared `Cutoff` per fixture),
-`catalog_path=study/'draw-catalog.json'` or `study/'high-catalog.json'`, repository
-root and project Python. Despite its historical name the RAW_TREE route supports
-high-only artifacts. It returns versioned predictions and machine-readable
-receipts; imports never scrape or write databases. Missing features remain
-explicit. Training replay gives a warning, not a refusal.
+Load the current release using `load_portable_experts` from
+`src.fundamentals_portable_experts`, supplying the pinned
+`config/expert_versions/portable-2.0.0.json`, `expected_version='2.0.0'`,
+and explicit `model_root`, `source_root`, `provenance_root`, `repository_root`.
+Use `predict_portable_expert(artifacts, 'draw' or 'high', frame, cutoff=...)`
+for independent prediction. Roots locate the model bundle, audited source
+snapshot, exact training code archive and current runtime code respectively.
+Moving all four roots preserves model identity and predictions; missing or
+changed files fail before deserialization. Only trusted audited bundles may be
+loaded. Training replay warns rather than refusing.
 
 For draw, omit `draw_weight` to use frozen CV policy; any explicit value in [0,1]
 is recorded as a caller override. `draw_target_probability` is already blended.
@@ -54,8 +57,11 @@ At the user's instruction both experts are selected as 2.0.0 in
 `config/expert_versions/active.json`. Use
 `src.fundamentals_active_experts.predict_active_experts(frame, cutoffs=...,
 selection_path=..., repository_root=..., python=..., draw_weight=None)`.
-The explicit selection pins both version catalogs by hash; both are validated
-before either prediction runs. This changes the caller's selected models, not
+The explicit selection pins the portable manifest by hash; both experts and
+all transitive source/code hashes are validated before either prediction runs.
+Optional `model_root`, `source_root` and `provenance_root` arguments explicitly
+locate separately mounted archives. `python` must identify the current project
+interpreter. This changes the caller's selected models, not
 the retrospective evidence or the old version catalogs. `draw_weight` applies
 only to draw; high keeps its own frozen output. Prior version catalogs remain
 available through the existing explicit-version router.
@@ -75,8 +81,19 @@ packages for this interface. CI generates synthetic data using
 renders QMD without scraping or access to the historical database. The synthetic
 render validates reporting contracts, not the historical model's performance.
 
-The scoped clean checkout passed 52 Python tests, the full existing R suite plus
+The scoped clean checkout passed the affected Python tests, the full existing R suite plus
 the two new report/query suites, cutoff governance and an executed offline QMD
 render. Historical evaluation remains: draw Brier 0.19315 → 0.19235 (1,087 games),
 high-margin Brier 0.19329 → 0.18979 (111 eligible games). Those retrospective
 results do not establish future profitability.
+
+## Portable publication
+
+`scripts/freeze_portable_experts.py --model-root BUNDLE --source-root SNAPSHOT
+--provenance-root TRAINING_CODE --output NEW_MANIFEST` creates an immutable
+manifest without refitting or altering original model bytes. Original source
+identifiers are retained as provenance keys; sealed relative locators, never
+those original paths, resolve files during loading. The exact-version legacy
+router remains for archived rollback; it is not the current portable entry.
+Relocation tests move models, sources and runtime together, remove their old
+location, compare both predictions and reject subsequent source tampering.

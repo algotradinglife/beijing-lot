@@ -1,18 +1,20 @@
 {
   "receipt": {
+    "format": "PORTABLE_EXPERT_SELECTION_V1",
     "scope": "RETROSPECTIVE_HISTORY",
     "experts": {
       "draw": {
-        "version": "2.0.0",
-        "catalog_path": "data/derived/fundamentals_417/expert-refresh-96-v2/draw-catalog.json",
-        "catalog_sha256": "d0b91bcdb68bf061260d10b01fe192d96464df630004e0f0ac69946a05997cd3"
+        "version": "2.0.0"
       },
       "high": {
-        "version": "2.0.0",
-        "catalog_path": "data/derived/fundamentals_417/expert-refresh-96-v2/high-catalog.json",
-        "catalog_sha256": "4255becdd52e81aaab2d20d66416981c8e0134f0af1e0b4282e944a1f75c3aab"
+        "version": "2.0.0"
       }
-    }
+    },
+    "manifest_path": "config/expert_versions/portable-2.0.0.json",
+    "manifest_sha256": "7632816a791a76d0ba89801f28f0164d1c1e50f068ce14c5d1a6ee99ff3b220a",
+    "model_root": "data/derived/fundamentals_417/expert-refresh-96-v2",
+    "source_root": ".",
+    "provenance_root": "."
   },
-  "seal": "74f5f8c782fe0755fb4b8a37f25946183b61b968552f75f83f4d4cc537e06666"
+  "seal": "a69ee5c07d410dc43594c392a9e1347f6dd8c5d79d29042ff9fa2c18a981cce9"
 }

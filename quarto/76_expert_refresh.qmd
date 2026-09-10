@@ -38,7 +38,7 @@ knitr::kable(rate_cv$metrics,digits=4)
 rm(draw_cv,high_cv,rate_cv)
 ```
 
-模型版本为 **2.0.0**，让平推理接口仍为 **1.1.0**。旧模型与版本目录保留，未覆盖旧版。新让平与高净球分别通过本次目录的 `draw-catalog.json`、`high-catalog.json` 调用已有 `predict_draw_version()` 路由（显式传入版本 `2.0.0`、逐场 cutoff 和项目 Python）。让平 `draw_weight=NULL` 使用 CV 冻结权重，可显式传入 0–1；返回的 `draw_target_probability` 已混合基线，投射比分时不得再次乘权重。高净球输出保持原有三态信号与条件概率。
+模型版本为 **2.0.0**，让平推理接口仍为 **1.1.0**。旧模型与版本目录保留，未覆盖旧版。当前发布通过 `portable-2.0.0.json` 清单与 `predict_portable_expert()` 独立调用两个专家；原版本路由用于归档回放。模型、来源快照和训练代码可用显式根目录迁移，加载前核验哈希。让平 `draw_weight=NULL` 使用 CV 冻结权重，可显式传入 0–1；返回的 `draw_target_probability` 已混合基线，投射比分时不得再次乘权重。高净球输出保持原有三态信号与条件概率。
 
 ```{r}
 #| label: holdout-eligibility
