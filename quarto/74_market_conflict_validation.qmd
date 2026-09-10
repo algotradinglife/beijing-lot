@@ -1,0 +1,107 @@
+---
+title: "市场与校正概率冲突：重叠双选替换试验"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/new48-market-conflict-v1"
+  archived_report: false
+---
+
+本轮继续使用100402–100607的48期：33期下注、15期持有现金。**这些赛果已被查看，属于追加回顾试验，不是新的独立样本外验证。**
+沿用冻结让平1.1.0与高净球0.1.0，权重各0.5，没有重新训练。
+
+市场概率q来自赛前欧赔与大小球映射的比分分布；p来自当前校正后的比分分布。
+两者均投影到同一北单让球胜平负，不拿普通胜平负与让球结果混比，也不使用结算SP来选场。
+
+固定原七场分组、单选角色、基本票单位与预算，每期1024元、每基本票2元、返奖只乘一次0.65，无比分保护。
+只在**后续重叠双选**上保留p最高方向，用第三方向替换第二方向；首次出现和单选不变。
+
+冲突条件：q对p第三方向的支持比第二方向至少高5个百分点。
+TAIL05只用这一方向反转；TV10/TV15/TV20再要求总变差距离
+$TV=\frac12\sum_{d\in\{W,D,L\}}|p_d-q_d|$至少为0.10/0.15/0.20。
+阈值预先固定，不根据本批收益挑选默认门槛。BASE不替换；GAP02/GAP05是原p第二、第三方向接近时替换的对照。
+
+例如p=(0.50,0.30,0.20)、q=(0.40,0.20,0.40)，TV=0.20，市场尾部支持差=0.20；符合TV20。
+这一规则不要求两边第一方向不同，而是要求市场明确支持原本未选的方向。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+source('r/fundamentals_repeated_double.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+stopifnot(identical(result$freeze_seal,frozen$seal))
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files,as.list(result$source_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY')
+ bindings <- archive$hashes
+ cat('归档只重放报告，不代表模型、源数据和SQLite全链重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==2688,n_distinct(x$issue)==48,!anyDuplicated(x[c('issue','policy')]),all(x$status %in% c('COMPLETE','NO_BET')))
+parts <- list()
+for(rule in c('GAP02','GAP05','TAIL05','TV10','TV15','TV20')) {
+ q <- filter(x,.data$rule %in% c('BASE',.env$rule)) |>
+  mutate(action=if_else(.data$rule=='BASE','BASE','ADJUSTED'),kind=if_else(.data$rule=='BASE','OLD','ADJUSTED'))
+ s <- repeated_double_summary(q,100000)
+ s$rule <- ifelse(s$action=='BASE','BASE',rule)
+ if(rule!='GAP02') s <- filter(s,action!='BASE')
+ parts[[rule]] <- s
+}
+s <- bind_rows(parts) |> mutate(budget_ROI_percent=100*budget_return,stake_ROI_percent=100*roi)
+```
+
+## 收益、回撤与命中组数
+
+预算回报率分母包括未使用现金（48×1024元）；另列实际投注回报率。
+最大回撤按逐期净收益、10万元初始资金计算。原始分组不变，因而同一环境内各规则的投入相同。
+
+```{r}
+s |> arrange(depth,quality,overlap,rule) |> select(case,rule,stake_cny,cash_cny,net_cny,budget_ROI_percent,stake_ROI_percent,
+ max_drawdown_cny,winning_groups,groups,changed_legs,gained_groups,lost_groups,matched_lift) |> knitr::kable(digits=2)
+```
+
+## 收益集中度
+
+```{r}
+s |> arrange(case,rule) |> select(case,rule,matched_lift,ex_largest_issue,ex_largest_net,ex_largest_matched_lift,
+ ex_largest_lift_issue,ex_largest_lift,longest_losing_run,worst_5_loss,worst_10_loss,model_union) |> knitr::kable(digits=2)
+```
+
+原压两场TOP2/STRICT：TV20相对不替换改善2885.65元，净收益仍为−2744.29元；
+中奖组17→20，最大回撤6189.12→5056.00元。移除改善最大的100407期后，配对改善仍为1045.42元。
+但不同组合约束下表现差异很大，例如压两场TOP2/FREE的TV20相对不替换减少4425.42元。
+因此，这批证据支持继续检验局部规则，不支持把它普遍设为默认替换。
+
+## 被改变的场次：结构和前几行
+
+每行是一张七串1中的一个被替换场次；相同比赛在不同组中可重复出现。p/q均为让球胜平负概率。support编码3=让胜、1=让平、0=让负。
+
+```{r}
+changes <- tibble::as_tibble(result$changes)
+glimpse(changes)
+changes |> select(issue,case,rule,group,slot,provider_id,source_support,selected_support,total_variation,market_tail_lead,
+ p_W,p_D,p_L,q_W,q_D,q_L) |> head(15) |> knitr::kable(digits=3)
+```
+
+## 每期全部对照
+
+```{r}
+x |> mutate(budget_ROI_percent=100*budget_return,stake_ROI_percent=100*roi) |>
+ arrange(issue,case,rule) |> select(issue,case,rule,status,groups,hits,stake,cash_cny,net,budget_ROI_percent,stake_ROI_percent) |>
+ knitr::kable(digits=2)
+```
+
+需要区分两个判断：市场对第三方向支持更强，并不意味着当前p模型也认为替换划算。
+因为p第二≥p第三、q第三>q第二，在当前p/q估计SP框架下，替换不会提高模型估算的返奖期望。
+它是在检验市场是否能纠正专家的错误偏向，必须同时查看实际收益、回撤与模型覆盖概率。
+
+实现：`src/fundamentals_market_conflict.py`调用已有支持替换接口验证原组合，只补充冲突门禁。
+`scripts/market_conflict_validation.py`冻结再结算；`scripts/check_market_conflict.py`独立重放。
+本QMD仅汇总冻结结果，不抓取、不训练、不改原始数据或旧结果。
