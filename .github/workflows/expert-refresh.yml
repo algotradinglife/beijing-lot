@@ -28,6 +28,26 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /AGENTS.md
+            /DESCRIPTION
+            /.Rprofile
+            /_quarto.yml
+            /config/
+            /src/
+            /scripts/
+            /r/
+            /quarto/76_expert_refresh.qmd
+            /tests/__init__.py
+            /tests/conftest.py
+            /tests/test_fundamentals*.py
+            /tests/scripts/test_fixed_prior_fit.py
+            /tests/testthat/test-fundamentals-expert-refresh*.R
+            /docs/research/temporal-function-inventory.csv
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14.4'
