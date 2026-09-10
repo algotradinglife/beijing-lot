@@ -1,0 +1,84 @@
+---
+title: "纯基线压两场：重复场次改变单选与双选"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/repeated-support-v2"
+  archived_report: false
+---
+
+固定同一批48期、原始纯基线概率及原来“压2、概率排序、不替换、放宽复用”的七场分组、
+单选位置和投入。每期1,024元，每组64元，共16组，没有比分保护。初始本金100,000元。
+只在比赛后续出现时改变选择，不重新选场、组注或分配资金。
+这是已经查看赛果后的回顾诊断，没有拟合、专家模型或阈值搜索。
+
+|规则|后续重复场次的变化|
+|---|---|
+|BASE|不变|
+|SINGLE|本组为单选且原始最高概率≤75%，改选原始第二方向|
+|GAP|本组为双选且第二、第三概率差≤5个百分点，改选第一＋第三|
+|MARKET|本组为双选，市场第三方向比第二方向高≥5个百分点，且市场与基线TV≥0.15时替换|
+|DOUBLE_OR|双选满足GAP或MARKET任一条件就替换|
+|ALL|合并SINGLE与DOUBLE_OR|
+
+第一次出现不改；任何先前出现（无论当时单选或双选）均计为复用。
+第三次及以后保持规则指定方向，不交替切换。排名始终基于原始概率，平手顺序为让胜、让平、让负。
+市场概率为赛前欧赔＋大小球映射到相同北单让球玩法，未使用赛后SP选择赛果。
+实际结算使用已验收SP；0.65票级返奖系数仅在原结算函数中计算一次。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows) |> mutate(model='纯基线')
+stopifnot(nrow(rows)==288,n_distinct(rows$issue)==48,all(rows$stake==1024),all(rows$groups==16))
+curves <- strategy_equity_curves(rows,sort(unique(rows$issue)),100000)
+summary <- rows |> group_by(rule) |> summarise(stake_cny=sum(stake),net_cny=sum(net),
+ budget_ROI_percent=100*net_cny/stake_cny,hits=sum(hits),groups=sum(groups),
+ profitable_issues=sum(net>0),changed_legs=sum(changed_legs),gained_groups=sum(gained_groups),lost_groups=sum(lost_groups),
+ best_issue_net=max(net),without_best=sum(net)-max(net),.groups='drop')
+risk <- curves |> group_by(rule) |> summarise(max_drawdown=max(drawdown_cny),final_capital=last(equity_cny),.groups='drop')
+summary <- summary |> left_join(risk,by='rule',relationship='one-to-one')
+summary$rule <- factor(summary$rule,levels=c('BASE','SINGLE','GAP','MARKET','DOUBLE_OR','ALL'))
+summary <- arrange(summary,rule)
+```
+
+## 收益与回撤
+
+```{r}
+summary |> knitr::kable(digits=2)
+```
+
+新增／失去的命中组均与同一期、同一组原方案直接比较。
+不同规则的总体场次、组数及投入完全一致；不把重复下注当作独立比赛样本。
+回撤是逐期期末资金相对于此前峰值的下降，包含起始资金。
+
+```{r}
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 11
+#| fig-height: 6
+plot_strategy_equity(mutate(curves,label=rule),'funded',100000)+
+ labs(title='固定分组与投入：只改变后续重复场次的赛果')
+```
+
+## 逐期收益
+
+```{r}
+rows |> select(issue,rule,net,hits,gained_groups,lost_groups) |>
+ tidyr::pivot_wider(names_from=rule,values_from=c(net,hits,gained_groups,lost_groups)) |>
+ arrange(issue) |> knitr::kable(digits=2)
+```
+
+复用模块：`src/fundamentals_repeated_support.py`组合已有双选差距和市场分歧规则；
+`settle_compression_variants`和`settle_breadth_bundle`复用原票级结算；
+资金会计复用`r/fundamentals_equity_curves.R`。
+全部48期新方案冻结并保存哈希后，才读取结算数据。历史源时间仍是原有代理证据，不声称前瞻有效。
+输入、实现、固定阈值和结果字节哈希见`freeze-receipt.json`与`plans-frozen.json`；
+归档模式仅重放报告，不代表全链模型重放。
