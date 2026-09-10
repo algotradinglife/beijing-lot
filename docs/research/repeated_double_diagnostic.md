@@ -55,3 +55,9 @@ quarto render quarto/71_repeated_double.qmd --execute-dir . --execute --no-cache
 本地97项相关Python测试、63项受影响R断言、cutoff静态检查及独立640计划核验通过。全仓R套件未执行，范围为受影响分析接口。完整研究和归档QMD均要求执行、无缓存、错误致命。v1保留为未验收草稿；v2补强预算与实际units元数据后完整重跑，所有数值结果与v1一致，未改写旧回执。
 
 独立CI工作流compression-breadth.yml增加本轮测试和QMD71归档渲染；共享工作区其他会话改动不纳入提交。Codex review与远端CI验收状态另行追加。
+
+## 最终本地审核及交付
+
+实现已提交并推送为453dac25。Codex final review无可操作P1/P2；审核者实际运行新增3项Python测试、独立640计划核验及新增10项R断言，并检查HTML含七张完整表和640结果行。待提交文件的隔离快照另通过97项Python测试、63项受影响R断言、cutoff检查及归档渲染；实际、归档、隔离归档三份HTML表行数均为1/8/8/8/8/48/640。实现闭包原始字节和检查日志保存在本地研究目录。
+
+[远端CI](https://github.com/algotradinglife/beijing-lot/actions/runs/34479521989)已触发，交付记录时仍运行中，不能记为通过；本轮本地验证和Codex审核通过，不进行合并或Issue关闭。
