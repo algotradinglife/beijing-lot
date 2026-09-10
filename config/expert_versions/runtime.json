@@ -1,0 +1,26 @@
+{
+  "python": "3.14.4",
+  "R": "4.6.1",
+  "quarto": "1.10.18",
+  "r_direct": {
+    "dplyr": "1.2.1",
+    "readr": "2.2.0",
+    "jsonlite": "2.0.0",
+    "digest": "0.6.39",
+    "testthat": "3.3.2",
+    "knitr": "1.51",
+    "rmarkdown": "2.31",
+    "tibble": "3.3.1",
+    "reticulate": "1.46.0",
+    "stringr": "1.6.0",
+    "DBI": "1.3.0",
+    "RSQLite": "3.53.3"
+  },
+  "python_direct": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scipy": "1.17.1",
+    "scikit-learn": "1.9.0",
+    "pytest": "9.0.3"
+  }
+}

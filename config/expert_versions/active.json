@@ -1,0 +1,20 @@
+{
+  "receipt": {
+    "format": "PORTABLE_EXPERT_SELECTION_V1",
+    "scope": "RETROSPECTIVE_HISTORY",
+    "experts": {
+      "draw": {
+        "version": "2.0.0"
+      },
+      "high": {
+        "version": "2.0.0"
+      }
+    },
+    "manifest_path": "config/expert_versions/portable-2.0.0.json",
+    "manifest_sha256": "068d084042344b76541ae399e72f2aeba5ace404defe933b4121705056717e9b",
+    "model_root": "data/derived/fundamentals_417/expert-refresh-96-v2/clock-verified-final",
+    "source_root": ".",
+    "provenance_root": "."
+  },
+  "seal": "185985ecd3ab8b9c745e60882fd366d7253e448f2e55e4282d32f2badea68c35"
+}
