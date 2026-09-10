@@ -1,0 +1,124 @@
+---
+title: "#419：扩组重叠双选改为最高＋第三概率赛果"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/repeated-double-v2"
+  archived_report: false
+---
+
+## 固定规则与对照
+
+沿用前轮同一40期、同一比分分布投射与冻结专家（让平1.1.0、高净球专家，权重各0.5），不重训。
+所有期均已暴露；原24/8/8分区仅供回顾，不是当前规则的新样本外测试，也不是#419完整因果跨年验收。
+
+保留原不重叠分组，按既定顺序扩组。当某场在**更早的任一组**已经出现：
+
+- 本次是双选：保留概率最高赛果，将第二高换成第三高。
+- 本次是单选：完全不改。
+- 首次出现不改；更早的组不回头修改。
+- 第三次及以后再次出现的双选，仍为最高＋第三高，不交替、不轮换。
+
+“第三赛果”指让球胜／平／负中概率排第三的方向，不是第三名比分。先前出现时即使为单选，也计为已出现。
+概率并列沿用W、D、L顺序。只改变后续双选支持，不重选七场、不重新分配资金、不重新选择单选角色。
+例如概率0.55／0.30／0.15，首次双选覆盖0.85，后续替换为0.70；是否改善整个组合仍需共享场次的联合覆盖检验。
+
+共8个基础环境：压一场／两场 × 双选概率TOP2／压缩后概率COMPRESSED选组 × STRICT每场最多两组且两组最多重叠两场／FREE无这两个限制。
+每个环境比较BASE与ADJUSTED，16策略×40期=640计划。全部使用HOLD，剩余现金保留；本轮不混入余款加倍，也不买比分。
+每种策略分配预算合计55,040元；各环境实际投注可能不同，**每对BASE／ADJUSTED实际投注、现金、组数和units完全相同**。
+CNY2基本票，0.65只乘一次完整七场中奖票返奖。最终SP仅用于结算，p/q保持原值，市场q仍来自欧赔＋大小球映射。
+
+所有调整与实际支持下的模型评估先封存，本轮程序随后才打开原审计。每个评估使用同一完整场次表、固定种子41902、8192个共享场次情景，
+同一场在所有组共用赛果；场次之间独立仍是模型假设。不继承调整前的候选覆盖缓存，不把组概率相加作为整体覆盖。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+source('r/fundamentals_repeated_double.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+stopifnot(identical(result$freeze_seal,frozen$seal))
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY');bindings <- archive$hashes
+ cat('归档仅重放已保存报告，不代表原数据或模型重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==640,!anyDuplicated(x[c('issue','policy')]))
+y <- bind_rows(x,mutate(x,partition='ALL40'))
+s <- repeated_double_summary(y,initial_capital_cny=100000) |> mutate(budget_return_percent=100*budget_return,stake_ROI_percent=100*roi)
+paired <- s |> filter(partition=='ALL40') |>
+ select(case,depth,quality,overlap,action,stake_cny,cash_cny,net_cny,budget_return_percent,max_drawdown_cny,model_union,fixture_hhi,mean_group_probability,
+ profitable_issues,winning_groups,any_payout,changed_legs,gained_groups,lost_groups,matched_lift) |>
+ tidyr::pivot_wider(names_from=action,values_from=c(stake_cny,cash_cny,net_cny,budget_return_percent,max_drawdown_cny,model_union,fixture_hhi,
+ mean_group_probability,profitable_issues,winning_groups,any_payout,changed_legs,gained_groups,lost_groups,matched_lift))
+tibble(issues=n_distinct(x$issue),cases=n_distinct(x$case),policies=n_distinct(x$policy),freeze_seal=result$freeze_seal,learning='NONE') |> knitr::kable()
+```
+
+## 40期收益比较
+
+预算回报率＝净收益／55,040元。每对实际投注相同，故方向性的收益比较不受现金分母混淆。
+
+```{r}
+paired |> arrange(depth,quality,overlap) |> select(depth,quality,overlap,stake_cny_BASE,cash_cny_BASE,
+ net_cny_BASE,net_cny_ADJUSTED,matched_lift_ADJUSTED,budget_return_percent_BASE,budget_return_percent_ADJUSTED) |> knitr::kable(digits=2)
+```
+
+本轮8个环境的净收益均下降，最大回撤均上升。旧两场TOP2／STRICT方案由21,686.87元降至16,572.80元，少5,114.07元；
+一场COMPRESSED／FREE由44,268.63元降至16,653.41元，少27,615.22元。
+这些结果不支持在本样本中无条件对所有重复双选作此替换；没有另行搜索有利的替换阈值或挑选个别期路由。
+
+## 命中组、覆盖与回撤
+
+gained_groups是原来没中、调整后命中的组；lost_groups是原来命中、调整后丢失的组。
+它们不是独立场次或盈利期数。一场STRICT新增5组、丢失4组；两场COMPRESSED／STRICT新增12组、丢失10组，
+但收益仍下降，说明多命中组并不保证赚得更多。
+
+```{r}
+paired |> arrange(depth,quality,overlap) |> select(depth,quality,overlap,changed_legs_ADJUSTED,gained_groups_ADJUSTED,lost_groups_ADJUSTED,
+ winning_groups_BASE,winning_groups_ADJUSTED,profitable_issues_BASE,profitable_issues_ADJUSTED,
+ max_drawdown_cny_BASE,max_drawdown_cny_ADJUSTED) |> knitr::kable(digits=2)
+```
+
+```{r}
+paired |> arrange(depth,quality,overlap) |> mutate(union_change_pp=100*(model_union_ADJUSTED-model_union_BASE)) |>
+ select(depth,quality,overlap,mean_group_probability_BASE,mean_group_probability_ADJUSTED,
+ model_union_BASE,model_union_ADJUSTED,union_change_pp,fixture_hhi_BASE,fixture_hhi_ADJUSTED) |> knitr::kable(digits=4)
+```
+
+每组单独覆盖只会下降或不变；整体覆盖需另算。本样本8个环境的跨期平均模型整体覆盖也均下降。
+场次持仓HHI不变是预期结果：场次、组数、资金不变，变化的是各组的赛果支持。
+
+## 尾部敏感性与资金风险
+
+10万元初始资金，逐期累计净收益。剔除最大净收益期时同步从同环境BASE中删除同一期；
+剔除最大增益期用于检查相对BASE的改善是否由单期主导。全部为2010年，无法评估剔除最大年份后的稳定性。
+
+```{r}
+s |> filter(partition=='ALL40',action=='ADJUSTED') |> select(case,matched_lift,ex_largest_issue,ex_largest_net,
+ ex_largest_matched_lift,ex_largest_lift,ex_largest_lift_issue,longest_losing_run,worst_5_loss,worst_10_loss,worst_20_loss,payout_hhi,ending_capital) |> knitr::kable(digits=2)
+```
+
+## 原训练／验证／测试分区
+
+```{r}
+s |> filter(partition!='ALL40') |> arrange(partition,case,action) |> select(partition,case,action,stake_cny,cash_cny,net_cny,
+ budget_return_percent,stake_ROI_percent,max_drawdown_cny,matched_lift,gained_groups,lost_groups) |> knitr::kable(digits=2)
+```
+
+## 每期完整结果
+
+```{r}
+x |> mutate(budget_return_percent=100*budget_return,stake_ROI_percent=100*roi) |> arrange(issue,case,action) |>
+ select(partition,issue,case,action,stake,cash_cny,groups,hits,net,budget_return_percent,stake_ROI_percent,changed_legs,gained_groups,lost_groups,model_union) |> knitr::kable(digits=2)
+```
+
+复用接口位于`src/fundamentals_n7_diversity.py`：`replace_repeated_double_tail`调整支持，`evaluate_fixed_supports`复用已有情景与持仓统计，
+绑定实际新支持而非旧候选矩阵。R入口为`r/fundamentals_repeated_double.R::repeated_double_summary`，复用已有预算、回撤和配对尾部统计。
+保存逐组逐场的先前出现次数、原支持、新支持及概率损失；独立检查器逐一核验，权威结算没有重写。
