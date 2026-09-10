@@ -1,0 +1,40 @@
+name: Compression breadth offline research
+on:
+  push:
+    branches: ['codex/411-historical-fundamentals']
+    paths: ['src/fundamentals_n7_single.py', 'src/fundamentals_n7_reuse_extension.py', 'scripts/*n7_c2_relax*', 'r/fundamentals_n7_c2_relax.R', 'tests/test_fundamentals_n7_c2_relax.py', 'tests/testthat/test-fundamentals-n7-c2-relax.R', 'tests/fixtures/n7_c2_relax_report.json.gz', 'quarto/68_n7_c2_relax.qmd', 'src/fundamentals_compression_breadth.py', 'r/fundamentals_compression_breadth.R', 'scripts/*compression_breadth*', 'tests/*compression_breadth*', 'tests/testthat/test-fundamentals-compression-breadth.R', 'tests/fixtures/compression_breadth_report.json.gz', 'quarto/69_compression_breadth.qmd', 'config/compression_breadth_runtime.json', '.github/workflows/compression-breadth.yml']
+  pull_request:
+    paths: ['src/fundamentals_n7_single.py', 'src/fundamentals_n7_reuse_extension.py', 'scripts/*n7_c2_relax*', 'r/fundamentals_n7_c2_relax.R', 'tests/test_fundamentals_n7_c2_relax.py', 'tests/testthat/test-fundamentals-n7-c2-relax.R', 'tests/fixtures/n7_c2_relax_report.json.gz', 'quarto/68_n7_c2_relax.qmd', 'src/fundamentals_compression_breadth.py', 'r/fundamentals_compression_breadth.R', 'scripts/*compression_breadth*', 'tests/*compression_breadth*', 'tests/testthat/test-fundamentals-compression-breadth.R', 'tests/fixtures/compression_breadth_report.json.gz', 'quarto/69_compression_breadth.qmd', 'config/compression_breadth_runtime.json', '.github/workflows/compression-breadth.yml']
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.4'
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.10.18'
+      - name: Install declared runtimes during setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libuv1-dev libpng-dev
+          python -c 'import json,subprocess,sys; c=json.load(open("config/compression_breadth_runtime.json")); subprocess.run([sys.executable,"-m","pip","install",*[k+"=="+v for k,v in c["python_direct"].items()]],check=True)'
+          Rscript -e 'install.packages(c("remotes","jsonlite"),repos="https://cloud.r-project.org"); v <- jsonlite::read_json("config/compression_breadth_runtime.json")$r_direct; for(p in names(v)) remotes::install_version(p,version=v[[p]],repos="https://cloud.r-project.org",upgrade="never")'
+      - name: Function and cutoff contracts
+        run: |
+          python -m pytest tests/test_fundamentals_compression_breadth.py tests/test_fundamentals_n7_single.py tests/test_fundamentals_n7_baseline.py tests/test_fundamentals_n7_twocover.py tests/test_fundamentals_n7_c2_relax.py tests/test_fundamentals_n7_diversity.py -q
+          python scripts/check_cutoff_governance.py
+          Rscript -e 'testthat::test_file("tests/testthat/test-fundamentals-compression-breadth.R",stop_on_failure=TRUE);testthat::test_file("tests/testthat/test-fundamentals-n7-c2-relax.R",stop_on_failure=TRUE)'
+      - name: Archived report render (not model replay)
+        run: |
+          python scripts/restore_compression_breadth_fixture.py --fixture tests/fixtures/compression_breadth_report.json.gz --output /tmp/compression-breadth-ci
+          quarto render quarto/69_compression_breadth.qmd --execute-dir . --execute --no-cache -P study:/tmp/compression-breadth-ci -P archived_report:true
+          python scripts/prepare_n7_single_fixture.py --fixture tests/fixtures/n7_c2_relax_report.json.gz --output /tmp/c2-relax-ci
+          quarto render quarto/68_n7_c2_relax.qmd --execute-dir . --execute --no-cache -P study:/tmp/c2-relax-ci -P archived_report:true

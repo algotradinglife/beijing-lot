@@ -1,0 +1,184 @@
+---
+title: "#419逻辑：压缩赛果与扩大组合的等额比较"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/compression-breadth-v2"
+  archived_report: false
+---
+
+## 范围与固定合同
+
+本轮沿用现有40期及冻结的专家概率，测试#419的方法逻辑；不是#419所要求的严格因果跨年验收。
+40期均已揭示，只作回顾诊断；新48期未纳入。让平专家1.1.0与同一高净胜球专家权重各0.5，不重新训练。
+市场q来自欧赔＋大小球，SP代理固定为1/q，最终SP只用于结算。
+
+各期**实际投注都等于原预算**，总计55,040元，没有将现金当收益或追加预算。
+#419的一组256元基准按当前每期原组数等比例扩展：原每组七场全双选128基本票×2元；
+压r=0/1/2/3场后，每组分别256/128/64/32元，同额可持有1/2/4/8倍的名义组数。
+原全双选、概率集中分组为参考 `D0_TOP1_REPEAT_C0_B0`，不是此前两场单选的追加组方案。
+
+压缩规则：TOP1按最高单选概率；RETENTION按p1/(p1+p2)；ABS_LOSS按最小p2；
+VALUE_RETENTION按(p1/q1)/(p1/q1+p2/q2)保留预期返奖贡献比例；RANDOM随机选被压缩的场次，保留其Top1赛果。
+随机规则使用预先指定的0/1/2三个种子，全部报告；不挑最好种子，不把种子分位数当未来置信区间。
+
+组合安排：
+
+- REPEAT：原七场不变，压缩后重复购买，物理票据合并为2^r倍注数；钱花完，但不会凭空增加覆盖。
+- QUALITY：按**压缩后的整组联合覆盖概率**选择组合，选组时已计入单选损失。
+- UNION：逐组优先增加“已有组全部落空时”的模型情景覆盖。
+- RANDOM：在与QUALITY/UNION相同的候选质量池中随机选组，不重复七场身份。
+
+候选池每期512个不同七场集合：包含原集中组、概率排序的循环窗口，再用固定种子均匀抽取七场补齐。
+每个压缩规则与深度下，QUALITY/UNION/RANDOM共用联合概率最高的128个候选，避免为扩大覆盖盲目纳入最差候选。
+这是明确的候选排名门槛，不是从历史收益调出的阈值；不同压缩规则的128组候选可能不同。
+没有逐场复用／两组重叠的硬上限，改为测量真实组合覆盖、单选集中度与HHI。这里只搜索有限候选池，不宣称全局最优。
+
+UNION使用1024次设计模拟选组，再用**独立种子的8192次模拟**评估所有方案。
+每次模拟中同一场在所有组共享同一个赛果；不同场次独立是模型假设。不得将各组概率相加作为至少命中一组概率。
+模型覆盖不是实际命中率。模拟标准误只描述有限抽样误差，不包含模型误差。所有模型指标和投注计划封存后，本轮程序才读取历史结算；不声称这些结果此前未被看到。
+票级0.65系数只乘一次，未模拟税费、奖金封顶或取整。所有实验分支均不自动成为默认策略。
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_breadth.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+stopifnot(identical(result$freeze_seal,frozen$seal))
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$surface_hashes,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY');bindings <- archive$hashes
+ cat('CI归档报告，仅验证报告，不是原始数据或模型重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+report_inputs <- jsonlite::read_json(file.path(params$study,'report-inputs.json'))
+for(name in names(report_inputs$hashes)) stopifnot(identical(digest::digest(file=file.path(params$study,name),algo='sha256'),report_inputs$hashes[[name]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==4560,all(x$stake==x$budget_cny),all(x$cash_cny==0),!anyDuplicated(x[c('issue','policy')]))
+baseline_policy <- 'D0_TOP1_REPEAT_C0_B0'
+y <- bind_rows(x,mutate(x,partition='ALL40'))
+report <- compression_breadth_summary(y,baseline_policy,initial_capital_cny=100000)
+s <- report$summary |> mutate(ROI_percent=100*roi,union_percent=100*model_union,union_lift_pp=100*union_lift,
+ ex_largest_ROI_percent=100*ex_largest_roi)
+seed0 <- s |> filter(compression_seed==0,breadth_seed==0)
+tibble(issues=n_distinct(x$issue),policies=n_distinct(x$policy),receipt=result$freeze_seal,
+ budget_per_policy=sum(x$stake[x$policy==baseline_policy]),learning='NONE',scope='EXPOSED_DIAGNOSTIC') |> knitr::kable()
+```
+
+## 本轮发现
+
+同额55,040元下，原全双选净收益10,754.90元（ROI 19.54%），最大回撤19,895.50元。
+TOP1压一场后重复买两倍，净收益40,585.22元（73.74%），回撤13,728.01元；
+TOP1压一场后按压缩后概率扩组，净收益31,181.03元（56.65%），回撤6,886.46元。
+分别剔除相对原方案增益最大的一期后，同期同额净增益仍为20,701.45元和7,930.25元。
+这两条值得保留为后续独立检验的候选，不据此替换默认策略。
+
+扩大模型覆盖不是收益保证：TOP1压两场并按UNION选组，模型至少中一组概率的跨期均值约73%，
+高于原方案约68%，但实际净亏10,697.99元。压两场按QUALITY扩组仅净赚615.46元；
+压三场按QUALITY扩组净亏10,523.06元。深度、广度、票据赔付必须分别检查，不能只追求组数或并集概率。
+
+分区亦不一致：压一场按QUALITY扩组在原TRAINING24／VALIDATION8／TEST8的净收益为
+29,388.92／−4,483.42／6,275.53元。上述分区已经暴露，TEST8不是这次规则比较的新样本外测试。
+随机策略全部种子与全部114策略的结果见下表；当前观察受多策略比较、单年度样本与既有概率偏差影响。
+
+## 主矩阵：固定种子0展示全部规则与深度
+
+所有方案实际投入相同，因此这里投注ROI与预算回报率相等。model_proxy_net是模型p与固定1/q代理SP下的预期净收益，不是最终SP结算收益。种子0仅是预先指定的展示视图，其他种子在后面完整列出。
+
+```{r}
+seed0 |> filter(partition=='ALL40') |> arrange(depth,rule,breadth) |>
+ select(depth,rule,breadth,stake_cny,net_cny,ROI_percent,model_proxy_net,matched_lift,union_percent,union_lift_pp,max_drawdown_cny,
+ winning_groups,groups) |> knitr::kable(digits=2)
+```
+
+```{r}
+seed0 |> filter(partition=='ALL40') |>
+ ggplot(aes(depth,ROI_percent,color=rule,group=rule))+geom_line()+geom_point()+facet_wrap(~breadth)+
+ scale_x_continuous(breaks=0:3)+labs(x='单选场数',y='实际投注ROI（%）',color='压缩规则')+theme_minimal()
+```
+
+## 覆盖与收益是否一致
+
+比较对象是每期同额原全双选组。模型覆盖提高但收益不提高，不能直接称为经济改善。
+REPEAT的groups是去重后的七场组数，名义倍数和重复基本票由paid_ticket_units与repeat_units记录。
+HHI按付费基本票中的场次／赛果持仓加权；重复购买不制造新的独立覆盖。
+
+```{r}
+seed0 |> filter(partition=='ALL40') |>
+ select(depth,rule,breadth,model_union,union_lift,payout_issue_rate,profitable_issue_rate,unique_tickets,paid_ticket_units,
+ repeat_units,mean_miss_distance,mean_fixture_hhi,mean_outcome_hhi,max_pair_overlap,max_single_groups) |> knitr::kable(digits=3)
+```
+
+## 最大盈利期与最大增益期剔除
+
+ex_largest_net剔除该方案净收益最高的一期；ex_largest_matched_lift让原方案同步剔除同一期。
+ex_largest_lift另行剔除该方案相对原方案增益最大的一期，用于判断改善是否依赖单一事件。
+这不是删掉不利期后重新调参。全部期次位于2010年，剔除最大收益年份后没有剩余年份，跨年稳定性不可评估。
+
+```{r}
+seed0 |> filter(partition=='ALL40') |> select(depth,rule,breadth,ex_largest_issue,ex_largest_net,ex_largest_ROI_percent,
+ ex_largest_matched_lift,ex_largest_lift_issue,ex_largest_lift,payout_hhi,largest_payout_share,ex_largest_year_issues) |> knitr::kable(digits=2)
+```
+
+## 路径风险
+
+每个方案使用独立的10万元起始资金账本，按期号累计结算。最大回撤从历史资金高点计算。
+亏损连期以net<0计，零收益打断；回撤持续期包含截至样本末仍未恢复的情况。
+5／10／20期窗口损失取连续窗口净收益最差值的亏损金额；不足窗口长度时缺失，不补零。
+
+```{r}
+seed0 |> filter(partition=='ALL40') |> select(depth,rule,breadth,ending_capital,max_drawdown_cny,longest_losing_run,
+ worst_5_loss,worst_10_loss,worst_20_loss,max_drawdown_duration,unrecovered_at_end) |> knitr::kable(digits=2)
+```
+
+## 训练／验证／测试历史分区
+
+```{r}
+seed0 |> filter(partition!='ALL40') |> select(partition,depth,rule,breadth,net_cny,ROI_percent,matched_lift,
+ union_lift_pp,max_drawdown_cny,ex_largest_lift) |> knitr::kable(digits=2)
+```
+
+## 三个随机种子的敏感性
+
+同一个种子跨期复用是已冻结的随机策略；种子之间不是独立历史样本。以期为统计单位，不能把数千组视作独立观测。
+
+```{r}
+s |> filter(partition=='ALL40',rule=='RANDOM' | breadth=='RANDOM') |>
+ select(depth,rule,breadth,compression_seed,breadth_seed,net_cny,ROI_percent,union_lift_pp,ex_largest_lift,max_drawdown_cny) |>
+ arrange(depth,rule,breadth,compression_seed,breadth_seed) |> knitr::kable(digits=2)
+```
+
+## 压缩场次分层
+
+每压一场成本减半；单位成本保留量为 `2*p1/(p1+p2)`，该量至少为1是Top1排序的数学结果，不能单凭它判定盈利。
+
+下表限种子0、两场单选的主矩阵。观测行为某场在某组中的单选持有，重复持有相互依赖；同时给出期数，
+不以持仓行数做独立样本显著性推断。分层边界事先固定，用于描述，不用于当前选择规则。
+
+```{r}
+legs <- tibble::as_tibble(jsonlite::fromJSON(file.path(params$study,'legs.json.gz')))
+selected_policies <- seed0 |> filter(partition=='ALL40',depth==2) |> pull(policy)
+strata <- compression_leg_strata(filter(legs,policy %in% selected_policies),breaks=list(
+ retention=c(-Inf,.6,.7,.8,.9,Inf),p2=c(-Inf,.1,.2,.3,Inf),gap=c(-Inf,.1,.2,.4,Inf),
+ entropy=c(-Inf,.6,.9,Inf),value_retention=c(-Inf,.5,.7,.9,Inf),divergence=c(-Inf,.1,.2,Inf),handicap=c(-Inf,-1,0,1,2,Inf)))
+strata |> arrange(policy,partition,variable,bin) |> knitr::kable(digits=3)
+```
+
+## 每期完整结果（全部114种策略）
+
+```{r}
+x |> mutate(ROI_percent=100*budget_return) |> arrange(issue,policy) |>
+ select(partition,issue,policy,stake,groups,hits,net,ROI_percent,model_union,miss_distance) |> knitr::kable(digits=2)
+```
+
+函数实现：`src/fundamentals_compression_breadth.py`，R统计：`r/fundamentals_compression_breadth.R`；
+批量结算在单次审计调用内复用相同组的结果，调用权威 `settle_n7_baseline`；已与原 `settle_n7_single` 对照验证，没有另写业务返奖公式。
+固定候选、压缩规则、完整票据、重复合并、独立模拟与等额预算均有函数测试；独立枚举另核对全部计划。
+新接口未新增历史拟合、时间分割或训练缓存；所有目标概率处理通过共享Cutoff与输入身份校验。
