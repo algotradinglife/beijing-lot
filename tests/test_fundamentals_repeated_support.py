@@ -6,6 +6,9 @@ from src.fundamentals_n7_diversity import replace_repeated_double_tail
 from src.fundamentals_market_conflict import replace_market_conflict_doubles
 from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
+from tests.test_fundamentals_compression_bridge import data
+from src.fundamentals_compression_bridge import bridge_surface,bridge_plan
+from src.fundamentals_compression_breadth import breadth_scenarios
 
 
 @pytest.mark.parametrize('singles,double_rule',[(False,'NONE'),(True,'NONE'),(False,'GAP'),(False,'MARKET'),(False,'EITHER'),(True,'EITHER')])
@@ -78,3 +81,29 @@ def test_requested_single_ceiling_inclusive(source,p1,changes):
     assert any(r['prior_appearances'] and len(r['source_support'])==1 for r in plan['diversity_ledger'])
     for row in plan['diversity_ledger']:
         assert row['changed']==bool(changes and row['prior_appearances'] and len(row['source_support'])==1)
+
+
+@pytest.mark.parametrize('uses,pair',[(1,0),(2,2),(2,4),(6,4),(6,5),(16,6)])
+def test_single75_preserves_frozen_caps_cash_and_roles(data,uses,pair):
+    f,c,refs,pool=data;surface=bridge_surface(f,pool,refs,cutoffs=c,depth=2)
+    design=breadth_scenarios(f,surface,cutoffs=c,seed=41901,draws=128)
+    base=bridge_plan(f,surface,design,refs[2],cutoffs=c,preserve_prefix=True,quality='TOP2',
+        overlap='CAPPED',max_uses=uses,max_pair_overlap=pair,cash_policy='HOLD',budget_cny=512,unit_cny=2,payout_factor=.65)
+    frozen=copy.deepcopy(base)
+    plan=replace_repeated_support(base,cutoffs=c,change_singles=True,double_rule='NONE',
+        single_ceiling=.75,max_gap=.05,minimum_tv=.15,minimum_market_tail_lead=.05)
+    assert base==frozen
+    for key in ['groups','stake','cash_cny','budget_cny','max_uses','max_pair_overlap','cutoffs','group_units']:
+        assert plan[key]==base[key]
+    before={(r['group'],r['slot']):r for r in base['legs']};seen=set()
+    for r in plan['legs']:
+        old=before[r['group'],r['slot']];order=sorted('WDL',key=lambda d:(-r['p_'+d],'WDL'.index(d)))
+        support=old['support']
+        if r['slot'] in seen and len(support)==1 and r['p_'+order[0]]<=.75+1e-12:
+            support=dict(W='3',D='1',L='0')[order[1]]
+        assert r==dict(old,support=support);seen.add(r['slot'])
+    for g in range(1,plan['groups']+1):
+        legs=sorted([r for r in plan['legs'] if r['group']==g],key=lambda r:r['slot'])
+        assert {t['code'] for t in plan['tickets'] if t['group']==g}=={''.join(c) for c in itertools.product(*(r['support'] for r in legs))}
+    assert sum(2*t['units'] for t in plan['tickets'])==base['stake']
+    if uses==1:assert plan['tickets']==base['tickets'] and not any(r['changed'] for r in plan['diversity_ledger'])

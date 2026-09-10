@@ -1,0 +1,114 @@
+---
+title: "复用限制叠加75%单选替换：配对回顾比较"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/reuse-cap-single75-v1"
+  archived_report: false
+---
+
+固定原48期100402–100607，沿用QMD80已经封存的六种七场分组：原放宽U16/P6、原严格U2/P2、
+完全不重叠U1/P0，以及U2/P4、U6/P4、U6/P5。U为每场最多进入几组，P为任意两组最多共同几场。
+六种条件每期各自预算1,024元、初始本金100,000元；每组两场单选、五场双选，32张基本票×2元＝64元。
+每对BASE/SINGLE75分组、单选位置、投入、余款和复用限制完全相同，不重新选组或花掉现金。
+
+SINGLE75规则：按封存的组顺序，任何先前出现都计为复用；若本次是单选且原始最高概率≤75%，
+改选原始第二赛果。首次出现与所有双选不变；第三次及以后仍选第二，不交替切换。
+边界沿用既有函数的1e-12容差，概率平手顺序为让胜、让平、让负。
+纯基线概率不重算，不加专家、比分保护或市场分歧替换；最终SP只用于结算，0.65在完整命中票上乘一次。
+
+这是既有已暴露48期的描述性配对实验；六个限制来自先前回顾结果，75%来自用户固定规则，
+不拟合新阈值、不授予前瞻最优。它不替代#421要求的因果跨年份验收，也不关闭#419。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+source('r/fundamentals_repeated_double.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows) |>
+  mutate(action=if_else(rule=='BASE','BASE','ADJUSTED'),kind=if_else(rule=='BASE','OLD','ADJUSTED'),
+         model_union=NA_real_,fixture_hhi=NA_real_)
+stopifnot(nrow(rows)==576,n_distinct(rows$issue)==48,n_distinct(rows$case)==6,
+          all(rows$rule %in% c('BASE','SINGLE75')),all(rows$budget_cny==1024))
+s <- repeated_double_summary(rows,100000) |>
+  mutate(budget_ROI_percent=100*budget_return,stake_ROI_percent=100*roi)
+curves <- strategy_equity_curves(mutate(rows,model=case),sort(unique(rows$issue)),100000)
+paired <- rows |> select(issue,case,rule,stake,net,hits,changed_legs,gained_groups,lost_groups) |>
+  tidyr::pivot_wider(names_from=rule,values_from=c(stake,net,hits,changed_legs,gained_groups,lost_groups)) |>
+  mutate(net_delta=net_SINGLE75-net_BASE)
+stopifnot(all(paired$stake_BASE==paired$stake_SINGLE75))
+```
+
+## 收益及回撤
+
+```{r}
+s |> arrange(case,action) |>
+  select(case,action,stake_cny,cash_cny,net_cny,budget_ROI_percent,stake_ROI_percent,
+         max_drawdown_cny,groups,winning_groups,profitable_issues) |> knitr::kable(digits=2)
+```
+
+BASE是不替换，ADJUSTED是SINGLE75。预算ROI分母固定49,152元，投注ROI分母为实际投入。
+回撤是按期结算后的账户峰值下降。未模拟跨期占款、税费、奖金封顶或取整。
+不把重复持仓当成独立比赛。没有重新评估并集概率或HHI，相应输入明确为缺失，不继承旧支持的覆盖值。
+
+```{r}
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 10
+plot_strategy_equity(mutate(curves,label=rule),'funded',100000)+
+  labs(title='每个限制条件内：不替换与75%单选替换',subtitle='相同七场分组、同实际投入；各账户起始100,000元')
+```
+
+## 替换增益及最大盈利期影响
+
+```{r}
+s |> filter(action=='ADJUSTED') |>
+  select(case,changed_legs,gained_groups,lost_groups,matched_lift,
+         ex_largest_issue,ex_largest_net,ex_largest_matched_lift,
+         ex_largest_lift_issue,ex_largest_lift,longest_losing_run,worst_5_loss,worst_10_loss,worst_20_loss) |>
+  knitr::kable(digits=2)
+paired |> group_by(case) |> arrange(issue,.by_group=TRUE) |>
+  summarise(first24_BASE=sum(head(net_BASE,24)),first24_SINGLE75=sum(head(net_SINGLE75,24)),
+            last24_BASE=sum(tail(net_BASE,24)),last24_SINGLE75=sum(tail(net_SINGLE75,24)),.groups='drop') |>
+  knitr::kable(digits=2)
+```
+
+matched_lift是相同分组、相同实际投入下的净收益差。
+ex_largest_net剔除调整方案自身最大盈利期；ex_largest_matched_lift在同一期同时剔除两个方案再比较增益。
+ex_largest_lift则剔除“调整相对原方案增益最大”的一期，更直接检查替换增益是否只来自一个尾部事件。
+新增和失去的命中组按同一期同一组配对；它们不是新增投注，也不构成新的独立样本量。
+前后24期均已暴露，不称作训练/测试划分。U1/P0没有复用，预期必为不变的负对照。
+
+## 每期收益率与命中组数
+
+```{r}
+paired |> mutate(BASE_budget_ROI_percent=100*net_BASE/1024,
+                 SINGLE75_budget_ROI_percent=100*net_SINGLE75/1024) |>
+  arrange(issue,case) |> select(issue,case,stake_BASE,net_BASE,net_SINGLE75,net_delta,
+      BASE_budget_ROI_percent,SINGLE75_budget_ROI_percent,hits_BASE,hits_SINGLE75,
+      changed_legs_SINGLE75,gained_groups_SINGLE75,lost_groups_SINGLE75) |> knitr::kable(digits=2)
+```
+
+## 复用与来源
+
+没有新增转换或统计函数：赛果替换调用`replace_repeated_support`，结算调用`settle_compression_variants`，
+统计调用`repeated_double_summary`和已有资金曲线函数。
+对应Python测试`test_fundamentals_repeated_support.py`及其六个cap组合整合测试，
+R测试`test-fundamentals-repeated-double.R`、`test-fundamentals-compression-bridge.R`、
+`test-fundamentals-integration-weight.R`、`test-fundamentals-equity-curves.R`与报告读取测试。
+`scripts/check_reuse_cap_single75.py`独立按固定规则重建支持、票据和返奖；全部48期计划先封存再读取结算。
+历史时间代理仍仅供诊断。归档模式只重放报告，不代表原始数据或模型重放。
+
+```{r}
+tibble(scope=verified$result$scope,plan_freeze_seal=verified$result$upstream_freeze_seal,
+       result_sha256=verified$receipt$result_sha256,archived_report=params$archived_report) |> knitr::kable()
+```
