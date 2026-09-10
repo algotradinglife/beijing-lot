@@ -1,0 +1,155 @@
+---
+title: "#419：为什么两场单选的结论改变——规则分解"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/compression-bridge-v1"
+  archived_report: false
+---
+
+## 固定边界
+
+同一40期（原训练24、验证8、测试8），全部已暴露；沿用同一比分概率投射、让平1.1.0与高净球专家各0.5权重。
+不训练、不调整专家、不增加新期、不把本轮规则称为样本外选优。每方案分配预算55,040元，按原期次分配。
+市场代理仍是欧赔＋大小球形成的q，最终SP仅用于结算；不买比分。CNY2基本票，0.65只乘一次完整七场票的返奖。
+本轮是#419逻辑的历史诊断，不满足其严格因果跨年验收，不关闭Issue或更换默认策略。
+
+前次同时改变了多个规则，不能把差异简单归因于单选场数。本轮固定TOP1压缩规则（组内按最高方向概率选一或两场单选），每个深度测试四个二元因素，共32种组合；另加原方案和前次QUALITY方案各两个直接对照，共36策略×40期。
+
+| 因素 | 第一水平 | 第二水平 |
+|---|---|---|
+| 原始分组 | 保留旧方案按双选概率连续七场形成的不重叠组 | 全部重新选组 |
+| 选组目标 | 最大双选概率乘积TOP2 | 最大压缩后的联合概率COMPRESSED |
+| 重叠约束 | 每场最多两组、两组最多重叠两场STRICT | 无上述硬上限FREE |
+| 余款 | HOLD保留现金 | REPEAT_BEST购买最高压缩概率已选组的完整倍数 |
+
+前三因素决定不同七场组及支持；最后一项只改变原有票的units，不改变选组、支持或模型并集覆盖。
+STRICT约束的是不同七场组的持有数，REPEAT_BEST另计加倍单位，不把重复买入称为新增独立组。
+所有方案最多花完原预算，剩余现金不是收益。重复购买的新增风险由付费持仓HHI和资金路径呈现。
+
+共同候选池为前次512个七场集合，加上旧一场／两场方案全部组，按集合去重；两个深度共用同一池。
+这样既能保留旧方案，又能单独测量前次有限候选池的影响。前次QUALITY对照保留原512池，完全复用原票。
+初始不重叠组仍按旧排序生成；TOP2追加排序沿用旧固定log目标和1e−10排名惩罚，COMPRESSED按联合概率排序。
+这是有限候选池的顺序贪心，不是全局最优；候选不足时停止，REPEAT_BEST才将余款加到已选组。
+
+所有1440计划和模型诊断封存后，本轮程序才打开历史审计；不声称这些标签以前没见过。
+1024次设计流与8192次独立评估流绑定同一场次赛果；场次之间独立仍是模型假设，覆盖只按OR并集估计。
+
+```{r}
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+stopifnot(identical(result$freeze_seal,frozen$seal))
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$surface_hashes,frozen$receipt$implementation$files,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY');bindings <- archive$hashes
+ cat('归档报告只验证已保存的报告输入，不代表原数据或模型重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==1440,!anyDuplicated(x[c('issue','policy')]),all(x$stake+x$cash_cny==x$budget_cny))
+y <- bind_rows(x,mutate(x,partition='ALL40'))
+s <- compression_bridge_summary(y,initial_capital_cny=100000) |>
+ mutate(budget_return_percent=100*budget_return,stake_ROI_percent=100*roi)
+contrasts <- compression_bridge_contrasts(y)
+tibble(issues=n_distinct(x$issue),policies=n_distinct(x$policy),freeze_seal=result$freeze_seal,
+ allocated_budget=sum(x$budget_cny[x$policy=='D1_OLD']),learning='NONE',scope='EXPOSED_DIAGNOSTIC') |> knitr::kable()
+```
+
+## 对旧结果的逐步分解
+
+这条路径先改变选组目标，再放开重叠限制，再取消原组保留，最后切回前次512候选池。
+每一步只改变一个条件；增量相加严格等于前次QUALITY与旧方案之间的差值。
+**归因依赖改变顺序**；不是声称每个因素在所有条件下都有相同效果。后面完整报告其他条件固定时的全部对照。
+
+```{r}
+stages <- tibble::tibble(suffix=c('OLD','P1_TOP2_STRICT_HOLD','P1_COMPRESSED_STRICT_HOLD','P1_COMPRESSED_FREE_HOLD','P0_COMPRESSED_FREE_HOLD','RECENT'),
+ stage=c('旧方案','共同候选池复现','仅改压缩后概率目标','再放开重叠限制','再取消原组保留','再切回前次512候选池'),step=1:6)
+bridge <- tidyr::crossing(depth=1:2,stages) |> mutate(policy=paste0('D',depth,'_',suffix)) |>
+ left_join(filter(s,partition=='ALL40'),by=c('depth','policy'),relationship='one-to-one') |>
+ arrange(depth,step) |> group_by(depth) |> mutate(step_net_delta=net_cny-lag(net_cny)) |> ungroup()
+bridge |> select(depth,stage,stake_cny,cash_cny,net_cny,budget_return_percent,max_drawdown_cny,step_net_delta) |> knitr::kable(digits=2)
+```
+
+两场单选沿这条路径：改变概率目标只减少278.23元；放开重叠限制再减少4,140.93元；
+取消原不重叠分组再减少16,356.29元；切回前次512池再减少295.97元。
+因此，在本路径中最明显的差异来自**取消原组、重新选组**，不是“压两场”本身突然失效。
+一场单选却在放开限制后受益，说明压缩深度与组间重叠、原组保留之间存在交互。
+
+## 只改变余款处理
+
+保留旧分组、双选目标和STRICT限制，比较现金与重复买最高概率组。不要与前次REPEAT混同：
+前次REPEAT是原全双选集中组压缩后统一加倍；本次先完成旧方案的扩组，再只处理剩余现金。
+
+```{r}
+s |> filter(partition=='ALL40',grepl('P1_TOP2_STRICT_',policy)) |>
+ select(depth,policy,stake_cny,cash_cny,net_cny,budget_return_percent,stake_ROI_percent,max_drawdown_cny,
+ matched_lift,ex_largest_lift,ex_largest_lift_issue,model_union,fixture_hhi,repeat_units) |> knitr::kable(digits=3)
+```
+
+两场单选把剩余16,128元加到最高概率已选组后，净收益59,876.59元，预算回报108.79%、回撤4,491.49元；
+相对旧方案增加38,189.72元，剔除增益最大一期100303后仍增加10,417.93元。
+一场单选同样处理余款反而减少1,536元。这个新观察仍来自已暴露样本；加倍不提升覆盖，不能据此作为稳定收益承诺。
+
+## 全部36策略：相同分配预算与实际投入分别展示
+
+```{r}
+s |> filter(partition=='ALL40') |> arrange(depth,policy) |>
+ select(depth,policy,stake_cny,cash_cny,net_cny,budget_return_percent,stake_ROI_percent,max_drawdown_cny,
+ profitable_issues,any_payout,groups,winning_groups,model_union,fixture_hhi) |> knitr::kable(digits=3)
+```
+
+```{r}
+bridge |> ggplot(aes(step,net_cny,color=factor(depth),group=depth))+geom_line()+geom_point()+
+ scale_x_continuous(breaks=1:6,labels=stages$stage)+labs(x=NULL,y='40期净收益（元）',color='单选场数')+
+ theme_minimal()+theme(axis.text.x=element_text(angle=25,hjust=1))
+```
+
+## 其余因素固定时的全部单因素对照
+
+每个因素有8种其他条件组合。context顺序如下：
+preserve_prefix对应quality/overlap/cash；quality对应prefix/overlap/cash；overlap对应prefix/quality/cash；cash_policy对应prefix/quality/overlap。
+正增量分别表示重新选组−保留原组、COMPRESSED−TOP2、FREE−STRICT、REPEAT_BEST−HOLD。
+金额为跨期净增量，union_delta为模型并集覆盖的跨期平均变化；不将重复票视为独立观测。
+ex_largest_delta在每个配对对照中剔除增益最大的一期，不是各方案各删不同一期。
+
+```{r}
+contrasts$summary |> filter(partition=='ALL40') |> arrange(depth,factor,context) |> knitr::kable(digits=3)
+```
+
+## 剔除最大收益与路径风险
+
+每个策略10万元初始资金，逐期结算。ex_largest_matched_lift同时从策略和同深度OLD删除该策略净收益最大一期；
+ex_largest_lift删除相对OLD增益最大一期。所有期均在2010年，不能评估剔除最大年份后的剩余表现。
+
+```{r}
+s |> filter(partition=='ALL40') |> select(depth,policy,ex_largest_issue,ex_largest_net,ex_largest_matched_lift,
+ ex_largest_lift,ex_largest_lift_issue,longest_losing_run,worst_5_loss,worst_10_loss,worst_20_loss,payout_hhi,ending_capital) |> knitr::kable(digits=2)
+```
+
+## 原24／8／8分区
+
+这些分区已经暴露，TEST8不是当前方案的新样本外验收。全部列出，不按当期结果路由策略。
+
+```{r}
+s |> filter(partition!='ALL40') |> select(partition,depth,policy,stake_cny,cash_cny,net_cny,budget_return_percent,
+ max_drawdown_cny,matched_lift,ex_largest_lift) |> knitr::kable(digits=2)
+```
+
+## 每期全部结果
+
+```{r}
+x |> mutate(budget_return_percent=100*budget_return,stake_ROI_percent=100*roi) |> arrange(issue,policy) |>
+ select(partition,issue,policy,budget_cny,stake,cash_cny,groups,hits,net,budget_return_percent,stake_ROI_percent,model_union) |> knitr::kable(digits=2)
+```
+
+复用模块：`src/fundamentals_compression_bridge.py`；R汇总：`r/fundamentals_compression_bridge.R`。
+权威结算复用现有接口，独立检查器重建候选池、压缩支持、全部单因素选择、票据units、并集与返奖。
+原始OLD与前次RECENT的投入、返奖、净收益、命中必须完全复现；新因素不读取结算标签。
