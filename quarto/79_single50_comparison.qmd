@@ -1,0 +1,52 @@
+---
+title: "重复单选替换：50%与75%阈值"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/single50-v1"
+  archived_report: false
+---
+
+保持原有纯基线、压两场、概率排序、放宽复用的分组、单选位置及每期1,024元投入不变，
+双选不作替换。只把后续重复单选的替换阈值从75%改为50%，均包含等号。
+仍为原有48期，初始资金10万元，没有比分保护、模型训练或新数据验证。
+
+**本样本中没有满足≤50%条件的后续重复单选。** 因而50%方案与不替换方案的
+每场选择、每张基本票、投入及结算完全相同。这不表示全部单选概率都超过50%；
+低概率单选存在，但没有在后续重复使用时进入本规则。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows) |> mutate(model='纯基线')
+evidence <- tibble::as_tibble(verified$result$evidence)
+stopifnot(nrow(rows)==144,nrow(evidence)==48,all(evidence$eligible_repeated_singles==0),
+ all(evidence$identical_legs),all(evidence$identical_tickets),all(rows$stake==1024))
+curves <- strategy_equity_curves(rows,sort(unique(rows$issue)),100000)
+summary <- rows |> group_by(rule) |> summarise(net_cny=sum(net),ROI_percent=100*net_cny/sum(stake),
+ hits=sum(hits),changed_legs=sum(changed_legs),without_best=sum(net)-max(net),.groups='drop') |>
+ left_join(curves |> group_by(rule) |> summarise(max_drawdown=max(drawdown_cny),.groups='drop'),
+ by='rule',relationship='one-to-one')
+summary |> knitr::kable(digits=2)
+```
+
+BASE是不替换，SINGLE50和SINGLE75分别为50%和75%阈值。
+只有发生替换的场次才可能产生收益差异，故50%没有带来回撤改善。
+75%的增益集中于100514期，排除同一期后，其余47期比BASE少赚约8,037元。
+
+```{r}
+rows |> select(issue,rule,net,hits) |> tidyr::pivot_wider(names_from=rule,values_from=c(net,hits)) |>
+ arrange(issue) |> knitr::kable(digits=2)
+evidence |> select(issue,eligible_repeated_singles,changed_legs,identical_legs,identical_tickets) |>
+ knitr::kable()
+```
+
+`scripts/verify_single50.py`调用已测试的`replace_repeated_support`逐期生成50%方案，
+断言完整场次选择及基本票与BASE一致后才复用原结算。任何选择发生变化都会报错，
+不会把改变过的方案套用原收益。验证身份、输入及代码哈希见报告收据。
+这是事后回顾验证，不用于宣称50%或75%为最优阈值；归档模式只重放报告。
