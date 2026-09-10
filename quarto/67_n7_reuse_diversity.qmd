@@ -1,0 +1,133 @@
+---
+title: "三场单选：提高复用上限与组间赛果变化"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-reuse-diversity-v1"
+  nested: "data/derived/fundamentals_417/n7-reuse-diversity-v1/nested-v1"
+  archived_report: false
+---
+
+## 固定合同
+
+同一40期、原每期预算，总预算55,040元。冻结让平1.1.0和同一高净球专家，权重各0.5，不重训练。
+以原比分分布投射的让球概率决策；市场q来自欧赔＋大小球，SP代理1/q固定，最终SP只用于结算。
+每组七场，按组内最高单选概率依次压三场，其余四场双选：16基本组合、每注2元、每组32元。
+
+先按原双选覆盖概率排序，连续七场集中组成不重叠组；再补重叠组。每场最多进入2、3、4、6组四档比较，
+任意两组最多共用两场。每个完整票据以七场身份＋逐场赛果识别，不重复购买；不能再买完整组则持现。
+补组沿用SciPy整数规划，逐组最大化双选覆盖概率乘积（log相加），slot秩惩罚1e−10处理数值并列，
+不是联合全局最优。求解30秒必须证明最优或不可行；超时不当作无组可买。
+
+每个复用档位同时比较两种赛果规则，**分组、单／双选身份、金额完全相同**：
+
+- FIXED：每次单选都取Top1，双选都取Top2。
+- DIVERSE：第一次出现不变；之后对每个方向计算 `原模型概率/(1+此前组覆盖该方向的次数)`，
+  按此优先级选一个或两个方向，方向并列按W、D、L。组序固定，计数只来自当前待投组合，绝不来自赛果。
+
+该优先级只用来选赛果，不是新的概率。原模型p、市场q始终不改。同一场可在不同组单选不同方向或双选不同组合，
+但不强迫为变化而选择某个低概率方向。不进行规则权重／阈值／种子搜索。
+
+CURRENT、SINGLE_1、SINGLE_2为原全双选、一场单选、两场单选参照；CAP2_FIXED须精确复现上一轮三场单选。
+40期均为已揭示历史，训练24／验证8／测试8只是回顾分区；逐场cutoff不证明同票共同购买时刻可执行。
+0.65仅乘一次票级返奖；税前理论结算，未模拟税费、奖金上限或取整。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY');bindings <- archive$hashes
+ cat('CI归档报告渲染，不是原始源数据或模型重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==440,!anyDuplicated(x[c('issue','policy')]),all(x$stake+x$cash_cny==x$budget_cny),all(x$cash_cny>=0))
+nf <- jsonlite::read_json(file.path(params$nested,'plans-frozen.json'))
+nr <- jsonlite::read_json(file.path(params$nested,'results.json'),simplifyVector=TRUE)
+nb <- c(nf$receipt$source_hashes,nf$receipt$plan_hashes,as.list(nr$audit_hashes))
+if (isTRUE(params$archived_report)) nb <- jsonlite::read_json(file.path(params$nested,'archive.json'))$hashes
+for(path in names(nb)) stopifnot(identical(digest::digest(file=path,algo='sha256'),nb[[path]]))
+x <- bind_rows(x,tibble::as_tibble(nr$rows))
+stopifnot(nrow(x)==680,!anyDuplicated(x[c('issue','policy')]),all(x$stake+x$cash_cny==x$budget_cny))
+all_rows <- bind_rows(x,mutate(x,partition='ALL40'))
+s <- integration_weight_summary(all_rows)
+extra <- all_rows |> group_by(partition,policy) |>
+ summarise(budget_cny=sum(budget_cny),cash_cny=sum(cash_cny),disjoint_groups=sum(disjoint_groups),overlap_groups=sum(overlap_groups),
+ any_hit_issues=sum(hits>0),unique_fixtures=sum(unique_fixtures),fixture_exposures=sum(fixture_exposures),
+ max_actual_uses=max(max_actual_uses),unique_fixture_direction_pairs=sum(unique_fixture_direction_pairs),
+ covered_legs=sum(covered_legs),expected_winning_groups=sum(expected_winning_groups),changed_support_legs=sum(changed_support_legs),.groups='drop')
+s <- left_join(s,extra,by=c('partition','policy'),relationship='one-to-one') |>
+ mutate(budget_return_percent=100*net_cny/budget_cny,stake_ROI_percent=100*roi,
+ group_hit_percent=100*winning_groups/groups,leg_hit_percent=100*covered_legs/fixture_exposures)
+tibble(receipt=result$freeze_seal,learning='NONE',scope='EXPOSED_40_ISSUE_DIAGNOSTIC') |> knitr::kable()
+```
+
+## 两种提高上限的比较口径
+
+CAP档位会重新选择补组，因此上限提高后的差异同时包含新增投注和换组。
+看到第一轮结果后补加NESTED对照：以CAP2_FIXED为起点，依次提高到3、4、6，保留原有全部组和票据，只追加新组。
+NESTED_DIVERSE在对应固定组上应用同一赛果多样化规则。此补充属于事后解释性诊断，不是未见数据验证。
+
+## 全40期：实际预算与风险
+
+预算回报率＝净收益÷同样的分配预算；投注ROI＝净收益÷实际投注；现金不是收益。
+最大回撤从0起算累计净收益高点的金额回落，不是初始本金百分比。
+
+```{r}
+s |> filter(partition=='ALL40') |> select(policy,budget_cny,stake_cny,cash_cny,net_cny,budget_return_percent,
+ stake_ROI_percent,max_drawdown_cny,winning_groups,groups,any_hit_issues,profitable_issues) |> knitr::kable(digits=2)
+```
+
+## 分区表现
+
+```{r}
+s |> filter(partition!='ALL40') |> select(partition,policy,net_cny,budget_return_percent,max_drawdown_cny,
+ winning_groups,groups,any_hit_issues) |> knitr::kable(digits=2)
+```
+
+## 广度、赛果覆盖与相关性
+
+unique_fixtures在同一期去重再加总；fixture_exposures按每组持有的场次计；fixture_direction_pairs是同一期的场次×赛果去重数。
+leg_hit_percent只描述每次场次持有的赛果是否覆盖实际方向，不等于整组命中。
+expected_winning_groups为各组模型联合覆盖概率之和，组内沿用场次独立假设；它是预期命中组数，
+**不是至少中一组的概率**。共享场次导致组间相关，不能套独立组公式。变更支持次数仅计相对同组FIXED的差异。
+
+```{r}
+s |> filter(partition=='ALL40') |> select(policy,disjoint_groups,overlap_groups,unique_fixtures,fixture_exposures,
+ max_actual_uses,unique_fixture_direction_pairs,changed_support_legs,leg_hit_percent,group_hit_percent,expected_winning_groups) |> knitr::kable(digits=2)
+```
+
+## 本轮结论
+
+提高场次复用上限确实释放组数，原先615组并不是预算允许的上限。
+不过重新分组的CAP3／4／6_FIXED总体均亏损；对应DIVERSE也全部亏损。
+保留原组只追加时，CAP6从615组增至1481组，实际投入从19,680增至47,392元，
+净收益从8,290.59增至8,623.47元：额外27,712元只增加332.88元净收益，新增投入回报约1.20%，
+最大回撤从3,008增至5,004.91元。预算回报由15.06%变为15.67%，提升有限。
+NESTED_CAP3／4预算回报分别11.26%／3.42%，也未改善原三单选方案。
+
+NESTED_CAP6_FIXED在TEST8的预算回报18.35%、回撤4,608元；CAP2_FIXED为1.98%、回撤3,008元。
+这说明扩大组数可能增加命中机会，但新增持仓的回撤不能忽略。所有多样化分支全40期均亏损，
+本轮固定的方向覆盖折扣规则没有证据值得采用；这不代表所有允许不同赛果的策略都无效。
+两场单选原参照的全40期预算回报39.40%、回撤3,248.79元，仍优于本轮新增分支。
+不自动调整默认规则，也不从这40期反复挑出“最优”档位当作新测试结论。
+
+## 全部40期
+
+```{r}
+x |> arrange(issue,policy) |> mutate(budget_return_percent=100*budget_return) |>
+ select(partition,issue,policy,budget_cny,stake,cash_cny,net,budget_return_percent,groups,hits,
+ unique_fixtures,max_actual_uses,changed_support_legs) |> knitr::kable(digits=2)
+```
+
+函数复用 `src/fundamentals_n7_single.py`（明确max_uses）和 `src/fundamentals_n7_diversity.py`。
+测试覆盖各复用上限、先不重叠、完整16票、预算与现金、无重复完整票据、首次支持不变、重复赛果可变、
+模型概率不变及赛果/SP变动不改变计划。首轮440份、补充240份计划分别封存后读取同一权威R/SQLite历史审计；两轮均为已揭示历史回顾。
+独立重算另行检查计数、支持、覆盖指标与返奖；不根据本轮结果自动启用某档复用或赛果规则。

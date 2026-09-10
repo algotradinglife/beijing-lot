@@ -1,0 +1,114 @@
+---
+title: "两场单选：概率＋随机，与先压缩再选场"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-selection-variants-v1"
+  archived_report: false
+---
+
+## 固定比较
+
+同一40期，总预算55,040元，每期预算沿用CURRENT。所有新变种每组恰好两场单选＋五场双选，
+32基本组合、每注2元、每组64元；每场最多两组、任意两组最多重叠两场。先不重叠，之后补有限重叠组，
+不能再买完整组则持现。无比分、无重复加注、无重训练。冻结让平1.1.0及同一高净球专家，各权重0.5。
+市场SP代理来自欧赔＋大小球，最终SP只结算，一次票级0.65。税前理论值，不模拟税费、奖金上限、取整。
+
+### 概率＋随机
+
+沿用SINGLE_2原有场次及分组。每组最高单选概率场次固定单选，再从其余六场等概率抽一场改单选，
+本轮赛果仍为该场模型最高概率方向。种子预先固定0至99，全100次均展示，不挑最佳seed。
+各组抽样独立，同场在不同组允许有不同角色和支持集合；本轮不随机赛果，因此重复单选时仍取同一Top1。
+100种子的分布只是随机机制敏感性，不是未来收益置信区间。
+
+### 先压缩再选场
+
+先对整期场次确定固定单选身份：按Top1概率前8、12、16场，或Top1概率至少50%、60%、70%。
+单选保留Top1，其余场次保留Top2。单选池和双选池分别按实际保留概率排序，先取最强2＋5组成不重叠组，
+再用同样的次数／重叠约束补组，并额外约束每组恰好2场单选。
+补组MILP最大化实际保留概率乘积，而不是未压缩双选概率；保留身份在同一方案的所有组内固定。
+若池子比例不合适，即使仍有预算也可能无法组单，必须持现。这与先分组再压缩分开比较。
+
+全部40期为已揭示历史，原训练24／验证8／测试8仅为回顾分区，不是新留出验证。
+逐场cutoff不证明共同购票时刻可执行。种子、阈值和数量均不根据本轮结算优化。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY');bindings <- archive$hashes
+ cat('CI归档报告渲染，不是原始数据或模型重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==4360,!anyDuplicated(x[c('issue','policy')]),all(x$cash_cny>=0),all(x$stake+x$cash_cny==x$budget_cny))
+all_rows <- bind_rows(x,mutate(x,partition='ALL40'))
+s <- integration_weight_summary(all_rows)
+budget <- all_rows |> group_by(partition,policy) |> summarise(budget_cny=sum(budget_cny),cash_cny=sum(cash_cny),any_hit_issues=sum(hits>0),.groups='drop')
+s <- left_join(s,budget,by=c('partition','policy'),relationship='one-to-one') |> mutate(budget_return_percent=100*net_cny/budget_cny,stake_ROI_percent=100*roi)
+random <- s |> filter(grepl('^RANDOM_',policy))
+control <- s |> filter(policy=='SINGLE_2') |> select(partition,control_return=budget_return_percent,control_drawdown=max_drawdown_cny)
+random <- left_join(random,control,by='partition',relationship='many-to-one')
+stopifnot(all(table(random$partition)==100))
+tibble(receipt=result$freeze_seal,random_seeds=100,learning='NONE') |> knitr::kable()
+```
+
+## 确定性方案：整体与分区
+
+预算回报率＝净收益÷固定分配预算，投注ROI＝净收益÷实际投入；现金不是收益。
+回撤按期号累计净收益从0开始计算，ALL40连续，分区分别起算。
+
+```{r}
+s |> filter(!grepl('^RANDOM_',policy)) |> select(partition,policy,stake_cny,cash_cny,net_cny,budget_return_percent,stake_ROI_percent,max_drawdown_cny,winning_groups,groups,any_hit_issues) |> knitr::kable(digits=2)
+```
+
+## 随机100次的分布
+
+```{r}
+random |> group_by(partition) |> summarise(seeds=n(),mean_net=mean(net_cny),median_net=median(net_cny),
+ median_budget_return=median(budget_return_percent),p05_return=quantile(budget_return_percent,.05),p95_return=quantile(budget_return_percent,.95),
+ median_drawdown=median(max_drawdown_cny),p95_drawdown=quantile(max_drawdown_cny,.95),
+ seeds_beating_two_probability=sum(budget_return_percent>control_return),
+ seeds_better_return_and_drawdown=sum(budget_return_percent>control_return & max_drawdown_cny<control_drawdown),.groups='drop') |> knitr::kable(digits=2)
+```
+
+## 每期：确定性方案与随机分布
+
+```{r}
+x |> filter(!grepl('^RANDOM_',policy)) |> arrange(issue,policy) |>
+ mutate(budget_return_percent=100*budget_return) |>
+ select(partition,issue,policy,budget_cny,stake,cash_cny,net,budget_return_percent,groups,hits,single_pool_size) |> knitr::kable(digits=2)
+x |> filter(grepl('^RANDOM_',policy)) |> group_by(partition,issue) |>
+ summarise(seeds=n(),stake=first(stake),cash=first(cash_cny),median_net=median(net),
+ p05_budget_return=100*quantile(budget_return,.05),median_budget_return=100*median(budget_return),p95_budget_return=100*quantile(budget_return,.95),.groups='drop') |>
+ arrange(issue) |> knitr::kable(digits=2)
+```
+
+## 全部100种子的40期结果
+
+```{r}
+random |> filter(partition=='ALL40') |> select(policy,stake_cny,net_cny,budget_return_percent,max_drawdown_cny,winning_groups,groups,any_hit_issues) |> knitr::kable(digits=2)
+```
+
+函数在 `src/fundamentals_n7_random_single.py` 与 `src/fundamentals_n7_precompress.py`；
+测试在 `tests/test_fundamentals_n7_selection_variants.py`。选择不读取赛果，全部4360计划压缩封存后才打开结算。
+复用共同Cutoff、基线分组验证、组件结算及R汇总。原随机问题暂按“随机选场、Top1赛果”口径，
+接口支持另行测试赛果按模型概率抽样或从原Top2抽样，本次不混入结果。
+
+## 结果解释
+
+两场均按组内概率选择的40期预算回报39.40%、最大回撤3,248.79元；随机第二场的100次中位
+预算回报10.28%、中位回撤8,573.97元，5%—95%种子分位为−16.38%至35.61%，仅2/100次净收益超过确定性两场方案。
+后8期随机中位预算回报23.35%高于确定性两场9.92%，但中位回撤2,634.06元也高于1,536元；
+并未超过一场单选的44.55%预算回报。分段差异不支持据此挑选有利种子。
+
+先压缩再分组的六个固定规则全40期预算回报均低于原两场方案，最高仅4.41%（阈值50%），
+且该规则后8期为−39.36%。阈值70%只买两组、其余大部分现金，验证和测试零下注；
+零损失不代表有预测优势。该批先压缩规则未带来稳定改进，保留否定诊断，不继续自动筛选阈值。

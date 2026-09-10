@@ -1,0 +1,99 @@
+---
+title: "固定预算：一场单选、六场双选，先不重叠再有限重叠"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-single-v2"
+  archived_report: false
+---
+
+## 冻结规则
+
+预算沿用CURRENT原每期投入（不统一改成1024元）；40期总预算55,040元。
+保持原模型版本：让平1.1.0、同一高净球专家，权重各0.5，不重训练。
+模型为比分分布投射的让球概率；市场概率来自欧赔＋大小球，SP代理为1/q，最终SP只结算。
+包含全部原可用场次，**不剔除冲突、不买比分**。原基线每组双选128注、256元、最多六组。
+
+新方案每组7场，其中一场选模型最高概率方向，另外六场双选，共64注、每注2元、每组128元。
+先按原双选覆盖概率排序，连续七场集中组成不重叠组；有预算但已无完整不重叠组时，补充重叠组。
+每场最多被两组覆盖，任意两组重叠最多两场；限制覆盖原组和新增组，按整组复式计，不按内部64个基本组合计。
+总组数受预算和约束限制，没有原六组上限；每个基本组合只买一注。不足128元或没有可行组时持有现金。
+
+补组使用现有SciPy/HiGHS整数规划，逐组最大化双选覆盖概率乘积（log相加），
+slot排序惩罚1e−10用于数值并列。每一步最多30秒，必须证明最优或不可行，超时不当作“无组可买”。
+这是固定规则下的当期组合选择，不进行历史学习；不声称逐组贪心等于多组联合最优。
+
+两个预先指定的单选规则都展示，不按本轮收益挑选：
+
+- MAX_SINGLE：组内单选概率最高的场次改单选。
+- MIN_RELATIVE_LOSS：选择 `最高方向概率÷双选覆盖概率` 最大的场次，使该组覆盖概率的相对损失最小。
+
+方向并列按W、D、L；场次并列按slot、provider_id。每张中奖票仅乘一次0.65。
+40期都是已揭示历史回顾：训练24／验证8／测试8，不是新留出验证。
+逐场cutoff不证明同一票的共同购买时刻可执行。税前理论结算，未模拟税费、奖金上限或取整。
+
+```{r}
+library(dplyr)
+library(tidyr)
+source('r/fundamentals_integration_weight.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+  archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+  stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY')
+  bindings <- archive$hashes
+  cat('CI归档渲染，仅验证报告输入，不构成原始数据或模型重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==120,!anyDuplicated(x[c('issue','policy')]),
+ all(x$stake+x$cash_cny==x$budget_cny),all(x$cash_cny>=0),
+ all(abs(x$ending_funds_cny-x$budget_cny-x$net)<1e-7))
+all_rows <- bind_rows(x,mutate(x,partition='ALL40'))
+s <- integration_weight_summary(all_rows)
+budget <- all_rows |> group_by(partition,policy) |>
+ summarise(budget_cny=sum(budget_cny),cash_cny=sum(cash_cny),
+ disjoint_groups=sum(disjoint_groups),overlap_groups=sum(overlap_groups),.groups='drop')
+s <- left_join(s,budget,by=c('partition','policy'),relationship='one-to-one') |>
+ mutate(stake_ROI_percent=100*roi,budget_return_percent=100*net_cny/budget_cny)
+tibble(input_receipt=result$freeze_seal,learning='NONE',model='draw1.1.0:0.5 / frozen-high:0.5') |> knitr::kable()
+```
+
+## 合计与分区
+
+投注ROI＝净收益÷实际投注；预算回报率＝净收益÷分配预算。现金不是收益。
+期末资金＝现金＋返奖＝预算＋净收益。回撤按期号累计净收益从0起算，ALL40连续计算，分区单独起算。
+
+```{r}
+s |> select(partition,policy,budget_cny,stake_cny,cash_cny,net_cny,
+ stake_ROI_percent,budget_return_percent,max_drawdown_cny,winning_groups,groups,
+ disjoint_groups,overlap_groups,profitable_issues) |> knitr::kable(digits=2)
+```
+
+## 全部40期
+
+```{r}
+x |> mutate(stake_ROI_percent=100*roi,budget_return_percent=100*budget_return) |>
+ select(partition,issue,policy,budget_cny,stake,cash_cny,net,
+ stake_ROI_percent,budget_return_percent,groups,hits,disjoint_groups,overlap_groups) |>
+ arrange(issue,policy) |> knitr::kable(digits=2)
+```
+
+## 可重复检查
+
+40期原基线215组，新方案418组（313组先行不重叠、105组后补有限重叠）。
+MAX_SINGLE实际投入53,504元、持现1,536元、净赚21,173.79元，投注ROI39.57%、预算回报38.47%，
+全程最大回撤5,946.77元；CURRENT净赚10,754.90元、ROI19.54%、回撤19,895.50元。
+但MAX_SINGLE验证8期预算回报69.10%低于CURRENT98.22%，验证回撤也更高。
+MIN_RELATIVE_LOSS全程预算回报15.28%，验证净亏4,448.69元。两个规则训练和测试的实际返奖碰巧相同，
+不意味着单选场次或预测相同。属于有进一步验证价值的历史线索，不自动替换默认策略。
+
+Python函数位于 `src/fundamentals_n7_single.py`：`next_overlap_group`、`n7_single_plan`、`settle_n7_single`。
+测试位于 `tests/test_fundamentals_n7_single.py`；结算拆为每组独立component，复用原有权威结算公式，
+避免允许重叠后破坏原结算接口的一对一身份约束。共享Cutoff、源hash、transitive implementation hash和计划封存均保留。
+单注金额、资金余数、完整64票支持、组间重叠、每场使用次数、比分方向和SP缺失均受测试或独立重算约束。
+先前仅不重叠的v1被用户追加规则取代，本报告仅使用v2。

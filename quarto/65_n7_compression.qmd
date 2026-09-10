@@ -1,0 +1,109 @@
+---
+title: "同预算下0—7场单选压缩：收益与回撤"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-compression-v1"
+  archived_report: false
+---
+
+## 固定比较规则
+
+同一40期、相同每期预算，总预算55,040元；冻结让平1.1.0及同一高净球专家，权重各0.5。
+沿用当前比分分布投射的让球概率，市场SP代理由欧赔＋大小球映射，最终SP只结算。
+本轮固定采用上一轮的MAX_SINGLE规则：组内按最高方向概率降序，把前k场改成该方向单选，
+其余7−k场双选。方向并列按W、D、L，场次并列按slot、provider_id。k=0至7全部展示，
+不根据本轮结果自动选择k，也不重训练专家。
+
+每组成本 `2 × 2^(7−k)` 元。先按原双选覆盖概率排序、连续七场集中组成不重叠组，
+再使用剩余预算补有限重叠组。每场最多进入两组、任意两组重叠最多两场；每基本组合只买一注，
+不加倍、不买比分、不剔除冲突。所有k使用相同分组排序及补组目标，保持压缩数是主要改变。
+
+补组复用SciPy MILP，逐组最大化双选覆盖概率乘积（log相加）；slot排序惩罚1e−10用于数值并列。
+不是按压缩后的单选联合概率重新挑组，也不声称全局组合最优。
+超时必须失败，只有证明当前约束无解才停止；不能买完整组的资金持有现金。
+组数受可用场次、使用次数与重叠约束限制：压缩更多不会无限增加组数。
+
+CURRENT为原全双选基线；SINGLE_0按统一新接口计算全双选，须与CURRENT逐期金额及命中一致。
+SINGLE_1应复现上一轮最高单选概率方案。所有40期已被揭示，分区为训练24／验证8／测试8，
+仅供回顾诊断。逐场cutoff不证明票据在共同购买时刻可执行；组间重叠造成相关性。
+0.65仅乘一次票级返奖；税前理论值，未模拟税费、奖金上限、取整。
+
+```{r}
+library(dplyr)
+source('r/fundamentals_integration_weight.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+ archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+ stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY')
+ bindings <- archive$hashes
+ cat('CI归档渲染，仅验证报告输入，不构成模型或原始源数据重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==360,!anyDuplicated(x[c('issue','policy')]),
+ all(x$cash_cny>=0),all(x$stake+x$cash_cny==x$budget_cny),
+ all(abs(x$ending_funds_cny-x$budget_cny-x$net)<1e-7))
+control <- x |> filter(policy=='CURRENT') |> arrange(issue)
+zero <- x |> filter(policy=='SINGLE_0') |> arrange(issue)
+stopifnot(identical(control$stake,zero$stake),identical(control$gross,zero$gross),identical(control$hits,zero$hits))
+all_rows <- bind_rows(x,mutate(x,partition='ALL40'))
+s <- integration_weight_summary(all_rows)
+extra <- all_rows |> group_by(partition,policy) |>
+ summarise(budget_cny=sum(budget_cny),cash_cny=sum(cash_cny),
+ disjoint_groups=sum(disjoint_groups),overlap_groups=sum(overlap_groups),
+ any_hit_issues=sum(hits>0),.groups='drop')
+s <- left_join(s,extra,by=c('partition','policy'),relationship='one-to-one') |>
+ mutate(stake_ROI_percent=100*roi,budget_return_percent=100*net_cny/budget_cny,
+ group_hit_percent=100*winning_groups/groups)
+tibble(receipt=result$freeze_seal,learning='NONE',scope='EXPOSED_40_ISSUE_DIAGNOSTIC') |> knitr::kable()
+```
+
+## 全40期合计
+
+公平比较优先看预算回报率＝净收益÷相同分配预算。投注ROI＝净收益÷实际投注，
+压缩越多、持现越多时两者会明显分离。现金不是收益。最大回撤按累计净收益从0起算。
+
+```{r}
+s |> filter(partition=='ALL40',policy!='CURRENT') |>
+ select(policy,budget_cny,stake_cny,cash_cny,net_cny,budget_return_percent,stake_ROI_percent,
+ max_drawdown_cny,winning_groups,groups,group_hit_percent,any_hit_issues,profitable_issues) |> knitr::kable(digits=2)
+```
+
+## 分区收益与风险
+
+```{r}
+s |> filter(partition!='ALL40',policy!='CURRENT') |>
+ select(partition,policy,net_cny,budget_return_percent,max_drawdown_cny,
+ winning_groups,groups,any_hit_issues,profitable_issues) |> knitr::kable(digits=2)
+```
+
+## 全部逐期结果
+
+```{r}
+x |> filter(policy!='CURRENT') |> arrange(issue,policy) |>
+ mutate(stake_ROI_percent=100*roi,budget_return_percent=100*budget_return) |>
+ select(partition,issue,policy,budget_cny,stake,cash_cny,net,stake_ROI_percent,
+ budget_return_percent,groups,hits,disjoint_groups,overlap_groups) |> knitr::kable(digits=2)
+```
+
+复用函数位于 `src/fundamentals_n7_single.py`，明确传入 `single_count`；函数测试覆盖0至7、
+完整票据支持、结算、现金、组间约束、求解失败、非法参数以及赛果/SP变动不改变计划。
+计划全部封存后读取权威R/SQLite审计；源文件、模型身份、cutoff和依赖实现绑定在receipt中。
+
+## 解释
+
+一场单选净收益21,173.79元，预算回报38.47%、回撤5,946.77元；两场单选净收益21,686.87元，
+预算回报39.40%、回撤3,248.79元。两场比一场净收益仅多513.08元，但投入少14,592元。
+然而后8期预算回报由一场44.55%降至两场9.92%，全样本收益领先并不构成稳定优势。
+一场和两场均有19/40期至少中一组，不代表组命中率相同，也不是独立事件的推算。
+
+组数在k=3时达到615组，k=4—7不再增加；每场最多两组与组间最多两场重叠限制了资金使用。
+继续压缩会增加现金并降低支持，不能用空闲资金突破原约束或重复加注。
+k=7投注ROI182.35%，但预算回报仅4.08%，全40期仅命中两组，且都来自验证段；训练及测试零命中。
+k=4—7后8期均零命中。保留完整比较，不据此自动提高压缩数或更换默认策略。
