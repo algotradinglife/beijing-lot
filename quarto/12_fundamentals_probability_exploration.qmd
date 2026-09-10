@@ -1,0 +1,240 @@
+---
+title: "基本面 → 比分概率 → 7串1与比分保护：数学探索"
+params:
+  score_transfer_mass: 0.08
+  quote_transfer_mass: 0.04
+  n: 7
+  budget_cny: 1024
+  unit_cny: 2
+  payout_factor: 0.65
+  tail_tolerance: 0.0000000001
+  lambda_home: [1.55, 1.20, 1.80, 0.95, 1.35, 1.60, 1.10]
+  lambda_away: [0.95, 1.10, 0.85, 1.40, 1.20, 1.05, 1.60]
+  handicap: [-1, 0, -1, 1, 0, -1, 1]
+execute:
+  freeze: false
+  cache: false
+  error: false
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+```{r}
+#| include: false
+source("r/probability_exploration.R")
+if (params$n != 7 || params$budget_cny != 1024 || params$unit_cny != 2 || params$payout_factor != 0.65) stop("This report requires N=7, budget=1024, unit=2 and payout factor=0.65")
+n <- as.integer(params$n)
+if (n != 7L || length(params$lambda_home) != n || length(params$lambda_away) != n || length(params$handicap) != n) stop("Declare seven scenario fixtures")
+models <- vector("list", n)
+for (i in seq_len(n)) models[[i]] <- illustrative_score_grid(params$lambda_home[[i]],
+  params$lambda_away[[i]], params$handicap[[i]], params$tail_tolerance)
+p <- do.call(rbind, lapply(models, `[[`, "probability"))
+sp <- 1 / p
+selections <- rep(list(c("W", "L")), n)
+hedge_probability <- sum(models[[1]]$grid$probability[
+  models[[1]]$grid$home_goals == 1 & models[[1]]$grid$away_goals == 0])
+if (params$handicap[[1]] != -1) stop("The illustrated1:0 hedge requires first-leg handicap -1")
+price_multipliers <- c(1, 0.7, 1, 1.7)
+core_multiples <- c(4L, 3L, 3L, 3L)
+labels <- c("纯128组合×4倍", "串关3倍+低SP比分", "串关3倍+匹配SP比分", "串关3倍+高SP比分")
+scenarios <- vector("list", 4)
+for (i in seq_along(scenarios)) scenarios[[i]] <- n7_double_hedge_demo(
+  p, sp, selections, hedge_leg = 1L, hedge_outcome = "D", hedge_probability = hedge_probability,
+  hedge_sp = price_multipliers[i] / hedge_probability, n = n,
+  budget_cny = params$budget_cny, unit_cny = params$unit_cny,
+  payout_factor = params$payout_factor, core_multiple = core_multiples[i])
+comparison <- dplyr::bind_rows(lapply(scenarios, `[[`, "metrics"))
+comparison$scenario <- labels
+```
+
+## 这次探索回答什么
+
+已确认的票型为 **7场、每场选两种让球赛果，共128个基本组合**。每注2元，一倍256元；沿用项目的1024元比较预算，纯串关是四倍。比分保护必须从同一预算中划出，不能用增加投入造成的命中改善冒充对冲效果。
+
+**本页全部概率和SP都是声明的数学假设，不是100101期预测、真实市场报价或历史回测。** 100101试点仍有时点、改期和比分口径待核。本页不读取结算标签、不训练参数、不选择最优球队或策略。
+
+## 从基本面到概率
+
+球队“战力”先拆成进攻能力、防守能力，以及赛事环境，而不是先压成一个胜率分数。后续可以采用以下结构：
+
+$$
+\log\lambda_H = \mu_{赛事,赛季}+主场效应+进攻_H-防守_A+赛前可用协变量,
+$$
+$$
+\log\lambda_A = \mu_{赛事,赛季}+进攻_A-防守_H+赛前可用协变量.
+$$
+
+历史赛果支撑攻防估计；具体联赛/杯赛/友谊赛、赛季、主客场影响可比较范围。对手强弱也要纳入，否则打弱队取得的高进球率会被误认成实力增长。天气只在有赛前可用证据、且此前样本足以估计影响时加入，不能凭经验任意减去进球数。稀疏赛事需要向既有长期先验收缩。
+
+本页**没有估计上述系数**，而是直接给出七场假设的期望进球数，以独立Poisson作为透明起点：
+
+$$P(X=x,Y=y)=\operatorname{Pois}(x;\lambda_H)\operatorname{Pois}(y;\lambda_A).$$
+
+实际模型还需检验低比分相关性和概率校准，不能把独立性当作事实。经典比分模型可参考[Dixon–Coles论文](https://academic.oup.com/jrsssc/article-abstract/46/2/265/6990546)。拟合、窗口/权重选择、校准及市场融合将统一通过项目的 `src/temporal_learning`，只使用对应截止时点之前、具有可用性证据的数据。
+
+```{r}
+#| echo: false
+knitr::kable(tibble::tibble(fixture = seq_len(n), lambda_home = unlist(params$lambda_home),
+ lambda_away = unlist(params$lambda_away), home_handicap = unlist(params$handicap),
+ omitted_score_mass = format(vapply(models, `[[`, numeric(1), "omitted_mass"), scientific = TRUE, digits = 3)), digits = 6,
+ caption = "假设参数，不是实际比赛预测；让球为加在主队进球上的带符号整数")
+```
+
+## 同一张比分表推导所有玩法
+
+设主队让球数为 $h$，则让球胜/平/负分别对应 $X+h-Y>0,=0,<0$。普通胜平负用 $h=0$；比分玩法直接取对应单元格。必须从**同一联合比分分布**汇总，避免各模型给出彼此矛盾的概率。
+
+```{r}
+#| echo: false
+#| fig-width: 6
+#| fig-height: 5
+first <- models[[1]]$grid
+shown <- first[first$home_goals <= 6 & first$away_goals <= 6, ]
+z <- matrix(0, 7, 7)
+z[cbind(shown$home_goals + 1L, shown$away_goals + 1L)] <- shown$probability
+image(0:6, 0:6, z, col = hcl.colors(30, "Blues 3", rev = TRUE),
+ xlab = "Home goals", ylab = "Away goals", main = "Illustrative score probabilities")
+for (i in seq_len(nrow(shown))) text(shown$home_goals[i], shown$away_goals[i],
+ sprintf("%.1f%%", 100 * shown$probability[i]), cex = 0.65)
+```
+
+图只显示0–6球，未对可见区域重新归一。完整计算支持之外的概率由上表单独报告，条件归一带来的总误差受声明容差约束。
+
+仅有胜平负、让球信息时，对“1:0还是3:2”的拆分往往仍依赖模型假设；总进球/大小球市场可提供额外约束。让球信息首先用于结果映射和市场对照，不应未经检验就再把它作为“独立基本面”重复加入。
+
+## 和市场比较什么
+
+同一时点的三项SP可先转成 $q_k=(1/SP_k)/\sum_j(1/SP_j)$，作为市场概率代理；它不自动等于真实概率。本例为了隔离组合结构，先设市场代理恰好等于假设模型，即没有基本面优势。
+
+```{r}
+#| echo: false
+market <- t(apply(sp, 1, market_probability_proxy))
+knitr::kable(tibble::tibble(fixture = seq_len(n), model_W = p[,"W"], model_D = p[,"D"],
+ model_L = p[,"L"], market_W = market[,"W"], market_D = market[,"D"], market_L = market[,"L"]), digits = 4)
+```
+
+下一步真实探索应分别比较基本面概率、市场概率、以及只在此前数据上校准过的融合概率。先比较log loss、Brier score和分组校准，再检查组合收益；本期不能用来既调参数又证明盈利。
+
+北京单场为浮动奖金，赛前SP并不锁定最终回报。[北京市体育局说明](https://tyj.beijing.gov.cn/bjsports/qaknowledge/326043164/index.html) 本例固定假设SP，只隔离概率和覆盖结构；实际研究必须分开保存赛前价格与最终结算SP。项目约定的0.65在完整中奖彩票上仅应用一次，不逐关连乘。此处不模拟税费、封顶和取消赛事的特殊规则。
+
+## 市场与战力的两类分歧
+
+固定首场主让一球，构造三种假设比分分布：基准、把2:0的一部分概率移到1:0、反向移动。三者普通胜平负概率完全相同，只有净胜球结构改变。这里的战力仅指假设模型分布，尚未从近期表现拟合评分。
+
+市场比分分布沿用首场假设Poisson分布；让球报价概率则人为从让胜向让平移动一部分，用来演示内部差异。它们不是采集的欧赔平均值，也不是从胜平负唯一反推的比分分布。实际平均欧赔应对同一时点、同一玩法的每家公司三项报价分别归一化，再按预先声明权重汇总。
+
+```{r}
+#| echo: false
+market_scores <- models[[1]]$grid
+one_zero <- which(market_scores$home_goals == 1 & market_scores$away_goals == 0)
+two_zero <- which(market_scores$home_goals == 2 & market_scores$away_goals == 0)
+transfer <- params$score_transfer_mass
+quote_transfer <- params$quote_transfer_mass
+if (!is.numeric(transfer) || length(transfer) != 1 || !is.finite(transfer) ||
+    transfer < 0 || transfer > min(market_scores$probability[c(one_zero,two_zero)]))
+  stop("Score transfer must fit both donor cells")
+quote_probability <- models[[1]]$probability
+if (!is.numeric(quote_transfer) || length(quote_transfer) != 1 || !is.finite(quote_transfer) ||
+    quote_transfer < 0 || quote_transfer >= quote_probability["W"])
+  stop("Quote transfer must leave positive market probabilities")
+quote_probability[c("W","D")] <- quote_probability[c("W","D")] + c(-quote_transfer,quote_transfer)
+disagreement_scenarios <- vector("list",3)
+scenario_names <- c("基准攻防分布","更多一球小胜","更多两球取胜")
+for (i in seq_len(3)) {
+  candidate <- market_scores
+  shift <- c(0,transfer,-transfer)[i]
+  candidate$probability[c(one_zero,two_zero)] <-
+    candidate$probability[c(one_zero,two_zero)] + c(shift,-shift)
+  result <- illustrative_market_disagreement(candidate,market_scores,-1,1/quote_probability)
+  result$outcomes$scenario <- scenario_names[i]
+  result$scores$scenario <- scenario_names[i]
+  disagreement_scenarios[[i]] <- result
+}
+disagreement <- dplyr::bind_rows(lapply(disagreement_scenarios, `[[`, "outcomes"))
+knitr::kable(dplyr::select(disagreement, scenario,outcome,model_ordinary,market_ordinary,
+ model_handicap,market_score_handicap,market_quote,market_internal_pp,model_vs_quote_pp),
+ digits=4, caption="每行是情景的一项赛果；W/D/L为主胜/平/客胜，让球列为让胜/让平/让负。概率0–1，差值单位为百分点")
+```
+
+市场内部差值＝市场比分假设所支持的让球概率－让球报价概率代理。战力对报价差值＝战力比分假设所支持的让球概率－让球报价概率代理。两者之差才是模型相对市场比分假设额外增加的概率；不能把两类差值当作两份独立证据叠加。
+
+```{r}
+#| echo: false
+contributions <- dplyr::bind_rows(lapply(disagreement_scenarios, `[[`, "scores"))
+knitr::kable(dplyr::select(dplyr::filter(contributions, contribution_pp != 0),
+ scenario,home_goals,away_goals,handicap_outcome,model_probability,market_probability,contribution_pp),
+ digits=4, caption="完整列出发生变化的比分；贡献加总等于模型与市场比分假设的让球概率差")
+```
+
+默认情景中，普通主胜概率不变，但小胜情景的让胜概率减少8个百分点、让平增加8个百分点。市场内部本来有“让胜高4点、让平低4点”的差异，因此小胜模型对让球报价变成“让胜低4点、让平高4点”；两球取胜情景则变成“让胜高12点、让平低12点”。**同样看好主胜，可能得到相反的让球判断。** 上述数字对应默认参数；修改参数后以表格为准。
+
+正差值表示模型给了更高概率，并不保证正期望。将三项SP同时乘以相同倍数，归一化代理概率不变，回报却改变。因此本页不凭差值自动推荐投注、排除某项结果或选择保护比分。
+
+真实数据阶段需绑定同场身份、赛前截止时点、普通/整数让球三项玩法口径及原始价格。亚洲让球两项盘存在走盘、半赢半输，不能直接塞入本表。三种情景展示假设敏感度，并非置信区间。
+
+## 什么比分才在保护串关
+
+本例固定每场选择让胜W、让负L，排除让平D；这只是预先声明的演示组合，**没有声称双选就应该排除让平**。
+
+第一场主队让一球（$h=-1$），被排除的让平对应“主队净胜一球”。因此1:0、2:1、3:2等都属于该场的遗漏区域。单独买1:0，只保护其中一个比分；买2:0则落在已选让胜内，属于同方向叠加，不能按本例的互斥对冲公式计算。
+
+即使1:0落在遗漏区域，它也没有覆盖其他六场造成的全部串关失败。本例中：
+
+```{r}
+#| echo: false
+knitr::kable(tibble::tibble(item = c("首场1:0概率", "七场双选全部覆盖概率", "串关落空时1:0保护命中概率"),
+ probability = c(hedge_probability, comparison$core_hit_probability[1],
+ comparison$hedge_hit_given_core_miss[2])), digits = 4)
+```
+
+## 固定预算下比较收益分布
+
+四种方案都投入1024元。纯串关用四倍；其余用三倍串关（768元）和256元单场1:0。后面三个SP情景只改变保护的价格，比分命中概率保持不变：分别为假设公平倒数价格的0.7、1.0、1.7倍。这里的“匹配”是未扣返奖因子前的倒数关系，不意味着无亏损。
+
+```{r}
+#| echo: false
+knitr::kable(dplyr::select(comparison, scenario, core_stake_cny, hedge_stake_cny,
+ expected_net_cny, zero_return_probability, profit_probability, net_sd_cny,
+ worst_20pct_mean_net_cny), digits = 3,
+ caption = "完全假设的单期净收益分布；金额单位：元，概率范围0–1")
+```
+
+```{r}
+#| echo: false
+#| fig-width: 7
+#| fig-height: 4
+plot(c(-params$budget_cny, 4000), c(0, 1), type = "n", xlab = "Net return (CNY)",
+ ylab = "Cumulative probability", main = "Fixed-budget illustrative return distributions")
+colors <- c("#234E70", "#B24C32", "#42856C", "#8654A2")
+for (i in seq_along(scenarios)) {
+ dist <- scenarios[[i]]$distribution
+ dist <- dist[order(dist$net_cny), ]
+ lines(dist$net_cny, cumsum(dist$probability), type = "s", col = colors[i], lwd = 2)
+}
+legend("bottomright", legend = c("Core only", "Low-SP hedge", "Matched-SP hedge", "High-SP hedge"),
+ col = colors, lty = 1, lwd = 2, cex = 0.8)
+```
+
+图只显示部分收益横轴范围，表中期望和风险统计使用全部离散情景。所有比赛之间在本例中假设独立；真实研究需要检验共享联赛、天气和参数误差造成的相关性。
+
+这个实验重点区分三件事：**少归零、提高盈利概率、提高期望净收益**。它们不是同一个指标。保护价格过低时，可能少归零却增加期望亏损；只有一个比分，即使有较好的单项价格，也不保证整个组合具有正期望。
+
+## 下一步接真实数据的最小实验
+
+仍以100101作为展示期，先解决比赛身份/改期、常规时间比分以及赛前可用性证据，再确认同一截止时点的让球、胜平负与比分价格是否齐备。数据不满足时，不用开奖SP替代赛前信息，也不把当前页面冒充当年快照。
+
+首轮固定比较三类概率来源、同一七场与同一预算，不大规模搜索票型或保护比分。该期只用于解释流程，不能单独证明策略有效；验证需要后来独立的历史期次和逐期冻结的预测。
+
+## 参数与实现
+
+```{r}
+#| echo: false
+knitr::kable(tibble::tibble(item = c("scenario", "implementation_sha256", "parameter_sha256", "historical_learning"),
+ value = c("SYNTHETIC_NOT_A_FORECAST", digest::digest(file = "r/probability_exploration.R", algo = "sha256"),
+ digest::digest(params, algo = "sha256"), "NONE")))
+input_hashes <- character(length(scenarios))
+for (i in seq_along(scenarios)) input_hashes[i] <- scenarios[[i]]$receipt$input_sha256
+knitr::kable(tibble::tibble(scenario = labels, input_sha256 = input_hashes))
+```

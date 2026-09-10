@@ -1,0 +1,10 @@
+{
+  "url": "https://live.nowscore.com/analysis/844632cn.html",
+  "final_url": "https://live.nowscore.com/analysis/844632cn.html",
+  "status": 200,
+  "received_at_utc": "2026-09-06T07:35:50.068696+00:00",
+  "sha256": "09aa69d5a3b05ebda42e3acf1a46ef2ec12b5c96beb0496d9f78983b0d7eec11",
+  "byte_count": 217565,
+  "content_type": "text/html",
+  "purpose": "Archived 130511/001 analysis identity and encoding regression; historical proxy only."
+}

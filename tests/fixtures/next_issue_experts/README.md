@@ -1,0 +1,1 @@
+Offline integration fixture: original 100104 slots 1, 4, 25, 30. The roster is cropped and its byte receipt recomputed; analysis responses are unchanged copies. Not full-issue coverage. training.json contains only inventoried 100101–100103 training features and expert evidence.

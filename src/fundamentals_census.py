@@ -217,16 +217,49 @@ def normalize_schedule_rows(rows: list[list[str]], *, source: str, fixture_local
     return normalized
 
 
+def decode_analysis_text(raw: bytes) -> tuple[str, str]:
+    """Strictly decode declared UTF-8/GB2312/GBK HTML; return text and codec.
+
+    Unknown or conflicting declarations and malformed bytes raise ValueError.
+    GB2312 follows the HTML GBK mapping. No I/O or replacement characters.
+    """
+    declarations = re.findall(br'<meta\b[^>]*\bcharset\s*=\s*[\"\x27]?\s*([A-Za-z0-9_-]+)',
+                              raw[:4096], flags=re.IGNORECASE)
+    labels = {value.decode("ascii").lower() for value in declarations}
+    codecs_by_label = {"utf-8": "utf-8-sig", "utf8": "utf-8-sig", "gb2312": "gbk", "gbk": "gbk"}
+    if labels - codecs_by_label.keys():
+        raise ValueError("unsupported declared analysis encoding")
+    encodings = {codecs_by_label[label] for label in labels}
+    if len(encodings) > 1:
+        raise ValueError("conflicting declared analysis encodings")
+    encoding = next(iter(encodings), "utf-8-sig")
+    return raw.decode(encoding, errors="strict"), "utf-8" if encoding == "utf-8-sig" else encoding
+
+
+class AnalysisFieldError(ValueError):
+    """A strict field failure carrying other parsed observations for diagnostics.
+
+    The exception remains fatal to facts callers. partial_record is not accepted
+    output; the failed normalized field is None and raw source cells are kept.
+    """
+
+    def __init__(self, field: str, message: str, partial_record: dict):
+        super().__init__(message)
+        self.field = field
+        self.partial_record = partial_record
+
+
 def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw: bytes | None = None) -> dict:
     """Parse factual analysis identity, data arrays and actual table cells.
 
-    UTF-8 is explicit for these documented endpoints. Malformed bytes/literals,
+    UTF-8 is the default; declared legacy GB2312/GBK HTML uses strict GBK
+    decoding (the HTML-compatible GB2312 label mapping). Malformed bytes/literals,
     missing identity and wrong document IDs raise; absent optional blocks retain
     None, published empty arrays retain []. No scores are corrected or learned.
     """
     if source not in {"nowscore", "titan"} or not re.fullmatch(r"\d+", provider_id):
         raise ValueError("invalid source or provider ID")
-    text = raw.decode("utf-8-sig", errors="strict")
+    text, encoding = decode_analysis_text(raw)
     soup = BeautifulSoup(text, "html.parser")
     if soup.title is None or "分析" not in soup.title.get_text():
         raise ValueError("not an analysis document")
@@ -241,6 +274,17 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
         embedded_id = hidden.get("value")
     elif source == "titan":
         embedded_id = js_value(text, "scheduleID")
+        if embedded_id is None:
+            # Early Titan templates identify this page in both language links.
+            # Require independent odds-navigation agreement, not arbitrary IDs
+            # in historical arrays or the caller URL.
+            language_ids = {match[1] for node in soup.select('a[href]')
+                if node.select_one('img[src="image/gb.gif"], img[src="image/big5.gif"]')
+                and (match := re.fullmatch(r"(\d+)(?:cn)?\.htm", node['href']))}
+            odds_ids = {match[1] for node in soup.select('a[href]')
+                if (match := re.fullmatch(r"(?:(?:https?:)?//)1x2\.bet007\.com/oddslist/(\d+)\.htm", node['href']))}
+            if language_ids == odds_ids and len(language_ids) == 1:
+                embedded_id = next(iter(language_ids))
     else:
         active_ids = {match[1] for node in soup.select("li.uu_on a[href]")
                       if (match := re.fullmatch(r"/analysis/(\d+)(?:cn)?\.html?", node.get("href", ""), re.I))}
@@ -258,9 +302,21 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
         if len(visible_times) > 1:
             raise ValueError("ambiguous visible fixture kickoff")
         time_raw = visible_times[0] if visible_times else None
+    if source == "titan" and not time_raw:
+        # Archived Titan pages publish the full timestamp in their clock script.
+        clock_values = [re.fullmatch(r"CalcTime\.asp\?matchTime=(\d{4}[-/]\d{1,2}[-/]\d{1,2} \d{1,2}:\d{2}:\d{2})", node["src"])
+                        for node in soup.select('script[src*="CalcTime.asp?"]')]
+        if len(clock_values) != 1 or clock_values[0] is None:
+            raise ValueError("missing or ambiguous archived Titan clock")
+        time_raw = datetime.strptime(clock_values[0][1].replace("/", "-"), "%Y-%m-%d %H:%M:%S").strftime("%Y-%m-%d %H:%M:%S")
+        visible_times = re.findall(r"开赛时间[：:]\s*(\d{4}-\d{2}-\d{2})\s*星期[一二三四五六日天]\s*(\d{1,2}:\d{2})",
+                                   soup.get_text(" ", strip=True))
+        if (len(visible_times) != 1 or
+                datetime.strptime(" ".join(visible_times[0]), "%Y-%m-%d %H:%M").strftime("%Y-%m-%d %H:%M") != time_raw[:16]):
+            raise ValueError("archived Titan visible kickoff disagrees with clock")
     if not time_raw:
         raise ValueError("missing fixture kickoff")
-    if not re.fullmatch(r"\d{4}[-/]\d{2}[-/]\d{2} \d{2}:\d{2}(?::\d{2})?", time_raw):
+    if not isinstance(time_raw, str) or not re.fullmatch(r"\d{4}[-/]\d{2}[-/]\d{2} \d{2}:\d{2}(?::\d{2})?", time_raw):
         raise ValueError("invalid source-local fixture kickoff")
     dt = datetime.fromisoformat(time_raw.replace("/", "-"))
     auxiliary_nodes = soup.select('script[src*="/analysisJs/data"]')
@@ -356,15 +412,20 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
         if any(("日期" in row or "时间" in row) and "对阵" in row for row in rows):
             schedule_section_present = True
             schedule_source_rows.extend(row for row in rows if any(re.fullmatch(r"(?:\d{2,4}-)?\d{2}-\d{2}", c) for c in row))
-    schedules = normalize_schedule_rows(
-        schedule_source_rows, source=source,
-        fixture_local_date=dt.replace(tzinfo=ZoneInfo("Asia/Shanghai")).date())
+    schedule_error = None
+    try:
+        schedules = normalize_schedule_rows(
+            schedule_source_rows, source=source,
+            fixture_local_date=dt.replace(tzinfo=ZoneInfo("Asia/Shanghai")).date())
+    except ValueError as exc:
+        schedules = None
+        schedule_error = str(exc)
     top_text = plain_text(str(soup))[:1800]
     venue_match = re.search(r"场地[：:]\s*(.*?)\s*天气[：:]", top_text)
     weather_match = re.search(r"天气[：:]\s*(.*?)\s*温度[：:]", top_text)
     temperature_match = re.search(r"温度[：:]\s*([^\s]+)", top_text)
     season_links = sorted(set(re.findall(r"(?:score|league_vs)/([0-9]{4}(?:-[0-9]{4})?)/([0-9]+)", text)))
-    return {"source": source, "provider_id": provider_id, "home": home, "away": away,
+    record = {"source": source, "provider_id": provider_id, "home": home, "away": away,
             "home_id": str(home_id), "away_id": str(away_id),
             "kickoff_utc": dt.replace(tzinfo=ZoneInfo("Asia/Shanghai")).astimezone(timezone.utc).isoformat(),
             "season_links": season_links, "blocks": blocks, "blocks_from_auxiliary": blocks_from_auxiliary,
@@ -376,7 +437,11 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
             "venue": venue_match[1].strip() or None if venue_match else None,
             "weather": weather_match[1].strip() or None if weather_match else None,
             "temperature": temperature_match[1] if temperature_match else None,
-            "title": soup.title.get_text(" ", strip=True), "encoding": "utf-8"}
+            "title": soup.title.get_text(" ", strip=True), "encoding": "utf-8" if encoding == "utf-8-sig" else encoding}
+    if schedule_error is not None:
+        record["quarantined_fields"] = ["schedules"]
+        raise AnalysisFieldError("schedules", schedule_error, record)
+    return record
 
 
 def compare_pair(left: dict, right: dict) -> list[dict]:

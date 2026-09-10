@@ -1,0 +1,215 @@
+{
+  "cutoffs": {
+    "1": "2010-01-01T12:30:00+08:00",
+    "2": "2010-01-02T19:05:00+08:00",
+    "3": "2010-01-02T22:30:00+08:00",
+    "4": "2010-01-02T20:00:00+08:00",
+    "5": "2010-01-02T22:30:00+08:00",
+    "6": "2010-01-02T22:30:00+08:00",
+    "7": "2010-01-02T22:30:00+08:00",
+    "8": "2010-01-02T22:30:00+08:00",
+    "9": "2010-01-02T22:30:00+08:00",
+    "10": "2010-01-02T22:30:00+08:00",
+    "11": "2010-01-02T22:30:00+08:00",
+    "12": "2010-01-02T22:30:00+08:00",
+    "13": "2010-01-02T22:30:00+08:00",
+    "14": "2010-01-02T22:30:00+08:00",
+    "15": "2010-01-02T22:30:00+08:00",
+    "16": "2010-01-02T22:30:00+08:00",
+    "17": "2010-01-02T22:30:00+08:00",
+    "18": "2010-01-02T22:30:00+08:00",
+    "19": "2010-01-02T22:30:00+08:00",
+    "20": "2010-01-02T22:30:00+08:00",
+    "21": "2010-01-02T22:30:00+08:00",
+    "22": "2010-01-02T22:30:00+08:00",
+    "23": "2010-01-02T22:30:00+08:00",
+    "24": "2010-01-02T22:30:00+08:00",
+    "25": "2010-01-02T22:30:00+08:00",
+    "26": "2010-01-02T19:09:00+08:00",
+    "27": "2010-01-02T22:30:00+08:00",
+    "28": "2010-01-02T19:01:00+08:00",
+    "29": "2010-01-02T21:00:00+08:00",
+    "30": "2010-01-02T22:30:00+08:00",
+    "31": "2010-01-02T22:30:00+08:00",
+    "32": "2010-01-02T22:30:00+08:00",
+    "33": "2010-01-02T22:30:00+08:00",
+    "34": "2010-01-02T20:00:00+08:00",
+    "35": "2010-01-02T22:30:00+08:00",
+    "36": "2010-01-02T19:00:00+08:00",
+    "37": "2010-01-02T19:00:00+08:00",
+    "38": "2010-01-02T19:00:00+08:00",
+    "39": "2010-01-02T22:30:00+08:00",
+    "40": "2010-01-02T22:28:00+08:00",
+    "41": "2010-01-02T20:00:00+08:00",
+    "42": "2010-01-02T22:30:00+08:00",
+    "43": "2010-01-02T22:30:00+08:00",
+    "44": "2010-01-03T00:30:00+08:00",
+    "45": "2010-01-03T00:30:00+08:00",
+    "46": "2010-01-03T00:30:00+08:00",
+    "47": "2010-01-03T00:30:00+08:00",
+    "48": "2010-01-03T00:30:00+08:00",
+    "49": "2010-01-03T00:30:00+08:00",
+    "50": "2010-01-03T00:45:00+08:00",
+    "51": "2010-01-03T02:30:00+08:00",
+    "52": "2010-01-03T03:20:00+08:00",
+    "53": "2010-01-03T03:20:00+08:00",
+    "54": "2010-01-03T18:30:00+08:00",
+    "55": "2010-01-03T20:00:00+08:00",
+    "56": "2010-01-03T20:30:00+08:00",
+    "57": "2010-01-03T19:38:00+08:00",
+    "58": "2010-01-03T22:30:00+08:00",
+    "59": "2010-01-03T22:30:00+08:00",
+    "60": "2010-01-03T22:30:00+08:00",
+    "61": "2010-01-03T23:30:00+08:00",
+    "62": "2010-01-03T23:30:00+08:00",
+    "63": "2010-01-03T23:30:00+08:00",
+    "64": "2010-01-03T23:30:00+08:00",
+    "65": "2010-01-03T23:30:00+08:00",
+    "66": "2010-01-03T23:30:00+08:00",
+    "67": "2010-01-03T23:30:00+08:00",
+    "68": "2010-01-03T23:30:00+08:00",
+    "69": "2010-01-03T23:30:00+08:00",
+    "70": "2010-01-03T23:30:00+08:00",
+    "71": "2010-01-03T23:30:00+08:00",
+    "72": "2010-01-03T23:30:00+08:00",
+    "73": "2010-01-03T23:45:00+08:00",
+    "74": "2010-01-04T01:30:00+08:00",
+    "75": "2010-01-04T01:45:00+08:00",
+    "76": "2010-01-04T01:45:00+08:00",
+    "77": "2010-01-04T03:30:00+08:00",
+    "78": "2010-01-04T03:45:00+08:00"
+  },
+  "adjudications": [
+    {
+      "issue": "100101",
+      "slot": 1,
+      "provider_id": "358101",
+      "history_mode": "ALL_VENUES",
+      "reason": "Owner approved neutral model using recent history irrespective of venue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 6,
+      "provider_id": "356279",
+      "titan_kickoff_utc": "2010-01-02T15:00:00+00:00",
+      "reason": "Owner accepted Titan kickoff versus Nowscore minute discrepancy, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 19,
+      "provider_id": "357562",
+      "titan_kickoff_utc": "2010-01-02T15:00:00+00:00",
+      "reason": "Owner accepted Titan kickoff versus Nowscore minute discrepancy, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 52,
+      "provider_id": "351104",
+      "history_mode": "ALL_VENUES",
+      "reason": "Owner approved neutral model using recent history irrespective of venue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 63,
+      "provider_id": "301435",
+      "minimum": 8,
+      "reason": "Owner accepted available eight same-role histories per team, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 2,
+      "provider_id": "356275",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 4,
+      "provider_id": "356277",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 26,
+      "provider_id": "356299",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 28,
+      "provider_id": "290397",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 29,
+      "provider_id": "290402",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 34,
+      "provider_id": "295074",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 36,
+      "provider_id": "295076",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 37,
+      "provider_id": "295077",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 38,
+      "provider_id": "295078",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 40,
+      "provider_id": "292447",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 41,
+      "provider_id": "292449",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    },
+    {
+      "issue": "100101",
+      "slot": 57,
+      "provider_id": "356302",
+      "exclude": true,
+      "reason": "Owner excluded postponed/cancelled fixture from this issue, 2026-09-07"
+    }
+  ],
+  "responses": [
+    "001-nowscore.json.gz",
+    "001-titan.json.gz",
+    "006-nowscore.json.gz",
+    "006-titan.json.gz",
+    "019-nowscore.json.gz",
+    "019-titan.json.gz",
+    "052-nowscore.json.gz",
+    "052-titan.json.gz",
+    "063-nowscore.json.gz",
+    "063-titan.json.gz"
+  ]
+}

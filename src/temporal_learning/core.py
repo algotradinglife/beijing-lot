@@ -422,40 +422,52 @@ def prepare_learning_context(
         .all()
     ):
         raise TemporalContractError("availability filter crossed cutoff")
-    if partition_policy.kind != "COMPLETE_PRIOR_YEARS":
-        raise TemporalContractError(
-            f"unsupported partition policy: {partition_policy.kind}"
-        )
-    if (
-        partition_policy.minimum_fit_years < 1
-        or partition_policy.tune_years < 1
-        or partition_policy.calibration_years < 1
-    ):
-        raise TemporalContractError(
-            "partition policy requires positive fit/tune/calibration years"
-        )
     years = sorted(eligible[availability.issue_year_column].astype(int).unique())
-    complete_years = [year for year in years if year < cutoff.cutoff_ts.year]
-    tail = partition_policy.tune_years + partition_policy.calibration_years
-    if len(complete_years) < partition_policy.minimum_fit_years + tail:
-        raise TemporalContractError("insufficient complete prior years for partitions")
-    fit_years = complete_years[:-tail]
-    tune_years = complete_years[-tail : -partition_policy.calibration_years]
-    calibration_years = complete_years[-partition_policy.calibration_years :]
-    partitions = {
-        "fit": eligible[
-            eligible[availability.issue_year_column].isin(fit_years)
-        ].copy(),
-        "tune": eligible[
-            eligible[availability.issue_year_column].isin(tune_years)
-        ].copy(),
-        "calibration": eligible[
-            eligible[availability.issue_year_column].isin(calibration_years)
-        ].copy(),
-        "final_refit": eligible,
-    }
-    if any(frame.empty for frame in partitions.values()):
-        raise TemporalContractError("derived partition is empty")
+    if partition_policy.kind == "FIXED_PRIOR_FIT":
+        # A fixed diagnostic fit has no parameter search or calibration split.
+        # It still uses the common strict availability, weights and receipts.
+        if intended_use != "HISTORICAL_DIAGNOSTIC":
+            raise TemporalContractError("fixed prior fit is diagnostic only")
+        if (partition_policy.tune_years != 0 or
+                partition_policy.calibration_years != 0 or
+                partition_policy.minimum_fit_years < 1 or
+                len(years) < partition_policy.minimum_fit_years):
+            raise TemporalContractError("fixed prior fit requires zero tuning/calibration and sufficient history")
+        fit_years, tune_years, calibration_years = years, [], []
+        partitions = {"fit": eligible.copy(), "tune": eligible.iloc[:0].copy(),
+                      "calibration": eligible.iloc[:0].copy(), "final_refit": eligible}
+    elif partition_policy.kind == "COMPLETE_PRIOR_YEARS":
+        if (
+            partition_policy.minimum_fit_years < 1
+            or partition_policy.tune_years < 1
+            or partition_policy.calibration_years < 1
+        ):
+            raise TemporalContractError(
+                "partition policy requires positive fit/tune/calibration years"
+            )
+        complete_years = [year for year in years if year < cutoff.cutoff_ts.year]
+        tail = partition_policy.tune_years + partition_policy.calibration_years
+        if len(complete_years) < partition_policy.minimum_fit_years + tail:
+            raise TemporalContractError("insufficient complete prior years for partitions")
+        fit_years = complete_years[:-tail]
+        tune_years = complete_years[-tail : -partition_policy.calibration_years]
+        calibration_years = complete_years[-partition_policy.calibration_years :]
+        partitions = {
+            "fit": eligible[
+                eligible[availability.issue_year_column].isin(fit_years)
+            ].copy(),
+            "tune": eligible[
+                eligible[availability.issue_year_column].isin(tune_years)
+            ].copy(),
+            "calibration": eligible[
+                eligible[availability.issue_year_column].isin(calibration_years)
+            ].copy(),
+            "final_refit": eligible,
+        }
+        if any(frame.empty for frame in partitions.values()):
+            raise TemporalContractError("derived partition is empty")
+    else:
+        raise TemporalContractError(f"unsupported partition policy: {partition_policy.kind}")
     ledger = _weight_ledger(eligible, cutoff, availability, weighting_policy)
     weights = pd.Series(ledger["weight"].to_numpy(float), index=eligible.index)
     from .provenance import implementation_closure

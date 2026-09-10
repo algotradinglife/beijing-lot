@@ -16,6 +16,41 @@ from src import fundamentals_census as census
 FIXTURES = Path(__file__).parent / 'fixtures' / 'fundamentals_census'
 
 
+@pytest.mark.parametrize('source,encoding,away', [('nowscore', 'utf-8', '北京中赫国安'),
+                                                ('titan', 'gbk', '北京国安')])
+def test_archived_844632_identity_encoding_and_raw_provenance(source, encoding, away):
+    path = FIXTURES / f'{source}-844632.html.gz'
+    raw = gzip.decompress(path.read_bytes())
+    provenance = json.loads(path.with_suffix('.provenance.json').read_text())
+    assert hashlib.sha256(raw).hexdigest() == provenance['sha256']
+    record = census.analysis_record(raw, source=source, provider_id='844632')
+    assert record['encoding'] == encoding
+    assert (record['home'], record['away']) == ('FC首尔', away)
+    assert (record['home_id'], record['away_id']) == ('741', '43')
+    assert record['kickoff_utc'] == '2013-05-21T10:30:00+00:00'
+    with pytest.raises(ValueError, match='fixture ID'):
+        census.analysis_record(raw, source=source, provider_id='844633')
+
+
+def test_archived_titan_single_digit_hour():
+    raw = gzip.decompress((FIXTURES / 'titan-844632.html.gz').read_bytes())
+    raw = raw.replace(b'18:30', b'0:30')
+    record = census.analysis_record(raw, source='titan', provider_id='844632')
+    assert record['kickoff_utc'] == '2013-05-20T16:30:00+00:00'
+
+
+def test_archived_titan_encoding_and_clock_fail_closed():
+    raw = gzip.decompress((FIXTURES / 'titan-844632.html.gz').read_bytes())
+    for bad in [raw.replace(b'charset=gb2312', b'charset=unknown'),
+                raw.replace(b'<head>', b'<head><meta charset="utf-8">'),
+                raw.replace(b'CalcTime.asp?matchTime=', b'not-a-clock.asp?matchTime='),
+                raw.replace(b'2013/5/21 18:30:00', b'2013/2/30 18:30:00'),
+                raw.replace(b'2013/5/21 18:30:00', b'2013/5/21 19:30:00'),
+                raw.replace(b'</head>', b'<script src="CalcTime.asp?matchTime=2013/5/21 19:30:00"></script></head>')]:
+        with pytest.raises(ValueError):
+            census.analysis_record(bad, source='titan', provider_id='844632')
+
+
 def write_roster_capture(root, row, *, home_id, away_id):
     kickoff = datetime.datetime.fromisoformat(row['kickoff_utc'].replace('Z', '+00:00')).astimezone(
         datetime.timezone(datetime.timedelta(hours=8)))

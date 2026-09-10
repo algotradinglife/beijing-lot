@@ -1,0 +1,1 @@
+Original response receipts from issue100101 historical-v2, captured2026-09-06. Gzip compression only; original URL, timestamps and body SHA256 remain inside each receipt. Roster retains all78fixtures; first-fixture pages exercise archived Titan profile. No network in tests.
