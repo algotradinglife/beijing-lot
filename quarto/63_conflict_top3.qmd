@@ -1,0 +1,98 @@
+---
+title: "冲突场退出7串1，独立投注比分Top3"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/conflict-top3-v1"
+  archived_report: false
+---
+
+## 固定规则与口径
+
+沿用40期、2313场已揭示历史数据，以及冻结的让平1.1.0／高净球专家，权重各0.5；不重训练。
+冲突＝赛前欧赔＋大小球投射的市场让球Top1不在模型让球Top2内，平概率排序并列按W、D、L。
+**所有冲突场退出串关，买模型比分Top3；不局限于原双选遗漏方向，也不局限于原入选串关场次。**
+
+非冲突场按双选覆盖概率重排，连续七场集中分组，最多六组、场次不重叠；每组128注，每注2元。
+每个冲突场三个可售精确比分各2元，共6元；按模型概率降序，并列按主队进球、客队进球升序。
+不把“其他比分”集合当成单一精确比分；缺三个正模型质量、有正市场价格的合法比分即停止。
+不足七场的非冲突尾部不买；没有非冲突场则只买比分。节省资金不再投入其他组。
+**这是固定单注金额、实际预算随场数变化的比较，不是同预算对照。**
+
+市场q固定，SP代理为1/q；该策略依模型概率排名，不以代理SP排名。
+最终SP只在计划全部封存后用于结算。复用已保存的R/SQLite权威结算审计。
+返奖系数0.65每张串关票或比分单注仅使用一次。金额为元，税前理论值，未模拟税费、奖金上限或取整。
+24训练／8验证／8测试均为历史回顾，不能作为新留出测试。逐场cutoff不证明整张票的同一购买时刻可执行。
+
+```{r}
+library(dplyr)
+library(tidyr)
+source('r/fundamentals_integration_weight.R')
+frozen <- jsonlite::read_json(file.path(params$study,'plans-frozen.json'))
+result_path <- file.path(params$study,'results.json')
+result <- jsonlite::read_json(result_path,simplifyVector=TRUE)
+bindings <- c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,as.list(result$audit_hashes))
+if (isTRUE(params$archived_report)) {
+  archive <- jsonlite::read_json(file.path(params$study,'archive.json'))
+  stopifnot(archive$mode=='ARCHIVED_RENDER_ONLY_NOT_MODEL_REPLAY')
+  bindings <- archive$hashes
+  cat('CI归档渲染：仅验证报告输入，不构成模型或原始源数据重放。\n')
+}
+for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+x <- tibble::as_tibble(result$rows)
+stopifnot(nrow(x)==160,!anyDuplicated(x[c('issue','policy')]),
+          all(x$conflict_matches<=x$eligible_matches))
+all_rows <- mutate(x,partition='ALL40')
+summary <- integration_weight_summary(bind_rows(x,all_rows))
+tibble(item=c('input_receipt','result_sha256','cutoff_mode','learning'),
+ value=c(result$freeze_seal,digest::digest(file=result_path,algo='sha256'),
+ 'EXPOSED_FIXTURE_RELATIVE_DIAGNOSTIC','NONE')) |> knitr::kable()
+```
+
+CURRENT＝原基线；NONCONFLICT_N7＝剔除冲突后的串关；CONFLICT_TOP3＝冲突场独立比分；SPLIT_TOP3＝两者合计。
+比分命中按场次计算，每场三个互斥比分至多中一个；串关命中为整组命中，两者不能混为同一命中率。
+
+## 整体与分区表现
+
+```{r}
+summary |> mutate(ROI_percent=100*roi) |>
+ select(partition,policy,issues,stake_cny,net_cny,ROI_percent,max_drawdown_cny,
+        profitable_issues,winning_groups,groups) |> knitr::kable(digits=2)
+x |> filter(policy=='CONFLICT_TOP3') |> group_by(partition) |>
+ summarise(conflict_matches=sum(conflict_matches),score_bets=sum(score_bets),
+ score_hits=sum(score_hits),hit_rate_percent=100*score_hits/conflict_matches,.groups='drop') |>
+ knitr::kable(digits=2)
+```
+
+比分分支的winning_groups/groups为0，并不代表比分零命中，比分命中见单独表。
+最大回撤按期号累计净收益、从0起算；ALL40跨分区连续计算，分区内则重新起算。
+
+## 全部40期
+
+```{r}
+x |> mutate(ROI_percent=100*roi) |>
+ select(partition,issue,policy,stake,net,ROI_percent) |>
+ pivot_wider(names_from=policy,values_from=c(stake,net,ROI_percent)) |>
+ arrange(issue) |> knitr::kable(digits=2)
+x |> filter(policy=='SPLIT_TOP3') |> arrange(issue) |>
+ mutate(cumulative_net=cumsum(net),drawdown=cummax(pmax(0,cumulative_net))-cumulative_net) |>
+ select(partition,issue,eligible_matches,conflict_matches,groups,hits,
+ score_bets,score_hits,main_stake,score_stake,cumulative_net,drawdown) |> knitr::kable(digits=2)
+```
+
+## 检查方法
+
+40期共257场冲突、771笔比分下注，命中91场（35.41%）。比分投入1,542元、净亏212.36元、ROI−13.77%；
+训练／验证／测试比分ROI分别−14.47%／−10.13%／−16.51%。
+仅非冲突串关净赚9,503.87元、ROI17.93%；加上Top3净赚9,291.51元、ROI17.04%，低于CURRENT的19.54%。
+全程最大回撤由CURRENT的19,895.50元降至合计15,172.22元；剔除冲突而不买比分则为15,028.83元。
+后8期合计ROI58.71%高于CURRENT33.75%，但回撤2,865.29元也高于CURRENT2,165.25元。
+因此整体降回撤主要来自冲突剔除，不能归功于比分Top3；三个分区比分均亏，不自动加入默认策略。
+
+计划先于本次结算读取封存；源数据、逐场cutoff、比分投射、函数依赖、计划及审计文件均绑定hash。
+使用共享时间对象，没有拟合、门槛搜索、重新分配预算或新缓存。
+自动测试覆盖全部冲突、无冲突、不足七场、非法比分、缺候选、身份与cutoff错误、
+比分和串关结算以及赛果／SP变动不改变计划。所有期次和分支都展示，不按收益挑选。

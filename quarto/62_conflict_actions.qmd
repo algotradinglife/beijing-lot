@@ -1,0 +1,135 @@
+---
+title: "冲突处理三阶段：比分重估、三选与条件比分保护"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/conflict-actions-v1"
+  attribution: "data/derived/fundamentals_417/conflict-actions-v1/attribution-v2"
+---
+
+三阶段分别与同一CURRENT比较，**不将事后较好的规则叠加到下一阶段**。
+CURRENT为让平1.1.0（权重0.5）＋同一高净球专家（权重0.5），比分投射后双选、
+覆盖概率排序、连续七场集中分组；最多六组不重叠7串1，每组128注、每注2元。
+返奖系数0.65仅在票级一次，基线不买比分保护。
+
+冲突定义：赛前欧赔＋大小球映射的市场概率第一方向被CURRENT双选排除。
+市场q与估算SP=1/q始终不变；比分同样以市场比分概率倒数估算SP，最终SP只用于结算。
+使用已保存的权威R/SQLite结算审计，本轮未重新查询数据库。
+
+同一40期、2313场；原训练32期中8期缺当前回放时钟，另46个端点市场不可用，沿用原排除清单。
+24训练／8验证／8测试都是**已揭示历史回顾**，不是新留出验证。
+逐场cutoff不证明同一张票在共同购买时刻可执行。无重训练、阈值优化或结果驱动的策略选择。
+新增48期不在本报告。
+
+```{r}
+library(dplyr)
+library(tibble)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_conflict_actions.R')
+check <- jsonlite::read_json(file.path(params$study,'independent-check.json'))
+stopifnot(check$status=='PASS')
+for(path in names(check$source_hashes)) stopifnot(identical(digest::digest(file=path,algo='sha256'),check$source_hashes[[path]]))
+stages <- list(
+ jsonlite::read_json(file.path(params$study,'reestimate/results.json'),simplifyVector=TRUE),
+ jsonlite::read_json(file.path(params$study,'expand/results.json'),simplifyVector=TRUE),
+ jsonlite::read_json(file.path(params$study,'protect/results.json'),simplifyVector=TRUE),
+ jsonlite::read_json(file.path(params$attribution,'results.json'),simplifyVector=TRUE))
+contract <- stages[[1]]$contract
+tables <- conflict_action_tables(stages,contract$score_log_floor)
+tibble(item=c('draw_version','draw_weight','high_weight','reverse_receipt_seal','plans_checked','attribution_plans_checked'),
+ value=c(contract$draw_version,contract$draw_weight,contract$high_weight,contract$reverse_receipt_seal,
+ check$plans_checked,check$attribution_plans_checked)) |> knitr::kable()
+```
+
+## 一：完整比分分布重估
+
+仅冲突场采用 `(1−α)×当前比分分布＋α×市场比分分布`，α固定0.5或1；其他场不变。
+按同一比分单元对齐，缺失支持填零。这是**固定混合，不是重新训练或拟合进球模型**。
+保留完整联合分布，再投射让球概率。为精确复现旧CURRENT排序，边际沿用冻结精度，
+与比分求和逐场核对误差不超过1e−12。
+
+```{r}
+tables$summary |> filter(stage=='REESTIMATE') |> mutate(ROI_percent=100*roi) |>
+ select(partition,policy,stake_cny,net_cny,ROI_percent,max_drawdown_cny,winning_groups,groups) |> knitr::kable(digits=2)
+tables$probability_diagnostics |> knitr::kable(digits=5)
+```
+
+WDL Brier为三方向平方误差之和（0—2），比分log loss为实际比分的负对数概率，均越小越好；
+log floor固定1e−12，报告支持之外与触底次数。冲突/非冲突分母完整保留。
+三个分区冲突场的两项概率误差均改善，但测试ROI由33.75%降至21.64%／27.93%，
+回撤由2,165元升至约4,352／4,354元。概率质量改善不等于选场串关收益改善。
+
+## 二：让球三选
+
+保留CURRENT原组与场次。ONE每组最多扩一场，优先市场对未选方向给概率最高的冲突场；
+ALL扩所有冲突场。EXTRA保留全部组，每票一注，披露增加成本。
+FIXED使用CURRENT当期预算，按原组顺序保留能完整支付的组，超预算组跳过；
+余额在保留的完整票池中按整数注均匀分配，余数采用固定seed=0的哈希顺序，不依据赛果。
+若一组也买不起，则不下注、保留现金。
+
+一组扩一场：128注变192注，256元变384元；扩两场：288注、576元。
+FIXED同时改变组数和每票注数，不能只归因为“多选一个方向”。
+
+```{r}
+tables$summary |> filter(stage=='EXPAND') |>
+ mutate(ROI_percent=100*roi,incremental_ROI_percent=100*incremental_roi) |>
+ select(partition,policy,stake_cny,stake_delta,net_cny,ROI_percent,net_lift,incremental_ROI_percent,
+ max_drawdown_cny,winning_groups,groups,expanded_matches,distinct_tickets,betting_units) |> knitr::kable(digits=2)
+```
+
+增量ROI=净收益差/增加投入，仅在投入增加时报告。
+测试ONE_EXTRA投入15,360元、ROI2.34%；ALL_EXTRA投入19,488元、ROI−4.41%；
+其新增投入增量ROI约−77.11%／−53.94%。两种FIXED在测试段恰好结算表现相同，ROI均−11.51%。
+
+## 三：条件比分保护
+
+沿用 `reverse-final-stage-v2`，不改60%正向门槛。四个封存叶子的最高概率45.28%低于60%，
+因此可证明**不可能输出POSITIVE**。这是模型上界检查，不是新40期逐场树推断。
+旧包只有前8期预测与receipt，没有可加载的完整树；不执行两位小数文本规则、不重训补树，
+不拿最大叶概率冒充逐场预测。`REVERSE_POSITIVE_ONLY`不买比分、与CURRENT一致，
+不意味着已经证明新40期的专家保护无效。
+
+另列**不经专家门控**的成本对照：只在入选冲突场，买未选方向中模型概率最高、
+有正市场定价的一个可售精确比分，每场2元。排除可能跨让球方向的“其他比分”桶。
+EXTRA保留串关。FIXED去掉末组，只保护保留组中的冲突场，再将全部余款投入保留串关。
+仅一组或保留组无可保护冲突时保持CURRENT，不破坏完整复式支持。
+
+```{r}
+tables$summary |> filter(stage=='PROTECT') |> mutate(ROI_percent=100*roi,score_ROI_percent=100*score_roi) |>
+ select(partition,policy,stake_cny,net_cny,ROI_percent,max_drawdown_cny,
+ score_stake,score_net,score_ROI_percent,score_hits,score_bets) |> knitr::kable(digits=2)
+```
+
+EXTRA比分部分测试51笔，投入102元、净赚37.48元；训练净亏28.39元、验证净亏20.61元。
+不足以恢复常规保护。FIXED测试ROI58.20%较高，但同时减少了组数、增加保留票注数，需拆开归因。
+
+## 事后归因：相同主串关组、不买比分
+
+看到FIXED结果后添加此对照，属于**事后归因，不是新选出的策略**。
+保持其主串关组与票据支持，把比分预算也按同一规则投入主串关，不再调参数。
+
+```{r}
+tables$summary |> filter(stage=='ATTRIBUTION') |> mutate(ROI_percent=100*roi) |>
+ select(partition,policy,stake_cny,net_cny,ROI_percent,max_drawdown_cny,score_net) |> knitr::kable(digits=2)
+```
+
+测试同组不买比分ROI57.27%，接近带比分58.20%，均高于原CURRENT33.75%。
+主要提升来自减少末组和主串关资金重分配，不能全部算给比分。
+该资金分配对照验证ROI75.00%，仍低于CURRENT98.22%，未形成稳定优势。
+
+## 每期收益率和回撤
+
+金额为元，税前理论结算，未模拟税额、奖金上限或取整。ROI=净收益/实际投入。
+回撤按各分区内期号顺序，从初始0累计净收益的历史高点计算，为金额而非本金百分比。
+三个阶段及归因完整列出；CURRENT重复用于各阶段独立比较。
+
+```{r}
+tables$periods |> select(stage,partition,issue,policy,stake,gross,net,ROI_percent,hits,groups,
+ score_stake,score_net,score_hits,score_bets,distinct_tickets,betting_units,drawdown_cny) |> knitr::kable(digits=2)
+```
+
+保留冲突风险诊断及概率误差改善线索，不自动启用混合、三选或比分保护。
+专家版本不变；下一版保护专家的完整模型导出与训练交由独立开发会话。

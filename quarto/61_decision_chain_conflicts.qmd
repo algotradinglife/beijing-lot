@@ -1,0 +1,112 @@
+---
+title: "旧决策链思想：冲突降权与跳过的历史对照"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/decision-chain-conflict-v1"
+---
+
+本轮不重训练专家、不增加比分保护，也不把让球双选扩大为全包。
+沿用让平专家 **1.1.0**、同一前32期冻结高净球模型（权重0.5）。
+当前对照让平权重0.5。这里检验的是旧决策链“意见冲突后处理”的固定简化规则，
+**不是 v3.3.3/v4.2 原样回测**，也不恢复无法完整回补的新闻与阵容判断。
+
+冲突定义：**赛前欧赔＋大小球映射的市场概率第一方向，不在当前模型概率前二中**。
+所有并列按 W、D、L 顺序处理，无阈值训练、无验证期选规则。市场 q 与估算 SP=1/q 始终不变。
+市场更看好的方向不一定实际命中，因此冲突本身不是错误标签。
+
+|方案|冲突场处理|无冲突场处理|
+|---|---|---|
+|CURRENT|保持让平权重0.5|保持0.5|
+|CONFLICT_REDUCE_025|使用已冻结权重0.25的比分投射|保持0.5|
+|CONFLICT_REVERT_0|使用已冻结权重0的比分投射|保持0.5|
+|CONFLICT_SKIP|跳过，按同一概率排序从其余候选补位|保持0.5|
+|SKIP_MATCHED_CURRENT|当前方案只保留前K组，K为跳过方案可买组数|等实际投入控制|
+
+权重0仍有高净球专家，不能称为完全无专家基线。降权只调整让平专家，
+未必消除模型与市场的冲突。本轮不按收益挑选要降权的专家。
+
+全部方案：7串1、每场双选、概率排序、连续七场集中分组、最多六组且组间不重叠；
+每组128注、每注2元，最高每期1,536元，仅一次票级0.65返奖系数，税前理论收益。
+跳过后不足七场的余额保持现金，不加倍、不补比分、不强制花完。
+所以这是**同预算上限与同单注金额**比较，另列等实际投入的 CURRENT 前K组对照；
+不能把减少投入直接解释为同风险下更好。
+
+```{r}
+library(dplyr)
+library(tibble)
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_decision_chain.R')
+check <- jsonlite::read_json(file.path(params$study,'independent-check.json'))
+stopifnot(check$status=='PASS')
+for(path in names(check$source_hashes)) {
+ stopifnot(identical(digest::digest(file=path,algo='sha256'),check$source_hashes[[path]]))
+}
+result <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+tables <- decision_chain_tables(result)
+tibble(input=c('draw_version','draw_release_seal','high_model_sha256','results_sha256'),
+ value=c(result$contract$draw_version,result$contract$draw_release_seal,
+ result$contract$high_model_sha256,check$source_hashes[[file.path(params$study,'results.json')]])) |>
+ knitr::kable()
+```
+
+## 分区收益和回撤
+
+沿用24期训练内回顾、8期验证、8期历史测试分区，共40期、2,313场可用市场候选。
+前8个原训练期缺预测时钟未纳入，另46个端点市场不可用，原因沿用 `scope-exclusions.json`。
+这些历史期已多次查看，本轮全部结果是回顾诊断，不能称为新独立测试。
+新增48期不在本研究中。所有计划先冻结后读取已保存的 R/SQLite 结算审计，未重新查询数据库。
+旧专家、市场、基本面派生仅作为归档证据；逐场 cutoff 不证明同一票在同一购买时刻可执行。
+
+ROI=净收益/实际投入；共同预算收益=净收益/同分区CURRENT总投入，未用现金收益为0。
+最大回撤为按期顺序、分区内累计净收益从历史高点跌落的最大金额，包含起点0，单位元；
+分区重新起算，不把它解释为指定本金下的百分比回撤。
+
+```{r}
+tables$summary |> mutate(ROI_percent=100*roi,
+ common_budget_return_percent=100*return_on_current_budget) |>
+ select(partition,policy,issues,stake_cny,net_cny,ROI_percent,common_budget_return_percent,
+        max_drawdown_cny,winning_groups,groups,net_lift_cny) |> knitr::kable(digits=2)
+```
+
+## 冲突与选场变化
+
+移除／新增场次数相对于CURRENT的实际入选场次。即使场次未更换，排序也可能重新分组；
+此表用于定位变化，不声称把支持改变与分组效应完全分离。
+
+```{r}
+tables$summary |> select(partition,policy,candidates,conflict_candidates,skipped_candidates,
+ selected_matches,removed_current_matches,added_matches,unspent_vs_current_cny) |>
+ knitr::kable()
+tables$accuracy |> mutate(across(ends_with('_rate'),~100*.x)) |>
+ rename_with(~sub('_rate$','_percent',.x),ends_with('_rate')) |> knitr::kable(digits=2)
+```
+
+## 各期表现
+
+```{r}
+tables$periods |> select(partition,issue,policy,stake,gross,net,ROI_percent,
+ hits,groups,selected_matches,skipped_candidates,unspent_vs_current_cny,
+ cumulative_net_cny,drawdown_cny) |> knitr::kable(digits=2)
+```
+
+## 结论
+
+历史测试8期，CURRENT的ROI为33.75%、最大回撤2,165元；冲突时降至0.25的ROI为23.38%、
+回撤2,972元；退回0的ROI为13.58%、回撤4,436元。这两种降权都没有改善测试段收益与回撤。
+
+跳过冲突场的测试ROI为61.59%、回撤2,894元，实际投入10,496元。
+等投入CURRENT前K组ROI为40.27%、回撤2,165元：跳过仍多赚约2,238元，但回撤更大。
+训练段跳过ROI为−25.99%，验证段为93.61%，均不优于各自等投入CURRENT。
+不能只凭测试8期较高的ROI推广跳过规则。
+
+冲突场与非冲突场的原双选命中率分别为：训练58.97%与73.34%，验证57.53%与74.95%，
+测试58.21%与73.12%。这个风险信号在三个分区方向一致，但还不足以证明某种处理方式有稳定收益优势。
+保持当前方案作为对照，暂不添加自动跳过／降权规则，不恢复负收益的比分保护。
+
+本轮只检验预先写明的规则，完整保留所有方案。独立重算核对冲突、选场、
+分组、128注笛卡尔票据及结算，并要求CURRENT与上一轮固定0.5逐期金额完全一致。
+最终结论见同目录研究记录；不根据已揭示收益倒选部署策略。

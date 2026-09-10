@@ -1,0 +1,87 @@
+---
+title: "冻结专家：整合层权重与收益"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/integration-weight-v3"
+---
+
+专家层固定为让平 1.1.0、原前 32 期冻结高净球模型，不重训练。
+整合层比较 0、0.1、0.25、0.5、0.7、0.75、1 七档让平权重，
+高净球权重固定 0.5。**让平权重 0 仍保留高净球专家，不等于完全不加专家。**
+
+赛前估算 SP 固定为欧赔＋大小球映射的北单让球结果概率的倒数，
+不随专家权重变化，不使用目标场最终 SP。最终 SP 仅用于已保存的 R/SQLite 审计结算。
+这是代理价格，不代表当时可成交或锁定的北单 SP。
+
+预期收益路由对每场、每档权重按概率取两个方向，以
+`sum(p / q) / 2 - penalty * weight^2` 选择权重；同分偏向较低权重。
+它是逐场局部规则，不宣称求得整个组合的全局最优。
+选场仍按双选覆盖概率排序、连续七场集中分组，最多六组、组间不重叠。
+每注 2 元，每组 128 注，仅一次票级 0.65 系数，无比分保护。
+
+共 2,359 个可回放专家端点，其中 2,313 场有可用市场分布，46 场按原市场门控原因统一排除。逐场原因见本研究目录的 `scope-exclusions.json`，不存在按结算结果选择不同权重的可用范围。
+
+原训练期可回放的 24 期仅作训练内诊断。后 16 期中的 100305—100312 八期为验证，
+100313—100401 八期为测试。惩罚网格提前固定，验证期按净收益选择惩罚，
+通过共享 cutoff 框架排除目标／未来标签，选择回执在读取测试标签前冻结。
+历史标签时间为声明的诊断代理（该期最后截止时间后 6 小时），不是观察到的发布时间。
+这些历史期已多次研究；本报告不提供前瞻准入证明，新增 48 期不在本结果内。
+
+```{r}
+library(dplyr)
+library(tibble)
+source('r/fundamentals_integration_weight.R')
+verified <- jsonlite::read_json(file.path(params$study,'independent-check.json'))
+stopifnot(verified$status=='PASS')
+for(path in names(verified$source_hashes)) {
+ stopifnot(identical(digest::digest(file=path,algo='sha256'),verified$source_hashes[[path]]))
+}
+r <- jsonlite::read_json(file.path(params$study,'results.json'),simplifyVector=TRUE)
+knitr::kable(tibble(input=c('results.json','endpoints.json','high_model'),
+ sha256=c(verified$source_hashes[[file.path(params$study,'results.json')]],
+ verified$source_hashes[[file.path(params$study,'endpoints.json')]],r$contract$high_model_sha256)))
+x <- as_tibble(r$rows)
+summary <- integration_weight_summary(x)
+selected <- r$selection$penalty
+main <- c(paste0('FIXED_',c(0,.1,.25,.5,.7,.75,1)),'EV_0','SELECTED_PENALTY')
+summary |> filter(policy %in% main) |> mutate(ROI_percent=100*roi) |> select(-roi) |> knitr::kable(digits=2)
+```
+
+`EV_0` 为不加偏离惩罚的纯预期收益规则。
+`SELECTED_PENALTY` 是验证期选出的惩罚规则，其训练／验证收益是回顾值，
+只有 TEST8 应读作选择之后的单列结果；不能倒推为当时已选定。
+
+```{r}
+tibble(selected_penalty=selected, selection_cutoff=r$selection$receipt$cutoff_ts,
+       minimum_validation_issues=8L) |> knitr::kable()
+summary |> filter(partition=='VALIDATION8',grepl('^EV_',policy)) |> mutate(ROI_percent=100*roi) |> select(-roi) |> knitr::kable(digits=2)
+```
+
+```{r}
+weights <- as_tibble(r$weights)
+partitions <- x |> select(issue,partition) |> distinct()
+weights <- left_join(weights,partitions,by='issue',relationship='many-to-one')
+weights |> filter(policy %in% c('EV_0',paste0('EV_',selected))) |>
+ group_by(partition,policy,weight) |> summarise(selected_matches=n(),.groups='drop') |>
+ group_by(partition,policy) |> mutate(share=selected_matches/sum(selected_matches)) |> ungroup() |> knitr::kable(digits=4)
+```
+
+```{r}
+x |> filter(policy %in% main) |>
+ mutate(ROI_percent=if_else(stake>0,100*net/stake,NA_real_)) |>
+ select(partition,issue,policy,stake,gross,net,ROI_percent,hits,groups,status) |> knitr::kable(digits=2)
+```
+
+本轮诊断：验证期选择的惩罚强度为 0.1，但其测试期 ROI 仅约 3.85%，低于固定 0.5 的约 33.75%。
+纯预期收益规则在测试期约 94.35% 的实际入选场次使用权重 1，说明以自身调整后的概率计价仍存在偏向极端权重的问题。
+这些结果不支持据此替换现有固定规则；固定权重 0 在测试段较好，也不能用这段已揭示结果倒选部署参数。
+
+数值敏感性：此前训练回放概率 JSON 保留 10 位小数，本轮统一使用 1.1.0 的完整精度端点。
+0.5 档让平概率最大差异不足 5e-11，但 100304 的集中分组收益会改变约 2,146.12 元。
+其余 39 期该权重收益一致。该差异不能归因为专家升级收益；详见问题总账 DQ-021。
+
+所有计划为逐场截止时间的历史回放，不证明同一张串关票在一个共同购买时刻可完整执行。
