@@ -1,0 +1,153 @@
+---
+title: "新增100期：收益下降的拆解诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/updated100-diagnosis-v1"
+  archive_fixture: null
+---
+
+本报告对照原48期与新增100期，使用已冻结的八个方案，随机方案固定 seed 0。
+不重新拟合、不更改选场或赛果，不将事后分类作为可用预测规则。
+全部100种子的稳健性范围见上一份更新回测报告。本页每组仍为两场单选，
+其余双选，无专家或比分保护，实际返奖只乘一次0.65。
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+source('r/fundamentals_updated_diagnosis.R')
+if (is.null(params$archive_fixture)) {
+  receipt<-jsonlite::fromJSON(file.path(params$study,'receipt.json'))
+  for (path in names(receipt$sources)) stopifnot(identical(digest::digest(file=path,algo='sha256'),receipt$sources[[path]]))
+  for (path in names(receipt$implementation)) stopifnot(identical(digest::digest(file=path,algo='sha256'),receipt$implementation[[path]]))
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(setequal(names(archive$files),c('receipt.json','legs.csv','fixtures.csv','issues.csv')))
+  for (path in names(archive$files)) stopifnot(identical(digest::digest(archive$files[[path]],algo='sha256',serialize=FALSE),archive$hashes[[path]]))
+  dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+  for (path in names(archive$files)) writeChar(archive$files[[path]],file.path(params$study,path),eos=NULL,useBytes=TRUE)
+  receipt<-jsonlite::fromJSON(archive$files[['receipt.json']])
+}
+stopifnot(identical(receipt$historical_admission,FALSE))
+for (path in names(receipt$outputs)) stopifnot(identical(digest::digest(file=file.path(params$study,path),algo='sha256'),receipt$outputs[[path]]))
+types<-readr::cols(issue=readr::col_character(),provider_id=readr::col_character(),.default=readr::col_guess())
+fixtures<-readr::read_csv(file.path(params$study,'fixtures.csv'),col_types=types)
+legs<-readr::read_csv(file.path(params$study,'legs.csv'),col_types=readr::cols(issue='c',provider_id='c',support='c',.default='?'))
+issues<-readr::read_csv(file.path(params$study,'issues.csv'),col_types=readr::cols(issue='c',.default='?'))
+v<-updated_scope_diagnosis(fixtures,legs,issues)
+for (name in names(v)) readr::write_csv(v[[name]],file.path(params$study,paste0(name,'.csv')))
+```
+
+## 组命中与返奖
+
+ROI＝净收益／实际投入；未下注期不记作输。mean_winning_gross 为中奖一组的平均返还（元），
+不同串数的组成本不同，不宜直接横比。p/q 为逐场支持概率相乘后的均值，独立性仅是模型假设。
+
+```{r}
+knitr::kable(v$payout,digits=2)
+```
+
+## 单选与双选
+
+A 为基线与市场第一赛果一致的单选，D 为 Top2 一致双选，C 为 Top2 分歧双选。
+holdings 按实际投注位置计数，重复使用会重复计入；unique_support 按期、策略、场次、角色、
+所选赛果去重，同场不同支持仍可出现多次。p 是基本面比分模型，q 是欧赔＋大小球映射概率。
+
+```{r}
+knitr::kable(v$rates |> filter(policy %in% c('N5_NO_SWAP','N6_NO_SWAP','U3_BASELINE','U6_BASELINE')),digits=2)
+```
+
+## 失败发生在哪里
+
+DOUBLES_ONLY 为单选均中、双选失手；SINGLES_ONLY 相反；BOTH 为两边都失手。
+one_away 为整组只错一场。这是事后归因，不能解释为可以提前修复的组数。
+
+```{r}
+knitr::kable(v$failures,digits=0)
+```
+
+## 全部可用场次
+
+不限制为已选入投注的场次；这里反映可用比赛池的变化，不与持仓样本混用。
+
+```{r}
+knitr::kable(v$available,digits=2)
+```
+
+## 让球细类和期号月份段
+
+以下按 U3 实际持仓位置统计。完整八策略、两种计数口径、赛事、概率档位和分歧幅度均在汇总 CSV 中。
+小样本波动和重复持仓相关性均可能较大，不能把这些百分比视为独立场次置信度。
+
+```{r}
+knitr::kable(v$strata |> filter(policy=='U3_BASELINE',view=='holdings',dimension %in% c('depth','month')),digits=2)
+```
+
+## 新样本单选的赛事分布
+
+显示 U3 去重后至少10个单选支持的赛事，按样本量排序。未使用赛后表现进行策略筛选。
+
+```{r}
+knitr::kable(v$strata |> filter(cohort=='new100',policy=='U3_BASELINE',view=='unique_support',role=='A',dimension=='competition',n>=10) |> arrange(desc(n)),digits=2)
+```
+
+## 复用导致的失误集中
+
+以下是新增样本中五串一不替换方案被最多组持有的错误场次，计数不是独立失误数。
+
+```{r}
+knitr::kable(v$blockers |> filter(cohort=='new100',policy=='N5_NO_SWAP') |> head(15))
+```
+
+## 未下注期
+
+```{r}
+knitr::kable(issues |> filter(cohort=='new100',policy=='U3_BASELINE',stake==0) |> select(cohort,issue,groups,hits,stake,status) |>
+  left_join(v$pools,by=c('cohort','issue'),relationship='one-to-one'))
+```
+
+输入 CSV 和所有读取的冻结计划、结算审计、概率及特征文件由 receipt.json 的 SHA256 绑定；
+默认运行时逐项检查；archive_fixture 模式只重放已封存输入，不宣称重新核验外部原文件。
+R 函数同时逐组重算命中和返奖，与上一轮每期结算精确核对。
+本报告仍属已暴露历史诊断，不构成 #421 的 cutoff-safe 验收证据。
+
+## 诊断结论
+
+主要退化在单选。U3 实际持仓单选命中率从59.06%降至50.00%；
+Top2一致双选从77.55%降至76.72%，分歧双选从72.08%降至70.15%。
+按场次支持去重后单选仍从58.25%降至50.00%，因此并非只有复用加权造成的表象。
+
+七串一的两个单选都需要命中，其余五个双选也必须全中。U3 组命中率因此从13.21%降至5.82%，
+平均中奖返还从1,054.47元降至906.58元；U6 也同时出现命中率和返还下降。
+五串一不替换的组命中率下降较小（17.53%至15.23%），新增样本仍有6.58%收益率。
+
+基线概率偏乐观尤为明显：新增样本 U3 单选平均基线概率66.09%，实际50.00%；
+分歧双选平均基线覆盖91.55%，实际70.15%。对应市场概率54.36%和69.89%更贴近观察值。
+这是冻结策略选中样本的校准诊断，不能直接推出一个适用于未来的概率调整系数。
+
+新增样本后段更弱：U3 去重单选在1010期号段为36/86（41.86%），1011段为31/80（38.75%）。
+让球−2的单选从60/94（63.83%）降至116/227（51.10%）；
+零让球仅7/22（31.82%），但样本小，且排除零让球Top2分歧的规则已经执行。
+联赛细分见上表，未发现足以只归因于某一类别的证据；还混有赛程构成与小样本波动。
+
+9个未下注期都有可用数据，但排除零让球Top2分歧后只有0或1个合格单选，无法凑齐两场单选。
+这些期没有计为亏损。五串一放宽复用则存在一场失手影响全部64组的情况；
+因此“中多少期”可随随机替换上升，而净收益仍下降。
+
+下一步若继续研究，优先检查单选的概率校准和后段赛事构成，再检查分歧双选的基线高估。
+本次不据此删赛事、调整门槛或替换赛果；否则会把诊断样本变成调参样本。
+
+```{r}
+#| include: false
+jsonlite::write_json(list(scope='POST_SETTLEMENT_DIAGNOSIS_NO_SELECTION',historical_admission=FALSE,
+ input_receipt_sha256=digest::digest(file=file.path(params$study,'receipt.json'),algo='sha256'),
+ implementation=list(r=digest::digest(file='r/fundamentals_updated_diagnosis.R',algo='sha256'),
+ qmd=digest::digest(file='quarto/121_updated100_diagnosis.qmd',algo='sha256'))),
+ file.path(params$study,'analysis-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
