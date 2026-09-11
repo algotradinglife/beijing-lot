@@ -53,14 +53,16 @@ def consensus_component(frame, roles, *, cutoffs, complement, unit_cny, payout_f
     return dict(**part, seal=stable_json_hash(part))
 
 
-def consensus_candidates(frame, *, cutoffs, minimum_anchor_market, converter_market):
+def consensus_candidates(frame, *, cutoffs, minimum_anchor_market, converter_market, anchor_score='TOP1'):
     """Validated A/D/C eligibility and fixed score objectives; no fit or labels.
 
+    anchor_score TOP1 or RETENTION changes A objective only; RETENTION is
+    q(pTop1)/q(pTop2 set), the market-assessed mass retained by compression.
     Pure arrays in slot order; explicit per-fixture Cutoffs are validated by the
     authoritative rank API. C uses baseline Top2 for primary groups, market
     probability of excluded baseline outcome for independent converter groups.
     """
-    if type(converter_market) is not bool or not 0 < minimum_anchor_market < 1:
+    if anchor_score not in ('TOP1','RETENTION') or type(converter_market) is not bool or not 0 < minimum_anchor_market < 1:
         raise ValueError("Explicit converter mode and anchor threshold required")
     ranked, bound = rank_double_candidates(frame, cutoffs=cutoffs)
     ranked = ranked.sort_values("slot")
@@ -78,12 +80,14 @@ def consensus_candidates(frame, *, cutoffs, minimum_anchor_market, converter_mar
         masses = [r["q_" + "WDL"[q[0]]],
                   sum(r["q_" + "WDL"[j]] for j in q[:2]),
                   (r["q_" + "WDL"[p[2]]] if converter_market else sum(r["p_" + "WDL"[j]] for j in p[:2]))]
+        if anchor_score=='RETENTION':
+            masses[0] /= sum(r["q_"+"WDL"[j]] for j in p[:2])
         objective[i] = -np.log(np.maximum(masses, 1e-300)) + 1e-10 * (i * 3 + np.arange(3))
     return ranked, bound, eligibility, objective
 
 
 def next_consensus_roles(frame, previous, *, cutoffs, minimum_anchor_market,
-                         converter_market, max_uses, max_overlap, disjoint, anchor_max_uses=None, group_size=7):
+                         converter_market, max_uses, max_overlap, disjoint, anchor_max_uses=None, group_size=7, anchor_score='TOP1'):
     """One optimal 2A/(N-3)D/1C group for explicit N6/N7; no learning.
 
     Caps count actual supplied groups; explicit caller policy applies equally
@@ -95,7 +99,7 @@ def next_consensus_roles(frame, previous, *, cutoffs, minimum_anchor_market,
         raise ValueError("Valid explicit reuse policy required")
     ranked, _, eligibility, objective = consensus_candidates(
         frame, cutoffs=cutoffs, minimum_anchor_market=minimum_anchor_market,
-        converter_market=converter_market)
+        converter_market=converter_market,anchor_score=anchor_score)
     slots=list(map(int,ranked.slot)); n=len(slots)
     if any(len(g)!=group_size or len(set(g))!=group_size or not set(g)<=set(slots) for g in previous):
         raise ValueError("Previous groups must match group size with distinct known fixtures")
@@ -231,10 +235,13 @@ def consensus_portfolios(frame, *, cutoffs, budget_cny, minimum_anchor_market,
 def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fraction,
                                     budget_cny, minimum_anchor_market, max_uses,
                                     max_pair_overlap, unit_cny, payout_factor, seed,
-                                    anchor_max_uses=None, group_size=7):
+                                    anchor_max_uses=None, group_size=7, anchor_score='TOP1'):
     """Assemble N6/N7 components under one shared exposure ledger.
 
     group_size is 6 or 7; primary price is 32 or 64 CNY respectively.
+    anchor_score TOP1 uses market favorite mass; RETENTION divides it by
+    market mass on the baseline Top2 being compressed. Eligibility unchanged.
+    The latter measures retained support, not whole-ticket hit probability.
 
     Conversion budget fraction is explicit (0/.25/.5/.75/1), never learned.
     Select type with lowest spent/target ratio, primary first on ties. Converter
@@ -252,7 +259,7 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
     ledger. No fits, labels, cache, I/O, or prospective-admission claim.
     """
     _,bound=rank_double_candidates(frame,cutoffs=cutoffs)
-    if (conversion_budget_fraction not in (0,.25,.5,.75,1) or
+    if (anchor_score not in ('TOP1','RETENTION') or conversion_budget_fraction not in (0,.25,.5,.75,1) or
             type(budget_cny) is not int or budget_cny<0 or
             not 0<minimum_anchor_market<1 or
             type(max_uses) is not int or max_uses<1 or
@@ -275,7 +282,7 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
         roles,step=next_consensus_roles(
             frame,roles_list,cutoffs=cutoffs,minimum_anchor_market=minimum_anchor_market,
             converter_market=kind,max_uses=max_uses,max_overlap=max_pair_overlap,disjoint=disjoint,
-            anchor_max_uses=anchor_max_uses,group_size=group_size)
+            anchor_max_uses=anchor_max_uses,group_size=group_size,anchor_score=anchor_score)
         ledger.append(dict(step,converter=kind,spent_before=sum(spent.values())))
         if not roles:
             if disjoint:
@@ -301,6 +308,6 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
                         primary_spend_cny=spent[False],converter_spend_cny=spent[True]),
         parameters=dict(minimum_anchor_market=minimum_anchor_market,max_uses=max_uses,
                         max_pair_overlap=max_pair_overlap,unit_cny=unit_cny,
-                        payout_factor=payout_factor,seed=seed,anchor_max_uses=anchor_max_uses,group_size=group_size),
+                        payout_factor=payout_factor,seed=seed,anchor_max_uses=anchor_max_uses,group_size=group_size,anchor_score=anchor_score),
         decision_ledger=ledger)
     return dict(**envelope,seal=stable_json_hash(envelope))
