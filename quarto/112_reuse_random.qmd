@@ -1,0 +1,79 @@
+---
+title: "复用时30%随机换赛果：100个固定种子"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/reuse-random-v2"
+  archived_report: false
+  initial_capital_cny: 100000
+---
+
+```{r}
+#| include: false
+library(dplyr)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows);controls<-as_tibble(v$controls)
+stopifnot(nrow(rows)==length(v$issue_order)*length(unique(rows$source_policy))*100,identical(as.integer(unlist(v$seeds)),0:99),!anyDuplicated(rows[c("policy","issue")]))
+z<-missed_strategy_summary(rows,unlist(v$issue_order),params$initial_capital_cny)
+b<-missed_strategy_summary(controls,unlist(v$issue_order),params$initial_capital_cny)$summary
+mapping<-distinct(rows,policy,source_policy,seed)
+s<-left_join(z$summary,mapping,by="policy",relationship="one-to-one") |>
+ left_join(b |> select(source_policy=policy,control_net=net_cny,control_ROI=stake_ROI_percent,control_dd=max_drawdown_cny,control_hits=hit_issues,control_stake=stake_cny),by="source_policy",relationship="many-to-one")
+stopifnot(all(s$stake_cny==s$control_stake),!anyNA(s$control_net),nrow(s)==length(unique(rows$source_policy))*100)
+pairs<-rows |> left_join(controls |> select(issue,source_policy=policy,original_hits=hits),by=c("issue","source_policy"),relationship="many-to-one")
+rescue<-pairs |> group_by(policy) |> summarise(rescued=sum(original_hits==0 & hits>0),lost=sum(original_hits>0 & hits==0),.groups="drop")
+s<-left_join(s,rescue,by="policy",relationship="one-to-one")
+summary<-s |> group_by(source_policy) |> summarise(seeds=n(),stake=first(stake_cny),control_ROI=first(control_ROI),
+ mean_ROI=mean(stake_ROI_percent),median_ROI=median(stake_ROI_percent),p05_ROI=quantile(stake_ROI_percent,.05),p95_ROI=quantile(stake_ROI_percent,.95),
+ control_dd=first(control_dd),median_dd=median(max_drawdown_cny),p95_dd=quantile(max_drawdown_cny,.95),
+ control_hits=first(control_hits),mean_hit_issues=mean(hit_issues),mean_rescued=mean(rescued),mean_lost=mean(lost),
+ outperform_percent=100*mean(net_cny>control_net),profitable_percent=100*mean(net_cny>0),.groups="drop")
+```
+
+当前报告串数N=`r v$group_size`。同48期、原组选顺序、两场单选、N-2场双选；同串数随机版本与对照的预算和投入不变。
+六串一沿用原先按完整候选池重新组装的U3/U6（基线双选）计划，优先不重叠、再按U/P扩组，未花完资金留现金。
+七串一包含基线/市场双选四个版本。不同N之间的组数和实际投入可以不同。
+每场首次出现不改，第二次及以后每个出现位置独立以30%概率替换；跨单选/双选角色也算复用。
+单选由市场Top1换为市场Top2；双选保留原概率源的Top1，把Top2换成Top3。
+每次从原排序出发，不连续翻转上一组已经替换的结果。替换后的单选不再要求两源认可该方向。
+七串一每组64元，六串一每组32元，无额外下注，0.65在结算中只扣一次。没有专家或比分保护。
+
+固定种子0–99在本轮结算前全部封存，不选最佳种子部署；百分位描述随机化分布，不是未来收益置信区间。
+原样本已经暴露，这仍是回顾诊断；无新模型拟合或清洁样本验收声明。
+
+## 收益分布
+
+```{r}
+summary |> select(source_policy,stake,control_ROI,mean_ROI,median_ROI,p05_ROI,p95_ROI,outperform_percent,profitable_percent) |> knitr::kable(digits=2)
+```
+
+## 命中、救回与回撤
+
+```{r}
+summary |> select(source_policy,control_hits,mean_hit_issues,mean_rescued,mean_lost,control_dd,median_dd,p95_dd) |> knitr::kable(digits=2)
+```
+
+“救回”是原方案未中而变体命中的期，“丢失”反之；100个种子的均值允许小数。
+收益率以实际投入为分母，回撤以10万元起始资金逐期扣投入、加返奖计算，单位元。
+
+## 实际替换频率
+
+```{r}
+rows |> group_by(source_policy) |> summarise(single_reuse=sum(eligible_single),single_swaps=sum(swapped_single),
+ single_percent=100*single_swaps/single_reuse,double_reuse=sum(eligible_double),double_swaps=sum(swapped_double),
+ double_percent=100*double_swaps/double_reuse,.groups="drop") |> knitr::kable(digits=2)
+```
+
+```{r}
+#| include: false
+readr::write_csv(summary,file.path(params$study,"summary.csv"))
+readr::write_csv(s,file.path(params$study,"seed_metrics.csv"))
+```
