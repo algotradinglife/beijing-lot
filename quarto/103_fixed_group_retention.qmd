@@ -1,0 +1,122 @@
+---
+title: "固定七场：三种保留率选胆与低概率诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/fixed-group-retention-v1"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+source("r/fundamentals_hit_improvement.R")
+source("r/fundamentals_single_probability.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows)
+summaries<-list();curves<-list();pairs<-list()
+for (u in c(3,6)) {
+ input<-rows |> filter(uses==u) |> mutate(protect=FALSE,cap=0,budget=budget_cny,cash=cash_cny)
+ part<-hit_improvement_summary(input,paste0("U",u,"_ORIGINAL"),unlist(v$issue_order),100000)
+ summaries[[as.character(u)]]<-part$summary
+ curves[[as.character(u)]]<-part$curves
+ pairs[[as.character(u)]]<-part$paired
+}
+z<-list(summary=bind_rows(summaries),curves=bind_rows(curves))
+paired<-bind_rows(pairs)
+diag<-single_probability_diagnostics(as_tibble(v$legs),
+ c(0,.5,.55,.6,.65,.7,.8,1),c(0,.2,.25,.3,.35,.4,.5,.65,1))
+```
+
+## 比较规则
+
+同一已曝光48期100402—100607。U3固定265组、U6固定497组；
+各U下原方案与三变体的七场组合、组顺序、两单选五双选、每组64元、
+投入及现金完全相同。每期预算1024元，初始资金100000元。
+不做重新组队、比分保护、转换、大让球校正或专家训练。
+
+单选候选一律要求原基线与市场首选一致，市场首选至少50%。
+每组都已有两场合格原胆；从该组全部合格候选挑两场。
+P使用基线概率，Q使用市场概率，MIX使用两者各50%。
+保留率是相应概率分布在共同首选上的质量，除以它在原基线Top2集合上的质量。
+分母固定实际原双选集合，不按不同概率源另换第二方向。
+没有改动赛果概率或其余五场基线Top2。并列按场次号。
+本轮检验的是相同资格下的组内排序，不是旧研究的原算法复刻。
+
+原单选资格只保证q>=50%，不保证基线p>=50%；两场联合概率是各自概率的乘积，
+依赖场次独立假设，不是整个七串命中概率。最低概率用于分档，不等于
+两单选命中率的预测。最低/联合分档只作诊断，未据此增加过滤或选择新门槛。
+同一场、相似组重复持仓，因此表中组数不是独立样本量，不能直接作显著性判断。
+
+原计划作为已绑定历史证据，所有384套票据在本轮结算前冻结。
+原生截止对象、来源、代码、参数与结算指针绑定；不做新拟合或自动推广最佳者。
+历史时间代理不证明真实赛前同时出票可行。结算单位2元，整票只乘一次0.65。
+NO_BET期保留在逐期收益表；组概率诊断只含实际购买的组。
+
+## 收益和风险
+
+```{r}
+z$summary |> mutate(group_hit_percent=100*winning_groups/groups) |>
+ select(policy,hit_issues,groups,winning_groups,group_hit_percent,stake_cny,net_cny,
+ stake_ROI_percent,budget_ROI_percent,max_drawdown_cny,longest_miss_streak) |> knitr::kable(digits=2)
+```
+
+## 获救、失去与极端收益敏感性
+
+获救和失去均相对同U的原方案。ex_best_lift剔除配对增益最大一期，
+不是按结果选择未来策略。投入变动单列。
+
+```{r}
+z$summary |> select(policy,rescued_issues,lost_issues,net_on_old_misses,
+ net_lift,stake_change_cny,ex_best_lift,best_lift_issue) |> knitr::kable(digits=2)
+```
+
+## 逐期比较
+
+```{r}
+rows |> mutate(group_hit_percent=if_else(groups>0,100*hits/groups,NA_real_),
+ stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,group_hit_percent,stake,cash_cny,gross,net,
+ stake_ROI_percent,budget_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 两场单选的概率和实际命中
+
+以下按实际持仓组统计。both_hit_rate为两场单选同时命中比例；
+group_hit_rate为整组七场命中比例。P/Q/MIX只是对同一持仓的三种评估。
+
+```{r}
+diag$groups |> group_by(policy) |> summarise(groups=n(),
+ mean_P_min=mean(P_min),mean_Q_min=mean(Q_min),
+ mean_P_joint=mean(P_joint),mean_Q_joint=mean(Q_joint),
+ baseline_min_below_50=sum(P_min<.5),market_min_below_55=sum(Q_min<.55),
+ both_hit_rate=mean(both_hit),group_hit_rate=mean(group_hit),.groups="drop") |>
+ knitr::kable(digits=3)
+diag$bins |> knitr::kable(digits=3)
+```
+
+## 逐期单选质量
+
+```{r}
+diag$groups |> group_by(issue,policy) |> summarise(groups=n(),
+ min_P=min(P_min),min_Q=min(Q_min),mean_P_joint=mean(P_joint),
+ mean_Q_joint=mean(Q_joint),both_hits=sum(both_hit),.groups="drop") |>
+ knitr::kable(digits=3)
+```
+
+## 收益与回撤曲线
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+```
