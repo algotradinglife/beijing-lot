@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'src/conditional_score/**'
+      - 'src/fundamentals_n7*.py'
+      - 'src/fundamentals_n67_overlay.py'
+      - 'tests/test_fundamentals_n7*.py'
+      - 'tests/test_fundamentals_n67_overlay.py'
       - 'src/temporal_learning/**'
       - 'r/conditional_score_report.R'
       - 'quarto/93_conditional_score.qmd'
@@ -23,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
             src
             r
@@ -48,7 +53,7 @@ jobs:
           Rscript -e 'install.packages(c("remotes","jsonlite"), repos="https://cloud.r-project.org"); x <- jsonlite::read_json("config/conditional_score_runtime.json")$r_direct; for(p in names(x)) remotes::install_version(p,version=x[[p]],repos="https://cloud.r-project.org",upgrade="never")'
       - name: Python contracts and governance
         run: |
-          python -m pytest tests/test_conditional_score.py -q
+          python -m pytest tests/test_conditional_score.py tests/test_fundamentals_n7_single.py tests/test_fundamentals_n7_baseline.py tests/test_fundamentals_n7_twocover.py tests/test_fundamentals_n67_overlay.py tests/scripts/test_cutoff_mapping.py tests/scripts/test_cutoff_governance.py -q
           python scripts/check_cutoff_governance.py
       - name: R contracts and fresh QMD
         run: |
