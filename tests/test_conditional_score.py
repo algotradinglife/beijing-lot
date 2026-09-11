@@ -150,6 +150,13 @@ def test_runner_end_to_end(sample,tmp_path):
     shutil.copytree(out,identical)
     checked=verify_experiment(out,identical,repository_root=ROOT)
     assert checked["status"]=="PASS" and checked["plans"]==32
+    from unittest.mock import patch
+    from importlib import metadata
+    original_version=metadata.version
+    with patch("src.temporal_learning.provenance.metadata.version",
+               side_effect=lambda name: "different-version" if name=="numpy" else original_version(name)):
+        with pytest.raises(TemporalContractError,match="implementation closure"):
+            verify_experiment(out,identical,repository_root=ROOT)
     (identical/"summary.csv").write_text("changed")
     with pytest.raises(ValueError,match="Output bytes"):
         verify_experiment(out,identical,repository_root=ROOT)
@@ -241,3 +248,10 @@ def test_changed_admission_binds_cache_and_fixed_plan_scope(sample):
         build_comparison_plan(factors,fixed_plan=plan,**{**kw,"cutoffs":wrong})
     with pytest.raises(ValueError,match="fixture identity"):
         build_comparison_plan(factors.assign(provider_id="wrong"),fixed_plan=plan,**kw)
+
+def test_issue_partitions_reject_unimplemented_recency(sample):
+    f,p,b,h,a=sample
+    kw=kwargs(Cutoff.decision_epoch("000026","2010-01-27T00:00:00Z"),"GLOBAL")
+    kw["weighting_policy"]=WeightingPolicy.recent_state_blend(2,.6,minimum_ess=4)
+    with pytest.raises(TemporalContractError,match="EXPANDING_EQUAL"):
+        fit_remapper(f,p,b,h,a,**kw)

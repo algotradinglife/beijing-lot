@@ -5,6 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 from src.fundamentals_n7_single import settle_n7_single
+from src.temporal_learning.provenance import verify_implementation_closure
 
 
 def verify_experiment(output, replay, *, repository_root):
@@ -27,8 +28,8 @@ def verify_experiment(output, replay, *, repository_root):
             if hashlib.sha256((directory/name).read_bytes()).hexdigest()!=expected:
                 raise ValueError("Output bytes changed: "+name)
     contract=json.loads((out/"contract.json").read_text())
-    for name,expected in {**contract["implementation"]["files"],
-                          **contract["report_implementation_hashes"]}.items():
+    verify_implementation_closure(root,contract["implementation"])
+    for name,expected in contract["report_implementation_hashes"].items():
         if hashlib.sha256((root/name).read_bytes()).hexdigest()!=expected:
             raise ValueError("Implementation changed: "+name)
     for name,expected in contract["source_hashes"].items():

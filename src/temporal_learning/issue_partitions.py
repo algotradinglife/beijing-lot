@@ -35,6 +35,8 @@ def prepare_issue_learning_context(history, cutoff, *, source_hashes, repository
         raise TemporalContractError("Positive issue partition sizes required")
     if intended_use!="HISTORICAL_DIAGNOSTIC":
         raise TemporalContractError("Issue diagnostic partition cannot authorize prospective use")
+    if weighting_policy.kind!="EXPANDING_EQUAL":
+        raise TemporalContractError("Issue partition currently requires EXPANDING_EQUAL weights")
     arguments=dict(source_hashes=source_hashes,repository_root=repository_root,
         implementation_modules=tuple(dict.fromkeys(("src.temporal_learning.issue_partitions",*implementation_modules))),
         implementation_distributions=implementation_distributions,availability=availability,
