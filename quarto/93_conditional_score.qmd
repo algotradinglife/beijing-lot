@@ -1,0 +1,117 @@
+---
+title: "#422 基本面条件比分重映射"
+format:
+  html:
+    toc: true
+    embed-resources: true
+params:
+  run_dir: null
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+这是已看过结果的历史回顾诊断。Titan 为主源，Nowscore 核对与补缺。
+历史代理时间与固定 72 小时标签延迟不是当年实际可用证据。
+本报告不证明赛前可交易收益，不更新既有专家版本，不加入比分保护。
+
+```{r}
+#| label: setup
+#| include: false
+root <- if (file.exists("r/conditional_score_report.R")) "." else ".."
+source(file.path(root, "r/conditional_score_report.R"))
+if (is.null(params$run_dir)) stop("Declare params.run_dir")
+report <- read_conditional_score_report(params$run_dir)
+tables <- summarise_conditional_score(report$observations, report$returns)
+```
+
+## 范围及方法
+
+原始 48 期每场只作一条训练观察。历史不足期不纳入三方法的共同评价集。
+每期在最早比赛的原生决策时点冻结拟合窗口，逐场沿用原生赛前输入。
+这是按场次时点的票据回放，不代表整张票在同一时刻已经可买。
+
+GLOBAL 只校准原比分分布；MARKET_CONTEXT 只加入市场映射及原概率的进球差项，
+用于辨别增益是否其实来自市场；CONDITIONAL 再加入双方整体与主客进失球、积分、
+样本量、中立场、具体赛事及市场映射双方进球数。连续字段的中位数、尺度及联赛
+词典只从拟合分区得到。未知跨级关系及对手强度不当作已确认字段。天气不纳入。
+
+```{r}
+tibble::tibble(评价期数 = report$receipt$issues,
+               共同评价场次 = report$receipt$fixtures,
+               正式历史准入 = report$receipt$historical_admission)
+knitr::kable(report$exclusions)
+```
+
+## 同场概率对照
+
+对数损失单位为自然对数，Brier 越小越好；概率偏差单位为百分点，
+正值表示高估。大比分差定义为净胜球绝对值至少 3。
+固定净胜球下总进球误差单位为球，只在实际净胜球所对应的条件分布上检验。
+
+```{r}
+report$summary
+tables$probability
+knitr::kable(tables$margins, digits = 4)
+```
+
+## 历史拟合、验证与校准
+
+前窗按时间顺序分为拟合、验证、校准；验证在预先冻结的惩罚候选中选择，
+校准只作独立前窗诊断。下表不能当作未见测试结果。
+
+```{r}
+report$training |>
+  dplyr::group_by(method, partition) |>
+  dplyr::summarise(窗口数 = dplyr::n(),
+                  平均比分对数损失 = weighted.mean(score_logloss, rows),
+                  平均让球对数损失 = weighted.mean(wdl_logloss, rows),
+                  .groups = "drop")
+```
+
+## 固定场次与重新选场收益
+
+N=7、每期预算 1,024 元、每注 2 元、每张中奖彩票只乘一次 0.65。
+未下注资金保留现金。FIXED 保持原基线场次分组，只调整双选方向；
+RESELECTED 允许依照新概率重新选场。两个比较均不下注比分。
+这些是理论税前结算，不含可交易性保证。
+
+```{r}
+tables$money
+report$returns |>
+  dplyr::select(issue, method, selection, stake, gross, net, roi_percent,
+                cash, hits, equity_cny, drawdown_cny) |>
+  knitr::kable(digits = 2)
+```
+
+## 逐场调整与数据结构
+
+TOWARD_MARKET / AWAY_FROM_MARKET 仅描述重映射方向，并非已经证实的盈利机会。
+全部概率由同一比分网格投射。每场历史支持量来自该期冻结拟合窗口。
+
+```{r}
+dplyr::glimpse(report$observations)
+report$observations |>
+  dplyr::select(issue, slot, competition, handicap, method, p_W, p_D, p_L,
+                fit_support, conflict, adjustment, top1, top2) |>
+  dplyr::arrange(issue, slot, method) |>
+  head(24) |>
+  knitr::kable(digits = 4)
+```
+
+## 溯源与限制
+
+原始数据未改动。比分网格、每期模型参数、前窗分区、预处理统计、
+权重账本、源文件和传递实现哈希、票据与逐期结算均由输出回执绑定。
+本页从 JSON/CSV 直接读取为 tibble，不依赖 RDS。
+
+缺失或不确定字段汇总维护在 `docs/research/issue422_data_issues.md`。
+本轮不替代 #421 的跨年和真实可用时间验收。
+
+## 结论口径
+
+优先看共同场次上的概率质量，再看相同预算的收益。即使比分或双选指标改善，
+只要组注收益未改善，就不建议凭本轮结果替换原基线。
+市场与基本面分歧的切片属于回顾解释：向市场靠拢或远离市场都不是默认正确。
+跨级关系、对手强度和真实历史可用时间证据不足，不能据此声称已找出可靠的事前套利规则。
