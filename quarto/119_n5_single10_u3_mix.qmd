@@ -1,0 +1,108 @@
+---
+title: "五串一10%替换＋U3各半预算：收益与回撤"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n5-single10-u3-mix-v1"
+  initial_capital_cny: 100000
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+issues<-unlist(v$issue_order);rows<-bind_rows(as_tibble(v$rows),as_tibble(v$controls))
+stopifnot(length(issues)==48,nrow(as_tibble(v$rows))==4800,!anyDuplicated(rows[c("policy","issue")]))
+curves<-strategy_equity_curves(rows |> mutate(model="Pure baseline",label=policy),issues,params$initial_capital_cny)
+stopifnot(!any(curves$stopped))
+metrics<-curves |> filter(period>0) |> group_by(policy,source_policy) |> summarise(stake=sum(stake),net=sum(net),
+ ROI_percent=100*sum(net)/sum(stake),groups=sum(groups),winning_groups=sum(hits),hit_issues=sum(hits>0),
+ max_drawdown=max(drawdown_cny),.groups="drop")
+fixed_names<-c("N5_NO_SWAP","N6_NO_SWAP","U3_BASELINE","U6_BASELINE")
+fixed<-metrics |> filter(policy %in% fixed_names)
+random<-metrics |> filter(!policy %in% fixed_names)
+summary<-random |> group_by(source_policy) |> summarise(seeds=n(),stake=first(stake),mean_net=mean(net),
+ mean_ROI=mean(ROI_percent),p05_ROI=quantile(ROI_percent,.05),p95_ROI=quantile(ROI_percent,.95),
+ mean_hit_issues=mean(hit_issues),median_dd=median(max_drawdown),p95_dd=quantile(max_drawdown,.95),.groups="drop")
+stopifnot(nrow(fixed)==4,nrow(summary)==4,all(summary$seeds==100))
+labels<-c(MIX_S000="组合：五串10%＋U3各半",N5_S000="五串：单选10%替换",N5_SWAP_S000="五串：单选25%替换",
+ N6_S000="六串：单选10%替换",N5_NO_SWAP="五串：不替换",N6_NO_SWAP="六串：不替换",
+ U3_BASELINE="七串：U3不替换",U6_BASELINE="七串：U6不替换")
+colors<-c(MIX_S000="#000000",N5_S000="#56B4E9",N5_SWAP_S000="#999999",N6_S000="#E69F00",
+ N5_NO_SWAP="#0072B2",N6_NO_SWAP="#009E73",U3_BASELINE="#D55E00",U6_BASELINE="#CC79A7")
+selected<-curves |> filter(policy %in% names(labels)) |> mutate(policy=factor(policy,levels=names(labels)))
+plot_data<-selected |> mutate(资金=equity_cny,回撤=-drawdown_cny) |> pivot_longer(c(资金,回撤),names_to="面板",values_to="金额") |>
+ mutate(面板=factor(面板,levels=c("资金","回撤")),线宽=if_else(as.character(policy)=="MIX_S000",1.2,.65))
+ticks<-c(0,12,24,36,48);tick_labels<-c("起始",issues[ticks[-1]])
+```
+
+各方案独立以10万元起始，同48期（100402–100607）；固定每期预算1024元，不按收益复利加注。
+组合将预算各分512元：五串一保留原顺序前32组，U3保留前8组；不足则现金保留，不跨钱包补投。
+**这是预算各半，实际投入未必相等。** 不将两条原收益曲线简单各乘50%，不买半张票。
+五串一仍只在复用单选处以10%概率替换，使用原随机序列。U3不替换；无新增比分保护。
+两个钱包之间允许场次重合，各自内部保留原复用规则；所有返还已含一次0.65系数。
+
+100个固定种子的组合票据全部在本轮结算前封存；原历史已暴露，仅作回顾诊断。
+主图中所有随机方案均固定展示**seed0**，不是按收益挑选；总体比较请同时看100种子汇总。
+
+## 同图比较资金与回撤
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+combined_plot<-ggplot(plot_data,aes(period,金额,color=policy,group=policy,linewidth=线宽))+
+ geom_line()+scale_linewidth_identity()+facet_wrap(~面板,ncol=1,scales="free_y")+
+ scale_color_manual(values=colors,breaks=names(labels),labels=labels)+
+ scale_x_continuous(breaks=ticks,labels=tick_labels)+
+ scale_y_continuous(labels=scales::label_number(big.mark=",",accuracy=1))+
+ labs(title="各半预算组合与独立策略：资金和回撤",subtitle="初始资金100,000元；随机方案均为固定seed0；黑线为组合",
+ x="历史期号（按期次排列）",y="人民币元；回撤以负值显示",color=NULL)+
+ theme_minimal(base_size=12,base_family="Noto Sans CJK SC")+
+ theme(legend.position="bottom",panel.grid.minor=element_blank())+guides(color=guide_legend(ncol=2,byrow=TRUE))
+combined_plot
+ggsave(file.path(params$study,"combined.png"),combined_plot,width=14,height=10,dpi=200)
+ggsave(file.path(params$study,"combined.pdf"),combined_plot,width=14,height=10,device=grDevices::cairo_pdf)
+```
+
+上图下半部分相对各账户历史最高资金计算回撤，越向下回撤越大。各方案实际投入不同。
+
+## 主图对应的实际结果
+
+```{r}
+metrics |> filter(policy %in% names(labels)) |> mutate(方案=unname(labels[policy]),期末资金=params$initial_capital_cny+net) |>
+ select(方案,stake,net,ROI_percent,hit_issues,max_drawdown,期末资金) |> knitr::kable(digits=2)
+```
+
+## 随机方案100种子汇总
+
+```{r}
+knitr::kable(summary,digits=2)
+knitr::kable(fixed,digits=2)
+```
+
+收益率为净收益／实际投入，median_dd是100次最大回撤的中位数。分位数不是未来置信区间。
+命中期指至少中一组，不等于该期盈利；本轮未优化组合权重或种子。
+
+## 各半钱包的实际投入
+
+```{r}
+as_tibble(v$rows) |> filter(seed==0) |> summarise(n5_stake=sum(n5_stake),u3_stake=sum(u3_stake),
+ total_stake=sum(stake),cash=sum(cash_cny)) |> knitr::kable(digits=2)
+```
+
+```{r}
+#| include: false
+readr::write_csv(metrics,file.path(params$study,"metrics.csv"))
+readr::write_csv(summary,file.path(params$study,"summary.csv"))
+readr::write_csv(curves,file.path(params$study,"curves.csv"))
+```

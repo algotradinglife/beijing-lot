@@ -1,9 +1,50 @@
-"""Prematch weak-leg removal and fixed-wallet N6/N7 diagnostic composition."""
+"""Prematch weak-leg removal and fixed-wallet N5/N6/N7 diagnostic composition."""
 import copy
 import itertools
 from src.temporal_learning.core import stable_json_hash
 from src.fundamentals_decision_chain import limit_decision_chain_plan
 from src.fundamentals_n7_baseline import settle_n7_baseline
+
+
+def flatten_component_groups(plan, *, cutoffs, n, budget_cny, unit_cny, payout_factor):
+    """Translate sealed one-group components to the existing flat wallet API.
+
+    Inputs: one-issue envelope, exact native cutoffs, explicit N5/N6/N7 and
+    CNY constants. Preserve group order, full ticket units/supports and source
+    identity, including random swaps; no reranking, fitting, I/O or mutation.
+    Reject changed seals, chronology, component shape or inconsistent funding.
+    Returns a sealed flat plan bound to the original envelope and components.
+    Empty envelopes produce zero groups and retain the original cutoff scope.
+    """
+    if (type(n) is not int or n not in (5,6,7) or
+            (budget_cny,unit_cny,payout_factor)!=(1024,2,.65) or
+            plan.get('seal')!=stable_json_hash({k:v for k,v in plan.items() if k!='seal'})):
+        raise ValueError('Sealed source and explicit N/CNY constants required')
+    result={k:copy.deepcopy(plan[k]) for k in ('issue','cutoffs','input_sha256')}
+    result.update(n=n,selector='EXISTING_SOURCE_ORDER',shape='FROZEN_COMPONENTS',funding='UNIT',
+        budget_cny=budget_cny,unit_cny=unit_cny,payout_factor=payout_factor,
+        groups=len(plan['components']),legs=[],tickets=[],component_source_seal=plan['seal'],
+        component_seals=[],historical_admission=False)
+    for group,part in enumerate(plan['components'],1):
+        if (part.get('seal')!=stable_json_hash({k:v for k,v in part.items() if k!='seal'}) or
+                part['issue']!=plan['issue'] or part['n']!=n or part['groups']!=1 or
+                part['unit_cny']!=unit_cny or part['payout_factor']!=payout_factor or
+                len(part['legs'])!=n or len({r['slot'] for r in part['legs']})!=n or
+                any(t['units']!=1 or t['group']!=1 for t in part['tickets']) or
+                part['stake']!=unit_cny*len(part['tickets']) or
+                any(plan['cutoffs'].get(s)!=t for s,t in part['cutoffs'].items()) or
+                any(str(r['slot']) not in part['cutoffs'] for r in part['legs'])):
+            raise ValueError('Component shape, seal, cutoff or funding changed')
+        result['legs'].extend(dict(copy.deepcopy(r),group=group) for r in part['legs'])
+        result['tickets'].extend(dict(copy.deepcopy(t),group=group) for t in part['tickets'])
+        result['component_seals'].append(part['seal'])
+    result['stake']=sum(t['units'] for t in result['tickets'])*unit_cny
+    result['cash_cny']=budget_cny-result['stake']
+    if result['stake']!=plan['stake'] or result['cash_cny']!=plan['cash_cny'] or result['cash_cny']<0:
+        raise ValueError('Source funding changed')
+    result['seal']=stable_json_hash(result)
+    limit_decision_chain_plan(result,groups=0,cutoffs=cutoffs)
+    return result
 
 
 def drop_weak_leg(plan,*,cutoffs):
@@ -36,7 +77,7 @@ def drop_weak_leg(plan,*,cutoffs):
 def fixed_n67_wallets(sources,*,cutoffs,wallets,budget_cny,unit_cny,payout_factor):
     """Whole-group source-order allocation with explicit wallets summing1024.
 
-    Sources are sealed N6/N7 plans with same inputs/cutoffs. No transfer/refill
+    Sources are sealed N5/N6/N7 plans with same inputs/cutoffs. No transfer/refill
     from other wallets; exact duplicate full holdings skipped. Returns sealed
     single-group components for authoritative settlement, explicit cash. No I/O.
     """
@@ -54,8 +95,8 @@ def fixed_n67_wallets(sources,*,cutoffs,wallets,budget_cny,unit_cny,payout_facto
             ls=sorted([dict(r,group=1) for r in plan['legs'] if r['group']==g],key=lambda r:r['slot'])
             ts=[dict(t,group=1) for t in plan['tickets'] if t['group']==g]
             expected={''.join(c) for c in itertools.product(*(r['support'] for r in ls))}
-            if len(ls) not in (6,7) or len({r['slot'] for r in ls})!=len(ls) or len(ts)!=len(expected) or {t['code'] for t in ts}!=expected or any(t['units']!=1 for t in ts):
-                raise ValueError('Complete one-unit N6/N7 groups required')
+            if len(ls) not in (5,6,7) or len({r['slot'] for r in ls})!=len(ls) or len(ts)!=len(expected) or {t['code'] for t in ts}!=expected or any(t['units']!=1 for t in ts):
+                raise ValueError('Complete one-unit N5/N6/N7 groups required')
             cost=len(ts)*unit_cny;key=tuple((r['slot'],r['provider_id'],r['support']) for r in ls)
             if key in seen or spent+cost>wallets[name]:continue
             part={k:copy.deepcopy(plan[k]) for k in ['issue','selector','shape','funding','cutoffs','input_sha256']}
