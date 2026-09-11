@@ -2,16 +2,19 @@
 
 ## Scope and status
 
-Isolated branch: `codex/422-conditional-score-remap`, based on `e9ad29eb`.
+Release branch: `codex/422-score-remap-release`, based on main `327f5d04`.
+The scoped delivery excludes 32 unrelated research commits and includes only four
+existing ticket modules plus their function/replay tests as necessary dependencies.
 No production expert version or raw data changed. No page download needed for this experiment.
 The existing 48-issue archived packet supplies 2,561 unique fixtures. The earliest 19
 issues lack the frozen prior-window support; the common evaluation cohort is
 29 issues / 1,369 fixtures. All are previously exposed retrospective observations.
 
-The independent Codex review command was rejected by automatic approval review:
-it may transmit private uncommitted code to the configured external review service.
-It has **not run**, and acceptance is **not complete**. No attempt to bypass the rejection.
-The new CI workflow is configured but not remotely executed yet.
+The owner authorized the external Codex review on 2026-09-11. The first review
+found two P2 issues: model cache identity collision and a fit-partition ESS gap.
+Both are fixed in research model 422-score-remap-0.1.1, with regression tests.
+The complete release diff is undergoing a second independent review.
+Remote CI and final acceptance remain pending until their recorded checks pass.
 
 ## Results (same fixture cohort)
 
@@ -80,16 +83,16 @@ repository_root=...)`. Outputs are JSON/CSV and full score grids; QMD calls the
 R reader and displays tibbles. No RDS. The actual candidate lives under the
 parent work area `../delivery`; independent replay `../delivery-replay`.
 
-Checks and logs are stored in the parent work area:
-`python-tests-isolated-final.txt`, `r-tests-isolated.txt`, `render-ci.log`,
-`render-delivery.log`, `verification-final.json`.
-The initial R failures were setup/code-freeze errors (missing offline fixtures,
-then changed implementation hashes during running tests), not passed checks;
-the final run uses rebuilt fixture provenance and unchanged code.
+Release evidence lives in the parent work area: `release-python-final.txt`
+(78 passed), `release-r-tests.txt` (full R suite, no failures/skips), and
+`release-render-ci-final.txt` (clean synthetic-data QMD render).
+An earlier local render used an incorrectly relative input path and failed; the
+successful run supplies an absolute, declared input directory.
 
-Existing tracked source files are byte-unchanged from the checkout base. The new
-issue partition client lives in `src/temporal_learning/issue_partitions.py`; it
-reuses the old core rather than altering existing expert implementation hashes.
-Final Python checks: 32 passed. Full R suite passed without skips after offline
-fixture setup. Governance passed. Clean real-data and synthetic-data QMD rendering
-and independent repeat-process checks form the remaining local acceptance evidence.
+The new issue partition client lives in
+`src/temporal_learning/issue_partitions.py`, reusing the existing core without
+altering production expert hashes. Fit weights, effective sample size and their
+source ledger are separately recorded for the actual fitting partition. Model
+method, version and candidate penalties bind distinct cache identities.
+No actual page collection requirement was identified; the data issue ledger
+records limitations without manufacturing an unavailable historical timestamp.
