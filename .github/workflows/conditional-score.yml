@@ -49,8 +49,10 @@ jobs:
           version: '1.10.18'
       - name: Install pinned direct dependencies during setup
         run: |
+          sudo apt-get update
+          sudo apt-get install --yes libuv1-dev libpng-dev libicu-dev
           python -c 'import json,subprocess,sys; c=json.load(open("config/conditional_score_runtime.json")); subprocess.check_call([sys.executable,"-m","pip","install",*[k+"=="+v for k,v in c["python_direct"].items()]])'
-          Rscript -e 'install.packages(c("remotes","jsonlite"), repos="https://cloud.r-project.org"); x <- jsonlite::read_json("config/conditional_score_runtime.json")$r_direct; for(p in names(x)) remotes::install_version(p,version=x[[p]],repos="https://cloud.r-project.org",upgrade="never")'
+          Rscript -e 'install.packages(c("remotes","jsonlite"), repos="https://cloud.r-project.org"); x <- jsonlite::read_json("config/conditional_score_runtime.json")$r_direct; for(p in names(x)) remotes::install_version(p,version=x[[p]],repos="https://cloud.r-project.org",upgrade="never"); actual <- vapply(names(x),function(p) as.character(utils::packageVersion(p)),character(1)); if (!identical(unname(actual),unname(unlist(x)))) stop("R dependency version mismatch")'
       - name: Python contracts and governance
         run: |
           python -m pytest tests/test_conditional_score.py tests/test_fundamentals_n7_single.py tests/test_fundamentals_n7_baseline.py tests/test_fundamentals_n7_twocover.py tests/test_fundamentals_n67_overlay.py tests/scripts/test_cutoff_mapping.py tests/scripts/test_cutoff_governance.py -q
