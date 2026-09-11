@@ -1,5 +1,8 @@
 # #422 implementation and current results
 
+Read the [frozen contract](issue422_contract.md) and
+[data issue ledger](issue422_data_issues.md) alongside this report.
+
 ## Scope and status
 
 Release branch: `codex/422-score-remap-release`, based on main `327f5d04`.
@@ -10,13 +13,20 @@ The existing 48-issue archived packet supplies 2,561 unique fixtures. The earlie
 issues lack the frozen prior-window support; the common evaluation cohort is
 29 issues / 1,369 fixtures. All are previously exposed retrospective observations.
 
-The owner authorized the external Codex review on 2026-09-11. The first review
-found two P2 issues: model cache identity collision and a fit-partition ESS gap.
-Both are fixed in research model 422-score-remap-0.1.1, with regression tests.
-The complete release diff is undergoing a second independent review.
+The owner authorized the external Codex review on 2026-09-11. The first two
+reviews found five P2 issues: model cache identity collision, a fit-partition
+ESS gap, label-delay identity, fixed-plan fixture/cutoff provenance, and null
+audit status in overlay replay. All five have fixes and regression tests in
+research model 422-score-remap-0.1.1. A third review identified that splitting
+the fit partition could invalidate recent-state blend weights. The issue-wise
+client now accepts only the frozen experiment's EXPANDING_EQUAL policy;
+other weighting policies fail closed. Final review acceptance is pending.
 Remote CI and final acceptance remain pending until their recorded checks pass.
 
 ## Results (same fixture cohort)
+
+These tables record the earlier four-method run. Regeneration and independent
+replay against the current release implementation remain pending.
 
 | Method | Score log loss | Handicap log loss | Top2 |
 |---|---:|---:|---:|
@@ -80,11 +90,13 @@ quarto render quarto/93_conditional_score.qmd --execute --no-cache -P run_dir:/p
 Repeat the first command in a separate process with a second new output path.
 Call `src.conditional_score.verification.verify_experiment(first, second,
 repository_root=...)`. Outputs are JSON/CSV and full score grids; QMD calls the
-R reader and displays tibbles. No RDS. The actual candidate lives under the
-parent work area `../delivery`; independent replay `../delivery-replay`.
+R reader and displays tibbles. No RDS. The current candidate is being regenerated
+under `../accepted-delivery`, with independent replay at `../accepted-replay`;
+neither directory name alone proves successful verification.
 
-Release evidence lives in the parent work area: `release-python-final.txt`
-(78 passed), `release-r-tests.txt` (full R suite, no failures/skips), and
+Release evidence lives in the parent work area: `accepted-python.txt`
+(80 passed before the third-review regression), `release-r-tests.txt`
+(full R suite, no failures/skips), and
 `release-render-ci-final.txt` (clean synthetic-data QMD render).
 An earlier local render used an incorrectly relative input path and failed; the
 successful run supplies an absolute, declared input directory.
