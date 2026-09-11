@@ -23,13 +23,15 @@ client now accepts only the frozen experiment's EXPANDING_EQUAL policy;
 other weighting policies fail closed. The third review also identified missing
 runtime dependency-version verification; replay now calls the shared
 `verify_implementation_closure` check. Seven findings across three reviews have
-implementation fixes; review of the final fixes and acceptance remain pending.
+implementation fixes. Independent review of final fix commit `86fe0594` found
+no actionable regressions (log `review-last-fixes.txt`).
 Remote CI and final acceptance remain pending until their recorded checks pass.
 
 ## Results (same fixture cohort)
 
-These tables record the earlier four-method run. Regeneration and independent
-replay against the current release implementation remain pending.
+These tables were regenerated with the current release implementation. Independent
+repeat-process replay passed: 1,253,296 score cells, 87 artifacts, 232 plans;
+source files, transitive code and dependency versions match (`final-verification.json`).
 
 | Method | Score log loss | Handicap log loss | Top2 |
 |---|---:|---:|---:|
@@ -93,17 +95,32 @@ quarto render quarto/93_conditional_score.qmd --execute --no-cache -P run_dir:/p
 Repeat the first command in a separate process with a second new output path.
 Call `src.conditional_score.verification.verify_experiment(first, second,
 repository_root=...)`. Outputs are JSON/CSV and full score grids; QMD calls the
-R reader and displays tibbles. No RDS. The current candidate is being regenerated
-under `../accepted-delivery`, with independent replay at `../accepted-replay`;
-neither directory name alone proves successful verification.
+R reader and displays tibbles. No RDS. Verified outputs are
+`../final-delivery` and `../final-replay`; output hashes and verification
+evidence bind the current implementation.
 
-Release evidence lives in the parent work area: `verified-python.txt`
-(81 passed before the dependency-version regression was added to an existing
-test; final rerun pending), `release-r-tests.txt`
-(full R suite, no failures/skips), and
-`release-render-ci-final.txt` (clean synthetic-data QMD render).
-An earlier local render used an incorrectly relative input path and failed; the
-successful run supplies an absolute, declared input directory.
+Release evidence in the parent work area:
+- `final-python.txt`: 81 passed, including the dependency-version regression.
+- `release-r-tests.txt`: full R suite, no failures/skips.
+- `final-render-ci.txt` and `final-render-real.txt`: executed, uncached QMD.
+- `final-verification.json`: independent byte equality and settlement replay PASS.
+- `review-last-fixes.txt`: final Codex fix review, no actionable findings.
+
+Commands (activate the declared project Python/R environment first):
+```sh
+python -m pytest tests/test_conditional_score.py tests/test_fundamentals_n7_single.py tests/test_fundamentals_n7_baseline.py tests/test_fundamentals_n7_twocover.py tests/test_fundamentals_n67_overlay.py tests/scripts/test_cutoff_mapping.py tests/scripts/test_cutoff_governance.py -q
+python scripts/check_cutoff_governance.py
+python scripts/materialize_fundamentals_pipeline_fixture.py --output-dir /path/to/offline-bundle
+FUNDAMENTALS_PIPELINE_TEST_BUNDLE=/path/to/offline-bundle FUNDAMENTALS_PYTHON=/path/to/project/python BEIJING_LOT_VENV_PYTHON=/path/to/project/python RETICULATE_PYTHON=/path/to/project/python Rscript tests/testthat.R
+```
+
+Function/test mapping: all functions in `src/conditional_score/` and
+`src/temporal_learning/issue_partitions.py` are exercised by
+`tests/test_conditional_score.py`; each copied ticket module has its same-named
+test file; both R report functions use `tests/testthat/test-conditional-score.R`.
+The two existing replay CLIs are exercised by their ticket module tests.
+An earlier local render used an incorrectly relative input path and failed; all
+accepted renders supply an absolute declared input directory.
 
 The new issue partition client lives in
 `src/temporal_learning/issue_partitions.py`, reusing the existing core without
