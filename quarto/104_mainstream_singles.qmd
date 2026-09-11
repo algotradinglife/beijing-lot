@@ -1,0 +1,137 @@
+---
+title: "七个主流联赛单选：基本面诊断与回测"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/mainstream-singles-v2"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+source("r/fundamentals_hit_improvement.R")
+source("r/fundamentals_missed_issues.R")
+source("r/fundamentals_category_diagnostics.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows)
+summaries<-list();curves<-list();pairs<-list()
+for (u in c(3,6)) {
+ input<-rows |> filter(uses==u) |> mutate(protect=FALSE,cap=0,budget=budget_cny,cash=cash_cny)
+ part<-hit_improvement_summary(input,paste0("U",u,"_ORIGINAL"),unlist(v$issue_order),100000)
+ summaries[[as.character(u)]]<-part$summary
+ curves[[as.character(u)]]<-part$curves
+ pairs[[as.character(u)]]<-part$paired
+}
+z<-list(summary=bind_rows(summaries),curves=bind_rows(curves))
+paired<-bind_rows(pairs)
+category<-list();observations<-list()
+for (u in c(3,6)) {
+ policy_name<-paste0("U",u,"_ORIGINAL")
+ held<-as_tibble(v$legs) |> filter(policy==policy_name) |>
+  transmute(issue,slot,provider_id,group=component+1L,support,handicap)
+ d<-category_diagnostics(as_tibble(v$factors),as_tibble(v$features),held,
+   as_tibble(v$audit),rows |> filter(policy==policy_name) |> select(issue,hits))
+ category[[as.character(u)]]<-d$summary |> mutate(uses=u)
+ observations[[as.character(u)]]<-d$observations |> mutate(uses=u)
+}
+categories<-bind_rows(category);observations<-bind_rows(observations)
+```
+
+## 比较规则
+
+用户指定主流范围：英超、西甲、德甲、意甲、法甲、葡超、荷甲。
+按比赛本身的赛事名称精确匹配，不把杯赛、欧战或荷甲附加赛算入。
+仅限制两场单选；其余五场双选不受联赛限制。
+资格仍为p/q首选一致、市场首选至少50%，按市场首选概率选胆。
+保留当前七串2A/4D/1C、U3/U6、P5、零让球Top2分歧排除、先不重叠后复用。
+MAINSTREAM在全候选池重新组队，允许原非主流单选成为双选；
+不是直接删原组，也不改变赛果概率。没有两名合格单选或凑不齐角色则留现金。
+候选表另列原组内仍有两名合格候选的组数，用于区分固定组与重新组队。
+
+已曝光48期100402—100607，每期预算1024元、每组64元、基本注2元、
+整票0.65一次、初始资金100000元。无比分保护、转换或专家。
+原方案票据/角色/金额复现；192计划冻结后才读取本轮结算。
+基本面从旧证据导出无标签的特征清单供选场使用；原始数据未改。
+特征时钟逐场核对为严格早于原生决策截止时点，但历史代理仍不代表真实赛前可用性。
+来源、代码、参数和结算指针绑定。不根据命中结果定义主流名单或优化门槛。
+
+## 原单选的主流与其他赛事
+
+去重SELECTED_UNIQUE按期/场次/身份/赛果计数；HOLDINGS计实际复用次数。
+两种分母不能合并。以下均为原方案选中的单选，不是所有赛事比赛。
+联赛差异是观察关联，可能混有盘口、赛程和球队因素；小样本不能据此建黑名单。
+
+```{r}
+observations |> filter(role=="SINGLE",view %in% c("SELECTED_UNIQUE","HOLDINGS")) |>
+ mutate(mainstream=league %in% unlist(v$allowed_competitions)) |>
+ group_by(uses,view,mainstream) |> summarise(n=n(),issues=n_distinct(issue),
+ hits=sum(hit),actual_percent=100*mean(hit),baseline_percent=100*mean(predicted),
+ market_percent=100*mean(market),.groups="drop") |> knitr::kable(digits=2)
+```
+
+## 联赛与其他基本面
+
+完整列出单选按联赛、绝对让球深度、给球方相对接球方近期主客场积分差、
+基本面与市场总进球预期差的分层。ALL为全48期，MISSED为原未中期，
+后者只能用于解释，不能作为赛前筛选条件。相同错误可进入多个维度，不能累加。
+giving_venue_ppg是两队积分差，不是给球方自身积分；缺失单列。
+本批主客历史样本深度基本一致，不能据此判断历史条数的作用。
+
+```{r}
+categories |> filter(view=="SELECTED_UNIQUE",role=="SINGLE",
+ dimension %in% c("league","depth","venue_ppg_gap","total_gap"),
+ slice %in% c("ALL","MISSED")) |>
+ select(uses,slice,dimension,stratum,n,issues,hits,actual_percent,
+ predicted_percent,market_percent) |> knitr::kable(digits=2)
+```
+
+## 收益和风险
+
+```{r}
+z$summary |> mutate(group_hit_percent=100*winning_groups/groups) |>
+ select(policy,hit_issues,groups,winning_groups,group_hit_percent,stake_cny,net_cny,
+ stake_ROI_percent,budget_ROI_percent,max_drawdown_cny,longest_miss_streak) |> knitr::kable(digits=2)
+```
+
+## 获救、失去与极端收益敏感性
+
+获救和失去均相对同U的原方案。ex_best_lift剔除配对增益最大一期，
+不是按结果选择未来策略。投入变动单列。
+
+```{r}
+z$summary |> select(policy,rescued_issues,lost_issues,net_on_old_misses,
+ net_lift,stake_change_cny,ex_best_lift,best_lift_issue) |> knitr::kable(digits=2)
+```
+
+## 逐期比较
+
+```{r}
+rows |> mutate(group_hit_percent=if_else(groups>0,100*hits/groups,NA_real_),
+ stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,group_hit_percent,stake,cash_cny,gross,net,
+ stake_ROI_percent,budget_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 各期候选数量
+
+```{r}
+as_tibble(v$candidate_counts) |> knitr::kable()
+```
+
+## 收益与回撤曲线
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+```
