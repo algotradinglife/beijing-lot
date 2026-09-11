@@ -1,0 +1,105 @@
+---
+title: "高命中六串一：压缩单选与减少投入"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n6-efficiency-v1"
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+source("r/fundamentals_hit_improvement.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows)
+stopifnot(nrow(rows)==576,n_distinct(rows$issue)==48,n_distinct(rows$policy)==12)
+z<-hit_improvement_summary(rows |> mutate(weight=0,protect=FALSE,cap=0,
+ budget=budget_cny,cash=cash_cny),"ORIGINAL",unlist(v$issue_order),100000)
+profits<-rows |> group_by(policy) |> summarise(profit_issues=sum(net>0),bet_issues=sum(stake>0),.groups="drop")
+summary<-z$summary |> left_join(profits,by="policy",relationship="one-to-one")
+```
+
+## 固定比较规则
+
+原H1_R050_N6_C1_RETENTION为对照，48期100402—100607，原方案41期至少一组命中。
+本轮不采用上一轮零让球Top2分歧过滤；不增加首选一致、主流联赛或专家条件。
+保持每组原六场搭配、原单选及原双选方向；变体只能删除组或把一个双选压为单选。
+因此新方案不会救回原未中期，只可能保留或失去命中。目标是提升资金效率。
+
+原支持概率m为大让球市场校正后的p与市场q各50%；q来自欧赔＋大小球比分映射，
+均为北单让球胜平负概率。原计划封存为历史证据，非当前前瞻准入接口。
+
+|方法|动作|
+|---|---|
+|ORIGINAL|原所有组六串一，一场单选五场双选，64元/组|
+|EXTRA_PROB|保留原单选；按最高概率保留率再压一场，32元/组|
+|EXTRA_VALUE|保留原单选；按最高预期回报保留率再压一场，32元/组|
+|PROBABILITY|按组联合命中概率排序，投入上限256/512/768元|
+|MARGINAL|按相对已选组新增覆盖的场景比例贪心选择，同三档上限|
+|EXPECTED_NET|按赛前估算期望净收益排序，同三档上限；未另加正EV门槛|
+
+两种额外压缩都保留原双选中m较高的方向，只改变压缩哪一场。
+概率保留率为m1/(m1+m2)；预期回报保留率为(m1/q1)/(m1/q1+m2/q2)。
+原单选不动，没有压缩后再扩组或重新分配现金。
+
+预估SP=1/q，是赛前价格代理，并非实际最终北单SP。
+完整复式组预估回报为2×0.65×各场所选方向的sum(m/q)之积，减投入得预估净收益。
+**若m=q，每组预估ROI都为−35%，单靠市场自定价格无法产生选组优势。**
+本轮优势只能来自m与q的分歧；不使用最终SP排名。
+
+新增覆盖复用现有模拟器，每期32768个固定种子419106场景。
+同场在所有复用组共用同一赛果；不同场次独立是假设。有限抽样和贪心不保证全局最优。
+其他排序用解析概率或EV。并列按原组序；新增覆盖并列再按解析组概率。
+12个固定方案共576计划全部冻结后才读取本轮结算，没有按结果挑种子或逐期赢家。
+
+每期资金上限1024元，未使用部分持有现金；单注2元、结算0.65整票一次。
+初始资金100000元，不复投。本批历史已暴露，结果仅作回顾诊断，不是样本外验证。
+
+## 总体命中、收益和回撤
+
+命中期表示至少一组命中，不等于盈利期。投入ROI以实际投入为分母；预算ROI以48×1024为分母。
+
+```{r}
+summary |> select(policy,hit_issues,profit_issues,groups,winning_groups,stake_cny,
+ net_cny,stake_ROI_percent,budget_ROI_percent,max_drawdown_cny,longest_miss_streak) |>
+ knitr::kable(digits=2)
+```
+
+## 相对原方案与极端收益依赖
+
+剔除最大盈利期看净收益是否仍正；剔除配对增益最大期检查改进是否依赖单期。
+这些是事后敏感性检查，不用于赛前选择。减投入会机械性降低部分风险，要同时看保留的收益。
+
+```{r}
+summary |> select(policy,lost_issues,profit_retained_percent,spend_retained_percent,
+ net_lift,ex_best_net,best_issue,ex_best_lift,best_lift_issue) |> knitr::kable(digits=2)
+stopifnot(all(summary$rescued_issues==0))
+```
+
+## 全部期次
+
+```{r}
+rows |> mutate(stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),budget_ROI_percent=100*net/1024) |>
+ select(issue,policy,groups,hits,stake,cash_cny,gross,net,stake_ROI_percent,budget_ROI_percent) |>
+ knitr::kable(digits=2)
+```
+
+## 收益与回撤
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+
+ labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+
+ labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(summary,file.path(params$study,"summary.csv"))
+```
