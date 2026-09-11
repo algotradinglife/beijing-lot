@@ -1,0 +1,63 @@
+---
+title: "六串一后段停滞：命中率还是中奖返奖？"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n6-period-returns-v1"
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_period_returns.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+z<-n6_period_returns(as_tibble(v$rows),as_tibble(v$groups),unlist(v$issue_order),16)
+```
+
+同48期按原顺序分前、中、后各16期。ORIGINAL为未过滤的高命中六串一；
+EXTRA_PROB为按概率再压一场；EXPECTED_NET_768为赛前预期收益排序、每期上限768元。
+重新调用权威结算函数读取每个封存中奖组的返奖，不改模型、票据或选场。
+原方案和预期收益方案每组64元，额外压一场每组32元，不能直接只比较中奖金额。
+最终SP只用于回顾结算，不用于选组。历史已暴露，不构成新的预测或因果结论。
+
+## 各段投入、命中与回收
+
+回收率=返奖/投入，超过100%才盈利。命中期不等于盈利期。
+
+```{r}
+z$summary |> mutate(hit_percent=100*hit_rate,recovery_percent=100*recovery) |>
+ select(policy,block,start_issue,end_issue,groups,winning_groups,hit_percent,
+ hit_issues,profit_issues,stake,gross,net,recovery_percent,ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 中奖后的赔付水平
+
+mean/median_winning_gross为中奖组的总返奖，不是净收益。
+required_mean_gross表示保持当前中奖组数时，每个中奖组平均需返奖多少才能覆盖本段全部投入。
+top3_gross_share为本段返奖最高三个组的占比；net_without_best_group是只去除最高组返奖、
+仍保留全部实际投入的压力检查。复用组并非独立样本。
+
+```{r}
+z$summary |> mutate(top3_percent=100*top3_gross_share) |>
+ select(policy,block,group_cost,mean_winning_gross,median_winning_gross,
+ required_mean_gross,top3_percent,net_without_best_group) |> knitr::kable(digits=2)
+```
+
+## 前段到后段的回收率分解
+
+对于组价不变的同一策略，回收率=组命中率×中奖组平均返奖/组价。
+对称分解把两因素交互项各分一半，两项相加等于回收率变化；单位为百分点。
+这是算术归因，不能证明为什么赔率或命中率发生变化。无中奖组时赔付均值及分解为缺失。
+
+```{r}
+z$change |> select(policy,recovery_change_pp,hit_effect_pp,payout_effect_pp) |> knitr::kable(digits=2)
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+readr::write_csv(z$change,file.path(params$study,"change.csv"))
+```
