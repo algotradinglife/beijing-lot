@@ -70,7 +70,7 @@ def test_overlap_timeout_is_not_reported_as_cash_infeasibility(sample,monkeypatc
     with pytest.raises(RuntimeError,match='optimality'):next_overlap_group(f,[],cutoffs=c,max_uses=2,max_pair_overlap=2)
 
 
-@pytest.mark.parametrize('fixture,count',[('single75_depth_report',384),('cap_depth_grid_report',7104),('reuse_cap_single75_report',576),('reuse_cap_grid_report',3552),('single50_report',144),('repeated_support_report',288),('pure_baseline_report',3456),('expanded_comparison_report',3456),('market_conflict_report',2688),('clean_validation_report',1920),('n7_single_report',120),('n7_compression_report',360),('n7_c2_relax_report',480),('compression_bridge_report',1440),('repeated_double_report',640),('conditional_gap02_report',640),('conditional_gap05_report',640),('conditional_gap10_report',640),('conditional_gapall_report',640)])
+@pytest.mark.parametrize('fixture,count',[('complement_report',22368),('single75_depth_report',384),('cap_depth_grid_report',7104),('reuse_cap_single75_report',576),('reuse_cap_grid_report',3552),('single50_report',144),('repeated_support_report',288),('pure_baseline_report',3456),('expanded_comparison_report',3456),('market_conflict_report',2688),('clean_validation_report',1920),('n7_single_report',120),('n7_compression_report',360),('n7_c2_relax_report',480),('compression_bridge_report',1440),('repeated_double_report',640),('conditional_gap02_report',640),('conditional_gap05_report',640),('conditional_gap10_report',640),('conditional_gapall_report',640)])
 def test_report_archive_restore(tmp_path,fixture,count):
     import subprocess,sys,json,hashlib
     from pathlib import Path

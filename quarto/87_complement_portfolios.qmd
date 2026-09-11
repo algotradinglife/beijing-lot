@@ -1,0 +1,187 @@
+---
+title: "固定预算下寻找互补策略：收益、相关性与回撤"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/complement-grid-v1"
+  archived_report: false
+---
+
+主策略固定为纯基线压两场、概率排序、不替换、U6/P5。同一批已暴露的48期
+100402–100607，每期预算1,024元、起始本金100,000元，不使用专家或比分保护。
+目标是观察另一个策略能否在保留收益的同时减少共同亏损和回撤。
+本轮冻结全部计划后再读取结算，但这些历史已经看过；这是回顾诊断，
+不是新测试集，不将事后筛选结果升级为默认策略，也不完成#421的因果验收。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_drawdown_plot.R')
+source('r/fundamentals_complement.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows)
+stopifnot(nrow(rows)==22368,n_distinct(rows$issue)==48,n_distinct(rows$policy)==466,
+          all(rows$budget_cny==1024),all(rows$stake<=1024))
+comp <- complement_summary(rows,'MAIN',sort(unique(rows$issue)),100000)
+s <- comp$summary
+main <- filter(s,policy=='MAIN')
+standalone <- filter(s,main_budget_cny==0)
+# Report-only screening; does not construct or change any bet.
+screen <- s |> filter(main_budget_cny %in% c(512,768),profit_retained_percent>=80,
+                     spend_retained_percent>=95,drawdown_reduction_cny>0,
+                     source_net_cny>0,source_ex_best_net>0) |>
+  arrange(max_drawdown_cny,desc(net_cny))
+```
+
+## 如何分配实际投注
+
+候选包含原有148种C1/C2、U/P和单选75%替换方案，以及7种新增方案：
+3个候选池seed（41910/41911/41912）、3个在压缩后模型概率最高64组中随机选组的seed、
+1个在同一64组中按模型模拟的联合覆盖增量选组（UNION）。随机方案不是随机修改赛果；
+每组仍为两场单选、五场双选。候选池512、模拟样本1024、设计seed41901固定。
+仅换seed的方案仍保留原不重叠前缀；RANDOM/UNION改变选组顺序，不要求相同前缀。
+
+每个候选分别测试独立投入、主/辅512/512和768/256，加上全额主策略，共466种组合。
+每组按原顺序整体买入，C1组128元、C2组64元。主策略先装入自己的钱包，
+辅策略使用自己的钱包；完全相同的七场及赛果支持只买一次，向后扫描补组。
+未花完的钱保留现金，不跨钱包挪用。新增RANDOM/UNION生成的候选列表可能超过1,024元，
+那是备选持仓，并非实际投入；实际组合全部受1,024元预算约束。
+
+不额外施加跨策略U/P限制，因此总复用和两组重叠可能高于单个策略参数。
+完整组不同但含相同基本注时分别付费、分别结算，下文列出重复基本注数量。
+组合是重新分配后的完整票据，不是把两条全额收益曲线乘权重相加。
+全部基本注2元；命中的完整七串一仅乘一次0.65返奖系数，结算SP不参与选组。
+
+## 主策略与互补筛查
+
+预算收益率分母固定为48×1,024＝49,152元；投注收益率分母为实际投入。
+筛查表保留主策略收益至少80%、实际投入至少95%、回撤下降，且辅策略独立运行
+在剔除自身最大盈利期后仍盈利的组合。门槛仅帮助浏览这批历史，不是未来准入规则。
+不同U/P可能产生相同持仓，不把重复设置视为独立证据。
+
+```{r}
+main |> select(policy,stake_cny,net_cny,budget_ROI_percent,stake_ROI_percent,max_drawdown_cny,
+               budget_used_percent,ex_best_net) |> knitr::kable(digits=2)
+tibble::tibble(screened_combinations=nrow(screen)) |> knitr::kable()
+head(screen,20) |> select(policy,net_cny,budget_ROI_percent,stake_ROI_percent,max_drawdown_cny,
+  profit_retained_percent,spend_retained_percent,source_pearson,pearson,common_loss_percent,
+  ex_best_net,ex_best_lift) |> knitr::kable(digits=2)
+```
+
+source_pearson是辅策略**独立运行**与主策略的逐期净收益相关系数；pearson是实际组合
+与主策略的相关系数。组合含主策略，本来就会偏相关，不能据此判断辅策略的独立性。
+相关性低但持续亏损也没有吸引力。所有比较按同一期配对，不比较累计资金的相关性。
+
+```{r}
+#| label: overview
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 10
+#| fig-height: 6
+ggplot(s,aes(max_drawdown_cny,net_cny,colour=factor(main_budget_cny)))+
+  geom_point(alpha=.65)+geom_point(data=main,shape=8,size=5,colour='black')+
+  labs(x='最大回撤（元）',y='48期净收益（元）',colour='主策略钱包（元）')+
+  theme_minimal(base_family='Noto Sans CJK SC')
+ggplot(standalone,aes(pearson,net_cny,colour=max_drawdown_cny))+
+  geom_point(alpha=.7)+geom_hline(yintercept=0,linetype=2)+
+  labs(x='独立辅策略与主策略的逐期收益 Pearson',y='独立辅策略净收益（元）',colour='最大回撤（元）')+
+  theme_minimal(base_family='Noto Sans CJK SC')
+```
+
+## 随机化是否有帮助
+
+三个seed是固定小样本，不搜索最佳seed，不将偶然获利的seed视为新策略。
+同时展示三者，观察仅换候选池与改变高概率组的选取方法是否有区别。
+
+```{r}
+s |> filter(grepl('SEED_|RANDOM_|UNION_',alternative)) |> arrange(alternative,main_budget_cny) |>
+  select(policy,stake_cny,net_cny,budget_ROI_percent,max_drawdown_cny,source_pearson,
+         pearson,ex_best_net,ex_best_lift,net_when_main_loses) |> knitr::kable(digits=2)
+```
+
+## 代表方案的资金与回撤
+
+下面先展示事前固定的代表方案，再展示筛查表前三个组合。后者是事后示例，不是独立验证。
+全部图起始资金一致，无追加本金。实际投入可能不同；即使达到95%投入保留，
+仍未做逐期完全同投入的现金对照，不能把全部回撤改善都归因于互补。
+
+```{r}
+#| label: representative-curves
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 7
+representatives <- c('D2_U2_P4_BASE','D2_U16_P6_SINGLE75','D1_U4_P5_SINGLE75',
+                     'SEED_41910','RANDOM_Q64_S41910','UNION_Q64')
+for(alt in representatives) {
+  part <- comp$curves |> filter(policy=='MAIN' | alternative==alt) |>
+    mutate(model=alt,label=policy)
+  print(plot_strategy_equity(part,'funded',100000))
+  print(strategy_drawdown_report(part)$plot)
+}
+short <- comp$curves |> filter(policy %in% c('MAIN',head(screen$policy,3))) |>
+  mutate(model='事后筛查示例',label=policy)
+print(plot_strategy_equity(short,'funded',100000))
+print(strategy_drawdown_report(short)$plot)
+```
+
+## 共同亏损与尾部依赖
+
+共同亏损率是双方净收益均小于零的期数/48。主策略最差连续5/10期使用同一时间窗口，
+观察辅策略在主策略低谷时的表现。ex_best_net剔除各策略自身最大盈利期；
+ex_best_lift剔除相对主策略增益最大的一期，两者不同。
+前/后24期均已暴露，不称为训练/测试。相关系数在常数序列上显示NA。
+
+```{r}
+s |> arrange(main_budget_cny,desc(net_cny)) |>
+  select(policy,source_pearson,source_spearman,pearson,spearman,pearson_without_best,
+         common_loss_percent,net_when_main_loses,wins_when_main_loses,main_worst5_net,main_worst10_net,
+         ex_best_net,best_issue,ex_best_lift,largest_lift_issue,first24_net,last24_net) |>
+  knitr::kable(digits=2)
+```
+
+## 全部财务与持仓暴露
+
+```{r}
+s |> arrange(main_budget_cny,desc(net_cny)) |>
+  select(policy,stake_cny,cash_cny,net_cny,budget_ROI_percent,stake_ROI_percent,max_drawdown_cny,
+         budget_used_percent,groups,hits,profitable_issues,average_fixture_hhi,
+         maximum_fixture_uses,maximum_pair_overlap,duplicate_ticket_units) |> knitr::kable(digits=2)
+```
+
+HHI按各场在组中的出现次数占比平方和计算，不等同于赛果或返奖相关性。
+不同赛果票据共享同场比赛，仍共享风险，不能把组数当成独立试验次数。
+
+## 每期结果与表结构
+
+```{r}
+dplyr::glimpse(rows)
+head(rows,6) |> knitr::kable(digits=2)
+rows |> filter(policy %in% c('MAIN',head(screen$policy,3))) |>
+  arrange(issue,policy) |> select(issue,policy,stake,cash_cny,groups,hits,net,
+                                budget_cny) |>
+  mutate(budget_ROI_percent=100*net/budget_cny) |> knitr::kable(digits=2)
+```
+
+## 可复现接口与证据
+
+Python生成、组装、结算使用 `src/fundamentals_complement.py` 的
+`complementary_sources`、`complement_catalog`、`allocate_complement`、`settle_complements`；
+复用原压缩/分组/结算实现。前三个接口显式接收每场原生cutoff，拒绝错配和篡改；
+结算接口只处理已冻结持仓。R的 `complement_summary` 整理已结算逐期数据，不学习或发信号。
+新历史数据上的学习、seed/权重选择必须走 `src/temporal_learning`，本诊断接口不能替代它。
+
+运行分为init、两个freeze分片、全量seal、两个settle分片、report；
+独立 `scripts/check_complement_grid.py` 重算完整基本注、钱包分配、去重、返奖及旧策略回归。
+移植的归档仅证明报告可重渲染，不冒充完整模型重放。
+
+```{r}
+verified$receipt$plan_freeze_seal
+verified$receipt$parameters
+```
