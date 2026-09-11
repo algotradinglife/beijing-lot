@@ -44,7 +44,8 @@ def test_no_bet_and_paired_draws(source):
     assert random_reuse_plan(b,**kw)['swap_ledger']==[]
 
 
-def test_six_leg_two_single_price_and_repeat(source):
+@pytest.mark.parametrize("single_rate,double_rate",[(1,1),(.1,0)])
+def test_six_leg_two_single_price_and_repeat(source,single_rate,double_rate):
     plan,cuts=source
     b=paired_double_source(plan,cutoffs=cuts,double_source='BASELINE',budget_cny=1024,unit_cny=2,payout_factor=.65)
     part=b['components'][0];part.pop('seal');part['legs']=[r for r in part['legs'] if r['slot']!=6]
@@ -52,8 +53,9 @@ def test_six_leg_two_single_price_and_repeat(source):
     part['tickets']=[dict(group=1,code=''.join(c),units=1) for c in itertools.product(*(r['support'] for r in part['legs']))]
     part['seal']=stable_json_hash(part)
     b.pop('seal');b.update(components=[copy.deepcopy(part),copy.deepcopy(part)],stake=64,cash_cny=960);b['seal']=stable_json_hash(b)
-    z=random_reuse_plan(b,cutoffs=cuts,seed=0,single_probability=1,double_probability=1,group_size=6,budget_cny=1024,unit_cny=2,payout_factor=.65)
+    z=random_reuse_plan(b,cutoffs=cuts,seed=0,single_probability=single_rate,double_probability=double_rate,group_size=6,budget_cny=1024,unit_cny=2,payout_factor=.65)
     assert z['stake']==64 and z['cash_cny']==960
     assert all(len(p['tickets'])==16 for p in z['components'])
-    assert [x['swapped'] for x in z['swap_ledger']]==[False]*6+[True]*6
+    assert all(x['swapped']==(x['eligible'] and x['draw']<(single_rate if x['single'] else double_rate)) for x in z['swap_ledger'])
+    assert all(x['support']==x['original'] for x in z['swap_ledger'] if not x['eligible'] or (not x['single'] and double_rate==0))
     with pytest.raises(ValueError):random_reuse_plan(b,cutoffs=cuts,seed=0,single_probability=1,double_probability=1,group_size=7,budget_cny=1024,unit_cny=2,payout_factor=.65)

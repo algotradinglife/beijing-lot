@@ -34,7 +34,7 @@ def test_n5_full_budget_no_binding_reuse_cap(base):
     assert all(Counter(r['role'] for r in c['legs'])==dict(A=2,D=2,C=1) and c['stake']==16 and len(c['tickets'])==8 for c in p['components'])
 
 
-@pytest.mark.parametrize('probability',[0,.25,1])
+@pytest.mark.parametrize('probability',[0,.1,.25,1])
 def test_only_reused_singles_change(base,probability):
     p,cuts=base;before=copy.deepcopy(p)
     kw=dict(cutoffs=cuts,seed=7,single_probability=probability,double_probability=0,group_size=5,budget_cny=1024,unit_cny=2,payout_factor=.65)
