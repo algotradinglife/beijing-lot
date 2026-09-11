@@ -1,0 +1,12 @@
+source(file.path('..','..','r','fundamentals_event_strata.R'))
+testthat::test_that('fixed strata preserve full denominators and missingness',{
+ o<-tibble::tibble(issue=c('001','002'),slot=1,provider_id=c('007','008'),model='baseline',event='ordinary_draw',probability=c(.2,.4),observed=c(TRUE,FALSE),handicap=0)
+ f<-dplyr::select(o,issue,slot,provider_id) |> dplyr::mutate(competition='A',cup=0,neutral=0,history_mode='SAME_ROLE',market_total=c(NA,2.5),giving_overall_ppg=0,giving_venue_ppg=.5,home_overall_goals_for_pg=1,away_overall_goals_for_pg=2,home_venue_goals_against_pg=1,away_venue_goals_against_pg=1,giving_big_win_rate=.1)
+ s<-event_strata(o,f)
+ testthat::expect_equal(dplyr::n_distinct(s$dimension),13L)
+ testthat::expect_true(all((s |> dplyr::group_by(dimension) |> dplyr::summarise(n=sum(n)))$n==2))
+ testthat::expect_equal((s |> dplyr::filter(dimension=='market_total_band',stratum=='MISSING'))$n,1L)
+ testthat::expect_equal((s |> dplyr::filter(dimension=='league'))$error_pp,20)
+ testthat::expect_error(event_strata(o,f[-1,]))
+ testthat::expect_error(event_strata(o,dplyr::bind_rows(f,f[1,])))
+})

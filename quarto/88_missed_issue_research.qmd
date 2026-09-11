@@ -1,0 +1,172 @@
+---
+title: "未中期归因、基本面概率偏差与N6/N7对照"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/missed-research-v2"
+  archived_report: false
+---
+
+这48期100402–100607为已经暴露的历史诊断，不是新验证集，不调整默认策略或重训专家。
+全部可用场次用于概率校准；未中期只用于失败归因。基本面沿用已批准的Titan主源流程，
+Nowscore用于补缺和核验。来源是现存清洗快照，本轮没有重新抓取或把未知跨级信息补成事实。
+
+主要结论：N6提高整期命中频率，但本样本收益显著低于原N7；按赛前支持概率删弱场降低回撤，
+同时牺牲较多收益。概率方面，基线明显低估让球方打穿，市场映射更接近实际；
+普通平局和总进球至少5球的总体频率较接近，仍需看分层而非统一调高。
+这些差异不能直接作为未来概率修正幅度，#419仍需#421因果验收。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_missed_issues.R')
+source('r/fundamentals_event_calibration.R')
+source('r/fundamentals_event_strata.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_drawdown_plot.R')
+source('r/fundamentals_missed_summary.R')
+v<-read_pure_baseline_report(params$study,params$archived_report)
+z<-v$result
+rows<-tibble::as_tibble(z$rows)
+audit<-tibble::as_tibble(z$audit)
+attr<-missed_issue_diagnostics(tibble::as_tibble(z$legs),audit)
+cal<-event_calibration(tibble::as_tibble(z$events),audit)
+strata<-event_strata(cal$observations,tibble::as_tibble(z$features))
+summary<-missed_strategy_summary(rows,sort(unique(rows$issue)),100000)
+stopifnot(nrow(rows)==288,n_distinct(rows$issue)==48,n_distinct(rows$policy)==6,
+ n_distinct(cal$observations$issue)==48,
+ nrow(distinct(cal$observations,issue,slot,provider_id))==2561)
+```
+
+## 整期未中原因
+
+```{r}
+attr$issues |> summarise(issues=n(),missed=sum(whole_issue_missed),
+ one_away=sum(whole_issue_missed & nearest_misses==1),two_plus=sum(whole_issue_missed & nearest_misses>=2)) |> knitr::kable()
+attr$groups |> inner_join(filter(attr$issues,whole_issue_missed) |> select(issue),by='issue') |>
+ count(single_error=single_misses>0,double_error=double_misses>0,name='groups') |> knitr::kable()
+attr$issues |> knitr::kable()
+```
+
+25个未中期中19期至少有一组只差一场。这是事后可挽救空间，并不代表能在赛前识别那场。
+单选错误和双选错误可以同时出现在同一组，不能把两者发生率简单相加。
+
+```{r}
+attr$fixtures |> inner_join(select(attr$issues,issue,whole_issue_missed,total_groups=groups),by='issue') |>
+ filter(whole_issue_missed,groups_missed>0) |> mutate(affected_percent=100*groups_missed/total_groups) |>
+ arrange(desc(affected_percent),issue,slot) |> head(30) |>
+ left_join(select(audit,issue,slot,provider_id,home,away,handicap,actual_home,actual_away),
+ by=c('issue','slot','provider_id'),relationship='many-to-one') |> knitr::kable(digits=2)
+```
+
+上表的groups_missed是包含该错误场的组数，不是移除该场后必然获救的组数；同组可能还有其他错误。
+所有复用均按实际持仓计数，概率校准时每个期次场次只计一次。
+
+## 全体场次的事件概率校准
+
+```{r}
+cal$summary |> knitr::kable(digits=2)
+```
+
+error_pp＝实际频率−平均预测概率，正值表示本样本低估，负值表示高估。
+普通平为原比分相等；让平为加入北单让球后相等。giving_cover仅在非零让球的1223场中定义，
+表示让球方打穿，不等于所有比赛的主胜。home/away_ge2、ge3是净胜球，不是单队进球数。
+全部比分事件分别从未调整基线和欧赔＋大小球市场网格求和，不使用专家输出替代纯基线。
+
+```{r}
+#| label: calibration
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 11
+#| fig-height: 6
+strata |> filter(dimension=='probability_band',event %in% c('ordinary_draw','handicap_draw','giving_cover','home_ge3')) |>
+ ggplot(aes(predicted_percent,actual_percent,colour=model,size=n))+
+ geom_abline(slope=1,intercept=0,linetype=2)+geom_point()+facet_wrap(~event)+
+ labs(x='平均预测概率（%）',y='实际频率（%）',size='场次',colour='分布')+
+ theme_minimal(base_family='Noto Sans CJK SC')
+```
+
+## 基本面分层
+
+分层固定为联赛、杯赛、场地模式、让球深度、预测概率、市场总进球、近期整体/主客积分差、
+近期进球和主客失球、历史大胜率。每个维度单独统计，不能把各维度行数相加作为新样本量。
+缺失值单列MISSING。小样本、同联赛/球队相关性和多重比较均限制解释，未作独立伯努利显著性宣称。
+
+`giving_overall_ppg`和`giving_venue_ppg`是让球方相对接球方的积分差，单位为分/场，
+并非让球方自身场均积分。本报告明确命名为ppg_gap，原冻结数据不改写。
+handicap_depth的2表示2及以上；competition_type的OTHER不保证全部为联赛。
+现存特征没有独立的跨级联赛身份字段，杯赛不等于跨级，不能据此声称已验证跨级效应。
+
+```{r}
+strata |> filter(event=='giving_cover',dimension %in% c('handicap_depth','competition_type','giving_overall_ppg_gap','giving_venue_ppg_gap','market_total_band')) |>
+ arrange(dimension,stratum,model) |> knitr::kable(digits=2)
+```
+
+```{r}
+strata |> filter(event %in% c('ordinary_draw','handicap_draw','home_ge3','away_ge3','total_ge5'),
+ dimension %in% c('home_scoring','away_scoring','home_venue_conceding','away_venue_conceding','giving_historical_big_win')) |>
+ arrange(event,dimension,stratum,model) |> knitr::kable(digits=2)
+```
+
+<details><summary>全部十三维分层表（含小样本与缺失）</summary>
+
+```{r}
+strata |> arrange(event,dimension,stratum,model) |> knitr::kable(digits=2)
+```
+
+</details>
+
+## 六种固定预算策略
+
+每期预算1024元、起始资金100000元，基本注2元，中奖完整串关只乘一次0.65。
+N7为原压两场U6/P5；N6候选从同seed41900、512个N7候选的六场子集产生，
+加入按TOP2概率排序的不重叠六场前缀，再用U6/P5扩组；单选位置按TOP1概率决定。
+因此N6并非只改变串关长度，候选集、前缀、组数也变化，不能把全部差异归因于N本身。
+
+N6_C1每组64元、N6_C2每组32元；DROP删除原N7每组支持概率最低的一场，
+其余赛果不变、相同完整持仓去重、不补组，因此成本可能不同。
+MIX_C1/C2固定给N7和对应N6各512元，按各自原顺序装入完整组，现金不跨钱包挪用。
+混合后没有额外跨策略U/P限制，不把各组视为独立试验。
+所有288份计划在本轮结算前冻结；结算SP只参与返奖，不参与选场。
+
+```{r}
+summary$summary |> knitr::kable(digits=2)
+```
+
+预算ROI除以48×1024，投注ROI除以实际投入。整期命中指至少中一组，未必当期盈利。
+现金、中奖组数、最长连续未中期数一并展示。删弱场回撤降低不能脱离其收益及投入变化解释。
+
+```{r}
+#| label: capital
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 7
+plot_strategy_equity(summary$curves,'funded',100000)
+strategy_drawdown_report(summary$curves)$plot
+```
+
+```{r}
+rows |> arrange(issue,policy) |> mutate(budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,stake,cash_cny,net,budget_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 数据结构、风险与复现
+
+```{r}
+glimpse(tibble::as_tibble(z$features))
+head(tibble::as_tibble(z$features) |> select(issue,slot,provider_id,competition,handicap,
+ home_overall_goals_for_pg,away_overall_goals_for_pg,giving_overall_ppg,market_total)) |> knitr::kable(digits=2)
+v$receipt$plan_freeze_seal
+```
+
+生成和票据模块在src，分析函数在r；QMD只声明输入、调用函数并呈现结果。
+归档只允许重渲染，不代表完整模型重放。可移植夹具保留本报告所有输入，原始页面没有改写。
+历史可用性沿用已披露的代理时间证据，不能授权新的因果使用。
+任何未来学习、分层门槛/权重选择都必须使用共享temporal_learning和显式cutoff；本轮没有拟合。
+研究异常台账见docs/research/missed_issue_research.md。
