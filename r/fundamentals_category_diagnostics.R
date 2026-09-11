@@ -26,7 +26,7 @@ category_diagnostics <- function(factors,features,legs,audit,issues) {
  top<-codes[order_p[,1]]
  pair<-paste0(ifelse(order_p[,3]!=1,'3',''),ifelse(order_p[,3]!=2,'1',''),ifelse(order_p[,3]!=3,'0',''))
  f<-f |> dplyr::mutate(
-  period=ifelse(hits==0,'MISS25','HIT23'),
+  period=ifelse(hits==0,'MISSED','HIT'),
   conflict=ifelse(order_p[,1]==max.col(qm,ties.method='first'),'AGREE',
    ifelse(rowSums(abs(pm-qm))/2>=.15,'STRONG_DIFF','MILD_DIFF')),
   depth=as.character(pmin(abs(handicap),2)),league=trimws(competition),
@@ -50,7 +50,7 @@ category_diagnostics <- function(factors,features,legs,audit,issues) {
    predicted=p_W*grepl('3',support)+p_D*grepl('1',support)+p_L*grepl('0',support),
    market=q_W*grepl('3',support)+q_D*grepl('1',support)+q_L*grepl('0',support),
    probability_band=as.character(cut(predicted,c(0,.5,.6,.7,.8,.9,1),include.lowest=TRUE)))
- sliced<-dplyr::bind_rows(dplyr::mutate(x,slice='ALL48'),dplyr::mutate(x,slice=period))
+ sliced<-dplyr::bind_rows(dplyr::mutate(x,slice='ALL'),dplyr::mutate(x,slice=period))
  dims<-c('conflict','depth','league','family','total_gap','venue_ppg_gap','history_n','probability_band')
  long<-sliced |> dplyr::select(issue,slot,provider_id,view,slice,role,hit,predicted,market,one_away_blocker,dplyr::all_of(dims)) |>
   tidyr::pivot_longer(dplyr::all_of(dims),names_to='dimension',values_to='stratum') |>

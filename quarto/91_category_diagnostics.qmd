@@ -6,7 +6,7 @@ execute:
   freeze: false
   error: false
 params:
-  study: "data/derived/fundamentals_417/category-diagnostics-v1"
+  study: "data/derived/fundamentals_417/category-diagnostics-v2"
   archived_report: false
 ---
 
@@ -53,7 +53,7 @@ error_pp为实际减基线预测。STRONG_DIFF是两源最高方向不同且总�
 MILD_DIFF方向不同但未达此距离。固定分箱仅作描述，不拟合、不据此发布策略。
 
 ```{r}
-s |> filter(slice=='ALL48',dimension=='conflict') |>
+s |> filter(slice=='ALL',dimension=='conflict') |>
  select(view,role,stratum,n,issues,actual_percent,predicted_percent,market_percent,error_pp) |>
  knitr::kable(digits=1)
 ```
@@ -63,7 +63,7 @@ s |> filter(slice=='ALL48',dimension=='conflict') |>
 depth 2表示绝对让球≥2，不代表主队一定让球。
 
 ```{r}
-s |> filter(view=='SELECTED_UNIQUE',slice=='ALL48',dimension %in% c('depth','probability_band')) |>
+s |> filter(view=='SELECTED_UNIQUE',slice=='ALL',dimension %in% c('depth','probability_band')) |>
  select(role,dimension,stratum,n,issues,actual_percent,predicted_percent,market_percent,error_pp) |> knitr::kable(digits=1)
 ```
 
@@ -75,9 +75,9 @@ competition仅去前后空格，未合并异名或纠正原数据。所有具体
 n≥30且至少5期只是阅读参考，不是显著性或准入标准。
 
 ```{r}
-s |> filter(view=='SELECTED_UNIQUE',slice=='ALL48',dimension=='family') |>
+s |> filter(view=='SELECTED_UNIQUE',slice=='ALL',dimension=='family') |>
  select(role,stratum,n,issues,actual_percent,predicted_percent,error_pp) |> knitr::kable(digits=1)
-s |> filter(view %in% c('ALL_AVAILABLE','SELECTED_UNIQUE'),slice=='ALL48',dimension=='league') |>
+s |> filter(view %in% c('ALL_AVAILABLE','SELECTED_UNIQUE'),slice=='ALL',dimension=='league') |>
  mutate(reference_sample=n>=30 & issues>=5) |> arrange(role,stratum,view) |>
  select(view,role,stratum,n,issues,reference_sample,actual_percent,predicted_percent,error_pp) |> knitr::kable(digits=1)
 ```
@@ -90,7 +90,7 @@ giving_venue_ppg是让球方相对接球方的近期主客场场均积分差，�
 这些下注场的双方主客历史最低样本数都是10，无法在本批数据比较样本深度影响。
 
 ```{r}
-s |> filter(view=='SELECTED_UNIQUE',slice=='ALL48',dimension %in% c('venue_ppg_gap','total_gap','history_n')) |>
+s |> filter(view=='SELECTED_UNIQUE',slice=='ALL',dimension %in% c('venue_ppg_gap','total_gap','history_n')) |>
  select(role,dimension,stratum,n,issues,actual_percent,predicted_percent,market_percent,error_pp) |> knitr::kable(digits=1)
 ```
 
@@ -101,9 +101,9 @@ s |> filter(view=='SELECTED_UNIQUE',slice=='ALL48',dimension %in% c('venue_ppg_g
 不是独立样本增加，也不能证明事先限次必然改善收益。
 
 ```{r}
-s |> filter(slice %in% c('MISS25','HIT23'),view!='ALL_AVAILABLE',dimension=='conflict') |>
+s |> filter(slice %in% c('MISSED','HIT'),view!='ALL_AVAILABLE',dimension=='conflict') |>
  select(view,slice,role,stratum,n,issues,actual_percent,predicted_percent,one_away_blockers) |> knitr::kable(digits=1)
-s |> filter(view=='HOLDINGS',slice=='MISS25',dimension %in% c('depth','family','conflict')) |>
+s |> filter(view=='HOLDINGS',slice=='MISSED',dimension %in% c('depth','family','conflict')) |>
  select(role,dimension,stratum,n,misses,one_away_blockers) |> knitr::kable()
 ```
 

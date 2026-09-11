@@ -8,7 +8,7 @@ from src.fundamentals_clean_receipts import verify_clean_file_bindings
 from src.temporal_learning.provenance import verify_implementation_closure
 
 if __name__=='__main__':
- root=Path('data/derived/fundamentals_417/category-diagnostics-v1')
+ root=Path('data/derived/fundamentals_417/category-diagnostics-v2')
  seal=json.loads((root/'plans-frozen.json').read_text());assert hashlib.sha256(seal['canonical_json'].encode()).hexdigest()==seal['seal'];receipt=json.loads(seal['canonical_json'])
  verify_clean_file_bindings({**receipt['source_hashes'],**receipt['report_files']},repository_root=Path.cwd());verify_implementation_closure(Path.cwd(),receipt['implementation'])
  assert hashlib.sha256((root/'results.json').read_bytes()).hexdigest()==receipt['result_sha256']
@@ -36,7 +36,7 @@ if __name__=='__main__':
    conflict='AGREE' if np.argmax(p)==np.argmax(q) else 'STRONG_DIFF' if sum(abs(x-y) for x,y in zip(p,q))/2>=.15 else 'MILD_DIFF'
    item=dict(issue=row['issue'],view=view,role='SINGLE' if len(row['support'])==1 else 'DOUBLE',conflict=conflict,depth=str(min(abs(f['handicap']),2)),league=competition.strip(),family=family,history_n=str(min(feature['home_venue_n'],feature['away_venue_n'])),
     hit=dict(W='3',D='1',L='0')[a['actual_direction']] in row['support'],predicted=sum(p['310'.index(c)] for c in row['support']),market=sum(q['310'.index(c)] for c in row['support']),one_away_blocker=row['one_away_blocker'])
-   for period in ['ALL48','MISS25' if states[row['issue']]==0 else 'HIT23']:records.append(dict(item,slice=period))
+   for period in ['ALL','MISSED' if states[row['issue']]==0 else 'HIT']:records.append(dict(item,slice=period))
  x=pd.DataFrame(records);saved=pd.read_csv(root/'summary.csv',dtype={'stratum':str})
  checked=0
  for dim in ['conflict','depth','league','family','history_n']:

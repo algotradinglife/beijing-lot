@@ -12,7 +12,7 @@ testthat::test_that('diagnosis separates complete cohort, unique supports and re
  z<-category_diagnostics(f,features,legs,audit,issues)
  testthat::expect_equal(as.integer(table(z$observations$view)),c(28L,21L,14L))
  testthat::expect_equal(sum(z$observations$one_away_blocker),2L)
- s<-z$summary |> dplyr::filter(view=='SELECTED_UNIQUE',slice=='ALL48',role=='SINGLE',dimension=='conflict')
+ s<-z$summary |> dplyr::filter(view=='SELECTED_UNIQUE',slice=='ALL',role=='SINGLE',dimension=='conflict')
  testthat::expect_equal(s$n,4L);testthat::expect_equal(s$actual_percent,75)
  testthat::expect_equal(s$predicted_percent,60);testthat::expect_equal(s$stratum,'STRONG_DIFF')
  features$competition[1]<-NA_character_

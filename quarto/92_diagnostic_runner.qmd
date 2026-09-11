@@ -1,0 +1,57 @@
+---
+title: "基本面与下注支持诊断"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  diagnostics: null
+---
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_diagnostic_runner.R')
+if(is.null(params$diagnostics)) stop('Supply diagnostics output directory')
+v<-read_category_diagnostic_output(params$diagnostics)
+s<-tibble::as_tibble(v$data$summary)
+```
+
+## 范围与分母
+
+本报告为结算后诊断，不生成下注建议，不拟合、不选择门槛、不授权前瞻使用。
+本次共 `r v$receipt$issues` 期，其中 `r v$receipt$missed_issues` 期原方案未中。
+ALL_AVAILABLE为全部可用比赛的Top1/Top2对照；SELECTED_UNIQUE为实际投注同场同支持去重；
+HOLDINGS为重复持仓。同场可同时属于单选和双选，不得相加当作独立比赛数。
+MISSED按结算结果划分，不能作为赛前条件。market_percent是市场对同一支持的概率。
+
+## 类别命中与概率偏差
+
+STRONG_DIFF表示两源最高方向不同且总变差≥0.15。depth=2表示绝对让球≥2。
+cup字段仅是原标签，不等同于干净的联赛/杯赛/跨级分类；友谊和名称含“附”者单列。
+giving_venue_ppg是给球方相对接球方的近期主客场积分差；无让球单列。
+固定分箱只用于描述，样本量、涉及期数都展示，不自动剔除小样本。
+
+```{r}
+s |> filter(view=='SELECTED_UNIQUE',slice=='ALL',dimension!='league') |> knitr::kable(digits=2)
+s |> filter(view %in% c('ALL_AVAILABLE','SELECTED_UNIQUE'),slice=='ALL',dimension=='league') |> knitr::kable(digits=2)
+```
+
+## 重复持仓与差一场的错误
+
+one_away_blockers仅在HOLDINGS中计数；组、场次、期次是不同单位。
+不同分层维度重叠，不可累加成总贡献。
+
+```{r}
+s |> filter(view!='ALL_AVAILABLE',slice!='ALL',dimension=='conflict') |> knitr::kable(digits=2)
+tibble::as_tibble(v$data$original_issues) |> knitr::kable()
+tibble::as_tibble(v$data$original_groups) |> knitr::kable()
+```
+
+## 全量分层与来源
+
+```{r}
+s |> knitr::kable(digits=2)
+v$receipt[c('source_seal','archived_input','generated_at_utc')]
+```
