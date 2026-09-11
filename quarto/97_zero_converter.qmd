@@ -1,0 +1,75 @@
+---
+title: "仅零让球转换：固定原组的删组对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/zero-converter-v2"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-tibble::as_tibble(v$rows)
+z<-missed_strategy_summary(rows,unlist(v$issue_order),100000)
+```
+
+## 对照口径
+
+48期已曝光历史的固定规则诊断，无训练、无新样本验证。
+所有原组保持原样；ZERO仅删除转换位北单让球非零的转换组；
+ALL保留原方案全部组。这里的零让球仅指C转换位，不要求其余六场也零让球。
+释放预算留作现金，不重新选场、不补组、不转移预算。
+因此检验的是过滤效果，不是从零让球候选重新优化的组合表现。
+
+配对COMPLEMENT与独立INDEPENDENT各预算比例分别对照。
+输入为散列绑定的既有历史方案，只作为既有证据使用，不宣称重放旧模型的当前实现。
+每期总预算1024元、初始资金100000元、每注2元、整票一次0.65结算系数。
+所有过滤方案冻结后才读取结算；原生截止对象与原计划逐场一致。
+历史代理时间不证明真实同一出票时刻可执行。无比分保护。
+
+## 收益与回撤
+
+```{r}
+z$summary |> knitr::kable(digits=2)
+```
+
+## 转换组本身：零让球与非零让球
+
+以下仅用ALL方案，避免ZERO重复计算。同一场在不同组复用，会多次计入组数。
+这是七场整组收益，不能当作C位置单场命中率。
+
+```{r}
+tibble::as_tibble(v$components) |>
+ filter(grepl("_ALL$",policy),complement) |>
+ mutate(handicap_class=if_else(handicap==0,"零让球","非零让球")) |>
+ group_by(policy,handicap_class) |>
+ summarise(groups=n(),hits=sum(hit),stake=sum(stake),gross=sum(gross),net=sum(net),
+ ROI_percent=100*sum(net)/sum(stake),.groups="drop") |> knitr::kable(digits=2)
+```
+
+## 逐期表现
+
+```{r}
+rows |> mutate(stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,stake,cash_cny,gross,net,stake_ROI_percent,budget_ROI_percent) |>
+ knitr::kable(digits=2)
+```
+
+## 曲线
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+```
