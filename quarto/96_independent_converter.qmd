@@ -1,0 +1,84 @@
+---
+title: "32元转换组独立扩组：固定预算配比测试"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/independent-converter-v1"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-tibble::as_tibble(v$rows)
+z<-missed_strategy_summary(rows,unlist(v$issue_order),100000)
+```
+
+## 固定设计
+
+48期已曝光历史，同期同一概率和结算快照，不训练、不调阈值。
+每期总预算1024元，初始资金10万元，2元单位，整张票一次0.65系数。
+不使用比分保护；未花资金保留现金，不计作返还。
+
+原组2单5双=64元；独立转换组3单4双=32元。
+共同角色为2个首选一致且市场概率>=50%的胆、4个Top2集合一致的双选、
+1个Top2集合不同的转换位。转换组对该位取基线遗漏的第三赛果，
+其余六场重新选择，无绑定配对，不保证每场至少一组覆盖。
+
+排序：A胆按市场首选概率；D双选按市场Top2之和；
+原组C按基线Top2之和；转换组C按市场对基线遗漏赛果的概率。
+因此独立扩组同时测试了转换位的针对性排序，不把改善全归于组数。
+整体对数和仅作为固定排序准则，不是已校准的组命中率。
+
+转换组预算比例固定0%、25%、50%、75%、100%。按各类型已花/目标预算较小者
+轮流生成，平手先原组；每组都重新优化七场。不可转移类型预算、不得超支。
+预算配额全部是整组成本的倍数；没有合格组合就停止，报告实际投入和留存现金。
+
+先全不重叠，证明不可行后允许重复；所有实际组统一每场最多6次、两组交集最多5场，
+没有配对豁免。每一步求解需证明最优/无解，不声称全组合最优。
+上一轮PRIMARY_FILL、COMPLEMENT和旧压2为散列绑定的历史对照，
+不是重新训练或按当前实现冒充重放；其实际持仓限制与独立扩组不同。
+
+## 汇总与资金效率
+
+```{r}
+z$summary |> knitr::kable(digits=2)
+```
+
+## 逐期收益率和组数
+
+```{r}
+rows |> mutate(stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,stake,cash_cny,gross,net,stake_ROI_percent,budget_ROI_percent) |>
+ knitr::kable(digits=2)
+```
+
+## 权益与回撤
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="距此前高点回撤（元）",color="方案")+theme_minimal()
+```
+
+## 支持量与边界
+
+A/D候选可能交叉，单组角色互斥。候选不足不降低门槛。
+本报告不自动推广表现最高的配比。需区分胜率下降、组数增加、
+资金暴露和大额单期收益的影响；过去已曝光样本不是新测试集。
+所有方案按原生场次截止时点绑定，未证明能在一个真实出票时刻同时执行。
+
+```{r}
+tibble::as_tibble(v$pools) |> select(-skeletons) |> knitr::kable()
+tibble(input_seal=v$upstream_freeze_seal,scope="EXPOSED_FIXED_NO_FITTING",
+ initial_capital_cny=100000) |> knitr::kable()
+```

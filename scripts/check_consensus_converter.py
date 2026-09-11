@@ -29,20 +29,35 @@ if __name__=="__main__":
     audit=json.loads(Path(next(iter(audits))).read_text())["rows"]
     labels={(a["issue"],a["slot"],a["provider_id"]):a for a in audit}
     saved={(a["issue"],a["policy"]):a for a in result["rows"]}
-    assert len(saved)==192
+    assert len(saved)==(384 if r["design"]=="independent" else 192)
     groups_checked=0
     for issue in r["issues"]:
         z=json.loads(gzip.decompress((root/"plans"/f"{issue}.json.gz").read_bytes()))
         assert stable_json_hash({k:v for k,v in z.items() if k!="seal"})==z["seal"]
         sk=z["skeletons"]
-        assert max(Counter(s for g in sk for s in g).values(),default=0)<=3
-        assert all(len(set(a)&set(b))<=5 for a,b in itertools.combinations(sk,2))
         plans=z["plans"]
-        primaries=[part for part in plans["COMPLEMENT"]["components"] if not part["complement"]]
-        assert primaries==plans["MATCHED_PRIMARY"]["components"]
-        old=Path("data/derived/fundamentals_417/cap-depth-grid-v1/plans")/f"{issue}.json.gz"
-        original=json.loads(gzip.decompress(old.read_bytes()))["D2_U6_P5_BASE"]["plan"]
-        plans=dict(plans,OLD_D2_U6_P5=dict(components=[original],stake=original["stake"],cash_cny=original["cash_cny"]))
+        if r["design"]=="paired":
+            assert max(Counter(s for g in sk for s in g).values(),default=0)<=3
+            assert all(len(set(a)&set(b))<=5 for a,b in itertools.combinations(sk,2))
+            primaries=[part for part in plans["COMPLEMENT"]["components"] if not part["complement"]]
+            assert primaries==plans["MATCHED_PRIMARY"]["components"]
+            old=Path("data/derived/fundamentals_417/cap-depth-grid-v1/plans")/f"{issue}.json.gz"
+            original=json.loads(gzip.decompress(old.read_bytes()))["D2_U6_P5_BASE"]["plan"]
+            plans=dict(plans,OLD_D2_U6_P5=dict(components=[original],stake=original["stake"],cash_cny=original["cash_cny"]))
+        else:
+            for env in plans.values():
+                actual_groups=[{leg["slot"] for leg in part["legs"]} for part in env["components"]]
+                assert max(Counter(s for g in actual_groups for s in g).values(),default=0)<=6
+                assert all(len(a&b)<=5 for a,b in itertools.combinations(actual_groups,2))
+                alloc=env["allocation"]
+                for kind,label in [(False,"primary"),(True,"converter")]:
+                    actual_spend=sum(p["stake"] for p in env["components"] if p["complement"]==kind)
+                    assert actual_spend==alloc[label+"_spend_cny"]<=alloc[label+"_quota_cny"]
+            previous=json.loads((Path(r["reference_root"])/"results.json").read_text())
+            for reference in previous["rows"]:
+                if reference["issue"]==issue and reference["policy"] in ["PRIMARY_FILL","COMPLEMENT","OLD_D2_U6_P5"]:
+                    expected=dict(reference,policy="PREVIOUS_"+reference["policy"])
+                    assert saved[issue,expected["policy"]]==expected
         for name,env in plans.items():
             gross=0.;hits=0;stake=0;groups=0
             for part in env["components"]:
@@ -83,4 +98,4 @@ if __name__=="__main__":
             assert math.isclose(gross,s["gross"],abs_tol=1e-7)
             assert math.isclose(gross-stake,s["net"],abs_tol=1e-7)
             groups_checked+=groups
-    print("PASS 192 policy/issue results;",groups_checked,"groups; Cartesian tickets, role eligibility, budgets, caps and one-factor payouts")
+    print("PASS",len(saved),"policy/issue results;",groups_checked,"groups; Cartesian tickets, role eligibility, budgets, caps and one-factor payouts")

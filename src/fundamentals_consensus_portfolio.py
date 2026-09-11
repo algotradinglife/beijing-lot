@@ -49,6 +49,86 @@ def consensus_component(frame, roles, *, cutoffs, complement, unit_cny, payout_f
     return dict(**part, seal=stable_json_hash(part))
 
 
+def consensus_candidates(frame, *, cutoffs, minimum_anchor_market, converter_market):
+    """Validated A/D/C eligibility and fixed score objectives; no fit or labels.
+
+    Pure arrays in slot order; explicit per-fixture Cutoffs are validated by the
+    authoritative rank API. C uses baseline Top2 for primary groups, market
+    probability of excluded baseline outcome for independent converter groups.
+    """
+    if type(converter_market) is not bool or not 0 < minimum_anchor_market < 1:
+        raise ValueError("Explicit converter mode and anchor threshold required")
+    ranked, bound = rank_double_candidates(frame, cutoffs=cutoffs)
+    ranked = ranked.sort_values("slot")
+    rows = ranked.to_dict("records")
+    slots = [int(r["slot"]) for r in rows]
+    n = len(rows)
+    eligibility = np.zeros((n, 3))
+    objective = np.zeros((n, 3))
+    for i, r in enumerate(rows):
+        p = sorted(range(3), key=lambda j: (-r["p_" + "WDL"[j]], j))
+        q = sorted(range(3), key=lambda j: (-r["q_" + "WDL"[j]], j))
+        same = set(p[:2]) == set(q[:2])
+        eligibility[i] = [p[0] == q[0] and r["q_" + "WDL"[q[0]]] >= minimum_anchor_market,
+                          same, not same]
+        masses = [r["q_" + "WDL"[q[0]]],
+                  sum(r["q_" + "WDL"[j]] for j in q[:2]),
+                  (r["q_" + "WDL"[p[2]]] if converter_market else sum(r["p_" + "WDL"[j]] for j in p[:2]))]
+        objective[i] = -np.log(np.maximum(masses, 1e-300)) + 1e-10 * (i * 3 + np.arange(3))
+    return ranked, bound, eligibility, objective
+
+
+def next_consensus_roles(frame, previous, *, cutoffs, minimum_anchor_market,
+                         converter_market, max_uses, max_overlap, disjoint):
+    """One optimal fixed 2A/4D/1C group, or proved infeasibility; no learning.
+
+    Caps count actual supplied groups; explicit caller policy applies equally
+    to original and converter groups. Returned role map is empty ONLY when
+    infeasible. Solver timeout/failure raises. Parent plan binds full ledger.
+    """
+    if (type(max_uses) is not int or max_uses < 1 or type(max_overlap) is not int
+            or not 0 <= max_overlap < 7 or type(disjoint) is not bool):
+        raise ValueError("Valid explicit reuse policy required")
+    ranked, _, eligibility, objective = consensus_candidates(
+        frame, cutoffs=cutoffs, minimum_anchor_market=minimum_anchor_market,
+        converter_market=converter_market)
+    slots=list(map(int,ranked.slot)); n=len(slots)
+    if any(len(g)!=7 or len(set(g))!=7 or not set(g)<=set(slots) for g in previous):
+        raise ValueError("Previous groups must contain seven distinct known fixtures")
+    counts=Counter(s for g in previous for s in g)
+    if (any(v>max_uses for v in counts.values()) or
+            any(len(set(a)&set(b))>max_overlap for a,b in itertools.combinations(previous,2))):
+        raise ValueError("Previous groups violate requested caps")
+    matrix = [np.tile(np.eye(3)[j], n) for j in range(3)]
+    lower, upper = [2, 4, 1], [2, 4, 1]
+    matrix.extend(np.eye(n).repeat(3, axis=1))
+    lower += [0] * n
+    upper += [1] * n
+    for prior in previous:
+        matrix.append(np.repeat([int(s in prior) for s in slots], 3))
+        lower.append(0)
+        upper.append(max_overlap)
+    allowed = eligibility * np.array(
+        [counts[s] < (1 if disjoint else max_uses) for s in slots])[:, None]
+    solved = milp(
+        objective.ravel(), integrality=np.ones(n * 3),
+        bounds=Bounds(np.zeros(n * 3), allowed.ravel()),
+        constraints=LinearConstraint(np.asarray(matrix), lower, upper),
+        options=dict(time_limit=30, mip_rel_gap=0))
+    ledger=dict(disjoint=disjoint,status=int(solved.status))
+    if solved.status==2:
+        return {},ledger
+    if solved.status!=0:
+        raise RuntimeError("Solver did not prove optimum/infeasibility: "+str(solved.message))
+    assignment=solved.x.reshape(n,3)>.5
+    roles={slots[i]:"ADC"[j] for i,j in zip(*np.where(assignment))}
+    if (Counter(roles.values())!=Counter(A=2,D=4,C=1) or len(roles)!=7 or
+            np.any(assignment>allowed) or
+            any(len(set(roles)&set(g))>max_overlap for g in previous)):
+        raise ValueError("Invalid solver role assignment")
+    return roles,ledger
+
+
 def consensus_portfolios(frame, *, cutoffs, budget_cny, minimum_anchor_market,
                          skeleton_max_uses, skeleton_pair_overlap, unit_cny,
                          payout_factor, seed):
@@ -75,58 +155,23 @@ def consensus_portfolios(frame, *, cutoffs, budget_cny, minimum_anchor_market,
             type(skeleton_pair_overlap) is not int or not 0 <= skeleton_pair_overlap < 7 or
             (unit_cny, payout_factor) != (2, .65)):
         raise ValueError("Explicit valid diagnostic parameters required")
-    ranked = ranked.sort_values("slot")
-    rows = ranked.to_dict("records")
-    slots = [int(r["slot"]) for r in rows]
-    n = len(rows)
-    eligibility = np.zeros((n, 3))
-    objective = np.zeros((n, 3))
-    for i, r in enumerate(rows):
-        p = sorted(range(3), key=lambda j: (-r["p_" + "WDL"[j]], j))
-        q = sorted(range(3), key=lambda j: (-r["q_" + "WDL"[j]], j))
-        same = set(p[:2]) == set(q[:2])
-        eligibility[i] = [p[0] == q[0] and r["q_" + "WDL"[q[0]]] >= minimum_anchor_market,
-                          same, not same]
-        masses = [r["q_" + "WDL"[q[0]]],
-                  sum(r["q_" + "WDL"[j]] for j in q[:2]),
-                  sum(r["p_" + "WDL"[j]] for j in p[:2])]
-        objective[i] = -np.log(np.maximum(masses, 1e-300)) + 1e-10 * (i * 3 + np.arange(3))
+    ranked, bound, eligibility, _ = consensus_candidates(
+        frame, cutoffs=cutoffs, minimum_anchor_market=minimum_anchor_market,
+        converter_market=False)
     skeletons, ledger = [], []
-    counts = Counter()
     disjoint = True
     while len(skeletons) < budget_cny // 64:
-        matrix = [np.tile(np.eye(3)[j], n) for j in range(3)]
-        lower, upper = [2, 4, 1], [2, 4, 1]
-        matrix.extend(np.eye(n).repeat(3, axis=1))
-        lower += [0] * n
-        upper += [1] * n
-        for prior in skeletons:
-            matrix.append(np.repeat([int(s in prior) for s in slots], 3))
-            lower.append(0)
-            upper.append(skeleton_pair_overlap)
-        allowed = eligibility * np.array(
-            [counts[s] < (1 if disjoint else skeleton_max_uses) for s in slots])[:, None]
-        solved = milp(
-            objective.ravel(), integrality=np.ones(n * 3),
-            bounds=Bounds(np.zeros(n * 3), allowed.ravel()),
-            constraints=LinearConstraint(np.asarray(matrix), lower, upper),
-            options=dict(time_limit=30, mip_rel_gap=0))
-        ledger.append(dict(disjoint=disjoint, status=int(solved.status)))
-        if solved.status == 2:
+        roles, step = next_consensus_roles(
+            frame, skeletons, cutoffs=cutoffs, minimum_anchor_market=minimum_anchor_market,
+            converter_market=False, max_uses=skeleton_max_uses,
+            max_overlap=skeleton_pair_overlap, disjoint=disjoint)
+        ledger.append(step)
+        if not roles:
             if disjoint:
-                disjoint = False
+                disjoint=False
                 continue
             break
-        if solved.status != 0:
-            raise RuntimeError("Solver did not prove optimum/infeasibility: " + str(solved.message))
-        assignment = solved.x.reshape(n, 3) > .5
-        rolemap = {slots[i]: "ADC"[j] for i, j in zip(*np.where(assignment))}
-        if (Counter(rolemap.values()) != Counter(A=2, D=4, C=1) or len(rolemap) != 7 or
-                np.any(assignment > allowed) or
-                any(len(set(rolemap) & set(g)) > skeleton_pair_overlap for g in skeletons)):
-            raise ValueError("Invalid solver role assignment")
-        skeletons.append(rolemap)
-        counts.update(rolemap.keys())
+        skeletons.append(roles)
     originals, alternatives = [], []
     for roles in skeletons:
         subset = frame[frame.slot.isin(roles)]
@@ -167,3 +212,68 @@ def consensus_portfolios(frame, *, cutoffs, budget_cny, minimum_anchor_market,
                                   unit_cny=unit_cny, payout_factor=payout_factor,
                                   budget_cny=budget_cny, seed=seed))
     return dict(**result, seal=stable_json_hash(result))
+
+def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fraction,
+                                    budget_cny, minimum_anchor_market, max_uses,
+                                    max_pair_overlap, unit_cny, payout_factor, seed):
+    """Independently assemble 64/32 CNY groups under one shared exposure ledger.
+
+    Conversion budget fraction is explicit (0/.25/.5/.75/1), never learned.
+    Select type with lowest spent/target ratio, primary first on ties. Converter
+    quota rounds down to32 CNY; primary receives remaining budget. Each group
+    is reassembled: 2 agreed high-q anchors, 4 agreed doubles, 1 different-Top2
+    converter. Primary C ranks p-Top2; converter C ranks q of omitted p outcome.
+    First use disjoint fixtures, then globally enforce actual-group U/P caps.
+    No paired-clone exemption, no transferred quotas, no fractional tickets.
+    Insufficient eligible groups or unspendable remainder stays cash. All
+    candidates use prediction-only frames and explicit shared Cutoffs.
+    Returns sealed settlement-compatible envelope, components and decision
+    ledger. No fits, labels, cache, I/O, or prospective-admission claim.
+    """
+    _,bound=rank_double_candidates(frame,cutoffs=cutoffs)
+    if (conversion_budget_fraction not in (0,.25,.5,.75,1) or
+            type(budget_cny) is not int or budget_cny<0 or
+            not 0<minimum_anchor_market<1 or
+            type(max_uses) is not int or max_uses<1 or
+            type(max_pair_overlap) is not int or not 0<=max_pair_overlap<7 or
+            type(seed) is not int or (unit_cny,payout_factor)!=(2,.65)):
+        raise ValueError("Valid explicit fixed allocation policy required")
+    converter_quota=int(budget_cny*conversion_budget_fraction)//32*32
+    quota={False:budget_cny-converter_quota,True:converter_quota}
+    spent={False:0,True:0};cost={False:64,True:32}
+    roles_list=[];parts=[];ledger=[];disjoint=True
+    while True:
+        available=[k for k in (False,True) if spent[k]+cost[k]<=quota[k]]
+        if not available:break
+        kind=min(available,key=lambda k:(spent[k]/quota[k],k))
+        roles,step=next_consensus_roles(
+            frame,roles_list,cutoffs=cutoffs,minimum_anchor_market=minimum_anchor_market,
+            converter_market=kind,max_uses=max_uses,max_overlap=max_pair_overlap,disjoint=disjoint)
+        ledger.append(dict(step,converter=kind,spent_before=sum(spent.values())))
+        if not roles:
+            if disjoint:
+                disjoint=False
+                continue
+            # Feasibility sets are identical for both types; only objectives differ.
+            break
+        subset=frame[frame.slot.isin(roles)]
+        cuts={str(s):cutoffs[str(s)] for s in roles}
+        part=consensus_component(subset,roles,cutoffs=cuts,complement=kind,
+                                 unit_cny=unit_cny,payout_factor=payout_factor,seed=seed)
+        if part["stake"]!=cost[kind]:raise ValueError("Unexpected component cost")
+        parts.append(part);roles_list.append(roles);spent[kind]+=cost[kind]
+    stake=sum(p["stake"] for p in parts)
+    envelope=dict(issue=str(frame.issue.iloc[0]),
+        strategy=f"INDEPENDENT_C{int(conversion_budget_fraction*100):03}",
+        funding="UNIT",components=parts,stake=stake,budget=budget_cny,
+        cash_cny=budget_cny-stake,model_any_hit=None,cutoffs=bound,historical_admission=False,
+        mode="EXPOSED_INDEPENDENT_CONSENSUS_NOT_SIMULTANEOUS",
+        input_sha256=stable_json_hash(frame.sort_values("slot").to_json(orient="records")),
+        allocation=dict(conversion_budget_fraction=conversion_budget_fraction,
+                        primary_quota_cny=quota[False],converter_quota_cny=quota[True],
+                        primary_spend_cny=spent[False],converter_spend_cny=spent[True]),
+        parameters=dict(minimum_anchor_market=minimum_anchor_market,max_uses=max_uses,
+                        max_pair_overlap=max_pair_overlap,unit_cny=unit_cny,
+                        payout_factor=payout_factor,seed=seed),
+        decision_ledger=ledger)
+    return dict(**envelope,seal=stable_json_hash(envelope))

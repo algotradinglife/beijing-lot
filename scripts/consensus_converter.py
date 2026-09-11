@@ -13,7 +13,7 @@ from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
 from src.temporal_learning.provenance import implementation_closure, verify_implementation_closure
 from src.fundamentals_clean_receipts import verify_clean_file_bindings
-from src.fundamentals_consensus_portfolio import consensus_portfolios
+from src.fundamentals_consensus_portfolio import consensus_portfolios, independent_consensus_portfolio, consensus_candidates
 from src.fundamentals_n7_twocover import settle_n7_twocover
 from src.fundamentals_n7_single import settle_n7_single
 
@@ -21,6 +21,7 @@ if __name__ == "__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("phase",choices=["freeze","settle"])
     parser.add_argument("--study",required=True)
+    parser.add_argument("--design",choices=["paired","independent"],default="paired")
     args=parser.parse_args()
     out=Path(args.study)
     pure=Path("data/derived/fundamentals_417/new48-pure-baseline-v1/factors.json")
@@ -35,21 +36,42 @@ if __name__ == "__main__":
         issues=previous["receipt"]["issues"]
         params=dict(budget_cny=1024,minimum_anchor_market=.5,skeleton_max_uses=3,
                     skeleton_pair_overlap=5,unit_cny=2,payout_factor=.65,seed=41902)
-        reports=["quarto/95_consensus_converter.qmd","r/fundamentals_pure_report.R",
+        reports=[("quarto/95_consensus_converter.qmd" if args.design=="paired" else "quarto/96_independent_converter.qmd"),"r/fundamentals_pure_report.R",
                  "r/fundamentals_missed_summary.R","r/fundamentals_equity_curves.R"]
-        receipt=dict(scope="EXPOSED_FIXED_CONSENSUS_NOT_FITTED",issues=issues,parameters=params,
+        receipt=dict(scope="EXPOSED_FIXED_CONSENSUS_NOT_FITTED",design=args.design,issues=issues,parameters=params,
             source_hashes={**data["source_hashes"],**previous["receipt"]["plan_hashes"],
                            str(pure):hashlib.sha256(pure.read_bytes()).hexdigest(),
                            str(prior/"plans-frozen.json"):hashlib.sha256((prior/"plans-frozen.json").read_bytes()).hexdigest()},
             implementation=implementation_closure(Path.cwd(),["scripts.consensus_converter"],distributions=["numpy","pandas","scipy"]),
             report_files={p:hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in reports})
+        if args.design=="independent":
+            reference=Path("data/derived/fundamentals_417/consensus-converter-v3")
+            witness=json.loads((reference/"plans-frozen.json").read_text())
+            assert hashlib.sha256(witness["canonical_json"].encode()).hexdigest()==witness["seal"]
+            assert json.loads(witness["canonical_json"])["result_sha256"]==hashlib.sha256((reference/"results.json").read_bytes()).hexdigest()
+            receipt["reference_mode"]="INVENTORIED_PRIOR_PAIRED_EVIDENCE_NOT_CURRENT_MODEL_REPLAY"
+            receipt["reference_root"]=str(reference)
+            receipt["source_hashes"].update({str(reference/p):hashlib.sha256((reference/p).read_bytes()).hexdigest() for p in ["results.json","plans-frozen.json"]})
+            params=dict(budget_cny=1024,minimum_anchor_market=.5,max_uses=6,max_pair_overlap=5,
+                        unit_cny=2,payout_factor=.65,seed=41902)
+            receipt["parameters"]=params
+            receipt["conversion_budget_fractions"]=[0,.25,.5,.75,1]
         (out/"plans").mkdir(parents=True)
         (out/"contract.json").write_text(json.dumps(dict(receipt=receipt,seal=stable_json_hash(receipt)),indent=2))
         frame=pd.DataFrame(data["rows"]);hashes={}
         for issue in issues:
             f=frame[frame.issue==issue].copy()
             cuts={str(s):Cutoff.decision_epoch(issue,data["cutoffs"][issue][str(s)]) for s in f.slot}
-            bundle=consensus_portfolios(f,cutoffs=cuts,**params)
+            if args.design=="paired":
+                bundle=consensus_portfolios(f,cutoffs=cuts,**params)
+            else:
+                plans={}
+                for fraction in receipt["conversion_budget_fractions"]:
+                    plan=independent_consensus_portfolio(f,cutoffs=cuts,conversion_budget_fraction=fraction,**params)
+                    plans[plan["strategy"]]=plan
+                _,_,eligible,_=consensus_candidates(f,cutoffs=cuts,minimum_anchor_market=.5,converter_market=False)
+                bundle=dict(plans=plans,skeletons=[],pool_counts=dict(zip("ADC",map(int,eligible.sum(axis=0)))))
+                bundle["seal"]=stable_json_hash(bundle)
             target=out/"plans"/f"{issue}.json.gz"
             target.write_bytes(gzip.compress(json.dumps(bundle).encode(),mtime=0))
             hashes[str(target)]=hashlib.sha256(target.read_bytes()).hexdigest()
@@ -81,13 +103,19 @@ if __name__ == "__main__":
                 rows.append(dict(s,policy=name,budget_cny=plan["budget"],cash_cny=plan["cash_cny"],n6_hits=0,n7_hits=s["hits"]))
                 for i,part in enumerate(plan["components"],1):
                     leg_rows.extend(dict(l,policy=name,component=i) for l in part["legs"])
-            reference=json.loads(gzip.decompress((prior/"plans"/f"{issue}.json.gz").read_bytes()))["D2_U6_P5_BASE"]["plan"]
-            s=settle_n7_single(reference,a)
-            rows.append(dict(s,policy="OLD_D2_U6_P5",budget_cny=reference["budget_cny"],
-                             cash_cny=reference["cash_cny"],n6_hits=0,n7_hits=s["hits"]))
-        assert len(rows)==4*len(r["issues"]) and all(x["status"] in ["COMPLETE","NO_BET"] for x in rows)
+            if r["design"]=="paired":
+                reference=json.loads(gzip.decompress((prior/"plans"/f"{issue}.json.gz").read_bytes()))["D2_U6_P5_BASE"]["plan"]
+                s=settle_n7_single(reference,a)
+                rows.append(dict(s,policy="OLD_D2_U6_P5",budget_cny=reference["budget_cny"],
+                                 cash_cny=reference["cash_cny"],n6_hits=0,n7_hits=s["hits"]))
+        if r["design"]=="independent":
+            previous=json.loads((Path(r["reference_root"])/"results.json").read_text())
+            rows.extend(dict(x,policy="PREVIOUS_"+x["policy"]) for x in previous["rows"]
+                        if x["policy"] in ["PRIMARY_FILL","COMPLEMENT","OLD_D2_U6_P5"])
+        expected=8 if r["design"]=="independent" else 4
+        assert len(rows)==expected*len(r["issues"]) and all(x["status"] in ["COMPLETE","NO_BET"] for x in rows)
         payload=dict(rows=rows,pools=pools,legs=leg_rows,issue_order=r["issues"],parameters=r["parameters"],
-                     upstream_freeze_seal=frozen["seal"],historical_admission=False)
+                     upstream_freeze_seal=frozen["seal"],historical_admission=False,design=r["design"])
         target=out/"results.json";target.write_text(json.dumps(payload))
         verification=dict(scope="PURE_BASELINE_POST_EXPOSURE_PAIRED_DIAGNOSTIC",
                           plan_freeze_seal=frozen["seal"],result_sha256=hashlib.sha256(target.read_bytes()).hexdigest(),

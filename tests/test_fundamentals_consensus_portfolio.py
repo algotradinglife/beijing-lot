@@ -125,3 +125,72 @@ def test_frozen_report_binds_upstream_audit_pointer(tmp_path):
     changed.write_text('{"source_hashes":{"different-audit.json":"changed"}}')
     with pytest.raises(ValueError):
         verify_clean_file_bindings({str(changed):receipt["source_hashes"][paths[0]]},repository_root=tmp_path)
+
+@pytest.mark.parametrize("fraction",[0,.25,.5,.75,1])
+def test_independent_converter_budget_and_actual_group_caps(inputs,fraction):
+    from src.fundamentals_consensus_portfolio import independent_consensus_portfolio
+    f,cuts=inputs
+    kw=dict(cutoffs=cuts,conversion_budget_fraction=fraction,budget_cny=256,
+            minimum_anchor_market=.5,max_uses=6,max_pair_overlap=5,unit_cny=2,payout_factor=.65,seed=0)
+    plan=independent_consensus_portfolio(f,**kw)
+    assert plan==independent_consensus_portfolio(f,**kw)
+    assert plan["stake"]+plan["cash_cny"]==256
+    assert plan["allocation"]["converter_spend_cny"]<=256*fraction
+    assert plan["allocation"]["primary_spend_cny"]<=256*(1-fraction)
+    groups=[{r["slot"] for r in p["legs"]} for p in plan["components"]]
+    assert max(Counter(s for g in groups for s in g).values(),default=0)<=6
+    assert all(len(a&b)<=5 for i,a in enumerate(groups) for b in groups[:i])
+    for p in plan["components"]:
+        assert p["stake"]==(32 if p["complement"] else 64)
+        assert sum(len(r["support"])==1 for r in p["legs"])==(3 if p["complement"] else 2)
+    if fraction==0:assert all(not p["complement"] for p in plan["components"])
+    if fraction==1:assert all(p["complement"] for p in plan["components"])
+
+
+def test_candidates_converter_ranks_actual_omitted_market_direction(inputs):
+    from src.fundamentals_consensus_portfolio import consensus_candidates
+    import numpy as np
+    f,cuts=inputs
+    a,_,ea,oa=consensus_candidates(f,cutoffs=cuts,minimum_anchor_market=.5,converter_market=False)
+    b,_,eb,ob=consensus_candidates(f,cutoffs=cuts,minimum_anchor_market=.5,converter_market=True)
+    assert np.array_equal(ea,eb) and np.allclose(oa[:,:2],ob[:,:2])
+    # Converter row7 baseline Top2=.8 versus omitted market L=.5.
+    assert oa[6,2]==pytest.approx(-np.log(.8)+1e-10*20)
+    assert ob[6,2]==pytest.approx(-np.log(.5)+1e-10*20)
+    with pytest.raises(ValueError):consensus_candidates(f,cutoffs=cuts,minimum_anchor_market=0,converter_market=True)
+
+
+def test_independent_converter_more_groups_and_failed_contracts(inputs):
+    from src.fundamentals_consensus_portfolio import independent_consensus_portfolio, next_consensus_roles
+    f,cuts=inputs
+    kw=dict(cutoffs=cuts,budget_cny=256,minimum_anchor_market=.5,max_uses=6,
+            max_pair_overlap=5,unit_cny=2,payout_factor=.65,seed=0)
+    primary=independent_consensus_portfolio(f,conversion_budget_fraction=0,**kw)
+    convert=independent_consensus_portfolio(f,conversion_budget_fraction=1,**kw)
+    assert len(convert["components"])>len(primary["components"])
+    assert convert["stake"]<=256
+    with pytest.raises(ValueError):independent_consensus_portfolio(f.assign(actual_direction="W"),conversion_budget_fraction=.5,**kw)
+    with pytest.raises(ValueError):independent_consensus_portfolio(f,conversion_budget_fraction=.3,**kw)
+    with pytest.raises(ValueError):next_consensus_roles(f,[{1:"A"}],cutoffs=cuts,minimum_anchor_market=.5,
+        converter_market=False,max_uses=6,max_overlap=5,disjoint=False)
+    with pytest.raises(ValueError):next_consensus_roles(f,[],cutoffs=cuts,minimum_anchor_market=.5,
+        converter_market=False,max_uses=0,max_overlap=5,disjoint=False)
+    empty=independent_consensus_portfolio(f,conversion_budget_fraction=.5,**dict(kw,minimum_anchor_market=.99))
+    assert empty["components"]==[] and empty["cash_cny"]==256
+
+def test_independent_archive_fixture_and_reference_scope(tmp_path):
+    import gzip
+    import hashlib
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    saved=json.loads(gzip.decompress(Path("tests/fixtures/independent_converter.json.gz").read_bytes()))
+    assert all(hashlib.sha256(v.encode()).hexdigest()==saved["hashes"][k] for k,v in saved["files"].items())
+    result=json.loads(saved["files"]["results.json"])
+    assert result["design"]=="independent" and len(result["rows"])==384
+    assert len({r["policy"] for r in result["rows"]})==8
+    assert all(r["stake"]+r["cash_cny"]==1024 for r in result["rows"])
+    out=tmp_path/"independent-archive"
+    subprocess.run([sys.executable,"scripts/prepare_n7_single_fixture.py","--fixture","tests/fixtures/independent_converter.json.gz","--output",str(out)],check=True)
+    assert json.loads((out/"results.json").read_text())==result
