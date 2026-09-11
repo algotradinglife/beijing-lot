@@ -1,0 +1,116 @@
+---
+title: "75%单选替换：压一场与压两场的对照"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/single75-depth-v1"
+  archived_report: false
+---
+
+同48期100402–100607、同纯基线概率、每期预算1,024元，初始本金100,000元。
+压一场C1每组一场单选、六场双选，64张基本票×2元＝128元，最多8组；
+压两场C2每组两场单选、五场双选，32张基本票×2元＝64元，最多16组。
+分别取QMD76封存的TOP2概率排序下原放宽FREE和原严格STRICT方案。
+STRICT每场最多两组、两组共同场次最多两场；FREE无这两个限制，仍不允许七场集合完全重复。
+各深度和复用条件内BASE与SINGLE75分组、单选位置、投入和现金完全相同；深度之间选组可以不同。
+
+首次出现不变，后续复用且本次单选、原p1≤75%时改选原第二赛果，所有双选不变；
+再往后仍取第二，不交替。原概率及市场映射保持不变，最终SP只用于结算，0.65在完整命中票上计算一次。
+本轮无专家、比分保护、额外预算、模型重训或阈值搜索；8方案×48期＝384计划。
+保留此前C2/FREE＋SINGLE75阳性对照，并逐期验证完整转换计划与原封存版本完全一致。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_integration_weight.R')
+source('r/fundamentals_compression_bridge.R')
+source('r/fundamentals_repeated_double.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_drawdown_plot.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows) |>
+ mutate(action=if_else(rule=='BASE','BASE','ADJUSTED'),kind=if_else(rule=='BASE','OLD','ADJUSTED'),
+        model_union=NA_real_,fixture_hhi=NA_real_,model=case,label=rule)
+stopifnot(nrow(rows)==384,n_distinct(rows$issue)==48,n_distinct(rows$policy)==8,all(rows$budget_cny==1024))
+s <- repeated_double_summary(rows,100000) |> mutate(budget_ROI_percent=100*budget_return,stake_ROI_percent=100*roi,
+                                                   group_hit_percent=100*winning_groups/groups)
+curves <- strategy_equity_curves(rows,sort(unique(rows$issue)),100000)
+risk <- strategy_drawdown_report(curves)
+paired <- rows |> select(issue,case,depth,overlap,rule,stake,net,hits,groups,changed_legs,gained_groups,lost_groups) |>
+ tidyr::pivot_wider(names_from=rule,values_from=c(stake,net,hits,groups,changed_legs,gained_groups,lost_groups)) |>
+ mutate(net_delta=net_SINGLE75-net_BASE)
+stopifnot(all(paired$stake_BASE==paired$stake_SINGLE75),all(paired$groups_BASE==paired$groups_SINGLE75))
+```
+
+## 收益、命中与回撤
+
+```{r}
+s |> arrange(depth,overlap,action) |> select(depth,overlap,action,stake_cny,cash_cny,net_cny,budget_ROI_percent,
+ stake_ROI_percent,max_drawdown_cny,groups,winning_groups,group_hit_percent,profitable_issues) |> knitr::kable(digits=2)
+```
+
+预算收益率统一除以49,152元；投注收益率除以实际投入。命中组率不是独立比赛胜率，复用造成组间关联。
+“更好用”同时看替换增益与最终收益水平：改善一个亏损基准，不等于最终优于压两场。
+没有重新模拟整体并集概率或HHI，相应统计明确为缺失，不把旧支持覆盖指标移植给新方案。
+
+```{r}
+#| label: equity
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 8
+plot_strategy_equity(curves,'funded',100000)+labs(title='压一场／压两场：同预算资金走势')
+```
+
+```{r}
+#| label: drawdown
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 8
+risk$plot+labs(title='逐期回撤：圆点为最大金额回撤')
+risk$summary |> select(model,label,max_drawdown_cny,max_drawdown_percent,max_cny_issue) |> knitr::kable(digits=2)
+```
+
+## 替换增益和尾部依赖
+
+```{r}
+s |> filter(action=='ADJUSTED') |> select(depth,overlap,changed_legs,gained_groups,lost_groups,matched_lift,
+ ex_largest_issue,ex_largest_net,ex_largest_matched_lift,ex_largest_lift_issue,ex_largest_lift,
+ longest_losing_run,worst_5_loss,worst_10_loss,worst_20_loss) |> knitr::kable(digits=2)
+paired |> group_by(case) |> arrange(issue,.by_group=TRUE) |>
+ summarise(first24_BASE=sum(head(net_BASE,24)),first24_SINGLE75=sum(head(net_SINGLE75,24)),
+           last24_BASE=sum(tail(net_BASE,24)),last24_SINGLE75=sum(tail(net_SINGLE75,24)),.groups='drop') |> knitr::kable(digits=2)
+```
+
+matched_lift为每个条件内的同组同投入净增益；ex_largest_lift同时剔除两方案中增益最大的一期再比较。
+ex_largest_net剔除调整方案自身最大盈利期；ex_largest_matched_lift在该同一期配对剔除后计算增益。
+前后24期均已暴露，不是新的训练／测试分区。本轮不能满足或替代#421的严格时序跨年份验收。
+
+## 每期收益率
+
+```{r}
+paired |> mutate(BASE_budget_ROI_percent=100*net_BASE/1024,SINGLE75_budget_ROI_percent=100*net_SINGLE75/1024) |>
+ arrange(issue,depth,overlap) |> select(issue,depth,overlap,stake_BASE,net_BASE,net_SINGLE75,net_delta,
+ BASE_budget_ROI_percent,SINGLE75_budget_ROI_percent,hits_BASE,hits_SINGLE75,groups_BASE,
+ changed_legs_SINGLE75,gained_groups_SINGLE75,lost_groups_SINGLE75) |> knitr::kable(digits=2)
+```
+
+## 接口和历史证据边界
+
+只扩展既有`replace_repeated_support`允许C1和C2输入；下层转换本已支持两种深度，未复制另一套替换实现。
+保留C2原行为及完整阳性计划，测试覆盖两深度、75%边界、完整基本票、现金和错误cutoff。
+统计、回撤和结算均复用既有函数；独立检查器按实际支持重建每张票并核对返奖。
+全部计划冻结后才读取本轮结算；原历史数据此前已暴露，旧输入作为登记证据而非新因果接口。
+实现扩展会改变旧报告的源码哈希；旧实验全链重放使用原提交，或使用归档模式重放报告，不修改旧收据。
+当前结果和报告代码由新收据绑定，归档仅验证报告，不代表采集和原模型重放。
+
+```{r}
+tibble(scope=verified$result$scope,result_sha256=verified$receipt$result_sha256,
+       plan_freeze_seal=verified$result$upstream_freeze_seal,archived_report=params$archived_report) |> knitr::kable()
+```

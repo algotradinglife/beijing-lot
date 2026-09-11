@@ -47,7 +47,9 @@ def test_existing_gates_match_and_bad_inputs_fail(source):
         with pytest.raises(ValueError):replace_repeated_support(base,**dict(kw,single_ceiling=bad))
     for bad in [dict(double_rule='BAD'),dict(change_singles=1),dict(cutoffs={})]:
         with pytest.raises((ValueError,KeyError)):replace_repeated_support(base,**dict(kw,**bad))
-    with pytest.raises(ValueError):replace_repeated_support(plans[1],**kw)
+    for depth in [0,3,True]:
+        bad=copy.deepcopy(base);bad['single_count']=depth
+        with pytest.raises(ValueError):replace_repeated_support(bad,**kw)
     with pytest.raises(ValueError):replace_repeated_support(replace_repeated_support(base,**kw),**kw)
     bad=copy.deepcopy(base);bad['stake']+=1
     with pytest.raises(ValueError):replace_repeated_support(bad,**kw)
@@ -107,3 +109,29 @@ def test_single75_preserves_frozen_caps_cash_and_roles(data,uses,pair):
         assert {t['code'] for t in plan['tickets'] if t['group']==g}=={''.join(c) for c in itertools.product(*(r['support'] for r in legs))}
     assert sum(2*t['units'] for t in plan['tickets'])==base['stake']
     if uses==1:assert plan['tickets']==base['tickets'] and not any(r['changed'] for r in plan['diversity_ledger'])
+
+
+@pytest.mark.parametrize('depth',[1,2])
+@pytest.mark.parametrize('ceiling,changed',[(.75,True),(.749,False)])
+def test_single75_depth_boundary_and_full_ticket_support(source,depth,ceiling,changed):
+    _,cuts,plans=source;base=copy.deepcopy(plans[depth])
+    for r in base['legs']:r.update(p_W=.75,p_D=.15,p_L=.10)
+    base['seal']=stable_json_hash({k:v for k,v in base.items() if k!='seal'});saved=copy.deepcopy(base)
+    plan=replace_repeated_support(base,cutoffs=cuts,change_singles=True,double_rule='NONE',
+        single_ceiling=ceiling,max_gap=.05,minimum_tv=.15,minimum_market_tail_lead=.05)
+    assert base==saved
+    assert plan['single_count']==depth and plan['stake']==base['stake'] and plan['cash_cny']==base['cash_cny']
+    assert any(z['prior_appearances'] and len(z['source_support'])==1 for z in plan['diversity_ledger'])
+    for z in plan['diversity_ledger']:
+        expected=bool(changed and z['prior_appearances'] and len(z['source_support'])==1)
+        assert z['changed']==expected
+        assert z['selected_support']==('1' if expected else z['source_support'])
+    for g in range(1,plan['groups']+1):
+        legs=sorted([r for r in plan['legs'] if r['group']==g],key=lambda r:r['slot'])
+        assert sorted(len(r['support']) for r in legs)==[1]*depth+[2]*(7-depth)
+        ts=[t for t in plan['tickets'] if t['group']==g]
+        assert len(ts)==2**(7-depth)
+        assert {t['code'] for t in ts}=={''.join(c) for c in itertools.product(*(r['support'] for r in legs))}
+    future={k:Cutoff.decision_epoch(base['issue'],'2099-01-01T00:00:00Z') for k in cuts}
+    with pytest.raises(ValueError):replace_repeated_support(base,cutoffs=future,change_singles=True,double_rule='NONE',
+        single_ceiling=ceiling,max_gap=.05,minimum_tv=.15,minimum_market_tail_lead=.05)

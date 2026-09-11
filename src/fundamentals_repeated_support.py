@@ -1,4 +1,4 @@
-"""Compose fixed single and double replacement gates on frozen C2 groups."""
+"""Compose fixed single and double replacement gates on frozen C1/C2 groups."""
 import math
 from src.fundamentals_n7_diversity import replace_repeated_double_tail
 from src.fundamentals_market_conflict import replace_market_conflict_doubles
@@ -7,7 +7,7 @@ from src.temporal_learning.core import stable_json_hash
 
 def replace_repeated_support(base, *, cutoffs, change_singles, double_rule,
                              single_ceiling, max_gap, minimum_tv, minimum_market_tail_lead):
-    """Return a sealed C2 plan with the same groups, roles, units and cash.
+    """Return a sealed C1/C2 plan with the same groups, roles, units and cash.
 
     All thresholds are explicit, fixed probability units, inclusive within
     1e-12. double_rule is NONE/GAP/MARKET/EITHER. Any earlier fixture appearance
@@ -20,8 +20,8 @@ def replace_repeated_support(base, *, cutoffs, change_singles, double_rule,
     """
     if type(change_singles) is not bool or double_rule not in {'NONE','GAP','MARKET','EITHER'}:
         raise ValueError('Explicit single switch and known double rule required')
-    if base.get('single_count') != 2:
-        raise ValueError('Two-single source plan required')
+    if type(base.get('single_count')) is not int or base['single_count'] not in (1,2):
+        raise ValueError('One- or two-single source plan required')
     if isinstance(single_ceiling,bool) or not isinstance(single_ceiling,(int,float)) or not math.isfinite(single_ceiling) or not 0<=single_ceiling<=1:
         raise ValueError('Single ceiling must be a finite probability')
     gap = replace_repeated_double_tail(base,cutoffs=cutoffs,max_gap=max_gap)
