@@ -1,0 +1,80 @@
+---
+title: "固定七场：市场概率与收益代理选择两场单押"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/within-group-singles-v1"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows)
+z<-missed_strategy_summary(rows,unlist(v$issue_order),100000)
+```
+
+## 固定组、固定投入的比较
+
+沿用已排除零让球Top2分歧场的独立原组，固定每期所有七场组合、总复用U6、
+两组交集P5、组数和金额。每组两场单选、五场双选，64元；
+每期预算1024元，余款现金。撤销单选只能使用一次的限制。
+不做转换、不做比分保护。既有组作为绑定历史证据，不重训组装模型。
+
+ORIGINAL_D2沿用原来两源首选一致、市场至少50%的两场单选。
+WITHIN_GROUP_MARKET在每组七场中取市场首选概率最高的两场。
+WITHIN_GROUP_VALUE对同样的市场首选方向，按基线概率p乘赛前估算SP(1/q)，
+即p/q，挑两场。它是单场收益代理，不是整张复式票期望收益最大化；
+不读取结算SP进行选择，也不在三个方向中额外搜索最大p/q的方向。
+两变体不再要求单选两源一致或q>=50%，其余五场使用基线Top2。
+并列按场次序号；方向并列按让胜、让平、让负。不自动推广回顾最优者。
+
+市场q来自欧赔与大小球约束的比分分布，再投射到北单让球胜平负，
+并非普通欧赔胜平负。q乘1/q恒为1，所以收益代理必须区分基线p和市场q。
+这是固定已曝光48期诊断，无新学习、无阈值调优。原生截止时间/来源/
+代码/参数/票据在结算前绑定，历史时间代理不证明真实同时出票可行。
+初始资金100000元；单位2元；结算整票只用一次0.65。
+
+## 收益和风险
+
+```{r}
+z$summary |> mutate(group_hit_percent=100*winning_groups/groups) |> knitr::kable(digits=2)
+```
+
+## 逐期比较
+
+```{r}
+rows |> mutate(group_hit_percent=if_else(groups>0,100*hits/groups,NA_real_),
+ stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,group_hit_percent,stake,cash_cny,gross,net,
+ stake_ROI_percent,budget_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 单押选择
+
+每行是组内一场的实际单选；同一场可在多组使用。
+收益代理仅用于VALUE排序，不是保证回报。
+
+```{r}
+as_tibble(v$legs) |> filter(nchar(support)==1) |>
+ select(issue,policy,component,slot,handicap,support,p_W,p_D,p_L,q_W,q_D,q_L) |>
+ head(30) |> knitr::kable(digits=3)
+```
+
+## 收益与回撤曲线
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+```
