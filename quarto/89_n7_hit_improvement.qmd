@@ -1,0 +1,125 @@
+---
+title: "保留N7的命中改进：市场融合、分歧保护与单选复用"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-hit-report-v1"
+  archived_report: false
+---
+
+48期100402–100607已暴露，本轮为固定规则回顾诊断，不是新验证集，不改变默认策略。
+主对照是纯基线N7压两场、TOP2概率排序、U6/P5；每期预算1024元、起始资金100000元。
+所有30个组合在本轮结算前固定并冻结，专家和比分保护均未加入。
+
+## 固定实验范围
+
+- W000/025/050/075/100：仅绝对让球≥2的场次，市场比分分布占0/25/50/75/100%。
+- P0/P1：分歧保护关闭/开启；最高方向不同且总变差距离≥0.15才判定为分歧。
+- C0/C2/C3：同场同方向单选不额外限制/最多2次/最多3次。
+
+先按比分格点混合归一化分布，再投影为北单概率，市场q始终不变。
+每个权重重新使用原分组流程；保护阶段保持该权重下的组顺序和场次不变。
+每组在可用位置中按TOP1概率压两场，达到上限或受保护的位置保持双选。
+不足两个可用位置则整组不买，不补组、不换第三方向，剩余资金持有现金。
+因此保护带来的回撤变化必须结合实际投入解释。不同权重的候选池/前缀也可能变化，
+不能把最终收益差异全部解释为单场概率校准效应。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_drawdown_plot.R')
+source('r/fundamentals_missed_summary.R')
+source('r/fundamentals_hit_improvement.R')
+source('r/fundamentals_event_calibration.R')
+v<-read_pure_baseline_report(params$study,params$archived_report)
+rows<-tibble::as_tibble(v$result$rows)
+stopifnot(nrow(rows)==1440,n_distinct(rows$policy)==30,n_distinct(rows$issue)==48)
+comp<-hit_improvement_summary(rows,'W000_P0_C0',sort(unique(rows$issue)),100000)
+events<-tibble::as_tibble(v$result$events) |> mutate(model=paste0('W',weight*100))
+cal<-event_calibration(events,tibble::as_tibble(v$result$audit))
+```
+
+## 收益、整期命中与回撤
+
+预算ROI除以48×1024；投注ROI除以实际投入。整期命中是至少一组中奖，不等于当期盈利。
+最长未中指连续零中奖组的期数。30种规则同样展示，不只保留事后赢家。
+
+```{r}
+comp$summary |> arrange(weight,protect,cap) |>
+ select(policy,hit_issues,issue_hit_percent,groups,winning_groups,stake_cny,cash_cny,
+        net_cny,budget_ROI_percent,stake_ROI_percent,max_drawdown_cny,longest_miss_streak) |> knitr::kable(digits=2)
+```
+
+## 原25个未中期有没有获救
+
+rescued是原对照未中而新策略命中的期数；lost是原对照命中而新策略未中的期数。
+两者必须一起看。获救也可能只获得小额返奖，不能等同于盈利提升。
+
+```{r}
+comp$summary |> arrange(weight,protect,cap) |>
+ select(policy,rescued_issues,lost_issues,preserved_issues,old_miss_issues,
+ net_on_old_misses,net_on_old_hits,net_lift,stake_change_cny,profit_retained_percent,
+ spend_retained_percent,ex_best_net,best_issue,ex_best_lift,best_lift_issue) |> knitr::kable(digits=2)
+```
+
+ex_best_net剔除各策略自身最大盈利期；ex_best_lift剔除相对原对照增益最大一期，
+不是同一个诊断。已暴露样本中的增益不授权未来选权重或路由。
+
+## 全部收益和回撤曲线
+
+```{r}
+#| label: all-curves
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 7
+for(w in sort(unique(rows$weight))) {
+ part<-comp$curves |> filter(weight==w | policy=='W000_P0_C0') |> mutate(model=paste('市场权重',w),label=policy)
+ print(plot_strategy_equity(part,'funded',100000))
+ print(strategy_drawdown_report(part)$plot)
+}
+```
+
+## 全场概率校准
+
+```{r}
+cal$summary |> filter(event %in% c('giving_cover','handicap_draw','ordinary_draw','home_ge3','away_ge3')) |>
+ arrange(event,model) |> knitr::kable(digits=2)
+cal$observations |> filter(abs(handicap)>=2) |> group_by(model,event) |>
+ summarise(n=n(),predicted_percent=100*mean(probability),actual_percent=100*mean(observed),
+ error_pp=actual_percent-predicted_percent,brier=mean((probability-observed)^2),.groups='drop') |> knitr::kable(digits=2)
+```
+
+校准以全体可用场次为分母，不只取下注场或原未中期。单选保护不改变比分概率，
+因此概率表只按五个权重展示；其变化作用于支持选择和持仓暴露。
+大让球子样本仅245场，相关联赛/球队及多重比较限制解释，不作独立试验显著性宣称。
+没有把实际打穿频率填回模型；混合权重是事先固定的候选值。
+
+## 每期结果
+
+```{r}
+comp$paired |> arrange(issue,policy) |> mutate(budget_ROI_percent=100*net/budget_cny,
+ rescue=hits>0 & main_hits==0,lost=hits==0 & main_hits>0) |>
+ select(issue,policy,hits,main_hits,rescue,lost,stake,cash_cny,net,budget_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 复现与边界
+
+新接口为src/fundamentals_market_blend.py的blend_market_scores，以及
+src/fundamentals_single_guard.py的guard_single_positions；均接收显式原生Cutoff，
+复用原概率验证、分组、单选压缩和结算实现。R汇总在r/fundamentals_hit_improvement.R。
+脚本按init、两分片freeze、全量seal、settle执行，禁止覆盖已冻结目录。
+
+没有拟合、自动择优或重训。新的历史学习必须使用共享temporal_learning、cutoff前窗口及冻结回执，
+本轮不替代#421因果验收。报告夹具仅支持重渲染，不冒充完整模型重放。
+现有输入的历史可用性仍为已披露的代理证据，不授权新的前瞻用途。
+
+```{r}
+v$receipt$plan_freeze_seal
+```
