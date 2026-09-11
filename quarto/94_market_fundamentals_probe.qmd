@@ -1,0 +1,101 @@
+---
+title: "市场分歧是否值得坚持基本面：首轮本地推演"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/category-diagnostics-v2"
+---
+
+```{r}
+#| include: false
+library(dplyr)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_missed_issues.R")
+source("r/fundamentals_category_diagnostics.R")
+v<-read_pure_baseline_report(params$study,FALSE)$result
+checked<-category_diagnostics(v$factors,v$features,v$legs,v$audit,select(v$rows,issue,hits))
+x<-checked$observations |> filter(view=="ALL_AVAILABLE",role=="SINGLE")
+stopifnot(nrow(x)==nrow(v$factors),!anyDuplicated(x[c("issue","slot","provider_id")]))
+pm<-as.matrix(x[c("p_W","p_D","p_L")]);qm<-as.matrix(x[c("q_W","q_D","q_L")])
+directions<-c("W","D","L")
+x$p_top<-directions[max.col(pm,ties.method="first")]
+x$q_top<-directions[max.col(qm,ties.method="first")]
+x$p_last<-directions[max.col(-pm,ties.method="last")]
+x$q_last<-directions[max.col(-qm,ties.method="last")]
+x<-x |> mutate(p_single=p_top==actual_direction,q_single=q_top==actual_direction,
+ p_double=p_last!=actual_direction,q_double=q_last!=actual_direction,
+ gap=if_else(handicap==0,"NO_HANDICAP",as.character(cut(giving_venue_ppg,c(-Inf,0,.5,1,Inf),right=FALSE))))
+```
+
+## 本轮回答什么
+
+这是对已经冻结的基线与市场概率做同场对照，不拟合或发布重映射模型。
+全部合格比赛每场一条，不仅选择25个未中期，也不按重复下注加权。
+基线与市场均为北单让球胜平负口径；市场列来自既有欧赔及总进球映射，
+不是直接把普通欧赔胜平负当作让球概率。
+
+市场分歧可能包含机会，但须先区分概率判断与赔率补偿。
+最高方向命中率较低，不能单独证明期望收益较低。
+此报告不计算收益，不根据这些结算后切片生成赛前信号。
+
+## 单选与双选同场比较
+
+AGREE：最高方向一致；STRONG_DIFF：最高方向不同且总变差至少0.15；
+其他方向分歧为MILD_DIFF。Top2分别取各分布前两名，
+并非把市场概率套在基线选择上。
+
+```{r}
+x |> group_by(conflict) |> summarise(
+ n=n(),issues=n_distinct(issue),
+ baseline_single_hits=sum(p_single),market_single_hits=sum(q_single),
+ baseline_single_pct=100*mean(p_single),market_single_pct=100*mean(q_single),
+ baseline_double_hits=sum(p_double),market_double_hits=sum(q_double),
+ baseline_double_pct=100*mean(p_double),market_double_pct=100*mean(q_double),
+ .groups="drop") |> knitr::kable(digits=2)
+```
+
+## 强分歧与主客近期表现
+
+gap 是给球方相对接球方的近期主客场场均积分差，并不等于
+“基线支持方”的优势，也没有控制其他特征。此表只能检查一个简单切片，
+不能据此否定多因素基本面条件校准。零让球单列，不赋予给球方向含义。
+
+```{r}
+x |> filter(conflict=="STRONG_DIFF") |> group_by(gap) |> summarise(
+ n=n(),issues=n_distinct(issue),
+ baseline_single_hits=sum(p_single),market_single_hits=sum(q_single),
+ baseline_single_pct=100*mean(p_single),market_single_pct=100*mean(q_single),
+ baseline_double_pct=100*mean(p_double),market_double_pct=100*mean(q_double),
+ .groups="drop") |> knitr::kable(digits=2)
+```
+
+## 逐期分歧表现
+
+```{r}
+x |> filter(conflict!="AGREE") |> group_by(issue) |> summarise(
+ n=n(),baseline_single_pct=100*mean(p_single),market_single_pct=100*mean(q_single),
+ baseline_double_pct=100*mean(p_double),market_double_pct=100*mean(q_double),
+ .groups="drop") |> knitr::kable(digits=2)
+```
+
+## 下一步与证据边界
+
+#422另一会话已登记条件比分模型的前窗推演结果，本地暂未获得其未推送提交，
+因此本报告不冒充独立重跑该模型。Issue登记的共同评价集为29期/1,369场，
+与此处48期/2,561场不同，不得直接横向比较。
+
+下一步应在同一前窗冻结的支持集检查：条件模型改对/改错哪些比分与赛果，
+这些变化是否发生在可重复的基本面条件下，以及赛前估算SP是否提供足够赔率补偿。
+不能只凭最高方向命中率决定一律信市场，也不能只凭少数盈利案例决定坚持基本面。
+固定预算、原组注与重新选场的收益需要分别验证。
+
+```{r}
+tibble(input_seal=v$upstream_freeze_seal,
+       evaluated_issues=n_distinct(x$issue),evaluated_fixtures=nrow(x),
+       analysis="POST_SETTLEMENT_DESCRIPTION_NO_NEW_MODEL") |> knitr::kable()
+```
