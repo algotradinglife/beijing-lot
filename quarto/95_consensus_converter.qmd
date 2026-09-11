@@ -1,0 +1,85 @@
+---
+title: "一致单选胆、稳定双选与单个互补转换位"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  archived_report: false
+  study: "data/derived/fundamentals_417/consensus-converter-v3"
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-tibble::as_tibble(v$rows)
+z<-missed_strategy_summary(rows,unlist(v$issue_order),100000)
+```
+
+## 固定规则与对照
+
+48期已曝光数据；本轮固定方案推演，不拟合、不据结果挑参数、不授权前瞻。
+每期预算1024元，初始资金10万元，每基本注2元，整张票乘一次0.65结算系数。
+结算SP只在全期方案冻结之后读取，不用于选场。保留未用现金；不做比分保护。
+
+每个七场框架由2场单选胆、4场稳定双选、1场转换位构成。
+胆要求基线与市场首选一致且市场概率至少50%；稳定双选要求Top2集合一致；
+转换位要求Top2集合不同（不限于最高方向不同）。
+单选与稳定双选按市场支持概率，转换位按基线双选覆盖概率，最大化组内对数概率之和。
+这是混合排序准则，不把两种模型乘积解释为已校准的实际组命中概率。
+
+先选完全不重复的框架，再允许每场最多进入3个框架、框架间最多重复5场。
+一对原组/转换组共享同一七场及其中六场的选择，特意豁免框架间重叠限制；
+实际每场最多6个持仓。此设计不等同于旧U6/P5算法。
+MILP每一步证明最优或无解，不声称整个组合全局最优。
+
+| 方案 | 含义 |
+|---|---|
+| OLD_D2_U6_P5 | 已冻结的旧压2方案，仅作历史参照 |
+| PRIMARY_FILL | 新框架，每组2单5双、64元，顺序买至预算上限 |
+| COMPLEMENT | 同一框架买64元原组+32元遗漏赛果单选组；余款够64元则加下一原组 |
+| MATCHED_PRIMARY | 与COMPLEMENT完全相同的原组，省去所有32元转换组，资金留现金 |
+
+COMPLEMENT与MATCHED_PRIMARY隔离转换组本身的增益；与PRIMARY_FILL比较的是
+相同预算下多买不同框架还是补齐转换位的取舍。96元一对等效于转换位全选，
+不应把配对视为独立七串机会：一对至多命中一组，其余六场必须全部命中。
+
+## 汇总
+
+```{r}
+z$summary |> knitr::kable(digits=2)
+```
+
+## 逐期收益率与命中
+
+```{r}
+rows |> mutate(stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+               budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,stake,cash_cny,gross,net,stake_ROI_percent,budget_ROI_percent) |>
+ knitr::kable(digits=2)
+```
+
+## 权益与回撤
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="距此前高点回撤（元）",color="方案")+theme_minimal()
+```
+
+## 候选池与现金原因
+
+A/D/C候选池允许交叉：同一场可同时符合胆与稳定双选候选条件，但每组只承担一个角色。
+无可行框架时停止下注，不降低50%门槛、不用不合格场次填充。
+不同时点原生赛前快照仅用于历史回顾，未证明所有组能在同一实际出票时点成立。
+
+```{r}
+tibble::as_tibble(v$pools) |> knitr::kable()
+tibble(input_seal=v$upstream_freeze_seal,scope="EXPOSED_FIXED_NO_FITTING",initial_capital_cny=100000) |> knitr::kable()
+```
