@@ -1,0 +1,138 @@
+---
+title: "N7复用评估：R参数接口"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  fixture: "tests/fixtures/n7_reuse_interface.json.gz"
+  python: null
+---
+
+三个入口位于`r/fundamentals_n7_reuse.R`：准备一期候选池、按参数生成方案、读取显式结算数据评估。
+它们调用同一套Python选组、替换和结算函数，没有另一套R算法。
+本例使用已暴露100514期的固定回归输入，不做重训或自动寻找最优参数，也不代表新测试集。
+当前压缩场数支持1、2；固定N7、每期预算1,024元、2元基本票、一次0.65返奖。
+
+```{r}
+library(dplyr)
+source('r/python_bridge.R')
+source('r/fundamentals_n7_reuse.R')
+python <- if(is.null(params$python)) Sys.getenv('FUNDAMENTALS_PYTHON') else params$python
+if(!nzchar(python) || !file.exists(python)) stop('Set FUNDAMENTALS_PYTHON or the python parameter to the configured project interpreter')
+project_root <- normalizePath('.')
+input <- jsonlite::fromJSON(gzfile(params$fixture),simplifyVector=TRUE)
+```
+
+## 参数说明
+
+|参数|含义|当前范围／默认值|
+|---|---|---|
+|`single_count`|每组压成单选的场数|显式传入1或2|
+|`U`|单场最多被多少组持有|显式正整数|
+|`P`|任意两组最多共同持有几场|显式整数0–6|
+|`replace_singles`|复用时启用单选替换|默认FALSE|
+|`single_ceiling`|原第一赛果概率不高于此值才替换单选|默认0.75，可改0.50等|
+|`double_rule`|双选替换条件|NONE、GAP、MARKET、EITHER；默认NONE|
+|`max_gap`|第二与第三赛果概率差门槛|默认0.05|
+|`minimum_tv`|市场与基线概率总变差距离门槛|默认0.15|
+|`minimum_market_tail_lead`|市场第三方向相对第二方向的概率领先门槛|默认0.05|
+
+所有概率门槛使用0–1单位。单选替换取原第二方向；双选替换取原第一＋第三方向。
+仅后续复用持仓可能改变，首次出现不变，再次复用不交替。
+GAP使用概率差条件，MARKET使用既有市场分歧条件，EITHER满足任一条件即可。
+两种替换可以独立开关或同时启用。不存在“预算不够就自动加钱”的路径，无法扩组就留现金。
+
+## 准备一次，反复生成
+
+`frame`包含一期的issue、slot、provider_id、handicap和p_W/D/L、q_W/D/L；
+可保留home、away名称，不能传入赛果或其他列。issue、provider_id必须为字符串，保留前导零。
+p为当前基线让球概率，q为赛前欧赔＋大小球映射的同玩法市场概率。
+`cutoffs`是以slot命名的UTC时间字符串列表，必须与frame场次一一对应；接口使用共享Cutoff实现验证。
+数据可用性及上游模型训练的时序责任仍由输入工件承担，本接口不将未知可用性升级为赛前已知。
+
+```{r}
+prepared <- prepare_n7_reuse(
+  frame=input$frame,cutoffs=input$cutoffs,
+  python=python,project_root=project_root,
+  n=7,budget_cny=1024,unit_cny=2,payout_factor=.65,
+  candidate_seed=41900,pool_size=512,design_seed=41901,design_draws=1024
+)
+plan <- plan_n7_reuse(
+  prepared,cutoffs=input$cutoffs,
+  single_count=2,U=6,P=5,
+  replace_singles=FALSE,double_rule='NONE',
+  python=python,project_root=project_root
+)
+plan$summary |> knitr::kable()
+plan$legs |> select(group,slot,provider_id,support,p_W,p_D,p_L) |> head(10) |> knitr::kable(digits=3)
+plan$tickets |> head(6) |> knitr::kable()
+```
+
+prepared为当前R会话内的可复用上下文，包含Python对象；每一期各准备一次即可，不在每次改U/P时重建候选池。
+换会话后重新准备，不将Python指针存为RDS。plan中的bundle_json和receipt则为可保存的普通R对象；
+场次和基本票直接返回tibble。输入、cutoff、实现或收据不匹配时明确失败，不静默重建。
+
+## 单选与双选替换示例
+
+```{r}
+alternative <- plan_n7_reuse(
+  prepared,cutoffs=input$cutoffs,
+  single_count=1,U=4,P=5,
+  replace_singles=TRUE,single_ceiling=.75,
+  double_rule='EITHER',max_gap=.05,
+  minimum_tv=.15,minimum_market_tail_lead=.05,
+  python=python,project_root=project_root
+)
+alternative$summary |> knitr::kable()
+```
+
+## 批量评估
+
+先生成整组方案，再传入结算。每个方案同时返回BASE和SELECTED；
+BASE是该方案同分组、同单选位置、同金额的不替换对照。重复BASE属于不同参数对照，不是独立投注。
+`policy`包含完整参数哈希，防止不同门槛或替换条件在合并时被混为同一策略。
+
+```{r}
+grid <- tibble::tribble(
+  ~single_count,~U,~P,~replace_singles,
+  1,4,5,TRUE,
+  2,2,4,FALSE,
+  2,6,5,FALSE,
+  2,16,6,TRUE
+)
+plans <- vector('list',nrow(grid))
+for(i in seq_len(nrow(grid))) plans[[i]] <- plan_n7_reuse(
+  prepared,cutoffs=input$cutoffs,
+  single_count=grid$single_count[i],U=grid$U[i],P=grid$P[i],
+  replace_singles=grid$replace_singles[i],double_rule='NONE',
+  python=python,project_root=project_root
+)
+results <- vector('list',length(plans))
+for(i in seq_along(plans)) results[[i]] <- settle_n7_reuse(
+  plans[[i]],audit=input$audit,python=python,project_root=project_root
+)
+results <- bind_rows(results)
+results |> mutate(budget_ROI_percent=100*budget_return) |>
+ select(issue,single_count,U,P,replace_singles,rule,stake,cash_cny,net,budget_ROI_percent,hits,groups) |>
+ knitr::kable(digits=2)
+```
+
+这里仅展示一期接口回归，不能用一期计算有代表性的历史回撤。
+多期结果保留issue、policy、预算、现金和净收益，可直接复用已有
+`strategy_equity_curves()`及`strategy_drawdown_report()`，不需要重写资金统计。
+结算数据仍通过项目已有SQLite查询和审计链取得，最终SP不会进入prepare或plan。
+
+## 收据与函数测试
+
+```{r}
+tibble::tibble(fixture_sha256=digest::digest(file=params$fixture,algo='sha256'),
+  scope=plan$receipt$scope,input_sha256=plan$receipt$input_sha256,
+  plan_seal=plan$receipt$plan_seal,receipt_seal=plan$receipt$seal) |> knitr::kable()
+```
+
+`tests/testthat/test-fundamentals-n7-reuse.R`覆盖三个公开函数及运行时助手：
+148个历史方案的完整seal对照、四种双选规则、单选开关、结算独立返奖核对、
+非法参数、错误cutoff、输入／收据变更、空或重复结算，以及R/Python字符串ID和整数slot转换。
+验收要求实际执行测试和无缓存渲染，随后通过Codex review。
