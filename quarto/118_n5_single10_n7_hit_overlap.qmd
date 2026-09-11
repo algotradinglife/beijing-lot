@@ -1,0 +1,98 @@
+---
+title: "五串一10%替换与七串一：命中期重叠"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n5-n6-single10-v1"
+  controls_study: "data/derived/fundamentals_417/n5-single-swaps-v1"
+  output: "data/derived/fundamentals_417/n5-single10-n7-hit-overlap-v1"
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+source("r/fundamentals_pure_report.R")
+a<-read_pure_baseline_report(params$study,params$archived_report)$result
+b<-read_pure_baseline_report(params$controls_study,params$archived_report)$result
+issues<-unlist(a$issue_order)
+stopifnot(identical(issues,unlist(b$issue_order)),length(issues)==48,!anyDuplicated(issues),
+ identical(as.integer(unlist(a$seeds)),0:99))
+rows<-as_tibble(a$rows) |> filter(source_policy=="N5",!endsWith(policy,"NO_SWAP"))
+controls<-as_tibble(b$controls) |> filter(policy %in% c("U3_BASELINE","U6_BASELINE"))
+stopifnot(nrow(rows)==4800,nrow(controls)==96,!anyDuplicated(rows[c("issue","seed")]),
+ !anyDuplicated(controls[c("issue","policy")]),!anyNA(rows$hits),!anyNA(controls$hits),
+ all(rows$status %in% c("COMPLETE","NO_BET")),all(controls$status %in% c("COMPLETE","NO_BET")))
+stopifnot(nrow(anti_join(expand_grid(issue=issues,seed=0:99),rows,by=c("issue","seed")))==0)
+paired<-tibble()
+for(ref in c("U3_BASELINE","U6_BASELINE")) {
+ current<-rows |> select(issue,seed,n5_hits=hits) |> left_join(controls |> filter(policy==ref) |>
+  select(issue,n7_hits=hits),by="issue",relationship="many-to-one") |>
+  mutate(reference=ref,n5_hit=n5_hits>0,n7_hit=n7_hits>0)
+ stopifnot(!anyNA(current$n7_hits))
+ paired<-bind_rows(paired,current)
+}
+per_seed<-paired |> group_by(reference,seed) |> summarise(n5_hit_issues=sum(n5_hit),n7_hit_issues=sum(n7_hit),
+ both_hit=sum(n5_hit & n7_hit),n5_only=sum(n5_hit & !n7_hit),n7_only=sum(!n5_hit & n7_hit),
+ neither=sum(!n5_hit & !n7_hit),either_hit=sum(n5_hit | n7_hit),hit_phi=cor(as.integer(n5_hit),as.integer(n7_hit)),.groups="drop")
+stopifnot(nrow(per_seed)==200,all(per_seed$both_hit+per_seed$n5_only+per_seed$n7_only+per_seed$neither==48))
+summary<-per_seed |> group_by(reference) |> summarise(seeds=n(),n5_hit_issues=mean(n5_hit_issues),n7_hit_issues=first(n7_hit_issues),
+ both_hit=mean(both_hit),n5_only=mean(n5_only),n7_only=mean(n7_only),neither=mean(neither),
+ either_p05=quantile(either_hit,.05),either_p95=quantile(either_hit,.95),
+ either_hit=mean(either_hit),either_hit_percent=100*mean(either_hit)/48,
+ n7_hits_covered_percent=100*mean(both_hit)/first(n7_hit_issues),mean_hit_phi=mean(hit_phi),.groups="drop")
+periods<-paired |> group_by(reference,issue) |> summarise(n7_hit=first(n7_hit),n5_hit_seed_percent=100*mean(n5_hit),
+ both_hit_seed_percent=100*mean(n5_hit & n7_hit),either_hit_seed_percent=100*mean(n5_hit | n7_hit),.groups="drop") |>
+ arrange(match(issue,issues),reference)
+```
+
+同48期，五串一为复用单选10%切换的100个固定种子；七串一U3/U6均为不替换对照。
+“命中期”指至少有一组中奖，不表示该期净盈利。包含三个空仓期的零命中。
+每个种子单独与固定七串一配对，再对100个种子的期数取平均；小数不代表实际期次可以拆分。
+不将100次运行合并成一个有4,800期的独立样本，也不取所有种子的命中并集。
+
+## 命中期重叠（100个种子的平均期数）
+
+```{r}
+summary |> select(reference,n5_hit_issues,n7_hit_issues,both_hit,n5_only,n7_only,neither,either_hit,either_hit_percent) |>
+ knitr::kable(digits=2)
+```
+
+n5_only表示五串一命中而对应七串一未中；n7_only反之。either_hit为两者至少一方命中的期数。
+这只是现有独立方案的命中集合并集，未实际组合投注，也未在共同1024元预算下重新分配资金。
+
+## 重叠比例与随机变化
+
+```{r}
+summary |> select(reference,n7_hits_covered_percent,mean_hit_phi,either_p05,either_p95) |> knitr::kable(digits=3)
+```
+
+n7_hits_covered_percent的分母是七串一命中的19期；hit_phi为二元命中相关性，报告各种子的均值。
+5%–95%分位数描述本次随机运行的并集期数，不是未来置信区间。历史已经暴露，仅作描述诊断。
+
+## 各期重叠情况
+
+```{r}
+knitr::kable(periods,digits=1)
+```
+
+```{r}
+#| include: false
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$output,"summary.csv"))
+readr::write_csv(per_seed,file.path(params$output,"per_seed.csv"))
+readr::write_csv(periods,file.path(params$output,"periods.csv"))
+hashes<-list()
+for(path in c(file.path(params$study,c("results.json","plans-frozen.json")),
+ file.path(params$controls_study,c("results.json","plans-frozen.json")),
+ "quarto/118_n5_single10_n7_hit_overlap.qmd","r/fundamentals_pure_report.R")) hashes[[path]]<-digest::digest(file=path,algo="sha256")
+jsonlite::write_json(list(hashes=hashes,issues=issues,seeds=0:99,parameters=params,
+ generated_at=format(Sys.time(),tz="UTC",usetz=TRUE),historical_admission=FALSE),
+ file.path(params$output,"provenance.json"),auto_unbox=TRUE,pretty=TRUE)
+```
