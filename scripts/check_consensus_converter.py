@@ -30,12 +30,38 @@ if __name__=="__main__":
     labels={(a["issue"],a["slot"],a["provider_id"]):a for a in audit}
     saved={(a["issue"],a["policy"]):a for a in result["rows"]}
     assert len(saved)==(384 if r["design"]=="independent" else 192)
+    excluded={}
+    if "filter_ledgers" in r:
+        import pandas as pd
+        factors=json.loads(Path("data/derived/fundamentals_417/new48-pure-baseline-v1/factors.json").read_text())
+        frame=pd.DataFrame(factors["rows"])
+        for issue,entry in r["filter_ledgers"].items():
+            ledger=entry["receipt"]
+            assert stable_json_hash(ledger)==entry["seal"]
+            original=frame[frame.issue==issue]
+            dropped=[]
+            for row in original.to_dict("records"):
+                po=sorted("WDL",key=lambda d:(-row["p_"+d],"WDL".index(d)))[:2]
+                qo=sorted("WDL",key=lambda d:(-row["q_"+d],"WDL".index(d)))[:2]
+                if row["handicap"]==0 and set(po)!=set(qo):dropped.append(int(row["slot"]))
+            assert sorted(dropped)==ledger["dropped_slots"]
+            kept=original[~original.slot.isin(dropped)]
+            assert stable_json_hash(kept.sort_values("slot").to_json(orient="records"))==ledger["retained_sha256"]
+            assert ledger["input_count"]==len(original) and ledger["retained_count"]==len(kept)
+            excluded[issue]=set(dropped)
+        reference=json.loads((Path(r["filtered_reference"])/"results.json").read_text())["rows"]
+        assert result["reference_rows"]==reference
     groups_checked=0
     for issue in r["issues"]:
         z=json.loads(gzip.decompress((root/"plans"/f"{issue}.json.gz").read_bytes()))
         assert stable_json_hash({k:v for k,v in z.items() if k!="seal"})==z["seal"]
         sk=z["skeletons"]
         plans=z["plans"]
+        if issue in excluded:
+            assert all(leg["slot"] not in excluded[issue] for plan in plans.values()
+                       for part in plan["components"] for leg in part["legs"])
+            assert all(plan["input_sha256"]==r["filter_ledgers"][issue]["receipt"]["retained_sha256"]
+                       for plan in plans.values())
         if r["design"]=="paired":
             assert max(Counter(s for g in sk for s in g).values(),default=0)<=3
             assert all(len(set(a)&set(b))<=5 for a,b in itertools.combinations(sk,2))

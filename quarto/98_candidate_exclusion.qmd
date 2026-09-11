@@ -1,0 +1,86 @@
+---
+title: "排除零让球且Top2分歧场次：重新选场对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/candidate-exclusion-v1"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+paired<-read_pure_baseline_report(file.path(params$study,"paired"),params$archived_report)$result
+independent<-read_pure_baseline_report(file.path(params$study,"independent"),params$archived_report)$result
+stopifnot(identical(paired$issue_order,independent$issue_order))
+rows<-bind_rows(
+ as_tibble(paired$rows) |> filter(policy!="OLD_D2_U6_P5") |> mutate(policy=paste0("FILTER_",policy)),
+ as_tibble(paired$reference_rows) |> filter(policy!="OLD_D2_U6_P5") |> mutate(policy=paste0("ORIGINAL_",policy)),
+ as_tibble(independent$rows) |> filter(grepl("^INDEPENDENT_",policy)) |> mutate(policy=paste0("FILTER_",policy)),
+ as_tibble(independent$reference_rows) |> filter(grepl("^INDEPENDENT_",policy)) |> mutate(policy=paste0("ORIGINAL_",policy))
+)
+z<-missed_strategy_summary(rows,unlist(paired$issue_order),100000)
+```
+
+## 已确认规则
+
+从整个候选池排除：北单主队让球为0，且基线与市场的Top2赛果集合不同。
+只比较集合，不比较集合内排序；首选不同而Top2集合相同仍可入选。
+这是用户纠正后的规则。上一轮97报告“只保留零让球转换组”不代表本轮意图。
+
+过滤后重新生成七场组合，包括胆、稳定双选和转换位；
+预算、排序、配比、种子和复用限制与各自未过滤对照一致。
+配对方案骨架U3/P5，独立方案实际组U6/P5。
+每期1024元、每票单位2元、整票一次0.65系数，未使用预算留现金。
+原组2单5双64元、转换组3单4双32元；不使用比分保护。
+
+48期已曝光历史固定规则诊断，不训练、不寻优、不升级专家。
+原方案是散列绑定的既有证据，不冒充当前实现重跑。
+本轮输入、原生逐场截止对象、删除清单、保留输入及传递代码均绑定；
+全部选场方案冻结后才读取结算。历史时间代理不证明真实同时可出票。
+本次差异包括重新选场带来的组数、概率与资金暴露变化。
+
+## 总收益、收益率和回撤
+
+```{r}
+z$summary |> knitr::kable(digits=2)
+```
+
+## 每期收益与命中
+
+```{r}
+rows |> mutate(stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,stake,cash_cny,gross,net,stake_ROI_percent,budget_ROI_percent) |>
+ knitr::kable(digits=2)
+```
+
+## 候选池变化
+
+```{r}
+pool_rows<-list()
+for(issue in names(paired$filter_ledgers)) {
+ r<-paired$filter_ledgers[[issue]]$receipt
+ pool_rows[[issue]]<-tibble(issue=issue,input_count=r$input_count,
+ retained_count=r$retained_count,excluded_count=r$input_count-r$retained_count,
+ excluded_slots=paste(unlist(r$dropped_slots),collapse=","))
+}
+bind_rows(pool_rows) |> knitr::kable()
+```
+
+## 收益与回撤曲线
+
+```{r}
+plot_rows<-z$curves |> mutate(family=if_else(grepl("INDEPENDENT",policy),"独立组","配对组"))
+ggplot(plot_rows,aes(period,equity_cny,color=policy))+geom_line()+facet_wrap(~family,scales="free_y")+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(plot_rows,aes(period,drawdown_cny,color=policy))+geom_line()+facet_wrap(~family,scales="free_y")+labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+```
