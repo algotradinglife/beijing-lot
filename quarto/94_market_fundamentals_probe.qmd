@@ -59,6 +59,48 @@ x |> group_by(conflict) |> summarise(
  .groups="drop") |> knitr::kable(digits=2)
 ```
 
+## 具体让球档位
+
+handicap按主队记号：负数表示主队让球（-1即主让1），正数表示客队让球
+（+1即客让1、主受让1）；0为不让球。逐个整数档位展示，不把2球以上合并。
+每行每场只计一次，样本量和涉及期数一并提供。四列命中率均为百分数；
+单选取最高概率方向，双选取各自前两方向。
+
+```{r}
+stopifnot(all(is.finite(x$handicap)),all(x$handicap==floor(x$handicap)))
+handicap_summary<-x |> group_by(handicap) |> summarise(
+ n=n(),issues=n_distinct(issue),
+ baseline_single_hits=sum(p_single),market_single_hits=sum(q_single),
+ baseline_single_pct=100*mean(p_single),market_single_pct=100*mean(q_single),
+ baseline_double_hits=sum(p_double),market_double_hits=sum(q_double),
+ baseline_double_pct=100*mean(p_double),market_double_pct=100*mean(q_double),
+ .groups="drop") |> arrange(handicap)
+stopifnot(sum(handicap_summary$n)==nrow(x))
+handicap_summary |> knitr::kable(digits=2)
+```
+
+## 让球档位与概率分歧交叉
+
+分歧分类依据最高方向；最高方向一致时，第二方向仍可能不同。
+下表补充双选的共同命中、基线独中、市场独中和共同未中。
+“独中”是某一双选覆盖实际赛果、另一双选未覆盖，不代表整张串关命中。
+这能帮助寻找复用时的互补候选，但不是替换后的组合收益测试。
+
+```{r}
+handicap_conflict<-x |> group_by(handicap,conflict) |> summarise(
+ n=n(),issues=n_distinct(issue),
+ baseline_single_pct=100*mean(p_single),market_single_pct=100*mean(q_single),
+ baseline_double_pct=100*mean(p_double),market_double_pct=100*mean(q_double),
+ both_double_hits=sum(p_double & q_double),
+ baseline_only_double_hits=sum(p_double & !q_double),
+ market_only_double_hits=sum(!p_double & q_double),
+ both_double_misses=sum(!p_double & !q_double),
+ .groups="drop") |> arrange(handicap,conflict)
+stopifnot(sum(handicap_conflict$n)==nrow(x),
+ all(with(handicap_conflict,both_double_hits+baseline_only_double_hits+market_only_double_hits+both_double_misses)==handicap_conflict$n))
+handicap_conflict |> knitr::kable(digits=2)
+```
+
 ## 强分歧与主客近期表现
 
 gap 是给球方相对接球方的近期主客场场均积分差，并不等于
