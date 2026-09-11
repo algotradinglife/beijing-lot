@@ -1,0 +1,117 @@
+---
+title: "更新100期：五、六、七串一及各半组合"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/updated100-strategies-v1"
+  initial_capital_cny: 100000
+  archived_report: false
+---
+
+各方案每期预算1024元，初始资金10万元。组合为五串一单选10%替换与U3各分512元，
+完整组按原顺序买入，剩余现金不转投；预算各半不代表实际投入相同。
+七个对照与上一轮一致，无专家、无比分保护。实际返还只乘一次0.65。
+随机替换只作用于被复用的单选位置，双选不替换；100个固定种子全部报告，主图统一seed0。
+原48期为已暴露研究；新增100期使用固定规则作历史诊断，不重训，不宣称前瞻或干净学习验收。
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+old_rows<-as_tibble(v$prior_rows)
+new_rows<-as_tibble(v$rows)
+stopifnot(length(v$issue_order)==100,length(v$prior_issue_order)==48,!any(unlist(v$issue_order) %in% unlist(v$prior_issue_order)))
+rows<-bind_rows(old_rows |> mutate(cohort='原48期'),new_rows |> mutate(cohort='新增100期'))
+stopifnot(!anyDuplicated(rows[c('issue','policy')]),all(rows$status %in% c('COMPLETE','NO_BET')))
+issue_order<-c(unlist(v$prior_issue_order),unlist(v$issue_order))
+curves<-strategy_equity_curves(rows |> mutate(model='Pure baseline',label=policy),issue_order,params$initial_capital_cny)
+stopifnot(!any(curves$stopped))
+cohort_curves<-bind_rows(
+ strategy_equity_curves(old_rows |> mutate(model='Pure baseline',label=policy),unlist(v$prior_issue_order),params$initial_capital_cny) |> mutate(cohort='原48期'),
+ strategy_equity_curves(new_rows |> mutate(model='Pure baseline',label=policy),unlist(v$issue_order),params$initial_capital_cny) |> mutate(cohort='新增100期'),
+ curves |> mutate(cohort='合计148期'))
+metrics<-cohort_curves |> filter(period>0) |> group_by(cohort,policy,source_policy) |> summarise(
+ stake=sum(stake),net=sum(net),ROI_percent=100*sum(net)/sum(stake),groups=sum(groups),wins=sum(hits),
+ hit_issues=sum(hits>0),max_drawdown=max(drawdown_cny),.groups='drop')
+fixed_names<-c('N5_NO_SWAP','N6_NO_SWAP','U3_BASELINE','U6_BASELINE')
+summary<-metrics |> filter(!policy %in% fixed_names) |> group_by(cohort,source_policy) |> summarise(seeds=n(),
+ stake=first(stake),mean_net=mean(net),mean_ROI=mean(ROI_percent),p05_ROI=quantile(ROI_percent,.05),
+ p95_ROI=quantile(ROI_percent,.95),mean_hit_issues=mean(hit_issues),median_dd=median(max_drawdown),.groups='drop')
+stopifnot(all(summary$seeds==100))
+labels<-c(MIX_S000='组合：五串10%＋U3各半',N5_S000='五串：单选10%替换',N5_SWAP_S000='五串：单选25%替换',
+ N6_S000='六串：单选10%替换',N5_NO_SWAP='五串：不替换',N6_NO_SWAP='六串：不替换',
+ U3_BASELINE='七串：U3不替换',U6_BASELINE='七串：U6不替换')
+colors<-c(MIX_S000='#000000',N5_S000='#56B4E9',N5_SWAP_S000='#999999',N6_S000='#E69F00',
+ N5_NO_SWAP='#0072B2',N6_NO_SWAP='#009E73',U3_BASELINE='#D55E00',U6_BASELINE='#CC79A7')
+plot_data<-curves |> filter(policy %in% names(labels)) |> mutate(policy=factor(policy,levels=names(labels)),
+ 资金=equity_cny,回撤=-drawdown_cny) |> pivot_longer(c(资金,回撤),names_to='面板',values_to='金额') |>
+ mutate(面板=factor(面板,levels=c('资金','回撤')),线宽=if_else(as.character(policy)=='MIX_S000',1.2,.65))
+```
+
+## 收益与回撤：原48期接续新增100期
+
+虚线为原样本与新增样本的分界，资金不在分界处重置。
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+p<-ggplot(plot_data,aes(period,金额,color=policy,group=policy,linewidth=线宽))+geom_line()+
+ geom_vline(xintercept=48,linetype='dashed',color='grey40')+
+ scale_linewidth_identity()+facet_wrap(~面板,ncol=1,scales='free_y')+
+ scale_color_manual(values=colors,breaks=names(labels),labels=labels)+
+ scale_x_continuous(breaks=c(0,24,48,73,98,123,148),labels=c('起始',issue_order[c(24,48,73,98,123,148)]))+
+ scale_y_continuous(labels=scales::label_number(big.mark=',',accuracy=1))+
+ labs(title='更新100期后的资金与回撤',subtitle='初始资金100,000元；随机方案固定seed0；虚线右侧为新增100期',
+ x='历史期号',y='人民币元；回撤以负值显示',color=NULL)+
+ theme_minimal(base_size=12,base_family='Noto Sans CJK SC')+
+ theme(legend.position='bottom',panel.grid.minor=element_blank())+guides(color=guide_legend(ncol=2,byrow=TRUE))
+p
+ggsave(file.path(params$study,'combined.png'),p,width=14,height=10,dpi=200)
+ggsave(file.path(params$study,'combined.pdf'),p,width=14,height=10,device=grDevices::cairo_pdf)
+```
+
+## 各阶段的实际收益与回撤
+
+收益率＝净收益／实际投入；各阶段回撤分别从10万元起算，合计回撤按连续148期计算。
+命中期指至少中一组，并不等于盈利期。
+
+```{r}
+metrics |> filter(policy %in% names(labels)) |> mutate(方案=unname(labels[policy])) |>
+ select(cohort,方案,stake,net,ROI_percent,hit_issues,max_drawdown) |> knitr::kable(digits=2)
+```
+
+## 全部100个种子的表现
+
+```{r}
+knitr::kable(summary,digits=2)
+```
+
+## 新增期逐期表现
+
+基本面窗口和盘口均可用才生成候选概率。原始缺失、历史不足、中立场未获建模授权等原因分别保留，
+不以缺失概率代替零概率；通过模型输入后仍需满足组票角色及复用规则。
+
+```{r}
+as_tibble(v$readiness) |> count(form_status,market_status,ready,name='场次数') |> knitr::kable()
+```
+
+```{r}
+new_rows |> filter(policy %in% names(labels)) |> mutate(方案=unname(labels[policy]),ROI_percent=if_else(stake>0,100*net/stake,NA_real_)) |>
+ select(issue,方案,stake,net,ROI_percent,groups,hits,status) |> knitr::kable(digits=2)
+```
+
+```{r}
+#| include: false
+readr::write_csv(metrics,file.path(params$study,'metrics.csv'))
+readr::write_csv(summary,file.path(params$study,'summary.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+```
