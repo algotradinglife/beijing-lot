@@ -1,0 +1,97 @@
+---
+title: "五／六／七串一不替换：逐期收益相关性"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n5-single-swaps-v1"
+  output: "data/derived/fundamentals_417/n5-n6-n7-correlations-v1"
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+source("r/fundamentals_pure_report.R")
+loaded<-read_pure_baseline_report(params$study,params$archived_report)
+rows<-bind_rows(as_tibble(loaded$result$rows) |> filter(policy=="N5_NO_SWAP"),
+ as_tibble(loaded$result$controls))
+issues<-unlist(loaded$result$issue_order)
+policies<-c("N5_NO_SWAP","N6_UNCAPPED","U3_BASELINE","U6_BASELINE")
+stopifnot(length(issues)==48,!anyDuplicated(issues),nrow(rows)==192,
+ !anyDuplicated(rows[c("issue","policy")]),setequal(rows$policy,policies),
+ !anyNA(rows[c("net","hits","stake")]),all(is.finite(rows$net)))
+expected<-expand_grid(issue=issues,policy=policies)
+stopifnot(nrow(anti_join(expected,rows,by=c("issue","policy")))==0)
+net<-rows |> select(issue,policy,net) |> pivot_wider(names_from=policy,values_from=net)
+net<-as.matrix(net[match(issues,net$issue),policies])
+hit<-rows |> mutate(hit=as.integer(hits>0)) |> select(issue,policy,hit) |>
+ pivot_wider(names_from=policy,values_from=hit)
+hit<-as.matrix(hit[match(issues,hit$issue),policies])
+stopifnot(!anyNA(net),!anyNA(hit))
+pearson<-stats::cor(net)
+spearman<-stats::cor(net,method="spearman")
+phi<-stats::cor(hit)
+pairs<-combn(seq_along(policies),2)
+comparison<-tibble()
+for (k in seq_len(ncol(pairs))) {
+ i<-pairs[1,k];j<-pairs[2,k]
+ comparison<-bind_rows(comparison,tibble(first=policies[i],second=policies[j],
+  pearson=pearson[i,j],spearman=spearman[i,j],hit_phi=phi[i,j],
+  both_hit=sum(hit[,i]==1 & hit[,j]==1),first_only=sum(hit[,i]==1 & hit[,j]==0),
+  second_only=sum(hit[,i]==0 & hit[,j]==1),neither=sum(hit[,i]==0 & hit[,j]==0)))
+}
+stopifnot(all(comparison$both_hit+comparison$first_only+comparison$second_only+comparison$neither==48))
+```
+
+同48期按期号严格配对，比较每期净收益金额，包含未下注期的零收益。
+五、六串一均无有效U限制、不替换；七串一保留原U3/U6限制、不替换。
+单选均按两源Top1一致、市场概率筛选，双选为基线Top2；排除零让球Top2分歧。
+五／六串一每期最多64／32组，组间最多重叠4／5场；七串一沿用原组。各版本实际投入不同。
+Pearson反映金额的线性同向变化；Spearman反映排序的同向变化，降低少数大额收益的影响。
+没有对累计资金曲线计算相关性，也没有将未下注期的ROI强行设为零。
+这是已暴露历史的描述性统计，不用于学习、调参或自动资金分配。
+
+## 每期净收益 Pearson 相关性
+
+```{r}
+knitr::kable(pearson,digits=3)
+```
+
+## 每期净收益 Spearman 相关性
+
+```{r}
+knitr::kable(spearman,digits=3)
+```
+
+## 中奖期重合情况
+
+hit_phi为“本期是否至少有一个组中奖”的二元相关性。命中不等于盈利。
+first_only、second_only分别为仅第一个、仅第二个版本命中的期数。
+
+```{r}
+comparison |> select(first,second,hit_phi,both_hit,first_only,second_only,neither) |>
+ knitr::kable(digits=3)
+```
+
+低相关并不自动带来较小回撤；组合收益还取决于实际权重、共同亏损时段和投入。
+48期且策略共享场次，结果只描述当前样本，不解释为独立样本的显著性或未来稳定关系。
+
+```{r}
+#| include: false
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(comparison,file.path(params$output,"correlations.csv"))
+bindings<-c(file.path(params$study,c("results.json","plans-frozen.json")),
+ "quarto/115_n5_n6_n7_correlations.qmd","r/fundamentals_pure_report.R")
+hashes<-list()
+for (f in bindings) hashes[[f]]<-digest::digest(file=f,algo="sha256")
+jsonlite::write_json(list(source_seal=loaded$receipt$plan_freeze_seal,hashes=hashes,
+ issues=issues,policies=policies,observations="issue_net_cny_and_any_group_hit",
+ generated_at=format(Sys.time(),tz="UTC",usetz=TRUE),historical_admission=FALSE),
+ file.path(params$output,"provenance.json"),auto_unbox=TRUE,pretty=TRUE)
+```
