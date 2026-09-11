@@ -1,0 +1,120 @@
+---
+title: "哪些比赛拖累命中：类别、概率偏差与重复持仓"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/category-diagnostics-v1"
+  archived_report: false
+---
+
+48期100402–100607及原25个未中期的事后诊断，不训练、不剔除类别、不改变票据。
+全体可用比赛2561场；实际下注按单选/双选分别去重，另看重复持仓。同场可以同时属于两种支持，
+不能把单选和双选分母相加当作独立比赛数。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_missed_issues.R')
+source('r/fundamentals_category_diagnostics.R')
+v<-read_pure_baseline_report(params$study,params$archived_report)
+z<-category_diagnostics(tibble::as_tibble(v$result$factors),tibble::as_tibble(v$result$features),
+ tibble::as_tibble(v$result$legs),tibble::as_tibble(v$result$audit),
+ tibble::as_tibble(v$result$rows) |> select(issue,hits))
+s<-z$summary
+stopifnot(n_distinct(z$observations$issue)==48,
+ nrow(filter(z$observations,view=='ALL_AVAILABLE',role=='SINGLE'))==2561,
+ sum(z$original_issues$whole_issue_missed)==25)
+```
+
+## 主要发现
+
+强分歧单选114场命中25.4%，基线预计56.0%；强分歧双选188场命中65.4%，基线预计79.2%。
+全体2561场的同类Top1/Top2也偏低，说明不完全由下注筛选造成。
+大让球单选175场实际命中53.1%，不是各让球深度中最低；问题在预计71.2%，高估18.1个百分点。
+单选概率70%–80%的105场实际只命中41.0%，说明基线的高置信度也需要检查。
+
+实际双选俄超46场命中56.5%、西乙69场63.8%、巴西甲32场59.4%；全体可用比赛Top2
+对应为60.0%、64.0%、57.6%。但联赛样本、期数有限，球队重复、赛季阶段、让球和分歧结构
+可能混杂，不能归因为联赛本身，更不能据此发布联赛黑名单。
+
+原25期有62组仅错1场，分布在19期：33组错在单选、29组错在双选。
+强分歧仅贡献8组（单选5、双选3），解释不了大部分一场之差；62组也不是62个独立事件。
+
+## 分母与概率含义
+
+ALL_AVAILABLE：全部可用场次的基线Top1/Top2校准对照；
+SELECTED_UNIQUE：实际投注同一期同场同支持去重；HOLDINGS：重复持仓。
+market_percent是市场对同一个所选支持的概率，非市场自己选方向的命中率。
+error_pp为实际减基线预测。STRONG_DIFF是两源最高方向不同且总变差≥0.15；
+MILD_DIFF方向不同但未达此距离。固定分箱仅作描述，不拟合、不据此发布策略。
+
+```{r}
+s |> filter(slice=='ALL48',dimension=='conflict') |>
+ select(view,role,stratum,n,issues,actual_percent,predicted_percent,market_percent,error_pp) |>
+ knitr::kable(digits=1)
+```
+
+## 让球深度与置信度
+
+depth 2表示绝对让球≥2，不代表主队一定让球。
+
+```{r}
+s |> filter(view=='SELECTED_UNIQUE',slice=='ALL48',dimension %in% c('depth','probability_band')) |>
+ select(role,dimension,stratum,n,issues,actual_percent,predicted_percent,market_percent,error_pp) |> knitr::kable(digits=1)
+```
+
+## 赛事类别与具体赛事
+
+友谊赛、名称含“附”的赛事单列；其余只称OTHER_CUP_FLAG/OTHER_CUP_ZERO。
+cup不是干净的联赛/杯赛分类：友谊赛也标1，比甲同时有0/1；不得当作跨级身份。
+competition仅去前后空格，未合并异名或纠正原数据。所有具体赛事都列出；
+n≥30且至少5期只是阅读参考，不是显著性或准入标准。
+
+```{r}
+s |> filter(view=='SELECTED_UNIQUE',slice=='ALL48',dimension=='family') |>
+ select(role,stratum,n,issues,actual_percent,predicted_percent,error_pp) |> knitr::kable(digits=1)
+s |> filter(view %in% c('ALL_AVAILABLE','SELECTED_UNIQUE'),slice=='ALL48',dimension=='league') |>
+ mutate(reference_sample=n>=30 & issues>=5) |> arrange(role,stratum,view) |>
+ select(view,role,stratum,n,issues,reference_sample,actual_percent,predicted_percent,error_pp) |> knitr::kable(digits=1)
+```
+
+## 近期主客表现与总进球预期
+
+giving_venue_ppg是让球方相对接球方的近期主客场场均积分差，不是球队自身场均积分；
+无让球单列NO_HANDICAP。差值<0时，实际双选108场命中68.5%，基线却预计85.9%。
+总进球预期与市场相差≥1球的单选29场，预计71.1%、实际44.8%，样本偏少。
+这些下注场的双方主客历史最低样本数都是10，无法在本批数据比较样本深度影响。
+
+```{r}
+s |> filter(view=='SELECTED_UNIQUE',slice=='ALL48',dimension %in% c('venue_ppg_gap','total_gap','history_n')) |>
+ select(role,dimension,stratum,n,issues,actual_percent,predicted_percent,market_percent,error_pp) |> knitr::kable(digits=1)
+```
+
+## 原未中期的重复持仓与关键错误
+
+强分歧单选在原25期有58场不同支持、命中20.7%；重复持仓111次后命中率16.2%。
+强分歧双选88场命中56.8%，192次持仓命中52.1%。这是持仓分布放大实际错误，
+不是独立样本增加，也不能证明事先限次必然改善收益。
+
+```{r}
+s |> filter(slice %in% c('MISS25','HIT23'),view!='ALL_AVAILABLE',dimension=='conflict') |>
+ select(view,slice,role,stratum,n,issues,actual_percent,predicted_percent,one_away_blockers) |> knitr::kable(digits=1)
+s |> filter(view=='HOLDINGS',slice=='MISS25',dimension %in% c('depth','family','conflict')) |>
+ select(role,dimension,stratum,n,misses,one_away_blockers) |> knitr::kable()
+```
+
+## 完整分层与复现
+
+各维度成员重叠，不能跨维度累加贡献。完整分层不只展示最差类别。没有独立事件显著性检验，
+没有学习阈值。原25期是按结果筛选，不能作为赛前条件。历史可用性仍是代理证据。
+后续若用类别调整概率或选场，仍须共享temporal_learning、先验窗口与冻结回执；不替代#421。
+函数r/fundamentals_category_diagnostics.R独立可复用；归档夹具只支持报告渲染。
+
+```{r}
+s |> arrange(view,slice,role,dimension,stratum) |> knitr::kable(digits=2)
+v$receipt$plan_freeze_seal
+```
