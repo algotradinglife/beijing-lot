@@ -1,0 +1,163 @@
+---
+title: "原25个未中期：支持宽度、单选位置与N6的固定探索"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/missed25-report-v2"
+  archived_report: false
+---
+
+48期100402–100607已暴露。原N7压2、U6/P5有25期未中；这只是结果分析切片，
+不会作为赛前路由条件。42个新规则及3个既有对照全部在本轮结算前冻结，
+不拟合、不训练专家、不加比分保护、不更改默认，也不替代#421的因果验收。
+每期预算1024元、每基本注2元、一次0.65，起始资金100000元。
+
+## 固定规则
+
+H0/H1表示使用纯基线/仅大让球市场化的原分组来源；组顺序保持不变。
+R000/R050/R100表示所有场次支持排序使用原p、p/q各半、市场q。
+它只改变支持排序，不重估盘口或结算SP。概率混合等价于比分网格线性混合后投影。
+
+- N7_C2_TOP1：压两场，选最高第一方向概率。
+- N7_C2_RETENTION：压两场，选最高“第一方向/前两方向之和”。
+- N7_C2_RETENTION_CAP2：上一规则再限制同场同方向最多单选两次。
+- N7_C1_RETENTION：仅压一场，最多买8组。
+- N7_C0：七场全双选，最多买4组。
+- N6_DROP_SUPPORT：从N7压两场方案删除所选支持概率最低的一场，其他支持保持。
+- N6_C1_RETENTION：先删除双选概率最低的一场，剩余六场按保留率压一场。
+
+使用完整复式，同一完整持仓去重，不足预算或可用单选位置则跳组；不补新组，剩余持有现金。
+N6_DROP_SUPPORT先确定原C2票据再删除，不将省下的钱回填。N6变化不能仅按命中数判断，
+必须同时看实际投入、收益和回撤。原U6/P5在删场/跳组后不会增加；同场单选上限只属于CAP2。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_drawdown_plot.R')
+source('r/fundamentals_missed_summary.R')
+source('r/fundamentals_rescue_summary.R')
+source('r/fundamentals_missed_issues.R')
+v<-read_pure_baseline_report(params$study,params$archived_report)
+rows<-tibble::as_tibble(v$result$rows)
+main<-'H0_R000_N7_C2_TOP1'
+stopifnot(nrow(rows)==2160,n_distinct(rows$policy)==45,n_distinct(rows$issue)==48)
+comp<-missed_rescue_summary(rows,main,sort(unique(rows$issue)),100000)
+stopifnot(all(comp$summary$original_misses==25))
+diag<-missed_issue_diagnostics(tibble::as_tibble(v$result$base_legs),tibble::as_tibble(v$result$audit))
+stopifnot(sum(diag$issues$whole_issue_missed)==25)
+meta<-rows |> distinct(policy,source_weight,support_weight,mode)
+```
+
+## 回顾结论
+
+本轮救回最多的是H1_R050_N6_C1_RETENTION：原25期救回19期，但只有9期盈利；
+全48期命中41期，净收益11357.61元、预算ROI23.11%、最大回撤5251.49元。
+它明显提高命中频率，却没有保留原N7的收益水平。
+
+新N7方案H1_R050_N7_C2_RETENTION救回10期、其中7期盈利，同时失去4个原中奖期；
+全48期命中29期，净收益31669.00元、预算ROI64.43%、最大回撤7095.83元。
+原对照相应为23期、30678.31元、62.42%、8470.38元。两者实际投入均为47744元。
+因此它是本轮值得再验证的N7折中，但原25期仍合计亏9116.58元。
+
+这45个规则中，24个原未中期至少曾被一种规则救回；只有100513始终未中。
+不能在事后逐期拼接这些赢家。100513原9组最近也差2场：第2组漏了22、27号的让平；
+第6组19、20号单选让胜失误，市场最高方向其实都是让负（约38%和39%），
+而基线仍分别给让胜约79%和69%。这是多场错误叠加，不是删一场就能修复。
+
+增加命中不代表稳定增益：新N7折中比原方案多990.69元，剔除相对增益最大的100410期后，
+增益变为−5463.21元。这里展示的是已暴露数据的诊断，不据此发布新默认。
+
+## 原25期改进与全48期代价
+
+整期命中是至少一组中奖，不等于盈利。miss_budget_ROI_percent的分母为25×1024，
+budget_ROI_percent的分母为48×1024。所有规则都展示，不只保留赢家。
+
+```{r}
+comp$summary |> select(policy,rescued_issues,profitable_old_misses,lost_issues,
+ net_old_misses,miss_budget_ROI_percent,stake_old_misses,hit_issues,
+ net_cny,budget_ROI_percent,stake_cny,max_drawdown_cny,longest_miss_streak) |> knitr::kable(digits=2)
+```
+
+## 高收益一期的依赖
+
+ex_best_miss_net从原25期中剔除该规则净收益最大一期；ex_best_lift则从48期中
+剔除相对原策略增益最大的一期。两者都是结果诊断，不是未来交易规则。
+
+```{r}
+comp$summary |> select(policy,net_lift,ex_best_lift,best_lift_issue,
+ ex_best_miss_net,best_miss_issue,net_old_hits) |> knitr::kable(digits=2)
+```
+
+## 原始失败形态与是否有规则救回
+
+any_rule_hit仅表示本次尝试的规则中是否存在命中，不是一个可执行的事后组合策略。
+
+```{r}
+reach<-comp$missed_periods |> group_by(issue) |> summarise(
+ rules_hit=sum(hits>0),rules_profitable=sum(net>0),any_rule_hit=any(hits>0),.groups='drop')
+diag$issues |> filter(whole_issue_missed) |>
+ left_join(reach,by='issue',relationship='one-to-one') |>
+ select(issue,groups,nearest_misses,one_away_groups,single_error_groups,double_error_groups,
+ rules_hit,rules_profitable,any_rule_hit) |> knitr::kable()
+miss_legs<-diag$legs |> semi_join(reach,by='issue') |> mutate(
+ market_top=unname(c('3','1','0')[max.col(as.matrix(pick(q_W,q_D,q_L)),ties.method='first')]))
+miss_legs |> filter(!hit) |> group_by(single) |> summarise(
+ error_holdings=n(),unique_fixtures=n_distinct(issue,slot),
+ actual_handicap_draw_percent=100*mean(actual_direction=='D'),
+ market_top_is_actual_percent=100*mean(market_top==actual_code),
+ large_handicap_percent=100*mean(abs(handicap)>=2),.groups='drop') |> knitr::kable(digits=2)
+```
+
+错误持仓含同场复用，不能当作独立比赛样本数；unique_fixtures仅在各单/双选分类内部去重。
+相同场次可能同时以单选和双选出现。此表只用于解释已发生错误，不代表全体概率校准。
+
+## 全部收益与回撤曲线
+
+按两个来源、三个支持权重分六组，每组同时画原对照。剩余现金包含在账户资金内。
+
+```{r}
+#| label: rescue-curves
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 7
+for(h in c(0,1)) for(w in c(0,.5,1)) {
+ policies<-meta |> filter(source_weight==h,support_weight==w) |> pull(policy)
+ part<-comp$curves |> filter(policy %in% c(main,policies)) |>
+  mutate(model=paste('分组来源',h,'支持市场权重',w),label=policy)
+ print(plot_strategy_equity(part,'funded',100000))
+ print(strategy_drawdown_report(part)$plot)
+}
+```
+
+## 原25期各规则明细
+
+```{r}
+comp$missed_periods |> arrange(issue,policy) |> mutate(issue_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,stake,cash_cny,net,issue_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 全48期明细与被牺牲期次
+
+```{r}
+comp$paired |> arrange(issue,policy) |> mutate(issue_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,main_hits,hits,rescued,lost,stake,cash_cny,net,issue_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 接口与复现
+
+Python：src/fundamentals_rescue_shapes.py的rescue_shape_plan接收原生cutoffs、固定权重、
+结构及显式金额参数。R：r/fundamentals_rescue_summary.R的missed_rescue_summary汇总结果。
+复用既有删除弱场、完整钱包、结算和错误归因接口。新的历史学习仍须走temporal_learning。
+源历史可用性依旧为已披露的代理证据，不授权前瞻使用。本夹具只支持报告再渲染，
+完整选场重放需原冻结输入；报告回执同时绑定源、实现及报告文件。
+
+```{r}
+v$receipt$plan_freeze_seal
+```
