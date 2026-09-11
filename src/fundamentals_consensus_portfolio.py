@@ -1,4 +1,4 @@
-"""Fixed exposed N7 anchor/consensus/one-converter experiment; no fitting."""
+"""Fixed exposed N6/N7 anchor/consensus/one-converter experiment; no fitting."""
 import copy
 import itertools
 from collections import Counter
@@ -6,28 +6,32 @@ from collections import Counter
 import numpy as np
 from scipy.optimize import Bounds, LinearConstraint, milp
 
-from src.fundamentals_n7_baseline import rank_double_candidates, n7_baseline_plan
+from src.fundamentals_n7_baseline import rank_double_candidates
 from src.temporal_learning.core import stable_json_hash
 
 
-def consensus_component(frame, roles, *, cutoffs, complement, unit_cny, payout_factor, seed):
-    """One settled-API-compatible N7: 2 agreed singles, 4 agreed doubles, 1 converter.
+def consensus_component(frame, roles, *, cutoffs, complement, unit_cny, payout_factor, seed, group_size=7):
+    """One N6/N7 component: two agreed singles, N-3 stable doubles, one C double.
 
-    roles maps all seven slots to A/D/C (counts 2/4/1). Complement changes only
+    roles maps all slots to A/D/C (counts 2/N-3/1). Complement changes only
     C to the excluded baseline direction. Prices are not read. Inputs are not
-    mutated. Complete Cartesian unit tickets cost 64 or 32 CNY respectively.
+    mutated. N7 primary/complement costs64/32 CNY; N6 costs32/16 CNY.
     Explicit native Cutoffs and fixed 2 CNY/.65 constants delegated upstream.
     """
     rank_double_candidates(frame, cutoffs=cutoffs)
-    if (len(frame) != 7 or set(roles) != set(map(int, frame.slot))
-            or Counter(roles.values()) != Counter(A=2, D=4, C=1)
+    if (type(group_size) is not int or group_size not in (6,7) or len(frame) != group_size or set(roles) != set(map(int, frame.slot))
+            or Counter(roles.values()) != Counter(A=2, D=group_size-3, C=1)
             or type(complement) is not bool):
-        raise ValueError("Exact seven-fixture role assignment required")
-    part = n7_baseline_plan(
-        frame, cutoffs=cutoffs, selector="COVERAGE", shape="C0E0", funding="UNIT",
-        max_groups=6, unit_cny=unit_cny, group_budget_cny=432,
-        payout_factor=payout_factor, allocation_seed=seed)
-    part.pop("seal")
+        raise ValueError("Exact six/seven fixture role assignment required")
+    if (unit_cny,payout_factor)!=(2,.65) or type(seed) is not int:
+        raise ValueError("Explicit unit, payout and seed required")
+    ranked,bound=rank_double_candidates(frame,cutoffs=cutoffs)
+    part=dict(issue=str(frame.issue.iloc[0]),selector="COVERAGE",funding="UNIT",
+        groups=1,legs=[dict(r,group=1) for r in ranked.to_dict("records")],
+        cutoffs=bound,n=group_size,unit_cny=unit_cny,payout_factor=payout_factor,
+        allocation_seed=seed,historical_admission=False,
+        input_sha256=stable_json_hash(frame.sort_values("slot").to_json(orient="records")),
+        mode="EXPOSED_FIXTURE_RELATIVE_REVIEW_NOT_SIMULTANEOUS_TICKET")
     for row in part["legs"]:
         p = sorted(range(3), key=lambda i: (-row["p_" + "WDL"[i]], i))
         q = sorted(range(3), key=lambda i: (-row["q_" + "WDL"[i]], i))
@@ -79,27 +83,27 @@ def consensus_candidates(frame, *, cutoffs, minimum_anchor_market, converter_mar
 
 
 def next_consensus_roles(frame, previous, *, cutoffs, minimum_anchor_market,
-                         converter_market, max_uses, max_overlap, disjoint, anchor_max_uses=None):
-    """One optimal fixed 2A/4D/1C group, or proved infeasibility; no learning.
+                         converter_market, max_uses, max_overlap, disjoint, anchor_max_uses=None, group_size=7):
+    """One optimal 2A/(N-3)D/1C group for explicit N6/N7; no learning.
 
     Caps count actual supplied groups; explicit caller policy applies equally
     to original and converter groups. Returned role map is empty ONLY when
     infeasible. Solver timeout/failure raises. Parent plan binds full ledger.
     """
     if (type(max_uses) is not int or max_uses < 1 or type(max_overlap) is not int
-            or not 0 <= max_overlap < 7 or type(disjoint) is not bool):
+            or type(group_size) is not int or group_size not in (6,7) or not 0 <= max_overlap < group_size or type(disjoint) is not bool):
         raise ValueError("Valid explicit reuse policy required")
     ranked, _, eligibility, objective = consensus_candidates(
         frame, cutoffs=cutoffs, minimum_anchor_market=minimum_anchor_market,
         converter_market=converter_market)
     slots=list(map(int,ranked.slot)); n=len(slots)
-    if any(len(g)!=7 or len(set(g))!=7 or not set(g)<=set(slots) for g in previous):
-        raise ValueError("Previous groups must contain seven distinct known fixtures")
+    if any(len(g)!=group_size or len(set(g))!=group_size or not set(g)<=set(slots) for g in previous):
+        raise ValueError("Previous groups must match group size with distinct known fixtures")
     anchor_counts=Counter()
     if anchor_max_uses is not None:
         if type(anchor_max_uses) is not int or not 1<=anchor_max_uses<=max_uses:
             raise ValueError("Valid explicit anchor cap required")
-        if any(not isinstance(g,dict) or Counter(g.values())!=Counter(A=2,D=4,C=1) for g in previous):
+        if any(not isinstance(g,dict) or Counter(g.values())!=Counter(A=2,D=group_size-3,C=1) for g in previous):
             raise ValueError("Anchor caps require previous role maps")
         anchor_counts=Counter(s for g in previous for s,role in g.items() if role=="A")
         if any(v>anchor_max_uses for v in anchor_counts.values()):
@@ -109,7 +113,7 @@ def next_consensus_roles(frame, previous, *, cutoffs, minimum_anchor_market,
             any(len(set(a)&set(b))>max_overlap for a,b in itertools.combinations(previous,2))):
         raise ValueError("Previous groups violate requested caps")
     matrix = [np.tile(np.eye(3)[j], n) for j in range(3)]
-    lower, upper = [2, 4, 1], [2, 4, 1]
+    lower, upper = [2, group_size-3, 1], [2, group_size-3, 1]
     matrix.extend(np.eye(n).repeat(3, axis=1))
     lower += [0] * n
     upper += [1] * n
@@ -133,7 +137,7 @@ def next_consensus_roles(frame, previous, *, cutoffs, minimum_anchor_market,
         raise RuntimeError("Solver did not prove optimum/infeasibility: "+str(solved.message))
     assignment=solved.x.reshape(n,3)>.5
     roles={slots[i]:"ADC"[j] for i,j in zip(*np.where(assignment))}
-    if (Counter(roles.values())!=Counter(A=2,D=4,C=1) or len(roles)!=7 or
+    if (Counter(roles.values())!=Counter(A=2,D=group_size-3,C=1) or len(roles)!=group_size or
             np.any(assignment>allowed) or
             any(len(set(roles)&set(g))>max_overlap for g in previous)):
         raise ValueError("Invalid solver role assignment")
@@ -227,13 +231,15 @@ def consensus_portfolios(frame, *, cutoffs, budget_cny, minimum_anchor_market,
 def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fraction,
                                     budget_cny, minimum_anchor_market, max_uses,
                                     max_pair_overlap, unit_cny, payout_factor, seed,
-                                    anchor_max_uses=None):
-    """Independently assemble 64/32 CNY groups under one shared exposure ledger.
+                                    anchor_max_uses=None, group_size=7):
+    """Assemble N6/N7 components under one shared exposure ledger.
+
+    group_size is 6 or 7; primary price is 32 or 64 CNY respectively.
 
     Conversion budget fraction is explicit (0/.25/.5/.75/1), never learned.
     Select type with lowest spent/target ratio, primary first on ties. Converter
-    quota rounds down to32 CNY; primary receives remaining budget. Each group
-    is reassembled: 2 agreed high-q anchors, 4 agreed doubles, 1 different-Top2
+    quota rounds down to complement group cost; primary receives remaining budget. Each group
+    is reassembled: 2 agreed high-q anchors, N-3 agreed doubles, 1 different-Top2
     converter. Primary C ranks p-Top2; converter C ranks q of omitted p outcome.
     First use disjoint fixtures, then globally enforce actual-group U/P caps.
     Optional anchor_max_uses limits A-role holdings only; a used anchor may be
@@ -250,15 +256,17 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
             type(budget_cny) is not int or budget_cny<0 or
             not 0<minimum_anchor_market<1 or
             type(max_uses) is not int or max_uses<1 or
-            type(max_pair_overlap) is not int or not 0<=max_pair_overlap<7 or
+            type(max_pair_overlap) is not int or type(group_size) is not int or group_size not in (6,7) or not 0<=max_pair_overlap<group_size or
             type(seed) is not int or (unit_cny,payout_factor)!=(2,.65)):
         raise ValueError("Valid explicit fixed allocation policy required")
     if anchor_max_uses is not None and (type(anchor_max_uses) is not int or
             not 1<=anchor_max_uses<=max_uses or conversion_budget_fraction!=0):
         raise ValueError("Anchor cap requires non-converting groups and valid cap")
-    converter_quota=int(budget_cny*conversion_budget_fraction)//32*32
+    primary_cost=unit_cny*2**(group_size-2)
+    converter_cost=primary_cost//2
+    converter_quota=int(budget_cny*conversion_budget_fraction)//converter_cost*converter_cost
     quota={False:budget_cny-converter_quota,True:converter_quota}
-    spent={False:0,True:0};cost={False:64,True:32}
+    spent={False:0,True:0};cost={False:primary_cost,True:converter_cost}
     roles_list=[];parts=[];ledger=[];disjoint=True
     while True:
         available=[k for k in (False,True) if spent[k]+cost[k]<=quota[k]]
@@ -267,7 +275,7 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
         roles,step=next_consensus_roles(
             frame,roles_list,cutoffs=cutoffs,minimum_anchor_market=minimum_anchor_market,
             converter_market=kind,max_uses=max_uses,max_overlap=max_pair_overlap,disjoint=disjoint,
-            anchor_max_uses=anchor_max_uses)
+            anchor_max_uses=anchor_max_uses,group_size=group_size)
         ledger.append(dict(step,converter=kind,spent_before=sum(spent.values())))
         if not roles:
             if disjoint:
@@ -278,7 +286,7 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
         subset=frame[frame.slot.isin(roles)]
         cuts={str(s):cutoffs[str(s)] for s in roles}
         part=consensus_component(subset,roles,cutoffs=cuts,complement=kind,
-                                 unit_cny=unit_cny,payout_factor=payout_factor,seed=seed)
+                                 unit_cny=unit_cny,payout_factor=payout_factor,seed=seed,group_size=group_size)
         if part["stake"]!=cost[kind]:raise ValueError("Unexpected component cost")
         parts.append(part);roles_list.append(roles);spent[kind]+=cost[kind]
     stake=sum(p["stake"] for p in parts)
@@ -293,6 +301,6 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
                         primary_spend_cny=spent[False],converter_spend_cny=spent[True]),
         parameters=dict(minimum_anchor_market=minimum_anchor_market,max_uses=max_uses,
                         max_pair_overlap=max_pair_overlap,unit_cny=unit_cny,
-                        payout_factor=payout_factor,seed=seed,anchor_max_uses=anchor_max_uses),
+                        payout_factor=payout_factor,seed=seed,anchor_max_uses=anchor_max_uses,group_size=group_size),
         decision_ledger=ledger)
     return dict(**envelope,seal=stable_json_hash(envelope))

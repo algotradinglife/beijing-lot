@@ -1,0 +1,70 @@
+---
+title: "六串与七串：U3/U6 同规则比较"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/consensus-n6-n7-v2"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows)
+z<-missed_strategy_summary(rows,unlist(v$issue_order),100000)
+```
+
+## 比较规则
+
+同一已曝光48期（100402—100607），每期预算1024元，初始资金100000元。
+六串两场单选、三场一致双选、一场分歧双选，每组32元，最多32组；
+七串增加一场一致双选，每组64元，最多16组。分别每场最多使用U3或U6，
+任意两组最多重叠P5场。先完全不重叠，无法扩组后才放宽到上述限制。
+P5在六串允许重叠5/6，在七串允许5/7；这是固定绝对上限，不是固定重叠比例。
+
+排除零让球且基线/市场Top2集合不同的场次。
+单选要求两源Top1一致、市场概率至少50%，按市场首选概率排序。
+一致双选按市场Top2合计概率，分歧双选按基线Top2合计概率。
+使用现有逐组MILP最优排序；不是整个组合全局优化。
+所有双选沿用基线Top2，不转换、不使用专家、不做比分保护。
+无可行组则留现金，不加倍强行花完预算。
+
+四方案全部在读取结算标签前冻结；七串逐期复算并与既有票据核对场次、角色、
+赛果和金额完全一致。显式原生截止对象、来源、代码、参数和票据均绑定。
+无模型训练或阈值调优；既有历史时间代理只能支持回顾诊断，
+不证明真实赛前同时出票可行。结算单位2元，整票只扣一次0.65。
+ROI按实际投入计算；预算ROI另列，以防少投入抬高ROI产生误解。
+本实验不自动推广样本内最优策略。
+
+## 收益和风险
+
+```{r}
+z$summary |> mutate(group_hit_percent=100*winning_groups/groups) |> knitr::kable(digits=2)
+```
+
+## 逐期比较
+
+```{r}
+rows |> mutate(group_hit_percent=if_else(groups>0,100*hits/groups,NA_real_),
+ stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,group_hit_percent,stake,cash_cny,gross,net,
+ stake_ROI_percent,budget_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 收益与回撤曲线
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+```
