@@ -7,7 +7,7 @@ from dataclasses import dataclass, asdict
 import pandas as pd
 from .core import (prepare_learning_context as prepare_base_context, PartitionPolicy,
                    LearningReceipt, temporal_cache_key, TemporalContractError,
-                   effective_sample_size, stable_json_hash)
+                   effective_sample_size, stable_json_hash, stable_frame_hash)
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,10 @@ def bind_model_receipt(context, cutoff, *, model_identity, model_parameters):
     if cutoff != context.cutoff or not model_identity or not model_parameters:
         raise TemporalContractError("Matching cutoff and model configuration required")
     binding=dict(model_identity=model_identity, model_parameters=model_parameters,
-                 temporal_cache_key=context.receipt.payload["cache_key"])
+                 temporal_cache_key=context.receipt.payload["cache_key"],
+                 availability=context.receipt.payload["availability"],
+                 partition=context.receipt.payload["partition"],
+                 admitted_frame_sha256=stable_frame_hash(context.eligible))
     receipt=dict(context.receipt.payload)
     receipt["model_cache_binding"]=binding
     receipt["cache_key"]=stable_json_hash(binding)

@@ -220,3 +220,24 @@ def test_model_cache_identity_and_fit_ess(sample):
     with pytest.raises(TemporalContractError):
         bind_model_receipt(context,Cutoff.decision_epoch("other","2010-01-13T00:00:00Z"),
                            model_identity={"method":"GLOBAL"},model_parameters={"penalties":[1]})
+
+def test_changed_admission_binds_cache_and_fixed_plan_scope(sample):
+    f,p,b,h,a=sample
+    cut=Cutoff.decision_epoch("000026","2010-01-27T00:00:00Z")
+    first=fit_remapper(f,p,b,h,a,**kwargs(cut,"GLOBAL"))
+    delayed=f.copy()
+    delayed.label_available_ts=(pd.to_datetime(delayed.label_available_ts)+pd.Timedelta(days=1)).astype(str)
+    second=fit_remapper(delayed,p,b,h,a,**kwargs(cut,"GLOBAL"))
+    assert first["receipt"]["cache_key"]!=second["receipt"]["cache_key"]
+    from tests.test_fundamentals_n7_baseline import sample as plan_sample
+    factors,old=plan_sample(7)
+    kw=dict(cutoffs=old["cutoffs"],budget_cny=1024,unit_cny=2,
+            payout_factor=.65,allocation_seed=422,max_uses=2)
+    plan=build_comparison_plan(factors,**kw)
+    with pytest.raises(ValueError,match="issue identity"):
+        build_comparison_plan(factors.assign(issue="other"),fixed_plan=plan,**kw)
+    wrong={str(s):Cutoff.decision_epoch(plan["issue"],"2011-01-01T00:00:00Z") for s in factors.slot}
+    with pytest.raises(ValueError,match="cutoffs"):
+        build_comparison_plan(factors,fixed_plan=plan,**{**kw,"cutoffs":wrong})
+    with pytest.raises(ValueError,match="fixture identity"):
+        build_comparison_plan(factors.assign(provider_id="wrong"),fixed_plan=plan,**kw)

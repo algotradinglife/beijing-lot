@@ -26,6 +26,19 @@ def build_comparison_plan(factors, *, cutoffs, budget_cny, unit_cny, payout_fact
     if (fixed_plan["budget_cny"]!=budget_cny or fixed_plan["unit_cny"]!=unit_cny or
         fixed_plan["payout_factor"]!=payout_factor):
         raise ValueError("Fixed plan business constants differ")
+    if (factors.issue.astype(str).nunique()!=1 or
+        str(factors.issue.iloc[0])!=fixed_plan["issue"]):
+        raise ValueError("Fixed plan issue identity differs")
+    if set(cutoffs)!=set(factors.slot.astype(str)) or any(
+        not isinstance(c, Cutoff) or c.target_issue!=fixed_plan["issue"] or
+        c.cutoff_ts.isoformat()!=fixed_plan["cutoffs"].get(slot)
+        for slot,c in cutoffs.items()):
+        raise ValueError("Fixed plan native cutoffs differ")
+    for leg in fixed_plan["legs"]:
+        match=factors[factors.slot.eq(leg["slot"])]
+        if (len(match)!=1 or str(match.provider_id.iloc[0])!=str(leg["provider_id"]) or
+            float(match.handicap.iloc[0])!=float(leg["handicap"])):
+            raise ValueError("Fixed plan fixture identity differs")
     result={k:v for k,v in fixed_plan.items() if k!="seal"}
     legs=[];tickets=[]
     for group in range(1,fixed_plan["groups"]+1):

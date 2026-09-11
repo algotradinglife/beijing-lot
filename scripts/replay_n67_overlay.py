@@ -35,7 +35,7 @@ if __name__=='__main__':
                 assert set(tickets)=={''.join(v) for v in itertools.product(*(r['support'] for r in legs))}
                 assert all(isinstance(u,int) and u>0 for u in tickets.values())
                 a=[audit.get((r['issue'],r['slot'],r['provider_id'])) for r in legs]
-                if any(z is None or z['actual_direction'] not in ['W','D','L'] or 'spf:IDENTITY' in z['status'] or z['handicap']!=r['handicap'] for z,r in zip(a,legs)):
+                if any(z is None or z['actual_direction'] not in ['W','D','L'] or not isinstance(z['status'],str) or 'spf:IDENTITY' in z['status'] or z['handicap']!=r['handicap'] for z,r in zip(a,legs)):
                     unknown=True;continue
                 code=''.join(dict(W='3',D='1',L='0')[z['actual_direction']] for z in a)
                 if code in tickets:

@@ -93,3 +93,20 @@ def test_independent_overlay_cash_replay_cli(tmp_path,n):
     r['gross']+=1
     (tmp_path/'settlement.json').write_text(json.dumps(result))
     assert subprocess.run(cmd,capture_output=True).returncode!=0
+
+
+def test_overlay_replay_null_audit_status(tmp_path):
+    import json,subprocess,sys
+    from pathlib import Path
+    x,kw=sample(7)
+    plan=n67_overlay_plan(x,strategy="DIRECT",funding="UNIT",**kw)
+    audit=x[["issue","slot","provider_id","handicap"]].assign(
+        actual_direction="W",spf_sp=2.,status=None)
+    settled=settle_n67_overlay(plan,audit)
+    assert settled["status"]=="PENDING_AUDIT_OR_WINNING_SP"
+    (tmp_path/"plans.json").write_text(json.dumps([plan]))
+    (tmp_path/"settlement.json").write_text(json.dumps(dict(results=[settled],audit=audit.to_dict("records"))))
+    command=[sys.executable,str(Path(__file__).resolve().parents[1]/"scripts/replay_n67_overlay.py"),str(tmp_path)]
+    result=subprocess.run(command,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    assert json.loads((tmp_path/"independent-replay.json").read_text())["pending_verified"]==1
