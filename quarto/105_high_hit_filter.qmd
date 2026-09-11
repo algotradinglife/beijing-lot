@@ -1,0 +1,116 @@
+---
+title: "高命中六串一：排除零让球 Top2 分歧"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/high-hit-filter-v1"
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+source("r/fundamentals_hit_improvement.R")
+v <- read_pure_baseline_report(params$study, params$archived_report)$result
+rows <- as_tibble(v$rows)
+stopifnot(nrow(rows)==192, n_distinct(rows$issue)==48,
+          length(v$control_replay)==48)
+z <- hit_improvement_summary(rows |> mutate(weight=0,protect=FALSE,cap=0,
+  budget=budget_cny,cash=cash_cny), "N6_ORIGINAL", unlist(v$issue_order), 100000)
+```
+
+## 比较口径
+
+48期100402—100607为已暴露的历史诊断，不构成未来可用性或独立样本外验证。
+仅排除**让球为0且原基线/市场Top2赛果集合不同**的场次；
+不排除所有零让球，不要求首选相同，不加50%概率门槛，也不限制主流联赛。
+过滤在候选池阶段执行，随后重建七场来源组，再转换为六串一。
+不是直接删除原下注组中的场次或跳过整组。
+
+沿用H1_R050_N6_C1_RETENTION：大让球（绝对值至少2）采用市场比分映射，
+其余维持原基线；源组按原概率Top2质量、先不重叠再U6/P5复用、固定候选种子构建。
+随后基线/市场各50%得到支持分布，删除组内Top2累积概率最低的一场，
+在剩余六场按第一概率/Top2之和选一场单选，其余五场双选。
+重复完整持仓跳过，未使用资金持有现金，不补额外候选。
+原始输入与概率均保存，过滤规则在零让球上不受大让球调整影响。
+
+每期预算1024元，每组64元（32个基本组合×2元），整票结算因子0.65仅乘一次。
+无比分保护、专家、转换、重新训练或逐期择优。
+初始资金100000元，逐期投入固定预算，不做盈亏复投。
+原六串一逐场持仓、票据、投入、现金和组数必须精确复现；U3/U6引用封存原组，
+仅作为相关性参照，没有改造它们。192份计划全部冻结后才读取本轮结算。
+历史时间代理仅支持回顾诊断；旧来源是带哈希的证据清单，不是干净的前瞻接口。
+
+## 收益、命中与回撤
+
+命中期指至少一组命中，**不等于该期盈利**。投入ROI以实际投入为分母，
+预算ROI以48×1024为分母。最长未中包括不下注期。
+
+```{r}
+profits <- rows |> group_by(policy) |> summarise(profit_issues=sum(net>0),bet_issues=sum(stake>0),.groups="drop")
+z$summary |> left_join(profits,by="policy",relationship="one-to-one") |>
+ select(policy,hit_issues,profit_issues,bet_issues,groups,winning_groups,stake_cny,
+ net_cny,stake_ROI_percent,budget_ROI_percent,max_drawdown_cny,longest_miss_streak) |>
+ knitr::kable(digits=2)
+```
+
+## 过滤的净变化
+
+获救、失去及净增益均相对于原六串一；剔除最大增益期仅作敏感性检查。
+
+```{r}
+z$summary |> filter(policy %in% c("N6_ORIGINAL","N6_FILTERED")) |>
+ select(policy,rescued_issues,lost_issues,net_lift,stake_change_cny,
+ ex_best_lift,best_lift_issue) |> knitr::kable(digits=2)
+```
+
+## 与U3/U6的逐期收益相关性
+
+相关性使用同48期逐期净收益，现金期净收益为0。Pearson是线性收益相关，
+Spearman是收益排名相关；低相关本身不保证组合能改善收益或回撤。
+
+```{r}
+correlations <- list()
+for (n in c("N6_ORIGINAL","N6_FILTERED")) {
+ for (u in c("U3_ORIGINAL","U6_ORIGINAL")) {
+  pair <- rows |> filter(policy==n) |> select(issue,net,hits) |>
+   inner_join(rows |> filter(policy==u) |> select(issue,net,hits),by="issue",
+              suffix=c("_n6","_u"),relationship="one-to-one")
+  stopifnot(nrow(pair)==48)
+  correlations[[paste(n,u)]] <- tibble(policy=n,reference=u,
+   pearson=cor(pair$net_n6,pair$net_u),spearman=cor(pair$net_n6,pair$net_u,method="spearman"),
+   both=sum(pair$hits_n6>0 & pair$hits_u>0),n6_only=sum(pair$hits_n6>0 & pair$hits_u==0),
+   reference_only=sum(pair$hits_n6==0 & pair$hits_u>0),neither=sum(pair$hits_n6==0 & pair$hits_u==0))
+ }
+}
+bind_rows(correlations) |> knitr::kable(digits=3)
+```
+
+## 全48期明细
+
+```{r}
+rows |> mutate(stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+               budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,stake,cash_cny,gross,net,stake_ROI_percent,budget_ROI_percent) |>
+ knitr::kable(digits=2)
+```
+
+## 收益与回撤走势
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+
+ labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+
+ labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+readr::write_csv(bind_rows(correlations),file.path(params$study,"correlations.csv"))
+```
