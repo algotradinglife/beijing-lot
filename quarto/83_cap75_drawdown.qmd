@@ -1,0 +1,78 @@
+---
+title: "十二个方案：资金走势与回撤"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/reuse-cap-single75-v1"
+  archived_report: false
+---
+
+本报告是QMD82的回撤补充，直接读取同一份已封存结果，不重新选择场次或结算。
+六种复用限制，各比较BASE不替换与SINGLE75单选替换，共12个方案、48期。
+每个账户本金100,000元，每期预算1,024元，余款保留现金；没有比分保护或专家。
+所有历史结果已暴露，图表只描述已观察资金路径。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_pure_report.R')
+source('r/fundamentals_equity_curves.R')
+source('r/fundamentals_drawdown_plot.R')
+verified <- read_pure_baseline_report(params$study,params$archived_report)
+rows <- tibble::as_tibble(verified$result$rows) |> mutate(model=case,label=rule)
+stopifnot(nrow(rows)==576,n_distinct(rows$policy)==12,n_distinct(rows$issue)==48)
+curves <- strategy_equity_curves(rows,sort(unique(rows$issue)),100000)
+risk <- strategy_drawdown_report(curves)
+```
+
+## 资金走势
+
+```{r}
+#| label: equity
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 10
+plot_strategy_equity(curves,'funded',100000)+labs(title='资金走势：每个账户起始100,000元')
+```
+
+## 逐期回撤
+
+红线BASE是不替换，蓝线SINGLE75为75%替换。所有小图使用同一纵轴。
+零线表示达到或恢复此前的资金峰值；曲线越向下，回撤越深。
+圆点标记各方案首次达到最大金额回撤的位置；重合的曲线或圆点可能互相遮挡。
+回撤从历史峰值计算，**不是相对初始本金的亏损**，所以盈利账户仍可能处在回撤中。
+
+```{r}
+#| label: drawdown
+#| dev: png
+#| dev-args: {type: cairo-png}
+#| fig-width: 12
+#| fig-height: 10
+risk$plot+labs(title='逐期回撤：圆点为各方案最大金额回撤',subtitle='同48期、同一纵轴；越接近零越好')
+```
+
+## 最大回撤汇总
+
+百分比回撤的分母是当时历史资金峰值，不是固定10万元。
+最大金额回撤和最大百分比回撤可能发生在不同期；max_cny_issue仅标识最大金额回撤首次发生期。
+current_drawdown_cny表示最后一期距离此前峰值的金额。
+
+```{r}
+risk$summary |> arrange(model,label) |> select(model,label,max_drawdown_cny,max_drawdown_percent,max_cny_issue,current_drawdown_cny) |>
+  knitr::kable(digits=2)
+```
+
+资金路径按本期全部结算后进入下一期计算；未模拟跨期占款、税费、奖金封顶或取整。
+旧结果、输入和原报告收据保持不变；新图表代码由本次提交独立绑定。
+复用`strategy_equity_curves`，新增展示函数`strategy_drawdown_report`在`r/fundamentals_drawdown_plot.R`，
+测试为`tests/testthat/test-fundamentals-drawdown-plot.R`，覆盖峰值百分比、并列最大值、分组和错误账本。
+
+```{r}
+tibble(result_sha256=verified$receipt$result_sha256,plan_freeze_seal=verified$result$upstream_freeze_seal,
+       archived_report=params$archived_report) |> knitr::kable()
+```
