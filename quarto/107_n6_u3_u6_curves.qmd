@@ -1,0 +1,120 @@
+---
+title: "六串一效率方案与原U3/U6：收益和回撤"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  efficiency_study: "data/derived/fundamentals_417/n6-efficiency-v1"
+  controls_study: "data/derived/fundamentals_417/high-hit-filter-v1"
+  output: "data/derived/fundamentals_417/n6-u3-u6-curves-v1"
+  initial_capital_cny: 100000
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+a <- read_pure_baseline_report(params$efficiency_study,params$archived_report)$result
+b <- read_pure_baseline_report(params$controls_study,params$archived_report)$result
+stopifnot(identical(unlist(a$issue_order),unlist(b$issue_order)))
+rows <- bind_rows(as_tibble(a$rows) |> filter(policy %in% c("EXTRA_PROB","EXPECTED_NET_768")),
+                  as_tibble(b$rows) |> filter(policy %in% c("U3_ORIGINAL","U6_ORIGINAL")))
+stopifnot(nrow(rows)==192,!anyDuplicated(rows[c("policy","issue")]))
+z <- missed_strategy_summary(rows,unlist(a$issue_order),params$initial_capital_cny)
+labels <- c(EXTRA_PROB="六串：按概率再压一场",EXPECTED_NET_768="六串：预期收益排序 ≤768元",
+            U3_ORIGINAL="原 U3",U6_ORIGINAL="原 U6")
+colors <- c(EXTRA_PROB="#0072B2",EXPECTED_NET_768="#009E73",U3_ORIGINAL="#D55E00",U6_ORIGINAL="#CC79A7")
+curves <- z$curves |> mutate(policy=factor(policy,levels=names(labels)))
+ticks <- c(0,12,24,36,48)
+tick_labels <- c("起始",unlist(a$issue_order)[ticks[-1]])
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+```
+
+同一批48期（100402—100607），每个方案分别以参数指定的初始资金开始（默认10万元），按原方案实际投入逐期结算，
+未用资金留作现金，不进行复利加注。这里是四条独立账户曲线，不是叠加后的投资组合。
+各方案累计投入不同，不能把收益高低直接解释为资金效率高低。
+
+蓝线为按概率保留率额外压一场的六串一，每组32元；绿线为预期收益排序六串一，
+每期实际投入不超过768元。橙线和紫线为原U3、U6七串一，每组64元。
+所有策略均无比分保护；这批历史已暴露，仅作回顾诊断。
+
+```{r}
+z$summary |> mutate(方案=unname(labels[policy]),期末资金=params$initial_capital_cny+net_cny) |>
+ select(方案,命中期=hit_issues,实际投入=stake_cny,净收益=net_cny,投入ROI百分比=stake_ROI_percent,
+        最大回撤元=max_drawdown_cny,期末资金) |> knitr::kable(digits=2)
+```
+
+## 收益曲线
+
+账户资金＝初始资金＋累计净收益。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+equity_plot <- ggplot(curves,aes(period,equity_cny,color=policy))+
+ geom_hline(yintercept=params$initial_capital_cny,color="grey65",linetype="dashed")+
+ geom_line(linewidth=.9)+
+ scale_color_manual(values=colors,breaks=names(labels),labels=labels)+
+ scale_x_continuous(breaks=ticks,labels=tick_labels)+
+ scale_y_continuous(labels=scales::label_number(big.mark=",",accuracy=1))+
+ labs(title="四方案收益曲线",subtitle=paste0("各自初始资金",format(params$initial_capital_cny,big.mark=",",scientific=FALSE,trim=TRUE),"元；沿用实际投入，不复投"),
+      x="历史期号（按期次排列）",y="账户资金（元）",color=NULL)+
+ theme_minimal(base_size=13,base_family="Noto Sans CJK SC")+
+ theme(legend.position="bottom",legend.text=element_text(size=10),panel.grid.minor=element_blank())+
+ guides(color=guide_legend(nrow=2,byrow=TRUE))
+equity_plot
+ggsave(file.path(params$output,"equity.png"),equity_plot,width=12,height=6,dpi=220)
+ggsave(file.path(params$output,"equity.pdf"),equity_plot,width=12,height=6,device=grDevices::cairo_pdf)
+```
+
+## 回撤曲线
+
+回撤＝截至该期的账户最高资金−当前资金，向下越深表示回撤越大。
+零线表示处于资金历史高点；图中展示负值便于观察，汇总表最大回撤用正数表示。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+drawdown_plot <- ggplot(curves,aes(period,-drawdown_cny,color=policy))+
+ geom_hline(yintercept=0,color="grey65")+geom_line(linewidth=.9)+
+ scale_color_manual(values=colors,breaks=names(labels),labels=labels)+
+ scale_x_continuous(breaks=ticks,labels=tick_labels)+
+ scale_y_continuous(labels=scales::label_number(big.mark=",",accuracy=1))+
+ labs(title="四方案回撤曲线",subtitle="相对各自资金历史高点的回撤；向下越深，回撤越大",
+      x="历史期号（按期次排列）",y="回撤（元，负值显示）",color=NULL)+
+ theme_minimal(base_size=13,base_family="Noto Sans CJK SC")+
+ theme(legend.position="bottom",legend.text=element_text(size=10),panel.grid.minor=element_blank())+
+ guides(color=guide_legend(nrow=2,byrow=TRUE))
+drawdown_plot
+ggsave(file.path(params$output,"drawdown.png"),drawdown_plot,width=12,height=6,dpi=220)
+ggsave(file.path(params$output,"drawdown.pdf"),drawdown_plot,width=12,height=6,device=grDevices::cairo_pdf)
+readr::write_csv(z$summary,file.path(params$output,"summary.csv"))
+readr::write_csv(curves,file.path(params$output,"curves.csv"))
+```
+
+```{r}
+#| include: false
+bindings <- list()
+for (study in c(params$efficiency_study,params$controls_study)) {
+ for (name in c("results.json","plans-frozen.json")) {
+  path <- file.path(study,name)
+  bindings[[path]] <- digest::digest(file=path,algo="sha256")
+ }
+}
+code <- list()
+for (path in c("quarto/107_n6_u3_u6_curves.qmd","r/fundamentals_pure_report.R",
+               "r/fundamentals_equity_curves.R","r/fundamentals_missed_summary.R")) {
+ code[[path]] <- digest::digest(file=path,algo="sha256")
+}
+jsonlite::write_json(list(inputs=bindings,code=code,parameters=params,
+ generated_at=format(Sys.time(),tz="UTC",usetz=TRUE),historical_admission=FALSE),
+ file.path(params$output,"provenance.json"),auto_unbox=TRUE,pretty=TRUE)
+```
