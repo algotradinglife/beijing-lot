@@ -20,7 +20,10 @@ audit status in overlay replay. All five have fixes and regression tests in
 research model 422-score-remap-0.1.1. A third review identified that splitting
 the fit partition could invalidate recent-state blend weights. The issue-wise
 client now accepts only the frozen experiment's EXPANDING_EQUAL policy;
-other weighting policies fail closed. Final review acceptance is pending.
+other weighting policies fail closed. The third review also identified missing
+runtime dependency-version verification; replay now calls the shared
+`verify_implementation_closure` check. Seven findings across three reviews have
+implementation fixes; review of the final fixes and acceptance remain pending.
 Remote CI and final acceptance remain pending until their recorded checks pass.
 
 ## Results (same fixture cohort)
@@ -94,8 +97,9 @@ R reader and displays tibbles. No RDS. The current candidate is being regenerate
 under `../accepted-delivery`, with independent replay at `../accepted-replay`;
 neither directory name alone proves successful verification.
 
-Release evidence lives in the parent work area: `accepted-python.txt`
-(80 passed before the third-review regression), `release-r-tests.txt`
+Release evidence lives in the parent work area: `verified-python.txt`
+(81 passed before the dependency-version regression was added to an existing
+test; final rerun pending), `release-r-tests.txt`
 (full R suite, no failures/skips), and
 `release-render-ci-final.txt` (clean synthetic-data QMD render).
 An earlier local render used an incorrectly relative input path and failed; the
