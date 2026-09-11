@@ -1,0 +1,66 @@
+---
+title: "未命中期：单选还是双选失误？"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/double-failure-v1"
+  archived_report: false
+---
+
+```{r}
+#| include: false
+library(dplyr)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_double_failure.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+z<-double_failure_summary(as_tibble(v$rows),as_tibble(v$legs))
+```
+
+四个版本沿用同48期封存票据和结算。只诊断有下注且没有任何组中奖的期次；没有下注的期次单列。
+每组两场单选、五场双选，后者为四场一致双选D和一场分歧双选C。
+本报告属于事后错误定位，不修改选场、资金或概率，不据此宣称可实现的策略提升。
+
+## 期次层面
+
+repair_singles：假设单选全部改对，保持双选不变，该期能至少中一组；repair_doubles反之。
+两个计数可能重叠，因为同一期可以由不同的组通过不同修正方式命中。
+互斥分类：SINGLES_ONLY仅修单选可救、DOUBLES_ONLY仅修双选可救、EITHER任一类修正均可救、
+BOTH_REQUIRED每一组都同时有两类错误，必须两类一起修正。
+“只修单选可救”不代表所有失败组都只错在单选。
+
+```{r}
+z$summary |> select(policy,issues,no_bet,hit_issues,missed_active,repair_singles,repair_doubles,
+ singles_only_issues,doubles_only_issues,either_issues,both_required_issues) |> knitr::kable()
+```
+
+## 未命中期内的组层面
+
+三类组互斥。单选只有两场、双选五场，不能仅凭错误组数量推断各自概率校准质量。
+one_single_away/one_double_away是只差一场对应类型即可至少中一组的期数，不是实际可获取的收益。
+
+```{r}
+z$summary |> select(policy,single_only_groups,double_only_groups,both_error_groups,one_single_away,one_double_away) |> knitr::kable()
+```
+
+## 未命中期内各类投注位置的命中率
+
+按票据位置计数，复用同一场会重复出现；A为单选，D为一致双选，C为分歧双选。
+这里以失败期为条件，会产生选择偏差，不代表全部场次的无条件命中率。
+
+```{r}
+knitr::kable(z$missed_leg_rates,digits=2)
+```
+
+## 各未命中期明细
+
+```{r}
+knitr::kable(z$per_issue)
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+readr::write_csv(z$per_issue,file.path(params$study,"issues.csv"))
+readr::write_csv(z$missed_leg_rates,file.path(params$study,"rates.csv"))
+```
