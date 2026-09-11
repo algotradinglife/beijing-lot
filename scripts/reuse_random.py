@@ -19,7 +19,7 @@ if __name__=='__main__':
         hashes={**r['source_hashes'],**r['plan_hashes'],str(source/'frozen.json'):hashlib.sha256((source/'frozen.json').read_bytes()).hexdigest()}
         verify_clean_file_bindings(hashes,repository_root=Path.cwd())
         reports=['quarto/112_reuse_random.qmd','r/fundamentals_pure_report.R','r/fundamentals_equity_curves.R','r/fundamentals_missed_summary.R']
-        receipt=dict(issues=r['issues'],seeds=list(range(100)),parameters=dict(group_size=a.group_size,probability=.3,budget_cny=1024,unit_cny=2,payout_factor=.65),source_hashes=hashes,
+        receipt=dict(issues=r['issues'],seeds=list(range(100)),parameters=dict(group_size=a.group_size,single_probability=.3,double_probability=.3,budget_cny=1024,unit_cny=2,payout_factor=.65),source_hashes=hashes,
             implementation=implementation_closure(Path.cwd(),['scripts.reuse_random'],distributions=['numpy','pandas']),
             report_files={f:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in reports},historical_admission=False,plan_hashes={})
         (out/'plans').mkdir(parents=True)

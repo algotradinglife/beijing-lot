@@ -1,4 +1,4 @@
-"""Fixed exposed N6/N7 anchor/consensus/one-converter experiment; no fitting."""
+"""Fixed exposed N5/N6/N7 anchor/consensus/one-converter experiment; no fitting."""
 import copy
 import itertools
 from collections import Counter
@@ -11,18 +11,18 @@ from src.temporal_learning.core import stable_json_hash
 
 
 def consensus_component(frame, roles, *, cutoffs, complement, unit_cny, payout_factor, seed, group_size=7):
-    """One N6/N7 component: two agreed singles, N-3 stable doubles, one C double.
+    """One N5/N6/N7 component: two agreed singles, N-3 stable doubles, one C double.
 
     roles maps all slots to A/D/C (counts 2/N-3/1). Complement changes only
     C to the excluded baseline direction. Prices are not read. Inputs are not
-    mutated. N7 primary/complement costs64/32 CNY; N6 costs32/16 CNY.
+    mutated. N7 primary/complement costs64/32 CNY; N6 costs32/16 CNY; N5 costs16/8 CNY.
     Explicit native Cutoffs and fixed 2 CNY/.65 constants delegated upstream.
     """
     rank_double_candidates(frame, cutoffs=cutoffs)
-    if (type(group_size) is not int or group_size not in (6,7) or len(frame) != group_size or set(roles) != set(map(int, frame.slot))
+    if (type(group_size) is not int or group_size not in (5,6,7) or len(frame) != group_size or set(roles) != set(map(int, frame.slot))
             or Counter(roles.values()) != Counter(A=2, D=group_size-3, C=1)
             or type(complement) is not bool):
-        raise ValueError("Exact six/seven fixture role assignment required")
+        raise ValueError("Exact five/six/seven fixture role assignment required")
     if (unit_cny,payout_factor)!=(2,.65) or type(seed) is not int:
         raise ValueError("Explicit unit, payout and seed required")
     ranked,bound=rank_double_candidates(frame,cutoffs=cutoffs)
@@ -96,14 +96,14 @@ def consensus_candidates(frame, *, cutoffs, minimum_anchor_market, converter_mar
 
 def next_consensus_roles(frame, previous, *, cutoffs, minimum_anchor_market,
                          converter_market, max_uses, max_overlap, disjoint, anchor_max_uses=None, group_size=7, anchor_score='TOP1', anchor_slots=None):
-    """One optimal 2A/(N-3)D/1C group for explicit N6/N7; no learning.
+    """One optimal 2A/(N-3)D/1C group for explicit N5/N6/N7; no learning.
 
     Caps count actual supplied groups; explicit caller policy applies equally
     to original and converter groups. Returned role map is empty ONLY when
     infeasible. Solver timeout/failure raises. Parent plan binds full ledger.
     """
     if (type(max_uses) is not int or max_uses < 1 or type(max_overlap) is not int
-            or type(group_size) is not int or group_size not in (6,7) or not 0 <= max_overlap < group_size or type(disjoint) is not bool):
+            or type(group_size) is not int or group_size not in (5,6,7) or not 0 <= max_overlap < group_size or type(disjoint) is not bool):
         raise ValueError("Valid explicit reuse policy required")
     ranked, _, eligibility, objective = consensus_candidates(
         frame, cutoffs=cutoffs, minimum_anchor_market=minimum_anchor_market,
@@ -244,9 +244,9 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
                                     budget_cny, minimum_anchor_market, max_uses,
                                     max_pair_overlap, unit_cny, payout_factor, seed,
                                     anchor_max_uses=None, group_size=7, anchor_score='TOP1', anchor_slots=None):
-    """Assemble N6/N7 components under one shared exposure ledger.
+    """Assemble N5/N6/N7 components under one shared exposure ledger.
 
-    group_size is 6 or 7; primary price is 32 or 64 CNY respectively.
+    group_size is 5, 6 or 7; primary price is 16, 32 or 64 CNY respectively.
     anchor_score TOP1 uses market favorite mass; RETENTION divides it by
     market mass on the baseline Top2 being compressed. Eligibility unchanged.
     The latter measures retained support, not whole-ticket hit probability.
@@ -275,7 +275,7 @@ def independent_consensus_portfolio(frame, *, cutoffs, conversion_budget_fractio
             type(budget_cny) is not int or budget_cny<0 or
             not 0<minimum_anchor_market<1 or
             type(max_uses) is not int or max_uses<1 or
-            type(max_pair_overlap) is not int or type(group_size) is not int or group_size not in (6,7) or not 0<=max_pair_overlap<group_size or
+            type(max_pair_overlap) is not int or type(group_size) is not int or group_size not in (5,6,7) or not 0<=max_pair_overlap<group_size or
             type(seed) is not int or (unit_cny,payout_factor)!=(2,.65)):
         raise ValueError("Valid explicit fixed allocation policy required")
     if anchor_max_uses is not None and (type(anchor_max_uses) is not int or

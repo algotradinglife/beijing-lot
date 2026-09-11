@@ -1,0 +1,105 @@
+---
+title: "五串一两单三双：复用单选25%切换"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n5-single-swaps-v1"
+  archived_report: false
+  initial_capital_cny: 100000
+---
+
+```{r}
+#| include: false
+library(dplyr)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows);controls<-as_tibble(v$controls);issues<-unlist(v$issue_order)
+stopifnot(length(issues)==48,nrow(rows)==48*101,identical(as.integer(unlist(v$seeds)),0:99),
+ !anyDuplicated(rows[c("policy","issue")]),all(rows$hits<=rows$groups),all(rows$swapped_double==0))
+all_rows<-bind_rows(rows,controls) |> mutate(model="Pure baseline",label=policy)
+curves<-strategy_equity_curves(all_rows,issues,params$initial_capital_cny)
+stopifnot(!any(curves$stopped))
+metrics<-curves |> filter(period>0) |> group_by(policy) |> summarise(stake=sum(stake),gross=sum(gross),net=sum(net),
+ ROI_percent=100*net/stake,groups=sum(groups),winning_groups=sum(hits),hit_issues=sum(hits>0),
+ max_drawdown=max(drawdown_cny),.groups="drop")
+fixed<-metrics |> filter(!startsWith(policy,"N5_SWAP_"))
+random<-metrics |> filter(startsWith(policy,"N5_SWAP_"))
+base<-fixed |> filter(policy=="N5_NO_SWAP")
+stopifnot(nrow(random)==100,nrow(base)==1,all(random$stake==base$stake))
+pairs<-rows |> filter(startsWith(policy,"N5_SWAP_")) |> left_join(rows |> filter(policy=="N5_NO_SWAP") |>
+ select(issue,original_hits=hits),by="issue",relationship="many-to-one")
+rescue<-pairs |> group_by(policy) |> summarise(rescued=sum(hits>0 & original_hits==0),lost=sum(hits==0 & original_hits>0),.groups="drop")
+random<-left_join(random,rescue,by="policy",relationship="one-to-one")
+distribution<-random |> summarise(seeds=n(),stake=first(stake),mean_net=mean(net),median_net=median(net),
+ mean_ROI=mean(ROI_percent),median_ROI=median(ROI_percent),p05_ROI=quantile(ROI_percent,.05),p95_ROI=quantile(ROI_percent,.95),
+ mean_hit_issues=mean(hit_issues),mean_winning_groups=mean(winning_groups),median_dd=median(max_drawdown),p95_dd=quantile(max_drawdown,.95),
+ outperform_percent=100*mean(net>base$net),profitable_percent=100*mean(net>0),mean_rescued=mean(rescued),mean_lost=mean(lost))
+periods<-rows |> filter(startsWith(policy,"N5_SWAP_")) |> group_by(issue) |> summarise(stake=first(stake),groups=first(groups),
+ mean_net=mean(net),median_net=median(net),mean_ROI=if(first(stake)>0)100*mean(net)/first(stake) else NA_real_,
+ mean_hits=mean(hits),hit_seed_percent=100*mean(hits>0),.groups="drop") |> arrange(match(issue,issues))
+```
+
+同48期（100402–100607），五串一每组两单三双：2个两源Top1一致的单选、2个Top2一致双选、1个Top2分歧双选。
+单选按市场概率筛选，初始Top1市场概率至少50%；双选固定基线Top2。排除零让球Top2分歧场。
+从全候选池重新组装，先不重叠，后扩组；任两组最多共享4场，避免完全相同的场次组合。
+无有效U上限：1024元预算、每组16元，最多64组；接口64只是预算上界，不额外约束复用。
+不足以构造合法组合时保留现金。不加专家、不加比分保护、不改变原预算。
+
+每场首次出现不替换；后续出现且本组为单选时，独立以25%概率从**市场Top1切到市场Top2**。
+双选永不替换。替换后的单选不要求两源Top1一致，始终从原排序取第二，不连续翻转。
+固定种子0–99在本轮读取结算前全部封存，所有种子完整报告，不按收益挑选种子。
+五串一不替换对照使用完全相同的组和投入；六、七串一为之前封存的对照，实际投入可能不同。
+0.65仅在每张中奖基本票的返奖中扣一次。
+
+历史已暴露，结果仅作回顾诊断。种子分布不是未来收益置信区间，不构成清洁样本验收。
+
+## 不替换对照
+
+```{r}
+knitr::kable(fixed,digits=2)
+```
+
+## 25%单选切换：100个种子的分布
+
+```{r}
+distribution |> select(stake,mean_net,median_net,mean_ROI,median_ROI,p05_ROI,p95_ROI,outperform_percent,profitable_percent) |> knitr::kable(digits=2)
+distribution |> select(mean_hit_issues,mean_winning_groups,mean_rescued,mean_lost,median_dd,p95_dd) |> knitr::kable(digits=2)
+rows |> filter(startsWith(policy,"N5_SWAP_")) |> summarise(eligible_single=sum(eligible_single),swapped_single=sum(swapped_single),
+ swap_percent=100*swapped_single/eligible_single,swapped_double=sum(swapped_double)) |> knitr::kable(digits=2)
+```
+
+命中指当期至少中一组，不等于当期盈利。ROI为净收益／实际投入，金额及回撤单位均为人民币元。
+
+## 收益与回撤走势
+
+```{r}
+#| fig-width: 10
+#| fig-height: 7
+plot_curves<-curves |> filter(policy %in% c("N5_NO_SWAP","N5_SWAP_S000","N6_UNCAPPED","U3_BASELINE","U6_BASELINE"))
+plot_strategy_equity(plot_curves,"funded",params$initial_capital_cny)
+ggplot2::ggplot(plot_curves,ggplot2::aes(period,drawdown_cny,colour=policy)) +
+ ggplot2::geom_line() + ggplot2::labs(x="期次顺序",y="回撤（元）",colour="策略") + ggplot2::theme_minimal()
+```
+
+随机曲线固定展示预先指定的seed=0，仅为可复现示例；判断以全部100个种子的分布为准。
+
+## 各期表现（随机种子平均）
+
+```{r}
+knitr::kable(periods,digits=2)
+```
+
+```{r}
+#| include: false
+readr::write_csv(fixed,file.path(params$study,"controls.csv"))
+readr::write_csv(distribution,file.path(params$study,"summary.csv"))
+readr::write_csv(random,file.path(params$study,"seed_metrics.csv"))
+readr::write_csv(periods,file.path(params$study,"periods.csv"))
+readr::write_csv(curves,file.path(params$study,"curves.csv"))
+```

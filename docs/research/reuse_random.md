@@ -11,7 +11,7 @@ N7沿用四个double-source-v1版本，两单五双，每组64元。N6沿用cons
 ## 方法与验收边界
 
 - 固定种子0–99，每个种子独立回看同48期；在本轮读取结算前封存所有种子的计划和逐位置随机数台账。不选最佳种子、不重训或改专家。
-- src/fundamentals_reuse_random.py::random_reuse_plan 为一个共享的N6/N7函数。输入显式group_size、Cutoff、seed、probability、1024/2/.65常量；source seal、native cutoff、唯一场次p/q、完整票码和资金保持不变都有检查。无全局随机状态或标签输入。
+- src/fundamentals_reuse_random.py::random_reuse_plan 为共享函数，现支持N5/N6/N7。输入显式group_size、Cutoff、seed、single_probability、double_probability、1024/2/.65常量；重放本研究时两种概率均传入.3。source seal、native cutoff、唯一场次p/q、完整票码和资金保持不变都有检查。无全局随机状态或标签输入。原已封存结果仍按其历史实现收据作为归档证据。
 - scripts/reuse_random.py freeze/settle 薄入口；原组装复用既有封存证据。结算复用settle_n7_baseline；临时缓存仅在单期、同实现调用内以完整组件seal为键，含cutoff与票码，不跨期共享。
 - scripts/check_reuse_random.py 独立逐位置复算随机规则、逐组核对实际票码与最终SP赔付，并确认首次出现保持不变。
 - tests/test_fundamentals_reuse_random.py 覆盖N6/N7、两概率源、首次/复用、0/1边界、30%确定性、资金、非法种子/概率/cutoff及空仓。与double_source/consensus_portfolio相关测试合计21项通过。

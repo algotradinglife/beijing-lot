@@ -9,21 +9,22 @@ from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
 
 
-def random_reuse_plan(base, *, cutoffs, seed, probability, group_size, budget_cny, unit_cny, payout_factor):
+def random_reuse_plan(base, *, cutoffs, seed, single_probability, double_probability, group_size, budget_cny, unit_cny, payout_factor):
     """Replace repeated A singles by qTop2, doubles by source Top1+Top3.
 
     Input is sealed paired_double_source output; native Cutoffs and constants
     required. First appearance in ordered components stays unchanged, irrespective
     of role. Each later occurrence has an independent seeded Bernoulli decision;
-    no cascading swaps. Single rank q; double rank p or q per double_source.
+    no cascading swaps. Explicit single/double probabilities in [0,1] allow
+    either role to remain unchanged. Single rank q; double rank p or q per double_source.
     Stable W/D/L ties. Hash(seed,issue,group,slot) gives common random draws across
     paired source arms, with no global RNG use. Return sealed full tickets and
     occurrence ledger; same groups, cost, cash. No fit, labels, I/O or mutation.
     Exposed historical diagnosis only; fixed seeds are not selected by results.
     """
-    if type(seed) is not int or seed<0 or not isinstance(probability,(int,float)) or not 0<=probability<=1:
+    if type(seed) is not int or seed<0 or any(type(p) not in (int,float) or not 0<=p<=1 for p in (single_probability,double_probability)):
         raise ValueError('Explicit seed and probability in [0,1] required')
-    if group_size not in (6,7) or (budget_cny,unit_cny,payout_factor)!=(1024,2,.65) or base.get('double_source') not in ('BASELINE','MARKET'):
+    if group_size not in (5,6,7) or (budget_cny,unit_cny,payout_factor)!=(1024,2,.65) or base.get('double_source') not in ('BASELINE','MARKET'):
         raise ValueError('Fixed source and business constants required')
     if base.get('seal')!=stable_json_hash({k:v for k,v in base.items() if k!='seal'}):raise ValueError('Source changed')
     if set(cutoffs)!=set(base['cutoffs']):raise ValueError('Exact cutoff scope required')
@@ -50,6 +51,7 @@ def random_reuse_plan(base, *, cutoffs, seed, probability, group_size, budget_cn
             if r['support']!=original:raise ValueError('Original rank support required')
             eligible=r['slot'] in seen;seen.add(r['slot'])
             draw=random.Random(int.from_bytes(hashlib.sha256(f'{seed}|{base["issue"]}|{group}|{r["slot"]}'.encode()).digest(),'big')).random()
+            probability=single_probability if single else double_probability
             swap=eligible and draw<probability
             if swap:
                 chosen=order[1:2] if single else [order[0],order[2]]
@@ -60,5 +62,5 @@ def random_reuse_plan(base, *, cutoffs, seed, probability, group_size, budget_cn
         part['seal']=stable_json_hash(part)
     if sum(p['stake'] for p in result['components'])!=base['stake'] or base['cash_cny']+base['stake']!=budget_cny:
         raise ValueError('Funding changed')
-    result.update(seed=seed,swap_probability=probability,swap_ledger=ledger,random_source_seal=base['seal'],model_any_hit=None)
+    result.update(seed=seed,single_swap_probability=single_probability,double_swap_probability=double_probability,swap_ledger=ledger,random_source_seal=base['seal'],model_any_hit=None)
     return dict(**result,seal=stable_json_hash(result))
