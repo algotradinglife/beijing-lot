@@ -1,0 +1,74 @@
+---
+title: "U3/U6：固定单选与组选，比较双选基线和市场 Top2"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/double-source-v1"
+  archived_report: false
+  initial_capital_cny: 100000
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows)
+z<-missed_strategy_summary(rows,unlist(v$issue_order),params$initial_capital_cny)
+```
+
+同48期，U3/U6分别保持封存的场次、两场单选、组数和每组64元不变。
+单选要求基线/市场Top1一致且市场概率至少50%；双选对照仅改用基线p或市场q的Top2。
+原组为2A（单选）+4D（Top2一致双选）+1C（Top2分歧双选），因此每组实际只改变C位置。
+继续保留原零让球Top2分歧排除规则、U3/U6复用上限和组间重叠上限5场。
+选场不重排：D仍按市场Top2质量，C仍按基线Top2质量选择。本实验不等于全市场选场。
+q来自欧赔和大小球映射的比分分布，再投射至北单让球赛果，不是直接用普通欧赔胜平负。
+每期预算1024元，未用留现金，2元基本注，返奖只扣一次0.65；无专家或比分保护。
+全部计划先封存再读取本轮结算；历史已暴露，fixture-relative时间代理仅供回顾诊断，不宣称无泄漏的新样本验证。
+
+## 总体表现
+
+```{r}
+z$summary |> mutate(group_hit_percent=100*winning_groups/groups) |>
+ select(policy,hit_issues,groups,winning_groups,group_hit_percent,stake_cny,net_cny,
+ stake_ROI_percent,max_drawdown_cny,longest_miss_streak) |> knitr::kable(digits=2)
+```
+
+## 前、中、后各16期
+
+```{r}
+rows |> mutate(block=(match(issue,unlist(v$issue_order))-1L)%/%16+1L) |>
+ group_by(policy,block) |> summarise(hit_issues=sum(hits>0),group_hit_percent=100*sum(hits)/sum(groups),
+ stake=sum(stake),net=sum(net),ROI_percent=100*net/stake,.groups="drop") |> knitr::kable(digits=2)
+```
+
+## 收益与回撤曲线
+
+```{r}
+#| fig-width: 11
+#| fig-height: 5
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+
+ labs(x="期次顺序",y="账户资金（元）",color=NULL)+theme_minimal(base_family="Noto Sans CJK SC")
+ggsave(file.path(params$study,"equity.png"),width=11,height=5,dpi=180)
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+
+ labs(x="期次顺序",y="距历史高点回撤（元，越小越好）",color=NULL)+theme_minimal(base_family="Noto Sans CJK SC")
+ggsave(file.path(params$study,"drawdown.png"),width=11,height=5,dpi=180)
+```
+
+## 每期表现
+
+```{r}
+rows |> mutate(ROI_percent=if_else(stake>0,100*net/stake,NA_real_)) |>
+ select(issue,policy,groups,hits,stake,net,ROI_percent) |> knitr::kable(digits=2)
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+readr::write_csv(rows,file.path(params$study,"periods.csv"))
+readr::write_csv(z$curves,file.path(params$study,"curves.csv"))
+```
