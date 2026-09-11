@@ -1,0 +1,73 @@
+---
+title: "无U限制六串一与原七串一：逐期收益相关性"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n6-uncapped-v1"
+  archived_report: false
+  initial_capital_cny: 100000
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-as_tibble(v$rows);issues<-unlist(v$issue_order)
+policies<-c("N6_UNCAPPED","U3_BASELINE","U6_BASELINE")
+stopifnot(nrow(rows)==144,length(issues)==48,!anyDuplicated(rows[c("issue","policy")]),
+ setequal(rows$policy,policies),!anyNA(rows[c("net","hits")]),all(is.finite(rows$net)))
+stopifnot(nrow(anti_join(expand_grid(issue=issues,policy=policies),rows,by=c("issue","policy")))==0)
+z<-missed_strategy_summary(rows,issues,params$initial_capital_cny)
+wide<-rows |> select(issue,policy,net) |> pivot_wider(names_from=policy,values_from=net)
+x<-as.matrix(wide[match(issues,wide$issue),policies])
+wide_hit<-rows |> mutate(any_hit=as.integer(hits>0)) |> select(issue,policy,any_hit) |> pivot_wider(names_from=policy,values_from=any_hit)
+h<-as.matrix(wide_hit[match(issues,wide_hit$issue),policies])
+pearson<-cor(x);spearman<-cor(x,method="spearman");phi<-cor(h)
+comparison<-tibble()
+for(j in 2:3) comparison<-bind_rows(comparison,tibble(reference=policies[j],pearson=pearson[1,j],
+ spearman=spearman[1,j],hit_phi=phi[1,j],both_hit=sum(h[,1]==1 & h[,j]==1),
+ n6_only=sum(h[,1]==1 & h[,j]==0),n7_only=sum(h[,1]==0 & h[,j]==1),neither=sum(h[,1]==0 & h[,j]==0)))
+```
+
+六串一两单四双，单选仍是两源Top1一致且市场至少50%，双选为基线Top2；没有随机替换或比分保护。
+保留原候选池与零让球Top2分歧排除，先组不重叠场次，再扩组，组间最多共享5场。
+取消U3/U6复用政策：预算1024元、每组32元，最多32组。复用接口传入的32是预算决定的数学上界，
+在购买第32组之前不可能阻止任何一次复用，不是额外U限制。原七串一U3/U6对照保持不变。
+
+同48期逐期净收益金额相关性，包含空仓零收益；不是累计曲线相关性。
+各方案实际投入不同，相关性本身不能判断组合收益、资金效率或回撤。
+全部新六串一票据在本轮读取结算前封存，但历史已暴露，仅作回顾诊断，不构成清洁样本验收。
+
+## 相关性与命中期重合
+
+```{r}
+knitr::kable(comparison,digits=3)
+```
+
+Pearson衡量金额线性相关，Spearman衡量期次收益排序，hit_phi为当期是否至少命中一组的二元相关。
+n6_only、n7_only分别为只有六串一、只有对应七串一命中的期数；命中不等于盈利。
+
+## 收益和回撤背景
+
+```{r}
+z$summary |> select(policy,hit_issues,groups,winning_groups,stake_cny,net_cny,stake_ROI_percent,max_drawdown_cny) |> knitr::kable(digits=2)
+```
+
+## 每期明细
+
+```{r}
+rows |> arrange(match(issue,issues),policy) |> mutate(ROI_percent=if_else(stake>0,100*net/stake,NA_real_)) |>
+ select(issue,policy,groups,hits,stake,net,ROI_percent) |> knitr::kable(digits=2)
+readr::write_csv(comparison,file.path(params$study,"correlations.csv"))
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+readr::write_csv(z$curves,file.path(params$study,"curves.csv"))
+```
