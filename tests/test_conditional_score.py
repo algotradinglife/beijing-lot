@@ -193,3 +193,30 @@ def test_archive_contract(tmp_path):
     assert result["probabilities"].shape==(1,1)
     source.write_text("changed")
     with pytest.raises(ValueError,match="Changed frozen source"):read_score_archive(tmp_path,**kw)
+
+
+def test_model_cache_identity_and_fit_ess(sample):
+    from src.temporal_learning.issue_partitions import bind_model_receipt
+    f,p,b,h,a=sample
+    cut=Cutoff.decision_epoch("000012","2010-01-13T00:00:00Z")
+    k=kwargs(cut,"GLOBAL")
+    global_fit=fit_remapper(f,p,b,h,a,**k)
+    conditional=fit_remapper(f,p,b,h,a,**{**k,"method":"CONDITIONAL"})
+    changed_grid=fit_remapper(f,p,b,h,a,**{**k,"penalties":(.1,10)})
+    assert len({x["receipt"]["cache_key"] for x in (global_fit,conditional,changed_grid)})==3
+    weights=global_fit["receipt"]["fit_weight_receipt"]
+    import json
+    ledger=json.loads(weights["ledger_json"])
+    assert weights["rows"]==8 and weights["effective_sample_size"]==pytest.approx(8)
+    assert sum(r["fit_weight"] for r in ledger)==pytest.approx(1)
+    assert {r["fixture_id"] for r in ledger}==set(map(str,range(8)))
+    # Twelve prior rows meet overall ESS=10 but only eight are actually fitted.
+    with pytest.raises(TemporalContractError,match="in fit partition"):
+        fit_remapper(f,p,b,h,a,**{**k,"weighting_policy":WeightingPolicy.expanding_equal(minimum_ess=10)})
+    params={x:v for x,v in k.items() if x not in {"method","penalties"}}
+    params["availability"]=AvailabilityFilter(params.pop("availability_policy"),data_available_column="data_available_ts")
+    params["implementation_modules"]=("src.conditional_score.model",)
+    context=prepare_learning_context(f,**params)
+    with pytest.raises(TemporalContractError):
+        bind_model_receipt(context,Cutoff.decision_epoch("other","2010-01-13T00:00:00Z"),
+                           model_identity={"method":"GLOBAL"},model_parameters={"penalties":[1]})

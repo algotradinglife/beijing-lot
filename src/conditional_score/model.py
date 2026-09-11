@@ -21,10 +21,11 @@ NUMERIC = (
     "home_venue_points_pg", "away_venue_points_pg",
     "home_overall_n", "away_overall_n", "home_venue_n", "away_venue_n",
     "market_home_goals", "market_away_goals", "home_goal_gap", "away_goal_gap")
-MODEL_VERSION = "422-score-remap-0.1.0"
+MODEL_VERSION = "422-score-remap-0.1.1"
 
 # Domain clients retain the standard context call; issue partitioning is shared.
-from src.temporal_learning.issue_partitions import prepare_issue_learning_context as prepare_learning_context
+from src.temporal_learning.issue_partitions import (
+    prepare_issue_learning_context as prepare_learning_context, bind_model_receipt)
 
 
 def grid_basis(home, away, handicap):
@@ -170,7 +171,9 @@ def fit_remapper(history, probabilities, basis, home, away, *, cutoff, repositor
         m=score_metrics(q,home[part.index],away[part.index],part.handicap,part.actual_home,part.actual_away)
         metrics[name]={"rows":len(part),"issues":part.issue_code.nunique(),
                        **m[["score_logloss","score_brier","wdl_logloss","wdl_brier","top1","top2"]].mean().to_dict()}
-    receipt=dict(context.receipt.payload)
+    receipt=bind_model_receipt(context,cutoff,
+        model_identity={"method":method,"version":MODEL_VERSION},
+        model_parameters={"candidate_penalties":list(map(float,penalties))})
     receipt.update(model_version=MODEL_VERSION,method=method,selected_parameters={"penalty":penalty},
         candidate_metrics=[{"penalty":c[1],"validation_score_logloss":c[0]} for c in candidates],
         coefficients=coef.tolist(),metrics=metrics,

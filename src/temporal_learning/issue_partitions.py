@@ -6,7 +6,8 @@ implementation closures. No duplicated availability, weighting or cache engine.
 from dataclasses import dataclass, asdict
 import pandas as pd
 from .core import (prepare_learning_context as prepare_base_context, PartitionPolicy,
-                   LearningReceipt, temporal_cache_key, TemporalContractError)
+                   LearningReceipt, temporal_cache_key, TemporalContractError,
+                   effective_sample_size, stable_json_hash)
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,25 @@ def prepare_issue_learning_context(history, cutoff, *, source_hashes, repository
     groups=dict(fit=issues[:-tail],tune=issues[-tail:-partition_policy.calibration_issues],
                 calibration=issues[-partition_policy.calibration_issues:],final_refit=issues)
     context.partitions={name:eligible[eligible[key].isin(ids)].copy() for name,ids in groups.items()}
+    fit=context.partitions["fit"]
+    fit_weights=context.weights.loc[fit.index].to_numpy(float)
+    fit_weights=fit_weights/fit_weights.sum()
+    fit_ess=effective_sample_size(fit_weights)
+    if fit_ess < weighting_policy.effective_sample.minimum:
+        raise TemporalContractError(
+            f"effective sample size {fit_ess:.3f} below floor "
+            f"{weighting_policy.effective_sample.minimum:.3f} in fit partition")
+    fit_ledger=context.weight_ledger.loc[fit.index].copy()
+    fit_ledger["input_row_index"]=fit.index
+    if "fixture_id" in fit:
+        fit_ledger["fixture_id"]=fit.fixture_id
+    fit_ledger["fit_weight"]=fit_weights
     receipt=dict(context.receipt.payload)
+    receipt["fit_weight_receipt"]={
+        "effective_sample_size":fit_ess,
+        "minimum_ess":weighting_policy.effective_sample.minimum,
+        "rows":len(fit), "sum":float(fit_weights.sum()),
+        "ledger_json":fit_ledger.to_json(orient="records",date_format="iso")}
     receipt["partition"]={
         **{name+"_issues":sorted(ids) for name,ids in groups.items()},
         **{name+"_rows":len(frame) for name,frame in context.partitions.items()},
@@ -73,3 +92,19 @@ def prepare_issue_learning_context(history, cutoff, *, source_hashes, repository
     receipt["excluded_partial_issues"]=sorted(incomplete.tolist())
     context.receipt=LearningReceipt(receipt)
     return context
+
+
+def bind_model_receipt(context, cutoff, *, model_identity, model_parameters):
+    """Bind model identity/search parameters to a shared temporal receipt.
+
+    Returns a new receipt; preserves the temporal context key separately. Pure,
+    explicit cutoff required; no cache I/O or mutation of the source context.
+    """
+    if cutoff != context.cutoff or not model_identity or not model_parameters:
+        raise TemporalContractError("Matching cutoff and model configuration required")
+    binding=dict(model_identity=model_identity, model_parameters=model_parameters,
+                 temporal_cache_key=context.receipt.payload["cache_key"])
+    receipt=dict(context.receipt.payload)
+    receipt["model_cache_binding"]=binding
+    receipt["cache_key"]=stable_json_hash(binding)
+    return receipt
