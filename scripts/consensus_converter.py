@@ -24,7 +24,10 @@ if __name__ == "__main__":
     parser.add_argument("--study",required=True)
     parser.add_argument("--design",choices=["paired","independent"],default="paired")
     parser.add_argument("--exclude-zero-top2-disagreement",action="store_true")
+    parser.add_argument("--anchor-max-uses",type=int,choices=range(1,7))
     args=parser.parse_args()
+    if args.phase=="freeze" and args.anchor_max_uses is not None and (args.design!="independent" or not args.exclude_zero_top2_disagreement):
+        parser.error("Anchor experiment requires independent design and exclusion")
     out=Path(args.study)
     pure=Path("data/derived/fundamentals_417/new48-pure-baseline-v1/factors.json")
     prior=Path("data/derived/fundamentals_417/cap-depth-grid-v1")
@@ -41,7 +44,8 @@ if __name__ == "__main__":
         reports=[("quarto/95_consensus_converter.qmd" if args.design=="paired" else "quarto/96_independent_converter.qmd"),"r/fundamentals_pure_report.R",
                  "r/fundamentals_missed_summary.R","r/fundamentals_equity_curves.R"]
         if args.exclude_zero_top2_disagreement:reports[0]="quarto/98_candidate_exclusion.qmd"
-        receipt=dict(exclude_zero_top2_disagreement=args.exclude_zero_top2_disagreement,scope="EXPOSED_FIXED_CONSENSUS_NOT_FITTED",design=args.design,issues=issues,parameters=params,
+        if args.anchor_max_uses is not None:reports[0]="quarto/99_unique_single.qmd"
+        receipt=dict(anchor_max_uses=args.anchor_max_uses,exclude_zero_top2_disagreement=args.exclude_zero_top2_disagreement,scope="EXPOSED_FIXED_CONSENSUS_NOT_FITTED",design=args.design,issues=issues,parameters=params,
             source_hashes={**data["source_hashes"],**previous["receipt"]["plan_hashes"],
                            str(pure):hashlib.sha256(pure.read_bytes()).hexdigest(),
                            str(prior/"plans-frozen.json"):hashlib.sha256((prior/"plans-frozen.json").read_bytes()).hexdigest()},
@@ -59,8 +63,18 @@ if __name__ == "__main__":
                         unit_cny=2,payout_factor=.65,seed=41902)
             receipt["parameters"]=params
             receipt["conversion_budget_fractions"]=[0,.25,.5,.75,1]
+            if args.anchor_max_uses is not None:
+                params["anchor_max_uses"]=args.anchor_max_uses
+                receipt["conversion_budget_fractions"]=[0]
         if args.exclude_zero_top2_disagreement:
             filtered_reference=Path("data/derived/fundamentals_417")/("consensus-converter-v3" if args.design=="paired" else "independent-converter-v1")
+            if args.anchor_max_uses is not None:
+                filtered_reference=Path("data/derived/fundamentals_417/candidate-exclusion-v1/independent")
+                ancestor=json.loads((filtered_reference/"frozen.json").read_text())
+                assert stable_json_hash(ancestor["receipt"])==ancestor["seal"]
+                verify_clean_file_bindings(ancestor["receipt"]["plan_hashes"],repository_root=Path.cwd())
+                receipt["source_hashes"].update(ancestor["receipt"]["plan_hashes"])
+                receipt["source_hashes"][str(filtered_reference/"frozen.json")]=hashlib.sha256((filtered_reference/"frozen.json").read_bytes()).hexdigest()
             witness=json.loads((filtered_reference/"plans-frozen.json").read_text())
             assert hashlib.sha256(witness["canonical_json"].encode()).hexdigest()==witness["seal"]
             assert json.loads(witness["canonical_json"])["result_sha256"]==hashlib.sha256((filtered_reference/"results.json").read_bytes()).hexdigest()
@@ -81,6 +95,11 @@ if __name__ == "__main__":
                 bundle=consensus_portfolios(f,cutoffs=cuts,**params)
             else:
                 plans={}
+                if args.anchor_max_uses is not None:
+                    baseline=independent_consensus_portfolio(f,cutoffs=cuts,conversion_budget_fraction=0,**dict(params,anchor_max_uses=None))
+                    ancestor_plan=json.loads(gzip.decompress((filtered_reference/"plans"/f"{issue}.json.gz").read_bytes()))["plans"]["INDEPENDENT_C000"]
+                    assert baseline["components"]==ancestor_plan["components"]
+                    assert baseline["stake"]==ancestor_plan["stake"] and baseline["cash_cny"]==ancestor_plan["cash_cny"]
                 for fraction in receipt["conversion_budget_fractions"]:
                     plan=independent_consensus_portfolio(f,cutoffs=cuts,conversion_budget_fraction=fraction,**params)
                     plans[plan["strategy"]]=plan
@@ -127,7 +146,7 @@ if __name__ == "__main__":
             previous=json.loads((Path(r["reference_root"])/"results.json").read_text())
             rows.extend(dict(x,policy="PREVIOUS_"+x["policy"]) for x in previous["rows"]
                         if x["policy"] in ["PRIMARY_FILL","COMPLEMENT","OLD_D2_U6_P5"])
-        expected=8 if r["design"]=="independent" else 4
+        expected=len(r["conversion_budget_fractions"])+3 if r["design"]=="independent" else 4
         assert len(rows)==expected*len(r["issues"]) and all(x["status"] in ["COMPLETE","NO_BET"] for x in rows)
         payload=dict(rows=rows,pools=pools,legs=leg_rows,issue_order=r["issues"],parameters=r["parameters"],
                      upstream_freeze_seal=frozen["seal"],historical_admission=False,design=r["design"])

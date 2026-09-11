@@ -1,0 +1,83 @@
+---
+title: "压两场：同一场只担任一次单选"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/unique-single-v1"
+  archived_report: false
+---
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_pure_report.R")
+source("r/fundamentals_equity_curves.R")
+source("r/fundamentals_missed_summary.R")
+v<-read_pure_baseline_report(params$study,params$archived_report)$result
+rows<-bind_rows(
+ as_tibble(v$rows) |> filter(policy=="INDEPENDENT_C000") |> mutate(policy="SINGLE_USE_ONCE"),
+ as_tibble(v$reference_rows) |> filter(policy=="INDEPENDENT_C000") |> mutate(policy="ORIGINAL_D2")
+)
+z<-missed_strategy_summary(rows,unlist(v$issue_order),100000)
+```
+
+## 唯一变化
+
+先排除零让球且基线、市场Top2集合不同的场次。无转换，无比分保护。
+每组七场中两场单选、五场双选，每组64元。原方案实际场次复用U6、
+两组交集P5；新增限制为每场最多只在一个组中担任单选，
+其他组仍可把它作为双选，且所有原有限制继续生效。
+单选仍须两源首选一致且市场首选概率至少50%，不放宽合格标准。
+
+先全不重叠，再按既有固定概率排序扩组。每期预算1024元，现金留存，
+不靠提高倍数花完资金。初始资金100000元，2元单位、整票一次0.65系数。
+因此这是固定预算上限下的组合比较，不是等实际投入比较。
+每个方案的选择是逐组贪心最优，不宣称全局最优。
+
+48期已曝光历史诊断，不拟合、不寻优、不改变专家。
+本轮全部方案冻结后才读取结算。原方案的组件、投入与现金在冻结阶段
+逐期由当前无新增限制的求解器重放，对照旧冻结组件完全一致；
+旧结算作为散列绑定的历史证据。输入、删除清单、截止对象和传递代码绑定。
+历史时间代理不证明真实同一出票时刻可执行。
+
+## 汇总
+
+```{r}
+z$summary |> knitr::kable(digits=2)
+```
+
+## 逐期命中、收益与收益率
+
+```{r}
+rows |> mutate(group_hit_percent=if_else(groups>0,100*hits/groups,NA_real_),
+ stake_ROI_percent=if_else(stake>0,100*net/stake,NA_real_),
+ budget_ROI_percent=100*net/budget_cny) |>
+ select(issue,policy,groups,hits,group_hit_percent,stake,cash_cny,gross,net,
+ stake_ROI_percent,budget_ROI_percent) |> knitr::kable(digits=2)
+```
+
+## 单选集中度
+
+本表每行是一期的一场入选比赛，仅统计新方案。single_uses不得超过1；
+total_uses可能超过1，因为其他组仍能双选。组数量下降可由合格单选池约束解释：
+有K场合格单选时最多能生成floor(K/2)组，还须满足其余角色和复用限制。
+
+```{r}
+as_tibble(v$legs) |> filter(policy=="INDEPENDENT_C000") |>
+ group_by(issue,slot) |> summarise(single_uses=sum(nchar(support)==1),
+ total_uses=n(),.groups="drop") |> knitr::kable()
+as_tibble(v$pools) |> mutate(anchor_group_upper_bound=floor(A/2)) |> knitr::kable()
+```
+
+## 收益与回撤
+
+```{r}
+ggplot(z$curves,aes(period,equity_cny,color=policy))+geom_line()+labs(x="期序",y="资金（元）",color="方案")+theme_minimal()
+ggplot(z$curves,aes(period,drawdown_cny,color=policy))+geom_line()+labs(x="期序",y="回撤（元）",color="方案")+theme_minimal()
+readr::write_csv(z$summary,file.path(params$study,"summary.csv"))
+```

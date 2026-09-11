@@ -29,7 +29,7 @@ if __name__=="__main__":
     audit=json.loads(Path(next(iter(audits))).read_text())["rows"]
     labels={(a["issue"],a["slot"],a["provider_id"]):a for a in audit}
     saved={(a["issue"],a["policy"]):a for a in result["rows"]}
-    assert len(saved)==(384 if r["design"]=="independent" else 192)
+    assert len(saved)==((len(r["conversion_budget_fractions"])+3)*len(r["issues"]) if r["design"]=="independent" else 192)
     excluded={}
     if "filter_ledgers" in r:
         import pandas as pd
@@ -75,6 +75,10 @@ if __name__=="__main__":
                 actual_groups=[{leg["slot"] for leg in part["legs"]} for part in env["components"]]
                 assert max(Counter(s for g in actual_groups for s in g).values(),default=0)<=6
                 assert all(len(a&b)<=5 for a,b in itertools.combinations(actual_groups,2))
+                if r["anchor_max_uses"] is not None:
+                    singles=Counter(leg["slot"] for part in env["components"] for leg in part["legs"] if len(leg["support"])==1)
+                    assert max(singles.values(),default=0)<=r["anchor_max_uses"]
+                    assert all(sum(len(leg["support"])==1 for leg in part["legs"])==2 for part in env["components"])
                 alloc=env["allocation"]
                 for kind,label in [(False,"primary"),(True,"converter")]:
                     actual_spend=sum(p["stake"] for p in env["components"] if p["complement"]==kind)
