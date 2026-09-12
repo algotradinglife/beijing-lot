@@ -1,5 +1,24 @@
 # Beijing-lot Research Roadmap v1.0
 
+## 2026-09-12: #424 final retrospective joint-constraint acceptance
+
+The R-native joint optimizer and the 100-issue, 2,400-plan follow-up complete
+the remaining research acceptance: **COVERAGE_STRUCTURE_SIGNAL**, without
+demonstrated capital superiority. Full constraints reach 53–60 hit issues,
+but ROI is 0.26–26.03% across three seeds (median 2.00%), versus quality ranking
+27.79%. Both QMD input modes agree; full independent replay and Codex review
+passed. See [PI decision](n7_joint_acceptance.md) and
+[QMD139](../../quarto/139_n7_joint_sleeves.qmd).
+
+Keep quality ranking as the economic comparison and union-only selection as
+the coverage comparison. Do not replace them with the full constraint stack
+on this evidence. The owner defines this as already-exposed historical research;
+new-data validation is not a closure gate. Any future tuning, production
+admission or main integration needs its own live graph contract. #425/#427 and
+other issue lifecycles remain unchanged. GitHub records the authoritative
+research-branch merge and #424 closure; the earlier entry below is retained as
+the staged PR #426 evidence, not the final lifecycle state.
+
 ## 2026-09-12: N7 8×64 structural evaluation (#424)
 
 PI accepts the historical-only method/accounting evidence after independent

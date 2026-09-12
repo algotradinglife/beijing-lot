@@ -1,0 +1,53 @@
+{
+  "mode": "EXPOSED_HISTORICAL_DIAGNOSTIC",
+  "model_id": "market-balance-draw-1.0.0-diagnostic",
+  "source": "data/derived/fundamentals_417/n7-sleeves-424-v3",
+  "n": 7,
+  "sleeves": 8,
+  "tickets_per_sleeve": 64,
+  "budget_cny": 1024,
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000,
+  "coverage_fraction": 0.8,
+  "minimum_roi": -0.35,
+  "reuse_cap": 4,
+  "overlap_cap": 3,
+  "path_steps": 5,
+  "mean_drawdown_cap": 3072,
+  "training_worlds": 500,
+  "evaluation_worlds": 10000,
+  "seeds": [
+    42401,
+    42402,
+    42403
+  ],
+  "evaluation_seed_offset": 1000000,
+  "solver_nodes": 200,
+  "solver_gap": 0.01,
+  "workers": 8,
+  "arms": [
+    "QUALITY_PROB",
+    "UNION_PROB",
+    "JOINT_UNION",
+    "JOINT_RETURN",
+    "JOINT_UP",
+    "JOINT_FULL",
+    "JOINT_NO_RETURN",
+    "JOINT_NO_UP"
+  ],
+  "provenance_roots": [
+    "src.n7_joint_study",
+    "src",
+    "src.divergence_materializer",
+    "src.low_n_selector_data",
+    "src.n7_chronology_sync",
+    "src.n7_support_shape",
+    "src.n7_support_transfer_grid",
+    "src.neural_top2_residual",
+    "src.qeu_threshold_n7",
+    "src.source_schema",
+    "src.temporal_learning"
+  ],
+  "solver_feasibility_tolerance": 1e-09
+}

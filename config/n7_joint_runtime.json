@@ -1,0 +1,17 @@
+{
+  "R": "4.6.1",
+  "Python": "3.14.4",
+  "Quarto": "1.10.18",
+  "r_packages": {
+    "highs": "1.14.0.2",
+    "Matrix": "1.7.5",
+    "withr": "3.0.3",
+    "dplyr": "1.2.1",
+    "tibble": "3.3.1",
+    "jsonlite": "2.0.0",
+    "reticulate": "1.46.0",
+    "testthat": "3.3.2"
+  },
+  "inherited_runtime": "config/compression_breadth_runtime.json",
+  "setup": "Install the declared R packages in the explicit project library before tests or rendering; never install during execution."
+}

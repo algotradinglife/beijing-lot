@@ -1,0 +1,223 @@
+---
+title: "N7 联合选组：覆盖、收益、复用与风险约束"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-joint-r-v2"
+  archive_fixture: "tests/fixtures/n7_joint_study.json.gz"
+  display_seed: 42401
+  bootstrap_seed: 42499
+  bootstrap_reps: 1000
+---
+
+本报告评估 [#424](https://github.com/algotradinglife/beijing-lot/issues/424) 的
+R 联合选组研究。使用已经反复研究过的 100 期历史数据，结果用于回顾诊断。
+主比较每期预算 **1,024 元**，买 **8 组 × 64 张 × 2 元**的全单选七串一；
+每组七场不同，完整票不重复，没有比分保护。三个种子各自回测，不叠加投入。
+
+概率 p 来自冻结的校正市场概率，q 是原市场概率。模型估算返奖为
+`2 × 0.65 / prod(q)`，结算使用冻结审计快照中的实际 SP，整票只乘一次 0.65。
+沿用 24 个候选七场集合，在 R 中计算全部 2,187 个赛果状态和各自的概率、估算返奖。
+PROB64、VALUE64 和约束前沿提供不同的组内选择。
+
+联合求解直接最大化同一批逐场模拟赛果下“至少中一张”的概率。
+重叠比赛共用同一个模拟赛果，不能把八组当作独立事件。
+完整方案同时要求估算 ROI ≥ −35%、每场最多复用 4 组、两组最多重叠 3 场，
+以及模拟五轮路径的平均最大回撤不超过 3,072 元。
+−35% 是沿用的研究比较门槛，不是盈利或实盘准入保证。
+
+风险路径把当前一期的模型重复模拟五次，是同分布压力实验，不是对后五期的预测。
+选择使用 500 个情景，另外 10,000 个情景用于数值检查；两者都不是未见历史数据。
+HiGHS 使用固定 200 节点、1% 相对最优差距、10⁻⁹ 可行性容差和单线程。只有通过约束检查的求解结果才投入；
+不可行或达到计算限制时整期保留现金。计算限制不等于证明不存在可行组合。
+
+首次试跑在 100913 期发现求解器默认容差大于覆盖下限的验收容差，已终止且未读取本轮结算。
+本报告使用修正容差后统一重跑的版本；仍未通过数值约束检查的解明确记为 `NUMERICAL_REJECTION`。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_equity_curves.R")
+source("r/market_conditional_summary.R")
+source("r/n7_sleeve_summary.R")
+source("r/n7_joint_report.R")
+if (!is.null(params$archive_fixture)) {
+  archive <- jsonlite::fromJSON(gzfile(params$archive_fixture), simplifyVector = FALSE)
+  stopifnot(archive$sha256 == digest::digest(charToRaw(archive$body), serialize = FALSE, algo = "sha256"))
+  payload <- jsonlite::fromJSON(archive$body)
+  cfg <- archive$parameters
+  identity <- archive$sha256
+  mode <- "归档结果的描述性重算"
+} else {
+  fp <- file.path(params$study, "plans-frozen.json")
+  rp <- file.path(params$study, "results.json")
+  er <- jsonlite::fromJSON(file.path(params$study, "evaluation-receipt.json"))
+  frozen <- jsonlite::fromJSON(fp, simplifyVector = FALSE)
+  stopifnot(digest::digest(file = fp, algo = "sha256") == er$freeze_sha256,
+    digest::digest(file = rp, algo = "sha256") == er$result_sha256,
+    digest::digest(file = file.path(params$study, "audit-snapshot.json"), algo = "sha256") == er$audit_sha256)
+  for (kind in c("source_hashes", "plan_hashes", "raw_hashes", "r_implementation")) {
+    bindings <- frozen$receipt[[kind]]
+    for (path in names(bindings)) stopifnot(digest::digest(file = path, algo = "sha256") == bindings[[path]])
+  }
+  payload <- jsonlite::fromJSON(rp)
+  exposure <- bind_rows(lapply(names(frozen$receipt$plan_hashes), function(path)
+    n7_joint_exposure(jsonlite::fromJSON(gzfile(path), simplifyVector = FALSE))))
+  payload$rows <- payload$rows |> left_join(exposure, by = c("issue", "arm", "seed"),
+    relationship = "one-to-one", suffix = c("", "_replayed")) |>
+    mutate(fixture_hhi = coalesce(fixture_hhi_replayed, fixture_hhi),
+           outcome_hhi = coalesce(outcome_hhi_replayed, outcome_hhi)) |>
+    select(-fixture_hhi_replayed, -outcome_hhi_replayed)
+  cfg <- frozen$receipt$parameters
+  identity <- er$result_sha256
+  mode <- "校验冻结文件后重算"
+}
+stopifnot(identical(payload$historical_admission, FALSE), params$display_seed %in% unlist(cfg$seeds))
+report <- n7_joint_report(payload$rows, payload$issue_order, cfg$initial_capital_cny,
+  cfg$budget_cny, cfg$mean_drawdown_cap)
+labels <- c(QUALITY_PROB = "组覆盖排序", UNION_PROB = "仅PROB联合选组", JOINT_UNION = "三选项联合选组",
+  JOINT_RETURN = "联合＋收益", JOINT_UP = "联合＋收益＋U/P", JOINT_FULL = "完整约束",
+  JOINT_NO_RETURN = "完整去收益约束", JOINT_NO_UP = "完整去U/P约束",
+  MONOLITHIC_PROB512 = "旧单体概率512", MONOLITHIC_COVERAGE512 = "旧单体覆盖512")
+curves <- report$curves |> mutate(label = factor(unname(labels[model]), levels = unname(labels)))
+stopifnot(!anyNA(curves$label))
+```
+
+运行模式：**`r mode`**。结果 SHA256：`r identity`。
+起始资金 100,000 元，不借款、不追加本金；不足整期投入时停止。
+资金曲线按期次顺序记账，假设前一期返奖在下一期投入前到账。
+逐场 cutoff 与原始概率版本保留，但历史可用时点和共同可下注时点的证据不完备，
+`historical_admission=false`。本次先冻结选票再读取结算，有助于复现，不能消除既有样本暴露。
+
+## 收益和命中
+
+本轮回顾结论：**提高命中期数的目标有进展，但完整约束方案没有建立收益优势，暂不替代组覆盖排序。**
+组覆盖排序在 100 期命中 40 期、盈利 34 期，ROI 27.79%；完整约束的三个种子命中
+53–60 期，ROI 0.26%–26.03%，中位数 2.00%。完整约束去最佳期后的 ROI 中位数为 −4.98%，
+而组覆盖排序为 15.21%。下表每个指标分别取种子中位数，不代表某一个共同的种子。
+
+完整约束相对组覆盖排序，在两者均足额下注的 97 期上，平均 ROI 差为 −22.31 个百分点，
+按期次整组抽样的描述性 95% 区间为 [−67.01, 16.39] 个百分点；该区间不支持稳定提升的判断。
+去掉风险约束的“联合＋收益＋U/P”收益中位数为 13.93%，高于完整约束；
+因此这项模拟风险门槛在本样本没有显示收益改善，也不能视为实际回撤的保证。
+仅 PROB 联合选组命中期数中位数 58、盈利期数中位数 44、ROI 中位数 10.40%，
+是覆盖与收益之间值得保留的研究对照，但不是本轮收益最优方案。
+
+旧单体概率512的 ROI 为 52.98%，去最佳期后仅为 5.82%，最大回撤 20,641 元，
+体现了大额返奖依赖。其候选访问范围也不同，不能把差异全部归因为拆组方式。
+本研究可据此完成方法、约束和回顾诊断的验收；不据此宣称未见数据泛化或实盘准入。
+
+以下为三个种子的中位数，另列最低与最高 ROI。ROI 分母为实际投入；
+空仓不算命中或盈利。单体策略是原先冻结的两个 512 票参照，不是本轮重新调参结果。
+旧单体候选还包含此前的票池，而本轮组策略限定为 24 个七场集合，
+因此与旧单体的差别不能全部归因于分组方式。各个新 R 方案之间使用相同的 24 组，
+它们的配对比较用于判断新增约束的作用。候选池扩容与可变深度结果另见报告 135–137。
+
+```{r}
+knitr::kable(report$grid |> mutate(策略 = unname(labels[model])) |>
+  select(策略, stake, net, roi, min_roi, max_roi, hit_issues, profitable_issues,
+         no_bet_issues, max_drawdown, max_drawdown_percent, without_best_roi), digits = 2,
+  col.names = c("策略", "投入/元", "净收益/元", "ROI/%", "最低ROI/%", "最高ROI/%",
+    "命中期数", "盈利期数", "空仓期数", "最大回撤/元", "最大回撤/%", "去最佳期ROI/%"))
+```
+
+## 资金与回撤曲线
+
+每幅图同时展示三个种子，各线是独立策略路径。横轴是期次顺序；没有把不同种子的盈利期拼接。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 13
+ggplot(curves, aes(period, equity_cny, colour = policy, group = policy)) +
+  geom_hline(yintercept = 100000, colour = "grey60", linetype = 2) + geom_line(linewidth = .55) +
+  facet_wrap(~label, ncol = 2) + labs(x = "期次顺序", y = "账户资金（元）", colour = "种子") +
+  theme_minimal(base_family = "Noto Sans CJK SC") + theme(legend.position = "bottom")
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 13
+ggplot(curves, aes(period, drawdown_cny, colour = policy, group = policy)) + geom_line(linewidth = .55) +
+  facet_wrap(~label, ncol = 2) + labs(x = "期次顺序", y = "距历史高点回撤（元）", colour = "种子") +
+  theme_minimal(base_family = "Noto Sans CJK SC") + theme(legend.position = "bottom")
+```
+
+## 同额投入的配对比较
+
+双方都投入 1,024 元的期次才进入下表。删除约束的版本用于消融，
+分别检查组内状态、收益约束、U/P 与风险约束。不能仅凭空仓后的低回撤判断改善。
+这里展示预先固定种子 `r params$display_seed`；全部种子在报告对象中保留。
+
+```{r}
+knitr::kable(report$paired |> filter(seed == params$display_seed, arm != control) |>
+  mutate(方案 = unname(labels[arm]), 对照 = unname(labels[control])) |>
+  select(方案, 对照, matched_issues, roi_percent, control_roi_percent,
+    matched_net_difference, gained_hit_issues, lost_hit_issues), digits = 2)
+```
+
+整期聚类 bootstrap 保留同一期的三个种子，不把它们当作三份独立历史。
+下面给出同额投入配对的 ROI 差与 95% 百分位区间；这是已暴露样本内的抽样不确定性，
+没有包含反复搜索策略造成的偏差。
+
+```{r}
+bootstrap <- n7_joint_bootstrap(report$periods, "JOINT_FULL", "QUALITY_PROB", 1024,
+  params$bootstrap_reps, params$bootstrap_seed)
+knitr::kable(bootstrap, digits = 2)
+```
+
+## 求解状态与模拟适配
+
+收益约束使用估算价格，风险约束只约束选组时的模拟路径。
+检查情景上的风险超限、选择与检查覆盖率差距，都是数值稳定性诊断；不使用这些检查结果反向调参。
+
+```{r}
+knitr::kable(report$constraints |> filter(seed == params$display_seed))
+knitr::kable(report$numerical |> filter(seed == params$display_seed), digits = 2)
+```
+
+## 连续风险、尾部依赖与期段
+
+亏损与无返奖连续长度按实际下注期计算，水下持续时间按全部期次计算。
+最差窗口金额是对应连续 5/10/20 期的净收益和。去最佳期 ROI 同时扣除该期投入。
+数据只有 2010 年，无法给出跨年稳定性结论；前后半期次仅作同年描述。
+
+```{r}
+knitr::kable(report$summary |> filter(policy == as.character(params$display_seed)) |>
+  select(model, longest_losing_run, longest_no_payout_run, longest_underwater,
+    worst5, worst10, worst20, best_issue, without_best_roi, largest_payout_share_percent, payout_hhi,
+    any_of(c("mean_fixture_hhi", "mean_outcome_hhi"))), digits = 3)
+knitr::kable(report$segments |> filter(seed == params$display_seed), digits = 2)
+```
+
+## 每期明细
+
+以下是固定种子 `r params$display_seed` 的逐期结果，金额为元。空仓期 ROI 不定义，显示 NA。
+
+```{r}
+periods <- report$periods |> filter(seed == params$display_seed) |>
+  select(issue, arm, stake, gross, net, roi_percent, hits)
+str(tibble::as_tibble(periods))
+knitr::kable(head(periods, 20), digits = 2)
+```
+
+<details>
+<summary>展开全部逐期结果</summary>
+
+```{r}
+knitr::kable(periods, digits = 2,
+  col.names = c("期次", "方案", "投入/元", "返奖/元", "净收益/元", "ROI/%", "命中票数"))
+```
+
+</details>
+
+调用接口为 `r/n7_joint_sleeves.R::n7_joint_issue()`；报告汇总为
+`r/n7_joint_report.R::n7_joint_report()`。求解参数集中在 `config/n7_joint_424.json`。
+重复实验必须创建新输出目录；既有冻结包不会被覆盖。完整合同、限制与验收定义见
+`docs/research/n7_joint_contract.md`。
