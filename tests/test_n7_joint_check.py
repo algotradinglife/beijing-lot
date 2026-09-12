@@ -8,7 +8,7 @@ import json
 import numpy as np
 import pytest
 
-from src.n7_joint_check import check_joint_plan, check_joint_study
+from src.n7_joint_check import check_joint_plan, check_prefix_study
 from src.temporal_learning import implementation_closure
 from src.temporal_learning.core import stable_json_hash
 
@@ -43,7 +43,7 @@ def replay_case():
 
 def test_replay_and_mutations(replay_case):
     plan, worlds, cfg = replay_case
-    assert check_joint_plan(plan, worlds, cfg)["eval_coverage"] == 1
+    assert check_joint_plan(plan, worlds, cfg, {"cutoffs": plan["cutoffs"]})["eval_coverage"] == 1
     for field, value, message in [("expected_net", 0, "return arithmetic"),
                                   ("eval_coverage", .5, "union"),
                                   ("train_path_drawdown", 3, "drawdown"),
@@ -53,22 +53,22 @@ def test_replay_and_mutations(replay_case):
         bad = copy.deepcopy(plan); bad[field] = value
         bad["seal"] = stable_json_hash({k: v for k, v in bad.items() if k != "seal"})
         with pytest.raises(ValueError, match=message):
-            check_joint_plan(bad, worlds, cfg)
+            check_joint_plan(bad, worlds, cfg, {"cutoffs": plan["cutoffs"]})
     bad = copy.deepcopy(plan); bad["outcomes"][1] = bad["outcomes"][0]
     bad["seal"] = stable_json_hash({k: v for k, v in bad.items() if k != "seal"})
     with pytest.raises(ValueError, match="identity"):
-        check_joint_plan(bad, worlds, cfg)
+        check_joint_plan(bad, worlds, cfg, {"cutoffs": plan["cutoffs"]})
     bad_worlds = copy.deepcopy(worlds); bad_worlds["evaluation"][0][0] = 4
     with pytest.raises(ValueError, match="Scenario"):
-        check_joint_plan(plan, bad_worlds, cfg)
+        check_joint_plan(plan, bad_worlds, cfg, {"cutoffs": plan["cutoffs"]})
     bad = copy.deepcopy(plan); bad["sleeve_keys"][0]["expected_gross"] += 10
     bad["seal"] = stable_json_hash({k: v for k, v in bad.items() if k != "seal"})
     with pytest.raises(ValueError, match="Sleeve expected return"):
-        check_joint_plan(bad, worlds, cfg)
+        check_joint_plan(bad, worlds, cfg, {"cutoffs": plan["cutoffs"]})
     bad = copy.deepcopy(plan); bad["fixture_indices"][0][0] = .5
     bad["seal"] = stable_json_hash({k: v for k, v in bad.items() if k != "seal"})
     with pytest.raises(ValueError, match="Integer"):
-        check_joint_plan(bad, worlds, cfg)
+        check_joint_plan(bad, worlds, cfg, {"cutoffs": plan["cutoffs"]})
 
 
 @pytest.mark.parametrize("source_change, accepted", [(None, True), ("roundoff", True),
@@ -97,9 +97,9 @@ def test_all_plan_replay_binds_source_and_raw_files(tmp_path, replay_case, sourc
     (tmp_path / "plans-frozen.json").write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
     if not accepted:
         with pytest.raises(ValueError, match="probabilities/identities"):
-            check_joint_study(tmp_path, repository_root=ROOT)
+            check_prefix_study(tmp_path, repository_root=ROOT, check_plan=check_joint_plan, check_result=None)
         return
-    assert check_joint_study(tmp_path, repository_root=ROOT)["plans_checked"] == 1
+    assert check_prefix_study(tmp_path, repository_root=ROOT, check_plan=check_joint_plan, check_result=None)["plans_checked"] == 1
     rp.write_bytes(b"changed")
     with pytest.raises(ValueError, match="Raw R output"):
-        check_joint_study(tmp_path, repository_root=ROOT)
+        check_prefix_study(tmp_path, repository_root=ROOT, check_plan=check_joint_plan, check_result=None)
