@@ -1,0 +1,97 @@
+---
+title: "盈利期数版＋概率排序版：各50%组合"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  archive: "tests/fixtures/n7_profit_periods.json.gz"
+  output: "data/derived/fundamentals_417/n7-profit-probability-mix-v1"
+---
+
+固定100期100608–101120，沿用上一轮计数门槛5/10000、三个seed41901–41903。
+本轮仅做已冻结结果的描述性组合会计，不重新训练、选票、挑seed或优化权重。
+验收模式为ARCHIVED_ACCOUNTING_ONLY：验证归档字节并复算金额，不重新认证原始来源或截止时间。
+底层策略仍是历史暴露诊断。返奖已包含一次票级0.65，不重复扣减。
+
+各50%归一化组合每期1024元，但等价于将原票缩到1元，不能直接作为2元票执行。
+完整叠加两套原票每期2048元，可以保留原票；两版重复的完整票按两份投入和返奖处理。
+两种口径均初始资金100000元，余额不足整期投入则永久停投；不追加资金。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/n7_profit_probability_mix.R')
+archive<-jsonlite::fromJSON(gzfile(params$archive))
+stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',identical(
+ digest::digest(archive$body,algo='sha256',serialize=FALSE),archive$sha256))
+result<-jsonlite::fromJSON(archive$body)
+input<-as_tibble(result$rows) |> filter(count==5,ranking %in% c('PROB','PROFIT')) |>
+ select(issue,seed,ranking,stake,gross,net,hits)
+stopifnot(nrow(input)==600)
+z<-n7_profit_probability_mix(input,as.character(result$issue_order),100000,1024)
+grid<-z$summary |> group_by(policy) |> summarise(stake=median(stake),net=median(net),
+ roi=median(roi_percent),min_roi=min(roi_percent),max_roi=max(roi_percent),
+ min_profitable=min(profitable_issues),max_profitable=max(profitable_issues),
+ profitable=median(profitable_issues),hit_issues=median(hit_issues),max_drawdown=median(max_drawdown),.groups='drop')
+correlations<-z$pairs |> group_by(seed) |> summarise(pearson=cor(net_prob,net_profit),
+ spearman=cor(net_prob,net_profit,method='spearman'),
+ both_profitable=sum(net_prob>0 & net_profit>0),profit_only=sum(net_prob<=0 & net_profit>0),
+ prob_only=sum(net_prob>0 & net_profit<=0),.groups='drop')
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(z$summary,file.path(params$output,'summary.csv'))
+readr::write_csv(z$periods,file.path(params$output,'periods.csv'))
+readr::write_csv(grid,file.path(params$output,'grid.csv'))
+readr::write_csv(correlations,file.path(params$output,'correlations.csv'))
+```
+
+各列分别取三个seed的中位数，不代表同一条路径；逐seed表紧随其后。
+命中一期指至少一票返奖；盈利一期要求整期返奖严格超过投入。
+
+本轮各50%归一化组合净收益40487元、ROI39.54%、最大回撤17207元，
+盈利期数20（范围18–20）、命中43期。两版收益Pearson相关系数0.50–0.52。
+相较PROB，最大回撤中位数减少约16.6%，净收益减少约25.4%；
+相较PROFIT，收益增加但回撤也增加，盈利期数从23降至20。
+组合不是两个版本盈利期数的并集：一个版本盈利可能不足以覆盖另一个版本亏损。
+完整叠加净收益80974元、ROI仍39.54%，最大回撤34413元，实际投入204800元。
+本样本两种组合均未触发资金不足停投。这些都是同一历史样本的会计对照，未优化权重。
+
+验证：`testthat::test_file`运行新组合函数9项断言及资金曲线25项断言通过；
+独立复算12条组合路径的金额、盈利期数、命中期数和回撤通过；cutoff治理检查通过。
+QMD以执行开启、缓存关闭的新进程渲染，图表已检查。Codex只读审核无发现；
+审核子进程未配置项目R库，未复跑R测试，以上执行证据来自主进程的项目R环境。
+未运行全仓库测试，本次不改变底层选票或结算逻辑。
+
+```{r}
+knitr::kable(grid,digits=2)
+knitr::kable(z$summary,digits=2)
+knitr::kable(correlations,digits=3)
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+equity<-ggplot2::ggplot(z$curves,ggplot2::aes(period,equity_cny,colour=policy,group=interaction(policy,seed)))+
+ ggplot2::geom_line(alpha=.7)+ggplot2::theme_minimal()+ggplot2::labs(x='Issue sequence',y='Capital CNY',colour='Policy')
+dd<-ggplot2::ggplot(z$curves,ggplot2::aes(period,drawdown_cny,colour=policy,group=interaction(policy,seed)))+
+ ggplot2::geom_line(alpha=.7)+ggplot2::theme_minimal()+ggplot2::labs(x='Issue sequence',y='Drawdown CNY',colour='Policy')
+equity
+dd
+ggplot2::ggsave(file.path(params$output,'equity.png'),equity,width=12,height=6,dpi=150)
+ggplot2::ggsave(file.path(params$output,'drawdown.png'),dd,width=12,height=6,dpi=150)
+```
+
+```{r}
+knitr::kable(z$periods |> select(issue,seed,policy,stake,gross,net,roi_percent,hits,stopped),digits=2)
+jsonlite::write_json(list(mode=archive$mode,archive_sha256=digest::digest(file=params$archive,algo='sha256'),
+ qmd_sha256=digest::digest(file='quarto/132_n7_profit_probability_mix.qmd',algo='sha256'),
+ mix_sha256=digest::digest(file='r/n7_profit_probability_mix.R',algo='sha256'),
+ equity_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+ parameters=list(count=5,weights=c(.5,.5),initial_capital=100000,budget=1024),
+ summary_sha256=digest::digest(file=file.path(params$output,'summary.csv'),algo='sha256')),
+ file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

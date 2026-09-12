@@ -1,0 +1,19 @@
+source('../../r/fundamentals_equity_curves.R')
+source('../../r/n7_profit_probability_mix.R')
+testthat::test_that('mix arithmetic, whole account stops and invalid inputs', {
+  x<-tibble::tibble(issue=rep(c('01','02'),2),seed=1L,ranking=rep(c('PROB','PROFIT'),each=2),
+    stake=2,gross=c(8,0,0,4),net=c(6,-2,-2,2),hits=c(1,0,0,1))
+  z<-n7_profit_probability_mix(x,c('01','02'),100,2)
+  s<-z$summary
+  testthat::expect_equal(s$net[s$policy=='MIX_NORMALIZED'],2)
+  testthat::expect_equal(s$net[s$policy=='MIX_FULL'],4)
+  testthat::expect_equal(s$profitable_issues[s$policy=='MIX_NORMALIZED'],1L)
+  testthat::expect_equal(s$hit_issues[s$policy=='MIX_NORMALIZED'],2L)
+  stopped<-n7_profit_probability_mix(x,c('01','02'),3,2)$summary
+  testthat::expect_equal(stopped$stake[stopped$policy=='MIX_FULL'],0)
+  testthat::expect_error(n7_profit_probability_mix(x[-1,],c('01','02'),100,2))
+  testthat::expect_error(n7_profit_probability_mix(dplyr::bind_rows(x,x[1,]),c('01','02'),100,2))
+  testthat::expect_error(n7_profit_probability_mix(x,c('02'),100,2))
+  x$net[1]<-NA_real_
+  testthat::expect_error(n7_profit_probability_mix(x,c('01','02'),100,2))
+})
