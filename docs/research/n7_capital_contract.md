@@ -115,8 +115,38 @@ root's `audits/issue425-capital-v1`; the replacement is
 `runtime/logs/issue425-capital-v2-freeze.log`. Neither directory is a production
 release. Reports belong under the persistent root's `reports/` directory.
 
-Remaining: full frozen batch, independent full-study replay/accounting, report
-execution and interpretation, final checks, final Codex review, PI classification
-and PR. The memory-fix review found no actionable defects but did not run the
+The replacement freeze completed all100issues and20400plans, with seal
+`325ef1df5521f3566963234f51ffff45c08314b649d43dc726d3cbd32fea45e1`.
+Only after that complete freeze did the evaluator restore the three original,
+hash-verified settlement members from the registered #424 archive. Evaluation
+completed21300rows:20400new plans and900separately identified archived controls.
+The independent replay passed all20400plans, including curves, shared worlds,
+physical identities and a separate actual-settlement reconstruction. Portable
+input `tests/fixtures/n7_capital_study.json.gz` contains195362sleeve rows and has
+body SHA256 `2e4e4b77c3fdec20726a5318e2cf9da6c4b50dab108b7c7f46bba5235540d245`.
+The complete external freeze package remains authoritative for full replay.
+
+Render from the repository root with the declared R dependencies installed:
+`quarto render quarto/140_n7_capital_frontier.qmd --execute-dir . --execute --no-cache`.
+The explicit execution directory is required for this individual report outside
+the project's default render list. No restored R workspace or manual setup
+objects are used. The default input is the tracked portable fixture; an explicit
+`-P archive:<path>` selects another hash-bound report input.
+
+The clean full R suite at0aad09d0 passed65test files using freshly prepared
+provenance-bound fixtures. The earlier stale-fixture failure was resolved by
+preparing a new fixture, without disabling its source-hash check. The additional
+frontier regression passed30assertions, excluding wholly unfunded diagnostic
+zeros from the descriptive frontier. Independent checker/archive tests passed
+19tests; the shared orchestration and Future-release regression passed6tests.
+The full code-phase Codex review reported no concrete actionable findings;
+final rendered-report and research review remain separate.
+
+The final report render and visual/content inspection passed; final Codex review
+found no actionable defects. See `docs/research/n7_capital_acceptance.md` for the
+requirement-by-requirement evidence and bounded research assessment. Remaining:
+live Issue Graph verification, final PI delivery acceptance and PR submission.
+The memory-fix review found
+no actionable defects but did not run the
 tests successfully in its chosen interpreter; separate project-interpreter
 tests passed. This narrow review does not replace final research acceptance.
