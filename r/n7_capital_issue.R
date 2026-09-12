@@ -34,10 +34,11 @@ n7_capital_issue <- function(bundle,cutoffs,config,python) {
     ep<-n7_capital_options(bundle,cutoffs,python,config$model_id,depth,2,.65)
     pools[[paste0('DEPTH_',depth)]]<-ep
   }
-  plans<-list();statuses<-list()
+  plans<-list();statuses<-list();world_records<-list()
   for(seed in unlist(config$seeds)) {
     train_worlds<-n7_joint_worlds(base,cutoffs,seed,config$training_worlds)
     eval_worlds<-n7_joint_worlds(base,cutoffs,seed+config$evaluation_seed_offset,config$evaluation_worlds)
+    world_records[[length(world_records)+1L]]<-list(seed=seed,training=train_worlds,evaluation=eval_worlds)
     for(pool_name in names(pools)) {
       pool<-pools[[pool_name]]
       train<-n7_joint_returns(pool,train_worlds,cutoffs)
@@ -61,6 +62,6 @@ n7_capital_issue <- function(bundle,cutoffs,config,python) {
       }
     }
   }
-  list(issue=bundle$issue,plans=plans,frontier_status=statuses,curves=curves,
+  list(issue=bundle$issue,plans=plans,frontier_status=statuses,curves=curves,worlds=world_records,
     cutoffs=cutoffs,historical_admission=FALSE)
 }

@@ -17,6 +17,9 @@ test_that('prediction-only runner covers preferences budgets and exact threshold
  py<-Sys.getenv('FUNDAMENTALS_PYTHON');expect_true(nzchar(py))
  ans<-n7_capital_issue(b,b$cutoffs,cfg,py)
  expect_length(ans$plans,8);expect_length(ans$frontier_status,8)
+ expect_length(ans$worlds,1)
+ expect_equal(dim(ans$worlds[[1]]$training),c(16,7))
+ expect_equal(dim(ans$worlds[[1]]$evaluation),c(32,7))
  expect_equal(nrow(ans$curves),2188)
  expect_false(ans$historical_admission)
  for(plan in ans$plans) {
