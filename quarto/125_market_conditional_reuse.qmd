@@ -1,0 +1,128 @@
+---
+title: "新版市场U3/U6：条件替换与减少复用"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/market-conditional-draw-single-v2"
+  archive_fixture: null
+---
+
+新版市场概率底座与纯市场7串1原组均保持冻结。市场指校正后的市场概率；
+战力只提供让平分歧信号，不重新参与概率排序。全部规则在读取本轮结算前冻结。
+每期预算1024元，原组2单5双、64元；让平分歧触发后双选压为单选让平，每压一场该组成本减半，节余留现金，U3/U6与两组最多重叠5场不变。
+首次出现保留原选择；后续复用触发时才调整，每次均根据原概率排序，不连锁替换。
+
+| 策略 | 单选条件 | 双选条件 | 操作 |
+|---|---|---|---|
+| BASE | 无 | 无 | 不变 |
+| S05 / S10 | Top1−Top2≤5/10个百分点 | 无 | 单选改第二 |
+| DRAW_ANY | 无 | 市场Top2无D、战力Top2有D | 双选直接改为单选D |
+| DRAW05 / DRAW10 | 无 | 上述分歧且市场第二−D≤5/10个百分点 | 同上 |
+| BOTH05 / BOTH10 | 对应S条件 | 对应DRAW条件 | 同时启用 |
+| AVOID05 / AVOID10 | 对应BOTH条件 | 对应BOTH条件 | 换场而不换赛果 |
+
+AVOID按当前角色的市场支持概率从高到低挑选替补（单选Top1，双选Top2），同时检查
+已有组和尚未处理原组的U/P限制，且替补不能再次触发同一回避条件。无法补足时跳过整组，资金保留现金。
+这与SWAP的原组不变对照分开解释。替换指标按投注位置计算，不能当成独立比赛样本。
+不增加比分保护，也不根据实际是否让平触发。仍为已暴露100期的回顾诊断，非前瞻收益证明。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+if(is.null(params$archive_fixture)) {
+  frozen<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'))
+  er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  stopifnot(identical(digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(file=file.path(params$study,'results.json'),algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(file.path(params$study,'results.json'))
+  stopifnot(identical(result$upstream_freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',
+    identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+x<-as_tibble(result$rows);x$issue<-as.character(x$issue)
+stopifnot(nrow(x)==2000,length(result$issue_order)==100)
+curves<-strategy_equity_curves(x,as.character(result$issue_order),100000)
+summary<-market_conditional_summary(x,curves)
+position<-as_tibble(result$positions) |>
+  mutate(model=paste0('U',u),changed=(!is.na(replacement_slot) | original!=support) & !group_dropped)
+changes<-position |> group_by(model,policy) |> summarise(triggers=sum(triggered),
+  changed=sum(changed),gained=sum(changed & !old_hit & new_hit),lost=sum(changed & old_hit & !new_hit),
+  dropped_positions=sum(group_dropped),.groups='drop')
+summary<-left_join(summary,changes,by=c('model','policy'),relationship='one-to-one')
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'))
+readr::write_csv(x |> mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_)),file.path(params$study,'periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+```
+
+## 100期总体表现
+
+金额为元；ROI以实际投入为分母，不把现金算成返奖；回撤以初始资金100000元计算。
+without_best剔除每个策略自身净收益最高的一期，同时剔除该期投入，不等于相同期的配对比较。
+AVOID中跳过整组的位置单独列出，不计入“换后新增/破坏命中”。
+
+```{r}
+knitr::kable(summary,digits=2)
+```
+
+本次100期回顾中，S10比各自BASE有改善：U3收益率12.93%→13.93%，
+U6为22.53%→26.54%；U6最大回撤14449.85元→11753.80元。
+剔除各自最高净盈利一期后，U3收益率3.94%→4.95%，U6为7.16%→11.22%。
+直接单选让平的DRAW各版本及AVOID各版本均未超过对应BASE收益率。
+S05有触发但未改变中奖组返奖。S10替换新增/破坏位置命中为U3的58/78、U6的35/52，
+所以收益改善来自组合与返奖分布，而非位置命中率提高；这仍需要新样本检验。
+
+## 原7串1中的让平分歧
+
+同时统计实际让平和未让平，包含未触发替换的首次出现。
+第一张表按投注位置计数；第二张表按U策略内独立场次去重，不重复计入同场复用。
+
+```{r}
+d<-as_tibble(result$disagreements)
+knitr::kable(d |> filter(draw_disagreement) |> group_by(u,single,repeated) |>
+  summarise(positions=n(),draws=sum(actual=='D'),non_draws=sum(actual!='D'),draw_percent=100*mean(actual=='D'),.groups='drop'),digits=2)
+knitr::kable(d |> filter(draw_disagreement) |> distinct(u,issue,slot,.keep_all=TRUE) |> group_by(u) |>
+  summarise(fixtures=n(),draws=sum(actual=='D'),non_draws=sum(actual!='D'),draw_percent=100*mean(actual=='D'),.groups='drop'),digits=2)
+```
+
+## 资金和回撤曲线
+
+```{r}
+#| fig-width: 14
+#| fig-height: 7
+curves$label<-curves$policy
+equity<-plot_strategy_equity(curves,'funded',100000)
+equity
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=14,height=7,dpi=160)
+drawdown<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=policy))+
+  ggplot2::geom_line()+ggplot2::facet_wrap(~model)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Drawdown (CNY)',colour=NULL)
+drawdown
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),drawdown,width=14,height=7,dpi=160)
+```
+
+## 每期收益率
+
+```{r}
+knitr::kable(x |> mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_)) |>
+  select(issue,model,policy,groups,hits,stake,gross,net,roi_percent),digits=2)
+jsonlite::write_json(list(mode='POST_EXPOSURE_FIXED_VARIANTS',result_freeze=result$upstream_freeze_seal,
+  accounting_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  summary_implementation_sha256=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+  qmd_sha256=digest::digest(file='quarto/125_market_conditional_reuse.qmd',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

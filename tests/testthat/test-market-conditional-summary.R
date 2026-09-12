@@ -1,0 +1,18 @@
+source('../../r/market_conditional_summary.R')
+testthat::test_that('remove best period uses original period net and matched stake',{
+  x<-data.frame(issue=c('a','b','c'),model='U3',policy='S10',stake=c(10,20,30),
+    net=c(-10,50,5),groups=1,hits=c(0,1,1))
+  curves<-data.frame(model='U3',policy='S10',drawdown_cny=c(0,10,0,0))
+  s<-market_conditional_summary(x,curves)
+  testthat::expect_equal(s$best_issue,'b')
+  testthat::expect_equal(s$net,45)
+  testthat::expect_equal(s$stake,60)
+  testthat::expect_equal(s$roi_percent,75)
+  testthat::expect_equal(s$without_best_net,-5)
+  testthat::expect_equal(s$without_best_stake,40)
+  testthat::expect_equal(s$without_best_roi,-12.5)
+  testthat::expect_equal(s$max_drawdown,10)
+  testthat::expect_error(market_conditional_summary(rbind(x,x),curves))
+  testthat::expect_error(market_conditional_summary(x[1,],curves))
+  testthat::expect_error(market_conditional_summary(x,curves[0,]))
+})
