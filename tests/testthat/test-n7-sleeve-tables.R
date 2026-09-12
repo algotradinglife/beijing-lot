@@ -1,0 +1,41 @@
+source(file.path('..','..','r','n7_sleeve_tables.R'))
+
+testthat::test_that('frozen state identity survives dense, ranked, long and depth views', {
+ e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
+ p<-as.numeric(unlist(e$probability));v<-as.numeric(unlist(e$expected_contribution))
+ selected<-order(-p,-v,seq_along(p))[1:64]-1L
+ b<-list(issue=e$issue,cutoffs=e$cutoffs,historical_admission=FALSE,seal='test-bundle',
+  expanded_pool=list(fixtures=e$fixtures),
+  sleeves=list(list(id=0L,fixture_indices=as.list(0:6),origin='QUALITY',enumeration=e,
+   options=list(PROB=list(status='COMPLETE',state_ids=as.list(selected))))))
+ z<-n7_sleeve_tables(b,b$cutoffs,'fixed-test-model')
+ testthat::expect_equal(dim(z$prob_mat),c(1L,2187L))
+ testthat::expect_equal(z$long$ticket_code[c(1,2,2187)],c('0000000','0000001','2222222'))
+ testthat::expect_equal(z$long$official_outcomes[c(1,2,2187)],c('3333333','3333331','0000000'))
+ testthat::expect_equal(z$long$prob,as.numeric(z$prob_mat[1,]))
+ testthat::expect_equal(z$long$expected_gross_contribution,z$long$prob*z$long$payout_hat)
+ testthat::expect_equal(z$rank_idx[1,],order(-p,-v,seq_along(p)))
+ testthat::expect_true(all(diff(z$depth$coverage)>=0))
+ testthat::expect_equal(tail(z$depth$coverage,1),1,tolerance=1e-8)
+ testthat::expect_equal(z$summary$coverage_64,sum(p[selected+1]))
+ testthat::expect_equal(z$summary$top64_expected_gross,sum(v[selected+1]))
+ testthat::expect_equal(sum(z$long$selected_rules=='PROB'),64)
+ testthat::expect_equal(z$long$prob_rank[z$rank_idx[1,]],seq_len(2187))
+ two<-b;two$sleeves[[2]]<-two$sleeves[[1]];two$sleeves[[2]]$id<-1L
+ joined<-n7_sleeve_tables(two,two$cutoffs,'fixed-test-model')
+ testthat::expect_equal(nrow(joined$summary),2)
+ testthat::expect_type(joined$summary$cutoff_receipt,'character')
+ testthat::expect_equal(nrow(joined$long),4374)
+ testthat::expect_error(n7_sleeve_tables(b,list(),'fixed-test-model'))
+ bad<-b;bad$sleeves[[1]]$enumeration$probability[[1]]<-2
+ testthat::expect_error(n7_sleeve_tables(bad,bad$cutoffs,'fixed-test-model'))
+ bad<-b;bad$sleeves[[1]]$enumeration$fixtures[[1]]$provider_id<-'wrong-provider'
+ testthat::expect_error(n7_sleeve_tables(bad,bad$cutoffs,'fixed-test-model'))
+ bad<-b;bad$sleeves[[1]]$enumeration$fixtures[[1]]$p_W<-1
+ bad$expanded_pool$fixtures<-bad$sleeves[[1]]$enumeration$fixtures
+ testthat::expect_error(n7_sleeve_tables(bad,bad$cutoffs,'fixed-test-model'))
+ bad<-b;bad$sleeves[[1]]$enumeration$states[[1]][[1]]<-2L
+ testthat::expect_error(n7_sleeve_tables(bad,bad$cutoffs,'fixed-test-model'))
+ bad<-b;bad$sleeves[[1]]$options$PROB$state_ids<-list(0L,0L)
+ testthat::expect_error(n7_sleeve_tables(bad,bad$cutoffs,'fixed-test-model'))
+})

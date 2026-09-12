@@ -1,0 +1,292 @@
+---
+title: "N7：8组×64票的覆盖、收益与回撤评估"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-sleeves-424-v3"
+  archive_fixture: null
+---
+
+本报告评估 [#424](https://github.com/algotradinglife/beijing-lot/issues/424)：
+固定七场的全部2187种赛果中选64种，组成一组；再选8组，合计512张2元全单选七串一。
+每期预算1024元，初始资金100000元。各组可复用比赛，但同一期8组的七场集合必须不同，
+因此512张完整票不重复；同一组最多中1张，全组合最多中8张。没有比分保护。
+
+沿用100期100608–101120的 market-balance-draw-1.0.0-diagnostic 概率，未重训专家。
+这批期次已经暴露，不能作为新策略的未见测试集。逐场cutoff和来源绑定保留，
+但原概率包不具备完整历史可用时间与整票共同可下注时点认证，故 historical_admission=false。
+本轮所有3300套计划在读取本轮结算前冻结，也不能消除原样本已被研究的影响。
+
+对七场集合G和状态s，状态概率为七场所选赛果概率p的乘积；
+估算完整票返奖为2×0.65÷七场原市场概率q的乘积。
+p是校正市场概率，q是原市场概率；逆q只是赛前价格代理，并非官方结算SP。
+组内64个状态互斥，覆盖率为概率之和，期望返奖为各状态概率×返奖的合计。
+跨组用同一套逐场模拟结果计算联合命中，不能相乘各组失败率。
+真实结算采用冻结审计快照中的北单SP，整张票只乘一次0.65。
+
+每期候选七场集合24个：8个来自既有概率排序票、8个按Top2质量加权抽样、8个均匀抽样。
+所有集合的2187种状态都加入原候选池，两个512票对照也使用这个扩大的共同候选宇宙。
+选场种子42400；组合种子42401/42402/42403，20000个选择情景、50000个独立评估情景。
+三个种子是三次比较，不把三套方案同时下注。
+
+| 组内选票 | 规则 |
+|---|---|
+| PROB / VALUE | 概率最高64种 / 期望返奖贡献最高64种 |
+| F80_R35 | 覆盖至少PROB的80%，估算ROI至少−35%，最大化期望返奖 |
+| F80_R0 / F95_R35 | 覆盖80%且ROI≥0 / 覆盖95%且ROI≥−35%的固定敏感性检查 |
+| RANDOM / DIVERSITY | 随机64种 / 按概率贪心且两状态至少相差2场 |
+
+前沿采用整数规划，最优差距容限0.1%、可行性容限10⁻⁹、每次限时3秒。
+不可行或超时都明确记录，不采用未通过约束的解；组合搜索也不声称全局最优。
+
+| 组合简称 | 实施规则 |
+|---|---|
+| MONO-P / MONO-C | 共同候选宇宙中选512票：概率排序 / 新增联合命中覆盖贪心 |
+| QUALITY | 8个组内PROB覆盖率最高的七场集合 |
+| SPREAD | 组覆盖率减去0.02×最大两组重叠比例，逐组选择 |
+| UNION | 使用PROB状态，逐组最大化新增共享情景命中 |
+| FRONTIER | 使用F80_R35状态，逐组最大化新增共享情景命中 |
+| FRONTIER-FIXED | 保留QUALITY的七场集合，仅改为F80_R35状态 |
+| RETURN | 从QUALITY出发最多16次换组，增加期望返奖，训练联合覆盖≥QUALITY的80% |
+| RANDOM-G | 共同候选中随机8个七场集合，使用PROB状态 |
+| RANDOM-S / HAMMING | 保留QUALITY集合，仅改随机64状态 / Hamming分散状态 |
+
+不足8个合格组的方案整期不投，保留现金。报告另列双方均实际投入1024元的配对比较，
+避免用空仓造成的低回撤解释结构增益。资金不足整期投入则永久停投，不新增本金或借款。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+source('r/n7_sleeve_summary.R')
+source('r/n7_sleeve_tables.R')
+mode<-if(is.null(params$archive_fixture)) 'SOURCE_VERIFIED_DIAGNOSTIC' else 'ARCHIVED_ACCOUNTING_ONLY'
+archive_hash<-NA_character_
+if(is.null(params$archive_fixture)) {
+ fp<-file.path(params$study,'plans-frozen.json');fr<-readBin(fp,'raw',n=file.size(fp))
+ frozen<-jsonlite::fromJSON(rawToChar(fr));er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+ rp<-file.path(params$study,'results.json');rr<-readBin(rp,'raw',n=file.size(rp))
+ stopifnot(identical(digest::digest(fr,serialize=FALSE,algo='sha256'),er$freeze_sha256),
+  identical(digest::digest(rr,serialize=FALSE,algo='sha256'),er$result_sha256),
+  identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+  identical(digest::digest(file=file.path(params$study,'prior-evaluation-snapshot.json'),algo='sha256'),er$prior_receipt_sha256))
+ bindings<-c(frozen$receipt$source_hashes,frozen$receipt$bundle_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+ for(path in names(bindings))stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+ result<-jsonlite::fromJSON(rawToChar(rr));stopifnot(result$freeze_seal==frozen$seal,!frozen$receipt$historical_admission)
+ ir<-jsonlite::fromJSON(file.path(params$study,'independent-replay.json'))
+ stopifnot(ir$freeze==frozen$seal,ir$result_sha256==er$result_sha256,ir$checked==3300,
+  identical(ir$checker_sha256,digest::digest(file='scripts/check_n7_sleeves.py',algo='sha256')))
+ tables<-list()
+ for(name in c('sleeve-diagnostics.csv','scenario-diagnostics.csv')) {
+  path<-file.path(params$study,name);raw<-readBin(path,'raw',n=file.size(path))
+  stopifnot(identical(ir$diagnostics[[name]],digest::digest(raw,serialize=FALSE,algo='sha256')))
+  tables[[name]]<-readr::read_csv(I(rawToChar(raw)),col_types=readr::cols(issue=readr::col_character()))
+ }
+} else {
+ archive_hash<-digest::digest(file=params$archive_fixture,algo='sha256')
+ archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+ stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+ result<-jsonlite::fromJSON(archive$body);tables<-list()
+ for(name in c('sleeve-diagnostics.csv','scenario-diagnostics.csv')) {
+  stopifnot(identical(digest::digest(archive$tables[[name]]$body,serialize=FALSE,algo='sha256'),archive$tables[[name]]$sha256))
+  tables[[name]]<-readr::read_csv(I(archive$tables[[name]]$body),col_types=readr::cols(issue=readr::col_character()))
+ }
+}
+stopifnot(nrow(result$rows)==3300,length(result$issue_order)==100,
+ !anyDuplicated(result$rows[c('issue','seed','arm')]))
+z<-n7_sleeve_summary(as_tibble(result$rows),as.character(result$issue_order),100000,1024)
+sd<-tables[['sleeve-diagnostics.csv']];sc<-tables[['scenario-diagnostics.csv']]
+if(is.null(params$archive_fixture)) {
+ td<-file.path(params$study,'state-tables');dir.create(td,showWarnings=FALSE)
+ summaries<-list();table_hashes<-list()
+ for(issue in as.character(result$issue_order)) {
+  path<-file.path(params$study,'bundles',paste0(issue,'.json.gz'));bytes<-readBin(path,'raw',n=file.size(path))
+  stopifnot(identical(digest::digest(bytes,serialize=FALSE,algo='sha256'),frozen$receipt$bundle_hashes[[path]]))
+  bundle<-jsonlite::fromJSON(rawToChar(memDecompress(bytes,'gzip')),simplifyVector=FALSE)
+  views<-n7_sleeve_tables(bundle,bundle$cutoffs,frozen$receipt$parameters$model)
+  summaries[[issue]]<-views$summary
+  for(name in c('depth','long')) {
+   path<-file.path(td,paste0(issue,'-',name,'.csv.gz'))
+   readr::write_csv(views[[name]],path)
+   table_hashes[[path]]<-digest::digest(file=path,algo='sha256')
+  }
+  if(issue==as.character(result$issue_order[1]))example_views<-views
+ }
+ sleeve_summary<-bind_rows(summaries)
+ path<-file.path(params$study,'sleeve-summary.csv');readr::write_csv(sleeve_summary,path)
+ table_hashes[[path]]<-digest::digest(file=path,algo='sha256')
+ jsonlite::write_json(list(freeze=result$freeze_seal,mode=mode,
+  implementation_sha256=digest::digest(file='r/n7_sleeve_tables.R',algo='sha256'),
+  tables=table_hashes),file.path(params$study,'state-table-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+} else {
+ stopifnot(identical(digest::digest(archive$sleeve_summary$body,serialize=FALSE,algo='sha256'),archive$sleeve_summary$sha256),
+  identical(digest::digest(archive$example_bundle$body,serialize=FALSE,algo='sha256'),archive$example_bundle$sha256))
+ sleeve_summary<-readr::read_csv(I(archive$sleeve_summary$body),col_types=readr::cols(issue=readr::col_character()))
+ bundle<-jsonlite::fromJSON(archive$example_bundle$body,simplifyVector=FALSE)
+ example_views<-n7_sleeve_tables(bundle,bundle$cutoffs,'market-balance-draw-1.0.0-diagnostic')
+}
+labels<-c(MONOLITHIC_PROB512='MONO-P',MONOLITHIC_COVERAGE512='MONO-C',
+ '8x64_PROB'='QUALITY','8x64_DIVERSIFIED_PROB'='SPREAD','8x64_UNION_PROB'='UNION',
+ '8x64_FRONTIER'='FRONTIER','8x64_FRONTIER_FIXEDG'='FRONTIER-FIXED','8x64_RETURN_AWARE'='RETURN',
+ '8x64_RANDOM_MATCHSETS'='RANDOM-G','8x64_RANDOM_STATES'='RANDOM-S','8x64_DIVERSITY_STATES'='HAMMING')
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+for(name in c('summary','grid','matched','periods','curves','years'))readr::write_csv(z[[name]],file.path(params$study,paste0(name,'.csv')))
+```
+
+验收模式：`r mode`。归档模式只验证归档字节及会计复算，不认证原始来源、票面、cutoff或独立模拟。
+所有金额为元；ROI和下表模拟率为百分比。财务、历史命中期数及风险取三个seed的中位数，
+范围取最小值/最大值；模拟覆盖列取均值。完整逐seed和逐期数据见后文。
+
+本轮没有全面优于两个对照的方案，但出现了两个有价值的取舍。
+QUALITY的ROI为27.79%、命中40期、盈利34期、最大回撤11653元；
+MONO-P为52.98%、28期、17期、20641元。QUALITY牺牲收益换取更高的盈利频率，
+剔除最赚钱一期后ROI仍有15.21%，高于MONO-P的5.82%。这是相对概率排序对照的
+COVERAGE_STRUCTURE_SIGNAL，限定为已暴露100期的历史诊断。
+
+UNION进一步把命中提高到57期、盈利41期，最大回撤11022元，但ROI仅6.29%，
+三个seed范围−1.20%至8.50%；删除最大盈利一期后ROI中位数1.81%。
+MONO-C命中62期、盈利36期、ROI−7.12%、回撤15514元。
+UNION相对MONO-C表现为RETURN_STRUCTURE_SIGNAL：实际命中期数略降，资金表现改善。
+这些结果还不足以宣告SLEEVE_PORTFOLIO_SIGNAL或稳定的前瞻收益优势。
+
+结构不能消除相关性。QUALITY若错误假设八组独立，会得到85.92%的联合命中率；
+共享比赛的独立评估结果只有37.29%。UNION把模型联合命中提高到61.76%，
+比赛暴露HHI从约0.120降至0.033，但原本较高质量比赛的集中收益也随之下降。
+本次0.02重叠惩罚很弱，SPREAD在98/100期与QUALITY使用相同完整票集合，实际收益完全相同。
+
+提高价值目标没有改善本批真实收益：FRONTIER的ROI为−10.33%，RETURN为−33.72%。
+在1928个有认证解的F80_R35候选上，相对同组PROB平均多9.96元估算期望返奖，
+代价是覆盖减少3.12个百分点、实际组命中减少3.68个百分点。
+F80_R35有472/2400次超时；固定QUALITY集合的FRONTIER-FIXED因此39期不投。
+这些空仓是计算可行性认证不足，不能全部解释成经济约束不满足。
+F80_R0没有获得任何认证可行解；此结论只适用于当前价格代理和求解限额。
+
+八组结构属于无约束512票空间的子集，理论全局最优的无约束模型包含这些选法。
+本轮比较的是具体有限搜索方法。MONO-C训练模拟覆盖71.23%、独立评估60.64%，
+而UNION为61.97%/61.76%，显示结构限制可能减少对模拟样本的适应。
+这不足以证明它优于更充分求解的无约束模型。后续可冻结QUALITY和UNION作为新数据对照，
+同时保留MONO-P；本轮不再根据这些结果追加调参。
+
+```{r}
+knitr::kable(z$grid |> mutate(model=unname(labels[model])) |>
+ select(model,stake,net,roi,min_roi,max_roi,hit_issues,profitable_issues,max_drawdown,without_best_roi,no_bet_issues,stopped_issues),digits=2)
+knitr::kable(z$grid |> mutate(model=unname(labels[model])) |>
+ select(model,longest_losing_run,longest_no_payout_run,longest_underwater,payout_hhi,train_coverage,eval_coverage),digits=3)
+knitr::kable(z$summary |> select(model,policy,worst5,worst10,worst20,maximum_completed_recovery,largest_year,ex_year_roi),digits=2)
+```
+
+最长水下期数包含尚未恢复的回撤；最长已完成恢复期数不含最后一个未恢复段。
+本批数据只有2010年，删除最大贡献年份后没有剩余投入，跨年稳健性为不可评估。
+删除最高盈利一期后的ROI单独列出。没有用反复研究后的普通bootstrap制造显著性结论。
+
+```{r}
+knitr::kable(z$matched,digits=2)
+knitr::kable(as_tibble(result$rows) |> group_by(arm) |> summarise(
+ mean_fixture_hhi=mean(fixture_hhi),mean_outcome_hhi=mean(outcome_hhi),
+ mean_estimated_gross=mean(expected_net+stake),mean_estimated_roi=100*mean(expected_roi,na.rm=TRUE),
+ mean_max_overlap=mean(max_overlap),mean_max_sleeve_reuse=mean(max_sleeve_reuse),
+ mean_hit_tickets=mean(hits),.groups='drop'),digits=3)
+```
+
+下表使用所有计划的独立评估情景，属于模型分布内结果。
+independent_union是故意计算的“各组独立”反事实对照，不用于选票或实际联合覆盖。
+差异说明重叠比赛使多组可能一起命中、一起落空。
+估算ROI均值仅覆盖有投入的计划；含空仓的独立组反事实均值保留NA，不混用条件样本。
+
+```{r}
+knitr::kable(sc |> group_by(arm) |> summarise(
+ joint_hit=100*mean(1-joint_failure),independent_union=100*mean(independent_sleeve_union),
+ modeled_profit=100*mean(modeled_profit_probability),mean_modeled_gross=mean(mean_modeled_gross),.groups='drop'),digits=2)
+knitr::kable(sd |> count(kind,status),digits=0)
+knitr::kable(sd |> filter(status=='COMPLETE') |> group_by(kind) |> summarise(
+ cases=n(),coverage=100*mean(coverage),estimated_roi=100*mean(expected_roi),
+ realized_hit=100*mean(realized_inclusion),minimum_hamming=min(minimum_hamming),mean_hamming=mean(mean_hamming),.groups='drop'),digits=3)
+reference<-sd |> filter(kind=='PROB') |> select(issue,sleeve_id,prob_coverage=coverage,
+ prob_gross=expected_gross,prob_hit=realized_inclusion)
+value_reference<-sd |> filter(kind=='VALUE') |> select(issue,sleeve_id,value_gross=expected_gross)
+costs<-sd |> filter(status=='COMPLETE') |>
+ left_join(reference,by=c('issue','sleeve_id'),relationship='many-to-one') |>
+ left_join(value_reference,by=c('issue','sleeve_id'),relationship='many-to-one') |>
+ group_by(kind) |> summarise(cases=n(),coverage_cost_pp=100*mean(prob_coverage-coverage),
+ expected_gross_gain_vs_prob=mean(expected_gross-prob_gross),
+ expected_gross_cost_vs_value=mean(value_gross-expected_gross),
+ actual_hit_lift_pp=100*mean(realized_inclusion-prob_hit),.groups='drop')
+knitr::kable(costs,digits=3)
+readr::write_csv(costs,file.path(params$study,'state-frontier-costs.csv'))
+```
+
+各组枚举和完整64票保存在 `bundles/<issue>.json.gz` 中，实际8组与512票在
+`plans/<issue>_<seed>_<arm>.json.gz`，由冻结凭证逐一绑定。
+组内统计的单位是“期次×候选七场集合×选票规则”，不同规则的可行样本数不同，
+不能把条件于可行的组内均值视作同等投入的收益比较。组合表和配对表才用于同预算比较。
+
+R接口同时返回概率、估算返奖、期望贡献矩阵和保留票面身份的排序索引。
+原生模式逐期保存全部1–2187票深度曲线及长审计表到 `state-tables/`，
+概览保存为 `sleeve-summary.csv`；#425可直接读取，无需重新定义概率语义。
+归档模式展示已归档概览与首期矩阵例子，不重新导出全部原始状态表。
+
+```{r}
+dim(example_views$prob_mat)
+dplyr::glimpse(sleeve_summary)
+knitr::kable(head(sleeve_summary |> select(issue,sleeve_id,coverage_16,coverage_32,coverage_64,
+ coverage_128,coverage_256,coverage_512,entropy,state_hhi),8),digits=4)
+knitr::kable(head(example_views$long |> select(issue,sleeve_id,ticket_code,official_outcomes,
+ ticket_col_idx,prob,prob_rank,cum_prob,payout_hat,selected_rules),8),digits=6)
+```
+
+首期24个候选七场集合的覆盖深度如下；这里只改变同组内覆盖多少状态，不改变单场概率。
+
+```{r}
+#| fig-width: 10
+#| fig-height: 4
+depth_plot<-example_views$depth |>
+ left_join(example_views$summary |> select(issue,sleeve_id,origin),by=c('issue','sleeve_id'),relationship='many-to-one') |>
+ filter(depth<=512)
+ggplot2::ggplot(depth_plot,ggplot2::aes(depth,coverage,group=sleeve_id,colour=origin))+
+ ggplot2::geom_line(alpha=.6)+ggplot2::geom_vline(xintercept=64,linetype='dashed')+
+ ggplot2::scale_x_log10(breaks=c(16,32,64,128,256,512))+ggplot2::theme_minimal()+
+ ggplot2::labs(x='Number of highest-probability states',y='Cumulative probability',colour='Fixture-set origin')
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 8
+pc<-z$curves |> mutate(label=unname(labels[arm]))
+variants<-pc |> filter(!arm %in% c('MONOLITHIC_PROB512','MONOLITHIC_COVERAGE512')) |>
+ mutate(family=case_when(arm %in% c('8x64_PROB','8x64_DIVERSIFIED_PROB','8x64_UNION_PROB')~'Fixture selection',
+  arm %in% c('8x64_FRONTIER','8x64_FRONTIER_FIXEDG','8x64_RETURN_AWARE')~'Return frontier',TRUE~'Random / diversity'))
+controls<-pc |> filter(arm %in% c('MONOLITHIC_PROB512','MONOLITHIC_COVERAGE512')) |>
+ tidyr::crossing(family=c('Fixture selection','Return frontier','Random / diversity'))
+curves<-bind_rows(variants,controls)
+eq<-ggplot2::ggplot(curves,ggplot2::aes(period,equity_cny,colour=label,group=interaction(arm,seed)))+
+ ggplot2::geom_line(alpha=.7)+ggplot2::facet_wrap(~family,ncol=1)+ggplot2::theme_minimal()+
+ ggplot2::labs(x='Issue sequence (100608–101120)',y='Capital CNY',colour='Policy')
+dd<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=label,group=interaction(arm,seed)))+
+ ggplot2::geom_line(alpha=.7)+ggplot2::facet_wrap(~family,ncol=1)+ggplot2::theme_minimal()+
+ ggplot2::labs(x='Issue sequence (100608–101120)',y='Drawdown CNY',colour='Policy')
+eq
+dd
+ggplot2::ggsave(file.path(params$study,'equity.png'),eq,width=14,height=8,dpi=150)
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),dd,width=14,height=8,dpi=150)
+```
+
+完整逐seed和逐期账本如下；逐期ROI为当期净收益/当期实际投入，空仓时为NA。
+
+```{r}
+knitr::kable(z$summary,digits=2)
+knitr::kable(z$periods |> select(issue,arm,seed,stake,gross,net,roi_percent,hits,stopped),digits=2)
+jsonlite::write_json(list(mode=mode,archive_sha256=archive_hash,freeze=result$freeze_seal,
+ qmd_sha256=digest::digest(file='quarto/134_n7_sleeve_portfolio.qmd',algo='sha256'),
+ summary_implementation=digest::digest(file='r/n7_sleeve_summary.R',algo='sha256'),
+ state_table_implementation=digest::digest(file='r/n7_sleeve_tables.R',algo='sha256'),
+ equity_implementation=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+ shared_summary_implementation=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+ summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+ file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

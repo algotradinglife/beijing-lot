@@ -1,5 +1,23 @@
 # Beijing-lot Research Roadmap v1.0
 
+## 2026-09-12: N7 8×64 structural evaluation (#424)
+
+PI accepts the historical-only method/accounting evidence after independent
+3,300-plan replay, automated checks and final Codex review. Live #424 is routed
+to PI Review; native GitHub remains authoritative for lifecycle decisions.
+See [decision report](n7_sleeve_portfolio.md) and
+[QMD134](../../quarto/134_n7_sleeve_portfolio.qmd).
+
+Quality-selected eight sleeves produced27.79% ROI,40 hit issues,34 profitable
+issues and CNY11,653 maximum drawdown over the exposed100 issues. Union-selected
+sleeves produced6.29%,57,41 and CNY11,022; the monolithic probability control
+produced52.98%,28,17 and CNY20,641. These are Pareto tradeoffs, not a general
+winner or clean prospective evidence. Keep QUALITY/UNION and monolithic PROB
+as fixed candidates for separately authorized new-data validation; do not tune
+more thresholds on these outcomes. Full identity-preserving state-depth curves
+and R matrices/tables are available for #425. #419/#421 dependencies and closure
+remain unchanged; no production promotion follows from this result.
+
 ## Project Positioning
 
 Beijing-lot is a research system for studying:
