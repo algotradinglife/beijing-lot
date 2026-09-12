@@ -75,3 +75,7 @@ def test_variable_capital_budget_preserves_one_ticket_payout(budget):
     for bad_budget in [-2,3,float('inf'),True]:
         bad=dict(plan,budget_cny=bad_budget);bad.pop('seal');bad['seal']=stable_json_hash(bad)
         with pytest.raises(ValueError):settle_single_tickets(bad,audit)
+    for key in ('fixture_indices','outcomes'):
+        bad=dict(plan);bad[key]=[list(plan[key][0])];bad[key][0][0]=.5
+        bad.pop('seal');bad['seal']=stable_json_hash(bad)
+        with pytest.raises(ValueError,match='integer coordinates'):settle_single_tickets(bad,audit)

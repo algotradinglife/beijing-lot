@@ -20,9 +20,13 @@ from src.n7_single_ticket_sampling import settle_single_tickets
 from src.temporal_learning import Cutoff, implementation_closure, verify_implementation_closure
 from src.temporal_learning.core import stable_json_hash
 
+JOINT_R_SOURCES = ("r/n7_joint_sleeves.R", "r/n7_sleeve_tables.R",
+                   "scripts/run_n7_joint_issue.R", "config/n7_joint_runtime.json",
+                   "config/compression_breadth_runtime.json")
 
-def run_joint_issue(bundle_path, config_path, output_path, *, cutoffs,
-                    repository_root, python, rscript):
+
+def run_prefix_issue(bundle_path, config_path, output_path, *, cutoffs,
+                     repository_root, python, rscript, entry_point):
     """Validate one immutable prediction bundle and invoke the thin R entry point.
 
     Explicit native Cutoffs must match the entire fixture scope. Writes one new
@@ -30,6 +34,10 @@ def run_joint_issue(bundle_path, config_path, output_path, *, cutoffs,
     subprocess has a one-hour operational timeout, which aborts the study rather
     than converting partial output into a successful/no-bet research result.
     """
+    root = Path(repository_root).resolve()
+    entry = (root / entry_point).resolve()
+    if not entry.is_relative_to(root) or not entry.is_file() or entry.suffix != '.R':
+        raise ValueError("R entry point must be a repository R file")
     bundle_path, output_path = Path(bundle_path), Path(output_path)
     if output_path.exists():
         raise ValueError("Refusing to overwrite issue output")
@@ -42,7 +50,7 @@ def run_joint_issue(bundle_path, config_path, output_path, *, cutoffs,
     env = dict(os.environ, PYTHONPATH=str(repository_root), RETICULATE_PYTHON=str(python),
                OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1")
     with output_path.with_suffix(".log").open("w") as log:
-        subprocess.run([str(rscript), "--vanilla", "scripts/run_n7_joint_issue.R",
+        subprocess.run([str(rscript), "--vanilla", str(entry.relative_to(root)),
                         str(bundle_path.resolve()), str(Path(config_path).resolve()),
                         str(output_path.resolve()), str(python)], cwd=repository_root,
                        env=env, stdout=log, stderr=subprocess.STDOUT, timeout=3600, check=True)
@@ -56,7 +64,8 @@ def run_joint_issue(bundle_path, config_path, output_path, *, cutoffs,
     return result
 
 
-def freeze_joint_study(source, output, config_path, *, repository_root, python, rscript):
+def freeze_prefix_study(source, output, config_path, *, repository_root, python, rscript,
+                        entry_point, r_sources):
     """Run the entire fixed issue/arm/seed grid and seal it before any evaluation.
 
     Reads only old freeze receipts and bundles. All raw responses/pools remain
@@ -77,9 +86,9 @@ def freeze_joint_study(source, output, config_path, *, repository_root, python, 
     # Package roots are explicitly inventoried, because a submodule import also
     # executes its parents' __init__.py. The shared closure does the hashing.
     impl = implementation_closure(root, cfg["provenance_roots"], distributions=["numpy", "pandas", "scipy"])
-    r_sources = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in
-                 ["r/n7_joint_sleeves.R", "r/n7_sleeve_tables.R", "scripts/run_n7_joint_issue.R",
-                  "config/n7_joint_runtime.json", "config/compression_breadth_runtime.json"]}
+    if entry_point not in r_sources or len(r_sources) != len(set(r_sources)):
+        raise ValueError("R source inventory must uniquely bind the entry point")
+    r_sources = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in r_sources}
     sources = {str(source / "plans-frozen.json"): hashlib.sha256(prior_raw).hexdigest(),
                str(Path(config_path).resolve()): hashlib.sha256(cfg_raw).hexdigest()}
     expected = {(issue, seed, arm) for issue in prior["receipt"]["issues"]
@@ -97,8 +106,9 @@ def freeze_joint_study(source, output, config_path, *, repository_root, python, 
             bundle = json.loads(gzip.decompress(raw))
             cuts = {slot: Cutoff.decision_epoch(issue, ts) for slot, ts in bundle["cutoffs"].items()}
             cutoff_receipts[issue] = bundle["cutoffs"]
-            job = executor.submit(run_joint_issue, path, output / "config.json", output / "raw" / f"{issue}.json",
-                                  cutoffs=cuts, repository_root=root, python=python, rscript=rscript)
+            job = executor.submit(run_prefix_issue, path, output / "config.json", output / "raw" / f"{issue}.json",
+                                  cutoffs=cuts, repository_root=root, python=python, rscript=rscript,
+                                  entry_point=entry_point)
             jobs[job] = issue
         for count, job in enumerate(as_completed(jobs), 1):
             issue = jobs[job]
@@ -137,13 +147,21 @@ def freeze_joint_study(source, output, config_path, *, repository_root, python, 
         plan_hashes=hashes, raw_hashes=raw_hashes, implementation=impl, r_implementation=r_sources, cutoffs=cutoff_receipts,
         prior_freeze_seal=prior["seal"], historical_admission=False, evidence_class="EXPOSED_HISTORICAL_DIAGNOSTIC",
         maximum_source_availability=None, maximum_label_availability=None,
-        historical_partitions="NO_NEW_FIT_TUNE_CALIBRATION", frontier_statuses=statuses)
+        historical_partitions="NO_NEW_FIT_TUNE_CALIBRATION", frontier_statuses=statuses,
+        entry_point=entry_point)
     frozen = dict(receipt=receipt, seal=stable_json_hash(receipt))
     (output / "plans-frozen.json").write_text(json.dumps(frozen, sort_keys=True))
     return frozen
 
 
-def evaluate_joint_study(source, output, *, repository_root):
+def describe_joint_plan(plan):
+    """Project the #424 plan diagnostics into its issue-level reporting schema."""
+    return {k: plan[k] for k in ("train_coverage", "eval_coverage", "train_path_drawdown", "eval_path_drawdown",
+        "expected_roi", "max_reuse", "max_overlap", "solver_status", "mean_sleeve_coverage")}
+
+
+def evaluate_prefix_study(source, output, *, repository_root, describe_plan,
+                          reference_arms, reference_seeds):
     """Settle a complete frozen R study through the existing authoritative API.
 
     Only this phase opens target labels/SP. Returns one row per issue/arm/seed
@@ -186,18 +204,15 @@ def evaluate_joint_study(source, output, *, repository_root):
         rows.append(dict(issue=plan["issue"], seed=plan["seed"], arm=plan["arm"],
             decision_year=min(plan["cutoffs"].values())[:4], **{k: settled[k] for k in
                 ("status", "stake", "gross", "net", "groups", "hits", "roi")},
-            **{k: plan[k] for k in ("train_coverage", "eval_coverage", "train_path_drawdown", "eval_path_drawdown",
-                "expected_roi", "max_reuse", "max_overlap", "solver_status", "mean_sleeve_coverage")},
+            **describe_plan(plan),
             reference=False))
     old_results = (source / "results.json").read_bytes()
     if hashlib.sha256(old_results).hexdigest() != old_er["result_sha256"]:
         raise ValueError("Archived reference results changed")
     controls = [dict(row, reference=True) for row in json.loads(old_results)["rows"]
-                if row["arm"] in ("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512")]
-    cfg = receipt["parameters"]
+                if row["arm"] in reference_arms and row["seed"] in reference_seeds]
     keys = {(r["issue"], r["seed"], r["arm"]) for r in controls}
-    expected = {(i, s, a) for i in receipt["issues"] for s in cfg["seeds"]
-                for a in ("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512")}
+    expected = {(i, s, a) for i in receipt["issues"] for s in reference_seeds for a in reference_arms}
     if keys != expected or len(controls) != len(expected):
         raise ValueError("Archived reference grid mismatch")
     payload = dict(rows=rows + controls, issue_order=receipt["issues"], freeze_seal=frozen["seal"], historical_admission=False)

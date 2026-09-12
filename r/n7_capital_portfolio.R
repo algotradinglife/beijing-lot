@@ -63,13 +63,13 @@ n7_capital_evaluate <- function(pool,selected,scenarios,cutoffs,budget_cny) {
 # preferences explicit; minimal ROI is a fraction, minimum_hit in[0,1]. Incumbents
 # may be returned as FEASIBLE_NOT_PROVEN only after all actual constraints pass.
 n7_capital_solve <- function(pool,scenarios,cutoffs,budget_cny,objective,minimum_roi,
-                              minimum_hit,spend_all,nodes,gap,seed) {
+                              minimum_hit,spend_all,nodes,gap,seed,time_seconds) {
   stopifnot(identical(pool$cutoffs,cutoffs),identical(scenarios$cutoffs,cutoffs),
-    objective %in% c('any_hit','at_least_two','expected_net','row_coverage'),
+    objective %in% c('any_hit','at_least_two','expected_net','row_coverage','random'),
     is.finite(budget_cny),budget_cny>=0,budget_cny%%2==0,
     is.finite(minimum_roi),minimum_roi>=-1,minimum_hit>=0,minimum_hit<=1,
     length(spend_all)==1,is.logical(spend_all),!is.na(spend_all),nodes>=1,nodes==floor(nodes),
-    gap>=0,gap<1,seed>=0,seed==floor(seed))
+    gap>=0,gap<1,seed>=0,seed==floor(seed),is.finite(time_seconds),time_seconds>0)
   k <- length(pool$options);w <- nrow(scenarios$hits)
   stopifnot(k>0,w>0,ncol(scenarios$hits)==k,all(scenarios$hits %in% 0:1))
   stake <- vapply(pool$options,function(o)o$stake,numeric(1))
@@ -97,13 +97,15 @@ n7_capital_solve <- function(pool,scenarios,cutoffs,budget_cny,objective,minimum
   if(use_two)L[k+w+seq_len(w)]<-1/w
   if(objective=='expected_net')L[seq_len(k)]<-gross-stake
   if(objective=='row_coverage')L[seq_len(k)]<-vapply(pool$options,function(o)o$coverage,numeric(1))
+  if(objective=='random')L[seq_len(k)]<-withr::with_seed(seed,stats::runif(k))
   fit<-highs::highs_solve(L=L,lower=rep(0,nvars),upper=rep(1,nvars),A=A,lhs=lo,rhs=hi,
     types=rep('I',nvars),maximum=TRUE,control=highs::highs_control(mip_max_nodes=as.integer(nodes),
       mip_rel_gap=gap,mip_feasibility_tolerance=1e-9,primal_feasibility_tolerance=1e-9,
-      threads=1L,random_seed=as.integer(seed),log_to_console=FALSE))
+      threads=1L,time_limit=as.double(time_seconds),random_seed=as.integer(seed),log_to_console=FALSE))
   selected<-integer();status<-as.character(fit$status_message)
   primal<-fit$primal_solution
-  if(length(primal)==nvars && all(is.finite(primal)) && all(abs(primal-round(primal))<1e-6)) {
+  if(identical(as.character(fit$info$primal_solution_status),'Feasible') &&
+      length(primal)==nvars && all(is.finite(primal)) && all(abs(primal-round(primal))<1e-6)) {
     chosen<-which(primal[seq_len(k)]>.5)
     amount<-sum(stake[chosen]);nh<-rowSums(scenarios$hits[,chosen,drop=FALSE])
     valid<-!anyDuplicated(groups[chosen]) && amount<=budget_cny+1e-7 &&
@@ -113,4 +115,54 @@ n7_capital_solve <- function(pool,scenarios,cutoffs,budget_cny,objective,minimum
     else status<-'NUMERICAL_REJECTION'
   }
   list(selected=selected,status=status,solver=fit$info,cutoffs=cutoffs,historical_admission=FALSE)
+}
+
+# Pack a variable-depth allocation into the authoritative settlement schema.
+# groups counts physical CNY2 tickets; funded_sleeves counts seven-fixture sets.
+# Sorting physical fixture indices also permutes outcome columns. State IDs in
+# sleeve_keys retain the ORIGINAL ordered sleeve identity (zero-based on disk).
+# Exposure is stake at risk, not a count of reused sleeves. No I/O or settlement.
+n7_capital_plan <- function(pool,selected,cutoffs,arm,seed,training,evaluation,
+                            status,solver,budget_cny,unit_cny,payout_factor) {
+  stopifnot(unit_cny==2,payout_factor==.65,budget_cny%%2==0,
+    length(arm)==1L,nzchar(arm),length(seed)==1L,is.finite(seed),seed==floor(seed))
+  train<-n7_capital_evaluate(pool,selected,training,cutoffs,budget_cny)
+  eval<-n7_capital_evaluate(pool,selected,evaluation,cutoffs,budget_cny)
+  canonical<-as.matrix(expand.grid(rep(list(0:2),7)))[,7:1,drop=FALSE]
+  indices<-outcomes<-matrix(integer(),0,7)
+  keys<-list(); sets<-character()
+  exposure<-matrix(0,length(pool$fixtures),3)
+  incidence<-matrix(0,length(pool$fixtures),length(selected))
+  for(i in seq_along(selected)) {
+    o<-pool$options[[selected[i]]];f<-o$fixtures;ids<-o$state_ids;k<-length(ids)
+    stopifnot(length(f)==7,!anyDuplicated(f),all(f==floor(f)),
+      all(f>=1 & f<=length(pool$fixtures)),k>0,k==o$depth,
+      all(ids==floor(ids)),all(ids>=1 & ids<=2187),!anyDuplicated(ids),
+      o$stake==unit_cny*k)
+    sets<-c(sets,paste(sort(f),collapse=','))
+    sort_columns<-order(f)
+    indices<-rbind(indices,matrix(rep(f[sort_columns]-1L,each=k),ncol=7))
+    outcomes<-rbind(outcomes,canonical[ids,sort_columns,drop=FALSE])
+    incidence[f,i]<-1
+    for(j in seq_along(f))exposure[f[j],]<-exposure[f[j],]+
+      unit_cny*tabulate(canonical[ids,j]+1L,nbins=3)
+    keys[[i]]<-list(sleeve_id=o$sleeve_id,rule=o$rule,depth=k,
+      fixture_indices=as.list(f-1L),state_ids=as.list(ids-1L),
+      coverage=o$coverage,stake=o$stake,expected_gross=o$expected_gross)
+  }
+  stopifnot(!anyDuplicated(sets),nrow(indices)*unit_cny==train$stake,
+    !anyDuplicated(apply(3*indices+outcomes,1,paste,collapse=',')),
+    abs(sum(exposure)-7*train$stake)<1e-8)
+  overlap<-crossprod(incidence);diag(overlap)<-0
+  list(issue=pool$issue,arm=arm,seed=seed,model_id=pool$model_id,
+    fixtures=pool$fixtures,cutoffs=cutoffs,fixture_indices=indices,outcomes=outcomes,
+    groups=nrow(indices),funded_sleeves=length(selected),sleeve_keys=keys,
+    stake=train$stake,cash_cny=budget_cny-train$stake,budget_cny=budget_cny,
+    unit_cny=unit_cny,payout_factor=payout_factor,solver_status=status,solver=solver,
+    training=as.list(train),evaluation=as.list(eval),
+    fixture_outcome_exposure_cny=exposure,fixture_exposure_cny=as.list(rowSums(exposure)),
+    max_fixture_exposure_cny=max(c(0,rowSums(exposure))),
+    max_outcome_exposure_cny=max(c(0,exposure)),
+    max_reuse=max(c(0,rowSums(incidence))),max_overlap=max(c(0,overlap)),
+    historical_admission=FALSE)
 }

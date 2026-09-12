@@ -49,25 +49,30 @@ def test_r_boundary_rejects_cutoffs_and_source_mutation(tmp_path, monkeypatch, f
 
     monkeypatch.setattr(study.subprocess, "run", invoke)
     out = tmp_path / "out.json"
-    got = study.run_joint_issue(path, tmp_path / "config.json", out, cutoffs=cuts,
-        repository_root=ROOT, python="explicit-python", rscript="Rscript")
+    got = study.run_prefix_issue(path, tmp_path / "config.json", out, cutoffs=cuts,
+        repository_root=ROOT, python="explicit-python", rscript="Rscript", entry_point="scripts/run_n7_joint_issue.R")
     plan = got["plans"][0]
     assert plan["seal"] == stable_json_hash({k: v for k, v in plan.items() if k != "seal"})
+    for entry in ("../escape.R", "src/n7_joint_study.py", "scripts/missing.R"):
+        with pytest.raises(ValueError, match="entry point"):
+            study.run_prefix_issue(path, tmp_path / "config.json", tmp_path / "invalid.json",
+                cutoffs=cuts, repository_root=ROOT, python="explicit-python", rscript="Rscript",
+                entry_point=entry)
     with pytest.raises(ValueError, match="overwrite"):
-        study.run_joint_issue(path, tmp_path / "config.json", out, cutoffs=cuts,
-            repository_root=ROOT, python="explicit-python", rscript="Rscript")
+        study.run_prefix_issue(path, tmp_path / "config.json", out, cutoffs=cuts,
+            repository_root=ROOT, python="explicit-python", rscript="Rscript", entry_point="scripts/run_n7_joint_issue.R")
     with pytest.raises(ValueError, match="cutoff"):
-        study.run_joint_issue(path, tmp_path / "config.json", tmp_path / "bad.json", cutoffs={},
-            repository_root=ROOT, python="explicit-python", rscript="Rscript")
+        study.run_prefix_issue(path, tmp_path / "config.json", tmp_path / "bad.json", cutoffs={},
+            repository_root=ROOT, python="explicit-python", rscript="Rscript", entry_point="scripts/run_n7_joint_issue.R")
     bad_cuts = {s: Cutoff.decision_epoch("wrong", t) for s, t in bundle["cutoffs"].items()}
     with pytest.raises(ValueError, match="Native target"):
-        study.run_joint_issue(path, tmp_path / "config.json", tmp_path / "bad.json", cutoffs=bad_cuts,
-            repository_root=ROOT, python="explicit-python", rscript="Rscript")
+        study.run_prefix_issue(path, tmp_path / "config.json", tmp_path / "bad.json", cutoffs=bad_cuts,
+            repository_root=ROOT, python="explicit-python", rscript="Rscript", entry_point="scripts/run_n7_joint_issue.R")
     bundle["expanded_pool"]["fixtures"][0]["p_W"] += .1
     path.write_bytes(gzip.compress(json.dumps(bundle).encode()))
     with pytest.raises(ValueError, match="bundle changed"):
-        study.run_joint_issue(path, tmp_path / "config.json", tmp_path / "bad.json", cutoffs=cuts,
-            repository_root=ROOT, python="explicit-python", rscript="Rscript")
+        study.run_prefix_issue(path, tmp_path / "config.json", tmp_path / "bad.json", cutoffs=cuts,
+            repository_root=ROOT, python="explicit-python", rscript="Rscript", entry_point="scripts/run_n7_joint_issue.R")
 
 
 def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, monkeypatch, fixture_bundle):
@@ -90,10 +95,11 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
             p["seal"] = stable_json_hash(p)
         return result
 
-    monkeypatch.setattr(study, "run_joint_issue", run)
+    monkeypatch.setattr(study, "run_prefix_issue", run)
     output = tmp_path / "study"
-    frozen = study.freeze_joint_study(source, output, config, repository_root=ROOT,
-        python="unused", rscript="unused")
+    frozen = study.freeze_prefix_study(source, output, config, repository_root=ROOT,
+        python="unused", rscript="unused",
+        entry_point="scripts/run_n7_joint_issue.R", r_sources=study.JOINT_R_SOURCES)
     assert len(frozen["receipt"]["plan_hashes"]) == 1
     original_plans = {p: Path(p).read_bytes() for p in frozen["receipt"]["plan_hashes"]}
     # Labels did not even exist until every plan was frozen.
@@ -104,18 +110,21 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
         audit_path=str(audit), audit_sha256=hashlib.sha256(audit.read_bytes()).hexdigest(),
         result_sha256=hashlib.sha256((source / "results.json").read_bytes()).hexdigest())
     (source / "evaluation-receipt.json").write_text(json.dumps(er))
-    result = study.evaluate_joint_study(source, output, repository_root=ROOT)
+    result = study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
     assert len(result["rows"]) == 3
     assert result["rows"][0]["status"] == "NO_BET"
     assert result["rows"][0]["net"] == 0
     assert all(Path(p).read_bytes() == raw for p, raw in original_plans.items())
     with pytest.raises(ValueError, match="already frozen"):
-        study.evaluate_joint_study(source, output, repository_root=ROOT)
+        study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
     # Replaying with changed raw input must stop, not update old receipts.
     (output / "evaluation-receipt.json").unlink()
     path.write_bytes(b"corrupted")
     with pytest.raises(ValueError, match="source changed"):
-        study.evaluate_joint_study(source, output, repository_root=ROOT)
+        study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
 
 
 @pytest.mark.parametrize("worker_error", [False, True])
@@ -133,10 +142,11 @@ def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixt
         if worker_error:
             raise ValueError("Worker failed")
         return dict(plans=[], frontier_status=[])
-    monkeypatch.setattr(study, "run_joint_issue", run)
+    monkeypatch.setattr(study, "run_prefix_issue", run)
     out = tmp_path / "out"
     with pytest.raises(ValueError, match="Worker failed" if worker_error else "Incomplete"):
-        study.freeze_joint_study(source, out, config, repository_root=ROOT, python="unused", rscript="unused")
+        study.freeze_prefix_study(source, out, config, repository_root=ROOT, python="unused", rscript="unused",
+        entry_point="scripts/run_n7_joint_issue.R", r_sources=study.JOINT_R_SOURCES)
     assert not (out / "plans-frozen.json").exists()
     if worker_error:
         assert "cancelling queued issues" in capsys.readouterr().out

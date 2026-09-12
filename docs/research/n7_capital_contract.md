@@ -49,7 +49,28 @@ only: cross-year/ex-year diagnostics unavailable, not blockers. Enumerated tiny
 oracles, function tests, independent accounting replay, fresh executable QMD,
 Codex review and submitted PR. No automatic main merge/issue closure.
 
-Current implementation: r/n7_capital_depth.R and corresponding24test assertions.
-Remaining: allocator/scenario/portfolio contracts, freeze/evaluation orchestration,
-full batch, report, independent replay, final review and PR. This record is not
-acceptance and does not declare the goal complete.
+Implementation now includes exact depth contracts, prefix MILP, physical-ticket
+packing with sorted fixture/outcome identity, monetary exposure, shared-world
+metrics, and an R issue runner. Python reuses the #424 freeze/evaluate pipeline
+with explicit R entry point/source inventory and a domain reporting callback.
+No parallel receipt or settlement implementation was added.
+
+The v1 configuration is config/n7_capital_425.json:68arms x3seeds x100issues,
+including4budgets. Simulation256optimization/5000evaluation worlds; offset1000000;
+40nodes,1% solver gap,15seconds per solve,8process workers. Time-limit incumbents
+are best-found only and timing may change which incumbent is returned; frozen
+ticket/scenario replay is the reproducibility contract, not bit-identical timed
+optimizer reruns. Raw solver status/bounds/gap are retained. Numerical precision
+of evaluation probabilities is finite-world Monte Carlo, not historical error.
+
+A prediction-only pilot on100608 exposed infeasibility at ROI floors -20% and0%.
+Both remain registered; unconstrained any-hit and at-least-two controls were added
+before opening this run's settlement. Row-additive and seeded random objectives
+use the same nonuniform space/budget and no ROI floor, matching the unconstrained
+joint arm. Random objective does not mean uniform allocation sampling. Threshold
+and equal-depth controls allow cash, so matched-spend evidence must be separate.
+Pilot files under the personal review-artifact directory are operational checks,
+not a completed historical study or evidence for choosing a profitable policy.
+
+Remaining: full frozen batch, independent replay/accounting, report, final checks,
+Codex review, PI classification and PR. This record does not declare acceptance.

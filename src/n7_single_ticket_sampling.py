@@ -78,8 +78,12 @@ def settle_single_tickets(plan, audit):
     if (isinstance(budget,bool) or not isinstance(budget,(int,float))
             or not np.isfinite(budget) or budget<0 or budget%2):
         raise ValueError('Invalid ticket budget')
-    idx=np.asarray(plan['fixture_indices'],dtype=int).reshape(-1,7)
-    codes=np.asarray(plan['outcomes'],dtype=int).reshape(-1,7)
+    packed=[np.asarray(plan[key]) for key in ('fixture_indices','outcomes')]
+    if any(not np.issubdtype(a.dtype,np.number) or not np.isfinite(a).all()
+           or not np.equal(a,np.floor(a)).all() for a in packed):
+        raise ValueError('Invalid packed tickets: integer coordinates required')
+    idx=packed[0].astype(int).reshape(-1,7)
+    codes=packed[1].astype(int).reshape(-1,7)
     if (idx.shape!=codes.shape or len(idx)!=plan['groups'] or np.any(idx<0) or np.any(idx>=len(plan['fixtures']))
             or np.any(codes<0) or np.any(codes>2) or plan['stake']!=2*len(idx)
             or (plan['unit_cny'],plan['payout_factor'])!=(2,.65)
