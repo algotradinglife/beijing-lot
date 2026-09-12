@@ -6,7 +6,7 @@ This is the owner's already-exposed historical research, not an unseen validatio
 
 ## Research decision
 
-The provisional PI classification is **COVERAGE_STRUCTURE_SIGNAL**, with no demonstrated capital superiority. It remains provisional until final Codex review is resolved.
+PI accepts this completed retrospective study as **COVERAGE_STRUCTURE_SIGNAL**, with no demonstrated capital superiority. Final independent Codex review found no actionable P1/P2 issues and independently replayed all2400plans. This scientific acceptance authorizes the research-branch delivery; it does not admit a production strategy.
 Across 100 issues, QUALITY_PROB hits40 with ROI27.79%; JOINT_FULL hits53–60 with ROI0.26–26.03% (median2.00%). Its ex-best-issue ROI median is−4.98%, versus QUALITY15.21%. Matched97-issue full-minus-quality ROI difference is−22.31pp, issue-cluster bootstrap95% interval[−67.01,16.39]. This is descriptive uncertainty, not a correction for repeated search.
 
 UNION_PROB has median58 hit issues,44 profitable issues, ROI10.40%; JOINT_UP without the risk gate has median ROI13.93%. These are trade-offs, not a dominant replacement. Different column medians can come from different seeds. The risk gate constrains an artificial five-round distribution, not actual chronological drawdown. The strongest raw-return old reference, MONOLITHIC_PROB512, has ROI52.98%, ex-best5.82%, and max drawdownCNY20,641; its broader candidate access prevents a clean attribution to decomposition.
@@ -57,4 +57,4 @@ The default QMD reads the committed compact accounting archive, verifies its bod
 
 V1 aborted before all-plan freeze/evaluation on an actual HiGHS tolerance violation in100913. V2 used explicit1e-9 and rejected invalid numerical incumbents; the original failure fixture is retained and tested. The all-study checker originally compared serialized probabilities byte-exactly; jsonlite's15-digit serialization differs at~3e-16. Only six p/q numeric fields now allow absolute1e-14, with larger perturbations and identities still rejected. No tickets or settlement results were changed for this replay correction.
 
-Final review and lifecycle evidence will be recorded after the independent Codex verdict; this document alone does not close the issue.
+Final Codex verdict is retained in `n7_joint_codex_review.md`; exact local evidence is in `n7_joint_checks.json`, with output/code/source bindings in `n7_joint_acceptance_receipt.json`. Both archive and raw-source QMD runs completed with9identicaltables,2plots and zero execution-error blocks. Latest joint Python9tests and R report25assertions passed. PI accepts the disclosed finite-candidate, already-exposed, single-year and price/chronology limitations as limits on interpretation, not hidden future work required for historical completion. GitHub remains authoritative for merge/closure and Project status.
