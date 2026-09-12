@@ -15,4 +15,9 @@ testthat::test_that('remove best period uses original period net and matched sta
   testthat::expect_error(market_conditional_summary(rbind(x,x),curves))
   testthat::expect_error(market_conditional_summary(x[1,],curves))
   testthat::expect_error(market_conditional_summary(x,curves[0,]))
+  cash<-x;cash$stake<-0;cash$net<-0;cash$hits<-0;cash$groups<-0
+  empty<-market_conditional_summary(cash,curves)
+  testthat::expect_true(is.na(empty$roi_percent))
+  testthat::expect_true(is.na(empty$without_best_roi))
+  testthat::expect_equal(empty$net,0)
 })

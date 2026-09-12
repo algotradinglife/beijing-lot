@@ -1,0 +1,134 @@
+---
+title: "7串1：有放回双池抽样（期望收益仅记录）"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-weighted-sampling-rates-v4"
+  archive_fixture: null
+---
+
+使用已暴露的100期100608–101120，冻结新版市场概率，不重新训练。
+每期预算1024元、每个基本组合2元、整注返奖系数0.65一次；初始资金100000元。
+本研究是逐场决策时点数据的回顾组合诊断，不证明整张票在同一时点可购。
+
+每组安排2个单选池角色与5个双选池角色，随机打乱角色顺序，再顺序加权抽场：
+单选池以Top1为权重（Top1≥50%），按Top1:Top2的概率比选第一或第二赛果；
+双选池以Top2累计概率为权重，按累计概率选Top2双选，否则选择第三赛果单选。
+组内屏蔽已选场次；组间有放回、无复用上限、无厚度取整。
+拒绝完整场次和支持完全相同的组，但允许不同组包含相同基本组合，并记录重复量。
+
+设每个位置支持集合为S，单位投入预期返还倍数为
+\(V=\sum_{r\in S}p_r/q_r\,/|S|\)，其中p为校正市场概率、1/q为原市场概率估算SP。
+原市场来自欧赔及大小球映射，不使用实际结算SP选场。
+整组预期收益率为\(0.65\prod V-1\)，整组成本为\(2\times2^d\)，d为实际双选场数。
+此计算使用比赛独立性假设。若p=q，所有组预期收益率都是−35%，期望值没有区分力。
+
+每种采样比例固定5个seed（41901–41905），期望收益仅记录，不参与接受/拒绝或选场选赛果。
+每期最多尝试500组；重复、超预算或组内无候选时拒绝，不消耗资金。
+未花完的预算留现金。不根据本轮收益择优seed。
+CAL_U3/U6为此前确定性原组对照；本轮同时改变了复用、选场、赛果和单选门槛，
+所以与旧策略的差异不能归因于某一项。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+if(is.null(params$archive_fixture)) {
+  frozen<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'))
+  er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  stopifnot(identical(digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(file=file.path(params$study,'results.json'),algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+    identical(digest::digest(file=er$controls_path,algo='sha256'),er$controls_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(file.path(params$study,'results.json'))
+  stopifnot(identical(result$freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',
+    identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+stopifnot(nrow(result$rows)==1500,nrow(result$controls)==200)
+x<-bind_rows(as_tibble(result$rows),as_tibble(result$controls)) |>
+  select(-any_of('rejections')) |>
+  mutate(issue=as.character(issue),status=if_else(stake>0,'COMPLETE','NO_BET'),budget_cny=1024,cash_cny=1024-stake)
+curves<-strategy_equity_curves(x,as.character(result$issue_order),100000)
+summary<-market_conditional_summary(x,curves)
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'))
+readr::write_csv(x |> select(-any_of('rejections')) |> mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_)),file.path(params$study,'periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+```
+
+## 总体收益、回撤及seed波动
+
+5%版本ROI中位数为−7.00%，优于原比例的−15.99%；10%为−15.92%。
+最大回撤中位数分别为21202元、30245元、21288元（顺序：5%、原比例、10%）。
+5%和10%均只有1/5个seed盈利，尚不支持替换原U3/U6方案，也不应事后选择最赚钱的seed。
+
+原概率比例抽样（PROPORTIONAL）为对照，RATE05/RATE10分别固定以5%／10%
+选择单选池第二赛果、双选池第三赛果单选。两池选择第一选项的概率为95%／90%。
+所有版本仍按相同Top1/Top2权重选场，仅改变选中场次后的赛果采样比例。
+100919、101004、101013、101107、101110五期无法满足两场单选池角色的50%入池条件，
+因此全额留现金；这是规则排除，不是数据缺失。
+
+每行是一套独立策略的100期表现，不能把5个seed相加视为同一预算组合。
+ROI按实际投入计算；without_best剔除该策略最高净收益的一期及对应投入。
+
+```{r}
+knitr::kable(summary,digits=2)
+knitr::kable(summary |> group_by(model) |> summarise(seeds=n(),
+  median_roi=median(roi_percent,na.rm=TRUE),min_roi=min(roi_percent,na.rm=TRUE),max_roi=max(roi_percent,na.rm=TRUE),
+  median_net=median(net),median_drawdown=median(max_drawdown),
+  worst_drawdown=max(max_drawdown),median_hit_issues=median(hit_issues),.groups='drop'),digits=2)
+```
+
+## 使用预算和复用
+
+单选池角色数固定为2，不等于实际只有2场单选。复用次数、重复基本组合按每期计算。
+未达到单选入池条件或尝试次数耗尽时可能保留现金；资金使用率单列。
+
+```{r}
+knitr::kable(x |> filter(policy!='CONTROL') |> group_by(model,policy) |> summarise(
+  spent=sum(stake),cash=sum(cash_cny),active_issues=sum(stake>0),total_groups=sum(groups),
+  group_hit_percent=100*sum(hits)/sum(groups),mean_group_coverage=weighted.mean(mean_coverage,groups,na.rm=TRUE),
+  planned_roi=weighted.mean(expected_roi,stake,na.rm=TRUE),max_reuse=max(max_reuse),
+  repeated_elementary=sum(repeated_elementary),attempts=sum(attempts),.groups='drop'),digits=3)
+```
+
+## 收益与回撤曲线
+
+```{r}
+#| fig-width: 14
+#| fig-height: 9
+curves$label<-curves$policy
+equity<-plot_strategy_equity(curves,'funded',100000)
+equity
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=14,height=9,dpi=140)
+dd<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=policy))+
+  ggplot2::geom_line()+ggplot2::facet_wrap(~model)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Drawdown (CNY)',colour='Seed')
+dd
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),dd,width=14,height=9,dpi=140)
+```
+
+## 每期收益率
+
+```{r}
+knitr::kable(x |> select(issue,model,policy,groups,hits,stake,net,cash_cny) |>
+  mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_)),digits=2)
+jsonlite::write_json(list(mode='EXPOSED_FIXED_SEEDS',freeze=result$freeze_seal,
+  qmd_sha256=digest::digest(file='quarto/126_n7_weighted_sampling.qmd',algo='sha256'),
+  summary_implementation_sha256=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+  equity_implementation_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
