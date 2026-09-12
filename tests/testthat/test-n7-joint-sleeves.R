@@ -14,7 +14,7 @@ testthat::test_that("shared worlds, canonical state returns and native cutoffs p
     expanded_pool = list(fixtures = e$fixtures), sleeves = list(list(id = 0L,
       fixture_indices = as.list(0:6), origin = "TEST", enumeration = e,
       options = list(PROB = list(status = "COMPLETE", state_ids = as.list(order(-p, -v)[1:64] - 1L))))))
-  pool <- n7_joint_options(b, b$cutoffs, python, "fixed", 2, .65, .8, -.35, 200, .01)
+  pool <- n7_joint_options(b, b$cutoffs, python, "fixed", 2, .65, .8, -.35, 200, .01, 1e-9)
   testthat::expect_identical(pool$options[[1]]$state_ids, order(-p, -v, seq_along(p))[1:64])
   testthat::expect_equal(pool$options[[1]]$coverage, sum(p[pool$options[[1]]$state_ids]))
   testthat::expect_true(all(vapply(pool$options, function(o) length(o$state_ids) == 64 && !anyDuplicated(o$state_ids), logical(1))))
@@ -54,7 +54,7 @@ testthat::test_that("joint optimum agrees with brute force and constraints chang
   s <- list(hits = hit, gross = hit * 400, cutoffs = cutoffs)
   args <- list(pool = pool, scenarios = s, cutoffs = cutoffs, choose = 2,
     budget_cny = 256, unit_cny = 2, reuse_cap = 2, overlap_cap = 7,
-    minimum_roi = -1, path_steps = 5, mean_drawdown_cap = Inf, solver_nodes = 200, solver_gap = 0)
+    minimum_roi = -1, path_steps = 5, mean_drawdown_cap = Inf, solver_nodes = 200, solver_gap = 0, solver_feasibility_tolerance = 1e-9)
   z <- do.call(n7_joint_solve, args)
   all <- combn(4, 2)
   coverage <- apply(all, 2, function(ix) mean(rowSums(hit[, ix, drop = FALSE]) > 0))
@@ -124,7 +124,7 @@ testthat::test_that("whole R issue exports exact 8x64 plans and empty plans hold
   testthat::expect_error(n7_joint_issue(b, b$cutoffs, cfg, Sys.getenv("FUNDAMENTALS_PYTHON")), "Prediction-only")
   b$expanded_pool$fixtures[[1]]$result <- NULL
   pool <- n7_joint_options(b, b$cutoffs, Sys.getenv("FUNDAMENTALS_PYTHON"), cfg$model_id,
-    2, .65, .8, -.35, 200, .01)
+    2, .65, .8, -.35, 200, .01, 1e-9)
   world <- n7_joint_returns(pool, n7_joint_worlds(pool, b$cutoffs, 42, 10), b$cutoffs)
   empty <- n7_joint_plan(pool, integer(), b$cutoffs, "EMPTY", 42, world, world, "Infeasible", NULL, cfg)
   testthat::expect_equal(empty$stake, 0)
@@ -136,4 +136,32 @@ testthat::test_that("whole R issue exports exact 8x64 plans and empty plans hold
   restored <- jsonlite::fromJSON(path, simplifyVector = FALSE)
   testthat::expect_length(restored$fixture_indices, 512)
   testthat::expect_identical(restored$fixtures[[1]]$provider_id, "000001")
+})
+
+testthat::test_that("100913 numerical boundary is solved tightly and invalid incumbents are rejected", {
+  b <- jsonlite::fromJSON(gzfile("../fixtures/n7_joint_numerical_boundary.json.gz"), simplifyVector = FALSE)
+  python <- Sys.getenv("FUNDAMENTALS_PYTHON")
+  p <- as.numeric(unlist(b$sleeves[[1]]$enumeration$probability))
+  v <- as.numeric(unlist(b$sleeves[[1]]$enumeration$expected_contribution))
+  floor <- .8 * sum(p[order(-p, -v, seq_along(p))[1:64]])
+  bad_ids <- as.integer(unlist(b$observed_bad_state_ids))
+  # Observed default-HiGHS result: Optimal, but coverage deficit 9.0147e-7.
+  testthat::expect_lt(sum(p[bad_ids]) - floor, -1e-7)
+  tight <- n7_joint_options(b, b$cutoffs, python, "fixed", 2, .65, .8, -.35, 200, .01, 1e-9)
+  frontier <- Filter(function(o) o$rule == "FRONTIER", tight$options)
+  testthat::expect_length(frontier, 1)
+  testthat::expect_gte(frontier[[1]]$coverage + 1e-7, floor)
+  testthat::local_mocked_bindings(highs_solve = function(...) list(status_message = "Optimal",
+    primal_solution = replace(rep(0, 2187), bad_ids, 1), info = list(mip_gap = 0)), .package = "highs")
+  rejected <- n7_joint_options(b, b$cutoffs, python, "fixed", 2, .65, .8, -.35, 200, .01, 1e-9)
+  testthat::expect_equal(rejected$statuses$frontier_status, "NUMERICAL_REJECTION")
+  testthat::expect_false(any(vapply(rejected$options, function(o) o$rule == "FRONTIER", logical(1))))
+  # The joint solver also refuses an invalid rounded binary assignment without
+  # aborting unrelated issues or funding that incumbent.
+  pool <- list(cutoffs = b$cutoffs, fixtures = as.list(1:7), options = list(
+    list(sleeve_id = 1, fixtures = 1:7, expected_gross = 128)))
+  s <- list(hits = matrix(1, 5, 1), gross = matrix(256, 5, 1), cutoffs = b$cutoffs)
+  z <- n7_joint_solve(pool, s, b$cutoffs, 1, 128, 2, 1, 7, -1, 5, Inf, 200, .01, 1e-9)
+  testthat::expect_equal(z$status, "NUMERICAL_REJECTION")
+  testthat::expect_length(z$selected, 0)
 })

@@ -118,7 +118,8 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
         study.evaluate_joint_study(source, output, repository_root=ROOT)
 
 
-def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixture_bundle):
+@pytest.mark.parametrize("worker_error", [False, True])
+def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixture_bundle, worker_error, capsys):
     source = tmp_path / "source"; (source / "bundles").mkdir(parents=True)
     issue = fixture_bundle["issue"]; path = source / "bundles" / f"{issue}.json.gz"
     path.write_bytes(gzip.compress(json.dumps(fixture_bundle).encode()))
@@ -128,8 +129,14 @@ def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixt
     config = tmp_path / "cfg.json"
     config.write_text(json.dumps(dict(seeds=[42], arms=["QUALITY_PROB"], workers=1,
         provenance_roots=["src.n7_joint_study", "src.temporal_learning"])))
-    monkeypatch.setattr(study, "run_joint_issue", lambda *a, **kw: dict(plans=[], frontier_status=[]))
+    def run(*args, **kwargs):
+        if worker_error:
+            raise ValueError("Worker failed")
+        return dict(plans=[], frontier_status=[])
+    monkeypatch.setattr(study, "run_joint_issue", run)
     out = tmp_path / "out"
-    with pytest.raises(ValueError, match="Incomplete"):
+    with pytest.raises(ValueError, match="Worker failed" if worker_error else "Incomplete"):
         study.freeze_joint_study(source, out, config, repository_root=ROOT, python="unused", rscript="unused")
     assert not (out / "plans-frozen.json").exists()
+    if worker_error:
+        assert "cancelling queued issues" in capsys.readouterr().out

@@ -101,7 +101,14 @@ def freeze_joint_study(source, output, config_path, *, repository_root, python, 
                                   cutoffs=cuts, repository_root=root, python=python, rscript=rscript)
             jobs[job] = issue
         for count, job in enumerate(as_completed(jobs), 1):
-            issue = jobs[job]; result = job.result()
+            issue = jobs[job]
+            try:
+                result = job.result()
+            except Exception:
+                print(f"FAILED issue {issue}; cancelling queued issues. No freeze/evaluation will be created.", flush=True)
+                for queued in jobs:
+                    queued.cancel()
+                raise
             raw_path = output / "raw" / f"{issue}.json.gz"
             raw_path.write_bytes(gzip.compress(json.dumps(result, sort_keys=True).encode(), mtime=0))
             raw_hashes[str(raw_path)] = hashlib.sha256(raw_path.read_bytes()).hexdigest()

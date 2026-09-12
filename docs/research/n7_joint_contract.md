@@ -53,6 +53,19 @@ constraints can fund a portfolio. Limits, infeasibility and no-bets remain visib
 never silently accept an incumbent or relax constraints. Solver timeouts are not
 proof that no feasible portfolio exists.
 
+Numerical revision before settlement: the first run stopped at issue100913 when
+HiGHS returned Optimal with a PROB-mass deficit of 9.014717489e-7. Its default
+MIP feasibility tolerance (1e-6) exceeded the explicit post-check allowance
+(1e-7). That attempt never produced a complete freeze or opened settlement.
+Version2 explicitly sets both MIP and primal feasibility tolerance to1e-9.
+A solver-success result that still violates the independent rounded-ticket
+constraints is marked NUMERICAL_REJECTION: exclude that frontier candidate, or
+hold cash for a joint portfolio. Source/data contract errors still abort.
+The complete100-issue grid is rerun under one implementation; partial old results
+are diagnostic failure evidence only. Eight independent R workers replace four
+for throughput; every solver remains single-threaded and seed/node limits stay
+fixed. Queued jobs are cancelled immediately on a genuine issue-processing error.
+
 ## Comparisons and acceptance
 
 QUALITY_PROB selects eight highest PROB64 masses. UNION_PROB optimizes only PROB64

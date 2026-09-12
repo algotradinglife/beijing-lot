@@ -29,12 +29,14 @@ n7_joint_validate <- function(fixtures, cutoffs, python) {
 # >= coverage_fraction * PROB mass and expected ROI >= minimum_roi.
 n7_joint_options <- function(bundle, cutoffs, python, model_id, unit_cny,
                              payout_factor, coverage_fraction, minimum_roi,
-                             solver_nodes, solver_gap) {
+                             solver_nodes, solver_gap, solver_feasibility_tolerance) {
   stopifnot(is.numeric(unit_cny), length(unit_cny) == 1L, unit_cny == 2,
             is.numeric(payout_factor), length(payout_factor) == 1L, payout_factor == .65,
             coverage_fraction > 0, coverage_fraction <= 1, minimum_roi >= -1,
             solver_nodes >= 1, solver_nodes == floor(solver_nodes),
-            solver_gap >= 0, solver_gap < 1)
+            solver_gap >= 0, solver_gap < 1,
+            is.finite(solver_feasibility_tolerance), solver_feasibility_tolerance >= 1e-10,
+            solver_feasibility_tolerance <= 1e-7)
   n7_joint_validate(bundle$expanded_pool$fixtures, cutoffs, python)
   view <- n7_sleeve_tables(bundle, cutoffs, model_id)
   stopifnot(!anyDuplicated(vapply(bundle$sleeves,
@@ -48,14 +50,17 @@ n7_joint_options <- function(bundle, cutoffs, python, model_id, unit_cny,
       A = rbind(rep(1, 2187), p, v), lhs = c(64, coverage_fraction * sum(p[prob]), 128 * (1 + minimum_roi)),
       rhs = c(64, Inf, Inf), types = rep("I", 2187), maximum = TRUE,
       control = highs::highs_control(mip_max_nodes = as.integer(solver_nodes),
-        mip_rel_gap = solver_gap, threads = 1L, random_seed = 0L, log_to_console = FALSE))
+        mip_rel_gap = solver_gap, mip_feasibility_tolerance = solver_feasibility_tolerance,
+        primal_feasibility_tolerance = solver_feasibility_tolerance,
+        threads = 1L, random_seed = 0L, log_to_console = FALSE))
     selected <- list(PROB = prob, VALUE = value)
     status <- as.character(fit$status_message)
     if (identical(status, "Optimal")) {
       ix <- which(fit$primal_solution > .5)
-      stopifnot(length(ix) == 64L, sum(p[ix]) + 1e-7 >= coverage_fraction * sum(p[prob]),
-                sum(v[ix]) + 1e-7 >= 128 * (1 + minimum_roi))
-      selected$FRONTIER <- ix
+      if (length(ix) == 64L && sum(p[ix]) + 1e-7 >= coverage_fraction * sum(p[prob]) &&
+          sum(v[ix]) + 1e-7 >= 128 * (1 + minimum_roi)) {
+        selected$FRONTIER <- ix
+      } else status <- "NUMERICAL_REJECTION"
     }
     statuses[[j]] <- tibble::tibble(sleeve_id = g$id, frontier_status = status)
     for (rule in names(selected)) {
@@ -124,13 +129,16 @@ n7_joint_path_drawdowns <- function(gross, steps, stake) {
 # fallback. choose supports small exact synthetic tests; production requires 8.
 n7_joint_solve <- function(pool, scenarios, cutoffs, choose, budget_cny,
                            unit_cny, reuse_cap, overlap_cap, minimum_roi,
-                           path_steps, mean_drawdown_cap, solver_nodes, solver_gap) {
+                           path_steps, mean_drawdown_cap, solver_nodes, solver_gap,
+                           solver_feasibility_tolerance) {
   stopifnot(identical(pool$cutoffs, cutoffs), identical(scenarios$cutoffs, cutoffs),
     choose >= 1, choose == floor(choose), budget_cny == choose * 64 * unit_cny,
     unit_cny == 2, reuse_cap >= 1, overlap_cap >= 0, overlap_cap <= 7,
     minimum_roi >= -1, path_steps >= 1, path_steps == floor(path_steps),
     mean_drawdown_cap >= 0, solver_nodes >= 1, solver_nodes == floor(solver_nodes),
-    solver_gap >= 0, solver_gap < 1)
+    solver_gap >= 0, solver_gap < 1,
+    is.finite(solver_feasibility_tolerance), solver_feasibility_tolerance >= 1e-10,
+    solver_feasibility_tolerance <= 1e-7)
   k <- length(pool$options); w <- nrow(scenarios$hits)
   stopifnot(k > 0, identical(dim(scenarios$hits), c(w, k)),
     identical(dim(scenarios$gross), c(w, k)), all(scenarios$hits %in% 0:1),
@@ -177,18 +185,22 @@ n7_joint_solve <- function(pool, scenarios, cutoffs, choose, budget_cny,
     lower = rep(0, nvars), upper = c(rep(1, k + w), rep(Inf, paths)),
     A = do.call(rbind, rows), lhs = lo, rhs = hi, types = c(rep("I", k), rep("C", w + paths)),
     maximum = TRUE, control = highs::highs_control(mip_max_nodes = as.integer(solver_nodes),
-      mip_rel_gap = solver_gap, threads = 1L, random_seed = 0L, log_to_console = FALSE))
+      mip_rel_gap = solver_gap, mip_feasibility_tolerance = solver_feasibility_tolerance,
+      primal_feasibility_tolerance = solver_feasibility_tolerance,
+      threads = 1L, random_seed = 0L, log_to_console = FALSE))
   status <- as.character(fit$status_message)
   selected <- if (identical(status, "Optimal")) which(fit$primal_solution[seq_len(k)] > .5) else integer()
   if (length(selected)) {
-    stopifnot(length(selected) == choose, !anyDuplicated(groups[selected]),
-      max(rowSums(incidence[, selected, drop = FALSE])) <= reuse_cap,
-      sum(vapply(pool$options[selected], function(o) o$expected_gross, numeric(1))) + 1e-6 >= budget_cny * (1 + minimum_roi))
+    valid <- length(fit$primal_solution) == nvars && length(selected) == choose && !anyDuplicated(groups[selected]) &&
+      max(rowSums(incidence[, selected, drop = FALSE])) <= reuse_cap &&
+      sum(vapply(pool$options[selected], function(o) o$expected_gross, numeric(1))) + 1e-6 >= budget_cny * (1 + minimum_roi)
     pair <- crossprod(incidence[, selected, drop = FALSE]); diag(pair) <- 0
-    stopifnot(max(pair) <= overlap_cap)
+    valid <- valid && max(pair) <= overlap_cap
     dd <- n7_joint_path_drawdowns(rowSums(scenarios$gross[, selected, drop = FALSE]), path_steps, budget_cny)
-    stopifnot(mean(dd) <= mean_drawdown_cap + 1e-5)
+    valid <- valid && mean(dd) <= mean_drawdown_cap + 1e-5
+    if (!valid) { selected <- integer(); status <- "NUMERICAL_REJECTION" }
   }
+  if (status == "Optimal" && !length(selected)) status <- "NUMERICAL_REJECTION"
   list(status = status, selected = selected, cutoffs = cutoffs,
        solver = fit$info, historical_admission = FALSE)
 }
@@ -250,7 +262,8 @@ n7_joint_issue <- function(bundle, cutoffs, config, python) {
     setequal(unlist(config$arms), c("QUALITY_PROB", "UNION_PROB", "JOINT_UNION", "JOINT_RETURN",
       "JOINT_UP", "JOINT_FULL", "JOINT_NO_RETURN", "JOINT_NO_UP")))
   pool <- n7_joint_options(bundle, cutoffs, python, config$model_id, config$unit_cny,
-    config$payout_factor, config$coverage_fraction, config$minimum_roi, config$solver_nodes, config$solver_gap)
+    config$payout_factor, config$coverage_fraction, config$minimum_roi, config$solver_nodes, config$solver_gap,
+    config$solver_feasibility_tolerance)
   result <- list(); world_receipts <- list()
   for (seed in unlist(config$seeds)) {
     training_worlds <- n7_joint_worlds(pool, cutoffs, seed, config$training_worlds)
@@ -279,7 +292,8 @@ n7_joint_issue <- function(bundle, cutoffs, config, python) {
         fit <- n7_joint_solve(local, local_train, cutoffs, config$sleeves, config$budget_cny,
           config$unit_cny, if (use_up) config$reuse_cap else 8, if (use_up) config$overlap_cap else 7,
           if (use_return) config$minimum_roi else -1, config$path_steps,
-          if (use_risk) config$mean_drawdown_cap else Inf, config$solver_nodes, config$solver_gap)
+          if (use_risk) config$mean_drawdown_cap else Inf, config$solver_nodes, config$solver_gap,
+          config$solver_feasibility_tolerance)
       }
       result[[length(result) + 1L]] <- n7_joint_plan(pool, allowed[fit$selected], cutoffs,
         arm, seed, train, evaluation, fit$status, fit$solver, config)
