@@ -202,3 +202,38 @@ def check_capital_result(result, source_bundle, config):
     if seen!={(seed,arm) for seed in config['seeds'] for arm in prefs}:
         raise ValueError('Capital result grid incomplete')
     return dict(curve_rows=len(curves),plans=len(result['plans']),status='PASS')
+
+
+def check_capital_settlement(plan, audit_rows, result_row):
+    """Independently settle by mutually exclusive sleeve states, not ticket rows.
+
+    Only call after freeze. Audit records retain exact issue/slot/provider and
+    handicap identities. Winning states use actual SP with one 0.65 factor.
+    Losing-state missing SP is irrelevant; missing winning SP fails. Returns
+    accounting totals and checks the authoritative evaluator's recorded result.
+    """
+    if plan['seal']!=stable_json_hash({k:v for k,v in plan.items() if k!='seal'}):
+        raise ValueError('Settlement plan seal mismatch')
+    audit={}
+    for row in audit_rows:
+        key=(str(row['issue']),row['slot'],row['provider_id'])
+        if key in audit:raise ValueError('Duplicate settlement identity')
+        audit[key]=row
+    gross=0.;hits=0;directions={'W':0,'D':1,'L':2}
+    for sleeve in plan['sleeve_keys']:
+        state=0;quotes=[]
+        for index in sleeve['fixture_indices']:
+            f=plan['fixtures'][index];row=audit[(str(f['issue']),f['slot'],f['provider_id'])]
+            if (f['handicap']!=row['handicap'] or row['actual_direction'] not in directions
+                or not isinstance(row['status'],str) or 'spf:IDENTITY' in row['status']):
+                raise ValueError('Settlement fixture conflict')
+            state=3*state+directions[row['actual_direction']];quotes.append(row['spf_sp'])
+        if state in sleeve['state_ids']:
+            if any(q is None or not math.isfinite(q) or q<=0 for q in quotes):
+                raise ValueError('Missing winning settlement SP')
+            gross+=2*.65*math.prod(quotes);hits+=1
+    expected=dict(stake=plan['stake'],groups=plan['groups'],hits=hits,gross=gross,
+        net=gross-plan['stake'],roi=gross/plan['stake']-1 if plan['stake'] else None,
+        status='COMPLETE' if plan['stake'] else 'NO_BET')
+    for key,value in expected.items():_capital_close(result_row[key],value,f'settlement.{key}',absolute=1e-6)
+    return expected

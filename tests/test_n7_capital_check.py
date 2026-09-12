@@ -2,7 +2,7 @@
 import copy
 import numpy as np
 import pytest
-from src.n7_capital_check import check_capital_plan, check_capital_result, _capital_close
+from src.n7_capital_check import check_capital_plan, check_capital_result, check_capital_settlement, _capital_close
 from src.temporal_learning.core import stable_json_hash
 
 
@@ -108,3 +108,20 @@ def test_full_curve_trace_and_registered_preference_are_replayed(capital_case):
     with pytest.raises(ValueError,match='full-curve trace'):check_capital_result(broken,b,c)
     broken=copy.deepcopy(result);broken['plans']=[]
     with pytest.raises(ValueError,match='grid incomplete'):check_capital_result(broken,b,c)
+
+
+def test_actual_settlement_is_independent_of_model_prices(capital_case):
+    plan,_,_,_=capital_case
+    audit=[dict(issue=f['issue'],slot=f['slot'],provider_id=f['provider_id'],handicap=0,
+        actual_direction='W',spf_sp=2.,status='READY') for f in plan['fixtures']]
+    gross=2*.65*2**7
+    result=dict(stake=4,groups=2,hits=1,gross=gross,net=gross-4,roi=gross/4-1,status='COMPLETE')
+    assert check_capital_settlement(plan,audit,result)['gross']==pytest.approx(gross)
+    bad=dict(result,gross=gross*.65)
+    with pytest.raises(ValueError,match='settlement.gross'):check_capital_settlement(plan,audit,bad)
+    audit[0]['spf_sp']=None
+    with pytest.raises(ValueError,match='winning'):check_capital_settlement(plan,audit,result)
+    audit[0]['actual_direction']='L'
+    losing=dict(result,hits=0,gross=0,net=-4,roi=-1)
+    assert check_capital_settlement(plan,audit,losing)['gross']==0
+    with pytest.raises(ValueError,match='Duplicate'):check_capital_settlement(plan,audit+audit[:1],losing)

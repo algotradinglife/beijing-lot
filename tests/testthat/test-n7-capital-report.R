@@ -13,6 +13,8 @@ test_that('capital reporting preserves variable spend ROI cash and bankroll stop
   expect_equal(a$without_best_roi,-100);expect_equal(a$max_drawdown,512)
   expect_equal(a$longest_underwater,1);expect_equal(a$maximum_completed_recovery,1)
   expect_equal(a$cash_cny,256)
+  expect_equal(a$conditional_gain_cny,512);expect_equal(a$conditional_loss_cny,-512)
+  expect_equal(a$realized_payoff_ratio,1)
   paired<-n7_capital_matched(result$periods,'A','B')
   expect_equal(paired$matched_issues,2);expect_equal(paired$matched_stake_cny,1024)
   expect_equal(paired$roi_delta_pp,-150)

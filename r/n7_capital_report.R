@@ -32,6 +32,10 @@ n7_capital_report <- function(rows,issue_order,initial_capital_cny,reference_bud
     worst10=if(dplyr::n()>=10)min(stats::filter(net,rep(1,10),sides=1),na.rm=TRUE) else NA_real_,
     worst20=if(dplyr::n()>=20)min(stats::filter(net,rep(1,20),sides=1),na.rm=TRUE) else NA_real_,
     payout_hhi=if(sum(gross)>0)sum((gross/sum(gross))^2) else NA_real_,
+    realized_profit_percent=100*mean(net>0),realized_loss_percent=100*mean(net<0),
+    conditional_gain_cny=if(any(net>0))mean(net[net>0]) else NA_real_,
+    conditional_loss_cny=if(any(net<0))mean(net[net<0]) else NA_real_,
+    realized_payoff_ratio=if(any(net>0) && any(net<0))mean(net[net>0])/abs(mean(net[net<0])) else NA_real_,
     .groups='drop')
   summary<-dplyr::left_join(summary,extra,by=c('model','policy'),relationship='one-to-one')
   grid<-summary |> dplyr::group_by(model,budget_cny,reference) |> dplyr::summarise(

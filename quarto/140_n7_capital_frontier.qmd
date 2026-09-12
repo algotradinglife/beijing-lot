@@ -1,0 +1,309 @@
+---
+title: "N7 资金规模：扩组还是加深组内覆盖"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  archive: "tests/fixtures/n7_capital_study.json.gz"
+  display_seed: 42501
+  bootstrap_seed: 42599
+  bootstrap_reps: 1000
+  diagnostic_hit_tolerance_pp: 2
+  diagnostic_net_tolerance_cny: 25
+---
+
+本报告回答 [#425](https://github.com/algotradinglife/beijing-lot/issues/425)：
+在明确的命中与收益偏好下，512、1,024、2,048、4,096 元预算分别应资助多少组七场比赛，
+每组购买多少个高概率赛果组合，资金扩张带来怎样的覆盖、收益和风险变化。
+这是已经反复研究过的 **100 期历史回顾诊断**，不是未见样本检验或实盘准入结论。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source("r/fundamentals_equity_curves.R")
+source("r/market_conditional_summary.R")
+source("r/n7_joint_report.R")
+source("r/n7_capital_report.R")
+source("r/n7_capital_depth.R")
+source("r/n7_capital_compare.R")
+archive <- jsonlite::fromJSON(gzfile(params$archive), simplifyVector = FALSE)
+stopifnot(archive$schema == "bj425_capital_report_v1",
+  digest::digest(charToRaw(archive$body), algo = "sha256", serialize = FALSE) == archive$sha256)
+payload <- jsonlite::fromJSON(archive$body)
+cfg <- payload$parameters
+stopifnot(identical(payload$historical_admission, FALSE),
+  params$display_seed %in% cfg$seeds,
+  payload$independent_replay$status == "PASS", payload$settlement_replay$status == "PASS")
+rows <- tibble::as_tibble(payload$rows)
+report <- n7_capital_report(rows, as.character(payload$issue_order), cfg$initial_capital_cny, 1024)
+answers <- n7_capital_answers(rows)
+sleeves <- tibble::as_tibble(payload$sleeves)
+curve_example <- tibble::as_tibble(payload$example_curves)
+frontier <- n7_capital_frontier(answers, params$diagnostic_hit_tolerance_pp, params$diagnostic_net_tolerance_cny)
+single_comparison <- n7_capital_compare(curve_example, c(32, 64, 128, 256), c(.1, .15, .2, .25),
+  1024, cfg$coverage_tolerance, payload$example_cutoffs, payload$example_cutoffs)
+budget_map <- report$periods |> distinct(model, budget_cny) |> rename(plot_budget = budget_cny)
+curves <- report$curves |> left_join(budget_map, by = "model", relationship = "many-to-one") |>
+  mutate(strategy = sub("_B[0-9]+$", "", model))
+display <- curves |> filter(!reference, policy == as.character(params$display_seed))
+```
+
+结果输入 SHA256：`r archive$sha256`。冻结计划标识：`r payload$freeze_seal`。
+本 QMD 从绑定哈希的归档表重新计算描述统计与图形；归档还包含所有方案的组内深度明细。
+它不代替完整冻结包。生成归档前，独立检查器已重算全部曲线、票据、共享场景和实际结算。
+
+## 研究口径
+
+一组（sleeve）是固定的七场比赛。每组有 2,187 种互斥赛果组合，按冻结概率从高到低排序，
+只购买前缀的前 $k_s$ 张基本注；每张 2 元，因此总投入为各组基本注数之和乘以 2。
+组数 S 与基本注数不同；同一组至多中一张，两组重叠比赛共用同一个赛果。
+完整票不重复，候选始终是 #424 已冻结的 24 个七场集合。
+
+概率 p 是冻结的校正市场概率，q 是原市场概率。模型返奖估算为
+`2 × 0.65 / prod(q)`，包含本金；实际结算使用审计快照中的真实 SP，整票只乘一次 0.65。
+固定条件均值报价无法描述结算 SP 本身的不确定性；模型收益和历史收益分开报告。
+
+非均匀分配同时选择组和深度。完整累计曲线保留 0–2,187 注；求解使用明确的深度网格：
+`r paste(cfg$depths, collapse = ", ")`。统一覆盖阈值使用完整曲线的精确最小深度，
+不把阈值近似到求解网格。统一深度为 32、64、128、256 注；不足以花完预算时保留现金，
+不通过重复同一组补足组数。相同预算下，统一深度和非均匀分配的可选空间不同。
+
+优化场景为 `r cfg$training_worlds` 个，另用 `r cfg$evaluation_worlds` 个场景做数值评估；
+这是额外随机模拟，不是额外历史测试期。每场比赛之间暂按独立建模，组之间的重叠依赖保留。
+每个固定组合的评估概率，在最保守的二项近似下，95% 数值误差约为
+±`r round(100 * 1.96 * sqrt(.25 / cfg$evaluation_worlds), 2)` 个百分点，
+不包含概率模型误差、历史样本误差或价格误差。
+
+三个种子各自回测，不叠加资金。每次求解最多 `r cfg$nodes` 个节点、`r cfg$time_seconds` 秒，
+相对最优差距目标 `r 100 * cfg$gap`%。满足约束的限时解保留为 best found；
+“最优”仅限该数值场景、候选集合和网格内的求解容差，不是无限候选空间的全局最优。
+所有计划冻结后才打开本轮结算；既有历史暴露仍存在，`historical_admission=false`。
+
+## 预算与偏好的答案
+
+`ANY` 最大化至少中一组，`TWO` 最大化至少中两组；`NET_HIT25/50` 在命中下限下最大化模型净收益。
+`ROI_M20/0` 分别要求模型 ROI 至少 −20%/0%；`ROI_NONE` 不附加收益下限。
+`ROW` 忽略组间重叠、最大化各组覆盖率之和；`RANDOM` 使用固定种子的随机线性目标，
+不是在所有可行分配中均匀抽样。它们与无收益门槛的联合方案使用相同深度空间及预算。
+
+下表分母包含所有期次和种子，不可行时的现金方案也计入。覆盖均值明确区分各组等权与资金加权。
+条件盈亏比只有盈利、亏损两类模拟事件都出现时才计算，缺失支持不记作无限大。
+
+```{r}
+knitr::kable(answers |> select(arm, budget_cny, funded_trials, infeasible_trials,
+  sleeves_median, sleeves_min, sleeves_max, distinct_fixtures_median,
+  mean_stake_cny, mean_cash_cny, equal_sleeve_coverage_percent,
+  money_weighted_coverage_percent, any_hit_percent, at_least_two_percent,
+  profit_percent, modeled_roi_percent), digits = 2)
+```
+
+每期具体组数、各组基本注数和覆盖率都保留在分配明细中，不能用跨期中位数组数替代。
+
+```{r}
+glimpse(sleeves)
+knitr::kable(sleeves |> select(issue, seed, arm, sleeve_id, depth, coverage, stake, expected_gross) |>
+  head(12), digits = 4)
+```
+
+## 登记方案的模型前沿与近优范围
+
+先沿预算方向比较组数、覆盖与模型净收益。横轴是预算上限，实际投入及保留现金另见上表；
+这几条曲线不能解释为固定组合同比例加仓的结果。
+
+```{r}
+#| fig-width: 14
+#| fig-height: 9
+budget_answers <- answers |>
+  mutate(strategy = sub("_B[0-9]+$", "", arm)) |>
+  select(strategy, budget_cny, sleeves_median, any_hit_percent, modeled_net_cny) |>
+  tidyr::pivot_longer(c(sleeves_median, any_hit_percent, modeled_net_cny),
+    names_to = "metric", values_to = "value") |>
+  mutate(metric = recode(metric, sleeves_median = "资助组数（中位数）",
+    any_hit_percent = "至少中一组（%）", modeled_net_cny = "模型净收益（元/期）"))
+ggplot(budget_answers, aes(budget_cny, value, colour = strategy)) +
+  geom_line() + geom_point(size = 1) + facet_wrap(~metric, scales = "free_y", ncol = 3) +
+  scale_x_continuous(breaks = cfg$budgets) +
+  labs(x = "每期预算上限（元）", y = NULL, colour = "方案", title = "预算增加时的组数、覆盖与预期收益") +
+  theme_minimal(base_family = "Noto Sans CJK SC") + theme(legend.position = "bottom") +
+  guides(colour = guide_legend(ncol = 3))
+```
+
+下图使用跨期模型均值，比较覆盖和预期净收益，不使用实际结算来选点。
+连线仅连接未被其他登记方案同时超过的点，不表示两点之间可以直接插值下注。
+这不是对所有潜在组合的全局前沿证明。
+
+```{r}
+#| fig-width: 13
+#| fig-height: 8
+ggplot(frontier$points, aes(any_hit_percent, modeled_net_cny)) +
+  geom_line(data = frontier$points |> filter(registered_frontier) |> arrange(any_hit_percent),
+    aes(group = budget_cny), colour = "grey50") +
+  geom_point(aes(size = sleeves_median, colour = registered_frontier)) +
+  geom_text(aes(label = sub("NONUNIFORM_", "", sub("_B[0-9]+$", "", arm))),
+    size = 2.5, check_overlap = TRUE, vjust = -1) +
+  facet_wrap(~budget_cny, ncol = 2) + scale_size_continuous(range = c(2, 6)) +
+  labs(x = "模型至少中一组（%）", y = "模型每期净收益（元）", size = "组数中位数",
+    colour = "登记点前沿", title = "覆盖—预期收益前沿") +
+  theme_minimal(base_family = "Noto Sans CJK SC")
+```
+
+近优范围的描述口径预先显式设为：距离登记点最高覆盖不超过
+`r params$diagnostic_hit_tolerance_pp` 个百分点，或距离最高模型净收益不超过
+`r params$diagnostic_net_tolerance_cny` 元，分别报告组数区间。
+这是登记方案均值之间的邻近范围，不代表无限分配空间内的近优集合，也不要求两个目标同时接近。
+
+```{r}
+knitr::kable(frontier$regions, digits = 2)
+```
+
+所有逐期求解界与间隙保留在归档中。这里展示结构和前几行；
+不可行时没有可用的最优差距，不能用零填补。
+
+```{r}
+glimpse(payload$solver_diagnostics)
+knitr::kable(tibble::as_tibble(payload$solver_diagnostics) |>
+  select(issue, seed, arm, stake, solver_status, objective_function_value, mip_dual_bound, mip_gap,
+    depth_configuration) |> head(12), digits = 4)
+```
+
+## 历史收益与回撤
+
+起始资金 `r format(cfg$initial_capital_cny, big.mark = ",", scientific = FALSE)` 元。
+不借款、不追加本金、不做比分保护；不足以承担整期计划后停止，现金保留。
+按给定期次顺序记账，假设上一期返奖在下一期投入前到账。
+ROI 分母是实际投入。三个种子的指标分别取中位数与范围，表中各项中位数不代表同一条路径。
+
+旧 `8x64_PROB` 和两个单体 512 注结果是原冻结参照，预算为 1,024 元，不随新预算同比例放大。
+旧单体可访问的候选范围更大，其差异不能全部归因于分组方式。
+
+```{r}
+knitr::kable(report$grid, digits = 2)
+```
+
+以下展示全部新方案、固定显示种子 `r params$display_seed` 的曲线；每个方案独立持有起始资金。
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+ggplot(display, aes(period, equity_cny, colour = strategy, group = model)) +
+  geom_hline(yintercept = cfg$initial_capital_cny, linetype = 2, colour = "grey50") +
+  geom_line(linewidth = .65) + facet_wrap(~plot_budget, ncol = 2) +
+  labs(x = "期次顺序", y = "账户资金（元）", colour = "方案", title = "固定预算下的资金走势") +
+  theme_minimal(base_family = "Noto Sans CJK SC") + theme(legend.position = "bottom") +
+  guides(colour = guide_legend(ncol = 3))
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+ggplot(display, aes(period, drawdown_percent, colour = strategy, group = model)) +
+  geom_line(linewidth = .65) + facet_wrap(~plot_budget, ncol = 2) +
+  labs(x = "期次顺序", y = "距历史资金高点的回撤（%）", colour = "方案", title = "回撤路径") +
+  theme_minimal(base_family = "Noto Sans CJK SC") + theme(legend.position = "bottom") +
+  guides(colour = guide_legend(ncol = 3))
+```
+
+模型预期与历史实现分开理解：更多组、更多命中期，不一定带来更多盈利期或更高 ROI。
+以下风险表还列出去最佳期、最长亏损连续段、最长无返奖段、回撤恢复与最差窗口。
+只有 2010 年数据，因此无法给出去最大盈利年份后的有效比较。
+
+```{r}
+knitr::kable(report$summary |> select(model, policy, without_best_roi, longest_losing_run,
+  longest_no_payout_run, longest_underwater, maximum_completed_recovery,
+  worst5, worst10, worst20, payout_hhi, stopped_issues), digits = 2)
+```
+
+历史实现的条件盈亏比与模型盈亏比另列；没有盈利或亏损支持时仍保留 NA。
+
+```{r}
+knitr::kable(report$summary |> select(model, policy, realized_profit_percent, realized_loss_percent,
+  conditional_gain_cny, conditional_loss_cny, realized_payoff_ratio), digits = 2)
+knitr::kable(rows |> filter(!reference, seed == params$display_seed) |>
+  select(issue, arm, evaluation_conditional_gain, evaluation_conditional_loss,
+    evaluation_payoff_ratio, evaluation_gain_support, evaluation_loss_support) |> head(12), digits = 2)
+```
+
+## 相同实际投入与数值稳定性
+
+以下只比较两边实际投入相同且大于零的期次。现金差额单独保留，不当作算法收益优势。
+联合方案与 ROW 对照隔离了共享场景优化相对于逐组加总的影响。
+
+```{r}
+matched <- list()
+intervals <- list()
+for (budget in cfg$budgets) {
+  treatment <- paste0("NONUNIFORM_ANY_ROI_NONE_B", budget)
+  controls <- c("NONUNIFORM_ROW_ROI_NONE", "NONUNIFORM_RANDOM_ROI_NONE",
+    paste0("DEPTH_", cfg$equal_depths, "_ANY"), paste0("TAU_", cfg$coverage_targets, "_ANY"))
+  for (control_prefix in controls) {
+    control <- paste0(control_prefix, "_B", budget)
+    matched[[paste(budget, control_prefix)]] <- n7_capital_matched(report$periods, treatment, control)
+  }
+  control <- paste0("NONUNIFORM_ROW_ROI_NONE_B", budget)
+  intervals[[as.character(budget)]] <- n7_joint_bootstrap(report$periods, treatment, control,
+    budget, params$bootstrap_reps, params$bootstrap_seed)
+}
+knitr::kable(bind_rows(matched), digits = 2)
+knitr::kable(bind_rows(intervals), digits = 2)
+```
+
+置信区间按整期联合抽取全部种子，是已曝光历史的描述性区间，不能消除多次试验带来的选择偏差。
+下表展示求解状态、优化与独立模拟的差距，以及条件盈亏比的支持量。
+
+```{r}
+knitr::kable(answers |> select(arm, optimal_trials, best_found_trials, other_status_trials,
+  optimism_pp, conditional_ratio_supported_trials, conditional_ratio_median,
+  gain_support_min, loss_support_min), digits = 2)
+```
+
+## 组内深度示例
+
+示例期 `r payload$example_issue` 的所有 24 条累计覆盖曲线均从完整的 2,187 个状态计算。
+相同注数不意味着相同覆盖；接近尾部继续加深，覆盖增量可能很小。
+阈值配置始终选择首个达到目标的前缀，不通过给重复组追加同一张票虚增覆盖。
+在同一金额或同一覆盖目标下，下面的比较报告局部支配与排名交叉；
+这种单行支配仅作诊断，候选始终全部保留，避免删掉对组合有互补价值的组。
+
+```{r}
+knitr::kable(single_comparison$crossings, digits = 3)
+knitr::kable(single_comparison$comparisons |> select(sleeve_id, mode, target, n_tickets,
+  actual_coverage, stake, expected_net, coverage_rank, locally_dominated, full_probability_hhi) |> head(24), digits = 4)
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 5
+ggplot(curve_example, aes(depth, coverage, group = sleeve_id, colour = factor(sleeve_id))) +
+  geom_line(linewidth = .5, show.legend = FALSE) +
+  labs(x = "每组基本注数 k", y = "累计概率", title = paste("完整深度曲线：", payload$example_issue)) +
+  theme_minimal(base_family = "Noto Sans CJK SC")
+```
+
+## 每期账本
+
+表中列出显示种子的全部期次，归档输入保留全部三个种子。旧参照使用自己的第一个原始种子。
+`planned_stake_cny` 是冻结投入，`stake` 是资金约束后真正执行的投入。
+
+```{r}
+glimpse(report$periods)
+```
+
+```{r}
+#| results: asis
+period_display <- report$periods |> filter((!reference & seed == params$display_seed) |
+  (reference & seed == cfg$reference_seeds[1]))
+for (arm_name in unique(period_display$arm)) {
+  cat("\n<details><summary>", arm_name, "</summary>\n\n", sep = "")
+  print(knitr::kable(period_display |> filter(arm == arm_name) |>
+    select(issue, budget_cny, planned_stake_cny, stake, gross, net, roi_percent, groups, hits,
+      equity_cny, drawdown_cny, stopped), digits = 2, format = "html"))
+  cat("\n</details>\n\n")
+}
+```
