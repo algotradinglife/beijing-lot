@@ -1,0 +1,171 @@
+---
+title: "概率底座候选：市场＋战力区间让平校正 v1.0.0"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  archive_fixture: null
+  study: "data/derived/fundamentals_417/market-strength-draw-v1-reviewed"
+  market_study: "data/derived/fundamentals_417/updated100-strategies-v1/projected"
+---
+
+本版本名称为 `market-strength-draw-1.0.0-diagnostic`，是概率底座候选，不替换默认版本。
+原48期为固定历史训练池；新增100期逐期使用该期最早决策时点为保守截止，排除尚不可用历史。
+这些样本已经参与此前探索，故本次是历史研究，不是全新盲测。
+标签可用时间使用开赛时间加6小时的历史代理，**不构成真实可用时间证明，不授权前瞻使用**。
+时间筛选、分区、权重、ESS、缓存身份和实现依赖均使用共享temporal_learning接口。
+
+## 设计
+
+市场让平概率区间为[0,20%)、[20%,24%)、[24%,28%)、[28%,100%]；
+战力让平概率区间为[0,15%)、[15%,20%)、[20%,25%)、[25%,30%)、[30%,100%]。
+按两个区间的交叉格统计实际让平发生率，作为该格的校正目标。
+
+设格内历史样本数为n、让平次数为d，原市场让平概率为q，固定收缩强度s=100：
+
+$$r_c=d_c/n_c,\qquad q'_D=\operatorname{clip}\left(\frac{n_c r_c+100q_D}{n_c+100},10^{-6},1-10^{-6}\right).$$
+
+因此，每格的**实际让平发生率**是校正目标；样本越多，校正后概率越接近该发生率。
+样本少时向原市场概率收缩；无历史样本时保留原市场概率。没有强制30%下限，允许上调或下调。
+区间和强度在本轮执行前固定，没有搜索最优参数或按新增样本挑选权重。
+
+市场比分底座中，让平对应的所有比分乘以q'_D/q_D；其他比分乘以(1−q'_D)/(1−q_D)。
+由此保持让胜与让负的比例、各结果内部的相对比分形状，并使比分与让球WDL精确一致。
+该步骤可能改变大小球概率与总进球均值，不能声称仍严格满足原大小球约束。
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+source('r/fundamentals_score_shape.R')
+source('r/fundamentals_signal_rate_projection.R')
+source('r/probability_foundation_draw.R')
+archived<-!is.null(params$archive_fixture)
+if(archived) {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='THREE_FIXTURE_RENDER_SMOKE_ONLY')
+  dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+  x<-tibble::as_tibble(archive$rows)
+  first_model<-archive$model
+  frozen<-list(predictions_sha256=archive$source_predictions_sha256)
+} else {
+frozen<-jsonlite::fromJSON(file.path(params$study,'frozen.json'))
+for(path in names(frozen$source_hashes)) stopifnot(identical(digest::digest(file=path,algo='sha256'),frozen$source_hashes[[path]]))
+for(m in frozen$models) stopifnot(identical(digest::digest(file=m$path,algo='sha256'),m$sha256))
+stopifnot(identical(digest::digest(file=file.path(params$study,'predictions.csv'),algo='sha256'),frozen$predictions_sha256))
+evaluation_receipt<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+stopifnot(identical(digest::digest(file=file.path(params$study,'evaluation.csv'),algo='sha256'),evaluation_receipt$evaluation_sha256),
+  identical(digest::digest(file=file.path(params$study,'frozen.json'),algo='sha256'),evaluation_receipt$freeze_sha256))
+x<-readr::read_csv(file.path(params$study,'evaluation.csv'),col_types=readr::cols(issue='c',provider_id='c',cutoff_ts='c',.default='?'))
+stopifnot(nrow(x)==6547)
+first_model<-jsonlite::fromJSON(frozen$models[[1]]$path)
+}
+stopifnot(!anyDuplicated(x[c('issue','slot','provider_id')]))
+metric_rows<-list()
+for(model in c('p','q','new')) {
+  probability<-as.matrix(x[paste0(model,c('_W','_D','_L'))])
+  stopifnot(all(abs(rowSums(probability)-1)<1e-10),all(probability>0))
+  target<-match(x$actual_direction,c('W','D','L'));draw<-as.numeric(target==2)
+  last<-apply(probability,1,function(z) order(-z)[3])
+  metric_rows[[model]]<-tibble(model=model,fixtures=nrow(x),
+    draw_brier=mean((probability[,2]-draw)^2),
+    draw_log_loss=mean(-draw*log(probability[,2])-(1-draw)*log(1-probability[,2])),
+    wdl_log_loss=mean(-log(probability[cbind(seq_len(nrow(x)),target)])),
+    mean_draw_percent=100*mean(probability[,2]),actual_draw_percent=100*mean(draw),
+    top2_hits=sum(last!=target),top2_percent=100*mean(last!=target),
+    draw_top2_hits=sum(last[draw==1]!=2),draw_top2_recall_percent=100*mean(last[draw==1]!=2))
+}
+metrics<-bind_rows(metric_rows)
+readr::write_csv(metrics,file.path(params$study,'metrics.csv'))
+```
+
+## 二维方格映射
+
+以下展示首个目标期所能使用的历史方格。每期按截止时间冻结自己的映射；
+表中的发生率只来自该期之前准入的历史样本，不使用目标期结果。
+
+```{r}
+if(archived) cat('CI样例渲染：仅3场，以下指标不是100期结论。\n')
+cell_table<-first_model$cells |>
+  mutate(market_interval=c('[0,20%)','[20%,24%)','[24%,28%)','[28%,100%]')[market_bin+1],
+    strength_interval=c('[0,15%)','[15%,20%)','[20%,25%)','[25%,30%)','[30%,100%]')[strength_bin+1],
+    empirical_percent=100*observed_draw_rate,
+    empirical_weight=n/(n+first_model$parameters$prior_strength)) |>
+  select(market_interval,strength_interval,n,draws,empirical_percent,empirical_weight)
+knitr::kable(cell_table,digits=3)
+ggplot2::ggplot(cell_table,ggplot2::aes(market_interval,strength_interval,fill=empirical_percent))+
+  ggplot2::geom_tile()+
+  ggplot2::geom_text(ggplot2::aes(label=sprintf('%.1f%%\nn=%.0f',empirical_percent,n)))+
+  ggplot2::scale_fill_gradient(low='white',high='steelblue',name='Draw rate (%)')+
+  ggplot2::labs(x='Market draw probability bin',y='Strength draw probability bin')+
+  ggplot2::theme_minimal()
+ggplot2::ggsave(file.path(params$study,'draw-cell-map.png'),width=9,height=5,dpi=160)
+```
+
+## 新增100期的诊断结果
+
+p为战力概率，q为原市场概率，new为新候选。Brier和对数损失越低越好；
+让平Top2召回率是实际让平场次被Top2覆盖的比例，不是选择让平的精确率。
+
+```{r}
+knitr::kable(metrics,digits=5)
+```
+
+## 全量比分一致性检查
+
+逐场调用可复用投影函数，核对原市场WDL、校正WDL和比分归一化；
+保存检查表与输入哈希，比分分布可从冻结预测和原市场格网重新生成，无需另存RDS。
+
+```{r}
+#| include: false
+checks<-list();examples<-list();market_hashes<-list();j<-0L
+for(issue in unique(x$issue)) {
+  if(archived) {
+    projected<-list(market=list(grids=archive$grids))
+  } else {
+  path<-file.path(params$market_study,paste0(issue,'.json'))
+  market_hashes[[path]]<-digest::digest(file=path,algo='sha256')
+  projected<-jsonlite::fromJSON(path)
+  }
+  rows<-filter(x,.data$issue==.env$issue)
+  for(i in seq_len(nrow(rows))) {
+    prediction<-rows[i,];grid<-projected$market$grids[[paste(issue,prediction$slot,sep='/')]]
+    result<-foundation_score_grid(grid,prediction$handicap,prediction,prediction$cutoff_ts)
+    j<-j+1L
+    checks[[j]]<-tibble(issue=issue,slot=prediction$slot,provider_id=prediction$provider_id,
+      draw_delta=prediction$new_D-prediction$q_D,
+      original_total=sum((grid$home_goals+grid$away_goals)*grid$probability),
+      new_total=sum((result$grid$home_goals+result$grid$away_goals)*result$grid$probability),
+      probability_sum=sum(result$grid$probability))
+    if(j<=3) examples[[j]]<-result$grid |> arrange(desc(probability)) |> head(5) |>
+      mutate(issue=issue,slot=prediction$slot,home=prediction$home,away=prediction$away)
+  }
+}
+checks<-bind_rows(checks)
+stopifnot(nrow(checks)==nrow(x),all(abs(checks$probability_sum-1)<1e-10))
+readr::write_csv(checks,file.path(params$study,'score-projection-checks.csv'))
+jsonlite::write_json(list(market_hashes=market_hashes,
+  predictions_sha256=frozen$predictions_sha256,
+  qmd_sha256=digest::digest(file='quarto/122_market_strength_draw_foundation.qmd',algo='sha256'),
+  fixtures=nrow(checks)),file.path(params$study,'score-projection-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+```{r}
+checks |> summarise(fixtures=n(),mean_draw_delta_pp=100*mean(draw_delta),
+  mean_total_delta=mean(new_total-original_total),max_abs_total_delta=max(abs(new_total-original_total))) |> knitr::kable(digits=5)
+knitr::kable(bind_rows(examples),digits=5)
+```
+
+## 接口和版本边界
+
+Python：`src/probability_foundation_draw.py`提供`fit_draw_foundation`与`predict_draw_foundation`，
+显式传入Cutoff、版本、来源哈希、区间和收缩强度。每期独立不可变artifact，100次独立重复拟合已核对完全一致。
+R：`r/probability_foundation_draw.R`的`foundation_score_grid(grid, handicap, prediction, cutoff)`
+把预测应用到原市场比分表；默认完整执行核对全部6547场。CI样例模式只验证3场渲染与投影，不代替完整验证。
+
+新候选提高了让平覆盖，但初步概率误差未改善，不能仅凭让平命中增加就升级为默认底座。
+它保留为可复现的研究版本，后续版本必须使用新的截止窗口与独立验证；本轮不调整七串一或预算。

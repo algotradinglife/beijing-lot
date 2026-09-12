@@ -1,0 +1,21 @@
+source('../../r/draw_balance_diagnosis.R')
+testthat::test_that('draw-gap cells count outcomes and preserve empty bins',{
+  f<-tibble::tibble(issue='a',slot=1:4,provider_id=as.character(1:4),cohort='old48',
+    actual=c('D','W','D','L'),p_W=c(.4,.4,0,1),p_D=c(.2,.2,1,0),p_L=c(.4,.4,0,0),
+    q_W=c(.4,.4,0,1),q_D=c(.2,.2,1,0),q_L=c(.4,.4,0,0))
+  v<-draw_balance_cells(f,c(0,.2,.3,1),c(0,.2,1))
+  testthat::expect_equal(sum(v$n),8)
+  testthat::expect_equal(sum(v$draws),4)
+  testthat::expect_equal(v$actual_percent[v$n==2],c(50,50))
+  testthat::expect_true(all(is.na(v$actual_percent[v$n==0])))
+  testthat::expect_equal(as.character(v$draw_band[v$n==2]),rep('[0.2,0.3)',2))
+  testthat::expect_equal(nrow(v),12)
+  testthat::expect_s3_class(plot_draw_balance(v,'market'),'ggplot')
+  testthat::expect_s3_class(plot_draw_balance(v,'strength'),'ggplot')
+  testthat::expect_error(plot_draw_balance(v,'invalid'))
+  testthat::expect_error(draw_balance_cells(dplyr::bind_rows(f,f),c(0,1),c(0,1)))
+  testthat::expect_error(draw_balance_cells(dplyr::mutate(f,p_D=NA_real_),c(0,1),c(0,1)))
+  testthat::expect_error(draw_balance_cells(f,c(0,.2,.1,1),c(0,1)))
+  empty<-draw_balance_cells(f[0,],c(0,1),c(0,1))
+  testthat::expect_equal(nrow(empty),0)
+})
