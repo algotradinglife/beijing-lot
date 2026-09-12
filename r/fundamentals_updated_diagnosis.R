@@ -27,6 +27,36 @@ updated_scope_diagnosis <- function(fixtures, legs, issues) {
     anchor=pt==qt & qm[cbind(seq_len(nrow(qm)),qt)]>=.5 & !excluded_zero)
   available<-all_fixtures |> dplyr::group_by(cohort) |> dplyr::summarise(n=dplyr::n(),
     dplyr::across(dplyr::ends_with('_hit'),~100*mean(.x)),.groups='drop')
+  direction_rows<-list()
+  for (model in c('baseline','market')) {
+    top<-if(model=='baseline') pt else qt
+    last<-if(model=='baseline') pl else ql
+    for (j in seq_len(3)) {
+      direction_rows[[length(direction_rows)+1L]]<-tibble::tibble(
+        cohort=fixtures$cohort,model=model,direction=c('W','D','L')[j],handicap=as.character(fixtures$handicap),
+        selected=top==j,actual=fixtures$actual==c('W','D','L')[j],
+        covered=last!=j)
+    }
+  }
+  direction_data<-dplyr::bind_rows(direction_rows)
+  directions<-dplyr::bind_rows(direction_data,dplyr::mutate(direction_data,handicap='ALL')) |>
+    dplyr::group_by(cohort,model,handicap,direction) |>
+    dplyr::summarise(hits=sum(selected & actual),top2_hits=sum(covered & actual),
+      selected_count=sum(selected),actual_count=sum(actual),.groups='drop') |>
+    dplyr::mutate(precision_percent=100*hits/dplyr::na_if(selected_count,0L),
+      recall_percent=100*hits/dplyr::na_if(actual_count,0L),top2_recall_percent=100*top2_hits/dplyr::na_if(actual_count,0L))
+  pairs<-dplyr::bind_rows(
+    tibble::tibble(cohort=fixtures$cohort,model='baseline',handicap=as.character(fixtures$handicap),excluded=c('W','D','L')[pl],hit=all_fixtures$baseline_top2_hit),
+    tibble::tibble(cohort=fixtures$cohort,model='market',handicap=as.character(fixtures$handicap),excluded=c('W','D','L')[ql],hit=all_fixtures$market_top2_hit))
+  pairs<-dplyr::bind_rows(pairs,dplyr::mutate(pairs,handicap='ALL')) |>
+    dplyr::group_by(cohort,model,handicap,excluded) |> dplyr::summarise(n=dplyr::n(),hits=sum(hit),hit_percent=100*mean(hit),.groups='drop')
+  handicap_accuracy<-directions |> dplyr::group_by(cohort,model,handicap) |>
+    dplyr::summarise(n=sum(selected_count),top1_hits=sum(hits),.groups='drop') |>
+    dplyr::left_join(pairs |> dplyr::group_by(cohort,model,handicap) |>
+      dplyr::summarise(pair_n=sum(n),top2_hits=sum(hits),.groups='drop'),
+      by=c('cohort','model','handicap'),relationship='one-to-one') |>
+    dplyr::mutate(top1_percent=100*top1_hits/n,top2_percent=100*top2_hits/n)
+  stopifnot(all(handicap_accuracy$n==handicap_accuracy$pair_n))
   pools<-all_fixtures |> dplyr::group_by(cohort,issue) |> dplyr::summarise(
     available=dplyr::n(),excluded_zero=sum(excluded_zero),anchors=sum(anchor),.groups='drop')
   x <- dplyr::left_join(legs, dplyr::select(fixtures,-cohort),by=keys,relationship='many-to-one')
@@ -69,5 +99,5 @@ updated_scope_diagnosis <- function(fixtures, legs, issues) {
       ROI_percent=100*sum(net)/sum(stake),.groups='drop'),by=c('cohort','policy'),relationship='one-to-one')
   blockers <- x |> dplyr::filter(hit==0) |> dplyr::group_by(cohort,policy,issue,slot,home,away,role,support,competition) |>
     dplyr::summarise(failed_holdings=dplyr::n(),.groups='drop') |> dplyr::arrange(dplyr::desc(failed_holdings))
-  list(rates=rates,strata=strata,failures=failures,payout=payout,blockers=blockers,groups=groups,available=available,pools=pools)
+  list(rates=rates,strata=strata,failures=failures,payout=payout,blockers=blockers,groups=groups,available=available,pools=pools,directions=directions,pairs=pairs,handicap_accuracy=handicap_accuracy)
 }

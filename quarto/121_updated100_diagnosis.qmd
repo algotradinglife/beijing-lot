@@ -80,6 +80,30 @@ knitr::kable(v$failures,digits=0)
 knitr::kable(v$available,digits=2)
 ```
 
+## 让球数与预测方向交叉细分
+
+handicap为主队让球数：−1表示主队让一球，+1表示主队受让一球。
+W/D/L均是加上北单让球后的让胜/让平/让负。ALL为所有让球数合并。
+precision_percent＝Top1选中该方向且正确／Top1选该方向的场数；
+recall_percent＝Top1正确捕捉／实际出现该方向的场数；
+top2_recall_percent＝Top2包含实际该方向／实际出现该方向的场数。
+分母为零显示NA，而不是0%命中。全部是可用场次，未按下注或复用次数筛选。
+
+```{r}
+knitr::kable(v$handicap_accuracy,digits=2)
+knitr::kable(v$directions |> filter(handicap=='ALL'),digits=2)
+knitr::kable(v$directions |> filter(handicap!='ALL'),digits=2)
+```
+
+## 双选组合与让球数
+
+excluded指Top2排除的方向：排除D即让胜＋让负，排除W即让平＋让负，排除L即让胜＋让平。
+hit_percent是选择该双选组合时的整体命中率，与上面的分方向召回率口径不同。
+
+```{r}
+knitr::kable(v$pairs,digits=2)
+```
+
 ## 让球细类和期号月份段
 
 以下按 U3 实际持仓位置统计。完整八策略、两种计数口径、赛事、概率档位和分歧幅度均在汇总 CSV 中。
