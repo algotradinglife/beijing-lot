@@ -2,6 +2,29 @@ source(testthat::test_path("..", "..", "r", "nowscore_query.R"))
 
 source(testthat::test_path("helper-nowscore-query.R"))
 
+testthat::test_that("direct SQLite corrections show original values and source notes", {
+  path <- tempfile(fileext=".sqlite")
+  nowscore_query_fixture(path)
+  original <- query_nowscore_settlement(path,"00123",1,"bf")$settlement
+  oid <- original$observation_id[original$option=="1:0"]
+  con <- DBI::dbConnect(RSQLite::SQLite(),path)
+  DBI::dbWriteTable(con,"sp_correction",data.frame(
+    observation_id=oid,option="1:0",new_raw_sp="13.03",new_sp=13.03,
+    old_raw_sp="",old_sp=NA_real_,source="500.com",source_url="https://trade.500.com/",
+    note="用户批准补缺"))
+  DBI::dbExecute(con,"UPDATE option_sp SET raw_sp='13.03',sp=13.03 WHERE observation_id=? AND option='1:0'",params=list(oid))
+  x <- query_nowscore_settlement(path,"00123",1,"bf")$settlement
+  i <- which(x$option=="1:0")
+  testthat::expect_equal(x$sp[i],13.03)
+  testthat::expect_identical(x$sp_source[i],"500.com")
+  testthat::expect_identical(x$correction_note[i],"用户批准补缺")
+  testthat::expect_true(is.na(x$original_sp[i]))
+  testthat::expect_identical(x$original_raw_sp[i],"")
+  DBI::dbExecute(con,"UPDATE option_sp SET sp=99 WHERE observation_id=? AND option='1:0'",params=list(oid))
+  testthat::expect_error(query_nowscore_settlement(path,"00123",1,"bf"),"audit/value")
+  DBI::dbDisconnect(con)
+})
+
 testthat::test_that("queries preserve source cells, keys and missing options read-only", {
   path <- tempfile(fileext = ".sqlite")
   nowscore_query_fixture(path)

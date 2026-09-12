@@ -5,11 +5,9 @@ import sqlite3
 
 import pytest
 
-from src import nowscore_settlement as settlement
-
 from src.nowscore_settlement import (
     PLAYS, TYPEID_LABELS, TITLE, audit_rows, build_database, canonical,
-    digest, expected_option, parse_page, source_url,
+    digest, expected_option, parse_page, source_url, hash_json_texts,
 )
 
 
@@ -41,7 +39,6 @@ def codes(row):
 def test_all_five_label_mapping(typeid, option):
     row = parse_page(page(typeid, values={option:"3.753"}), "25053", typeid)[0]
     assert row["parse_errors"] == []
-    assert (row["home_id"], row["away_id"]) == ("456", "789")
     assert expected_option(row) == option
     assert len(row["options"]) == len(TYPEID_LABELS[typeid])
     assert codes(row) == set()
@@ -88,8 +85,6 @@ def test_wrong_issue_or_play_rejected():
         parse_page(page().replace(b'25053_1_6.html',b'25053_2_6.html'),"25053",6)
     with pytest.raises(ValueError, match="roster"):
         parse_page(page().replace(b'M[1][0]=123;',b'M[1][0]=123; M[2][0]=999;'),"25053",6)
-    invalid_team = parse_page(page().replace(b"/temp/123_456.htm", b"/temp/123_789.htm"), "25053", 6)[0]
-    assert "missing_or_invalid_native_team_identity" in invalid_team["parse_errors"]
 
 
 def test_missing_handicap_not_zero_and_bq_missing_half():
@@ -118,7 +113,7 @@ def test_cross_play_checks_and_missing_coverage():
     assert "missing_play_coverage" in {x["code"] for x in audit_rows(rows[:1])}
 
 
-def test_replay_hashes_sqlite_options_and_no_overwrite(tmp_path):
+def test_replay_hashes_sqlite_options_and_no_overwrite(tmp_path, capsys, monkeypatch):
     raw = tmp_path / "raw"
     raw.mkdir()
     captures = []
@@ -131,6 +126,18 @@ def test_replay_hashes_sqlite_options_and_no_overwrite(tmp_path):
     (tmp_path / "manifest.json").write_text(canonical(manifest))
     receipt = build_database(tmp_path,tmp_path / "first.sqlite")
     assert receipt == build_database(tmp_path,tmp_path / "replay.sqlite")
+    from scripts.rebuild_nowscore_settlement import main
+    import urllib.request
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: pytest.fail("offline build attempted networking"))
+    main(["build", "--data-root", str(tmp_path), "--run-root", str(tmp_path), "--output", str(tmp_path / "cli.sqlite")])
+    assert json.loads(capsys.readouterr().out) == receipt
+    with pytest.raises(FileExistsError):
+        main(["build", "--data-root", str(tmp_path), "--run-root", str(tmp_path), "--output", str(tmp_path / "cli.sqlite")])
+    with pytest.raises(SystemExit):
+        main(["capture", "--run-root", str(tmp_path), "--output", str(tmp_path / "unused.sqlite")])
+    with pytest.raises(SystemExit):
+        main(["build", "--run-root", str(tmp_path)])
+    assert not (tmp_path / "unused.sqlite").exists()
     assert receipt["options"] == 49
     assert receipt["observations"] == 5
     assert receipt["capture_failures"] == []
@@ -142,36 +149,6 @@ def test_replay_hashes_sqlite_options_and_no_overwrite(tmp_path):
     (raw / f'{captures[0]["sha256"]}.html').write_bytes(b"tampered")
     with pytest.raises(ValueError, match="hash mismatch"):
         build_database(tmp_path,tmp_path / "bad.sqlite")
-
-
-def test_database_write_failure_rolls_back_publish_and_allows_retry(tmp_path, monkeypatch):
-    raw = tmp_path / "raw"
-    raw.mkdir()
-    captures = []
-    for typeid in PLAYS:
-        payload = page(typeid)
-        sha = digest(payload)
-        (raw / f"{sha}.html").write_bytes(payload)
-        captures.append(dict(issue="25053", typeid=typeid, url=source_url("25053", typeid),
-                             sha256=sha, received_at="2026-09-05T00:00:00+00:00"))
-    (tmp_path / "manifest.json").write_text(canonical({
-        "schema": "nowscore_capture_v1", "source": "nowscore",
-        "requested_issues": ["25053"], "captures": captures}))
-    connect = sqlite3.connect
-
-    class BrokenConnection(sqlite3.Connection):
-        def executemany(self, *args, **kwargs):
-            raise sqlite3.OperationalError("simulated write failure")
-
-    output = tmp_path / "audit.sqlite"
-    monkeypatch.setattr(settlement.sqlite3, "connect",
-                        lambda path: connect(path, factory=BrokenConnection))
-    with pytest.raises(sqlite3.OperationalError, match="simulated write failure"):
-        build_database(tmp_path, output)
-    assert not output.exists()
-    assert not list(tmp_path.glob(".nowscore-audit-*"))
-    monkeypatch.setattr(settlement.sqlite3, "connect", connect)
-    assert build_database(tmp_path, output)["observations"] == 5
 
 
 def test_missing_score_half_exceeds_and_reference_sp():
@@ -192,3 +169,87 @@ def test_bf_summary_does_not_fill_other_option():
     assert all(o["sp"] is None for o in r["options"])
     assert expected_option(r) == "胜其他"
     assert codes(r) == {"summary_sp_without_option"}
+
+
+@pytest.mark.parametrize("values", [[], [{"文字": "比分"}, None, 0, "a\nb"], [1, 2, 3]])
+def test_streamed_json_hash_matches_canonical_array(values):
+    assert hash_json_texts(canonical(value) for value in values) == digest(canonical(values).encode())
+
+
+def multi_issue_bundle(root, count=12):
+    """Synthetic source-pure bundle exercising issue boundaries in one rebuild."""
+    (root / "raw").mkdir(parents=True)
+    captures, rows = [], []
+    issues = [f"25{i:03d}" for i in range(1, count + 1)]
+    for issue in issues:
+        for typeid in PLAYS:
+            payload = page(typeid).replace(b"25053", issue.encode())
+            sha = digest(payload)
+            (root / "raw" / f"{sha}.html").write_bytes(payload)
+            entry = dict(issue=issue, typeid=typeid, url=source_url(issue, typeid),
+                         received_at="2026-09-06T00:00:00+00:00", sha256=sha)
+            captures.append(entry)
+            parsed = parse_page(payload, issue, typeid)
+            for row in parsed:
+                row.update(source_sha256=sha, source_url=entry["url"], received_at=entry["received_at"])
+            rows.extend(parsed)
+    manifest = dict(schema="nowscore_capture_v1", source="nowscore",
+                    requested_issues=issues, captures=captures)
+    (root / "manifest.json").write_text(canonical(manifest))
+    return rows
+
+
+def test_rebuild_audits_one_issue_at_a_time_and_reconciles_hashes(tmp_path, monkeypatch):
+    import src.nowscore_settlement as module
+
+    root = tmp_path / "source"
+    expected = multi_issue_bundle(root)
+    checked = []
+    original = module.audit_rows
+
+    def per_issue(rows):
+        assert len({row["issue"] for row in rows}) == 1
+        assert len(rows) == 5
+        checked.append(rows[0]["issue"])
+        return original(rows)
+
+    monkeypatch.setattr(module, "audit_rows", per_issue)
+    result = build_database(root, tmp_path / "data.sqlite")
+    assert len(checked) == 12
+    assert result["peak_issue_observations"] == 5
+    assert result["observations"] == 60 and result["options"] == 12 * 49
+    assert result["data_sha256"] == digest(canonical(expected).encode())
+    assert result["audit_sha256"] == digest(canonical(original(expected)).encode())
+
+
+def test_mid_rebuild_failure_rolls_back_and_releases_connection(tmp_path, monkeypatch):
+    import src.nowscore_settlement as module
+
+    root = tmp_path / "source"
+    multi_issue_bundle(root, count=2)
+    calls = 0
+    original = module.audit_rows
+
+    def fail_second(rows):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected audit failure")
+        return original(rows)
+
+    monkeypatch.setattr(module, "audit_rows", fail_second)
+    output = tmp_path / "unsealed.sqlite"
+    with pytest.raises(RuntimeError, match="injected"):
+        build_database(root, output)
+    with sqlite3.connect(output, timeout=1) as con:
+        con.execute("BEGIN EXCLUSIVE")
+        for table in ("capture", "observation", "option_sp", "finding", "receipt"):
+            assert con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+
+
+def test_modern_roster_preserves_team_ids_for_six_digit_issue():
+    raw=page().replace(b'25053', b'130511')
+    row=parse_page(raw,'130511',6)[0]
+    assert (row['home_id'],row['away_id'])==('456','789')
+    damaged=raw.replace(b'/temp/123_456.htm',b'/temp/123_789.htm')
+    assert 'missing_or_invalid_native_team_identity' in parse_page(damaged,'130511',6)[0]['parse_errors']

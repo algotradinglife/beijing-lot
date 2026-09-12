@@ -62,6 +62,31 @@ query_nowscore_settlement <- function(path, issue, slot = NULL, play = NULL) {
   if (anyDuplicated(settlement[c("observation_id", "option")])) {
     stop("Duplicate option keys in selection")
   }
+  # Corrections are stored in this database, not in an external overlay.
+  # source_url/source_sha256 still identify the original observation; sp_source
+  # and sp_source_url explicitly identify the effective SP provenance.
+  settlement$sp_source <- rep("nowscore", nrow(settlement))
+  settlement$sp_source_url <- settlement$source_url
+  settlement$correction_note <- rep(NA_character_, nrow(settlement))
+  settlement$original_raw_sp <- settlement$raw_sp
+  settlement$original_sp <- settlement$sp
+  if (DBI::dbExistsTable(con, "sp_correction")) {
+    corrections <- DBI::dbGetQuery(con, paste(selected,
+      "SELECT a.* FROM sp_correction a JOIN selected o USING(observation_id)"), params = params)
+    for (i in seq_len(nrow(corrections))) {
+      a <- corrections[i, ]
+      j <- which(settlement$observation_id == a$observation_id & settlement$option == a$option)
+      if (length(j) != 1L || !identical(settlement$raw_sp[j], a$new_raw_sp) ||
+          !isTRUE(settlement$sp[j] == a$new_sp)) stop("SP correction audit/value mismatch")
+      settlement$sp_source[j] <- a$source
+      settlement$sp_source_url[j] <- a$source_url
+      settlement$correction_note[j] <- a$note
+      settlement$original_raw_sp[j] <- a$old_raw_sp
+      settlement$original_sp[j] <- a$old_sp
+    }
+  } else if (identical(receipt$source_pure, FALSE)) {
+    stop("Corrected build is missing its correction audit table")
+  }
   findings <- tibble::as_tibble(DBI::dbGetQuery(con, paste(
     "SELECT issue, slot, play, code, detail, source_sha256 FROM finding WHERE",
     where, "ORDER BY slot, play, code, source_sha256, detail"), params = params))

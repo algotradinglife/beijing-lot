@@ -1,0 +1,30 @@
+---
+title: "独立数据目录：结算 SQLite 查询"
+params:
+  database: null
+  issue: "100213"
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+数据库由 `database` 参数显式传入，可位于 worktree 之外的挂载磁盘。
+本报告只读，不更新 SP；历史采集时间不代表赛前可得时间。
+
+```{r}
+source("r/nowscore_query.R")
+x <- query_nowscore_settlement(params$database, params$issue, play = "bf")
+dplyr::glimpse(x$settlement)
+knitr::kable(head(x$settlement[c("issue", "slot", "home", "away", "score",
+  "option", "sp", "original_sp", "sp_source")], 10))
+```
+
+每行是某场某玩法的一个选项，SP 是来源倍率，不是整张投注返奖。
+缺失值保持 NA；修正来源和原始观测来源分别保留。
+
+```{r}
+knitr::kable(head(x$findings, 10))
+x$receipt
+```

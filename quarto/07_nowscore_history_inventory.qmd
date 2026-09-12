@@ -1,0 +1,89 @@
+---
+title: "Nowscore 全历史期号发现与实际覆盖"
+params:
+  plan_json: "data/derived/nowscore_only/20260906_history_inventory_v4/plan.json"
+  inventory_json: null
+  inventory_file_sha256: null
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+本报告只读取 Nowscore 原生开奖归档的候选计划及显式指定的发现结果，不读取 500、Titan 或旧混合数据库。
+候选计划不等于已发现期号；只有所有批次完成、控制请求正常且合并重放通过后，
+才允许形成**候选域内**的覆盖分母；候选域探测完成仍不代表所有历史期号均已找到。
+本阶段不接入生产、回测或策略结算。
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+library(dplyr)
+source("r/nowscore_inventory.R")
+inventory_plan <- read_nowscore_inventory_plan(params$plan_json)
+plan <- inventory_plan$plan
+candidates <- inventory_plan$candidates
+batches <- inventory_plan$batches
+```
+
+## 候选覆盖
+
+```{r}
+cat("来源：", plan$source, "\n")
+cat("候选期号：", format(plan$candidate_count, big.mark = ","), "个\n")
+cat("批次数：", plan$batch_count, "；每批最多", plan$batch_size, "个候选\n")
+cat("计划HTTP请求：", format(plan$planned_archive_requests, big.mark = ","), "次（包含每批前后健康检查）\n")
+cat("最低限速耗时：", round(plan$minimum_inventory_request_seconds / 3600, 2), "小时\n")
+cat("控制期号：", plan$control_issue, "；请求间隔：", plan$request_interval_seconds, "秒\n")
+cat("候选哈希：", plan$candidates_sha256, "\n")
+candidates %>% count(issue_year, encoding, name = "候选数") %>% knitr::kable()
+```
+
+旧制候选按显式年份、月份和月内序号域生成 `YYMMNN`；新制候选按每年显式序号域生成 `YYNNN`。
+归档页返回非空且玩法导航、可选期号（如页面提供）及 SP 链接身份均一致时才记为已发现；HTTP成功但正文为空单独记为
+`source_empty`，传输、重定向、编码和解析问题记为失败，不能混入历史缺口。
+
+## 分批执行
+
+```{r}
+batches %>%
+  mutate(预计最低分钟 = round((candidate_count + 1L) * plan$request_interval_seconds / 60, 1)) %>%
+  knitr::kable()
+```
+
+每个批次前后重新读取同一合法控制期号。批次保留所有响应原始字节、SHA256、状态、最终URL和带时区收件时间；
+中断批次保留日志但不产生封存清单。合并时必须完整覆盖计划中的每个批次和候选期号，且不存在未解决请求失败。
+
+## 实际发现结果
+
+```{r}
+#| results: asis
+if (is.null(params$inventory_json)) {
+  cat("未提供封存发现结果：本次仅报告候选计划，不宣称已完成采集。\n")
+} else {
+  actual <- read_nowscore_inventory_result(params$inventory_json, params$plan_json,
+                                            params$inventory_file_sha256)
+  cat("发现结果文件 SHA256：", actual$file_sha256, "\n")
+  cat("发现结果内容 SHA256：", actual$receipt$inventory_sha256, "\n")
+  cat("结果生成时间：", actual$receipt$generated_at, "\n")
+  cat("候选域探测完成：", isTRUE(actual$receipt$candidate_coverage_complete), "\n")
+  cat("已发现期号：", actual$receipt$issue_count, "；源站空页候选：",
+      actual$receipt$source_empty_count, "\n")
+  cat("五玩法计划数据页：", actual$receipt$five_play_pages_to_capture,
+      "（不是已采集且可用的数据页数）\n")
+  print(knitr::kable(actual$years))
+  cat("\n\n现代序号内部未观察候选：", nrow(actual$gaps), "\n\n")
+  print(knitr::kable(actual$gaps))
+}
+```
+
+`source_empty` 包括空正文以及身份有效但只有表头、没有记录的归档页，
+不能据此断言该期从未发行。逐年发现数为零同样不是“当年没有比赛”的证明。
+现代序号内部缺口是已观察最小、最大序号之间尚未观察到记录的候选；
+候选范围之外、历史页面丢失以及未观察到的边界仍是覆盖限制。
+五玩法页面的解析失败、隔离、有效观测数和内部一致性异常由单独的五玩法审计报告说明。
+
+## 后续门槛
+
+期号发现结果只冻结五玩法采集的输入域；必须另行完成分批原文保存、独立重放、数据库重建与五玩法审计。
+人工裁决仍只适用于已批准的具体场次，不会自动扩展到新发现比赛。
