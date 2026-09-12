@@ -1,0 +1,13 @@
+用户授权的半小时盘口清洗轮询。源码目录 /home/drwho1985/.codex/worktrees/0aac/beijing-lot；数据根目录 /run/media/drwho1985/Sandisk/data/beijing-lot。只处理欧赔和大小球，不依赖基本面完成状态，不启动基本面采集，不停止盘口采集。保持1秒请求间隔。不得推送、合并、训练模型或修改结算库。
+
+1. 读取 AGENTS.md、beijing-lot-data-cleaning skill 和实时 GitHub #411 blockedBy/blocking/projectItems；控制面不可用则记录失败，下一轮重试。
+2. 读取数据根目录 registry/markets-current.json。它提供当前采集目录、计划、响应索引、请求账本、全历史原生期序清单及其哈希、冻结原始归档目录和已验收基准归档。所有数据读取和输出均使用持久化路径，不再读取或创建工作区 data/ 目录。源码和 QMD 仍保留在仓库。
+3. 使用 src/data_archive.py::read_archive_members，传入归档路径、成员列表和预期归档SHA，读取已验收基准 final-acceptance.json（截至110717），并在同一归档中校验它绑定的 summary 原始字节。再读取 audits/market-cleaning/batches 下后续验收凭证，验证摘要后排除已验收期。不得仅按目录名或计划存在认定已完成，不能回到100101。
+4. 合并当前采集目录的 batch-*/*-receipt.json 与冻结盘口归档中的逐期完成凭证。归档目录见 registry/raw-archive-catalog.json；原始路径只是来源标识，按归档 source 前缀映射到归档成员。去重同一期，并按原生期序判断新完成但未验收的期次。不要求基本面完成。HTTP失败是待补采，不是有效报价；未写完或损坏的凭证不能算ready。
+5. 对旧凭证所指响应，优先用 markets/manifests/persistent-forward-v1/path-map.json 解析到持久化缓存；缺少映射时，从相应已验证归档读出成员、核对凭证SHA，再保存至持久化 raw。不得改写冻结凭证或其哈希。新清洗输入同时记录原始来源路径/哈希和新的实际读取路径。src/market_storage.py 中的验证复制实现可复用；不得默默回退到工作区旧文件。
+6. 进度写 runtime/state/market-cleaning/status.json，包含UTC时间、待清洗期数、期次列表、缺失理由和阶段。未满50期结束并保持安静。优先续跑已有未完成批次，不重复选期。达到50期按原生期序选最早50期，在 audits/market-cleaning/batches/<first>-<last>/manifest.json 冻结范围及全部输入路径/哈希。处理前再次检查其他任务是否已经验收。
+7. 自主完成清洗、验证、异常修复和合并，复用 src/market_cleaning_batch.py、src/fundamentals_scope_market.py 及上一批已验收流程。Titan主源；Nowscore补缺须500/澳客或独立证据核对。保存原始字节，精确作用于期/场/市场，保留原cutoff，分别记录非完场、无报价和请求失败。按已批准规则自主裁决，证据不足隔离。更新异常总表，有新规则则更新skill。历史输出保持 historical_admission=false。
+8. 独立 QMD 放 quarto/，可复用函数放 r/ 或 src/，不写RDS；相关 pytest、testthat、干净QMD渲染与内容检查、独立 Codex review 必须通过。有缺陷则修复复审。渲染报告存数据根目录 reports/。只有检查通过才写 final-acceptance.json，沿用原契约，绑定摘要路径/哈希、精确期次、review、测试日志和QMD。更新跨批合并及 #411 验收评论，不关闭全量任务。验收后的版本化输出进入 markets/releases/；未验收产物留 audits/。每轮至多验收一批50期。
+
+当前任务全程持有 flock 互斥锁。仅在实际启动、完成、失败或需用户行动时通知；未达阈值或无变化保持安静。失败保留可恢复输入和明确阶段。
+Python=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python；R_LIBS_USER=/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib；TMPDIR=/dev/shm；Quarto=/home/drwho1985/.local/opt/quarto-1.10.18/bin/quarto。不要覆盖无关未提交修改。

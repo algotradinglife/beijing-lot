@@ -1,0 +1,17 @@
+[Unit]
+Description=Beijing-Lot no-agent Titan historical fixture collector (1x2 only)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStartPre=/usr/bin/mountpoint -q /run/media/drwho1985/Sandisk
+Type=simple
+WorkingDirectory=/home/drwho1985/workspace/algotradinglife/beijing-lot
+Environment=PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot
+ExecStart=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/workspace/algotradinglife/beijing-lot/scripts/collect_titan_historical_fixtures.py --data-root /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/legacy-titan-clean --bridge /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/legacy-titan-clean/handoff/titan_historical_candidates/60bd7e5e3f8ad4c6c12cf2a1491880386fce17e421e37244bb0f68dabd033e6e.json --risk-acknowledgment /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/legacy-titan-clean/titan-risk-ack.json --batch-size 60 --skip-aux
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=default.target
