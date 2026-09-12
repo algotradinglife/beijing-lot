@@ -53,6 +53,11 @@ testthat::test_that('diagnosis reconciles roles, unique supports and payout', {
   testthat::expect_equal(sum(dc$n),5L)
   testthat::expect_equal(sum(dc$draws),2L)
   testthat::expect_equal(sum(dc$predicted_draws),sum(f$q_D))
+  bd<-v$baseline_draw_calibration |> dplyr::filter(handicap=='ALL')
+  testthat::expect_equal(sum(bd$n),5L)
+  testthat::expect_equal(sum(bd$draws),2L)
+  testthat::expect_equal(sum(bd$predicted_draws),sum(f$p_D))
+  testthat::expect_equal(bd$gap_pp[bd$n>0],40-25)
   testthat::expect_true(all(is.na(dc$actual_percent[dc$n==0])))
   fine<-v$draw_calibration_fine |> dplyr::filter(handicap=='ALL')
   testthat::expect_equal(sum(fine$n),5L)
@@ -68,6 +73,9 @@ testthat::test_that('diagnosis reconciles roles, unique supports and payout', {
   for (j in seq_along(endpoints)) {
     f$q_D<-endpoints[j];f$q_W<-(1-f$q_D)/2;f$q_L<-f$q_W
     edge<-updated_scope_diagnosis(f,l,i)$draw_calibration |> dplyr::filter(handicap=='ALL')
+    testthat::expect_equal(which(edge$n>0),min(j,9L))
+    f$p_D<-endpoints[j];f$p_W<-(1-f$p_D)/2;f$p_L<-f$p_W
+    edge<-updated_scope_diagnosis(f,l,i)$baseline_draw_calibration |> dplyr::filter(handicap=='ALL')
     testthat::expect_equal(which(edge$n>0),min(j,9L))
   }
 })

@@ -100,6 +100,18 @@ knitr::kable(v$draw_calibration |> filter(cohort=='new100',handicap!='ALL',n>0),
 knitr::kable(v$draw_calibration_fine |> filter(handicap=='ALL'),digits=2)
 ```
 
+## 基线让平概率分档与实际发生率
+
+沿用相同分档，但按基线p_D划分场次，gap_pp改为实际减平均基线概率。
+两模型相同概率档内的比赛集合不同，不能将两张表作为同场配对比较。
+mean_market_percent为基线该档场次的市场参照值。分档不筛选Top2或下注场次。
+
+```{r}
+knitr::kable(v$baseline_draw_calibration |> filter(handicap=='ALL'),digits=2)
+knitr::kable(v$baseline_draw_calibration_fine |> filter(handicap=='ALL'),digits=2)
+knitr::kable(v$baseline_draw_calibration |> filter(cohort=='new100',handicap!='ALL',n>0),digits=2)
+```
+
 ## 共同命中、独有命中与均未命中
 
 同一场次在每个玩法中只计一次，四类互斥且合计等于样本数。
