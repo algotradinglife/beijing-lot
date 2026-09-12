@@ -18,8 +18,11 @@ def check_joint_plan(plan, worlds, config):
     """
     if plan["seal"] != stable_json_hash({k: v for k, v in plan.items() if k != "seal"}):
         raise ValueError("Plan seal mismatch")
-    indices = np.asarray(plan["fixture_indices"], dtype=int).reshape(-1, 7)
-    codes = np.asarray(plan["outcomes"], dtype=int).reshape(-1, 7)
+    raw_indices = np.asarray(plan["fixture_indices"]); raw_codes = np.asarray(plan["outcomes"])
+    if any(a.size and a.dtype.kind not in "iu" for a in (raw_indices, raw_codes)):
+        raise ValueError("Integer ticket indices/outcomes required")
+    indices = raw_indices.astype(int).reshape(-1, 7)
+    codes = raw_codes.astype(int).reshape(-1, 7)
     if (indices.shape != codes.shape or len(indices) not in (0, 512) or plan["groups"] != len(indices)
             or plan["stake"] != 2 * len(indices) or plan["cash_cny"] + plan["stake"] != 1024
             or (plan["budget_cny"], plan["unit_cny"], plan["payout_factor"]) != (1024, 2, .65)

@@ -65,6 +65,10 @@ def test_replay_and_mutations(replay_case):
     bad["seal"] = stable_json_hash({k: v for k, v in bad.items() if k != "seal"})
     with pytest.raises(ValueError, match="Sleeve expected return"):
         check_joint_plan(bad, worlds, cfg)
+    bad = copy.deepcopy(plan); bad["fixture_indices"][0][0] = .5
+    bad["seal"] = stable_json_hash({k: v for k, v in bad.items() if k != "seal"})
+    with pytest.raises(ValueError, match="Integer"):
+        check_joint_plan(bad, worlds, cfg)
 
 
 def test_all_plan_replay_binds_source_and_raw_files(tmp_path, replay_case):
