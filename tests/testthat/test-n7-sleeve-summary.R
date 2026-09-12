@@ -21,3 +21,18 @@ testthat::test_that('sleeve accounting distinguishes no-bet, concentration and m
  testthat::expect_equal(stopped$stake+stopped$cash_cny,rep(2,nrow(stopped)))
  testthat::expect_equal(stopped$cash_cny[stopped$stopped],rep(2,sum(stopped$stopped)))
 })
+
+testthat::test_that('funded streaks bridge NO_BET and distinguish partial payouts',{
+ x<-tidyr::expand_grid(arm=c('MONOLITHIC_PROB512','MONOLITHIC_COVERAGE512','8x64_PROB'),issue=as.character(1:7)) |>
+  dplyr::mutate(seed=1L,stake=rep(c(2,0,2,2,0,2,2),3),gross=rep(c(0,0,0,1,0,4,0),3),
+   net=gross-stake,groups=stake/2,hits=as.integer(gross>0),decision_year='2010',
+   train_coverage=.3,eval_coverage=.2,status=ifelse(stake>0,'COMPLETE','NO_BET'))
+ z<-n7_sleeve_summary(x,as.character(1:7),100,2)
+ testthat::expect_equal(z$summary$longest_losing_run,rep(3,3))
+ testthat::expect_equal(z$summary$longest_no_payout_run,rep(2,3))
+ # All-cash policies have zero funded observations, not a seven-issue loss run.
+ empty<-x |> dplyr::mutate(stake=0,gross=0,net=0,groups=0,hits=0,status='NO_BET')
+ e<-n7_sleeve_summary(empty,as.character(1:7),100,2)
+ testthat::expect_equal(e$summary$longest_losing_run,rep(0,3))
+ testthat::expect_equal(e$summary$longest_no_payout_run,rep(0,3))
+})

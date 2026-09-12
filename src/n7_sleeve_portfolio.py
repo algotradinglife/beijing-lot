@@ -103,7 +103,7 @@ def sleeve_portfolios(bundle, *, cutoffs, seed, training_worlds,evaluation_world
         counts=np.bincount(np.array(ii,dtype=int).ravel(),minlength=len(p));z={k:v for k,v in base.items() if k!='seal'}
         z.update(arm=arm,fixture_indices=ii,outcomes=dd,groups=len(ii),stake=stake,cash_cny=budget_cny-stake,
             expected_net=float(gross-stake),expected_roi=float(gross/stake-1) if stake else None,
-            mean_coverage=float(sum(options[k]['coverage'] for k in chosen)/len(ii)) if ii else None,
+            mean_coverage=float(sum(options[k]['coverage'] for k in chosen)/len(chosen)) if ii else None,
             min_selected_probability=min(options[k]['min_probability'] for k in chosen) if chosen else None,
             max_reuse=int(counts.max()),sleeve_keys=[list(k) for k in chosen],bundle_seal=bundle['seal'],
             no_bet_reason=None if chosen else 'FEWER_THAN_EIGHT_FEASIBLE_DISTINCT_SLEEVES',

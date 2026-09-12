@@ -48,6 +48,24 @@ def test_independent_replay_and_rehashed_result_mutations(tmp_path,monkeypatch):
     assert proof['checked']==22 and len(proof['diagnostics'])==2
     original=(output/'results.json').read_text()
     evaluation=json.loads((output/'evaluation-receipt.json').read_text())
+    # A fully resealed old 1/64 mean must fail semantic replay, not just hashing.
+    pp=next((output/'plans').glob('*_8x64_PROB.json.gz'))
+    saved_plan=pp.read_bytes();saved_freeze=(output/'plans-frozen.json').read_bytes()
+    saved_er=(output/'evaluation-receipt.json').read_bytes()
+    plan=json.loads(gzip.decompress(saved_plan));plan['mean_coverage']/=64
+    plan['seal']=stable_json_hash({k:v for k,v in plan.items() if k!='seal'})
+    raw=gzip.compress(json.dumps(plan).encode());pp.write_bytes(raw)
+    freeze=json.loads(saved_freeze);freeze['receipt']['plan_hashes'][str(pp)]=hashlib.sha256(raw).hexdigest()
+    freeze['seal']=stable_json_hash(freeze['receipt']);raw=json.dumps(freeze).encode()
+    (output/'plans-frozen.json').write_bytes(raw)
+    changed=json.loads(original);changed['freeze_seal']=freeze['seal'];rr=json.dumps(changed).encode()
+    (output/'results.json').write_bytes(rr)
+    er2=dict(evaluation,freeze_sha256=hashlib.sha256(raw).hexdigest(),result_sha256=hashlib.sha256(rr).hexdigest())
+    (output/'evaluation-receipt.json').write_text(json.dumps(er2))
+    with pytest.raises(ValueError,match='Sleeve-level mean coverage'):
+        runpy.run_module('scripts.check_n7_sleeves',run_name='__main__')
+    pp.write_bytes(saved_plan);(output/'plans-frozen.json').write_bytes(saved_freeze)
+    (output/'results.json').write_text(original);(output/'evaluation-receipt.json').write_bytes(saved_er)
     for field in ('gross','fixture_hhi','eval_coverage','decision_year'):
         changed=json.loads(original);changed['rows'][0][field]='2099' if field=='decision_year' else changed['rows'][0][field]+1
         raw=json.dumps(changed).encode();(output/'results.json').write_bytes(raw)

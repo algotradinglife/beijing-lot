@@ -104,6 +104,11 @@ if __name__=='__main__':
                         expected_d.extend(np.asarray(group['enumeration']['states'])[subset['state_ids']].tolist())
                     if idx.tolist()!=expected_i or codes.tolist()!=expected_d:raise ValueError('Sleeve ledger mismatch')
                 elif arm.startswith('8x64') and len(idx):raise ValueError('Unregistered sleeves')
+                if arm.startswith('8x64'):
+                    expected_mean=math.fsum(groups[g]['options'][kind]['coverage'] for g,kind in keys)/len(keys) if keys else None
+                    if expected_mean is None:
+                        if plan['mean_coverage'] is not None:raise ValueError('Empty sleeve mean must be null')
+                    elif not math.isclose(plan['mean_coverage'],expected_mean,rel_tol=1e-12,abs_tol=1e-14):raise ValueError('Sleeve-level mean coverage mismatch')
                 used=np.unique(idx)
                 if any(actual_rows[i]['handicap']!=f[i]['handicap'] or 'spf:IDENTITY' in actual_rows[i]['status'] for i in used):raise ValueError('Settlement identity mismatch')
                 wins=np.all(outcome[idx]==codes,axis=1)

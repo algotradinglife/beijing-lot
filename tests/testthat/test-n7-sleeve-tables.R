@@ -9,6 +9,10 @@ testthat::test_that('frozen state identity survives dense, ranked, long and dept
   sleeves=list(list(id=0L,fixture_indices=as.list(0:6),origin='QUALITY',enumeration=e,
    options=list(PROB=list(status='COMPLETE',state_ids=as.list(selected))))))
  z<-n7_sleeve_tables(b,b$cutoffs,'fixed-test-model')
+ testthat::expect_named(z,c('prob_mat','payout_hat_mat','value_mat','rank_idx','summary','depth','long'))
+ testthat::expect_named(z$depth,c('issue','sleeve_id','depth','ticket_col_idx','ticket_code','coverage'))
+ testthat::expect_named(z$long,c('issue','sleeve_id','ticket_code','official_outcomes','ticket_col_idx',
+  'prob','prob_rank','cum_prob','payout_hat','expected_gross_contribution','selected_rules'))
  testthat::expect_equal(dim(z$prob_mat),c(1L,2187L))
  testthat::expect_equal(z$long$ticket_code[c(1,2,2187)],c('0000000','0000001','2222222'))
  testthat::expect_equal(z$long$official_outcomes[c(1,2,2187)],c('3333333','3333331','0000000'))
@@ -26,6 +30,20 @@ testthat::test_that('frozen state identity survives dense, ranked, long and dept
  testthat::expect_equal(nrow(joined$summary),2)
  testthat::expect_type(joined$summary$cutoff_receipt,'character')
  testthat::expect_equal(nrow(joined$long),4374)
+ # Consumer boundary: CSV round trips must retain leading-zero namespaces.
+ testthat::expect_type(z$summary$issue,'character')
+ testthat::expect_false(anyDuplicated(z$depth[c('issue','sleeve_id','depth')])>0)
+ testthat::expect_false(anyDuplicated(z$long[c('issue','sleeve_id','ticket_col_idx')])>0)
+ path<-tempfile(fileext='.csv')
+ readr::write_csv(z$long,path)
+ restored<-readr::read_csv(path,col_types=readr::cols(.default=readr::col_double(),
+  issue=readr::col_character(),sleeve_id=readr::col_integer(),ticket_code=readr::col_character(),
+  official_outcomes=readr::col_character(),ticket_col_idx=readr::col_integer(),
+  prob_rank=readr::col_integer(),selected_rules=readr::col_character()),na=character())
+ testthat::expect_identical(restored$ticket_code,z$long$ticket_code)
+ testthat::expect_identical(restored$official_outcomes,z$long$official_outcomes)
+ testthat::expect_identical(restored$issue,z$long$issue)
+ testthat::expect_equal(restored$prob,z$long$prob,tolerance=1e-15)
  testthat::expect_error(n7_sleeve_tables(b,list(),'fixed-test-model'))
  bad<-b;bad$sleeves[[1]]$enumeration$probability[[1]]<-2
  testthat::expect_error(n7_sleeve_tables(bad,bad$cutoffs,'fixed-test-model'))

@@ -22,8 +22,8 @@ n7_sleeve_summary <- function(rows,issue_order,initial_capital_cny,budget_cny) {
  extra<-funded |> dplyr::group_by(model,policy) |> dplyr::summarise(
   profitable_issues=sum(net>0),payout_issues=sum(gross>0),funded_issues=sum(stake>0),stopped_issues=sum(stopped),
   no_bet_issues=sum(stake==0 & !stopped),
-  longest_losing_run={rr<-rle(stake>0 & net<0);max(c(0,rr$lengths[rr$values]))},
-  longest_no_payout_run={rr<-rle(stake>0 & gross==0);max(c(0,rr$lengths[rr$values]))},
+  longest_losing_run={rr<-rle(net[stake>0]<0);max(c(0,rr$lengths[rr$values]))},
+  longest_no_payout_run={rr<-rle(gross[stake>0]==0);max(c(0,rr$lengths[rr$values]))},
   longest_underwater={rr<-rle(drawdown_cny>0);max(c(0,rr$lengths[rr$values]))},
   maximum_completed_recovery={rr<-rle(drawdown_cny>0);max(c(0,rr$lengths[rr$values & seq_along(rr$values)<length(rr$values)]))},
   worst5=if(dplyr::n()>=5)min(stats::filter(net,rep(1,5),sides=1),na.rm=TRUE) else NA_real_,

@@ -1,11 +1,13 @@
 import numpy as np
 import pandas as pd
 import pytest
+import copy
 from src.n7_probability_gate import probability_gate_candidates
 from src.n7_sleeve_candidates import build_sleeve_candidates
 from src.n7_sleeve_portfolio import sleeve_portfolios
 from src.n7_single_ticket_sampling import settle_single_tickets
 from src.temporal_learning import Cutoff
+from src.temporal_learning.core import stable_json_hash
 
 
 def test_expanded_universe_shared_world_union_and_budget():
@@ -30,8 +32,17 @@ def test_expanded_universe_shared_world_union_and_budget():
         union=np.zeros(400,dtype=bool)
         for ii,dd in zip(plan['fixture_indices'],plan['outcomes']):union|=np.all(worlds[ii]==np.array(dd)[:,None],axis=0)
         assert union.mean()==plan['simulation']['evaluation_hit_rate']
-        if plan['sleeve_keys']:assert len({k[0] for k in plan['sleeve_keys']})==8
+        if plan['sleeve_keys']:
+            assert len({k[0] for k in plan['sleeve_keys']})==8
+            expected=np.mean([bundle['sleeves'][gid]['options'][kind]['coverage'] for gid,kind in plan['sleeve_keys']])
+            assert plan['mean_coverage']==pytest.approx(expected)
+            assert plan['mean_coverage']!=pytest.approx(expected/64)
     prob=next(p for p in z['plans'] if p['arm']=='8x64_PROB')
+    random_states=next(p for p in z['plans'] if p['arm']=='8x64_RANDOM_STATES')
+    # Same seven-fixture sets, different selected states: Top64 coverage cannot
+    # substitute for the actual random-subset portfolio average.
+    assert [k[0] for k in random_states['sleeve_keys']]==[k[0] for k in prob['sleeve_keys']]
+    assert random_states['mean_coverage']<prob['mean_coverage']
     ret=next(p for p in z['plans'] if p['arm']=='8x64_RETURN_AWARE')
     assert ret['simulation']['training_hit_rate']>=.8*prob['simulation']['training_hit_rate']-1e-8
     changed=sleeve_portfolios(bundle,**{**args,'evaluation_worlds':450})
@@ -47,3 +58,10 @@ def test_expanded_universe_shared_world_union_and_budget():
         maximum_attempts=100,frontier_points=[('F80',.8,-.35)],solver_seconds=10.,solver_relative_gap=.001,solver_feasibility_tolerance=1e-9,**money)
     with pytest.raises(ValueError):build_sleeve_candidates(pool,cutoffs=cuts,candidate_count=9,seed=424,
         maximum_attempts=100,frontier_points=[('PROB',.8,-.35)],solver_seconds=10.,solver_relative_gap=.001,solver_feasibility_tolerance=1e-9,**money)
+    short=copy.deepcopy(bundle);short['sleeves']=short['sleeves'][:7]
+    short['seal']=stable_json_hash({k:v for k,v in short.items() if k!='seal'})
+    empty=sleeve_portfolios(short,**args)
+    for plan in empty['plans']:
+        if plan['arm'].startswith('8x64'):
+            assert plan['stake']==0 and plan['cash_cny']==1024
+            assert plan['mean_coverage'] is None

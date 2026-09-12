@@ -1,0 +1,74 @@
+---
+title: "PR426 修订：组平均覆盖概率与实际下注期连续风险"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  archive_fixture: "tests/fixtures/n7_sleeve_portfolio.json.gz"
+  output_dir: "data/derived/fundamentals_417/n7-sleeve-comments-report"
+---
+
+本报告处理 PR426 的两个明确错误，不进行新的选场、参数搜索或模型训练。
+沿用已暴露的100期冻结结算，仅重新计算描述性风险统计。
+模式为 **ARCHIVED_ACCOUNTING_ONLY**，不提供历史因果时点认证。
+
+`mean_coverage` 对8×64策略表示各组覆盖概率的算术平均，分母是组数8，
+不是物理票数512。旧字段被缩小64倍；生产函数和独立检查器均已修正。
+该字段不参与现有选票或返奖计算。单体策略的同名字段仍表示单票平均概率，
+二者统计单位不同，不允许混合作为组质量。Top64概率深度质量使用组表的
+`coverage_64`；若计算前沿／随机等实际所选子集的覆盖率，须按该组具体选票身份
+累加概率，不能替换成Top64覆盖率。
+
+亏损／无返奖 streak 按实际下注期计数：先去掉投入为0的期，再统计连续长度。
+有返奖但亏损会打断“无返奖”，不会打断“亏损”。回撤持续时间仍按全部期次计算。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+source('r/n7_sleeve_summary.R')
+archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+stopifnot(archive$sha256==digest::digest(charToRaw(archive$body),serialize=FALSE,algo='sha256'))
+result<-jsonlite::fromJSON(archive$body)
+report<-n7_sleeve_summary(result$rows,result$issue_order,100000,1024)
+dir.create(params$output_dir,recursive=TRUE,showWarnings=FALSE)
+for(name in names(report))readr::write_csv(report[[name]],file.path(params$output_dir,paste0(name,'.csv')))
+```
+
+输入归档SHA256：`r archive$sha256`。每期预算1024元，起始资金100000元。
+以下每行是一种策略和一个种子的统计，种子不代表额外独立历史期。
+
+本次修订影响固定场次前沿策略（8x64_FRONTIER_FIXEDG）的三个种子：
+最长连续亏损由4期更正为9个实际下注期，最长连续无返奖由4期更正为6个实际下注期。
+其余策略的这两项统计未变。全部33个策略／种子组合的投入、净收益、ROI、
+命中期数和最大回撤保持一致。
+
+```{r}
+knitr::kable(report$summary |> select(model,policy,funded_issues,no_bet_issues,stopped_issues,
+ longest_losing_run,longest_no_payout_run,longest_underwater,net,roi_percent,max_drawdown),digits=2)
+```
+
+原子组数据接口继续使用 `r/n7_sleeve_tables.R::n7_sleeve_tables()`。
+`summary` 每组一行，`depth` 每组每深度一行，`long` 每组每标准状态一行。
+完整1–2187深度曲线保持票身份；编号必须以字符读取，保留前导零。
+接口字段、键、单位、读取示例与拒用旧字段规则见
+`docs/research/n7_sleeve_interface.md`。
+
+旧原生冻结包与旧实现绑定，不被本次修改重写或重新封签。
+旧 `mean_coverage` 不可直接流入下游；使用组表重算并生成新派生收据，
+或在新版生产实现下重新冻结。旧原生包复放须使用其绑定提交。
+当前归档报告只证明会计／统计修订，不把原包升级为可前瞻使用的数据。
+
+```{r}
+#| include: false
+paths<-c('quarto/138_n7_sleeve_review_corrections.qmd','r/n7_sleeve_summary.R',
+ 'r/fundamentals_equity_curves.R','r/market_conditional_summary.R',params$archive_fixture)
+bindings<-setNames(lapply(paths,function(p)digest::digest(file=p,algo='sha256')),paths)
+jsonlite::write_json(list(mode='ARCHIVED_ACCOUNTING_ONLY',historical_admission=FALSE,
+ source_sha256=archive$sha256,implementation=bindings),file.path(params$output_dir,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

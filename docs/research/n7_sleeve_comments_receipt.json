@@ -1,0 +1,37 @@
+{
+  "generated_at_utc": "2026-09-12T12:05:46.168605+00:00",
+  "review_base": "db4723d6",
+  "comment": "https://github.com/algotradinglife/beijing-lot/pull/426#issuecomment-5645714508",
+  "historical_admission": false,
+  "verdict": "REMEDIATION_PASSED_KEEP_DRAFT",
+  "source_study_reselected": false,
+  "unchanged_financial_arm_seed_rows": 33,
+  "streak_changed_arm_seed_rows": 3,
+  "checks": {
+    "python_scope": 7,
+    "final_independent_python": 2,
+    "full_r_suite": "PASS",
+    "cutoff": "PASS",
+    "qmd138": "PASS",
+    "qmd134_archive": "PASS",
+    "remote_ci": "DISABLED_BY_OWNER"
+  },
+  "files": {
+    "data/derived/fundamentals_417/n7-sleeve-comments-py-all.log": "8ae2af44059a2d6c3b47e3080d5cc83f5805531a8df8154dda82e4beb1954849",
+    "data/derived/fundamentals_417/n7-sleeve-comments-r-suite.log": "a939529faad14e78c76eaa71d48adccb6e9676cd89fb3e66dfa9f9663d8294a2",
+    "data/derived/fundamentals_417/n7-sleeve-comments-cutoff.log": "169d15bb0b5f1dd49daf0d58dc61f178e95c9607a97447c8032e2e44040a659d",
+    "data/derived/fundamentals_417/n7-sleeve-comments-render.log": "ceff692bf5e1578e66003ea045bd602d1d6e3722de6f764360a090016d9a58dd",
+    "data/derived/fundamentals_417/n7-sleeve-comments-render-134-final.log": "690e2cd22063df2d581c2365ab61fa1f94837922c29c0bb864dea1f34e7ecc69",
+    "data/derived/fundamentals_417/n7-sleeve-comments-review-result.txt": "ad6d2e03ad0bf3f09de432a2b346d1e435c0de784e4165020fe11c185a25a966",
+    "data/derived/fundamentals_417/n7-sleeve-comments-review-final.txt": "cdde474e14836ade03b9a06139d3953694e8b60ce3705b6580d97832a8dd214e",
+    "data/derived/fundamentals_417/n7-sleeve-comments-report/receipt.json": "346d54f94708d86923af30827174e26e01e8a907e683f962454c3b76e1738e9c",
+    "data/derived/fundamentals_417/n7-sleeve-comments-report/summary.csv": "7d14bcda8d430838a3d4047fe5acd660406a6044ca06193984d9688d36d84427",
+    "data/derived/fundamentals_417/n7-sleeve-comments-report/streak-corrections.csv": "1ea3842b4a4dae2c7344b2914ebb068875dbaaeeaa41d0820ab54e372599ae77",
+    "data/derived/fundamentals_417/n7-sleeves-424-v3/summary.csv": "e2aac7b07caf265f314c1245c266dab59c678afe652c9140ca737f3d04c9c46a",
+    "tests/fixtures/n7_sleeve_portfolio.json.gz": "98b1fc1bcba1331fed84c5876edb1c0dc33ef48ddd5494ec10e0c5dc037eb4af",
+    "quarto/138_n7_sleeve_review_corrections.qmd": "187c9527c2b958a724c284c01354af365c6c526e9dfd5bc5cd7b1d41f36f0079",
+    "src/n7_sleeve_portfolio.py": "076933ce3c605f32f3ed58ef4039a77a3dc19b6162ea30550b0c91d9ce0d105a",
+    "scripts/check_n7_sleeves.py": "9c19f9f85af819b0a6ee029287e1702a61ef97355c13deef212c2c115580896e",
+    "r/n7_sleeve_summary.R": "fb13fdba9914753dc1fb642c9bfc4038d9199ffbd0b8d23bc45ff76760a591c6"
+  }
+}
