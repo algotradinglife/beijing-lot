@@ -110,8 +110,11 @@ def freeze_prefix_study(source, output, config_path, *, repository_root, python,
                                   cutoffs=cuts, repository_root=root, python=python, rscript=rscript,
                                   entry_point=entry_point)
             jobs[job] = issue
+        total_jobs = len(jobs)
         for count, job in enumerate(as_completed(jobs), 1):
-            issue = jobs[job]
+            # A Future retains its result. Drop completed futures from our map
+            # so full issue curves/worlds do not accumulate for the entire study.
+            issue = jobs.pop(job)
             try:
                 result = job.result()
             except Exception:
@@ -135,7 +138,7 @@ def freeze_prefix_study(source, output, config_path, *, repository_root, python,
                 path = output / "plans" / f"{issue}_{plan['seed']}_{plan['arm']}.json.gz"
                 raw = gzip.compress(json.dumps(plan, sort_keys=True).encode(), mtime=0)
                 path.write_bytes(raw); hashes[str(path)] = hashlib.sha256(raw).hexdigest()
-            print(f"Frozen R issue {count}/{len(jobs)}: {issue}", flush=True)
+            print(f"Frozen R issue {count}/{total_jobs}: {issue}", flush=True)
     if expected:
         raise ValueError("Incomplete frozen plan grid")
     verify_implementation_closure(root, impl)

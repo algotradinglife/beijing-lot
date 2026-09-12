@@ -4,6 +4,8 @@ import copy
 import gzip
 import hashlib
 import json
+import gc
+import weakref
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +15,48 @@ from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_completed_issue_futures_are_released_before_study_finishes(tmp_path, monkeypatch, fixture_bundle):
+    source = tmp_path / 'source'; (source / 'bundles').mkdir(parents=True)
+    bundles = {}; hashes = {}
+    for issue in ('100101', '100102', '100103'):
+        bundle = copy.deepcopy(fixture_bundle); bundle['issue'] = issue
+        bundle['seal'] = stable_json_hash({k:v for k,v in bundle.items() if k != 'seal'})
+        path = source / 'bundles' / f'{issue}.json.gz'
+        path.write_bytes(gzip.compress(json.dumps(bundle).encode()))
+        bundles[issue] = bundle; hashes[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+    receipt = dict(issues=list(bundles), historical_admission=False, bundle_hashes=hashes)
+    (source / 'plans-frozen.json').write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
+    config = tmp_path / 'config.json'
+    config.write_text(json.dumps(dict(seeds=[42], arms=['QUALITY_PROB'], workers=1,
+        provenance_roots=['src.n7_joint_study', 'src.temporal_learning'])))
+
+    def run(path, *args, **kwargs):
+        result = empty_result(bundles[path.name.removesuffix('.json.gz')], [42], ['QUALITY_PROB'])
+        for plan in result['plans']: plan['seal'] = stable_json_hash(plan)
+        return result
+
+    original = study.as_completed
+    observed = []
+    def watch(futures):
+        iterator = original(futures)
+        first = next(iterator); ref = weakref.ref(first)
+        yield first
+        del first
+        second = next(iterator)
+        yield second
+        del second
+        gc.collect()
+        observed.append(ref() is None)
+        yield from iterator
+
+    monkeypatch.setattr(study, 'run_prefix_issue', run)
+    monkeypatch.setattr(study, 'as_completed', watch)
+    frozen = study.freeze_prefix_study(source, tmp_path / 'output', config, repository_root=ROOT,
+        python='unused', rscript='unused', entry_point='scripts/run_n7_joint_issue.R', r_sources=study.JOINT_R_SOURCES)
+    assert observed == [True]
+    assert len(frozen['receipt']['plan_hashes']) == 3
 
 
 @pytest.fixture
