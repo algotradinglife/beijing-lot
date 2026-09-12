@@ -1,0 +1,201 @@
+---
+title: "7串1四版对照：概率、收益、命中覆盖、盈利期数"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-profit-periods-v1"
+  archive_fixture: null
+---
+
+固定100期100608–101120、同一候选集合和market-balance-draw-1.0.0-diagnostic概率底座。
+7场全单选，完整票不重复、跨票复用不限；每期预算1024元，每票2元，初始资金100000元。
+门槛按每10000次等价计数0/1/5/10/25/50/100/200，即组合概率达标。
+所有门槛和seed固定；本轮不重新训练专家，也不按实际赛果选择参数。
+
+| 版本 | 选票目标 |
+|---|---|
+| PROB | 原始组合概率排序 |
+| EV | 正估算期望收益票，按估算收益排序 |
+| COVERAGE | 最大化新增的至少一票命中情景 |
+| PROFIT | 局部提高整期合计返奖严格超过投入的模拟概率 |
+
+PROFIT从PROB/COVERAGE两种同预算起点中，按训练模拟盈利率选较优者；并列依次按
+封顶回收金额、估算净收益排序。每门槛尝试2048次一换一，新增票提议分布为
+50%按组合概率加权＋50%均匀抽样；剔除已选票。仅接受训练盈利情景数增加，
+或盈利数不变但封顶回收金额增加的交换。封顶回收额为min(合计返奖,最终投入)，
+只作并列时的次级目标。这是有界局部改进，不是全局最优求解。
+
+三个固定seed41901/41902/41903；20000训练世界、50000独立评估世界、另一个独立换票提议流。
+一场比赛在一个世界只生成一次结果，所有票共享。比赛间独立，票之间相关。
+预计单票返奖=2×0.65÷各场原市场概率q的乘积；不使用目标期结算SP做任何选择。
+盈利定义是合计返奖严格大于最终投入，零投注不计盈利。最终实际结算沿用同一R/SQLite审计快照。
+
+全部9600套计划在读取结算前冻结。已暴露历史、逐场时点诊断，不代表干净前瞻验证或
+整票同一时点可购买。利润目标还依赖赛前SP估计的准确性。三个旧版本票面保持不变，
+重新计算它们的模拟盈利率以便公平对照。
+
+```{r}
+#| include: false
+library(dplyr)
+report_mode<-if(is.null(params$archive_fixture)) 'SOURCE_VERIFIED_DIAGNOSTIC' else 'ARCHIVED_ACCOUNTING_ONLY'
+archive_sha256<-if(is.null(params$archive_fixture)) NA_character_ else digest::digest(file=params$archive_fixture,algo='sha256')
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+if(is.null(params$archive_fixture)) {
+  fp<-file.path(params$study,'plans-frozen.json');fr<-readBin(fp,'raw',n=file.size(fp))
+  frozen<-jsonlite::fromJSON(rawToChar(fr));er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  rp<-file.path(params$study,'results.json');rr<-readBin(rp,'raw',n=file.size(rp))
+  stopifnot(identical(digest::digest(fr,serialize=FALSE,algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(rr,serialize=FALSE,algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+    identical(digest::digest(file=file.path(params$study,'prior-evaluation-snapshot.json'),algo='sha256'),er$prior_receipt_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(rawToChar(rr))
+  stopifnot(identical(result$freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',identical(
+    digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+stopifnot(nrow(result$rows)==9600)
+x<-as_tibble(result$rows) |> mutate(issue=as.character(issue),status=if_else(stake>0,'COMPLETE','NO_BET'),
+  budget_cny=1024,cash_cny=1024-stake,roi_percent=if_else(stake>0,100*net/stake,NA_real_))
+curves<-strategy_equity_curves(x,as.character(result$issue_order),100000)
+funded<-x |> left_join(curves |> filter(period>0) |> select(model,policy,issue,stopped,funded_net_cny,funded_stake_cny),
+  by=c('model','policy','issue'),relationship='one-to-one') |>
+  mutate(stake=funded_stake_cny,net=funded_net_cny,gross=stake+net,groups=if_else(stopped,0,groups),
+    hits=if_else(stopped,0,hits),cash_cny=1024-stake,roi_percent=if_else(stake>0,100*net/stake,NA_real_))
+summary<-market_conditional_summary(funded,curves)
+extra<-funded |> group_by(model,policy) |> summarise(count=first(count),ranking=first(ranking),seed=first(seed),
+  profitable_issues=sum(net>0),stopped_issues=sum(stopped),bet_issues=sum(stake>0),
+  full_budget_issues=sum(stake==1024),mean_train_coverage=mean(train_coverage),mean_eval_coverage=mean(eval_coverage),
+  mean_train_profit=mean(train_profit),mean_eval_profit=mean(eval_profit),accepted_swaps=sum(accepted),.groups='drop')
+summary<-left_join(summary,extra,by=c('model','policy'),relationship='one-to-one')
+grid<-summary |> group_by(count,ranking) |> summarise(stake=median(stake),net=median(net),roi=median(roi_percent),
+  min_roi=min(roi_percent),max_roi=max(roi_percent),min_hits=min(hit_issues),max_hits=max(hit_issues),hit_issues=median(hit_issues),
+  min_profitable=min(profitable_issues),max_profitable=max(profitable_issues),profitable_issues=median(profitable_issues),max_drawdown=median(max_drawdown),without_best_roi=median(without_best_roi),
+  mean_train_coverage=100*mean(mean_train_coverage),mean_eval_coverage=100*mean(mean_eval_coverage),
+  mean_train_profit=100*mean(mean_train_profit),mean_eval_profit=100*mean(mean_eval_profit),.groups='drop')
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'));readr::write_csv(grid,file.path(params$study,'grid.csv'))
+readr::write_csv(x,file.path(params$study,'planned-periods.csv'));readr::write_csv(funded,file.path(params$study,'periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+
+paired<-funded |> filter(ranking %in% c('PROFIT','PROB','COVERAGE')) |>
+  select(issue,count,seed,ranking,net) |> mutate(profitable=net>0) |> select(-net) |>
+  tidyr::pivot_wider(names_from=ranking,values_from=profitable) |> group_by(count,seed) |>
+  summarise(both_prob=sum(PROFIT & PROB),new_vs_prob=sum(PROFIT & !PROB),lost_vs_prob=sum(!PROFIT & PROB),
+    both_coverage=sum(PROFIT & COVERAGE),new_vs_coverage=sum(PROFIT & !COVERAGE),
+    lost_vs_coverage=sum(!PROFIT & COVERAGE),.groups='drop')
+paired_check<-paired |> left_join(summary |> filter(ranking %in% c('PROFIT','PROB','COVERAGE')) |>
+  select(count,seed,ranking,profitable_issues) |> tidyr::pivot_wider(names_from=ranking,values_from=profitable_issues),
+  by=c('count','seed'),relationship='one-to-one')
+stopifnot(all(with(paired_check,both_prob+new_vs_prob)==paired_check$PROFIT),
+  all(with(paired_check,both_prob+lost_vs_prob)==paired_check$PROB),
+  all(with(paired_check,both_coverage+new_vs_coverage)==paired_check$PROFIT),
+  all(with(paired_check,both_coverage+lost_vs_coverage)==paired_check$COVERAGE))
+readr::write_csv(paired,file.path(params$study,'paired.csv'))
+range_check<-summary |> group_by(count,ranking) |>
+  summarise(lo=min(profitable_issues),hi=max(profitable_issues),.groups='drop') |>
+  left_join(grid |> select(count,ranking,min_profitable,max_profitable),by=c('count','ranking'),relationship='one-to-one')
+stopifnot(all(range_check$lo==range_check$min_profitable),all(range_check$hi==range_check$max_profitable))
+```
+
+## 四版总体比较
+
+本次报告验收模式：`r report_mode`。ARCHIVED_ACCOUNTING_ONLY仅复算已归档结算数字，
+不验证原始来源、票面和截止时间；SOURCE_VERIFIED_DIAGNOSTIC校验完整来源绑定，仍是历史诊断。
+
+金额、收益、命中、盈利和回撤均为三个seed的中位数，范围另列，不是将三个seed合并下注。
+ROI分母是实际投入；余额不足购买整期计划时永久停投并持有现金。
+模拟率是完整计划的均值，真实期数按可执行账户计算；停投期数在逐seed表列出。
+
+```{r}
+knitr::kable(grid |> arrange(count,ranking),digits=2)
+knitr::kable(summary |> arrange(count,ranking,seed),digits=2)
+knitr::kable(paired,digits=0)
+```
+
+## 盈利期数与命中期数
+
+```{r}
+#| fig-width: 12
+#| fig-height: 5
+profit_plot<-ggplot2::ggplot(grid,ggplot2::aes(factor(count),profitable_issues,colour=ranking,group=ranking))+
+  ggplot2::geom_line()+ggplot2::geom_point()+
+  ggplot2::geom_errorbar(ggplot2::aes(ymin=min_profitable,ymax=max_profitable),width=.15)+
+  ggplot2::theme_minimal()+ggplot2::labs(x='Minimum count / 10000',y='Profitable issues / 100',colour='Policy')
+hit_plot<-ggplot2::ggplot(grid,ggplot2::aes(factor(count),hit_issues,colour=ranking,group=ranking))+
+  ggplot2::geom_line()+ggplot2::geom_point()+
+  ggplot2::geom_errorbar(ggplot2::aes(ymin=min_hits,ymax=max_hits),width=.15)+
+  ggplot2::theme_minimal()+ggplot2::labs(x='Minimum count / 10000',y='Hit issues / 100',colour='Policy')
+profit_plot
+hit_plot
+ggplot2::ggsave(file.path(params$study,'profitable-issues.png'),profit_plot,width=12,height=5,dpi=150)
+ggplot2::ggsave(file.path(params$study,'hit-issues.png'),hit_plot,width=12,height=5,dpi=150)
+```
+
+## 资金及回撤曲线
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+equity<-ggplot2::ggplot(curves,ggplot2::aes(period,equity_cny,colour=ranking,group=policy))+
+  ggplot2::geom_line(alpha=.65)+ggplot2::facet_wrap(~count,ncol=3)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Capital CNY',colour='Policy')
+dd<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=ranking,group=policy))+
+  ggplot2::geom_line(alpha=.65)+ggplot2::facet_wrap(~count,ncol=3)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Drawdown CNY',colour='Policy')
+equity
+dd
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=14,height=10,dpi=150)
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),dd,width=14,height=10,dpi=150)
+```
+
+## 本轮结论
+
+沿用上一轮重点展示的计数门槛5/10000，不按本轮盈利结果重选门槛。
+各列为三个seed分别计算后的中位数，因此一行不代表同一条真实资金路径。
+
+| 版本 | 实际投入 | 命中期数 | 盈利期数 | 净收益 | ROI | 最大回撤 |
+|---|---:|---:|---:|---:|---:|---:|
+| 概率PROB | 102400 | 28 | 17 | 54255 | 52.98% | 20641 |
+| 收益EV | 50288 | 1 | 1 | 26676 | 53.05% | 40270 |
+| 新增覆盖COVERAGE | 102400 | 44 | 20 | 33054 | 32.28% | 19424 |
+| 盈利期数PROFIT | 102400 | 41 | 23 | 26719 | 26.09% | 14311 |
+
+PROFIT盈利期数范围21–24、命中40–42、ROI 25.48%–28.52%。
+COVERAGE盈利期数19–25、命中43–45，区间重叠；不能声称每个seed都提高盈利期数。
+PROFIT去除最高收益一期后的ROI中位数5.76%，PROB为5.82%，COVERAGE为6.87%。
+EV仅靠一期盈利，去除后ROI为-100%，不适合作为频繁盈利的证据。
+
+独立模拟盈利率：PROB 12.47%、COVERAGE 16.84%、PROFIT 17.23%。
+PROFIT训练模拟盈利率18.92%，高于独立模拟17.23%，显示局部搜索也会适应训练模拟噪声。
+对覆盖版的独立模拟增益仅约0.39个百分点，远小于样本中的盈利期数差，需避免过度解读。
+独立模拟命中率则由覆盖版42.90%降至盈利版41.47%：后者主动牺牲部分低返奖命中情景。
+
+提高命中期数应关注COVERAGE；提高盈利期数并控制这批样本的回撤，可继续研究PROFIT；
+追求这批样本的累计收益，PROB仍领先。没有一个版本同时赢得全部目标。
+本轮是固定100期、同概率底座的回顾诊断，所有结论均不构成新增未见数据的验证。
+
+## 逐期结果
+
+全部9600行在periods.csv，以下固定展示seed41901，不按收益挑seed。
+
+```{r}
+knitr::kable(funded |> filter(seed==41901) |> arrange(count,ranking,issue) |>
+  select(issue,count,ranking,stake,gross,net,roi_percent,hits,stopped),digits=2)
+jsonlite::write_json(list(freeze=result$freeze_seal,report_mode=report_mode,archive_sha256=archive_sha256,
+  qmd_sha256=digest::digest(file='quarto/131_n7_profit_periods.qmd',algo='sha256'),
+  summary_implementation_sha256=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+  equity_implementation_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
