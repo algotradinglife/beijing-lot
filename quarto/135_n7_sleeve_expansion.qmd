@@ -1,0 +1,143 @@
+---
+title: "七串一 Top64：扩大候选组与15%门槛"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-sleeve-expansion-v1"
+  archive_fixture: null
+  output_dir: "data/derived/fundamentals_417/n7-sleeve-expansion-report"
+---
+
+每期候选七场集合由原24组扩为240、960组，三个档位严格嵌套。原24组及其Top64保留。
+新增尝试轮流采用既有高概率票对应集合、按单场Top2概率加权抽七场、均匀抽七场；
+既有高概率集合耗尽后，该通道采用Top2加权。全池去重，不限制比赛跨组复用。
+候选种子42410、最多50000次尝试，报告实际数量。
+
+**仅保留 Top64 累计概率严格大于15%的组**。组内64种赛果始终按原概率排序，
+不是收益排序。组间采用以下两种抽样，均不放回抽8个不同的七场集合：
+
+- 收益加权：组权重为64票的期望返奖之和，每抽一组后在剩余组内重新归一化。
+- 等概率：合格组同权重，隔离扩池与收益加权各自的影响。
+
+票概率为七个所选赛果校正市场概率p之积，估算返奖为 `2 × 0.65 / prod(q)`，
+q为欧赔、大小球映射后的原市场让球概率。权重使用期望返奖，而非可能为负的期望净收益。
+这是赛前价格代理，不能当作官方SP。实际收益采用冻结结算SP，整票只乘一次0.65。
+
+每期仍投入1024元：8组×64票×2元；不足8个合格组整期不投。
+初始资金100000元，无追加本金；不足完整一期投入后永久停投。
+三个抽样种子42401/42402/42403独立比较，不能把三套方案同时下注。
+每次用50000个共享逐场情景测量“至少中一组”，保留比赛重叠带来的相关性。
+
+本研究沿用已暴露的100期100608–101120，固定 market-balance-draw-1.0.0-diagnostic，
+没有重训专家。显式cutoff、来源与实现哈希绑定；全部计划在本轮读取结算前冻结。
+旧概率包缺少完整赛前可用性证明，因此 **historical_admission=false，结果仅为历史诊断**。
+240/960及15%是预先固定的敏感性比较，没有用实际收益调整参数。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+source('r/n7_sleeve_expansion_report.R')
+mode<-if(is.null(params$archive_fixture)) 'SOURCE_VERIFIED_DIAGNOSTIC' else 'ARCHIVED_ACCOUNTING_ONLY'
+if(is.null(params$archive_fixture)) {
+ frozen<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'))
+ er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+ stopifnot(er$freeze_sha256==digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),
+   er$result_sha256==digest::digest(file=file.path(params$study,'results.json'),algo='sha256'),
+   er$audit_sha256==digest::digest(file=er$audit_path,algo='sha256'),
+   er$prior_receipt_sha256==digest::digest(file=file.path(params$study,'prior-evaluation-snapshot.json'),algo='sha256'))
+ bindings<-c(frozen$receipt$source_hashes,frozen$receipt$bundle_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+ for(path in names(bindings)) stopifnot(bindings[[path]]==digest::digest(file=path,algo='sha256'))
+ result<-jsonlite::fromJSON(file.path(params$study,'results.json'))
+ checked<-jsonlite::fromJSON(file.path(params$study,'independent-replay.json'))
+ for(path in names(checked$implementation$files)) stopifnot(checked$implementation$files[[path]]==digest::digest(file=path,algo='sha256'))
+ stopifnot(checked$freeze==frozen$seal,checked$result_sha256==er$result_sha256,
+   checked$checked==nrow(result$rows),result$freeze_seal==frozen$seal,!frozen$receipt$historical_admission)
+ cfg<-frozen$receipt$parameters;result_hash<-er$result_sha256
+} else {
+ archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+ stopifnot(archive$result_sha256==digest::digest(charToRaw(archive$result_body),serialize=FALSE,algo='sha256'))
+ result<-jsonlite::fromJSON(archive$result_body);cfg<-archive$config;result_hash<-archive$result_sha256
+}
+report<-n7_sleeve_expansion_report(result$rows,result$candidates,result$issue_order,cfg$initial_capital_cny,cfg$budget_cny)
+dir.create(params$output_dir,recursive=TRUE,showWarnings=FALSE)
+for(name in names(report)) readr::write_csv(report[[name]],file.path(params$output_dir,paste0(name,'.csv')))
+```
+
+运行模式：`r mode`。输入结果 SHA256：`r result_hash`。
+
+候选数量与门槛
+
+```{r}
+knitr::kable(report$counts,digits=1)
+knitr::kable(result$candidates |> filter(eligible<8) |> arrange(issue,pool_size),digits=3)
+```
+
+各方案汇总
+
+各列为三个固定种子的中位数；ROI范围列出全部种子，模拟联合命中取均值。
+中位数各列可能来自不同种子，不代表一条可实际下注的合成资金曲线。
+`without_best_roi` 为剔除最大净收益期后的ROI；金额单位元，ROI及模拟命中单位%。
+
+```{r}
+knitr::kable(report$grid,digits=2)
+knitr::kable(report$summary |> select(model,policy,stake,net,roi_percent,hit_issues,profit_issues,max_drawdown,without_best_roi),digits=2)
+```
+
+收益和回撤曲线
+
+曲线固定展示预设种子42401；其他种子的完整账本在输出表中保留。
+
+```{r}
+#| fig-width: 11
+#| fig-height: 6
+plot_rows<-report$curves |> filter(policy=='42401')
+equity<-ggplot(plot_rows,aes(period,equity_cny,color=model))+geom_line(linewidth=.6)+
+ labs(x='Issue index',y='Capital (CNY)',color='Pool / weighting')+theme_minimal()+theme(legend.position='bottom')
+drawdown<-ggplot(plot_rows,aes(period,drawdown_cny,color=model))+geom_line(linewidth=.6)+
+ labs(x='Issue index',y='Drawdown (CNY)',color='Pool / weighting')+theme_minimal()+theme(legend.position='bottom')
+print(equity)
+print(drawdown)
+ggsave(file.path(params$output_dir,'equity.png'),equity,width=11,height=6,dpi=140)
+ggsave(file.path(params$output_dir,'drawdown.png'),drawdown,width=11,height=6,dpi=140)
+```
+
+双方均投入1024元的配对比较
+
+每个扩池方案与相同权重规则、相同种子的24组版本比较，排除一方空仓的期次。
+new_hits / lost_hits 表示新增命中期 / 丢失命中期。
+
+```{r}
+knitr::kable(report$matched,digits=2)
+```
+
+每期表现与接口
+
+```{r}
+knitr::kable(report$periods |> filter(policy=='42401') |>
+ select(issue,model,stake,gross,net,roi_percent,hits,equity_cny,drawdown_cny),digits=2)
+```
+
+生成接口 `src/n7_sleeve_expansion.py::expand_top64` 接受显式cutoff、候选数量和种子；
+抽样接口 `sample_top64` 接受候选档位、覆盖门槛、权重规则、种子和预算。
+R入口 `r/n7_sleeve_expansion_report.R::n7_sleeve_expansion_report` 汇总冻结输出；
+`scripts/replay_n7_sleeve_expansion.py` 生成，`scripts/check_n7_sleeve_expansion.py` 独立校验。
+所有函数导入均不抓取或写数据库。配置为 `config/n7_sleeve_expansion.json`。
+
+```{r}
+#| include: false
+report_implementation<-list()
+for(path in c('quarto/135_n7_sleeve_expansion.qmd','r/n7_sleeve_expansion_report.R',
+ 'r/fundamentals_equity_curves.R','r/market_conditional_summary.R'))
+ report_implementation[[path]]<-digest::digest(file=path,algo='sha256')
+jsonlite::write_json(list(mode=mode,result_sha256=result_hash,parameters=cfg,
+ implementation=report_implementation),
+ file.path(params$output_dir,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
