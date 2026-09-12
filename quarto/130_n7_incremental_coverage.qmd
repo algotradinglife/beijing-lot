@@ -1,0 +1,169 @@
+---
+title: "7串1：新增覆盖选票与命中期数"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-incremental-coverage-v2"
+  archive_fixture: null
+---
+
+固定100期100608–101120，使用上一轮同一候选集合（每标量排序深度2048）和
+market-balance-draw-1.0.0-diagnostic校正市场概率。每票7场全单选，组内场次不重复，
+完整票不重复；跨票复用不限。预算1024元、每票2元、初始资金100000元。
+组合概率门槛为每10000次等价计数0/1/5/10/25/50/100/200，边界包含。
+
+新增覆盖COVERAGE每次选择训练模拟中能覆盖最多“已有票全部未中”情景的票。
+增量相同时按估算EV、原始组合概率和固定候选顺序打破并列。新增覆盖不要求正EV。
+训练增量为零时仍按上述次级排序尽量用满预算；不是达到训练覆盖后持有现金。
+对照PROB按概率排序，EV仅选正期望票并按估算收益排序，均使用相同候选集合及门槛。
+
+固定seed41901/41902/41903；每期每seed用20000个模拟世界选票，另50000个独立世界
+评估覆盖率。每个世界内每场只生成一次赛果，全部票共享该结果。比赛间采用独立假设；
+票之间不独立，覆盖率按事件并集计算。三seed分别运行预算，不能合并为一次投注。
+模拟只使用概率，没有目标期真实赛果。全部计划冻结后才读取本轮结算快照。
+
+目标是至少一张票命中，不是当期盈利；二者分开报告。候选集合限制了可实现的覆盖，
+贪心求的是经验覆盖近似最优，不保证全局最优。原概率底座属于已暴露历史样本、
+逐场时点诊断；本轮不训练模型、不满足干净前瞻验收，也不证明整票有共同可购时点。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+if(is.null(params$archive_fixture)) {
+  fp<-file.path(params$study,'plans-frozen.json');fr<-readBin(fp,'raw',n=file.size(fp))
+  frozen<-jsonlite::fromJSON(rawToChar(fr));er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  rp<-file.path(params$study,'results.json');rr<-readBin(rp,'raw',n=file.size(rp))
+  stopifnot(identical(digest::digest(fr,serialize=FALSE,algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(rr,serialize=FALSE,algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+    identical(digest::digest(file=file.path(params$study,'prior-evaluation-snapshot.json'),algo='sha256'),er$prior_receipt_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(rawToChar(rr))
+  stopifnot(identical(result$freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',identical(
+    digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+stopifnot(nrow(result$rows)==7200)
+x<-as_tibble(result$rows) |> mutate(issue=as.character(issue),status=if_else(stake>0,'COMPLETE','NO_BET'),
+  budget_cny=1024,cash_cny=1024-stake,roi_percent=if_else(stake>0,100*net/stake,NA_real_))
+curves<-strategy_equity_curves(x,as.character(result$issue_order),100000)
+funded<-x |> left_join(curves |> filter(period>0) |> select(model,policy,issue,stopped,funded_net_cny,funded_stake_cny),
+  by=c('model','policy','issue'),relationship='one-to-one') |>
+  mutate(stake=funded_stake_cny,net=funded_net_cny,gross=stake+net,groups=if_else(stopped,0,groups),
+    hits=if_else(stopped,0,hits),cash_cny=1024-stake,roi_percent=if_else(stake>0,100*net/stake,NA_real_))
+summary<-market_conditional_summary(funded,curves)
+extra<-funded |> group_by(model,policy) |> summarise(count=first(count),ranking=first(ranking),seed=first(seed),
+  profitable_issues=sum(net>0),stopped_issues=sum(stopped),bet_issues=sum(stake>0),
+  full_budget_issues=sum(stake==1024),mean_train_coverage=mean(train_coverage),mean_eval_coverage=mean(eval_coverage),
+  mean_max_reuse=mean(max_reuse),zero_gain_tickets=sum(zero_gain_tickets),.groups='drop')
+summary<-left_join(summary,extra,by=c('model','policy'),relationship='one-to-one')
+grid<-summary |> group_by(count,ranking) |> summarise(stake=median(stake),net=median(net),roi=median(roi_percent),
+  min_roi=min(roi_percent),max_roi=max(roi_percent),min_hits=min(hit_issues),max_hits=max(hit_issues),hit_issues=median(hit_issues),
+  profitable_issues=median(profitable_issues),max_drawdown=median(max_drawdown),without_best_roi=median(without_best_roi),
+  mean_train_coverage=100*mean(mean_train_coverage),mean_eval_coverage=100*mean(mean_eval_coverage),.groups='drop')
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'));readr::write_csv(grid,file.path(params$study,'grid.csv'))
+readr::write_csv(x,file.path(params$study,'planned-periods.csv'));readr::write_csv(funded,file.path(params$study,'periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+paired<-funded |> filter(ranking %in% c('COVERAGE','PROB')) |>
+  select(issue,count,seed,ranking,hits) |> mutate(hit=hits>0) |> select(-hits) |>
+  tidyr::pivot_wider(names_from=ranking,values_from=hit) |> group_by(count,seed) |>
+  summarise(both=sum(COVERAGE & PROB),coverage_only=sum(COVERAGE & !PROB),
+    probability_only=sum(!COVERAGE & PROB),neither=sum(!COVERAGE & !PROB),.groups='drop')
+readr::write_csv(paired,file.path(params$study,'paired.csv'))
+paired_check<-paired |> left_join(summary |> filter(ranking %in% c('COVERAGE','PROB')) |>
+  select(count,seed,ranking,hit_issues) |> tidyr::pivot_wider(names_from=ranking,values_from=hit_issues),
+  by=c('count','seed'),relationship='one-to-one')
+stopifnot(all(with(paired_check,both+coverage_only+probability_only+neither)==100),
+  all(with(paired_check,both+coverage_only)==paired_check$COVERAGE),
+  all(with(paired_check,both+probability_only)==paired_check$PROB))
+range_check<-summary |> group_by(count,ranking) |>
+  summarise(lo=min(hit_issues),hi=max(hit_issues),.groups='drop') |>
+  left_join(grid |> select(count,ranking,min_hits,max_hits),by=c('count','ranking'),relationship='one-to-one')
+stopifnot(all(range_check$lo==range_check$min_hits),all(range_check$hi==range_check$max_hits))
+```
+
+## 命中期数、盈利期数与收益
+
+本轮新增覆盖提高了真实命中期数，但没有同时提高总收益。门槛5（组合概率0.05%）下，
+3个seed命中43–45期，中位44期，对照概率排序28期；独立模拟覆盖率约42.90%，
+对照25.13%。新增覆盖的ROI中位32.28%，范围25.03%–36.67%，低于对照52.98%；
+盈利期数中位20期，对照17期，最大回撤中位19424元，对照20641元，投入均102400元。
+剔除各自最佳一期后，新增覆盖ROI中位6.87%，对照5.82%。
+
+门槛5按期配对：新增覆盖新增命中17–18期，同时丢失原有命中0–2期。
+训练模拟覆盖率46.67%高于独立评估42.90%，存在约3.77个百分点的选择乐观偏差；
+不能用训练覆盖率替代独立评估。该结论仅针对既有候选集合及已暴露100期，
+不证明扩大候选或换新期后的表现，也没有超过既往U3的54个命中期记录。
+
+下表金额、ROI、命中期数和回撤是3个seed的中位数，不是合并投注结果；范围另列。
+ROI按实际投入计算。账户余额不足购买整期计划时永久停止，后续持有现金。
+模拟覆盖率是完整计划的平均值；真实命中期数是实际执行值，停投情况在逐seed表列出。
+
+```{r}
+knitr::kable(grid |> arrange(count,ranking),digits=2)
+knitr::kable(summary |> arrange(count,ranking,seed),digits=2)
+```
+
+## 哪些命中是新增、哪些原有命中被丢失
+
+同一门槛同一seed按期配对；不把三个seed的期数加总当成独立期次。
+
+```{r}
+knitr::kable(paired,digits=0)
+```
+
+## 独立模拟覆盖率与真实命中
+
+```{r}
+#| fig-width: 12
+#| fig-height: 5
+hit_plot<-ggplot2::ggplot(grid,ggplot2::aes(factor(count),hit_issues,colour=ranking,group=ranking))+
+  ggplot2::geom_line()+ggplot2::geom_point()+ggplot2::geom_errorbar(ggplot2::aes(ymin=min_hits,ymax=max_hits),width=.15)+
+  ggplot2::theme_minimal()+ggplot2::labs(x='Minimum count / 10000',y='Hit issues / 100',colour='Policy')
+hit_plot
+ggplot2::ggsave(file.path(params$study,'hit-issues.png'),hit_plot,width=12,height=5,dpi=150)
+```
+
+## 资金及回撤曲线
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+equity<-ggplot2::ggplot(curves,ggplot2::aes(period,equity_cny,colour=ranking,group=policy))+
+  ggplot2::geom_line(alpha=.65)+ggplot2::facet_wrap(~count,ncol=3)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Capital CNY',colour='Policy')
+dd<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=ranking,group=policy))+
+  ggplot2::geom_line(alpha=.65)+ggplot2::facet_wrap(~count,ncol=3)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Drawdown CNY',colour='Policy')
+equity
+dd
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=14,height=10,dpi=150)
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),dd,width=14,height=10,dpi=150)
+```
+
+## 逐期结果
+
+全部7200行在periods.csv，以下展示固定seed41901，不按收益挑seed。
+
+```{r}
+knitr::kable(funded |> filter(seed==41901) |> arrange(count,ranking,issue) |>
+  select(issue,count,ranking,stake,gross,net,roi_percent,hits,stopped),digits=2)
+jsonlite::write_json(list(freeze=result$freeze_seal,
+  qmd_sha256=digest::digest(file='quarto/130_n7_incremental_coverage.qmd',algo='sha256'),
+  summary_implementation_sha256=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+  equity_implementation_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
