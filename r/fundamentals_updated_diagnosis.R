@@ -32,16 +32,18 @@ updated_scope_diagnosis <- function(fixtures, legs, issues) {
   for (model in c('market','baseline')) {
   for (scheme in c('5pp','2pp')) {
   breaks<-if(scheme=='5pp') c(0,.05,.1,.15,.2,.25,.3,.35,.4,1) else c(0,.2,.22,.24,.26,.28,.3,1)
-  draw_rows<-fixtures |> dplyr::mutate(handicap=as.character(handicap),
+  draw_rows<-all_fixtures |> dplyr::mutate(handicap=as.character(handicap),
     bin_probability=if(model=='market') q_D else p_D,
+    top2_hit=if(model=='market') market_top2_hit else baseline_top2_hit,
     band=cut(bin_probability,breaks=breaks,right=FALSE,include.lowest=TRUE),
     draw=actual=='D')
   draw_calibration<-dplyr::bind_rows(draw_rows,dplyr::mutate(draw_rows,handicap='ALL')) |>
     dplyr::group_by(cohort,handicap,band,.drop=FALSE) |>
-    dplyr::summarise(n=dplyr::n(),draws=sum(draw),predicted_draws=sum(bin_probability),
+    dplyr::summarise(n=dplyr::n(),draws=sum(draw),top2_hits=sum(top2_hit),predicted_draws=sum(bin_probability),
       mean_market_percent=if(dplyr::n()>0) 100*mean(q_D) else NA_real_,
       mean_baseline_percent=if(dplyr::n()>0) 100*mean(p_D) else NA_real_,.groups='drop') |>
     dplyr::mutate(actual_percent=100*draws/dplyr::na_if(n,0L),
+      top2_percent=100*top2_hits/dplyr::na_if(n,0L),
       gap_pp=actual_percent-if(model=='market') mean_market_percent else mean_baseline_percent)
   draw_tables[[paste(model,scheme,sep='_')]]<-draw_calibration
   }

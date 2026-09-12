@@ -137,36 +137,46 @@ ggplot2::ggsave(file.path(params$study,'draw-probability-scatter.png'),scatter_p
 ggplot2::ggsave(file.path(params$study,'draw-probability-scatter.pdf'),scatter_plot,width=12,height=6.5,device=grDevices::cairo_pdf)
 ```
 
-## 同一坐标下的基线Top2与市场Top2命中
+## 让平概率与实际让平率、Top2命中率
 
-下面两张图的横纵轴、场次和分面与上图完全相同；实心点改为该模型Top2命中实际
-北单让球赛果，空心点为Top2未命中。这里的命中可以是让胜、让平或让负，并非只看让平。
+两张图各自按该模型的让平概率分档，横轴使用档内平均预测概率，纵轴为实际比例。
+实线为实际让平率，虚线为该模型Top2命中率，颜色区分原48期与新增100期。
+两项指标使用相同的档内场次；灰色点线y=x仅供让平概率校准参考，不是Top2的预测基准。
+每5个百分点分档，空档不画，底部同色n标注场数。连线不是拟合模型，小样本端点可能剧烈波动。
 
 ```{r}
-#| fig-width: 12
-#| fig-height: 6.5
-#| message: false
-top2_labels<-v$overlap_fixtures |> filter(play=='Top2') |>
-  select(issue,slot,provider_id,baseline_hit,market_hit)
-stopifnot(!anyDuplicated(top2_labels[c('issue','slot','provider_id')]))
-top2_points<-fixtures |> left_join(top2_labels,by=c('issue','slot','provider_id'),relationship='one-to-one')
-stopifnot(nrow(top2_points)==9108,!anyNA(top2_points[c('baseline_hit','market_hit')]),
-  sum(top2_points$baseline_hit)==6608,sum(top2_points$market_hit)==6765)
+#| fig-width: 11
+#| fig-height: 7
 for (model in c('baseline','market')) {
   model_label<-if(model=='baseline') '基线' else '市场'
-  top2_data<-top2_points |> mutate(
-    样本=factor(cohort,levels=c('old48','new100'),labels=c('原48期：2,561场','新增100期：6,547场')),
-    Top2结果=factor(if_else(.data[[paste0(model,'_hit')]],'命中','未命中'),levels=c('未命中','命中'))) |>
-    arrange(Top2结果)
-  top2_plot<-scatter_plot+top2_data+
-    ggplot2::aes(shape=Top2结果,color=Top2结果)+
-    ggplot2::scale_shape_manual(values=c('未命中'=1,'命中'=16))+
-    ggplot2::scale_color_manual(values=c('未命中'='#88949E','命中'='#C45719'))+
-    ggplot2::labs(title=paste0('基线与市场让平概率：',model_label,'Top2命中分布'),
-      subtitle=paste0('实心＝',model_label,'Top2命中；空心＝未命中；虚线＝两模型让平概率相等'))
-  print(top2_plot)
-  ggplot2::ggsave(file.path(params$study,paste0('draw-probability-',model,'-top2.png')),top2_plot,width=12,height=6.5,dpi=200)
-  ggplot2::ggsave(file.path(params$study,paste0('draw-probability-',model,'-top2.pdf')),top2_plot,width=12,height=6.5,device=grDevices::cairo_pdf)
+  calibration<-if(model=='baseline') v$baseline_draw_calibration else v$draw_calibration
+  curve_data<-calibration |> filter(handicap=='ALL',n>0) |>
+    mutate(预测概率=if(model=='baseline') mean_baseline_percent else mean_market_percent,
+      样本=factor(cohort,levels=c('old48','new100'),labels=c('原48期','新增100期')),
+      实际让平率=actual_percent,Top2命中率=top2_percent) |> arrange(样本,预测概率)
+  stopifnot(sum(curve_data$n)==9108,sum(curve_data$draws)==2422,
+    sum(curve_data$top2_hits)==if(model=='baseline') 6608 else 6765)
+  curve_long<-curve_data |> tidyr::pivot_longer(c(实际让平率,Top2命中率),names_to='指标',values_to='实际比例')
+  calibration_plot<-ggplot2::ggplot(curve_long,ggplot2::aes(预测概率,实际比例,color=样本,linetype=指标,
+      group=interaction(样本,指标)))+
+    ggplot2::geom_abline(slope=1,intercept=0,color='grey60',linetype='dotted',linewidth=.5)+
+    ggplot2::geom_line(linewidth=.8)+ggplot2::geom_point(size=2)+
+    ggplot2::geom_text(data=curve_data,ggplot2::aes(x=预测概率,y=ifelse(cohort=='old48',-8,-15),
+      label=paste0('n=',n),color=样本),inherit.aes=FALSE,size=3)+
+    ggplot2::scale_color_manual(values=c('原48期'='#0072B2','新增100期'='#D55E00'))+
+    ggplot2::scale_linetype_manual(values=c('实际让平率'='solid','Top2命中率'='dashed'))+
+    ggplot2::scale_x_continuous(breaks=seq(0,40,5),labels=scales::label_number(suffix='%'))+
+    ggplot2::scale_y_continuous(breaks=seq(0,100,10),labels=scales::label_number(suffix='%'))+
+    ggplot2::coord_cartesian(xlim=c(0,40),ylim=c(-19,100),expand=FALSE)+
+    ggplot2::labs(title=paste0(model_label,'让平概率：实际让平率与Top2命中率'),
+      subtitle='实线：实际让平率；虚线：该模型Top2命中率；灰色点线：y=x',
+      x=paste0(model_label,'让平概率（每档平均值）'),y='实际比例',color=NULL,linetype=NULL,
+      caption='固定5个百分点分档；底部蓝色n为原48期、橙色n为新增100期；小样本端点谨慎解读')+
+    ggplot2::theme_minimal(base_size=12,base_family='Noto Sans CJK SC')+
+    ggplot2::theme(legend.position='bottom',panel.grid.minor=ggplot2::element_blank())
+  print(calibration_plot)
+  ggplot2::ggsave(file.path(params$study,paste0(model,'-draw-calibration-top2.png')),calibration_plot,width=11,height=7,dpi=200)
+  ggplot2::ggsave(file.path(params$study,paste0(model,'-draw-calibration-top2.pdf')),calibration_plot,width=11,height=7,device=grDevices::cairo_pdf)
 }
 ```
 

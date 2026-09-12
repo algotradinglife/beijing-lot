@@ -73,4 +73,6 @@ actual为D用实心点，其余用空心点；形状不依赖颜色。等比例�
 不抽样、不抖动；实心点置于空心点之后，密集处不能据视觉密度推算发生率。
 输出draw-probability-scatter.png及同名PDF。本次仅增加图形展示，无函数或学习规则变更。
 
-另增draw-probability-baseline-top2与draw-probability-market-top2两张独立PNG/PDF，坐标和场次保持不变，形状改为相应Top2是否命中实际北单赛果。命中标签从已验证overlap_fixtures按期号、场次、provider_id一对一取得，并核对9108场、基线6608次命中、市场6765次命中。复用同一图形设置，无重新排序或预测实现。
+按用户更正，Top2散点图已从报告移除，改为baseline-draw-calibration-top2与market-draw-calibration-top2两张PNG/PDF。横轴各自让平概率的档内均值；纵轴同时显示实际让平率（实线）和该模型Top2命中率（虚线），同一档两条指标使用同一批场次。颜色区分原48期与新增100期，底部标注各档n，灰色y=x只适用于让平校准。固定5个百分点分档，无拟合或门槛选择。R分档输出新增top2_hits、top2_percent，零分母保持NA，使用已有同模型Top2结果。
+
+本轮66条R断言通过，独立按源概率排序核验四张分档表共480行Top2计数；实时与归档新进程渲染的两张PNG逐字节一致，并人工检查坐标、图例和样本数标签。
