@@ -1,0 +1,104 @@
+---
+title: "市场概率底座：7串1 U3/U6，无战力、无替换"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/market-foundation-n7-v1"
+  archive_fixture: null
+---
+
+本次比较原市场概率（RAW）和`market-balance-draw-1.0.0-diagnostic`校正概率（CAL）。
+**不使用战力概率，不保留共识筛选、零让球分歧排除、分歧场配额或50%单选门槛。**
+因此这是新的纯市场U3/U6对照，不能把差异全部归因于与旧混合策略相比的概率底座变化。
+
+每组7场、2单选+5双选。先按Top2概率之和排序组成不重叠组；剩余预算通过既有MILP选场器
+最大化一组的Top2概率乘积，U3/U6分别限制每场最多出现在3/6组中，两组最多重叠5场。
+每组内Top1概率最大的两场压为单选，其余买Top2；无随机替换、分歧替换、转换组、比分保护。
+这是先选组后压单的贪心策略，不宣称联合优化整个组合池。
+
+每期预算1024元，每注2元，每组32注即64元，最多16组。余额保留现金。
+返奖使用已保存的权威R/SQLite北单胜平负结算导出，中奖票仅乘一次0.65。
+全部400套计划冻结后才读取结算；校正底座只拟合原48期截止前历史，但时间证据仍为历史代理，
+且这100期已经暴露。这里是回顾诊断，不是前瞻收益证明，也不把逐场时点当成真实同时可下注时点。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+if(is.null(params$archive_fixture)) {
+  frozen<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'))
+  er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  stopifnot(identical(digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(file=file.path(params$study,'results.json'),algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(file.path(params$study,'results.json'))
+  stopifnot(identical(result$upstream_freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',
+    identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+periods<-as_tibble(result$rows)
+periods$issue<-as.character(periods$issue)
+stopifnot(nrow(periods)==400,length(result$issue_order)==100)
+curves<-strategy_equity_curves(periods,as.character(result$issue_order),100000)
+summary<-periods |> group_by(policy) |>
+  summarise(issues=n(),active_issues=sum(stake>0),hit_issues=sum(hits>0),groups=sum(groups),
+    hit_groups=sum(hits),group_hit_percent=100*sum(hits)/sum(groups),
+    stake=sum(stake),gross=sum(gross),net=sum(net),roi_percent=100*sum(net)/sum(stake),.groups='drop') |>
+  left_join(curves |> group_by(policy) |> summarise(max_drawdown_cny=max(drawdown_cny),
+    max_drawdown_percent=100*max(drawdown_cny/cummax(equity_cny)),.groups='drop'),by='policy',relationship='one-to-one')
+periods<-periods |> mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_),
+  group_hit_percent=if_else(groups>0,100*hits/groups,NA_real_))
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'))
+readr::write_csv(periods,file.path(params$study,'periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+```
+
+## 总体表现
+
+命中期指至少一组7串1中奖；ROI=净收益/实际投入。未下注期不记作输。
+回撤以初始本金100000元计算。顺序按期次排列，假设一期全部结算后进入下一期。
+本批CAL相较RAW，U3命中期49→54、U6为49→56，净收益与最大回撤均改善；
+但中奖组数分别96→95、113→104，收益改善来自中奖组返奖金额及分布，而非中奖组数增加。
+这不能推翻此前新版底座整体概率误差略差的结论，也不能凭已暴露100期诊断宣称稳定预期收益优势。
+
+```{r}
+knitr::kable(summary,digits=2)
+```
+
+## 资金与回撤
+
+```{r}
+#| fig-width: 11
+#| fig-height: 6
+curves$label<-curves$policy
+equity<-plot_strategy_equity(curves,'funded',100000)
+equity
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=11,height=6,dpi=160)
+drawdown<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=policy))+
+  ggplot2::geom_line()+ggplot2::labs(x='Issue sequence',y='Drawdown (CNY)',colour=NULL)+ggplot2::theme_minimal()
+drawdown
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),drawdown,width=11,height=6,dpi=160)
+```
+
+## 每期明细
+
+```{r}
+knitr::kable(periods |> select(issue,policy,groups,hits,group_hit_percent,stake,gross,net,roi_percent,cash_cny),digits=2)
+jsonlite::write_json(list(mode='POST_EXPOSURE_MARKET_ONLY',
+  result_freeze=result$upstream_freeze_seal,
+  accounting_implementation=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  qmd_sha256=digest::digest(file='quarto/124_market_foundation_n7.qmd',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

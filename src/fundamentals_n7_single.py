@@ -14,13 +14,13 @@ def next_overlap_group(frame, existing_groups, *, cutoffs, max_uses, max_pair_ov
 
     Pure sequential MILP, not fitting. Existing groups are slot lists, including
     original disjoint groups. Each fixture appears <=max_uses times total and each new
-    group shares <=2 slots with every old group. Explicit shared Cutoffs required.
+    group shares <=max_pair_overlap slots with every old group. Explicit shared Cutoffs required.
     Maximize sum log(double coverage); deterministic slot-rank penalty 1e-10 is
     a declared tie policy. Solver time limit 30s; nonoptimal/noninfeasible exits
     fail closed, never interpreted as lack of feasible groups. Empty slots only
     for proved infeasibility. No global claim about future-group optimality.
     """
-    if type(max_uses) is not int or max_uses not in {2,3,4,6} or type(max_pair_overlap) is not int or max_pair_overlap not in {2,3,4}:raise ValueError('Explicit owner reuse caps required')
+    if type(max_uses) is not int or max_uses not in {2,3,4,6} or type(max_pair_overlap) is not int or max_pair_overlap not in {2,3,4,5}:raise ValueError('Explicit owner reuse caps required')
     ranked,_=rank_double_candidates(frame,cutoffs=cutoffs)
     ranked=ranked.sort_values(['slot','provider_id']);slots=list(ranked.slot)
     if any(len(g)!=7 or len(set(g))!=7 or not set(g)<=set(slots) for g in existing_groups):
@@ -43,7 +43,7 @@ def next_overlap_group(frame, existing_groups, *, cutoffs, max_uses, max_pair_ov
 
 
 def n7_single_plan(frame, *, cutoffs, budget_cny, single_rule, single_count, max_uses, unit_cny,
-                   payout_factor, allocation_seed):
+                   payout_factor, allocation_seed, max_pair_overlap=2):
     """Freeze a fixed-budget probability-concentrated CkE0 portfolio (k=0..7).
 
     Input: exact prediction-only one-issue baseline frame and shared Cutoffs.
@@ -55,7 +55,7 @@ def n7_single_plan(frame, *, cutoffs, budget_cny, single_rule, single_count, max
     Contract the first single_count fixtures under the declared single rule.
     Group cost is 2*2**(7-single_count). First buy disjoint groups, then append feasible overlap
     groups from next_overlap_group within the remaining budget. Every fixture
-    <=max_uses groups (explicit2/3/4/6), every pair shares <=2. No repeated elementary units. Cash remains
+    <=max_uses groups (explicit2/3/4/6), every pair shares <=max_pair_overlap (2/3/4/5). No repeated elementary units. Cash remains
     cash; no scores, conflict exclusions, historical fitting or I/O.
     Returns baseline-compatible sealed plan plus budget/cash and selection ledger.
     """
@@ -63,6 +63,7 @@ def n7_single_plan(frame, *, cutoffs, budget_cny, single_rule, single_count, max
         raise ValueError('Explicit nonnegative integer budget and fixed single rule required')
     if type(single_count) is not int or not 0<=single_count<=7:raise ValueError('Integer single_count 0..7 required')
     if type(max_uses) is not int or max_uses not in {2,3,4,6}:raise ValueError('Explicit max_uses 2/3/4/6 required')
+    if type(max_pair_overlap) is not int or max_pair_overlap not in {2,3,4,5}:raise ValueError('Explicit overlap 2/3/4/5 required')
     group_cost=unit_cny*2**(7-single_count)
     base=n7_baseline_plan(frame,cutoffs=cutoffs,selector='COVERAGE',shape='C0E0',funding='UNIT',
         max_groups=6,unit_cny=unit_cny,group_budget_cny=432,payout_factor=payout_factor,allocation_seed=allocation_seed)
@@ -72,7 +73,7 @@ def n7_single_plan(frame, *, cutoffs, budget_cny, single_rule, single_count, max
     groups=[list(map(int,ranked.iloc[i*7:(i+1)*7].slot)) for i in range(disjoint)]
     overlap_ledger=[]
     while len(groups)<budget_cny//group_cost:
-        extra=next_overlap_group(frame,groups,cutoffs=cutoffs,max_uses=max_uses,max_pair_overlap=2)
+        extra=next_overlap_group(frame,groups,cutoffs=cutoffs,max_uses=max_uses,max_pair_overlap=max_pair_overlap)
         overlap_ledger.append(extra)
         if not extra['slots']:break
         groups.append(extra['slots'])
@@ -98,7 +99,7 @@ def n7_single_plan(frame, *, cutoffs, budget_cny, single_rule, single_count, max
     result.update(shape=f'C{single_count}E0',single_rule=single_rule,single_count=single_count,group_cost_cny=group_cost,groups=count,legs=legs,tickets=tickets,
         stake=group_cost*count,budget_cny=budget_cny,cash_cny=budget_cny-group_cost*count,
         contraction_ledger=ledger,disjoint_groups=disjoint,overlap_groups=count-disjoint,
-        overlap_ledger=overlap_ledger,max_uses=max_uses,max_pair_overlap=2,
+        overlap_ledger=overlap_ledger,max_uses=max_uses,max_pair_overlap=max_pair_overlap,
         max_groups='BUDGET_AND_REUSE_CAPS',source_plan_seal=base['seal'])
     return dict(**result,seal=stable_json_hash(result))
 
