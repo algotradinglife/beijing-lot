@@ -1,0 +1,180 @@
+---
+title: "7串1：互斥分池与条件次选"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-exclusive-conditional-v5"
+  archive_fixture: null
+  overlap_fixture: "tests/fixtures/n7_weighted_sampling.json.gz"
+---
+
+使用已暴露的100期100608–101120，冻结新版市场概率，不重新训练。
+每期预算1024元、每个基本组合2元、整注返奖系数0.65一次；初始资金100000元。
+本研究是逐场决策时点数据的回顾组合诊断，不证明整张票在同一时点可购。
+
+每场先按市场Top1≥50%进入单选池，否则进入双选池，两池互斥。
+每组从单选池取2场、双选池取5场，不足时留现金且不跨池补位。
+单选池按Top1概率归一化加权，双选池按Top2累计概率归一化加权；
+组内抽走一场后重新归一化，组间有放回且无复用上限。
+完全相同的场次及赛果支持组不重复买；不同组可包含相同基本组合，重复量另记。
+默认单选池选第一赛果，双选池选Top2双选。次选分别为第二赛果单选、第三赛果单选。
+只有达到条件才以5%或10%采用次选；否则保持默认，期望收益仅记录。
+
+| 规则 | 单选次选条件 | 双选次选条件 |
+|---|---|---|
+| BASE | 从不 | 从不 |
+| ANY05/10 | 无条件 | 无条件 |
+| G10_05/10 | 第一−第二≤10个百分点 | 第一−第三≤10个百分点 |
+| G20_05/10 | 第一−第二≤20个百分点 | 第一−第三≤20个百分点 |
+| SIGNAL05/10 | 第一−第二≤10个百分点 | 市场第三进入战力Top2 |
+| JOINT05/10 | 第一−第二≤10个百分点 | 第一−第三≤20个百分点且市场第三进入战力Top2 |
+
+战力只提供分歧触发，不影响分池和选场排序；所有条件使用冻结的赛前概率。
+触发次数和次选命中统计按持有位置计，同场复用不是独立样本。
+
+设每个位置支持集合为S，单位投入预期返还倍数为
+\(V=\sum_{r\in S}p_r/q_r\,/|S|\)，其中p为校正市场概率、1/q为原市场概率估算SP。
+原市场来自欧赔及大小球映射，不使用实际结算SP选场。
+整组预期收益率为\(0.65\prod V-1\)，整组成本为\(2\times2^d\)，d为实际双选场数。
+此计算使用比赛独立性假设。若p=q，所有组预期收益率都是−35%，期望值没有区分力。
+
+每种条件规则固定5个seed（41901–41905），期望收益仅记录，不参与接受/拒绝或选场选赛果。
+每期最多尝试500组；重复、超预算或组内无候选时拒绝，不消耗资金。
+未花完的预算留现金。不根据本轮收益择优seed。
+CAL_U3/U6为此前确定性原组对照；与旧控制相比同时改变了复用、选场、赛果和单选门槛，
+所以与旧策略的差异不能归因于某一项。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+if(is.null(params$archive_fixture)) {
+  frozen<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'))
+  er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  stopifnot(identical(digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(file=file.path(params$study,'results.json'),algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+    identical(digest::digest(file=er$controls_path,algo='sha256'),er$controls_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(file.path(params$study,'results.json'))
+  stopifnot(identical(result$freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',
+    identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+stopifnot(nrow(result$rows)==5500,nrow(result$controls)==200)
+x<-bind_rows(as_tibble(result$rows),as_tibble(result$controls)) |>
+  select(-any_of('rejections')) |>
+  mutate(issue=as.character(issue),status=if_else(stake>0,'COMPLETE','NO_BET'),budget_cny=1024,cash_cny=1024-stake)
+curves<-strategy_equity_curves(x,as.character(result$issue_order),100000)
+summary<-market_conditional_summary(x,curves)
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'))
+readr::write_csv(x |> select(-any_of('rejections')) |> mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_)),file.path(params$study,'periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+```
+
+## 总体收益、回撤及seed波动
+
+互斥池BASE的ROI中位数为−8.29%。SIGNAL05改善至−0.19%，最大回撤中位数
+从16313元降至13983元；5个seed仍只有2个盈利，剔除各自最高盈利一期后ROI中位数−5.55%。
+G20_05为−0.83%，但跨seed波动较大。尚不能用本轮结果替换旧U3/U6策略。
+
+单选池共有1070场候选，第一、第二赛果最小差值21.01个百分点，
+因此10/20个百分点条件均没有触发单选次选。本轮条件策略的改变来自双选池，
+不能据此判断单选差值条件无效；25/30个百分点分别覆盖374/774场候选，尚未测试收益。
+
+每行是一套独立策略的100期表现，不能把5个seed相加视为同一预算组合。
+ROI按实际投入计算；without_best剔除该策略最高净收益的一期及对应投入。
+
+```{r}
+knitr::kable(summary,digits=2)
+knitr::kable(summary |> group_by(model) |> summarise(seeds=n(),
+  median_roi=median(roi_percent,na.rm=TRUE),min_roi=min(roi_percent,na.rm=TRUE),max_roi=max(roi_percent,na.rm=TRUE),
+  median_net=median(net),median_drawdown=median(max_drawdown),
+  worst_drawdown=max(max_drawdown),median_hit_issues=median(hit_issues),.groups='drop'),digits=2)
+```
+
+## 与原重叠池的无条件次选对比
+
+保持同一期次、seed和5%／10%次选比例，比较分池变化。
+旧结果来自已归档回顾记录，不复用旧模型作为当前决策接口。
+
+```{r}
+overlap<-jsonlite::fromJSON(gzfile(params$overlap_fixture))
+stopifnot(overlap$mode=='ARCHIVED_ACCOUNTING_ONLY',
+  identical(digest::digest(overlap$body,serialize=FALSE,algo='sha256'),overlap$sha256))
+previous<-jsonlite::fromJSON(overlap$body)
+old<-as_tibble(previous$rows) |> filter(model %in% c('RATE05','RATE10')) |>
+  select(-any_of('rejections')) |>
+  mutate(issue=as.character(issue),status=if_else(stake>0,'COMPLETE','NO_BET'),budget_cny=1024,cash_cny=1024-stake)
+stopifnot(identical(as.character(previous$issue_order),as.character(result$issue_order)))
+old_summary<-market_conditional_summary(old,strategy_equity_curves(old,as.character(result$issue_order),100000))
+knitr::kable(bind_rows(old_summary,summary |> filter(model %in% c('ANY05','ANY10'))) |>
+  select(model,policy,stake,net,roi_percent,hit_issues,max_drawdown),digits=2)
+```
+
+## 使用预算和复用
+
+单选池角色数固定为2，不等于实际只有2场单选。复用次数、重复基本组合按每期计算。
+未达到单选入池条件或尝试次数耗尽时可能保留现金；资金使用率单列。
+
+```{r}
+knitr::kable(x |> filter(policy!='CONTROL') |> group_by(model,policy) |> summarise(
+  spent=sum(stake),cash=sum(cash_cny),active_issues=sum(stake>0),total_groups=sum(groups),
+  group_hit_percent=100*sum(hits)/sum(groups),mean_group_coverage=weighted.mean(mean_coverage,groups,na.rm=TRUE),
+  planned_roi=weighted.mean(expected_roi,stake,na.rm=TRUE),max_reuse=max(max_reuse),
+  repeated_elementary=sum(repeated_elementary),attempts=sum(attempts),.groups='drop'),digits=3)
+```
+
+## 条件触发与次选命中
+
+以下为投注位置汇总，不能解释为独立比赛数；只统计最终接受的组。
+eligible表示条件许可（BASE的许可不产生次选，因为配置概率为0）。
+5%／10%是提案层的抽样概率；组装后按余额接受的低成本组可能使最终次选持有比例不同。
+
+```{r}
+knitr::kable(x |> filter(policy!='CONTROL') |> group_by(model) |> summarise(
+  S_positions=sum(S_positions),S_eligible=sum(S_eligible),S_alternatives=sum(S_alternatives),S_alt_hits=sum(S_alt_hits),
+  B_positions=sum(B_positions),B_eligible=sum(B_eligible),B_alternatives=sum(B_alternatives),B_alt_hits=sum(B_alt_hits),
+  .groups='drop'),digits=0)
+```
+
+## 收益与回撤曲线
+
+```{r}
+#| fig-width: 14
+#| fig-height: 18
+curves$label<-curves$policy
+equity<-plot_strategy_equity(curves,'funded',100000)
+equity
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=14,height=18,dpi=140)
+dd<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=policy))+
+  ggplot2::geom_line()+ggplot2::facet_wrap(~model)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Drawdown (CNY)',colour='Seed')
+dd
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),dd,width=14,height=18,dpi=140)
+```
+
+## 每期收益率
+
+```{r}
+knitr::kable(x |> select(issue,model,policy,groups,hits,stake,net,cash_cny) |>
+  mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_)),digits=2)
+jsonlite::write_json(list(mode='EXPOSED_FIXED_SEEDS',freeze=result$freeze_seal,
+  overlap_fixture_sha256=digest::digest(file=params$overlap_fixture,algo='sha256'),
+  qmd_sha256=digest::digest(file='quarto/127_n7_exclusive_conditional.qmd',algo='sha256'),
+  summary_implementation_sha256=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+  equity_implementation_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
