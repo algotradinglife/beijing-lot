@@ -98,6 +98,23 @@ def test_scope_and_gap_and_disk(setup):
         load_inventory(manifest)
 
 
+def test_historical_pages_returns_nonplayed_quarantine_when_requested(setup):
+    manifest, output, options, calls, _ = setup
+    soup = BeautifulSoup(gzip.decompress(Path('tests/fixtures/fundamentals_census/roster-130511-type8.html.gz').read_bytes()), 'html.parser')
+    row = soup.select_one('tr#row_1')
+    row.find('a', string='析')['href'] = '//live.nowscore.com/analysis/-1cn.html'
+    for prefix in ['HomeTeam', 'GuestTeam']:
+        node = row.select_one(f'a[id^="{prefix}_"]')
+        node['id'] = f'{prefix}_-1'
+    row.append(' 取消')
+    inventory, cutoff, _ = load_inventory(manifest)
+    pages, gaps, quarantined = historical_pages(
+        str(soup).encode(), roster_url=URL, issue='130511', cutoff=cutoff,
+        quarantine_unavailable=True, include_quarantined=True)
+    assert len(pages) == 82 and gaps == [] and len(quarantined) == 1
+    assert quarantined[0]['source_status'] == '取消'
+
+
 def test_bad_roster_and_interrupted(setup):
     manifest, output, options, calls, soup = setup
     soup.select_one('option[selected]')['value'] = '130512'
@@ -291,3 +308,22 @@ def test_native_fetch_preserves_validated_headers_and_transport(monkeypatch):
     assert 'Chrome/152' in options['headers']['User-Agent']
     assert options['timeout'] == 20 and options['stream'] is True
     assert options['allow_redirects'] is False
+
+
+def test_shared_ledger_contention_waits_without_consuming_attempt(setup, monkeypatch):
+    import src.fundamentals_bulk_capture as module
+    manifest, output, options, calls, _ = setup
+    original = module.capture_history_batch
+    attempts = []
+    def busy_once(*args, **kwargs):
+        attempts.append(args[1])
+        if len(attempts) == 1:
+            raise BlockingIOError(11, "shared ledger busy")
+        return original(*args, **kwargs)
+    monkeypatch.setattr(module, "capture_history_batch", busy_once)
+    result = run_historical_inventory(manifest, output, **options)
+    assert result["state"] == "FINISHED"
+    assert attempts[0] == attempts[1]
+    assert len(calls) == 3
+    progress = json.loads((output / "130511" / "progress.json").read_text())
+    assert all(len(page["attempts"]) == 1 for page in progress["item"]["page_states"].values())

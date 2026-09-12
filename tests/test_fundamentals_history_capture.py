@@ -102,7 +102,7 @@ def test_backwards_clock_and_short_wait_fail_closed(tmp_path, doc):
 
 
 @pytest.mark.parametrize("kwargs", [{"budget_id": " "}, {"request_budget": True},
-    {"request_budget": 0}, {"min_interval_seconds": 4}, {"min_interval_seconds": float("nan")}])
+    {"request_budget": 0}, {"min_interval_seconds": 0.9}, {"min_interval_seconds": float("nan")}])
 def test_invalid_policy_rejected_before_io(tmp_path, doc, kwargs):
     policy = {"budget_id": "a", "request_budget": 1, **kwargs}
     with pytest.raises(ValueError):
@@ -118,3 +118,48 @@ def test_invalid_input_and_existing_output(tmp_path, doc):
     with pytest.raises(FileExistsError):
         capture_history_batch([doc], tmp_path, ledger_path=tmp_path / "ledger",
                               budget_id="a", request_budget=1)
+
+
+def test_two_seconds_new_policy_preserves_old_budget(tmp_path, doc):
+    stamp = [100.0]
+    calls = []
+    def sleep(seconds):
+        stamp[0] += seconds
+    def fetch(*args, **kwargs):
+        calls.append(stamp[0])
+        return Response()
+    ledger = tmp_path / 'ledger'
+    for index, interval in enumerate((5, 2, 2, 5)):
+        capture_history_batch([doc], tmp_path / str(index), ledger_path=ledger,
+            budget_id=str(interval), request_budget=2, min_interval_seconds=interval,
+            wall_clock=lambda: stamp[0], sleeper=sleep, fetch=fetch)
+    assert calls == [100, 105, 107, 109]
+    with pytest.raises(ValueError, match='policy'):
+        capture_history_batch([doc], tmp_path / 'bad', ledger_path=ledger,
+            budget_id='5', request_budget=2, min_interval_seconds=2)
+
+def test_one_second_budget_preserves_old_policy(tmp_path, doc):
+    stamp = [100.0]
+    calls = []
+    def sleep(seconds):
+        stamp[0] += seconds
+    def fetch(*args, **kwargs):
+        calls.append(stamp[0])
+        return Response()
+    ledger = tmp_path / "ledger"
+    for index, interval in enumerate((2, 1, 1, 2)):
+        capture_history_batch([doc], tmp_path / str(index), ledger_path=ledger,
+            budget_id=str(interval), request_budget=2, min_interval_seconds=interval,
+            wall_clock=lambda: stamp[0], sleeper=sleep, fetch=fetch)
+    assert calls == [100, 102, 103, 104]
+    with pytest.raises(ValueError, match="policy"):
+        capture_history_batch([doc], tmp_path / "bad", ledger_path=ledger,
+            budget_id="2", request_budget=2, min_interval_seconds=1)
+
+
+def test_nowscore_euro_endpoint_uses_shared_nowscore_rate_key():
+    from src.fundamentals_history_capture import capture_rate_source
+    assert capture_rate_source({'source':'nowscore','url':'https://1x2.nowscore.com/547279.js'}) == 'nowscore'
+    import pytest
+    with pytest.raises(ValueError):
+        capture_rate_source({'source':'titan','url':'https://1x2.nowscore.com/547279.js'})
