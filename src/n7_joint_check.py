@@ -53,6 +53,9 @@ def check_joint_plan(plan, worlds, config):
         if key["state_ids"] != state.tolist() or len(set(state)) != 64:
             raise ValueError("Selected state identity mismatch")
         sets.append(set(ix[0])); mass = np.prod(triplets[ix, outcome], axis=1).sum(); masses.append(mass)
+        group_value = float(np.sum(1.3 * np.prod(triplets[ix, outcome] / quotes[ix, outcome], axis=1)))
+        if not np.isclose(group_value, key["expected_gross"], atol=1e-6, rtol=1e-12):
+            raise ValueError("Sleeve expected return mismatch")
         all_p = np.prod(triplets[ix[0], canonical], axis=1)
         best = np.sort(all_p)[-64:].sum()
         if key["rule"] == "PROB" and not np.isclose(mass, best, atol=1e-12, rtol=1e-10):

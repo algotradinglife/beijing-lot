@@ -61,6 +61,13 @@ JOINT_RETURN adds the return floor; JOINT_UP adds U/P as well; JOINT_FULL adds r
 JOINT_NO_RETURN and JOINT_NO_UP remove one constraint family from the full arm.
 Existing monolithic 512-ticket and old sleeve controls remain separately labeled
 frozen references. A reference is not regenerated with changed selection logic.
+The monolithic archive can access the prior ticket pool as well as all states of
+the 24 sets; the new sleeve solver is restricted to those 24 sets. Its comparison
+against monolithic references is therefore not a pure equal-access decomposition
+experiment. The R-native quality/union/constraint arms do share exactly the same
+24 sets. Candidate-budget sensitivity at 24/240/960 and variable-depth cap/U/P
+results remain separately inventoried in reports 135–137; they are not silently
+mixed with this fixed 8x64 trial.
 
 Report all-issue cash-inclusive results and matched jointly funded issue subsets;
 no-bet counts by solver status; each issue's stake, gross, net, ROI, hits; seed
@@ -77,6 +84,11 @@ receipts before opening the audit. Use shared `src/temporal_learning` Cutoff and
 provenance functions; no fitting, partitions or cross-cutoff cache reuse here.
 The historical p artifact retains its existing exposure/availability limitations;
 maximum source/label availability is unproven, not invented from event dates.
+
+Paired ROI uncertainty uses a percentile bootstrap resampling whole matched
+issues with all seeds together. This is descriptive sampling uncertainty on the
+exposed cohort, not a correction for prior strategy search or a fresh selection
+gate. Seeds and repetition count are explicit report parameters.
 
 Delivery is reusable R functions, corresponding tests, executable QMD, independent
 replay and Codex review. A negative or tail-dependent result can complete research.

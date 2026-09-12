@@ -1,0 +1,5 @@
+{
+  "r_packages": {"boot": "1.3.32"},
+  "inherits": "config/n7_joint_runtime.json",
+  "role": "Descriptive issue-cluster bootstrap only; no ticket selection or tuning."
+}
