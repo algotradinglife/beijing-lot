@@ -100,6 +100,43 @@ knitr::kable(v$draw_calibration |> filter(cohort=='new100',handicap!='ALL',n>0),
 knitr::kable(v$draw_calibration_fine |> filter(handicap=='ALL'),digits=2)
 ```
 
+## 基线与市场让平概率散点图
+
+每个点是一场比赛。实心点表示实际北单让平，空心点表示未让平；
+零让球时让平等于普通平局，非零让球时表示加上让球后打平。
+虚线为两模型概率相等。点未做抖动或抽样，重叠区域不能直接用视觉密度估计发生率。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6.5
+scatter_data<-fixtures |> mutate(
+  样本=factor(cohort,levels=c('old48','new100'),labels=c('原48期：2,561场','新增100期：6,547场')),
+  实际结果=factor(if_else(actual=='D','实际让平','未让平'),levels=c('未让平','实际让平'))) |>
+  arrange(实际结果)
+stopifnot(nrow(scatter_data)==9108,!anyNA(scatter_data[c('p_D','q_D','实际结果')]))
+axis_max<-ceiling(max(scatter_data$p_D,scatter_data$q_D)*20)/20
+scatter_plot<-ggplot2::ggplot(scatter_data,ggplot2::aes(p_D,q_D,shape=实际结果,color=实际结果))+
+  ggplot2::geom_abline(slope=1,intercept=0,linetype='dashed',color='grey55',linewidth=.45)+
+  ggplot2::geom_point(size=1.15,alpha=.5,stroke=.35)+
+  ggplot2::facet_wrap(~样本,nrow=1)+
+  ggplot2::scale_shape_manual(values=c('未让平'=1,'实际让平'=16))+
+  ggplot2::scale_color_manual(values=c('未让平'='#88949E','实际让平'='#C45719'))+
+  ggplot2::scale_x_continuous(labels=scales::label_percent(accuracy=1),breaks=seq(0,axis_max,.1))+
+  ggplot2::scale_y_continuous(labels=scales::label_percent(accuracy=1),breaks=seq(0,axis_max,.1))+
+  ggplot2::coord_equal(xlim=c(0,axis_max),ylim=c(0,axis_max),expand=FALSE)+
+  ggplot2::labs(title='基线与市场让平概率：实际结果分布',
+    subtitle='实心＝实际让平；空心＝未让平；虚线＝两模型概率相等',
+    x='基线让平概率',y='市场让平概率',shape=NULL,color=NULL,
+    caption='全部可用场次；北单让球口径；未加入专家或筛选下注场次')+
+  ggplot2::theme_minimal(base_size=12,base_family='Noto Sans CJK SC')+
+  ggplot2::theme(legend.position='bottom',panel.grid.minor=ggplot2::element_blank(),
+    panel.spacing.x=grid::unit(2,'lines'))+
+  ggplot2::guides(shape=ggplot2::guide_legend(override.aes=list(alpha=1,size=2.5)))
+scatter_plot
+ggplot2::ggsave(file.path(params$study,'draw-probability-scatter.png'),scatter_plot,width=12,height=6.5,dpi=200)
+ggplot2::ggsave(file.path(params$study,'draw-probability-scatter.pdf'),scatter_plot,width=12,height=6.5,device=grDevices::cairo_pdf)
+```
+
 ## 基线让平概率分档与实际发生率
 
 沿用相同分档，但按基线p_D划分场次，gap_pp改为实际减平均基线概率。
