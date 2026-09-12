@@ -1,5 +1,5 @@
 ---
-title: "概率底座候选：市场＋战力区间让平校正 v1.0.0"
+title: "概率底座候选：市场让平与胜负差联合校正 v1.0.0"
 format:
   html:
     embed-resources: true
@@ -9,11 +9,12 @@ execute:
   error: false
 params:
   archive_fixture: null
-  study: "data/derived/fundamentals_417/market-strength-draw-v1-reviewed"
+  study: "data/derived/fundamentals_417/market-balance-draw-v1"
+  comparison_study: "data/derived/fundamentals_417/market-strength-draw-v1-shared"
   market_study: "data/derived/fundamentals_417/updated100-strategies-v1/projected"
 ---
 
-本版本名称为 `market-strength-draw-1.0.0-diagnostic`，是概率底座候选，不替换默认版本。
+本版本名称为 `market-balance-draw-1.0.0-diagnostic`，是概率底座候选，不替换默认版本。
 原48期为固定历史训练池；新增100期逐期使用该期最早决策时点为保守截止，排除尚不可用历史。
 这些样本已经参与此前探索，故本次是历史研究，不是全新盲测。
 标签可用时间使用开赛时间加6小时的历史代理，**不构成真实可用时间证明，不授权前瞻使用**。
@@ -21,8 +22,9 @@ params:
 
 ## 设计
 
-市场让平概率区间为[0,20%)、[20%,24%)、[24%,28%)、[28%,100%]；
-战力让平概率区间为[0,15%)、[15%,20%)、[20%,25%)、[25%,30%)、[30%,100%]。
+市场让平概率区间边界为0、10%、15%、20%、25%、30%、35%、100%；
+市场胜负概率绝对差区间边界为0、10%、20%、30%、40%、50%、60%、100%。
+新版本只使用市场概率；战力概率仅参与旧候选对照，不是新版本的输入。
 按两个区间的交叉格统计实际让平发生率，作为该格的校正目标。
 
 设格内历史样本数为n、让平次数为d，原市场让平概率为q，固定收缩强度s=100：
@@ -62,11 +64,24 @@ stopifnot(identical(digest::digest(file=file.path(params$study,'evaluation.csv')
   identical(digest::digest(file=file.path(params$study,'frozen.json'),algo='sha256'),evaluation_receipt$freeze_sha256))
 x<-readr::read_csv(file.path(params$study,'evaluation.csv'),col_types=readr::cols(issue='c',provider_id='c',cutoff_ts='c',.default='?'))
 stopifnot(nrow(x)==6547)
+comparison_frozen<-jsonlite::fromJSON(file.path(params$comparison_study,'frozen.json'))
+comparison_receipt<-jsonlite::fromJSON(file.path(params$comparison_study,'evaluation-receipt.json'))
+stopifnot(identical(digest::digest(file=file.path(params$comparison_study,'frozen.json'),algo='sha256'),comparison_receipt$freeze_sha256),
+  identical(digest::digest(file=file.path(params$comparison_study,'evaluation.csv'),algo='sha256'),comparison_receipt$evaluation_sha256))
+for(path in names(comparison_frozen$source_hashes)) stopifnot(identical(digest::digest(file=path,algo='sha256'),comparison_frozen$source_hashes[[path]]))
+for(m in comparison_frozen$models) stopifnot(identical(digest::digest(file=m$path,algo='sha256'),m$sha256))
+previous<-readr::read_csv(file.path(params$comparison_study,'evaluation.csv'),col_types=readr::cols(issue='c',provider_id='c',cutoff_ts='c',.default='?'))
+keys<-c('issue','slot','provider_id')
+stopifnot(nrow(previous)==nrow(x),!anyDuplicated(previous[keys]),
+  nrow(anti_join(x,previous,by=keys))==0)
+x<-left_join(x,previous |> select(all_of(keys),previous_W=new_W,previous_D=new_D,previous_L=new_L,
+  previous_actual=actual_direction,previous_cutoff=cutoff_ts),by=keys,relationship='one-to-one')
+stopifnot(all(x$previous_actual==x$actual_direction),all(x$previous_cutoff==x$cutoff_ts))
 first_model<-jsonlite::fromJSON(frozen$models[[1]]$path)
 }
 stopifnot(!anyDuplicated(x[c('issue','slot','provider_id')]))
 metric_rows<-list()
-for(model in c('p','q','new')) {
+for(model in c('p','q','previous','new')) {
   probability<-as.matrix(x[paste0(model,c('_W','_D','_L'))])
   stopifnot(all(abs(rowSums(probability)-1)<1e-10),all(probability>0))
   target<-match(x$actual_direction,c('W','D','L'));draw<-as.numeric(target==2)
@@ -90,25 +105,28 @@ readr::write_csv(metrics,file.path(params$study,'metrics.csv'))
 
 ```{r}
 if(archived) cat('CI样例渲染：仅3场，以下指标不是100期结论。\n')
+market_labels<-paste0(head(first_model$parameters$market_edges,-1)*100,'–',tail(first_model$parameters$market_edges,-1)*100,'%')
+gap_labels<-paste0(head(first_model$parameters$secondary_edges,-1)*100,'–',tail(first_model$parameters$secondary_edges,-1)*100,'%')
 cell_table<-first_model$cells |>
-  mutate(market_interval=c('[0,20%)','[20%,24%)','[24%,28%)','[28%,100%]')[market_bin+1],
-    strength_interval=c('[0,15%)','[15%,20%)','[20%,25%)','[25%,30%)','[30%,100%]')[strength_bin+1],
+  mutate(market_interval=factor(market_labels[market_bin+1],levels=market_labels),
+    gap_interval=factor(gap_labels[secondary_bin+1],levels=gap_labels),
     empirical_percent=100*observed_draw_rate,
     empirical_weight=n/(n+first_model$parameters$prior_strength)) |>
-  select(market_interval,strength_interval,n,draws,empirical_percent,empirical_weight)
+  select(market_interval,gap_interval,n,draws,empirical_percent,empirical_weight)
 knitr::kable(cell_table,digits=3)
-ggplot2::ggplot(cell_table,ggplot2::aes(market_interval,strength_interval,fill=empirical_percent))+
+ggplot2::ggplot(cell_table,ggplot2::aes(market_interval,gap_interval,fill=empirical_percent))+
   ggplot2::geom_tile()+
   ggplot2::geom_text(ggplot2::aes(label=sprintf('%.1f%%\nn=%.0f',empirical_percent,n)))+
   ggplot2::scale_fill_gradient(low='white',high='steelblue',name='Draw rate (%)')+
-  ggplot2::labs(x='Market draw probability bin',y='Strength draw probability bin')+
+  ggplot2::labs(x='Market draw probability bin',y='Absolute market W-L gap bin')+
   ggplot2::theme_minimal()
 ggplot2::ggsave(file.path(params$study,'draw-cell-map.png'),width=9,height=5,dpi=160)
 ```
 
 ## 新增100期的诊断结果
 
-p为战力概率，q为原市场概率，new为新候选。Brier和对数损失越低越好；
+p为战力概率，q为原市场概率，previous为市场让平×战力让平旧候选，new为市场让平×市场胜负差新候选。
+旧候选与新候选共享相同历史池、截止规则及收缩强度，但分档定义不同；这不是只改变单一变量的消融实验。Brier和对数损失越低越好；
 让平Top2召回率是实际让平场次被Top2覆盖的比例，不是选择让平的精确率。
 
 ```{r}
@@ -162,10 +180,16 @@ knitr::kable(bind_rows(examples),digits=5)
 
 ## 接口和版本边界
 
+本次完整100期结果：新候选让平Brier为0.197041，原市场为0.196620（越低越好）；
+Top2命中4825/6547（73.70%），原市场4854/6547（74.14%）。
+实际让平的Top2覆盖增加53场（193→246），但非让平命中减少82场（4661→4579），总命中净减29场。
+上一版市场×战力候选为4840场，因此本版也没有优于上一版。样例模式的3场指标不能替代上述完整结果。
+结论是保存此候选及其证据，不推广为默认概率底座；未测试串关收益，不由概率覆盖变化推断收益改善。
+
 Python：`src/probability_foundation_draw.py`提供`fit_draw_foundation`与`predict_draw_foundation`，
 显式传入Cutoff、版本、来源哈希、区间和收缩强度。每期独立不可变artifact，100次独立重复拟合已核对完全一致。
 R：`r/probability_foundation_draw.R`的`foundation_score_grid(grid, handicap, prediction, cutoff)`
 把预测应用到原市场比分表；默认完整执行核对全部6547场。CI样例模式只验证3场渲染与投影，不代替完整验证。
 
-新候选提高了让平覆盖，但初步概率误差未改善，不能仅凭让平命中增加就升级为默认底座。
+是否采用新候选以整体概率误差及命中指标共同判断，不能仅凭让平命中增加就升级为默认底座。
 它保留为可复现的研究版本，后续版本必须使用新的截止窗口与独立验证；本轮不调整七串一或预算。

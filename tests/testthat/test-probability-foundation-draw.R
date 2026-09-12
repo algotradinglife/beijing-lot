@@ -9,6 +9,8 @@ testthat::test_that('foundation maps draw scores and retains non-draw ratios', {
   z<-foundation_score_grid(g,0,p,p$cutoff_ts)
   testthat::expect_equal(z$grid$probability,c(.2,.65,.15),tolerance=1e-12)
   testthat::expect_equal(sum(z$grid$probability),1)
+  p$version<-'market-balance-draw-1.0.0-diagnostic'
+  testthat::expect_equal(foundation_score_grid(g,0,p,p$cutoff_ts)$grid$probability,z$grid$probability)
   testthat::expect_error(foundation_score_grid(g,0,p,'wrong'))
   p$q_D<-.4
   testthat::expect_error(foundation_score_grid(g,0,p,p$cutoff_ts))

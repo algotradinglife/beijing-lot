@@ -1,4 +1,4 @@
-"""Market score foundation with cutoff-bound strength/market draw correction."""
+"""Market score foundation with cutoff-bound joint-bin draw correction."""
 from pathlib import Path
 import json
 import numpy as np
@@ -9,12 +9,20 @@ from src.temporal_learning import (Cutoff, AvailabilityFilter, AvailabilityPolic
 from src.temporal_learning.core import stable_json_hash
 
 
-def draw_cells(frame, cutoff, *, market_edges, strength_edges):
+def draw_cells(frame, cutoff, *, market_edges, secondary_edges, version):
     """Return integer bin pairs; probabilities are fractions, endpoints 0/1 allowed."""
     if not isinstance(cutoff, Cutoff):
         raise TemporalContractError('Explicit cutoff required')
+    if version not in ('market-strength-draw-1.0.0-diagnostic','market-balance-draw-1.0.0-diagnostic'):
+        raise TemporalContractError('Unknown foundation version')
     result = frame.copy()
-    for column, edges, output in [('q_D', market_edges, 'market_bin'), ('p_D', strength_edges, 'strength_bin')]:
+    if version == 'market-balance-draw-1.0.0-diagnostic':
+        q = result[['q_W','q_D','q_L']].to_numpy(float)
+        if not np.isfinite(q).all() or (q<0).any() or not np.allclose(q.sum(axis=1),1,atol=1e-10,rtol=0):
+            raise TemporalContractError('Normalized market WDL required')
+        result['market_gap'] = np.abs(q[:,0]-q[:,2])
+    secondary = 'market_gap' if version == 'market-balance-draw-1.0.0-diagnostic' else 'p_D'
+    for column, edges, output in [('q_D', market_edges, 'market_bin'), (secondary, secondary_edges, 'secondary_bin')]:
         values = result[column].to_numpy(float)
         edges = np.asarray(edges, dtype=float)
         if (not np.isfinite(edges).all() or len(edges) < 2 or edges[0] != 0 or edges[-1] != 1
@@ -27,7 +35,7 @@ def draw_cells(frame, cutoff, *, market_edges, strength_edges):
 
 @temporal_client
 def fit_draw_foundation(history, cutoff, *, repository_root, source_hashes,
-                        market_edges, strength_edges, prior_strength, epsilon, version):
+                        market_edges, secondary_edges, prior_strength, epsilon, version):
     """Fixed-policy historical diagnostic fit; no target labels or parameter search.
 
     Each bin learns its observed draw rate, shrunk toward the fixture market rate.
@@ -35,7 +43,7 @@ def fit_draw_foundation(history, cutoff, *, repository_root, source_hashes,
     Requires explicit proxy clocks; never authorizes prospective decisions.
     """
     if (not np.isfinite(prior_strength) or prior_strength <= 0 or not 0 < epsilon < .01
-            or version != 'market-strength-draw-1.0.0-diagnostic'):
+            or version not in ('market-strength-draw-1.0.0-diagnostic','market-balance-draw-1.0.0-diagnostic')):
         raise TemporalContractError('Invalid fixed foundation parameters/version')
     context = prepare_learning_context(history, cutoff, repository_root=Path(repository_root),
         source_hashes=source_hashes, implementation_modules=('src.probability_foundation_draw', 'src.temporal_learning.diagnostic_labels'),
@@ -45,16 +53,16 @@ def fit_draw_foundation(history, cutoff, *, repository_root, source_hashes,
         intended_use='HISTORICAL_DIAGNOSTIC',
         partition_policy=PartitionPolicy(kind='FIXED_PRIOR_FIT',tune_years=0,calibration_years=0),
         weighting_policy=WeightingPolicy.expanding_equal(minimum_ess=100))
-    rows = draw_cells(context.partitions['fit'], cutoff, market_edges=market_edges,strength_edges=strength_edges)
+    rows = draw_cells(context.partitions['fit'], cutoff, market_edges=market_edges,secondary_edges=secondary_edges,version=version)
     if (rows.duplicated(['issue_code','slot','provider_id']).any()
             or not rows.actual.isin(['W','D','L']).all()):
         raise TemporalContractError('Invalid history identities/outcomes')
     rows['weight'] = context.weights.loc[rows.index]
     rows['draw_mass'] = rows.weight * rows.actual.eq('D').astype(float)
-    cells = rows.groupby(['market_bin','strength_bin'],as_index=False).agg(
+    cells = rows.groupby(['market_bin','secondary_bin'],as_index=False).agg(
         n=('weight','sum'),draws=('draw_mass','sum'))
     cells['observed_draw_rate'] = cells.draws/cells.n
-    parameters = dict(market_edges=list(market_edges),strength_edges=list(strength_edges),
+    parameters = dict(market_edges=list(market_edges),secondary_edges=list(secondary_edges),
                       prior_strength=float(prior_strength),epsilon=float(epsilon))
     receipt = dict(context.receipt.payload)
     receipt.update(version=version,parameters=parameters,
@@ -89,8 +97,8 @@ def predict_draw_foundation(artifact, frame, cutoff, *, repository_root):
     if not np.isfinite(q).all() or (q<=0).any() or not np.allclose(q.sum(axis=1),1,atol=1e-10,rtol=0):
         raise TemporalContractError('Strictly positive normalized market probabilities required')
     params = artifact['parameters']
-    result = draw_cells(frame,cutoff,market_edges=params['market_edges'],strength_edges=params['strength_edges'])
-    result = result.merge(pd.DataFrame(artifact['cells']),on=['market_bin','strength_bin'],how='left',validate='many_to_one')
+    result = draw_cells(frame,cutoff,market_edges=params['market_edges'],secondary_edges=params['secondary_edges'],version=artifact['version'])
+    result = result.merge(pd.DataFrame(artifact['cells']),on=['market_bin','secondary_bin'],how='left',validate='many_to_one')
     result[['n','draws']] = result[['n','draws']].fillna(0)
     result['new_D'] = np.clip((result.draws+params['prior_strength']*result.q_D)/
         (result.n+params['prior_strength']),params['epsilon'],1-params['epsilon'])

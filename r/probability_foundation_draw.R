@@ -4,7 +4,7 @@
 # Returns coherent grid and WDL. Pure, no fitting/I/O; mismatched inputs stop.
 foundation_score_grid <- function(grid, handicap, prediction, cutoff) {
   stopifnot(nrow(prediction)==1L,identical(as.character(prediction$cutoff_ts),cutoff),
-    identical(as.character(prediction$version),'market-strength-draw-1.0.0-diagnostic'))
+    as.character(prediction$version) %in% c('market-strength-draw-1.0.0-diagnostic','market-balance-draw-1.0.0-diagnostic'))
   delta<-grid$home_goals-grid$away_goals+handicap
   observed<-c(sum(grid$probability[delta>0]),sum(grid$probability[delta==0]),sum(grid$probability[delta<0]))
   expected<-as.numeric(prediction[1,c('q_W','q_D','q_L')])

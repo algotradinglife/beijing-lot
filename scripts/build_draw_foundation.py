@@ -10,7 +10,11 @@ from src.temporal_learning.diagnostic_labels import diagnostic_label_clock
 
 p=argparse.ArgumentParser()
 p.add_argument('--output',required=True)
+p.add_argument('--variant',required=True,choices=['strength','balance'])
 a=p.parse_args()
+version=f'market-{a.variant}-draw-1.0.0-diagnostic'
+market_edges=[0,.1,.15,.2,.25,.3,.35,1] if a.variant=='balance' else [0,.2,.24,.28,1]
+secondary_edges=[0,.1,.2,.3,.4,.5,.6,1] if a.variant=='balance' else [0,.15,.2,.25,.3,1]
 root=Path(__file__).resolve().parents[1]
 base=root/'data/derived/fundamentals_417'
 out=Path(a.output)
@@ -38,14 +42,14 @@ for issue in new['issues']:
     target['fixture_decision_ts']=[new['cutoffs'][str(issue)][str(r.slot)] for r in target.itertuples()]
     cutoff=Cutoff.decision_epoch(str(issue),min(pd.to_datetime(list(new['cutoffs'][str(issue)].values()),utc=True)))
     artifact=fit_draw_foundation(history,cutoff,repository_root=root,source_hashes=sources,
-        market_edges=[0,.2,.24,.28,1],strength_edges=[0,.15,.2,.25,.3,1],
-        prior_strength=100,epsilon=1e-6,version='market-strength-draw-1.0.0-diagnostic')
+        market_edges=market_edges,secondary_edges=secondary_edges,
+        prior_strength=100,epsilon=1e-6,version=version)
     path=out/'models'/f'{issue}.json'
     with path.open('x') as handle:json.dump(artifact,handle,ensure_ascii=False)
     models[str(issue)]={'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
     # Mandatory independent deterministic fit replay before prediction.
     assert artifact==fit_draw_foundation(history,cutoff,repository_root=root,source_hashes=sources,
-        market_edges=[0,.2,.24,.28,1],strength_edges=[0,.15,.2,.25,.3,1],
+        market_edges=market_edges,secondary_edges=secondary_edges,
         prior_strength=100,epsilon=1e-6,version=artifact['version'])
     predicted=predict_draw_foundation(artifact,target,cutoff,repository_root=root)
     predicted['cutoff_ts']=cutoff.cutoff_ts.isoformat()
