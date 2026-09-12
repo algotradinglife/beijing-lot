@@ -22,6 +22,9 @@ def sleeve_portfolios(bundle, *, cutoffs, seed, training_worlds,evaluation_world
     optimum claim. Evaluation RNG cannot alter selected tickets. All constants,
     cutoffs and scenario settings explicit. No I/O or target settlement/labels.
     Returns sealed packed plans and per-sleeve simulation diagnostics.
+    Plans expose mean_sleeve_coverage for sleeve arms and mean_ticket_probability
+    for monolithic arms (probability units); the other field is None. Empty
+    portfolios have both None. No mixed-unit mean_coverage field is exported.
     """
     if bundle.get('seal')!=stable_json_hash({k:v for k,v in bundle.items() if k!='seal'}):raise ValueError('Candidate bundle changed')
     if (type(seed) is not int or seed<0 or any(type(n) is not int or n<1 for n in (training_worlds,evaluation_worlds))
@@ -88,7 +91,11 @@ def sleeve_portfolios(bundle, *, cutoffs, seed, training_worlds,evaluation_world
     plans=[]
     for control in controls:
         if control['parameters']['ranking']=='EV':continue
-        z={k:v for k,v in control.items() if k!='seal'}
+        z={k:v for k,v in control.items() if k not in ('seal','mean_coverage')}
+        idx=np.asarray(control['fixture_indices'],dtype=int).reshape(-1,7)
+        codes=np.asarray(control['outcomes'],dtype=int).reshape(-1,7)
+        z.update(mean_sleeve_coverage=None,
+            mean_ticket_probability=float(np.prod(p[idx,codes],axis=1).mean()) if len(idx) else None)
         z.update(arm='MONOLITHIC_'+control['parameters']['ranking']+'512',sleeve_keys=[],bundle_seal=bundle['seal'])
         z['seal']=stable_json_hash(z);plans.append(z)
     for arm,chosen in selected.items():
@@ -100,10 +107,11 @@ def sleeve_portfolios(bundle, *, cutoffs, seed, training_worlds,evaluation_world
         if len({tuple(zip(a,b)) for a,b in zip(ii,dd)})!=len(ii):raise ValueError('Duplicate physical tickets')
         rates=[functools.reduce(operator.or_,(mask[k] for k in chosen),0).bit_count()/n for mask,n in zip(masks,(training_worlds,evaluation_worlds))]
         gross=sum(options[k]['expected_gross'] for k in chosen);stake=len(ii)*unit_cny
-        counts=np.bincount(np.array(ii,dtype=int).ravel(),minlength=len(p));z={k:v for k,v in base.items() if k!='seal'}
+        counts=np.bincount(np.array(ii,dtype=int).ravel(),minlength=len(p));z={k:v for k,v in base.items() if k not in ('seal','mean_coverage')}
         z.update(arm=arm,fixture_indices=ii,outcomes=dd,groups=len(ii),stake=stake,cash_cny=budget_cny-stake,
             expected_net=float(gross-stake),expected_roi=float(gross/stake-1) if stake else None,
-            mean_coverage=float(sum(options[k]['coverage'] for k in chosen)/len(chosen)) if ii else None,
+            mean_ticket_probability=None,
+            mean_sleeve_coverage=float(sum(options[k]['coverage'] for k in chosen)/len(chosen)) if ii else None,
             min_selected_probability=min(options[k]['min_probability'] for k in chosen) if chosen else None,
             max_reuse=int(counts.max()),sleeve_keys=[list(k) for k in chosen],bundle_seal=bundle['seal'],
             no_bet_reason=None if chosen else 'FEWER_THAN_EIGHT_FEASIBLE_DISTINCT_SLEEVES',

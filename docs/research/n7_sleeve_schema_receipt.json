@@ -1,0 +1,20 @@
+{
+  "base_commit": "e41afd8ca56af264087ffbedeedd651aeb5b0963",
+  "historical_admission": false,
+  "scope": "PR426 estimand schema separation only",
+  "files": {
+    "src/n7_sleeve_portfolio.py": "e161bacd2f6cf1580460c6ad56259cdaf00689fa074f9144bfcf7e6a22abb82d",
+    "scripts/check_n7_sleeves.py": "4fb7bbd91f8c19d4c18411040cb817eeae5c750a32fda587b99b8938ce85dc9c",
+    "tests/test_n7_sleeve_portfolio.py": "f2f476a6557507e61d9c558a424db64bac12850ab472d0f837bb8d8c9e363df0",
+    "tests/test_n7_sleeve_checker.py": "85d631a07b303c8ba7996b63cd3f59c9065de69d57d027ccce9977b02496a725",
+    "docs/research/n7_sleeve_interface.md": "62654bae8b11d6a3a97bf75cf93d2d542831d70f5e2c48a0a5f52e0a0c0e7cd5",
+    "quarto/138_n7_sleeve_review_corrections.qmd": "c9fca0e072d279ee106dc374e906bed90ea232c31a7492f9410f91ef25700aeb"
+  },
+  "python_tests_passed": 7,
+  "invariant_plans": 33,
+  "independent_review": "No actionable findings in the six-file uncommitted diff.\n\nThe producer removes `mean_coverage`, exports both distinct estimands, and sets non-applicable values to null. The checker enforces these semantics. Regressions cover the factor-64 error, actual selected subsets, empty sleeves, and resealed schema corruption.\n\nTargeted tests: **2 passed** using the specified interpreter with `TMPDIR=/dev/shm`, bytecode and pytest caching disabled.\n\nNo edits, agents, commits, network mutations, or historical artifact resealing performed. QMD rendering was not run.",
+  "cutoff": "PASS",
+  "qmd": "PASS; explicit repository execute-dir",
+  "remote_ci": "owner disabled",
+  "r_suite": "not repeated: no R function changes; QMD rerendered"
+}

@@ -104,11 +104,19 @@ if __name__=='__main__':
                         expected_d.extend(np.asarray(group['enumeration']['states'])[subset['state_ids']].tolist())
                     if idx.tolist()!=expected_i or codes.tolist()!=expected_d:raise ValueError('Sleeve ledger mismatch')
                 elif arm.startswith('8x64') and len(idx):raise ValueError('Unregistered sleeves')
+                if 'mean_coverage' in plan:raise ValueError('Mixed-unit mean_coverage is forbidden')
                 if arm.startswith('8x64'):
+                    if plan['mean_ticket_probability'] is not None:raise ValueError('Sleeve ticket mean must be null')
                     expected_mean=math.fsum(groups[g]['options'][kind]['coverage'] for g,kind in keys)/len(keys) if keys else None
                     if expected_mean is None:
-                        if plan['mean_coverage'] is not None:raise ValueError('Empty sleeve mean must be null')
-                    elif not math.isclose(plan['mean_coverage'],expected_mean,rel_tol=1e-12,abs_tol=1e-14):raise ValueError('Sleeve-level mean coverage mismatch')
+                        if plan['mean_sleeve_coverage'] is not None:raise ValueError('Empty sleeve mean must be null')
+                    elif not math.isclose(plan['mean_sleeve_coverage'],expected_mean,rel_tol=1e-12,abs_tol=1e-14):raise ValueError('Sleeve-level mean coverage mismatch')
+                else:
+                    if plan['mean_sleeve_coverage'] is not None:raise ValueError('Monolithic sleeve mean must be null')
+                    expected_ticket=float(np.prod(p[idx,codes],axis=1).mean()) if len(idx) else None
+                    if expected_ticket is None:
+                        if plan['mean_ticket_probability'] is not None:raise ValueError('Empty ticket mean must be null')
+                    elif not math.isclose(plan['mean_ticket_probability'],expected_ticket,rel_tol=1e-12,abs_tol=1e-14):raise ValueError('Ticket-level mean probability mismatch')
                 used=np.unique(idx)
                 if any(actual_rows[i]['handicap']!=f[i]['handicap'] or 'spf:IDENTITY' in actual_rows[i]['status'] for i in used):raise ValueError('Settlement identity mismatch')
                 wins=np.all(outcome[idx]==codes,axis=1)

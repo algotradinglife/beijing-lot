@@ -80,3 +80,23 @@ field refers to mean physical-ticket probability, a different observational unit
 Further allocation/calibration work belongs to the independently frozen #425 /
 #427 contracts. No expanded threshold, U/P or cap search on the current100 issues
 is part of this comment remediation.
+
+### PR426 estimand separation (supersedes the old common mean field)
+
+New `sleeve_portfolios()` plans never export `mean_coverage`. Both fields below
+are always present and sealed; JSON null becomes R `NA_real_` when tabulated.
+
+| Arm | `mean_sleeve_coverage` | `mean_ticket_probability` |
+|---|---|---|
+| 8×64 | Mean coverage of the eight actual selected subsets | null |
+| Monolithic PROB/COVERAGE | null | Mean probability of selected individual tickets |
+| Empty portfolio | null | null |
+
+Both quantities are dimensionless probabilities, but their observational units
+are different. Neither is the probability of at least one portfolio hit.
+The independent checker reconstructs both from candidate probabilities, enforces
+non-applicable nulls, and rejects the removed mixed-unit name. No compatibility
+alias or automatic conversion of old frozen plans is provided. Generic older
+research producers outside this sleeve interface remain pinned historical evidence.
+The existing R summary/depth/long tables have no overloaded portfolio mean column
+and retain their current schema. Frozen original artifacts are not rewritten.

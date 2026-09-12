@@ -27,22 +27,29 @@ def test_expanded_universe_shared_world_union_and_budget():
     rng=np.random.default_rng(np.random.SeedSequence(42).spawn(2)[1])
     worlds=np.array([np.searchsorted(np.array([.6,.9,1.]),rng.random(400),side='right') for _ in range(8)])
     for plan in z['plans']:
+        assert 'mean_coverage' not in plan
         assert plan['groups']==512 and plan['stake']==1024 and plan['cash_cny']==0
         assert len({tuple(zip(ii,dd)) for ii,dd in zip(plan['fixture_indices'],plan['outcomes'])})==512
         union=np.zeros(400,dtype=bool)
         for ii,dd in zip(plan['fixture_indices'],plan['outcomes']):union|=np.all(worlds[ii]==np.array(dd)[:,None],axis=0)
         assert union.mean()==plan['simulation']['evaluation_hit_rate']
         if plan['sleeve_keys']:
+            assert plan['mean_ticket_probability'] is None
             assert len({k[0] for k in plan['sleeve_keys']})==8
             expected=np.mean([bundle['sleeves'][gid]['options'][kind]['coverage'] for gid,kind in plan['sleeve_keys']])
-            assert plan['mean_coverage']==pytest.approx(expected)
-            assert plan['mean_coverage']!=pytest.approx(expected/64)
+            assert plan['mean_sleeve_coverage']==pytest.approx(expected)
+            assert plan['mean_sleeve_coverage']!=pytest.approx(expected/64)
+        else:
+            assert plan['mean_sleeve_coverage'] is None
+            probabilities=np.array([[.6,.3,.1]]*8)
+            expected_ticket=np.prod(probabilities[np.array(plan['fixture_indices']),np.array(plan['outcomes'])],axis=1).mean()
+            assert plan['mean_ticket_probability']==pytest.approx(expected_ticket)
     prob=next(p for p in z['plans'] if p['arm']=='8x64_PROB')
     random_states=next(p for p in z['plans'] if p['arm']=='8x64_RANDOM_STATES')
     # Same seven-fixture sets, different selected states: Top64 coverage cannot
     # substitute for the actual random-subset portfolio average.
     assert [k[0] for k in random_states['sleeve_keys']]==[k[0] for k in prob['sleeve_keys']]
-    assert random_states['mean_coverage']<prob['mean_coverage']
+    assert random_states['mean_sleeve_coverage']<prob['mean_sleeve_coverage']
     ret=next(p for p in z['plans'] if p['arm']=='8x64_RETURN_AWARE')
     assert ret['simulation']['training_hit_rate']>=.8*prob['simulation']['training_hit_rate']-1e-8
     changed=sleeve_portfolios(bundle,**{**args,'evaluation_worlds':450})
@@ -64,4 +71,6 @@ def test_expanded_universe_shared_world_union_and_budget():
     for plan in empty['plans']:
         if plan['arm'].startswith('8x64'):
             assert plan['stake']==0 and plan['cash_cny']==1024
-            assert plan['mean_coverage'] is None
+            assert plan['mean_sleeve_coverage'] is None
+            assert plan['mean_ticket_probability'] is None
+            assert 'mean_coverage' not in plan
