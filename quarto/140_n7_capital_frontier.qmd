@@ -138,11 +138,13 @@ ggplot(budget_answers, aes(budget_cny, value, colour = strategy)) +
 下图使用跨期模型均值，比较覆盖和预期净收益，不使用实际结算来选点。
 连线仅连接未被其他登记方案同时超过的点，不表示两点之间可以直接插值下注。
 这不是对所有潜在组合的全局前沿证明。
+始终未下注的方案保留在答案表中，但不参与前沿或近优范围；
+不可行方案的诊断净收益零不代表可执行的收益最优分配。
 
 ```{r}
 #| fig-width: 13
 #| fig-height: 8
-ggplot(frontier$points, aes(any_hit_percent, modeled_net_cny)) +
+ggplot(frontier$points |> filter(frontier_eligible), aes(any_hit_percent, modeled_net_cny)) +
   geom_line(data = frontier$points |> filter(registered_frontier) |> arrange(any_hit_percent),
     aes(group = budget_cny), colour = "grey50") +
   geom_point(aes(size = sleeves_median, colour = registered_frontier)) +

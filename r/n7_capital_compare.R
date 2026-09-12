@@ -48,26 +48,35 @@ n7_capital_compare <- function(curves,depths,targets,budget_cny,tolerance,cutoff
 # proof over every possible allocation. Tolerances are explicit plot/summary
 # conventions in percentage points/CNY. No historical outcome enters this view.
 n7_capital_frontier <- function(answers,hit_tolerance_pp,net_tolerance_cny) {
-  stopifnot(all(c('arm','budget_cny','any_hit_percent','modeled_net_cny','sleeves_median') %in% names(answers)),
-    !anyNA(answers[c('arm','budget_cny','any_hit_percent','modeled_net_cny')]),
+  stopifnot(all(c('arm','budget_cny','any_hit_percent','modeled_net_cny','sleeves_median','funded_trials') %in% names(answers)),
+    !anyNA(answers[c('arm','budget_cny','any_hit_percent','modeled_net_cny','funded_trials')]),
+    all(answers$funded_trials>=0 & answers$funded_trials%%1==0),
     !anyDuplicated(answers[c('arm','budget_cny')]),hit_tolerance_pp>=0,net_tolerance_cny>=0)
   parts<-answers |> dplyr::group_by(budget_cny) |> dplyr::group_split()
   points<-regions<-list()
   for(x in parts) {
-    p<-x$any_hit_percent;v<-x$modeled_net_cny
+    # An entirely unfunded/infeasible policy is not an attainable allocation
+    # optimum merely because its diagnostic zero beats negative expected net.
+    eligible<-x$funded_trials>0
+    x$frontier_eligible<-eligible
+    p<-x$any_hit_percent[eligible];v<-x$modeled_net_cny[eligible]
     dominates<-outer(p,p,`>=`) & outer(v,v,`>=`) & (outer(p,p,`>`) | outer(v,v,`>`))
-    x$registered_frontier<-colSums(dominates)==0
-    x$near_registered_hit_max<-p>=max(p)-hit_tolerance_pp
-    x$near_registered_net_max<-v>=max(v)-net_tolerance_cny
+    x$registered_frontier<-x$near_registered_hit_max<-x$near_registered_net_max<-FALSE
+    if(any(eligible)) {
+      x$registered_frontier[eligible]<-colSums(dominates)==0
+      x$near_registered_hit_max[eligible]<-p>=max(p)-hit_tolerance_pp
+      x$near_registered_net_max[eligible]<-v>=max(v)-net_tolerance_cny
+    }
     points[[length(points)+1L]]<-x
     regions[[length(regions)+1L]]<-tibble::tibble(budget_cny=x$budget_cny[1],
       hit_tolerance_pp=hit_tolerance_pp,net_tolerance_cny=net_tolerance_cny,
+      eligible_policies=sum(eligible),unfunded_policies=sum(!eligible),
       near_hit_policies=sum(x$near_registered_hit_max),
-      near_hit_sleeves_min=min(x$sleeves_median[x$near_registered_hit_max]),
-      near_hit_sleeves_max=max(x$sleeves_median[x$near_registered_hit_max]),
+      near_hit_sleeves_min=if(any(eligible))min(x$sleeves_median[x$near_registered_hit_max]) else NA_real_,
+      near_hit_sleeves_max=if(any(eligible))max(x$sleeves_median[x$near_registered_hit_max]) else NA_real_,
       near_net_policies=sum(x$near_registered_net_max),
-      near_net_sleeves_min=min(x$sleeves_median[x$near_registered_net_max]),
-      near_net_sleeves_max=max(x$sleeves_median[x$near_registered_net_max]))
+      near_net_sleeves_min=if(any(eligible))min(x$sleeves_median[x$near_registered_net_max]) else NA_real_,
+      near_net_sleeves_max=if(any(eligible))max(x$sleeves_median[x$near_registered_net_max]) else NA_real_)
   }
   list(points=dplyr::bind_rows(points),regions=dplyr::bind_rows(regions))
 }
