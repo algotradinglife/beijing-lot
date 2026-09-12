@@ -12,6 +12,9 @@ project:
     - quarto/07_fundamentals_pipeline.qmd
     - quarto/08_issue_413_delivery.qmd
     - quarto/09_nowscore_query_delivery.qmd
+    - quarto/07_nowscore_history_inventory.qmd
+    - quarto/08_nowscore_history_audit.qmd
+    - quarto/10_settlement_external_storage.qmd
 
 execute:
   freeze: false

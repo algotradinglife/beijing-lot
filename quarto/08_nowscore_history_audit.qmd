@@ -1,0 +1,93 @@
+---
+title: "Nowscore 全历史覆盖与原始异常"
+params:
+  audit_db: null
+  detail_limit: 100
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+本报告读取显式指定的 Nowscore 原始审计数据库。来源范围由回执绑定；
+完成候选域或页面任务不等于证明源站存有全部历史记录。
+这里不应用旧样本人工裁决，不启用生产计奖、回测或下注。
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+source("r/nowscore_history_report.R")
+a <- read_nowscore_history_report(params$audit_db, params$detail_limit)
+```
+
+## 实际覆盖
+
+```{r}
+knitr::kable(a$counts, caption = "实际页面、场次玩法、选项、标记与比赛数量")
+knitr::kable(a$years, caption = "按期号年份汇总已留存页面")
+cat("五玩法任务覆盖完成：", isTRUE(a$receipt$five_play_task_coverage_complete), "\n")
+cat("源站空页面：", length(a$receipt$source_empty_pages), "\n")
+cat("请求或解析失败：", length(a$receipt$capture_failures), "\n")
+knitr::kable(a$statuses, caption = "玩法与原始比赛状态")
+```
+
+源站空页面与技术失败分别计数。比赛状态与彩票结算证据分开保存；
+全选项 SP=1 只说明特殊结算形态，不代表已取得官方结算公告。
+
+页面数包含已留存但被隔离的页面，不等于可用页面数。
+`source_roster_conflict` 表示同一原始页面的内嵌名单与可见名单不一致：
+当前实现隔离整页，因此该页其他可见比赛也不进入 observation 和 option_sp 表。
+这些页面的原始字节及选项内容仍保存在原始响应中；异常明细中的空状态、比分或
+选项向量不表示源页面没有这些内容，也不能据此判定退票。隔离相关失败记录及
+具体期号、slot、玩法可通过回执与 finding 表追溯，不能将异常标记条数当作隔离页数。
+
+```{r}
+cat("名单冲突隔离页数：", nrow(a$quarantined_pages), "\n")
+knitr::kable(a$quarantined_pages,
+             caption = "全部名单冲突隔离页；冲突标记数不等于整页排除的玩法行数")
+```
+
+## 全量异常汇总
+
+这里的标记不等于“错误比赛”：同场可被多项规则标记。
+`archive_partial_option_coverage`、`unobserved_status` 和
+`unobserved_full_schedule_date` 表示历史布局的覆盖限制。
+`cross_play_handicap_raw` 也包含让球胜平负有让球值、其他玩法为空的情形，
+不能直接认定数值矛盾。`malformed_score` 可来自比分栏里的取消、推迟等文字，
+不代表发现了错误数字比分，也不证明退票。
+原始字段与所有标记仍完整保留，不据此自动更正或填充。
+
+```{r}
+knitr::kable(a$findings, caption = "所有原始异常标记；同场比赛可有多个标记")
+```
+
+## 有限明细展示
+
+下面是按期号、slot、玩法和异常码排序的确定性明细窗口，非随机样本。
+展示上限只影响 HTML 明细；上面的统计覆盖整个数据库。完整异常仍保存在 finding 表。
+
+```{r}
+cat("明细展示：", a$details_shown, "；未展示：", a$details_omitted,
+    "；参数 detail_limit：", a$detail_limit, "\n")
+knitr::kable(a$details, caption = "具体期号、slot、状态、比分、原始选项 SP 与来源证据")
+```
+
+## 输入与重放身份
+
+```{r}
+cat("原始清单 SHA256：", a$receipt$manifest_sha256, "\n")
+cat("期号 inventory SHA256：", a$receipt$inventory_sha256, "\n")
+cat("解析结果 SHA256：", a$receipt$data_sha256, "\n")
+cat("原始审计 SHA256：", a$receipt$audit_sha256, "\n")
+cat("证据类别：", a$receipt$evidence_class, "\n")
+cat("生产启用：", a$receipt$production_enabled, "\n")
+```
+
+历史抓取时间不证明历史赛前可用性。未来如用于历史学习，必须另行遵守
+共享 cutoff、标签可用性、回执和独立重放契约。
+
+本次重建按修订后的验收要求交付一份完整构建，不要求第二次全历史建库比较；
+不声称两次全量结果已比对通过。原始页面可通过 source_sha256 定位至
+组装目录的 `raw/<SHA256>.html`。仓库中的
+`scripts/nowscore_provenance_queries.sql` 提供全库溯源关联检查及绑定
+issue、slot、play 的只读明细查询；隔离记录也能定位原始页面。

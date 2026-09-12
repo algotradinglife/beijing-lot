@@ -1,11 +1,13 @@
-# 在 Positron 中查询 Nowscore 结算观测
+# R 查询 Nowscore 结算观测
 
 从项目根目录运行，数据库路径由调用者明确传入，不自动寻找或切换数据库。
 依赖沿用项目已有 DBI、RSQLite、jsonlite、tibble；查询时不安装依赖。
 
 ```r
 source("r/nowscore_query.R")
-db_path <- "data/derived/nowscore_only/20260907_history_five_play_v2/nowscore_history_replay.sqlite"
+data_root <- Sys.getenv("BEIJING_LOT_DATA_ROOT")
+stopifnot(nzchar(data_root), dir.exists(data_root))
+db_path <- file.path(data_root, "settlement/20260907_history_five_play_v2/nowscore_history_replay.sqlite")
 
 # 单场五玩法
 x <- query_nowscore_settlement(db_path, issue = "23084", slot = 131)
@@ -33,3 +35,7 @@ x$receipt
 
 可执行交付与验收入口：[查询交付 QMD](../../quarto/09_nowscore_query_delivery.qmd)。
 该报告只使用合成临时库；实际结算数据库不随 Git 仓库分发。
+
+数据目录独立于 worktree。当前主机在运行 R 前设置 `BEIJING_LOT_DATA_ROOT=/run/media/drwho1985/Sandisk/data/beijing-lot`，其他主机显式设置自己的挂载目录。原始 `source_url` 对应 Nowscore；修正后的 SP 来源见 `sp_source`、`sp_source_url`，原值见 `original_raw_sp`、`original_sp`，说明见 `correction_note`。
+
+生成和修正入口：[结算库维护](settlement_database_maintenance.md)。

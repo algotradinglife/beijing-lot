@@ -1,0 +1,53 @@
+name: Settlement history and external storage
+on:
+  pull_request:
+    paths:
+      - 'src/nowscore*.py'
+      - 'src/settlement*.py'
+      - 'scripts/*nowscore*.py'
+      - 'scripts/apply_settlement_sp_update.py'
+      - 'r/nowscore*.R'
+      - 'tests/test_nowscore*.py'
+      - 'tests/test_settlement*.py'
+      - 'tests/testthat/*nowscore*.R'
+      - 'quarto/*nowscore*.qmd'
+      - 'quarto/10_settlement_external_storage.qmd'
+      - 'config/settlement_runtime.json'
+      - '_quarto.yml'
+      - '.github/workflows/settlement-history.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  settlement-contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.4'
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.10.18'
+      - name: Install declared dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libuv1-dev libpng-dev
+          python -c 'import json, subprocess, sys; v=json.load(open("config/settlement_runtime.json"))["python_direct"]; subprocess.check_call([sys.executable,"-m","pip","install",*[k+"=="+v[k] for k in v]])'
+          Rscript -e 'install.packages(c("remotes","jsonlite"),repos="https://cloud.r-project.org"); v<-jsonlite::read_json("config/settlement_runtime.json")$r_direct; for(p in names(v)) remotes::install_version(p,version=v[[p]],repos="https://cloud.r-project.org",upgrade="never")'
+      - name: Offline history replay, rollback, storage and Quarto contracts
+        run: |
+          python -m pytest tests/test_nowscore_history* tests/test_nowscore_issue_inventory.py tests/test_nowscore_settlement.py tests/test_nowscore_archive.py tests/test_nowscore_replay.py tests/test_settlement_sp* tests/test_settlement_storage.py -q
+      - name: R settlement tests
+        run: |
+          Rscript -e 'testthat::test_dir("tests/testthat",filter="nowscore",stop_on_failure=TRUE)'
+      - name: Standalone external-path query report
+        run: |
+          Rscript -e 'source("tests/testthat/helper-nowscore-query.R"); nowscore_query_fixture("/tmp/settlement-query.sqlite")'
+          python -c 'import json; json.dump({"database":"/tmp/settlement-query.sqlite","issue":"00123"},open("/tmp/settlement-params.json","w"))'
+          quarto render quarto/10_settlement_external_storage.qmd --execute --no-cache --execute-params /tmp/settlement-params.json
+      - name: Cutoff governance
+        run: python scripts/check_cutoff_governance.py
