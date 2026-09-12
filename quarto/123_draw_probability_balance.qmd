@@ -16,6 +16,7 @@ params:
 `|P(让胜)−P(让负)|`，均按预先固定的区间分格。格内“命中率”指
 **实际让平场数／该格全部场数**，不要求Top1或Top2选中了让平。
 原48期与新增100期分面展示，避免混合掩盖时段差异。
+另增加交叉图：横轴为战力让平概率，纵轴为市场胜负概率绝对差。
 
 这是已知结算后的描述性研究，不拟合模型、不改变当前概率底座，也不将这些发生率直接用于历史下注。
 如后续加入校正，只能使用目标期之前可准入的历史方格，通过共享时间治理接口另行冻结版本。
@@ -35,13 +36,13 @@ gap_edges<-c(0,.1,.2,.3,.4,.5,.6,1)
 cells<-draw_balance_cells(fixtures,draw_edges,gap_edges)
 dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
 readr::write_csv(cells,file.path(params$output,'draw-balance-cells.csv'))
-stopifnot(sum(cells$n)==2*nrow(fixtures),sum(cells$draws)==2*sum(fixtures$actual=='D'))
+stopifnot(sum(cells$n)==3*nrow(fixtures),sum(cells$draws)==3*sum(fixtures$actual=='D'))
 ```
 
 横纵轴使用概率小数，例如`[0.2,0.25)`为20%至25%（不含25%）。
 颜色越深，实际让平发生率越高；格内同时给出百分比和样本数。
 **少于30场的格子颜色淡化，不能据此断言规律；灰色空格表示没有样本。**
-两张图使用同一色标，超过60%的极小样本格仍显示真实数值。
+三张图使用同一色标，超过60%的极小样本格仍显示真实数值。
 
 ## 市场概率
 
@@ -63,6 +64,23 @@ strength_plot<-plot_draw_balance(cells,'strength')
 strength_plot
 ggplot2::ggsave(file.path(params$output,'strength-draw-balance.png'),strength_plot,width=13,height=7,dpi=160)
 ggplot2::ggsave(file.path(params$output,'strength-draw-balance.pdf'),strength_plot,width=13,height=7)
+```
+
+## 战力让平概率 × 市场胜负差
+
+横轴保留战力的让平概率，但胜负差改用市场概率。表中此配对的平均预测概率与偏差仍以战力让平概率为参照。
+在新增100期中，战力让平概率20%–25%这档，市场胜负差0–10、10–20、20–30个百分点
+对应实际让平率26.99%（1304场）、27.13%（1150场）、27.29%（546场），区分很弱。
+战力25%–30%这档则分别为28.42%、27.57%、27.30%，差异也较小。
+目前不能据此宣称加入市场胜负差会改善校正；高差值区域样本更少，需要独立检验。
+
+```{r}
+#| fig-width: 13
+#| fig-height: 7
+cross_plot<-plot_draw_balance(cells,'strength_draw_market_gap')
+cross_plot
+ggplot2::ggsave(file.path(params$output,'strength-draw-market-gap.png'),cross_plot,width=13,height=7,dpi=160)
+ggplot2::ggsave(file.path(params$output,'strength-draw-market-gap.pdf'),cross_plot,width=13,height=7)
 ```
 
 ## 样本数不少于100的方格
