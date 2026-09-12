@@ -1,0 +1,146 @@
+---
+title: "7串1全单选：第三赛果阈值与双重集中参数"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-single-ticket-grid-v2"
+  archive_fixture: null
+---
+
+固定100期100608–101120、5个seed41901–41905，使用冻结的校正市场概率。
+不设原先50%的入池门槛，不使用战力筛选，不重新训练。
+每期预算1024元、每张全单选票2元，最多512张，初始资金100000元。
+组内7场不重复，组间可复用；相同场次及赛果的完整票不重复买，最多尝试4096张。
+
+三个参数固定网格：第三赛果阈值τ∈{0,0.20,0.25}，赛果集中α∈{1,2,4}，
+选场集中β∈{1,2,4}。共27组参数，每组5个seed；不事后挑选seed作为策略。
+选场权重为原始Top2累计概率的β次方归一化；以Gumbel top-k实现等价的逐场
+加权不放回抽取。第三赛果严格低于τ时归零；余下概率的α次方归一化用于抽赛果。
+W/D/L固定顺序处理概率并列，权重采用成熟数值库的softmax。
+
+幂次后的概率只是抽样权重，期望胜率仍使用原始概率底座。
+估算SP仍为欧赔＋大小球映射市场概率的倒数，期望收益仅记录，不过滤。
+真实返奖按R/SQLite审计结算SP，整张票只乘一次0.65；使用比赛独立性假设。
+所有计划在读取本轮结算前冻结。属于已暴露样本的逐场时点回顾诊断，
+不证明整张票在同一赛前时点可购，也不是新样本前瞻验证。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+if(is.null(params$archive_fixture)) {
+  frozen<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'))
+  er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  stopifnot(identical(digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(file=file.path(params$study,'results.json'),algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+    identical(digest::digest(file=er$controls_path,algo='sha256'),er$controls_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(file.path(params$study,'results.json'))
+  stopifnot(identical(result$freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',
+    identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+stopifnot(nrow(result$rows)==13500,nrow(result$controls)==200)
+x<-bind_rows(as_tibble(result$rows),as_tibble(result$controls)) |>
+  mutate(issue=as.character(issue),status=if_else(stake>0,'COMPLETE','NO_BET'),budget_cny=1024,cash_cny=1024-stake)
+curves<-strategy_equity_curves(x,as.character(result$issue_order),100000)
+summary<-market_conditional_summary(x,curves)
+parameters<-x |> filter(policy!='CONTROL') |> distinct(model,tau,alpha,beta)
+grid<-summary |> filter(policy!='CONTROL') |> group_by(model) |> summarise(
+  median_roi=median(roi_percent),min_roi=min(roi_percent),max_roi=max(roi_percent),
+  mean_roi=mean(roi_percent),profitable_seeds=sum(net>0),median_net=median(net),
+  median_dd=median(max_drawdown),worst_dd=max(max_drawdown),median_hit_issues=median(hit_issues),
+  median_hit_groups=median(hit_groups),without_best_roi=median(without_best_roi),.groups='drop') |>
+  left_join(parameters,by='model',relationship='one-to-one')
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'))
+readr::write_csv(grid,file.path(params$study,'grid.csv'))
+readr::write_csv(x |> mutate(roi_percent=if_else(stake>0,100*net/stake,NA_real_)),file.path(params$study,'periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+```
+
+## 参数网格结果
+
+本轮27组中只有2组的ROI中位数为正，均为第三赛果阈值25%、赛果集中α=1。
+中位数最高的是τ=25%、α=1、β=1：ROI中位数+3.57%，但平均值−1.63%，
+5个seed中3个盈利，范围−22.37%至+9.74%；剔除各自最佳一期后中位数为−1.87%。
+它的命中期数中位数42/100、最大回撤中位数16859元，未超过原U3/U6对照的
+54/56个命中期及+12.93%/+22.53% ROI。提高集中参数没有形成稳定收益改善。
+因此本轮支持保留这套抽样接口用于研究，但不支持替换当前U3/U6策略。
+
+ROI使用实际投入；最大回撤基于初始资金100000元。每个seed是一套独立的预算运行，
+不将5个seed的投注合并。剔除最佳期是剔除各自最高净盈利的一期及对应投入。
+
+```{r}
+knitr::kable(summary |> filter(policy=='CONTROL'),digits=2)
+knitr::kable(grid |> arrange(tau,alpha,beta),digits=2)
+```
+
+```{r}
+#| fig-width: 13
+#| fig-height: 5
+heat<-ggplot2::ggplot(grid,ggplot2::aes(factor(alpha),factor(beta),fill=median_roi))+
+  ggplot2::geom_tile()+ggplot2::geom_text(ggplot2::aes(label=sprintf('%.1f%%',median_roi)))+
+  ggplot2::facet_wrap(~tau,nrow=1)+ggplot2::scale_fill_gradient2(midpoint=0)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Outcome concentration alpha',y='Fixture concentration beta',fill='Median ROI %')
+heat
+ggplot2::ggsave(file.path(params$study,'grid.png'),heat,width=13,height=5,dpi=150)
+```
+
+## 逐seed结果与资金使用
+
+```{r}
+knitr::kable(summary |> filter(policy!='CONTROL'),digits=2)
+knitr::kable(x |> filter(policy!='CONTROL') |> group_by(model) |> summarise(
+  full_budget_issues=sum(stake==1024),total_runs=n(),mean_tickets=mean(groups),
+  duplicates=sum(duplicates),max_reuse=max(max_reuse),
+  average_ticket_probability=weighted.mean(mean_coverage,groups,na.rm=TRUE),.groups='drop'),digits=4)
+```
+
+## 每个阈值的收益和回撤曲线
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+#| results: asis
+for(threshold in c(0,.2,.25)) {
+  models<-parameters$model[parameters$tau==threshold]
+  part<-curves |> filter(model %in% models)
+  equity<-ggplot2::ggplot(part,ggplot2::aes(period,equity_cny,colour=policy))+
+    ggplot2::geom_line()+ggplot2::facet_wrap(~model,ncol=3)+ggplot2::theme_minimal()+
+    ggplot2::labs(title=paste('Third threshold',threshold),x='Issue sequence',y='Capital CNY',colour='Seed')
+  drawdown<-ggplot2::ggplot(part,ggplot2::aes(period,drawdown_cny,colour=policy))+
+    ggplot2::geom_line()+ggplot2::facet_wrap(~model,ncol=3)+ggplot2::theme_minimal()+
+    ggplot2::labs(title=paste('Third threshold',threshold),x='Issue sequence',y='Drawdown CNY',colour='Seed')
+  print(equity);print(drawdown)
+  ggplot2::ggsave(file.path(params$study,paste0('equity-',threshold,'.png')),equity,width=14,height=10,dpi=140)
+  ggplot2::ggsave(file.path(params$study,paste0('drawdown-',threshold,'.png')),drawdown,width=14,height=10,dpi=140)
+}
+```
+
+## 每期概览
+
+每期每组参数展示5个seed的中位数与范围，仅用于概览；完整逐seed账目保存于periods.csv。
+
+```{r}
+knitr::kable(x |> filter(policy!='CONTROL') |> mutate(roi_percent=100*net/stake) |>
+  group_by(issue,model) |> summarise(median_net=median(net),min_net=min(net),max_net=max(net),
+  median_roi=median(roi_percent),median_hits=median(hits),.groups='drop'),digits=2)
+jsonlite::write_json(list(mode='EXPOSED_FIXED_GRID',freeze=result$freeze_seal,
+  qmd_sha256=digest::digest(file='quarto/128_n7_single_ticket_grid.qmd',algo='sha256'),
+  summary_implementation_sha256=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+  equity_implementation_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
