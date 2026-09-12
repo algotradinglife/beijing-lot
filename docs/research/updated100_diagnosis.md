@@ -72,3 +72,5 @@ QMD使用全部9108场绘制基线p_D横轴、市场q_D纵轴，按原48期／�
 actual为D用实心点，其余用空心点；形状不依赖颜色。等比例坐标、共同轴界与p=q参考线，
 不抽样、不抖动；实心点置于空心点之后，密集处不能据视觉密度推算发生率。
 输出draw-probability-scatter.png及同名PDF。本次仅增加图形展示，无函数或学习规则变更。
+
+另增draw-probability-baseline-top2与draw-probability-market-top2两张独立PNG/PDF，坐标和场次保持不变，形状改为相应Top2是否命中实际北单赛果。命中标签从已验证overlap_fixtures按期号、场次、provider_id一对一取得，并核对9108场、基线6608次命中、市场6765次命中。复用同一图形设置，无重新排序或预测实现。

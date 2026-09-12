@@ -137,6 +137,39 @@ ggplot2::ggsave(file.path(params$study,'draw-probability-scatter.png'),scatter_p
 ggplot2::ggsave(file.path(params$study,'draw-probability-scatter.pdf'),scatter_plot,width=12,height=6.5,device=grDevices::cairo_pdf)
 ```
 
+## 同一坐标下的基线Top2与市场Top2命中
+
+下面两张图的横纵轴、场次和分面与上图完全相同；实心点改为该模型Top2命中实际
+北单让球赛果，空心点为Top2未命中。这里的命中可以是让胜、让平或让负，并非只看让平。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6.5
+#| message: false
+top2_labels<-v$overlap_fixtures |> filter(play=='Top2') |>
+  select(issue,slot,provider_id,baseline_hit,market_hit)
+stopifnot(!anyDuplicated(top2_labels[c('issue','slot','provider_id')]))
+top2_points<-fixtures |> left_join(top2_labels,by=c('issue','slot','provider_id'),relationship='one-to-one')
+stopifnot(nrow(top2_points)==9108,!anyNA(top2_points[c('baseline_hit','market_hit')]),
+  sum(top2_points$baseline_hit)==6608,sum(top2_points$market_hit)==6765)
+for (model in c('baseline','market')) {
+  model_label<-if(model=='baseline') '基线' else '市场'
+  top2_data<-top2_points |> mutate(
+    样本=factor(cohort,levels=c('old48','new100'),labels=c('原48期：2,561场','新增100期：6,547场')),
+    Top2结果=factor(if_else(.data[[paste0(model,'_hit')]],'命中','未命中'),levels=c('未命中','命中'))) |>
+    arrange(Top2结果)
+  top2_plot<-scatter_plot+top2_data+
+    ggplot2::aes(shape=Top2结果,color=Top2结果)+
+    ggplot2::scale_shape_manual(values=c('未命中'=1,'命中'=16))+
+    ggplot2::scale_color_manual(values=c('未命中'='#88949E','命中'='#C45719'))+
+    ggplot2::labs(title=paste0('基线与市场让平概率：',model_label,'Top2命中分布'),
+      subtitle=paste0('实心＝',model_label,'Top2命中；空心＝未命中；虚线＝两模型让平概率相等'))
+  print(top2_plot)
+  ggplot2::ggsave(file.path(params$study,paste0('draw-probability-',model,'-top2.png')),top2_plot,width=12,height=6.5,dpi=200)
+  ggplot2::ggsave(file.path(params$study,paste0('draw-probability-',model,'-top2.pdf')),top2_plot,width=12,height=6.5,device=grDevices::cairo_pdf)
+}
+```
+
 ## 基线让平概率分档与实际发生率
 
 沿用相同分档，但按基线p_D划分场次，gap_pp改为实际减平均基线概率。
