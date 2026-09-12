@@ -1,0 +1,81 @@
+commit,subject,patch_equivalent_in_main,integration_class,required_paths,touched_file_count
+4236e44ff000ce00972a9a1df0f1705f793fb5e8,research: checkpoint N7 portfolio and settlement foundations (#417),False,INHERITED_CODE_TOUCH,src/fundamentals_n7_baseline.py,61
+7db39dee52e6df3655fe2957c600ac1cf10b633b,research: checkpoint expert integration and conflict diagnostics (#417),False,OUTSIDE_RUNTIME_CLOSURE,,51
+36bea2a962313d5ccf072d67b417a8dd9f325bd8,research: checkpoint N7 compression and reuse experiments (#417),False,OUTSIDE_RUNTIME_CLOSURE,,30
+f68af3390132adc89f359510ab5d82d63434adcb,research: compare fixed-budget C2 reuse relaxation (#417),False,OUTSIDE_RUNTIME_CLOSURE,,13
+f4b3138a15a49e3883393c58a5105880f8854940,research: test matched-budget compression and breadth logic (#419),False,OUTSIDE_RUNTIME_CLOSURE,,12
+f8a26f2c873bc2dca0e2cb0ab058e3a7caa3ff35,research: isolate N7 compression selection and funding effects (#419),False,OUTSIDE_RUNTIME_CLOSURE,,12
+2b48542c1664ec44edbdcf1f7a55a7600455eb8f,docs: record bridge review and passing CI (#419),False,OUTSIDE_RUNTIME_CLOSURE,,1
+453dac256f591d6907a47b50b23e59a0964fb63d,research: compare repeated-double outcome replacement (#419),False,OUTSIDE_RUNTIME_CLOSURE,,11
+146b9012d48b337c8e4d402e6f5338189f49dccc,docs: record repeated-double review and validation (#419),False,OUTSIDE_RUNTIME_CLOSURE,,1
+c5cbb15edc06367a99ce82ceb419787294079923,research: gate repeated-double replacement by probability gap (#419),False,OUTSIDE_RUNTIME_CLOSURE,,12
+e0c5bba5b150b5205774fd9ee04057506db569a7,Publish reusable fundamentals and frozen expert dependencies,False,INHERITED_CODE_TOUCH,src/temporal_learning/core.py,145
+7c23e118cc3ca5f225090506449223cec79ddf24,Validate conditional double replacement on cleaned new 48 issues,False,OUTSIDE_RUNTIME_CLOSURE,,23
+41056999e1ff93d7111105bb3f8d8b1143709565,Compare market conflict gates on repeated double selections,False,OUTSIDE_RUNTIME_CLOSURE,,9
+552cf213f5766994a9c506dac0fade35be40eb99,Compare all C1 and C2 variants after new48 input expansion,False,OUTSIDE_RUNTIME_CLOSURE,,13
+5b7366143e2ff93fef7211c2d5d376ee5d9db689,Compare pure baseline compression returns against frozen experts,False,OUTSIDE_RUNTIME_CLOSURE,,15
+33455fb228e1a086ee8eeb8a8c2054d049a6fe42,Plot fixed-budget strategy equity from CNY 100000 capital,False,INHERITED_CODE_TOUCH,r/fundamentals_equity_curves.R,4
+0912ea953599b6dca0c998a868bf848e14e395ae,Compare fixed repeated single and double support variants,False,OUTSIDE_RUNTIME_CLOSURE,,8
+754493ea1abae5e9a07fe1f27e3dfe5093a2744c,Verify single50 replacement is unchanged on frozen cohort,False,OUTSIDE_RUNTIME_CLOSURE,,5
+f48b91f87c19cbe2e0040a08d30c2854820d3248,research: compare fixed reuse and pair-overlap caps for N7 compression,False,OUTSIDE_RUNTIME_CLOSURE,,10
+a6aef2495d6a2fcce43d6f654ad96dcf30bfe83e,docs: synthesize issue 419 compression evidence and acceptance gaps,False,OUTSIDE_RUNTIME_CLOSURE,,4
+be91bb65421bdba6f02445763ea1f04ab0642787,research: pair single75 replacement with frozen reuse caps,False,OUTSIDE_RUNTIME_CLOSURE,,8
+061b3be26e0b6a3b98d0d64969d871cdd52f3417,report: add paired underwater curves and peak-relative drawdown,False,OUTSIDE_RUNTIME_CLOSURE,,4
+5d4523f212474cf9eccec93023ae305f4af68286,Compare single75 substitution at C1 and C2 compression depths,False,OUTSIDE_RUNTIME_CLOSURE,,9
+d872888e736f6dcf530fbdb5573247c8c3505da6,Compare C1 and C2 across fixed reuse cap grid,False,OUTSIDE_RUNTIME_CLOSURE,,8
+42edf151ef8ea7ad169374d51c97494c37ba88c4,Expose N7 compression reuse and replacement parameters through R,False,OUTSIDE_RUNTIME_CLOSURE,,5
+99a4b76acd6b2808cbc1d8e8889c8a83a1d15623,research: compare fixed-budget complementary N7 portfolios,False,OUTSIDE_RUNTIME_CLOSURE,,11
+34ee9c91067e6aaf9413f62f06fba2a308739c81,research: diagnose missed issues and compare fixed-budget N6 variants,False,OUTSIDE_RUNTIME_CLOSURE,,25
+74548acf517bb751bd9e5bec416296323ee87128,Compare fixed N7 market blends and single-position safeguards,False,OUTSIDE_RUNTIME_CLOSURE,,14
+ab17192c5b72538c277f92c54a3bbf92fad1503d,Explore fixed support and N6 repairs for original missed issues,False,OUTSIDE_RUNTIME_CLOSURE,,12
+c10cd291b64bc9b15a964996e491b1dd1fbf29af,Diagnose category calibration and repeated exposure in missed issues,False,OUTSIDE_RUNTIME_CLOSURE,,9
+e9ad29eb4aeb6bf0cd60c26b164f7cfa7328782d,feat: add reusable settled-match diagnostic CLI and QMD report,False,OUTSIDE_RUNTIME_CLOSURE,,11
+fe2244ce88907a8170b7f533f594d98c83f026e0,research: compare frozen market and fundamentals disagreement outcomes,False,OUTSIDE_RUNTIME_CLOSURE,,1
+0e46479c00d8a32f6d4984f282316d494eafe29a,research: stratify market and baseline hits by exact handicap,False,OUTSIDE_RUNTIME_CLOSURE,,1
+4464eb2ef0159e67958b618a23410971db46dbc1,research: test consensus anchors with complementary converter pairs,False,OUTSIDE_RUNTIME_CLOSURE,,8
+bf10ef9c46fad8f0719a979e4ae511419e4d2167,research: test independently allocated 32 CNY converter groups,False,OUTSIDE_RUNTIME_CLOSURE,,8
+72c4fa20b5add1bad7d08747c4f7fe23146e3b78,Compare zero-handicap converter filtering on frozen portfolios,False,OUTSIDE_RUNTIME_CLOSURE,,7
+6df92d21b3a32d7930ee09ce70cb55890150a6b2,Exclude zero-handicap Top2 disagreements before portfolio assembly,False,OUTSIDE_RUNTIME_CLOSURE,,9
+63079819e481e75983b5e567b118401d5822c835,Test single-role uniqueness in filtered non-converting D2 portfolios,False,OUTSIDE_RUNTIME_CLOSURE,,8
+46c98a7e9157b08ae6499619d8d80538703874a6,Compare market and value single selection within fixed D2 groups,False,OUTSIDE_RUNTIME_CLOSURE,,8
+90c5d86d94d3a5480b70a92dc97ce6f6396e924a,Compare N6 and N7 consensus portfolios at U3 and U6,False,OUTSIDE_RUNTIME_CLOSURE,,8
+da9c870a49bb26134bcb8d612e6bcaacd6ad59cd,Evaluate consensus retention and large-handicap market rescue,False,OUTSIDE_RUNTIME_CLOSURE,,8
+15e4c576133f686238b95687eeba7cfe3771cb75,Compare fixed-group retention sources and diagnose weak singles,False,OUTSIDE_RUNTIME_CLOSURE,,10
+f955ae41c1d92c7bef28506ee5309c400ccf4d96,Diagnose league effects and test mainstream-only singles,False,OUTSIDE_RUNTIME_CLOSURE,,8
+92c461c418a0c543d7d7dda652b64c9ff027159f,Compare zero-handicap disagreement exclusion for high-hit N6,False,OUTSIDE_RUNTIME_CLOSURE,,8
+f34ce1e378ac9fd318cbf6eb523e3b444eeeebec,Compare fixed-source N6 compression and spending efficiency,False,OUTSIDE_RUNTIME_CLOSURE,,8
+979f950dd6371118b0047045fb8026c84f1a594c,Plot N6 efficiency strategies against original U3 and U6,False,OUTSIDE_RUNTIME_CLOSURE,,3
+c39fb9d34511258919779874160d94bc39f17a6b,Diagnose N6 late-period hit frequency and winning payouts,False,OUTSIDE_RUNTIME_CLOSURE,,7
+e7195bbe5e8a01eb6f91ae6f009741bfddc7d5bf,Compare baseline and market doubles on fixed U3 U6 groups,False,OUTSIDE_RUNTIME_CLOSURE,,8
+e0b7e58267ec04bc6a718ca58bdcd035e2b91bac,Report paired U3 U6 return and hit correlations,False,OUTSIDE_RUNTIME_CLOSURE,,3
+5ccd7dc15aec08fede8eb5734816719512623e60,Diagnose single and double failures in missed U3 U6 issues,False,OUTSIDE_RUNTIME_CLOSURE,,7
+16f7385dace5d82d28358c126022bf4205d149c0,Compare repeated-use random swaps for fixed-budget N6 and N7,False,OUTSIDE_RUNTIME_CLOSURE,,9
+f4be0aa4b56b5b35b8a60162d552e720e2a4f12a,Compare uncapped no-swap N6 with original N7 returns,False,OUTSIDE_RUNTIME_CLOSURE,,7
+bb96efaca7885c32d276683629358eb0e977dfa3,Test uncapped N5 portfolios with single-only 25 percent swaps,False,OUTSIDE_RUNTIME_CLOSURE,,12
+e8fb63a8990cb7b2f0d436a28408294db4ea3b92,Report no-swap N5 N6 N7 return correlations,False,OUTSIDE_RUNTIME_CLOSURE,,3
+38acfd505375b7d8cb2cb590afe8cdc3620a3d44,Plot no-swap N5 N6 N7 equity and drawdown,False,OUTSIDE_RUNTIME_CLOSURE,,3
+da5055fe9526d34773d3218447aa117ebf12da80,Compare paired N5 N6 single-only 10 percent swaps,False,OUTSIDE_RUNTIME_CLOSURE,,8
+ab1285fa9436171e2f446b55beac6518be5ef162,Compare N5 single10 and N7 hit-issue overlap,False,OUTSIDE_RUNTIME_CLOSURE,,3
+b692a329725b78531f09004c822c7544fa9a0acb,Compare equal-budget N5 single10 and U3 mix equity and drawdown,False,OUTSIDE_RUNTIME_CLOSURE,,8
+b0755499694b2b65ce6de7a01e853550d483cfd3,Replay fixed N5 N6 N7 strategies and equal-wallet mix on 100 updated issues,False,OUTSIDE_RUNTIME_CLOSURE,,11
+9b22081df5869560b576caf0c5d05b29a7d5138d,Diagnose updated 100-period strategy losses against original 48,False,OUTSIDE_RUNTIME_CLOSURE,,7
+d0d57ee2d736c7f9ee53ea5560b32452fa3a2605,Break down baseline and market accuracy by handicap and outcome,False,OUTSIDE_RUNTIME_CLOSURE,,4
+894a33ec975c234fad3737aacf579e75cc156954,Compare shared and exclusive baseline market hits by fixture,False,OUTSIDE_RUNTIME_CLOSURE,,4
+219bb658d6d4d53ac6723ae7c7e272cf49e4181c,Diagnose observed handicap draws across market probability bands,False,OUTSIDE_RUNTIME_CLOSURE,,4
+581536cc97f0c63313734a8ddeac79f4aa087d47,Compare baseline handicap draw probabilities with observed frequencies,False,OUTSIDE_RUNTIME_CLOSURE,,4
+6011fa29dcea54020528b7831b85063c36668959,Plot baseline versus market handicap draw probabilities,False,OUTSIDE_RUNTIME_CLOSURE,,2
+2e4405ef7e723e28d8741ab7d04154316ee4d42a,Plot baseline and market Top2 hits on shared draw probability axes,False,OUTSIDE_RUNTIME_CLOSURE,,2
+142b5cc2a4fba2ae5a4e58cbe516c34f8b02b3df,Replace Top2 scatter plots with draw calibration and hit rate curves,False,OUTSIDE_RUNTIME_CLOSURE,,4
+b9e31592a43c9c3e2f97de5d9378ca8c570261f0,Add empirical draw-cell foundation and probability balance diagnosis,False,OUTSIDE_RUNTIME_CLOSURE,,13
+8a631980a4eb320a13e64ade52d752816cbd4a7e,Compare strength draw bands against market outcome balance,False,OUTSIDE_RUNTIME_CLOSURE,,4
+e6c4afb4b87b34e364a598d9d24651fd1bc12963,Evaluate market draw and outcome balance calibration foundation,False,ARTIFACT_PRODUCER_ONLY,,8
+a85410f49fa1a97a66b3a98a3793b875209e5757,Compare market-only U3 U6 portfolios with calibrated foundation,False,OUTSIDE_RUNTIME_CLOSURE,,8
+4480fd7d2aee5365d6bf3762b4c4ddc13ff99cc5,Test conditional reuse with direct handicap draw singles,False,INHERITED_CODE_TOUCH,r/market_conditional_summary.R,9
+8ae4f92e0b6bfcbdebd4e620c056a218bbba7adf,Compare weighted N7 pools with fixed alternative sampling rates,False,INHERITED_CODE_TOUCH,r/market_conditional_summary.R,9
+d223fe8394ab130f6961d7d588c49fc3c5d16c71,Test exclusive N7 pools with conditional alternative outcomes,False,OUTSIDE_RUNTIME_CLOSURE,,7
+32c90784d579f20a9ff7b068e7f785ff7c562d15,Evaluate all-single N7 threshold and concentration grid,False,INHERITED_CODE_TOUCH,src/n7_single_ticket_sampling.py,7
+4bb25f4594ea6dca534aee8b3bec86ba75577ee4,Test probability-gated expected-return N7 allocation,False,INHERITED_CODE_TOUCH,src/n7_probability_gate.py,8
+db30d6525858efe26f6bf0cd13a1ccf900e06b2a,Evaluate incremental union coverage for single N7 tickets,False,INHERITED_CODE_TOUCH,src/n7_incremental_coverage.py,8
+9341e79d03c09f92ad6531672718497caca7b05d,Compare profitable-period N7 allocation with probability and coverage policies,False,OUTSIDE_RUNTIME_CLOSURE,,8
+5c1fc0e66cbc560742d97288baef158704e0060c,Compare equal-weight profit and probability portfolios,False,OUTSIDE_RUNTIME_CLOSURE,,4
+2798b83a7b8fe31fe3e985c329d28c5ea201af5f,Explore fixed probability cores and profitable-gap N7 supplements,False,ARTIFACT_PRODUCER_ONLY,,10
