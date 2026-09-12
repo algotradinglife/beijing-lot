@@ -1,0 +1,129 @@
+---
+title: "七串一 sleeve：场次复用与组间重叠硬约束"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-sleeve-reuse-v1"
+  archive_fixture: null
+  output_dir: "data/derived/fundamentals_417/n7-sleeve-reuse-report"
+---
+
+本轮固定960组候选池，同一100期100608–101120、三个种子42401/42402/42403。
+比较不限制、U3/P2、U3/P3、U4/P3；另保留原固定64注对照。
+U表示每场最多进入几组，P表示任意两组最多共享几场。
+同组内部的多张票只算一次场次复用，赛果不同仍算共享场次。
+
+先按概率排序截取累计不超过25%的最长前缀，最多64票；保留概率必须严格大于15%。
+每次购组前，同时筛选满足U/P和资金可负担的组，再按前缀期望返奖重新归一化抽样。
+无合格候选即持有现金，不自动放宽限制、不购不完整尾组。
+这是顺序随机构组；某条路径无法继续，不等于不存在更好的全局组合。
+
+概率和原市场价格代理保持冻结，每票2元、每期预算1024元、整票只乘一次0.65。
+所有新计划先冻结再读取结算，50000个共享逐场情景估算至少命中一组概率。
+本批数据早已暴露，**historical_admission=false**；这不是新的验证集，
+价格代理不是可执行北单赛前SP。未优化或重训概率模型。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+source('r/n7_sleeve_cap_report.R')
+mode<-if(is.null(params$archive_fixture)) 'SOURCE_VERIFIED_DIAGNOSTIC' else 'ARCHIVED_ACCOUNTING_ONLY'
+if(is.null(params$archive_fixture)) {
+ frozen<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'))
+ er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+ stopifnot(er$freeze_sha256==digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),
+   er$result_sha256==digest::digest(file=file.path(params$study,'results.json'),algo='sha256'),
+   er$audit_sha256==digest::digest(file=er$audit_path,algo='sha256'),
+   er$prior_receipt_sha256==digest::digest(file=file.path(params$study,'prior-evaluation-snapshot.json'),algo='sha256'))
+ bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+ for(path in names(bindings)) stopifnot(bindings[[path]]==digest::digest(file=path,algo='sha256'))
+ result<-jsonlite::fromJSON(file.path(params$study,'results.json'))
+ checked<-jsonlite::fromJSON(file.path(params$study,'independent-replay.json'))
+ for(path in names(checked$implementation$files)) stopifnot(checked$implementation$files[[path]]==digest::digest(file=path,algo='sha256'))
+ stopifnot(checked$freeze==frozen$seal,checked$result_sha256==er$result_sha256,
+   checked$checked==nrow(result$rows),result$freeze_seal==frozen$seal,!frozen$receipt$historical_admission)
+ cfg<-frozen$receipt$parameters;result_hash<-er$result_sha256
+} else {
+ archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+ stopifnot(archive$result_sha256==digest::digest(charToRaw(archive$result_body),serialize=FALSE,algo='sha256'))
+ result<-jsonlite::fromJSON(archive$result_body);cfg<-archive$config;result_hash<-archive$result_sha256
+}
+report<-n7_sleeve_cap_report(result$rows,result$issue_order,cfg$initial_capital_cny,cfg$budget_cny,control_arm="UNRESTRICTED")
+dir.create(params$output_dir,recursive=TRUE,showWarnings=FALSE)
+for(name in names(report))readr::write_csv(report[[name]],file.path(params$output_dir,paste0(name,'.csv')))
+```
+
+模式：`r mode`。结果SHA256：`r result_hash`。
+
+汇总和对照
+
+ROI分母为实际投入，现金另列；同时报告绝对净收益和回撤，避免把少投入解释为更优。
+汇总各列为三个种子的中位数，可能来自不同种子；模拟命中率为三个种子的平均值。
+
+```{r}
+knitr::kable(report$grid,digits=2)
+knitr::kable(report$summary |> select(model,policy,stake,net,roi_percent,hit_issues,profit_issues,
+ cash,average_sleeves,max_drawdown,without_best_roi),digits=2)
+knitr::kable(report$matched,digits=2)
+```
+
+实际约束与现金原因
+
+CONCENTRATION_CAPS_EXHAUSTED表示剩余候选均违反U/P；
+NO_AFFORDABLE_COMPLETE_SLEEVE表示仍有满足U/P的候选，但现金不足以完整买入。
+下表计数与现金汇总三个种子的300条记录，不代表300个独立期次。
+未入选候选可能同时受两种约束影响，不把这类统计当成独立因果贡献。
+
+```{r}
+knitr::kable(result$rows |> filter(arm!='FIXED64') |> group_by(arm) |>
+ summarise(max_reuse=max(max_fixture_reuse),max_overlap=max(max_pair_overlap),
+ cash=sum(cash),zero_bet=sum(stake==0),.groups='drop'),digits=2)
+knitr::kable(result$rows |> filter(arm!='FIXED64') |> count(arm,unspent_reason))
+```
+
+资金与回撤曲线
+
+固定种子42401；其他种子轨迹保存在输出表。初始资金100000元，不补入本金。
+
+```{r}
+#| fig-width: 11
+#| fig-height: 6
+plot_rows<-report$curves |> filter(policy=='42401')
+equity<-ggplot(plot_rows,aes(period,equity_cny,color=arm))+geom_line(linewidth=.7)+
+ labs(x='Issue index',y='Capital (CNY)',color='Policy')+theme_minimal()+theme(legend.position='bottom')
+drawdown<-ggplot(plot_rows,aes(period,drawdown_cny,color=arm))+geom_line(linewidth=.7)+
+ labs(x='Issue index',y='Drawdown (CNY)',color='Policy')+theme_minimal()+theme(legend.position='bottom')
+print(equity)
+print(drawdown)
+ggsave(file.path(params$output_dir,'equity.png'),equity,width=11,height=6,dpi=140)
+ggsave(file.path(params$output_dir,'drawdown.png'),drawdown,width=11,height=6,dpi=140)
+```
+
+每期结果
+
+```{r}
+knitr::kable(report$periods |> filter(policy=='42401') |>
+ select(issue,arm,sleeve_count,groups,stake,cash_cny,gross,net,roi_percent,hits,equity_cny,drawdown_cny),digits=2)
+```
+
+构组接口：`sample_capped_sleeves()` 显式参数 `max_fixture_reuse`、`max_pair_overlap`，
+两者为 `None` 表示不限制。R汇总函数 `n7_sleeve_cap_report()` 的 `control_arm`
+参数指定配对对照。本报告取 UNRESTRICTED。配置为 `config/n7_sleeve_reuse.json`。
+复用同一生成与独立核验入口，只有配置变化；没有第二套构组实现。
+
+```{r}
+#| include: false
+report_implementation<-list()
+for(path in c('quarto/137_n7_sleeve_reuse.qmd','r/n7_sleeve_cap_report.R',
+ 'r/fundamentals_equity_curves.R','r/market_conditional_summary.R'))report_implementation[[path]]<-digest::digest(file=path,algo='sha256')
+jsonlite::write_json(list(mode=mode,result_sha256=result_hash,parameters=cfg,implementation=report_implementation),
+ file.path(params$output_dir,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

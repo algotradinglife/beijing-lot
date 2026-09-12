@@ -1,0 +1,62 @@
+{
+  "mode": "EXPOSED_HISTORICAL_DIAGNOSTIC",
+  "model": "market-balance-draw-1.0.0-diagnostic",
+  "origin": "data/derived/fundamentals_417/n7-core-profit-v1",
+  "pool_root": "data/derived/fundamentals_417/n7-probability-gate-v2/pools",
+  "candidate_count": 24,
+  "candidate_seed": 42400,
+  "maximum_attempts": 5000,
+  "frontier_points": [
+    [
+      "F80_R35",
+      0.8,
+      -0.35
+    ],
+    [
+      "F80_R0",
+      0.8,
+      0.0
+    ],
+    [
+      "F95_R35",
+      0.95,
+      -0.35
+    ]
+  ],
+  "solver_seconds": 3.0,
+  "seeds": [
+    42401,
+    42402,
+    42403
+  ],
+  "training_worlds": 20000,
+  "evaluation_worlds": 50000,
+  "primary_frontier": "F80_R35",
+  "overlap_penalty": 0.02,
+  "return_union_fraction": 0.8,
+  "return_passes": 16,
+  "budget_cny": 1024,
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000,
+  "solver_relative_gap": 0.001,
+  "solver_feasibility_tolerance": 1e-09,
+  "n": 7,
+  "sleeves_per_issue": 8,
+  "tickets_per_sleeve": 64,
+  "arms": [
+    "MONOLITHIC_PROB512",
+    "MONOLITHIC_COVERAGE512",
+    "8x64_PROB",
+    "8x64_DIVERSIFIED_PROB",
+    "8x64_UNION_PROB",
+    "8x64_FRONTIER",
+    "8x64_FRONTIER_FIXEDG",
+    "8x64_RETURN_AWARE",
+    "8x64_RANDOM_MATCHSETS",
+    "8x64_RANDOM_STATES",
+    "8x64_DIVERSITY_STATES"
+  ],
+  "candidate_workers": 8,
+  "portfolio_workers": 2
+}

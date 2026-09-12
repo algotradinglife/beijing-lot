@@ -1,0 +1,19 @@
+{
+  "mode": "EXPOSED_HISTORICAL_DIAGNOSTIC",
+  "model": "market-balance-draw-1.0.0-diagnostic",
+  "origin": "data/derived/fundamentals_417/n7-core-profit-v1",
+  "prior_study": "data/derived/fundamentals_417/n7-sleeves-424-v3",
+  "pool_root": "data/derived/fundamentals_417/n7-probability-gate-v2/pools",
+  "pool_sizes": [24, 240, 960],
+  "candidate_seed": 42410,
+  "maximum_attempts": 50000,
+  "coverage_floor": 0.15,
+  "weightings": ["EXPECTED_GROSS", "UNIFORM"],
+  "seeds": [42401, 42402, 42403],
+  "evaluation_worlds": 50000,
+  "workers": 8,
+  "budget_cny": 1024,
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000
+}

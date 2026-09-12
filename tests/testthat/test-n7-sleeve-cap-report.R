@@ -1,0 +1,29 @@
+source('../../r/fundamentals_equity_curves.R')
+source('../../r/market_conditional_summary.R')
+source('../../r/n7_sleeve_cap_report.R')
+testthat::test_that('variable stake and expanded group accounting stays funded', {
+ rows<-tibble::tibble(issue=rep(c('001','002','003'),2),arm=rep(c('CAP25','FIXED64'),each=3),pool_size=24L,seed=1L,
+   stake=c(1000,1000,0,1024,1024,0),gross=c(0,3000,0,0,4096,0),net=gross-stake,cash=1024-stake,
+   groups=stake/2,hits=ifelse(gross>0,1L,0L),status=ifelse(stake>0,'COMPLETE','NO_BET'),
+   sleeve_count=c(10L,10L,0L,8L,8L,0L),eval_coverage=.5)
+ a<-n7_sleeve_cap_report(rows,c('001','002','003'),100000,1024)
+ testthat::expect_equal(a$summary$stake,c(2000,2048))
+ testthat::expect_equal(a$summary$roi_percent,c(50,100))
+ testthat::expect_equal(a$summary$max_drawdown,c(1000,1024))
+ testthat::expect_equal(a$summary$average_sleeves,c(10,8))
+ testthat::expect_equal(a$summary$cash,c(1072,1024))
+ testthat::expect_equal(a$matched$issues,2L)
+ testthat::expect_equal(a$summary$without_best_roi,c(-100,-100))
+ stop<-n7_sleeve_cap_report(rows,c('001','002','003'),1024,1024)
+ testthat::expect_equal(stop$summary$net,c(-1000,-1024))
+ testthat::expect_equal(stop$summary$stopped_issues,c(2L,2L))
+ bad<-rows;bad$stake[1]<-1001
+ testthat::expect_error(n7_sleeve_cap_report(bad,c('001','002','003'),100000,1024))
+ extended<-dplyr::bind_rows(rows, dplyr::mutate(dplyr::filter(rows,arm=='CAP25'),arm='U3_P2'))
+ compared<-n7_sleeve_cap_report(extended,c('001','002','003'),100000,1024,control_arm='CAP25')
+ testthat::expect_equal(nrow(compared$matched),2L)
+ testthat::expect_equal(compared$matched$control_stake,c(2000,2000))
+ testthat::expect_equal(compared$matched$new_hits,c(0L,0L))
+ testthat::expect_equal(nrow(compared$periods),9L)
+ testthat::expect_error(n7_sleeve_cap_report(rows,c('001','002','003'),100000,1024,control_arm='MISSING'))
+})
