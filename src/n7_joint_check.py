@@ -3,6 +3,7 @@ from pathlib import Path
 import gzip
 import hashlib
 import json
+import math
 import numpy as np
 
 from src.temporal_learning import verify_implementation_closure
@@ -140,7 +141,17 @@ def check_joint_study(output, *, repository_root):
             b = bundles[issue]
             if plan["cutoffs"] != receipt["cutoffs"][issue] or plan["cutoffs"] != b["cutoffs"]:
                 raise ValueError("Cutoff map changed")
-            if plan["fixtures"] != b["expanded_pool"]["fixtures"]:
+            source_fixtures = b["expanded_pool"]["fixtures"]
+            probability_keys = {f"{prefix}_{direction}" for prefix in "pq" for direction in "WDL"}
+            # R/jsonlite preserves 15 significant digits. Only these six numeric
+            # probabilities admit serialization roundoff; identities stay exact.
+            if len(plan["fixtures"]) != len(source_fixtures) or any(
+                set(actual) != set(source) or any(
+                    not math.isclose(actual[k], source[k], rel_tol=0, abs_tol=1e-14)
+                    if k in probability_keys else actual[k] != source[k]
+                    for k in source)
+                for actual, source in zip(plan["fixtures"], source_fixtures)
+            ):
                 raise ValueError("Plan probabilities/identities differ from frozen source")
             groupmap = {g["id"]: g["fixture_indices"] for g in b["sleeves"]}
             for j, key in enumerate(plan["sleeve_keys"]):

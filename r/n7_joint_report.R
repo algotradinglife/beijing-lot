@@ -2,6 +2,24 @@
 # issue/arm/seed. Amounts CNY, probability inputs fractions, displayed rates %.
 # Existing equity and sleeve summary functions must be sourced by the entry point.
 # No fitting, selection, chronology inference, source mutation or I/O.
+
+# Describe equal-CNY2 packed-ticket exposure. Returns one issue/arm/seed row;
+# HHI is sum of squared shares of physical legs, by fixture or fixture/outcome.
+# Empty portfolios have zero exposure. No missing/fractional codes accepted.
+n7_joint_exposure <- function(plan) {
+  ix <- if (is.matrix(plan$fixture_indices)) as.vector(t(plan$fixture_indices)) else unlist(plan$fixture_indices)
+  code <- if (is.matrix(plan$outcomes)) as.vector(t(plan$outcomes)) else unlist(plan$outcomes)
+  if (!length(ix)) ix <- integer()
+  if (!length(code)) code <- integer()
+  stopifnot(is.numeric(ix), is.numeric(code), length(ix) == length(code), length(ix) %% 7 == 0,
+    !anyNA(ix), !anyNA(code), all(ix >= 0), all(ix < length(plan$fixtures)),
+    all(ix == floor(ix)), all(code %in% 0:2), is.character(plan$issue), length(plan$issue) == 1L,
+    !is.na(plan$issue), !is.null(plan$arm), !is.null(plan$seed))
+  tibble::tibble(issue = as.character(plan$issue), arm = plan$arm, seed = plan$seed,
+    fixture_hhi = if (length(ix)) sum((table(ix) / length(ix))^2) else 0,
+    outcome_hhi = if (length(ix)) sum((table(3 * ix + code) / length(ix))^2) else 0)
+}
+
 n7_joint_report <- function(rows, issue_order, initial_capital_cny, budget_cny,
                             mean_drawdown_cap) {
   stopifnot(all(c("solver_status", "train_path_drawdown", "eval_path_drawdown") %in% names(rows)),
@@ -16,6 +34,20 @@ n7_joint_report <- function(rows, issue_order, initial_capital_cny, budget_cny,
   base$grid <- base$grid |> dplyr::left_join(
     dd |> dplyr::group_by(model) |> dplyr::summarise(max_drawdown_percent = median(max_drawdown_percent), .groups = "drop"),
     by = "model", relationship = "one-to-one")
+  concentration <- base$periods |> dplyr::group_by(model, policy) |>
+    dplyr::summarise(largest_payout_share_percent = if (sum(gross) > 0) 100 * max(gross) / sum(gross) else NA_real_,
+                    .groups = "drop")
+  if (all(c("fixture_hhi", "outcome_hhi") %in% names(base$periods))) {
+    exposure <- base$periods |> dplyr::group_by(model, policy) |>
+      dplyr::summarise(
+        mean_fixture_hhi = if (any(stake > 0 & !is.na(fixture_hhi))) mean(fixture_hhi[stake > 0], na.rm = TRUE) else NA_real_,
+        mean_outcome_hhi = if (any(stake > 0 & !is.na(outcome_hhi))) mean(outcome_hhi[stake > 0], na.rm = TRUE) else NA_real_,
+        .groups = "drop")
+    concentration <- concentration |> dplyr::left_join(exposure,
+      by = c("model", "policy"), relationship = "one-to-one")
+  }
+  base$summary <- base$summary |> dplyr::left_join(concentration,
+    by = c("model", "policy"), relationship = "one-to-one")
   comparisons <- list()
   for (control in c("QUALITY_PROB", "JOINT_UNION", "JOINT_FULL")) {
     reference <- base$periods |> dplyr::filter(arm == control) |>

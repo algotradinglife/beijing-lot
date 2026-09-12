@@ -71,7 +71,9 @@ def test_replay_and_mutations(replay_case):
         check_joint_plan(bad, worlds, cfg)
 
 
-def test_all_plan_replay_binds_source_and_raw_files(tmp_path, replay_case):
+@pytest.mark.parametrize("source_change, accepted", [(None, True), ("roundoff", True),
+    ("probability", False), ("identity", False)])
+def test_all_plan_replay_binds_source_and_raw_files(tmp_path, replay_case, source_change, accepted):
     plan, worlds, cfg = replay_case
     (tmp_path / "plans").mkdir(); (tmp_path / "raw").mkdir(); (tmp_path / "bundles").mkdir()
     pp = tmp_path / "plans" / f"{plan['issue']}_{plan['seed']}_{plan['arm']}.json.gz"
@@ -79,13 +81,24 @@ def test_all_plan_replay_binds_source_and_raw_files(tmp_path, replay_case):
     rp = tmp_path / "raw" / "issue.json.gz"
     rp.write_bytes(gzip.compress(json.dumps(dict(plans=[plan], worlds=[worlds])).encode()))
     bp = tmp_path / "bundles" / "issue.json.gz"
+    source_fixtures = copy.deepcopy(plan["fixtures"])
+    if source_change == "roundoff":
+        source_fixtures[0]["p_D"] += 3e-16
+    elif source_change == "probability":
+        source_fixtures[0]["p_D"] += 1e-8
+    elif source_change == "identity":
+        source_fixtures[0]["provider_id"] = "WRONG"
     bp.write_bytes(gzip.compress(json.dumps(dict(issue=plan["issue"], cutoffs=plan["cutoffs"],
-        expanded_pool=dict(fixtures=plan["fixtures"]), sleeves=[dict(id=j, fixture_indices=list(range(j * 7, j * 7 + 7))) for j in range(8)])).encode()))
+        expanded_pool=dict(fixtures=source_fixtures), sleeves=[dict(id=j, fixture_indices=list(range(j * 7, j * 7 + 7))) for j in range(8)])).encode()))
     receipt = dict(parameters=cfg, source_hashes={str(bp): hashlib.sha256(bp.read_bytes()).hexdigest()},
         r_implementation={}, implementation=implementation_closure(ROOT, ["src.temporal_learning"]),
         plan_hashes={str(pp): hashlib.sha256(pp.read_bytes()).hexdigest()},
         raw_hashes={str(rp): hashlib.sha256(rp.read_bytes()).hexdigest()}, cutoffs={plan["issue"]: plan["cutoffs"]})
     (tmp_path / "plans-frozen.json").write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
+    if not accepted:
+        with pytest.raises(ValueError, match="probabilities/identities"):
+            check_joint_study(tmp_path, repository_root=ROOT)
+        return
     assert check_joint_study(tmp_path, repository_root=ROOT)["plans_checked"] == 1
     rp.write_bytes(b"changed")
     with pytest.raises(ValueError, match="Raw R output"):
