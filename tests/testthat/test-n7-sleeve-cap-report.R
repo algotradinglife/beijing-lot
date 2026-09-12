@@ -19,4 +19,11 @@ testthat::test_that('variable stake and expanded group accounting stays funded',
  testthat::expect_equal(stop$summary$stopped_issues,c(2L,2L))
  bad<-rows;bad$stake[1]<-1001
  testthat::expect_error(n7_sleeve_cap_report(bad,c('001','002','003'),100000,1024))
+ extended<-dplyr::bind_rows(rows, dplyr::mutate(dplyr::filter(rows,arm=='CAP25'),arm='U3_P2'))
+ compared<-n7_sleeve_cap_report(extended,c('001','002','003'),100000,1024,control_arm='CAP25')
+ testthat::expect_equal(nrow(compared$matched),2L)
+ testthat::expect_equal(compared$matched$control_stake,c(2000,2000))
+ testthat::expect_equal(compared$matched$new_hits,c(0L,0L))
+ testthat::expect_equal(nrow(compared$periods),9L)
+ testthat::expect_error(n7_sleeve_cap_report(rows,c('001','002','003'),100000,1024,control_arm='MISSING'))
 })

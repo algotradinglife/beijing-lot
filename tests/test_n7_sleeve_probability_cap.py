@@ -19,7 +19,7 @@ def case():
     pool=probability_gate_candidates(f,cutoffs=cuts,n=7,depth=64,tradeoffs=['PROBABILITY'])
     money=dict(budget_cny=1024,unit_cny=2,payout_factor=.65)
     b=expand_top64(pool,cutoffs=cuts,original_groups=[list(range(7))],candidate_count=60,seed=1,maximum_attempts=1000,**money)
-    opts=dict(cutoffs=cuts,pool_size=60,coverage_floor=.15,coverage_cap=.25,seed=4,evaluation_worlds=500,**money)
+    opts=dict(cutoffs=cuts,pool_size=60,coverage_floor=.15,coverage_cap=.25,seed=4,evaluation_worlds=500,max_fixture_reuse=None,max_pair_overlap=None,**money)
     return f,b,opts
 
 
@@ -80,3 +80,38 @@ def test_independent_replay_rejects_budget_depth_draw_and_simulation_mutations(c
         bad['seal']=stable_json_hash({k:v for k,v in bad.items() if k!='seal'})
         with pytest.raises(ValueError):check_capped_plan(bad,b,cutoffs=opts['cutoffs'])
     with pytest.raises(ValueError):check_capped_plan(z,b,cutoffs={})
+
+
+@pytest.mark.parametrize('u,p',[(1,None),(2,None),(3,4),(None,4),(3,2)])
+def test_hard_caps_filter_before_weighting_and_hold_cash(case,u,p):
+    _,b,opts=case
+    z=sample_capped_sleeves(b,**{**opts,'max_fixture_reuse':u,'max_pair_overlap':p})
+    assert check_capped_plan(z,b,cutoffs=opts['cutoffs'])==len(z['sleeves'])
+    assert z['unspent_reason']=='CONCENTRATION_CAPS_EXHAUSTED'
+    assert z['cash_cny']>0 and z['stake']+z['cash_cny']==1024
+    chosen=[]
+    for draw,sleeve in zip(z['draws'],z['sleeves']):
+        allowed=[]
+        for candidate in b['sleeves']:
+            if candidate['id'] in [g['id'] for g in chosen]:continue
+            if u is not None and any(sum(i in g['fixture_indices'] for g in chosen)>=u for i in candidate['fixture_indices']):continue
+            if p is not None and any(len(set(candidate['fixture_indices'])&set(g['fixture_indices']))>p for g in chosen):continue
+            allowed.append(candidate)
+        # All toy sleeves have equal retained mass/value and are affordable.
+        assert draw['affordable_count']==len(allowed)
+        assert draw['probability']==pytest.approx(1/len(allowed))
+        chosen.append(sleeve)
+    for i in range(10):
+        if u is not None:assert sum(i in s['fixture_indices'] for s in chosen)<=u
+    for j,a in enumerate(chosen):
+        for b2 in chosen[:j]:
+            if p is not None:assert len(set(a['fixture_indices'])&set(b2['fixture_indices']))<=p
+    bad=copy.deepcopy(z);bad['parameters']['max_fixture_reuse']=0
+    bad['seal']=stable_json_hash({k:v for k,v in bad.items() if k!='seal'})
+    with pytest.raises(ValueError):check_capped_plan(bad,b,cutoffs=opts['cutoffs'])
+
+
+@pytest.mark.parametrize('key,value',[('max_fixture_reuse',0),('max_fixture_reuse',True),('max_pair_overlap',7),('max_pair_overlap',-1)])
+def test_invalid_hard_caps_fail(case,key,value):
+    _,b,opts=case
+    with pytest.raises(ValueError):sample_capped_sleeves(b,**{**opts,key:value})

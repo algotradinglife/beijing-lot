@@ -2,8 +2,8 @@
 # Explicit CNY budget/initial capital and chronological issue order; no I/O or fit.
 # Uses shared equity and market summary functions. Returns per-period funded rows,
 # curves, seed summaries, median grid and paired active-issue comparisons.
-n7_sleeve_cap_report <- function(rows,issue_order,initial_capital_cny,budget_cny) {
- stopifnot(all(c('issue','arm','pool_size','seed','stake','gross','net','cash','groups','hits','status','sleeve_count','eval_coverage') %in% names(rows)),
+n7_sleeve_cap_report <- function(rows,issue_order,initial_capital_cny,budget_cny,control_arm="FIXED64") {
+ stopifnot(is.character(control_arm),length(control_arm)==1,!is.na(control_arm),control_arm %in% rows$arm,all(c('issue','arm','pool_size','seed','stake','gross','net','cash','groups','hits','status','sleeve_count','eval_coverage') %in% names(rows)),
    !anyDuplicated(rows[c('issue','arm','pool_size','seed')]),
    all(rows$stake>=0 & rows$stake<=budget_cny & rows$stake%%2==0),all(rows$cash+rows$stake==budget_cny),
    all(rows$groups==rows$stake/2),all(abs(rows$gross-rows$stake-rows$net)<1e-7),
@@ -28,10 +28,10 @@ n7_sleeve_cap_report <- function(rows,issue_order,initial_capital_cny,budget_cny
    hit_issues=median(hit_issues),profit_issues=median(profit_issues),max_drawdown=median(max_drawdown),
    without_best_roi=median(without_best_roi),average_sleeves=median(average_sleeves),over_eight=median(over_eight),
    modeled_any_hit=mean(modeled_any_hit),stopped_issues=median(stopped_issues),.groups='drop')
- control<-periods |> dplyr::filter(arm=='FIXED64') |> dplyr::select(issue,pool_size,seed,
+ control<-periods |> dplyr::filter(arm==control_arm) |> dplyr::select(issue,pool_size,seed,
    control_stake=stake,control_net=net,control_hits=hits,control_coverage=eval_coverage)
- joined<-periods |> dplyr::filter(arm=='CAP25') |>
-   dplyr::left_join(control,by=c('issue','pool_size','seed'),relationship='one-to-one')
+ joined<-periods |> dplyr::filter(arm!=control_arm) |>
+   dplyr::left_join(control,by=c('issue','pool_size','seed'),relationship='many-to-one')
  stopifnot(!anyNA(joined[c('control_stake','control_net','control_hits')]))
  matched<-joined |> dplyr::mutate(active=stake>0 & control_stake>0) |> dplyr::group_by(model,policy) |>
    dplyr::summarise(issues=sum(active),stake=sum(stake[active]),control_stake=sum(control_stake[active]),

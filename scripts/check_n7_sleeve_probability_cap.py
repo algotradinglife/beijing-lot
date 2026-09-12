@@ -26,7 +26,7 @@ if __name__=='__main__':
     result=json.loads((root/'results.json').read_bytes());assert result['freeze_seal']==frozen['seal'] and result['issue_order']==fr['issues']
     rows={(r['issue'],r['pool_size'],r['seed'],r['arm']):r for r in result['rows']}
     entries={(r['issue'],r['pool_size'],r['seed'],r['arm']):r for r in fr['entries']}
-    expected={(i,n,s,a) for i in fr['issues'] for n in cfg['pool_sizes'] for s in cfg['seeds'] for a in ('CAP25','FIXED64')}
+    expected={(i,n,s,a) for i in fr['issues'] for n in cfg['pool_sizes'] for s in cfg['seeds'] for a in [p['arm'] for p in cfg['policies']]+['FIXED64']}
     assert set(rows)==set(entries)==expected and len(rows)==len(result['rows'])==len(fr['entries'])==len(fr['plan_hashes'])
     audit=pd.DataFrame(json.loads(Path(er['audit_path']).read_bytes())['rows']);audit.issue=audit.issue.astype(str)
     assert not audit.duplicated(['issue','slot','provider_id']).any();checked=0
@@ -38,12 +38,13 @@ if __name__=='__main__':
         actual=a.actual_direction.map(dict(W=0,D=1,L=2)).to_numpy();sp=a.spf_sp.to_numpy()
         for n in cfg['pool_sizes']:
             for seed in cfg['seeds']:
-                for arm in ('CAP25','FIXED64'):
+                for arm in [p['arm'] for p in cfg['policies']]+['FIXED64']:
                     e=entries[issue,n,seed,arm];z=json.loads(gzip.decompress(Path(e['path']).read_bytes()))
                     assert z['seal']==stable_json_hash({k:v for k,v in z.items() if k!='seal'})
                     assert z['fixtures']==b['fixtures'] and z['cutoffs']==b['cutoffs'] and z['expansion_seal']==b['seal']
-                    if arm=='CAP25':
-                        assert z['parameters']==dict(pool_size=n,coverage_floor=cfg['coverage_floor'],coverage_cap=cfg['coverage_cap'],seed=seed,evaluation_worlds=cfg['evaluation_worlds'],weighting='EXPECTED_GROSS')
+                    if arm!='FIXED64':
+                        policy=next(p for p in cfg['policies'] if p['arm']==arm)
+                        assert z['parameters']==dict(pool_size=n,coverage_floor=cfg['coverage_floor'],coverage_cap=cfg['coverage_cap'],seed=seed,evaluation_worlds=cfg['evaluation_worlds'],weighting='EXPECTED_GROSS',max_fixture_reuse=policy['max_fixture_reuse'],max_pair_overlap=policy['max_pair_overlap'])
                         sleeve_count=check_capped_plan(z,b,cutoffs=cuts)
                     else:
                         path=str(origin/'plans'/f'{issue}_{n}_EXPECTED_GROSS_{seed}.json.gz')
@@ -55,6 +56,10 @@ if __name__=='__main__':
                     assert (r['groups'],r['stake'],r['hits'],r['cash'],r['sleeve_count'])==(len(idx),2*len(idx),int(won.sum()),1024-2*len(idx),sleeve_count)
                     assert r['status']==('COMPLETE' if len(idx) else 'NO_BET') and r['eval_coverage']==z['eval_coverage']
                     assert np.isclose(r['gross'],gross,rtol=1e-12) and np.isclose(r['net'],gross-r['stake'],rtol=1e-12)
+                    if arm!='FIXED64':
+                        reuse=max([sum(i in g['fixture_indices'] for g in z['sleeves']) for i in range(len(z['fixtures']))],default=0)
+                        overlap=max([len(set(a['fixture_indices'])&set(b['fixture_indices'])) for j,a in enumerate(z['sleeves']) for b in z['sleeves'][:j]],default=0)
+                        assert (r['max_fixture_reuse'],r['max_pair_overlap'],r['unspent_reason'])==(reuse,overlap,z['unspent_reason'])
                     assert r['expected_roi']==z['expected_roi'] and r['eligible_count']==z['eligible_count'];checked+=1
         print(f'Checked {issue}: {checked} plans',flush=True)
     verify_implementation_closure(Path.cwd(),closure)

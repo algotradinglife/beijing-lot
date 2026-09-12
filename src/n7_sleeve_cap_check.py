@@ -20,6 +20,10 @@ def check_capped_plan(plan, expansion, *, cutoffs):
         or (plan['budget_cny'],plan['unit_cny'],plan['payout_factor'])!=(1024,2,.65)):
         raise ValueError('Source/cutoff/money mismatch')
     cfg=plan['parameters'];candidates=[]
+    u=cfg['max_fixture_reuse'];overlap_cap=cfg['max_pair_overlap']
+    if ((u is not None and (type(u) is not int or u<1)) or
+        (overlap_cap is not None and (type(overlap_cap) is not int or not 0<=overlap_cap<=6))):
+        raise ValueError('Invalid concentration caps')
     for s in expansion['sleeves'][:cfg['pool_size']]:
         triples=list(zip(s['state_ids'],s['probabilities'],s['estimated_payouts']))
         triples.sort(key=lambda t:(-t[1],-t[1]*t[2],t[0]));mass=0.;chosen=[]
@@ -32,7 +36,14 @@ def check_capped_plan(plan, expansion, *, cutoffs):
             expected_gross=float(np.sum([t[1]*t[2] for t in chosen]))))
     rng=np.random.default_rng(np.random.SeedSequence([cfg['seed'],0]));cash=1024;left=list(candidates);selected=[]
     while True:
-        affordable=[s for s in left if s['cost_cny']<=cash]
+        counts={i:sum(i in g['fixture_indices'] for g in selected) for i in range(len(expansion['fixtures']))}
+        allowed=[]
+        for candidate in left:
+            indices=set(candidate['fixture_indices'])
+            if u is not None and any(counts[i]>=u for i in indices):continue
+            if overlap_cap is not None and any(len(indices.intersection(g['fixture_indices']))>overlap_cap for g in selected):continue
+            allowed.append(candidate)
+        affordable=[s for s in allowed if s['cost_cny']<=cash]
         if not affordable:break
         weights=np.array([s['expected_gross'] for s in affordable]);j=int(rng.choice(len(affordable),p=weights/weights.sum()))
         s=affordable[j];step=len(selected)
@@ -65,7 +76,7 @@ def check_capped_plan(plan, expansion, *, cutoffs):
     if selected:
         if not np.isclose(plan['expected_roi'],gross/plan['stake']-1,rtol=1e-12):raise ValueError('Expected ROI mismatch')
     elif plan['expected_roi'] is not None:raise ValueError('Empty ROI must be null')
-    reason='NO_ELIGIBLE_SLEEVES' if not candidates else ('CANDIDATES_EXHAUSTED' if not left else 'NO_AFFORDABLE_COMPLETE_SLEEVE') if cash else None
+    reason='NO_ELIGIBLE_SLEEVES' if not candidates else ('CANDIDATES_EXHAUSTED' if not left else ('CONCENTRATION_CAPS_EXHAUSTED' if not allowed else 'NO_AFFORDABLE_COMPLETE_SLEEVE')) if cash else None
     if plan['unspent_reason']!=reason:raise ValueError('Cash reason mismatch')
     rng=np.random.default_rng(np.random.SeedSequence([cfg['seed'],1]));n=cfg['evaluation_worlds']
     p=np.array([[f[f'p_{d}'] for d in 'WDL'] for f in plan['fixtures']])

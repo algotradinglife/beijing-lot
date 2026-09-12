@@ -9,10 +9,13 @@ from src.temporal_learning.core import stable_json_hash
 
 
 @pytest.mark.parametrize('failure',['none','initial_hash','later_mutation'])
-def test_cap_runner_freezes_before_settlement(tmp_path,monkeypatch,failure):
+@pytest.mark.parametrize('policy_count',[1,4])
+def test_cap_runner_freezes_before_settlement(tmp_path,monkeypatch,failure,policy_count):
     cfg=json.loads(Path('config/n7_sleeve_probability_cap.json').read_text())
     origin=tmp_path/'origin';(origin/'bundles').mkdir(parents=True);(origin/'plans').mkdir()
-    cfg.update(origin=str(origin),pool_sizes=[24],seeds=[1]);config=tmp_path/'config.json';config.write_text(json.dumps(cfg))
+    cfg.update(origin=str(origin),pool_sizes=[24],seeds=[1])
+    cfg['policies']=[dict(arm=f'POLICY_{i}',max_fixture_reuse=3 if i else None,max_pair_overlap=2 if i else None) for i in range(policy_count)]
+    config=tmp_path/'config.json';config.write_text(json.dumps(cfg))
     bundles={};plans={}
     for issue in ('001','002'):
         path=origin/'bundles'/f'{issue}.json.gz';path.write_bytes(gzip.compress(json.dumps(dict(issue=issue,cutoffs={'0':'2010-01-01T00:00:00+00:00'})).encode()))
@@ -28,7 +31,7 @@ def test_cap_runner_freezes_before_settlement(tmp_path,monkeypatch,failure):
     def guarded_read(path):
         if path==origin/'evaluation-receipt.json':
             events.append('audit');frozen=json.loads((output/'plans-frozen.json').read_text())
-            assert len(frozen['receipt']['entries'])==len(frozen['receipt']['plan_hashes'])==4
+            assert len(frozen['receipt']['entries'])==len(frozen['receipt']['plan_hashes'])==2*(policy_count+1)
             assert all(Path(p).exists() for p in frozen['receipt']['plan_hashes'])
             raise AuditOpened
         return original_read(path)

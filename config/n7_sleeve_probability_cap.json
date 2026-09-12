@@ -1,13 +1,28 @@
 {
   "origin": "data/derived/fundamentals_417/n7-sleeve-expansion-v1",
   "model": "market-balance-draw-1.0.0-diagnostic",
-  "pool_sizes": [24, 240, 960],
-  "seeds": [42401, 42402, 42403],
+  "pool_sizes": [
+    24,
+    240,
+    960
+  ],
+  "seeds": [
+    42401,
+    42402,
+    42403
+  ],
   "coverage_floor": 0.15,
   "coverage_cap": 0.25,
   "evaluation_worlds": 50000,
   "budget_cny": 1024,
   "unit_cny": 2,
   "payout_factor": 0.65,
-  "initial_capital_cny": 100000
+  "initial_capital_cny": 100000,
+  "policies": [
+    {
+      "arm": "CAP25",
+      "max_fixture_reuse": null,
+      "max_pair_overlap": null
+    }
+  ]
 }
