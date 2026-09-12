@@ -1,0 +1,145 @@
+---
+title: "概率核心＋盈利补充：固定预算探索"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-core-profit-v1"
+  archive_fixture: null
+---
+
+固定100期100608–101120、market-balance-draw-1.0.0-diagnostic概率底座，沿用计数门槛5/10000，
+候选池depth2048。每期1024元、512张2元七串一全单选票；完整票不重复，跨票复用比赛不限。
+保留25%、50%、75%的概率排序核心，即128、256、384张票，核心只锁票，不锁其余场次。
+三seed41901/41902/41903，20000训练模拟世界、50000独立评估世界；每场在每个世界只生成一个结果。
+全部3300套计划在读取本轮结算前冻结，不重新训练专家或按实际收益选择参数。
+
+| 版本 | 固定规则 |
+|---|---|
+| PROB | 原概率排序版，票面不变 |
+| PROFIT | 原盈利期数版，票面不变 |
+| FIXED | 核心＋原PROFIT票按概率补齐，不够再从PROB补齐 |
+| GAP | 核心＋逐票选择新增盈利情景最多的补充票；并列按封顶回收增量、期望返奖 |
+| JOINT | 从GAP起步，尝试1024次两票换两票，核心不可替换；只接受训练盈利率不降的交换 |
+
+GAP每步只比较16张随机候选和下一张未选PROB票，是有限候选搜索；并非全局最优。
+GAP在未填满时仍以最终1024元为回本线，避免把当前低投入误当作最终盈利。
+估算单票返奖=2×0.65÷原市场q概率乘积；真实结算仅在选票结束后使用。
+评估时将估算返奖统一缩放0.8/1/1.2，检查敏感性；不据此调票。
+
+这批100期已被反复研究。独立模拟只检验对模拟抽样的适应，不是未见期次验证。
+当前工作区可直接复用的校正概率仍覆盖同一批100期；原概率底座为历史诊断，
+不具备整票共同可下注时点认证。新期次和跨年验收仍由开放依赖#421约束，#419不关闭。
+没有在此样本上挑出“最佳参数”并冒充验证结果；本轮不构成干净前瞻验收。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+source('r/n7_core_profit_summary.R')
+mode<-if(is.null(params$archive_fixture)) 'SOURCE_VERIFIED_DIAGNOSTIC' else 'ARCHIVED_ACCOUNTING_ONLY'
+archive_hash<-NA_character_
+if(is.null(params$archive_fixture)) {
+ fp<-file.path(params$study,'plans-frozen.json');fr<-readBin(fp,'raw',n=file.size(fp))
+ frozen<-jsonlite::fromJSON(rawToChar(fr));er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+ rp<-file.path(params$study,'results.json');rr<-readBin(rp,'raw',n=file.size(rp))
+ stopifnot(identical(digest::digest(fr,serialize=FALSE,algo='sha256'),er$freeze_sha256),
+  identical(digest::digest(rr,serialize=FALSE,algo='sha256'),er$result_sha256),
+  identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+  identical(digest::digest(file=file.path(params$study,'prior-evaluation-snapshot.json'),algo='sha256'),er$prior_receipt_sha256))
+ bindings<-c(frozen$receipt$source_hashes,frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+ for(path in names(bindings))stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+ result<-jsonlite::fromJSON(rawToChar(rr));stopifnot(result$freeze_seal==frozen$seal,!frozen$receipt$historical_admission)
+ ir<-jsonlite::fromJSON(file.path(params$study,'independent-replay.json'))
+ dp<-file.path(params$study,'ticket-diagnostics.csv');dr<-readBin(dp,'raw',n=file.size(dp))
+ stopifnot(ir$freeze==frozen$seal,ir$result_sha256==er$result_sha256,
+   identical(ir$diagnostics_sha256,digest::digest(dr,serialize=FALSE,algo='sha256')),
+   identical(ir$checker_sha256,digest::digest(file='scripts/check_n7_core_profit.py',algo='sha256')))
+ diagnostics<-readr::read_csv(I(rawToChar(dr)),show_col_types=FALSE)
+} else {
+ archive_hash<-digest::digest(file=params$archive_fixture,algo='sha256')
+ archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+ stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+ result<-jsonlite::fromJSON(archive$body)
+ stopifnot(identical(digest::digest(archive$diagnostics_body,serialize=FALSE,algo='sha256'),archive$diagnostics_sha256))
+ diagnostics<-readr::read_csv(I(archive$diagnostics_body),show_col_types=FALSE)
+}
+stopifnot(nrow(result$rows)==3300)
+z<-n7_core_profit_summary(as_tibble(result$rows),as.character(result$issue_order),100000,1024)
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(z$summary,file.path(params$study,'summary.csv'))
+readr::write_csv(z$grid,file.path(params$study,'grid.csv'))
+readr::write_csv(z$paired,file.path(params$study,'paired.csv'))
+readr::write_csv(z$periods,file.path(params$study,'periods.csv'))
+readr::write_csv(z$curves,file.path(params$study,'curves.csv'))
+```
+
+验收模式：`r mode`。归档模式只验证结算归档字节和会计复算，不验证原始来源、票面或截止时间。
+
+本轮结果：固定核心的简单版本较值得继续跟踪；模拟盈利缺口搜索未转化为更多真实盈利期。
+FIXED_25/50/75的ROI中位数分别39.04%/46.75%/49.27%，盈利21/19/18期，
+最大回撤17071/17059/18098元。原PROB为52.98%、17期、20641元；
+原PROFIT为26.09%、23期、14311元。没有一个新版本同时超过两种对照。
+
+FIXED_50保留约88.2%的原PROB净收益，回撤降低约17.4%，但最长连续亏损从11期增至17期。
+FIXED_25收益更低，但剔除最高盈利一期后的ROI为16.57%，且最长连续亏损10期。
+因此不能只凭最大回撤就称50%核心“最稳”。25%和50%核心可作为后续未见数据的固定对照，
+这是暴露样本形成的研究假设，不是已经独立验证的参数选择。
+
+GAP_25和JOINT_25独立模拟盈利率15.76%/15.90%，高于FIXED_25的15.11%，
+实际盈利期数却仅17/17，低于FIXED_25的21。联合换票只带来约0.14个百分点的模拟改善。
+这说明优化模拟目标与历史真实获利之间仍有差距，可能涉及概率/估算SP误差及样本波动，
+本轮无法单独确定原因。不能靠扩大搜索次数就假定能解决。
+
+票面诊断也显示不同路径：FIXED_25平均新增4.75场原PROB未使用的比赛，GAP_25新增9.91场，
+但后者未获得更好的实际盈利频率。更分散本身不等于更盈利。
+PROFIT与PROB平均仅共享16.5张完整票（各512张），互补既涉及赛果，也涉及新增比赛。
+表中的独特返奖只指“不在PROB票单中的票”的返奖，不能把它全当作组合新增净收益。
+
+初始资金100000元；不足整期投入则永久停投，保留现金。真实指标用可执行资金账本，模拟指标来自完整计划。
+金额单位元，ROI和模拟率单位%。总体表的金额、历史期数及风险指标取三个seed的中位数，
+模拟概率列取三个seed的均值；范围列分别为最小值和最大值。逐seed明细保留各次结果，不合并三个seed下注。
+
+```{r}
+knitr::kable(z$grid,digits=2)
+knitr::kable(z$summary,digits=2)
+knitr::kable(z$paired,digits=0)
+knitr::kable(diagnostics |> group_by(tag) |> summarise(
+ mean_shared_tickets=mean(shared_tickets_prob),mean_extra_fixtures=mean(extra_fixtures_prob),
+ mean_fixture_hhi=mean(fixture_hhi),mean_unique_winning_tickets=mean(unique_winning_tickets),
+ mean_unique_gross=mean(unique_winning_gross),.groups='drop'),digits=3)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 6
+variants<-z$curves |> filter(!tag %in% c('PROB','PROFIT')) |>
+ mutate(family=sub('_.*','',tag),core=paste0(sub('.*_','',tag),'%'))
+controls<-z$curves |> filter(tag %in% c('PROB','PROFIT')) |> mutate(family=tag) |>
+ tidyr::crossing(core=c('25%','50%','75%'))
+curves<-bind_rows(variants,controls)
+equity<-ggplot2::ggplot(curves,ggplot2::aes(period,equity_cny,colour=family,group=interaction(tag,seed)))+
+ ggplot2::geom_line(alpha=.65)+ggplot2::facet_wrap(~core,nrow=1)+ggplot2::theme_minimal()+ggplot2::labs(x='Issue sequence',y='Capital CNY',colour='Policy')
+dd<-ggplot2::ggplot(curves,ggplot2::aes(period,drawdown_cny,colour=family,group=interaction(tag,seed)))+
+ ggplot2::geom_line(alpha=.65)+ggplot2::facet_wrap(~core,nrow=1)+ggplot2::theme_minimal()+ggplot2::labs(x='Issue sequence',y='Drawdown CNY',colour='Policy')
+equity
+dd
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=14,height=6,dpi=150)
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),dd,width=14,height=6,dpi=150)
+```
+
+```{r}
+knitr::kable(z$periods |> select(issue,tag,seed,stake,gross,net,roi_percent,hits,stopped),digits=2)
+jsonlite::write_json(list(mode=mode,archive_sha256=archive_hash,freeze=result$freeze_seal,
+ qmd_sha256=digest::digest(file='quarto/133_n7_core_profit.qmd',algo='sha256'),
+ summary_implementation=digest::digest(file='r/n7_core_profit_summary.R',algo='sha256'),
+ equity_implementation=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+ shared_summary_implementation=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+ summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+ file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
