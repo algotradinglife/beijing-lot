@@ -80,6 +80,26 @@ knitr::kable(v$failures,digits=0)
 knitr::kable(v$available,digits=2)
 ```
 
+## 市场让平概率分档与实际发生率
+
+固定每5个百分点一档，40%以上合并；区间左闭右开，最后一档包含100%。
+按全部可用比赛统计，不筛选是否下注或是否把让平列入Top2。
+mean_market_percent为档内平均市场让平概率，actual_percent为实际让平比例，
+gap_pp为实际减预测的百分点差。mean_baseline_percent提供同场基线参照。
+空档保留，发生率为NA。固定分档用于事后描述，不返回调参或预测规则。
+
+```{r}
+knitr::kable(v$draw_calibration |> filter(handicap=='ALL'),digits=2)
+knitr::kable(v$draw_calibration |> filter(cohort=='new100',handicap!='ALL',n>0),digits=2)
+```
+
+概率集中在20%–30%，额外用每2个百分点的描述性分档查看这一区间；两端合并。
+两种分档均保留，未据此选择预测门槛。此细分是查看样本分布后的探索，不能当作独立验证。
+
+```{r}
+knitr::kable(v$draw_calibration_fine |> filter(handicap=='ALL'),digits=2)
+```
+
 ## 共同命中、独有命中与均未命中
 
 同一场次在每个玩法中只计一次，四类互斥且合计等于样本数。

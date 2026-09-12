@@ -49,4 +49,25 @@ testthat::test_that('diagnosis reconciles roles, unique supports and payout', {
   testthat::expect_equal(overlap$n,5L)
   testthat::expect_equal(sum(unlist(overlap[grep('_percent$',names(overlap))])),100)
   testthat::expect_equal(nrow(v$overlap_fixtures),10L)
+  dc<-v$draw_calibration |> dplyr::filter(handicap=='ALL')
+  testthat::expect_equal(sum(dc$n),5L)
+  testthat::expect_equal(sum(dc$draws),2L)
+  testthat::expect_equal(sum(dc$predicted_draws),sum(f$q_D))
+  testthat::expect_true(all(is.na(dc$actual_percent[dc$n==0])))
+  fine<-v$draw_calibration_fine |> dplyr::filter(handicap=='ALL')
+  testthat::expect_equal(sum(fine$n),5L)
+  testthat::expect_equal(sum(fine$draws),2L)
+  # q_D=.2 is admitted to [.2,.22), not the lower residual bucket.
+  testthat::expect_equal(fine$n[as.character(fine$band)=='[0.2,0.22)'],4L)
+  f$q_D<-c(0,.2,.22,.3,1);f$q_W<-(1-f$q_D)/2;f$q_L<-f$q_W
+  edge<-updated_scope_diagnosis(f,l,i)$draw_calibration_fine |> dplyr::filter(handicap=='ALL')
+  testthat::expect_equal(edge$n[as.character(edge$band)=='[0.22,0.24)'],1L)
+  testthat::expect_equal(edge$n[as.character(edge$band)=='[0.3,1]'],2L)
+  testthat::expect_equal(sum(edge$n),5L)
+  endpoints<-c(0,.05,.1,.15,.2,.25,.3,.35,.4,1)
+  for (j in seq_along(endpoints)) {
+    f$q_D<-endpoints[j];f$q_W<-(1-f$q_D)/2;f$q_L<-f$q_W
+    edge<-updated_scope_diagnosis(f,l,i)$draw_calibration |> dplyr::filter(handicap=='ALL')
+    testthat::expect_equal(which(edge$n>0),min(j,9L))
+  }
 })
