@@ -80,6 +80,20 @@ knitr::kable(v$failures,digits=0)
 knitr::kable(v$available,digits=2)
 ```
 
+## 共同命中、独有命中与均未命中
+
+同一场次在每个玩法中只计一次，四类互斥且合计等于样本数。
+both为共同命中，baseline_only/market_only为仅该模型命中，neither为均未命中。
+百分比分母是所在分层的全部场次；actual为实际北单让球赛果。
+Top2两模型并集若覆盖三种结果，会机械地达到全覆盖，不能当作免费提高双选命中率。
+逐场归类保存在overlap_fixtures.csv，包含期号、场次、球队、让球与实际赛果。
+
+```{r}
+knitr::kable(v$overlap |> filter(handicap=='ALL',actual=='ALL'),digits=2)
+knitr::kable(v$overlap |> filter(cohort=='new100',handicap!='ALL',actual=='ALL'),digits=2)
+knitr::kable(v$overlap |> filter(cohort=='new100',handicap=='ALL',actual!='ALL'),digits=2)
+```
+
 ## 让球数与预测方向交叉细分
 
 handicap为主队让球数：−1表示主队让一球，+1表示主队受让一球。

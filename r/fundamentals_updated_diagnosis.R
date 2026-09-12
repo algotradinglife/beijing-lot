@@ -27,6 +27,19 @@ updated_scope_diagnosis <- function(fixtures, legs, issues) {
     anchor=pt==qt & qm[cbind(seq_len(nrow(qm)),qt)]>=.5 & !excluded_zero)
   available<-all_fixtures |> dplyr::group_by(cohort) |> dplyr::summarise(n=dplyr::n(),
     dplyr::across(dplyr::ends_with('_hit'),~100*mean(.x)),.groups='drop')
+  overlap_fixtures<-dplyr::bind_rows(
+    all_fixtures |> dplyr::mutate(play='Top1',baseline_hit=baseline_top1_hit,market_hit=market_top1_hit),
+    all_fixtures |> dplyr::mutate(play='Top2',baseline_hit=baseline_top2_hit,market_hit=market_top2_hit)) |>
+    dplyr::select(cohort,issue,slot,provider_id,home,away,handicap,actual,play,baseline_hit,market_hit) |>
+    dplyr::mutate(handicap=as.character(handicap),outcome=dplyr::case_when(
+      baseline_hit & market_hit~'BOTH',baseline_hit~'BASELINE_ONLY',market_hit~'MARKET_ONLY',TRUE~'NEITHER'))
+  overlap_slices<-dplyr::bind_rows(overlap_fixtures,dplyr::mutate(overlap_fixtures,handicap='ALL'))
+  overlap<-dplyr::bind_rows(overlap_slices,dplyr::mutate(overlap_slices,actual='ALL')) |>
+    dplyr::group_by(cohort,play,handicap,actual) |> dplyr::summarise(n=dplyr::n(),
+      both=sum(outcome=='BOTH'),baseline_only=sum(outcome=='BASELINE_ONLY'),
+      market_only=sum(outcome=='MARKET_ONLY'),neither=sum(outcome=='NEITHER'),.groups='drop') |>
+    dplyr::mutate(dplyr::across(c(both,baseline_only,market_only,neither),~100*.x/n,.names='{.col}_percent'))
+  stopifnot(all(overlap$n==overlap$both+overlap$baseline_only+overlap$market_only+overlap$neither))
   direction_rows<-list()
   for (model in c('baseline','market')) {
     top<-if(model=='baseline') pt else qt
@@ -99,5 +112,5 @@ updated_scope_diagnosis <- function(fixtures, legs, issues) {
       ROI_percent=100*sum(net)/sum(stake),.groups='drop'),by=c('cohort','policy'),relationship='one-to-one')
   blockers <- x |> dplyr::filter(hit==0) |> dplyr::group_by(cohort,policy,issue,slot,home,away,role,support,competition) |>
     dplyr::summarise(failed_holdings=dplyr::n(),.groups='drop') |> dplyr::arrange(dplyr::desc(failed_holdings))
-  list(rates=rates,strata=strata,failures=failures,payout=payout,blockers=blockers,groups=groups,available=available,pools=pools,directions=directions,pairs=pairs,handicap_accuracy=handicap_accuracy)
+  list(rates=rates,strata=strata,failures=failures,payout=payout,blockers=blockers,groups=groups,available=available,pools=pools,directions=directions,pairs=pairs,handicap_accuracy=handicap_accuracy,overlap=overlap,overlap_fixtures=overlap_fixtures)
 }
