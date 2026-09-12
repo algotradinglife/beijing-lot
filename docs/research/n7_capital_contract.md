@@ -72,5 +72,51 @@ and equal-depth controls allow cash, so matched-spend evidence must be separate.
 Pilot files under the personal review-artifact directory are operational checks,
 not a completed historical study or evidence for choosing a profitable policy.
 
-Remaining: full frozen batch, independent replay/accounting, report, final checks,
-Codex review, PI classification and PR. This record does not declare acceptance.
+## Reporting and independent verification
+
+`quarto/140_n7_capital_frontier.qmd` is the analysis entry point. Reusable R
+summaries live in `r/n7_capital_report.R`; descriptive same-depth/threshold
+comparisons and registered-policy frontiers live in `r/n7_capital_compare.R`.
+These diagnostics do not prune candidates or feed a revised allocation.
+The QMD includes budget versus group count/coverage/model return, funded equity
+and drawdown, per-issue returns and ROI, matched actual spend, solver diagnostics,
+and the difference between model and realized conditional payoff ratios.
+
+`scripts/package_n7_capital.py` creates its portable input only after a complete
+freeze and evaluation. It invokes the common source/implementation/receipt
+checker and `src/n7_capital_check.py` to independently reconstruct all prefix
+curves, physical tickets, shared-world diagnostics and actual settlement. This
+second settlement calculation is an independent audit, not a competing storage
+or production settlement API. The portable report includes all issue results
+and allocation depths plus one full-curve example; the external frozen package
+retains the complete physical-ticket and scenario evidence.
+
+Function tests map to `tests/testthat/test-n7-capital-{depth,portfolio,issue,report,compare}.R`
+and `tests/test_n7_{joint_study,joint_check,capital_study,capital_check,capital_archive}.py`.
+Rendering and full-study replay remain separate acceptance checks.
+
+## Batch failure and recovery evidence
+
+The first complete attempt stopped after69issues when issue101012 exceeded its
+3600-second subprocess limit. No complete freeze receipt or evaluation exists
+for that attempt. The Python coordinator retained completed Future objects and
+their large results; its resident memory reached approximately7.3GB while host
+memory and swap were exhausted. Commit0aad09d0 releases each completed Future
+after taking its result and preserves the original total for progress reporting.
+A regression test observes release while the study is still running; it fails
+with the old implementation and passes with the fix.
+
+The replacement run uses the same research configuration and original source
+bundles, in a new output directory with a new implementation binding. No partial
+plans or results from the failed attempt are imported into the replacement.
+The failed attempt is retained as diagnostic evidence under the external data
+root's `audits/issue425-capital-v1`; the replacement is
+`audits/issue425-capital-v2`, with its log in
+`runtime/logs/issue425-capital-v2-freeze.log`. Neither directory is a production
+release. Reports belong under the persistent root's `reports/` directory.
+
+Remaining: full frozen batch, independent full-study replay/accounting, report
+execution and interpretation, final checks, final Codex review, PI classification
+and PR. The memory-fix review found no actionable defects but did not run the
+tests successfully in its chosen interpreter; separate project-interpreter
+tests passed. This narrow review does not replace final research acceptance.
