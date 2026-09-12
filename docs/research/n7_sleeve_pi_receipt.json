@@ -1,0 +1,177 @@
+{
+  "generated_at_utc": "2026-09-12T11:15:48.112294+00:00",
+  "issue": 424,
+  "verdict": "DRAFT_READY_HISTORICAL_ONLY_CONTRACT_INCOMPLETE",
+  "historical_admission": false,
+  "reviewed_head": "b125a0d133fb1e96ecbe4debf8b28b52222fb4fa",
+  "review_base": "2798b83a7b8fe31fe3e985c329d28c5ea201af5f",
+  "issue_graph_observation": {
+    "blockedBy": {
+      "nodes": [],
+      "totalCount": 0
+    },
+    "blocking": {
+      "nodes": [],
+      "totalCount": 0
+    },
+    "issueType": {
+      "id": "IT_kwDOCnDY5c4BXL5P",
+      "name": "Task",
+      "description": "A specific piece of work",
+      "color": "YELLOW"
+    },
+    "number": 424,
+    "parent": {
+      "id": "I_kwDOSUeGgM8AAAABLtwTVg",
+      "number": 202,
+      "state": "OPEN",
+      "title": "Research Program: unified learning model from issue value tensor to N-fold bankroll policy (BJ-UNIFIED-LEARNING-001)",
+      "url": "https://github.com/algotradinglife/beijing-lot/issues/202"
+    },
+    "projectItems": [
+      {
+        "status": {
+          "optionId": "582c0c1d",
+          "name": "PI Review"
+        },
+        "title": "BJ Prediction & Betting"
+      }
+    ],
+    "state": "OPEN",
+    "subIssues": {
+      "nodes": [],
+      "totalCount": 0
+    },
+    "title": "Research: N7 64-ticket sleeve coverage × return frontier and 8-sleeve portfolio optimization (BJ-N7-SLEEVE-PORTFOLIO-001)"
+  },
+  "graph_note": "Read-only observation; live GitHub remains authoritative",
+  "acceptance_receipts": [
+    {
+      "path": "data/derived/fundamentals_417/n7-sleeves-424-v3/acceptance-receipt.json",
+      "sha256": "09b112c252dd6d966d9b103f2759c1bf1b6689073a86f9518f2d3099d5415bf9",
+      "verified_files": {
+        "data/derived/fundamentals_417/n7-sleeves-424-v3/plans-frozen.json": "61e3bb182423be4134b519b11558c2a29da897eda87dc03b2dad9d0f70afc30d",
+        "data/derived/fundamentals_417/n7-sleeves-424-v3/evaluation-receipt.json": "28bef5360c0987e1a26d5322f3f2be9e36d85bd18b14ff5ba28304fa76b409ae",
+        "data/derived/fundamentals_417/n7-sleeves-424-v3/independent-replay.json": "860bc659344bc6452b205b2bf5b3511893010e77d7b62e91e2332f5136e50d90",
+        "data/derived/fundamentals_417/n7-sleeves-424-v3/report-receipt.json": "e4e0c38d8a07cc1427f5c6449b23cf4f016e8cfe06bc9e4ac93b39edd8668825",
+        "data/derived/fundamentals_417/n7-sleeves-424-v3/state-table-receipt.json": "6365ae76528935d9c51e64b6c8643dfe2b2296662ed968c36d8cb2fcd2447847",
+        "quarto/134_n7_sleeve_portfolio.qmd": "f00932a056736d51ebec44a3827815e077f6b0ffd0c6f0ef43ce4ce16de437e2",
+        "quarto/134_n7_sleeve_portfolio.html": "c3ec13a5d46488b153c76a31fc1da1575b2ebb82374f41da9881571ac1a28a71",
+        "tests/fixtures/n7_sleeve_portfolio.json.gz": "98b1fc1bcba1331fed84c5876edb1c0dc33ef48ddd5494ec10e0c5dc037eb4af",
+        "data/derived/fundamentals_417/n7-sleeves-424-review-final.log": "82a37bcd1f698d597303bf928dc026f1820d5edf5e9b64e39f02051d4da8ac68",
+        "data/derived/fundamentals_417/n7-sleeves-424-r-suite-v3.log": "42cc774196601ba057cd7843cabfa1729b048dbd309fefb9381422fb91561e1f",
+        "data/derived/fundamentals_417/n7-sleeves-424-py-tests.log": "abee51dca50cc36ceae794283e203887ff2d2e23cd3ed063249b81a7a723956d"
+      }
+    },
+    {
+      "path": "data/derived/fundamentals_417/n7-sleeve-expansion-v1/acceptance-receipt.json",
+      "sha256": "586d535cfd283bbba14fc1a85e0353a204fafed587ec0687b8e6aad7aac16c2a",
+      "verified_files": {
+        "data/derived/fundamentals_417/n7-sleeve-expansion-check-final.log": "1fbcc9ae20cba677686b4c7019ebbafa539e7f9190f8c4d1e314b28e4cc64d4f",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-cutoff.log": "169d15bb0b5f1dd49daf0d58dc61f178e95c9607a97447c8032e2e44040a659d",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-py-tests.log": "cab8c8e132b031172ffe2a920dbba38942fafa959dc4fe87f6f7dba982a70597",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-r-suite.log": "734ee2ab94c231b935a366afef4575b6a114e9d560f568d3652f8723352725c4",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-render-archive.log": "ef8c88cac5c126767134b6e58e416f0c00f73b9d59849c80b06f129badfca235",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-render-native-final.log": "ef8c88cac5c126767134b6e58e416f0c00f73b9d59849c80b06f129badfca235",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-report/report-receipt.json": "29a0f9b687ee732e2f4c5dacbb64ff15bcada5d16e3ed2eef57b0e29c04269b1",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-review-final.txt": "c5445666cb473731032a068729c8fd2bdcd19e9de4458567b9c507093e9ed28a",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-v1/evaluation-receipt.json": "ada2e2a87241850743abf17d50448709aa62e308d26f17fad803fa1417e1b64e",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-v1/independent-replay.json": "a834bb5805e9833a673fcabc2321b353226d8f80ce36565b9bb624eab09e5454",
+        "data/derived/fundamentals_417/n7-sleeve-expansion-v1/plans-frozen.json": "2e5245a41cb71265994868c2ccb01680452c68e6bd8a74759fe35a11a89bd07f",
+        "quarto/135_n7_sleeve_expansion.html": "f574415bcbe17032168c55d8e2808138525cb4c9e4ec3969612e6d0ac14be7eb",
+        "quarto/135_n7_sleeve_expansion.qmd": "4ff179f1e34f7b1d5d553079787d9c5f32c6dbcc82fbe3644df5c2c47168869b",
+        "tests/fixtures/n7_sleeve_expansion.json.gz": "0702587ef28fdea1669fcffc2f7f49e7e544d128fbb014a89a0f0dd5a5ee7041"
+      }
+    },
+    {
+      "path": "data/derived/fundamentals_417/n7-sleeve-cap25-v1/acceptance-receipt.json",
+      "sha256": "bff7866f71bc9a4002ce27c092226f7751c854460d9c59df1f839a845346c53d",
+      "verified_files": {
+        "data/derived/fundamentals_417/n7-sleeve-cap25-check.log": "a91edc9dbaee4e3ad06acb1f32a94d86736de2d7affb8e607f6046fe1e3251b1",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-cutoff.log": "169d15bb0b5f1dd49daf0d58dc61f178e95c9607a97447c8032e2e44040a659d",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-py-tests.log": "be640c5f3902dafbd06997dd4fbcfa02f8daffd107cd74f96dda4b4a8322531d",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-r-suite.log": "c343a9713857372303d33e3678f05b18882f060f42dfe1a84f5329c08e22c015",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-render-archive.log": "7d5a86a6c95bdf01ea845932b54f4279e125f95e455a5d69d0f84927d203c804",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-render-native.log": "7d5a86a6c95bdf01ea845932b54f4279e125f95e455a5d69d0f84927d203c804",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-report/report-receipt.json": "f2f4e23051431b7d10bf2b1b65f7a746f4cd43a43b80be367d3e0a476253203d",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-review-result.txt": "bb8dbe701fcef05c014514f6c7efce31d3accb1038ff321286e5abe239c58bac",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-v1/evaluation-receipt.json": "54455ce523ce275315e35a6498e2723b1589f1cdf7494bddf78cda9fd95a555c",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-v1/independent-replay.json": "e01ddc93dcbe725a61620dd1581b69d6cf1263a08d8651cc64f320fd9a730b6d",
+        "data/derived/fundamentals_417/n7-sleeve-cap25-v1/plans-frozen.json": "a457e0a67341360edd38457bf249a7228b4126cb452336f6c142ab0cab6829a4",
+        "quarto/136_n7_sleeve_probability_cap.html": "dec1ac07b2cbfeed3e79b77799f16f37778c97cb2810ad3d82db805a12662e74",
+        "quarto/136_n7_sleeve_probability_cap.qmd": "513b122598d6a7c99e6f1010004a4804d117b884a0b3c5c21a8f38ec8c0c7ac2",
+        "tests/fixtures/n7_sleeve_probability_cap.json.gz": "2ab021384f3e9414f28c68877049055a58558f38c68c6925308672b4ad2caa67"
+      }
+    }
+  ],
+  "reviewed_file_sha256": {
+    ".github/workflows/compression-breadth.yml": "d294fb8923b9dbcf5d7c91c759d0915ef6b3f5c2809126d27eccba0de5e040a0",
+    "config/n7_sleeve_424.json": "9f4818679e3bd72e193aed7a3b9bfb144601c4222b6214424e824401bed29b00",
+    "config/n7_sleeve_expansion.json": "2b7f5aef18bd1c8ad7f22b07525d997c41c483b807c3a8039d1d16e541516db3",
+    "config/n7_sleeve_probability_cap.json": "80ab7701e4d77c7c232bb4432b4a2a519d4defbd5dbfbeee17207b273e5d6b4c",
+    "docs/research/n7_sleeve_expansion.md": "7d35d32dd1e7405e490c740b9f7d5183f37c611162d92c710ba6913d6b36d7d0",
+    "docs/research/n7_sleeve_portfolio.md": "0741675aed6eea0a109f80ce15beb516b96c83e1adaa7a1fb0f32925133bd56a",
+    "docs/research/n7_sleeve_probability_cap.md": "40b5998db79502a7a466658652c0e29ac14ed53bb34d328fb033ce69f66f74f9",
+    "docs/research/roadmap.md": "e9dffd5d85dac333bf1e0555894dd759294388467c6137ebd2d77f25dd5e7d1a",
+    "quarto/134_n7_sleeve_portfolio.qmd": "f00932a056736d51ebec44a3827815e077f6b0ffd0c6f0ef43ce4ce16de437e2",
+    "quarto/135_n7_sleeve_expansion.qmd": "4ff179f1e34f7b1d5d553079787d9c5f32c6dbcc82fbe3644df5c2c47168869b",
+    "quarto/136_n7_sleeve_probability_cap.qmd": "513b122598d6a7c99e6f1010004a4804d117b884a0b3c5c21a8f38ec8c0c7ac2",
+    "r/n7_sleeve_cap_report.R": "ff7c5987760e646a7a69398088cb197f847bded2276e53e6c02ca072539f73d0",
+    "r/n7_sleeve_expansion_report.R": "9ff7f1ceea2fee87e5dd659c2eca54eabc1b63b0ab44bc25b1263b427a122841",
+    "r/n7_sleeve_summary.R": "17746458c9fbc0979c40a2bde7be371a9140b89629c61f6a6e02b33f5d106b23",
+    "r/n7_sleeve_tables.R": "3a14c5c6681c9488f5c39181026d4114d10992cd913f60500ec307fb6498520d",
+    "scripts/check_n7_sleeve_expansion.py": "1bf22e72ad3380e41affe4a2ae68bfc0a931b3757c6d18f6dfca073cad73bc70",
+    "scripts/check_n7_sleeve_probability_cap.py": "0d322ef19269d3c6b3204b32a8818671733747893cc3c904d8ff8f7bd746f224",
+    "scripts/check_n7_sleeves.py": "6cb5fe376acd250c905c0776d56b97175d4a619e2f8a8c18301a9b58af5fba5b",
+    "scripts/replay_n7_sleeve_expansion.py": "ab5b71902b0c3154bb5f78f29a2e3d417bc23067a428845976fd836145ee0fb7",
+    "scripts/replay_n7_sleeve_probability_cap.py": "55b82a0bf8841650e80030f047604ac13a1d1d4c2d55d71fa81ff9b400799e80",
+    "scripts/replay_n7_sleeves.py": "7a5fa435d8124854bfdf0fceff07ce8aa702d24e7b9d55c67d3b1f74d55c0eb0",
+    "src/n7_sleeve_candidates.py": "f726d9525e49bdf2ad17137b718ab638b19c35f1e5b7b74c1be4ee699b0fb439",
+    "src/n7_sleeve_cap_check.py": "0408bc3110d917a13bc1e45988afca519de7c1439583bca1c5455fbdd79a29f4",
+    "src/n7_sleeve_expansion.py": "b168de04abffe7255591dafc4ee2bae2552bf576676ab22f1616fd2e5a9eaadd",
+    "src/n7_sleeve_expansion_check.py": "61934ac7495b559e8b088d276adc21e97466b170355ab5b8616ee177c68d3716",
+    "src/n7_sleeve_portfolio.py": "b6cc1909252aab5dfc51c097827e387f6281a0a64352c899e603d3746e125794",
+    "src/n7_sleeve_probability_cap.py": "9c464f955dc909974dd4edf5910fffe3ddbbad78f587d196724ffa8eb83b1ce4",
+    "src/n7_sleeve_states.py": "5c4e037b0c975784928ee9d00b416819a239e5cc67a79781ac17d553bf8d74bd",
+    "tests/fixtures/n7_sleeve_expansion.json.gz": "0702587ef28fdea1669fcffc2f7f49e7e544d128fbb014a89a0f0dd5a5ee7041",
+    "tests/fixtures/n7_sleeve_numerical.json.gz": "798635c4bc093889e9b112e0efc696d1888fbd0c689191f764e50d87b2df7bf2",
+    "tests/fixtures/n7_sleeve_portfolio.json.gz": "98b1fc1bcba1331fed84c5876edb1c0dc33ef48ddd5494ec10e0c5dc037eb4af",
+    "tests/fixtures/n7_sleeve_probability_cap.json.gz": "2ab021384f3e9414f28c68877049055a58558f38c68c6925308672b4ad2caa67",
+    "tests/test_n7_sleeve_cap_runner.py": "81eb263525802ec5e57b52b902f3d9ee86ee47174919248e5e9943507511c9df",
+    "tests/test_n7_sleeve_checker.py": "e6b555b097494c216d6946d298bccb6197aa95147bd7f8e40ee724078509f202",
+    "tests/test_n7_sleeve_expansion.py": "15f0b99e36d04c4c301a5f38deb0ed128733523301a1e35726705a27cd3cb412",
+    "tests/test_n7_sleeve_expansion_runner.py": "b02ebc3ed2c723ff6e5b8200560076fae86a174fa012b4445f593253508835da",
+    "tests/test_n7_sleeve_portfolio.py": "9700b5bf84518acd0f8118453a22ed69ca3c0d8c22572f47ab30961772797b4c",
+    "tests/test_n7_sleeve_probability_cap.py": "47059842b27cec8cd8c634a9635b325f2827c05726cd8c93312f8ab632d94e2d",
+    "tests/test_n7_sleeve_runner.py": "33ca6af9fad36b17c4991bd3e899d43764c1248c5e3223d4c30329c3c002c357",
+    "tests/test_n7_sleeve_states.py": "6dfe863d30f33840ea0dcd5a98208e24e4b26726d2ae6d01e3666ce159ee4670",
+    "tests/testthat/test-n7-sleeve-cap-report.R": "be90aa7310fa84bccbebaa0d7a732d4a1cb80773c146fdf36ccaf1ef5c89c772",
+    "tests/testthat/test-n7-sleeve-expansion-report.R": "c8a7e07239dc2cb7a04fcb78689b5016dc634fddd6292b2af88b0cf450a29757",
+    "tests/testthat/test-n7-sleeve-summary.R": "eebcedb4d9b9a9f5a807ffb70c551e87078a6d83baf4e6ac8aaed9856ea1f372",
+    "tests/testthat/test-n7-sleeve-tables.R": "702c676efdc71401d18c24aef1ea26917ec0dbe274b51f550d62195f05066370"
+  },
+  "current_verification": {
+    "python_tests": 19,
+    "r_assertions": 53,
+    "cutoff_governance": "PASS",
+    "implementation_closures": 3,
+    "whitespace": "PASS",
+    "full_native_replay": "REUSED_MATCHING_EVIDENCE_NOT_RERUN",
+    "full_r_suite": "REUSED_MATCHING_EVIDENCE_NOT_RERUN",
+    "qmd_renders": "REUSED_MATCHING_EVIDENCE_NOT_RERUN"
+  },
+  "independent_codex_verification": {
+    "python_tests": 34,
+    "r_assertions": 53,
+    "acceptance_bound_files": 39,
+    "state_exports": 201,
+    "implementation_closures": 5,
+    "verdict": "DRAFT_READY_HISTORICAL_ONLY_CONTRACT_INCOMPLETE"
+  },
+  "current_log_sha256": {
+    "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/n7-sleeve-pi-review-result.txt": "1ca8145370637b76d61cc6f2e06906226a402235fc0880b0a93284712c17f3ce",
+    "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/n7-sleeve-pi-tests.log": "c51f62e28d582f456e48157f90f147938def58a676afa73c1f857b32a24d898c",
+    "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/n7-sleeve-pi-r-tests.log": "45e079d1b99c93f010295d85d1bf5e0ff2e9467006861377b1f1aa8d9795d41b",
+    "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/data/derived/fundamentals_417/n7-sleeve-pi-cutoff.log": "169d15bb0b5f1dd49daf0d58dc61f178e95c9607a97447c8032e2e44040a659d"
+  }
+}
