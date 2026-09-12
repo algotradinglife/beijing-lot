@@ -1,0 +1,205 @@
+---
+title: "7串1：组合概率达标后最大化估算期望收益"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: "data/derived/fundamentals_417/n7-probability-gate-v2"
+  archive_fixture: null
+---
+
+固定100期100608–101120；使用冻结版本market-balance-draw-1.0.0-diagnostic的校正市场概率p与原市场概率q。
+7场全单选，组内场次不重复，完整票不重复买，组间场次复用不限。
+每期预算1024元、每票2元；初始资金100000元。未花资金持有现金。
+不使用战力概率，不训练专家，不通过历史收益选择门槛。
+
+每张票原始组合概率为 $P_t=\prod_i p_{i,r_i}$，估算SP为各场 $1/q_{i,r_i}$。
+门槛为每10000次抽样等价计数0、1、5、10、25、50、100、200，即组合概率
+0%、0.01%、0.05%、0.1%、0.25%、0.5%、1%、2%，边界包含。
+不用实际随机计数；直接计算独立假设下的精确组合概率。
+每票估算净收益为 $2(0.65\prod_i(p_{i,r_i}/q_{i,r_i})-1)$。
+实际结算使用R/SQLite审计导出的SP，整票只乘一次0.65。
+
+| 策略 | 门槛之后的处理 |
+|---|---|
+| PROB | 按组合概率排序，包括负期望票，用于对照 |
+| PROB_POS | 仅保留正期望票，按组合概率排序 |
+| EV | 仅保留正期望票，按估算期望净收益排序 |
+
+候选搜索同时处理选场与选赛果：动态规划分别求
+$\sum_i[\log(p_i/q_i)+\lambda\log p_i]$ 的前K张，
+$\lambda\in\{0,0.1,0.25,0.5,1,2,4,8\}$，再加入纯概率排序前K张。
+每条标量排序保留512或2048张，去重合并，形成两个嵌套候选集合。
+各标量排序由动态规划精确求取（浮点精度内）；对概率约束后的收益目标，
+候选并集仍是近似搜索，不能宣称全体可能组合的全局最优。
+对同一个候选集合、等价票价和不重复票约束，EV排序给出集合内最优估算期望收益。
+
+所有计划在本轮打开结算快照前冻结；数据本身属于已暴露历史样本，沿用逐场时点
+诊断准入，不代表同一时点可购买整票，也不满足干净前瞻验证。#419仍依赖#421。
+
+```{r}
+#| include: false
+library(dplyr)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+if(is.null(params$archive_fixture)) {
+  freeze_path<-file.path(params$study,'plans-frozen.json')
+  freeze_raw<-readBin(freeze_path,'raw',n=file.size(freeze_path))
+  frozen<-jsonlite::fromJSON(rawToChar(freeze_raw))
+  er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+  result_path<-file.path(params$study,'results.json')
+  result_raw<-readBin(result_path,'raw',n=file.size(result_path))
+  stopifnot(identical(digest::digest(freeze_raw,serialize=FALSE,algo='sha256'),er$freeze_sha256),
+    identical(digest::digest(result_raw,serialize=FALSE,algo='sha256'),er$result_sha256),
+    identical(digest::digest(file=er$audit_path,algo='sha256'),er$audit_sha256),
+    identical(digest::digest(file=er$controls_path,algo='sha256'),er$controls_sha256),
+    identical(digest::digest(file=er$controls_receipt_path,algo='sha256'),er$controls_receipt_sha256))
+  bindings<-c(frozen$receipt$source_hashes,frozen$receipt$pool_hashes,
+    frozen$receipt$plan_hashes,frozen$receipt$implementation$files)
+  for(path in names(bindings)) stopifnot(identical(digest::digest(file=path,algo='sha256'),bindings[[path]]))
+  result<-jsonlite::fromJSON(rawToChar(result_raw))
+  stopifnot(identical(result$freeze_seal,frozen$seal),!frozen$receipt$historical_admission)
+  diagnostic<-jsonlite::fromJSON(file.path(params$study,'independent-replay.json'))
+  stopifnot(identical(diagnostic$freeze,frozen$seal),identical(diagnostic$result_sha256,er$result_sha256),
+    identical(diagnostic$checker_sha256,digest::digest(file='scripts/check_n7_probability_gate.py',algo='sha256')))
+  result$position_diagnosis<-diagnostic$composition
+} else {
+  archive<-jsonlite::fromJSON(gzfile(params$archive_fixture))
+  stopifnot(archive$mode=='ARCHIVED_ACCOUNTING_ONLY',
+    identical(digest::digest(archive$body,serialize=FALSE,algo='sha256'),archive$sha256))
+  result<-jsonlite::fromJSON(archive$body)
+}
+stopifnot(nrow(result$rows)==4800,nrow(result$controls)==200)
+x<-bind_rows(as_tibble(result$rows),as_tibble(result$controls)) |>
+  mutate(issue=as.character(issue),status=if_else(stake>0,'COMPLETE','NO_BET'),
+    budget_cny=1024,cash_cny=1024-stake,roi_percent=if_else(stake>0,100*net/stake,NA_real_))
+curves<-strategy_equity_curves(x,as.character(result$issue_order),100000)
+shadow_curves<-curves |> group_by(model,policy) |>
+  mutate(drawdown_cny=cummax(shadow_equity_cny)-shadow_equity_cny) |> ungroup()
+planned_summary<-market_conditional_summary(x,shadow_curves)
+funded<-x |> left_join(curves |> filter(period>0) |>
+  select(model,policy,issue,stopped,funded_net_cny,funded_stake_cny),
+  by=c('model','policy','issue'),relationship='one-to-one') |>
+  mutate(stake=funded_stake_cny,net=funded_net_cny,gross=stake+net,
+    groups=if_else(stopped,0,groups),hits=if_else(stopped,0,hits),
+    expected_net=if_else(stopped,0,expected_net),cash_cny=1024-stake,
+    roi_percent=if_else(stake>0,100*net/stake,NA_real_))
+summary<-market_conditional_summary(funded,curves)
+extra<-funded |> group_by(model,policy) |> summarise(
+  profitable_issues=sum(net>0),bet_issues=sum(stake>0),full_budget_issues=sum(stake==1024),
+  budget_used_percent=100*sum(stake)/sum(budget_cny),
+  count=first(count),depth=first(depth),estimated_net=if(all(is.na(expected_net))) NA_real_ else sum(expected_net),
+  average_ticket_probability=if(sum(groups)>0 && any(!is.na(mean_coverage)))
+    weighted.mean(mean_coverage,groups,na.rm=TRUE) else NA_real_,
+  mean_max_reuse=mean(max_reuse[!stopped],na.rm=TRUE),stopped_issues=sum(stopped),.groups='drop')
+summary<-left_join(summary,extra,by=c('model','policy'),relationship='one-to-one') |>
+  mutate(estimated_roi_percent=if_else(stake>0,100*estimated_net/stake,NA_real_))
+dir.create(params$study,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$study,'summary.csv'))
+readr::write_csv(planned_summary,file.path(params$study,'planned-summary.csv'))
+readr::write_csv(x,file.path(params$study,'periods.csv'))
+readr::write_csv(funded,file.path(params$study,'funded-periods.csv'))
+readr::write_csv(curves,file.path(params$study,'curves.csv'))
+```
+
+## 各门槛收益、命中和资金使用
+
+本轮不支持按当前估算EV替代概率排序：较大搜索下，计数门槛5的EV方案ROI为+53.05%，
+但仅1个命中期，剔除该期后ROI为−100%；门槛10则为−84.21%，门槛100及200不下注。
+无门槛EV方案连续亏损，10万元账户执行97期后余额672元，余下3期停投。
+
+概率排序对照反而较好：计数门槛50的ROI为+60.06%，净收益58111元，最大回撤20641元，
+剔除最佳一期后ROI为+10.19%；门槛100的ROI为+70.68%、回撤14935元，但剔除最佳一期后
+仅+1.25%。这是固定网格的样本内诊断，不能据此把最高ROI门槛当作未来最优参数。
+两档搜索的纯概率对照一致；EV门槛5的ROI从小搜索+125.16%降至大搜索+53.05%，
+仍只命中一期，说明扩大估算收益机会并没有产生稳定的实际收益改善。
+
+主表按10万元账户实际可执行的投入计算；余额不足以购买整期计划时停止，后续持有现金。
+ROI以实际投入为分母；盈利期数要求返奖超过当期投入。
+命中期数仅表示至少一票命中，两者不同。最大回撤为资金峰值至低点的元数。
+零投入的ROI为空，不能记为盈利。不同门槛的投入可能不同，同时展示预算使用率。
+
+```{r}
+knitr::kable(summary |> filter(policy=='CONTROL'),digits=2)
+knitr::kable(summary |> filter(depth==2048) |> arrange(count,policy) |>
+  select(count,policy,stake,net,roi_percent,hit_issues,profitable_issues,max_drawdown,
+    bet_issues,full_budget_issues,budget_used_percent,stopped_issues,without_best_roi,estimated_roi_percent),digits=2)
+```
+
+## 搜索规模扩大4倍是否稳定
+
+512/2048是每条标量搜索保留的候选数，不是最终票数；最终最多512票。
+较大集合包含较小集合，所以完整计划的EV估算总净收益不应下降，但实际净收益并无单调保证。
+账户资金不足后的停投会改变实际执行规模，因此另列不受资金约束的完整计划账面结果。
+
+```{r}
+knitr::kable(summary |> filter(policy!='CONTROL') |> arrange(count,policy,depth) |>
+  select(count,policy,depth,stake,net,roi_percent,estimated_net,max_drawdown,hit_issues),digits=2)
+knitr::kable(planned_summary,digits=2)
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 5
+sensitivity<-ggplot2::ggplot(summary |> filter(policy!='CONTROL'),
+  ggplot2::aes(factor(count),roi_percent,colour=factor(depth),group=depth))+
+  ggplot2::geom_hline(yintercept=0,colour='grey60')+ggplot2::geom_line()+ggplot2::geom_point()+
+  ggplot2::facet_wrap(~policy,nrow=1)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Minimum count per 10000',y='ROI %',colour='Search depth')
+sensitivity
+ggplot2::ggsave(file.path(params$study,'search-depth.png'),sensitivity,width=12,height=5,dpi=150)
+```
+
+## 收益排序是否集中到特定赛果
+
+以下按完整计划中的持仓位置计数，同一比赛在不同票中重复计数，不能当作独立比赛样本。
+无门槛EV方案的持仓位置中约95.8%是让平，说明估算收益优化主要放大了让平校正带来的
+p/q优势。概率门槛约束每张票，但不会自动分散同一赛果、同一比赛或同一批获胜情景的风险。
+
+```{r}
+knitr::kable(as_tibble(result$position_diagnosis) |> filter(depth==2048) |>
+  group_by(count,policy) |> summarise(positions=sum(positions),draw_positions=sum(draw_positions),
+    draw_share_percent=if(sum(positions)>0) 100*sum(draw_positions)/sum(positions) else NA_real_,
+    .groups='drop'),digits=2)
+```
+
+## 收益及回撤曲线
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+part<-curves |> filter(depth==2048)
+control<-curves |> filter(policy=='CONTROL') |> select(-count) |> mutate(policy=model)
+equity<-ggplot2::ggplot(part,ggplot2::aes(period,equity_cny,colour=policy))+
+  ggplot2::geom_line()+ggplot2::geom_line(data=control,linetype=2)+
+  ggplot2::facet_wrap(~count,ncol=3)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Capital CNY',colour='Policy',title='Probability gate: equivalent count / 10000')
+drawdown<-ggplot2::ggplot(part,ggplot2::aes(period,drawdown_cny,colour=policy))+
+  ggplot2::geom_line()+ggplot2::geom_line(data=control,linetype=2)+
+  ggplot2::facet_wrap(~count,ncol=3)+ggplot2::theme_minimal()+
+  ggplot2::labs(x='Issue sequence',y='Drawdown CNY',colour='Policy',title='Probability gate: equivalent count / 10000')
+equity
+drawdown
+ggplot2::ggsave(file.path(params$study,'equity.png'),equity,width=14,height=10,dpi=150)
+ggplot2::ggsave(file.path(params$study,'drawdown.png'),drawdown,width=14,height=10,dpi=150)
+```
+
+## 每期结果
+
+完整5000行计划账目保存在periods.csv，账户实际执行账目保存在funded-periods.csv。
+以下展示主要2048候选深度的各期实际收益与ROI；停投不是零收益投注，而是持有现金。
+
+```{r}
+knitr::kable(funded |> filter(depth==2048) |> arrange(count,policy,issue) |>
+  select(issue,count,policy,stopped,groups,hits,stake,gross,net,roi_percent),digits=2)
+jsonlite::write_json(list(mode='EXPOSED_FIXED_GRID',freeze=result$freeze_seal,
+  qmd_sha256=digest::digest(file='quarto/129_n7_probability_gate.qmd',algo='sha256'),
+  summary_implementation_sha256=digest::digest(file='r/market_conditional_summary.R',algo='sha256'),
+  equity_implementation_sha256=digest::digest(file='r/fundamentals_equity_curves.R',algo='sha256'),
+  summary_sha256=digest::digest(file=file.path(params$study,'summary.csv'),algo='sha256')),
+  file.path(params$study,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
