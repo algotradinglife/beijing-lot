@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "mountpoint": "/run/media/drwho1985/Sandisk",
+  "data_root": "/run/media/drwho1985/Sandisk/data/beijing-lot",
+  "directories": [
+    "settlement/raw",
+    "settlement/manifests",
+    "settlement/releases",
+    "settlement/corrections",
+    "settlement/backups",
+    "fundamentals/raw",
+    "fundamentals/manifests",
+    "fundamentals/releases",
+    "fundamentals/corrections",
+    "markets/raw",
+    "markets/manifests",
+    "markets/releases",
+    "markets/corrections",
+    "shared/fixtures",
+    "registry",
+    "audits",
+    "reports",
+    "runtime/state",
+    "runtime/logs"
+  ],
+  "references": {
+    "registry/settlement-current.json": {
+      "database": {
+        "prefix": "settlement/releases",
+        "type": "file"
+      },
+      "migration_receipt": {
+        "prefix": "settlement/manifests",
+        "type": "file"
+      }
+    },
+    "registry/markets-current.json": {
+      "capture_root": {
+        "prefix": "markets/raw",
+        "type": "directory"
+      },
+      "plan": {
+        "prefix": "markets/manifests",
+        "type": "file"
+      },
+      "index": {
+        "prefix": "markets/manifests",
+        "type": "file"
+      },
+      "ledger": {
+        "prefix": "runtime/state",
+        "type": "file"
+      },
+      "inventory": {
+        "prefix": "shared/fixtures",
+        "type": "file"
+      },
+      "current_release.path": {
+        "prefix": "markets/releases",
+        "type": "file"
+      },
+      "current_release.receipt": {
+        "prefix": "markets/releases",
+        "type": "file"
+      }
+    }
+  }
+}

@@ -132,3 +132,10 @@ duplicated temporal helpers fail repository governance checks. Migrations delete
 or replace obsolete implementations; they do not add compatibility wrappers.
 Static enforcement scans both `src/` and `scripts/` and permits legacy debt only
 by exact AST occurrence fingerprint and count, never by exempting a whole file.
+
+## Persistent data storage
+
+- For settlement, fundamentals and market data operations, use `skills/beijing-lot-data-storage/SKILL.md`.
+- `config/persistent_data_layout.json` is the directory contract. Run `scripts/check_persistent_data_layout.py --contract config/persistent_data_layout.json` with the project Python before writes and at acceptance.
+- Keep actual data on the declared mounted root; obtain current inputs from registry or explicit manifests. Do not fall back to worktree data or infer current versions by directory age.
+- A passing path check does not establish data-content validity, coverage or historical availability.
