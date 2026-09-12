@@ -177,6 +177,20 @@ knitr::kable(tibble::as_tibble(payload$solver_diagnostics) |>
 
 ## 历史收益与回撤
 
+同一期、同一种子、同一预算下，若不同偏好或阈值得到完全相同的组和前缀深度，
+它们就是同一分配的不同名称。下面合并这些等价名称作诊断，不能将其当作多份独立证据。
+各登记方案的回测账本仍分别保留，以完整呈现原有对照；本表不修改任何冻结计划。
+始终零投入的方案另在可行性表中说明，不算有效分配。
+
+```{r}
+equivalent_allocations <- tibble::as_tibble(payload$solver_diagnostics) |>
+  filter(stake > 0) |>
+  group_by(issue, seed, budget_cny, depth_configuration) |>
+  summarise(registered_names = n(), arms = paste(sort(arm), collapse = ", "), .groups = "drop") |>
+  filter(registered_names > 1)
+knitr::kable(equivalent_allocations |> head(20))
+```
+
 起始资金 `r format(cfg$initial_capital_cny, big.mark = ",", scientific = FALSE)` 元。
 不借款、不追加本金、不做比分保护；不足以承担整期计划后停止，现金保留。
 按给定期次顺序记账，假设上一期返奖在下一期投入前到账。
