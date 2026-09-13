@@ -1,0 +1,205 @@
+---
+title: "N7 收益来源与分散、加深、加倍比较"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  attribution_dir: null
+  output_dir: null
+---
+
+同一冻结 200 期（100608–110513）的回顾诊断；这些数据已经参与研究，
+不是未见测试集。不清洗、不重训、不改变概率底座。
+每张票 2 元，每张中奖票仅折算一次 0.65；初始资金 100,000 元。
+三个固定种子全部展示，不能把同一场次在不同种子或重叠组中的出现当作独立样本。
+
+```{r}
+#| include: false
+library(dplyr);library(tidyr);library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R');source('r/n7_return_diagnostics.R')
+report_code<-c('r/fundamentals_equity_curves.R','r/n7_sweet_union_summary.R','r/n7_return_diagnostics.R','quarto/150_n7_return_attribution.qmd')
+report_hashes<-vapply(report_code,digest::digest,character(1),file=TRUE,algo='sha256')
+stopifnot(is.character(params$attribution_dir),is.character(params$output_dir),!dir.exists(params$output_dir))
+dir.create(params$output_dir,recursive=TRUE)
+receipt_path<-file.path(params$attribution_dir,'receipt.json')
+receipt<-jsonlite::fromJSON(receipt_path)
+for(n in names(receipt$outputs))stopifnot(digest::digest(file=file.path(params$attribution_dir,n),algo='sha256')==receipt$outputs[[n]])
+rows<-readr::read_csv(file.path(params$attribution_dir,'periods.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c')) |>
+  filter(stage=='issue441-funding-v2')
+groups<-readr::read_csv(file.path(params$attribution_dir,'bridges.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c',sleeve_id='c')) |>
+  filter(stage=='issue441-funding-v2')
+fixture_prices<-readr::read_csv(file.path(params$attribution_dir,'fixture-prices.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c'))
+stopifnot(digest::digest(file=receipt$config$catalog,algo='sha256')==receipt$catalog_sha256)
+order<-jsonlite::fromJSON(receipt$config$catalog)$issues$issue
+stopifnot(length(order)==200,nrow(rows)==5400)
+z<-n7_return_diagnostics(rows,groups,order,100000,50,c(0,.15,.25,.35,.5,.75,1))
+for(n in names(z))readr::write_csv(z[[n]],file.path(params$output_dir,paste0(n,'.csv')))
+readr::write_csv(rows |> mutate(issue_roi=ifelse(stake>0,net/stake,NA_real_)),file.path(params$output_dir,'per-issue.csv'))
+curves<-z$curves |> mutate(mode=sub('T250_(.*)_B.*','\\1',arm),budget=sub('.*_B','',arm))
+rows<-rows |> mutate(mode=sub('T250_(.*)_B.*','\\1',arm))
+theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=12))
+plots<-list()
+```
+
+## 当前结论
+
+在这 200 期回顾样本里，512 元上限的逐组加深仍是较平衡的候选：
+三个种子的净收益为 20,221–25,977 元，ROI 为 21.3%–27.4%，
+最大回撤为 6,718–8,884 元，命中 77–83 期。去掉各自最赚钱的 5 期后，
+仍剩 388–2,975 元净收益；这只是样本内稳健性诊断。
+
+同预算上限下，加深相较只买初始覆盖，在三个种子中都提高收益和命中期数，
+但并非每一种子都降低回撤。768、1,024 元上限提高总收益的同时也带来更大回撤，
+不应只按净收益额选胜者。
+
+加倍没有带来优势：512 元上限下没有发生加倍，因此与只买初始覆盖完全相同。
+768 元上限仅 1–3 期发生加倍，1,024 元上限仅 5 期；本轮只能评价这种
+“先买其他可负担组、最多 4 倍”的规则，不能推断所有加倍策略都无效。
+
+正收益的主要桥梁是结算价格差异。512 元加深方案若按估算 SP 支付已命中的票，
+仍亏损约 22,153–24,800 元；实际结算价格贡献约 45,021–48,130 元。
+贡献最大的 5 期占总价格残差约 38%–40%。后续优先核查估算 SP 的适用性与
+差价是否可在赛前识别；不据此直接把已知高收益期的参数加大。
+
+## 策略与资金规则
+
+准入条件：该组达到 25% 累计概率所需成本不超过 256 元。
+BREADTH 只买初始覆盖；DEPTH 可继续增加同组赛果；MULTIPLY 对初始票集加倍，最多 4 倍。
+三者都先购买仍可负担的其他主力组，再处理余款。
+按共同场次的联合情景，每步选新增覆盖概率／新增金额最大的动作，预期收益用作平局排序。
+加倍不增加覆盖概率，后续排序由预期收益差异决定。
+深度使用原固定网格；三者不是全局最优求解。
+分配情景 256 个，独立评估 5,000 个；种子为 42501、42502、42503。
+
+预算上限为每期 512、768、1,024 元，未支出资金保留。
+同预算上限不等于实际投入相同。现金基准净收益与回撤均为 0，未投注时 ROI 无定义。
+全部结算按期完成后才进入下一期；这是账户曲线的资金周转假设。
+
+```{r}
+knitr::kable(z$summary,digits=2)
+```
+
+## 收益与回撤
+
+```{r}
+#| fig-width: 13
+#| fig-height: 9
+plots$equity<-ggplot(curves,aes(period,equity_cny,colour=mode))+geom_hline(yintercept=100000,linetype=2)+
+  geom_line()+facet_grid(seed~budget)+labs(x='期次顺序',y='账户资金（元）',colour='资金模式')
+plots$equity
+```
+
+```{r}
+#| fig-width: 13
+#| fig-height: 9
+plots$drawdown<-ggplot(curves,aes(period,drawdown_cny,colour=mode))+geom_line()+
+  facet_grid(seed~budget)+labs(x='期次顺序',y='峰值回撤（元）',colour='资金模式')
+plots$drawdown
+```
+
+## 收益的精确分解
+
+实际净收益 = 模型预期净收益 + 命中结果残差 + 结算价格残差。
+命中结果残差按估算价格计算，混合了抽样波动、相关性和模型误差，不能全部解释为概率校正收益。
+价格残差只对实际中奖票计算，不代表赛前可识别的套利空间。
+
+```{r}
+knitr::kable(z$bridge,digits=2)
+```
+
+```{r}
+#| fig-width: 13
+#| fig-height: 8
+bridge<-z$bridge |> filter(grepl('_B512$',arm)) |>
+  pivot_longer(c(model_net,outcome_residual,price_residual),names_to='component',values_to='amount')
+plots$bridge<-ggplot(bridge,aes(component,amount,fill=component))+geom_col()+
+  facet_grid(seed~arm)+labs(x=NULL,y='收益分解（元）')+theme(axis.text.x=element_text(angle=35,hjust=1),legend.position='none')
+plots$bridge
+```
+
+## 校准与差价集中程度
+
+每个分箱展示购买组的模型覆盖和实际命中比例。重叠组不是独立样本，
+图形用于诊断，不给出基于独立伯努利假设的置信区间。
+差价曲线按已知的实际差价事后排序；它仅解释收益来源，不参与选组。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+plots$calibration<-ggplot(z$calibration |> filter(grepl('_B512$',arm)),aes(model_hit,actual_hit,colour=arm,size=group_observations))+
+  geom_abline(slope=1,intercept=0,linetype=2)+geom_point()+facet_wrap(~seed)+
+  labs(x='平均模型覆盖概率',y='实际组命中比例',size='组观测数',colour='方案')
+plots$calibration
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+plots$price_tail<-ggplot(z$price_tails |> filter(grepl('_B512$',arm)),
+  aes(price_rank,cumulative_price_residual,colour=arm))+geom_line()+facet_wrap(~seed)+
+  labs(x='按价格残差从大到小的期次排名',y='累计价格残差（元）',colour='方案')
+plots$price_tail
+```
+
+## 单场价格核查
+
+逐场核对实际赛果的估算 SP（1／市场映射概率）和北单结算 SP。
+结算值来自冻结审计快照，保留来源哈希；重新连乘七场后与历史组奖金核对。
+以下每场仅出现一次，避免组间复用对单场分布重复加权。
+价格比值大于 1 表示结算 SP 高于估算值；实际赛果已知，这仍是事后诊断。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+plots$fixture_price<-ggplot(fixture_prices,aes(estimated_sp,spf_sp,colour=actual_direction))+
+  geom_abline(slope=1,intercept=0,linetype=2)+geom_point(alpha=.3,size=.8)+
+  scale_x_log10()+scale_y_log10()+labs(x='估算 SP（对数轴）',y='结算 SP（对数轴）',colour='实际方向')
+plots$fixture_price
+knitr::kable(fixture_prices |> group_by(actual_direction) |> summarise(matches=n(),
+  median_price_ratio=median(price_ratio),mean_log_price_ratio=mean(log(price_ratio)),
+  above_estimate=mean(price_ratio>1),.groups='drop'),digits=3)
+```
+
+## 时间分段与极值敏感性
+
+每 50 期一个固定时间段。汇总表中的 net_without_best1/3/5（第一项名为
+net_without_best）移除每个方案自身最赚钱的期次；属于事后敏感性检查。
+
+```{r}
+#| fig-width: 13
+#| fig-height: 8
+plots$blocks<-ggplot(z$blocks |> mutate(budget=sub('.*_B','',arm),mode=sub('T250_(.*)_B.*','\\1',arm)),
+ aes(factor(block),roi,fill=mode))+geom_col(position='dodge')+facet_grid(seed~budget)+
+ scale_y_continuous(labels=scales::label_percent())+labs(x='连续 50 期分段',y='净收益／实际投入',fill='资金模式')
+plots$blocks
+knitr::kable(z$blocks,digits=3)
+```
+
+## 逐期结果与可复现性
+
+完整逐期收益额、ROI、投入、现金和命中数组成 `per-issue.csv`；此处展示前几行。
+机器可读收据绑定输入与输出哈希，源计划在读取结算前冻结。
+
+```{r}
+str(rows |> select(issue,arm,seed,stake,cash,net))
+knitr::kable(head(rows |> select(issue,arm,seed,stake,cash,hits,net) |> mutate(roi=ifelse(stake>0,net/stake,NA_real_)),12),digits=3)
+```
+
+```{r}
+#| include: false
+for(n in names(plots))ggsave(file.path(params$output_dir,paste0(n,'.png')),plots[[n]],width=13,height=9,dpi=150)
+outputs<-list.files(params$output_dir,full.names=TRUE)
+stopifnot(identical(report_hashes,vapply(report_code,digest::digest,character(1),file=TRUE,algo='sha256')))
+jsonlite::write_json(list(generated_at=as.character(Sys.time()),implementation=as.list(report_hashes),input_receipt_sha256=digest::digest(file=receipt_path,algo='sha256'),
+  input_dir=params$attribution_dir,initial_capital_cny=100000,block_size=50,
+  source_sha256=digest::digest(file='quarto/150_n7_return_attribution.qmd',algo='sha256'),
+  outputs=as.list(setNames(vapply(outputs,digest::digest,character(1),file=TRUE,algo='sha256'),basename(outputs)))),
+  file.path(params$output_dir,'report-receipt.json'),pretty=TRUE,auto_unbox=TRUE)
+```

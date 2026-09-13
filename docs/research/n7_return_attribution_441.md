@@ -65,3 +65,23 @@ Settlement-price differences dominate the bridge to positive historical net.
 This does not establish that those price differences were predictable.
 The next diagnostic must inspect concentration of this price residual and
 fixture-level estimated-versus-settled price sources before interpreting it.
+
+## Funding comparison implementation
+
+`n7_funding_allocate` in `r/n7_funding_modes.R` delegates all option construction,
+shared-scenario accounting and breadth-first action decisions to existing
+`n7_core_option_pool`, `n7_joint_returns` and `n7_core_allocate`. Three modes,
+ceilings512/768/1024, three seeds, one25% threshold:5400 plans. MULTIPLY has an
+explicit four-copy maximum. Copies are recorded in funded rows and scale
+settlement payouts, but not hit counts or coverage probabilities.
+
+`tests/test_n7_funding_runner.py` exercises prediction freeze, independent
+settlement checker and allocation replay on saved fixtures for ineligible,
+unaffordable and multiplied cases, plus post-freeze label mutation rejection.
+`n7_return_diagnostics` uses shared account curves with explicit issue order and
+100000 CNY opening capital,50-issue fixed blocks and declared coverage bins.
+`n7_fixture_price_diagnostic` joins exact fixture identities/handicaps with the
+frozen settlement source, retaining settlement-source hashes.
+
+QMD entry: `quarto/150_n7_return_attribution.qmd`. Inputs: attribution_dir,
+output_dir. Rendering is still pending until all final verified inputs exist.

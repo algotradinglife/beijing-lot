@@ -1,0 +1,22 @@
+source(file.path('..','..','r','fundamentals_equity_curves.R'))
+source(file.path('..','..','r','n7_sweet_union_summary.R'))
+source(file.path('..','..','r','n7_return_diagnostics.R'))
+testthat::test_that('diagnostics preserve chronological capital and bridge blocks',{
+ x<-tibble::tibble(issue=c('02','01'),arm='a',seed=1,stake=2,gross=c(0,8),net=c(-2,6),
+   cash=0,budget_cny=2,hits=c(0,1),model_net=-1,outcome_residual=c(-1,1),price_residual=c(0,6))
+ g<-tibble::tibble(issue=c('02','01'),arm='a',seed=1,coverage=c(.2,.3),hit=c(FALSE,TRUE),price_residual=c(0,6),actual_gross=c(0,8))
+ z<-n7_return_diagnostics(x,g,c('01','02'),100,1,c(0,.25,.5,1))
+ testthat::expect_equal(z$curves$equity_cny,c(100,106,104))
+ testthat::expect_equal(z$blocks$net,c(6,-2))
+ testthat::expect_equal(z$bridge$net,4)
+ testthat::expect_equal(z$bridge$estimated_hit_net,-2)
+ testthat::expect_equal(z$summary$max_drawdown,2)
+ testthat::expect_equal(z$price_tails$issue,c('01','02'))
+ testthat::expect_equal(z$calibration$actual_hit,c(0,1))
+ testthat::expect_error(n7_return_diagnostics(x,g,c('01'),100,1,c(0,1)))
+ testthat::expect_error(n7_return_diagnostics(x,g,c('01','02'),100,0,c(0,1)))
+ testthat::expect_error(n7_return_diagnostics(x,g,c('01','02'),100,1,c(0,.5,.4,1)))
+ testthat::expect_error(n7_return_diagnostics(x,g,c('02','01'),2,1,c(0,1)))
+ x$model_net[1]<-3
+ testthat::expect_error(n7_return_diagnostics(x,g,c('01','02'),100,1,c(0,1)))
+})
