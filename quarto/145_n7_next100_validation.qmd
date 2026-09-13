@@ -25,20 +25,10 @@ stopifnot(is.character(params$predictions_path),is.character(params$study_config
           identical(digest::digest(file=params$study_config,algo='sha256'),params$study_config_sha256))
 pred <- jsonlite::read_json(params$predictions_path,simplifyVector=TRUE)
 cfg <- jsonlite::read_json(params$study_config,simplifyVector=TRUE)
-stopifnot(identical(pred$historical_admission,FALSE),identical(cfg$historical_admission,FALSE),
-          length(pred$issue_order)==cfg$scope$issue_count,!anyDuplicated(pred$issue_order),
-          pred$issue_order[1]==cfg$scope$first,tail(pred$issue_order,1)==cfg$scope$last)
-probabilities <- tibble::as_tibble(pred$rows)
-stopifnot(!anyDuplicated(probabilities[c('issue','slot','provider_id')]),
-          all(abs(rowSums(probabilities[c('q_W','q_D','q_L')])-1)<1e-10),
-          all(abs(rowSums(probabilities[c('new_W','new_D','new_L')])-1)<1e-10))
-periods <- tibble::tibble(issue=pred$issue_order,order=seq_along(pred$issue_order)) |>
-  dplyr::left_join(tibble::as_tibble(pred$publication_coverage),by='issue',relationship='one-to-one') |>
-  dplyr::left_join(dplyr::count(probabilities,issue,name='projected_fixtures'),by='issue',relationship='one-to-one') |>
-  dplyr::mutate(projected_fixtures=tidyr::replace_na(projected_fixtures,0L),
-                excluded_fixtures=fixture_market_rows/2-projected_fixtures)
-stopifnot(!anyNA(periods$status),all(probabilities$version==cfg$model$version),
-          all(periods$fixture_market_rows%%2==0),all(periods$excluded_fixtures>=0))
+source('r/n7_next100_report.R')
+inputs <- n7_next100_inputs(pred,cfg)
+probabilities <- inputs$probabilities
+periods <- inputs$periods
 ```
 
 ## 固定规则与概率口径
