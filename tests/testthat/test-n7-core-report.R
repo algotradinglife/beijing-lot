@@ -2,7 +2,7 @@ root<-normalizePath(file.path(testthat::test_path(),'../..'))
 source(file.path(root,'r/n7_core_report.R'))
 test_that('paired rescue and loss counts retain unequal spending and complete scope',{
  x<-tibble::tibble(issue=rep(c('001','002'),2),seed=1,arm=rep(c('A','B'),each=2),
-  stake=c(10,20,20,20),gross=c(30,0,0,50),net=c(20,-20,-20,30),hits=c(1,0,0,1))
+  stake=c(10,20,20,20),gross=c(30,0,0,50),net=c(20,-20,-20,30),hits=c(1,0,0,1),stopped=FALSE)
  map<-tibble::tibble(treatment='A',control='B',comparison='baseline')
  z<-n7_core_pairs(x,map,c('001','002'),1)
  expect_equal(z$rescued,1);expect_equal(z$lost,1);expect_equal(z$net_delta_cny,-10)
@@ -48,4 +48,18 @@ test_that('rank-based attribution reconciles copies before fixed cost-band summa
  expect_error(n7_core_rank_attribution(ranks[1,],sleeves,p))
  stop<-n7_core_rank_attribution(ranks,sleeves,dplyr::mutate(p,stopped=TRUE,gross=0,hits=0,stake=0))
  expect_equal(nrow(stop),0)
+})
+test_that('paired account results distinguish funded misses from cash stops and no bets',{
+ x<-tibble::tibble(issue=rep(c('001','002','003','004'),2),arm=rep(c('A','B'),each=4),seed=1,
+  stake=c(2,2,0,0,0,2,0,0),hits=c(1,1,0,0,0,0,0,0),
+  gross=c(4,4,0,0,0,0,0,0),stopped=c(FALSE,FALSE,FALSE,TRUE,TRUE,FALSE,FALSE,TRUE)) |>
+  dplyr::mutate(net=gross-stake)
+ z<-n7_core_pairs(x,tibble::tibble(treatment='A',control='B',comparison='test'),
+  c('001','002','003','004'),1)
+ expect_equal(z$rescued,2);expect_equal(z$funded_rescued,1)
+ expect_equal(z$both_funded,1);expect_equal(z$one_side_funded,1);expect_equal(z$neither_funded,2)
+ expect_equal(z$one_side_stopped,1);expect_equal(z$both_stopped,1)
+ expect_equal(z$treatment_no_bet,1);expect_equal(z$control_no_bet,1)
+ expect_equal(z$equal_spend_issues,1)
+ expect_equal(z$both_funded+z$one_side_funded+z$neither_funded,z$issues)
 })

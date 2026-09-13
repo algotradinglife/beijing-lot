@@ -2,17 +2,17 @@
 # unequal spending is reported, never rescaled to manufacture matched returns.
 # Inputs are funded period rows from n7_capital_report; money CNY, ROI percent.
 n7_core_pairs <- function(periods,comparisons,issue_order,seeds) {
-  stopifnot(all(c('issue','arm','seed','stake','gross','net','hits') %in% names(periods)),
+  stopifnot(all(c('issue','arm','seed','stake','gross','net','hits','stopped') %in% names(periods)),
     all(c('treatment','control','comparison') %in% names(comparisons)),
     !anyDuplicated(periods[c('issue','arm','seed')]),
-    !anyNA(periods[c('issue','arm','seed','stake','gross','net','hits')]),
+    !anyNA(periods[c('issue','arm','seed','stake','gross','net','hits','stopped')]),
     !anyDuplicated(issue_order),length(issue_order)>0,length(seeds)>0,!anyDuplicated(seeds))
   rows<-lapply(seq_len(nrow(comparisons)),function(j) {
     rule<-comparisons[j,]
     a<-periods |> dplyr::filter(arm==rule$treatment) |>
-      dplyr::select(issue,seed,a_stake=stake,a_net=net,a_gross=gross,a_hits=hits)
+      dplyr::select(issue,seed,a_stake=stake,a_net=net,a_gross=gross,a_hits=hits,a_stopped=stopped)
     b<-periods |> dplyr::filter(arm==rule$control) |>
-      dplyr::select(issue,seed,b_stake=stake,b_net=net,b_gross=gross,b_hits=hits)
+      dplyr::select(issue,seed,b_stake=stake,b_net=net,b_gross=gross,b_hits=hits,b_stopped=stopped)
     z<-dplyr::full_join(a,b,by=c('issue','seed'),relationship='one-to-one')
     stopifnot(nrow(z)==length(issue_order)*length(seeds),!anyNA(z),
       setequal(z$issue,issue_order),setequal(z$seed,seeds))
@@ -20,8 +20,15 @@ n7_core_pairs <- function(periods,comparisons,issue_order,seeds) {
       treatment=rule$treatment,control=rule$control,comparison=rule$comparison,
       issues=dplyr::n(),rescued=sum(a_hits>0 & b_hits==0),lost=sum(a_hits==0 & b_hits>0),
       both_hit=sum(a_hits>0 & b_hits>0),both_missed=sum(a_hits==0 & b_hits==0),
+      both_funded=sum(a_stake>0 & b_stake>0),
+      one_side_funded=sum(xor(a_stake>0,b_stake>0)),neither_funded=sum(a_stake==0 & b_stake==0),
+      treatment_stopped=sum(a_stopped),control_stopped=sum(b_stopped),
+      one_side_stopped=sum(xor(a_stopped,b_stopped)),both_stopped=sum(a_stopped & b_stopped),
+      treatment_no_bet=sum(a_stake==0 & !a_stopped),control_no_bet=sum(b_stake==0 & !b_stopped),
+      funded_rescued=sum(a_stake>0 & b_stake>0 & a_hits>0 & b_hits==0),
+      funded_lost=sum(a_stake>0 & b_stake>0 & a_hits==0 & b_hits>0),
       net_delta_cny=sum(a_net-b_net),stake_delta_cny=sum(a_stake-b_stake),
-      equal_spend_issues=sum(a_stake==b_stake),
+      equal_spend_issues=sum(a_stake==b_stake & a_stake>0),
       treatment_roi_percent=if(sum(a_stake)>0)100*sum(a_net)/sum(a_stake) else NA_real_,
       control_roi_percent=if(sum(b_stake)>0)100*sum(b_net)/sum(b_stake) else NA_real_,
       .groups='drop')
