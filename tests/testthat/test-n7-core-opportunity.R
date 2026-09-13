@@ -1,6 +1,7 @@
 root<-normalizePath(file.path(testthat::test_path(),'../..'))
 source(file.path(root,'r/n7_capital_depth.R'))
 source(file.path(root,'r/n7_core_opportunity.R'))
+source(file.path(root,'r/n7_capital_portfolio.R'))
 test_that('concentrated and uniform surfaces retain distinct cost and value features',{
  p<-rbind(c(.5,.3,.2,rep(0,2184)),rep(1/2187,2187));rownames(p)<-c('0','1')
  cut<-list(a='epoch');s<-list(prob_mat=p,value_mat=p*10,rank_idx=rbind(1:2187,1:2187),
@@ -17,27 +18,79 @@ test_that('core and opportunity roles are disjoint with explicit score and caps'
  cut<-list(a='epoch');x<-tibble::tibble(sleeve_id=0:3,
   coverage_64=c(.5,.4,.2,.1),coverage_15=c(.3,.2,.08,.05),
   expected_net_64=c(-30,-20,-10,-15),expected_net_15=c(-8,-7,-10,4))
+ x$target_0.15_cost_cny<-c(20,40,60,80)
  attr(x,'cutoffs')<-cut
- a<-n7_core_partition(x,cut,cut,2,30,30,2,'PROB')
- b<-n7_core_partition(x,cut,cut,2,30,30,2,'VALUE')
+ a<-n7_core_partition(x,cut,cut,2,30,30,2,'PROB',.15)
+ b<-n7_core_partition(x,cut,cut,2,30,30,2,'VALUE',.15)
  expect_equal(a$core_ids,0:1);expect_equal(a$opportunity_ids,2L)
  expect_equal(b$opportunity_ids,3L);expect_equal(a$opportunity_stake_cny,30)
- z<-n7_core_partition(x,cut,cut,2,0,30,2,'PROB');expect_length(z$opportunity_ids,0)
- z<-n7_core_partition(x,cut,cut,2,240,30,2,'PROB');expect_equal(z$opportunity_stake_cny,60)
+ z<-n7_core_partition(x,cut,cut,2,0,30,2,'PROB',.15);expect_length(z$opportunity_ids,0)
+ z<-n7_core_partition(x,cut,cut,2,240,30,2,'PROB',.15);expect_equal(z$opportunity_stake_cny,60)
  expect_length(intersect(z$core_ids,z$opportunity_ids),0)
- expect_error(n7_core_partition(x,cut,list(a='wrong'),2,30,30,2,'PROB'))
- expect_error(n7_core_partition(x,cut,cut,4,30,30,2,'PROB'))
- expect_error(n7_core_partition(x,cut,cut,2,31,30,2,'PROB'))
+ expect_error(n7_core_partition(x,cut,list(a='wrong'),2,30,30,2,'PROB',.15))
+ expect_error(n7_core_partition(x,cut,cut,4,30,30,2,'PROB',.15))
+ expect_error(n7_core_partition(x,cut,cut,2,31,30,2,'PROB',.15))
 })
 test_that('multiplicity changes payout and spending but not coverage',{
  cut<-list(x='epoch');o<-list(sleeve_id=0,depth=15,stake=30,expected_gross=21,
   state_payout=rep(100,2187),coverage=.2)
  other<-o;other$sleeve_id<-1
  base<-list(cutoffs=cut,options=list(o,other))
- partition<-list(core_ids=0,opportunity_ids=1,opportunity_depth=15,cutoffs=cut)
+ partition<-list(core_ids=0,opportunity_ids=1,opportunity_depth=15,opening_depths=c('0'=15),cutoffs=cut)
  p<-n7_core_option_pool(base,partition,cut,'MULTIPLY',3)
- expect_length(p$options,4);expect_equal(p$required_options,4L)
+ expect_length(p$options,4);expect_equal(p$opportunity_options,4L)
  expect_equal(p$options[[3]]$stake,90);expect_equal(p$options[[3]]$expected_gross,63)
  expect_equal(p$options[[3]]$coverage,.2);expect_equal(p$options[[3]]$state_payout[1],300)
  expect_error(n7_core_option_pool(base,partition,list(x='later'),'DEPTH',1))
+})
+test_that('breadth precedes copies even when copied group has superior expected value',{
+ cut<-list(x='epoch')
+ a<-list(sleeve_id=0,depth=2,stake=4,expected_gross=100,
+  state_payout=rep(100,2187),coverage=.2,fixtures=1:7)
+ b<-a;b$sleeve_id<-1;b$depth<-3;b$stake<-6;b$expected_gross<-3
+ base<-list(cutoffs=cut,options=list(a,b))
+ part<-list(core_ids=0:1,opportunity_ids=integer(),opportunity_depth=15,
+  opening_depths=c('0'=2,'1'=3),cutoffs=cut)
+ p<-n7_core_option_pool(base,part,cut,'MULTIPLY',3)
+ hit<-cbind(c(1,0,0,0),c(1,0,0,0),c(1,0,0,0),c(0,1,0,0),c(0,1,0,0),c(0,1,0,0))
+ sc<-list(cutoffs=cut,hits=hit,gross=sweep(hit,2,c(100,200,300,100,200,300),'*'))
+ x<-n7_core_allocate(p,sc,cut,14,'expected_net',20)
+ expect_equal(x$actions$phase,c('OPEN','OPEN','MULTIPLY'))
+ expect_equal(x$actions$sleeve_id,c(0,1,0))
+ expect_equal(x$actions$opening_stop[3],'ALL_CORE_OPEN')
+ expect_equal(x$metrics$stake,14);expect_equal(x$metrics$any_hit,.5)
+ expect_equal(x$actions$marginal_hit[3],0)
+ expect_equal(x$actions$affordable_new_core_count[3],0)
+ # Remaining cash cannot buy a new core, so adding an existing copy is legal.
+ y<-n7_core_allocate(p,sc,cut,8,'expected_net',20)
+ expect_equal(y$actions$phase,c('OPEN','MULTIPLY'))
+ expect_equal(y$actions$opening_stop[2],'NO_AFFORDABLE_NEW_CORE')
+ expect_equal(y$actions$cheapest_unopened_cost[2],6)
+ expect_equal(y$metrics$any_hit,.25)
+ expect_equal(y,n7_core_allocate(p,sc,cut,8,'expected_net',20))
+ empty<-n7_core_allocate(p,sc,cut,2,'expected_net',20)
+ expect_length(empty$selected,0);expect_equal(empty$metrics$cash,2)
+ limit<-n7_core_allocate(p,sc,cut,14,'expected_net',1)
+ expect_equal(limit$stop_reason,'ACTION_LIMIT')
+ expect_error(n7_core_allocate(p,sc,list(x='later'),14,'expected_net',20))
+ expect_error(n7_core_allocate(p,sc,cut,15,'expected_net',20))
+})
+test_that('depth control opens all affordable cores before deepening and breadth keeps cash',{
+ cut<-list(x='epoch');opts<-lapply(1:2,function(id)list(sleeve_id=id,depth=1,
+  stake=2,expected_gross=3,state_payout=rep(20,2187),coverage=.1,fixtures=1:7))
+ deep<-opts[[1]];deep$depth<-2;deep$stake<-4;deep$expected_gross<-9;deep$coverage<-.3
+ base<-list(cutoffs=cut,options=c(opts,list(deep)))
+ part<-list(core_ids=1:2,opportunity_ids=integer(),opportunity_depth=15,
+  opening_depths=c('1'=1,'2'=1),cutoffs=cut)
+ p<-n7_core_option_pool(base,part,cut,'DEPTH',1)
+ sc<-list(cutoffs=cut,hits=cbind(c(1,0,0),c(0,1,0),c(1,0,1)))
+ sc$gross<-sc$hits*20
+ x<-n7_core_allocate(p,sc,cut,6,'any_hit',10)
+ expect_equal(x$actions$phase,c('OPEN','OPEN','DEPTH'))
+ expect_equal(x$metrics$any_hit,1)
+ p<-n7_core_option_pool(base,part,cut,'BREADTH',1)
+ sc$hits<-sc$hits[,1:2];sc$gross<-sc$gross[,1:2]
+ x<-n7_core_allocate(p,sc,cut,6,'any_hit',10)
+ expect_equal(x$metrics$cash,2);expect_equal(x$stop_reason,'BREADTH_COMPLETE')
+ expect_error(n7_core_option_pool(base,part,cut,'UNKNOWN',1))
 })

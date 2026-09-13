@@ -63,7 +63,7 @@ n7_capital_evaluate <- function(pool,selected,scenarios,cutoffs,budget_cny) {
 # preferences explicit; minimal ROI is a fraction, minimum_hit in[0,1]. Incumbents
 # may be returned as FEASIBLE_NOT_PROVEN only after all actual constraints pass.
 n7_capital_solve <- function(pool,scenarios,cutoffs,budget_cny,objective,minimum_roi,
-                              minimum_hit,spend_all,nodes,gap,seed,time_seconds,required_options=integer()) {
+                              minimum_hit,spend_all,nodes,gap,seed,time_seconds) {
   stopifnot(identical(pool$cutoffs,cutoffs),identical(scenarios$cutoffs,cutoffs),
     objective %in% c('any_hit','at_least_two','expected_net','row_coverage','random'),
     is.finite(budget_cny),budget_cny>=0,budget_cny%%2==0,
@@ -71,7 +71,6 @@ n7_capital_solve <- function(pool,scenarios,cutoffs,budget_cny,objective,minimum
     length(spend_all)==1,is.logical(spend_all),!is.na(spend_all),nodes>=1,nodes==floor(nodes),
     gap>=0,gap<1,seed>=0,seed==floor(seed),is.finite(time_seconds),time_seconds>0)
   k <- length(pool$options);w <- nrow(scenarios$hits)
-  stopifnot(all(required_options %in% seq_len(k)),!anyDuplicated(required_options))
   stopifnot(k>0,w>0,ncol(scenarios$hits)==k,all(scenarios$hits %in% 0:1))
   stake <- vapply(pool$options,function(o)o$stake,numeric(1))
   gross <- vapply(pool$options,function(o)o$expected_gross,numeric(1))
@@ -99,8 +98,7 @@ n7_capital_solve <- function(pool,scenarios,cutoffs,budget_cny,objective,minimum
   if(objective=='expected_net')L[seq_len(k)]<-gross-stake
   if(objective=='row_coverage')L[seq_len(k)]<-vapply(pool$options,function(o)o$coverage,numeric(1))
   if(objective=='random')L[seq_len(k)]<-withr::with_seed(seed,stats::runif(k))
-  lower<-rep(0,nvars);lower[required_options]<-1
-  fit<-highs::highs_solve(L=L,lower=lower,upper=rep(1,nvars),A=A,lhs=lo,rhs=hi,
+  fit<-highs::highs_solve(L=L,lower=rep(0,nvars),upper=rep(1,nvars),A=A,lhs=lo,rhs=hi,
     types=rep('I',nvars),maximum=TRUE,control=highs::highs_control(mip_max_nodes=as.integer(nodes),
       mip_rel_gap=gap,mip_feasibility_tolerance=1e-9,primal_feasibility_tolerance=1e-9,
       threads=1L,time_limit=as.double(time_seconds),random_seed=as.integer(seed),log_to_console=FALSE))
@@ -110,7 +108,7 @@ n7_capital_solve <- function(pool,scenarios,cutoffs,budget_cny,objective,minimum
       length(primal)==nvars && all(is.finite(primal)) && all(abs(primal-round(primal))<1e-6)) {
     chosen<-which(primal[seq_len(k)]>.5)
     amount<-sum(stake[chosen]);nh<-rowSums(scenarios$hits[,chosen,drop=FALSE])
-    valid<-all(required_options %in% chosen) && !anyDuplicated(groups[chosen]) && amount<=budget_cny+1e-7 &&
+    valid<-!anyDuplicated(groups[chosen]) && amount<=budget_cny+1e-7 &&
       (!spend_all || abs(amount-budget_cny)<1e-7) &&
       sum(gross[chosen])>=amount*(1+minimum_roi)-1e-7 && mean(nh>=1)>=minimum_hit-1e-9
     if(valid){selected<-chosen;status<-if(status=='Optimal')'OPTIMAL_WITHIN_TOLERANCE' else 'FEASIBLE_NOT_PROVEN'}
