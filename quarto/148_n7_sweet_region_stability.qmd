@@ -1,0 +1,285 @@
+---
+title: "N7 甜区是否存在：概率、成本、集中度与固定预算诊断"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  prior_rank_dir: null
+  output_dir: null
+---
+
+本研究检验报告 147 的候选区域，并不把看过结果后挑出的参数称为未见数据验证。
+使用同一 200 期、每期 24 个冻结七场组，不重训概率底座，不清洗或采集新数据。
+累计概率网格为 10%–50%，步长 2.5 个百分点；单组达标成本上限 64–512 元，步长 32 元。
+所有收益均包含整张票一次 0.65 系数。组级分析购买所有符合条件的组；
+固定预算部分另行限制每期最多 1,024 元，基本票 2 元，起始本金 100,000 元。
+
+```{r}
+#| include: false
+library(dplyr);library(tidyr);library(ggplot2)
+source('r/n7_coverage_diagnostic.R');source('r/n7_sweet_diagnostics.R')
+source('r/fundamentals_equity_curves.R');source('r/market_conditional_summary.R')
+theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=12))
+freeze <- jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'),simplifyVector=FALSE)
+evaluation <- jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+stopifnot(evaluation$status=='PASS',evaluation$issues==200,evaluation$plans==5400,
+  digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256')==evaluation$freeze_sha256,
+  digest::digest(file=file.path(params$study,'results.csv'),algo='sha256')==evaluation$results_sha256,
+  identical(freeze$historical_admission,FALSE))
+for(name in names(freeze$files)) stopifnot(digest::digest(file=file.path(params$study,name),algo='sha256')==freeze$files[[name]])
+for(name in names(freeze$implementation)) stopifnot(digest::digest(file=name,algo='sha256')==freeze$implementation[[name]])
+issue_order <- names(freeze$metadata)
+stopifnot(length(issue_order)==200,!anyDuplicated(issue_order))
+points <- readr::read_csv(file.path(params$study,'prediction-points.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c'))
+stopifnot(digest::digest(file=file.path(params$prior_rank_dir,'ranks.csv'),algo='sha256')==evaluation$ranks_sha256)
+rank_labels <- readr::read_csv(file.path(params$prior_rank_dir,'ranks.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c')) |>
+  select(issue,sleeve_id,actual_rank,actual_gross_cny,fixture_slots)
+points <- points |> left_join(rank_labels,by=c('issue','sleeve_id'),relationship='many-to-one') |>
+  mutate(hit=actual_rank<=depth,gross=ifelse(hit,actual_gross_cny,0),net=gross-stake)
+stopifnot(nrow(points)==200*24*17)
+diagnosis <- n7_sweet_diagnostics(points,seq(64,512,32),issue_order,25)
+grid <- diagnosis$grid
+dir.create(params$output_dir,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(grid,file.path(params$output_dir,'grid.csv'))
+readr::write_csv(diagnosis$blocks,file.path(params$output_dir,'blocks.csv'))
+readr::write_csv(diagnosis$trimmed,file.path(params$output_dir,'trimmed.csv'))
+```
+
+## 一、概率覆盖是否校准
+
+```{r}
+calibration <- points |> group_by(cohort,target) |> summarise(
+  actual=mean(hit),modeled=mean(coverage),median_cost=median(stake),.groups='drop') |>
+  pivot_longer(c(actual,modeled),names_to='type',values_to='probability')
+p <- ggplot(calibration,aes(target,probability,colour=cohort,linetype=type)) + geom_line() +
+  geom_abline(slope=1,intercept=0,colour='grey70') +
+  scale_x_continuous(labels=scales::percent) + scale_y_continuous(labels=scales::percent) +
+  labs(x='模型累计概率目标',y='组命中率 / 实际模型覆盖',colour=NULL,
+    title='全部候选组：覆盖率校准',subtitle='actual 为历史命中；modeled 包含最后一票造成的覆盖超出')
+ggsave(file.path(params$output_dir,'01-calibration.png'),p,width=10,height=5,dpi=160);p
+```
+
+## 二、ROI、支持量和资金成本的联合区域
+
+每个网格购买所有达标成本不超过上限的组。颜色仅作组级描述，不代表组合独立中奖概率。
+ROI 色阶截在 ±100%；原始数值保留在 CSV。少于 50 个组的格子留灰，支持量另图展示。
+
+```{r}
+p <- ggplot(grid,aes(cap_cny,target_pct,fill=ifelse(groups>=50,roi,NA_real_))) +
+  geom_tile() + facet_wrap(~cohort) +
+  scale_fill_gradient2(low='#b94d48',mid='white',high='#297b63',midpoint=0,
+    limits=c(-1,1),oob=scales::squish,na.value='grey85',labels=scales::percent) +
+  labs(x='单组达标成本上限 / 元',y='累计概率目标 / %',fill='ROI',title='收益区域是否连续存在？')
+ggsave(file.path(params$output_dir,'02-roi-surface.png'),p,width=11,height=6,dpi=160);p
+p <- ggplot(grid,aes(cap_cny,target_pct,fill=groups)) + geom_tile() + facet_wrap(~cohort) +
+  scale_fill_viridis_c() + labs(x='单组达标成本上限 / 元',y='累计概率目标 / %',fill='候选组数',
+    title='支持量：高 ROI 是否只有很少几个组？')
+ggsave(file.path(params$output_dir,'03-support.png'),p,width=11,height=6,dpi=160);p
+p <- ggplot(grid,aes(cap_cny,target_pct,fill=cost_median)) + geom_tile() + facet_wrap(~cohort) +
+  scale_fill_viridis_c() + labs(x='单组达标成本上限 / 元',y='累计概率目标 / %',fill='中位投入 / 元',
+    title='相同覆盖目标，在不同集中程度的组中需要多少资金？')
+ggsave(file.path(params$output_dir,'04-capital.png'),p,width=11,height=6,dpi=160);p
+grid |> filter(target_pct %in% c(20,22.5,25,27.5,30),cap_cny %in% c(224,256,288,320)) |>
+  select(cohort,target_pct,cap_cny,groups,issues,cost_median,hit_rate,roi,roi_without_best) |>
+  knitr::kable(digits=3)
+```
+
+## 三、去除极端盈利期后是否保留
+
+一次删除整期所有符合条件的组，按该格子的期净收益从高到低删除 1、3、5 期。
+这比删除单个中奖组更能揭示同一期多组重叠带来的收入集中。
+
+```{r}
+p <- diagnosis$trimmed |> filter(cap_cny==256) |>
+  ggplot(aes(target_pct,roi,colour=factor(drop_issues))) + geom_line() +
+  geom_hline(yintercept=0,colour='grey60') + facet_wrap(~cohort) +
+  scale_y_continuous(labels=scales::percent) +
+  labs(x='累计概率目标 / %',y='ROI',colour='删除最高净收益期数',title='固定成本上限 256 元的极端期敏感性')
+ggsave(file.path(params$output_dir,'05-tail-sensitivity.png'),p,width=11,height=5,dpi=160);p
+diagnosis$trimmed |> filter(target_pct==25,cap_cny %in% c(224,256,288,320)) |>
+  knitr::kable(digits=3)
+```
+
+## 四、每 25 期是否稳定
+
+按原生期次顺序连续分为八个区段，不依据收益划分。
+小区段可能受到单期大额返还影响；不能把 200 期整体正收益称为逐段稳定。
+
+```{r}
+p <- diagnosis$blocks |> filter(cap_cny==256) |>
+  ggplot(aes(factor(block),target_pct,fill=roi)) + geom_tile() +
+  scale_fill_gradient2(low='#b94d48',mid='white',high='#297b63',midpoint=0,
+    limits=c(-1,1),oob=scales::squish,labels=scales::percent) +
+  labs(x='连续 25 期区段（1–4 旧批次，5–8 新批次）',y='累计概率目标 / %',fill='ROI',
+    title='甜区在不同历史阶段的表现，成本上限 256 元')
+ggsave(file.path(params$output_dir,'06-chronological-blocks.png'),p,width=11,height=6,dpi=160);p
+diagnosis$blocks |> filter(target_pct==25,cap_cny==256) |> knitr::kable(digits=3)
+```
+
+## 五、同组加深的边际收益
+
+固定“25% 达标成本不超过 256 元”的组身份，比较这些组在完整目标网格上的不同深度。
+高于 25% 的购买可能超过原筛选成本上限；此处专门分析同组加深，不重新过滤组。
+增量 ROI 只统计相邻两个目标之间新增票的返还和成本，第一档没有前一档可比。
+
+```{r}
+ids <- points |> filter(abs(target-.25)<1e-12,stake<=256) |> select(issue,sleeve_id)
+same <- points |> semi_join(ids,by=c('issue','sleeve_id')) |>
+  group_by(cohort,target) |> summarise(groups=n(),stake=sum(stake),gross=sum(gross),
+    roi=gross/stake-1,.groups='drop') |>
+  group_by(cohort) |> arrange(target,.by_group=TRUE) |>
+  mutate(marginal_roi=(gross-lag(gross))/(stake-lag(stake))-1) |> ungroup()
+readr::write_csv(same,file.path(params$output_dir,'same-group-marginal.csv'))
+p <- same |> select(cohort,target,roi,marginal_roi) |>
+  pivot_longer(c(roi,marginal_roi),names_to='measure',values_to='value') |>
+  ggplot(aes(target,value,colour=cohort)) + geom_line(na.rm=TRUE) +
+  geom_hline(yintercept=0,colour='grey60') + facet_wrap(~measure,scales='free_y') +
+  scale_y_continuous(labels=scales::percent) + scale_x_continuous(labels=scales::percent) +
+  labs(x='累计概率目标',y='ROI',colour=NULL,title='同一批组：总收益和相邻深度增量收益')
+ggsave(file.path(params$output_dir,'07-marginal.png'),p,width=11,height=5,dpi=160);p
+```
+
+## 六、重叠与资金需求
+
+同一期多个候选组可能只更换一两场，因此盈利组数不能当成独立证据。
+下面统计 25%／256 元区域的真实比赛重叠，而不假设独立样本数。
+
+```{r}
+overlap <- vector('list',length(issue_order))
+for(i in seq_along(issue_order)) {
+  issue <- issue_order[i]
+  selected <- ids$sleeve_id[ids$issue==issue]
+  sets <- lapply(freeze$metadata[[issue]]$fixture_sets,unlist)
+  overlap[[i]] <- n7_sweet_overlap(selected,sets) |> mutate(issue=issue,period=i)
+}
+overlap <- bind_rows(overlap) |>
+  left_join(diagnosis$issues |> filter(target_pct==25,cap_cny==256) |>
+    select(issue,stake,net),by='issue',relationship='one-to-one') |>
+  mutate(stake=coalesce(stake,0),net=coalesce(net,0),roi=ifelse(stake>0,net/stake,NA_real_))
+readr::write_csv(overlap,file.path(params$output_dir,'overlap.csv'))
+p <- ggplot(overlap,aes(mean_pair_overlap,roi,size=groups,colour=max_fixture_group_share)) +
+  geom_point(alpha=.65,na.rm=TRUE) + scale_y_continuous(labels=scales::percent) +
+  scale_colour_viridis_c(labels=scales::percent) +
+  labs(x='两组平均共享的比赛场数',y='该期组级 ROI',size='符合条件组数',colour='单场最大覆盖组占比',
+    title='组间相关性：收益是否集中在高度重叠的候选组？')
+ggsave(file.path(params$output_dir,'08-overlap.png'),p,width=10,height=6,dpi=160);p
+p <- ggplot(overlap,aes(groups,stake,colour=period<=100)) + geom_point(alpha=.7) +
+  geom_hline(yintercept=1024,linetype=2) +
+  labs(x='符合条件的组数',y='全买这些组所需资金 / 元',colour='旧100期',
+    title='主力候选组是否装得进每期 1024 元？')
+ggsave(file.path(params$output_dir,'09-budget-demand.png'),p,width=10,height=5,dpi=160);p
+overlap |> summarise(期数=n(),无合格组=sum(groups==0),超过预算期数=sum(stake>1024),
+  资金需求中位数=median(stake),合格组数中位数=median(groups),
+  共享比赛场数中位数=median(mean_pair_overlap,na.rm=TRUE)) |> knitr::kable(digits=3)
+```
+
+## 七、固定预算探针：组级甜区能否转成组合收益
+
+固定 27 个对照：目标 20%／25%／30%，成本上限 224／256／320 元，
+复用／重叠约束 U3P3、U6P5、U24P7。U 是一场最多进入几组，P 是两组最多共享几场。
+每组只买一份达标前缀，不加倍；余款持有现金。
+HiGHS 求解固定 0/1 背包，最大化组覆盖率之和并满足预算与重叠约束。
+覆盖率之和只是择组目标，**不是至少中一组的概率**。
+所有组与资金分配在连接结算标签之前冻结，输入边界复用共享 Cutoff 验证；不选择历史最优参数部署。
+
+原方案与三个 8 主力对照使用此前 seed=42501 的冻结资金分配，按同一结算表还原。
+
+```{r}
+results <- readr::read_csv(file.path(params$study,'results.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c'))
+prior <- jsonlite::fromJSON(file.path(params$prior_rank_dir,'receipt.json'))
+fund_receipt <- jsonlite::fromJSON(file.path(params$prior_rank_dir,'funded.receipt.json'))
+stopifnot(digest::digest(file=file.path(params$prior_rank_dir,'funded.csv'),algo='sha256')==fund_receipt$output_sha256,
+  digest::digest(file=file.path(params$prior_rank_dir,'ranks.csv'),algo='sha256')==prior$outputs[['ranks.csv']])
+ranks <- readr::read_csv(file.path(params$prior_rank_dir,'ranks.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c'))
+funded <- readr::read_csv(file.path(params$prior_rank_dir,'funded.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c')) |>
+  left_join(ranks,by=c('issue','sleeve_id'),relationship='many-to-one')
+stopifnot(!anyNA(funded$actual_rank))
+controls <- funded |> group_by(issue,arm) |> summarise(groups=n(),stake=sum(2*depth),
+  gross=sum(ifelse(actual_rank<=depth,actual_gross_cny,0)),hits=sum(actual_rank<=depth),
+  net=gross-stake,cash=1024-stake,.groups='drop')
+combined <- bind_rows(results |> select(issue,arm,groups,stake,gross,hits,net,cash),controls) |>
+  mutate(model=arm,policy='fixed',status=ifelse(stake>0,'COMPLETE','NO_BET'),
+    budget_cny=1024,cash_cny=cash)
+curves <- strategy_equity_curves(combined,issue_order,100000)
+periods <- curves |> filter(period>0) |> mutate(stake=funded_stake_cny,net=funded_net_cny,
+  hits=ifelse(stopped,0,hits),groups=ifelse(stopped,0,groups))
+portfolio <- market_conditional_summary(periods,curves)
+portfolio <- portfolio |> mutate(budget_utilization=stake/(length(issue_order)*1024),
+  capital_return=net/100000)
+readr::write_csv(portfolio,file.path(params$output_dir,'portfolio-summary.csv'))
+readr::write_csv(curves,file.path(params$output_dir,'portfolio-curves.csv'))
+portfolio |> select(model,stake,net,roi_percent,budget_utilization,hit_issues,max_drawdown,without_best_roi) |> knitr::kable(digits=2)
+policies <- bind_rows(freeze$config$policies)
+p <- portfolio |> inner_join(policies,by=c('model'='arm'),relationship='one-to-one') |>
+  mutate(constraint=paste0('U',reuse,'P',overlap)) |>
+  ggplot(aes(factor(cap_cny),factor(target*100),fill=roi_percent)) + geom_tile() +
+  geom_text(aes(label=sprintf('%.1f%%',roi_percent)),size=3.4) + facet_wrap(~constraint) +
+  scale_fill_gradient2(low='#b94d48',mid='white',high='#297b63',midpoint=0) +
+  labs(x='单组达标成本上限 / 元',y='累计概率目标 / %',fill='ROI / %',title='固定预算后的收益是否仍有甜区？')
+ggsave(file.path(params$output_dir,'10-portfolio-grid.png'),p,width=11,height=5,dpi=160);p
+focus <- c('T250_C256_U3_P3','T250_C256_U6_P5','T250_C256_U24_P7',
+  'T300_C256_U6_P5','T300_C320_U6_P5',
+  'NONUNIFORM_ANY_ROI_NONE_B1024','C8_DEPTH_ANY_O0_PROB','C8_DEPTH_ANY_O60_PROB')
+plot_curves <- curves |> filter(model %in% focus)
+stopifnot(n_distinct(plot_curves$model)==length(focus))
+p <- ggplot(plot_curves,aes(period,equity_cny,colour=model)) + geom_line() +
+  geom_hline(yintercept=100000,linetype=2,colour='grey60') +
+  labs(x='期次顺序',y='账户资金 / 元',colour=NULL,title='固定预算资金曲线：甜区探针与原有对照') +
+  theme(legend.position='bottom') + guides(colour=guide_legend(ncol=2))
+ggsave(file.path(params$output_dir,'11-equity.png'),p,width=12,height=7,dpi=160);p
+p <- ggplot(plot_curves,aes(period,-drawdown_cny,colour=model)) + geom_line() +
+  labs(x='期次顺序',y='距历史资金高点 / 元',colour=NULL,title='固定预算回撤曲线') +
+  theme(legend.position='bottom') + guides(colour=guide_legend(ncol=2))
+ggsave(file.path(params$output_dir,'12-drawdown.png'),p,width=12,height=7,dpi=160);p
+```
+
+## 八、研究结论
+
+本轮支持“存在一个候选盈利区域”，但不支持“找到了稳定盈利的统一阈值”。
+
+- 25%／256 元组级区域旧、新批次 ROI 为 23.96%、21.75%。删除最高净收益一期后仍正；
+  删除三期后旧批次降至 −8.63%，新批次为 5.30%；删除五期后两批均转负。
+- 八个连续 25 期区段中，七段盈利，但第四段 ROI 为 −47.58%。正收益的幅度也不稳定。
+- 合格组平均两两共享约 5.38 场比赛，不能把约八个组当作八次独立机会。
+- 固定预算下，25%／256 元 U6P5 的 ROI 为 29.16%，净收益 24,968.98 元，
+  最大回撤 8,260.32 元；但只使用了总预算的 41.81%。原 8 主力＋60 元机会方案
+  净收益 43,643.47 元、ROI 21.38%、最大回撤 12,228.40 元，投入接近全部预算。
+  因此更高 ROI 不能解释为更高总盈利，较低回撤也部分来自较少投入。
+- 30%／256 元 U6P5 也是值得关注的邻近探针：ROI 41.11%，净收益 28,849.69 元，
+  最大回撤 6,877.99 元，预算利用率 34.26%。这提示甜区不能收窄成“只能买到 25%”。
+
+进一步研究应保留覆盖目标与资金成本两个维度，同时检查区段风险及预算利用率。
+不把余款强行按比例加倍，也不因某格历史 ROI 最高而把它直接升级为部署规则。
+
+## 解释边界与复现
+
+“甜区存在”至少要分成三层：概率／成本的邻域是否有正收益；正收益是否跨时期且不依赖极端期；
+在固定预算与重叠约束下是否仍有收益。任何一层失败都必须单列，不能用组级 ROI 替代组合表现。
+现有概率与价格是历史研究产物，未获前瞻准入；最大化固定输入的背包并未重新训练概率。
+更换目标、成本或重叠规则以后，仍需独立评估，不能将这批历史的最佳格子直接部署。
+
+执行入口 `scripts/run_n7_sweet_region.R CONFIG.json`，QMD 显式读取冻结输出。
+函数、测试与传递依赖说明在源码和研究验收记录中；原始资料不改写，输出不提供 RDS。
+
+```{r}
+tibble(column=names(grid),type=vapply(grid,typeof,character(1))) |> knitr::kable()
+head(grid) |> knitr::kable(digits=3)
+files <- c('grid.csv','blocks.csv','trimmed.csv','same-group-marginal.csv','overlap.csv',
+  'portfolio-summary.csv','portfolio-curves.csv')
+jsonlite::write_json(list(evidence_class='POST_SETTLEMENT_DIAGNOSTIC',historical_admission=FALSE,
+  freeze_sha256=evaluation$freeze_sha256,
+  qmd_sha256=digest::digest(file='quarto/148_n7_sweet_region_stability.qmd',algo='sha256'),
+  outputs=as.list(setNames(vapply(file.path(params$output_dir,files),digest::digest,character(1),
+    algo='sha256',file=TRUE),files))),file.path(params$output_dir,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
