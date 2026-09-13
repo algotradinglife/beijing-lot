@@ -1,0 +1,32 @@
+source(file.path(testthat::test_path(),'../../r/n7_sweet_union.R'))
+test_that('sweet eligibility uses only explicit modeled target costs', {
+  cuts <- list(a='epoch')
+  f <- tibble::tibble(sleeve_id=c(0,1,2),target_0.25_cost_cny=c(128,256,258))
+  attr(f,'cutoffs') <- cuts
+  p <- n7_sweet_union_partition(f,cuts,cuts,.25,256,2)
+  expect_equal(p$core_ids,c(0,1));expect_equal(unname(p$opening_depths),c(64,128))
+  expect_length(p$opportunity_ids,0)
+  expect_error(n7_sweet_union_partition(f,cuts,list(a='wrong'),.25,256,2))
+  expect_error(n7_sweet_union_partition(f,cuts,cuts,.3,256,2))
+  expect_length(n7_sweet_union_partition(f,cuts,cuts,.25,64,2)$core_ids,0)
+})
+test_that('union bridge opens fixed prefixes, deepens and preserves empty cash', {
+  source(file.path(testthat::test_path(),'../../r/n7_core_opportunity.R'))
+  source(file.path(testthat::test_path(),'../../r/n7_capital_portfolio.R'))
+  source(file.path(testthat::test_path(),'../../r/n7_joint_sleeves.R'))
+  cuts <- list(a='epoch')
+  o <- list(sleeve_id=0,depth=1,stake=2,expected_gross=3,coverage=.25,
+    fixtures=1:7,state_ids=1L,state_payout=rep(12,2187))
+  deep <- o;deep$depth <- 2;deep$stake <- 4;deep$coverage <- .5;deep$expected_gross <- 6;deep$state_ids <- 1:2
+  base <- list(cutoffs=cuts,fixtures=as.list(1:7),options=list(o,deep))
+  part <- list(cutoffs=cuts,core_ids=0,opening_depths=c('0'=1),opportunity_ids=numeric(),opportunity_depth=15L)
+  worlds <- matrix(0L,4,7);worlds[,7] <- c(0,1,2,2)
+  fixed <- n7_sweet_union_allocate(base,part,cuts,'BREADTH',worlds,4,20)
+  varied <- n7_sweet_union_allocate(base,part,cuts,'DEPTH',worlds,4,20)
+  expect_equal(fixed$fit$metrics$any_hit,.25);expect_equal(fixed$fit$metrics$cash,2)
+  expect_equal(varied$fit$metrics$any_hit,.5);expect_equal(varied$fit$metrics$cash,0)
+  part$core_ids <- numeric();part$opening_depths <- numeric()
+  empty <- n7_sweet_union_allocate(base,part,cuts,'BREADTH',worlds,4,20)
+  expect_equal(empty$fit$metrics$cash,4)
+  expect_error(n7_sweet_union_allocate(base,part,list(b='bad'),'BREADTH',worlds,4,20))
+})
