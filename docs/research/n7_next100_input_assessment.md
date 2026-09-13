@@ -14,3 +14,15 @@
 - `predict_draw_foundation` 要求模型 receipt 与目标 cutoff 完全一致，不能将 101120 缓存直接用于新期。下一步通过已有 temporal_learning 接口验证固定原训练样本与参数的逐期凭证生成，核对校正单元统计保持一致；不使用新增期标签更新模型。
 
 本轮仅保存范围与模型元信息，未生成目标期票单，未读取目标期实际结算赛果或 SP，尚无新 100 期收益结论。
+
+## 研究侧市场概率入口
+
+`r/n7_market_projection.R::project_n7_market_inputs` 接收已验收、已按原截止选好的公司报价，复用 `total_market_constraint` 和 `total_constrained_projection`，不运行基本面模型。与已有投影函数逐值一致性及相关测试共 40 项断言通过。此入口本身不判定来源已验收，不重新选择报价；消费层仍须绑定发布凭证和输入哈希，明确排除清单。
+
+所需输入为：
+
+- 场次表：issue、slot、provider_id、handicap、cutoff_utc、odds_W/D/L（已选公司欧赔的均值）。
+- 大小球公司表：issue、slot、provider_id、company、line、over_hk、under_hk（每公司一条已选赛前报价）。
+- 显式的每期每场 cutoff、总进球求解范围和尾部误差容限。
+
+返回场次 tibble 中的 q_W/D/L、双方期望进球和欧赔拟合残差，以及比分网格。保持历史诊断标记，不能把调用成功当作可用性验收。不改变 N7 候选构造、策略参数或冻结概率校正单元。
