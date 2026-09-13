@@ -48,7 +48,7 @@ n7_core_partition <- function(features,cutoffs,expected_cutoffs,core_count,
   stopifnot(identical(cutoffs,expected_cutoffs),length(cutoffs)>0,
     identical(attr(features,'cutoffs'),cutoffs),
     !anyDuplicated(features$sleeve_id),unit_cny==2,group_cap_cny==30,
-    core_count>=1,core_count==floor(core_count),core_count<nrow(features),
+    core_count>=1,core_count==floor(core_count),core_count<=nrow(features),
     is.finite(opportunity_cap_cny),opportunity_cap_cny>=0,
     opportunity_cap_cny%%unit_cny==0,rule %in% c('PROB','VALUE'),
     all(is.finite(as.matrix(features[c('coverage_64','coverage_15','expected_net_64','expected_net_15')]))))
@@ -136,7 +136,12 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
   initial<-n7_capital_evaluate(pool,selected,scenarios,cutoffs,budget_cny)
   ledger<-list();opening_stop<-NULL;stop_reason<-NULL
   for(step in seq_len(max_actions)) {
-    current<-n7_capital_evaluate(pool,selected,scenarios,cutoffs,budget_cny)
+    # Boundary validation above is once per allocation. Candidate scoring needs
+    # only union events and exact linear value, not full risk tables per trial.
+    current_stake<-sum(stake[selected])
+    current_events<-rowSums(scenarios$hits[,selected,drop=FALSE])
+    current<-list(cash=budget_cny-current_stake,stake=current_stake,
+      any_hit=mean(current_events>0),expected_net=sum(expected[selected])-current_stake)
     unopened<-pool$opening_options[!ids[pool$opening_options] %in% ids[selected]]
     affordable<-unopened[stake[unopened]<=current$cash]
     if(length(affordable)) {
@@ -159,7 +164,10 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
     scores<-lapply(candidates,function(j) {
       old<-selected[ids[selected]==ids[j]]
       proposal<-c(setdiff(selected,old),j)
-      v<-n7_capital_evaluate(pool,proposal,scenarios,cutoffs,budget_cny)
+      proposal_stake<-sum(stake[proposal])
+      removed<-if(length(old))scenarios$hits[,old] else 0
+      v<-list(stake=proposal_stake,expected_net=sum(expected[proposal])-proposal_stake,
+        any_hit=mean(current_events-removed+scenarios$hits[,j]>0))
       cost<-v$stake-current$stake
       tibble::tibble(option=j,cost=cost,
         hit_gain=v$any_hit-current$any_hit,

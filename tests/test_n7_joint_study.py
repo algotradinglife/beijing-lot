@@ -119,7 +119,8 @@ def test_r_boundary_rejects_cutoffs_and_source_mutation(tmp_path, monkeypatch, f
             repository_root=ROOT, python="explicit-python", rscript="Rscript", entry_point="scripts/run_n7_joint_issue.R")
 
 
-def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, monkeypatch, fixture_bundle):
+@pytest.mark.parametrize("core_layers", [False, True])
+def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, monkeypatch, fixture_bundle, core_layers):
     bundle = fixture_bundle; issue = bundle["issue"]
     source = tmp_path / "source"; (source / "bundles").mkdir(parents=True)
     path = source / "bundles" / f"{issue}.json.gz"
@@ -130,12 +131,16 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
     (source / "plans-frozen.json").write_text(json.dumps(prior))
     cfg = dict(seeds=[42], arms=["QUALITY_PROB"], workers=1,
                provenance_roots=["src.n7_joint_study", "src.temporal_learning"])
+    if core_layers:
+        cfg["provenance_roots"].append("src.n7_core_settlement")
     config = tmp_path / "config.json"; config.write_text(json.dumps(cfg))
 
     def run(*args, **kwargs):
         assert not (source / "evaluation-receipt.json").exists()
         result = empty_result(bundle, cfg["seeds"], cfg["arms"])
         for p in result["plans"]:
+            if core_layers:
+                p.update(schema="CORE_COPY_LAYERS_V1", layers=[], unique_tickets=0)
             p["seal"] = stable_json_hash(p)
         return result
 
@@ -154,11 +159,20 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
         audit_path=str(audit), audit_sha256=hashlib.sha256(audit.read_bytes()).hexdigest(),
         result_sha256=hashlib.sha256((source / "results.json").read_bytes()).hexdigest())
     (source / "evaluation-receipt.json").write_text(json.dumps(er))
+    with pytest.raises(ValueError, match="callback is not bound"):
+        study.evaluate_prefix_study(source, output, repository_root=ROOT,
+            describe_plan=study.describe_joint_plan, reference_arms=[], reference_seeds=[],
+            settle_plan=lambda plan, rows: {})
+    from src.n7_core_settlement import settle_core_layers
     result = study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
         describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
     assert len(result["rows"]) == 3
     assert result["rows"][0]["status"] == "NO_BET"
     assert result["rows"][0]["net"] == 0
+    if core_layers:
+        assert result["rows"][0]["paid_hits"] == 0
+        assert result["rows"][0]["opportunity_gross"] == 0
     assert all(Path(p).read_bytes() == raw for p, raw in original_plans.items())
     with pytest.raises(ValueError, match="already frozen"):
         study.evaluate_prefix_study(source, output, repository_root=ROOT,

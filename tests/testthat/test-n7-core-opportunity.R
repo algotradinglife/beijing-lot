@@ -28,7 +28,7 @@ test_that('core and opportunity roles are disjoint with explicit score and caps'
  z<-n7_core_partition(x,cut,cut,2,240,30,2,'PROB',.15);expect_equal(z$opportunity_stake_cny,60)
  expect_length(intersect(z$core_ids,z$opportunity_ids),0)
  expect_error(n7_core_partition(x,cut,list(a='wrong'),2,30,30,2,'PROB',.15))
- expect_error(n7_core_partition(x,cut,cut,4,30,30,2,'PROB',.15))
+ expect_error(n7_core_partition(x,cut,cut,5,30,30,2,'PROB',.15))
  expect_error(n7_core_partition(x,cut,cut,2,31,30,2,'PROB',.15))
 })
 test_that('multiplicity changes payout and spending but not coverage',{

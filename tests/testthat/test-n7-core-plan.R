@@ -1,0 +1,28 @@
+root<-normalizePath(file.path(testthat::test_path(),'../..'))
+source(file.path(root,'r/n7_capital_portfolio.R'))
+source(file.path(root,'r/n7_core_opportunity.R'))
+source(file.path(root,'r/n7_core_plan.R'))
+test_that('packed copy layers preserve unique states, payout and total cash',{
+ cut<-list(x='epoch')
+ a<-list(sleeve_id=0,depth=1,stake=2,expected_gross=100,
+  state_payout=rep(100,2187),coverage=.2,fixtures=1:7,state_ids=1L,rule='PROB_PREFIX')
+ b<-a;b$sleeve_id<-1;b$fixtures<-2:8;b$expected_gross<-2
+ base<-list(issue='001',model_id='TEST',fixtures=lapply(1:8,function(s)list(slot=s)),
+  cutoffs=cut,options=list(a,b))
+ part<-list(core_ids=0:1,opportunity_ids=integer(),opportunity_depth=15,
+  opening_depths=c('0'=1,'1'=1),cutoffs=cut)
+ p<-n7_core_option_pool(base,part,cut,'MULTIPLY',3)
+ hit<-cbind(c(1,0),c(1,0),c(1,0),c(0,1),c(0,1),c(0,1))
+ sc<-list(cutoffs=cut,hits=hit,gross=sweep(hit,2,c(100,200,300,100,200,300),'*'))
+ fit<-n7_core_allocate(p,sc,cut,6,'expected_net',20)
+ z<-n7_core_plan(p,fit,cut,'TEST',1,sc,sc,6,2,.65)
+ expect_equal(z$stake,6);expect_equal(z$unique_tickets,2);expect_equal(z$groups,3)
+ expect_length(z$layers,2);expect_equal(z$layers[[1]]$groups,2)
+ expect_equal(z$layers[[2]]$groups,1);expect_equal(z$training$any_hit,1)
+ expect_equal(z$training$expected_gross,202)
+ expect_equal(z$layers[[2]]$fixture_indices,matrix(0:6,nrow=1))
+ empty<-n7_core_allocate(p,sc,cut,0,'any_hit',20)
+ zero<-n7_core_plan(p,empty,cut,'TEST',1,sc,sc,0,2,.65)
+ expect_length(zero$layers,0);expect_equal(zero$stake,0)
+ expect_error(n7_core_plan(p,fit,list(x='wrong'),'TEST',1,sc,sc,6,2,.65))
+})

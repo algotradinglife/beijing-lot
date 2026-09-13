@@ -164,13 +164,14 @@ def describe_joint_plan(plan):
 
 
 def evaluate_prefix_study(source, output, *, repository_root, describe_plan,
-                          reference_arms, reference_seeds):
+                          reference_arms, reference_seeds, settle_plan=settle_single_tickets):
     """Settle a complete frozen R study through the existing authoritative API.
 
     Only this phase opens target labels/SP. Returns one row per issue/arm/seed
     plus two separately labeled archived monolithic references. Rejects missing
     settlement, mismatched freeze/source/plan hashes and duplicate evaluation.
     Does not alter any tickets, limits or coefficients after seeing outcomes.
+    A custom settlement callback must be included in the frozen code closure.
     """
     source, output, root = Path(source).resolve(), Path(output).resolve(), Path(repository_root).resolve()
     if (output / "evaluation-receipt.json").exists():
@@ -180,6 +181,10 @@ def evaluate_prefix_study(source, output, *, repository_root, describe_plan,
     if frozen["seal"] != stable_json_hash(receipt):
         raise ValueError("Freeze changed")
     verify_implementation_closure(root, receipt["implementation"])
+    callback_module = settle_plan.__module__
+    callback_path = callback_module.replace(".", "/") + ".py"
+    if callback_path not in receipt["implementation"]["files"]:
+        raise ValueError("Settlement callback is not bound by frozen implementation")
     for name, digest in receipt["r_implementation"].items():
         if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
             raise ValueError("R implementation changed")
@@ -201,12 +206,11 @@ def evaluate_prefix_study(source, output, *, repository_root, describe_plan,
         raw = Path(name).read_bytes()
         if hashlib.sha256(raw).hexdigest() != digest:
             raise ValueError("Frozen plan changed")
-        plan = json.loads(gzip.decompress(raw)); settled = settle_single_tickets(plan, audit[audit.issue == plan["issue"]])
+        plan = json.loads(gzip.decompress(raw)); settled = settle_plan(plan, audit[audit.issue == plan["issue"]])
         if settled["status"] not in ("COMPLETE", "NO_BET"):
             raise ValueError(f"Unresolved settlement: {plan['issue']} {settled['status']}")
         rows.append(dict(issue=plan["issue"], seed=plan["seed"], arm=plan["arm"],
-            decision_year=min(plan["cutoffs"].values())[:4], **{k: settled[k] for k in
-                ("status", "stake", "gross", "net", "groups", "hits", "roi")},
+            decision_year=min(plan["cutoffs"].values())[:4], **{k: value for k, value in settled.items() if k != "issue"},
             **describe_plan(plan),
             reference=False))
     old_results = (source / "results.json").read_bytes()
