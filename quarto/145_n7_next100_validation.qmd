@@ -170,6 +170,40 @@ if (!is.null(params$figures_dir)) ggsave(file.path(params$figures_dir,'next100-e
                                        chart,width=11,height=8,dpi=160)
 ```
 
+## 旧新合计 200 期连续资金与回撤
+
+登记的原生历史清单从 100101 开始，截至 110513 共 296 期：100101–100108 为最早 8 期，100109–100401 为早期 40 期，100402–100607 为其后 48 期，另有本图对应的旧新各 100 期。当前四方案已有同口径结果的范围是后 200 期；前 96 期不拼接其他策略收益，也不填零。
+
+两批按原生顺序连接，仅在最初投入 100,000 元，第 100／101 期之间不重置本金或回撤峰值。固定 seed 42501；虚线为旧新批次分界。这是两批历史诊断结果的连续记账，不将旧期研究内表现改称前瞻表现。
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+#| fig-width: 11
+#| fig-height: 8
+combined_order <- c(as.character(old$issue_order),as.character(x$issue_order))
+combined_rows <- bind_rows(tibble::as_tibble(old$rows),rows) |>
+  filter(arm %in% focus) |> mutate(reference=arm==cfg$control)
+combined_report <- n7_capital_report(combined_rows,combined_order,
+                                    cfg$initial_capital_cny,cfg$budget_cny)
+combined_curves <- combined_report$curves |> filter(seed==params$display_seed) |>
+  mutate(strategy=factor(arm,levels=focus,labels=focus_labels))
+combined_plot_rows <- combined_curves |>
+  select(period,strategy,equity_cny,drawdown_cny,drawdown_percent) |>
+  tidyr::pivot_longer(c(equity_cny,drawdown_cny,drawdown_percent),names_to='metric',values_to='value') |>
+  mutate(metric=factor(metric,levels=c('equity_cny','drawdown_cny','drawdown_percent'),
+    labels=c('资金（元；初始100000）','回撤（元）','回撤（%）')))
+combined_chart <- ggplot(combined_plot_rows,aes(period,value,color=strategy)) +
+  geom_line(linewidth=.65) + geom_vline(xintercept=100.5,linetype='dashed',color='grey45') +
+  facet_wrap(~metric,ncol=1,scales='free_y') +
+  labs(x='连续200期顺序（虚线左侧：旧100期；右侧：新100期）',y=NULL,color=NULL) +
+  theme_minimal(base_size=11,base_family='Noto Sans CJK SC') + theme(legend.position='bottom')
+print(combined_chart)
+if (!is.null(params$figures_dir)) ggsave(file.path(params$figures_dir,'all200-equity-drawdown.png'),
+  combined_chart,width=11,height=8,dpi=160)
+knitr::kable(combined_report$summary |> filter(policy==as.character(params$display_seed)) |>
+  select(model,stake,net,roi_percent,hit_issues,profitable_issues,max_drawdown,max_drawdown_percent),digits=2)
+```
+
 ## 分段与种子敏感性
 
 前 50／后 50 期按固定清单顺序切分，仅作描述。分段投入和收益继承整条资金路径，不在每段重新补资。各段不能作为事后调整下注规则的依据。
