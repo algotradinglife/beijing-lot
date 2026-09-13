@@ -1,5 +1,6 @@
 import sys
 import types
+from unittest.mock import Mock
 from pathlib import Path
 
 import pytest
@@ -38,3 +39,13 @@ def test_loaded_callback_origin_and_code_are_bound(tmp_path, monkeypatch):
     monkeypatch.setattr(module,'settle_single_tickets',bad)
     with pytest.raises(TemporalContractError):
         verify_callable_binding(ROOT,receipt,settle_core_layers,expected_identity=identity)
+
+
+@pytest.mark.parametrize('replacement',[lambda plan,audit: {}, object(), Mock(return_value={})])
+def test_nonlocal_replacement_cannot_disappear_from_binding(monkeypatch,replacement):
+    import src.n7_core_settlement as module
+    receipt=implementation_closure(ROOT,['src.n7_core_settlement'])
+    monkeypatch.setattr(module,'settle_single_tickets',replacement)
+    with pytest.raises(TemporalContractError,match='helper reference'):
+        verify_callable_binding(ROOT,receipt,settle_core_layers,
+            expected_identity='src.n7_core_settlement:settle_core_layers')

@@ -146,7 +146,7 @@ def verify_callable_binding(repo_root: Path, receipt: dict[str, object], callbac
     identity = f'{callback.__module__}:{callback.__qualname__}'
     if identity != expected_identity or '<locals>' in callback.__qualname__:
         raise TemporalContractError('callback qualified identity differs')
-    pending = [callback]; checked = {}; compiled = {}
+    pending = [callback]; checked = {}; compiled = {}; source_references = {}
     while pending:
         function = pending.pop()
         name = f'{function.__module__}:{function.__qualname__}'
@@ -171,11 +171,32 @@ def verify_callable_binding(repo_root: Path, receipt: dict[str, object], callbac
                 node = stack.pop(); codes[node.co_qualname] = node
                 stack.extend(c for c in node.co_consts if isinstance(c, types.CodeType))
             compiled[relative] = codes
+            refs = {}
+            tree = ast.parse(path.read_text(encoding='utf-8'))
+            for node in tree.body:
+                if isinstance(node, ast.ImportFrom):
+                    origin = _resolve_from(function.__module__, resolved[1], node.level, node.module) if node.level else node.module
+                    if origin and _module_path(root, origin) is not None:
+                        for alias in node.names:
+                            refs[alias.asname or alias.name] = (origin, alias.name)
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    refs[node.name] = (function.__module__, node.name)
+            source_references[relative] = refs
         if compiled[relative].get(function.__qualname__) != function.__code__:
             raise TemporalContractError('executing callback code differs from frozen source')
         checked[name] = function
         for symbol in function.__code__.co_names:
             other = function.__globals__.get(symbol)
-            if inspect.isfunction(other) and _module_path(root, other.__module__) is not None:
+            expected = source_references[relative].get(symbol)
+            if expected is not None:
+                origin, attribute = expected
+                origin_module = sys.modules.get(origin)
+                original = getattr(origin_module, attribute, None) if origin_module else None
+                if (other is None or other is not original or not inspect.isfunction(other)
+                        or _module_path(root, other.__module__) is None
+                        or other.__qualname__ != attribute):
+                    raise TemporalContractError('frozen local helper reference was replaced')
+                pending.append(other)
+            elif inspect.isfunction(other) and _module_path(root, other.__module__) is not None:
                 pending.append(other)
     return dict(identity=identity, executing_functions=sorted(checked))
