@@ -9,3 +9,9 @@ Historical-only 200-issue probe, native Cutoff-bound frozen probability inputs; 
 Artifacts: explicit persistent audit `audits/issue439-union-v1/stage1`; report `reports/issue439-union-v1/stage1`. Stage1 freeze bbbef67ddc5ca2c398da436fd2871a0f311e7b8673bc7130ab24b3cf6ac505b3. Results5c6502ec3f99b84acf5376d49b1ca832d860b7cf079c88a2f2d63bc984f86e3b. Re-run entry: Rscript scripts/run_n7_sweet_union.R CONFIG_JSON (explicit source catalog, new output). Report entry quarto/149_n7_sweet_joint_coverage.qmd with stages, prior_study, rank_dir, output_dir params. Tests: Rscript -e "testthat::test_dir('tests/testthat',filter='n7-sweet-union',stop_on_failure=TRUE)". Independent replay: project-python scripts/check_n7_sweet_union.py STUDY NEW_RECEIPT.
 
 Stages 2/3 and final Codex review remain pending; not final acceptance.
+
+## Stage 2
+
+1200 additional plans, independent settlement replay PASS, clean combined QMD render PASS. Target25% DEPTH: stake190496–190614, net40871–50857, ROI21.45–26.68%, hit88–92issues, DD14532–16671. Seed42501 gains only549 CNY versus BREADTH for14120 additional spend; seeds42502/42503 gain12812/8848. Target30% DEPTH ROI13.39–15.63%; extra hit issues do not translate to better net return. Thus no uniform depth advantage. Stage2 freeze and exact plan hashes are in audits/issue439-union-v1/stage2/evaluation-receipt.json.
+
+The label-free replay entry also checks exact selected IDs/depths and allocation-world union coverage. Budget-control prototype reuses original #433 partition/allocator and passes36-plan settlement and label-free replay. Stages1/2 full final allocation replay and Codexreview are pending.
