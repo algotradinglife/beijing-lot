@@ -256,17 +256,21 @@ knitr::kable(attribution,digits=2)
 
 ## 逐期完整结果
 
-展开查看所有 100 期 × 85 方案 × 3 种子。金额单位为元，ROI 单位为 %，hits 为去重后的中奖票数，主力相同票加倍不重复计数；多倍投入及返还已经计入金额。
+三张分页表按 seed 42501、42502、42503 排列，每张 8,500 条，共保留所有 100 期 × 85 方案 × 3 种子。金额单位为元，ROI 单位为 %，hits 为去重后的中奖票数，主力相同票加倍不重复计数；多倍投入及返还已经计入金额。
 
 <details>
 <summary>展开 25,500 条逐期记录</summary>
 
 ```{r}
 #| eval: !expr is.character(params$results_path)
-rmarkdown::paged_table(report$periods |> arrange(period,arm,seed) |>
+period_rows <- report$periods |> arrange(period,arm,seed) |>
   select(issue,arm,seed,stake,gross,net,roi_percent,hits,equity_cny,
          drawdown_cny,drawdown_percent,cash_cny,stopped) |>
-  mutate(across(where(is.numeric),~round(.x,2))),options=list(rows.print=20))
+  mutate(across(where(is.numeric),~round(.x,2)))
+stopifnot(all(table(period_rows$seed)==8500))
+rmarkdown::paged_table(filter(period_rows,seed==42501),options=list(rows.print=20,max.print=8500))
+rmarkdown::paged_table(filter(period_rows,seed==42502),options=list(rows.print=20,max.print=8500))
+rmarkdown::paged_table(filter(period_rows,seed==42503),options=list(rows.print=20,max.print=8500))
 ```
 
 </details>
