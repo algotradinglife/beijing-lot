@@ -1,0 +1,189 @@
+---
+title: "200 期七场候选组：中奖排序、累计概率与收益诊断"
+format:
+  html:
+    embed-resources: true
+    toc: true
+    html-math-method: mathml
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  input_dir: null
+  figure_dir: null
+---
+
+这是冻结概率的事后研究诊断，未重训、未改选场或采样规则。
+范围是旧 100 期（100608–101120）和新 100 期（101121–110513），每期 24 个候选组。
+同一期候选组存在比赛重叠，不能把组命中率代入独立事件公式计算整期命中率。
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+source('r/n7_rank_return.R')
+source('r/n7_rank_diagnostic.R')
+theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=12))
+stopifnot(dir.exists(params$input_dir),is.character(params$figure_dir))
+receipt <- jsonlite::fromJSON(file.path(params$input_dir,'receipt.json'))
+stopifnot(receipt$evidence_class=='POST_SETTLEMENT_DIAGNOSTIC',
+  identical(receipt$historical_admission,FALSE),receipt$payout_factor==.65)
+for (name in names(receipt$outputs)) stopifnot(
+  digest::digest(file=file.path(params$input_dir,name),algo='sha256')==receipt$outputs[[name]])
+for (name in names(receipt$implementation)) stopifnot(
+  digest::digest(file=name,algo='sha256')==receipt$implementation[[name]])
+ranks <- readr::read_csv(file.path(params$input_dir,'ranks.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c'))
+prefixes <- readr::read_csv(file.path(params$input_dir,'prefixes.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c'))
+summary <- n7_rank_return_summary(prefixes)
+fund_receipt <- jsonlite::fromJSON(file.path(params$input_dir,'funded.receipt.json'))
+stopifnot(digest::digest(file=file.path(params$input_dir,'funded.csv'),algo='sha256')==
+  fund_receipt$output_sha256)
+funded <- readr::read_csv(file.path(params$input_dir,'funded.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c')) |>
+  left_join(ranks,by=c('issue','sleeve_id'),relationship='many-to-one')
+stopifnot(!anyNA(funded$actual_rank),n_distinct(ranks$issue)==200,nrow(ranks)==4800)
+stopifnot(digest::digest(file='scripts/diagnose_n7_rank_funding.py',algo='sha256')==
+  fund_receipt$implementation_sha256)
+dir.create(params$figure_dir,recursive=TRUE,showWarnings=FALSE)
+```
+
+## 计算口径
+
+每个七场组有 $3^7=2187$ 张互斥的完整赛果票，按冻结模型概率从高到低排列。
+实际中奖票名次为 $r$，其累计概率 $C_r=\sum_{j\le r}p_j$，买到该位置需 $2r$ 元。
+
+实际中奖返还 $G=2\times0.65\times\prod_{i=1}^7SP_i$；系数仅在整张票乘一次。
+模型预期返还使用冻结的赛前估算 SP，实际返还使用结算 SP。
+前 N 张的预期净收益是 $\sum_{j\le N}p_j\widehat G_j-2N$，
+实际净收益为 $\mathbf1(r\le N)G-2N$。下文 ROI 均为净收益/投入。
+
+“买到中奖名次”的收益使用了事后才知道的 r，**不是可执行的买到中奖就停止策略**。
+固定 Top N 图则对所有候选组都计入成本，包括未中奖的组；它仍是等额购买全部候选组的诊断，
+并非每期 1,024 元预算的组合回测。
+
+## 中奖名次和累计概率的分布
+
+```{r}
+ranks |> group_by(cohort) |> summarise(组数=n(),
+  名次中位数=median(actual_rank),名次P25=quantile(actual_rank,.25),
+  名次P75=quantile(actual_rank,.75),名次P90=quantile(actual_rank,.9),
+  累计概率中位数=median(actual_cumulative),.groups='drop') |> knitr::kable(digits=3)
+p_rank <- ggplot(ranks,aes(actual_rank,colour=cohort)) + stat_ecdf(linewidth=.8) +
+  scale_x_log10(breaks=c(1,8,16,32,64,128,256,512,1024,2187)) +
+  scale_y_continuous(labels=scales::percent) +
+  labs(x='实际中奖票名次 / 买到该位置的票数（对数轴）',y='累计组占比',colour=NULL,
+    title='中奖票在概率排序中的位置',subtitle='每组等权；越靠左越容易被浅层购买覆盖')
+ggsave(file.path(params$figure_dir,'winning-rank-cdf.png'),p_rank,width=10,height=5,dpi=160)
+p_rank
+p_cum <- ggplot(ranks,aes(actual_cumulative,colour=cohort)) + stat_ecdf(linewidth=.8) +
+  geom_abline(slope=1,intercept=0,linetype=2,colour='grey50') +
+  scale_x_continuous(labels=scales::percent) + scale_y_continuous(labels=scales::percent) +
+  labs(x='实际中奖位置对应的模型累计概率',y='累计组占比',colour=NULL,
+    title='中奖位置的累计概率分布',subtitle='虚线为连续均匀分布参考；离散票的累计概率上端点并非严格均匀')
+ggsave(file.path(params$figure_dir,'winning-coverage-cdf.png'),p_cum,width=10,height=5,dpi=160)
+p_cum
+```
+
+## 固定 Top N：理论覆盖、实际命中和收益
+
+```{r}
+coverage <- summary |> select(cohort,depth,理论覆盖=expected_hit,实际命中=actual_hit) |>
+  pivot_longer(c(理论覆盖,实际命中),names_to='类型',values_to='比率')
+p_cover <- ggplot(coverage,aes(depth,比率,colour=cohort,linetype=类型)) + geom_line() +
+  scale_x_log10(breaks=c(1,8,16,32,64,128,256,512,1024,2187)) +
+  scale_y_continuous(labels=scales::percent) + labs(x='每组购买前 N 张',y='组命中率 / 模型覆盖',colour=NULL)
+ggsave(file.path(params$figure_dir,'fixed-depth-coverage.png'),p_cover,width=10,height=5,dpi=160)
+p_cover
+roi <- summary |> select(cohort,depth,模型预期=expected_roi,实际结算=actual_roi) |>
+  pivot_longer(c(模型预期,实际结算),names_to='类型',values_to='ROI')
+p_roi <- ggplot(roi,aes(depth,ROI,colour=cohort,linetype=类型)) + geom_line() +
+  geom_hline(yintercept=0,colour='grey50') +
+  scale_x_log10(breaks=c(1,8,16,32,64,128,256,512,1024,2187)) +
+  scale_y_continuous(labels=scales::percent) +
+  labs(x='每组购买前 N 张（每组成本 2N 元）',y='净收益 / 投入',colour=NULL,
+    title='固定购买深度与收益：所有未中组也扣除成本',subtitle='预期与实际均已包含一次 0.65；金额加总后计算 ROI')
+ggsave(file.path(params$figure_dir,'fixed-depth-roi.png'),p_roi,width=10,height=5,dpi=160)
+p_roi
+summary |> filter(depth %in% c(1,8,16,32,64,128,256,512,1024,2187)) |>
+  select(cohort,depth,groups,expected_hit,actual_hit,expected_roi,actual_roi) |> knitr::kable(digits=4)
+```
+
+这批冻结估值中，每张票的预期返还近似为
+$2\times0.65\times p_j/q_j$，其中 q 来自用于估算 SP 的市场概率，p 是排序所用概率。
+当 p 与 q 接近时，预期返还接近 1.30 元，预期 ROI 接近 −35%，因而难以区分购买深度。
+这是一项估值框架的限制：不能把此处预期 ROI 当作已经校准好的北单实际盈利预测。
+实际结算 SP 与这项赛前估值不同，因此理论覆盖接近实际命中，并不保证预期收益接近实际收益。
+
+## 中奖排序和返还的对应关系
+
+点的颜色是买到中奖位置的模型累计概率。纵轴是该位置的事后前缀净收益，
+包括为更高概率但未中的票付出的成本。负值说明即使买到了，也无法覆盖此前票款。
+
+```{r}
+p_scatter <- ggplot(ranks,aes(actual_rank,actual_prefix_net_cny,colour=actual_cumulative)) +
+  geom_point(alpha=.3,size=1) + facet_wrap(~cohort) +
+  geom_hline(yintercept=0,colour='grey50') +
+  scale_x_log10(breaks=c(1,16,64,256,1024)) +
+  scale_y_continuous(trans=scales::pseudo_log_trans(sigma=100)) +
+  scale_colour_viridis_c(labels=scales::percent) +
+  labs(x='实际中奖票名次（对数轴）',y='事后前缀净收益 / 元（对称对数轴）',colour='累计概率',
+    title='浅层中奖不必然盈利，深层中奖也未必亏损')
+ggsave(file.path(params$figure_dir,'rank-realized-net.png'),p_scatter,width=11,height=5,dpi=160)
+p_scatter
+relations <- ranks |> group_by(cohort) |> summarise(
+  排名与中奖返还_Spearman=cor(actual_rank,actual_gross_cny,method='spearman'),
+  排名与事后前缀ROI_Spearman=cor(actual_rank,actual_prefix_roi,method='spearman'),
+  .groups='drop')
+relations |> knitr::kable(digits=3)
+ranks |> mutate(rank_band=cut(actual_rank,c(0,15,32,64,128,256,512,2187))) |>
+  group_by(cohort,rank_band) |> summarise(组数=n(),
+    累计概率中位数=median(actual_cumulative),
+    中奖返还中位数=median(actual_gross_cny),
+    事后前缀盈利占比=mean(actual_prefix_net_cny>0),
+    预期前缀ROI中位数=median(model_prefix_gross_cny/actual_hit_cost_cny-1),
+    事后前缀ROI中位数=median(actual_prefix_roi),.groups='drop') |> knitr::kable(digits=3)
+```
+
+名次越靠后，中奖返还通常越高，但此前买入更多票的成本也更高。
+排名与前缀 ROI 的相关关系包含 $2r$ 分母的机械影响，只作描述，不是因果或赛前择组信号。
+
+## 实际买入组与全部候选组
+
+固定 seed=42501，沿用原方案、8 主力及其两档机会预算。
+同一个组在不同方案中会重复出现，各方案单独统计，不合并成独立样本。
+该图只比较所买组的中奖名次分布；实际是否覆盖到中奖票另按已买深度判断。
+
+```{r}
+funded |> group_by(arm) |> summarise(买入组数=n(),
+  中奖名次中位数=median(actual_rank),买入深度中位数=median(depth),
+  已覆盖中奖组占比=mean(actual_rank<=depth),
+  实际投入=sum(2*depth),实际返还=sum(ifelse(actual_rank<=depth,actual_gross_cny,0)),
+  实际净收益=实际返还-实际投入,ROI=实际净收益/实际投入,.groups='drop') |> knitr::kable(digits=3)
+comparison <- bind_rows(ranks |> mutate(arm='全部候选组'),funded)
+p_funded <- ggplot(comparison,aes(actual_rank,colour=arm)) + stat_ecdf(linewidth=.7) +
+  scale_x_log10(breaks=c(1,16,64,256,1024,2187)) +
+  scale_y_continuous(labels=scales::percent) +
+  labs(x='实际中奖票名次',y='累计组占比',colour=NULL,title='被买入的组，中奖位置是否更靠前？') +
+  theme(legend.position='bottom') + guides(colour=guide_legend(ncol=2))
+ggsave(file.path(params$figure_dir,'funded-rank-cdf.png'),p_funded,width=11,height=6,dpi=160)
+p_funded
+```
+
+## 表结构和复现
+
+```{r}
+tibble(字段=names(ranks),类型=vapply(ranks,typeof,character(1))) |> knitr::kable()
+head(ranks,6) |> knitr::kable(digits=4)
+```
+
+输入文件及 SHA256、三个冻结研究来源、代码哈希见输入目录的 `receipt.json`；
+实际买入计划的绑定见 `funded.receipt.json`。
+先通过 `scripts/diagnose_n7_rank_return.R CONFIG.json` 生成诊断表，
+再用 `scripts/diagnose_n7_rank_funding.py DATA_ROOT OUTPUT_CSV` 提取冻结资金分配。
+本 QMD 从显式 `input_dir` 读取哈希校验后的表，并通过 R 函数汇总。
+只输出表格和图片，不生成 RDS。
