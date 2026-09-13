@@ -17,3 +17,21 @@ testthat::test_that('requested coverage survives serialized empty predictions', 
   p$rows$q_W <- .4;p$rows$issue <- '003'
   testthat::expect_error(n7_next100_inputs(p,cfg))
 })
+
+testthat::test_that('financial reporting requires successful complete replay evidence', {
+  x <- list(historical_admission=FALSE,settlement_replay_status='PASS',issue_order=c('001','002'),
+    independent_replay=list(status='PASS',plans_checked=2),
+    settlement_replay=list(status='PASS',plans_checked=2),
+    rows=data.frame(issue=c('001','002'),seed=1,arm='A'))
+  testthat::expect_true(n7_next100_acceptance(x,c('001','002'),1,'A'))
+  for (field in c('independent_replay','settlement_replay')) {
+    bad <- x;bad[[field]] <- NULL
+    testthat::expect_error(n7_next100_acceptance(bad,c('001','002'),1,'A'))
+    bad <- x;bad[[field]]$status <- 'FAIL'
+    testthat::expect_error(n7_next100_acceptance(bad,c('001','002'),1,'A'))
+    bad <- x;bad[[field]]$plans_checked <- NULL
+    testthat::expect_error(n7_next100_acceptance(bad,c('001','002'),1,'A'))
+  }
+  bad <- x;bad$rows$issue[2] <- '003'
+  testthat::expect_error(n7_next100_acceptance(bad,c('001','002'),1,'A'))
+})

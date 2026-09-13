@@ -88,9 +88,6 @@ source('r/n7_capital_report.R')
 source('r/n7_core_report.R')
 stopifnot(identical(digest::digest(file=params$results_path,algo='sha256'),params$results_sha256))
 x <- jsonlite::fromJSON(params$results_path)
-stopifnot(identical(x$historical_admission,FALSE),x$settlement_replay_status=='PASS',
-  identical(as.character(x$issue_order),as.character(pred$issue_order)),
-  x$independent_replay$plans_checked==25500,x$settlement_replay$plans_checked==25500)
 rows <- tibble::as_tibble(x$rows) |> mutate(reference=arm==cfg$control)
 old_wrapper <- jsonlite::fromJSON(readLines(gzfile(params$old_archive),warn=FALSE),simplifyVector=FALSE)
 stopifnot(old_wrapper$schema=='bj433_core_report_v1',old_wrapper$sha256==params$old_body_sha256,
@@ -100,6 +97,7 @@ stopifnot(old$independent_replay$status=='PASS',old$settlement_replay$status=='P
   identical(old$historical_admission,FALSE),length(old$issue_order)==100,
   !any(x$issue_order %in% old$issue_order),setequal(rows$arm,old$rows$arm),
   setequal(rows$seed,old$parameters$seeds),params$display_seed %in% rows$seed)
+n7_next100_acceptance(x,as.character(pred$issue_order),old$parameters$seeds,unique(old$rows$arm))
 report <- n7_capital_report(rows,x$issue_order,cfg$initial_capital_cny,cfg$budget_cny)
 old_report <- n7_capital_report(tibble::as_tibble(old$rows),old$issue_order,
                                cfg$initial_capital_cny,cfg$budget_cny)
@@ -121,6 +119,20 @@ knitr::kable(report$grid |> filter(model %in% focus) |>
   select(model,stake_median,net_median,roi_median,roi_min,roi_max,
          hit_issues_median,profitable_issues_median,max_drawdown_median,
          max_drawdown_percent_median,without_best_roi_median),digits=2)
+```
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+#| results: asis
+original <- report$grid |> filter(model==cfg$control)
+core_only <- report$grid |> filter(model=='C8_DEPTH_ANY_O0_PROB')
+small_opportunity <- report$grid |> filter(model=='C8_DEPTH_ANY_O60_PROB')
+cat(sprintf('原方案三个种子的收益中位数为 **%.2f 元（ROI %.2f%%）**，命中期数中位数为 %d。8 主力、无机会版相应为 **%.2f 元（ROI %.2f%%）**、%d 期。命中期多不代表收益更高，必须同时看中奖返还与投入。\n\n',
+  original$net_median,original$roi_median,original$hit_issues_median,
+  core_only$net_median,core_only$roi_median,core_only$hit_issues_median))
+cat(sprintf('机会预算≤60元版的收益中位数为 %.2f 元，最大回撤中位数为 %.2f 元；无机会版最大回撤中位数为 %.2f 元。对应的剔除最大净收益期 ROI 为 %.2f%% 和 %.2f%%。这些是完整路径指标的种子中位数，不能拼成一条虚构的资金路径。\n\n',
+  small_opportunity$net_median,small_opportunity$max_drawdown_median,core_only$max_drawdown_median,
+  small_opportunity$without_best_roi_median,core_only$without_best_roi_median))
 ```
 
 ## 新旧 100 期同口径比较
@@ -210,7 +222,7 @@ knitr::kable(attribution,digits=2)
 
 ## 逐期完整结果
 
-展开查看所有 100 期 × 85 方案 × 3 种子。金额单位为元，ROI 单位为 %，hits 为实际中奖基本票数；同一主力票的多倍投入收益已经计入金额。
+展开查看所有 100 期 × 85 方案 × 3 种子。金额单位为元，ROI 单位为 %，hits 为去重后的中奖票数，主力相同票加倍不重复计数；多倍投入及返还已经计入金额。
 
 <details>
 <summary>展开 25,500 条逐期记录</summary>
@@ -219,7 +231,7 @@ knitr::kable(attribution,digits=2)
 #| eval: !expr is.character(params$results_path)
 knitr::kable(report$periods |> arrange(period,arm,seed) |>
   select(issue,arm,seed,stake,gross,net,roi_percent,hits,equity_cny,
-         drawdown_cny,drawdown_percent,cash_cny,stopped),digits=2)
+         drawdown_cny,drawdown_percent,cash_cny,stopped),digits=2,format='html')
 ```
 
 </details>

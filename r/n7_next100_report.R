@@ -36,3 +36,29 @@ n7_next100_inputs <- function(pred, cfg) {
     all(periods$fixture_market_rows%%2==0),all(periods$excluded_fixtures>=0))
   list(probabilities=probabilities,periods=periods)
 }
+
+# Verify accepted report evidence and the exact requested issue/seed/arm grid.
+# Counts are scalar numeric integers; missing/failed evidence or missing/extra
+# rows stop. This is a descriptive input contract, not independent replay itself.
+# Returns invisible TRUE, with no I/O, fitting or mutation.
+n7_next100_acceptance <- function(x, issue_order, seeds, arms) {
+  stopifnot(length(issue_order)>0,length(seeds)>0,length(arms)>0,
+    !anyDuplicated(issue_order),!anyDuplicated(seeds),!anyDuplicated(arms),
+    identical(x$historical_admission,FALSE),
+    identical(x$settlement_replay_status,'PASS'),
+    identical(as.character(x$issue_order),as.character(issue_order)))
+  expected_count <- length(issue_order)*length(seeds)*length(arms)
+  for (receipt in list(x$independent_replay,x$settlement_replay)) {
+    count <- receipt$plans_checked
+    stopifnot(identical(receipt$status,'PASS'),is.numeric(count),length(count)==1L,
+      !is.na(count),is.finite(count),count==expected_count)
+  }
+  rows <- tibble::as_tibble(x$rows)
+  keys <- c('issue','seed','arm')
+  stopifnot(all(keys %in% names(rows)),!anyNA(rows[keys]),
+    !anyDuplicated(rows[keys]),nrow(rows)==expected_count)
+  expected <- tidyr::expand_grid(issue=issue_order,seed=seeds,arm=arms)
+  stopifnot(nrow(dplyr::anti_join(expected,rows,by=keys))==0,
+    nrow(dplyr::anti_join(rows,expected,by=keys))==0)
+  invisible(TRUE)
+}
