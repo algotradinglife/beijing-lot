@@ -229,3 +229,52 @@ def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixt
     assert not (out / "plans-frozen.json").exists()
     if worker_error:
         assert "cancelling queued issues" in capsys.readouterr().out
+
+
+def test_active_sleeve_producer_receipt_is_accepted_by_prefix_consumer(tmp_path, monkeypatch, fixture_bundle):
+    import concurrent.futures
+    import runpy
+    import sys
+    import src.n7_sleeve_candidates as candidates
+    import src.n7_sleeve_portfolio as portfolios
+    bundle = fixture_bundle
+    issue = bundle['issue']
+    origin = tmp_path/'origin'; origin.mkdir()
+    pools = tmp_path/'pools'; pools.mkdir()
+    pool = pools/f'{issue}.json.gz'
+    pool.write_bytes(gzip.compress(json.dumps(dict(cutoffs=bundle['cutoffs'])).encode()))
+    implementation = study.implementation_closure(ROOT, ['src.temporal_learning'])
+    prior = dict(issues=[issue],implementation=implementation,
+                 source_hashes={str(pool):hashlib.sha256(pool.read_bytes()).hexdigest()})
+    (origin/'plans-frozen.json').write_text(json.dumps(dict(receipt=prior,seal=stable_json_hash(prior))))
+    cfg = json.loads((ROOT/'config/n7_sleeve_424.json').read_text())
+    cfg.update(origin=str(origin),pool_root=str(pools),seeds=[42],arms=['QUALITY_PROB'],
+               candidate_workers=1,portfolio_workers=1)
+    config = tmp_path/'producer.json'; config.write_text(json.dumps(cfg))
+    source = tmp_path/'source'
+    with monkeypatch.context() as m:
+        m.chdir(ROOT)
+        m.setattr(sys,'argv',['replay_n7_sleeves','--output',str(source),'--config',str(config)])
+        m.setattr(concurrent.futures,'ProcessPoolExecutor',concurrent.futures.ThreadPoolExecutor)
+        m.setattr(candidates,'build_sleeve_candidates',lambda *a,**kw: bundle)
+        m.setattr(portfolios,'sleeve_portfolios',lambda *a,**kw: dict(
+            plans=empty_result(bundle,[42],['QUALITY_PROB'])['plans'],sleeve_simulation=[]))
+        # No target label file exists: stop after actual producer freeze creation.
+        with pytest.raises(FileNotFoundError,match='evaluation-receipt.json'):
+            runpy.run_path(str(ROOT/'scripts/replay_n7_sleeves.py'),run_name='__main__')
+    manifest = source/'plans-frozen.json'
+    produced = json.loads(manifest.read_text())['receipt']
+    assert produced['requested_issues']==[issue] and produced['unavailable']=={}
+    consumer_cfg = tmp_path/'consumer.json'
+    consumer_cfg.write_text(json.dumps(dict(seeds=[42],arms=['QUALITY_PROB'],workers=1,
+        provenance_roots=['src.n7_joint_study','src.temporal_learning'])))
+    def run(*a,**kw):
+        result=empty_result(bundle,[42],['QUALITY_PROB'])
+        for plan in result['plans']: plan['seal']=stable_json_hash(plan)
+        return result
+    monkeypatch.setattr(study,'run_prefix_issue',run)
+    frozen=study.freeze_prefix_study(source,tmp_path/'consumer',consumer_cfg,
+        source_manifest=manifest,repository_root=ROOT,python='unused',rscript='unused',
+        entry_point='scripts/run_n7_joint_issue.R',r_sources=study.JOINT_R_SOURCES)
+    assert frozen['receipt']['issues']==[issue]
+    assert len(frozen['receipt']['plan_hashes'])==1

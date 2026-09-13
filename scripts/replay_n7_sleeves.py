@@ -62,7 +62,7 @@ if __name__=='__main__':
         if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=digest:raise ValueError('Inputs changed during build')
     expected_paths={str(out/'plans'/f'{issue}_{seed}_{arm}.json.gz') for issue in issues for seed in cfg['seeds'] for arm in cfg['arms']}
     if set(hashes)!=expected_paths:raise ValueError('Incomplete freeze grid')
-    receipt=dict(issues=issues,seeds=cfg['seeds'],parameters=cfg,source_hashes=sources,bundle_hashes=bundlehashes,
+    receipt=dict(issues=issues,requested_issues=list(issues),unavailable={},seeds=cfg['seeds'],parameters=cfg,source_hashes=sources,bundle_hashes=bundlehashes,
         plan_hashes=hashes,implementation=implementation,historical_admission=False)
     frozen=dict(receipt=receipt,seal=stable_json_hash(receipt));(out/'plans-frozen.json').write_text(json.dumps(frozen,sort_keys=True))
     print('ALL PLANS FROZEN; opening settlement snapshot',flush=True)
