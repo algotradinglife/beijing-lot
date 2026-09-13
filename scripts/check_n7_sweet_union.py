@@ -1,0 +1,56 @@
+"""Independent frozen-plan budget/settlement replay, no fitting or selection.
+
+Usage: project-python scripts/check_n7_sweet_union.py STUDY OUTPUT_JSON
+The payout in rank evidence already includes one ticket-level 0.65 factor.
+"""
+import csv
+import hashlib
+import json
+import math
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+study, output = map(Path, sys.argv[1:])
+assert not output.exists()
+raw = (study / 'plans-frozen.json').read_bytes()
+freeze = json.loads(raw)
+ev = json.loads((study / 'evaluation-receipt.json').read_text())
+assert hashlib.sha256(raw).hexdigest() == ev['freeze_sha256']
+assert freeze['historical_admission'] is False
+for name, sha in freeze['files'].items():
+    assert hashlib.sha256((study/name).read_bytes()).hexdigest() == sha
+assert hashlib.sha256((study/'results.csv').read_bytes()).hexdigest() == ev['results_sha256']
+rank_path = Path(freeze['config']['rank_dir'])/'ranks.csv'
+assert hashlib.sha256(rank_path.read_bytes()).hexdigest() == ev['ranks_sha256']
+ranks = {(r['issue'],r['sleeve_id']):r for r in csv.DictReader(rank_path.open())}
+funded = defaultdict(list)
+for r in csv.DictReader((study/'funded.csv').open()):
+    assert not {'actual_rank','actual_gross_cny','hit','net'} & set(r)
+    funded[r['issue'],r['arm'],r['seed']].append(r)
+seen=set()
+for r in csv.DictReader((study/'results.csv').open()):
+    key=r['issue'],r['arm'],r['seed']
+    assert key not in seen
+    seen.add(key)
+    selected=funded[key]
+    assert len({x['sleeve_id'] for x in selected})==len(selected)
+    stake=gross=hits=0
+    for x in selected:
+        depth=int(x['depth'])
+        assert 1<=depth<=2187 and float(x['stake'])==2*depth
+        assert float(x['coverage'])+1e-12>=float(r['target'])
+        if r['mode']=='BREADTH': assert float(x['stake'])<=freeze['config']['cap_cny']
+        rank=ranks[key[0],x['sleeve_id']]
+        hit=int(rank['actual_rank'])<=depth
+        hits+=hit;stake+=2*depth;gross+=hit*float(rank['actual_gross_cny'])
+    assert stake==float(r['stake'])<=float(r['budget_cny'])
+    assert float(r['cash'])==float(r['budget_cny'])-stake
+    assert hits==int(r['hits']) and len(selected)==int(r['groups'])
+    assert math.isclose(gross,float(r['gross']),rel_tol=1e-10,abs_tol=1e-6)
+    assert math.isclose(gross-stake,float(r['net']),rel_tol=1e-10,abs_tol=1e-6)
+assert len(seen)==ev['plans']
+output.write_text(json.dumps(dict(status='PASS',plans=len(seen),
+    freeze_sha256=ev['freeze_sha256'],results_sha256=ev['results_sha256'],
+    implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()),indent=2))
+print(f'PASS: {len(seen)} plans')

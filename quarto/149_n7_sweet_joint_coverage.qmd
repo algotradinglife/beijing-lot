@@ -1,0 +1,154 @@
+---
+title: "N7 甜区优化：联合覆盖、购买深度与预算"
+format:
+  html:
+    embed-resources: true
+    toc: true
+    html-math-method: mathml
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  stages: null
+  prior_study: null
+  rank_dir: null
+  output_dir: null
+---
+
+同一冻结 200 期（100608–110513）回顾研究，不重训、不引入新清洗。
+候选组达到 25% 或 30% 累计概率的成本不得超过 256 元。
+每张基本票 2 元，结算只乘一次 0.65，起始资金 100,000 元。
+三个预先固定种子全部展示，不从中挑选最赚钱的种子。
+
+联合分配沿用原算法：先购买仍可负担的新组，再考虑加深已购组；
+每步按共享场次情景里的新增“至少中一组”概率除以新增成本排序。
+分配采用 256 个情景，独立评估采用 5,000 个情景，分别使用不同种子。
+这不是全局最优求解；与旧概率加总优化器的比较也同时包含求解方式差别。
+不加 U/P 硬限制，重叠通过同一场次的共同情景计入联合覆盖。
+
+```{r}
+#| include: false
+library(dplyr);library(tidyr);library(ggplot2)
+source('r/fundamentals_equity_curves.R');source('r/n7_sweet_union_summary.R')
+theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=12))
+all_results <- list();all_actions <- list();all_groups <- list();issue_order <- NULL
+for(path in unlist(params$stages)) {
+  freeze <- jsonlite::fromJSON(file.path(path,'plans-frozen.json'),simplifyVector=FALSE)
+  ev <- jsonlite::fromJSON(file.path(path,'evaluation-receipt.json'))
+  check <- jsonlite::fromJSON(file.path(path,'independent-replay.json'))
+  stopifnot(identical(freeze$historical_admission,FALSE),check$status=='PASS',
+    check$freeze_sha256==ev$freeze_sha256,
+    digest::digest(file=file.path(path,'plans-frozen.json'),algo='sha256')==ev$freeze_sha256,
+    digest::digest(file=file.path(path,'results.csv'),algo='sha256')==ev$results_sha256)
+  for(n in names(freeze$files))stopifnot(digest::digest(file=file.path(path,n),algo='sha256')==freeze$files[[n]])
+  for(n in names(freeze$implementation))stopifnot(digest::digest(file=n,algo='sha256')==freeze$implementation[[n]])
+  if(is.null(issue_order))issue_order <- names(freeze$metadata)
+  stopifnot(identical(issue_order,names(freeze$metadata)))
+  all_results[[path]] <- readr::read_csv(file.path(path,'results.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c'))
+  all_actions[[path]] <- readr::read_csv(file.path(path,'actions.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c'))
+  all_groups[[path]] <- readr::read_csv(file.path(path,'funded.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c',sleeve_id='c'))
+}
+results <- bind_rows(all_results);actions <- bind_rows(all_actions);funded <- bind_rows(all_groups)
+stopifnot(length(issue_order)==200)
+# Prior summed-coverage plans, exact original receipts.
+prior <- jsonlite::fromJSON(file.path(params$prior_study,'evaluation-receipt.json'))
+stopifnot(digest::digest(file=file.path(params$prior_study,'results.csv'),algo='sha256')==prior$results_sha256)
+summed <- readr::read_csv(file.path(params$prior_study,'results.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c')) |>
+  filter(arm %in% c('T250_C256_U24_P7','T300_C256_U24_P7')) |>
+  mutate(seed=42501,budget_cny=1024,arm=paste0('SUM_',arm))
+# Original main/opportunity plans reconstructed from funded prefixes and bound ranks.
+fr <- jsonlite::fromJSON(file.path(params$rank_dir,'funded.receipt.json'))
+stopifnot(digest::digest(file=file.path(params$rank_dir,'funded.csv'),algo='sha256')==fr$output_sha256,
+  digest::digest(file=file.path(params$rank_dir,'ranks.csv'),algo='sha256')==prior$ranks_sha256)
+ranks <- readr::read_csv(file.path(params$rank_dir,'ranks.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c',sleeve_id='c'))
+original <- readr::read_csv(file.path(params$rank_dir,'funded.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c',sleeve_id='c')) |>
+  left_join(select(ranks,issue,sleeve_id,actual_rank,actual_gross_cny),by=c('issue','sleeve_id'),relationship='many-to-one') |>
+  group_by(issue,arm,seed) |> summarise(stake=sum(2*depth),gross=sum(ifelse(actual_rank<=depth,actual_gross_cny,0)),
+    groups=n(),hits=sum(actual_rank<=depth),.groups='drop') |>
+  mutate(net=gross-stake,budget_cny=1024,cash=1024-stake)
+control_grid <- tidyr::expand_grid(issue=issue_order,arm=unique(original$arm),seed=42501)
+original <- control_grid |> left_join(original,by=c('issue','arm','seed'),relationship='one-to-one') |>
+  mutate(across(c(stake,gross,net,groups,hits),~coalesce(.x,0)),budget_cny=1024,cash=1024-stake)
+analysis <- n7_sweet_union_summary(bind_rows(results,summed,original),issue_order,100000)
+summary <- analysis$summary;curves <- analysis$curves
+dir.create(params$output_dir,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$output_dir,'summary.csv'))
+readr::write_csv(curves,file.path(params$output_dir,'curves.csv'))
+```
+
+## 资金、命中与回撤
+
+ROI 是净收益／实际投入；相同预算上限不表示实际投入相同。
+SUM 为旧累计概率加总优化器；C8 为原八主力组及机会组分配器。
+不同 seed 是模拟随机性重复，不是新增历史样本。
+
+```{r}
+knitr::kable(summary,digits=3)
+```
+
+```{r}
+p <- ggplot(filter(curves,seed==42501),aes(period,equity_cny,colour=arm))+
+  geom_line()+labs(x='按时间排列的期次',y='资金（元）',colour='方案',title='资金曲线：固定种子 42501')
+ggsave(file.path(params$output_dir,'01-equity.png'),p,width=12,height=7,dpi=150);p
+p <- ggplot(filter(curves,seed==42501),aes(period,drawdown_cny,colour=arm))+
+  geom_line()+labs(x='按时间排列的期次',y='峰值回撤（元）',colour='方案',title='回撤曲线')
+ggsave(file.path(params$output_dir,'02-drawdown.png'),p,width=12,height=7,dpi=150);p
+```
+
+## 联合覆盖的乐观程度
+
+训练情景只用于无标签选组。独立评估情景用于检查有限情景选组造成的乐观偏差。
+实际命中率按历史期统计；同一批 200 期重复查看，不提供未见数据验证结论。
+
+```{r}
+coverage <- results |> group_by(arm,seed) |> summarise(train=mean(train_union),
+  independent=mean(eval_union),actual=mean(hits>0),mean_spend=mean(stake),.groups='drop')
+knitr::kable(coverage,digits=3)
+p <- coverage |> pivot_longer(c(train,independent,actual),names_to='measurement',values_to='probability') |>
+  ggplot(aes(arm,probability,colour=measurement,shape=factor(seed)))+geom_point(position=position_dodge(width=.5))+
+  coord_flip()+scale_y_continuous(labels=scales::percent)+labs(x=NULL,y='至少中一组的期概率／比例',colour=NULL,shape='种子')
+ggsave(file.path(params$output_dir,'03-coverage.png'),p,width=11,height=7,dpi=150);p
+```
+
+## 开组与加深的边际覆盖
+
+深度版固定入选候选组身份，但允许以已有前缀网格继续购买。256 元是入围成本上限，
+不是深度版最终每组投入上限。先开组再加深；剩余现金不足以购买合法增量时保留现金。
+
+```{r}
+action_summary <- actions |> group_by(arm,seed,phase) |>
+  summarise(actions=n(),added_stake=sum(added_stake),gain=sum(marginal_hit),.groups='drop') |>
+  mutate(gain_per_100=100*gain/added_stake)
+knitr::kable(action_summary,digits=4)
+p <- ggplot(filter(funded,seed==42501),aes(depth,colour=arm))+stat_ecdf()+
+  labs(x='每组购买基本票数',y='组数累计占比',colour=NULL,title='购买深度分布')
+ggsave(file.path(params$output_dir,'04-depth.png'),p,width=10,height=6,dpi=150);p
+```
+
+## 相同预算档位与时间稳定性
+
+预算档位必须重新选组，不能把低投入收益线性放大。全部种子显示；不以最高 ROI 单独选择方案。
+
+```{r}
+budget_summary <- results |> group_by(arm,seed,budget_cny) |> summarise(stake=sum(stake),net=sum(net),
+  roi=net/stake,cash=sum(cash),.groups='drop')
+p <- ggplot(budget_summary,aes(stake,net,colour=arm,shape=factor(seed)))+geom_point(size=2.5)+
+  labs(x='200 期实际投入（元）',y='净收益（元）',colour=NULL,shape='种子')
+ggsave(file.path(params$output_dir,'05-spend-return.png'),p,width=11,height=7,dpi=150);p
+blocks <- results |> mutate(block=ceiling(match(issue,issue_order)/25)) |>
+  group_by(arm,seed,block) |> summarise(stake=sum(stake),net=sum(net),roi=net/stake,.groups='drop')
+p <- ggplot(filter(blocks,seed==42501),aes(block,arm,fill=roi))+geom_tile()+
+  scale_fill_gradient2(labels=scales::percent)+labs(x='连续 25 期区块',y=NULL,fill='ROI')
+ggsave(file.path(params$output_dir,'06-blocks.png'),p,width=11,height=7,dpi=150);p
+readr::write_csv(coverage,file.path(params$output_dir,'coverage.csv'))
+readr::write_csv(action_summary,file.path(params$output_dir,'actions.csv'))
+readr::write_csv(blocks,file.path(params$output_dir,'blocks.csv'))
+```
+
+## 使用边界
+
+这里检验固定规则的历史表现。候选阈值来自已查看的历史诊断，因此历史准入标记为 false。
+没有新增拟合、校正、阈值学习或重训；原概率产物的历史证据属性不因本报告而改变。
+后续面向新一期的自动学习须单独执行共享 temporal_learning 的 cutoff、receipt 和重放约束。
