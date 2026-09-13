@@ -85,3 +85,51 @@ frozen settlement source, retaining settlement-source hashes.
 
 QMD entry: `quarto/150_n7_return_attribution.qmd`. Inputs: attribution_dir,
 output_dir. Rendering is still pending until all final verified inputs exist.
+
+## Final calculation inputs and findings
+
+The final calculation uses `audits/issue441-funding-v2` (5400plans), with
+`audits/issue441-attribution-v3` (4800sourcegroups,66626fundedrows across old and
+new studies). V1 funding removed30%-derived legal depths and is debugging only;
+v2 preserves the25%/30% shared depth universe while selects only25% eligible
+candidates. All3600 BREADTH/DEPTH controls reproduce #439 exactly: IDs, depths,
+stake, cash, hits, settlement and model metrics. The independent checker passed
+all5400funding plans; bridge checker passed all66626funded rows. Full allocation
+replay is an additional required receipt, not implied by those checks.
+
+At512, DEPTH net20221–25977, ROI21.3–27.4%, DD6718–8884, hits77–83issues.
+BREADTH net11596–14331, ROI14.0–17.3%, DD6681–10446, hits65–69issues.
+MULTIPLY equals BREADTH at512 because no legal copy is affordable after opening
+other groups. At768 only1–3issues copy; at1024 only5issues copy. Therefore these
+results do not evaluate broad arbitrary multiplicity strategies. In this study
+copying reduces net versus BREADTH at768/1024 and never increases hit incidence.
+DEPTH increases net/hit incidence in each seed but does not lower DD in every pair.
+
+At512, estimated-price actual-hit net remains -24800 to-22153; settlement price
+residual+45021 to+48130 produces positive net. The top5positive-price-residual
+issues contribute37.5–40.2% of signed totalprice residual; top10 contribute
+53.3–58.4%. Do not confuse price attribution with a predictable predecision edge.
+
+Fixture audit includes12988 distinct frozen candidate-pool fixtures. Realized
+W/D/L estimated-price ratios have medians .988/.935/1.07 respectively, with
+47.0%/33.3%/63.9% settled prices exceeding estimates. These are realized-direction
+descriptive distributions, not unconditional fair-SP calibrations or new policies.
+
+Report source: QMD150. Current rendered report directory:
+`reports/issue441-return-v2`; seven figures plus full per-issueROI ledger and
+fixed50issue blocks. Its receipt binds sourcecatalogchronology, QMD and all
+threeRdiagnostichelpers. Insufficient capital fails the bridge diagnostic;
+it cannot silently mix shadow unfinanced plans with funded equity results.
+
+Decision-path inventory remains original n7_capital_options -> n7_joint_validate
+(shared Cutoff and rank_double_candidates), sleeve_tables, core_curve_features,
+sweet_union_partition, core_option_pool, joint_worlds/returns, core_allocate,
+capital_evaluate. The new adapter supplies explicit budgets/copies/actions and
+cutoff maps; no history fit, cache, recency policy or temporal helper is added.
+Attribution reads bound post-settlement audit and ranks descriptively only.
+
+Validation:50focused Rassertions;3saved-fixture end-to-end tests including no-bet
+columns, multiplied settlements, hash-consistent eval metric corruption and
+auditdirection/SP contradiction;6cutoff-governancetests; broader affected R suite.
+Final review, full replay and PR acceptance are recorded in the final delivery
+receipt rather than inferred from this progress record.

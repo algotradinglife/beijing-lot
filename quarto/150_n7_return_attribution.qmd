@@ -42,7 +42,7 @@ stopifnot(length(order)==200,nrow(rows)==5400)
 z<-n7_return_diagnostics(rows,groups,order,100000,50,c(0,.15,.25,.35,.5,.75,1))
 for(n in names(z))readr::write_csv(z[[n]],file.path(params$output_dir,paste0(n,'.csv')))
 readr::write_csv(rows |> mutate(issue_roi=ifelse(stake>0,net/stake,NA_real_)),file.path(params$output_dir,'per-issue.csv'))
-curves<-z$curves |> mutate(mode=sub('T250_(.*)_B.*','\\1',arm),budget=sub('.*_B','',arm))
+curves<-z$curves |> mutate(mode=sub('T250_(.*)_B.*','\\1',arm),budget=factor(sub('.*_B','',arm),levels=c('512','768','1024')))
 rows<-rows |> mutate(mode=sub('T250_(.*)_B.*','\\1',arm))
 theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=12))
 plots<-list()
@@ -119,6 +119,7 @@ knitr::kable(z$bridge,digits=2)
 #| fig-height: 8
 bridge<-z$bridge |> filter(grepl('_B512$',arm)) |>
   pivot_longer(c(model_net,outcome_residual,price_residual),names_to='component',values_to='amount')
+bridge$component<-factor(bridge$component,levels=c('model_net','outcome_residual','price_residual'),labels=c('模型预期净收益','命中结果残差','结算价格残差'))
 plots$bridge<-ggplot(bridge,aes(component,amount,fill=component))+geom_col()+
   facet_grid(seed~arm)+labs(x=NULL,y='收益分解（元）')+theme(axis.text.x=element_text(angle=35,hjust=1),legend.position='none')
 plots$bridge
@@ -175,7 +176,7 @@ net_without_best）移除每个方案自身最赚钱的期次；属于事后敏�
 ```{r}
 #| fig-width: 13
 #| fig-height: 8
-plots$blocks<-ggplot(z$blocks |> mutate(budget=sub('.*_B','',arm),mode=sub('T250_(.*)_B.*','\\1',arm)),
+plots$blocks<-ggplot(z$blocks |> mutate(budget=factor(sub('.*_B','',arm),levels=c('512','768','1024')),mode=sub('T250_(.*)_B.*','\\1',arm)),
  aes(factor(block),roi,fill=mode))+geom_col(position='dodge')+facet_grid(seed~budget)+
  scale_y_continuous(labels=scales::label_percent())+labs(x='连续 50 期分段',y='净收益／实际投入',fill='资金模式')
 plots$blocks
