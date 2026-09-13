@@ -111,7 +111,7 @@ def check_joint_plan(plan, worlds, config, source_bundle):
     return replay
 
 
-def check_prefix_study(output, *, repository_root, check_plan, check_result):
+def check_prefix_study(output, *, repository_root, check_plan, check_result, physical_plans=None):
     """Verify every frozen plan and scenario file, then replay all R arithmetic.
 
     No result-based selection or mutation. Caller may persist this returned audit
@@ -160,16 +160,17 @@ def check_prefix_study(output, *, repository_root, check_plan, check_result):
             ):
                 raise ValueError("Plan probabilities/identities differ from frozen source")
             groupmap = {g["id"]: g["fixture_indices"] for g in b["sleeves"]}
-            offset = 0
-            for key in plan["sleeve_keys"]:
-                expected_group = sorted(groupmap[key["sleeve_id"]])
-                start = offset
-                while offset < len(plan["fixture_indices"]) and plan["fixture_indices"][offset] == expected_group:
-                    offset += 1
-                if offset == start:
-                    raise ValueError("Selected group differs from source candidate")
-            if offset != len(plan["fixture_indices"]):
-                raise ValueError("Unclaimed physical tickets")
+            for physical in ([plan] if physical_plans is None else physical_plans(plan)):
+                offset = 0
+                for key in physical["sleeve_keys"]:
+                    expected_group = sorted(groupmap[key["sleeve_id"]])
+                    start = offset
+                    while offset < len(physical["fixture_indices"]) and physical["fixture_indices"][offset] == expected_group:
+                        offset += 1
+                    if offset == start:
+                        raise ValueError("Selected group differs from source candidate")
+                if offset != len(physical["fixture_indices"]):
+                    raise ValueError("Unclaimed physical tickets")
             plan_path = output.resolve() / "plans" / f"{issue}_{plan['seed']}_{plan['arm']}.json.gz"
             raw_plan = plan_path.read_bytes()
             if hashlib.sha256(raw_plan).hexdigest() != receipt["plan_hashes"][str(plan_path)]:
