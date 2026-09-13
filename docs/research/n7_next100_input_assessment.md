@@ -2,6 +2,8 @@
 
 检查日期：2026-09-13。以下是输入调查，不是回测结果或数据验收。
 
+用户随后明确：数据清洗由另一会话负责。本会话停止清洗与补缺，转为消费对方发布的验收输入。已运行的准备任务正常结束，产物位于 `audits/issue435-next100-v1/market45-prepared-v1`，仅为未验收中间资料；未启动盘口清理程序，未更新 current registry。临时桥接函数及测试撤销，不作为研究接口交付。
+
 - 固定范围已保存于持久化根 `audits/issue435-next100-v1/scope.json`，绑定原生 inventory 与当前盘口发布文件 SHA-256。100 期中当前发布覆盖 55 期，未发布 45 期。
 - 持久化目录检查通过；登记盘口 merged.json 的 SHA-256 核验通过。路径检查不能证明盘口内容有效。
 - 已核验 `all-history-market-v1`、`all-history-market-one-second-v2/v3` 计划归档。其中 v1 的 190 个 reused scopes 不包含这 45 期，不能直接作为补齐计划。
