@@ -1,0 +1,75 @@
+---
+title: "候选组的理论覆盖票数与实际中奖票数"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  archive: null
+  output_dir: null
+---
+
+横轴是在冻结概率排序下，累积模型概率首次达到指定阈值所需的票数；
+纵轴是实际中奖组合在同一排序中的名次，即覆盖它所需的前缀票数。
+每张基本注 2 元，票数乘以 2 即对应投入。每个点是一组固定的七场比赛。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/n7_threshold_scatter.R')
+stopifnot(file.exists(params$archive),dir.exists(params$output_dir))
+a<-jsonlite::fromJSON(params$archive,simplifyVector=FALSE)
+stopifnot(a$schema=='bj433_threshold_scatter_v1',
+ digest::digest(charToRaw(a$body),algo='sha256',serialize=FALSE)==a$sha256)
+x<-jsonlite::fromJSON(a$body)
+stopifnot(x$evidence_class=='POST_SETTLEMENT_DIAGNOSTIC',identical(x$historical_admission,FALSE))
+points<-n7_threshold_points(tibble::as_tibble(x$rows),x$targets,2)
+bins<-n7_threshold_bins(points,c(0,15,32,64,128,256,512,2187),15)
+points<-points |> mutate(panel=factor(paste0(round(100*target),'%'),levels=paste0(round(100*x$targets),'%')))
+plot<-ggplot(points,aes(theory_tickets,actual_tickets))+
+ geom_abline(slope=1,intercept=0,color='#444444',linetype=2)+
+ geom_hline(yintercept=15,color='#a66520',linetype=3)+
+ geom_point(aes(color=origin),alpha=.2,size=.65)+
+ scale_x_log10(limits=c(1,2187),breaks=c(1,10,100,1000))+
+ scale_y_log10(limits=c(1,2187),breaks=c(1,10,100,1000))+
+ facet_wrap(~panel,ncol=4)+coord_equal()+theme_minimal(base_size=11)+
+ labs(x='达到模型概率阈值所需票数（对数刻度）',
+      y='实际中奖组合名次／覆盖所需票数（对数刻度）',color='候选生成方式')
+ggsave(file.path(params$output_dir,'threshold-rank-scatter.png'),plot,width=13,height=8,dpi=160)
+readr::write_csv(points,file.path(params$output_dir,'threshold-points.csv'))
+readr::write_csv(bins,file.path(params$output_dir,'threshold-bins.csv'))
+```
+
+本图使用已核账的 `r length(x$issue_order)` 期、`r nrow(x$rows)` 个候选组。
+数据哈希：`r a$sha256`。同一组在不同阈值面板中重复出现，各组也可能共享场次，因此不是独立观测。
+
+```{r}
+#| fig-width: 13
+#| fig-height: 8
+plot
+```
+
+虚线下方（含线上）的点表示按该理论覆盖深度购买就能中奖；线上方表示还需要更深的覆盖。
+棕色水平线为 15 票，即 30 元的小额投入。
+右下方的点是事后“小额命中”的机会案例，右上方则同时需要较多理论票数和实际票数。
+不能单凭右下方成功案例来划机会池，必须同时查看同一横轴区间内的所有失败组。
+
+## 按理论票数区间检查边界
+
+“覆盖率”为实际中奖名次不超过理论票数的比例；“30 元命中率”为实际名次不超过 15 的比例。
+这些都是描述统计，不等同于收益率。主力／机会边界还应结合赛前代理收益、组间重叠和资金约束。
+
+```{r}
+knitr::kable(bins |> mutate(target=100*target,covered_rate=100*covered_rate,
+ small_ticket_hit_rate=100*small_ticket_hit_rate),digits=2,
+ col.names=c('目标概率（%）','理论票数区间','组数','期数','实际覆盖率（%）',
+ '30元命中率（%）','理论票数中位数','实际票数中位数'))
+```
+
+此图只用于提出边界假设，不改写正在运行的 #433 固定分组规则。任何后续按此图选出的边界，
+均须单列为已曝光历史上的探索变种，不能描述为未见数据验证。

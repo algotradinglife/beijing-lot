@@ -24,3 +24,7 @@ R reusable functions and tests; thin shared Python orchestration/authoritative s
 Report all-period and original-missed-period paired rescues/lost hits, opportunity/core attribution, ROI on actual spend, equity/drawdown, cash-stop, worst windows, tail concentration/max-profit removal and seed sensitivity. Evaluate classification curve features against actual ranks descriptively, never use cheapest-winner identity to allocate. Conclusions may be NO_INCREMENT/TAIL_ONLY/unstable; profit is not required. No actual betting, merge, closing unrelated issues or remote CI.
 
 Deliver final executed QMD and source interfaces, tests, independent replay, Codex review, PI research assessment and pushed PR. Native Issue Graph/Project controls routing and lifecycle; references above do not assert dependency edges.
+
+## Additional owner-requested diagnostic
+
+Plot all2400 #425 candidates with minimum prefix ticket count for nominal model coverage15%,20%,25%,30%,35%,40%,45%,50% on the horizontal axis and actual winning-state rank on the vertical axis. Include equality and15-ticket/CNY30 reference lines plus fixed theoretical-cost bins and support counts. Use the already settled #425 evidence; this descriptive extension does not change the ongoing #433 frozen policy grid. Thresholds are hypotheses for later core/opportunity classification, not prospective admission or retrospectively selected winners. QMD144 and reusable R transformations provide the artifact.
