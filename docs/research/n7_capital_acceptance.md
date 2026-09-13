@@ -42,9 +42,9 @@ allocation solutions. All detailed answers and risk qualifications are in
 | Final Codex review | Read-only review exits 0, no actionable defects; reviewer independently recomputed R summaries and checked hashes/receipts | PASS |
 | Current native Issue Graph | Authenticated live read: OPEN, In Progress; no blockedBy/blocking, parent or subIssues; research base verified at 8c1713f1 | PASS |
 | PI research acceptance | Contract, replay, tests, final render and Codex review reconciled; accepts NO_STABLE_FRONTIER within the stated diagnostic scope | PASS |
-| PR submission | Delivery record below | PENDING |
+| PR submission | PR #432 OPEN, targets codex/424-research-base; Issue #425 read back OPEN / Review with native relationships unchanged | PASS |
 
-PR submission remains the last delivery step. No merge, issue closure,
+Research and PR submission are complete. No merge, issue closure,
 or other Issue lifecycle change is performed. This document is evidence and a
 local research assessment, not a substitute for live GitHub graph state.
 
@@ -105,4 +105,7 @@ Coverage thresholds are minimum first-crossing targets, not a 25% upper cap.
 The allocator records overlap/exposure but applies no U/P hard caps. These are
 limits of this experiment, not implementations of earlier cap-and-expand ideas.
 
-PR submission is pending; Issue #425 remains open and main integration is separate.
+PR submitted: https://github.com/algotradinglife/beijing-lot/pull/432 .
+Issue #425 was moved from In Progress to Review and read back OPEN / Review.
+Its native blockedBy, blocking, parent and subIssues remain unchanged (empty).
+No main merge or Issue closure was performed. Integration remains separate.
