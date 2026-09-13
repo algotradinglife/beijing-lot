@@ -1,0 +1,152 @@
+---
+title: "N7 候选组诊断：实际命中位置与资金规模"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  python: null
+  output_dir: null
+  portable_archive: "tests/fixtures/n7_capital_study.json.gz"
+---
+
+本报告对 #425 已曝光历史候选组作事后诊断，不重新选场、不更改概率或原冻结计划。
+实际赛果排序位置为 r，从概率最高的票连续买到该位置需 2r 元。
+这不是可事先知道的投注成本：同一期的票必须在结果出现前买定，不能等到中奖才停止购买。
+模型预期位置成本为 Σ p(r) × 2r；覆盖目标成本另列。
+实际返还为 2 × 0.65 × 七场实际结算 SP 的乘积，系数只乘一次。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+theme_set(theme_minimal(base_family="Noto Sans CJK SC"))
+stopifnot(is.character(params$study),dir.exists(params$study),
+  is.character(params$python),file.exists(params$python),
+  is.character(params$output_dir),!dir.exists(params$output_dir))
+reticulate::use_python(params$python, required=TRUE)
+reader <- reticulate::import('src.n7_rank_diagnostic',convert=TRUE)
+source('r/n7_rank_diagnostic.R')
+frozen <- jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'),simplifyVector=FALSE)
+issues <- unlist(frozen$receipt$issues)
+parts <- vector('list',length(issues))
+for (i in seq_along(issues)) {
+  x <- jsonlite::fromJSON(reader$load_rank_issue(params$study,issues[i]))
+  parts[[i]] <- n7_rank_diagnostic(x,2,.65,c(.1,.15,.25,.5))
+  message(i,'/',length(issues),' ',issues[i])
+}
+rows <- bind_rows(parts)
+summary <- n7_rank_summary(rows,c(128,256,512,1024,2048,4096))
+stopifnot(n_distinct(rows$issue)==length(issues))
+evaluation_receipt <- jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+stopifnot(digest::digest(file=file.path(params$study,'results.json'),algo='sha256') ==
+  evaluation_receipt$result_sha256)
+all_results <- jsonlite::fromJSON(file.path(params$study,'results.json'))$rows |> filter(!reference)
+portable <- jsonlite::fromJSON(readLines(gzfile(params$portable_archive),warn=FALSE),simplifyVector=FALSE)
+stopifnot(digest::digest(charToRaw(portable$body),algo='sha256',serialize=FALSE)==portable$sha256)
+portable <- jsonlite::fromJSON(portable$body)
+stopifnot(portable$freeze_seal==frozen$seal)
+replay <- n7_rank_allocation_check(rows,portable$sleeves,all_results)
+results <- all_results |>
+  filter(grepl('^NONUNIFORM_(ANY|ROW|TWO)_ROI_NONE_B',arm)) |>
+  left_join(summary,by=c('issue','budget_cny'),relationship='many-to-one')
+stopifnot(nrow(results)==length(issues)*4*3*3,!anyNA(results$oracle_any_hit))
+comparison <- results |> group_by(arm,budget_cny,seed) |> summarise(
+  actual_hit_issues=sum(hits>0),oracle_hit_issues=sum(oracle_any_hit),
+  missed_despite_affordable=sum(hits==0 & oracle_any_hit),
+  candidate_cost_exceeds_budget=sum(!oracle_any_hit),
+  actual_net=sum(net),actual_roi=sum(net)/sum(stake),.groups='drop')
+dir.create(params$output_dir,recursive=TRUE)
+readr::write_csv(rows,file.path(params$output_dir,'candidate-ranks.csv'))
+readr::write_csv(summary,file.path(params$output_dir,'issue-cost-distribution.csv'))
+readr::write_csv(comparison,file.path(params$output_dir,'allocation-gap.csv'))
+jsonlite::write_json(list(freeze_seal=frozen$seal,issues=length(issues),rows=nrow(rows),
+  allocation_replay=replay,evaluation_receipt=evaluation_receipt,
+  evidence_class='POST_SETTLEMENT_DIAGNOSTIC',unit_cny=2,payout_factor=.65,
+  qmd_sha256=digest::digest(file='quarto/141_n7_candidate_hit_rank.qmd',algo='sha256'),
+  r_sha256=digest::digest(file='r/n7_rank_diagnostic.R',algo='sha256'),
+  reader_sha256=digest::digest(file='src/n7_rank_diagnostic.py',algo='sha256')),
+  file.path(params$output_dir,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 数据范围与口径
+
+```{r}
+tibble(issues=n_distinct(rows$issue),candidate_rows=nrow(rows),
+  minimum_candidates=min(summary$candidates),maximum_candidates=max(summary$candidates)) |> knitr::kable()
+rows |> summarise(across(c(actual_hit_cost_cny,model_expected_hit_cost_cny),
+  list(min=min,q25=~quantile(.x,.25),median=median,q75=~quantile(.x,.75),max=max))) |> knitr::kable(digits=2)
+```
+
+各组成本分布均按候选组等权统计，不把重叠组视作独立样本。
+每组仅有一张实际命中票；同时买多个不同七场集合时，票身份不同。
+下表的“事后至少命中一期上限”指已知结果后选一个成本在预算内的组，不是可执行策略，也不保证盈利。
+
+```{r}
+summary |> group_by(budget_cny) |> summarise(issues=n(),
+  oracle_hit_issues=sum(oracle_any_hit),
+  oracle_profitable_prefix_issues=sum(oracle_profitable_prefix),
+  median_affordable_groups=median(affordable_candidates),.groups='drop') |> knitr::kable()
+```
+
+## 候选生成方式与覆盖校准
+
+```{r}
+rows |> group_by(origin) |> summarise(groups=n(),
+  model_top64=mean(top64_coverage),actual_top64=mean(actual_rank<=64),
+  model_top128=mean(top128_coverage),actual_top128=mean(actual_rank<=128),
+  .groups='drop') |> knitr::kable(digits=3)
+```
+
+组间共享比赛，以上频率不能按 2,400 个独立观测解释。
+
+## 每期资金分布
+
+```{r}
+summary |> filter(budget_cny==1024) |>
+  ggplot(aes(x=reorder(issue,min_cost_cny)))+
+  geom_linerange(aes(ymin=q25_cost_cny,ymax=q75_cost_cny),colour='grey65')+
+  geom_point(aes(y=median_cost_cny),size=1)+
+  geom_point(aes(y=min_cost_cny),colour='#0072B2',size=1)+
+  geom_hline(yintercept=1024,linetype=2)+
+  labs(x='期次（按最低成本排序）',y='首次覆盖实际赛果的投入（元）',
+    subtitle='蓝点：最低；黑点：中位数；灰线：四分位区间；虚线：1024元')+
+  theme_minimal(base_family='Noto Sans CJK SC')+theme(axis.text.x=element_blank())
+summary |> filter(budget_cny==1024) |> knitr::kable(digits=2)
+```
+
+## 成本与返还
+
+```{r}
+ggplot(rows,aes(actual_hit_cost_cny,actual_gross_cny,colour=origin))+
+  geom_point(alpha=.3,size=1)+geom_abline(slope=1,intercept=0,linetype=2)+
+  scale_x_log10()+scale_y_log10()+
+  labs(x='买到命中位置的投入（元，对数）',y='该命中票的实际返还（元，对数）',
+    subtitle='虚线上方仅表示事后恰好买到命中位置时盈利')+theme_minimal(base_family='Noto Sans CJK SC')
+rows |> group_by(origin) |> summarise(groups=n(),median_hit_cost=median(actual_hit_cost_cny),
+  median_model_cost=median(model_expected_hit_cost_cny),
+  positive_prefix_rate=mean(actual_prefix_net_cny>0),.groups='drop') |> knitr::kable(digits=3)
+```
+
+## 候选池机会与实际分配
+
+```{r}
+comparison |> knitr::kable(digits=3)
+```
+
+存在预算内命中组但实际没中，证明该候选池内存在事后机会；不能证明赛前能辨认该组。
+预算内不存在任何命中组时，连续概率前缀策略必然无法在该预算内命中。
+成本与返还配对用于区分“排得太后”和“返还不足”，不把事后最低成本当作预算推荐。
+
+## 表结构与样例
+
+```{r}
+glimpse(rows)
+head(rows,10) |> knitr::kable(digits=3)
+```
