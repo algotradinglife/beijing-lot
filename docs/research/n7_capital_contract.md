@@ -144,8 +144,9 @@ final rendered-report and research review remain separate.
 
 The final report render and visual/content inspection passed; final Codex review
 found no actionable defects. See `docs/research/n7_capital_acceptance.md` for the
-requirement-by-requirement evidence and bounded research assessment. Remaining:
-live Issue Graph verification, final PI delivery acceptance and PR submission.
+requirement-by-requirement evidence and bounded research assessment. Live Issue
+Graph verification and PI research acceptance passed on 2026-09-13; PR delivery
+is recorded in that acceptance document. Main integration remains separate.
 The memory-fix review found
 no actionable defects but did not run the
 tests successfully in its chosen interpreter; separate project-interpreter

@@ -40,9 +40,11 @@ allocation solutions. All detailed answers and risk qualifications are in
 | Independent replay and portable report | Both replay receipts PASS for 20,400 plans; bound portable fixture | PASS |
 | Clean executed QMD and visual inspection | Final render exits 0; 87 tables, 8,106 table rows, five embedded figures; all five inspected, clipped frontier label corrected | PASS |
 | Final Codex review | Read-only review exits 0, no actionable defects; reviewer independently recomputed R summaries and checked hashes/receipts | PASS |
-| Current native Issue Graph, final lifecycle acceptance and PR submission | GitHub CLI remains unavailable; app lacks Project-state capability; browser discovery returns no browsers | PENDING |
+| Current native Issue Graph | Authenticated live read: OPEN, In Progress; no blockedBy/blocking, parent or subIssues; research base verified at 8c1713f1 | PASS |
+| PI research acceptance | Contract, replay, tests, final render and Codex review reconciled; accepts NO_STABLE_FRONTIER within the stated diagnostic scope | PASS |
+| PR submission | Delivery record below | PENDING |
 
-The last row prevents claiming the full Issue delivered. No merge, issue closure,
+PR submission remains the last delivery step. No merge, issue closure,
 or other Issue lifecycle change is performed. This document is evidence and a
 local research assessment, not a substitute for live GitHub graph state.
 
@@ -83,8 +85,24 @@ freeze package. Local execution/review logs reside in the session's
 `issue425-capital` review-artifact directory and must not be confused with
 GitHub lifecycle evidence.
 
-## Remaining delivery action
+## PI delivery assessment
 
-Restore authenticated GitHub access, read the current Issue Graph and Project
-Status, verify PR base/diff scope, push the remaining owned commits, and submit
-the #425 PR with these results. Only then record the final PI delivery decision.
+On 2026-09-13, authenticated live GitHub access was restored and the Issue contract
+and native graph were re-read. PI accepts the #425 research deliverable: its
+negative conclusion meets the contract, without requiring positive ROI or unseen
+data. This acceptance concerns the research evidence, not permission to merge.
+
+The target base is `codex/424-research-base` at
+`8c1713f1a60617e9022d7224d067b396dd932607`. The branch also contains pre-existing
+persistent-storage commits `544e36c0`, `3e9fafe4`, and `50811d54`, previously pushed
+alongside the research. They are explicitly outside the final #425 Codex review's
+scope. Their inclusion is disclosed for integration review; research acceptance
+must not be interpreted as a blanket merge approval for those changes. Shared
+working-tree changes from other sessions are not staged or submitted.
+
+The current main experiment uses 24 inherited candidates and probability prefixes.
+Coverage thresholds are minimum first-crossing targets, not a 25% upper cap.
+The allocator records overlap/exposure but applies no U/P hard caps. These are
+limits of this experiment, not implementations of earlier cap-and-expand ideas.
+
+PR submission is pending; Issue #425 remains open and main integration is separate.
