@@ -82,3 +82,29 @@ testthat::test_that('serialized empty arrays render through the projection entry
     testthat::expect_false(result$historical_admission)
   }
 })
+
+testthat::test_that('unpublished batch keeps scope through the published entry', {
+  root <- normalizePath('../..')
+  market <- tempfile(fileext='.json.gz'); handicap <- tempfile(fileext='.json')
+  output <- tempfile(fileext='.json')
+  connection <- gzfile(market,'wt')
+  writeLines(jsonlite::toJSON(list(rows=list(),issue_order=list('00101'),
+    coverage=list(list(issue='00101',status='NOT_PUBLISHED',fixture_market_rows=0)),
+    historical_admission=FALSE),auto_unbox=TRUE),connection)
+  close(connection)
+  market_sha <- digest::digest(file=market,algo='sha256')
+  jsonlite::write_json(list(rows=list(),market_snapshot_sha256=market_sha,
+    historical_admission=FALSE),handicap,auto_unbox=TRUE)
+  log <- system2(file.path(R.home('bin'),'Rscript'),c('--vanilla',
+    shQuote(file.path(root,'scripts/project_n7_published_markets.R')),shQuote(market),market_sha,
+    shQuote(handicap),digest::digest(file=handicap,algo='sha256'),shQuote(output),shQuote(root)),
+    stdout=TRUE,stderr=TRUE)
+  testthat::expect_null(attr(log,'status'))
+  testthat::expect_true(file.exists(output))
+  if (file.exists(output)) {
+    result <- jsonlite::read_json(output,simplifyVector=FALSE)
+    testthat::expect_length(result$fixtures,0)
+    testthat::expect_identical(result$issue_order,list('00101'))
+    testthat::expect_identical(result$publication_coverage[[1]]$status,'NOT_PUBLISHED')
+  }
+})

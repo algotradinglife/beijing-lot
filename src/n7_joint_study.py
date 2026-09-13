@@ -209,7 +209,11 @@ def evaluate_prefix_study(source, output, *, repository_root, describe_plan,
     if hashlib.sha256(audit_raw).hexdigest() != audit_sha256:
         raise ValueError("Settlement snapshot hash mismatch")
     (output / "audit-snapshot.json").write_bytes(audit_raw)
-    audit = pd.DataFrame(json.loads(audit_raw)["rows"]); audit.issue = audit.issue.astype(str)
+    audit = pd.DataFrame(json.loads(audit_raw)["rows"])
+    if audit.empty:
+        audit = pd.DataFrame({"issue": pd.Series(dtype="string")})
+    else:
+        audit.issue = audit.issue.astype(str)
     rows = []
     for name, digest in sorted(receipt["plan_hashes"].items()):
         raw = Path(name).read_bytes()

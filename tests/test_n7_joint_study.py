@@ -278,3 +278,31 @@ def test_active_sleeve_producer_receipt_is_accepted_by_prefix_consumer(tmp_path,
         entry_point='scripts/run_n7_joint_issue.R',r_sources=study.JOINT_R_SOURCES)
     assert frozen['receipt']['issues']==[issue]
     assert len(frozen['receipt']['plan_hashes'])==1
+
+
+def test_all_unavailable_periods_preserve_null_finances_with_empty_audit(tmp_path):
+    source = tmp_path / 'source'
+    source.mkdir()
+    receipt = dict(issues=[], requested_issues=['missing'],
+                   unavailable={'missing': 'NOT_PUBLISHED'},
+                   historical_admission=False, bundle_hashes={})
+    manifest = source / 'candidate-manifest.json'
+    manifest.write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
+    config = tmp_path / 'config.json'
+    config.write_text(json.dumps(dict(seeds=[42], arms=['QUALITY_PROB'], workers=1,
+        provenance_roots=['src.n7_joint_study', 'src.temporal_learning'])))
+    output = tmp_path / 'study'
+    frozen = study.freeze_prefix_study(source, output, config,
+        source_manifest=manifest, repository_root=ROOT, python='unused', rscript='unused',
+        entry_point='scripts/run_n7_joint_issue.R', r_sources=study.JOINT_R_SOURCES)
+    assert not frozen['receipt']['plan_hashes']
+    audit = source / 'audit.json'
+    audit.write_text(json.dumps(dict(rows=[])))
+    result = study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        describe_plan=study.describe_joint_plan, reference_arms=[], reference_seeds=[],
+        audit_path=audit, audit_sha256=hashlib.sha256(audit.read_bytes()).hexdigest())
+    assert result['issue_order'] == ['missing']
+    assert len(result['rows']) == 1
+    row = result['rows'][0]
+    assert row['status'] == 'NOT_EVALUABLE' and row['reason'] == 'NOT_PUBLISHED'
+    assert all(row[k] is None for k in ['stake', 'gross', 'net', 'roi', 'hits'])

@@ -21,7 +21,10 @@ for (row in market$rows) {
   if (!is.null(prior) && !identical(prior,row$cutoff_utc)) stop('Published cutoff conflict')
   cuts[[row$issue]][[as.character(row$slot)]] <- row$cutoff_utc
 }
-inputs <- n7_published_projection_inputs(market$rows,dplyr::bind_rows(handicaps$rows),cuts)
+handicap_template <- tibble::tibble(issue=character(),slot=integer(),
+  provider_id=character(),home_handicap=integer())
+inputs <- n7_published_projection_inputs(market$rows,
+  dplyr::bind_rows(handicap_template,handicaps$rows),cuts)
 inputs$issue_order <- market$issue_order
 inputs$publication_coverage <- market$coverage
 inputs$source_hashes <- stats::setNames(as.list(args[c(2,4)]),args[c(1,3)])

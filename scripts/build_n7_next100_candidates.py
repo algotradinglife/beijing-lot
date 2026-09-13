@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.n7_study_model_contract import verify_n7_frozen_model
 from src.n7_study_scope import n7_study_scope
 from src.n7_probability_gate import probability_gate_candidates
 from src.n7_sleeve_candidates import build_sleeve_candidates
@@ -19,7 +20,7 @@ from src.temporal_learning.core import stable_json_hash
 
 if __name__=='__main__':
     cli=argparse.ArgumentParser(description=__doc__)
-    for name in ('predictions','predictions-sha256','config','config-sha256','repository-root','output'):
+    for name in ('predictions','predictions-sha256','config','config-sha256','repository-root','output','reference-model','scope-manifest','scope-sha256'):
         cli.add_argument('--'+name,required=True)
     cli.add_argument('--workers',type=int,required=True)
     args=cli.parse_args()
@@ -34,6 +35,17 @@ if __name__=='__main__':
     for path,digest in {**pred['source_hashes'],**{str(root/p):h for p,h in cfg['configs'].items()}}.items():
         if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=digest:raise ValueError('Inherited input changed')
         sources[path]=digest
+    reference_path=Path(args.reference_model).resolve()
+    reference_raw=reference_path.read_bytes()
+    reference_sha=hashlib.sha256(reference_raw).hexdigest()
+    if reference_sha!=cfg['model']['reference_model_sha256']:raise ValueError('Reference model hash mismatch')
+    reference=json.loads(reference_raw);sources[str(reference_path)]=reference_sha
+    scope_path=Path(args.scope_manifest).resolve();scope_raw=scope_path.read_bytes()
+    if hashlib.sha256(scope_raw).hexdigest()!=args.scope_sha256:raise ValueError('Scope manifest hash mismatch')
+    declared=json.loads(scope_raw)['issues'];sources[str(scope_path)]=args.scope_sha256
+    if (pred['issue_order']!=declared or len(declared)!=cfg['scope']['issue_count'] or
+            declared[0]!=cfg['scope']['first'] or declared[-1]!=cfg['scope']['last']):
+        raise ValueError('Requested inventory differs from declared study scope')
     candidate_cfg=json.loads((root/'config/n7_sleeve_424.json').read_text())
     if (cfg['n'],cfg['budget_cny'],cfg['unit_cny'],cfg['payout_factor'])!=(7,1024,2,.65):
         raise ValueError('Fixed study money contract differs')
@@ -49,6 +61,7 @@ if __name__=='__main__':
         entry=pred['models'][issue];mp=Path(entry['path']);raw=mp.read_bytes()
         if hashlib.sha256(raw).hexdigest()!=entry['sha256']:raise ValueError('Frozen model changed')
         sources[str(mp)]=entry['sha256'];model=json.loads(raw);x=frame[frame.issue==issue]
+        verify_n7_frozen_model(model,reference,cfg['model'],reference_sha256=reference_sha)
         cutoff=Cutoff.decision_epoch(issue,model['receipt']['cutoff_ts'])
         checked=predict_draw_foundation(model,x[['issue','slot','provider_id','handicap','fixture_decision_ts','q_W','q_D','q_L']],cutoff,repository_root=root)
         if not np.allclose(checked[['new_W','new_D','new_L']],x[['new_W','new_D','new_L']],atol=1e-14,rtol=0):
