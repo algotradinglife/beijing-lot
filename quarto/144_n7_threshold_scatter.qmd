@@ -9,7 +9,7 @@ execute:
   freeze: false
   error: false
 params:
-  archive: null
+  archive: "tests/fixtures/n7_core433_ranks.json.gz"
   output_dir: null
 ---
 
@@ -22,8 +22,9 @@ params:
 library(dplyr)
 library(ggplot2)
 source('r/n7_threshold_scatter.R')
-stopifnot(file.exists(params$archive),dir.exists(params$output_dir))
-a<-jsonlite::fromJSON(params$archive,simplifyVector=FALSE)
+stopifnot(file.exists(params$archive))
+if (!is.null(params$output_dir)) stopifnot(dir.exists(params$output_dir))
+a<-jsonlite::fromJSON(readLines(gzfile(params$archive),warn=FALSE),simplifyVector=FALSE)
 stopifnot(a$schema=='bj433_threshold_scatter_v1',
  digest::digest(charToRaw(a$body),algo='sha256',serialize=FALSE)==a$sha256)
 x<-jsonlite::fromJSON(a$body)
@@ -40,9 +41,11 @@ plot<-ggplot(points,aes(theory_tickets,actual_tickets))+
  facet_wrap(~panel,ncol=4)+coord_equal()+theme_minimal(base_size=11)+
  labs(x='达到模型概率阈值所需票数（对数刻度）',
       y='实际中奖组合名次／覆盖所需票数（对数刻度）',color='候选生成方式')
-ggsave(file.path(params$output_dir,'threshold-rank-scatter.png'),plot,width=13,height=8,dpi=160)
-readr::write_csv(points,file.path(params$output_dir,'threshold-points.csv'))
-readr::write_csv(bins,file.path(params$output_dir,'threshold-bins.csv'))
+if (!is.null(params$output_dir)) {
+ ggsave(file.path(params$output_dir,'threshold-rank-scatter.png'),plot,width=13,height=8,dpi=160)
+ readr::write_csv(points,file.path(params$output_dir,'threshold-points.csv'))
+ readr::write_csv(bins,file.path(params$output_dir,'threshold-bins.csv'))
+}
 ```
 
 本图使用已核账的 `r length(x$issue_order)` 期、`r nrow(x$rows)` 个候选组。
@@ -71,5 +74,5 @@ knitr::kable(bins |> mutate(target=100*target,covered_rate=100*covered_rate,
  '30元命中率（%）','理论票数中位数','实际票数中位数'))
 ```
 
-此图只用于提出边界假设，不改写正在运行的 #433 固定分组规则。任何后续按此图选出的边界，
+此图只用于提出边界假设，不改写 #433 已冻结的固定分组规则。任何后续按此图选出的边界，
 均须单列为已曝光历史上的探索变种，不能描述为未见数据验证。
