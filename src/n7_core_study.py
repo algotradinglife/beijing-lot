@@ -13,9 +13,11 @@ def describe_core_plan(plan):
 
     ROI/probabilities are fractions; unsupported metrics remain None. No I/O,
     fitting, target settlement access or state. Missing fields raise KeyError.
+    Settlement owns unique_tickets and paid-unit accounting; this projection
+    supplies only the additional frozen policy and prediction fields.
     """
     out = {key: plan[key] for key in ('budget_cny', 'cash_cny', 'funded_sleeves',
-                                     'unique_tickets', 'opening_stop', 'solver_status')}
+                                     'opening_stop', 'solver_status')}
     out.update(plan['policy'])
     for prefix in ('training', 'evaluation'):
         out.update({f'{prefix}_{k}': v for k, v in plan[prefix].items()})
