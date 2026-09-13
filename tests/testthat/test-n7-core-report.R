@@ -33,3 +33,19 @@ test_that('exposure separates paid copies from unique coverage and cash stops',{
  empty<-n7_core_exposure(s[FALSE,],dplyr::mutate(p,stake=0))
  expect_equal(empty$paid_ticket_units,0);expect_true(is.na(empty$repeated_stake_percent))
 })
+test_that('rank-based attribution reconciles copies before fixed cost-band summaries',{
+ ranks<-tibble::tibble(issue=c('001','001'),sleeve_id=c(1,2),actual_rank=c(10,20),
+  actual_gross_cny=c(100,200),coverage_20_cost_cny=c(64,128))
+ sleeves<-tibble::tibble(issue='001',arm='A',seed=1,sleeve_id=c(1,1,2),
+  copy_index=c(1,2,1),role=c('CORE','CORE','OPPORTUNITY'),depth=15,stake=30,expected_gross=24)
+ p<-tibble::tibble(issue='001',arm='A',seed=1,reference=FALSE,stopped=FALSE,gross=200,hits=1,stake=90)
+ z<-n7_core_rank_attribution(ranks,sleeves,p)
+ core<-z[z$role=='CORE',]
+ expect_equal(core$unique_hits,1);expect_equal(core$paid_hits,2)
+ expect_equal(core$gross,200);expect_equal(core$stake,60)
+ expect_equal(core$model_roi_percent,-20);expect_equal(as.character(core$cost_band),'<=32')
+ expect_error(n7_core_rank_attribution(ranks,sleeves,dplyr::mutate(p,gross=201)))
+ expect_error(n7_core_rank_attribution(ranks[1,],sleeves,p))
+ stop<-n7_core_rank_attribution(ranks,sleeves,dplyr::mutate(p,stopped=TRUE,gross=0,hits=0,stake=0))
+ expect_equal(nrow(stop),0)
+})

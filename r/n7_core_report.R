@@ -85,3 +85,42 @@ n7_core_exposure <- function(sleeves,periods) {
       repeated_stake_percent=if(sum(period_stake)>0)100*sum(repeated_stake_cny)/sum(period_stake) else NA_real_,
       .groups='drop')
 }
+
+# Post-settlement diagnostic only. ranks: one issue/sleeve with accepted actual
+# winning rank/return and theoretical 20% coverage cost. Each sleeve row is one
+# paid copy; periods are cash-stop-adjusted. Reconciles every issue/arm/seed first,
+# then groups by fixed theoretical ticket-cost bands, never selects investments.
+n7_core_rank_attribution <- function(ranks,sleeves,periods) {
+  key<-c('issue','arm','seed')
+  stopifnot(!anyDuplicated(ranks[c('issue','sleeve_id')]),
+    !anyDuplicated(sleeves[c(key,'sleeve_id','copy_index')]),!anyDuplicated(periods[key]),
+    all(c('actual_rank','actual_gross_cny','coverage_20_cost_cny') %in% names(ranks)),
+    all(ranks$actual_rank>=1 & ranks$actual_rank<=2187),
+    all(ranks$coverage_20_cost_cny>0 & ranks$coverage_20_cost_cny%%2==0))
+  ranks$sleeve_id<-as.character(ranks$sleeve_id)
+  sleeves$sleeve_id<-as.character(sleeves$sleeve_id)
+  p<-periods |> dplyr::filter(!reference) |>
+    dplyr::select(dplyr::all_of(key),stopped,period_gross=gross,period_hits=hits,period_stake=stake)
+  z<-dplyr::left_join(sleeves,ranks,by=c('issue','sleeve_id'),relationship='many-to-one') |>
+    dplyr::left_join(p,by=key,relationship='many-to-one')
+  stopifnot(!anyNA(z[c('actual_rank','actual_gross_cny','coverage_20_cost_cny','stopped')]))
+  z<-z |> dplyr::mutate(won=depth>=actual_rank & !stopped,
+    actual_gross=ifelse(won,actual_gross_cny,0),funded_stake=ifelse(stopped,0,stake),
+    forecast_gross=ifelse(stopped,0,expected_gross),
+    theory_tickets=coverage_20_cost_cny/2,
+    cost_band=cut(theory_tickets,c(0,32,64,128,256,Inf),
+      labels=c('<=32','33–64','65–128','129–256','>256'),right=TRUE))
+  totals<-z |> dplyr::group_by(dplyr::across(dplyr::all_of(key))) |>
+    dplyr::summarise(replay_gross=sum(actual_gross),replay_hits=sum(won & copy_index==1),
+      replay_stake=sum(funded_stake),.groups='drop')
+  check<-dplyr::left_join(p,totals,by=key,relationship='one-to-one') |>
+    dplyr::mutate(dplyr::across(c(replay_gross,replay_hits,replay_stake),~dplyr::coalesce(.x,0)))
+  stopifnot(all(check$replay_hits==check$period_hits),all(check$replay_stake==check$period_stake),
+    all(abs(check$replay_gross-check$period_gross)<=1e-6+abs(check$period_gross)*1e-10))
+  z |> dplyr::filter(!stopped) |> dplyr::group_by(arm,seed,role,cost_band) |>
+    dplyr::summarise(issues=dplyr::n_distinct(issue),paid_prefixes=dplyr::n(),
+      unique_prefixes=sum(copy_index==1),unique_hits=sum(won & copy_index==1),paid_hits=sum(won),
+      stake=sum(funded_stake),gross=sum(actual_gross),model_gross=sum(forecast_gross),
+      .groups='drop') |> dplyr::mutate(net=gross-stake,roi_percent=100*net/stake,
+        model_roi_percent=100*(model_gross-stake)/stake)
+}
