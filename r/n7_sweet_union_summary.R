@@ -14,6 +14,8 @@ n7_sweet_union_summary <- function(rows,issue_order,initial_capital_cny) {
       hit_issues=sum(hits>0 & !stopped),profit_issues=sum(funded_net_cny>0),
       cash=sum(cash_cny),max_drawdown=max(drawdown_cny),
       net_without_best=net-max(funded_net_cny),
+      net_without_best3=net-sum(head(sort(funded_net_cny,decreasing=TRUE),3)),
+      net_without_best5=net-sum(head(sort(funded_net_cny,decreasing=TRUE),5)),
       stopped_issues=sum(stopped),.groups='drop')
   list(summary=summary,curves=curves)
 }

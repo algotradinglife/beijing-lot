@@ -86,6 +86,20 @@ readr::write_csv(curves,file.path(params$output_dir,'curves.csv'))
 
 ## 资金、命中与回撤
 
+本轮最值得继续研究的是 **25% 入围累计概率＋按组加深＋每期 512 元上限**。
+在三个固定种子下，其净收益为 20,221–25,977 元，ROI 为 21.3%–27.4%，
+命中 77–83 期、盈利 70–74 期；最大回撤为 6,718–8,884 元。
+它的实际总投入约 9.48 万元，比同预算的原八主力约 10.17 万元更少，三个种子的净收益都更高。
+
+这个改善并不只依赖最佳一期：剔除各自收益最高的五期后，仍余 388–2,975 元净收益。
+相同预算下的原八主力对照，无论是否配 60 元机会组，剔除最佳三期后均转负。
+但这里仍是已查看的 200 期研究，不能把这些门槛视为未见数据选出的最优参数。
+
+如果更重视总收益，25% 加深的 1,024 元方案赚得更多，同时回撤约为 1.45–1.67 万元。
+768 元方案的净收益为 3.01–4.53 万元，对随机种子更敏感，并不一致优于 1,024 元方案。
+仅把固定深度选组改为联合覆盖，尚未显示整体优势；将入围门槛提高到 30%，
+也未改善 1,024 元深度版的收益表现。
+
 ROI 是净收益／实际投入；相同预算上限不表示实际投入相同。
 SUM 为旧累计概率加总优化器；C8 为原八主力组及机会组分配器。
 不同 seed 是模拟随机性重复，不是新增历史样本。
@@ -128,9 +142,11 @@ action_summary <- actions |> group_by(arm,seed,phase) |>
   summarise(actions=n(),added_stake=sum(added_stake),gain=sum(marginal_hit),.groups='drop') |>
   mutate(gain_per_100=100*gain/added_stake)
 knitr::kable(action_summary,digits=4)
-p <- ggplot(filter(funded,seed==42501),aes(depth,colour=arm))+stat_ecdf()+
-  labs(x='每组购买基本票数',y='组数累计占比',colour=NULL,title='购买深度分布')
-ggsave(file.path(params$output_dir,'04-depth.png'),p,width=10,height=6,dpi=150);p
+p <- funded |> filter(seed==42501) |>
+  mutate(family=sub('_B[0-9]+$','',arm),budget=as.numeric(sub('.*_B','',arm))) |>
+  ggplot(aes(depth,colour=family))+stat_ecdf()+facet_wrap(~budget,ncol=2)+
+  labs(x='每组购买基本票数',y='组数累计占比',colour='分配规则',title='购买深度分布')
+ggsave(file.path(params$output_dir,'04-depth.png'),p,width=13,height=8,dpi=150);p
 ```
 
 ## 相同预算档位与时间稳定性
@@ -151,6 +167,17 @@ ggsave(file.path(params$output_dir,'06-blocks.png'),p,width=11,height=10,dpi=150
 readr::write_csv(coverage,file.path(params$output_dir,'coverage.csv'))
 readr::write_csv(action_summary,file.path(params$output_dir,'actions.csv'))
 readr::write_csv(blocks,file.path(params$output_dir,'blocks.csv'))
+```
+
+新旧各 100 期仍分别检查；两个分段都属于已暴露研究数据。
+以下聚焦 512 元方案及其同预算对照，避免合计收益掩盖时段差别。
+
+```{r}
+cohort_summary <- results |> group_by(arm,seed,cohort) |>
+  summarise(profit_issues=sum(net>0),hit_issues=sum(hits>0),
+    stake=sum(stake),net=sum(net),ROI_percent=100*net/stake,.groups='drop')
+knitr::kable(filter(cohort_summary,arm %in% c('T250_DEPTH_B512','C8_DEPTH_ANY_O0_PROB_B512','C8_DEPTH_ANY_O60_PROB_B512')),digits=2)
+readr::write_csv(cohort_summary,file.path(params$output_dir,'cohorts.csv'))
 ```
 
 ## 分预算的资金与回撤曲线
@@ -175,6 +202,15 @@ ggsave(file.path(params$output_dir,'09-net-risk.png'),p,width=12,height=8,dpi=15
 ```
 
 ## 使用边界
+
+```{r}
+tails <- summary |> filter(arm %in% results$arm) |>
+  select(arm,seed,net,net_without_best,net_without_best3,net_without_best5) |>
+  pivot_longer(c(net,net_without_best,net_without_best3,net_without_best5),names_to='exclusion',values_to='net_cny')
+p <- ggplot(filter(tails,seed==42501),aes(arm,net_cny,colour=exclusion))+geom_point(position=position_dodge(width=.5))+
+  coord_flip()+geom_hline(yintercept=0,colour='grey50')+labs(x=NULL,y='净收益（元）',colour='剔除最佳期数')
+ggsave(file.path(params$output_dir,'11-tail-sensitivity.png'),p,width=12,height=10,dpi=150);p
+```
 
 ```{r}
 expectation <- results |> group_by(arm,seed,budget_cny) |>

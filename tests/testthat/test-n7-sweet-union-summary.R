@@ -12,6 +12,8 @@ testthat::test_that('union summaries use exact issue order, funded money and cas
   testthat::expect_equal(z$summary$profit_issues,1)
   testthat::expect_equal(z$summary$cash,8)
   testthat::expect_equal(z$summary$net_without_best,-2)
+  testthat::expect_equal(z$summary$net_without_best3,0)
+  testthat::expect_equal(z$summary$net_without_best5,0)
   testthat::expect_equal(z$curves$equity_cny,c(100,104,102,102))
   testthat::expect_error(n7_sweet_union_summary(x,c('01','02'),100))
   x$gross[1] <- 1
