@@ -1,0 +1,43 @@
+root<-normalizePath(file.path(testthat::test_path(),'../..'))
+source(file.path(root,'r/n7_capital_depth.R'))
+source(file.path(root,'r/n7_core_opportunity.R'))
+test_that('concentrated and uniform surfaces retain distinct cost and value features',{
+ p<-rbind(c(.5,.3,.2,rep(0,2184)),rep(1/2187,2187));rownames(p)<-c('0','1')
+ cut<-list(a='epoch');s<-list(prob_mat=p,value_mat=p*10,rank_idx=rbind(1:2187,1:2187),
+  summary=tibble::tibble(sleeve_id=0:1,origin=c('QUALITY','UNIFORM'),entropy=c(-sum(c(.5,.3,.2)*log(c(.5,.3,.2))),log(2187))))
+ x<-n7_core_curve_features(s,cut,cut,c(.15,.25),2)
+ expect_equal(x$coverage_15,c(1,15/2187));expect_equal(x$normalized_entropy[2],1)
+ expect_equal(x$target_0.25_cost_cny,c(2,1094))
+ expect_equal(x$expected_rank_cost_cny,c(3.4,2188))
+ expect_equal(x$expected_net_15,c(-20,150/2187-30))
+ expect_error(n7_core_curve_features(s,cut,list(a='later'),.25,2))
+ expect_error(n7_core_curve_features(s,cut,cut,NA_real_,2))
+})
+test_that('core and opportunity roles are disjoint with explicit score and caps',{
+ cut<-list(a='epoch');x<-tibble::tibble(sleeve_id=0:3,
+  coverage_64=c(.5,.4,.2,.1),coverage_15=c(.3,.2,.08,.05),
+  expected_net_64=c(-30,-20,-10,-15),expected_net_15=c(-8,-7,-10,4))
+ attr(x,'cutoffs')<-cut
+ a<-n7_core_partition(x,cut,cut,2,30,30,2,'PROB')
+ b<-n7_core_partition(x,cut,cut,2,30,30,2,'VALUE')
+ expect_equal(a$core_ids,0:1);expect_equal(a$opportunity_ids,2L)
+ expect_equal(b$opportunity_ids,3L);expect_equal(a$opportunity_stake_cny,30)
+ z<-n7_core_partition(x,cut,cut,2,0,30,2,'PROB');expect_length(z$opportunity_ids,0)
+ z<-n7_core_partition(x,cut,cut,2,240,30,2,'PROB');expect_equal(z$opportunity_stake_cny,60)
+ expect_length(intersect(z$core_ids,z$opportunity_ids),0)
+ expect_error(n7_core_partition(x,cut,list(a='wrong'),2,30,30,2,'PROB'))
+ expect_error(n7_core_partition(x,cut,cut,4,30,30,2,'PROB'))
+ expect_error(n7_core_partition(x,cut,cut,2,31,30,2,'PROB'))
+})
+test_that('multiplicity changes payout and spending but not coverage',{
+ cut<-list(x='epoch');o<-list(sleeve_id=0,depth=15,stake=30,expected_gross=21,
+  state_payout=rep(100,2187),coverage=.2)
+ other<-o;other$sleeve_id<-1
+ base<-list(cutoffs=cut,options=list(o,other))
+ partition<-list(core_ids=0,opportunity_ids=1,opportunity_depth=15,cutoffs=cut)
+ p<-n7_core_option_pool(base,partition,cut,'MULTIPLY',3)
+ expect_length(p$options,4);expect_equal(p$required_options,4L)
+ expect_equal(p$options[[3]]$stake,90);expect_equal(p$options[[3]]$expected_gross,63)
+ expect_equal(p$options[[3]]$coverage,.2);expect_equal(p$options[[3]]$state_payout[1],300)
+ expect_error(n7_core_option_pool(base,partition,list(x='later'),'DEPTH',1))
+})

@@ -77,3 +77,15 @@ test_that('finite-space MILP agrees with exhaustive allocations including two hi
  expect_equal(no$status,'Infeasible')
  expect_error(n7_capital_solve(pool,sc,cut,3,'any_hit',-1,0,TRUE,1000,0,0,60))
 })
+
+test_that('explicit required options consume budget and cannot be silently dropped',{
+ cut<-list(x='epoch')
+ opts<-lapply(0:1,function(i)list(sleeve_id=i,stake=2,expected_gross=1,coverage=if(i==0)1 else .5))
+ pool<-list(cutoffs=cut,options=opts)
+ sc<-list(cutoffs=cut,hits=matrix(c(1,1,1,0),2,2),gross=matrix(0,2,2))
+ fit<-n7_capital_solve(pool,sc,cut,2,'any_hit',-1,0,TRUE,100,.001,1,5,required_options=2L)
+ expect_equal(fit$selected,2L)
+ fit<-n7_capital_solve(pool,sc,cut,2,'any_hit',-1,0,TRUE,100,.001,1,5,required_options=1:2)
+ expect_length(fit$selected,0)
+ expect_error(n7_capital_solve(pool,sc,cut,2,'any_hit',-1,0,TRUE,100,.001,1,5,required_options=3L))
+})
