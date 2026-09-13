@@ -68,8 +68,9 @@ def test_package_complete_binding_and_no_success_on_mutation(tmp_path):
         issue_order=['001'],parameters=dict(seeds=[1])))
     digest=hashlib.sha256(body.encode()).hexdigest();archive=tmp_path/'report.gz'
     archive.write_bytes(gzip.compress(json.dumps(dict(schema='bj433_core_report_v1',body=body,sha256=digest)).encode()))
-    out=tmp_path/'coverage.gz';kw=dict(repository_root=ROOT,expected_report_sha256=digest)
-    result=package_core_coverage(study,archive,out,**kw)
+    out=tmp_path/'coverage.gz';kw=dict(repository_root=str(ROOT),expected_report_sha256=digest)
+    # argparse supplies strings, including the source root used for provenance.
+    result=package_core_coverage(str(study),str(archive),str(out),**kw)
     wrapper=json.loads(gzip.decompress(out.read_bytes()))
     assert result['plans']==1 and result['sha256']==hashlib.sha256(wrapper['body'].encode()).hexdigest()
     with pytest.raises(ValueError,match='overwrite'):package_core_coverage(study,archive,out,**kw)

@@ -65,7 +65,7 @@ def package_core_coverage(study, report_archive, destination, *, repository_root
     Refuses overwrite; no output on failed verification. Does not refit or alter
     the accepted report, the original policies, their worlds, or source export.
     """
-    study=Path(study);destination=Path(destination)
+    study=Path(study);destination=Path(destination);repository_root=Path(repository_root).resolve()
     if destination.exists():raise ValueError('Refusing coverage archive overwrite')
     wrapper=json.loads(gzip.decompress(Path(report_archive).read_bytes()))
     if (wrapper['schema']!='bj433_core_report_v1' or wrapper['sha256']!=expected_report_sha256

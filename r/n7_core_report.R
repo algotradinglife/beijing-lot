@@ -1,6 +1,4 @@
-# Pair every period/seed against explicit comparison arms. Descriptive only;
-# unequal spending is reported, never rescaled to manufacture matched returns.
-# Inputs are funded period rows from n7_capital_report; money CNY, ROI percent.
+# Descriptive fixed-core coverage and cash-aware accounting summaries.
 n7_core_coverage_summary <- function(coverage,periods) {
   # coverage: one frozen issue/arm/seed/scenario-kind; probabilities fractions.
   # Return means over all account periods, zeroing stopped/nonfunded periods;
@@ -31,6 +29,9 @@ n7_core_coverage_summary <- function(coverage,periods) {
       .groups='drop')
 }
 
+# Pair every period/seed against explicit comparison arms. Descriptive only;
+# unequal spending is reported, never rescaled to manufacture matched returns.
+# Inputs are funded period rows from n7_capital_report; money CNY, ROI percent.
 n7_core_pairs <- function(periods,comparisons,issue_order,seeds) {
   stopifnot(all(c('issue','arm','seed','stake','gross','net','hits','stopped') %in% names(periods)),
     all(c('treatment','control','comparison') %in% names(comparisons)),
