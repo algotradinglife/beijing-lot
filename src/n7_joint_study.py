@@ -15,6 +15,7 @@ import subprocess
 
 import pandas as pd
 
+from src.n7_study_scope import n7_study_scope
 from src.fundamentals_n7_baseline import rank_double_candidates
 from src.n7_single_ticket_sampling import settle_single_tickets
 from src.temporal_learning import Cutoff, implementation_closure, verify_implementation_closure
@@ -84,6 +85,8 @@ def freeze_prefix_study(source, output, config_path, *, repository_root, python,
     prior_raw = manifest.read_bytes(); prior = json.loads(prior_raw)
     if prior["seal"] != stable_json_hash(prior["receipt"]) or prior["receipt"]["historical_admission"] is not False:
         raise ValueError("Invalid candidate source manifest")
+    scope = n7_study_scope(prior["receipt"]["requested_issues"],
+        prior["receipt"]["issues"], prior["receipt"]["unavailable"])
     (output / "prior-freeze.json").write_bytes(prior_raw)
     # Package roots are explicitly inventoried, because a submodule import also
     # executes its parents' __init__.py. The shared closure does the hashing.
@@ -152,7 +155,8 @@ def freeze_prefix_study(source, output, config_path, *, repository_root, python,
         raise ValueError("Inputs changed during selection")
     if any(hashlib.sha256((root / p).read_bytes()).hexdigest() != h for p, h in r_sources.items()):
         raise ValueError("R implementation changed during selection")
-    receipt = dict(issues=prior["receipt"]["issues"], parameters=cfg, source_hashes=sources,
+    receipt = dict(issues=scope["requested_issues"], modeled_issues=scope["modeled_issues"],
+        unavailable_issues=scope["unavailable_issues"], parameters=cfg, source_hashes=sources,
         plan_hashes=hashes, raw_hashes=raw_hashes, implementation=impl, r_implementation=r_sources, cutoffs=cutoff_receipts,
         prior_freeze_seal=prior["seal"], source_manifest=str(manifest), historical_admission=False, evidence_class="EXPOSED_HISTORICAL_DIAGNOSTIC",
         maximum_source_availability=None, maximum_label_availability=None,
@@ -237,6 +241,11 @@ def evaluate_prefix_study(source, output, *, repository_root, describe_plan,
     expected = {(i, s, a) for i in receipt["issues"] for s in reference_seeds for a in reference_arms}
     if keys != expected or len(controls) != len(expected):
         raise ValueError("Archived reference grid mismatch")
+    for missing in receipt["unavailable_issues"]:
+        for seed in receipt["parameters"]["seeds"]:
+            for arm in receipt["parameters"]["arms"]:
+                rows.append(dict(**missing, seed=seed, arm=arm, reference=False,
+                    stake=None, gross=None, net=None, roi=None, hits=None))
     payload = dict(rows=rows + controls, issue_order=receipt["issues"], freeze_seal=frozen["seal"], historical_admission=False)
     result_raw = json.dumps(payload, sort_keys=True).encode(); (output / "results.json").write_bytes(result_raw)
     er = dict(freeze_sha256=hashlib.sha256((output / "plans-frozen.json").read_bytes()).hexdigest(),

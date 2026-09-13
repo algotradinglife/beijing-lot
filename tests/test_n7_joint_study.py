@@ -27,7 +27,7 @@ def test_completed_issue_futures_are_released_before_study_finishes(tmp_path, mo
         path = source / 'bundles' / f'{issue}.json.gz'
         path.write_bytes(gzip.compress(json.dumps(bundle).encode()))
         bundles[issue] = bundle; hashes[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
-    receipt = dict(issues=list(bundles), historical_admission=False, bundle_hashes=hashes)
+    receipt = dict(issues=list(bundles), requested_issues=list(bundles), unavailable={}, historical_admission=False, bundle_hashes=hashes)
     (source / 'candidate-manifest.json').write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
     config = tmp_path / 'config.json'
     config.write_text(json.dumps(dict(seeds=[42], arms=['QUALITY_PROB'], workers=1,
@@ -127,8 +127,11 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
     source = tmp_path / "source"; (source / "bundles").mkdir(parents=True)
     path = source / "bundles" / f"{issue}.json.gz"
     path.write_bytes(gzip.compress(json.dumps(bundle).encode()))
-    prior_receipt = dict(issues=[issue], historical_admission=False,
+    prior_receipt = dict(issues=[issue], requested_issues=[issue], unavailable={}, historical_admission=False,
                          bundle_hashes={str(path): hashlib.sha256(path.read_bytes()).hexdigest()})
+    if fresh:
+        prior_receipt["requested_issues"].append("missing")
+        prior_receipt["unavailable"] = {"missing": "NOT_PUBLISHED"}
     prior = dict(receipt=prior_receipt, seal=stable_json_hash(prior_receipt))
     (source / "candidate-manifest.json").write_text(json.dumps(prior))
     cfg = dict(seeds=[42], arms=["QUALITY_PROB"], workers=1,
@@ -178,7 +181,13 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
     result = study.evaluate_prefix_study(source, output, audit_path=audit, audit_sha256=er["audit_sha256"], repository_root=ROOT,
         settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
         describe_plan=study.describe_joint_plan, reference_arms=reference_arms, reference_seeds=[42])
-    assert len(result["rows"]) == (1 if fresh else 3)
+    assert len(result["rows"]) == (2 if fresh else 3)
+    if fresh:
+        assert result["issue_order"] == [issue, "missing"]
+        missing = result["rows"][-1]
+        assert missing["status"] == "NOT_EVALUABLE"
+        assert missing["reason"] == "NOT_PUBLISHED"
+        assert missing["net"] is None and missing["stake"] is None
     assert result["rows"][0]["status"] == "NO_BET"
     assert result["rows"][0]["net"] == 0
     if core_layers:
@@ -202,7 +211,7 @@ def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixt
     source = tmp_path / "source"; (source / "bundles").mkdir(parents=True)
     issue = fixture_bundle["issue"]; path = source / "bundles" / f"{issue}.json.gz"
     path.write_bytes(gzip.compress(json.dumps(fixture_bundle).encode()))
-    receipt = dict(issues=[issue], historical_admission=False,
+    receipt = dict(issues=[issue], requested_issues=[issue], unavailable={}, historical_admission=False,
                    bundle_hashes={str(path): hashlib.sha256(path.read_bytes()).hexdigest()})
     (source / "candidate-manifest.json").write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
     config = tmp_path / "cfg.json"

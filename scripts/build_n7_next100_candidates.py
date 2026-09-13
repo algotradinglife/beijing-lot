@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from src.n7_study_scope import n7_study_scope
 from src.n7_probability_gate import probability_gate_candidates
 from src.n7_sleeve_candidates import build_sleeve_candidates
 from src.probability_foundation_draw import predict_draw_foundation
@@ -36,7 +37,13 @@ if __name__=='__main__':
     candidate_cfg=json.loads((root/'config/n7_sleeve_424.json').read_text())
     if (cfg['n'],cfg['budget_cny'],cfg['unit_cny'],cfg['payout_factor'])!=(7,1024,2,.65):
         raise ValueError('Fixed study money contract differs')
-    frame=pd.DataFrame(pred['rows']);issues=[i for i in pred['issue_order'] if i in pred['models']]
+    frame=pd.DataFrame(pred['rows'],columns=['issue','slot','provider_id','handicap',
+        'fixture_decision_ts','q_W','q_D','q_L','new_W','new_D','new_L'])
+    issues=[i for i in pred['issue_order'] if i in pred['models']]
+    coverage={r['issue']:r['status'] for r in pred['publication_coverage']}
+    unavailable={i:('NO_USABLE_MARKET_PROBABILITIES' if coverage[i]=='PUBLISHED_DETAIL_VERIFIED'
+                    else coverage[i]) for i in pred['issue_order'] if i not in pred['models']}
+    scope=n7_study_scope(pred['issue_order'],issues,unavailable)
     if set(frame.issue)!=set(issues):raise ValueError('Prediction scope mismatch')
     for issue in issues:
         entry=pred['models'][issue];mp=Path(entry['path']);raw=mp.read_bytes()
@@ -70,7 +77,8 @@ if __name__=='__main__':
     verify_implementation_closure(root,implementation)
     for path,digest in sources.items():
         if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=digest:raise ValueError('Source changed during build')
-    receipt=dict(issues=issues,requested_issues=pred['issue_order'],publication_coverage=pred['publication_coverage'],
+    receipt=dict(issues=scope['modeled_issues'],requested_issues=scope['requested_issues'],
+        unavailable=unavailable,publication_coverage=pred['publication_coverage'],
         source_hashes=sources,pool_hashes=pool_hashes,bundle_hashes=bundle_hashes,implementation=implementation,
         historical_admission=False,state='CANDIDATES_ONLY_NO_TICKETS_OR_SETTLEMENT',
         full_scope_available=len(issues)==len(pred['issue_order']))
