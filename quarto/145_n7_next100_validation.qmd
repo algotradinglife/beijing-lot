@@ -263,9 +263,10 @@ knitr::kable(attribution,digits=2)
 
 ```{r}
 #| eval: !expr is.character(params$results_path)
-knitr::kable(report$periods |> arrange(period,arm,seed) |>
+rmarkdown::paged_table(report$periods |> arrange(period,arm,seed) |>
   select(issue,arm,seed,stake,gross,net,roi_percent,hits,equity_cny,
-         drawdown_cny,drawdown_percent,cash_cny,stopped),digits=2,format='html')
+         drawdown_cny,drawdown_percent,cash_cny,stopped) |>
+  mutate(across(where(is.numeric),~round(.x,2))),options=list(rows.print=20))
 ```
 
 </details>
