@@ -245,7 +245,9 @@ def check_core_settlement(plan, audit_rows, result_row):
         parts.append((layer['role'], layer['copy_index'], independent))
     stake = sum(r['stake'] for _, _, r in parts)
     gross = sum(r['gross'] for _, _, r in parts)
-    expected = dict(status='COMPLETE' if stake else 'NO_BET',stake=stake,gross=gross,net=gross-stake,
+    expected = dict(issue=plan['issue'],cash=plan['budget_cny']-stake,
+        unique_tickets=sum(r['groups'] for _, index, r in parts if index == 1),
+        status='COMPLETE' if stake else 'NO_BET',stake=stake,gross=gross,net=gross-stake,
         groups=sum(r['groups'] for _, _, r in parts),
         hits=sum(r['hits'] for _, index, r in parts if index == 1),
         paid_hits=sum(r['hits'] for _, _, r in parts),roi=gross/stake-1 if stake else None)

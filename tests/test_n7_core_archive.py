@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import src.n7_core_archive as archive
 from src.n7_core_settlement import settle_core_layers
+from src.n7_core_study import describe_core_plan
 from src.temporal_learning.core import stable_json_hash
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -29,7 +30,8 @@ def package_inputs(tmp_path,monkeypatch):
     receipt=dict(issues=[p['issue']],parameters=config,plan_hashes={str(path):hashlib.sha256(path.read_bytes()).hexdigest()})
     frozen=dict(receipt=receipt,seal=stable_json_hash(receipt))
     (study/'plans-frozen.json').write_text(json.dumps(frozen))
-    row=dict(result,issue=p['issue'],arm=p['arm'],seed=p['seed'],reference=False)
+    row=dict(result,arm=p['arm'],seed=p['seed'],reference=False,
+        decision_year=min(p['cutoffs'].values())[:4],**describe_core_plan(p))
     payload=dict(rows=[row],issue_order=[p['issue']],freeze_seal=frozen['seal'],historical_admission=False)
     (study/'results.json').write_text(json.dumps(payload))
     (study/'audit-snapshot.json').write_text(json.dumps(dict(rows=audit)))
@@ -63,6 +65,7 @@ def test_core_archive_rejects_changed_inputs_and_failed_replay(package_inputs,mo
     raw=(study/'results.json').read_bytes();(study/'results.json').write_bytes(raw+b' ')
     with pytest.raises(ValueError,match='result binding'):archive.package_core_report(study,out,**kwargs)
     assert not out.exists()
+
     (study/'results.json').write_bytes(raw)
     with pytest.raises(ValueError,match='Baseline archive identity'):
         archive.package_core_report(study,out,**dict(kwargs,baseline_body_sha256='wrong'))
@@ -72,4 +75,18 @@ def test_core_archive_rejects_changed_inputs_and_failed_replay(package_inputs,mo
     def fail(*a,**kw):raise ValueError('replay failed')
     monkeypatch.setattr(archive,'check_prefix_study',fail)
     with pytest.raises(ValueError,match='replay failed'):archive.package_core_report(study,out,**kwargs)
+    assert not out.exists()
+
+
+@pytest.mark.parametrize('field',['evaluation_any_hit','cash_cny','unique_tickets','cash','mode'])
+def test_receipt_consistent_result_mutation_cannot_change_published_plan(package_inputs,field):
+    study,out,kwargs=package_inputs
+    payload=json.loads((study/'results.json').read_text())
+    row=payload['rows'][0]
+    row[field]='ALTERED' if field=='mode' else row[field]+1
+    raw=json.dumps(payload).encode();(study/'results.json').write_bytes(raw)
+    er=json.loads((study/'evaluation-receipt.json').read_text())
+    er['result_sha256']=hashlib.sha256(raw).hexdigest()
+    (study/'evaluation-receipt.json').write_text(json.dumps(er))
+    with pytest.raises(ValueError):archive.package_core_report(study,out,**kwargs)
     assert not out.exists()

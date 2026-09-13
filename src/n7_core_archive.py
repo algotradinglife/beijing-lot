@@ -6,6 +6,7 @@ import json
 
 from src.n7_joint_check import check_prefix_study
 from src.n7_core_check import check_core_plan, check_core_result, check_core_settlement
+from src.n7_core_study import describe_core_plan
 from src.temporal_learning import implementation_closure
 
 
@@ -53,7 +54,11 @@ def package_core_report(study, destination, *, frozen_source_root, checker_root,
         if key in seen or key not in rows:
             raise ValueError('Duplicate or unexpected core plan')
         seen.add(key)
-        check_core_settlement(p,audit.get(p['issue'],[]),rows[key])
+        checked=check_core_settlement(p,audit.get(p['issue'],[]),rows[key])
+        metadata=dict(issue=p['issue'],seed=p['seed'],arm=p['arm'],
+            decision_year=min(p['cutoffs'].values())[:4],reference=False,**describe_core_plan(p))
+        if set(rows[key])!=set(checked)|set(metadata) or any(rows[key][k]!=v for k,v in metadata.items()):
+            raise ValueError('Core published fields differ from frozen plan')
         ident=dict(issue=p['issue'],seed=p['seed'],arm=p['arm'])
         allocations.extend(dict(**ident,**a) for a in p['allocation'])
         for layer in p['layers']:
