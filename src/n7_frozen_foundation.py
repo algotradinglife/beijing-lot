@@ -3,11 +3,44 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+import pandas as pd
 
 from src.temporal_learning import (AvailabilityFilter, AvailabilityPolicy,
     PartitionPolicy, WeightingPolicy, prepare_learning_context, temporal_client,
     verify_implementation_closure, TemporalContractError)
 from src.temporal_learning.core import stable_json_hash, utc
+from src.temporal_learning.diagnostic_labels import diagnostic_label_clock
+
+
+def read_frozen_draw_history(*, factors_path, factors_sha256, audit_path,
+                            audit_sha256, cutoff, label_delay_hours):
+    """Replay original training-table construction from two explicit old snapshots.
+
+    This is an input reader, not a fit. Hashes and unique native join keys must
+    match. Shared diagnostic clocks require all supplied labels before cutoff;
+    no target settlement is read. Return the original ordered pandas frame for
+    bind_frozen_draw_foundation to check against its exact admitted-history hash.
+    No writes. Model and source evidence stay historical diagnostic only.
+    """
+    payloads=[]
+    for path,digest in ((factors_path,factors_sha256),(audit_path,audit_sha256)):
+        raw=Path(path).read_bytes()
+        if hashlib.sha256(raw).hexdigest()!=digest:
+            raise TemporalContractError('Reference history file changed')
+        payloads.append(json.loads(raw))
+    factors,audit=payloads
+    history=pd.DataFrame(factors['rows'])
+    labels=pd.DataFrame(audit['rows'])
+    history=history.merge(labels[['issue','slot','provider_id','actual_direction']],
+        on=['issue','slot','provider_id'],validate='one_to_one',how='left').rename(columns={'actual_direction':'actual'})
+    if history.empty or not history.actual.isin(['W','D','L']).all():
+        raise TemporalContractError('Missing or invalid reference history labels')
+    history['fixture_decision_ts']=[factors['cutoffs'][str(r.issue)][str(r.slot)] for r in history.itertuples()]
+    history['label_available_ts']=[diagnostic_label_clock(t,cutoff=cutoff,delay_hours=label_delay_hours)
+                                   for t in history.fixture_decision_ts]
+    history['issue_code']=history.issue.astype(str)
+    history['issue_year']=pd.to_datetime(history.fixture_decision_ts,utc=True).dt.year
+    return history
 
 
 @temporal_client

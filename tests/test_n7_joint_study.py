@@ -28,7 +28,7 @@ def test_completed_issue_futures_are_released_before_study_finishes(tmp_path, mo
         path.write_bytes(gzip.compress(json.dumps(bundle).encode()))
         bundles[issue] = bundle; hashes[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
     receipt = dict(issues=list(bundles), historical_admission=False, bundle_hashes=hashes)
-    (source / 'plans-frozen.json').write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
+    (source / 'candidate-manifest.json').write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
     config = tmp_path / 'config.json'
     config.write_text(json.dumps(dict(seeds=[42], arms=['QUALITY_PROB'], workers=1,
         provenance_roots=['src.n7_joint_study', 'src.temporal_learning'])))
@@ -54,7 +54,7 @@ def test_completed_issue_futures_are_released_before_study_finishes(tmp_path, mo
 
     monkeypatch.setattr(study, 'run_prefix_issue', run)
     monkeypatch.setattr(study, 'as_completed', watch)
-    frozen = study.freeze_prefix_study(source, tmp_path / 'output', config, repository_root=ROOT,
+    frozen = study.freeze_prefix_study(source, tmp_path / 'output', config, source_manifest=source / "candidate-manifest.json", repository_root=ROOT,
         python='unused', rscript='unused', entry_point='scripts/run_n7_joint_issue.R', r_sources=study.JOINT_R_SOURCES)
     assert observed == [True]
     assert len(frozen['receipt']['plan_hashes']) == 3
@@ -120,8 +120,9 @@ def test_r_boundary_rejects_cutoffs_and_source_mutation(tmp_path, monkeypatch, f
             repository_root=ROOT, python="explicit-python", rscript="Rscript", entry_point="scripts/run_n7_joint_issue.R")
 
 
+@pytest.mark.parametrize("fresh", [False, True])
 @pytest.mark.parametrize("core_layers", [False, True])
-def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, monkeypatch, fixture_bundle, core_layers):
+def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, monkeypatch, fixture_bundle, core_layers, fresh):
     bundle = fixture_bundle; issue = bundle["issue"]
     source = tmp_path / "source"; (source / "bundles").mkdir(parents=True)
     path = source / "bundles" / f"{issue}.json.gz"
@@ -129,7 +130,7 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
     prior_receipt = dict(issues=[issue], historical_admission=False,
                          bundle_hashes={str(path): hashlib.sha256(path.read_bytes()).hexdigest()})
     prior = dict(receipt=prior_receipt, seal=stable_json_hash(prior_receipt))
-    (source / "plans-frozen.json").write_text(json.dumps(prior))
+    (source / "candidate-manifest.json").write_text(json.dumps(prior))
     cfg = dict(seeds=[42], arms=["QUALITY_PROB"], workers=1,
                provenance_roots=["src.n7_joint_study", "src.temporal_learning"])
     if core_layers:
@@ -147,7 +148,7 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
 
     monkeypatch.setattr(study, "run_prefix_issue", run)
     output = tmp_path / "study"
-    frozen = study.freeze_prefix_study(source, output, config, repository_root=ROOT,
+    frozen = study.freeze_prefix_study(source, output, config, source_manifest=source / "candidate-manifest.json", repository_root=ROOT,
         settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
         python="unused", rscript="unused",
         entry_point="scripts/run_n7_joint_issue.R", r_sources=study.JOINT_R_SOURCES)
@@ -157,18 +158,27 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
     audit = source / "audit-snapshot.json"; audit.write_text(json.dumps(dict(rows=[dict(issue=issue)])))
     controls = [dict(issue=issue, seed=42, arm=a) for a in ("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512")]
     (source / "results.json").write_text(json.dumps(dict(rows=controls)))
-    er = dict(freeze_sha256=hashlib.sha256((source / "plans-frozen.json").read_bytes()).hexdigest(),
+    er = dict(freeze_sha256=hashlib.sha256((source / "candidate-manifest.json").read_bytes()).hexdigest(),
         audit_path=str(audit), audit_sha256=hashlib.sha256(audit.read_bytes()).hexdigest(),
         result_sha256=hashlib.sha256((source / "results.json").read_bytes()).hexdigest())
     (source / "evaluation-receipt.json").write_text(json.dumps(er))
+    if fresh:
+        (source / "results.json").unlink()
+        (source / "evaluation-receipt.json").unlink()
+    reference_arms = [] if fresh else ("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512")
+    with pytest.raises(ValueError, match="Settlement snapshot hash mismatch"):
+        study.evaluate_prefix_study(source, output, audit_path=audit, audit_sha256="0" * 64,
+            repository_root=ROOT, describe_plan=study.describe_joint_plan,
+            reference_arms=reference_arms, reference_seeds=[42],
+            settle_plan=settle_core_layers if core_layers else study.settle_single_tickets)
     with pytest.raises(ValueError, match="callback qualified identity differs"):
-        study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        study.evaluate_prefix_study(source, output, audit_path=audit, audit_sha256=er["audit_sha256"], repository_root=ROOT,
             describe_plan=study.describe_joint_plan, reference_arms=[], reference_seeds=[],
             settle_plan=lambda plan, rows: {})
-    result = study.evaluate_prefix_study(source, output, repository_root=ROOT,
+    result = study.evaluate_prefix_study(source, output, audit_path=audit, audit_sha256=er["audit_sha256"], repository_root=ROOT,
         settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
-        describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
-    assert len(result["rows"]) == 3
+        describe_plan=study.describe_joint_plan, reference_arms=reference_arms, reference_seeds=[42])
+    assert len(result["rows"]) == (1 if fresh else 3)
     assert result["rows"][0]["status"] == "NO_BET"
     assert result["rows"][0]["net"] == 0
     if core_layers:
@@ -176,15 +186,15 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
         assert result["rows"][0]["opportunity_gross"] == 0
     assert all(Path(p).read_bytes() == raw for p, raw in original_plans.items())
     with pytest.raises(ValueError, match="already frozen"):
-        study.evaluate_prefix_study(source, output, repository_root=ROOT,
-        describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
+        study.evaluate_prefix_study(source, output, audit_path=audit, audit_sha256=er["audit_sha256"], repository_root=ROOT,
+        describe_plan=study.describe_joint_plan, reference_arms=reference_arms, reference_seeds=[42])
     # Replaying with changed raw input must stop, not update old receipts.
     (output / "evaluation-receipt.json").unlink()
     path.write_bytes(b"corrupted")
     with pytest.raises(ValueError, match="source changed"):
-        study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        study.evaluate_prefix_study(source, output, audit_path=audit, audit_sha256=er["audit_sha256"], repository_root=ROOT,
         settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
-        describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
+        describe_plan=study.describe_joint_plan, reference_arms=reference_arms, reference_seeds=[42])
 
 
 @pytest.mark.parametrize("worker_error", [False, True])
@@ -194,7 +204,7 @@ def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixt
     path.write_bytes(gzip.compress(json.dumps(fixture_bundle).encode()))
     receipt = dict(issues=[issue], historical_admission=False,
                    bundle_hashes={str(path): hashlib.sha256(path.read_bytes()).hexdigest()})
-    (source / "plans-frozen.json").write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
+    (source / "candidate-manifest.json").write_text(json.dumps(dict(receipt=receipt, seal=stable_json_hash(receipt))))
     config = tmp_path / "cfg.json"
     config.write_text(json.dumps(dict(seeds=[42], arms=["QUALITY_PROB"], workers=1,
         provenance_roots=["src.n7_joint_study", "src.temporal_learning"])))
@@ -205,7 +215,7 @@ def test_incomplete_grid_never_gets_a_freeze_receipt(tmp_path, monkeypatch, fixt
     monkeypatch.setattr(study, "run_prefix_issue", run)
     out = tmp_path / "out"
     with pytest.raises(ValueError, match="Worker failed" if worker_error else "Incomplete"):
-        study.freeze_prefix_study(source, out, config, repository_root=ROOT, python="unused", rscript="unused",
+        study.freeze_prefix_study(source, out, config, source_manifest=source / "candidate-manifest.json", repository_root=ROOT, python="unused", rscript="unused",
         entry_point="scripts/run_n7_joint_issue.R", r_sources=study.JOINT_R_SOURCES)
     assert not (out / "plans-frozen.json").exists()
     if worker_error:

@@ -1,0 +1,87 @@
+{
+  "mode": "EXPOSED_HISTORICAL_DIAGNOSTIC",
+  "model_id": "market-balance-draw-1.0.0-diagnostic",
+  "budgets": [
+    1024
+  ],
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000,
+  "seeds": [
+    42501,
+    42502,
+    42503
+  ],
+  "evaluation_seed_offset": 1000000,
+  "training_worlds": 256,
+  "evaluation_worlds": 5000,
+  "depths": [
+    8,
+    16,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512,
+    768,
+    1024,
+    1536,
+    2048,
+    2187
+  ],
+  "equal_depths": [],
+  "coverage_targets": [],
+  "coverage_tolerance": 1e-12,
+  "nodes": 40,
+  "gap": 0.01,
+  "time_seconds": 15,
+  "workers": 2,
+  "entry_point": "scripts/run_n7_capital_issue.R",
+  "r_sources": [
+    "r/n7_sleeve_tables.R",
+    "r/n7_joint_sleeves.R",
+    "r/n7_capital_depth.R",
+    "r/n7_capital_portfolio.R",
+    "r/n7_capital_issue.R",
+    "scripts/run_n7_capital_issue.R",
+    "config/n7_joint_runtime.json",
+    "config/compression_breadth_runtime.json"
+  ],
+  "reference_arms": [],
+  "reference_seeds": [],
+  "provenance_roots": [
+    "src.n7_joint_study",
+    "src",
+    "src.divergence_materializer",
+    "src.low_n_selector_data",
+    "src.n7_chronology_sync",
+    "src.n7_support_shape",
+    "src.n7_support_transfer_grid",
+    "src.neural_top2_residual",
+    "src.qeu_threshold_n7",
+    "src.source_schema",
+    "src.temporal_learning",
+    "src.n7_capital_study"
+  ],
+  "preferences": [
+    {
+      "name": "ANY_ROI_NONE",
+      "objective": "any_hit",
+      "minimum_roi": -1,
+      "minimum_hit": 0,
+      "spend_all": true
+    }
+  ],
+  "arms": [
+    "NONUNIFORM_ANY_ROI_NONE_B1024"
+  ],
+  "inherited_configuration": {
+    "path": "config/n7_capital_425.json",
+    "sha256": "4af8c528d9c8949a5bb19eebc1a518984604923cbff9f738b0d62754e8b0a29b",
+    "selection": "Existing NONUNIFORM_ANY_ROI_NONE_B1024 arm only; no probability or allocation parameter tuning"
+  }
+}

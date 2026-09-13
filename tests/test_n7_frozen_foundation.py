@@ -5,10 +5,32 @@ import pandas as pd
 import pytest
 
 from src.probability_foundation_draw import fit_draw_foundation, predict_draw_foundation
-from src.n7_frozen_foundation import bind_frozen_draw_foundation
+from src.n7_frozen_foundation import bind_frozen_draw_foundation, read_frozen_draw_history
 from src.temporal_learning import Cutoff, TemporalContractError
 
 ROOT=Path(__file__).resolve().parents[1]
+
+
+def test_reference_history_reader_preserves_keys_and_shared_clocks(tmp_path):
+    factors=dict(rows=[dict(issue='001',slot=1,provider_id='002',q_D=.2)],
+                 cutoffs={'001':{'1':'2010-01-01T00:00:00Z'}})
+    audit=dict(rows=[dict(issue='001',slot=1,provider_id='002',actual_direction='D')])
+    fp=tmp_path/'factors.json';ap=tmp_path/'audit.json'
+    fp.write_text(json.dumps(factors));ap.write_text(json.dumps(audit))
+    args=dict(factors_path=fp,factors_sha256=hashlib.sha256(fp.read_bytes()).hexdigest(),
+        audit_path=ap,audit_sha256=hashlib.sha256(ap.read_bytes()).hexdigest(),
+        cutoff=Cutoff.decision_epoch('target','2010-02-01T00:00:00Z'),label_delay_hours=6)
+    result=read_frozen_draw_history(**args)
+    assert result.provider_id.tolist()==['002']
+    assert result.label_available_ts.tolist()==['2010-01-01T06:00:00+00:00']
+    assert result.actual.tolist()==['D']
+    with pytest.raises(TemporalContractError,match='precede cutoff'):
+        read_frozen_draw_history(**{**args,'cutoff':Cutoff.decision_epoch('target','2010-01-01T01:00:00Z')})
+    with pytest.raises(TemporalContractError,match='file changed'):
+        read_frozen_draw_history(**{**args,'audit_sha256':'0'*64})
+    audit['rows']*=2;ap.write_text(json.dumps(audit))
+    with pytest.raises(pd.errors.MergeError):
+        read_frozen_draw_history(**{**args,'audit_sha256':hashlib.sha256(ap.read_bytes()).hexdigest()})
 
 
 def test_frozen_cells_rebind_without_fit_and_reject_changed_history(tmp_path,monkeypatch):

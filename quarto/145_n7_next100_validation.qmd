@@ -1,0 +1,79 @@
+---
+title: "N7 后续 100 期固定策略比较"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  error: false
+  cache: false
+  freeze: false
+params:
+  predictions_path: null
+  predictions_sha256: null
+  study_config: null
+  study_config_sha256: null
+---
+
+本研究固定为原生清单中 101120 之后的 100 期（101121–110513）。数据清洗由另一会话负责；本报告只使用已交接的发布数据。缺失期保留在分母中，不替换为更晚的完整期。
+
+当前为**票单冻结前的输入报告**，尚未读取本批实际结算，不能据此报告命中率、收益或回撤。完整交付仍须完成票单冻结、独立结算复核和 Codex review。
+
+```{r}
+stopifnot(is.character(params$predictions_path),is.character(params$study_config),
+          identical(digest::digest(file=params$predictions_path,algo='sha256'),params$predictions_sha256),
+          identical(digest::digest(file=params$study_config,algo='sha256'),params$study_config_sha256))
+pred <- jsonlite::read_json(params$predictions_path,simplifyVector=TRUE)
+cfg <- jsonlite::read_json(params$study_config,simplifyVector=TRUE)
+stopifnot(identical(pred$historical_admission,FALSE),identical(cfg$historical_admission,FALSE),
+          length(pred$issue_order)==cfg$scope$issue_count,!anyDuplicated(pred$issue_order),
+          pred$issue_order[1]==cfg$scope$first,tail(pred$issue_order,1)==cfg$scope$last)
+probabilities <- tibble::as_tibble(pred$rows)
+stopifnot(!anyDuplicated(probabilities[c('issue','slot','provider_id')]),
+          all(abs(rowSums(probabilities[c('q_W','q_D','q_L')])-1)<1e-10),
+          all(abs(rowSums(probabilities[c('new_W','new_D','new_L')])-1)<1e-10))
+periods <- tibble::tibble(issue=pred$issue_order,order=seq_along(pred$issue_order)) |>
+  dplyr::left_join(tibble::as_tibble(pred$publication_coverage),by='issue',relationship='one-to-one') |>
+  dplyr::left_join(dplyr::count(probabilities,issue,name='projected_fixtures'),by='issue',relationship='one-to-one') |>
+  dplyr::mutate(projected_fixtures=tidyr::replace_na(projected_fixtures,0L),
+                excluded_fixtures=fixture_market_rows/2-projected_fixtures)
+stopifnot(!anyNA(periods$status),all(probabilities$version==cfg$model$version),
+          all(periods$fixture_market_rows%%2==0),all(periods$excluded_fixtures>=0))
+```
+
+## 固定规则与概率口径
+
+每期预算 `r cfg$budget_cny` 元，基本投注单位 `r cfg$unit_cny` 元，7 串 1，初始资金 `r cfg$initial_capital_cny` 元，不补资。结算时只施加一次票级 `r cfg$payout_factor` 系数。未投入资金保留现金。
+
+市场概率由已选赛前欧赔和大小球通过原有进球分布函数推导。固定让平校正版本为 `r cfg$model$version`：保留原训练样本、统计权重、16 个校正单元与参数，只为新期生成截止时间凭证，不调用训练函数。此数据与时间证据仍属历史诊断，不能升级为实测赛前可获得性。
+
+对照为 `r cfg$control`，比较 #433 已登记的主力／机会完整策略网格及三个固定 seed。候选组生成和分配参数保持原口径，不根据本批结果调参。
+
+## 数据范围
+
+本输入快照有 `r sum(periods$projected_fixtures>0)` 期、`r sum(periods$projected_fixtures)` 场完成概率转换。已发布场次中有 `r sum(periods$excluded_fixtures)` 场未同时满足两类盘口的研究输入条件。清洗完成不等于每场均可参与回测；这些场次保留在原始分母中。
+
+```{r}
+knitr::kable(dplyr::select(periods,issue,status,fixture_market_rows,projected_fixtures,excluded_fixtures),
+             col.names=c('期号','发布读取状态','场次×市场记录','已转换概率场数','未转换场数'))
+```
+
+## 概率表结构与前几行
+
+`q_W/D/L` 是欧赔＋大小球映射后的原市场让球概率；`new_W/D/L` 是固定校正后的概率。两者均为 0–1 的概率，不是 SP，也不是实际命中率。
+
+```{r}
+dplyr::glimpse(probabilities)
+knitr::kable(utils::head(dplyr::select(probabilities,issue,slot,provider_id,handicap,
+  q_W,q_D,q_L,new_W,new_D,new_L),10),digits=4)
+```
+
+## 输入身份
+
+```{r}
+knitr::kable(tibble::tibble(
+  input=c('研究概率快照','固定研究配置'),
+  sha256=c(params$predictions_sha256,params$study_config_sha256)))
+```
+
+后续收益与回撤部分将以全部冻结票单及独立核验的结算为输入；本阶段没有用旧 100 期结果代替新批次结果。

@@ -60,3 +60,57 @@ project_n7_market_inputs <- function(fixtures, total_quotes, cutoffs,
        parameters=list(total_bounds=total_bounds,tail_tolerance=tail_tolerance,
                        method='EXISTING_OU_FIXED_MEAN_LEAST_SQUARES_1X2'))
 }
+
+# Adapt verified published market rows and lottery handicaps, without cleaning.
+# market_rows is a list of per-market records from read_n7_published_markets;
+# handicaps is a tibble with issue/slot/provider_id/home_handicap. cutoffs is
+# the explicit issue -> slot map from that release. Keep every non-ready fixture
+# in exclusions with both source statuses. Returns typed projection inputs,
+# narrowed ready cutoffs and the full input cutoffs. No writes or label access.
+n7_published_projection_inputs <- function(market_rows, handicaps, cutoffs) {
+  fixture_template <- tibble::tibble(issue=character(),slot=integer(),provider_id=character(),
+    handicap=integer(),cutoff_utc=character(),odds_W=double(),odds_D=double(),odds_L=double())
+  quote_template <- tibble::tibble(issue=character(),slot=integer(),provider_id=character(),
+    company=character(),line=double(),over_hk=double(),under_hk=double())
+  exclusion_template <- tibble::tibble(issue=character(),slot=integer(),provider_id=character(),
+    euro_status=character(),total_status=character())
+  if (!is.list(market_rows) || !is.data.frame(handicaps) ||
+      !all(c('issue','slot','provider_id','home_handicap') %in% names(handicaps)) ||
+      !is.character(handicaps$issue) || !is.character(handicaps$provider_id) ||
+      anyNA(handicaps[c('issue','slot','provider_id','home_handicap')]) ||
+      anyDuplicated(handicaps[c('issue','slot')])) stop('Invalid published handicap identities')
+  group_keys <- vapply(market_rows,function(r) paste(r$issue,r$slot,sep='/'),character(1))
+  if (!setequal(unique(group_keys),paste(handicaps$issue,handicaps$slot,sep='/')))
+    stop('Published market/handicap scope mismatch')
+  fixtures <- quotes <- exclusions <- list()
+  ready_cutoffs <- list()
+  for (group in split(market_rows,group_keys)) {
+    if (length(group)!=2L || !setequal(vapply(group,`[[`,character(1),'market'),c('euro','total')))
+      stop('Exactly two published markets required')
+    e <- group[[which(vapply(group,`[[`,character(1),'market')=='euro')]]
+    t <- group[[which(vapply(group,`[[`,character(1),'market')=='total')]]
+    h <- handicaps[handicaps$issue==e$issue & handicaps$slot==e$slot,]
+    cut <- cutoffs[[e$issue]][[as.character(e$slot)]]
+    if (nrow(h)!=1L || !identical(e$provider_id,t$provider_id) ||
+        !identical(h$provider_id,e$provider_id) || is.null(cut) ||
+        !identical(e$cutoff_utc,cut) || !identical(t$cutoff_utc,cut)) stop('Published identity/cutoff mismatch')
+    if (e$status!='QUOTES_PRIOR_DIAGNOSTIC' || t$status!='QUOTES_PRIOR_DIAGNOSTIC') {
+      exclusions[[length(exclusions)+1L]] <- tibble::tibble(issue=e$issue,slot=as.integer(e$slot),
+        provider_id=e$provider_id,euro_status=e$status,total_status=t$status)
+      next
+    }
+    eq <- dplyr::bind_rows(e$rows); tq <- dplyr::bind_rows(t$rows)
+    if (!nrow(eq) || !nrow(tq) || nrow(eq)!=e$prior_companies || nrow(tq)!=t$prior_companies ||
+        anyDuplicated(eq$company) || anyDuplicated(tq$company)) stop('Published company contract mismatch')
+    fixtures[[length(fixtures)+1L]] <- tibble::tibble(issue=e$issue,slot=as.integer(e$slot),
+      provider_id=e$provider_id,handicap=h$home_handicap,cutoff_utc=cut,
+      odds_W=mean(eq$odds_W),odds_D=mean(eq$odds_D),odds_L=mean(eq$odds_L))
+    quotes[[length(quotes)+1L]] <- dplyr::mutate(tq,issue=e$issue,slot=as.integer(e$slot),provider_id=e$provider_id) |>
+      dplyr::select(dplyr::all_of(names(quote_template)))
+    ready_cutoffs[[e$issue]][[as.character(e$slot)]] <- cut
+  }
+  list(fixtures=dplyr::bind_rows(fixture_template,fixtures),
+       total_quotes=dplyr::bind_rows(quote_template,quotes),
+       exclusions=dplyr::bind_rows(exclusion_template,exclusions),
+       cutoffs=ready_cutoffs,input_cutoffs=cutoffs,historical_admission=FALSE)
+}

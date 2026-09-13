@@ -31,3 +31,33 @@ testthat::test_that('market-only projection equals existing projection without f
   testthat::expect_equal(nrow(empty$fixtures),0L)
   testthat::expect_type(empty$fixtures$q_D,'double')
 })
+
+testthat::test_that('published input adapter retains exclusions and source identity', {
+  cut <- '2010-01-01T00:00:00Z'
+  e <- list(issue='001',slot=1L,provider_id='002',market='euro',cutoff_utc=cut,
+            status='QUOTES_PRIOR_DIAGNOSTIC',prior_companies=2L,
+            rows=list(list(company='A',odds_W=2,odds_D=3,odds_L=4),
+                      list(company='B',odds_W=3,odds_D=4,odds_L=5)))
+  t <- list(issue='001',slot=1L,provider_id='002',market='total',cutoff_utc=cut,
+            status='QUOTES_PRIOR_DIAGNOSTIC',prior_companies=1L,
+            rows=list(list(company='A',line=2.5,over_hk=.9,under_hk=1)))
+  h <- tibble::tibble(issue='001',slot=1L,provider_id='002',home_handicap=-1L)
+  cuts <- list('001'=list('1'=cut))
+  x <- n7_published_projection_inputs(list(e,t),h,cuts)
+  testthat::expect_equal(x$fixtures$odds_W,2.5)
+  testthat::expect_identical(x$cutoffs,cuts)
+  testthat::expect_equal(nrow(x$total_quotes),1L)
+  testthat::expect_equal(nrow(x$exclusions),0L)
+  testthat::expect_equal(nrow(project_n7_market_inputs(x$fixtures,x$total_quotes,x$cutoffs,c(.1,16),1e-10)$fixtures),1L)
+  bad <- t;bad$status <- 'NO_PRIOR_QUOTES';bad$rows <- list();bad$prior_companies <- 0L
+  z <- n7_published_projection_inputs(list(e,bad),h,cuts)
+  testthat::expect_equal(z$exclusions$total_status,'NO_PRIOR_QUOTES')
+  testthat::expect_equal(nrow(z$fixtures),0L)
+  testthat::expect_identical(z$input_cutoffs,cuts)
+  testthat::expect_error(n7_published_projection_inputs(list(e,t),h[0,],cuts),'scope mismatch')
+  testthat::expect_error(n7_published_projection_inputs(list(e,e,t),h,cuts),'two published')
+  bad <- t;bad$provider_id <- '003'
+  testthat::expect_error(n7_published_projection_inputs(list(e,bad),h,cuts),'identity/cutoff')
+  bad <- t;bad$prior_companies <- 2L
+  testthat::expect_error(n7_published_projection_inputs(list(e,bad),h,cuts),'company contract')
+})
