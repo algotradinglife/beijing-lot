@@ -9,6 +9,17 @@ from src.n7_core_check import core_replay_surface, check_core_plan
 from src.temporal_learning.core import stable_json_hash
 
 
+def test_shared_issue_opening_crossings_are_legal_depth_choices():
+    x=json.loads(gzip.decompress((Path(__file__).parent/'fixtures/n7_core433_shared_depth.json.gz').read_bytes()))
+    p=x['plans'][0]; c=x['config']; b=x['bundle']
+    surface=core_replay_surface(b,c,cutoffs=b['cutoffs'])
+    sleeve=next(k for layer in p['layers'] for k in layer['sleeve_keys']
+                if k['sleeve_id']==2 and layer['role']=='CORE')
+    assert sleeve['depth']==90 and surface[2]['opening']==48
+    assert 90 not in c['depths']
+    assert check_core_plan(p,x['worlds'],c,b)['status']=='PASS'
+
+
 def test_core_replay_prefixes_layers_and_adversarial_changes():
     x=json.loads(gzip.decompress((Path(__file__).parent/'fixtures/n7_core433_replay.json.gz').read_bytes()))
     b,c,w=x['bundle'],x['config'],x['worlds']
@@ -76,3 +87,25 @@ def test_shared_receipt_checker_visits_all_physical_layers(tmp_path):
     result=check_prefix_study(tmp_path,repository_root=root,check_plan=check_core_plan,
         check_result=check_core_result,physical_plans=lambda p:p['layers'])
     assert result['plans_checked']==3 and result['status']=='PASS'
+
+
+def test_independent_core_settlement_counts_paid_copies_separately():
+    import pandas as pd
+    from src.n7_core_settlement import settle_core_layers
+    from src.n7_core_check import check_core_settlement
+    x=json.loads(gzip.decompress((Path(__file__).parent/'fixtures/n7_core433_replay.json.gz').read_bytes()))
+    p=x['plans'][-1]
+    audit=[dict(issue=f['issue'],slot=f['slot'],provider_id=f['provider_id'],handicap=f['handicap'],
+        actual_direction='W',spf_sp=2.,status='READY') for f in p['fixtures']]
+    # Force a selected first-layer prefix to win; probabilities stay frozen.
+    first=p['layers'][0]
+    for idx, direction in zip(first['fixture_indices'][0],first['outcomes'][0]):
+        audit[idx]['actual_direction']='WDL'[direction]
+    result=settle_core_layers(p,pd.DataFrame(audit))
+    checked=check_core_settlement(p,audit,result)
+    assert checked['hits']>0 and checked['paid_hits']>=checked['hits']
+    assert checked['gross']==pytest.approx(result['gross'])
+    assert checked['core_gross']+checked['opportunity_gross']==pytest.approx(checked['gross'])
+    for field in ('gross','hits','paid_hits','core_gross','opportunity_stake'):
+        with pytest.raises(ValueError,match='settlement'):
+            check_core_settlement(p,audit,dict(result,**{field:result[field]+1}))

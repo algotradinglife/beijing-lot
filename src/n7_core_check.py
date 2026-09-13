@@ -68,6 +68,12 @@ def check_core_plan(plan, worlds, config, source_bundle):
     surface = core_replay_surface(source_bundle, config, cutoffs=plan['cutoffs'])
     ranked = sorted(surface, key=lambda i: (-surface[i]['mass'][64], -surface[i]['value'][64], i))
     core = ranked[:policy['core_count']]
+    # The frozen R issue runner builds one shared depth pool: configured depths
+    # plus opening crossings for every registered core cohort in this issue.
+    # Those extra crossings are legal depth choices for any held core group.
+    shared_core_count = max(p['core_count'] for p in config['policies'])
+    legal_depths = set(config['depths']) | {
+        surface[i]['opening'] for i in ranked[:shared_core_count]}
     remaining = [i for i in ranked if i not in core]
     def_score = {i: (surface[i]['mass'][15], surface[i]['value'][15]-30) for i in remaining}
     if policy['opportunity_rule'] == 'VALUE':
@@ -94,7 +100,7 @@ def check_core_plan(plan, worlds, config, source_bundle):
                 raise ValueError('Opportunity exceeds fixed prefix')
             if role == 'CORE' and (k < r['opening'] or
                     (policy['mode'] != 'DEPTH' and k != r['opening']) or
-                    (policy['mode'] == 'DEPTH' and k not in [r['opening'], *config['depths']])):
+                    (policy['mode'] == 'DEPTH' and k not in legal_depths)):
                 raise ValueError('Core opening/depth mismatch')
             if copy == 1:
                 if sid in held: raise ValueError('Repeated first-layer sleeve')
@@ -166,6 +172,15 @@ def check_core_plan(plan, worlds, config, source_bundle):
             zero_net_probability=float((~win & ~loss).mean()), conditional_gain=gain, conditional_loss=decline,
             payoff_ratio=gain/abs(decline) if gain is not None and decline is not None else None,
             simulated_expected_net=float(net.mean()))
+        cover = [surface[i]['mass'][k] for i, (k, _) in held.items()]
+        money = [2*k*m for k, m in held.values()]
+        metrics.update(sleeves=len(held), distinct_fixture_count=len({int(f) for i in held for f in surface[i]['f']}),
+            gain_support=int(win.sum()), loss_support=int(loss.sum()), simulation_worlds=len(w),
+            payoff_support_status='BOTH_EVENTS_OBSERVED' if win.any() and loss.any() else 'INSUFFICIENT_CONDITIONAL_SUPPORT',
+            coverage_mean=float(np.mean(cover)) if cover else None,
+            coverage_weighted_mean=float(np.dot(cover, money)/plan['stake']) if units else None,
+            coverage_median=float(np.median(cover)) if cover else None,
+            coverage_min=float(min(cover)) if cover else None, coverage_max=float(max(cover)) if cover else None)
         for key, val in metrics.items():
             _capital_close(plan[kind][key], val, 'core.'+kind+'.'+key, absolute=1e-6)
     return dict(status='PASS', paid_units=units, unique_tickets=plan['unique_tickets'])
@@ -201,3 +216,43 @@ def check_core_result(result, source_bundle, config):
     if set(actual) != expected or len(actual) != len(expected):
         raise ValueError('Core plan grid incomplete or duplicated')
     return dict(status='PASS', features_checked=len(rows), plans=len(actual))
+
+
+def check_core_settlement(plan, audit_rows, result_row):
+    """Independently aggregate canonical winning states across genuine copy layers.
+
+    Reuses #425's state-based settlement checker for each layer; the authoritative
+    unit-ticket evaluator supplies its separately implemented comparison value.
+    First layers count unique wins, every layer counts paid units. Actual SP is
+    read only here, after the caller verifies a complete frozen study. CNY units;
+    missing winning SP, identity conflict or any mismatch fails acceptance.
+    """
+    import pandas as pd
+    from src.n7_single_ticket_sampling import settle_single_tickets
+    from src.n7_core_settlement import settle_core_layers
+    from src.n7_capital_check import check_capital_settlement
+
+    # Structural validation and missing-label semantics stay authoritative.
+    authoritative = settle_core_layers(plan, pd.DataFrame(audit_rows))
+    if authoritative['status'] not in ('COMPLETE', 'NO_BET'):
+        raise ValueError('Core settlement still pending')
+    parts = []
+    for layer in plan['layers']:
+        child = {k: v for k, v in layer.items() if k != 'seal'}
+        child['seal'] = stable_json_hash(child)
+        unit_result = settle_single_tickets(child, pd.DataFrame(audit_rows))
+        independent = check_capital_settlement(child, audit_rows, unit_result)
+        parts.append((layer['role'], layer['copy_index'], independent))
+    stake = sum(r['stake'] for _, _, r in parts)
+    gross = sum(r['gross'] for _, _, r in parts)
+    expected = dict(status='COMPLETE' if stake else 'NO_BET',stake=stake,gross=gross,net=gross-stake,
+        groups=sum(r['groups'] for _, _, r in parts),
+        hits=sum(r['hits'] for _, index, r in parts if index == 1),
+        paid_hits=sum(r['hits'] for _, _, r in parts),roi=gross/stake-1 if stake else None)
+    for role in ('CORE', 'OPPORTUNITY'):
+        for field in ('stake', 'gross'):
+            expected[role.lower()+'_'+field] = sum(r[field] for tag, _, r in parts if tag == role)
+    for field, value in expected.items():
+        _capital_close(result_row[field], value, 'core.settlement.'+field, absolute=1e-6)
+        _capital_close(authoritative[field], value, 'core.authoritative.'+field, absolute=1e-6)
+    return expected
