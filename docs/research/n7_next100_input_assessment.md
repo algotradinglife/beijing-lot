@@ -1,0 +1,14 @@
+# #435 输入衔接检查
+
+检查日期：2026-09-13。以下是输入调查，不是回测结果或数据验收。
+
+- 固定范围已保存于持久化根 `audits/issue435-next100-v1/scope.json`，绑定原生 inventory 与当前盘口发布文件 SHA-256。100 期中当前发布覆盖 55 期，未发布 45 期。
+- 持久化目录检查通过；登记盘口 merged.json 的 SHA-256 核验通过。路径检查不能证明盘口内容有效。
+- 已核验 `all-history-market-v1`、`all-history-market-one-second-v2/v3` 计划归档。其中 v1 的 190 个 reused scopes 不包含这 45 期，不能直接作为补齐计划。
+- 登记的 `fundamentals/raw/historical-v2.tar.zst` 整包 SHA-256 验证通过，前 45 期场次页面全部 HTTP 200，解析到 2840 场。已保存原始响应副本与成员哈希供后续离线处理。
+- 当前盘口 index 对这 2840 场均有欧赔及大小球条目：欧赔 HTTP_OK 2840；大小球 HTTP_OK 2826、HTTP_FAILURE 7、TRANSPORT_FAILURE 7。失败分布在 101122、101203、101210、101211、110109 五期。此处仅验证索引匹配，尚未验证各盘口响应字节、比赛身份、报价时间与解析质量。证据：`audits/issue435-next100-v1/missing45-roster-index-check.json`。
+- 旧概率版本来自已核验的 `market-balance-draw-v1` 归档：`market-balance-draw-1.0.0-diagnostic`，100 个逐期模型，只使用原始 48 期训练数据。末期 101120 模型成员 SHA-256 为 `74bc7729496cccb64722e75200dc0d59c3ddf7acb6b64271fd5f8cc1c76770ea`。
+- 固定参数：市场让平分界 `[0,.1,.15,.2,.25,.3,.35,1]`；市场胜负概率差分界 `[0,.1,.2,.3,.4,.5,.6,1]`；prior_strength=100；epsilon=1e-6。证据保存在 `audits/issue435-next100-v1/inherited-model-metadata.json`。
+- `predict_draw_foundation` 要求模型 receipt 与目标 cutoff 完全一致，不能将 101120 缓存直接用于新期。下一步通过已有 temporal_learning 接口验证固定原训练样本与参数的逐期凭证生成，核对校正单元统计保持一致；不使用新增期标签更新模型。
+
+本轮仅保存范围与模型元信息，未生成目标期票单，未读取目标期实际结算赛果或 SP，尚无新 100 期收益结论。
