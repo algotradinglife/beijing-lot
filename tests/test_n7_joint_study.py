@@ -13,6 +13,7 @@ import pytest
 import src.n7_joint_study as study
 from src.temporal_learning import Cutoff
 from src.temporal_learning.core import stable_json_hash
+from src.n7_core_settlement import settle_core_layers
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -147,6 +148,7 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
     monkeypatch.setattr(study, "run_prefix_issue", run)
     output = tmp_path / "study"
     frozen = study.freeze_prefix_study(source, output, config, repository_root=ROOT,
+        settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
         python="unused", rscript="unused",
         entry_point="scripts/run_n7_joint_issue.R", r_sources=study.JOINT_R_SOURCES)
     assert len(frozen["receipt"]["plan_hashes"]) == 1
@@ -159,11 +161,10 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
         audit_path=str(audit), audit_sha256=hashlib.sha256(audit.read_bytes()).hexdigest(),
         result_sha256=hashlib.sha256((source / "results.json").read_bytes()).hexdigest())
     (source / "evaluation-receipt.json").write_text(json.dumps(er))
-    with pytest.raises(ValueError, match="callback is not bound"):
+    with pytest.raises(ValueError, match="callback qualified identity differs"):
         study.evaluate_prefix_study(source, output, repository_root=ROOT,
             describe_plan=study.describe_joint_plan, reference_arms=[], reference_seeds=[],
             settle_plan=lambda plan, rows: {})
-    from src.n7_core_settlement import settle_core_layers
     result = study.evaluate_prefix_study(source, output, repository_root=ROOT,
         settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
         describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
@@ -182,6 +183,7 @@ def test_freeze_precedes_labels_and_evaluation_cannot_rewrite_plans(tmp_path, mo
     path.write_bytes(b"corrupted")
     with pytest.raises(ValueError, match="source changed"):
         study.evaluate_prefix_study(source, output, repository_root=ROOT,
+        settle_plan=settle_core_layers if core_layers else study.settle_single_tickets,
         describe_plan=study.describe_joint_plan, reference_arms=("MONOLITHIC_PROB512", "MONOLITHIC_COVERAGE512"), reference_seeds=[42])
 
 

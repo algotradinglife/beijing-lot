@@ -19,6 +19,7 @@ from src.fundamentals_n7_baseline import rank_double_candidates
 from src.n7_single_ticket_sampling import settle_single_tickets
 from src.temporal_learning import Cutoff, implementation_closure, verify_implementation_closure
 from src.temporal_learning.core import stable_json_hash
+from src.temporal_learning.provenance import verify_callable_binding
 
 JOINT_R_SOURCES = ("r/n7_joint_sleeves.R", "r/n7_sleeve_tables.R",
                    "scripts/run_n7_joint_issue.R", "config/n7_joint_runtime.json",
@@ -65,7 +66,7 @@ def run_prefix_issue(bundle_path, config_path, output_path, *, cutoffs,
 
 
 def freeze_prefix_study(source, output, config_path, *, repository_root, python, rscript,
-                        entry_point, r_sources):
+                        entry_point, r_sources, settle_plan=settle_single_tickets):
     """Run the entire fixed issue/arm/seed grid and seal it before any evaluation.
 
     Reads only old freeze receipts and bundles. All raw responses/pools remain
@@ -89,6 +90,8 @@ def freeze_prefix_study(source, output, config_path, *, repository_root, python,
     if entry_point not in r_sources or len(r_sources) != len(set(r_sources)):
         raise ValueError("R source inventory must uniquely bind the entry point")
     r_sources = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in r_sources}
+    callback_identity = f"{settle_plan.__module__}:{settle_plan.__qualname__}"
+    callback_binding = verify_callable_binding(root, impl, settle_plan, expected_identity=callback_identity)
     sources = {str(source / "plans-frozen.json"): hashlib.sha256(prior_raw).hexdigest(),
                str(Path(config_path).resolve()): hashlib.sha256(cfg_raw).hexdigest()}
     expected = {(issue, seed, arm) for issue in prior["receipt"]["issues"]
@@ -142,6 +145,8 @@ def freeze_prefix_study(source, output, config_path, *, repository_root, python,
     if expected:
         raise ValueError("Incomplete frozen plan grid")
     verify_implementation_closure(root, impl)
+    if verify_callable_binding(root, impl, settle_plan, expected_identity=callback_identity) != callback_binding:
+        raise ValueError("Executing settlement callback changed during freeze")
     if any(hashlib.sha256(Path(p).read_bytes()).hexdigest() != h for p, h in sources.items()):
         raise ValueError("Inputs changed during selection")
     if any(hashlib.sha256((root / p).read_bytes()).hexdigest() != h for p, h in r_sources.items()):
@@ -151,7 +156,7 @@ def freeze_prefix_study(source, output, config_path, *, repository_root, python,
         prior_freeze_seal=prior["seal"], historical_admission=False, evidence_class="EXPOSED_HISTORICAL_DIAGNOSTIC",
         maximum_source_availability=None, maximum_label_availability=None,
         historical_partitions="NO_NEW_FIT_TUNE_CALIBRATION", frontier_statuses=statuses,
-        entry_point=entry_point)
+        entry_point=entry_point, settlement_callback=callback_binding)
     frozen = dict(receipt=receipt, seal=stable_json_hash(receipt))
     (output / "plans-frozen.json").write_text(json.dumps(frozen, sort_keys=True))
     return frozen
@@ -181,10 +186,10 @@ def evaluate_prefix_study(source, output, *, repository_root, describe_plan,
     if frozen["seal"] != stable_json_hash(receipt):
         raise ValueError("Freeze changed")
     verify_implementation_closure(root, receipt["implementation"])
-    callback_module = settle_plan.__module__
-    callback_path = callback_module.replace(".", "/") + ".py"
-    if callback_path not in receipt["implementation"]["files"]:
-        raise ValueError("Settlement callback is not bound by frozen implementation")
+    binding = receipt["settlement_callback"]
+    if verify_callable_binding(root, receipt["implementation"], settle_plan,
+                               expected_identity=binding["identity"]) != binding:
+        raise ValueError("Executing settlement callback binding changed")
     for name, digest in receipt["r_implementation"].items():
         if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
             raise ValueError("R implementation changed")

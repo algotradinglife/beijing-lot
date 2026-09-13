@@ -124,3 +124,58 @@ def verify_implementation_closure(repo_root: Path, receipt: dict[str, object]) -
     )
     if expected != receipt:
         raise TemporalContractError("transitive implementation closure differs")
+
+
+def verify_callable_binding(repo_root: Path, receipt: dict[str, object], callback,
+                            *, expected_identity: str) -> dict[str, object]:
+    """Bind a module-level callback to executing source, not its claimed name.
+
+    Requires the loaded module and globals to originate at the explicit root,
+    and compares code objects to freshly compiled frozen files without executing
+    those files. Directly referenced local Python functions are checked likewise.
+    This is an accidental cross-checkout/monkeypatch guard, not a hostile-Python
+    sandbox. Returns a deterministic identity ledger; raises on any mismatch.
+    """
+    import inspect
+    import sys
+    import types
+
+    root = Path(repo_root).resolve()
+    if not inspect.isfunction(callback):
+        raise TemporalContractError('callback must be a Python function')
+    identity = f'{callback.__module__}:{callback.__qualname__}'
+    if identity != expected_identity or '<locals>' in callback.__qualname__:
+        raise TemporalContractError('callback qualified identity differs')
+    pending = [callback]; checked = {}; compiled = {}
+    while pending:
+        function = pending.pop()
+        name = f'{function.__module__}:{function.__qualname__}'
+        if name in checked:
+            if checked[name] is not function:
+                raise TemporalContractError('multiple executing callback implementations')
+            continue
+        module = sys.modules.get(function.__module__)
+        resolved = _module_path(root, function.__module__)
+        if module is None or resolved is None:
+            raise TemporalContractError('callback module is not bound')
+        path = resolved[0].resolve(); relative = path.relative_to(root).as_posix()
+        if (relative not in receipt['files'] or _sha256(path) != receipt['files'][relative]
+                or not getattr(module, '__file__', None) or Path(module.__file__).resolve() != path
+                or function.__globals__ is not vars(module)
+                or Path(function.__code__.co_filename).resolve() != path):
+            raise TemporalContractError('executing callback source differs from frozen root')
+        if relative not in compiled:
+            code = compile(path.read_bytes(), str(path), 'exec', dont_inherit=True, optimize=sys.flags.optimize)
+            codes = {}; stack = [code]
+            while stack:
+                node = stack.pop(); codes[node.co_qualname] = node
+                stack.extend(c for c in node.co_consts if isinstance(c, types.CodeType))
+            compiled[relative] = codes
+        if compiled[relative].get(function.__qualname__) != function.__code__:
+            raise TemporalContractError('executing callback code differs from frozen source')
+        checked[name] = function
+        for symbol in function.__code__.co_names:
+            other = function.__globals__.get(symbol)
+            if inspect.isfunction(other) and _module_path(root, other.__module__) is not None:
+                pending.append(other)
+    return dict(identity=identity, executing_functions=sorted(checked))

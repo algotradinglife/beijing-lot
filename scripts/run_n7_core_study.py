@@ -19,7 +19,7 @@ if __name__ == '__main__':
     if args.phase == 'freeze':
         freeze_prefix_study(args.source, args.output, args.config, repository_root=args.repository_root,
                             python=args.python, rscript=args.rscript,
-                            entry_point='scripts/run_n7_core_issue.R', r_sources=CORE_R_SOURCES)
+                            entry_point='scripts/run_n7_core_issue.R', r_sources=CORE_R_SOURCES, settle_plan=settle_core_layers)
     else:
         evaluate_prefix_study(args.source, args.output, repository_root=args.repository_root,
                               describe_plan=describe_core_plan, settle_plan=settle_core_layers,
