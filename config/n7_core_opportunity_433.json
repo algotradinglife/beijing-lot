@@ -1,0 +1,916 @@
+{
+  "mode": "EXPOSED_HISTORICAL_DIAGNOSTIC",
+  "model_id": "market-balance-draw-1.0.0-diagnostic",
+  "budgets": [
+    1024
+  ],
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000,
+  "seeds": [
+    42501,
+    42502,
+    42503
+  ],
+  "evaluation_seed_offset": 1000000,
+  "training_worlds": 256,
+  "evaluation_worlds": 5000,
+  "depths": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    24,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512
+  ],
+  "feature_targets": [
+    0.15,
+    0.25
+  ],
+  "group_cap_cny": 30,
+  "workers": 4,
+  "policies": [
+    {
+      "name": "C8_BREADTH_ANY_O0_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_ANY_O60_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_ANY_O60_VALUE",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_ANY_O120_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_ANY_O120_VALUE",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_ANY_O240_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_ANY_O240_VALUE",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_VALUE_O0_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_VALUE_O60_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_VALUE_O60_VALUE",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_VALUE_O120_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_VALUE_O120_VALUE",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_VALUE_O240_PROB",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_BREADTH_VALUE_O240_VALUE",
+      "core_count": 8,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_ANY_O0_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_ANY_O60_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_ANY_O60_VALUE",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_ANY_O120_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_ANY_O120_VALUE",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_ANY_O240_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_ANY_O240_VALUE",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_VALUE_O0_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_VALUE_O60_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_VALUE_O60_VALUE",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_VALUE_O120_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_VALUE_O120_VALUE",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_VALUE_O240_PROB",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_DEPTH_VALUE_O240_VALUE",
+      "core_count": 8,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C8_MULTIPLY_ANY_O0_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_ANY_O60_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_ANY_O60_VALUE",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_ANY_O120_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_ANY_O120_VALUE",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_ANY_O240_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_ANY_O240_VALUE",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_VALUE_O0_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_VALUE_O60_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_VALUE_O60_VALUE",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_VALUE_O120_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_VALUE_O120_VALUE",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_VALUE_O240_PROB",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C8_MULTIPLY_VALUE_O240_VALUE",
+      "core_count": 8,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_BREADTH_ANY_O0_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_ANY_O60_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_ANY_O60_VALUE",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_ANY_O120_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_ANY_O120_VALUE",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_ANY_O240_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_ANY_O240_VALUE",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_VALUE_O0_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_VALUE_O60_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_VALUE_O60_VALUE",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_VALUE_O120_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_VALUE_O120_VALUE",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_VALUE_O240_PROB",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_BREADTH_VALUE_O240_VALUE",
+      "core_count": 12,
+      "mode": "BREADTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_ANY_O0_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_ANY_O60_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_ANY_O60_VALUE",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_ANY_O120_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_ANY_O120_VALUE",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_ANY_O240_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_ANY_O240_VALUE",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_VALUE_O0_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_VALUE_O60_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_VALUE_O60_VALUE",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_VALUE_O120_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_VALUE_O120_VALUE",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_VALUE_O240_PROB",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_DEPTH_VALUE_O240_VALUE",
+      "core_count": 12,
+      "mode": "DEPTH",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 1
+    },
+    {
+      "name": "C12_MULTIPLY_ANY_O0_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_ANY_O60_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_ANY_O60_VALUE",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_ANY_O120_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_ANY_O120_VALUE",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_ANY_O240_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_ANY_O240_VALUE",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "any_hit",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_VALUE_O0_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 0,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_VALUE_O60_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_VALUE_O60_VALUE",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 60,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_VALUE_O120_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_VALUE_O120_VALUE",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 120,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_VALUE_O240_PROB",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "PROB",
+      "max_copies": 3
+    },
+    {
+      "name": "C12_MULTIPLY_VALUE_O240_VALUE",
+      "core_count": 12,
+      "mode": "MULTIPLY",
+      "objective": "expected_net",
+      "opportunity_cap_cny": 240,
+      "opportunity_rule": "VALUE",
+      "max_copies": 3
+    }
+  ],
+  "arms": [
+    "C8_BREADTH_ANY_O0_PROB",
+    "C8_BREADTH_ANY_O60_PROB",
+    "C8_BREADTH_ANY_O60_VALUE",
+    "C8_BREADTH_ANY_O120_PROB",
+    "C8_BREADTH_ANY_O120_VALUE",
+    "C8_BREADTH_ANY_O240_PROB",
+    "C8_BREADTH_ANY_O240_VALUE",
+    "C8_BREADTH_VALUE_O0_PROB",
+    "C8_BREADTH_VALUE_O60_PROB",
+    "C8_BREADTH_VALUE_O60_VALUE",
+    "C8_BREADTH_VALUE_O120_PROB",
+    "C8_BREADTH_VALUE_O120_VALUE",
+    "C8_BREADTH_VALUE_O240_PROB",
+    "C8_BREADTH_VALUE_O240_VALUE",
+    "C8_DEPTH_ANY_O0_PROB",
+    "C8_DEPTH_ANY_O60_PROB",
+    "C8_DEPTH_ANY_O60_VALUE",
+    "C8_DEPTH_ANY_O120_PROB",
+    "C8_DEPTH_ANY_O120_VALUE",
+    "C8_DEPTH_ANY_O240_PROB",
+    "C8_DEPTH_ANY_O240_VALUE",
+    "C8_DEPTH_VALUE_O0_PROB",
+    "C8_DEPTH_VALUE_O60_PROB",
+    "C8_DEPTH_VALUE_O60_VALUE",
+    "C8_DEPTH_VALUE_O120_PROB",
+    "C8_DEPTH_VALUE_O120_VALUE",
+    "C8_DEPTH_VALUE_O240_PROB",
+    "C8_DEPTH_VALUE_O240_VALUE",
+    "C8_MULTIPLY_ANY_O0_PROB",
+    "C8_MULTIPLY_ANY_O60_PROB",
+    "C8_MULTIPLY_ANY_O60_VALUE",
+    "C8_MULTIPLY_ANY_O120_PROB",
+    "C8_MULTIPLY_ANY_O120_VALUE",
+    "C8_MULTIPLY_ANY_O240_PROB",
+    "C8_MULTIPLY_ANY_O240_VALUE",
+    "C8_MULTIPLY_VALUE_O0_PROB",
+    "C8_MULTIPLY_VALUE_O60_PROB",
+    "C8_MULTIPLY_VALUE_O60_VALUE",
+    "C8_MULTIPLY_VALUE_O120_PROB",
+    "C8_MULTIPLY_VALUE_O120_VALUE",
+    "C8_MULTIPLY_VALUE_O240_PROB",
+    "C8_MULTIPLY_VALUE_O240_VALUE",
+    "C12_BREADTH_ANY_O0_PROB",
+    "C12_BREADTH_ANY_O60_PROB",
+    "C12_BREADTH_ANY_O60_VALUE",
+    "C12_BREADTH_ANY_O120_PROB",
+    "C12_BREADTH_ANY_O120_VALUE",
+    "C12_BREADTH_ANY_O240_PROB",
+    "C12_BREADTH_ANY_O240_VALUE",
+    "C12_BREADTH_VALUE_O0_PROB",
+    "C12_BREADTH_VALUE_O60_PROB",
+    "C12_BREADTH_VALUE_O60_VALUE",
+    "C12_BREADTH_VALUE_O120_PROB",
+    "C12_BREADTH_VALUE_O120_VALUE",
+    "C12_BREADTH_VALUE_O240_PROB",
+    "C12_BREADTH_VALUE_O240_VALUE",
+    "C12_DEPTH_ANY_O0_PROB",
+    "C12_DEPTH_ANY_O60_PROB",
+    "C12_DEPTH_ANY_O60_VALUE",
+    "C12_DEPTH_ANY_O120_PROB",
+    "C12_DEPTH_ANY_O120_VALUE",
+    "C12_DEPTH_ANY_O240_PROB",
+    "C12_DEPTH_ANY_O240_VALUE",
+    "C12_DEPTH_VALUE_O0_PROB",
+    "C12_DEPTH_VALUE_O60_PROB",
+    "C12_DEPTH_VALUE_O60_VALUE",
+    "C12_DEPTH_VALUE_O120_PROB",
+    "C12_DEPTH_VALUE_O120_VALUE",
+    "C12_DEPTH_VALUE_O240_PROB",
+    "C12_DEPTH_VALUE_O240_VALUE",
+    "C12_MULTIPLY_ANY_O0_PROB",
+    "C12_MULTIPLY_ANY_O60_PROB",
+    "C12_MULTIPLY_ANY_O60_VALUE",
+    "C12_MULTIPLY_ANY_O120_PROB",
+    "C12_MULTIPLY_ANY_O120_VALUE",
+    "C12_MULTIPLY_ANY_O240_PROB",
+    "C12_MULTIPLY_ANY_O240_VALUE",
+    "C12_MULTIPLY_VALUE_O0_PROB",
+    "C12_MULTIPLY_VALUE_O60_PROB",
+    "C12_MULTIPLY_VALUE_O60_VALUE",
+    "C12_MULTIPLY_VALUE_O120_PROB",
+    "C12_MULTIPLY_VALUE_O120_VALUE",
+    "C12_MULTIPLY_VALUE_O240_PROB",
+    "C12_MULTIPLY_VALUE_O240_VALUE"
+  ],
+  "evidence_note": "Fixed prediction-only grid updated before any #433 settlement evaluation to enforce owner breadth-before-multiplicity. First core purchase reaches15%mass; all affordable eligible new core groups precede depth/copy stages. VALUE maximizes local expected-net per added CNY; no50%hit floor. BREADTH is a cash-retaining control. All stops and cash reported.",
+  "core_open_coverage": 0.15,
+  "allocation_order": "OPEN_AFFORDABLE_CORE_FIRST_THEN_DEEPEN_OR_COPY",
+  "max_actions": 512,
+  "provenance_roots": [
+    "src.n7_joint_study",
+    "src",
+    "src.divergence_materializer",
+    "src.low_n_selector_data",
+    "src.n7_chronology_sync",
+    "src.n7_support_shape",
+    "src.n7_support_transfer_grid",
+    "src.neural_top2_residual",
+    "src.qeu_threshold_n7",
+    "src.source_schema",
+    "src.temporal_learning",
+    "src.n7_capital_study",
+    "src.n7_core_settlement",
+    "src.n7_core_study"
+  ]
+}

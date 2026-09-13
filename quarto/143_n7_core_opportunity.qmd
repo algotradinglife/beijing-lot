@@ -1,0 +1,365 @@
+---
+title: "N7 主力组与小额机会：先扩组，后加倍"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  archive: "tests/fixtures/n7_core433_study.json.gz"
+  ranks_archive: "tests/fixtures/n7_core433_ranks.json.gz"
+  coverage_archive: "tests/fixtures/n7_core433_coverage.json.gz"
+  display_seed: 42501
+  display_core_count: 8
+  figures_dir: null
+---
+
+本报告研究 [#433](https://github.com/algotradinglife/beijing-lot/issues/433)：
+在每期 1,024 元预算上限内，先购买不同主力组，无法继续扩组后再加深覆盖或增加倍数；
+另比较每组 30 元的小额机会投入。使用已经研究过的 100 期历史数据，不是未见样本检验。
+分类和当期资金分配只读取冻结预测；实际赛果和结算 SP 仅用于冻结后的核账。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+source('r/n7_capital_report.R')
+source('r/n7_core_report.R')
+archive <- jsonlite::fromJSON(readLines(gzfile(params$archive),warn=FALSE),simplifyVector=FALSE)
+stopifnot(archive$schema=='bj433_core_report_v1',
+  digest::digest(charToRaw(archive$body),algo='sha256',serialize=FALSE)==archive$sha256)
+x <- jsonlite::fromJSON(archive$body)
+stopifnot(identical(x$historical_admission,FALSE),x$independent_replay$status=='PASS',
+  x$settlement_replay$status=='PASS',length(x$issue_order)==100,
+  params$display_seed %in% x$parameters$seeds,
+  params$display_core_count %in% c(8,12))
+if (!is.null(params$figures_dir)) dir.create(params$figures_dir,recursive=TRUE,showWarnings=FALSE)
+rows <- tibble::as_tibble(x$rows)
+report <- n7_capital_report(rows,as.character(x$issue_order),x$parameters$initial_capital_cny,1024)
+pairs <- n7_core_pairs(report$periods,tibble::as_tibble(x$comparisons),
+  as.character(x$issue_order),x$parameters$seeds)
+attribution <- n7_core_attribution(report$periods)
+exposure <- n7_core_exposure(tibble::as_tibble(x$sleeves),report$periods)
+rank_wrapper <- jsonlite::fromJSON(readLines(gzfile(params$ranks_archive),warn=FALSE),simplifyVector=FALSE)
+stopifnot(rank_wrapper$sha256=='3197f588bebcecbee8c17afbb641733b48217306b753e8a15a36f4c9d1894f4a',
+  digest::digest(charToRaw(rank_wrapper$body),algo='sha256',serialize=FALSE)==rank_wrapper$sha256)
+rank_input <- jsonlite::fromJSON(rank_wrapper$body)
+stopifnot(rank_input$freeze_seal==x$baseline_freeze_seal,
+  identical(as.character(rank_input$issue_order),as.character(x$issue_order)))
+rank_attribution <- n7_core_rank_attribution(tibble::as_tibble(rank_input$rows),
+  tibble::as_tibble(x$sleeves),report$periods)
+coverage_wrapper <- jsonlite::fromJSON(readLines(gzfile(params$coverage_archive),warn=FALSE),simplifyVector=FALSE)
+stopifnot(coverage_wrapper$schema=='bj433_role_coverage_v1',
+  digest::digest(charToRaw(coverage_wrapper$body),algo='sha256',serialize=FALSE)==coverage_wrapper$sha256)
+coverage_input <- jsonlite::fromJSON(coverage_wrapper$body)
+stopifnot(coverage_input$report_sha256==archive$sha256,coverage_input$freeze_seal==x$freeze_seal,
+  coverage_input$verification$status=='PASS',coverage_input$verification$plans_checked==25200,
+  identical(coverage_input$historical_admission,FALSE),
+  identical(as.character(coverage_input$issue_order),as.character(x$issue_order)))
+role_coverage <- n7_core_coverage_summary(tibble::as_tibble(coverage_input$rows),report$periods)
+```
+
+输入哈希：`r archive$sha256`。冻结标识：`r x$freeze_seal`。
+独立核验覆盖 `r x$independent_replay$plans_checked` 份方案。
+
+## 收益与命中期数的取舍
+
+```{r}
+#| include: false
+best_net <- report$grid |> filter(!reference) |> arrange(desc(net_median),model) |> slice_head(n=1)
+original <- report$grid |> filter(model=='NONUNIFORM_ANY_ROI_NONE_B1024')
+stopifnot(nrow(best_net)==1,nrow(original)==1)
+```
+
+按三个种子的净收益中位数查看，本批历史中最高的是 **`r best_net$model`**：
+净收益 `r sprintf('%.2f',best_net$net_median)` 元，实际投入 ROI
+`r sprintf('%.2f%%',best_net$roi_median)`，命中期数中位数 `r best_net$hit_issues_median`。
+原方案相应为 `r sprintf('%.2f',original$net_median)` 元、
+`r sprintf('%.2f%%',original$roi_median)`、`r original$hit_issues_median` 期。
+这里的“最高”是看完这批已曝光历史后的描述，不是未来期次的选策规则。
+
+该方案最大回撤中位数为 `r sprintf('%.2f',best_net$max_drawdown_median)` 元，
+原方案为 `r sprintf('%.2f',original$max_drawdown_median)` 元。
+删除各自最大收益期后，ROI 中位数分别为
+`r sprintf('%.2f%%',best_net$without_best_roi_median)` 和
+`r sprintf('%.2f%%',original$without_best_roi_median)`。
+命中期数、盈利期数、实际投入和回撤是不同指标；不能用其中一个代替其余指标。
+
+本轮首先冻结全部 25,200 份方案，再打开结算。首次生成结果表时发现描述字段与结算字段重复；
+修复只移除了重复的 `unique_tickets` 描述，逐份核对了新旧描述的一致性，
+保留了原冻结方案、原结算算法和单独的修复来源记录。该过程不改变本轮选组及资金分配。
+
+## 分组与资金规则
+
+主力候选按 Top64 累积概率排序，比较前 8 组与前 12 组。首次购买达到该组至少 15% 的模型覆盖概率，
+避免仅买一张票就算完成扩组。机会组从主力候选以外选择，每组买概率最高的 15 张基本注，共 30 元。
+总机会预算比较 0、60、120、240 元；机会排序比较覆盖概率和赛前代理预期净收益。
+
+主力阶段先购买剩余预算能够负担的未持有组。全部买过或买不起任何新组后：
+扩组版持有现金；加深版增加已持有组的前缀票数；加倍版重复首次购买的前缀，最多三份。
+新增组之间可能共享场次，模型命中覆盖使用共享场景计算，不假设各组独立。
+
+概率目标按每增加一元所增加的联合命中覆盖排序；价值目标按每增加一元所增加的代理预期净收益排序。
+倍数不增加不同票的命中覆盖，加倍时据预期净收益排序。代理价格来自赛前市场概率，
+实际收益使用权威结算 SP，每张支付份额仅乘一次 0.65 系数。
+
+加深档位包括配置中的固定票数，以及本期所有注册主力候选达到 15% 覆盖的票数。
+因此，某组也可以加深到另一主力组的首次购买档位。这是冻结时构建的共享档位池，
+没有按实际中奖排序添加档位。每次最多比较已登记选项，最多执行 512 次动作，
+结果是顺序分配方案，不是全局最优解。
+
+本轮用 `r x$parameters$training_worlds` 个共享场景计算分配时的联合增益，
+另用 `r x$parameters$evaluation_worlds` 个场景检查模型风险。
+这两个场景集合都来自冻结概率；它们不是训练期和测试期，也不能替代实际历史回测。
+
+## 全部方案与种子敏感性
+
+ROI 为净收益／实际投入，以下按三个固定种子汇总。预算上限相同不代表实际投入相同，
+扩组版和加倍版的现金余额必须一并看。种子不是三份独立的历史样本。
+
+先并列查看原方案、主力加深、机会投入和加倍；同时保留较宽主力池的纯扩组对照。
+代表行只用于解释差异，完整注册方案均列在后表，不丢弃亏损方案。
+
+```{r}
+representatives <- c('NONUNIFORM_ANY_ROI_NONE_B1024','C8_DEPTH_ANY_O0_PROB',
+  'C8_DEPTH_ANY_O60_PROB','C8_DEPTH_ANY_O240_PROB','C8_DEPTH_VALUE_O0_PROB',
+  'C8_MULTIPLY_ANY_O0_PROB','C12_BREADTH_ANY_O0_PROB')
+knitr::kable(report$grid |> filter(model %in% representatives) |>
+  arrange(match(model,representatives)) |>
+  select(model,stake_median,net_median,roi_median,roi_min,roi_max,hit_issues_median,
+    profitable_issues_median,max_drawdown_median,without_best_roi_median),digits=2)
+```
+
+加倍重复已有票，不能增加这些票覆盖的赛果。它可能提高少数命中期的返奖，也会放大损失；
+必须同时检查删除最高收益期后的 ROI。机会预算的增益则要对照相同主力规则的零机会版本，
+不能仅凭它超过原方案就归功于机会投入。
+
+```{r}
+knitr::kable(report$grid |> select(model,stake_median,net_median,roi_median,roi_min,roi_max,
+  hit_issues_median,profitable_issues_median,max_drawdown_median,without_best_roi_median),digits=2)
+```
+
+## 原未中期：救回与丢失
+
+每个方案按同一期、同一种子配对比较。救回原未中期的同时，也可能丢失原有命中期。
+投入不等的配对不会重新缩放收益，表中保留投入差额。
+`rescued/lost` 是包含停买在内的账户结果；`funded_rescued/funded_lost` 只比较双方实际下注的期次。
+另列双方下注、单方下注、双方未下注，以及资金不足停买和策略主动不下注的期数。
+零投入对零投入不计入“等额下注”。
+
+```{r}
+knitr::kable(pairs |> filter(seed==params$display_seed),digits=2)
+```
+
+## 主力与机会投入归因
+
+以下拆分账务不代表两部分风险相互独立。机会组是否有增益，仍需与对应的零机会预算方案配对判断。
+
+```{r}
+knitr::kable(attribution |> filter(seed==params$display_seed),digits=2)
+```
+
+```{r}
+#| include: false
+opportunity_examples <- attribution |>
+  filter(arm %in% c('C8_DEPTH_ANY_O60_PROB','C8_DEPTH_ANY_O240_PROB')) |>
+  group_by(arm) |> summarise(opportunity_net=median(opportunity_net),
+    opportunity_roi_percent=median(opportunity_roi_percent),.groups='drop')
+opportunity_60 <- opportunity_examples |> filter(arm=='C8_DEPTH_ANY_O60_PROB')
+opportunity_240 <- opportunity_examples |> filter(arm=='C8_DEPTH_ANY_O240_PROB')
+```
+
+**整体改善不能直接解读为机会票赚钱。** 在主力前 8 组、概率目标、加深版本中，
+60 元机会预算的机会部分净收益中位数为
+`r sprintf('%.2f',opportunity_60$opportunity_net)` 元，ROI
+`r sprintf('%.2f%%',opportunity_60$opportunity_roi_percent)`；240 元版本相应为
+`r sprintf('%.2f',opportunity_240$opportunity_net)` 元和
+`r sprintf('%.2f%%',opportunity_240$opportunity_roi_percent)`。
+如果这两部分亏损而组合仍优于零机会版本，差额来自主力分配改变后的收益提升。
+机会组可以救回少数原未中期，但本批历史没有因此证明其单独具有正收益优势。
+
+这也限制了“守正出奇”的当前结论：主力先扩组、再加深值得继续研究；
+小额机会暂作为预算分配和少数期次覆盖的实验项。
+加倍不能增加独立命中覆盖，应结合删除最大收益期后的表现判断，不能因为总收益为正就优先采用。
+
+下面另计算机会组自身新增的联合覆盖：保持该方案已经购买的主力票不变，
+在同一批冻结场景中计算 **P（主力或机会至少一组命中）− P（主力至少一组命中）**。
+它等于“只有机会组命中、主力均未中”的场景比例，已经扣除两者共同命中的部分。
+加倍购买不增加该概率。此表没有把节省机会预算后重新分配主力资金的效果算进来。
+
+数值为逐期平均模型概率，新增覆盖用百分点表示；停买或未下注的期次贡献零。
+这里展示 5,000 个独立于分配场景的模型评估场景，不是实际历史命中率。
+新诊断独立重算各角色与完整方案的联合命中事件，并与冻结时的 R 指标核对；没有修改冻结方案。
+
+```{r}
+knitr::kable(role_coverage |> filter(seed==params$display_seed,kind=='evaluation'),digits=2)
+```
+
+## 理论覆盖成本与实际回报
+
+累计曲线前段越陡，较少票数覆盖的模型概率越多；Top64 与 Top128 概率之差体现继续加深的覆盖增量。
+预期中奖成本则按完整 2,187 个赛果组合的概率加权其排序位置，再乘每票 2 元。
+计算模块同时保留信息熵和有效状态数：有效状态数越大，分布越分散，但这不自动意味着小额票更有价值。
+票的赛前代理预期收益还取决于对应价格，实际收益则取决于真实结算 SP。
+
+先展示原清单顺序的前 12 个候选组，避免只展示事后容易中奖的例子。
+“实际中奖排序”乘 2 元是按概率前缀覆盖到该组合的成本，不是能够赛前知道的最低保证中奖金额。
+
+```{r}
+knitr::kable(tibble::as_tibble(rank_input$rows) |>
+  select(issue,sleeve_id,top64_coverage,top128_coverage,model_expected_hit_cost_cny,
+    actual_rank,actual_gross_cny) |> slice_head(n=12),digits=3)
+```
+
+使用已核验的 #425 全候选组实际中奖排序，按“达到 20% 理论覆盖所需票数”分层。
+每份重复购买单独计入投入和返奖，但只在第一份中计入独立命中。
+该分层仅用于复盘，没有参与本轮选组；先逐方案核对这些组的实际收益与权威结算一致，再汇总。
+同一期的组可能共享场次，支持数量不能视为独立样本数。
+
+```{r}
+knitr::kable(rank_attribution |> filter(seed==params$display_seed),digits=2)
+```
+
+## 资金与回撤曲线
+
+先区分资金买到了更多不同票，还是重复购买了已持有的票。以下票数只统计实际获得资金的方案；
+因资金不足而停止的期次不计为新增覆盖。重复投入占比高，并不代表命中概率提高。
+
+```{r}
+knitr::kable(exposure |> filter(seed==params$display_seed),digits=2)
+```
+
+初始资金 100,000 元，不追加本金。资金不足时停止投入；现金留存不算投资收益。
+下图展示指定种子、主力候选数及按概率选择机会组的版本，完整方案保留在上表。
+
+```{r}
+#| fig-width: 11
+#| fig-height: 7
+metadata <- rows |> filter(!reference) |> distinct(arm,core_count,mode,objective,
+  opportunity_cap_cny,opportunity_rule)
+curves <- report$curves |> select(model,policy,period,equity_cny,drawdown_cny) |>
+  left_join(metadata,by=c('model'='arm'),relationship='many-to-one')
+shown <- curves |> filter(policy==as.character(params$display_seed),
+  core_count==params$display_core_count,opportunity_rule=='PROB')
+reference_curve <- report$curves |> filter(policy==as.character(params$display_seed),
+  model=='NONUNIFORM_ANY_ROI_NONE_B1024') |>
+  select(period,equity_cny,drawdown_cny)
+equity_plot <- ggplot(shown,aes(period,equity_cny,color=factor(opportunity_cap_cny),group=model))+
+  geom_line(linewidth=.55)+facet_grid(objective~mode,labeller=labeller(
+    mode=c(BREADTH='只扩组',DEPTH='扩组后加深',MULTIPLY='扩组后加倍'),
+    objective=c(any_hit='联合覆盖目标',expected_net='代理收益目标')))+
+  geom_line(data=reference_curve,aes(period,equity_cny),inherit.aes=FALSE,
+    color='black',linetype='dashed',linewidth=.6)+
+  labs(x='按历史顺序的期次',y='资金（元）',color='机会预算（元）',
+    subtitle=paste('初始资金 100,000 元；主力候选',params$display_core_count,
+      '组；黑色虚线：原 ANY；种子',params$display_seed))+theme_minimal()
+equity_plot
+if (!is.null(params$figures_dir)) ggsave(file.path(params$figures_dir,'core-equity.png'),
+  equity_plot,width=11,height=7,dpi=160,bg='white')
+```
+
+```{r}
+#| fig-width: 11
+#| fig-height: 7
+drawdown_plot <- ggplot(shown,aes(period,drawdown_cny,color=factor(opportunity_cap_cny),group=model))+
+  geom_line(linewidth=.55)+facet_grid(objective~mode,labeller=labeller(
+    mode=c(BREADTH='只扩组',DEPTH='扩组后加深',MULTIPLY='扩组后加倍'),
+    objective=c(any_hit='联合覆盖目标',expected_net='代理收益目标')))+
+  geom_line(data=reference_curve,aes(period,drawdown_cny),inherit.aes=FALSE,
+    color='black',linetype='dashed',linewidth=.6)+
+  labs(x='按历史顺序的期次',y='距此前资金高点的回撤（元）',color='机会预算（元）',
+    subtitle=paste('回撤越低越好；主力候选',params$display_core_count,
+      '组；黑色虚线：原 ANY；种子',params$display_seed))+theme_minimal()
+drawdown_plot
+if (!is.null(params$figures_dir)) ggsave(file.path(params$figures_dir,'core-drawdown.png'),
+  drawdown_plot,width=11,height=7,dpi=160,bg='white')
+```
+
+## 尾部依赖与逐期记录
+
+曲线中的黑色虚线是原 ANY 1,024 元方案，采用同一期次和种子作对照。
+
+删除最高收益期后的 ROI、最差连续窗口、最长亏损／无返奖序列用于检查收益是否依赖少数大奖。
+任何从这批历史结果中挑出的优选方案，都应继续标为回顾性研究结论。
+
+```{r}
+knitr::kable(report$summary |> filter(model %in% representatives) |>
+  select(model,policy,roi_percent,without_best_roi,max_drawdown,worst20),digits=2)
+```
+
+在三个种子中，60 元机会版本剔除最大收益期后的最低 ROI 为
+`r sprintf('%.2f%%',min(report$summary$without_best_roi[report$summary$model=='C8_DEPTH_ANY_O60_PROB']))`，
+240 元版本为
+`r sprintf('%.2f%%',min(report$summary$without_best_roi[report$summary$model=='C8_DEPTH_ANY_O240_PROB']))`。
+因此，正的 ROI 中位数不能代表所有种子在尾部压力下仍盈利。
+
+```{r}
+knitr::kable(report$summary |> filter(policy==as.character(params$display_seed)) |>
+  select(model,without_best_roi,worst5,worst10,worst20,payout_hhi,longest_losing_run,
+    longest_no_payout_run,max_drawdown_percent),digits=2)
+```
+
+```{r}
+knitr::kable(report$periods |> filter(policy==as.character(params$display_seed)) |>
+  select(issue,model,stake,gross,net,roi_percent,hits,cash_cny,drawdown_cny),digits=2)
+```
+
+## 复现与接口
+
+本报告的观测单位是“期次 × 方案 × 种子”。票层台账的观测单位是
+“期次 × 方案 × 种子 × 候选组 × 购买份数层”；同一张票的不同购买份额必须保留，
+不能用简单去重删除。三份报告输入都验证正文 SHA256，中奖排序输入还需匹配原对照实验的冻结标识，
+机会新增覆盖输入需匹配本轮完整报告正文和冻结标识。
+
+| 工作 | 实现 | 对应测试 |
+|---|---|---|
+| 曲线、主力／机会分组、扩组与加倍 | `r/n7_core_opportunity.R` | `tests/testthat/test-n7-core-opportunity.R` |
+| 组装票层、执行单期方案 | `r/n7_core_plan.R`、`r/n7_core_issue.R` | `test-n7-core-plan.R`、`test-n7-core-issue.R` |
+| 配对、投入归因、覆盖成本诊断 | `r/n7_core_report.R` | `tests/testthat/test-n7-core-report.R` |
+| 权威结算、报告描述 | `src/n7_core_settlement.py`、`src/n7_core_study.py` | `test_n7_core_settlement.py`、`test_n7_core_study.py` |
+| 独立重放与完整报告包 | `src/n7_core_check.py`、`src/n7_core_archive.py` | `test_n7_core_check.py`、`test_n7_core_archive.py` |
+| 固定主力票下的机会新增覆盖 | `src/n7_core_coverage.py`、`r/n7_core_report.R` | `test_n7_core_coverage.py`、`test-n7-core-report.R` |
+| 固定覆盖阈值散点图 | `r/n7_threshold_scatter.R`、QMD 144 | `tests/testthat/test-n7-threshold-scatter.R` |
+
+历史边界和来源绑定复用 `src/temporal_learning` 与共享研究运行器；本轮没有重新拟合、
+校准专家或挑选历史训练窗口。冻结来源、预测实现、实际结算快照和报告生成实现分别保留身份。
+这批输入只支持已曝光历史研究，不授权将旧模型包作为未来期次的合格概率来源。
+
+安装项目声明的环境后，从仓库根目录用干净进程执行：
+
+```bash
+quarto render quarto/143_n7_core_opportunity.qmd --execute --cache-refresh --execute-dir .
+```
+
+默认输入为版本化的三个压缩 JSON 报告包；可通过 `archive`、`ranks_archive`、`coverage_archive` 指定路径，
+通过 `display_seed`、`display_core_count` 切换展示，`figures_dir` 指定独立 PNG 的输出目录。
+这些展示参数不会重选下注方案。HTML 自身包含图表，不依赖手工预先运行的 R 会话。
+
+## 检查记录与研究边界
+
+完整报告包已独立核对全部 25,200 份冻结方案的物理票、重复份数、来源、共享场景覆盖和实际结算。
+机会新增覆盖另有绑定到该报告的逐份复算回执：
+`r coverage_input$verification$method`，核对 `r coverage_input$verification$plans_checked` 份方案。
+这些检查证明本批票账与声明规则的对应关系，不证明该顺序分配过程是全局最优解。
+
+本轮原六个 Python 测试文件 25 项通过，新增角色覆盖测试 4 项通过；
+R 五个受影响测试文件通过，其中最新报告测试 49 项断言通过。
+时间边界静态扫描和持久化目录检查通过。最终 Codex 代码审核发现的
+“机会组自身新增覆盖未单列”已补充，并经专项复审无新增发现；
+前轮的发布字段来源绑定、停买与下注未中混淆问题亦已修复。
+
+实际运行全仓 `Rscript tests/testthat.R` 时仍有旧测试输入缺口：
+draw-signal／draw-tree 缺旧比较数据，retraining 缺 `NEXT_ISSUE_FIXTURE`，
+两项 #408 集成检查缺 materialized bundle 而跳过。
+两条解释器配置冲突在统一显式 Python 路径后已分别复测通过。
+因此本报告只声明上述已执行的相关检查通过，**不声明全仓测试绿色**。
+缺口与修复证据已写入 #433 验收记录；本次交付为研究 PR，不执行合并。
+
+历史中表现较好的版本仍是事后研究发现。没有以本批结果重训专家或覆盖已冻结的概率，
+也没有将诊断性的历史时间戳代理升级为未来期次可用的来源证据。
