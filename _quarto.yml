@@ -3,6 +3,7 @@ project:
   execute-dir: project
   output-dir: quarto/_output
   render:
+    - quarto/persistent_data_layout.qmd
     - quarto/00_environment.qmd
     - quarto/01_mapping_quality.qmd
     - quarto/02_snapshot_quality.qmd

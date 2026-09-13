@@ -10,13 +10,15 @@ from src.temporal_learning import verify_implementation_closure
 from src.temporal_learning.core import stable_json_hash
 
 
-def check_joint_plan(plan, worlds, config):
+def check_joint_plan(plan, worlds, config, source_bundle):
     """Rebuild physical identities, p/q values, dependent hit union and path loss.
 
     Inputs contain no actual settlement. Returns replay metrics; raises on any
     mismatch. Numpy arithmetic is independent of R option projection and MILP.
     Fixed research limits are enforced for each relevant arm, including NO_BET.
     """
+    if plan["cutoffs"] != source_bundle["cutoffs"]:
+        raise ValueError("Cutoff map changed")
     if plan["seal"] != stable_json_hash({k: v for k, v in plan.items() if k != "seal"}):
         raise ValueError("Plan seal mismatch")
     raw_indices = np.asarray(plan["fixture_indices"]); raw_codes = np.asarray(plan["outcomes"])
@@ -109,7 +111,7 @@ def check_joint_plan(plan, worlds, config):
     return replay
 
 
-def check_joint_study(output, *, repository_root):
+def check_prefix_study(output, *, repository_root, check_plan, check_result):
     """Verify every frozen plan and scenario file, then replay all R arithmetic.
 
     No result-based selection or mutation. Caller may persist this returned audit
@@ -136,6 +138,10 @@ def check_joint_study(output, *, repository_root):
         if hashlib.sha256(raw).hexdigest() != digest:
             raise ValueError("Raw R output changed")
         result = json.loads(gzip.decompress(raw)); worlds = {w["seed"]: w for w in result["worlds"]}
+        if len(worlds) != len(result["worlds"]):
+            raise ValueError("Duplicate scenario seed")
+        if check_result is not None:
+            check_result(result, bundles[result['issue']], receipt['parameters'])
         for plan in result["plans"]:
             issue = plan["issue"]
             b = bundles[issue]
@@ -154,16 +160,23 @@ def check_joint_study(output, *, repository_root):
             ):
                 raise ValueError("Plan probabilities/identities differ from frozen source")
             groupmap = {g["id"]: g["fixture_indices"] for g in b["sleeves"]}
-            for j, key in enumerate(plan["sleeve_keys"]):
-                if plan["fixture_indices"][j * 64] != groupmap[key["sleeve_id"]]:
+            offset = 0
+            for key in plan["sleeve_keys"]:
+                expected_group = sorted(groupmap[key["sleeve_id"]])
+                start = offset
+                while offset < len(plan["fixture_indices"]) and plan["fixture_indices"][offset] == expected_group:
+                    offset += 1
+                if offset == start:
                     raise ValueError("Selected group differs from source candidate")
+            if offset != len(plan["fixture_indices"]):
+                raise ValueError("Unclaimed physical tickets")
             plan_path = output.resolve() / "plans" / f"{issue}_{plan['seed']}_{plan['arm']}.json.gz"
             raw_plan = plan_path.read_bytes()
             if hashlib.sha256(raw_plan).hexdigest() != receipt["plan_hashes"][str(plan_path)]:
                 raise ValueError("Plan bytes changed")
             if json.loads(gzip.decompress(raw_plan)) != plan:
                 raise ValueError("Packed plan differs from R output")
-            check_joint_plan(plan, worlds[plan["seed"]], receipt["parameters"]); count += 1
+            check_plan(plan, worlds[plan["seed"]], receipt["parameters"], b); count += 1
     if count != len(receipt["plan_hashes"]):
         raise ValueError("Incomplete raw plan replay")
     return dict(status="PASS", plans_checked=count, freeze_seal=frozen["seal"], historical_admission=False)

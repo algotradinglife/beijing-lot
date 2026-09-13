@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import fcntl
 import math
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -16,6 +17,23 @@ from urllib.parse import urlparse
 import requests
 
 from src.fundamentals_capture import SOURCE_HOSTS, capture_documents
+
+
+def capture_rate_source(document):
+    """Validate a primary or exact Titan market URL and return its shared rate key.
+
+    Market transport retains ``independent`` solely for the response writer's
+    generic HTTPS class; Titan/Jina market bytes are not independent evidence.
+    """
+    if not isinstance(document, dict):
+        raise ValueError("invalid capture document")
+    source, url = document.get('source'), str(document.get('url', ''))
+    if source in SOURCE_HOSTS and urlparse(url).hostname in SOURCE_HOSTS[source]:
+        return source
+    if source == 'independent' and (re.fullmatch(r'https://1x2d\.titan007\.com/\d+\.js', url)
+            or re.fullmatch(r'https://r\.jina\.ai/https://vip\.titan007\.com/OverDown_n\.aspx\?id=\d+&l=0', url)):
+        return 'titan'
+    raise ValueError("historical capture source host mismatch")
 
 
 def capture_history_batch(documents: list[dict], output_dir: str | Path, *,
@@ -39,15 +57,12 @@ def capture_history_batch(documents: list[dict], output_dir: str | Path, *,
     if type(request_budget) is not int or request_budget < 1:
         raise ValueError("request_budget must be a positive integer")
     if (type(min_interval_seconds) not in (float, int) or
-            not math.isfinite(min_interval_seconds) or min_interval_seconds < 5):
-        raise ValueError("historical minimum interval is five seconds")
+            not math.isfinite(min_interval_seconds) or min_interval_seconds < 1):
+        raise ValueError("historical minimum interval is one second")
     if not isinstance(documents, list) or not documents:
         raise ValueError("nonempty documents required")
     for doc in documents:
-        if not isinstance(doc, dict) or doc.get("source") not in SOURCE_HOSTS:
-            raise ValueError("historical capture requires a declared primary source")
-        if urlparse(str(doc.get("url", ""))).hostname not in SOURCE_HOSTS[doc["source"]]:
-            raise ValueError("source host mismatch")
+        capture_rate_source(doc)
     output = Path(output_dir)
     if output.exists():
         raise FileExistsError(output)
@@ -55,7 +70,7 @@ def capture_history_batch(documents: list[dict], output_dir: str | Path, *,
     ledger.parent.mkdir(parents=True, exist_ok=True)
     now = wall_clock or time.time
     pause = sleeper or time.sleep
-    source_by_url = {doc["url"]: doc["source"] for doc in documents}
+    source_by_url = {doc["url"]: capture_rate_source(doc) for doc in documents}
     with ledger.with_suffix(ledger.suffix + ".lock").open("a+b") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         con = sqlite3.connect(ledger)

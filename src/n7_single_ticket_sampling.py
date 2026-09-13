@@ -70,15 +70,24 @@ def settle_single_tickets(plan, audit):
     conflicts or missing outcomes on used fixtures fail closed; missing winning
     SP leaves unknown returns. Unused fixtures cannot change settlement. Pending
     or zero-bet semantics match the authoritative component interface. Seals and
-    packed shapes validated; duplicate complete tickets rejected.
+    packed shapes validated; duplicate complete tickets rejected. Budget is an
+    explicit nonnegative even CNY amount; every physical ticket still costs2CNY.
     """
     if plan.get('seal')!=stable_json_hash({k:v for k,v in plan.items() if k!='seal'}):raise ValueError('Plan changed')
-    idx=np.asarray(plan['fixture_indices'],dtype=int).reshape(-1,7)
-    codes=np.asarray(plan['outcomes'],dtype=int).reshape(-1,7)
+    budget=plan['budget_cny']
+    if (isinstance(budget,bool) or not isinstance(budget,(int,float))
+            or not np.isfinite(budget) or budget<0 or budget%2):
+        raise ValueError('Invalid ticket budget')
+    packed=[np.asarray(plan[key]) for key in ('fixture_indices','outcomes')]
+    if any(not np.issubdtype(a.dtype,np.number) or not np.isfinite(a).all()
+           or not np.equal(a,np.floor(a)).all() for a in packed):
+        raise ValueError('Invalid packed tickets: integer coordinates required')
+    idx=packed[0].astype(int).reshape(-1,7)
+    codes=packed[1].astype(int).reshape(-1,7)
     if (idx.shape!=codes.shape or len(idx)!=plan['groups'] or np.any(idx<0) or np.any(idx>=len(plan['fixtures']))
             or np.any(codes<0) or np.any(codes>2) or plan['stake']!=2*len(idx)
-            or (plan['budget_cny'],plan['unit_cny'],plan['payout_factor'])!=(1024,2,.65)
-            or plan['cash_cny']+plan['stake']!=1024 or plan['cash_cny']<0
+            or (plan['unit_cny'],plan['payout_factor'])!=(2,.65)
+            or plan['cash_cny']+plan['stake']!=budget or plan['cash_cny']<0
             or np.any(np.diff(idx,axis=1)<=0)
             or len({tuple(zip(i,d)) for i,d in zip(idx,codes)})!=len(idx)):
         raise ValueError('Invalid packed tickets')

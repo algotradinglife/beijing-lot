@@ -1,0 +1,95 @@
+---
+title: "持久化数据目录与结算读取验收"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: "."
+  data_root: "/run/media/drwho1985/Sandisk/data/beijing-lot"
+  python: "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python"
+---
+
+源码保留在仓库；数据根目录由参数显式指定。原始响应、采集清单、修正依据和版本化结果分别保存。
+本报告验证持久化结算库、原始采集归档和已验收盘口表。
+服务切换与旧副本清退凭证保存在数据根目录的 `registry/` 和 `audits/`。
+
+```{r}
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+data_root <- normalizePath(params$data_root, mustWork = TRUE)
+reticulate::use_python(normalizePath(params$python, mustWork = TRUE), required = TRUE)
+storage <- reticulate::import_from_path("persistent_data_layout", file.path(root, "src"))
+layout_check <- storage$check_layout(file.path(root, "config/persistent_data_layout.json"))
+stopifnot(identical(data_root, layout_check$data_root))
+layout_check$status
+reference <- jsonlite::read_json(file.path(data_root, "registry/settlement-current.json"))
+db_path <- file.path(data_root, reference$database)
+stopifnot(file.exists(db_path))
+stopifnot(identical(digest::digest(file = db_path, algo = "sha256"), reference$sha256))
+source(file.path(root, "r/nowscore_query.R"))
+x <- query_nowscore_settlement(db_path, "100213", play = "bf")
+stopifnot(nrow(x$settlement) == 98L, !anyNA(x$settlement$sp))
+```
+
+## 数据库引用
+
+```{r}
+reference
+```
+
+## 表结构与前几行
+
+```{r}
+dplyr::glimpse(x$settlement)
+head(x$settlement)
+x$findings
+```
+
+更新前备份存放于 `settlement/backups/`，迁移凭证存放于 `settlement/manifests/`。
+`registry/directory-layout-20260913.json` 保留此次文件迁移前后路径、大小和 SHA-256。
+历史可用性仍标记为诊断用途，迁移不会改变数据的赛前可用性资格。
+
+## 已验收盘口表
+
+每行表示一期内一场比赛的一个市场记录。此发布保留此前已验收的100期合并表原始字节，
+没有重新清洗、训练或调整验收尺度。
+
+```{r}
+markets <- jsonlite::read_json(file.path(data_root, "registry/markets-current.json"))
+market_path <- file.path(data_root, markets$current_release$path)
+stopifnot(identical(digest::digest(file = market_path, algo = "sha256"), markets$current_release$sha256))
+merged <- jsonlite::fromJSON(market_path)
+market_rows <- tibble::as_tibble(merged$rows)
+stopifnot(nrow(market_rows) == merged$fixture_market_rows)
+tibble::tibble(issues = length(merged$issues), fixture_market_rows = nrow(market_rows))
+dplyr::glimpse(market_rows)
+head(market_rows)
+```
+
+## 无损归档读取
+
+外置盘的 exFAT 分配单元为 1MB，冻结的小文件批次使用 TAR/Zstandard 归档。
+通过 Python 标准库读取所需成员，验证归档哈希，不产生解压目录。
+以下示例将一条原始请求失败记录转换为 R object，验证失败证据也被完整保留。
+
+```{r}
+reticulate::use_python(normalizePath(params$python, mustWork = TRUE), required = TRUE)
+archive_module <- reticulate::import_from_path("data_archive", file.path(root, "src"), convert = FALSE)
+json_module <- reticulate::import("json", convert = FALSE)
+archive_ref <- jsonlite::read_json(file.path(data_root, "fundamentals/manifests/historical-v1-read-check.json"))
+payload <- archive_module$read_archive_members(
+  file.path(data_root, archive_ref$archive),
+  list(archive_ref$member), expected_sha256 = archive_ref$archive_sha256
+)
+raw_response <- reticulate::py_to_r(json_module$loads(payload$get(archive_ref$member)))
+tibble::tibble(
+  archive = archive_ref$archive,
+  member = archive_ref$member,
+  url = raw_response$url,
+  transport_error = raw_response$error,
+  response_fields = paste(names(raw_response), collapse = ", ")
+)
+```

@@ -1,0 +1,118 @@
+---
+title: "未中期诊断：最便宜命中组为何没有覆盖"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  rank_dir: null
+  archive: "tests/fixtures/n7_capital_study.json.gz"
+  output_dir: null
+  baseline_arm: "NONUNIFORM_ANY_ROI_NONE_B1024"
+  budget_cny: 1024
+  display_seed: 42501
+---
+
+本报告研究已有 #425 冻结结果。没有重新训练、选票或修改策略；对照是原实验中已冻结的变种。
+最便宜命中组依赖实际赛果，只用于事后定位问题，不能用它的身份生成当期新下注。
+三个种子的“期次×种子”记录不是独立的历史期次；并列最低成本组全部保留。
+
+```{r}
+#| include: false
+library(dplyr)
+library(ggplot2)
+source('r/n7_rank_diagnostic.R')
+source('r/n7_missed_candidates.R')
+stopifnot(dir.exists(params$rank_dir),is.character(params$output_dir),!dir.exists(params$output_dir))
+verification <- jsonlite::fromJSON(file.path(params$rank_dir,'verification.json'))
+rank_receipt <- jsonlite::fromJSON(file.path(params$rank_dir,'receipt.json'))
+stopifnot(verification$status=='PASS',
+  digest::digest(file=file.path(params$rank_dir,'candidate-ranks.csv'),algo='sha256')==
+    verification$outputs[['candidate-ranks.csv']],
+  digest::digest(file=file.path(params$rank_dir,'receipt.json'),algo='sha256')==
+    verification$outputs[['receipt.json']])
+rows<-readr::read_csv(file.path(params$rank_dir,'candidate-ranks.csv'),
+  col_types=readr::cols(issue=readr::col_character(),sleeve_id=readr::col_character(),fixture_slots=readr::col_character()))
+w<-jsonlite::fromJSON(readLines(gzfile(params$archive),warn=FALSE),simplifyVector=FALSE)
+stopifnot(digest::digest(charToRaw(w$body),algo='sha256',serialize=FALSE)==w$sha256)
+x<-jsonlite::fromJSON(w$body)
+stopifnot(x$freeze_seal==rank_receipt$freeze_seal,x$historical_admission==FALSE)
+replay<-n7_rank_allocation_check(rows,x$sleeves,x$rows |> filter(!reference))
+probe<-n7_missed_candidates(rows,x$sleeves,x$rows,params$baseline_arm,params$budget_cny,x$parameters$depths)
+comparison<-n7_missed_comparison(x$rows,params$baseline_arm,params$budget_cny)
+stopifnot(params$display_seed %in% comparison$seed)
+medians<-comparison |> group_by(arm) |> summarise(across(c(hit_periods,rescued,lost,stake_cny,net_cny,roi),median),.groups='drop')
+dir.create(params$output_dir,recursive=TRUE)
+readr::write_csv(probe$cheapest,file.path(params$output_dir,'cheapest-missed.csv'))
+readr::write_csv(probe$periods,file.path(params$output_dir,'missed-periods.csv'))
+readr::write_csv(probe$candidates,file.path(params$output_dir,'all-candidate-funding.csv'))
+readr::write_csv(comparison,file.path(params$output_dir,'matched-alternatives.csv'))
+jsonlite::write_json(list(freeze_seal=x$freeze_seal,baseline=params$baseline_arm,budget_cny=params$budget_cny,
+  portable_sha256=w$sha256,rank_receipt_sha256=verification$outputs[['receipt.json']],replay=replay,
+  qmd_sha256=digest::digest(file='quarto/142_n7_missed_candidates.qmd',algo='sha256'),
+  implementation_sha256=digest::digest(file='r/n7_missed_candidates.R',algo='sha256'),
+  rank_implementation_sha256=digest::digest(file='r/n7_rank_diagnostic.R',algo='sha256'),
+  evidence_class='POST_SETTLEMENT_DIAGNOSTIC'),file.path(params$output_dir,'receipt.json'),pretty=TRUE,auto_unbox=TRUE)
+```
+
+## 没选中，还是买浅了
+
+```{r}
+probe$periods |> group_by(seed) |> summarise(missed_periods=n(),
+  no_cheapest_funded=sum(!any_cheapest_funded),
+  cheapest_funded_but_shallow=sum(any_cheapest_funded),
+  median_cheapest_cost=median(minimum_cost),.groups='drop') |> knitr::kable(digits=1)
+probe$cheapest |> group_by(diagnosis) |> summarise(candidate_records=n(),
+  median_probability_rank=median(model_coverage_rank),
+  median_actual_rank=median(actual_rank),median_required_cost=median(actual_hit_cost_cny),
+  median_added_cost=median(additional_cost_cny),
+  median_grid_added_cost=median(grid_additional_cost_cny),
+  median_overlap=median(max_overlap_other_funded),.groups='drop') |> knitr::kable(digits=1)
+```
+
+模型排序使用当期冻结的 Top64 累计概率，不包含实际赛果。
+“补足资金”是事后差额，必须从其他组削减，不能算作免费救回。
+实际优化只允许登记的深度网格，网格差额可能比精确排名差额更大。
+与其他已选组重叠场次数用于描述冗余，不等价于联合边际覆盖。
+
+```{r}
+probe$cheapest |> group_by(diagnosis,origin) |> summarise(n=n(),.groups='drop') |> knitr::kable()
+probe$cheapest |> ggplot(aes(model_coverage_rank,actual_rank,colour=diagnosis))+
+  geom_point(alpha=.5)+labs(x='当期24组内 Top64 累计概率排名（1最好）',y='实际命中票排名',
+    subtitle='仅展示未中记录的事后最便宜组；三个种子可能重复同一组')+
+  theme_minimal(base_family='Noto Sans CJK SC')
+```
+
+## 已有变种能不能救回来
+
+以下不重新选赢家，而是对照原实验的全部 17 个已冻结方案。
+救回、损失都在同一期同一种子配对计算。汇总是各种子的中位数，各列中位数不必可相减。
+ROI 按实际投入；低阈值方案可能留有现金，因此不视为完全相同投入。
+
+```{r}
+medians |> knitr::kable(digits=3)
+comparison |> filter(seed==params$display_seed) |>
+  select(arm,hit_periods,rescued,lost,net_hit_change,stake_cny,net_cny,roi) |> knitr::kable(digits=3)
+```
+
+命中偏好对模型共享场景的“至少一组命中”求解，而不是对真实世界的最低命中成本求解。
+模型认为某组累计覆盖低或与已选组冗余时，它可以被放弃；模型预测不是赛果真值。
+原求解只有 256 个优化场景、有限节点和时间，有限样本与搜索误差也可能影响选择。
+本报告没有计算每个被放弃组的联合边际覆盖或重新求解，因此不把这些可能机制宣称为已证实的个案原因。
+
+现有对照说明救回未中期必须同时计算丢失原命中期。若固定深度、阈值或换目标未改善总命中，
+不能只凭救回数推荐切换。下一步可在保持预算下测试少量探索资金或更充分的联合场景搜索；
+应同时评估全部100期，不能使用本期最便宜组身份做路由或只在未中期测试。
+
+## 逐期最便宜候选（展示种子）
+
+```{r}
+probe$cheapest |> filter(seed==params$display_seed) |>
+ select(issue,sleeve_id,origin,diagnosis,actual_rank,depth,additional_cost_cny,
+   grid_additional_cost_cny,model_coverage_rank,max_overlap_other_funded) |> knitr::kable(digits=1)
+```

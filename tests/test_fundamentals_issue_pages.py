@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from bs4 import BeautifulSoup
 
-from src.fundamentals_issue_pages import issue_analysis_pages
+from src.fundamentals_issue_pages import issue_analysis_pages, issue_analysis_pages_with_quarantine
 
 FIXTURE = Path(__file__).parent / 'fixtures/fundamentals_census/roster-130511-type8.html.gz'
 URL = 'https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=8&issueNum=130511'
@@ -78,6 +78,37 @@ def test_zero_team_ids_preserve_distinct_names_without_asserting_pairing():
     row.select_one('a[id^="GuestTeam_"]').string = row.select_one('a[id^="HomeTeam_"]').get_text()
     with pytest.raises(ValueError, match='same home and away'):
         issue_analysis_pages(str(soup).encode(), roster_url=URL, issue='130511')
+
+
+def test_nonplayed_minus_one_analysis_is_explicitly_quarantined():
+    soup = BeautifulSoup(gzip.decompress(FIXTURE.read_bytes()).decode('utf-8-sig'), 'html.parser')
+    row = soup.select_one('tr#row_1')
+    row.find('a', string='析')['href'] = '//live.nowscore.com/analysis/-1cn.html'
+    for prefix in ['HomeTeam', 'GuestTeam']:
+        node = row.select_one(f'a[id^="{prefix}_"]')
+        node['id'] = f'{prefix}_-1'
+    row.append(' 中断')
+    valid, quarantined = issue_analysis_pages_with_quarantine(
+        str(soup).encode(), roster_url=URL, issue='130511', quarantine_unavailable=True)
+    assert len(valid) == 82 and len(quarantined) == 1
+    assert quarantined[0]['slot'] == 1
+    assert quarantined[0]['source_status'] == '中断'
+    assert quarantined[0]['quarantine_reason'] == 'UNAVAILABLE_ANALYSIS_ID'
+    assert quarantined[0]['home_id'].isdigit() and quarantined[0]['away_id'].isdigit()
+
+
+def test_all_selected_nonplayed_slots_return_quarantine_evidence():
+    soup = BeautifulSoup(gzip.decompress(FIXTURE.read_bytes()).decode('utf-8-sig'), 'html.parser')
+    row = soup.select_one('tr#row_1')
+    row.find('a', string='析')['href'] = '//live.nowscore.com/analysis/-1cn.html'
+    for prefix in ['HomeTeam', 'GuestTeam']:
+        node = row.select_one(f'a[id^="{prefix}_"]')
+        node['id'] = f'{prefix}_-1'
+    row.append(' 中断')
+    valid, quarantined = issue_analysis_pages_with_quarantine(
+        str(soup).encode(), roster_url=URL, issue='130511', slots=[1],
+        quarantine_unavailable=True)
+    assert valid == [] and [row['slot'] for row in quarantined] == [1]
 
 
 def test_explicit_subset_quarantines_repeated_identity_without_renumbering():

@@ -60,3 +60,22 @@ def test_zero_bet_duplicate_budget_pending_and_threshold_boundary():
     assert single_ticket_plan(boundary,**dict(args,third_threshold=.2))['outcome_weights'][0][2]==pytest.approx(.2)
     boundary[['p_W','p_D','p_L']]=[.2,.5,.3]
     assert single_ticket_plan(boundary,**dict(args,third_threshold=.25))['outcome_weights'][0][0]==0
+
+
+@pytest.mark.parametrize('budget',[512,1024,2048,4096])
+def test_variable_capital_budget_preserves_one_ticket_payout(budget):
+    fixtures=[dict(issue='001',slot=s,provider_id=str(s),handicap=0) for s in range(1,8)]
+    plan=dict(issue='001',fixtures=fixtures,fixture_indices=[list(range(7))],outcomes=[[0]*7],groups=1,
+        stake=2,cash_cny=budget-2,budget_cny=budget,unit_cny=2,payout_factor=.65)
+    plan['seal']=stable_json_hash(plan)
+    audit=pd.DataFrame(fixtures).assign(actual_direction='W',spf_sp=2.,status='READY')
+    result=settle_single_tickets(plan,audit)
+    assert result['gross']==pytest.approx(2*.65*2**7)
+    assert result['cash']==budget-2 and result['net']==pytest.approx(result['gross']-2)
+    for bad_budget in [-2,3,float('inf'),True]:
+        bad=dict(plan,budget_cny=bad_budget);bad.pop('seal');bad['seal']=stable_json_hash(bad)
+        with pytest.raises(ValueError):settle_single_tickets(bad,audit)
+    for key in ('fixture_indices','outcomes'):
+        bad=dict(plan);bad[key]=[list(plan[key][0])];bad[key][0][0]=.5
+        bad.pop('seal');bad['seal']=stable_json_hash(bad)
+        with pytest.raises(ValueError,match='integer coordinates'):settle_single_tickets(bad,audit)

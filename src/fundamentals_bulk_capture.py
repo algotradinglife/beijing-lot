@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import time
 from functools import partial
 import requests
 from datetime import datetime, timedelta, timezone
@@ -23,7 +24,7 @@ from bs4 import BeautifulSoup
 from src.fundamentals_capture import TRANSIENT_STATUSES
 from src.fundamentals_census import read_response
 from src.fundamentals_history_capture import capture_history_batch
-from src.fundamentals_issue_pages import issue_analysis_pages
+from src.fundamentals_issue_pages import issue_analysis_pages, issue_analysis_pages_with_quarantine
 
 
 def native_page_fetch(url, *, timeout, stream, referer):
@@ -76,14 +77,26 @@ def load_inventory(path):
     return inventory, cutoff, hashlib.sha256(content).hexdigest()
 
 
-def historical_pages(raw, *, roster_url, issue, cutoff):
+def historical_pages(raw, *, roster_url, issue, cutoff, allow_repeated_provider_ids=False,
+                     allow_same_team_identity=False, quarantine_unavailable=False,
+                     include_quarantined=False):
     """Extract all slots and reject a roster if any diagnostic kickoff is not past.
 
     Deadline plus next displayed clock is a conservative collection scope check,
     not proof of historical information availability. Slot gaps are reported.
     """
-    pages = issue_analysis_pages(raw, roster_url=roster_url, issue=issue)
-    for row in pages:
+    if quarantine_unavailable:
+        pages, quarantined = issue_analysis_pages_with_quarantine(
+            raw, roster_url=roster_url, issue=issue,
+            allow_repeated_provider_ids=allow_repeated_provider_ids,
+            allow_same_team_identity=allow_same_team_identity,
+            quarantine_unavailable=True)
+    else:
+        pages = issue_analysis_pages(raw, roster_url=roster_url, issue=issue,
+                                     allow_repeated_provider_ids=allow_repeated_provider_ids,
+                                     allow_same_team_identity=allow_same_team_identity)
+        quarantined = []
+    for row in [*pages, *quarantined]:
         match = re.fullmatch(r'截止时间[：:]\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})', row['deadline_text'] or '')
         if match is None:
             raise ValueError('missing explicit deadline')
@@ -94,8 +107,11 @@ def historical_pages(raw, *, roster_url, issue, cutoff):
             kickoff += timedelta(days=1)
         if kickoff >= cutoff or deadline >= cutoff:
             raise ValueError('roster contains nonhistorical fixture')
-    slots = {row['slot'] for row in pages}
-    return pages, sorted(set(range(1, max(slots) + 1)) - slots)
+    slots = {row['slot'] for row in [*pages, *quarantined]}
+    if not slots:
+        raise ValueError('no designated fixtures')
+    gaps = sorted(set(range(1, max(slots) + 1)) - slots)
+    return (pages, gaps, quarantined) if include_quarantined else (pages, gaps)
 
 
 def attempt_receipt(directory, document):
@@ -149,7 +165,8 @@ def save_progress(status_path, state, issue, item):
 
 
 def run_historical_inventory(manifest_path, output_dir, *, ledger_path, budget_id,
-                             request_budget, min_free_bytes=20 * 1024**3, fetch=None, wall_clock=None, sleeper=None):
+                             request_budget, min_free_bytes=20 * 1024**3, fetch=None, wall_clock=None,
+                             sleeper=None, only_issues=None):
     """Capture fixed issues sequentially; resume durable attempts without repeats.
 
     One worker lock spans the loop, plus existing shared ledger request locking.
@@ -160,6 +177,17 @@ def run_historical_inventory(manifest_path, output_dir, *, ledger_path, budget_i
     if type(min_free_bytes) is not int or min_free_bytes < 0:
         raise ValueError('min_free_bytes must be a nonnegative integer')
     inventory, cutoff, digest = load_inventory(manifest_path)
+    if only_issues is not None:
+        if (not isinstance(only_issues, (list, tuple)) or not only_issues or
+                any(not isinstance(issue, str) or not issue.isdigit() for issue in only_issues) or
+                len(set(only_issues)) != len(only_issues)):
+            raise ValueError('only_issues must be a nonempty unique numeric sequence')
+        known = {entry['issue'] for entry in inventory['issues']}
+        if not set(only_issues) <= known:
+            raise ValueError('only_issues contains an unknown issue')
+        entries = [entry for entry in inventory['issues'] if entry['issue'] in set(only_issues)]
+    else:
+        entries = inventory['issues']
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
     with (output / 'worker.lock').open('a+b') as lock:
@@ -193,7 +221,7 @@ def run_historical_inventory(manifest_path, output_dir, *, ledger_path, budget_i
             return state
         state['state'] = 'RUNNING'
         atomic_json(status_path, state)
-        for entry in inventory['issues']:
+        for entry in entries:
             issue = entry['issue']
             issue_dir = output / issue
             progress_path = issue_dir / 'progress.json'
@@ -235,6 +263,14 @@ def run_historical_inventory(manifest_path, output_dir, *, ledger_path, budget_i
                             budget_id=budget_id, request_budget=request_budget, min_interval_seconds=5,
                             fetch=fetch if fetch is not None else partial(native_page_fetch, referer=entry['roster_url']),
                             wall_clock=wall_clock, sleeper=sleeper)
+                    except BlockingIOError:
+                        # Shared lock rejected before a request or raw write.
+                        page["attempts"].pop()
+                        state["state"] = "WAITING_SHARED_LEDGER"
+                        save_progress(status_path, state, issue, item)
+                        (sleeper or time.sleep)(5)
+                        state["state"] = "RUNNING"
+                        continue
                     except ValueError as exc:
                         if 'request budget exhausted' not in str(exc):
                             raise
@@ -262,11 +298,16 @@ def run_historical_inventory(manifest_path, output_dir, *, ledger_path, budget_i
                     item['roster_path'] = last['receipt_path']
                     _, raw = read_response(Path(item['roster_path']))
                     try:
-                        pages, gaps = historical_pages(raw, roster_url=entry['roster_url'], issue=issue, cutoff=cutoff)
+                        pages, gaps, quarantined = historical_pages(
+                            raw, roster_url=entry['roster_url'], issue=issue, cutoff=cutoff,
+                            quarantine_unavailable=True, include_quarantined=True)
                     except (ValueError, TypeError) as exc:
                         item['roster_error'] = str(exc)
                         break
-                    item.update(fixture_count=len(pages), slot_gaps=gaps, expected_pages=2 * len(pages), inventory=pages)
+                    item.pop('roster_error', None)
+                    item.update(fixture_count=len(pages), slot_gaps=gaps,
+                        expected_pages=2 * len(pages), inventory=pages,
+                        quarantined_slots=quarantined)
                     for row in pages:
                         for source, url_key in [('nowscore', 'nowscore_url'), ('titan', 'titan_candidate_url')]:
                             documents.append((f'{row["slot"]:03d}-{source}', {'source': source, 'url': row[url_key], 'filename': 'response.json', 'provider_id': row['provider_id']}))
@@ -301,6 +342,6 @@ def run_historical_inventory(manifest_path, output_dir, *, ledger_path, budget_i
             save_progress(status_path, state, issue, item)
             if state['state'] != 'RUNNING':
                 return state
-        state['state'] = 'FINISHED'
+        state['state'] = 'FINISHED' if only_issues is None else 'PARTIAL_FINISHED'
         atomic_json(status_path, state)
         return state

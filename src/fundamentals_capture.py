@@ -25,7 +25,7 @@ from src.fundamentals_census import canonical
 CAPTURE_SCHEMA = "bj408_capture_batch_v1"
 MAX_BYTES = 10 * 1024 * 1024
 TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
-SOURCE_HOSTS = {"nowscore": frozenset({"cp.nowscore.com", "live.nowscore.com"}),
+SOURCE_HOSTS = {"nowscore": frozenset({"cp.nowscore.com", "live.nowscore.com", "1x2.nowscore.com"}),
                 "titan": frozenset({"zq.titan007.com"})}
 
 

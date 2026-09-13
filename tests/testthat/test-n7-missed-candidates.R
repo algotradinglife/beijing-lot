@@ -1,0 +1,29 @@
+root<-normalizePath(file.path(testthat::test_path(),'../..'))
+source(file.path(root,'r/n7_missed_candidates.R'))
+test_that('ties, funded-depth misses and model ranks stay separate',{
+  rows<-tibble::tibble(issue='001',sleeve_id=c('0','1'),actual_rank=c(3,3),
+    actual_hit_cost_cny=c(6,6),top64_coverage=c(.2,.4),model_expected_hit_cost_cny=c(8,7),
+    fixture_slots=c('1,2,3,4,5,6,7','1,2,3,4,5,6,8'))
+  a<-tibble::tibble(issue='001',seed=1,arm='base',sleeve_id=0L,depth=2)
+  r<-tibble::tibble(issue='001',seed=1,arm='base',reference=FALSE,budget_cny=4,stake=4,hits=0)
+  x<-n7_missed_candidates(rows,a,r,'base',4,c(1,2,4))
+  expect_equal(x$cheapest$diagnosis,c('UNDERDEPTH','UNFUNDED'))
+  expect_equal(x$cheapest$model_coverage_rank,c(2L,1L))
+  expect_equal(x$periods$cheapest_ties,2L);expect_true(x$periods$any_cheapest_funded)
+  expect_equal(x$cheapest$additional_cost_cny,c(2,6))
+  expect_equal(x$cheapest$max_overlap_other_funded,c(0L,6L))
+  expect_true(all(is.na(x$cheapest$allowed_depth)))
+  bad<-rows;bad$fixture_slots<-1234567
+  expect_error(n7_missed_candidates(bad,a,r,'base',4,c(1,2,4)))
+  r$hits<-1;expect_error(n7_missed_candidates(rows,a,r,'base',4,c(1,2,4)))
+})
+test_that('rescues are netted against losses without summarise column shadowing',{
+  x<-tibble::tibble(issue=rep(c('001','002'),3),seed=1,arm=rep(c('base','alt','cash'),each=2),
+    reference=FALSE,budget_cny=4,hits=c(1,0,0,1,0,0),stake=c(4,4,4,4,0,0),net=c(6,-4,-4,10,0,0))
+  y<-n7_missed_comparison(x,'base',4)
+  expect_equal(y$rescued[y$arm=='base'],0)
+  expect_equal(y$rescued[y$arm=='alt'],1);expect_equal(y$lost[y$arm=='alt'],1)
+  expect_equal(y$net_hit_change[y$arm=='alt'],0)
+  expect_equal(y$roi[y$arm=='alt'],.75);expect_true(is.na(y$roi[y$arm=='cash']))
+  expect_error(n7_missed_comparison(x[-4,],'base',4))
+})
