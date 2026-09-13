@@ -47,3 +47,41 @@ n7_core_attribution <- function(periods) {
       core_roi_percent=ifelse(core_stake>0,100*core_net/core_stake,NA_real_),
       opportunity_roi_percent=ifelse(opportunity_stake>0,100*opportunity_net/opportunity_stake,NA_real_))
 }
+
+# Realized funded coverage versus paid copies. Sleeve rows represent one prefix
+# in one copy layer; period rows are the cash-stop-adjusted report. CNY units.
+# Returns per-arm/seed exposure totals; no learning, selection, or side effects.
+n7_core_exposure <- function(sleeves,periods) {
+  keys<-c('issue','arm','seed')
+  stopifnot(all(c(keys,'sleeve_id','role','copy_index','depth','stake') %in% names(sleeves)),
+    all(c(keys,'reference','stopped','stake') %in% names(periods)),
+    !anyDuplicated(periods[keys]),
+    !anyDuplicated(sleeves[c(keys,'sleeve_id','copy_index')]),
+    !anyNA(sleeves[c(keys,'role','copy_index','depth','stake')]),
+    all(sleeves$role %in% c('CORE','OPPORTUNITY')),
+    all(sleeves$copy_index>=1 & sleeves$copy_index<=3 & sleeves$copy_index==floor(sleeves$copy_index)),
+    all(sleeves$depth>0 & sleeves$depth==floor(sleeves$depth)),
+    all(sleeves$stake==2*sleeves$depth))
+  p<-periods |> dplyr::filter(!reference) |>
+    dplyr::select(dplyr::all_of(keys),stopped,period_stake=stake)
+  z<-dplyr::left_join(sleeves,p,by=keys,relationship='many-to-one')
+  stopifnot(!anyNA(z$stopped))
+  total<-z |> dplyr::group_by(issue,arm,seed) |>
+    dplyr::summarise(paid=sum(ifelse(stopped,0,stake)),.groups='drop')
+  check<-dplyr::left_join(p,total,by=keys,relationship='one-to-one')
+  stopifnot(all(dplyr::coalesce(check$paid,0)==check$period_stake))
+  by_issue<-z |> dplyr::filter(!stopped) |> dplyr::group_by(issue,arm,seed) |>
+    dplyr::summarise(core_groups=sum(role=='CORE' & copy_index==1),
+      opportunity_groups=sum(role=='OPPORTUNITY' & copy_index==1),
+      unique_ticket_units=sum(depth[copy_index==1]),paid_ticket_units=sum(depth),
+      repeated_stake_cny=sum(stake[copy_index>1]),.groups='drop')
+  dplyr::left_join(p,by_issue,by=keys,relationship='one-to-one') |>
+    dplyr::mutate(dplyr::across(c(core_groups,opportunity_groups,unique_ticket_units,
+      paid_ticket_units,repeated_stake_cny),~dplyr::coalesce(.x,0))) |>
+    dplyr::group_by(arm,seed) |> dplyr::summarise(issues=dplyr::n(),
+      core_groups_mean=mean(core_groups),opportunity_groups_mean=mean(opportunity_groups),
+      unique_ticket_units=sum(unique_ticket_units),paid_ticket_units=sum(paid_ticket_units),
+      repeated_stake_cny=sum(repeated_stake_cny),
+      repeated_stake_percent=if(sum(period_stake)>0)100*sum(repeated_stake_cny)/sum(period_stake) else NA_real_,
+      .groups='drop')
+}
