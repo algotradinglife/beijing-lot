@@ -15,12 +15,15 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--python', type=Path, required=True)
     parser.add_argument('--rscript', type=Path, required=True)
+    parser.add_argument("--source-manifest", required=True)
+    parser.add_argument("--audit-path", required=True)
+    parser.add_argument("--audit-sha256", required=True)
     args = parser.parse_args()
     if args.phase == 'freeze':
-        freeze_prefix_study(args.source, args.output, args.config, repository_root=args.repository_root,
+        freeze_prefix_study(args.source, args.output, args.config, source_manifest=args.source_manifest, repository_root=args.repository_root,
                             python=args.python, rscript=args.rscript,
                             entry_point='scripts/run_n7_core_issue.R', r_sources=CORE_R_SOURCES, settle_plan=settle_core_layers)
     else:
-        evaluate_prefix_study(args.source, args.output, repository_root=args.repository_root,
+        evaluate_prefix_study(args.source, args.output, audit_path=args.audit_path, audit_sha256=args.audit_sha256, repository_root=args.repository_root,
                               describe_plan=describe_core_plan, settle_plan=settle_core_layers,
                               reference_arms=[], reference_seeds=[])

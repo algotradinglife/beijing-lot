@@ -1,0 +1,46 @@
+{
+  "scope": {
+    "anchor": "101120",
+    "first": "101121",
+    "last": "110513",
+    "issue_count": 100
+  },
+  "n": 7,
+  "budget_cny": 1024,
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000,
+  "projection": {
+    "total_bounds": [
+      0.1,
+      16
+    ],
+    "tail_tolerance": 1e-10
+  },
+  "pool": {
+    "depth": 2048,
+    "tradeoffs": [
+      0,
+      0.1,
+      0.25,
+      0.5,
+      1,
+      2,
+      4,
+      8,
+      "PROBABILITY"
+    ]
+  },
+  "model": {
+    "version": "market-balance-draw-1.0.0-diagnostic",
+    "reference_issue": "101120",
+    "reference_model_sha256": "74bc7729496cccb64722e75200dc0d59c3ddf7acb6b64271fd5f8cc1c76770ea",
+    "refit": false
+  },
+  "configs": {
+    "config/n7_sleeve_424.json": "9f4818679e3bd72e193aed7a3b9bfb144601c4222b6214424e824401bed29b00",
+    "config/n7_core_opportunity_433.json": "866e578e9f8dda97d3432eb27fd11b45014b58930d8581d90a7a46966142b798"
+  },
+  "control": "NONUNIFORM_ANY_ROI_NONE_B1024",
+  "historical_admission": false
+}

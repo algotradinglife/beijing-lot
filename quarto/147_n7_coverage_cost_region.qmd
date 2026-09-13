@@ -1,0 +1,192 @@
+---
+title: "累计概率、投入与收益：200 期候选甜区诊断"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  input_dir: null
+  output_dir: null
+---
+
+本报告沿用 200 期、4,800 个冻结候选组，按现有精确覆盖目标 15%、20%、25%、50%
+与单组成本上限 64、128、256、512 元交叉作事后描述，另列不设成本筛选的结果。
+这是研究样本内的候选区间，不是已经通过未见期次验证的最优参数，也未改变投注策略。
+未新增拟合、学习、概率校正或赛前路由；所有标签只用于收益诊断。
+
+```{r}
+#| include: false
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+source('r/n7_coverage_diagnostic.R')
+theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=12))
+stopifnot(is.character(params$input_dir),dir.exists(params$input_dir),
+  is.character(params$output_dir))
+receipt <- jsonlite::fromJSON(file.path(params$input_dir,'receipt.json'))
+stopifnot(receipt$evidence_class=='POST_SETTLEMENT_DIAGNOSTIC',
+  identical(receipt$historical_admission,FALSE),receipt$payout_factor==.65,
+  digest::digest(file=file.path(params$input_dir,'ranks.csv'),algo='sha256')==receipt$outputs[['ranks.csv']])
+ranks <- readr::read_csv(file.path(params$input_dir,'ranks.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c'))
+stopifnot(nrow(ranks)==4800,n_distinct(ranks$issue)==200)
+grid <- n7_coverage_grid(ranks,c(15,20,25,50),c(64,128,256,512,4374))
+result <- n7_coverage_summary(grid)
+summary <- result$summary
+dir.create(params$output_dir,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(summary,file.path(params$output_dir,'grid-summary.csv'))
+readr::write_csv(result$issues,file.path(params$output_dir,'grid-issues.csv'))
+```
+
+## 如何理解甜区
+
+累计概率相同，所需票数不同：用更少资金达到目标的组，其概率更集中。
+所以不能只找“买到 25% 就停止”的统一阈值，还要看达到 25% 的成本。
+以下均为**购买所有符合条件的候选组**的诊断，成本是每组金额；没有施加每期 1,024 元总预算。
+组之间存在重叠，组数不是独立样本数，也不能据此推导整期中奖概率。
+实际返还始终是每张票 2 × 0.65 × 七场结算 SP 乘积，不再二次折扣。
+
+## 固定累计概率，不筛选成本
+
+```{r}
+summary |> filter(cap_cny==4374) |>
+  select(cohort,target_pct,groups,cost_median,cost_q25,cost_q75,hit_rate,roi,roi_without_best) |>
+  knitr::kable(digits=3)
+```
+
+每组购买到固定累计概率也未必盈利。成本高、分布分散的组可能消耗大量预算。
+下图将这些组与更低成本的组分开：缺失单元格表示没有符合条件的候选组。
+
+```{r}
+plot_data <- tidyr::expand_grid(cohort=unique(ranks$cohort),target_pct=c(15,20,25,50),
+  cap_cny=c(64,128,256,512)) |>
+  left_join(summary,by=c('cohort','target_pct','cap_cny'),relationship='one-to-one') |>
+  mutate(label=ifelse(is.na(roi),'无组',sprintf('ROI %.1f%%\nn=%d',100*roi,groups)))
+p <- ggplot(plot_data,aes(factor(cap_cny),factor(target_pct),fill=roi)) +
+  geom_tile(colour='white') + geom_text(aes(label=label),size=3.4) +
+  facet_wrap(~cohort) + scale_fill_gradient2(low='#b85450',mid='white',high='#438d71',
+    midpoint=0,na.value='grey90',labels=scales::percent) +
+  labs(x='达到目标的单组成本上限 / 元',y='目标累计概率 / %',fill='实际 ROI',
+    title='概率目标 × 达标成本：甜区必须同时满足两个条件')
+ggsave(file.path(params$output_dir,'coverage-cost-roi.png'),p,width=11,height=6,dpi=160)
+p
+```
+
+## 候选区域及最大盈利期敏感性
+
+以下两个区域在本次网格中表现值得关注；它们是看过结果后的研究候选。
+“去除最好一期”一次删掉该期所有符合条件的组，避免只删一张大额中奖票。
+此检查不能消除跨组相关性或多重比较偏差。
+
+```{r}
+focus <- summary |> filter((target_pct==15 & cap_cny==128) | (target_pct==25 & cap_cny==256))
+focus |> select(cohort,target_pct,cap_cny,groups,issues,cost_median,hit_rate,roi,
+  best_issue,roi_without_best) |> knitr::kable(digits=4)
+```
+
+对 25% 目标再细分成本上限，检查正收益是否只是某个孤立阈值。
+这是观察前述结果之后的进一步描述，不能将该网格称为独立验证。
+
+```{r}
+refined <- n7_coverage_summary(n7_coverage_grid(ranks,25,c(128,160,192,224,256,288,320)))$summary
+readr::write_csv(refined,file.path(params$output_dir,'refined-cost-caps.csv'))
+refined |> select(cohort,cap_cny,groups,issues,roi,roi_without_best) |> knitr::kable(digits=4)
+refined_long <- refined |> select(cohort,cap_cny,全部期次=roi,去除最大盈利期=roi_without_best) |>
+  pivot_longer(c(全部期次,去除最大盈利期),names_to='口径',values_to='ROI')
+p_refined <- ggplot(refined_long,aes(cap_cny,ROI,colour=cohort,linetype=口径)) +
+  geom_line() + geom_point(size=1.7) + geom_hline(yintercept=0,colour='grey50') +
+  scale_y_continuous(labels=scales::percent) + scale_x_continuous(breaks=c(128,160,192,224,256,288,320)) +
+  labs(x='达到 25% 覆盖率的单组成本上限 / 元',y='实际 ROI',colour=NULL,
+    title='25% 目标下的成本上限敏感性',subtitle='上限 224–320 元：两批去除最大盈利期后仍为正')
+ggsave(file.path(params$output_dir,'refined-cost-roi.png'),p_refined,width=10,height=5,dpi=160)
+p_refined
+```
+
+## 固定同一批组，追加投入是否赚钱
+
+固定筛选条件为“达到 25% 累计概率成本不超过 256 元”。在**完全相同的组**上，
+分别买到 15%、20%、25%，从而隔离购买深度与重新选组的影响。
+增量 ROI = 新增返还 / 新增成本 − 1；负值表示这段追加购买在样本中亏损。
+
+```{r}
+fixed <- ranks |> filter(coverage_25_cost_cny<=256)
+paired_rows <- n7_coverage_grid(fixed,c(15,20,25),4374)
+paired <- n7_coverage_summary(paired_rows)$summary |>
+  group_by(cohort) |> arrange(target_pct,.by_group=TRUE) |>
+  mutate(added_stake=stake-lag(stake),added_gross=gross-lag(gross),
+    marginal_roi=added_gross/added_stake-1) |> ungroup()
+paired |> select(cohort,target_pct,groups,cost_median,hit_rate,roi,roi_without_best,
+  added_stake,added_gross,marginal_roi) |> knitr::kable(digits=4)
+readr::write_csv(paired,file.path(params$output_dir,'same-groups-depth.csv'))
+p_pair <- ggplot(paired,aes(target_pct,roi,colour=cohort)) + geom_line() + geom_point(size=2) +
+  geom_hline(yintercept=0,colour='grey50') + scale_y_continuous(labels=scales::percent) +
+  scale_x_continuous(breaks=c(15,20,25)) +
+  labs(x='累计概率目标 / %',y='实际 ROI',colour=NULL,
+    title='固定达标成本较低的组：从 15% 买到 25% 的收益变化')
+ggsave(file.path(params$output_dir,'same-groups-roi.png'),p_pair,width=10,height=5,dpi=160)
+p_pair
+```
+
+## 30 元机会投入
+
+对同一批较集中的组比较每组固定买前 15 张（30 元），与其余组分开。
+此处不能将“低成本达到较高概率”和“少投一点碰运气”视为同一种选择。
+
+```{r}
+stopifnot(digest::digest(file=file.path(params$input_dir,'prefixes.csv'),algo='sha256')==
+  receipt$outputs[['prefixes.csv']])
+prefixes <- readr::read_csv(file.path(params$input_dir,'prefixes.csv'),show_col_types=FALSE,
+  col_types=readr::cols(issue='c',sleeve_id='c'))
+opportunity <- prefixes |> filter(depth==15) |>
+  left_join(ranks |> select(issue,sleeve_id,coverage_25_cost_cny),
+    by=c('issue','sleeve_id'),relationship='one-to-one') |>
+  mutate(region=ifelse(coverage_25_cost_cny<=256,'25% 成本≤256元','其余组')) |>
+  group_by(cohort,region) |> summarise(groups=n(),mean_coverage=mean(coverage),
+    hit_rate=mean(hit),stake=sum(stake),gross=sum(realized_gross),roi=gross/stake-1,.groups='drop')
+opportunity |> knitr::kable(digits=4)
+readr::write_csv(opportunity,file.path(params$output_dir,'opportunity-30.csv'))
+```
+
+## 使用边界与复现
+
+本次更有支持的主力候选区域是：**累计覆盖目标 25%，达标成本不超过 256 元**。
+旧、新批次 ROI 分别为 23.96%、21.75%；各自去掉最大盈利期后为 9.87%、15.97%。
+典型组的达标成本中位数分别为 152、156 元。
+成本上限细分为 224、256、288、320 元时，两批去除各自最大盈利期后仍均为正；
+因此候选区域并非仅在 256 元这一点成立。这里指成本**上限**，不是只买成本介于 224–320 元的组。
+固定这批组，20%→25% 的追加投入 ROI 分别为 40.45%、30.34%。
+15%／128 元候选区虽两批盈利，但旧批次去除最大盈利期后 ROI 为 −9.85%，支持较弱。
+
+30 元浅层购买在上述较集中组中为正，在其余组中为负；这不支持对分布分散的组无差别碰运气。
+主力组的典型成本约 150 元，八组不一定能放入每期 1,024 元预算。
+还需在期内处理预算、组间重叠和机会额度，不能将本报告组级 ROI 直接当作整套策略收益。
+
+目前只能划定上述研究区域，不能宣称单一阈值已经最优。
+15%、20%、25% 各档的差异还需要更细网格和期内固定预算比较；本报告不自动部署这些筛选。
+50% 目标的低成本组较少，不能仅凭少数高收益组将主力覆盖目标提高到 50%。
+赛前 SP 倒数估值使预期 ROI 接近常数，因此这次以实际结算及追加购买成本作描述，
+不将旧的估算预期收益当作可信的盈利筛选器。
+
+QMD 显式读取上一报告的哈希绑定数据，调用 `r/n7_coverage_diagnostic.R`。
+输出按目标、成本上限、历史批次整理成 tibble 和 CSV，不生成 RDS。
+
+```{r}
+tibble(column=names(summary),type=vapply(summary,typeof,character(1))) |> knitr::kable()
+head(summary) |> knitr::kable(digits=3)
+files <- c('grid-summary.csv','grid-issues.csv','same-groups-depth.csv','opportunity-30.csv','refined-cost-caps.csv')
+jsonlite::write_json(list(evidence_class='POST_SETTLEMENT_DIAGNOSTIC',historical_admission=FALSE,
+  source_receipt_sha256=digest::digest(file=file.path(params$input_dir,'receipt.json'),algo='sha256'),
+  source_hashes=receipt$outputs,targets_pct=c(15,20,25,50),caps_cny=c(64,128,256,512,4374),
+  refined_target_pct=25,refined_caps_cny=c(128,160,192,224,256,288,320),
+  payout_factor=.65,unit_cny=2,
+  implementation_sha256=digest::digest(file='r/n7_coverage_diagnostic.R',algo='sha256'),
+  qmd_sha256=digest::digest(file='quarto/147_n7_coverage_cost_region.qmd',algo='sha256'),
+  outputs=as.list(setNames(vapply(file.path(params$output_dir,files),digest::digest,
+    character(1),algo='sha256',file=TRUE),files))),
+  file.path(params$output_dir,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
