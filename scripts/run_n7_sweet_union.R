@@ -2,12 +2,18 @@
 # Sequential #439 stage runner; explicit source catalog and fixed stage config.
 args <- commandArgs(trailingOnly=TRUE);stopifnot(length(args)==1)
 cfg <- jsonlite::fromJSON(args[1]);library(dplyr)
+reticulate::use_python(cfg$python,required=TRUE)
+bindings <- reticulate::import('src.n7_union_inputs',convert=TRUE)
+input_binding <- bindings$bind_union_inputs(cfg$catalog,cfg$rank_dir,cfg$repository_root)
 sources <- c('r/n7_sleeve_tables.R','r/n7_joint_sleeves.R','r/n7_capital_depth.R',
   'r/n7_capital_portfolio.R','r/n7_core_opportunity.R','r/n7_sweet_union.R')
 for(p in sources)source(p)
+code <- c(sources,'scripts/run_n7_sweet_union.R')
+code_identity <- vapply(code,digest::digest,character(1),algo='sha256',file=TRUE)
 stopifnot(!dir.exists(cfg$output_dir));dir.create(cfg$output_dir,recursive=TRUE)
 catalog <- jsonlite::fromJSON(cfg$catalog)
-all_rows <- list();groups <- list();actions <- list();clock <- list();metadata <- list()
+stopifnot(nrow(catalog$issues)>0)
+all_rows <- list();groups <- list(tibble(issue=character(),arm=character(),seed=numeric(),sleeve_id=character(),depth=numeric(),stake=numeric(),coverage=numeric(),expected_gross=numeric()));actions <- list(tibble(step=integer(),phase=character(),sleeve_id=numeric(),option=integer(),depth=numeric(),copies=numeric(),added_stake=numeric(),cash_before=numeric(),affordable_new_core_count=integer(),unopened_core_count=integer(),cheapest_unopened_cost=numeric(),opening_stop=character(),marginal_hit=numeric(),marginal_expected_net=numeric(),issue=character(),arm=character(),seed=numeric()));clock <- list();metadata <- list()
 for(i in seq_len(nrow(catalog$issues))) {
   item <- catalog$issues[i,]
   stopifnot(digest::digest(file=item$path,algo='sha256')==item$sha256)
@@ -23,9 +29,12 @@ for(i in seq_len(nrow(catalog$issues))) {
   for(seed in cfg$seeds) {
     train_worlds <- n7_joint_worlds(base,cuts,seed,cfg$allocation_worlds)
     eval_worlds <- n7_joint_worlds(base,cuts,seed+cfg$evaluation_seed_offset,cfg$evaluation_worlds)
-    for(t in seq_along(partitions))for(mode in cfg$modes)for(budget in cfg$budgets) {
+    for(t in seq_along(partitions))for(mode in cfg$modes) {
+      eval_pool <- n7_core_option_pool(base,partitions[[t]],cuts,mode,1L)
+      eval_sc <- n7_joint_returns(eval_pool,eval_worlds,cuts)
+      for(budget in cfg$budgets) {
       fit <- n7_sweet_union_allocate(base,partitions[[t]],cuts,mode,train_worlds,budget,256L)
-      eval_sc <- n7_joint_returns(fit$pool,eval_worlds,cuts)
+      stopifnot(identical(eval_pool$options,fit$pool$options))
       ev <- n7_capital_evaluate(fit$pool,fit$fit$selected,eval_sc,cuts,budget)
       arm <- paste0('T',round(1000*cfg$targets[t]),'_',mode,'_B',budget)
       all_rows[[length(all_rows)+1L]] <- tibble(issue=item$issue,cohort=item$cohort,
@@ -42,6 +51,7 @@ for(i in seq_len(nrow(catalog$issues))) {
       }
       if(nrow(fit$fit$actions))actions[[length(actions)+1L]] <- fit$fit$actions |>
         mutate(issue=item$issue,arm=arm,seed=seed)
+      }
     }
   }
   if(i %% 10==0)message(cfg$stage,': ',i,'/',nrow(catalog$issues),' prediction issues frozen')
@@ -53,16 +63,17 @@ readr::write_csv(rows,file.path(cfg$output_dir,'predictions.csv'))
 readr::write_csv(funded,file.path(cfg$output_dir,'funded.csv'))
 readr::write_csv(ledger,file.path(cfg$output_dir,'actions.csv'))
 files <- c('predictions.csv','funded.csv','actions.csv')
-code <- c(sources,'scripts/run_n7_sweet_union.R')
-jsonlite::write_json(list(config=cfg,cutoffs=clock,metadata=metadata,
+stopifnot(identical(code_identity,vapply(code,digest::digest,character(1),algo='sha256',file=TRUE)))
+jsonlite::write_json(list(config=cfg,cutoffs=clock,metadata=metadata,input_binding=input_binding,
   historical_admission=FALSE,evidence_class='FIXED_RETROSPECTIVE_PROBE',
   source_catalog_sha256=digest::digest(file=cfg$catalog,algo='sha256'),
   files=as.list(setNames(vapply(file.path(cfg$output_dir,files),digest::digest,character(1),
     algo='sha256',file=TRUE),files)),
-  implementation=as.list(setNames(vapply(code,digest::digest,character(1),algo='sha256',file=TRUE),code))),
+  implementation=as.list(setNames(code_identity,code))),
   file.path(cfg$output_dir,'plans-frozen.json'),auto_unbox=TRUE,pretty=TRUE)
 # Labels enter only here, after the entire stage has immutable prediction plans.
 prior <- jsonlite::fromJSON(file.path(cfg$rank_dir,'receipt.json'))
+stopifnot(bindings$verify_union_binding(input_binding,cfg$catalog,cfg$rank_dir,cfg$repository_root))
 stopifnot(digest::digest(file=file.path(cfg$rank_dir,'ranks.csv'),algo='sha256')==prior$outputs[['ranks.csv']])
 ranks <- readr::read_csv(file.path(cfg$rank_dir,'ranks.csv'),show_col_types=FALSE,
   col_types=readr::cols(issue='c',sleeve_id='c')) |> select(issue,sleeve_id,actual_rank,actual_gross_cny)

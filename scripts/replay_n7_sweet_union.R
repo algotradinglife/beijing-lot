@@ -10,6 +10,9 @@ for(n in names(freeze$implementation)) {
 }
 for(n in names(freeze$files))stopifnot(digest::digest(file=file.path(args[1],n),algo='sha256')==freeze$files[[n]])
 cfg <- jsonlite::fromJSON(file.path(args[1],'plans-frozen.json'))$config
+reticulate::use_python(cfg$python,required=TRUE)
+bindings <- reticulate::import('src.n7_union_inputs',convert=TRUE)
+stopifnot(bindings$verify_union_binding(freeze$input_binding,cfg$catalog,cfg$rank_dir,cfg$repository_root))
 control <- !is.null(cfg$original_config)
 if(control) {
   original <- jsonlite::fromJSON(cfg$original_config)
@@ -29,10 +32,12 @@ for(i in seq_len(nrow(catalog$issues))) {
   base <- n7_capital_options(bundle,cuts,cfg$python,cfg$model_id,15L,2,.65)
   if(control) {
     features <- n7_core_curve_features(base$surface,cuts,cuts,original$feature_targets,2)
-    partitions <- lapply(seq_len(nrow(policies)),function(j)n7_core_partition(features,cuts,cuts,
-      policies$core_count[j],policies$opportunity_cap_cny[j],original$group_cap_cny,2,
-      policies$opportunity_rule[j],original$core_open_coverage))
-    cfg$depths <- original$depths;cfg$modes <- 'CONTROL'
+    all_partitions <- lapply(seq_len(nrow(original$policies)),function(j)n7_core_partition(features,cuts,cuts,
+      original$policies$core_count[j],original$policies$opportunity_cap_cny[j],original$group_cap_cny,2,
+      original$policies$opportunity_rule[j],original$core_open_coverage))
+    partitions <- all_partitions[match(policies$name,original$policies$name)]
+    cfg$depths <- unique(c(original$depths,unlist(lapply(all_partitions,`[[`,'opening_depths'))))
+    cfg$modes <- 'CONTROL'
   } else {
     features <- n7_core_curve_features(base$surface,cuts,cuts,cfg$targets,2)
     partitions <- lapply(cfg$targets,function(t)n7_sweet_union_partition(features,cuts,cuts,t,cfg$cap_cny,2))

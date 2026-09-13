@@ -9,13 +9,19 @@ import json
 import math
 import sys
 from collections import defaultdict
+from itertools import product
 from pathlib import Path
 
 study, output = map(Path, sys.argv[1:])
 assert not output.exists()
 raw = (study / 'plans-frozen.json').read_bytes()
 freeze = json.loads(raw)
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from src.n7_union_inputs import verify_union_binding
+assert verify_union_binding(freeze['input_binding'],freeze['config']['catalog'],
+    freeze['config']['rank_dir'],freeze['config']['repository_root'])
 ev = json.loads((study / 'evaluation-receipt.json').read_text())
+assert ev['ranks_sha256']==json.loads(freeze['input_binding'])['ranks_sha256']
 assert hashlib.sha256(raw).hexdigest() == ev['freeze_sha256']
 assert freeze['historical_admission'] is False
 for name, sha in freeze['files'].items():
@@ -50,6 +56,15 @@ for r in csv.DictReader((study/'results.csv').open()):
     assert math.isclose(gross,float(r['gross']),rel_tol=1e-10,abs_tol=1e-6)
     assert math.isclose(gross-stake,float(r['net']),rel_tol=1e-10,abs_tol=1e-6)
 assert len(seen)==ev['plans']
+cfg=freeze['config']
+for name in ('policies','budgets','targets','modes','seeds'):
+    if name in cfg and not isinstance(cfg[name],list):cfg[name]=[cfg[name]]
+if 'original_config' in cfg:
+    arms=[f'{p}_B{b}' for p,b in product(cfg['policies'],cfg['budgets'])]
+else:
+    arms=[f'T{round(1000*t)}_{m}_B{b}' for t,m,b in product(cfg['targets'],cfg['modes'],cfg['budgets'])]
+assert seen==set(product(freeze['metadata'],arms,map(str,cfg['seeds'])))
+assert set(funded)<=seen
 output.write_text(json.dumps(dict(status='PASS',plans=len(seen),
     freeze_sha256=ev['freeze_sha256'],results_sha256=ev['results_sha256'],
     implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()),indent=2))

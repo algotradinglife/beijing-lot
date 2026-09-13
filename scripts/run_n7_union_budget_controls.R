@@ -4,9 +4,14 @@
 args <- commandArgs(trailingOnly=TRUE);stopifnot(length(args)==1)
 library(dplyr)
 cfg <- jsonlite::fromJSON(args[1]);stopifnot(!dir.exists(cfg$output_dir))
+reticulate::use_python(cfg$python,required=TRUE)
+bindings <- reticulate::import('src.n7_union_inputs',convert=TRUE)
+input_binding <- bindings$bind_union_inputs(cfg$catalog,cfg$rank_dir,cfg$repository_root)
 sources <- c('r/n7_sleeve_tables.R','r/n7_joint_sleeves.R','r/n7_capital_depth.R',
   'r/n7_capital_portfolio.R','r/n7_core_opportunity.R')
 for(p in sources)source(p)
+code <- c(sources,'scripts/run_n7_union_budget_controls.R',cfg$original_config)
+code_identity <- vapply(code,digest::digest,character(1),algo='sha256',file=TRUE)
 original <- jsonlite::fromJSON(cfg$original_config)
 stopifnot(original$unit_cny==2,original$payout_factor==.65,
   identical(original$allocation_order,'OPEN_AFFORDABLE_CORE_FIRST_THEN_DEEPEN_OR_COPY'))
@@ -14,18 +19,21 @@ policies <- original$policies |> filter(name %in% cfg$policies)
 stopifnot(nrow(policies)==length(cfg$policies),all(policies$mode=='DEPTH'),all(policies$max_copies==1))
 dir.create(cfg$output_dir,recursive=TRUE)
 catalog <- jsonlite::fromJSON(cfg$catalog)
-rows <- list();funded <- list();clock <- list();meta <- list();actions <- list()
+stopifnot(nrow(catalog$issues)>0)
+rows <- list();funded <- list(tibble(issue=character(),arm=character(),seed=numeric(),sleeve_id=character(),depth=numeric(),stake=numeric(),coverage=numeric(),expected_gross=numeric()));clock <- list();meta <- list();actions <- list(tibble(step=integer(),phase=character(),sleeve_id=numeric(),option=integer(),depth=numeric(),copies=numeric(),added_stake=numeric(),cash_before=numeric(),affordable_new_core_count=integer(),unopened_core_count=integer(),cheapest_unopened_cost=numeric(),opening_stop=character(),marginal_hit=numeric(),marginal_expected_net=numeric(),issue=character(),arm=character(),seed=numeric()))
 for(i in seq_len(nrow(catalog$issues))) {
   item <- catalog$issues[i,];stopifnot(digest::digest(file=item$path,algo='sha256')==item$sha256)
   bundle <- jsonlite::fromJSON(gzfile(item$path),simplifyVector=FALSE);cuts <- bundle$cutoffs
   base <- n7_capital_options(bundle,cuts,cfg$python,original$model_id,15L,2,.65)
   features <- n7_core_curve_features(base$surface,cuts,cuts,original$feature_targets,2)
-  partitions <- lapply(seq_len(nrow(policies)),function(j) {
-    p <- policies[j,]
+  # Preserve depths contributed by every original policy, including C12.
+  all_partitions <- lapply(seq_len(nrow(original$policies)),function(j) {
+    p <- original$policies[j,]
     n7_core_partition(features,cuts,cuts,p$core_count,p$opportunity_cap_cny,
       original$group_cap_cny,2,p$opportunity_rule,original$core_open_coverage)
   })
-  depths <- sort(unique(c(original$depths,unlist(lapply(partitions,`[[`,'opening_depths')))))
+  partitions <- all_partitions[match(policies$name,original$policies$name)]
+  depths <- sort(unique(c(original$depths,unlist(lapply(all_partitions,`[[`,'opening_depths')))))
   base <- n7_capital_options(bundle,cuts,cfg$python,original$model_id,depths,2,.65)
   pools <- lapply(seq_along(partitions),function(j)n7_core_option_pool(base,partitions[[j]],cuts,'DEPTH',1))
   for(seed in cfg$seeds) {
@@ -59,13 +67,15 @@ stopifnot(!anyDuplicated(rows[c('issue','arm','seed')]),nrow(rows)==nrow(catalog
 readr::write_csv(rows,file.path(cfg$output_dir,'predictions.csv'))
 readr::write_csv(funded,file.path(cfg$output_dir,'funded.csv'))
 readr::write_csv(actions,file.path(cfg$output_dir,'actions.csv'))
-files <- c('predictions.csv','funded.csv','actions.csv');code <- c(sources,'scripts/run_n7_union_budget_controls.R',cfg$original_config)
-jsonlite::write_json(list(config=cfg,cutoffs=clock,metadata=meta,historical_admission=FALSE,
+files <- c('predictions.csv','funded.csv','actions.csv')
+stopifnot(identical(code_identity,vapply(code,digest::digest,character(1),algo='sha256',file=TRUE)))
+jsonlite::write_json(list(config=cfg,cutoffs=clock,metadata=meta,input_binding=input_binding,historical_admission=FALSE,
   evidence_class='FIXED_RETROSPECTIVE_PROBE',source_catalog_sha256=digest::digest(file=cfg$catalog,algo='sha256'),
   files=as.list(setNames(vapply(file.path(cfg$output_dir,files),digest::digest,character(1),algo='sha256',file=TRUE),files)),
-  implementation=as.list(setNames(vapply(code,digest::digest,character(1),algo='sha256',file=TRUE),code))),
+  implementation=as.list(setNames(code_identity,code))),
   file.path(cfg$output_dir,'plans-frozen.json'),auto_unbox=TRUE,pretty=TRUE)
 prior <- jsonlite::fromJSON(file.path(cfg$rank_dir,'receipt.json'))
+stopifnot(bindings$verify_union_binding(input_binding,cfg$catalog,cfg$rank_dir,cfg$repository_root))
 stopifnot(digest::digest(file=file.path(cfg$rank_dir,'ranks.csv'),algo='sha256')==prior$outputs[['ranks.csv']])
 ranks <- readr::read_csv(file.path(cfg$rank_dir,'ranks.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c',sleeve_id='c'))
 joined <- funded |> left_join(select(ranks,issue,sleeve_id,actual_rank,actual_gross_cny),by=c('issue','sleeve_id'),relationship='many-to-one')

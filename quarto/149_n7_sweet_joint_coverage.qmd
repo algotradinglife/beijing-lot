@@ -38,6 +38,12 @@ for(path in unlist(params$stages)) {
   freeze <- jsonlite::fromJSON(file.path(path,'plans-frozen.json'),simplifyVector=FALSE)
   ev <- jsonlite::fromJSON(file.path(path,'evaluation-receipt.json'))
   check <- jsonlite::fromJSON(file.path(path,'independent-replay.json'))
+  replay <- jsonlite::fromJSON(file.path(path,'allocation-replay.json'))
+  reticulate::use_python(freeze$config$python,required=TRUE)
+  binding <- reticulate::import('src.n7_union_inputs',convert=TRUE)
+  stopifnot(binding$verify_union_binding(freeze$input_binding,freeze$config$catalog,
+    freeze$config$rank_dir,freeze$config$repository_root),replay$status=='PASS',
+    identical(replay$labels_loaded,FALSE),replay$freeze_sha256==ev$freeze_sha256)
   stopifnot(identical(freeze$historical_admission,FALSE),check$status=='PASS',
     check$freeze_sha256==ev$freeze_sha256,
     digest::digest(file=file.path(path,'plans-frozen.json'),algo='sha256')==ev$freeze_sha256,
@@ -85,14 +91,14 @@ SUM 为旧累计概率加总优化器；C8 为原八主力组及机会组分配�
 不同 seed 是模拟随机性重复，不是新增历史样本。
 
 ```{r}
-knitr::kable(summary,digits=3)
+knitr::kable(mutate(summary,ROI_percent=100*roi) |> select(-roi),digits=2)
 ```
 
 ```{r}
-p <- ggplot(filter(curves,seed==42501),aes(period,equity_cny,colour=arm))+
+p <- ggplot(filter(curves,seed==42501,grepl('B1024$|^SUM_|^C8_DEPTH_ANY_O[0-9]+_PROB$',arm)),aes(period,equity_cny,colour=arm))+
   geom_line()+labs(x='按时间排列的期次',y='资金（元）',colour='方案',title='资金曲线：固定种子 42501')
 ggsave(file.path(params$output_dir,'01-equity.png'),p,width=12,height=7,dpi=150);p
-p <- ggplot(filter(curves,seed==42501),aes(period,drawdown_cny,colour=arm))+
+p <- ggplot(filter(curves,seed==42501,grepl('B1024$|^SUM_|^C8_DEPTH_ANY_O[0-9]+_PROB$',arm)),aes(period,drawdown_cny,colour=arm))+
   geom_line()+labs(x='按时间排列的期次',y='峰值回撤（元）',colour='方案',title='回撤曲线')
 ggsave(file.path(params$output_dir,'02-drawdown.png'),p,width=12,height=7,dpi=150);p
 ```
@@ -109,7 +115,7 @@ knitr::kable(coverage,digits=3)
 p <- coverage |> pivot_longer(c(train,independent,actual),names_to='measurement',values_to='probability') |>
   ggplot(aes(arm,probability,colour=measurement,shape=factor(seed)))+geom_point(position=position_dodge(width=.5))+
   coord_flip()+scale_y_continuous(labels=scales::percent)+labs(x=NULL,y='至少中一组的期概率／比例',colour=NULL,shape='种子')
-ggsave(file.path(params$output_dir,'03-coverage.png'),p,width=11,height=7,dpi=150);p
+ggsave(file.path(params$output_dir,'03-coverage.png'),p,width=11,height=10,dpi=150);p
 ```
 
 ## 开组与加深的边际覆盖
@@ -141,13 +147,53 @@ blocks <- results |> mutate(block=ceiling(match(issue,issue_order)/25)) |>
   group_by(arm,seed,block) |> summarise(stake=sum(stake),net=sum(net),roi=net/stake,.groups='drop')
 p <- ggplot(filter(blocks,seed==42501),aes(block,arm,fill=roi))+geom_tile()+
   scale_fill_gradient2(labels=scales::percent)+labs(x='连续 25 期区块',y=NULL,fill='ROI')
-ggsave(file.path(params$output_dir,'06-blocks.png'),p,width=11,height=7,dpi=150);p
+ggsave(file.path(params$output_dir,'06-blocks.png'),p,width=11,height=10,dpi=150);p
 readr::write_csv(coverage,file.path(params$output_dir,'coverage.csv'))
 readr::write_csv(action_summary,file.path(params$output_dir,'actions.csv'))
 readr::write_csv(blocks,file.path(params$output_dir,'blocks.csv'))
 ```
 
+## 分预算的资金与回撤曲线
+
+同一颜色表示同一分配规则，面板表示每期预算上限。
+每个面板均从十万元开始，不把三个种子的资金加总。
+
+```{r}
+budget_curves <- curves |> filter(seed==42501,!grepl('^SUM_|^NONUNIFORM_',arm),
+  !grepl('^C8_DEPTH_ANY_O240_PROB$',arm)) |>
+  mutate(family=sub('_B[0-9]+$','',arm),ceiling=ifelse(period==0,NA_real_,budget_cny)) |>
+  group_by(arm) |> tidyr::fill(ceiling,.direction='updown') |> ungroup()
+p <- ggplot(budget_curves,aes(period,equity_cny,colour=family))+geom_line()+
+  facet_wrap(~ceiling,ncol=2)+labs(x='期次',y='资金（元）',colour='分配规则')
+ggsave(file.path(params$output_dir,'07-budget-equity.png'),p,width=13,height=8,dpi=150);p
+p <- ggplot(budget_curves,aes(period,drawdown_cny,colour=family))+geom_line()+
+  facet_wrap(~ceiling,ncol=2)+labs(x='期次',y='回撤（元）',colour='分配规则')
+ggsave(file.path(params$output_dir,'08-budget-drawdown.png'),p,width=13,height=8,dpi=150);p
+p <- ggplot(filter(summary,arm %in% results$arm),aes(net,max_drawdown,colour=arm,shape=factor(seed)))+
+  geom_point(size=2.5)+labs(x='净收益（元）',y='最大回撤（元）',colour='方案',shape='种子')
+ggsave(file.path(params$output_dir,'09-net-risk.png'),p,width=12,height=8,dpi=150);p
+```
+
 ## 使用边界
+
+```{r}
+expectation <- results |> group_by(arm,seed,budget_cny) |>
+  summarise(stake=sum(stake),model_expected_net=sum(expected_net),actual_net=sum(net),.groups='drop') |>
+  mutate(model_roi=model_expected_net/stake,actual_roi=actual_net/stake,
+    family=sub('_B[0-9]+$','',arm))
+knitr::kable(select(expectation,arm,seed,stake,model_expected_net,actual_net),digits=2)
+p <- ggplot(expectation,aes(model_roi,actual_roi,colour=family,shape=factor(seed)))+
+  geom_point()+geom_abline(slope=1,intercept=0,colour='grey50')+
+  facet_wrap(~budget_cny,ncol=2)+scale_x_continuous(labels=scales::percent)+
+  scale_y_continuous(labels=scales::percent)+labs(x='赛前概率及估算 SP 的期望 ROI',
+    y='实际结算 ROI',colour='分配规则',shape='种子')
+ggsave(file.path(params$output_dir,'10-model-realized.png'),p,width=12,height=8,dpi=150);p
+readr::write_csv(expectation,file.path(params$output_dir,'expectation.csv'))
+```
+
+模型期望采用赛前估算 SP，实际收益采用冻结结算 SP。两者不相等。
+历史正 ROI 不能直接当作模型已经识别出正期望组合；需要分别理解价格代理误差、
+概率误差及少数高回报实现的贡献。
 
 这里检验固定规则的历史表现。候选阈值来自已查看的历史诊断，因此历史准入标记为 false。
 没有新增拟合、校正、阈值学习或重训；原概率产物的历史证据属性不因本报告而改变。
