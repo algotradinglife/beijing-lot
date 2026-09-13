@@ -3,6 +3,7 @@ title: "N7 后续 100 期固定策略比较"
 format:
   html:
     embed-resources: true
+    toc: true
 execute:
   echo: false
   error: false
@@ -13,11 +14,17 @@ params:
   predictions_sha256: null
   study_config: null
   study_config_sha256: null
+  results_path: null
+  results_sha256: null
+  old_archive: "tests/fixtures/n7_core433_study.json.gz"
+  old_body_sha256: "be745a60f6e597b697bc74964a022a3c71ff70f502f6f73ae530f68f2d2dc49a"
+  display_seed: 42501
+  figures_dir: null
 ---
 
 本研究固定为原生清单中 101120 之后的 100 期（101121–110513）。数据清洗由另一会话负责；本报告只使用已交接的发布数据。缺失期保留在分母中，不替换为更晚的完整期。
 
-当前为**票单冻结前的输入报告**，尚未读取本批实际结算，不能据此报告命中率、收益或回撤。完整交付仍须完成票单冻结、独立结算复核和 Codex review。
+`r if (is.null(params$results_path)) "本次为输入验证模式，不提供收益结论。" else "本次为完整结算报告：全部票单先冻结，再打开实际赛果与 SP；输入通过独立票单及结算复核。"` 本研究属于后续历史诊断，不是对前瞻可用性的认证，也不依据这批结果重新选择参数。
 
 ```{r}
 stopifnot(is.character(params$predictions_path),is.character(params$study_config),
@@ -66,4 +73,157 @@ knitr::kable(tibble::tibble(
   sha256=c(params$predictions_sha256,params$study_config_sha256)))
 ```
 
-后续收益与回撤部分将以全部冻结票单及独立核验的结算为输入；本阶段没有用旧 100 期结果代替新批次结果。
+
+
+## 结算与报告输入
+
+```{r}
+#| include: false
+#| eval: !expr is.character(params$results_path)
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/market_conditional_summary.R')
+source('r/n7_capital_report.R')
+source('r/n7_core_report.R')
+stopifnot(identical(digest::digest(file=params$results_path,algo='sha256'),params$results_sha256))
+x <- jsonlite::fromJSON(params$results_path)
+stopifnot(identical(x$historical_admission,FALSE),x$settlement_replay_status=='PASS',
+  identical(as.character(x$issue_order),as.character(pred$issue_order)),
+  x$independent_replay$plans_checked==25500,x$settlement_replay$plans_checked==25500)
+rows <- tibble::as_tibble(x$rows) |> mutate(reference=arm==cfg$control)
+old_wrapper <- jsonlite::fromJSON(readLines(gzfile(params$old_archive),warn=FALSE),simplifyVector=FALSE)
+stopifnot(old_wrapper$schema=='bj433_core_report_v1',old_wrapper$sha256==params$old_body_sha256,
+  digest::digest(charToRaw(old_wrapper$body),algo='sha256',serialize=FALSE)==params$old_body_sha256)
+old <- jsonlite::fromJSON(old_wrapper$body)
+stopifnot(old$independent_replay$status=='PASS',old$settlement_replay$status=='PASS',
+  identical(old$historical_admission,FALSE),length(old$issue_order)==100,
+  !any(x$issue_order %in% old$issue_order),setequal(rows$arm,old$rows$arm),
+  setequal(rows$seed,old$parameters$seeds),params$display_seed %in% rows$seed)
+report <- n7_capital_report(rows,x$issue_order,cfg$initial_capital_cny,cfg$budget_cny)
+old_report <- n7_capital_report(tibble::as_tibble(old$rows),old$issue_order,
+                               cfg$initial_capital_cny,cfg$budget_cny)
+comparison <- full_join(old_report$grid,report$grid,by='model',suffix=c('_old','_new'),
+                        relationship='one-to-one')
+stopifnot(nrow(comparison)==85,!anyNA(comparison$model),nrow(report$periods)==25500)
+attribution <- n7_core_attribution(report$periods)
+focus <- c(cfg$control,'C8_DEPTH_ANY_O0_PROB','C8_DEPTH_ANY_O60_PROB','C8_DEPTH_ANY_O240_PROB')
+focus_labels <- c('原方案','8主力／无机会','8主力／机会≤60元','8主力／机会≤240元')
+if (!is.null(params$figures_dir)) dir.create(params$figures_dir,recursive=TRUE,showWarnings=FALSE)
+```
+
+固定展示原方案及此前已经讨论的 8 主力、机会预算 0／60／240 元的 PROB 版本，不按本批收益改选展示策略。完整 85 方案和三个种子的结果列在下方。
+ROI 为净收益除以**实际投入**，不是除以预算。命中期指至少一张票中奖，盈利期指当期净收益大于零；两者不等价。每张基本票仅施加一次 0.65 结算系数。
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+knitr::kable(report$grid |> filter(model %in% focus) |>
+  select(model,stake_median,net_median,roi_median,roi_min,roi_max,
+         hit_issues_median,profitable_issues_median,max_drawdown_median,
+         max_drawdown_percent_median,without_best_roi_median),digits=2)
+```
+
+## 新旧 100 期同口径比较
+
+旧 100 期与新 100 期分别从 100,000 元开始计算，不把旧期盈利注入新期。表内数值为三个固定种子各自完整路径指标的中位数；收益率和回撤单位均为百分比或元，如列名所示。
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+knitr::kable(comparison |> filter(model %in% focus) |>
+  select(model,net_median_old,net_median_new,roi_median_old,roi_median_new,
+         hit_issues_median_old,hit_issues_median_new,
+         max_drawdown_median_old,max_drawdown_median_new,
+         without_best_roi_median_old,without_best_roi_median_new),digits=2)
+```
+
+## 收益与回撤曲线
+
+以下固定使用 seed 42501 展示实际路径，其他两个种子的总体指标列于后文。曲线不是逐期挑最好种子拼接而成。回撤从当时资金峰值计量；资金不足时沿用原有停止下注规则，不补资。
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+#| fig-width: 11
+#| fig-height: 8
+curves <- report$curves |> filter(arm %in% focus,seed==params$display_seed) |>
+  mutate(strategy=factor(arm,levels=focus,labels=focus_labels))
+plot_rows <- curves |> select(period,strategy,equity_cny,drawdown_cny,drawdown_percent) |>
+  tidyr::pivot_longer(c(equity_cny,drawdown_cny,drawdown_percent),names_to='metric',values_to='value') |>
+  mutate(metric=factor(metric,levels=c('equity_cny','drawdown_cny','drawdown_percent'),
+                       labels=c('资金（元；初始100000）','回撤（元）','回撤（%）')))
+chart <- ggplot(plot_rows,aes(period,value,color=strategy)) + geom_line(linewidth=.65) +
+  facet_wrap(~metric,ncol=1,scales='free_y') + labs(x='新100期顺序',y=NULL,color=NULL) +
+  theme_minimal(base_size=11,base_family='Noto Sans CJK SC') + theme(legend.position='bottom')
+print(chart)
+if (!is.null(params$figures_dir)) ggsave(file.path(params$figures_dir,'next100-equity-drawdown.png'),
+                                       chart,width=11,height=8,dpi=160)
+```
+
+## 分段与种子敏感性
+
+前 50／后 50 期按固定清单顺序切分，仅作描述。分段投入和收益继承整条资金路径，不在每段重新补资。各段不能作为事后调整下注规则的依据。
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+segments <- report$periods |> mutate(segment=ifelse(period<=50,'前50期','后50期')) |>
+  group_by(arm,seed,segment) |> summarise(stake=sum(stake),net=sum(net),
+    roi_percent=ifelse(stake>0,100*net/stake,NA_real_),hit_issues=sum(hits>0),
+    profitable_issues=sum(net>0),.groups='drop')
+knitr::kable(segments |> filter(arm %in% focus),digits=2)
+knitr::kable(report$summary |> filter(model %in% focus) |>
+  select(model,policy,stake,net,roi_percent,hit_issues,profitable_issues,
+         max_drawdown,max_drawdown_percent,without_best_roi,stopped_issues),digits=2)
+```
+
+## 主力与机会归因
+
+分别列出实际投入、返还和净收益。机会部分自身是否盈利，与它改变整体预算分配后组合是否改善，是两个不同问题。倍数投入计入主力实际资金；不重复计算返还。
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+knitr::kable(attribution |> filter(arm %in% focus),digits=2)
+```
+
+## 全部方案汇总
+
+保留完整网格，不删除亏损方案。这里按策略名称展示；三种种子的最小／中位／最大 ROI 和剔除最高净收益期后的 ROI 可用于判断结果集中程度。
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+knitr::kable(report$grid |> arrange(model),digits=2)
+```
+
+<details>
+<summary>全部方案的新旧比较、分段、种子与归因</summary>
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+knitr::kable(comparison |> select(model,net_median_old,net_median_new,roi_median_old,roi_median_new,
+  hit_issues_median_old,hit_issues_median_new,max_drawdown_median_old,max_drawdown_median_new,
+  without_best_roi_median_old,without_best_roi_median_new),digits=2)
+knitr::kable(report$summary |> select(model,policy,stake,net,roi_percent,hit_issues,profitable_issues,
+  max_drawdown,max_drawdown_percent,without_best_roi,stopped_issues),digits=2)
+knitr::kable(segments,digits=2)
+knitr::kable(attribution,digits=2)
+```
+
+</details>
+
+## 逐期完整结果
+
+展开查看所有 100 期 × 85 方案 × 3 种子。金额单位为元，ROI 单位为 %，hits 为实际中奖基本票数；同一主力票的多倍投入收益已经计入金额。
+
+<details>
+<summary>展开 25,500 条逐期记录</summary>
+
+```{r}
+#| eval: !expr is.character(params$results_path)
+knitr::kable(report$periods |> arrange(period,arm,seed) |>
+  select(issue,arm,seed,stake,gross,net,roi_percent,hits,equity_cny,
+         drawdown_cny,drawdown_percent,cash_cny,stopped),digits=2)
+```
+
+</details>
+
+## 解释边界
+
+这批结果属于冻结规则的后续历史诊断。原有概率校正使用的历史代理时间没有被升级为实测赛前可用性；模型世界中的理论覆盖与现实中奖频率也不是同一个量。完整网格中事后最高收益的方案不因此成为新的默认策略。清洗发布完成、概率输入可用、票单检查通过、结算复核通过和代码审查通过分别记录，不能互相替代。
