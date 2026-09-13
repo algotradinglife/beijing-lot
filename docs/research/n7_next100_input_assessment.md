@@ -26,3 +26,11 @@
 - 显式的每期每场 cutoff、总进球求解范围和尾部误差容限。
 
 返回场次 tibble 中的 q_W/D/L、双方期望进球和欧赔拟合残差，以及比分网格。保持历史诊断标记，不能把调用成功当作可用性验收。不改变 N7 候选构造、策略参数或冻结概率校正单元。
+
+## 发布输入读取与固定模型衔接
+
+- `src/n7_published_markets.py::read_n7_published_markets` 只读发布的逐期明细与归档，验证 merged/归档/成员哈希和摘要明细一致性。实测 55 期、7928 条场次×市场记录通过；45 期保留 NOT_PUBLISHED。读取不替代清洗验收。研究快照 `audits/issue435-next100-v1/published-market-inputs-v1.json.gz` 的 SHA-256 为 `1eb3a394cd9965fd0f78960b0cd4ff4578425c5fa411f067ef79f9755e158f0e`。
+- 旧模型实现闭包仅 `src/temporal_learning/provenance.py` 与当前代码不同。已用 Git 中 `75d8f520` 的精确匹配字节重建独立参考实现快照，全部 6 个文件哈希及闭包验证通过；未覆盖当前实现。
+- `src/n7_frozen_foundation.py::bind_frozen_draw_foundation` 通过共享上下文重新验证固定历史样本的准入与权重，并复制原有校正单元。无 fit 调用，无新增训练数据或参数调整。新 cutoff 的时钟/样本年龄改变，但全部统计权重、样本哈希、政策及原模型单元必须一致；模型只能用于参考期之后的新期。
+- 实际冻结产物在 110212 截止时间的衔接验证通过：2561 个原训练观察、16 个校正单元完全保持原值。产物为 `audits/issue435-next100-v1/preview-model-110212.json`，只是接口验证，并非 100 期票单已冻结或回测完成。
+- Python 相关 5 个测试通过；截止时间治理扫描通过。完整策略不变性、研究 QMD、Codex review 和最终收益评估尚待完成。
