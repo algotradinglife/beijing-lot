@@ -16,7 +16,11 @@ if (!identical(input$historical_admission,FALSE) || !identical(config$historical
 for (name in names(input$implementation_hashes))
   if (!identical(digest::digest(file=file.path(root,name),algo='sha256'),input$implementation_hashes[[name]]))
     stop('Prepared input implementation changed')
-result <- project_n7_market_inputs(dplyr::bind_rows(input$fixtures),dplyr::bind_rows(input$total_quotes),
+# Reuse the authoritative adapter's typed prototypes after JSON empty arrays.
+empty <- n7_published_projection_inputs(list(),tibble::tibble(
+  issue=character(),slot=integer(),provider_id=character(),home_handicap=integer()),list())
+result <- project_n7_market_inputs(dplyr::bind_rows(empty$fixtures,input$fixtures),
+  dplyr::bind_rows(empty$total_quotes,input$total_quotes),
   input$cutoffs,unlist(config$projection$total_bounds),config$projection$tail_tolerance)
 result$issue_order <- input$issue_order
 result$exclusions <- input$exclusions

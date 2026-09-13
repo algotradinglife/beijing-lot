@@ -61,3 +61,24 @@ testthat::test_that('published input adapter retains exclusions and source ident
   bad <- t;bad$prior_companies <- 2L
   testthat::expect_error(n7_published_projection_inputs(list(e,bad),h,cuts),'company contract')
 })
+
+testthat::test_that('serialized empty arrays render through the projection entry', {
+  root <- normalizePath('../..')
+  input <- tempfile(fileext='.json'); output <- tempfile(fileext='.json')
+  config <- file.path(root,'config/n7_next100_435.json')
+  jsonlite::write_json(list(fixtures=list(),total_quotes=list(),cutoffs=list(),
+    historical_admission=FALSE,implementation_hashes=list(),issue_order=list('00101'),
+    exclusions=list(),publication_coverage=list(),source_hashes=list()),input,auto_unbox=TRUE)
+  log <- system2(file.path(R.home('bin'),'Rscript'),c('--vanilla',
+    shQuote(file.path(root,'scripts/run_n7_market_projection.R')),shQuote(input),
+    digest::digest(file=input,algo='sha256'),shQuote(config),digest::digest(file=config,algo='sha256'),
+    shQuote(output),shQuote(root)),stdout=TRUE,stderr=TRUE)
+  testthat::expect_null(attr(log,'status'))
+  testthat::expect_true(file.exists(output))
+  if (file.exists(output)) {
+    result <- jsonlite::read_json(output,simplifyVector=FALSE)
+    testthat::expect_length(result$fixtures,0)
+    testthat::expect_identical(result$issue_order,list('00101'))
+    testthat::expect_false(result$historical_admission)
+  }
+})
