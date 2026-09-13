@@ -1,5 +1,18 @@
 root<-normalizePath(file.path(testthat::test_path(),'../..'))
 source(file.path(root,'r/n7_core_report.R'))
+test_that('role coverage keeps treatment cores fixed and counts only funded increments',{
+ x<-tidyr::crossing(issue=c('001','002'),arm='A',seed=1,kind=c('training','evaluation')) |>
+   dplyr::mutate(worlds=4,core_hits=2,opportunity_hits=3,shared_hits=1,union_hits=4,incremental_hits=2)
+ p<-tibble::tibble(issue=c('001','002'),arm='A',seed=1,reference=FALSE,stopped=c(FALSE,TRUE),stake=c(100,0))
+ z<-n7_core_coverage_summary(x,p)
+ expect_equal(z$incremental_percentage_points,c(25,25))
+ expect_equal(z$union_probability_percent,c(50,50))
+ expect_equal(z$core_probability_percent,c(25,25))
+ expect_equal(z$funded_issues,c(1L,1L))
+ expect_error(n7_core_coverage_summary(x[-1,],p))
+ expect_error(n7_core_coverage_summary(dplyr::mutate(x,incremental_hits=3),p))
+ expect_error(n7_core_coverage_summary(dplyr::mutate(x,shared_hits=3),p))
+})
 test_that('paired rescue and loss counts retain unequal spending and complete scope',{
  x<-tibble::tibble(issue=rep(c('001','002'),2),seed=1,arm=rep(c('A','B'),each=2),
   stake=c(10,20,20,20),gross=c(30,0,0,50),net=c(20,-20,-20,30),hits=c(1,0,0,1),stopped=FALSE)

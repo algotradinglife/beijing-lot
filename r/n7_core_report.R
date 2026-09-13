@@ -1,6 +1,36 @@
 # Pair every period/seed against explicit comparison arms. Descriptive only;
 # unequal spending is reported, never rescaled to manufacture matched returns.
 # Inputs are funded period rows from n7_capital_report; money CNY, ROI percent.
+n7_core_coverage_summary <- function(coverage,periods) {
+  # coverage: one frozen issue/arm/seed/scenario-kind; probabilities fractions.
+  # Return means over all account periods, zeroing stopped/nonfunded periods;
+  # increments are percentage points with the treatment's core tickets fixed.
+  # Counts reconcile event unions; this diagnostic never ranks or reallocates.
+  keys<-c('issue','arm','seed')
+  required<-c('worlds','core_hits','opportunity_hits','shared_hits','union_hits','incremental_hits')
+  stopifnot(all(c(keys,'kind',required) %in% names(coverage)),
+    !anyDuplicated(coverage[c(keys,'kind')]),!anyNA(coverage[c(keys,'kind',required)]),
+    all(coverage$kind %in% c('training','evaluation')),
+    all(as.matrix(coverage[required])>=0),all(as.matrix(coverage[required])==floor(as.matrix(coverage[required]))),
+    all(coverage$worlds>0),all(coverage$union_hits<=coverage$worlds),
+    all(coverage$shared_hits<=pmin(coverage$core_hits,coverage$opportunity_hits)),
+    all(coverage$union_hits==coverage$core_hits+coverage$opportunity_hits-coverage$shared_hits),
+    all(coverage$incremental_hits==coverage$union_hits-coverage$core_hits),
+    !anyDuplicated(periods[keys]))
+  p<-periods |> dplyr::filter(!reference) |>
+    dplyr::select(dplyr::all_of(keys),stopped,stake)
+  expected<-tidyr::crossing(p,kind=c('training','evaluation'))
+  z<-dplyr::full_join(expected,coverage,by=c(keys,'kind'),relationship='one-to-one')
+  stopifnot(nrow(z)==2*nrow(p),!anyNA(z[c('stopped','stake',required)]))
+  z |> dplyr::mutate(funded=!stopped & stake>0) |>
+    dplyr::group_by(arm,seed,kind) |> dplyr::summarise(issues=dplyr::n(),funded_issues=sum(funded),
+      core_probability_percent=100*mean(ifelse(funded,core_hits/worlds,0)),
+      opportunity_probability_percent=100*mean(ifelse(funded,opportunity_hits/worlds,0)),
+      union_probability_percent=100*mean(ifelse(funded,union_hits/worlds,0)),
+      incremental_percentage_points=100*mean(ifelse(funded,incremental_hits/worlds,0)),
+      .groups='drop')
+}
+
 n7_core_pairs <- function(periods,comparisons,issue_order,seeds) {
   stopifnot(all(c('issue','arm','seed','stake','gross','net','hits','stopped') %in% names(periods)),
     all(c('treatment','control','comparison') %in% names(comparisons)),
