@@ -38,6 +38,13 @@
 
 ## 必需输入凭据校验
 
+`r/strategy_handicap_diagnostic.R::strategy_handicap_diagnostic(frame,strata,outcomes,breaks)`
+复用分类概率验证器，按显式让球数、阶段和赛果统计预测/实际发生率、偏差、
+Top1准确率、Top1/Top2召回率与Top2漏选数。正让球加到主队比分；
+并列按outcomes顺序；无预测/实际发生时条件率为NA。纯描述性，不拟合或选参数。
+测试为`tests/testthat/test-strategy-handicap-diagnostic.R`，入口为
+`quarto/162_handicap_probability_diagnostic.qmd`。图中稀疏格子可以不显示，CSV完整保留。
+
 `strategy_verify_diagnostic_inputs(root, hashes, required)` 位于
 `r/strategy_diagnostic_probabilities.R`；对每个必需文件要求非空、单值 SHA-256，
 并核验本地文件内容。遗漏条目、无效哈希、文件缺失或内容变化均停止。
