@@ -146,6 +146,8 @@ receipt[c('status','rows','independent_locked_prefix_settlement_checks','results
 
 ## 验收记录
 
+代码提交 `645ed71b`，交付 [PR #450](https://github.com/algotradinglife/beijing-lot/pull/450)，关联 [Issue #449](https://github.com/algotradinglife/beijing-lot/issues/449)。PR 以 #448 的分支为基础；本次提交供审核，不合并或关闭 Issue。
+
 Python 范围测试 5 项通过；R 范围测试 17 个断言通过。独立复算核验 81,000 行结果、405 个汇总、486 份分配重放及 243 个配对覆盖成本汇总，全部通过。结果 SHA256 为 `b3a0be38e64270a14fb4fe878f63636756fe71566166c457c5eab8cea9e593d0`。
 
 2026-09-14 最终 `codex review` 对本次实现无发现；首次审核指出的源文件成员哈希、结算审计与对照一致性、配对新增覆盖成本三项问题均已修复并复核。审核日志 `residual-review-final.log` 随验收材料保存在研究数据目录，其 SHA256 为 `4ad5a32b7fff9d335fbb2d06119d8e67162d9ec5950b10373ff0e66f424a2bcc`。审核范围、函数测试映射、复现命令和继承实现清单见仓库 `docs/research/n7_refill_conclusion_449.md`。
