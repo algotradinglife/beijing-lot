@@ -112,12 +112,17 @@ n7_core_option_pool <- function(base,partition,cutoffs,mode,max_copies) {
 # Sequential breadth-first allocator on shared prediction scenarios. Budget is an
 # upper bound in CNY; expected_net scores marginal expected net per added CNY.
 # any_hit scores marginal union probability per CNY, with expected value ties.
-# All affordable unopened core prefixes must be bought before depth or copies.
+# OPEN_FIRST buys affordable unopened prefixes before depth/copies; COMPETE
+# compares those actions together. coverage_sum ranks marginal summed coverage
+# per CNY (not joint-hit probability). Estimated value is a fixed ranking
+# reference, not a positive-EV gate; legal actions may have negative value.
 # Returns selected option indices, model accounting, action/stop audit and cash.
 # No actual results, history fitting, persistence or randomness are introduced.
-n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_actions) {
+n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_actions,
+                             allocation_order='OPEN_FIRST') {
   stopifnot(identical(pool$cutoffs,cutoffs),identical(scenarios$cutoffs,cutoffs),
-    objective %in% c('any_hit','expected_net'),budget_cny>=0,budget_cny%%2==0,
+    objective %in% c('any_hit','expected_net','coverage_sum'),
+    allocation_order %in% c('OPEN_FIRST','COMPETE'),budget_cny>=0,budget_cny%%2==0,
     is.finite(budget_cny),is.finite(max_actions),max_actions>=1,max_actions==floor(max_actions),
     pool$mode %in% c('BREADTH','DEPTH','MULTIPLY'))
   # Shared accounting boundary validates scenario dimensions, values and budget.
@@ -144,10 +149,10 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
       any_hit=mean(current_events>0),expected_net=sum(expected[selected])-current_stake)
     unopened<-pool$opening_options[!ids[pool$opening_options] %in% ids[selected]]
     affordable<-unopened[stake[unopened]<=current$cash]
-    if(length(affordable)) {
+    if(length(affordable) && (allocation_order=='OPEN_FIRST' || pool$mode=='BREADTH')) {
       candidates<-affordable;phase<-'OPEN'
     } else {
-      if(is.null(opening_stop))opening_stop<-if(length(unopened))'NO_AFFORDABLE_NEW_CORE' else 'ALL_CORE_OPEN'
+      if(!length(affordable) && is.null(opening_stop))opening_stop<-if(length(unopened))'NO_AFFORDABLE_NEW_CORE' else 'ALL_CORE_OPEN'
       if(pool$mode=='BREADTH') {stop_reason<-'BREADTH_COMPLETE';break}
       candidates<-which(ids %in% ids[selected] & !seq_along(opts) %in% selected)
       candidates<-candidates[vapply(candidates,function(j) {
@@ -157,6 +162,7 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
           if(pool$mode=='DEPTH')depth[j]>depth[old] else
             (depth[j]==depth[old] && copies[j]==copies[old]+1)
       },logical(1))]
+      if(allocation_order=='COMPETE')candidates<-c(affordable,candidates)
       phase<-pool$mode
       if(!length(candidates)) {stop_reason<-'NO_AFFORDABLE_LEGAL_ACTION';break}
     }
@@ -171,13 +177,16 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
       cost<-v$stake-current$stake
       tibble::tibble(option=j,cost=cost,
         hit_gain=v$any_hit-current$any_hit,
+        coverage_gain=opts[[j]]$coverage-if(length(old))opts[[old]]$coverage else 0,
         net_gain=v$expected_net-current$expected_net,
         value_rate=(v$expected_net-current$expected_net)/cost)
     })
     scores<-dplyr::bind_rows(scores)
-    primary<-if(objective=='any_hit')scores$hit_gain/scores$cost else scores$value_rate
+    primary<-switch(objective,any_hit=scores$hit_gain/scores$cost,
+      coverage_sum=scores$coverage_gain/scores$cost,expected_net=scores$value_rate)
     best<-order(-primary,-scores$value_rate,-scores$hit_gain,ids[scores$option],scores$option)[1]
     row<-scores[best,];j<-row$option
+    if(allocation_order=='COMPETE')phase<-if(j %in% affordable)'OPEN' else pool$mode
     stopifnot(row$cost>=2)
     ledger[[step]]<-tibble::tibble(step=step,phase=phase,sleeve_id=ids[j],option=j,
       depth=depth[j],copies=copies[j],added_stake=row$cost,cash_before=current$cash,

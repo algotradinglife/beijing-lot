@@ -1,0 +1,48 @@
+source(file.path('..','..','r','n7_core_opportunity.R'))
+source(file.path('..','..','r','n7_capital_portfolio.R'))
+testthat::test_that('joint competition can deepen before an affordable new group',{
+ cuts<-list(a='epoch')
+ a<-list(sleeve_id=0,depth=1,stake=2,coverage=.4,expected_gross=2,
+   unit_copies=1,role='CORE')
+ deep<-a;deep$depth<-2;deep$stake<-4;deep$coverage<-.8;deep$expected_gross<-4
+ b<-a;b$sleeve_id<-1;b$coverage<-.3;b$expected_gross<-1.5
+ pool<-list(cutoffs=cuts,options=list(a,deep,b),opening_options=c(1L,3L),opportunity_options=integer(),mode='DEPTH')
+ hit<-cbind(c(1,1,0,0,0),c(1,1,1,1,0),c(1,0,0,0,1))>0
+ scenarios<-list(cutoffs=cuts,hits=hit,gross=hit*5)
+ first<-n7_core_allocate(pool,scenarios,cuts,4,'any_hit',20,'OPEN_FIRST')
+ joint<-n7_core_allocate(pool,scenarios,cuts,4,'any_hit',20,'COMPETE')
+ testthat::expect_setequal(first$selected,c(1,3))
+ testthat::expect_equal(joint$selected,2)
+ testthat::expect_equal(joint$actions$phase,c('OPEN','DEPTH'))
+ testthat::expect_equal(joint$metrics$any_hit,.8)
+ testthat::expect_equal(joint$metrics$cash,0)
+ summed<-n7_core_allocate(pool,scenarios,cuts,4,'coverage_sum',20,'COMPETE')
+ testthat::expect_equal(summed$selected,2)
+ value<-n7_core_allocate(pool,scenarios,cuts,4,'expected_net',20,'COMPETE')
+ testthat::expect_equal(value$selected,2)
+ testthat::expect_error(n7_core_allocate(pool,scenarios,list(b='bad'),4,'any_hit',20,'COMPETE'))
+ testthat::expect_error(n7_core_allocate(pool,scenarios,cuts,4,'any_hit',20,'INVALID'))
+ testthat::expect_error(n7_core_allocate(pool,scenarios,cuts,4,'INVALID',20,'COMPETE'))
+})
+
+testthat::test_that('summed coverage and joint coverage rank overlapping groups differently',{
+ cuts<-list(a='epoch')
+ a<-list(sleeve_id=0,depth=1,stake=2,coverage=.6,expected_gross=2,
+   unit_copies=1,role='CORE')
+ b<-a;b$sleeve_id<-1;b$coverage<-.5
+ c<-a;c$sleeve_id<-2;c$coverage<-.4
+ pool<-list(cutoffs=cuts,options=list(a,b,c),opening_options=1:3,
+   opportunity_options=integer(),mode='BREADTH')
+ hit<-cbind(c(rep(TRUE,6),rep(FALSE,4)),c(rep(TRUE,5),rep(FALSE,5)),
+   c(rep(FALSE,6),rep(TRUE,4)))
+ scenarios<-list(cutoffs=cuts,hits=hit,gross=hit*5)
+ summed<-n7_core_allocate(pool,scenarios,cuts,4,'coverage_sum',20,'OPEN_FIRST')
+ joint<-n7_core_allocate(pool,scenarios,cuts,4,'any_hit',20,'OPEN_FIRST')
+ testthat::expect_setequal(summed$selected,c(1,2))
+ testthat::expect_setequal(joint$selected,c(1,3))
+ testthat::expect_equal(summed$metrics$any_hit,.6)
+ testthat::expect_equal(joint$metrics$any_hit,1)
+ compete<-n7_core_allocate(pool,scenarios,cuts,4,'any_hit',20,'COMPETE')
+ testthat::expect_identical(joint$selected,compete$selected)
+ testthat::expect_equal(sum(joint$actions$added_stake),4)
+})

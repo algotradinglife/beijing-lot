@@ -2,6 +2,8 @@
 # #441 fixed funding modes; shared allocator, explicit copies and source bindings.
 args <- commandArgs(trailingOnly=TRUE);stopifnot(length(args)==1)
 cfg <- jsonlite::fromJSON(args[1]);library(dplyr)
+stopifnot(is.data.frame(cfg$policies),!anyDuplicated(cfg$policies$id),
+ all(c('id','mode','objective','allocation_order') %in% names(cfg$policies)))
 reticulate::use_python(cfg$python,required=TRUE)
 bindings <- reticulate::import('src.n7_union_inputs',convert=TRUE)
 input_binding <- bindings$bind_union_inputs(cfg$catalog,cfg$rank_dir,cfg$repository_root)
@@ -31,16 +33,18 @@ for(i in seq_len(nrow(catalog$issues))) {
   for(seed in cfg$seeds) {
     train_worlds <- n7_joint_worlds(base,cuts,seed,cfg$allocation_worlds)
     eval_worlds <- n7_joint_worlds(base,cuts,seed+cfg$evaluation_seed_offset,cfg$evaluation_worlds)
-    for(t in seq_along(partitions))for(mode in cfg$modes) {
+    for(t in seq_along(partitions))for(k in seq_len(nrow(cfg$policies))) {
+      policy <- cfg$policies[k,];mode <- policy$mode
       eval_pool <- n7_core_option_pool(base,partitions[[t]],cuts,mode,cfg$max_copies)
       eval_sc <- n7_joint_returns(eval_pool,eval_worlds,cuts)
       for(budget in cfg$budgets) {
-      fit <- n7_funding_allocate(base,partitions[[t]],cuts,mode,train_worlds,budget,cfg$max_actions,cfg$max_copies)
+      fit <- n7_funding_allocate(base,partitions[[t]],cuts,mode,train_worlds,budget,cfg$max_actions,cfg$max_copies,policy$objective,policy$allocation_order)
       stopifnot(identical(eval_pool$options,fit$pool$options))
       ev <- n7_capital_evaluate(fit$pool,fit$fit$selected,eval_sc,cuts,budget)
-      arm <- paste0('T',round(1000*cfg$targets[t]),'_',mode,'_B',budget)
+      arm <- paste0('T',round(1000*cfg$targets[t]),'_',policy$id,'_B',budget)
       all_rows[[length(all_rows)+1L]] <- tibble(issue=item$issue,cohort=item$cohort,
-        arm=arm,seed=seed,target=cfg$targets[t],mode=mode,budget_cny=budget,
+        arm=arm,seed=seed,target=cfg$targets[t],mode=mode,objective=policy$objective,
+        allocation_order=policy$allocation_order,budget_cny=budget,
         stake=ev$stake,cash=ev$cash,groups=length(fit$fit$selected),
         train_union=fit$fit$metrics$any_hit,eval_union=ev$any_hit,
         eval_profit=ev$profit_probability,expected_net=ev$expected_net,
@@ -60,7 +64,7 @@ for(i in seq_len(nrow(catalog$issues))) {
 }
 rows <- bind_rows(all_rows);funded <- bind_rows(groups);ledger <- bind_rows(actions)
 stopifnot(!anyDuplicated(rows[c('issue','arm','seed')]),
-  nrow(rows)==nrow(catalog$issues)*length(cfg$targets)*length(cfg$modes)*length(cfg$budgets)*length(cfg$seeds))
+  nrow(rows)==nrow(catalog$issues)*length(cfg$targets)*nrow(cfg$policies)*length(cfg$budgets)*length(cfg$seeds))
 readr::write_csv(rows,file.path(cfg$output_dir,'predictions.csv'))
 readr::write_csv(funded,file.path(cfg$output_dir,'funded.csv'))
 readr::write_csv(ledger,file.path(cfg$output_dir,'actions.csv'))
