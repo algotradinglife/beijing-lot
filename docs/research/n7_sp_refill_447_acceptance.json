@@ -1,0 +1,32 @@
+{
+  "issue": 447,
+  "pr": "https://github.com/algotradinglife/beijing-lot/pull/448",
+  "reviewed_commits": [
+    "00bd29ba",
+    "ce8e246b"
+  ],
+  "codex_review": "PASS_NO_ACTIONABLE_FINDINGS",
+  "scoped_python_tests": 7,
+  "scoped_r_assertions": 32,
+  "full_r_suite": "6 inherited failures; 2 skips",
+  "independent_check": {
+    "status": "PASS",
+    "allocation_replays": 162,
+    "independent_prefix_checks": 162,
+    "report_summaries": 243,
+    "result_rows": 48600,
+    "implementation_sha256": "c137990cce6410ff8aaf2536ed9f0860c43c397724c5e39a9d42ef8f837aec92",
+    "source_files": {
+      "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-predictions-v3/prediction-freeze.json": "e24d320f12253c06d69ab28b26f5c210be3a103e35f26451fa24248d246478a6",
+      "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-predictions-v4/prediction-freeze.json": "029692373387abbc2281d9a8384a49e7a57387e4964038b563adb87be177748c",
+      "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-comparison-v4/results.csv": "428b58c7fe64fda567ff7fbd6f75cd471b748c13186f6597997bed5f1010ff35",
+      "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-comparison-v4/report-summary.csv": "fc53e2ee43cb1bd6cf858554b728fbd30f84972cccbd2fe7954d9a13c6f3d844"
+    }
+  },
+  "logs": {
+    "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-comparison-v4/acceptance-v1/refill-codex-review-4.log": "86ecbbe99a3b03570d3bde8be1cda7af142e0ea615cc6f1b05226e802451c2b9",
+    "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-comparison-v4/acceptance-v1/refill-scoped-python.log": "f49503c65c9dc51f12ddcb033fa1998d7ff6bdb0b650baa3913ebddd37b328d5",
+    "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-comparison-v4/acceptance-v1/refill-scoped-r.log": "b127a63491c5862285e8e5f94756a14170a4f66049d0228ce56e267940aae7fb",
+    "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue447-refill-comparison-v4/acceptance-v1/refill-full-r-tests-explicit.log": "ba9b72206626d830115a3cbd9d72db9f1e4107ca30e90df14095dea0f58ac7f4"
+  }
+}
