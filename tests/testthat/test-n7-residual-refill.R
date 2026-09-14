@@ -1,0 +1,28 @@
+source('../../r/n7_residual_refill.R')
+testthat::test_that('residual policies preserve locked bets and use genuine incremental coverage',{
+  cuts<-list(a='epoch')
+  pool<-list(cutoffs=cuts,options=list(
+    list(sleeve_id=1,stake=4,coverage=.5),
+    list(sleeve_id=2,stake=2,coverage=.9),
+    list(sleeve_id=3,stake=2,coverage=.4),
+    list(sleeve_id=4,stake=2,coverage=.5)))
+  sc<-list(cutoffs=cuts,hits=cbind(c(1,1,0,0),c(1,1,1,0),c(0,0,1,1),c(1,1,0,0)))
+  a<-n7_residual_refill(pool,sc,cuts,1,2:4,6,2,'standalone')
+  b<-n7_residual_refill(pool,sc,cuts,1,2:4,6,2,'incremental')
+  testthat::expect_equal(a$selected,c(1,2))
+  testthat::expect_equal(b$selected,c(1,3))
+  testthat::expect_equal(b$incremental_union,.5)
+  testthat::expect_equal(b$cash_cny,0)
+  full<-n7_residual_refill(pool,sc,cuts,1,2:4,4,2,'incremental')
+  testthat::expect_equal(full$selected,1)
+  empty<-n7_residual_refill(pool,sc,cuts,integer(),2:4,6,2,'efficiency_gate')
+  testthat::expect_equal(empty$cash_cny,6)
+  zero<-n7_residual_refill(pool,sc,cuts,1,4,8,2,'incremental')
+  testthat::expect_length(zero$added,0)
+  pool$options[[3]]$stake<-6
+  gate<-n7_residual_refill(pool,sc,cuts,1,3,10,2,'efficiency_gate')
+  testthat::expect_length(gate$added,0)
+  testthat::expect_error(n7_residual_refill(pool,sc,list(),1,2:4,6,2,'standalone'))
+  testthat::expect_error(n7_residual_refill(pool,sc,cuts,1,c(1,2),6,2,'standalone'))
+  testthat::expect_error(n7_residual_refill(pool,sc,cuts,1,2:4,3,2,'standalone'))
+})

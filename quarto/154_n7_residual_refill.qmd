@@ -1,0 +1,153 @@
+---
+title: "补组是否值得：保留原票、增量覆盖与持币的结论性比较"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  initial_capital_cny: 100000
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+stopifnot(!is.null(params$study))
+study<-params$study
+source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R')
+source('r/n7_selection_diagnostics.R')
+source('r/n7_sp_refill_diagnostics.R')
+source('r/n7_residual_efficiency.R')
+receipt<-jsonlite::fromJSON(file.path(study,'evaluation-receipt.json'))
+stopifnot(receipt$status=='PASS',receipt$rows==81000,
+ digest::digest(file=file.path(study,'results.csv'),algo='sha256')==receipt$results_sha256,
+ digest::digest(file=file.path(study,'plans-frozen.json'),algo='sha256')==receipt$freeze_sha256)
+for(p in names(receipt$input_hashes))stopifnot(digest::digest(file=p,algo='sha256')==receipt$input_hashes[[p]])
+rows<-readr::read_csv(file.path(study,'results.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+issue_order<-sort(unique(rows$issue));stopifnot(length(issue_order)==200)
+z<-n7_sp_refill_diagnostics(rows,issue_order,params$initial_capital_cny)
+efficiency<-n7_residual_efficiency(rows)
+readr::write_csv(efficiency$paired,file.path(study,'report-efficiency.csv'))
+readr::write_csv(efficiency$per_issue,file.path(study,'report-efficiency-per-issue.csv'))
+for(name in c('summary','curves','blocks','paired','per_issue'))readr::write_csv(z[[name]],file.path(study,paste0('report-',name,'.csv')))
+```
+
+## 固定比较口径
+
+五种方案使用同一200期、SP≥1.30、N7、每期512／768／1024元预算、三个固定种子及九种原资金分配规则。市场概率和估算 SP 冻结，实际北单 SP 仅在计划冻结后结算；每张2元票只乘一次0.65。没有训练、清洗、增加期次或按结果调参。
+
+| 方案 | 操作 |
+|---|---|
+| FILTER_ONLY | 仅过滤，沿用原下注并保留现金 |
+| REFILL | #447 全池重新分配，可能挤占原票 |
+| STANDALONE | 保留原票，仅用余款按新组自身覆盖／元排序购买 |
+| INCREMENTAL | 保留原票，按相对已买票的新增联合覆盖／元购买 |
+| EFFICIENCY_GATE | 同上，新增覆盖效率还须达到原票组合的覆盖／元；否则持币 |
+
+仅允许新增 REFILL_TOP2 组，使用其达到25%覆盖的最小前缀，起投不超过256元，一组一份，不加深、不调整原票。每买一组重新计算增量覆盖。分配与评估使用不同的既定模拟样本。门槛是概率效率参考，不是正期望收益保证；原投入为零时门槛方案持币。
+
+## 净收益结论对照
+
+**本轮结论：保留 FILTER_ONLY，仅过滤后持币；不采用补满候选池或余款自动补组。** 四种补组方式在各自81组参数对照中都没有净收益改善。保留原票避免了原中奖前缀被挤占，但新增投入未带来额外中奖回报；按新增覆盖选组并未改变这一结果。效率门槛减少了无效投入，仍未优于直接持币。
+
+具体而言：全池重分配61组收益下降；保留原票的两种无门槛补组均27组下降；效率门槛补组9组下降，其余均持平。对应最大净收益减少分别约3,819.14元、758元、758元、252元。该结论限于本次冻结规则和已有样本，不承诺未来结果，但足以决定本轮不启用自动补组。
+
+```{r}
+verdict<-z$paired |> filter(variant!='FILTER_ONLY') |> group_by(variant) |>
+ summarise(configurations=n(),improved=sum(delta_net>1e-6),unchanged=sum(abs(delta_net)<=1e-6),
+ worse=sum(delta_net< -1e-6),min_delta_net=min(delta_net),max_delta_net=max(delta_net),
+ improved_hit_periods=sum(delta_hit_issues>0),lower_drawdown=sum(delta_drawdown< -1e-6),.groups='drop')
+knitr::kable(verdict,digits=3)
+```
+
+81个参数组合不是81份独立历史样本。实际受补组影响的只有100608与100711两期；其余198期完全保持原冻结选择。下列200期汇总用于比较账户表现，两期变化表用于解释补组的实际作用。不能把在这两期的成功或失败推广为未来必然结果。
+
+## 投入、收益、ROI 与风险
+
+```{r}
+knitr::kable(z$summary |> filter(seed==42501) |>
+ select(variant,mode,allocation_order,objective,budget_cny,stake,cash,net,roi,
+ hit_issues,profit_issues,max_drawdown,longest_loss_streak,net_without_best,net_without_best3,net_without_best5),digits=3)
+```
+
+ROI 使用实际投入为分母。账户从10万元开始，未投入资金保留现金；回撤以账户历史峰值计算。完整三个种子的汇总如下，不选择最好的种子作为报告结论。
+
+```{r}
+knitr::kable(z$summary,digits=3)
+```
+
+## 收益与回撤曲线
+
+```{r}
+#| fig-width: 15
+#| fig-height: 11
+curves<-z$curves |> filter(seed==42501) |> mutate(rule=paste(mode,allocation_order,objective,sep=' / '))
+for(b in sort(unique(curves$budget_cny))) {
+ part<-filter(curves,budget_cny==b)
+ equity<-ggplot(part,aes(period,equity_cny,colour=variant))+geom_line(linewidth=.45)+
+ facet_wrap(~rule,ncol=3)+theme_minimal()+labs(title=paste('预算',b,'元：账户资金'),x='历史期序',y='元',colour='方案')
+ drawdown<-ggplot(part,aes(period,drawdown_cny,colour=variant))+geom_line(linewidth=.45)+
+ facet_wrap(~rule,ncol=3)+theme_minimal()+labs(title=paste('预算',b,'元：回撤'),x='历史期序',y='元',colour='方案')
+ print(equity);print(drawdown)
+ ggsave(file.path(study,paste0('equity-',b,'.png')),equity,width=15,height=11,dpi=140)
+ ggsave(file.path(study,paste0('drawdown-',b,'.png')),drawdown,width=15,height=11,dpi=140)
+}
+```
+
+## 两期实际变化与新增覆盖
+
+```{r}
+changes<-z$per_issue |> filter(issue %in% c('100608','100711'))
+knitr::kable(changes |> filter(seed==42501) |> select(issue,variant,mode,allocation_order,objective,
+ budget_cny,stake,gross,net,delta_stake,delta_gross,delta_net,delta_hits,added_eval_union),digits=4)
+knitr::kable(changes |> filter(variant %in% c('STANDALONE','INCREMENTAL','EFFICIENCY_GATE')) |>
+ group_by(variant) |> summarise(min_added_stake=min(added_stake),max_added_stake=max(added_stake),
+ min_added_coverage_pp=100*min(added_eval_union),max_added_coverage_pp=100*max(added_eval_union),
+ .groups='drop'),digits=4)
+```
+
+新增资金的模型估算 ROI 约为−33.1%至−35.4%，虽然新增覆盖提高，仍缺少估值上的正收益支持。这里使用冻结估算 SP，不是实际北单结算 SP，也不是对未来回报的保证。
+
+```{r}
+knitr::kable(changes |> filter(added_stake>0) |>
+ mutate(added_expected_net=expected_net-original_expected_net,
+        added_expected_roi=added_expected_net/added_stake) |>
+ group_by(variant) |> summarise(min_added_expected_net=min(added_expected_net),
+ max_added_expected_net=max(added_expected_net),min_added_expected_roi=min(added_expected_roi),
+ max_added_expected_roi=max(added_expected_roi),.groups='drop'),digits=4)
+```
+
+## 分段稳定性与数据结构
+
+### 每个参数组合的新增覆盖成本
+
+以下逐一列出全部政策／预算／种子组合，分子分母来自同一组合。跨期覆盖之和表示模拟下新增命中期数的期望；其成本比率不是实际盈利预测。`NO_ADDITION` 表示持币，`SPENT_WITHOUT_EVAL_GAIN` 表示已投入但独立评估样本没有新增覆盖，二者比率均记为缺失值而非无穷大。
+
+```{r}
+knitr::kable(efficiency$paired,digits=4)
+knitr::kable(efficiency$per_issue |> filter(issue %in% c('100608','100711'),seed==42501) |>
+ select(issue,arm,seed,added_stake,added_eval_union,efficiency_status,cny_per_coverage_pp),digits=4)
+```
+
+```{r}
+knitr::kable(z$blocks |> filter(seed==42501),digits=3)
+glimpse(rows)
+knitr::kable(head(rows,6))
+receipt[c('status','rows','independent_locked_prefix_settlement_checks','results_sha256')]
+```
+
+这是暴露过的历史研究集；继承输入缺少完整的历史可用性证据，不声明未见数据效果。结论为保留 SP≥1.30 过滤与余款持币，拒绝本轮测试的自动补组规则。
+
+## 验收记录
+
+Python 范围测试 5 项通过；R 范围测试 17 个断言通过。独立复算核验 81,000 行结果、405 个汇总、486 份分配重放及 243 个配对覆盖成本汇总，全部通过。结果 SHA256 为 `b3a0be38e64270a14fb4fe878f63636756fe71566166c457c5eab8cea9e593d0`。
+
+2026-09-14 最终 `codex review` 对本次实现无发现；首次审核指出的源文件成员哈希、结算审计与对照一致性、配对新增覆盖成本三项问题均已修复并复核。审核日志 `residual-review-final.log` 随验收材料保存在研究数据目录，其 SHA256 为 `4ad5a32b7fff9d335fbb2d06119d8e67162d9ec5950b10373ff0e66f424a2bcc`。审核范围、函数测试映射、复现命令和继承实现清单见仓库 `docs/research/n7_refill_conclusion_449.md`。
+
+全量 `Rscript tests/testthat.R` 未通过：6 个既有失败（解释器冲突、缺少旧模型或重训测试输入）及 2 个缺集成输入的跳过。范围测试通过不代表全库通过；本次交付不声明合并验收已完成。未执行完整 Python 测试集或远端 CI。QMD 已在新进程、执行开启和缓存刷新条件下渲染，六张收益／回撤图及配对表内容完整。
