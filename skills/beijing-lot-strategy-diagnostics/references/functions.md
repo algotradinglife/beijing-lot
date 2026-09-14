@@ -38,6 +38,12 @@
 
 ## 必需输入凭据校验
 
+`r/strategy_distribution_shape.R::strategy_distribution_shape(fixtures,members,n_legs,prefix_depth)`
+精确枚举已冻结组的三赛果独立乘积，比较p/q的Top1–Top2差、熵、实际惊讶度、
+预期中奖排名、实际排名并列区间与固定前缀覆盖；单场去重和组重叠须分开报告。
+实际惊讶度减熵不是因果归因，也不排除组内依赖。对应测试
+`tests/testthat/test-strategy-distribution-shape.R`；入口`quarto/163_distribution_shape_diagnostic.qmd`。
+
 `r/strategy_handicap_diagnostic.R::strategy_handicap_diagnostic(frame,strata,outcomes,breaks)`
 复用分类概率验证器，按显式让球数、阶段和赛果统计预测/实际发生率、偏差、
 Top1准确率、Top1/Top2召回率与Top2漏选数。正让球加到主队比分；

@@ -1,0 +1,22 @@
+source(file.path('..','..','r','strategy_distribution_shape.R'))
+test_that('exact product geometry distinguishes flatness from realized surprise', {
+  f<-tibble::tibble(issue=c('01','01'),slot=1:2,provider_id=c('a','b'),
+    actual_direction=c('W','D'),p_W=.6,p_D=.3,p_L=.1,q_W=1/3,q_D=1/3,q_L=1/3)
+  m<-tibble::tibble(issue='01',sleeve_id='0',slot=1:2)
+  r<-strategy_distribution_shape(f,m,2,1);p<-r$groups[r$groups$model=='p',];q<-r$groups[r$groups$model=='q',]
+  expect_equal(p$actual_probability,.18);expect_equal(p$prefix_coverage,.36)
+  expect_equal(p$actual_rank_low,2L);expect_equal(p$actual_rank_high,3L)
+  expect_equal(p$first,1L);expect_equal(p$second,1L)
+  expect_equal(q$effective_states,9);expect_equal(q$entropy_residual,0,tolerance=1e-12)
+  expect_equal(q$actual_rank_low,1L);expect_equal(q$actual_rank_high,9L)
+  expect_false(q$prefix_hit_low);expect_true(q$prefix_hit_high)
+  expect_equal(q$cumulative_mid,.5);expect_gt(q$entropy,p$entropy)
+  f$p_D<-0;f$p_L<-.4
+  expect_true(is.infinite(strategy_distribution_shape(f,m,2,1)$groups$surprise[1]))
+  expect_error(strategy_distribution_shape(f,m[-1,],2,1))
+  m$slot[2]<-3L;expect_error(strategy_distribution_shape(f,m,2,1))
+  m$slot[2]<-1L;expect_error(strategy_distribution_shape(f,m,2,1))
+  m$slot[2]<-2L;f$p_W[1]<-NA_real_
+  expect_error(strategy_distribution_shape(f,m,2,1))
+  expect_error(strategy_distribution_shape(f[0,],m,2,1))
+})
