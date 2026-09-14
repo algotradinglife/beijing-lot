@@ -1,0 +1,198 @@
+---
+title: "固定原组顺序：25%至40%买入深度与广度对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  output: null
+---
+
+## 对照口径
+
+固定JOINT、seed42501、每期1024元上限、7场串关、每注2元、10万元本金；
+欧赔及大小球映射估算价格用于旧计划，实际北单回款已经包含一次0.65系数。
+沿用旧计划的SP1.3准入、候选身份、校正市场概率和已经购买的组顺序。
+本轮只在**原方案已买组**内部改变深度，不纳入原来未买的候选，不重新做联合覆盖排序。
+这是隔离深度影响的局部对照，不是重新运行完整选组流程。
+
+每组取达到25%、30%、35%、40%累计概率的最小整数票数；
+按原顺序检查完整前缀，买不起则跳过，继续检查后面的原组，余款持有现金。
+旧256元上限用于冻结25%原组准入，不再作为加深后的单组限制，否则同时改变候选资格。
+不倍投、不买比分保护、不截断末组凑满预算。25%必须逐组逐期复现原账本。
+
+本轮仅固定阈值的历史敏感性核算，使用已暴露的旧概率包，不拟合、选择最优参数或提供未来决策接口。
+继承包的fixture cutoff映射，但这些旧包的源/标签历史可用性未证明，historical_admission保持false。
+不新增时序工具，不产生训练分区或跨期学习缓存。所有源、参数、实现和冻结前缀均绑定哈希。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R');source('r/n7_sleeve_tables.R')
+source('r/n7_capital_depth.R');source('r/n7_depth_sensitivity.R')
+source('r/n7_quality_settlement.R');source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R');source('r/n7_recent_structure.R')
+stopifnot(!is.null(params$study),!is.null(params$output))
+s<-params$study;o<-params$output;targets<-c(.25,.30,.35,.40)
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+sr<-jsonlite::fromJSON(file.path(s,'settlement-inputs/receipt.json'))
+cp<-file.path(s,'settlement-inputs/catalog.json')
+# The catalogue is bound by the published settlement-input receipt.
+strategy_verify_diagnostic_inputs(file.path(s,'settlement-inputs'),sr$files,'catalog.json')
+catalog<-jsonlite::fromJSON(cp)
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('predictions.csv','funded.csv'))
+p<-read_csv(file.path(s,'evaluation/predictions.csv'),col_types=cols(issue='c'),show_col_types=FALSE) |>
+ filter(variant=='JOINT',seed==42501,budget_cny==1024)
+original<-read_csv(file.path(s,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |>
+ semi_join(p,by=c('issue','arm','seed'))
+stopifnot(!anyDuplicated(p$issue),!anyDuplicated(original[c('issue','sleeve_id')]),all(original$copies==1))
+order<-sort(p$issue);reference<-sort(p$issue[p$cohort=='原200期'])
+dir.create(o,recursive=TRUE,showWarnings=FALSE)
+files<-c('r/strategy_diagnostic_probabilities.R','r/n7_sleeve_tables.R','r/n7_capital_depth.R',
+ 'r/n7_depth_sensitivity.R','r/n7_quality_settlement.R','r/fundamentals_equity_curves.R',
+ 'r/n7_sweet_union_summary.R','r/n7_recent_structure.R','quarto/166_depth_breadth_sensitivity.qmd')
+code_hashes<-vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')
+scenarios<-list();cuts<-list()
+for(i in seq_along(order)) {
+ issue<-order[i];g<-original |> filter(.data$issue==.env$issue)
+ if(!nrow(g))next
+ item<-catalog$issues |> filter(.data$issue==.env$issue)
+ stopifnot(nrow(item)==1,digest::digest(file=item$path,algo='sha256')==item$sha256)
+ b<-jsonlite::fromJSON(gzfile(item$path),simplifyVector=FALSE)
+ cuts[[issue]]<-b$cutoffs
+ b$sleeves<-b$sleeves[vapply(b$sleeves,function(x)as.character(x$id) %in% g$sleeve_id,logical(1))]
+ surface<-n7_sleeve_tables(b,b$cutoffs,'market-balance-draw-1.0.0-diagnostic')
+ curves<-n7_capital_curves(surface,b$cutoffs,b$cutoffs,2)
+ for(tau in targets) {
+  z<-n7_depth_sensitivity(curves,g$sleeve_id,tau,1024,2,b$cutoffs,b$cutoffs) |> mutate(issue=issue)
+  if(tau==.25)stopifnot(all(z$selected),identical(z$sleeve_id,g$sleeve_id),
+    all(z$depth==g$depth),max(abs(z$coverage-g$coverage))<1e-10)
+  scenarios[[length(scenarios)+1L]]<-z
+ }
+ if(i%%10==0)writeLines(paste('Depth surfaces:',i,'/',length(order)),file.path(o,'progress.txt'))
+}
+scenarios<-bind_rows(scenarios)
+write_csv(scenarios,file.path(o,'frozen-prefixes.csv'))
+stopifnot(identical(code_hashes,vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')))
+freeze<-list(targets=targets,budget_cny=1024,unit_cny=2,initial_capital_cny=100000,
+ historical_admission=FALSE,intended_use='RETROSPECTIVE_FIXED_LEDGER_SENSITIVITY_ONLY',
+ cutoff_evidence='INHERITED_LEGACY_PROXY_NOT_AVAILABILITY_PROOF',cutoffs=cuts,
+ catalog_sha256=digest::digest(file=cp,algo='sha256'),bundles=catalog$issues,
+ predictions_sha256=er$files[['predictions.csv']],funded_sha256=er$files[['funded.csv']],
+ prefix_sha256=digest::digest(file=file.path(o,'frozen-prefixes.csv'),algo='sha256'),
+ implementation=as.list(code_hashes))
+jsonlite::write_json(freeze,file.path(o,'prefix-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+以上先冻结所有敏感性前缀，再读取结算。冻结不使旧概率包获得赛前因果有效性。
+
+```{r}
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+stopifnot(identical(ar$source_receipt_sha256,digest::digest(file=file.path(s,'settlement-inputs/receipt.json'),algo='sha256')))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,'ranks.csv')
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,'results.csv')
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'),show_col_types=FALSE)
+plans<-crossing(issue=order,target=targets) |> mutate(arm=paste0('T',target*100),seed=42501,budget_cny=1024)
+funded<-scenarios |> filter(selected) |> mutate(arm=paste0('T',target*100),seed=42501,copies=1)
+totals<-funded |> group_by(issue,arm,seed) |> summarise(stake=sum(stake),groups=n(),.groups='drop')
+plans<-plans |> left_join(totals,by=c('issue','arm','seed'),relationship='one-to-one') |>
+ mutate(stake=replace_na(stake,0),groups=replace_na(groups,0L),cash=budget_cny-stake,
+ status=ifelse(stake>0,'COMPLETE','NO_BET'))
+settled<-n7_quality_settlement(plans,funded,k)
+rows<-settled$rows |> mutate(model='frozen-market-diagnostic',policy=arm,cash_cny=cash)
+old<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c'),show_col_types=FALSE) |>
+ filter(variant=='JOINT',seed==42501,budget_cny==1024) |> arrange(match(issue,order))
+check<-rows |> filter(target==.25) |> arrange(match(issue,order))
+stopifnot(identical(old$issue,check$issue),max(abs(old$stake-check$stake))<1e-8,
+ max(abs(old$gross-check$gross))<1e-6)
+st<-n7_diagnostic_stage_map(old,order,reference,100000,60)
+rows<-rows |> left_join(st$map |> select(issue,stage),by='issue',relationship='many-to-one')
+baseline<-rows |> filter(target==.25) |> select(issue,base_hit=hits,base_net=net,base_stake=stake)
+paired<-rows |> left_join(baseline,by='issue',relationship='many-to-one') |>
+ mutate(rescued=hits>0 & base_hit==0,lost=hits==0 & base_hit>0,delta_net=net-base_net)
+gs<-settled$groups |> left_join(original |> select(issue,sleeve_id,original_depth=depth),
+ by=c('issue','sleeve_id'),relationship='many-to-one') |>
+ mutate(depth_rescue=actual_rank>original_depth & actual_rank<=depth)
+summary<-list();curves<-list()
+for(scope in c('ALL495','OLD200','RECENT295')) {
+ ids<-switch(scope,ALL495=order,OLD200=reference,RECENT295=setdiff(order,reference))
+ cv<-strategy_equity_curves(rows |> filter(issue %in% ids),ids,100000) |> mutate(scope=scope)
+ curves[[scope]]<-cv
+ sums<-cv |> filter(period>0) |> group_by(policy) |> summarise(issues=n(),
+  hit_issues=sum(gross>0 & !stopped),profit_issues=sum(funded_net_cny>0),
+  stake=sum(funded_stake_cny),net=sum(funded_net_cny),roi=net/stake,
+  max_drawdown=max(drawdown_cny),minimum_equity=min(100000,equity_cny),stopped=any(stopped),.groups='drop')
+ extras<-paired |> filter(issue %in% ids) |> group_by(policy) |> summarise(
+  rescued=sum(rescued),lost=sum(lost),winning_groups=sum(hits),mean_groups=mean(groups),cash=sum(cash),.groups='drop')
+ summary[[scope]]<-sums |> left_join(extras,by='policy',relationship='one-to-one') |> mutate(scope=scope)
+}
+summary<-bind_rows(summary);curves<-bind_rows(curves)
+window<-paired |> group_by(stage,policy) |> summarise(issues=n(),hit_issues=sum(hits>0),
+ rescued=sum(rescued),lost=sum(lost),stake=sum(stake),net=sum(net),delta_net=sum(delta_net),.groups='drop')
+group_changes<-gs |> group_by(arm) |> summarise(groups=n(),added_tickets=sum(depth-original_depth),
+ deeper_winners=sum(depth_rescue),deeper_gross=sum(gross[depth_rescue]),.groups='drop')
+for(name in c('rows','paired','gs','summary','curves','window','group_changes'))
+ write_csv(get(name),file.path(o,paste0(name,'.csv')))
+knitr::kable(summary,digits=3)
+knitr::kable(window,digits=2)
+knitr::kable(group_changes,digits=2)
+```
+
+“救回／丢失”按整期是否至少一组中奖，不能由组中奖数直接推导。
+新增深度中奖组可能与原来中奖组同时发生，所以加深救回组数不等于救回期数。
+固定每期资金上限，实际投入及闲置现金单列；比较不是全额投入1024元。
+零投注期全部保留。最大回撤在每个范围内独立从10万元起算，ALL495连续计算。
+
+```{r}
+for(scope_name in c('RECENT295','ALL495')) {
+ plotdata<-curves |> filter(scope==scope_name) |> select(policy,period,equity_cny,drawdown_cny) |>
+  pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY')
+ gg<-ggplot(plotdata,aes(period,CNY,colour=policy))+geom_line(linewidth=.65)+
+  facet_wrap(~metric,ncol=1,scales='free_y')+theme_minimal(base_size=12)+
+  labs(title=paste(scope_name,': fixed original group order, deeper prefixes'),
+   subtitle='T25/T30/T35/T40 = target cumulative coverage; CNY1024 cap; residual cash retained',
+   x='Issue index',y='CNY',colour=NULL)
+ print(gg);ggsave(file.path(o,paste0('depth-curves-',scope_name,'.png')),gg,width=12,height=8,dpi=150)
+}
+jsonlite::write_json(list(prefix_receipt_sha256=digest::digest(file=file.path(o,'prefix-receipt.json'),algo='sha256'),
+ baseline_reproduced=TRUE,settlement_hash=ar$files[['ranks.csv']],results_hash=er$files[['results.csv']],
+ historical_admission=FALSE,generated_at=as.character(Sys.time())),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 解释边界
+
+这是已暴露495期上的固定参数对照；不将表现最好的深度称为未来最优阈值。
+保留原已选组顺序的目的，是分开“买深”和“换组”的影响。
+没有测试提高覆盖后重新评估全部候选组、改变组间重叠或把剩余资金倍投。
+概率底座、旧排序和数据历史可用性限制原样继承；本报告不把它们包装为合格的未来策略。
+
+
+## 结论
+
+**适度加深提高了命中期数并减轻最大回撤，但本轮没有出现收益与回撤同时改善的替代方案。**
+新增295期：25%原方案净收益7,136元、ROI2.71%、最大回撤23,852元、命中126期。
+30%覆盖命中140期（救回22、丢失8），净收益537元、ROI0.21%、最大回撤20,131元。
+35%覆盖命中147期（救回28、丢失7），最大回撤15,165元，较原方案降低36.4%；
+但净收益转为−6,797元、ROI−2.72%。40%命中145期，净收益−11,386元，回撤又升至23,454元。
+因此不是覆盖越深越稳定。
+
+25%至35%的平均购买组数由每期5.70降至3.02，投入263,800元降至249,576元（减少5.4%）。
+35%的回撤减少幅度大于投入减少幅度，但不能据此认定本金保护更好。
+新增期资金最低点：25%为98,290元、30%为93,495元、35%为87,475元、40%为82,873元。
+35%赚得少，最高资金也低，其从历史高点计算的回撤较小，但对起始本金的侵蚀更大。
+因此必须同时看净收益、最大回撤和最低资金，而不能单独把较小回撤解读为更安全。
+中奖期数增加的同时，中奖组总数由419降至310；每个中奖期平均中奖组数约从3.33降至2.11。
+原先同一期多组命中的回款被部分放弃，是不能把“更多命中期”直接等同于“更多收益”的原因。
+组有重叠，这些组计数不代表独立试验。
+
+全495期也呈现同样取舍：25%净收益48,680元、ROI11.09%；30%为39,406元、9.14%；
+35%为17,546元、4.23%；40%仅1,578元、0.40%。
+旧200期与新增295期分别列在表中，不能用全样本正收益掩盖新增期35%及40%的亏损。
+
+**对原推论的判断：加深在30%和35%下确有降低历史最大回撤、提高期命中的作用；
+但深度换广度牺牲了收益，40%还出现回撤反弹。当前证据不足以取代25%原方案，
+也不把35%认定为未来最优深度。** 此结论限于冻结原已买组顺序的局部实验。

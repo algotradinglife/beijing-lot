@@ -38,6 +38,12 @@
 
 ## 必需输入凭据校验
 
+`r/n7_depth_sensitivity.R::n7_depth_sensitivity(curves,group_order,target,budget_cny,unit_cny,cutoffs,expected_cutoffs)`
+对固定旧组顺序做完整前缀深度敏感性核算，复用 `n7_capital_resolve`；买不起则跳过并继续原顺序，余款现金。
+不新增候选、不重排、不拟合或选择阈值、不提供未来准入；cutoff沿用旧证据并明确历史可用性未证明。
+25%须复现原账本，再比较加深救回/减少组数丢失期、实际投入、收益及回撤。
+测试 `tests/testthat/test-n7-depth-sensitivity.R`；入口 `quarto/166_depth_breadth_sensitivity.qmd`。
+
 `r/n7_component_accounting.R::n7_component_accounting(groups,plans,issue_order,threshold,unit_cny,initial_capital_cny)`
 按固定Top128覆盖边界拆分已结算票账本，核对金额、实际前缀命中和完整期账，返回MAIN/LOW/ALL及
 与MAIN逐期同投入的分数资金SCALED_ALL对照。只做事后资金归因；不输出未来筛选器或新增票。
