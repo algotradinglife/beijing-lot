@@ -1,0 +1,215 @@
+---
+title: "低估算 SP 场次过滤：N7 分配方案比较（#445）"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study_dir: null
+  output_dir: null
+---
+
+## 研究口径
+
+同一已暴露200期、每期原24个候选组，固定比较不筛除（1.00）及估算SP门槛
+1.10、1.20、1.30、1.50。单场按概率最高赛果对应的 `1/q` 定义估算SP，
+同概率按让胜、让平、让负顺序选择。严格低于门槛时排除整场，含该场的原候选组一并排除。
+概率来自冻结欧赔与大小球映射；北单实际SP只结算，票级仅乘一次0.65。
+
+九种分配方案、预算512/768/1024元、三个固定种子，共81,000个计划。
+不重建候选组、不修改概率或排名、不重训，不把未投入的现金算作收益。
+固定N7、每票2元，账户初始100000元，不倍投。
+25%累计概率在256元内可达的原组准入条件及完整深度网格保持不变。
+所有结果是回顾研究，不能直接解释为未见期次的盈利能力。
+
+```{r}
+#| include: false
+library(dplyr);library(tidyr);library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R')
+source('r/n7_selection_report.R')
+source('r/n7_selection_diagnostics.R')
+stopifnot(is.character(params$output_dir),!dir.exists(params$output_dir))
+v<-n7_selection_report_inputs(params$study_dir,81000)
+gate_check<-jsonlite::fromJSON(file.path(params$study_dir,'sp-filter-check.json'))
+stopifnot(gate_check$status=='PASS',gate_check$plans==81000,gate_check$admission_cells==1000,
+ gate_check$freeze_sha256==v$freeze_sha256,gate_check$results_sha256==v$results_sha256,
+ gate_check$control_rows[['results.csv']]==16200)
+frozen<-v$frozen
+rows<-readr::read_csv(file.path(params$study_dir,'results.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c'))
+stopifnot(nrow(rows)==81000)
+stopifnot(digest::digest(file=frozen$config$catalog,algo='sha256')==frozen$source_catalog_sha256)
+issue_order<-jsonlite::fromJSON(frozen$config$catalog)$issues$issue
+source('r/n7_sp_diagnostics.R')
+tables<-n7_sp_diagnostics(rows,issue_order,100000)
+summary<-tables$summary;curves<-tables$curves;blocks<-tables$blocks
+per_issue<-tables$per_issue;admission<-tables$admission;admission_summary<-tables$admission_summary
+paired<-tables$paired;common<-tables$common
+dir.create(params$output_dir,recursive=TRUE)
+for(n in c('summary','curves','blocks','per_issue','admission','admission_summary','paired','common'))
+ readr::write_csv(get(n),file.path(params$output_dir,paste0(n,'.csv')))
+plots<-list();theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=10))
+```
+
+## 主要发现
+
+本轮低SP过滤影响很集中：1.10与1.20门槛排除同一场，结果完全相同；
+1.30涉及100608期两场及100711期一场；1.50再增加110308期一场。
+最高门槛总共只改变3期、4场比赛，因此其余197期提供的是原方案表现，
+不能把200期的整体盈利都归因于过滤规则。
+
+1.50门槛相对不筛除，在81个“方案×预算×种子”配置中有67个净收益增加、14个减少，
+变化范围约为−4,640至+5,229元。这81项相互关联，并非81次独立实验。
+大多数最大回撤不变，说明本轮并没有解决原方案主要回撤阶段的问题。
+1.10/1.20并不更稳妥：33项增加、41项减少、7项不变；提高门槛与提高收益不呈简单单调关系。
+
+以1024元预算、种子42501的“先开组再加深＋预期收益排序”为例，
+净收益由约46,472元升至50,287元，ROI由24.4%升至26.4%，命中期从90增至91，
+最大回撤仍约16,227元。它是保留对照继续研究的线索，尚不足以据此选定通用过滤阈值。
+
+收益增加也有不同原因。同样1024元预算下，“仅扩组＋预期收益排序”从约41,212元
+增至42,548元，同时投入从176,016元降至174,680元，回款和82个命中期均不变：
+这1,336元改善完全来自少投入。前述“先开组再加深＋预期收益排序”则只多投入4元，
+回款增加约3,819元。应分别理解节省未中奖投入和重新分配后增加回款，不能只比较ROI。
+
+所有门槛下均有13期没有达到原25%累计概率准入条件的组；这些期原本就保留现金，
+并非过滤新造成的空仓。虽然剩余场次数量都足够组成新组，本轮未重建候选，
+不对重建后是否改善收益作结论。
+
+## 收益、ROI、命中与回撤
+
+ROI为累计净收益除以实际投入；命中期表示至少一组中奖，盈利期表示净收益大于零。
+最大回撤为资金曲线距先前峰值的最大下降（元）。各随机种子并非独立历史样本。
+
+```{r}
+knitr::kable(summary |> select(rule,budget_cny,minimum_sp,seed,stake,net,roi,hit_issues,profit_issues,max_drawdown,
+ net_without_best,net_without_best3,net_without_best5),digits=3)
+```
+
+## 候选损失与重建边界
+
+“足够重建”只表示保留场次不少于7，不能证明这些新组达到25%准入条件或有盈利。
+本轮不将候选重建和过滤效果混在一起。移除Top1概率质量是被删场次各自Top1概率之和，
+不是独立事件的联合命中率。
+
+```{r}
+knitr::kable(admission_summary,digits=3)
+```
+
+被过滤场次明细由独立检查器从冻结输入重建，列出期次、场次编号、来源ID、
+最高概率赛果及对应估算SP。同一场可能在多个门槛下被排除。
+
+```{r}
+knitr::kable(gate_check$excluded_fixtures,digits=4)
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+plots$admission<-ggplot(admission,aes(factor(minimum_sp),eligible_core_groups))+
+ geom_boxplot()+labs(x='SP门槛',y='原候选中仍达准入条件的组数')
+plots$admission
+```
+
+## 相对无过滤的变化
+
+负的回撤差表示回撤降低，但需同时看投入下降和收益损失。
+
+```{r}
+knitr::kable(paired |> select(rule,budget_cny,minimum_sp,seed,delta_net,delta_stake,delta_roi,delta_dd,delta_hit),digits=3)
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 13
+plots$sensitivity<-ggplot(summary,aes(minimum_sp,roi,colour=budget,group=interaction(budget,seed),linetype=factor(seed)))+
+ geom_line()+geom_point()+facet_wrap(~rule,ncol=3)+labs(x='SP门槛',y='ROI（比例）',colour='预算',linetype='种子')
+plots$sensitivity
+```
+
+## 资金与回撤曲线
+
+每档预算分别作图，九个面板对应九种方案，颜色为门槛，线型为种子。
+
+```{r}
+#| fig-width: 16
+#| fig-height: 12
+for(b in sort(unique(rows$budget_cny))) {
+ x<-curves |> filter(budget_cny==b)
+ plots[[paste0('equity_',b)]]<-ggplot(x,aes(period,equity_cny,colour=gate,linetype=factor(seed)))+
+ geom_line()+facet_wrap(~rule,ncol=3)+geom_hline(yintercept=100000,linetype=3)+
+ labs(title=paste('预算上限',b,'元'),x='期次顺序',y='账户资金（元）',colour='SP门槛',linetype='种子')
+ plots[[paste0('drawdown_',b)]]<-ggplot(x,aes(period,drawdown_cny,colour=gate,linetype=factor(seed)))+
+ geom_line()+facet_wrap(~rule,ncol=3)+labs(title=paste('预算上限',b,'元'),x='期次顺序',y='回撤（元）',colour='SP门槛',linetype='种子')
+ print(plots[[paste0('equity_',b)]]);print(plots[[paste0('drawdown_',b)]])
+}
+```
+
+## 收益与回撤取舍
+
+```{r}
+#| fig-width: 15
+#| fig-height: 12
+plots$tradeoff<-ggplot(summary,aes(max_drawdown,net,colour=gate,shape=budget))+
+ geom_point()+facet_wrap(~rule,ncol=3)+labs(x='最大回撤（元）',y='净收益（元）',colour='SP门槛',shape='预算')
+plots$tradeoff
+```
+
+## 相同有投注期次对照
+
+只保留过滤方案和无过滤方案都实际投入的期次，二者使用完全相同的期次集合。
+这仍不是等实际投入对照，投入金额列出供判断；完整200期的主结果不删无投注期。
+
+```{r}
+knitr::kable(common,digits=3)
+```
+
+## 分段与去极值
+
+```{r}
+#| fig-width: 16
+#| fig-height: 12
+plots$blocks<-ggplot(blocks |> filter(budget_cny==1024),
+ aes(factor(block),roi,colour=gate,group=interaction(gate,seed),linetype=factor(seed)))+
+ geom_line()+geom_point()+facet_wrap(~rule,ncol=3)+geom_hline(yintercept=0,linetype=3)+
+ labs(x='每50期分段',y='分段ROI（比例）',colour='SP门槛',linetype='种子',title='1024元预算；其他预算见完整blocks.csv')
+plots$blocks
+```
+
+去除最佳1/3/5期后的净收益已在汇总表提供。各策略独立移除自己的最佳期，
+不是删掉共同期次再重新选组，也不以此调节当期参数。
+
+## 逐期数据结构
+
+```{r}
+tibble::glimpse(per_issue)
+knitr::kable(per_issue |> select(issue,arm,seed,minimum_sp,stake,cash,hits,gross,net,issue_roi) |> head(12),digits=3)
+```
+
+## 凭证与限制
+
+报告入口强制验证81,000个计划的分配回放、独立结算凭证以及结果哈希。
+概率及上游可用时间证据沿用原回顾研究限制，不声称已完成前瞻准入。
+完整验证命令、Codex review及无过滤对照等价检查另随验收凭证保存。
+
+全仓 `Rscript tests/testthat.R` 在本任务独立临时目录下仍有6个旧测试失败、2个跳过：
+两个R/Python桥接测试存在解释器路径冲突，两个旧让平测试缺少历史比较文件，
+重训输入测试有两项缺失输入相关失败，两个旧流水线测试缺少集成bundle。
+本轮新增函数测试通过，不能据此声称全仓检查通过或直接合并。
+
+```{r}
+#| include: false
+for(n in names(plots))ggsave(file.path(params$output_dir,paste0(n,'.png')),plots[[n]],width=16,height=12,dpi=120)
+code<-c('quarto/152_n7_low_sp.qmd','r/n7_sp_diagnostics.R','r/n7_selection_report.R','r/n7_selection_diagnostics.R','r/n7_sweet_union_summary.R','r/fundamentals_equity_curves.R')
+files<-list.files(params$output_dir,full.names=TRUE)
+jsonlite::write_json(list(freeze_sha256=v$freeze_sha256,results_sha256=v$results_sha256,
+ plans=nrow(rows),historical_admission=FALSE,
+ implementation=as.list(setNames(vapply(code,digest::digest,character(1),file=TRUE,algo='sha256'),code)),
+ outputs=as.list(setNames(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256'),basename(files)))),
+ file.path(params$output_dir,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

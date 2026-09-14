@@ -3,12 +3,12 @@
 args <- commandArgs(trailingOnly=TRUE);stopifnot(length(args)==1)
 cfg <- jsonlite::fromJSON(args[1]);library(dplyr)
 stopifnot(is.data.frame(cfg$policies),!anyDuplicated(cfg$policies$id),
- all(c('id','mode','objective','allocation_order') %in% names(cfg$policies)))
+ all(c('id','mode','objective','allocation_order','minimum_sp') %in% names(cfg$policies)))
 reticulate::use_python(cfg$python,required=TRUE)
 bindings <- reticulate::import('src.n7_union_inputs',convert=TRUE)
 input_binding <- bindings$bind_union_inputs(cfg$catalog,cfg$rank_dir,cfg$repository_root)
 sources <- c('r/n7_sleeve_tables.R','r/n7_joint_sleeves.R','r/n7_capital_depth.R',
-  'r/n7_capital_portfolio.R','r/n7_core_opportunity.R','r/n7_sweet_union.R','r/n7_funding_modes.R')
+  'r/n7_capital_portfolio.R','r/n7_core_opportunity.R','r/n7_sweet_union.R','r/n7_funding_modes.R','r/n7_sp_filter.R')
 for(p in sources)source(p)
 code <- c(sources,'scripts/run_n7_funding_modes.R')
 code_identity <- vapply(code,digest::digest,character(1),algo='sha256',file=TRUE)
@@ -33,18 +33,27 @@ for(i in seq_len(nrow(catalog$issues))) {
   for(seed in cfg$seeds) {
     train_worlds <- n7_joint_worlds(base,cuts,seed,cfg$allocation_worlds)
     eval_worlds <- n7_joint_worlds(base,cuts,seed+cfg$evaluation_seed_offset,cfg$evaluation_worlds)
-    for(t in seq_along(partitions))for(k in seq_len(nrow(cfg$policies))) {
-      policy <- cfg$policies[k,];mode <- policy$mode
-      eval_pool <- n7_core_option_pool(base,partitions[[t]],cuts,mode,cfg$max_copies)
+    for(t in seq_along(partitions)) {
+    equivalents<-n7_sp_policy_groups(base,partitions[[t]],cuts,cfg$policies)
+    for(class in equivalents$classes) {
+      k<-class[1];policy<-cfg$policies[k,];mode<-policy$mode
+      partition<-equivalents$gates[[k]]$partition
+      eval_pool <- n7_core_option_pool(base,partition,cuts,mode,cfg$max_copies)
       eval_sc <- n7_joint_returns(eval_pool,eval_worlds,cuts)
       for(budget in cfg$budgets) {
-      fit <- n7_funding_allocate(base,partitions[[t]],cuts,mode,train_worlds,budget,cfg$max_actions,cfg$max_copies,policy$objective,policy$allocation_order)
+      fit <- n7_funding_allocate(base,partition,cuts,mode,train_worlds,budget,cfg$max_actions,cfg$max_copies,policy$objective,policy$allocation_order)
       stopifnot(identical(eval_pool$options,fit$pool$options))
       ev <- n7_capital_evaluate(fit$pool,fit$fit$selected,eval_sc,cuts,budget)
+      for(k in class) {
+      policy<-cfg$policies[k,];gate<-equivalents$gates[[k]]
       arm <- paste0('T',round(1000*cfg$targets[t]),'_',policy$id,'_B',budget)
       all_rows[[length(all_rows)+1L]] <- tibble(issue=item$issue,cohort=item$cohort,
         arm=arm,seed=seed,target=cfg$targets[t],mode=mode,objective=policy$objective,
         allocation_order=policy$allocation_order,budget_cny=budget,
+        minimum_sp=policy$minimum_sp,eligible_fixtures=sum(gate$fixtures$eligible),
+        total_fixtures=nrow(gate$fixtures),eligible_groups=sum(gate$groups$eligible),
+        total_groups=nrow(gate$groups),eligible_core_groups=length(partition$core_ids),
+        removed_top1_mass=sum(gate$fixtures$probability[!gate$fixtures$eligible]),
         stake=ev$stake,cash=ev$cash,groups=length(fit$fit$selected),
         train_union=fit$fit$metrics$any_hit,eval_union=ev$any_hit,
         eval_profit=ev$profit_probability,expected_net=ev$expected_net,
@@ -59,6 +68,8 @@ for(i in seq_len(nrow(catalog$issues))) {
         mutate(issue=item$issue,arm=arm,seed=seed)
       }
     }
+  }
+  }
   }
   if(i %% 10==0)message(cfg$stage,': ',i,'/',nrow(catalog$issues),' prediction issues frozen')
 }

@@ -32,12 +32,17 @@ for(i in seq_len(nrow(catalog$issues))) {
   for(seed in cfg$seeds) {
     worlds <- n7_joint_worlds(base,cuts,seed,cfg$allocation_worlds)
     eval_worlds <- n7_joint_worlds(base,cuts,seed+cfg$evaluation_seed_offset,cfg$evaluation_worlds)
-    for(t in seq_along(partitions))for(k in seq_len(nrow(cfg$policies))) {
-      policy <- cfg$policies[k,];mode <- policy$mode
-      eval_pool <- n7_core_option_pool(base,partitions[[t]],cuts,mode,cfg$max_copies)
+    for(t in seq_along(partitions)) {
+    equivalents<-n7_sp_policy_groups(base,partitions[[t]],cuts,cfg$policies)
+    for(class in equivalents$classes) {
+      k<-class[1];policy<-cfg$policies[k,];mode<-policy$mode
+      partition<-equivalents$gates[[k]]$partition
+      eval_pool <- n7_core_option_pool(base,partition,cuts,mode,cfg$max_copies)
       eval_sc <- n7_joint_returns(eval_pool,eval_worlds,cuts)
       for(budget in cfg$budgets) {
-      fit <- n7_funding_allocate(base,partitions[[t]],cuts,mode,worlds,budget,cfg$max_actions,cfg$max_copies,policy$objective,policy$allocation_order)
+      fit <- n7_funding_allocate(base,partition,cuts,mode,worlds,budget,cfg$max_actions,cfg$max_copies,policy$objective,policy$allocation_order)
+      for(k in class) {
+      policy<-cfg$policies[k,];gate<-equivalents$gates[[k]]
       arm <- paste0('T',round(1000*cfg$targets[t]),'_',policy$id,'_B',budget)
       expected <- funded |> filter(issue==item$issue,.data$seed==.env$seed,.data$arm==.env$arm)
       held <- fit$pool$options[fit$fit$selected]
@@ -61,6 +66,8 @@ for(i in seq_len(nrow(catalog$issues))) {
       count <- count+1L
       }
     }
+  }
+  }
   }
   if(i%%10==0)message('Replay: ',i,'/',nrow(catalog$issues))
 }
