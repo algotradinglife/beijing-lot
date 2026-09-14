@@ -38,6 +38,12 @@
 
 ## 必需输入凭据校验
 
+`r/n7_component_accounting.R::n7_component_accounting(groups,plans,issue_order,threshold,unit_cny,initial_capital_cny)`
+按固定Top128覆盖边界拆分已结算票账本，核对金额、实际前缀命中和完整期账，返回MAIN/LOW/ALL及
+与MAIN逐期同投入的分数资金SCALED_ALL对照。只做事后资金归因；不输出未来筛选器或新增票。
+最大回撤不能按分量相加，固定128注与实际买入深度必须区分。测试为
+`tests/testthat/test-n7-component-accounting.R`，报告为`quarto/165_main_component_diagnostic.qmd`。
+
 `r/strategy_distribution_shape.R::strategy_distribution_shape(fixtures,members,n_legs,prefix_depth)`
 精确枚举已冻结组的三赛果独立乘积，比较p/q的Top1–Top2差、熵、实际惊讶度、
 预期中奖排名、实际排名并列区间与固定前缀覆盖；单场去重和组重叠须分开报告。

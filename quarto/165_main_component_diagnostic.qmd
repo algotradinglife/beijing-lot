@@ -1,0 +1,107 @@
+---
+title: "只留主力组：实际票深下的资金归因与回撤诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  output: null
+---
+
+本轮为固定旧账本的事后分解，不拟合门槛、不生成未来筛选器。固定JOINT、seed42501、1024元预算、
+每注2元、10万元本金；实际回款已有一次0.65折算。
+以此前讨论的Top128覆盖30%为描述性边界，MAIN为>30%，LOW为≤30%；这不是旧策略正式主力/机会标签。
+MAIN只保留原主力组原票与原倍数，余款现金，不补组。LOW为对应分量。
+SCALED_ALL把原方案每期回款与投入等比例缩至MAIN实际投入，仅为分数资金风险参照，不是可下单票据。
+本轮不执行把节省资金再加注主力的分配规则。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R');source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R');source('r/n7_recent_structure.R');source('r/n7_component_accounting.R')
+stopifnot(!is.null(params$study),!is.null(params$output))
+s<-params$study;o<-params$output
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','settled-groups.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,'ranks.csv')
+p<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c')) |> filter(variant=='JOINT',seed==42501,budget_cny==1024)
+g<-read_csv(file.path(s,'evaluation/settled-groups.csv'),col_types=cols(issue='c',sleeve_id='c')) |> semi_join(p,by=c('issue','arm','seed'))
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'))
+g<-g |> left_join(k |> select(issue,sleeve_id,top128_coverage,rank_check=actual_rank),by=c('issue','sleeve_id'),relationship='many-to-one')
+stopifnot(!anyNA(g$rank_check),all(g$actual_rank==g$rank_check))
+order<-sort(p$issue);reference<-sort(p$issue[p$cohort=='原200期'])
+st<-n7_diagnostic_stage_map(p,order,reference,100000,60)
+z<-n7_component_accounting(g |> select(issue,sleeve_id,depth,copies,stake,coverage,actual_rank,actual_gross_cny,hit,gross,net,top128_coverage),
+ p,order,.3,2,100000)
+components<-z$components |> left_join(st$map |> select(issue,stage),by='issue',relationship='many-to-one') |>
+ mutate(band=cut(top128_coverage,c(0,.3,.4,1),include.lowest=TRUE))
+bygroup<-components |> group_by(stage,band) |> summarise(groups=n(),issues=n_distinct(issue),
+ stake=sum(stake),gross=sum(gross),net=sum(net),hits=sum(hit),actual_hit=mean(hit),
+ predicted_hit=mean(coverage),mean_depth=mean(depth),roi=net/stake,.groups='drop')
+periods<-z$ledger |> left_join(st$map |> select(issue,stage),by='issue',relationship='many-to-one')
+window<-periods |> group_by(stage,policy) |> summarise(issues=n(),hit_issues=sum(gross>0),profit_issues=sum(net>0),
+ stake=sum(stake),gross=sum(gross),net=sum(net),roi=ifelse(stake>0,net/stake,NA_real_),.groups='drop')
+summary<-list();curves<-list()
+for(scope in c('ALL495','OLD200','RECENT295')) {
+ ids<-switch(scope,ALL495=order,OLD200=reference,RECENT295=setdiff(order,reference))
+ c<-strategy_equity_curves(z$ledger |> filter(issue %in% ids),ids,100000) |> mutate(scope=scope)
+ curves[[scope]]<-c
+ summary[[scope]]<-c |> filter(period>0) |> group_by(policy) |> summarise(issues=n(),
+ stake=sum(funded_stake_cny),net=sum(funded_net_cny),roi=ifelse(stake>0,net/stake,NA_real_),
+ hit_issues=sum(gross>0 & !stopped),profit_issues=sum(funded_net_cny>0),max_drawdown=max(drawdown_cny),
+ stopped=any(stopped),.groups='drop') |> mutate(scope=scope)
+}
+summary<-bind_rows(summary);curves<-bind_rows(curves)
+dir.create(o,recursive=TRUE,showWarnings=FALSE)
+for(name in c('bygroup','window','periods','summary','curves'))write_csv(get(name),file.path(o,paste0(name,'.csv')))
+knitr::kable(summary,digits=3);knitr::kable(bygroup,digits=3);knitr::kable(window,digits=3)
+```
+
+固定Top128的理论覆盖与实际所买前缀的coverage不同。分量净收益可加，最大回撤不能相加。
+各scope从10万元单独起算；ALL495连续合并，RECENT295单独展示新增期，不能混淆两种回撤。
+
+```{r}
+plotdata<-curves |> filter(scope=='RECENT295') |>
+ select(policy,period,equity_cny,drawdown_cny) |> pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY')
+gg<-ggplot(plotdata,aes(period,CNY,colour=policy))+geom_line(linewidth=.65)+
+ facet_wrap(~metric,ncol=1,scales='free_y')+theme_minimal(base_size=12)+
+ labs(title='Recent 295 issues: original ledger and held components',
+ subtitle='MAIN: Top128 coverage >30%; original tickets retained; SCALED_ALL: fractional equal-stake benchmark',
+ x='Issue index',y='CNY',colour=NULL)
+print(gg);ggsave(file.path(o,'component-curves.png'),gg,width=12,height=8,dpi=150)
+files<-c('r/strategy_diagnostic_probabilities.R','r/fundamentals_equity_curves.R',
+ 'r/n7_sweet_union_summary.R','r/n7_recent_structure.R','r/n7_component_accounting.R','quarto/165_main_component_diagnostic.qmd')
+jsonlite::write_json(list(study=s,threshold=.3,unit_cny=2,initial_capital_cny=100000,diagnostic_only=TRUE,
+ evaluation=er$files,settlement=ar$files,
+ implementation=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files),
+ generated_at=as.character(Sys.time())),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 结论
+
+**当前证据不支持只留主力组就能显著降低总体回撤。**
+新增295期：只留MAIN投入198,264元，比原方案263,800元少24.8%；
+净收益由7,136元降至2,207元，ROI从2.71%降至1.11%，最大回撤只从23,852元降至22,528元（约5.5%）。
+命中期数由126期降至98期。这里每期固定1024元资金上限、未用现金保留；没有追加主力投注。
+
+在原94期回撤窗口，LOW亏8,650元，MAIN亏15,202元，总亏23,852元。
+删掉LOW确实减轻这个窗口的亏损，但MAIN自身最大回撤窗口不同，不能把15,202元当作删组后最大回撤。
+实际MAIN中的30%–40%覆盖组平均只买约74注（详见mean_depth），预测所买前缀命中约25.1%，实际22.7%。
+此前固定128注下的33.3%命中不等于原账本实际买到了这些中奖组合。
+
+在原94期窗口，把原方案等比例缩至MAIN同样每期投入的分数资金参照亏15,248元，与MAIN亏15,202元接近。
+新增295期整体，等投入参照净收益9,697元、最大回撤21,809元，均好于MAIN。
+这个参照不是可下单的整数票策略，仅用于说明降低风险不应与挑选更稳定组混为一谈。
+
+全495期也不支持简单删组：原方案净收益48,680元、ROI11.09%；MAIN净收益23,751元、ROI7.36%。
+LOW使用约26.5%的总投入，贡献约51.2%的总净收益；新增295期LOW自身净收益4,929元、ROI7.52%。
+这些为相互重叠的旧组账本归因，不能外推为未来保证或新的最优资金权重。
+
+**本轮推论只得到局部支持：缩仓能减轻原回撤窗口损失，但保留主力没有展现足够的额外稳定性，
+反而丢掉了其他时期的重要收益来源。** 不据此上线MAIN筛选器，也不把事后30%边界当成未来已验证规则。
