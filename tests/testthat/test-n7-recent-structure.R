@@ -1,0 +1,47 @@
+source(file.path('..','..','r','fundamentals_equity_curves.R'))
+source(file.path('..','..','r','n7_sweet_union_summary.R'))
+source(file.path('..','..','r','n7_return_attribution.R'))
+source(file.path('..','..','r','n7_recent_structure.R'))
+testthat::test_that('post-hoc stages preserve chronology, peak and recovery',{
+ p<-tibble::tibble(issue=c('01','02','03','04'),arm='a',seed=1,stake=10,
+   gross=c(20,6,4,22),net=c(10,-4,-6,12),cash=0,budget_cny=10,hits=c(1,1,1,1))
+ z<-n7_diagnostic_stage_map(p,p$issue,'01',100,2)
+ testthat::expect_equal(z$worst$peak_issue,'01')
+ testthat::expect_equal(z$worst$trough_issue,'03')
+ testthat::expect_equal(z$worst$recovery_issue,'04')
+ testthat::expect_equal(z$worst$drawdown_cny,10)
+ testthat::expect_equal(z$map$in_drawdown,c(FALSE,TRUE,TRUE,FALSE))
+ testthat::expect_equal(z$map$block,c(0,1,1,2))
+ p2<-p[1:3,];testthat::expect_true(is.na(n7_diagnostic_stage_map(p2,p2$issue,'01',100,2)$worst$recovery_issue))
+ p$gross<-20;p$net<-10
+ testthat::expect_false(any(n7_diagnostic_stage_map(p,p$issue,'01',100,2)$map$in_drawdown))
+ testthat::expect_error(n7_diagnostic_stage_map(p,p$issue,'02',100,2))
+ testthat::expect_error(n7_diagnostic_stage_map(p,p$issue,'01',1,2))
+ testthat::expect_error(n7_diagnostic_stage_map(p,p$issue,'01',100,0))
+})
+testthat::test_that('candidate identity, payout replay and purchased bridge agree',{
+ f<-tibble::tibble(issue='01',slot=1:7,p_W=.4,p_D=.3,p_L=.3,q_W=.4,q_D=.3,q_L=.3,
+   actual_q=.4,spf_sp=2.5)
+ k<-tibble::tibble(issue='01',sleeve_id=c('0','1'),fixture_slots='1,2,3,4,5,6,7',
+   actual_rank=c(1,2),actual_gross_cny=1.3*2.5^7,coverage_25_cost_cny=c(2,4))
+ g<-tibble::tibble(issue='01',arm='a',seed=1,sleeve_id='0',depth=1,stake=2,
+   coverage=.25,copies=1,expected_gross=1)
+ m<-tibble::tibble(issue='01',period=1,stage='RECENT_OTHER')
+ z<-n7_diagnostic_group_structure(f,g,k,m,2,.65,7,1.3,2)
+ testthat::expect_equal(z$ranks$eligible,c(TRUE,FALSE))
+ testthat::expect_equal(z$bridge$periods$actual_net,1.3*2.5^7-2)
+ testthat::expect_equal(z$group_summary$price_residual,0,tolerance=1e-8)
+ testthat::expect_equal(nrow(z$members),14)
+ g$depth<-1;k$actual_rank<-2
+ z<-n7_diagnostic_group_structure(f,g,k,m,2,.65,7,1.3,2)
+ testthat::expect_equal(z$group_summary$hits,0)
+ testthat::expect_true(is.na(z$group_summary$gross_per_hit))
+ testthat::expect_equal(z$group_summary$net,-2)
+ testthat::expect_error(n7_diagnostic_group_structure(f,g,k,m,2,.5,7,1.3,2))
+ testthat::expect_error(n7_diagnostic_group_structure(f[-1,],g,k,m,2,.65,7,1.3,2))
+ testthat::expect_error(n7_diagnostic_group_structure(f,g,dplyr::bind_rows(k,k),m,2,.65,7,1.3,2))
+ k$fixture_slots[1]<-'1,2,3,4,5,6,6'
+ testthat::expect_error(n7_diagnostic_group_structure(f,g,k,m,2,.65,7,1.3,2))
+ k$fixture_slots[1]<-'1,2,3,4,5,6,bad'
+ testthat::expect_error(n7_diagnostic_group_structure(f,g,k,m,2,.65,7,1.3,2))
+})

@@ -1,0 +1,218 @@
+---
+title: "最近295期北单策略诊断"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  python: null
+  output: null
+  seed: 42501
+  budget_cny: 1024
+  unit_cny: 2
+  payout_factor: 0.65
+  n_legs: 7
+  initial_capital_cny: 100000
+  block_length: 60
+  minimum_sp: 1.3
+  cap_cny: 256
+---
+
+新增295期为对象，原200期作对照；固定市场校正版本、7串1、每期预算1024元、
+2元票及票级一次0.65折算，无比分保护。不拟合、不重选参数。
+赛前估算SP来自欧赔与大小球映射，结算使用北单SP。
+最大回撤窗口属于事后解释，不能作为未来路由条件。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R')
+source('r/n7_fixture_price_diagnostic.R');source('r/n7_return_attribution.R')
+source('r/fundamentals_equity_curves.R');source('r/n7_sweet_union_summary.R')
+source('r/n7_expanded_diagnostics.R');source('r/n7_recent_structure.R')
+stopifnot(!is.null(params$study),!is.null(params$python),!is.null(params$output),
+ params$unit_cny==2,params$payout_factor==.65,params$n_legs==7,
+ params$minimum_sp==1.3,params$cap_cny==256,params$seed==42501,params$budget_cny==1024,params$initial_capital_cny==100000,params$block_length==60)
+s<-params$study
+reticulate::use_python(params$python,required=TRUE)
+receipt<-jsonlite::fromJSON(file.path(s,'settlement-inputs/receipt.json'))
+input<-reticulate::import('src.strategy_diagnostic_inputs')$read_diagnostic_fixtures(
+ file.path(s,'settlement-inputs/catalog.json'),receipt$files[['catalog.json']])
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','funded.csv','settled-groups.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,c('fixture-audit.csv','ranks.csv'))
+a<-read_csv(file.path(s,'current-settlement/fixture-audit.csv'),col_types=cols(issue='c',provider_id='c'),show_col_types=FALSE)
+f<-n7_fixture_price_diagnostic(bind_rows(input$rows),a)
+allplans<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c'),show_col_types=FALSE)
+plans<-allplans |> filter(seed==params$seed,budget_cny==params$budget_cny)
+order<-sort(unique(plans$issue));reference<-sort(unique(plans$issue[plans$cohort=='原200期']))
+stopifnot(length(order)==495,length(reference)==200)
+primary<-plans |> filter(variant=='JOINT')
+st<-n7_diagnostic_stage_map(primary,order,reference,params$initial_capital_cny,params$block_length)
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'),show_col_types=FALSE)
+funded<-read_csv(file.path(s,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |> semi_join(plans,by=c('issue','arm','seed'))
+g<-read_csv(file.path(s,'evaluation/settled-groups.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |> semi_join(plans,by=c('issue','arm','seed'))
+structure<-n7_diagnostic_group_structure(f,funded,k,st$map,params$unit_cny,params$payout_factor,params$n_legs,params$minimum_sp,params$cap_cny)
+gate_counts<-structure$ranks |> group_by(issue) |> summarise(replayed_core=sum(eligible),.groups='drop')
+gate_check<-primary |> left_join(gate_counts,by='issue',relationship='one-to-one') |> mutate(replayed_core=replace_na(replayed_core,0L))
+present<-!is.na(gate_check$eligible_core_groups)
+stopifnot(all(gate_check$eligible_core_groups[present]==gate_check$replayed_core[present]))
+knitr::kable(tibble(recorded_counts=sum(present),missing_recorded_counts=sum(!present)))
+selected_gate<-funded |> semi_join(primary,by=c('issue','arm','seed')) |>
+ left_join(structure$ranks |> select(issue,sleeve_id,eligible),by=c('issue','sleeve_id'),relationship='many-to-one')
+stopifnot(!anyNA(selected_gate$eligible),all(selected_gate$eligible))
+b<-plans |> left_join(structure$bridge$periods |> select(issue,arm,seed,actual_net,model_net,outcome_residual,price_residual),by=c('issue','arm','seed'),relationship='one-to-one')
+stopifnot(all(b$stake[is.na(b$actual_net)]==0))
+b<-b |> mutate(across(c(actual_net,model_net,outcome_residual,price_residual),~replace_na(.x,0)))
+stopifnot(all(abs(b$net-b$actual_net)<1e-6))
+diagnostic<-n7_expanded_diagnostics(plans,order,params$initial_capital_cny,params$block_length,seq(0,1,.1))
+stage_labels<-c(REFERENCE='原200期',RECENT_DRAWDOWN='回撤94期',RECENT_OTHER='新增其余201期')
+labels<-c(SUM='概率和排序',JOINT='联合覆盖',EV='估算收益排序',DEPTH='可变深度',EXCHANGE11='换组11',EXCHANGE12='换组12',NO_FILTER='不滤低SP')
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+summary<-diagnostic$summary |> filter(scope=='新增295期') |> transmute(strategy=labels[variant],variant,issues,stake,net,roi,hit_issues,profit_issues,max_drawdown)
+knitr::kable(summary,digits=3)
+write_csv(summary,file.path(params$output,'recent-summary.csv'))
+knitr::kable(st$map |> group_by(cohort) |> summarise(first=min(issue),last=max(issue),issues=n(),.groups='drop'))
+knitr::kable(primary |> filter(stake==0) |> select(issue,status,stake,cash))
+```
+
+## 资金走势与阶段变化
+
+最近295期单独以10万元起始；全495期连续曲线另存。组共享比赛，不视为独立样本。
+
+```{r}
+curves<-diagnostic$curves |> filter(scope=='新增295期') |> mutate(strategy=labels[variant])
+cp<-curves |> select(period,strategy,equity_cny,drawdown_cny) |> pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |> mutate(metric=factor(metric,levels=c('equity_cny','drawdown_cny'),labels=c('账户资金','距历史高点的回撤')))
+p1<-ggplot(cp,aes(period,CNY,colour=strategy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+labs(x='新增期序',y='元',colour=NULL)+theme_minimal(base_family='Noto Sans CJK SC')+theme(legend.position='bottom')
+ggsave(file.path(params$output,'recent-equity-drawdown.png'),p1,width=12,height=8,dpi=140);p1
+write_csv(diagnostic$curves,file.path(params$output,'all-curves.csv'))
+wide<-plans |> filter(cohort=='新增295期') |> select(issue,variant,net) |> pivot_wider(names_from=variant,values_from=net)
+correlations<-cor(as.matrix(wide[setdiff(names(wide),'issue')]))
+knitr::kable(correlations,digits=3)
+write_csv(tibble::rownames_to_column(as.data.frame(correlations),'variant'),file.path(params$output,'return-correlations.csv'))
+knitr::kable(st$worst,digits=4)
+```
+
+## 已选组与同条件候选池
+
+REFERENCE为原200期；RECENT_DRAWDOWN为新增期与全历史最大回撤窗口的交集；
+RECENT_OTHER为新增其余期。候选对照使用同一最低SP1.3、
+达到25%累计概率所需投入不超过256元的条件。
+
+```{r}
+gs<-structure$group_summary |> filter(arm==unique(primary$arm))
+knitr::kable(gs |> select(stage,issues,groups,stake,hits,hit_rate,model_hit,avg_depth,gross_per_hit,net,roi),digits=4)
+knitr::kable(structure$candidate_summary,digits=4)
+write_csv(gs,file.path(params$output,'stage-groups.csv'))
+write_csv(structure$candidate_summary,file.path(params$output,'stage-candidates.csv'))
+fixed<-primary |> left_join(st$map |> select(issue,block),by='issue',relationship='one-to-one') |> group_by(cohort,block) |> summarise(first=min(issue),last=max(issue),issues=n(),stake=sum(stake),net=sum(net),roi=net/stake,hit_issues=sum(hits>0),hit_rate=mean(hits>0),predicted=mean(eval_union),gross_per_hit=ifelse(hit_issues>0,sum(gross)/hit_issues,NA_real_),.groups='drop')
+knitr::kable(fixed,digits=4);write_csv(fixed,file.path(params$output,'fixed-blocks.csv'))
+pp<-gs |> select(stage,hit_rate,model_hit,gross_per_hit,roi) |> pivot_longer(-stage,names_to='metric',values_to='value')
+pp<-pp |> mutate(stage=stage_labels[stage],metric=recode(metric,hit_rate='已选组实际命中率',model_hit='模型累计覆盖概率',gross_per_hit='每个中奖组回款（元）',roi='ROI'))
+p2<-ggplot(pp,aes(stage,value,fill=stage))+geom_col()+facet_wrap(~metric,scales='free_y',ncol=2)+theme_minimal(base_family='Noto Sans CJK SC')+theme(legend.position='none',axis.text.x=element_text(angle=20,hjust=1))+labs(x=NULL,y=NULL)
+ggsave(file.path(params$output,'stage-hit-payout.png'),p2,width=12,height=7,dpi=140);p2
+```
+
+## 概率底座：三种赛果与排序
+
+p是固定校正市场，q是未校正市场，均不是战力概率。在完全相同场次比较；
+Brier与log loss越低越好。二元事件Brier逐一检查让胜、让平、让负。
+冻结场次包不含联赛与近期战绩，无法据此认定某联赛造成退化。
+
+```{r}
+selected<-structure$members |> semi_join(funded |> semi_join(primary,by=c('issue','arm','seed')),by=c('issue','sleeve_id')) |> distinct(issue,slot)
+f<-f |> left_join(st$map,by='issue',relationship='many-to-one') |> mutate(handicap_class=case_when(handicap==0~'零让球',abs(handicap)==1~'一球',TRUE~'两球及以上'),selected=paste(issue,slot)%in%paste(selected$issue,selected$slot))
+long<-f |> select(issue,slot,provider_id,cohort,stage,handicap_class,selected,actual_outcome=actual_direction,p_W,p_D,p_L,q_W,q_D,q_L) |> pivot_longer(c(p_W,p_D,p_L,q_W,q_D,q_L),names_to=c('model','outcome'),names_pattern='([pq])_([WDL])',values_to='probability')
+prob<-strategy_probability_diagnostics(long,c('cohort','stage','handicap_class','selected'),c('W','D','L'),seq(0,1,.1))
+scores<-prob$scores |> group_by(cohort,model) |> summarise(fixtures=n(),issues=n_distinct(issue),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),.groups='drop')
+knitr::kable(scores,digits=5);write_csv(scores,file.path(params$output,'probability-scores.csv'))
+events<-long |> mutate(observed=as.integer(outcome==actual_outcome),error=(probability-observed)^2) |> group_by(cohort,stage,model,outcome) |> summarise(fixtures=n(),issues=n_distinct(issue),predicted=mean(probability),observed=mean(observed),event_brier=mean(error),.groups='drop')
+knitr::kable(events,digits=5);write_csv(events,file.path(params$output,'event-scores.csv'))
+paired<-prob$scores |> select(issue,slot,provider_id,cohort,stage,handicap_class,selected,model,brier,top1,top2) |> pivot_wider(names_from=model,values_from=c(brier,top1,top2))
+changes<-paired |> group_by(cohort,stage,selected) |> summarise(fixtures=n(),corrected_only=sum(top2_p & !top2_q),raw_only=sum(!top2_p & top2_q),both=sum(top2_p & top2_q),neither=sum(!top2_p & !top2_q),brier_delta=mean(brier_p-brier_q),.groups='drop')
+knitr::kable(changes,digits=5);write_csv(changes,file.path(params$output,'top2-exclusive.csv'))
+composition<-strategy_composition_diagnostics(prob$scores |> filter(model=='p') |> transmute(segment=cohort,stratum=handicap_class,value=brier),'REFERENCE','RECENT')
+knitr::kable(composition$summary,digits=7);write_csv(composition$cells,file.path(params$output,'composition.csv'))
+cal<-long |> mutate(bin=cut(probability,seq(0,1,.1),include.lowest=TRUE),hit=outcome==actual_outcome) |> group_by(cohort,model,outcome,bin) |> summarise(fixtures=n(),predicted=mean(probability),observed=mean(hit),.groups='drop')
+p3<-ggplot(cal,aes(predicted,observed,colour=model,size=fixtures))+geom_abline(slope=1,intercept=0,linetype=2)+geom_point()+facet_grid(cohort~outcome)+coord_cartesian(xlim=c(0,1),ylim=c(0,1))+theme_minimal(base_family='Noto Sans CJK SC')+labs(x='预测概率',y='实际发生率')+theme(legend.position='bottom')
+ggsave(file.path(params$output,'probability-calibration.png'),p3,width=12,height=7,dpi=140);p3
+```
+
+## 估算与实际价格的损益桥接
+
+下面是会计恒等式，不是因果贡献。价格差不自动表示错误或可交易套利优势。
+
+```{r}
+bridge<-b |> filter(variant=='JOINT') |> left_join(st$map |> select(issue,stage),by='issue',relationship='one-to-one') |> group_by(stage) |> summarise(stake=sum(stake),model_net=sum(model_net),outcome_residual=sum(outcome_residual),price_residual=sum(price_residual),net=sum(net),.groups='drop')
+knitr::kable(bridge,digits=2);write_csv(bridge,file.path(params$output,'return-bridge.csv'))
+pb<-bridge |> pivot_longer(c(model_net,outcome_residual,price_residual,net),names_to='component',values_to='CNY') |> mutate(per100=100*CNY/stake)
+pb<-pb |> mutate(stage=stage_labels[stage],component=recode(component,model_net='模型估算净收益',outcome_residual='赛果实现差',price_residual='实际价格差',net='实际净收益'))
+p4<-ggplot(pb,aes(component,per100,fill=stage))+geom_col(position='dodge')+geom_hline(yintercept=0)+theme_minimal(base_family='Noto Sans CJK SC')+labs(x=NULL,y='每投入100元对应金额',fill=NULL)+theme(legend.position='bottom')
+ggsave(file.path(params$output,'return-bridge.png'),p4,width=12,height=6,dpi=140);p4
+```
+
+## 选组、深度与尾部敏感性
+
+只有票集合嵌套时才能称为净追加，否则是换入换出的合计效应。
+去极值移除各自最大盈利组的投入与回款，属于事后压力分析。
+
+```{r}
+paired_summary<-diagnostic$paired |> filter(cohort=='新增295期') |> group_by(variant) |> summarise(delta_stake=sum(delta_stake),delta_net=sum(delta_net),rescued=sum(rescued),lost=sum(lost),.groups='drop')
+knitr::kable(paired_summary,digits=2);write_csv(paired_summary,file.path(params$output,'paired-strategies.csv'))
+dg<-funded |> semi_join(plans |> filter(variant=='DEPTH'),by=c('issue','arm','seed')) |> select(issue,seed,sleeve_id,depth_new=depth,copies_new=copies)
+bg<-funded |> semi_join(primary,by=c('issue','arm','seed')) |> select(issue,seed,sleeve_id,depth_old=depth,copies_old=copies)
+nested<-bg |> left_join(dg,by=c('issue','seed','sleeve_id'),relationship='one-to-one') |> group_by(issue) |> summarise(nested=all(!is.na(depth_new)&depth_new>=depth_old&copies_new>=copies_old),.groups='drop')
+knitr::kable(nested |> summarise(issues=n(),nested_issues=sum(nested)))
+depth<-plans |> filter(variant%in%c('JOINT','DEPTH')) |> left_join(st$map |> select(issue,stage),by='issue',relationship='many-to-one') |> group_by(stage,variant) |> summarise(stake=sum(stake),gross=sum(gross),net=sum(net),hit_issues=sum(hits>0),.groups='drop') |> pivot_wider(names_from=variant,values_from=c(stake,gross,net,hit_issues)) |> mutate(delta_stake=stake_DEPTH-stake_JOINT,delta_net=net_DEPTH-net_JOINT,incremental_roi=ifelse(delta_stake>0,delta_net/delta_stake,NA_real_))
+knitr::kable(depth,digits=4);write_csv(depth,file.path(params$output,'depth-differences.csv'))
+trims<-n7_expanded_group_trims(g,plans,c(0,1,3,5)) |> filter(scope=='新增295期')
+knitr::kable(trims |> select(variant,trim_k,trimmed_net,trimmed_roi),digits=4);write_csv(trims,file.path(params$output,'group-trims.csv'))
+seed_summary<-allplans |> filter(cohort=='新增295期',budget_cny==params$budget_cny) |> group_by(variant,seed) |> summarise(stake=sum(stake),net=sum(net),roi=net/stake,hit_issues=sum(hits>0),.groups='drop')
+knitr::kable(seed_summary,digits=4);write_csv(seed_summary,file.path(params$output,'seed-sensitivity.csv'))
+```
+
+## 诊断结论
+
+**结论：新增期的优势明显变薄，但现有证据不支持“单场准确率整体崩坏”或“只要加深就能修复”。主要症状是中奖回款下降，叠加一段候选池与已选组同时变难。**
+
+| 诊断问题 | 证据 | 判断 |
+|---|---|---|
+| 是否所有新增期都弱 | 固定60期分段ROI依次为22.77%、18.74%、−2.47%、−22.70%，最后55期−1.70% | 表现随阶段变化，前120期仍强；不能只看合计 |
+| 是否仅选组失误 | 事后回撤94期，已选组命中21.71%，同条件候选组21.38%；其余新增期分别26.36%、26.59% | 问题跨越选组层，候选可达性同样恶化 |
+| 是否中奖回款下降 | 每中奖组原200期742元、回撤段526元、其余新增期692元；期命中率原41.0%、新增42.71%，但新增ROI仅2.71% | 命中不降不等于收益不降；实际中奖价格结构很重要 |
+| 概率校正是否有效 | 新增Top1不变；校正后Top2为73.31%，未校正73.60%，净少69场；已选场净少25场，其中回撤段仅1场 | 当前校正有小幅可见损害；不能据此把整个回撤归因于校正 |
+| 让平是否唯一问题 | 回撤段让平预测25.47%、实际27.99%；W/L也存在偏差；校正后三类事件Brier均未优于未校正 | 应分别检查赛果与概率区间，不能只拍高让平 |
+| 是否应全面加深 | 可变深度新增投入21312元，多命中6期但少赚1130元；回撤段改善2745元，其余新增期减少3876元 | 局部缓解，整体不构成改善；不能事后挑窗口切换 |
+| 换组是否形成稳定新增优势 | 换组12多投入320元，多命中1期，净收益仅增加5.87元；另外两个种子方向不一致 | 没有稳定增益证据 |
+| 盈利是否稳健 | 联合覆盖移除自身前三个最大盈利组及成本后净收益−1639元；三个种子ROI为2.71%–4.39% | 正收益对少数中奖组敏感；种子不是独立样本 |
+| 是否能归因联赛/基本面或排除随机性 | 本冻结输入不含联赛和近期战绩；组重叠、最差窗口事后选择 | 证据不足，不能宣称联赛原因或结构断裂已获统计确认 |
+
+回款桥接中，每投入100元，原期/新增期的模型估算净收益约−31.01/−31.30元，
+赛果实现差约4.43/2.36元，实际价格差约50.30/31.65元。
+ROI从23.72%降到2.71%的约21.01个百分点差距，约18.65个百分点落在价格差分量。
+这是同一会计口径的变化，不等于价格变化具有已证实的因果贡献，也不意味着可以用实际北单SP赛前选场。
+
+联合覆盖与可变深度、换组方案的逐期收益相关性约0.98–1.00，因此混合它们难以形成明显风险分散。
+本轮保留联合覆盖与SP1.3作为对照，不增加倍投、全面加深或宣称已经找到可提前识别的弱市。
+
+最小后续验证应是：固定同一候选与预算，对未校正市场概率做局部重排及完整流程对照，
+检验小幅评分改善是否能转化为回款改善；同时接入已验收的联赛与近期表现标签做同类比较。
+任何据此学习新校正或切换规则的工作，必须使用共享cutoff流程另行验收。
+
+```{r}
+outputs<-list.files(params$output,pattern='[.](csv|png)$',full.names=TRUE)
+sources<-input$source_hashes
+for(n in c('results.csv','funded.csv','settled-groups.csv'))sources[[file.path(s,'evaluation',n)]]<-er$files[[n]]
+for(n in c('fixture-audit.csv','ranks.csv'))sources[[file.path(s,'current-settlement',n)]]<-ar$files[[n]]
+implementation<-c('r/strategy_diagnostic_probabilities.R','r/n7_fixture_price_diagnostic.R','r/n7_return_attribution.R','r/fundamentals_equity_curves.R','r/n7_sweet_union_summary.R','r/n7_expanded_diagnostics.R','r/n7_recent_structure.R','src/strategy_diagnostic_inputs.py','quarto/161_recent295_strategy_diagnostics.qmd')
+jsonlite::write_json(list(kind='DESCRIPTIVE_POST_HOC_DIAGNOSTIC',parameters=params,source_hashes=sources,
+ implementation=as.list(setNames(vapply(implementation,digest::digest,character(1),file=TRUE,algo='sha256'),implementation)),
+ files=as.list(setNames(vapply(outputs,digest::digest,character(1),file=TRUE,algo='sha256'),basename(outputs)))),
+ file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
