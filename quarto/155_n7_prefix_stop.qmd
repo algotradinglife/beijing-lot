@@ -1,0 +1,148 @@
+---
+title: "组内买到哪里停止：边际覆盖、回报与持币"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  initial_capital_cny: 100000
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+stopifnot(!is.null(params$study))
+study<-params$study
+source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R')
+source('r/n7_selection_diagnostics.R')
+source('r/n7_sp_refill_diagnostics.R')
+receipt<-jsonlite::fromJSON(file.path(study,'evaluation-receipt.json'))
+stopifnot(receipt$status=='PASS',receipt$rows==129600)
+for(n in names(receipt$files))stopifnot(digest::digest(file=file.path(study,n),algo='sha256')==receipt$files[[n]])
+for(p in names(receipt$input_hashes))stopifnot(digest::digest(file=p,algo='sha256')==receipt$input_hashes[[p]])
+rows<-readr::read_csv(file.path(study,'results.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+bands<-readr::read_csv(file.path(study,'bands.csv'),col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+issue_order<-sort(unique(rows$issue));stopifnot(length(issue_order)==200)
+z<-n7_sp_refill_diagnostics(rows,issue_order,params$initial_capital_cny)
+for(name in c('summary','curves','blocks','paired','per_issue'))readr::write_csv(z[[name]],file.path(study,paste0('report-',name,'.csv')))
+theme_set(theme_minimal(base_size=12))
+```
+
+## 口径与限制
+
+固定原200期、SP≥1.30、N7、512／768／1024元预算上限，原选组、赛果排序和单份下注不变。减少的资金全部持币，不补组。`FILTER_ONLY` 是原深度；`CAP32/64/128` 限制每组票数；`HALF/THREE_QUARTERS` 保留原深度50%／75%向下取整；`COVER15/20` 到达累计概率15%／20%即停，均不超出原深度。
+
+所有8条规则在读取本轮结算数据前已确定并冻结。三个既定种子和九种资金政策是敏感性配置，不能当独立历史观测。估算 SP 来自冻结概率映射，结算使用北单实际 SP，票级0.65仅计算一次。历史样本已暴露，继承可用性证据不足，不声称未见或因果回测效果。
+
+原方案59,825个已购组位置的模型估算 ROI 全为负，范围约−35.5%至−26.0%。这是估算概率／SP尺度下的价值，不等于实际北单结算收益。故本轮不采用“估算收益为正”作为删票门槛；估算值只用于边际形态诊断，实际回报作为独立评价口径。
+
+## 全部配对配置
+
+**结论：保留原购买深度，不采用本轮测试的通用提前停止规则。** 32／64票上限、保留50%／75%深度和15%／20%累计概率停止均在大多数配置中损失净收益。减少回撤主要伴随下注规模和命中期数下降，不能据此认定删掉的是低效投入。
+
+128票上限没有统一优势：81个配置中27个改善、27个恶化、27个不变。BREADTH政策本来就不超过128票，因此这27个不变不能当作改进证据；收益改善主要集中于部分DEPTH/COMPETE配置。当前证据不支持把它升级为跨政策默认规则。
+
+```{r}
+comparison<-z$paired |> filter(variant!='FILTER_ONLY') |> group_by(variant) |>
+ summarise(configurations=n(),better=sum(delta_net>1e-6),worse=sum(delta_net< -1e-6),same=sum(abs(delta_net)<=1e-6),
+ median_delta_net=median(delta_net),min_delta_net=min(delta_net),max_delta_net=max(delta_net),
+ median_delta_roi=median(delta_roi),median_delta_drawdown=median(delta_drawdown),
+ median_delta_hits=median(delta_hit_issues),.groups='drop')
+knitr::kable(comparison,digits=3)
+readr::write_csv(comparison,file.path(study,'report-comparison.csv'))
+```
+
+```{r}
+keys<-c('seed','mode','objective','allocation_order','budget_cny')
+robust<-z$summary |> left_join(z$summary |> filter(variant=='FILTER_ONLY') |>
+ select(all_of(keys),base_best1=net_without_best,base_best3=net_without_best3,base_best5=net_without_best5),
+ by=keys,relationship='many-to-one') |> filter(variant!='FILTER_ONLY') |>
+ group_by(variant) |> summarise(better_without_best1=sum(net_without_best>base_best1+1e-6),
+ better_without_best3=sum(net_without_best3>base_best3+1e-6),
+ better_without_best5=sum(net_without_best5>base_best5+1e-6),.groups='drop')
+knitr::kable(robust)
+```
+
+以上去极值口径是各方案分别剔除自身最大1／3／5个盈利期，并非剔除同一组期次。即使采用这一敏感性检查，也没有出现多数配置净收益改善的通用提前停止规则。
+
+## 收益与回撤曲线
+
+展示规则预先固定的种子42501、1024元预算、BREADTH/OPEN_FIRST/any_hit政策，便于阅读；不根据本轮结果挑选示例。完整648个配置汇总及逐期数据同时输出。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+primary<-z$curves |> filter(seed==42501,budget_cny==1024,mode=='BREADTH',allocation_order=='OPEN_FIRST',objective=='any_hit')
+equity<-ggplot(primary,aes(period,equity_cny,color=variant))+geom_line(linewidth=.7)+
+ labs(title='组内提前停止：账户资金',x='历史期序',y='账户资金（元）',color='规则')
+equity
+ggsave(file.path(study,'prefix-equity.png'),equity,width=12,height=6,dpi=160)
+drawdown<-ggplot(primary,aes(period,drawdown_cny,color=variant))+geom_line(linewidth=.7)+
+ labs(title='组内提前停止：回撤',x='历史期序',y='回撤（元）',color='规则')
+drawdown
+ggsave(file.path(study,'prefix-drawdown.png'),drawdown,width=12,height=6,dpi=160)
+knitr::kable(z$summary |> filter(seed==42501,budget_cny==1024,mode=='BREADTH',allocation_order=='OPEN_FIRST',objective=='any_hit') |>
+ select(variant,stake,net,roi,hit_issues,profit_issues,max_drawdown,longest_loss_streak,net_without_best3),digits=3)
+```
+
+## 省钱和丢失奖金的配对关系
+
+横轴为相对原方案省下的本金，纵轴为失去的奖金。点位于等值线下方表示省下的本金超过失去的奖金，净收益改善；线上方则相反。每点是一种固定政策／预算／种子配置，彼此并不独立。
+
+```{r}
+#| fig-width: 10
+#| fig-height: 7
+tradeoff<-z$per_issue |> filter(variant!='FILTER_ONLY') |>
+ group_by(arm,seed,variant,budget_cny) |> summarise(saved=-sum(delta_stake),forfeited=-sum(delta_gross),.groups='drop')
+p<-ggplot(tradeoff,aes(saved,forfeited,color=variant))+geom_point(alpha=.6)+geom_abline(slope=1,intercept=0,linetype=2)+
+ labs(title='省下本金是否超过失去的奖金',x='省下本金（元）',y='失去奖金（元）',color='规则')
+p
+ggsave(file.path(study,'prefix-tradeoff.png'),p,width=10,height=7,dpi=160)
+```
+
+## 追加票的边际覆盖与回报
+
+下表按原方案实际购买的票，分概率排名区间统计。每张票归入一个区间；同一组在多期配置复用不能解释为独立样本。图仍使用上述固定示例政策，其余配置保留在原始诊断表。
+
+`coverage` 为各组位置的概率质量之和，不是组合“至少一组中奖”的联合概率。示例中的33–64、65–96、97–128区间实际 ROI 仍为正，因此概率排名靠后不等于实际收益贡献为负。97–128区间样本投入较少、回报易受少数中奖影响，不据此倒推出新的选票规则。
+
+```{r}
+#| fig-width: 11
+#| fig-height: 6
+band_summary<-bands |> filter(band_stake>0) |> group_by(arm,seed,band_end) |>
+ summarise(issues=n_distinct(issue),positions=n(),stake=sum(band_stake),coverage=sum(band_coverage),
+ expected_gross=sum(band_expected_gross),gross=sum(band_gross),.groups='drop') |>
+ mutate(expected_roi=expected_gross/stake-1,actual_roi=gross/stake-1,cny_per_coverage_pp=stake/(100*coverage))
+readr::write_csv(band_summary,file.path(study,'report-bands.csv'))
+example<-band_summary |> filter(seed==42501,arm=='T250_SP130_BREADTH_OPEN_FIRST_any_hit_B1024')
+knitr::kable(example |> select(-arm,-seed),digits=4)
+long<-example |> tidyr::pivot_longer(c(expected_roi,actual_roi),names_to='measure',values_to='roi')
+p<-ggplot(long,aes(factor(band_end),roi,color=measure,group=measure))+geom_line()+geom_point()+
+ geom_hline(yintercept=0,linetype=2)+labs(title='原方案追加票：概率排名区间 ROI',x='区间排名上界（票）',y='ROI（比例）',color='回报口径')
+p
+ggsave(file.path(study,'prefix-band-roi.png'),p,width=11,height=6,dpi=160)
+```
+
+## 全部数据结构与敏感性
+
+```{r}
+glimpse(rows)
+knitr::kable(head(rows,6))
+knitr::kable(z$summary,digits=3)
+knitr::kable(z$blocks |> filter(seed==42501,budget_cny==1024),digits=3)
+```
+
+## 验收记录
+
+独立复算通过：4,800个候选组的中奖位置及实际奖金、478,600个购买前缀、129,600行逐期结果、648个完整配置汇总，以及概率排名分段的投入／覆盖／回报对账。结果 SHA256：`54c1ff9551955e49cc381bbd7c59e7ccc55a8e044595981f5804b968d6774a9f`。
+
+范围测试15个R断言、1个Python测试通过。2026-09-14最终 `codex review` 无可操作发现；首次发现的“缺失版本行被误当持币”和“缺失汇总漏检”均已修复并添加回归测试。最终审核日志 `prefix-review-final.log` 随研究证据保存，SHA256：`a54be6114d5099e2dc6ce86fb4a0b7437b558df238cf17b34cc74feebd3c4e51`。
+
+全量R测试仍有6个既有失败／错误及2个跳过，涉及解释器冲突和缺失旧测试输入；未宣称这些通过，也未宣称全量Python或远端CI通过。本轮交付供审核，不代表全仓库合并验收完成。输入绑定、共享实现清单、函数测试映射及复现命令见 `docs/research/n7_prefix_stop_451.md`。

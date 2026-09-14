@@ -1,0 +1,18 @@
+source(file.path('..','..','r','n7_prefix_stop.R'))
+testthat::test_that('prefix rules preserve identities, truncate and retain cash', {
+  curves<-data.frame(sleeve_id='a',depth=0:2187,coverage=(0:2187)/2187,expected_gross=(0:2187)*1.3)
+  f<-data.frame(issue='001',arm='x',seed=1,sleeve_id='a',depth=100,copies=1,stake=200,
+    coverage=100/2187,expected_gross=130)
+  rules<-data.frame(variant=c('FILTER_ONLY','CAP32','HALF','P001'),mode=c('original','cap','fraction','coverage'),value=c(1,32,.5,.01))
+  cuts<-list(a='2010-01-01T00:00:00Z')
+  x<-n7_prefix_stop(curves,f,rules,cuts,cuts,2)
+  testthat::expect_equal(x$depth,c(100,32,50,22))
+  testthat::expect_equal(x$saved_stake,c(0,136,100,156))
+  testthat::expect_true(all(x$stake+x$saved_stake==200))
+  testthat::expect_identical(x,n7_prefix_stop(transform(curves,future_label='changed'),f,rules,cuts,cuts,2))
+  testthat::expect_equal(nrow(n7_prefix_stop(curves,f[FALSE,],rules,cuts,cuts,2)),0)
+  testthat::expect_error(n7_prefix_stop(curves,f,rules,cuts,list(a='later'),2))
+  testthat::expect_error(n7_prefix_stop(curves,rbind(f,transform(f,issue='002')),rules,cuts,cuts,2))
+  f$coverage<-.5;testthat::expect_error(n7_prefix_stop(curves,f,rules,cuts,cuts,2))
+  testthat::expect_error(n7_prefix_stop(curves, f,transform(rules,value=-1),cuts,cuts,2))
+})
