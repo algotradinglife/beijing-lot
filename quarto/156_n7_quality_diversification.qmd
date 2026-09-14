@@ -1,0 +1,179 @@
+---
+title: "选组质量与共同失手：质量门槛内的覆盖和分散"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  initial_capital_cny: 100000
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+stopifnot(!is.null(params$study))
+study<-params$study
+for(p in c('fundamentals_equity_curves','n7_sweet_union_summary','n7_selection_diagnostics','n7_quality_diagnostics'))source(file.path('r',paste0(p,'.R')))
+receipt<-jsonlite::fromJSON(file.path(study,'evaluation-receipt.json'))
+freeze<-jsonlite::fromJSON(file.path(study,'plans-frozen.json'))
+stopifnot(receipt$status=='PASS',receipt$plans==9000,receipt$controls_reproduced==3600,
+ digest::digest(file=file.path(study,'plans-frozen.json'),algo='sha256')==receipt$freeze_sha256,
+ digest::digest(file=file.path(study,'results.csv'),algo='sha256')==receipt$results_sha256,
+ digest::digest(file=file.path(study,'settled-groups.csv'),algo='sha256')==receipt$groups_sha256)
+rows<-readr::read_csv(file.path(study,'results.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+funded<-readr::read_csv(file.path(study,'funded.csv'),col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+stopifnot(digest::digest(file=file.path(study,'funded.csv'),algo='sha256')==freeze$files[['funded.csv']])
+issue_order<-sort(unique(rows$issue));stopifnot(length(issue_order)==200)
+members<-list()
+for(issue in issue_order) {
+ name<-paste0('replay-',issue,'-42501.json.gz')
+ stopifnot(digest::digest(file=file.path(study,name),algo='sha256')==freeze$files[[name]])
+ replay<-jsonlite::fromJSON(gzfile(file.path(study,name)),simplifyVector=FALSE)
+ for(o in replay$options)members[[length(members)+1L]]<-tibble(issue=issue,
+  sleeve_id=as.character(o$sleeve_id),fixture_id=as.integer(unlist(o$fixtures)))
+}
+membership<-bind_rows(members)
+z<-n7_quality_diagnostics(rows,funded,membership,issue_order,params$initial_capital_cny)
+for(name in names(z))readr::write_csv(z[[name]],file.path(study,paste0('report-',name,'.csv')))
+theme_set(theme_minimal(base_size=12,base_family='Noto Sans CJK SC'))
+```
+
+## 固定比较口径
+
+同一批已用于研究的200期，沿用原24组候选目录、市场概率底座、估算SP≥1.30过滤、N7。每组只买原先达到25%累计概率所需的固定前缀，开组上限256元，单份下注。预算上限512／768／1024元。三个固定种子42501／42502／42503属于模拟敏感性配置，不是独立历史样本。
+
+|规则|选组方法|
+|---|---|
+|JOINT|原方案：边际联合覆盖／元最大|
+|SUM|原对照：单组累计概率／元最大|
+|NEAR95_UNION|在当前可负担组中，单组概率／元达到最好组95%以上，再选边际联合覆盖／元最大|
+|NEAR90_UNION|同上，门槛为90%|
+|NEAR95_OVERLAP|95%质量范围内，先最小化与已选组的最大重叠，再最小化平均重叠，最后比较边际联合覆盖／元|
+
+每次选择后重新计算质量范围。不新增候选组、不补组、不改票数、不加倍，买不动时持币。门槛是相对效率门槛，不是要求两组概率相差5个百分点。不同组固定票数不同，因此比较的是相同预算上限；实际投入的差异必须单列。
+
+分配使用256个共享场次模拟世界，评估使用独立5000个世界。相同场次在不同组中共享同一模拟结果。三个新规则不从结算结果学习；所有200期的选组在本轮读取标签前统一冻结。冻结物保留cutoff、共享Python实现绑定、R实现哈希、输入哈希、选组轨迹和模拟矩阵，随后由独立NumPy实现复算新方案。历史可用性证据不足仍标为 `historical_admission=false`，不作为未见回测或前瞻收益证明。
+
+估算SP用于选组，北单实际SP用于结算；二者不能混为一谈。结算奖金已包含票级0.65，分析不再乘第二次。
+
+## 结论：保留原JOINT选组，不添加通用质量门槛
+
+**本轮不采用三个新增规则替代原方案。** 原JOINT本来就在最大化每元新增的联合覆盖；再预先用单组效率截掉候选，往往排除了有分散价值的组。95%和90%质量门槛的联合覆盖版本，分别只有2／9和1／9种配置提高净收益，没有配置增加命中期数，回撤也各仅1／9改善。
+
+95%质量范围内的重叠优先有5／9种配置增加净收益，净收益增量中位数约805元；但仅2／9改善回撤，仅1／9增加命中期数。512元预算下三个种子均增益，1024元预算下三个种子均减益，说明它没有形成跨预算的统一改进。各自剔除最大3个盈利期后仍有6／9增益，不能简单归因为单个大奖；问题在于命中和风险改善不稳定，且大预算的减益仍存在。
+
+**“重叠优先”没有比原JOINT更分散。** 45种配置汇总中，JOINT平均组间重叠约4.95场，95%重叠优先约5.44场。95%范围内确实能略降重叠（相对95%联合覆盖的约5.49场），但质量门槛先缩窄了选择空间，局部降重叠仍不及无该门槛的原联合覆盖。模型联合命中率均值也从约40.32%降至37.89%，实际投注期命中比例从约40.34%降至38.98%。这些是9种配置的描述性平均，不能视为9份独立样本。
+
+SUM对照在7／9配置降低回撤，但净收益仅3／9提高，没有配置增加命中期数，也不替代JOINT。当前结论是继续使用SP≥1.30、原固定组内深度和JOINT边际联合覆盖选组；不把单组效率质量门槛或结构重叠优先升级为默认规则。
+
+## 45种配置的收益、风险和稳健性
+
+```{r}
+comparison<-z$paired |> filter(variant!='JOINT') |> group_by(variant) |>
+ summarise(configurations=n(),better_net=sum(delta_net>1e-6),worse_net=sum(delta_net< -1e-6),
+  median_delta_net=median(delta_net),median_delta_roi=median(delta_roi),
+  median_delta_drawdown=median(delta_drawdown),median_delta_hits=median(delta_hits),
+  median_delta_stake=median(delta_stake),better_without_best1=sum(delta_best1>1e-6),
+  better_without_best3=sum(delta_best3>1e-6),better_without_best5=sum(delta_best5>1e-6),.groups='drop')
+knitr::kable(comparison,digits=3)
+knitr::kable(z$summary |> select(variant,budget_cny,seed,stake,net,roi,hit_issues,profit_issues,max_drawdown),digits=3)
+```
+
+ROI为净收益／实际投入，回撤以账户累计资金的前高计算。初始资金10万元，每期先支出本金再结算；若整期计划无法负担则停止下注。去极值分别剔除各规则自身最大1／3／5个盈利期，是敏感性检查，不是样本外证据。
+
+## 资金和回撤曲线
+
+固定展示种子42501的三个预算，完整种子统计见上表，避免根据结果挑选最好种子。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 8
+primary<-z$curves |> filter(seed==42501)
+equity<-ggplot(primary,aes(period,equity_cny,color=variant))+geom_line(linewidth=.65)+
+ facet_wrap(~budget_cny,ncol=1)+labs(x='历史期序',y='账户资金（元）',color='规则')
+equity
+ggsave(file.path(study,'quality-equity.png'),equity,width=12,height=8,dpi=160)
+drawdown<-ggplot(primary,aes(period,drawdown_cny,color=variant))+geom_line(linewidth=.65)+
+ facet_wrap(~budget_cny,ncol=1)+labs(x='历史期序',y='距资金前高的回撤（元）',color='规则')
+drawdown
+ggsave(file.path(study,'quality-drawdown.png'),drawdown,width=12,height=8,dpi=160)
+```
+
+## 共同失手和概率冗余
+
+组间共享场次数只是结构上的集中度，不等于实际失手相关性。下图分别展示结构重叠与整期零命中，以及模型联合命中概率与历史发生率。只统计实际投注的期次，零投注期不算失败；不把重复种子的期次叠成独立样本。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 6
+risk<-ggplot(z$summary,aes(mean_pair_overlap,zero_hit_issues/funded_issues,color=variant,shape=factor(budget_cny)))+
+ geom_point(size=3)+labs(x='已买组的平均共享场次数',y='投注期中零命中比例',color='规则',shape='预算')
+risk
+ggsave(file.path(study,'quality-common-failure.png'),risk,width=12,height=6,dpi=160)
+calibration<-ggplot(z$summary,aes(mean_model_union,observed_union,color=variant,shape=factor(budget_cny)))+
+ geom_point(size=3)+geom_abline(slope=1,intercept=0,linetype=2)+
+ labs(x='平均模型联合命中概率',y='实际命中期比例',color='规则',shape='预算')
+calibration
+ggsave(file.path(study,'quality-union-check.png'),calibration,width=12,height=6,dpi=160)
+knitr::kable(z$per_issue |> group_by(variant,budget_cny,seed) |>
+ summarise(rescued=sum(rescued),lost=sum(lost),both_miss=sum(both_miss),
+  stake_change=sum(delta_stake),gross_change=sum(delta_gross),net_change=sum(delta_net),.groups='drop'),digits=2)
+```
+
+相对JOINT的救回／丢失是配对事件；两边均零投注的期次会进入both_miss，不能解释为共同投注失败。共同投注失败的总体比例采用上一图的 `zero_hit_issues / funded_issues`。
+
+## 分段和投入归因
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+blocks<-ggplot(z$blocks |> filter(seed==42501),aes(factor(block),roi,fill=variant))+
+ geom_col(position='dodge')+facet_wrap(~budget_cny,ncol=1)+
+ labs(x='每50期的固定时间段',y='分段ROI',fill='规则')
+blocks
+ggsave(file.path(study,'quality-blocks.png'),blocks,width=12,height=7,dpi=160)
+attribution<-ggplot(z$paired |> filter(variant!='JOINT'),aes(delta_stake,delta_net,color=variant))+
+ geom_point(size=3)+geom_hline(yintercept=0,linetype=2)+geom_vline(xintercept=0,linetype=2)+
+ labs(x='相对JOINT新增投入（元）',y='相对JOINT新增净收益（元）',color='规则')
+attribution
+ggsave(file.path(study,'quality-stake-attribution.png'),attribution,width=12,height=7,dpi=160)
+```
+
+同一固定前缀的投入不变；新增或减少投入来自选到不同组后的成本差异。不能把单纯减少下注规模带来的回撤下降，当作选组质量改善。
+
+## 证据身份
+
+```{r}
+knitr::kable(tibble(item=c('冻结计划SHA256','结算表SHA256','固定历史期数','计划数','旧方案精确复现数'),
+ value=c(receipt$freeze_sha256,receipt$results_sha256,'200',as.character(receipt$plans),as.character(receipt$controls_reproduced))))
+```
+
+## 验收与复现
+
+选组、结算和诊断的35项R断言、4项Python测试通过，cutoff静态检查和持久化路径检查通过。所有5400份新方案独立复算，以及全部9000份计划的独立结算复算通过。QMD已在R4.6.1／Quarto1.10.18的新进程中执行，关闭缓存和freeze；六张输出图已逐张检查坐标、单位和内容。
+
+Codex最终审核结论为“No actionable defects found in scope”。审核日志SHA256：`9ef1582b9116a5dd3bb1e22906221afc94315aad80f2d46f1836359af3770143`。首轮提出的逐组票数绑定、缺少哈希时拒绝、资金耗尽后统一使用实际账本三项问题均已修复，并添加回归测试。审核覆盖函数、入口、测试、QMD、冻结数据和研究结论；本节为审核完成后的验收记录。
+
+全仓库测试并非全部通过：上一轮完整R测试遗留6项失败／错误及2项集成跳过，涉及解释器冲突、缺少阈值测试数据与重训上下文。本轮未修改这些模块，也不据本次研究交付宣称全仓库可合并。详细函数／测试对应关系及遗留日志见`docs/research/n7_quality_diversification_453.md`。
+
+从仓库根目录运行，`python`、`config`、`study`及R库路径应显式设置为冻结配置对应环境：
+
+```bash
+Rscript -e 'for(f in c("allocate","settlement","diagnostics")) testthat::test_file(paste0("tests/testthat/test-n7-quality-",f,".R"),stop_on_failure=TRUE)'
+"$python" -m pytest tests/test_n7_quality_replay.py -q
+"$python" scripts/check_cutoff_governance.py
+"$python" scripts/check_persistent_data_layout.py --contract config/persistent_data_layout.json
+Rscript scripts/run_n7_quality_selection.R "$config"
+"$python" scripts/check_n7_quality_selection.py "$study" > "$study/selection-replay.json"
+Rscript scripts/settle_n7_quality_selection.R "$study"
+"$python" scripts/check_n7_quality_settlement.py "$study" > "$study/settlement-replay.json"
+quarto render quarto/156_n7_quality_diversification.qmd --execute --cache-refresh --execute-dir "$repository_root" -P study:"$study"
+```
+
+选组批处理要求新的输出目录；已有冻结研究直接运行复算及报告即可。结算重复执行只允许与既有结果一致，不改写选组冻结。
