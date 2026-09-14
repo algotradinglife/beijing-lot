@@ -1,0 +1,147 @@
+---
+title: "策略诊断方法与可复用函数：真实数据演示"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: true
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  python: null
+  output: null
+  seed: 42501
+  budget_cny: 1024
+  unit_cny: 2
+  payout_factor: 0.65
+  n_legs: 7
+  reference_segment: "原200期"
+  target_segment: "新增295期"
+---
+
+方法学维护在 `skills/beijing-lot-strategy-diagnostics/references/methodology.md`，
+函数输入/输出索引在同目录 `functions.md`。本页演示如何复用函数；不拟合、调参或创建未来交易规则。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R')
+source('r/n7_fixture_price_diagnostic.R');source('r/n7_return_attribution.R')
+stopifnot(!is.null(params$study),!is.null(params$python),!is.null(params$output))
+# This demonstration consumes frozen #459 payouts and expected_gross.
+# Reject partial repricing: a different convention requires rebuilt inputs.
+stopifnot(identical(as.numeric(params$unit_cny),2),
+          identical(as.numeric(params$payout_factor),0.65),
+          identical(as.numeric(params$n_legs),7))
+reticulate::use_python(params$python,required=TRUE)
+study<-params$study
+receipt<-jsonlite::fromJSON(file.path(study,'settlement-inputs/receipt.json'))
+catalog<-file.path(study,'settlement-inputs/catalog.json')
+reader<-reticulate::import('src.strategy_diagnostic_inputs')
+input<-reader$read_diagnostic_fixtures(catalog,receipt$files[['catalog.json']])
+f<-bind_rows(input$rows)
+audit_receipt<-jsonlite::fromJSON(file.path(study,'current-settlement/receipt.json'))
+audit_path<-file.path(study,'current-settlement/fixture-audit.csv')
+strategy_verify_diagnostic_inputs(file.path(study,'current-settlement'),audit_receipt$files,c('fixture-audit.csv','ranks.csv'))
+a<-read_csv(audit_path,col_types=cols(issue='c',provider_id='c'),show_col_types=FALSE)
+f<-n7_fixture_price_diagnostic(f,a)
+er<-jsonlite::fromJSON(file.path(study,'evaluation/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(study,'evaluation'),er$files,unique(c('results.csv','funded.csv',names(er$files))))
+rows<-read_csv(file.path(study,'evaluation/results.csv'),col_types=cols(issue='c'),show_col_types=FALSE) |>
+ filter(seed==params$seed,budget_cny==params$budget_cny,variant=='JOINT')
+segments<-rows |> distinct(issue,segment=cohort)
+f<-f |> left_join(segments,by='issue',relationship='many-to-one') |>
+ mutate(handicap_class=case_when(handicap<0~'主让',handicap==0~'零让球',TRUE~'客让'))
+stopifnot(!anyNA(f$segment),!anyDuplicated(f[c('issue','slot')]))
+long<-f |> select(issue,slot,provider_id,segment,handicap_class,actual_outcome=actual_direction,
+ p_W,p_D,p_L,q_W,q_D,q_L) |>
+ pivot_longer(c(p_W,p_D,p_L,q_W,q_D,q_L),names_to=c('model','outcome'),
+ names_pattern='([pq])_([WDL])',values_to='probability') |>
+ mutate(model=recode(model,p='固定校正市场',q='未校正市场'))
+z<-strategy_probability_diagnostics(long,c('segment','handicap_class'),c('W','D','L'),seq(0,1,.1))
+all_scores<-strategy_probability_diagnostics(long,'segment',c('W','D','L'),seq(0,1,.1))
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(z$summary,file.path(params$output,'stratified-scores.csv'))
+readr::write_csv(z$calibration,file.path(params$output,'calibration.csv'))
+knitr::kable(all_scores$summary,digits=4)
+knitr::kable(z$summary,digits=4)
+```
+
+上表检验同场次、同赛果类别下的两个概率版本。Brier是多类别误差之和，越低越好；
+log loss不裁剪零概率。Top1/Top2不是概率校准的替代指标，分层样本数也必须一起看。
+
+```{r}
+p<-ggplot(z$calibration,aes(predicted,observed,colour=model,size=fixtures))+
+ geom_abline(slope=1,intercept=0,linetype=2,colour='grey60')+geom_point(alpha=.7)+
+ facet_grid(segment+handicap_class~outcome)+coord_cartesian(xlim=c(0,1),ylim=c(0,1))+
+ labs(x='预测概率',y='实际发生率',colour='版本',size='场次')+
+ theme_minimal(base_family='Noto Sans CJK SC')+theme(legend.position='bottom')
+ggsave(file.path(params$output,'stratified-calibration.png'),p,width=12,height=13,dpi=140);p
+```
+
+## 区分赛事构成与同类变化
+
+这里用让球正负类别演示，不把它认定为原因。分解采用旧期类别均值与新期权重，
+顺序明确且非因果；无共同支持的类别会报错，不悄悄移除。
+
+```{r}
+composition<-strategy_composition_diagnostics(z$scores |> filter(model=='固定校正市场') |>
+ transmute(segment,stratum=handicap_class,value=brier),params$reference_segment,params$target_segment)
+knitr::kable(composition$ledger,digits=5)
+knitr::kable(composition$summary,digits=6)
+write_csv(composition$cells,file.path(params$output,'composition-cells.csv'))
+```
+
+## 概率、赛果实现与实际价格的损益桥接
+
+固定现有联合覆盖计划；估算SP来自赛前市场概率，实际SP只用于结算。
+下列桥接是会计分解，不是因果贡献或未来盈利预测。
+
+```{r}
+rank_path<-file.path(study,'current-settlement/ranks.csv')
+strategy_verify_diagnostic_inputs(file.path(study,'current-settlement'),audit_receipt$files,'ranks.csv')
+k<-read_csv(rank_path,col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'),show_col_types=FALSE)
+slots<-k |> select(issue,sleeve_id,fixture_slots) |> separate_longer_delim(fixture_slots,',') |>
+ mutate(slot=as.integer(fixture_slots))
+stopifnot(!anyNA(slots$slot))
+price<-slots |> left_join(f |> select(issue,slot,actual_q),by=c('issue','slot'),relationship='many-to-one')
+stopifnot(!anyNA(price$actual_q))
+price<-price |> group_by(issue,sleeve_id) |>
+ summarise(estimated_actual_payout=params$unit_cny*params$payout_factor/prod(actual_q),slots=n(),.groups='drop')
+stopifnot(all(price$slots==params$n_legs))
+evidence<-k |> left_join(price,by=c('issue','sleeve_id'),relationship='one-to-one')
+funded<-read_csv(file.path(study,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |>
+ semi_join(rows,by=c('issue','arm','seed'))
+bridge<-n7_return_attribution(funded,evidence,params$unit_cny)
+b<-rows |> select(issue,arm,seed,cohort,stake,net) |>
+ left_join(bridge$periods |> select(issue,arm,seed,model_net,outcome_residual,price_residual,actual_net),
+ by=c('issue','arm','seed'),relationship='one-to-one')
+stopifnot(all(b$stake[is.na(b$actual_net)]==0))
+b<-b |> mutate(across(c(model_net,outcome_residual,price_residual,actual_net),~replace_na(.x,0)))
+stopifnot(all(abs(b$net-b$actual_net)<1e-6))
+summary<-b |> group_by(cohort) |> summarise(across(c(stake,model_net,outcome_residual,price_residual,net),sum),.groups='drop') |>
+ mutate(roi=net/stake)
+knitr::kable(summary,digits=2)
+write_csv(b,file.path(params$output,'return-bridge.csv'))
+```
+
+相同的方法可按固定时间块、联赛或不同候选机制比较，但最大回撤窗口与事后最优组只能用于解释历史。
+收益改善需要同时检查预算、命中、回款、回撤和尾部敏感性。新阈值或策略切换不能从本页直接导出；
+必须使用目标期之前的数据及共享时序学习流程另行验证。
+
+
+```{r}
+implementation<-c('r/strategy_diagnostic_probabilities.R','src/strategy_diagnostic_inputs.py',
+ 'r/n7_fixture_price_diagnostic.R','r/n7_return_attribution.R','quarto/160_strategy_diagnostic_handbook.qmd')
+outputs<-c('stratified-scores.csv','calibration.csv','stratified-calibration.png','composition-cells.csv','return-bridge.csv')
+bound<-c(input$source_hashes,setNames(list(audit_receipt$files[['fixture-audit.csv']],
+ audit_receipt$files[['ranks.csv']]),c(audit_path,rank_path)))
+for(n in names(er$files))bound[[file.path(study,'evaluation',n)]]<-er$files[[n]]
+jsonlite::write_json(list(kind='DESCRIPTIVE_DIAGNOSTIC_NOT_DECISION_RULE',parameters=params,
+ generated_at=format(Sys.time(),tz='UTC',usetz=TRUE),source_hashes=bound,
+ implementation=as.list(setNames(vapply(implementation,digest::digest,character(1),algo='sha256',file=TRUE),implementation)),
+ files=as.list(setNames(vapply(file.path(params$output,outputs),digest::digest,character(1),algo='sha256',file=TRUE),outputs))),
+ file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

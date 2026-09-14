@@ -1,0 +1,4 @@
+interface:
+  display_name: "北京单场策略诊断"
+  short_description: "分层诊断概率、选组、覆盖、回款与回撤，复用已有分析函数"
+  default_prompt: "使用 $beijing-lot-strategy-diagnostics 诊断策略表现变化，给出受控对照、损益分解和证据结论。"
