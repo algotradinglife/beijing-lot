@@ -28,3 +28,26 @@
 不依据当期结算切换策略。本轮是固定候选 24 组之内的排序与覆盖研究，不能代表候选池扩大后的表现。
 运行器复用 shared R 分配器和 src/temporal_learning 的冻结输入绑定；完整计划先于结算写入，独立进程重建分配与模型指标。
 配置、源码、输入和输出哈希写入凭证；函数测试、回放、干净 QMD 渲染和 Codex review 全部通过后提交 PR。
+
+## 可复现入口
+
+当前运行器统一使用 `policies` 表，每行包含唯一 `id`、`mode`、`objective`、`allocation_order`。
+`mode` 为 BREADTH 或 DEPTH；`objective` 为 coverage_sum、any_hit 或 expected_net；
+`allocation_order` 为 OPEN_FIRST 或 COMPETE。BREADTH 没有加深动作，因此只保留 OPEN_FIRST，避免重复策略。
+完整配置随 `plans-frozen.json$config` 留存；其余输入显式包含 catalog、rank_dir、repository_root、python、output_dir，不能从目录年龄推断输入。
+
+依次执行（从仓库根目录，使用已配置的项目 Python/R 环境）：
+
+```sh
+Rscript scripts/run_n7_funding_modes.R /absolute/path/config.json
+Rscript scripts/replay_n7_funding_modes.R /absolute/path/study /absolute/path/study/allocation-replay.json
+/path/to/project/python scripts/check_n7_funding_modes.py /absolute/path/study /absolute/path/study/independent-check.json
+quarto render quarto/151_n7_selection_coverage.qmd --execute-dir . --execute \
+  -P study_dir:/absolute/path/study -P output_dir:/absolute/path/new-report-directory
+```
+
+研究输出目录和报告目录必须不存在，避免覆盖已有冻结证据。
+报告只接受与当前计划和结算字节匹配的独立检查凭证。
+`n7_selection_report_inputs()` 负责输入凭证检查；`n7_selection_overlap()` 描述买入组合的场次复用与组间重叠；
+`n7_sweet_union_summary()` 复用统一资金、ROI、命中、回撤与去极值核算。
+上述描述函数不参与选组或历史拟合。
