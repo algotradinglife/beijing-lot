@@ -34,7 +34,8 @@ def test_refill_bridge_and_allocator(tmp_path):
     script.write_text('''
 args<-commandArgs(TRUE)
 for(f in c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio',
- 'n7_core_opportunity','n7_sweet_union','n7_funding_modes','n7_sp_filter','n7_sp_refill','n7_sp_refill_prepare','n7_sp_refill_plans'))source(paste0('r/',f,'.R'))
+ 'n7_core_opportunity','n7_sweet_union','n7_funding_modes','n7_sp_filter','n7_sp_refill','n7_sp_refill_prepare','n7_sp_refill_plans',
+ 'n7_residual_refill','n7_residual_plans'))source(paste0('r/',f,'.R'))
 raw<-paste(readLines(args[1],warn=FALSE),collapse='\\n')
 cuts<-jsonlite::fromJSON(raw,simplifyVector=FALSE)$cutoffs
 p<-n7_sp_refill_prepare(raw,cuts,args[2],'fixed',1.3,2,11,100,c(15,32,64),c(.25,.3),.25,256,2,.65,7)
@@ -62,6 +63,16 @@ changed<-paste(readLines(args[3],warn=FALSE),collapse='\\n')
 changed_pool<-n7_sp_refill_prepare(changed,cuts,args[2],'fixed',1.3,2,11,100,c(15,32,64),c(.25,.3),.25,256,2,.65,7)
 changed_plans<-n7_sp_refill_plans(changed_pool,cuts,cfg,11)
 stopifnot(identical(p$refill,changed_pool$refill),identical(plans,changed_plans))
+cfg$python<-args[2];cfg$model_id<-'fixed'
+funded<-data.frame(issue='001',seed=11,arm=paste0('T250_SP130_EXPECTED_B',cfg$budgets),
+ sleeve_id='0',depth=15,copies=1,stake=30)
+residual<-n7_residual_plans(p$bundle_json,p$refill,funded,cuts,cfg,11)
+stopifnot(length(residual$plans)==6,all(residual$rows$stake>=30),
+ all(residual$rows$stake<=residual$rows$budget_cny),
+ all(vapply(residual$plans,function(x)0 %in% x$locked_sleeve_ids,logical(1))))
+packed<-jsonlite::fromJSON(jsonlite::toJSON(residual$plans,auto_unbox=TRUE,digits=NA),simplifyVector=FALSE)
+stopifnot(all(vapply(packed,function(x)is.list(x$locked_sleeve_ids),logical(1))))
+stopifnot(identical(residual,n7_residual_plans(changed_pool$bundle_json,changed_pool$refill,funded,cuts,cfg,11)))
 cat('BRIDGE_PASS')
 ''')
     import sys
