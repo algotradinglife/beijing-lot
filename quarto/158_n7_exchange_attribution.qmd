@@ -1,0 +1,210 @@
+---
+title: "N7换组收益来自哪里：组级归因与集中度"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  output: null
+  replay_receipt: null
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+source('r/n7_exchange_attribution.R')
+source('r/n7_quality_settlement.R')
+stopifnot(!is.null(params$study),!is.null(params$output),!is.null(params$replay_receipt))
+study<-params$study;output<-params$output
+stopifnot(normalizePath(study)!=normalizePath(output,mustWork=FALSE))
+receipt<-jsonlite::fromJSON(file.path(study,'evaluation-receipt.json'))
+freeze<-jsonlite::fromJSON(file.path(study,'plans-frozen.json'))
+replay<-jsonlite::fromJSON(params$replay_receipt)
+stopifnot(receipt$status=='PASS',receipt$plans==5400,replay$status=='PASS',replay$plans==5400,
+  replay$settlement_checked,replay$freeze_sha256==receipt$freeze_sha256)
+for(n in names(replay$implementation))stopifnot(digest::digest(file=n,algo='sha256')==replay$implementation[[n]])
+inputs<-c('plans-frozen.json'=receipt$freeze_sha256,'results.csv'=receipt$results_sha256,
+  'settled-groups.csv'=receipt$groups_sha256,'actions.csv'=freeze$files[['actions.csv']],
+  'predictions.csv'=freeze$files[['predictions.csv']],'funded.csv'=freeze$files[['funded.csv']])
+for(n in names(inputs))stopifnot(digest::digest(file=file.path(study,n),algo='sha256')==inputs[[n]])
+plans<-readr::read_csv(file.path(study,'results.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+groups<-readr::read_csv(file.path(study,'settled-groups.csv'),
+  col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+stopifnot(digest::digest(file=receipt$ranks_path,algo='sha256')==receipt$ranks_sha256,
+ digest::digest(file='r/n7_quality_settlement.R',algo='sha256')==receipt$implementation[['r/n7_quality_settlement.R']])
+predictions<-readr::read_csv(file.path(study,'predictions.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+funded<-readr::read_csv(file.path(study,'funded.csv'),col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+ranks<-readr::read_csv(receipt$ranks_path,col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+n7_verify_attribution_groups(groups,predictions,funded,ranks)
+order<-sort(unique(plans$issue));stopifnot(length(order)==200)
+z<-n7_exchange_attribution(groups,plans,order,c(1L,3L,5L))
+# Fixed membership features; use hashes from the original frozen source.
+prior<-jsonlite::fromJSON(file.path(freeze$config$source_dir,'plans-frozen.json'))
+stopifnot(digest::digest(file=file.path(freeze$config$source_dir,'plans-frozen.json'),algo='sha256')==freeze$source_freeze_sha256)
+membership<-list()
+for(issue in order) {
+  name<-paste0('replay-',issue,'-42501.json.gz');path<-file.path(freeze$config$source_dir,name)
+  stopifnot(digest::digest(file=path,algo='sha256')==prior$files[[name]])
+  snapshot<-jsonlite::fromJSON(gzfile(path),simplifyVector=FALSE)
+  for(o in snapshot$options)membership[[length(membership)+1L]]<-tibble(issue=issue,
+    sleeve_id=as.character(o$sleeve_id),fixture_id=as.integer(unlist(o$fixtures)))
+}
+membership<-bind_rows(membership)
+stopifnot(!anyDuplicated(membership),all(count(membership,issue,sleeve_id)$n==7))
+# Mean overlap with OTHER original JOINT groups; excludes the same sleeve.
+base<-groups |> inner_join(plans |> filter(variant=='JOINT') |> select(issue,arm,seed,budget_cny),
+  by=c('issue','arm','seed'),relationship='many-to-one')
+base_members<-base |> select(issue,seed,budget_cny,sleeve_id) |>
+  left_join(membership,by=c('issue','sleeve_id'),relationship='many-to-many') |>
+  rename(base_sleeve=sleeve_id)
+all_members<-z$ledger |> select(issue,seed,budget_cny,variant,sleeve_id) |>
+  left_join(membership,by=c('issue','sleeve_id'),relationship='many-to-many')
+overlap<-all_members |> inner_join(base_members,by=c('issue','seed','budget_cny','fixture_id'),relationship='many-to-many') |>
+  filter(sleeve_id!=base_sleeve) |> count(issue,seed,budget_cny,variant,sleeve_id,name='shared')
+base_counts<-base |> count(issue,seed,budget_cny,name='base_count')
+z$ledger<-z$ledger |> left_join(overlap,by=c('issue','seed','budget_cny','variant','sleeve_id'),relationship='one-to-one') |>
+  left_join(base_counts,by=c('issue','seed','budget_cny'),relationship='many-to-one') |>
+  mutate(other_groups=tidyr::replace_na(base_count,0)-(role!='added'),
+    mean_overlap=ifelse(other_groups>0,tidyr::replace_na(shared,0)/other_groups,NA_real_))
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+for(n in names(z))readr::write_csv(z[[n]],file.path(output,paste0(n,'.csv')))
+theme_set(theme_minimal(base_size=12,base_family='Noto Sans CJK SC'))
+```
+
+## 结论：保留研究优选，但优势是薄而集中的
+
+**换组收益可以完整解释为新增与放弃中奖组回款的差额，扣除投入变化；存在小幅组合改善，但还没有一致的单组特征可以作为新筛选规则。** 保留EXCHANGE12研究优选及JOINT对照，不新增按覆盖、重叠或估算回报决定是否换组的阈值。
+
+公平地分别移除各方案最大的1／3／5个正收益中奖组后，EXCHANGE12仍有7／9配置优于JOINT；EXCHANGE11均为6／9。原来的正负方向没有因这些组级去极值而改变。因此优势不是“全盘恰好中了一个最大组”这么简单。
+
+这一检查的局限是，两个方案最大的五个盈利组有4—5个相同，剔除的大部分是共同收益，未必触及换组产生的增量。下面另列共同组数，并采用仅针对新增回款的压力检查。
+
+但单边压力检查给出另一面：仅抹掉换入中奖组最大一笔回款，EXCHANGE12只剩4／9配置有正增益；抹掉前三笔或前五笔，全部配置的增益消失。前三个换入中奖组占换入回款约31.9%—66.7%。这不证明优化无效，而说明增量利润小于少数新增回款，风险缓冲有限；不能把公平去极值的稳健性解释为“低集中度”。
+
+固定1024元／42501例子：换入回款15280.11元，放弃原组回款11054.89元，新增投入66元，净增4159.23元。其中拯救一个原未中期贡献2076.45元，双方都命中的82期合计贡献2104.78元，双方均未中的117期新增成本22元。约一半来自拯救未中期，一半来自已中期回款改善；保留组本身的赛果和回报完全没有改变。
+
+单组覆盖都约25.1%，受固定25%开组前缀限制，区分力很弱。9配置中换入组的平均每元估算回款有8个低于换出组；与原JOINT其他组的平均重叠有7个反而更高。因此“换入更高单组概率、更高估算回报、或更低重叠的组”都不是一致解释。算法直接优化的是组合联合覆盖，不能用这些单组均值替代；这些计数只描述本历史样本，不构成因果检验。
+
+分段增益并非全程一致，保持此前“收益改善强于回撤改善”的判断。本轮不重画未经修改的资金曲线；新增图专注回款来源、中奖组集中度、组特征和分段差额。
+
+## 口径与识别范围
+
+仅解释 #455 已冻结的200期、3种预算、3个种子、3种方案。SP≥1.30，7串一，欧赔／大小球估算SP与北单结算SP分开；结算回款已含票级0.65，不重复折算。不新增策略、调参或训练，不构造用于未来选择的学习规则。种子重复不能当作独立历史。
+
+按期／预算／种子／组ID对齐最终计划，分成保留、换入、换出。中途换入又换出的组不计最终投入，不能把一换二硬配成两次一换一。严格核对保留组的概率、前缀、投入和回款不变，因此其差额必须为零。
+
+净收益差额 = 换入组回款 − 换出组放弃的回款 − 新增投入。增加的中奖组不一定拯救未中期，也可能是在已经中奖的期多中一组。
+
+## 配置级收益来源
+
+```{r}
+totals<-z$contributions |> group_by(variant,budget_cny,seed) |>
+  summarise(added_gross=sum(added_gross),removed_gross=sum(removed_gross),
+    cost_change=sum(cost_change),delta_net=sum(delta_net),.groups='drop')
+knitr::kable(totals,digits=2)
+knitr::kable(z$contributions |> filter(variant=='EXCHANGE12',budget_cny==1024,seed==42501),digits=2)
+readr::write_csv(totals,file.path(output,'totals.csv'))
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+terms<-totals |> mutate(removed_gross=-removed_gross,cost_change=-cost_change) |>
+  tidyr::pivot_longer(c(added_gross,removed_gross,cost_change),names_to='term',values_to='cny')
+p<-ggplot(terms,aes(factor(seed),cny,fill=term))+geom_col()+
+  facet_grid(variant~budget_cny)+labs(x='固定种子',y='相对JOINT收益贡献（元）',fill='贡献项')
+p;ggsave(file.path(output,'attribution-contributions.png'),p,width=12,height=7,dpi=160)
+```
+
+## 是否依赖少数中奖组
+
+第一种口径：每方案分别移除净收益最大的1／3／5个正收益中奖组，同时去掉该组投入。重新对比剩余净收益，单位是一次期内购入组，并非整期，也非跨期同名组。重叠组可能同时中奖，不代表独立机会。
+
+第二种口径更苛刻：只抹掉换入组中最大1／3／5笔回款，所有原投入和JOINT回款保留。这是单边压力检查；与公平移除各自极值回答的问题不同，均不能变成赛前可执行规则。
+
+```{r}
+knitr::kable(z$trims |> filter(variant!='JOINT') |> select(variant,budget_cny,seed,k,delta_trimmed_net),digits=2)
+knitr::kable(z$adverse,digits=2)
+robust<-z$trims |> filter(variant!='JOINT') |> group_by(variant,k) |>
+ summarise(positive_configurations=sum(delta_trimmed_net>0),median_gain=median(delta_trimmed_net),.groups='drop')
+knitr::kable(robust,digits=2)
+top5<-groups |> left_join(plans |> select(issue,arm,seed,variant,budget_cny),
+ by=c('issue','arm','seed'),relationship='many-to-one') |> filter(net>0,variant %in% c('JOINT','EXCHANGE12')) |>
+ group_by(variant,budget_cny,seed) |> arrange(desc(net),issue,sleeve_id,.by_group=TRUE) |> slice_head(n=5) |> ungroup()
+common<-inner_join(top5 |> filter(variant=='JOINT'),top5 |> filter(variant=='EXCHANGE12'),
+ by=c('issue','sleeve_id','budget_cny','seed'),relationship='one-to-one') |> count(budget_cny,seed,name='common_top5')
+knitr::kable(common);readr::write_csv(common,file.path(output,'common-top5.csv'))
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+p<-ggplot(z$trims |> filter(variant!='JOINT'),aes(k,delta_trimmed_net,color=factor(seed)))+
+ geom_line()+geom_point()+geom_hline(yintercept=0,linetype=2)+facet_grid(variant~budget_cny)+
+ labs(x='各方案移除的最大正收益中奖组数',y='剩余净收益差（元）',color='种子')
+p;ggsave(file.path(output,'attribution-trim.png'),p,width=12,height=7,dpi=160)
+concentration<-z$ledger |> filter(role=='added',gross>0) |> group_by(variant,budget_cny,seed) |>
+ arrange(desc(gross),issue,sleeve_id,.by_group=TRUE) |> mutate(rank=row_number(),cumulative=cumsum(gross)/sum(gross))
+readr::write_csv(concentration,file.path(output,'concentration.csv'))
+p<-ggplot(concentration,aes(rank,cumulative,color=factor(seed)))+geom_line()+geom_point()+
+ facet_grid(variant~budget_cny)+labs(x='换入中奖组：按回款从高到低排序',y='累计换入回款占比',color='种子')
+p;ggsave(file.path(output,'attribution-concentration.png'),p,width=12,height=7,dpi=160)
+```
+
+## 冻结组特征与分段
+
+```{r}
+feature_summary<-z$ledger |> filter(role!='retained') |> group_by(variant,budget_cny,seed,role) |>
+ summarise(groups=n(),winners=sum(gross>0),mean_coverage=mean(coverage),
+  mean_cost=mean(stake),mean_estimated_return=mean(expected_gross/stake),
+  mean_overlap=mean(mean_overlap,na.rm=TRUE),.groups='drop')
+knitr::kable(feature_summary,digits=3)
+readr::write_csv(feature_summary,file.path(output,'feature-summary.csv'))
+```
+
+均值只描述选组机制，不证明特征导致中奖。重叠定义为该组与原JOINT其他组共享场次的平均数，自身不计；没有其他组则NA。同一场次在多个组出现，组级命中并不独立。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+p<-ggplot(z$ledger |> filter(role!='retained',variant=='EXCHANGE12',seed==42501),
+ aes(coverage,expected_gross/stake,color=role,shape=gross>0))+geom_point(alpha=.6)+
+ facet_wrap(~budget_cny)+labs(x='冻结组累计覆盖概率',y='估算回款／投入',color='组角色',shape='实际中奖')
+p;ggsave(file.path(output,'attribution-features.png'),p,width=12,height=7,dpi=160)
+blocks<-z$paired |> group_by(variant,budget_cny,seed,block) |>
+ summarise(delta_net=sum(delta_net),.groups='drop')
+readr::write_csv(blocks,file.path(output,'blocks.csv'))
+p<-ggplot(blocks,aes(factor(block),delta_net,fill=factor(seed)))+geom_col(position='dodge')+
+ facet_grid(variant~budget_cny)+labs(x='每50期固定时间段',y='相对JOINT净收益差（元）',fill='种子')
+p;ggsave(file.path(output,'attribution-blocks.png'),p,width=12,height=7,dpi=160)
+```
+
+## 验收
+
+23项R断言通过；来源5400计划／结算复算通过；3600配对计划、15356条组级记录的独立结算、重叠、动作和去极值核算通过。QMD在新R进程中执行，缓存关闭，五张图已检查。持久化路径与cutoff治理检查通过。
+
+首轮Codex review发现“期级结算正确不等于组级分配正确”，已复用权威结算函数从冻结投注及哈希绑定的中奖排序重建各组，并加入保持期合计不变而挪动组回款的拒绝测试。最终review无待修复问题，独立核验了共同最大盈利组的计数和结论。审核日志SHA256：`f912b22169d17f5781cb9431ae72b3b1ea69243d66793035f627f6e4da557f1e`。
+
+全仓既有6项R失败／错误和2项集成跳过仍按前序记录列明，不宣称全仓通过。完整复现命令与函数测试映射见`docs/research/n7_exchange_attribution_457.md`。本次交付不包含合并授权。
+
+## 可复现凭证
+
+```{r}
+bindings<-list(status='PASS',historical_admission=FALSE,issue='457',plans=nrow(plans),
+ source_freeze_sha256=receipt$freeze_sha256,source_files=as.list(inputs),cutoffs=freeze$cutoffs,
+ ranks_path=receipt$ranks_path,ranks_sha256=receipt$ranks_sha256,
+ replay_receipt_sha256=digest::digest(file=params$replay_receipt,algo='sha256'),
+ parameters=list(trim_k=c(1,3,5),block_size=50,group_unit='issue/arm/seed/sleeve'),
+ generated_at=format(Sys.time(),tz='UTC',usetz=TRUE),implementation=list(),outputs=list())
+for(n in c('r/n7_exchange_attribution.R','r/n7_quality_settlement.R','quarto/158_n7_exchange_attribution.qmd'))
+ bindings$implementation[[n]]<-digest::digest(file=n,algo='sha256')
+for(n in list.files(output,pattern='\\.(csv|png)$'))bindings$outputs[[n]]<-digest::digest(file=file.path(output,n),algo='sha256')
+jsonlite::write_json(bindings,file.path(output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+knitr::kable(tibble(source_freeze=receipt$freeze_sha256,plans=nrow(plans),ledger_rows=nrow(z$ledger)))
+```
