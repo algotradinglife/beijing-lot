@@ -1,0 +1,236 @@
+---
+title: "N7 选组排序与覆盖分配比较（#443）"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study_dir: null
+  output_dir: null
+---
+
+本报告比较同一冻结 200 期、24 个候选组中的九种固定策略。
+这是已暴露历史数据上的回顾诊断，不是未见数据验收。
+欧赔和大小球映射给出概率与估算 SP，北单实际 SP 只用于结算。
+不使用北单赛前 SP，不重训概率，也不把支付机制的差异解释成必须修复的估算错误。
+
+```{r}
+#| include: false
+library(dplyr);library(tidyr);library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R')
+stopifnot(is.character(params$study_dir),is.character(params$output_dir),!dir.exists(params$output_dir))
+source('r/n7_selection_report.R')
+verified<-n7_selection_report_inputs(params$study_dir,16200)
+frozen<-verified$frozen;freeze_hash<-verified$freeze_sha256
+rows<-readr::read_csv(file.path(params$study_dir,'results.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c'))
+stopifnot(nrow(rows)==16200)
+stopifnot(digest::digest(file=frozen$config$catalog,algo='sha256')==frozen$source_catalog_sha256)
+issue_order<-jsonlite::fromJSON(frozen$config$catalog)$issues$issue
+z<-n7_sweet_union_summary(rows,issue_order,100000)
+stopifnot(!any(z$curves$stopped))
+policy<-rows |> distinct(arm,mode,objective,allocation_order,budget_cny) |>
+ mutate(rule=paste(mode,allocation_order,sep='/'),budget=factor(budget_cny))
+curves<-z$curves |> select(-any_of(c('mode','objective','allocation_order','budget_cny'))) |>
+ left_join(policy,by='arm',relationship='many-to-one')
+summary<-z$summary |> left_join(policy,by='arm',relationship='many-to-one')
+source('r/n7_selection_diagnostics.R')
+blocks<-n7_selection_blocks(rows,issue_order,50) |>
+ left_join(policy,by='arm',relationship='many-to-one')
+funded<-readr::read_csv(file.path(params$study_dir,'funded.csv'),show_col_types=FALSE,
+ col_types=readr::cols(issue='c',sleeve_id='c')) |> select(issue,arm,seed,sleeve_id,coverage)
+catalog<-jsonlite::fromJSON(frozen$config$catalog)$issues
+membership<-list()
+for(i in seq_len(nrow(catalog))) {
+ item<-catalog[i,]
+ stopifnot(digest::digest(file=item$path,algo='sha256')==item$sha256)
+ bundle<-jsonlite::fromJSON(gzfile(item$path),simplifyVector=FALSE)
+ for(group in bundle$sleeves)membership[[length(membership)+1L]]<-tibble(
+  issue=as.character(item$issue),sleeve_id=as.character(group$id),
+  fixture_id=as.character(unlist(group$fixture_indices)))
+}
+overlap<-n7_selection_overlap(rows,funded,bind_rows(membership)) |>
+ left_join(policy,by='arm',relationship='many-to-one')
+per_issue<-rows |> mutate(issue_roi=ifelse(stake>0,net/stake,NA_real_))
+dir.create(params$output_dir,recursive=TRUE)
+readr::write_csv(overlap,file.path(params$output_dir,'overlap.csv'))
+readr::write_csv(summary,file.path(params$output_dir,'summary.csv'))
+readr::write_csv(curves,file.path(params$output_dir,'curves.csv'))
+readr::write_csv(blocks,file.path(params$output_dir,'blocks.csv'))
+readr::write_csv(per_issue,file.path(params$output_dir,'per-issue.csv'))
+theme_set(theme_minimal(base_family='Noto Sans CJK SC',base_size=11))
+plots<-list()
+```
+
+## 主要发现
+
+在 512 元预算上限下，原“先开新组、再加深，按联合新增覆盖排序”仍较均衡：
+三个种子净收益 20,221–25,977 元，ROI 21.3%–27.4%，命中 77–83 期，最大回撤 6,718–8,884 元。
+改为开组与加深直接竞争，仍以联合命中增量排序，命中升到 90–95 期，
+但净收益只有 5,150–11,019 元，ROI 5.4%–11.5%，最大回撤 9,086–12,871 元。
+因此，优化“至少中一组”与优化资金结果在本样本中并不一致。
+
+估算收益排序的竞争分配得到净收益 20,487 元、ROI 21.5%、命中 85 期、最大回撤 8,705 元；
+去掉最盈利的 5 期后仍有 3,109 元净收益。估算收益排序但先开新组时，净收益为 22,071 元，
+ROI 23.3%，命中 80 期，最大回撤 8,348 元。它们值得保留为对照，
+但不能据这 200 期宣称已经优于原方案或可前瞻获利。
+
+概率质量之和排序没有表现出优势：512 元可变深度方案约 15,849–15,851 元净收益，
+命中 71 期，去掉最盈利的 5 期后转负。
+全部种子都会展示；某些固定精确排序的资金结果相同，不能将其视为三份独立历史证据。
+
+## 比较口径
+
+统一以“25% 累计概率可在 256 元内达到”准入。
+固定深度 BREADTH 只买初始票集；DEPTH 可以继续买排名更后的赛果组合。
+OPEN_FIRST 先买仍可负担的新组；COMPETE 将开新组与加深已有组同时比较。
+各组的深度候选全集保持一致，不做倍投，不做撤减或交换。
+
+三种排序分别使用新增概率质量之和（coverage_sum）、联合至少中一组概率增量（any_hit）、
+估算净收益增量（expected_net），均除以新增投入。
+联合概率考虑共享场次；概率质量之和不能解读为至少中奖一次的概率。
+估算收益仅排序，不作为正期望门槛。没有合法动作时保留现金。
+
+每张票 2 元、票级一次 0.65 结算系数；每期预算上限 512、768、1024 元。
+账户初始资金 100000 元，按每期结算后再投入下一期计算。
+种子全部展示，不依据事后结果选择某个种子；模型分配情景 256 个，独立评估情景 5000 个。
+原对照是 DEPTH / OPEN_FIRST / any_hit。
+
+## 全部收益、ROI、命中与回撤
+
+ROI 的分母是实际投入，预算未用完的部分保留现金。
+去极值诊断直接移除各策略自身最盈利的 1、3、5 期净收益，不是重新训练或重选场次。
+
+```{r}
+knitr::kable(summary |> select(arm,seed,stake,net,roi,hit_issues,profit_issues,max_drawdown,
+ net_without_best,net_without_best3,net_without_best5) |>
+ mutate(roi=sprintf('%.1f%%',100*roi)),digits=2)
+```
+
+## 逐期结果结构与示例
+
+完整 16,200 行逐期表保存为报告目录中的 `per-issue.csv`；每行是一种策略、一个种子在一期的结果。
+`stake`、`cash`、`gross`、`net` 均为元，`issue_roi` 为净收益除以实际投入，未投注时为空。
+`hits` 为该期中奖组数，不是中奖期数。下方展示结构及前几行；CSV 保留全部期次。
+
+```{r}
+tibble::glimpse(per_issue)
+knitr::kable(per_issue |> select(issue,arm,seed,budget_cny,stake,cash,groups,hits,gross,net,issue_roi) |>
+ slice_head(n=12) |> mutate(issue_roi=ifelse(is.na(issue_roi),NA_character_,sprintf('%.1f%%',100*issue_roi))),digits=2)
+```
+
+## 收益曲线
+
+每个面板固定覆盖规则与预算；颜色比较排序，线型展示三个种子。
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+plots$equity<-ggplot(curves,aes(period,equity_cny,colour=objective,linetype=factor(seed)))+
+ geom_line()+facet_grid(rule~budget)+geom_hline(yintercept=100000,linetype=3)+
+ labs(x='期次顺序',y='账户资金（元）',colour='排序',linetype='种子')
+plots$equity
+```
+
+## 回撤曲线
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+plots$drawdown<-ggplot(curves,aes(period,drawdown_cny,colour=objective,linetype=factor(seed)))+
+ geom_line()+facet_grid(rule~budget)+labs(x='期次顺序',y='距历史峰值回撤（元）',colour='排序',linetype='种子')
+plots$drawdown
+```
+
+## 收益与回撤的取舍
+
+```{r}
+#| fig-width: 13
+#| fig-height: 8
+plots$tradeoff<-ggplot(summary,aes(max_drawdown,net,colour=objective,shape=rule))+
+ geom_point(size=3)+facet_wrap(~budget)+labs(x='最大回撤（元）',y='净收益（元）',colour='排序',shape='覆盖规则')
+plots$tradeoff
+```
+
+## 时间分段稳定性
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+plots$blocks<-ggplot(blocks,aes(factor(block),roi,colour=objective,group=interaction(objective,seed),linetype=factor(seed)))+
+ geom_hline(yintercept=0,linetype=3)+geom_line()+geom_point()+facet_grid(rule~budget)+
+ labs(x='每 50 期分段',y='分段 ROI',colour='排序',linetype='种子')
+plots$blocks
+```
+
+## 为什么命中增加但收益下降
+
+以预先固定的种子 42501、512 元预算为例，联合概率竞争分配平均每期买约 1.00 组，
+原先开组方案平均约 2.60 组。前者每个命中期平均回款约 1,111 元，后者约 1,438 元。
+这支持一种样本内解释：允许竞争后，概率目标偏向加深已有组，扩大中奖覆盖，
+却不保证中奖回款足以改善总体收益。下表完整展示各策略、种子和预算，避免只看示例。
+
+```{r}
+mechanism<-rows |> group_by(arm,seed) |> summarise(mean_groups=mean(groups),
+ mean_model_union=mean(eval_union),actual_hit_rate=mean(hits>0),
+ actual_profit_rate=mean(net>0),stake=sum(stake),gross=sum(gross),
+ gross_per_hit_issue=ifelse(sum(hits>0)>0,sum(gross)/sum(hits>0),NA_real_),.groups='drop')
+knitr::kable(mechanism,digits=3)
+readr::write_csv(mechanism,file.path(params$output_dir,'mechanism.csv'))
+```
+
+768/1024 元预算下，联合概率竞争方案仍有类似问题：1024 元时命中 126–127 期，
+但净收益约 −4,303 至 +5,462 元，最大回撤约 16,952–26,943 元。
+相比之下原先开组方案净收益约 40,871–50,857 元，最大回撤约 14,532–16,671 元。
+
+不能把“概率质量之和排序在 512 元下较弱”扩展到所有预算：
+其竞争分配在 768 元时净收益约 38,830 元、ROI 27.2%；1024 元时约 47,426 元、ROI 24.9%，
+去掉各自最佳 5 期后仍分别有约 7,104 元和 11,601 元净收益。
+原先开组／联合概率方案在这些预算下的结果与之存在交叠，尚无统一赢家。
+
+## 组间重复风险与新增覆盖
+
+以下只诊断已经冻结的购买计划。最多复用数按场次计，组间重叠按共同场次数计。
+概率质量之和减去联合概率是重复覆盖的描述量；联合概率为独立模型抽样估计，存在蒙特卡洛误差。
+不将这些历史结果作为当期选组条件。
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+plots$overlap<-ggplot(overlap,aes(factor(budget_cny),max_pair_overlap,fill=objective))+
+ geom_boxplot(outlier.size=.4)+facet_wrap(~rule)+
+ labs(x='预算上限（元）',y='任意两组最多共同场次',fill='排序')
+plots$overlap
+```
+
+## 验证范围与剩余仓库缺口
+
+本报告执行前强制验证全部 16,200 个计划的独立结算检查与分配回放凭证，
+并核对计划和结果文件哈希。原方案对照另有 1,800 个计划和 7,288 条买入组的精确复现记录。
+本轮函数专项、端到端及 cutoff 治理检查通过；每个新函数均有对应测试。
+
+完整仓库 `Rscript tests/testthat.R` 尚未通过：6 个失败涉及未改动的
+旧 draw-threshold 数据文件、retraining 集成包，以及两个测试的 Python 路径冲突；
+另外两个旧流水线集成测试因缺少 bundle 跳过。详细证据已记录 #443。
+这不改变本轮冻结结果的独立复现记录，但不能据此声称全仓测试通过或允许直接合并。
+
+研究输入是已暴露历史样本，模拟情景及不同种子不增加独立历史样本量。
+固定 24 组候选集和有限深度网格也限制结论；本轮不是全局最优求解，
+未测试新增场次 SP 筛除或候选池扩张。
+
+```{r}
+#| include: false
+for(n in names(plots))ggsave(file.path(params$output_dir,paste0(n,'.png')),plots[[n]],width=15,height=10,dpi=130)
+report_code<-c('r/fundamentals_equity_curves.R','r/n7_sweet_union_summary.R','r/n7_selection_report.R','r/n7_selection_diagnostics.R','quarto/151_n7_selection_coverage.qmd')
+output_files<-list.files(params$output_dir,full.names=TRUE)
+output_hashes<-as.list(setNames(vapply(output_files,digest::digest,character(1),file=TRUE,algo='sha256'),basename(output_files)))
+jsonlite::write_json(list(outputs=output_hashes,freeze_sha256=freeze_hash,results_sha256=verified$results_sha256,config=frozen$config,
+ implementation=as.list(setNames(vapply(report_code,digest::digest,character(1),file=TRUE,algo='sha256'),report_code)),
+ initial_capital_cny=100000,plans=nrow(rows),historical_admission=FALSE),
+ file.path(params$output_dir,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

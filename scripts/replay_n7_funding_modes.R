@@ -32,9 +32,13 @@ for(i in seq_len(nrow(catalog$issues))) {
   for(seed in cfg$seeds) {
     worlds <- n7_joint_worlds(base,cuts,seed,cfg$allocation_worlds)
     eval_worlds <- n7_joint_worlds(base,cuts,seed+cfg$evaluation_seed_offset,cfg$evaluation_worlds)
-    for(t in seq_along(partitions))for(mode in cfg$modes)for(budget in cfg$budgets) {
-      fit <- n7_funding_allocate(base,partitions[[t]],cuts,mode,worlds,budget,cfg$max_actions,cfg$max_copies)
-      arm <- paste0('T',round(1000*cfg$targets[t]),'_',mode,'_B',budget)
+    for(t in seq_along(partitions))for(k in seq_len(nrow(cfg$policies))) {
+      policy <- cfg$policies[k,];mode <- policy$mode
+      eval_pool <- n7_core_option_pool(base,partitions[[t]],cuts,mode,cfg$max_copies)
+      eval_sc <- n7_joint_returns(eval_pool,eval_worlds,cuts)
+      for(budget in cfg$budgets) {
+      fit <- n7_funding_allocate(base,partitions[[t]],cuts,mode,worlds,budget,cfg$max_actions,cfg$max_copies,policy$objective,policy$allocation_order)
+      arm <- paste0('T',round(1000*cfg$targets[t]),'_',policy$id,'_B',budget)
       expected <- funded |> filter(issue==item$issue,.data$seed==.env$seed,.data$arm==.env$arm)
       held <- fit$pool$options[fit$fit$selected]
       ids <- vapply(held,function(o)as.character(o$sleeve_id),character(1))
@@ -47,7 +51,7 @@ for(i in seq_len(nrow(catalog$issues))) {
         reconstructed<-vapply(held,function(o)o[[field]],numeric(1))
         stopifnot(isTRUE(all.equal(as.numeric(expected[[field]][match(ids,expected$sleeve_id)]),reconstructed,tolerance=1e-10)))
       }
-      evaluated<-n7_capital_evaluate(fit$pool,fit$fit$selected,n7_joint_returns(fit$pool,eval_worlds,cuts),cuts,budget)
+      evaluated<-n7_capital_evaluate(fit$pool,fit$fit$selected,eval_sc,cuts,budget)
       row <- expected_rows |> filter(issue==item$issue,.data$seed==.env$seed,.data$arm==.env$arm)
       stopifnot(nrow(row)==1,fit$fit$metrics$stake==row$stake,
         abs(fit$fit$metrics$any_hit-row$train_union)<1e-12,
@@ -55,6 +59,7 @@ for(i in seq_len(nrow(catalog$issues))) {
         abs(evaluated$any_hit-row$eval_union)<1e-12,
         abs(evaluated$profit_probability-row$eval_profit)<1e-12)
       count <- count+1L
+      }
     }
   }
   if(i%%10==0)message('Replay: ',i,'/',nrow(catalog$issues))

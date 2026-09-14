@@ -61,7 +61,7 @@ cfg=freeze['config']
 for name in ('policies','budgets','targets','modes','seeds'):
     if name in cfg and not isinstance(cfg[name],list):cfg[name]=[cfg[name]]
 assert 'original_config' not in cfg
-arms=[f'T{round(1000*t)}_{m}_B{b}' for t,m,b in product(cfg['targets'],cfg['modes'],cfg['budgets'])]
+arms=[f'T{round(1000*t)}_{m}_B{b}' for t,m,b in product(cfg['targets'],[p['id'] for p in cfg['policies']],cfg['budgets'])]
 assert seen==set(product(freeze['metadata'],arms,map(str,cfg['seeds'])))
 assert set(funded)<=seen
 output.write_text(json.dumps(dict(status='PASS',plans=len(seen),

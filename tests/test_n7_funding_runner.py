@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize('kind',['ineligible','unaffordable','copies'])
+@pytest.mark.parametrize('kind',['ineligible','unaffordable','copies','competition'])
 def test_funding_modes_end_to_end(tmp_path,kind):
     repo=Path(__file__).resolve().parents[1]
     e=json.loads(gzip.decompress((repo/'tests/fixtures/n7_sleeve_numerical.json.gz').read_bytes()))['enumeration']
@@ -38,7 +38,12 @@ def test_funding_modes_end_to_end(tmp_path,kind):
       allocation_worlds=2,evaluation_worlds=5,evaluation_seed_offset=100,modes=['BREADTH'],budgets=[2],model_id='fixture')
     script='scripts/run_n7_funding_modes.R'
     cfg.update(depth_reference_targets=[.25,.3],max_copies=4,max_actions=256,modes=['MULTIPLY'])
-    if kind=='copies':cfg['budgets']=[1024]
+    cfg.pop('modes')
+    cfg['policies']=[dict(id='MULTIPLY',mode='MULTIPLY',objective='any_hit',allocation_order='OPEN_FIRST')]
+    if kind in ('copies','competition'):cfg['budgets']=[1024]
+    if kind=='competition':
+        cfg['max_copies']=1
+        cfg['policies']=[dict(id='DEPTH_COMPETE',mode='DEPTH',objective='coverage_sum',allocation_order='COMPETE')]
     config=tmp_path/'config.json';config.write_text(json.dumps(cfg))
     env=os.environ.copy();env['PYTHONPATH']=str(repo)
     result=subprocess.run([os.environ['RSCRIPT'],script,str(config)],cwd=repo,env=env,capture_output=True,text=True,timeout=120)
@@ -48,6 +53,10 @@ def test_funding_modes_end_to_end(tmp_path,kind):
         funded=list(csv.DictReader((output/'funded.csv').open()))
         assert len(funded)==1 and int(funded[0]['copies'])>1
         assert float(rows[0]['stake'])==2*int(funded[0]['depth'])*int(funded[0]['copies'])
+    elif kind=='competition':
+        funded=list(csv.DictReader((output/'funded.csv').open()))
+        assert len(funded)==1 and int(funded[0]['copies'])==1
+        assert 0<float(rows[0]['stake'])<=1024
     else:
         assert float(rows[0]['stake'])==0 and float(rows[0]['cash'])==2 and float(rows[0]['gross'])==0
         for name in ('funded.csv','actions.csv'):
