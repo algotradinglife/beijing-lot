@@ -1,0 +1,113 @@
+---
+title: "旧战力概率与两种市场底座：100期配对诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  evidence: null
+  python: null
+---
+
+这是旧冻结战力概率的历史诊断，不是新训练版本。100608–101120的100期具备战力与市场配对数据。
+最近295期的候选包未包含战力概率，本报告不能代表最近回撤段的战力表现。
+组对照固定原市场策略候选及已选组，不重选组、不改变资金，不等于完整策略ROI回测。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R');source('r/strategy_handicap_diagnostic.R')
+source('r/n7_fixture_price_diagnostic.R');source('r/strategy_distribution_shape.R')
+stopifnot(!is.null(params$study),!is.null(params$evidence),!is.null(params$python))
+s<-params$study;o<-params$evidence
+ir<-jsonlite::fromJSON(file.path(o,'inputs.json'))
+strategy_verify_diagnostic_inputs(o,list('archived-strength.csv'=ir$archived_strength_sha256,'catalog.json'=ir$catalog_sha256),c('archived-strength.csv','catalog.json'))
+parent<-jsonlite::fromJSON(file.path(s,'settlement-inputs/receipt.json'))
+stopifnot(identical(parent$files[['catalog.json']],ir$parent_catalog_sha256))
+reticulate::use_python(params$python,required=TRUE)
+z<-reticulate::import('src.strategy_diagnostic_inputs')$read_diagnostic_fixtures(file.path(o,'catalog.json'),ir$catalog_sha256)
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,c('fixture-audit.csv','ranks.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','funded.csv'))
+a<-read_csv(file.path(s,'current-settlement/fixture-audit.csv'),col_types=cols(issue='c',provider_id='c'))
+f<-n7_fixture_price_diagnostic(bind_rows(z$rows),a)
+old<-read_csv(file.path(o,'archived-strength.csv'),col_types=cols(issue='c',provider_id='c'))
+keys<-c('issue','slot','provider_id');stopifnot(!anyDuplicated(old[keys]))
+f<-inner_join(f,old |> select(all_of(keys),handicap,actual_direction,starts_with('p_'),starts_with('q_')),by=keys,suffix=c('','_old'),relationship='one-to-one')
+stopifnot(nrow(f)==6547,n_distinct(f$issue)==100,all(f$handicap==f$handicap_old),all(f$actual_direction==f$actual_direction_old))
+for(d in c('W','D','L')) stopifnot(all(abs(f[[paste0('q_',d)]]-f[[paste0('q_',d,'_old')]])<1e-8))
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c')) |> filter(issue %in% f$issue)
+m<-k |> select(issue,sleeve_id,fixture_slots) |> separate_longer_delim(fixture_slots,',') |> mutate(slot=as.integer(fixture_slots)) |> select(-fixture_slots)
+missing<-anti_join(m,f,by=c('issue','slot')) |> distinct(issue,sleeve_id)
+write_csv(missing,file.path(o,'excluded-groups.csv'))
+m<-anti_join(m,missing,by=c('issue','sleeve_id'))
+strength<-f
+for(d in c('W','D','L')) strength[[paste0('p_',d)]]<-f[[paste0('p_',d,'_old')]]
+s1<-strategy_distribution_shape(strength,m,7,128);s2<-strategy_distribution_shape(f,m,7,128)
+fx<-bind_rows(s1$fixtures |> mutate(model=recode(model,p='Strength',q='Raw market')),
+ s2$fixtures |> filter(model=='p') |> mutate(model='Corrected market'))
+g<-bind_rows(s1$groups |> mutate(model=recode(model,p='Strength',q='Raw market')),
+ s2$groups |> filter(model=='p') |> mutate(model='Corrected market'))
+plans<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c')) |> filter(variant=='JOINT',seed==42501,budget_cny==1024)
+fund<-read_csv(file.path(s,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c')) |> semi_join(plans,by=c('issue','arm','seed')) |> filter(issue %in% f$issue) |> distinct(issue,sleeve_id)
+stopifnot(nrow(anti_join(fund,k,by=c('issue','sleeve_id')))==0)
+excluded_funded<-semi_join(fund,missing,by=c('issue','sleeve_id'))
+write_csv(excluded_funded,file.path(o,'excluded-funded.csv'))
+g<-bind_rows(g |> mutate(scope='ALL'),g |> semi_join(fund,by=c('issue','sleeve_id')) |> mutate(scope='SELECTED'))
+fs<-fx |> group_by(model) |> summarise(n=n(),issues=n_distinct(issue),top1=mean(actual_rank==1),top2=mean(actual_rank<=2),
+ gap12=mean(gap12),entropy=mean(entropy),log_loss=mean(surprise),.groups='drop')
+gs<-g |> group_by(scope,model) |> summarise(n=n(),issues=n_distinct(issue),entropy=mean(entropy),
+ expected_rank=mean(expected_rank),rank_median_low=median(actual_rank_low),rank_median_high=median(actual_rank_high),
+ predicted128=mean(prefix_coverage),hit128_low=mean(prefix_hit_low),hit128_high=mean(prefix_hit_high),residual=mean(entropy_residual),.groups='drop')
+long<-bind_rows(strength |> select(all_of(keys),handicap,actual_direction,all_of(paste0('p_',c('W','D','L')))) |> mutate(model='Strength'),
+ f |> select(all_of(keys),handicap,actual_direction,all_of(paste0('p_',c('W','D','L')))) |> mutate(model='Corrected market'),
+ f |> select(all_of(keys),handicap,actual_direction,all_of(paste0('q_',c('W','D','L')))) |> rename(p_W=q_W,p_D=q_D,p_L=q_L) |> mutate(model='Raw market')) |>
+ pivot_longer(c(p_W,p_D,p_L),names_to='outcome',names_prefix='p_',values_to='probability') |> rename(actual_outcome=actual_direction)
+cells<-strategy_handicap_diagnostic(long,'handicap',c('W','D','L'),seq(0,1,.1))$cells
+for(name in c('fs','gs','cells')) write_csv(get(name),file.path(o,paste0(name,'.csv')))
+knitr::kable(fs,digits=4);knitr::kable(gs,digits=4)
+```
+
+Top128为固定购买深度的诊断对照，保留并列排名/命中上下界；候选组来自市场构建，不能当作战力选组策略的上限。
+
+```{r}
+plot<-gs |> filter(scope=='SELECTED') |> select(model,predicted128,hit128_low) |> pivot_longer(-model)
+gg<-ggplot(plot,aes(model,value,fill=name))+geom_col(position='dodge')+
+ geom_text(aes(label=sprintf('%.1f%%',100*value)),position=position_dodge(.9),vjust=-.3)+
+ theme_minimal(base_size=12)+labs(title='Same selected groups: predicted vs actual Top128 coverage',x=NULL,y='Probability / hit rate',fill=NULL)
+print(gg);ggsave(file.path(o,'strength-coverage.png'),gg,width=10,height=5,dpi=150)
+knitr::kable(cells |> select(handicap,model,outcome,fixtures,actual,predicted,observed,gap,top2_recall),digits=3)
+files<-c('r/strategy_diagnostic_probabilities.R','r/strategy_handicap_diagnostic.R','r/n7_fixture_price_diagnostic.R',
+ 'r/strategy_distribution_shape.R','src/strategy_diagnostic_inputs.py','src/data_archive.py','quarto/164_strength_foundation_diagnostic.qmd')
+jsonlite::write_json(list(inputs=ir,source_hashes=z$source_hashes,settlement=ar$files,evaluation=er$files,
+ implementation=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files),
+ diagnostic_only=TRUE,generated_at=as.character(Sys.time())),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 结论
+
+本次6,547场完全配对，市场q在旧战力档案与当前冻结包间数值一致；没有因缺成员排除组。
+全部候选2,400组／100期，原策略已选546组／95期，其他5期无已选组。
+
+旧战力Top1命中40.49%、Top2命中72.02%，低于原市场43.00%、74.14%，
+也低于校正市场43.00%、73.70%。战力Top1–Top2平均差24.0个百分点，市场约13.2个百分点；
+战力更集中，但log loss为1.1247，高于两种市场约1.069，显示这批历史上概率赋值较差。
+
+固定原已选组，战力Top128预测覆盖56.4%、实际28.4%；原市场31.6%、33.7%；
+校正市场33.3%、34.2%。战力模型预期平均中奖排名252，但实际中位数390；
+原市场实际中位数312、校正市场298.5。均值与中位数不作比例归因。
+全部候选池也呈相同方向，战力实际Top128命中18.1%，两种市场约23%，
+因此差距不只出现在原策略最终选中的组。
+
+战力并非毫无互补性：实际让平进入Top2的比例为41.2%，原市场10.9%、校正市场13.9%。
+但其实际让胜/让负进入Top2的比例只有82.4%/84.4%，低于原市场97.9%/97.1%。
+对比原市场，战力多覆盖536次让平，却少覆盖675次让胜/让负，Top2合计少中139场。
+
+**现有旧战力版本不支持直接替代市场底座；更集中的概率没有兑现成更好的组合覆盖。**
+这不是对基本面方法的否定，也不是最近295期的战力回测结论。当前输入只允许旧100期配对诊断；
+固定市场组不等于让战力重新构建候选、选组和分配资金后的完整策略，未估算替换后的ROI或回撤。
