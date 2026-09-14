@@ -141,6 +141,8 @@ knitr::kable(z$blocks |> filter(seed==42501,budget_cny==1024),digits=3)
 
 ## 验收记录
 
+代码提交 `71cc1e15`，交付 [PR #452](https://github.com/algotradinglife/beijing-lot/pull/452)，关联 [Issue #451](https://github.com/algotradinglife/beijing-lot/issues/451)。提交供审核，不合并PR或关闭Issue。
+
 独立复算通过：4,800个候选组的中奖位置及实际奖金、478,600个购买前缀、129,600行逐期结果、648个完整配置汇总，以及概率排名分段的投入／覆盖／回报对账。结果 SHA256：`54c1ff9551955e49cc381bbd7c59e7ccc55a8e044595981f5804b968d6774a9f`。
 
 范围测试15个R断言、1个Python测试通过。2026-09-14最终 `codex review` 无可操作发现；首次发现的“缺失版本行被误当持币”和“缺失汇总漏检”均已修复并添加回归测试。最终审核日志 `prefix-review-final.log` 随研究证据保存，SHA256：`a54be6114d5099e2dc6ce86fb4a0b7437b558df238cf17b34cc74feebd3c4e51`。
