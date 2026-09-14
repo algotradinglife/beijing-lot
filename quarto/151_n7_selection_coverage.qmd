@@ -43,8 +43,24 @@ blocks<-rows |> mutate(period=match(issue,issue_order),block=ceiling(period/50))
  group_by(arm,seed,block) |> summarise(stake=sum(stake),net=sum(net),
  roi=ifelse(stake>0,net/stake,NA_real_),hit_issues=sum(hits>0),profit_issues=sum(net>0),.groups='drop') |>
  left_join(policy,by='arm',relationship='many-to-one')
+source('r/n7_selection_diagnostics.R')
+funded<-readr::read_csv(file.path(params$study_dir,'funded.csv'),show_col_types=FALSE,
+ col_types=readr::cols(issue='c',sleeve_id='c')) |> select(issue,arm,seed,sleeve_id,coverage)
+catalog<-jsonlite::fromJSON(frozen$config$catalog)$issues
+membership<-list()
+for(i in seq_len(nrow(catalog))) {
+ item<-catalog[i,]
+ stopifnot(digest::digest(file=item$path,algo='sha256')==item$sha256)
+ bundle<-jsonlite::fromJSON(gzfile(item$path),simplifyVector=FALSE)
+ for(group in bundle$sleeves)membership[[length(membership)+1L]]<-tibble(
+  issue=as.character(item$issue),sleeve_id=as.character(group$id),
+  fixture_id=as.character(unlist(group$fixture_indices)))
+}
+overlap<-n7_selection_overlap(rows,funded,bind_rows(membership)) |>
+ left_join(policy,by='arm',relationship='many-to-one')
 per_issue<-rows |> mutate(issue_roi=ifelse(stake>0,net/stake,NA_real_))
 dir.create(params$output_dir,recursive=TRUE)
+readr::write_csv(overlap,file.path(params$output_dir,'overlap.csv'))
 readr::write_csv(summary,file.path(params$output_dir,'summary.csv'))
 readr::write_csv(curves,file.path(params$output_dir,'curves.csv'))
 readr::write_csv(blocks,file.path(params$output_dir,'blocks.csv'))
@@ -124,11 +140,28 @@ plots$blocks<-ggplot(blocks,aes(factor(block),roi,colour=objective,group=interac
 plots$blocks
 ```
 
+## 组间重复风险与新增覆盖
+
+以下只诊断已经冻结的购买计划。最多复用数按场次计，组间重叠按共同场次数计。
+概率质量之和减去联合概率是重复覆盖的描述量；联合概率为独立模型抽样估计，存在蒙特卡洛误差。
+不将这些历史结果作为当期选组条件。
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+plots$overlap<-ggplot(overlap,aes(factor(budget_cny),max_pair_overlap,fill=objective))+
+ geom_boxplot(outlier.size=.4)+facet_wrap(~rule)+
+ labs(x='预算上限（元）',y='任意两组最多共同场次',fill='排序')
+plots$overlap
+```
+
 ```{r}
 #| include: false
 for(n in names(plots))ggsave(file.path(params$output_dir,paste0(n,'.png')),plots[[n]],width=15,height=10,dpi=130)
-report_code<-c('r/fundamentals_equity_curves.R','r/n7_sweet_union_summary.R','r/n7_selection_report.R','quarto/151_n7_selection_coverage.qmd')
-jsonlite::write_json(list(freeze_sha256=freeze_hash,results_sha256=verified$results_sha256,config=frozen$config,
+report_code<-c('r/fundamentals_equity_curves.R','r/n7_sweet_union_summary.R','r/n7_selection_report.R','r/n7_selection_diagnostics.R','quarto/151_n7_selection_coverage.qmd')
+output_files<-list.files(params$output_dir,full.names=TRUE)
+output_hashes<-as.list(setNames(vapply(output_files,digest::digest,character(1),file=TRUE,algo='sha256'),basename(output_files)))
+jsonlite::write_json(list(outputs=output_hashes,freeze_sha256=freeze_hash,results_sha256=verified$results_sha256,config=frozen$config,
  implementation=as.list(setNames(vapply(report_code,digest::digest,character(1),file=TRUE,algo='sha256'),report_code)),
  initial_capital_cny=100000,plans=nrow(rows),historical_admission=FALSE),
  file.path(params$output_dir,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)

@@ -1,0 +1,20 @@
+source('../../r/n7_selection_diagnostics.R')
+testthat::test_that('overlap diagnostics distinguish genuine coverage from repeated fixtures',{
+ rows<-tibble::tibble(issue='001',arm=c('shared','empty'),seed=1,groups=c(2,0),eval_union=c(.6,0))
+ f<-tibble::tibble(issue='001',arm='shared',seed=1,sleeve_id=c('0','1'),coverage=c(.4,.4))
+ m<-tibble::tibble(issue='001',sleeve_id=rep(c('0','1'),each=7),fixture_id=as.character(c(1:7,5:11)))
+ z<-n7_selection_overlap(rows,f,m)
+ testthat::expect_equal(z$unique_fixtures,c(11,0))
+ testthat::expect_equal(z$max_fixture_reuse,c(2,0))
+ testthat::expect_equal(z$max_pair_overlap,c(3,0))
+ testthat::expect_equal(z$mean_pair_overlap,c(3,0))
+ testthat::expect_equal(z$coverage_minus_union,c(.2,0))
+ testthat::expect_error(n7_selection_overlap(rows,dplyr::bind_rows(f,f[1,]),m))
+ testthat::expect_error(n7_selection_overlap(rows,f,m[-1,]))
+ bad<-f;bad$arm<-'missing'
+ testthat::expect_error(n7_selection_overlap(rows,bad,m))
+ bad<-rows;bad$groups[1]<-1
+ testthat::expect_error(n7_selection_overlap(bad,f,m))
+ one<-n7_selection_overlap(dplyr::mutate(rows[1,],groups=1),f[1,],m)
+ testthat::expect_equal(one$max_pair_overlap,0)
+})
