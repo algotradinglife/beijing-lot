@@ -16,7 +16,7 @@ Automated tests for each changed function, no-filter equivalence, boundaries/tie
 
 ## Implementation and run inputs
 The shared runner requires `minimum_sp` on every policy row. Unfiltered means explicit1.00; no hidden default. `n7_sp_filter()` returns fixture and group ledgers plus a filtered admission partition. It never rebuilds candidates, alters fixture indices or reads settlement. Original core depth grid is constructed before filtering.
-Input: the explicit #439 catalog and #435 rank receipts used by #443. Output is a new immutable issue445-low-sp-v1 audit directory on the declared mounted data root. Run/check/replay commands are the same shared entry points as #443, with the new45-policy configuration stored inside plans-frozen.json.
+Input: the explicit #439 catalog and #435 rank receipts used by #443. Completed calculation outputs are in the immutable issue445-low-sp-v2 audit directory on the declared mounted data root; v1 preserves the deliberately aborted pre-settlement attempt. Run/check/replay commands are the same shared entry points as #443, with the new45-policy configuration stored inside plans-frozen.json.
 All5 gates ×9 policies ×3 budgets ×3 seeds ×200 issues =81000 plans.
 
 `n7_sp_diagnostics()` exposes the descriptive table contract (summary, curves,
