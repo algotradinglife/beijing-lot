@@ -1,0 +1,208 @@
+---
+title: "连续异常后的防守：固定减仓、动态减仓与高胜率优先"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  depth_study: null
+  output: null
+  python: null
+---
+
+## 固定实验与历史边界
+
+沿用JOINT、seed42501、495期原组/原前缀、SP1.3准入、7场、2元票、1024元资金上限、10万元本金。
+实际北单回款已有一次0.65，汇总不再折算。不重训概率、不扩大候选、不改变深度、不倍投。
+
+结算历史可用时间未证明：采用该期最后fixture cutoff后48小时的**历史代理**，只允许该时间严格早于目标期
+最早fixture cutoff的原方案模拟表现进入监控。原概率包也未获历史可用性验收，因此全程为诊断，不能宣称赛前可交易。
+准入、窗口权重、ESS、分区、凭据和逐期时序统一复用 `src/temporal_learning`；不复制时序逻辑。
+
+每期一个观察值：原中奖组比例减预测平均coverage，以及Top128实际命中比例减预测Top128覆盖。
+这两个指标以期等权，避免将相互重叠的组当独立样本。
+固定80%最近20个已准入期＋20%全部准入历史，ESS至少20；不足则WARMUP，不下注。
+任一加权残差低于−5个百分点为异常；连续2次新增历史证据触发DEFENSIVE（512元）。
+两残差均不低于0连续3次进入RECOVERING（768元），再连续3次恢复NORMAL（1024元）。
+重复相同历史不累计连续次数；中间状态保持原状态但重置相应计数。
+参数为预先声明的小实验，没有在这495期选择最优门槛。FIXED_PRIOR_FIT不进行调参/校准分区。
+
+HIGH只在防守/恢复期按**实际买入前缀coverage**优先，不能用假想Top128覆盖代替。
+原前缀都约25%，所以“高胜率”的差异可能很小。它仍只在原已买组内检查完整前缀，买不起跳过、余款现金。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R');source('r/n7_risk_monitor.R')
+source('r/n7_quality_settlement.R');source('r/fundamentals_equity_curves.R')
+stopifnot(!is.null(params$study),!is.null(params$depth_study),!is.null(params$output),!is.null(params$python))
+reticulate::use_python(params$python,required=TRUE)
+mod<-reticulate::import('src.n7_risk_context',convert=TRUE)
+s<-params$study;o<-params$output
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+dr<-jsonlite::fromJSON(file.path(params$depth_study,'validation.json'))
+strategy_verify_diagnostic_inputs(params$depth_study,dr$files,'prefix-receipt.json')
+pr<-jsonlite::fromJSON(file.path(params$depth_study,'prefix-receipt.json'),simplifyVector=FALSE)
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','settled-groups.csv','funded.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,'ranks.csv')
+old<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c'),show_col_types=FALSE) |>
+ filter(variant=='JOINT',seed==42501,budget_cny==1024)
+original<-read_csv(file.path(s,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |>
+ semi_join(old,by=c('issue','arm','seed'))
+g<-read_csv(file.path(s,'evaluation/settled-groups.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |>
+ semi_join(old,by=c('issue','arm','seed'))
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'),show_col_types=FALSE)
+g<-g |> left_join(k |> select(issue,sleeve_id,top128_coverage,rank_check=actual_rank),by=c('issue','sleeve_id'),relationship='many-to-one')
+stopifnot(all(g$rank_check==g$actual_rank),!anyNA(g$rank_check))
+history<-g |> group_by(issue) |> summarise(hit_residual=mean(as.numeric(hit)-coverage),
+ depth_residual=mean(as.numeric(actual_rank<=128)-top128_coverage),.groups='drop') |> rename(issue_code=issue)
+targets<-list();clocks<-list()
+for(id in names(pr$cutoffs)) {
+ t<-unlist(pr$cutoffs[[id]])
+ targets[[id]]<-tibble(issue_code=id,fixture_decision_ts=unname(t))
+ clocks[[id]]<-tibble(issue_code=id,last_fixture_cutoff=max(t))
+}
+history<-history |> left_join(bind_rows(clocks),by='issue_code',relationship='one-to-one')
+stopifnot(!anyNA(history),nrow(history)==n_distinct(g$issue))
+files<-c('src/n7_risk_context.py','r/n7_risk_monitor.R','r/n7_quality_settlement.R',
+ 'r/fundamentals_equity_curves.R','r/strategy_diagnostic_probabilities.R','quarto/167_risk_monitor_diagnostic.qmd')
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+sources<-c(code,list(results=er$files[['results.csv']],settled_groups=er$files[['settled-groups.csv']],funded=er$files[['funded.csv']],
+ ranks=ar$files[['ranks.csv']],clock_receipt=dr$files[['prefix-receipt.json']]))
+dir.create(o,recursive=TRUE,showWarnings=FALSE)
+raw_contexts<-mod$n7_risk_contexts_json(jsonlite::toJSON(history,dataframe='rows',auto_unbox=TRUE,digits=NA),
+ jsonlite::toJSON(bind_rows(targets),dataframe='rows',auto_unbox=TRUE),repository_root=getwd(),
+ source_hashes_json=jsonlite::toJSON(sources,auto_unbox=TRUE),delay_hours=48L,window_issues=20L,recent_blend=.8,minimum_ess=20)
+writeLines(raw_contexts,file.path(o,'contexts.json'))
+contexts<-jsonlite::fromJSON(raw_contexts,simplifyVector=FALSE)
+states<-list();receipts<-list();prev<-NULL
+for(ct in contexts) {
+ ct$rows<-bind_rows(ct$rows);id<-ct$receipt$target_issue;receipts[[id]]<-ct$receipt
+ z<-n7_risk_state(ct,prev,ct$receipt$cutoff_identity,-.05,0,2,3)
+ states[[id]]<-tibble(issue=id,state=z$state,hit_residual=z$hit_residual,depth_residual=z$depth_residual,
+  bad=z$bad,good=z$good,cutoff_identity=z$cutoff_identity,cutoff_ts=ct$receipt$cutoff_ts,
+  history_identity=if(is.null(z$history_identity))NA_character_ else z$history_identity)
+ prev<-z
+}
+states<-bind_rows(states);order<-sort(old$issue);reference<-sort(old$issue[old$cohort=='原200期'])
+policies<-c('ORIGINAL','ACTIVE_ORIGINAL','FIXED_HALF','DYNAMIC','DYNAMIC_HIGH')
+plans<-list();funded<-list()
+for(id in order) {
+ state<-states |> filter(issue==id)
+ gg<-original |> filter(issue==id) |> select(sleeve_id,depth,stake,coverage)
+ if(!nrow(state))stopifnot(!nrow(gg))
+ state_name<-if(nrow(state))state$state else 'NO_ORIGINAL_GROUP'
+ identity<-if(nrow(state))state$cutoff_identity else paste0('NO_ORIGINAL_GROUP_',id)
+ for(policy in policies) {
+  ready<-state_name %in% c('NORMAL','DEFENSIVE','RECOVERING')
+  limit<-if(policy=='ORIGINAL')1024 else if(!ready)0 else if(policy=='FIXED_HALF')512 else
+   if(policy=='ACTIVE_ORIGINAL')1024 else switch(state_name,NORMAL=1024,DEFENSIVE=512,RECOVERING=768)
+  mode<-if(policy=='DYNAMIC_HIGH' && state_name %in% c('DEFENSIVE','RECOVERING'))'HIGH' else 'ORIGINAL'
+  f<-if(nrow(state))n7_risk_fund(gg,limit,mode,2,receipts[[id]],identity) else list(groups=gg,stake=0,cash=limit)
+  plans[[length(plans)+1L]]<-tibble(issue=id,arm=policy,seed=42501,policy=policy,model='frozen-market-diagnostic',
+   state=state_name,risk_limit=limit,budget_cny=1024,stake=f$stake,cash=1024-f$stake,
+   groups=nrow(f$groups),status=if(f$stake>0)'COMPLETE' else 'NO_BET')
+  funded[[length(funded)+1L]]<-f$groups |> mutate(issue=id,arm=policy,seed=42501,copies=1)
+ }
+}
+plans<-bind_rows(plans);funded<-bind_rows(funded)
+write_csv(plans,file.path(o,'frozen-plans.csv'));write_csv(funded,file.path(o,'frozen-funded.csv'));write_csv(states,file.path(o,'states.csv'))
+stopifnot(identical(code,setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)))
+jsonlite::write_json(list(implementation=code,source_hashes=sources,historical_admission=FALSE,
+ params=list(delay_hours=48,window_issues=20,recent_blend=.8,minimum_ess=20,bad_threshold=-.05,
+ good_threshold=0,enter_count=2,recover_count=3),contexts_sha256=digest::digest(file=file.path(o,'contexts.json'),algo='sha256'),
+ plans_sha256=digest::digest(file=file.path(o,'frozen-plans.csv'),algo='sha256'),
+ states_sha256=digest::digest(file=file.path(o,'states.csv'),algo='sha256'),
+ funded_sha256=digest::digest(file=file.path(o,'frozen-funded.csv'),algo='sha256')),
+ file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+状态只使用共享准入后的旧账本；以下才将本期中奖排名/SP用于新计划的结算。
+ORIGINAL完整复现；其余四个可执行票方案共享WARMUP停投期，ACTIVE_ORIGINAL是公平基准。
+
+```{r}
+out<-n7_quality_settlement(plans,funded,k);rows<-out$rows |> mutate(cash_cny=cash)
+check<-rows |> filter(policy=='ORIGINAL') |> arrange(issue)
+stopifnot(max(abs(check$gross-(old |> arrange(issue))$gross))<1e-6,
+ all(check$stake==(old |> arrange(issue))$stake))
+summary<-curves<-list()
+for(scope in c('ALL495','OLD200','RECENT295')) {
+ ids<-switch(scope,ALL495=order,OLD200=reference,RECENT295=setdiff(order,reference))
+ p<-rows |> filter(issue %in% ids)
+ base<-p |> filter(policy=='ACTIVE_ORIGINAL')
+ matches<-list()
+ for(variant in c('DYNAMIC','DYNAMIC_HIGH')) {
+  factor<-sum(p$stake[p$policy==variant])/sum(base$stake)
+  matches[[variant]]<-base |> mutate(policy=if(variant=='DYNAMIC')'MATCHED_CONSTANT' else 'MATCHED_HIGH',
+   arm=policy,stake=stake*factor,gross=gross*factor,net=gross-stake,cash_cny=1024-stake,cash=cash_cny)
+ }
+ matched<-bind_rows(matches)
+ cv<-strategy_equity_curves(bind_rows(p,matched),ids,100000) |> mutate(scope=scope)
+ curves[[scope]]<-cv
+ summary[[scope]]<-cv |> filter(period>0) |> group_by(policy) |> summarise(issues=n(),
+  hit_issues=sum(gross>0 & !stopped),profit_issues=sum(funded_net_cny>0),stake=sum(funded_stake_cny),
+  net=sum(funded_net_cny),roi=net/stake,max_drawdown=max(drawdown_cny),minimum_equity=min(100000,equity_cny),
+  stopped=any(stopped),.groups='drop') |> mutate(scope=scope)
+}
+summary<-bind_rows(summary);curves<-bind_rows(curves)
+state_summary<-rows |> filter(policy=='ACTIVE_ORIGINAL') |>
+ mutate(cohort=ifelse(issue %in% reference,'OLD200','RECENT295')) |> group_by(cohort,state) |> summarise(issues=n(),
+ stake=sum(stake),net=sum(net),roi=ifelse(stake>0,net/stake,NA_real_),.groups='drop')
+signal_assessment<-states |> left_join(history |> select(issue_code,current_hit_residual=hit_residual,current_depth_residual=depth_residual),
+ by=c('issue'='issue_code'),relationship='one-to-one') |>
+ mutate(cohort=ifelse(issue %in% reference,'OLD200','RECENT295')) |> group_by(cohort,state) |>
+ summarise(issues=n(),actual_hit_residual=mean(current_hit_residual),actual_depth_residual=mean(current_depth_residual),.groups='drop')
+coverage<-original |> summarise(min=min(coverage),median=median(coverage),max=max(coverage))
+for(name in c('rows','summary','curves','state_summary','signal_assessment','coverage'))write_csv(get(name),file.path(o,paste0(name,'.csv')))
+knitr::kable(summary,digits=3);knitr::kable(state_summary,digits=2);knitr::kable(coverage,digits=4);knitr::kable(signal_assessment,digits=4)
+for(scope_name in c('RECENT295','ALL495')) {
+ pd<-curves |> filter(scope==scope_name,!policy %in% c('ORIGINAL','MATCHED_CONSTANT')) |> select(policy,period,equity_cny,drawdown_cny) |>
+  pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY')
+ plot<-ggplot(pd,aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+
+  facet_wrap(~metric,ncol=1,scales='free_y')+theme_minimal(base_size=11)+
+  labs(title=paste(scope_name,': prior-clock risk monitor'),subtitle='Same warmup; matched constant is a fractional exposure benchmark',
+   x='Issue index',y='CNY',colour=NULL)
+ print(plot);ggsave(file.path(o,paste0('risk-curves-',scope_name,'.png')),plot,width=12,height=8,dpi=150)
+}
+```
+
+MATCHED_CONSTANT和MATCHED_HIGH在每个scope内将ACTIVE_ORIGINAL的投入/回款按同一常数缩放，
+使总投入分别等于DYNAMIC和DYNAMIC_HIGH；
+它是事后分数金额的风险参照，不是可购买整数票。ROI天然与ACTIVE_ORIGINAL相同；
+不能把它当作另一个已部署策略。资金曲线沿用逐期账本假设，不证明重叠赛期的资金实时可用性。
+
+## 验收边界
+
+历史代理不能授权未来下注；风险指标、状态、每期上限和旧组选票全部留痕。
+代码测试须覆盖未来/目标标签变动不改变准入分数、相同历史不重复计数、进入与恢复状态、完整票预算与现金。
+最低资金与最大回撤同时报告，不把更低盈利高点造成的较小回撤解释为本金保护改善。
+
+
+## 结论
+
+**首版没有证明连续异常识别本身带来稳定优势。高胜率优先在新增期改善了本金保护，但跨阶段表现不一致。**
+新增295期原方案净收益7,136元、ROI2.71%、最大回撤23,852元、最低资金98,290元。
+动态减仓为1,284元、0.61%、22,738元、98,039元；等总投入的固定比例参照则净收益5,739元、回撤19,183元。
+因此动态减仓本身没有胜过相同总暴露的简单参照。
+
+动态减仓＋HIGH在新增期投入212,652元，净收益5,691元、ROI2.68%、最大回撤18,368元、最低资金99,529元。
+其等总投入MATCHED_HIGH参照净收益5,753元、最大回撤19,227元；前者主要表现为稍好的历史回撤和本金底线，
+未显示额外收益。HIGH在旧200期净收益20,951元，低于普通动态的24,368元，阶段稳定性不足。
+
+防守信号没有把后续亏损期清楚分开：新增期被标DEFENSIVE的94期，原方案仍净赚6,905元、ROI7.74%；
+NORMAL的175期ROI2.35%；RECOVERING只有11期，ROI−34.19%。
+DEFENSIVE目标期的实际组命中减预测均值为+0.47个百分点，NORMAL为−0.87个百分点。
+这些是冻结状态后才评价的目标结果，不能反过来修改当期状态。它们提示信号可能滞后、或碰到均值回归/随机波动，
+尚不能把连续亏损后的状态等同于未来危险期。
+
+原前缀coverage范围仅25.0001%–25.3907%，中位25.1003%；HIGH只是这一窄范围内的排序变化，
+不应解释为已找到明显更高胜率的组合。全495期HIGH的ROI7.75%，也低于同预热基准9.22%。
+本轮保留固定实验和诊断结论，不把该规则上线，也不在本样本继续搜索最优报警阈值。
+
+验收中另有两个旧Issue354源包集成测试因规范数据根缺失而报错，未计为通过；
+它们与本轮采用的495期快照不同。本轮受影响函数、跨R/Python决策不变性、静态时序治理及QMD分别验收。

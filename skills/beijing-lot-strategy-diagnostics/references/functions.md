@@ -38,6 +38,13 @@
 
 ## 必需输入凭据校验
 
+`src/n7_risk_context.py::n7_risk_context` / `n7_risk_contexts_json`：仅通过共享时序上下文、权重和runner准入旧期残差，
+固定历史代理label clock，返回完整权重凭据；不拟合报警阈值、不授权未来使用。测试 `tests/test_n7_risk_context.py` 含跨R决策不变性。
+`r/n7_risk_monitor.R::n7_risk_state(context,previous,cutoff_identity,bad_threshold,good_threshold,enter_count,recover_count)`
+消费准入上下文；同一历史不重复计数。`n7_risk_fund(groups,budget_cny,mode,unit_cny,cutoff,expected_identity)`
+要求共享cutoff凭据，按原序或实际coverage优先买完整原前缀并留现金。
+测试 `tests/testthat/test-n7-risk-monitor.R`；入口 `quarto/167_risk_monitor_diagnostic.qmd`。
+
 `r/n7_depth_sensitivity.R::n7_depth_sensitivity(curves,group_order,target,budget_cny,unit_cny,cutoffs,expected_cutoffs)`
 对固定旧组顺序做完整前缀深度敏感性核算，复用 `n7_capital_resolve`；买不起则跳过并继续原顺序，余款现金。
 不新增候选、不重排、不拟合或选择阈值、不提供未来准入；cutoff沿用旧证据并明确历史可用性未证明。
