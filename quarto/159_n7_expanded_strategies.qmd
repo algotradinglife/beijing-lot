@@ -1,0 +1,217 @@
+---
+title: "更新历史数据：七种 N7 策略的复核"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  output: null
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R')
+source('r/n7_quality_settlement.R')
+source('r/n7_exchange_attribution.R')
+source('r/n7_expanded_diagnostics.R')
+stopifnot(!is.null(params$study),!is.null(params$output))
+study<-params$study;output<-params$output
+evaluation<-file.path(study,'evaluation')
+receipt<-jsonlite::fromJSON(file.path(evaluation,'receipt.json'))
+proof<-jsonlite::fromJSON(file.path(evaluation,'independent-replay.json'))
+stopifnot(receipt$status=='PASS',proof$status=='PASS',receipt$issues==495,
+ receipt$plans==31185,proof$plans==31185,
+ proof$evaluation_receipt_sha256==digest::digest(file=file.path(evaluation,'receipt.json'),algo='sha256'))
+for(n in names(receipt$files))stopifnot(digest::digest(file=file.path(evaluation,n),algo='sha256')==receipt$files[[n]])
+for(n in names(proof$implementation))stopifnot(digest::digest(file=n,algo='sha256')==proof$implementation[[n]])
+rows<-readr::read_csv(file.path(evaluation,'results.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+groups<-readr::read_csv(file.path(evaluation,'settled-groups.csv'),col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+predictions<-readr::read_csv(file.path(evaluation,'predictions.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+funded<-readr::read_csv(file.path(evaluation,'funded.csv'),col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+rp<-file.path(receipt$config$output_dir,'ranks.csv')
+stopifnot(digest::digest(file=rp,algo='sha256')==receipt$source_hashes[[rp]])
+ranks<-readr::read_csv(rp,col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+n7_verify_attribution_groups(groups,predictions,funded,ranks)
+order<-sort(unique(rows$issue));stopifnot(length(order)==495)
+z<-n7_expanded_diagnostics(rows,order,100000,50,seq(0,1,.1))
+trims<-n7_expanded_group_trims(groups,rows,c(0L,1L,3L,5L))
+labels<-c(SUM='概率覆盖总和',JOINT='联合覆盖',EV='估算收益排序',DEPTH='先分散后加深',
+ EXCHANGE11='一换一',EXCHANGE12='一换二',NO_FILTER='联合覆盖·不过滤')
+colours<-c(SUM='#0072B2',JOINT='#009E73',EV='#CC79A7',DEPTH='#E69F00',
+ EXCHANGE11='#56B4E9',EXCHANGE12='#D55E00',NO_FILTER='#666666')
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+for(n in names(z))readr::write_csv(z[[n]],file.path(output,paste0(n,'.csv')))
+readr::write_csv(trims,file.path(output,'group-trims.csv'))
+theme_set(theme_minimal(base_size=12,base_family='Noto Sans CJK SC'))
+```
+
+## 研究口径
+
+原 200 期与新增 295 期分别报告，合并范围共 495 期。固定市场让平校正版本
+`market-balance-draw-1.0.0-diagnostic`，不重训、不按新结果调参。主比较仍是
+7 串 1，每注 2 元、每期预算 1,024 元；512／768 元及三个固定随机种子作为敏感性检查。
+每组用概率前缀覆盖约 25%，开组投入不超过 256 元。六个过滤方案均采用估算 SP ≥1.30，
+另列不过滤对照。各方案共享原候选生成规则，每期最多 24 个候选组。
+
+估算 SP 来自欧赔与大小球映射，实际回款来自当前北单结算 SQLite，仅乘一次票级 0.65。
+原计划保持不变，原期结算也重新核对。110915 缺乏可用盘口，作为现金期保留。
+这些是已暴露历史数据的研究诊断；新增期检验冻结方法的跨样本表现，不宣称前瞻实盘验证。
+重复随机种子不是独立历史样本，九组参数中的胜出次数不当作显著性检验。
+
+## 本轮结论
+
+**保留 SP≥1.30 的联合覆盖作为默认参照；本轮不支持凭合计收益把一换二升级为稳定增益方案。**
+以下主结果固定每期预算 1,024 元、种子 42501，既不是本轮寻找的最优参数，也不代表未来收益。
+
+| 既定假设 | 新增295期证据 | 判断 |
+|---|---|---|
+| SP≥1.30 有助于回报/风险 | 联合覆盖少投入810元，回款、命中126期和最大回撤23,852.02元均不变；ROI由2.39%升至2.71%；九个预算/种子组合均改善净收益和ROI | 支持小幅节省无效投入；不支持独立降低最大回撤的强结论 |
+| 联合覆盖优于覆盖总和、估算收益排序 | 联合覆盖净赚7,136.36元；覆盖总和亏9,597.21元，估算收益排序亏5,525.94元；两者各只在九个组合中的一个超过联合覆盖 | 支持联合覆盖方向；本轮不支持用估算收益排序取代它 |
+| 加深可改善回报 | 命中132期，比联合覆盖多6期；多投入21,312元，净收益反少1,130.24元；新增期仅3/9组合净收益优于联合覆盖 | 支持增加命中；不支持稳定增加收益，合计期结果受到原200期贡献影响 |
+| 换组收益优势延续 | 一换一少赚337.36元；一换二仅多赚5.87元、ROI略低，均多命中1期；一换二7/9组合净收益较高、6/9组合ROI较高 | 有局部改善，但默认配置收益近乎持平，不足以证明稳定优势 |
+| 换组收益仍依赖少数中奖组 | 合计期一换二多赚4,165.10元；仅抹掉换入组最高3笔回款后反落后2,572.63元；新增期抹掉最高1笔即落后1,996.61元 | 支持集中度风险仍在，不据此追加倍投或预算 |
+
+联合覆盖原200期净收益41,544.02元、ROI23.72%；新增295期净收益7,136.36元、ROI2.71%。
+命中期率从41.00%升至42.71%，与平均模型期覆盖40.37%／41.47%方向一致。
+**收益衰减主要表现在命中后的回款，不是期命中率下降**：平均每个命中期回款从2,642.85元降至2,150.29元，
+每个中奖组回款从742.17元降至646.63元，同时每期平均投入由875.85元升至894.24元。
+这些是描述性分解；尚不能区分实际SP分布、中奖组合结构或其他来源对变化的因果贡献。
+估算SP与北单结算SP本来不同，报告没有用结算SP反向挑选赛果。
+
+新增期联合覆盖剔除自身最高3个盈利期后净收益为−14,941.55元，
+说明正收益仍依赖尾部回款。三档预算与三个种子是固定敏感性检查，不能算九次独立验证。
+合计495期全部方案均可由10万元本金支付，无停投；当前SQLite核对未改变任何原200期方案的结算收益。
+
+本轮结论限定于冻结的495期清单。存储登记在运行期间已有后续清洗版本，未静默扩展本轮范围。
+不重训、不搜索新阈值，也不将这些已暴露历史结果包装成未见样本或实盘承诺。
+
+## 收益、ROI、命中与回撤
+
+每个范围单独从 100,000 元起算。ROI 的分母为实际投入，而不是预算上限。
+资金不足以支付整期计划时，沿用既有规则停止下注并持有现金，不借款或补款；
+`planned_` 列另列不考虑资金约束的原计划诊断。合并曲线不会在新增期起点补充本金。
+资金曲线按期顺序记账，假定每期结算后进入下一期；未模拟跨期同时占款。
+
+```{r}
+primary<-z$summary |> filter(budget_cny==1024,seed==42501) |>
+ mutate(策略=unname(labels[variant]),ROI百分比=100*roi,
+   命中期率百分比=100*hit_issues/issues) |>
+ select(scope,策略,issues,stake,cash,net,ROI百分比,hit_issues,命中期率百分比,profit_issues,max_drawdown,stopped_issues)
+knitr::kable(primary,digits=2)
+knitr::kable(z$summary |> group_by(scope,variant,budget_cny) |>
+ summarise(ROI中位数百分比=100*median(roi),ROI最低百分比=100*min(roi),ROI最高百分比=100*max(roi),
+   回撤中位数=median(max_drawdown),命中期数中位数=median(hit_issues),.groups='drop'),digits=2)
+```
+
+```{r}
+path<-z$curves |> filter(scope=='ALL',grepl('_B1024$',arm),seed==42501)
+chart<-path |> select(period,variant,equity_cny,drawdown_cny) |>
+ tidyr::pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ mutate(metric=recode(metric,equity_cny='账户资金（元）',drawdown_cny='距历史高点回撤（元）'))
+p<-ggplot(chart,aes(period,CNY,colour=variant))+geom_line(linewidth=.65)+
+ geom_vline(xintercept=200,linetype=2,colour='grey50')+facet_wrap(~metric,ncol=1,scales='free_y')+
+ scale_colour_manual(values=colours,labels=labels)+labs(x='期次顺序；虚线之后为新增295期',y=NULL,colour=NULL)+
+ theme(legend.position='bottom')
+ggsave(file.path(output,'equity-drawdown.png'),p,width=12,height=9,dpi=160);p
+```
+
+## 新增期是否支持原有推断
+
+比较以同一期、同一预算、同一种子的联合覆盖方案为对照。
+收益差既可能来自救回原未中期，也可能来自同样中奖但回款不同。
+对于 SP 过滤，同时看投入、ROI、现金和回撤，避免把少下注产生的低回撤全算作筛选优势。
+
+```{r}
+paired_summary<-z$paired |> group_by(cohort,variant,budget_cny,seed) |>
+ summarise(delta_net=sum(delta_net),delta_stake=sum(delta_stake),rescued=sum(rescued),lost=sum(lost),
+   model_union_change=mean(delta_union),.groups='drop')
+readr::write_csv(paired_summary,file.path(output,'paired-summary.csv'))
+knitr::kable(paired_summary |> filter(budget_cny==1024,seed==42501),digits=3)
+p<-ggplot(z$summary |> filter(scope!='ALL'),aes(100*roi,max_drawdown,colour=variant,shape=as.factor(seed)))+
+ geom_point(size=2.7)+facet_grid(scope~budget_cny)+scale_colour_manual(values=colours,labels=labels)+
+ labs(x='ROI（%）',y='最大回撤（元）',colour=NULL,shape='固定种子')+theme(legend.position='bottom')
+ggsave(file.path(output,'roi-drawdown-cohorts.png'),p,width=13,height=8,dpi=160);p
+```
+
+## 分段收益与模型覆盖
+
+联合概率按共享场次的模拟赛果计算，重叠组不是独立试验。
+下面的可靠性图比较独立模拟评估的期命中概率与实际命中率；每个点保留样本期数，
+不能把稀疏区间的偶然偏差直接变成新校正规则。
+
+```{r}
+p<-ggplot(z$blocks |> filter(budget_cny==1024,seed==42501,variant!='JOINT'),aes(block,delta_net,fill=variant))+
+ geom_col(position='dodge')+geom_hline(yintercept=0)+scale_fill_manual(values=colours,labels=labels)+
+ labs(x='按时间每50期一段（末段不足50期）',y='相对联合覆盖的净收益差（元）',fill=NULL)+theme(legend.position='bottom')
+ggsave(file.path(output,'block-differences.png'),p,width=13,height=6,dpi=160);p
+p<-ggplot(z$reliability |> filter(budget_cny==1024,seed==42501),aes(predicted,observed,colour=variant,size=issues))+
+ geom_abline(slope=1,intercept=0,linetype=2,colour='grey60')+geom_point(alpha=.8)+
+ facet_wrap(~cohort)+scale_colour_manual(values=colours,labels=labels)+
+ coord_cartesian(xlim=c(0,1),ylim=c(0,1))+labs(x='模型期命中概率',y='实际期命中率',colour=NULL,size='期数')+
+ theme(legend.position='bottom')
+ggsave(file.path(output,'union-reliability.png'),p,width=12,height=7,dpi=160);p
+```
+
+## 收益集中度与换组归因
+
+```{r}
+knitr::kable(z$summary |> filter(budget_cny==1024,seed==42501) |>
+ mutate(策略=unname(labels[variant])) |>
+ select(scope,策略,net,net_without_best,net_without_best3,net_without_best5),digits=2)
+```
+
+上表先剔除各方案自身最高净收益的 1／3／5 期，期内成本和回款一起移除；
+下图再检验组级集中度。两者均为事后诊断。
+
+公平去极值分别剔除各方案自己的最大 1／3／5 个盈利组，同时扣除该组投入。
+它是事后敏感性检查，不能事先识别应排除的组。
+换组另做单边压力：只抹掉换入中奖组的最大回款，换出损失和全部成本照常保留。
+两种检查回答的问题不同。
+
+```{r}
+p<-ggplot(trims |> filter(budget_cny==1024,seed==42501),aes(trim_k,trimmed_net,colour=variant))+
+ geom_line()+geom_point()+facet_wrap(~scope)+scale_x_continuous(breaks=c(0,1,3,5))+
+ scale_colour_manual(values=colours,labels=labels)+labs(x='各方案剔除的最大盈利组数',y='剔除后净收益（元）',colour=NULL)+
+ theme(legend.position='bottom')
+ggsave(file.path(output,'group-trim-sensitivity.png'),p,width=13,height=6,dpi=160);p
+attribution<-list();adverse<-list()
+for(scope in c('ALL',unique(rows$cohort))) {
+ x<-rows |> filter(variant %in% c('JOINT','EXCHANGE11','EXCHANGE12'))
+ if(scope!='ALL')x<-x |> filter(cohort==scope)
+ g<-groups |> semi_join(x,by=c('issue','arm','seed'))
+ a<-n7_exchange_attribution(g,x,order[order %in% x$issue],c(1L,3L,5L))
+ attribution[[scope]]<-a$contributions |> mutate(scope=scope)
+ adverse[[scope]]<-a$adverse |> mutate(scope=scope)
+}
+attribution<-bind_rows(attribution);adverse<-bind_rows(adverse)
+readr::write_csv(attribution,file.path(output,'exchange-contributions.csv'))
+readr::write_csv(adverse,file.path(output,'exchange-adverse.csv'))
+knitr::kable(adverse |> filter(budget_cny==1024,seed==42501),digits=2)
+p<-ggplot(adverse |> filter(budget_cny==1024,seed==42501),aes(k,stressed_delta_net,colour=variant))+
+ geom_hline(yintercept=0)+geom_line()+geom_point()+facet_wrap(~scope)+
+ scale_colour_manual(values=colours,labels=labels)+scale_x_continuous(breaks=c(1,3,5))+
+ labs(x='仅抹掉换入组的最大回款笔数',y='受压后相对联合覆盖的净收益差（元）',colour=NULL)+theme(legend.position='bottom')
+ggsave(file.path(output,'exchange-adverse.png'),p,width=13,height=6,dpi=160);p
+```
+
+## 逐期账本与验收证据
+
+```{r}
+knitr::kable(rows |> filter(seed==42501,budget_cny==1024) |>
+ mutate(roi=ifelse(stake>0,100*net/stake,NA_real_)) |>
+ select(issue,cohort,variant,stake,cash,gross,net,roi,hits,groups),digits=2)
+revisions<-readr::read_csv(file.path(evaluation,'old-settlement-revisions.csv'),
+ col_types=readr::cols(issue='c'),show_col_types=FALSE)
+knitr::kable(revisions |> group_by(variant,budget_cny,seed) |>
+ summarise(结算改变期数=sum(abs(net_change)>1e-6),净收益修订=sum(net_change),.groups='drop'),digits=2)
+knitr::kable(tibble(项目=c('原期','新增期','全部期','完整计划','独立复核计划','复核中奖排序组'),
+ 数量=c(200,295,495,receipt$plans,proof$plans,proof$candidate_ranks)))
+```

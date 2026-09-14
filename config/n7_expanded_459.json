@@ -1,0 +1,98 @@
+{
+  "targets": 0.25,
+  "cap_cny": 256,
+  "depths": [
+    15,
+    32,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512
+  ],
+  "seeds": [
+    42501,
+    42502,
+    42503
+  ],
+  "allocation_worlds": 256,
+  "evaluation_worlds": 5000,
+  "evaluation_seed_offset": 1000000,
+  "budgets": [
+    512,
+    768,
+    1024
+  ],
+  "model_id": "market-balance-draw-1.0.0-diagnostic",
+  "max_copies": 1,
+  "max_actions": 256,
+  "depth_reference_targets": [
+    0.25,
+    0.3
+  ],
+  "policies": [
+    {
+      "id": "SP130_BREADTH_OPEN_FIRST_coverage_sum",
+      "mode": "BREADTH",
+      "allocation_order": "OPEN_FIRST",
+      "objective": "coverage_sum",
+      "minimum_sp": 1.3,
+      "variant": "SP130_BREADTH_OPEN_FIRST_coverage_sum",
+      "max_add": 0
+    },
+    {
+      "id": "SP130_BREADTH_OPEN_FIRST_any_hit",
+      "mode": "BREADTH",
+      "allocation_order": "OPEN_FIRST",
+      "objective": "any_hit",
+      "minimum_sp": 1.3,
+      "variant": "SP130_BREADTH_OPEN_FIRST_any_hit",
+      "max_add": 0
+    },
+    {
+      "id": "SP130_BREADTH_OPEN_FIRST_expected_net",
+      "mode": "BREADTH",
+      "allocation_order": "OPEN_FIRST",
+      "objective": "expected_net",
+      "minimum_sp": 1.3,
+      "variant": "SP130_BREADTH_OPEN_FIRST_expected_net",
+      "max_add": 0
+    },
+    {
+      "id": "SP130_DEPTH_OPEN_FIRST_any_hit",
+      "mode": "DEPTH",
+      "allocation_order": "OPEN_FIRST",
+      "objective": "any_hit",
+      "minimum_sp": 1.3,
+      "variant": "SP130_DEPTH_OPEN_FIRST_any_hit",
+      "max_add": 0
+    },
+    {
+      "id": "SP130_EXCHANGE11",
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "minimum_sp": 1.3,
+      "variant": "SP130_EXCHANGE11",
+      "max_add": 1
+    },
+    {
+      "id": "SP130_EXCHANGE12",
+      "mode": "BREADTH",
+      "objective": "any_hit",
+      "minimum_sp": 1.3,
+      "variant": "SP130_EXCHANGE12",
+      "max_add": 2
+    },
+    {
+      "id": "SP100_BREADTH_OPEN_FIRST_any_hit",
+      "mode": "BREADTH",
+      "allocation_order": "OPEN_FIRST",
+      "objective": "any_hit",
+      "minimum_sp": 1,
+      "variant": "SP100_BREADTH_OPEN_FIRST_any_hit",
+      "max_add": 0
+    }
+  ]
+}
