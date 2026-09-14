@@ -1,0 +1,129 @@
+---
+title: "固定 SP≥1.30 后补建候选组：200期对照"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  initial_capital_cny: 100000
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+stopifnot(!is.null(params$study),dir.exists(params$study))
+source('r/fundamentals_equity_curves.R')
+source('r/n7_sweet_union_summary.R')
+source('r/n7_selection_diagnostics.R')
+source('r/n7_sp_refill_diagnostics.R')
+study<-params$study
+receipt<-jsonlite::fromJSON(file.path(study,'evaluation-receipt.json'))
+stopifnot(receipt$status=='PASS',receipt$plans==48600,
+ digest::digest(file=file.path(study,'results.csv'),algo='sha256')==receipt$results_sha256,
+ digest::digest(file=file.path(study,'plans-frozen.json'),algo='sha256')==receipt$freeze_sha256)
+frozen<-jsonlite::fromJSON(file.path(study,'plans-frozen.json'))
+for(p in names(frozen$input_bindings))stopifnot(digest::digest(file=p,algo='sha256')==frozen$input_bindings[[p]])
+for(p in names(frozen$files))stopifnot(digest::digest(file=p,algo='sha256')==frozen$files[[p]])
+for(p in names(receipt$settlement_inputs))stopifnot(digest::digest(file=p,algo='sha256')==receipt$settlement_inputs[[p]])
+rows<-readr::read_csv(file.path(study,'results.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+order<-sort(unique(rows$issue))
+stopifnot(length(order)==200)
+z<-n7_sp_refill_diagnostics(rows,order,params$initial_capital_cny)
+readr::write_csv(z$summary,file.path(study,'report-summary.csv'))
+readr::write_csv(z$blocks,file.path(study,'report-blocks.csv'))
+readr::write_csv(z$curves,file.path(study,'report-curves.csv'))
+readr::write_csv(z$paired,file.path(study,'report-paired.csv'))
+readr::write_csv(z$per_issue,file.path(study,'report-per-issue.csv'))
+```
+
+本研究使用 #445 的同一200期冻结市场概率和估算 SP，比较不过滤（NO_FILTER）、过滤但不补组（FILTER_ONLY）、过滤并补组（REFILL）。这是历史回顾诊断，不是未见数据验证；继承输入的历史可用性证据不足，不作赛前准入声明。
+
+估算 SP 来自欧赔与大小球映射。按每场最高概率方向的估算 SP 排除低于1.30的场次，等于1.30保留。实际北单 SP 仅用于冻结后的结算，每张2元票仅乘一次0.65。
+
+补组保留所有合格原组及其标识；以合格场次的 Top2 概率和作为抽样权重，组内不放回抽7场，组间拒绝相同的7场集合，最多尝试10000次，补至24组。每个种子独立重建。资金分配、九种规则及每期512／768／1024元预算保持原口径，不增加候选上限，不重训。
+
+原组沿用原24组产生的25%／30%参考深度档位，包括后来被过滤组曾贡献的档位。新组仅额外加入其自身达到25%覆盖率的必要起投档位，不将新档位扩散到原组。第一轮草稿未保持这一限制，已根据 Codex review 修正；最终比较以本报告绑定的冻结版本为准。
+
+只有100608和100711受到该阈值影响；其余198期直接引用已核验的原冻结选择。先冻结全部三组计划，再读取结算。新增组按实际场次和赛果逐票结算，并使用组内状态编码独立核对，未使用旧组的命中排名代替。
+
+## 收益、命中与风险
+
+本轮81组参数对照（九种分配规则×三档预算×三个种子）中，补组相对仅过滤没有净收益改善：61组下降、20组持平，最大回撤均未改变。收益变化集中于100608期，100711期没有结算变化，其余198期冻结选择不变。当前证据不支持将“补满24组”设为默认；保留仅过滤方案更合适。受影响历史期仅两期，不能由此推断其他时期补组一定无效。
+
+主展示固定种子42501，其他种子同样完整保留，不能将种子间结果当作独立200期样本。
+
+```{r}
+primary<-z$summary |> filter(seed==42501) |> arrange(budget_cny,mode,allocation_order,objective,variant)
+knitr::kable(primary |> select(variant,mode,allocation_order,objective,budget_cny,stake,net,roi,
+ hit_issues,profit_issues,max_drawdown,longest_loss_streak,net_without_best,net_without_best3,net_without_best5),digits=3)
+```
+
+ROI=累计净收益／实际投入，未下注现金仍留在账户。回撤以10万元起始资金的逐期账户权益计算；零收益或持币期中断连续亏损期计数。去除最高1／3／5期净收益仅用于检验对极端结果的依赖。
+
+## 资金与回撤曲线
+
+```{r}
+#| fig-width: 15
+#| fig-height: 11
+curves<-z$curves |> filter(seed==42501) |>
+ mutate(rule=paste(mode,allocation_order,objective,sep=' / '))
+for(b in sort(unique(curves$budget_cny))) {
+  part<-filter(curves,budget_cny==b)
+  equity<-ggplot(part,aes(period,equity_cny,colour=variant))+geom_line(linewidth=.45)+
+    facet_wrap(~rule,ncol=3)+theme_minimal()+
+    labs(title=paste('每期预算',b,'元：资金曲线'),x='历史期序',y='账户资金（元）',colour='方案')
+  drawdown<-ggplot(part,aes(period,drawdown_cny,colour=variant))+geom_line(linewidth=.45)+
+    facet_wrap(~rule,ncol=3)+theme_minimal()+
+    labs(title=paste('每期预算',b,'元：回撤'),x='历史期序',y='距历史峰值回撤（元）',colour='方案')
+  print(equity);print(drawdown)
+  ggsave(file.path(study,paste0('equity-',b,'.png')),equity,width=15,height=11,dpi=140)
+  ggsave(file.path(study,paste0('drawdown-',b,'.png')),drawdown,width=15,height=11,dpi=140)
+}
+```
+
+## 分段表现
+
+```{r}
+knitr::kable(z$blocks |> filter(seed==42501),digits=3)
+```
+
+## 相对仅过滤的变化和机会成本
+
+```{r}
+knitr::kable(z$paired |> filter(seed==42501,variant=='REFILL') |>
+ select(mode,allocation_order,objective,budget_cny,delta_stake,delta_net,delta_roi,
+ delta_hit_issues,delta_drawdown),digits=3)
+```
+
+下表仅列发生投入或回报变化的历史期。新增投入对应少留的现金；回报下降对应组合覆盖改变后的机会成本。这是结果后的分解，不用于挑选种子或重新调整抽样。
+
+```{r}
+knitr::kable(z$per_issue |> filter(seed==42501,variant=='REFILL',abs(delta_stake)>1e-6 | abs(delta_gross)>1e-6) |>
+ select(issue,mode,allocation_order,objective,budget_cny,stake,gross,net,
+ delta_stake,delta_gross,delta_net,delta_hits),digits=3)
+```
+
+## 全部种子结果
+
+```{r}
+knitr::kable(z$summary |> select(arm,seed,stake,net,roi,hit_issues,profit_issues,
+ max_drawdown,longest_loss_streak),digits=3)
+```
+
+## 数据结构与验收凭据
+
+```{r}
+dplyr::glimpse(rows)
+knitr::kable(head(rows,6))
+receipt
+```
+
+独立分配重放162个方案、独立前缀检查162个方案、独立统计核验243条汇总均已通过；完整结果48,600条。4项 Python 测试覆盖新适配器、R/Python 集成、前缀与结算；R 新增测试覆盖候选重建及诊断统计。全量 `Rscript tests/testthat.R` 在显式指定项目解释器后仍有6项既有失败和2项跳过：分析接口／映射桥接解释器冲突、让平历史比较输入缺失、重训输入缺失，另有两项流水线集成缺少历史包。全量测试不声明通过。
+
+Codex review 第一轮发现原参考深度档位未保留、结算来源绑定不足及同概率前缀排序检查不足；三项均已修复并添加或加强回归验证。最终审查和关联 PR 状态以交付记录为准；当前页面不代替最终审查批准。

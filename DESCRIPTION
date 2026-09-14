@@ -3,6 +3,7 @@ Title: Beijing Lot Analysis Environment
 Version: 0.1.0
 Description: Project dependency declaration for R and Quarto analysis.
 Imports:
+    withr,
     DBI,
     RSQLite,
     tidyverse,
