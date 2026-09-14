@@ -25,16 +25,9 @@ library(dplyr);library(tidyr);library(ggplot2)
 source('r/fundamentals_equity_curves.R')
 source('r/n7_sweet_union_summary.R')
 stopifnot(is.character(params$study_dir),is.character(params$output_dir),!dir.exists(params$output_dir))
-frozen_path<-file.path(params$study_dir,'plans-frozen.json')
-frozen<-jsonlite::fromJSON(frozen_path)
-freeze_hash<-digest::digest(file=frozen_path,algo='sha256')
-for(n in names(frozen$files))stopifnot(digest::digest(file=file.path(params$study_dir,n),algo='sha256')==frozen$files[[n]])
-for(n in c('allocation-replay.json','independent-check.json')) {
-  receipt<-jsonlite::fromJSON(file.path(params$study_dir,n))
-  stopifnot(receipt$status=='PASS',receipt$freeze_sha256==freeze_hash,receipt$plans==16200)
-}
-ev<-jsonlite::fromJSON(file.path(params$study_dir,'evaluation-receipt.json'))
-stopifnot(ev$freeze_sha256==freeze_hash,digest::digest(file=file.path(params$study_dir,'results.csv'),algo='sha256')==ev$results_sha256)
+source('r/n7_selection_report.R')
+verified<-n7_selection_report_inputs(params$study_dir,16200)
+frozen<-verified$frozen;freeze_hash<-verified$freeze_sha256
 rows<-readr::read_csv(file.path(params$study_dir,'results.csv'),show_col_types=FALSE,col_types=readr::cols(issue='c'))
 stopifnot(nrow(rows)==16200)
 stopifnot(digest::digest(file=frozen$config$catalog,algo='sha256')==frozen$source_catalog_sha256)
@@ -134,8 +127,8 @@ plots$blocks
 ```{r}
 #| include: false
 for(n in names(plots))ggsave(file.path(params$output_dir,paste0(n,'.png')),plots[[n]],width=15,height=10,dpi=130)
-report_code<-c('r/fundamentals_equity_curves.R','r/n7_sweet_union_summary.R','quarto/151_n7_selection_coverage.qmd')
-jsonlite::write_json(list(freeze_sha256=freeze_hash,config=frozen$config,
+report_code<-c('r/fundamentals_equity_curves.R','r/n7_sweet_union_summary.R','r/n7_selection_report.R','quarto/151_n7_selection_coverage.qmd')
+jsonlite::write_json(list(freeze_sha256=freeze_hash,results_sha256=verified$results_sha256,config=frozen$config,
  implementation=as.list(setNames(vapply(report_code,digest::digest,character(1),file=TRUE,algo='sha256'),report_code)),
  initial_capital_cny=100000,plans=nrow(rows),historical_admission=FALSE),
  file.path(params$output_dir,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
