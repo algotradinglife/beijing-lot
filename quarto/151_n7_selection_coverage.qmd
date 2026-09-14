@@ -39,11 +39,9 @@ policy<-rows |> distinct(arm,mode,objective,allocation_order,budget_cny) |>
 curves<-z$curves |> select(-any_of(c('mode','objective','allocation_order','budget_cny'))) |>
  left_join(policy,by='arm',relationship='many-to-one')
 summary<-z$summary |> left_join(policy,by='arm',relationship='many-to-one')
-blocks<-rows |> mutate(period=match(issue,issue_order),block=ceiling(period/50)) |>
- group_by(arm,seed,block) |> summarise(stake=sum(stake),net=sum(net),
- roi=ifelse(stake>0,net/stake,NA_real_),hit_issues=sum(hits>0),profit_issues=sum(net>0),.groups='drop') |>
- left_join(policy,by='arm',relationship='many-to-one')
 source('r/n7_selection_diagnostics.R')
+blocks<-n7_selection_blocks(rows,issue_order,50) |>
+ left_join(policy,by='arm',relationship='many-to-one')
 funded<-readr::read_csv(file.path(params$study_dir,'funded.csv'),show_col_types=FALSE,
  col_types=readr::cols(issue='c',sleeve_id='c')) |> select(issue,arm,seed,sleeve_id,coverage)
 catalog<-jsonlite::fromJSON(frozen$config$catalog)$issues

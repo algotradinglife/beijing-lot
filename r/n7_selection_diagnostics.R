@@ -43,3 +43,22 @@ n7_selection_overlap <- function(rows,funded,membership) {
   }
   dplyr::bind_rows(answer)
 }
+
+# Descriptive fixed-size chronological blocks of settled plans; no fitting/IO.
+# rows: unique issue/arm/seed, finite nonnegative stake, net CNY, hits count.
+# issue_order is complete unique chronological issue IDs; block_size positive
+# integer issues. Returns stake/net CNY, ROI fraction (NA for zero stake), and
+# counts of hit/profitable issues. Count events before aggregating net/stake.
+n7_selection_blocks <- function(rows,issue_order,block_size) {
+  keys<-c('issue','arm','seed')
+  stopifnot(all(c(keys,'stake','net','hits') %in% names(rows)),
+    length(issue_order)>0,!anyNA(issue_order),!anyDuplicated(issue_order),
+    length(block_size)==1,is.finite(block_size),block_size>=1,block_size==floor(block_size),
+    !anyNA(rows[c(keys,'stake','net','hits')]),!anyDuplicated(rows[keys]),
+    all(rows$issue %in% issue_order),all(is.finite(rows$stake)),all(rows$stake>=0),
+    all(is.finite(rows$net)),all(rows$hits>=0 & rows$hits==floor(rows$hits)))
+  rows |> dplyr::mutate(period=match(issue,issue_order),block=ceiling(period/block_size)) |>
+    dplyr::group_by(arm,seed,block) |> dplyr::summarise(
+      hit_issues=sum(hits>0),profit_issues=sum(net>0),
+      stake=sum(stake),net=sum(net),roi=ifelse(stake>0,net/stake,NA_real_),.groups='drop')
+}
