@@ -1,0 +1,229 @@
+---
+title: "提高正常状态资金上限：新增不同组是否改善收益与回撤"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+  message: false
+params:
+  study: null
+  risk_study: null
+  output: null
+  python: null
+  catalog_sha256: null
+---
+
+## 固定口径
+
+495期、原200期与新增295期分别报告。使用原冻结校正市场概率、原完整候选池，
+SP≥1.3、每组累计概率25%（最小完整前缀）、每组准入成本≤256元，7场、2元票、一次0.65。
+本金10万元。预算上限1024、1536、2048元；多出的预算买不同组，不加深、不同组也不能视作相互独立。
+不改变原候选池的场次复用/组间重叠结构；**原选组器没有额外组合级U/P硬上限，本轮不新增这类限制**。
+无可负担的完整组时保留现金，不加倍。固定预算与动态预算均使用同一原方案影子账本产生的预热期。
+动态预算只提高NORMAL上限；DEFENSIVE仍512，RECOVERING仍768。
+
+原始概率包是历史研究证据，未经前瞻可用性验收。风险状态复用上一实验的共享历史准入context，
+标签时间是最后fixture cutoff＋48小时代理，historical_admission=false。
+不重训、调参或重选报警阈值。共享时序由`src/n7_risk_context.py`及`src/temporal_learning`提供；
+本轮只向原受测选组器提供不同预算。目标结算只在票冻结后用于评价。
+
+候选选择按模拟联合新增命中概率/新增成本排序，沿用seed42501、256个共同场景。
+预算改变可能使原不可负担的组提前入选，所以三档组合**不保证嵌套**；本报告同时统计新增与删除组。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+stopifnot(!is.null(params$study),!is.null(params$risk_study),!is.null(params$output),!is.null(params$python))
+reticulate::use_python(params$python,required=TRUE)
+files<-c('r/n7_sleeve_tables.R','r/n7_joint_sleeves.R','r/n7_capital_depth.R',
+ 'r/n7_capital_portfolio.R','r/n7_core_opportunity.R','r/n7_sweet_union.R','r/n7_sp_filter.R',
+ 'r/n7_risk_monitor.R','r/n7_budget_policy.R','r/n7_quality_settlement.R',
+ 'r/strategy_diagnostic_probabilities.R','r/fundamentals_equity_curves.R')
+for(p in files)source(p)
+files<-c(files,'quarto/168_budget_expansion_diagnostic.qmd')
+provenance<-reticulate::import('src.temporal_learning.provenance',convert=TRUE)
+pathlib<-reticulate::import('pathlib',convert=TRUE)
+temporal<-reticulate::import('src.temporal_learning.core',convert=TRUE)
+pyclosure<-provenance$implementation_closure(pathlib$Path(getwd()),
+ c('src.n7_risk_context','src.fundamentals_n7_baseline'),distributions=c('numpy','pandas'))
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+s<-params$study;r<-params$risk_study;o<-params$output
+catalog_path<-file.path(s,'settlement-inputs/catalog.json')
+stopifnot(digest::digest(file=catalog_path,algo='sha256')==params$catalog_sha256)
+catlg<-jsonlite::fromJSON(catalog_path)
+rr<-jsonlite::fromJSON(file.path(r,'plans-receipt.json'),simplifyVector=FALSE)
+stopifnot(digest::digest(file=file.path(r,'contexts.json'),algo='sha256')==rr$contexts_sha256,
+ digest::digest(file=file.path(r,'states.csv'),algo='sha256')==rr$states_sha256)
+# Re-use immutable context; verify the implementation that produced its state.
+for(p in c('src/n7_risk_context.py','r/n7_risk_monitor.R'))stopifnot(
+ digest::digest(file=p,algo='sha256')==rr$implementation[[p]])
+contexts<-jsonlite::fromJSON(file.path(r,'contexts.json'),simplifyVector=FALSE)
+ctx<-states<-list();prev<-NULL
+closures<-list()
+for(ct in contexts)if(ct$status=='READY')closures[[ct$receipt$implementation$closure_sha256]]<-ct$receipt$implementation
+for(cl in closures)provenance$verify_implementation_closure(pathlib$Path(getwd()),cl)
+for(ct in contexts) {
+ ct$rows<-bind_rows(ct$rows);id<-ct$receipt$target_issue
+ z<-n7_risk_state(ct,prev,ct$receipt$cutoff_identity,-.05,0,2,3)
+ ctx[[id]]<-ct;states[[id]]<-z;prev<-z
+}
+stored<-read_csv(file.path(r,'states.csv'),col_types=cols(issue='c'),show_col_types=FALSE)
+stopifnot(all(vapply(states,`[[`,character(1),'state')==stored$state))
+source_hashes<-list(catalog=params$catalog_sha256,risk_receipt=digest::digest(file=file.path(r,'plans-receipt.json'),algo='sha256'),
+ risk_contexts=rr$contexts_sha256,risk_states=rr$states_sha256)
+dir.create(o,recursive=TRUE,showWarnings=FALSE)
+plans<-funded<-list();pool_audit<-list();bindings<-list()
+for(id in catlg$requested_issues) {
+ item<-catlg$issues |> filter(issue==id)
+ if(id %in% names(ctx)) {
+  stopifnot(nrow(item)==1,digest::digest(file=item$path,algo='sha256')==item$sha256)
+  bundle<-jsonlite::fromJSON(gzfile(item$path),simplifyVector=FALSE);cuts<-bundle$cutoffs
+  base<-n7_capital_options(bundle,cuts,params$python,'market-balance-draw-1.0.0-diagnostic',15L,2,.65)
+  features<-n7_core_curve_features(base$surface,cuts,cuts,.25,2)
+  part<-n7_sweet_union_partition(features,cuts,cuts,.25,256,2)
+  depths<-sort(unique(c(15L,unlist(part$opening_depths))))
+  base<-n7_capital_options(bundle,cuts,params$python,'market-balance-draw-1.0.0-diagnostic',depths,2,.65)
+  gate<-n7_sp_filter(base,part,cuts,1.3)
+  pool<-n7_core_option_pool(base,gate$partition,cuts,'BREADTH',1)
+  worlds<-n7_joint_worlds(pool,cuts,42501,256)
+  train<-n7_joint_returns(pool,worlds,cuts)
+  replay_name<-paste0('replay-',id,'.json.gz')
+  con<-gzfile(file.path(o,replay_name),'wt')
+  writeLines(jsonlite::toJSON(list(options=pool$options,opening_options=pool$opening_options,
+   train=train,worlds=worlds,cutoffs=cuts,context_identity=ctx[[id]]$receipt$cutoff_identity),auto_unbox=TRUE,digits=NA),con);close(con)
+  allocation_key<-temporal$temporal_cache_key(
+   temporal$Cutoff$decision_epoch(id,ctx[[id]]$receipt$cutoff_ts),
+   c(source_hashes,list(bundle=item$sha256,parameters=digest::digest(c(1024,1536,2048,512,768,.25,256,1.3,42501,2,.65),algo='sha256'))),
+   c(code,list(python_closure=pyclosure$closure_sha256)),
+   temporal$AvailabilityPolicy$historical_proxy('LAST_FIXTURE_PLUS_DELAY'),'HISTORICAL_DIAGNOSTIC',
+   temporal$PartitionPolicy('FIXED_PRIOR_FIT',0L,0L,1L),
+   temporal$WeightingPolicy$recent_state_blend(20L,.8,minimum_ess=20))
+  bindings[[id]]<-list(allocation_cache_key=allocation_key,replay=replay_name,replay_sha256=digest::digest(file=file.path(o,replay_name),algo='sha256'),bundle_sha256=item$sha256,cutoffs=cuts,context=ctx[[id]]$receipt,
+   options_sha256=digest::digest(pool$options,algo='sha256'),worlds_sha256=digest::digest(worlds,algo='sha256'))
+  pool_audit[[id]]<-tibble(issue=id,eligible_groups=length(pool$options),
+   total_candidate_groups=nrow(features),total_prefix_cost=sum(vapply(pool$options,`[[`,numeric(1),'stake')))
+ } else stopifnot(!id %in% stored$issue)
+ for(kind in c('FIXED','DYNAMIC'))for(budget in c(1024,1536,2048)) {
+  arm<-paste(kind,budget,sep='_');selected<-integer();limit<-0
+  if(id %in% names(ctx)) {
+   fit<-n7_budget_policy(pool,train,cuts,ctx[[id]],states[[id]],kind,budget,512,768,2,256,params$python)
+   selected<-fit$selected;limit<-fit$risk_limit
+  }
+  amount<-0
+  for(j in selected) {
+   opt<-pool$options[[j]];amount<-amount+opt$stake
+   funded[[length(funded)+1L]]<-tibble(issue=id,arm=arm,seed=42501,sleeve_id=as.character(opt$sleeve_id),
+    depth=opt$depth,copies=1,stake=opt$stake,coverage=opt$coverage)
+  }
+  plans[[length(plans)+1L]]<-tibble(issue=id,arm=arm,policy=arm,seed=42501,model='frozen-market-diagnostic',
+   kind=kind,normal_cap=budget,risk_limit=limit,budget_cny=budget,stake=amount,cash=budget-amount,groups=length(selected),
+   state=if(id %in% names(states))states[[id]]$state else 'NO_ORIGINAL_GROUP',
+   status=if(amount>0)'COMPLETE' else 'NO_BET')
+ }
+ message('Budget plans frozen: ',id)
+ writeLines(id,file.path(o,'progress.txt'))
+}
+plans<-bind_rows(plans);funded<-bind_rows(funded);pool_audit<-bind_rows(pool_audit)
+write_csv(plans,file.path(o,'frozen-plans.csv'));write_csv(funded,file.path(o,'frozen-funded.csv'))
+write_csv(pool_audit,file.path(o,'pool-audit.csv'))
+stopifnot(identical(code,setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)))
+jsonlite::write_json(list(source_hashes=source_hashes,implementation=code,python_implementation=pyclosure,bindings=bindings,historical_admission=FALSE,
+ params=list(budgets=c(1024,1536,2048),defensive=512,recovering=768,target=.25,cap=256,minimum_sp=1.3,seed=42501,worlds=256,
+ unit_cny=2,payout_factor=.65,initial_capital=100000),
+ plans_sha256=digest::digest(file=file.path(o,'frozen-plans.csv'),algo='sha256'),
+ funded_sha256=digest::digest(file=file.path(o,'frozen-funded.csv'),algo='sha256')),
+ file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 结算与受控比较
+
+以下才读取结算。28个原本无买入组的期继续现金，不以本轮新结果改写影子监控定义。
+FIXED1024须逐组复现上一实验ACTIVE_ORIGINAL，包含相同21期预热停投。
+其他预算档从完整合格池重新选组；不是把原组原票等比例放大。
+
+```{r}
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','funded.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,'ranks.csv')
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'),show_col_types=FALSE)
+old<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c'),show_col_types=FALSE) |>
+ filter(variant=='JOINT',seed==42501,budget_cny==1024)
+original<-read_csv(file.path(s,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |>
+ semi_join(old,by=c('issue','arm','seed')) |> filter(issue %in% stored$issue[stored$state!='WARMUP']) |>
+ select(issue,sleeve_id,depth,stake) |> arrange(issue,sleeve_id)
+reproduced<-funded |> filter(arm=='FIXED_1024') |> select(issue,sleeve_id,depth,stake) |> arrange(issue,sleeve_id)
+stopifnot(isTRUE(all.equal(original,reproduced,check.attributes=FALSE)))
+settled<-n7_quality_settlement(plans,funded,k);rows<-settled$rows |> mutate(cash_cny=cash)
+order<-sort(old$issue);reference<-sort(old$issue[old$cohort=='原200期'])
+summary<-curves<-marginal<-changes<-list()
+for(scope in c('ALL495','OLD200','RECENT295')) {
+ ids<-switch(scope,ALL495=order,OLD200=reference,RECENT295=setdiff(order,reference))
+ cv<-strategy_equity_curves(rows |> filter(issue %in% ids),ids,100000) |> mutate(scope=scope)
+ # All tables below are executable only when no bankroll stop occurred.
+ # Fail closed rather than silently mix raw hypothetical and funded accounting.
+ stopifnot(!any(cv$stopped))
+ curves[[scope]]<-cv
+ summary[[scope]]<-cv |> filter(period>0) |> group_by(policy) |> summarise(issues=n(),
+  stake=sum(funded_stake_cny),net=sum(funded_net_cny),roi=net/stake,hit_issues=sum(gross>0 & !stopped),
+  profit_issues=sum(funded_net_cny>0),max_drawdown=max(drawdown_cny),minimum_equity=min(100000,equity_cny),
+  stopped=any(stopped),.groups='drop') |> mutate(scope=scope)
+ for(kind in c('FIXED','DYNAMIC'))for(cap in c(1536,2048)) {
+  a<-rows |> filter(issue %in% .env$ids,policy==paste0(.env$kind,'_1024')) |> arrange(issue)
+  b<-rows |> filter(issue %in% .env$ids,policy==paste0(.env$kind,'_',.env$cap)) |> arrange(issue)
+  stopifnot(nrow(a)==length(ids),nrow(b)==length(ids),identical(a$issue,b$issue),
+   all(a$kind==kind),all(b$kind==kind))
+  marginal[[length(marginal)+1L]]<-tibble(scope=scope,kind=kind,cap=cap,extra_stake=sum(b$stake-a$stake),
+   extra_net=sum(b$net-a$net),marginal_roi=extra_net/extra_stake,rescued=sum(a$gross==0 & b$gross>0),
+   lost=sum(a$gross>0 & b$gross==0))
+  ga<-settled$groups |> filter(issue %in% .env$ids,arm==paste0(.env$kind,'_1024'))
+  gb<-settled$groups |> filter(issue %in% .env$ids,arm==paste0(.env$kind,'_',.env$cap))
+  added<-anti_join(gb,ga,by=c('issue','sleeve_id'));removed<-anti_join(ga,gb,by=c('issue','sleeve_id'))
+  stopifnot(sum(added$stake)-sum(removed$stake)==sum(b$stake-a$stake),
+   abs(sum(added$net)-sum(removed$net)-sum(b$net-a$net))<1e-6)
+  changes[[length(changes)+1L]]<-tibble(scope=scope,kind=kind,cap=cap,added_groups=nrow(added),removed_groups=nrow(removed),
+   added_stake=sum(added$stake),removed_stake=sum(removed$stake),added_gross=sum(added$gross),removed_gross=sum(removed$gross))
+ }
+}
+summary<-bind_rows(summary);curves<-bind_rows(curves);marginal<-bind_rows(marginal);changes<-bind_rows(changes)
+for(name in c('rows','summary','curves','marginal','changes'))write_csv(get(name),file.path(o,paste0(name,'.csv')))
+jsonlite::write_json(list(plans_receipt_sha256=digest::digest(file=file.path(o,'plans-receipt.json'),algo='sha256'),
+ ranks_sha256=ar$files[['ranks.csv']],results_sha256=er$files[['results.csv']],funded_sha256=er$files[['funded.csv']],
+ baseline_reproduction=TRUE,historical_admission=FALSE),file.path(o,'settlement-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+knitr::kable(summary,digits=3);knitr::kable(marginal,digits=3);knitr::kable(changes,digits=2)
+for(scope_name in c('RECENT295','ALL495')) {
+ pd<-curves |> filter(scope==scope_name) |> select(policy,period,equity_cny,drawdown_cny) |>
+  pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY')
+ plot<-ggplot(pd,aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+
+  theme_minimal(base_size=11)+labs(title=paste(scope_name,': budget expansion into distinct groups'),
+  subtitle='Same warmup, frozen market model; drawdown and minimum equity both matter',x='Issue index',y='CNY',colour=NULL)
+ print(plot);ggsave(file.path(o,paste0('budget-curves-',scope_name,'.png')),plot,width=12,height=8,dpi=150)
+}
+```
+
+全部金额为研究逐期账本，未模拟重叠赛期的实时占款。报警未证明可识别未来危险，因此动态策略仅是对照。
+更高上限不保证额外花费全额，也不保证增加的组选票带来正边际收益。
+
+## 结论
+
+**本轮不支持以降低回撤为目的提高预算上限，建议保留1024元作为比较基准。**
+新增295期，无报警固定预算由1024提高至1536/2048元，命中期126→131/132，
+但净收益7136→7030/6384元，ROI2.71%→1.96%/1.70%，最大回撤23852→29358/31748元。
+相对1024档多投入94308/112334元，净收益却分别减少约107/752元。
+扩大覆盖确实救回部分期次，却未转化为更高净收益，且资金从高点回落的幅度更大。
+
+全部495期固定1536档净收益49388元，高于1024档38755元；增益主要来自旧200期。
+旧200期净收益31619→42359元，新增295期没有复现这项收益改善。
+因此全期绝对收益增加不足以证明新时期值得扩大资金暴露。固定2048档全期净收益46255元，
+低于1536档，投入和最大回撤反而更高。
+
+动态预算同样没有提供稳定支持。新增期1024/1536/2048档净收益分别1393/−2415/1893元，
+最大回撤22738/33673/32588元。2048档只多约500元净收益，回撤却增加约9851元。
+此处动态预算各状态都从完整候选池重新选组，与上轮仅裁剪原已买组的动态方案不同。
+
+最低资金与最大回撤给出的信息并不完全相同：新增期固定1536/2048的最低资金约99629/99728元，
+高于1024档98290元，但随后从盈利高点回落更多。因此不能把“最低资金较高”解释为整体回撤改善。
+以上是已反复研究的历史样本对照；未证明风险报警能提前识别未来危险，也不据此更改报警门槛。

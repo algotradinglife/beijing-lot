@@ -58,15 +58,28 @@ def test_mutation_replay_through_R_states_budgets_prefixes_and_cash(tmp_path):
     script=tmp_path/'replay.R'
     script.write_text("""args<-commandArgs(trailingOnly=TRUE)
 source(file.path(args[1],'r/n7_risk_monitor.R'))
+source(file.path(args[1],'r/n7_budget_policy.R'))
+source(file.path(args[1],'r/n7_core_opportunity.R'))
+source(file.path(args[1],'r/n7_capital_portfolio.R'))
 cs<-jsonlite::fromJSON(args[2],simplifyVector=FALSE);prev<-NULL;rows<-list()
 g<-data.frame(sleeve_id=c('a','b','c'),depth=c(200,150,100),stake=c(400,300,200),coverage=c(.25,.26,.27))
 for(ct in cs) {
  ct$rows<-dplyr::bind_rows(ct$rows)
  z<-n7_risk_state(ct,prev,ct$receipt$cutoff_identity,-.05,0,2,3)
  budget<-switch(z$state,WARMUP=0,NORMAL=1024,DEFENSIVE=512,RECOVERING=768)
+ cut<-list(fixture=ct$receipt$cutoff_ts)
+ pool<-list(issue=ct$receipt$target_issue,cutoffs=cut,mode='BREADTH',opening_options=1:3,
+ opportunity_options=integer(),options=lapply(1:3,function(i)list(sleeve_id=as.numeric(i),
+ depth=g$depth[i],stake=g$stake[i],expected_gross=200,unit_copies=1,coverage=g$coverage[i],fixtures=i:(i+6))))
+ sc<-list(cutoffs=cut,hits=diag(3),gross=diag(3)*600)
+ expansions<-list()
+ for(kind in c('FIXED','DYNAMIC'))for(cap in c(1024,1536,2048)) {
+  e<-n7_budget_policy(pool,sc,cut,ct,z,kind,cap,512,768,2,256,Sys.getenv('RETICULATE_PYTHON'))
+  expansions[[paste(kind,cap)]]<-list(selected=e$selected,limit=e$risk_limit,stake=e$metrics$stake,cash=e$metrics$cash)
+ }
  for(mode in c('ORIGINAL','HIGH')) {
   f<-n7_risk_fund(g,budget,mode,2,ct$receipt,ct$receipt$cutoff_identity)
-  rows[[length(rows)+1L]]<-list(state=z,budget=budget,mode=mode,tickets=f$groups,stake=f$stake,cash=f$cash)
+  rows[[length(rows)+1L]]<-list(state=z,budget=budget,mode=mode,expansions=expansions,tickets=f$groups,stake=f$stake,cash=f$cash)
  }
  prev<-z
 }
