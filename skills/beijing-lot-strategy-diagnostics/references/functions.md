@@ -48,4 +48,5 @@
 - `r/n7_recent_structure.R::n7_diagnostic_stage_map(plans,issue_order,reference_issues,initial_capital_cny,block_length)`：单方案完整期账本，显式参考期前缀；返回固定分段、事后最大回撤窗口、恢复信息及资金曲线。没有未来状态识别或学习。
 - 同文件 `n7_diagnostic_group_structure(fixtures,funded,ranks,map,unit_cny,payout_factor,n_legs,minimum_sp,cap_cny)`：核对7场成员和实际SP乘积回款，复用损益桥接，对比已选组与同条件25%覆盖候选池；缺成员、错回款或不匹配参数停止。组数不代表独立样本。
 - 同文件 `n7_diagnostic_supply(plans,fixtures,ranks,map,minimum_sp,breaks)`：逐场重算SP合格数、核对可用场次和账本差异，统计合格组、下注组、现金与分箱收益；现金期不丢弃。
-- 三函数测试：`tests/testthat/test-n7-recent-structure.R`。真实调用及证据结论：`quarto/161_recent295_strategy_diagnostics.qmd`。
+- 同文件 `n7_diagnostic_depth_distribution(ranks,funded,map,unit_cny,rank_breaks,extra_depths)`：分全部/合格/已选组统计中奖排名分位数、组等权和期等权CDF、未中组距中奖组合所差票数；不执行加深或改变预算。
+- 四函数测试：`tests/testthat/test-n7-recent-structure.R`。真实调用及证据结论：`quarto/161_recent295_strategy_diagnostics.qmd`。

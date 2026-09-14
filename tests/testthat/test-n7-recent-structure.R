@@ -63,3 +63,24 @@ testthat::test_that('supply replays eligibility, preserves cash and exposes stal
  k$eligible<-FALSE
  testthat::expect_error(n7_diagnostic_supply(p,f,k,m,1.3,c(0,Inf)))
 })
+testthat::test_that('rank distributions separate pools, boundary hits and weighting',{
+ k<-tibble::tibble(issue=c('01','01','01','02'),sleeve_id=c('0','1','2','0'),
+   actual_rank=c(1,64,65,2187),actual_cumulative=c(.1,.2,.3,1),eligible=c(TRUE,TRUE,FALSE,TRUE),model_expected_hit_cost_cny=200)
+ f<-tibble::tibble(issue='01',sleeve_id=c('0','2'),depth=c(1,64))
+ m<-tibble::tibble(issue=c('01','02'),stage='R')
+ z<-n7_diagnostic_depth_distribution(k,f,m,2,c(0,64,128,2187),c(0,1,64))
+ testthat::expect_equal(z$cdf$hit_fraction[z$cdf$pool=='ALL' & z$cdf$depth_limit==64],.5)
+ testthat::expect_equal(z$issue_cdf$hit_fraction[z$issue_cdf$pool=='ALL' & z$issue_cdf$depth_limit==64],1/3)
+ testthat::expect_equal(z$summary$groups[z$summary$pool=='ELIGIBLE'],3L)
+ testthat::expect_equal(z$summary$median[z$summary$pool=='ALL'],64.5)
+ testthat::expect_equal(z$summary$model_mean_rank,rep(100,3))
+ testthat::expect_true(all(z$cdf$hit_fraction[z$cdf$depth_limit==2187]==1))
+ testthat::expect_equal(z$miss_gaps$reached_fraction,c(0,1,1))
+ testthat::expect_equal(z$miss_gaps$median_extra_cost_cny,rep(2,3))
+ testthat::expect_equal(nrow(n7_diagnostic_depth_distribution(k,f[0,],m,2,c(0,2187),1)$miss_gaps),0)
+ testthat::expect_error(n7_diagnostic_depth_distribution(dplyr::bind_rows(k,k),f,m,2,c(0,2187),1))
+ testthat::expect_error(n7_diagnostic_depth_distribution(k,f,m[1,],2,c(0,2187),1))
+ testthat::expect_error(n7_diagnostic_depth_distribution(k,f,m,2,c(0,64),1))
+ k$actual_rank[1]<-0
+ testthat::expect_error(n7_diagnostic_depth_distribution(k,f,m,2,c(0,2187),1))
+})

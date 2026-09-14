@@ -130,3 +130,52 @@ n7_diagnostic_supply <- function(plans,fixtures,ranks,map,minimum_sp,breaks) {
     dplyr::mutate(roi=ifelse(stake>0,net/stake,NA_real_))
   list(periods=x,stages=stages,bins=bins)
 }
+
+# Actual winning ticket rank in frozen probability-descending prefixes (1..2187).
+# ranks: unique issue/sleeve_id, actual_rank, actual_cumulative, eligible and
+# model_expected_hit_cost_cny; funded: one arm/seed, unique issue/sleeve_id/depth;
+# map: unique issue/stage. Includes ALL, ELIGIBLE, SELECTED pools separately.
+# rank_breaks start at0/end2187; extra_depths are diagnostic ticket increments.
+# Returns group-weighted quantiles/CDF/bins, issue-weighted CDF and miss gaps.
+# Additional costs are NOT a fixed-budget strategy or a payout calculation.
+# Explicit CNY2 unit; no learning, allocation, IO or RNG. Empty funded is valid.
+n7_diagnostic_depth_distribution <- function(ranks,funded,map,unit_cny,rank_breaks,extra_depths) {
+  stopifnot(unit_cny==2,nrow(ranks)>0,!anyDuplicated(ranks[c('issue','sleeve_id')]),
+    !anyDuplicated(funded[c('issue','sleeve_id')]),!anyDuplicated(map$issue),
+    all(ranks$issue %in% map$issue),!anyNA(map$stage),
+    is.logical(ranks$eligible),!anyNA(ranks$eligible),
+    all(is.finite(ranks$actual_rank)),all(ranks$actual_rank>=1 & ranks$actual_rank<=2187 & ranks$actual_rank==floor(ranks$actual_rank)),
+    all(is.finite(ranks$actual_cumulative)),all(ranks$actual_cumulative>0 & ranks$actual_cumulative<=1),
+    all(is.finite(ranks$model_expected_hit_cost_cny)),all(ranks$model_expected_hit_cost_cny>=unit_cny),
+    all(is.finite(funded$depth)),all(funded$depth>=1 & funded$depth<=2187 & funded$depth==floor(funded$depth)),
+    length(rank_breaks)>=2,rank_breaks[1]==0,tail(rank_breaks,1)==2187,
+    all(is.finite(rank_breaks)),all(diff(rank_breaks)>0),all(rank_breaks==floor(rank_breaks)),
+    length(extra_depths)>0,all(is.finite(extra_depths)),all(extra_depths>=0 & extra_depths==floor(extra_depths)),!anyDuplicated(extra_depths))
+  k<-ranks |> dplyr::select(issue,sleeve_id,actual_rank,actual_cumulative,eligible,model_expected_hit_cost_cny) |>
+    dplyr::left_join(map |> dplyr::select(issue,stage),by='issue',relationship='many-to-one')
+  selected<-funded |> dplyr::select(issue,sleeve_id,depth) |>
+    dplyr::left_join(k,by=c('issue','sleeve_id'),relationship='one-to-one')
+  stopifnot(!anyNA(selected$actual_rank))
+  rows<-dplyr::bind_rows(dplyr::mutate(k,pool='ALL'),
+    dplyr::mutate(dplyr::filter(k,eligible),pool='ELIGIBLE'),dplyr::mutate(selected,pool='SELECTED')) |>
+    dplyr::mutate(rank_bin=cut(actual_rank,rank_breaks,include.lowest=TRUE,dig.lab=7))
+  summary<-rows |> dplyr::group_by(pool,stage) |> dplyr::summarise(groups=dplyr::n(),issues=dplyr::n_distinct(issue),
+    q10=stats::quantile(actual_rank,.1),q25=stats::quantile(actual_rank,.25),median=median(actual_rank),
+    q75=stats::quantile(actual_rank,.75),q90=stats::quantile(actual_rank,.9),mean_rank=mean(actual_rank),
+    model_mean_rank=mean(model_expected_hit_cost_cny/unit_cny),median_probability_mass=median(actual_cumulative),.groups='drop')
+  cdf<-tidyr::crossing(rows,depth_limit=rank_breaks[-1]) |>
+    dplyr::group_by(pool,stage,depth_limit) |> dplyr::summarise(groups=dplyr::n(),
+      hit_fraction=mean(actual_rank<=depth_limit),.groups='drop')
+  issue_cdf<-tidyr::crossing(rows,depth_limit=rank_breaks[-1]) |>
+    dplyr::group_by(pool,stage,depth_limit,issue) |> dplyr::summarise(hit_fraction=mean(actual_rank<=depth_limit),.groups='drop') |>
+    dplyr::group_by(pool,stage,depth_limit) |> dplyr::summarise(issues=dplyr::n(),hit_fraction=mean(hit_fraction),.groups='drop')
+  bins<-rows |> dplyr::count(pool,stage,rank_bin,name='groups') |>
+    dplyr::group_by(pool,stage) |> dplyr::mutate(fraction=groups/sum(groups)) |> dplyr::ungroup()
+  misses<-selected |> dplyr::filter(actual_rank>depth) |>
+    dplyr::mutate(extra_required=actual_rank-depth)
+  gaps<-tidyr::crossing(misses,extra_depth=extra_depths) |> dplyr::group_by(stage,extra_depth) |>
+    dplyr::summarise(misses=dplyr::n(),issues=dplyr::n_distinct(issue),
+      reached_fraction=mean(extra_required<=extra_depth),median_extra=median(extra_required),
+      median_extra_cost_cny=unit_cny*median_extra,.groups='drop')
+  list(rows=rows,summary=summary,cdf=cdf,issue_cdf=issue_cdf,bins=bins,miss_gaps=gaps)
+}

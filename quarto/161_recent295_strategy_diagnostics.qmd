@@ -214,6 +214,59 @@ ggsave(file.path(params$output,'supply-vs-return.png'),p5,width=11,height=9,dpi=
 尚未排除的是场次多时的候选生成质量、有效独立覆盖或赛事构成问题；
 当前数据只能反驳粗略数量不足，不能证明这些更细机制。
 
+
+## 实际中奖组合的命中深度分布
+
+命中深度是实际中奖组合在冻结概率降序排列中的名次，范围1–2187；
+买前K张才覆盖名次≤K的中奖组合，每张2元。它不是当前已买深度，也不只统计已经中奖的组。
+三个候选口径分别呈现，避免准入筛选造成混淆。组有重叠，下列分布是描述结果，
+不把每组当独立样本；另存每期等权CDF用于对照。
+
+```{r}
+depth_distribution<-n7_diagnostic_depth_distribution(structure$ranks,
+ funded |> semi_join(primary,by=c('issue','arm','seed')),st$map,params$unit_cny,
+ c(0,15,32,64,128,256,512,1024,2187),c(16,32,64,128,256))
+knitr::kable(depth_distribution$summary,digits=3)
+knitr::kable(depth_distribution$cdf |> filter(pool=='SELECTED') |>
+ select(stage,depth_limit,hit_fraction) |> pivot_wider(names_from=depth_limit,values_from=hit_fraction),digits=4)
+knitr::kable(depth_distribution$miss_gaps,digits=4)
+for(n in c('summary','cdf','issue_cdf','bins','miss_gaps'))
+ write_csv(depth_distribution[[n]],file.path(params$output,paste0('hit-depth-',n,'.csv')))
+pd<-depth_distribution$rows |> mutate(stage=stage_labels[stage],
+ pool=recode(pool,ALL='全部候选组',ELIGIBLE='同条件合格组',SELECTED='实际已选组'))
+p6<-ggplot(pd,aes(actual_rank,colour=stage))+stat_ecdf(geom='step',linewidth=.8)+
+ facet_wrap(~pool,ncol=1)+scale_x_log10(breaks=c(1,15,32,64,128,256,512,1024,2187))+
+ scale_y_continuous(labels=scales::label_percent())+
+ labs(x='实际中奖组合的概率排名（张，对数轴）',y='累计覆盖实际中奖组的比例',colour=NULL)+
+ theme_minimal(base_family='Noto Sans CJK SC')+theme(legend.position='bottom')
+ggsave(file.path(params$output,'hit-depth-cdf.png'),p6,width=11,height=10,dpi=140);p6
+pbins<-depth_distribution$bins |> filter(pool=='SELECTED') |>
+ mutate(stage=stage_labels[stage])
+p7<-ggplot(pbins,aes(rank_bin,fraction,fill=stage))+geom_col(position='dodge')+
+ scale_y_continuous(labels=scales::label_percent())+
+ labs(x='实际中奖排名区间（张）',y='已选组占比',fill=NULL)+
+ theme_minimal(base_family='Noto Sans CJK SC')+theme(legend.position='bottom',axis.text.x=element_text(angle=30,hjust=1))
+ggsave(file.path(params$output,'hit-depth-bins.png'),p7,width=12,height=6,dpi=140);p7
+```
+
+**分布结论：回撤段的已选组在浅层至中层覆盖更弱，但不是整个深度分布全面变深。**
+中奖排名中位数为原期271张、回撤段338张、其他新增期266张；
+前128张覆盖率依次约36.3%、30.1%、35.4%。回撤段中位数比其他新增期深约27%。
+回撤段257–1024张区间占已选组46.3%，其他新增期36.9%；超过1024张反而为11.4%对14.3%。
+按期等权的前128张覆盖率也为28.7%对35.3%，并非仅由每期买组数不同造成。
+
+与此同时，回撤段90%分位约1185张，其他新增期约1337张；
+平均排名约471与465张，差距远小于中位数。说明主要差别在常用浅层覆盖和中间区间，
+不能把它概括成极端冷门尾部整体增厚。
+
+回撤段未中组的额外中奖距离中位数为367张，即每组734元。
+每组再多64张（128元）仅能覆盖约15.1%的未中组，其他新增期约15.3%，
+并没有出现大量“只差几张就能中”的特殊堆积。
+
+未中组的额外票数仅表示离实际中奖组合还有多远，不能当成可提前选中的追加投注。
+每组追加相同深度会改变投入；固定预算下还涉及换出损失。
+因而深度分布偏后不等于全面加深已经具有正收益。
+
 ## 诊断结论
 
 **结论：新增期的优势明显变薄，但现有证据不支持“单场准确率整体崩坏”或“只要加深就能修复”。主要症状是中奖回款下降，叠加一段候选池与已选组同时变难。**
