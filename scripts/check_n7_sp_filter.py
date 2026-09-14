@@ -25,6 +25,11 @@ for directory,receipt in ((study,frozen),(control,old)):
 assert frozen['source_catalog_sha256']==old['source_catalog_sha256']
 cat=Path(frozen['config']['catalog'])
 assert hashlib.sha256(cat.read_bytes()).hexdigest()==frozen['source_catalog_sha256']
+# jsonlite auto_unbox represents a one-element numeric vector as a scalar.
+# Normalize the serialized configuration contract before enumerating arms.
+for name in ('targets','budgets','policies'):
+    if not isinstance(frozen['config'][name],list):
+        frozen['config'][name]=[frozen['config'][name]]
 policies=frozen['config']['policies']
 thresholds={p['minimum_sp'] for p in policies}
 expected_threshold={f'T{round(1000*t)}_{p["id"]}_B{b}':p['minimum_sp']

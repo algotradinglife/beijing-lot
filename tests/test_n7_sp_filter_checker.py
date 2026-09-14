@@ -11,7 +11,8 @@ import pytest
 
 
 @pytest.mark.parametrize('mutation',[None,'admission','funded','control','threshold'])
-def test_sp_filter_checker(tmp_path,mutation):
+@pytest.mark.parametrize('unboxed',[False,True])
+def test_sp_filter_checker(tmp_path,mutation,unboxed):
     fixtures=[dict(p_W=.8,p_D=.1,p_L=.1,q_W=.8,q_D=.1,q_L=.1,slot=i+1,provider_id=str(i)) for i in range(7)]
     bundle=dict(cutoffs={'a':'epoch'},expanded_pool=dict(fixtures=fixtures),
                 sleeves=[dict(id=0,fixture_indices=list(range(7)))])
@@ -47,6 +48,9 @@ def test_sp_filter_checker(tmp_path,mutation):
         freeze=dict(config=dict(catalog=str(catalog),targets=[.25],budgets=[512],policies=[dict(id=f'SP{round(t*100):03d}_TEST',minimum_sp=t) for t in (1,1.1,1.2,1.3,1.5)]),
             cutoffs={'001':{'a':'epoch'}},source_catalog_sha256=hashlib.sha256(catalog.read_bytes()).hexdigest(),
             files={n:hashlib.sha256((directory/n).read_bytes()).hexdigest() for n in ('predictions.csv','funded.csv','actions.csv')})
+        if unboxed:
+            freeze['config']['targets']=.25
+            freeze['config']['budgets']=512
         (directory/'plans-frozen.json').write_text(json.dumps(freeze))
         (directory/'evaluation-receipt.json').write_text(json.dumps(dict(
             freeze_sha256=hashlib.sha256((directory/'plans-frozen.json').read_bytes()).hexdigest(),
