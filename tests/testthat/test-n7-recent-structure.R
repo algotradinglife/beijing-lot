@@ -31,7 +31,8 @@ testthat::test_that('candidate identity, payout replay and purchased bridge agre
  testthat::expect_equal(z$ranks$eligible,c(TRUE,FALSE))
  testthat::expect_equal(z$bridge$periods$actual_net,1.3*2.5^7-2)
  testthat::expect_equal(z$group_summary$price_residual,0,tolerance=1e-8)
- testthat::expect_equal(nrow(z$members),14)
+  testthat::expect_equal(nrow(z$members),14)
+  testthat::expect_equal(z$fixtures$estimated_top1_sp,rep(2.5,7))
  g$depth<-1;k$actual_rank<-2
  z<-n7_diagnostic_group_structure(f,g,k,m,2,.65,7,1.3,2)
  testthat::expect_equal(z$group_summary$hits,0)
@@ -44,4 +45,21 @@ testthat::test_that('candidate identity, payout replay and purchased bridge agre
  testthat::expect_error(n7_diagnostic_group_structure(f,g,k,m,2,.65,7,1.3,2))
  k$fixture_slots[1]<-'1,2,3,4,5,6,bad'
  testthat::expect_error(n7_diagnostic_group_structure(f,g,k,m,2,.65,7,1.3,2))
+})
+testthat::test_that('supply replays eligibility, preserves cash and exposes stale counts',{
+ p<-tibble::tibble(issue=c('01','02'),arm='a',seed=1,total_fixtures=c(2,0),
+  eligible_fixtures=c(2,0),stake=c(2,0),net=c(-2,0),groups=c(1,0),hits=0,budget_cny=10)
+ f<-tibble::tibble(issue='01',slot=1:2,estimated_top1_sp=c(1.2,1.5))
+ k<-tibble::tibble(issue='01',sleeve_id='0',eligible=TRUE)
+ m<-tibble::tibble(issue=c('01','02'),period=1:2,stage=c('REFERENCE','RECENT_OTHER'))
+ z<-n7_diagnostic_supply(p,f,k,m,1.3,c(0,1,Inf))
+ testthat::expect_equal(z$periods$qualified,c(1,0))
+ testthat::expect_equal(z$periods$metadata_delta,c(1,0))
+ testthat::expect_true(is.na(z$stages$roi[z$stages$stage=='RECENT_OTHER']))
+ testthat::expect_equal(sum(z$bins$net),-2)
+ testthat::expect_error(n7_diagnostic_supply(p,f[0,],k,m,1.3,c(0,Inf)))
+ testthat::expect_error(n7_diagnostic_supply(p,f,k,m[1,],1.3,c(0,Inf)))
+ testthat::expect_error(n7_diagnostic_supply(p,dplyr::bind_rows(f,f),k,m,1.3,c(0,Inf)))
+ k$eligible<-FALSE
+ testthat::expect_error(n7_diagnostic_supply(p,f,k,m,1.3,c(0,Inf)))
 })

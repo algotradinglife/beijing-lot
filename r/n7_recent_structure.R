@@ -85,5 +85,48 @@ n7_diagnostic_group_structure <- function(fixtures,funded,ranks,map,unit_cny,pay
       median_rank=median(actual_rank),rank_le15=mean(actual_rank<=15),
       avg_cost=mean(coverage_25_cost_cny),gross_per_hit=ifelse(sum(hit25)>0,
         sum(actual_gross_cny[hit25])/sum(hit25),NA_real_),.groups='drop')
-  list(ranks=k,members=members,bridge=bridge,group_summary=summary,candidate_summary=candidates)
+  list(fixtures=fixtures,ranks=k,members=members,bridge=bridge,group_summary=summary,candidate_summary=candidates)
+}
+
+# Describe fixture/group supply, never choose a future threshold. plans is one
+# complete arm/seed; fixtures/ranks are the frozen-replay outputs above; map has
+# every planned issue exactly once. A missing fixture issue is accepted only if
+# total_fixtures is explicitly zero. Reconstruct SP eligibility rather than trust
+# stored eligible_fixtures metadata; report mismatches separately. Integer breaks
+# define descriptive fixture-count bins. Returns issue ledger, stages and bins;
+# CNY stake/net, ROI net/stake (NA with zero stake), no IO or fitting.
+n7_diagnostic_supply <- function(plans,fixtures,ranks,map,minimum_sp,breaks) {
+  stopifnot(nrow(plans)>0,!anyDuplicated(plans$issue),!anyDuplicated(map$issue),
+    setequal(plans$issue,map$issue),dplyr::n_distinct(plans$arm)==1,dplyr::n_distinct(plans$seed)==1,
+    !anyDuplicated(fixtures[c('issue','slot')]),!anyDuplicated(ranks[c('issue','sleeve_id')]),
+    all(fixtures$issue %in% plans$issue),all(ranks$issue %in% plans$issue),
+    all(is.finite(fixtures$estimated_top1_sp)),all(fixtures$estimated_top1_sp>=1),
+    length(minimum_sp)==1,is.finite(minimum_sp),minimum_sp>=1,
+    length(breaks)>=2,breaks[1]==0,all(diff(breaks)>0),!anyNA(breaks),
+    !anyNA(plans[c('total_fixtures','eligible_fixtures','stake','net','groups','hits','budget_cny')]),
+    all(plans$total_fixtures>=0),all(plans$stake>=0),all(plans$budget_cny>0))
+  counts<-fixtures |> dplyr::group_by(issue) |>
+    dplyr::summarise(available=dplyr::n(),qualified=sum(estimated_top1_sp>=minimum_sp),.groups='drop')
+  cores<-ranks |> dplyr::group_by(issue) |> dplyr::summarise(candidates=dplyr::n(),core=sum(eligible),.groups='drop')
+  x<-plans |> dplyr::left_join(map |> dplyr::select(issue,period,stage),by='issue',relationship='one-to-one') |>
+    dplyr::left_join(counts,by='issue',relationship='one-to-one') |>
+    dplyr::left_join(cores,by='issue',relationship='one-to-one')
+  stopifnot(all(x$total_fixtures[is.na(x$available)]==0))
+  x<-x |> dplyr::mutate(dplyr::across(c(available,qualified,candidates,core),~tidyr::replace_na(.x,0L)))
+  stopifnot(all(x$available==x$total_fixtures),all(x$groups<=x$core),
+    !anyNA(x$stage),all(x$stake<=x$budget_cny),all(x$net>=-x$stake))
+  x<-x |> dplyr::mutate(supply_bin=cut(qualified,breaks,include.lowest=TRUE),
+    metadata_delta=eligible_fixtures-qualified,budget_use=stake/budget_cny)
+  stopifnot(!anyNA(x$supply_bin))
+  stages<-x |> dplyr::group_by(stage) |> dplyr::summarise(issues=dplyr::n(),
+    mean_qualified=mean(qualified),median_qualified=median(qualified),q25=stats::quantile(qualified,.25),
+    q75=stats::quantile(qualified,.75),min_qualified=min(qualified),mean_core=mean(core),
+    mean_selected_groups=mean(groups),cash_issues=sum(stake==0),mean_stake=mean(stake),
+    budget_use=mean(budget_use),hit_rate=mean(hits>0),stake=sum(stake),net=sum(net),
+    metadata_mismatches=sum(metadata_delta!=0),.groups='drop') |>
+    dplyr::mutate(roi=ifelse(stake>0,net/stake,NA_real_))
+  bins<-x |> dplyr::group_by(stage,supply_bin) |> dplyr::summarise(issues=dplyr::n(),
+    hit_rate=mean(hits>0),stake=sum(stake),net=sum(net),.groups='drop') |>
+    dplyr::mutate(roi=ifelse(stake>0,net/stake,NA_real_))
+  list(periods=x,stages=stages,bins=bins)
 }

@@ -177,6 +177,43 @@ seed_summary<-allplans |> filter(cohort=='新增295期',budget_cny==params$budge
 knitr::kable(seed_summary,digits=4);write_csv(seed_summary,file.path(params$output,'seed-sensitivity.csv'))
 ```
 
+
+## 回撤是否来自合格场次不足
+
+“可用场次”指已形成冻结概率的场次，不代表该期原始赛程全部场次；
+“合格场次”再要求Top1方向估算SP≥1.3；“合格组”还要求达到25%覆盖的成本≤256元。
+逐场重算准入并报告账本数量差异，现金期保留。分箱阈值只用于描述，不是新选场规则。
+
+```{r}
+supply<-n7_diagnostic_supply(primary,structure$fixtures,structure$ranks,st$map,params$minimum_sp,c(0,28,56,84,Inf))
+knitr::kable(supply$stages,digits=3)
+knitr::kable(supply$bins,digits=4)
+worst_supply<-supply$periods |> filter(stage=='RECENT_DRAWDOWN') |> arrange(net) |>
+ select(issue,available,qualified,core,groups,stake,net) |> head(15)
+knitr::kable(worst_supply,digits=2)
+write_csv(supply$stages,file.path(params$output,'supply-stages.csv'))
+write_csv(supply$bins,file.path(params$output,'supply-bins.csv'))
+write_csv(supply$periods,file.path(params$output,'supply-periods.csv'))
+ps<-supply$periods |> mutate(stage=stage_labels[stage])
+p5<-ggplot(ps,aes(qualified,net,colour=stage))+geom_point(alpha=.65)+
+ geom_hline(yintercept=0,linetype=2)+facet_wrap(~stage,ncol=1)+
+ theme_minimal(base_family='Noto Sans CJK SC')+theme(legend.position='none')+
+ labs(x='每期合格场次数（重算SP1.3）',y='每期净收益（元）')
+ggsave(file.path(params$output,'supply-vs-return.png'),p5,width=11,height=9,dpi=140);p5
+```
+
+**数量诊断结论：不支持“合格场次不足是本次大回撤的主要原因”。**
+
+回撤94期平均77.85场合格场次，其他新增201期80.93场；平均合格组7.86/8.16组，
+实际下注5.59/5.76组；预算使用率87.02%/87.47%。逐场重算与账本合格数量无不一致。
+回撤段只有9期合格场次≤28场；42期超过84场，后者净亏损18310.72元，
+占该段净亏损23852.02元约76.8%。这是该分箱净亏损的会计占比，不是因果贡献。
+
+少量场次不足的期次存在，但并非主要亏损来源。也不能反推“场次越多越差”：
+其他新增期超过84场的97期ROI为+19.25%，同样大场次池可盈利。
+尚未排除的是场次多时的候选生成质量、有效独立覆盖或赛事构成问题；
+当前数据只能反驳粗略数量不足，不能证明这些更细机制。
+
 ## 诊断结论
 
 **结论：新增期的优势明显变薄，但现有证据不支持“单场准确率整体崩坏”或“只要加深就能修复”。主要症状是中奖回款下降，叠加一段候选池与已选组同时变难。**
