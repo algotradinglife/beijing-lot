@@ -110,7 +110,20 @@ ROI 的分母是实际投入，预算未用完的部分保留现金。
 
 ```{r}
 knitr::kable(summary |> select(arm,seed,stake,net,roi,hit_issues,profit_issues,max_drawdown,
- net_without_best,net_without_best3,net_without_best5),digits=3)
+ net_without_best,net_without_best3,net_without_best5) |>
+ mutate(roi=sprintf('%.1f%%',100*roi)),digits=2)
+```
+
+## 逐期结果结构与示例
+
+完整 16,200 行逐期表保存为报告目录中的 `per-issue.csv`；每行是一种策略、一个种子在一期的结果。
+`stake`、`cash`、`gross`、`net` 均为元，`issue_roi` 为净收益除以实际投入，未投注时为空。
+`hits` 为该期中奖组数，不是中奖期数。下方展示结构及前几行；CSV 保留全部期次。
+
+```{r}
+tibble::glimpse(per_issue)
+knitr::kable(per_issue |> select(issue,arm,seed,budget_cny,stake,cash,groups,hits,gross,net,issue_roi) |>
+ slice_head(n=12) |> mutate(issue_roi=ifelse(is.na(issue_roi),NA_character_,sprintf('%.1f%%',100*issue_roi))),digits=2)
 ```
 
 ## 收益曲线
@@ -196,6 +209,21 @@ plots$overlap<-ggplot(overlap,aes(factor(budget_cny),max_pair_overlap,fill=objec
  labs(x='预算上限（元）',y='任意两组最多共同场次',fill='排序')
 plots$overlap
 ```
+
+## 验证范围与剩余仓库缺口
+
+本报告执行前强制验证全部 16,200 个计划的独立结算检查与分配回放凭证，
+并核对计划和结果文件哈希。原方案对照另有 1,800 个计划和 7,288 条买入组的精确复现记录。
+本轮函数专项、端到端及 cutoff 治理检查通过；每个新函数均有对应测试。
+
+完整仓库 `Rscript tests/testthat.R` 尚未通过：6 个失败涉及未改动的
+旧 draw-threshold 数据文件、retraining 集成包，以及两个测试的 Python 路径冲突；
+另外两个旧流水线集成测试因缺少 bundle 跳过。详细证据已记录 #443。
+这不改变本轮冻结结果的独立复现记录，但不能据此声称全仓测试通过或允许直接合并。
+
+研究输入是已暴露历史样本，模拟情景及不同种子不增加独立历史样本量。
+固定 24 组候选集和有限深度网格也限制结论；本轮不是全局最优求解，
+未测试新增场次 SP 筛除或候选池扩张。
 
 ```{r}
 #| include: false
