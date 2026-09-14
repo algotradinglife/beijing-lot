@@ -12,7 +12,7 @@ import pytest
 
 @pytest.mark.parametrize('mutation',[None,'admission','funded','control','threshold'])
 def test_sp_filter_checker(tmp_path,mutation):
-    fixtures=[dict(p_W=.8,p_D=.1,p_L=.1,q_W=.8,q_D=.1,q_L=.1) for _ in range(7)]
+    fixtures=[dict(p_W=.8,p_D=.1,p_L=.1,q_W=.8,q_D=.1,q_L=.1,slot=i+1,provider_id=str(i)) for i in range(7)]
     bundle=dict(cutoffs={'a':'epoch'},expanded_pool=dict(fixtures=fixtures),
                 sleeves=[dict(id=0,fixture_indices=list(range(7)))])
     bundle_path=tmp_path/'bundle.json.gz'
@@ -59,5 +59,7 @@ def test_sp_filter_checker(tmp_path,mutation):
         receipt=json.loads(out.read_text())
         assert receipt['status']=='PASS' and receipt['plans']==5
         assert receipt['control_rows']=={'results.csv':1,'funded.csv':1,'actions.csv':1}
+        assert len(receipt['excluded_fixtures'])==14
+        assert all(x['estimated_sp']==1.25 and x['top1']=='W' for x in receipt['excluded_fixtures'])
     else:
         assert run.returncode!=0 and not out.exists()
