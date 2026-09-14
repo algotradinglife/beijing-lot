@@ -132,7 +132,7 @@ files<-c('r/strategy_distribution_shape.R','r/strategy_diagnostic_probabilities.
  'src/strategy_diagnostic_inputs.py','quarto/163_distribution_shape_diagnostic.qmd')
 jsonlite::write_json(list(study=s,parameters=params,prefix_depth=128,diagnostic_only=TRUE,
  catalog=receipt$files[['catalog.json']],bundles=input$source_hashes,evaluation=er$files,settlement=ar$files,
- implementation=setNames(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256'),files),
+ implementation=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files),
  generated_at=as.character(Sys.time())),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
 ```
 
