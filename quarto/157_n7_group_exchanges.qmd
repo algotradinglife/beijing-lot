@@ -1,0 +1,178 @@
+---
+title: "固定预算下的一换一／一换二：N7组合调整研究"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  initial_capital_cny: 100000
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+stopifnot(!is.null(params$study));study<-params$study
+for(p in c('fundamentals_equity_curves','n7_sweet_union_summary','n7_selection_diagnostics','n7_quality_diagnostics'))source(file.path('r',paste0(p,'.R')))
+receipt<-jsonlite::fromJSON(file.path(study,'evaluation-receipt.json'))
+freeze<-jsonlite::fromJSON(file.path(study,'plans-frozen.json'))
+stopifnot(receipt$status=='PASS',receipt$plans==5400,receipt$controls_reproduced==1800,
+ digest::digest(file=file.path(study,'plans-frozen.json'),algo='sha256')==receipt$freeze_sha256,
+ digest::digest(file=file.path(study,'results.csv'),algo='sha256')==receipt$results_sha256)
+source_dir<-freeze$config$source_dir
+stopifnot(digest::digest(file=file.path(source_dir,'plans-frozen.json'),algo='sha256')==freeze$source_freeze_sha256)
+prior<-jsonlite::fromJSON(file.path(source_dir,'plans-frozen.json'))
+rows<-readr::read_csv(file.path(study,'results.csv'),col_types=readr::cols(issue='c'),show_col_types=FALSE)
+funded<-readr::read_csv(file.path(study,'funded.csv'),col_types=readr::cols(issue='c',sleeve_id='c'),show_col_types=FALSE)
+stopifnot(digest::digest(file=file.path(study,'funded.csv'),algo='sha256')==freeze$files[['funded.csv']])
+issue_order<-sort(unique(rows$issue));stopifnot(length(issue_order)==200)
+members<-list()
+for(issue in issue_order) {
+ name<-paste0('replay-',issue,'-42501.json.gz')
+ stopifnot(digest::digest(file=file.path(source_dir,name),algo='sha256')==prior$files[[name]])
+ replay<-jsonlite::fromJSON(gzfile(file.path(source_dir,name)),simplifyVector=FALSE)
+ for(o in replay$options)members[[length(members)+1L]]<-tibble(issue=issue,
+  sleeve_id=as.character(o$sleeve_id),fixture_id=as.integer(unlist(o$fixtures)))
+}
+z<-n7_quality_diagnostics(rows,funded,bind_rows(members),issue_order,params$initial_capital_cny)
+for(name in names(z))readr::write_csv(z[[name]],file.path(study,paste0('report-',name,'.csv')))
+theme_set(theme_minimal(base_size=12,base_family='Noto Sans CJK SC'))
+```
+
+## 固定比较口径
+
+复用原200期、候选目录和市场概率底座，SP≥1.30、N7、原25%累计概率固定开组前缀、单组上限256元、单份下注。预算上限512／768／1024元；初始资金10万元。不开新候选组、不补组、不改深度、不重训。估算SP沿用欧赔／大小球映射，结算用北单实际SP，票级0.65只计一次。
+
+原JOINT按每元新增联合覆盖逐步选组；EXCHANGE11从原计划出发，每步允许撤零或一组、加入一组；EXCHANGE12允许加入一或两组。强制保留原机会组。枚举预算内合法调整，只接受覆盖模拟世界数严格增加的调整。同覆盖候选依次比较总估算净收益、较低总投入、排序后的组ID；相同覆盖的原计划不会被替换。每次重新枚举，无可改善调整即停；覆盖数为整数，因此最多256次改善。
+
+局部最优不等于全局最优。本轮不更换求解器、不加入全局优化第四方案。#424已有不同8×64范围的求解器研究，本轮只检验当前固定前缀方案是否值得增加局部换组。
+
+分配使用256个共享场次模拟世界；独立评估使用5000个世界。种子42501／42502／42503是固定敏感性配置，不当作独立历史样本。新5400份计划在本轮读取结算前统一冻结；同200期已在此前研究暴露，`historical_admission=false`，不声称未见或前瞻回测。
+
+## 结论：采用EXCHANGE12作为当前研究优选，保留JOINT对照
+
+**预算内局部换组有小幅、可复现的改进，采用允许一换一／一换二的EXCHANGE12研究版本。** 它在9种固定配置中7种增加净收益，净收益增量中位数约2009元，ROI增量中位数约2.16个百分点；命中期数5／9增加，回撤4／9改善。分别剔除自身最大1、3个盈利期后仍是7／9增益，剔除5个后为6／9，说明主要结果不完全依赖单个大奖。
+
+这不是稳定降回撤方案：最差配置净收益少2705元、最大回撤多760元。512和1024元预算的三个种子均增益，768元预算仅1／3增益，因此收益改善有预算／随机配置差异。相较一换一，一换二净收益改善配置从6／9提高到7／9；中位增益略低，但扩大邻域的计算范围仍有限。
+
+机制是修正贪心顺序留下的局部组合缺口，而非更换概率底座。EXCHANGE12在1800份计划中改变439份，独立模拟平均覆盖增益约0.192个百分点；110份计划的独立模拟覆盖反而下降。平均增益较小，且部分改善仅适用于选组模拟，不能把“分配世界严格提高”说成真实命中概率必然提高。
+
+固定示例（种子42501、1024元预算）：原JOINT净收益41544元、ROI23.72%、82个命中期、最大回撤16369元；两个换组方案均为净收益45703元、ROI26.08%、83个命中期、最大回撤16192元。投入仅从175170元增加到175236元，说明这组增益主要不是加大投入造成的。
+
+采用范围限于本次已暴露历史的研究配置，继续保留JOINT作为基准；没有据此批准实盘使用，也不追加邻域／种子搜索来追求更高历史收益。
+
+## 覆盖改善与模拟样本依赖
+
+```{r}
+coverage<-rows |> group_by(variant,budget_cny,seed) |>
+ summarise(plans=n(),changed=sum(moves>0),mean_moves=mean(moves),
+  mean_allocation_gain=mean(delta_train_union),mean_independent_gain=mean(delta_eval_union),
+  independent_declines=sum(delta_eval_union< -1e-12),.groups='drop')
+knitr::kable(coverage,digits=5)
+readr::write_csv(coverage,file.path(study,'report-coverage.csv'))
+```
+
+增益是概率差，0.002相当于0.2个百分点。平均值包含未换组的计划，分配模拟中严格改善并不保证独立模拟也改善。
+
+```{r}
+#| fig-width: 11
+#| fig-height: 6
+gain<-ggplot(rows |> filter(variant!='JOINT',moves>0),aes(delta_train_union,delta_eval_union,color=variant))+
+ geom_point(alpha=.25)+geom_hline(yintercept=0,linetype=2)+geom_abline(slope=1,intercept=0,linetype=3)+
+ labs(x='分配模拟覆盖增益',y='独立模拟覆盖增益',color='规则')
+gain
+ggsave(file.path(study,'exchange-coverage.png'),gain,width=11,height=6,dpi=160)
+```
+
+## 收益、命中和稳健性
+
+```{r}
+knitr::kable(z$summary |> select(variant,budget_cny,seed,stake,net,roi,hit_issues,profit_issues,
+ max_drawdown,longest_loss_streak,net_without_best,net_without_best3,net_without_best5),digits=3)
+comparison<-z$paired |> filter(variant!='JOINT') |> group_by(variant) |>
+ summarise(configurations=n(),better_net=sum(delta_net>1e-6),better_drawdown=sum(delta_drawdown< -1e-6),
+  better_hits=sum(delta_hits>0),median_delta_net=median(delta_net),median_delta_roi=median(delta_roi),
+  better_without_best1=sum(delta_best1>1e-6),better_without_best3=sum(delta_best3>1e-6),
+  better_without_best5=sum(delta_best5>1e-6),.groups='drop')
+knitr::kable(comparison,digits=3)
+readr::write_csv(comparison,file.path(study,'report-comparison.csv'))
+```
+
+ROI为净收益／实际投入，预算上限相同不表示投入完全相同。去极值分别移除各方案自身最大1／3／5个盈利期。资金无法负担整期计划时停止，后续风险和配对统计统一使用实际执行账本。
+
+## 资金与回撤
+
+固定展示种子42501，不按结果选择最优种子；完整27种配置见上表。
+
+```{r}
+#| fig-width: 12
+#| fig-height: 8
+primary<-z$curves |> filter(seed==42501)
+equity<-ggplot(primary,aes(period,equity_cny,color=variant))+geom_line(linewidth=.7)+
+ facet_wrap(~budget_cny,ncol=1)+labs(x='历史期序',y='账户资金（元）',color='规则')
+equity
+ggsave(file.path(study,'exchange-equity.png'),equity,width=12,height=8,dpi=160)
+drawdown<-ggplot(primary,aes(period,drawdown_cny,color=variant))+geom_line(linewidth=.7)+
+ facet_wrap(~budget_cny,ncol=1)+labs(x='历史期序',y='距资金前高的回撤（元）',color='规则')
+drawdown
+ggsave(file.path(study,'exchange-drawdown.png'),drawdown,width=12,height=8,dpi=160)
+```
+
+## 归因与时间稳定性
+
+```{r}
+knitr::kable(z$per_issue |> group_by(variant,budget_cny,seed) |>
+ summarise(rescued=sum(rescued),lost=sum(lost),stake_change=sum(delta_stake),
+  gross_change=sum(delta_gross),net_change=sum(delta_net),.groups='drop'),digits=2)
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+blocks<-ggplot(z$blocks |> filter(seed==42501),aes(factor(block),roi,fill=variant))+
+ geom_col(position='dodge')+facet_wrap(~budget_cny,ncol=1)+labs(x='每50期固定时间段',y='分段ROI',fill='规则')
+blocks
+ggsave(file.path(study,'exchange-blocks.png'),blocks,width=12,height=7,dpi=160)
+stake<-ggplot(z$paired |> filter(variant!='JOINT'),aes(delta_stake,delta_net,color=variant,shape=factor(budget_cny)))+
+ geom_point(size=3)+geom_hline(yintercept=0,linetype=2)+labs(x='相对JOINT新增投入（元）',y='新增净收益（元）',color='规则',shape='预算')
+stake
+ggsave(file.path(study,'exchange-stake.png'),stake,width=12,height=7,dpi=160)
+risk<-ggplot(z$summary,aes(mean_pair_overlap,zero_hit_issues/funded_issues,color=variant,shape=factor(budget_cny)))+
+ geom_point(size=3)+labs(x='平均组间共享场次数',y='投注期零命中比例',color='规则',shape='预算')
+risk
+ggsave(file.path(study,'exchange-risk.png'),risk,width=12,height=7,dpi=160)
+```
+
+## 输入身份
+
+```{r}
+knitr::kable(tibble(item=c('本轮冻结SHA256','来源冻结SHA256','结算表SHA256'),
+ value=c(receipt$freeze_sha256,freeze$source_freeze_sha256,receipt$results_sha256)))
+```
+
+## 验收与复现
+
+23项R断言、8项Python测试通过（含共享来源验证测试）；5400份计划／结算独立复算、1800份原对照复现、cutoff静态检查及持久化路径检查通过。六张诊断图已检查；QMD以新R进程执行，缓存和freeze关闭。复现采用R4.6.1、项目Python和Quarto1.10.18，路径及R库应在运行前显式设置。
+
+最终Codex review无可修复发现，独立重算支持上述历史研究结论。审核日志SHA256：`741363ff02aa258b768e72ec56834ed9e27acf2fc956375d0e4f97928abe9244`。首轮发现的“复算未重新验证冻结实现及底层来源绑定”已修复，并加入代码、cutoff及来源变更拒绝测试。本节为审核后的验收记录。
+
+全仓库仍有前序完整R测试记录的6项失败／错误与2项集成跳过，涉及解释器、缺失测试数据和重训上下文，均在本次改动之外；本次范围验收不等于全仓库绿灯或允许合并。函数／测试对应关系及完整限制见`docs/research/n7_budget_exchanges_455.md`。
+
+```bash
+Rscript -e 'for(f in c("group-exchange","frozen-scenarios")) testthat::test_file(paste0("tests/testthat/test-n7-",f,".R"),stop_on_failure=TRUE)'
+"$python" -m pytest tests/test_n7_exchange_replay.py tests/test_n7_union_inputs.py -q
+"$python" scripts/check_cutoff_governance.py
+"$python" scripts/check_persistent_data_layout.py --contract config/persistent_data_layout.json
+Rscript scripts/run_n7_group_exchanges.R "$config"
+"$python" scripts/check_n7_group_exchanges.py "$study" > "$study/selection-replay.json"
+Rscript scripts/settle_n7_group_exchanges.R "$study"
+"$python" scripts/check_n7_group_exchanges.py "$study" --settlement > "$study/settlement-replay.json"
+quarto render quarto/157_n7_group_exchanges.qmd --execute --cache-refresh --execute-dir "$repository_root" -P study:"$study"
+```
+
+选组入口要求新的输出目录；复算和报告可直接读取既有冻结研究。规则和资金上限均在结算前确定，未按本轮结果追加参数搜索。

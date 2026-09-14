@@ -1,0 +1,21 @@
+root<-normalizePath(file.path(testthat::test_path(),'../..'))
+source(file.path(root,'r/n7_capital_portfolio.R'))
+source(file.path(root,'r/n7_frozen_scenarios.R'))
+testthat::test_that('JSON empty and singleton scenario matrices preserve their shape', {
+ cuts<-list(a='epoch')
+ x<-list(options=list(),cutoffs=cuts,opening_options=list(),opportunity_options=list(),
+   train=list(cutoffs=cuts,hits=list(list(),list()),gross=list(list(),list())))
+ x$evaluation<-x$train
+ out<-n7_frozen_scenarios(x,cuts)
+ testthat::expect_equal(dim(out$train$hits),c(2L,0L))
+ x$options<-list(list(sleeve_id=0,stake=2,coverage=.5,expected_gross=2,unit_copies=1,
+  fixtures=as.list(1:7),state_ids=list(1),state_payout=list(4)))
+ x$opening_options<-list(1)
+ x$train$hits<-list(list(1),list(0));x$train$gross<-list(list(4),list(0));x$evaluation<-x$train
+ out<-n7_frozen_scenarios(x,cuts)
+ testthat::expect_equal(out$train$hits,matrix(c(1,0),2,1))
+ testthat::expect_equal(out$pool$options[[1]]$fixtures,1:7)
+ testthat::expect_error(n7_frozen_scenarios(x,list(a='later')))
+ x$train$hits[[1]]<-list(1,0)
+ testthat::expect_error(n7_frozen_scenarios(x,cuts))
+})
