@@ -28,6 +28,10 @@ for root,freeze_name in [(args.refill,'prediction-freeze.json'),(args.control,'p
         path=root/name
         if hashlib.sha256(path.read_bytes()).hexdigest()!=expected:raise ValueError('Prediction binding changed')
         bindings[str(path)]=expected
+    if root==args.control:
+        prior_receipt=json.loads((root/'evaluation-receipt.json').read_text())
+        if prior_receipt['freeze_sha256']!=bindings[str(root/freeze_name)]:
+            raise ValueError('Control settlement freeze binding changed')
 refill_freeze=json.loads((args.refill/'prediction-freeze.json').read_text())
 control=pd.read_csv(args.control/'predictions.csv',dtype={'issue':str})
 control=control[control.minimum_sp.isin([1.,1.3])].copy()
@@ -73,6 +77,8 @@ actual=pd.DataFrame(settled)
 new=refill.merge(actual[['issue','arm','seed','gross','net','hits','physical_tickets']],
                  on=['issue','arm','seed'],validate='one_to_one')
 prior_receipt=json.loads((args.control/'evaluation-receipt.json').read_text())
+if prior_receipt['freeze_sha256']!=bindings[str(args.control/'plans-frozen.json')]:
+    raise ValueError('Control settlement freeze binding changed')
 if hashlib.sha256((args.control/'results.csv').read_bytes()).hexdigest()!=prior_receipt['results_sha256']:
     raise ValueError('Control settlement binding changed')
 prior=pd.read_csv(args.control/'results.csv',dtype={'issue':str})

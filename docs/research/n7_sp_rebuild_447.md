@@ -39,5 +39,6 @@ Function/test mapping:
 | `check_refill_prefixes` | `tests/test_n7_sp_refill_check.py` |
 | `settle_refill_plans` | `tests/test_n7_sp_refill_settlement.py` |
 | `n7_sp_refill_diagnostics` | `tests/testthat/test-n7-sp-refill-diagnostics.R` |
+| Settlement/check command receipt boundaries | `tests/test_n7_sp_refill_receipts.py` |
 
 The prediction command is `Rscript scripts/run_n7_sp_refill.R CONFIG.json`. Its explicit configuration and every input path are retained in `prediction-freeze.json`; use a new output directory for replay. Settlement is `python -m scripts.settle_n7_sp_refill --refill REFILL --control CONTROL --audit-study AUDIT --output OUTPUT`. Independent acceptance is `python -m scripts.check_n7_sp_refill --refill REFILL --replay REPLAY --comparison OUTPUT --repository ROOT`. Render `quarto/153_n7_sp_refill.qmd` with execution/cache refresh, repository execution directory, and the explicit `study` parameter. Restore the project R/Python environments before running; do not install dependencies during rendering.

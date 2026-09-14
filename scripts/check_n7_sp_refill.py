@@ -17,6 +17,9 @@ p.add_argument('--comparison',required=True,type=Path)
 p.add_argument('--repository',required=True,type=Path)
 a=p.parse_args()
 evaluation=json.loads((a.comparison/'evaluation-receipt.json').read_text())
+for name,field in [('results.csv','results_sha256'),('plans-frozen.json','freeze_sha256')]:
+    if hashlib.sha256((a.comparison/name).read_bytes()).hexdigest()!=evaluation[field]:
+        raise ValueError('Comparison output binding changed: '+name)
 verify_implementation_closure(a.repository,evaluation['settlement_implementation'])
 for path,sha in evaluation['settlement_inputs'].items():
     if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=sha:raise ValueError('Settlement input changed')
