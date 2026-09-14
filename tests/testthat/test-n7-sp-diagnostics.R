@@ -1,0 +1,33 @@
+library(dplyr)
+source(file.path('..','..','r','fundamentals_equity_curves.R'))
+source(file.path('..','..','r','n7_sweet_union_summary.R'))
+source(file.path('..','..','r','n7_selection_diagnostics.R'))
+source(file.path('..','..','r','n7_sp_diagnostics.R'))
+testthat::test_that('SP comparisons retain no-bet periods and match common exposure exactly', {
+ x<-tibble(issue=rep(c('01','02','03'),2),arm=rep(c('base','filtered'),each=3),seed=1,
+ mode='DEPTH',objective='any_hit',allocation_order='OPEN_FIRST',budget_cny=512,
+ minimum_sp=rep(c(1,1.5),each=3),stake=c(2,2,2,2,0,2),gross=c(8,0,0,4,0,0),
+ hits=c(1,0,0,1,0,0),total_fixtures=8,eligible_fixtures=c(8,8,8,7,6,7),
+ total_groups=2,eligible_groups=c(2,2,2,1,0,1),eligible_core_groups=c(2,2,2,1,0,1),
+ removed_top1_mass=c(0,0,0,.8,1.6,.8)) |> mutate(net=gross-stake,cash=budget_cny-stake)
+ z<-n7_sp_diagnostics(x,c('01','02','03'),100000)
+ testthat::expect_equal(nrow(z$summary),2)
+ a<-filter(z$summary,arm=='filtered')
+ testthat::expect_equal(a$stake,4)
+ testthat::expect_equal(a$net,0)
+ testthat::expect_equal(a$roi,0)
+ testthat::expect_equal(a$profit_issues,1)
+ testthat::expect_equal(a$max_drawdown,2)
+ testthat::expect_equal(filter(z$paired,arm=='filtered')$delta_net,-2)
+ common<-filter(z$common,arm=='filtered')
+ testthat::expect_equal(common$common_issues,2)
+ testthat::expect_equal(common$original_net,4)
+ testthat::expect_equal(common$filtered_net,0)
+ testthat::expect_true(is.na(z$per_issue$issue_roi[5]))
+ testthat::expect_equal(filter(z$admission_summary,minimum_sp==1.5)$no_group_issues,1)
+ testthat::expect_equal(filter(z$admission_summary,minimum_sp==1.5)$enough_fixtures_to_rebuild,2)
+ testthat::expect_error(n7_sp_diagnostics(filter(x,arm=='filtered'),c('01','02','03'),100000))
+ testthat::expect_error(n7_sp_diagnostics(bind_rows(x,x[1,]),c('01','02','03'),100000))
+ bad<-x;bad$eligible_fixtures[1]<-9
+ testthat::expect_error(n7_sp_diagnostics(bad,c('01','02','03'),100000))
+})
