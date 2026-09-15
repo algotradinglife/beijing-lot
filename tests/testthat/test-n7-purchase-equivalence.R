@@ -1,0 +1,41 @@
+source('../../r/n7_purchase_equivalence.R')
+
+testthat::test_that('purchase comparisons ignore only descriptive metadata', {
+ cut<-list('01'='2010-01-01T00:00:00Z')
+ opt<-list(sleeve_id=0,fixtures=1:7,state_ids=1:3,depth=3,stake=6,coverage=.25,expected_gross=4)
+ a<-list(pool=list(options=list(opt),fixtures=list(id='x'),cutoffs=cut),fit=list(selected=1L),worlds=matrix(1,2,2))
+ b<-a;b$pool$options[[1]]$rule<-'renamed';names(b$pool$options[[1]]$depth)<-'incidental'
+ testthat::expect_true(all(n7_purchase_equivalence(a,b,cut)))
+ b$pool$options[[1]]$state_ids<-c(1L,2L,4L)
+ z<-n7_purchase_equivalence(a,b,cut)
+ testthat::expect_false(z[['pool_options']]);testthat::expect_false(z[['selected_tickets']])
+ b<-a;b$fit$selected<-integer()
+ testthat::expect_false(n7_purchase_equivalence(a,b,cut)[['selected_tickets']])
+ a$fit$selected<-integer()
+ testthat::expect_true(all(n7_purchase_equivalence(a,b,cut)))
+ b$pool$options[[1]]$coverage<-.3
+ testthat::expect_false(n7_purchase_equivalence(a,b,cut)[['pool_options']])
+ testthat::expect_true(n7_purchase_equivalence(a,b,cut)[['selected_tickets']])
+ b<-a;b$pool$fixtures<-list(id='y')
+ testthat::expect_false(n7_purchase_equivalence(a,b,cut)[['fixtures']])
+ b<-a;b$worlds[1,1]<-2
+ testthat::expect_false(n7_purchase_equivalence(a,b,cut)[['worlds']])
+ b<-a;b$fit$selected<-TRUE
+ testthat::expect_error(n7_purchase_equivalence(a,b,cut))
+ b<-a;b$pool$options[[1]]$state_ids<-NULL
+ testthat::expect_error(n7_purchase_equivalence(a,b,cut))
+ b<-a;b$pool$options[[1]]$stake<-8
+ testthat::expect_error(n7_purchase_equivalence(a,b,cut))
+})
+testthat::test_that('empty pools are valid but malformed selections fail', {
+ cut<-list('01'='2010-01-01T00:00:00Z')
+ a<-list(pool=list(options=list(),fixtures=list(),cutoffs=cut),fit=list(selected=integer()),worlds=matrix(numeric(),0,0))
+ testthat::expect_true(all(n7_purchase_equivalence(a,a,cut)))
+ b<-a;b$fit$selected<-1L
+ testthat::expect_error(n7_purchase_equivalence(a,b,cut))
+ testthat::expect_error(n7_purchase_equivalence(a,a,list('01'='later')))
+ b<-a;b$pool$fixtures<-NULL
+ testthat::expect_error(n7_purchase_equivalence(a,b,cut))
+ b<-a;b$worlds<-NULL
+ testthat::expect_error(n7_purchase_equivalence(a,b,cut))
+})

@@ -1,0 +1,240 @@
+---
+title: "旧 JOINT 与新让平校正：概率及购票实现的交叉诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  parent: null
+  drawdown: null
+  old_check: null
+  new_check: null
+  pool_check: null
+  output: null
+---
+
+## 比较口径
+
+旧方案的完整494期单独保留。四组共同范围为预热后484期，分别为回撤前305期、
+回撤区94期和回撤后85期。全部使用同一期1024元预算、10万元本金、2元票额，
+回款包含且仅包含一次0.65系数。本报告不重训或调参，也不将历史代理时点称为真实赛前可用。
+
+A为旧概率＋旧实现，B为新概率＋旧实现，C为旧概率＋新实现，D为新概率＋新实现。
+若完整票单核验表明A=C、B=D，则报告两个重合的结果，不能假装存在独立的购票规则效应。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+modules<-paste0('r/',c('diagnostic_verified_csv','diagnostic_verified_rds','n7_quality_settlement',
+ 'fundamentals_equity_curves','n7_baseline_comparison','n7_winner_changes','n7_purchase_equivalence','n7_replay_checks'),'.R')
+implementation_paths<-c(modules,'quarto/181_probability_rule_factorial.qmd','config/top2_outside_validation.json')
+implementation<-setNames(vapply(implementation_paths,digest::digest,character(1),file=TRUE,algo='sha256'),implementation_paths)
+for(f in modules)source(f)
+stopifnot(all(vapply(params,function(x)!is.null(x),logical(1))))
+cfg<-jsonlite::fromJSON('config/top2_outside_validation.json')
+s<-params$study
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+old<-diagnostic_read_verified_csv(file.path(s,'evaluation/results.csv'),cfg$source_results_sha256,cols(issue='c')) |>
+ filter(variant=='JOINT',seed==cfg$seed,budget_cny==cfg$budget_cny,status=='BREADTH_COMPLETE')
+stopifnot(nrow(old)==494,!anyDuplicated(old$issue))
+labels<-diagnostic_read_verified_csv(file.path(s,'current-settlement/fixture-audit.csv'),ar$files[['fixture-audit.csv']],cols(issue='c',provider_id='c'))
+old_groups<-diagnostic_read_verified_csv(file.path(s,'evaluation/settled-groups.csv'),er$files[['settled-groups.csv']],cols(issue='c',sleeve_id='c')) |>
+ semi_join(old |> select(issue,arm,seed),by=c('issue','arm','seed'))
+old_ranks<-diagnostic_read_verified_csv(file.path(s,'current-settlement/ranks.csv'),ar$files[['ranks.csv']],cols(issue='c',sleeve_id='c',fixture_slots='c'))
+label_issues<-split(labels,labels$issue);reference_issues<-split(old_ranks,old_ranks$issue)
+oc<-jsonlite::fromJSON(file.path(params$old_check,'receipt.json'))
+nc<-jsonlite::fromJSON(file.path(params$new_check,'receipt.json'))
+stopifnot(oc$status=='PASS',oc$issues==494,nc$status=='PASS',nc$issues==390)
+checks_old<-diagnostic_read_verified_csv(file.path(params$old_check,'progress.csv'),oc$progress_sha256,cols(issue='c'))
+sealed_new<-jsonlite::fromJSON(file.path(params$new_check,'verified-receipt.json'))
+stopifnot(sealed_new$status=='PASS',sealed_new$catalog_sha256==cfg$catalog_sha256,
+ sealed_new$config_sha256==digest::digest(file='config/top2_outside_validation.json',algo='sha256'))
+checks_new<-diagnostic_read_verified_csv(file.path(params$new_check,'progress.csv'),sealed_new$progress_sha256,cols(issue='c'))
+n7_replay_checks(checks_old,old$issue,c('old_new_tickets_identical','legacy_funded_identical','worlds_identical'))
+n7_replay_checks(checks_new,cfg$issues,c('tickets_identical','worlds_identical'))
+pool_receipt<-jsonlite::fromJSON(file.path(params$pool_check,'receipt.json'),simplifyVector=FALSE)
+stopifnot(pool_receipt$status=='PASS',pool_receipt$rows==884,
+ pool_receipt$catalog_sha256==cfg$catalog_sha256,
+ pool_receipt$config_sha256==digest::digest(file='config/top2_outside_validation.json',algo='sha256'))
+for(f in names(pool_receipt$implementation))stopifnot(digest::digest(file=f,algo='sha256')==pool_receipt$implementation[[f]])
+pool_checks<-diagnostic_read_verified_csv(file.path(params$pool_check,'checks.csv'),pool_receipt$checks_sha256,cols(issue='c'))
+stopifnot('foundation' %in% names(pool_checks),is.character(pool_checks$foundation),
+ !anyNA(pool_checks$foundation),setequal(pool_checks$foundation,c('OLD','NEW')))
+n7_replay_checks(filter(pool_checks,foundation=='OLD'),old$issue,c('fixtures','pool_options','selected_tickets','worlds'))
+n7_replay_checks(filter(pool_checks,foundation=='NEW'),cfg$issues,c('fixtures','pool_options','selected_tickets','worlds'))
+parent_receipt<-jsonlite::fromJSON(file.path(params$parent,'plans-receipt.json'),simplifyVector=FALSE)
+stopifnot(sealed_new$parent_receipt_sha256==digest::digest(file=file.path(params$parent,'plans-receipt.json'),algo='sha256'))
+stopifnot(pool_receipt$parent_receipt_sha256==sealed_new$parent_receipt_sha256)
+dd_receipt<-jsonlite::fromJSON(file.path(params$drawdown,'receipt.json'),simplifyVector=FALSE)
+stopifnot(dd_receipt$status=='FROZEN_NOT_SETTLED',dd_receipt$parent_models_sha256==parent_receipt$model_sha256)
+bindings<-c(lapply(parent_receipt$bindings,function(x){x$root<-params$parent;x$rule<-'NEW_RULE';x$path<-x$replay;x$sha256<-x$replay_sha256;x}),
+ lapply(dd_receipt$bindings,function(x){x$root<-params$drawdown;x}))
+bindings<-Filter(function(x)is.null(x$arm)||x$arm=='HANDICAP_PROB',bindings)
+plans<-funded<-ranks<-identities<-old_identities<-rule_checks<-list()
+for(binding in bindings) {
+ replay<-diagnostic_read_verified_rds(file.path(binding$root,binding$path),binding$sha256)
+ id<-binding$issue;rule<-binding$rule;result<-replay$result
+ label_rows<-label_issues[[id]];reference_rows<-reference_issues[[id]]
+ source_fixture_rows<-bind_rows(replay$fixtures)
+ if(rule=='OLD_RULE') {
+  counterpart<-Filter(function(x)x$issue==id && x$rule=='NEW_RULE',dd_receipt$bindings)
+  stopifnot(length(counterpart)==1)
+  other<-diagnostic_read_verified_rds(file.path(params$drawdown,counterpart[[1]]$path),counterpart[[1]]$sha256)
+  eq<-n7_purchase_equivalence(result,other$result,replay$cutoffs)
+  stopifnot(all(eq))
+  rule_checks[[id]]<-tibble(issue=id,check=names(eq),equal=unname(eq))
+ }
+ selected<-result$pool$options[result$fit$selected]
+ stake<-sum(vapply(selected,`[[`,numeric(1),'stake'))
+ plans[[length(plans)+1L]]<-tibble(issue=id,arm=rule,seed=cfg$seed,stake=stake,
+  budget_cny=cfg$budget_cny,cash=cfg$budget_cny-stake,groups=length(selected))
+ for(opt in selected)funded[[length(funded)+1L]]<-tibble(issue=id,arm=rule,seed=cfg$seed,
+  sleeve_id=as.character(opt$sleeve_id),depth=as.numeric(opt$depth),stake=as.numeric(opt$stake),copies=1)
+ for(j in seq_len(nrow(result$surface$prob_mat))) {
+  sid<-rownames(result$surface$prob_mat)[j]
+  slots<-strsplit(result$surface$summary$fixture_slots[j],'|',fixed=TRUE)[[1]]
+  f<-label_rows[match(slots,as.character(label_rows$slot)),]
+  stopifnot(nrow(f)==7,!anyNA(f$provider_id),all(f$status=='READY'),all(f$actual_direction %in% c('W','D','L')))
+  source_f<-source_fixture_rows[match(slots,as.character(source_fixture_rows$slot)),]
+  stopifnot(identical(as.character(source_f$provider_id),f$provider_id))
+  state<-1+sum((match(f$actual_direction,c('W','D','L'))-1)*3^(6:0))
+  rank<-match(state,result$surface$rank_idx[j,])
+  pay<-cfg$unit_cny*cfg$payout_factor*prod(f$spf_sp)
+  reference<-reference_rows[reference_rows$sleeve_id==sid,]
+  stopifnot(nrow(reference)==1,abs(pay-reference$actual_gross_cny)<1e-6)
+  legacy_slots<-strsplit(reference$fixture_slots,',',fixed=TRUE)[[1]]
+  stopifnot(identical(slots,legacy_slots),state==reference$actual_state_id+1)
+  legacy_f<-label_rows[match(legacy_slots,as.character(label_rows$slot)),]
+  stopifnot(nrow(legacy_f)==7,!anyNA(legacy_f$provider_id))
+  old_identities[[length(old_identities)+1L]]<-tibble(issue=id,sleeve_id=sid,
+   ticket_key=paste(sort(paste(legacy_f$provider_id,legacy_f$actual_direction,sep=':')),collapse='|'))
+  ranks[[length(ranks)+1L]]<-tibble(issue=id,arm=rule,sleeve_id=sid,actual_rank=rank,actual_gross_cny=pay)
+  identities[[length(identities)+1L]]<-tibble(issue=id,sleeve_id=sid,
+   ticket_key=paste(sort(paste(f$provider_id,f$actual_direction,sep=':')),collapse='|'))
+ }
+}
+plans<-bind_rows(plans)
+funded<-bind_rows(tibble(issue=character(),arm=character(),seed=numeric(),sleeve_id=character(),
+ depth=numeric(),stake=numeric(),copies=numeric()),bind_rows(funded));ranks<-bind_rows(ranks)
+ids<-sort(setdiff(old$issue,cfg$warmup_issues));stopifnot(length(ids)==484)
+settled<-list()
+for(rule in unique(plans$arm))settled[[rule]]<-n7_quality_settlement(filter(plans,arm==rule),filter(funded,arm==rule),filter(ranks,arm==rule))
+new<-settled$NEW_RULE$rows
+stopifnot(setequal(new$issue,ids),nrow(new)==484)
+dd_old<-settled$OLD_RULE$rows
+dd_pair<-inner_join(dd_old,new,by='issue',suffix=c('_old','_new'),relationship='one-to-one')
+stopifnot(nrow(dd_pair)==94,all(dd_pair$stake_old==dd_pair$stake_new),all(abs(dd_pair$gross_old-dd_pair$gross_new)<1e-8))
+old_rows<-old |> transmute(issue,policy='A_OLD_OLD',model='FROZEN',stake,gross,net,budget_cny,
+ cash_cny=budget_cny-stake,status=if_else(stake>0,'COMPLETE','NO_BET'),hits)
+new_rows<-new |> transmute(issue,policy='D_NEW_NEW',model='HANDICAP',stake,gross,net,budget_cny,
+ cash_cny=cash,status=if_else(stake>0,'COMPLETE','NO_BET'),hits)
+rows<-bind_rows(filter(old_rows,issue %in% ids),new_rows,
+ filter(old_rows,issue %in% ids) |> mutate(policy='C_OLD_NEW'),new_rows |> mutate(policy='B_NEW_OLD')) |>
+ mutate(stage=case_when(issue %in% cfg$excluded_drawdown_issues~'DRAWDOWN_94',issue<'111104'~'BEFORE_305',TRUE~'AFTER_85'))
+comparison<-n7_baseline_comparison(rows,ids,c('BEFORE_305','DRAWDOWN_94','AFTER_85'),'A_OLD_OLD',cfg$initial_capital_cny)
+full<-strategy_equity_curves(old_rows,sort(old$issue),cfg$initial_capital_cny)
+full_comparison<-n7_baseline_comparison(old_rows |> mutate(stage=case_when(
+ issue %in% cfg$excluded_drawdown_issues~'DRAWDOWN_94',issue<'111104'~'BEFORE_315',TRUE~'AFTER_85')),
+ sort(old$issue),c('BEFORE_315','DRAWDOWN_94','AFTER_85'),'A_OLD_OLD',cfg$initial_capital_cny)
+identity<-distinct(bind_rows(identities))
+old_identity<-distinct(bind_rows(old_identities))
+stopifnot(!anyDuplicated(identity[c('issue','sleeve_id')]),!anyDuplicated(old_identity[c('issue','sleeve_id')]))
+winners<-bind_rows(old_groups |> filter(issue %in% ids,gross>0) |> transmute(issue,sleeve_id,policy='OLD',gross_cny=gross) |>
+ left_join(old_identity,by=c('issue','sleeve_id'),relationship='many-to-one'),
+ settled$NEW_RULE$groups |> filter(gross>0) |> transmute(issue,sleeve_id,policy='NEW',gross_cny=gross) |>
+ left_join(identity,by=c('issue','sleeve_id'),relationship='many-to-one'))
+changes<-n7_winner_changes(winners,ids,'OLD','NEW')
+attribution<-changes$issues |>
+ left_join(old_rows |> select(issue,old_stake=stake,old_gross=gross,old_net=net),by='issue',relationship='one-to-one') |>
+ left_join(new_rows |> select(issue,new_stake=stake,new_gross=gross,new_net=net),by='issue',relationship='one-to-one') |>
+ mutate(stake_saved=old_stake-new_stake,net_change=new_net-old_net)
+stopifnot(all(abs(attribution$gross_change-(attribution$new_gross-attribution$old_gross))<1e-6),
+ all(abs(attribution$net_change-(attribution$added_gross-attribution$lost_gross+attribution$stake_saved))<1e-6))
+out<-params$output;stopifnot(!dir.exists(out),dir.create(out,recursive=TRUE))
+write_csv(rows,file.path(out,'rows.csv'));write_csv(comparison$summary,file.path(out,'summary.csv'))
+write_csv(comparison$curves,file.path(out,'curves.csv'));write_csv(full,file.path(out,'old-full494.csv'))
+write_csv(full_comparison$summary,file.path(out,'old-full494-summary.csv'))
+write_csv(changes$issues,file.path(out,'winner-changes.csv'));write_csv(changes$tickets,file.path(out,'winning-tickets.csv'))
+write_csv(attribution,file.path(out,'net-attribution.csv'))
+write_csv(bind_rows(rule_checks),file.path(out,'drawdown-rule-equivalence.csv'))
+write_csv(pool_checks,file.path(out,'outside-pool-equivalence.csv'))
+knitr::kable(comparison$summary |> select(evaluation,policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny),digits=2)
+```
+
+## 旧方案完整494期与预热期
+
+```{r}
+knitr::kable(full_comparison$summary |> select(evaluation,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny),digits=2)
+knitr::kable(old_rows |> filter(issue %in% cfg$warmup_issues) |> summarise(
+ issues=n(),stake=sum(stake),net=sum(net),roi_percent=100*net/stake,hit_issues=sum(gross>0)),digits=2)
+old_plot<-full |> pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='value') |>
+ mutate(metric=factor(metric,levels=c('equity_cny','drawdown_cny'),labels=c('资金余额','距历史高点的回撤')))
+p0<-ggplot(old_plot,aes(period,value))+
+ annotate('rect',xmin=315.5,xmax=409.5,ymin=-Inf,ymax=Inf,fill='grey80',alpha=.3)+
+ geom_line(color='#0072B2',linewidth=.65)+facet_wrap(~metric,ncol=1,scales='free_y')+theme_minimal()+
+ labs(x='完整494期（顺序）',y='元',title='旧 JOINT：保留原始回撤结构',subtitle='灰色区：111104–120419；不剔除回撤或预热期')
+ggsave(file.path(out,'old-full494-equity-drawdown.png'),p0,width=12,height=8,dpi=150);p0
+```
+
+## 资金与回撤
+
+```{r}
+plot_rows<-comparison$curves |> filter(evaluation=='ALL',policy %in% c('A_OLD_OLD','D_NEW_NEW')) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='value') |>
+ mutate(metric=factor(metric,levels=c('equity_cny','drawdown_cny'),labels=c('资金余额','距历史高点的回撤')))
+p<-ggplot(plot_rows,aes(period,value,color=policy))+
+ annotate('rect',xmin=305.5,xmax=399.5,ymin=-Inf,ymax=Inf,fill='grey80',alpha=.3)+
+ geom_line(linewidth=.65)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ scale_color_manual(values=c(A_OLD_OLD='#0072B2',D_NEW_NEW='#D55E00'),labels=c(A_OLD_OLD='旧概率（A=C）',D_NEW_NEW='新校正（B=D）'))+theme_minimal()+
+ labs(x='共同484期（顺序）',y='元',color='方案',title='相同预算：旧概率与新校正概率',
+ subtitle='灰色区为原94期回撤窗口；同一概率下两套购票实现重合')
+ggsave(file.path(out,'equity-drawdown.png'),p,width=12,height=8,dpi=150);p
+```
+
+## 中奖票变化
+
+```{r}
+knitr::kable(attribution |> left_join(distinct(rows,issue,stage),by='issue',relationship='many-to-one') |>
+ group_by(stage) |> summarise(across(c(retained,added,lost,added_gross,lost_gross,stake_saved,net_change),sum)),digits=2)
+```
+
+## 结论
+
+本轮支持继续保留旧 JOINT 冻结方案作为研究基线，不支持将本轮 HANDICAP 校正全局替换它。
+四组对照的购票实现事实上等价：A=C，B=D。概率版本变化会继续影响SP准入、组覆盖成本、
+联合选组与购买票单，因此这里识别的是概率变化传导至整个策略后的总效果，不是把下游票单固定的局部效应。
+
+- 共同484期，旧概率净收益53,342.31元、ROI 12.40%；新校正净亏5,211.52元、ROI −1.31%。
+  两者实际投入分别430,268元和397,760元；每期预算上限相同，实际支出不同。
+- 新校正在回撤94期少亏6,904.80元，但中奖组由114降至101、命中期由32降至29。
+  新增中奖票回款21,571.14元，丢失中奖票回款26,184.35元，回款反而少4,613.20元；
+  节省投入11,518元才使净损失减少。不能把这个局部改善解释为命中修复。
+- 回撤前305期和后85期，新校正分别损失54,131.59元、11,327.04元的相对净收益。
+  回撤区局部少亏不足以抵消其他区间的损失。
+- 完整共同期次的最大回撤仅从23,852.02元降至23,407.12元，同时少赚58,553.83元；
+  从整体收益和回撤看，没有形成值得替换基线的改进。
+
+本轮不增加新的校正阈值或购票变种。后续研究应保留旧概率不动，检验覆盖与资金使用效率；
+任何概率校正都需要同时满足全期和分段对照，不能仅凭已知回撤区的净损失下降升级。
+以上是历史研究结论，不是对未来盈利的证明；旧冻结概率的历史可用性与新模型的代理时间限制仍然存在。
+
+## 复现凭据
+
+```{r}
+stopifnot(identical(implementation,setNames(vapply(implementation_paths,digest::digest,character(1),file=TRUE,algo='sha256'),implementation_paths)))
+outputs<-list.files(out,pattern='[.](csv|png)$')
+inputs<-c(file.path(params$old_check,c('receipt.json','progress.csv')),
+ file.path(params$new_check,c('receipt.json','verified-receipt.json','progress.csv')),
+ file.path(params$pool_check,c('receipt.json','checks.csv')),
+ file.path(params$parent,'plans-receipt.json'),file.path(params$drawdown,'receipt.json'),
+ file.path(s,'evaluation/receipt.json'),file.path(s,'current-settlement/receipt.json'))
+jsonlite::write_json(list(status='REPORT_REQUIRES_INDEPENDENT_REVIEW',historical_admission=FALSE,generated_at_utc=format(Sys.time(),tz='UTC',usetz=TRUE),
+ parameters=params,common_issues=ids,old_issues=sort(old$issue),implementation=as.list(implementation),
+ input_receipts=as.list(setNames(vapply(inputs,digest::digest,character(1),file=TRUE,algo='sha256'),inputs)),
+ files=as.list(setNames(vapply(file.path(out,outputs),digest::digest,character(1),file=TRUE,algo='sha256'),outputs))),
+ file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
