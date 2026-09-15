@@ -14,6 +14,7 @@ params:
   structure: null
   structure_sha256: null
   labels: null
+  labels_sha256: null
   output: null
 ---
 
@@ -39,7 +40,7 @@ for(i in 1:2) {
 stopifnot(identical(receipts[[1]]$scope,receipts[[2]]$scope),
  receipts[[2]]$parent_receipt_sha256==hashes[1])
 ids<-unlist(receipts[[1]]$scope)
-labels<-diagnostic_read_verified_csv(params$labels,'ef9082abfbd5fffe497cb632c5cdfc37522b6c8ad02ff7125b0e940a51672c32',cols(issue='c',provider_id='c')) |>
+labels<-diagnostic_read_verified_csv(params$labels,params$labels_sha256,cols(issue='c',provider_id='c')) |>
  select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
 groups<-models<-list()
 for(i in 1:2)for(id in ids) {
@@ -68,6 +69,14 @@ drawdown_percent<-comparison$curves |> group_by(evaluation,policy) |>
  summarise(max_drawdown_percent=100*max(drawdown_cny/cummax(equity_cny)),.groups='drop')
 summary<-comparison$summary |> left_join(drawdown_percent,by=c('evaluation','policy'),relationship='one-to-one')
 knitr::kable(summary,digits=2)
+original_ids<-c(cfg$issues,cfg$excluded_drawdown_issues)
+cohort_rows<-rows |> mutate(stage=if_else(issue %in% original_ids,'ORIGINAL','ADDITIONAL'))
+cohort_comparison<-n7_baseline_comparison(cohort_rows,ids,unique(cohort_rows$stage),'JOINT',100000)
+cohort_drawdown<-cohort_comparison$curves |> group_by(evaluation,policy) |>
+ summarise(max_drawdown_percent=100*max(drawdown_cny/cummax(equity_cny)),.groups='drop')
+cohort_summary<-cohort_comparison$summary |>
+ left_join(cohort_drawdown,by=c('evaluation','policy'),relationship='one-to-one')
+knitr::kable(cohort_summary,digits=2)
 ```
 
 ## 收益及回撤曲线
@@ -131,14 +140,14 @@ for(k in c(1L,3L,5L)) {
 }
 trimmed<-bind_rows(trimmed);knitr::kable(trimmed,digits=2)
 o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
-for(n in c('rows','groups','summary','exposure','trimmed','curves','profiles','role_support'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+for(n in c('rows','groups','summary','cohort_summary','exposure','trimmed','curves','profiles','role_support'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
 write_csv(comparison$paired,file.path(o,'paired.csv'))
 ggsave(file.path(o,'equity.png'),equity_plot,width=13,height=16,dpi=160)
 ggsave(file.path(o,'drawdown.png'),drawdown_plot,width=13,height=16,dpi=160)
 ggsave(file.path(o,'shapes.png'),shape_plot,width=13,height=16,dpi=160)
 artifacts<-list.files(o,full.names=TRUE)
 jsonlite::write_json(list(status='PENDING_INDEPENDENT_REVIEW',scope=ids,parent_hashes=hashes,code=code,
- labels_sha256='ef9082abfbd5fffe497cb632c5cdfc37522b6c8ad02ff7125b0e940a51672c32',
+ labels_sha256=params$labels_sha256,
  files=setNames(as.list(vapply(artifacts,digest::digest,character(1),file=TRUE,algo='sha256')),basename(artifacts)),
 historical_admission=FALSE),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
 ```
