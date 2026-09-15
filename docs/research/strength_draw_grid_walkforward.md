@@ -1,0 +1,9 @@
+# New market × strength draw mapping
+
+QMD192 tests newly fitted fixed grids, distinct from QMD191's archived mapping reference. Same legacy100issues6547fixtures; first10issues warmup, remaining90issues6114fixtures. Eighteen models across nine10-issue blocks compare market-only bins and market×strength bins. Edges fixed0/.1/.15/.2/.25/.3/.35/1; market-only uses one strength bin. Cumulative equal-weight history and prior strength100; no outcome-based tuning.
+
+Shared temporal_learning prior-label reader, frozen blocks, context, weighting, implementation closure and target validation govern chronology. Labels admitted only after last fixture+24h proxy, excluded target/later identities regardless of claimed dates. Domain callback aggregates admitted weighted draw counts. Targets are saved before evaluation; each model binds full context/receipt, schedule, code and parameters. These are historical proxies, not prospective availability proof. Old strength predictions are inventoried legacy evidence only.
+
+RAW Brier .646464, logloss1.069335, Top273.978%; market-grid .646426/1.069350/73.994%; joint-grid .646654/1.069709/74.239%. Adding strength to the matched market-grid control worsens proper scores, despite15 additional Top2 hits (16 versus RAW). It has not demonstrated better overall probabilities. No purchase-return implication is tested.
+
+Functions: src/strength_draw_context.py::strength_draw_context, r/strength_draw_grid.R::strength_draw_grid_fit/predict. Integration tests test-strength-draw-grid.R cover shared context, weighted cell arithmetic, normalization, target exclusion and post-cutoff label/clock mutation invariance, corrupt artifact/label rejection. Independent base-R replay recomputes all18models' admitted-cell predictions (12228 rows) and score summaries without the estimator. Scope-limited Codex review, clean QMD render, storage and governance evidence accompany published receipt.
