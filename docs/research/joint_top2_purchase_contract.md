@@ -106,3 +106,28 @@ The `140401/63` diagnostic exclusion records a noninteger original lottery
 handicap (`-0.5`). The displayed abandoned status is supporting context, not a
 replacement handicap or permission to rewrite source data. Full-data results
 must retain this exclusion ledger alongside missing-market and settlement gaps.
+
+## Independent replay entry points
+
+The mathematical verifiers are retained in the repository rather than only in
+local review artifacts. They are diagnostic checks, not purchase or fitting APIs;
+they do not import the production purchase/settlement functions.
+
+- `Rscript scripts/check_n7_purchase_replay.R PLAN_DIRECTORY RECEIPT_SHA256 OUTPUT_JSON`
+  reconstructs all 2,187 canonical states, ranking, exposure and greedy allocation.
+- `Rscript scripts/check_n7_purchase_gates.R MAIN_DIRECTORY STRUCTURE_DIRECTORY OUTPUT_JSON`
+  independently reconstructs head mass, coverage cost, roles and admitted options.
+- `Rscript scripts/check_n7_purchase_settlement.R REPORT_PARAMS_JSON OUTPUT_JSON`
+  checks official ticket payouts and chronological accounting after labels open.
+
+Use a fresh output path and the declared project R environment. The first two
+checks must pass before opening new labels; the third runs after report rendering.
+Bind verifier code hashes and resulting proof hashes in the acceptance record.
+Run long checks from a hash-bound immutable script copy; do not edit an R script
+while its process may still be reading it. The repository entry regression tests
+exercise changed purchase lists, malformed identity, missing columns, inconsistent
+net returns and mismatched parent receipts, alongside valid synthetic reports.
+These checks do not establish historical source availability or authorize a
+prospective learned policy. The settlement check covers the original stage
+summaries; the cohort extension additionally requires ORIGINAL/ADDITIONAL/ALL
+scope and accounting reconciliation.
