@@ -82,3 +82,11 @@ Top1准确率、Top1/Top2召回率与Top2漏选数。正让球加到主队比分
 - 同文件 `n7_diagnostic_supply(plans,fixtures,ranks,map,minimum_sp,breaks)`：逐场重算SP合格数、核对可用场次和账本差异，统计合格组、下注组、现金与分箱收益；现金期不丢弃。
 - 同文件 `n7_diagnostic_depth_distribution(ranks,funded,map,unit_cny,rank_breaks,extra_depths)`：分全部/合格/已选组统计中奖排名分位数、组等权和期等权CDF、未中组距中奖组合所差票数；不执行加深或改变预算。
 - 四函数测试：`tests/testthat/test-n7-recent-structure.R`。真实调用及证据结论：`quarto/161_recent295_strategy_diagnostics.qmd`。
+
+## 分块更新让平校正
+
+- `r/draw_refresh.R::draw_refresh_fit()` / `draw_refresh_predict()`：以原始市场让平概率与让胜负差绝对值分格；长期、近期条件率分别归一化，再按显式 alpha 混合。长期向原市场概率收缩，近期按共享 ESS 向长期收缩；保留每格支持数与实际近期权重。接受显式 cutoff，模型只用于封存块内的精确期身份及决策时点。测试 `tests/testthat/test-draw-refresh.R` 覆盖未来标签/时间扰动至支持、排名、准入、最终选票的不变性。
+- `src/draw_refresh_context.py`：领域数据桥接；只通过 `src/temporal_learning/prior_labels.py` 返回截止前、非目标期的标签，再调用共享 context。`src/temporal_learning/frozen_blocks.py` 定义按期数更新的冻结块及目标校验。原始完整结算不得直接传到 QMD 选组流程；上一块模型和票冻结后，下一块才打开其准入历史。测试 `tests/test_draw_refresh_context.py`。
+- `r/n7_probability_replay.R::n7_probability_bundle()` / `n7_probability_allocate()`：保留原候选组成员与原市场估算价格，重建概率乘积、排序和完整内容凭据，复用原 SP 门槛、覆盖前缀及联合选组器。不生成新候选、不替换北单结算 SP、不重复乘0.65。测试 `tests/testthat/test-n7-probability-replay.R`。
+- `r/diagnostic_verified_csv.R::diagnostic_read_verified_csv()`：对实际解析的同一份字节核验 SHA-256，显式列类型，解析失败停止；防止预检之后结算文件被替换。测试 `tests/testthat/test-diagnostic-verified-csv.R`。
+- 入口 `quarto/169_draw_refresh_drawdown.qmd`；`config/draw_refresh_drawdown.json` 固定已知94期窗口，输出目录必须新建，拒绝覆盖既有冻结包。历史标签采用最后场次＋显式延迟的代理，仍为历史诊断，不能授权未来使用。现有输入缺比分格，本轮只评价 W/D/L，不能声称大小球/比分约束已经再协调。
