@@ -1,0 +1,84 @@
+---
+title: "只使用战力让平信息：100期配对试验"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  evidence: null
+  receipt_sha256: null
+  python: null
+  output: null
+---
+
+本轮仅覆盖旧档案100608—101120的100期6,547场，不覆盖最近回撤段。
+直接混合仅替换让平概率，让胜/让负保持原市场比例；权重固定0%、25%、50%、100%，不选取事后最优值。
+同时评价旧“市场让平×战力让平”映射快照（ARCHIVED_GRID），作为回顾性对照；它不是本轮每10期重训的版本。
+不学习新映射，不把完整战力模型的胜负方向带入混合。旧档案的历史可用性限制保留。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+modules<-paste0('r/',c('diagnostic_verified_csv','strategy_diagnostic_probabilities','probability_foundation_pairs','strength_draw_blend'),'.R')
+for(f in modules)source(f)
+stopifnot(!dir.exists(params$output),digest::digest(file=file.path(params$evidence,'inputs.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(params$evidence,'inputs.json'),simplifyVector=FALSE)
+x<-diagnostic_read_verified_csv(file.path(params$evidence,'archived-strength.csv'),r$archived_strength_sha256,cols(issue='c',provider_id='c',cutoff_ts='c',fixture_decision_ts='c'))
+stopifnot(nrow(x)==6547,n_distinct(x$issue)==100,!anyDuplicated(x[c('issue','slot','provider_id')]),all(x$version=='market-strength-draw-1.0.0-diagnostic'))
+reticulate::use_python(params$python,required=TRUE);core<-reticulate::import('src.temporal_learning.core')
+all<-list()
+for(id in sort(unique(x$issue))) {
+ f<-x |> filter(issue==id) |> select(issue,slot,provider_id,handicap,cutoff_ts,fixture_decision_ts,q_W,q_D,q_L,p_D)
+ cutoff<-core$Cutoff$decision_epoch(id,unique(f$cutoff_ts))
+ all[[id]]<-strength_draw_blend(f,cutoff,c(0,.25,.5,1))
+}
+y<-bind_rows(bind_rows(all),
+ x |> transmute(issue,slot,provider_id,handicap,model='STRENGTH_FULL',W=p_W,D=p_D,L=p_L),
+ x |> transmute(issue,slot,provider_id,handicap,model='ARCHIVED_GRID',W=new_W,D=new_D,L=new_L))
+y<-left_join(y,x |> transmute(issue,slot,provider_id,actual_outcome=actual_direction),by=c('issue','slot','provider_id'),relationship='many-to-one')
+y$block<-paste0('BLOCK_',1L+(match(y$issue,sort(unique(y$issue)))-1L)%/%25L)
+long<-y |> pivot_longer(c(W,D,L),names_to='outcome',values_to='probability')
+z<-probability_foundation_pairs(long,'BLEND_0',c('block','handicap'),c('W','D','L'),seq(0,1,.1),1e-12)
+scores<-z$scores
+summary<-scores |> group_by(model) |> summarise(fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),.groups='drop')
+events<-long |> filter(outcome=='D') |> group_by(model) |> summarise(draw_brier=mean((probability-(actual_outcome=='D'))^2),predicted_draw=mean(probability),observed_draw=mean(actual_outcome=='D'),.groups='drop')
+summary<-left_join(summary,events,by='model',relationship='one-to-one')
+dir.create(params$output)
+write_csv(y,file.path(params$output,'predictions.csv'));write_csv(scores,file.path(params$output,'scores.csv'));write_csv(summary,file.path(params$output,'summary.csv'));write_csv(z$pairs,file.path(params$output,'pairs.csv'))
+knitr::kable(summary,digits=6)
+periods<-scores |> group_by(block,model) |> summarise(fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top2=mean(top2),.groups='drop')
+write_csv(z$summary,file.path(params$output,'handicap-block-scores.csv'));write_csv(periods,file.path(params$output,'periods.csv'));knitr::kable(periods,digits=5)
+knitr::kable(z$pairs |> group_by(model) |> summarise(up=sum(actual_probability_movement=='UP'),down=sum(actual_probability_movement=='DOWN'),actual_probability_delta=mean(actual_probability_delta),rescued=sum(top2_rescued),lost=sum(top2_lost),.groups='drop'),digits=6)
+```
+
+## 本轮结论
+
+原市场让平Brier为0.196620，纯战力让平为0.198454；直接混合25%、50%、100%均恶化。
+旧联合映射让平Brier为0.196798，同样未胜过原市场。整体Brier、Log loss和Top2亦未改善。
+因此，当前旧战力让平的绝对数值不宜直接作为校正目标；更多让平进入Top2不等于概率更准确。
+
+但分层并非没有信号：市场让平在20%—30%范围时，战力让平从低到高四档的实际让平率为
+17.0%（53场）、24.5%（972场）、27.4%（5168场）、32.6%（270场）。
+这只是较宽市场区间内的正向梯度，还不能排除市场区间内差异及其他特征混杂。
+本轮不否定把战力作为额外特征，结论只是否定已测的直接混合与旧映射已证明改善。
+新的历史映射如需研究，必须走截止前拟合和每10期更新，不使用本图发生率直接回填目标期。
+
+## 相近市场让平概率下，战力是否提供额外区分？
+
+以下方格仅描述发生率，不用于本轮拟合或决策；稀疏格子保留支持数。
+
+```{r}
+grid<-x |> mutate(market_bin=cut(q_D,seq(0,1,.1),include.lowest=TRUE),strength_bin=cut(p_D,seq(0,1,.1),include.lowest=TRUE)) |> group_by(market_bin,strength_bin) |> summarise(n=n(),observed=mean(actual_direction=='D'),market=mean(q_D),strength=mean(p_D),.groups='drop')
+write_csv(grid,file.path(params$output,'conditional-grid.csv'))
+p<-ggplot(grid,aes(strength_bin,market_bin,fill=observed))+geom_tile()+geom_text(aes(label=paste0(round(observed*100,1),'% / n=',n)),size=3)+scale_fill_viridis_c()+theme_minimal(base_family='Noto Sans CJK SC')+labs(x='战力让平区间',y='市场让平区间',fill='实际让平率')
+ggsave(file.path(params$output,'conditional-grid.png'),p,width=12,height=6);print(p)
+p2<-summary |> select(model,brier,log_loss,draw_brier) |> pivot_longer(-model,names_to='metric',values_to='value') |> ggplot(aes(model,value))+geom_point(size=3)+facet_wrap(~metric,scales='free_y')+theme_minimal()+theme(axis.text.x=element_text(angle=45,hjust=1))
+ggsave(file.path(params$output,'scores.png'),p2,width=11,height=5);print(p2)
+files<-list.files(params$output,full.names=TRUE);code<-c(modules,'src/temporal_learning/core.py','quarto/191_strength_draw_correction.qmd')
+jsonlite::write_json(list(status='PENDING_REVIEW',historical_admission=FALSE,source_receipt=params$receipt_sha256,source_sha256=r$archived_strength_sha256,
+ implementation=setNames(as.list(vapply(code,digest::digest,character(1),file=TRUE,algo='sha256')),code),
+ files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),basename(files))),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
