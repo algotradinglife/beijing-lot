@@ -83,3 +83,26 @@ probabilities for model coverage, shared worlds for overlapping groups, and
 separate-world checks for simulation noise. Send plots directly to the session.
 Finish with adopt/reject/insufficient evidence conclusions, tested reusable R
 functions, independent replay, Codex review, commit/push and PR evidence update.
+
+## Full accepted-data replay entry
+
+`quarto/200_joint_purchase_comparison.qmd` accepts explicit `catalog`, `config`,
+`config_sha256`, `output`, `python`, `settle`, `labels`, and `labels_sha256`.
+The configuration binds the catalog hash and issue list. `settle: false` freezes
+all purchase plans without opening settlement; structure allocation and independent
+replay follow before the settlement report. `limit` is only for smoke verification,
+never for claiming full-scope completion. Missing identities fail rather than
+selecting an implicit latest release. Fixed budget, seed, coverage, unit, SP floor
+and payout settings are checked against this experiment's original constants.
+
+The latest accepted union must report original, additional and complete eligible
+issues separately. Market-publication counts are not betting eligibility counts.
+Any explicit fixture exclusion carries issue, original slot, reason and verified
+roster hash in the preparation receipt; both markets are removed together while
+the original published/raw data remain unchanged. An exclusion must exist in the
+input and cannot silently remove an entire issue from the requested scope.
+
+The `140401/63` diagnostic exclusion records a noninteger original lottery
+handicap (`-0.5`). The displayed abandoned status is supporting context, not a
+replacement handicap or permission to rewrite source data. Full-data results
+must retain this exclusion ledger alongside missing-market and settlement gaps.

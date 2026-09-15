@@ -14,6 +14,10 @@ params:
   labels: null
   python: null
   limit: null
+  config: null
+  config_sha256: null
+  labels_sha256: null
+  settle: true
 ---
 
 原 joint 冻结概率、候选组、SP≥1.3准入和每期1024元上限相同。
@@ -22,20 +26,28 @@ params:
 
 ```{r}
 suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
-stopifnot(!is.null(params$catalog),!is.null(params$output),!is.null(params$labels),!is.null(params$python))
+stopifnot(!is.null(params$catalog),!is.null(params$output),!is.null(params$python),
+ !is.null(params$config),!is.null(params$config_sha256),
+ is.logical(params$settle),length(params$settle)==1,!is.na(params$settle))
+if(params$settle)stopifnot(!is.null(params$labels),!is.null(params$labels_sha256))
 reticulate::use_python(params$python,required=TRUE)
 modules<-paste0('r/',c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio',
  'n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_probability_replay','n7_purchase_pool',
  'n7_purchase_exposure','n7_purchase_equivalence','n7_purchase_settle','diagnostic_verified_csv',
- 'fundamentals_equity_curves'),'.R')
+ 'fundamentals_equity_curves','n7_purchase_scope'),'.R')
 for(f in modules)source(f)
-files<-c(modules,'quarto/200_joint_purchase_comparison.qmd','config/top2_outside_validation.json')
+stopifnot(identical(digest::digest(file=params$config,algo='sha256'),params$config_sha256))
+files<-c(modules,'quarto/200_joint_purchase_comparison.qmd',params$config)
 code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
-cfg<-jsonlite::fromJSON('config/top2_outside_validation.json')
-stopifnot(digest::digest(file=params$catalog,algo='sha256')==cfg$catalog_sha256)
+cfg<-jsonlite::fromJSON(params$config)
+ids<-n7_purchase_scope(cfg,digest::digest(file=params$catalog,algo='sha256'))
 catalog<-jsonlite::fromJSON(params$catalog)$issues
-ids<-sort(c(cfg$issues,cfg$excluded_drawdown_issues));stopifnot(length(ids)==484)
-if(!is.null(params$limit))ids<-head(ids,params$limit)
+requested_ids<-ids
+if(!is.null(params$limit)) {
+ stopifnot(is.numeric(params$limit),length(params$limit)==1,is.finite(params$limit),
+  params$limit>=1,params$limit==floor(params$limit),params$limit<=length(ids))
+ ids<-head(ids,params$limit)
+}
 catalog<-catalog[match(ids,catalog$issue),];stopifnot(!anyNA(catalog))
 policies<-tribble(~id,~rule,~gap,~expand,~ordering,~u,~money,
  'JOINT','PROB',.05,FALSE,'OPEN_FIRST',Inf,Inf,
@@ -84,6 +96,7 @@ for(i in seq_len(nrow(catalog))) {
 }
 stopifnot(identical(code,setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)))
 receipt<-list(status='FROZEN_NOT_SETTLED',scope=ids,bindings=bindings,code=code,closure=closure,
+ requested_scope=requested_ids,scope_complete=identical(ids,requested_ids),smoke_limit=params$limit,
  catalog_sha256=cfg$catalog_sha256,policies=policies,extra_depths=extra_depths,
  budget_cny=1024,unit_cny=2,payout_factor=.65,historical_admission=FALSE)
 jsonlite::write_json(receipt,file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
@@ -91,8 +104,8 @@ jsonlite::write_json(receipt,file.path(o,'plans-receipt.json'),auto_unbox=TRUE,p
 
 ## 冻结后结算与逐期表现
 
-```{r}
-labels<-diagnostic_read_verified_csv(params$labels,'ef9082abfbd5fffe497cb632c5cdfc37522b6c8ad02ff7125b0e940a51672c32',cols(issue='c',provider_id='c')) |>
+```{r, eval=params$settle}
+labels<-diagnostic_read_verified_csv(params$labels,params$labels_sha256,cols(issue='c',provider_id='c')) |>
  select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
 groups<-models<-list()
 for(id in ids) {
