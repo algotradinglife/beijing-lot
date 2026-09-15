@@ -1,0 +1,22 @@
+{
+  "scope": "111104-120419 retrospective 94 issues; other frozen history descriptive only",
+  "allocation": "preserve original PROB groups and paid ticket depths; do not reapply 25% gate",
+  "models": ["FROZEN", "DYNAMIC", "HANDICAP"],
+  "rules": [
+    {"id": "ORIGINAL", "kind": "discount", "value": 1.0},
+    {"id": "DISCOUNT80", "kind": "discount", "value": 0.8},
+    {"id": "DISCOUNT50", "kind": "discount", "value": 0.5},
+    {"id": "CAP20", "kind": "cap", "value": 0.20},
+    {"id": "CAP15", "kind": "cap", "value": 0.15},
+    {"id": "HARD", "kind": "hard", "value": 0.0}
+  ],
+  "transfer": "discount/cap release goes to original second outcome; hard keeps original Top2 ordering",
+  "gap_breaks": [0, 0.02, 0.05, 0.10, 0.20, 1],
+  "third_breaks": [0, 0.10, 0.15, 0.20, 0.25, 0.30, 1],
+  "budget_cny": 1024,
+  "unit_cny": 2,
+  "initial_capital_cny": 100000,
+  "payout_factor": 0.65,
+  "learning": "none added; inherited frozen 10-issue calibration artifacts only",
+  "selection_weights_are_calibrated_probabilities": false
+}

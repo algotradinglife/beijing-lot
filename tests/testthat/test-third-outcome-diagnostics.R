@@ -1,0 +1,29 @@
+source(file.path('..','..','r','strategy_diagnostic_probabilities.R'))
+source(file.path('..','..','r','third_outcome_diagnostics.R'))
+testthat::test_that('rank calibration preserves ties, counts and concentration reference', {
+ f<-tibble::tibble(issue=c('01','01'),slot=1:2,provider_id=c('a','b'),model='M',
+  stage='drawdown',handicap=c(-1,0),actual_outcome=c('L','D'),
+  p_W=c(.5,.4),p_D=c(.3,.3),p_L=c(.2,.3))
+ z<-third_outcome_diagnostics(f,c(0,.05,1),c(0,.25,1))
+ testthat::expect_equal(z$fixtures$third,c('L','L'))
+ testthat::expect_equal(z$fixtures$second,c('D','D'))
+ testthat::expect_equal(z$issues$expected_third,.5)
+ testthat::expect_equal(z$issues$actual_third,1)
+ testthat::expect_equal(z$issues$independent_variance,.37)
+ testthat::expect_equal(sum(z$cells$fixtures),2)
+ testthat::expect_equal(z$fixtures$gap23,c(.1,0))
+ testthat::expect_error(third_outcome_diagnostics(f[0,],c(0,1),c(0,1)))
+ testthat::expect_error(third_outcome_diagnostics(dplyr::bind_rows(f,f),c(0,1),c(0,1)))
+ bad<-f;bad$p_L[1]<-.4
+ testthat::expect_error(third_outcome_diagnostics(bad,c(0,1),c(0,1)))
+ testthat::expect_error(third_outcome_diagnostics(f,c(0,.5,.4,1),c(0,1)))
+ bad<-f;bad$handicap[1]<-NA_real_
+ testthat::expect_error(third_outcome_diagnostics(bad,c(0,1),c(0,1)))
+ both<-dplyr::bind_rows(f,dplyr::mutate(f,model='N'))
+ both$actual_outcome[3]<-'W'
+ testthat::expect_error(third_outcome_diagnostics(both,c(0,1),c(0,1)))
+ f$p_W<-1;f$p_D<-0;f$p_L<-0;f$actual_outcome<-'W'
+ z<-third_outcome_diagnostics(f,c(0,1),c(0,1))
+ testthat::expect_equal(z$issues$actual_third,0)
+ testthat::expect_true(is.na(z$issues$standardized_residual))
+})
