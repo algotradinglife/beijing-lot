@@ -8,11 +8,36 @@
 # group is not admitted. FULL spends 128 units even if fewer meet the target.
 n7_top2_options <- function(bundle,cutoffs,python,model_id,policy,third_penalty,
                             target_coverage,group_cap,unit_cny,payout_factor,minimum_sp) {
+ base<-n7_capital_options(bundle,cutoffs,python,model_id,1L,unit_cny,payout_factor)
+ n7_top2_transform(base,bundle,cutoffs,model_id,policy,third_penalty,target_coverage,
+                    group_cap,unit_cny,payout_factor,minimum_sp)
+}
+
+# Batch uses the identical policy transform with one native validation and surface
+# preparation. Explicit cutoff/model bind this call; no persistent/global cache.
+# Returns a named list of the same per-policy objects as n7_top2_options.
+n7_top2_batch <- function(bundle,cutoffs,python,model_id,policies,third_penalty,
+                          target_coverage,group_cap,unit_cny,payout_factor,minimum_sp) {
+ stopifnot(is.character(policies),length(policies)>0,!anyNA(policies),
+  !anyDuplicated(policies),all(policies %in% c('PROB','SOFT','HARD','FULL')))
+ base<-n7_capital_options(bundle,cutoffs,python,model_id,1L,unit_cny,payout_factor)
+ result<-lapply(policies,function(policy)n7_top2_transform(base,bundle,cutoffs,model_id,
+  policy,third_penalty,target_coverage,group_cap,unit_cny,payout_factor,minimum_sp))
+ stats::setNames(result,policies)
+}
+
+# Pure per-policy transformation of an already validated capital surface.
+# Internal shared worker; callers obtain base through n7_capital_options.
+# It rejects a base from a different fixture/cutoff/model identity.
+n7_top2_transform <- function(base,bundle,cutoffs,model_id,policy,third_penalty,
+                              target_coverage,group_cap,unit_cny,payout_factor,minimum_sp) {
+ stopifnot(identical(base$cutoffs,cutoffs),identical(bundle$cutoffs,cutoffs),
+  identical(base$fixtures,bundle$expanded_pool$fixtures),identical(base$model_id,model_id),
+  identical(base$issue,bundle$issue),unit_cny==2,payout_factor==.65)
  stopifnot(length(policy)==1,policy %in% c('PROB','SOFT','HARD','FULL'),
   length(third_penalty)==1,is.finite(third_penalty),third_penalty>0,third_penalty<=1,
   length(target_coverage)==1,is.finite(target_coverage),target_coverage>0,target_coverage<=1,
   length(group_cap)==1,is.finite(group_cap),group_cap>=unit_cny,group_cap%%unit_cny==0)
- base<-n7_capital_options(bundle,cutoffs,python,model_id,1L,unit_cny,payout_factor)
  ranks<-list();ledgers<-list();options<-base$options;core_ids<-numeric();opening<-numeric()
  for(j in seq_along(bundle$sleeves)) {
   g<-bundle$sleeves[[j]];p<-base$surface$prob_mat[j,];value<-base$surface$value_mat[j,]

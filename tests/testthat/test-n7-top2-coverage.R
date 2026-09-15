@@ -37,4 +37,17 @@ testthat::test_that('Top2 preference changes ticket choice without changing prob
  testthat::expect_equal(fitted$fit$metrics$stake,256)
  testthat::expect_error(n7_top2_options(bundle,cut,py,'test-new','SOFT',0,.25,256,2,.65,1))
  testthat::expect_error(n7_top2_allocate(full,list(),42501,32L,1024,256))
+ batch<-n7_top2_batch(bundle,cut,py,'test-new',c('PROB','SOFT','HARD','FULL'),.5,.25,256,2,.65,1)
+ testthat::expect_identical(batch,list(PROB=prob,SOFT=soft,HARD=hard,FULL=full))
+ testthat::expect_error(n7_top2_batch(bundle,cut,py,'test-new',character(),.5,.25,256,2,.65,1))
+ testthat::expect_error(n7_top2_batch(bundle,cut,py,'test-new',c('PROB','PROB'),.5,.25,256,2,.65,1))
+ testthat::expect_error(n7_top2_batch(bundle,cut,py,'test-new','UNKNOWN',.5,.25,256,2,.65,1))
+ base<-n7_capital_options(bundle,cut,py,'test-new',1L,2,.65)
+ testthat::expect_error(n7_top2_transform(base,bundle,list(),'test-new','PROB',.5,.25,256,2,.65,1))
+ testthat::expect_error(n7_top2_transform(base,bundle,cut,'wrong','PROB',.5,.25,256,2,.65,1))
+ bad<-base;bad$fixtures[[1]]$p_W<-.1
+ testthat::expect_error(n7_top2_transform(bad,bundle,cut,'test-new','PROB',.5,.25,256,2,.65,1))
+ none<-n7_top2_batch(bundle,cut,py,'test-new',c('HARD','FULL'),.5,1,256,2,.65,1)
+ testthat::expect_true(all(vapply(none,function(z)length(z$pool$options)==0,logical(1))))
+
 })
