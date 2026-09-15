@@ -1,0 +1,246 @@
+---
+title: "让球数分层校正与 Top2 购买覆盖：回撤94期"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+  message: false
+params:
+  study: null
+  output: null
+  python: null
+  catalog_sha256: null
+---
+
+## 研究口径
+
+固定此前识别的111104–120419共94期事后回撤窗口，不重新挑选最差区间。
+累计历史限定为同一495期冻结快照中更新前的可用历史，并非所有已采集年代的全量比赛。
+每10期更新一次，共10次；两次更新之间冻结格子模型。只使用更新时以前的历史，
+标签可用时间采用该期最后场次决策时点＋48小时的诊断代理，不能证明真实赛前可用性。
+同一期/后续目标期按身份排除，即使标签误标了早于cutoff的时间也不能入模。
+
+比较旧冻结校正 FROZEN、原二维动态校正 DYNAMIC、加入有符号让球数的 HANDICAP。
+动态模型每10期更新，累计50%＋最近三期50%。概率格子与上轮相同：
+市场让平边界0/10/15/20/25/30/35/100%，让胜负绝对差边界0/10/20/30/40/50/60/100%。
+二维长期收缩强度100、近期20；让球子格子的长期和近期分别以100、20向对应上层分布收缩。
+近期三期按期等权、期内等权；ESS和全部时间准入来自共享时序库。参数固定，不根据目标结果优化。
+
+每个概率版本比较四种购买顺序：PROB 原概率；SOFT 每出现一次第三赛果将购买分数乘0.5；
+HARD 只购买每场Top2；FULL 买齐128种Top2组合。真实概率和SP不受购买偏好改写或归一化。
+前三种达到25%真实覆盖即停止，FULL买齐128注；所有模式都要求至少25%覆盖且单组≤256元。
+因此FULL与HARD准入相同，但FULL投入更多，通常能买的组更少。无法达到门槛时保留现金。
+
+每期上限1024元、本金100000元，SP≥1.3，累计概率25%的最小完整前缀，单组准入成本≤256元。
+固定原七场候选组的成员、不重新生成场次；组内赛果排序和联合选组允许随新概率变化。
+使用原联合新增命中概率/成本选组器，seed42501、256个共同随机场景；不给复制组加倍。
+原始欧赔/大小球映射的估算SP保持不变，北单SP仅结算，票级0.65仅使用一次。
+本轮只校正W/D/L；原输入包不含比分格，故不声称已验证比分分布与大小球约束的再协调。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+stopifnot(!is.null(params$study),!is.null(params$output),!is.null(params$python))
+reticulate::use_python(params$python,required=TRUE)
+files<-c('diagnostic_verified_csv','draw_refresh','draw_handicap_refresh','n7_top2_coverage','n7_probability_replay','n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth',
+ 'n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_quality_settlement',
+ 'strategy_diagnostic_probabilities','strategy_handicap_diagnostic','fundamentals_equity_curves',
+ 'n7_sweet_union_summary','n7_recent_structure')
+files<-paste0('r/',files,'.R');for(f in files)source(f)
+files<-c(files,'quarto/172_handicap_top2_experiment.qmd','config/draw_refresh_drawdown.json')
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+core<-reticulate::import('src.temporal_learning.core');blocks_api<-reticulate::import('src.temporal_learning.frozen_blocks')
+prov<-reticulate::import('src.temporal_learning.provenance');pathlib<-reticulate::import('pathlib')
+closure<-prov$implementation_closure(pathlib$Path(getwd()),
+ c('src.draw_refresh_context','src.probability_foundation_draw','src.fundamentals_n7_baseline','src.strategy_diagnostic_inputs'),distributions=c('numpy','pandas'))
+s<-params$study;o<-params$output
+# Exclusive run directory: never overwrite an earlier frozen research package.
+stopifnot(!dir.exists(o),dir.create(o,recursive=TRUE,showWarnings=FALSE))
+input_api<-reticulate::import('src.strategy_diagnostic_inputs')
+catpath<-file.path(s,'settlement-inputs/catalog.json')
+catbytes<-readBin(catpath,'raw',n=file.info(catpath)$size)
+stopifnot(digest::digest(catbytes,serialize=FALSE,algo='sha256')==params$catalog_sha256)
+catlg<-jsonlite::fromJSON(rawToChar(catbytes))
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','funded.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,c('fixture-audit.csv','ranks.csv'))
+window<-jsonlite::fromJSON('config/draw_refresh_drawdown.json')
+stopifnot(window$source_results_sha256==er$files[['results.csv']])
+ids<-window$issues
+stopifnot(length(ids)==94,head(ids,1)=='111104',tail(ids,1)=='120419')
+input<-jsonlite::fromJSON(input_api$read_diagnostic_epoch_fixtures(catpath,params$catalog_sha256))
+fx<-as_tibble(input$rows)
+fixtures<-split(fx,fx$issue)
+targets<-fx |> filter(issue %in% ids) |> transmute(issue_code=issue,fixture_decision_ts)
+blocks<-blocks_api$frozen_block_schedule(reticulate::r_to_py(as.data.frame(targets)),cadence=10L)
+stopifnot(length(blocks)==10)
+sources<-list(catalog=params$catalog_sha256,fixture_audit=ar$files[['fixture-audit.csv']],
+ evaluation_results=er$files[['results.csv']],r_code=digest::digest(code,algo='sha256'))
+models<-list();cells<-list()
+plans<-funded<-predictions<-bindings<-list()
+jsonlite::write_json(blocks,file.path(o,'blocks.json'),auto_unbox=TRUE,pretty=TRUE)
+for(block in blocks) {
+ cutoff<-core$Cutoff$decision_epoch(block$fit_issue,block$fit_cutoff_ts)
+ # Only prior labels cross the shared reader; earlier blocks already have
+ # immutable model/ticket replays on disk before later historical labels open.
+ history_json<-reticulate::import('src.draw_refresh_context')$draw_refresh_prior_history_json(
+  jsonlite::toJSON(fx,dataframe='rows',auto_unbox=TRUE,digits=NA),
+  jsonlite::toJSON(block,auto_unbox=TRUE,digits=NA),
+  label_path=file.path(s,'current-settlement/fixture-audit.csv'),
+  label_sha256=ar$files[['fixture-audit.csv']],delay_hours=48)
+ history<-jsonlite::fromJSON(history_json)
+ model<-draw_handicap_fit(history,block,cutoff,getwd(),sources,
+ c(0,.1,.15,.2,.25,.3,.35,1),c(0,.1,.2,.3,.4,.5,.6,1),100,20,100,20,48,3,100,params$python)
+ models[[block$fit_issue]]<-model
+ saveRDS(model,file.path(o,paste0('model-',block$fit_issue,'.rds')))
+ cells[[block$fit_issue]]<-model$cells |> mutate(fit_issue=block$fit_issue)
+ for(target in block$targets) {
+ id<-target$issue;cutoff<-core$Cutoff$decision_epoch(id,target$cutoff_ts)
+ item<-catlg$issues |> filter(issue==id)
+ bundle<-jsonlite::fromJSON(input_api$read_verified_bundle_json(item$path,item$sha256),simplifyVector=FALSE)
+ f<-fixtures[[id]];model<-models[[block$fit_issue]]
+ for(arm in c('FROZEN','DYNAMIC','HANDICAP')) {
+  if(arm=='FROZEN') {
+   z<-f;z$new_W<-z$p_W;z$new_D<-z$p_D;z$new_L<-z$p_L
+   model_key<-paste(arm,item$sha256,sep=':')
+  } else {
+   z<-if(arm=='DYNAMIC')draw_refresh_predict(model$parent,f,cutoff,.5,getwd(),params$python) else
+    draw_handicap_predict(model,f,cutoff,.5,getwd(),params$python)
+   model_key<-paste(if(arm=='DYNAMIC')model$parent$seal else model$seal,.5,sep=':')
+  }
+  predictions[[length(predictions)+1L]]<-z |> mutate(arm=arm,fit_issue=block$fit_issue)
+  updated<-n7_probability_bundle(bundle,z,bundle$cutoffs,model_key)
+  for(mode in c('PROB','SOFT','HARD','FULL')) {
+   name<-paste(arm,mode,sep='_')
+   prepared<-n7_top2_options(updated,bundle$cutoffs,params$python,model_key,mode,.5,.25,256,2,.65,1.3)
+   allocated<-n7_top2_allocate(prepared,bundle$cutoffs,42501,256,1024,256)
+   result<-list(surface=prepared$surface,pool=prepared$pool,gate=prepared$gate,
+    rank_preferences=prepared$ranks,coverage_ledger=prepared$ledger,parameters=prepared$parameters,
+    worlds=allocated$worlds,scenarios=allocated$scenarios,fit=allocated$fit)
+   opts<-result$pool$options[result$fit$selected];amount<-sum(vapply(opts,`[[`,numeric(1),'stake'))
+   for(opt in opts)funded[[length(funded)+1L]]<-tibble(issue=id,arm=name,seed=42501,
+    sleeve_id=as.character(opt$sleeve_id),depth=opt$depth,copies=1,stake=opt$stake,coverage=opt$coverage)
+   plans[[length(plans)+1L]]<-tibble(issue=id,arm=name,policy=name,seed=42501,model=arm,
+    budget_cny=1024,stake=amount,cash=1024-amount,groups=length(opts),status=if(amount>0)'COMPLETE' else 'NO_BET')
+   replay_name<-paste0('replay-',id,'-',name,'.rds')
+   saveRDS(list(result=result,fixtures=updated$expanded_pool$fixtures,cutoffs=bundle$cutoffs,
+    model_identity=model_key,block=block),file.path(o,replay_name),compress='gzip')
+   bindings[[paste(id,name)]]<-list(issue=id,arm=name,replay=replay_name,
+    replay_sha256=digest::digest(file=file.path(o,replay_name),algo='sha256'),source_bundle=item$sha256,
+    fit_model_seal=if(arm=='FROZEN')NULL else if(arm=='DYNAMIC')model$parent$seal else model$seal,
+    cache_key=core$stable_json_hash(list(cutoff=target,block=block$seal,model=model_key,sources=sources,
+     implementation=code,python=closure$closure_sha256,
+     parameters=list(mode=mode,third_penalty=.5,budget=1024,target=.25,group_cap=256,minimum_sp=1.3,
+      unit=2,factor=.65,seed=42501,worlds=256,handicap_strength=100,handicap_recent_strength=20))))
+  }
+ }
+ message('Draw refresh frozen: ',id);writeLines(id,file.path(o,'progress.txt'))
+}
+}
+saveRDS(models,file.path(o,'frozen-models.rds'))
+write_csv(bind_rows(cells),file.path(o,'cells.csv'))
+plans<-bind_rows(plans);funded<-bind_rows(funded);predictions<-bind_rows(predictions)
+write_csv(plans,file.path(o,'frozen-plans.csv'));write_csv(funded,file.path(o,'frozen-funded.csv'))
+write_csv(predictions,file.path(o,'predictions.csv'))
+stopifnot(identical(code,setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)))
+jsonlite::write_json(list(sources=sources,implementation=code,python_implementation=closure,
+ bindings=bindings,model_sha256=digest::digest(file=file.path(o,'frozen-models.rds'),algo='sha256'),
+ plans_sha256=digest::digest(file=file.path(o,'frozen-plans.csv'),algo='sha256'),
+ funded_sha256=digest::digest(file=file.path(o,'frozen-funded.csv'),algo='sha256'),
+ predictions_sha256=digest::digest(file=file.path(o,'predictions.csv'),algo='sha256'),
+ historical_admission=FALSE,scope=ids),file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 开封目标结果与比较
+
+所有目标票先冻结，再计算各概率版本下的实际中奖排名。以下沿用同一场次组合的北单回款，
+不能将旧概率排名直接用于新票结算。原冻结版本必须逐组复现旧账本。
+
+```{r}
+labels<-diagnostic_read_verified_csv(file.path(s,'current-settlement/fixture-audit.csv'),ar$files[['fixture-audit.csv']],cols(issue='c',provider_id='c'))
+old<-diagnostic_read_verified_csv(file.path(s,'evaluation/results.csv'),er$files[['results.csv']],cols(issue='c')) |>
+ filter(variant=='JOINT',seed==42501,budget_cny==1024)
+k<-diagnostic_read_verified_csv(file.path(s,'current-settlement/ranks.csv'),ar$files[['ranks.csv']],cols(issue='c',sleeve_id='c',fixture_slots='c'))
+original<-diagnostic_read_verified_csv(file.path(s,'evaluation/funded.csv'),er$files[['funded.csv']],cols(issue='c',sleeve_id='c')) |>
+ semi_join(old |> filter(issue %in% ids),by=c('issue','arm','seed')) |>
+ select(issue,sleeve_id,depth,stake) |> arrange(issue,sleeve_id)
+reproduced<-funded |> filter(arm=='FROZEN_PROB') |> select(issue,sleeve_id,depth,stake) |> arrange(issue,sleeve_id)
+stopifnot(isTRUE(all.equal(original,reproduced,check.attributes=FALSE)))
+ranks<-coverage_ledgers<-list()
+for(binding in bindings) {
+ stopifnot(digest::digest(file=file.path(o,binding$replay),algo='sha256')==binding$replay_sha256)
+ replay<-readRDS(file.path(o,binding$replay));surface<-replay$result$surface
+ coverage_ledgers[[length(coverage_ledgers)+1L]]<-replay$result$coverage_ledger |> mutate(issue=binding$issue,arm=binding$arm)
+ for(j in seq_len(nrow(surface$prob_mat))) {
+  sid<-rownames(surface$prob_mat)[j]
+  group<-k |> filter(issue==binding$issue,sleeve_id==sid)
+  stopifnot(nrow(group)==1)
+  slots<-as.integer(strsplit(surface$summary$fixture_slots[j],'|',fixed=TRUE)[[1]])
+  lf<-labels |> filter(issue==binding$issue) |> slice(match(slots,slot))
+  stopifnot(nrow(lf)==7,!anyNA(lf$actual_direction),all(lf$status=='READY'))
+  actual_index<-1+sum((match(lf$actual_direction,c('W','D','L'))-1)*3^(6:0))
+  preferences<-replay$result$rank_preferences |> filter(sleeve_id==as.integer(sid))
+  actual_pref<-preferences |> filter(state_id==actual_index)
+  rank<-actual_pref$settlement_rank;purchase<-actual_pref$purchase_rank
+  if(binding$arm=='FROZEN_PROB')stopifnot(rank==group$actual_rank)
+  ix<-preferences$state_id[which(preferences$purchase_rank<=purchase)]
+  ranks[[length(ranks)+1L]]<-tibble(issue=binding$issue,arm=binding$arm,sleeve_id=sid,
+   actual_rank=rank,purchase_rank=purchase,actual_legal=!is.na(purchase),actual_top2=actual_pref$all_top2,
+   actual_cost=2*purchase,actual_probability=surface$prob_mat[j,actual_index],
+   actual_cumulative=if(is.na(purchase))NA_real_ else sum(surface$prob_mat[j,ix]),
+   top128=sum(surface$prob_mat[j,surface$rank_idx[j,1:128]]),
+   actual_gross_cny=group$actual_gross_cny)
+
+ }
+}
+ranks<-bind_rows(ranks);coverage_ledgers<-bind_rows(coverage_ledgers)
+write_csv(coverage_ledgers,file.path(o,'coverage-ledgers.csv'));rows<-groups<-list()
+for(arm_name in unique(plans$arm)) {
+ z<-n7_quality_settlement(plans |> filter(arm==arm_name),funded |> filter(arm==arm_name),ranks |> filter(arm==arm_name))
+ rows[[arm_name]]<-z$rows;groups[[arm_name]]<-z$groups
+}
+rows<-bind_rows(rows) |> mutate(cash_cny=cash);groups<-bind_rows(groups)
+curves<-strategy_equity_curves(rows,ids,100000);stopifnot(!any(curves$stopped))
+summary<-curves |> filter(period>0) |> group_by(policy) |> summarise(issues=n(),stake=sum(funded_stake_cny),
+ net=sum(funded_net_cny),roi=net/stake,hit_issues=sum(gross>0),profit_issues=sum(funded_net_cny>0),
+ max_drawdown=max(drawdown_cny),minimum_equity=min(100000,equity_cny),.groups='drop')
+long<-predictions |> select(issue,slot,provider_id,handicap,arm,new_W,new_D,new_L) |>
+ pivot_longer(starts_with('new_'),names_prefix='new_',names_to='outcome',values_to='probability') |>
+ rename(model=arm) |> left_join(labels |> select(issue,slot,provider_id,actual_outcome=actual_direction),
+ by=c('issue','slot','provider_id'),relationship='many-to-one')
+probability<-strategy_probability_diagnostics(long,character(),c('W','D','L'),seq(0,1,.1))
+handicap<-strategy_handicap_diagnostic(long,'handicap',c('W','D','L'),seq(0,1,.1))
+rank_summary<-ranks |> group_by(arm) |> summarise(groups=n(),legal_fraction=mean(actual_legal),top2_fraction=mean(actual_top2),median_rank=median(purchase_rank,na.rm=TRUE),
+ rank_q75=quantile(purchase_rank,.75,na.rm=TRUE),rank_q90=quantile(purchase_rank,.9,na.rm=TRUE),within128=mean(actual_legal & actual_rank<=128),
+ median_cost=median(actual_cost,na.rm=TRUE),.groups='drop')
+base_rank<-ranks |> filter(arm=='FROZEN_PROB') |> select(issue,sleeve_id,old_rank=actual_rank)
+rank_changes<-ranks |> left_join(base_rank,by=c('issue','sleeve_id'),relationship='many-to-one') |>
+ group_by(arm) |> summarise(earlier=sum(actual_legal & actual_rank<old_rank),later=sum(actual_legal & actual_rank>old_rank),
+ unreachable=sum(!actual_legal),
+ rescue128=sum(actual_rank<=128 & old_rank>128),lost128=sum(actual_rank>128 & old_rank<=128),.groups='drop')
+for(name in c('rows','groups','ranks','summary','curves','rank_summary','rank_changes'))write_csv(get(name),file.path(o,paste0(name,'.csv')))
+write_csv(probability$summary,file.path(o,'probability-summary.csv'))
+write_csv(probability$calibration,file.path(o,'calibration.csv'))
+write_csv(handicap$cells,file.path(o,'handicap.csv'))
+knitr::kable(summary,digits=3);knitr::kable(probability$summary,digits=4)
+knitr::kable(rank_summary,digits=2);knitr::kable(rank_changes)
+pd<-curves |> select(policy,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY')
+p1<-ggplot(pd,aes(period,CNY,colour=policy))+geom_line()+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+labs(title='Signed handicap calibration and Top2 coverage: 94 issues',subtitle='CNY 1,024 cap; retrospective window; starting capital CNY 100,000',colour=NULL,x='Issue index')
+print(p1);ggsave(file.path(o,'equity-drawdown.png'),p1,width=12,height=8,dpi=150)
+p2<-ggplot(ranks |> filter(actual_legal),aes(actual_cost,colour=arm))+stat_ecdf()+scale_x_log10()+theme_minimal()+
+ labs(title='Actual winning combination: required prefix cost',subtitle='Conditional on legal winning states; excluded third outcomes reported separately',x='CNY (log scale)',y='Fraction of groups covered',colour=NULL)
+print(p2);ggsave(file.path(o,'winning-rank-cdf.png'),p2,width=11,height=6,dpi=150)
+p3<-ggplot(probability$calibration |> filter(outcome=='D'),aes(predicted,observed,colour=model))+
+ geom_abline(slope=1,intercept=0,linetype=2)+geom_line()+geom_point(aes(size=fixtures))+theme_minimal()+
+ labs(title='Handicap draw calibration',x='Predicted probability',y='Observed draw frequency',colour=NULL)
+print(p3);ggsave(file.path(o,'draw-calibration.png'),p3,width=10,height=6,dpi=150)
+```
+
+上述结果只解释这个已知回撤窗口。格子更新不保证让平只能上调；若历史支持下调，也应如实反映。
+期命中增加不等于盈利增加，中奖组排名提前也必须与被挤出的原中奖票一起评价。

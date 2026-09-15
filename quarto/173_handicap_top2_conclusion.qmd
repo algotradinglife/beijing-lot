@@ -1,0 +1,214 @@
+---
+title: "让球数分层与 Top2 覆盖：收益及机制对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+  message: false
+params:
+  study: null
+  receipt_sha256: null
+---
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+source('r/diagnostic_verified_csv.R')
+source('r/strategy_diagnostic_probabilities.R')
+source('r/n7_top2_diagnostics.R')
+source('r/fundamentals_equity_curves.R')
+stopifnot(!is.null(params$study),!is.null(params$receipt_sha256))
+s<-params$study;path<-file.path(s,'report-receipt.json')
+b<-readBin(path,'raw',n=file.info(path)$size)
+stopifnot(digest::digest(b,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+receipt<-jsonlite::fromJSON(rawToChar(b))
+required<-c('summary.csv','rows.csv','ranks.csv','frozen-funded.csv','curves.csv',
+ 'handicap.csv','probability-summary.csv','coverage-ledgers.csv','independent-replay.json')
+strategy_verify_diagnostic_inputs(s,receipt$files,required)
+replay_path<-file.path(s,'independent-replay.json')
+replay_bytes<-readBin(replay_path,'raw',n=file.info(replay_path)$size)
+stopifnot(digest::digest(replay_bytes,serialize=FALSE,algo='sha256')==receipt$files[['independent-replay.json']],
+ identical(jsonlite::fromJSON(rawToChar(replay_bytes))$status,'PASS'))
+tables<-list()
+for(n in required[grepl('[.]csv$',required)]) {
+ types<-if(n %in% c('ranks.csv','frozen-funded.csv','coverage-ledgers.csv'))cols(issue='c',sleeve_id='c') else
+  if(n %in% c('rows.csv','curves.csv'))cols(issue='c') else cols()
+ tables[[n]]<-diagnostic_read_verified_csv(file.path(s,n),receipt$files[[n]],types)
+}
+summary<-tables[['summary.csv']] |> mutate(prob_model=sub('_[^_]+$','',policy),mode=sub('^.*_','',policy))
+stopifnot(nrow(summary)==12,all(summary$issues==94),
+ setequal(summary$policy,as.vector(outer(c('FROZEN','DYNAMIC','HANDICAP'),c('PROB','SOFT','HARD','FULL'),paste,sep='_'))))
+ranks<-tables[['ranks.csv']];funded<-tables[['frozen-funded.csv']]
+diagnostics<-n7_top2_diagnostics(ranks,funded)
+reference<-summary |> filter(policy=='FROZEN_PROB')
+best<-summary |> filter(mode=='PROB') |> arrange(desc(net),policy) |> slice(1)
+```
+
+本轮固定回撤 **111104–120419 共94期**，每期预算上限1024元，本金10万元。
+每10期冻结一次校正，只准入此前可用历史；时间可用性为诊断代理，结论属于已知回撤窗口的回顾研究。
+三个概率版本为旧冻结 FROZEN、二维动态 DYNAMIC、加入有符号让球数的 HANDICAP。
+两种动态版本均为累计50%＋最近三期50%，分层收缩强度事前固定。
+
+PROB 按真实组合概率买；SOFT 每出现一场第三赛果将购买分数乘0.5；
+HARD 只买Top2里的部分组合；FULL买齐128种Top2组合，共256元。
+**四种方式均保留真实概率，均要求单组覆盖至少25%、成本不超过256元，SP至少1.3。**
+FULL因此最多买4组，并不保证预算能够花完。没有同时降低准入门槛。
+
+## 收益与回撤
+
+```{r}
+display<-summary |> mutate(roi_percent=100*roi,cash=94*1024-stake) |>
+ select(prob_model,mode,stake,net,roi_percent,hit_issues,profit_issues,max_drawdown,minimum_equity,cash)
+knitr::kable(display,digits=2)
+```
+
+在保持原概率购买规则的三个校正版本中，本窗口净收益最高为 **`r best$policy`**，净收益 **`r round(best$net,2)` 元**，
+ROI **`r round(100*best$roi,2)`%**，最大回撤 **`r round(best$max_drawdown,2)` 元**。
+相对原冻结概率排序，其净收益差为 **`r round(best$net-reference$net,2)` 元**。
+`r if(all(summary$net<=0)) '本轮所有方案仍未达到正收益；较少亏损不等于策略已经盈利。' else '本窗口出现正收益方案，但事后窗口内的领先不证明未来收益。'`
+
+```{r}
+curves<-tables[['curves.csv']] |> mutate(prob_model=sub('_[^_]+$','',policy),mode=sub('^.*_','',policy))
+p<-curves |> select(prob_model,mode,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,color=mode))+geom_line()+facet_grid(metric~prob_model,scales='free_y')+
+ theme_minimal()+labs(x='Issue index',color='Coverage policy',title='Same CNY 1,024 issue budget; starting capital CNY 100,000')
+print(p);ggsave(file.path(s,'factorial-equity-drawdown.png'),p,width=14,height=8,dpi=150)
+```
+
+## 本轮判断
+
+**支持让球数分层；统一软降权没有改善，而刚性Top2必须区分是否重新执行25%准入。**
+保持原概率购买规则时，HANDICAP 相对 DYNAMIC 净收益改善约4869元，
+ROI由−16.27%变为−9.27%，命中期数29→32，盈利期数23→27，最大回撤约17689→16476元。
+不过整体 Brier、对数损失和单场Top2命中率没有改善；这属于本窗口下注结果的改善，
+不能写成概率底座全面变准，也仍然没有扭亏。
+
+软约束在两个动态版本中均降低收益和命中期数、扩大最大回撤。
+例如 HANDICAP_SOFT 相对 HANDICAP_PROB 少赚约3745元、命中期数32→24。
+因此本轮不采用将第三赛果统一降权0.5的做法。
+
+**刚性Top2在当前25%单组准入门槛下退化为几乎停投，不能用它的低回撤证明优越。**
+三个概率版本都只有8个候选组达到联合Top2质量25%，且全部来自同一期；
+HARD仅在该期买8组，FULL仅买4组。94期总投入分别为696–752元和1024元。
+这也说明每组256元是“买齐Top2”的成本，并不代表其真实覆盖能达到25%。
+本次没有降低准入门槛或重建候选组，故不能据此断言其他门槛下的刚性Top2一定无效。
+
+## 分清校正与覆盖的贡献
+
+```{r}
+base<-summary |> filter(mode=='PROB') |>
+ select(prob_model,base_net=net,base_stake=stake,base_dd=max_drawdown,base_hits=hit_issues)
+coverage_changes<-summary |> left_join(base,by='prob_model',relationship='many-to-one') |>
+ transmute(prob_model,mode,net_change=net-base_net,stake_change=stake-base_stake,
+ hit_issue_change=hit_issues-base_hits,drawdown_change=max_drawdown-base_dd)
+knitr::kable(coverage_changes,digits=2)
+calibration_changes<-summary |> filter(prob_model=='HANDICAP') |>
+ inner_join(summary |> filter(prob_model=='DYNAMIC'),by='mode',suffix=c('_handicap','_dynamic'),relationship='one-to-one') |>
+ transmute(mode,net_change=net_handicap-net_dynamic,stake_change=stake_handicap-stake_dynamic,
+ hit_issue_change=hit_issues_handicap-hit_issues_dynamic,
+ drawdown_change=max_drawdown_handicap-max_drawdown_dynamic)
+knitr::kable(calibration_changes,digits=2)
+```
+
+第一张表固定概率版本，只变覆盖；第二张表固定覆盖方式，只增加让球数分层。
+回撤降低时还应看最低资金与实际投入：减少投注本身就能降低部分风险。
+
+## 换入、换出以及第三赛果损失
+
+```{r}
+knitr::kable(diagnostics$flow,digits=2)
+knitr::kable(diagnostics$fixed_depth,digits=2)
+```
+
+完整流程表包含重新选组后的救回与丢失；金额以同概率版本的PROB为参照。
+`third_lost_groups` 指原本中奖、改变覆盖后未中，且真实七场组合包含至少一个第三赛果的组。
+这些组并不独立，不能把组数当成独立试验样本数。
+
+固定深度表保留PROB实际买下的组、票数和投入，只替换SOFT/HARD的组内购买顺序，
+用于分辨购买顺序本身和重新分配资金的作用。FULL必须买齐128注，因此不放进这个等票数诊断。
+
+## 保留原组与原票数：刚性Top2的另一种结果
+
+此处保留各概率版本PROB在开封结果前已选定的组及每组票数，只更换组内购买次序。
+**不重新要求修改后的票达到25%覆盖，也不重新选组。** 因而它与上面的HARD完整流程不是同一策略。
+这是已冻结购票顺序的等投入反事实结算，不用目标结果决定组、深度或新排序。
+
+```{r}
+fixed_rows<-diagnostics$fixed_groups |> group_by(issue,model,mode) |>
+ summarise(stake=sum(base_stake),gross=sum(fixed_gross),.groups='drop')
+fixed_rows<-expand_grid(issue=as.character(receipt$scope),model=c('FROZEN','DYNAMIC','HANDICAP'),mode=c('SOFT','HARD')) |>
+ left_join(fixed_rows,by=c('issue','model','mode'),relationship='one-to-one') |>
+ mutate(stake=replace_na(stake,0),gross=replace_na(gross,0),net=gross-stake,
+  policy=paste(model,'FIXED',mode,sep='_'),status=ifelse(stake>0,'COMPLETE','NO_BET'),
+  budget_cny=1024,cash_cny=1024-stake)
+fixed_curves<-strategy_equity_curves(fixed_rows,as.character(receipt$scope),100000)
+stopifnot(!any(fixed_curves$stopped))
+fixed_summary<-fixed_curves |> filter(period>0) |> group_by(model,policy) |>
+ summarise(stake=sum(stake),net=sum(net),roi=net/stake,hit_issues=sum(gross>0),
+  profit_issues=sum(funded_net_cny>0),max_drawdown=max(drawdown_cny),best_issue_net=max(funded_net_cny),
+  net_excluding_best=sum(funded_net_cny)-max(funded_net_cny),.groups='drop')
+check_fixed<-fixed_summary |> mutate(mode=sub('^.*_','',policy)) |>
+ left_join(diagnostics$fixed_depth |> select(model,mode,gross_change,original_stake=stake),
+ by=c('model','mode'),relationship='one-to-one') |>
+ left_join(summary |> filter(mode=='PROB') |> select(model=prob_model,base_net=net),by='model',relationship='many-to-one')
+stopifnot(all(check_fixed$stake==check_fixed$original_stake),
+ all(abs(check_fixed$net-check_fixed$base_net-check_fixed$gross_change)<1e-6))
+knitr::kable(fixed_summary |> mutate(roi=100*roi),digits=2)
+comparison<-bind_rows(curves |> filter(mode=='PROB') |> mutate(line='Original PROB'),
+ fixed_curves |> filter(grepl('_HARD$',policy)) |> mutate(prob_model=model,line='Same groups/depth, hard Top2'))
+p_fixed<-comparison |> select(prob_model,line,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,color=line))+geom_line()+facet_grid(metric~prob_model,scales='free_y')+
+ theme_minimal()+labs(x='Issue index',color=NULL,title='Fixed original groups and stakes; changed purchase order only')
+print(p_fixed);ggsave(file.path(s,'fixed-depth-equity-drawdown.png'),p_fixed,width=14,height=8,dpi=150)
+write_csv(fixed_rows,file.path(s,'fixed-depth-rows.csv'))
+write_csv(fixed_summary,file.path(s,'fixed-depth-summary.csv'))
+```
+
+HANDICAP等投入刚性Top2的净收益约63881元、ROI约87.99%、最大回撤约9587元；
+原HANDICAP_PROB为−6732元、−9.27%、最大回撤16476元。
+但命中期数32→30，盈利期数27→25，中奖组105→97：**收益提升来自中奖结构和回款，而非命中更频繁。**
+最高收益期111110贡献约29243元；剔除该期后总净收益仍约34638元。
+这个剔除只是集中度诊断，没有用它选择规则，也没有证明未来稳定。
+
+因此，对“如何往Top2靠拢”的本轮答案是：保留原概率选组及资金深度，
+再把所购票的赛果限制在Top2，这个受控反事实值得保留；
+统一软降权没有优势，重新要求刚性Top2达到25%则几乎停投。
+旧冻结概率下同样的等投入刚性Top2仍亏损，不能脱离概率版本泛化。
+
+## 单场Top2与七场联合Top2
+
+```{r}
+hc<-tables[['handicap.csv']]
+trade<-hc |> mutate(kind=ifelse(outcome=='D','draw','win_loss')) |> group_by(model,kind) |>
+ summarise(actual=sum(actual),top2_hits=sum(top2_hits),.groups='drop')
+knitr::kable(trade)
+knitr::kable(tables[['probability-summary.csv']],digits=4)
+joint_result<-n7_top2_joint_calibration(tables[['coverage-ledgers.csv']],ranks,seq(0,1,.05))
+joint<-joint_result$summary
+p2<-ggplot(joint,aes(predicted,observed,color=prob_model))+geom_abline(slope=1,intercept=0,linetype=2)+
+ geom_point(aes(size=groups))+labs(x='Predicted mass of all 128 Top2 states',y='Actual all-seven Top2 frequency',
+ color='Probability model',size='Groups')+theme_minimal()
+print(p2);ggsave(file.path(s,'joint-top2-calibration.png'),p2,width=10,height=6,dpi=150)
+```
+
+单场Top2命中稳定，不意味着七场同时落入Top2的发生率稳定。
+买齐128注只能覆盖“七场全部位于各自Top2”的事件；若任何一场落到第三赛果，这组全部128注都不中。
+这里的预测联合质量采用现有独立场次模型，实际组存在重叠；图为描述性检验，没有独立样本显著性主张。
+
+## 输出与复现
+
+```{r}
+write_csv(diagnostics$flow,file.path(s,'flow-transfers.csv'))
+write_csv(diagnostics$fixed_depth,file.path(s,'fixed-depth-transfers.csv'))
+write_csv(coverage_changes,file.path(s,'coverage-changes.csv'))
+write_csv(calibration_changes,file.path(s,'calibration-changes.csv'))
+write_csv(joint,file.path(s,'joint-top2-calibration.csv'))
+```
+
+输入由显式收据SHA256绑定，目标票在开封结算前冻结，独立重放通过后才生成本报告。
+没有重训其他专家，没有新增采集或清洗，也没有将这次回顾研究自动部署成投注规则。
