@@ -45,7 +45,7 @@ for(b in blocks) {
  for(arm in c('ABS','SIGNED')) {
   edges<-cfg$gap_breaks;if(arm=='SIGNED')edges<-c(-rev(edges[-1]),edges)
   m<-draw_handicap_fit(h,b,cutoff,getwd(),list(catalog=cfg$catalog_sha256,labels=params$receipt_sha256,code=digest::digest(code_hashes,algo='sha256')),
-   cfg$draw_breaks,edges,100,20,100,20,48,3,100,params$python,if(arm=='ABS')'absolute' else 'signed')
+   cfg$draw_breaks,edges,100,20,100,20,48,3,100,params$python,if(arm=='ABS')'absolute' else 'signed',refinement_cols='handicap')
   saveRDS(m,file.path(params$output,'frozen',paste0(b$fit_issue,'-',arm,'-model.rds')))
   for(target in b$targets) {
    epoch<-core$Cutoff$decision_epoch(target$issue,target$cutoff_ts)

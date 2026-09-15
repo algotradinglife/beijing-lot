@@ -1,0 +1,52 @@
+{
+  "sources": [
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-000/projected.json",
+      "sha256": "69111c1623f1ab03742b9da2388d3d9ec7489059a445f61f48b5b4ff01413e5f"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-001/projected.json",
+      "sha256": "b4088e967c30d578cdfa57dc2be661cdbe985a3de063bb9566d0f1ceb225145c"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-002/projected.json",
+      "sha256": "dd39e26cd6c077cbc6396d8984ec55913908ae62a226d4452040e14f62c6bd0b"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-003/projected.json",
+      "sha256": "fcdc54db10f0c5d1599c0db813c4a4809bd2df31cd710837289d615c6c9c896e"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-004/projected.json",
+      "sha256": "b7a3480145be360973989395a874c5d12843007b95ebc6213400ba7d495112b2"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-005/projected.json",
+      "sha256": "c2fc2dea5f9a80832c2ce235a5bd27dafe08ec061620c0fd98aea6316428ea0b"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-006/projected.json",
+      "sha256": "4416b4b6868606285e017ff48a91e7f87dbd2961cdd9632cf373ad18af46178b"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-007/projected.json",
+      "sha256": "91f4c256170579429028809cdf0ce2a6fd15ee74cc0f25ddf0d4b87a91b60e1a"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-008/projected.json",
+      "sha256": "9e1431526e3eeac7ee17521abf1e75045936715931144db5b9ef0dd89c81e129"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-009/projected.json",
+      "sha256": "7adc26ee770e3dd1c1bfeba823de2f0cc6e6511d1946db560789f9b81f44fe10"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-010/projected.json",
+      "sha256": "f7a4f18c5b3cb8427a4a8f00f02d8b55d84eb62e9e2ca9bb86a3d325eeb6af7c"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1/batch-011/projected.json",
+      "sha256": "418ed8a576da84bb77fa2bc498af1d2f74c420a336823ca57545aa076d30cd55"
+    }
+  ]
+}

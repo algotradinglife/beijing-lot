@@ -1,7 +1,7 @@
 source(file.path('..','..','r','draw_refresh.R'))
 source(file.path('..','..','r','draw_handicap_refresh.R'))
 
-for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink separately and do not use future outcomes', {
+for(refine in list('handicap',c('handicap','total_band'))) for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink separately and do not use future outcomes', {
  root<-normalizePath('../..');py<-Sys.getenv('RETICULATE_PYTHON')
  reticulate::use_python(py,required=TRUE)
  core<-reticulate::import('src.temporal_learning.core')
@@ -9,7 +9,7 @@ for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink sep
  h<-expand.grid(i=1:8,slot=1:3)
  h$issue_code<-sprintf('%06d',h$i);h$provider_id<-paste(h$i,h$slot,sep='-')
  h$q_W<-.4;h$q_D<-.2;h$q_L<-.4;h$actual<-ifelse(h$slot==1,'D','W')
- h$handicap<-c(-1,0,1)[h$slot]
+ h$handicap<-c(-1,0,1)[h$slot];h$total_band<-'MID'
  h$fixture_decision_ts<-sprintf('2011-01-%02dT00:00:00Z',h$i)
  h$last_fixture_cutoff<-h$fixture_decision_ts;h$i<-NULL
  targets<-data.frame(issue_code=c('000006','000007','000008'),
@@ -17,8 +17,8 @@ for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink sep
  b<-blocks$frozen_block_schedule(reticulate::r_to_py(targets),cadence=2L)[[1]]
  cutoff<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
  a<-draw_handicap_fit(h,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode)
- f<-h[h$issue_code=='000007',c('slot','provider_id','handicap','q_W','q_D','q_L','fixture_decision_ts')]
+  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode,refinement_cols=refine)
+ f<-h[h$issue_code=='000007',c('slot','provider_id','total_band','handicap','q_W','q_D','q_L','fixture_decision_ts')]
  f$issue<-'000007';c7<-core$Cutoff$decision_epoch('000007','2011-01-07T00:00:00Z')
  z<-draw_handicap_predict(a,f,c7,.5,root,py)
  parent_long<-(4+2*.2)/14;parent_recent<-(3+2*parent_long)/11
@@ -35,7 +35,7 @@ for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink sep
  changed<-h;future<-changed$issue_code>='000006';changed$actual[future]<-'L'
  changed$fixture_decision_ts[future]<-'2010-01-01T00:00:00Z';changed$last_fixture_cutoff[future]<-'2010-01-01T00:00:00Z'
  aa<-draw_handicap_fit(changed,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode)
+  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode,refinement_cols=refine)
  testthat::expect_identical(a$cells,aa$cells)
  testthat::expect_equal(z$new_D,draw_handicap_predict(aa,f,c7,.5,root,py)$new_D)
  bad<-a;bad$cells$h_rate<-0
@@ -53,7 +53,7 @@ for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink sep
   expanded_pool=list(fixtures=e$fixtures),sleeves=list(list(id=0L,fixture_indices=as.list(0:6),
   origin='QUALITY',enumeration=e,options=list())))
  target<-dplyr::bind_rows(e$fixtures);target$fixture_decision_ts<-'2011-01-07T00:00:00+00:00'
- target$handicap<-rep(c(-1,0,1),length.out=7)
+ target$handicap<-rep(c(-1,0,1),length.out=7);target$total_band<-'MID'
  pa<-draw_handicap_predict(a,target,c7,.5,root,py)
  pb<-draw_handicap_predict(aa,target,c7,.5,root,py)
  ba<-n7_probability_bundle(bundle,pa,bundle$cutoffs,a$seal)
