@@ -24,6 +24,10 @@ source('r/strategy_diagnostic_probabilities.R')
 source('r/diagnostic_verified_csv.R')
 stopifnot(!is.null(params$study),!is.null(params$catalog_sha256),
           !is.null(params$python),!is.null(params$output))
+# This report carries conclusions for one frozen study, not arbitrary snapshots.
+stopifnot(identical(params$catalog_sha256,'3b502b7827a93354ff74e826829779391bb062a1b9b41d6cf3a11537d397ef00'),
+ is.numeric(params$display_minimum),length(params$display_minimum)==1,
+ identical(as.numeric(params$display_minimum),50))
 reticulate::use_python(params$python,required=TRUE)
 api<-reticulate::import('src.strategy_diagnostic_inputs',convert=FALSE)
 catalog<-file.path(params$study,'settlement-inputs/catalog.json')
@@ -31,10 +35,15 @@ input<-jsonlite::fromJSON(reticulate::py_to_r(reticulate::import('json',convert=
   api$read_diagnostic_fixtures(catalog,params$catalog_sha256))))
 fx<-as_tibble(input$rows)
 ar<-jsonlite::fromJSON(file.path(params$study,'current-settlement/receipt.json'))
+stopifnot(identical(ar$files[['fixture-audit.csv']],
+ 'ef9082abfbd5fffe497cb632c5cdfc37522b6c8ad02ff7125b0e940a51672c32'))
 labels<-diagnostic_read_verified_csv(file.path(params$study,'current-settlement/fixture-audit.csv'),
  ar$files[['fixture-audit.csv']],cols(issue='c',provider_id='c'))
 stopifnot(all(labels$status=='READY'),!anyDuplicated(labels[c('issue','slot','provider_id')]))
-window<-jsonlite::fromJSON('config/draw_refresh_drawdown.json')
+window_bytes<-readBin('config/draw_refresh_drawdown.json','raw',n=file.info('config/draw_refresh_drawdown.json')$size)
+stopifnot(digest::digest(window_bytes,serialize=FALSE,algo='sha256')==
+ '56a09d9391df0d95be14ca617673a931cad9d0e17838175554bd83b83f813ffd')
+window<-jsonlite::fromJSON(rawToChar(window_bytes))
 stopifnot(length(window$issues)==94)
 keys<-c('issue','slot','provider_id')
 stopifnot(nrow(anti_join(fx,labels,by=keys))==0,nrow(anti_join(labels,fx,by=keys))==0)

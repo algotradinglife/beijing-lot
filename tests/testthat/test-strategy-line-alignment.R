@@ -32,3 +32,27 @@ test_that('all draws yield empty conditional diagnostics and ties abstain', {
   expect_equal(strategy_line_alignment(x,c(0,1))$conditional$directional_n,0)
   x$p_D<-.3;expect_error(strategy_line_alignment(x,c(0,1)))
 })
+
+test_that('numeric residuals, bin boundaries, Brier and tails match hand calculations', {
+  x<-tibble::tibble(issue='01',slot=1:5,provider_id=as.character(1:5),model='raw',stage='test',
+    handicap=c(-1,-1,1,0,0),home_goals=c(4,0,0,1,0),away_goals=c(0,3,1,0,1),
+    p_W=c(.6,.2,.1,.3,.45),p_D=c(.2,.3,.2,.4,.1),p_L=c(.2,.5,.7,.3,.45))
+  y<-strategy_line_alignment(x,c(0,.5,1))
+  expect_equal(y$fixtures$direction_residual,c(.6,-.7,.6,1,-1))
+  expect_equal(y$fixtures$line_distance,c(3,-4,0,1,-1))
+  expect_equal(as.character(y$fixtures$conditional_bin),c('[0.5,1]','[0,0.5)','[0,0.5)','[0.5,1]','[0.5,1]'))
+  c0<-y$classes |> dplyr::filter(handicap==0) |> dplyr::arrange(outcome)
+  expect_equal(c0$outcome,c('D','L','W'))
+  expect_equal(c0$predicted,c(.25,.375,.375))
+  expect_equal(c0$observed,c(0,.5,.5))
+  expect_equal(c0$gap,c(-.25,.125,.125))
+  lo<-y$conditional |> dplyr::filter(handicap==-1,predicted<.5)
+  hi<-y$conditional |> dplyr::filter(handicap==-1,predicted>.5)
+  expect_equal(lo$gap,-2/7);expect_equal(lo$brier,4/49)
+  expect_equal(hi$gap,.25);expect_equal(hi$brier,1/16)
+  mid<-y$conditional |> dplyr::filter(handicap==0)
+  expect_equal(mid$gap,0);expect_equal(mid$brier,.25)
+  tails<-y$distances |> dplyr::filter(handicap==-1) |> dplyr::arrange(distance_band)
+  expect_setequal(tails$distance_band,c('<=-3','>=3'))
+  expect_equal(tails$observed,c(.5,.5));expect_equal(tails$fixtures,c(1L,1L))
+})
