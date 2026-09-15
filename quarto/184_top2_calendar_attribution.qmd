@@ -1,0 +1,109 @@
+---
+title: "Top2 回撤期盈利差异：冻结概率与选组的交叉归因"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  old: null
+  new: null
+  old_sha256: null
+  new_sha256: null
+  output: null
+  labels: null
+  python: null
+---
+
+固定111104–120419共94期，以旧独立日历O和统一日历N交叉比较概率与选组/深度。
+OO复现此前盈利，NN复现统一日历；ON/NO只交换概率与原选组/深度，不重新执行25%准入。
+这两个交叉单元用于归因，不冒充完整可部署策略。标签仅在全部计划冻结后读入。
+全部为已知历史窗口的诊断；不选择日历、种子或门槛，也不证明未来盈利。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+stopifnot(all(vapply(params,function(x)!is.null(x),logical(1))))
+reticulate::use_python(params$python,required=TRUE)
+modules<-paste0('r/',c('diagnostic_verified_rds','diagnostic_verified_csv','n7_joint_sleeves',
+ 'third_outcome_tickets','fundamentals_equity_curves','n7_freeze_attribution'),'.R')
+for(f in modules)source(f)
+code<-setNames(as.list(vapply(c(modules,'quarto/184_top2_calendar_attribution.qmd'),digest::digest,character(1),file=TRUE,algo='sha256')),c(modules,'quarto/184_top2_calendar_attribution.qmd'))
+stopifnot(digest::digest(file=file.path(params$old,'plans-receipt.json'),algo='sha256')==params$old_sha256,
+ digest::digest(file=file.path(params$new,'receipt.json'),algo='sha256')==params$new_sha256)
+old<-jsonlite::fromJSON(file.path(params$old,'plans-receipt.json'),simplifyVector=FALSE)
+new<-jsonlite::fromJSON(file.path(params$new,'receipt.json'),simplifyVector=FALSE)
+ids<-sort(unlist(old$scope));stopifnot(length(ids)==94,head(ids,1)=='111104',tail(ids,1)=='120419')
+ob<-Filter(function(b)b$arm=='HANDICAP_PROB',old$bindings)
+nb<-Filter(function(b)b$rule=='NEW_RULE',new$bindings)
+stopifnot(length(ob)==94,length(nb)==94,setequal(vapply(nb,`[[`,character(1),'issue'),ids))
+o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
+rules<-tibble(id='HARD',kind='hard',value=0)
+bindings<-list();fixture_changes<-list()
+for(id in ids) {
+ a<-Filter(function(b)b$issue==id,ob)[[1]];b<-Filter(function(b)b$issue==id,nb)[[1]]
+ x<-diagnostic_read_verified_rds(file.path(params$old,a$replay),a$replay_sha256)
+ y<-diagnostic_read_verified_rds(file.path(params$new,b$path),b$sha256)
+ xf<-bind_rows(x$fixtures);yf<-bind_rows(y$fixtures);yf<-yf[match(xf$slot,yf$slot),]
+ stopifnot(identical(xf$provider_id,yf$provider_id),all(xf$handicap==yf$handicap),
+ max(abs(as.matrix(xf[c('q_W','q_D','q_L')])-as.matrix(yf[c('q_W','q_D','q_L')])))<1e-12)
+ fixture_changes[[id]]<-xf |> select(issue,slot,provider_id,handicap,p_W,p_D,p_L) |>
+ rename(old_W=p_W,old_D=p_D,old_L=p_L) |>
+ bind_cols(yf |> select(p_W,p_D,p_L) |> rename(new_W=p_W,new_D=p_D,new_L=p_L))
+ for(pc in c('O','N'))for(ac in c('O','N')) {
+  pr<-if(pc=='O')x else y;allocation<-if(ac=='O')x else y
+  selected<-allocation$result$pool$options[allocation$result$fit$selected]
+  funded<-tibble(sleeve_id=vapply(selected,function(z)as.character(z$sleeve_id),character(1)),depth=vapply(selected,function(z)as.integer(z$depth),integer(1)))
+  plan<-third_outcome_ticket_plan(pr$fixtures,pr$result$surface,funded,pr$cutoffs,params$python,rules,2,.65,1024)
+  cell<-paste0(pc,ac);name<-paste0('plan-',id,'-',cell,'.rds');saveRDS(plan,file.path(o,name))
+  bindings[[paste(id,cell)]]<-list(issue=id,cell=cell,path=name,sha256=digest::digest(file=file.path(o,name),algo='sha256'),
+   probability_source=if(pc=='O')a$replay_sha256 else b$sha256,allocation_source=if(ac=='O')a$replay_sha256 else b$sha256,
+   probability_seal=if(pc=='O')a$fit_model_seal else b$model_seal,allocation_seal=if(ac=='O')a$fit_model_seal else b$model_seal,
+   cutoffs=pr$cutoffs)
+ }
+ writeLines(id,file.path(o,'progress.txt'))
+}
+write_csv(bind_rows(fixture_changes),file.path(o,'fixture-changes.csv'))
+jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',scope=ids,implementation=code,bindings=bindings,
+ old_receipt=params$old_sha256,new_receipt=params$new_sha256,historical_admission=FALSE),file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+```{r}
+labels<-diagnostic_read_verified_csv(params$labels,old$sources$fixture_audit,cols(issue='c',provider_id='c')) |>
+ select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
+label_issues<-split(labels,labels$issue)
+groups<-list()
+for(b in bindings) {
+ plan<-diagnostic_read_verified_rds(file.path(o,b$path),b$sha256)
+ groups[[paste(b$issue,b$cell)]]<-third_outcome_ticket_settle(plan,label_issues[[b$issue]]) |> mutate(cell=b$cell)
+}
+groups<-bind_rows(groups)
+rows<-groups |> group_by(issue,cell) |> summarise(stake=sum(stake),gross=sum(gross),hits=sum(hit),.groups='drop')
+rows<-expand_grid(issue=ids,cell=c('OO','ON','NO','NN')) |> left_join(rows,by=c('issue','cell'),relationship='one-to-one') |>
+ mutate(across(c(stake,gross,hits),~replace_na(.x,0)),net=gross-stake,model='HANDICAP',policy=cell,
+ budget_cny=1024,cash_cny=1024-stake,status=ifelse(stake>0,'COMPLETE','NO_BET'))
+stopifnot(abs(sum(rows$net[rows$cell=='OO'])-63881.009766859366)<1e-6,
+ abs(sum(rows$net[rows$cell=='NN'])+6042.582491921206)<1e-6)
+attribution<-n7_freeze_attribution(rows,ids)
+curves<-strategy_equity_curves(rows,ids,100000);stopifnot(!any(curves$stopped))
+summary<-curves |> filter(period>0) |> group_by(policy) |> summarise(stake=sum(stake),net=sum(net),roi_percent=100*net/stake,
+ hit_issues=sum(gross>0),max_drawdown=max(drawdown_cny),net_without_best=net-max(funded_net_cny),.groups='drop')
+transitions<-full_join(groups |> filter(cell=='OO') |> select(issue,sleeve_id,old_stake=stake,old_gross=gross),
+ groups |> filter(cell=='NN') |> select(issue,sleeve_id,new_stake=stake,new_gross=gross),by=c('issue','sleeve_id'),relationship='one-to-one') |>
+ mutate(old_selected=!is.na(old_stake),new_selected=!is.na(new_stake),across(c(old_stake,new_stake,old_gross,new_gross),~replace_na(.x,0)),
+ gross_change=new_gross-old_gross,net_change=gross_change-(new_stake-old_stake)) |> arrange(gross_change)
+for(n in c('groups','rows','attribution','curves','summary','transitions'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+knitr::kable(summary,digits=2)
+knitr::kable(attribution |> summarise(probability_effect=sum(probability_effect_cny),allocation_effect=sum(allocation_effect_cny),net_change=sum(net_change_cny)),digits=2)
+knitr::kable(head(transitions,12),digits=2)
+p<-curves |> select(policy,period,equity_cny,drawdown_cny) |> pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,color=policy))+geom_line()+facet_wrap(~metric,ncol=1,scales='free_y')+theme_minimal()+
+ labs(title='Top2 calendar attribution: 94 identical issues',subtitle='First letter: probability calendar; second: allocation calendar. O=old, N=uniform',x='Issue index',color=NULL)
+print(p);ggsave(file.path(o,'calendar-attribution.png'),p,width=12,height=8,dpi=150)
+f<-list.files(o,pattern='[.](rds|csv|png)$',full.names=TRUE)
+jsonlite::write_json(list(status='REPLAYED_PENDING_REVIEW',historical_admission=FALSE,implementation=code,
+ plans_receipt_sha256=digest::digest(file=file.path(o,'plans-receipt.json'),algo='sha256'),
+ files=setNames(as.list(vapply(f,digest::digest,character(1),file=TRUE,algo='sha256')),basename(f))),file.path(o,'report-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
