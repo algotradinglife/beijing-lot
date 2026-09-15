@@ -41,7 +41,7 @@ files<-c(modules,'quarto/200_joint_purchase_comparison.qmd',params$config)
 code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
 cfg<-jsonlite::fromJSON(params$config)
 ids<-n7_purchase_scope(cfg,digest::digest(file=params$catalog,algo='sha256'))
-catalog<-jsonlite::fromJSON(params$catalog)$issues
+catalog<-jsonlite::fromJSON(params$catalog)$issues |> select(issue,path,sha256)
 requested_ids<-ids
 if(!is.null(params$limit)) {
  stopifnot(is.numeric(params$limit),length(params$limit)==1,is.finite(params$limit),
