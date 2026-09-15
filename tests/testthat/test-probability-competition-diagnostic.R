@@ -1,0 +1,21 @@
+source(file.path('..','..','r','strategy_diagnostic_probabilities.R'))
+source(file.path('..','..','r','probability_competition_diagnostic.R'))
+testthat::test_that('composition uses common support and reconciles exactly', {
+ f<-data.frame(issue=c('001','001','002','002','002'),slot=c(1,2,1,2,3),provider_id=letters[1:5],
+  model='RAW',stage=c('A','A','B','B','B'),stratum=c('x','y','x','y','z'),value=c(.1,.3,.2,.6,1))
+ d<-probability_competition_decomposition(f,'A','B')
+ testthat::expect_equal(d$summary$change,.2)
+ testthat::expect_equal(d$summary$composition+d$summary$within,d$summary$change)
+ testthat::expect_equal(d$coverage$excluded,c(0L,1L))
+ testthat::expect_error(probability_competition_decomposition(rbind(f,f),'A','B'))
+ testthat::expect_error(probability_competition_decomposition(transform(f,stratum=stage),'A','B'))
+ testthat::expect_error(probability_competition_decomposition(transform(f,value=NA_real_),'A','B'))
+})
+testthat::test_that('metadata joins cannot invent missing tiers or multiply rows', {
+ f<-data.frame(issue='001',slot=1:2,provider_id=c('01','02'),competition=c('英超','unknown'))
+ d<-data.frame(competition='英超',competition_type='LEAGUE',tier='1',evidence='explicit')
+ z<-probability_competition_tags(f,d)
+ testthat::expect_equal(z$tier,c('1','UNKNOWN'))
+ testthat::expect_equal(z$provider_id,c('01','02'))
+ testthat::expect_error(probability_competition_tags(f,rbind(d,d)))
+})

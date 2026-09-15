@@ -1,0 +1,92 @@
+---
+title: "概率校正的赛事构成与类内误差诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  receipt_sha256: null
+  database: null
+  python: null
+  output: null
+---
+
+只读已冻结的484期预测和既有结算赛事标签，不重采集或清洗。
+赛事名称是Nowscore原始观察的回顾性标签，不证明赛前可用，也不替代Titan球队级别证据。
+具体赛事名称原样保留，不凭名称推断两队是否跨级。本页不拟合校正参数。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/diagnostic_verified_csv.R');source('r/strategy_diagnostic_probabilities.R');source('r/probability_competition_diagnostic.R')
+stopifnot(all(vapply(params,function(v)!is.null(v),logical(1))),!dir.exists(params$output))
+stopifnot(digest::digest(file=file.path(params$study,'receipt.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(params$study,'receipt.json'),simplifyVector=FALSE)
+x<-diagnostic_read_verified_csv(file.path(params$study,'inputs.csv'),r$files[['inputs.csv']],cols(issue='c',provider_id='c'))
+s<-diagnostic_read_verified_csv(file.path(params$study,'scores.csv'),r$files[['scores.csv']],cols(issue='c',provider_id='c'))
+reticulate::use_python(params$python,required=TRUE)
+fixtures<-lapply(seq_len(nrow(x)),function(i)list(issue=x$issue[i],slot=as.integer(x$slot[i]),provider_id=x$provider_id[i]))
+a<-reticulate::import('src.probability_competition_labels')$read_competition_labels(params$database,fixtures)
+labels<-bind_rows(lapply(a$rows,function(z)tibble(issue=z$issue,slot=z$slot,provider_id=z$provider_id,competition=if(is.null(z$competition))'UNKNOWN' else z$competition)))
+stopifnot(nrow(labels)==nrow(x),!anyDuplicated(labels[c('issue','slot','provider_id')]))
+dictionary<-read_csv('config/probability_competition_dictionary.csv',col_types=cols(.default='c'))
+labels<-probability_competition_tags(labels,dictionary)
+labels$cross_tier<-'UNKNOWN_NO_TARGET_TEAM_MEMBERSHIP'
+z<-left_join(s,labels,by=c('issue','slot','provider_id'),relationship='many-to-one')
+dir.create(params$output)
+jsonlite::write_json(a,file.path(params$output,'competition-evidence.json'),auto_unbox=TRUE,pretty=TRUE)
+write_csv(labels,file.path(params$output,'labels.csv'))
+coverage<-z |> filter(model=='RAW') |> group_by(stage) |> summarise(fixtures=n(),issues=n_distinct(issue),competitions=n_distinct(competition),missing=sum(competition=='UNKNOWN'),.groups='drop')
+knitr::kable(coverage)
+summary<-z |> group_by(stage,competition,model) |> summarise(fixtures=n(),issues=n_distinct(issue),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),actual_probability=mean(actual_probability),.groups='drop')
+write_csv(summary,file.path(params$output,'competition-scores.csv'))
+reference<-summary |> filter(model=='RAW') |> select(-model)
+changes<-summary |> filter(model!='RAW') |> inner_join(reference,by=c('stage','competition'),suffix=c('','_raw'),relationship='many-to-one') |> mutate(brier_delta=brier-brier_raw,log_loss_delta=log_loss-log_loss_raw,contribution=brier_delta*fixtures)
+write_csv(changes,file.path(params$output,'competition-changes.csv'))
+knitr::kable(changes |> filter(stage=='DRAWDOWN_94',model=='DYNAMIC') |> arrange(desc(contribution)) |> head(20) |> select(competition,fixtures,brier_delta,log_loss_delta,contribution),digits=5)
+```
+
+## 固定赛事构成
+
+仅在两个阶段共同出现的具体赛事上分解；排除数明确列出，不填补不存在的类别。
+采用参考阶段均值计算构成效应、目标阶段权重计算类内效应，分解顺序固定，非因果归因。
+
+```{r}
+ledger<-list();cells<-list();exclusions<-list()
+for(dimension in c('competition','competition_handicap','competition_type','tier'))for(other in c('BEFORE_305','AFTER_85'))for(metric in c('brier','log_loss','top1','top2')) {
+ t<-z |> mutate(stratum=if(dimension=='competition_handicap')paste(competition,handicap,sep=' / ') else .data[[dimension]]) |>
+ select(issue,slot,provider_id,model,stage,stratum,all_of(metric)) |> rename(value=all_of(metric)) |> mutate(value=as.numeric(value))
+ d<-probability_competition_decomposition(t,other,'DRAWDOWN_94')
+ ledger[[length(ledger)+1]]<-d$summary |> mutate(metric=metric,dimension=dimension)
+ cells[[length(cells)+1]]<-d$cells |> mutate(metric=metric,dimension=dimension)
+ exclusions[[length(exclusions)+1]]<-d$coverage |> mutate(metric=metric,dimension=dimension)
+}
+composition<-bind_rows(ledger);write_csv(composition,file.path(params$output,'composition.csv'))
+write_csv(bind_rows(cells),file.path(params$output,'composition-cells.csv'));write_csv(bind_rows(exclusions),file.path(params$output,'common-support.csv'))
+knitr::kable(composition |> filter(metric=='brier'),digits=5)
+strata<-z |> group_by(stage,competition_type,tier,handicap,model) |> summarise(fixtures=n(),issues=n_distinct(issue),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),.groups='drop')
+write_csv(strata,file.path(params$output,'type-tier-handicap.csv'))
+paired<-diagnostic_read_verified_csv(file.path(params$study,'pairs.csv'),r$files[['pairs.csv']],cols(issue='c',provider_id='c')) |> filter(baseline=='RAW') |>
+ left_join(labels,by=c('issue','slot','provider_id'),relationship='many-to-one')
+paired_summary<-paired |> group_by(stage,competition,competition_type,tier,handicap,model) |>
+ summarise(fixtures=n(),issues=n_distinct(issue),actual_probability_delta=mean(actual_probability_delta),up=sum(actual_probability_movement=='UP'),down=sum(actual_probability_movement=='DOWN'),
+ top1_rescued=sum(top1_rescued),top1_lost=sum(top1_lost),top2_rescued=sum(top2_rescued),top2_lost=sum(top2_lost),brier_delta=mean(brier_delta),log_loss_delta=mean(log_loss_delta),.groups='drop')
+write_csv(paired_summary,file.path(params$output,'paired-strata.csv'))
+knitr::kable(labels |> count(competition_type,tier,cross_tier),caption='赛事级别不等于双方球队级别；跨级字段未获得同范围已验收证据，保持未知')
+
+```
+
+## 图示
+
+```{r}
+p<-ggplot(changes |> filter(fixtures>=100),aes(brier_delta,reorder(competition,brier_delta),colour=stage,size=fixtures))+geom_vline(xintercept=0,linetype=2)+geom_point()+facet_wrap(~model)+theme_minimal(base_family='Noto Sans CJK SC')+labs(x='相对RAW的Brier变化：负值更好',y='赛事（阶段样本至少100场）')
+ggsave(file.path(params$output,'league-errors.png'),p,width=12,height=14);print(p)
+p2<-composition |> filter(metric=='brier',dimension=='competition_handicap') |> select(reference,model,composition,within) |> pivot_longer(c(composition,within),names_to='component',values_to='change') |> ggplot(aes(model,change,fill=component))+geom_col(position='dodge')+facet_wrap(~reference)+theme_minimal(base_family='Noto Sans CJK SC')+labs(y='回撤段Brier相对参考段的变化',x=NULL)
+ggsave(file.path(params$output,'composition.png'),p2,width=10,height=5);print(p2)
+files<-list.files(params$output,full.names=TRUE)
+jsonlite::write_json(list(status='PENDING_REVIEW',parent_receipt=params$receipt_sha256,evidence_sha256=a$evidence_sha256,implementation=setNames(as.list(vapply(c('src/probability_competition_labels.py','r/probability_competition_diagnostic.R','r/strategy_diagnostic_probabilities.R','quarto/188_probability_competition_diagnostic.qmd','config/probability_competition_dictionary.csv'),digest::digest,character(1),file=TRUE,algo='sha256')),c('src/probability_competition_labels.py','r/probability_competition_diagnostic.R','r/strategy_diagnostic_probabilities.R','quarto/188_probability_competition_diagnostic.qmd','config/probability_competition_dictionary.csv')),files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),basename(files))),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

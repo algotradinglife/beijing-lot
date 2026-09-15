@@ -1,0 +1,81 @@
+---
+title: "冻结历史校正的弱化、收缩与局部规则比较"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  parent: null
+  parent_sha256: null
+  drawdown: null
+  drawdown_sha256: null
+  foundation: null
+  foundation_sha256: null
+  python: null
+  output: null
+---
+
+固定政策比较，不选择事后最优参数。复用49个每10期更新的已封存模型，逐期显式cutoff。
+候选为原校正幅度的25%/50%、按历史格子支持数n/(n+100)收缩，以及局部证据门控。
+局部门控使用历史让平率Wilson区间（z=1.96、n至少100）是否排除当前原市场让平概率，
+且排除方向与原动态校正一致。它是固定启发式，不是效果显著性检验，也没有针对回撤期调参。
+旧模型历史时点代理限制保留，不能据此部署。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+modules<-paste0('r/',c('diagnostic_verified_csv','diagnostic_verified_rds','draw_refresh','draw_handicap_refresh','draw_correction_candidates','strategy_diagnostic_probabilities','probability_foundation_pairs'),'.R')
+for(f in modules)source(f)
+implementation_files<-c(modules,'quarto/189_probability_correction_candidates.qmd')
+implementation<-setNames(as.list(vapply(implementation_files,digest::digest,character(1),file=TRUE,algo='sha256')),implementation_files)
+stopifnot(!dir.exists(params$output))
+stopifnot(digest::digest(file=file.path(params$parent,'plans-receipt.json'),algo='sha256')==params$parent_sha256,
+ digest::digest(file=file.path(params$drawdown,'receipt.json'),algo='sha256')==params$drawdown_sha256)
+a<-jsonlite::fromJSON(file.path(params$parent,'plans-receipt.json'),simplifyVector=FALSE)
+b<-jsonlite::fromJSON(file.path(params$drawdown,'receipt.json'),simplifyVector=FALSE)
+stopifnot(a$model_sha256==b$parent_models_sha256)
+models<-diagnostic_read_verified_rds(file.path(params$parent,'frozen-models.rds'),a$model_sha256)
+x<-bind_rows(diagnostic_read_verified_csv(file.path(params$parent,'predictions.csv'),a$predictions_sha256,cols(issue='c',provider_id='c',fit_issue='c')),
+ diagnostic_read_verified_csv(file.path(params$drawdown,'predictions.csv'),b$files[['predictions.csv']],cols(issue='c',provider_id='c',fit_issue='c')))
+stopifnot(!anyDuplicated(x[c('issue','slot','provider_id')]),nrow(x)==36140,n_distinct(x$issue)==484)
+reticulate::use_python(params$python,required=TRUE);core<-reticulate::import('src.temporal_learning.core')
+dir.create(params$output);dir.create(file.path(params$output,'frozen'))
+for(id in sort(unique(x$issue))) {
+ t<-filter(x,issue==id);fit<-unique(t$fit_issue);stopifnot(length(fit)==1)
+ m<-models[[fit]];stopifnot(all(t$model_seal==m$seal))
+ target<-Filter(function(z)z$issue==id,m$parent$block$targets)[[1]]
+ cutoff<-core$Cutoff$decision_epoch(id,target$cutoff_ts)
+ f<-t |> select(issue,slot,provider_id,handicap,q_W,q_D,q_L,fixture_decision_ts)
+ v<-draw_correction_candidates(m,f,cutoff,.5,c(.25,.5),100,100,1.96,getwd(),params$python)
+ check<-v$rows |> filter(model=='DYNAMIC')
+ stopifnot(max(abs(check$D-t$new_D))<1e-12)
+ # Freeze every target probability before opening the evaluation labels below.
+ saveRDS(v,file.path(params$output,'frozen',paste0(id,'.rds')))
+ cat(id,' frozen\n')
+}
+```
+
+```{r}
+stopifnot(digest::digest(file=file.path(params$foundation,'receipt.json'),algo='sha256')==params$foundation_sha256)
+r<-jsonlite::fromJSON(file.path(params$foundation,'receipt.json'),simplifyVector=FALSE)
+labels<-diagnostic_read_verified_csv(file.path(params$foundation,'inputs.csv'),r$files[['inputs.csv']],cols(issue='c',provider_id='c',fit_issue='c')) |> select(issue,slot,provider_id,actual_outcome,stage)
+rows<-bind_rows(lapply(list.files(file.path(params$output,'frozen'),full.names=TRUE),function(p)readRDS(p)$rows))
+rows<-left_join(rows,labels,by=c('issue','slot','provider_id'),relationship='many-to-one')
+long<-rows |> pivot_longer(c(W,D,L),names_to='outcome',values_to='probability')
+result<-probability_foundation_pairs(long,'RAW',c('stage','handicap'),c('W','D','L'),seq(0,1,.1),1e-12)
+summary<-result$scores |> group_by(stage,model) |> summarise(fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),.groups='drop')
+all<-result$scores |> group_by(model) |> summarise(stage='ALL',fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),.groups='drop')
+summary<-bind_rows(summary,all)
+write_csv(rows,file.path(params$output,'predictions.csv'));write_csv(result$scores,file.path(params$output,'scores.csv'))
+write_csv(summary,file.path(params$output,'summary.csv'));write_csv(result$pairs,file.path(params$output,'pairs.csv'))
+knitr::kable(summary,digits=6)
+p<-summary |> pivot_longer(c('brier','log_loss'),names_to='metric',values_to='value') |> ggplot(aes(model,value,colour=stage,group=stage))+geom_point()+geom_line()+facet_wrap(~metric,scales='free_y')+theme_minimal()+theme(axis.text.x=element_text(angle=35,hjust=1))
+ggsave(file.path(params$output,'candidate-scores.png'),p,width=11,height=5);print(p)
+files<-list.files(params$output,recursive=TRUE,full.names=TRUE)
+jsonlite::write_json(list(status='PENDING_REVIEW',historical_admission=FALSE,parent_model_sha256=a$model_sha256,
+ implementation=implementation,parent_receipt=params$parent_sha256,drawdown_receipt=params$drawdown_sha256,foundation_receipt=params$foundation_sha256,
+ files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),substring(files,nchar(params$output)+2))),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
