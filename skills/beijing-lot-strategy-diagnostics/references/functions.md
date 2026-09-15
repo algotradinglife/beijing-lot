@@ -90,3 +90,8 @@ Top1准确率、Top1/Top2召回率与Top2漏选数。正让球加到主队比分
 - `r/n7_probability_replay.R::n7_probability_bundle()` / `n7_probability_allocate()`：保留原候选组成员与原市场估算价格，重建概率乘积、排序和完整内容凭据，复用原 SP 门槛、覆盖前缀及联合选组器。不生成新候选、不替换北单结算 SP、不重复乘0.65。测试 `tests/testthat/test-n7-probability-replay.R`。
 - `r/diagnostic_verified_csv.R::diagnostic_read_verified_csv()`：对实际解析的同一份字节核验 SHA-256，显式列类型，解析失败停止；防止预检之后结算文件被替换。测试 `tests/testthat/test-diagnostic-verified-csv.R`。
 - 入口 `quarto/169_draw_refresh_drawdown.qmd`；`config/draw_refresh_drawdown.json` 固定已知94期窗口，输出目录必须新建，拒绝覆盖既有冻结包。历史标签采用最后场次＋显式延迟的代理，仍为历史诊断，不能授权未来使用。现有输入缺比分格，本轮只评价 W/D/L，不能声称大小球/比分约束已经再协调。
+# 让球线及方向错位诊断
+
+- `r/strategy_line_alignment.R::strategy_line_alignment(frame, breaks)`：只读描述性函数；每行为 issue/slot/provider_id/model，要求 stage、有符号整数 handicap、实际主客进球及正值归一化 p_W/p_D/p_L。返回场次净方向残差、分让球数的三分类校准、实际非让平子样本的 W/(W+L) 分箱、去除模型重复后的实际距让球线分布。比率为0–1，净胜球为球；净方向残差不是球数。无拟合、无 I/O、无决策阈值；无预测比分网格时不能识别预测位置/尾部误差。
+- 测试：`tests/testthat/test-strategy-line-alignment.R`，包括让球符号、跨模型赛果一致性、保持W:L比例的等价性、全让平、精确平手弃判、重复/缺失/非法概率失败。
+- 入口：`quarto/171_line_alignment_diagnostic.qmd`；显式 study/catalog_sha256/python/output，固定回撤94期与原200期、其他新增期对照。复用 `strategy_composition_diagnostics` 分离构成和类内变化，不输出未来校正参数。
