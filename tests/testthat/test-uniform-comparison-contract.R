@@ -1,0 +1,20 @@
+testthat::test_that('uniform report preserves comparison contracts across foundations and no-bet issues', {
+ source('../../r/fundamentals_equity_curves.R')
+ source('../../r/n7_baseline_comparison.R')
+ text<-readLines('../../quarto/182_joint_top2_uniform.qmd')
+ start<-grep('^combined<-',text);end<-grep('^comparison<-',text)
+ testthat::expect_length(start,1);testthat::expect_length(end,1)
+ env<-new.env(parent=globalenv())
+ env$oldrows<-tibble::tibble(issue=c('1','2','3'),policy='A_OLD_OLD',stake=c(2,0,2),gross=c(3,0,0),net=c(1,0,-2),hits=c(1,0,0))
+ env$rows<-tidyr::expand_grid(issue=c('1','2','3'),rule=c('ORIGINAL','HARD')) |>
+  dplyr::mutate(stake=0,gross=0,net=0,hits=0)
+ env$cfg<-list(excluded_drawdown_issues='2',budget_cny=1024,initial_capital_cny=100000)
+ suppressPackageStartupMessages(library(dplyr))
+ eval(parse(text=paste(text[start:(end-1)],collapse='\n')),envir=env)
+ x<-env$combined
+ testthat::expect_true(all(c('model','hits') %in% names(x)))
+ result<-n7_baseline_comparison(x,c('1','2','3'),c('BEFORE_305','DRAWDOWN_94','AFTER_85'),'OLD_JOINT',100000)
+ testthat::expect_equal(nrow(result$summary),12)
+ testthat::expect_equal(result$summary$stake_cny[result$summary$policy=='UNIFORM_TOP2'],rep(0,4))
+ testthat::expect_true(all(is.na(result$summary$roi_percent[result$summary$policy=='UNIFORM_TOP2'])))
+})

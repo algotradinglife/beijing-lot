@@ -1,0 +1,38 @@
+---
+title: "JOINT 与刚性 Top2：统一冻结日历的完整结果"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  receipt_sha256: null
+---
+
+全部484期的 Top2 票单使用同一49块模型冻结日历；最早10期为预热，未拼接其他模型。
+旧JOINT保留旧冻结概率；UNIFORM_PROB与UNIFORM_TOP2使用同一HANDICAP概率。
+后两者保持组和票数相同，只改变赛果组合购买规则。每期预算上限1024元、本金10万元、
+2元票额、票级0.65仅应用一次。标签可用性使用历史代理，本报告属于历史研究。
+
+```{r}
+stopifnot(!is.null(params$study),!is.null(params$receipt_sha256))
+s<-params$study
+stopifnot(digest::digest(file=file.path(s,'report-receipt.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(s,'report-receipt.json'),simplifyVector=FALSE)
+stopifnot(length(r$scope)==484,!anyDuplicated(unlist(r$scope)))
+for(f in c('comparison-summary.csv','comparison-rows.csv','joint-top2-uniform.png'))
+ stopifnot(digest::digest(file=file.path(s,f),algo='sha256')==r$files[[f]])
+x<-readr::read_csv(file.path(s,'comparison-summary.csv'),show_col_types=FALSE)
+knitr::kable(x,digits=2)
+knitr::include_graphics(file.path(s,'joint-top2-uniform.png'))
+```
+
+统一口径后，旧JOINT净收益约53,342元、ROI12.40%、最大回撤23,852元；
+刚性Top2净收益约−7,386元、ROI−1.86%、最大回撤53,180元。
+此前拼接曲线的Top2盈利不能复现，不支持用该版本替换旧JOINT。
+回撤94期Top2仍亏损约6,043元；净亏损较少，但该段内最大回撤约25,808元，
+高于旧JOINT约23,852元。不能把期末净亏损减少等同于最大回撤改善。
