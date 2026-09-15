@@ -48,6 +48,11 @@ policies<-policies |> mutate(low_uses=if_else(id %in% c('LIMIT_FIXED','LIMIT_MON
  high_uses=6,low_stake=if_else(id %in% c('LIMIT_FIXED','LIMIT_USES'),384,128),high_stake=384)
 prov<-reticulate::import('src.temporal_learning.provenance');pathlib<-reticulate::import('pathlib')
 closure<-prov$implementation_closure(pathlib$Path(getwd()),as.list('src.fundamentals_n7_baseline'),distributions=c('numpy','pandas'))
+closure$root_modules<-as.list(closure$root_modules)
+# Preserve Python's list schema even when only one root module is bound.
+json_api<-reticulate::import('json',convert=FALSE)
+prov$verify_implementation_closure(pathlib$Path(getwd()),
+ json_api$loads(jsonlite::toJSON(closure,auto_unbox=TRUE)))
 o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
 bindings<-list();shapes<-list()
 for(id in unlist(parent$scope)) {
