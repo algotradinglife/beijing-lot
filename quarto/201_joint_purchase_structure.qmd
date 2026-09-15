@@ -1,0 +1,87 @@
+---
+title: "Joint 选组结构：区分度复用与相似概率曲线"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  parent: null
+  receipt_sha256: null
+  output: null
+  python: null
+---
+
+本轮只使用上一轮已冻结、已通过当前路径joint重放的候选池。全部新增计划冻结后另行结算。
+固定比较区分度复用、头部集中、覆盖成本相似与角色构成；不重训概率。
+角色阈值是研究假设：Top1至少55%且第二第三差至少5个百分点为核心，Top1低于40%为机会，其余为中间。
+不是历史可靠性的证明。相似曲线也不代表独立风险。
+
+```{r}
+suppressPackageStartupMessages(library(dplyr))
+stopifnot(!is.null(params$parent),!is.null(params$receipt_sha256),!is.null(params$output),!is.null(params$python))
+reticulate::use_python(params$python,required=TRUE)
+modules<-paste0('r/',c('n7_joint_sleeves','n7_capital_portfolio','n7_core_opportunity','n7_purchase_pool',
+ 'n7_purchase_exposure','n7_purchase_shape','n7_purchase_confidence','n7_purchase_group_filter','diagnostic_verified_rds'),'.R')
+for(f in modules)source(f)
+files<-c(modules,'quarto/201_joint_purchase_structure.qmd')
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+path<-file.path(params$parent,'plans-receipt.json')
+bytes<-readBin(path,'raw',n=file.info(path)$size)
+stopifnot(digest::digest(bytes,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+parent<-jsonlite::fromJSON(rawToChar(bytes),simplifyVector=FALSE)
+policies<-tribble(~id,~confidence,~minimum_mass,~minimum_core,~max_opportunity,~ratio,
+ 'CONFIDENCE',TRUE,0,0,7,Inf,
+ 'HEAD15',FALSE,.15,0,7,Inf,
+ 'SIMILAR',FALSE,0,0,7,1.25,
+ 'HEAD_SIMILAR',FALSE,.15,0,7,1.25,
+ 'CORE3',FALSE,0,3,1,Inf,
+ 'CORE4',FALSE,0,4,1,Inf,
+ 'STRUCTURE',TRUE,.15,3,1,1.25,
+ 'LIMIT_FIXED',TRUE,0,0,7,Inf,
+ 'LIMIT_USES',TRUE,0,0,7,Inf,
+ 'LIMIT_MONEY',TRUE,0,0,7,Inf)
+policies<-policies |> mutate(low_uses=if_else(id %in% c('LIMIT_FIXED','LIMIT_MONEY'),6,2),
+ high_uses=6,low_stake=if_else(id %in% c('LIMIT_FIXED','LIMIT_USES'),384,128),high_stake=384)
+prov<-reticulate::import('src.temporal_learning.provenance');pathlib<-reticulate::import('pathlib')
+closure<-prov$implementation_closure(pathlib$Path(getwd()),as.list('src.fundamentals_n7_baseline'),distributions=c('numpy','pandas'))
+o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
+bindings<-list();shapes<-list()
+for(id in unlist(parent$scope)) {
+ b<-parent$bindings[[id]];path<-file.path(params$parent,b$file)
+ old<-diagnostic_read_verified_rds(path,b$sha256)
+ stopifnot(identical(old$seal,digest::digest(old[names(old)!='seal'],algo='sha256')),old$issue==id)
+ base<-old$arms$JOINT$pool;cut<-old$cutoffs
+ n7_joint_validate(base$fixtures,cut,params$python)
+ shape<-n7_purchase_shape(base,cut,c(16,32,64,128),c(.15,.2,.25),2,.55,.4,.05)
+ shapes[[id]]<-shape |> mutate(issue=id)
+ worlds<-n7_joint_worlds(base,cut,old$seed,old$worlds)
+ evaluation_worlds<-n7_joint_worlds(base,cut,old$seed+100000,4096)
+ plan<-list(issue=id,fixtures=old$fixtures,cutoffs=cut,arms=list(),source_sha256=b$sha256,
+  code=code,closure_sha256=closure$closure_sha256,policies=policies,seed=old$seed,worlds=old$worlds,historical_admission=FALSE)
+ for(j in seq_len(nrow(policies))) {
+  p<-policies[j,];pool<-n7_purchase_group_filter(base,shape,cut,p$minimum_mass,p$minimum_core,p$max_opportunity,p$ratio)
+  sc<-n7_joint_returns(pool,worlds,cut)
+  limits<-if(p$confidence)n7_purchase_confidence_limits(pool,cut,2,.05,p$low_uses,p$high_uses,p$low_stake,p$high_stake) else n7_purchase_limits(pool,cut,2,Inf,Inf)
+  fit<-n7_core_allocate(pool,sc,cut,1024,'any_hit',1024,'OPEN_FIRST',limits)
+  stopifnot(fit$stop_reason!='ACTION_LIMIT')
+  exposure<-n7_purchase_exposure(pool,cut,2) |> filter(option %in% fit$selected) |>
+   group_by(fixture,outcome) |> summarise(required_stake=sum(required_stake),incompatible_stake=sum(incompatible_stake),uses=n(),.groups='drop')
+  evaluation<-n7_joint_returns(pool,evaluation_worlds,cut)
+  plan$arms[[p$id]]<-list(pool=pool,fit=fit,options=pool$options[fit$selected],exposure=exposure,
+   evaluation=n7_capital_evaluate(pool,fit$selected,evaluation,cut,1024))
+ }
+ plan$seal<-digest::digest(plan,algo='sha256');name<-paste0('plan-',id,'.rds');saveRDS(plan,file.path(o,name))
+ bindings[[id]]<-list(file=name,sha256=digest::digest(file=file.path(o,name),algo='sha256'),source_sha256=b$sha256)
+ writeLines(paste(length(bindings),length(parent$scope),id),file.path(o,'progress.txt'))
+}
+stopifnot(identical(code,setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)))
+readr::write_csv(bind_rows(shapes),file.path(o,'shapes.csv'))
+jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',scope=parent$scope,bindings=bindings,code=code,closure=closure,
+ parent_receipt_sha256=params$receipt_sha256,policies=policies,shape_sha256=digest::digest(file=file.path(o,'shapes.csv'),algo='sha256'),
+ historical_admission=FALSE),file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+knitr::kable(policies)
+```

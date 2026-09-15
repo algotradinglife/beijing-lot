@@ -16,6 +16,7 @@ import pandas as pd
 from src.data_archive import read_archive_members
 from src.fundamentals_roster_handicap import roster_handicaps
 from src.n7_published_markets import read_n7_published_markets
+from src.n7_research_scope import exclude_n7_research_fixtures
 
 cfg = json.loads(Path(sys.argv[1]).read_text())
 root = Path(cfg['data_root']);out = Path(cfg['output'])
@@ -75,11 +76,15 @@ for (archive,identity), batch in requests.items():
 for issue,raw in direct.items():
     if hashlib.sha256(raw).hexdigest()!=expected[issue]:
         raise ValueError('Roster byte mismatch: '+issue)
+scope_rows, exclusion_ledger = exclude_n7_research_fixtures(
+    release['rows'], cfg.get('excluded_fixtures', []), expected)
 out.mkdir(parents=True);(out/'rosters').mkdir()
 handicaps=[];roster_hashes={}
 for issue in issues:
     path=out/'rosters'/f'{issue}.json';path.write_bytes(direct[issue]);roster_hashes[str(path)]=expected[issue]
-    slots=sorted({r['slot'] for r in release['rows'] if r['issue']==issue})
+    slots=sorted({r['slot'] for r in scope_rows if r['issue']==issue})
+    if not slots:
+        continue
     for row in roster_handicaps(path,issue=issue,slots=slots):
         handicaps.append(dict(issue=issue,**row))
 del direct
@@ -88,6 +93,8 @@ for start in range(0,len(issues),25):
     batch_issues=issues[start:start+25]
     market=read_n7_published_markets(data_root=root,merged_path=cfg['release'],
         expected_sha256=cfg['release_sha256'],issues=batch_issues)
+    market['rows'], market['scope_exclusions'] = exclude_n7_research_fixtures(
+        market['rows'], [e for e in cfg.get('excluded_fixtures', []) if e['issue'] in batch_issues], expected)
     batch_dir=out/f'batch-{start//25:03d}';batch_dir.mkdir()
     market_path=batch_dir/'published-markets.json.gz'
     market_path.write_bytes(gzip.compress(json.dumps(market,ensure_ascii=False,allow_nan=False).encode(),mtime=0))
@@ -98,9 +105,11 @@ for start in range(0,len(issues),25):
     batch_receipts.append(dict(path=str(batch_dir),issues=batch_issues,market_sha256=market_hash,
         handicap_sha256=hashlib.sha256((batch_dir/'handicaps.json').read_bytes()).hexdigest()))
     print('Prepared quote batch',start//25,len(batch_issues),flush=True)
-(out/'scope.json').write_text(json.dumps(dict(issues=issues,old_issues=sorted(old),all_issues=sorted(old|set(issues)))))
+(out/'scope.json').write_text(json.dumps(dict(issues=issues,old_issues=sorted(old),all_issues=sorted(old|set(issues)),exclusions=exclusion_ledger)))
 (out/'input-receipt.json').write_text(json.dumps(dict(config=cfg,config_sha256=hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest(),
     source_hashes=source_hashes,roster_bindings=roster_bindings,issues=len(issues),batches=batch_receipts,
     outputs={name:hashlib.sha256((out/name).read_bytes()).hexdigest() for name in ['scope.json']},
-    implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),historical_admission=False),indent=2))
+    implementation_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    scope_implementation_sha256=hashlib.sha256((Path(__file__).resolve().parents[1]/'src/n7_research_scope.py').read_bytes()).hexdigest(),
+    historical_admission=False),indent=2))
 print('Prepared',len(issues),'issues and',len(handicaps),'roster handicap rows',flush=True)

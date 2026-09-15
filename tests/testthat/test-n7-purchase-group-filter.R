@@ -1,0 +1,21 @@
+source(file.path('..','..','r','n7_purchase_group_filter.R'))
+testthat::test_that('shape gates remove groups and preserve opening indices', {
+ c<-list(a='epoch')
+ p<-list(cutoffs=c,opportunity_options=integer(),opening_options=c(1L,3L,5L),
+  options=lapply(c(1,1,2,2,3,3),function(i)list(sleeve_id=i)))
+ s<-tibble::tibble(sleeve_id=1:3,mass_64=c(.25,.2,.1),`cost_0.25`=c(128,160,320),
+  core_count=c(4L,3L,1L),opportunity_count=c(0L,1L,2L));attr(s,'cutoffs')<-c
+ attr(s,'prediction_hash')<-digest::digest(list(p$fixtures,p$options),algo='sha256')
+ z<-n7_purchase_group_filter(p,s,c,.15,0,7,Inf)
+ testthat::expect_length(z$options,4)
+ testthat::expect_identical(z$opening_options,c(1L,3L))
+ z<-n7_purchase_group_filter(p,s,c,0,0,7,1.1)
+ testthat::expect_equal(z$group_gate$admitted_ids,2)
+ z<-n7_purchase_group_filter(p,s,c,0,4,0,Inf)
+ testthat::expect_equal(z$group_gate$admitted_ids,1)
+ z<-n7_purchase_group_filter(p,s,c,.9,0,7,Inf)
+ testthat::expect_length(z$options,0)
+ testthat::expect_error(n7_purchase_group_filter(p,s,list(a='other'),0,0,7,Inf))
+ changed<-p;changed$fixtures<-list(list(p_W=.8))
+ testthat::expect_error(n7_purchase_group_filter(changed,s,c,0,0,7,Inf))
+})

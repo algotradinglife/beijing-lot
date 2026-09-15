@@ -1,0 +1,165 @@
+---
+title: "Joint 购买效率与选组结构：统一结算报告"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  main: null
+  main_sha256: null
+  structure: null
+  structure_sha256: null
+  labels: null
+  output: null
+---
+
+各方案使用相同冻结概率和原候选组。本金10万元，每期投入上限1024元；北单回款只在票级乘一次0.65。
+分段为固定原研究窗口，最大回撤段属于事后窗口；这些回顾结果不能当作未见数据成绩。
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+modules<-paste0('r/',c('n7_purchase_settle','diagnostic_verified_csv','diagnostic_verified_rds',
+ 'fundamentals_equity_curves','n7_baseline_comparison'),'.R')
+for(f in modules)source(f)
+files<-c(modules,'quarto/202_joint_purchase_report.qmd','config/top2_outside_validation.json')
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+cfg<-jsonlite::fromJSON('config/top2_outside_validation.json')
+roots<-c(params$main,params$structure);hashes<-c(params$main_sha256,params$structure_sha256)
+stopifnot(length(roots)==2,length(hashes)==2,!anyNA(roots),!anyNA(hashes))
+receipts<-list()
+for(i in 1:2) {
+ path<-file.path(roots[i],'plans-receipt.json');bytes<-readBin(path,'raw',n=file.info(path)$size)
+ stopifnot(digest::digest(bytes,serialize=FALSE,algo='sha256')==hashes[i])
+ receipts[[i]]<-jsonlite::fromJSON(rawToChar(bytes),simplifyVector=FALSE)
+}
+stopifnot(identical(receipts[[1]]$scope,receipts[[2]]$scope),
+ receipts[[2]]$parent_receipt_sha256==hashes[1])
+ids<-unlist(receipts[[1]]$scope)
+labels<-diagnostic_read_verified_csv(params$labels,'ef9082abfbd5fffe497cb632c5cdfc37522b6c8ad02ff7125b0e940a51672c32',cols(issue='c',provider_id='c')) |>
+ select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
+groups<-models<-list()
+for(i in 1:2)for(id in ids) {
+ b<-receipts[[i]]$bindings[[id]]
+ plan<-diagnostic_read_verified_rds(file.path(roots[i],b$file),b$sha256)
+ groups[[paste(i,id)]]<-n7_purchase_settle(plan,labels,2,.65)
+ for(arm in names(plan$arms)) {
+  a<-plan$arms[[arm]];e<-a$exposure
+  models[[paste(id,arm)]]<-tibble(issue=id,policy=arm,model_hit=a$evaluation$any_hit,
+   purchased_groups=length(a$options),
+   max_required=if(nrow(e))max(e$required_stake) else 0,
+   max_incompatible=if(nrow(e))max(e$incompatible_stake) else 0,
+   max_uses=if(nrow(e))max(e$uses) else 0)
+ }
+}
+groups<-bind_rows(groups);models<-bind_rows(models)
+rows<-groups |> group_by(issue,policy) |> summarise(stake=sum(stake),gross=sum(gross),hits=sum(hit),.groups='drop')
+rows<-models |> left_join(rows,by=c('issue','policy'),relationship='one-to-one') |>
+ mutate(across(c(stake,gross,hits),~replace_na(.x,0)),net=gross-stake,model='FROZEN',budget_cny=1024,
+ cash_cny=1024-stake,status=ifelse(stake>0,'COMPLETE','NO_BET'),
+ stage=case_when(issue<min(cfg$excluded_drawdown_issues)~'BEFORE',issue %in% cfg$excluded_drawdown_issues~'DRAWDOWN',TRUE~'AFTER'))
+stopifnot(!anyDuplicated(rows[c('issue','policy')]),all(table(rows$policy)==length(ids)))
+stages<-c('BEFORE','DRAWDOWN','AFTER');stages<-stages[stages %in% rows$stage]
+comparison<-n7_baseline_comparison(rows,ids,stages,'JOINT',100000)
+drawdown_percent<-comparison$curves |> group_by(evaluation,policy) |>
+ summarise(max_drawdown_percent=100*max(drawdown_cny/cummax(equity_cny)),.groups='drop')
+summary<-comparison$summary |> left_join(drawdown_percent,by=c('evaluation','policy'),relationship='one-to-one')
+knitr::kable(summary,digits=2)
+```
+
+## 收益及回撤曲线
+
+各小图的灰线为同一joint对照，彩色线为该方案；从同一个10万元起点计算。
+
+```{r}
+curves<-comparison$curves |> filter(evaluation=='ALL')
+base<-curves |> filter(policy=='JOINT')
+curves<-curves |> left_join(base |> select(period,base_equity=equity_cny,base_drawdown=drawdown_cny),by='period',relationship='many-to-one')
+equity_plot<-ggplot(curves,aes(period,equity_cny))+geom_line(aes(y=base_equity),color='grey60')+
+ geom_line(color='#206b9b')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Equity (CNY)')
+drawdown_plot<-ggplot(curves,aes(period,drawdown_cny))+geom_line(aes(y=base_drawdown),color='grey60')+
+ geom_line(color='#b84635')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Drawdown (CNY)')
+print(equity_plot);print(drawdown_plot)
+```
+
+## 命中变化、资金利用和集中度
+
+```{r}
+knitr::kable(comparison$paired,digits=2)
+exposure<-rows |> group_by(policy) |> summarise(issues=n(),mean_stake=mean(stake),cash=sum(cash_cny),
+ mean_groups=mean(purchased_groups),mean_model_hit=mean(model_hit),actual_hit=mean(gross>0),
+ mean_max_required=mean(max_required),worst_required=max(max_required),
+ mean_max_incompatible=mean(max_incompatible),max_fixture_uses=max(max_uses),.groups='drop')
+knitr::kable(exposure,digits=3)
+```
+
+## 被购买组的概率曲线形态
+
+横轴为按原概率从高到低购买的票数，纵轴为累计概率。线为中位数，带为组间25%—75%分位区间。
+这里只描述最终被购买的组，不把不同组的形态相似当作风险独立。
+
+```{r}
+shapes<-diagnostic_read_verified_csv(file.path(params$structure,'shapes.csv'),receipts[[2]]$shape_sha256,
+ cols(issue='c',sleeve_id='d'))
+membership<-groups |> distinct(issue,policy,sleeve_id)
+selected_shapes<-membership |> left_join(shapes,by=c('issue','sleeve_id'),relationship='many-to-one')
+stopifnot(!anyNA(selected_shapes$mass_64))
+profiles<-selected_shapes |> pivot_longer(c(mass_16,mass_32,mass_64,mass_128),names_to='prefix',values_to='mass') |>
+ mutate(tickets=as.integer(sub('mass_','',prefix))) |> group_by(policy,tickets) |>
+ summarise(groups=n(),median=median(mass),lower=quantile(mass,.25),upper=quantile(mass,.75),.groups='drop')
+shape_plot<-ggplot(profiles,aes(tickets,median))+geom_ribbon(aes(ymin=lower,ymax=upper),fill='#206b9b',alpha=.2)+
+ geom_line(color='#206b9b')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Tickets in probability order',y='Cumulative probability')
+print(shape_plot)
+role_support<-shapes |> count(core_count,middle_count,opportunity_count,name='candidate_groups')
+knitr::kable(role_support)
+```
+
+## 剔除自身最大盈利期
+
+同时移除该期成本和回款；保留的范围不同，因此这是各方案自身尾部压力检查。
+
+```{r}
+trimmed<-list()
+for(k in c(1L,3L,5L)) {
+ z<-rows |> group_by(policy) |> arrange(desc(net),issue,.by_group=TRUE) |> filter(row_number()>k) |>
+ summarise(remaining_issues=n(),stake=sum(stake),gross=sum(gross),net=gross-stake,
+ roi_percent=if(stake>0)100*net/stake else NA_real_,.groups='drop') |> mutate(removed=k)
+ trimmed[[as.character(k)]]<-z
+}
+trimmed<-bind_rows(trimmed);knitr::kable(trimmed,digits=2)
+o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
+for(n in c('rows','groups','summary','exposure','trimmed','curves','profiles','role_support'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+write_csv(comparison$paired,file.path(o,'paired.csv'))
+ggsave(file.path(o,'equity.png'),equity_plot,width=13,height=16,dpi=160)
+ggsave(file.path(o,'drawdown.png'),drawdown_plot,width=13,height=16,dpi=160)
+ggsave(file.path(o,'shapes.png'),shape_plot,width=13,height=16,dpi=160)
+artifacts<-list.files(o,full.names=TRUE)
+jsonlite::write_json(list(status='PENDING_INDEPENDENT_REVIEW',scope=ids,parent_hashes=hashes,code=code,
+ labels_sha256='ef9082abfbd5fffe497cb632c5cdfc37522b6c8ad02ff7125b0e940a51672c32',
+ files=setNames(as.list(vapply(artifacts,digest::digest,character(1),file=TRUE,algo='sha256')),basename(artifacts)),
+historical_admission=FALSE),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 本轮结论及适用边界
+
+保留 JOINT 作为比较基准。DEPTH_OPEN 在优先分散到不同组后使用剩余资金加深覆盖，
+绝对收益有所增加，但投入也更多，ROI 与 JOINT 几乎相同，不能称为显著的资金效率提升。
+U4 可作为降低暴露的选择；其较低回撤伴随较低投入，不能解释为同等实际投入下的改进。
+
+不采用本轮的直接深度竞争作为升级：命中期数增加，却出现负收益。
+HARD 仅测试原候选组内刚性剔除第三赛果，不代表早先所有 Top2 选场和选胆版本。
+相似覆盖成本筛选也未显示优势；这只否定当前定义及当前候选池，不能推及所有曲线选组方法。
+
+区分度复用的拆分对照显示，相对于固定上限，变化主要来自减少低区分度场次的复用。
+附加方向金额限制的作用较小，组合方案 ROI 仍低于 JOINT。它目前更接近减仓措施，
+尚不是已证实的效率升级。概率区分度也不等同于经过历史校准的可靠性。
+
+CORE3、CORE4 与 STRUCTURE 几乎没有合格投注，证据不足。
+这里是在旧候选池上筛选，尚未测试按“核心／中间／机会”构成重新生成七场候选组。
+不能将几乎不投注产生的平坦回撤曲线称为成功。
+
+当前结论属于固定484期的回顾诊断。原、新增、完整数据的同参数重跑仍须分别报告，
+不能将这批已被反复研究的样本称为未见测试集；最终验收还包括独立证据与 Codex review。
