@@ -6,7 +6,7 @@
 draw_handicap_fit <- function(history, block, cutoff, repository_root, source_hashes,
                               market_edges, gap_edges, prior_strength, recent_strength,
                               handicap_strength, handicap_recent_strength,
-                              delay_hours, recent_issues, minimum_ess, python) {
+                              delay_hours, recent_issues, minimum_ess, python, gap_mode) {
  stopifnot('handicap' %in% names(history),is.numeric(history$handicap),
   all(is.finite(history$handicap)),all(history$handicap==trunc(history$handicap)),
   length(handicap_strength)==1,is.finite(handicap_strength),handicap_strength>0,
@@ -15,14 +15,11 @@ draw_handicap_fit <- function(history, block, cutoff, repository_root, source_ha
  implementation<-digest::digest(file=file.path(repository_root,'r/draw_handicap_refresh.R'),algo='sha256')
  source_hashes$handicap_implementation<-implementation
  parent<-draw_refresh_fit(history,block,cutoff,repository_root,source_hashes,
-  market_edges,gap_edges,prior_strength,recent_strength,delay_hours,recent_issues,minimum_ess,python)
+  market_edges,gap_edges,prior_strength,recent_strength,delay_hours,recent_issues,minimum_ess,python,gap_mode)
  ctx<-jsonlite::fromJSON(parent$context_json,simplifyVector=FALSE)
  rows<-dplyr::bind_rows(ctx$rows)
  core<-reticulate::import('src.temporal_learning.core')
- binned<-reticulate::import('src.probability_foundation_draw',convert=FALSE)$draw_cells(
-  reticulate::r_to_py(as.data.frame(rows)),cutoff,market_edges=market_edges,
-  secondary_edges=gap_edges,version='market-balance-draw-1.0.0-diagnostic')
- rows<-jsonlite::fromJSON(reticulate::py_to_r(binned$to_json(orient='records',double_precision=15L)))
+ rows<-draw_refresh_bins(rows,cutoff,market_edges,gap_edges,gap_mode)
  cells<-rows |> dplyr::group_by(handicap,market_bin,secondary_bin) |>
   dplyr::summarise(h_n=dplyr::n(),h_rate=sum(long_mass*(actual=='D'))/sum(long_mass),
    h_recent_rows=sum(recent_mass>0),h_recent_issues=dplyr::n_distinct(issue_code[recent_mass>0]),

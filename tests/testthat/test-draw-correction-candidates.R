@@ -17,7 +17,7 @@ testthat::test_that('fixed correction candidates bind chronology and preserve pr
  b<-blocks$frozen_block_schedule(reticulate::r_to_py(targets),cadence=2L)[[1]]
  cutoff<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
  a<-draw_handicap_fit(h,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-  c(0,.3,1),c(0,.5,1),2,2,2,2,24,3,2,py)
+  c(0,.3,1),c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode='absolute')
  f<-h[h$issue_code=='000007',c('slot','provider_id','handicap','q_W','q_D','q_L','fixture_decision_ts')]
  f$issue<-'000007';c7<-core$Cutoff$decision_epoch('000007','2011-01-07T00:00:00Z')
 
@@ -39,7 +39,7 @@ testthat::test_that('fixed correction candidates bind chronology and preserve pr
  changed<-h;future<-changed$issue_code>='000006';changed$actual[future]<-'L'
  changed$fixture_decision_ts[future]<-'2010-01-01T00:00:00Z';changed$last_fixture_cutoff[future]<-'2010-01-01T00:00:00Z'
  aa<-draw_handicap_fit(changed,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-  c(0,.3,1),c(0,.5,1),2,2,2,2,24,3,2,py)
+  c(0,.3,1),c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode='absolute')
  zz<-draw_correction_candidates(aa,f,c7,.5,c(.25,.5),100,100,1.96,root,py)
  testthat::expect_identical(z$rows,zz$rows)
 })

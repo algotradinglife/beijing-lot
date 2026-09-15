@@ -1,0 +1,91 @@
+---
+title: "市场胜负方向：动态联合校正对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  evidence: null
+  receipt_sha256: null
+  python: null
+  output: null
+---
+
+完整484期36140场，同原49个更新块；原市场RAW、ABS与SIGNED三版配对。
+ABS/SIGNED均按有符号让球数细分，每10期更新，累计50%+最近三期50%，长期/近期收缩100/20，子格收缩100/20，标签代理48小时，ESS100。
+SIGNED仅将绝对胜负差改为有符号差；以原绝对差边界镜像为负半轴，不调参。不涉及下注、收益或比分投射。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+modules<-paste0('r/',c('diagnostic_verified_csv','strategy_diagnostic_probabilities','probability_foundation_pairs','draw_refresh','draw_handicap_refresh'),'.R')
+for(f in modules)source(f)
+stopifnot(!dir.exists(params$output))
+reticulate::use_python(params$python,required=TRUE)
+core<-reticulate::import('src.temporal_learning.core');api<-reticulate::import('src.temporal_learning.frozen_blocks')
+cfg<-jsonlite::fromJSON('config/top2_outside_validation.json')
+catpath<-file.path(params$evidence,'settlement-inputs/catalog.json')
+f<-as_tibble(jsonlite::fromJSON(reticulate::import('src.strategy_diagnostic_inputs')$read_diagnostic_epoch_fixtures(catpath,cfg$catalog_sha256))$rows)
+label_path<-file.path(params$evidence,'current-settlement/fixture-audit.csv')
+stopifnot(digest::digest(file=label_path,algo='sha256')==params$receipt_sha256)
+ids<-sort(c(cfg$issues,cfg$excluded_drawdown_issues));stopifnot(length(ids)==484)
+targets<-f |> filter(issue %in% ids) |> transmute(issue_code=issue,fixture_decision_ts)
+blocks<-api$frozen_block_schedule(reticulate::r_to_py(as.data.frame(targets)),cadence=10L);stopifnot(length(blocks)==49)
+dir.create(params$output);dir.create(file.path(params$output,'frozen'))
+code<-c(modules,'src/draw_refresh_context.py','src/strategy_diagnostic_inputs.py','config/top2_outside_validation.json','quarto/194_signed_draw_comparison.qmd')
+code_hashes<-setNames(as.list(vapply(code,digest::digest,character(1),file=TRUE,algo='sha256')),code)
+for(b in blocks) {
+ cutoff<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
+ h<-jsonlite::fromJSON(reticulate::import('src.draw_refresh_context')$draw_refresh_prior_history_json(
+ jsonlite::toJSON(f,dataframe='rows',auto_unbox=TRUE,digits=NA),jsonlite::toJSON(b,auto_unbox=TRUE,digits=NA),
+ label_path=label_path,label_sha256=params$receipt_sha256,delay_hours=48))
+ for(arm in c('ABS','SIGNED')) {
+  edges<-cfg$gap_breaks;if(arm=='SIGNED')edges<-c(-rev(edges[-1]),edges)
+  m<-draw_handicap_fit(h,b,cutoff,getwd(),list(catalog=cfg$catalog_sha256,labels=params$receipt_sha256,code=digest::digest(code_hashes,algo='sha256')),
+   cfg$draw_breaks,edges,100,20,100,20,48,3,100,params$python,if(arm=='ABS')'absolute' else 'signed')
+  saveRDS(m,file.path(params$output,'frozen',paste0(b$fit_issue,'-',arm,'-model.rds')))
+  for(target in b$targets) {
+   epoch<-core$Cutoff$decision_epoch(target$issue,target$cutoff_ts)
+   z<-draw_handicap_predict(m,filter(f,issue==target$issue),epoch,.5,getwd(),params$python)
+   z<-mutate(z,model=arm,W=new_W,D=new_D,L=new_L)
+   saveRDS(z,file.path(params$output,'frozen',paste0(target$issue,'-',arm,'-prediction.rds')))
+  }
+ }
+}
+
+```
+
+```{r}
+# Evaluation opens after every target prediction is frozen.
+labels<-diagnostic_read_verified_csv(label_path,params$receipt_sha256,cols_only(issue='c',slot='i',provider_id='c',actual_direction='c'))
+y<-bind_rows(lapply(list.files(file.path(params$output,'frozen'),pattern='prediction.rds$',full.names=TRUE),readRDS))
+raw<-f |> filter(issue %in% unique(y$issue)) |> transmute(issue,slot,provider_id,handicap,model='RAW',W=q_W,D=q_D,L=q_L)
+y<-bind_rows(select(y,issue,slot,provider_id,handicap,model,W,D,L),raw) |>
+ left_join(labels |> transmute(issue,slot,provider_id,actual_outcome=actual_direction),by=c('issue','slot','provider_id'),relationship='many-to-one')
+y$segment<-ifelse(y$issue<min(cfg$excluded_drawdown_issues),'BEFORE_305',ifelse(y$issue %in% cfg$excluded_drawdown_issues,'DRAWDOWN_94','AFTER_85'))
+long<-y |> pivot_longer(c(W,D,L),names_to='outcome',values_to='probability')
+z<-probability_foundation_pairs(long,'RAW',c('segment','handicap'),c('W','D','L'),seq(0,1,.1),1e-12)
+sum<-z$scores |> group_by(model) |> summarise(fixtures=n(),issues=n_distinct(issue),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),.groups='drop')
+e<-long |> filter(outcome=='D') |> group_by(model) |> summarise(draw_brier=mean((probability-(actual_outcome=='D'))^2),predicted=mean(probability),observed=mean(actual_outcome=='D'),.groups='drop')
+sum<-left_join(sum,e,by='model',relationship='one-to-one');knitr::kable(sum,digits=6)
+period<-z$scores |> group_by(segment,model) |> summarise(fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top2=mean(top2),.groups='drop');knitr::kable(period,digits=6)
+movement<-z$pairs |> group_by(model) |> summarise(up=sum(actual_probability_movement=='UP'),down=sum(actual_probability_movement=='DOWN'),actual_probability_delta=mean(actual_probability_delta),rescued=sum(top2_rescued),lost=sum(top2_lost),.groups='drop');knitr::kable(movement,digits=6)
+write_csv(y,file.path(params$output,'predictions.csv'));write_csv(sum,file.path(params$output,'summary.csv'));write_csv(period,file.path(params$output,'periods.csv'));write_csv(z$scores,file.path(params$output,'scores.csv'));write_csv(z$pairs,file.path(params$output,'pairs.csv'))
+p<-period |> pivot_longer(c(brier,log_loss),names_to='metric',values_to='value') |> ggplot(aes(segment,value,colour=model,group=model))+geom_point()+geom_line()+facet_wrap(~metric,scales='free_y')+theme_minimal()
+ggsave(file.path(params$output,'scores.png'),p,width=10,height=5);print(p)
+# Descriptive strata only; not used to choose coefficients or thresholds.
+strata<-z$scores |> group_by(handicap,model) |> summarise(fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top2=mean(top2),.groups='drop')
+write_csv(strata,file.path(params$output,'handicap.csv'));knitr::kable(strata,digits=5)
+p2<-strata |> ggplot(aes(factor(handicap),brier,colour=model,group=model))+geom_point()+geom_line()+labs(x='Signed handicap',y='Brier (lower is better)')+theme_minimal()
+ggsave(file.path(params$output,'handicap.png'),p2,width=10,height=5);print(p2)
+files<-list.files(params$output,recursive=TRUE,full.names=TRUE)
+jsonlite::write_json(list(status='PENDING_REVIEW',historical_admission=FALSE,source_sha256=cfg$catalog_sha256,source_receipt=params$receipt_sha256,
+ implementation=code_hashes,files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),substring(files,nchar(params$output)+2))),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 判定口径
+
+先核验ABS复现此前动态校正，再比较SIGNED对ABS与RAW的整体和分段评分。概率改善与购买收益分开，不凭单个时期或Top2变化声称升级。

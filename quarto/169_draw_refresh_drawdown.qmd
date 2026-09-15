@@ -89,7 +89,7 @@ for(block in blocks) {
   label_sha256=ar$files[['fixture-audit.csv']],delay_hours=48)
  history<-jsonlite::fromJSON(history_json)
  model<-draw_refresh_fit(history,block,cutoff,getwd(),sources,
- c(0,.1,.15,.2,.25,.3,.35,1),c(0,.1,.2,.3,.4,.5,.6,1),100,20,48,3,100,params$python)
+ c(0,.1,.15,.2,.25,.3,.35,1),c(0,.1,.2,.3,.4,.5,.6,1),100,20,48,3,100,params$python,gap_mode='absolute')
  models[[block$fit_issue]]<-model
  saveRDS(model,file.path(o,paste0('model-',block$fit_issue,'.rds')))
  cells[[block$fit_issue]]<-model$cells |> mutate(fit_issue=block$fit_issue)

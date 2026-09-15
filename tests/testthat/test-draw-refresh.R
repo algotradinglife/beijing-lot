@@ -15,7 +15,7 @@ testthat::test_that('block cell calibration separates components and freezes tar
  b<-blocks$frozen_block_schedule(reticulate::r_to_py(targets),cadence=2L)[[1]]
  cutoff<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
  a<-draw_refresh_fit(h,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-   c(0,.3,1),c(0,.5,1),2,2,24,3,2,py)
+   c(0,.3,1),c(0,.5,1),2,2,24,3,2,py,gap_mode='absolute')
  f<-h[h$issue_code=='000007',c('slot','provider_id','q_W','q_D','q_L','fixture_decision_ts')]
  f$issue<-'000007';c7<-core$Cutoff$decision_epoch('000007','2011-01-07T00:00:00Z')
  z<-draw_refresh_predict(a,f,c7,.5,root,py)
@@ -30,7 +30,7 @@ testthat::test_that('block cell calibration separates components and freezes tar
  testthat::expect_equal(draw_refresh_predict(a,unseen,c7,.5,root,py)$new_D,rep(.8,3))
  h$actual[h$issue_code %in% c('000006','000007','000008')]<-'L'
  mutated<-draw_refresh_fit(h,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-   c(0,.3,1),c(0,.5,1),2,2,24,3,2,py)
+   c(0,.3,1),c(0,.5,1),2,2,24,3,2,py,gap_mode='absolute')
  testthat::expect_identical(a,mutated)
  testthat::expect_identical(z,draw_refresh_predict(mutated,f,c7,.5,root,py))
  testthat::expect_error(draw_refresh_predict(a,transform(f,actual='D'),c7,.5,root,py))
@@ -38,7 +38,7 @@ testthat::test_that('block cell calibration separates components and freezes tar
  testthat::expect_error(draw_refresh_predict(a,f,core$Cutoff$decision_epoch('000007','2011-01-07T01:00:00Z'),.5,root,py))
  bad<-a;bad$cells$long_rate<-1
  testthat::expect_error(draw_refresh_predict(bad,f,c7,.5,root,py))
- testthat::expect_error(draw_refresh_fit(h,b,c7,root,list(input='a'),c(0,1),c(0,1),2,2,24,3,2,py))
+ testthat::expect_error(draw_refresh_fit(h,b,c7,root,list(input='a'),c(0,1),c(0,1),2,2,24,3,2,py,gap_mode='absolute'))
 })
 
 testthat::test_that('post-cutoff mutation cannot change support, tickets or allocation', {
@@ -55,8 +55,8 @@ testthat::test_that('post-cutoff mutation cannot change support, tickets or allo
  fit_cut<-core$Cutoff$decision_epoch(block$fit_issue,block$fit_cutoff_ts)
  mutated<-h;future<-mutated$issue_code>='000006';mutated$actual[future]<-'L'
  mutated$fixture_decision_ts[future]<-'2010-01-01T00:00:00Z';mutated$last_fixture_cutoff[future]<-'2010-01-01T00:00:00Z'
- a<-draw_refresh_fit(h,block,fit_cut,root,list(source=paste(rep('a',64),collapse='')),c(0,.3,1),c(0,.5,1),2,2,24,3,2,py)
- b<-draw_refresh_fit(mutated,block,fit_cut,root,list(source=paste(rep('a',64),collapse='')),c(0,.3,1),c(0,.5,1),2,2,24,3,2,py)
+ a<-draw_refresh_fit(h,block,fit_cut,root,list(source=paste(rep('a',64),collapse='')),c(0,.3,1),c(0,.5,1),2,2,24,3,2,py,gap_mode='absolute')
+ b<-draw_refresh_fit(mutated,block,fit_cut,root,list(source=paste(rep('a',64),collapse='')),c(0,.3,1),c(0,.5,1),2,2,24,3,2,py,gap_mode='absolute')
  testthat::expect_identical(a$cells,b$cells)
  e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
  e$issue<-'000007';e$cutoffs<-lapply(e$cutoffs,function(x)'2011-01-07T00:00:00+00:00')
@@ -73,4 +73,16 @@ testthat::test_that('post-cutoff mutation cannot change support, tickets or allo
  testthat::expect_identical(xa$gate,xb$gate)
  testthat::expect_identical(xa$pool$options,xb$pool$options)
  testthat::expect_identical(xa$fit,xb$fit)
+})
+
+testthat::test_that('signed bins retain mirrored direction and absolute bins agree with legacy', {
+ c<-reticulate::import('src.temporal_learning.core')$Cutoff$decision_epoch('000001','2011-01-01T00:00:00Z')
+ f<-data.frame(q_W=c(.5,.25,.375),q_D=c(.25,.25,.25),q_L=c(.25,.5,.375))
+ a<-draw_refresh_bins(f,c,c(0,.2,.3,1),c(0,.1,.2,.3,1),'absolute')
+ b<-draw_refresh_bins(f,c,c(0,.2,.3,1),c(-1,-.3,-.2,-.1,0,.1,.2,.3,1),'signed')
+ testthat::expect_equal(a$secondary_bin,c(2L,2L,0L))
+ testthat::expect_equal(b$secondary_bin,c(6L,1L,4L))
+ testthat::expect_equal(a$market_bin,b$market_bin)
+ testthat::expect_error(draw_refresh_bins(f,c,c(0,1),c(0,1),'signed'))
+ testthat::expect_error(draw_refresh_bins(transform(f,q_D=NA),c,c(0,1),c(0,1),'absolute'))
 })

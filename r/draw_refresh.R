@@ -7,7 +7,7 @@
 # rates shrink toward the frozen long estimate, using shared effective N.
 draw_refresh_fit <- function(history, block, cutoff, repository_root, source_hashes,
                              market_edges, gap_edges, prior_strength, recent_strength,
-                             delay_hours, recent_issues, minimum_ess, python) {
+                             delay_hours, recent_issues, minimum_ess, python, gap_mode) {
  stopifnot(length(python)==1,file.exists(python),is.finite(prior_strength),prior_strength>0,
   is.finite(recent_strength),recent_strength>0)
  reticulate::use_python(python,required=TRUE)
@@ -21,10 +21,7 @@ draw_refresh_fit <- function(history, block, cutoff, repository_root, source_has
   delay_hours=delay_hours,recent_issues=as.integer(recent_issues),minimum_ess=minimum_ess)
  ctx<-jsonlite::fromJSON(ctx_json,simplifyVector=FALSE)
  rows<-dplyr::bind_rows(ctx$rows)
- binning<-reticulate::import('src.probability_foundation_draw',convert=FALSE)
- rows<-binning$draw_cells(reticulate::r_to_py(as.data.frame(rows)),cutoff,
-  market_edges=market_edges,secondary_edges=gap_edges,version='market-balance-draw-1.0.0-diagnostic')
- rows<-jsonlite::fromJSON(reticulate::py_to_r(rows$to_json(orient='records',double_precision=15L)))
+ rows<-draw_refresh_bins(rows,cutoff,market_edges,gap_edges,gap_mode)
  cells<-rows |> dplyr::group_by(market_bin,secondary_bin) |> dplyr::summarise(
   n_long=dplyr::n(),long_rate=sum(long_mass*(actual=='D'))/sum(long_mass),
   recent_rows=sum(recent_mass>0),recent_issue_count=dplyr::n_distinct(issue_code[recent_mass>0]),
@@ -32,7 +29,7 @@ draw_refresh_fit <- function(history, block, cutoff, repository_root, source_has
   recent_rate=if(sum(recent_mass)>0)sum(recent_mass*(actual=='D'))/sum(recent_mass) else 0,
   .groups='drop')
  artifact<-list(cells=cells,context_json=ctx_json,block=block,
-  parameters=list(market_edges=market_edges,gap_edges=gap_edges,prior_strength=prior_strength,
+  parameters=list(gap_mode=gap_mode,market_edges=market_edges,gap_edges=gap_edges,prior_strength=prior_strength,
    recent_strength=recent_strength,delay_hours=delay_hours,recent_issues=recent_issues,minimum_ess=minimum_ess),
   implementation_sha256=digest::digest(file=file.path(repository_root,'r/draw_refresh.R'),algo='sha256'),
   historical_admission=FALSE)
@@ -62,10 +59,7 @@ draw_refresh_predict <- function(artifact, frame, cutoff, alpha, repository_root
  reticulate::import('src.temporal_learning.provenance')$verify_implementation_closure(
   reticulate::import('pathlib')$Path(repository_root),ctx$receipt$implementation)
  p<-artifact$parameters
- z<-reticulate::import('src.probability_foundation_draw',convert=FALSE)$draw_cells(
-  reticulate::r_to_py(as.data.frame(frame)),cutoff,market_edges=p$market_edges,
-  secondary_edges=p$gap_edges,version='market-balance-draw-1.0.0-diagnostic')
- z<-jsonlite::fromJSON(reticulate::py_to_r(z$to_json(orient='records',double_precision=15L)))
+ z<-draw_refresh_bins(frame,cutoff,p$market_edges,p$gap_edges,p$gap_mode)
  stopifnot(all(z$q_D>0 & z$q_D<1),all(z$q_W>0),all(z$q_L>0))
  z<-dplyr::left_join(z,artifact$cells,by=c('market_bin','secondary_bin'),relationship='many-to-one')
  for(n in c('n_long','long_rate','recent_rows','recent_issue_count','recent_ess','recent_rate'))z[[n]][is.na(z[[n]])]<-0
@@ -76,4 +70,19 @@ draw_refresh_predict <- function(artifact, frame, cutoff, alpha, repository_root
  z$new_W<-z$q_W*(1-z$new_D)/(1-z$q_D)
  z$new_L<-z$q_L*(1-z$new_D)/(1-z$q_D)
  z$model_seal<-artifact$seal;z$alpha<-alpha;z
+}
+
+# Fixed probability binning; signed mode preserves the market W/L direction.
+# No learning/I/O. Explicit cutoff; caller owns shared fit/predict admission.
+draw_refresh_bins <- function(frame,cutoff,market_edges,gap_edges,gap_mode) {
+ stopifnot(!is.null(cutoff),length(gap_mode)==1,gap_mode %in% c('absolute','signed'),
+ all(c('q_W','q_D','q_L') %in% names(frame)),nrow(frame)>0)
+ q<-as.matrix(frame[c('q_W','q_D','q_L')]);stopifnot(all(is.finite(q)),all(q>0),all(abs(rowSums(q)-1)<1e-10),
+ length(market_edges)>=2,all(is.finite(market_edges)),all(diff(market_edges)>0),head(market_edges,1)==0,tail(market_edges,1)==1,
+ length(gap_edges)>=2,all(is.finite(gap_edges)),all(diff(gap_edges)>0),tail(gap_edges,1)==1,
+ head(gap_edges,1)==if(gap_mode=='signed')-1 else 0)
+ gap<-frame$q_W-frame$q_L;if(gap_mode=='absolute')gap<-abs(gap)
+ frame$market_bin<-findInterval(frame$q_D,market_edges,rightmost.closed=TRUE)-1L
+ frame$secondary_bin<-findInterval(gap,gap_edges,rightmost.closed=TRUE)-1L
+ frame
 }

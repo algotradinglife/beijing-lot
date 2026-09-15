@@ -85,7 +85,7 @@ for(block in blocks) {
   label_sha256=ar$files[['fixture-audit.csv']],delay_hours=window$delay_hours)
  history<-jsonlite::fromJSON(history_json)
  model<-draw_handicap_fit(history,block,cutoff,getwd(),sources,
- window$draw_breaks,window$gap_breaks,window$long_strength,window$recent_strength,window$handicap_strength,window$handicap_recent_strength,window$delay_hours,window$recent_issues,window$minimum_ess,params$python)
+ window$draw_breaks,window$gap_breaks,window$long_strength,window$recent_strength,window$handicap_strength,window$handicap_recent_strength,window$delay_hours,window$recent_issues,window$minimum_ess,params$python,gap_mode='absolute')
  models[[block$fit_issue]]<-model
  saveRDS(model,file.path(o,paste0('model-',block$fit_issue,'.rds')))
  cells[[block$fit_issue]]<-model$cells |> mutate(fit_issue=block$fit_issue)

@@ -1,7 +1,7 @@
 source(file.path('..','..','r','draw_refresh.R'))
 source(file.path('..','..','r','draw_handicap_refresh.R'))
 
-testthat::test_that('signed cells shrink separately and do not use future outcomes', {
+for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink separately and do not use future outcomes', {
  root<-normalizePath('../..');py<-Sys.getenv('RETICULATE_PYTHON')
  reticulate::use_python(py,required=TRUE)
  core<-reticulate::import('src.temporal_learning.core')
@@ -17,7 +17,7 @@ testthat::test_that('signed cells shrink separately and do not use future outcom
  b<-blocks$frozen_block_schedule(reticulate::r_to_py(targets),cadence=2L)[[1]]
  cutoff<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
  a<-draw_handicap_fit(h,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-  c(0,.3,1),c(0,.5,1),2,2,2,2,24,3,2,py)
+  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode)
  f<-h[h$issue_code=='000007',c('slot','provider_id','handicap','q_W','q_D','q_L','fixture_decision_ts')]
  f$issue<-'000007';c7<-core$Cutoff$decision_epoch('000007','2011-01-07T00:00:00Z')
  z<-draw_handicap_predict(a,f,c7,.5,root,py)
@@ -35,7 +35,7 @@ testthat::test_that('signed cells shrink separately and do not use future outcom
  changed<-h;future<-changed$issue_code>='000006';changed$actual[future]<-'L'
  changed$fixture_decision_ts[future]<-'2010-01-01T00:00:00Z';changed$last_fixture_cutoff[future]<-'2010-01-01T00:00:00Z'
  aa<-draw_handicap_fit(changed,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
-  c(0,.3,1),c(0,.5,1),2,2,2,2,24,3,2,py)
+  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode)
  testthat::expect_identical(a$cells,aa$cells)
  testthat::expect_equal(z$new_D,draw_handicap_predict(aa,f,c7,.5,root,py)$new_D)
  bad<-a;bad$cells$h_rate<-0
