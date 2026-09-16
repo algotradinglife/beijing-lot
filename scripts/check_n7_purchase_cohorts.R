@@ -35,13 +35,13 @@ stopifnot(is.character(sha),length(sha)==1,nzchar(sha),
  digest::digest(file=config_path,algo='sha256')==sha)
 config<-jsonlite::fromJSON(config_path)
 periods<-read.csv(file.path(report,'rows.csv'),colClasses=c(issue='character'))
-observed<-read.csv(file.path(report,'cohort_summary.csv'))
+observed<-read.csv(file.path(report,'cohort_summary.csv'),colClasses=c(funding_stop_issue='character'))
 source('r/n7_purchase_cohort_audit.R')
 verified<-n7_purchase_cohort_audit(periods,observed,unlist(receipt$scope),
  unlist(c(config$issues,config$excluded_drawdown_issues),use.names=FALSE),policies,1024,100000)
 jsonlite::write_json(list(status='PASS',issues=length(receipt$scope),
  policies=length(unique(verified$policy)),cohort_rows=nrow(verified),
- scope='ALL/ORIGINAL/ADDITIONAL complete scope, funded accounting and independent drawdown',
+ scope='ALL/ORIGINAL/ADDITIONAL complete scope, separate funded/shadow accounting and independent drawdown',
  report_receipt_sha256=digest::digest(file=receipt_path,algo='sha256'),
  implementation=as.list(setNames(vapply(c('r/n7_purchase_cohort_audit.R',
  'scripts/check_n7_purchase_cohorts.R'),digest::digest,character(1),file=TRUE,algo='sha256'),

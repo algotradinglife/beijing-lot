@@ -119,6 +119,10 @@ they do not import the production purchase/settlement functions.
   independently reconstructs head mass, coverage cost, roles and admitted options.
 - `Rscript scripts/check_n7_purchase_settlement.R REPORT_PARAMS_JSON OUTPUT_JSON`
   checks official ticket payouts and chronological accounting after labels open.
+- `Rscript scripts/check_n7_purchase_cohorts.R REPORT_PARAMS_JSON OUTPUT_JSON`
+  binds the report to the requested parent receipts, catalog and labels, then
+  independently checks ALL/ORIGINAL/ADDITIONAL accounting against the frozen
+  policy roster. Omitting an entire policy from both tables is rejected.
 
 Use a fresh output path and the declared project R environment. The first two
 checks must pass before opening new labels; the third runs after report rendering.
@@ -130,4 +134,80 @@ net returns and mismatched parent receipts, alongside valid synthetic reports.
 These checks do not establish historical source availability or authorize a
 prospective learned policy. The settlement check covers the original stage
 summaries; the cohort extension additionally requires ORIGINAL/ADDITIONAL/ALL
-scope and accounting reconciliation.
+scope and accounting reconciliation. Its reusable implementation is
+`r/n7_purchase_cohort_audit.R`, tested by
+`tests/testthat/test-n7-purchase-cohort-audit.R`, including tampered summary fields,
+missing policies/issues, invalid cash, wrong cohort membership and stale source
+bindings. Each independent cohort starts at the declared initial capital, while
+ALL remains a single uninterrupted account.
+
+## First expanded snapshot and latest-release extension
+
+The first expanded accepted-source snapshot requests 735 issues: the original 484 and 251
+additional issues. The candidate catalog admits 734 (484 + 250); `110915` remains
+`NO_USABLE_MARKET_PROBABILITIES`, not a losing or cash-only betting period.
+The catalog SHA-256 is
+`fa6929fcc3c6afc39b3168d2854e65b453a845635a4ad4644acd1dcabdfbb255`.
+The combined-input receipt binds the accepted releases and every candidate bundle.
+Do not interpret this as coverage of every issue ever published: it is the
+complete eligible union of the accepted inputs identified by this receipt.
+
+The subsequent registry recheck found the accepted `140412-140901` release:
+`afb8b42bd933c2dae3f6adbafeaa3742aaa3f9a9d509e95fd349a8e072cc4da6`.
+Its 50 additional issues expand the requested union to 785. The prior release's
+645 issue-level published row sets are byte-equivalent after canonical encoding;
+the new acceptance and Codex-review receipt hashes have been verified. Complete
+delivery must include this extension; the 734-issue replay is an intermediate
+snapshot, not final full-data acceptance. Betting eligibility for the new 50 is
+determined by the same projection/candidate contracts, not presumed from cleaning
+acceptance. Freeze this explicit release for the comparison rather than chasing
+unbounded subsequent registry publications during computation.
+
+`quarto/202_joint_purchase_report.qmd` additionally requires the explicit
+`catalog` parameter and verifies it against the frozen main purchase receipt.
+Its scope and unavailable-issue tables must reconcile to the complete requested
+union, and all 21 policies must retain the same eligible issue calendar. Original
+484-issue narrative is labeled separately until the full-union conclusion is
+verified. Original/additional comparisons use independently initialized accounts;
+the ALL curve uses one continuous account without replenishing capital.
+
+The post-freeze label entry is `scripts/prepare_n7_purchase_labels.py CONFIG`.
+It requires main and structure allocation replay plus group-gate replay, exact
+receipt/catalog/bundle bindings, current implementation closure and purchase-file
+hashes before opening outcomes. It preserves missing outcomes rather than
+turning them into losses. `scripts/settle_n7_expanded_batches.R CONFIG` then uses
+the authoritative R/SQLite settlement audit; report rendering follows only after
+the full scope is resolved or unresolved cases are explicitly accounted for.
+
+## Funding exhaustion discovered in the expanded replay
+
+The first 734-issue report stopped on the existing unaffordable-plan guard.
+Do not raise the CNY100,000 initial capital, drop the affected policies/issues,
+or silently report debt-financed plans as executed wagers. Purchase plans and
+probability inputs remain unchanged. Use `r/n7_purchase_accounting.R` to reuse
+the authoritative `strategy_equity_curves()` funding ledger and report both:
+
+- FUNDED: execute whole affordable plans; permanently hold remaining cash after
+  the first unaffordable plan, without deposits, debt, partial plans or resumption.
+- SHADOW: continue all frozen plans diagnostically; capital may be negative and
+  is not a claim of performance achievable with the declared initial capital.
+
+Every evaluation/cohort is tagged by accounting basis. ALL uses one continuous
+account; each separately reported cohort/stage initializes independently. Report
+the first unaffordable issue and stopped issue count. `cash_cny` denotes unused
+nominal per-issue budget, not new cash credited to a depleted account.
+
+`rows.csv` and `groups.csv` preserve planned outcomes. `funded_groups.csv` records
+only executable groups. `curves.csv`, `summary.csv`, `cohort_summary.csv` and
+`trimmed.csv` distinguish both bases; default equity/drawdown figures are funded,
+with separately labeled shadow figures. Probability-shape plots describe funded
+groups, while exposure diagnostics remain explicitly plan-level. Trimming the
+largest gains removes their costs/returns from each existing ledger; it does not
+refit a strategy or recompute funding stops after deleting those gains.
+
+The accounting and cohort tests cover exhaustion followed by later shadow
+profits, no-bet ROI, independent cohort starts, full-scope validation and unchanged
+metrics on affordable histories. The physical settlement entry tests include 100
+consecutive losing plans, exact stop at issue 98, negative shadow capital, and
+rejection of falsely funded curves or a wrong stop issue. Independent replay must
+validate both bases and funded-group execution before final acceptance.

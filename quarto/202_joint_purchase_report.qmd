@@ -15,16 +15,21 @@ params:
   structure_sha256: null
   labels: null
   labels_sha256: null
+  catalog: null
   output: null
 ---
 
 各方案使用相同冻结概率和原候选组。本金10万元，每期投入上限1024元；北单回款只在票级乘一次0.65。
 分段为固定原研究窗口，最大回撤段属于事后窗口；这些回顾结果不能当作未见数据成绩。
+资金曲线按期序逐期结算，不模拟同时占用多期本金。原期和新增期分组各从10万元起算，
+合计曲线使用连续账户，不在分界处补充本金。金额为依据结算 SP 计算的理论税前回款。
+FUNDED 是可支付账本：首次无法支付整期计划后永久停投，保留余款，不拆注、不借款。
+SHADOW 是持续执行全部冻结计划的诊断账本，资金可以为负，不能视为这10万元实际可实现的收益。
 
 ```{r}
 suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
 modules<-paste0('r/',c('n7_purchase_settle','diagnostic_verified_csv','diagnostic_verified_rds',
- 'fundamentals_equity_curves','n7_baseline_comparison'),'.R')
+ 'fundamentals_equity_curves','n7_purchase_accounting'),'.R')
 for(f in modules)source(f)
 files<-c(modules,'quarto/202_joint_purchase_report.qmd','config/top2_outside_validation.json')
 code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
@@ -40,6 +45,18 @@ for(i in 1:2) {
 stopifnot(identical(receipts[[1]]$scope,receipts[[2]]$scope),
  receipts[[2]]$parent_receipt_sha256==hashes[1])
 ids<-unlist(receipts[[1]]$scope)
+catalog_bytes<-readBin(params$catalog,'raw',n=file.info(params$catalog)$size)
+stopifnot(digest::digest(catalog_bytes,serialize=FALSE,algo='sha256')==receipts[[1]]$catalog_sha256)
+catalog<-jsonlite::fromJSON(rawToChar(catalog_bytes))
+stopifnot(identical(catalog$issues$issue,ids),!anyDuplicated(catalog$requested_issues),
+ !anyDuplicated(catalog$unavailable_issues$issue),
+ !any(catalog$unavailable_issues$issue %in% ids),
+ setequal(catalog$requested_issues,c(ids,catalog$unavailable_issues$issue)))
+scope_table<-tibble(requested_issues=length(catalog$requested_issues),
+ evaluated_issues=length(ids),unavailable_issues=nrow(catalog$unavailable_issues),
+ first_issue=min(ids),last_issue=max(ids))
+knitr::kable(scope_table)
+knitr::kable(catalog$unavailable_issues)
 labels<-diagnostic_read_verified_csv(params$labels,params$labels_sha256,cols(issue='c',provider_id='c')) |>
  select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
 groups<-models<-list()
@@ -64,37 +81,54 @@ rows<-models |> left_join(rows,by=c('issue','policy'),relationship='one-to-one')
  stage=case_when(issue<min(cfg$excluded_drawdown_issues)~'BEFORE',issue %in% cfg$excluded_drawdown_issues~'DRAWDOWN',TRUE~'AFTER'))
 stopifnot(!anyDuplicated(rows[c('issue','policy')]),all(table(rows$policy)==length(ids)))
 stages<-c('BEFORE','DRAWDOWN','AFTER');stages<-stages[stages %in% rows$stage]
-comparison<-n7_baseline_comparison(rows,ids,stages,'JOINT',100000)
-drawdown_percent<-comparison$curves |> group_by(evaluation,policy) |>
- summarise(max_drawdown_percent=100*max(drawdown_cny/cummax(equity_cny)),.groups='drop')
-summary<-comparison$summary |> left_join(drawdown_percent,by=c('evaluation','policy'),relationship='one-to-one')
+comparison<-n7_purchase_accounting(rows,ids,stages,'JOINT',100000)
+summary<-comparison$summary
 knitr::kable(summary,digits=2)
 original_ids<-c(cfg$issues,cfg$excluded_drawdown_issues)
 cohort_rows<-rows |> mutate(stage=if_else(issue %in% original_ids,'ORIGINAL','ADDITIONAL'))
-cohort_comparison<-n7_baseline_comparison(cohort_rows,ids,unique(cohort_rows$stage),'JOINT',100000)
-cohort_drawdown<-cohort_comparison$curves |> group_by(evaluation,policy) |>
- summarise(max_drawdown_percent=100*max(drawdown_cny/cummax(equity_cny)),.groups='drop')
-cohort_summary<-cohort_comparison$summary |>
- left_join(cohort_drawdown,by=c('evaluation','policy'),relationship='one-to-one')
+cohort_comparison<-n7_purchase_accounting(cohort_rows,ids,unique(cohort_rows$stage),'JOINT',100000)
+cohort_summary<-cohort_comparison$summary
 knitr::kable(cohort_summary,digits=2)
+funding_stops<-summary |> filter(evaluation=='ALL',accounting_basis=='FUNDED',!is.na(funding_stop_issue))
+knitr::kable(funding_stops,digits=2)
 ```
 
 ## 收益及回撤曲线
 
 各小图的灰线为同一joint对照，彩色线为该方案；从同一个10万元起点计算。
+先展示可支付资金曲线，再展示持续计划的诊断曲线。停投后平坦不是风险消失，而是停止承担新仓位。
 
 ```{r}
 curves<-comparison$curves |> filter(evaluation=='ALL')
 base<-curves |> filter(policy=='JOINT')
-curves<-curves |> left_join(base |> select(period,base_equity=equity_cny,base_drawdown=drawdown_cny),by='period',relationship='many-to-one')
-equity_plot<-ggplot(curves,aes(period,equity_cny))+geom_line(aes(y=base_equity),color='grey60')+
- geom_line(color='#206b9b')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Equity (CNY)')
-drawdown_plot<-ggplot(curves,aes(period,drawdown_cny))+geom_line(aes(y=base_drawdown),color='grey60')+
- geom_line(color='#b84635')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Drawdown (CNY)')
+plot_curves<-curves |> left_join(base |> select(accounting_basis,period,base_equity=equity_cny,base_drawdown=drawdown_cny),by=c('accounting_basis','period'),relationship='many-to-one')
+funded_curves<-plot_curves |> filter(accounting_basis=='FUNDED')
+shadow_curves<-plot_curves |> filter(accounting_basis=='SHADOW')
+equity_plot<-ggplot(funded_curves,aes(period,equity_cny))+geom_line(aes(y=base_equity),color='grey60')+
+ geom_line(color='#206b9b')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Funded equity (CNY)')
+drawdown_plot<-ggplot(funded_curves,aes(period,drawdown_cny))+geom_line(aes(y=base_drawdown),color='grey60')+
+ geom_line(color='#b84635')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Funded drawdown (CNY)')
 print(equity_plot);print(drawdown_plot)
+shadow_equity_plot<-ggplot(shadow_curves,aes(period,equity_cny))+geom_line(aes(y=base_equity),color='grey60')+
+ geom_line(color='#206b9b')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Shadow equity (CNY; diagnostic only)')
+shadow_drawdown_plot<-ggplot(shadow_curves,aes(period,drawdown_cny))+geom_line(aes(y=base_drawdown),color='grey60')+
+ geom_line(color='#b84635')+facet_wrap(~policy,ncol=3)+theme_minimal()+labs(x='Issue sequence',y='Shadow drawdown (CNY; diagnostic only)')
+print(shadow_equity_plot);print(shadow_drawdown_plot)
+key_policies<-c('JOINT','HARD','DEPTH_OPEN','U4','CONFIDENCE')
+key_curves<-funded_curves |> filter(policy %in% key_policies) |>
+ mutate(policy=factor(policy,levels=key_policies))
+key_equity_plot<-ggplot(key_curves,aes(period,equity_cny,color=policy))+
+ geom_line(linewidth=.55)+theme_minimal()+
+ labs(x='Issue sequence',y='Funded equity (CNY)',color='Policy',
+      subtitle='Same CNY 100,000 initial capital; actual spending differs')
+key_drawdown_plot<-ggplot(key_curves,aes(period,drawdown_cny,color=policy))+
+ geom_line(linewidth=.55)+theme_minimal()+labs(x='Issue sequence',y='Funded drawdown (CNY)',color='Policy')
+print(key_equity_plot);print(key_drawdown_plot)
 ```
 
 ## 命中变化、资金利用和集中度
+
+下方敞口与模型命中率描述冻结计划，停投后未执行的计划不计入 FUNDED 收益。cash 为未使用的名义预算，不是向账户补入的现金。
 
 ```{r}
 knitr::kable(comparison$paired,digits=2)
@@ -108,12 +142,13 @@ knitr::kable(exposure,digits=3)
 ## 被购买组的概率曲线形态
 
 横轴为按原概率从高到低购买的票数，纵轴为累计概率。线为中位数，带为组间25%—75%分位区间。
-这里只描述最终被购买的组，不把不同组的形态相似当作风险独立。
+这里只描述可支付账本中实际执行的组，不把不同组的形态相似当作风险独立。
 
 ```{r}
 shapes<-diagnostic_read_verified_csv(file.path(params$structure,'shapes.csv'),receipts[[2]]$shape_sha256,
  cols(issue='c',sleeve_id='d'))
-membership<-groups |> distinct(issue,policy,sleeve_id)
+funded_groups<-groups |> semi_join(funded_curves |> filter(period>0,!stopped),by=c('issue','policy'))
+membership<-funded_groups |> distinct(issue,policy,sleeve_id)
 selected_shapes<-membership |> left_join(shapes,by=c('issue','sleeve_id'),relationship='many-to-one')
 stopifnot(!anyNA(selected_shapes$mass_64))
 profiles<-selected_shapes |> pivot_longer(c(mass_16,mass_32,mass_64,mass_128),names_to='prefix',values_to='mass') |>
@@ -129,30 +164,36 @@ knitr::kable(role_support)
 ## 剔除自身最大盈利期
 
 同时移除该期成本和回款；保留的范围不同，因此这是各方案自身尾部压力检查。
+分别检查两个既有账本，不在删除大奖后重新模拟停投状态。
 
 ```{r}
 trimmed<-list()
 for(k in c(1L,3L,5L)) {
- z<-rows |> group_by(policy) |> arrange(desc(net),issue,.by_group=TRUE) |> filter(row_number()>k) |>
+ z<-curves |> filter(period>0) |> group_by(accounting_basis,policy) |> arrange(desc(net),issue,.by_group=TRUE) |> filter(row_number()>k) |>
  summarise(remaining_issues=n(),stake=sum(stake),gross=sum(gross),net=gross-stake,
  roi_percent=if(stake>0)100*net/stake else NA_real_,.groups='drop') |> mutate(removed=k)
  trimmed[[as.character(k)]]<-z
 }
 trimmed<-bind_rows(trimmed);knitr::kable(trimmed,digits=2)
 o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
-for(n in c('rows','groups','summary','cohort_summary','exposure','trimmed','curves','profiles','role_support'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+for(n in c('rows','groups','funded_groups','summary','cohort_summary','funding_stops','exposure','trimmed','curves','profiles','role_support','scope_table'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+write_csv(catalog$unavailable_issues,file.path(o,'unavailable_issues.csv'))
 write_csv(comparison$paired,file.path(o,'paired.csv'))
 ggsave(file.path(o,'equity.png'),equity_plot,width=13,height=16,dpi=160)
 ggsave(file.path(o,'drawdown.png'),drawdown_plot,width=13,height=16,dpi=160)
+ggsave(file.path(o,'shadow-equity.png'),shadow_equity_plot,width=13,height=16,dpi=160)
+ggsave(file.path(o,'shadow-drawdown.png'),shadow_drawdown_plot,width=13,height=16,dpi=160)
+ggsave(file.path(o,'key-equity.png'),key_equity_plot,width=11,height=6,dpi=160)
+ggsave(file.path(o,'key-drawdown.png'),key_drawdown_plot,width=11,height=6,dpi=160)
 ggsave(file.path(o,'shapes.png'),shape_plot,width=13,height=16,dpi=160)
 artifacts<-list.files(o,full.names=TRUE)
 jsonlite::write_json(list(status='PENDING_INDEPENDENT_REVIEW',scope=ids,parent_hashes=hashes,code=code,
- labels_sha256=params$labels_sha256,
+ labels_sha256=params$labels_sha256,catalog_sha256=receipts[[1]]$catalog_sha256,
  files=setNames(as.list(vapply(artifacts,digest::digest,character(1),file=TRUE,algo='sha256')),basename(artifacts)),
 historical_admission=FALSE),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
 ```
 
-## 本轮结论及适用边界
+## 原484期结论：供新增数据对照
 
 保留 JOINT 作为比较基准。DEPTH_OPEN 在优先分散到不同组后使用剩余资金加深覆盖，
 绝对收益有所增加，但投入也更多，ROI 与 JOINT 几乎相同，不能称为显著的资金效率提升。
@@ -170,5 +211,6 @@ CORE3、CORE4 与 STRUCTURE 几乎没有合格投注，证据不足。
 这里是在旧候选池上筛选，尚未测试按“核心／中间／机会”构成重新生成七场候选组。
 不能将几乎不投注产生的平坦回撤曲线称为成功。
 
-当前结论属于固定484期的回顾诊断。原、新增、完整数据的同参数重跑仍须分别报告，
-不能将这批已被反复研究的样本称为未见测试集；最终验收还包括独立证据与 Codex review。
+本节文字仅概括原484期的结果，不能代替上方新增期及完整数据表的判断。
+全部数据仍属于回顾诊断，不能将这批已被反复研究的样本称为未见测试集。
+完整数据的采用结论须在独立结算复核及 Codex review 后确认。

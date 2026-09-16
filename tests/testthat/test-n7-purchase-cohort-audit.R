@@ -9,7 +9,13 @@ testthat::test_that('cohort audit independently reconciles complete and split ac
   cash_cny=c(2044,1022,1022,2046,1024,1022),max_drawdown_cny=c(2,0,2,0,0,0),
   minimum_equity_cny=c(100000,100000,99998,100000,100000,100000),
   net_without_best_cny=c(-2,0,0,0,0,0),max_drawdown_percent=c(200/100004,0,.002,0,0,0))
- testthat::expect_equal(as.data.frame(n7_purchase_cohort_audit(periods,summary,c('01','02'),'01',c('JOINT','U4'),1024,100000)),summary)
+ summary$bet_issues<-c(2,1,1,1,0,1)
+ summary$stopped_issues<-0L;summary$funding_stop_issue<-NA_character_
+ summary<-do.call(rbind,lapply(seq_len(nrow(summary)),function(i) {
+  z<-summary[rep(i,2),];z$accounting_basis<-c('FUNDED','SHADOW');z
+ }))
+ rownames(summary)<-NULL
+ testthat::expect_equal(as.data.frame(n7_purchase_cohort_audit(periods,summary,c('01','02'),'01',c('JOINT','U4'),1024,100000))[,names(summary)],summary)
  for(column in c('issues','stake_cny','net_cny','roi_percent','hit_issues','profit_issues',
                   'winning_groups','cash_cny','max_drawdown_cny','minimum_equity_cny','net_without_best_cny','max_drawdown_percent')) {
   bad<-summary;bad[[column]][1]<-bad[[column]][1]+1
@@ -18,7 +24,7 @@ testthat::test_that('cohort audit independently reconciles complete and split ac
  testthat::expect_error(n7_purchase_cohort_audit(periods,summary,c('01','02'),'02',c('JOINT','U4'),1024,100000))
  testthat::expect_error(n7_purchase_cohort_audit(periods[-1,],summary,c('01','02'),'01',c('JOINT','U4'),1024,100000))
  testthat::expect_error(n7_purchase_cohort_audit(periods,summary[-1,],c('01','02'),'01',c('JOINT','U4'),1024,100000))
- bad<-summary;bad$roi_percent[5]<-0
+ bad<-summary;bad$roi_percent[which(bad$stake_cny==0)[1]]<-0
  testthat::expect_error(n7_purchase_cohort_audit(periods,bad,c('01','02'),'01',c('JOINT','U4'),1024,100000))
  bad<-periods;bad$cash_cny[1]<-0
  testthat::expect_error(n7_purchase_cohort_audit(bad,summary,c('01','02'),'01',c('JOINT','U4'),1024,100000))
@@ -29,7 +35,7 @@ testthat::test_that('cohort audit independently reconciles complete and split ac
  testthat::expect_error(n7_purchase_cohort_audit(periods,summary,c('01','02'),'01',c('JOINT','U4'),1024,1))
  single<-periods[periods$issue=='01',];s<-summary[summary$evaluation=='ORIGINAL',]
  both<-rbind(transform(s,evaluation='ALL'),s)
- testthat::expect_equal(nrow(n7_purchase_cohort_audit(single,both,'01','01',c('JOINT','U4'),1024,100000)),4L)
+ testthat::expect_equal(nrow(n7_purchase_cohort_audit(single,both,'01','01',c('JOINT','U4'),1024,100000)),8L)
  testthat::expect_error(n7_purchase_cohort_audit(periods[periods$policy=='JOINT',],summary[summary$policy=='JOINT',],c('01','02'),'01',c('JOINT','U4'),1024,100000))
  root<-normalizePath('../..');work<-tempfile('cohort-entry-');dir.create(work)
  on.exit(unlink(work,recursive=TRUE),add=TRUE)
@@ -62,7 +68,7 @@ testthat::test_that('cohort audit independently reconciles complete and split ac
  command<-shQuote(c(file.path(root,'scripts/check_n7_purchase_cohorts.R'),params,proof))
  status<-withr::with_dir(work,system2(file.path(R.home('bin'),'Rscript'),command,stdout=log,stderr=log))
  testthat::expect_equal(status,0L,info=paste(readLines(log),collapse='\n'))
- testthat::expect_equal(jsonlite::fromJSON(proof)$cohort_rows,6L)
+ testthat::expect_equal(jsonlite::fromJSON(proof)$cohort_rows,12L)
  unlink(proof)
  stale<-jsonlite::fromJSON(params);stale$main_sha256<-paste(rep('0',64),collapse='')
  stale_params<-file.path(work,'stale-params.json');jsonlite::write_json(stale,stale_params,auto_unbox=TRUE)
@@ -73,4 +79,19 @@ testthat::test_that('cohort audit independently reconciles complete and split ac
  status<-withr::with_dir(work,system2(file.path(R.home('bin'),'Rscript'),command,stdout=log,stderr=log))
  testthat::expect_true(status!=0L)
  testthat::expect_false(file.exists(proof))
+})
+
+testthat::test_that('cohort audit independently verifies exhaustion and later shadow profit', {
+ source('../../r/fundamentals_equity_curves.R');source('../../r/n7_purchase_accounting.R')
+ x<-data.frame(issue=c('01','02','03'),policy='JOINT',model='M',
+  stage=c('ORIGINAL','ORIGINAL','ADDITIONAL'),stake=8,gross=c(0,0,100),
+  net=c(-8,-8,92),budget_cny=8,cash_cny=0,status='COMPLETE',hits=c(0,0,1))
+ s<-n7_purchase_accounting(x,x$issue,c('ORIGINAL','ADDITIONAL'),'JOINT',10)$summary
+ verified<-n7_purchase_cohort_audit(x,s,x$issue,c('01','02'),'JOINT',8,10)
+ testthat::expect_equal(verified$net_cny[verified$evaluation=='ALL' & verified$accounting_basis=='FUNDED'],-8)
+ testthat::expect_equal(verified$net_cny[verified$evaluation=='ALL' & verified$accounting_basis=='SHADOW'],76)
+ bad<-s;bad$funding_stop_issue[bad$evaluation=='ALL']<-'01'
+ testthat::expect_error(n7_purchase_cohort_audit(x,bad,x$issue,c('01','02'),'JOINT',8,10))
+ bad<-s[s$accounting_basis=='FUNDED',]
+ testthat::expect_error(n7_purchase_cohort_audit(x,bad,x$issue,c('01','02'),'JOINT',8,10))
 })
