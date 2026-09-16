@@ -46,7 +46,7 @@ if __name__=='__main__':
                 for u in (3,6):
                     key=f'{issue}_{"RAW" if source=="RAW_MARKET" else "CAL"}_U{u}'
                     jobs[pool.submit(market_foundation_n7,frame,cutoffs=cuts,max_uses=u,max_pair_overlap=5,
-                        budget_cny=1024,unit_cny=2,payout_factor=.65,seed=41902,source_version=source)]=key
+                        budget_cny=1024,unit_cny=2,payout_factor=.65,seed=41902,source_version=source,single_count=2)]=key
         for job in as_completed(jobs):
             key=jobs[job];plan=job.result();path=out/'plans'/f'{key}.json.gz'
             path.write_bytes(gzip.compress(json.dumps(plan,sort_keys=True).encode(),mtime=0))

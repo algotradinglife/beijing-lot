@@ -1,0 +1,21 @@
+source(file.path('..','..','r','fundamentals_equity_curves.R'))
+source(file.path('..','..','r','n7_purchase_accounting.R'))
+source(file.path('..','..','r','legacy_strategy_comparison.R'))
+testthat::test_that('legacy comparisons reconcile joint hits, funding and own-best trimming', {
+  x <- expand.grid(issue = sprintf('%03d',1:8), policy = c('JOINT','RAW'), stringsAsFactors=FALSE)
+  x$model <- 'DIAGNOSTIC'; x$stage <- rep(c(rep('BEFORE',4),rep('AFTER',4)),2)
+  x$status <- 'COMPLETE'; x$stake <- 2; x$budget_cny <- 4; x$cash_cny <- 2
+  x$gross <- c(0,8,0,0,8,0,0,0,8,0,0,8,0,0,8,0)
+  x$net <- x$gross - x$stake; x$hits <- as.numeric(x$gross>0)
+  z <- legacy_strategy_comparison(x, sprintf('%03d',1:8), c('BEFORE','AFTER'),'JOINT',100)
+  y <- subset(z$complementarity, evaluation=='ALL' & accounting_basis=='FUNDED' & policy=='RAW')
+  testthat::expect_equal(y$unique_hit,3); testthat::expect_equal(y$baseline_only_hit,2)
+  testthat::expect_equal(y$neither_hit,3); testthat::expect_equal(y$correlation,cor(x$net[1:8],x$net[9:16]))
+  t <- subset(z$trimmed,evaluation=='ALL' & accounting_basis=='FUNDED' & policy=='RAW' & removed==1)
+  testthat::expect_equal(t$net_cny,2); testthat::expect_equal(t$stake_cny,14)
+  testthat::expect_error(legacy_strategy_comparison(x[-1,],sprintf('%03d',1:8),c('BEFORE','AFTER'),'JOINT',100))
+  cash <- x;cash$stake <- 0;cash$gross <- 0;cash$net <- 0;cash$cash_cny <- 4;cash$hits <- 0;cash$status <- 'NO_BET'
+  z <- legacy_strategy_comparison(cash,sprintf('%03d',1:8),c('BEFORE','AFTER'),'JOINT',100)
+  testthat::expect_true(all(is.na(z$summary$roi_percent)))
+  testthat::expect_true(all(is.na(z$complementarity$correlation)))
+})

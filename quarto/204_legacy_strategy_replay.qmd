@@ -1,0 +1,185 @@
+---
+title: "旧7串1策略复测：独立概率口径与JOINT对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  market_study: null
+  market_proof: null
+  market_plan_proof: null
+  strength_study: null
+  strength_proof: null
+  joint_report: null
+  joint_receipt_sha256: null
+  output: null
+---
+
+```{r}
+#| echo: false
+library(dplyr)
+library(readr)
+library(ggplot2)
+for(x in params) stopifnot(is.character(x),length(x)==1,nzchar(x))
+source(file.path(params$project_root,'r/fundamentals_equity_curves.R'))
+source(file.path(params$project_root,'r/n7_purchase_accounting.R'))
+source(file.path(params$project_root,'r/legacy_strategy_comparison.R'))
+stopifnot(digest::digest(file=file.path(params$joint_report,'receipt.json'),algo='sha256')==params$joint_receipt_sha256)
+jreceipt <- jsonlite::fromJSON(file.path(params$joint_report,'receipt.json'))
+stopifnot(digest::digest(file=file.path(params$joint_report,'rows.csv'),algo='sha256')==jreceipt$files[['rows.csv']])
+joint <- read_csv(file.path(params$joint_report,'rows.csv'),col_types=cols(issue=col_character()),show_col_types=FALSE) |> filter(policy=='JOINT')
+market <- jsonlite::fromJSON(file.path(params$market_study,'results.json'))
+strength <- jsonlite::fromJSON(file.path(params$strength_study,'results.json'))
+mp <- jsonlite::fromJSON(params$market_proof);sp <- jsonlite::fromJSON(params$strength_proof)
+plan_proof <- jsonlite::fromJSON(params$market_plan_proof)
+stopifnot(mp$status=='PASS',sp$status=='PASS',
+ plan_proof$status=='PASS',plan_proof$frozen_sha256==mp$frozen_sha256,
+ digest::digest(file=file.path(params$market_study,'results.json'),algo='sha256')==mp$results_sha256,
+ digest::digest(file=file.path(params$strength_study,'results.json'),algo='sha256')==sp$results_sha256)
+order <- market$issue_order
+stopifnot(setequal(order,joint$issue),length(order)==784)
+cfg_path <- file.path(params$project_root,'config/top2_outside_validation.json')
+stopifnot(digest::digest(file=cfg_path,algo='sha256')==jreceipt$code[['config/top2_outside_validation.json']])
+cfg <- jsonlite::fromJSON(cfg_path)
+original <- c(cfg$issues,cfg$excluded_drawdown_issues)
+joint <- joint |> mutate(stage=if_else(issue %in% original,'ORIGINAL','ADDITIONAL'))
+stopifnot(sum(joint$stage=='ORIGINAL')==484,sum(joint$stage=='ADDITIONAL')==300)
+stage <- joint |> select(issue,stage)
+periods <- bind_rows(market$rows |> left_join(stage,by='issue',relationship='many-to-one'),joint) |> mutate(model='DIAGNOSTIC')
+z <- legacy_strategy_comparison(periods,order,c('ORIGINAL','ADDITIONAL'),'JOINT',100000)
+out <- params$output;dir.create(out,recursive=TRUE,showWarnings=FALSE)
+for(n in names(z)) write_csv(z[[n]],file.path(out,paste0(n,'.csv')))
+```
+
+## 收敛结论
+
+**本轮不以旧压1/压2策略替换JOINT。** 784期中JOINT净收益53188.68元、ROI7.52%、最大回撤35125.71元；
+8个旧市场版本全部亏损。相对最好的RAW压2-U3仍亏69624.15元、ROI−9.06%，最大回撤72693.24元。
+4个压1版本均触发资金不足停投；压2整体优于压1，但未建立可取代JOINT的收益证据。
+
+RAW压2-U3命中435期，比JOINT的345期多90期，仍明显亏损。提高命中期数不能代替投入与中奖回款检验。
+它与JOINT逐期净收益相关性仅0.112，独有命中198期；低相关也不足以证明值得配置资金。
+新增300期JOINT接近持平（−153.64元），所有市场压缩版本继续亏损。
+去掉各自最大盈利5期后，JOINT剩6445.59元；其余8个市场版本仍为负。
+
+冻结校正不是普遍最优：例如压2-U3全样本RAW好于CAL，但新增300期CAL亏损较少。
+这不足以根据事后分段切换底座。100期战力/共识子集6版本也均亏损；共识U3/U6复现了旧报告金额。
+以上支持保留JOINT研究基准，不支持恢复旧方案，也没有证明某一种概率底座本身必然较差。
+旧策略与JOINT还存在选场、SP准入、组合覆盖差异，本轮不将结果只归因为Top2或冻结校正。
+
+## 范围和算法
+
+这是已见历史资料上的固定策略回顾诊断，不是未见数据测试。市场版本784期（100708—140901）；
+110915缺市场输入，不能记为未中。输入清单沿用上一轮冻结验收快照，不自动追随新数据。
+战力版本使用通过迁移哈希验证的100期旧研究归档，只代表该归档的可用基本面范围，未重新拟合或重新清洗。
+早先约117.61% ROI的共识U3记录来自100402—100607的48期，与本轮784期市场清单不重合；
+本轮不能当作该短样本成绩的直接复现。这里复现的是后续100608—101120这100期共识策略的亏损记录。
+
+RAW使用欧赔、大小球映射的原始市场让球概率；CAL使用原冻结让平校正市场概率。
+STRENGTH使用旧主客场基本面泊松战力概率。三者不强制一致，也不将跨口径差异单独归因为购买规则。
+
+市场/战力压缩版本：先按Top2累计概率排序，每7场成组；每组Top1概率最高的1场（C1）或2场（C2）单选，其余Top2双选。
+先取不重叠组，再以同一Top2目标补组。U3/U6分别限制每场最多进入3/6组，两组最多重叠5场。
+C1每组128元、C2每组64元；预算不足或组合不可行时留现金。
+保留旧策略原生条件，不附加JOINT的1.3估算SP过滤，不做赛果替换或比分保护。
+
+CONSENSUS是另一套旧选场算法：2场市场/战力Top1共识单选（市场概率至少50%），
+4场Top2共识双选和1场Top2分歧双选，双选取战力Top2；剔除零让球Top2分歧场。
+它与纯市场U3/U6名称相近但规则不同。
+
+每期预算1024元、每票2元、初始本金10万元；北单实际SP只用于结算，票级0.65只乘一次。
+按期先结算再投入下一期，不模拟同期占款。FUNDED在整期计划不可支付时永久停投；SHADOW仍执行所有计划，仅供诊断。
+分段账本分别从10万元起算，ALL连续计算，不在分段点补钱。
+
+## 市场8版本与JOINT：全部784期
+
+```{r}
+#| echo: false
+knitr::kable(z$summary |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |>
+ select(policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny,max_drawdown_percent,funding_stop_issue),digits=2)
+```
+
+## 收益与回撤
+
+```{r}
+#| echo: false
+#| fig-width: 12
+#| fig-height: 7
+c <- z$curves |> filter(evaluation=='ALL',accounting_basis=='FUNDED')
+for(metric in c('equity_cny','drawdown_cny')) {
+ chart <- ggplot(c,aes(x=period,y=.data[[metric]],colour=policy))+geom_line(linewidth=.5)+
+   labs(x='Issue index',y=if(metric=='equity_cny')'Capital (CNY)' else 'Drawdown (CNY)',colour='Policy')+
+   theme_minimal()+theme(legend.position='bottom')
+ ggsave(file.path(out,paste0(metric,'.png')),chart,width=12,height=7,dpi=150)
+ print(chart)
+}
+```
+
+## 原484期与新增300期
+
+```{r}
+#| echo: false
+knitr::kable(z$summary |> filter(evaluation!='ALL',accounting_basis=='FUNDED') |>
+ select(evaluation,policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny),digits=2)
+```
+
+## 互补性与大盈利依赖
+
+相关性使用逐期净收益。独有命中、独有盈利均相对JOINT；命中不等于当期盈利。
+剔除各方案自身最大盈利期同时移除对应投入，不重演资金停投路径。
+
+```{r}
+#| echo: false
+knitr::kable(z$complementarity |> filter(evaluation=='ALL',accounting_basis=='FUNDED'),digits=3)
+knitr::kable(z$trimmed |> filter(evaluation=='ALL',accounting_basis=='FUNDED'),digits=2)
+```
+
+## 早期战力与共识版本：可用范围和共同期
+
+缺基本面输入的期不作为空仓收益行，也不外推为784期表现。数据不足后的未入选与规则确实买不到组分别记载。
+共同期对照只统一期次，不强制各策略具备相同场次池；归档基本面与当前市场输入的场次覆盖可能不同。
+
+```{r}
+#| echo: false
+if(length(strength$unavailable)) print(knitr::kable(strength$unavailable)) else cat('100期均有部分可用战力输入；规则造成的不投注仍保留。\n')
+srows <- strength$rows |> mutate(stage='ARCHIVE',model='DIAGNOSTIC')
+sz <- legacy_strategy_comparison(srows,strength$issue_order,'ARCHIVE','STRENGTH_C2_U3',100000)
+common <- order[order %in% strength$issue_order]
+shared <- bind_rows(periods |> filter(issue %in% common),srows |> filter(issue %in% common)) |> mutate(stage='COMMON')
+cz <- legacy_strategy_comparison(shared,common,'COMMON','JOINT',100000)
+for(n in names(sz)) write_csv(sz[[n]],file.path(out,paste0('strength_',n,'.csv')))
+for(n in names(cz)) write_csv(cz[[n]],file.path(out,paste0('common_',n,'.csv')))
+knitr::kable(sz$summary |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |>
+ select(policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny),digits=2)
+knitr::kable(cz$summary |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |>
+ select(policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny),digits=2)
+knitr::kable(cz$complementarity |> filter(evaluation=='ALL',accounting_basis=='FUNDED'),digits=3)
+```
+
+## 验证边界
+
+市场计划已逐组核验源概率、单选位置、完整笛卡尔票集与U/P约束；该数学检查不宣称独立证明MILP最优性。
+两类结算另以不导入生产结算器的逐票程序重算比分方向、SP乘积、中奖票与资金恒等式。
+固定策略接受显式fixture cutoff，但历史概率材料没有取得前瞻准入资格，全部输出保持historical_admission=false。
+
+```{r}
+#| echo: false
+knitr::kable(data.frame(source=c('market','strength'),plans=c(mp$plans,sp$plans),groups=c(mp$groups,sp$groups),tickets=c(mp$tickets,sp$tickets)))
+files <- list.files(out,pattern='\\.(csv|png)$',full.names=TRUE)
+hashes <- list()
+for(f in files) hashes[[basename(f)]] <- digest::digest(file=f,algo='sha256')
+inputs <- c(file.path(params$market_study,'results.json'),file.path(params$strength_study,'results.json'),
+ params$market_proof,params$market_plan_proof,params$strength_proof,file.path(params$joint_report,'receipt.json'))
+input_hashes <- list()
+for(f in inputs) input_hashes[[f]] <- digest::digest(file=f,algo='sha256')
+code <- list()
+for(f in c('r/legacy_strategy_comparison.R','r/fundamentals_equity_curves.R','r/n7_purchase_accounting.R','quarto/204_legacy_strategy_replay.qmd','config/top2_outside_validation.json'))
+ code[[f]] <- digest::digest(file=file.path(params$project_root,f),algo='sha256')
+jsonlite::write_json(list(historical_admission=FALSE,inputs=input_hashes,code=code,files=hashes,
+ market_issues=length(order),strength_issues=length(strength$issue_order),common_issues=length(common)),
+ file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
