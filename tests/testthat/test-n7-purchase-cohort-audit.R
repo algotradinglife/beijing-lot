@@ -1,0 +1,76 @@
+source('../../r/n7_purchase_cohort_audit.R')
+testthat::test_that('cohort audit independently reconciles complete and split accounts', {
+ periods<-data.frame(issue=rep(c('01','02'),2),policy=rep(c('JOINT','U4'),each=2),
+  stake=c(2,2,0,2),gross=c(6,0,0,4),net=c(4,-2,0,2),hits=c(1,0,0,1),cash_cny=c(1022,1022,1024,1022))
+ summary<-data.frame(evaluation=rep(c('ALL','ORIGINAL','ADDITIONAL'),2),policy=rep(c('JOINT','U4'),each=3),
+  issues=c(2,1,1,2,1,1),stake_cny=c(4,2,2,2,0,2),net_cny=c(2,4,-2,2,0,2),
+  roi_percent=c(50,200,-100,100,NA,100),hit_issues=c(1,1,0,1,0,1),
+  profit_issues=c(1,1,0,1,0,1),winning_groups=c(1,1,0,1,0,1),
+  cash_cny=c(2044,1022,1022,2046,1024,1022),max_drawdown_cny=c(2,0,2,0,0,0),
+  minimum_equity_cny=c(100000,100000,99998,100000,100000,100000),
+  net_without_best_cny=c(-2,0,0,0,0,0),max_drawdown_percent=c(200/100004,0,.002,0,0,0))
+ testthat::expect_equal(as.data.frame(n7_purchase_cohort_audit(periods,summary,c('01','02'),'01',c('JOINT','U4'),1024,100000)),summary)
+ for(column in c('issues','stake_cny','net_cny','roi_percent','hit_issues','profit_issues',
+                  'winning_groups','cash_cny','max_drawdown_cny','minimum_equity_cny','net_without_best_cny','max_drawdown_percent')) {
+  bad<-summary;bad[[column]][1]<-bad[[column]][1]+1
+  testthat::expect_error(n7_purchase_cohort_audit(periods,bad,c('01','02'),'01',c('JOINT','U4'),1024,100000),info=column)
+ }
+ testthat::expect_error(n7_purchase_cohort_audit(periods,summary,c('01','02'),'02',c('JOINT','U4'),1024,100000))
+ testthat::expect_error(n7_purchase_cohort_audit(periods[-1,],summary,c('01','02'),'01',c('JOINT','U4'),1024,100000))
+ testthat::expect_error(n7_purchase_cohort_audit(periods,summary[-1,],c('01','02'),'01',c('JOINT','U4'),1024,100000))
+ bad<-summary;bad$roi_percent[5]<-0
+ testthat::expect_error(n7_purchase_cohort_audit(periods,bad,c('01','02'),'01',c('JOINT','U4'),1024,100000))
+ bad<-periods;bad$cash_cny[1]<-0
+ testthat::expect_error(n7_purchase_cohort_audit(bad,summary,c('01','02'),'01',c('JOINT','U4'),1024,100000))
+ bad<-periods;bad$gross[1]<-NA_real_
+ testthat::expect_error(n7_purchase_cohort_audit(bad,summary,c('01','02'),'01',c('JOINT','U4'),1024,100000))
+ testthat::expect_error(n7_purchase_cohort_audit(periods,summary,c('01','01'),'01',c('JOINT','U4'),1024,100000))
+ testthat::expect_error(n7_purchase_cohort_audit(periods,summary,c('01','02'),'03',c('JOINT','U4'),1024,100000))
+ testthat::expect_error(n7_purchase_cohort_audit(periods,summary,c('01','02'),'01',c('JOINT','U4'),1024,1))
+ single<-periods[periods$issue=='01',];s<-summary[summary$evaluation=='ORIGINAL',]
+ both<-rbind(transform(s,evaluation='ALL'),s)
+ testthat::expect_equal(nrow(n7_purchase_cohort_audit(single,both,'01','01',c('JOINT','U4'),1024,100000)),4L)
+ testthat::expect_error(n7_purchase_cohort_audit(periods[periods$policy=='JOINT',],summary[summary$policy=='JOINT',],c('01','02'),'01',c('JOINT','U4'),1024,100000))
+ root<-normalizePath('../..');work<-tempfile('cohort-entry-');dir.create(work)
+ on.exit(unlink(work,recursive=TRUE),add=TRUE)
+ for(name in c('r','scripts','config','report','main','structure'))dir.create(file.path(work,name))
+ file.copy(file.path(root,'r/n7_purchase_cohort_audit.R'),file.path(work,'r/n7_purchase_cohort_audit.R'))
+ file.copy(file.path(root,'scripts/check_n7_purchase_cohorts.R'),file.path(work,'scripts/check_n7_purchase_cohorts.R'))
+ config_path<-file.path(work,'config/top2_outside_validation.json')
+ jsonlite::write_json(list(issues=list('01'),excluded_drawdown_issues=list()),config_path,auto_unbox=TRUE)
+ write.csv(periods,file.path(work,'report/rows.csv'),row.names=FALSE)
+ write.csv(summary,file.path(work,'report/cohort_summary.csv'),row.names=FALSE)
+ files<-file.path(work,'report',c('rows.csv','cohort_summary.csv'))
+ catalog<-file.path(work,'catalog.json')
+ jsonlite::write_json(list(issues=list(list(issue='01'),list(issue='02'))),catalog,auto_unbox=TRUE)
+ catalog_sha<-digest::digest(file=catalog,algo='sha256');parent<-character()
+ for(i in 1:2) {
+  r<-list(scope=list('01','02'),policies=list(list(id=c('JOINT','U4')[i])),catalog_sha256=catalog_sha)
+  if(i==2)r$parent_receipt_sha256<-parent[1]
+  path<-file.path(work,c('main','structure')[i],'plans-receipt.json')
+  jsonlite::write_json(r,path,auto_unbox=TRUE);parent[i]<-digest::digest(file=path,algo='sha256')
+ }
+ labels<-file.path(work,'labels.csv');writeLines('hash-bound settlement input',labels)
+ labels_sha<-digest::digest(file=labels,algo='sha256')
+ jsonlite::write_json(list(scope=list('01','02'),parent_hashes=as.list(parent),
+  catalog_sha256=catalog_sha,labels_sha256=labels_sha,
+  code=setNames(list(digest::digest(file=config_path,algo='sha256')),'config/top2_outside_validation.json'),
+  files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),basename(files))),
+  file.path(work,'report/receipt.json'),auto_unbox=TRUE)
+ params<-file.path(work,'params.json');jsonlite::write_json(list(output=file.path(work,'report'),main=file.path(work,'main'),structure=file.path(work,'structure'),main_sha256=parent[1],structure_sha256=parent[2],catalog=catalog,labels=labels,labels_sha256=labels_sha),params,auto_unbox=TRUE)
+ proof<-file.path(work,'proof.json');log<-file.path(work,'run.log')
+ command<-shQuote(c(file.path(root,'scripts/check_n7_purchase_cohorts.R'),params,proof))
+ status<-withr::with_dir(work,system2(file.path(R.home('bin'),'Rscript'),command,stdout=log,stderr=log))
+ testthat::expect_equal(status,0L,info=paste(readLines(log),collapse='\n'))
+ testthat::expect_equal(jsonlite::fromJSON(proof)$cohort_rows,6L)
+ unlink(proof)
+ stale<-jsonlite::fromJSON(params);stale$main_sha256<-paste(rep('0',64),collapse='')
+ stale_params<-file.path(work,'stale-params.json');jsonlite::write_json(stale,stale_params,auto_unbox=TRUE)
+ stale_command<-shQuote(c(file.path(root,'scripts/check_n7_purchase_cohorts.R'),stale_params,proof))
+ status<-withr::with_dir(work,system2(file.path(R.home('bin'),'Rscript'),stale_command,stdout=log,stderr=log))
+ testthat::expect_true(status!=0L);testthat::expect_false(file.exists(proof))
+ cat('\n',file=config_path,append=TRUE)
+ status<-withr::with_dir(work,system2(file.path(R.home('bin'),'Rscript'),command,stdout=log,stderr=log))
+ testthat::expect_true(status!=0L)
+ testthat::expect_false(file.exists(proof))
+})
