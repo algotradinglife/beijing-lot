@@ -1,0 +1,40 @@
+{
+  "study": "fixed-group payout and exposure factorial diagnostic",
+  "historical_admission": false,
+  "scope": "784 frozen issues; original JOINT groups and per-group ticket quotas",
+  "budget_cny": 1024,
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000,
+  "payout_floor_grid_cny": [
+    0,
+    128,
+    256,
+    512
+  ],
+  "exposure_grid": [
+    {
+      "name": "OPEN",
+      "fixture_cny": 1024,
+      "direction_cny": 1024
+    },
+    {
+      "name": "MODERATE",
+      "fixture_cny": 768,
+      "direction_cny": 512
+    },
+    {
+      "name": "STRICT",
+      "fixture_cny": 512,
+      "direction_cny": 384
+    }
+  ],
+  "primary_comparison": {
+    "payout_floor_cny": 256,
+    "exposure": "MODERATE"
+  },
+  "selection": "global descending ticket probability, expected contribution and IDs for ties; fixed per-group quotas; same-group replacements only",
+  "evaluation": "all fixed grid cells; no winner selected from target labels; historical exposed probabilities are retrospective evidence only",
+  "coverage_seed": 1901,
+  "coverage_worlds": 8192
+}
