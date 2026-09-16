@@ -23,15 +23,24 @@ joint_payout_freeze_issue <- function(job,config,python,output) {
   world_states<-lapply(selected_sleeves,function(x)as.integer(worlds[,as.integer(unlist(x$fixture_indices))+1L,drop=FALSE] %*% (3^(6:0)))+1L)
   names(world_states)<-vapply(selected_sleeves,function(x)as.character(x$id),character(1))
  }
- for(floor in unlist(config$payout_floor_grid_cny))for(exposure in config$exposure_grid) {
-  arm<-paste0('P',floor,'_',exposure$name)
+ specs<-list()
+ for(floor in unlist(config$payout_floor_grid_cny))for(exposure in config$exposure_grid)
+  specs[[paste0('P',floor,'_',exposure$name)]]<-list(floor=floor,exposure=exposure)
+ for(share in unlist(config$supplement_shares))
+  specs[[paste0('MIX',round(100*share))]]<-list(share=share)
+ for(arm in names(specs)) {
+  spec<-specs[[arm]];floor<-spec$floor;exposure<-spec$exposure
   if(nrow(a)) {
-   z<-joint_payout_exposure(b,view,a,cutoffs,python,config$budget_cny,config$unit_cny,
+   if(!is.null(spec$share)) {
+    z<-joint_payout_mix(b,view,a,cutoffs,python,config$budget_cny,config$unit_cny,
+     config$main_floor_cny,config$supplement_floor_cny,spec$share)
+    z$reason_counts<-c(MAIN=z$main_stake/config$unit_cny,SUPPLEMENT=z$supplement_stake/config$unit_cny)
+   } else z<-joint_payout_exposure(b,view,a,cutoffs,python,config$budget_cny,config$unit_cny,
                           floor,exposure$fixture_cny,exposure$direction_cny)
    tickets<-z$tickets |> dplyr::select(sleeve_id,ticket_col_idx,prob,payout_hat,expected_gross_contribution,prob_rank)
    hit<-rep(FALSE,config$coverage_worlds)
    for(id in names(world_states))hit<-hit | world_states[[id]] %in% tickets$ticket_col_idx[as.character(tickets$sleeve_id)==id]
-   if(floor==0 && exposure$name=='OPEN') {
+   if(arm=='P0_OPEN') {
     stopifnot(z$stake==sum(a$depth)*config$unit_cny)
     for(i in seq_len(nrow(a)))stopifnot(setequal(tickets$ticket_col_idx[tickets$sleeve_id==a$sleeve_id[i]],view$rank_idx[as.character(a$sleeve_id[i]),seq_len(a$depth[i])]))
    }

@@ -22,7 +22,7 @@ from src.temporal_learning.core import stable_json_hash
 from src.fundamentals_n7_baseline import rank_double_candidates
 from src.n7_single_ticket_sampling import settle_single_tickets
 
-R_SOURCES = ['r/joint_payout_exposure.R', 'r/joint_payout_study.R',
+R_SOURCES = ['r/joint_payout_mix.R', 'r/joint_payout_exposure.R', 'r/joint_payout_study.R',
              'r/n7_joint_sleeves.R', 'r/n7_sleeve_tables.R',
              'scripts/freeze_joint_payout_chunk.R', 'config/n7_joint_runtime.json',
              'config/compression_breadth_runtime.json']
@@ -123,6 +123,36 @@ def replay_payout_selection(bundle, allocations, cutoffs, floor, fixture_cap, di
     return selected
 
 
+def replay_payout_mix(bundle, allocations, cutoffs, main_floor, supplement_floor, share, unit_cny):
+    """Replay two-stage reservation independently, with the shared cutoff gate.
+
+    Reserve floor(original ticket count * share) units; lower-band tickets can
+    only enter already opened groups, respecting original group quotas.
+    """
+    if not (np.isfinite(share) and 0<=share<1 and
+            np.isfinite(main_floor) and np.isfinite(supplement_floor) and
+            0<=supplement_floor<main_floor):
+        raise ValueError('Invalid mixed allocation parameters')
+    high=replay_payout_selection(bundle,allocations,cutoffs,main_floor,1024,1024,unit_cny)
+    quotas={a['sleeve_id']:a['depth'] for a in allocations}
+    reserve=int(np.floor(sum(quotas.values())*share+1e-10))
+    main=high[:sum(quotas.values())-reserve]
+    counts={sid:sum(s==sid for s,k in main) for sid in quotas}
+    candidates=[]
+    for group in bundle['sleeves']:
+        sid=group['id']
+        if not counts.get(sid,0):continue
+        e=group['enumeration']
+        for k,(p,v,pay) in enumerate(zip(e['probability'],e['expected_contribution'],e['estimated_payout'])):
+            if supplement_floor<=pay<main_floor:candidates.append((-p,-v,sid,k+1))
+    candidates.sort();low=[]
+    for _,_,sid,k in candidates:
+        if len(low)>=reserve:break
+        if counts[sid]>=quotas[sid]:continue
+        low.append((sid,k));counts[sid]+=1
+    return main+low
+
+
 def finalize_payout_freeze(output, repository_root, python, rscript):
     """Verify every input/code/plan and independently replay all arms before seal.
 
@@ -170,6 +200,7 @@ def finalize_payout_freeze(output, repository_root, python, rscript):
             raise ValueError('Plan identity changed')
         native={s:Cutoff.decision_epoch(job['issue'],t) for s,t in b['cutoffs'].items()}
         expected_arms={f"P{floor}_{e['name']}" for floor in cfg['payout_floor_grid_cny'] for e in cfg['exposure_grid']}
+        expected_arms.update(f'MIX{round(100*s)}' for s in cfg.get('supplement_shares', []))
         if set(plan['plans'])!=expected_arms:
             raise ValueError('Incomplete arm grid')
         for floor in cfg['payout_floor_grid_cny']:
@@ -180,6 +211,14 @@ def finalize_payout_freeze(output, repository_root, python, rscript):
                 if actual!=expected or z['stake']!=2*len(expected) or z['cash']!=1024-z['stake']:
                     raise ValueError(f"Independent ticket replay mismatch: {job['issue']} {arm}")
                 replayed+=1
+        for share in cfg.get('supplement_shares', []):
+            arm=f'MIX{round(100*share)}'; z=plan['plans'][arm]
+            expected=replay_payout_mix(b,job['allocations'],native,cfg['main_floor_cny'],
+                cfg['supplement_floor_cny'],share,cfg['unit_cny'])
+            actual=[(t['sleeve_id'],t['ticket_col_idx']) for t in z['tickets']]
+            if actual!=expected or z['stake']!=2*len(expected) or z['cash']!=1024-z['stake']:
+                raise ValueError(f'Independent mixed replay mismatch: {job["issue"]} {arm}')
+            replayed+=1
         hashes[str(path)]=hashlib.sha256(raw).hexdigest();cuts[job['issue']]=b['cutoffs']
         if n%20==0:print(f'Independent replay {n}/{len(m["jobs"])}',flush=True)
     verify_implementation_closure(root,m['implementation'])

@@ -1,0 +1,142 @@
+---
+title: "JOINT：256主力与128补充覆盖"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  study: null
+  evaluation_sha256: null
+  reference: null
+  reference_receipt_sha256: null
+  output: null
+---
+
+这是冻结784期的**回顾诊断**，不构成未见数据验证。原概率校正和原选组属于历史研究证据，
+本轮不重训、不选新的7场组，不把时点代理宣称为真实赛前可用证明。实际北单SP只用于结算，
+预计回款仍由欧赔及大小球映射，已包含一次票级0.65系数。
+
+对照原 JOINT、统一128和256元门槛，以及10%、15%、20%低门槛补充。
+比例以原计划票数为分母，补充票数向下取整。主力票预计回款至少256元；
+补充票回款在128元（含）至256元（不含），只能进入已有主力票的组。
+两阶段各按概率、预计回款贡献、组与票ID排序；不重复买同票。
+固定每期1024元上限、2元票、10万元本金；保留原组配额，未使用额度持现，不自动转给另一部分。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+for(f in c('diagnostic_verified_csv','fundamentals_equity_curves','n7_purchase_accounting','joint_payout_report','joint_payout_mix_diagnostics'))source(file.path(params$project_root,'r',paste0(f,'.R')))
+stopifnot(digest::digest(file=file.path(params$study,'evaluation-receipt.json'),algo='sha256')==params$evaluation_sha256,
+ digest::digest(file=file.path(params$reference,'receipt.json'),algo='sha256')==params$reference_receipt_sha256)
+er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+rr<-jsonlite::fromJSON(file.path(params$reference,'receipt.json'))
+rows<-diagnostic_read_verified_csv(file.path(params$study,'rows.csv'),er$files[['rows.csv']],cols(issue='c'))
+contributions<-diagnostic_read_verified_csv(file.path(params$study,'contributions.csv'),er$files[['contributions.csv']],cols(issue='c'))
+original<-diagnostic_read_verified_csv(file.path(params$reference,'rows.csv'),rr$files[['rows.csv']],cols(issue='c')) |> filter(policy=='JOINT') |> select(issue,stake,gross,net,hits)
+reference_curves<-diagnostic_read_verified_csv(file.path(params$reference,'curves.csv'),rr$files[['curves.csv']],cols(issue='c'))
+map<-reference_curves |> filter(policy=='JOINT',evaluation=='ALL',accounting_basis=='FUNDED',period>0) |> select(issue,period,stage) |> arrange(period)
+stopifnot(nrow(map)==784)
+z<-joint_payout_report(rows,contributions,original,map,100000,'P0_OPEN',2)
+out<-params$output;dir.create(out,recursive=TRUE,showWarnings=FALSE)
+for(n in names(z))write_csv(z[[n]],file.path(out,paste0(n,'.csv')))
+primary<-c('P0_OPEN','P128_OPEN','P256_OPEN','MIX10','MIX15','MIX20')
+labels<-c(P0_OPEN='Original JOINT',P128_OPEN='Floor128',P256_OPEN='Floor256',MIX10='Mix10%',MIX15='Mix15%',MIX20='Mix20%')
+summary<-z$summary |> filter(accounting_basis=='FUNDED',policy %in% primary)
+knitr::kable(summary |> select(evaluation,policy,stake_cny,net_cny,roi_percent,max_drawdown_cny,hit_issues,cash_cny,stopped_issues),digits=2)
+```
+
+## 收益与回撤
+
+全期资金连续结算；若资金不足整期计划则永久持现，不借款。分段表在各段独立从10万元计算局部回撤，
+全期图不在阶段边界重置本金。BEFORE为1—305期，DRAWDOWN为306—399期，AFTER为400—784期。
+这些是旧诊断的事后阶段，不能作为未来切换信号。
+
+```{r}
+chart<-z$curves |> filter(evaluation=='ALL',accounting_basis=='FUNDED',policy %in% primary) |> mutate(label=factor(labels[policy],levels=unname(labels)))
+p1<-ggplot(chart,aes(period,equity_cny,colour=label))+geom_line(linewidth=.55)+geom_vline(xintercept=c(305,399),linetype=2)+theme_minimal()+theme(legend.position='bottom')+labs(x='Issue index',y='Capital (CNY)',colour=NULL)
+p2<-ggplot(chart,aes(period,drawdown_cny,colour=label))+geom_line(linewidth=.55)+geom_vline(xintercept=c(305,399),linetype=2)+theme_minimal()+theme(legend.position='bottom')+labs(x='Issue index',y='Drawdown (CNY)',colour=NULL)
+ggsave(file.path(out,'equity.png'),p1,width=11,height=5,dpi=150)
+ggsave(file.path(out,'drawdown.png'),p2,width=11,height=5,dpi=150)
+p1;p2
+```
+
+## 省钱还是提高回款效率
+
+COMMON是两方案共有票；REMOVED为原方案有、新方案无；ADDED为新方案替补票。
+因此“新净收益−原净收益＝ADDED净收益−REMOVED净收益”，逐期严格校验。
+这张表是完整计划的影子会计；如果上方资金不足停投，不能当作实际资金账本。
+概率质量跨组相加不是期覆盖，下面另用共享场次模拟给出期覆盖。
+
+```{r}
+ct<-z$contributions |> filter(policy %in% primary[-1],category!='COMMON') |> mutate(delta_component=if_else(category=='REMOVED',-net,net))
+p3<-ggplot(ct,aes(policy,delta_component,fill=category))+geom_col(position='dodge')+facet_wrap(~stage)+geom_hline(yintercept=0)+theme_minimal()+theme(legend.position='bottom')+labs(x=NULL,y='Change in net return (CNY)')
+ggsave(file.path(out,'replacement-contribution.png'),p3,width=12,height=5,dpi=150);p3
+knitr::kable(ct |> select(stage,policy,category,tickets,stake,gross,net),digits=2)
+knitr::kable(z$coverage |> filter(policy %in% primary),digits=4)
+```
+
+期模型覆盖采用8192个固定种子共享场次世界，组间共享相同赛果；不把重叠组当独立事件。
+随机种子只用于诊断覆盖，不决定购票，也没有按实绩选种子。单期期覆盖模拟标准误最高约0.55个百分点。
+
+## 相对统一256门槛：救回与丢失
+
+```{r}
+paired<-joint_payout_mix_diagnostics(rows,map,'P256_OPEN')
+write_csv(paired$paired,file.path(out,'paired-issues.csv'))
+write_csv(paired$summary,file.path(out,'paired-summary.csv'))
+knitr::kable(paired$summary,digits=2)
+```
+
+“救回”指统一256未中而新方案命中；“丢失”相反。收益改善还受同一期中奖票数与实际SP影响。
+两者不应以净命中期数取代；投入减少与回款变化分别列出。
+
+## 补充额度是否用足
+
+```{r}
+freeze_path<-file.path(params$study,'plans-frozen.json')
+stopifnot(digest::digest(file=freeze_path,algo='sha256')==er$freeze_sha256)
+frozen<-jsonlite::fromJSON(freeze_path,simplifyVector=FALSE)
+usage<-list()
+for(path in names(frozen$receipt$plan_hashes)) {
+ stopifnot(digest::digest(file=path,algo='sha256')==frozen$receipt$plan_hashes[[path]])
+ plan<-jsonlite::fromJSON(gzfile(path),simplifyVector=FALSE)
+ allocation<-bind_rows(plan$allocations)
+ for(arm in c('MIX10','MIX15','MIX20')) {
+  selected<-bind_rows(plan$plans[[arm]]$tickets)
+  cap<-floor(sum(allocation$depth)*as.numeric(sub('MIX','',arm))/100+1e-10)*2
+  low<-if(nrow(selected))sum(selected$payout_hat<256)*2 else 0
+  usage[[length(usage)+1L]]<-tibble(issue=plan$issue,policy=arm,
+   cap_cny=cap,supplement_cny=low,main_cny=plan$plans[[arm]]$stake-low,
+   unfilled=low<cap)
+ }
+}
+usage<-bind_rows(usage)
+write_csv(usage,file.path(out,'supplement-usage.csv'))
+usage_summary<-usage |> group_by(policy) |> summarise(cap_cny=sum(cap_cny),
+ supplement_cny=sum(supplement_cny),main_cny=sum(main_cny),
+ unfilled_issues=sum(unfilled),.groups='drop') |>
+ mutate(fill_percent=100*supplement_cny/cap_cny)
+knitr::kable(usage_summary,digits=2)
+```
+
+## 结论
+
+**本轮不采用固定预留比例的混合方案。** 10%、15%、20%的ROI分别为4.89%、4.40%、5.76%，
+均低于统一256的6.51%与原JOINT的7.52%；最大回撤分别约5.06万、4.91万、4.62万元，
+也高于原JOINT的3.51万元。统一128的8.02%仍仅是暴露历史样本的诊断结果。
+
+相对统一256，三个方案分别救回4、4、5期，却丢失15、26、35期。
+节省投入3.75万、6.33万、9.17万元的同时，回款减少5.08万、8.09万、10.22万元。
+旧大回撤段的亏损均约2.71万—2.73万元，差于统一256的2.01万元。
+所以失败不只是“投得少，赚得少”，收益率与回撤也同步退化。
+
+固定组配额是本结论的边界：主力先按全局概率占用配额，补充只能进入已开组的剩余位置。
+低门槛额度仅用掉约46.4%、39.9%、34.9%，不是实际有10%、15%、20%的投入落在补充票。
+这是预留配额与可买组合不匹配的结果，不能把它推广为所有128–256元组合都无价值。
+但在当前明确测试的分配方式下，补充覆盖不足以弥补主力覆盖的损失，不建议替代原JOINT。
+
+全部比较为同一784期回顾诊断，不把此样本的最优方案当作未来盈利保证。

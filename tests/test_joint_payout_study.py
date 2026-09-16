@@ -15,7 +15,8 @@ from src.temporal_learning import Cutoff
 ROOT=Path(__file__).resolve().parents[1]
 
 
-def test_full_frozen_payout_roundtrip(tmp_path):
+@pytest.mark.parametrize('mixed', [False, True])
+def test_full_frozen_payout_roundtrip(tmp_path, mixed):
     e=json.loads(gzip.decompress((ROOT/'tests/fixtures/n7_sleeve_numerical.json.gz').read_bytes()))['enumeration']
     b=dict(issue=e['issue'],cutoffs=e['cutoffs'],historical_admission=False,seal='test',
            expanded_pool=dict(fixtures=e['fixtures']),sleeves=[dict(id=0,fixture_indices=list(range(7)),
@@ -25,6 +26,8 @@ def test_full_frozen_payout_roundtrip(tmp_path):
     groups=tmp_path/'groups.csv';groups.write_text(f"issue,policy,sleeve_id,depth\n{b['issue']},JOINT,0,64\n")
     cfg=json.loads((ROOT/'config/research/joint_payout_exposure_v1.json').read_text())
     cfg['payout_floor_grid_cny']=[0,256];cfg['coverage_worlds']=256
+    if mixed:cfg.update(supplement_shares=[.1,.15,.2],main_floor_cny=256,supplement_floor_cny=128)
+    expected_arms=9 if mixed else 6
     config=tmp_path/'config.json';config.write_text(json.dumps(cfg))
     out=tmp_path/'out'
     with pytest.raises(ValueError,match='source changed'):
@@ -45,7 +48,7 @@ def test_full_frozen_payout_roundtrip(tmp_path):
     assert not (out/'plans-frozen.json').exists()
     plan_path.write_bytes(saved)
     freeze=finalize_payout_freeze(out,ROOT,python,'/usr/local/bin/Rscript')
-    assert freeze['receipt']['independent_replays']==6
+    assert freeze['receipt']['independent_replays']==expected_arms
     native={k:Cutoff.decision_epoch(b['issue'],v) for k,v in b['cutoffs'].items()}
     got=replay_payout_selection(b,[dict(sleeve_id=0,depth=64)],native,0,1024,1024,2)
     assert len(got)==64
@@ -79,4 +82,4 @@ def test_full_frozen_payout_roundtrip(tmp_path):
     evaluate_payout_study(empty,ROOT,audit,hashlib.sha256(audit.read_bytes()).hexdigest())
     with (empty/'rows.csv').open() as h:
         zero=list(csv.DictReader(h))
-    assert len(zero)==6 and all(float(r['stake'])==0 and float(r['cash_cny'])==1024 for r in zero)
+    assert len(zero)==expected_arms and all(float(r['stake'])==0 and float(r['cash_cny'])==1024 for r in zero)

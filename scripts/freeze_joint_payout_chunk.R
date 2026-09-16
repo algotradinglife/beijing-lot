@@ -1,6 +1,6 @@
 # Thin worker: manifest, output, python, worker index, worker count, freeze/verify.
 args<-commandArgs(trailingOnly=TRUE);stopifnot(length(args)==6)
-for(f in c('n7_sleeve_tables','n7_joint_sleeves','joint_payout_exposure','joint_payout_study'))source(paste0('r/',f,'.R'))
+for(f in c('n7_sleeve_tables','n7_joint_sleeves','joint_payout_exposure','joint_payout_mix','joint_payout_study'))source(paste0('r/',f,'.R'))
 runtime<-jsonlite::fromJSON('config/n7_joint_runtime.json')
 stopifnot(as.character(getRversion())==runtime$R,
  all(vapply(names(runtime$r_packages),function(p)as.character(utils::packageVersion(p))==runtime$r_packages[[p]],logical(1))))
