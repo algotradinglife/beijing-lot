@@ -1,0 +1,160 @@
+---
+title: "JOINT：第305—399期回撤与后续震荡诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  report: null
+  report_sha256: null
+  settlement: null
+  settlement_sha256: null
+  fixtures: null
+  fixtures_sha256: null
+  output: null
+---
+
+这是已冻结策略的事后诊断，不拟合、不选新参数、不改变购票。BEFORE为1—305期，
+DRAWDOWN为306—399期，AFTER为400—784期。区间由已见曲线定位，不能作为未来防守信号。
+p为冻结校正市场概率，q为原始市场概率，均不是战力概率。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+for(f in c('diagnostic_verified_csv','strategy_diagnostic_probabilities','n7_fixture_price_diagnostic',
+ 'n7_return_attribution','n7_recent_structure','joint_phase_diagnostic'))source(file.path(params$project_root,'r',paste0(f,'.R')))
+stopifnot(digest::digest(file=file.path(params$report,'receipt.json'),algo='sha256')==params$report_sha256,
+ digest::digest(file=file.path(params$settlement,'receipt.json'),algo='sha256')==params$settlement_sha256,
+ digest::digest(file=params$fixtures,algo='sha256')==params$fixtures_sha256)
+rr<-jsonlite::fromJSON(file.path(params$report,'receipt.json'))
+ar<-jsonlite::fromJSON(file.path(params$settlement,'receipt.json'))
+rows<-diagnostic_read_verified_csv(file.path(params$report,'rows.csv'),rr$files[['rows.csv']],cols(issue='c'))
+groups<-diagnostic_read_verified_csv(file.path(params$report,'groups.csv'),rr$files[['groups.csv']],cols(issue='c',sleeve_id='c'))
+curves<-diagnostic_read_verified_csv(file.path(params$report,'curves.csv'),rr$files[['curves.csv']],cols(issue='c'))
+audit<-diagnostic_read_verified_csv(file.path(params$settlement,'fixture-audit.csv'),ar$files[['fixture-audit.csv']],cols(issue='c',provider_id='c'))
+ranks<-diagnostic_read_verified_csv(file.path(params$settlement,'ranks.csv'),ar$files[['ranks.csv']],cols(issue='c',sleeve_id='c',fixture_slots='c'))
+fixtures<-jsonlite::fromJSON(params$fixtures)$rows
+map<-curves |> filter(policy=='JOINT',evaluation=='ALL',accounting_basis=='FUNDED',period>0) |> select(issue,period,stage) |>
+ mutate(period=as.integer(period),stage=factor(stage,levels=c('BEFORE','DRAWDOWN','AFTER')))
+stopifnot(nrow(map)==784,sum(map$stage=='BEFORE')==305,sum(map$stage=='DRAWDOWN')==94,sum(map$stage=='AFTER')==385)
+z<-joint_phase_diagnostic(rows,groups,fixtures,audit,ranks,map,c('JOINT','DEPTH_OPEN','U4','CONFIDENCE'),1.3,256,2,.65,7)
+out<-params$output;dir.create(out,recursive=TRUE,showWarnings=FALSE)
+for(n in names(z))write_csv(z[[n]],file.path(out,paste0(n,'.csv')))
+knitr::kable(z$phases,digits=4)
+```
+
+## 主要结论
+
+**前面的回撤是组命中率与中奖回款双降；后面的震荡主要表现为中奖回款下降，命中率已恢复。**
+1—305期JOINT盈利68347.56元（ROI25.47%）；306—399期亏23852.02元（−28.48%）；
+400—784期盈利8693.14元（2.45%），不是持续亏损，但已远低于前段增长速度。
+
+- 已选组命中率26.48%→21.71%→26.42%，而平均模型覆盖均约25.1%。
+  同条件合格候选池也呈26.03%→21.38%→27.00%，不支持只因选组排序失误而回撤。
+- 每个中奖组平均回款760.06→525.53→550.79元。后段每组平均投入从160.41降至142.04元，
+  仍不足以抵消中奖回款下降；按已实现平均回款算，盈亏平衡组命中率从21.10%升到25.79%，
+  后段实际26.42%只略高于该水平。这个平衡点是事后会计诊断，不是赛前阈值。
+- 已选组中奖排名中位数273→338→218。回撤段更深，后段反而更浅；
+  不支持用“后段普遍买得不够深”解释震荡。
+- JOINT选中场次的校正Top2命中率76.50%→77.04%→76.87%，Brier0.6117→0.6139→0.6050。
+  回撤并没有伴随选中场次Top2崩坏；第三赛果每组平均发生数1.62→1.57→1.53，也没有突然增加。
+  这不能证明概率模型完全正确，但不支持把整段简单归为概率底座持续恶化或第三赛果黑天鹅增加。
+- 冻结输入中平均合格场次数67.9→77.9→102.5，不支持供给数量下降的解释。
+  这是冻结候选输入范围，不能当作全部赛程的市场数据覆盖率。
+- 后段每个中奖组按原市场估算的回款也由455.97降到385.22元，实际/估算回款比由1.667降至1.430。
+  两者共同伴随实际中奖回款下降，不能仅解释为北单SP整体下降；中奖组合构成也在变。
+
+四个策略均未避开回撤94期。区分度限制的绝对亏损较小（10540.96元），但ROI为−35.22%，
+比JOINT更差，不能把少投入带来的小亏损当成筛选质量提升。后段区分度限制ROI4.08%，
+JOINT2.45%，扩组后加深1.41%，U4为0.52%；投入差异和事后窗口仍限制策略优劣判断。
+本轮没有联赛/近期基本面字段或独立时期推断，不能认定具体联赛、市场机制或未来状态导致这些变化。
+
+## 资金路径及回撤窗口
+
+```{r}
+chart_data<-curves |> filter(evaluation=='ALL',accounting_basis=='FUNDED',policy %in% c('JOINT','DEPTH_OPEN','U4','CONFIDENCE'))
+p1<-ggplot(chart_data,aes(period,equity_cny,colour=policy))+geom_line(linewidth=.5)+
+ geom_vline(xintercept=c(305,399),linetype=2)+labs(x='Issue index',y='Capital (CNY)')+theme_minimal()+theme(legend.position='bottom')
+ggsave(file.path(out,'phase-equity.png'),p1,width=11,height=6,dpi=150);p1
+```
+
+## 命中与回款：组级分解
+
+期命中不同于组命中。重叠组不是独立样本；预测coverage为每组前缀覆盖概率。
+每个中奖组回款减少可以来自中奖构成变化或实际价格变化，需要下方价格桥接区分。
+
+```{r}
+knitr::kable(z$groups,digits=4)
+g<-z$groups |> filter(arm=='JOINT')
+p2<-g |> transmute(stage,`组实际命中率（%）`=100*hit_rate,`模型覆盖概率（%）`=100*model_hit,
+ `中奖组平均回款（元）`=gross_per_hit,`平均购票深度（注/组）`=avg_depth) |>
+ pivot_longer(-stage,names_to='metric',values_to='value') |>
+ ggplot(aes(stage,value,fill=stage))+geom_col()+facet_wrap(~metric,scales='free_y')+
+ scale_x_discrete(labels=c(BEFORE='前305期',DRAWDOWN='回撤94期',AFTER='后385期'))+
+ theme_minimal(base_family='Noto Sans CJK SC')+theme(legend.position='none')+labs(x=NULL,y=NULL)
+ggsave(file.path(out,'phase-hit-payout.png'),p2,width=10,height=6,dpi=150);p2
+```
+
+## 候选、场次供给与复用
+
+合格场次沿用估算SP至少1.3；候选组同时要求25%覆盖成本不超过256元。
+只计冻结候选输入内的可用场次，不将其视作全期全部场次或完整市场供给。
+不同策略实际投入不同，低回撤不能单独归因于筛选优质。复用集中度按场次持有次数计算，未按金额加权。
+
+```{r}
+knitr::kable(z$supply,digits=3)
+knitr::kable(z$candidates,digits=4)
+knitr::kable(z$exposure,digits=4)
+```
+
+## 中奖组合是否变深
+
+下面是JOINT已选组的真实中奖组合在概率排序中的位置；候选池、合格池另存完整CSV。
+CDF按期等权，空仓期不参与组的条件分布。多买若干票的缺口统计是事后参照，不是固定预算策略。
+
+```{r}
+knitr::kable(z$depths |> filter(pool=='SELECTED'),digits=3)
+p3<-z$depth_cdf |> filter(pool=='SELECTED') |> ggplot(aes(depth_limit,100*hit_fraction,colour=stage))+
+ geom_line()+geom_point()+scale_x_log10()+theme_minimal(base_family='Noto Sans CJK SC')+
+ scale_colour_discrete(labels=c('前305期','回撤94期','后385期'))+
+ labs(x='按概率排序购票深度（注，对数轴）',y='中奖组合落入前缀的比例（%，按期等权）',colour=NULL)
+ggsave(file.path(out,'phase-depth-cdf.png'),p3,width=10,height=6,dpi=150);p3
+knitr::kable(z$miss_gaps,digits=4)
+knitr::kable(z$top2_groups,digits=4)
+```
+
+## 概率底座与赛果
+
+同时查看全部可用场次和JOINT选中场次（去重）。Brier和log loss越低越好。
+完整让球数分层、校准格及其支持数写入CSV；没有联赛/基本面字段，不能据此归因为某联赛。
+
+```{r}
+knitr::kable(z$scores,digits=5)
+knitr::kable(z$events,digits=5)
+```
+
+## 估算、赛果实现与实际价格
+
+净收益=模型估算净收益+赛果实现差+实际价格差。模型估算使用原市场映射SP，实际价格使用北单结算SP；
+票级0.65已包含，不再乘。该恒等式是会计分解，不是因果解释。
+
+```{r}
+bridge<-z$groups |> filter(arm=='JOINT') |> select(stage,stake,model_net,outcome_residual,price_residual,net)
+knitr::kable(bridge,digits=2)
+pb<-bridge |> pivot_longer(c(model_net,outcome_residual,price_residual,net),names_to='component',values_to='amount') |>
+ mutate(per100=amount/stake*100) |> ggplot(aes(component,per100,fill=stage))+geom_col(position='dodge')+
+ theme_minimal()+labs(x=NULL,y='CNY per 100 CNY staked')+theme(legend.position='bottom')
+ggsave(file.path(out,'phase-return-bridge.png'),pb,width=11,height=6,dpi=150);pb
+files<-list.files(out,pattern='\\.(csv|png)$',full.names=TRUE);hashes<-list()
+for(f in files)hashes[[basename(f)]]<-digest::digest(file=f,algo='sha256')
+code<-list()
+for(f in c('diagnostic_verified_csv','strategy_diagnostic_probabilities','n7_fixture_price_diagnostic',
+ 'n7_return_attribution','n7_recent_structure','joint_phase_diagnostic'))
+ code[[paste0('r/',f,'.R')]]<-digest::digest(file=file.path(params$project_root,'r',paste0(f,'.R')),algo='sha256')
+code[['quarto/205_joint_phase_diagnostic.qmd']]<-digest::digest(file=file.path(params$project_root,'quarto/205_joint_phase_diagnostic.qmd'),algo='sha256')
+jsonlite::write_json(list(historical_admission=FALSE,parameters=params,files=hashes,code=code),file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
