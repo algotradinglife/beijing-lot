@@ -1,0 +1,86 @@
+---
+title: "Joint 与 Top2 思想：784期收敛结论"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  report: null
+  receipt_sha256: null
+---
+
+```{r}
+#| echo: false
+library(dplyr)
+library(readr)
+p <- params$report
+stopifnot(is.character(p), length(p)==1, nzchar(p),
+ digest::digest(file=file.path(p,'receipt.json'),algo='sha256')==params$receipt_sha256)
+r <- jsonlite::fromJSON(file.path(p,'receipt.json'))
+stopifnot(length(r$scope)==784)
+for(n in names(r$files)) stopifnot(digest::digest(file=file.path(p,n),algo='sha256')==r$files[[n]])
+s <- read_csv(file.path(p,'cohort_summary.csv'), show_col_types=FALSE)
+t <- read_csv(file.path(p,'trimmed.csv'),show_col_types=FALSE)
+```
+
+## 结论
+
+**保留原 JOINT 作为研究基准，不将本轮变种升级为默认方案。**
+784期来自冻结验收资料并集（原484期＋新增300期），并非未见测试集，也不代表全部已发行历史期。
+请求785期中，110915缺可用市场概率；140401第63场非整数让球排除记录保留于输入凭据。
+各方案固定概率、候选池和参数，每期预算1024元、2元票、初始本金10万元；回款在票级仅乘一次0.65。
+赛前估算SP与实际北单结算SP分开。下表是可支付账本，资金不足支付整期计划后永久停投。
+分队列分别从10万元起算，ALL连续且不补充本金；不模拟同时占款，金额为理论税前回款。
+
+```{r}
+#| echo: false
+knitr::kable(s |> filter(accounting_basis=='FUNDED',evaluation=='ALL') |>
+ select(policy,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny,max_drawdown_percent,funding_stop_issue),digits=2)
+```
+
+## 为什么不升级
+
+- 优先扩组后加深（DEPTH_OPEN）比JOINT多命中20期，但多投入55492元、净收益少2300.14元，ROI由7.52%降至6.67%。增加命中不等于提高资金效率。
+- U4降低复用，净收益37110.68元、ROI7.45%、最大回撤26519.73元；投入比JOINT少208634元。可作为低暴露参照，不能据此声称相同实际投入下更优。
+- 按概率区分度限制复用（CONFIDENCE）最大回撤16214.10元，但仅投入253420元。新增300期盈利3743.74元，支持继续保留诊断证据，尚不足以证明普遍优势。
+- HEAD15要求Top64累计概率至少15%，合计比JOINT多350.59元、多命中1期；差异太小，不支持强升级结论。
+- 刚性Top2（HARD）、深度竞争（DEPTH_COMPETE）和GAP_COMPETE出现本金不足停投。本轮HARD只在原候选组中剔除第三赛果，不代表以往所有Top2选场、选胆策略。
+- 曲线相似性筛选未建立优于JOINT的证据。CORE3/CORE4及组合结构筛选支持不足；本轮没有重新生成角色均衡的候选池，不能认定“核心／中间／机会”的思路无效。
+
+## 原期与新增期
+
+新增300期JOINT净收益−153.64元，接近持平；原484期盈利不能外推为稳定增长。
+
+```{r}
+#| echo: false
+knitr::kable(s |> filter(accounting_basis=='FUNDED',evaluation!='ALL',
+ policy %in% c('JOINT','DEPTH_OPEN','U4','CONFIDENCE','HEAD15')) |>
+ select(evaluation,policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny),digits=2)
+```
+
+## 资金与回撤
+
+```{r}
+#| echo: false
+knitr::include_graphics(file.path(p,c('key-equity.png','key-drawdown.png')))
+```
+
+## 大盈利期依赖与组分布
+
+剔除各方案自身盈利最高5期，并同时移除对应投入及回款后，JOINT仅剩6445.59元，ROI0.92%；
+加深版本剩4401.46元、ROI0.58%；CONFIDENCE转为−963.71元。
+这是已冻结账本的尾部贡献诊断，不重新推演删除盈利后的停投路径。
+不能把平滑曲线当作稳定盈利证明，也不能把组概率曲线相似当作组间独立。
+
+```{r}
+#| echo: false
+knitr::kable(t |> filter(accounting_basis=='FUNDED',removed==5),digits=2)
+knitr::include_graphics(file.path(p,'shapes.png'))
+```
+
+完整21方案、两种资金口径、集中暴露和候选角色支持见计算报告202及其绑定CSV。
+原始计划持续执行的SHADOW账本允许负资金，仅供诊断，不代表10万元能实际执行。
+本结论不引入新参数、重训或未来下注决策接口。
