@@ -1,0 +1,12 @@
+source(file.path('..','..','r','joint_rotation_components.R'))
+test_that('new second copies are separated and bridge reconciles', {
+ x<-tibble::tibble(issue='1',policy='p',ticket_id=letters[1:4],base_copies=c(0L,1L,1L,0L),copies=c(2L,2L,0L,1L),gross=c(20,30,10,0))
+ z<-joint_rotation_components(x,2)
+ expect_equal(z$net_change[z$component=='NEW'],16)
+ expect_equal(z$net_change[z$component=='MULTIPLIED'],46)
+ expect_equal(z$net_change[z$component=='REMOVED'],-8)
+ expect_equal(sum(z$net_change),sum((x$copies-x$base_copies)*(x$gross-2)))
+ expect_equal(nrow(joint_rotation_components(x[FALSE,],2)),0)
+ expect_error(joint_rotation_components(dplyr::bind_rows(x,x[1,]),2))
+ x$copies[1]<-3L;expect_error(joint_rotation_components(x,2))
+})

@@ -1,0 +1,187 @@
+---
+title: "JOINT网格轮动：资金转移是否值得"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  study: null
+  receipt_sha256: null
+  multiplier_report: null
+  multiplier_sha256: null
+  figures: null
+  python: null
+  original_report: null
+  original_sha256: null
+  audit: null
+---
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+check<-system2(params$python,c(shQuote(file.path(params$project_root,'scripts/check_persistent_data_layout.py')),'--contract',shQuote(file.path(params$project_root,'config/persistent_data_layout.json'))),stdout=TRUE)
+stopifnot(is.null(attr(check,'status')),!dir.exists(params$figures));dir.create(params$figures,recursive=TRUE)
+source(file.path(params$project_root,'r/diagnostic_verified_csv.R'))
+source(file.path(params$project_root,'r/fundamentals_equity_curves.R'))
+source(file.path(params$project_root,'r/joint_tail_risk.R'))
+source(file.path(params$project_root,'r/joint_rotation_components.R'))
+source(file.path(params$project_root,'r/joint_rotation_read_plan.R'))
+source(file.path(params$project_root,'r/joint_rotation_report_receipt.R'))
+report_files<-c('quarto/217_joint_grid_rotation_report.qmd','r/joint_rotation_report_receipt.R','r/joint_rotation_read_plan.R','r/joint_rotation_components.R','r/joint_tail_risk.R','r/fundamentals_equity_curves.R','r/diagnostic_verified_csv.R','src/joint_grid_rotation_inputs.py','src/strategy_diagnostic_inputs.py')
+report_code<-setNames(as.list(vapply(file.path(params$project_root,report_files),digest::digest,character(1),file=TRUE,algo='sha256')),report_files)
+raw<-readBin(file.path(params$study,'analysis-receipt.json'),'raw',n=file.info(file.path(params$study,'analysis-receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+receipt<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE);stopifnot(receipt$status=='ANALYSIS_COMPLETE')
+tables<-list()
+for(name in c('summary','rows','curves','bridge','concentration','verified-allocation-diagnostics'))
+ tables[[name]]<-diagnostic_read_verified_csv(file.path(params$study,paste0(name,'.csv')),receipt$files[[paste0(name,'.csv')]],if(name %in% c('rows','curves','bridge','verified-allocation-diagnostics'))cols(issue='c') else cols())
+raw<-readBin(file.path(params$multiplier_report,'receipt.json'),'raw',n=file.info(file.path(params$multiplier_report,'receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$multiplier_sha256)
+mr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE);stopifnot(mr$status=='PASS')
+old<-diagnostic_read_verified_csv(file.path(params$multiplier_report,'rows.csv'),mr$files[['rows.csv']],cols(issue='c'))
+base_check<-tables$rows |> filter(policy=='BASE') |> inner_join(old |> filter(policy=='long_cash_only'),by='issue',suffix=c('_new','_old'),relationship='one-to-one')
+stopifnot(nrow(base_check)==784,setequal(tables$rows$issue,old$issue),all(base_check$stake_new==base_check$stake_old),all(abs(base_check$gross_new-base_check$gross_old)<1e-6))
+tables$rows<-bind_rows(tables$rows,old |> filter(policy=='BLEND_ADD'))
+issue_order<-tables$rows |> distinct(issue,period) |> arrange(period) |> pull(issue)
+tables$curves<-strategy_equity_curves(tables$rows |> select(-period),issue_order,100000)
+stopifnot(!any(tables$curves$stopped))
+tables$summary<-joint_tail_windows(tables$rows,tibble(window='ALL',start=1L,end=784L))
+profit_counts<-tables$rows |> group_by(policy) |> summarise(profitable_issues=sum(net>0),.groups='drop')
+s<-tables$summary |> filter(window=='ALL') |> left_join(profit_counts,by='policy',relationship='one-to-one');base<-s |> filter(policy=='BASE')
+write_csv(s,file.path(params$figures,'comparison-summary.csv'))
+raw<-readBin(file.path(params$original_report,'receipt.json'),'raw',n=file.info(file.path(params$original_report,'receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$original_sha256)
+original<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+original_ids<-diagnostic_read_verified_csv(file.path(params$original_report,'frozen-plans.csv'),original$files[['frozen-plans.csv']],cols(issue='c',ticket_id='c')) |>
+ filter(policy=='long_cash_only') |> distinct(issue,ticket_id) |> mutate(was_original=TRUE)
+raw<-readBin(file.path(params$study,'plans-receipt.json'),'raw',n=file.info(file.path(params$study,'plans-receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==receipt$plan_receipt_sha256)
+pr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+audit<-diagnostic_read_verified_csv(params$audit,pr$audit_sha256,cols(issue='c',provider_id='c'))
+reticulate::use_python(params$python,required=TRUE)
+projection<-reticulate::import('src.joint_grid_rotation_inputs',convert=TRUE)
+jobs<-setNames(pr$source_bundles,vapply(pr$source_bundles,`[[`,character(1),'issue'))
+novelty<-components<-list()
+for(id in names(pr$plan_hashes)) {
+ all_tickets<-joint_rotation_read_plan(file.path(params$study,'plans',paste0(id,'.csv')),pr$plan_hashes[[id]])
+ z<-all_tickets |> filter(policy %in% c('EXPAND','ROTATE'),copies>0,base_copies==0) |>
+ left_join(original_ids |> filter(issue==id),by=c('issue','ticket_id'),relationship='many-to-one') |>
+ mutate(origin=if_else(is.na(was_original),'UNSEEN_ORIGINAL','RESTORED_ORIGINAL')) |>
+ group_by(policy,origin) |> summarise(unique_combinations=n(),physical_tickets=sum(copies),.groups='drop')
+ novelty[[id]]<-z
+ b<-jsonlite::fromJSON(projection$read_rotation_members_json(jobs[[id]]$path,jobs[[id]]$sha256),simplifyVector=FALSE)
+ stopifnot(b$issue==id)
+ g_labels<-list();ia<-audit |> filter(issue==id)
+ for(g in b$sleeves) {
+  if(!g$id %in% all_tickets$sleeve_id)next
+  fx<-bind_rows(b$fixtures[as.integer(unlist(g$fixture_indices))+1L])
+  a<-fx |> select(slot,provider_id,handicap) |> left_join(ia,by=c('slot','provider_id','handicap'),relationship='one-to-one')
+  stopifnot(nrow(a)==7,!anyNA(a$actual_direction),!anyNA(a$spf_sp))
+  g_labels[[as.character(g$id)]]<-tibble(sleeve_id=g$id,
+   actual=sum((match(a$actual_direction,c('W','D','L'))-1L)*3^(6:0))+1L,winning_gross=2*.65*prod(a$spf_sp))
+ }
+ gl<-if(length(g_labels))bind_rows(g_labels) else tibble(sleeve_id=integer(),actual=integer(),winning_gross=double())
+ ledger<-all_tickets |> filter(policy!='BASE') |> left_join(gl,by='sleeve_id',relationship='many-to-one') |>
+  mutate(gross=if_else(ticket_col_idx==actual,winning_gross,0))
+ components[[id]]<-joint_rotation_components(ledger,2)
+}
+novelty<-bind_rows(novelty) |> group_by(policy,origin) |> summarise(across(c(unique_combinations,physical_tickets),sum),.groups='drop')
+write_csv(novelty,file.path(params$figures,'novelty.csv'))
+refined<-bind_rows(components)
+check<-refined |> group_by(issue,policy) |> summarise(new=sum(net_change),.groups='drop') |>
+ full_join(tables$bridge |> group_by(issue,policy) |> summarise(old=sum(net_change),.groups='drop'),by=c('issue','policy'),relationship='one-to-one')
+stopifnot(!anyNA(check),all(abs(check$new-check$old)<1e-6))
+write_csv(refined,file.path(params$figures,'refined-bridge.csv'))
+actions<-refined |> group_by(policy,component) |>
+ summarise(across(c(stake_change,gross_change,net_change),sum),.groups='drop')
+```
+
+本轮固定784期，预算每期1024元、每票2元、本金10万元。ROI分母为实际投入，回款已含一次0.65。
+使用完整冻结候选组，保持35格、概率底座和历史信号不变。历史已被观察，结果为研究证据。
+
+- **BASE**：原累计筛弱留现金方案。
+- **BLEND_ADD**：上一轮只在好格原票上加倍、不增加覆盖。
+- **EXPAND**：原票不减，用余款优先买好格的新组合。
+- **ROTATE**：差格减半，资金优先转向好格的新组合。
+- **PROB对照**：保持对应方案的删票动作和目标投入，将新增目的地放宽到所有合格格子，按概率排序。
+
+优先不同组，再增加组内不同赛果，最后才加倍。新组最多与现有组重叠5场；新增每份票受每场512元
+或原暴露较大值的上限约束。新增票估算回款至少128元。没有合适票则留现金。
+
+```{r}
+knitr::kable(s |> transmute(方案=policy,投入=stake,净收益=net,ROI百分比=100*roi,命中期数=hit_issues,盈利期数=profitable_issues,最大回撤=local_drawdown),digits=2)
+```
+
+相比BASE：EXPAND净收益变化为 **`r round(s$net[s$policy=='EXPAND']-base$net)`元**，
+命中期数变化 **`r s$hit_issues[s$policy=='EXPAND']-base$hit_issues`期**；
+ROTATE净收益变化为 **`r round(s$net[s$policy=='ROTATE']-base$net)`元**，
+命中期数变化 **`r s$hit_issues[s$policy=='ROTATE']-base$hit_issues`期**。
+是否值得采用，需要同时看ROI、回撤和同投入目的地对照，不能只看新增命中。
+
+本轮结论：不将这套网格轮动替换为默认方案。扩覆盖确实增加命中期数，但相对BASE增加约9.29万元投入，
+净收益仅增加约777元，边际净ROI约0.84%，且最大回撤增加约5717元。减仓再转投的全期净收益下降，回撤显著放大。
+因此“增加命中期数”在本轮并未转化为更好的资金使用效率。扩覆盖增加的777元净收益，剔除贡献最大的3期增量后变为负13485元，改善也缺乏分散性。网格选新增票优于对应的纯概率目的地对照，
+也不足以证明值得动用这些资金。结论限于这组固定规则和已观察历史，不推广为所有资金轮动均无效。
+
+
+```{r, fig.width=12, fig.height=8}
+p<-tables$curves |> select(policy,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+theme(legend.position='bottom')+labs(title='Full frozen history: capital and drawdown',x='Issue index',colour=NULL)
+ggsave(file.path(params$figures,'full-curves.png'),p,width=12,height=8,dpi=150);p
+```
+
+新增、删票、倍投三部分单列。NEW仅包含相对BASE新增组合的首份；MULTIPLIED包含旧票和新票的所有第二份。其中RESTORED_ORIGINAL是恢复原JOINT曾买过的票，UNSEEN_ORIGINAL才是原JOINT未购买的票；下表另列两类数量。REMOVED一行表示相对于BASE的资金变化：负回款是放弃的中奖回款；
+净收益变化为正才说明删除整体有利。
+
+```{r}
+matched<-tables[['verified-allocation-diagnostics']] |> filter(target_stake==comparator_stake) |> select(issue,policy)
+paired<-matched |> left_join(tables$rows |> select(issue,policy,stake,net),by=c('issue','policy'),relationship='one-to-one') |>
+ mutate(comparator=paste0(policy,'_PROB')) |> left_join(tables$rows |> select(issue,comparator=policy,prob_net=net),by=c('issue','comparator'),relationship='one-to-one') |>
+ group_by(policy) |> summarise(matched_issues=n(),stake=sum(stake),grid_net=sum(net),prob_net=sum(prob_net),difference=grid_net-prob_net,.groups='drop')
+knitr::kable(paired,digits=2)
+knitr::kable(actions,digits=2)
+knitr::kable(novelty)
+knitr::kable(tables$concentration,digits=2)
+knitr::kable(tables[['verified-allocation-diagnostics']] |> group_by(policy) |>
+ summarise(新增组合=sum(new_combinations),新增组=sum(new_groups),额外份数=sum(extra_copies),删除票=sum(removed),
+ 投入不匹配期数=sum(target_stake!=comparator_stake),对照少投金额=sum(target_stake-comparator_stake),.groups='drop'))
+```
+
+```{r, fig.width=11, fig.height=7}
+p2<-actions |> ggplot(aes(component,net_change,fill=policy))+geom_col(position='dodge')+
+ geom_hline(yintercept=0)+theme_minimal()+labs(title='Incremental profit: new combinations, removed tickets, extra copies',x=NULL,y='CNY')
+ggsave(file.path(params$figures,'attribution.png'),p2,width=11,height=7,dpi=150);p2
+```
+
+700期后的曲线使用该窗口起点重新计算收益和回撤，窗口只用于事后诊断。
+
+```{r, fig.width=12, fig.height=8}
+tail<-tables$rows |> filter(period>=700) |> arrange(policy,period) |> group_by(policy) |>
+ mutate(relative_net=cumsum(net),local_drawdown=cummax(c(0,relative_net))[-1]-relative_net) |> ungroup()
+p3<-tail |> select(policy,period,relative_net,local_drawdown) |>
+ pivot_longer(c(relative_net,local_drawdown),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+theme(legend.position='bottom')+labs(title='Issues 700 onward: net and local drawdown',x='Issue index',colour=NULL)
+ggsave(file.path(params$figures,'tail-curves.png'),p3,width=12,height=8,dpi=150);p3
+```
+
+格子信号来自原购买集合；推广到未买组合属于此次要检验的外推。
+模型依旧采用历史可用性时间代理，本轮不能作为真实赛前可执行性认证。
+
+复现顺序为：使用显式参数运行216冻结入口，再运行218结算入口，其中调用
+`joint_rotation_receipt(out, repository_root, audit_path, generated_at, evaluation_code)`封存数值输出，再向本报告传入该凭据的SHA-256。
+最终验收另包含函数测试、独立重放、干净渲染和Codex review；ANALYSIS_COMPLETE本身不等于审核通过。
+
+```{r}
+report_inputs<-list(analysis=list(path=file.path(params$study,'analysis-receipt.json'),sha256=params$receipt_sha256),
+ multiplier=list(path=file.path(params$multiplier_report,'receipt.json'),sha256=params$multiplier_sha256),
+ original=list(path=file.path(params$original_report,'receipt.json'),sha256=params$original_sha256),
+ audit=list(path=params$audit,sha256=pr$audit_sha256))
+joint_rotation_report_receipt(params$figures,params$project_root,report_inputs,report_code,format(Sys.time(),'%Y-%m-%dT%H:%M:%SZ',tz='UTC'))
+```

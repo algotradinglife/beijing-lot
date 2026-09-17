@@ -1,0 +1,111 @@
+---
+title: "JOINT网格轮动：冻结票据结算与对账"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  study: null
+  freeze_sha256: null
+  parent: null
+  parent_sha256: null
+  audit: null
+  python: null
+---
+
+只结算显式封存的票据，不重新选择或修改票据。每份票单独包含一次0.65，倍投按独立份数对账。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+for(name in c('diagnostic_verified_csv','joint_rotation_read_plan','joint_rotation_receipt','joint_rotation_diagnostics','joint_tail_risk','fundamentals_equity_curves'))source(file.path(params$project_root,'r',paste0(name,'.R')))
+out<-params$study
+stopifnot(!file.exists(file.path(out,'rows.csv')))
+check<-system2(params$python,c(shQuote(file.path(params$project_root,'scripts/check_persistent_data_layout.py')),'--contract',shQuote(file.path(params$project_root,'config/persistent_data_layout.json'))),stdout=TRUE)
+stopifnot(is.null(attr(check,'status')))
+raw<-readBin(file.path(out,'plans-receipt.json'),'raw',n=file.info(file.path(out,'plans-receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$freeze_sha256)
+pr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+stopifnot(identical(pr$historical_admission,FALSE),pr$original_receipt==params$parent_sha256)
+audit_sha256<-pr$audit_sha256
+raw<-readBin(file.path(params$parent,'receipt.json'),'raw',n=file.info(file.path(params$parent,'receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$parent_sha256)
+parent<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+reticulate::use_python(params$python,required=TRUE)
+projection<-reticulate::import('src.joint_grid_rotation_inputs',convert=TRUE)
+provenance<-reticulate::import('src.temporal_learning.provenance',convert=TRUE)
+pyroot<-reticulate::import('pathlib',convert=FALSE)$Path(params$project_root)
+provenance$verify_implementation_closure(pyroot,pr$implementation)
+manifest<-list(jobs=pr$source_bundles);plan_hashes<-pr$plan_hashes
+order<-sort(names(plan_hashes));map<-tibble(issue=order,period=seq_along(order))
+verified_diagnostics<-list()
+files<-c('quarto/218_joint_grid_rotation_settle.qmd','r/joint_rotation_read_plan.R','r/joint_rotation_receipt.R','r/joint_rotation_diagnostics.R','r/joint_rotation_settle_issue.R','src/joint_grid_rotation_inputs.py')
+evaluation_code<-setNames(as.list(vapply(file.path(params$project_root,files),digest::digest,character(1),file=TRUE,algo='sha256')),files)
+```
+
+```{r}
+# Only now open target labels, after all new plans have been sealed.
+audit<-diagnostic_read_verified_csv(params$audit,audit_sha256,cols(issue='c',provider_id='c'))
+accounting<-list(budget=1024,unit=2,payout_factor=.65)
+cluster<-parallel::makePSOCKcluster(4L)
+parallel::clusterExport(cluster,c('params','out','plan_hashes','audit','accounting'),envir=environment())
+parallel::clusterEvalQ(cluster,{
+ library(dplyr);library(tidyr);library(readr)
+ for(name in c('diagnostic_verified_csv','joint_rotation_read_plan','joint_rotation_diagnostics','joint_rotation_settle_issue'))source(file.path(params$project_root,'r',paste0(name,'.R')))
+ reticulate::use_python(params$python,required=TRUE)
+ projection<-reticulate::import('src.joint_grid_rotation_inputs',convert=TRUE)
+ NULL
+})
+settled_issues<-tryCatch(parallel::parLapplyLB(cluster,manifest$jobs,function(job) {
+ id<-job$issue
+ z<-joint_rotation_read_plan(file.path(out,'plans',paste0(id,'.csv')),plan_hashes[[id]])
+ b<-jsonlite::fromJSON(projection$read_rotation_members_json(job$path,job$sha256),simplifyVector=FALSE)
+ stopifnot(b$issue==id)
+ joint_rotation_settle_issue(z,b,audit |> filter(issue==id),accounting,params$python)
+}),finally=parallel::stopCluster(cluster))
+rows<-lapply(settled_issues,`[[`,'rows');bridge<-lapply(settled_issues,`[[`,'bridge')
+d<-bind_rows(lapply(settled_issues,`[[`,'diagnostics'));write_csv(d,file.path(out,'verified-allocation-diagnostics.csv'))
+rows<-bind_rows(rows) |> mutate(budget_cny=1024,cash_cny=1024-stake,status=if_else(stake>0,'COMPLETE','NO_BET'),model='frozen-market') |>
+ left_join(map,by='issue',relationship='many-to-one')
+dc<-d |> left_join(rows |> select(issue,policy,stake),by=c('issue','policy'),relationship='one-to-one') |>
+ mutate(comparator=paste0(policy,'_PROB')) |> left_join(rows |> select(issue,comparator=policy,prob_stake=stake),by=c('issue','comparator'),relationship='one-to-one')
+stopifnot(all(dc$target_stake==dc$stake),all(dc$comparator_stake==dc$prob_stake))
+old<-diagnostic_read_verified_csv(file.path(params$parent,'rows.csv'),parent$files[['rows.csv']],cols(issue='c')) |> filter(policy=='long_cash_only')
+check<-rows |> filter(policy=='BASE') |> left_join(old,by='issue',suffix=c('_new','_old'),relationship='one-to-one')
+stopifnot(all(check$stake_new==check$stake_old),all(abs(check$gross_new-check$gross_old)<1e-6),all(check$hits_new==check$hits_old))
+bridge<-bind_rows(bridge)
+check<-bridge |> group_by(issue,policy) |> summarise(delta=sum(net_change),.groups='drop') |>
+ left_join(rows |> select(issue,policy,net),by=c('issue','policy'),relationship='one-to-one') |>
+ left_join(rows |> filter(policy=='BASE') |> select(issue,base_net=net),by='issue',relationship='many-to-one')
+stopifnot(all(abs(check$delta-(check$net-check$base_net))<1e-6))
+curves<-strategy_equity_curves(rows |> select(-period),order,100000)
+windows<-tribble(~window,~start,~end,'ALL',1L,784L,'PRE700',1L,699L,'TAIL700',700L,784L,'CLIFF671',671L,685L)
+summary<-joint_tail_windows(rows,windows)
+concentration<-rows |> filter(policy!='BASE') |> left_join(rows |> filter(policy=='BASE') |> select(issue,base_net=net),by='issue') |>
+ mutate(delta=net-base_net) |> group_by(policy) |> arrange(desc(delta),.by_group=TRUE) |>
+ summarise(net_gain=sum(delta),without_top3=sum(delta)-sum(head(pmax(delta,0),3)),.groups='drop')
+for(name in c('rows','curves','summary','bridge','concentration'))write_csv(get(name),file.path(out,paste0(name,'.csv')))
+knitr::kable(summary,digits=3)
+knitr::kable(bridge |> group_by(policy,component) |> summarise(across(c(stake_change,gross_change,net_change),sum),.groups='drop'),digits=2)
+knitr::kable(d |> group_by(policy) |> summarise(across(c(new_combinations,new_groups,extra_copies,removed),sum),spend_mismatch=sum(target_stake!=comparator_stake),.groups='drop'))
+knitr::kable(concentration,digits=2)
+```
+
+```{r, fig.width=12, fig.height=8}
+plot<-curves |> select(policy,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+theme(legend.position='bottom')+labs(title='Grid rotation: new combinations before multipliers',x='Issue index',colour=NULL)
+ggsave(file.path(out,'full-curves.png'),plot,width=12,height=8,dpi=150);plot
+```
+
+新的格子信号应用于未购买组合，存在支持分布外推，必须由新增票的实际表现单独检验。
+这是完整候选池上的固定规则研究，非前瞻验收；不能根据事后回撤窗口择时启停。
+
+```{r}
+joint_rotation_receipt(out,params$project_root,params$audit,format(Sys.time(),'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),evaluation_code)
+```

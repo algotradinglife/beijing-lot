@@ -1,0 +1,11 @@
+source(file.path('..','..','r','joint_rotation_report_receipt.R'))
+test_that('report receipt seals refined attribution and detects implementation drift', {
+ out<-tempfile();dir.create(out);root<-tempfile();dir.create(root);source<-file.path(root,'code.R');writeLines('code',source)
+ input<-tempfile();writeLines('input',input);inputs<-list(list(path=input,sha256=digest::digest(file=input,algo='sha256')))
+ code<-list('code.R'=digest::digest(file=source,algo='sha256'))
+ for(n in c('refined-bridge.csv','comparison-summary.csv','novelty.csv','full-curves.png','attribution.png','tail-curves.png'))writeLines('result',file.path(out,n))
+ bad<-code;bad[[1]]<-paste(rep('0',64),collapse='');expect_error(joint_rotation_report_receipt(out,root,inputs,bad,'now'))
+ p<-joint_rotation_report_receipt(out,root,inputs,code,'now');r<-jsonlite::fromJSON(p)
+ expect_equal(r$files[['refined-bridge.csv']],digest::digest(file=file.path(out,'refined-bridge.csv'),algo='sha256'))
+ expect_equal(r$status,'REPORT_COMPLETE');expect_error(joint_rotation_report_receipt(out,root,inputs,code,'now'))
+})

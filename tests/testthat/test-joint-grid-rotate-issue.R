@@ -1,0 +1,23 @@
+source(file.path('..','..','r','joint_win_scale.R'))
+source(file.path('..','..','r','joint_grid_rotate.R'))
+source(file.path('..','..','r','joint_grid_rotate_issue.R'))
+source(file.path('..','..','r','n7_sleeve_tables.R'))
+test_that('full frozen issue builder replays and handles zero-sleeve scope', {
+ library(dplyr);library(tidyr)
+ python<-Sys.getenv('RETICULATE_PYTHON');expect_true(file.exists(python));reticulate::use_python(python,required=TRUE)
+ root<-normalizePath('../..');reticulate::import('sys',convert=FALSE)$path$insert(0L,root)
+ e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
+ b<-list(issue=e$issue,cutoffs=e$cutoffs,historical_admission=FALSE,seal='test',expanded_pool=list(fixtures=e$fixtures),
+ sleeves=list(list(id=0L,fixture_indices=as.list(0:6),origin='QUALITY',enumeration=e,options=list())))
+ ts<-min(unlist(e$cutoffs));native<-reticulate::import('src.temporal_learning.core',convert=FALSE)$Cutoff$decision_epoch(b$issue,ts)
+ cut<-list(cutoff_kind='DECISION_EPOCH',cutoff_identity=reticulate::py_to_r(native$identity),cutoff_ts=ts,target_issue=b$issue,historical_admission=FALSE,model_receipt_sha256='m')
+ base<-tibble(issue=b$issue,ticket_id='0:1',base_copies=1L)
+ signals<-tibble(issue=character(),cell=character(),return_ratio=double(),long_return_ratio=double(),supported=logical(),long_hit_signal=character(),cutoff_identity=character())
+ settings<-list(n=7,unit=2,budget=8,payout_floor=128,fixture_cap=4,max_overlap=5,cut_fraction=.5,bad=.8,good=1.2,model_id='test',p_breaks=c(0,.001,.002,.003,.005,.01,.02,1),r_breaks=c(0,128,256,512,1024,Inf))
+ z<-joint_grid_rotate_issue(b,base,signals,cut,'m',settings,python)
+ expect_equal(nrow(z$plans),5);expect_true(all(z$plans$copies==1L));expect_equal(nrow(z$diagnostics),2)
+ expect_error(joint_grid_rotate_issue(b,base,signals,modifyList(cut,list(target_issue='wrong')),'m',settings,python))
+ b$sleeves<-list()
+ empty<-joint_grid_rotate_issue(b,base[FALSE,],signals,cut,'m',settings,python)
+ expect_equal(nrow(empty$plans),0);expect_equal(empty$diagnostics$candidates,c(0,0))
+})
