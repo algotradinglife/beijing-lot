@@ -1,0 +1,125 @@
+---
+title: "JOINT 新增50期：冻结、逐期结算与六方案整合"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+复用原冻结概率底座与JOINT选组，延伸BASE及五种加仓方案。每期先冻结全部方案，再读取该期标签。
+格子历史通过共享截止时间接口准入；末场时间加48小时仅为历史诊断代理，不构成前瞻证据。
+旧784期金额原样保留；新增期继续使用相同参数。北单SP只用于结算，票级0.65仅应用一次。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(jsonlite)
+cfg<-jsonlite::fromJSON(params$config,simplifyVector=FALSE);root<-cfg$repository_root
+for(f in c('n7_probability_replay','n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','joint_extension_original','joint_grid_monitor','joint_win_scale','joint_selective_add','nowscore_query','python_bridge','fundamentals_returns','n7_rank_diagnostic'))source(file.path(root,'r',paste0(f,'.R')))
+reticulate::use_python(cfg$python,required=TRUE)
+reader<-reticulate::import('src.strategy_diagnostic_inputs',convert=TRUE)
+risk<-reticulate::import('src.n7_risk_context',convert=TRUE)
+strat<-reticulate::import('src.temporal_learning.stratified',convert=TRUE)
+labelreader<-reticulate::import('src.n7_extension_labels',convert=TRUE)
+stopifnot(!dir.exists(cfg$output));dir.create(cfg$output,recursive=TRUE)
+for(p in names(cfg$source_hashes))stopifnot(digest::digest(file=p,algo='sha256')==cfg$source_hashes[[p]])
+codepaths<-c(list.files(file.path(root,'r'),pattern='^(n7_|joint_|fundamentals_returns|nowscore_query|python_bridge).*\\.R$',full.names=TRUE),file.path(root,'quarto/222_joint_new50_replay.qmd'),file.path(root,'src/n7_extension_labels.py'))
+code<-as.list(setNames(vapply(codepaths,digest::digest,character(1),file=TRUE,algo='sha256'),codepaths))
+inputs<-jsonlite::fromJSON(file.path(cfg$study,'inputs/input-receipt.json'),simplifyVector=FALSE)
+h<-read_csv(file.path(cfg$parent,'grid-history.csv'),col_types=cols(issue_code='c'))
+fr<-jsonlite::fromJSON(cfg$old_freeze,simplifyVector=FALSE)
+clocks<-list()
+for(p in names(fr$receipt$plan_hashes)) {
+ b<-jsonlite::fromJSON(reader$read_verified_bundle_json(p,fr$receipt$plan_hashes[[p]]),simplifyVector=FALSE)
+ clocks[[b$issue]]<-tibble(issue_code=b$issue,last_fixture_cutoff=max(unlist(b$cutoffs)))
+}
+clocks<-bind_rows(clocks)
+stopifnot(nrow(clocks)==784,!anyDuplicated(clocks$issue_code),all(h$issue_code %in% clocks$issue_code))
+jobs<-bind_rows(lapply(cfg$catalogs,function(p)as_tibble(jsonlite::fromJSON(p)$issues)))
+stopifnot(nrow(jobs)==50,!anyDuplicated(jobs$issue),!any(jobs$issue %in% clocks$issue_code))
+settings<-cfg$original_settings;addsettings<-cfg$add_settings
+originals<-list();bundles<-list();epochs<-list()
+for(i in seq_len(nrow(jobs))) {
+ j<-jobs[i,];b<-jsonlite::fromJSON(reader$read_verified_bundle_json(j$path,j$sha256),simplifyVector=FALSE)
+ o<-joint_extension_original(b,b$cutoffs,settings,cfg$python)
+ o$tickets<-o$tickets |> mutate(cell=paste(cut(prob,c(0,.001,.002,.003,.005,.01,.02,1),right=FALSE,include.lowest=TRUE),cut(payout_hat,c(0,128,256,512,1024,Inf),right=FALSE),sep=' | '))
+ originals[[b$issue]]<-o;bundles[[b$issue]]<-b
+ epochs[[b$issue]]<-tibble(issue=b$issue,epoch=min(unlist(b$cutoffs)))
+ message('Original JOINT frozen input ',i,'/50 ',b$issue)
+}
+order<-bind_rows(epochs) |> arrange(epoch,issue) |> pull(issue)
+rows<-ranks<-audits<-ticketlabels<-allocations<-forecasts<-list();planhashes<-list();historyhashes<-cfg$source_hashes
+initial_db_hash<-digest::digest(file=cfg$db_path,algo='sha256')
+```
+
+```{r}
+for(id in order) {
+ b<-bundles[[id]];o<-originals[[id]];t<-o$tickets
+ residual<-h |> group_by(issue_code) |> summarise(hit_residual=sum(hits-expected)/sum(stake/2),.groups='drop')
+ history<-clocks |> left_join(residual,by='issue_code',relationship='one-to-one') |> mutate(hit_residual=replace_na(hit_residual,0),depth_residual=hit_residual)
+ target<-tibble(issue_code=id,fixture_decision_ts=min(unlist(b$cutoffs)))
+ rawct<-risk$n7_risk_contexts_json(toJSON(history,dataframe='rows',auto_unbox=TRUE),toJSON(target,dataframe='rows',auto_unbox=TRUE),repository_root=root,source_hashes_json=toJSON(c(historyhashes,code),auto_unbox=TRUE),delay_hours=48,window_issues=20L,recent_blend=.5,minimum_ess=20)
+ rawct<-strat$stratified_contexts_json(rawct,toJSON(h |> select(issue_code,cell),dataframe='rows',auto_unbox=TRUE),minimum_ess=20,minimum_recent_ess=5)
+ ct<-jsonlite::fromJSON(rawct,simplifyVector=FALSE)[[1]]
+ f<-joint_grid_monitor(h,ct,ct$receipt,30,10,.8,1)
+ base<-joint_grid_allocate(t,f,ct$receipt,'long_hit_signal',2,1024)
+ t$base_copies<-pmin(base$copies,1L)
+ stopifnot(identical(as.integer(t$base_copies),joint_extension_base_replay(t,f,ct$receipt)))
+ contextpath<-file.path(cfg$output,paste0(id,'-context.json'));writeLines(rawct,contextpath)
+ csha<-digest::digest(file=contextpath,algo='sha256')
+ cutoff<-ct$receipt[c('cutoff_kind','cutoff_identity','cutoff_ts','target_issue','historical_admission')];cutoff$model_receipt_sha256<-csha
+ s<-f;s$issue<-rep(id,nrow(f));attr(s,'signal_receipt')<-NULL
+ attr(s,'input_receipt')<-list(cutoff=cutoff,hash=digest::digest(s,algo='sha256'))
+ plans<-list(BASE=t |> select(ticket_id) |> mutate(copies=t$base_copies))
+ for(policy in c('ORIGINAL','PROB','EV','PROB_CAP','EV_CAP')) {
+  a<-joint_selective_add(t,o$members,s,cutoff,csha,policy,addsettings)
+  stopifnot(identical(a$copies,joint_selective_replay(t,o$members,s,cutoff,csha,policy,addsettings)))
+  changed<-t[rev(seq_len(nrow(t))),];changed$actual_gross<-seq_len(nrow(t))*1e9
+  z<-joint_selective_add(changed,o$members,s,cutoff,csha,policy,addsettings)
+  stopifnot(identical(a,z[match(a$ticket_id,z$ticket_id),]))
+  plans[[policy]]<-a |> select(ticket_id,copies)
+ }
+ path<-file.path(cfg$output,paste0(id,'-plan.json'))
+ jsonlite::write_json(list(status='FROZEN_REPLAYED',issue=id,historical_admission=FALSE,cutoff=cutoff,
+  source_bundle=jobs[jobs$issue==id,],roster_sha256=inputs$roster_bindings[[id]]$sha256,fixtures=o$fixtures,
+  tickets=t,plans=plans,settings=settings,add_settings=addsettings,code=code,context_sha256=csha),path,auto_unbox=TRUE,digits=NA,na='null',null='null')
+ planhashes[[path]]<-digest::digest(file=path,algo='sha256')
+ # Target labels are opened only after all six plans and their replay gates exist.
+ lab<-jsonlite::fromJSON(labelreader$read_extension_labels(path,planhashes[[path]],file.path(cfg$study,'inputs/rosters',paste0(id,'.json')),inputs$roster_bindings[[id]]$sha256))
+ stopifnot(all(lab$result_state=='完场'),all(is.finite(lab$actual_home)),all(is.finite(lab$actual_away)))
+ audit<-fundamentals_settlement_audit(cfg$db_path,lab,cfg$python,root);a<-audit$fixtures
+ stopifnot(!anyNA(a$status),!any(grepl('spf:IDENTITY',a$status)),all(is.finite(a$spf_sp)),all(a$spf_sp>0))
+ ap<-file.path(cfg$output,paste0(id,'-audit.json'));jsonlite::write_json(audit,ap,auto_unbox=TRUE,digits=NA,na='null',null='null')
+ v<-n7_sleeve_tables(b,b$cutoffs,settings$model_id)
+ curves<-n7_capital_curves(v,b$cutoffs,b$cutoffs,2)
+ sleeves<-bind_rows(lapply(b$sleeves,function(g)tibble(id=g$id,fixture_indices=list(as.integer(unlist(g$fixture_indices))),origin=g$origin)))
+ g<-n7_rank_diagnostic(list(issue=id,cutoffs=b$cutoffs,curves=curves,audit=a,fixtures=o$fixtures,sleeves=sleeves,evidence_class='POST_SETTLEMENT_DIAGNOSTIC'),2,.65,c(.15,.20,.25,.50))
+ g$sleeve_id<-as.integer(g$sleeve_id)
+ z<-t |> left_join(g |> select(sleeve_id,actual_rank,actual_gross_cny),by='sleeve_id',relationship='many-to-one') |> mutate(hit=prob_rank==actual_rank,gross=if_else(hit,actual_gross_cny,0))
+ stopifnot(!anyNA(z$hit))
+ for(policy in names(plans)) {
+  pp<-plans[[policy]];zz<-z[match(pp$ticket_id,z$ticket_id),]
+  rows[[paste(id,policy)]]<-tibble(issue=id,policy,stake=sum(2*pp$copies),gross=sum(zz$gross*pp$copies),hits=sum(zz$hit*pp$copies))
+  allocations[[paste(id,policy)]]<-pp |> mutate(issue=id,policy)
+ }
+ newh<-z |> group_by(cell) |> summarise(issue_code=id,expected=sum(prob),hits=sum(hit),stake=n()*2,gross=sum(gross),.groups='drop')
+ h<-bind_rows(h,newh);clocks<-bind_rows(clocks,tibble(issue_code=id,last_fixture_cutoff=max(unlist(b$cutoffs))))
+ historyhashes[[ap]]<-digest::digest(file=ap,algo='sha256');historyhashes[[path]]<-planhashes[[path]]
+ ranks[[id]]<-g;audits[[id]]<-a;ticketlabels[[id]]<-z;forecasts[[id]]<-s
+ message('Frozen, replayed and settled ',match(id,order),'/50 ',id)
+}
+stopifnot(initial_db_hash==digest::digest(file=cfg$db_path,algo='sha256'))
+for(p in names(code))stopifnot(digest::digest(file=p,algo='sha256')==code[[p]])
+newrows<-bind_rows(rows) |> mutate(net=gross-stake,budget_cny=1024,cash_cny=1024-stake,status='COMPLETE',model='frozen-market',period=784+match(issue,order))
+oldrows<-read_csv(cfg$old_rows,col_types=cols(issue='c'))
+stopifnot(n_distinct(oldrows$issue)==784,nrow(newrows)==300,!anyDuplicated(newrows[c('issue','policy')]))
+allrows<-bind_rows(oldrows,newrows)
+outputs<-list('rows.csv'=allrows,'new-rows.csv'=newrows,'fixture-audit.csv'=bind_rows(audits),'ranks.csv'=bind_rows(ranks),'ticket-labels.csv'=bind_rows(ticketlabels),'allocation.csv'=bind_rows(allocations),'forecasts.csv'=bind_rows(forecasts),'grid-history.csv'=h,'coverage.csv'=bind_rows(lapply(originals,`[[`,'metrics')))
+for(n in names(outputs))write_csv(outputs[[n]],file.path(cfg$output,n))
+jsonlite::write_json(list(status='SETTLED',historical_admission=FALSE,scope=c(old=784,new=50,total=834),source_hashes=cfg$source_hashes,code=code,settings=settings,add_settings=addsettings,plans=planhashes,db_sha256=initial_db_hash,files=as.list(setNames(vapply(file.path(cfg$output,names(outputs)),digest::digest,character(1),file=TRUE,algo='sha256'),names(outputs)))),file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+newrows |> group_by(policy) |> summarise(issues=n(),stake=sum(stake),gross=sum(gross),net=sum(net),ROI=sum(net)/sum(stake),hit_issues=sum(hits>0)) |> knitr::kable(digits=3)
+```

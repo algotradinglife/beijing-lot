@@ -1,0 +1,182 @@
+---
+title: "JOINT 834期完整诊断：新增50期收益、回撤与归因"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+## 口径与边界
+
+旧784期金额保留，新增50期沿用冻结市场概率及原JOINT候选/选组规则。BASE为长期格子弱区减仓并保留现金；ORIGINAL为各好格概率前半追加一份；PROB/EV分别跨好格按概率/预计回款贡献追加；CAP约束单场资金暴露。加仓仅增加已买票的份数，不增加命中覆盖。
+每期上限1024元、每票2元、比分保护关闭。赛前预计回款来自欧赔及大小球映射，结算使用北单SP且只乘一次0.65。全期曲线本金10万元，新旧交界不重置。分段回撤从该段单独起算，并同时列全曲线回撤。资金曲线按期顺序结算，不模拟多期赛程重叠期间的并行占款。
+这是既有历史研究的延伸，不是独立未见测试。截止时点由原输入绑定；历史标签可用性采用末场加48小时代理，因此不证明当时实盘可获得。参数未按这50期收益重新选择。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+for(f in c('extension_ticket_diagnostics','extension_report_verification','joint_extension_diagnostics','joint_selective_evidence','strategy_diagnostic_probabilities'))source(file.path(root,'r',paste0(f,'.R')))
+receipt<-jsonlite::fromJSON(file.path(cfg$input,'receipt.json'))
+stopifnot(receipt$status=='SETTLED',digest::digest(file=file.path(cfg$input,'receipt.json'),algo='sha256')==cfg$receipt_sha256)
+verification_path<-file.path(cfg$input,'independent-replay.json')
+verification<-jsonlite::fromJSON(verification_path)
+stopifnot(extension_report_verification(verification,cfg$receipt_sha256,digest::digest(file=file.path(root,'scripts/check_joint_extension_replay.R'),algo='sha256'),50))
+verification_sha256<-digest::digest(file=verification_path,algo='sha256')
+for(n in names(receipt$files))stopifnot(digest::digest(file=file.path(cfg$input,n),algo='sha256')==receipt$files[[n]])
+stopifnot(!dir.exists(cfg$output));dir.create(cfg$output,recursive=TRUE)
+r<-read_csv(file.path(cfg$input,'rows.csv'),col_types=cols(issue='c'))
+d<-joint_extension_diagnostics(r,784,100000);curves<-d$curves;summary<-d$summary
+summary<-summary |> mutate(no_bet_issues=vapply(seq_len(nrow(summary)),function(i) {z<-r[r$policy==summary$policy[i],];if(summary$cohort[i]=='OLD784')z<-z[z$period<=784,];if(summary$cohort[i]=='NEW50')z<-z[z$period>784,];sum(z$stake==0)},integer(1)))
+write_csv(summary,file.path(cfg$output,'summary.csv'));write_csv(curves,file.path(cfg$output,'equity.csv'))
+summary |> arrange(cohort,policy) |> knitr::kable(digits=3)
+```
+
+## 核心结论
+
+新增50期六个方案全部亏损，BASE净亏13,875.13元（ROI −31.50%），PROB净亏15,409.02元（−33.33%）。合计834期仍为正收益：BASE净赚47,547.03元，PROB净赚55,029.87元；其全程最大回撤分别为22,223.53元与28,058.43元。全程最大回撤没有刷新，不代表新增期风险小：BASE在新段自身仍出现16,856.84元回撤。
+
+新增期中，加仓没有增加命中期数；PROB相比BASE多投2,192元，反而少赚1,533.89元。CAP相对BASE只改善56.23元，不能据此认定稳定优势。本轮不支持把概率加仓作为普遍改进；它在旧段留下的累计优势，未在新增50期延续。
+
+## 收益与回撤
+
+```{r}
+p<-curves |> select(period,policy,bankroll,drawdown) |> pivot_longer(c(bankroll,drawdown),names_to='measure',values_to='CNY') |>
+ ggplot(aes(period,CNY,color=policy))+geom_line(linewidth=.55)+geom_vline(xintercept=784.5,linetype=2)+facet_wrap(~measure,ncol=1,scales='free_y')+theme_minimal()+labs(x='Issue order (new data starts at 785)',y='CNY',title='JOINT: full 834-issue equity and drawdown')
+p
+ggsave(file.path(cfg$output,'full-equity-drawdown.png'),p,width=12,height=8,dpi=160)
+new<-curves |> filter(period>784) |> group_by(policy) |> arrange(period,.by_group=TRUE) |> mutate(local_bankroll=100000+cumsum(net),local_dd=cummax(c(100000,local_bankroll))[-1]-local_bankroll) |> ungroup()
+p<-new |> select(period,policy,local_bankroll,local_dd) |> pivot_longer(c(local_bankroll,local_dd),names_to='measure',values_to='CNY') |> ggplot(aes(period,CNY,color=policy))+geom_line()+facet_wrap(~measure,ncol=1,scales='free_y')+theme_minimal()+labs(x='Issue order',y='CNY',title='New 50 issues: local equity and drawdown')
+p
+ggsave(file.path(cfg$output,'new50-equity-drawdown.png'),p,width=12,height=8,dpi=160)
+```
+
+## 加仓是否真正增益
+
+```{r}
+base<-r |> filter(policy=='BASE') |> select(issue,base_stake=stake,base_net=net)
+inc<-r |> filter(policy!='BASE') |> left_join(base,by='issue',relationship='many-to-one') |> mutate(extra_stake=stake-base_stake,extra_net=net-base_net,cohort=if_else(period<=784,'OLD784','NEW50'))
+incsummary<-bind_rows(lapply(split(inc,inc$cohort),function(x)joint_selective_concentration(x) |> mutate(cohort=unique(x$cohort))))
+write_csv(incsummary,file.path(cfg$output,'incremental-summary.csv'));incsummary |> knitr::kable(digits=3)
+inc |> filter(period>784) |> group_by(policy) |> arrange(period,.by_group=TRUE) |> mutate(increment=cumsum(extra_net)) |> ggplot(aes(period,increment,color=policy))+geom_line()+geom_hline(yintercept=0,linetype=2)+theme_minimal()+labs(y='Incremental net CNY versus BASE',x='Issue order')
+```
+
+## 新增期逐期表现及场次供给
+
+```{r}
+cov<-read_csv(file.path(cfg$input,'coverage.csv'),col_types=cols(issue='c'))
+periods<-r |> filter(period>784) |> left_join(cov,by='issue',relationship='many-to-one') |> mutate(roi=if_else(stake>0,net/stake,NA_real_))
+write_csv(periods,file.path(cfg$output,'new50-per-issue.csv'))
+periods |> select(issue,policy,eligible_fixtures,bought_groups,stake,gross,net,roi,hits,cash_cny) |> knitr::kable(digits=3)
+p<-periods |> filter(policy=='BASE') |> ggplot(aes(eligible_fixtures,net,color=hits>0))+geom_point()+geom_hline(yintercept=0,linetype=2)+theme_minimal()+labs(x='Eligible fixtures after SP gate',y='Issue net CNY',color='Any hit')
+p
+ggsave(file.path(cfg$output,'new50-supply-return.png'),p,width=9,height=6,dpi=160)
+```
+
+新增期有两期完整持有现金：141013、150202。它们分别有152、284场通过SP筛选，因而不是场次数量不足；但符合SP门槛的候选组达到25%累计概率，最低需274、284元，超过每组256元上限。50期中的实际下注期为48期。最长无命中期数包含无下注期，不等同于连续亏损投注。
+
+## 概率底座：按让球数与赛果检查
+
+下表范围是冻结候选输入池：旧段67,514场，新增段7,426场。新增段有效映射输入全部纳入；原始7,697场中的271场未满足输入条件，不在本表。单场统计覆盖输入池，组统计仅覆盖实际选择的组合，两者不可混用。
+
+```{r}
+reticulate::use_python(cfg$python,required=TRUE)
+reader<-reticulate::import('src.strategy_diagnostic_inputs',convert=TRUE)
+pred<-list()
+for(path in c(cfg$old_catalog,cfg$new_catalogs)) {
+ stopifnot(digest::digest(file=path,algo='sha256')==cfg$catalog_hashes[[path]])
+ z<-reader$read_diagnostic_fixtures(path,cfg$catalog_hashes[[path]])
+ pred[[path]]<-bind_rows(z$rows)
+}
+f<-bind_rows(pred) |> mutate(provider_id=as.character(provider_id),issue=as.character(issue))
+stopifnot(digest::digest(file=cfg$old_audit,algo='sha256')==cfg$old_audit_sha256)
+a<-bind_rows(read_csv(cfg$old_audit,col_types=cols(issue='c',provider_id='c')),read_csv(file.path(cfg$input,'fixture-audit.csv'),col_types=cols(issue='c',provider_id='c')))
+f$cohort<-if_else(f$issue %in% r$issue[r$period>784],'NEW50','OLD784')
+f<-f |> left_join(a |> select(issue,slot,provider_id,actual_outcome=actual_direction),by=c('issue','slot','provider_id'),relationship='one-to-one')
+stopifnot(!anyNA(f$actual_outcome))
+long<-f |> pivot_longer(matches('^[pq]_[WDL]$'),names_to=c('model','outcome'),names_sep='_',values_to='probability') |> mutate(model=recode(model,p='Frozen calibrated market',q='Uncalibrated market'),handicap_group=as.character(handicap))
+pd<-strategy_probability_diagnostics(long,c('cohort','handicap_group'),c('W','D','L'),seq(0,1,.1))
+allpd<-strategy_probability_diagnostics(long,'cohort',c('W','D','L'),seq(0,1,.1))
+write_csv(pd$summary,file.path(cfg$output,'probability-by-handicap.csv'));write_csv(allpd$summary,file.path(cfg$output,'probability-summary.csv'));write_csv(pd$calibration,file.path(cfg$output,'probability-calibration.csv'))
+allpd$summary |> knitr::kable(digits=4)
+pd$summary |> knitr::kable(digits=4)
+p<-allpd$calibration |> ggplot(aes(predicted,observed,color=model,size=fixtures))+geom_abline(slope=1,intercept=0,linetype=2)+geom_point()+geom_line(aes(group=model),linewidth=.4)+facet_grid(cohort~outcome)+coord_equal(xlim=c(0,1),ylim=c(0,1))+theme_minimal()+labs(x='Mean forecast probability',y='Observed frequency',title='Old784 versus new50 calibration: W / handicap draw / L')
+p
+ggsave(file.path(cfg$output,'new50-calibration.png'),p,width=12,height=8,dpi=160)
+```
+
+## 候选组的命中深度与回款
+
+```{r}
+g<-read_csv(file.path(cfg$input,'ranks.csv'),col_types=cols(issue='c'))
+t<-read_csv(file.path(cfg$input,'ticket-labels.csv'),col_types=cols(issue='c'))
+bought<-t |> group_by(issue,sleeve_id) |> summarise(purchased_depth=max(prob_rank),coverage=sum(prob),estimated_gross=sum(prob*payout_hat),.groups='drop')
+g<-g |> left_join(bought,by=c('issue','sleeve_id'),relationship='one-to-one') |> mutate(selected=!is.na(purchased_depth),covered=selected & actual_rank<=replace_na(purchased_depth,0),rank_band=cut(actual_rank,c(0,15,32,64,128,256,512,2187),include.lowest=TRUE))
+gsummary<-g |> group_by(selected,rank_band) |> summarise(groups=n(),issues=n_distinct(issue),covered=sum(covered),median_actual_gross=median(actual_gross_cny),median_hit_cost=median(actual_hit_cost_cny),.groups='drop')
+write_csv(g,file.path(cfg$output,'group-diagnostics.csv'));gsummary |> knitr::kable(digits=2)
+stopifnot(digest::digest(file=cfg$old_groups,algo='sha256')==cfg$old_groups_sha256)
+oldgroups<-read_csv(cfg$old_groups,col_types=cols(issue='c')) |> filter(arm=='JOINT') |> transmute(cohort='OLD784',actual_rank,coverage,purchased_depth=depth,actual_gross_cny,covered=hit)
+newgroups<-g |> filter(selected) |> transmute(cohort='NEW50',actual_rank,coverage,purchased_depth,actual_gross_cny,covered)
+depthcompare<-bind_rows(oldgroups,newgroups)
+depthcompare |> group_by(cohort) |> summarise(groups=n(),hit_rate=mean(covered),expected_hits=sum(coverage),actual_hits=sum(covered),median_winning_rank=median(actual_rank),median_bought_depth=median(purchased_depth),mean_winning_return=mean(actual_gross_cny[covered]),.groups='drop') |> knitr::kable(digits=3)
+p<-ggplot(depthcompare,aes(actual_rank,color=cohort))+stat_ecdf()+scale_x_log10()+theme_minimal()+labs(x='Actual winning combination rank (log)',y='Cumulative fraction of selected groups',title='Original JOINT selected groups: old versus new winning depth')
+p
+ggsave(file.path(cfg$output,'old-new-depth-distribution.png'),p,width=10,height=6,dpi=160)
+
+p<-g |> ggplot(aes(actual_rank,actual_gross_cny,color=covered,shape=selected))+geom_point(alpha=.6)+scale_x_log10()+scale_y_log10()+theme_minimal()+labs(x='Winning combination probability rank (log)',y='Actual winning unit return CNY (log)',title='New50 candidate depth versus return')
+p
+ggsave(file.path(cfg$output,'new50-depth-return.png'),p,width=10,height=6,dpi=160)
+```
+
+## 资金格子与价格桥接
+
+```{r}
+alloc<-read_csv(file.path(cfg$input,'allocation.csv'),col_types=cols(issue='c',ticket_id='c'))
+ledger<-alloc |> left_join(t,by=c('issue','ticket_id'),relationship='many-to-one') |> mutate(stake=2*copies,expected_return=copies*prob*payout_hat,estimated_hit_return=copies*as.numeric(hit)*payout_hat,actual_return=copies*gross)
+ticket_accounting<-extension_ticket_diagnostics(ledger,2)
+bridge<-ticket_accounting$bridge
+stopifnot(all(abs(bridge$actual_net-bridge$model_net-bridge$outcome_residual-bridge$price_residual)<1e-7))
+write_csv(bridge,file.path(cfg$output,'return-bridge.csv'));bridge |> knitr::kable(digits=2)
+grid<-ticket_accounting$grid
+stopifnot(all(abs((grid |> group_by(policy) |> summarise(net=sum(net),.groups='drop') |> arrange(policy))$net-(r |> filter(period>784) |> group_by(policy) |> summarise(net=sum(net),.groups='drop') |> arrange(policy))$net)<1e-7))
+write_csv(grid,file.path(cfg$output,'grid-results.csv'))
+p<-grid |> filter(policy=='BASE') |> ggplot(aes(expected_hits,hits,size=stake,color=net))+geom_abline(slope=1,intercept=0,linetype=2)+geom_point()+scale_color_gradient2(low='red',mid='grey',high='blue')+theme_minimal()+labs(x='Expected winning ticket copies',y='Observed winning copies',title='New50 BASE grid: forecast versus outcomes')
+p
+ggsave(file.path(cfg$output,'new50-grid-outcomes.png'),p,width=9,height=6,dpi=160)
+correlation<-cor(r |> select(issue,policy,net) |> pivot_wider(names_from=policy,values_from=net) |> select(-issue))
+correlation |> knitr::kable(digits=3)
+```
+
+该桥接将净收益精确拆为模型估计、赛果实现差与估算/北单结算价格差。它不是因果证明，也不能将价格差全部视为模型优势或数据错误。相关性使用逐期净收益。
+
+## 诊断结论矩阵
+
+| 问题 | 证据 | 判断 |
+|---|---|---|
+| 是否单场整体命中明显变差 | 校正市场Top1由43.82%至44.12%，Top2由73.57%至73.90%；Brier由0.64526至0.64599 | 不支持整体命中塌陷；不能排除特定细分或联合分布失效 |
+| 是否选中组更难中 | 原JOINT已选组实际命中率25.92%降至18.41%；新增353组理论合计88.76次，实际65次 | 支持选中组联合命中不足，组间相关性存在，不能视为353个独立样本 |
+| 是否覆盖深度更吃紧 | 已选组中奖组合排名中位数253升至296，购买深度中位数73降至61 | 支持实际中奖位置变深而购买更浅；这是事后诊断，不等于已证明加深能改善收益 |
+| 是否中奖回款更低 | 原JOINT中奖组平均单份回款624.60元降至464.17元 | 支持回款结构共同拖累收益；欧赔估算与北单结算价差本来就存在 |
+| 是否没有足够场次 | 新期最少37场；仅两期因SP/累计概率覆盖成本联合约束完全持币 | 否定普遍场次数量不足；两期空仓原因已经明确 |
+| 追加份数是否改善 | 各方案新增期均18期命中；PROB额外净收益−1,533.89元 | 不支持加仓能修复本段问题，重复买已覆盖票不会新增命中期 |
+
+本轮更值得关注的是**选择后的组合联合命中与回款结构**。单场总体Top1/Top2并未下降，不能据此直接归罪于所有场次的概率底座，也不能把联合命中不足全部归因于购买深度。报告中的新旧分布对照是诊断证据，尚未构成替换策略的受控改善证明。
+
+## 诊断解释与限制
+
+加仓的命中期数应与BASE一致；若发生差异，首先视为实现或结算错误。收益改善须区分单纯多投与追加票自身的收益率，并观察去除最有利少数期后的变化。CAP降低回撤可能主要来自现金保留，不能直接解释为选票更准确。
+新增50期的分层概率统计仅说明该段校准表现，不自动改写冻结底座。候选排名利用真实赛果，只用于诊断“中奖票原本需要买多深”，不能作为选择票据的输入。多个组共享场次，因此不可把组命中率当作独立试验。
+本报告没有重新抓取或清洗基本面；联赛、天气等未绑定到本次概率输入的解释不能由此确认。大小球的贡献已包含在底座映射中，但这里没有进行单独移除大小球的受控实验。
+
+```{r}
+stopifnot(n_distinct(r$issue)==834,all((r |> group_by(issue) |> summarise(n=n_distinct(hits>0),.groups='drop'))$n==1))
+files<-list.files(cfg$output,full.names=TRUE)
+report_code<-file.path(root,c('r/extension_ticket_diagnostics.R','r/extension_report_verification.R','r/joint_extension_diagnostics.R','r/joint_selective_evidence.R','r/strategy_diagnostic_probabilities.R','src/strategy_diagnostic_inputs.py','quarto/223_joint_new50_diagnostics.qmd'))
+jsonlite::write_json(list(status='REPORT_RENDERED',historical_admission=FALSE,config=cfg,implementation=as.list(setNames(vapply(report_code,digest::digest,character(1),file=TRUE,algo='sha256'),report_code)),input_receipt_sha256=cfg$receipt_sha256,independent_replay_sha256=verification_sha256,files=as.list(setNames(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256'),basename(files)))),file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
