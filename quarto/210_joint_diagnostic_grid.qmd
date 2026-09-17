@@ -1,0 +1,86 @@
+---
+title: "JOINT组合概率—回款分型网格"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  input: null
+  receipt_sha256: null
+  output: null
+  minimum_issues: 30
+  minimum_expected_hits: 5
+---
+
+本报告构建诊断网格，不修改下注。横轴是单张7串一组合的模型概率，纵轴是2元票中奖后的预计回款，
+预计回款含一次0.65；实际ROI使用北单结算SP。每格是已购买组合的历史汇总，不是所有可能组合。
+固定784期、JOINT与统一128，保留全期、前段、旧回撤段和后段。
+
+```{r}
+library(dplyr);library(readr);library(ggplot2)
+source(file.path(params$project_root,'r/joint_diagnostic_grid.R'))
+stopifnot(digest::digest(file=file.path(params$input,'receipt.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(params$input,'receipt.json'))
+stopifnot(digest::digest(file=file.path(params$input,'types.csv'),algo='sha256')==r$outputs[['types.csv']])
+t<-read_csv(file.path(params$input,'types.csv'),show_col_types=FALSE)
+prob_levels<-c('[0,0.001)','[0.001,0.002)','[0.002,0.003)','[0.003,0.005)','[0.005,0.01)','[0.01,0.02)','[0.02,1]')
+pay_levels<-c('[0,128)','[128,256)','[256,512)','[512,1.02e+03)','[1.02e+03,Inf)')
+g<-joint_diagnostic_grid(t,prob_levels,pay_levels,params$minimum_issues,params$minimum_expected_hits)
+g$stage<-factor(g$stage,levels=c('ALL','BEFORE','DRAWDOWN','AFTER'))
+g$policy<-factor(g$policy,levels=c('P0_OPEN','P128_OPEN'),labels=c('JOINT','Floor128'))
+g<-g |> mutate(cell=paste0('H ',actual_hits,'/',sprintf('%.1f',expected_hits),'\nROI ',if_else(empty,'—',sprintf('%.1f%%',100*roi)),'\nStake ',sprintf('%.1f%%',100*stake_share)))
+out<-params$output;dir.create(out,recursive=TRUE,showWarnings=FALSE)
+write_csv(g,file.path(out,'grid.csv'))
+summary<-g |> group_by(policy,stage,diagnosis) |> summarise(cells=n(),tickets=sum(tickets),stake=sum(stake),gross=sum(gross),expected_hits=sum(expected_hits),actual_hits=sum(actual_hits),.groups='drop') |> group_by(policy,stage) |> mutate(stake_share=stake/sum(stake),net=gross-stake,roi=if_else(stake>0,net/stake,NA_real_)) |> ungroup()
+write_csv(summary,file.path(out,'diagnosis-summary.csv'))
+```
+
+## 分型说明
+
+| 标签 | 描述 |
+|---|---|
+| NO_PURCHASE | 没有买入，不评价表现 |
+| LOW_SUPPORT | 少于30期或预计中奖少于5张，暂不分类 |
+| HIT_SHORTFALL | 支持量达标，但实际中奖少于预计；ROI可能仍为正 |
+| PAYOUT_SHORTFALL | 命中达到预计，但实际ROI为负 |
+| HIT_AND_RETURN_OK | 命中达到预计且实际ROI不为负 |
+
+30期／5张是显式展示参数，不是显著性检验，也不是未来下注门槛。重叠组合不独立；
+同一场复用可能使很多格子同时波动。预计中奖数是单票概率之和，不是至少中一张的概率。
+图中H表示“实际／预计中奖张数”，Stake为该策略该阶段的资金占比。
+
+```{r}
+#| fig-width: 14
+#| fig-height: 9
+colours<-c(NO_PURCHASE='#eeeeee',LOW_SUPPORT='#cccccc',HIT_SHORTFALL='#d95f59',PAYOUT_SHORTFALL='#e6ad44',HIT_AND_RETURN_OK='#60ad87')
+prob_labels<-c('<0.1%','0.1–0.2%','0.2–0.3%','0.3–0.5%','0.5–1%','1–2%','>=2%')
+pay_labels<-c('<128','128–256','256–512','512–1024','>=1024')
+for(phase in levels(g$stage)) {
+ p<-ggplot(filter(g,stage==phase),aes(band,payout_band,fill=diagnosis))+
+  geom_tile(colour='white')+geom_text(aes(label=if_else(empty,'No purchase',cell)),size=2.8)+
+  facet_wrap(~policy,ncol=1)+scale_fill_manual(values=colours,drop=FALSE)+
+  scale_x_discrete(labels=prob_labels,drop=FALSE)+scale_y_discrete(labels=pay_labels,drop=FALSE)+
+  theme_minimal()+theme(panel.grid=element_blank(),legend.position='bottom',legend.text=element_text(size=8))+
+  labs(title=paste('Diagnostic grid:',phase),x='Model ticket probability',y='Estimated payout per CNY2 ticket',fill=NULL)
+ ggsave(file.path(out,paste0('grid-',phase,'.png')),p,width=14,height=9,dpi=150)
+ print(p)
+}
+```
+
+## 可复核的格子明细
+
+每格保留期数、票数、模型平均概率、实际命中率、命中实现比例、资金、回款和ROI。
+前段为1—305期、旧回撤段306—399期、后段400—784期；这些是固定事后窗口。
+
+```{r}
+knitr::kable(g |> filter(!empty) |> select(policy,stage,band,payout_band,diagnosis,issues,tickets,expected_hits,actual_hits,hit_ratio,stake,stake_share,gross,roi),digits=3)
+knitr::kable(summary,digits=3)
+```
+
+网格用于把资金落点和表现放在一起观察。后续资金分配只能根据目标期之前的记录学习，
+不能将本期结算后的红黄绿标签直接用于本期下注。本次没有拟合参数或改变购票。
