@@ -1,0 +1,68 @@
+---
+title: "新增50期研究输入整合：140902—150202"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  receipt: null
+  receipt_sha256: null
+  output: null
+  python: null
+---
+
+```{r}
+library(dplyr);library(readr)
+stopifnot(!dir.exists(params$output))
+check<-system2(params$python,c(shQuote(file.path(params$project_root,'scripts/check_persistent_data_layout.py')),'--contract',shQuote(file.path(params$project_root,'config/persistent_data_layout.json'))),stdout=TRUE)
+stopifnot(is.null(attr(check,'status')))
+reticulate::use_python(params$python,required=TRUE)
+reader<-reticulate::import('src.n7_prepared_input_coverage',convert=TRUE)
+code_files<-c('src/n7_prepared_input_coverage.py','quarto/221_joint_new50_inputs.qmd','scripts/prepare_n7_expanded_inputs.py','src/n7_published_markets.py','src/n7_research_scope.py')
+code<-setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)
+x<-reader$prepared_input_coverage(params$receipt,params$receipt_sha256)
+t<-bind_rows(x$rows);stopifnot(nrow(t)==50,!anyDuplicated(t$issue))
+scope<-tibble(issue=unlist(x$scope$all_issues)) |>
+ mutate(cohort=case_when(issue=='110915'~'PRIOR_UNAVAILABLE',issue %in% t$issue~'NEW_INPUT',TRUE~'PRIOR_STUDY'))
+stopifnot(sum(scope$cohort=='PRIOR_STUDY')==784,sum(scope$cohort=='NEW_INPUT')==50)
+dir.create(params$output,recursive=TRUE)
+write_csv(t,file.path(params$output,'coverage.csv'));write_csv(scope,file.path(params$output,'combined-scope.csv'))
+```
+
+当前已接入新验收批次 **140902—150202，共50期**。以原784期研究样本为基准，新增期没有重叠。
+原输入清单中还保留110915，该期此前未进入可用研究样本，本次不将它重新计作新增。
+合并清单835期包括：784期原研究、50期新输入、1期原已知不可用。
+
+本轮只整合另一个任务已经清洗发布的输入，不重新清洗，不改变旧概率／票据，也尚未生成新50期回测收益。
+欧赔、大小球明细由发布版本逐文件哈希核验；北单场次ID与让球来自冻结期次页面。
+双方盘口均有已发布历史报价且provider ID与期次页面相同，只表示具备输入，不等于满足后续公司数、盘口映射和选组条件。
+结算读取将在概率及票据冻结之后执行。
+
+```{r}
+knitr::kable(t |> summarise(期数=n(),场次=sum(fixtures),欧赔可用=sum(euro),大小球可用=sum(total),两盘均可用=sum(both_markets),对齐场次让球=sum(roster_aligned)))
+glimpse(t)
+knitr::kable(head(t,10))
+```
+
+逐期可用情况：
+
+```{r}
+knitr::kable(t)
+```
+
+本批验收为历史诊断准入，`historical_admission=FALSE`。采集失败、缺盘口等仍保留在原发布记录中，未以零报价补填。
+旧的784期策略表现保持冻结；后续新增收益须单独列出，再与旧期合计。
+
+```{r}
+stopifnot(identical(code,setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)))
+files<-list.files(params$output,full.names=TRUE)
+jsonlite::write_json(list(status='INPUTS_INTEGRATED',historical_admission=FALSE,source_receipt=params$receipt_sha256,
+ sources=x$source_hashes,code=code,old_research_issues=784,new_input_issues=50,prior_unavailable='110915',
+ outputs=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),basename(files))),
+ file.path(params$output,'receipt.json'),pretty=TRUE,auto_unbox=TRUE,digits=NA)
+```
