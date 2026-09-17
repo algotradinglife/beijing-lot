@@ -1,0 +1,28 @@
+source(file.path('..','..','r','joint_grid_stability.R'))
+test_that('stability distinguishes state flips, support transitions and gaps', {
+  x<-data.frame(grid='g',cell='c',period=c(1,2,3,4,6),stake=2,gross=c(0,4,0,0,6),expected=.5,hits=c(0,1,0,0,1),
+    score=c(1.5,.5,NA,1.5,.5),state=c('GOOD','BAD','UNKNOWN','GOOD','BAD'))
+  w<-data.frame(window=c('all','tail'),start=c(1,3),end=6)
+  z<-joint_grid_stability(x,w)
+  expect_equal(z$summary$support_fraction,c(.8,2/3))
+  expect_equal(z$summary$flip_rate[1],1);expect_true(is.na(z$summary$flip_rate[2]))
+  expect_equal(z$summary$extreme_rate[1],1)
+  expect_equal(z$summary$support_churn,c(2/3,1))
+  expect_equal(z$summary$weighted_mae[1],1.75)
+  expect_equal(sum(z$states$stake[z$states$window=='all']),10)
+  expect_equal(z$cells$roi,c(0,0))
+  expect_identical(joint_grid_stability(x[5:1,],w),z)
+  expect_error(joint_grid_stability(rbind(x,x[1,]),w))
+  x$score[1]<-NA;expect_error(joint_grid_stability(x,w))
+})
+test_that('unknown-only and empty inputs do not imply a stable or profitable signal', {
+  x<-data.frame(grid='g',cell='c',period=1:2,stake=2,gross=0,expected=0,hits=0,
+    score=NA_real_,state='UNKNOWN')
+  w<-data.frame(window='all',start=1,end=2)
+  z<-joint_grid_stability(x,w)
+  expect_equal(z$summary$support_fraction,0)
+  expect_true(is.na(z$summary$flip_rate));expect_true(is.na(z$summary$weighted_mae))
+  expect_true(is.na(z$states$hit_ratio));expect_equal(z$states$roi,-1)
+  expect_equal(nrow(joint_grid_stability(x[FALSE,],w)$summary),0)
+  x$stake[1]<-0;expect_error(joint_grid_stability(x,w))
+})

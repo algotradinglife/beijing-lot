@@ -1,0 +1,202 @@
+---
+title: "JOINT网格大小：稳定性、支持度与前向区分能力"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  parent: null
+  parent_sha256: null
+  study: null
+  depth_report: null
+  depth_sha256: null
+  output: null
+  python: null
+---
+
+固定原784期与JOINT原购买集合，比较35、16、9格三个固定划分。边界相互嵌套，不按结算收益选边界。
+本轮评价格子是否适合提供资金轮动信号，不执行新的下注分配；格子变粗造成的机械平滑不等于收益改善。
+回款已经包含一次0.65。样本单位为期×格子，重叠票不作为独立重复观测。
+
+共同设置：每个目标期使用严格早于其最早比赛截止的历史标签；最后比赛截止＋48小时为诊断可用性代理。
+累计历史和最近20期分别归一化后各占50%；格子至少30个有票期、累计预计中奖10票、ESS20、近期ESS5。
+预测回款/投入<0.8标BAD、>=1.2标GOOD，其他中性；证据不足UNKNOWN。
+所有时序准入、权重、ESS、分层条件化和代码闭包由src/temporal_learning提供；不复用旧预测缓存。
+这是已观察历史的研究，代理时间与原概率包均不能证明可实时执行。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source(file.path(params$project_root,'r/diagnostic_verified_csv.R'))
+source(file.path(params$project_root,'r/joint_grid_monitor.R'))
+source(file.path(params$project_root,'r/joint_grid_stability.R'))
+stopifnot(!dir.exists(params$output))
+check<-system2(params$python,c(shQuote(file.path(params$project_root,'scripts/check_persistent_data_layout.py')),
+ '--contract',shQuote(file.path(params$project_root,'config/persistent_data_layout.json'))),stdout=TRUE)
+stopifnot(is.null(attr(check,'status')))
+raw<-readBin(file.path(params$parent,'receipt.json'),'raw',n=file.info(file.path(params$parent,'receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$parent_sha256)
+parent<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+raw<-readBin(file.path(params$parent,'plans-receipt.json'),'raw',n=file.info(file.path(params$parent,'plans-receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==parent$files[['plans-receipt.json']])
+pr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+stopifnot(params$depth_sha256==pr$source_hashes$depth)
+raw<-readBin(file.path(params$depth_report,'receipt.json'),'raw',n=file.info(file.path(params$depth_report,'receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$depth_sha256)
+dr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+raw<-readBin(file.path(params$study,'plans-frozen.json'),'raw',n=file.info(file.path(params$study,'plans-frozen.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==pr$source_hashes$frozen)
+fr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+reticulate::use_python(params$python,required=TRUE)
+reader<-reticulate::import('src.strategy_diagnostic_inputs',convert=TRUE)
+mod<-reticulate::import('src.n7_risk_context',convert=TRUE)
+stratifier<-reticulate::import('src.temporal_learning.stratified',convert=TRUE)
+provenance<-reticulate::import('src.temporal_learning.provenance',convert=TRUE)
+pyroot<-reticulate::import('pathlib',convert=FALSE)$Path(params$project_root)
+tables<-clock<-list()
+for(path in names(fr$receipt$plan_hashes)) {
+ b<-jsonlite::fromJSON(reader$read_verified_bundle_json(path,fr$receipt$plan_hashes[[path]]))
+ stopifnot(!b$issue %in% names(clock))
+ ts<-unlist(b$cutoffs);stopifnot(length(ts)>0,all(grepl('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\+00:00$',ts)))
+ clock[[b$issue]]<-tibble(issue_code=b$issue,last_fixture_cutoff=max(ts),fixture_decision_ts=min(ts))
+ if(length(b$plans$P0_OPEN$tickets))tables[[b$issue]]<-as_tibble(b$plans$P0_OPEN$tickets) |> mutate(issue=b$issue)
+}
+x<-bind_rows(tables);clock<-bind_rows(clock);order<-sort(clock$issue_code);stopifnot(length(order)==784)
+g<-diagnostic_read_verified_csv(file.path(params$depth_report,'groups.csv'),dr$outputs[['groups.csv']],cols(issue='c')) |>
+ filter(arm=='JOINT') |> select(issue,sleeve_id,actual_rank,actual_gross_cny)
+x<-x |> left_join(g,by=c('issue','sleeve_id'),relationship='many-to-one') |>
+ mutate(hit=prob_rank==actual_rank,gross=if_else(hit,actual_gross_cny,0))
+stopifnot(!anyNA(x$hit))
+grids<-list(FINE35=list(p=c(0,.001,.002,.003,.005,.01,.02,1),r=c(0,128,256,512,1024,Inf)),
+ MID16=list(p=c(0,.002,.005,.01,1),r=c(0,256,512,1024,Inf)),
+ COARSE9=list(p=c(0,.002,.005,1),r=c(0,256,1024,Inf)))
+histories<-list();geometry<-list()
+for(grid in names(grids)) {
+ a<-x |> mutate(p_band=as.character(cut(prob,grids[[grid]]$p,right=FALSE,include.lowest=TRUE)),
+  r_band=as.character(cut(payout_hat,grids[[grid]]$r,right=FALSE)),cell=paste(grid,p_band,r_band,sep=' | '))
+ stopifnot(!anyNA(a$p_band),!anyNA(a$r_band))
+ histories[[grid]]<-a |> group_by(issue_code=issue,cell) |>
+  summarise(expected=sum(prob),hits=sum(hit),stake=2*n(),gross=sum(gross),.groups='drop') |> mutate(grid=grid)
+ geometry[[grid]]<-a |> distinct(cell,p_band,r_band) |> mutate(grid=grid)
+}
+h<-bind_rows(histories);geometry<-bind_rows(geometry)
+old<-diagnostic_read_verified_csv(file.path(params$parent,'grid-history.csv'),parent$files[['grid-history.csv']],cols(issue_code='c'))
+recheck<-h |> filter(grid=='FINE35') |> mutate(cell=sub('^FINE35 \\| ','',cell)) |>
+ full_join(old,by=c('issue_code','cell'),suffix=c('_new','_old'),relationship='one-to-one')
+for(k in c('expected','hits','stake','gross'))stopifnot(!anyNA(recheck[[paste0(k,'_old')]]),
+ all(abs(recheck[[paste0(k,'_new')]]-recheck[[paste0(k,'_old')]])<1e-6))
+base<-h |> filter(grid=='FINE35') |> group_by(issue_code) |>
+ summarise(hit_residual=(sum(hits)-sum(expected))/sum(stake/2),.groups='drop') |>
+ right_join(clock,by='issue_code',relationship='one-to-one') |>
+ mutate(hit_residual=replace_na(hit_residual,0),depth_residual=hit_residual)
+out<-params$output;dir.create(out,recursive=TRUE)
+write_csv(h,file.path(out,'grid-history.csv'));write_csv(geometry,file.path(out,'geometry.csv'))
+code_files<-c('r/joint_grid_monitor.R','r/joint_grid_stability.R','r/diagnostic_verified_csv.R','quarto/214_joint_grid_size.qmd')
+code<-setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)
+implementation<-provenance$implementation_closure(pyroot,list('src.n7_risk_context','src.temporal_learning.stratified','src.strategy_diagnostic_inputs'),distributions=list('numpy','pandas'))
+sources<-c(code,list(history=digest::digest(file=file.path(out,'grid-history.csv'),algo='sha256'),
+ frozen=pr$source_hashes$frozen,depth=params$depth_sha256,implementation=implementation$closure_sha256))
+message('Building shared native cutoff contexts')
+contexts_raw<-mod$n7_risk_contexts_json(jsonlite::toJSON(base,dataframe='rows',auto_unbox=TRUE,digits=NA),
+ jsonlite::toJSON(clock |> select(issue_code,fixture_decision_ts),dataframe='rows',auto_unbox=TRUE),
+ repository_root=params$project_root,source_hashes_json=jsonlite::toJSON(sources,auto_unbox=TRUE),
+ delay_hours=48L,window_issues=20L,recent_blend=.5,minimum_ess=20)
+con<-gzfile(file.path(out,'contexts.json.gz'),'w');writeLines(contexts_raw,con);close(con)
+contexts<-jsonlite::fromJSON(contexts_raw,simplifyVector=FALSE);rm(contexts_raw)
+```
+
+```{r}
+forecasts<-list();replay_count<-0L
+membership<-jsonlite::toJSON(h |> select(issue_code,cell),dataframe='rows',auto_unbox=TRUE)
+ledger<-gzfile(file.path(out,'strata-ledgers.jsonl.gz'),'w')
+for(i in seq_along(contexts)) {
+ ct<-jsonlite::fromJSON(stratifier$stratified_context_json(jsonlite::toJSON(contexts[[i]],auto_unbox=TRUE,digits=NA),membership,
+  minimum_ess=20,minimum_recent_ess=5),simplifyVector=FALSE)
+ id<-ct$receipt$target_issue
+ admitted<-if(ct$status=='READY')bind_rows(ct$rows)$issue_code else character()
+ prior<-h |> filter(issue_code %in% admitted)
+ z<-joint_grid_monitor(prior,ct,ct$receipt,30,10,.8,1.2)
+ # Independent weighted arithmetic for every cell, including unsupported cells.
+ for(st in ct$strata) {
+  wh<-bind_rows(st$rows) |> inner_join(prior |> filter(cell==st$cell),by='issue_code',relationship='one-to-one')
+  expected_return<-(1-st$alpha)*sum(wh$gross*wh$long_weight)/sum(wh$stake*wh$long_weight)+
+   st$alpha*sum(wh$gross*wh$recent_weight)/sum(wh$stake*wh$recent_weight)
+  zz<-z |> filter(cell==st$cell)
+  enough<-nrow(wh)>=30 && sum(wh$expected)>=10 && st$status=='READY'
+  signal<-if(!enough)'UNKNOWN' else if(expected_return<.8)'BAD' else if(expected_return>=1.2)'GOOD' else 'NEUTRAL'
+  stopifnot(isTRUE(all.equal(zz$return_ratio,expected_return)),identical(zz$return_signal,signal))
+  replay_count<-replay_count+1L
+ }
+ # Future/target labels are not passed to the domain scorer; native adapter
+ # mutation tests independently verify that admission itself is invariant.
+ altered<-h;outside<-!altered$issue_code %in% admitted
+ altered$gross[outside]<-altered$gross[outside]+1e9;altered$hits[outside]<-altered$hits[outside]+1e6
+ changed<-joint_grid_monitor(altered |> filter(issue_code %in% admitted),ct,ct$receipt,30,10,.8,1.2)
+ stopifnot(identical(z,changed))
+ forecasts[[id]]<-z |> mutate(issue=id,cutoff_identity=ct$receipt$cutoff_identity)
+ writeLines(jsonlite::toJSON(list(cutoff=ct$receipt$cutoff_identity,strata=ct$strata,receipt=ct$strata_receipt),auto_unbox=TRUE,digits=NA),ledger)
+ if(i%%100==0)message('Grid forecasts frozen/replayed: ',i)
+}
+close(ledger)
+f<-bind_rows(forecasts);write_csv(f,file.path(out,'forecasts.csv'))
+stopifnot(identical(code,setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)))
+provenance$verify_implementation_closure(pyroot,implementation)
+jsonlite::write_json(list(historical_admission=FALSE,source_hashes=sources,implementation=implementation,
+ parameters=list(grids=grids,delay_hours=48,window=20,alpha=.5,minimum_ess=20,recent_ess=5,
+ minimum_issues=30,minimum_expected=10,bad=.8,good=1.2),independent_cell_replays=replay_count,
+ target_mutation_replays=length(contexts),contexts_sha256=digest::digest(file=file.path(out,'contexts.json.gz'),algo='sha256'),
+ strata_sha256=digest::digest(file=file.path(out,'strata-ledgers.jsonl.gz'),algo='sha256'),
+ forecasts_sha256=digest::digest(file=file.path(out,'forecasts.csv'),algo='sha256')),
+ file.path(out,'forecasts-receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+以下仅做预测后的描述性评价。翻转率只比较相邻期且两期都可判断的同格子；未知率与支持变化另列。
+固定窗口包括全期、预热后101–784期以及700期后，不能据此触发策略。
+
+```{r}
+a<-h |> rename(issue=issue_code) |> left_join(f |> select(issue,cell,score=return_ratio,state=return_signal),
+ by=c('issue','cell'),relationship='one-to-one') |> mutate(state=replace_na(state,'UNKNOWN'),period=match(issue,order))
+windows<-tribble(~window,~start,~end,'ALL',1L,784L,'MATURE',101L,784L,'TAIL700',700L,784L)
+z<-joint_grid_stability(a,windows)
+for(n in names(z))write_csv(z[[n]],file.path(out,paste0(n,'.csv')))
+write_csv(a,file.path(out,'assessment.csv'))
+knitr::kable(z$summary |> select(window,grid,occupied_cells,active_issues,support_fraction,flip_rate,extreme_rate,support_churn,weighted_mae),digits=3)
+knitr::kable(z$states,digits=3)
+# Same calendar blocks, unchanged original stakes: no forward labels train these summaries.
+blocks<-a |> mutate(block=(period-1L)%/%50L+1L) |> group_by(grid,block) |>
+ summarise(period=max(period),support=sum(stake[state!='UNKNOWN'])/sum(stake),.groups='drop')
+write_csv(blocks,file.path(out,'blocks.csv'))
+```
+
+```{r, fig.width=11, fig.height=7}
+plot<-z$summary |> filter(window=='MATURE') |> select(grid,support_fraction,flip_rate,extreme_rate,support_churn) |>
+ pivot_longer(-grid,names_to='metric',values_to='rate') |>
+ ggplot(aes(grid,100*rate,fill=grid))+geom_col()+facet_wrap(~metric,scales='free_y')+
+ theme_minimal()+theme(legend.position='none')+labs(title='Grid stability after warm-up',x=NULL,y='Percent of stake')
+ggsave(file.path(out,'stability.png'),plot,width=11,height=7,dpi=150);plot
+```
+
+```{r, fig.width=11, fig.height=7}
+plot2<-z$states |> filter(window %in% c('MATURE','TAIL700'),state!='UNKNOWN') |>
+ ggplot(aes(state,100*roi,fill=grid))+geom_col(position='dodge')+geom_hline(yintercept=0,colour='grey50')+
+ facet_wrap(~window)+theme_minimal()+theme(legend.position='bottom')+
+ labs(title='Realized ROI after each pre-target grid signal',x='Signal from prior labels',y='ROI (%)',fill=NULL)
+ggsave(file.path(out,'forward-roi.png'),plot2,width=11,height=7,dpi=150);plot2
+```
+
+```{r, fig.width=12, fig.height=7}
+plot3<-z$cells |> filter(window=='MATURE') |> left_join(geometry,by=c('grid','cell'),relationship='one-to-one') |>
+ ggplot(aes(p_band,r_band,fill=support_fraction))+geom_tile()+geom_text(aes(label=round(100*support_fraction)),size=3)+
+ facet_wrap(~grid,scales='free')+scale_fill_viridis_c(limits=c(0,1))+theme_minimal()+
+ theme(axis.text.x=element_text(angle=35,hjust=1),legend.position='bottom')+
+ labs(title='Observed grid cells: supported share of stake (%)',x='Joint ticket probability',y='Estimated payout (CNY)',fill='Supported')
+ggsave(file.path(out,'grid-support.png'),plot3,width=12,height=7,dpi=150);plot3
+```
+
+支持度与翻转率共同判断“稳”；强弱信号后的实际ROI判断是否仍有区分能力。
+不同粒度覆盖的票集合不同，不能将某个GOOD子集的ROI直接当作可执行资金轮动收益。
+粗格子误差更小也可能仅因聚合抵消，不能单凭这个指标判优；本轮不宣称发现最优边界。
