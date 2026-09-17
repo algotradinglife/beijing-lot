@@ -1,0 +1,139 @@
+---
+title: "JOINT与128门槛：赛果组合概率分型"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  study: null
+  study_receipt_sha256: null
+  depth_report: null
+  depth_receipt_sha256: null
+  output: null
+---
+
+本报告分析已购买的赛果组合，单票概率为横轴，实际命中频率为纵轴。
+概率质量之和是预计中奖票数，不是至少中一票的概率；跨组有共享场次，不能当独立样本。
+范围是冻结784期的回顾诊断，不拟合分型阈值、不输出资金路由规则。
+沿用先前阶段：前305期、306—399期旧回撤段、400—784期后段，均为事后描述。
+
+```{r}
+library(dplyr);library(readr);library(ggplot2)
+source(file.path(params$project_root,'r/joint_ticket_calibration.R'))
+stopifnot(digest::digest(file=file.path(params$study,'evaluation-receipt.json'),algo='sha256')==params$study_receipt_sha256,
+ digest::digest(file=file.path(params$depth_report,'receipt.json'),algo='sha256')==params$depth_receipt_sha256)
+er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+dr<-jsonlite::fromJSON(file.path(params$depth_report,'receipt.json'))
+stopifnot(digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256')==er$freeze_sha256)
+fr<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'),simplifyVector=FALSE)
+stopifnot(digest::digest(file=file.path(params$depth_report,'groups.csv'),algo='sha256')==dr$outputs[['groups.csv']])
+g<-read_csv(file.path(params$depth_report,'groups.csv'),col_types=cols(issue='c'),show_col_types=FALSE) |> filter(arm=='JOINT')
+stopifnot(!anyDuplicated(g[c('issue','sleeve_id')]))
+tables<-list()
+for(path in names(fr$receipt$plan_hashes)) {
+ stopifnot(digest::digest(file=path,algo='sha256')==fr$receipt$plan_hashes[[path]])
+ p<-jsonlite::fromJSON(gzfile(path),simplifyVector=FALSE)
+ for(arm in c('P0_OPEN','P128_OPEN')) {
+  t<-bind_rows(p$plans[[arm]]$tickets)
+  if(!nrow(t))next
+  t<-t |> mutate(issue=p$issue,policy=arm,stake=2) |>
+   left_join(g |> select(issue,sleeve_id,actual_rank,actual_gross_cny,stage),
+    by=c('issue','sleeve_id'),relationship='many-to-one') |>
+   mutate(hit=prob_rank==actual_rank,gross=if_else(hit,actual_gross_cny,0))
+  stopifnot(!anyNA(t$hit))
+  tables[[length(tables)+1L]]<-t
+ }
+}
+x<-bind_rows(tables)
+stopifnot(digest::digest(file=file.path(params$study,'rows.csv'),algo='sha256')==er$files[['rows.csv']])
+r<-read_csv(file.path(params$study,'rows.csv'),col_types=cols(issue='c'),show_col_types=FALSE)
+check<-x |> group_by(issue,policy) |> summarise(rebuilt_hits=sum(hit),rebuilt_gross=sum(gross),rebuilt_stake=sum(stake),.groups='drop') |>
+ left_join(r,by=c('issue','policy'),relationship='one-to-one')
+stopifnot(all(check$rebuilt_hits==check$hits),all(abs(check$rebuilt_gross-check$gross)<1e-6),all(check$rebuilt_stake==check$stake))
+breaks<-c(0,.001,.002,.003,.005,.01,.02,1)
+z<-joint_ticket_calibration(x,breaks)
+out<-params$output;dir.create(out,recursive=TRUE,showWarnings=FALSE)
+write_csv(z$bins,file.path(out,'bins.csv'));write_csv(z$types,file.path(out,'types.csv'))
+summary<-x |> group_by(policy,stage) |> summarise(tickets=n(),issues=n_distinct(issue),expected_hits=sum(prob),actual_hits=sum(hit),stake=sum(stake),gross=sum(gross),.groups='drop') |> mutate(hit_ratio=actual_hits/expected_hits,roi=(gross-stake)/stake)
+write_csv(summary,file.path(out,'summary.csv'))
+knitr::kable(summary,digits=4)
+```
+
+## 单票概率与实际命中频率
+
+每个点对应一个固定概率区间，横轴是区间内平均模型概率；虚线表示完全校准。
+点大小表示实际中奖票数；零命中的区间仍保留。没有绘制假设票独立的置信区间。
+
+```{r}
+b<-z$bins |> filter(stage!='ALL')
+p1<-ggplot(b,aes(mean_probability*100,hit_rate*100,colour=stage,group=stage))+
+ geom_abline(slope=1,intercept=0,linetype=2,colour='grey50')+geom_line()+geom_point(aes(size=actual_hits))+
+ facet_wrap(~policy)+theme_minimal()+labs(x='Mean model ticket probability (%)',y='Observed ticket hit rate (%)',size='Winning tickets',colour='Phase')
+ggsave(file.path(out,'calibration.png'),p1,width=11,height=5,dpi=150);p1
+p1zoom<-(p1 %+% filter(b,mean_probability<.01))+coord_cartesian(xlim=c(0,1),ylim=c(0,1))
+ggsave(file.path(out,'calibration-main.png'),p1zoom,width=11,height=5,dpi=150);p1zoom
+knitr::kable(b |> select(policy,stage,band,tickets,actual_hits,expected_hits,hit_ratio,roi),digits=3)
+```
+
+## 同一组内的累计覆盖率
+
+一组不同组合互斥，因此可以直接相加；跨组不能这样做。少于30组的格子不连线，并标注支持数；30只是展示门槛，不是统计显著性或决策准入标准。
+
+```{r}
+groups<-x |> group_by(issue,policy,sleeve_id,stage) |>
+ summarise(coverage=sum(prob),hit=any(hit),stake=sum(stake),gross=sum(gross),.groups='drop')
+stopifnot(all(groups$coverage<=1+1e-10))
+group_bins<-groups |> mutate(band=cut(coverage,c(0,.15,.2,.25,.3,.4,.5,1),include.lowest=TRUE)) |>
+ group_by(policy,stage,band) |> summarise(groups=n(),issues=n_distinct(issue),expected_hits=sum(coverage),actual_hits=sum(hit),mean_coverage=mean(coverage),hit_rate=mean(hit),stake=sum(stake),gross=sum(gross),.groups='drop')
+write_csv(group_bins,file.path(out,'group-bins.csv'))
+p4<-ggplot(group_bins,aes(mean_coverage*100,hit_rate*100,colour=stage,group=stage))+
+ geom_abline(slope=1,intercept=0,linetype=2,colour='grey50')+
+ geom_line(data=filter(group_bins,groups>=30))+geom_point(aes(size=groups,shape=groups>=30))+
+ geom_text(data=filter(group_bins,groups<30),aes(label=paste0('n=',groups)),vjust=-.7,size=3,show.legend=FALSE)+
+ facet_wrap(~policy)+theme_minimal()+labs(x='Mean purchased group coverage (%)',y='Observed group hit rate (%)',colour='Phase',size='Groups')
+ggsave(file.path(out,'group-calibration.png'),p4,width=11,height=5,dpi=150);p4
+knitr::kable(group_bins,digits=3)
+```
+
+## 概率区间与资金回报
+
+ROI按实际北单SP结算，包含一次0.65。命中频率改善不自动代表ROI改善。
+
+```{r}
+p2<-ggplot(b,aes(band,roi*100,fill=stage))+geom_col(position='dodge')+geom_hline(yintercept=0)+facet_wrap(~policy)+theme_minimal()+theme(axis.text.x=element_text(angle=35,hjust=1))+labs(x='Model ticket probability interval',y='ROI (%)',fill='Phase')
+ggsave(file.path(out,'band-roi.png'),p2,width=12,height=5,dpi=150);p2
+p3<-ggplot(z$types |> filter(stage!='ALL'),aes(band,payout_band,fill=hit_ratio))+geom_tile()+facet_grid(stage~policy)+scale_fill_gradient2(midpoint=1,low='#b2182b',mid='white',high='#2166ac',na.value='grey85')+theme_minimal()+theme(axis.text.x=element_text(angle=35,hjust=1))+labs(x='Model ticket probability interval',y='Estimated payout interval (CNY)',fill='Actual / expected hits')
+ggsave(file.path(out,'type-calibration.png'),p3,width=12,height=8,dpi=150);p3
+```
+
+分型先采用“单票概率×预计回款”两个可解释维度。低支持格子不能直接变成资金分配规则；
+后续若使用历史分型调整资金，必须另走截止时间约束的学习与验证流程。
+
+## 主要发现与分型用途
+
+JOINT的前段、回撤段、后段分别中奖443/114/660票，预计420.0/131.8/627.4票，
+实现比例105.5%/86.5%/105.2%。相应ROI为25.47%/−28.48%/2.45%。
+前段与后段的命中实现比例接近，收益却相差很大，支持把命中与价格实现分开诊断。
+统计中的285/89/379期是有投注的期数，完整阶段仍为305/94/385期；未投注期不产生票级观察。
+
+回撤段，0.2%—0.3%单票概率区间预计中奖54.4票、实际38票，实现69.8%；
+0.3%—0.5%区间预计27.9、实际18，实现64.5%。两个区间分别亏损约1.59万元和0.59万元，
+合计约占该段净亏损的91.4%。低概率0.1%—0.2%区间命中实现111.1%，仍亏损11.4%，
+说明“命中没有少”也可能因回款不足亏损。
+
+全期JOINT的0.3%—0.5%区间ROI为−13.33%，但前段、回撤段、后段的实现比例分别为76.1%、64.5%、103.2%；
+不能说这个概率区间一直预测差，也不能从暴露样本直接定为永久禁投区。
+统一128在回撤段仅中奖99票，预计126.8票，实现78.1%，没有修复该阶段的问题。
+
+建议将组合标注为两层：第一层“模型概率区间×预计回款区间”，用于检查命中实现、回款和资金占比；
+第二层再补充组内排名、七场中Top1/Top2/Top3构成与场次复用程度，解释第一层差异。
+本报告实测第一层及组累计覆盖；第二层尚未测算，不能把其机制当作已证实原因。
+
+历史诊断可归为：命中不足型、命中达标但回款不足型、命中与回款均较好型、证据不足型。
+这些是看到结算后的状态描述；实际分配资金时只能用此前历史对目标组合分型，不能用其最终结果标记后再下注。
+本轮不据此自动调整资金，也不把重叠票数当成独立样本量或计算独立二项置信区间。
