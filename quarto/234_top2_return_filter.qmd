@@ -1,0 +1,172 @@
+---
+title: "Top2低回款票过滤：固定原组、现金与再分配"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+## 冻结比较口径
+
+本研究使用前一诊断的全部939期、原分散Top2选组，不重新清洗或训练。
+早期105期为原市场概率，旧784期和新增50期为归档校正p列；估算SP均来自q列的倒数。
+单位票2元，七串一，预算上限1024元，中奖回款仅乘一次0.65。
+门槛为**一张2元票中奖时的估算总回款**，不是净利润或实际北单结算SP。
+固定128、256、512、1024元四档，全数报告，不根据本次结算选择参数。
+
+- BASE：保留原选组的全部Top2票。
+- CASH：仅删除估算回款低于门槛的票，省下的钱保留现金。
+- REFILL：保留CASH票；用删除票节省的资金，从原候选池其他组的合格Top2票中，
+  按单票概率降序买入，估算期望回款、组ID及编码依次破同分。不重复买同一票。
+  这不是原组内的纯过滤，可能增加组数和重叠风险；不另加复用限制，也不动原有现金。
+
+概率、门槛、购票方案全部在本次读取结算前冻结。历史结果已暴露，旧概率可用时点
+未重新证明，因此只作回顾诊断，不声称是未见数据验证或未来准入策略。
+选票没有拟合历史参数；沿用共享temporal_learning验证显式场次cutoff，禁止标签进入规划接口。
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+modules<-c('n7_joint_sleeves','top2_return_filter','eight_strategy_validation','diagnostic_verified_csv',
+ 'fundamentals_equity_curves','n7_purchase_accounting','legacy_strategy_comparison')
+code_files<-c(paste0('r/',modules,'.R'),'quarto/234_top2_return_filter.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+reticulate::use_python(cfg$python,required=TRUE)
+provenance<-reticulate::import('src.temporal_learning.provenance')
+implementation<-provenance$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.fundamentals_n7_baseline'),distributions=list('numpy','pandas'))
+stopifnot(!dir.exists(cfg$output),digest::digest(file=cfg$source$path,algo='sha256')==cfg$source$sha256)
+prior<-jsonlite::fromJSON(cfg$source$path)
+report_path<-prior$config$report$path
+stopifnot(digest::digest(file=report_path,algo='sha256')==prior$config$report$sha256)
+r<-jsonlite::fromJSON(report_path)
+reference<-diagnostic_read_verified_csv(file.path(dirname(cfg$source$path),'periods.csv'),prior$files[['periods.csv']],cols(issue='c')) |>
+ filter(policy=='TOP2_DIVERSE')
+stopifnot(nrow(reference)==length(r$issues),setequal(reference$issue,r$issues))
+dir.create(file.path(cfg$output,'plans'),recursive=TRUE)
+bindings<-sources<-parents<-list();index<-0L
+# No label files opened in this phase. Freeze all issue plans before settlement.
+for(part in seq_len(nrow(r$config$reports))) {
+ entry<-r$config$reports[part,]
+ stopifnot(digest::digest(file=entry$receipt,algo='sha256')==entry$sha256)
+ parent<-jsonlite::fromJSON(entry$receipt);parents[[part]]<-parent;pr<-parent$config
+ stopifnot(digest::digest(file=pr$top2$receipt,algo='sha256')==pr$top2$sha256)
+ freeze<-jsonlite::fromJSON(pr$top2$receipt,simplifyVector=FALSE)
+ for(id in parent$issues) {
+  b<-freeze$bindings[[id]];stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+  s<-readRDS(b$path)$fresh
+  z<-top2_return_filter_plan(s,s$cutoffs,cfg$python,cfg$thresholds,cfg$n,cfg$budget_cny,cfg$unit_cny,cfg$payout_factor)
+  path<-file.path(cfg$output,'plans',paste0(id,'.rds'));saveRDS(z,path)
+  bindings[[id]]<-list(path=path,sha256=digest::digest(file=path,algo='sha256'))
+  sources[[id]]<-b
+  index<-index+1L;if(index%%100==0)message('FROZEN ',index)
+ }
+}
+stopifnot(setequal(names(bindings),r$issues),!anyDuplicated(names(bindings)))
+jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',generated_at=format(Sys.time(),tz='UTC',usetz=TRUE),config=cfg,code=code,implementation=implementation,
+ bindings=bindings,sources=sources,historical_admission=FALSE),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+freeze_hash<-digest::digest(file=file.path(cfg$output,'freeze.json'),algo='sha256')
+```
+
+## 结算与可复现性
+
+BASE必须逐期复现已核验的原Top2金额及命中组数。CASH严格是原票子集；
+报告省下的投入与丢失的实际奖金。REFILL单列新增票的投入与回款。
+完整计划影子账本用于受控比较，可能低于零；资金账本从10万元开始，买不起整期计划时永久停投，
+不借款、不补本金。各阶段单独展示时各自初始化本金，ALL为连续全历史账户。
+
+```{r}
+rows<-details<-list()
+for(part in seq_len(nrow(r$config$reports))) {
+ parent<-parents[[part]];pr<-parent$config
+ labels<-bind_rows(lapply(seq_len(nrow(pr$labels)),function(i)
+  diagnostic_read_verified_csv(pr$labels$path[i],pr$labels$sha256[i],cols(issue='c',provider_id='c')) |>
+   select(issue,slot,provider_id,handicap,status,actual_direction,spf_sp)))
+ for(id in parent$issues) {
+  b<-bindings[[id]];stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+  z<-top2_return_filter_settle(readRDS(b$path),filter(labels,issue==id))
+  ref<-filter(reference,issue==id);brow<-filter(z$rows,policy=='BASE')
+  stopifnot(nrow(ref)==1,brow$stake==ref$stake,brow$hits==ref$hits,abs(brow$gross-ref$gross)<1e-7)
+  rows[[id]]<-mutate(z$rows,stage=ref$cohort);details[[id]]<-mutate(z$groups,stage=ref$cohort)
+ }
+}
+x<-bind_rows(rows);g<-bind_rows(details)
+base<-filter(x,policy=='BASE') |> select(issue,base_stake=stake,base_gross=gross,base_hits=hits)
+bridge<-x |> left_join(base,by='issue',relationship='many-to-one') |>
+ mutate(saved_cny=base_stake-retained_tickets*cfg$unit_cny,lost_gross=base_gross-retained_gross,
+  refill_stake=added_tickets*cfg$unit_cny,net_change=net-(base_gross-base_stake))
+stopifnot(all(abs(bridge$net_change-(bridge$saved_cny-bridge$lost_gross+bridge$added_gross-bridge$refill_stake))<1e-7),
+ all(x$stake<=cfg$budget_cny),all(bridge$lost_gross>= -1e-7))
+account<-mutate(x,model='FROZEN',budget_cny=cfg$budget_cny,cash_cny=cfg$budget_cny-stake,
+ status=if_else(stake>0,'COMPLETE','NO_BET'))
+a<-legacy_strategy_comparison(account,sort(r$issues),c('EARLY105','OLD784','NEW50'),'BASE',cfg$initial_capital_cny)
+a$summary |> filter(evaluation=='ALL') |> select(accounting_basis,policy,stake_cny,net_cny,roi_percent,hit_issues,profit_issues,max_drawdown_cny,minimum_equity_cny,stopped_issues) |> knitr::kable(digits=2)
+a$summary |> filter(evaluation!='ALL',accounting_basis=='SHADOW') |> select(evaluation,policy,net_cny,roi_percent,hit_issues,max_drawdown_cny) |> knitr::kable(digits=2)
+bridge_summary<-bind_rows(mutate(bridge,evaluation='ALL'),mutate(bridge,evaluation=stage)) |>
+ group_by(evaluation,policy) |> summarise(issues=n(),saved_cny=sum(saved_cny),lost_gross=sum(lost_gross),
+ refill_stake=sum(refill_stake),added_gross=sum(added_gross),net_change=sum(net_change),
+ mean_groups=mean(bought_groups),mean_unique_fixtures=mean(unique_fixtures),mean_max_uses=mean(max_group_uses),.groups='drop')
+bridge_summary |> filter(evaluation=='ALL') |> knitr::kable(digits=2)
+a$paired |> filter(evaluation=='ALL',accounting_basis=='SHADOW') |> knitr::kable(digits=2)
+a$trimmed |> filter(evaluation=='ALL',accounting_basis=='SHADOW') |> knitr::kable(digits=2)
+```
+
+## 直接诊断结论
+
+```{r results='asis'}
+full<-filter(a$summary,evaluation=='ALL',accounting_basis=='SHADOW')
+original<-filter(full,policy=='BASE')
+cash<-filter(full,grepl('^CASH_',policy));refill<-filter(full,grepl('^REFILL_',policy))
+cat(sprintf('在全部%d期计划账本中，四档留现金方案有%d档净收益高于原版、%d档ROI高于原版；四档再分配方案有%d档净收益高于原版。\n\n',
+ length(r$issues),sum(cash$net_cny>original$net_cny),sum(cash$roi_percent>original$roi_percent),sum(refill$net_cny>original$net_cny)))
+cat('这些是固定档位的回顾比较，不据此自动选择未来门槛。现金版的净收益变化严格等于省下投入减去丢失奖金；再分配还需加上新增票的净收益。各阶段是否同向见上表。\n')
+```
+
+## 收益与回撤
+
+```{r}
+plotdata<-a$curves |> filter(evaluation=='ALL') |> mutate(mode=if_else(grepl('REFILL',policy),'REFILL','CASH'))
+plotdata<-bind_rows(plotdata,filter(plotdata,policy=='BASE') |> mutate(mode='REFILL'))
+p1<-ggplot(plotdata,aes(period,equity_cny,color=policy))+geom_line()+
+ facet_grid(accounting_basis~mode)+theme_minimal()+labs(x='Issue',y='Account CNY')
+p2<-ggplot(plotdata,aes(period,drawdown_cny,color=policy))+geom_line()+
+ facet_grid(accounting_basis~mode)+theme_minimal()+labs(x='Issue',y='Drawdown CNY')
+p1;p2
+p3<-bridge_summary |> filter(evaluation=='ALL',policy!='BASE') |>
+ select(policy,saved_cny,lost_gross,refill_stake,added_gross) |>
+ pivot_longer(-policy,names_to='component',values_to='cny') |>
+ ggplot(aes(policy,cny,fill=component))+geom_col(position='dodge')+theme_minimal()+
+ theme(axis.text.x=element_text(angle=35,hjust=1))+labs(x=NULL,y='CNY')
+p3
+```
+
+## 输出与限制
+
+选择基于归档p、定价基于q，两者不是同一列。当p=q时每票估算期望回款恒为1.30元，
+不能靠该期望值识别套利。低回款过滤改变所买赛果和概率质量；最大回撤下降可能仅源于少投入。
+REFILL从其他组补票，重叠变化另列，不能把收益变化全部归因于原组过滤。
+当前结果只评价这四个固定阈值和明确的补票方法，不能证明所有过滤方法均有效或无效。
+
+```{r}
+tables<-list(periods=x,groups=g,bridge=bridge,bridge_summary=bridge_summary,summary=a$summary,
+ curves=a$curves,paired=a$paired,trimmed=a$trimmed)
+for(n in names(tables))write_csv(tables[[n]],file.path(cfg$output,paste0(n,'.csv')))
+ggsave(file.path(cfg$output,'equity.png'),p1,width=14,height=8,dpi=150)
+ggsave(file.path(cfg$output,'drawdown.png'),p2,width=14,height=8,dpi=150)
+ggsave(file.path(cfg$output,'cash-bridge.png'),p3,width=12,height=6,dpi=150)
+stopifnot(digest::digest(file=file.path(cfg$output,'freeze.json'),algo='sha256')==freeze_hash,
+ identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)),
+ identical(implementation,provenance$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.fundamentals_n7_baseline'),distributions=list('numpy','pandas'))))
+files<-list.files(cfg$output,full.names=TRUE);files<-files[!dir.exists(files)]
+jsonlite::write_json(list(status='DIAGNOSTIC_PENDING_REVIEW',config=cfg,code=code,implementation=implementation,
+ freeze_sha256=freeze_hash,issues=sort(r$issues),historical_admission=FALSE,
+ files=setNames(lapply(files,function(p)digest::digest(file=p,algo='sha256')),basename(files))),
+ file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
