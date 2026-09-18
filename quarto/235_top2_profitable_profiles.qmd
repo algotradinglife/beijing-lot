@@ -1,0 +1,197 @@
+---
+title: "盈利组合画像：Top2保留、删去与新增票的全体对照"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+## 问题与证据范围
+
+本研究诊断已冻结939期、512元门槛的票，不重新选场或调参数。
+只看中奖票会产生幸存者偏差，因此每类包含全部投入及未中奖票。
+RETAINED、REMOVED、ADDED互斥：保留票、删除票、补入票。
+原版=保留+删除；补票版=保留+新增。组ID只在同一期原候选宇宙内有效。
+
+预先固定画像：第二赛果数量、最弱一腿概率、概率至少50%的腿数、
+概率低于30%的腿数、最大单腿对log(SP乘积)的贡献、
+七场组Top2覆盖及Top64占比、达到20%覆盖所需Top2票数、
+补票方案内相同场次同方向的资金暴露比例。
+Top64和覆盖深度只在128个Top2状态内定义；达不到20%时记缺失。
+所有票均为Top2，第三赛果在本研究中没有变化，不能评价其价值。
+
+分箱仅作描述，全部预先记录于配置，不按收益挑门槛。
+按早105期RAW、旧784期归档p列、新50期归档p列分别报告；三段均已暴露，非未见验证。
+保留每格的期数和中奖期数，去掉该格自身最大1/3/5个盈利期的投入和回款，
+不把重叠票当独立样本。不输出未来选票规则；转成策略需要共享cutoff学习验收。
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+modules<-c('top2_ticket_profiles','top2_return_filter','eight_strategy_validation','diagnostic_verified_csv')
+code_files<-c(paste0('r/',modules,'.R'),'quarto/235_top2_profitable_profiles.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+stopifnot(!dir.exists(cfg$output),digest::digest(file=cfg$source$path,algo='sha256')==cfg$source$sha256,
+ digest::digest(file=cfg$acceptance$path,algo='sha256')==cfg$acceptance$sha256)
+accepted<-jsonlite::fromJSON(cfg$acceptance$path)
+stopifnot(accepted$status=='ACCEPTED_EXPOSED_DIAGNOSTIC',accepted$proof$receipt_sha256==cfg$source$sha256)
+r<-jsonlite::fromJSON(cfg$source$path)
+freeze_path<-file.path(dirname(cfg$source$path),'freeze.json')
+stopifnot(digest::digest(file=freeze_path,algo='sha256')==r$freeze_sha256)
+freeze<-jsonlite::fromJSON(freeze_path,simplifyVector=FALSE)
+# Build the verified label-source chain now; keep parsed receipts immutable.
+prior_path<-r$config$source$path;stopifnot(digest::digest(file=prior_path,algo='sha256')==r$config$source$sha256)
+prior<-jsonlite::fromJSON(prior_path)
+stopifnot(digest::digest(file=prior$config$report$path,algo='sha256')==prior$config$report$sha256)
+report<-jsonlite::fromJSON(prior$config$report$path);parents<-list()
+for(i in seq_len(nrow(report$config$reports))) {
+ e<-report$config$reports[i,];stopifnot(digest::digest(file=e$receipt,algo='sha256')==e$sha256)
+ parents[[i]]<-jsonlite::fromJSON(e$receipt)
+}
+features<-list();index<-0L
+for(id in r$issues) {
+ b<-freeze$bindings[[id]];stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+ plan<-readRDS(b$path)
+ features[[id]]<-top2_ticket_profiles(plan,plan$cutoffs,cfg$threshold,cfg$core_probability,cfg$weak_probability,cfg$coverage_target)
+ index<-index+1L;if(index%%100==0)message('FEATURES ',index)
+}
+dir.create(cfg$output,recursive=TRUE)
+saveRDS(features,file.path(cfg$output,'features.rds'))
+feature_hash<-digest::digest(file=file.path(cfg$output,'features.rds'),algo='sha256')
+jsonlite::write_json(list(status='FEATURES_FROZEN_BEFORE_LABEL_READ',config=cfg,code=code,
+ generated_at=format(Sys.time(),tz='UTC',usetz=TRUE),feature_sha256=feature_hash,
+ source_receipt_sha256=cfg$source$sha256,historical_admission=FALSE),file.path(cfg$output,'feature-freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+## 完整票群与金额核对
+
+```{r}
+reference<-diagnostic_read_verified_csv(file.path(dirname(cfg$source$path),'periods.csv'),r$files[['periods.csv']],cols(issue='c'))
+rows<-list()
+for(parent in parents) {
+ pr<-parent$config
+ labels<-bind_rows(lapply(seq_len(nrow(pr$labels)),function(i)
+  diagnostic_read_verified_csv(pr$labels$path[i],pr$labels$sha256[i],cols(issue='c',provider_id='c')) |>
+   select(issue,slot,provider_id,handicap,status,actual_direction,spf_sp)))
+ for(id in parent$issues) {
+  b<-freeze$bindings[[id]];stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+  z<-top2_ticket_profile_labels(features[[id]],readRDS(b$path),filter(labels,issue==id))
+  ref<-filter(reference,issue==id);base<-filter(ref,policy=='BASE');new<-filter(ref,policy==paste0('REFILL_',cfg$threshold))
+  stopifnot(abs(sum(z$gross[z$role=='RETAINED'])-new$retained_gross)<1e-7,
+   abs(sum(z$gross[z$role=='ADDED'])-new$added_gross)<1e-7,
+   abs(sum(z$gross[z$role=='REMOVED'])-(base$gross-new$retained_gross))<1e-7,
+   sum(z$stake[z$role=='RETAINED'])==new$retained_tickets*2,
+   sum(z$stake[z$role=='ADDED'])==new$added_tickets*2,
+   sum(z$stake[z$role=='REMOVED'])==base$stake-new$retained_tickets*2)
+  rows[[id]]<-mutate(z,cohort=base$stage)
+ }
+}
+x<-bind_rows(rows)
+a<-top2_ticket_profile_summary(x,cfg$breaks,cfg$trim_k,sort(r$issues))
+a$summary |> filter(feature=='ALL') |> select(evaluation,role,issues,tickets,hit_issues,hits,stake_cny,net_cny,roi_percent,expected_hits,hit_ratio) |> knitr::kable(digits=2)
+a$trimmed |> filter(feature=='ALL') |> knitr::kable(digits=2)
+```
+
+## 概率与回款形态
+
+每条曲线均以该类所有票为分母，而非赢家构成。收益率是实际北单SP结算结果；
+概率和估算SP只来自冻结p/q。分类差异不自动代表因果作用，尤其第二赛果数量、
+最弱腿概率和估算回款彼此相关。
+
+```{r}
+second<-filter(a$summary,feature=='second_count')
+p1<-ggplot(second,aes(bin,roi_percent,color=evaluation,group=evaluation))+geom_hline(yintercept=0,linetype=2)+
+ geom_line()+geom_point()+facet_wrap(~role)+theme_minimal()+labs(x='Number of second-ranked outcomes',y='ROI %')
+p1
+shape<-filter(a$summary,feature %in% c('min_leg_p','max_log_sp_share','top2_mass','top64_share'))
+p2<-ggplot(shape,aes(evaluation,bin,fill=roi_percent))+geom_tile()+
+ geom_text(aes(label=paste0(round(roi_percent),'% / ',hit_issues)),size=2.5)+
+ facet_grid(feature~role,scales='free_y',space='free_y')+
+ scale_fill_gradient2(low='#b2182b',mid='white',high='#2166ac',midpoint=0,limits=c(-100,100),oob=scales::squish)+
+ theme_minimal()+theme(axis.text.x=element_text(angle=45,hjust=1))+
+ labs(x='Cohort',y='Fixed bin',fill='ROI %',subtitle='Cell: ROI / hit issues; colors clipped to +/-100%, labels untruncated')
+p2
+```
+
+## 主体加少量分歧、以及复用集中度
+
+CORE4+仅指至少四腿所选赛果的模型概率≥50%，不保证这些腿实际更可靠。
+WEAK≤1指至多一腿所选赛果概率<30%。SP集中指单腿贡献≥30%的log(SP乘积)。
+复用指标基于已冻结REFILL组合，是方案内风险暴露特征，不是场次独立属性；
+删除票上的该指标只是其若被保留时对应的方向暴露，不能解释为实际新增投入。
+
+```{r}
+a$summary |> filter(feature %in% c('core_weak','second_sp')) |>
+ select(evaluation,role,feature,bin,issues,hit_issues,stake_cny,net_cny,roi_percent) |> knitr::kable(digits=2)
+p3<-filter(a$summary,feature=='max_refill_direction_exposure') |>
+ ggplot(aes(bin,roi_percent,color=evaluation,group=evaluation))+geom_hline(yintercept=0,linetype=2)+
+ geom_point()+geom_line()+facet_wrap(~role)+theme_minimal()+theme(axis.text.x=element_text(angle=35,hjust=1))+
+ labs(x='Largest shared-direction ticket fraction',y='ROI %')
+p3
+trim<-a$trimmed |> filter(feature %in% c('ALL','second_count'),k==3)
+p4<-filter(a$summary,feature %in% c('ALL','second_count')) |>
+ select(evaluation,role,feature,bin,roi_percent) |> mutate(version='FULL') |>
+ bind_rows(trim |> select(evaluation,role,feature,bin,roi_percent) |> mutate(version='REMOVE_BEST3_ISSUES')) |>
+ filter(evaluation=='ALL') |> mutate(cell=paste(feature,bin)) |>
+ ggplot(aes(cell,roi_percent,color=version,group=version))+geom_hline(yintercept=0,linetype=2)+
+ geom_point()+geom_line()+facet_wrap(~role)+theme_minimal()+theme(axis.text.x=element_text(angle=40,hjust=1))+
+ labs(x='Ticket class',y='ROI %')
+p4
+```
+
+## 验证结论
+
+本次数据不支持把“盈利画像”直接当作稳定选票规则。新增票的盈利集中于旧784期，
+早105期和新50期亏损；删除票和新增票的合计正收益都经不起去掉各自最大三个盈利期。
+
+```{r}
+portrait<-filter(a$summary,evaluation=='ALL',role=='ADDED',
+ (feature=='second_count' & bin=='2') | (feature=='min_leg_p' & bin=='[0.25,0.35)') |
+ (feature=='max_log_sp_share' & bin=='[0.2,0.3)') | (feature=='top2_mass' & bin=='[0.15,0.2)') |
+ (feature=='top64_share' & bin=='[0.75,0.85)')) |>
+ select(role,feature,bin,stake_cny,hit_issues,roi_percent) |>
+ left_join(filter(a$trimmed,evaluation=='ALL',k==3) |> select(role,feature,bin,trim3_roi=roi_percent),
+ by=c('role','feature','bin'),relationship='one-to-one')
+portrait |> knitr::kable(digits=2)
+consistency<-filter(a$summary,evaluation!='ALL') |> group_by(role,feature,bin) |>
+ summarise(cohorts=n(),positive=sum(roi_percent>0),minimum_hit_issues=min(hit_issues),.groups='drop')
+consistency |> filter(cohorts==3,positive==3) |> knitr::kable()
+filter(a$summary,feature=='ALL') |> select(evaluation,role,net_cny,model_net,outcome_residual,price_residual) |>
+ knitr::kable(digits=2)
+```
+
+上表是同一批新增票的几个重叠视角，不能把净收益相加，也不是同时满足条件的组合策略。
+“至少四条50%概率腿、至多一条30%以下腿”的新增票只有三个中奖期；样本不足，
+不能支持最初的高可信主体假设。单腿SP贡献超过30%的新增票同样稀少，不能据此判断其必然不好。
+新增票的总命中票数接近模型期望，但分阶段并不稳定；估算净收益仍负，
+实际盈利由正的结算价格差额支持。这是会计分解，不证明能在赛前预测北单价格优势。
+
+## 解释边界与输出
+
+这是一份分型诊断，不把样本内盈利格子自动作为未来策略。看似盈利但只由少数期支撑、
+分阶段方向不一致、去掉大奖后反转的类别，不能据此断言有稳定优势。
+Top2票群不能支持关于第三赛果的推断。早期RAW和后续校正概率混合后的合计不能替代分阶段检验。
+
+```{r}
+write_csv(x,file.path(cfg$output,'tickets.csv'))
+for(n in names(a))write_csv(a[[n]],file.path(cfg$output,paste0(n,'.csv')))
+ggsave(file.path(cfg$output,'second-outcomes.png'),p1,width=13,height=5,dpi=150)
+ggsave(file.path(cfg$output,'shape-grid.png'),p2,width=15,height=12,dpi=150)
+ggsave(file.path(cfg$output,'reuse.png'),p3,width=13,height=5,dpi=150)
+ggsave(file.path(cfg$output,'tail-stress.png'),p4,width=13,height=5,dpi=150)
+stopifnot(digest::digest(file=file.path(cfg$output,'features.rds'),algo='sha256')==feature_hash,
+ identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+files<-list.files(cfg$output,full.names=TRUE)
+jsonlite::write_json(list(status='DIAGNOSTIC_PENDING_REVIEW',config=cfg,code=code,issues=r$issues,
+ source_receipt_sha256=cfg$source$sha256,historical_admission=FALSE,
+ files=setNames(lapply(files,function(p)digest::digest(file=p,algo='sha256')),basename(files))),
+ file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```

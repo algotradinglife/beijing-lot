@@ -95,3 +95,10 @@ Top1准确率、Top1/Top2召回率与Top2漏选数。正让球加到主队比分
 - `r/strategy_line_alignment.R::strategy_line_alignment(frame, breaks)`：只读描述性函数；每行为 issue/slot/provider_id/model，要求 stage、有符号整数 handicap、实际主客进球及正值归一化 p_W/p_D/p_L。返回场次净方向残差、分让球数的三分类校准、实际非让平子样本的 W/(W+L) 分箱、去除模型重复后的实际距让球线分布。比率为0–1，净胜球为球；净方向残差不是球数。无拟合、无 I/O、无决策阈值；无预测比分网格时不能识别预测位置/尾部误差。
 - 测试：`tests/testthat/test-strategy-line-alignment.R`，包括让球符号、跨模型赛果一致性、保持W:L比例的等价性、全让平、精确平手弃判、重复/缺失/非法概率失败。
 - 入口：`quarto/171_line_alignment_diagnostic.qmd`；显式 study/catalog_sha256/python/output，固定回撤94期与原200期、其他新增期对照。复用 `strategy_composition_diagnostics` 分离构成和类内变化，不输出未来校正参数。
+
+## 冻结Top2票群的盈利画像
+
+- `r/top2_ticket_profiles.R::top2_ticket_profiles(plan,cutoffs,threshold,core_probability,weak_probability,coverage_target)`：对已冻结BASE及REFILL票取并集，互斥标记RETAINED/REMOVED/ADDED；提取所选赛果的Top1/Top2数量、最弱概率、模型高概率腿数、log-SP贡献集中度、组内Top2质量/Top64占比/覆盖深度及同方向资金复用。Top64和深度仅在128个Top2状态中定义；目标不可达时深度为NA。显式cutoff只绑定旧计划，不新增历史可用性证明；拒绝空原计划，不拟合或选票。
+- 同模块 `top2_ticket_profile_labels(features,plan,labels)`：在特征冻结后接入READY标签，复用权威Top2结算接口；完整身份核验，输出一票一行，未中奖票同样保留。
+- 同模块 `top2_ticket_profile_summary(tickets,breaks,trim_k,issue_order)`：固定描述性分箱，全体投入为分母，分阶段/票群汇总，并剔除各格自己的最大盈利期（成本和回款同时剔除）。不把重叠票当独立样本，不把样本内盈利格转为未来准入规则。
+- 测试 `tests/testthat/test-top2-ticket-profiles.R` 含三个阶段不同赢家、并列、亏损期、1/3/5期剔除、异质概率的精确Top64/深度/熵及逐腿复用验证。独立脚本 `scripts/check_top2_ticket_profiles.R` 重算票级特征与SP结算、分阶段身份、所有分箱及去极值表。入口 `quarto/235_top2_profitable_profiles.qmd`。
