@@ -1,0 +1,69 @@
+{
+  "schema": "zero_handicap_diagnostic_v1",
+  "study": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/issue459-expanded-v1",
+  "scope": "All 12 frozen expansion batches; original 200 issues excluded because these projection inputs cover the additional 295.",
+  "batches": [
+    {
+      "batch": "batch-000",
+      "receipt_sha256": "100ec380f6876a18865aff0a52869e9d661e6ddc9379538e0b163755acc83564"
+    },
+    {
+      "batch": "batch-001",
+      "receipt_sha256": "0afd4ffc858bc3235b61355df5f1e4df061a2d79c603bc2d05df18497b67a722"
+    },
+    {
+      "batch": "batch-002",
+      "receipt_sha256": "7a5bef57f94410cbbff0e4d5d90f9b0721310d1ede550d2d370ff54601f6426c"
+    },
+    {
+      "batch": "batch-003",
+      "receipt_sha256": "4aff8da553bc5524dfd5e5f0547bc2257416a181a011b553a27b72d886be3d63"
+    },
+    {
+      "batch": "batch-004",
+      "receipt_sha256": "2b8c5809b27a3233747209c2f46b0b111b1fa7efcd77aa43c476273b00f39085"
+    },
+    {
+      "batch": "batch-005",
+      "receipt_sha256": "9c143cb65e4f70931284495247c2b04c82f94ce165bdca873b59ec90acf47791"
+    },
+    {
+      "batch": "batch-006",
+      "receipt_sha256": "0b4b54dd07bd12b24719c70baab3c059da7a2e14986baeb821a5cbad388e0f28"
+    },
+    {
+      "batch": "batch-007",
+      "receipt_sha256": "570bd1fd228c6c4888cd3e3945559db9e65d48a5742c78cdde52a8fc18be5ba1"
+    },
+    {
+      "batch": "batch-008",
+      "receipt_sha256": "30823de903142c0e425cfb65816e6280bac65184d71e2a5be68079ec6ac19b29"
+    },
+    {
+      "batch": "batch-009",
+      "receipt_sha256": "a07f66e065a29f4a0146bae82f124c3e9d6f3bf19e0b04b8f6e21dd7509db00d"
+    },
+    {
+      "batch": "batch-010",
+      "receipt_sha256": "0d69bfae7ebaebc61ad37559b7ba188560ddbc1cca9c2e2614c8e3bc690b609f"
+    },
+    {
+      "batch": "batch-011",
+      "receipt_sha256": "72f4db76cef41d2e82829ee66f85df6cb0919b4a3c8851961434f7fa47a86a40"
+    }
+  ],
+  "settlement_receipt_sha256": "95d2de998afab5c4d95113a9d92f82109b55e75592eb051cee4979af46fe5df0",
+  "models": [
+    "SCORE",
+    "EURO",
+    "CORRECTED",
+    "HALF"
+  ],
+  "blend_weight": 0.5,
+  "block_length": 10,
+  "repetitions": 2000,
+  "seed": 20260918,
+  "historical_learning": "NONE",
+  "graph_exception": "User explicitly authorized bypass in this session",
+  "storage_exception": "Read existing frozen hash-bound study; registry current release points to audited SQLite activation under audits instead of markets/releases. No source writes or registry edits."
+}
