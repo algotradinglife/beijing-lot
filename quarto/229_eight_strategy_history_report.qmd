@@ -1,0 +1,169 @@
+---
+title: "全历史八策略：收益、覆盖与回撤比较"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+本报告比较已暴露历史上的固定算法，不重新训练或选择最优种子。
+各算法联合决定七场组与赛果购买；预算相同不代表实际投入相同。
+本金10万元，每期上限1024元，每票2元，北单回款仅折算一次0.65。
+FUNDED在资金不足以支付整期计划后持有现金；SHADOW仅供诊断，不代表可执行账户。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+modules<-c('n7_purchase_settle','joint_candidate_comparison','top2_fresh_groups',
+ 'diagnostic_verified_csv','fundamentals_equity_curves','n7_purchase_accounting',
+ 'legacy_strategy_comparison','eight_strategy_validation')
+code_files<-c(paste0('r/',modules,'.R'),'quarto/229_eight_strategy_history_report.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+stopifnot(!dir.exists(cfg$output))
+receipts<-list()
+for(k in c('joint','top2')) {
+ path<-cfg[[k]]$receipt
+ stopifnot(digest::digest(file=path,algo='sha256')==cfg[[k]]$sha256)
+ receipts[[k]]<-jsonlite::fromJSON(path,simplifyVector=FALSE)
+ stopifnot(receipts[[k]]$status=='FROZEN_NOT_SETTLED')
+}
+issues<-unlist(receipts$joint$config$issues)
+requested_issues<-issues
+model_label<-receipts$top2$config$settings$model_id
+scope_path<-receipts$top2$config$scope
+stopifnot(digest::digest(file=scope_path,algo='sha256')==receipts$top2$config$scope_sha256)
+scope<-jsonlite::fromJSON(scope_path);source_version<-NULL
+if(!is.null(scope$config$input)) {
+ stopifnot(digest::digest(file=scope$config$input,algo='sha256')==scope$config$input_sha256)
+ provenance<-jsonlite::fromJSON(scope$config$input)
+ source_version<-provenance$probability_version
+}
+probability_version<-NULL
+stopifnot(identical(issues,unlist(receipts$top2$config$issues)),
+ !anyDuplicated(issues),identical(issues,sort(issues)))
+# All plans are already frozen. Read byte-verified labels only at this boundary.
+labels<-bind_rows(lapply(seq_len(nrow(cfg$labels)),function(i)
+ diagnostic_read_verified_csv(cfg$labels$path[i],cfg$labels$sha256[i],
+ cols(issue='c',provider_id='c')) |>
+ select(issue,slot,provider_id,handicap,status,actual_direction,spf_sp)))
+stopifnot(!anyDuplicated(labels[c('issue','slot')]))
+groups<-list();tickets<-list();input_counts<-list();unavailable<-list()
+for(id in issues) {
+ plans<-list()
+ for(k in names(receipts)) {
+  b<-receipts[[k]]$bindings[[id]]
+  stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+  z<-readRDS(b$path)
+  stopifnot(identical(z$seal,digest::digest(z[names(z)!='seal'],algo='sha256')),
+    z$issue==id)
+  plans[[k]]<-z
+ }
+ eight_strategy_validate_pair(plans$joint,plans$top2)
+ unavailable[[id]]<-eight_strategy_unavailable_labels(bind_rows(plans$joint$fixtures),filter(labels,issue==id))
+ if(nrow(unavailable[[id]])>0)next
+ input_counts[[id]]<-tibble(issue=id,fixtures=nrow(plans$top2$fresh$fixtures),
+  eligible_fixtures=length(plans$top2$fresh$eligible),
+  fresh_candidates=length(plans$top2$fresh$groups),
+  expanded_candidates=n_distinct(plans$top2$expanded$groups$group_id),
+  source_sha256=plans$joint$source_sha256)
+ v<-eight_strategy_probability_version(bind_rows(plans$joint$fixtures),source_version,model_label)
+ if(is.null(probability_version))probability_version<-v else stopifnot(identical(probability_version,v))
+ admitted_labels<-eight_strategy_ready_labels(bind_rows(plans$joint$fixtures),filter(labels,issue==id))
+ j<-n7_purchase_settle(plans$joint,admitted_labels,2,.65)
+ f<-top2_fresh_settle(plans$top2$fresh,admitted_labels) |>
+  filter(policy=='TOP2_DIVERSE') |>
+  transmute(issue,policy,sleeve_id=as.double(group),stake,depth=128L,
+    coverage=probability,expected_gross,hit,gross)
+ x<-joint_candidate_settle(plans$top2$expanded,admitted_labels)
+ t<-x$tickets |> filter(policy %in% c('HARD1','HARD2','WITHIN0'))
+ g<-t |> group_by(issue,policy,group_id) |> summarise(stake=n()*2,
+   depth=n(),coverage=sum(probability),expected_gross=sum(probability*estimated_payout),
+   hit=any(hit),gross=sum(gross),.groups='drop') |> rename(sleeve_id=group_id)
+ groups[[id]]<-bind_rows(j,f,g);tickets[[id]]<-t
+}
+unavailable<-bind_rows(unavailable)
+issues<-setdiff(requested_issues,unavailable$issue)
+stopifnot(length(issues)>0)
+groups<-bind_rows(groups)
+policies<-c('JOINT','DEPTH_OPEN','U4','CONFIDENCE','TOP2_DIVERSE','HARD1','HARD2','WITHIN0')
+rows<-groups |> group_by(issue,policy) |> summarise(stake=sum(stake),gross=sum(gross),hits=sum(hit),.groups='drop')
+rows<-expand_grid(issue=issues,policy=policies) |>
+ left_join(rows,by=c('issue','policy'),relationship='one-to-one') |>
+ mutate(across(c(stake,gross,hits),~replace_na(.x,0)),net=gross-stake,
+  model=probability_version,probability_version=probability_version,budget_cny=1024,cash_cny=1024-stake,
+  status=if_else(stake>0,'COMPLETE','NO_BET'),
+  stage=sprintf('BLOCK_%02d',(match(issue,issues)-1L)%/%100L+1L))
+stopifnot(nrow(rows)==length(issues)*8,all(rows$stake<=1024))
+result<-legacy_strategy_comparison(rows,issues,unique(rows$stage),'JOINT',100000)
+tail_diagnostics<-eight_strategy_tail_diagnostics(result$curves,c(1L,3L,5L))
+result$trimmed<-tail_diagnostics$trimmed
+result$streaks<-tail_diagnostics$streaks
+result$summary |> filter(evaluation=='ALL') |> knitr::kable(digits=2)
+```
+
+## 结算不可用期次
+
+以下异常导致整期对八个方案统一暂不结算。投注计划保持冻结，不将缺价算作未中或使用估算价格替代。
+
+```{r}
+unavailable |> knitr::kable()
+```
+
+## 收益与回撤
+
+```{r}
+curve<-result$curves |> filter(evaluation=='ALL',accounting_basis=='FUNDED')
+plot_data<-curve |> select(period,policy,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='measure',values_to='CNY')
+p<-ggplot(plot_data,aes(period,CNY,color=policy))+geom_line(linewidth=.6)+
+ facet_wrap(~measure,ncol=1,scales='free_y')+theme_minimal()+
+ scale_y_continuous(labels=scales::label_comma())+
+ labs(x='Issue order',y='CNY',color='Strategy')
+p
+```
+
+## 固定100期分段与去极值
+
+分段独立初始化本金；全样本曲线连续运行，不在分界补充资金。
+去极值只剔除正净收益期，不足指定数量时如实报告实际剔除数。
+连续未中按实际投注期序列统计，忽略现金期及资金不足后的停投期。
+
+```{r}
+result$summary |> filter(evaluation!='ALL',accounting_basis=='FUNDED') |>
+ select(evaluation,policy,issues,stake_cny,net_cny,roi_percent,hit_issues,profit_issues,max_drawdown_cny) |>
+ knitr::kable(digits=2)
+result$trimmed |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |> knitr::kable(digits=2)
+result$complementarity |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |> knitr::kable(digits=3)
+result$streaks |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |> knitr::kable()
+```
+
+## 输出与范围
+
+```{r}
+dir.create(cfg$output,recursive=TRUE)
+write_csv(unavailable,file.path(cfg$output,'unavailable-issues.csv'))
+write_csv(rows,file.path(cfg$output,'rows.csv'));write_csv(groups,file.path(cfg$output,'groups.csv'))
+write_csv(bind_rows(input_counts),file.path(cfg$output,'input-counts.csv'))
+for(n in names(result))write_csv(result[[n]],file.path(cfg$output,paste0(n,'.csv')))
+ggsave(file.path(cfg$output,'equity-drawdown.png'),p,width=13,height=9,dpi=160)
+files<-list.files(cfg$output,full.names=TRUE)
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+jsonlite::write_json(list(status='SETTLED_PENDING_INDEPENDENT_REVIEW',config=cfg,
+ requested_issues=requested_issues,issues=issues,policies=policies,historical_admission=FALSE,
+ code=code,
+ files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files))),
+ file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+data.frame(first=issues[1],last=tail(issues,1),issues=length(issues),probability_version=probability_version) |> knitr::kable()
+```
+
+本报告的输入范围由冻结清单决定，不能自动声称覆盖全部已验收历史。
+旧U3/U6压单策略的原配置复现、早期范围核验、独立重放和最终研究结论
+应与本计算报告共同交付；本入口的成功渲染不单独构成整项验收。

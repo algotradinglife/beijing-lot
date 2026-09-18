@@ -1,0 +1,269 @@
+---
+title: "八策略完整历史比较：资金效率、命中与回撤"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+每期预算上限1024元，每票2元，七场串关，起始资金10万元。
+估算价格来自市场概率，实际回款使用北单结算SP并只折算一次0.65。
+资金按期号顺序结算后进入下一期，未模拟跨期未结算资金占用。
+这是已暴露历史研究。早期原市场概率与后期归档的p列分别标注。
+后期候选包没有完整校正器版本凭据，因此标为ARCHIVED_P_COLUMN，
+不将配置中的模型名称当作版本证明，也不将跨阶段差异全部归因于购买算法。
+
+## 八个固定方案
+
+| 图表代号 | 方案及候选组 | 购买方式 |
+|---|---|---|
+| JOINT | 原始候选组 | 原概率排序与组间联合覆盖配置 |
+| DEPTH_OPEN | 原始候选组 | 优先扩组，再从预设深度中加深 |
+| U4 | 原始候选组 | 每场最多被四组复用 |
+| CONFIDENCE | 原始候选组 | 按第二、第三赛果区分度限制复用和金额 |
+| TOP2_DIVERSE | Top2排序窗口与单场换入构造候选 | 按新增联合覆盖选组，每组完整128票 |
+| HARD1 | 原始组＋扩充候选 | 组内Top1最高的一场压单，完整64票 |
+| HARD2 | 原始组＋扩充候选 | 组内Top1最高的两场压单，完整32票 |
+| WITHIN0 | 与HARD1/HARD2相同的扩充候选 | Top2内概率排序，保留边际覆盖约束及硬性组合参照 |
+
+各方案共同使用每期的同一份场次概率输入和估算SP至少1.3的准入条件，
+但候选生成、最终七场和实际投入可以不同。因此比较的是完整方案；
+收益差不能全部归因于“压单”或“概率排序”某一个环节。
+HARD1/HARD2不是旧U3/U6的改名，旧配置复现另列。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+modules<-c('fundamentals_equity_curves','n7_purchase_accounting',
+ 'legacy_strategy_comparison','eight_strategy_validation','diagnostic_verified_csv','n7_purchase_cohort_audit')
+code_files<-c(paste0('r/',modules,'.R'),'quarto/232_eight_strategy_full_comparison.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+stopifnot(!dir.exists(cfg$output),!anyDuplicated(cfg$expected_issues),
+ digest::digest(file=cfg$source_scope$path,algo='sha256')==cfg$source_scope$sha256)
+source_scope<-jsonlite::fromJSON(cfg$source_scope$path)
+stopifnot(setequal(source_scope$prepared_issues,cfg$expected_issues))
+periods<-groups<-scopes<-input_counts<-unavailable<-requested<-list();joint_bindings<-character()
+for(i in seq_len(nrow(cfg$reports))) {
+ e<-cfg$reports[i,]
+ stopifnot(digest::digest(file=e$receipt,algo='sha256')==e$sha256,
+  digest::digest(file=e$proof,algo='sha256')==e$proof_sha256)
+ receipt<-jsonlite::fromJSON(e$receipt)
+ proof<-jsonlite::fromJSON(e$proof)
+ stopifnot(proof$status=='PASS',proof$issues==length(receipt$issues),
+  proof$report_receipt_sha256==e$sha256)
+ dir<-dirname(e$receipt)
+ joint_bindings[receipt$config$joint$receipt]<-receipt$config$joint$sha256
+ requested[[i]]<-receipt$requested_issues
+ unavailable[[i]]<-diagnostic_read_verified_csv(file.path(dir,'unavailable-issues.csv'),
+  receipt$files[['unavailable-issues.csv']],cols(issue='c',provider_id='c',slot='d',handicap='d',status='c',actual_direction='c',spf_sp='d')) |> mutate(phase=e$phase)
+ rows<-diagnostic_read_verified_csv(file.path(dir,'rows.csv'),receipt$files[['rows.csv']],cols(issue='c'))
+ g<-diagnostic_read_verified_csv(file.path(dir,'groups.csv'),receipt$files[['groups.csv']],cols(issue='c'))
+ stopifnot(setequal(rows$issue,receipt$issues),length(unique(rows$probability_version))==1)
+ periods[[i]]<-mutate(rows,stage=e$phase,model='RECORDED_MARKET_VERSIONS')
+ groups[[i]]<-mutate(g,phase=e$phase)
+ input_counts[[i]]<-diagnostic_read_verified_csv(file.path(dir,'input-counts.csv'),
+  receipt$files[['input-counts.csv']],cols(issue='c')) |> mutate(phase=e$phase)
+ scopes[[i]]<-tibble(phase=e$phase,first=min(rows$issue),last=max(rows$issue),
+   issues=n_distinct(rows$issue),probability_version=unique(rows$probability_version))
+}
+rows<-bind_rows(periods);groups<-bind_rows(groups)
+input_counts<-bind_rows(input_counts)
+unavailable<-bind_rows(unavailable);requested<-unlist(requested,use.names=FALSE)
+stopifnot(!anyDuplicated(requested),setequal(requested,cfg$expected_issues),
+ !anyDuplicated(rows[c('issue','policy')]),
+ !any(unavailable$issue %in% rows$issue),
+ setequal(c(unique(rows$issue),unique(unavailable$issue)),requested))
+stopifnot(!anyDuplicated(input_counts$issue),setequal(input_counts$issue,rows$issue))
+issues<-sort(unique(rows$issue))
+result<-legacy_strategy_comparison(rows,issues,unique(rows$stage),'JOINT',100000)
+tails<-eight_strategy_tail_diagnostics(result$curves,c(1L,3L,5L))
+result$trimmed<-tails$trimmed;result$streaks<-tails$streaks
+block_rows<-mutate(rows,stage=sprintf('BLOCK_%02d',(match(issue,issues)-1L)%/%100L+1L))
+blocks<-legacy_strategy_comparison(block_rows,issues,unique(block_rows$stage),'JOINT',100000)
+scope_table<-bind_rows(scopes) |> group_by(phase,probability_version) |>
+ summarise(first=min(first),last=max(last),issues=sum(issues),.groups='drop')
+scope_table |> knitr::kable()
+input_counts |> group_by(phase) |> summarise(issues=n(),total_fixtures=sum(fixtures),
+ total_eligible_fixtures=sum(eligible_fixtures),minimum_eligible=min(eligible_fixtures),
+ median_eligible=median(eligible_fixtures),median_fresh_candidates=median(fresh_candidates),
+ median_expanded_candidates=median(expanded_candidates),.groups='drop') |> knitr::kable()
+result$summary |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |>
+ select(policy,issues,stake_cny,net_cny,roi_percent,hit_issues,profit_issues,
+   max_drawdown_cny,max_drawdown_percent,minimum_equity_cny,cash_cny,stopped_issues) |>
+ knitr::kable(digits=2)
+```
+
+## 结算范围例外
+
+以下期次保留冻结计划，因中奖价格缺失从所有方案的共同结算范围暂时排除，未当作亏损，也未按估算SP补算。
+
+```{r}
+unavailable |> knitr::kable()
+source_scope$excluded |> knitr::kable()
+source_scope$observations |> knitr::kable()
+```
+
+## 完整收益与回撤曲线
+
+完整账户只初始化一次，不把分批计算的账户余额直接拼接。
+资金不足以支付整期计划后停投持有现金；对应影子账本另列，以免把停投当作低风险优势。
+表中cash_cny是各期未使用预算额度的累计值，不是账户余额；实际余额见equity_cny曲线。
+
+```{r}
+c<-result$curves |> filter(evaluation=='ALL',accounting_basis=='FUNDED')
+long<-c |> select(period,policy,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='measure',values_to='CNY') |>
+ mutate(measure=factor(measure,levels=c('equity_cny','drawdown_cny'),
+  labels=c('Account value','Drawdown from peak')))
+boundaries<-rows |> distinct(issue,stage) |> arrange(match(issue,issues)) |>
+ mutate(position=row_number(),changed=stage!=lag(stage,default=first(stage))) |>
+ filter(changed) |> transmute(x=position-.5)
+p<-ggplot(long,aes(period,CNY,color=policy))+geom_line(linewidth=.65)+
+ geom_vline(data=boundaries,aes(xintercept=x),linetype='dashed',color='grey55')+
+ facet_wrap(~measure,ncol=1,scales='free_y')+theme_minimal()+
+ scale_y_continuous(labels=scales::label_comma())+labs(x='Issue order',y='CNY',color='Strategy')
+p
+family<-long |> mutate(family=if_else(policy %in% c('JOINT','DEPTH_OPEN','U4','CONFIDENCE'),'JOINT','Top2'))
+p_family<-ggplot(family,aes(period,CNY,color=policy))+geom_line(linewidth=.65)+
+ geom_vline(data=boundaries,aes(xintercept=x),linetype='dashed',color='grey55')+
+ facet_grid(measure~family,scales='free_y')+theme_minimal()+
+ scale_y_continuous(labels=scales::label_comma())+labs(x='Issue order',y='CNY',color='Strategy')
+p_family
+```
+
+虚线标出输入概率版本阶段的分界。横轴是本报告排序后的期次序号；
+补入早期期次后，同一历史回撤在横轴上的位置会移动，应以期号对齐比较。
+回撤画为距历史资金高点的损失金额，数值越大表示回撤越深。
+
+## 资金使用结构
+
+只统计完整账户实际支付的期次。这里的组命中率与期命中率不同：
+同一期可以有多个组中奖。平均购买深度是每组购买的不同赛果组合数，
+不是中奖组合的事后排名。
+
+```{r}
+funded_keys<-c |> filter(period>0,stake>0) |> select(issue,policy)
+funded_groups<-inner_join(groups,funded_keys,by=c('issue','policy'),relationship='many-to-one')
+funded_groups |> group_by(policy) |> summarise(
+ bet_issues=n_distinct(issue),groups=n(),groups_per_bet_issue=n()/n_distinct(issue),
+ mean_depth=mean(depth),median_depth=median(depth),mean_group_stake_cny=mean(stake),
+ hit_groups=sum(hit),group_hit_percent=100*mean(hit),
+ mean_winning_gross_cny=if(any(hit))mean(gross[hit]) else NA_real_,
+ estimated_net_cny=sum(expected_gross-stake),actual_net_cny=sum(gross-stake),.groups='drop') |>
+ knitr::kable(digits=2)
+```
+
+估算净收益基于赛前概率和估算SP，实际净收益基于北单结算SP；
+两者差异同时包含赛果实现与价格差，不能只归因于概率是否准确。
+
+## 分阶段、资金停止与集中收益
+
+阶段账户独立初始化，用于观察阶段特征；它们的回撤不能直接相加。
+去极值仅删除正收益期，并记录实际删除数量，不删除亏损期。
+这是对原已执行账本的收益集中度检查，不重算删期后的停投路径。
+
+```{r}
+result$summary |> filter(evaluation!='ALL',accounting_basis=='FUNDED') |> knitr::kable(digits=2)
+result$summary |> filter(evaluation=='ALL',accounting_basis=='SHADOW') |> knitr::kable(digits=2)
+blocks$summary |> filter(evaluation!='ALL',accounting_basis=='FUNDED') |>
+ select(evaluation,policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny) |> knitr::kable(digits=2)
+result$trimmed |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |> knitr::kable(digits=2)
+result$streaks |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |> knitr::kable()
+result$complementarity |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |> knitr::kable(digits=3)
+```
+
+## 本轮收敛结论
+
+以下结论针对本轮冻结的939个可结算期次，不是对未来收益的承诺。
+
+| 判断 | 本轮证据 | 结论 |
+|---|---|---|
+| 原JOINT是否仍应作为比较基线 | 净收益35,686.83元，ROI 4.26%，八方案最高 | 支持保留；不能据此说已有稳健盈利能力 |
+| 先扩组再加深是否提高资金效率 | 比JOINT多命中23期，多投入68,424元，却少赚8,580.03元 | 本配置不支持升级；命中更多不等于效率更高 |
+| U4是否改善风险收益 | ROI 3.98%，最大回撤30,246.32元；JOINT为4.26%、35,125.71元 | 提供较低投入的风险折中，没有支配原JOINT |
+| 区分度复用是否带来独立收益 | 最大回撤16,214.10元，但仅投入JOINT的36.2%，ROI降至2.34% | 更像缩小风险敞口，不能把较小金额回撤当作新增优势 |
+| 好的Top2基线是否已形成 | 完整Top2及压单、Top2内概率购买，持续执行的影子ROI均为负 | 本轮候选构造尚未形成这个基线；不能只归咎于概率排序 |
+| 正收益是否普遍而稳定 | 四个正收益方案各自剔除最大的五个盈利期后全部转负 | 不支持稳定性结论，存在明显大赢期依赖 |
+
+**选组与买法的联动值得保留，但这次没有找到优于原JOINT的升级。**
+Top2、压一场和压两场的实际账户因资金不足提前停止；不能用它们停投后的平线
+解释风险改善。其影子账户继续执行至期末仍然亏损，所以结论也不是停投规则制造的。
+
+WITHIN0在未停投的情况下命中510期，多于JOINT的404期，却亏损92,945.05元。
+它直接说明问题不只是“是否中奖”，还包括中奖回款与整期成本的关系。
+旧压单策略另列的784期复现也未显示正收益；早期小样本的良好表现不能直接外推。
+
+本轮仍不能把Top2系列的差表现拆解成某一个独立环节的责任：候选构造、选组和
+支持集合一起变化，而且早期与后期概率版本不同。现有证据足以否定这批具体升级
+优于原方案，但不足以否定所有Top2候选池。后续若更换候选构造，必须重新展示
+该候选池自身的Top2基线，而不能把“应该有一个好基线”当作已经验证的事实。
+
+## 旧配置复现参照
+
+以下是另一个固定的784期样本：原市场／归档p列 × 压一／两场 × U3／U6。
+它保留旧选场、复用及准入规则，没有加入本轮的估算SP门槛。
+本次重新核对原购买支持和实际结算，并独立重算资金汇总；不是重新求解旧优化器。
+不能把该表与本轮更大范围的结果直接相减来判断算法增益。
+
+```{r}
+stopifnot(is.list(cfg$legacy))
+for(n in c('receipt','results','payout_proof','selection_proof','joint_replication')) {
+ e<-cfg$legacy[[n]]
+ stopifnot(digest::digest(file=e$path,algo='sha256')==e$sha256)
+}
+old_receipt<-jsonlite::fromJSON(cfg$legacy$receipt$path)
+old_result<-jsonlite::fromJSON(cfg$legacy$results$path)
+old_payout<-jsonlite::fromJSON(cfg$legacy$payout_proof$path)
+old_selection<-jsonlite::fromJSON(cfg$legacy$selection_proof$path)
+old_joint<-jsonlite::fromJSON(cfg$legacy$joint_replication$path)
+for(path in names(old_joint$inputs))stopifnot(digest::digest(file=path,algo='sha256')==old_joint$inputs[[path]])
+shared<-intersect(names(joint_bindings),names(old_joint$inputs))
+stopifnot(length(shared)>0,all(joint_bindings[shared]==unlist(old_joint$inputs[shared])))
+stopifnot(old_payout$status=='PASS',old_selection$status=='PASS',old_joint$status=='PASS',
+ old_payout$results_sha256==cfg$legacy$results$sha256,
+ old_payout$frozen_sha256==old_selection$frozen_sha256,
+ old_selection$issues==length(old_result$issue_order),
+ old_receipt$inputs[[cfg$legacy$results$path]]==cfg$legacy$results$sha256)
+old_summary<-diagnostic_read_verified_csv(file.path(dirname(cfg$legacy$receipt$path),'summary.csv'),
+ old_receipt$files[['summary.csv']],cols(funding_stop_issue='c')) |>
+ filter(evaluation=='ALL',policy %in% old_result$rows$policy)
+old_duplicate<-mutate(old_summary,evaluation='ADDITIONAL')
+invisible(n7_purchase_cohort_audit(old_result$rows,bind_rows(old_summary,old_duplicate),
+ old_result$issue_order,character(),unique(old_result$rows$policy),1024,100000))
+old_summary |> filter(accounting_basis=='FUNDED') |>
+ select(policy,issues,stake_cny,net_cny,roi_percent,hit_issues,max_drawdown_cny,stopped_issues) |>
+ knitr::kable(digits=2)
+tibble(verification=c('原JOINT四方案逐计划一致','旧压单支持核对','旧压单结算核对'),
+ plans=c(old_joint$plans,old_selection$plans,old_payout$plans)) |> knitr::kable()
+```
+
+## 保存可核验账本
+
+```{r}
+dir.create(cfg$output,recursive=TRUE)
+write_csv(rows,file.path(cfg$output,'rows.csv'));write_csv(groups,file.path(cfg$output,'groups.csv'))
+write_csv(scope_table,file.path(cfg$output,'scope.csv'))
+write_csv(unavailable,file.path(cfg$output,'unavailable-issues.csv'))
+write_csv(input_counts,file.path(cfg$output,'input-counts.csv'))
+write_csv(old_summary,file.path(cfg$output,'legacy-summary.csv'))
+for(n in names(result))write_csv(result[[n]],file.path(cfg$output,paste0(n,'.csv')))
+write_csv(blocks$summary,file.path(cfg$output,'block-summary.csv'))
+ggsave(file.path(cfg$output,'equity-drawdown.png'),p,width=14,height=9,dpi=160)
+ggsave(file.path(cfg$output,'families-equity-drawdown.png'),p_family,width=14,height=9,dpi=160)
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+files<-list.files(cfg$output,full.names=TRUE)
+jsonlite::write_json(list(status='REPORT_PENDING_FINAL_REVIEW',config=cfg,code=code,
+ requested_issues=sort(requested),issues=issues,historical_admission=FALSE,r_session=capture.output(sessionInfo()),
+ files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files))),
+ file.path(cfg$output,'receipt.json'),pretty=TRUE,auto_unbox=TRUE)
+```
+
+本报告随同冻结计划、逐期账本、独立重放与测试凭据交付。结论只适用于所绑定的历史输入和参数；更换范围后须重新审阅解释。

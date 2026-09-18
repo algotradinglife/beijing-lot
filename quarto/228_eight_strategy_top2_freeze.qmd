@@ -1,0 +1,66 @@
+---
+title: "全历史八策略：Top2与概率购买计划冻结"
+format: html
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+保留最近候选池实验的既有算法与参数，不读取结算。完整Top2使用分散选组；
+压一场、压两场使用HARD1/HARD2；范围内概率购买使用WITHIN0。
+后三者使用相同扩充候选构造，但各自选组，不固定最终七场组。
+这不是历史U3/U6压单算法的重新命名：旧算法复现另列。
+
+```{r}
+library(dplyr)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+reticulate::use_python(cfg$python,required=TRUE)
+modules<-c('n7_probability_replay','n7_sleeve_tables','n7_joint_sleeves',
+ 'n7_capital_depth','n7_capital_portfolio','n7_core_opportunity',
+ 'n7_sweet_union','n7_sp_filter','top2_fresh_groups','joint_candidate_comparison')
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+stopifnot(digest::digest(file=cfg$scope,algo='sha256')==cfg$scope_sha256)
+scope<-jsonlite::fromJSON(cfg$scope)
+stopifnot(scope$status=='BUNDLE_HASHES_VERIFIED',length(scope$errors)==0,
+ !anyDuplicated(cfg$issues),all(cfg$issues %in% scope$issues$issue),!dir.exists(cfg$output))
+entries<-scope$issues[match(cfg$issues,scope$issues$issue),]
+code_files<-c(paste0('r/',modules,'.R'),'quarto/228_eight_strategy_top2_freeze.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+api<-reticulate::import('src.strategy_diagnostic_inputs')
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),
+ list('src.strategy_diagnostic_inputs','src.fundamentals_n7_baseline','src.n7_sleeve_states'),
+ distributions=list('numpy','pandas','scipy'))
+s<-cfg$settings
+dir.create(cfg$output,recursive=TRUE);bindings<-list()
+for(i in seq_len(nrow(entries))) {
+ e<-entries[i,]
+ b<-jsonlite::fromJSON(api$read_verified_bundle_json(e$path,e$sha256),simplifyVector=FALSE)
+ stopifnot(b$issue==e$issue)
+ fresh<-top2_fresh_groups(bind_rows(b$expanded_pool$fixtures),b$cutoffs,cfg$python,
+  7,s$budget_cny,s$unit_cny,s$payout_factor,s$minimum_sp)
+ expanded<-joint_candidate_expand(b,fresh,b$cutoffs,cfg$python,64,4)
+ z<-joint_candidate_compare(expanded,b$cutoffs,cfg$python,s)
+ # Keep all outputs of the unchanged prior implementation as secondary
+ # diagnostics. The primary policies are declared before settlement below.
+ plan<-list(issue=b$issue,fresh=fresh,expanded=z,source_sha256=e$sha256,
+   code=code,closure_sha256=closure$closure_sha256,historical_admission=FALSE)
+ plan$seal<-digest::digest(plan,algo='sha256')
+ path<-file.path(cfg$output,paste0('plan-',b$issue,'.rds'));saveRDS(plan,path)
+ bindings[[b$issue]]<-list(path=path,sha256=digest::digest(file=path,algo='sha256'),source_sha256=e$sha256)
+ writeLines(paste(i,nrow(entries),b$issue),file.path(cfg$output,'progress.txt'))
+ message('FROZEN ',i,'/',nrow(entries),' ',b$issue)
+}
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',config=cfg,bindings=bindings,
+ primary_policies=c('TOP2_DIVERSE','HARD1','HARD2','WITHIN0'),
+ code=code,closure=closure,historical_admission=FALSE),
+ file.path(cfg$output,'plans-receipt.json'),pretty=TRUE,auto_unbox=TRUE,digits=NA)
+```
+
+已冻结 `r length(bindings)` 期，未结算。固定参数为历史研究设置，
+不声称这些期次具备清洁的赛前历史可用性证据。

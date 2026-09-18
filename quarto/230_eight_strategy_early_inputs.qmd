@@ -1,0 +1,76 @@
+---
+title: "早期历史输入：原市场概率归档接入"
+format: html
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+从显式迁移凭据读取历史归档，复用既有比分投射函数。
+不重新训练，不读取结算，不将战力概率误当市场概率。
+本阶段保留原市场概率，后续与冻结校正市场阶段分开标记。
+
+```{r}
+library(dplyr)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+reticulate::use_python(cfg$python,required=TRUE)
+code_files<-c('r/fundamentals_pure_baseline.R','quarto/230_eight_strategy_early_inputs.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+source(file.path(root,'r/fundamentals_pure_baseline.R'))
+api<-reticulate::import('src.data_archive')
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),
+ list('src.data_archive'),distributions=list())
+stopifnot(!dir.exists(cfg$output))
+frames<-list();cuts<-list();excluded<-list();sources<-list()
+for(i in seq_len(nrow(cfg$sources))) {
+ e<-cfg$sources[i,]
+ bytes<-api$read_archive_members(e$archive,list(e$member),expected_sha256=e$archive_sha256)[[e$member]]
+ text<-bytes$decode('utf-8')
+ d<-jsonlite::fromJSON(text)
+ sources[[e$member]]<-list(archive=e$archive,archive_sha256=e$archive_sha256,
+   member_sha256=digest::digest(charToRaw(text),serialize=FALSE,algo='sha256'))
+ if(e$kind=='prediction') {
+  control<-d$selected;control$fixtures<-control$fixtures |> filter(scenario=='baseline')
+  ready<-d$market$status |> filter(status=='READY') |> select(issue,slot,provider_id)
+  excluded[[e$member]]<-anti_join(control$fixtures,ready,by=c('issue','slot','provider_id')) |>
+    select(issue,slot,provider_id) |> mutate(reason='ARCHIVED_MARKET_NOT_READY')
+  control$fixtures<-semi_join(control$fixtures,ready,by=c('issue','slot','provider_id'))
+  f<-pure_baseline_factors(control,d$market,control$cutoffs)
+  native<-control$cutoffs
+ } else {
+  stopifnot(e$kind=='factors');f<-as_tibble(d$rows);native<-d$cutoffs
+ }
+ f<-f |> filter(issue<cfg$before_issue)
+ # Explicit RAW market foundation, shared across all eight early-period arms.
+ # Stored p values from the archived strength models are not used.
+ for(direction in c('W','D','L'))f[[paste0('p_',direction)]]<-f[[paste0('q_',direction)]]
+ f<-f |> select(issue,slot,provider_id,handicap,p_W,p_D,p_L,q_W,q_D,q_L)
+ stopifnot(!anyDuplicated(f[c('issue','slot')]))
+ frames[[e$member]]<-f
+ for(id in unique(f$issue)) {
+  stopifnot(is.null(cuts[[id]]))
+  cuts[[id]]<-native[[id]][as.character(f$slot[f$issue==id])]
+ }
+}
+frame<-bind_rows(frames)
+stopifnot(nrow(frame)>0,!anyDuplicated(frame[c('issue','slot')]))
+for(id in unique(frame$issue)) {
+ f<-filter(frame,issue==id)
+ stopifnot(length(cuts[[id]])==nrow(f),!any(vapply(cuts[[id]],is.null,logical(1))))
+}
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+dir.create(cfg$output,recursive=TRUE)
+jsonlite::write_json(list(rows=frame,cutoffs=cuts,issues=sort(unique(frame$issue)),
+ probability_version='ARCHIVED_RAW_MARKET',sources=sources,historical_admission=FALSE,
+ status='INPUTS_ONLY_PENDING_CONTRACT_REPLAY',config=cfg,code=code,implementation=closure),
+ file.path(cfg$output,'inputs.json'),auto_unbox=TRUE,digits=NA,pretty=TRUE)
+readr::write_csv(bind_rows(excluded),file.path(cfg$output,'excluded.csv'))
+frame |> count(issue) |> knitr::kable()
+```
+
+这些输入仍需共享cutoff验证、候选重建与结算身份核对；输入导出不等于研究验收。

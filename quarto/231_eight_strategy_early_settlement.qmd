@@ -1,0 +1,89 @@
+---
+title: "早期期次结算接入：归档比赛身份与当前北单SP"
+format: html
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+仅在两类购票计划完整冻结后读取标签。复用R结算查询和既有身份核验函数，
+不改动数据库，不补造SP，不依据结果重选场次。
+
+```{r}
+library(dplyr);library(readr)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+reticulate::use_python(cfg$python,required=TRUE)
+files<-c('r/nowscore_query.R','r/fundamentals_clean_settlement.R','r/eight_strategy_settlement.R',
+ 'quarto/231_eight_strategy_early_settlement.qmd')
+code<-setNames(lapply(files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),files)
+source(file.path(root,'r/nowscore_query.R'))
+source(file.path(root,'r/fundamentals_clean_settlement.R'))
+source(file.path(root,'r/eight_strategy_settlement.R'))
+stopifnot(!dir.exists(cfg$output))
+scope<-list(joint=character(),top2=character())
+for(i in seq_len(nrow(cfg$freezes))) {
+ e<-cfg$freezes[i,]
+ stopifnot(e$kind %in% names(scope),digest::digest(file=e$path,algo='sha256')==e$sha256)
+ r<-jsonlite::fromJSON(e$path,simplifyVector=FALSE)
+ stopifnot(r$status=='FROZEN_NOT_SETTLED',
+   setequal(names(r$bindings),unlist(r$config$issues)),!anyDuplicated(unlist(r$config$issues)))
+ for(b in r$bindings)stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+ scope[[e$kind]]<-c(scope[[e$kind]],unlist(r$config$issues))
+}
+stopifnot(!anyDuplicated(scope$joint),!anyDuplicated(scope$top2),
+ setequal(scope$joint,scope$top2),setequal(scope$joint,cfg$issues),
+ digest::digest(file=cfg$inputs,algo='sha256')==cfg$inputs_sha256)
+inputs<-jsonlite::fromJSON(cfg$inputs)
+frame<-as_tibble(inputs$rows) |> filter(issue %in% cfg$issues)
+api<-reticulate::import('src.data_archive')
+labels<-list();source_hashes<-list()
+for(i in seq_len(nrow(cfg$labels))) {
+ e<-cfg$labels[i,]
+ raw<-api$read_archive_members(e$archive,list(e$member),expected_sha256=e$archive_sha256)[[e$member]]
+ text<-raw$decode('utf-8');d<-jsonlite::fromJSON(text)
+ source_hashes[[e$member]]<-list(archive=e$archive,archive_sha256=e$archive_sha256,
+   member_sha256=digest::digest(charToRaw(text),serialize=FALSE,algo='sha256'))
+ x<-if(e$kind=='comparison')as_tibble(d$fixtures) |> filter(scenario=='baseline') else as_tibble(d$rows)
+ labels[[e$member]]<-x |> filter(issue %in% cfg$issues) |>
+  select(issue,slot,provider_id,handicap,home,away,actual_home,actual_away)
+}
+label<-bind_rows(labels)
+stopifnot(!anyDuplicated(label[c('issue','slot')]))
+fixture<-frame |> select(issue,slot,provider_id,handicap) |>
+ left_join(label,by=c('issue','slot','provider_id','handicap'),relationship='one-to-one')
+stopifnot(!anyNA(fixture[c('home','away','actual_home','actual_away')]))
+# Completion evidence is derived explicitly from the queried source below.
+database_hash<-digest::digest(file=cfg$database,algo='sha256')
+audit<-queries<-list()
+for(id in cfg$issues) {
+ x<-query_nowscore_settlement(cfg$database,id,play='spf')
+ queries[[id]]<-x$settlement
+ completed<-eight_strategy_completion_evidence(filter(fixture,issue==id),x$settlement)
+ audit[[id]]<-clean_validation_spf_audit(x$settlement,completed) |>
+  left_join(select(completed,issue,slot,completion_evidence),by=c('issue','slot'),relationship='one-to-one')
+}
+stopifnot(digest::digest(file=cfg$database,algo='sha256')==database_hash,
+ identical(code,setNames(lapply(files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),files)))
+audit<-bind_rows(audit)
+stopifnot(nrow(audit)==nrow(frame),!anyDuplicated(audit[c('issue','slot')]))
+dir.create(cfg$output,recursive=TRUE)
+write_csv(audit,file.path(cfg$output,'fixture-audit.csv'))
+write_csv(bind_rows(queries),file.path(cfg$output,'query-rows.csv'))
+coverage<-audit |> group_by(issue) |> summarise(fixtures=n(),ready=sum(status=='READY'),
+ available=all(status=='READY'),.groups='drop')
+write_csv(coverage,file.path(cfg$output,'coverage.csv'))
+jsonlite::write_json(list(status='AUDITED_NOT_CORRECTED',config=cfg,code=code,
+ database_sha256=database_hash,label_sources=source_hashes,
+ files=setNames(lapply(c('fixture-audit.csv','query-rows.csv','coverage.csv'),
+  function(f)digest::digest(file=file.path(cfg$output,f),algo='sha256')),
+  c('fixture-audit.csv','query-rows.csv','coverage.csv')),
+ historical_admission=FALSE),file.path(cfg$output,'receipt.json'),pretty=TRUE,auto_unbox=TRUE)
+coverage |> knitr::kable()
+audit |> count(status) |> knitr::kable()
+```
+
+非READY记录保留原因，不作为未中奖处理，也不自动清洗或更改其他会话的数据。
