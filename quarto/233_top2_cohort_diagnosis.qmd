@@ -1,0 +1,157 @@
+---
+title: "Top2阶段差异：候选、选场、命中与回款核对"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+本诊断复用已冻结的939期计划，不重选场、不改参数、不拟合概率。
+主表用完整计划账本排除提前停投的影响；收益曲线另由既有资金函数计算。
+早期105期为RAW市场概率，后784期及最新50期为归档p列，不能混称同一概率版本。
+同一扩充候选池下的JOINT_NATIVE和HARD0也保留各自原准入规则，
+其中JOINT含25%覆盖/组成本门槛，不能解释为仅改变购票排序的单因素实验。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+modules<-c('eight_strategy_validation','top2_fresh_groups','top2_cohort_diagnostics',
+ 'joint_candidate_comparison','diagnostic_verified_csv','fundamentals_equity_curves',
+ 'n7_purchase_accounting','legacy_strategy_comparison')
+code_files<-c(paste0('r/',modules,'.R'),'quarto/233_top2_cohort_diagnosis.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+stopifnot(!dir.exists(cfg$output))
+for(k in c('report','old_freeze'))stopifnot(digest::digest(file=cfg[[k]]$path,algo='sha256')==cfg[[k]]$sha256)
+r<-jsonlite::fromJSON(cfg$report$path);old<-jsonlite::fromJSON(cfg$old_freeze$path,simplifyVector=FALSE)
+stopifnot(old$code[['r/top2_fresh_groups.R']]==code[['r/top2_fresh_groups.R']])
+reference<-diagnostic_read_verified_csv(file.path(dirname(cfg$report$path),'rows.csv'),r$files[['rows.csv']],cols(issue='c'))
+old_ids<-character();old_plans<-list()
+for(path in names(old$plans)) {
+ stopifnot(digest::digest(file=path,algo='sha256')==old$plans[[path]])
+ a<-jsonlite::fromJSON(path,simplifyVector=FALSE);old_plans[[a$issue]]<-a;old_ids<-c(old_ids,a$issue)
+}
+stopifnot(length(old_ids)==50,!anyDuplicated(old_ids))
+fixtures<-groups<-periods<-controls<-replay<-list();index<-0L
+for(part in seq_len(nrow(r$config$reports))) {
+ entry<-r$config$reports[part,];stopifnot(digest::digest(file=entry$receipt,algo='sha256')==entry$sha256)
+ parent<-jsonlite::fromJSON(entry$receipt);pr<-parent$config
+ stopifnot(digest::digest(file=pr$top2$receipt,algo='sha256')==pr$top2$sha256)
+ freeze<-jsonlite::fromJSON(pr$top2$receipt,simplifyVector=FALSE)
+ labels<-bind_rows(lapply(seq_len(nrow(pr$labels)),function(i)
+  diagnostic_read_verified_csv(pr$labels$path[i],pr$labels$sha256[i],cols(issue='c',provider_id='c')) |>
+   select(issue,slot,provider_id,handicap,status,actual_direction,spf_sp)))
+ for(id in parent$issues) {
+  b<-freeze$bindings[[id]];stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+  plan<-readRDS(b$path);stopifnot(identical(plan$seal,digest::digest(plan[names(plan)!='seal'],algo='sha256')))
+  z<-top2_frozen_diagnostic(plan$fresh,filter(labels,issue==id),2,.65)
+  cohort<-if(id %in% old_ids)'NEW50' else if(entry$phase=='EARLY_RAW')'EARLY105' else 'OLD784'
+  fixtures[[id]]<-mutate(z$fixtures,cohort=cohort)
+  groups[[id]]<-mutate(z$groups,cohort=cohort);periods[[id]]<-mutate(z$periods,cohort=cohort)
+  lab<-eight_strategy_ready_labels(plan$expanded$fixtures,filter(labels,issue==id))
+  settled<-joint_candidate_settle(plan$expanded,lab)
+  controls[[id]]<-settled$rows |> filter(policy %in% c('JOINT_NATIVE','HARD0')) |>
+   mutate(policy=if_else(policy=='HARD0','EXPANDED_TOP2','EXPANDED_JOINT'),cohort=cohort) |>
+   select(issue,policy,cohort,stake,gross,net,hits)
+  if(id %in% old_ids) {
+   a<-old_plans[[id]];f<-plan$fresh
+   stopifnot(identical(lapply(a$groups,function(x)as.integer(unlist(x))),lapply(f$groups,as.integer)),
+    identical(as.integer(unlist(a$selected$TOP2_DIVERSE)),as.integer(f$selected$TOP2_DIVERSE)),
+    identical(as.integer(unlist(a$selected$TOP2_PROB)),as.integer(f$selected$TOP2_PROB)),
+    isTRUE(all.equal(as.data.frame(bind_rows(a$fixtures)),as.data.frame(f$fixtures),check.attributes=FALSE,tolerance=1e-12)),
+    identical(a$cutoffs,f$cutoffs))
+   replay[[id]]<-tibble(issue=id,identity_probabilities_cutoffs_candidates_selections_match=TRUE)
+  }
+  index<-index+1L;if(index%%100==0)message('CHECKED ',index)
+ }
+}
+f<-bind_rows(fixtures);g<-bind_rows(groups);x<-bind_rows(periods);control<-bind_rows(controls)
+stopifnot(setequal(x$issue,r$issues),n_distinct(x$issue)==939,length(replay)==50)
+check<-filter(x,policy=='TOP2_DIVERSE') |> inner_join(filter(reference,policy=='TOP2_DIVERSE'),by=c('issue','policy'),suffix=c('_new','_old'),relationship='one-to-one')
+stopifnot(all(abs(check$gross_new-check$gross_old)<1e-7),all(check$stake_new==check$stake_old),all(check$hits_new==check$hits_old))
+base<-reference |> filter(policy=='JOINT') |> select(issue,policy,stake,gross,net,hits) |>
+ left_join(distinct(x,issue,cohort),by='issue',relationship='one-to-one')
+comparison<-bind_rows(select(x,issue,policy,cohort,stake,gross,net,hits),control,base)
+summary<-comparison |> group_by(cohort,policy) |> summarise(issues=n(),hit_issues=sum(gross>0),profit_issues=sum(net>0),
+ stake_cny=sum(stake),gross_cny=sum(gross),net_cny=sum(net),roi_percent=100*net_cny/stake_cny,.groups='drop')
+summary |> knitr::kable(digits=2)
+```
+
+## 阶段命中与选场集中度
+
+期概率使用精确交叠事件计算，但仍依赖场次独立及单场概率正确的假设。
+全候选池里有中奖组属于事后可达性，不是事前能识别的收益。
+
+```{r}
+structure<-x |> group_by(cohort,policy) |> summarise(issues=n(),
+ mean_unique_fixtures=mean(unique_fixtures),mean_max_uses=mean(max_uses),
+ expected_hit_issues=sum(expected_issue_hit),actual_hit_issues=sum(hit_issues),
+ expected_group_hits=sum(expected_group_hits),actual_group_hits=sum(hits),
+ total_groups=sum(groups),pool_hit_issues=sum(pool_has_hit),missed_available_issues=sum(missed_available_hit),
+ .groups='drop')
+structure |> knitr::kable(digits=2)
+selected<-filter(g,selected_diverse)
+bridge<-selected |> group_by(cohort) |> summarise(groups=n(),hit_groups=sum(hit),
+ hit_percent=100*mean(hit),mean_predicted_percent=100*mean(coverage),
+ winning_gross=if(any(hit))mean(gross[hit]) else NA_real_,
+ stake_cny=256*n(),model_net=sum(expected_gross)-stake_cny,
+ outcome_residual=sum(estimated_hit_gross-expected_gross),price_residual=sum(gross-estimated_hit_gross),
+ net_cny=sum(gross)-stake_cny,.groups='drop')
+stopifnot(all(abs(bridge$net_cny-bridge$model_net-bridge$outcome_residual-bridge$price_residual)<1e-6))
+bridge |> knitr::kable(digits=2)
+fixture_views<-bind_rows(mutate(f,universe='ALL'),mutate(filter(f,eligible),universe='ELIGIBLE'),
+ mutate(filter(f,diverse_uses>0),universe='DIVERSE_SELECTED'))
+fixture_summary<-fixture_views |> group_by(cohort,universe) |> summarise(fixtures=n(),issues=n_distinct(issue),
+ predicted_top2=mean(top2_probability),actual_top2=mean(top2_hit),predicted_top1=mean(top1_probability),
+ actual_top1=mean(top1_hit),mean_gap23=mean(gap23),.groups='drop')
+fixture_summary |> knitr::kable(digits=3)
+handicap<-fixture_views |> group_by(cohort,universe,handicap) |> summarise(fixtures=n(),
+ predicted_top2=mean(top2_probability),actual_top2=mean(top2_hit),.groups='drop')
+handicap |> filter(universe=='DIVERSE_SELECTED') |> knitr::kable(digits=3)
+```
+
+## 图示与资金口径
+
+以下每个阶段独立初始化10万元；完整939期曲线见前一份八方案报告。
+桥接项是精确会计分解，不是因果归因；欧赔估算与北单结算价格天然不同。
+
+```{r}
+plot_data<-structure |> select(cohort,policy,expected_hit_issues,actual_hit_issues) |>
+ pivot_longer(c(expected_hit_issues,actual_hit_issues),names_to='type',values_to='issues')
+p1<-ggplot(plot_data,aes(cohort,issues,fill=type))+geom_col(position='dodge')+
+ facet_wrap(~policy)+theme_minimal()+labs(x='Cohort',y='Hit issues')
+p1
+plot_fixture<-fixture_summary |> pivot_longer(c(predicted_top2,actual_top2),names_to='type',values_to='rate')
+p2<-ggplot(plot_fixture,aes(universe,rate,color=type,group=type))+geom_point()+geom_line()+
+ facet_wrap(~cohort)+theme_minimal()+scale_y_continuous(labels=scales::label_percent())+labs(x='Fixture scope',y='Top2 coverage')
+p2
+account<-mutate(comparison,model='RECORDED',stage=cohort,budget_cny=1024,cash_cny=1024-stake,status=if_else(stake>0,'COMPLETE','NO_BET'))
+result<-legacy_strategy_comparison(account,sort(r$issues),c('EARLY105','OLD784','NEW50'),'JOINT',100000)
+p3<-result$curves |> filter(evaluation!='ALL',accounting_basis=='FUNDED') |>
+ ggplot(aes(period,equity_cny,color=policy))+geom_line()+facet_wrap(~evaluation,scales='free_x')+
+ theme_minimal()+labs(x='Issue within cohort',y='Account CNY')
+p3
+```
+
+## 输出
+
+```{r}
+dir.create(cfg$output,recursive=TRUE)
+tables<-list(fixtures=f,candidates=g,periods=x,controls=control,comparison=comparison,summary=summary,
+ structure=structure,bridge=bridge,fixture_summary=fixture_summary,handicap=handicap,replay=bind_rows(replay),accounts=result$summary,curves=result$curves)
+for(n in names(tables))write_csv(tables[[n]],file.path(cfg$output,paste0(n,'.csv')))
+ggsave(file.path(cfg$output,'hit-calibration.png'),p1,width=11,height=6,dpi=150)
+ggsave(file.path(cfg$output,'fixture-coverage.png'),p2,width=12,height=6,dpi=150)
+ggsave(file.path(cfg$output,'cohort-equity.png'),p3,width=13,height=7,dpi=150)
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+files<-list.files(cfg$output,full.names=TRUE)
+jsonlite::write_json(list(status='DIAGNOSTIC_PENDING_REVIEW',config=cfg,code=code,historical_admission=FALSE,
+ issues=sort(r$issues),old50=sort(old_ids),files=setNames(lapply(files,function(p)digest::digest(file=p,algo='sha256')),basename(files))),file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
