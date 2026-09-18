@@ -1,0 +1,135 @@
+---
+title: "全集零让球直接欧赔：JOINT与Top2受控购买测试"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+本轮采用原全历史比较的完整已验收清单，覆盖100101至150202，共939期。
+候选七场组、每期预算1024元、原算法及种子固定，仅替换零让球的概率或概率与估算SP。
+早期105期原底座为原始市场概率，其他834期沿用各期冻结版本，分阶段报告。
+BASE / EURO_P / EURO_PQ与上一轮定义相同；报价必须对应原场次与原决策时点。
+100107未在原验收清单中；110915当前盘口仍为日期冲突或不可用，没有可配对冻结组。
+不是未见样本验证，不重训，不重新构建候选池。所有计划先冻结再结算。
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+modules<-c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio',
+ 'n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_probability_replay','top2_fresh_groups',
+ 'joint_candidate_comparison','zero_handicap_purchase','diagnostic_verified_csv',
+ 'eight_strategy_validation','fundamentals_equity_curves','n7_purchase_accounting','legacy_strategy_comparison')
+for(m in modules)source(file.path(root,'r',paste0(m,'.R')))
+reticulate::use_python(cfg$python,required=TRUE)
+api<-reticulate::import('src.strategy_diagnostic_inputs')
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.strategy_diagnostic_inputs','src.zero_purchase_history_inputs','src.fundamentals_n7_baseline'),distributions=list('numpy','pandas'))
+code_files<-c(paste0('r/',modules,'.R'),'quarto/240_zero_handicap_full_purchase.qmd')
+code<-setNames(lapply(code_files,function(p)digest::digest(file=file.path(root,p),algo='sha256')),code_files)
+stopifnot(!dir.exists(cfg$output),digest::digest(file=cfg$history_manifest,algo='sha256')==cfg$scope_sha256,
+ digest::digest(file=cfg$inputs$path,algo='sha256')==cfg$inputs$sha256)
+history<-jsonlite::fromJSON(cfg$history_manifest)
+history_lists<-jsonlite::fromJSON(cfg$history_manifest,simplifyVector=FALSE)
+input<-jsonlite::fromJSON(cfg$inputs$path);euro<-as_tibble(input$rows)
+scope<-list(issues=history$bundles)
+stopifnot(digest::digest(file=history$parent$path,algo='sha256')==history$parent$sha256)
+full_parent<-jsonlite::fromJSON(history$parent$path)
+issues<-sort(full_parent$issues);stopifnot(identical(issues,sort(input$issues)),length(issues)==939)
+excluded<-tibble(issue=setdiff(full_parent$requested_issues,issues),reason='NOT_IN_ACCEPTED_PARENT_SCOPE')
+if(!is.null(cfg$smoke_issues))issues<-head(issues,cfg$smoke_issues)
+if(!is.null(cfg$chunk_index))issues<-issues[(seq_along(issues)-1L) %% cfg$chunk_count == cfg$chunk_index]
+parents<-list()
+for(path in unique(unlist(lapply(history_lists$parents,function(z)vapply(z,`[[`,character(1),'path'))))){
+ expected<-unlist(lapply(history_lists$parents,function(z)lapply(z,function(y)if(y$path==path)y$sha256 else NULL)))
+ stopifnot(length(unique(expected))==1,digest::digest(file=path,algo='sha256')==expected[1])
+ parents[[path]]<-jsonlite::fromJSON(path,simplifyVector=FALSE)
+}
+s<-cfg$settings;bindings<-sources<-list();audit<-list();states<-as.matrix(expand.grid(rep(list(0:2),7)))[,7:1,drop=FALSE]
+dir.create(file.path(cfg$output,'plans'),recursive=TRUE)
+if(is.null(cfg$plan_receipts)){
+for(id in issues) {
+ entry<-scope$issues[match(id,scope$issues$issue),]
+ b<-jsonlite::fromJSON(api$read_verified_bundle_json(entry$path,entry$sha256),simplifyVector=FALSE)
+ old<-list();for(k in c('joint','top2')){z<-parents[[history_lists$parents[[id]][[k]]$path]]$bindings[[id]];stopifnot(digest::digest(file=z$path,algo='sha256')==z$sha256);old[[k]]<-readRDS(z$path);stopifnot(identical(old[[k]]$seal,digest::digest(old[[k]][names(old[[k]])!='seal'],algo='sha256')))}
+ f<-bind_rows(b$expanded_pool$fixtures);ef<-filter(euro,issue==id)
+ zix<-which(f$handicap==0);ej<-match(paste(f$slot[zix],f$provider_id[zix]),paste(ef$slot,ef$provider_id))
+ stopifnot(!anyNA(ej),isTRUE(all.equal(as.matrix(f[zix,paste0('p_',c('W','D','L'))]),as.matrix(ef[ej,paste0('p_',c('W','D','L'))]),check.attributes=FALSE,tolerance=1e-12)),
+ isTRUE(all.equal(as.matrix(f[zix,paste0('q_',c('W','D','L'))]),as.matrix(ef[ej,paste0('q_',c('W','D','L'))]),check.attributes=FALSE,tolerance=1e-12)))
+ z<-zero_purchase_compare(b,old$top2$fresh,old$joint$arms$JOINT$options,ef,b$cutoffs,cfg$python,s)
+ frozen<-z$plans;audit[[id]]<-z$admission
+ path<-file.path(cfg$output,'plans',paste0(id,'.rds'));saveRDS(frozen,path)
+ bindings[[id]]<-list(path=path,sha256=digest::digest(file=path,algo='sha256'));sources[[id]]<-as.list(entry)
+ writeLines(paste(match(id,issues),length(issues),id),file.path(cfg$output,'progress.txt'));message('FROZEN ',match(id,issues),'/',length(issues),' ',id)
+}
+stopifnot(identical(code,setNames(lapply(code_files,function(p)digest::digest(file=file.path(root,p),algo='sha256')),code_files)))
+jsonlite::write_json(list(generated_at_utc=format(Sys.time(),tz='UTC',usetz=TRUE),status='FROZEN_NOT_SETTLED',config=cfg,bindings=bindings,sources=sources,euro_sources=input$source_hashes,code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+write_csv(bind_rows(lapply(audit,bind_rows)),file.path(cfg$output,'admission.csv'))
+} else {
+ chunk_audits<-list()
+ for(i in seq_len(nrow(cfg$plan_receipts))){
+  e<-cfg$plan_receipts[i,];stopifnot(digest::digest(file=e$path,algo='sha256')==e$sha256)
+  part<-jsonlite::fromJSON(e$path,simplifyVector=FALSE)
+  zero_purchase_chunk(part,cfg,code,closure$closure_sha256)
+  stopifnot(!any(names(part$bindings) %in% names(bindings)))
+  bindings<-c(bindings,part$bindings);sources<-c(sources,part$sources)
+  chunk_audits[[i]]<-diagnostic_read_verified_csv(file.path(dirname(e$path),'admission.csv'),e$admission_sha256,cols(issue='c'))
+ }
+ stopifnot(setequal(names(bindings),issues))
+ jsonlite::write_json(list(generated_at_utc=format(Sys.time(),tz='UTC',usetz=TRUE),status='FROZEN_NOT_SETTLED',config=cfg,bindings=bindings,sources=sources,euro_sources=input$source_hashes,code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+ write_csv(bind_rows(chunk_audits),file.path(cfg$output,'admission.csv'))
+}
+if(isTRUE(cfg$freeze_only))knitr::knit_exit()
+```
+
+全部购票计划冻结后才读取结算。BASE须逐期重现既有购票计划。
+同期选票差异只在各自算法内部比较，不能跨算法用组ID比较。
+
+```{r}
+stopifnot(digest::digest(file=cfg$reference$path,algo='sha256')==cfg$reference$sha256)
+ref<-jsonlite::fromJSON(cfg$reference$path)
+labels<-bind_rows(lapply(seq_len(nrow(history$labels)),function(i)diagnostic_read_verified_csv(history$labels$path[i],history$labels$sha256[i],cols(issue='c',provider_id='c')) |> select(issue,slot,provider_id,handicap,status,actual_direction,spf_sp)))
+rows<-details<-list()
+for(id in issues){z<-bindings[[id]];stopifnot(digest::digest(file=z$path,algo='sha256')==z$sha256);plans<-readRDS(z$path)
+ for(policy in names(plans)){
+  plan<-plans[[policy]];lab<-eight_strategy_ready_labels(plan$fixtures,filter(labels,issue==id))
+  result<-joint_candidate_settle(plan,lab);rows[[paste(id,policy)]]<-result$rows;details[[paste(id,policy)]]<-result$tickets
+ }}
+x<-bind_rows(rows);tickets<-bind_rows(details)
+base<-tickets |> filter(grepl('_BASE$',policy)) |> mutate(algorithm=sub('_BASE$','',policy)) |> select(issue,algorithm,group_id,state_id,base_gross=gross)
+changes<-tickets |> mutate(algorithm=sub('_EURO_PQ$|_EURO_P$|_BASE$','',policy)) |>
+ left_join(base,by=c('issue','algorithm','group_id','state_id'),relationship='many-to-one') |> mutate(added=is.na(base_gross)) |>
+ group_by(policy) |> summarise(added_tickets=sum(added),added_gross=sum(gross[added]),retained_gross=sum(gross[!added]),.groups='drop')
+base_total<-base |> group_by(algorithm) |> summarise(base_tickets=n(),base_gross_total=sum(base_gross),.groups='drop')
+changes<-changes |> mutate(algorithm=sub('_EURO_PQ$|_EURO_P$|_BASE$','',policy)) |> left_join(base_total,by='algorithm',relationship='many-to-one') |>
+ left_join(x |> group_by(policy) |> summarise(total_tickets=sum(stake)/s$unit_cny,.groups='drop'),by='policy',relationship='one-to-one') |>
+ mutate(removed_tickets=base_tickets-(total_tickets-added_tickets),removed_gross=base_gross_total-retained_gross,
+  net_change=added_gross-removed_gross-s$unit_cny*(added_tickets-removed_tickets))
+account<-x |> mutate(stage=if_else(issue<'100708','EARLY105',if_else(issue %in% cfg$previous_issues,'PRIOR294','OTHER540')),model='ZERO_EURO_DIAGNOSTIC',budget_cny=s$budget_cny,cash_cny=s$budget_cny-stake,status=if_else(stake>0,'COMPLETE','NO_BET'))
+a<-legacy_strategy_comparison(account,issues,unique(account$stage),'JOINT_BASE',100000)
+a$summary |> filter(evaluation=='ALL') |> select(accounting_basis,policy,stake_cny,net_cny,roi_percent,hit_issues,profit_issues,max_drawdown_cny,minimum_equity_cny,stopped_issues) |> knitr::kable(digits=2)
+changes |> knitr::kable(digits=2)
+for(n in c('summary','curves','trimmed'))write_csv(a[[n]],file.path(cfg$output,paste0(n,'.csv')))
+write_csv(x,file.path(cfg$output,'periods.csv'));write_csv(tickets,file.path(cfg$output,'tickets.csv'));write_csv(changes,file.path(cfg$output,'changes.csv'))
+```
+
+```{r}
+curves<-a$curves |> filter(evaluation=='ALL',accounting_basis=='FUNDED') |>
+ mutate(algorithm=if_else(grepl('^JOINT',policy),'JOINT','Top2'),arm=sub('^JOINT_|^TOP2_','',policy))
+p1<-ggplot(curves,aes(period,equity_cny,color=arm))+geom_line(linewidth=.6)+facet_wrap(~algorithm,ncol=1)+theme_minimal()+labs(x='Issue index',y='Equity (CNY; initial 100,000)',color='Probability / price')
+p2<-ggplot(curves,aes(period,drawdown_cny,color=arm))+geom_line(linewidth=.6)+facet_wrap(~algorithm,ncol=1)+theme_minimal()+labs(x='Issue index',y='Drawdown (CNY)',color='Probability / price')
+print(p1);print(p2)
+ggsave(file.path(cfg$output,'equity.png'),p1,width=10,height=7,dpi=150)
+ggsave(file.path(cfg$output,'drawdown.png'),p2,width=10,height=7,dpi=150)
+write_csv(excluded,file.path(cfg$output,'exclusions.csv'))
+files<-c('freeze.json','admission.csv','summary.csv','curves.csv','trimmed.csv','periods.csv','tickets.csv','changes.csv','equity.png','drawdown.png','exclusions.csv')
+jsonlite::write_json(list(generated_at_utc=format(Sys.time(),tz='UTC',usetz=TRUE),status='COMPUTED_PENDING_INDEPENDENT_REVIEW',config=cfg,issues=issues,
+ files=setNames(lapply(files,function(n)digest::digest(file=file.path(cfg$output,n),algo='sha256')),files),code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```

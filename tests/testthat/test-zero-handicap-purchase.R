@@ -49,10 +49,27 @@ testthat::test_that('parallel merge rejects differing parent identities and para
  cfg<-list(scope_sha256='s',euro_manifest_sha256='e',top2=list(path='t',sha256='t1'),joint=list(path='j',sha256='j1'),reference=list(path='r',sha256='r1'),settings=list(budget_cny=1024L))
  part<-list(status='FROZEN_NOT_SETTLED',config=cfg,code=list(x='hash'),closure=list(closure_sha256='c'))
  testthat::expect_true(zero_purchase_chunk(part,cfg,part$code,'c'))
+ bad<-part;bad$config$inputs<-list(path='different',sha256='different');testthat::expect_error(zero_purchase_chunk(bad,cfg,part$code,'c'))
  for(k in c('top2','joint','reference'))for(field in c('path','sha256')){
   bad<-part;bad$config[[k]][[field]]<-'other';testthat::expect_error(zero_purchase_chunk(bad,cfg,part$code,'c'))
  }
  bad<-part;bad$config$settings$budget_cny<-2048L;testthat::expect_error(zero_purchase_chunk(bad,cfg,part$code,'c'))
  testthat::expect_error(zero_purchase_chunk(part,cfg,list(x='different'),'c'))
  testthat::expect_error(zero_purchase_chunk(part,cfg,part$code,'different'))
+})
+for(n in c('n7_capital_depth','n7_capital_portfolio','n7_core_opportunity','n7_sweet_union'))source(file.path('..','..','r',paste0(n,'.R')))
+testthat::test_that('six-arm issue function replays controls and rejects wrong baseline', {
+ e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
+ b<-list(issue=e$issue,cutoffs=e$cutoffs,historical_admission=FALSE,seal='test',expanded_pool=list(fixtures=e$fixtures),sleeves=list(list(id=0L,fixture_indices=as.list(0:6),origin='QUALITY',enumeration=e,options=list())))
+ f<-dplyr::bind_rows(e$fixtures);f$p_W<-.7;f$p_D<-.2;f$p_L<-.1;f$q_W<-.5;f$q_D<-.3;f$q_L<-.2
+ b<-zero_purchase_bundle(b,f,b$cutoffs,'test',2,.65);py<-Sys.getenv('RETICULATE_PYTHON')
+ fresh<-top2_fresh_groups(f,e$cutoffs,py,7,1024,2,.65,1.3)
+ a<-n7_probability_allocate(b,b$cutoffs,'test',py,.25,256,1.3,1024,2,.65,42501,256,1024)
+ euro<-f[f$handicap==0,];euro$odds_W<-rep(2,nrow(euro));euro$odds_D<-rep(4,nrow(euro));euro$odds_L<-rep(4,nrow(euro))
+ s<-list(unit_cny=2,payout_factor=.65,budget_cny=1024,target_coverage=.25,group_cap_cny=256,minimum_sp=1.3,seed=42501,worlds=256,max_actions=1024)
+ z<-zero_purchase_compare(b,fresh,a$pool$options[a$fit$selected],euro,b$cutoffs,py,s)
+ testthat::expect_length(z$plans,6);testthat::expect_equal(nrow(z$admission),3)
+ testthat::expect_true(all(vapply(z$plans,function(p)nrow(p$tickets)*2<=1024,logical(1))))
+ testthat::expect_error(zero_purchase_compare(b,fresh,a$pool$options[a$fit$selected],euro,list(),py,s))
+ bad<-a$pool$options[a$fit$selected];testthat::expect_length(bad,1);bad[[1]]$state_ids<-1L;testthat::expect_error(zero_purchase_compare(b,fresh,bad,euro,b$cutoffs,py,s))
 })

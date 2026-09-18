@@ -88,6 +88,43 @@ zero_purchase_chunk <- function(part, config, code, closure_sha256) {
   identical(part$config$euro_manifest_sha256,config$euro_manifest_sha256))
  for(k in c('top2','joint','reference'))for(field in c('path','sha256'))
   stopifnot(identical(part$config[[k]][[field]],config[[k]][[field]]))
+ if(!is.null(part$config$inputs)||!is.null(config$inputs))stopifnot(identical(part$config$inputs,config$inputs))
  expected<-jsonlite::fromJSON(jsonlite::toJSON(config$settings,auto_unbox=TRUE,digits=NA),simplifyVector=FALSE)
  stopifnot(identical(part$config$settings,expected));TRUE
+}
+
+# Reusable six-arm controlled issue replay. Reuse native JOINT and Top2
+# algorithms, candidate memberships, explicit cutoff and settings. euro is the
+# complete zero-line quote subset; fresh_control and joint_control are frozen
+# original plans. BASE must reproduce both. No labels, learning, or I/O.
+zero_purchase_compare <- function(bundle, fresh_control, joint_control, euro,
+                                  cutoffs, python, settings) {
+ stopifnot(identical(bundle$cutoffs,cutoffs))
+ b<-bundle;s<-settings;f<-dplyr::bind_rows(b$expanded_pool$fixtures);ef<-euro;id<-b$issue
+ states<-as.matrix(expand.grid(rep(list(0:2),7)))[,7:1,drop=FALSE]
+ frozen<-list();audit<-list()
+ for(arm in c('BASE','EURO_P','EURO_PQ')) {
+  ff<-zero_purchase_fixtures(f,dplyr::select(ef,issue,slot,provider_id,handicap,odds_W,odds_D,odds_L),b$cutoffs,python,arm)
+  bb<-if(arm=='BASE')b else zero_purchase_bundle(b,ff,b$cutoffs,arm,s$unit_cny,s$payout_factor)
+  a<-n7_probability_allocate(bb,b$cutoffs,arm,python,s$target_coverage,s$group_cap_cny,s$minimum_sp,s$budget_cny,s$unit_cny,s$payout_factor,s$seed,s$worlds,s$max_actions)
+  picks<-a$pool$options[a$fit$selected]
+  if(arm=='BASE') {
+   ref<-joint_control
+   stopifnot(identical(lapply(picks,function(o)list(o$sleeve_id,o$state_ids)),lapply(ref,function(o)list(o$sleeve_id,o$state_ids))))
+  }
+  groups<-dplyr::bind_rows(lapply(bb$sleeves,function(g)tibble::tibble(group_id=as.integer(g$id),fixture_index=as.integer(unlist(g$fixture_indices))+1L)))
+  frozen[[paste0('JOINT_',arm)]]<-zero_purchase_tickets(ff,groups,picks,b$cutoffs,s,paste0('JOINT_',arm))
+  fresh<-zero_purchase_top2(fresh_control,ff,b$cutoffs,python)
+  if(arm=='BASE')stopifnot(identical(fresh$options,fresh_control$options),identical(fresh$selected$TOP2_DIVERSE,fresh_control$selected$TOP2_DIVERSE))
+  p<-as.matrix(ff[paste0('p_',c('W','D','L'))]);q<-as.matrix(ff[paste0('q_',c('W','D','L'))]);picks<-list()
+  for(j in fresh$selected$TOP2_DIVERSE) {
+   ix<-fresh$groups[[j]];mask<-rep(TRUE,2187);prob<-rep(1,2187);pay<-rep(s$unit_cny*s$payout_factor,2187)
+   for(k in 1:7){mask<-mask & (states[,k]+1L) %in% fresh$options[ix[k],];prob<-prob*p[ix[k],states[,k]+1L];pay<-pay/q[ix[k],states[,k]+1L]}
+   stopifnot(sum(mask)==128);picks[[length(picks)+1L]]<-list(sleeve_id=j,state_ids=which(mask),state_probability=prob,state_payout=pay)
+  }
+  groups<-dplyr::bind_rows(lapply(seq_along(fresh$groups),function(j)tibble::tibble(group_id=as.integer(j),fixture_index=fresh$groups[[j]])))
+  frozen[[paste0('TOP2_',arm)]]<-zero_purchase_tickets(ff,groups,picks,b$cutoffs,s,paste0('TOP2_',arm))
+  audit[[arm]]<-tibble::tibble(issue=id,arm=arm,fixtures=nrow(ff),zero=sum(ff$handicap==0),eligible=sum(a$gate$fixtures$eligible),joint_candidates=nrow(a$gate$groups),joint_legal=sum(a$gate$groups$eligible),top2_candidates=length(fresh$groups),top2_selected=length(fresh$selected$TOP2_DIVERSE),joint_groups=length(a$fit$selected))
+ }
+ list(plans=frozen,admission=dplyr::bind_rows(audit))
 }

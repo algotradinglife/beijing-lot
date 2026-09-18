@@ -9,16 +9,28 @@ source(file.path(root,'r/diagnostic_verified_csv.R'))
 source(file.path(root,'r/joint_candidate_comparison.R'))
 source(file.path(root,'r/zero_handicap_purchase.R'))
 reticulate::use_python(r$config$python,required=TRUE)
-closure<-reticulate::import('src.temporal_learning.provenance')$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.strategy_diagnostic_inputs','src.zero_handicap_inputs','src.fundamentals_n7_baseline'),distributions=list('numpy','pandas'))
+closure<-reticulate::import('src.temporal_learning.provenance')$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.strategy_diagnostic_inputs',if(is.null(r$config$history_manifest))'src.zero_handicap_inputs' else 'src.zero_purchase_history_inputs','src.fundamentals_n7_baseline'),distributions=list('numpy','pandas'))
 stopifnot(closure$closure_sha256==r$closure$closure_sha256)
 f<-jsonlite::fromJSON(file.path(out,'freeze.json'),simplifyVector=FALSE)
 stopifnot(digest::digest(file=r$config$scope,algo='sha256')==r$config$scope_sha256)
 for(b in f$sources)stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
 for(path in names(f$euro_sources))stopifnot(digest::digest(file=path,algo='sha256')==f$euro_sources[[path]])
+if(!is.null(r$config$history_manifest)){
+ history<-jsonlite::fromJSON(r$config$history_manifest,simplifyVector=FALSE)
+ stopifnot(digest::digest(file=r$config$inputs$path,algo='sha256')==r$config$inputs$sha256)
+ replayed<-reticulate::import('src.zero_purchase_history_inputs')$read_zero_purchase_history(r$config$history_manifest,r$config$scope_sha256)
+ stopifnot(identical(jsonlite::fromJSON(replayed,simplifyVector=FALSE),jsonlite::fromJSON(r$config$inputs$path,simplifyVector=FALSE)))
+ for(id in r$issues)for(kind in c('joint','top2')){
+  parent<-history$parents[[id]][[kind]];stopifnot(digest::digest(file=parent$path,algo='sha256')==parent$sha256)
+  pp<-jsonlite::fromJSON(parent$path,simplifyVector=FALSE);b<-pp$bindings[[id]]
+  stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)
+ }
+} else {
 for(kind in c('joint','top2')){
  parent<-r$config[[kind]];stopifnot(digest::digest(file=parent$path,algo='sha256')==parent$sha256)
  pp<-jsonlite::fromJSON(parent$path,simplifyVector=FALSE)
  for(id in r$issues){b<-pp$bindings[[id]];stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256)}
+}
 }
 if(!is.null(r$config$plan_receipts))for(i in seq_len(nrow(r$config$plan_receipts))){
  z<-r$config$plan_receipts[i,];stopifnot(digest::digest(file=z$path,algo='sha256')==z$sha256,
@@ -29,7 +41,8 @@ if(!is.null(r$config$plan_receipts))for(i in seq_len(nrow(r$config$plan_receipts
 
 refp<-r$config$reference;stopifnot(digest::digest(file=refp$path,algo='sha256')==refp$sha256)
 ref<-jsonlite::fromJSON(refp$path)
-labels<-bind_rows(lapply(seq_len(nrow(ref$config$labels)),function(i)diagnostic_read_verified_csv(ref$config$labels$path[i],ref$config$labels$sha256[i],cols(issue='c',provider_id='c'))))
+label_sources<-if(is.null(r$config$history_manifest))ref$config$labels else jsonlite::fromJSON(r$config$history_manifest)$labels
+labels<-bind_rows(lapply(seq_len(nrow(label_sources)),function(i)diagnostic_read_verified_csv(label_sources$path[i],label_sources$sha256[i],cols(issue='c',provider_id='c'))))
 ledger<-diagnostic_read_verified_csv(file.path(out,'periods.csv'),r$files[['periods.csv']],cols(issue='c'))
 states<-as.matrix(expand.grid(rep(list(0:2),7)))[,7:1,drop=FALSE];count<-0;independent<-list()
 for(id in r$issues){b<-f$bindings[[id]];stopifnot(digest::digest(file=b$path,algo='sha256')==b$sha256);plans<-readRDS(b$path)
@@ -76,5 +89,14 @@ for(policy in unique(ledger$policy)){
  eq<-c(100000,100000+cumsum(executed_gross-executed_stake));actual<-summ[summ$evaluation=='ALL' & summ$accounting_basis=='FUNDED' & summ$policy==policy,]
  stopifnot(abs(actual$net_cny-sum(executed_gross-executed_stake))<1e-7,
  abs(actual$stake_cny-sum(executed_stake))<1e-7,abs(actual$max_drawdown_cny-max(cummax(eq)-eq))<1e-7)
+}
+if(!is.null(r$config$prior_test)){
+ prior<-r$config$prior_test;stopifnot(digest::digest(file=prior$path,algo='sha256')==prior$sha256)
+ old<-jsonlite::fromJSON(prior$path)
+ old_rows<-diagnostic_read_verified_csv(file.path(dirname(prior$path),'periods.csv'),old$files[['periods.csv']],cols(issue='c'))
+ paired<-merge(ledger,old_rows,by=c('issue','policy'),suffixes=c('_new','_old'))
+ stopifnot(nrow(paired)==nrow(old_rows),setequal(old$issues,r$config$previous_issues))
+ for(k in c('stake','gross','hits','net'))stopifnot(max(abs(paired[[paste0(k,'_new')]]-paired[[paste0(k,'_old')]]))<1e-7)
+ cat('PASS: previous 294-issue six-arm period ledgers reproduced exactly\n')
 }
 cat('PASS:' ,length(r$issues),'issues;',count,'tickets; independent probability/price/settlement/changes replay; source and implementation hashes verified\n')

@@ -57,36 +57,14 @@ for(id in issues) {
  zix<-which(f$handicap==0);ej<-match(paste(f$slot[zix],f$provider_id[zix]),paste(ef$slot,ef$provider_id))
  stopifnot(!anyNA(ej),isTRUE(all.equal(as.matrix(f[zix,paste0('p_',c('W','D','L'))]),as.matrix(ef[ej,paste0('p_',c('W','D','L'))]),check.attributes=FALSE,tolerance=1e-12)),
  isTRUE(all.equal(as.matrix(f[zix,paste0('q_',c('W','D','L'))]),as.matrix(ef[ej,paste0('q_',c('W','D','L'))]),check.attributes=FALSE,tolerance=1e-12)))
- frozen<-list();audit[[id]]<-list()
- for(arm in c('BASE','EURO_P','EURO_PQ')) {
-  ff<-zero_purchase_fixtures(f,select(ef,issue,slot,provider_id,handicap,odds_W,odds_D,odds_L),b$cutoffs,cfg$python,arm)
-  bb<-if(arm=='BASE')b else zero_purchase_bundle(b,ff,b$cutoffs,arm,s$unit_cny,s$payout_factor)
-  a<-n7_probability_allocate(bb,b$cutoffs,arm,cfg$python,s$target_coverage,s$group_cap_cny,s$minimum_sp,s$budget_cny,s$unit_cny,s$payout_factor,s$seed,s$worlds,s$max_actions)
-  picks<-a$pool$options[a$fit$selected]
-  if(arm=='BASE') {
-   ref<-old$joint$arms$JOINT$options
-   stopifnot(identical(lapply(picks,function(o)list(o$sleeve_id,o$state_ids)),lapply(ref,function(o)list(o$sleeve_id,o$state_ids))))
-  }
-  groups<-bind_rows(lapply(bb$sleeves,function(g)tibble(group_id=as.integer(g$id),fixture_index=as.integer(unlist(g$fixture_indices))+1L)))
-  frozen[[paste0('JOINT_',arm)]]<-zero_purchase_tickets(ff,groups,picks,b$cutoffs,s,paste0('JOINT_',arm))
-  fresh<-zero_purchase_top2(old$top2$fresh,ff,b$cutoffs,cfg$python)
-  if(arm=='BASE')stopifnot(identical(fresh$options,old$top2$fresh$options),identical(fresh$selected$TOP2_DIVERSE,old$top2$fresh$selected$TOP2_DIVERSE))
-  p<-as.matrix(ff[paste0('p_',c('W','D','L'))]);q<-as.matrix(ff[paste0('q_',c('W','D','L'))]);picks<-list()
-  for(j in fresh$selected$TOP2_DIVERSE) {
-   ix<-fresh$groups[[j]];mask<-rep(TRUE,2187);prob<-rep(1,2187);pay<-rep(s$unit_cny*s$payout_factor,2187)
-   for(k in 1:7){mask<-mask & (states[,k]+1L) %in% fresh$options[ix[k],];prob<-prob*p[ix[k],states[,k]+1L];pay<-pay/q[ix[k],states[,k]+1L]}
-   stopifnot(sum(mask)==128);picks[[length(picks)+1L]]<-list(sleeve_id=j,state_ids=which(mask),state_probability=prob,state_payout=pay)
-  }
-  groups<-bind_rows(lapply(seq_along(fresh$groups),function(j)tibble(group_id=as.integer(j),fixture_index=fresh$groups[[j]])))
-  frozen[[paste0('TOP2_',arm)]]<-zero_purchase_tickets(ff,groups,picks,b$cutoffs,s,paste0('TOP2_',arm))
-  audit[[id]][[arm]]<-tibble(issue=id,arm=arm,fixtures=nrow(ff),zero=sum(ff$handicap==0),eligible=sum(a$gate$fixtures$eligible),joint_candidates=nrow(a$gate$groups),joint_legal=sum(a$gate$groups$eligible),top2_candidates=length(fresh$groups),top2_selected=length(fresh$selected$TOP2_DIVERSE),joint_groups=length(a$fit$selected))
- }
+ z<-zero_purchase_compare(b,old$top2$fresh,old$joint$arms$JOINT$options,ef,b$cutoffs,cfg$python,s)
+ frozen<-z$plans;audit[[id]]<-z$admission
  path<-file.path(cfg$output,'plans',paste0(id,'.rds'));saveRDS(frozen,path)
  bindings[[id]]<-list(path=path,sha256=digest::digest(file=path,algo='sha256'));sources[[id]]<-as.list(entry)
  writeLines(paste(match(id,issues),length(issues),id),file.path(cfg$output,'progress.txt'));message('FROZEN ',match(id,issues),'/',length(issues),' ',id)
 }
 stopifnot(identical(code,setNames(lapply(code_files,function(p)digest::digest(file=file.path(root,p),algo='sha256')),code_files)))
-jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',config=cfg,bindings=bindings,sources=sources,euro_sources=input$source_hashes,code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+jsonlite::write_json(list(generated_at_utc=format(Sys.time(),tz='UTC',usetz=TRUE),status='FROZEN_NOT_SETTLED',config=cfg,bindings=bindings,sources=sources,euro_sources=input$source_hashes,code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
 write_csv(bind_rows(lapply(audit,bind_rows)),file.path(cfg$output,'admission.csv'))
 } else {
  chunk_audits<-list()
@@ -99,7 +77,7 @@ write_csv(bind_rows(lapply(audit,bind_rows)),file.path(cfg$output,'admission.csv
   chunk_audits[[i]]<-diagnostic_read_verified_csv(file.path(dirname(e$path),'admission.csv'),e$admission_sha256,cols(issue='c'))
  }
  stopifnot(setequal(names(bindings),issues))
- jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',config=cfg,bindings=bindings,sources=sources,euro_sources=input$source_hashes,code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+ jsonlite::write_json(list(generated_at_utc=format(Sys.time(),tz='UTC',usetz=TRUE),status='FROZEN_NOT_SETTLED',config=cfg,bindings=bindings,sources=sources,euro_sources=input$source_hashes,code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
  write_csv(bind_rows(chunk_audits),file.path(cfg$output,'admission.csv'))
 }
 if(isTRUE(cfg$freeze_only))knitr::knit_exit()
@@ -146,6 +124,6 @@ ggsave(file.path(cfg$output,'equity.png'),p1,width=10,height=7,dpi=150)
 ggsave(file.path(cfg$output,'drawdown.png'),p2,width=10,height=7,dpi=150)
 write_csv(excluded,file.path(cfg$output,'exclusions.csv'))
 files<-c('freeze.json','admission.csv','summary.csv','curves.csv','trimmed.csv','periods.csv','tickets.csv','changes.csv','equity.png','drawdown.png','exclusions.csv')
-jsonlite::write_json(list(status='COMPUTED_PENDING_INDEPENDENT_REVIEW',config=cfg,issues=issues,
+jsonlite::write_json(list(generated_at_utc=format(Sys.time(),tz='UTC',usetz=TRUE),status='COMPUTED_PENDING_INDEPENDENT_REVIEW',config=cfg,issues=issues,
  files=setNames(lapply(files,function(n)digest::digest(file=file.path(cfg$output,n),algo='sha256')),files),code=code,closure=closure,historical_admission=FALSE),file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
 ```
