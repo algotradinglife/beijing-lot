@@ -1,0 +1,111 @@
+---
+title: "939期北单让球设置与条件内表现：描述性归因"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+这是已暴露历史样本的描述性诊断，不拟合或发布新校正，不生成下注规则。
+范围为上一轮939期固定候选场池，非全部北单发行赛事；候选准入变化可能影响结果。
+按真实决策日期年份分段，2015年只有开头部分，单列展示，不参与完整年份标准化。
+2010年仅967场有总进球映射，故总进球条件对照限于2011—2014；欧赔单条件对照覆盖2010—2014。
+标准化格子使用普通欧赔去水主胜减客胜概率（并非让球胜负差）和既有映射的总进球均值。
+后者不是原始大小球盘口，且受映射算法版本影响；没有完整联赛字段，不能宣称已排除联赛构成因素。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root;out<-cfg$output
+stopifnot(!file.exists(file.path(out,'regime-receipt.json')))
+for(n in c('diagnostic_verified_csv','strategy_diagnostic_probabilities','handicap_setting_regimes'))source(file.path(root,'r',paste0(n,'.R')))
+stopifnot(digest::digest(file=cfg$input,algo='sha256')==cfg$input_sha256,
+ digest::digest(file=cfg$manifest,algo='sha256')==cfg$manifest_sha256)
+input<-jsonlite::fromJSON(cfg$input);manifest<-jsonlite::fromJSON(cfg$manifest)
+x<-as_tibble(input$rows)
+stopifnot(all(grepl('(Z|\\+00:00)$',x$cutoff_utc)))
+x<-x |> mutate(year=substr(cutoff_utc,1,4))
+labels<-bind_rows(lapply(seq_len(nrow(manifest$labels)),function(i)
+ diagnostic_read_verified_csv(manifest$labels$path[i],manifest$labels$sha256[i],cols(issue='c',provider_id='c')) |> select(issue,slot,provider_id,handicap,status,actual_home,actual_away,actual_direction,spf_sp)))
+stopifnot(!anyDuplicated(labels[c('issue','slot','provider_id')]))
+x<-left_join(x,labels,by=c('issue','slot','provider_id','handicap'),relationship='one-to-one')
+stopifnot(!anyNA(x$status),all(x$status=='READY'),all(x$actual_direction==ifelse(x$actual_home-x$actual_away+x$handicap>0,'W',ifelse(x$actual_home-x$actual_away+x$handicap==0,'D','L'))))
+z<-handicap_setting_regimes(x,cfg$strength_breaks,c(cfg$total_breaks,Inf),cfg$complete_years,cfg$minimum_support)
+x<-z$fixtures
+z$annual |> knitr::kable(digits=3)
+z$coverage |> select(year,fixtures,common_n,common_share) |> knitr::kable(digits=3)
+z$standardized |> knitr::kable(digits=3)
+z_strength<-handicap_setting_regimes(x,cfg$strength_breaks,c(cfg$total_breaks,Inf),c("2010","2011","2012","2013","2014"),cfg$minimum_support,FALSE)
+z_strength$standardized |> knitr::kable(digits=3)
+for(n in c("coverage","standardized","decomposition"))write_csv(z_strength[[n]],file.path(out,paste0("regime-strength-",n,".csv")))
+z$decomposition |> knitr::kable(digits=4)
+for(n in names(z))write_csv(z[[n]],file.path(out,paste0('regime-',n,'.csv')))
+```
+
+共同支持分解只适用于上表列明的交集。标准化权重来自所有完整年份共同格子的合并频数，
+用于事后比较，不能用作未来策略。composition与within采用各自首年参照，顺序依赖、非因果；
+缺少共同支持时不补造分解。场次重复在不同期出现仍视作不同决策观察，不当成独立赛事推断。
+
+```{r}
+# Evaluate already-frozen probabilities; EURO modifies only zero-line fixtures.
+a<-x |> mutate(model='FROZEN')
+b<-x |> mutate(p_W=q_W,p_D=q_D,p_L=q_L,model='RAW_MAPPING')
+c<-x |> mutate(p_W=if_else(handicap==0,euro_W,p_W),p_D=if_else(handicap==0,euro_D,p_D),p_L=if_else(handicap==0,euro_L,p_L),model='ZERO_EURO')
+long<-bind_rows(a,b,c) |> select(issue,slot,provider_id,year,handicap,model,actual_direction,p_W,p_D,p_L) |>
+ rename(actual_outcome=actual_direction) |> pivot_longer(starts_with('p_'),names_to='outcome',names_prefix='p_',values_to='probability')
+scores<-strategy_probability_diagnostics(long,c('year','handicap'),c('W','D','L'),seq(0,1,.1))
+observed<-long |> group_by(year,handicap,model,outcome) |> summarise(n=n(),issues=n_distinct(issue),predicted=mean(probability),observed=mean(outcome==actual_outcome),.groups='drop') |> mutate(gap=observed-predicted)
+write_csv(scores$summary,file.path(out,'regime-scores.csv'));write_csv(observed,file.path(out,'regime-calibration.csv'))
+scores$summary |> filter(handicap==0) |> knitr::kable(digits=4)
+# Descriptive issue-level paired zero-line Brier differences, not IID fixture CIs.
+paired<-scores$scores |> filter(handicap==0) |> select(issue,slot,provider_id,year,model,brier) |> pivot_wider(names_from=model,values_from=brier) |>
+ group_by(year,issue) |> summarise(n=n(),euro_minus_frozen=mean(ZERO_EURO-FROZEN),euro_minus_raw=mean(ZERO_EURO-RAW_MAPPING),.groups='drop')
+write_csv(paired,file.path(out,'regime-paired-issues.csv'))
+paired |> group_by(year) |> summarise(issues=n(),mean_issue_delta=mean(euro_minus_frozen),improved_issues=sum(euro_minus_frozen<0),.groups='drop') |> knitr::kable(digits=5)
+```
+
+Brier越低越好。非零让球ZERO_EURO与FROZEN相同；本轮不把普通欧赔当成非零让球概率。
+校准图显示观测减预测的百分点；正数代表低估，负数代表高估。只绘制每格至少100场的结果，CSV保留全部。
+年度比较未给出独立赛事显著性结论，不能用稀疏极端让球格推断规则改变。
+
+```{r}
+p1<-bind_rows(z$annual |> transmute(year,type='Observed full pool',value=zero_share),z$standardized |> transmute(year,type='Euro + mapped total (2011-14)',value=standard_zero),z_strength$standardized |> transmute(year,type='Euro only (2010-14)',value=standard_zero)) |>
+ ggplot(aes(year,value*100,color=type,group=type))+geom_line()+geom_point()+theme_minimal()+labs(x='Decision year (2015 partial)',y='Zero-handicap share (%)',color=NULL)
+p2<-z$cells |> filter(n>=100,total_bin!='UNKNOWN') |> ggplot(aes(year,strength_bin,fill=zero_share*100))+geom_tile()+facet_wrap(~total_bin)+scale_fill_viridis_c()+theme_minimal()+labs(x='Decision year',y='Euro home minus away probability',fill='Zero line %',title='Mapped total-goal bands; cells with >=100 fixtures')
+p3<-observed |> filter(model=='FROZEN',n>=100,abs(handicap)<=2) |> ggplot(aes(year,as.factor(handicap),fill=gap*100))+geom_tile()+facet_wrap(~outcome)+scale_fill_gradient2(low='#2166ac',mid='white',high='#b2182b',midpoint=0)+theme_minimal()+labs(x='Decision year',y='Signed home handicap',fill='Observed - predicted (pp)',title='Frozen probability calibration; cells with >=100 fixtures')
+for(n in c('p1','p2','p3')){print(get(n));ggsave(file.path(out,paste0(n,'.png')),get(n),width=11,height=6,dpi=150)}
+code_files<-c('src/zero_purchase_history_inputs.py','src/zero_handicap_inputs.py','src/strategy_diagnostic_inputs.py','src/data_archive.py','r/diagnostic_verified_csv.R','r/strategy_diagnostic_probabilities.R','r/handicap_setting_regimes.R','quarto/242_handicap_setting_regimes.qmd')
+files<-list.files(out,pattern='^(regime-.*\\.csv|p[123]\\.png)$',full.names=TRUE)
+jsonlite::write_json(list(status='COMPUTED_PENDING_REVIEW',config=cfg,fixtures=nrow(x),issues=n_distinct(x$issue),historical_learning='NONE',
+ sources=c(input$source_hashes,as.list(setNames(manifest$labels$sha256,manifest$labels$path))),
+ code=setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files),
+ files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files))),file.path(out,'regime-receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+## 本轮结论
+
+**支持零让球直接欧赔，暂不推广统一的非零让球修正。** 44,328条零让球记录中，
+FROZEN、RAW_MAPPING、ZERO_EURO的Brier分别为0.651111、0.650283、0.649230；
+ZERO_EURO相对原冻结Top1从42.713%到42.765%，Top2从72.241%到73.139%。
+2010—2014每个完整年份，直接欧赔Brier均较原始映射更低；2015仅7期不能代表全年。
+这是描述性跨年一致性，不是独立留出样本的显著性证明，也不能替代购票收益验证。
+
+**让球结构有温和漂移，单凭此不能断言发行规则改变。** 2011到2014，零让球占比
+52.457%升至56.977%。控制欧赔差和映射总进球后的共同格子标准率54.360%升至56.216%，
+共同支持覆盖各年99.25%—99.54%的候选场次。共同支持样本的4.402个百分点变化，
+按2011参考顺序分解为构成效应2.526个百分点、同格变化1.876个百分点。
+格子仍较粗，缺少联赛及原始大小球线；所以同格变化不等于已识别北单规则的因果变化。
+欧赔单条件标准率2010年53.702%、2014年56.325%，方向一致。
+
+**非零让球不能一律补让平。** 主队让1球（h=-1）的让平低估在2010—2013约0.63—1.47个百分点，
+2014缩至0.08个百分点；主队受让1球（h=+1）方向随年份翻转。
+主队受让2球（h=+2）的让胜在2010—2014每年均被高估；合计1,171场，
+预测50.30%、实际47.82%，值得保留为盲点，但样本较小且赛事构成尚未控制，暂不转为自动扣减。
+
+本轮只诊断，不变更任何非零让球概率或下注规则。最小后续工作是待联赛字段绑定齐备后，
+检验h=+2让胜偏高是否仍在同联赛、同强弱条件下出现；不继续盲搜全局让平权重。

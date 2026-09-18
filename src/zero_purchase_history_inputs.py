@@ -13,15 +13,19 @@ from src.data_archive import read_archive_members
 from src.zero_handicap_inputs import verified_zero_json
 from src.strategy_diagnostic_inputs import read_verified_bundle_json
 from src.temporal_learning import Cutoff
+from src.temporal_learning.core import utc
 
 
-def read_zero_purchase_history(manifest_path, manifest_sha256):
+def read_zero_purchase_history(manifest_path, manifest_sha256, zero_only=True):
     """Return JSON with zero-line odds and source hashes for explicit issue scope.
 
     sources: kind=fixtures / market / euro, issues, and either file+sha256 or
     archive+archive_sha256+member. bundles pins one candidate JSON per issue.
     Rows are unique issue/slot/provider_id, handicap=0, odds_W/D/L plus frozen
     p/q controls. Every needed quote must have the same decision epoch as bundle.
+    zero_only=False admits every signed handicap and adds cutoff_utc and nullable
+    lambda_home/away (mapped goal means, NOT original over/under quote lines).
+    Missing means remain null; malformed supplied means fail. No labels returned.
     """
     m = verified_zero_json(manifest_path, manifest_sha256)
     hashes = {str(manifest_path): manifest_sha256}
@@ -74,7 +78,7 @@ def read_zero_purchase_history(manifest_path, manifest_sha256):
         if bundle['issue'] != entry['issue']:
             raise ValueError('Bundle issue differs')
         for fixture in bundle['expanded_pool']['fixtures']:
-            if fixture['handicap'] != 0:
+            if zero_only and fixture['handicap'] != 0:
                 continue
             key = (fixture['issue'], fixture['slot'], fixture['provider_id'])
             if key not in quotes:
@@ -83,7 +87,7 @@ def read_zero_purchase_history(manifest_path, manifest_sha256):
             if Cutoff.decision_epoch(key[0], q['cutoff_utc']) != Cutoff.decision_epoch(
                     key[0], bundle['cutoffs'][str(key[1])]):
                 raise ValueError(f'Quote epoch mismatch: {key}')
-            if 'handicap' in q and q['handicap'] != 0:
+            if 'handicap' in q and q['handicap'] != fixture['handicap']:
                 raise ValueError('Quote handicap differs')
             odds = {f'odds_{d}': q[f'odds_{d}'] for d in 'WDL'}
             if any(not isinstance(v, (int, float)) or not math.isfinite(v) or v <= 1
@@ -92,6 +96,15 @@ def read_zero_purchase_history(manifest_path, manifest_sha256):
             for d in 'WDL':
                 if f'q_{d}' in q and abs(q[f'q_{d}'] - fixture[f'q_{d}']) > 1e-10:
                     raise ValueError(f'Frozen quote projection differs: {key}')
-            rows.append(dict(fixture, **odds))
+            row = dict(fixture, **odds)
+            if not zero_only:
+                row['cutoff_utc'] = utc(q['cutoff_utc']).isoformat()
+                for field in ('lambda_home', 'lambda_away'):
+                    value = q.get(field)
+                    if value is not None and (not isinstance(value, (int, float))
+                            or not math.isfinite(value) or value <= 0):
+                        raise ValueError('Invalid mapped goal mean')
+                    row[field] = value
+            rows.append(row)
     return json.dumps(dict(rows=rows, issues=issues, source_hashes=hashes,
                            historical_learning='NONE'), allow_nan=False)

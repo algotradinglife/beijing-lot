@@ -54,3 +54,23 @@ def test_duplicate_assignment_changed_bytes_and_missing_scope(tmp_path,monkeypat
     with pytest.raises(ValueError,match='scope'):run_case(tmp_path,m)
     m['bundles'][0]['issue']='001';p.write_text('{}')
     with pytest.raises(ValueError,match='Changed input'):run_case(tmp_path,m)
+
+
+def test_all_handicaps_preserve_context_and_missing_means(tmp_path,monkeypatch):
+    m,p,b=setup_case(tmp_path,monkeypatch)
+    b['expanded_pool']['fixtures'][0]['handicap']=-1
+    obj=json.loads(p.read_text());obj['fixtures'][0].update(handicap=-1,lambda_home=2.1,lambda_away=1.2,actual_direction='W')
+    p.write_text(json.dumps(obj));m['sources'][0]['sha256']=hashlib.sha256(p.read_bytes()).hexdigest()
+    mp=tmp_path/'manifest.json';mp.write_text(json.dumps(m))
+    sha=hashlib.sha256(mp.read_bytes()).hexdigest()
+    x=json.loads(mod.read_zero_purchase_history(mp,sha,zero_only=False))['rows'][0]
+    assert x['handicap']==-1 and x['lambda_home']==2.1
+    assert x['cutoff_utc']=='2020-01-01T00:00:00+00:00'
+    assert 'actual_direction' not in x
+    assert json.loads(mod.read_zero_purchase_history(mp,sha))['rows']==[]
+    obj['fixtures'][0].pop('lambda_home');obj['fixtures'][0].pop('lambda_away')
+    p.write_text(json.dumps(obj));m['sources'][0]['sha256']=hashlib.sha256(p.read_bytes()).hexdigest();mp.write_text(json.dumps(m));sha=hashlib.sha256(mp.read_bytes()).hexdigest()
+    assert json.loads(mod.read_zero_purchase_history(mp,sha,False))['rows'][0]['lambda_home'] is None
+    obj['fixtures'][0]['lambda_home']=-1
+    p.write_text(json.dumps(obj));m['sources'][0]['sha256']=hashlib.sha256(p.read_bytes()).hexdigest();mp.write_text(json.dumps(m));sha=hashlib.sha256(mp.read_bytes()).hexdigest()
+    with pytest.raises(ValueError,match='goal mean'):mod.read_zero_purchase_history(mp,sha,False)
