@@ -1,0 +1,42 @@
+for(n in c('n7_probability_replay','n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','top2_fresh_groups','joint_candidate_comparison'))source(file.path('..','..','r',paste0(n,'.R')))
+testthat::test_that('expanded shared pools preserve original groups and buy comparable tickets', {
+ e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
+ bundle<-list(issue=e$issue,cutoffs=e$cutoffs,historical_admission=FALSE,seal='test',expanded_pool=list(fixtures=e$fixtures),sleeves=list(list(id=0L,fixture_indices=as.list(0:6),origin='QUALITY',enumeration=e,options=list())))
+ f<-dplyr::bind_rows(e$fixtures);extra<-f[1:3,];extra$slot<-max(f$slot)+1:3;extra$provider_id<-paste0('extra',1:3)
+ f<-rbind(f,extra);bundle$cutoffs<-c(e$cutoffs,setNames(rep(e$cutoffs[1],3),as.character(extra$slot)))
+ bundle$expanded_pool$fixtures<-c(e$fixtures,lapply(1:3,function(i)as.list(extra[i,])))
+ py<-Sys.getenv('RETICULATE_PYTHON');fresh<-top2_fresh_groups(f,bundle$cutoffs,py,7,1024,2,.65,1)
+ b<-joint_candidate_expand(bundle,fresh,bundle$cutoffs,py,8,4)
+ testthat::expect_identical(b$sleeves[[1]],bundle$sleeves[[1]])
+ testthat::expect_gt(length(b$sleeves),1)
+ s<-list(model_id='test',target_coverage=.25,group_cap_cny=256,minimum_sp=1,budget_cny=1024,unit_cny=2,payout_factor=.65,seed=42501L,worlds=32L,hard_seed=42503L,hard_worlds=128L,temperature=.5,marginal_tv_cap=.25,outside_mix=.05,outside_ticket_fraction=.05,evaluation_seed=42502L,evaluation_worlds=128L,max_actions=1024L)
+ z<-joint_candidate_compare(b,b$cutoffs,py,s)
+ testthat::expect_length(z$policies,10)
+ testthat::expect_true(all(z$metrics$max_marginal_tv[z$metrics$policy!="JOINT_NATIVE"]<=.25))
+ testthat::expect_true(all(z$tickets$state_id>=1 & z$tickets$state_id<=2187))
+ testthat::expect_true(all(!z$tickets$outside_support[grepl('^(HARD|WITHIN)',z$tickets$policy)]))
+ for(k in 0:2) {
+  tt<-z$tickets[z$tickets$policy==paste0('HARD',k),]
+  testthat::expect_true(all(table(tt$group_id)==2^(7-k)))
+ }
+ lab<-f[c('issue','slot','provider_id','handicap')];lab$actual_direction<-'W';lab$spf_sp<-2
+ tmp<-tempfile(fileext='.json');on.exit(unlink(tmp),add=TRUE)
+ jsonlite::write_json(z,tmp,auto_unbox=TRUE,digits=NA,null='null',na='null')
+ restored<-jsonlite::fromJSON(tmp)
+ testthat::expect_identical(restored$seal,joint_candidate_seal(restored[names(restored)!='seal']))
+ settled<-joint_candidate_settle(z,lab)
+ testthat::expect_equal(joint_candidate_settle(restored,lab),settled)
+ bad_settings<-s;bad_settings$marginal_tv_cap<-.3
+ testthat::expect_error(joint_candidate_compare(b,b$cutoffs,py,bad_settings))
+ testthat::expect_equal(settled$rows$gross,settled$rows$hits*2*.65*2^7)
+ testthat::expect_true(all(settled$rows$stake<=1024))
+ testthat::expect_error(joint_candidate_settle(z,lab[-1,]))
+ bad<-z;bad$tickets$state_id[1]<-1;bad$seal<-'bad';testthat::expect_error(joint_candidate_settle(bad,lab))
+ testthat::expect_error(joint_candidate_expand(bundle,fresh,list(),py,8,4))
+ testthat::expect_error(joint_candidate_compare(b,list(),py,s))
+ s$minimum_sp<-1e6;empty<-joint_candidate_compare(b,b$cutoffs,py,s)
+ testthat::expect_equal(nrow(empty$tickets),0)
+ jsonlite::write_json(empty,tmp,auto_unbox=TRUE,digits=NA,null='null',na='null')
+ testthat::expect_equal(joint_candidate_settle(jsonlite::fromJSON(tmp),lab)$rows$stake,rep(0,10))
+ testthat::expect_equal(joint_candidate_settle(empty,lab)$rows$stake,rep(0,10))
+})
