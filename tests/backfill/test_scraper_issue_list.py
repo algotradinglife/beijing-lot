@@ -54,9 +54,10 @@ class _Session:
         return _Response(self._body, self._status)
 
 
-def _body(options: list[str], *, extra: str = "", select: bool = True) -> str:
+def _body(options: list[str], *, extra: str = "", inside: str = "", select: bool = True) -> str:
+    """Build a page body; ``extra`` precedes the dropdown and ``inside`` is inside it."""
     opts = "".join(f'<option value="{o}">{o}</option>' for o in options)
-    dropdown = f'<select id="expect_select" name="expect">{opts}</select>' if select else ""
+    dropdown = f'<select id="expect_select" name="expect">{opts}{inside}</select>' if select else ""
     return f"<html><body>{extra}{dropdown}</body></html>"
 
 
@@ -95,9 +96,15 @@ def test_deduplicates_repeated_options():
 
 
 def test_league_links_are_not_issues():
-    extra = '<a href="https://liansai.500.com/zuqiu-26049">联赛</a>'
+    outside = '<a href="https://liansai.500.com/zuqiu-26049">联赛</a>'
     inside = '<a href="https://liansai.500.com/zuqiu-24022">联赛</a>'
-    assert scraper.parse_issue_list_body(_body(["24011"], extra=extra + inside)) == ["24011"]
+    body = _body(["24011"], extra=outside, inside=inside)
+
+    # Guard the fixture itself: one league link must really sit inside the dropdown.
+    select_start = body.index('id="expect_select"')
+    assert select_start < body.index("24022") < body.index("</select>")
+
+    assert scraper.parse_issue_list_body(body) == ["24011"]
 
 
 def test_missing_dropdown_returns_empty_list():
@@ -125,10 +132,25 @@ def test_requests_trade_index_with_redirects_and_timeout():
     assert call["timeout"] == 7
 
 
-def test_fetch_decodes_gb18030_only_bytes():
-    # '㐀' (U+3400) is outside GB2312; a gb2312 decode would mangle the page.
+def test_fetch_decodes_gb18030_only_bytes(monkeypatch):
+    """The decoded body must survive the GB18030 path, not merely yield issues.
+
+    '㐀' (U+3400) is outside GB2312. Decoding this response as GB2312 or
+    Latin-1 mangles that character while leaving the issue list unchanged, so
+    the assertion is on the body handed to the parser, not on the issues.
+    """
+    captured: dict[str, str] = {}
+    real_parse = scraper.parse_issue_list_body
+
+    def _capture(body: str) -> list[str]:
+        captured["body"] = body
+        return real_parse(body)
+
+    monkeypatch.setattr(scraper, "parse_issue_list_body", _capture)
     session = _Session(_body(["24011", "100101"], extra="<span>㐀</span>"))
+
     assert scraper.fetch_issue_list(session) == ["100101", "24011"]
+    assert "㐀" in captured["body"]
 
 
 def test_http_error_propagates():

@@ -9,7 +9,7 @@ params:
 execute:
   freeze: false
   cache: false
-  error: true
+  error: false
 format: html
 ---
 
@@ -116,6 +116,8 @@ stopifnot(pytest_status == 0L)
 ```bash
 python -m pytest tests/backfill -q
 quarto render quarto/11_issue_discovery_contract.qmd --execute --no-cache -P python=<项目解释器>
+# 负向检查：解释器无效时必须渲染失败（fail-fast），退出码非 0
+quarto render quarto/11_issue_discovery_contract.qmd --execute --no-cache -P python:/nonexistent/python
 git diff --check
 ```
 
@@ -131,3 +133,22 @@ git diff --check
 - 发现期号 ≠ 已采集数据：本报告不证明任何期号存在可抓取的比赛内容。
 - 只涉及确定性解析与取数，不引入历史拟合、调参、学习或决策选择函数；不涉及截止时间学习规则。
 - Nowscore 原生归档的候选域发现是另一条线，见 `quarto/07_nowscore_history_inventory.qmd`。
+
+## 审查证据
+
+### 第一轮 `codex review`（被审版本 `b506ef28`）
+
+- 工具：Codex CLI 0.154.0。命令与完整提示见 `docs/reviews/issue-463-review-prompt.txt`。
+- 审查方独立复算：24 个 backfill 用例通过（含屏蔽 socket 的复跑）；fixture 哈希、1,618 个准入期号、两个制度计数与时间序均复核一致；临时副本渲染产出预期表格。
+- 结论：**4 项 P2 阻断**，均已修复并复验。
+
+| 发现 | 处置与证据 |
+|---|---|
+| QMD 的 `execute: error: true` 在 Quarto 中是"出错继续"，失败的 provenance 校验、解释器或 pytest 仍能渲染成功 | 改为 `error: false`。负向检查：`-P python:/nonexistent/python` 渲染退出码 **1**（修复前为退出码 0 且 HTML 内含 `Error in project_python_module()`） |
+| GB18030 用例只断言期号列表，改按 GB2312 或 Latin-1 解码同样通过，测不到解码契约 | 改为 monkeypatch 捕获传给 `parse_issue_list_body` 的**解码后正文**并断言 `㐀` 原样保留，再断言期号列表 |
+| 标注为"select 内"的联赛链接实际被放在下拉之前，未验证内部排除 | `_body()` 增加 `inside` 参数，把链接真正放进 `<select>`；用例自身断言 `expect_select` < `24022` < `</select>` |
+| 新增 QMD 与 `tests/backfill` 无任何 CI 覆盖（既有 workflow 的 sparse checkout 亦排除 backfill） | 新增 `.github/workflows/backfill-issue-discovery.yml`：恢复声明环境、运行 `tests/backfill`、以显式 `python` / `project_root` 参数渲染本 QMD |
+
+### 第二轮 `codex review`（被审版本待补）
+
+- 待第一轮修复提交后重跑，结论与取证命令在此补记。
