@@ -1,0 +1,23 @@
+---
+title: "固定预算下七场候选组合排序"
+format: html
+execute:
+  error: true
+  warning: false
+---
+
+本报告在已冻结的候选池上比较七场组合。每个组合使用相同的 1,024 元预算，分别计算预算内累计命中概率和预期净收益，再取两者归一化排名的平均值。该结果是候选组排序诊断，不读取结算标签，也不改变概率底座。
+
+```{r}
+ranked_path <- "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/candidate-combo-rank-v1/ranked_combinations.csv"
+if (file.exists(ranked_path)) {
+  x <- read.csv(ranked_path)
+  print(head(x, 20))
+  cat("期次数:", length(unique(x$issue)), "\n")
+  cat("Pareto 组合数:", sum(x$pareto_frontier), "\n")
+  print(aggregate(cbind(budget_hit_probability, budget_expected_net,
+    budget_roi) ~ issue, x, function(z) c(max = max(z), mean = mean(z))))
+}
+```
+
+排序前先移除被 Pareto 支配的组合；最终仍需叠加场次复用和组合间重叠约束。单纯提高预算内累计概率不代表真实概率变高，合法概率质量和预期收益必须同时保留。
