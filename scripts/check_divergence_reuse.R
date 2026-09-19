@@ -51,3 +51,8 @@ run_one <- function(path) {
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ans <- do.call(rbind, lapply(paths, run_one)); write.csv(ans, file.path(out_dir, "model_metrics.csv"), row.names = FALSE)
 writeLines(capture.output(print(ans)), file.path(out_dir, "progress.txt"))
+receipt <- list(scope = basename(paths), source_context = normalizePath(root),
+  settlement_db = normalizePath(settlement_db), worlds = 32L, budget_cny = 1024,
+  payout_factor = 0.65, variants = c("D2", "D4", "D2_EV", "D4_EV"),
+  label_rule = "score plus frozen handicap; winner option SP from Nowscore replay")
+jsonlite::write_json(receipt, file.path(out_dir, "receipt.json"), auto_unbox = TRUE, pretty = TRUE)
