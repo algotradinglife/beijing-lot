@@ -1,0 +1,13 @@
+{
+  "source_url": "https://trade.500.com/bjdc/index.php",
+  "http_status": 200,
+  "content_type": "text/html;charset=gb2312",
+  "declared_charset": "gb2312",
+  "decoded_as": "gb18030",
+  "bytes": 1345836,
+  "sha256": "f4e50827d9884476a64c7e67b01a3699582719c7ac4bc805acea096bdb435609",
+  "collected_at_utc": "2026-09-19T19:13:00Z",
+  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "purpose": "offline replay of the expect_select issue-discovery contract for src/backfill/scraper.py",
+  "note": "Frozen snapshot of a volatile listing page; counts are properties of this recording, not of the live site."
+}

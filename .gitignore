@@ -204,3 +204,6 @@ evidence/bj_freeze_review_001/.publish.lock
 # Saved offline mapping response fixtures
 !tests/fixtures/mapping/
 !tests/fixtures/mapping/*.html
+
+# Saved offline trade-index response fixtures (#463)
+!tests/fixtures/backfill/*.html

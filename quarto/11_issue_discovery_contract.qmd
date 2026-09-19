@@ -1,0 +1,173 @@
+---
+title: "#463：500 全历史期号发现（expect_select）契约与验收"
+date: "2026-09-19"
+params:
+  python: null
+  project_root: "."
+  fixture: "tests/fixtures/backfill/trade_index_bjdc_20260919.html"
+  provenance: "tests/fixtures/backfill/trade_index_bjdc_20260919.provenance.json"
+execute:
+  freeze: false
+  cache: false
+  error: false
+format: html
+---
+
+本报告是 [GitHub #463](https://github.com/algotradinglife/beijing-lot/issues/463) 的交付与验收入口。
+它只读取随仓库保存的**录制页面**，不访问网络、不写数据库、不启动采集；
+期号域由录制页面的字节身份固定，不读取任何生产数据。
+
+## 范围与输入
+
+- 权威实现：`src/backfill/scraper.py`。`parse_issue_list_body()` 承载准入规则（纯函数），
+  `fetch_issue_list()` 只负责请求、重定向、超时与 GB18030 解码。
+- 调用方：`src/backfill/main.py`、`scripts/historical_id_map_progress.py`、
+  `scripts/historical_id_map_watch.py`、`scripts/run_next_historical_id_mapping.py`。
+- 录制输入：`tests/fixtures/backfill/trade_index_bjdc_20260919.html`，其身份由同名
+  provenance 旁车文件显式声明（来源 URL、HTTP 状态、字节数、SHA-256、采集时间、解码方式）。
+- 参数：`python` 必须显式指定项目解释器；`project_root`、`fixture`、`provenance` 显式传入。
+
+```{r}
+#| label: inputs
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+source("r/python_bridge.R")
+
+stopifnot(!is.null(params$python), file.exists(params$python),
+          file.exists(params$fixture), file.exists(params$provenance))
+
+provenance <- jsonlite::fromJSON(params$provenance)
+recorded_bytes <- readBin(params$fixture, what = "raw",
+                          n = file.info(params$fixture)$size)
+
+# 字节身份不一致必须中止：期号域解释只对被封存的这份录制有效。
+stopifnot(length(recorded_bytes) == provenance$bytes,
+          digest::digest(recorded_bytes, algo = "sha256", serialize = FALSE) == provenance$sha256)
+
+tibble::tibble(
+  项目 = c("来源 URL", "HTTP 状态", "声明字符集", "解码方式", "字节数", "SHA-256", "采集时间 (UTC)"),
+  值 = c(provenance$source_url, as.character(provenance$http_status),
+         provenance$declared_charset, provenance$decoded_as,
+         format(provenance$bytes, big.mark = ","), provenance$sha256,
+         provenance$collected_at_utc)
+) |> knitr::kable(caption = "录制输入身份；字节数单位：字节")
+```
+
+## 期号域（录制页面重放）
+
+```{r}
+#| label: issue-domain
+scraper <- project_python_module("src.backfill.scraper", params$project_root, params$python)
+builtins <- reticulate::import("builtins", convert = TRUE)
+
+# 原始字节交给 Python 按声明编码解码，与 fetch_issue_list() 的内部路径一致。
+body <- builtins$open(params$fixture, "rb")$read()$decode(provenance$decoded_as, errors = "replace")
+issues <- scraper$parse_issue_list_body(body)
+
+stopifnot(is.character(issues), length(issues) > 0L,
+          identical(issues, sort(issues)), !anyDuplicated(issues))
+
+issue_tbl <- tibble::tibble(期号 = issues) |>
+  dplyr::mutate(位数 = nchar(期号),
+                制度 = dplyr::if_else(位数 == 6L, "2010–2019（YYMMNN）", "2020+（YYNNN）"))
+
+issue_tbl |>
+  dplyr::count(制度, 位数, name = "期号数") |>
+  knitr::kable(caption = "按期号制度分类的准入结果")
+
+six_digit <- issues[nchar(issues) == 6L]
+five_digit <- issues[nchar(issues) == 5L]
+
+stopifnot(length(six_digit) + length(five_digit) == length(issues),
+          all(as.integer(six_digit) >= 100101L),
+          all(as.integer(substr(five_digit, 3, 5)) >= 1L),
+          all(as.integer(substr(five_digit, 3, 5)) <= 170L),
+          max(six_digit) < min(five_digit))
+
+tibble::tibble(
+  项目 = c("准入期号总数", "6 位期号数", "5 位期号数", "最早期号", "最新期号", "排序", "重复"),
+  值 = c(format(length(issues), big.mark = ","),
+         format(length(six_digit), big.mark = ","),
+         format(length(five_digit), big.mark = ","),
+         min(issues), max(issues), "升序（对已准入值即时间序）", "无")
+) |> knitr::kable(caption = "契约检查；最大 6 位期号小于最小 5 位期号，排序即时间序")
+```
+
+## 函数与测试
+
+| 实现 | 对应自动化验证 |
+|---|---|
+| `parse_issue_list_body()`：下拉定位、5/6 位准入、边界、去重、排序、联赛链接排除、缺下拉返回空表 | `tests/backfill/test_scraper_issue_list.py` 解析层 |
+| `fetch_issue_list()`：请求 URL、重定向、超时透传、GB18030 解码、HTTP 错误传播 | 同上取数层 |
+| 录制页面身份与期号域 | 同上录制页两例，绑定 provenance 的字节数与 SHA-256 |
+
+```{r}
+#| label: pytest
+pytest_out <- system2(params$python,
+                      c("-m", "pytest", "tests/backfill", "-q", "-p", "no:cacheprovider"),
+                      stdout = TRUE, stderr = TRUE)
+pytest_status <- attr(pytest_out, "status")
+if (is.null(pytest_status)) pytest_status <- 0L
+cat(paste(pytest_out, collapse = "\n"))
+stopifnot(pytest_status == 0L)
+```
+
+## 验证命令
+
+```bash
+python -m pytest tests/backfill -q
+quarto render quarto/11_issue_discovery_contract.qmd --execute --no-cache -P python=<项目解释器>
+# 负向检查：解释器无效时必须渲染失败（fail-fast），退出码非 0
+quarto render quarto/11_issue_discovery_contract.qmd --execute --no-cache -P python:/nonexistent/python
+git diff --check
+```
+
+## 契约与边界
+
+- 准入规则：6 位 `YYMMNN` 需 `>= 100101`；5 位 `YYNNN` 需 `NNN ∈ [1,170]`；其他位数不是期号。
+- `liansai.500.com/zuqiu-<id>` 联赛链接不是期号；下拉缺失时返回空表而不是抛错。
+- 期号按字典序升序返回；对已准入值（6 位 2010 年代、5 位 2020 年代）该顺序等同于时间序。
+- 本次录制中 5 位规则没有过滤任何值（405 个全部落在 `1..170`）：它是异常下拉内容的守卫，
+  其边界由合成用例覆盖，而不是由录制页面覆盖。
+- 计数是**该录制**的性质，不是线上站点的性质。刷新 fixture 必须同时更新 provenance 校验值
+  与录制页断言；线上期号会随赛季继续增加。
+- 发现期号 ≠ 已采集数据：本报告不证明任何期号存在可抓取的比赛内容。
+- 只涉及确定性解析与取数，不引入历史拟合、调参、学习或决策选择函数；不涉及截止时间学习规则。
+- Nowscore 原生归档的候选域发现是另一条线，见 `quarto/07_nowscore_history_inventory.qmd`。
+
+## 审查证据
+
+### 第一轮 `codex review`（被审版本 `b506ef28`）
+
+- 工具：Codex CLI 0.154.0。命令与完整提示见 `docs/reviews/issue-463-review-prompt.txt`。
+- 审查方独立复算：24 个 backfill 用例通过（含屏蔽 socket 的复跑）；fixture 哈希、1,618 个准入期号、两个制度计数与时间序均复核一致；临时副本渲染产出预期表格。
+- 结论：**4 项 P2 阻断**，均已修复并复验。
+
+| 发现 | 处置与证据 |
+|---|---|
+| QMD 的 `execute: error: true` 在 Quarto 中是"出错继续"，失败的 provenance 校验、解释器或 pytest 仍能渲染成功 | 改为 `error: false`。负向检查：`-P python:/nonexistent/python` 渲染退出码 **1**（修复前为退出码 0 且 HTML 内含 `Error in project_python_module()`） |
+| GB18030 用例只断言期号列表，改按 GB2312 或 Latin-1 解码同样通过，测不到解码契约 | 改为 monkeypatch 捕获传给 `parse_issue_list_body` 的**解码后正文**并断言 `㐀` 原样保留，再断言期号列表 |
+| 标注为"select 内"的联赛链接实际被放在下拉之前，未验证内部排除 | `_body()` 增加 `inside` 参数，把链接真正放进 `<select>`；用例自身断言 `expect_select` < `24022` < `</select>` |
+| 新增 QMD 与 `tests/backfill` 无任何 CI 覆盖（既有 workflow 的 sparse checkout 亦排除 backfill） | 新增 `.github/workflows/backfill-issue-discovery.yml`：恢复声明环境、运行 `tests/backfill`、以显式 `python` / `project_root` 参数渲染本 QMD |
+
+### CI 状态（托管 runner 不可用）
+
+- 本 PR 的两个 workflow（新增的 `backfill-issue-discovery` 与被 `_quarto.yml` 触发的 `settlement-history`）
+  均以 `failure` 结束，但**任务从未启动**：运行注解为
+  `The job was not started because recent account payments have failed or your spending limit needs to be increased`。
+- 该仓库全部近期运行（含 `main` 上 `c9190955` 之前的提交）结论同为 `failure`，属于账户计费层面的托管 CI 不可用，
+  不是本交付的代码缺陷；仓库既有先例已按同样方式记录。
+- 作为替代证据，本交付在**模拟 CI sparse-checkout 的干净副本**中完成了等价验证：
+  清单内 `src/backfill/`、`tests/backfill/`、`tests/fixtures/backfill/`、`quarto/11_*.qmd`、`r/python_bridge.R`、
+  `r/bootstrap.R`、`_quarto.yml`、`requirements-analysis.txt` 全部存在；在该副本中
+  `pytest tests/backfill` → **24 passed**，且 QMD 以显式 `python` / `project_root` 参数渲染成功、
+  证据表格齐备。
+- 待托管 CI 恢复后必须重跑并在 PR 中补记真实 CI 结论；本地等价验证不能替代 CI 通过。
+
+### 第二轮 `codex review`（被审版本 `5eead4f1`）
+
+- 结论：**no blocking findings**；审查已读取实时 Issue Graph。
+- 审查方独立复核：24 个用例通过（含屏蔽 socket 的复跑）；fixture 字节数与 SHA-256、
+  1,618 个准入期号、两个制度计数与时间序一致；在 `/tmp` 副本中以显式 `python` / `project_root`
+  参数渲染成功、无执行错误块；**无效解释器渲染失败**，与第一轮修复要求一致。
+- 边界：本 PR 的 CI 结果与 PI 最终验收记录在本轮之后追加；命令退出码本身不作为通过依据，
+  合并状态以 PR 与 #463 的原生状态为准。

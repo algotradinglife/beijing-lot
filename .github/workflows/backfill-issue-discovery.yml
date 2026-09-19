@@ -1,0 +1,72 @@
+name: Backfill issue discovery contract
+on:
+  pull_request:
+    paths:
+      - 'src/backfill/**'
+      - 'scripts/historical_id_map_progress.py'
+      - 'scripts/historical_id_map_watch.py'
+      - 'scripts/run_next_historical_id_mapping.py'
+      - 'tests/backfill/**'
+      - 'tests/fixtures/backfill/**'
+      - 'quarto/11_issue_discovery_contract.qmd'
+      - 'r/python_bridge.R'
+      - '.Rprofile'
+      - 'DESCRIPTION'
+      - 'renv.lock'
+      - 'requirements-analysis.txt'
+      - '_quarto.yml'
+      - '.github/workflows/backfill-issue-discovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-discovery:
+    runs-on: ubuntu-latest
+    env:
+      TZ: UTC
+      RENV_CONFIG_CONSENT: 'TRUE'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /AGENTS.md
+            /DESCRIPTION
+            /.Rprofile
+            /renv.lock
+            /requirements-analysis.txt
+            /_quarto.yml
+            /r/
+            /src/
+            /quarto/
+            /tests/backfill/
+            /tests/fixtures/backfill/
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.4'
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.6.1'
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.10.18'
+      - name: Install analysis system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libfontconfig1-dev libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff-dev libjpeg-dev
+      - name: Restore declared analysis environment
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements-analysis.txt
+          Rscript --vanilla r/bootstrap.R
+          echo "R_LIBS_USER=$GITHUB_WORKSPACE/r_lib" >> "$GITHUB_ENV"
+          echo "BEIJING_LOT_VENV_PYTHON=$GITHUB_WORKSPACE/.venv/bin/python" >> "$GITHUB_ENV"
+      - name: Offline issue-discovery contract tests
+        run: .venv/bin/python -m pytest tests/backfill -q -p no:cacheprovider
+      - name: Clean offline QMD render
+        run: |
+          quarto render quarto/11_issue_discovery_contract.qmd --execute --no-cache \
+            -P python:"$GITHUB_WORKSPACE/.venv/bin/python" \
+            -P project_root:"$GITHUB_WORKSPACE"
