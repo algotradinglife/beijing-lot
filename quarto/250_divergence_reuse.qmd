@@ -30,6 +30,13 @@ if (file.exists(metrics_path)) {
   if (requireNamespace("ggplot2", quietly = TRUE)) {
     print(ggplot2::ggplot(metrics, ggplot2::aes(issue, model_hit, colour = variant, group = variant)) +
       ggplot2::geom_point() + ggplot2::geom_line() + ggplot2::labs(y = "共同世界命中率", x = "期次"))
+    metrics <- metrics[order(metrics$variant, metrics$issue), ]
+    metrics$cumulative_net <- ave(metrics$actual_net, metrics$variant,
+      FUN = cumsum)
+    print(ggplot2::ggplot(metrics, ggplot2::aes(issue, cumulative_net,
+      colour = variant, group = variant)) + ggplot2::geom_line() +
+      ggplot2::geom_point() + ggplot2::labs(y = "实际累计净收益（元）",
+      x = "期次"))
   }
 }
 ```
