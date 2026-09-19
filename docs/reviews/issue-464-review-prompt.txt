@@ -1,4 +1,4 @@
-Review ROUND 5 of the delivery for GitHub issue #464 in this repository.
+Review ROUND 6 of the delivery for GitHub issue #464 in this repository.
 
 ## Context you need first
 
@@ -73,6 +73,37 @@ Round 4's fix was to delete that gate rather than harden it:
    evidence boundary: it does not claim a mechanical proof that every function
    repository-wide is covered.
 
+**Round 5** reviewed revision `30933379` and returned needs-revision with one
+blocker. It confirmed the round-3 fixes and the main-execution gate survive
+mutation testing, but found ten functions still never executed by any test.
+Three review rounds had raised the same class of problem, so the fix was to stop
+judging coverage by name:
+
+- `scripts/audit_execution_coverage.py` (new, reusable, pure helpers tested)
+  injects an unconditional `raise AssertionError` as the first statement of
+  **every** function in `src/titan_clean/` and the five entry scripts —
+  private helpers and `main()`-local closures included — runs the acceptance
+  command, and treats a still-passing suite as "no test reached this function".
+  Every uncovered verdict is recomputed once and reported only when both runs
+  agree, because single runs proved flaky.
+- The QMD gate invokes it and asserts zero gaps. It is falsifiable: disabling
+  one test's coverage makes the render exit 1.
+- Dispositions: `_clean_cells` had no caller anywhere and was **deleted** as
+  dead code rather than tested; `now_utc` (four scripts), `_fetch_aux` and
+  `_capture_aux` gained tests; `needs_aux`, `reserve_n` and `worker` are
+  `main()`-local closures with no importable name, so two end-to-end tests drive
+  a full `main()` run against a temporary data root with transport and
+  subprocess stubbed.
+
+Round 5 also exposed a flaw in the round-5 test for `worker`: it runs on daemon
+threads, so an injected exception kills the thread silently while `main()` still
+prints `ALL_ISSUES_DONE`. That test now asserts the observable work (one
+reservation per issue booked through `reserve_for_issue`) and fails under
+mutation.
+
+Audit result at the revision under review: **112 functions, 0 injection errors,
+0 never executed**.
+
 The delivery does **not** claim the routed behaviours are correct. That is a
 deliberate, documented governance decision, not an oversight.
 
@@ -82,8 +113,9 @@ deliberate, documented governance decision, not an oversight.
 - 5 scripts added under `scripts/`
 - 10 modules added under `src/titan_clean/`
 - `tests/titan_clean/test_clean_stores.py` added; `tests/titan_clean/test_snapshots.py` updated
-- `tests/scripts/test_collection_runtime_entry_points.py` added, now 105 cases
-  (23 of them execute the entry scripts' `main()`)
+- `tests/scripts/test_collection_runtime_entry_points.py` added, now 115 cases
+  (including 23 that execute the entry scripts' `main()` and two full end-to-end runs)
+- `scripts/audit_execution_coverage.py` added (the execution-coverage auditor)
 - `quarto/12_collection_runtime_stack.qmd` added and registered in `_quarto.yml`
 - `docs/reviews/issue-464-*.{txt,json}` added
 
@@ -92,16 +124,21 @@ deliberate, documented governance decision, not an oversight.
 1. **Verify the round 3 fixes actually landed.**
    - Confirm the completed-issue filter test really stores a mapping and would
      fail without the filter — a test that passes either way is not a fix.
-   - Confirm the nine functions have real tests with normal, boundary and
-     rejection paths, not padding. Confirm they do **not** assert the
-     transaction, provenance or completion semantics routed to #466–#474/#476.
+   - Confirm the nine functions from round 3 have real tests with normal,
+     boundary and rejection paths, not padding. Confirm they do **not** assert
+     the transaction, provenance or completion semantics routed to
+     #466–#474/#476.
+   - Confirm `_clean_cells` really was dead code (no caller anywhere) and that
+     deleting it, rather than testing it, was correct.
 
-2. **Test the new gate rather than trusting it.** Confirm
-   `entry-point-main-execution` genuinely fails the render when a `main()` is
-   broken — inject a raise into one or all five `main()` functions and observe
-   a non-zero render exit. Then confirm the tests that gate runs really do
-   invoke `main()` rather than merely mentioning it. A gate that cannot fail is
-   worse than no gate, and round 4 is exactly why.
+2. **Test the audit gate rather than trusting it.** The gate claims that no
+   function in the audited set is left unexecuted. Confirm it fails when that is
+   untrue — for example disable one test's coverage and observe a non-zero
+   render exit — and confirm the auditor itself is sound: that its probe is
+   inserted rather than replacing a statement (so it cannot manufacture a
+   SyntaxError that looks like a catch), and that a single flaky run cannot
+   produce a false verdict. Round 4 and round 5 are both reasons a gate that
+   cannot fail is worse than no gate.
 
 3. **Confirm no test in this delivery pins a routed defect** as the expected
    contract (#466, #467, #468, #469, #470, #471, #472, #473, #474, #476).
