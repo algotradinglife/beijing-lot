@@ -1,0 +1,92 @@
+---
+title: "最差23期：七场候选组、购票支持与回款诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+这是沿用前轮23个最差期的事后诊断，不是未见验证或未来可部署策略。
+概率/欧赔映射估价、SP门槛1.3、每期1024元上限、2元票和票级0.65系数冻结。
+只使用同一已验收场池。不拟合、不根据真实赛果选参数，不新增数据采集。
+
+比较旧候选组与扩充组：复用既有Top2搜索（概率排序循环窗口及最高Top2质量七场的一腿替换），
+将其四个分散覆盖组作为锚点，再交替按覆盖概率、估算回款添加，后添组相互重叠不超过4场，
+最多选择24个扩充候选，旧组全部保留。锚点本身不保证4场重叠限制。
+这个有界搜索不是全部七场组合的穷举，不声称达到全局最优。
+
+旧/扩充候选各比较原JOINT与排除第三赛果购买支持。后者保留原每组深度，
+原概率仍用于估值和共用模拟世界，不把过滤后的支持当作真实概率。
+旧组与扩充组各增加完整Top2、分散覆盖对照，以识别25%覆盖/256元准入及购票规则影响。
+扩充组另测估算净收益排序；完整Top2概率排序/分散覆盖使用全部新Top2搜索池作机制对照。
+这些对照候选宇宙不同，不把其差额单独归因于赛果覆盖方法。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root;out<-cfg$output;s<-cfg$settings
+modules<-c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_probability_replay','top2_fresh_groups','joint_candidate_comparison','zero_handicap_purchase','diagnostic_verified_csv','line_gap_third','worst_regroup')
+for(m in modules)source(file.path(root,'r',paste0(m,'.R')))
+reticulate::use_python(cfg$python,required=TRUE);api<-reticulate::import('src.strategy_diagnostic_inputs')
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.strategy_diagnostic_inputs','src.n7_sleeve_states','src.temporal_learning'),distributions=list('numpy','pandas'))
+stopifnot(!dir.exists(out),digest::digest(file=cfg$manifest,algo='sha256')==cfg$manifest_sha256,digest::digest(file=cfg$previous$path,algo='sha256')==cfg$previous$sha256)
+previous<-jsonlite::fromJSON(cfg$previous$path);parent<-dirname(cfg$previous$path);manifest<-jsonlite::fromJSON(cfg$manifest)
+scope<-diagnostic_read_verified_csv(file.path(parent,'scope.csv'),previous$files[['scope.csv']],cols(issue='c'));issues<-sort(scope$issue[scope$included])
+stopifnot(digest::digest(file=file.path(parent,'freeze.json'),algo='sha256')==previous$files[['freeze.json']])
+oldfreeze<-jsonlite::fromJSON(file.path(parent,'freeze.json'),simplifyVector=FALSE)
+code_files<-c(paste0('r/',modules,'.R'),'quarto/247_worst_regroup.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+dir.create(file.path(out,'plans'),recursive=TRUE);dir.create(file.path(out,'contexts'));write_csv(scope,file.path(out,'scope.csv'))
+bindings<-list();metrics<-list()
+for(id in issues){
+ e<-manifest$bundles[match(id,manifest$bundles$issue),];b<-jsonlite::fromJSON(api$read_verified_bundle_json(e$path,e$sha256),simplifyVector=FALSE)
+ z<-worst_regroup_compare(b,b$cutoffs,cfg$python,s,cfg$additional_groups,cfg$max_overlap)
+ old<-oldfreeze$bindings[[id]];stopifnot(digest::digest(file=old$path,algo='sha256')==old$sha256);ref<-readRDS(old$path)
+ for(pair in list(c('OLD_JOINT','BASE'),c('OLD_DROP','ALL_DROP')))stopifnot(identical(z$plans[[pair[1]]]$tickets |> select(group_id,state_id) |> arrange(group_id,state_id),ref[[pair[2]]]$tickets |> select(group_id,state_id) |> arrange(group_id,state_id)))
+ p<-file.path(out,'plans',paste0(id,'.rds'));saveRDS(z$plans,p)
+ z$original<-b;context<-file.path(out,'contexts',paste0(id,'.rds'));saveRDS(z,context)
+ bindings[[id]]<-list(path=p,sha256=digest::digest(file=p,algo='sha256'),context=context,context_sha256=digest::digest(file=context,algo='sha256'),bundle_path=e$path,bundle_sha256=e$sha256)
+ metrics[[id]]<-z$metrics;writeLines(paste(match(id,issues),length(issues),id),file.path(out,'progress.txt'))
+}
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+jsonlite::write_json(list(status='FROZEN_POSTHOC_WINDOW_BEFORE_VARIANT_SETTLEMENT',config=cfg,bindings=bindings,code=code,closure=closure,historical_admission=FALSE),file.path(out,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+write_csv(bind_rows(metrics),file.path(out,'model-metrics.csv'))
+```
+
+```{r}
+labels<-bind_rows(lapply(seq_len(nrow(manifest$labels)),function(i)diagnostic_read_verified_csv(manifest$labels$path[i],manifest$labels$sha256[i],cols(issue='c',provider_id='c')) |> select(issue,slot,provider_id,handicap,actual_direction,spf_sp)))
+rows<-groups<-fresh_rows<-list()
+for(id in issues){
+ z<-readRDS(bindings[[id]]$context);lab<-filter(labels,issue==id)
+ for(policy in names(z$plans))rows[[paste(id,policy)]]<-joint_candidate_settle(z$plans[[policy]],lab)$rows
+ for(kind in c('OLD','EXP'))groups[[paste(id,kind)]]<-worst_regroup_diagnose(if(kind=='OLD')z$original else z$expanded,z$pools[[kind]],z$plans[[paste0(kind,'_DROP')]],lab,z$original$cutoffs,s$unit_cny,s$minimum_sp) |> mutate(kind=kind)
+ fresh_rows[[id]]<-worst_regroup_fresh_reach(z$fresh,lab,z$original$cutoffs)
+}
+x<-bind_rows(rows);g<-bind_rows(groups);fresh<-bind_rows(fresh_rows)
+summary<-x |> group_by(policy) |> summarise(issues=n(),funded=sum(stake>0),hit_issues=sum(hits>0),profit_issues=sum(net>0),total_stake=sum(stake),total_gross=sum(gross),net=sum(net),.groups='drop') |> mutate(roi=net/total_stake)
+summary |> knitr::kable(digits=3)
+paired<-x |> select(issue,policy,hits,net,stake,gross) |> pivot_wider(names_from=policy,values_from=c(hits,net,stake,gross))
+paired |> knitr::kable(digits=2)
+classified<-worst_regroup_stages(g,fresh);diagnosis<-classified$rows
+diagnosis |> knitr::kable(digits=2)
+stages<-classified$stages;stages |> knitr::kable()
+trim<-x |> group_by(policy) |> arrange(desc(net),issue,.by_group=TRUE) |> slice(-1) |> summarise(issues=n(),stake=sum(stake),net=sum(net),.groups='drop') |> mutate(roi=net/stake)
+trim |> knitr::kable(digits=3)
+write_csv(x,file.path(out,'periods.csv'));write_csv(summary,file.path(out,'summary.csv'));write_csv(g,file.path(out,'groups.csv'));write_csv(fresh,file.path(out,'fresh-reach.csv'));write_csv(diagnosis,file.path(out,'diagnosis.csv'));write_csv(stages,file.path(out,'stages.csv'));write_csv(trim,file.path(out,'trim.csv'))
+p<-ggplot(summary,aes(reorder(policy,net),net,fill=net>0))+geom_col(show.legend=FALSE)+coord_flip()+theme_minimal()+labs(x=NULL,y='Net return (CNY)',title='Seven-fixture regrouping: fixed post-hoc 23 issues')
+print(p);ggsave(file.path(out,'net.png'),p,width=10,height=5,dpi=150)
+p2<-ggplot(stages,aes(reorder(stage,n),n))+geom_col(fill='#2878A0')+coord_flip()+theme_minimal()+labs(x=NULL,y='Issues',title='Original third-excluded support: failure attribution')
+print(p2);ggsave(file.path(out,'diagnosis.png'),p2,width=11,height=5,dpi=150)
+files<-list.files(out,pattern='\\.(csv|png|json)$',full.names=TRUE)
+jsonlite::write_json(list(status='COMPUTED_PENDING_REVIEW',config=cfg,issues=issues,files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files)),code=code,closure=closure,historical_admission=FALSE),file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+“可达”以实际赛果事后枚举，仅定位旧组/深度/资金分配的缺口，不代表赛前能识别那个组。
+命中与盈利分开；全部候选的可达上限不等于1024元能买下的组合，也不等于未来预测。
+本窗口不连续且由失败标签选出，不把累计曲线或最大回撤解读为完整历史风险。
