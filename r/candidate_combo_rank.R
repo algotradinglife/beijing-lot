@@ -38,3 +38,10 @@ rank_candidate_combinations <- function(candidates, budget_cny = 1024,
   x[order(x$average_rank, -x$budget_hit_probability,
     -x$budget_expected_net, x$combo_id), , drop = FALSE]
 }
+
+rank_role_combinations <- function(combos, metrics, budget_cny = 1024,
+                                   unit_cny = 2, hit_weight = 0.5,
+                                   legal_mass_min = 0) {
+  x <- attach_combo_metrics(combos, metrics)
+  rank_candidate_combinations(x, budget_cny, unit_cny, hit_weight, legal_mass_min)
+}
