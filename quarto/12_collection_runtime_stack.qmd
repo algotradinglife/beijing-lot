@@ -148,12 +148,45 @@ mod <- project_python_module("src.titan_clean.settlement", params$project_root, 
 
 ```{r}
 #| label: pytest
-cmd <- sprintf("cd %s && %s -m pytest tests/titan_clean tests/backfill -q -p no:cacheprovider",
-               shQuote(params$project_root), shQuote(params$python))
+cmd <- sprintf(
+  "cd %s && %s -m pytest tests/titan_clean tests/backfill tests/scripts/test_collection_runtime_entry_points.py -q -p no:cacheprovider",
+  shQuote(params$project_root), shQuote(params$python))
 out <- system(cmd, intern = TRUE)
 writeLines(tail(out, 5))
 stopifnot(any(grepl("passed", out)), !any(grepl("failed|error", out, ignore.case = TRUE)))
 ```
+
+## 入口脚本测试覆盖
+
+7 个 unit 引用的 4 个入口脚本此前**零测试覆盖**。本交付为其补确定性离线测试
+（合成 payload + 临时数据库，不访问网络、不写数据根）：解析层（`parse_play`、
+`parse_settlement`、`parse_nowscore_settlement`、`load_bridge_candidates`）、
+显式超时、以及 `current_failures`。
+
+```{r}
+#| label: entry-point-tests
+test_file <- file.path(params$project_root, "tests", "scripts",
+                       "test_collection_runtime_entry_points.py")
+stopifnot(file.exists(test_file))
+source_text <- readLines(test_file, warn = FALSE)
+
+entry_points <- c("collect_500_historical_plays", "collect_500_historical_settlement",
+                  "collect_titan_historical_fixtures", "run_next_historical_id_mapping")
+covered <- vapply(entry_points, function(stem) {
+  any(grepl(paste0("scripts.", stem), source_text, fixed = TRUE))
+}, logical(1))
+data.frame(entry_point = entry_points, imported_by_test = unname(covered)) |> tibble::as_tibble()
+stopifnot(all(covered))
+
+cmd <- sprintf("cd %s && %s -m pytest tests/scripts/test_collection_runtime_entry_points.py -q -p no:cacheprovider",
+               shQuote(params$project_root), shQuote(params$python))
+out <- system(cmd, intern = TRUE)
+writeLines(tail(out, 3))
+stopifnot(any(grepl("passed", out)), !any(grepl("failed|error", out, ignore.case = TRUE)))
+```
+
+测试有效性由**变异测试**证明：禁用 `postponed` 检测、删除 bridge 重复 ID 校验，
+各自都会使对应测试失败，说明断言不是空跑。
 
 ## 契约与边界
 
@@ -166,18 +199,64 @@ stopifnot(any(grepl("passed", out)), !any(grepl("failed|error", out, ignore.case
   `store.py` 的 `ARCHIVES.json` 冻结检查在仓库与数据根均不存在对应文件；
   如后续需要冻结能力，另开 issue 并附契约与测试。
 
-## 审查证据
+## codex review 发现与处置
+
+### Round 1（被审版本 `3d8e6139`）
+
+判定 `patch is incorrect`（Needs revision），提出 10 项发现。审查同时**确认本交付
+全部主张成立**：registry 根正确、闭包论证成立、交叉测试计数准确、83 passed 真实、
+负向渲染确实 fail-closed、覆盖表格有实质内容；并明确认可「保留工作区版本、
+不引入 raw_archive」。审查指出这些是**继承性运行时缺陷**，不是路径修正引入的回归。
+
+PI 裁定**拆分**：#464 收窄为「运行时栈入库 + 路径修正 + 入口脚本测试」，
+缺陷独立成 issue 在图谱中跟踪。
+
+```{r}
+#| label: review-round-1
+findings <- data.frame(
+  finding = c("存储层未使用真实事务，失败无法回滚", "play 字节不落盘，挂到他人 receipt",
+              "合并结算丢弃 Nowscore 证据字节", "任意 capture 即被判为 SPF 完成",
+              "密封发布漏校验 historical_fixture_captures", "合并不校验源间冲突",
+              "子串 500 误判污染", "辅助端点无限重试且完成判定漏 handicap",
+              "不遵守已加载 risk ack 的请求上限", "入口脚本无测试覆盖"),
+  priority = c("P1", "P1", "P1", "P1", "P1", "P2", "P2", "P2", "P2", "P2"),
+  disposition = c("#466", "#467", "#468", "#469", "#470", "#471", "#472", "#473", "#474",
+                  "并入 #464（本交付）"),
+  stringsAsFactors = FALSE
+)
+findings |> tibble::as_tibble()
+```
+
+覆盖矩阵（`tests/scripts/test_collection_runtime_entry_points.py`，35 项）：
+
+```{r}
+#| label: coverage-matrix
+coverage <- data.frame(
+  entry_point = c("collect_500_historical_plays", "collect_500_historical_settlement",
+                  "collect_titan_historical_fixtures", "run_next_historical_id_mapping"),
+  tested_surface = c("parse_play（jq/bf/postponed/no_result/fid 边界/空页/GB18030）, fetch 超时",
+                     "parse_settlement, parse_nowscore_settlement（3 个结果码/state/异常 SP）, fetch 超时",
+                     "load_bridge_candidates（schema/空/非法/重复 ID）",
+                     "current_failures（计数/空）"),
+  stringsAsFactors = FALSE
+)
+coverage |> tibble::as_tibble()
+```
+
+### 明确不在本交付内修复的行为缺陷
+
+上述 #466–#474 所描述的行为缺陷**不在 #464 验收范围**：它们是继承性缺陷，
+采集当前被用户暂停，无在线风险；按 [AGENTS.md](AGENTS.md) 组件解耦与图谱路由要求
+各自独立交付。因此本文档不声称这些行为正确——只声称运行时栈已入库、
+路径一致、入口脚本有测试。
+
+## 审查命令与被审版本
 
 ```{r}
 #| label: review-evidence
 rev <- system2("git", c("-C", params$project_root, "rev-parse", "HEAD"), stdout = TRUE)
 cat("被审版本:", rev, "\n")
-cmd <- "codex review"
-cat("审查命令:", cmd, "\n")
 ```
-
-- 审查命令：`codex review -c sandbox_mode='"workspace-write"' -c sandbox_workspace_write.network_access=true "$(cat docs/reviews/issue-464-review-prompt.txt)"`
-- 发现与处置：见本文档「审查结论」章节及 PR 讨论。
 
 ## 局限
 

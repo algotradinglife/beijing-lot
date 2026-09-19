@@ -1,0 +1,107 @@
+{
+  "findings": [
+    {
+      "title": "[P1] Use real transactions for multi-statement store operations",
+      "body": "With `isolation_level=None`, the later `with self.connection:` blocks do not begin transactions. Injecting a failure into `capture_authorization` left both the capture and roster rows committed without authorization. The same configuration affects SettlementStore, and concurrent reservation callers can both read the same remaining budget before inserting. Use explicit transactions, including a write lock before reservation checks, and regression-test rollback/concurrency as required by [AGENTS.md:76–77](AGENTS.md#L76-L77).",
+      "confidence_score": 1.0,
+      "priority": 1,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/src/titan_clean/store.py",
+        "line_range": {"start": 88, "end": 88}
+      }
+    },
+    {
+      "title": "[P1] Preserve each play response instead of borrowing another receipt",
+      "body": "When an issue already has a capture, the newly fetched play payload is never persisted: its parsed rows are attached to the SPF capture or another play's capture. Consequently the recorded URL, hash, parser version and collection time describe different evidence, and the play results cannot be replayed. Persist a separate receipt for every fetched play page and bind its rows to that receipt, following [AGENTS.md:65–66](AGENTS.md#L65-L66).",
+      "confidence_score": 1.0,
+      "priority": 1,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/scripts/collect_500_historical_plays.py",
+        "line_range": {"start": 155, "end": 159}
+      }
+    },
+    {
+      "title": "[P1] Persist the Nowscore evidence used in merged settlements",
+      "body": "When Nowscore supplies a missing winner/SP or overrides a row as cancelled/postponed, the stored result depends on `payload_ns`, but this call saves only `payload_500` and its URL. The Nowscore bytes and receipt are discarded, so offline replay cannot reproduce the stored label. Persist both source responses and bind merged rows to both receipts, as required by [AGENTS.md:65–66](AGENTS.md#L65-L66).",
+      "confidence_score": 1.0,
+      "priority": 1,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/scripts/collect_500_historical_settlement.py",
+        "line_range": {"start": 232, "end": 236}
+      }
+    },
+    {
+      "title": "[P1] Distinguish successful SPF completion from arbitrary captures",
+      "body": "`raw_settlement_issues()` treats every capture as completed SPF collection. A play collector running before SPF creates a capture with `rows=[]`; I verified that this immediately marks the issue completed despite zero SPF rows, so subsequent SPF runs skip it permanently. An HTTP-200 error page that parses to zero rows has the same effect. Track endpoint-specific validated completion rather than capture existence, preserving the empty-result/failure distinction required by [AGENTS.md:73](AGENTS.md#L73).",
+      "confidence_score": 1.0,
+      "priority": 1,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/src/titan_clean/settlement.py",
+        "line_range": {"start": 364, "end": 365}
+      }
+    },
+    {
+      "title": "[P2] Reject conflicting source rows before merging settlement labels",
+      "body": "For matching slots whose source scores disagree, the merge discards both Nowscore scores and can attach its winner/SP to the 500 score and fixture ID. If both sources provide different winners, it silently keeps 500 instead. This does not perform the claimed cross-validation and can produce internally contradictory labels. Validate shared identity/score fields and quarantine or explicitly adjudicate conflicts before persistence, following [AGENTS.md:62–63](AGENTS.md#L62-L63).",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/scripts/collect_500_historical_settlement.py",
+        "line_range": {"start": 217, "end": 222}
+      }
+    },
+    {
+      "title": "[P2] Check source fields instead of searching for the substring 500",
+      "body": "A valid Titan identifier, batch name, timestamp or SHA-256 can contain `500`. I sealed a Titan-only roster containing fixture `500123`; verification incorrectly reported settlement contamination, blocking release consumers such as as-of materialization and bridge export. Inspect structured source identifiers/roles rather than arbitrary serialized values.",
+      "confidence_score": 1.0,
+      "priority": 2,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/src/titan_clean/release.py",
+        "line_range": {"start": 95, "end": 96}
+      }
+    },
+    {
+      "title": "[P1] Verify historical raw evidence in sealed releases",
+      "body": "The store manifest includes `historical_fixture_captures`, but verification only traverses roster and nonhistorical fixture captures. I sealed a historical fixture, replaced its raw file with unrelated bytes, and verification still returned `[]`. Include historical receipts in raw verification and include/verify auxiliary receipts when their tables are sealed; otherwise the release silently accepts missing or corrupted collection evidence contrary to [AGENTS.md:65–66](AGENTS.md#L65-L66).",
+      "confidence_score": 1.0,
+      "priority": 1,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/src/titan_clean/release.py",
+        "line_range": {"start": 109, "end": 111}
+      }
+    },
+    {
+      "title": "[P2] Bound auxiliary retries and track both endpoint outcomes",
+      "body": "Without `--skip-aux`, a permanently failing analysis request is swallowed by `_capture_aux` and requeued forever here, without incrementing attempts or applying `MAX_ATTEMPTS`. Conversely, a successful analysis followed by a failed handicap request is considered complete because `needs_aux()` checks only analysis. Track success and bounded retries separately for both endpoints, as required by [AGENTS.md:72–73](AGENTS.md#L72-L73).",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/scripts/collect_titan_historical_fixtures.py",
+        "line_range": {"start": 237, "end": 239}
+      }
+    },
+    {
+      "title": "[P2] Honor the loaded acknowledgment's request limit",
+      "body": "For a valid acknowledgment permitting fewer than 60 requests/minute, mapping workers nevertheless reserve against a hardcoded limit of 60. Loading and hashing the acknowledgment therefore does not enforce its operational bound. Pass `risk.max_requests_per_minute` into `reserve_for_issue` and reject limits unable to accommodate its reservation, following [AGENTS.md:72](AGENTS.md#L72).",
+      "confidence_score": 1.0,
+      "priority": 2,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/scripts/run_next_historical_id_mapping.py",
+        "line_range": {"start": 68, "end": 73}
+      }
+    },
+    {
+      "title": "[P2] Add offline tests for the newly tracked runtime entry points",
+      "body": "The 83 passing tests do not exercise any of the four scripts referenced by the seven units; the collector imported here is the additional roster script. Repository-wide test searches also find no coverage for the new settlement parsers, bridge-candidate loader or Titan fundamentals parser. Thus the delivery leaves its main runtime paths untested despite the explicit function-test requirement in [AGENTS.md:82–87](AGENTS.md#L82-L87). Add deterministic saved-response and temporary-database tests covering orchestration, parsing failures, retries and repeated runs.",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "absolute_file_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-464/tests/titan_clean/test_clean_stores.py",
+        "line_range": {"start": 16, "end": 16}
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "Needs revision: the findings concern inherited runtime defects now brought into version control and explicitly placed in scope, not regressions caused by the corrected unit paths. Registry roots, closure, cross-test counts, 83 passing tests, negative/clean renders and populated coverage tables were verified; retaining the workspace revision without raw_archive is justified. No workflows changed or units were started/enabled by this review, but live unit status remains unverified because the user systemd bus is inaccessible.",
+  "overall_confidence_score": 0.99
+}

@@ -1,0 +1,80 @@
+Review the delivery for GitHub issue #464 in this repository.
+
+## What the delivery claims
+
+Issue #464: bring the collection runtime stack under version control so a
+worktree rebuild or cleanup cannot silently lose it.
+
+Scope of the change under review:
+- 7 systemd units added under `ops/systemd/user/`
+- 5 scripts added under `scripts/`
+- 10 modules added under `src/titan_clean/`, plus a modified
+  `tests/titan_clean/test_snapshots.py` and a new
+  `tests/titan_clean/test_clean_stores.py`
+- `_quarto.yml` registers `quarto/12_collection_runtime_stack.qmd`
+- the delivery QMD is `quarto/12_collection_runtime_stack.qmd`
+
+## Claims you must independently verify or falsify
+
+1. **Unit data roots are correct.** All 7 units must pass `--data-root` equal to
+   the `new_root` field of
+   `/run/media/drwho1985/Sandisk/data/beijing-lot/registry/legacy-titan-migration.json`.
+   Verify the JSON yourself. Six of these units previously pointed at
+   `/run/media/drwho1985/Sandisk/beijing-lot/titan-clean`, described in the
+   issue as a 4 MB empty shell. Check whether that path is genuinely not the
+   registry's `old_root` and whether pointing at it would write to the wrong
+   place.
+
+2. **The titan_clean upgrade direction was reversed.** The issue originally
+   claimed the workspace copy was an old version and the branch
+   `chore/workspace-snapshot-20260919` held a newer version needing a larger
+   closure. The delivery asserts the opposite: the workspace revision is
+   self-consistent and strictly stronger. Evidence claimed:
+   - workspace modules + workspace tests => 59 passed
+   - snapshot modules + workspace tests => 13 failed, 46 passed
+   - snapshot modules + snapshot tests => 44 passed
+   Reproduce this cross-test yourself. Then judge whether tracking the
+   workspace revision is right, and whether the "no raw_archive" decision is
+   sound.
+
+3. **The closure argument.** The delivery claims `raw_archive`, `data_archive`
+   and `market_storage` have zero references in `src/`, `scripts/` and
+   `tests/`, and that `read_titan_raw` has no caller. Verify. If the claim is
+   wrong, this is a blocker: the tracked package would not import.
+
+4. **Acceptance tests actually pass.** Run:
+   `.venv/bin/python -m pytest tests/titan_clean tests/backfill -q -p no:cacheprovider`
+   The claim is 83 passed. Verify the count and that nothing is skipped or
+   xfailed into a green result.
+
+5. **The delivery QMD is a real gate, not decoration.** It is declared with
+   `execute: error: false` (fail-fast). Confirm that a wrong `python` parameter
+   and a wrong `data_root` parameter each make the render exit non-zero, and
+   that the clean parameterized render exits zero. A successful exit alone is
+   not acceptance: check the rendered tables actually carry the unit/script
+   coverage evidence rather than empty frames.
+
+6. **No workflow or CI file is part of this delivery.** Confirm the change set
+   contains no `.github/workflows/` addition or modification, and that no unit
+   was enabled or started.
+
+7. **Data contract hygiene per AGENTS.md.** Judge whether the scripts and
+   modules respect the repository's rules: fetching/parsing/validation/
+   persistence separation, preserved raw bytes, explicit timeouts, parameterized
+   SQL, tests for every project function. Report any gap that the delivery
+   introduces or that it now makes tracked and therefore in-scope.
+
+## What is explicitly out of scope
+
+- Hosted CI cannot run: the organization's Actions budget is 0 with
+  `prevent_further_usage`, so jobs never start. The delivery states this
+  honestly and claims local equivalent evidence only. Do not treat "CI did not
+  run" as a delivery defect, but DO flag any place where the delivery claims CI
+  success it does not have.
+- Collection is paused by user instruction; do not ask for units to be started.
+
+## Output
+
+Report blocking findings with file and line, and state clearly whether the
+delivery is acceptable as-is, needs revision, or must be rejected. Distinguish
+defects the change introduces from pre-existing debt it merely makes visible.
