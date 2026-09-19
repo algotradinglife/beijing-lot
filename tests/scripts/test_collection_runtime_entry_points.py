@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import re
 import sqlite3
 import subprocess
 import sys
@@ -1283,6 +1284,281 @@ def test_roster_main_rejects_conflicting_modes(
         main()
     assert excinfo.value.code == 2
     assert message in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------- #
+# Auxiliary capture helpers (deterministic; no network)
+# --------------------------------------------------------------------------- #
+
+ANALYSIS_PAGE = (
+    '<a class="place">场地：北京工人体育场</a> 天气：晴 温度：22℃<br>'
+    'var h_data = [1,2];'
+).encode("utf-8")
+HANDICAP_PAGE = b"<html>handicap</html>"
+
+
+def test_now_utc_returns_a_second_precision_utc_stamp() -> None:
+    for module_name in ENTRY_POINT_MODULES:
+        module = importlib.import_module(f"scripts.{module_name}")
+        stamp = module.now_utc()
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", stamp), (module_name, stamp)
+        datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_fetch_aux_uses_an_explicit_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scripts.collect_titan_historical_fixtures as fixtures
+
+    seen: dict[str, object] = {}
+
+    class _Response:
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, *_: object) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return b"aux page"
+
+    def _fake_urlopen(request: object, timeout: float | None = None) -> _Response:
+        seen["url"] = request.full_url  # type: ignore[attr-defined]
+        seen["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr(fixtures.urllib.request, "urlopen", _fake_urlopen)
+    assert fixtures._fetch_aux("https://zq.titan007.com/analysis/289498cn.htm") == b"aux page"
+    assert seen["url"] == "https://zq.titan007.com/analysis/289498cn.htm"
+    assert seen["timeout"] == 30.0
+
+
+def test_capture_aux_persists_analysis_and_handicap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.collect_titan_historical_fixtures as fixtures
+
+    monkeypatch.setattr(
+        fixtures, "_fetch_aux",
+        lambda url, timeout=30: ANALYSIS_PAGE if "analysis" in url else HANDICAP_PAGE,
+    )
+    store = TitanRosterStore.open(tmp_path)
+    try:
+        _seed_fixture_capture(store, "fixture:1", "289498")
+        fixtures._capture_aux(store, "fixture:1", "289498")
+        kinds = {
+            row[0] for row in store.connection.execute(
+                "SELECT endpoint_kind FROM historical_aux_capture"
+            )
+        }
+        assert kinds == {"analysis", "handicap"}
+        assert store.connection.execute(
+            "SELECT venue, weather, temperature, fundamentals_available "
+            "FROM historical_fundamental"
+        ).fetchall() == [("北京工人体育场", "晴", "22℃", 1)]
+    finally:
+        store.close()
+
+
+def test_capture_aux_records_a_failure_without_raising(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A provider error is reported, not propagated: capture is best effort."""
+    import scripts.collect_titan_historical_fixtures as fixtures
+
+    def _boom(url: str, timeout: float = 30) -> bytes:
+        raise fixtures.urllib.error.URLError("provider down")
+
+    monkeypatch.setattr(fixtures, "_fetch_aux", _boom)
+    store = TitanRosterStore.open(tmp_path)
+    try:
+        _seed_fixture_capture(store, "fixture:1", "289498")
+        fixtures._capture_aux(store, "fixture:1", "289498")
+        assert store.connection.execute(
+            "SELECT COUNT(*) FROM historical_aux_capture"
+        ).fetchone()[0] == 0
+        printed = capsys.readouterr().out
+        assert "aux_failed" in printed and "URLError" in printed
+        assert printed.count("aux_failed") == 2  # analysis and handicap both attempted
+    finally:
+        store.close()
+
+
+# --------------------------------------------------------------------------- #
+# Entry-point main(): end-to-end runs.
+#
+# `needs_aux`, `reserve_n` and `worker` are closures defined inside `main()`, so
+# they have no importable name and can only be executed by running `main()`
+# itself. These tests drive a complete run against a temporary data root with
+# the transport and the collector subprocess stubbed out.
+# --------------------------------------------------------------------------- #
+
+def _bridge_file(tmp_path: Path, fixture_ids: list[str]) -> Path:
+    """A bridge whose 64-char stem doubles as the admission bridge hash."""
+    path = tmp_path / f"{BRIDGE_SHA256}.json"
+    path.write_text(
+        json.dumps({
+            "schema_version": "titan_historical_candidate_bridge_v1",
+            "candidates": [
+                {"nowscore_provider_match_id": fixture_id} for fixture_id in fixture_ids
+            ],
+        }),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _ack_file(tmp_path: Path) -> Path:
+    path = tmp_path / "ack.json"
+    path.write_text(json.dumps(_risk_ack_document()), encoding="utf-8")
+    return path
+
+
+def test_fixtures_main_captures_aux_for_an_already_captured_fixture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Executes the `needs_aux` and `reserve_n` closures inside `main()`.
+
+    The fixture is already captured, so it enters the aux branch: `needs_aux`
+    returns True, `reserve_n` books the requests, and the loop ends once the
+    stubbed capture has written an analysis row and `needs_aux` turns False.
+    """
+    import scripts.collect_titan_historical_fixtures as fixtures
+
+    bridge = _bridge_file(tmp_path, ["289498"])
+    ack = _ack_file(tmp_path)
+    store = TitanRosterStore.open(tmp_path)
+    try:
+        _seed_fixture_capture(store, "fixture:1", "289498")
+    finally:
+        store.close()
+
+    captured_calls: list[tuple[str, str]] = []
+
+    def _fake_capture_aux(store_: TitanRosterStore, fixture_batch_id: str, fixture_id: str) -> None:
+        captured_calls.append((fixture_batch_id, fixture_id))
+        store_.record_historical_aux(
+            batch_id=f"{fixture_batch_id}:analysis",
+            fixture_batch_id=fixture_batch_id,
+            endpoint_kind="analysis",
+            source_fixture_id=fixture_id,
+            source_url=f"https://zq.titan007.com/analysis/{fixture_id}cn.htm",
+            payload=ANALYSIS_PAGE,
+            requested_at_utc=NOW,
+            trusted_received_at_utc=NOW,
+            parser_version="test",
+        )
+
+    monkeypatch.setattr(fixtures, "_capture_aux", _fake_capture_aux)
+    main = _run_main(
+        "collect_titan_historical_fixtures",
+        ["--data-root", str(tmp_path), "--bridge", str(bridge),
+         "--risk-acknowledgment", str(ack), "--batch-size", "10"],
+        monkeypatch,
+    )
+    main()
+
+    out = capsys.readouterr().out
+    assert captured_calls == [("fixture:1", "289498")]
+    assert "'aux_pending': 1" in out
+    assert "ALL_HISTORICAL_CANDIDATES_DONE" in out
+
+    store = TitanRosterStore.open(tmp_path)
+    try:
+        # reserve_n ran once for the aux pair, and needs_aux now reports False.
+        assert store.connection.execute(
+            "SELECT COUNT(*) FROM low_frequency_reservation"
+        ).fetchone()[0] == 1
+        assert store.connection.execute(
+            "SELECT COUNT(*) FROM historical_aux_capture WHERE endpoint_kind='analysis'"
+        ).fetchone()[0] == 1
+    finally:
+        store.close()
+
+
+def test_run_next_main_drains_the_issue_queue_through_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Executes the `worker` closure inside `main()` with two worker threads."""
+    import scripts.run_next_historical_id_mapping as mapping
+
+    ack = _ack_file(tmp_path)
+    monkeypatch.setattr(mapping, "make_session", lambda: object())
+    monkeypatch.setattr(mapping, "fetch_issue_list", lambda session: [ISSUE_6, "120712"])
+    monkeypatch.setattr(mapping.subprocess, "run", lambda *a, **k: None)
+
+    main = _run_main(
+        "run_next_historical_id_mapping",
+        ["--data-root", str(tmp_path), "--risk-acknowledgment", str(ack), "--workers", "2"],
+        monkeypatch,
+    )
+    main()
+
+    out = capsys.readouterr().out
+    assert "'pending': 2" in out
+    assert "ALL_ISSUES_DONE" in out
+    assert "'done': 2" in out and "'failed': 0" in out
+    assert current_failures(tmp_path) == {}
+    # `worker` runs on daemon threads, so an exception inside it would NOT
+    # propagate to this test - the thread would simply die and the run would
+    # still print ALL_ISSUES_DONE. Assert the work actually happened:
+    # reserve_for_issue (called from `worker`) books one reservation per issue.
+    store = TitanRosterStore.open(tmp_path)
+    try:
+        assert store.connection.execute(
+            "SELECT COUNT(*) FROM low_frequency_reservation"
+        ).fetchone()[0] == 2
+    finally:
+        store.close()
+
+
+# --------------------------------------------------------------------------- #
+# scripts/audit_execution_coverage.py (pure helpers only; the audit itself is
+# the delivery gate and is exercised by the render, not recursively here)
+# --------------------------------------------------------------------------- #
+
+def test_function_sites_locates_nested_closures_and_first_statements() -> None:
+    import scripts.audit_execution_coverage as audit
+
+    source = (
+        "def outer(a):\n"
+        "    def inner():\n"
+        "        return a\n"
+        "    return inner\n"
+    )
+    sites = {site.name: site for site in audit.function_sites(source)}
+    assert set(sites) == {"outer", "inner"}
+    # The probe goes before the first *statement*, not on the def line.
+    assert sites["outer"].body_lineno == 2
+    assert sites["outer"].body_col == 4
+    assert sites["inner"].body_lineno == 3
+    assert sites["inner"].body_col == 8
+
+
+def test_mutated_source_inserts_without_deleting_any_line() -> None:
+    import scripts.audit_execution_coverage as audit
+
+    source = "def f():\n    value = (\n        1\n    )\n    return value\n"
+    site = audit.function_sites(source)[0]
+    mutated = audit.mutated_source(source, site)
+    # Nothing is removed: the original body survives behind the probe, so the
+    # mutation cannot introduce a syntax error and be misread as "covered".
+    assert len(mutated.split("\n")) == len(source.split("\n")) + 1
+    assert audit.MUTATION in mutated
+    compile(mutated, "<mutated>", "exec")
+    compile(source, "<original>", "exec")
+
+
+def test_audit_scope_covers_the_entry_scripts_and_is_closed() -> None:
+    import scripts.audit_execution_coverage as audit
+
+    assert audit.ENTRY_SCRIPTS == (
+        "collect_500_historical_plays.py",
+        "collect_500_historical_settlement.py",
+        "collect_titan_historical_fixtures.py",
+        "run_next_historical_id_mapping.py",
+        "collect_titan_clean_roster.py",
+    )
+    # The auditor is test infrastructure, not audited runtime code.
+    assert "audit_execution_coverage.py" not in audit.ENTRY_SCRIPTS
 
 
 # --------------------------------------------------------------------------- #

@@ -243,11 +243,11 @@ coverage <- data.frame(
               "src/titan_clean/store.py",
               "src/titan_clean/settlement.py",
               "src/titan_clean/snapshots.py"),
-  tested_surface = c("参数校验/--help/缺失必填/越界值（真实调用 main，不触网）",
+  tested_surface = c("参数校验/--help/缺失必填/越界值（真实调用 main，不触网）, now_utc",
                      "parse_play（jq/bf/postponed/no_result/fid 边界/空页/GB18030）, fetch 超时",
                      "parse_settlement, parse_nowscore_settlement（3 个结果码/state/status）, fetch 超时",
-                     "load_bridge_candidates（schema/空/非法/重复 ID）, fetch_fixture（URL/超时）",
-                     "pending_issues（已完成过滤/尝试上限/全量）, run_issue（成功/失败记录）, reserve_for_issue, current_failures",
+                     "load_bridge_candidates（schema/空/非法/重复 ID）, fetch_fixture/_fetch_aux（URL/超时）, _capture_aux（analysis+handicap 落盘/异常不抛出）, main() 端到端（needs_aux/reserve_n 闭包）",
+                     "pending_issues（已完成过滤/尝试上限/全量）, run_issue（成功/失败记录）, reserve_for_issue, current_failures, main() 端到端（worker 闭包）",
                      "fetch_bytes（超时/非 200）",
                      "parse_analysis_fundamentals（场地/天气/温度/积分榜链接/JS 数组/空页）",
                      "load_risk_acknowledgment（receipt 绑定/JSON/契约/origin/数值上界/缺键）",
@@ -259,31 +259,40 @@ coverage <- data.frame(
 coverage |> tibble::as_tibble()
 ```
 
-**关于「每个函数都有测试」的证据边界。** round 4 审查正确地指出：按名字子串在测试中
-搜索会把无关引用算成覆盖——把 `AssertionError` 注入 5 个入口脚本的 `main()` 之后，
-测试仍全绿、渲染仍成功。因此那个扫描门已被**删除**：一个无法证伪的门比没有门更糟，
-它会把错误结论认证为证据。取而代之的是**真实执行证据**：下门的用例会真正调用每个
-入口脚本的 `main()`，走的是首个 HTTP 请求与首次数据库写入**之前**的参数校验路径，
-因此与已路由的行为缺陷无关。
+### 函数执行覆盖：机械审计门
+
+「每个项目函数都要有对应自动化测试」是本交付的实质义务，而 round 3–5 三轮审查说明：
+**按名字搜索测试文件证明不了任何事**。本交付因此采用**执行证据**——对
+`src/titan_clean/` 与 5 个入口脚本中的**每一个**函数（含私有函数与 `main()` 内闭包）
+逐个注入 `raise AssertionError`、运行验收命令，凡测试仍通过者即为未被执行。
+每个「未覆盖」结论独立复算两次，两次一致才采信，以排除抖动。
+
+审计器是仓库内的可复用脚本 `scripts/audit_execution_coverage.py`（QMD 只负责调用与断言，
+实现不在 QMD 内）。下门执行该审计并断言缺口为 0。它是**可证伪**的：任一函数失去执行
+覆盖都会使渲染失败（round 5 即由该审计发现 10 个从未被执行的函数）。
+
+审计集合是封闭的：`src/titan_clean/` 加 5 个采集入口脚本；审计器自身不在集合内。
 
 ```{r}
-#| label: entry-point-main-execution
-main_evidence <- system2(
+#| label: execution-coverage-audit
+audit <- system2(
   params$python,
-  c("-m", "pytest", "tests/scripts/test_collection_runtime_entry_points.py",
-    "-q", "-p", "no:cacheprovider", "-k", "main"),
-  stdout = TRUE, stderr = TRUE
+  c(file.path(params$project_root, "scripts", "audit_execution_coverage.py"),
+    "--python", params$python, "--root", params$project_root),
+  stdout = TRUE, stderr = FALSE
 )
-main_summary <- tail(main_evidence, 1)
-main_passed <- suppressWarnings(as.integer(sub("^([0-9]+) passed.*$", "\\1", main_summary)))
-data.frame(entry_point = "5 entry scripts: main()", main_tests_executed = main_passed,
-           summary = main_summary, stringsAsFactors = FALSE) |> tibble::as_tibble()
-stopifnot(!is.na(main_passed), main_passed >= 23L, !any(grepl("failed", main_evidence)))
+audit_fields <- strsplit(tail(audit, 1), "\t")[[1]]
+audit_total <- suppressWarnings(as.integer(audit_fields[1]))
+audit_errors <- suppressWarnings(as.integer(audit_fields[2]))
+audit_gaps <- suppressWarnings(as.integer(audit_fields[3]))
+data.frame(functions_audited = audit_total, injection_errors = audit_errors,
+           functions_never_executed_by_tests = audit_gaps,
+           gaps = if (length(audit_fields) >= 4) audit_fields[4] else "",
+           stringsAsFactors = FALSE) |> tibble::as_tibble()
+stopifnot(!is.na(audit_total), audit_total > 100L,
+          !is.na(audit_errors), audit_errors == 0L,
+          !is.na(audit_gaps), audit_gaps == 0L)
 ```
-
-该门**可证伪**：向任一 `main()` 注入异常会使这 23 个用例失败，渲染随之失败（实测
-变异结果为 `23 failed`）。其余模块函数的测试义务由常规用例与上方映射表承载；
-本文档**不**声称存在一个能机械证明「全仓库函数均已覆盖」的检查。
 
 ### Round 2（被审版本 `d19b4043`）
 
@@ -366,6 +375,50 @@ round4 <- data.frame(
   stringsAsFactors = FALSE
 )
 round4 |> tibble::as_tibble()
+```
+
+### Round 5（被审版本 `30933379`）
+
+判定 **Needs revision**，1 项阻塞。审查确认 round 3 的修复与新门**通过了变异测试**
+（188 passed、7 个数据根、闭包检查、正负渲染均正常），但指出仍有函数从未被执行。
+这已是第三轮出现同类问题，说明我方此前是**按名字**而非**按执行**判断覆盖。
+
+因此本轮改用**机械执行审计**，而不是再猜：对 `src/titan_clean/` 与 5 个入口脚本中
+**每一个**函数（含私有函数与嵌套闭包）逐个注入 `raise AssertionError`，运行验收命令，
+凡测试仍通过者即为「未被执行」。为排除抖动，每个「未覆盖」结论都**独立复算两次**，
+两次一致才采信。审计规模 113 个函数，注入错误 0。
+
+审计先暴露了两个我方自身的方法错误，均已修正：
+
+- 首版审计在**首行是多行语句开头**时替换首行会产生 `SyntaxError`，把「测试报错」误判成
+  「已覆盖」——这正是 `_fetch_aux` 一度被误判的原因。改为**在首条语句前插入** `raise`、
+  不删除任何行。
+- 单次结果存在抖动（`fetch_fixture` 一次判未覆盖、一次判已覆盖），故加二次确认。
+
+最终确认 **10 个函数从未被执行**，逐类处置如下：
+
+| 函数 | 性质 | 处置 |
+|---|---|---|
+| `fundamentals.py::_clean_cells` | **全仓库无调用者的死代码** | 按 AGENTS.md 删除，而非补测试 |
+| `now_utc`（4 个脚本各一个） | 保留的可复用函数 | 补测试：格式与秒级 UTC 解析 |
+| `_fetch_aux` | 保留（有 2 个调用者） | 补测试：URL 与显式超时 |
+| `_capture_aux` | 保留 | 补测试：analysis+handicap 落盘、场地/天气/温度、异常分支不抛出 |
+| `needs_aux`、`reserve_n` | `main()` 内闭包，无独立名字 | 端到端测试驱动 `main()`：已捕获夹具走 aux 分支，验证 `needs_aux` 翻转为 False、`reserve_n` 产生预订、分析行落盘 |
+| `worker` | `main()` 内闭包 | 端到端测试驱动 `main()` 跑完 2 个期次 |
+
+`worker` 一项还暴露了第三个方法错误：它运行在**守护线程**中，注入异常只会让线程静默死掉，
+主线程仍打印 `ALL_ISSUES_DONE`，因此原测试无法证伪。已补真实执行断言
+（每个期次经 `worker` 调用 `reserve_for_issue` 产生一条预订），注入变异后可捕获。
+
+```{r}
+#| label: review-round-5
+round5 <- data.frame(
+  finding = c("10 个函数从未被测试执行（含死代码与 main() 内闭包）"),
+  priority = c("P2"),
+  disposition = c("死代码删除；7 个函数补测试；3 个闭包由端到端 main() 测试覆盖"),
+  stringsAsFactors = FALSE
+)
+round5 |> tibble::as_tibble()
 ```
 
 ### 明确不在本交付内修复的行为缺陷

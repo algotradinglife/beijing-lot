@@ -50,11 +50,6 @@ def _js_array_text(text: str, name: str) -> str | None:
     return None
 
 
-def _clean_cells(row: str) -> list[str]:
-    cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
-    return [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", cell)).strip() for cell in cells]
-
-
 def _season_table(text: str, ordinal: int) -> str | None:
     matches: list[str] = []
     for match in re.finditer(r"\[[^\]]+?-\d+\]", text):
