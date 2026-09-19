@@ -1,4 +1,4 @@
-Review ROUND 6 of the delivery for GitHub issue #464 in this repository.
+Review ROUND 7 of the delivery for GitHub issue #464 in this repository.
 
 ## Context you need first
 
@@ -103,6 +103,34 @@ mutation.
 
 Audit result at the revision under review: **112 functions, 0 injection errors,
 0 never executed**.
+
+**Round 6** reviewed revision `2c2472e2` and returned needs-revision with four
+in-scope blockers, all in this delivery's own gate and test code. Each was
+reproduced before being fixed:
+
+1. The auditor accepted an unattributable failure as proof of execution: an
+   unrelated flaky test failing a run made a function count as covered from a
+   single observation. Coverage now requires two consistent observations, and a
+   `fail, fail` pair counts only when the probe's own exception marker appears
+   in both outputs. `pass, fail` and `fail, pass` are inconclusive and fail the
+   audit rather than defaulting to covered.
+2. `--jobs > 1` ran probes concurrently over the same file. Reproduced: a
+   `--jobs 4` run left probe exceptions in eleven source files, because one
+   worker could read another's injected source as its "original" and write it
+   back. Parallel execution is removed entirely; probes run strictly one at a
+   time and the original bytes are restored on every path.
+3. The QMD gate read only the summary line and ignored the auditor's exit
+   status, so a failed audit whose summary still showed zero gaps rendered
+   successfully. The gate now checks the exit status and the inconclusive count.
+4. The round-5 end-to-end test pinned the incomplete-aux completion behaviour
+   routed to #473: its stub wrote only the analysis capture while `needs_aux`
+   inspects only that endpoint, so the run finished with handicap missing. The
+   stub now persists both endpoints.
+
+The gate is falsified two independent ways at the revision under review:
+making the auditor report one inconclusive result exits 1, and disabling one
+test's coverage to create four real gaps exits 1 — with no source-file
+corruption in either case.
 
 The delivery does **not** claim the routed behaviours are correct. That is a
 deliberate, documented governance decision, not an oversight.
