@@ -22,6 +22,7 @@ asserted here, because asserting them would freeze broken behaviour:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -33,9 +34,20 @@ from scripts.collect_500_historical_settlement import (
     parse_nowscore_settlement,
     parse_settlement,
 )
-from scripts.collect_titan_historical_fixtures import load_bridge_candidates
-from scripts.run_next_historical_id_mapping import current_failures
+from scripts.collect_titan_historical_fixtures import fetch_fixture, load_bridge_candidates
+from scripts.run_next_historical_id_mapping import (
+    MAX_ATTEMPTS,
+    current_failures,
+    pending_issues,
+    run_issue,
+)
+from src.titan_clean.fundamentals import parse_analysis_fundamentals
 from src.titan_clean.historical_id_map import HistoricalIdMapStore
+from src.titan_clean.risk_acknowledgment import (
+    RISK_ACK_SCHEMA,
+    TitanRiskAcknowledgmentError,
+    load_risk_acknowledgment,
+)
 
 ISSUE_6 = "120711"
 ISSUE_5 = "26096"
@@ -330,10 +342,11 @@ def test_parse_nowscore_multiple_filled_cells_is_no_result() -> None:
     assert rows[1][2] is None and rows[1][4] == "no_result"
 
 
-def test_parse_nowscore_unparsable_sp_keeps_state_but_drops_price() -> None:
-    payload = _ns_row("1", score=(2, 1), sps=("-", "", ""))
-    rows = parse_nowscore_settlement(ISSUE_6, payload.encode("utf-8"))
-    assert rows[1] == (2, 1, "3", None, "settled")
+# NOTE: an unparsable SP cell (e.g. "-") currently yields `settled` with
+# `sp=None`, because the float() failure is swallowed inside
+# parse_nowscore_settlement. That is defect #476, and it is deliberately NOT
+# asserted here: pinning it would freeze a parsing failure as the accepted
+# contract. Its regression test belongs to #476 and lands with that fix.
 
 
 def test_parse_nowscore_finished_without_score_and_without_sp_is_cancelled() -> None:
@@ -441,6 +454,235 @@ def test_current_failures_counts_attempts_per_issue(tmp_path: Path) -> None:
 
 def test_current_failures_is_empty_without_recorded_failures(tmp_path: Path) -> None:
     HistoricalIdMapStore.open(tmp_path).close()
+    assert current_failures(tmp_path) == {}
+
+
+# --------------------------------------------------------------------------- #
+# collect_titan_historical_fixtures.fetch_fixture
+# --------------------------------------------------------------------------- #
+
+def test_fetch_fixture_requests_provider_url_with_explicit_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import scripts.collect_titan_historical_fixtures as fixtures
+
+    seen: dict[str, object] = {}
+
+    class _Response:
+        def __enter__(self) -> "_Response":
+            return self
+
+        def __exit__(self, *_: object) -> bool:
+            return False
+
+        def read(self) -> bytes:
+            return b'var game=Array("a");'
+
+    def _fake_urlopen(request: object, timeout: float | None = None) -> _Response:
+        seen["url"] = request.full_url  # type: ignore[attr-defined]
+        seen["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr(fixtures.urllib.request, "urlopen", _fake_urlopen)
+    assert fetch_fixture("289498") == b'var game=Array("a");'
+    assert seen["url"] == "https://1x2d.titan007.com/289498.js"
+    assert seen["timeout"] == 30.0
+
+
+# --------------------------------------------------------------------------- #
+# src.titan_clean.fundamentals.parse_analysis_fundamentals
+# --------------------------------------------------------------------------- #
+
+def _analysis_page(
+    *,
+    venue: str = "北京工人体育场",
+    weather: str = "晴",
+    temperature: str = "22℃",
+    standings: tuple[str, str] | None = None,
+    arrays: dict[str, str] | None = None,
+) -> bytes:
+    parts = [f'<a class="place">场地：{venue}</a> 天气：{weather} 温度：{temperature}<br>']
+    if standings is not None:
+        season, league = standings
+        parts.append(f'<a href="http://info.titan007.com/score/{season}/{league}.htm">积分榜</a>')
+    for name, body in (arrays or {}).items():
+        parts.append(f"var {name} = {body};")
+    return "".join(parts).encode("utf-8")
+
+
+def test_parse_analysis_fundamentals_extracts_the_pre_match_snapshot() -> None:
+    payload = _analysis_page(
+        standings=("2025-2026", "123"),
+        arrays={"h_data": "[1,2]", "v_data": "[3]"},
+    )
+    fundamentals = parse_analysis_fundamentals(payload)
+    assert (fundamentals.venue, fundamentals.weather, fundamentals.temperature) == (
+        "北京工人体育场", "晴", "22℃",
+    )
+    assert fundamentals.standings_link == "info.titan007.com/score/2025-2026/123.htm"
+    assert fundamentals.home_form == "[1,2]"
+    assert fundamentals.h2h == "[3]"
+    assert fundamentals.away_form is None
+    assert fundamentals.raw_blocks == {"h_data": "[1,2]", "v_data": "[3]"}
+
+
+def test_parse_analysis_fundamentals_returns_an_empty_snapshot_for_a_blank_page() -> None:
+    fundamentals = parse_analysis_fundamentals(b"")
+    assert (
+        fundamentals.venue,
+        fundamentals.weather,
+        fundamentals.temperature,
+        fundamentals.standings_link,
+    ) == (None, None, None, None)
+    assert fundamentals.raw_blocks == {}
+
+
+# --------------------------------------------------------------------------- #
+# src.titan_clean.risk_acknowledgment.load_risk_acknowledgment
+# --------------------------------------------------------------------------- #
+
+def _risk_ack_document(**overrides: object) -> dict[str, object]:
+    document: dict[str, object] = {
+        "schema_version": RISK_ACK_SCHEMA,
+        "source_id": "titan",
+        "operator_accepts_risk": True,
+        "allowed_origins": ["data.titan007.com", "1x2d.titan007.com"],
+        "max_requests_per_minute": 60,
+        "max_fixture_ids_per_run": 50,
+    }
+    document.update(overrides)
+    return document
+
+
+def _write_risk_ack(tmp_path: Path, document: object) -> Path:
+    path = tmp_path / "titan-risk-ack.json"
+    if isinstance(document, str):
+        path.write_text(document, encoding="utf-8")
+    else:
+        path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def test_load_risk_acknowledgment_binds_the_receipt_to_the_file_bytes(tmp_path: Path) -> None:
+    path = _write_risk_ack(tmp_path, _risk_ack_document())
+    acknowledgment = load_risk_acknowledgment(path)
+    assert acknowledgment.receipt_sha256 == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert acknowledgment.max_requests_per_minute == 60
+    assert acknowledgment.max_fixture_ids_per_run == 50
+
+
+def test_load_risk_acknowledgment_rejects_invalid_json(tmp_path: Path) -> None:
+    path = _write_risk_ack(tmp_path, "{not json")
+    with pytest.raises(TitanRiskAcknowledgmentError, match="not valid JSON"):
+        load_risk_acknowledgment(path)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"schema_version": "other_v1"}, "incompatible contract"),
+        ({"source_id": "nowscore"}, "incompatible contract"),
+        ({"operator_accepts_risk": False}, "operator risk acceptance is required"),
+        ({"allowed_origins": ["data.titan007.com"]}, "omits a required Titan origin"),
+        ({"max_requests_per_minute": 0}, "between 1 and 600"),
+        ({"max_requests_per_minute": 601}, "between 1 and 600"),
+        ({"max_fixture_ids_per_run": -1}, "between 0 and 600"),
+        ({"max_fixture_ids_per_run": 601}, "between 0 and 600"),
+    ],
+)
+def test_load_risk_acknowledgment_rejects_incompatible_contracts(
+    tmp_path: Path, overrides: dict[str, object], message: str
+) -> None:
+    path = _write_risk_ack(tmp_path, _risk_ack_document(**overrides))
+    with pytest.raises(TitanRiskAcknowledgmentError, match=message):
+        load_risk_acknowledgment(path)
+
+
+def test_load_risk_acknowledgment_rejects_a_missing_required_key(tmp_path: Path) -> None:
+    document = _risk_ack_document()
+    del document["max_fixture_ids_per_run"]
+    path = _write_risk_ack(tmp_path, document)
+    with pytest.raises(TitanRiskAcknowledgmentError, match="incompatible contract"):
+        load_risk_acknowledgment(path)
+
+
+# --------------------------------------------------------------------------- #
+# run_next_historical_id_mapping.pending_issues / run_issue
+# --------------------------------------------------------------------------- #
+
+def _seed_failures(root: Path, issue: str, times: int) -> None:
+    store = HistoricalIdMapStore.open(root)
+    try:
+        for index in range(times):
+            store.record_failure(
+                issue_code=issue,
+                attempted_at_utc=f"2026-09-19T00:00:0{index}Z",
+                error=ValueError("seeded"),
+            )
+    finally:
+        store.close()
+
+
+def test_pending_issues_excludes_issues_at_the_attempt_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.run_next_historical_id_mapping as mapping
+
+    monkeypatch.setattr(mapping, "make_session", lambda: object())
+    monkeypatch.setattr(
+        mapping, "fetch_issue_list", lambda session: ["120711", "120712", "120713"]
+    )
+    _seed_failures(tmp_path, "120712", MAX_ATTEMPTS)
+    assert pending_issues(tmp_path) == ["120711", "120713"]
+
+
+def test_pending_issues_keeps_issues_below_the_attempt_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.run_next_historical_id_mapping as mapping
+
+    monkeypatch.setattr(mapping, "make_session", lambda: object())
+    monkeypatch.setattr(mapping, "fetch_issue_list", lambda session: ["120711"])
+    _seed_failures(tmp_path, "120711", MAX_ATTEMPTS - 1)
+    assert pending_issues(tmp_path) == ["120711"]
+
+
+def test_pending_issues_returns_every_fetched_issue_on_a_fresh_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.run_next_historical_id_mapping as mapping
+
+    monkeypatch.setattr(mapping, "make_session", lambda: object())
+    monkeypatch.setattr(mapping, "fetch_issue_list", lambda session: ["120711", "26096"])
+    assert pending_issues(tmp_path) == ["120711", "26096"]
+
+
+def test_run_issue_records_a_failure_when_the_collector_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.run_next_historical_id_mapping as mapping
+
+    class _NoSleep:
+        @staticmethod
+        def sleep(*_: object) -> None:
+            return None
+
+    def _fail(*args: object, **kwargs: object) -> None:
+        raise subprocess.CalledProcessError(returncode=3, cmd=args[0], stderr="boom")
+
+    monkeypatch.setattr(mapping, "time", _NoSleep)
+    monkeypatch.setattr(mapping.subprocess, "run", _fail)
+    assert run_issue(tmp_path, ISSUE_6) is False
+    assert current_failures(tmp_path) == {ISSUE_6: 1}
+
+
+def test_run_issue_returns_true_and_records_nothing_on_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.run_next_historical_id_mapping as mapping
+
+    monkeypatch.setattr(mapping.subprocess, "run", lambda *a, **k: None)
+    assert run_issue(tmp_path, ISSUE_6) is True
     assert current_failures(tmp_path) == {}
 
 

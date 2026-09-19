@@ -1,16 +1,15 @@
-Review ROUND 2 of the delivery for GitHub issue #464 in this repository.
+Review ROUND 3 of the delivery for GitHub issue #464 in this repository.
 
 ## Context you need first
 
-Round 1 reviewed revision `3d8e6139` and returned `patch is incorrect` with 10
-findings. Read `docs/reviews/issue-464-codex-review-round1.json` for that
-finding list; it is part of this delivery.
+**Round 1** reviewed revision `3d8e6139` and returned `patch is incorrect` with 10
+findings. The full finding list is committed at
+`docs/reviews/issue-464-codex-review-round1.json` and is part of this delivery.
 
-The PI then made an explicit scope decision: #464 is narrowed to
-**"bring the collection runtime stack under version control + correct the unit
-data roots + add offline tests for the entry-point scripts"**. Each behaviour
-defect from round 1 was filed as its own issue and routed in the GitHub issue
-graph:
+The PI then made an explicit scope decision: #464 is narrowed to **"bring the
+collection runtime stack under version control + correct the unit data roots +
+add offline tests for the entry-point scripts"**. Each behaviour defect from
+round 1 was filed as its own issue and routed in the GitHub issue graph:
 
 | round 1 finding | issue |
 |---|---|
@@ -25,10 +24,23 @@ graph:
 | acknowledged request limit not honored | #474 |
 | entry scripts have no test coverage | folded into #464 (this delivery) |
 
-The delivery therefore does **not** claim those behaviours are correct. This is
-a deliberate, documented governance decision, not an oversight. Do not re-report
-the nine routed defects as blockers for this issue; instead see "What to judge"
-below.
+**Round 2** reviewed revision `d19b4043` and returned needs-revision with two
+in-scope blockers, both addressed on the branch you are reviewing now:
+
+1. Five independently testable functions still had no coverage:
+   `pending_issues`, `run_issue`, `fetch_fixture`, `parse_analysis_fundamentals`,
+   `load_risk_acknowledgment`. Offline tests were added, growing that test file
+   from 35 to 53 cases.
+2. A new test asserted that an unparsable SP cell still yields `settled`,
+   freezing a parsing failure as the accepted contract. That assertion was
+   **removed**, and the underlying defect is now routed as issue **#476**.
+
+Round 2 independently verified the seven unit roots, the closure argument, the
+59-vs-13 cross-test result, 118 passing tests with no skips/xfails, and both
+mutation checks.
+
+The delivery does **not** claim the routed behaviours are correct. That is a
+deliberate, documented governance decision, not an oversight.
 
 ## The delivery under review (HEAD of branch `codex/464-runtime-stack`)
 
@@ -36,54 +48,45 @@ below.
 - 5 scripts added under `scripts/`
 - 10 modules added under `src/titan_clean/`
 - `tests/titan_clean/test_clean_stores.py` added; `tests/titan_clean/test_snapshots.py` updated
-- `tests/scripts/test_collection_runtime_entry_points.py` added (new in round 2)
+- `tests/scripts/test_collection_runtime_entry_points.py` added, now 53 cases
 - `quarto/12_collection_runtime_stack.qmd` added and registered in `_quarto.yml`
 - `docs/reviews/issue-464-*.{txt,json}` added
 
-Two commits: `3d8e6139` (stack + units + QMD) and its successor (entry-point
-tests + QMD review record).
-
 ## What to judge
 
-1. **Verify the delivery's own claims.** Independently confirm:
+1. **Verify the two round 2 fixes actually landed.**
+   - Confirm the five named functions now have real offline tests with normal,
+     boundary and failure paths — not `assert True`-style padding, and not tests
+     that merely import the module.
+   - Confirm the invalid-SP assertion is gone, and that **no** test in this
+     delivery now asserts behaviour belonging to #466, #467, #468, #469, #470,
+     #471, #472, #473, #474 or #476. A test that pins a routed defect as the
+     expected contract is a blocker, because it makes the defect harder to fix.
+
+2. **Re-verify the delivery's own claims** (these were confirmed in round 2;
+   confirm they still hold at this revision):
    - all 7 units pass `--data-root` equal to the `new_root` in
-     `/run/media/drwho1985/Sandisk/data/beijing-lot/registry/legacy-titan-migration.json`,
-     and that the previously used `/run/media/drwho1985/Sandisk/beijing-lot/titan-clean`
-     is genuinely neither `old_root` nor `new_root`;
-   - the titan_clean closure argument: zero references to
-     `raw_archive`/`data_archive`/`market_storage` in `src/`, `scripts/`,
-     `tests/`, and no caller of `read_titan_raw`;
-   - the cross-test result that justifies keeping the workspace revision
-     (workspace modules + workspace tests pass; snapshot modules + workspace
-     tests fail);
+     `/run/media/drwho1985/Sandisk/data/beijing-lot/registry/legacy-titan-migration.json`;
+   - zero references to `raw_archive`/`data_archive`/`market_storage` in `src/`,
+     `scripts/`, `tests/`, and no caller of `read_titan_raw`;
    - `python -m pytest tests/titan_clean tests/backfill tests/scripts/test_collection_runtime_entry_points.py -q -p no:cacheprovider`
-     reports 118 passed with nothing skipped or xfailed into green;
+     is green with nothing skipped or xfailed into green;
    - the delivery QMD is a real gate: a wrong `python` and a wrong `data_root`
      each make the render exit non-zero, the clean parameterized render exits
-     zero, and the rendered tables carry real coverage evidence.
+     zero, and the rendered coverage tables carry real evidence.
 
-2. **Judge the new entry-point tests on their merits.** This is the main new
-   artifact in round 2. Are they deterministic and offline? Do they test
-   observable contracts rather than restating the implementation? Do they cover
-   normal, boundary and failure paths of `parse_play`, `parse_settlement`,
-   `parse_nowscore_settlement`, `load_bridge_candidates` and
-   `current_failures`? The delivery claims validity by mutation (disabling the
-   postponed detection or the bridge duplicate-id check makes the matching test
-   fail) — reproduce or falsify that. **Most importantly:** do any of these
-   tests assert behaviour that round 1 found defective, thereby freezing a bug
-   as the expected contract? That would be a blocker for this issue.
-
-3. **Check the routing is complete and honest.** Is any defect introduced or
-   made visible by this diff left both unfixed and unrouted? Is anything in the
-   delivery claiming correctness it does not have (for example the QMD
-   claiming CI passed, or claiming the routed defects are fixed)? Is the
-   `#466`–`#474` mapping in the QMD accurate against the round 1 JSON?
+3. **Check the routing is complete and honest.** `#466`–`#474` plus `#476` are
+   the routed homes. Is any defect introduced or made visible by this diff left
+   both unfixed and unrouted? Does anything claim correctness it does not have
+   (for example claiming CI passed, or claiming the routed defects are fixed)?
+   Is the mapping in the QMD accurate against the round 1 JSON and round 2
+   findings?
 
 4. **Report only what is in scope.** Blockers for this delivery are: a false
    claim, a missing routine test for a function this delivery adds or makes
-   tracked, a unit pointing at the wrong data root, a broken QMD gate, or a
-   defect newly introduced by this diff. Pre-existing behaviour defects belong
-   to their routed issues.
+   tracked, a test that freezes a routed defect, a unit pointing at the wrong
+   data root, a broken QMD gate, or a defect newly introduced by this diff.
+   Pre-existing behaviour defects belong to their routed issues.
 
 ## Explicitly out of scope
 

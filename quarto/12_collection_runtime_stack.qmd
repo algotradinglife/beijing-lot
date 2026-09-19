@@ -232,20 +232,50 @@ findings |> tibble::as_tibble()
 ```{r}
 #| label: coverage-matrix
 coverage <- data.frame(
-  entry_point = c("collect_500_historical_plays", "collect_500_historical_settlement",
-                  "collect_titan_historical_fixtures", "run_next_historical_id_mapping"),
+  surface = c("scripts/collect_500_historical_plays.py",
+              "scripts/collect_500_historical_settlement.py",
+              "scripts/collect_titan_historical_fixtures.py",
+              "scripts/run_next_historical_id_mapping.py",
+              "src/titan_clean/fundamentals.py",
+              "src/titan_clean/risk_acknowledgment.py"),
   tested_surface = c("parse_play（jq/bf/postponed/no_result/fid 边界/空页/GB18030）, fetch 超时",
-                     "parse_settlement, parse_nowscore_settlement（3 个结果码/state/异常 SP）, fetch 超时",
-                     "load_bridge_candidates（schema/空/非法/重复 ID）",
-                     "current_failures（计数/空）"),
+                     "parse_settlement, parse_nowscore_settlement（3 个结果码/state/status）, fetch 超时",
+                     "load_bridge_candidates（schema/空/非法/重复 ID）, fetch_fixture（URL/超时）",
+                     "pending_issues（已完成过滤/尝试上限）, run_issue（成功/失败记录）, current_failures（计数/空）",
+                     "parse_analysis_fundamentals（场地/天气/温度/积分榜链接/JS 数组/空页）",
+                     "load_risk_acknowledgment（receipt 绑定/JSON/契约/origin/数值上界/缺键）"),
   stringsAsFactors = FALSE
 )
 coverage |> tibble::as_tibble()
 ```
 
+### Round 2（被审版本 `d19b4043`）
+
+判定 **Needs revision**，2 项在范围内的阻塞。审查同时独立验证了 7 个 unit 数据根、
+闭包论证、59 vs 13 的交叉测试、118 passed（无 skip/xfail）、以及两项变异检查。
+
+| round 2 发现 | 级别 | 处置 |
+|---|---|---|
+| `pending_issues`/`run_issue`/`fetch_fixture`/`parse_analysis_fundamentals`/`load_risk_acknowledgment` 仍无测试 | P2 | 本轮补齐（测试数 35 → 53），覆盖矩阵已更新 |
+| 新测试把「SP 解析失败仍判 settled」固化为契约 | P2 | 删除该断言；缺陷路由为 **#476**，其回归测试随 #476 落地 |
+
+第 2 项是审查**新发现**的未路由缺陷，且正是「测试固化了缺陷」这一类；本轮修复方式为
+**不把缺陷行为写成期望值**，并把它路由进图谱，而不是就地放宽断言。
+
+```{r}
+#| label: review-round-2
+round2 <- data.frame(
+  finding = c("入口脚本其余可测函数无覆盖", "测试固化「SP 解析失败仍判 settled」"),
+  priority = c("P2", "P2"),
+  disposition = c("本轮补齐（35 → 53 项测试）", "删除断言，缺陷路由为 #476"),
+  stringsAsFactors = FALSE
+)
+round2 |> tibble::as_tibble()
+```
+
 ### 明确不在本交付内修复的行为缺陷
 
-上述 #466–#474 所描述的行为缺陷**不在 #464 验收范围**：它们是继承性缺陷，
+上述 #466–#474 与 #476 所描述的行为缺陷**不在 #464 验收范围**：它们是继承性缺陷，
 采集当前被用户暂停，无在线风险；按 [AGENTS.md](AGENTS.md) 组件解耦与图谱路由要求
 各自独立交付。因此本文档不声称这些行为正确——只声称运行时栈已入库、
 路径一致、入口脚本有测试。
