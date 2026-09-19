@@ -149,6 +149,11 @@ git diff --check
 | 标注为"select 内"的联赛链接实际被放在下拉之前，未验证内部排除 | `_body()` 增加 `inside` 参数，把链接真正放进 `<select>`；用例自身断言 `expect_select` < `24022` < `</select>` |
 | 新增 QMD 与 `tests/backfill` 无任何 CI 覆盖（既有 workflow 的 sparse checkout 亦排除 backfill） | 新增 `.github/workflows/backfill-issue-discovery.yml`：恢复声明环境、运行 `tests/backfill`、以显式 `python` / `project_root` 参数渲染本 QMD |
 
-### 第二轮 `codex review`（被审版本待补）
+### 第二轮 `codex review`（被审版本 `5eead4f1`）
 
-- 待第一轮修复提交后重跑，结论与取证命令在此补记。
+- 结论：**no blocking findings**；审查已读取实时 Issue Graph。
+- 审查方独立复核：24 个用例通过（含屏蔽 socket 的复跑）；fixture 字节数与 SHA-256、
+  1,618 个准入期号、两个制度计数与时间序一致；在 `/tmp` 副本中以显式 `python` / `project_root`
+  参数渲染成功、无执行错误块；**无效解释器渲染失败**，与第一轮修复要求一致。
+- 边界：本 PR 的 CI 结果与 PI 最终验收记录在本轮之后追加；命令退出码本身不作为通过依据，
+  合并状态以 PR 与 #463 的原生状态为准。
