@@ -1,4 +1,4 @@
-Review ROUND 3 of the delivery for GitHub issue #464 in this repository.
+Review ROUND 4 of the delivery for GitHub issue #464 in this repository.
 
 ## Context you need first
 
@@ -8,8 +8,8 @@ findings. The full finding list is committed at
 
 The PI then made an explicit scope decision: #464 is narrowed to **"bring the
 collection runtime stack under version control + correct the unit data roots +
-add offline tests for the entry-point scripts"**. Each behaviour defect from
-round 1 was filed as its own issue and routed in the GitHub issue graph:
+add offline tests for the runtime stack"**. Each behaviour defect from round 1
+was filed as its own issue and routed in the GitHub issue graph:
 
 | round 1 finding | issue |
 |---|---|
@@ -25,19 +25,31 @@ round 1 was filed as its own issue and routed in the GitHub issue graph:
 | entry scripts have no test coverage | folded into #464 (this delivery) |
 
 **Round 2** reviewed revision `d19b4043` and returned needs-revision with two
-in-scope blockers, both addressed on the branch you are reviewing now:
+in-scope blockers, both addressed:
 
-1. Five independently testable functions still had no coverage:
-   `pending_issues`, `run_issue`, `fetch_fixture`, `parse_analysis_fundamentals`,
-   `load_risk_acknowledgment`. Offline tests were added, growing that test file
-   from 35 to 53 cases.
-2. A new test asserted that an unparsable SP cell still yields `settled`,
-   freezing a parsing failure as the accepted contract. That assertion was
-   **removed**, and the underlying defect is now routed as issue **#476**.
+1. Five independently testable functions had no coverage (`pending_issues`,
+   `run_issue`, `fetch_fixture`, `parse_analysis_fundamentals`,
+   `load_risk_acknowledgment`). Tests were added.
+2. A test asserted that an unparsable SP cell still yields `settled`, freezing a
+   parsing failure as accepted contract. The assertion was **removed** and the
+   defect routed as issue **#476**.
 
-Round 2 independently verified the seven unit roots, the closure argument, the
-59-vs-13 cross-test result, 118 passing tests with no skips/xfails, and both
-mutation checks.
+**Round 3** reviewed revision `353baba9` and returned needs-revision with two
+coverage blockers, both addressed on the branch you are reviewing now:
+
+1. The coverage matrix claimed completed-issue filtering was tested, but no
+   `pending_issues` case had a stored mapping, so deleting the
+   `value not in completed` filter broke nothing. A test now stores a real 500
+   coverage plus Nowscore mapping and drops the mapped issue; removing the
+   filter fails it.
+2. Nine module-level functions the delivery newly tracks had no routine
+   coverage (`record_historical_aux`, `record_historical_fundamental`,
+   `record_raw_settlement`, `record_raw_play_settlement`,
+   `raw_settlement_issues`, `raw_play_issues`, `derive_batch_snapshots`,
+   `reserve_for_issue`, `fetch_bytes`). All now have tests, and the QMD runs
+   `function-coverage-scan`, which enumerates every module-level public
+   function under `src/titan_clean/` and the five entry scripts and **fails the
+   render** unless none lack a test reference.
 
 The delivery does **not** claim the routed behaviours are correct. That is a
 deliberate, documented governance decision, not an oversight.
@@ -48,44 +60,43 @@ deliberate, documented governance decision, not an oversight.
 - 5 scripts added under `scripts/`
 - 10 modules added under `src/titan_clean/`
 - `tests/titan_clean/test_clean_stores.py` added; `tests/titan_clean/test_snapshots.py` updated
-- `tests/scripts/test_collection_runtime_entry_points.py` added, now 53 cases
+- `tests/scripts/test_collection_runtime_entry_points.py` added, now 82 cases
 - `quarto/12_collection_runtime_stack.qmd` added and registered in `_quarto.yml`
 - `docs/reviews/issue-464-*.{txt,json}` added
 
 ## What to judge
 
-1. **Verify the two round 2 fixes actually landed.**
-   - Confirm the five named functions now have real offline tests with normal,
-     boundary and failure paths — not `assert True`-style padding, and not tests
-     that merely import the module.
-   - Confirm the invalid-SP assertion is gone, and that **no** test in this
-     delivery now asserts behaviour belonging to #466, #467, #468, #469, #470,
-     #471, #472, #473, #474 or #476. A test that pins a routed defect as the
-     expected contract is a blocker, because it makes the defect harder to fix.
+1. **Verify the round 3 fixes actually landed.**
+   - Confirm the completed-issue filter test really stores a mapping and would
+     fail without the filter — a test that passes either way is not a fix.
+   - Confirm the nine functions have real tests with normal, boundary and
+     rejection paths, not padding. Confirm they do **not** assert the
+     transaction, provenance or completion semantics routed to #466–#474/#476.
 
-2. **Re-verify the delivery's own claims** (these were confirmed in round 2;
-   confirm they still hold at this revision):
+2. **Test the new mechanical gate rather than trusting it.** Confirm
+   `function-coverage-scan` genuinely fails the render when a module-level
+   public function loses its test reference — for example by temporarily
+   renaming a tested function in a copy and observing a non-zero render exit.
+   A gate that cannot fail is worse than no gate.
+
+3. **Confirm no test in this delivery pins a routed defect** as the expected
+   contract (#466, #467, #468, #469, #470, #471, #472, #473, #474, #476).
+
+4. **Re-verify the delivery's own claims** (confirmed in rounds 2 and 3):
    - all 7 units pass `--data-root` equal to the `new_root` in
      `/run/media/drwho1985/Sandisk/data/beijing-lot/registry/legacy-titan-migration.json`;
    - zero references to `raw_archive`/`data_archive`/`market_storage` in `src/`,
      `scripts/`, `tests/`, and no caller of `read_titan_raw`;
    - `python -m pytest tests/titan_clean tests/backfill tests/scripts/test_collection_runtime_entry_points.py -q -p no:cacheprovider`
      is green with nothing skipped or xfailed into green;
-   - the delivery QMD is a real gate: a wrong `python` and a wrong `data_root`
-     each make the render exit non-zero, the clean parameterized render exits
-     zero, and the rendered coverage tables carry real evidence.
+   - a wrong `python` and a wrong `data_root` each make the render exit non-zero
+     and the clean parameterized render exits zero;
+   - the #466–#474/#476 mapping in the QMD is accurate.
 
-3. **Check the routing is complete and honest.** `#466`–`#474` plus `#476` are
-   the routed homes. Is any defect introduced or made visible by this diff left
-   both unfixed and unrouted? Does anything claim correctness it does not have
-   (for example claiming CI passed, or claiming the routed defects are fixed)?
-   Is the mapping in the QMD accurate against the round 1 JSON and round 2
-   findings?
-
-4. **Report only what is in scope.** Blockers for this delivery are: a false
-   claim, a missing routine test for a function this delivery adds or makes
-   tracked, a test that freezes a routed defect, a unit pointing at the wrong
-   data root, a broken QMD gate, or a defect newly introduced by this diff.
+5. **Report only what is in scope.** Blockers are: a false claim, a missing
+   routine test for a function this delivery adds or makes tracked, a test that
+   freezes a routed defect, a unit pointing at the wrong data root, a broken or
+   unfalsifiable QMD gate, or a defect newly introduced by this diff.
    Pre-existing behaviour defects belong to their routed issues.
 
 ## Explicitly out of scope
