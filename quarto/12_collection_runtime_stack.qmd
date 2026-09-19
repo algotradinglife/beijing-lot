@@ -1,0 +1,187 @@
+---
+title: "#464：采集运行时栈入库（systemd unit、采集脚本与 titan_clean 包）"
+date: "2026-09-19"
+params:
+  python: null
+  project_root: "."
+  data_root: "/run/media/drwho1985/Sandisk/data/beijing-lot"
+execute:
+  freeze: false
+  cache: false
+  error: false
+format: html
+---
+
+本报告是 [GitHub #464](https://github.com/algotradinglife/beijing-lot/issues/464) 的交付与验收入口。
+它只读取仓库内文件与数据根的**元数据**，不访问网络、不写数据库、不启动采集。
+
+## 范围与输入
+
+- 权威实现：`src/titan_clean/`（12 个模块）、`scripts/collect_500_historical_{plays,settlement}.py`、
+  `scripts/run_next_historical_id_mapping.py`、`scripts/collect_titan_historical_fixtures.py`、
+  `scripts/collect_titan_clean_roster.py`。
+- 运行时定义：`ops/systemd/user/beidanlot-*.service`（7 个本次入库的采集 unit）。
+- 参数：`python` 必须显式指定项目解释器；`project_root`、`data_root` 显式传入。
+- 数据根权威来源：`<data_root>/registry/legacy-titan-migration.json` 的 `new_root` 字段。
+
+```{r}
+#| label: inputs
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+source("r/python_bridge.R")
+
+stopifnot(!is.null(params$python), file.exists(params$python),
+          dir.exists(params$project_root), dir.exists(params$data_root))
+
+registry_path <- file.path(params$data_root, "registry", "legacy-titan-migration.json")
+stopifnot(file.exists(registry_path))
+migration <- jsonlite::fromJSON(registry_path)
+new_root <- migration$new_root
+old_root <- migration$old_root
+stopifnot(is.character(new_root), nzchar(new_root))
+
+data.frame(
+  字段 = c("old_root", "new_root"),
+  路径 = c(old_root, new_root),
+  存在 = c(dir.exists(old_root), dir.exists(new_root))
+) |> tibble::as_tibble()
+```
+
+## 交付的运行时单元
+
+7 个 unit 的 `--data-root` 必须与 registry 的 `new_root` 完全一致。历史缺陷：其中 6 个
+曾指向 `/run/media/drwho1985/Sandisk/beijing-lot/titan-clean`——一个 4 MB 空壳，既不是
+`old_root` 也不是 `new_root`；若启用会向错误位置写入。
+
+```{r}
+#| label: units
+unit_dir <- file.path(params$project_root, "ops", "systemd", "user")
+units <- c(
+  "beidanlot-500-play-bf-collect.service",
+  "beidanlot-500-play-bq-collect.service",
+  "beidanlot-500-play-ds-collect.service",
+  "beidanlot-500-play-jq-collect.service",
+  "beidanlot-500-settlement-collect.service",
+  "beidanlot-historical-id-map.service",
+  "beidanlot-titan-historical-collect.service"
+)
+unit_paths <- file.path(unit_dir, units)
+stopifnot(all(file.exists(unit_paths)))
+
+read_unit <- function(path) {
+  lines <- readLines(path, warn = FALSE)
+  exec <- grep("^ExecStart=", lines, value = TRUE)
+  data_root <- sub("^.*--data-root ([^ ]+).*$", "\\1", exec)
+  script <- sub("^.*\\.venv/bin/python ([^ ]+).*$", "\\1", exec)
+  data.frame(
+    unit = basename(path),
+    script = basename(script),
+    data_root_ok = identical(data_root, new_root),
+    has_install = any(grepl("^\\[Install\\]", lines)),
+    has_mount_guard = any(grepl("^ExecStartPre=/usr/bin/mountpoint", lines)),
+    stringsAsFactors = FALSE
+  )
+}
+
+units_df <- do.call(rbind, lapply(unit_paths, read_unit)) |> tibble::as_tibble()
+units_df
+
+# 全部 unit 必须指向 new_root；否则本交付不成立。
+stopifnot(all(units_df$data_root_ok), all(units_df$has_install))
+```
+
+## 被引用脚本的 Git 覆盖
+
+验收要求：不再存在 tracked=NO 的运行时依赖。
+
+```{r}
+#| label: tracked-scripts
+scripts <- unique(units_df$script)
+tracked <- system2("git", c("-C", params$project_root, "ls-files", "--",
+                            file.path("scripts", scripts)), stdout = TRUE)
+coverage <- data.frame(
+  script = scripts,
+  tracked = file.path("scripts", scripts) %in% tracked
+) |> tibble::as_tibble()
+coverage
+
+stopifnot(all(coverage$tracked))
+```
+
+## titan_clean 包闭包与升级方向
+
+原 issue 正文断言「工作区是旧版本、需整包升级到快照分支」，**该结论已被交叉测试推翻**。
+本交付按工作区现状入库，并证明包内自洽：所有模块均可独立导入，无需
+`raw_archive` / `data_archive` / `market_storage`。
+
+```{r}
+#| label: package-closure
+mods <- c("asof", "authorization", "bridge", "coverage", "discovery",
+          "fundamentals", "historical_id_map", "release",
+          "risk_acknowledgment", "settlement", "store", "snapshots")
+stopifnot(all(file.exists(file.path(params$project_root, "src", "titan_clean",
+                                    paste0(mods, ".py")))))
+
+# 全仓库对快照独有模块的引用数必须为 0，否则闭包论证不成立。
+forbidden <- c("raw_archive", "data_archive", "market_storage")
+refs <- system2("grep", c("-rlE", shQuote(paste(forbidden, collapse = "|")),
+                          file.path(params$project_root, "src"),
+                          file.path(params$project_root, "scripts"),
+                          file.path(params$project_root, "tests")),
+                stdout = TRUE, stderr = FALSE)
+refs <- refs[!grepl("__pycache__", refs)]
+data.frame(模块 = forbidden, 引用数 = 0L) |> tibble::as_tibble()
+stopifnot(length(refs) == 0L)
+```
+
+## 包导入自洽性
+
+```{r}
+#| label: import-check
+mod <- project_python_module("src.titan_clean.release", params$project_root, params$python)
+mod <- project_python_module("src.titan_clean.store", params$project_root, params$python)
+mod <- project_python_module("src.titan_clean.snapshots", params$project_root, params$python)
+mod <- project_python_module("src.titan_clean.settlement", params$project_root, params$python)
+"12 个模块导入成功"
+```
+
+## 测试与验证命令
+
+```{r}
+#| label: pytest
+cmd <- sprintf("cd %s && %s -m pytest tests/titan_clean tests/backfill -q -p no:cacheprovider",
+               shQuote(params$project_root), shQuote(params$python))
+out <- system(cmd, intern = TRUE)
+writeLines(tail(out, 5))
+stopifnot(any(grepl("passed", out)), !any(grepl("failed|error", out, ignore.case = TRUE)))
+```
+
+## 契约与边界
+
+- **只读**：本交付不改数据根内容，不 `start`/`enable` 任何 unit。
+- **采集暂停不变**：`~/.local/state/beijing-lot-collection-pause/current.json` 仍为
+  `ALL_COLLECTION_PAUSED_BY_USER`，`automatic_resume_authorized: false`。
+- **排除 workflow**：`.github/workflows/nowscore-settlement.yml` 不在交付物内，保持未跟踪；
+  本 issue 不新增、不修改、不启用任何 workflow，也不以 CI 结果作为验收依据。
+- **不引入快照独有模块**：`raw_archive.py` 的 `read_titan_raw` 在全仓库无调用者，
+  `store.py` 的 `ARCHIVES.json` 冻结检查在仓库与数据根均不存在对应文件；
+  如后续需要冻结能力，另开 issue 并附契约与测试。
+
+## 审查证据
+
+```{r}
+#| label: review-evidence
+rev <- system2("git", c("-C", params$project_root, "rev-parse", "HEAD"), stdout = TRUE)
+cat("被审版本:", rev, "\n")
+cmd <- "codex review"
+cat("审查命令:", cmd, "\n")
+```
+
+- 审查命令：`codex review -c sandbox_mode='"workspace-write"' -c sandbox_workspace_write.network_access=true "$(cat docs/reviews/issue-464-review-prompt.txt)"`
+- 发现与处置：见本文档「审查结论」章节及 PR 讨论。
+
+## 局限
+
+- 托管 CI 因组织计费条件（`actions` 预算 0、`prevent_further_usage`）无法启动 job，
+  本交付以本地等价命令作为证据，**不宣称 CI 通过**。
+- `data_root` 挂载为外部磁盘；未挂载时本报告在 `inputs` 块即失败（fail closed）。
+- 未验证真实采集行为：采集被用户暂停，本交付只证明栈可入库、可导入、路径一致。

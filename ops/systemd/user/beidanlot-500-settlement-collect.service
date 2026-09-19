@@ -1,0 +1,16 @@
+[Unit]
+Description=Beijing-Lot historical 500 settlement collector (parallel, 500.com only)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/drwho1985/workspace/algotradinglife/beijing-lot
+Environment=PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot
+ExecStart=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/workspace/algotradinglife/beijing-lot/scripts/collect_500_historical_settlement.py --data-root /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/legacy-titan-clean --rate-per-minute 30
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=default.target
