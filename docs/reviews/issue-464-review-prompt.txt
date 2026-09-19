@@ -1,4 +1,4 @@
-Review ROUND 4 of the delivery for GitHub issue #464 in this repository.
+Review ROUND 5 of the delivery for GitHub issue #464 in this repository.
 
 ## Context you need first
 
@@ -51,6 +51,28 @@ coverage blockers, both addressed on the branch you are reviewing now:
    function under `src/titan_clean/` and the five entry scripts and **fails the
    render** unless none lack a test reference.
 
+**Round 4** reviewed revision `fd2a823a` and returned needs-revision with one
+blocker, and it was right. The `function-coverage-scan` added in round 3 proved
+nothing: it searched bare names across test files, so unrelated occurrences of
+`main` counted as coverage for the five entry scripts. Injecting
+`AssertionError` into every `main()` still produced 165 passing tests and a
+successful render. The gate certified a false conclusion.
+
+Round 4's fix was to delete that gate rather than harden it:
+
+1. 23 new tests **actually call** each entry script's `main()`: `--help`, missing
+   mandatory arguments, out-of-range values (`--rate-per-minute`, `--limit`,
+   `--batch-size`, `--workers`), an unknown `--play`, mutually exclusive roster
+   modes, a missing authorization mode and an incompatible risk acknowledgment.
+   Every path runs before the first HTTP request or database write, so none of
+   it asserts the behaviour routed to #466-#474/#476.
+2. The QMD gate now runs exactly that 23-case selection and asserts zero
+   failures. Repeating the mutation yields `23 failed` and the **render exits
+   1**; restoring it exits 0. The gate is falsifiable.
+3. The coverage matrix gained a `main()` row and the document now states its
+   evidence boundary: it does not claim a mechanical proof that every function
+   repository-wide is covered.
+
 The delivery does **not** claim the routed behaviours are correct. That is a
 deliberate, documented governance decision, not an oversight.
 
@@ -60,7 +82,8 @@ deliberate, documented governance decision, not an oversight.
 - 5 scripts added under `scripts/`
 - 10 modules added under `src/titan_clean/`
 - `tests/titan_clean/test_clean_stores.py` added; `tests/titan_clean/test_snapshots.py` updated
-- `tests/scripts/test_collection_runtime_entry_points.py` added, now 82 cases
+- `tests/scripts/test_collection_runtime_entry_points.py` added, now 105 cases
+  (23 of them execute the entry scripts' `main()`)
 - `quarto/12_collection_runtime_stack.qmd` added and registered in `_quarto.yml`
 - `docs/reviews/issue-464-*.{txt,json}` added
 
@@ -73,11 +96,12 @@ deliberate, documented governance decision, not an oversight.
      rejection paths, not padding. Confirm they do **not** assert the
      transaction, provenance or completion semantics routed to #466–#474/#476.
 
-2. **Test the new mechanical gate rather than trusting it.** Confirm
-   `function-coverage-scan` genuinely fails the render when a module-level
-   public function loses its test reference — for example by temporarily
-   renaming a tested function in a copy and observing a non-zero render exit.
-   A gate that cannot fail is worse than no gate.
+2. **Test the new gate rather than trusting it.** Confirm
+   `entry-point-main-execution` genuinely fails the render when a `main()` is
+   broken — inject a raise into one or all five `main()` functions and observe
+   a non-zero render exit. Then confirm the tests that gate runs really do
+   invoke `main()` rather than merely mentioning it. A gate that cannot fail is
+   worse than no gate, and round 4 is exactly why.
 
 3. **Confirm no test in this delivery pins a routed defect** as the expected
    contract (#466, #467, #468, #469, #470, #471, #472, #473, #474, #476).
