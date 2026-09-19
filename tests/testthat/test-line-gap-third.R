@@ -1,0 +1,25 @@
+source(file.path('..','..','r','line_gap_third.R'))
+testthat::test_that('third-outcome purchase scores preserve true probabilities and fixed costs',{
+ f<-tibble::tibble(issue='001',slot=1:7,provider_id=letters[1:7],p_W=.45,p_D=.35,p_L=.2)
+ cut<-as.list(setNames(rep('epoch',7),1:7));states<-as.matrix(expand.grid(rep(list(1:3),7)))[,7:1]
+ prob<-apply(states,1,function(z)prod(c(.45,.35,.2)[z]));ids<-order(-prob,seq_along(prob))[1:128]
+ o<-list(fixtures=1:7,unit_copies=1,depth=128,stake=256,state_ids=ids,state_probability=prob,state_payout=rep(10,2187),coverage=sum(prob[ids]),expected_gross=10*sum(prob[ids]))
+ pool<-list(fixtures=lapply(1:7,function(i)as.list(f[i,])),options=list(o),cutoffs=cut,mode='BREADTH')
+ ev<-f[c('issue','slot','provider_id')];ev$degree<-c(.5,1,rep(0,5));ev$signal<-c('W','W',rep('NONE',5))
+ testthat::expect_identical(line_gap_third(pool,ev,cut,.5,1)$pool,pool)
+ testthat::expect_identical(line_gap_third(pool,ev,cut,2,0)$pool,pool)
+ z<-line_gap_third(pool,ev,cut,.5,0);oi<-z$pool$options[[1]]
+ testthat::expect_true(all(states[oi$state_ids,1:2]!=3));testthat::expect_equal(oi$stake,256)
+ testthat::expect_identical(oi$state_probability,prob);testthat::expect_equal(oi$coverage,sum(prob[oi$state_ids]))
+ testthat::expect_equal(z$fixtures$treated,c(TRUE,TRUE,rep(FALSE,5)))
+ z<-line_gap_third(pool,ev,cut,.5,.5);n3<-rowSums(states[,1:2]==3);expected<-order(-prob*.5^n3,1:2187)[1:128]
+ testthat::expect_equal(z$pool$options[[1]]$state_ids,expected)
+ z<-line_gap_third(pool,ev,cut,0,0);testthat::expect_equal(sort(z$pool$options[[1]]$state_ids),which(rowSums(states==3)==0))
+ testthat::expect_equal(line_gap_third(pool,ev,cut,1,0)$fixtures$treated,c(FALSE,TRUE,rep(FALSE,5)))
+ bad<-pool;bad$options[[1]]$depth<-129;bad$options[[1]]$stake<-258;bad$options[[1]]$state_ids<-1:129
+ testthat::expect_error(line_gap_third(bad,ev,cut,0,0))
+ testthat::expect_error(line_gap_third(pool,ev,list(bad=1),.5,0))
+ testthat::expect_error(line_gap_third(pool,dplyr::mutate(ev,actual='L'),cut,.5,0))
+ testthat::expect_error(line_gap_third(pool,ev,cut,.5,-1))
+ ev$provider_id[1]<-'bad';testthat::expect_error(line_gap_third(pool,ev,cut,.5,0))
+})
