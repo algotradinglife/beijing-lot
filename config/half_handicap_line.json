@@ -1,0 +1,14 @@
+{
+  "repository_root": "/home/drwho1985/.codex/worktrees/0aac/beijing-lot",
+  "output": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/half-handicap-line-v1",
+  "input": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-line-gap-v1/inputs.json.gz",
+  "input_sha256": "a3a229da0bde6fdf0b6c1bfb9f6f1edf31e82532bd8b1360a109dc453e965741",
+  "context_receipt": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-setting-regimes-v3/regime-receipt.json",
+  "context_receipt_sha256": "1c586a2dceb4eb3f919b61d768463b66715760383f70405dbac2f5b060b4fa27",
+  "tolerance": 1e-12,
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "input_uncompressed_sha256": "34eb2bf8e9951066038e02c4dae627e7f9495f3df2db74b0809d0d75da34f2b3",
+  "previous_receipt": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-line-gap-v2/receipt.json",
+  "previous_receipt_sha256": "55cf02458a7a45b6403786b6ecf52a098ae3a5121d0c356003d6692c643138e2"
+}
