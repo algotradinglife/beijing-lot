@@ -236,17 +236,60 @@ coverage <- data.frame(
               "scripts/collect_500_historical_settlement.py",
               "scripts/collect_titan_historical_fixtures.py",
               "scripts/run_next_historical_id_mapping.py",
+              "scripts/collect_titan_clean_roster.py",
               "src/titan_clean/fundamentals.py",
-              "src/titan_clean/risk_acknowledgment.py"),
+              "src/titan_clean/risk_acknowledgment.py",
+              "src/titan_clean/store.py",
+              "src/titan_clean/settlement.py",
+              "src/titan_clean/snapshots.py"),
   tested_surface = c("parse_play（jq/bf/postponed/no_result/fid 边界/空页/GB18030）, fetch 超时",
                      "parse_settlement, parse_nowscore_settlement（3 个结果码/state/status）, fetch 超时",
                      "load_bridge_candidates（schema/空/非法/重复 ID）, fetch_fixture（URL/超时）",
-                     "pending_issues（已完成过滤/尝试上限）, run_issue（成功/失败记录）, current_failures（计数/空）",
+                     "pending_issues（已完成过滤/尝试上限/全量）, run_issue（成功/失败记录）, reserve_for_issue, current_failures",
+                     "fetch_bytes（超时/非 200）",
                      "parse_analysis_fundamentals（场地/天气/温度/积分榜链接/JS 数组/空页）",
-                     "load_risk_acknowledgment（receipt 绑定/JSON/契约/origin/数值上界/缺键）"),
+                     "load_risk_acknowledgment（receipt 绑定/JSON/契约/origin/数值上界/缺键）",
+                     "record_historical_aux（落盘/幂等/端点/时序/批次冲突）, record_historical_fundamental（upsert）",
+                     "record_raw_settlement（落盘/幂等/7 类行校验）, record_raw_play_settlement（父批次/重复 slot/重跑替换）, raw_settlement_issues, raw_play_issues",
+                     "derive_batch_snapshots（派生/子集/limit/缺失夹具）"),
   stringsAsFactors = FALSE
 )
 coverage |> tibble::as_tibble()
+```
+
+下列扫描把「每个函数都有测试」从声明变成**可执行的断言**：它枚举
+`src/titan_clean/` 与 5 个入口脚本的模块级公开函数，并检查每个名字是否至少被
+`tests/` 引用；结果必须为 0 个缺口（`main()` 内的嵌套闭包不属于可独立测试的接口）。
+
+```{r}
+#| label: function-coverage-scan
+scan_py <- file.path(tempdir(), "scan_464_coverage.py")
+writeLines(c(
+  "import ast, pathlib, re, sys",
+  "root = pathlib.Path(sys.argv[1])",
+  "def top(path):",
+  "    tree = ast.parse(path.read_text(encoding='utf-8'))",
+  "    names = []",
+  "    for node in tree.body:",
+  "        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith('_'):",
+  "            names.append(node.name)",
+  "        if isinstance(node, ast.ClassDef):",
+  "            for sub in node.body:",
+  "                if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)) and not sub.name.startswith('_'):",
+  "                    names.append(sub.name)",
+  "    return sorted(set(names))",
+  "text = ''.join(p.read_text(encoding='utf-8', errors='replace') for p in (root / 'tests').rglob('*.py'))",
+  "scripts = ['collect_500_historical_plays.py', 'collect_500_historical_settlement.py',",
+  "           'collect_titan_historical_fixtures.py', 'run_next_historical_id_mapping.py',",
+  "           'collect_titan_clean_roster.py']",
+  "targets = sorted((root / 'src' / 'titan_clean').glob('*.py')) + [root / 'scripts' / s for s in scripts]",
+  "gap = [n for p in targets for n in top(p) if not re.search(r'\\b' + re.escape(n) + r'\\b', text)]",
+  "print(len(gap))"
+), scan_py)
+scan_out <- system2(params$python, c(scan_py, params$project_root), stdout = TRUE, stderr = TRUE)
+gap_count <- suppressWarnings(as.integer(tail(scan_out, 1)))
+data.frame(module_level_public_functions_without_a_test_reference = gap_count) |> tibble::as_tibble()
+stopifnot(!is.na(gap_count), gap_count == 0L)
 ```
 
 ### Round 2（被审版本 `d19b4043`）
@@ -273,12 +316,42 @@ round2 <- data.frame(
 round2 |> tibble::as_tibble()
 ```
 
+### Round 3（被审版本 `353baba9`）
+
+判定 **Needs revision**，2 项覆盖阻塞，本轮已全部关闭。第 1 项属实且是**我方的过度声明**：
+覆盖矩阵写了「已完成过滤」，但三个 `pending_issues` 用例的库里都没有已完成映射，
+删掉 `value not in completed` 不会有任何测试失败。第 2 项指向 `store.py`、
+`settlement.py`、`snapshots.py` 中尚未被调用的持久化函数。
+
+处置方式不是补两处了事，而是把「每个函数都有测试」变成**可执行的门**：本轮补齐了
+9 个模块级函数（aux/fundamental 写入、500 与 play 结算落盘、批次冲突与行校验、
+`derive_batch_snapshots` 派生、`reserve_for_issue`、`fetch_bytes`），并在下方
+`function-coverage-scan` 中枚举全部模块级公开函数、断言缺口为 0。
+
+| round 3 发现 | 级别 | 处置 |
+|---|---|---|
+| 覆盖矩阵声称「已完成过滤」但无测试支撑 | P2 | 新增真实 mapping 的过滤用例；该用例在移除过滤时失败 |
+| `store.py` 等 5 个新入库持久化函数无例行测试 | P2 | 补齐 9 个函数；新增可执行零缺口扫描门 |
+
+```{r}
+#| label: review-round-3
+round3 <- data.frame(
+  finding = c("覆盖矩阵声称「已完成过滤」但无对应测试",
+              "store.py 等新入库持久化函数无覆盖"),
+  priority = c("P2", "P2"),
+  disposition = c("补真实 mapping 的过滤用例（变异可捕获）",
+                  "补齐 9 个模块级函数并加入零缺口扫描门"),
+  stringsAsFactors = FALSE
+)
+round3 |> tibble::as_tibble()
+```
+
 ### 明确不在本交付内修复的行为缺陷
 
 上述 #466–#474 与 #476 所描述的行为缺陷**不在 #464 验收范围**：它们是继承性缺陷，
 采集当前被用户暂停，无在线风险；按 [AGENTS.md](AGENTS.md) 组件解耦与图谱路由要求
-各自独立交付。因此本文档不声称这些行为正确——只声称运行时栈已入库、
-路径一致、入口脚本有测试。
+各自独立交付。因此本文档不声称这些行为正确——只声称运行时栈已入库、路径一致、
+且其模块级公开函数全部有例行测试（由 `function-coverage-scan` 断言，而非声明）。
 
 ## 审查命令与被审版本
 
