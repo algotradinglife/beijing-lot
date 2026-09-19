@@ -149,6 +149,20 @@ git diff --check
 | 标注为"select 内"的联赛链接实际被放在下拉之前，未验证内部排除 | `_body()` 增加 `inside` 参数，把链接真正放进 `<select>`；用例自身断言 `expect_select` < `24022` < `</select>` |
 | 新增 QMD 与 `tests/backfill` 无任何 CI 覆盖（既有 workflow 的 sparse checkout 亦排除 backfill） | 新增 `.github/workflows/backfill-issue-discovery.yml`：恢复声明环境、运行 `tests/backfill`、以显式 `python` / `project_root` 参数渲染本 QMD |
 
+### CI 状态（托管 runner 不可用）
+
+- 本 PR 的两个 workflow（新增的 `backfill-issue-discovery` 与被 `_quarto.yml` 触发的 `settlement-history`）
+  均以 `failure` 结束，但**任务从未启动**：运行注解为
+  `The job was not started because recent account payments have failed or your spending limit needs to be increased`。
+- 该仓库全部近期运行（含 `main` 上 `c9190955` 之前的提交）结论同为 `failure`，属于账户计费层面的托管 CI 不可用，
+  不是本交付的代码缺陷；仓库既有先例已按同样方式记录。
+- 作为替代证据，本交付在**模拟 CI sparse-checkout 的干净副本**中完成了等价验证：
+  清单内 `src/backfill/`、`tests/backfill/`、`tests/fixtures/backfill/`、`quarto/11_*.qmd`、`r/python_bridge.R`、
+  `r/bootstrap.R`、`_quarto.yml`、`requirements-analysis.txt` 全部存在；在该副本中
+  `pytest tests/backfill` → **24 passed**，且 QMD 以显式 `python` / `project_root` 参数渲染成功、
+  证据表格齐备。
+- 待托管 CI 恢复后必须重跑并在 PR 中补记真实 CI 结论；本地等价验证不能替代 CI 通过。
+
 ### 第二轮 `codex review`（被审版本 `5eead4f1`）
 
 - 结论：**no blocking findings**；审查已读取实时 Issue Graph。
