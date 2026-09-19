@@ -1,0 +1,20 @@
+---
+title: "真实冻结候选池的主力—机会组合测算"
+format: html
+execute:
+  error: true
+  warning: false
+---
+
+```{r}
+p <- "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/role-combo-eval-v1/ranked_role_combinations.csv"
+if (file.exists(p)) {
+  x <- read.csv(p)
+  print(aggregate(cbind(budget_hit_probability, budget_expected_net, budget_roi) ~
+    main_count + opportunity_count, x, max))
+  s <- read.csv("/run/media/drwho1985/Sandisk/data/beijing-lot/audits/role-combo-eval-v1/selected_per_issue.csv")
+  print(aggregate(cbind(budget_hit_probability, budget_expected_net, budget_roi) ~ 1, s, mean))
+}
+```
+
+本轮是冻结最差 23 期的回报代理测算。6:1 有 192 个合法状态，5:2 有 288 个，均低于 1,024 元预算可购买的 512 张票，因此当前结果主要反映合法概率质量和欧赔回报代理；还没有进入“预算截断概率曲线”阶段。
