@@ -15,11 +15,14 @@ from src.temporal_learning.core import stable_json_hash
 from src.fundamentals_census import read_response
 from src.fundamentals_issue_pages import issue_analysis_pages
 from src.fundamentals_home_away import roster_observed_results
+from src.n7_purchase_labels import bind_purchase_roster_labels
 
 cfg=json.loads(Path(sys.argv[1]).read_text());study=Path(cfg['study'])
 freeze_path=study/'all-plans-frozen.json';freeze_raw=freeze_path.read_bytes();freeze=json.loads(freeze_raw)
 if freeze['status']!='ALL_PREDICTIONS_FROZEN_BEFORE_TARGET_SETTLEMENT':raise ValueError('Incomplete prediction freeze')
 sources={str(freeze_path):hashlib.sha256(freeze_raw).hexdigest()}
+label_implementation=Path(cfg['repository_root'])/'src/n7_purchase_labels.py'
+sources[str(label_implementation)]=hashlib.sha256(label_implementation.read_bytes()).hexdigest()
 for path,sha in freeze['files'].items():
     if hashlib.sha256(Path(path).read_bytes()).hexdigest()!=sha:raise ValueError('Prediction freeze changed')
     sources[path]=sha
@@ -117,14 +120,10 @@ for k,_ in enumerate(input_receipt['batches']):
         if hashlib.sha256(rraw).hexdigest()!=sha:raise ValueError('Roster changed')
         sources[str(rp)]=sha
         meta,html=read_response(rp)
-        inventory={f['slot']:f for f in issue_analysis_pages(html,roster_url=meta['url'],issue=issue,slots=slots)}
-        outcomes={r['slot']:r for r in roster_observed_results(rp,issue=issue,slots=slots)}
-        for f in bundle['expanded_pool']['fixtures']:
-            native=inventory[f['slot']];r=outcomes[f['slot']]
-            if str(native['provider_id'])!=str(f['provider_id']):raise ValueError('Outcome native identity mismatch')
-            labels.append(dict(issue=issue,slot=f['slot'],provider_id=f['provider_id'],handicap=f['handicap'],
-                home=native['home'],away=native['away'],actual_home=r['actual_home'],actual_away=r['actual_away'],
-                result_state=r['result_state'],cohort='新增295期'))
+        inventory=issue_analysis_pages(html,roster_url=meta['url'],issue=issue,slots=slots)
+        outcomes=roster_observed_results(rp,issue=issue,slots=slots)
+        labels.extend(bind_purchase_roster_labels(issue,bundle['expanded_pool']['fixtures'],
+                                                  inventory,outcomes,'新增295期'))
 if len({(r['issue'],r['slot'],r['provider_id']) for r in labels})!=len(labels):raise ValueError('Duplicate label identity')
 out.mkdir();(out/'labels.json').write_text(json.dumps(labels,allow_nan=False))
 (out/'catalog.json').write_text(json.dumps(dict(issues=sorted(items,key=lambda i:i['issue']),

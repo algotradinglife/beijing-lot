@@ -1,0 +1,42 @@
+source('../../r/n7_sleeve_tables.R')
+source('../../r/n7_joint_sleeves.R')
+source('../../r/joint_payout_exposure.R')
+source('../../r/joint_payout_mix.R')
+testthat::test_that('mixed payout reserves buy distinct low-floor tickets in opened groups',{
+ e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
+ b<-list(issue=e$issue,cutoffs=e$cutoffs,historical_admission=FALSE,seal='test',
+  expanded_pool=list(fixtures=e$fixtures),sleeves=list(list(id=0L,
+   fixture_indices=as.list(0:6),origin='TEST',enumeration=e,options=list())))
+ v<-n7_sleeve_tables(b,b$cutoffs,'test')
+ # Controlled payout bands isolate reservation behavior from source prices.
+ v$long$payout_hat<-ifelse(v$long$ticket_col_idx%%2==0,300,150)
+ a<-tibble::tibble(sleeve_id=0L,depth=64L)
+ args<-list(bundle=b,view=v,allocations=a,cutoffs=b$cutoffs,
+  python=Sys.getenv('FUNDAMENTALS_PYTHON'),budget_cny=1024,unit_cny=2,
+  main_floor=256,supplement_floor=128,supplement_share=.15)
+ z<-do.call(joint_payout_mix,args)
+ testthat::expect_equal(z$main_stake,110)
+ testthat::expect_equal(z$supplement_stake,18)
+ testthat::expect_equal(z$stake,128)
+ testthat::expect_equal(z$cash,896)
+ testthat::expect_equal(nrow(z$tickets),64)
+ testthat::expect_false(anyDuplicated(z$tickets[c('sleeve_id','ticket_col_idx')])>0)
+ testthat::expect_true(all(z$tickets$payout_hat[z$tickets$component=='MAIN']>=256))
+ testthat::expect_true(all(z$tickets$payout_hat[z$tickets$component=='SUPPLEMENT']<256))
+ testthat::expect_equal(z$fixture_exposure,rep(128,7))
+ testthat::expect_equal(rowSums(z$direction_exposure),rep(128,7))
+ zero<-do.call(joint_payout_mix,modifyList(args,list(supplement_share=0)))
+ control<-joint_payout_exposure(b,v,a,b$cutoffs,args$python,1024,2,256,1024,1024)
+ testthat::expect_identical(zero$tickets$ticket_col_idx,control$tickets$ticket_col_idx)
+ absent<-v;absent$long$payout_hat<-300
+ cash<-do.call(joint_payout_mix,modifyList(args,list(view=absent)))
+ testthat::expect_equal(cash$stake,110)
+ testthat::expect_equal(cash$supplement_stake,0)
+ unopened<-v;unopened$long$payout_hat<-150
+ cash<-do.call(joint_payout_mix,modifyList(args,list(view=unopened)))
+ testthat::expect_equal(cash$stake,0)
+ for(s in c(-.1,1,NA_real_))testthat::expect_error(do.call(joint_payout_mix,modifyList(args,list(supplement_share=s))))
+ bad<-args;bad$cutoffs<-list()
+ testthat::expect_error(do.call(joint_payout_mix,bad))
+ testthat::expect_error(do.call(joint_payout_mix,modifyList(args,list(supplement_floor=256))))
+})

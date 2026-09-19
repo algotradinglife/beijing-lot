@@ -1,0 +1,80 @@
+---
+title: "全历史八策略：JOINT四方案预测计划冻结"
+format: html
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+本入口是八方案研究的第一计算阶段，不读取赛果或结算SP。
+复用原JOINT、先扩组后加深、U4及区分度复用实现；不能将此阶段
+误称为八方案验收完成。已暴露历史诊断，历史可用性未证明。
+
+```{r}
+library(dplyr)
+cfg<-jsonlite::fromJSON(params$config)
+root<-cfg$repository_root
+reticulate::use_python(cfg$python,required=TRUE)
+modules<-c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth',
+ 'n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter',
+ 'n7_probability_replay','n7_purchase_pool','n7_purchase_exposure',
+ 'n7_purchase_confidence','n7_purchase_equivalence')
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+stopifnot(digest::digest(file=cfg$scope,algo='sha256')==cfg$scope_sha256)
+scope<-jsonlite::fromJSON(cfg$scope)
+stopifnot(scope$status=='BUNDLE_HASHES_VERIFIED',length(scope$errors)==0,
+ !anyDuplicated(cfg$issues),all(cfg$issues %in% scope$issues$issue),
+ !dir.exists(cfg$output))
+entries<-scope$issues[match(cfg$issues,scope$issues$issue),]
+code_files<-c(paste0('r/',modules,'.R'),'quarto/227_eight_strategy_joint_freeze.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+api<-reticulate::import('src.strategy_diagnostic_inputs')
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),
+ list('src.strategy_diagnostic_inputs','src.fundamentals_n7_baseline'),distributions=list('numpy','pandas'))
+s<-cfg$settings
+stopifnot(s$budget_cny==1024,s$unit_cny==2,s$payout_factor==.65)
+dir.create(cfg$output,recursive=TRUE)
+bindings<-list()
+for(i in seq_len(nrow(entries))) {
+ e<-entries[i,]
+ b<-jsonlite::fromJSON(api$read_verified_bundle_json(e$path,e$sha256),simplifyVector=FALSE)
+ stopifnot(b$issue==e$issue)
+ a<-n7_probability_allocate(b,b$cutoffs,'FROZEN',cfg$python,s$target_coverage,
+  s$group_cap_cny,s$minimum_sp,s$budget_cny,s$unit_cny,s$payout_factor,
+  s$seed,s$worlds,s$max_actions)
+ plan<-list(issue=b$issue,fixtures=b$expanded_pool$fixtures,cutoffs=b$cutoffs,
+  arms=list(),source_sha256=e$sha256,settings=s,code=code,
+  closure_sha256=closure$closure_sha256,historical_admission=FALSE)
+ for(policy in c('JOINT','DEPTH_OPEN','U4','CONFIDENCE')) {
+  pool<-n7_purchase_pool(a$pool,b$cutoffs,'PROB',.05,.5,
+    if(policy=='DEPTH_OPEN')as.integer(s$extra_depths) else integer())
+  limits<-if(policy=='CONFIDENCE')
+   n7_purchase_confidence_limits(pool,b$cutoffs,s$unit_cny,.05,2,6,128,384) else
+   n7_purchase_limits(pool,b$cutoffs,s$unit_cny,if(policy=='U4')4 else Inf,Inf)
+  sc<-n7_joint_returns(pool,a$worlds,b$cutoffs)
+  fit<-n7_core_allocate(pool,sc,b$cutoffs,s$budget_cny,'any_hit',s$max_actions,'OPEN_FIRST',limits)
+  stopifnot(fit$stop_reason!='ACTION_LIMIT')
+  if(policy=='JOINT')stopifnot(all(n7_purchase_equivalence(a,list(pool=pool,fit=fit,worlds=a$worlds),b$cutoffs)))
+  plan$arms[[policy]]<-list(options=pool$options[fit$selected],metrics=fit$metrics,
+   stop_reason=fit$stop_reason)
+ }
+ plan$seal<-digest::digest(plan,algo='sha256')
+ path<-file.path(cfg$output,paste0('plan-',b$issue,'.rds'))
+ saveRDS(plan,path)
+ bindings[[b$issue]]<-list(path=path,sha256=digest::digest(file=path,algo='sha256'),source_sha256=e$sha256)
+ writeLines(paste(i,nrow(entries),b$issue),file.path(cfg$output,'progress.txt'))
+ message('FROZEN ',i,'/',nrow(entries),' ',b$issue)
+}
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',config=cfg,
+ bindings=bindings,code=code,closure=closure,historical_admission=FALSE),
+ file.path(cfg$output,'plans-receipt.json'),pretty=TRUE,auto_unbox=TRUE,digits=NA)
+```
+
+冻结期数：`r length(bindings)`。后续独立核验、结算、四个其他方案及
+完整分析报告尚须完成；本入口没有产生收益结论。

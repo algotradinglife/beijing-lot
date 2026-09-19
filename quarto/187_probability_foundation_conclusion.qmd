@@ -1,0 +1,122 @@
+---
+title: "概率基座独立评估：结论与逐场变化"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  old_calendar: null
+  old_calendar_sha256: null
+  study: null
+  receipt_sha256: null
+---
+
+本轮使用484期全部36,140场合格比赛，不按是否下注筛选。RAW是市场投影，
+FROZEN是旧冻结校正，DYNAMIC是统一49块HANDICAP动态校正。
+所有三版本共享场次和标签；前10期仅作动态模型预热，不拼接替代概率。
+这是历史研究：旧冻结校正的遗留限制与动态模型的标签可用性代理仍保留，不宣称前瞻可用或统计显著。
+
+```{r}
+library(dplyr);library(tidyr);library(readr)
+s<-params$study
+stopifnot(digest::digest(file=file.path(s,'receipt.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(s,'receipt.json'),simplifyVector=FALSE)
+for(f in names(r$files))stopifnot(digest::digest(file=file.path(s,f),algo='sha256')==r$files[[f]])
+i<-jsonlite::fromJSON(file.path(s,'independent-replay.json'))
+stopifnot(i$status=='PASS',i$fixtures==36140,i$issues==484,i$receipt_sha256==params$receipt_sha256)
+summary<-read_csv(file.path(s,'summary.csv'),show_col_types=FALSE)
+movements<-read_csv(file.path(s,'movements.csv'),show_col_types=FALSE)
+pairs<-read_csv(file.path(s,'pairs.csv'),show_col_types=FALSE,col_types=cols(issue='c',provider_id='c'))
+x<-read_csv(file.path(s,'inputs.csv'),show_col_types=FALSE,col_types=cols(issue='c',provider_id='c'))
+knitr::kable(summary |> filter(stage=='ALL'),digits=5)
+```
+
+## 概率质量的总体结论
+
+RAW的Brier与Log loss最低，FROZEN次之，DYNAMIC较差。Top1/Top2也没有因校正整体改善。
+三个时间段的总体评分方向一致，按期等权汇总的方向也一致。
+这里比较的是适当评分而非收益；不将旧JOINT的盈利当作旧概率更准确的证据。
+Brier采用三类别平方误差之和（范围0–2），Log loss采用自然对数，不对零概率截断。
+
+```{r}
+knitr::kable(summary |> select(stage,model,fixtures,issues,brier,log_loss,top1,top2),digits=5)
+knitr::kable(read_csv(file.path(s,'period_summary.csv'),show_col_types=FALSE),digits=5)
+```
+
+## 每场实际赛果的概率是升还是降？
+
+```{r}
+knitr::kable(movements |> filter(stage=='ALL') |> select(model,baseline,fixtures,up,down,unchanged,
+ actual_probability_delta,top1_mass_delta,top2_mass_delta,baseline_top2_mass_delta,top1_rescued,top1_lost,top2_rescued,top2_lost),digits=5)
+knitr::kable(pairs |> filter(baseline=='RAW') |> group_by(model,actual_outcome) |>
+ summarise(fixtures=n(),actual_probability_delta=mean(actual_probability_delta),
+ up=sum(actual_probability_movement=='UP'),down=sum(actual_probability_movement=='DOWN'),
+ log_loss_delta=mean(log_loss_delta),.groups='drop'),digits=5)
+```
+
+相对RAW，旧校正让17,327场实际赛果概率上升、18,737场下降；动态校正让15,199场上升、20,925场下降。
+平均实际赛果概率分别下降约0.052和0.217个百分点。上涨场数不是充分评价标准，变化幅度和损失函数同样重要。
+Top1/Top2质量、模型对自己Top1/Top2的信心以及对固定RAW Top2集合的覆盖概率分别报告，不能混为“命中概率”。
+
+## 为什么让平总量变准，评分却变差？
+
+```{r}
+class_rows<-bind_rows(
+ x |> transmute(actual_outcome,model='RAW',W=q_W,D=q_D,L=q_L),
+ x |> transmute(actual_outcome,model='FROZEN',W=p_W,D=p_D,L=p_L),
+ x |> transmute(actual_outcome,model='DYNAMIC',W=new_W,D=new_D,L=new_L)) |>
+ pivot_longer(c(W,D,L),names_to='outcome',values_to='probability') |>
+ mutate(observed=as.integer(actual_outcome==outcome))
+class_summary<-class_rows |> group_by(model,outcome) |> summarise(fixtures=n(),predicted=mean(probability),
+ observed=mean(observed),binary_brier=mean((probability-observed)^2),.groups='drop')
+knitr::kable(class_summary,digits=5)
+```
+
+实际让平率约27.095%。RAW平均让平概率25.142%，旧校正25.328%，动态校正27.126%。
+动态校正确实将总体让平频率调得很接近，但让平二元Brier从0.19703恶化到0.19854。
+因此“总量对齐”没有转化为更好的逐场概率质量。它提高了实际让平场次的概率，也压低了实际让胜/让负场次的概率，
+总体效果必须由适当评分判断；不能只看命中让平的子集。
+
+## 让球数分层与诊断图
+
+```{r}
+knitr::kable(pairs |> filter(baseline=='RAW') |> group_by(handicap,model) |>
+ summarise(fixtures=n(),issues=n_distinct(issue),brier_delta=mean(brier_delta),log_loss_delta=mean(log_loss_delta),
+ actual_probability_delta=mean(actual_probability_delta),.groups='drop'),digits=5)
+knitr::include_graphics(file.path(s,c('calibration.png','actual-probability-changes.png','paired-score-changes.png')))
+```
+
+各有符号让球数的全期汇总中，两种校正相对RAW的Brier/Log loss均未改善；+3仅31场，不能作稳定性推断。
+分箱曲线保留支持数，稀疏点不作为新门槛依据。本轮没有置信区间或显著性推断，不以微小差异宣布普遍规律。
+
+当前可比较冻结输入只含让球三分类投影，缺少三个版本同口径完整比分网格，故不评价比分、总进球或大比分差概率。
+本轮结论限于让球概率层：RAW可作为后续研究的概率评价参照；两种已测试校正未改善这批历史样本的整体概率质量。
+这不要求立即改下注策略，也没有检验RAW配合JOINT的收益。后续若研究校正，应重点检验逐场区分能力，不能仅追求总体让平比例吻合。
+
+
+## 旧更新时点HANDICAP：仅限94期的补充对照
+
+它不是上文FROZEN旧JOINT概率，也没有拼接进484期主结果。
+
+```{r}
+stopifnot(digest::digest(file=file.path(params$old_calendar,'report-receipt.json'),algo='sha256')==params$old_calendar_sha256)
+cr<-jsonlite::fromJSON(file.path(params$old_calendar,'report-receipt.json'),simplifyVector=FALSE)
+stopifnot(digest::digest(file=file.path(params$old_calendar,'fixture-changes.csv'),algo='sha256')==cr$files[['fixture-changes.csv']])
+cf<-read_csv(file.path(params$old_calendar,'fixture-changes.csv'),show_col_types=FALSE,col_types=cols(issue='c',provider_id='c'))
+reference<-x |> filter(stage=='DRAWDOWN_94')
+stopifnot(nrow(cf)==7318,nrow(reference)==7318)
+cf<-left_join(cf,select(reference,issue,slot,provider_id,handicap,actual_outcome),by=c('issue','slot','provider_id','handicap'),relationship='one-to-one')
+stopifnot(!anyNA(cf$actual_outcome))
+source('r/strategy_diagnostic_probabilities.R')
+supp<-cf |> transmute(issue,slot,provider_id,model='OLD_CALENDAR_HANDICAP',actual_outcome,W=old_W,D=old_D,L=old_L) |>
+ pivot_longer(c(W,D,L),names_to='outcome',values_to='probability')
+supp_result<-strategy_probability_diagnostics(supp,character(),c('W','D','L'),seq(0,1,.1))$summary
+knitr::kable(bind_rows(summary |> filter(stage=='DRAWDOWN_94') |> select(model,fixtures,issues,brier,log_loss,top1,top2),supp_result),digits=5)
+```
+
+旧更新时点HANDICAP在这94期的整体Brier与Log loss也弱于RAW。
+其Top2下注盈利不能据此解释成整体概率更准确；先前的排序边界与复用归因仍是独立的购买机制证据。

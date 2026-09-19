@@ -1,0 +1,36 @@
+source(file.path('..','..','r','joint_grid_monitor.R'))
+test_that('grid score excludes target/future labels and marks sparse evidence unknown', {
+  cut<-list(cutoff_identity='x',cutoff_kind='DECISION_EPOCH',target_issue='3',historical_admission=FALSE)
+  ct<-list(status='READY',receipt=cut,rows=list(list(issue_code='1',weight=.5),list(issue_code='2',weight=.5)))
+  ct$strata_receipt<-list(cutoff_identity='x')
+  ct$strata<-list(list(cell='a',status='READY',alpha=.5,ess=2,recent_ess=2,
+    rows=list(list(issue_code='1',long_weight=.5,recent_weight=.5),list(issue_code='2',long_weight=.5,recent_weight=.5))))
+  h<-data.frame(issue_code=c('1','2','3'),cell='a',expected=10,hits=c(5,5,100),stake=20,gross=c(5,5,100))
+  a<-joint_grid_monitor(h,ct,cut,2,10,.8,1)
+  expect_equal(a$hit_ratio,.5);expect_equal(a$hit_signal,'BAD')
+  h$hits[3]<-0;expect_identical(a,joint_grid_monitor(h,ct,cut,2,10,.8,1))
+  t<-data.frame(ticket_id=c('a','b'),cell='a',prob=c(.4,.3))
+  before<-joint_grid_allocate(t,a,cut,'hit_signal',2,4)
+  h$gross[3]<-1e9;h$expected[3]<-1e6
+  after<-joint_grid_monitor(h,ct,cut,2,10,.8,1)
+  expect_identical(before,joint_grid_allocate(t,after,cut,'hit_signal',2,4))
+  expect_equal(joint_grid_monitor(h,ct,cut,3,10,.8,1)$hit_signal,'UNKNOWN')
+  expect_error(joint_grid_monitor(rbind(h,h[1,]),ct,cut,2,10,.8,1))
+  ct$status<-'WARMUP';expect_equal(nrow(joint_grid_monitor(h,ct,cut,2,10,.8,1)),0)
+})
+test_that('integer redistribution preserves the cap and leaves cash without healthy capacity', {
+  cut<-list(cutoff_identity='x',cutoff_kind='DECISION_EPOCH',historical_admission=FALSE)
+  t<-data.frame(ticket_id=letters[1:6],cell=rep(c('a','b'),each=3),prob=c(.3,.2,.1,.3,.2,.1))
+  s<-data.frame(cell=c('a','b'),hit_signal=c('BAD','GOOD'))
+  attr(s,'signal_receipt')<-list(cutoff=cut,signal_hash=digest::digest(s,algo='sha256'))
+  a<-joint_grid_allocate(t,s,cut,'hit_signal',2,12)
+  expect_equal(a$copies,c(1,1,0,2,1,1));expect_equal(sum(a$copies),6)
+  wrong<-cut;wrong$cutoff_identity<-'future'
+  expect_error(joint_grid_allocate(t,s,wrong,'hit_signal',2,12))
+  attr(s,'signal_receipt')<-NULL
+  s$hit_signal[2]<-'UNKNOWN'
+  attr(s,'signal_receipt')<-list(cutoff=cut,signal_hash=digest::digest(s,algo='sha256'))
+  expect_equal(sum(joint_grid_allocate(t,s,cut,'hit_signal',2,12)$copies),5)
+  expect_error(joint_grid_allocate(t,s,cut,'hit_signal',2,10))
+  expect_error(joint_grid_allocate(rbind(t,t[1,]),s,cut,'hit_signal',2,14))
+})

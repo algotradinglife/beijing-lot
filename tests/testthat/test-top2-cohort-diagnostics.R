@@ -1,0 +1,29 @@
+for(n in c('eight_strategy_validation','top2_fresh_groups','top2_cohort_diagnostics'))source(file.path('..','..','r',paste0(n,'.R')))
+testthat::test_that('frozen cohort arithmetic separates coverage, outcomes and price',{
+ f<-data.frame(issue='01',slot=1:7,provider_id=as.character(1:7),handicap=0,p_W=.5,p_D=.3,p_L=.2,q_W=.5,q_D=.3,q_L=.2)
+ z<-list(issue='01',fixtures=f,parameters=list(unit_cny=2,payout_factor=.65),
+  options=matrix(rep(c(1L,2L),7),ncol=2,byrow=TRUE),groups=list(1:7),eligible=1:7,
+  probability=.8^7,expected_gross=1.3*2^7,
+  selected=list(TOP2_DIVERSE=1L,TOP2_PROB=1L),
+  union_probability=list(TOP2_DIVERSE=.8^7,TOP2_PROB=.8^7))
+ z$seal<-digest::digest(z,algo='sha256')
+ l<-transform(f[c('issue','slot','provider_id','handicap')],status='READY',actual_direction='W',spf_sp=3)
+ a<-top2_frozen_diagnostic(z,l,2,.65)
+ testthat::expect_equal(a$periods$gross,rep(1.3*3^7,2))
+ testthat::expect_equal(a$periods$expected_gross,rep(1.3*2^7,2))
+ testthat::expect_equal(a$periods$estimated_hit_gross,rep(1.3*2^7,2))
+ testthat::expect_equal(a$periods$net,a$periods$model_net+a$periods$outcome_residual+a$periods$price_residual)
+ testthat::expect_equal(a$periods$unique_fixtures,c(7L,7L))
+ testthat::expect_true(all(a$fixtures$diverse_uses==1))
+ l$actual_direction[7]<-'L';a<-top2_frozen_diagnostic(z,l,2,.65)
+ testthat::expect_equal(a$periods$gross,c(0,0));testthat::expect_equal(sum(a$fixtures$top2_hit),6)
+ testthat::expect_error(top2_frozen_diagnostic(z,l[-1,],2,.65))
+ l$status[1]<-'PENDING';testthat::expect_error(top2_frozen_diagnostic(z,l,2,.65));l$status[1]<-'READY'
+ bad<-z;bad$probability<-.1;testthat::expect_error(top2_frozen_diagnostic(bad,l,2,.65))
+ testthat::expect_error(top2_frozen_diagnostic(z,l,2,1))
+ z$seal<-NULL;z$groups<-list();z$probability<-z$expected_gross<-numeric();z$eligible<-integer()
+ z$selected<-list(TOP2_DIVERSE=integer(),TOP2_PROB=integer());z$union_probability<-list(TOP2_DIVERSE=numeric(),TOP2_PROB=numeric());z$seal<-digest::digest(z,algo='sha256')
+ a<-top2_frozen_diagnostic(z,l,2,.65)
+ testthat::expect_equal(nrow(a$groups),0);testthat::expect_equal(a$periods$stake,c(0,0))
+ testthat::expect_equal(a$periods$expected_issue_hit,c(0,0))
+})

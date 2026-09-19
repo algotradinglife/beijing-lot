@@ -1,0 +1,135 @@
+---
+title: "Joint 购买效率：Top2 倾向、复用约束与深度广度"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  catalog: null
+  output: null
+  labels: null
+  python: null
+  limit: null
+  config: null
+  config_sha256: null
+  labels_sha256: null
+  settle: true
+---
+
+原 joint 冻结概率、候选组、SP≥1.3准入和每期1024元上限相同。
+原组准入成本固定，改变购票排序不重新定义25%门槛；HARD无法满足原票数时不买该组。
+全部计划先冻结，再读取结算。既有概率的历史可用性缺口仍在，本研究为回顾诊断。
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+stopifnot(!is.null(params$catalog),!is.null(params$output),!is.null(params$python),
+ !is.null(params$config),!is.null(params$config_sha256),
+ is.logical(params$settle),length(params$settle)==1,!is.na(params$settle))
+if(params$settle)stopifnot(!is.null(params$labels),!is.null(params$labels_sha256))
+reticulate::use_python(params$python,required=TRUE)
+modules<-paste0('r/',c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio',
+ 'n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_probability_replay','n7_purchase_pool',
+ 'n7_purchase_exposure','n7_purchase_equivalence','n7_purchase_settle','diagnostic_verified_csv',
+ 'fundamentals_equity_curves','n7_purchase_scope'),'.R')
+for(f in modules)source(f)
+stopifnot(identical(digest::digest(file=params$config,algo='sha256'),params$config_sha256))
+files<-c(modules,'quarto/200_joint_purchase_comparison.qmd',params$config)
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+cfg<-jsonlite::fromJSON(params$config)
+ids<-n7_purchase_scope(cfg,digest::digest(file=params$catalog,algo='sha256'))
+catalog<-jsonlite::fromJSON(params$catalog)$issues |> select(issue,path,sha256)
+requested_ids<-ids
+if(!is.null(params$limit)) {
+ stopifnot(is.numeric(params$limit),length(params$limit)==1,is.finite(params$limit),
+  params$limit>=1,params$limit==floor(params$limit),params$limit<=length(ids))
+ ids<-head(ids,params$limit)
+}
+catalog<-catalog[match(ids,catalog$issue),];stopifnot(!anyNA(catalog))
+policies<-tribble(~id,~rule,~gap,~expand,~ordering,~u,~money,
+ 'JOINT','PROB',.05,FALSE,'OPEN_FIRST',Inf,Inf,
+ 'HARD','HARD',.05,FALSE,'OPEN_FIRST',Inf,Inf,
+ 'GAP05','GAP',.05,FALSE,'OPEN_FIRST',Inf,Inf,
+ 'GAP00','GAP',0,FALSE,'OPEN_FIRST',Inf,Inf,
+ 'U4','PROB',.05,FALSE,'OPEN_FIRST',4,Inf,
+ 'M384','PROB',.05,FALSE,'OPEN_FIRST',Inf,384,
+ 'DEPTH_OPEN','PROB',.05,TRUE,'OPEN_FIRST',Inf,Inf,
+ 'DEPTH_COMPETE','PROB',.05,TRUE,'COMPETE',Inf,Inf,
+ 'GAP_COMPETE','GAP',.05,TRUE,'COMPETE',Inf,Inf,
+ 'RISK_COMPETE','PROB',.05,TRUE,'COMPETE',4,384,
+ 'GAP_RISK','GAP',.05,TRUE,'COMPETE',4,384)
+extra_depths<-c(32L,64L,96L,128L,192L,256L,384L,512L)
+api<-reticulate::import('src.strategy_diagnostic_inputs')
+prov<-reticulate::import('src.temporal_learning.provenance');pathlib<-reticulate::import('pathlib')
+closure<-prov$implementation_closure(pathlib$Path(getwd()),as.list(c('src.strategy_diagnostic_inputs','src.fundamentals_n7_baseline')),distributions=c('numpy','pandas'))
+o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
+bindings<-list()
+for(i in seq_len(nrow(catalog))) {
+ a<-catalog[i,];b<-jsonlite::fromJSON(api$read_verified_bundle_json(a$path,a$sha256),simplifyVector=FALSE)
+ original<-n7_probability_allocate(b,b$cutoffs,'FROZEN',params$python,cfg$target_coverage,cfg$group_cap_cny,
+  cfg$minimum_sp,cfg$budget_cny,cfg$unit_cny,cfg$payout_factor,cfg$seed,cfg$worlds,1024)
+ evalworlds<-n7_joint_worlds(original$pool,b$cutoffs,cfg$seed+100000,4096)
+ plan<-list(issue=a$issue,fixtures=b$expanded_pool$fixtures,cutoffs=b$cutoffs,arms=list(),
+  source_sha256=a$sha256,code=code,closure_sha256=closure$closure_sha256,
+  policies=policies,seed=cfg$seed,worlds=cfg$worlds,extra_depths=extra_depths,historical_admission=FALSE)
+ for(j in seq_len(nrow(policies))) {
+  z<-policies[j,]
+  pool<-n7_purchase_pool(original$pool,b$cutoffs,z$rule,z$gap,.5,if(z$expand)extra_depths else integer())
+  sc<-n7_joint_returns(pool,original$worlds,b$cutoffs)
+  limits<-n7_purchase_limits(pool,b$cutoffs,2,z$u,z$money)
+  fit<-n7_core_allocate(pool,sc,b$cutoffs,1024,'any_hit',1024,z$ordering,limits)
+  stopifnot(fit$stop_reason!='ACTION_LIMIT')
+  if(z$id=='JOINT')stopifnot(all(n7_purchase_equivalence(original,list(pool=pool,fit=fit,worlds=original$worlds),b$cutoffs)))
+  exposure<-n7_purchase_exposure(pool,b$cutoffs,2) |> filter(option %in% fit$selected) |>
+   group_by(fixture,outcome) |> summarise(required_stake=sum(required_stake),incompatible_stake=sum(incompatible_stake),uses=n(),.groups='drop')
+  evaluation<-n7_joint_returns(pool,evalworlds,b$cutoffs)
+  plan$arms[[z$id]]<-list(pool=pool,fit=fit,options=pool$options[fit$selected],exposure=exposure,
+   evaluation=n7_capital_evaluate(pool,fit$selected,evaluation,b$cutoffs,1024))
+ }
+ plan$seal<-digest::digest(plan,algo='sha256');name<-paste0('plan-',a$issue,'.rds')
+ saveRDS(plan,file.path(o,name))
+ bindings[[a$issue]]<-list(file=name,sha256=digest::digest(file=file.path(o,name),algo='sha256'),source_sha256=a$sha256)
+ writeLines(paste(i,nrow(catalog),a$issue),file.path(o,'progress.txt'));message('Frozen ',i,'/',nrow(catalog),' ',a$issue)
+}
+stopifnot(identical(code,setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)))
+receipt<-list(status='FROZEN_NOT_SETTLED',scope=ids,bindings=bindings,code=code,closure=closure,
+ requested_scope=requested_ids,scope_complete=identical(ids,requested_ids),smoke_limit=params$limit,
+ catalog_sha256=cfg$catalog_sha256,policies=policies,extra_depths=extra_depths,
+ budget_cny=1024,unit_cny=2,payout_factor=.65,historical_admission=FALSE)
+jsonlite::write_json(receipt,file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 冻结后结算与逐期表现
+
+```{r, eval=params$settle}
+labels<-diagnostic_read_verified_csv(params$labels,params$labels_sha256,cols(issue='c',provider_id='c')) |>
+ select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
+groups<-models<-list()
+for(id in ids) {
+ b<-bindings[[id]];path<-file.path(o,b$file);stopifnot(digest::digest(file=path,algo='sha256')==b$sha256)
+ plan<-readRDS(path);groups[[id]]<-n7_purchase_settle(plan,labels,2,.65)
+ for(arm in names(plan$arms)) {
+  a<-plan$arms[[arm]];e<-a$exposure
+  models[[paste(id,arm)]]<-tibble(issue=id,policy=arm,model_hit=a$evaluation$any_hit,
+   max_required=if(nrow(e))max(e$required_stake) else 0,max_incompatible=if(nrow(e))max(e$incompatible_stake) else 0,
+   max_uses=if(nrow(e))max(e$uses) else 0)
+ }
+}
+groups<-bind_rows(groups);models<-bind_rows(models)
+rows<-groups |> group_by(issue,policy) |> summarise(stake=sum(stake),gross=sum(gross),hits=sum(hit),.groups='drop')
+rows<-expand_grid(issue=ids,policy=policies$id) |> left_join(rows,by=c('issue','policy'),relationship='one-to-one') |>
+ mutate(across(c(stake,gross,hits),~replace_na(.x,0)),net=gross-stake,model='FROZEN',budget_cny=1024,cash_cny=1024-stake,
+ status=ifelse(stake>0,'COMPLETE','NO_BET')) |> left_join(models,by=c('issue','policy'),relationship='one-to-one')
+curves<-strategy_equity_curves(rows,ids,100000)
+summary<-curves |> filter(period>0) |> group_by(policy) |> summarise(stake=sum(funded_stake_cny),net=sum(funded_net_cny),
+ roi=net/stake,hit_issues=sum(gross>0),profit_issues=sum(funded_net_cny>0),max_drawdown=max(drawdown_cny),
+ minimum_equity=min(100000,equity_cny),.groups='drop')
+for(n in c('rows','groups','models','curves','summary'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+knitr::kable(summary,digits=3)
+fig<-curves |> select(policy,period,equity_cny,drawdown_cny) |> pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,color=policy))+geom_line()+facet_wrap(~metric,ncol=1,scales='free_y')+theme_minimal()+labs(x='Issue sequence',color=NULL)
+print(fig);ggsave(file.path(o,'equity-drawdown.png'),fig,width=13,height=9,dpi=160)
+```

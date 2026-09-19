@@ -1,0 +1,114 @@
+---
+title: "新增50期：Top2重新选组与JOINT对照"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+## 对照口径
+
+使用140902—150202共50期的冻结校正市场概率，不用战力概率、不重训。
+Top2从每期全部可用场次重新组队，不沿用JOINT的24个候选组。
+沿用SP门槛1.3（按概率第一赛果的估算SP筛选）；每组七场全双选，共128票、256元，最多四组、1024元。无比分保护，无单选压缩，无赛果替换。
+
+候选组包括Top2概率排序的七场循环窗口，以及最高七场的全部单场替换组；两个方案共用这一候选池。
+概率优先按整组Top2概率选前四组，分散覆盖逐步最大化新增的“至少一组中”概率，平手按预计回款排序。此为有界搜索，不宣称全局最优。
+分散算法利用容斥计算交叠事件，场次独立假设仍然存在。所有场次均使用相同Top2，因此重叠场次的开奖结果保持一致。
+
+JOINT对照是原始购票P0，未加长期格子减仓或后续加仓，保留其25%覆盖/每组256元门槛。Top2不设置25%门槛，两者每期均以1024元为上限，实际投入会不同。
+每票结算为2×0.65×七场北单SP之积；估算SP来自赛前欧赔/大小球映射，不使用结算SP选场。
+本金10万元，按期结算，不模拟跨期占款。这是已暴露历史数据的研究诊断，fixture-relative截止证据不证明整张票当时可同时购买。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+for(n in c('n7_joint_sleeves','n7_sp_filter','top2_fresh_groups','fundamentals_equity_curves'))source(file.path(root,'r',paste0(n,'.R')))
+rec<-jsonlite::fromJSON(file.path(cfg$input,'receipt.json'),simplifyVector=FALSE)
+stopifnot(digest::digest(file=file.path(cfg$input,'receipt.json'),algo='sha256')==cfg$receipt_sha256,rec$status=='SETTLED',!dir.exists(cfg$output))
+dir.create(cfg$output,recursive=TRUE)
+plans<-list();hashes<-list();sources<-list();supply<-list()
+for(path in names(rec$plans)) {
+ stopifnot(digest::digest(file=path,algo='sha256')==rec$plans[[path]])
+ old<-jsonlite::fromJSON(path);bpath<-old$source_bundle$path[1];bsha<-old$source_bundle$sha256[1]
+ stopifnot(digest::digest(file=bpath,algo='sha256')==bsha)
+ b<-jsonlite::fromJSON(gzfile(bpath),simplifyVector=FALSE)
+ fixtures<-bind_rows(b$expanded_pool$fixtures)
+ z<-top2_fresh_groups(fixtures,b$cutoffs,cfg$python,7,1024,2,.65,1.3)
+ # Independent repeat precedes opening the label table.
+ replay<-top2_fresh_groups(fixtures,b$cutoffs,cfg$python,7,1024,2,.65,1.3)
+ stopifnot(identical(z,replay))
+ plans[[z$issue]]<-z
+ dest<-file.path(cfg$output,paste0(z$issue,'-plan.json'))
+ jsonlite::write_json(z,dest,auto_unbox=TRUE,digits=NA,null='null')
+ hashes[[dest]]<-digest::digest(file=dest,algo='sha256');sources[[bpath]]<-bsha
+ supply[[z$issue]]<-tibble(issue=z$issue,available=nrow(fixtures),eligible=length(z$eligible),candidates=length(z$groups))
+ cat('Frozen ',z$issue,'\n')
+}
+code_files<-c('r/top2_fresh_groups.R','r/n7_joint_sleeves.R','r/n7_sp_filter.R','r/fundamentals_equity_curves.R','quarto/224_top2_fresh_groups.qmd')
+# Bind transitive Python chronology dependencies using the native receipt API.
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.fundamentals_n7_baseline'),distributions=list('numpy','pandas'))
+freeze<-list(status='FROZEN_BEFORE_LABEL_READ',historical_admission=FALSE,source_receipt=cfg$receipt_sha256,source_bundles=sources,plans=hashes,
+ code=setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files),python_implementation=closure,generated_at=format(Sys.time(),tz='UTC',usetz=TRUE))
+jsonlite::write_json(freeze,file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+bind_rows(supply) |> summarise(issues=n(),min_eligible=min(eligible),max_eligible=max(eligible),min_candidates=min(candidates),max_candidates=max(candidates)) |> knitr::kable()
+```
+
+## 实际结算和逐期表现
+
+先冻结全部50期计划和实现绑定，再读取既有验收结算。
+
+```{r}
+for(n in c('fixture-audit.csv','ticket-labels.csv'))stopifnot(digest::digest(file=file.path(cfg$input,n),algo='sha256')==rec$files[[n]])
+labels<-read_csv(file.path(cfg$input,'fixture-audit.csv'),col_types=cols(issue='c',provider_id='c')) |> select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
+groups<-bind_rows(lapply(plans,function(z)top2_fresh_settle(z,filter(labels,issue==z$issue))))
+issues<-sort(names(plans));stopifnot(length(issues)==50)
+rows<-groups |> group_by(issue,policy) |> summarise(stake=sum(stake),gross=sum(gross),hits=sum(hit),bought_groups=n(),.groups='drop')
+rows<-crossing(issue=issues,policy=c('TOP2_PROB','TOP2_DIVERSE')) |> left_join(rows,by=c('issue','policy'),relationship='one-to-one') |> mutate(across(c(stake,gross,hits,bought_groups),~replace_na(.x,0)))
+p0<-read_csv(file.path(cfg$input,'ticket-labels.csv'),col_types=cols(issue='c'))
+# Original tickets each bought once; base_copies is deliberately not used.
+original<-p0 |> group_by(issue) |> summarise(stake=n()*2,gross=sum(gross),hits=n_distinct(sleeve_id[hit]),bought_groups=n_distinct(sleeve_id),.groups='drop')
+original<-tibble(issue=issues) |> left_join(original,by='issue',relationship='one-to-one') |> mutate(across(c(stake,gross,hits,bought_groups),~replace_na(.x,0)),policy='JOINT_P0')
+rows<-bind_rows(rows,original) |> mutate(net=gross-stake,budget_cny=1024,cash_cny=1024-stake,status=if_else(stake>0,'COMPLETE','NO_BET'),model='FROZEN_MARKET',roi=if_else(stake>0,net/stake,NA_real_)) |> arrange(issue,policy)
+stopifnot(all(rows$stake<=1024),all(rows$cash_cny>=0))
+curves<-strategy_equity_curves(rows,issues,100000)
+summary<-top2_fresh_summary(select(rows,issue,policy,stake,gross,net,hits,bought_groups),curves)
+write_csv(groups,file.path(cfg$output,'groups.csv'));write_csv(rows,file.path(cfg$output,'periods.csv'));write_csv(summary,file.path(cfg$output,'summary.csv'));write_csv(curves,file.path(cfg$output,'curves.csv'))
+summary |> knitr::kable(digits=3)
+```
+
+```{r}
+plot<-curves |> select(period,policy,equity_cny,drawdown_cny) |> pivot_longer(c(equity_cny,drawdown_cny),names_to='measure',values_to='CNY') |> ggplot(aes(period,CNY,color=policy))+geom_line(linewidth=.7)+facet_wrap(~measure,ncol=1,scales='free_y')+theme_minimal()+labs(title='Fresh Top2 groups versus original JOINT: new 50 issues',x='Issue order: 140902 to 150202',y='CNY')
+plot
+ggsave(file.path(cfg$output,'equity-drawdown.png'),plot,width=11,height=8,dpi=160)
+rows |> select(issue,policy,stake,gross,net,roi,hits) |> knitr::kable(digits=3)
+```
+
+## 覆盖、重叠与收益结构
+
+```{r}
+coverage<-bind_rows(lapply(plans,function(z)bind_rows(lapply(names(z$selected),function(pol) {
+ ids<-z$selected[[pol]];gs<-z$groups[ids];reuse<-table(unlist(gs))
+ tibble(issue=z$issue,policy=pol,model_union=if(length(ids))tail(z$union_probability[[pol]],1) else 0,expected_groups=sum(z$probability[ids]),distinct_fixtures=length(reuse),maximum_reuse=if(length(reuse))max(reuse) else 0)
+})))) |> left_join(rows |> select(issue,policy,hits,net),by=c('issue','policy'),relationship='one-to-one')
+coverage |> group_by(policy) |> summarise(model_hit_issues=sum(model_union),actual_hit_issues=sum(hits>0),expected_group_hits=sum(expected_groups),actual_group_hits=sum(hits),mean_distinct_fixtures=mean(distinct_fixtures),.groups='drop') |> knitr::kable(digits=3)
+coverage |> ggplot(aes(model_union,as.integer(hits>0),color=policy))+geom_jitter(height=.035,width=0)+theme_minimal()+labs(x='Exact model probability of at least one group hit',y='Observed issue hit (0/1)')
+write_csv(coverage,file.path(cfg$output,'coverage.csv'))
+rows |> group_by(policy) |> summarise(net_without_best=sum(net)-max(net),.groups='drop') |> knitr::kable(digits=2)
+wide<-rows |> select(issue,policy,net) |> pivot_wider(names_from=policy,values_from=net)
+cor(as.matrix(select(wide,-issue))) |> knitr::kable(digits=3)
+files<-c('groups.csv','periods.csv','summary.csv','curves.csv','coverage.csv','equity-drawdown.png','freeze.json')
+jsonlite::write_json(list(status='SETTLED',historical_admission=FALSE,config=cfg,files=setNames(lapply(files,function(f)digest::digest(file=file.path(cfg$output,f),algo='sha256')),files),issues=issues),file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+## 解读边界
+
+Top2总覆盖高不等于七场同时命中率高，更不等于正收益。概率优先可能把同一批场次反复放入四组；分散方案则牺牲部分单组概率来扩大期覆盖。模型估计与实际命中必须分列，不将本轮历史表现称为未来保证。

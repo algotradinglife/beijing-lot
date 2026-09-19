@@ -1,0 +1,165 @@
+---
+title: "Top1–Top2接近与组合中奖深度诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  python: null
+  output: null
+  seed: 42501
+  budget_cny: 1024
+  unit_cny: 2
+  payout_factor: 0.65
+  n_legs: 7
+  initial_capital_cny: 100000
+  block_length: 60
+  minimum_sp: 1.3
+  cap_cny: 256
+---
+
+原200期与新增295期使用同一冻结版本。q为原市场映射，p为市场让平校正后的概率，均不是战力概率。
+让球按主队加球定义；W/D/L均是北单让胜/让平/让负。按场次去重，不用组复用次数放大支持数。
+回撤94期为事后窗口。以下是描述性诊断，不拟合、不改变下注策略。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R')
+source('r/strategy_distribution_shape.R');source('r/n7_fixture_price_diagnostic.R');source('r/n7_return_attribution.R')
+source('r/fundamentals_equity_curves.R');source('r/n7_sweet_union_summary.R')
+source('r/n7_expanded_diagnostics.R');source('r/n7_recent_structure.R')
+stopifnot(!is.null(params$study),!is.null(params$python),!is.null(params$output),
+ params$unit_cny==2,params$payout_factor==.65,params$n_legs==7,
+ params$minimum_sp==1.3,params$cap_cny==256,params$seed==42501,params$budget_cny==1024,params$initial_capital_cny==100000,params$block_length==60)
+s<-params$study
+reticulate::use_python(params$python,required=TRUE)
+receipt<-jsonlite::fromJSON(file.path(s,'settlement-inputs/receipt.json'))
+input<-reticulate::import('src.strategy_diagnostic_inputs')$read_diagnostic_fixtures(
+ file.path(s,'settlement-inputs/catalog.json'),receipt$files[['catalog.json']])
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','funded.csv','settled-groups.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,c('fixture-audit.csv','ranks.csv'))
+a<-read_csv(file.path(s,'current-settlement/fixture-audit.csv'),col_types=cols(issue='c',provider_id='c'),show_col_types=FALSE)
+f<-n7_fixture_price_diagnostic(bind_rows(input$rows),a)
+allplans<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c'),show_col_types=FALSE)
+plans<-allplans |> filter(seed==params$seed,budget_cny==params$budget_cny)
+order<-sort(unique(plans$issue));reference<-sort(unique(plans$issue[plans$cohort=='原200期']))
+stopifnot(length(order)==495,length(reference)==200)
+primary<-plans |> filter(variant=='JOINT')
+st<-n7_diagnostic_stage_map(primary,order,reference,params$initial_capital_cny,params$block_length)
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'),show_col_types=FALSE)
+funded<-read_csv(file.path(s,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |> semi_join(plans,by=c('issue','arm','seed'))
+
+structure<-n7_diagnostic_group_structure(f,funded,k,st$map,params$unit_cny,
+ params$payout_factor,params$n_legs,params$minimum_sp,params$cap_cny)
+sel<-structure$members |>
+ semi_join(funded |> semi_join(primary,by=c('issue','arm','seed')),
+           by=c('issue','sleeve_id')) |>
+ select(issue,slot) |> distinct()
+f<-f |> left_join(st$map |> select(issue,stage),by='issue',relationship='many-to-one')
+stopifnot(!anyNA(f$stage))
+shape<-strategy_distribution_shape(f,structure$members |> select(issue,sleeve_id,slot),params$n_legs,128)
+fx<-shape$fixtures |> left_join(f |> select(issue,slot,stage),by=c('issue','slot'),relationship='many-to-one')
+groups<-shape$groups |> left_join(structure$ranks |> select(issue,sleeve_id,stage,eligible,actual_rank,top128_coverage),by=c('issue','sleeve_id'),relationship='many-to-one')
+check<-groups |> filter(model=='p')
+stopifnot(all(check$actual_rank>=check$actual_rank_low),all(check$actual_rank<=check$actual_rank_high),
+ all(abs(check$prefix_coverage-check$top128_coverage)<1e-8))
+selected<-funded |> semi_join(primary,by=c('issue','arm','seed')) |> select(issue,sleeve_id) |> distinct()
+groups<-bind_rows(groups |> mutate(scope='ALL'),groups |> filter(eligible) |> mutate(scope='ELIGIBLE'),
+ groups |> semi_join(selected,by=c('issue','sleeve_id')) |> mutate(scope='SELECTED'))
+fx<-bind_rows(fx |> mutate(scope='ALL'),fx |> semi_join(sel,by=c('issue','slot')) |> mutate(scope='SELECTED'))
+fs<-fx |> group_by(scope,stage,model) |> summarise(n=n(),issues=n_distinct(issue),
+ top1=mean(top1),top2=mean(top2),gap12=mean(gap12),gap23=mean(gap23),entropy=mean(entropy),
+ surprise=mean(surprise),residual=mean(entropy_residual),hit1=mean(actual_rank==1),hit2=mean(actual_rank<=2),.groups='drop')
+gs<-groups |> group_by(scope,stage,model) |> summarise(n=n(),issues=n_distinct(issue),
+ gap12=mean(gap12),entropy=mean(entropy),effective_states=mean(effective_states),
+ expected_rank=mean(expected_rank),actual_rank_median_low=median(actual_rank_low),actual_rank_median_high=median(actual_rank_high),
+ surprise=mean(surprise),residual=mean(entropy_residual),prefix_expected=mean(prefix_coverage),
+ prefix_actual_low=mean(prefix_hit_low),prefix_actual_high=mean(prefix_hit_high),
+ cumulative_mid=mean(cumulative_mid),mean_third=mean(third),multiple_third=mean(third>=2),.groups='drop')
+conditional<-groups |> mutate(coverage_bin=cut(prefix_coverage,c(0,.2,.3,.4,.5,.6,.8,1),include.lowest=TRUE)) |>
+ group_by(scope,stage,model,coverage_bin) |> summarise(n=n(),issues=n_distinct(issue),
+ expected=mean(prefix_coverage),actual_low=mean(prefix_hit_low),actual_high=mean(prefix_hit_high),
+ residual=mean(entropy_residual),.groups='drop')
+periods<-groups |> group_by(scope,stage,model,issue) |> summarise(entropy=mean(entropy),
+ gap12=mean(gap12),expected=mean(prefix_coverage),actual_low=mean(prefix_hit_low),actual_high=mean(prefix_hit_high),
+ residual=mean(entropy_residual),.groups='drop')
+periodsummary<-periods |> group_by(scope,stage,model) |> summarise(issues=n(),
+ across(c(entropy,gap12,expected,actual_low,actual_high,residual),mean),.groups='drop')
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+for(name in c('fx','groups','fs','gs','conditional','periods','periodsummary')) write_csv(get(name),file.path(params$output,paste0(name,'.csv')))
+print(glimpse(gs));knitr::kable(gs,digits=3)
+```
+
+单场熵衡量分布平坦度；独立乘积下组熵等于七场熵之和。有效组合数为exp(熵)。
+实际惊讶度为−log(实际组合预测概率)；其与组熵之差，衡量实际结果是否比模型自身预期更难。
+排名和Top128命中若有并列均保留上下界，不把保守下界当作确定命中率。
+后者不是因果分解，组内依赖和模型偏差均可能贡献。全部组、同准入合格组、已选组分列。
+Top128是固定深度对照，不是当前实际购买前缀；组重叠不作为独立证据，另提供期等权统计。
+
+```{r}
+plotg<-gs |> filter(scope=='SELECTED') |> mutate(stage=recode(stage,REFERENCE='Earlier 200',RECENT_DRAWDOWN='Drawdown 94',RECENT_OTHER='Other 201')) |> select(stage,model,gap12,entropy,expected_rank,prefix_expected,prefix_actual_low,residual) |>
+ pivot_longer(-c(stage,model),names_to='metric',values_to='value')
+g1<-ggplot(plotg,aes(stage,value,fill=model))+geom_col(position='dodge')+
+ facet_wrap(~metric,scales='free_y',ncol=3)+theme_minimal(base_size=11)+
+ theme(axis.text.x=element_text(angle=0),plot.margin=margin(10,20,10,20))+
+ labs(title='Selected groups: shape versus realized outcomes',x=NULL,y=NULL,fill='p: corrected / q: raw')
+print(g1);ggsave(file.path(params$output,'shape-comparison.png'),g1,width=13,height=8,dpi=150)
+g2<-ggplot(groups |> filter(scope=='SELECTED',model=='p'),aes(entropy_residual,colour=stage))+stat_ecdf()+
+ theme_minimal(base_size=12)+labs(title='Actual surprise minus model entropy: selected groups',
+ x='Residual surprise (nats; larger means worse than model expectation)',y='Empirical CDF')
+print(g2);ggsave(file.path(params$output,'surprise-cdf.png'),g2,width=11,height=5,dpi=150)
+cg<-conditional |> filter(scope=='SELECTED',model=='p',stage!='REFERENCE') |>
+ mutate(stage=recode(stage,RECENT_DRAWDOWN='Drawdown 94',RECENT_OTHER='Other 201'))
+g3<-ggplot(cg,aes(expected,actual_low,colour=stage))+geom_abline(slope=1,intercept=0,linetype=2)+
+ geom_point(aes(size=n))+geom_linerange(aes(ymin=actual_low,ymax=actual_high))+
+ geom_text(aes(label=paste0('n=',n,'; issues=',issues)),nudge_y=.035,size=3)+
+ coord_cartesian(xlim=c(.24,.60),ylim=c(0,1.05),clip='off')+theme_minimal(base_size=11)+
+ labs(title='Same Top128 coverage bin, different realized group hits',
+ x='Mean predicted Top128 coverage',y='Actual Top128 hit rate (tie bounds)',
+ caption='Overlapping groups are dependent; sparse bins retained and labeled. Retrospective window.')
+print(g3);ggsave(file.path(params$output,'conditional-coverage.png'),g3,width=11,height=6,dpi=150)
+knitr::kable(conditional |> filter(scope=='SELECTED',model=='p'),digits=3)
+knitr::kable(fs,digits=4);knitr::kable(periodsummary,digits=4)
+files<-c('r/strategy_distribution_shape.R','r/strategy_diagnostic_probabilities.R','r/n7_recent_structure.R',
+ 'r/n7_fixture_price_diagnostic.R','r/n7_return_attribution.R','r/n7_sweet_union_summary.R','r/fundamentals_equity_curves.R',
+ 'src/strategy_diagnostic_inputs.py','quarto/163_distribution_shape_diagnostic.qmd')
+jsonlite::write_json(list(study=s,parameters=params,prefix_depth=128,diagnostic_only=TRUE,
+ catalog=receipt$files[['catalog.json']],bundles=input$source_hashes,evaluation=er$files,settlement=ar$files,
+ implementation=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files),
+ generated_at=as.character(Sys.time())),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 结论与边界
+
+**Top1与Top2普遍接近，不是这次回撤的主要已见特征。**
+已选唯一场次的平均差距为回撤段25.6个百分点、其他新增期25.0个百分点；
+计入组内复用权重后为28.5与28.7个百分点，只有很小的收窄。
+
+在已选组中，回撤段熵约7.04、其他新增期7.03，有效组合数约1,158与1,140。
+模型预期平均中奖排名约465与458，但实际排名中位数为338与266。
+前128注的预测覆盖率33.6%与34.1%，实际命中率30.1%与35.4%。
+分布变平确实存在一点，但不能充分解释观察到的覆盖差异；均值与中位数不能作比例归因。
+
+偏差集中在部分组，而非所有组同时恶化：预测Top128覆盖20%–30%的已选组，两阶段平均预测均约27.4%，
+回撤段实际15/100（35期），其他新增期73/195（86期）。
+覆盖30%–40%的主力部分则是回撤段33.3%与其他期33.8%，接近。
+覆盖40%–50%的回撤样本只有11组、3期，不能将其零命中视为稳定规律。
+
+组等权Top128差距约5.3个百分点，期等权仍约6.6个百分点（28.7%对35.3%）；
+这不是仅由某些期下注组数更多造成的。组重叠和连续期相关仍未被当作独立样本检验。
+
+原始市场q也存在相同方向：实际中奖排名中位数343对265，Top128实际命中29.9%对34.5%。
+因此不能把全部问题归于让平校正。平均实际惊讶度减熵在回撤段为0.022、其他新增期0.030，
+并没有整体上升；实际组合概率的几何均值也很接近（约0.0854%对0.0860%）。
+所以现有证据指向**分布某些部位、部分组的覆盖失配**，而非普遍分布变平或所有实际结果概率均被进一步低估。
+
+以上比较固定候选与选择，只比较概率分布，不是重跑不同模型选组后的收益对照。
+回撤窗口及分层表现为事后诊断；随机波动、组内依赖、构成变化与概率偏差仍不能完全区分。
+下一步最有辨别力的检验是对覆盖20%–30%那部分组检查赛果构成与联合命中，不能直接据此过滤未来组。

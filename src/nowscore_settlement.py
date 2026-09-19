@@ -104,7 +104,8 @@ def parse_page(payload: bytes, issue: str, typeid: int) -> list[dict]:
         if home is None or away is None:
             raise ValueError("missing native team/match identity")
         native_id = home["id"].removeprefix("HomeTeam_")
-        if not native_id.isdigit() or away["id"] != f"GuestTeam_{native_id}":
+        unavailable = native_id == "-1" and any(s in tr.get_text(" ", strip=True) for s in ("中断", "推迟", "取消"))
+        if (not native_id.isdigit() and not unavailable) or away["id"] != f"GuestTeam_{native_id}":
             raise ValueError("home/away native identity mismatch")
         team_ids = []
         for side in (home, away):
@@ -175,7 +176,7 @@ def parse_page(payload: bytes, issue: str, typeid: int) -> list[dict]:
         rows.append(row)
     if not rows:
         raise ValueError("no fixture rows; cannot assert an empty issue")
-    matrix = re.findall(r"M\[(\d+)\]\[0\]\s*=\s*['\"]?(\d+)['\"]?\s*;", text)
+    matrix = re.findall(r"M\[(\d+)\]\[0\]\s*=\s*['\"]?(-?\d+)['\"]?\s*;", text)
     if not matrix or Counter((int(i), n) for i, n in matrix) != Counter((r["slot"], r["native_match_id"]) for r in rows):
         raise ValueError("embedded roster and visible all=1 rows differ or roster missing")
     return rows

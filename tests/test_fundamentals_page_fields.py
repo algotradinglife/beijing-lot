@@ -46,3 +46,11 @@ def test_error_document_and_strict_encoding():
     with pytest.raises(ValueError):decode_analysis_text(b'<meta charset="unknown">')
     with pytest.raises(ValueError):decode_analysis_text(b'<meta charset="utf-8">\xff')
     with pytest.raises(ValueError):decode_analysis_text(b'<meta charset="utf-8"><meta charset="gbk">')
+
+
+@pytest.mark.parametrize("codec,bom", [("utf-16le", b"\xff\xfe"), ("utf-16be", b"\xfe\xff")])
+def test_unicode_bom_detection(codec, bom):
+    text = "var name=分析;"
+    assert decode_analysis_text(bom + text.encode(codec)) == (text, codec)
+    with pytest.raises(ValueError):
+        decode_analysis_text(bom + b"x")

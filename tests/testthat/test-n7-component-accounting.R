@@ -1,0 +1,21 @@
+source(file.path('..','..','r','fundamentals_equity_curves.R'))
+source(file.path('..','..','r','n7_component_accounting.R'))
+test_that('component accounting reconciles cash, payout and equal exposure', {
+ g<-tibble::tibble(issue=c('01','01'),sleeve_id=c('a','b'),depth=2,copies=1,stake=4,
+ coverage=.25,actual_rank=c(1,3),actual_gross_cny=c(10,20),hit=c(TRUE,FALSE),gross=c(10,0),
+ net=c(6,-4),top128_coverage=c(.4,.3))
+ p<-tibble::tibble(issue=c('01','02'),stake=c(8,0),gross=c(10,0),net=c(2,0),budget_cny=10)
+ z<-n7_component_accounting(g,p,c('01','02'),.3,2,100)
+ expect_equal(z$components$component,c('MAIN','LOW'))
+ expect_equal(z$ledger$net[z$ledger$policy=='MAIN'],c(6,0))
+ expect_equal(z$ledger$net[z$ledger$policy=='LOW'],c(-4,0))
+ expect_equal(z$ledger$net[z$ledger$policy=='SCALED_ALL'],c(1,0))
+ expect_equal(z$ledger$stake[z$ledger$policy=='MAIN'],z$ledger$stake[z$ledger$policy=='SCALED_ALL'])
+ expect_equal(z$curves$equity_cny[z$curves$policy=='MAIN'],c(100,106,106))
+ expect_equal(nrow(z$ledger),8)
+ bad<-g;bad$gross[1]<-20;expect_error(n7_component_accounting(bad,p,c('01','02'),.3,2,100))
+ bad<-p;bad$net[1]<-1;expect_error(n7_component_accounting(g,bad,c('01','02'),.3,2,100))
+ expect_error(n7_component_accounting(dplyr::bind_rows(g,g),p,c('01','02'),.3,2,100))
+ expect_error(n7_component_accounting(g,p,c('01','02'),NA_real_,2,100))
+ expect_error(n7_component_accounting(g,p,'01',.3,2,100))
+})

@@ -1,0 +1,136 @@
+---
+title: "回撤期让平校正：结论与资金效率"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+  message: false
+params:
+  study: null
+  receipt_sha256: null
+---
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(readr)})
+source('r/diagnostic_verified_csv.R');source('r/strategy_diagnostic_probabilities.R')
+stopifnot(!is.null(params$study),!is.null(params$receipt_sha256))
+s<-params$study;path<-file.path(s,'report-receipt.json')
+bytes<-readBin(path,'raw',n=file.info(path)$size)
+stopifnot(digest::digest(bytes,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+receipt<-jsonlite::fromJSON(rawToChar(bytes))
+strategy_verify_diagnostic_inputs(s,receipt$files,c('summary.csv','rows.csv','rank_summary.csv','rank_changes.csv',
+ 'probability-summary.csv','handicap.csv','equity-drawdown.png','winning-rank-cdf.png','draw-calibration.png','independent-replay.json'))
+stopifnot(identical(jsonlite::fromJSON(file.path(s,'independent-replay.json'))$status,'PASS'))
+summary<-diagnostic_read_verified_csv(file.path(s,'summary.csv'),receipt$files[['summary.csv']],cols())
+rows<-diagnostic_read_verified_csv(file.path(s,'rows.csv'),receipt$files[['rows.csv']],cols(issue='c'))
+rank_summary<-diagnostic_read_verified_csv(file.path(s,'rank_summary.csv'),receipt$files[['rank_summary.csv']],cols())
+rank_changes<-diagnostic_read_verified_csv(file.path(s,'rank_changes.csv'),receipt$files[['rank_changes.csv']],cols())
+probability<-diagnostic_read_verified_csv(file.path(s,'probability-summary.csv'),receipt$files[['probability-summary.csv']],cols())
+handicap<-diagnostic_read_verified_csv(file.path(s,'handicap.csv'),receipt$files[['handicap.csv']],cols())
+base<-summary |> filter(policy=='FROZEN')
+updated<-summary |> filter(policy %in% c('CUMULATIVE','RECENT25','RECENT50'))
+best<-updated |> arrange(desc(net),policy) |> slice(1)
+stopifnot(nrow(summary)==5,nrow(base)==1,all(summary$issues==94))
+labels<-c(FROZEN='旧冻结校正',RAW='原始市场',CUMULATIVE='累计历史',RECENT25='累计75%＋近三期25%',RECENT50='累计50%＋近三期50%')
+r50<-summary |> filter(policy=='RECENT50')
+r50r<-rank_changes |> filter(arm=='RECENT50')
+r50s<-rank_summary |> filter(arm=='RECENT50')
+draws<-handicap |> filter(outcome=='D') |> group_by(model) |>
+ summarise(expected=sum(expected),actual=sum(actual),fixtures=sum(fixtures),top2_hits=sum(top2_hits),.groups='drop')
+d0<-draws |> filter(model=='FROZEN');d50<-draws |> filter(model=='RECENT50')
+p0<-probability |> filter(model=='FROZEN');p50<-probability |> filter(model=='RECENT50')
+wl<-handicap |> filter(outcome!='D') |> group_by(model) |> summarise(hits=sum(top2_hits),.groups='drop')
+wl_delta<-(wl |> filter(model=='RECENT50'))$hits-(wl |> filter(model=='FROZEN'))$hits
+ratio<-r50$stake/base$stake
+
+paired<-rows |> left_join(rows |> filter(arm=='FROZEN') |> select(issue,base_gross=gross,base_net=net),
+ by='issue',relationship='many-to-one') |> group_by(arm) |> summarise(
+ 救回期数=sum(base_gross==0 & gross>0),丢失期数=sum(base_gross>0 & gross==0),
+ 净收益改善期数=sum(net>base_net),净收益变差期数=sum(net<base_net),.groups='drop')
+```
+
+## 核心结论
+
+本轮在**事先固定的111104–120419共94期回撤窗口**内比较五种概率底座，每期上限1024元。
+更新策略每10期拟合一次；保留同一七场候选组成员、SP门槛、25%覆盖和联合选组规则。
+最近三期是更新时结果已可用的三期；累计历史来自同一495期冻结快照。
+这是事后选取回撤段的诊断，不是提前预警回撤或未见数据检验。
+
+在三个更新版本中，本窗口净收益最高的是 **`r labels[[best$policy]]`**：
+相对旧冻结校正，净收益变化 **`r sprintf('%+.2f',best$net-base$net)` 元**，
+ROI变化 **`r sprintf('%+.2f',100*(best$roi-base$roi))` 个百分点**，
+最大回撤变化 **`r sprintf('%+.2f',best$max_drawdown-base$max_drawdown)` 元**。
+这里“最高”是对本窗口结果的描述，不代表未来应自动选用该参数。
+
+**`r if(all(summary$net<0)) '五种版本在本窗口均为负收益，更新没有将回撤段变成盈利段。' else '部分版本出现正收益，需结合完整风险指标评价。'`**
+以50/50版本为例：投入变化`r sprintf('%+.2f',r50$stake-base$stake)`元，回款变化`r sprintf('%+.2f',(r50$stake+r50$net)-(base$stake+base$net))`元，净收益变化`r sprintf('%+.2f',r50$net-base$net)`元。
+这体现的是用更少投入保留了接近原有的回款，并非命中了更多期：命中期由`r base$hit_issues`变为`r r50$hit_issues`，
+救回`r (paired |> filter(arm=='RECENT50'))$救回期数`期、同时丢失`r (paired |> filter(arm=='RECENT50'))$丢失期数`个原命中期。
+
+若仅把原方案全部下注按同一个比例缩至相同总投入，描述性参照净收益`r sprintf('%.2f',base$net*ratio)`元、
+最大回撤`r sprintf('%.2f',base$max_drawdown*ratio)`元；50/50则分别为`r sprintf('%.2f',r50$net)`元和`r sprintf('%.2f',r50$max_drawdown)`元。
+因此改善也不能全部解释为等比例少下注；新概率引发的过滤、排序与资金分配共同改变了回款结构。
+该等投入参照允许分数票，仅用于分解，不是新增可执行策略。
+
+`r if(best$net>base$net && best$roi>base$roi && best$max_drawdown<base$max_drawdown && best$minimum_equity>=base$minimum_equity) '该版本改善净收益、资金效率和最大回撤，最低资金不恶化，本窗口支持其带来局部改善。' else '四项资金指标没有同时改善，本轮不足以将更新校正直接替换为默认底座。'`
+
+## 实际投入、收益与风险
+
+ROI以实际投入为分母；相同预算上限不保证相同实际投入。命中期只要求至少一组回款，
+盈利期才要求当期回款超过全部投入。最低资金与从历史高点计算的最大回撤同时报告。
+
+```{r}
+knitr::kable(summary |> mutate(方案=unname(labels[policy]),ROI百分比=100*roi) |>
+ select(方案,投入=stake,净收益=net,ROI百分比,命中期=hit_issues,盈利期=profit_issues,
+ 最大回撤=max_drawdown,最低资金=minimum_equity),digits=2)
+knitr::asis_output(sprintf('<img src="%s" alt="equity-drawdown" />',knitr::image_uri(file.path(s,'equity-drawdown.png'))))
+knitr::kable(paired |> mutate(方案=unname(labels[arm])) |> select(方案,everything(),-arm))
+```
+
+## 中奖组合是否被提到更靠前的位置
+
+以下固定同一候选组成员，比较实际中奖赛果组合在概率排序中的位置及从第一票买到该位置的成本。
+统计全部候选组，不能把重叠组当成独立样本。救回与丢失的Top128组合必须同时看，
+不能只展示原来没买中的少数成功案例。
+
+```{r}
+knitr::kable(rank_summary |> mutate(方案=unname(labels[arm]),Top128命中百分比=100*within128) |>
+ select(方案,组数=groups,中奖排名中位数=median_rank,排名75分位=rank_q75,排名90分位=rank_q90,
+ 覆盖成本中位数=median_cost,Top128命中百分比),digits=2)
+knitr::kable(rank_changes |> mutate(方案=unname(labels[arm])) |> select(方案,everything(),-arm))
+knitr::asis_output(sprintf('<img src="%s" alt="winning-rank-cdf" />',knitr::image_uri(file.path(s,'winning-rank-cdf.png'))))
+```
+
+`r r50s$groups`个候选组中，50/50版本让`r r50r$earlier`个中奖组合排名提前、`r r50r$later`个变晚。
+Top128救回`r r50r$rescue128`个组合、同时丢失`r r50r$lost128`个，净增加`r r50r$rescue128-r50r$lost128`个。
+因此**本轮不支持“中奖组合普遍被拉到高概率区段”的强解释**。
+
+## 单场概率质量
+
+让平增加不是唯一目标；还要观察让胜/让负是否被挤出，以及整体Top1、Top2、Brier和log loss。
+实际让平发生`r d0$actual`/`r d0$fixtures`场（`r sprintf('%.2f%%',100*d0$actual/d0$fixtures)`）。50/50将平均预测让平由`r sprintf('%.2f%%',100*d0$expected/d0$fixtures)`变为`r sprintf('%.2f%%',100*d50$expected/d50$fixtures)`，
+缩小了总体低估；但让平进入Top2并命中的场次从`r d0$top2_hits`变为`r d50$top2_hits`时，让胜/让负的Top2命中变化`r sprintf('%+.0f',wl_delta)`场，
+整体Top2净变化`r round((p50$top2-p0$top2)*p0$fixtures)`场（`r sprintf('%.2f%%',100*p0$top2)`→`r sprintf('%.2f%%',100*p50$top2)`）。这正是单个赛果校正改善不等于整体组合命中大幅改善的原因。
+曲线上的点按样本量显示大小，稀疏区间不能据此推断稳定校准。
+
+```{r}
+knitr::kable(probability |> mutate(方案=unname(labels[model])) |> select(方案,everything(),-model),digits=4)
+knitr::asis_output(sprintf('<img src="%s" alt="draw-calibration" />',knitr::image_uri(file.path(s,'draw-calibration.png'))))
+```
+
+## 可复核性与解释边界
+
+逐期计划、模型、近期权重、所有组合排名及结算均保存在本报告声明的快照中。
+完整拟合、冻结和回放入口为仓库`quarto/169_draw_refresh_drawdown.qmd`，业务函数位于`r/`，
+时序与历史准入使用`src/temporal_learning`。输出目录必须新建，不能覆盖已有冻结包。
+北单实际SP仅用于结算；估算SP仍来自原欧赔/大小球映射，票级0.65只应用一次。
+
+长期格子以100个等效观察向原市场概率收缩；近期格子以20个等效观察向长期估计收缩。
+因此名义50%的近期份额在稀疏格子里会降低，空格子保留长期估计。
+这次没有重选这些参数，也没有重新生成七场候选组；收益变化同时反映重新排序、深度与选组的传递效果。
+输入只含W/D/L，因此尚不能声称校正后的比分格仍满足原大小球约束。
+标签采用最后场次＋48小时代理，只支持历史研究，不证明真实历史时点的可用性。

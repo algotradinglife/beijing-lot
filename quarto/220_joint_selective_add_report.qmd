@@ -1,0 +1,125 @@
+---
+title: "已买组合加仓：收敛结论"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  study: null
+  receipt_sha256: null
+  output: null
+  python: null
+---
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source(file.path(params$project_root,'r/diagnostic_verified_csv.R'))
+source(file.path(params$project_root,'r/fundamentals_equity_curves.R'))
+source(file.path(params$project_root,'r/joint_tail_risk.R'))
+stopifnot(!dir.exists(params$output))
+check<-system2(params$python,c(shQuote(file.path(params$project_root,'scripts/check_persistent_data_layout.py')),'--contract',shQuote(file.path(params$project_root,'config/persistent_data_layout.json'))),stdout=TRUE)
+stopifnot(is.null(attr(check,'status')))
+raw<-readBin(file.path(params$study,'analysis-receipt.json'),'raw',n=file.info(file.path(params$study,'analysis-receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE);stopifnot(r$status=='ANALYSIS_COMPLETE')
+for(k in names(r$code))stopifnot(digest::digest(file=file.path(params$project_root,k),algo='sha256')==r$code[[k]])
+code_files<-c('quarto/220_joint_selective_add_report.qmd','r/diagnostic_verified_csv.R','r/fundamentals_equity_curves.R','r/joint_tail_risk.R')
+code<-setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)
+x<-list()
+for(k in c('rows','curves','summary','incremental','concentration','shortfalls','worst','allocation'))x[[k]]<-diagnostic_read_verified_csv(file.path(params$study,paste0(k,'.csv')),r$files[[paste0(k,'.csv')]],if(k %in% c('rows','curves','incremental','allocation'))cols(issue='c') else cols())
+out<-params$output;dir.create(out,recursive=TRUE)
+summary<-x$summary |> filter(window=='ALL')
+stopifnot(all(summary$issues==784),all(summary$hit_issues==332))
+inc<-x$incremental
+old<-inc |> filter(policy=='ORIGINAL') |> select(issue,original_extra_net=extra_net,original_extra_stake=extra_stake)
+paired<-inc |> left_join(old,by='issue',relationship='many-to-one') |>
+ mutate(matched=extra_stake==original_extra_stake,difference=extra_net-original_extra_net)
+paired_summary<-paired |> group_by(policy) |>
+ summarise(matched_issues=sum(matched),matched_active_issues=sum(matched & extra_stake>0),
+ difference_same_spend=sum(difference[matched]),difference_all=sum(difference),.groups='drop')
+# Fractional accounting benchmark only: reproduces the cap policy's stake while
+# proportionally scaling ORIGINAL's additions, leaving baseline untouched.
+# This is not an executable 2-CNY ticket strategy and is not a causal estimate.
+scaled<-paired |> filter(policy %in% c('PROB_CAP','EV_CAP')) |>
+ mutate(ratio=if_else(original_extra_stake>0,extra_stake/original_extra_stake,0),
+  net=base_net+original_extra_net*ratio,gross=net+stake,policy=paste0(policy,'_SCALED_ORIGINAL'))
+stopifnot(all(scaled$ratio>=0 & scaled$ratio<=1))
+scaled_summary<-scaled |> group_by(policy) |> summarise(stake=sum(stake),net=sum(net),.groups='drop') |> mutate(roi=net/stake)
+scurves<-strategy_equity_curves(scaled |> select(issue,policy,stake,gross,net,cash_cny,budget_cny,status,model),sort(unique(x$rows$issue)),100000)
+scaled_summary<-scaled_summary |> left_join(scurves |> group_by(policy) |> summarise(drawdown=max(drawdown_cny),.groups='drop'),by='policy',relationship='one-to-one')
+blocks<-x$rows |> mutate(block=paste0(1+196*((period-1)%/%196),'-',pmin(784,196*(1+(period-1)%/%196)))) |>
+ group_by(policy,block) |> summarise(issues=n(),stake=sum(stake),net=sum(net),.groups='drop') |> mutate(roi=net/stake)
+expected<-x$allocation |> group_by(policy) |> summarise(expected_extra_gross=sum(expected_extra_gross),.groups='drop') |>
+ left_join(x$concentration,by='policy',relationship='one-to-one') |> mutate(actual_extra_gross=total_extra_stake+total_extra_net)
+for(k in c('paired_summary','scaled_summary','blocks','expected'))write_csv(get(k),file.path(out,paste0(k,'.csv')))
+```
+
+本轮结论是：**保留原加仓作为研究参照，不把选择性加仓升级为默认策略；主方案仍为不加仓BASE。**
+跨好格概率排序有小幅增益，但尚未解决加仓带来的回撤，且改进集中在尾段。
+预计收益排序没有优于概率排序；本轮512元场次上限则过于紧，几乎取消了追加投入。
+这批784期已被反复研究，结论属于历史诊断，不能当作未见数据验证。
+
+固定概率底座、35格、每期上限1024元、每票2元、本金10万元。实际回款已含一次0.65；ROI以实际投入为分母。
+BASE不加仓；ORIGINAL是原BLEND_ADD；PROB跨好格按概率；EV按概率×赛前估算回款；CAP增加场次资金暴露上限。
+每个CAP方案的上限为512元或BASE原暴露较大值，原有超限不强制减仓，但不得继续增加。
+
+```{r}
+knitr::kable(summary |> transmute(方案=policy,总投入=stake,净收益=net,ROI百分比=100*roi,命中期数=hit_issues,最大回撤=local_drawdown),digits=2)
+knitr::kable(x$concentration,digits=2)
+knitr::kable(x$shortfalls)
+```
+
+PROB和ORIGINAL逐期投入完全相同。其全期净收益差为
+**`r round(summary$net[summary$policy=='PROB']-summary$net[summary$policy=='ORIGINAL'])`元**，
+最大回撤变化为 **`r round(summary$local_drawdown[summary$policy=='PROB']-summary$local_drawdown[summary$policy=='ORIGINAL'])`元**。
+所有方案仍命中332期，因为没有新增赛果覆盖。
+
+```{r, fig.width=12, fig.height=8}
+p<-x$curves |> select(policy,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+theme(legend.position='bottom')+labs(title='Selective additions: capital and drawdown',x='Issue index',colour=NULL)
+ggsave(file.path(out,'full-curves.png'),p,width=12,height=8,dpi=150);p
+```
+
+CAP少投的资金单列。以下同投入比较只对实际金额相同的期次成立，并列出其中真正加仓的期数，避免现金期主导样本。
+比例缩放ORIGINAL是金额归因参照：每期追加投入与CAP完全一致，但允许小数份票，因此不是可直接下单的策略。
+
+```{r}
+knitr::kable(paired_summary,digits=2)
+knitr::kable(scaled_summary,digits=2)
+knitr::kable(expected,digits=2)
+```
+
+```{r, fig.width=12, fig.height=8}
+p2<-inc |> arrange(policy,period) |> group_by(policy) |>
+ mutate(cumulative_increment=cumsum(extra_net)) |> ungroup() |>
+ ggplot(aes(period,cumulative_increment,colour=policy))+geom_line()+geom_hline(yintercept=0)+
+ theme_minimal()+theme(legend.position='bottom')+labs(title='Incremental net relative to BASE',x='Issue index',y='CNY',colour=NULL)
+ggsave(file.path(out,'incremental-curves.png'),p2,width=12,height=8,dpi=150);p2
+```
+
+固定196期分块以及最差连续20期的结果如下；最差窗口由结果选择，仅作事后诊断，不能据此择时。
+去掉最大正增量的1/3期只是集中度压力，不是重新寻找策略参数。
+
+```{r}
+knitr::kable(blocks,digits=2)
+knitr::kable(x$worst,digits=2)
+```
+
+结论的边界：本轮支持“直接概率排序优于本次预计收益排序”，不支持“加仓解决回撤”。
+PROB可以作为原加仓的简化候选，但其相对BASE的额外收益与回撤必须一起接受；不自动提升为默认下注规则。
+CAP的结果否定不了其他分散办法，只说明这次固定上限的可分配资金过少。
+
+```{r}
+stopifnot(identical(code,setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)))
+files<-list.files(out,recursive=TRUE,full.names=TRUE)
+jsonlite::write_json(list(status='REPORT_COMPLETE',source_receipt=params$receipt_sha256,historical_admission=FALSE,code=code,
+ files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),substring(files,nchar(out)+2))),
+ file.path(out,'report-receipt.json'),pretty=TRUE,auto_unbox=TRUE,digits=NA)
+```

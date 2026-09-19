@@ -1,0 +1,88 @@
+---
+title: "概率与购票实现交叉核验：补齐同一校正日历的回撤窗口"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  parent: null
+  output: null
+  python: null
+---
+
+本入口只补齐原窗口外研究未评价的94期。读取同一次冻结的49个模型及其日历，
+不使用另一批次的回撤窗口模型，不重新选择校正参数。时间可用性仍为历史诊断代理，
+不声称真实赛前可交易。先保存全部票单，再由结论报告读取结算。
+
+```{r}
+library(dplyr)
+stopifnot(!is.null(params$study),!is.null(params$parent),!is.null(params$output),!is.null(params$python))
+reticulate::use_python(params$python,required=TRUE)
+cfg<-jsonlite::fromJSON('config/top2_outside_validation.json')
+parent<-params$parent
+receipt<-jsonlite::fromJSON(file.path(parent,'plans-receipt.json'),simplifyVector=FALSE)
+stopifnot(receipt$model_sha256=='4f2e0131050870a9f08476c446ced17ed3b2dcad06915292393f070b34c234b2')
+for(f in names(receipt$implementation)) {
+ stopifnot(digest::digest(file=f,algo='sha256')==receipt$implementation[[f]])
+ if(startsWith(f,'r/'))source(f)
+}
+models<-diagnostic_read_verified_rds(file.path(parent,'frozen-models.rds'),receipt$model_sha256)
+blocks<-jsonlite::fromJSON(file.path(parent,'blocks.json'),simplifyVector=FALSE)
+core<-reticulate::import('src.temporal_learning.core')
+api<-reticulate::import('src.strategy_diagnostic_inputs')
+cp<-file.path(params$study,'settlement-inputs/catalog.json')
+stopifnot(digest::digest(file=cp,algo='sha256')==cfg$catalog_sha256)
+catalog<-jsonlite::fromJSON(cp)
+fx<-as_tibble(jsonlite::fromJSON(api$read_diagnostic_epoch_fixtures(cp,cfg$catalog_sha256))$rows)
+out<-params$output;stopifnot(!dir.exists(out),dir.create(out,recursive=TRUE))
+bindings<-plans<-funded<-predictions<-list()
+for(block in blocks)for(target in block$targets) {
+ id<-target$issue
+ if(!id %in% cfg$excluded_drawdown_issues)next
+ cutoff<-core$Cutoff$decision_epoch(id,target$cutoff_ts)
+ model<-models[[block$fit_issue]]
+ z<-draw_handicap_predict(model,filter(fx,issue==id),cutoff,cfg$alpha,getwd(),params$python)
+ key<-paste(model$seal,cfg$alpha,sep=':')
+ a<-catalog$issues |> filter(issue==id)
+ bundle<-jsonlite::fromJSON(api$read_verified_bundle_json(a$path,a$sha256),simplifyVector=FALSE)
+ updated<-n7_probability_bundle(bundle,z,bundle$cutoffs,key)
+ predictions[[id]]<-z |> mutate(fit_issue=block$fit_issue)
+ old<-n7_probability_allocate(updated,bundle$cutoffs,key,params$python,cfg$target_coverage,
+  cfg$group_cap_cny,cfg$minimum_sp,cfg$budget_cny,cfg$unit_cny,cfg$payout_factor,cfg$seed,cfg$worlds,256)
+ prep<-n7_top2_options(updated,bundle$cutoffs,params$python,key,'PROB',cfg$third_penalty,
+  cfg$target_coverage,cfg$group_cap_cny,cfg$unit_cny,cfg$payout_factor,cfg$minimum_sp)
+ new<-n7_top2_allocate(prep,bundle$cutoffs,cfg$seed,cfg$worlds,cfg$budget_cny,256)
+ for(rule in c('OLD_RULE','NEW_RULE')) {
+  result<-if(rule=='OLD_RULE')old else list(surface=prep$surface,pool=prep$pool,
+   worlds=new$worlds,scenarios=new$scenarios,fit=new$fit)
+  opts<-result$pool$options[result$fit$selected]
+  stake<-sum(vapply(opts,`[[`,numeric(1),'stake'))
+  plans[[paste(id,rule)]]<-tibble(issue=id,policy=rule,model='HANDICAP',stake=stake,
+   budget_cny=cfg$budget_cny,cash_cny=cfg$budget_cny-stake,status=if(stake>0)'COMPLETE' else 'NO_BET')
+  for(opt in opts)funded[[length(funded)+1L]]<-tibble(issue=id,policy=rule,
+   sleeve_id=as.character(opt$sleeve_id),depth=as.numeric(opt$depth),stake=as.numeric(opt$stake),
+   state_ids=paste(as.integer(opt$state_ids),collapse='|'))
+  path<-file.path(out,paste0('replay-',id,'-',rule,'.rds'))
+  saveRDS(list(result=result,fixtures=updated$expanded_pool$fixtures,cutoffs=bundle$cutoffs,
+   model_identity=key,block=block),path)
+  bindings[[paste(id,rule)]]<-list(issue=id,rule=rule,source_sha256=a$sha256,
+   model_seal=model$seal,path=basename(path),sha256=digest::digest(file=path,algo='sha256'))
+ }
+ message('Frozen ',id);writeLines(id,file.path(out,'progress.txt'))
+}
+plans<-bind_rows(plans);stopifnot(nrow(plans)==188,setequal(plans$issue,cfg$excluded_drawdown_issues))
+readr::write_csv(plans,file.path(out,'plans.csv'))
+readr::write_csv(bind_rows(funded),file.path(out,'funded.csv'))
+readr::write_csv(bind_rows(predictions),file.path(out,'predictions.csv'))
+jsonlite::write_json(list(status='FROZEN_NOT_SETTLED',bindings=bindings,
+ parent_models_sha256=receipt$model_sha256,catalog_sha256=cfg$catalog_sha256,
+ implementation=receipt$implementation,entry_sha256=digest::digest(file='quarto/180_probability_rule_drawdown_replay.qmd',algo='sha256'),
+ files=as.list(setNames(vapply(c('plans.csv','funded.csv','predictions.csv'),function(f)
+ digest::digest(file=file.path(out,f),algo='sha256'),character(1)),c('plans.csv','funded.csv','predictions.csv')))),
+ file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+knitr::kable(plans |> group_by(policy) |> summarise(issues=n(),stake=sum(stake),cash=sum(cash_cny)),digits=2)
+```

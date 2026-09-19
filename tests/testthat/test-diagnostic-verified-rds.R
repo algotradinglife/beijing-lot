@@ -1,0 +1,12 @@
+source(file.path('..','..','r','diagnostic_verified_rds.R'))
+testthat::test_that('RDS deserialization consumes verified gzip bytes only', {
+ p<-tempfile();on.exit(unlink(p))
+ x<-list(issue='001',value=c(NA_real_,1),nested=list(flag=FALSE))
+ saveRDS(x,p,compress='gzip');hash<-digest::digest(file=p,algo='sha256')
+ testthat::expect_identical(diagnostic_read_verified_rds(p,hash),x)
+ saveRDS(list(issue='002'),p)
+ testthat::expect_error(diagnostic_read_verified_rds(p,hash))
+ testthat::expect_error(diagnostic_read_verified_rds(p,'bad'))
+ saveRDS(x,p,compress=FALSE)
+ testthat::expect_error(diagnostic_read_verified_rds(p,digest::digest(file=p,algo='sha256')))
+})

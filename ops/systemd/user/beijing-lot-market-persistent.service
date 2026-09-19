@@ -3,13 +3,13 @@ Description=Historical market collection on persistent Sandisk storage
 
 [Service]
 Type=simple
-WorkingDirectory=/home/drwho1985/.codex/worktrees/0aac/beijing-lot
+WorkingDirectory=/home/drwho1985/.local/lib/beijing-lot/market-capture/roster-correction-a96c8a6ae823e2f3
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=TMPDIR=/dev/shm
 ExecStartPre=/usr/bin/mountpoint -q /run/media/drwho1985/Sandisk
-ExecStartPre=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/.codex/worktrees/0aac/beijing-lot/scripts/check_persistent_data_layout.py --contract /home/drwho1985/.codex/worktrees/0aac/beijing-lot/config/persistent_data_layout.json
-ExecStartPre=/usr/bin/test -f /run/media/drwho1985/Sandisk/data/beijing-lot/markets/manifests/market-forward-persistent-v1/ready.json
-ExecStart=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python -u scripts/collect_market_history.py --plan /run/media/drwho1985/Sandisk/data/beijing-lot/markets/manifests/market-forward-persistent-v1/plan.json --index /run/media/drwho1985/Sandisk/data/beijing-lot/markets/manifests/market-forward-persistent-v1/existing-captures.json --output /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/market-forward-persistent-v1 --ledger /run/media/drwho1985/Sandisk/data/beijing-lot/runtime/state/request_ledger.sqlite --budget-id market-observed-history-one-second-v2 --request-budget 994386 --min-free-bytes 21474836480 --min-interval-seconds 1
+ExecStartPre=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/.local/lib/beijing-lot/market-capture/roster-correction-a96c8a6ae823e2f3/scripts/check_persistent_data_layout.py --contract /home/drwho1985/.local/lib/beijing-lot/market-capture/roster-correction-a96c8a6ae823e2f3/config/persistent_data_layout.json
+ExecStartPre=/usr/bin/test -f /run/media/drwho1985/Sandisk/data/beijing-lot/markets/manifests/market-roster-corrected-v1/epoch-receipt.json
+ExecStart=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python -u scripts/supervise_market_history.py --contract /home/drwho1985/.local/lib/beijing-lot/market-capture/roster-correction-a96c8a6ae823e2f3/config/persistent_data_layout.json --plan /run/media/drwho1985/Sandisk/data/beijing-lot/markets/manifests/market-roster-corrected-v1/plan.json --index /run/media/drwho1985/Sandisk/data/beijing-lot/markets/manifests/market-roster-corrected-v1/existing-captures.json --output /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/market-roster-corrected-v1 --ledger-path /run/media/drwho1985/Sandisk/data/beijing-lot/runtime/state/request_ledger.sqlite --budget-id market-observed-history-one-second-v2 --request-budget 994386 --min-free-bytes 21474836480 --min-interval-seconds 2 --workers 5
 Restart=on-failure
 RestartSec=30
 

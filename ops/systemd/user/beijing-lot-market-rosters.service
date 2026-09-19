@@ -1,0 +1,16 @@
+[Unit]
+Description=Independent market fixture roster supplier
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/home/drwho1985/.codex/worktrees/0aac/beijing-lot
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=TMPDIR=/dev/shm
+ExecStartPre=/usr/bin/mountpoint -q /run/media/drwho1985/Sandisk
+ExecStart=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python -u scripts/supply_market_rosters.py --contract config/persistent_data_layout.json --plan-path /run/media/drwho1985/Sandisk/data/beijing-lot/markets/manifests/roster-resume-20260917-v2/plan.json --output /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/roster-supply-v1 --ledger-path /run/media/drwho1985/Sandisk/data/beijing-lot/runtime/state/request_ledger.sqlite --budget-id market-roster-recovery-20260917 --request-budget 1956
+Restart=on-failure
+RestartSec=1800
+
+[Install]
+WantedBy=default.target

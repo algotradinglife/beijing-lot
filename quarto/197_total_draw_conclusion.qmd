@@ -1,0 +1,48 @@
+---
+title: "大小球信息：平局构成与校正增益"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  evidence: null
+  receipt_sha256: null
+---
+
+284期22943场配对评估；另有前10期预热。低档总期望进球<2.5，中档2.5至3，高档≥3。
+总期望进球来自已验收欧赔＋大小球映射的双方lambda之和，不使用实际赛后总进球分档。
+原市场概率已经包含大小球约束，本轮检验额外历史分层的增量作用。
+
+```{r}
+library(dplyr);library(readr);library(tidyr);library(ggplot2)
+source('r/diagnostic_verified_csv.R')
+stopifnot(digest::digest(file=file.path(params$evidence,'receipt.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(params$evidence,'receipt.json'),simplifyVector=FALSE)
+s<-diagnostic_read_verified_csv(file.path(params$evidence,'summary.csv'),r$files[['summary.csv']],cols())
+d<-diagnostic_read_verified_csv(file.path(params$evidence,'total-strata.csv'),r$files[['total-strata.csv']],cols())
+m<-diagnostic_read_verified_csv(file.path(params$evidence,'draw-score-mix.csv'),r$files[['draw-score-mix.csv']],cols())
+p<-diagnostic_read_verified_csv(file.path(params$evidence,'periods.csv'),r$files[['periods.csv']],cols())
+t<-d |> group_by(total_band) |> summarise(ordinary_draw=weighted.mean(ordinary_draw,fixtures),handicap_draw=weighted.mean(handicap_draw,fixtures),fixtures=sum(fixtures),.groups='drop')
+knitr::kable(t,digits=4)
+m$total_band<-factor(m$total_band,levels=c('LOW','MID','HIGH'))
+fig<-ggplot(m,aes(total_band,share,fill=factor(actual_home)))+geom_col()+theme_minimal()+labs(x='Pre-match expected total band',y='Share among ordinary draws',fill='Goals per team',subtitle='0 = 0:0; 1 = 1:1; 2 = 2:2')
+print(fig)
+knitr::kable(s,digits=6)
+p$segment<-factor(p$segment,levels=c('BEFORE_305','DRAWDOWN_94','AFTER_85'))
+fig2<-p |> pivot_longer(c(brier,log_loss),names_to='metric',values_to='value') |> ggplot(aes(segment,value,colour=model,group=model))+geom_point()+geom_line()+facet_wrap(~metric,scales='free_y')+scale_x_discrete(labels=c(BEFORE_305='Before',DRAWDOWN_94='Drawdown',AFTER_85='After'))+theme_minimal()+labs(x='Stage',y='Score; lower is better')
+print(fig2)
+```
+
+## 结论
+
+普通平局率：低档30.03%、中档25.76%、高档19.18%。在已经发生的普通平局中，0:0的占比由低档36.38%降到高档22.08%；2:2及以上从18.14%升到32.50%。1:1占比两端均约45.4%。
+因此总进球预期与平局的比分构成存在明显描述性关联，但不能仅据盘口证明对攻或保守战术；各档赛事构成也不同。
+
+增加总进球分层后，相对相同历史的BASE，Brier改善0.000116、Log loss改善0.000190，三个时间段均小幅改善；Top2净增5场，Top1减少34场。
+但TOTAL仍逊于RAW。结论是保留总进球这一诊断维度，本次校正不升级为默认底座，不宣称收益改善。
+
+机器结果中的BEFORE_305是沿用完整484期研究的阶段标识，并非本轮期数；本轮对应回撤前105期、回撤94期、回撤后85期。110915不在可用投影中。三组共用同一清单及预热历史。

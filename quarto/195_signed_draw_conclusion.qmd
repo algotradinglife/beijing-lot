@@ -1,0 +1,39 @@
+---
+title: "有符号胜负差：结论与分段对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  evidence: null
+  receipt_sha256: null
+---
+
+484期36140场，原49块、每10期更新。ABS为绝对胜负差，SIGNED保留正负；其余让球数分层、累计50%＋近三期50%、收缩100/20及48小时历史标签代理全部相同。
+
+```{r}
+library(dplyr);library(readr);library(tidyr);library(ggplot2)
+source('r/diagnostic_verified_csv.R')
+rpath<-file.path(params$evidence,'receipt.json')
+stopifnot(digest::digest(file=rpath,algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(rpath,simplifyVector=FALSE)
+s<-diagnostic_read_verified_csv(file.path(params$evidence,'summary.csv'),r$files[['summary.csv']],cols())
+p<-diagnostic_read_verified_csv(file.path(params$evidence,'periods.csv'),r$files[['periods.csv']],cols())
+knitr::kable(s,digits=6)
+p$segment<-factor(p$segment,levels=c('BEFORE_305','DRAWDOWN_94','AFTER_85'))
+fig<-p |> pivot_longer(c(brier,log_loss),names_to='metric',values_to='value') |> ggplot(aes(segment,value,colour=model,group=model))+geom_point()+geom_line()+facet_wrap(~metric,scales='free_y')+scale_x_discrete(labels=c(BEFORE_305='Before',DRAWDOWN_94='Drawdown',AFTER_85='After'))+theme_minimal()+labs(x='Stage (chronological)',y='Score; lower is better')
+print(fig)
+```
+
+## 结论
+
+本轮不采纳有符号差版本。SIGNED相对ABS，Brier增加0.000314、Log loss增加0.000399、让平Brier增加0.000167；Top2只净增6场（0.0166个百分点），Top1减少76场。
+三个时间段的Brier及Log loss全部更差。Top2回撤前增加27场、回撤段减少4场、回撤后减少17场，缺乏跨阶段稳定改善。
+两种动态校正整体均逊于RAW。这不证明主客方向没有信息，只说明当前固定分档及收缩方式没有把方向信息转化为更好的预测。
+SIGNED格子更细，支持变少；这是可能解释，尚未通过额外消融确认，不应当作已证实原因。本轮不继续扫描参数追求回顾最优，不改变默认概率底座。
+
+本报告仅作历史诊断；未测下注收益，不能由Top2净增推断盈利改善。

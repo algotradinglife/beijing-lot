@@ -1,0 +1,263 @@
+---
+title: "格子退化监控与资金迁移：固定规则逐期回顾"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  study: null
+  study_receipt_sha256: null
+  depth_report: null
+  depth_receipt_sha256: null
+  output: null
+  python: null
+---
+
+固定784期；不挑事后回撤段训练。每个目标期仅使用最后比赛截止时间加48小时、严格早于目标期最早截止时间的历史。
+时间代理不证明真实标签可用性，原概率包也仅为暴露历史研究；本报告不能作为实时交易验收。
+共享时序模块负责准入、20期近期窗口、50%累计历史+50%近期归一化权重，ESS至少20。
+格子需至少30个有票期、累计预计中奖10票；格子有效样本至少20期、近期有效样本至少5期，否则UNKNOWN。
+长短历史分别在格子内归一化后按50%合成，避免稀疏格子改变权重；命中实现或回款/投入低于0.8标BAD，至少1标GOOD，其余中性。
+这些是本轮事先固定的实验参数，未搜索最佳门槛。
+
+资金实验仅用原JOINT购买集合：BAD格减掉低概率一半票；释放资金优先给GOOD格高概率票各加一倍，最多两倍。
+不能转出的资金保留现金；没有扩组、没有增加预算。WARMUP与UNKNOWN保持原方案。
+该设计测的是保守重分配，不代表所有可能的调仓策略。统一128保留为独立对照。
+
+```{r}
+library(dplyr);library(readr);library(ggplot2)
+source(file.path(params$project_root,'r/joint_ticket_calibration.R'))
+stopifnot(digest::digest(file=file.path(params$study,'evaluation-receipt.json'),algo='sha256')==params$study_receipt_sha256,
+ digest::digest(file=file.path(params$depth_report,'receipt.json'),algo='sha256')==params$depth_receipt_sha256)
+er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+dr<-jsonlite::fromJSON(file.path(params$depth_report,'receipt.json'))
+stopifnot(digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256')==er$freeze_sha256)
+fr<-jsonlite::fromJSON(file.path(params$study,'plans-frozen.json'),simplifyVector=FALSE)
+stopifnot(digest::digest(file=file.path(params$depth_report,'groups.csv'),algo='sha256')==dr$outputs[['groups.csv']])
+g<-read_csv(file.path(params$depth_report,'groups.csv'),col_types=cols(issue='c'),show_col_types=FALSE) |> filter(arm=='JOINT')
+stopifnot(!anyDuplicated(g[c('issue','sleeve_id')]))
+tables<-list()
+for(path in names(fr$receipt$plan_hashes)) {
+ stopifnot(digest::digest(file=path,algo='sha256')==fr$receipt$plan_hashes[[path]])
+ p<-jsonlite::fromJSON(gzfile(path),simplifyVector=FALSE)
+ for(arm in c('P0_OPEN','P128_OPEN')) {
+  t<-bind_rows(p$plans[[arm]]$tickets)
+  if(!nrow(t))next
+  t<-t |> mutate(issue=p$issue,policy=arm,stake=2) |>
+   left_join(g |> select(issue,sleeve_id,actual_rank,actual_gross_cny,stage),
+    by=c('issue','sleeve_id'),relationship='many-to-one') |>
+   mutate(hit=prob_rank==actual_rank,gross=if_else(hit,actual_gross_cny,0))
+  stopifnot(!anyNA(t$hit))
+  tables[[length(tables)+1L]]<-t
+ }
+}
+x<-bind_rows(tables)
+stopifnot(digest::digest(file=file.path(params$study,'rows.csv'),algo='sha256')==er$files[['rows.csv']])
+r<-read_csv(file.path(params$study,'rows.csv'),col_types=cols(issue='c'),show_col_types=FALSE)
+check<-x |> group_by(issue,policy) |> summarise(rebuilt_hits=sum(hit),rebuilt_gross=sum(gross),rebuilt_stake=sum(stake),.groups='drop') |>
+ left_join(r,by=c('issue','policy'),relationship='one-to-one')
+stopifnot(all(check$rebuilt_hits==check$hits),all(abs(check$rebuilt_gross-check$gross)<1e-6),all(check$rebuilt_stake==check$stake))
+
+library(tidyr)
+source(file.path(params$project_root,'r/joint_grid_monitor.R'))
+source(file.path(params$project_root,'r/fundamentals_equity_curves.R'))
+x<-x |> mutate(ticket_id=paste(sleeve_id,ticket_col_idx,sep=':'),
+ band=cut(prob,c(0,.001,.002,.003,.005,.01,.02,1),right=FALSE,include.lowest=TRUE),
+ payout_band=cut(payout_hat,c(0,128,256,512,1024,Inf),right=FALSE),
+ cell=paste(band,payout_band,sep=' | '))
+stopifnot(!anyNA(x$cell))
+h<-x |> filter(policy=='P0_OPEN') |> group_by(issue_code=issue,cell) |>
+ summarise(expected=sum(prob),hits=sum(hit),stake=sum(stake),gross=sum(gross),.groups='drop')
+clock<-list()
+for(path in names(fr$receipt$plan_hashes)) {
+ p<-jsonlite::fromJSON(gzfile(path),simplifyVector=FALSE)
+ ts<-unlist(p$cutoffs)
+ clock[[p$issue]]<-tibble(issue_code=p$issue,last_fixture_cutoff=max(ts),fixture_decision_ts=min(ts))
+}
+clock<-bind_rows(clock)
+base<-h |> group_by(issue_code) |> summarise(hit_residual=(sum(hits)-sum(expected))/sum(stake/2),.groups='drop') |>
+ right_join(clock,by='issue_code',relationship='one-to-one') |>
+ mutate(hit_residual=replace_na(hit_residual,0),depth_residual=hit_residual)
+# No-bet issues contain no grid evidence; their zero residual is used only by the
+# shared clock adapter, never as a cell observation.
+out<-params$output;dir.create(out,recursive=TRUE,showWarnings=FALSE)
+write_csv(h,file.path(out,'grid-history.csv'))
+code_files<-c('r/joint_grid_monitor.R','r/fundamentals_equity_curves.R','src/temporal_learning/stratified.py','quarto/211_joint_grid_monitor.qmd')
+code<-setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)
+sources<-c(code,list(history=digest::digest(file=file.path(out,'grid-history.csv'),algo='sha256'),
+ frozen=digest::digest(file=file.path(params$study,'plans-frozen.json'),algo='sha256'),
+ depth=params$depth_receipt_sha256))
+reticulate::use_python(params$python,required=TRUE)
+mod<-reticulate::import('src.n7_risk_context',convert=TRUE)
+contexts_raw<-mod$n7_risk_contexts_json(jsonlite::toJSON(base,dataframe='rows',auto_unbox=TRUE,digits=NA),
+ jsonlite::toJSON(clock |> select(issue_code,fixture_decision_ts),dataframe='rows',auto_unbox=TRUE),
+ repository_root=params$project_root,source_hashes_json=jsonlite::toJSON(sources,auto_unbox=TRUE),
+ delay_hours=48L,window_issues=20L,recent_blend=.5,minimum_ess=20)
+writeLines(contexts_raw,file.path(out,'contexts.json'))
+forecasts<-plans<-strata_ledgers<-list()
+stratifier<-reticulate::import('src.temporal_learning.stratified',convert=TRUE)
+shared_core<-reticulate::import('src.temporal_learning.core',convert=TRUE)
+np<-reticulate::import('numpy',convert=FALSE)
+membership_json<-jsonlite::toJSON(h |> select(issue_code,cell),dataframe='rows',auto_unbox=TRUE)
+channels<-c('hit_signal','return_signal','long_hit_signal')
+contexts<-jsonlite::fromJSON(stratifier$stratified_contexts_json(contexts_raw,membership_json,
+ minimum_ess=20,minimum_recent_ess=5),simplifyVector=FALSE)
+for(ct in contexts) {
+ id<-ct$receipt$target_issue
+ strata_ledgers[[id]]<-list(strata=ct$strata,receipt=ct$strata_receipt)
+ z<-joint_grid_monitor(h,ct,ct$receipt,30,10,.8,1)
+ # Independent arithmetic replay of domain forecasts from shared admitted masses.
+ for(st in ct$strata) {
+  wh<-bind_rows(st$rows) |> inner_join(h |> filter(cell==st$cell),by='issue_code')
+  long_hit<-sum(wh$hits*wh$long_weight)/sum(wh$expected*wh$long_weight)
+  recent_hit<-sum(wh$hits*wh$recent_weight)/sum(wh$expected*wh$recent_weight)
+  zz<-z |> filter(cell==st$cell)
+  hit_score<-(1-st$alpha)*long_hit+st$alpha*recent_hit
+  long_return<-sum(wh$gross*wh$long_weight)/sum(wh$stake*wh$long_weight)
+  recent_return<-sum(wh$gross*wh$recent_weight)/sum(wh$stake*wh$recent_weight)
+  return_score<-(1-st$alpha)*long_return+st$alpha*recent_return
+  ess<-shared_core$effective_sample_size(np$array((1-st$alpha)*wh$long_weight+st$alpha*wh$recent_weight))
+  recent_ess<-if(sum(wh$recent_weight)>0)shared_core$effective_sample_size(np$array(wh$recent_weight)) else 0
+  support<-ess>=20 && recent_ess>=5
+  enough<-nrow(wh)>=30 && sum(wh$expected)>=10
+  hit_class<-if(!support || !enough)'UNKNOWN' else if(hit_score<.8)'BAD' else if(hit_score>=1)'GOOD' else 'NEUTRAL'
+  return_class<-if(!support || !enough)'UNKNOWN' else if(return_score<.8)'BAD' else if(return_score>=1)'GOOD' else 'NEUTRAL'
+  long_class<-if(!enough)'UNKNOWN' else if(long_hit<.8)'BAD' else if(long_hit>=1)'GOOD' else 'NEUTRAL'
+  stopifnot(isTRUE(all.equal(zz$hit_ratio,hit_score)),isTRUE(all.equal(zz$return_ratio,return_score)),
+    isTRUE(all.equal(st$ess,ess)),isTRUE(all.equal(st$recent_ess,recent_ess)),
+    identical(zz$supported,support),identical(zz$hit_signal,hit_class),
+    identical(zz$return_signal,return_class),identical(zz$long_hit_signal,long_class))
+ }
+ altered<-h
+ admitted<-if(ct$status=='READY')bind_rows(ct$rows)$issue_code else character()
+ outside<-!altered$issue_code %in% admitted
+ altered$hits[outside]<-altered$hits[outside]+1e6;altered$gross[outside]<-altered$gross[outside]+1e9
+ changed<-joint_grid_monitor(altered,ct,ct$receipt,30,10,.8,1)
+ stopifnot(identical(z,changed))
+ forecasts[[id]]<-z |> mutate(issue=id)
+ tt<-x |> filter(issue==id,policy=='P0_OPEN') |> select(ticket_id,cell,prob)
+ for(channel in channels) {
+  a<-joint_grid_allocate(tt,z,ct$receipt,channel,2,1024)
+  stopifnot(identical(a,joint_grid_allocate(tt,changed,ct$receipt,channel,2,1024)))
+  # Attribution control: same integer spend and copy-count distribution, but
+  # choose cuts/additions by original probability without grid membership.
+  m<-a;m$copies<-1L
+  ranking<-order(-tt$prob,tt$ticket_id)
+  if(sum(a$copies==0)>0)m$copies[tail(ranking,sum(a$copies==0))]<-0L
+  if(sum(a$copies==2)>0)m$copies[head(ranking,sum(a$copies==2))]<-2L
+  stopifnot(identical(sort(m$copies),sort(a$copies)))
+  plans[[paste(id,channel,'matched')]]<-m |> mutate(issue=id,policy=paste0(channel,'_matched'),cutoff_identity=ct$receipt$cutoff_identity)
+  # Independent replay of integer cut/add decisions, without invoking allocator.
+  replay<-tt |> left_join(z |> select(cell,signal=all_of(channel)),by='cell',relationship='many-to-one') |>
+   mutate(signal=replace_na(signal,'UNKNOWN')) |> arrange(cell,desc(prob),ticket_id) |>
+   group_by(cell) |> mutate(copies=if_else(signal=='BAD' & row_number()>ceiling(n()/2),0L,1L)) |> ungroup()
+  freed<-nrow(replay)-sum(replay$copies)
+  extras<-replay |> filter(signal=='GOOD') |> arrange(desc(prob),ticket_id) |> slice_head(n=freed)
+  replay$copies[replay$ticket_id %in% extras$ticket_id]<-2L
+  stopifnot(identical(a$copies,replay$copies[match(a$ticket_id,replay$ticket_id)]))
+  plans[[paste(id,channel)]]<-a |> mutate(issue=id,policy=channel,cutoff_identity=ct$receipt$cutoff_identity)
+ }
+}
+f<-bind_rows(forecasts);p<-bind_rows(plans)
+# Exposed-sample mechanism ablation: keep the same prior-only LONG cuts but
+# retain released cash, rather than adding copies. No new signal/threshold.
+p<-bind_rows(p,p |> filter(policy=='long_hit_signal') |>
+ mutate(copies=pmin(copies,1L),policy='long_cash_only'))
+jsonlite::write_json(strata_ledgers,file.path(out,'strata-ledgers.json'),auto_unbox=TRUE,digits=NA)
+write_csv(f,file.path(out,'forecasts.csv'));write_csv(p,file.path(out,'frozen-plans.csv'))
+jsonlite::write_json(list(historical_admission=FALSE,source_hashes=sources,
+ contexts_sha256=digest::digest(file=file.path(out,'contexts.json'),algo='sha256'),
+ plans_sha256=digest::digest(file=file.path(out,'frozen-plans.csv'),algo='sha256'),
+ strata_sha256=digest::digest(file=file.path(out,'strata-ledgers.json'),algo='sha256'),
+ parameters=list(cell_ess=20,recent_cell_ess=5,delay_hours=48,window=20,alpha=.5,ess=20,minimum_issues=30,minimum_expected=10,bad=.8,good=1,
+ unit_cny=2,budget_cny=1024,max_copies=2),verified_plans=length(plans),independent_replays=length(contexts)*length(channels),cash_ablation_plans=length(contexts)),
+ file.path(out,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+以上先冻结每期分配，再将目标结算用于以下评价。历史格子统计仅经共享准入名单进入预测。
+
+```{r}
+assessment<-h |> rename(issue=issue_code) |> left_join(f,by=c('issue','cell'),suffix=c('','_history'),relationship='one-to-one') |>
+ mutate(hit_signal=replace_na(hit_signal,'UNKNOWN'),return_signal=replace_na(return_signal,'UNKNOWN'),long_hit_signal=replace_na(long_hit_signal,'UNKNOWN')) |>
+ pivot_longer(c(hit_signal,return_signal,long_hit_signal),names_to='channel',values_to='signal') |>
+ group_by(channel,signal) |> summarise(issues=n_distinct(issue),cells=n(),stake=sum(stake),
+ expected=sum(expected),hits=sum(hits),gross=sum(gross),.groups='drop') |>
+ mutate(hit_ratio=hits/expected,roi=gross/stake-1)
+new<-p |> left_join(x |> filter(policy=='P0_OPEN') |> select(issue,ticket_id,hit,gross),
+ by=c('issue','ticket_id'),relationship='many-to-one') |>
+ group_by(issue,policy) |> summarise(stake=sum(2*copies),gross=sum(gross*copies),hits=sum(hit*copies),.groups='drop')
+order<-sort(clock$issue_code)
+new<-expand_grid(issue=order,policy=c(channels,paste0(channels,'_matched'),'long_cash_only')) |> left_join(new,by=c('issue','policy')) |>
+ mutate(across(c(stake,gross,hits),~replace_na(.x,0)))
+control<-r |> filter(policy %in% c('P0_OPEN','P128_OPEN')) |> select(issue,policy,stake,gross,hits)
+rows<-bind_rows(control,new) |> mutate(net=gross-stake,budget_cny=1024,cash_cny=1024-stake,
+ status=if_else(stake>0,'COMPLETE','NO_BET'),model='frozen-market')
+curves<-strategy_equity_curves(rows,order,100000)
+stopifnot(!any(curves$stopped))
+summary<-curves |> filter(period>0) |> group_by(policy) |>
+ summarise(issues=n(),stake=sum(stake),net=sum(net),roi=net/stake,hit_issues=sum(hits>0),
+ max_drawdown=max(drawdown_cny),.groups='drop')
+for(n in c('assessment','rows','curves','summary'))write_csv(get(n),file.path(out,paste0(n,'.csv')))
+knitr::kable(assessment,digits=3);knitr::kable(summary,digits=3)
+cell_assessment<-h |> rename(issue=issue_code) |>
+ left_join(f |> select(issue,cell,hit_signal,return_signal,long_hit_signal),by=c('issue','cell'),relationship='one-to-one') |>
+ mutate(across(c(hit_signal,return_signal,long_hit_signal),~replace_na(.x,'UNKNOWN'))) |>
+ pivot_longer(c(hit_signal,return_signal,long_hit_signal),names_to='channel',values_to='signal') |>
+ group_by(channel,cell,signal) |> summarise(issues=n_distinct(issue),stake=sum(stake),
+ expected=sum(expected),hits=sum(hits),gross=sum(gross),.groups='drop') |>
+ mutate(hit_ratio=hits/expected,roi=gross/stake-1)
+bridge<-p |> left_join(x |> filter(policy=='P0_OPEN') |> select(issue,ticket_id,gross),
+ by=c('issue','ticket_id'),relationship='many-to-one') |> filter(copies!=1) |>
+ mutate(category=if_else(copies==0,'REMOVED','ADDED')) |> group_by(policy,category) |>
+ summarise(tickets=n(),stake=2*n(),gross=sum(gross),net=gross-stake,.groups='drop')
+phase<-rows |> mutate(period=match(issue,order),
+ stage=case_when(period<=305~'BEFORE',period<=399~'DRAWDOWN',TRUE~'AFTER')) |>
+ group_by(policy,stage) |> summarise(stake=sum(stake),gross=sum(gross),net=sum(net),roi=net/stake,
+ hit_issues=sum(hits>0),.groups='drop')
+# Fractional diagnostic benchmark only: same per-issue spend as redistributed
+# plans, but proportional exposure to original tickets. Not a purchasable plan.
+matched<-rows |> filter(policy %in% c('hit_signal','return_signal')) |>
+ left_join(control |> filter(policy=='P0_OPEN') |> select(issue,original_stake=stake,original_gross=gross),by='issue') |>
+ mutate(matched_gross=if_else(original_stake>0,original_gross*stake/pmax(original_stake,1),0)) |>
+ group_by(policy) |> summarise(matched_net=sum(matched_gross-stake),actual_net=sum(net),stake=sum(stake),.groups='drop')
+for(n in c('cell_assessment','bridge','phase','matched'))write_csv(get(n),file.path(out,paste0(n,'.csv')))
+knitr::kable(bridge,digits=2);knitr::kable(phase,digits=3);knitr::kable(matched,digits=2)
+
+```
+
+```{r, fig.width=12, fig.height=8}
+plot<-curves |> filter(!grepl('_matched$',policy)) |> select(policy,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+labs(title='Prior-only grid monitoring: fixed redistribution rules',x='Issue index',colour=NULL)
+ggsave(file.path(out,'curves.png'),plot,width=12,height=8,dpi=150);plot
+```
+
+```{r, fig.width=12, fig.height=7}
+fp<-f |> left_join(tibble(issue=order,period=seq_along(order)),by='issue')
+plot2<-ggplot(fp,aes(period,cell,fill=hit_signal))+geom_tile()+
+ scale_fill_manual(values=c(BAD='#b2182b',GOOD='#2166ac',NEUTRAL='grey80',UNKNOWN='white'))+
+ theme_minimal()+labs(title='Signals known from admitted prior history',x='Target issue index',y='Probability | estimated payout',fill='Hit signal')
+ggsave(file.path(out,'signals.png'),plot2,width=12,height=7,dpi=150);plot2
+```
+
+所有结果是暴露历史上的固定规则回顾。BAD并不等于能预测下一期差；需同时检查前瞻一周期的命中实现、回款、资金利用和回撤。
+期内各票高度相关，不把票数当独立样本量。模型估计回款与北单实际回款不同；回款监控用历史真实结算，不回填本期赛前SP。
+加倍会集中已有中奖风险，本实验不把它包装成新增覆盖。现金减少风险不等于格子选择变好。
+
+
+## 本轮结论
+
+本轮加入近期信息的全格迁移未改善结果：合并提前标BAD的格子，目标期的命中实现反而高于预期。
+但局部有辨识价值：概率0.3%–0.5%、预计回款256–512元的密集格，BAD后ROI为−13.1%，GOOD后为+5.4%；中性后更差（−26.3%），故预警不完整，不能从 pooled 结果推断每格都无效。
+两种加入近期信息的迁移规则均降低收益、减少命中期并加大回撤，不建议启用这类近期追随调仓。
+累计历史命中规则保留了收益并降低回撤，但桥接表显示改善来自减掉亏损票，新增倍投本身仍亏损。
+增加long_cash_only作为**看过初算后的机制消融**：保持同一份累计历史减票计划，释放资金全部持有现金。
+这不是未见样本验证，不将该消融的事后选择包装成事先提出的优胜策略。
+同一格子的条件统计、减掉与加倍投入票的收益桥接另存表，避免把格子构成变化或现金效应误称预测力。
+这否定本轮简单的近期追随规则，不证明退化绝对不可预测，也不以事后重新挑门槛挽救结果。

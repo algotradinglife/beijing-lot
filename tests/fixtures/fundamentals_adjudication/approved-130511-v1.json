@@ -1,0 +1,350 @@
+{
+  "schema": "bj411_field_decisions_v1",
+  "authority": "OWNER_CONVERSATION",
+  "historical_admission": false,
+  "scope": "Each issue/slot independently; no propagation",
+  "origin_sha256": "3fc8d777ab9e12998c258b0c49176f8b1be0f301e696fe05bc5925e45f1d1475",
+  "rules": [
+    {
+      "case_id": "130511/7/schedules/titan",
+      "issue": "130511",
+      "slot": 7,
+      "field": "schedules",
+      "status": "APPROVED",
+      "operation": "隔离 Nowscore 赛程，选用 Titan",
+      "selection": {
+        "issue": "130511",
+        "slot": 7,
+        "source": "titan",
+        "provider_id": "725219",
+        "url": "https://zq.titan007.com/analysis/725219cn.htm",
+        "sha256": "ff2e03825e3620780c60dd2755aa632cba6bdcfa399d7dd0678a2114579858b3",
+        "column": "normalized_fields",
+        "path": [
+          "schedules"
+        ],
+        "value_sha256": "d3b975afdeca00a44a1657c7a6a236077445acefcf308754f676969cd91e3cbe"
+      },
+      "guards": [
+        {
+          "issue": "130511",
+          "slot": 7,
+          "source": "nowscore",
+          "provider_id": "725219",
+          "url": "https://live.nowscore.com/analysis/725219cn.html",
+          "sha256": "c51476d7a00ce911b59a472dbb06c020aad91ab7acb2a3001e9ff474fe27c271",
+          "column": "schedules_raw",
+          "path": [],
+          "value_sha256": "2372b6cbcffc76e067b107034d8facff594f25b2c892102f222aa0a2e48c9145"
+        },
+        {
+          "issue": "130511",
+          "slot": 7,
+          "source": "titan",
+          "provider_id": "725219",
+          "url": "https://zq.titan007.com/analysis/725219cn.htm",
+          "sha256": "ff2e03825e3620780c60dd2755aa632cba6bdcfa399d7dd0678a2114579858b3",
+          "column": "schedules_raw",
+          "path": [],
+          "value_sha256": "f2ed0ae8799dcc57af871083c820ee135200c6233bda607a14f083aab92c8c7a"
+        }
+      ],
+      "edits": [],
+      "exclusion": null,
+      "nowscore": {
+        "url": "https://live.nowscore.com/analysis/725219cn.html",
+        "information": "赛程含未来信息"
+      },
+      "titan": {
+        "url": "https://zq.titan007.com/analysis/725219cn.htm",
+        "information": "赛程可供本场选用"
+      },
+      "evidence": [
+        "第7场Nowscore未来信息泄露，同意隔离，未来合并这部分可只使用Titan",
+        "第73场确定Titan缺失，可以Nowscore源为准",
+        "诺科平2165，哈尔姆斯达斯424",
+        "如果你已经查到历史的对阵记录，我支持你的调整",
+        "好的，接受你的建议。〔上下文：第68场保留Nowscore四条，排除Titan多出的两条〕",
+        "第34场的半场比分按照你的建议来〔历史比赛821616，不是本场845808〕"
+      ]
+    },
+    {
+      "case_id": "130511/34/home_history/nowscore",
+      "issue": "130511",
+      "slot": 34,
+      "field": "home_history",
+      "status": "APPROVED",
+      "operation": "历史821616半场1:2改为2:1；全场4:1不变",
+      "selection": {
+        "issue": "130511",
+        "slot": 34,
+        "source": "nowscore",
+        "provider_id": "845808",
+        "url": "https://live.nowscore.com/analysis/845808cn.html",
+        "sha256": "dc7c2e206b64d7dca159b9cee759f4adf8274b9bc19b7efc6dcf2352f760d5c6",
+        "column": "home_history_raw",
+        "path": [],
+        "value_sha256": "b046bf1ae0c93a6fd95b2d756cbcd0187ef63c38991b361d5b2a98f748db0c83"
+      },
+      "guards": [
+        {
+          "issue": "130511",
+          "slot": 34,
+          "source": "nowscore",
+          "provider_id": "845808",
+          "url": "https://live.nowscore.com/analysis/845808cn.html",
+          "sha256": "dc7c2e206b64d7dca159b9cee759f4adf8274b9bc19b7efc6dcf2352f760d5c6",
+          "column": "home_history_raw",
+          "path": [],
+          "value_sha256": "b046bf1ae0c93a6fd95b2d756cbcd0187ef63c38991b361d5b2a98f748db0c83"
+        },
+        {
+          "issue": "130511",
+          "slot": 34,
+          "source": "titan",
+          "provider_id": "845808",
+          "url": "https://zq.titan007.com/analysis/845808cn.htm",
+          "sha256": "96fedc54b852a6362f53697873f961fcceefa5d2fbf273c752efc7c535a3b5d9",
+          "column": "home_history_raw",
+          "path": [],
+          "value_sha256": "d7330afa805665e237e85321f44e748bbca854ad5d5a6163e325afbc432028b6"
+        }
+      ],
+      "edits": [
+        {
+          "row": 17,
+          "column": 11,
+          "before": "1-2",
+          "after": "2-1"
+        }
+      ],
+      "exclusion": null,
+      "nowscore": {
+        "url": "https://live.nowscore.com/analysis/845808cn.html",
+        "information": "历史821616半场1-2，全场4-1"
+      },
+      "titan": {
+        "url": "https://zq.titan007.com/analysis/845808cn.htm",
+        "information": "历史821616半场1-2，全场4-1"
+      },
+      "evidence": [
+        "第7场Nowscore未来信息泄露，同意隔离，未来合并这部分可只使用Titan",
+        "第73场确定Titan缺失，可以Nowscore源为准",
+        "诺科平2165，哈尔姆斯达斯424",
+        "如果你已经查到历史的对阵记录，我支持你的调整",
+        "好的，接受你的建议。〔上下文：第68场保留Nowscore四条，排除Titan多出的两条〕",
+        "第34场的半场比分按照你的建议来〔历史比赛821616，不是本场845808〕",
+        "https://www.tipsbladet.dk/nyhed/superliga/shakhtar-stor-en-mundfuld-randers — 2013-02-19 报道进球顺序支持半场2:1；原始HTTP200已保存"
+      ]
+    },
+    {
+      "case_id": "130511/34/home_history/titan",
+      "issue": "130511",
+      "slot": 34,
+      "field": "home_history",
+      "status": "APPROVED",
+      "operation": "历史821616半场1:2改为2:1；全场4:1不变",
+      "selection": {
+        "issue": "130511",
+        "slot": 34,
+        "source": "titan",
+        "provider_id": "845808",
+        "url": "https://zq.titan007.com/analysis/845808cn.htm",
+        "sha256": "96fedc54b852a6362f53697873f961fcceefa5d2fbf273c752efc7c535a3b5d9",
+        "column": "home_history_raw",
+        "path": [],
+        "value_sha256": "d7330afa805665e237e85321f44e748bbca854ad5d5a6163e325afbc432028b6"
+      },
+      "guards": [
+        {
+          "issue": "130511",
+          "slot": 34,
+          "source": "nowscore",
+          "provider_id": "845808",
+          "url": "https://live.nowscore.com/analysis/845808cn.html",
+          "sha256": "dc7c2e206b64d7dca159b9cee759f4adf8274b9bc19b7efc6dcf2352f760d5c6",
+          "column": "home_history_raw",
+          "path": [],
+          "value_sha256": "b046bf1ae0c93a6fd95b2d756cbcd0187ef63c38991b361d5b2a98f748db0c83"
+        },
+        {
+          "issue": "130511",
+          "slot": 34,
+          "source": "titan",
+          "provider_id": "845808",
+          "url": "https://zq.titan007.com/analysis/845808cn.htm",
+          "sha256": "96fedc54b852a6362f53697873f961fcceefa5d2fbf273c752efc7c535a3b5d9",
+          "column": "home_history_raw",
+          "path": [],
+          "value_sha256": "d7330afa805665e237e85321f44e748bbca854ad5d5a6163e325afbc432028b6"
+        }
+      ],
+      "edits": [
+        {
+          "row": 17,
+          "column": 11,
+          "before": "1-2",
+          "after": "2-1"
+        }
+      ],
+      "exclusion": null,
+      "nowscore": {
+        "url": "https://live.nowscore.com/analysis/845808cn.html",
+        "information": "历史821616半场1-2，全场4-1"
+      },
+      "titan": {
+        "url": "https://zq.titan007.com/analysis/845808cn.htm",
+        "information": "历史821616半场1-2，全场4-1"
+      },
+      "evidence": [
+        "第7场Nowscore未来信息泄露，同意隔离，未来合并这部分可只使用Titan",
+        "第73场确定Titan缺失，可以Nowscore源为准",
+        "诺科平2165，哈尔姆斯达斯424",
+        "如果你已经查到历史的对阵记录，我支持你的调整",
+        "好的，接受你的建议。〔上下文：第68场保留Nowscore四条，排除Titan多出的两条〕",
+        "第34场的半场比分按照你的建议来〔历史比赛821616，不是本场845808〕",
+        "https://www.tipsbladet.dk/nyhed/superliga/shakhtar-stor-en-mundfuld-randers — 2013-02-19 报道进球顺序支持半场2:1；原始HTTP200已保存"
+      ]
+    },
+    {
+      "case_id": "130511/68/head_to_head/nowscore",
+      "issue": "130511",
+      "slot": 68,
+      "field": "head_to_head",
+      "status": "APPROVED",
+      "operation": "排除 Titan 两条错配交锋；保留两源一致的四条",
+      "selection": {
+        "issue": "130511",
+        "slot": 68,
+        "source": "nowscore",
+        "provider_id": "813536",
+        "url": "https://live.nowscore.com/analysis/813536cn.html",
+        "sha256": "7d1f85cb240a49e1d4a2ded724b8952435e64fbb426df7b625794a37b2c523c1",
+        "column": "head_to_head_raw",
+        "path": [],
+        "value_sha256": "bfe734d32b2a242e6c53b53a33484965ef2d28f71245be3b11cc0fdb062893fb"
+      },
+      "guards": [
+        {
+          "issue": "130511",
+          "slot": 68,
+          "source": "nowscore",
+          "provider_id": "813536",
+          "url": "https://live.nowscore.com/analysis/813536cn.html",
+          "sha256": "7d1f85cb240a49e1d4a2ded724b8952435e64fbb426df7b625794a37b2c523c1",
+          "column": "head_to_head_raw",
+          "path": [],
+          "value_sha256": "bfe734d32b2a242e6c53b53a33484965ef2d28f71245be3b11cc0fdb062893fb"
+        },
+        {
+          "issue": "130511",
+          "slot": 68,
+          "source": "titan",
+          "provider_id": "813536",
+          "url": "https://zq.titan007.com/analysis/813536cn.htm",
+          "sha256": "899921504f1b05b82179eb3c393abc6bf2fafb1b76c37518e50351c161139c9f",
+          "column": "head_to_head_raw",
+          "path": [],
+          "value_sha256": "46907eeffd8c6f29aeed7cb84409239a444a786288ea52310da73618fb824527"
+        }
+      ],
+      "edits": [],
+      "exclusion": {
+        "binding": {
+          "issue": "130511",
+          "slot": 68,
+          "source": "titan",
+          "provider_id": "813536",
+          "url": "https://zq.titan007.com/analysis/813536cn.htm",
+          "sha256": "899921504f1b05b82179eb3c393abc6bf2fafb1b76c37518e50351c161139c9f",
+          "column": "head_to_head_raw",
+          "path": [],
+          "value_sha256": "46907eeffd8c6f29aeed7cb84409239a444a786288ea52310da73618fb824527"
+        },
+        "rows": [
+          5,
+          6
+        ]
+      },
+      "nowscore": {
+        "url": "https://live.nowscore.com/analysis/813536cn.html",
+        "information": "4条交锋"
+      },
+      "titan": {
+        "url": "https://zq.titan007.com/analysis/813536cn.htm",
+        "information": "6条交锋，其中2条身份错误"
+      },
+      "evidence": [
+        "第7场Nowscore未来信息泄露，同意隔离，未来合并这部分可只使用Titan",
+        "第73场确定Titan缺失，可以Nowscore源为准",
+        "诺科平2165，哈尔姆斯达斯424",
+        "如果你已经查到历史的对阵记录，我支持你的调整",
+        "好的，接受你的建议。〔上下文：第68场保留Nowscore四条，排除Titan多出的两条〕",
+        "第34场的半场比分按照你的建议来〔历史比赛821616，不是本场845808〕",
+        "https://www.sverigesradio.se/artikel/467985 — 搜索提供方文本支持恩科平主场0:1诺科平；直接HTTP403保留",
+        "https://www.svenskafans.com/fotboll/17668 — 搜索提供方文本支持诺科平主场0:0恩科平"
+      ]
+    },
+    {
+      "case_id": "130511/73/analysis_fields/nowscore",
+      "issue": "130511",
+      "slot": 73,
+      "field": "analysis_fields",
+      "status": "APPROVED",
+      "operation": "Titan 缺失，选用 Nowscore",
+      "selection": {
+        "issue": "130511",
+        "slot": 73,
+        "source": "nowscore",
+        "provider_id": "847050",
+        "url": "https://live.nowscore.com/analysis/847050cn.html",
+        "sha256": "29be1e2c73f052807f6a067b0ec3adca49585a129fd3e6313deb6a0f775a1660",
+        "column": "normalized_fields",
+        "path": [],
+        "value_sha256": "411dfa84205c05f9b412b33dc457a622fa80b8150afa84a83f2f784def17bfa3"
+      },
+      "guards": [
+        {
+          "issue": "130511",
+          "slot": 73,
+          "source": "nowscore",
+          "provider_id": "847050",
+          "url": "https://live.nowscore.com/analysis/847050cn.html",
+          "sha256": "29be1e2c73f052807f6a067b0ec3adca49585a129fd3e6313deb6a0f775a1660",
+          "column": "normalized_fields",
+          "path": [],
+          "value_sha256": "411dfa84205c05f9b412b33dc457a622fa80b8150afa84a83f2f784def17bfa3"
+        },
+        {
+          "issue": "130511",
+          "slot": 73,
+          "source": "titan",
+          "provider_id": "847050",
+          "url": "https://zq.titan007.com/analysis/847050cn.htm",
+          "sha256": "938a4ddd33ed0ea35e22c18bcac29bbe8a8eaa9e98a1fb484f656400660c47b3",
+          "column": "normalized_fields",
+          "path": [],
+          "value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        }
+      ],
+      "edits": [],
+      "exclusion": null,
+      "nowscore": {
+        "url": "https://live.nowscore.com/analysis/847050cn.html",
+        "information": "分析页可用"
+      },
+      "titan": {
+        "url": "https://zq.titan007.com/analysis/847050cn.htm",
+        "information": "分析页明确不存在"
+      },
+      "evidence": [
+        "第7场Nowscore未来信息泄露，同意隔离，未来合并这部分可只使用Titan",
+        "第73场确定Titan缺失，可以Nowscore源为准",
+        "诺科平2165，哈尔姆斯达斯424",
+        "如果你已经查到历史的对阵记录，我支持你的调整",
+        "好的，接受你的建议。〔上下文：第68场保留Nowscore四条，排除Titan多出的两条〕",
+        "第34场的半场比分按照你的建议来〔历史比赛821616，不是本场845808〕"
+      ]
+    }
+  ]
+}

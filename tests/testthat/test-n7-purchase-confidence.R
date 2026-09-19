@@ -1,0 +1,23 @@
+source(file.path('..','..','r','n7_purchase_exposure.R'))
+source(file.path('..','..','r','n7_purchase_confidence.R'))
+testthat::test_that('ambiguous boundaries cannot inherit high reuse or high direction stake', {
+ c<-list(a='2020-01-01T00:00:00Z')
+ p<-list(cutoffs=c,options=list(),fixtures=list(list(p_W=.6,p_D=.21,p_L=.19),list(p_W=.6,p_D=.3,p_L=.1)))
+ x<-n7_purchase_confidence_limits(p,c,2,.05,2,6,128,384)
+ testthat::expect_equal(x$upper[1:2],c(2,6))
+ testthat::expect_equal(x$upper[3:8],c(384,128,128,384,128,128))
+ # Component controls use the same coefficient matrix; only their bound
+ # families differ, so subsequent allocation can isolate the policy effect.
+ constant<-n7_purchase_confidence_limits(p,c,2,.05,6,6,384,384)
+ ordinary<-n7_purchase_limits(p,c,2,6,384)
+ testthat::expect_equal(constant$upper,ordinary$upper)
+ testthat::expect_identical(constant$matrix,ordinary$matrix)
+ uses_only<-n7_purchase_confidence_limits(p,c,2,.05,2,6,384,384)
+ money_only<-n7_purchase_confidence_limits(p,c,2,.05,6,6,128,384)
+ testthat::expect_equal(uses_only$upper[1:2],x$upper[1:2])
+ testthat::expect_equal(uses_only$upper[3:8],rep(384,6))
+ testthat::expect_equal(money_only$upper[1:2],c(6,6))
+ testthat::expect_equal(money_only$upper[3:8],x$upper[3:8])
+ testthat::expect_error(n7_purchase_confidence_limits(p,c,2,.05,6,2,128,384))
+ testthat::expect_error(n7_purchase_confidence_limits(p,list(a='other'),2,.05,2,6,128,384))
+})

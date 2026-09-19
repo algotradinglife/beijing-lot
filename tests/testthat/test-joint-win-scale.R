@@ -1,0 +1,47 @@
+source(file.path('..','..','r','joint_win_scale.R'))
+test_that('win scaling expands good cells and contracts bad without labels', {
+  cutoff<-list(cutoff_kind='DECISION_EPOCH',cutoff_identity='DECISION_EPOCH_1',cutoff_ts='2020-01-01T00:00:00Z',
+    historical_admission=FALSE,target_issue='1',model_receipt_sha256='model')
+  t<-data.frame(issue='1',ticket_id=letters[1:8],cell=rep(c('a','b'),each=4),prob=c(.8,.7,.6,.5,.4,.3,.2,.1),base_copies=1L)
+  s<-data.frame(issue='1',cell=c('a','b'),return_ratio=c(.6,1.4),long_return_ratio=c(1.2,1),supported=TRUE,long_hit_signal='GOOD')
+  attr(s,'input_receipt')<-list(cutoff=cutoff,hash=digest::digest(s,algo='sha256'))
+  expect_equal(joint_win_scale(t,s,cutoff,'model','BLEND','CUT',.5,.8,1.2,.5,.5,2,20)$copies,c(1,1,0,0,1,1,1,1))
+  expect_equal(joint_win_scale(t,s,cutoff,'model','BLEND','ADD',.5,.8,1.2,.5,.5,2,20)$copies,c(1,1,1,1,2,2,1,1))
+  both<-joint_win_scale(t,s,cutoff,'model','RECENT','BOTH',.5,.8,1.2,.5,.5,2,16)
+  expect_equal(both$copies,c(1,1,0,0,2,2,1,1));expect_equal(both$score,c(rep(0,4),rep(1.8,4)))
+  expect_equal(both$state,c(rep('BAD',4),rep('GOOD',4)))
+  expect_equal(joint_win_scale(t,s,cutoff,'model','BLEND','ADD',.5,.8,1.2,.5,.5,2,17)$copies,rep(1L,8))
+  u<-t;u$actual_gross<-1e9;expect_identical(joint_win_scale(u,s,cutoff,'model','RECENT','BOTH',.5,.8,1.2,.5,.5,2,16),both)
+  expect_equal(nrow(joint_win_scale(t[FALSE,],s,cutoff,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,0)),0)
+  q<-t;q$base_copies[5]<-0L
+  expect_equal(joint_win_scale(q,s,cutoff,'model','BLEND','ADD',.5,.8,1.2,.5,.5,2,20)$copies,c(1,1,1,1,0,2,1,1))
+  s$supported<-FALSE;attr(s,'input_receipt')<-NULL;attr(s,'input_receipt')<-list(cutoff=cutoff,hash=digest::digest(s,algo='sha256'))
+  expect_equal(joint_win_scale(t,s,cutoff,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20)$copies,rep(1L,8))
+  expect_true(all(joint_win_scale(t,s,cutoff,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20)$state=='UNKNOWN'))
+  bad<-cutoff;bad$target_issue<-'2'
+  expect_error(joint_win_scale(t,s,bad,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20))
+  expect_error(joint_win_scale(t,s,cutoff,'wrong','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20))
+  expect_error(joint_win_scale(t,s,cutoff,'model','BLEND','BOTH',0,.8,1.2,.5,.5,2,20))
+  expect_error(joint_win_scale(t,s,cutoff,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,10))
+  s$return_ratio[1]<-2;expect_error(joint_win_scale(t,s,cutoff,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20))
+})
+test_that('recent component changes states, sparse cells stay put and order is immaterial', {
+  cutoff<-list(cutoff_kind='DECISION_EPOCH',cutoff_identity='DECISION_EPOCH_1',cutoff_ts='2020-01-01T00:00:00Z',
+    historical_admission=FALSE,target_issue='1',model_receipt_sha256='model')
+  t<-data.frame(issue='1',ticket_id=letters[1:9],cell=rep(c('a','b','c'),each=3),prob=rep(c(.6,.3,.1),3),base_copies=1L)
+  s<-data.frame(issue='1',cell=c('a','b'),return_ratio=1.1,long_return_ratio=c(.2,2),supported=TRUE,long_hit_signal='GOOD')
+  attr(s,'input_receipt')<-list(cutoff=cutoff,hash=digest::digest(s,algo='sha256'))
+  blend<-joint_win_scale(t,s,cutoff,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20)
+  recent<-joint_win_scale(t,s,cutoff,'model','RECENT','BOTH',.5,.8,1.2,.5,.5,2,20)
+  expect_equal(blend$copies,rep(1L,9));expect_equal(recent$copies,c(2,1,1,1,1,0,1,1,1))
+  expect_equal(recent$state,c(rep('GOOD',3),rep('BAD',3),rep('UNKNOWN',3)))
+  rev<-joint_win_scale(t[9:1,],s,cutoff,'model','RECENT','BOTH',.5,.8,1.2,.5,.5,2,20)
+  expect_identical(rev[match(recent$ticket_id,rev$ticket_id),],recent)
+  empty<-s[FALSE,];attr(empty,'input_receipt')<-NULL
+  attr(empty,'input_receipt')<-list(cutoff=cutoff,hash=digest::digest(empty,algo='sha256'))
+  expect_equal(joint_win_scale(t,empty,cutoff,'model','RECENT','BOTH',.5,.8,1.2,.5,.5,2,20)$copies,rep(1L,9))
+  changed<-cutoff;changed$cutoff_ts<-'2020-01-02T00:00:00Z'
+  expect_error(joint_win_scale(t,s,changed,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20))
+  dup<-t;dup$ticket_id[2]<-dup$ticket_id[1]
+  expect_error(joint_win_scale(dup,s,cutoff,'model','BLEND','BOTH',.5,.8,1.2,.5,.5,2,20))
+})

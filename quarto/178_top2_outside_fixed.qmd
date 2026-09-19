@@ -1,0 +1,113 @@
+---
+title: "窗口外验证：固定原组与原票数的 Top2 重放"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  output: null
+  labels: null
+  python: null
+  receipt_sha256: null
+---
+
+本轮不新增拟合：继承上一轮每10期更新、截止前历史冻结的HANDICAP 概率版本。
+规则已声明为原权重、第三赛果50%折扣转给原第二赛果、刚性Top2。
+折扣/上限释放的权重转给原第二赛果；这些是购买权重，不冒充已经校准的概率。
+原概率、赛前估算价格、原组与票数不变，不重新执行改变后25%覆盖准入。
+所有规则票先冻结，再开封目标结算；本研究窗口和参数属于回顾探索，不能视为未见样本证明。
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+stopifnot(!is.null(params$study),!is.null(params$output),!is.null(params$python),!is.null(params$labels))
+reticulate::use_python(params$python,required=TRUE)
+files<-c('r/diagnostic_verified_csv.R','r/diagnostic_verified_rds.R','r/n7_joint_sleeves.R','r/third_outcome_tickets.R',
+ 'r/fundamentals_equity_curves.R','quarto/178_top2_outside_fixed.qmd','config/top2_outside_validation.json')
+for(n in files[grepl('[.]R$',files)])source(n)
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+s<-params$study;o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
+pb<-readBin(file.path(s,'plans-receipt.json'),'raw',n=file.info(file.path(s,'plans-receipt.json'))$size)
+stopifnot(digest::digest(pb,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+parent<-jsonlite::fromJSON(rawToChar(pb),simplifyVector=FALSE)
+for(n in names(parent$implementation))stopifnot(digest::digest(file=n,algo='sha256')==parent$implementation[[n]])
+vb<-readBin(file.path(s,'independent-replay.json'),'raw',n=file.info(file.path(s,'independent-replay.json'))$size)
+validation<-jsonlite::fromJSON(rawToChar(vb))
+stopifnot(validation$status=='PASS',validation$allocations==length(parent$scope)*4)
+if(!identical(validation$plans_receipt_sha256,params$receipt_sha256))stop('Parent replay receipt identity mismatch')
+validation_sha256<-digest::digest(vb,serialize=FALSE,algo='sha256')
+cfg<-jsonlite::fromJSON('config/top2_outside_validation.json');cfg$rules<-cfg$fixed_rules
+stopifnot(identical(unlist(parent$scope),cfg$issues))
+core<-reticulate::import('src.temporal_learning.core')
+prov<-reticulate::import('src.temporal_learning.provenance');pathlib<-reticulate::import('pathlib')
+closure<-prov$implementation_closure(pathlib$Path(getwd()),as.list('src.fundamentals_n7_baseline'),distributions=c('numpy','pandas'))
+ids<-unlist(parent$scope);bindings<-list();counter<-0
+for(b in parent$bindings) {
+ if(!grepl('_PROB$',b$arm))next
+ path<-file.path(s,b$replay)
+ x<-diagnostic_read_verified_rds(path,b$replay_sha256);selected<-x$result$pool$options[x$result$fit$selected]
+ funded<-tibble(sleeve_id=vapply(selected,function(z)as.character(z$sleeve_id),character(1)),
+  depth=vapply(selected,function(z)as.integer(z$depth),integer(1)))
+ plan<-third_outcome_ticket_plan(x$fixtures,x$result$surface,funded,x$cutoffs,params$python,
+  cfg$rules,cfg$unit_cny,cfg$payout_factor,cfg$budget_cny)
+ model<-sub('_PROB$','',b$arm);name<-paste0('plan-',b$issue,'-',model,'.rds')
+ saveRDS(plan,file.path(o,name))
+ bindings[[paste(b$issue,model)]]<-list(issue=b$issue,model=model,plan=name,
+  sha256=digest::digest(file=file.path(o,name),algo='sha256'),source=b$replay,source_sha256=b$replay_sha256,
+  inherited_fit_seal=b$fit_model_seal,cutoffs=x$cutoffs,
+  cache_key=core$stable_json_hash(list(cutoffs=x$cutoffs,parent=b$cache_key,rules_sha256=code[['config/top2_outside_validation.json']],
+   implementation=code,python=closure$closure_sha256)))
+ counter<-counter+1;writeLines(as.character(counter),file.path(o,'progress.txt'))
+}
+stopifnot(counter==length(ids),identical(code,setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)))
+receipt<-list(scope=ids,parent_receipt=params$receipt_sha256,parent_replay_sha256=validation_sha256,code=code,python=closure,
+ config=cfg,bindings=bindings,labels_sha256=parent$sources$fixture_audit,historical_admission=FALSE)
+jsonlite::write_json(receipt,file.path(o,'plans-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 冻结后结算
+
+```{r}
+labels<-diagnostic_read_verified_csv(params$labels,receipt$labels_sha256,cols(issue='c',provider_id='c')) |>
+ select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
+groups<-members<-list()
+for(b in bindings) {
+ path<-file.path(o,b$plan)
+ plan<-diagnostic_read_verified_rds(path,b$sha256)
+ groups[[length(groups)+1L]]<-third_outcome_ticket_settle(plan,labels) |> mutate(model=b$model)
+ members[[length(members)+1L]]<-plan$members |> mutate(model=b$model)
+}
+groups<-bind_rows(groups);members<-bind_rows(members)
+stopifnot(nrow(anti_join(members,labels,by=c('issue','slot','provider_id','handicap')))==0)
+members<-members |> left_join(labels,by=c('issue','slot','provider_id','handicap'),relationship='many-to-one') |>
+ mutate(third_hit=actual_direction==third)
+rows<-groups |> group_by(issue,model,rule) |> summarise(stake=sum(stake),gross=sum(gross),
+ expected_gross=sum(expected_gross),estimated_actual_gross=sum(ifelse(hit,estimated_actual_gross,0)),
+ hits=sum(hit),bought_groups=n(),third_tickets=sum(third_tickets),.groups='drop')
+rows<-expand_grid(issue=ids,model=cfg$models,rule=cfg$rules$id) |>
+ left_join(rows,by=c('issue','model','rule'),relationship='one-to-one') |>
+ mutate(across(c(stake,gross,expected_gross,estimated_actual_gross,hits,bought_groups,third_tickets),~replace_na(.x,0)),
+ net=gross-stake,budget_cny=cfg$budget_cny,cash_cny=budget_cny-stake,
+ status=ifelse(stake>0,'COMPLETE','NO_BET'),policy=paste(model,rule,sep='_'))
+curves<-strategy_equity_curves(rows,ids,cfg$initial_capital_cny);stopifnot(!any(curves$stopped))
+summary<-curves |> filter(period>0) |> group_by(model,policy) |>
+ summarise(stake=sum(funded_stake_cny),net=sum(funded_net_cny),roi=if(stake>0)net/stake else NA_real_,
+ hit_issues=sum(gross>0),profit_issues=sum(funded_net_cny>0),max_drawdown=max(drawdown_cny),
+ minimum_equity=min(cfg$initial_capital_cny,equity_cny),cash=sum(cash_cny),
+ net_excluding_best=sum(funded_net_cny)-max(funded_net_cny),.groups='drop')
+for(n in c('groups','members','rows','curves','summary'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+knitr::kable(summary,digits=3)
+p<-curves |> mutate(rule=sub('^[^_]+_','',policy)) |>
+ select(model,rule,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,color=rule))+geom_line()+facet_grid(metric~model,scales='free_y')+
+ theme_minimal()+labs(x='Issue index',color='Purchase rule')
+print(p);ggsave(file.path(o,'equity-drawdown.png'),p,width=14,height=8,dpi=150)
+```
+
+汇总的收益并不证明调整后权重是真实概率；真实覆盖仍按输入冻结概率计算。
+完整诊断需结合第三赛果挤占、回款桥接、期内集中和独立重放验收。

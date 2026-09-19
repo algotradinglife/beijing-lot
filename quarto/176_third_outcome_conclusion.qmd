@@ -1,0 +1,186 @@
+---
+title: "第三赛果诊断：概率、覆盖与回款结构"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  diagnostic: null
+  receipt_sha256: null
+---
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+source('r/diagnostic_verified_csv.R');source('r/third_outcome_diagnostics.R')
+stopifnot(!is.null(params$study),!is.null(params$diagnostic),!is.null(params$receipt_sha256))
+s<-params$study;d<-params$diagnostic
+b<-readBin(file.path(s,'report-receipt.json'),'raw',n=file.info(file.path(s,'report-receipt.json'))$size)
+stopifnot(digest::digest(b,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+receipt<-jsonlite::fromJSON(rawToChar(b));tables<-list()
+stopifnot(all(c('groups.csv','members.csv','rows.csv','summary.csv','curves.csv','independent-replay.json') %in% names(receipt$study)),
+ all(c('overview.csv','history-overview.csv','gap-calibration.csv','history-issues.csv','fixtures.csv') %in% names(receipt$diagnostic)))
+for(n in names(receipt$study)) {
+ p<-file.path(s,n)
+ if(grepl('[.]csv$',n)) {
+  types<-if(n=='summary.csv')cols() else if(n=='members.csv')cols(issue='c',sleeve_id='c',provider_id='c') else if(n=='groups.csv')cols(issue='c',sleeve_id='c') else cols(issue='c')
+  tables[[n]]<-diagnostic_read_verified_csv(p,receipt$study[[n]],types)
+ }
+ else {
+  bytes<-readBin(p,'raw',n=file.info(p)$size);stopifnot(digest::digest(bytes,serialize=FALSE,algo='sha256')==receipt$study[[n]])
+  if(n=='independent-replay.json')stopifnot(jsonlite::fromJSON(rawToChar(bytes))$status=='PASS')
+ }
+}
+dt<-list()
+for(n in names(receipt$diagnostic))dt[[n]]<-diagnostic_read_verified_csv(file.path(d,n),receipt$diagnostic[[n]],
+ if(n %in% c('fixtures.csv','history-fixtures.csv'))cols(issue='c',provider_id='c') else if(n=='history-issues.csv')cols(issue='c') else cols())
+groups<-tables[['groups.csv']];members<-tables[['members.csv']];rows<-tables[['rows.csv']]
+summary<-tables[['summary.csv']];curves<-tables[['curves.csv']]
+risk<-third_outcome_group_risk(members)
+stopifnot(nrow(summary)==18,nrow(rows)==94*18)
+```
+
+固定94期111104–120419、每期预算上限1024元、本金10万元。
+三个冻结概率版本、原组、原票数不变；不重新执行修改后25%覆盖准入。
+第三赛果折扣/上限将释放权重补给原第二赛果；HARD仅保留原Top2并按原组合概率购买。
+不把购买权重当真实概率。真实覆盖和估算回款仍使用原冻结概率及赛前欧赔/大小球映射价格；
+实际结算使用北单SP，票级0.65只应用一次。
+概率更新沿用每10期冻结及48小时标签可用性代理，本报告为已知回撤窗口的研究诊断。
+
+## 场次层：是否高估第三赛果
+
+```{r}
+knitr::kable(dt[['overview.csv']],digits=4)
+knitr::kable(dt[['history-overview.csv']],digits=4)
+gap<-dt[['gap-calibration.csv']] |>
+ mutate(gap_bin=factor(gap_bin,levels=levels(cut(0,c(0,.02,.05,.1,.2,1),include.lowest=TRUE))))
+stopifnot(!anyNA(gap$gap_bin))
+gap_plot<-gap |> pivot_longer(c(predicted_third,observed_third,predicted_second,observed_second),names_to='series',values_to='fraction')
+g<-ggplot(gap_plot,aes(gap_bin,fraction,color=series,group=series))+geom_point(aes(size=fixtures))+
+ geom_line(data=gap_plot |> mutate(fraction=ifelse(fixtures>=50,fraction,NA_real_)),na.rm=TRUE)+
+ facet_wrap(~model)+theme_minimal()+labs(x='Second-minus-third probability',y='Probability / actual frequency',color=NULL,
+ subtitle='Points show all bins; lines omit bins with fewer than 50 fixtures')
+print(g);ggsave(file.path(s,'gap-calibration.png'),g,width=13,height=6,dpi=150)
+handicap_cells<-dt[['fixtures.csv']] |> group_by(model,handicap,third) |>
+ summarise(fixtures=n(),issues=n_distinct(issue),predicted=mean(p3),observed=mean(third_hit),.groups='drop') |>
+ mutate(gap=observed-predicted)
+knitr::kable(handicap_cells |> filter(model=='HANDICAP'),digits=4)
+p_cells<-ggplot(handicap_cells |> mutate(display_gap=ifelse(fixtures>=50,gap,NA_real_)),aes(third,factor(handicap),fill=display_gap))+geom_tile()+
+ geom_text(aes(label=fixtures))+facet_wrap(~model)+scale_fill_gradient2(midpoint=0)+theme_minimal()+
+ labs(x='Identity of original third outcome',y='Signed handicap',fill='Actual minus predicted',subtitle='Cell labels are fixture counts; fewer than 50 shown in grey')
+print(p_cells);ggsave(file.path(s,'handicap-third-calibration.png'),p_cells,width=12,height=6,dpi=150)
+```
+
+不同概率版本的“第三赛果”可能是不同方向，不能把它们当完全相同的事件。
+分箱是描述性统计；稀疏格子不用于选规则，完整有符号让球数及赛果类别支持数在场次诊断cells.csv。
+
+总体不支持“第三赛果被高估”：HANDICAP预测25.92%，实际28.11%。
+在第二、第三赛果差距不超过2个百分点的1999场中，第三赛果实际29.66%，第二赛果26.61%。
+因此，差距小本身不是压低第三赛果的经验依据。
+旧冻结模型的平均差距原200期为5.645个百分点、回撤94期为5.639个百分点，没有明显整体变平。
+按让球数分层，HANDICAP中让球数−1且第三赛果为北单让平的1411场，
+预测让平24.68%，实际30.05%，仍低估约5.37个百分点；不适合一概解释成第三赛果概率过高。
+
+## 已买组：第三赛果占用的票和真实覆盖
+
+```{r}
+coverage<-groups |> group_by(model,rule) |> summarise(groups=n(),tickets=sum(depth),
+ third_tickets=sum(third_tickets),third_ticket_fraction=third_tickets/tickets,
+ mean_true_coverage=mean(coverage),mean_top2_coverage=mean(top2_coverage),
+ winning_groups=sum(hit),rescued_groups=sum(rescued),lost_groups=sum(lost),
+ rescued_gross=sum(actual_gross[rescued]),lost_gross=sum(actual_gross[lost]),.groups='drop')
+knitr::kable(coverage |> rename(`Rescued gross (CNY)`=rescued_gross,`Lost gross (CNY)`=lost_gross),digits=3)
+paid<-members |> distinct(model,issue,slot,provider_id,p3,third_hit) |> group_by(model) |>
+ summarise(fixtures=n(),issues=n_distinct(issue),predicted=mean(p3),observed=mean(third_hit),.groups='drop')
+knitr::kable(paid,digits=4)
+bridge<-rows |> group_by(model,rule) |> summarise(stake=sum(stake),
+ model_expected_net=sum(expected_gross)-sum(stake),
+ outcome_difference=sum(estimated_actual_gross)-sum(expected_gross),
+ price_difference=sum(gross)-sum(estimated_actual_gross),actual_net=sum(net),.groups='drop')
+stopifnot(all(abs(bridge$model_expected_net+bridge$outcome_difference+bridge$price_difference-bridge$actual_net)<1e-6))
+knitr::kable(bridge |> rename_with(~paste0(.x,' (CNY)'),-c(model,rule)),digits=2)
+```
+
+第一张表核对票数转移和换入/换出中奖组；第二张是已买场次校准，第三张是赛前估价与北单结算的回款桥接（会计恒等式），不能直接视为因果解释。
+各回款、投入、收益金额单位均为人民币元（CNY）。
+价格差是北单结算SP与赛前估算价格的差异，本身不是数据错误。
+固定组和票数，原概率排序最大化该模型下的预测命中覆盖；替换若增加实际收益，
+不能据此宣称替换后的概率更准。
+
+HANDICAP原方案64.22%的票含第三赛果。减半＋补第二赛果后降至4.11%，
+平均Top2覆盖由10.90%提高至16.09%，但总真实覆盖由25.09%降至17.79%。
+换入30个中奖组、换出40个，换入回款65142元、换出回款30180元，净增加约34962元。
+因此，“Top2覆盖被挤占”在购买结构上成立，但不能说原来那些第三赛果票没有概率价值。
+
+全部18个方案按原模型与赛前估价计算的期望净收益仍为负。
+HANDICAP减半规则若将实际中奖票按赛前估价结算，净收益约−708元；
+实际北单结算带来约28938元价格差，最终为+28230元。
+HARD对应的赛前估价实现净收益约28162元、价格差约35719元。
+这些是会计分解，说明收益依赖中奖结构和结算价格，不能把历史盈利全归功于概率校正。
+
+## 第三赛果集中与复用
+
+```{r}
+concentration<-dt[['history-issues.csv']] |> group_by(stage,model) |>
+ summarise(issues=n(),mean_residual=mean(residual),
+ centered_dispersion=sum((residual-mean(residual))^2)/sum(independent_variance),
+ mean_actual_fraction=mean(actual_fraction),max_actual_fraction=max(actual_fraction),.groups='drop')
+knitr::kable(concentration,digits=3)
+reuse<-risk$issues |> group_by(model) |> summarise(active_issues=n(),
+ groups=sum(groups),groups_with_third=sum(groups_with_third),
+ all_top2_groups=sum(actual_all_top2),expected_all_top2=sum(expected_all_top2),
+ variance_inflation=sum(shared_fixtures_variance)/sum(independent_groups_variance),
+ maximum_single_third_fanout=max(max_third_fanout),.groups='drop')
+knitr::kable(reuse,digits=3)
+distribution<-risk$groups |> count(model,thirds,name='groups') |> group_by(model) |> mutate(fraction=groups/sum(groups)) |> ungroup()
+knitr::kable(distribution,digits=3)
+p_risk<-ggplot(distribution,aes(thirds,fraction,fill=model))+geom_col(position='dodge')+
+ theme_minimal()+labs(x='Actual third outcomes within funded seven-fixture group',y='Fraction of funded groups')
+print(p_risk);ggsave(file.path(s,'third-count-distribution.png'),p_risk,width=10,height=6,dpi=150)
+```
+
+方差膨胀值是显式共享同一场赛果后的模型参照，仍假设不同场次相互独立；
+不是由历史数据估出的因果效应。期内第三赛果总体偏多与同一场被多组复用是两层风险。
+
+回撤期旧冻结模型平均每期比预测多约2.06场第三赛果，但去掉平均残差后的离散比约1.01，
+原200期约1.25；这个描述指标没有显示回撤期具有更强的额外集中波动。
+HANDICAP中“七场全部落入Top2的已买组数量”的共享场次模型方差，是“误将各组独立”参照的约3.73倍。
+这不是收益方差的倍率，也不是实际中奖组数的方差倍率。
+因此，目前支持的是复用带来的共同暴露；不能认定发生了更强的黑天鹅聚集。
+
+## 收益与回撤
+
+```{r}
+knitr::kable(summary |> mutate(roi=100*roi) |>
+ rename(`ROI (%)`=roi,`Stake (CNY)`=stake,`Net (CNY)`=net,`Max drawdown (CNY)`=max_drawdown,
+  `Minimum equity (CNY)`=minimum_equity,`Cash (CNY)`=cash,`Net excluding best (CNY)`=net_excluding_best),digits=2)
+p_equity<-curves |> mutate(rule=sub('^[^_]+_','',policy)) |>
+ select(model,rule,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,color=rule))+geom_line()+facet_grid(metric~model,scales='free_y')+
+ theme_minimal()+labs(x='Issue index',color='Purchase rule')
+print(p_equity);ggsave(file.path(s,'equity-drawdown-comparison.png'),p_equity,width=14,height=8,dpi=150)
+for(n in c('coverage','bridge','concentration','reuse','distribution','paid','handicap_cells'))write_csv(get(n),file.path(s,paste0(n,'.csv')))
+for(n in c('groups','fanout','issues'))write_csv(risk[[n]],file.path(s,paste0('risk-',n,'.csv')))
+```
+
+所有参数在本轮票重排前声明，没有依据本轮目标结算筛选门槛；
+窗口和研究方向本身来自既往观察，不能将本轮领先解释为未见赛事的无偏验证。
+
+## 结论边界
+
+1. 全部场次的第三赛果没有整体高估，已买场次的HANDICAP第三赛果预测22.71%、实际22.86%，总体接近。
+   目前不能把向下压概率称为更准确的概率校正。
+2. 原排序确实购买了含第三赛果的票，改变顺序会换入Top2票；这是覆盖重新分配，必须同时扣除被换出的中奖回款。
+3. 同一第三赛果最多出现在8个已买组中，场次复用显著改变组的联合风险，不能把组当独立重复试验。
+4. HANDICAP的50%折扣＋补第二赛果净收益约28230元、ROI38.88%、最大回撤8211元；
+   剔除最高收益期后仍盈利14418元。它是有效的本窗口购买偏好对照，并非已证实的概率修正。
+5. HARD净收益仍最高，约63881元、ROI87.99%，最大回撤9587元；
+   15%上限回撤更小，但剔除最高收益期后转为亏损。20%上限仍亏损，不能泛称增加上限都会改善。
+
+本轮保留原概率做风险计量，将“第三赛果减半、权重转第二赛果”作为刚性Top2之外的研究对照。
+真正支持的是购买结构与回款结构变化；没有证据支持把第三赛果整体当作不会发生的噪声。

@@ -1,0 +1,89 @@
+---
+title: "第三赛果：校准偏差、覆盖挤占与集中风险"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  reference: null
+  output: null
+  acceptance_sha256: null
+  reference_receipt_sha256: null
+---
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+source('r/diagnostic_verified_csv.R')
+source('r/strategy_diagnostic_probabilities.R')
+source('r/third_outcome_diagnostics.R')
+stopifnot(!is.null(params$study),!is.null(params$reference),!is.null(params$output))
+s<-params$study;r<-params$reference;o<-params$output
+stopifnot(!dir.exists(o));dir.create(o,recursive=FALSE)
+ab<-readBin(file.path(s,'acceptance.json'),'raw',n=file.info(file.path(s,'acceptance.json'))$size)
+rb<-readBin(file.path(r,'receipt.json'),'raw',n=file.info(file.path(r,'receipt.json'))$size)
+stopifnot(digest::digest(ab,serialize=FALSE,algo='sha256')==params$acceptance_sha256,
+ digest::digest(rb,serialize=FALSE,algo='sha256')==params$reference_receipt_sha256)
+a<-jsonlite::fromJSON(rawToChar(ab));rr<-jsonlite::fromJSON(rawToChar(rb))
+stopifnot(a$status=='PASS')
+config<-jsonlite::fromJSON('config/third_outcome_diagnostic.json')
+# Freeze the declared non-fitted alternatives before reading outcome tables.
+jsonlite::write_json(list(config=config,config_sha256=digest::digest(file='config/third_outcome_diagnostic.json',algo='sha256'),
+ parent_acceptance=params$acceptance_sha256,reference_receipt=params$reference_receipt_sha256,
+ historical_admission=FALSE),file.path(o,'design.json'),auto_unbox=TRUE,pretty=TRUE)
+p<-diagnostic_read_verified_csv(file.path(s,'predictions.csv'),a$outputs[['predictions.csv']],
+ cols(issue='c',provider_id='c',fit_issue='c'))
+ref<-diagnostic_read_verified_csv(file.path(r,'fixtures.csv'),rr$files[['fixtures.csv']],
+ cols(issue='c',provider_id='c'))
+labels<-ref |> distinct(issue,slot,provider_id,actual_outcome=actual)
+stopifnot(!anyDuplicated(labels[c('issue','slot','provider_id')]),
+ nrow(anti_join(p,labels,by=c('issue','slot','provider_id')))==0)
+f<-p |> transmute(issue,slot,provider_id,model=arm,handicap,stage='drawdown94',
+ p_W=new_W,p_D=new_D,p_L=new_L) |>
+ left_join(labels,by=c('issue','slot','provider_id'),relationship='many-to-one')
+d<-third_outcome_diagnostics(f,config$gap_breaks,config$third_breaks)
+history<-ref |> transmute(issue,slot,provider_id,model=toupper(model),stage,handicap,
+ actual_outcome=actual,p_W,p_D,p_L)
+hd<-third_outcome_diagnostics(history,config$gap_breaks,config$third_breaks)
+```
+
+本报告先诊断是否存在第三赛果高估，再评价购买覆盖的挤占与回款变化。
+回撤94期为已知的事后窗口；其他历史仅作描述参照，不用于选择参数。
+第三赛果是各概率版本在该场的最低概率方向，并列按让胜、让平、让负顺序打破。
+逐期残差的方差以场次独立为参照，不视为已证明独立，也不作为显著性检验。
+
+## 场次校准与阶段对照
+
+```{r}
+overview<-d$fixtures |> group_by(model) |> summarise(fixtures=n(),issues=n_distinct(issue),
+ predicted_third=mean(p3),observed_third=mean(third_hit),predicted_second=mean(p2),
+ observed_second=mean(second_hit),mean_gap23=mean(gap23),.groups='drop')
+history_overview<-hd$fixtures |> group_by(stage,model) |> summarise(fixtures=n(),issues=n_distinct(issue),
+ predicted_third=mean(p3),observed_third=mean(third_hit),mean_gap23=mean(gap23),.groups='drop')
+knitr::kable(overview,digits=4);knitr::kable(history_overview,digits=4)
+gap<-d$fixtures |> group_by(model,gap_bin) |> summarise(fixtures=n(),issues=n_distinct(issue),
+ predicted_third=mean(p3),observed_third=mean(third_hit),
+ predicted_second=mean(p2),observed_second=mean(second_hit),.groups='drop')
+knitr::kable(gap,digits=4)
+g<-gap |> pivot_longer(c(predicted_third,observed_third,predicted_second,observed_second),names_to='series',values_to='fraction') |>
+ ggplot(aes(gap_bin,fraction,color=series,group=series))+geom_line()+geom_point()+
+ facet_wrap(~model)+theme_minimal()+labs(x='Second-minus-third probability',y='Probability / frequency',color=NULL)
+print(g);ggsave(file.path(o,'gap-calibration.png'),g,width=13,height=6,dpi=150)
+g2<-ggplot(d$issues,aes(expected_fraction,actual_fraction,color=model))+
+ geom_abline(slope=1,intercept=0,linetype=2)+geom_point(alpha=.6)+theme_minimal()+
+ labs(x='Predicted third-outcome fraction',y='Actual third-outcome fraction',color='Model')
+print(g2);ggsave(file.path(o,'issue-third-concentration.png'),g2,width=9,height=6,dpi=150)
+for(n in c('fixtures','cells','issues')) {
+ write_csv(d[[n]],file.path(o,paste0(n,'.csv')))
+ write_csv(hd[[n]],file.path(o,paste0('history-',n,'.csv')))
+}
+write_csv(overview,file.path(o,'overview.csv'));write_csv(history_overview,file.path(o,'history-overview.csv'))
+write_csv(gap,file.path(o,'gap-calibration.csv'))
+```
+
+完整的有符号让球数、第三赛果类别及联合分箱支持数保留在 cells.csv。
+场次层不能直接证明组合覆盖有效；购票挤占、共同落空与等投入变体由配套的175重放和176结论报告评价。

@@ -1,0 +1,13 @@
+source('../../r/n7_freeze_attribution.R')
+testthat::test_that('calendar accounting reconciles both replacement orders', {
+ x<-data.frame(issue=rep(c('01','02'),each=4),cell=rep(c('OO','ON','NO','NN'),2),net=c(10,14,6,8,0,0,0,0))
+ y<-n7_freeze_attribution(x,c('02','01'))
+ testthat::expect_identical(y$issue,c('02','01'))
+ testthat::expect_equal(y$probability_effect_cny,c(0,-5))
+ testthat::expect_equal(y$allocation_effect_cny,c(0,3))
+ testthat::expect_equal(y$net_change_cny,c(0,-2))
+ testthat::expect_error(n7_freeze_attribution(x[-1,],c('01','02')))
+ testthat::expect_error(n7_freeze_attribution(rbind(x,x[1,]),c('01','02')))
+ x$net[1]<-NA_real_;testthat::expect_error(n7_freeze_attribution(x,c('01','02')))
+ x$net[1]<-Inf;testthat::expect_error(n7_freeze_attribution(x,c('01','02')))
+})

@@ -1,0 +1,109 @@
+---
+title: "战力让平增量信息：连续校正收敛检验"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  evidence: null
+  receipt_sha256: null
+  python: null
+  output: null
+---
+
+已研究的100期旧战力档案，前10期预热、后90期配对诊断；每10期更新，只用此前准入历史。
+对照RAW、MARKET_RIDGE和JOINT_RIDGE。两种连续逻辑校正均使用市场让平logit、市场胜负差绝对值、有符号让球数；后者仅增加战力让平logit。
+市场logit作offset，标准化特征系数使用固定ridge惩罚10，截距不惩罚；不依据目标期调参。
+标准化只使用本次共享context准入历史。保留市场W:L。运行依赖R及mgcv 1.9.4，固定参数与版本写入模型凭据。
+这些结果不构成前瞻验收，也不覆盖最近回撤期。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+modules<-paste0('r/',c('diagnostic_verified_csv','strategy_diagnostic_probabilities','probability_foundation_pairs','strength_draw_ridge'),'.R')
+for(f in modules)source(f)
+stopifnot(!dir.exists(params$output),digest::digest(file=file.path(params$evidence,'inputs.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(params$evidence,'inputs.json'),simplifyVector=FALSE)
+x<-diagnostic_read_verified_csv(file.path(params$evidence,'archived-strength.csv'),r$archived_strength_sha256,cols_only(issue='c',slot='i',provider_id='c',handicap='d',q_W='d',q_D='d',q_L='d',p_D='d',fixture_decision_ts='c'))
+stopifnot(nrow(x)==6547,n_distinct(x$issue)==100)
+f<-x |> select(issue,slot,provider_id,handicap,q_W,q_D,q_L,p_D,fixture_decision_ts) |> group_by(issue) |> mutate(last_fixture_cutoff=max(fixture_decision_ts)) |> ungroup()
+# Clock aggregation uses original explicit issue timestamps; ISO offset is constant.
+stopifnot(all(grepl('\\+00:00$',f$fixture_decision_ts)))
+reticulate::use_python(params$python,required=TRUE);core<-reticulate::import('src.temporal_learning.core');api<-reticulate::import('src.temporal_learning.frozen_blocks')
+ids<-sort(unique(f$issue));targets<-f |> filter(!issue %in% head(ids,10)) |> transmute(issue_code=issue,fixture_decision_ts)
+blocks<-api$frozen_block_schedule(reticulate::r_to_py(as.data.frame(targets)),cadence=10L)
+stopifnot(length(blocks)==9)
+dir.create(params$output);dir.create(file.path(params$output,'frozen'))
+code<-c(modules,'src/strength_draw_context.py','src/probability_foundation_draw.py','quarto/193_strength_draw_ridge.qmd')
+code_hashes<-setNames(as.list(vapply(code,digest::digest,character(1),file=TRUE,algo='sha256')),code)
+
+for(b in blocks) {
+ cutoff<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
+ for(arm in c('MARKET_RIDGE','JOINT_RIDGE')) {
+  m<-strength_draw_ridge_fit(f,b,cutoff,file.path(params$evidence,'archived-strength.csv'),r$archived_strength_sha256,
+   getwd(),list(forecasts=r$archived_strength_sha256,code=digest::digest(code_hashes,algo='sha256')),
+   arm=='JOINT_RIDGE',10,24,100)
+  saveRDS(m,file.path(params$output,'frozen',paste0(b$fit_issue,'-',arm,'-model.rds')))
+  for(target in b$targets) {
+   epoch<-core$Cutoff$decision_epoch(target$issue,target$cutoff_ts)
+   z<-strength_draw_ridge_predict(m,filter(f,issue==target$issue),epoch,getwd())
+   z$model<-arm
+   saveRDS(z,file.path(params$output,'frozen',paste0(target$issue,'-',arm,'-prediction.rds')))
+  }
+ }
+}
+```
+
+```{r}
+# Evaluation begins after all90 target issues and both arms have frozen outputs.
+labels<-diagnostic_read_verified_csv(file.path(params$evidence,'archived-strength.csv'),r$archived_strength_sha256,cols_only(issue='c',slot='i',provider_id='c',actual_direction='c'))
+y<-bind_rows(lapply(list.files(file.path(params$output,'frozen'),pattern='prediction.rds$',full.names=TRUE),readRDS))
+raw<-f |> filter(issue %in% unique(y$issue)) |> transmute(issue,slot,provider_id,handicap,model='RAW',W=q_W,D=q_D,L=q_L)
+y<-bind_rows(select(y,issue,slot,provider_id,handicap,model,W,D,L),raw) |>
+ left_join(labels |> transmute(issue,slot,provider_id,actual_outcome=actual_direction),by=c('issue','slot','provider_id'),relationship='many-to-one')
+y$segment<-paste0('BLOCK_',1L+(match(y$issue,ids[-(1:10)])-1L)%/%30L)
+long<-y |> pivot_longer(c(W,D,L),names_to='outcome',values_to='probability')
+z<-probability_foundation_pairs(long,'RAW',c('segment','handicap'),c('W','D','L'),seq(0,1,.1),1e-12)
+sum<-z$scores |> group_by(model) |> summarise(fixtures=n(),issues=n_distinct(issue),brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),.groups='drop')
+e<-long |> filter(outcome=='D') |> group_by(model) |> summarise(draw_brier=mean((probability-(actual_outcome=='D'))^2),predicted=mean(probability),observed=mean(actual_outcome=='D'),.groups='drop')
+sum<-left_join(sum,e,by='model',relationship='one-to-one');knitr::kable(sum,digits=6)
+period<-z$scores |> group_by(segment,model) |> summarise(fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top2=mean(top2),.groups='drop');knitr::kable(period,digits=6)
+movement<-z$pairs |> group_by(model) |> summarise(up=sum(actual_probability_movement=='UP'),down=sum(actual_probability_movement=='DOWN'),actual_probability_delta=mean(actual_probability_delta),rescued=sum(top2_rescued),lost=sum(top2_lost),.groups='drop');knitr::kable(movement,digits=6)
+write_csv(y,file.path(params$output,'predictions.csv'));write_csv(sum,file.path(params$output,'summary.csv'));write_csv(period,file.path(params$output,'periods.csv'));write_csv(z$scores,file.path(params$output,'scores.csv'));write_csv(z$pairs,file.path(params$output,'pairs.csv'))
+p<-period |> pivot_longer(c(brier,log_loss),names_to='metric',values_to='value') |> ggplot(aes(segment,value,colour=model,group=model))+geom_point()+geom_line()+facet_wrap(~metric,scales='free_y')+theme_minimal()
+ggsave(file.path(params$output,'scores.png'),p,width=10,height=5);print(p)
+# Descriptive strata only; not used to choose coefficients or thresholds.
+strata<-z$scores |> group_by(handicap,model) |> summarise(fixtures=n(),brier=mean(brier),log_loss=mean(log_loss),top2=mean(top2),.groups='drop')
+write_csv(strata,file.path(params$output,'handicap.csv'));knitr::kable(strata,digits=5)
+p2<-strata |> ggplot(aes(factor(handicap),brier,colour=model,group=model))+geom_point()+geom_line()+labs(x='Signed handicap',y='Brier (lower is better)')+theme_minimal()
+ggsave(file.path(params$output,'handicap.png'),p2,width=10,height=5);print(p2)
+conditional<-f |> filter(issue %in% unique(y$issue)) |> left_join(labels,by=c('issue','slot','provider_id'),relationship='one-to-one') |>
+ mutate(market_band=cut(q_D,seq(0,1,.025),include.lowest=TRUE),strength_band=cut(p_D,c(0,.2,.25,.3,1),include.lowest=TRUE)) |>
+ group_by(handicap,market_band,strength_band) |> summarise(fixtures=n(),market=mean(q_D),draw_rate=mean(actual_direction=='D'),.groups='drop')
+write_csv(conditional,file.path(params$output,'conditional.csv'))
+knitr::kable(filter(conditional,fixtures>=100),digits=4)
+p3<-conditional |> filter(fixtures>=30) |> ggplot(aes(market,draw_rate,colour=strength_band,size=fixtures))+geom_point()+geom_abline(slope=1,intercept=0,linetype=2)+facet_wrap(~handicap)+theme_minimal()+labs(x='Mean market draw probability',y='Observed draw rate',colour='Strength draw',subtitle='Market bins 2.5 pp; cells n >= 30, full counts in CSV')
+ggsave(file.path(params$output,'conditional.png'),p3,width=11,height=7);print(p3)
+files<-list.files(params$output,recursive=TRUE,full.names=TRUE)
+jsonlite::write_json(list(status='PENDING_REVIEW',historical_admission=FALSE,source_sha256=r$archived_strength_sha256,source_receipt=params$receipt_sha256,
+ implementation=code_hashes,files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),substring(files,nchar(params$output)+2))),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 判定口径
+
+完整概率质量以Brier、Log loss和让平Brier为主；Top2救回与丢失单列。
+只有加入战力相对市场单独校正及RAW均有改善，并在时间分段中稳定，才支持继续这条路径。
+单个分层或少数Top2净增不作为升级依据。精细分层仅用于描述，不反向选择模型。
+
+## 收敛结论
+
+本轮不升级概率底座，停止继续调教当前旧战力让平输入。
+JOINT_RIDGE相对MARKET_RIDGE在三个30期分段的Brier和Log loss全部更差；
+两者Top2均为74.125%，比RAW多9场，但联合版本没有额外Top2净增。
+平均让平约27.2%接近实际27.1%，仍未改善逐场概率质量。
+结合此前直接混合和联合分箱的失败结果，当前证据不支持将该特征投入概率底座。
+这不是证明基本面无用：结论限定当前旧战力版本及这90期；新基本面模型可作为独立新证据。
+固定惩罚10没有全样本寻优，本轮不继续扫描惩罚以追逐样本内最优。

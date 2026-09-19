@@ -122,6 +122,7 @@ def capture_documents(documents: list[dict], output_dir: str | Path, *, fetch=No
                             raise ValueError("invalid HTTP status")
                         result = {"url": document["url"], "final_url": str(response.url), "status": status,
                                   "content_type": str(response.headers.get("content-type", "")),
+                                  "retry_after": response.headers.get("Retry-After", response.headers.get("retry-after")),
                                   "started_at_utc": started.isoformat(), "received_at_utc": received.isoformat(),
                                   "byte_count": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
                                   "body_base64": base64.b64encode(raw).decode("ascii"), "attempts": attempt}

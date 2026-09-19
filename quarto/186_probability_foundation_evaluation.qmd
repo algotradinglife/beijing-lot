@@ -1,0 +1,116 @@
+---
+title: "独立概率基座评估：校准、准确性与逐场概率变化"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  parent: null
+  drawdown: null
+  parent_sha256: null
+  drawdown_sha256: null
+  labels: null
+  output: null
+---
+
+本轮独立于购买策略，使用484个共同期次的全部合格场次，而非已下注场次。
+RAW为未作本轮让平校正的市场投影，FROZEN为旧冻结校正，DYNAMIC为统一49块HANDICAP校正。
+前10期为动态模型预热；回撤前305期、回撤94期、回撤后85期分别报告。
+历史可用性代理与旧冻结版本限制保留，不宣称前瞻验证；本轮不拟合、调参或挑选下注。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+stopifnot(all(vapply(params,function(x)!is.null(x),logical(1))))
+modules<-paste0('r/',c('diagnostic_verified_csv','diagnostic_verified_rds','strategy_diagnostic_probabilities','probability_foundation_pairs'),'.R')
+for(f in modules)source(f)
+files<-c(modules,'quarto/186_probability_foundation_evaluation.qmd','config/top2_outside_validation.json')
+code<-setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),files)
+stopifnot(digest::digest(file=file.path(params$parent,'plans-receipt.json'),algo='sha256')==params$parent_sha256,
+ digest::digest(file=file.path(params$drawdown,'receipt.json'),algo='sha256')==params$drawdown_sha256)
+pr<-jsonlite::fromJSON(file.path(params$parent,'plans-receipt.json'),simplifyVector=FALSE)
+dr<-jsonlite::fromJSON(file.path(params$drawdown,'receipt.json'),simplifyVector=FALSE)
+stopifnot(pr$model_sha256==dr$parent_models_sha256)
+a<-diagnostic_read_verified_csv(file.path(params$parent,'predictions.csv'),pr$predictions_sha256,cols(issue='c',provider_id='c',fit_issue='c'))
+b<-diagnostic_read_verified_csv(file.path(params$drawdown,'predictions.csv'),dr$files[['predictions.csv']],cols(issue='c',provider_id='c',fit_issue='c'))
+keep<-c('issue','slot','provider_id','handicap','p_W','p_D','p_L','q_W','q_D','q_L','new_W','new_D','new_L','fixture_decision_ts','model_seal','fit_issue')
+pred<-bind_rows(select(a,all_of(keep)),select(b,all_of(keep)))
+cfg<-jsonlite::fromJSON('config/top2_outside_validation.json');ids<-sort(c(cfg$issues,cfg$excluded_drawdown_issues))
+stopifnot(length(ids)==484,setequal(pred$issue,ids),!anyDuplicated(pred[c('issue','slot','provider_id')]))
+models<-diagnostic_read_verified_rds(file.path(params$parent,'frozen-models.rds'),pr$model_sha256)
+block<-1L+(match(pred$issue,ids)-1L)%/%10L
+seals<-vapply(models,`[[`,character(1),'seal')
+stopifnot(length(models)==49,all(pred$model_seal==seals[block]),all(pred$fit_issue==names(models)[block]),
+ !anyNA(as.POSIXct(pred$fixture_decision_ts,format='%Y-%m-%dT%H:%M:%S',tz='UTC')))
+labels<-diagnostic_read_verified_csv(params$labels,pr$sources$fixture_audit,cols(issue='c',provider_id='c')) |>
+ select(issue,slot,provider_id,handicap,actual_direction)
+stopifnot(nrow(anti_join(pred,labels,by=c('issue','slot','provider_id','handicap')))==0)
+x<-left_join(pred,labels,by=c('issue','slot','provider_id','handicap'),relationship='one-to-one') |>
+ mutate(stage=case_when(issue<min(cfg$excluded_drawdown_issues)~'BEFORE_305',issue %in% cfg$excluded_drawdown_issues~'DRAWDOWN_94',TRUE~'AFTER_85'),
+ actual_outcome=actual_direction)
+long<-bind_rows(
+ x |> transmute(issue,slot,provider_id,stage,handicap,actual_outcome,model='RAW',W=q_W,D=q_D,L=q_L),
+ x |> transmute(issue,slot,provider_id,stage,handicap,actual_outcome,model='FROZEN',W=p_W,D=p_D,L=p_L),
+ x |> transmute(issue,slot,provider_id,stage,handicap,actual_outcome,model='DYNAMIC',W=new_W,D=new_D,L=new_L)) |>
+ pivot_longer(c(W,D,L),names_to='outcome',values_to='probability')
+result<-probability_foundation_pairs(long,'RAW',c('stage','handicap'),c('W','D','L'),seq(0,1,.1),1e-12)
+# All three pairwise comparisons share exactly the same fixture universe.
+old_control<-probability_foundation_pairs(filter(long,model!='RAW'),'FROZEN',c('stage','handicap'),c('W','D','L'),seq(0,1,.1),1e-12)
+pairs<-bind_rows(result$pairs,old_control$pairs)
+scores<-result$scores
+scope_scores<-bind_rows(scores,scores |> mutate(stage='ALL'))
+summary<-scope_scores |> group_by(stage,model) |> summarise(fixtures=n(),issues=n_distinct(issue),
+ brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),
+ actual_probability=mean(actual_probability),top1_mass=mean(top1_mass),top2_mass=mean(top2_mass),.groups='drop')
+strata<-scores |> group_by(stage,handicap,actual_outcome,model) |> summarise(fixtures=n(),issues=n_distinct(issue),
+ brier=mean(brier),log_loss=mean(log_loss),top1=mean(top1),top2=mean(top2),actual_probability=mean(actual_probability),.groups='drop')
+movements<-bind_rows(pairs,pairs |> mutate(stage='ALL')) |> group_by(stage,model,baseline) |>
+ summarise(fixtures=n(),up=sum(actual_probability_movement=='UP'),down=sum(actual_probability_movement=='DOWN'),
+ unchanged=sum(actual_probability_movement=='UNCHANGED'),actual_probability_delta=mean(actual_probability_delta),
+ brier_delta=mean(brier_delta),log_loss_delta=mean(log_loss_delta),top1_rescued=sum(top1_rescued),top1_lost=sum(top1_lost),
+ top2_rescued=sum(top2_rescued),top2_lost=sum(top2_lost),top2_changed=sum(top2_changed),
+ top1_mass_delta=mean(top1_mass_delta),top2_mass_delta=mean(top2_mass_delta),baseline_top2_mass_delta=mean(baseline_top2_mass_delta),.groups='drop')
+periods<-pairs |> group_by(issue,stage,model,baseline) |> summarise(fixtures=n(),brier_delta=mean(brier_delta),
+ log_loss_delta=mean(log_loss_delta),actual_probability_delta=mean(actual_probability_delta),.groups='drop')
+period_summary<-periods |> group_by(stage,model,baseline) |> summarise(issues=n(),
+ brier_better=sum(brier_delta<0),brier_worse=sum(brier_delta>0),equal_issue_brier_delta=mean(brier_delta),
+ median_issue_brier_delta=median(brier_delta),logloss_better=sum(log_loss_delta<0),logloss_worse=sum(log_loss_delta>0),
+ equal_issue_logloss_delta=mean(log_loss_delta),.groups='drop')
+calibration<-strategy_probability_diagnostics(long,'stage',c('W','D','L'),seq(0,1,.1))$calibration
+handicap_calibration<-result$calibration
+stopifnot(nrow(scores)==3*nrow(x),nrow(pairs)==3*nrow(x),!anyNA(pairs$actual_probability_delta))
+o<-params$output;stopifnot(!dir.exists(o),dir.create(o,recursive=FALSE))
+for(n in c('summary','strata','movements','periods','period_summary','calibration','handicap_calibration','scores','pairs'))write_csv(get(n),file.path(o,paste0(n,'.csv')))
+write_csv(x,file.path(o,'inputs.csv'))
+knitr::kable(summary,digits=5)
+knitr::kable(movements,digits=5)
+```
+
+模型给自身Top1/Top2的覆盖概率是“信心”，实际赛果获得的概率是事后逐场评分依据。
+平均实际赛果概率不是严格适当评分，不能替代Log loss与Brier。固定旧Top2集合的概率变化也单列，避免集合变化混淆。
+当前统一冻结输入只保存让球W/D/L概率，没有三版本同口径的完整比分网格；因此本轮不宣称比分分布改善。
+
+```{r}
+p1<-calibration |> ggplot(aes(predicted,observed,color=model))+geom_abline(slope=1,intercept=0,linetype=2)+
+ geom_line()+geom_point(aes(size=fixtures),alpha=.7)+facet_grid(stage~outcome)+coord_equal(xlim=c(0,1),ylim=c(0,1))+
+ theme_minimal()+labs(title='Calibration: all eligible fixtures, no purchase filtering',x='Mean predicted probability',y='Observed rate',size='Fixtures')
+print(p1);ggsave(file.path(o,'calibration.png'),p1,width=13,height=10,dpi=150)
+p2<-pairs |> mutate(comparison=paste(model,'vs',baseline)) |> ggplot(aes(actual_probability_delta,fill=comparison))+
+ geom_histogram(binwidth=.02,boundary=0)+geom_vline(xintercept=0,linetype=2)+facet_grid(stage~comparison,scales='free_y')+
+ theme_minimal()+theme(legend.position='none')+labs(title='Change in probability assigned to the actual outcome',x='Probability change (new minus reference)',y='Fixtures')
+print(p2);ggsave(file.path(o,'actual-probability-changes.png'),p2,width=13,height=9,dpi=150)
+p3<-periods |> mutate(comparison=paste(model,'vs',baseline),period=match(issue,ids)) |>
+ pivot_longer(c(brier_delta,log_loss_delta),names_to='metric',values_to='change') |>
+ ggplot(aes(period,change,color=comparison))+geom_hline(yintercept=0,linetype=2)+geom_line(alpha=.65)+
+ facet_grid(metric~comparison,scales='free_y')+theme_minimal()+theme(legend.position='none')+
+ labs(title='Paired issue-level proper-score changes (negative is better)',x='Issue sequence',y='Score change')
+print(p3);ggsave(file.path(o,'paired-score-changes.png'),p3,width=13,height=8,dpi=150)
+f<-list.files(o,pattern='[.](csv|png)$',full.names=TRUE)
+jsonlite::write_json(list(status='GENERATED_PENDING_REVIEW',historical_admission=FALSE,scope=ids,fixtures=nrow(x),
+ parent_receipt=params$parent_sha256,drawdown_receipt=params$drawdown_sha256,model_sha256=pr$model_sha256,
+ label_sha256=pr$sources$fixture_audit,implementation=code,score_grid_status='NOT_AVAILABLE_IN_COMPARABLE_FROZEN_INPUTS',
+ files=setNames(as.list(vapply(f,digest::digest,character(1),file=TRUE,algo='sha256')),basename(f))),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

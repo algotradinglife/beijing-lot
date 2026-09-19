@@ -1,0 +1,68 @@
+---
+title: "七场构组与覆盖：23个最差期的收敛结论"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+```{r}
+library(dplyr);library(readr)
+cfg<-jsonlite::fromJSON(params$config)
+source(file.path(cfg$repository_root,'r/diagnostic_verified_csv.R'))
+for(k in c('regroup','open'))stopifnot(digest::digest(file=cfg[[k]]$path,algo='sha256')==cfg[[k]]$sha256)
+a<-jsonlite::fromJSON(cfg$regroup$path);b<-jsonlite::fromJSON(cfg$open$path);ad<-dirname(cfg$regroup$path);bd<-dirname(cfg$open$path)
+stopifnot(digest::digest(file=file.path(cfg$repository_root,'r/diagnostic_verified_csv.R'),algo='sha256')==b$code[['r/diagnostic_verified_csv.R']])
+s<-diagnostic_read_verified_csv(file.path(bd,'summary.csv'),b$files[['summary.csv']],cols(.default='d',policy='c'))
+x<-diagnostic_read_verified_csv(file.path(bd,'periods.csv'),b$files[['periods.csv']],cols(issue='c'))
+d<-diagnostic_read_verified_csv(file.path(ad,'stages.csv'),a$files[['stages.csv']],cols(stage='c',n='i'))
+t<-diagnostic_read_verified_csv(file.path(bd,'trim.csv'),b$files[['trim.csv']],cols(.default='d',policy='c'))
+labels<-c(OLD_JOINT='旧组／原JOINT',OLD_DROP='旧组／排除第三赛果',OLD_OPEN_DROP='旧组／排除第三＋取消25%准入',OLD_TOP2='旧组／完整Top2',EXP_JOINT='扩充组／原JOINT',EXP_DROP='扩充组／排除第三赛果',EXP_OPEN_DROP='扩充组／排除第三＋取消25%准入',EXP_TOP2='扩充组／完整Top2',EXP_DROP_EV='扩充组／估算净收益排序',TOP2_PROB='新Top2池／概率排序',TOP2_DIVERSE='新Top2池／分散覆盖')
+```
+
+**旧七场候选组里已经存在不少机会；简单扩充组或取消准入门槛，并未自动改善收益。**
+
+这是从939期中事后挑出的最差25期，排除两期缺矩阵后得到的23期配对诊断，
+不是未见测试，也不授权未来策略。冻结原概率、欧赔映射估价、每期1024元预算上限、
+2元票和票级一次0.65系数。比分保护关闭。
+
+上一轮排除第三赛果后仍未中的18期，原因是：11期旧组里有Top2中奖组合，
+却被“256元内覆盖至少25%概率”的准入门槛挡住；2期有可中奖的已准入方案但未获资金；
+4期需要进入本次新搜索池才找到Top2中奖组；1期本次搜索仍找不到。
+这是事后可达性，不代表赛前能够识别赢家，也不是穷举全部七场组合。
+
+```{r}
+s |> mutate(方案=unname(labels[policy]),ROI百分比=100*roi) |> select(方案,命中期数=hit_issues,盈利期数=profit_issues,投入元=total_stake,回款元=total_gross,净收益元=net,ROI百分比) |> knitr::kable(digits=2)
+```
+
+三个对照给出不同层面的答案：
+
+1. **候选池：**旧组改买完整Top2可命中11期，说明无需先重构场次就有改善空间；
+   同样完整Top2在扩充组上只中9期。扩大搜索空间不等于分配得更好。
+2. **准入门槛：**取消25%硬门槛后，旧组命中5→6期，但净收益＋4364→−11539元；
+   扩充组命中8→7期，净收益−6663→−9888元。该门槛不是必要的赛前资格条件，
+   但移除它后需要重新评价资金竞争，不能仅以新增候选数量或命中期数评价。
+3. **回款与集中度：**旧组取消门槛救回3期、丢失2期；120407期回款减少约14902元。
+   每期是否至少中一组并不反映同一期能中多少组、回款多少。所有方案剔除各自
+   最大盈利期后均亏损，正收益尚未稳定。
+
+```{r}
+t |> mutate(方案=unname(labels[policy]),ROI百分比=100*roi) |> select(方案,剩余期数=issues,投入元=stake,净收益元=net,ROI百分比) |> knitr::kable(digits=2)
+for(pair in list(list(dir=bd,receipt=b,name='net.png'),list(dir=ad,receipt=a,name='diagnosis.png'))){
+ p<-file.path(pair$dir,pair$name);stopifnot(digest::digest(file=p,algo='sha256')==pair$receipt$files[[pair$name]])
+}
+knitr::include_graphics(c(file.path(bd,'net.png'),file.path(ad,'diagnosis.png')))
+```
+
+**本轮结论：不能把主要问题归为“七场选错了”。旧组的准入、覆盖和资金分配，
+比简单增加候选组更值得优先处理。25%可以作为深度参考，不应被误作分歧选场的必要条件；
+但本轮取消门槛并未证明收益改善，也未验证分歧本身的预测增益。**
+
+所有赛前决策与选票在新增方案结算前冻结。运行、原始票账本和分层诊断分别由
+247与248号QMD生成，本文件仅从哈希绑定的结果读取并汇总结论。

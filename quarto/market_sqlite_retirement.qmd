@@ -1,0 +1,35 @@
+---
+title: "盘口 SQLite 原始文件清退记录"
+format: html
+execute:
+  error: false
+  cache: false
+  freeze: false
+params:
+  repository_root: null
+  retirement_result: null
+  retirement_journal: null
+---
+
+本报告展示正式清退结果与逐文件日志的一致性，不代替数据库内容验收、备份核验或删除后实际文件检查。未完成的清退不能生成本报告。
+
+```{r}
+stopifnot(is.character(params$repository_root), dir.exists(params$repository_root),
+          is.character(params$retirement_result), file.exists(params$retirement_result),
+          is.character(params$retirement_journal), file.exists(params$retirement_journal))
+source(file.path(params$repository_root, "r", "market_retirement_report.R"))
+result <- jsonlite::read_json(params$retirement_result, simplifyVector = FALSE)
+journal <- jsonlite::read_json(params$retirement_journal, simplifyVector = FALSE)
+knitr::kable(market_retirement_table(result, journal))
+```
+
+## 输入凭证
+
+```{r}
+knitr::kable(tibble::tibble(
+  document = c("正式清退结果", "逐文件日志"),
+  path = c(params$retirement_result, params$retirement_journal)
+))
+```
+
+删除数量不等于整个磁盘可用空间的变化；磁盘空间还受其他进程写入影响。

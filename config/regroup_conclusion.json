@@ -1,0 +1,11 @@
+{
+  "repository_root": "/home/drwho1985/.codex/worktrees/0aac/beijing-lot",
+  "regroup": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/worst-regroup-v3/receipt.json",
+    "sha256": "5118231250ac3e466b6ab46d6a3762a469a22f2652e822be4a7080c81d629eab"
+  },
+  "open": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/worst-regroup-open-v2/receipt.json",
+    "sha256": "902a55fc2937fb6e3a5bf5f8cd08fc9caa0199bc7a37ab92e91fd994b89c9697"
+  }
+}

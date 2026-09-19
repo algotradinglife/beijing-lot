@@ -8,20 +8,21 @@ from src.fundamentals_n7_single import settle_n7_single
 
 
 @pytest.mark.parametrize('u',[3,6])
-def test_market_only_budget_caps_support_and_settlement(u):
+@pytest.mark.parametrize('count',[1,2])
+def test_market_only_budget_caps_support_and_settlement(u,count):
     frame=pd.DataFrame([dict(issue='001',slot=s,provider_id=str(s),handicap=0,
         q_W=.5+.01*s,q_D=.3-.01*s,q_L=.2) for s in range(1,15)])
     cuts={str(s):Cutoff.decision_epoch('001','2010-01-01') for s in frame.slot}
     kw=dict(cutoffs=cuts,max_uses=u,max_pair_overlap=5,budget_cny=1024,unit_cny=2,
-        payout_factor=.65,seed=41902,source_version='RAW_MARKET')
+        payout_factor=.65,seed=41902,source_version='RAW_MARKET',single_count=count)
     p=market_foundation_n7(frame,**kw)
     assert p==market_foundation_n7(frame,**kw)
-    assert p['stake']==64*p['groups']<=1024 and p['cash_cny']==1024-p['stake']
+    assert p['stake']==(2*2**(7-count))*p['groups']<=1024 and p['cash_cny']==1024-p['stake']
     groups=[]
     for g in range(1,p['groups']+1):
         legs=[r for r in p['legs'] if r['group']==g];groups.append({r['slot'] for r in legs})
-        assert len(legs)==7 and sum(len(r['support'])==1 for r in legs)==2
-        singles={r['slot'] for r in sorted(legs,key=lambda r:-r['q_W'])[:2]}
+        assert len(legs)==7 and sum(len(r['support'])==1 for r in legs)==count
+        singles={r['slot'] for r in sorted(legs,key=lambda r:-r['q_W'])[:count]}
         assert {r['slot'] for r in legs if len(r['support'])==1}==singles
         for r in legs:
             order=sorted(range(3),key=lambda i:(-r['q_'+'WDL'[i]],i))[:len(r['support'])]
@@ -37,3 +38,11 @@ def test_market_only_budget_caps_support_and_settlement(u):
     with pytest.raises(ValueError):market_foundation_n7(frame,**dict(kw,cutoffs={}))
     short=frame.head(6);empty=market_foundation_n7(short,**dict(kw,cutoffs={str(s):cuts[str(s)] for s in short.slot}))
     assert empty['groups']==0 and empty['cash_cny']==1024
+
+
+@pytest.mark.parametrize('count',[0,3,True,1.5,None])
+def test_invalid_single_count(count):
+    with pytest.raises(ValueError):
+        market_foundation_n7(pd.DataFrame(),cutoffs={},max_uses=3,max_pair_overlap=5,
+            budget_cny=1024,unit_cny=2,payout_factor=.65,seed=41902,
+            source_version='RAW_MARKET',single_count=count)

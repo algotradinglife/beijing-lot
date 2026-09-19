@@ -1,0 +1,29 @@
+source(file.path('..','..','r','draw_weight_selection.R'))
+testthat::test_that('prior-only weight selection freezes choices and rejects mutation', {
+ root<-normalizePath('../..');py<-Sys.getenv('RETICULATE_PYTHON')
+ core<-reticulate::import('src.temporal_learning.core');api<-reticulate::import('src.temporal_learning.frozen_blocks')
+ h<-expand.grid(day=1:6,slot=1:2);h$issue_code<-sprintf('%06d',h$day);h$provider_id<-paste(h$day,h$slot,sep='-')
+ h$q_W<-.5;h$q_D<-.2;h$q_L<-.3;h$BASE_D<-.2;h$TOTAL_D<-.5
+ h$actual<-ifelse(h$slot==1,'D','W');h$fixture_decision_ts<-sprintf('2011-01-%02dT00:00:00Z',h$day);h$last_fixture_cutoff<-h$fixture_decision_ts;h$day<-NULL
+ b<-api$frozen_block_schedule(reticulate::r_to_py(subset(h,issue_code>='000005')),cadence=2L)[[1]]
+ c<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
+ m<-draw_weight_fit(h,b,c,root,list(input=paste(rep('a',64),collapse='')),c(0,.5,1),12,2,py)
+ testthat::expect_equal(m$chosen$weight[m$chosen$arm=='BASE'],0)
+ testthat::expect_gt(m$chosen$weight[m$chosen$arm=='TOTAL'],0)
+ f<-subset(h,issue_code=='000005');f$issue<-f$issue_code;f$actual<-NULL
+ z<-draw_weight_predict(m,f,c,root)
+ testthat::expect_equal(z$W+z$D+z$L,rep(1,4));testthat::expect_equal(z$W/z$L,rep(5/3,4))
+ changed<-h;ix<-h$issue_code>='000005';changed$actual[ix]<-'L';changed$TOTAL_D[ix]<-.99;changed$fixture_decision_ts[ix]<-'2010-01-01T00:00:00Z';changed$last_fixture_cutoff[ix]<-'2010-01-01T00:00:00Z'
+ mm<-draw_weight_fit(changed,b,c,root,list(input=paste(rep('a',64),collapse='')),c(0,.5,1),12,2,py)
+ testthat::expect_equal(m$scores,mm$scores);testthat::expect_equal(m$chosen,mm$chosen)
+ testthat::expect_equal(z$D,draw_weight_predict(mm,f,c,root)$D)
+ bad<-m;bad$chosen$weight<-1;testthat::expect_error(draw_weight_predict(bad,f,c,root))
+ testthat::expect_error(draw_weight_predict(m,transform(f,actual='D'),c,root))
+ testthat::expect_error(draw_weight_fit(h,b,c,root,list(),c(1,0),12,2,py))
+ testthat::expect_error(draw_weight_predict(m,f,core$Cutoff$decision_epoch('000006','2011-01-06T00:00:00Z'),root))
+})
+testthat::test_that('selection report freezes before evaluation reads', {
+ s<-readLines(file.path('..','..','quarto','198_draw_weight_comparison.qmd'))
+ testthat::expect_true(grep('^labels<-',s)>grep('saveRDS(z,',s,fixed=TRUE))
+ testthat::expect_true(any(grepl('draw_refresh_prior_history_json',s,fixed=TRUE)))
+})

@@ -1,0 +1,83 @@
+---
+title: "JOINT最差25期：强让球分歧选组压力测试"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+事后按939期JOINT_BASE净收益从低到高选25期，同额亏损按期号升序截取。
+这是标签选择的失败窗口，不是独立测试集，不授权未来路由。原25期均零回款，
+其中2期缺本轮比分矩阵，剩23期配对。并列边界的截取与排除完整记录。
+
+第一轮仅检验选组门槛：原JOINT、直接差法至少1场强分歧、条件差法至少1场、条件差法至少2场。
+强分歧为半球刻度下线差绝对值>=1且有明确W/L方向。只筛原候选组，不新建组，
+不强制单选，不变更原组赛果前缀、概率、估价或共享模拟世界；每期1024元上限、2元票、0.65一次、SP门槛1.3不变。
+因此不能把本轮结果称为“强分歧单选方案”的验证。不足时留现金，不追加高复用新组。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root;out<-cfg$output;s<-cfg$settings
+modules<-c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_probability_replay','joint_candidate_comparison','zero_handicap_purchase','diagnostic_verified_csv','line_gap_pool')
+for(m in modules)source(file.path(root,'r',paste0(m,'.R')))
+reticulate::use_python(cfg$python,required=TRUE);api<-reticulate::import('src.strategy_diagnostic_inputs')
+stopifnot(!dir.exists(out),digest::digest(file=cfg$manifest,algo='sha256')==cfg$manifest_sha256)
+for(k in c('full','line'))stopifnot(digest::digest(file=cfg[[k]]$path,algo='sha256')==cfg[[k]]$sha256)
+full<-jsonlite::fromJSON(cfg$full$path);line<-jsonlite::fromJSON(cfg$line$path);manifest<-jsonlite::fromJSON(cfg$manifest)
+periods<-diagnostic_read_verified_csv(file.path(dirname(cfg$full$path),'periods.csv'),full$files[['periods.csv']],cols(issue='c'))
+scope<-periods |> filter(policy=='JOINT_BASE') |> arrange(net,issue) |> slice_head(n=cfg$worst_count) |> mutate(worst_rank=row_number())
+evidence<-diagnostic_read_verified_csv(file.path(dirname(cfg$line$path),'features.csv'),line$files[['features.csv']],cols(issue='c',provider_id='c'))
+scope<-scope |> mutate(included=issue %in% evidence$issue,reason=if_else(included,'PAIRED','SCORE_GRID_NOT_IN_CURRENT_INVENTORY'))
+issues<-sort(scope$issue[scope$included]);stopifnot(length(issues)>0)
+dir.create(file.path(out,'plans'),recursive=TRUE);write_csv(scope,file.path(out,'scope.csv'))
+freeze<-jsonlite::fromJSON(file.path(dirname(cfg$full$path),'freeze.json'),simplifyVector=FALSE)
+stopifnot(digest::digest(file=file.path(dirname(cfg$full$path),'freeze.json'),algo='sha256')==full$files[['freeze.json']])
+policies<-tibble(policy=c('BASE','RAW_MIN1','COND_MIN1','COND_MIN2'),model=c('HALF','HALF','HALF_CONDITIONAL','HALF_CONDITIONAL'),minimum=c(0L,1L,1L,2L))
+code_files<-c(paste0('r/',modules,'.R'),'quarto/245_worst_line_groups.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+bindings<-list();audit<-list()
+for(id in issues){
+ e<-manifest$bundles[match(id,manifest$bundles$issue),];b<-jsonlite::fromJSON(api$read_verified_bundle_json(e$path,e$sha256),simplifyVector=FALSE)
+ a<-n7_probability_allocate(b,b$cutoffs,s$model_id,cfg$python,s$target_coverage,s$group_cap_cny,s$minimum_sp,s$budget_cny,s$unit_cny,s$payout_factor,s$seed,s$worlds,s$max_actions)
+ f<-bind_rows(b$expanded_pool$fixtures);groups<-bind_rows(lapply(b$sleeves,function(g)tibble(group_id=as.integer(g$id),fixture_index=as.integer(unlist(g$fixture_indices))+1L)))
+ plans<-list()
+ for(j in seq_len(nrow(policies))){
+  policy<-policies$policy[j];ev<-evidence |> filter(issue==id,model==policies$model[j]) |> mutate(degree=abs(delta)) |> select(issue,slot,provider_id,degree,signal)
+  filtered<-line_gap_pool(a$pool,a$scenarios,ev,b$cutoffs,1,policies$minimum[j])
+  fit<-n7_core_allocate(filtered$pool,filtered$scenarios,b$cutoffs,s$budget_cny,'any_hit',s$max_actions,'OPEN_FIRST');stopifnot(fit$stop_reason!='ACTION_LIMIT')
+  picks<-filtered$pool$options[fit$selected];plans[[policy]]<-zero_purchase_tickets(f,groups,picks,b$cutoffs,s,policy)
+  audit[[paste(id,policy)]]<-tibble(issue=id,policy=policy,strong_fixtures=filtered$strong_fixtures,original_options=length(a$pool$options),admitted_options=length(filtered$pool$options),selected_groups=length(picks),max_reuse=if(length(picks))max(table(unlist(lapply(picks,`[[`,'fixtures')))) else 0)
+ }
+ ref<-freeze$bindings[[id]];stopifnot(digest::digest(file=ref$path,algo='sha256')==ref$sha256);old<-readRDS(ref$path)$JOINT_BASE
+ stopifnot(identical(plans$BASE$tickets |> select(group_id,state_id) |> arrange(group_id,state_id),old$tickets |> select(group_id,state_id) |> arrange(group_id,state_id)))
+ p<-file.path(out,'plans',paste0(id,'.rds'));saveRDS(plans,p);bindings[[id]]<-list(path=p,sha256=digest::digest(file=p,algo='sha256'),bundle_path=e$path,bundle_sha256=e$sha256)
+ writeLines(paste(match(id,issues),length(issues),id),file.path(out,'progress.txt'))
+}
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+jsonlite::write_json(list(status='FROZEN_POSTHOC_WINDOW_BEFORE_VARIANT_SETTLEMENT',config=cfg,bindings=bindings,code=code,historical_admission=FALSE),file.path(out,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+write_csv(bind_rows(audit),file.path(out,'admission.csv'))
+```
+
+```{r}
+labels<-bind_rows(lapply(seq_len(nrow(manifest$labels)),function(i)diagnostic_read_verified_csv(manifest$labels$path[i],manifest$labels$sha256[i],cols(issue='c',provider_id='c')) |> select(issue,slot,provider_id,handicap,actual_direction,spf_sp)))
+rows<-list()
+for(id in issues){plans<-readRDS(bindings[[id]]$path);for(policy in names(plans))rows[[paste(id,policy)]]<-joint_candidate_settle(plans[[policy]],filter(labels,issue==id))$rows}
+x<-bind_rows(rows)
+control<-scope |> filter(included) |> select(issue,old_stake=stake,old_gross=gross)
+z<-left_join(x,control,by='issue',relationship='many-to-one') |> mutate(saved_stake=old_stake-stake,return_change=gross-old_gross,net_change=net-(old_gross-old_stake))
+stopifnot(all(abs(z$net_change-z$saved_stake-z$return_change)<1e-7),all(z$old_gross==0),all(z$net[z$policy=='BASE']== -z$old_stake[z$policy=='BASE']))
+summary<-z |> group_by(policy) |> summarise(issues=n(),funded_issues=sum(stake>0),hit_issues=sum(hits>0),profit_issues=sum(net>0),total_stake=sum(stake),total_gross=sum(gross),net=sum(net),saved_stake=sum(saved_stake),extra_return=sum(return_change),.groups='drop') |> mutate(roi=if_else(total_stake>0,net/total_stake,NA_real_))
+summary |> knitr::kable(digits=2)
+z |> select(issue,policy,stake,gross,hits,net) |> pivot_wider(names_from=policy,values_from=c(stake,gross,hits,net)) |> knitr::kable(digits=2)
+write_csv(z,file.path(out,'periods.csv'));write_csv(summary,file.path(out,'summary.csv'))
+p<-summary |> select(policy,saved_stake,extra_return) |> pivot_longer(-policy,names_to='component',values_to='cny') |> ggplot(aes(policy,cny,fill=component))+geom_col()+theme_minimal()+labs(x=NULL,y='Net change from BASE (CNY)',fill=NULL,title='Saved stake versus newly recovered payout; post-hoc worst periods')
+print(p);ggsave(file.path(out,'attribution.png'),p,width=10,height=5,dpi=150)
+files<-list.files(out,pattern='\\.(csv|png|json)$',full.names=TRUE)
+jsonlite::write_json(list(status='COMPUTED_PENDING_REVIEW',config=cfg,issues=issues,files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files)),code=code,historical_admission=FALSE),file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```

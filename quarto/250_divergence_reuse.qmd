@@ -1,0 +1,46 @@
+---
+title: "分歧驱动复用与第三赛果回报门槛"
+format: html
+execute:
+  echo: true
+  warning: false
+  error: true
+---
+
+本报告是事后研究诊断，不改变生产概率底座或下注策略。它把让球线分歧、Top2 清晰度和第三赛果的增量预期回报分开：分歧只影响复用上限；第三赛果必须通过显式回报门槛。
+
+```{r}
+source("r/divergence_reuse_allocate.R")
+pool <- list(
+  cutoffs = list(diagnostic = "frozen"),
+  fixtures = list(list(issue="pilot", slot=1L, provider_id="p",
+    p_W=.70, p_D=.20, p_L=.10)))
+evidence <- divergence_reuse_features(pool, data.frame(
+  issue="pilot", slot=1L, provider_id="p", degree=1, stringsAsFactors=FALSE))
+evidence
+```
+
+冻结回放的模拟分配结果（32 个共同世界，仅用于检查分配器行为，不代表真实结算收益）由 `scripts/check_divergence_reuse.R` 生成：
+
+```{r}
+metrics_path <- "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/divergence-reuse-v1/model_metrics.csv"
+if (file.exists(metrics_path)) {
+  metrics <- read.csv(metrics_path)
+  print(head(metrics, 10))
+  if (requireNamespace("ggplot2", quietly = TRUE)) {
+    print(ggplot2::ggplot(metrics, ggplot2::aes(issue, model_hit, colour = variant, group = variant)) +
+      ggplot2::geom_point() + ggplot2::geom_line() + ggplot2::labs(y = "共同世界命中率", x = "期次"))
+    metrics <- metrics[order(metrics$variant, metrics$issue), ]
+    metrics$cumulative_net <- ave(metrics$actual_net, metrics$variant,
+      FUN = cumsum)
+    print(ggplot2::ggplot(metrics, ggplot2::aes(issue, cumulative_net,
+      colour = variant, group = variant)) + ggplot2::geom_line() +
+      ggplot2::geom_point() + ggplot2::labs(y = "实际累计净收益（元）",
+      x = "期次"))
+  }
+}
+```
+
+`HIGH` 场次可承受更高复用，`MEDIUM` 场次受限，`LOW` 场次只保留一次暴露。任何候选第三赛果还必须满足 `expected_gross / stake >= third_min_expected_return`；低于门槛的资金留在现金池，不为了填满预算而分散。
+
+完整冻结期次的结果写入外置盘 `audits/divergence-reuse-v1/`，并与旧 JOINT、Top2 对照。结论只在冻结的研究窗口内成立。

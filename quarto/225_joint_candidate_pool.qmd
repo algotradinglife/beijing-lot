@@ -1,0 +1,121 @@
+---
+title: "候选池归因：Top2基线与JOINT的提升空间"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+## 原生选择结构与逐层改进
+
+使用140902—150202共50期，冻结校正市场概率，每期1024元上限，每票2元，一次0.65结算系数，估算SP门槛1.3，本金10万元，无比分保护。
+从原24组出发，保留全部旧组并增加最多64组：先纳入上一轮分散Top2的四组，再从循环窗口/单场替换组中交替按Top2概率和预计回款选择；除保留锚点外，新加组之间最多重叠4场。候选不足如实记录。
+
+| 规则 | 购买结构 |
+|---|---|
+| HARD0 | 七场全Top2，共128票，256元/组 |
+| HARD1 | 组内Top1概率最高一场改单选，共64票，128元/组 |
+| HARD2 | 组内Top1概率最高两场改单选，共32票，64元/组 |
+| WITHIN0/1/2 | 在对应硬基线范围内按概率排序，允许买1/4、1/2或全部票；省下的钱用于其他组 |
+| ANCHOR0/1/2 | 对应范围内概率开平方归一化，再与原始联合概率以95%/5%混合排序；范围外票数最多5% |
+| JOINT_NATIVE | 原始JOINT自由概率前缀及25%/256元门槛，用作偏离结构的对照 |
+
+所有WITHIN/ANCHOR选项的每场投注边际与原生单选/双选分布的总变差不得超过0.25：双选不能退化成几乎全押一个方向。硬基线的全套票始终可选；如果贪心排序方案在选组模拟场景上的至少一组命中概率低于硬基线，保留硬基线。
+这只约束模型目标，不保证实际收益。完整Top2双选票的投注比例是50%/50%，不能与模型真实概率混用：所有估值和场景均使用原始冻结概率，变换分数只用于选票排序。
+
+硬基线及排序变种共用4096个选组场景，独立4096场景仅作评估，不参与选择。JOINT_NATIVE保留原256场景规则与种子，不重训、不用实际SP选场。
+这是已暴露的历史诊断，fixture-relative截止证据不证明整张票当时可同时买入。全部50期计划先冻结，之后才读取结算。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root
+modules<-c('n7_probability_replay','n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','top2_fresh_groups','joint_candidate_comparison','fundamentals_equity_curves')
+for(n in modules)source(file.path(root,'r',paste0(n,'.R')))
+rec<-jsonlite::fromJSON(file.path(cfg$input,'receipt.json'),simplifyVector=FALSE)
+stopifnot(digest::digest(file=file.path(cfg$input,'receipt.json'),algo='sha256')==cfg$receipt_sha256,rec$status=='SETTLED',!dir.exists(cfg$output))
+dir.create(cfg$output,recursive=TRUE)
+s<-list(model_id='frozen-market',target_coverage=.25,group_cap_cny=256,minimum_sp=1.3,budget_cny=1024,unit_cny=2,payout_factor=.65,seed=42501L,worlds=256L,hard_seed=42503L,hard_worlds=4096L,temperature=.5,marginal_tv_cap=.25,outside_mix=.05,outside_ticket_fraction=.05,evaluation_seed=42502L,evaluation_worlds=4096L,max_actions=1024L)
+plans<-list();hashes<-list();sources<-list();counts<-list();metrics<-list()
+for(path in names(rec$plans)) {
+ stopifnot(digest::digest(file=path,algo='sha256')==rec$plans[[path]])
+ old<-jsonlite::fromJSON(path);bp<-old$source_bundle$path[1];bs<-old$source_bundle$sha256[1]
+ stopifnot(digest::digest(file=bp,algo='sha256')==bs)
+ b<-jsonlite::fromJSON(gzfile(bp),simplifyVector=FALSE);sources[[bp]]<-bs
+ fresh<-top2_fresh_groups(bind_rows(b$expanded_pool$fixtures),b$cutoffs,cfg$python,7,1024,2,.65,1.3)
+ expanded<-joint_candidate_expand(b,fresh,b$cutoffs,cfg$python,64,4)
+ for(pool in 'EXPANDED') {
+  candidate<-if(pool=='OLD')b else expanded
+  z<-joint_candidate_compare(candidate,candidate$cutoffs,cfg$python,s)
+  id<-paste(z$issue,pool,sep='-');plans[[id]]<-z
+  dest<-file.path(cfg$output,paste0(id,'-plan.json'));jsonlite::write_json(z,dest,auto_unbox=TRUE,digits=NA,null='null')
+  hashes[[dest]]<-digest::digest(file=dest,algo='sha256')
+  counts[[id]]<-tibble(issue=z$issue,pool=pool,groups=length(candidate$sleeves),eligible_fixtures=length(fresh$eligible))
+  metrics[[id]]<-z$metrics |> mutate(issue=z$issue,pool=pool)
+ }
+ cat('Frozen ',b$issue,'\n');writeLines(b$issue,file.path(cfg$output,'last-frozen.txt'))
+}
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.fundamentals_n7_baseline','src.n7_sleeve_states'),distributions=list('numpy','pandas','scipy'))
+code<-c(paste0('r/',modules,'.R'),'quarto/225_joint_candidate_pool.qmd')
+jsonlite::write_json(list(status='FROZEN_BEFORE_LABEL_READ',historical_admission=FALSE,plans=hashes,sources=sources,source_receipt=cfg$receipt_sha256,code=setNames(lapply(code,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code),python_implementation=closure),file.path(cfg$output,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+## 结算与资金曲线
+
+```{r}
+for(n in c('fixture-audit.csv','ticket-labels.csv'))stopifnot(digest::digest(file=file.path(cfg$input,n),algo='sha256')==rec$files[[n]])
+labels<-read_csv(file.path(cfg$input,'fixture-audit.csv'),col_types=cols(issue='c',provider_id='c')) |> select(issue,slot,provider_id,handicap,actual_direction,spf_sp)
+results<-lapply(names(plans),function(id) {
+ saved<-file.path(cfg$output,paste0(id,'-plan.json'));stopifnot(digest::digest(file=saved,algo='sha256')==hashes[[saved]]);z<-jsonlite::fromJSON(saved);pool<-sub('^[^-]+-','',id);res<-joint_candidate_settle(z,filter(labels,issue==z$issue))
+ list(rows=mutate(res$rows,pool=pool),tickets=mutate(res$tickets,pool=pool))
+})
+old_tickets<-read_csv(file.path(cfg$input,'ticket-labels.csv'),col_types=cols(issue='c'))
+old_rows<-old_tickets |> group_by(issue) |> summarise(stake=n()*2,gross=sum(gross),hits=sum(hit),bought_groups=n_distinct(sleeve_id),.groups='drop')
+old_rows<-tibble(issue=sort(unique(labels$issue))) |> left_join(old_rows,by='issue',relationship='one-to-one') |> mutate(across(c(stake,gross,hits,bought_groups),~replace_na(.x,0)),net=gross-stake,pool='OLD',policy='JOINT_NATIVE')
+rows<-bind_rows(bind_rows(lapply(results,`[[`,'rows')),old_rows) |> mutate(rule=policy,policy=paste(pool,rule,sep='/'),budget_cny=1024,cash_cny=1024-stake,status=if_else(stake>0,'COMPLETE','NO_BET'),model='FROZEN_MARKET',roi=if_else(stake>0,net/stake,NA_real_))
+tickets<-bind_rows(lapply(results,`[[`,'tickets'))
+issues<-sort(unique(rows$issue));stopifnot(length(issues)==50,nrow(rows)==550)
+curves<-strategy_equity_curves(rows,issues,100000)
+summary<-top2_fresh_summary(select(rows,issue,policy,stake,gross,net,hits,bought_groups),curves)
+summary |> knitr::kable(digits=3)
+for(n in c('rows','tickets','curves','summary'))write_csv(get(n),file.path(cfg$output,paste0(n,'.csv')))
+p<-curves |> filter(grepl('HARD|JOINT_NATIVE',policy)) |> select(period,policy,equity_cny,drawdown_cny) |> pivot_longer(c(equity_cny,drawdown_cny),names_to='measure',values_to='CNY') |> mutate(measure=factor(measure,levels=c('equity_cny','drawdown_cny'))) |> ggplot(aes(period,CNY,color=policy))+geom_line(linewidth=.65)+facet_wrap(~measure,ncol=1,scales='free_y')+theme_minimal()+scale_y_continuous(labels=scales::label_comma())+labs(title='Candidate-pool attribution: 50 accepted issues',x='Issue order: 140902 to 150202',y='CNY')
+p
+ggsave(file.path(cfg$output,'equity-drawdown.png'),p,width=12,height=8,dpi=160)
+```
+
+## 相对同池Top2的提升
+
+```{r}
+base<-rows |> filter(grepl('^HARD',rule)) |> mutate(compression=sub('HARD','',rule)) |> select(issue,pool,compression,base_net=net,base_hit=hits)
+delta<-rows |> filter(pool=='EXPANDED',!grepl('^HARD',rule)) |> mutate(compression=if_else(rule=='JOINT_NATIVE','0',sub('^(WITHIN|ANCHOR)','',rule))) |> left_join(base,by=c('issue','pool','compression'),relationship='many-to-one') |> mutate(net_delta=net-base_net)
+delta |> group_by(pool,rule) |> summarise(extra_net=sum(net_delta),extra_hit_issues=sum(hits>0)-sum(base_hit>0),rescued=sum(hits>0 & base_hit==0),lost=sum(hits==0 & base_hit>0),.groups='drop') |> knitr::kable(digits=2)
+near<-curves |> filter(grepl('HARD|WITHIN|ANCHOR',policy)) |> mutate(compression=sub('.*([012])$','\\1',policy),family=sub('[012]$','',sub('EXPANDED/','',policy))) |> select(period,family,compression,equity_cny,drawdown_cny) |> pivot_longer(c(equity_cny,drawdown_cny),names_to='measure',values_to='CNY')
+near_plot<-ggplot(near,aes(period,CNY,color=family))+geom_line()+facet_grid(measure~compression,scales='free_y')+theme_minimal()+scale_y_continuous(labels=scales::label_comma())+labs(title='Hard supports versus anchored ranking: compression 0 / 1 / 2',x='Issue order',y='CNY')
+near_plot
+ggsave(file.path(cfg$output,'anchored-equity-drawdown.png'),near_plot,width=13,height=8,dpi=160)
+metrics<-bind_rows(metrics) |> left_join(rows |> select(issue,pool,rule,hits),by=c('issue','pool','policy'='rule'),relationship='one-to-one')
+metrics |> group_by(pool,policy) |> summarise(model_hit_issues=sum(model_any_hit),actual_hit_issues=sum(hits>0),estimated_gross=sum(model_expected_gross),hard_fallbacks=sum(hard_fallback),.groups='drop') |> knitr::kable(digits=2)
+bind_rows(counts) |> group_by(pool) |> summarise(min_groups=min(groups),median_groups=median(groups),max_groups=max(groups),.groups='drop') |> knitr::kable()
+rows |> group_by(policy) |> summarise(net_without_best=sum(net)-max(net),.groups='drop') |> knitr::kable(digits=2)
+write_csv(delta,file.path(cfg$output,'relative-top2.csv'));write_csv(metrics,file.path(cfg$output,'model-metrics.csv'));write_csv(bind_rows(counts),file.path(cfg$output,'pool-counts.csv'))
+```
+
+## 逐期明细
+
+```{r}
+rows |> arrange(issue,policy) |> select(issue,policy,stake,gross,net,roi,hits) |> knitr::kable(digits=3)
+files<-c('rows.csv','tickets.csv','curves.csv','summary.csv','relative-top2.csv','model-metrics.csv','pool-counts.csv','equity-drawdown.png','anchored-equity-drawdown.png','freeze.json')
+jsonlite::write_json(list(status='SETTLED',historical_admission=FALSE,config=cfg,files=setNames(lapply(files,function(f)digest::digest(file=file.path(cfg$output,f),algo='sha256')),files),issues=issues),file.path(cfg$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+## 解释边界
+
+旧JOINT与扩池JOINT比较构组变化；HARD0/1/2比较刚性压单与扩组；同压单数的WITHIN/ANCHOR与HARD比较排序购买的增益。估算概率与实际中奖分开报告，接近硬分布约束也不保证模型准确或实盘获利。各策略本金相同、预算上限相同，实际投入与闲置资金必须同时看。

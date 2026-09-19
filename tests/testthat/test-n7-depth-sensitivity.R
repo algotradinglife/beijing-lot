@@ -1,0 +1,22 @@
+source(file.path('..','..','r','n7_capital_depth.R'))
+source(file.path('..','..','r','n7_depth_sensitivity.R'))
+test_that('fixed-order complete prefixes preserve budget, skips and cash', {
+ p<-rbind(c(.6,.3,.1,rep(0,2184)),c(.2,.2,.2,.2,.2,rep(0,2182)),c(.7,.3,rep(0,2185)))
+ rownames(p)<-c('a','b','c');cut<-list(slot='frozen-epoch')
+ s<-list(prob_mat=p,value_mat=p*10,rank_idx=matrix(rep(1:2187,3),3,byrow=TRUE))
+ curves<-n7_capital_curves(s,cut,cut,2)
+ z<-n7_depth_sensitivity(curves,c('a','b','c'),.65,6,2,cut,cut)
+ expect_equal(z$depth,c(2L,4L,1L));expect_equal(z$selected,c(TRUE,FALSE,TRUE))
+ expect_equal(z$cash_after,c(2,2,0));expect_equal(sum(z$stake),6)
+ expect_equal(z$reason[2],'UNAFFORDABLE_COMPLETE_PREFIX')
+ expect_equal(n7_depth_sensitivity(curves,c('a','b'),.65,0,2,cut,cut)$stake,c(0,0))
+ expect_equal(nrow(n7_depth_sensitivity(curves,character(),.3,6,2,cut,cut)),0)
+ expect_error(n7_depth_sensitivity(curves,c('a','a'),.3,6,2,cut,cut))
+ expect_error(n7_depth_sensitivity(curves,'x',.3,6,2,cut,cut))
+ expect_error(n7_depth_sensitivity(curves,'a',.3,5,2,cut,cut))
+ expect_error(n7_depth_sensitivity(curves,'a',NA_real_,6,2,cut,cut))
+ expect_error(n7_depth_sensitivity(curves,'a',.3,6,2,list(slot='other'),cut))
+ # Outcomes are absent from the interface and cannot affect depth or inclusion.
+ dirty<-curves;dirty$actual_rank<-seq_len(nrow(dirty))%%2187+1L
+ expect_identical(n7_depth_sensitivity(dirty,c('a','b','c'),.65,6,2,cut,cut),z)
+})

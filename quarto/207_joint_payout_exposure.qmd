@@ -1,0 +1,127 @@
+---
+title: "JOINT：低回款过滤与资金复用限制"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  study: null
+  evaluation_sha256: null
+  reference: null
+  reference_receipt_sha256: null
+  output: null
+---
+
+这是冻结784期的**回顾诊断**，不构成未见数据验证。原概率校正和原选组属于历史研究证据，
+本轮不重训、不选新的7场组，不把时点代理宣称为真实赛前可用证明。实际北单SP只用于结算，
+预计回款仍由欧赔及大小球映射，已包含一次票级0.65系数。
+
+主对照：原JOINT；预计单票回款至少256元；单场最多承载768元且同方向最多512元；两者结合。
+固定1024元预算上限、2元票、10万元初始资金。组票数不超过原配额，余款持现。
+原未使用预算本轮不补满；只在同组2187个组合内按概率排序寻找替补，资金竞争按全局票概率排序。
+每张2元票在其7场中的每一场均计2元风险承载，不能把7场暴露相加当作实际投入。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+for(f in c('diagnostic_verified_csv','fundamentals_equity_curves','n7_purchase_accounting','joint_payout_report'))source(file.path(params$project_root,'r',paste0(f,'.R')))
+stopifnot(digest::digest(file=file.path(params$study,'evaluation-receipt.json'),algo='sha256')==params$evaluation_sha256,
+ digest::digest(file=file.path(params$reference,'receipt.json'),algo='sha256')==params$reference_receipt_sha256)
+er<-jsonlite::fromJSON(file.path(params$study,'evaluation-receipt.json'))
+rr<-jsonlite::fromJSON(file.path(params$reference,'receipt.json'))
+rows<-diagnostic_read_verified_csv(file.path(params$study,'rows.csv'),er$files[['rows.csv']],cols(issue='c'))
+contributions<-diagnostic_read_verified_csv(file.path(params$study,'contributions.csv'),er$files[['contributions.csv']],cols(issue='c'))
+original<-diagnostic_read_verified_csv(file.path(params$reference,'rows.csv'),rr$files[['rows.csv']],cols(issue='c')) |> filter(policy=='JOINT') |> select(issue,stake,gross,net,hits)
+reference_curves<-diagnostic_read_verified_csv(file.path(params$reference,'curves.csv'),rr$files[['curves.csv']],cols(issue='c'))
+map<-reference_curves |> filter(policy=='JOINT',evaluation=='ALL',accounting_basis=='FUNDED',period>0) |> select(issue,period,stage) |> arrange(period)
+stopifnot(nrow(map)==784)
+z<-joint_payout_report(rows,contributions,original,map,100000,'P0_OPEN',2)
+out<-params$output;dir.create(out,recursive=TRUE,showWarnings=FALSE)
+for(n in names(z))write_csv(z[[n]],file.path(out,paste0(n,'.csv')))
+primary<-c('P0_OPEN','P256_OPEN','P0_MODERATE','P256_MODERATE')
+labels<-c(P0_OPEN='Original JOINT',P256_OPEN='Payout >=256',P0_MODERATE='Exposure cap',P256_MODERATE='Both')
+summary<-z$summary |> filter(accounting_basis=='FUNDED',policy %in% primary)
+knitr::kable(summary |> select(evaluation,policy,stake_cny,net_cny,roi_percent,max_drawdown_cny,hit_issues,cash_cny,stopped_issues),digits=2)
+```
+
+## 收益与回撤
+
+全期资金连续结算；若资金不足整期计划则永久持现，不借款。分段表在各段独立从10万元计算局部回撤，
+全期图不在阶段边界重置本金。BEFORE为1—305期，DRAWDOWN为306—399期，AFTER为400—784期。
+这些是旧诊断的事后阶段，不能作为未来切换信号。
+
+```{r}
+chart<-z$curves |> filter(evaluation=='ALL',accounting_basis=='FUNDED',policy %in% primary) |> mutate(label=factor(labels[policy],levels=unname(labels)))
+p1<-ggplot(chart,aes(period,equity_cny,colour=label))+geom_line(linewidth=.55)+geom_vline(xintercept=c(305,399),linetype=2)+theme_minimal()+theme(legend.position='bottom')+labs(x='Issue index',y='Capital (CNY)',colour=NULL)
+p2<-ggplot(chart,aes(period,drawdown_cny,colour=label))+geom_line(linewidth=.55)+geom_vline(xintercept=c(305,399),linetype=2)+theme_minimal()+theme(legend.position='bottom')+labs(x='Issue index',y='Drawdown (CNY)',colour=NULL)
+ggsave(file.path(out,'equity.png'),p1,width=11,height=5,dpi=150)
+ggsave(file.path(out,'drawdown.png'),p2,width=11,height=5,dpi=150)
+p1;p2
+```
+
+## 省钱还是提高回款效率
+
+COMMON是两方案共有票；REMOVED为原方案有、新方案无；ADDED为新方案替补票。
+因此“新净收益−原净收益＝ADDED净收益−REMOVED净收益”，逐期严格校验。
+这张表是完整计划的影子会计；如果上方资金不足停投，不能当作实际资金账本。
+概率质量跨组相加不是期覆盖，下面另用共享场次模拟给出期覆盖。
+
+```{r}
+ct<-z$contributions |> filter(policy %in% primary[-1],category!='COMMON') |> mutate(delta_component=if_else(category=='REMOVED',-net,net))
+p3<-ggplot(ct,aes(policy,delta_component,fill=category))+geom_col(position='dodge')+facet_wrap(~stage)+geom_hline(yintercept=0)+theme_minimal()+theme(legend.position='bottom')+labs(x=NULL,y='Change in net return (CNY)')
+ggsave(file.path(out,'replacement-contribution.png'),p3,width=12,height=5,dpi=150);p3
+knitr::kable(ct |> select(stage,policy,category,tickets,stake,gross,net),digits=2)
+knitr::kable(z$coverage |> filter(policy %in% primary),digits=4)
+```
+
+期模型覆盖采用8192个固定种子共享场次世界，组间共享相同赛果；不把重叠组当独立事件。
+随机种子只用于诊断覆盖，不决定购票，也没有按实绩选种子。单期期覆盖模拟标准误最高约0.55个百分点。
+
+## 公开全部固定档位
+
+回款门槛0/128/256/512元，暴露限制OPEN（1024/1024）、MODERATE（768/512）、STRICT（512/384）。
+相邻档位全部展示，不从本样本选最佳参数后宣称其为未来最优；数据可用时点未证实，不执行历史窗口调参。
+
+```{r}
+grid<-z$summary |> filter(accounting_basis=='FUNDED') |> tidyr::separate_wider_delim(policy,'_',names=c('payout','exposure'),cols_remove=FALSE)
+p4<-ggplot(grid,aes(payout,exposure,fill=roi_percent))+geom_tile()+geom_text(aes(label=sprintf('%.1f%%',roi_percent)),size=3)+facet_wrap(~evaluation)+scale_fill_gradient2(midpoint=0)+theme_minimal()+labs(x='Payout floor (CNY)',y='Exposure limit',fill='ROI %')
+ggsave(file.path(out,'grid-roi.png'),p4,width=11,height=7,dpi=150);p4
+knitr::kable(grid |> select(evaluation,policy,stake_cny,net_cny,roi_percent,max_drawdown_cny,hit_issues,stopped_issues),digits=2)
+```
+
+## 收敛结论与命中结构
+
+**本轮不采用256元门槛或768/512元资金限制替换原JOINT。** 全期原方案净收益53188.68元、
+ROI7.52%、最大回撤35125.71元；256元过滤净收益45987.15元、ROI6.51%、回撤35772.46元。
+仅资金限制净收益−31149.03元、回撤59787.27元；两者结合净收益−31554.58元、回撤63848.63元。
+各方案都没有资金不足停投，因此这里不是资金账本截断造成的差异。
+
+256元过滤的命中期数345→351，但中奖票总数1217→986。每张中奖票平均实际回款约625→764元，
+方向上实现了“中一次回款更多”，却损失了同一期多个组同时中奖的回款。
+被换出的42847票投入85694元、净赚1463.25元；替补同样票数却净亏5738.28元，差额−7201.53元。
+门槛提高了单次回款，并没有提高整套资金效率。
+
+仅资金限制节省113954元，却减少198291.71元回款。被换出票净赚52655.11元，
+替补票净亏31682.60元，因此恶化不只是少投入；它破坏了原有组合的收益贡献。
+这个结论只针对固定原组、按票概率竞争资金、原组配额不变的限制，不证明重新设计分散选组必然无效。
+
+128元轻过滤是一个小幅正向敏感性结果：同投入净收益56683.54元、ROI8.02%、回撤34784.04元，
+比原方案多3494.86元，仅多命中1期。784期里14期改善、30期变差、740期不变，
+最大单期改善贡献2484.28元；去掉这一个改善仍增加1010.59元，但证据仍薄，不能宣称普遍优势。
+它在旧回撤段反而多亏379.70元，所以也没有解决原来的回撤问题。
+
+```{r}
+hit_structure<-rows |> filter(policy %in% primary) |> group_by(policy) |> summarise(
+ hit_issues=sum(hits>0),winning_tickets=sum(hits),gross=sum(gross),
+ gross_per_winning_ticket=gross/winning_tickets,winning_tickets_per_hit_issue=winning_tickets/hit_issues,.groups='drop')
+write_csv(hit_structure,file.path(out,'hit-structure.csv'))
+knitr::kable(hit_structure,digits=2)
+```
+
+最终保留原JOINT作参照，不把硬资金限制或高回款过滤作为本轮已证明的升级。
+128元结果单列为有限的研究证据，不从全部档位中事后挑赢家来替代主对照。
+关键归因是：**命中期数、同一期中奖组数、每个中奖组的回款必须联合评价；只优化其中一个会损害总回款。**

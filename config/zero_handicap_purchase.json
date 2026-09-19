@@ -1,0 +1,93 @@
+{
+  "repository_root": "/home/drwho1985/.codex/worktrees/0aac/beijing-lot",
+  "python": "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python",
+  "scope": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/eight-strategy-full-history-v1/scope-inventory.json",
+  "scope_sha256": "2bec7b486368163d8a820425a92c56bfa631da1caa1ffdd82716184411321415",
+  "settings": {
+    "target_coverage": 0.25,
+    "minimum_sp": 1.3,
+    "budget_cny": 1024,
+    "unit_cny": 2,
+    "payout_factor": 0.65,
+    "seed": 42501,
+    "worlds": 256,
+    "group_cap_cny": 256,
+    "max_actions": 1024,
+    "extra_depths": [
+      32,
+      64,
+      96,
+      128,
+      192,
+      256,
+      384,
+      512
+    ],
+    "model_id": "frozen-market",
+    "hard_seed": 42503,
+    "hard_worlds": 4096,
+    "temperature": 0.5,
+    "marginal_tv_cap": 0.25,
+    "outside_mix": 0.05,
+    "outside_ticket_fraction": 0.05,
+    "evaluation_seed": 42502,
+    "evaluation_worlds": 4096
+  },
+  "output": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3",
+  "euro_manifest": "config/zero_handicap_diagnostic.json",
+  "euro_manifest_sha256": "6cb68a4f5eafc6af74a6dc1e1a4f7c3c343d3759112b878b5b1bb69946b01368",
+  "top2": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/eight-strategy-full-history-v1/top2-834-v1/plans-receipt.json",
+    "sha256": "255fe94dd7a238acdad8ab8354d8cd71c5aaa29d79e9c48eb2bd3f1980cd8d2a"
+  },
+  "joint": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/eight-strategy-full-history-v1/joint-834-v1/plans-receipt.json",
+    "sha256": "302a638234dc14c552e7bb3002f91d138bd763df039f5bede4a7627fcae0138e"
+  },
+  "reference": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/eight-strategy-full-history-v1/report-834-v1/receipt.json",
+    "sha256": "91542d669c5d3713b1087c1d056d4b11bdce42ca16df13cff27d814808cc601a"
+  },
+  "plan_receipts": [
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part0/freeze.json",
+      "sha256": "ceb749b3b25e7e88339214c0ebe70ade806c3a45f53906c937fce16e8a4ba61c",
+      "admission_sha256": "ceb5261b97fa2f27ce95f256e271b91d778c811adf6b29705c98bb4752145a78"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part1/freeze.json",
+      "sha256": "15a9dbd0249a18c5c5a5646561c53810c3dd76acf1e1c3fa07a20864df2f1795",
+      "admission_sha256": "0b3ce7bbb30fb9e873b02fb1c1305a47090e8a996f1614910deece27a534fe50"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part2/freeze.json",
+      "sha256": "97cbe6e62ee456c9224d4595dc8da383398208e6ae408f07e2428ed03a9c6d52",
+      "admission_sha256": "8f17dae5b8621575f0cfff82e1cdc8380362a75f733a8c88cb16d74a59d545e2"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part3/freeze.json",
+      "sha256": "74cc635eb5e91b6a517e13fe291faaee94eb33bf12b63765c963e2d5631ca7bd",
+      "admission_sha256": "dce8b1c872d2c5ff4ececb716ca19f901cf13094945ed93a4822bebf90223c72"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part4/freeze.json",
+      "sha256": "2eeb79487a1def0e316f82855ecf1ca468d655c9ffeff5736e81858f0c128489",
+      "admission_sha256": "b56404e57a75ae719380df18b1b9fb4b38327eb5c3fee007cb86aa0298f4ad9e"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part5/freeze.json",
+      "sha256": "d53330f15e166339ec4487d2cc180200b29371ada6631b4695357f6d078c840f",
+      "admission_sha256": "bbfbda067dfc145f70dcdf872339b2f96e5114b2e53a394bd4709c15da316653"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part6/freeze.json",
+      "sha256": "d6bac8fcc496344f091c4eb7e14406ee4e33bffd73bdd8a281dfc649db60f99b",
+      "admission_sha256": "4f3e171a59d7f37c5bd48962b5962fc52fe1c5f8bd29936936257b16e7781913"
+    },
+    {
+      "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/zero-handicap-purchase-v3-part7/freeze.json",
+      "sha256": "985008606e887a97b2b43872bffeba8943cc9fa7d09b663978c46203828b30a0",
+      "admission_sha256": "e593aad4bd6069945360be48760f00ef85d29e0e2ce63f241970bfd9a930c788"
+    }
+  ]
+}

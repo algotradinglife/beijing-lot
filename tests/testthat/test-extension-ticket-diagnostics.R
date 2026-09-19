@@ -1,0 +1,12 @@
+source(file.path('..','..','r/extension_ticket_diagnostics.R'))
+test_that('ticket sums cannot subtract aggregate stake once per row',{
+ x<-tibble::tibble(issue='01',policy='BASE',ticket_id=c('a','b'),cell=c('a','b'),prob=c(.25,.5),payout_hat=c(100,10),copies=c(1L,2L),hit=c(TRUE,FALSE),gross=c(80,0))
+ z<-extension_ticket_diagnostics(x,2)
+ expect_equal(z$bridge$stake,6);expect_equal(z$bridge$actual_net,74)
+ expect_equal(z$bridge$model_net,29);expect_equal(z$bridge$outcome_residual,65)
+ expect_equal(z$bridge$price_residual,-20);expect_equal(z$grid$net,c(78,-4))
+ x$cell<-'same';expect_equal(extension_ticket_diagnostics(x,2)$grid$net,74)
+ x$copies<-0L;expect_equal(extension_ticket_diagnostics(x,2)$bridge$actual_net,0)
+ expect_equal(nrow(extension_ticket_diagnostics(x[FALSE,],2)$grid),0)
+ x$gross[2]<-10;expect_error(extension_ticket_diagnostics(x,2))
+})

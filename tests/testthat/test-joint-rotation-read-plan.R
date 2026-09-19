@@ -1,0 +1,11 @@
+source(file.path('..','..','r','diagnostic_verified_csv.R'))
+source(file.path('..','..','r','joint_rotation_read_plan.R'))
+test_that('zero-bet CSV retains join and arithmetic types', {
+ x<-tibble::tibble(issue=character(),policy=character(),ticket_id=character(),sleeve_id=integer(),ticket_col_idx=integer(),prob=double(),payout_hat=double(),cell=character(),base_copies=integer(),copies=integer(),state=character(),action=character())
+ p<-tempfile(fileext='.csv');readr::write_csv(x,p);h<-digest::digest(file=p,algo='sha256')
+ y<-joint_rotation_read_plan(p,h);expect_equal(nrow(y),0);expect_type(y$sleeve_id,'integer');expect_type(y$copies,'integer');expect_type(y$prob,'double')
+ expect_equal(nrow(dplyr::left_join(y,tibble::tibble(sleeve_id=integer(),gross=double()),by='sleeve_id')),0)
+ expect_error(joint_rotation_read_plan(p,paste(rep('0',64),collapse='')))
+ x<-tibble::tibble(issue='001',policy='BASE',ticket_id='0:1',sleeve_id=0L,ticket_col_idx=1L,prob=.1,payout_hat=100,cell='c',base_copies=1L,copies=1L,state='BASE',action='UNCHANGED')
+ readr::write_csv(x,p);expect_equal(joint_rotation_read_plan(p,digest::digest(file=p,algo='sha256'))$issue,'001')
+})

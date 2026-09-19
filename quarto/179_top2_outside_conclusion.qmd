@@ -1,0 +1,249 @@
+---
+title: "Top2 固定规则：窗口外收益、回撤与命中比较"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  gated: null
+  fixed: null
+  receipt: null
+  receipt_sha256: null
+  output: null
+  evaluation_seed: 42502
+  evaluation_worlds: 16384
+---
+
+本轮保持规则不变，评价已研究回撤窗口之外的历史资料。最早10期只供预热；
+窗口前305期和窗口后85期分别列出，并给出390期合计。
+规则来自此前94期窗口的研究；向前回看305期用于稳定性诊断，不能当作这些规则当时已知的交易记录。
+窗口后85期单列检验固定规则的方向，仍受标签时间代理和既有历史资料研究口径限制。
+这些资料属于历史研究验证，不能称为未见数据或前瞻结果。
+六个方案共用逐块冻结的 HANDICAP 概率；“原概率排序”指不调整第三赛果购买权重的购票规则。
+本轮完整账本一致性对照为固定原组 ORIGINAL 与 HANDICAP_PROB，逐期验证投入和回款相同。
+校正逐块读取截止前可用的历史赛果，先前期计划保持冻结；全部计划生成后才进行最终收益比较。
+
+所有方案每期预算上限1024元，每票2元，本金10万元；实际北单SP结算且0.65只使用一次。
+资金曲线假设每期回款结算后再投入下一期，不包含真实日历上的跨期占款检验。
+固定原组的折扣和刚性Top2只改变购买顺序；旧SOFT/HARD/FULL保留25%真实累计覆盖准入，允许改变选组和闲置资金。
+因此必须同时看实际投入、现金、命中期数和收益，不能仅按回撤高低排序。
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+source('r/diagnostic_verified_csv.R')
+source('r/diagnostic_verified_rds.R')
+source('r/n7_joint_sleeves.R')
+source('r/fundamentals_equity_curves.R')
+source('r/n7_baseline_comparison.R')
+stopifnot(!is.null(params$output),!dir.exists(params$output))
+rb<-readBin(params$receipt,'raw',n=file.info(params$receipt)$size)
+stopifnot(digest::digest(rb,serialize=FALSE,algo='sha256')==params$receipt_sha256)
+receipt<-jsonlite::fromJSON(rawToChar(rb))
+stopifnot(receipt$status=='PASS')
+cfg<-jsonlite::fromJSON('config/top2_outside_validation.json')
+stopifnot(digest::digest(file='config/top2_outside_validation.json',algo='sha256')==receipt$config_sha256)
+for(check in list(list(directory=params$gated,hash=receipt$gated_independent,parent=receipt$gated_plans),
+ list(directory=params$fixed,hash=receipt$fixed_independent,parent=receipt$fixed_plans))) {
+ path<-file.path(check$directory,'independent-replay.json')
+ bytes<-readBin(path,'raw',n=file.info(path)$size)
+ stopifnot(identical(digest::digest(bytes,serialize=FALSE,algo='sha256'),check$hash))
+ evidence<-jsonlite::fromJSON(rawToChar(bytes))
+ if(!identical(evidence$status,'PASS') || !identical(evidence$plans_receipt_sha256,check$parent))
+  stop('Report upstream replay identity mismatch')
+}
+
+g<-diagnostic_read_verified_csv(file.path(params$gated,'rows.csv'),receipt$gated_rows,cols(issue='c'))
+f<-diagnostic_read_verified_csv(file.path(params$fixed,'rows.csv'),receipt$fixed_rows,cols(issue='c'))
+# ORIGINAL must reproduce the complete-pipeline PROB ledger exactly.
+same<-g |> filter(arm=='HANDICAP_PROB') |> select(issue,stake,gross) |>
+ inner_join(f |> filter(rule=='ORIGINAL') |> select(issue,stake,gross),by='issue',suffix=c('_g','_f'),relationship='one-to-one')
+stopifnot(nrow(same)==length(cfg$issues),all(same$stake_g==same$stake_f),max(abs(same$gross_g-same$gross_f))<1e-6)
+rows<-bind_rows(
+ g |> transmute(issue,policy=arm,model='HANDICAP',stake,gross,net,budget_cny,cash_cny,status,hits),
+ f |> filter(rule!='ORIGINAL') |> transmute(issue,policy=paste0('FIXED_',rule),model='HANDICAP',stake,gross,net,budget_cny,cash_cny,status,hits)
+) |> mutate(stage=ifelse(issue<min(cfg$excluded_drawdown_issues),'BEFORE_305','AFTER_85'))
+stopifnot(nrow(rows)==390*6,!anyDuplicated(rows[c('issue','policy')]),setequal(rows$issue,cfg$issues))
+dir.create(params$output,recursive=FALSE)
+comparison<-n7_baseline_comparison(rows,cfg$issues,c('BEFORE_305','AFTER_85'),'HANDICAP_PROB',cfg$initial_capital_cny)
+all_curves<-comparison$curves;summary<-comparison$summary
+write_csv(summary,file.path(params$output,'summary.csv'))
+write_csv(rows,file.path(params$output,'rows.csv'))
+write_csv(all_curves,file.path(params$output,'curves.csv'))
+knitr::kable(summary,digits=2)
+```
+
+分段回撤均以10万元独立起算；合计曲线只注入一次本金，跳过预先排除的94期。
+去掉最大盈利期是敏感性检查，不代表可预先避开或剔除该期。
+
+```{r}
+plot_data<-all_curves |> select(evaluation,policy,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ mutate(evaluation=factor(evaluation,levels=c('BEFORE_305','AFTER_85','ALL')),
+ metric=factor(metric,levels=c('equity_cny','drawdown_cny')),
+ policy=factor(policy,levels=c('HANDICAP_PROB','HANDICAP_SOFT','HANDICAP_HARD','HANDICAP_FULL','FIXED_DISCOUNT50','FIXED_HARD'),
+ labels=c('原概率排序','旧软惩罚：重选组','旧刚性Top2：重选组','旧Top2全覆盖','固定原组：第三减半','固定原组：刚性Top2')))
+p<-ggplot(plot_data,aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+
+ facet_grid(metric~evaluation,scales='free')+theme_minimal(base_family='Noto Sans CJK SC')+
+ labs(x='Evaluated issue index',colour='Rule',title='Frozen Top2 rules outside the drawdown window',
+ subtitle='Starting capital CNY 100,000; issue cap CNY 1,024; official settlement factor applied once')+
+ theme(legend.position='bottom')
+print(p);ggsave(file.path(params$output,'equity-drawdown.png'),p,width=16,height=8,dpi=160)
+```
+
+固定原组比较的损益桥接：模型期望、实际命中但按赛前估算价格结算、实际北单价格结算。
+价格差属于两种SP口径的差异，不自动代表数据错误。
+
+```{r}
+bridge<-f |> mutate(stage=ifelse(issue<min(cfg$excluded_drawdown_issues),'BEFORE_305','AFTER_85')) |>
+ group_by(stage,rule) |> summarise(stake_cny=sum(stake),model_net_cny=sum(expected_gross-stake),
+ outcome_difference_cny=sum(estimated_actual_gross-expected_gross),
+ price_difference_cny=sum(gross-estimated_actual_gross),net_cny=sum(net),.groups='drop')
+stopifnot(max(abs(bridge$model_net_cny+bridge$outcome_difference_cny+bridge$price_difference_cny-bridge$net_cny))<1e-6)
+knitr::kable(bridge,digits=2);write_csv(bridge,file.path(params$output,'bridge.csv'))
+paired<-comparison$paired
+knitr::kable(paired,digits=2);write_csv(paired,file.path(params$output,'paired.csv'))
+```
+
+最终结论需结合窗口后85期的方向、投入差、去极值和价格桥接；不从此表挑选新参数再回算同一范围。
+
+## 同预算下的有效覆盖
+
+以下用独立于选组时256次模拟的新随机样本估算“至少一组命中”的概率。
+同一期、同一个场次在所有组中共享赛果，避免重复计算重叠组的覆盖。
+不同场次仍假设独立；这是模型条件下的模拟覆盖，不是实际命中率。
+每期每方案16384次，种子固定42502，不据此调整已冻结的选组或购买计划。
+
+```{r}
+gp<-file.path(params$gated,'plans-receipt.json');fp<-file.path(params$fixed,'plans-receipt.json')
+gb<-readBin(gp,'raw',n=file.info(gp)$size);fb<-readBin(fp,'raw',n=file.info(fp)$size)
+stopifnot(digest::digest(gb,serialize=FALSE,algo='sha256')==receipt$gated_plans,
+ digest::digest(fb,serialize=FALSE,algo='sha256')==receipt$fixed_plans)
+gr<-jsonlite::fromJSON(rawToChar(gb),simplifyVector=FALSE)
+fr<-jsonlite::fromJSON(rawToChar(fb),simplifyVector=FALSE)
+coverage<-pricing<-list()
+gated_ranks<-diagnostic_read_verified_csv(file.path(params$gated,'ranks.csv'),receipt$gated_ranks,cols(issue='c',sleeve_id='c'))
+for(b in gr$bindings) {
+ x<-diagnostic_read_verified_rds(file.path(params$gated,b$replay),b$replay_sha256)
+ pool<-x$result$pool;pool$options<-pool$options[x$result$fit$selected]
+ worlds<-n7_joint_worlds(pool,x$cutoffs,params$evaluation_seed,params$evaluation_worlds)
+ simulated<-n7_joint_returns(pool,worlds,x$cutoffs)
+ probability<-mean(rowSums(simulated$hits)>0)
+ coverage[[length(coverage)+1L]]<-tibble(issue=b$issue,policy=b$arm,joint_coverage=probability,
+  mc_se=sqrt(probability*(1-probability)/params$evaluation_worlds))
+ expected<-estimated_actual<-0
+ for(opt in pool$options) {
+  z<-gated_ranks |> filter(issue==b$issue,arm==b$arm,sleeve_id==as.character(opt$sleeve_id))
+  stopifnot(nrow(z)==1)
+  preferences<-x$result$rank_preferences |> filter(sleeve_id==opt$sleeve_id,settlement_rank==z$actual_rank)
+  stopifnot(nrow(preferences)==1)
+  expected<-expected+opt$expected_gross
+  if(preferences$state_id %in% opt$state_ids)
+   estimated_actual<-estimated_actual+x$result$surface$payout_hat_mat[as.character(opt$sleeve_id),preferences$state_id]
+ }
+ pricing[[length(pricing)+1L]]<-tibble(issue=b$issue,policy=b$arm,expected_gross=expected,estimated_actual_gross=estimated_actual)
+}
+for(b in fr$bindings) {
+ plan<-diagnostic_read_verified_rds(file.path(params$fixed,b$plan),b$sha256)
+ x<-diagnostic_read_verified_rds(file.path(params$gated,b$source),b$source_sha256)
+ pool<-x$result$pool
+ worlds<-n7_joint_worlds(pool,x$cutoffs,params$evaluation_seed,params$evaluation_worlds)
+ fixture_slots<-vapply(pool$fixtures,function(z)as.integer(z$slot),integer(1))
+ for(rule_id in c('DISCOUNT50','HARD')) {
+  pool$options<-list()
+  for(opt in plan$options)if(opt$rule==rule_id) {
+   indices<-match(opt$fixture_slots,fixture_slots);stopifnot(!anyNA(indices))
+   pool$options[[length(pool$options)+1L]]<-list(fixtures=indices,state_ids=opt$state_ids,state_payout=opt$estimated_payout)
+  }
+  simulated<-n7_joint_returns(pool,worlds,x$cutoffs)
+  probability<-mean(rowSums(simulated$hits)>0)
+  coverage[[length(coverage)+1L]]<-tibble(issue=b$issue,policy=paste0('FIXED_',rule_id),joint_coverage=probability,
+   mc_se=sqrt(probability*(1-probability)/params$evaluation_worlds))
+ }
+}
+coverage<-bind_rows(coverage) |> left_join(rows |> select(issue,policy,stage,stake,gross),by=c('issue','policy'),relationship='one-to-one')
+stopifnot(nrow(coverage)==390*6,!anyNA(coverage),!anyDuplicated(coverage[c('issue','policy')]))
+coverage_summary<-coverage |> group_by(stage,policy) |> summarise(issues=n(),stake_cny=sum(stake),
+ mean_joint_coverage=mean(joint_coverage),actual_hit_rate=mean(gross>0),
+ expected_hit_issues=sum(joint_coverage),coverage_per_100_cny=if(stake_cny>0)100*sum(joint_coverage)/stake_cny else NA_real_,.groups='drop')
+knitr::kable(coverage_summary,digits=4)
+write_csv(coverage,file.path(params$output,'joint-coverage.csv'))
+write_csv(coverage_summary,file.path(params$output,'joint-coverage-summary.csv'))
+pricing<-bind_rows(bind_rows(pricing),f |> filter(rule!='ORIGINAL') |>
+ transmute(issue,policy=paste0('FIXED_',rule),expected_gross,estimated_actual_gross)) |>
+ left_join(rows |> select(issue,policy,stage,stake,gross,net),by=c('issue','policy'),relationship='one-to-one')
+stopifnot(nrow(pricing)==390*6,!anyNA(pricing))
+all_bridge<-pricing |> group_by(stage,policy) |> summarise(stake_cny=sum(stake),
+ model_net_cny=sum(expected_gross-stake),outcome_difference_cny=sum(estimated_actual_gross-expected_gross),
+ price_difference_cny=sum(gross-estimated_actual_gross),net_cny=sum(net),.groups='drop')
+stopifnot(max(abs(all_bridge$model_net_cny+all_bridge$outcome_difference_cny+all_bridge$price_difference_cny-all_bridge$net_cny))<1e-6)
+knitr::kable(all_bridge,digits=2)
+write_csv(pricing,file.path(params$output,'price-ledger.csv'))
+write_csv(all_bridge,file.path(params$output,'all-bridge.csv'))
+```
+
+每100元的覆盖效率用于解释资金利用，不代替总覆盖、实际命中或收益。
+少投入可能提高这一比率却降低整期命中概率，因此与投入及闲置资金一起判断。
+
+## 结论与基线定位
+
+本轮不支持把无条件压低第三赛果或刚性Top2升级为统一默认规则。原概率排序仍是主要对照基线；
+其余规则保留为不同投入方式和风险特征的对照。这是本次固定规则历史检验的结论，不是未来盈利保证。
+
+- **收益与风险同时看：** 390期原概率排序净收益11,735.71元、ROI 3.61%、最大回撤18,413.99元；
+  固定原组第三减半净收益15,190.94元、ROI 4.67%，但回撤升至26,462.73元，命中期数由163降至115。
+  减半方案去掉最大盈利期后净亏10,401.04元，原概率排序仍盈利4,915.95元。
+- **窗口后改善未形成全范围优势：** 固定原组减半及刚性Top2在后85期分别盈利27,922.78元和27,400.46元，
+  但前305期分别亏损12,731.84元和28,743.44元。后85期各自去掉最大盈利期后仍小幅盈利，
+  分别为2,330.80元和1,808.48元；不能把这部分收益全称为偶然，也不能忽略其集中程度。
+- **覆盖没有提升：** 固定原组减半在前／后窗口的模型整体覆盖及实际命中率均低于原概率排序。
+  后85期模型覆盖由39.35%降至31.16%，实际命中由38期降至28期；提高该阶段收益主要依赖中奖票的返奖结构，
+  不是更多期次命中。旧SOFT在后85期较好，但390期合计收益和回撤均逊于原概率排序。
+- **低投入不能伪装成风险改善：** 带25%覆盖准入的旧HARD／FULL仅18期下注；
+  全期实际投入分别为12,092元和13,312元，且均亏损。它们的较低绝对回撤伴随大量空仓。
+- **价格差必须保留解释：** 后85期固定减半的实际北单净收益为27,922.78元，
+  同样中奖票按赛前估算价格结算则为负；两种价格口径的差额为38,769.94元。
+  欧赔与大小球映射的估算SP和实际北单SP天然不同，这项差额不自动构成数据错误。
+  实际结算价格始终只用于冻结后的核算。
+
+因此，后续概率购票方法的验收标准是：在同样投入与现金口径下，检查整体覆盖、命中、收益、回撤和去极值表现。
+本轮没有选取新的门槛、权重或种子；不会依据后85期的大额回款倒推并宣布一个新最优参数。
+
+## 覆盖与价格诊断图
+
+```{r}
+policy_ids<-c('HANDICAP_PROB','HANDICAP_SOFT','HANDICAP_HARD','HANDICAP_FULL','FIXED_DISCOUNT50','FIXED_HARD')
+policy_labels<-setNames(levels(plot_data$policy),policy_ids)
+cover_plot<-coverage_summary |>
+ select(stage,policy,mean_joint_coverage,actual_hit_rate) |>
+ pivot_longer(c(mean_joint_coverage,actual_hit_rate),names_to='measure',values_to='probability') |>
+ mutate(stage=factor(stage,levels=c('BEFORE_305','AFTER_85')),
+  policy=factor(policy,levels=rev(policy_ids),labels=unname(rev(policy_labels))),
+  measure=factor(measure,levels=c('mean_joint_coverage','actual_hit_rate'),labels=c('模型整体覆盖','实际命中率')))
+pc<-ggplot(cover_plot,aes(probability,policy,fill=measure))+
+ geom_col(position='dodge')+facet_wrap(~stage)+
+ scale_x_continuous(labels=scales::label_percent(accuracy=1))+
+ theme_minimal(base_family='Noto Sans CJK SC')+
+ labs(x='包含零投注期的期均概率／命中率',y=NULL,fill=NULL,
+ title='同一期重叠组共享场次：整体覆盖与实际命中',
+ subtitle='16384次独立模拟；不同场次仍假设独立；不据此重新选票')+
+ theme(legend.position='bottom')
+print(pc);ggsave(file.path(params$output,'coverage-comparison.png'),pc,width=14,height=7,dpi=160)
+price_plot<-all_bridge |>
+ transmute(stage,policy,model=model_net_cny,estimated=model_net_cny+outcome_difference_cny,official=net_cny) |>
+ pivot_longer(c(model,estimated,official),names_to='valuation',values_to='net_cny') |>
+ mutate(stage=factor(stage,levels=c('BEFORE_305','AFTER_85')),
+  policy=factor(policy,levels=rev(policy_ids),labels=unname(rev(policy_labels))),
+  valuation=factor(valuation,levels=c('model','estimated','official'),
+   labels=c('模型期望净收益','实际命中×赛前估价','实际北单结算净收益')))
+pp<-ggplot(price_plot,aes(net_cny,policy,fill=valuation))+
+ geom_vline(xintercept=0,colour='grey50')+geom_col(position='dodge')+facet_wrap(~stage,scales='free_x')+
+ theme_minimal(base_family='Noto Sans CJK SC')+
+ labs(x='净收益（元）',y=NULL,fill=NULL,title='相同冻结票单：概率、命中与价格的区别',
+ subtitle='每种口径均扣实际投入；2元票级回款仅乘一次0.65')+
+ theme(legend.position='bottom')
+print(pp);ggsave(file.path(params$output,'price-comparison.png'),pp,width=15,height=7,dpi=160)
+```

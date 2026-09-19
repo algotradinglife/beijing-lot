@@ -5,6 +5,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from src.data_archive import read_archive_members
+from src.market_sqlite_query import query_market_records
+from src.market_sqlite import canonical_market_record
 
 
 def read_n7_published_markets(*, data_root, merged_path, expected_sha256, issues):
@@ -39,7 +41,19 @@ def read_n7_published_markets(*, data_root, merged_path, expected_sha256, issues
         if issue not in sources:
             continue
         source = sources[issue]
-        if 'archive' in source:
+        if 'sqlite' in source:
+            db=(root/source['sqlite']).resolve(strict=True)
+            db.relative_to(root)
+            records=query_market_records(db,issue=issue,kind='fixture_market')
+            if not records or any(r['batch_id']!=source['batch_id'] for r in records):
+                raise ValueError('SQLite issue batch mismatch')
+            detail=sorted((r['data'] for r in records),key=lambda r:(r['slot'],r['market']))
+            encoded=canonical_market_record(detail).encode()
+            if hashlib.sha256(encoded).hexdigest()!=source['structured_sha256']:
+                raise ValueError('SQLite detail hash mismatch')
+            contents[issue]=encoded
+            hashes[db.relative_to(root).as_posix()+'#issue='+issue]=source['structured_sha256']
+        elif 'archive' in source:
             ap = (root/source['archive']).resolve(strict=True)
             ap.relative_to(root)
             archived[(ap,source['archive_sha256'])].append(source)
@@ -62,7 +76,7 @@ def read_n7_published_markets(*, data_root, merged_path, expected_sha256, issues
         if issue not in contents:
             coverage.append(dict(issue=issue,status='NOT_PUBLISHED',fixture_market_rows=0))
             continue
-        if hashlib.sha256(contents[issue]).hexdigest()!=sources[issue]['sha256']:
+        if hashlib.sha256(contents[issue]).hexdigest()!=(sources[issue]['structured_sha256'] if 'sqlite' in sources[issue] else sources[issue]['sha256']):
             raise ValueError('Detail hash mismatch')
         detail = json.loads(contents[issue])
         keys = [(r['issue'],r['slot'],r['market']) for r in detail]

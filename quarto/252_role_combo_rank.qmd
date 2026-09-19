@@ -1,0 +1,24 @@
+---
+title: "主力—机会场六比一与五比二候选组合"
+format: html
+execute:
+  error: true
+  warning: false
+---
+
+本报告把场次标签和固定预算组合排序连接起来。组合只允许 6 主力 + 1 机会或 5 主力 + 2 机会；排除场不进入组合。回报仍是赛前欧赔代理，最终收益必须以北单结算复核。
+
+```{r}
+source("r/role_combo_generator.R")
+source("r/candidate_combo_rank.R")
+fixtures <- data.frame(fixture_id = as.character(1:9),
+  role = c(rep("主力", 7), rep("机会", 2)))
+combos <- generate_role_combinations(fixtures, max_candidates = 100)
+metrics <- data.frame(combo_id = combos$combo_id,
+  hit_probability = seq_len(nrow(combos)) / (nrow(combos) + 10),
+  expected_gross = 300 + seq_len(nrow(combos)), stake_cny = 128,
+  legal_mass = .9)
+ranked <- rank_role_combinations(combos, metrics, budget_cny = 1024)
+head(ranked[, c("combo_id", "main_count", "opportunity_count",
+  "budget_hit_probability", "budget_expected_net", "average_rank")])
+```

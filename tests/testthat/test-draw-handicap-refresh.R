@@ -1,0 +1,70 @@
+source(file.path('..','..','r','draw_refresh.R'))
+source(file.path('..','..','r','draw_handicap_refresh.R'))
+
+for(refine in list('handicap',c('handicap','total_band'))) for(mode in c('absolute','signed')) testthat::test_that('signed cells shrink separately and do not use future outcomes', {
+ root<-normalizePath('../..');py<-Sys.getenv('RETICULATE_PYTHON')
+ reticulate::use_python(py,required=TRUE)
+ core<-reticulate::import('src.temporal_learning.core')
+ blocks<-reticulate::import('src.temporal_learning.frozen_blocks')
+ h<-expand.grid(i=1:8,slot=1:3)
+ h$issue_code<-sprintf('%06d',h$i);h$provider_id<-paste(h$i,h$slot,sep='-')
+ h$q_W<-.4;h$q_D<-.2;h$q_L<-.4;h$actual<-ifelse(h$slot==1,'D','W')
+ h$handicap<-c(-1,0,1)[h$slot];h$total_band<-'MID'
+ h$fixture_decision_ts<-sprintf('2011-01-%02dT00:00:00Z',h$i)
+ h$last_fixture_cutoff<-h$fixture_decision_ts;h$i<-NULL
+ targets<-data.frame(issue_code=c('000006','000007','000008'),
+  fixture_decision_ts=c('2011-01-06T00:00:00Z','2011-01-07T00:00:00Z','2011-01-08T00:00:00Z'))
+ b<-blocks$frozen_block_schedule(reticulate::r_to_py(targets),cadence=2L)[[1]]
+ cutoff<-core$Cutoff$decision_epoch(b$fit_issue,b$fit_cutoff_ts)
+ a<-draw_handicap_fit(h,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
+  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode,refinement_cols=refine)
+ f<-h[h$issue_code=='000007',c('slot','provider_id','total_band','handicap','q_W','q_D','q_L','fixture_decision_ts')]
+ f$issue<-'000007';c7<-core$Cutoff$decision_epoch('000007','2011-01-07T00:00:00Z')
+ z<-draw_handicap_predict(a,f,c7,.5,root,py)
+ parent_long<-(4+2*.2)/14;parent_recent<-(3+2*parent_long)/11
+ expected_long<-(c(4,0,0)+2*parent_long)/6
+ expected_recent<-(c(3,0,0)+2*parent_recent)/5
+ testthat::expect_equal(z$h_n,rep(4L,3))
+ testthat::expect_equal(z$h_recent_ess,rep(3,3))
+ testthat::expect_equal(z$new_D,(expected_long+expected_recent)/2)
+ testthat::expect_equal(z$new_W+z$new_D+z$new_L,rep(1,3))
+ testthat::expect_equal(z$new_W/z$new_L,f$q_W/f$q_L)
+ unseen<-f;unseen$handicap<-9
+ testthat::expect_equal(draw_handicap_predict(a,unseen,c7,.5,root,py)$new_D,
+  draw_refresh_predict(a$parent,unseen,c7,.5,root,py)$new_D)
+ changed<-h;future<-changed$issue_code>='000006';changed$actual[future]<-'L'
+ changed$fixture_decision_ts[future]<-'2010-01-01T00:00:00Z';changed$last_fixture_cutoff[future]<-'2010-01-01T00:00:00Z'
+ aa<-draw_handicap_fit(changed,b,cutoff,root,list(input=paste(rep('a',64),collapse='')),
+  c(0,.3,1),if(mode=='signed')c(-1,-.5,0,.5,1) else c(0,.5,1),2,2,2,2,24,3,2,py,gap_mode=mode,refinement_cols=refine)
+ testthat::expect_identical(a$cells,aa$cells)
+ testthat::expect_equal(z$new_D,draw_handicap_predict(aa,f,c7,.5,root,py)$new_D)
+ bad<-a;bad$cells$h_rate<-0
+ testthat::expect_error(draw_handicap_predict(bad,f,c7,.5,root,py))
+ testthat::expect_error(draw_handicap_predict(a,transform(f,handicap=.5),c7,.5,root,py))
+ testthat::expect_error(draw_handicap_predict(a,f,cutoff,.5,root,py))
+ testthat::expect_error(draw_handicap_predict(a,f,c7,1,root,py))
+ for(n in c('n7_probability_replay','n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth',
+  'n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_top2_coverage'))
+  source(file.path(root,'r',paste0(n,'.R')))
+ e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
+ e$issue<-'000007';e$cutoffs<-lapply(e$cutoffs,function(x)'2011-01-07T00:00:00+00:00')
+ for(i in seq_along(e$fixtures))e$fixtures[[i]]$issue<-'000007'
+ bundle<-list(issue=e$issue,cutoffs=e$cutoffs,historical_admission=FALSE,seal='test',
+  expanded_pool=list(fixtures=e$fixtures),sleeves=list(list(id=0L,fixture_indices=as.list(0:6),
+  origin='QUALITY',enumeration=e,options=list())))
+ target<-dplyr::bind_rows(e$fixtures);target$fixture_decision_ts<-'2011-01-07T00:00:00+00:00'
+ target$handicap<-rep(c(-1,0,1),length.out=7);target$total_band<-'MID'
+ pa<-draw_handicap_predict(a,target,c7,.5,root,py)
+ pb<-draw_handicap_predict(aa,target,c7,.5,root,py)
+ ba<-n7_probability_bundle(bundle,pa,bundle$cutoffs,a$seal)
+ bb<-n7_probability_bundle(bundle,pb,bundle$cutoffs,aa$seal)
+ xa<-n7_top2_options(ba,ba$cutoffs,py,a$seal,'HARD',.5,.05,256,2,.65,1)
+ xb<-n7_top2_options(bb,bb$cutoffs,py,aa$seal,'HARD',.5,.05,256,2,.65,1)
+ testthat::expect_gt(length(xa$pool$options),0)
+ testthat::expect_identical(xa$ranks,xb$ranks)
+ testthat::expect_identical(xa$gate,xb$gate)
+ testthat::expect_identical(xa$pool$options,xb$pool$options)
+ fa<-n7_top2_allocate(xa,ba$cutoffs,42501,32L,1024,256)
+ fb<-n7_top2_allocate(xb,bb$cutoffs,42501,32L,1024,256)
+ testthat::expect_identical(fa$fit,fb$fit)
+})

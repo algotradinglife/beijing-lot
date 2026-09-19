@@ -26,7 +26,7 @@ def test_plan_caps_repeated_only_and_input_invariance(mode):
         q_W=.4,q_D=.25,q_L=.35) for s in range(1,22)])
     c={str(s):Cutoff.decision_epoch('001','2010-01-01') for s in f.slot}
     base=market_foundation_n7(f,cutoffs=c,max_uses=3,max_pair_overlap=5,budget_cny=1024,
-        unit_cny=2,payout_factor=.65,seed=41902,source_version='market-balance-draw-1.0.0-diagnostic')
+        unit_cny=2,payout_factor=.65,seed=41902,source_version='market-balance-draw-1.0.0-diagnostic',single_count=2)
     frame=f.assign(strength_W=.4,strength_D=.35,strength_L=.25)
     before=copy.deepcopy(base)
     args=dict(cutoffs=c,single_gap=.05,draw_gap=.1,draw_enabled=True,mode=mode)

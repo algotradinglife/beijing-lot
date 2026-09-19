@@ -1,0 +1,115 @@
+---
+title: "盘口清洗：111208–120402 范围内最早就绪的 50 期"
+format:
+  html:
+    toc: true
+    embed-resources: true
+execute:
+  echo: true
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: null
+  data_root: null
+  batch_dir: "audits/market-cleaning/batches/111208-120402"
+  summary_sha256: null
+---
+
+本报告仅处理欧赔和大小球。Titan 为主源；不依赖基本面完成状态。
+期号范围内请求失败的期次留待补采，因此本批期次不连续。原始凭证、响应字节、
+原始来源路径与实际读取路径均由冻结清单绑定；原销售截止不变。
+所有输出保持 `historical_admission = FALSE`，仅供历史诊断。
+
+```{r}
+stopifnot(!is.null(params$repository_root), !is.null(params$data_root),
+          !is.null(params$summary_sha256))
+code_root <- normalizePath(params$repository_root, mustWork = TRUE)
+data_root <- normalizePath(params$data_root, mustWork = TRUE)
+batch <- file.path(data_root, params$batch_dir)
+study <- file.path(batch, "audit-v1")
+source(file.path(code_root, "r/fundamentals_scope_market.R"))
+source(file.path(code_root, "r/market_cleaning_quotes.R"))
+audit <- read_scope_market_audit(
+  study, repository_root = data_root, implementation_root = code_root,
+  scope_path = file.path(batch, "inputs-v1/scope.json"),
+  expected_sha256 = params$summary_sha256
+)
+manifest <- jsonlite::read_json(file.path(batch, "manifest.json"), simplifyVector = TRUE)
+stopifnot(length(manifest$issues) == 50L,
+          identical(manifest$historical_admission, FALSE))
+print(tibble::tibble(issue = manifest$issues), n = 50)
+```
+
+## 逐期覆盖与排除
+
+每行表示一期内一场比赛的一个市场。非完场、无截止前合格报价、来源不可用、
+身份冲突与日期冲突分别保留。身份或日期证据不足时隔离，不修正原始来源、不放行报价。
+HTTP 成功仅证明取到响应，不能证明页面或报价有效。
+
+```{r}
+print(audit$availability, n = 50, width = Inf)
+print(audit$by_issue, n = Inf, width = Inf)
+print(dplyr::count(audit$rows, market, status, name = "fixture_market_rows"), n = Inf, width = Inf)
+```
+
+## 来源状态与报价示例
+
+本轮未采用 Nowscore 替换；不存在未经独立核对的补缺放行。
+证据不足的身份、日期和缺报价记录维持隔离；本轮未发出补源请求。
+欧赔保留十进制赔率，大小球盘口单位为进球，大/小水位保留来源口径。
+只有原截止前合格报价进入诊断报价表；其余行保留在异常表。
+
+```{r}
+dplyr::glimpse(audit$rows)
+head(audit$rows, 10)
+source_rows <- jsonlite::read_json(file.path(study, "summary.json"),
+                                 simplifyVector = TRUE)$rows |>
+  tibble::as_tibble() |>
+  dplyr::select(issue, slot, market, original_status, cutoff_utc, status)
+print(head(source_rows, 10), width = Inf)
+quote_examples <- read_market_quote_examples(study, params$summary_sha256)
+dplyr::glimpse(quote_examples)
+quote_examples
+if (nrow(quote_examples)) {
+  head(tibble::as_tibble(dplyr::bind_rows(quote_examples$quotes[[1]])), 6)
+}
+total_example <- which(quote_examples$market == "total")
+if (length(total_example)) {
+  print(head(tibble::as_tibble(dplyr::bind_rows(
+    quote_examples$quotes[[total_example[[1]]]])), 6), width = Inf)
+}
+```
+
+## 隔离与待补充证据
+
+异常分类不代表报价已补齐。隔离行不作为有效报价，不改变原 cutoff；
+后续补源须绑定精确期、场、市场和来源哈希，经复核后另行发布。
+
+111211/24 大小球原始变化表含非法盘口 `2.2`，当前严格解析器拒绝该市场；
+其他原始报价仍保存，不能称为 HTTP 失败或历史无报价，也不擅改为 `2.25`。
+120109 的 28 条市场日期冲突涉及统一较早停售与跨多日赛程：
+按截止后 24 小时推导的时钟与来源标题不一致。原因未经独立来源核实，
+保持隔离，不据此断言比赛改期或来源标题错误，不移动原 cutoff。
+
+```{r}
+quarantined <- dplyr::filter(audit$rows, status != "QUOTES_PRIOR_DIAGNOSTIC")
+print(quarantined, n = Inf, width = Inf)
+```
+
+完整精确行键、来源哈希和补源状态见批次 `final-anomalies.json`；
+跨批异常总表见持久化根下 `audits/market-cleaning/anomaly-register.json`。
+
+## 输入与复现
+
+摘要 SHA-256、每期输出哈希、全部来源哈希及传递实现哈希已由报告入口逐项核验。
+清洗函数不执行拟合、调参或训练；共享时间工具仅按原截止筛选诊断报价。
+验收结果以批次 `final-acceptance.json` 为准；报告本身不是验收凭证。
+
+```{r}
+cat("Summary SHA-256:", params$summary_sha256, "\n")
+tibble::tibble(summary_sha256 = params$summary_sha256,
+               fixture_count = manifest$fixture_count,
+               market_fixture_rows = manifest$market_fixture_rows,
+               historical_admission = manifest$historical_admission)
+```

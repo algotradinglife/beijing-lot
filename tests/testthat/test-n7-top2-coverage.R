@@ -1,0 +1,53 @@
+for(n in c('n7_probability_replay','n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth',
+ 'n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_top2_coverage'))
+ source(file.path('..','..','r',paste0(n,'.R')))
+
+testthat::test_that('Top2 preference changes ticket choice without changing probability mass', {
+ py<-Sys.getenv('RETICULATE_PYTHON');reticulate::use_python(py,required=TRUE)
+ e<-jsonlite::fromJSON(gzfile('../fixtures/n7_sleeve_numerical.json.gz'),simplifyVector=FALSE)$enumeration
+ bundle<-list(issue=e$issue,cutoffs=e$cutoffs,historical_admission=FALSE,seal='test',
+  expanded_pool=list(fixtures=e$fixtures),sleeves=list(list(id=0L,fixture_indices=as.list(0:6),
+  origin='QUALITY',enumeration=e,options=list())))
+ f<-dplyr::bind_rows(e$fixtures) |> dplyr::mutate(new_W=.6,new_D=.3,new_L=.1)
+ bundle<-n7_probability_bundle(bundle,f,bundle$cutoffs,'test-new')
+ cut<-bundle$cutoffs
+ prob<-n7_top2_options(bundle,cut,py,'test-new','PROB',.5,.25,256,2,.65,1)
+ original<-n7_probability_allocate(bundle,cut,'test-new',py,.25,256,1,1024,2,.65,42501,32L,256)
+ testthat::expect_equal(prob$pool$options[[1]]$state_ids,original$pool$options[[1]]$state_ids)
+ testthat::expect_equal(prob$pool$options[[1]]$coverage,original$pool$options[[1]]$coverage)
+ soft<-n7_top2_options(bundle,cut,py,'test-new','SOFT',.5,.25,256,2,.65,1)
+ testthat::expect_equal(soft$ranks$selection_score,soft$ranks$probability*.5^soft$ranks$third_choices)
+ testthat::expect_equal(soft$surface$prob_mat,prob$surface$prob_mat)
+ neutral<-n7_top2_options(bundle,cut,py,'test-new','SOFT',1,.25,256,2,.65,1)
+ testthat::expect_identical(neutral$pool$options[[1]]$state_ids,prob$pool$options[[1]]$state_ids)
+ hard<-n7_top2_options(bundle,cut,py,'test-new','HARD',.5,.25,256,2,.65,1)
+ testthat::expect_true(all(hard$ranks$all_top2[hard$pool$options[[1]]$state_ids]))
+ testthat::expect_equal(sum(!is.na(hard$ranks$purchase_rank)),128)
+ full<-n7_top2_options(bundle,cut,py,'test-new','FULL',.5,.25,256,2,.65,1)
+ testthat::expect_equal(full$pool$options[[1]]$depth,128L)
+ testthat::expect_equal(full$pool$options[[1]]$stake,256)
+ testthat::expect_equal(full$pool$options[[1]]$coverage,.9^7)
+ testthat::expect_lt(full$pool$options[[1]]$coverage,1)
+ testthat::expect_equal(sum(full$pool$options[[1]]$state_probability),1)
+ no<-n7_top2_options(bundle,cut,py,'test-new','HARD',.5,1,256,2,.65,1)
+ testthat::expect_length(no$pool$options,0)
+ empty<-n7_top2_allocate(no,cut,42501,32L,1024,256)
+ testthat::expect_equal(empty$fit$metrics$cash,1024)
+ fitted<-n7_top2_allocate(full,cut,42501,32L,1024,256)
+ testthat::expect_equal(fitted$fit$metrics$stake,256)
+ testthat::expect_error(n7_top2_options(bundle,cut,py,'test-new','SOFT',0,.25,256,2,.65,1))
+ testthat::expect_error(n7_top2_allocate(full,list(),42501,32L,1024,256))
+ batch<-n7_top2_batch(bundle,cut,py,'test-new',c('PROB','SOFT','HARD','FULL'),.5,.25,256,2,.65,1)
+ testthat::expect_identical(batch,list(PROB=prob,SOFT=soft,HARD=hard,FULL=full))
+ testthat::expect_error(n7_top2_batch(bundle,cut,py,'test-new',character(),.5,.25,256,2,.65,1))
+ testthat::expect_error(n7_top2_batch(bundle,cut,py,'test-new',c('PROB','PROB'),.5,.25,256,2,.65,1))
+ testthat::expect_error(n7_top2_batch(bundle,cut,py,'test-new','UNKNOWN',.5,.25,256,2,.65,1))
+ base<-n7_capital_options(bundle,cut,py,'test-new',1L,2,.65)
+ testthat::expect_error(n7_top2_transform(base,bundle,list(),'test-new','PROB',.5,.25,256,2,.65,1))
+ testthat::expect_error(n7_top2_transform(base,bundle,cut,'wrong','PROB',.5,.25,256,2,.65,1))
+ bad<-base;bad$fixtures[[1]]$p_W<-.1
+ testthat::expect_error(n7_top2_transform(bad,bundle,cut,'test-new','PROB',.5,.25,256,2,.65,1))
+ none<-n7_top2_batch(bundle,cut,py,'test-new',c('HARD','FULL'),.5,1,256,2,.65,1)
+ testthat::expect_true(all(vapply(none,function(z)length(z$pool$options)==0,logical(1))))
+
+})

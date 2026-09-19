@@ -1,0 +1,12 @@
+{
+  "scope": "quarto/193_strength_draw_ridge.qmd",
+  "R": "4.6.1",
+  "direct_packages": {"mgcv": "1.9.4"},
+  "other_dependencies": "DESCRIPTION and renv.lock; inherited QMD tidyverse/reticulate helpers",
+  "installation": "Environment setup only; rendering does not install packages",
+  "penalty": 10,
+  "refit_issues": 10,
+  "minimum_ess": 100,
+  "label_delay_hours": 24,
+  "intended_use": "HISTORICAL_DIAGNOSTIC"
+}

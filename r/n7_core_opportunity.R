@@ -119,7 +119,7 @@ n7_core_option_pool <- function(base,partition,cutoffs,mode,max_copies) {
 # Returns selected option indices, model accounting, action/stop audit and cash.
 # No actual results, history fitting, persistence or randomness are introduced.
 n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_actions,
-                             allocation_order='OPEN_FIRST') {
+                             allocation_order='OPEN_FIRST', exposure_limits=NULL) {
   stopifnot(identical(pool$cutoffs,cutoffs),identical(scenarios$cutoffs,cutoffs),
     objective %in% c('any_hit','expected_net','coverage_sum'),
     allocation_order %in% c('OPEN_FIRST','COMPETE'),budget_cny>=0,budget_cny%%2==0,
@@ -138,6 +138,16 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
     all(pool$opening_options %in% seq_along(opts)),
     all(pool$opportunity_options %in% seq_along(opts)))
   selected<-pool$opportunity_options
+  if(!is.null(exposure_limits)) {
+    stopifnot(identical(exposure_limits$cutoffs,cutoffs),
+      identical(exposure_limits$pool_hash,digest::digest(pool,algo='sha256')),
+      is.matrix(exposure_limits$matrix),is.numeric(exposure_limits$matrix),
+      all(is.finite(exposure_limits$matrix)),all(exposure_limits$matrix>=0),
+      is.numeric(exposure_limits$upper),length(exposure_limits$upper)==nrow(exposure_limits$matrix),
+      !anyNA(exposure_limits$upper),all(exposure_limits$upper>=0),
+      ncol(exposure_limits$matrix)==length(opts),
+      all(as.numeric(exposure_limits$matrix[,selected,drop=FALSE] %*% rep(1,length(selected)))<=exposure_limits$upper+1e-8))
+  }
   initial<-n7_capital_evaluate(pool,selected,scenarios,cutoffs,budget_cny)
   ledger<-list();opening_stop<-NULL;stop_reason<-NULL
   for(step in seq_len(max_actions)) {
@@ -149,6 +159,14 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
       any_hit=mean(current_events>0),expected_net=sum(expected[selected])-current_stake)
     unopened<-pool$opening_options[!ids[pool$opening_options] %in% ids[selected]]
     affordable<-unopened[stake[unopened]<=current$cash]
+    legal<-seq_along(opts)
+    if(!is.null(exposure_limits)) {
+      legal<-legal[vapply(legal,function(j) {
+        proposal<-c(selected[ids[selected]!=ids[j]],j)
+        all(rowSums(exposure_limits$matrix[,proposal,drop=FALSE])<=exposure_limits$upper+1e-8)
+      },logical(1))]
+      affordable<-intersect(affordable,legal)
+    }
     if(length(affordable) && (allocation_order=='OPEN_FIRST' || pool$mode=='BREADTH')) {
       candidates<-affordable;phase<-'OPEN'
     } else {
@@ -163,6 +181,7 @@ n7_core_allocate <- function(pool,scenarios,cutoffs,budget_cny,objective,max_act
             (depth[j]==depth[old] && copies[j]==copies[old]+1)
       },logical(1))]
       if(allocation_order=='COMPETE')candidates<-c(affordable,candidates)
+      candidates<-intersect(candidates,legal)
       phase<-pool$mode
       if(!length(candidates)) {stop_reason<-'NO_AFFORDABLE_LEGAL_ACTION';break}
     }

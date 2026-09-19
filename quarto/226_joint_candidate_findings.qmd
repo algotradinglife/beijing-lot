@@ -1,0 +1,72 @@
+---
+title: "候选池与Top2结构：50期研究结论"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+## 结论
+
+本轮支持**先保留Top2的双选结构，再温和缩减组内购买深度**；不支持把“先硬压单，再缩减组合”视为必然的资金效率提升。所有方案仍亏损，不能称为已找到正收益策略。
+
+同时，本轮没有证明候选池已“做好”：扩池后的原JOINT有所改善，但完整Top2的选组表现弱于上一轮分散Top2。扩充候选范围与最终选组都需验收，不能只看候选数量。上一轮使用精确Top2联合覆盖的贪心选择，本轮硬基线使用4096个共同场景；两者不是只改变了池大小的单因素比较。
+
+```{r}
+library(dplyr);library(tidyr);library(readr)
+cfg<-jsonlite::fromJSON(params$config)
+source(file.path(cfg$repository_root,'r/top2_fresh_groups.R'))
+stopifnot(digest::digest(file=file.path(cfg$input,'receipt.json'),algo='sha256')==cfg$receipt_sha256,
+ digest::digest(file=file.path(cfg$prior,'receipt.json'),algo='sha256')==cfg$prior_sha256)
+rec<-jsonlite::fromJSON(file.path(cfg$input,'receipt.json'));prior_rec<-jsonlite::fromJSON(file.path(cfg$prior,'receipt.json'))
+for(n in names(rec$files))stopifnot(digest::digest(file=file.path(cfg$input,n),algo='sha256')==rec$files[[n]])
+for(n in c('summary.csv','periods.csv'))stopifnot(digest::digest(file=file.path(cfg$prior,n),algo='sha256')==prior_rec$files[[n]])
+rows<-read_csv(file.path(cfg$input,'rows.csv'),col_types=cols(issue='c'))
+curves<-read_csv(file.path(cfg$input,'curves.csv'),col_types=cols(issue='c'))
+summary<-top2_fresh_summary(select(rows,issue,policy,stake,gross,net,hits,bought_groups),curves)
+prior<-read_csv(file.path(cfg$prior,'summary.csv'),show_col_types=FALSE) |> filter(policy=='TOP2_DIVERSE') |> mutate(policy='PRIOR/TOP2_DIVERSE')
+comparison<-bind_rows(summary,prior) |> filter(!grepl('ANCHOR',policy)) |> select(policy,stake,hit_issues,profit_issues,net,roi,max_drawdown) |> mutate(roi=100*roi)
+comparison |> knitr::kable(digits=2,col.names=c('方案','实际投入/元','命中期','盈利期','净收益/元','ROI/%','最大回撤/元'))
+```
+
+口径：140902—150202共50期，冻结市场概率，预算上限1024元/期，本金10万元，估算SP门槛1.3，北单官方SP结算，每票只乘一次0.65。不重训、无比分保护。全部计划先冻结后结算，属于已暴露历史诊断，不是未见数据验证。
+
+## 分层解释
+
+- **候选池对原JOINT有帮助，但幅度有限。** OLD/JOINT_NATIVE净亏13,883元，EXPANDED/JOINT_NATIVE净亏11,455元；命中期18→32，ROI −31.51%→−23.50%。这组对照保留原购买器，仅扩池。
+- **硬压一场优于本轮完整Top2；硬压两场没有继续改善。** HARD1净亏8,723元，HARD0亏16,130元，HARD2亏15,949元。
+- **不硬压单的范围内排序最有价值。** WITHIN0净亏1,504元，相对HARD0改善14,626元；两者都命中25期，但中奖组30→44、盈利期12→18，最大回撤17,397→6,419元。新增覆盖并非体现在更多命中期，而在更多中奖组和回款分布。
+- **压单后继续缩深过度。** WITHIN1和WITHIN2分别比HARD1、HARD2再亏9,225元和6,527元。WITHIN2命中期达到31期，盈利期却只有11期：更多中期不能替代回款效率。
+
+WITHIN0平均每期8组，HARD0为4组；HARD1为8组、WITHIN1约15组；HARD2为16组、WITHIN2约27组。本轮范围外5%混合没有实际买入范围外票，ANCHOR与WITHIN逐票相同，不能据此判断第三赛果扩展是否有效。
+
+## 与上一轮分散Top2比较
+
+WITHIN0净亏1,504元，上轮分散Top2净亏1,490元，收益基本持平；最大回撤从10,981元降至6,419元，约下降42%。盈利期13→18。
+剔除最好一期，WITHIN0净亏6,127元，上轮分散Top2净亏10,455元。这个结果支持继续把“保留双选结构的温和缩深”作为研究方向，但没有证明收益已经为正。
+
+```{r}
+knitr::include_graphics(file.path(cfg$input,'anchored-equity-drawdown.png'))
+```
+
+三列分别为硬压0、1、2场；上行为回撤，下行为10万元本金资金曲线。绿色HARD为硬基线，蓝色WITHIN为范围内排序；红色ANCHOR与蓝线完全重合。
+
+```{r}
+knitr::include_graphics(file.path(cfg$input,'equity-drawdown.png'))
+```
+
+## 算法与验收边界
+
+本轮新池保留原24组，加入最多64个不同组；先保留上一轮分散Top2四组，其余交替依据Top2覆盖与估算回款选入，并限制新增组之间重叠。实际未必达到上限。
+压单选择组内Top1概率最高的一场或两场。范围内排序只买硬支持内的赛果；每场投注边际与硬基线总变差不超过0.25，避免双选事实上退化为单选。
+
+完整硬基线始终可选，模拟目标较差时退回硬基线。这保证的是同一模型场景上的目标，不是实际收益支配。固定概率本身、有限场景选组及实际北单SP变化仍会影响结果。
+
+计算入口为225_joint_candidate_pool.qmd，函数位于r/joint_candidate_comparison.R。报告使用冻结JSON重新加载结算，不提供RDS。新函数及既有SP/概率/收益函数测试通过；独立审计检查票据排序、支持约束和官方结算。完整工作区包含其他任务修改，未把全仓测试作为本轮通过项。

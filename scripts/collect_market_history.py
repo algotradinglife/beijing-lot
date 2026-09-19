@@ -14,8 +14,9 @@ if __name__ == '__main__':
     parser.add_argument('--request-budget', type=int, required=True)
     parser.add_argument('--min-free-bytes', type=int, required=True)
     parser.add_argument("--min-interval-seconds", type=float, required=True)
+    parser.add_argument("--workers", type=int, default=5)
     args = parser.parse_args()
     result = run_market_history(args.plan, args.index, args.output, ledger_path=args.ledger,
         budget_id=args.budget_id, request_budget=args.request_budget, min_free_bytes=args.min_free_bytes,
-        min_interval_seconds=args.min_interval_seconds)
+        min_interval_seconds=args.min_interval_seconds, workers=args.workers)
     print(json.dumps(result), flush=True)

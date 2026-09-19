@@ -1,0 +1,107 @@
+---
+title: "联赛结构与概率校正：集中比较结论"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  competition: null
+  competition_sha256: null
+  candidates: null
+  candidates_sha256: null
+  output: null
+---
+
+## 结论
+
+在同一484期36,140场上，回撤段的恶化不能主要解释为联赛构成更难。
+控制具体联赛与让球数后，主要仍是同类比赛内部预测误差上升。
+弱化原校正至25%可以大幅消除原动态校正的损害，但全期优势极小，且并非每个阶段改善；
+不足以宣布新底座优于未校正市场。当前保留RAW为概率评价参照，不自动切换下注策略。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R')
+stopifnot(!dir.exists(params$output))
+for(pair in list(c(params$competition,params$competition_sha256),c(params$candidates,params$candidates_sha256))) {
+ stopifnot(digest::digest(file=file.path(pair[1],'receipt.json'),algo='sha256')==pair[2])
+ r<-jsonlite::fromJSON(file.path(pair[1],'receipt.json'),simplifyVector=FALSE)
+ strategy_verify_diagnostic_inputs(pair[1],r$files,names(r$files))
+}
+r<-jsonlite::fromJSON(file.path(params$candidates,'receipt.json'),simplifyVector=FALSE)
+required<-c('quarto/189_probability_correction_candidates.qmd','r/probability_foundation_pairs.R','r/strategy_diagnostic_probabilities.R','r/draw_correction_candidates.R','r/draw_handicap_refresh.R','r/draw_refresh.R','r/diagnostic_verified_csv.R','r/diagnostic_verified_rds.R')
+strategy_verify_diagnostic_inputs(getwd(),r$implementation,required)
+replay<-jsonlite::fromJSON(file.path(params$candidates,'independent-replay.json'))
+stopifnot(replay$status=='PASS')
+s<-read_csv(file.path(params$candidates,'summary.csv'),show_col_types=FALSE)
+c<-read_csv(file.path(params$competition,'composition.csv'),show_col_types=FALSE)
+l<-read_csv(file.path(params$competition,'labels.csv'),show_col_types=FALSE,col_types=cols(.default='c'))
+p<-read_csv(file.path(params$candidates,'pairs.csv'),show_col_types=FALSE,col_types=cols(issue='c',provider_id='c'))
+dir.create(params$output)
+knitr::kable(s |> filter(stage=='ALL'),digits=6)
+```
+
+## 联赛构成与类内误差
+
+```{r}
+knitr::kable(c |> filter(model=='RAW',metric=='brier'),digits=6)
+knitr::kable(read_csv(file.path(params$competition,'common-support.csv'),show_col_types=FALSE) |> filter(model=='RAW',metric=='brier'),digits=0)
+knitr::include_graphics(file.path(params$competition,'composition.png'))
+```
+
+图为“具体联赛×让球数”共同支持范围的分解，负值有利，正值恶化。
+参考阶段为回撤前或回撤后；不是在同一总体上强行填补缺失联赛。
+基于回撤前，RAW构成效应约−0.000992，类内效应约+0.00513。
+这说明赛事构成没有解释大部分评分恶化，但不排除同一联赛里的球队、赛程或其他细项变化。
+
+```{r}
+knitr::kable(l |> count(competition_type,tier,cross_tier),caption='标签覆盖：具体赛事全覆盖；球队跨级证据未知')
+knitr::include_graphics(file.path(params$competition,'league-errors.png'))
+```
+
+具体赛事名称全部匹配；赛事类型字典有62场未分类，联赛级别有1398场未知。
+字典是显式诊断分组，不能当成球队会员或升降级证据。已登记旧跨级专家归档仅23条、100101—100103三期，
+与本轮484期没有重合。不能依据国内杯赛或大让球直接判定跨级，故跨级解释属于证据不足。
+回撤段原动态校正的主要不利贡献包括日职乙、法甲、墨西联、英甲等；这些是回顾性贡献，不据此禁用某联赛。
+
+## 四种改法的效果
+
+```{r}
+raw<-s |> filter(model=='RAW') |> select(stage,brier,log_loss,top2)
+delta<-s |> filter(model!='RAW') |> left_join(raw,by='stage',suffix=c('','_raw'),relationship='many-to-one') |>
+ mutate(brier_delta=brier-brier_raw,log_loss_delta=log_loss-log_loss_raw,top2_delta=top2-top2_raw)
+knitr::kable(delta |> select(stage,model,brier_delta,log_loss_delta,top2_delta),digits=7)
+g<-delta |> pivot_longer(c(brier_delta,log_loss_delta),names_to='metric',values_to='change') |>
+ ggplot(aes(model,change,colour=stage,group=stage))+geom_hline(yintercept=0,linetype=2)+geom_point()+geom_line()+facet_wrap(~metric,scales='free_y')+theme_minimal()+theme(axis.text.x=element_text(angle=35,hjust=1))+labs(y='相对RAW：负值改善',x=NULL)
+ggsave(file.path(params$output,'correction-deltas.png'),g,width=11,height=5);print(g)
+movement<-p |> group_by(model) |> summarise(fixtures=n(),up=sum(actual_probability_movement=='UP'),down=sum(actual_probability_movement=='DOWN'),unchanged=sum(actual_probability_movement=='UNCHANGED'),actual_probability_delta=mean(actual_probability_delta),top1_rescued=sum(top1_rescued),top1_lost=sum(top1_lost),top2_rescued=sum(top2_rescued),top2_lost=sum(top2_lost),.groups='drop')
+knitr::kable(movement,digits=6)
+write_csv(delta,file.path(params$output,'candidate-deltas.csv'));write_csv(movement,file.path(params$output,'candidate-movements.csv'))
+```
+
+25%校正全期Brier仅改善约0.00000838，Top2净增加3场；回撤前Brier仍恶化。
+它在回撤段改善评分，却减少Top2命中10场，进一步说明完整概率评分与Top2截断覆盖不能互相替代。
+50%校正、稀疏收缩和局部门控全期评分仍弱于RAW。局部门控启用10626场，救回1622场Top2，却丢失1652场。
+历史让平率偏离原市场概率，不足以保证对新场次的校正有益。
+
+## 验收判断
+
+- 支持：校正强度过大是原动态版本退化的一部分；弱化比全强度更稳。
+- 不支持：回撤主要由联赛构成变化导致；仅增加历史支持数或局部门控即可稳定改善底座。
+- 证据不足：25%校正具有稳定外推优势；球队跨级解释；没有同口径比分网格时的比分层改善。
+
+固定政策均在49个原冻结块上、逐期显式cutoff计算，先保存全部目标概率再读取评估标签。
+未在这批赛果上搜索最优权重或阈值；没有专家重训、收益优化或数据重清洗。
+历史模型仍用时点代理，且这些期已被反复研究，不宣称未见测试或统计显著。
+本轮结论是保留RAW参照，不把微小平均优势当作升级理由，也不直接改动现有购买算法。
+
+```{r}
+files<-list.files(params$output,full.names=TRUE)
+jsonlite::write_json(list(status='PENDING_REVIEW',competition_receipt=params$competition_sha256,candidate_receipt=params$candidates_sha256,
+ implementation_sha256=digest::digest(file='quarto/190_probability_competition_conclusion.qmd',algo='sha256'),
+ files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),basename(files))),file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```

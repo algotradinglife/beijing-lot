@@ -192,3 +192,14 @@ def test_bf_summary_does_not_fill_other_option():
     assert all(o["sp"] is None for o in r["options"])
     assert expected_option(r) == "胜其他"
     assert codes(r) == {"summary_sp_without_option"}
+
+@pytest.mark.parametrize('status', ['取消', '推迟', '中断'])
+def test_unavailable_native_id_requires_explicit_nonplayed_status(status):
+    raw = page(8, status=status).replace(b'123', b'-1')
+    row = parse_page(raw, '25053', 8)[0]
+    assert row['native_match_id'] == '-1'
+    assert row['status'] == status
+    with pytest.raises(ValueError, match='native identity'):
+        parse_page(page(8).replace(b'123', b'-1'), '25053', 8)
+    with pytest.raises(ValueError, match='embedded roster'):
+        parse_page(raw.replace(b'M[1][0]=-1;', b'M[1][0]=123;'), '25053', 8)

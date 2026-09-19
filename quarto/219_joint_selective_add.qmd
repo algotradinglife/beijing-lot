@@ -1,0 +1,236 @@
+---
+title: "JOINT已买组合选择性加仓：同投入比较"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: null
+  parent: null
+  parent_sha256: null
+  study: null
+  depth_report: null
+  depth_sha256: null
+  output: null
+  python: null
+  metadata: null
+  metadata_sha256: null
+  rotation: null
+  rotation_sha256: null
+  multiplier: null
+  multiplier_sha256: null
+---
+
+固定784期、35格历史信号、7串1、每期1024元上限、每票2元、本金10万元。
+本轮只给已买赛果组合增加第二份，不新增覆盖，不删除原票。
+ORIGINAL沿用每个好格取概率前50%；PROB跨好格统一按概率；EV按概率乘赛前估算回款。
+PROB_CAP、EV_CAP分别叠加场次暴露约束：新增后每场资金不超过512元或原暴露较大值。
+目标追加票数逐期等于ORIGINAL；约束下无法投入则持有现金，不另找机会组。
+估算回款由赛前欧赔和大小球映射；真实北单SP只用于冻结后的结算，0.65只应用一次。
+所有规则固定运行；最差窗口、去极值仅供事后诊断。时间代理仍不支持前瞻准入。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source(file.path(params$project_root,'r/joint_tail_risk.R'))
+source(file.path(params$project_root,'r/joint_win_scale.R'))
+source(file.path(params$project_root,'r/joint_selective_add.R'))
+source(file.path(params$project_root,'r/joint_selective_evidence.R'))
+source(file.path(params$project_root,'r/diagnostic_verified_csv.R'))
+source(file.path(params$project_root,'r/fundamentals_equity_curves.R'))
+stopifnot(!dir.exists(params$output))
+check<-system2(params$python,c(shQuote(file.path(params$project_root,'scripts/check_persistent_data_layout.py')),
+ '--contract',shQuote(file.path(params$project_root,'config/persistent_data_layout.json'))),stdout=TRUE)
+stopifnot(is.null(attr(check,'status')))
+loaded<-list()
+for(name in c('parent','depth')) {
+ path<-if(name=='parent')file.path(params$parent,'receipt.json') else file.path(params$depth_report,'receipt.json')
+ sha<-if(name=='parent')params$parent_sha256 else params$depth_sha256
+ raw<-readBin(path,'raw',n=file.info(path)$size)
+ stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==sha)
+ loaded[[name]]<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+}
+parent<-loaded$parent;depth<-loaded$depth
+stopifnot(parent$status=='PASS',identical(parent$historical_admission,FALSE))
+for(k in names(parent$code))stopifnot(digest::digest(file=file.path(params$project_root,k),algo='sha256')==parent$code[[k]])
+objects<-list()
+for(k in c('plans-receipt.json')) {
+ raw<-readBin(file.path(params$parent,k),'raw',n=file.info(file.path(params$parent,k))$size)
+ stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==parent$files[[k]])
+ objects[[k]]<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+}
+stopifnot(params$depth_sha256==objects[['plans-receipt.json']]$source_hashes$depth)
+raw<-readBin(params$metadata,'raw',n=file.info(params$metadata)$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$metadata_sha256)
+metadata<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+stopifnot(metadata$parent_sha256==params$parent_sha256,metadata$contexts_sha256==parent$files[['contexts.json']],identical(metadata$code[sort(names(metadata$code))],parent$code[sort(names(parent$code))]))
+reticulate::use_python(params$python,required=TRUE)
+reader<-reticulate::import('src.strategy_diagnostic_inputs',convert=TRUE)
+core<-reticulate::import('src.temporal_learning.core',convert=FALSE)
+provenance<-reticulate::import('src.temporal_learning.provenance',convert=TRUE)
+pyroot<-reticulate::import('pathlib',convert=FALSE)$Path(params$project_root)
+closures<-list();cuts<-list()
+for(r in metadata$receipts) {
+ id<-r$target_issue
+ native<-core$Cutoff$decision_epoch(id,r$cutoff_ts)
+ stopifnot(reticulate::py_to_r(native$identity)==r$cutoff_identity,identical(r$historical_admission,FALSE))
+ if(!is.null(r$implementation))closures[[r$implementation$closure_sha256]]<-r$implementation
+ cuts[[id]]<-list(cutoff_kind=r$cutoff_kind,cutoff_identity=r$cutoff_identity,
+  cutoff_ts=r$cutoff_ts,target_issue=id,historical_admission=FALSE,model_receipt_sha256=params$parent_sha256)
+}
+for(c in closures)provenance$verify_implementation_closure(pyroot,c)
+objects[['contexts.json']]<-NULL
+frpath<-file.path(params$study,'plans-frozen.json');raw<-readBin(frpath,'raw',n=file.info(frpath)$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==objects[['plans-receipt.json']]$source_hashes$frozen)
+fr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+tables<-list();seen<-character();ticket_sources<-list()
+for(path in names(fr$receipt$plan_hashes)) {
+ b<-jsonlite::fromJSON(reader$read_verified_bundle_json(path,fr$receipt$plan_hashes[[path]]))
+ stopifnot(!b$issue %in% seen,b$issue %in% names(cuts));seen<-c(seen,b$issue)
+ ticket_sources[[b$issue]]<-list(issue=b$issue,sha256=b$source_sha256)
+ if(length(b$plans$P0_OPEN$tickets))tables[[b$issue]]<-as_tibble(b$plans$P0_OPEN$tickets) |> mutate(issue=b$issue)
+}
+stopifnot(setequal(seen,names(cuts)))
+x<-bind_rows(tables) |> mutate(ticket_id=paste(sleeve_id,ticket_col_idx,sep=':'),
+ cell=paste(cut(prob,c(0,.001,.002,.003,.005,.01,.02,1),right=FALSE,include.lowest=TRUE),
+ cut(payout_hat,c(0,128,256,512,1024,Inf),right=FALSE),sep=' | '))
+base<-diagnostic_read_verified_csv(file.path(params$parent,'frozen-plans.csv'),parent$files[['frozen-plans.csv']],cols(issue='c',ticket_id='c')) |>
+ filter(policy=='long_cash_only') |> select(issue,ticket_id,base_copies=copies,cutoff_identity)
+stopifnot(!anyDuplicated(base[c('issue','ticket_id')]),nrow(base)==nrow(x))
+x<-x |> left_join(base,by=c('issue','ticket_id'),relationship='one-to-one')
+stopifnot(!anyNA(x$base_copies),all(x$base_copies %in% c(0L,1L)))
+f<-diagnostic_read_verified_csv(file.path(params$parent,'forecasts.csv'),parent$files[['forecasts.csv']],cols(issue='c'))
+order<-sort(names(cuts));map<-tibble(issue=order,period=seq_along(order))
+stopifnot(objects[['plans-receipt.json']]$parameters$alpha==.5,
+ objects[['plans-receipt.json']]$parameters$window==20)
+code_files<-c('r/joint_win_scale.R','r/joint_tail_risk.R','r/diagnostic_verified_csv.R',
+ 'r/fundamentals_equity_curves.R','quarto/219_joint_selective_add.qmd','r/joint_selective_add.R','r/joint_selective_evidence.R','src/joint_grid_rotation_inputs.py')
+code<-setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)
+import_closure<-provenance$implementation_closure(pyroot,list('src.strategy_diagnostic_inputs','src.temporal_learning.core'),distributions=list('numpy','pandas'))
+```
+
+
+```{r}
+raw<-readBin(file.path(params$rotation,'plans-receipt.json'),'raw',n=file.info(file.path(params$rotation,'plans-receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$rotation_sha256)
+rp<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE)
+projection<-reticulate::import('src.joint_grid_rotation_inputs',convert=TRUE)
+members<-list()
+for(job in rp$source_bundles) {
+ b<-jsonlite::fromJSON(projection$read_rotation_members_json(job$path,job$sha256),simplifyVector=FALSE)
+ stopifnot(b$issue==job$issue,b$issue %in% order)
+ members[[b$issue]]<-joint_selective_members(ticket_sources[[b$issue]],job,b)
+}
+stopifnot(setequal(names(members),order))
+settings<-list(alpha=.5,bad=.8,good=1.2,fraction=.5,unit=2,budget=1024,n=7,fixture_cap_cny=512)
+policies<-c('ORIGINAL','PROB','EV','PROB_CAP','EV_CAP')
+xs<-split(x,x$issue);fs<-split(f,f$issue);plans<-list();diagnostics<-list()
+for(id in order) {
+ t<-if(id %in% names(xs))xs[[id]] else x[FALSE,]
+ s<-if(id %in% names(fs))fs[[id]] else f[FALSE,]
+ cutoff<-cuts[[id]];stopifnot(all(t$cutoff_identity==cutoff$cutoff_identity))
+ attr(s,'input_receipt')<-list(cutoff=cutoff,hash=digest::digest(s,algo='sha256'))
+ original<-joint_selective_add(t,members[[id]],s,cutoff,params$parent_sha256,'ORIGINAL',settings)
+ target<-sum(original$copies-t$base_copies)
+ for(policy in policies) {
+  a<-joint_selective_add(t,members[[id]],s,cutoff,params$parent_sha256,policy,settings)
+  stopifnot(identical(a$copies,joint_selective_replay(t,members[[id]],s,cutoff,params$parent_sha256,policy,settings)))
+  changed<-t[rev(seq_len(nrow(t))),];changed$actual_gross<-seq_len(nrow(t))*1e9
+  again<-joint_selective_add(changed,members[[id]],s,cutoff,params$parent_sha256,policy,settings)
+  stopifnot(identical(a,again[match(a$ticket_id,again$ticket_id),]))
+  plans[[paste(id,policy)]]<-a |> select(ticket_id,copies) |> mutate(issue=id,policy,cutoff_identity=cutoff$cutoff_identity)
+  diagnostics[[paste(id,policy)]]<-tibble(issue=id,policy,target_extra=target,actual_extra=sum(a$copies-t$base_copies),
+    expected_extra_gross=sum((a$copies-t$base_copies)*t$prob*t$payout_hat))
+ }
+ if(match(id,order)%%100==0)message('Frozen and replayed ',match(id,order),' issues')
+}
+p<-bind_rows(plans);allocation<-bind_rows(diagnostics);out<-params$output;dir.create(out,recursive=TRUE)
+write_csv(p,file.path(out,'frozen-plans.csv'));write_csv(allocation,file.path(out,'allocation.csv'))
+stopifnot(identical(code,setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)))
+jsonlite::write_json(list(historical_admission=FALSE,imported_model_receipt=params$parent_sha256,
+ sources=list(original_freeze=objects[['plans-receipt.json']]$source_hashes$frozen,original_tickets=fr$receipt$plan_hashes,
+ forecasts=parent$files[['forecasts.csv']],base_plans=parent$files[['frozen-plans.csv']],metadata=params$metadata_sha256,depth=params$depth_sha256,
+ membership_receipt=params$rotation_sha256,membership_bundles=rp$source_bundles),cutoffs=cuts,new_import_implementation=import_closure,code=code,
+ settings=settings,policies=policies,independent_replays=length(order)*length(policies),permutation_label_mutation=length(order)*length(policies),
+ plans_sha256=digest::digest(file=file.path(out,'frozen-plans.csv'),algo='sha256'),
+ allocation_sha256=digest::digest(file=file.path(out,'allocation.csv'),algo='sha256')),
+ file.path(out,'plans-receipt.json'),pretty=TRUE,auto_unbox=TRUE,digits=NA)
+```
+
+以下才读取冻结版本的结算标签；核对BASE及ORIGINAL与上一轮784期逐期金额完全一致。
+
+```{r}
+g<-diagnostic_read_verified_csv(file.path(params$depth_report,'groups.csv'),depth$outputs[['groups.csv']],cols(issue='c')) |>
+ filter(arm=='JOINT') |> select(issue,sleeve_id,actual_rank,actual_gross_cny)
+z<-x |> left_join(g,by=c('issue','sleeve_id'),relationship='many-to-one') |>
+ mutate(hit=prob_rank==actual_rank,gross=if_else(hit,actual_gross_cny,0))
+stopifnot(!anyNA(z$hit))
+labels<-z |> select(issue,ticket_id,hit,gross,base_copies)
+r<-p |> left_join(labels,by=c('issue','ticket_id'),relationship='many-to-one') |>
+ group_by(issue,policy) |> summarise(stake=sum(2*copies),gross=sum(gross*copies),hits=sum(hit*copies),.groups='drop')
+r<-expand_grid(issue=order,policy=policies) |> left_join(r,by=c('issue','policy'),relationship='one-to-one') |>
+ mutate(across(c(stake,gross,hits),~replace_na(.x,0)))
+base<-diagnostic_read_verified_csv(file.path(params$parent,'rows.csv'),parent$files[['rows.csv']],cols(issue='c')) |>
+ filter(policy=='long_cash_only') |> mutate(policy='BASE') |> select(issue,policy,stake,gross,hits)
+raw<-readBin(file.path(params$multiplier,'receipt.json'),'raw',n=file.info(file.path(params$multiplier,'receipt.json'))$size)
+stopifnot(digest::digest(raw,serialize=FALSE,algo='sha256')==params$multiplier_sha256)
+mr<-jsonlite::fromJSON(rawToChar(raw),simplifyVector=FALSE);stopifnot(mr$status=='PASS')
+previous<-diagnostic_read_verified_csv(file.path(params$multiplier,'rows.csv'),mr$files[['rows.csv']],cols(issue='c')) |>
+ filter(policy=='BLEND_ADD')
+reconcile<-r |> filter(policy=='ORIGINAL') |> inner_join(previous,by='issue',suffix=c('_new','_old'),relationship='one-to-one')
+stopifnot(nrow(reconcile)==784,all(reconcile$stake_new==reconcile$stake_old),all(abs(reconcile$gross_new-reconcile$gross_old)<1e-6),all(reconcile$hits_new==reconcile$hits_old))
+rebuilt<-z |> group_by(issue) |> summarise(stake=sum(2*base_copies),gross=sum(gross*base_copies),.groups='drop')
+reconcile<-base |> left_join(rebuilt,by='issue',suffix=c('_old','_new'),relationship='one-to-one')
+stopifnot(all(abs(reconcile$gross_old-replace_na(reconcile$gross_new,0))<1e-6),all(reconcile$stake_old==replace_na(reconcile$stake_new,0)))
+rows<-bind_rows(base,r) |> mutate(net=gross-stake,budget_cny=1024,cash_cny=1024-stake,
+ status=if_else(stake>0,'COMPLETE','NO_BET'),model='frozen-market') |> left_join(map,by='issue',relationship='many-to-one')
+curves<-strategy_equity_curves(rows |> select(-period),order,100000);stopifnot(!any(curves$stopped))
+windows<-tribble(~window,~start,~end,'ALL',1L,784L,'PRE700',1L,699L,'TAIL700',700L,784L,'CLIFF671',671L,685L)
+summary<-joint_tail_windows(rows,windows)
+incremental<-rows |> filter(policy!='BASE') |>
+ left_join(rows |> filter(policy=='BASE') |> select(issue,base_net=net,base_stake=stake),by='issue',relationship='many-to-one') |>
+ mutate(extra_stake=stake-base_stake,extra_net=net-base_net)
+concentration<-joint_selective_concentration(incremental |> select(issue,policy,extra_stake,extra_net))
+shortfalls<-allocation |> group_by(policy) |> summarise(shortfall_issues=sum(actual_extra<target_extra),cash_shortfall=2*sum(target_extra-actual_extra),.groups='drop')
+worst<-rows |> arrange(policy,period) |> group_by(policy) |>
+ mutate(rolling20=as.numeric(stats::filter(net,rep(1,20),sides=1))) |>
+ filter(!is.na(rolling20)) |> slice_min(rolling20,n=1,with_ties=FALSE) |> transmute(start=period-19L,end=period,net20=rolling20) |> ungroup()
+for(n in c('rows','curves','summary','incremental','concentration','shortfalls','worst'))write_csv(get(n),file.path(out,paste0(n,'.csv')))
+knitr::kable(summary |> filter(window=='ALL') |> mutate(roi=100*roi),digits=2)
+knitr::kable(concentration,digits=2)
+knitr::kable(shortfalls)
+knitr::kable(worst,digits=2)
+```
+
+所有加仓均不改变原票覆盖，故命中期数应相同。去掉最大增量贡献期的结果仅是集中度压力检查。
+共同场次上限可能少投；需结合实际追加金额及同投入可比期评估，而不能只凭回撤下降判断有效。
+
+```{r, fig.width=12, fig.height=8}
+plot<-curves |> select(policy,period,equity_cny,drawdown_cny) |>
+ pivot_longer(c(equity_cny,drawdown_cny),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,colour=policy))+geom_line(linewidth=.6)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+theme(legend.position='bottom')+labs(title='Selective additions: capital and drawdown',x='Issue index',colour=NULL)
+ggsave(file.path(out,'full-curves.png'),plot,width=12,height=8,dpi=150);plot
+```
+
+```{r, fig.width=12, fig.height=8}
+tail<-curves |> filter(period>=700) |> group_by(policy) |>
+ mutate(relative_net=cumsum(net),local_drawdown=cummax(c(0,relative_net))[-1]-relative_net) |> ungroup()
+plot2<-tail |> select(policy,period,relative_net,local_drawdown) |>
+ pivot_longer(c(relative_net,local_drawdown),names_to='metric',values_to='CNY') |>
+ ggplot(aes(period,CNY,colour=policy))+geom_line(linewidth=.7)+facet_wrap(~metric,ncol=1,scales='free_y')+
+ theme_minimal()+theme(legend.position='bottom')+labs(title='Issues 700 onward',x='Issue index',colour=NULL)
+ggsave(file.path(out,'tail-curves.png'),plot2,width=12,height=8,dpi=150);plot2
+```
+
+```{r}
+stopifnot(identical(code,setNames(as.list(vapply(file.path(params$project_root,code_files),digest::digest,character(1),file=TRUE,algo='sha256')),code_files)))
+files<-list.files(out,recursive=TRUE,full.names=TRUE)
+jsonlite::write_json(list(status='ANALYSIS_COMPLETE',historical_admission=FALSE,code=code,
+ source_receipts=list(parent=params$parent_sha256,depth=params$depth_sha256,multiplier=params$multiplier_sha256),
+ files=setNames(as.list(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256')),substring(files,nchar(out)+2))),
+ file.path(out,'analysis-receipt.json'),pretty=TRUE,auto_unbox=TRUE,digits=NA)
+```

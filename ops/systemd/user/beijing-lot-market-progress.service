@@ -3,5 +3,5 @@ Description=Check historical market capture progress
 [Service]
 Type=oneshot
 ExecStartPre=/usr/bin/mountpoint -q /run/media/drwho1985/Sandisk
-ExecStartPre=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/.codex/worktrees/0aac/beijing-lot/scripts/check_persistent_data_layout.py --contract /home/drwho1985/.codex/worktrees/0aac/beijing-lot/config/persistent_data_layout.json
-ExecStart=/usr/bin/bash /home/drwho1985/.codex/worktrees/0aac/beijing-lot/scripts/monitor_market_capture.sh /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/market-forward-persistent-v1 /run/media/drwho1985/Sandisk/data/beijing-lot/runtime/state/market-progress
+ExecStartPre=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/.local/lib/beijing-lot/market-capture/rolling-d2c1b84514b1b2f4/scripts/check_persistent_data_layout.py --contract /home/drwho1985/.local/lib/beijing-lot/market-capture/rolling-d2c1b84514b1b2f4/config/persistent_data_layout.json
+ExecStart=/usr/bin/bash /home/drwho1985/.local/lib/beijing-lot/market-monitor/3c6deca864a8a087/monitor_market_capture.sh /run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/market-sqlite-batch-0001-v8 /run/media/drwho1985/Sandisk/data/beijing-lot/runtime/state/market-progress

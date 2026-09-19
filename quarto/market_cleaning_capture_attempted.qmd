@@ -1,0 +1,146 @@
+---
+title: "盘口清洗：完整遍历准入的50期批次"
+format:
+  html:
+    toc: true
+    embed-resources: true
+execute:
+  echo: true
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: null
+  data_root: null
+  batch_dir: null
+  summary_sha256: null
+---
+
+本报告仅处理欧赔和大小球。Titan 为主源；不依赖基本面完成状态。
+整期须已完成冻结名单的场次×市场遍历，键完整且无重复，所有响应及失败凭证哈希可验证。
+请求失败不会删除整期；逐项保留缺口和补采队列。排除已验收精确期号后，按原生期序选择50期。
+原始凭证、响应字节、
+原始来源路径与实际读取路径均由冻结清单绑定；原销售截止不变。
+所有输出保持 `historical_admission = FALSE`，仅供历史诊断。
+
+```{r}
+stopifnot(!is.null(params$repository_root), !is.null(params$data_root), !is.null(params$batch_dir),
+          !is.null(params$summary_sha256))
+code_root <- normalizePath(params$repository_root, mustWork = TRUE)
+data_root <- normalizePath(params$data_root, mustWork = TRUE)
+batch <- file.path(data_root, params$batch_dir)
+study <- file.path(batch, "audit-v1")
+source(file.path(code_root, "r/fundamentals_scope_market.R"))
+source(file.path(code_root, "r/market_cleaning_quotes.R"))
+audit <- read_scope_market_audit(
+  study, repository_root = data_root, implementation_root = code_root,
+  scope_path = file.path(batch, "inputs-v1/scope.json"),
+  expected_sha256 = params$summary_sha256
+)
+manifest <- jsonlite::read_json(file.path(batch, "manifest.json"), simplifyVector = TRUE)
+stopifnot(length(manifest$issues) == 50L,
+          identical(manifest$historical_admission, FALSE))
+print(tibble::tibble(issue = manifest$issues), n = 50)
+jsonlite::read_json(file.path(batch, "capture-status.json"), simplifyVector = TRUE)
+```
+
+## 逐期覆盖与排除
+
+每行表示一期内一场比赛的一个市场。非完场、无截止前合格报价、来源不可用、
+身份冲突与日期冲突分别保留。身份或日期证据不足时隔离，不修正原始来源、不放行报价。
+HTTP 成功仅证明取到响应，不能证明页面或报价有效。
+
+```{r}
+print(audit$availability, n = 50, width = Inf)
+print(audit$by_issue, n = Inf, width = Inf)
+print(dplyr::count(audit$rows, market, status, name = "fixture_market_rows"), n = Inf, width = Inf)
+scope_exclusions <- jsonlite::read_json(file.path(study, "summary.json"),
+                                      simplifyVector = TRUE)$scope_exclusions
+scope_exclusions
+```
+
+## 来源状态与报价示例
+
+本轮未采用 Nowscore 替换；不存在未经独立核对的补缺放行。
+证据不足的身份、日期和缺报价记录维持隔离；本轮未发出补源请求。
+欧赔保留十进制赔率，大小球盘口单位为进球，大/小水位保留来源口径。
+只有原截止前合格报价进入诊断报价表；其余行保留在异常表。
+
+```{r}
+dplyr::glimpse(audit$rows)
+head(audit$rows, 10)
+source_rows <- jsonlite::read_json(file.path(study, "summary.json"),
+                                 simplifyVector = TRUE)$rows |>
+  tibble::as_tibble() |>
+  dplyr::select(issue, slot, market, original_status, cutoff_utc, status)
+print(head(source_rows, 10), width = Inf)
+quote_examples <- read_market_quote_examples(study, params$summary_sha256)
+dplyr::glimpse(quote_examples)
+quote_examples
+if (nrow(quote_examples)) {
+  head(tibble::as_tibble(dplyr::bind_rows(quote_examples$quotes[[1]])), 6)
+}
+total_example <- which(quote_examples$market == "total")
+if (length(total_example)) {
+  print(head(tibble::as_tibble(dplyr::bind_rows(
+    quote_examples$quotes[[total_example[[1]]]])), 6), width = Inf)
+}
+```
+
+## 隔离与待补充证据
+
+异常分类不代表报价已补齐。隔离行不作为有效报价，不改变原 cutoff；
+后续补源须绑定精确期、场、市场和来源哈希，经复核后另行发布。
+
+原名单身份排除另列于 `scope_exclusions`，不并入有效报价。传输失败、HTTP失败、
+内容空表和解析失败分别保留；任何缺口都不能解释为历史上没有报价。
+本轮没有独立新来源核验，也没有未经核验的 Nowscore 替换。
+
+```{r}
+quarantined <- dplyr::filter(audit$rows, status != "QUOTES_PRIOR_DIAGNOSTIC")
+print(quarantined, n = Inf, width = Inf)
+# Preserve original error detail so transport, HTTP and parse failures remain distinct.
+source_details <- jsonlite::read_json(file.path(study, "summary.json"),
+                                      simplifyVector = TRUE)$rows |> tibble::as_tibble()
+print(dplyr::count(source_details, status, error, name = "fixture_market_rows"),
+      n = Inf, width = Inf)
+print(dplyr::filter(source_details, status == "RESPONSE_UNAVAILABLE") |>
+        dplyr::select(issue, slot, market, original_status, cutoff_utc, status, error),
+      n = Inf, width = Inf)
+```
+
+完整精确行键、来源哈希和补源状态见批次 `final-anomalies.json`；
+跨批异常总表见持久化根下 `audits/market-cleaning/anomaly-register.json`。
+
+## 日期冲突的原始字段
+
+下表并列原销售截止与盘口页标题时间。标题早于原截止并不能证明真实开球时间；
+无法在现有证据下解决的日期冲突维持隔离，不移动截止或报价时间使其通过。
+
+```{r}
+head(dplyr::filter(source_details, status == "DAY_MISMATCH") |>
+       dplyr::select(issue, slot, market, cutoff_utc, published_kickoff, status), 8)
+```
+
+## 请求结果未知的中断凭证
+
+完整键覆盖不证明每个请求均实际发出。以下 `INTERRUPTED_OR_RESERVED` 凭证
+保持请求是否发出未知，原始状态和哈希不变；适配清洗解析器时按失败隔离，不产生报价。
+
+```{r}
+jsonlite::read_json(file.path(batch, "request-uncertainty.json"), simplifyVector = TRUE)
+```
+
+## 输入与复现
+
+摘要 SHA-256、每期输出哈希、全部来源哈希及传递实现哈希已由报告入口逐项核验。
+清洗函数不执行拟合、调参或训练；共享时间工具仅按原截止筛选诊断报价。
+验收结果以批次 `final-acceptance.json` 为准；报告本身不是验收凭证。
+
+```{r}
+cat("Summary SHA-256:", params$summary_sha256, "\n")
+tibble::tibble(summary_sha256 = params$summary_sha256,
+               fixture_count = manifest$fixture_count,
+               market_fixture_rows = manifest$market_fixture_rows,
+               historical_admission = manifest$historical_admission)
+```

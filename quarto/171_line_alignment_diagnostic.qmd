@@ -1,0 +1,221 @@
+---
+title: "让球线与概率分布：方向及阶段错位诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+  message: false
+params:
+  study: null
+  catalog_sha256: null
+  python: null
+  output: null
+  display_minimum: 50
+---
+
+```{r}
+suppressPackageStartupMessages({library(dplyr);library(tidyr);library(readr);library(ggplot2)})
+source('r/strategy_line_alignment.R')
+source('r/strategy_diagnostic_probabilities.R')
+source('r/diagnostic_verified_csv.R')
+stopifnot(!is.null(params$study),!is.null(params$catalog_sha256),
+          !is.null(params$python),!is.null(params$output))
+# This report carries conclusions for one frozen study, not arbitrary snapshots.
+stopifnot(identical(params$catalog_sha256,'3b502b7827a93354ff74e826829779391bb062a1b9b41d6cf3a11537d397ef00'),
+ is.numeric(params$display_minimum),length(params$display_minimum)==1,
+ identical(as.numeric(params$display_minimum),50))
+reticulate::use_python(params$python,required=TRUE)
+api<-reticulate::import('src.strategy_diagnostic_inputs',convert=FALSE)
+catalog<-file.path(params$study,'settlement-inputs/catalog.json')
+input<-jsonlite::fromJSON(reticulate::py_to_r(reticulate::import('json',convert=FALSE)$dumps(
+  api$read_diagnostic_fixtures(catalog,params$catalog_sha256))))
+fx<-as_tibble(input$rows)
+ar<-jsonlite::fromJSON(file.path(params$study,'current-settlement/receipt.json'))
+stopifnot(identical(ar$files[['fixture-audit.csv']],
+ 'ef9082abfbd5fffe497cb632c5cdfc37522b6c8ad02ff7125b0e940a51672c32'))
+labels<-diagnostic_read_verified_csv(file.path(params$study,'current-settlement/fixture-audit.csv'),
+ ar$files[['fixture-audit.csv']],cols(issue='c',provider_id='c'))
+stopifnot(all(labels$status=='READY'),!anyDuplicated(labels[c('issue','slot','provider_id')]))
+window_bytes<-readBin('config/draw_refresh_drawdown.json','raw',n=file.info('config/draw_refresh_drawdown.json')$size)
+stopifnot(digest::digest(window_bytes,serialize=FALSE,algo='sha256')==
+ '56a09d9391df0d95be14ca617673a931cad9d0e17838175554bd83b83f813ffd')
+window<-jsonlite::fromJSON(rawToChar(window_bytes))
+stopifnot(length(window$issues)==94)
+keys<-c('issue','slot','provider_id')
+stopifnot(nrow(anti_join(fx,labels,by=keys))==0,nrow(anti_join(labels,fx,by=keys))==0)
+z<-inner_join(fx,labels |> select(all_of(keys),label_handicap=handicap,
+ home_goals=actual_home,away_goals=actual_away,actual_direction),by=keys,relationship='one-to-one')
+stopifnot(all(z$handicap==z$label_handicap))
+stopifnot(max(abs(z$p_W/(z$p_W+z$p_L)-z$q_W/(z$q_W+z$q_L)))<1e-10)
+z<-z |> mutate(stage=case_when(issue %in% window$issues~'drawdown94',
+ issue<'110514'~'original200',TRUE~'recent_other200'))
+frame<-bind_rows(z |> mutate(model='frozen'),z |> mutate(model='raw',p_W=q_W,p_D=q_D,p_L=q_L)) |>
+ select(all_of(keys),stage,model,handicap,home_goals,away_goals,p_W,p_D,p_L)
+result<-strategy_line_alignment(frame,seq(0,1,.1))
+stopifnot(all(result$fixtures$actual==rep(z$actual_direction,2)))
+o<-params$output
+stopifnot(!dir.exists(o),dir.create(o,recursive=TRUE))
+for(nm in names(result))write_csv(result[[nm]],file.path(o,paste0(nm,'.csv')))
+counts<-result$fixtures |> filter(model=='raw') |> group_by(stage) |>
+ summarise(issues=n_distinct(issue),fixtures=n(),.groups='drop')
+knitr::kable(counts)
+```
+
+这是既有 495 期研究范围的回顾诊断；110915 没有概率包，故场次层为 494 期。
+固定回撤窗口为 111104–120419，共 94 期。其余新增期与原 200 期分别展示。
+回撤窗口由历史收益选出，不能将这里的差异解释成可提前交易的信号。
+原始市场与旧冻结校正都来自同一场次快照；旧校正保留让胜与让负的比值。
+
+## 让胜、让平、让负的校准缺口
+
+正值表示实际发生更多，负值表示概率高估。图标出各格场次数；极端让球小样本单独保留。
+
+```{r}
+g1<-ggplot(result$classes,aes(factor(handicap),outcome,fill=gap))+
+ geom_tile()+geom_text(aes(label=paste0(round(100*gap,1),'pp\nn=',fixtures)),size=2.5)+
+ facet_grid(model~stage)+scale_fill_gradient2(low='#2166ac',mid='white',high='#b2182b',midpoint=0)+
+ labs(x='Signed home handicap',y='Handicap outcome',fill='Observed - predicted')+theme_minimal()
+ggsave(file.path(o,'class-gaps.png'),g1,width=14,height=7,dpi=150)
+g1
+```
+
+## 剥离让平后的胜负方向
+
+只对实际非让平比赛检查条件概率 `P(让胜)/(P(让胜)+P(让负))`。
+曲线低于对角线意味着条件让胜概率偏高；低于对角线不等于方向应翻转，
+只有预测高于 50% 而实际稳定低于 50% 等情形才支持反向排序。
+小样本格子的交叉不能单独证明系统倒置。两个版本条件概率相同，图只画原始市场。
+
+```{r}
+cnd<-result$conditional |> filter(model=='raw')
+stopifnot(is.numeric(params$display_minimum),length(params$display_minimum)==1,
+ params$display_minimum>=1,params$display_minimum==trunc(params$display_minimum))
+g2<-ggplot(cnd,aes(predicted,observed,color=stage))+
+ geom_abline(slope=1,intercept=0,linetype=2)+geom_hline(yintercept=.5,alpha=.25)+
+ geom_vline(xintercept=.5,alpha=.25)+
+ geom_line(data=cnd |> filter(fixtures>=params$display_minimum))+
+ geom_point(aes(size=fixtures,alpha=fixtures>=params$display_minimum))+
+ scale_alpha_manual(values=c('FALSE'=.25,'TRUE'=1),guide='none')+
+ facet_wrap(~handicap)+coord_cartesian(xlim=c(0,1),ylim=c(0,1))+
+ labs(x='Predicted W / (W + L)',y='Observed W among non-draws',size='Fixtures')+theme_minimal()
+ggsave(file.path(o,'conditional-direction.png'),g2,width=13,height=9,dpi=150)
+g2
+```
+
+连线仅展示至少 `r params$display_minimum` 场的格子；其余格子仍以淡点展示，并保留在表中。
+这是展示支持数门槛，不是显著性判据或投注筛选规则。
+
+## 实际净胜球距让球线的位置
+
+距离为主队进球减客队进球再加北单主队让球。0 是让平，正值为让胜。
+两侧尾部按距离小于等于 −3、大于等于 3 合并，避免稀疏到无法阅读。
+本输入没有预测比分网格，因此图是实际分布对照；不能据此计算预测均值误差、
+预测左右一球质量或预测尾部误差，也不能仅从三分类概率唯一恢复这些量。
+
+```{r}
+dist<-result$distances |> mutate(distance_band=factor(distance_band,levels=c('<=-3','-2','-1','0','1','2','>=3')))
+g3<-ggplot(dist,aes(distance_band,observed,fill=stage))+geom_col(position='dodge')+
+ facet_wrap(~handicap)+labs(x='Actual goal difference + handicap',y='Observed fraction')+theme_minimal()
+ggsave(file.path(o,'line-distance.png'),g3,width=13,height=9,dpi=150)
+g3
+```
+
+## 同类内变化与赛事构成
+
+按有符号让球类别 −2及以下、−1、0、+1、+2及以上进行分解。
+这是事先明确的粗分层，完整让球数仍保留在上图。
+参考期类内均值定义构成效应，目标期权重定义类内变化；该分解依赖顺序，不代表因果。
+
+```{r}
+raw<-result$fixtures |> filter(model=='raw') |> mutate(
+ stratum=as.character(pmax(-2,pmin(2,handicap))))
+decompositions<-list()
+for(ref in c('original200','recent_other200')) {
+ for(metric in c('direction_residual','draw_residual')) {
+  tmp<-raw |> transmute(segment=stage,stratum,
+   value=if(metric=='direction_residual')direction_residual else (actual=='D')-p_D)
+  dd<-strategy_composition_diagnostics(tmp,ref,'drawdown94')
+  decompositions[[paste(ref,metric)]]<-dd$summary |> mutate(metric=metric)
+ }
+}
+composition<-bind_rows(decompositions)
+write_csv(composition,file.path(o,'composition.csv'))
+knitr::kable(composition,digits=4)
+issue_metrics<-raw |> group_by(stage,issue) |> summarise(fixtures=n(),
+ direction_residual=mean(direction_residual),draw_residual=mean((actual=='D')-p_D),
+ conditional_gap=mean((actual[actual!='D']=='W')-conditional_W[actual!='D']),.groups='drop')
+write_csv(issue_metrics,file.path(o,'issue-metrics.csv'))
+g4<-issue_metrics |> pivot_longer(c(direction_residual,draw_residual,conditional_gap)) |>
+ ggplot(aes(stage,value,color=stage))+geom_hline(yintercept=0,linetype=2)+
+ geom_boxplot(outlier.shape=NA)+geom_point(position=position_jitter(width=.12,seed=459),alpha=.35)+
+ facet_wrap(~name,scales='free_y')+labs(x=NULL,y='Per-issue residual')+theme_minimal()
+ggsave(file.path(o,'issue-residuals.png'),g4,width=12,height=5,dpi=150)
+g4
+```
+
+## 结论：没有观察到广泛胜负倒置，偏差集中在让平及局部方向
+
+```{r}
+overview<-raw |> group_by(stage) |> summarise(fixtures=n(),issues=n_distinct(issue),
+ predicted_draw=mean(p_D),observed_draw=mean(actual=='D'),
+ non_draws=sum(actual!='D'),
+ directional_n=sum(actual!='D' & conditional_W!=.5),
+ directional_hits=sum((actual=='W' & conditional_W>.5)|(actual=='L' & conditional_W<.5)),
+ .groups='drop') |> mutate(direction_accuracy=directional_hits/directional_n)
+inversions<-cnd |> filter(fixtures>=params$display_minimum) |> group_by(stage) |>
+ summarise(supported_cells=n(),opposite_sides=sum((predicted-.5)*(observed-.5)<0),
+ fixtures=sum(fixtures),.groups='drop')
+write_csv(overview,file.path(o,'overview.csv'))
+write_csv(inversions,file.path(o,'inversions.csv'))
+knitr::kable(overview,digits=4)
+knitr::kable(inversions)
+selected<-result$classes |> filter(model=='raw',stage=='drawdown94',handicap %in% c(-2,-1,0,1,2)) |>
+ select(handicap,outcome,fixtures,predicted,observed,gap)
+knitr::kable(selected,digits=4)
+```
+
+在这一固定样本中，回撤期实际非让平比赛的方向命中率与两个参考阶段接近。
+具备展示支持数的回撤格子没有出现预测与实际落在50%两侧的情况；
+这不证明每场排序正确，也不排除更细类别的偏差，但不支持用“大量W/L倒置”解释这段回撤。
+
+回撤段的让平低估比其他新增期更明显，特别是主队让一球。
+零让球的平局低估则在三个阶段都存在，不能视为回撤期独有原因。
+主队受让一球的回撤期呈现让胜低估、让负高估，但其他新增期的方向相反；
+因此全时期统一平移净胜球分布缺乏支持。
+
+构成分解显示，相对于其他新增期，回撤段让平残差的增加主要来自粗让球类别内变化，
+而非这些类别的占比变化。这只控制了让球类别，没有控制联赛等其他构成。
+
+| 假设 | 本轮判断 |
+|---|---|
+| 回撤段普遍把让胜、让负排序弄反 | 主要分箱结果不支持；不能据此排除稀疏或未分层类别 |
+| 回撤段让平低估加重 | 支持描述性差异，主要体现于负让球；零让球为长期存在的偏差 |
+| 只是让球类别构成变化 | 粗类别分解不支持作为主要解释，其他基本面构成未检验 |
+| 整个净胜球分布应往同一方向平移 | 类别和阶段偏差方向不一致，不能支持统一调整 |
+| 预测均值、盘口左右一球或尾部质量错误 | 缺完整预测比分网格，尚不可识别；实际分布已保存 |
+
+本轮不产生校正模型或收益改善承诺。若进入校正，证据更支持按让球类别分别处理三赛果关系，
+而不是机械提高所有让平，或统一翻转W/L。仍需按此前历史准入、冻结和独立重放检验实际效果。
+
+## 输入与实现凭据
+
+```{r}
+sources<-c('r/strategy_line_alignment.R','r/strategy_diagnostic_probabilities.R',
+ 'r/diagnostic_verified_csv.R','src/strategy_diagnostic_inputs.py',
+ 'config/draw_refresh_drawdown.json','quarto/171_line_alignment_diagnostic.qmd')
+code<-setNames(as.list(vapply(sources,digest::digest,character(1),file=TRUE,algo='sha256')),sources)
+outputs<-list.files(o,full.names=TRUE)
+hashes<-setNames(as.list(vapply(outputs,digest::digest,character(1),file=TRUE,algo='sha256')),basename(outputs))
+jsonlite::write_json(list(kind='DESCRIPTIVE_ONLY',source_hashes=input$source_hashes,
+ label_sha256=ar$files[['fixture-audit.csv']],code=code,files=hashes,
+ generated_at=format(Sys.time(),tz='UTC',usetz=TRUE),counts=counts,
+ parameters=list(display_minimum=params$display_minimum,conditional_breaks=seq(0,1,.1),
+ composition_handicap_bands=c('<=-2','-1','0','1','>=2')),
+ runtime=list(R=R.version.string,python=params$python,session=capture.output(sessionInfo())),
+ missing_score_grid=TRUE),file.path(o,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+knitr::kable(tibble::tibble(input=c('catalog','fixture labels'),sha256=c(params$catalog_sha256,ar$files[['fixture-audit.csv']])) )
+```

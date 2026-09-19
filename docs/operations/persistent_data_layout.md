@@ -78,6 +78,22 @@
 `scripts/poll_market_cleaning.sh`，使用 `ops/market_cleaning_poll.prompt`。
 两者的输出都位于持久化 `runtime/` 下。
 
+盘口采集支持 `collect_market_history.py --workers 5`，最多五个唯一页面同时处理，
+共用账本的 1 秒请求预留间隔与原有预算。限速锁只覆盖预留阶段；响应写入后，
+串行协调器先持久化处理顺序，再更新断点。熔断在重启后保留，不通过换批次解除。
+
+代码使用 `~/.local/lib/beijing-lot/market-capture/` 下的固定版本部署，
+不直接运行持续修改的工作区文件。代码或线程数改变时，停止旧服务并通过
+`scripts/prepare_market_capture_epoch.py --help` 指定新清单与新输出目录。
+该入口检查持久化布局、独占旧 worker 锁并校验响应；复用旧字节，保留中断请求
+的剩余重试次数，将原账本、预算身份、上限及间隔绑定到新计划。
+不覆盖旧 `policy.json`，不重置 SQLite 预算。
+
+切换后更新 `registry/markets-current.json` 的当前采集引用，并将旧目录登记到
+`prior_capture_roots`；清洗任务同时扫描这些目录及 `reused-issues` 凭证。
+更新采集服务和八小时监控的输入路径，验证新增响应、清洗入口和监控后才算完成。
+性能对照及约束见 `quarto/market_capture_five_workers.qmd`。
+
 ## 旧副本清退
 
 `scripts/retire_archived_workspace_data.py` 只处理显式工作区中已登记的四个基本面/盘口数据根目录，以及
@@ -103,3 +119,54 @@
 存储维护 skill 的版本化源为 `skills/beijing-lot-data-storage/SKILL.md`，
 本机发现副本为 `~/.codex/skills/beijing-lot-data-storage/SKILL.md`。修改后同步两者，
 不要在 skill 中维护第二份目录表。
+
+### 盘口自动限流恢复
+
+入口 `scripts/supervise_market_history.py` 调用同一采集函数，持有
+`supervisor.lock`；采集和恢复共用 `worker.lock`，不会并发修改断点。
+仅已核验、连续三次 429 的熔断可以自动恢复；403、
+磁盘/预算/哈希/配置错误保持停止供检查。
+
+`recovery.json` 提供 `state`、`reason`、`next_probe_at`（UTC Unix 秒）和
+`attempt`（从零开始）。冷却逐次为 60、300、900、1800 秒，此后维持
+1800 秒；HTTP `Retry-After` 或 Jina `retryAfter`/`retryAfterDate` 要求
+更晚时采用更晚时间，不截短上游等待要求。冷却状态落盘，重启不重置。
+
+每次只探测一个触发限流的页面；若涉及欧赔和大小球两个端点，依次各探测一次，全部成功才恢复。探测计入原 SQLite 请求账本和预算，
+HTTP 200、解析成功、原生比赛 ID 一致且盘口报价非空才解除熔断。
+探测原始响应在 `recovery/<事件身份>/probe-*/`，仅作为健康证据，
+不自动加入正式盘口表。探测中断后先退避，不重用请求目录；正常页面
+原有最多两次尝试的约束保持不变。
+
+解除前在事件目录保存 `progress-before.json`，成功保存 `receipt.json`。
+`supervisor-policy.json` 固定输入、存储契约、请求参数和实现身份。
+改版部署使用已有 `prepare_market_capture_epoch.py` 冻结新批次引用，
+不修改旧批次不可变策略、不重置全局预算。监控脚本会显示自动冷却状态
+和下次探测时间。报告入口为 `quarto/market_capture_auto_recovery.qmd`。
+
+### 清洗批次会话通知
+
+`config/market_cleaning_notifications.json` 固定授权接收会话 UUID 和 Codex CLI。
+清洗流程在启动、验收完成时调用 `scripts/poll_market_cleaning_notifications.sh`；
+独立每分钟 cron 补漏，不使用清洗长任务锁。通知入口先检查持久化存储。
+`runtime/state/market-cleaning/notifications/outbox.json` 保存事件与发送状态，
+按批次范围凭证及事件类型去重。已确认入队不重复发送；明确命令失败下轮重试。
+超时或进程在发送期间中断时，UNKNOWN/IN_FLIGHT 保留待核对，避免猜测后重复发送。
+完成通知要求 ACCEPTED_DIAGNOSTIC_BATCH、精确期次、manifest 和摘要哈希一致。
+通知只报告进度，不授权接收会话再次启动同一清洗任务。
+# 冻结旧版 Titan 盘口小文件
+
+`scripts/pack_legacy_titan_odds.py` 只处理持久化根下
+`markets/raw/legacy-titan-clean/raw/titan` 的两位十六进制分片。
+运行前确认旧版 Titan 写入任务已停止，不能对活动写入目录使用。
+每片先 tar.zst 打包，执行 tar diff、全部成员原字节与内容地址校验，
+再发布该目录的 `ARCHIVES.json`，最后复用 `retire_archived_workspace_data.py`
+的日志化清退。`--shards` 明确限定本次范围，重复执行可恢复已登记的清退。
+未登记但已存在的最终归档会停止运行，须核查中断点，不会覆盖。
+
+历史数据库 raw_path 不改写；`src.titan_clean.raw_archive.read_titan_raw`
+按显式 store 根及相对路径读取散文件或已登记归档，并校验哈希。
+Titan release 核验已使用此入口。冻结后原 store 写入接口拒绝新增写入。
+当前 market history 采集器继续使用其独立的现行目录，不依赖此旧版目录。
+归档不能删除；不能把“散文件已清退”当作数据被删除或质量验收通过。
+汇总报告入口为 `quarto/market_raw_storage.qmd`，显式传入 catalog 参数。

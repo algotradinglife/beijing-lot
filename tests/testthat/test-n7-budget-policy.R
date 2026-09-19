@@ -1,0 +1,33 @@
+source(file.path('..','..','r','n7_budget_policy.R'))
+source(file.path('..','..','r','n7_core_opportunity.R'))
+source(file.path('..','..','r','n7_capital_portfolio.R'))
+test_that('budget intervention opens distinct whole groups and preserves defensive limits', {
+ python<-Sys.getenv('RETICULATE_PYTHON');stopifnot(file.exists(python))
+ reticulate::use_python(python,required=TRUE)
+ core<-reticulate::import('src.temporal_learning',convert=TRUE)
+ identity<-core$Cutoff$decision_epoch('1','2010-01-01T00:00:00Z')$identity
+ cut<-list(x='2010-01-01T00:00:00Z')
+ opts<-list(list(sleeve_id=0,depth=2,stake=4,expected_gross=8,unit_copies=1,coverage=.5,fixtures=1:7),
+  list(sleeve_id=1,depth=3,stake=6,expected_gross=6,unit_copies=1,coverage=.5,fixtures=2:8))
+ pool<-list(issue='1',cutoffs=cut,mode='BREADTH',options=opts,opening_options=1:2,opportunity_options=integer())
+ sc<-list(cutoffs=cut,hits=cbind(c(1,1,0,0),c(0,0,1,1)),gross=cbind(c(16,16,0,0),c(0,0,12,12)))
+ ct<-list(status='READY',receipt=list(cutoff_identity=identity,target_issue='1',cutoff_ts='2010-01-01T00:00:00Z',cutoff_kind='DECISION_EPOCH',historical_admission=FALSE))
+ st<-list(state='NORMAL',cutoff_identity=identity)
+ a<-n7_budget_policy(pool,sc,cut,ct,st,'FIXED',8,4,6,2,10,python)
+ b<-n7_budget_policy(pool,sc,cut,ct,st,'FIXED',12,4,6,2,10,python)
+ expect_equal(a$selected,1);expect_equal(a$metrics$cash,4)
+ expect_equal(b$selected,1:2);expect_equal(b$metrics$cash,2)
+ st$state<-'DEFENSIVE'
+ d<-n7_budget_policy(pool,sc,cut,ct,st,'DYNAMIC',12,4,6,2,10,python)
+ expect_equal(d$risk_limit,4);expect_equal(d$selected,1)
+ st$state<-'RECOVERING';expect_equal(n7_budget_policy(pool,sc,cut,ct,st,'DYNAMIC',12,4,6,2,10,python)$risk_limit,6)
+ st$state<-'WARMUP';ct$status<-'WARMUP'
+ expect_length(n7_budget_policy(pool,sc,cut,ct,st,'FIXED',12,4,6,2,10,python)$selected,0)
+ expect_error(n7_budget_policy(pool,sc,list(x='future'),ct,st,'FIXED',12,4,6,2,10,python))
+ expect_error(n7_budget_policy(pool,sc,cut,ct,st,'FIXED',11,4,6,2,10,python))
+ late<-ct;late$receipt$cutoff_ts<-'2011-01-01T00:00:00Z'
+ late$receipt$cutoff_identity<-core$Cutoff$decision_epoch('1',late$receipt$cutoff_ts)$identity
+ ls<-st;ls$cutoff_identity<-late$receipt$cutoff_identity
+ expect_error(n7_budget_policy(pool,sc,cut,late,ls,'FIXED',12,4,6,2,10,python))
+ ct$receipt$target_issue<-'2';expect_error(n7_budget_policy(pool,sc,cut,ct,st,'FIXED',12,4,6,2,10,python))
+})

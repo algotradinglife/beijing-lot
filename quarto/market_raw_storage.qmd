@@ -1,0 +1,44 @@
+---
+title: "盘口原始文件空间整理"
+format: html
+params:
+  catalog: null
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本报告只核验存储整理，不代表盘口覆盖或数据质量验收。旧版 Titan 盘口 JS
+按哈希前两位分片归档；原始字节、文件名及数据库中的历史路径保持不变。
+当前盘口续采目录、请求账本及结算数据库不参与此次清退。
+
+```{r}
+stopifnot(is.character(params$catalog), length(params$catalog) == 1L)
+catalog <- jsonlite::fromJSON(params$catalog)
+stopifnot(identical(catalog$schema, "titan_odds_shard_archives_v1"))
+cat("输入清单：", params$catalog, "\n")
+cat("输入 SHA-256：", digest::digest(file = params$catalog, algo = "sha256"), "\n")
+entries <- tibble::as_tibble(catalog$entries)
+summary <- entries |>
+  dplyr::summarise(
+    archived_shards = dplyr::n(),
+    retired_shards = sum(source_removed),
+    files = sum(file_count),
+    logical_GiB = sum(logical_bytes) / 1024^3,
+    original_allocated_GiB = sum(source_allocated_bytes) / 1024^3,
+    archive_allocated_GiB = sum(archive_allocated_bytes) / 1024^3,
+    net_released_GiB = (sum(source_allocated_bytes[source_removed]) -
+                          sum(archive_allocated_bytes)) / 1024^3
+  )
+knitr::kable(summary, digits = 3)
+entries |>
+  dplyr::select(source, file_count, archive_bytes, state) |>
+  head(10) |>
+  knitr::kable()
+```
+
+每片执行归档哈希、成员清单和原始字节核对，发布读取映射后才由已有清退脚本删除散文件。
+清退中断可依据持久化日志继续；归档保留。离线读取使用
+`src.titan_clean.raw_archive.read_titan_raw(root, paths)`，传入旧版 store 根目录
+和原数据库中的相对路径。函数按分片读取并核对归档及文件哈希，不需要重新下载。

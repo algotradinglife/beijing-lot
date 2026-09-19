@@ -1,0 +1,66 @@
+---
+title: "比分分布隐含让球线与北单线：方向分歧检验"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+合理整数线定义为让胜与让负概率差绝对值最小的整数线。正线差=北单有符号让球减合理线>0，支持让胜；负线差支持让负。
+并列合理线不强行给方向，单列。完整比分分布来自保存的原始市场映射矩阵，未把零让球直接欧赔重新嵌入矩阵；
+不从三分类概率反推比分，也不声称这是新的独立信息。市场映射版本随原历史输入保留。
+本轮使用有明确矩阵清单的文件投射源；归档但尚未盘点矩阵的期次明确排除，不代表无法取得矩阵。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root;out<-cfg$output
+stopifnot(!file.exists(file.path(out,'receipt.json')))
+source(file.path(root,'r/handicap_line_gap.R'));source(file.path(root,'r/diagnostic_verified_csv.R'))
+stopifnot(digest::digest(file=cfg$input,algo='sha256')==cfg$input_sha256)
+input<-jsonlite::fromJSON(gzfile(cfg$input),simplifyVector=FALSE)
+features<-bind_rows(lapply(input$rows,function(f){
+ a<-handicap_line_gap(bind_rows(f$distribution),f$handicap,cfg$tolerance)
+ stopifnot(max(abs(unlist(a[c('q_W','q_D','q_L')])-unlist(f[c('q_W','q_D','q_L')])))<1e-8)
+ bind_cols(tibble(issue=f$issue,slot=f$slot,provider_id=f$provider_id,handicap=f$handicap),a)
+}))
+write_csv(features,file.path(out,'features-before-labels.csv'))
+# Join the existing accepted candidate/label universe only after features exist.
+stopifnot(digest::digest(file=cfg$context_receipt,algo='sha256')==cfg$context_receipt_sha256)
+r<-jsonlite::fromJSON(cfg$context_receipt)
+x<-diagnostic_read_verified_csv(file.path(dirname(cfg$context_receipt),'regime-fixtures.csv'),r$files[['regime-fixtures.csv']],cols(issue='c',provider_id='c',year='c'))
+excluded<-anti_join(x,features,by=c('issue','slot','provider_id','handicap')) |> count(issue,name='excluded_fixtures') |>
+ left_join(bind_rows(input$exclusions),by='issue',relationship='one-to-one')
+stopifnot(!anyNA(excluded$reason),setequal(excluded$issue,vapply(input$exclusions,`[[`,character(1),'issue')))
+z<-inner_join(features,x |> select(issue,slot,provider_id,handicap,year,actual_direction,spf_sp),by=c('issue','slot','provider_id','handicap'),relationship='one-to-one')
+stopifnot(nrow(z)>0,nrow(z)+sum(excluded$excluded_fixtures)==nrow(x))
+q<-as.matrix(z[c('q_W','q_D','q_L')]);z$raw_top1<-c('W','D','L')[max.col(q,ties.method='first')]
+z<-z |> mutate(directed=signal %in% c('W','L'),selected_probability=case_when(signal=='W'~q_W,signal=='L'~q_L,TRUE~NA_real_),
+ hit=if_else(directed,signal==actual_direction,NA),top1_same=if_else(directed,signal==raw_top1,NA),
+ gross_cny=if_else(directed,cfg$unit_cny*cfg$payout_factor*spf_sp*as.numeric(signal==actual_direction),NA_real_))
+write_csv(z,file.path(out,'fixtures.csv'));write_csv(excluded,file.path(out,'excluded.csv'))
+summary<-z |> group_by(signal,delta) |> summarise(fixtures=n(),issues=n_distinct(issue),predicted_W=mean(q_W),observed_W=mean(actual_direction=='W'),predicted_D=mean(q_D),observed_D=mean(actual_direction=='D'),predicted_L=mean(q_L),observed_L=mean(actual_direction=='L'),.groups='drop')
+selected<-z |> filter(directed) |> group_by(signal) |> summarise(fixtures=n(),issues=n_distinct(issue),predicted=mean(selected_probability),hit=mean(hit),non_draw_hit=sum(signal==actual_direction)/sum(actual_direction!='D'),same_as_top1=mean(top1_same),stake_cny=n()*cfg$unit_cny,gross_cny=sum(gross_cny),.groups='drop') |> mutate(net_cny=gross_cny-stake_cny,roi=net_cny/stake_cny)
+yearly<-z |> filter(directed) |> group_by(year,signal) |> summarise(fixtures=n(),predicted=mean(selected_probability),hit=mean(hit),draw_rate=mean(actual_direction=='D'),top1_same=mean(top1_same),roi=sum(gross_cny)/(n()*cfg$unit_cny)-1,.groups='drop')
+summary |> knitr::kable(digits=4);selected |> knitr::kable(digits=4);yearly |> knitr::kable(digits=4)
+write_csv(summary,file.path(out,'summary.csv'));write_csv(selected,file.path(out,'selected.csv'));write_csv(yearly,file.path(out,'yearly.csv'))
+```
+
+这里只计算“每个有方向信号的记录等额2元单场下注”的描述性账本，结算应用一次0.65；
+不是7串1回测，不是1024元每期预算，也不考虑重复赛事跨期相关性。没有根据标签挑阈值或调整概率。
+线差方向预期命中高，是比分模型本身的数学结果；实际命中与预测的差、是否区别于原Top1才检验新增价值。
+
+```{r}
+p<-yearly |> select(year,signal,predicted,hit) |> pivot_longer(c(predicted,hit),names_to='type',values_to='rate') |>
+ ggplot(aes(year,rate*100,color=type,group=type))+geom_line()+geom_point()+facet_wrap(~signal)+theme_minimal()+labs(x='Decision year (2015 partial)',y='Direction hit rate (%)',color=NULL,title='W: positive line gap; L: negative line gap')
+print(p);ggsave(file.path(out,'direction.png'),p,width=10,height=5,dpi=150)
+files<-list.files(out,pattern='\\.(csv|png)$',full.names=TRUE)
+code_files<-c('src/handicap_line_inputs.py','src/zero_handicap_inputs.py','r/handicap_line_gap.R','r/diagnostic_verified_csv.R','quarto/243_handicap_line_gap.qmd')
+jsonlite::write_json(list(status='COMPUTED_PENDING_REVIEW',config=cfg,fixtures=nrow(z),issues=n_distinct(z$issue),source_hashes=input$source_hashes,historical_learning='NONE',
+ files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files)),code=setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)),file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```

@@ -1,0 +1,74 @@
+---
+title: "七场重组结论：取消25%准入门槛"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+前轮同一23个最差期，保持原概率、估算SP与1024元预算上限。这个窗口是事后选择的，
+只能用于失败诊断，不是未见验证。新的对照取消“256元内必须覆盖25%概率”的组准入条件：
+25%仅用于计算期望深度，超过单组256元就截至128张票，仍准许候选组参与比较。
+严格Top2支持不变，SP>=1.3保留。旧组与扩充组都测试，不根据结算调整门槛或种子。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root;out<-cfg$output;s<-cfg$settings
+modules<-c('n7_sleeve_tables','n7_joint_sleeves','n7_capital_depth','n7_capital_portfolio','n7_core_opportunity','n7_sweet_union','n7_sp_filter','n7_probability_replay','joint_candidate_comparison','zero_handicap_purchase','diagnostic_verified_csv','line_gap_third','regroup_open_pool')
+for(m in modules)source(file.path(root,'r',paste0(m,'.R')))
+reticulate::use_python(cfg$python,required=TRUE)
+stopifnot(!dir.exists(out),digest::digest(file=cfg$regroup$path,algo='sha256')==cfg$regroup$sha256,digest::digest(file=cfg$manifest,algo='sha256')==cfg$manifest_sha256)
+parent<-jsonlite::fromJSON(cfg$regroup$path);parent_dir<-dirname(cfg$regroup$path)
+prov<-reticulate::import('src.temporal_learning.provenance')
+closure<-prov$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.strategy_diagnostic_inputs','src.n7_sleeve_states','src.temporal_learning'),distributions=list('numpy','pandas'))
+stopifnot(identical(closure$closure_sha256,parent$closure$closure_sha256))
+stopifnot(digest::digest(file=file.path(parent_dir,'freeze.json'),algo='sha256')==parent$files[['freeze.json']])
+parent_freeze<-jsonlite::fromJSON(file.path(parent_dir,'freeze.json'),simplifyVector=FALSE);manifest<-jsonlite::fromJSON(cfg$manifest);issues<-parent$issues
+code_files<-c(paste0('r/',modules,'.R'),'quarto/248_regroup_open_admission.qmd')
+code<-setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)
+dir.create(file.path(out,'plans'),recursive=TRUE);dir.create(file.path(out,'contexts'));bindings<-list();admission<-list()
+for(id in issues){
+ ref<-parent_freeze$bindings[[id]];stopifnot(digest::digest(file=ref$context,algo='sha256')==ref$context_sha256);z<-readRDS(ref$context)
+ plans<-contexts<-list()
+ for(kind in c('OLD','EXP')){
+  b<-if(kind=='OLD')z$original else z$expanded;policy<-paste0(kind,'_OPEN_DROP')
+  a<-regroup_open_pool(b,b$cutoffs,cfg$python,s,policy);plans[[policy]]<-a$plan;contexts[[policy]]<-a
+  admission[[paste(id,kind)]]<-tibble(issue=id,policy=policy,candidates=length(b$sleeves),legal_groups=length(a$pool$options),below_target=sum(vapply(a$pool$options,function(o)o$coverage<s$target_coverage,logical(1))),selected_groups=n_distinct(a$plan$tickets$group_id))
+ }
+ p<-file.path(out,'plans',paste0(id,'.rds'));saveRDS(plans,p);context<-file.path(out,'contexts',paste0(id,'.rds'));saveRDS(contexts,context)
+ bindings[[id]]<-list(path=p,sha256=digest::digest(file=p,algo='sha256'),context=context,context_sha256=digest::digest(file=context,algo='sha256'),parent_context=ref$context,parent_context_sha256=ref$context_sha256)
+ writeLines(paste(match(id,issues),length(issues),id),file.path(out,'progress.txt'))
+}
+stopifnot(identical(code,setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)))
+stopifnot(identical(prov$implementation_closure(reticulate::import('pathlib')$Path(root),list('src.strategy_diagnostic_inputs','src.n7_sleeve_states','src.temporal_learning'),distributions=list('numpy','pandas'))$closure_sha256,closure$closure_sha256))
+jsonlite::write_json(list(status='FROZEN_POSTHOC_WINDOW_BEFORE_VARIANT_SETTLEMENT',config=cfg,bindings=bindings,code=code,closure=closure,historical_admission=FALSE),file.path(out,'freeze.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+write_csv(bind_rows(admission),file.path(out,'admission.csv'))
+```
+
+```{r}
+labels<-bind_rows(lapply(seq_len(nrow(manifest$labels)),function(i)diagnostic_read_verified_csv(manifest$labels$path[i],manifest$labels$sha256[i],cols(issue='c',provider_id='c')) |> select(issue,slot,provider_id,handicap,actual_direction,spf_sp)))
+rows<-list()
+for(id in issues){plans<-readRDS(bindings[[id]]$path);for(policy in names(plans))rows[[paste(id,policy)]]<-joint_candidate_settle(plans[[policy]],filter(labels,issue==id))$rows}
+old<-diagnostic_read_verified_csv(file.path(parent_dir,'periods.csv'),parent$files[['periods.csv']],cols(issue='c'))
+x<-bind_rows(old,bind_rows(rows));stopifnot(!anyDuplicated(x[c('issue','policy')]))
+summary<-x |> group_by(policy) |> summarise(issues=n(),hit_issues=sum(hits>0),profit_issues=sum(net>0),total_stake=sum(stake),total_gross=sum(gross),net=sum(net),.groups='drop') |> mutate(roi=net/total_stake)
+summary |> knitr::kable(digits=3)
+trim<-x |> group_by(policy) |> arrange(desc(net),issue,.by_group=TRUE) |> slice(-1) |> summarise(issues=n(),stake=sum(stake),net=sum(net),.groups='drop') |> mutate(roi=net/stake)
+trim |> knitr::kable(digits=3)
+x |> select(issue,policy,hits,stake,gross,net) |> pivot_wider(names_from=policy,values_from=c(hits,stake,gross,net)) |> knitr::kable(digits=2)
+diagnosis<-diagnostic_read_verified_csv(file.path(parent_dir,'diagnosis.csv'),parent$files[['diagnosis.csv']],cols(issue='c'));diagnosis |> knitr::kable(digits=2)
+write_csv(x,file.path(out,'periods.csv'));write_csv(summary,file.path(out,'summary.csv'));write_csv(trim,file.path(out,'trim.csv'))
+p<-ggplot(summary,aes(reorder(policy,net),net,fill=net>0))+geom_col(show.legend=FALSE)+coord_flip()+theme_minimal()+labs(x=NULL,y='Net return (CNY)',title='23 post-hoc worst issues: regrouping and admission controls')
+print(p);ggsave(file.path(out,'net.png'),p,width=11,height=6,dpi=150)
+files<-list.files(out,pattern='\\.(csv|png|json)$',full.names=TRUE)
+jsonlite::write_json(list(status='COMPUTED_PENDING_REVIEW',config=cfg,issues=issues,files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files)),code=code,closure=closure,historical_admission=FALSE),file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```
+
+归因基于实际赛果事后枚举：“候选可达”不等于能够赛前识别该组，也不等于能在预算内覆盖全部组。
+需要同时比较命中、回款、投入及去掉最大盈利期后的结果，不能只凭命中增加就认为资金效率提高。

@@ -1,0 +1,35 @@
+{
+  "study": "Fixed-group mixed payout coverage",
+  "historical_admission": false,
+  "scope": "784 frozen issues; original JOINT groups and per-group ticket quotas",
+  "budget_cny": 1024,
+  "unit_cny": 2,
+  "payout_factor": 0.65,
+  "initial_capital_cny": 100000,
+  "payout_floor_grid_cny": [
+    0,
+    128,
+    256
+  ],
+  "exposure_grid": [
+    {
+      "name": "OPEN",
+      "fixture_cny": 1024,
+      "direction_cny": 1024
+    }
+  ],
+  "primary_comparison": {
+    "supplement_share": 0.15
+  },
+  "selection": "Main >=256 followed by supplement [128,256); reserve share of original planned ticket count rounded down; open groups only; fixed original quotas; unused reserve remains cash",
+  "evaluation": "all fixed grid cells; no winner selected from target labels; historical exposed probabilities are retrospective evidence only",
+  "coverage_seed": 1901,
+  "coverage_worlds": 8192,
+  "supplement_shares": [
+    0.1,
+    0.15,
+    0.2
+  ],
+  "main_floor_cny": 256,
+  "supplement_floor_cny": 128
+}

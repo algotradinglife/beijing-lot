@@ -1,0 +1,97 @@
+---
+title: "Top2 盈利差异的真相：排序边界与复用集中"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  receipt_sha256: null
+  labels: null
+  labels_sha256: null
+---
+
+本报告解释同一94期的两次历史实验，不使用目标结果选择模型或交易门槛。
+O代表旧独立冻结日历，N代表统一冻结日历；第一个字母是概率，第二个是选组/深度。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+s<-params$study
+stopifnot(digest::digest(file=file.path(s,'report-receipt.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(s,'report-receipt.json'),simplifyVector=FALSE)
+for(f in names(r$files))stopifnot(digest::digest(file=file.path(s,f),algo='sha256')==r$files[[f]])
+ind<-jsonlite::fromJSON(file.path(s,'independent-replay.json'))
+stopifnot(ind$status=='PASS',ind$issues==94,ind$cells==376,
+ ind$receipt_sha256==digest::digest(file=file.path(s,'plans-receipt.json'),algo='sha256'))
+summary<-read_csv(file.path(s,'summary.csv'),show_col_types=FALSE)
+g<-read_csv(file.path(s,'groups.csv'),show_col_types=FALSE,col_types=cols(issue='c',sleeve_id='c'))
+a<-read_csv(file.path(s,'attribution.csv'),show_col_types=FALSE)
+knitr::kable(summary,digits=2)
+knitr::kable(a |> summarise(probability=sum(probability_effect_cny),allocation=sum(allocation_effect_cny),net_change=sum(net_change_cny)),digits=2)
+knitr::include_graphics(file.path(s,'calendar-attribution.png'))
+```
+
+两次净收益差约−69,924元。对交换顺序取平均的账务分解：约−56,802元来自概率更换，
+约−13,122元来自选组/深度更换。这不是未来效果的因果估计，也不意味着可以事先知道该用哪个日历。
+
+## 是购买不够深，还是Top2排除了中奖赛果？
+
+```{r}
+z<-inner_join(filter(g,cell=='OO'),filter(g,cell=='NO'),by=c('issue','sleeve_id'),suffix=c('_old','_new'),relationship='one-to-one') |>
+ mutate(category=case_when(hit_old & !hit_new & actual_thirds_new>0~'Lost: outside Top2',
+ hit_old & !hit_new~'Lost: purchase depth',!hit_old & hit_new~'Added winners',hit_old & hit_new~'Retained winners',TRUE~'Neither'))
+stopifnot(all(z$depth_old==z$depth_new),all(z$stake_old==z$stake_new),max(abs(z$actual_gross_old-z$actual_gross_new))<1e-6)
+transfers<-z |> group_by(category) |> summarise(groups=n(),old_gross=sum(gross_old),new_gross=sum(gross_new),.groups='drop')
+knitr::kable(transfers,digits=2)
+p<-transfers |> filter(category!='Neither') |> mutate(change=new_gross-old_gross) |>
+ ggplot(aes(reorder(category,change),change,fill=change>0))+geom_col()+coord_flip()+theme_minimal()+
+ labs(title='Same groups and ticket counts: winner transfers',x=NULL,y='Change in gross payout (CNY)',fill='Gain')
+print(p)
+```
+
+保留旧组与旧票数，只更换概率：59个原中奖组全部因实际赛果变成第三而被硬Top2排除，
+损失回款约105,423元；新增27个中奖组回款约26,439元。没有原中奖组仅因排名超过购买深度而丢失。
+因此单纯增加同一Top2内的购买深度无法找回这59组；这是本次固定组对照的结论，不泛化到其他策略。
+
+## 111110期：复用放大了排序变化
+
+```{r}
+stopifnot(digest::digest(file=params$labels,algo='sha256')==params$labels_sha256)
+labels<-read_csv(params$labels,show_col_types=FALSE,col_types=cols(issue='c',provider_id='c'))
+f<-read_csv(file.path(s,'fixture-changes.csv'),show_col_types=FALSE,col_types=cols(issue='c',provider_id='c')) |>
+ left_join(select(labels,issue,slot,home,away,actual_direction),by=c('issue','slot'),relationship='one-to-one')
+stopifnot(!anyNA(f$actual_direction))
+example<-f |> filter(issue=='111110',slot %in% c(3,12,63)) |>
+ select(slot,home,away,handicap,actual_direction,old_W,old_D,old_L,new_W,new_D,new_L)
+knitr::kable(example,digits=4)
+knitr::kable(z |> filter(issue=='111110',hit_old) |>
+ select(sleeve_id,depth_old,actual_rank_old,actual_rank_new,actual_thirds_new,gross_old),digits=2)
+```
+
+横滨水手—枥木SC的让胜、浦和红钻—东京绿茵的让平、阿尔塔奇—第一维也的让平，
+从旧概率Top2进入新概率第三赛果。5个旧中奖组同时复用这3场，合计约30,223元回款因此同时丢失。
+其中横滨场的让胜概率只从21.51%变为21.23%，但它与让平发生排序互换；
+硬Top2把连续的小概率变化变成了“可以买/完全不买”的离散边界。
+
+## 并非整体Top2命中率下降
+
+```{r}
+y<-match(f$actual_direction,c('W','D','L'));obs<-diag(3)[y,]
+oldp<-as.matrix(f[c('old_W','old_D','old_L')]);newp<-as.matrix(f[c('new_W','new_D','new_L')])
+metrics<-tibble(calendar=c('O','N'),fixtures=nrow(f),
+ top2_hit=c(mean(max.col(-oldp,ties.method='last')!=y),mean(max.col(-newp,ties.method='last')!=y)),
+ brier=c(mean(rowSums((oldp-obs)^2)),mean(rowSums((newp-obs)^2))))
+knitr::kable(metrics,digits=5)
+```
+
+7318场的Top2命中率约71.89%→71.99%，基本不变且略升，而七串一收益显著下降。
+证据支持的是：哪些场次被改排、它们在多个组中的共同复用，以及对应的实际回款，共同决定资金曲线；
+不能将旧方案高盈利直接等同于整体概率更准确。
+
+保留旧JOINT为研究基线。下一项有明确依据的局部对照是：在固定预算下，限制硬Top2边界的脆弱性，
+同时控制同一边界场次在多个组中的集中暴露。具体阈值仍须在截止前历史确定；
+本报告不根据这94期挑选阈值，也不恢复未经统一检验的旧盈利曲线。

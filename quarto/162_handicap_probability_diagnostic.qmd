@@ -1,0 +1,149 @@
+---
+title: "让球数×赛果：概率底座盲区诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  study: null
+  python: null
+  output: null
+  seed: 42501
+  budget_cny: 1024
+  unit_cny: 2
+  payout_factor: 0.65
+  n_legs: 7
+  initial_capital_cny: 100000
+  block_length: 60
+  minimum_sp: 1.3
+  cap_cny: 256
+---
+
+原200期与新增295期使用同一冻结版本。q为原市场映射，p为市场让平校正后的概率，均不是战力概率。
+让球按主队加球定义；W/D/L均是北单让胜/让平/让负。按场次去重，不用组复用次数放大支持数。
+回撤94期为事后窗口。以下是描述性诊断，不拟合、不改变下注策略。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/strategy_diagnostic_probabilities.R')
+source('r/strategy_handicap_diagnostic.R');source('r/n7_fixture_price_diagnostic.R');source('r/n7_return_attribution.R')
+source('r/fundamentals_equity_curves.R');source('r/n7_sweet_union_summary.R')
+source('r/n7_expanded_diagnostics.R');source('r/n7_recent_structure.R')
+stopifnot(!is.null(params$study),!is.null(params$python),!is.null(params$output),
+ params$unit_cny==2,params$payout_factor==.65,params$n_legs==7,
+ params$minimum_sp==1.3,params$cap_cny==256,params$seed==42501,params$budget_cny==1024,params$initial_capital_cny==100000,params$block_length==60)
+s<-params$study
+reticulate::use_python(params$python,required=TRUE)
+receipt<-jsonlite::fromJSON(file.path(s,'settlement-inputs/receipt.json'))
+input<-reticulate::import('src.strategy_diagnostic_inputs')$read_diagnostic_fixtures(
+ file.path(s,'settlement-inputs/catalog.json'),receipt$files[['catalog.json']])
+er<-jsonlite::fromJSON(file.path(s,'evaluation/receipt.json'))
+ar<-jsonlite::fromJSON(file.path(s,'current-settlement/receipt.json'))
+strategy_verify_diagnostic_inputs(file.path(s,'evaluation'),er$files,c('results.csv','funded.csv','settled-groups.csv'))
+strategy_verify_diagnostic_inputs(file.path(s,'current-settlement'),ar$files,c('fixture-audit.csv','ranks.csv'))
+a<-read_csv(file.path(s,'current-settlement/fixture-audit.csv'),col_types=cols(issue='c',provider_id='c'),show_col_types=FALSE)
+f<-n7_fixture_price_diagnostic(bind_rows(input$rows),a)
+allplans<-read_csv(file.path(s,'evaluation/results.csv'),col_types=cols(issue='c'),show_col_types=FALSE)
+plans<-allplans |> filter(seed==params$seed,budget_cny==params$budget_cny)
+order<-sort(unique(plans$issue));reference<-sort(unique(plans$issue[plans$cohort=='原200期']))
+stopifnot(length(order)==495,length(reference)==200)
+primary<-plans |> filter(variant=='JOINT')
+st<-n7_diagnostic_stage_map(primary,order,reference,params$initial_capital_cny,params$block_length)
+k<-read_csv(file.path(s,'current-settlement/ranks.csv'),col_types=cols(issue='c',sleeve_id='c',fixture_slots='c'),show_col_types=FALSE)
+funded<-read_csv(file.path(s,'evaluation/funded.csv'),col_types=cols(issue='c',sleeve_id='c'),show_col_types=FALSE) |> semi_join(plans,by=c('issue','arm','seed'))
+
+structure<-n7_diagnostic_group_structure(f,funded,k,st$map,params$unit_cny,
+ params$payout_factor,params$n_legs,params$minimum_sp,params$cap_cny)
+sel<-structure$members |>
+ semi_join(funded |> semi_join(primary,by=c('issue','arm','seed')),
+           by=c('issue','sleeve_id')) |>
+ select(issue,slot) |> distinct()
+f<-f |> left_join(st$map |> select(issue,stage),by='issue',relationship='many-to-one')
+stopifnot(!anyNA(f$stage))
+long<-f |> select(issue,slot,provider_id,handicap,actual_direction,stage,starts_with('p_'),starts_with('q_')) |>
+ pivot_longer(matches('^[pq]_[WDL]$'),names_to=c('model','outcome'),names_sep='_',values_to='probability') |>
+ rename(actual_outcome=actual_direction)
+scopes<-list(ALL=long, SELECTED=semi_join(long,sel,by=c('issue','slot')))
+allcells<-list();allscores<-list();allcal<-list()
+for(scope in names(scopes)) {
+ x<-scopes[[scope]]
+ for(view in c('stages','recent')) {
+  z<-if(view=='recent') x |> filter(stage!='REFERENCE') |> mutate(stage='RECENT_ALL') else x
+  d<-strategy_handicap_diagnostic(z,c('stage','handicap'),c('W','D','L'),seq(0,1,.1))
+  key<-paste(scope,view)
+  allcells[[key]]<-d$cells |> mutate(scope=scope)
+  allscores[[key]]<-d$summary |> mutate(scope=scope)
+  allcal[[key]]<-d$calibration |> mutate(scope=scope)
+ }
+}
+cells<-bind_rows(allcells);scores<-bind_rows(allscores);calibration<-bind_rows(allcal)
+dir.create(params$output,recursive=TRUE,showWarnings=FALSE)
+write_csv(cells,file.path(params$output,'cells.csv'))
+write_csv(scores,file.path(params$output,'scores.csv'))
+write_csv(calibration,file.path(params$output,'calibration.csv'))
+print(glimpse(cells));knitr::kable(head(cells),digits=3)
+```
+
+概率偏差为“实际发生率−平均预测概率”：正值表示低估。Top2召回率的分母为实际发生该赛果的场次，
+不是全部比赛；Top1准确率的分母为该方向被排第一的场次，无选择记NA。
+
+```{r}
+plotdata<-cells |> filter(scope=='ALL',stage=='RECENT_ALL',fixtures>=100) |>
+ mutate(model=recode(model,p='Corrected market',q='Raw market'),
+ outcome=factor(outcome,levels=c('W','D','L')),
+ label=sprintf('%+.1f pp\nn=%d',100*gap,fixtures))
+g1<-ggplot(plotdata,aes(factor(handicap),outcome,fill=100*gap))+
+ geom_tile()+geom_text(aes(label=label),size=3)+facet_wrap(~model)+
+ scale_fill_gradient2(low='#2166ac',mid='white',high='#b2182b',midpoint=0)+
+ labs(title='Recent 295 issues: calibration by signed handicap and result',
+ x='Home handicap (added to home goals)',y='Handicap outcome',fill='Observed minus\npredicted (pp)',
+ caption='Unique fixtures; cells with n < 100 omitted from plot, retained in tables')+theme_minimal(base_size=12)
+print(g1);ggsave(file.path(params$output,'handicap-calibration.png'),g1,width=12,height=5,dpi=150)
+p2<-cells |> filter(scope=='ALL',stage!='RECENT_ALL',model=='p',fixtures>=100) |>
+ mutate(stage=factor(stage,levels=c('REFERENCE','RECENT_OTHER','RECENT_DRAWDOWN')),
+ outcome=factor(outcome,levels=c('W','D','L')),
+ label=sprintf('%.0f%%\nhits=%d/%d',100*top2_recall,top2_hits,actual))
+g2<-ggplot(p2,aes(factor(handicap),outcome,fill=top2_recall))+
+ geom_tile()+geom_text(aes(label=label),size=2.8)+facet_wrap(~stage,ncol=1)+
+ scale_fill_gradient(low='#b2182b',high='#2166ac',limits=c(0,1),na.value='grey80')+
+ labs(title='Corrected market: Top2 recall of each actual outcome',
+ x='Home handicap',y='Handicap outcome',fill='Recall',
+ caption='Denominator: actual occurrences; drawdown window is selected retrospectively')+theme_minimal(base_size=12)
+print(g2);ggsave(file.path(params$output,'handicap-recall.png'),g2,width=11,height=9,dpi=150)
+knitr::kable(cells |> filter(scope=='ALL',stage=='RECENT_ALL',model=='p') |>
+ select(handicap,outcome,fixtures,actual,predicted,observed,gap,top1_selected,top1_precision,top2_recall,top2_misses),digits=3)
+files<-c('r/strategy_handicap_diagnostic.R','r/strategy_diagnostic_probabilities.R','r/n7_recent_structure.R',
+ 'r/n7_fixture_price_diagnostic.R','r/n7_return_attribution.R','r/n7_sweet_union_summary.R','r/fundamentals_equity_curves.R','src/strategy_diagnostic_inputs.py',
+ 'quarto/162_handicap_probability_diagnostic.qmd')
+jsonlite::write_json(list(study=s,model='market-balance-draw-1.0.0-diagnostic',parameters=params,
+ source_catalog=receipt$files[['catalog.json']],source_bundle_hashes=input$source_hashes,
+ evaluation=er$files,settlement=ar$files,
+ implementation=setNames(vapply(files,digest::digest,character(1),file=TRUE,algo='sha256'),files),
+ generated_at=as.character(Sys.time()),diagnostic_only=TRUE),
+ file.path(params$output,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 诊断结论
+
+新增295期中294期有冻结概率，共23,585个唯一场次；剩余1期没有可用概率，不记作未中。
+
+- 零让球平局：平均预测26.1%，实际29.1%（3,663/12,607）；回撤段与其余阶段均低估约3个百分点，是持续的校准缺口。
+- 主队受让两球（+2）时让负，即客队净胜至少三球：预测28.5%，实际35.6%（134/376）。
+  但回撤段偏差−0.9个百分点、其余阶段+10.3个百分点，不能当作回撤原因或已确认的稳定规律。
+- 主让一球（−1）的让平：回撤段实际28.0%、预测25.2%；其余阶段实际25.0%、预测约25.0%。
+  这是阶段变化线索；回撤窗口事后选出，未作显著性或因果认定。
+- 排序覆盖集中漏掉让平：校正后Top2漏选6,296场，其中5,586场为让平（88.7%）。
+  但低Top2召回不等于错误校准，例如−2让平发生率22.6%、预测22.5%基本一致，仍只有0.7%的实际让平进入Top2。
+  这说明类别基准发生率与排序目标的取舍，不能据此一律抬高让平。
+- 校正减少了全部场次的让平漏选209场，却增加其他赛果漏选278场，整体Top2净减少69次命中。
+  在实际入组的3,375个唯一场次上，让平漏选反而增加75场，其他方向减少50场，总体少命中25场。
+  全池改善不一定传递到策略选中的子集。
+- 回撤段实际入组选中场次Top2命中77.0%，高于其余时期75.1%；Top1为51.5%和51.1%。
+  因而单场准确率恶化不足以解释大回撤，仍需结合此前组内联合命中深度、重叠集中及中奖回款诊断。
+
+本报告仅诊断概率及排名，不把Top2视为当前sleeve实际买票规则，不据此宣称调概率能提高收益。
+±3让球样本稀少，完整保留表格但不形成策略判断。所有结论为冻结历史研究诊断，未调整模型。

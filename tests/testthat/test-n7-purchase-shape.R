@@ -1,0 +1,21 @@
+source(file.path('..','..','r','n7_purchase_shape.R'))
+testthat::test_that('shape measures probability concentration and seven roles', {
+ c<-list(a='2020-01-01T00:00:00Z');q<-c(.6,.3,.1)
+ states<-as.matrix(expand.grid(rep(list(0:2),7)))[,7:1]
+ p<-apply(states,1,function(s)prod(q[s+1]))
+ b<-list(cutoffs=c,fixtures=rep(list(list(p_W=.6,p_D=.3,p_L=.1)),7),
+  options=list(list(sleeve_id=1,fixtures=1:7,state_probability=p)))
+ x<-n7_purchase_shape(b,c,c(16,64),c(.15,.25),2,.55,.4,.05)
+ testthat::expect_equal(x$core_count,7)
+ testthat::expect_equal(x$top2_mass,.9^7)
+ testthat::expect_equal(x$mass_16,sum(sort(p,decreasing=TRUE)[1:16]))
+ testthat::expect_true(x$mass_64>x$mass_16)
+ testthat::expect_equal(x[['cost_0.25']],2*which(cumsum(sort(p,decreasing=TRUE))>=.25)[1])
+ testthat::expect_equal(x$ambiguous_count,0)
+ testthat::expect_error(n7_purchase_shape(b,list(a='wrong'),16,.25,2,.55,.4,.05))
+ testthat::expect_error(n7_purchase_shape(b,c,16,.25,2,.3,.4,.05))
+ b$options<-list()
+ empty<-n7_purchase_shape(b,c,64,.25,2,.55,.4,.05)
+ testthat::expect_equal(nrow(empty),0L)
+ testthat::expect_true(all(c('sleeve_id','mass_64','cost_0.25') %in% names(empty)))
+})

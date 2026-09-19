@@ -1,0 +1,44 @@
+---
+title: "校正强度与条件信息：收敛结论"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  evidence: null
+  receipt_sha256: null
+---
+
+274期22439场共同评估，另有前10期作为强度选择预热；使用已有冻结预测，不重训概率模型。
+BASE不增加大小球分层，TOTAL增加该分层。固定0.25/0.5/1对照与此前历史选择的0/0.25/0.5/0.75/1分开评价。
+每10期更新，权重选择只用此前已可用标签下的冻结预测Brier，候选相同时选小权重。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+source('r/diagnostic_verified_csv.R')
+stopifnot(digest::digest(file=file.path(params$evidence,'receipt.json'),algo='sha256')==params$receipt_sha256)
+r<-jsonlite::fromJSON(file.path(params$evidence,'receipt.json'),simplifyVector=FALSE)
+s<-diagnostic_read_verified_csv(file.path(params$evidence,'summary.csv'),r$files[['summary.csv']],cols())
+p<-diagnostic_read_verified_csv(file.path(params$evidence,'periods.csv'),r$files[['periods.csv']],cols())
+c<-diagnostic_read_verified_csv(file.path(params$evidence,'choices.csv'),r$files[['choices.csv']],cols(fit_issue='c'))
+knitr::kable(s,digits=7)
+knitr::kable(count(c,arm,weight,name='blocks'))
+ref<-p |> filter(model=='RAW') |> select(segment,raw_brier=brier,raw_log=log_loss)
+z<-p |> filter(model %in% c('BASE_0.25','TOTAL_0.25','BASE_SELECTED','TOTAL_SELECTED')) |> left_join(ref,by='segment',relationship='many-to-one') |> mutate(Brier=brier-raw_brier,LogLoss=log_loss-raw_log) |> pivot_longer(c(Brier,LogLoss),names_to='metric',values_to='delta')
+z$segment<-factor(z$segment,levels=c('BEFORE','DRAWDOWN','AFTER'))
+ggplot(z,aes(segment,delta,colour=model,group=model))+geom_hline(yintercept=0,linetype=2)+geom_point()+geom_line()+facet_wrap(~metric,scales='free_y')+theme_minimal()+theme(axis.text.x=element_text(angle=30,hjust=1))+labs(y='Score difference vs RAW (negative is better)',x='Stage')
+```
+
+## 收敛结论
+
+保留RAW作为当前底座，不升级动态强度或TOTAL版本。
+
+固定25%强度的BASE整体Brier/Log loss略优于RAW，但改善只有0.000079/0.000126，回撤前变差、后两段改善，Top2减少22场；不足以据此宣布稳定升级。
+同为25%或50%强度时，TOTAL整体评分并不优于BASE。因此此前全强度下TOTAL的小幅改善，不能认定为可靠的额外信息优势；也没有严格证明全部来自幅度变化。
+
+此前历史选择只选到0或25%：BASE分别12/16块，TOTAL分别11/17块。两者整体Brier/Log loss未超过RAW，TOTAL的让平Brier略好但不能替代完整评分。没有选择50%以上强度。
+这提供了停止强校正的证据，而不是继续增加格子的依据。总进球保留为诊断字段；不继续在本批数据上扫描阈值追逐最优，不声称下注收益变化。

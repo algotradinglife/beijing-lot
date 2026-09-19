@@ -1,0 +1,71 @@
+---
+title: "合理让球线细化至半球：新增方向信号检验"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  config: null
+---
+
+沿用744期68,826条保存完整比分矩阵的候选记录，另外195期不在本轮矩阵范围内。
+比较INTEGER（整数线直接概率差）、HALF（半球步长直接概率差）、HALF_CONDITIONAL（半球步长，
+按非让平质量归一化的胜负差）。半球步长同时包含整数线和半球线，仍按北单原整数线结算。
+公平线只是模型的均衡线，不是最大收益盘口。并列线不强行给方向；条件定义若非让平质量为零则排除此线。
+这是固定定义的历史诊断，无拟合、参数搜索、未来准入或实际下注变更。
+2010及2015覆盖不完整。矩阵仍为原市场映射，不是零让球欧赔重整后的完整比分矩阵。
+
+```{r}
+library(dplyr);library(tidyr);library(readr);library(ggplot2)
+cfg<-jsonlite::fromJSON(params$config);root<-cfg$repository_root;out<-cfg$output
+source(file.path(root,'r/handicap_line_gap.R'));source(file.path(root,'r/diagnostic_verified_csv.R'))
+stopifnot(!file.exists(file.path(out,'receipt.json')),digest::digest(file=cfg$input,algo='sha256')==cfg$input_sha256)
+input<-jsonlite::fromJSON(gzfile(cfg$input),simplifyVector=FALSE)
+methods<-tibble(model=c('INTEGER','HALF','HALF_CONDITIONAL'),step=c(1,.5,.5),metric=c('unconditional','unconditional','conditional'))
+features<-bind_rows(lapply(input$rows,function(f){
+ d<-bind_rows(f$distribution)
+ bind_rows(lapply(seq_len(nrow(methods)),function(j){
+  a<-handicap_line_gap(d,f$handicap,cfg$tolerance,methods$step[j],methods$metric[j])
+  bind_cols(tibble(issue=f$issue,slot=f$slot,provider_id=f$provider_id,handicap=f$handicap,model=methods$model[j]),a)
+ }))
+}))
+write_csv(features,file.path(out,'features.csv'))
+# Labels opened after all three feature variants exist; reproduce prior integer arm.
+stopifnot(digest::digest(file=cfg$previous_receipt,algo='sha256')==cfg$previous_receipt_sha256)
+r<-jsonlite::fromJSON(cfg$previous_receipt)
+old<-diagnostic_read_verified_csv(file.path(dirname(cfg$previous_receipt),'fixtures.csv'),r$files[['fixtures.csv']],cols(issue='c',provider_id='c',year='c'))
+stopifnot(!anyDuplicated(old[c('issue','slot','provider_id')]))
+b<-filter(features,model=='INTEGER') |> left_join(old |> select(issue,slot,provider_id,handicap,old_line=optimal_line,old_ties=ties,old_signal=signal),by=c('issue','slot','provider_id','handicap'),relationship='one-to-one')
+stopifnot(nrow(b)==nrow(old),!anyNA(b$old_signal),all(b$optimal_line==b$old_line),all(b$ties==b$old_ties),all(b$signal==b$old_signal))
+z<-features |> left_join(old |> select(issue,slot,provider_id,handicap,year,actual_direction,old_signal=signal,old_delta=delta),by=c('issue','slot','provider_id','handicap'),relationship='many-to-one')
+stopifnot(!anyNA(z$actual_direction),nrow(z)==3*nrow(old))
+z<-z |> mutate(degree=abs(delta),directed=signal %in% c('W','L'),new_signal=old_signal=='NONE' & directed,
+ selected_p=case_when(signal=='W'~q_W,signal=='L'~q_L,TRUE~NA_real_),hit=if_else(directed,signal==actual_direction,NA))
+write_csv(z,file.path(out,'fixtures.csv'))
+summary<-z |> group_by(model,signal,degree) |> summarise(fixtures=n(),issues=n_distinct(issue),predicted=if(all(is.na(selected_p)))NA_real_ else mean(selected_p),
+ hit_rate=if(all(is.na(hit)))NA_real_ else mean(hit),draw_rate=mean(actual_direction=='D'),.groups='drop')
+new<-z |> filter(new_signal) |> group_by(model,signal,degree) |> summarise(fixtures=n(),issues=n_distinct(issue),predicted=mean(selected_p),hit_rate=mean(hit),draw_rate=mean(actual_direction=='D'),.groups='drop')
+overall<-z |> group_by(model) |> summarise(fixtures=n(),directed=sum(directed),none=sum(signal=='NONE'),ambiguous=sum(signal=='AMBIGUOUS'),new_signals=sum(new_signal),.groups='drop')
+yearly<-z |> filter(new_signal) |> group_by(model,year,signal) |> summarise(fixtures=n(),predicted=mean(selected_p),hit_rate=mean(hit),.groups='drop')
+overall |> knitr::kable();summary |> filter(signal %in% c('W','L')) |> knitr::kable(digits=4);new |> knitr::kable(digits=4)
+write_csv(summary,file.path(out,'summary.csv'));write_csv(new,file.path(out,'new-signals.csv'));write_csv(overall,file.path(out,'overall.csv'));write_csv(yearly,file.path(out,'yearly.csv'))
+```
+
+命中率分母包含实际让平；新信号专指原INTEGER无线差而新定义有方向的记录。
+更细的让球线会改变信号覆盖范围，不能只看新增场次的绝对命中率就断言改进。
+样本很少的1.5/2球格子不作为稳定胜率估计；没有计算新的串关或收益策略。
+
+```{r}
+p<-summary |> filter(signal %in% c('W','L')) |> select(model,signal,degree,fixtures,predicted,hit_rate) |>
+ pivot_longer(c(predicted,hit_rate),names_to='type',values_to='rate') |>
+ ggplot(aes(degree,rate*100,color=type,group=type))+geom_line()+geom_point(aes(size=fixtures))+facet_grid(signal~model)+theme_minimal()+labs(x='Absolute handicap gap (goals)',y='Direction hit rate (%)',size='Records',color=NULL)
+print(p);ggsave(file.path(out,'half-gap.png'),p,width=12,height=6,dpi=150)
+files<-list.files(out,pattern='\\.(csv|png)$',full.names=TRUE)
+code_files<-c('r/handicap_line_gap.R','r/diagnostic_verified_csv.R','quarto/244_half_handicap_line.qmd')
+jsonlite::write_json(list(status='COMPUTED_PENDING_REVIEW',config=cfg,source_hashes=input$source_hashes,historical_learning='NONE',
+ files=setNames(lapply(files,function(f)digest::digest(file=f,algo='sha256')),basename(files)),code=setNames(lapply(code_files,function(f)digest::digest(file=file.path(root,f),algo='sha256')),code_files)),file.path(out,'receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+```

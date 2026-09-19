@@ -1,0 +1,32 @@
+{
+  "repository_root": "/home/drwho1985/.codex/worktrees/0aac/beijing-lot",
+  "output": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-setting-regimes-v3",
+  "input": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-setting-regimes-v1/inputs.json",
+  "input_sha256": "86b20800a1f00aa18feb7d940a70899cc24f67e42ed35378409091875ac948cd",
+  "manifest": "/home/drwho1985/.codex/worktrees/0aac/beijing-lot/config/zero_purchase_full_inputs.json",
+  "manifest_sha256": "fb0b12b96dd29ffc1700af6e2e879839e1376a5643422e3d9fb8a1ec1ce8dc0a",
+  "strength_breaks": [
+    -1,
+    -0.6,
+    -0.3,
+    -0.1,
+    0.1,
+    0.3,
+    0.6,
+    1
+  ],
+  "total_breaks": [
+    0,
+    2,
+    2.5,
+    3,
+    3.5
+  ],
+  "complete_years": [
+    "2011",
+    "2012",
+    "2013",
+    "2014"
+  ],
+  "minimum_support": 30
+}
