@@ -1,0 +1,25 @@
+---
+title: "分歧驱动复用与第三赛果回报门槛"
+format: html
+execute:
+  echo: true
+  warning: false
+  error: true
+---
+
+本报告是事后研究诊断，不改变生产概率底座或下注策略。它把让球线分歧、Top2 清晰度和第三赛果的增量预期回报分开：分歧只影响复用上限；第三赛果必须通过显式回报门槛。
+
+```{r}
+source("r/divergence_reuse_allocate.R")
+pool <- list(
+  cutoffs = list(diagnostic = "frozen"),
+  fixtures = list(list(issue="pilot", slot=1L, provider_id="p",
+    p_W=.70, p_D=.20, p_L=.10)))
+evidence <- divergence_reuse_features(pool, data.frame(
+  issue="pilot", slot=1L, provider_id="p", degree=1, stringsAsFactors=FALSE))
+evidence
+```
+
+`HIGH` 场次可承受更高复用，`MEDIUM` 场次受限，`LOW` 场次只保留一次暴露。任何候选第三赛果还必须满足 `expected_gross / stake >= third_min_expected_return`；低于门槛的资金留在现金池，不为了填满预算而分散。
+
+完整冻结期次的结果写入外置盘 `audits/divergence-reuse-v1/`，并与旧 JOINT、Top2 对照。结论只在冻结的研究窗口内成立。
