@@ -1,0 +1,18 @@
+source(file.path('..','..','r','line_gap_pool.R'))
+source(file.path('..','..','r','n7_core_opportunity.R'))
+source(file.path('..','..','r','n7_capital_portfolio.R'))
+testthat::test_that('group gating preserves aligned scenarios and cannot read labels',{
+ cut<-list('1'='epoch','2'='epoch');p<-list(cutoffs=cut,fixtures=list(list(issue='001',slot=1L,provider_id='a'),list(issue='001',slot=2L,provider_id='b')),
+ options=list(list(fixtures=1L),list(fixtures=2L),list(fixtures=1:2)),opening_options=c(1L,3L),opportunity_options=2L,mode='BREADTH')
+ s<-list(cutoffs=cut,hits=matrix(c(1,0,0,1,1,1),2),gross=matrix(1:6,2))
+ e<-tibble::tibble(issue='001',slot=1:2,provider_id=c('a','b'),degree=c(1,.5),signal=c('W','L'))
+ z<-line_gap_pool(p,s,e,cut,1,1)
+ testthat::expect_identical(z$pool$options,p$options[c(1,3)]);testthat::expect_identical(z$scenarios$hits,s$hits[,c(1,3)])
+ testthat::expect_equal(z$pool$opening_options,1:2);testthat::expect_length(z$pool$opportunity_options,0)
+ testthat::expect_identical(line_gap_pool(p,s,e,cut,1,0)$pool,p)
+ z<-line_gap_pool(p,s,e,cut,1,2);testthat::expect_equal(dim(z$scenarios$hits),c(2L,0L))
+ fit<-n7_core_allocate(z$pool,z$scenarios,cut,1024,'any_hit',1024,'OPEN_FIRST');testthat::expect_equal(fit$metrics$cash,1024)
+ testthat::expect_error(line_gap_pool(p,s,e, list(x='wrong'),1,1))
+ testthat::expect_error(line_gap_pool(p,s,dplyr::mutate(e,actual='W'),cut,1,1))
+ e$provider_id[2]<-'wrong';testthat::expect_error(line_gap_pool(p,s,e,cut,1,1))
+})
