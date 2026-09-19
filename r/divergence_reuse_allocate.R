@@ -47,6 +47,16 @@ divergence_reuse_allocate <- function(pool, scenarios, evidence,
   expected <- vapply(opts, function(o) o$expected_gross, numeric(1))
   stake <- vapply(opts, function(o) o$stake, numeric(1))
   ids <- vapply(opts, function(o) as.character(o$sleeve_id), character(1))
+  third_by_fixture <- vapply(pool$fixtures, function(f) {
+    order(c(f$p_W, f$p_D, f$p_L), decreasing = TRUE)[3] - 1L
+  }, integer(1))
+  contains_third <- vapply(opts, function(o) {
+    state <- as.integer(o$state_ids) - 1L
+    digits <- t(vapply(state, function(s) (s %/% (3^(6:0))) %% 3L, integer(7)))
+    any(digits[, as.integer(o$fixtures), drop = FALSE] ==
+      matrix(third_by_fixture[as.integer(o$fixtures)], nrow = nrow(digits),
+        ncol = length(o$fixtures), byrow = TRUE))
+  }, logical(1))
   selected <- integer(); used <- integer(0); usage <- integer(nrow(evidence)); cash <- budget_cny
   actions <- list()
   repeat {
@@ -61,7 +71,7 @@ divergence_reuse_allocate <- function(pool, scenarios, evidence,
     value <- expected[cand] / stake[cand]
     # A third option is admitted only when its incremental expected return
     # clears the caller's explicit diversification cost threshold.
-    keep <- value >= third_min_expected_return
+    keep <- !contains_third[cand] | value >= third_min_expected_return
     cand <- cand[keep]; gain <- gain[keep]; value <- value[keep]
     if (!length(cand)) break
     ord <- order(-gain / stake[cand], -value, -group_score[cand], ids[cand])
