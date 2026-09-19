@@ -9,6 +9,5 @@ test_that("divergence features classify fixtures from label-free evidence", {
 })
 
 test_that("allocator respects a per-fixture reuse cap", {
-  skip_if_not(exists("n7_capital_evaluate"))
   expect_true(is.function(divergence_reuse_allocate))
 })
