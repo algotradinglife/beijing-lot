@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import pathlib
 import re
 import sqlite3
 import subprocess
@@ -1419,7 +1420,13 @@ def test_fixtures_main_captures_aux_for_an_already_captured_fixture(
 
     The fixture is already captured, so it enters the aux branch: `needs_aux`
     returns True, `reserve_n` books the requests, and the loop ends once the
-    stubbed capture has written an analysis row and `needs_aux` turns False.
+    stubbed capture has written its rows and `needs_aux` turns False.
+
+    The stub persists **both** endpoints on purpose. `needs_aux` only inspects
+    the analysis row, so a stub that wrote analysis alone would let the run
+    finish with the handicap capture missing - which is the incomplete-aux
+    completion behaviour routed to #473. This test must exercise the closures
+    without pinning that defect, so it satisfies the capture it claims to.
     """
     import scripts.collect_titan_historical_fixtures as fixtures
 
@@ -1435,17 +1442,18 @@ def test_fixtures_main_captures_aux_for_an_already_captured_fixture(
 
     def _fake_capture_aux(store_: TitanRosterStore, fixture_batch_id: str, fixture_id: str) -> None:
         captured_calls.append((fixture_batch_id, fixture_id))
-        store_.record_historical_aux(
-            batch_id=f"{fixture_batch_id}:analysis",
-            fixture_batch_id=fixture_batch_id,
-            endpoint_kind="analysis",
-            source_fixture_id=fixture_id,
-            source_url=f"https://zq.titan007.com/analysis/{fixture_id}cn.htm",
-            payload=ANALYSIS_PAGE,
-            requested_at_utc=NOW,
-            trusted_received_at_utc=NOW,
-            parser_version="test",
-        )
+        for kind, payload in (("analysis", ANALYSIS_PAGE), ("handicap", HANDICAP_PAGE)):
+            store_.record_historical_aux(
+                batch_id=f"{fixture_batch_id}:{kind}",
+                fixture_batch_id=fixture_batch_id,
+                endpoint_kind=kind,
+                source_fixture_id=fixture_id,
+                source_url=f"https://example.test/{kind}/{fixture_id}",
+                payload=payload,
+                requested_at_utc=NOW,
+                trusted_received_at_utc=NOW,
+                parser_version="test",
+            )
 
     monkeypatch.setattr(fixtures, "_capture_aux", _fake_capture_aux)
     main = _run_main(
@@ -1467,9 +1475,14 @@ def test_fixtures_main_captures_aux_for_an_already_captured_fixture(
         assert store.connection.execute(
             "SELECT COUNT(*) FROM low_frequency_reservation"
         ).fetchone()[0] == 1
-        assert store.connection.execute(
-            "SELECT COUNT(*) FROM historical_aux_capture WHERE endpoint_kind='analysis'"
-        ).fetchone()[0] == 1
+        # Both endpoints are persisted, so a future fix for #473 (completion
+        # must not ignore handicap) leaves this test passing rather than
+        # turning it into a retry loop.
+        assert {
+            row[0] for row in store.connection.execute(
+                "SELECT endpoint_kind FROM historical_aux_capture"
+            )
+        } == {"analysis", "handicap"}
     finally:
         store.close()
 
@@ -1545,6 +1558,89 @@ def test_mutated_source_inserts_without_deleting_any_line() -> None:
     assert audit.MUTATION in mutated
     compile(mutated, "<mutated>", "exec")
     compile(source, "<original>", "exec")
+
+
+def test_classify_requires_two_consistent_attributable_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only `fail, fail` with the probe's own marker counts as execution.
+
+    A single failure may come from unrelated flakiness, so it must not be
+    accepted as evidence that the injected exception was reached.
+    """
+    import scripts.audit_execution_coverage as audit
+
+    source = "def f():\n    return 1\n"
+    path = tmp_path / "probe_target.py"
+    path.write_text(source, encoding="utf-8")
+    site = audit.function_sites(source)[0]
+    assert site.name == "f"
+
+    def with_outcomes(*outcomes: tuple[str, str]):
+        calls = iter(outcomes)
+
+        def _fake_probe(*_: object) -> tuple[str, str]:
+            return next(calls)
+
+        monkeypatch.setattr(audit, "probe", _fake_probe)
+
+    with_outcomes((audit.PASSED, ""), (audit.PASSED, ""))
+    assert audit.classify("py", tmp_path, path, site) == ("gap", "")
+
+    with_outcomes((audit.FAILED, f"{audit.PROBE_MARKER} boom"),
+                  (audit.FAILED, f"{audit.PROBE_MARKER} boom"))
+    assert audit.classify("py", tmp_path, path, site) == ("covered", "")
+
+    # fail then pass is inconclusive, not coverage.
+    with_outcomes((audit.FAILED, "some unrelated flake"), (audit.PASSED, ""))
+    verdict, _ = audit.classify("py", tmp_path, path, site)
+    assert verdict == "unstable"
+
+    # pass then fail is also inconclusive.
+    with_outcomes((audit.PASSED, ""), (audit.FAILED, "some unrelated flake"))
+    verdict, _ = audit.classify("py", tmp_path, path, site)
+    assert verdict == "unstable"
+
+    # Two failures without the probe marker are flakiness, not evidence.
+    with_outcomes((audit.FAILED, "unrelated failure"), (audit.FAILED, "unrelated failure"))
+    verdict, _ = audit.classify("py", tmp_path, path, site)
+    assert verdict == "unstable"
+
+    with_outcomes((audit.UNUSABLE, "SyntaxError"), (audit.PASSED, ""))
+    verdict, _ = audit.classify("py", tmp_path, path, site)
+    assert verdict == "unusable"
+
+
+def test_probe_restores_the_original_file_on_every_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.audit_execution_coverage as audit
+
+    source = "def f():\n    return 1\n"
+    path = tmp_path / "probe_target.py"
+    path.write_text(source, encoding="utf-8")
+    site = audit.function_sites(source)[0]
+
+    monkeypatch.setattr(audit, "run_scope", lambda *_: (audit.FAILED, "boom"))
+    audit.probe("py", tmp_path, path, site)
+    assert path.read_text(encoding="utf-8") == source
+
+    def _explode(*_: object) -> tuple[str, str]:
+        raise RuntimeError("runner died")
+
+    monkeypatch.setattr(audit, "run_scope", _explode)
+    with pytest.raises(RuntimeError):
+        audit.probe("py", tmp_path, path, site)
+    assert path.read_text(encoding="utf-8") == source
+
+
+def test_auditor_runs_probes_serially() -> None:
+    """Parallel probes would corrupt the checkout, so concurrency is gone."""
+    import scripts.audit_execution_coverage as audit
+
+    source = pathlib.Path(audit.__file__).read_text(encoding="utf-8")
+    assert "ThreadPoolExecutor" not in source
+    assert "--jobs" not in source
 
 
 def test_audit_scope_covers_the_entry_scripts_and_is_closed() -> None:

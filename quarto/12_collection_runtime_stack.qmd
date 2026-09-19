@@ -265,7 +265,11 @@ coverage |> tibble::as_tibble()
 **按名字搜索测试文件证明不了任何事**。本交付因此采用**执行证据**——对
 `src/titan_clean/` 与 5 个入口脚本中的**每一个**函数（含私有函数与 `main()` 内闭包）
 逐个注入 `raise AssertionError`、运行验收命令，凡测试仍通过者即为未被执行。
-每个「未覆盖」结论独立复算两次，两次一致才采信，以排除抖动。
+**探针失败只有在可归因于探针时才被接受为执行证据**：无关的抖动测试也可能让某次运行失败，
+因此每个函数都探测**两次**——两次都通过＝未被执行的缺口；两次都失败且输出中出现探针自身的
+异常＝确有执行；一通过一失败＝结论不确定，审计**失败**而非默认判为已覆盖。
+审计严格**串行**执行：并行探测会让多个 worker 同时改写同一文件，一个 worker 可能把另一个
+worker 注入后的源码当作「原始版本」并写回，既损坏工作区又使结论失效。
 
 审计器是仓库内的可复用脚本 `scripts/audit_execution_coverage.py`（QMD 只负责调用与断言，
 实现不在 QMD 内）。下门执行该审计并断言缺口为 0。它是**可证伪**的：任一函数失去执行
@@ -275,22 +279,32 @@ coverage |> tibble::as_tibble()
 
 ```{r}
 #| label: execution-coverage-audit
-audit <- system2(
+# The auditor's exit status is part of its contract: 0 means "no gaps AND no
+# inconclusive probe". Reading only the summary line would accept a failed audit
+# whose summary happens to show zero gaps, so both are checked.
+audit_lines <- system2(
   params$python,
   c(file.path(params$project_root, "scripts", "audit_execution_coverage.py"),
     "--python", params$python, "--root", params$project_root),
   stdout = TRUE, stderr = FALSE
 )
-audit_fields <- strsplit(tail(audit, 1), "\t")[[1]]
+audit_status <- attr(audit_lines, "status")
+if (is.null(audit_status)) audit_status <- 0L
+audit_fields <- strsplit(tail(audit_lines, 1), "\t")[[1]]
 audit_total <- suppressWarnings(as.integer(audit_fields[1]))
 audit_errors <- suppressWarnings(as.integer(audit_fields[2]))
-audit_gaps <- suppressWarnings(as.integer(audit_fields[3]))
+audit_unstable <- suppressWarnings(as.integer(audit_fields[3]))
+audit_gaps <- suppressWarnings(as.integer(audit_fields[4]))
 data.frame(functions_audited = audit_total, injection_errors = audit_errors,
+           inconclusive_probes = audit_unstable,
            functions_never_executed_by_tests = audit_gaps,
-           gaps = if (length(audit_fields) >= 4) audit_fields[4] else "",
+           auditor_exit_status = audit_status,
+           gaps = if (length(audit_fields) >= 5) audit_fields[5] else "",
            stringsAsFactors = FALSE) |> tibble::as_tibble()
-stopifnot(!is.na(audit_total), audit_total > 100L,
+stopifnot(audit_status == 0L,
+          !is.na(audit_total), audit_total > 100L,
           !is.na(audit_errors), audit_errors == 0L,
+          !is.na(audit_unstable), audit_unstable == 0L,
           !is.na(audit_gaps), audit_gaps == 0L)
 ```
 
