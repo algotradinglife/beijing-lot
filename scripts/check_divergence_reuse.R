@@ -30,9 +30,10 @@ run_one <- function(path) {
   }))
   worlds <- n7_joint_worlds(p, p$cutoffs, s$seed, 32L)
   scenarios <- n7_joint_returns(p, worlds, p$cutoffs)
-  do.call(rbind, lapply(c("D2", "D4"), function(nm) {
+  do.call(rbind, lapply(c("D2", "D4", "D2_EV", "D4_EV"), function(nm) {
+    wide <- grepl("D4", nm); ev_gate <- if (grepl("EV", nm)) 1 else 0
     z <- divergence_reuse_allocate(p, scenarios, feat, p$cutoffs, 1024, 2,
-      if (nm == "D4") 4 else 3, if (nm == "D4") 4 else 2, 1, 0)
+      if (wide) 4 else 3, if (wide) 4 else 2, 1, ev_gate)
     actual_state <- sum((match(fixture_labels$actual_direction, c("W", "D", "L")) - 1L) * 3^(6:0)) + 1L
     won <- vapply(p$options[z$selected], function(o) actual_state %in% o$state_ids, logical(1))
     gross <- sum(ifelse(won, 2 * .65 * prod(fixture_labels$spf_sp), 0))

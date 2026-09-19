@@ -52,10 +52,9 @@ divergence_reuse_allocate <- function(pool, scenarios, evidence,
   }, integer(1))
   contains_third <- vapply(opts, function(o) {
     state <- as.integer(o$state_ids) - 1L
-    digits <- t(vapply(state, function(s) (s %/% (3^(6:0))) %% 3L, integer(7)))
-    any(digits[, as.integer(o$fixtures), drop = FALSE] ==
-      matrix(third_by_fixture[as.integer(o$fixtures)], nrow = nrow(digits),
-        ncol = length(o$fixtures), byrow = TRUE))
+    digits <- t(vapply(state, function(s) as.integer((s %/% (3^(6:0))) %% 3L), integer(7)))
+    any(digits == matrix(third_by_fixture[as.integer(o$fixtures)],
+      nrow = nrow(digits), ncol = length(o$fixtures), byrow = TRUE))
   }, logical(1))
   selected <- integer(); used <- integer(0); usage <- integer(nrow(evidence)); cash <- budget_cny
   actions <- list()
