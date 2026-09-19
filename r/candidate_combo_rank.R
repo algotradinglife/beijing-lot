@@ -45,3 +45,24 @@ rank_role_combinations <- function(combos, metrics, budget_cny = 1024,
   x <- attach_combo_metrics(combos, metrics)
   rank_candidate_combinations(x, budget_cny, unit_cny, hit_weight, legal_mass_min)
 }
+
+select_combo_portfolio <- function(ranked, n_groups = 8L, max_fixture_reuse = 4L,
+                                   max_pair_overlap = 5L) {
+  stopifnot(is.data.frame(ranked), all(c("combo_id", "fixtures", "average_rank") %in% names(ranked)),
+    n_groups >= 1, max_fixture_reuse >= 1, max_pair_overlap >= 0)
+  all_f <- unique(unlist(strsplit(ranked$fixtures, ",", fixed = TRUE)))
+  usage <- setNames(integer(length(all_f)), all_f); chosen <- integer()
+  for (i in order(ranked$average_rank, -ranked$budget_hit_probability,
+                  -ranked$budget_expected_net, ranked$combo_id)) {
+    f <- strsplit(ranked$fixtures[[i]], ",", fixed = TRUE)[[1]]
+    if (any((usage[f] + 1L) > max_fixture_reuse, na.rm = TRUE)) next
+    if (length(chosen) && any(vapply(chosen, function(j) {
+      length(intersect(f, strsplit(ranked$fixtures[[j]], ",", fixed = TRUE)[[1]])) > max_pair_overlap
+    }, logical(1)))) next
+    chosen <- c(chosen, i); usage[f] <- usage[f] + 1L
+    if (length(chosen) == n_groups) break
+  }
+  out <- ranked[chosen, , drop = FALSE]
+  out$portfolio_order <- seq_len(nrow(out)); out$fixture_reuse <- vapply(seq_len(nrow(out)), function(i) usage[strsplit(out$fixtures[[i]], ",", fixed = TRUE)[[1]]][1], integer(1))
+  out
+}

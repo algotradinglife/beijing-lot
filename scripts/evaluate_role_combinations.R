@@ -54,15 +54,17 @@ rows <- lapply(paths, function(path) {
   roles$fixture_id <- as.character(seq_len(nrow(roles)))
   combos <- generate_role_combinations(roles, max_candidates = 50, seed = 1)
   if (!nrow(combos)) return(NULL)
-  metrics <- do.call(rbind, lapply(seq_len(nrow(combos)), function(i) combo_metrics(combos[i, ], roles)))
-  z <- rank_role_combinations(combos, metrics, 1024, 2, .5, 0)
+  metrics <- do.call(rbind, lapply(seq_len(nrow(combos)), function(i) combo_metrics(combos[i, ], roles, 128)))
+  z <- rank_role_combinations(combos, metrics, 128, 2, .5, 0)
   z$issue <- p$issue; z$main_available <- sum(roles$role == "主力"); z$opportunity_available <- sum(roles$role == "机会")
   z[, c("issue", "combo_id", "main_count", "opportunity_count", "average_rank",
-    "budget_hit_probability", "budget_expected_gross", "budget_expected_net",
-    "budget_roi", "legal_mass", "states", "pareto_frontier",
+    "budget_hit_probability", "budget_expected_gross", "budget_expected_net", "funded_stake",
+    "budget_roi", "legal_mass", "states", "pareto_frontier", "fixtures",
     "main_available", "opportunity_available")]
 })
 ans <- do.call(rbind, rows); dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 write.csv(ans, file.path(out_dir, "ranked_role_combinations.csv"), row.names = FALSE)
-write.csv(do.call(rbind, lapply(split(ans, ans$issue), function(z) z[which.min(z$average_rank), ])), file.path(out_dir, "selected_per_issue.csv"), row.names = FALSE)
+portfolios <- do.call(rbind, lapply(split(ans, ans$issue), function(z) select_combo_portfolio(z, 8L, 4L, 5L)))
+write.csv(portfolios, file.path(out_dir, "selected_portfolios.csv"), row.names = FALSE)
+write.csv(do.call(rbind, lapply(split(portfolios, portfolios$issue), function(z) data.frame(issue=z$issue[1], groups=nrow(z), total_stake= sum(z$funded_stake), hit_probability=sum(z$budget_hit_probability), expected_gross=sum(z$budget_expected_gross), expected_net=sum(z$budget_expected_net), roi=sum(z$budget_expected_net)/sum(z$funded_stake)))), file.path(out_dir, "portfolio_summary.csv"), row.names = FALSE)
 jsonlite::write_json(list(scope = basename(paths), budget_cny = 1024, role_rule = "abs degree >= .5 OR gap23 >= .10 -> MAIN; small gap -> OPPORTUNITY", source = root), file.path(out_dir, "receipt.json"), auto_unbox = TRUE, pretty = TRUE)
