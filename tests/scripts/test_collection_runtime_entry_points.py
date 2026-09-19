@@ -23,9 +23,11 @@ asserted here, because asserting them would freeze broken behaviour:
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import sqlite3
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -1126,6 +1128,161 @@ def test_fetch_bytes_rejects_a_non_200_response(monkeypatch: pytest.MonkeyPatch)
     )
     with pytest.raises(RuntimeError, match="unexpected HTTP status 404"):
         roster.fetch_bytes("https://example.test/roster.js")
+
+
+# --------------------------------------------------------------------------- #
+# Entry-point main(): argument validation.
+#
+# These tests actually invoke each script's `main()`. Everything they exercise
+# happens before the first HTTP request or database write, so nothing here
+# depends on the behaviour defects routed to #466-#474 and #476. Their purpose
+# is to make the claim "every entry point is executed by a test" falsifiable:
+# breaking a `main()` body immediately fails these cases.
+# --------------------------------------------------------------------------- #
+
+ENTRY_POINT_MODULES = (
+    "collect_500_historical_plays",
+    "collect_500_historical_settlement",
+    "collect_titan_historical_fixtures",
+    "run_next_historical_id_mapping",
+    "collect_titan_clean_roster",
+)
+
+
+def _run_main(module_name: str, argv: list[str], monkeypatch: pytest.MonkeyPatch):
+    module = importlib.import_module(f"scripts.{module_name}")
+    monkeypatch.setattr(sys, "argv", [module_name, *argv])
+    return module.main
+
+
+@pytest.mark.parametrize("module_name", ENTRY_POINT_MODULES)
+def test_entry_point_main_is_reachable_and_prints_help(
+    module_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main = _run_main(module_name, ["--help"], monkeypatch)
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 0
+
+
+@pytest.mark.parametrize("module_name", ENTRY_POINT_MODULES)
+def test_entry_point_main_rejects_missing_mandatory_arguments(
+    module_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main = _run_main(module_name, [], monkeypatch)
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 2
+
+
+def test_plays_main_rejects_an_unknown_play_type(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main = _run_main(
+        "collect_500_historical_plays",
+        ["--data-root", str(tmp_path), "--play", "zz"],
+        monkeypatch,
+    )
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 2
+
+
+@pytest.mark.parametrize(
+    ("module_name", "argv", "message"),
+    [
+        ("collect_500_historical_plays",
+         ["--play", "jq", "--rate-per-minute", "0"], "--rate-per-minute must be between 1 and 120"),
+        ("collect_500_historical_settlement",
+         ["--rate-per-minute", "121"], "--rate-per-minute must be between 1 and 120"),
+        ("collect_500_historical_settlement",
+         ["--limit", "-1"], "--limit must be >= 0"),
+        ("collect_titan_historical_fixtures",
+         ["--batch-size", "0"], "--batch-size must be between 1 and 600"),
+        ("collect_titan_historical_fixtures",
+         ["--batch-size", "601"], "--batch-size must be between 1 and 600"),
+        ("collect_titan_historical_fixtures",
+         ["--limit", "-1"], "--limit must be >= 0"),
+        ("run_next_historical_id_mapping",
+         ["--workers", "0"], "--workers must be at least 1"),
+    ],
+)
+def test_entry_point_main_rejects_out_of_range_arguments(
+    tmp_path: Path,
+    module_name: str,
+    argv: list[str],
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prefix = ["--data-root", str(tmp_path)]
+    if module_name == "collect_titan_historical_fixtures":
+        prefix += ["--bridge", str(tmp_path / "bridge.json"),
+                   "--risk-acknowledgment", str(tmp_path / "ack.json")]
+    if module_name == "run_next_historical_id_mapping":
+        prefix += ["--risk-acknowledgment", str(tmp_path / "ack.json")]
+    main = _run_main(module_name, [*prefix, *argv], monkeypatch)
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 2
+    assert message in capsys.readouterr().err
+
+
+def test_run_next_main_rejects_an_incompatible_risk_acknowledgment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ack = tmp_path / "ack.json"
+    ack.write_text(json.dumps({"schema_version": "wrong"}), encoding="utf-8")
+    main = _run_main(
+        "run_next_historical_id_mapping",
+        ["--data-root", str(tmp_path), "--risk-acknowledgment", str(ack), "--workers", "1"],
+        monkeypatch,
+    )
+    with pytest.raises(TitanRiskAcknowledgmentError, match="incompatible contract"):
+        main()
+
+
+def test_roster_main_requires_an_explicit_authorization_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main = _run_main(
+        "collect_titan_clean_roster",
+        ["--data-root", str(tmp_path), "--capture-key", "k"],
+        monkeypatch,
+    )
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 2
+    assert "requires --authorization-receipt or --risk-acknowledgment" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["--next-unseen-fixture", "--fixture-id", "1"],
+         "--next-unseen-fixture and --fixture-id are mutually exclusive"),
+        (["--probe", "--risk-acknowledgment", "a.json"],
+         "are mutually exclusive"),
+        (["--probe", "--fixture-id", "1", "--fixture-id", "2"],
+         "a probe can request at most one fixture"),
+    ],
+)
+def test_roster_main_rejects_conflicting_modes(
+    tmp_path: Path,
+    argv: list[str],
+    message: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    main = _run_main(
+        "collect_titan_clean_roster",
+        ["--data-root", str(tmp_path), "--capture-key", "k", *argv],
+        monkeypatch,
+    )
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+    assert excinfo.value.code == 2
+    assert message in capsys.readouterr().err
 
 
 # --------------------------------------------------------------------------- #
