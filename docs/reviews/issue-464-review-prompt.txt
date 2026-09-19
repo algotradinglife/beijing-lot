@@ -1,80 +1,101 @@
-Review the delivery for GitHub issue #464 in this repository.
+Review ROUND 2 of the delivery for GitHub issue #464 in this repository.
 
-## What the delivery claims
+## Context you need first
 
-Issue #464: bring the collection runtime stack under version control so a
-worktree rebuild or cleanup cannot silently lose it.
+Round 1 reviewed revision `3d8e6139` and returned `patch is incorrect` with 10
+findings. Read `docs/reviews/issue-464-codex-review-round1.json` for that
+finding list; it is part of this delivery.
 
-Scope of the change under review:
+The PI then made an explicit scope decision: #464 is narrowed to
+**"bring the collection runtime stack under version control + correct the unit
+data roots + add offline tests for the entry-point scripts"**. Each behaviour
+defect from round 1 was filed as its own issue and routed in the GitHub issue
+graph:
+
+| round 1 finding | issue |
+|---|---|
+| store layer does not use real transactions | #466 |
+| play bytes never persisted, rows attached to another receipt | #467 |
+| Nowscore evidence discarded by the merge | #468 |
+| any capture counts as SPF completion | #469 |
+| sealed release skips historical_fixture_captures | #470 |
+| merge does not adjudicate source conflicts | #471 |
+| substring "500" false contamination positive | #472 |
+| aux endpoints retried unboundedly, completion misses handicap | #473 |
+| acknowledged request limit not honored | #474 |
+| entry scripts have no test coverage | folded into #464 (this delivery) |
+
+The delivery therefore does **not** claim those behaviours are correct. This is
+a deliberate, documented governance decision, not an oversight. Do not re-report
+the nine routed defects as blockers for this issue; instead see "What to judge"
+below.
+
+## The delivery under review (HEAD of branch `codex/464-runtime-stack`)
+
 - 7 systemd units added under `ops/systemd/user/`
 - 5 scripts added under `scripts/`
-- 10 modules added under `src/titan_clean/`, plus a modified
-  `tests/titan_clean/test_snapshots.py` and a new
-  `tests/titan_clean/test_clean_stores.py`
-- `_quarto.yml` registers `quarto/12_collection_runtime_stack.qmd`
-- the delivery QMD is `quarto/12_collection_runtime_stack.qmd`
+- 10 modules added under `src/titan_clean/`
+- `tests/titan_clean/test_clean_stores.py` added; `tests/titan_clean/test_snapshots.py` updated
+- `tests/scripts/test_collection_runtime_entry_points.py` added (new in round 2)
+- `quarto/12_collection_runtime_stack.qmd` added and registered in `_quarto.yml`
+- `docs/reviews/issue-464-*.{txt,json}` added
 
-## Claims you must independently verify or falsify
+Two commits: `3d8e6139` (stack + units + QMD) and its successor (entry-point
+tests + QMD review record).
 
-1. **Unit data roots are correct.** All 7 units must pass `--data-root` equal to
-   the `new_root` field of
-   `/run/media/drwho1985/Sandisk/data/beijing-lot/registry/legacy-titan-migration.json`.
-   Verify the JSON yourself. Six of these units previously pointed at
-   `/run/media/drwho1985/Sandisk/beijing-lot/titan-clean`, described in the
-   issue as a 4 MB empty shell. Check whether that path is genuinely not the
-   registry's `old_root` and whether pointing at it would write to the wrong
-   place.
+## What to judge
 
-2. **The titan_clean upgrade direction was reversed.** The issue originally
-   claimed the workspace copy was an old version and the branch
-   `chore/workspace-snapshot-20260919` held a newer version needing a larger
-   closure. The delivery asserts the opposite: the workspace revision is
-   self-consistent and strictly stronger. Evidence claimed:
-   - workspace modules + workspace tests => 59 passed
-   - snapshot modules + workspace tests => 13 failed, 46 passed
-   - snapshot modules + snapshot tests => 44 passed
-   Reproduce this cross-test yourself. Then judge whether tracking the
-   workspace revision is right, and whether the "no raw_archive" decision is
-   sound.
+1. **Verify the delivery's own claims.** Independently confirm:
+   - all 7 units pass `--data-root` equal to the `new_root` in
+     `/run/media/drwho1985/Sandisk/data/beijing-lot/registry/legacy-titan-migration.json`,
+     and that the previously used `/run/media/drwho1985/Sandisk/beijing-lot/titan-clean`
+     is genuinely neither `old_root` nor `new_root`;
+   - the titan_clean closure argument: zero references to
+     `raw_archive`/`data_archive`/`market_storage` in `src/`, `scripts/`,
+     `tests/`, and no caller of `read_titan_raw`;
+   - the cross-test result that justifies keeping the workspace revision
+     (workspace modules + workspace tests pass; snapshot modules + workspace
+     tests fail);
+   - `python -m pytest tests/titan_clean tests/backfill tests/scripts/test_collection_runtime_entry_points.py -q -p no:cacheprovider`
+     reports 118 passed with nothing skipped or xfailed into green;
+   - the delivery QMD is a real gate: a wrong `python` and a wrong `data_root`
+     each make the render exit non-zero, the clean parameterized render exits
+     zero, and the rendered tables carry real coverage evidence.
 
-3. **The closure argument.** The delivery claims `raw_archive`, `data_archive`
-   and `market_storage` have zero references in `src/`, `scripts/` and
-   `tests/`, and that `read_titan_raw` has no caller. Verify. If the claim is
-   wrong, this is a blocker: the tracked package would not import.
+2. **Judge the new entry-point tests on their merits.** This is the main new
+   artifact in round 2. Are they deterministic and offline? Do they test
+   observable contracts rather than restating the implementation? Do they cover
+   normal, boundary and failure paths of `parse_play`, `parse_settlement`,
+   `parse_nowscore_settlement`, `load_bridge_candidates` and
+   `current_failures`? The delivery claims validity by mutation (disabling the
+   postponed detection or the bridge duplicate-id check makes the matching test
+   fail) — reproduce or falsify that. **Most importantly:** do any of these
+   tests assert behaviour that round 1 found defective, thereby freezing a bug
+   as the expected contract? That would be a blocker for this issue.
 
-4. **Acceptance tests actually pass.** Run:
-   `.venv/bin/python -m pytest tests/titan_clean tests/backfill -q -p no:cacheprovider`
-   The claim is 83 passed. Verify the count and that nothing is skipped or
-   xfailed into a green result.
+3. **Check the routing is complete and honest.** Is any defect introduced or
+   made visible by this diff left both unfixed and unrouted? Is anything in the
+   delivery claiming correctness it does not have (for example the QMD
+   claiming CI passed, or claiming the routed defects are fixed)? Is the
+   `#466`–`#474` mapping in the QMD accurate against the round 1 JSON?
 
-5. **The delivery QMD is a real gate, not decoration.** It is declared with
-   `execute: error: false` (fail-fast). Confirm that a wrong `python` parameter
-   and a wrong `data_root` parameter each make the render exit non-zero, and
-   that the clean parameterized render exits zero. A successful exit alone is
-   not acceptance: check the rendered tables actually carry the unit/script
-   coverage evidence rather than empty frames.
+4. **Report only what is in scope.** Blockers for this delivery are: a false
+   claim, a missing routine test for a function this delivery adds or makes
+   tracked, a unit pointing at the wrong data root, a broken QMD gate, or a
+   defect newly introduced by this diff. Pre-existing behaviour defects belong
+   to their routed issues.
 
-6. **No workflow or CI file is part of this delivery.** Confirm the change set
-   contains no `.github/workflows/` addition or modification, and that no unit
-   was enabled or started.
-
-7. **Data contract hygiene per AGENTS.md.** Judge whether the scripts and
-   modules respect the repository's rules: fetching/parsing/validation/
-   persistence separation, preserved raw bytes, explicit timeouts, parameterized
-   SQL, tests for every project function. Report any gap that the delivery
-   introduces or that it now makes tracked and therefore in-scope.
-
-## What is explicitly out of scope
+## Explicitly out of scope
 
 - Hosted CI cannot run: the organization's Actions budget is 0 with
-  `prevent_further_usage`, so jobs never start. The delivery states this
-  honestly and claims local equivalent evidence only. Do not treat "CI did not
-  run" as a delivery defect, but DO flag any place where the delivery claims CI
-  success it does not have.
-- Collection is paused by user instruction; do not ask for units to be started.
+  `prevent_further_usage`, so jobs never start. The delivery says so honestly
+  and claims local equivalent evidence only.
+- Collection is paused by user instruction. Do not ask for units to be started
+  or enabled.
+- No workflow or CI file is part of this delivery and none should be added.
 
 ## Output
 
-Report blocking findings with file and line, and state clearly whether the
-delivery is acceptable as-is, needs revision, or must be rejected. Distinguish
-defects the change introduces from pre-existing debt it merely makes visible.
+State clearly whether the narrowed delivery is acceptable as-is, needs
+revision, or must be rejected. If it needs revision, give file and line for
+each in-scope blocker, and separate those from the routed defects.
