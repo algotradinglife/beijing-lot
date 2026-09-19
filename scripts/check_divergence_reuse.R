@@ -42,6 +42,7 @@ run_one <- function(path) {
       model_gross = sum(scenarios$gross[, z$selected, drop = FALSE]),
       actual_hit = any(won), actual_gross = gross,
       actual_net = gross - (1024 - z$cash),
+      actual_roi = gross / max(1, 1024 - z$cash) - 1,
       max_reuse = max(z$usage), distinct_fixtures = sum(z$usage > 0),
       reuse_hhi = sum((z$usage / max(1, sum(z$usage)))^2),
       high = sum(feat$category == "HIGH"), medium = sum(feat$category == "MEDIUM"),
