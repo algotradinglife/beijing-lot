@@ -1,0 +1,46 @@
+---
+title: "盘口采集：5 线程并发验收"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  data_root: ""
+  benchmark_sha256: "487df1e4418601c06c68db9d8c1fee8249b8c36c136fc1bd5b0b12edcfe72d13"
+---
+
+最多 5 个唯一盘口页面同时处理，共享 Titan 请求账本、预算与全局 1 秒预留间隔。
+下载与写盘可重叠；处理完成事件按持久化顺序统一更新断点。
+连续限流触发共享停止信号，已发出的请求保留响应，后续预留及重试停止。
+熔断状态在重启后保留。
+
+## 受控性能比较
+
+本测试每个响应模拟等待 2 秒，共 5 个请求，不访问网站。
+因此只说明并发减少等待时间，不能当作真实站点吞吐率保证。
+
+```{r}
+stopifnot(nzchar(params$data_root))
+input <- file.path(params$data_root, "audits", "market-five-workers-benchmark.json")
+stopifnot(identical(digest::digest(file = input, algo = "sha256"), params$benchmark_sha256))
+benchmark <- jsonlite::fromJSON(input)
+results <- tibble::as_tibble(benchmark$results)
+dplyr::glimpse(results)
+knitr::kable(results, digits = 3, col.names = c("线程数", "请求数", "耗时（秒）", "同时在途峰值", "最小启动间隔（秒）"))
+```
+
+2 秒响应等待配合 1 秒全局间隔时，无需五个请求同时在途就能取得提速。
+并发上限是 5；每个线程都不持有独立请求预算。
+
+## 恢复与发布约束
+
+新的采集批次引用旧原始响应，不覆盖旧数据。未完成的首次请求保留预留证据，
+只能使用剩余重试次数；新计划绑定原账本、预算身份、上限和时间间隔。
+代码使用固定部署版本，防止工作区后续开发改变在跑批次的代码身份。
+
+清洗入口同时读取当前目录、登记的旧采集目录和复用凭证。
+监控切换批次时不把计数重新开始误报为进度倒退。
+
+实时进度以持久化目录的 `registry/markets-current.json` 所指采集目录为准。
+本报告只验收采集机制；HTTP 成功不等同于盘口内容清洗通过。

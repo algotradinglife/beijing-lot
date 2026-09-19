@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import json5
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, UnicodeDammit
 
 from src.nowscore_settlement import parse_page
 
@@ -36,6 +36,15 @@ def read_response(path: Path) -> tuple[dict, bytes]:
     Non-200 bodies remain evidence, never silently parsed as successful pages.
     """
     record = json.loads(path.read_text(encoding="utf-8"))
+    return validate_response_record(record)
+
+
+def validate_response_record(record: dict) -> tuple[dict, bytes]:
+    """Validate an in-memory transport receipt using the saved-response contract.
+
+    Return metadata and original body bytes without filesystem/network effects.
+    Used for embedded retry receipts as well as standalone response files.
+    """
     for field in ("url", "final_url"):
         if urlparse(record[field]).scheme not in {"http", "https"}:
             raise ValueError(f"invalid {field}")
@@ -218,11 +227,19 @@ def normalize_schedule_rows(rows: list[list[str]], *, source: str, fixture_local
 
 
 def decode_analysis_text(raw: bytes) -> tuple[str, str]:
-    """Strictly decode declared UTF-8/GB2312/GBK HTML; return text and codec.
+    """Decode BOM UTF-16 or declared UTF-8/GB2312/GBK; return text and codec.
 
     Unknown or conflicting declarations and malformed bytes raise ValueError.
     GB2312 follows the HTML GBK mapping. No I/O or replacement characters.
     """
+    # BOM is authoritative; do not let a detector repair malformed Unicode.
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        detected = UnicodeDammit(raw)
+        encoding = detected.original_encoding
+        if encoding not in ("utf-16le", "utf-16be"):
+            raise ValueError("unsupported Unicode BOM encoding")
+        text = raw[2:].decode(encoding, errors="strict")
+        return text, encoding
     declarations = re.findall(br'<meta\b[^>]*\bcharset\s*=\s*[\"\x27]?\s*([A-Za-z0-9_-]+)',
                               raw[:4096], flags=re.IGNORECASE)
     labels = {value.decode("ascii").lower() for value in declarations}
@@ -329,35 +346,40 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
     data_text = auxiliary_raw.decode("utf-8-sig", errors="strict") if blocks_from_auxiliary else text
     blocks = {name: js_value(data_text, name) for name in ("h_data", "a_data", "v_data")}
     history_id_column = 20 if source == "nowscore" else 15
-    for name, records in blocks.items():
-        if records is not None and (not isinstance(records, list) or any(not isinstance(row, list) or len(row) <= history_id_column for row in records)):
-            raise ValueError(f"malformed {name} row shape")
-    history = []
-    for block, records in blocks.items():
-        for ordinal, row in enumerate(records or []):
-            if (not all(type(row[i]) is int for i in (4, 6, 8, 9, history_id_column)) or
-                    any(row[i] <= 0 for i in (4, 6, history_id_column)) or row[4] == row[6] or
-                    any(row[i] < 0 for i in (8, 9))):
-                raise ValueError(f"invalid history integer in {block}")
-            halftime_raw = str(row[10]).strip()
-            halftime_match = re.fullmatch(r"(\d+)\s*[-:]\s*(\d+)", halftime_raw)
-            if halftime_match is None and halftime_raw not in {"", "-", "--"}:
-                raise ValueError(f"invalid halftime score in {block}")
-            date_raw = str(row[0])
-            if re.fullmatch(r"\d{2}-\d{2}-\d{2}", date_raw):
-                date_raw = "20" + date_raw
-            date = datetime.strptime(date_raw, "%Y-%m-%d").date().isoformat()
-            halftime_home = int(halftime_match[1]) if halftime_match else None
-            halftime_away = int(halftime_match[2]) if halftime_match else None
-            if ((halftime_home is not None and halftime_home > row[8]) or
-                    (halftime_away is not None and halftime_away > row[9])):
-                raise ValueError(f"halftime score exceeds full-time score in {block}")
-            history.append({"block": block, "ordinal": ordinal, "history_id": str(row[history_id_column]), "event_date": date,
-                            "home_id": str(row[4]), "away_id": str(row[6]), "home_score": row[8], "away_score": row[9],
-                            "halftime_home_score": halftime_home,
-                            "halftime_away_score": halftime_away,
-                            "score_scope": "SOURCE_PUBLISHED_FULL_TIME",
-                            "home_text": plain_text(str(row[5])), "away_text": plain_text(str(row[7]))})
+    history_error = None
+    try:
+        for name, records in blocks.items():
+            if records is not None and (not isinstance(records, list) or any(not isinstance(row, list) or len(row) <= history_id_column for row in records)):
+                raise ValueError(f"malformed {name} row shape")
+        history = []
+        for block, records in blocks.items():
+            for ordinal, row in enumerate(records or []):
+                if (not all(type(row[i]) is int for i in (4, 6, 8, 9, history_id_column)) or
+                        any(row[i] <= 0 for i in (4, 6, history_id_column)) or row[4] == row[6] or
+                        any(row[i] < 0 for i in (8, 9))):
+                    raise ValueError(f"invalid history integer in {block}")
+                halftime_raw = str(row[10]).strip()
+                halftime_match = re.fullmatch(r"(\d+)\s*[-:]\s*(\d+)", halftime_raw)
+                if halftime_match is None and halftime_raw not in {"", "-", "--"}:
+                    raise ValueError(f"invalid halftime score in {block}")
+                date_raw = str(row[0])
+                if re.fullmatch(r"\d{2}-\d{2}-\d{2}", date_raw):
+                    date_raw = "20" + date_raw
+                date = datetime.strptime(date_raw, "%Y-%m-%d").date().isoformat()
+                halftime_home = int(halftime_match[1]) if halftime_match else None
+                halftime_away = int(halftime_match[2]) if halftime_match else None
+                if ((halftime_home is not None and halftime_home > row[8]) or
+                        (halftime_away is not None and halftime_away > row[9])):
+                    raise ValueError(f"halftime score exceeds full-time score in {block}")
+                history.append({"block": block, "ordinal": ordinal, "history_id": str(row[history_id_column]), "event_date": date,
+                                "home_id": str(row[4]), "away_id": str(row[6]), "home_score": row[8], "away_score": row[9],
+                                "halftime_home_score": halftime_home,
+                                "halftime_away_score": halftime_away,
+                                "score_scope": "SOURCE_PUBLISHED_FULL_TIME",
+                                "home_text": plain_text(str(row[5])), "away_text": plain_text(str(row[7]))})
+    except (ValueError, TypeError) as exc:
+        history_error = str(exc)
+        history = None
     standings_by_side = {}
     for table in soup.find_all("table"):
         if table.find("table"):
@@ -438,9 +460,12 @@ def analysis_record(raw: bytes, *, source: str, provider_id: str, auxiliary_raw:
             "weather": weather_match[1].strip() or None if weather_match else None,
             "temperature": temperature_match[1] if temperature_match else None,
             "title": soup.title.get_text(" ", strip=True), "encoding": "utf-8" if encoding == "utf-8-sig" else encoding}
-    if schedule_error is not None:
-        record["quarantined_fields"] = ["schedules"]
-        raise AnalysisFieldError("schedules", schedule_error, record)
+    failures = {name: error for name, error in (("history", history_error), ("schedules", schedule_error)) if error is not None}
+    if failures:
+        record["quarantined_fields"] = list(failures)
+        record["field_errors"] = failures
+        field = next(iter(failures))
+        raise AnalysisFieldError(field, failures[field], record)
     return record
 
 

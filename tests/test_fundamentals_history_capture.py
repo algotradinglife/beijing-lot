@@ -163,3 +163,26 @@ def test_nowscore_euro_endpoint_uses_shared_nowscore_rate_key():
     import pytest
     with pytest.raises(ValueError):
         capture_rate_source({'source':'titan','url':'https://1x2.nowscore.com/547279.js'})
+
+
+def test_queued_lock_waits_without_spending_request(tmp_path, doc):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    ledger=tmp_path/'queued.sqlite'
+    started=Event()
+    def capture():
+        started.set()
+        return capture_history_batch([doc],tmp_path/'queued',ledger_path=ledger,
+            budget_id='queue',request_budget=1,wait_for_lock=True,fetch=lambda *a,**k:Response())
+    with ledger.with_suffix('.sqlite.lock').open('a+b') as lock, ThreadPoolExecutor(max_workers=1) as executor:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        future=executor.submit(capture)
+        try:
+            assert started.wait(2)
+            assert not future.done()
+            assert not (tmp_path/'queued').exists()
+        finally:
+            fcntl.flock(lock,fcntl.LOCK_UN)
+        assert future.result(timeout=5)['documents'][0]['state']=='HTTP_OK'
+    with sqlite3.connect(ledger) as con:
+        assert con.execute('select used from budgets').fetchone()[0]==1

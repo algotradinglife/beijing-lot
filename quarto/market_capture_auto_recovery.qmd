@@ -1,0 +1,53 @@
+---
+title: "盘口采集：限流后自动恢复验收"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  data_root: ""
+  receipt: "audits/market-auto-recovery-acceptance.json"
+---
+
+连续三次 429 限流后，监督器持久化冷却时间，单请求探测成功后再恢复
+原采集计划。最多 5 个页面并发，共享全局 1 秒请求间隔和原预算。
+
+## 恢复规则
+
+| 状态 | 行为 |
+|---|---|
+| COOLDOWN | 等待持久化的下次探测时间，重启不提前 |
+| PROBING | 使用原预算，仅请求一个页面，保存原始响应 |
+| READY | HTTP 200、比赛 ID 一致且解析到非空报价，准备解除熔断 |
+| RESUMED | 已保留旧断点快照并解除熔断，继续原计划 |
+| MANUAL_REQUIRED | 非暂时性探测错误或本地错误，不自动解除 |
+
+退避依次为 60、300、900、1800 秒；重复问题维持 1800 秒。
+上游 `Retry-After` 或 Jina 重试时间要求更晚时，以更晚时间为准。
+403、磁盘不足、预算耗尽及数据哈希错误不自动解除。
+
+## 验收凭证
+
+```{r}
+stopifnot(nzchar(params$data_root), !grepl("^/|\\.\\.", params$receipt))
+receipt_path <- file.path(params$data_root, params$receipt)
+receipt <- jsonlite::fromJSON(receipt_path)
+cat("验收快照：", receipt$generated_at_utc, "\n")
+cat("输入 SHA-256：", digest::digest(file = receipt_path, algo = "sha256"), "\n")
+checks <- tibble::as_tibble(receipt$checks)
+dplyr::glimpse(checks)
+knitr::kable(checks)
+```
+
+测试包含真实采集函数的离线端到端回放：连续限流 → 冷却 → 有效内容探测 →
+剩余请求续采，验证探测计入预算而不计入正式采集响应数。
+上线验证另外核对后台进程与新增响应，不以测试通过代替实际运行证据。
+
+```{r}
+live <- tibble::as_tibble(receipt$live)
+knitr::kable(live)
+```
+
+原始限流响应、探测响应和解除前断点均保留。探测仅验证端点健康，
+不代表这些历史盘口通过清洗或具备赛前可用性。

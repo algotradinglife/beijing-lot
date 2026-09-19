@@ -1,0 +1,14 @@
+{
+  "roster": "roster-130511.json.gz",
+  "receipts": [
+    "nowscore-725219.json.gz",
+    "titan-725219.json.gz",
+    "nowscore-845808.json.gz",
+    "titan-845808.json.gz",
+    "nowscore-813536.json.gz",
+    "titan-813536.json.gz",
+    "nowscore-847050.json.gz",
+    "titan-847050.json.gz"
+  ],
+  "rules": "approved-130511-v1.json"
+}

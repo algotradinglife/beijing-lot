@@ -1,6 +1,6 @@
 """One-issue offline field integration; diagnostic observations, never model input admission."""
 import copy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
 import json
@@ -9,6 +9,8 @@ from urllib.parse import urlparse, parse_qs
 from zoneinfo import ZoneInfo
 
 from src.fundamentals_census import plain_text
+from src.temporal_learning import Cutoff
+from src.temporal_learning.roster_clock import roster_clock_alignment
 
 SOURCE_POLICY = 'TITAN_PRIMARY_NOWSCORE_FILL_CROSSCHECK_NONVETO'
 
@@ -134,12 +136,12 @@ def history_observations(raw, *, issue, slot, source, provider_id, body_sha256, 
     return result
 
 
-def pilot_tables(report, *, cutoffs, adjudications=None):
+def pilot_tables(report, *, cutoffs, adjudications=None, source_substitutions=None, repository_root=None):
     """Build aligned source fixtures, long histories and Titan-first diagnostic tables.
 
     cutoffs maps every slot string to an explicit timezone-aware decision time.
-    Identity requires native team IDs and kickoff agreement with native roster
-    clock after deadline. Name aliases alone do not block matched native IDs.
+    Identity requires native match/team IDs and shared roster-date alignment;
+    minute differences alone do not invalidate an otherwise aligned fixture. Name aliases alone do not block matched native IDs.
     Unavailable strict/partial identity prevents integration of that source.
     Optional identity-bound owner decisions may accept an exact Titan kickoff;
     native team IDs and deadline/day checks still apply. No historical admission.
@@ -159,6 +161,13 @@ def pilot_tables(report, *, cutoffs, adjudications=None):
         if cutoff > deadline:
             raise ValueError('Cutoff exceeds declared lottery deadline')
         deadlines[slot] = (cutoff.astimezone(ZoneInfo('Asia/Shanghai')), deadline)
+    substitution_slots = set()
+    if source_substitutions:
+        if repository_root is None:
+            raise ValueError("Substitution requires explicit repository root")
+        from src.fundamentals_analysis_identity import validate_analysis_substitutions
+        substitution_slots = validate_analysis_substitutions(report, source_substitutions,
+            cutoffs=cutoffs, repository_root=repository_root)
     source_rows = []; categories = {}; histories = []; source_exclusions = []
     for obs, fields in zip(report['observations'], report['page_fields'], strict=True):
         if any(obs[k] != fields[k] for k in ('issue', 'slot', 'source')):
@@ -185,10 +194,13 @@ def pilot_tables(report, *, cutoffs, adjudications=None):
         accepted = decisions.get(obs['slot'], {}).get('titan_kickoff_utc')
         accepted_time = (obs['source']=='titan' and accepted is not None and kickoff is not None and
                          kickoff == datetime.fromisoformat(accepted))
-        identity = (obs.get('home_id') == fixture['home_id'] and obs.get('away_id') == fixture['away_id'] and
-            kickoff is not None and
-            (kickoff.astimezone(ZoneInfo('Asia/Shanghai')).strftime('%H:%M') == fixture['clock'] or accepted_time) and
-            deadline <= kickoff < deadline + timedelta(days=1))
+        clock_alignment = (roster_clock_alignment(
+            fixture, {obs['source']: obs['kickoff_utc']},
+            cutoff=Cutoff.decision_epoch(fixture['issue'], cutoffs[str(obs['slot'])]),
+            timezone='Asia/Shanghai', midnight_hours=12) if kickoff is not None else None)
+        identity = (obs.get('provider_id') == fixture['provider_id'] and
+            obs.get('home_id') == fixture['home_id'] and obs.get('away_id') == fixture['away_id'] and
+            clock_alignment is not None and clock_alignment['status'] == 'ALIGNED')
         weather_error = None
         try:
             weather = weather_context(raw.get('page_text', ''))
@@ -199,7 +211,7 @@ def pilot_tables(report, *, cutoffs, adjudications=None):
                 reason='INVALID_SOURCE_WEATHER',error=weather_error,raw_sha256=obs.get('raw_sha256')))
         row.update(context); row.update(weather)
         row.update(weather_parse_error=weather_error,competition_parse_error=context_error)
-        row.update(identity_valid=bool(identity), approved_kickoff_used=bool(accepted_time), cutoff_utc=cutoff.isoformat(),
+        row.update(clock_alignment=clock_alignment, identity_valid=bool(identity), approved_kickoff_used=bool(accepted_time), cutoff_utc=cutoff.isoformat(),
             neutral_venue=True if re.search(r'中立场|中立場', raw.get('page_text', '')[:1000]) else None,
             historical_admission=False)
         source_rows.append(row)
@@ -216,9 +228,21 @@ def pilot_tables(report, *, cutoffs, adjudications=None):
                        'temperature_min_c', 'temperature_max_c', 'neutral_venue')
     for slot, fixture in fixtures.items():
         pair = {s: by_key[slot, s] for s in ('titan', 'nowscore')}
+        if slot in substitution_slots and (pair['titan']['identity_valid'] or not pair['nowscore']['identity_valid']):
+            raise ValueError("Substitution requires rejected Titan and valid Nowscore identity/date")
+        if slot in substitution_slots:
+            source_exclusions.append(dict(slot=slot, source='titan', field='identity',
+                reason='INDEPENDENTLY_VERIFIED_NOWSCORE_SUBSTITUTION', raw_sha256=pair['titan']['raw_sha256']))
+        titan_unavailable = (
+            (pair['titan']['raw_sha256'] is None or pair['titan']['parse_state'] in {'PARSE_FAILURE', 'HTTP_FAILURE', 'NOT_CAPTURED'})
+            and all(pair['titan'][key] is None for key in ('home_id', 'away_id', 'kickoff_utc')))
         for source in pair:
             pair[source]['integration_eligible'] = pair[source]['identity_valid'] and (
-                source == 'titan' or pair['titan']['identity_valid'] or pair['titan']['raw_sha256'] is None)
+                source == 'titan' or pair['titan']['identity_valid'] or titan_unavailable or slot in substitution_slots)
+        if titan_unavailable and pair['nowscore']['integration_eligible']:
+            source_exclusions.append(dict(slot=slot, source='titan', field='identity',
+                reason='UNAVAILABLE_PRIMARY_NOWSCORE_FILL_NOT_INDEPENDENTLY_VERIFIED',
+                raw_sha256=pair['titan']['raw_sha256']))
         chosen = pair['titan'] if pair['titan']['integration_eligible'] else pair['nowscore'] if pair['nowscore']['integration_eligible'] else None
         row = dict(issue=report['issue'], slot=slot, provider_id=fixture['provider_id'],
             home=chosen['home'] if chosen else None, away=chosen['away'] if chosen else None,

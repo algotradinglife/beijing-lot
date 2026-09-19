@@ -1,0 +1,83 @@
+---
+title: "盘口清洗第二批：110509–110717"
+format:
+  html:
+    toc: true
+execute:
+  echo: true
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  batch_dir: "data/derived/fundamentals_411/market-only-batch-0002"
+  summary_sha256: "c9708ab193a1dc5697c1d2f77f5301fdd636814f089da9a718df74f836b306e8"
+---
+
+本报告仅处理盘口，Titan 为主源。原始响应不覆盖，异常保留原值和原因。
+所有时间可用性为历史代理证据，`historical_admission = FALSE`。
+本批 50 期、3,138 场、6,276 条场次市场记录已完成清洗：6,221 条有可保留报价，46 条属于原始非完场比赛，9 条无赛前报价。身份和日期异常已落实 79 条裁决，11 个低欧赔页面已由 Nowscore 同场脚本核对；超时补采和空表解析已处理。与上一批合并为 100 期、13,444 条场次市场记录。无报价与非完场记录保留状态，不填造赔率。
+
+```{r}
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+source(file.path(root, "r/fundamentals_scope_market.R"))
+study <- file.path(root, params$batch_dir, "final-audit")
+audit <- read_scope_market_audit(
+  study = study, repository_root = root, implementation_root = root,
+  scope_path = file.path(root, params$batch_dir, "inputs-v6/scope.json"),
+  expected_sha256 = params$summary_sha256
+)
+```
+
+## 逐期盘口可用情况
+
+```{r}
+audit$availability
+```
+
+## 数据结构和示例
+
+每行表示一期内一场比赛的一个市场（欧赔或大小球）。这是审核状态表；
+各公司的原始报价、时间筛选结果保存在对应期次的 JSON 中。
+
+```{r}
+dplyr::glimpse(audit$rows)
+head(audit$rows, 10)
+```
+
+## 状态统计
+
+```{r}
+audit$by_issue
+```
+
+
+## 已落实的身份裁决
+
+以下裁决只适用于指定期、场次和市场。主客反向时欧赔胜负互换，大小球报价不变；
+球队 ID 冲突只作单场身份放行，不建立全局球队别名。原始身份和截止时间保留。
+
+```{r}
+decisions <- jsonlite::read_json(
+  file.path(root, params$batch_dir, "inputs-v6/decisions.json"),
+  simplifyVector = TRUE
+)
+tibble::as_tibble(decisions) |>
+  dplyr::select(issue, slot, market, provider_id, action, adjudication_id) |>
+  head(12)
+```
+
+## 保留报价的结构与示例
+
+每行对应一期一场的一个市场，公司报价保存在 `quotes` 列中。欧赔是十进制赔率，
+大小球盘口以进球数计，大/小水位沿用来源口径。
+
+```{r}
+source(file.path(root, "r/market_cleaning_quotes.R"))
+quote_examples <- read_market_quote_examples(study, params$summary_sha256)
+dplyr::glimpse(quote_examples)
+quote_examples
+if (nrow(quote_examples)) {
+  tibble::as_tibble(dplyr::bind_rows(quote_examples$quotes[[1]])) |> head(6)
+}
+```

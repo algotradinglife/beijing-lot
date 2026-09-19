@@ -1,0 +1,267 @@
+{
+  "issue": "100101",
+  "competition": "英足总杯",
+  "mapping_basis": "Explicit team-name aliases, home-away orientation and fixture kickoff; no scores used",
+  "rows": [
+    {
+      "slot": 3,
+      "provider_id": "356276",
+      "roster_home": "热刺",
+      "roster_away": "皮特堡",
+      "market_id": "278181",
+      "market_home": "热刺",
+      "market_away": "彼得堡联",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 5,
+      "provider_id": "356278",
+      "roster_home": "米德尔",
+      "roster_away": "曼城",
+      "market_id": "278183",
+      "market_home": "米德尔斯堡",
+      "market_away": "曼城",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 7,
+      "provider_id": "356280",
+      "roster_home": "哈德斯",
+      "roster_away": "西布朗维",
+      "market_id": "278185",
+      "market_home": "哈德斯菲尔德",
+      "market_away": "西布罗姆维奇",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 8,
+      "provider_id": "356281",
+      "roster_home": "米尔顿",
+      "roster_away": "伯恩利",
+      "market_id": "278186",
+      "market_home": "米尔顿凯恩斯",
+      "market_away": "伯恩利",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 9,
+      "provider_id": "356282",
+      "roster_home": "诺丁汉",
+      "roster_away": "伯明翰",
+      "market_id": "278187",
+      "market_home": "诺丁汉森林",
+      "market_away": "伯明翰",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 10,
+      "provider_id": "356283",
+      "roster_home": "普雷斯",
+      "roster_away": "科切斯",
+      "market_id": "278188",
+      "market_home": "普雷斯顿",
+      "market_away": "科尔切斯特联",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 11,
+      "provider_id": "356284",
+      "roster_home": "维拉",
+      "roster_away": "布莱克",
+      "market_id": "278189",
+      "market_home": "阿斯顿维拉",
+      "market_away": "布莱克本",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 12,
+      "provider_id": "356285",
+      "roster_home": "朴茨茅",
+      "roster_away": "考文垂",
+      "market_id": "278190",
+      "market_home": "朴茨茅斯",
+      "market_away": "考文垂",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 13,
+      "provider_id": "356286",
+      "roster_home": "桑德兰",
+      "roster_away": "巴洛",
+      "market_id": "278191",
+      "market_home": "桑德兰",
+      "market_away": "巴罗",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 14,
+      "provider_id": "356287",
+      "roster_home": "维冈",
+      "roster_away": "赫尔城",
+      "market_id": "278192",
+      "market_home": "维冈竞技",
+      "market_away": "赫尔城",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 15,
+      "provider_id": "356288",
+      "roster_home": "埃弗顿",
+      "roster_away": "卡利斯",
+      "market_id": "278193",
+      "market_home": "埃弗顿",
+      "market_away": "卡莱尔联",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 16,
+      "provider_id": "356289",
+      "roster_home": "谢周三",
+      "roster_away": "水晶宫",
+      "market_id": "278194",
+      "market_home": "谢周三",
+      "market_away": "水晶宫",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 17,
+      "provider_id": "356291",
+      "roster_home": "布莱普",
+      "roster_away": "伊普斯",
+      "market_id": "278196",
+      "market_home": "布莱克浦",
+      "market_away": "伊普斯维奇",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 18,
+      "provider_id": "356292",
+      "roster_home": "富勒姆",
+      "roster_away": "斯文登",
+      "market_id": "278197",
+      "market_home": "富勒姆",
+      "market_away": "斯文登",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 20,
+      "provider_id": "356293",
+      "roster_home": "斯坎索",
+      "roster_away": "巴恩斯",
+      "market_id": "278198",
+      "market_home": "斯坎索普联",
+      "market_away": "巴恩斯利",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 21,
+      "provider_id": "356294",
+      "roster_home": "南安普",
+      "roster_away": "卢顿",
+      "market_id": "278199",
+      "market_home": "南安普顿",
+      "market_away": "卢顿",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 22,
+      "provider_id": "356295",
+      "roster_home": "米尔沃",
+      "roster_away": "德比郡",
+      "market_id": "278200",
+      "market_home": "米尔沃尔",
+      "market_away": "德比郡",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 23,
+      "provider_id": "356296",
+      "roster_home": "普利茅",
+      "roster_away": "纽卡斯",
+      "market_id": "278201",
+      "market_home": "普利茅斯",
+      "market_away": "纽卡斯尔联",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 24,
+      "provider_id": "356297",
+      "roster_home": "莱切斯",
+      "roster_away": "斯旺西",
+      "market_id": "278202",
+      "market_home": "莱斯特城",
+      "market_away": "斯旺西",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 25,
+      "provider_id": "356298",
+      "roster_home": "博尔顿",
+      "roster_away": "林肯城",
+      "market_id": "278203",
+      "market_home": "博尔顿",
+      "market_away": "林肯城",
+      "market_kickoff": "2010-01-02 23:00"
+    },
+    {
+      "slot": 50,
+      "provider_id": "356300",
+      "roster_home": "雷丁",
+      "roster_away": "利物浦",
+      "market_id": "278205",
+      "market_home": "雷丁",
+      "market_away": "利物浦",
+      "market_kickoff": "2010-01-03 01:15"
+    },
+    {
+      "slot": 56,
+      "provider_id": "356301",
+      "roster_home": "曼联",
+      "roster_away": "利兹联",
+      "market_id": "278206",
+      "market_home": "曼联",
+      "market_away": "利兹联",
+      "market_kickoff": "2010-01-03 21:00"
+    },
+    {
+      "slot": 58,
+      "provider_id": "356303",
+      "roster_home": "谢菲尔",
+      "roster_away": "巡游者",
+      "market_id": "278208",
+      "market_home": "谢菲联",
+      "market_away": "女王公园",
+      "market_kickoff": "2010-01-03 23:00"
+    },
+    {
+      "slot": 59,
+      "provider_id": "356304",
+      "roster_home": "切尔西",
+      "roster_away": "沃特福",
+      "market_id": "278209",
+      "market_home": "切尔西",
+      "market_away": "沃特福德",
+      "market_kickoff": "2010-01-03 23:00"
+    },
+    {
+      "slot": 73,
+      "provider_id": "356305",
+      "roster_home": "西汉姆",
+      "roster_away": "阿森纳",
+      "market_id": "278210",
+      "market_home": "西汉姆联",
+      "market_away": "阿森纳",
+      "market_kickoff": "2010-01-04 00:15"
+    },
+    {
+      "slot": 75,
+      "provider_id": "356290",
+      "roster_home": "特兰米",
+      "roster_away": "狼队",
+      "market_id": "278195",
+      "market_home": "特兰米尔流浪",
+      "market_away": "狼队",
+      "market_kickoff": "2010-01-04 02:15"
+    }
+  ]
+}

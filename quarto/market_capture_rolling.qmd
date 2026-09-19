@@ -1,0 +1,24 @@
+---
+title: "盘口采集滚动补位升级"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  data_root: ""
+---
+
+采集使用固定 5 个并发任务，任意任务完成后立即补入下一任务；不再等待整组任务完成。
+保持现有共享 1 秒限速、原请求预算、两次尝试上限和熔断恢复规则。
+同一期内滚动调度；期次完成后仍核验并发布整期凭证。
+
+```{r}
+stopifnot(nzchar(params$data_root))
+receipt <- jsonlite::fromJSON(file.path(params$data_root, "audits/market-rolling-acceptance.json"))
+knitr::kable(tibble::as_tibble(receipt$checks))
+knitr::kable(tibble::as_tibble(receipt$live))
+```
+
+离线回归故意阻塞第一个请求，验证第六个请求在它完成前启动。
+这证明消除了批次等待，不代表已量化线上速度提升。

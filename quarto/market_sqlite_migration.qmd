@@ -1,0 +1,102 @@
+---
+title: "盘口 SQLite 迁移验收"
+format: html
+execute:
+  error: false
+  cache: false
+  freeze: false
+params:
+  repository_root: null
+  database: null
+  issue: "101121"
+  batch_id: null
+  python: null
+---
+
+本报告只核查存储迁移，不提升历史数据的可用性等级。入库不等于完成验收或允许删除原始文件；异常记录、来源链接和原始字段长期保留。
+
+```{r}
+#| label: declared-inputs
+stopifnot(
+  is.character(params$repository_root), dir.exists(params$repository_root),
+  is.character(params$database), file.exists(params$database),
+  is.character(params$python), file.exists(params$python),
+  is.character(params$batch_id), length(params$batch_id) == 1L
+)
+reticulate::use_python(params$python, required = TRUE)
+market_query <- reticulate::import_from_path(
+  "src.market_sqlite_query", path = params$repository_root, convert = TRUE
+)
+records <- market_query$query_market_records(params$database, issue = params$issue)
+if (length(records) == 0L) stop("指定期次尚未入库，不能生成验收结果")
+if (!all(purrr::map_chr(records, "batch_id") == params$batch_id)) {
+  stop("所选期次不属于指定迁移批次")
+}
+source(file.path(params$repository_root, "r", "market_sqlite_report.R"))
+record_table <- market_sqlite_record_table(records)
+```
+
+## 输入与迁移状态
+
+```{r}
+tibble::tibble(database = params$database, issue = params$issue)
+dplyr::count(record_table, kind, import_state, name = "records")
+```
+
+`IMPORTED_PENDING_ACCEPTANCE` 表示尚未完成读取切换、独立审核及清退验收，不应解释为允许删除文件。
+
+## 全批次记录数量
+
+下面逐期列出本批 50 期的记录数量；数量汇总不能替代逐记录核验。
+
+```{r}
+batch_counts <- market_query$query_market_batch_counts(
+  params$database, batch_id = params$batch_id
+)
+knitr::kable(dplyr::bind_rows(batch_counts))
+```
+
+## 结构与示例
+
+```{r}
+str(record_table)
+head(record_table, 6)
+```
+
+## 异常记录
+
+以下保留来源核对信息；没有异常行仅表示本次查询没有返回异常，不证明全部盘口完整。
+
+```{r}
+anomalies <- market_query$query_market_records(
+  params$database, issue = params$issue, kind = "anomaly"
+)
+length(anomalies)
+head(anomalies, 3)
+```
+
+## 报价字段与来源
+
+下面展示所选期次的报价字段、来源 URL、原始响应哈希和记录标识。报价保留原始顺序字段；不会把数据库键的排序当成报价时间顺序。
+
+```{r}
+quotes <- market_query$query_market_records(
+  params$database, issue = params$issue, kind = "quote"
+)
+length(quotes)
+str(head(quotes, 2))
+head(quotes, 3)
+```
+
+## 清洗裁决与异常台账留存
+
+完整台账按原验收批次保留，可能包含当前迁移范围以外的关联记录。
+以下查询要求台账已经入库；缺少台账会使报告执行失败，不以空表表示“没有异常”。
+
+```{r}
+audit_evidence <- market_query$query_market_audit_evidence(
+  params$database, batch_id = params$batch_id
+)
+length(audit_evidence)
+str(audit_evidence, max.level = 2)
+```

@@ -12,17 +12,16 @@ import json
 import math
 import os
 import re
-import shutil
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from datetime import datetime, timezone
 from pathlib import Path
 
-import requests
 
 from src.fundamentals_bulk_capture import atomic_json, historical_pages, load_inventory
 from src.fundamentals_census import read_response
-from src.fundamentals_capture import TRANSIENT_STATUSES
-from src.fundamentals_history_capture import capture_history_batch
+from src.market_capture_workers import capture_market_key
 from src.temporal_learning.provenance import implementation_closure
 
 
@@ -61,6 +60,22 @@ def verify_market_receipt(path, expected_key, expected_sha256):
     elif not receipt['error']:
         raise ValueError('empty transport error')
     return receipt
+
+
+def verify_selected_market_receipt(selected, expected_key):
+    """Verify an explicitly selected raw or accepted SQLite capture reference.
+
+    Storage choice is declared in the index, never inferred from missing files.
+    SQLite returns metadata only; downstream parsing requires structured inputs.
+    """
+    if 'storage' not in selected:
+        return verify_market_receipt(selected['path'],expected_key,selected['sha256'])
+    from src.market_sqlite_capture import read_market_storage_receipt
+    reference=selected['storage']
+    url=reference['source_url']
+    if market_key(url)!=expected_key:
+        raise ValueError('stored market receipt identity mismatch')
+    return read_market_storage_receipt(reference,expected_sha256=selected['sha256'],expected_url=url)
 
 
 def index_market_captures(manifest_paths):
@@ -109,17 +124,32 @@ def issue_market_scope(entry, roster_root, cutoff):
         if item.get('processing_complete'):
             return {'issue': entry['issue'], 'state': 'ROSTER_UNAVAILABLE', 'error': item.get('roster_error'), 'fixtures': []}
         return None
+    correction_receipt = None
     try:
         meta, raw = read_response(Path(path))
         if meta['url'] != entry['roster_url'] or meta['status'] != 200:
             raise ValueError('roster transport mismatch')
+        if item.get('roster_name_correction'):
+            from src.market_roster_correction import correct_roster_names
+            correction_ref = item['roster_name_correction']
+            correction_bytes = Path(correction_ref['path']).read_bytes()
+            if hashlib.sha256(correction_bytes).hexdigest() != correction_ref['sha256']:
+                raise ValueError('roster correction hash mismatch')
+            correction = json.loads(correction_bytes)
+            if hashlib.sha256(raw).hexdigest() != correction['source_sha256']:
+                raise ValueError('roster correction source mismatch')
+            evidence = {e['sha256']: Path(e['path']).read_bytes() for e in correction['evidence']}
+            raw, correction_receipt = correct_roster_names(raw, issue=entry['issue'],
+                corrections=correction['corrections'], evidence=evidence)
         fixtures, gaps, quarantined = historical_pages(
             raw, roster_url=entry['roster_url'], issue=entry['issue'], cutoff=cutoff,
             allow_repeated_provider_ids=True, allow_same_team_identity=True,
             quarantine_unavailable=True, include_quarantined=True)
-    except (ValueError, TypeError) as exc:
+    except (ValueError, TypeError, KeyError, OSError) as exc:
         return {'issue': entry['issue'], 'state': 'ROSTER_INVALID', 'error': str(exc), 'fixtures': [], 'roster_path': path}
     return {'issue': entry['issue'], 'state': 'SCOPED', 'fixtures': fixtures, 'slot_gaps': gaps,
+            'roster_name_correction': item.get('roster_name_correction'),
+            'roster_name_correction_receipt': correction_receipt,
             'quarantined_slots': quarantined,
             'roster_path': path, 'roster_sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
@@ -144,7 +174,7 @@ def verify_reused_scope(scope, cache):
             selected = cache.get(key, {}).get('selected')
             if not selected:
                 raise ValueError('reused market response missing: ' + key)
-            verify_market_receipt(selected['path'], key, selected['sha256'])
+            verify_selected_market_receipt(selected, key)
             rows.append({'issue': scope['issue'], 'slot': fixture['slot'],
                          'provider_id': provider_id, 'market': market, **selected})
     return rows
@@ -165,6 +195,22 @@ def _capture_manifests(output):
     return sorted(paths, key=received_at)
 
 
+def record_circuit_response(state, identity, status):
+    """Record the actual first blocking triple and every later in-flight event.
+
+    Shared by live callbacks and crash reconciliation. Mutates only supplied
+    checkpoint; response identities bind raw manifests, not inferred journal tails.
+    """
+    was_open = bool(state.get('circuit_tripped'))
+    state['blocked_streak'] = state.get('blocked_streak', 0) + 1 if status in (403, 429) else 0
+    state['blocked_events'] = state.get('blocked_events', []) + [identity] if status in (403, 429) else []
+    if was_open:
+        state.setdefault('circuit_events', []).append(identity)
+    elif state['blocked_streak'] >= 3:
+        state['circuit_tripped'] = True
+        state['circuit_events'] = list(state['blocked_events'])
+
+
 def _reconcile_uncheckpointed_attempts(state, output):
     """Account exactly once for manifests committed before a progress checkpoint."""
     manifests = _capture_manifests(output)
@@ -174,6 +220,17 @@ def _reconcile_uncheckpointed_attempts(state, output):
         state['accounted_manifests'] = [_capture_manifest_identity(path) for path in manifests]
         return
     accounted = set(accounted)
+    journal = Path(output) / 'attempt-events.jsonl'
+    if journal.exists():
+        identities = [json.loads(line)['manifest_identity'] for line in journal.read_text().splitlines()]
+        if len(set(identities)) != len(identities):
+            raise ValueError('duplicate attempt journal event')
+        by_identity = {_capture_manifest_identity(path): path for path in manifests}
+        if set(identities) - by_identity.keys():
+            raise ValueError('attempt journal source missing or changed')
+        recorded = set(identities)
+        manifests = [by_identity[identity] for identity in identities] + [
+            path for identity, path in by_identity.items() if identity not in recorded]
     for path in manifests:
         identity = _capture_manifest_identity(path)
         if identity in accounted:
@@ -181,8 +238,7 @@ def _reconcile_uncheckpointed_attempts(state, output):
         indexed = index_market_captures([path])
         chosen = next(iter(indexed.values()))['selected']
         state['new_responses'] = state.get('new_responses', 0) + 1
-        state['blocked_streak'] = (state.get('blocked_streak', 0) + 1
-                                   if chosen['status'] in (403, 429) else 0)
+        record_circuit_response(state, identity, chosen['status'])
         accounted.add(identity)
     state['accounted_manifests'] = sorted(accounted)
 
@@ -219,19 +275,25 @@ def plan_market_history(manifest_path, roster_root, existing_index):
 
 def run_market_history(plan_path, index_path, output_dir, *, ledger_path, budget_id,
                        request_budget, min_free_bytes, min_interval_seconds=5.0, fetch=None, sleeper=time.sleep,
-                       disk_free=None, wall_clock=None):
+                       disk_free=None, wall_clock=None, workers=1):
     """Run fixed issue batches with shared ledger, two bounded attempts and resume.
 
     Status/attempt checkpoints are atomic; raw output is immutable. Return on
     disk/budget/circuit pause; wait for live upstream or shared-lock availability.
     No subprocess or daemon is created by this function. Caller owns lifecycle.
     """
+    if type(workers) is not int or not 1 <= workers <= 5:
+        raise ValueError('workers must be between one and five')
     if type(min_interval_seconds) not in (int, float) or not math.isfinite(min_interval_seconds) or min_interval_seconds < 1:
         raise ValueError("invalid minimum interval")
     if type(min_free_bytes) is not int or min_free_bytes < 0:
         raise ValueError('invalid disk floor')
     plan_bytes, index_bytes = Path(plan_path).read_bytes(), Path(index_path).read_bytes()
     plan, cache = json.loads(plan_bytes), json.loads(index_bytes)
+    inherited = plan.get('inherited_request_policy')
+    if inherited is not None and inherited != dict(ledger_path=str(Path(ledger_path).resolve()),
+            budget_id=budget_id, request_budget=request_budget, min_interval_seconds=min_interval_seconds):
+        raise ValueError('inherited request policy changed')
     inventory, cutoff, digest = load_inventory(plan['inventory_path'])
     if digest != plan['inventory_sha256']:
         raise ValueError('inventory changed')
@@ -249,7 +311,7 @@ def run_market_history(plan_path, index_path, output_dir, *, ledger_path, budget
     policy = {'plan_sha256': hashlib.sha256(plan_bytes).hexdigest(), 'index_sha256': hashlib.sha256(index_bytes).hexdigest(),
               'ledger_path': str(Path(ledger_path).resolve()), 'budget_id': budget_id,
               'request_budget': request_budget, 'min_free_bytes': min_free_bytes,
-              'min_interval_seconds': min_interval_seconds,
+              'min_interval_seconds': min_interval_seconds, 'workers': workers,
               'implementation_hashes': implementation_closure(Path(__file__).resolve().parents[1],
                   ('src.fundamentals_market_history', 'src.fundamentals_history_capture'))['files']}
     with (output / 'worker.lock').open('a+b') as lock:
@@ -262,16 +324,18 @@ def run_market_history(plan_path, index_path, output_dir, *, ledger_path, budget
         progress_path = output / 'progress.json'
         state = json.loads(progress_path.read_text()) if progress_path.exists() else {
             'schema': 'bj411_market_history_progress_v1', 'completed_batches': [], 'completed_issues': 0,
-            'new_responses': 0, 'blocked_streak': 0, 'accounted_manifests': []}
+            'new_responses': 0, 'blocked_streak': plan.get('inherited_blocked_streak', 0), 'accounted_manifests': []}
         _reconcile_uncheckpointed_attempts(state, output)
+        if state.get('circuit_tripped') or state.get('state') == 'CIRCUIT_OPEN':
+            state['state'] = 'CIRCUIT_OPEN'
+            atomic_json(progress_path, state)
+            return state
         state.update(state='RUNNING', pid=os.getpid(), updated_at_utc=datetime.now(timezone.utc).isoformat())
         atomic_json(progress_path, state)
         if state['blocked_streak'] >= 3:
             state['state'] = 'CIRCUIT_OPEN'
             atomic_json(progress_path, state)
             return state
-        session = requests.Session()
-        session.headers.update({'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'identity', 'X-Return-Format': 'html'})
         try:
             reused_dir = output / 'reused-issues'
             for reused_scope in plan['reused_issues']:
@@ -299,70 +363,71 @@ def run_market_history(plan_path, index_path, output_dir, *, ledger_path, budget
                         scope = issue_market_scope(entry, plan['roster_root'], cutoff)
                     if not scope_path.exists():
                         atomic_json(scope_path, scope)
+                    keys = list(dict.fromkeys(market + ':' + fixture['provider_id']
+                        for fixture in scope['fixtures'] for market in ('euro', 'total')))
+                    pending = [key for key in keys if key not in cache]
+                    stop_event = threading.Event()
+                    checkpoint_lock = threading.Lock()
+                    def record_attempt(key, manifest, chosen):
+                        # One coordinator serializes all checkpoint mutations.
+                        with checkpoint_lock:
+                            identity = _capture_manifest_identity(manifest)
+                            # Durable callback order precedes evaluating the circuit.
+                            with (output/'attempt-events.jsonl').open('a') as journal:
+                                journal.write(json.dumps({'manifest_identity': identity}) + '\n')
+                                journal.flush()
+                                os.fsync(journal.fileno())
+                            state['new_responses'] += 1
+                            record_circuit_response(state, identity, chosen['status'])
+                            state.setdefault('accounted_manifests', []).append(identity)
+                            if state.get('circuit_tripped'):
+                                stop_event.set()
+                            state.update(active_key=key, updated_at_utc=datetime.now(timezone.utc).isoformat())
+                            if state.get('circuit_tripped'):
+                                state['state'] = 'CIRCUIT_OPEN'
+                            atomic_json(progress_path, state)
+                    remaining = iter(pending)
+                    stop = None
+                    with ThreadPoolExecutor(max_workers=workers) as executor:
+                        futures = {}
+                        try:
+                            while True:
+                                while len(futures) < workers and not stop and not stop_event.is_set():
+                                    key = next(remaining, None)
+                                    if key is None:
+                                        break
+                                    future = executor.submit(capture_market_key, key, output,
+                                        ledger_path=ledger_path, budget_id=budget_id, request_budget=request_budget,
+                                        min_free_bytes=min_free_bytes, min_interval_seconds=min_interval_seconds,
+                                        sleeper=sleeper, wall_clock=wall_clock, fetch=fetch, disk_free=disk_free,
+                                        stop_event=stop_event, on_attempt=record_attempt)
+                                    futures[future] = key
+                                if not futures:
+                                    break
+                                done, _ = wait(futures, return_when=FIRST_COMPLETED)
+                                for future in done:
+                                    key = futures.pop(future)
+                                    result = future.result()
+                                    if result['indexed'] is not None:
+                                        cache[key] = result['indexed']
+                                    stop = stop or result['stop']
+                                if stop:
+                                    stop_event.set()
+                        except BaseException:
+                            stop_event.set()
+                            raise
+                    if state.get('circuit_tripped'):
+                        stop = 'CIRCUIT_OPEN'
+                    if stop:
+                        state['state'] = stop
+                        atomic_json(progress_path, state)
+                        return state
                     rows = []
                     for fixture in scope['fixtures']:
                         for market in ('euro', 'total'):
                             key = market + ':' + fixture['provider_id']
-                            state.update(state='RUNNING', active_key=key)
-                            document = market_document(key)
-                            key_dir = output / 'responses' / key.replace(':', '-')
-                            for attempt in range(1, 3):
-                                if key in cache:
-                                    break
-                                directory = key_dir / f'attempt-{attempt:02d}'
-                                manifest = directory / 'capture-manifest.json'
-                                newly_captured = False
-                                reservation = key_dir / f'attempt-{attempt:02d}.json'
-                                if reservation.exists() and not manifest.exists():
-                                    interrupted = {'path': str(reservation), 'sha256': hashlib.sha256(reservation.read_bytes()).hexdigest(),
-                                                   'state': 'INTERRUPTED', 'status': None, 'received_at_utc': json.loads(reservation.read_text())['received_at_utc']}
-                                    if attempt == 2:
-                                        cache[key] = {'attempts': [interrupted], 'selected': interrupted}
-                                    continue
-                                if not manifest.exists():
-                                    if (disk_free(output) if disk_free else shutil.disk_usage(output).free) < min_free_bytes:
-                                        state['state'] = 'DISK_SPACE_LOW'
-                                        atomic_json(progress_path, state)
-                                        return state
-                                    while True:
-                                        try:
-                                            # Preserve an interrupted attempt without granting a hidden retry.
-                                            atomic_json(reservation, {'url': document['url'], 'error': 'INTERRUPTED_OR_RESERVED',
-                                                'received_at_utc': datetime.now(timezone.utc).isoformat()})
-                                            capture_history_batch([document], directory, ledger_path=ledger_path,
-                                                budget_id=budget_id, request_budget=request_budget, min_interval_seconds=min_interval_seconds,
-                                                wall_clock=wall_clock, sleeper=sleeper,
-                                                fetch=fetch if fetch is not None else lambda url, **kw: session.get(url, allow_redirects=False, **kw))
-                                            state['new_responses'] += 1
-                                            newly_captured = True
-                                            state['updated_at_utc'] = datetime.now(timezone.utc).isoformat()
-                                            break
-                                        except BlockingIOError:
-                                            reservation.unlink()  # The shared lock rejected before budget/network I/O.
-                                            state['state'] = 'WAITING_SHARED_LEDGER'
-                                            atomic_json(progress_path, state)
-                                            sleeper(5)
-                                        except ValueError as exc:
-                                            if 'budget exhausted' not in str(exc):
-                                                raise
-                                            reservation.unlink()  # No reservation was available in the ledger.
-                                            state['state'] = 'BUDGET_EXHAUSTED'
-                                            atomic_json(progress_path, state)
-                                            return state
-                                indexed = index_market_captures([manifest])[key]
-                                chosen = indexed['selected']
-                                if newly_captured:
-                                    state['blocked_streak'] = state['blocked_streak'] + 1 if chosen['status'] in (403, 429) else 0
-                                    state.setdefault('accounted_manifests', []).append(_capture_manifest_identity(manifest))
-                                atomic_json(progress_path, state)
-                                if state['blocked_streak'] >= 3:
-                                    state['state'] = 'CIRCUIT_OPEN'
-                                    atomic_json(progress_path, state)
-                                    return state
-                                if (chosen['status'] not in TRANSIENT_STATUSES and chosen['state'] != 'TRANSPORT_FAILURE') or attempt == 2:
-                                    cache[key] = indexed
                             selected = cache[key]['selected']
-                            verify_market_receipt(selected['path'], key, selected['sha256'])
+                            verify_selected_market_receipt(selected, key)
                             rows.append({'issue': issue, 'slot': fixture['slot'], 'provider_id': fixture['provider_id'], 'market': market, **selected})
                     receipt = {'issue': issue, 'state': 'CAPTURE_ATTEMPTED' if rows else scope['state'], 'rows': rows,
                                'scope_sha256': hashlib.sha256(scope_path.read_bytes()).hexdigest(), 'acceptance': 'NOT_REVIEWED'}
@@ -393,5 +458,3 @@ def run_market_history(plan_path, index_path, output_dir, *, ledger_path, budget
                          updated_at_utc=datetime.now(timezone.utc).isoformat())
             atomic_json(progress_path, state)
             raise
-        finally:
-            session.close()

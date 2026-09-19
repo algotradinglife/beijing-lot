@@ -1,0 +1,91 @@
+---
+title: "盘口独立场次清单供应"
+format: html
+params:
+  verification_path: "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/market-roster-full-verification.json"
+  progress_path: "/run/media/drwho1985/Sandisk/data/beijing-lot/markets/raw/roster-supply-v1/progress.json"
+  python: "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python"
+  correction_paths:
+    - "/run/media/drwho1985/Sandisk/data/beijing-lot/markets/corrections/roster-20094-506/correction.json"
+    - "/run/media/drwho1985/Sandisk/data/beijing-lot/markets/corrections/roster-21031-204/correction.json"
+    - "/run/media/drwho1985/Sandisk/data/beijing-lot/markets/corrections/roster-22042-349/correction.json"
+    - "/run/media/drwho1985/Sandisk/data/beijing-lot/markets/corrections/roster-24021-289/correction.json"
+---
+
+本流程仅补充冻结盘口计划所需的场次清单，不采集基本面分析页。
+请求共用持久化账本，间隔为 2 秒。原始响应保留，经过期号、URL、响应状态和解析检查后发布清单。
+失败清单不发布为空比赛；单次运行每期最多发起三次请求，限流时停止本轮，后台服务等待 30 分钟再恢复。累计请求预算为 1,956。共享账本锁被其他采集进程占用时，供应进程等待锁交接，不消耗请求次数，也不进入 30 分钟限流等待。
+
+```{r}
+#| error: false
+progress <- jsonlite::read_json(params$progress_path, simplifyVector = TRUE)
+tibble::tibble(
+  状态 = progress$state,
+  当前期次 = progress$active_issue,
+  本轮已发布 = progress$published,
+  已有清单 = progress$existing,
+  更新时间UTC = progress$updated_at_utc
+)
+```
+
+清单成功不等于盘口齐全，也不表示满足赛前可得性要求。
+
+## 冻结计划全量核验
+
+以下凭证覆盖原冻结计划的全部待采期次，逐期检查原始响应、来源身份、哈希和清单解析。它与上面的单轮供应进度分别记录；单轮失败随后经核对修正，不会改写原运行记录。
+
+```{r}
+#| error: false
+verification <- jsonlite::read_json(params$verification_path, simplifyVector = FALSE)
+verified_rows <- dplyr::bind_rows(purrr::map(
+  verification$rows, `[`,
+  c("issue", "status_sha256", "roster_sha256", "fixtures", "quarantined")
+))
+stopifnot(verification$state == "PASS",
+          nrow(verified_rows) == verification$total,
+          length(verification$errors) == 0L,
+          !anyDuplicated(verified_rows$issue))
+tibble::tibble(
+  核验状态 = verification$state,
+  期数 = verification$total,
+  场次数 = sum(verified_rows$fixtures),
+  隔离场次数 = sum(verified_rows$quarantined),
+  错误数 = length(verification$errors),
+  完成时间UTC = verification$completed_at_utc,
+  冻结计划SHA256 = verification$plan_sha256
+)
+dplyr::glimpse(dplyr::select(verified_rows, -dplyr::any_of("correction")))
+head(dplyr::select(verified_rows, -dplyr::any_of("correction")))
+```
+
+## 已核对的名称修正
+
+以下修正只填补原页面中的空球队名称。比赛编号、球队编号、主客方向和日期保持原值。
+凭证绑定原始响应及独立来源证据；这里调用同一修正函数离线重放，不发布清单，也不改写原始响应。
+表格显示修正可以重放，不代表后台进程已经部署或采用修正。
+
+```{r}
+#| error: false
+reticulate::use_python(params$python, required = TRUE)
+reticulate::py_set_attr(reticulate::import_main(), "correction_paths", params$correction_paths)
+reticulate::py_run_string("
+import json, hashlib
+from pathlib import Path
+from src.fundamentals_census import read_response
+from src.market_roster_correction import correct_roster_names
+correction_rows = []
+for correction_path in correction_paths:
+    c = json.loads(Path(correction_path).read_text())
+    source = Path(c['source_path'])
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == c['source_response_sha256']
+    meta, raw = read_response(source)
+    assert hashlib.sha256(raw).hexdigest() == c['source_sha256']
+    evidence = {e['sha256']: Path(e['path']).read_bytes() for e in c['evidence']}
+    derived, receipt = correct_roster_names(raw, issue=c['issue'], corrections=c['corrections'], evidence=evidence)
+    for change in receipt['corrections']:
+        correction_rows.append(dict(issue=c['issue'], slot=change['slot'], provider_id=change['provider_id'], role=change['role'], team_id=change['team_id'], old_name=change['old_name'], new_name=change['new_name'], source_sha256=receipt['source_sha256'], derived_sha256=receipt['derived_sha256']))
+")
+corrections <- dplyr::bind_rows(reticulate::py$correction_rows)
+dplyr::glimpse(corrections)
+head(corrections)
+```

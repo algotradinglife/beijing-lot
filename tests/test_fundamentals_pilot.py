@@ -120,13 +120,13 @@ def test_nowscore_difference_does_not_veto_valid_titan(sample):
     assert not any(r.get('history_id')==history_id for r in output['exclusions'])
 
 
-def test_titan_parser_failure_is_not_treated_as_source_absence(sample):
+def test_titan_parser_failure_allows_flagged_nowscore_supplement(sample):
     report,cutoffs,_=sample
     report['observations'][1].update(parse_state='PARSE_FAILURE',home_id=None,away_id=None,kickoff_utc=None)
     output=pilot_tables(report,cutoffs=cutoffs)
     assert output['source_fixtures'][0]['identity_valid']
-    assert output['integrated_fixtures'][0]['identity_source'] is None
-    assert not output['integrated_history']
+    assert output['integrated_fixtures'][0]['identity_source'] == 'nowscore'
+    assert output['integrated_history']
 
 
 def test_review_regressions_blank_weather_target_id_half_fill_and_receipt(sample):
@@ -231,3 +231,126 @@ def test_ambiguous_nowscore_category_mapping_remains_source_local(sample):
     assert any(e['reason']=='AMBIGUOUS_SOURCE_CATEGORY_MAPPING' and e['source']=='nowscore' for e in result['exclusions'])
     relevant=[h for h in result['source_history'] if h['source']=='nowscore' and h['competition_id']=='162']
     assert relevant and all(h['competition_category']=='UNKNOWN' for h in relevant)
+
+@pytest.mark.parametrize("source", ["nowscore", "titan"])
+@pytest.mark.parametrize("bad_kind", ["same_ids", "short_row", "half_above_full"])
+def test_history_partial_preserves_identity_and_valid_rows(source, bad_kind):
+    import hashlib
+    from src.fundamentals_census import AnalysisFieldError, analysis_record, canonical
+    from src.fundamentals_issue_report import parsed_page_observation
+    index = 20 if source == "nowscore" else 15
+    good = [""] * (index + 1)
+    good[0:4] = ["26-08-01", 36, "联赛", "#000000"]
+    good[4:11] = [1, "甲", 3, "丙", 2, 0, "1-0"]
+    good[index] = 99
+    bad = copy.deepcopy(good)
+    bad[index] = 100
+    if bad_kind == "same_ids":
+        bad[6] = 1
+    elif bad_kind == "short_row":
+        bad = []
+    else:
+        bad[10] = "3-0"
+    embedded = ('<input id="hide_scheduleId" value="123">' if source == "nowscore"
+                else "<script>var scheduleID=123;</script>")
+    raw = (f'<html><meta charset="utf-8"><title>分析</title>{embedded}'
+        '<input id="hide_matchTime" value="2026-09-05 20:00">'
+        '<script>var hometeam="甲";var guestteam="乙";var h2h_home=1;var h2h_away=2;'
+        f'var h_data={canonical([good,bad])};var a_data=[];var v_data=[];</script></html>').encode()
+    original = bytes(raw)
+    with pytest.raises(AnalysisFieldError) as caught:
+        analysis_record(raw, source=source, provider_id="123")
+    assert caught.value.field == "history"
+    assert caught.value.partial_record["home_id"] == "1"
+    assert caught.value.partial_record["history"] is None
+    assert caught.value.partial_record["blocks"]["h_data"] == [good,bad]
+    fixture = dict(issue="260901", slot=1, provider_id="123", home_id="1", away_id="2",
+        clock="20:00", deadline_text="截止时间：2026-09-05 19:30")
+    observations=[]; fields=[]
+    for selected in ("nowscore","titan"):
+        url = (f"https://live.nowscore.com/analysis/123cn.html" if selected=="nowscore"
+               else "https://zq.titan007.com/analysis/123cn.htm")
+        obs = dict(issue="260901",slot=1,provider_id="123",source=selected,url=url,raw_sha256=None,
+            parse_state="NOT_ATTEMPTED",home=None,away=None,home_id=None,away_id=None,kickoff_utc=None)
+        field=dict(issue="260901",slot=1,source=selected,raw_fields=None)
+        if selected == source:
+            parsed=parsed_page_observation(raw,source=source,provider_id="123",url=url)
+            obs.update(parsed["row"]);obs["raw_sha256"]=hashlib.sha256(raw).hexdigest()
+            field.update(parsed["fields"])
+            assert obs["parse_state"]=="PARTIAL_FIELD_FAILURE"
+        observations.append(obs);fields.append(field)
+    report=dict(issue="260901",fixtures=[fixture],observations=observations,page_fields=fields,
+        input_file_hashes={},implementation_hashes={},runtime={})
+    result=pilot_tables(report,cutoffs={"1":"2026-09-05T19:30:00+08:00"})
+    assert next(r for r in result["source_fixtures"] if r["source"]==source)["identity_valid"]
+    selected={r["history_id"]:r for r in result["integrated_history"]}
+    assert selected["99"]["home_goals"]==2
+    if bad_kind=="half_above_full":
+        assert selected["100"]["home_goals"]==2
+        assert selected["100"]["halftime_home_goals"] is None
+    else:
+        assert "100" not in selected
+        assert any(not r["valid"] for r in result["source_history"])
+    assert raw==original
+
+
+def test_shared_roster_clock_allows_minutes_but_rejects_day_or_identity(sample):
+    from datetime import timedelta
+    report,cutoffs,_=sample
+    original=copy.deepcopy(report)
+    base=datetime.fromisoformat(report["observations"][0]["kickoff_utc"])
+    for changes, expected in (
+        ({"kickoff_utc":(base+timedelta(minutes=5)).isoformat()},True),
+        ({"kickoff_utc":(base+timedelta(days=1)).isoformat()},False),
+        ({"home_id":"999"},False),
+        ({"provider_id":"999"},False),
+    ):
+        changed=copy.deepcopy(report)
+        changed["observations"][0].update(changes)
+        result=pilot_tables(changed,cutoffs=cutoffs)
+        assert result["source_fixtures"][0]["identity_valid"] is expected
+        assert result["source_fixtures"][0]["clock_alignment"]["cutoff_identity"]
+    assert report==original
+
+
+def test_unavailable_primary_fill_does_not_bypass_partial_or_identity_conflict(sample):
+    report,cutoffs,_=sample
+    titan=next(o for o in report["observations"] if o["source"]=="titan" and o["slot"]==1)
+    original=copy.deepcopy(titan)
+    for state in ("PARSE_FAILURE","HTTP_FAILURE","NOT_CAPTURED"):
+        titan.update(parse_state=state,home_id=None,away_id=None,kickoff_utc=None)
+        result=pilot_tables(report,cutoffs=cutoffs)
+        assert result["integrated_fixtures"][0]["identity_source"]=="nowscore"
+        assert any(r["reason"]=="UNAVAILABLE_PRIMARY_NOWSCORE_FILL_NOT_INDEPENDENTLY_VERIFIED" for r in result["exclusions"])
+    titan["parse_state"]="PARTIAL_FIELD_FAILURE"
+    assert pilot_tables(report,cutoffs=cutoffs)["integrated_fixtures"][0]["identity_source"] is None
+    titan.update(original);titan["home_id"]="WRONG"
+    assert pilot_tables(report,cutoffs=cutoffs)["integrated_fixtures"][0]["identity_source"] is None
+    titan["parse_state"]="PARSE_FAILURE"
+    assert pilot_tables(report,cutoffs=cutoffs)["integrated_fixtures"][0]["identity_source"] is None
+
+
+def test_independent_date_substitution_exact_scope_and_source_contract(sample,tmp_path):
+    import hashlib
+    report,cutoffs,_=sample
+    titan=next(o for o in report["observations"] if o["slot"]==1 and o["source"]=="titan")
+    titan["kickoff_utc"]="2009-12-30T05:00:00+00:00"
+    original=copy.deepcopy(report)
+    f=report["fixtures"][0]
+    evidence=tmp_path/"verified.json";evidence.write_text("independent exact date")
+    d=dict(issue=f["issue"],slot=1,provider_id=f["provider_id"],roster_ids=[f["home_id"],f["away_id"]],cutoff_utc=cutoffs["1"],action="INDEPENDENTLY_VERIFIED_NOWSCORE_DATE_SUBSTITUTION",independent_evidence_path="verified.json",evidence_files={"verified.json":hashlib.sha256(evidence.read_bytes()).hexdigest()},analysis_sources={o["source"]:{k:o.get(k) for k in ("raw_sha256","home_id","away_id","kickoff_utc","provider_id")} for o in report["observations"] if o["slot"]==1})
+    before=pilot_tables(report,cutoffs=cutoffs)
+    after=pilot_tables(report,cutoffs=cutoffs,source_substitutions=[d],repository_root=tmp_path)
+    assert before["integrated_fixtures"][0]["identity_source"] is None
+    assert after["integrated_fixtures"][0]["identity_source"]=="nowscore"
+    assert before["integrated_fixtures"][1:]==after["integrated_fixtures"][1:]
+    assert report==original
+    for key,value in (("slot",2),("cutoff_utc","2000-01-01T00:00:00+00:00"),("provider_id","wrong"),("action","WRONG"),("roster_ids",["x","y"]),("independent_evidence_path","missing")):
+        bad=copy.deepcopy(d);bad[key]=value
+        with pytest.raises(ValueError):pilot_tables(report,cutoffs=cutoffs,source_substitutions=[bad],repository_root=tmp_path)
+    bad=copy.deepcopy(d);bad["analysis_sources"]["nowscore"]["raw_sha256"]="wrong"
+    with pytest.raises(ValueError):pilot_tables(report,cutoffs=cutoffs,source_substitutions=[bad],repository_root=tmp_path)
+    with pytest.raises(ValueError):pilot_tables(report,cutoffs=cutoffs,source_substitutions=[d,d],repository_root=tmp_path)
+    with pytest.raises(ValueError):pilot_tables(report,cutoffs=cutoffs,source_substitutions=[d])
+    evidence.write_text("changed")
+    with pytest.raises(ValueError):pilot_tables(report,cutoffs=cutoffs,source_substitutions=[d],repository_root=tmp_path)
