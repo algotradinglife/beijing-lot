@@ -1524,137 +1524,86 @@ def test_run_next_main_drains_the_issue_queue_through_worker(
 
 
 # --------------------------------------------------------------------------- #
-# scripts/audit_execution_coverage.py (pure helpers only; the audit itself is
-# the delivery gate and is exercised by the render, not recursively here)
+# scripts/check_function_execution_coverage.py (pure helpers only; the
+# measurement is coverage.py's, and the gate itself is exercised by the render)
 # --------------------------------------------------------------------------- #
 
-def test_function_sites_locates_nested_closures_and_first_statements() -> None:
-    import scripts.audit_execution_coverage as audit
+def test_function_body_lines_excludes_the_def_line_and_docstrings() -> None:
+    """Coverage marks a `def` line executed at import, so it must not count.
+
+    Counting it would make every function look covered and the gate would never
+    fire.
+    """
+    import scripts.check_function_execution_coverage as gate
 
     source = (
         "def outer(a):\n"
+        '    """Doc."""\n'
+        "    b = a + 1\n"
         "    def inner():\n"
-        "        return a\n"
+        "        return b\n"
         "    return inner\n"
     )
-    sites = {site.name: site for site in audit.function_sites(source)}
+    sites = {name: lines for name, _def, lines in gate.function_body_lines(source)}
     assert set(sites) == {"outer", "inner"}
-    # The probe goes before the first *statement*, not on the def line.
-    assert sites["outer"].body_lineno == 2
-    assert sites["outer"].body_col == 4
-    assert sites["inner"].body_lineno == 3
-    assert sites["inner"].body_col == 8
+    # The def line (1) and the docstring (2) are excluded. Line 4 is the nested
+    # `def`, which the parent body does execute, so it counts for `outer`; the
+    # nested body line 5 belongs to `inner` alone.
+    assert sites["outer"] == (3, 4, 6)
+    assert sites["inner"] == (5,)
 
 
-def test_mutated_source_inserts_without_deleting_any_line() -> None:
-    import scripts.audit_execution_coverage as audit
+def test_a_body_of_only_a_nested_def_is_still_coverable() -> None:
+    """Otherwise such a function could never be reported as covered."""
+    import scripts.check_function_execution_coverage as gate
 
-    source = "def f():\n    value = (\n        1\n    )\n    return value\n"
-    site = audit.function_sites(source)[0]
-    mutated = audit.mutated_source(source, site)
-    # Nothing is removed: the original body survives behind the probe, so the
-    # mutation cannot introduce a syntax error and be misread as "covered".
-    assert len(mutated.split("\n")) == len(source.split("\n")) + 1
-    assert audit.MUTATION in mutated
-    compile(mutated, "<mutated>", "exec")
-    compile(source, "<original>", "exec")
+    source = "def factory():\n    def made():\n        return 1\n    return made\n"
+    sites = {name: lines for name, _def, lines in gate.function_body_lines(source)}
+    # Executing only the nested `def` line (2) covers `factory`.
+    assert gate.uncovered_functions(source, {2}) == ["made"]
+    assert gate.uncovered_functions(source, {2, 3}) == []
 
 
-def test_classify_requires_two_consistent_attributable_failures(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Only `fail, fail` with the probe's own marker counts as execution.
+def test_uncovered_functions_reports_only_unexecuted_bodies() -> None:
+    import scripts.check_function_execution_coverage as gate
 
-    A single failure may come from unrelated flakiness, so it must not be
-    accepted as evidence that the injected exception was reached.
-    """
-    import scripts.audit_execution_coverage as audit
-
-    source = "def f():\n    return 1\n"
-    path = tmp_path / "probe_target.py"
-    path.write_text(source, encoding="utf-8")
-    site = audit.function_sites(source)[0]
-    assert site.name == "f"
-
-    def with_outcomes(*outcomes: tuple[str, str]):
-        calls = iter(outcomes)
-
-        def _fake_probe(*_: object) -> tuple[str, str]:
-            return next(calls)
-
-        monkeypatch.setattr(audit, "probe", _fake_probe)
-
-    with_outcomes((audit.PASSED, ""), (audit.PASSED, ""))
-    assert audit.classify("py", tmp_path, path, site) == ("gap", "")
-
-    with_outcomes((audit.FAILED, f"{audit.PROBE_MARKER} boom"),
-                  (audit.FAILED, f"{audit.PROBE_MARKER} boom"))
-    assert audit.classify("py", tmp_path, path, site) == ("covered", "")
-
-    # fail then pass is inconclusive, not coverage.
-    with_outcomes((audit.FAILED, "some unrelated flake"), (audit.PASSED, ""))
-    verdict, _ = audit.classify("py", tmp_path, path, site)
-    assert verdict == "unstable"
-
-    # pass then fail is also inconclusive.
-    with_outcomes((audit.PASSED, ""), (audit.FAILED, "some unrelated flake"))
-    verdict, _ = audit.classify("py", tmp_path, path, site)
-    assert verdict == "unstable"
-
-    # Two failures without the probe marker are flakiness, not evidence.
-    with_outcomes((audit.FAILED, "unrelated failure"), (audit.FAILED, "unrelated failure"))
-    verdict, _ = audit.classify("py", tmp_path, path, site)
-    assert verdict == "unstable"
-
-    with_outcomes((audit.UNUSABLE, "SyntaxError"), (audit.PASSED, ""))
-    verdict, _ = audit.classify("py", tmp_path, path, site)
-    assert verdict == "unusable"
+    source = (
+        "def ran():\n"
+        "    return 1\n"
+        "def never():\n"
+        "    return 2\n"
+    )
+    # Only `ran`'s body line (2) executed.
+    assert gate.uncovered_functions(source, {2}) == ["never"]
+    assert gate.uncovered_functions(source, {2, 4}) == []
+    # An empty executed set is a real gap, not an error.
+    assert gate.uncovered_functions(source, set()) == ["ran", "never"]
 
 
-def test_probe_restores_the_original_file_on_every_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    import scripts.audit_execution_coverage as audit
+def test_gate_audit_scope_covers_the_entry_scripts_and_is_closed() -> None:
+    import scripts.check_function_execution_coverage as gate
 
-    source = "def f():\n    return 1\n"
-    path = tmp_path / "probe_target.py"
-    path.write_text(source, encoding="utf-8")
-    site = audit.function_sites(source)[0]
-
-    monkeypatch.setattr(audit, "run_scope", lambda *_: (audit.FAILED, "boom"))
-    audit.probe("py", tmp_path, path, site)
-    assert path.read_text(encoding="utf-8") == source
-
-    def _explode(*_: object) -> tuple[str, str]:
-        raise RuntimeError("runner died")
-
-    monkeypatch.setattr(audit, "run_scope", _explode)
-    with pytest.raises(RuntimeError):
-        audit.probe("py", tmp_path, path, site)
-    assert path.read_text(encoding="utf-8") == source
-
-
-def test_auditor_runs_probes_serially() -> None:
-    """Parallel probes would corrupt the checkout, so concurrency is gone."""
-    import scripts.audit_execution_coverage as audit
-
-    source = pathlib.Path(audit.__file__).read_text(encoding="utf-8")
-    assert "ThreadPoolExecutor" not in source
-    assert "--jobs" not in source
-
-
-def test_audit_scope_covers_the_entry_scripts_and_is_closed() -> None:
-    import scripts.audit_execution_coverage as audit
-
-    assert audit.ENTRY_SCRIPTS == (
+    assert gate.ENTRY_SCRIPTS == (
         "collect_500_historical_plays.py",
         "collect_500_historical_settlement.py",
         "collect_titan_historical_fixtures.py",
         "run_next_historical_id_mapping.py",
         "collect_titan_clean_roster.py",
     )
-    # The auditor is test infrastructure, not audited runtime code.
-    assert "audit_execution_coverage.py" not in audit.ENTRY_SCRIPTS
+    # The gate is test infrastructure, not audited runtime code.
+    assert "check_function_execution_coverage.py" not in gate.ENTRY_SCRIPTS
+
+
+def test_gate_delegates_measurement_to_coverage_py() -> None:
+    """The gate must not reimplement coverage; it uses the maintained library."""
+    import scripts.check_function_execution_coverage as gate
+
+    source = pathlib.Path(gate.__file__).read_text(encoding="utf-8")
+    assert '"coverage"' in source or "'coverage'" in source or "-m", "coverage" in source
+    # No bespoke source mutation survives.
+    assert "__execution_coverage_probe__" not in source
+    assert "ThreadPoolExecutor" not in source
+    assert "--jobs" not in source
 
 
 # --------------------------------------------------------------------------- #

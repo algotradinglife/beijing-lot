@@ -242,7 +242,8 @@ coverage <- data.frame(
               "src/titan_clean/risk_acknowledgment.py",
               "src/titan_clean/store.py",
               "src/titan_clean/settlement.py",
-              "src/titan_clean/snapshots.py"),
+              "src/titan_clean/snapshots.py",
+              "scripts/check_function_execution_coverage.py（覆盖门自身）"),
   tested_surface = c("参数校验/--help/缺失必填/越界值（真实调用 main，不触网）, now_utc",
                      "parse_play（jq/bf/postponed/no_result/fid 边界/空页/GB18030）, fetch 超时",
                      "parse_settlement, parse_nowscore_settlement（3 个结果码/state/status）, fetch 超时",
@@ -253,7 +254,8 @@ coverage <- data.frame(
                      "load_risk_acknowledgment（receipt 绑定/JSON/契约/origin/数值上界/缺键）",
                      "record_historical_aux（落盘/幂等/端点/时序/批次冲突）, record_historical_fundamental（upsert）",
                      "record_raw_settlement（落盘/幂等/7 类行校验）, record_raw_play_settlement（父批次/重复 slot/重跑替换）, raw_settlement_issues, raw_play_issues",
-                     "derive_batch_snapshots（派生/子集/limit/缺失夹具）"),
+                     "derive_batch_snapshots（派生/子集/limit/缺失夹具）",
+                     "function_body_lines（def 行/文档字符串/嵌套定义边界）, uncovered_functions（空执行集/部分/全执行）, 入口脚本清单封闭性, 不重建 coverage.py"),
   stringsAsFactors = FALSE
 )
 coverage |> tibble::as_tibble()
@@ -261,30 +263,38 @@ coverage |> tibble::as_tibble()
 
 ### 函数执行覆盖：机械审计门
 
-「每个项目函数都要有对应自动化测试」是本交付的实质义务，而 round 3–5 三轮审查说明：
-**按名字搜索测试文件证明不了任何事**。本交付因此采用**执行证据**——对
-`src/titan_clean/` 与 5 个入口脚本中的**每一个**函数（含私有函数与 `main()` 内闭包）
-逐个注入 `raise AssertionError`、运行验收命令，凡测试仍通过者即为未被执行。
-**探针失败只有在可归因于探针时才被接受为执行证据**：无关的抖动测试也可能让某次运行失败，
-因此每个函数都探测**两次**——两次都通过＝未被执行的缺口；两次都失败且输出中出现探针自身的
-异常＝确有执行；一通过一失败＝结论不确定，审计**失败**而非默认判为已覆盖。
-审计严格**串行**执行：并行探测会让多个 worker 同时改写同一文件，一个 worker 可能把另一个
-worker 注入后的源码当作「原始版本」并写回，既损坏工作区又使结论失效。
+**测量委托给 `coverage.py`**（Python 执行覆盖的成熟维护库）。本仓库只实现它不提供的
+那一小段能力：把「已执行行号」映射回所属函数，从而把门从「行覆盖率百分比」提升为
+「每个函数都有测试执行过它」。
 
-审计器是仓库内的可复用脚本 `scripts/audit_execution_coverage.py`（QMD 只负责调用与断言，
-实现不在 QMD 内）。下门执行该审计并断言缺口为 0。它是**可证伪**的：任一函数失去执行
-覆盖都会使渲染失败（round 5 即由该审计发现 10 个从未被执行的函数）。
+这是对早期自建实现的替换。此前我用「向函数体注入 `AssertionError` 再重跑测试」的变异
+探测来自建覆盖审计，但它连续三轮（round 4/5/6）被审查在自身代码里发现缺陷——并行探测
+会损坏源文件、失败归因不成立、门忽略退出码。按 AGENTS.md「R 和 Python 必须使用主流、
+成熟、有维护的库；不要重建它们的能力」，该自建审计器已**整体删除**，未保留兼容层。
 
-审计集合是封闭的：`src/titan_clean/` 加 5 个采集入口脚本；审计器自身不在集合内。
+| | 自建变异审计器（已删除） | `coverage.py` 适配器 |
+|---|---|---|
+| 结论 | 112 函数 / 0 缺口 | 112 函数 / 0 缺口（一致） |
+| 耗时 | 约 20 分钟 | 约 1.3 秒 |
+| 源文件 | 需改写（曾损坏工作区） | 只读，零改写 |
+| 依赖 | 无 | `coverage==7.16.1`（已声明） |
+
+适配器是仓库内的可复用脚本 `scripts/check_function_execution_coverage.py`（QMD 只负责
+调用与断言，实现不在 QMD 内）。下门执行该检查并断言缺口为 0。
+
+它是**可证伪**的，两种方式均已复现：删除 `_fetch_aux` 的唯一直测后，门以 exit 1 精确
+报出该函数；令被测范围出现失败测试时，门拒绝采信覆盖数据并以 exit 1 退出。
+
+审计集合是封闭的：`src/titan_clean/` 加 5 个采集入口脚本；门脚本自身不在集合内。
 
 ```{r}
 #| label: execution-coverage-audit
-# The auditor's exit status is part of its contract: 0 means "no gaps AND no
-# inconclusive probe". Reading only the summary line would accept a failed audit
-# whose summary happens to show zero gaps, so both are checked.
+# The gate's exit status is part of its contract: 0 means the audited test scope
+# passed and every audited function body executed. Reading only the summary line
+# would accept a failed gate whose summary happened to show zero gaps.
 audit_lines <- system2(
   params$python,
-  c(file.path(params$project_root, "scripts", "audit_execution_coverage.py"),
+  c(file.path(params$project_root, "scripts", "check_function_execution_coverage.py"),
     "--python", params$python, "--root", params$project_root),
   stdout = TRUE, stderr = FALSE
 )
@@ -292,19 +302,14 @@ audit_status <- attr(audit_lines, "status")
 if (is.null(audit_status)) audit_status <- 0L
 audit_fields <- strsplit(tail(audit_lines, 1), "\t")[[1]]
 audit_total <- suppressWarnings(as.integer(audit_fields[1]))
-audit_errors <- suppressWarnings(as.integer(audit_fields[2]))
-audit_unstable <- suppressWarnings(as.integer(audit_fields[3]))
-audit_gaps <- suppressWarnings(as.integer(audit_fields[4]))
-data.frame(functions_audited = audit_total, injection_errors = audit_errors,
-           inconclusive_probes = audit_unstable,
+audit_gaps <- suppressWarnings(as.integer(audit_fields[2]))
+data.frame(functions_audited = audit_total,
            functions_never_executed_by_tests = audit_gaps,
-           auditor_exit_status = audit_status,
-           gaps = if (length(audit_fields) >= 5) audit_fields[5] else "",
+           gate_exit_status = audit_status,
+           gaps = if (length(audit_fields) >= 3) audit_fields[3] else "",
            stringsAsFactors = FALSE) |> tibble::as_tibble()
 stopifnot(audit_status == 0L,
           !is.na(audit_total), audit_total > 100L,
-          !is.na(audit_errors), audit_errors == 0L,
-          !is.na(audit_unstable), audit_unstable == 0L,
           !is.na(audit_gaps), audit_gaps == 0L)
 ```
 
@@ -402,6 +407,10 @@ round4 |> tibble::as_tibble()
 凡测试仍通过者即为「未被执行」。为排除抖动，每个「未覆盖」结论都**独立复算两次**，
 两次一致才采信。审计规模 113 个函数，注入错误 0。
 
+> **后记（round 7 修订）**：此处描述的注入式审计器在 round 6 被审查发现自身缺陷后，
+> 已按 AGENTS.md 的库优先要求**整体删除**，改由 `coverage.py` 适配器承担同一职责
+> （结论一致：112 函数 / 0 缺口）。以下过程记录保留为历史证据，机制本身已不存在。
+
 审计先暴露了两个我方自身的方法错误，均已修正：
 
 - 首版审计在**首行是多行语句开头**时替换首行会产生 `SyntaxError`，把「测试报错」误判成
@@ -423,6 +432,7 @@ round4 |> tibble::as_tibble()
 `worker` 一项还暴露了第三个方法错误：它运行在**守护线程**中，注入异常只会让线程静默死掉，
 主线程仍打印 `ALL_ISSUES_DONE`，因此原测试无法证伪。已补真实执行断言
 （每个期次经 `worker` 调用 `reserve_for_issue` 产生一条预订），注入变异后可捕获。
+该断言与 `coverage.py` 无关，是**独立于测量工具**的行为断言，故在替换审计器后仍然保留。
 
 ```{r}
 #| label: review-round-5
@@ -442,7 +452,7 @@ round5 |> tibble::as_tibble()
 | round 6 发现 | 复现结果 | 处置 |
 |---|---|---|
 | 审计把「不可归因于探针的失败」当成执行证据 | 无关抖动测试失败即被判为已覆盖 | 改为**两次一致**才下结论；`fail,fail` 还需输出中出现探针自身标记；`pass,fail`/`fail,pass` 判为**不确定**并使审计失败 |
-| `--jobs > 1` 并行探测会损坏源文件 | **已复现**：`--jobs 4` 在 11 个源文件中留下探针异常 | **彻底删除并行**，严格串行；原字节在所有路径（含异常）恢复 |
+| `--jobs > 1` 并行探测会损坏源文件 | **已复现**：`--jobs 4` 在 11 个源文件中留下探针异常 | 先改为严格串行；round 7 进一步**整体删除**该审计器，改用 `coverage.py`（只读，无改写） |
 | QMD 门忽略审计器退出码 | 失败审计的摘要仍显示 0 缺口，渲染照样通过 | 门同时校验**退出码**与**不确定计数** |
 | round 5 的端到端测试固化了 #473 | stub 只写 analysis，而 `needs_aux` 只看该端点，于是 handicap 缺失也能跑完 | stub 改为**两个端点都落盘**，修好 #473 后该测试仍应通过 |
 
@@ -456,8 +466,8 @@ round6 <- data.frame(
               "门忽略审计器退出码",
               "端到端测试固化 #473 的 aux 完成判定"),
   priority = c("P2", "P2", "P2", "P2"),
-  disposition = c("两次一致 + 探针标记；不确定即使审计失败",
-                  "删除并行，严格串行并保证恢复",
+  disposition = c("两次一致 + 探针标记（该审计器已于 round 7 删除）",
+                  "删除并行；round 7 整体删除审计器，改用 coverage.py",
                   "同时校验退出码与不确定计数",
                   "stub 落盘两个端点"),
   stringsAsFactors = FALSE
@@ -467,6 +477,39 @@ round6 |> tibble::as_tibble()
 
 门的证伪证据（两项独立复现）：令审计器报告 1 个不确定结果 → 渲染 **exit 1**；
 停用 `now_utc` 测试制造 4 个真实缺口 → 渲染 **exit 1**，且**源文件零污染**。
+
+### Round 7（未获审查结论）
+
+round 7 审查**未能运行**：Codex 配额耗尽，需等到 2026-09-24 21:45。因此本轮**没有**
+审查结论，不计为通过。
+
+在等待期间，我按 AGENTS.md「R 和 Python 必须使用主流、成熟、有维护的库；不要重建它们的
+能力」复核了本交付的覆盖门，发现它违反该条：Python 执行覆盖有成熟库 `coverage.py`，
+而我自建了 250 行变异审计器，且该自建件在 round 4/5/6 **连续三轮**被审查在自身代码里
+发现缺陷。
+
+处置：**删除** `scripts/audit_execution_coverage.py` 与全部探针机制，改为薄适配器
+`scripts/check_function_execution_coverage.py`。测量完全委托 `coverage.py`；本仓库只实现
+它不提供的那一小段能力——把已执行行号映射回所属函数（`function_body_lines`、
+`uncovered_functions`，均为纯函数并有测试）。依赖 `coverage==7.16.1` 已在
+`requirements-analysis.txt` 声明。
+
+两者结论一致（112 函数 / 0 缺口），但适配器耗时约 1.3 秒而非约 20 分钟，且**只读**，
+不再改写源文件。门仍**可证伪**，两种方式均已复现：删除 `_fetch_aux` 唯一直测 → exit 1
+并精确报出该函数；被测范围出现失败测试 → 拒绝采信覆盖数据并 exit 1。
+
+```{r}
+#| label: review-round-7
+round7 <- data.frame(
+  item = c("round 7 审查", "自建变异审计器", "coverage.py 适配器"),
+  status = c("未运行（Codex 配额耗尽至 2026-09-24）", "已删除", "已启用"),
+  evidence = c("无审查结论，不计为通过",
+               "round 4/5/6 三轮在自身代码发现缺陷",
+               "112 函数 / 0 缺口；约 1.3 秒；只读"),
+  stringsAsFactors = FALSE
+)
+round7 |> tibble::as_tibble()
+```
 
 ### 明确不在本交付内修复的行为缺陷
 

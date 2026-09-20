@@ -1,4 +1,4 @@
-Review ROUND 7 of the delivery for GitHub issue #464 in this repository.
+Review ROUND 8 of the delivery for GitHub issue #464 in this repository.
 
 ## Context you need first
 
@@ -79,7 +79,7 @@ mutation testing, but found ten functions still never executed by any test.
 Three review rounds had raised the same class of problem, so the fix was to stop
 judging coverage by name:
 
-- `scripts/audit_execution_coverage.py` (new, reusable, pure helpers tested)
+- `scripts/check_function_execution_coverage.py` (new, thin adapter over coverage.py)
   injects an unconditional `raise AssertionError` as the first statement of
   **every** function in `src/titan_clean/` and the five entry scripts —
   private helpers and `main()`-local closures included — runs the acceptance
@@ -127,6 +127,22 @@ reproduced before being fixed:
    inspects only that endpoint, so the run finished with handicap missing. The
    stub now persists both endpoints.
 
+**Between rounds 6 and 7** the execution-coverage gate was replaced. It had been
+a bespoke 250-line mutation auditor that injected `AssertionError` into each
+function and re-ran the suite; rounds 4, 5 and 6 each found defects in that
+auditor itself. AGENTS.md requires using mainstream maintained libraries rather
+than recreating their capabilities, and `coverage.py` is the maintained library
+for Python execution coverage, so the bespoke auditor was deleted outright with
+no compatibility layer. Measurement is now delegated to `coverage.py`; the only
+code left in the repository is a thin adapter implementing the one thing
+coverage does not provide - mapping executed line numbers back to the function
+that owns them (`function_body_lines`, `uncovered_functions`, both pure and
+tested). `coverage==7.16.1` is declared in `requirements-analysis.txt`.
+
+Both approaches agree on this revision (112 functions, 0 gaps), but the adapter
+takes ~1.3 seconds instead of ~20 minutes and is read-only, so it can no longer
+corrupt the checkout it is checking.
+
 The gate is falsified two independent ways at the revision under review:
 making the auditor report one inconclusive result exits 1, and disabling one
 test's coverage to create four real gaps exits 1 — with no source-file
@@ -143,7 +159,7 @@ deliberate, documented governance decision, not an oversight.
 - `tests/titan_clean/test_clean_stores.py` added; `tests/titan_clean/test_snapshots.py` updated
 - `tests/scripts/test_collection_runtime_entry_points.py` added, now 115 cases
   (including 23 that execute the entry scripts' `main()` and two full end-to-end runs)
-- `scripts/audit_execution_coverage.py` added (the execution-coverage auditor)
+- `scripts/check_function_execution_coverage.py` added; `coverage==7.16.1` declared
 - `quarto/12_collection_runtime_stack.qmd` added and registered in `_quarto.yml`
 - `docs/reviews/issue-464-*.{txt,json}` added
 
