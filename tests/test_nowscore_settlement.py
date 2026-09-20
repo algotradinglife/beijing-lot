@@ -69,6 +69,25 @@ def test_invalid_sp(bad):
     assert all(o["sp"] is None for o in row["options"])
 
 
+def test_status_cell_holding_the_betting_deadline_is_read_as_a_deadline():
+    """The third cell carries the deadline until a fixture is under way, not a status."""
+    row = parse_page(page(6, status="22:25", ft="-", ht="-", values={}), "25053", 6)[0]
+    assert row["status"] == "" and row["deadline_time"] == "22:25"
+    assert codes(row) == {"status_cell_holds_deadline_time"}
+
+
+def test_a_real_status_word_is_still_read_as_the_status():
+    row = parse_page(page(6, status="完场", values={}), "25053", 6)[0]
+    assert row["status"] == "完场" and row["deadline_time"] == ""
+    assert "unrecognized_status" not in codes(row)
+
+
+def test_an_unrecognized_status_is_still_flagged_rather_than_dropped():
+    row = parse_page(page(6, status="??", values={}), "25053", 6)[0]
+    assert row["status"] == "??" and row["deadline_time"] == ""
+    assert "unrecognized_status" in codes(row)
+
+
 def test_domain_missing_and_duplicate_fail_closed():
     p = page(6).replace(b'title="7+', b'title="6')
     row = parse_page(p,"25053",6)[0]

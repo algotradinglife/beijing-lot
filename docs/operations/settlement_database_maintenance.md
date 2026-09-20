@@ -151,6 +151,42 @@ DOM 感知提取，并要求**至少两个独立来源给出完全一致的半�
 回归检查（应恒为 0 条不一致）：对每个 `bq` 完场观测，`expected_option` 必须等于
 「半场结果-全场结果」。
 
+## 标注已作废的 finding
+
+finding 记录的是**构建当时**在源站字节里观察到的事实，因此更正**刻意不改** finding 表。
+但主体已被更正消除的 finding 会误导按 code 过滤的消费者 —— 它们被告知一个库内已不存在的矛盾。
+
+通用入口为 `scripts/apply_settlement_finding_supersession.py`，对应
+`src/settlement_finding_supersession.py::supersede_findings(..., approval_note=...)`。
+它把这类 finding 的 code 改写为 `<原code>_superseded`，并把原因与更正批次写进 detail。
+**finding 从不删除**：原 code、原 detail 与原因保留在 `finding_supersession` 审计表，
+回执的 `findings_by_code` 同步迁移计数。
+
+```sh
+.venv/bin/python scripts/apply_settlement_finding_supersession.py \
+  --database "$SETTLEMENT_DB" --ledger "$SUPERSESSION_LEDGER" \
+  --backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-finding-supersession.sqlite" \
+  --data-root "$BEIJING_LOT_DATA_ROOT" --mountpoint "$SETTLEMENT_MOUNT" \
+  --approval-note '已批准的裁决编号与依据'
+```
+
+**它拒绝在主体仍未解决时标注**：受影响观测必须已经满足该 finding 所断言谓词的补集
+（例如 `halftime_exceeds_fulltime` 要求半场已不再大于全场），否则整批拒绝。
+账本声明的行数必须与库内一致，回执计数也必须一致。
+
+## 采集版式与期次位数无关
+
+`parse_page` 按**页面版式**分派，不再按期次位数：归档页没有直播页的 `dropIssueNum`
+选择器，且是**唯一**会渲染直播页所隐藏场次、并在该轮结束后仍保留结果的版式。
+同一期次两种版式都可能提供，故 5 位期次也可能走归档分支。
+
+直播页第三格是**双用途**的：赛事进行中放状态词，未开赛放**投注截止时间**。
+截止时间被记为 `deadline_time`，`status` 留空，并发 `status_cell_holds_deadline_time`
+而非 `unrecognized_status` —— 保留原值，不静默丢弃。
+
+若某期次的**内嵌 JS 阵容**列出了可见行没有的场次（源站会隐藏部分场次），该页会被整体隔离
+（`source_roster_conflict`）。此时改用该期次的**归档开奖页**重抓，它渲染全部场次。
+
 ## R 与 QMD
 
 见 [R 查询示例](nowscore_settlement_queries.md)。完整查询接口仍是

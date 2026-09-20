@@ -24,6 +24,26 @@ def test_archive_partial_result_and_unobserved_fields():
     assert parse_page(archive_page().encode(), "090919", 5) == [row]
 
 
+def test_parse_page_dispatches_the_archive_layout_for_a_five_digit_issue():
+    """The archive layout is recognised by its markup, not by the issue's width.
+
+    Five-digit issues are served in both layouts, and only the archive one renders the
+    fixtures the live page hides and keeps results after the round closes.
+    """
+    raw = archive_page().replace("090919", "23075").encode()
+    row = parse_page(raw, "23075", 5)[0]
+    assert row["issue"] == "23075" and row["score"] == "1-1"
+    assert [(o["option"], o["sp"]) for o in row["options"]] == [("胜", 2.40285)]
+
+
+def test_parse_page_still_reads_the_live_layout_when_its_selector_is_present():
+    """A page carrying the live selector must not be diverted to the archive parser."""
+    raw = archive_page().replace("090919", "23075").replace(
+        '<title>', '<select id="dropIssueNum"><option selected value="23075">23075</option></select><title>').encode()
+    with pytest.raises(ValueError, match="selected issue differs from requested issue"):
+        parse_page(raw.replace(b'value="23075"', b'value="23074"'), "23075", 5)
+
+
 @pytest.mark.parametrize("old,new", [
     ("开奖SP</td>", "未知列</td>"), ("row_1", "row_0"),
     ("090919_1_5", "090919_2_5"), ("analysis/123cn.html", "analysis/badcn.html"),

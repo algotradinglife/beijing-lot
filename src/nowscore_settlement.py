@@ -171,9 +171,15 @@ def parse_archive_page(payload: bytes, issue: str, typeid: int) -> list[dict]:
 
 
 def parse_page(payload: bytes, issue: str, typeid: int) -> list[dict]:
-    """Validate page identity and parse labels, never numerical cell order."""
+    """Validate page identity and parse labels, never numerical cell order.
+
+    The two served layouts are dispatched on the layout itself, not on the issue's
+    width: the archive page carries a labelled settlement and omits the live page's
+    ``dropIssueNum`` selector, and it is the only layout that renders fixtures the
+    live page hides and that keeps results after the round closes.
+    """
     source_url(issue, typeid)
-    if len(issue) == 6 and b"dropIssueNum" not in payload:
+    if b"dropIssueNum" not in payload:
         return parse_archive_page(payload, issue, typeid)
     text = payload.decode("utf-8-sig", errors="strict")
     soup = BeautifulSoup(text, "html.parser")
@@ -261,12 +267,19 @@ def parse_page(payload: bytes, issue: str, typeid: int) -> list[dict]:
                     except ValueError:
                         summary_sp = None
                         errors.append("invalid_summary_sp")
+        # The source's third cell is dual-purpose: it carries the status once a fixture is
+        # under way, and the betting deadline while it has not started. A deadline is not an
+        # unrecognized status, so it is kept as itself and the status is left unstated rather
+        # than misread as a status word.
+        raw_status = td[3].get_text(strip=True)
+        deadline_time = raw_status if re.fullmatch(r"\d{1,2}:\d{2}", raw_status) else ""
         row = {
             "issue": issue, "slot": slot, "typeid": typeid, "play": PLAYS[typeid],
             "native_match_id": native_id, "home": home.get_text(strip=True), "away": away.get_text(strip=True),
             "home_id": team_ids[0], "away_id": team_ids[1],
             "league": tr.get("gamename", ""), "schedule_date": tr.get("name", ""),
-            "kickoff_time": td[2].get_text(strip=True), "status": td[3].get_text(strip=True),
+            "kickoff_time": td[2].get_text(strip=True),
+            "status": "" if deadline_time else raw_status, "deadline_time": deadline_time,
             "cutoff_text": td[3].get("title", ""), "can_sale": tr.get("cansale", ""),
             "score": td[5 + offset].get_text(strip=True),
             "halftime_score": td[7 + offset].get_text(strip=True),
@@ -341,7 +354,12 @@ def audit_rows(rows: list[dict]) -> list[dict]:
             add(r, "finished_missing_score")
         if r["status"] == "完场" and r["can_sale"] != "false":
             add(r, "finished_sale_flag_conflict")
-        if r["status"] not in ABNORMAL | {"完场", "未", "未开", "未开始", "上", "中", "下", "加", "点"} and not re.fullmatch(r"\d+['′]?", r["status"]) and not (r["status"] == "" and r.get("source_layout") == "archive_result_v1"):
+        if r.get("deadline_time"):
+            # The cell held the betting deadline, not a status: the fixture had not started
+            # when the page was captured. Recorded explicitly so it is neither mistaken for a
+            # parse failure nor silently dropped.
+            add(r, "status_cell_holds_deadline_time", r["deadline_time"])
+        elif r["status"] not in ABNORMAL | {"完场", "未", "未开", "未开始", "上", "中", "下", "加", "点"} and not re.fullmatch(r"\d+['′]?", r["status"]) and not (r["status"] == "" and r.get("source_layout") == "archive_result_v1"):
             add(r, "unrecognized_status", r["status"])
     for key, group in sorted(groups.items()):
         counts = Counter(r["play"] for r in group)
