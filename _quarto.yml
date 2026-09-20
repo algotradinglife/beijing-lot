@@ -11,6 +11,7 @@ project:
     - quarto/06_fundamentals_census.qmd
     - quarto/07_fundamentals_pipeline.qmd
     - quarto/258_dixon_coles_score_grid.qmd
+    - quarto/259_dc_rebase_handicap_line_gap.qmd
 
 execute:
   freeze: false
