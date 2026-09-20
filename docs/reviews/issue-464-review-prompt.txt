@@ -1,0 +1,220 @@
+Review ROUND 8 of the delivery for GitHub issue #464 in this repository.
+
+## Context you need first
+
+**Round 1** reviewed revision `3d8e6139` and returned `patch is incorrect` with 10
+findings. The full finding list is committed at
+`docs/reviews/issue-464-codex-review-round1.json` and is part of this delivery.
+
+The PI then made an explicit scope decision: #464 is narrowed to **"bring the
+collection runtime stack under version control + correct the unit data roots +
+add offline tests for the runtime stack"**. Each behaviour defect from round 1
+was filed as its own issue and routed in the GitHub issue graph:
+
+| round 1 finding | issue |
+|---|---|
+| store layer does not use real transactions | #466 |
+| play bytes never persisted, rows attached to another receipt | #467 |
+| Nowscore evidence discarded by the merge | #468 |
+| any capture counts as SPF completion | #469 |
+| sealed release skips historical_fixture_captures | #470 |
+| merge does not adjudicate source conflicts | #471 |
+| substring "500" false contamination positive | #472 |
+| aux endpoints retried unboundedly, completion misses handicap | #473 |
+| acknowledged request limit not honored | #474 |
+| entry scripts have no test coverage | folded into #464 (this delivery) |
+
+**Round 2** reviewed revision `d19b4043` and returned needs-revision with two
+in-scope blockers, both addressed:
+
+1. Five independently testable functions had no coverage (`pending_issues`,
+   `run_issue`, `fetch_fixture`, `parse_analysis_fundamentals`,
+   `load_risk_acknowledgment`). Tests were added.
+2. A test asserted that an unparsable SP cell still yields `settled`, freezing a
+   parsing failure as accepted contract. The assertion was **removed** and the
+   defect routed as issue **#476**.
+
+**Round 3** reviewed revision `353baba9` and returned needs-revision with two
+coverage blockers, both addressed on the branch you are reviewing now:
+
+1. The coverage matrix claimed completed-issue filtering was tested, but no
+   `pending_issues` case had a stored mapping, so deleting the
+   `value not in completed` filter broke nothing. A test now stores a real 500
+   coverage plus Nowscore mapping and drops the mapped issue; removing the
+   filter fails it.
+2. Nine module-level functions the delivery newly tracks had no routine
+   coverage (`record_historical_aux`, `record_historical_fundamental`,
+   `record_raw_settlement`, `record_raw_play_settlement`,
+   `raw_settlement_issues`, `raw_play_issues`, `derive_batch_snapshots`,
+   `reserve_for_issue`, `fetch_bytes`). All now have tests, and the QMD runs
+   `function-coverage-scan`, which enumerates every module-level public
+   function under `src/titan_clean/` and the five entry scripts and **fails the
+   render** unless none lack a test reference.
+
+**Round 4** reviewed revision `fd2a823a` and returned needs-revision with one
+blocker, and it was right. The `function-coverage-scan` added in round 3 proved
+nothing: it searched bare names across test files, so unrelated occurrences of
+`main` counted as coverage for the five entry scripts. Injecting
+`AssertionError` into every `main()` still produced 165 passing tests and a
+successful render. The gate certified a false conclusion.
+
+Round 4's fix was to delete that gate rather than harden it:
+
+1. 23 new tests **actually call** each entry script's `main()`: `--help`, missing
+   mandatory arguments, out-of-range values (`--rate-per-minute`, `--limit`,
+   `--batch-size`, `--workers`), an unknown `--play`, mutually exclusive roster
+   modes, a missing authorization mode and an incompatible risk acknowledgment.
+   Every path runs before the first HTTP request or database write, so none of
+   it asserts the behaviour routed to #466-#474/#476.
+2. The QMD gate now runs exactly that 23-case selection and asserts zero
+   failures. Repeating the mutation yields `23 failed` and the **render exits
+   1**; restoring it exits 0. The gate is falsifiable.
+3. The coverage matrix gained a `main()` row and the document now states its
+   evidence boundary: it does not claim a mechanical proof that every function
+   repository-wide is covered.
+
+**Round 5** reviewed revision `30933379` and returned needs-revision with one
+blocker. It confirmed the round-3 fixes and the main-execution gate survive
+mutation testing, but found ten functions still never executed by any test.
+Three review rounds had raised the same class of problem, so the fix was to stop
+judging coverage by name:
+
+- `scripts/check_function_execution_coverage.py` (new, thin adapter over coverage.py)
+  injects an unconditional `raise AssertionError` as the first statement of
+  **every** function in `src/titan_clean/` and the five entry scripts —
+  private helpers and `main()`-local closures included — runs the acceptance
+  command, and treats a still-passing suite as "no test reached this function".
+  Every uncovered verdict is recomputed once and reported only when both runs
+  agree, because single runs proved flaky.
+- The QMD gate invokes it and asserts zero gaps. It is falsifiable: disabling
+  one test's coverage makes the render exit 1.
+- Dispositions: `_clean_cells` had no caller anywhere and was **deleted** as
+  dead code rather than tested; `now_utc` (four scripts), `_fetch_aux` and
+  `_capture_aux` gained tests; `needs_aux`, `reserve_n` and `worker` are
+  `main()`-local closures with no importable name, so two end-to-end tests drive
+  a full `main()` run against a temporary data root with transport and
+  subprocess stubbed.
+
+Round 5 also exposed a flaw in the round-5 test for `worker`: it runs on daemon
+threads, so an injected exception kills the thread silently while `main()` still
+prints `ALL_ISSUES_DONE`. That test now asserts the observable work (one
+reservation per issue booked through `reserve_for_issue`) and fails under
+mutation.
+
+Audit result at the revision under review: **112 functions, 0 injection errors,
+0 never executed**.
+
+**Round 6** reviewed revision `2c2472e2` and returned needs-revision with four
+in-scope blockers, all in this delivery's own gate and test code. Each was
+reproduced before being fixed:
+
+1. The auditor accepted an unattributable failure as proof of execution: an
+   unrelated flaky test failing a run made a function count as covered from a
+   single observation. Coverage now requires two consistent observations, and a
+   `fail, fail` pair counts only when the probe's own exception marker appears
+   in both outputs. `pass, fail` and `fail, pass` are inconclusive and fail the
+   audit rather than defaulting to covered.
+2. `--jobs > 1` ran probes concurrently over the same file. Reproduced: a
+   `--jobs 4` run left probe exceptions in eleven source files, because one
+   worker could read another's injected source as its "original" and write it
+   back. Parallel execution is removed entirely; probes run strictly one at a
+   time and the original bytes are restored on every path.
+3. The QMD gate read only the summary line and ignored the auditor's exit
+   status, so a failed audit whose summary still showed zero gaps rendered
+   successfully. The gate now checks the exit status and the inconclusive count.
+4. The round-5 end-to-end test pinned the incomplete-aux completion behaviour
+   routed to #473: its stub wrote only the analysis capture while `needs_aux`
+   inspects only that endpoint, so the run finished with handicap missing. The
+   stub now persists both endpoints.
+
+**Between rounds 6 and 7** the execution-coverage gate was replaced. It had been
+a bespoke 250-line mutation auditor that injected `AssertionError` into each
+function and re-ran the suite; rounds 4, 5 and 6 each found defects in that
+auditor itself. AGENTS.md requires using mainstream maintained libraries rather
+than recreating their capabilities, and `coverage.py` is the maintained library
+for Python execution coverage, so the bespoke auditor was deleted outright with
+no compatibility layer. Measurement is now delegated to `coverage.py`; the only
+code left in the repository is a thin adapter implementing the one thing
+coverage does not provide - mapping executed line numbers back to the function
+that owns them (`function_body_lines`, `uncovered_functions`, both pure and
+tested). `coverage==7.16.1` is declared in `requirements-analysis.txt`.
+
+Both approaches agree on this revision (112 functions, 0 gaps), but the adapter
+takes ~1.3 seconds instead of ~20 minutes and is read-only, so it can no longer
+corrupt the checkout it is checking.
+
+The gate is falsified two independent ways at the revision under review:
+making the auditor report one inconclusive result exits 1, and disabling one
+test's coverage to create four real gaps exits 1 — with no source-file
+corruption in either case.
+
+The delivery does **not** claim the routed behaviours are correct. That is a
+deliberate, documented governance decision, not an oversight.
+
+## The delivery under review (HEAD of branch `codex/464-runtime-stack`)
+
+- 7 systemd units added under `ops/systemd/user/`
+- 5 scripts added under `scripts/`
+- 10 modules added under `src/titan_clean/`
+- `tests/titan_clean/test_clean_stores.py` added; `tests/titan_clean/test_snapshots.py` updated
+- `tests/scripts/test_collection_runtime_entry_points.py` added, now 115 cases
+  (including 23 that execute the entry scripts' `main()` and two full end-to-end runs)
+- `scripts/check_function_execution_coverage.py` added; `coverage==7.16.1` declared
+- `quarto/12_collection_runtime_stack.qmd` added and registered in `_quarto.yml`
+- `docs/reviews/issue-464-*.{txt,json}` added
+
+## What to judge
+
+1. **Verify the round 3 fixes actually landed.**
+   - Confirm the completed-issue filter test really stores a mapping and would
+     fail without the filter — a test that passes either way is not a fix.
+   - Confirm the nine functions from round 3 have real tests with normal,
+     boundary and rejection paths, not padding. Confirm they do **not** assert
+     the transaction, provenance or completion semantics routed to
+     #466–#474/#476.
+   - Confirm `_clean_cells` really was dead code (no caller anywhere) and that
+     deleting it, rather than testing it, was correct.
+
+2. **Test the audit gate rather than trusting it.** The gate claims that no
+   function in the audited set is left unexecuted. Confirm it fails when that is
+   untrue — for example disable one test's coverage and observe a non-zero
+   render exit — and confirm the auditor itself is sound: that its probe is
+   inserted rather than replacing a statement (so it cannot manufacture a
+   SyntaxError that looks like a catch), and that a single flaky run cannot
+   produce a false verdict. Round 4 and round 5 are both reasons a gate that
+   cannot fail is worse than no gate.
+
+3. **Confirm no test in this delivery pins a routed defect** as the expected
+   contract (#466, #467, #468, #469, #470, #471, #472, #473, #474, #476).
+
+4. **Re-verify the delivery's own claims** (confirmed in rounds 2 and 3):
+   - all 7 units pass `--data-root` equal to the `new_root` in
+     `/run/media/drwho1985/Sandisk/data/beijing-lot/registry/legacy-titan-migration.json`;
+   - zero references to `raw_archive`/`data_archive`/`market_storage` in `src/`,
+     `scripts/`, `tests/`, and no caller of `read_titan_raw`;
+   - `python -m pytest tests/titan_clean tests/backfill tests/scripts/test_collection_runtime_entry_points.py -q -p no:cacheprovider`
+     is green with nothing skipped or xfailed into green;
+   - a wrong `python` and a wrong `data_root` each make the render exit non-zero
+     and the clean parameterized render exits zero;
+   - the #466–#474/#476 mapping in the QMD is accurate.
+
+5. **Report only what is in scope.** Blockers are: a false claim, a missing
+   routine test for a function this delivery adds or makes tracked, a test that
+   freezes a routed defect, a unit pointing at the wrong data root, a broken or
+   unfalsifiable QMD gate, or a defect newly introduced by this diff.
+   Pre-existing behaviour defects belong to their routed issues.
+
+## Explicitly out of scope
+
+- Hosted CI cannot run: the organization's Actions budget is 0 with
+  `prevent_further_usage`, so jobs never start. The delivery says so honestly
+  and claims local equivalent evidence only.
+- Collection is paused by user instruction. Do not ask for units to be started
+  or enabled.
+- No workflow or CI file is part of this delivery and none should be added.
+
+## Output
+
+State clearly whether the narrowed delivery is acceptable as-is, needs
+revision, or must be rejected. If it needs revision, give file and line for
+each in-scope blocker, and separate those from the routed defects.

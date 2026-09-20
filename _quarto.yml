@@ -16,6 +16,7 @@ project:
     - quarto/08_nowscore_history_audit.qmd
     - quarto/10_settlement_external_storage.qmd
     - quarto/11_issue_discovery_contract.qmd
+    - quarto/12_collection_runtime_stack.qmd
 
 execute:
   freeze: false
