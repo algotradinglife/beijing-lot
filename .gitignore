@@ -201,6 +201,8 @@ evidence/bj_freeze_review_001/.publish.lock
 # rendered DOMs and screenshots stay off-repo under <data root>/audits).
 !results/bj480_quarantine_replay_v1/
 !results/bj480_quarantine_replay_v1/**
+!results/bj479_halftime_correction_v1/
+!results/bj479_halftime_correction_v1/**
 
 /.quarto/
 **/*.quarto_ipynb

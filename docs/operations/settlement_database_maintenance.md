@@ -39,7 +39,7 @@ export SETTLEMENT_DB="$BEIJING_LOT_DATA_ROOT/settlement/20260907_history_five_pl
 `build_database(run_root, output)` 不覆盖已有库。原始证据验证在写入前执行，
 数据与最终 receipt 同事务；失败产物没有有效构建封印，不能使用。
 新增历史批次走新的完整汇集与重建，不将不同库直接拼接。
-重建产生来源原始值，不自动包含之后人工核验的 SP 更正。
+重建产生来源原始值，不自动包含之后人工核验的 SP 更正或半场比分更正。
 
 ## 修正缺失比分 SP
 
@@ -66,6 +66,50 @@ receipt.source_url/source_sha256；`EVIDENCE_HTML` 必须与哈希完全一致�
 会核验已更正值再返回 already_applied。原始 payload/findings 保留，
 `sp_correction` 和 `sp_correction_batch` 保存原值、新值、证据及审计备注。
 数据库、备份与证据路径必须不同。新建备份不会覆盖旧备份。
+
+## 修正半场比分
+
+通用入口为 `scripts/apply_settlement_halftime_update.py`，对应
+`src/settlement_halftime_update.py::apply_halftime_update(..., approval_note=...)`。
+它只更正**被源站自身全场比分否定**的半场值（半场进球数大于全场），全场比分一律不改。
+
+半场更正的证据类别与 SP 不同：500 与 Nowscore 两源携带**同一个**错值，任何一源都不能
+自证，因此只能采用第三方赛果档案。`src/settlement_halftime_evidence.py` 对每个来源做
+DOM 感知提取，并要求**至少两个独立来源给出完全一致的半场值**；单一来源、来源分歧、
+全场比分或比赛日期与期次不符，一律失败关闭。
+
+```sh
+.venv/bin/python scripts/apply_settlement_halftime_update.py \
+  --database "$SETTLEMENT_DB" --ledger "$HALFTIME_LEDGER" \
+  --backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-halftime-update.sqlite" \
+  --data-root "$BEIJING_LOT_DATA_ROOT" --mountpoint "$SETTLEMENT_MOUNT" \
+  --approval-note '已批准的裁决编号与依据'
+```
+
+`HALFTIME_LEDGER` 是审定 JSON（schema `bj479_halftime_correction_ledger_v1`），逐场列出
+期次/slot/玩法、原半场、新半场、全场比分，以及各来源证据文件的**绝对路径与 SHA-256**。
+证据原始字节保留在 `audits/` 下（见 `evidence_manifest.json`），账本只绑定其哈希；
+批次行记录该清单，因此无需信任已被改写的数据库即可复放并复核。
+
+事务、备份、幂等与审计语义与 SP 更正一致：写入前用 SQLite backup 接口备份并检查完整性，
+失败整体回滚，重复同一账本核验已更正值后返回 `already_applied`；
+`halftime_correction` 与 `halftime_correction_batch` 保存原值、新值、全场比分、印证来源、
+原始来源哈希与审计备注。构建回执的 `data_sha256` 保留为**更正前快照**，
+并在回执中登记 `halftime_correction_batch_id`；`registry/settlement-current.json`
+的 `sha256` 更新为更正后文件哈希，其 `corrections` 数组记录每次更正的批次与备份。
+
+独立复核：
+
+```sh
+.venv/bin/python scripts/verify_settlement_halftime_correction.py \
+  --database "$SETTLEMENT_DB" --ledger "$HALFTIME_LEDGER" \
+  --backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-halftime-update.sqlite" \
+  --out results/bj479_halftime_correction_v1/correction_verification.json
+```
+
+交付与验收入口：`quarto/260_settlement_halftime_correction.qmd`。
+半场比分不参与任何下注、SP 或结算推导（`src/decision_api` 将其排除在决策依据之外），
+故该更正只修正记录与展示，不影响既有结果。
 
 ## R 与 QMD
 

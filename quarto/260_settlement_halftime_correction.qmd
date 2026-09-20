@@ -1,0 +1,127 @@
+---
+title: "半场比分外部印证更正（#479）"
+subtitle: "3 场「半场进球数 > 全场进球数」的独立核实、更正与回执"
+params:
+  verification_json: "results/bj479_halftime_correction_v1/correction_verification.json"
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+本报告记录 #479 中 3 场「半场进球数 > 全场进球数」异常的处置：**仅更正半场比分**，
+并以两个独立第三方赛果档案逐场印证。输入为保留的证据原始字节与 sealed 库审计表；
+本报告**只读**，不联网、不重抓。
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+stopifnot(requireNamespace("jsonlite", quietly = TRUE))
+stopifnot(is.character(params$verification_json), length(params$verification_json) == 1L,
+          !is.na(params$verification_json), file.exists(params$verification_json))
+v <- jsonlite::fromJSON(params$verification_json, simplifyVector = FALSE)
+stopifnot(identical(v$schema, "bj479_halftime_correction_verification_v1"))
+```
+
+## 结论摘要
+
+```{r}
+cat("判定通过：", v$conclusion$verified, "\n")
+cat("涉及期次：", v$conclusion$fixtures, "｜更正观测：", v$conclusion$observations, "\n")
+cat("全场比分未变：", v$conclusion$full_time_unchanged, "\n")
+cat("证据文件复核：", v$replay$evidence_files_verified, "个，哈希全部匹配：",
+    v$replay$all_hashes_match, "\n")
+cat("库内值全部由证据复现：", v$replay$all_values_reproduced, "\n")
+cat("备份 quick_check：", v$backup$quick_check, "｜仍保存原值：",
+    v$backup$holds_original_values, "\n")
+cat("\n更正批次：", v$batch_id, "\n")
+cat("执行时间：", v$applied_at, "\n")
+```
+
+**这 3 场的全场比分本来就是对的**，需要更正的是被源站自身全场比分否定的半场值。
+500 源与 Nowscore 源携带**同一个**错值，因此两者都不能自证；更正依据只能是第三方赛果档案。
+
+## 逐场更正与印证来源
+
+```{r}
+rows <- lapply(v$corrections, function(c) {
+  data.frame(
+    期次 = c$issue, slot = c$slot, 玩法数 = c$plays,
+    原半场 = c$old_half_time, 新半场 = c$new_half_time,
+    库内半场 = paste(unlist(c$database_half_time), collapse = "/"),
+    全场 = as.character(c$full_time),
+    印证来源 = paste(unlist(c$corroborating_sources), collapse = " + "),
+    复放一致 = c$replay_agrees, stringsAsFactors = FALSE)
+})
+tibble::as_tibble(do.call(rbind, rows))
+```
+
+## 证据来源明细（逐来源提取值）
+
+```{r}
+src <- do.call(rbind, lapply(v$corrections, function(c) {
+  do.call(rbind, lapply(c$sources, function(s) data.frame(
+    期次 = c$issue, slot = c$slot, 来源 = s$source_id,
+    半场 = s$half_time, 全场 = s$full_time,
+    字节 = s$bytes, sha256 = substr(s$sha256, 1, 16), stringsAsFactors = FALSE)))
+}))
+tibble::as_tibble(src)
+```
+
+```{r}
+links <- unique(unlist(lapply(v$corrections, function(c)
+  vapply(c$sources, function(s) s$url, character(1)))))
+cat(paste0("- ", links, collapse = "\n"), "\n")
+```
+
+## 回执绑定
+
+```{r}
+rc <- v$receipt
+cat("构建回执 data_sha256（更正前快照）：", rc$data_sha256, "\n")
+cat("回执登记的更正批次：", rc$halftime_correction_batch_id, "\n")
+cat("回执登记的更正观测数：", rc$corrected_halftime_observations, "\n")
+cat("此前 SP 更正批次（未受影响）：", rc$correction_batch_id, "\n")
+cat("此前 SP 更正观测数（未受影响）：", rc$corrected_options, "\n")
+cat("当前库文件 sha256：", v$database_sha256, "\n")
+```
+
+构建回执中的 `data_sha256` **保留为更正前的构建快照哈希**，与 `registry/settlement-current.json`
+的 `hash_note` 一致；注册表登记的是更正后的文件哈希。更正前状态另有 SQLite 备份可查：
+
+```{r}
+cat("备份路径：", v$backup$path, "\n")
+cat("库路径：", v$database, "\n")
+```
+
+## 校验与失败关闭
+
+```{r}
+cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
+```
+
+实现与测试：
+
+- `src/settlement_halftime_evidence.py` — 逐来源 DOM 感知提取 + ≥2 独立来源一致才采纳；
+  单一来源、来源分歧、全场比分与期次不符一律**失败关闭**。
+- `src/settlement_halftime_update.py` — 事务写入：审批备注必填、路径互斥、账本哈希即批次号、
+  证据哈希复核、目标行必须仍是账本记录的旧值、备份 `quick_check`、失败整体回滚、重跑幂等。
+- `scripts/apply_settlement_halftime_update.py` / `scripts/verify_settlement_halftime_correction.py`
+  — 薄入口。
+- 测试：`tests/test_settlement_halftime_evidence.py`、
+  `tests/scripts/test_apply_settlement_halftime_update.py`、
+  `tests/scripts/test_verify_settlement_halftime_correction.py`（共 32 项，全通过）。
+
+## 局限
+
+```{r}
+cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
+```
+
+补充说明：
+
+- 半场比分**不参与任何下注、SP 或结算推导**（`src/decision_api` 明确将其排除在决策依据之外），
+  故本次更正不影响任何既有结果，只修正记录与展示。
+- 从封存原始字节重放构建，**按设计**仍会产生源站的错误半场值；本次更正是与 SP 更正同样的
+  **独立记录层**，不是对构建逻辑的改写。
+- 本交付未移除 `halftime_exceeds_fulltime` 探针 —— 它是真阳性，源站确有此矛盾。

@@ -1,0 +1,185 @@
+{
+ "schema": "bj479_halftime_correction_verification_v1",
+ "database": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
+ "database_sha256": "ceb69e9f24867ed750cd321fcb765bd9e29eee7ac677757988b1523145e4083c",
+ "batch_id": "d43e7e12b4b5bf99451491cf172b8b99508db50c09f741b555ce8c5685260a14",
+ "applied_at": "2026-09-20T15:15:37.086519+00:00",
+ "note": "用户明确授权直接更新原 SQLite；21082/90、21082/94、24041/328 三场半场比分仅订正被源站自身全场比分否定的错误值（3-2→2-2、2-0→1-0、2-1→1-1）。500 与 Nowscore 两源携带同一错值，故仅采用第三方赛果档案独立印证（每场两个来源：GlobalSportsArchive、24score、Sports Mole、FootballCritic、Transfermarkt）。全场比分一律不改；原始 payload 与审计发现保留。",
+ "batch_rows": 15,
+ "batch_fixtures": 3,
+ "recorded_backup": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/nowscore_history_replay.before_bj479_halftime_update.sqlite",
+ "evidence_manifest": [
+  {
+   "source_id": "globalsportsarchive",
+   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/bj479-halftime-corroboration-v1/raw/gsa-21082-90.html",
+   "sha256": "e767b5d0256bb264131a7c2d3c781b798b733e7ea9cc4bb41134a07bfff62245",
+   "url": "https://globalsportsarchive.com/match/soccer/2021-08-06/galway-united-fc-vs-cork-city-fc/2312895/"
+  },
+  {
+   "source_id": "24score",
+   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/bj479-halftime-corroboration-v1/raw/24score-21082-90.html",
+   "sha256": "d7e8c4df0b800f04b132cdf13872015e2867f4555ddc5bb2e056b6dd826cc3d6",
+   "url": "https://en.24score.com/football/match/593727-galway-cork-city"
+  },
+  {
+   "source_id": "sportsmole",
+   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/bj479-halftime-corroboration-v1/raw/sportsmole-21082-94.html",
+   "sha256": "1a4c2bed230f1dca4de43c65bd871ef96b1fd6c6cbc6f5f5ae7fa522ee72eb64",
+   "url": "https://www.sportsmole.co.uk/football/belgian-pro-league/club-brugge-vs-cercle-brugge_game_135981.html"
+  },
+  {
+   "source_id": "footballcritic",
+   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/bj479-halftime-corroboration-v1/raw/footballcritic-21082-94.html",
+   "sha256": "2d6ee076fb2e91c5c59d6c37a9341a95154c4af7c9a7bab194305f55928b66f0",
+   "url": "https://www.footballcritic.com/jupiler-pro-league-club-brugge-kv-cercle-brugge-ksv/match-stats/2384846"
+  },
+  {
+   "source_id": "sportsmole",
+   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/bj479-halftime-corroboration-v1/raw/sportsmole-24041-328.html",
+   "sha256": "798ec97804f0412b4a7125bddc538374d7eb26bb002948313f8659c3f176bec2",
+   "url": "https://www.sportsmole.co.uk/football/serie-b/lecco-vs-cittadella_game_186458.html"
+  },
+  {
+   "source_id": "transfermarkt",
+   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/bj479-halftime-corroboration-v1/raw/transfermarkt-24041-328.html",
+   "sha256": "6c94ce91c5ecaca0f1822a1b19efbd43647bf1c329eb7d7ac4ebbbec567b7e4b",
+   "url": "https://www.transfermarkt.com/calcio-lecco-1912_as-cittadella/index/spielbericht/4112692"
+  }
+ ],
+ "corrections": [
+  {
+   "issue": "21082",
+   "slot": 90,
+   "plays": 5,
+   "old_half_time": "3-2",
+   "new_half_time": "2-2",
+   "ledger_new_half_time": "2-2",
+   "full_time": "2-3",
+   "database_half_time": [
+    "2-2"
+   ],
+   "corroborating_sources": [
+    "24score",
+    "globalsportsarchive"
+   ],
+   "sources": [
+    {
+     "source_id": "globalsportsarchive",
+     "url": "https://globalsportsarchive.com/match/soccer/2021-08-06/galway-united-fc-vs-cork-city-fc/2312895/",
+     "sha256": "e767b5d0256bb264131a7c2d3c781b798b733e7ea9cc4bb41134a07bfff62245",
+     "bytes": 1635607,
+     "half_time": "2-2",
+     "full_time": "2-3"
+    },
+    {
+     "source_id": "24score",
+     "url": "https://en.24score.com/football/match/593727-galway-cork-city",
+     "sha256": "d7e8c4df0b800f04b132cdf13872015e2867f4555ddc5bb2e056b6dd826cc3d6",
+     "bytes": 103059,
+     "half_time": "2-2",
+     "full_time": "2-3"
+    }
+   ],
+   "replay_agrees": true
+  },
+  {
+   "issue": "21082",
+   "slot": 94,
+   "plays": 5,
+   "old_half_time": "2-0",
+   "new_half_time": "1-0",
+   "ledger_new_half_time": "1-0",
+   "full_time": "1-1",
+   "database_half_time": [
+    "1-0"
+   ],
+   "corroborating_sources": [
+    "footballcritic",
+    "sportsmole"
+   ],
+   "sources": [
+    {
+     "source_id": "sportsmole",
+     "url": "https://www.sportsmole.co.uk/football/belgian-pro-league/club-brugge-vs-cercle-brugge_game_135981.html",
+     "sha256": "1a4c2bed230f1dca4de43c65bd871ef96b1fd6c6cbc6f5f5ae7fa522ee72eb64",
+     "bytes": 75467,
+     "half_time": "1-0",
+     "full_time": "1-1"
+    },
+    {
+     "source_id": "footballcritic",
+     "url": "https://www.footballcritic.com/jupiler-pro-league-club-brugge-kv-cercle-brugge-ksv/match-stats/2384846",
+     "sha256": "2d6ee076fb2e91c5c59d6c37a9341a95154c4af7c9a7bab194305f55928b66f0",
+     "bytes": 119594,
+     "half_time": "1-0",
+     "full_time": "1-1"
+    }
+   ],
+   "replay_agrees": true
+  },
+  {
+   "issue": "24041",
+   "slot": 328,
+   "plays": 5,
+   "old_half_time": "2-1",
+   "new_half_time": "1-1",
+   "ledger_new_half_time": "1-1",
+   "full_time": "1-1",
+   "database_half_time": [
+    "1-1"
+   ],
+   "corroborating_sources": [
+    "sportsmole",
+    "transfermarkt"
+   ],
+   "sources": [
+    {
+     "source_id": "sportsmole",
+     "url": "https://www.sportsmole.co.uk/football/serie-b/lecco-vs-cittadella_game_186458.html",
+     "sha256": "798ec97804f0412b4a7125bddc538374d7eb26bb002948313f8659c3f176bec2",
+     "bytes": 83533,
+     "half_time": "1-1",
+     "full_time": "1-1"
+    },
+    {
+     "source_id": "transfermarkt",
+     "url": "https://www.transfermarkt.com/calcio-lecco-1912_as-cittadella/index/spielbericht/4112692",
+     "sha256": "6c94ce91c5ecaca0f1822a1b19efbd43647bf1c329eb7d7ac4ebbbec567b7e4b",
+     "bytes": 189195,
+     "half_time": "1-1",
+     "full_time": "1-1"
+    }
+   ],
+   "replay_agrees": true
+  }
+ ],
+ "replay": {
+  "evidence_files_verified": 6,
+  "all_hashes_match": true,
+  "all_values_reproduced": true
+ },
+ "backup": {
+  "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/nowscore_history_replay.before_bj479_halftime_update.sqlite",
+  "quick_check": "ok",
+  "holds_original_values": true
+ },
+ "receipt": {
+  "data_sha256": "e37597091f0375c28a3c080db111dbb66a620e444ebc336ba5a3c8638c522f7b",
+  "halftime_correction_batch_id": "d43e7e12b4b5bf99451491cf172b8b99508db50c09f741b555ce8c5685260a14",
+  "corrected_halftime_observations": 15,
+  "corrected_halftime_fixtures": 3,
+  "correction_batch_id": "601dc2b6f9a56e828bc646a1f528a2d987eeb2db3c755de5c1b9ce54cfa33b16",
+  "corrected_options": 86
+ },
+ "conclusion": {
+  "verified": true,
+  "fixtures": 3,
+  "observations": 15,
+  "full_time_unchanged": true,
+  "limitations": [
+   "Corroboration is external: the 500 and Nowscore sources carry the same wrong half-time value, so neither can corroborate its own correction.",
+   "Replaying the build from the archived raw bytes reproduces the source's wrong half-time value by design; this correction is a separately recorded layer, exactly as the earlier SP correction is.",
+   "Half-time is excluded from the decision basis (see src/decision_api); no betting, SP or settlement derivation consumes the corrected field."
+  ]
+ }
+}
