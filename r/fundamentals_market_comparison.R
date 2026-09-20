@@ -10,12 +10,18 @@ bounded_market_lambdas <- function(market, home_away, alpha, cap) {
 
 # Poisson grid projections used by the existing shape evaluator/coverage rules.
 # No outcome inputs. Tail probability is bounded by the supplied tolerance.
-market_score_projection <- function(lambda, handicap, tail_tolerance) {
-  g <- illustrative_score_grid(lambda[1],lambda[2],handicap,tail_tolerance)$grid
+#
+# `rho` is the Dixon-Coles low-score dependence parameter and is REQUIRED: an
+# independent-Poisson grid (rho = 0) understates the draw against a de-vigged
+# 1X2 target, so leaving this implicit would let the compressed caliber survive
+# by default. Callers that genuinely want independence must pass 0 explicitly.
+market_score_projection <- function(lambda, handicap, tail_tolerance, rho) {
+  g <- dixon_coles_score_grid(lambda[1],lambda[2],handicap,tail_tolerance,rho)$grid
   g$net <- g$home_goals-g$away_goals
   g$outcome <- g$handicap_outcome
   total <- g$home_goals+g$away_goals
   p <- list(lambda_home=lambda[1],lambda_away=lambda[2],
+    low_score_dependence_rho=rho,
     finite_mean_total=sum(total*g$probability),finite_mean_net=sum(g$net*g$probability),
     boundary_mass=sum(g$probability[g$home_goals==max(g$home_goals) | g$away_goals==max(g$away_goals)]))
   for(d in c('W','D','L')) p[[d]] <- sum(g$probability[g$outcome==d])
@@ -122,7 +128,7 @@ prepare_market_comparison <- function(models, quotes, cutoffs, league_catalog,
       lambdas <- list(baseline=raw,market=ml,
         corrected10=bounded_market_lambdas(ml,raw,corrections[1],cap),
         corrected20=bounded_market_lambdas(ml,raw,corrections[2],cap))
-      projections <- lapply(lambdas,market_score_projection,handicap=f$handicap,tail_tolerance=models$parameters$tail_tolerance)
+      projections <- lapply(lambdas,market_score_projection,handicap=f$handicap,tail_tolerance=models$parameters$tail_tolerance,rho=models$parameters$low_score_dependence_rho)
       residuals <- vapply(projections,function(p)max(abs(unlist(p$fields[c('ordinary_W','ordinary_D','ordinary_L')])-market$ordinary_target)),numeric(1))
       status$max_market_residual <- max(residuals[-1])
       if(status$max_market_residual>residual_limit) {

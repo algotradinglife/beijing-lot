@@ -1,4 +1,5 @@
 source('../../r/probability_exploration.R')
+source('../../r/dixon_coles_grid.R')
 source('../../r/strength_market_scenario.R')
 source('../../r/fundamentals_score_diagnostic.R')
 source('../../r/fundamentals_score_shape.R')
@@ -10,16 +11,16 @@ test_that('bounded correction limits each team and projection reconciles', {
   expect_error(bounded_market_lambdas(c(0,1),c(1,1),.2,.1),'Positive')
   expect_error(bounded_market_lambdas(c(1,1),c(1,1),2,.1),'Invalid')
   expect_error(bounded_market_lambdas(c(1,1),c(1,1),.2,NA_real_),'Invalid')
-  p <- market_score_projection(c(2,1),-1,1e-10)
+  p <- market_score_projection(c(2,1),-1,1e-10,0)
   expect_equal(sum(unlist(p$fields[c('W','D','L')])),1)
   expect_equal(p$fields$D,sum(p$grid$probability[p$grid$net==1]))
   expect_equal(p$fields$home_ge3,sum(p$grid$probability[p$grid$net>=3]))
-  expect_error(market_score_projection(c(-1,1),0,1e-10))
+  expect_error(market_score_projection(c(-1,1),0,1e-10,0))
 })
 
 test_that('market comparison seals label-free choices and rejects mismatched inputs', {
   project <- normalizePath('../..')
-  p <- market_score_projection(c(1.8,1.2),-1,1e-10)
+  p <- market_score_projection(c(1.8,1.2),-1,1e-10,0)
   f <- dplyr::bind_cols(tibble::tibble(slot=1L,provider_id='001',home='Home',away='Away',
     variant='raw',status='OK_DIAGNOSTIC',handicap=-1),tibble::as_tibble(p$fields))
   cuts <- list('001'=list('1'='2010-01-01T00:00:00Z'))
@@ -30,7 +31,7 @@ test_that('market comparison seals label-free choices and rejects mismatched inp
     coverage_choices=score_coverage_choices(list('001'=e)),
     provenance=list('001'=list(review_context=list(list(slot=1L,home_league_evidence='A',away_league_evidence='B')))),
     implementation_hashes=stats::setNames(digest::digest(file='../../r/probability_exploration.R',algo='sha256'),'r/probability_exploration.R'),
-    parameters=list(tail_tolerance=1e-10),gates=tibble::tibble(),historical_admission=FALSE)
+    parameters=list(tail_tolerance=1e-10,low_score_dependence_rho=0),gates=tibble::tibble(),historical_admission=FALSE)
   model$seal <- digest::digest(model,algo='sha256')
   odds <- 1/unlist(p$fields[c('ordinary_W','ordinary_D','ordinary_L')])
   capture_path <- tempfile();writeLines('synthetic quote envelope',capture_path)

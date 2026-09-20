@@ -187,3 +187,9 @@ evidence/bj_freeze_review_001/.publish.lock
 # Issue #383 source-bound walk-forward diagnostic package.
 !results/cutoff_walkforward/
 !results/cutoff_walkforward/**
+
+/.quarto/
+**/*.quarto_ipynb
+
+# Local scratch for research QMD inputs (see scripts/build_dixon_coles_inputs.py)
+.tmpwork/

@@ -1,4 +1,5 @@
 source('../../r/probability_exploration.R')
+source('../../r/dixon_coles_grid.R')
 source('../../r/strength_market_scenario.R')
 source('../../r/fundamentals_score_diagnostic.R')
 source('../../r/fundamentals_score_shape.R')
@@ -27,22 +28,22 @@ test_that('heterogeneous line inversion recovers total and fixed total fit', {
   expect_error(total_market_constraint(q[c(1,1),],c(.1,16)),'Invalid')
   expect_error(total_market_constraint(q[0,],c(.1,16)),'Invalid')
   expect_error(total_market_constraint(q,c(3,4)))
-  p <- market_score_projection(c(1.8,.9),-1,1e-10)
+  p <- market_score_projection(c(1.8,.9),-1,1e-10,0)
   target <- unlist(p$fields[c('ordinary_W','ordinary_D','ordinary_L')])
-  fit <- total_constrained_projection(2.7,target,-1,1e-10)
+  fit <- total_constrained_projection(2.7,target,-1,1e-10,0)
   expect_equal(fit$fields$lambda_home,1.8,tolerance=1e-7)
   expect_equal(fit$fields$lambda_home+fit$fields$lambda_away,2.7)
   expect_lt(fit$fields$market_residual,1e-7)
-  expect_error(total_constrained_projection(2.7,c(.5,.5,.5),0,1e-10),'Invalid')
+  expect_error(total_constrained_projection(2.7,c(.5,.5,.5),0,1e-10,0),'Invalid')
 })
 
 test_that('OU scenarios preserve total seal choices and refuse mutation', {
   project <- normalizePath('../..')
-  p <- market_score_projection(c(1.8,.9),-1,1e-10)
+  p <- market_score_projection(c(1.8,.9),-1,1e-10,0)
   row <- dplyr::bind_cols(tibble::tibble(issue='001',slot=1L,provider_id='id',home='Home',away='Away',
     variant='raw',status='OK_DIAGNOSTIC',handicap=-1),tibble::as_tibble(p$fields))
   baseline <- row
-  bp <- market_score_projection(c(1.2,1.5),-1,1e-10)
+  bp <- market_score_projection(c(1.2,1.5),-1,1e-10,0)
   for(field in names(bp$fields)) baseline[[field]] <- bp$fields[[field]]
   fixtures <- dplyr::bind_rows(dplyr::mutate(baseline,scenario='baseline'),dplyr::mutate(row,scenario='market'))
   cuts <- list('001'=list('1'='2010-01-01T00:00:00Z'))
@@ -61,7 +62,7 @@ test_that('OU scenarios preserve total seal choices and refuse mutation', {
   totals$canonical_json <- as.character(jsonlite::toJSON(totals,auto_unbox=TRUE,digits=17,null='null'))
   totals$seal <- digest::digest(totals$canonical_json,algo='sha256',serialize=FALSE)
   args <- list(market=market,totals=totals,cutoffs=cuts,project_root=project,generated_at='2026-09-08T00:00:00Z',
-    total_bounds=c(.1,16),correction_alpha=.1,residual_limit=.05,tail_tolerance=1e-10)
+    total_bounds=c(.1,16),correction_alpha=.1,residual_limit=.05,tail_tolerance=1e-10,rho=0)
   x <- do.call(prepare_total_market_comparison,args)
   expect_equal(nrow(x$fixtures),4)
   expect_equal(x$fixtures$lambda_home+x$fixtures$lambda_away,rep(2.7,4))

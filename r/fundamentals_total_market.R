@@ -26,17 +26,19 @@ total_market_constraint <- function(quotes, bounds) {
 }
 
 # Fix OU total mean; minimize ordinary W/D/L squared residual over home lambda.
-# Overidentified independent Poisson need not match all prices: report residual.
-total_constrained_projection <- function(total, ordinary_target, handicap, tail_tolerance) {
+# Overidentified grid need not match all prices: report residual. `rho` is the
+# frozen Dixon-Coles dependence parameter; with it fixed this stays a
+# one-dimensional search, which is what keeps the model identified.
+total_constrained_projection <- function(total, ordinary_target, handicap, tail_tolerance, rho) {
   if(length(total)!=1 || is.na(total) || !is.finite(total) || total<=.1 ||
      length(ordinary_target)!=3L || anyNA(ordinary_target) || any(!is.finite(ordinary_target)) ||
      any(ordinary_target<=0) || abs(sum(ordinary_target)-1)>1e-10) stop('Invalid total/ordinary target')
   objective <- function(home) {
-    p <- market_score_projection(c(home,total-home),handicap,tail_tolerance)
+    p <- market_score_projection(c(home,total-home),handicap,tail_tolerance,rho)
     sum((unlist(p$fields[c('ordinary_W','ordinary_D','ordinary_L')])-ordinary_target)^2)
   }
   fit <- stats::optimize(objective,c(.05,total-.05),tol=1e-10)
-  p <- market_score_projection(c(fit$minimum,total-fit$minimum),handicap,tail_tolerance)
+  p <- market_score_projection(c(fit$minimum,total-fit$minimum),handicap,tail_tolerance,rho)
   p$fields$market_residual <- max(abs(unlist(p$fields[c('ordinary_W','ordinary_D','ordinary_L')])-ordinary_target))
   p
 }
@@ -45,7 +47,7 @@ total_constrained_projection <- function(total, ordinary_target, handicap, tail_
 # correction, holding OU total fixed. Match explicit cutoffs and source seals.
 # Reads bound file hashes only; never reads target labels or writes files.
 prepare_total_market_comparison <- function(market, totals, cutoffs, project_root,
-    generated_at, total_bounds, correction_alpha, residual_limit, tail_tolerance) {
+    generated_at, total_bounds, correction_alpha, residual_limit, tail_tolerance, rho) {
   if(!identical(market$seal,digest::digest(market[c('fixtures','grids','choices','receipt')],algo='sha256')) ||
      !identical(cutoffs,market$receipt$cutoffs) || !identical(cutoffs,totals$cutoffs) ||
      !identical(totals$euro_seal,market$receipt$quote_inputs$seal) ||
@@ -79,11 +81,11 @@ prepare_total_market_comparison <- function(market, totals, cutoffs, project_roo
     base <- dplyr::filter(market$fixtures,issue==f$issue,slot==f$slot,scenario=='baseline')
     odds <- dplyr::bind_rows(Filter(function(x)x$issue==f$issue && x$slot==f$slot,market$receipt$quote_inputs$rows))
     target <- unlist(odds[c('odds_W','odds_D','odds_L')]);target <- (1/target)/sum(1/target)
-    p <- total_constrained_projection(constraint$lambda_total,target,f$handicap,tail_tolerance)
+    p <- total_constrained_projection(constraint$lambda_total,target,f$handicap,tail_tolerance,rho)
     share <- p$fields$lambda_home/constraint$lambda_total
     raw_share <- base$lambda_home/(base$lambda_home+base$lambda_away)
     corrected_share <- (1-correction_alpha)*share+correction_alpha*raw_share
-    cp <- market_score_projection(constraint$lambda_total*c(corrected_share,1-corrected_share),f$handicap,tail_tolerance)
+    cp <- market_score_projection(constraint$lambda_total*c(corrected_share,1-corrected_share),f$handicap,tail_tolerance,rho)
     cp$fields$market_residual <- max(abs(unlist(cp$fields[c('ordinary_W','ordinary_D','ordinary_L')])-target))
     statuses$max_ou_market_residual[idx] <- max(p$fields$market_residual,cp$fields$market_residual)
     constraints[[key]] <- dplyr::mutate(constraint$companies,fixture_lambda_total=constraint$lambda_total)
