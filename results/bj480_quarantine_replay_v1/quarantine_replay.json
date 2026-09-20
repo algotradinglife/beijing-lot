@@ -1,0 +1,506 @@
+{
+ "schema": "bj480_quarantine_replay_v1",
+ "replay_db": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
+ "receipt_sha256_source": "e37597091f0375c28a3c080db111dbb66a620e444ebc336ba5a3c8638c522f7b",
+ "classification_counts": {
+  "quarantined": 25
+ },
+ "reason_counts": {
+  "embedded roster and visible all=1 rows differ": 25
+ },
+ "failure_count": 25,
+ "quarantined_issue_count": 5,
+ "typeids_per_issue": {
+  "20082": [
+   5,
+   6,
+   7,
+   8,
+   9
+  ],
+  "20123": [
+   5,
+   6,
+   7,
+   8,
+   9
+  ],
+  "23075": [
+   5,
+   6,
+   7,
+   8,
+   9
+  ],
+  "24014": [
+   5,
+   6,
+   7,
+   8,
+   9
+  ],
+  "25114": [
+   5,
+   6,
+   7,
+   8,
+   9
+  ]
+ },
+ "missing_slot_total": 21,
+ "issues": [
+  {
+   "issue": "20082",
+   "typeids": [
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "missing_slots": [
+    5
+   ],
+   "per_typeid": {
+    "5": {
+     "sha256": "9c1448a52059fddebb22191839af3e4bb6dabd02897ed8c41e115ae2bd98b7f1",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0065/raw/9c1448a52059fddebb22191839af3e4bb6dabd02897ed8c41e115ae2bd98b7f1.html",
+     "embedded_count": 206,
+     "visible_count": 205,
+     "missing_slots": [
+      5
+     ],
+     "embedded_max_slot": 206,
+     "visible_max_slot": 206
+    },
+    "6": {
+     "sha256": "b93b3b8c674d960fb7aa5d97460feb2919558e34f51ec406f4e56ce2ceadff5d",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0065/raw/b93b3b8c674d960fb7aa5d97460feb2919558e34f51ec406f4e56ce2ceadff5d.html",
+     "embedded_count": 206,
+     "visible_count": 205,
+     "missing_slots": [
+      5
+     ],
+     "embedded_max_slot": 206,
+     "visible_max_slot": 206
+    },
+    "7": {
+     "sha256": "5f4edc7c199b0c046a8945d5f4cea3961954fe77dbeb205cc8fae6326429d61e",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0065/raw/5f4edc7c199b0c046a8945d5f4cea3961954fe77dbeb205cc8fae6326429d61e.html",
+     "embedded_count": 206,
+     "visible_count": 205,
+     "missing_slots": [
+      5
+     ],
+     "embedded_max_slot": 206,
+     "visible_max_slot": 206
+    },
+    "8": {
+     "sha256": "47b25c1d2ec9d20cfed227847717879d995a395dc5d3fef54723a84d3af725e1",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0065/raw/47b25c1d2ec9d20cfed227847717879d995a395dc5d3fef54723a84d3af725e1.html",
+     "embedded_count": 206,
+     "visible_count": 205,
+     "missing_slots": [
+      5
+     ],
+     "embedded_max_slot": 206,
+     "visible_max_slot": 206
+    },
+    "9": {
+     "sha256": "2fa4e7168d9bf90e6b469bf3617cb46fb3f787eb48ffa47204db6d004b5f4cb3",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0065/raw/2fa4e7168d9bf90e6b469bf3617cb46fb3f787eb48ffa47204db6d004b5f4cb3.html",
+     "embedded_count": 206,
+     "visible_count": 205,
+     "missing_slots": [
+      5
+     ],
+     "embedded_max_slot": 206,
+     "visible_max_slot": 206
+    }
+   }
+  },
+  {
+   "issue": "20123",
+   "typeids": [
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "missing_slots": [
+    116
+   ],
+   "per_typeid": {
+    "5": {
+     "sha256": "d78bd2273b78b39cc11e48041d20c432c475bbd0278741834f50915ff4e7bb82",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0066/raw/d78bd2273b78b39cc11e48041d20c432c475bbd0278741834f50915ff4e7bb82.html",
+     "embedded_count": 458,
+     "visible_count": 457,
+     "missing_slots": [
+      116
+     ],
+     "embedded_max_slot": 458,
+     "visible_max_slot": 458
+    },
+    "6": {
+     "sha256": "cc704d1ecf3a93d3a81a9c284ca0412772e5c23b0acb3980d91794a4b4e5925a",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0066/raw/cc704d1ecf3a93d3a81a9c284ca0412772e5c23b0acb3980d91794a4b4e5925a.html",
+     "embedded_count": 458,
+     "visible_count": 457,
+     "missing_slots": [
+      116
+     ],
+     "embedded_max_slot": 458,
+     "visible_max_slot": 458
+    },
+    "7": {
+     "sha256": "f162bcd3fcfb700e7acc8de9ef50543c638c484e553ff732e9c8c6c97dceb255",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0066/raw/f162bcd3fcfb700e7acc8de9ef50543c638c484e553ff732e9c8c6c97dceb255.html",
+     "embedded_count": 458,
+     "visible_count": 457,
+     "missing_slots": [
+      116
+     ],
+     "embedded_max_slot": 458,
+     "visible_max_slot": 458
+    },
+    "8": {
+     "sha256": "26854c663c3af4f2f3a3cde6055c02c553628183da1d37451f213cb9a8d30036",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0066/raw/26854c663c3af4f2f3a3cde6055c02c553628183da1d37451f213cb9a8d30036.html",
+     "embedded_count": 458,
+     "visible_count": 457,
+     "missing_slots": [
+      116
+     ],
+     "embedded_max_slot": 458,
+     "visible_max_slot": 458
+    },
+    "9": {
+     "sha256": "c27520c5d15a4d8f018ae46f9ce4febf8704baad06ac6b8b0b2cc5ef48207d51",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0066/raw/c27520c5d15a4d8f018ae46f9ce4febf8704baad06ac6b8b0b2cc5ef48207d51.html",
+     "embedded_count": 458,
+     "visible_count": 457,
+     "missing_slots": [
+      116
+     ],
+     "embedded_max_slot": 458,
+     "visible_max_slot": 458
+    }
+   }
+  },
+  {
+   "issue": "23075",
+   "typeids": [
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "missing_slots": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    154
+   ],
+   "per_typeid": {
+    "5": {
+     "sha256": "e1b24c8e199b897235736a79a3950987a74b3bf4995cc2becb6fddf16e4bd211",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0073/raw/e1b24c8e199b897235736a79a3950987a74b3bf4995cc2becb6fddf16e4bd211.html",
+     "embedded_count": 196,
+     "visible_count": 179,
+     "missing_slots": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      154
+     ],
+     "embedded_max_slot": 196,
+     "visible_max_slot": 196
+    },
+    "6": {
+     "sha256": "379b4019e99a2dd533760f6adaaac81b70ebae709ed16d60b133e9a57534ada8",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0073/raw/379b4019e99a2dd533760f6adaaac81b70ebae709ed16d60b133e9a57534ada8.html",
+     "embedded_count": 196,
+     "visible_count": 179,
+     "missing_slots": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      154
+     ],
+     "embedded_max_slot": 196,
+     "visible_max_slot": 196
+    },
+    "7": {
+     "sha256": "0dcec6ad7299ed256aaee09ca8d45bf26f14c8e2e2e3afb9bc6cb8d5e2d8dd6a",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0073/raw/0dcec6ad7299ed256aaee09ca8d45bf26f14c8e2e2e3afb9bc6cb8d5e2d8dd6a.html",
+     "embedded_count": 196,
+     "visible_count": 179,
+     "missing_slots": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      154
+     ],
+     "embedded_max_slot": 196,
+     "visible_max_slot": 196
+    },
+    "8": {
+     "sha256": "fc265e5e52a30bcac1944fabdca94140335e12f1e4f7e77ff34487c3cb09aaf2",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0073/raw/fc265e5e52a30bcac1944fabdca94140335e12f1e4f7e77ff34487c3cb09aaf2.html",
+     "embedded_count": 196,
+     "visible_count": 179,
+     "missing_slots": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      154
+     ],
+     "embedded_max_slot": 196,
+     "visible_max_slot": 196
+    },
+    "9": {
+     "sha256": "34cb99509e44ff4269cf327ea8543f16bf408c4febc4a1ad205af3d0e79dac6d",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0073/raw/34cb99509e44ff4269cf327ea8543f16bf408c4febc4a1ad205af3d0e79dac6d.html",
+     "embedded_count": 196,
+     "visible_count": 179,
+     "missing_slots": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      154
+     ],
+     "embedded_max_slot": 196,
+     "visible_max_slot": 196
+    }
+   }
+  },
+  {
+   "issue": "24014",
+   "typeids": [
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "missing_slots": [
+    245
+   ],
+   "per_typeid": {
+    "5": {
+     "sha256": "70373c0f92e074ce4204be9838ab89ad194a36cb97cd4c8b55f1cbfbbb376cc9",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0075/raw/70373c0f92e074ce4204be9838ab89ad194a36cb97cd4c8b55f1cbfbbb376cc9.html",
+     "embedded_count": 245,
+     "visible_count": 244,
+     "missing_slots": [
+      245
+     ],
+     "embedded_max_slot": 245,
+     "visible_max_slot": 244
+    },
+    "6": {
+     "sha256": "edf4f6db6a114ebffb9ad8c7e298c338d12fa00aa77fe15042e9fdf842c93858",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0075/raw/edf4f6db6a114ebffb9ad8c7e298c338d12fa00aa77fe15042e9fdf842c93858.html",
+     "embedded_count": 245,
+     "visible_count": 244,
+     "missing_slots": [
+      245
+     ],
+     "embedded_max_slot": 245,
+     "visible_max_slot": 244
+    },
+    "7": {
+     "sha256": "1050ac68119c02909d60be7d8c47831edf6b0fd7fefaca45d6a0d86c9121cdc4",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0075/raw/1050ac68119c02909d60be7d8c47831edf6b0fd7fefaca45d6a0d86c9121cdc4.html",
+     "embedded_count": 245,
+     "visible_count": 244,
+     "missing_slots": [
+      245
+     ],
+     "embedded_max_slot": 245,
+     "visible_max_slot": 244
+    },
+    "8": {
+     "sha256": "a79531e920c22e3c268e93550e40b0570425dc080e7396f4a332fce18bf5ebe6",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0075/raw/a79531e920c22e3c268e93550e40b0570425dc080e7396f4a332fce18bf5ebe6.html",
+     "embedded_count": 245,
+     "visible_count": 244,
+     "missing_slots": [
+      245
+     ],
+     "embedded_max_slot": 245,
+     "visible_max_slot": 244
+    },
+    "9": {
+     "sha256": "e3c881144a5611a26ac373699ab33a1963d86e36064ebeb1abf892c8ebe78222",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0075/raw/e3c881144a5611a26ac373699ab33a1963d86e36064ebeb1abf892c8ebe78222.html",
+     "embedded_count": 245,
+     "visible_count": 244,
+     "missing_slots": [
+      245
+     ],
+     "embedded_max_slot": 245,
+     "visible_max_slot": 244
+    }
+   }
+  },
+  {
+   "issue": "25114",
+   "typeids": [
+    5,
+    6,
+    7,
+    8,
+    9
+   ],
+   "missing_slots": [
+    77
+   ],
+   "per_typeid": {
+    "5": {
+     "sha256": "0a2d394e60de0028233c5f995e48bcc282f9ed5dccce1c217de2c70789a55a10",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0080/raw/0a2d394e60de0028233c5f995e48bcc282f9ed5dccce1c217de2c70789a55a10.html",
+     "embedded_count": 308,
+     "visible_count": 307,
+     "missing_slots": [
+      77
+     ],
+     "embedded_max_slot": 308,
+     "visible_max_slot": 308
+    },
+    "6": {
+     "sha256": "55e8af27a0acedb9d09884fd793df776aa0750b6c4cc410f8959835d84856bf0",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0080/raw/55e8af27a0acedb9d09884fd793df776aa0750b6c4cc410f8959835d84856bf0.html",
+     "embedded_count": 308,
+     "visible_count": 307,
+     "missing_slots": [
+      77
+     ],
+     "embedded_max_slot": 308,
+     "visible_max_slot": 308
+    },
+    "7": {
+     "sha256": "e438d47f44850d442a8a8a32c41a87e371dcf56577b3cbc872bd4fc1a445b30c",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0080/raw/e438d47f44850d442a8a8a32c41a87e371dcf56577b3cbc872bd4fc1a445b30c.html",
+     "embedded_count": 308,
+     "visible_count": 307,
+     "missing_slots": [
+      77
+     ],
+     "embedded_max_slot": 308,
+     "visible_max_slot": 308
+    },
+    "8": {
+     "sha256": "fb65fe774edb23cafb6ecd1ea2c8e3828402966a6a565bb367a4941397e37424",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0080/raw/fb65fe774edb23cafb6ecd1ea2c8e3828402966a6a565bb367a4941397e37424.html",
+     "embedded_count": 308,
+     "visible_count": 307,
+     "missing_slots": [
+      77
+     ],
+     "embedded_max_slot": 308,
+     "visible_max_slot": 308
+    },
+    "9": {
+     "sha256": "3626a120019ae326a3a56453ca0775a8f0c71a649e000eb3db366d524bd55cfb",
+     "raw_path": ".tmpwork/q480/20260907_history_five_play_v2/batches/plays-0080/raw/3626a120019ae326a3a56453ca0775a8f0c71a649e000eb3db366d524bd55cfb.html",
+     "embedded_count": 308,
+     "visible_count": 307,
+     "missing_slots": [
+      77
+     ],
+     "embedded_max_slot": 308,
+     "visible_max_slot": 308
+    }
+   }
+  }
+ ],
+ "conclusion": {
+  "verdict": "source_response_missing_rendered_rows",
+  "parser_defect": false,
+  "parser_relaxation_required": false,
+  "receipt_reproduced": true,
+  "note": "Every quarantined response declares more roster slots in its embedded script than it renders as rows; the absent slots appear nowhere in the page text. Fail-closed quarantine is correct and must not be relaxed."
+ }
+}

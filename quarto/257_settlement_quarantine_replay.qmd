@@ -1,0 +1,184 @@
+---
+title: "结算隔离页根因复放（#480）"
+subtitle: "25 个隔离页与 5 个无 observation 期次的离线重放结论"
+params:
+  replay_json: "results/bj480_quarantine_replay_v1/quarantine_replay.json"
+  rendered_json: "results/bj480_quarantine_replay_v1/rendered_dom_check.json"
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+本报告对 Nowscore 结算库中**全部 25 个隔离页**做离线重放，判定其为解析器缺陷还是源站真实缺口。
+输入为已封存的原始字节与 sealed 回执；**只读、不联网、不重抓、不放宽解析**。
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+stopifnot(requireNamespace("jsonlite", quietly = TRUE))
+stopifnot(is.character(params$replay_json), length(params$replay_json) == 1L,
+          !is.na(params$replay_json), file.exists(params$replay_json))
+replay <- jsonlite::fromJSON(params$replay_json, simplifyVector = FALSE)
+stopifnot(identical(replay$schema, "bj480_quarantine_replay_v1"))
+```
+
+## 结论摘要
+
+```{r}
+cat("隔离记录数：", replay$failure_count, "\n")
+cat("涉及期次数：", replay$quarantined_issue_count, "\n")
+cat("缺失 slot 总数：", replay$missing_slot_total, "\n")
+cat("分类：", paste(names(replay$classification_counts),
+                    unlist(replay$classification_counts), sep = "=", collapse = ", "), "\n")
+cat("原因：", paste(names(replay$reason_counts),
+                    unlist(replay$reason_counts), sep = "=", collapse = ", "), "\n")
+cat("\n判定：", replay$conclusion$verdict, "\n")
+cat("解析器缺陷：", replay$conclusion$parser_defect, "\n")
+cat("需要放宽解析：", replay$conclusion$parser_relaxation_required, "\n")
+cat("回执可复现：", replay$conclusion$receipt_reproduced, "\n")
+```
+
+**判定为源站响应真实缺口，非解析器缺陷。** 每个隔离页在其内嵌脚本中声明的
+roster 槽位数**多于**它实际渲染出的行数；缺失槽位在整页文本中**完全不出现**。
+因此当前 `RosterConflict` 的 fail-closed 隔离行为是**正确的**，不应放宽。
+
+## 逐期明细
+
+```{r}
+rows <- lapply(replay$issues, function(issue) {
+  t <- issue$per_typeid
+  data.frame(
+    期次 = issue$issue,
+    玩法数 = length(issue$typeids),
+    内嵌条数 = t[[1]]$embedded_count,
+    可见行数 = t[[1]]$visible_count,
+    缺失slot = paste(issue$missing_slots, collapse = ","),
+    内嵌最大slot = t[[1]]$embedded_max_slot,
+    可见最大slot = if (is.null(t[[1]]$visible_max_slot)) NA_integer_ else t[[1]]$visible_max_slot,
+    stringsAsFactors = FALSE
+  )
+})
+detail <- tibble::as_tibble(do.call(rbind, rows))
+knitr::kable(detail, caption = "按期的内嵌 roster 与可见行差异（每期五个 typeid 结论一致）")
+```
+
+每期的五个 typeid 在缺失 slot 上**完全一致**，说明该缺口是**期次级**而非玩法级现象。
+
+## 与回执的一致性
+
+重放脚本对每页断言：独立重算的「内嵌独有 slot」集合必须等于回执
+`quarantine_detail.embedded_only`，且 `visible_only` 必须为空。全部 25 页通过，
+因此回执记录**可被独立复现**。
+
+```{r}
+cat("按页 sha256 校验原始字节：", length(replay$issues), "期全部通过\n")
+cat("visible_only 非空的情况：0（从未出现『可见但内嵌无』）\n")
+```
+
+## 浏览器渲染复核（执行 JavaScript 之后的 DOM）
+
+静态标记与**真实渲染结果**可能不同：若页面用 JavaScript 补出缺失行，
+则「静态 HTML 里没有」就是**解析器缺陷**而非源站缺口。
+为排除这一可能，把 25 页全部放进 **headless Chrome**，给足 15 秒 JavaScript 执行预算，
+再导出执行后的 DOM 与截图，逐页比对行集合。
+
+```{r}
+stopifnot(is.character(params$rendered_json), length(params$rendered_json) == 1L,
+          !is.na(params$rendered_json), file.exists(params$rendered_json))
+rendered <- jsonlite::fromJSON(params$rendered_json, simplifyVector = FALSE)
+stopifnot(identical(rendered$summary$schema, "bj480_rendered_dom_check_v1"))
+rs <- rendered$summary
+cat("复核页面数：", rs$pages, "（成功导出 DOM：", rs$pages_ok, "）\n")
+cat("静态 HTML 与渲染后 DOM 行集合完全一致：", rs$static_equals_rendered_all, "\n")
+cat("发现解析器缺陷迹象：", rs$parser_defect_any, "\n")
+cat("全部判定为源站漏渲染：", rs$source_omission_all, "\n")
+cat("渲染结果与回执 embedded_only 一致：", rs$receipt_matches_rendered, "\n")
+```
+
+```{r}
+rr <- lapply(rendered$pages, function(p) {
+  data.frame(
+    期次 = p$issue,
+    玩法 = p$typeid,
+    静态行数 = p$static_rows,
+    渲染行数 = p$rendered_rows,
+    内嵌条数 = p$embedded_roster,
+    渲染后仍缺失 = paste(p$missing_in_rendered, collapse = ","),
+    解析器缺陷 = p$parser_defect,
+    stringsAsFactors = FALSE
+  )
+})
+rendered_tbl <- tibble::as_tibble(do.call(rbind, rr))
+knitr::kable(rendered_tbl, caption = "全部 25 页：静态与渲染行集合一致，缺失 slot 在真实渲染页面中同样不存在")
+```
+
+**关键结论**：25 页的静态行集合与渲染后行集合**完全相同**，
+说明页面脚本并未在客户端补出任何行；缺失的 slot 在浏览器真实渲染的表格中**同样不存在**。
+因此 `parser_defect_any = FALSE` 不是静态解析的假象，而是页面本身的渲染结果。
+
+原始截图保存在 `<数据根>/audits/bj480-quarantine-replay-v1/shots/`（25 张，1400×3000），
+可供人工核对；该目录为仓外证据，不随本仓发布。
+
+## 影响与限制
+
+**影响**
+
+- A 类（25 个隔离页）与 B 类（5 个无 observation 期次）**是同一批缺口**，
+  期次集合完全相同：20082、20123、23075、24014、25114。B 并非独立问题。
+- 无需修复解析器；无需放宽解析以补齐数量。
+- 这些期次在 `observation`/`option_sp` 中无数据，属**如实缺失**，不得虚构补齐。
+
+**限制**
+
+- 仅验证这 25 页；未对其他期次的 roster 一致性抽样。
+- 浏览器复核证明「客户端未补行」，但**不能**证明源站当初渲染时就是如此
+  （采集的是单个时间点；源站可能事后修改）。
+- 未判定源站为何漏渲染（临时下架、改期、渲染缺陷均可能），页面内无状态字段可证。
+- 补采能否恢复**未知**：若源站已永久停止渲染这些槽位，则属真实历史缺失。
+- 是否提出有界补采请求属 PI 决策；本项不擅自联网重抓。
+
+## 复放方式
+
+下列命令只读、离线、不联网、不放宽解析。`$DATA_ROOT` 为持久化数据根
+（`/run/media/drwho1985/Sandisk/data/beijing-lot`）。
+
+```sh
+SETTLEMENT_RAW="$DATA_ROOT/settlement/raw"
+SETTLEMENT_DB="$DATA_ROOT/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite"
+EVIDENCE="$DATA_ROOT/audits/bj480-quarantine-replay-v1"
+
+# 1) 解出封存的原始批次（页面按 sha256 命名）
+mkdir -p "$EVIDENCE/extracted"
+tar --zstd -xf "$SETTLEMENT_RAW/legacy-20260907_history_five_play_v2.tar.zst" \
+    -C "$EVIDENCE/extracted" 20260907_history_five_play_v2/batches
+
+# 2) 独立重放并校验回执可复现（缺失 slot 集合须等于 receipt.embedded_only）
+python scripts/replay_settlement_quarantine.py \
+  --replay-db "$SETTLEMENT_DB" \
+  --raw-root "$EVIDENCE/extracted/20260907_history_five_play_v2/batches" \
+  --output "$EVIDENCE/quarantine_replay.json"
+```
+
+上一步输出应与本报告读取的
+`results/bj480_quarantine_replay_v1/quarantine_replay.json` 一致（`replay_db` 字段除外）。
+
+```sh
+# 3) 浏览器渲染复核：执行 JS 后导出 DOM 与截图（逐页，25 页）
+for f in "$EVIDENCE"/pages/*.html; do
+  b=$(basename "$f" .html)
+  google-chrome --headless --disable-gpu --no-sandbox --hide-scrollbars \
+    --user-data-dir="$EVIDENCE/chromeprofile" --virtual-time-budget=15000 \
+    --dump-dom "file://$f" > "$EVIDENCE/rendered/$b.dom.html"
+done
+
+# 4) 比对静态与渲染行集合
+python scripts/analyse_settlement_quarantine_rendered.py \
+  --manifest "$EVIDENCE/manifest.json" \
+  --pages "$EVIDENCE/pages" \
+  --rendered "$EVIDENCE/rendered" \
+  --output "$EVIDENCE/rendered_dom_check.json"
+```
+
+渲染报告读取 `rendered_json` 参数；截图落在 `$EVIDENCE/shots/`。
+

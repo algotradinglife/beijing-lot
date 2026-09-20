@@ -197,6 +197,11 @@ evidence/bj_freeze_review_001/.publish.lock
 !results/cutoff_walkforward/
 !results/cutoff_walkforward/**
 
+# Issue #480 quarantined-page replay evidence (two small JSON reports; raw pages,
+# rendered DOMs and screenshots stay off-repo under <data root>/audits).
+!results/bj480_quarantine_replay_v1/
+!results/bj480_quarantine_replay_v1/**
+
 /.quarto/
 **/*.quarto_ipynb
 .Rproj.user
@@ -207,3 +212,6 @@ evidence/bj_freeze_review_001/.publish.lock
 
 # Saved offline trade-index response fixtures (#463)
 !tests/fixtures/backfill/*.html
+
+# Local scratch for research QMD inputs (rendered artifacts live in quarto/_output)
+.tmpwork/
