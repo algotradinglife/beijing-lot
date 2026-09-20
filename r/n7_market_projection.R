@@ -7,8 +7,10 @@
 # does not select, clean, fetch, fit history, or read settlement. Caller binds
 # release hashes/availability evidence. Returns fixture tibble, named score grids,
 # parameters and cutoffs. Missing/duplicate inputs fail; empty input is typed.
+# rho is the frozen Dixon-Coles dependence parameter supplied by the caller; it is
+# recorded in parameters so the receipt binds the caliber actually used.
 project_n7_market_inputs <- function(fixtures, total_quotes, cutoffs,
-                                     total_bounds, tail_tolerance) {
+                                     total_bounds, tail_tolerance, rho) {
   keys <- c('issue','slot','provider_id')
   fields <- c(keys,'handicap','cutoff_utc','odds_W','odds_D','odds_L')
   quote_fields <- c(keys,'company','line','over_hk','under_hk')
@@ -29,6 +31,7 @@ project_n7_market_inputs <- function(fixtures, total_quotes, cutoffs,
       tail_tolerance<=0 || tail_tolerance>=1 || length(total_bounds)!=2L ||
       any(!is.finite(total_bounds)) || total_bounds[1]<=0 || total_bounds[2]<=total_bounds[1])
     stop('Invalid market numerical parameters')
+  dc_validate_rho(rho)
   if (!is.list(cutoffs) || !setequal(names(cutoffs),unique(fixtures$issue)) ||
       anyDuplicated(names(cutoffs))) stop('Explicit matching cutoffs required')
   for (issue in names(cutoffs)) {
@@ -51,14 +54,15 @@ project_n7_market_inputs <- function(fixtures, total_quotes, cutoffs,
     constraint <- total_market_constraint(quotes,total_bounds)
     inverse <- 1/as.numeric(f[1,c('odds_W','odds_D','odds_L')])
     projection <- total_constrained_projection(constraint$lambda_total,inverse/sum(inverse),
-                                               f$handicap,tail_tolerance)
+                                               f$handicap,tail_tolerance,rho)
     for (direction in c('W','D','L')) result[[paste0('q_',direction)]][i] <- projection$fields[[direction]]
     for (column in c('lambda_home','lambda_away','market_residual')) result[[column]][i] <- projection$fields[[column]]
     grids[[paste(f$issue,f$slot,sep='/')]] <- projection$grid
   }
   list(fixtures=result,grids=grids,cutoffs=cutoffs,historical_admission=FALSE,
        parameters=list(total_bounds=total_bounds,tail_tolerance=tail_tolerance,
-                       method='EXISTING_OU_FIXED_MEAN_LEAST_SQUARES_1X2'))
+                       low_score_dependence_rho=rho,
+                       method='EXISTING_OU_FIXED_MEAN_LEAST_SQUARES_1X2_DIXON_COLES'))
 }
 
 # Adapt verified published market rows and lottery handicaps, without cleaning.

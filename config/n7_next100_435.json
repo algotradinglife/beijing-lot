@@ -15,7 +15,8 @@
       0.1,
       16
     ],
-    "tail_tolerance": 1e-10
+    "tail_tolerance": 1e-10,
+    "low_score_dependence_rho": 0.0
   },
   "pool": {
     "depth": 2048,

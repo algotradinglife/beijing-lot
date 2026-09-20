@@ -33,7 +33,7 @@ project_clean_validation_input <- function(input, tail_tolerance) {
       selected <- dplyr::filter(quotes,slot==f$slot,provider_id==f$provider_id)
       constraint <- total_market_constraint(selected,c(.1,16))
       odds <- unlist(q[c('odds_W','odds_D','odds_L')]);target <- (1/odds)/sum(1/odds)
-      projection <- total_constrained_projection(constraint$lambda_total,target,f$handicap,tail_tolerance)
+      projection <- total_constrained_projection(constraint$lambda_total,target,f$handicap,tail_tolerance,rho)
       row$lambda_home <- projection$fields$lambda_home;row$lambda_away <- projection$fields$lambda_away
       row$market_residual <- projection$fields$market_residual
       grids[[paste(issue,f$slot,sep='/')]] <- projection$grid

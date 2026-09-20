@@ -53,7 +53,7 @@ ev_market_probabilities <- function(euro_path,total_path,fixtures,cutoffs,projec
         selected <- dplyr::filter(total$selected,issue==f$issue,slot==f$slot,provider_id==f$provider_id)
         constraint <- total_market_constraint(selected,c(.1,16))
         odds <- unlist(q[c('odds_W','odds_D','odds_L')]);target <- (1/odds)/sum(1/odds)
-        p <- total_constrained_projection(constraint$lambda_total,target,f$handicap,tail_tolerance)
+        p <- total_constrained_projection(constraint$lambda_total,target,f$handicap,tail_tolerance,rho)
         row$status <- 'READY';row$market_residual <- p$fields$market_residual
         row$lambda_home <- p$fields$lambda_home;row$lambda_away <- p$fields$lambda_away
         grids[[paste(f$issue,f$slot,sep='/')]] <- p$grid
