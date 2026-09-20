@@ -1,7 +1,7 @@
 {
  "schema": "bj479_halftime_correction_verification_v1",
  "database": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
- "database_sha256": "ceb69e9f24867ed750cd321fcb765bd9e29eee7ac677757988b1523145e4083c",
+ "database_sha256": "6926200dac07d5f70e5b2284f1c71ee8f6be1ca1f92f92cc277a1d8d57abfee1",
  "batch_id": "d43e7e12b4b5bf99451491cf172b8b99508db50c09f741b555ce8c5685260a14",
  "applied_at": "2026-09-20T15:15:37.086519+00:00",
  "note": "用户明确授权直接更新原 SQLite；21082/90、21082/94、24041/328 三场半场比分仅订正被源站自身全场比分否定的错误值（3-2→2-2、2-0→1-0、2-1→1-1）。500 与 Nowscore 两源携带同一错值，故仅采用第三方赛果档案独立印证（每场两个来源：GlobalSportsArchive、24score、Sports Mole、FootballCritic、Transfermarkt）。全场比分一律不改；原始 payload 与审计发现保留。",
@@ -163,23 +163,142 @@
   "quick_check": "ok",
   "holds_original_values": true
  },
+ "half_full": {
+  "schema": "bj479_half_full_correction_verification_v1",
+  "batch_id": "f8d3dc47e6665da4f596bd584af92c19f77ef4c69b39946c64f6ea4342b8d4c7",
+  "applied_at": "2026-09-20T17:03:33.837309+00:00",
+  "note": "主人明确授权第二批更正（2026-09-20）：半场比分是 bq 半全场的推导输入，需一并更正其彩果与 SP 归属。",
+  "batch_rows": 2,
+  "batch_fixtures": 2,
+  "corrections": [
+   {
+    "issue": "21082",
+    "slot": 90,
+    "play": "bq",
+    "half_time": "2-2",
+    "full_time": "2-3",
+    "old_option": "胜-负",
+    "new_option": "平-负",
+    "settlement_sp": 16.07,
+    "database_option": "平-负",
+    "database_sp": {
+     "平-负": 16.07
+    },
+    "corroborating_sources": [
+     "24score",
+     "globalsportsarchive",
+     "okooo",
+     "okooo_half_full"
+    ],
+    "sources": [
+     {
+      "source_id": "globalsportsarchive",
+      "url": "https://www.globalsportsarchive.com/match/football/2021-08-06/galway-united-fc-vs-cork-city-fc/1986340/",
+      "sha256": "e767b5d0256bb264131a7c2d3c781b798b733e7ea9cc4bb41134a07bfff62245",
+      "bytes": 1635607
+     },
+     {
+      "source_id": "24score",
+      "url": "https://en.24score.com/football/match/593727-galway-cork-city",
+      "sha256": "d7e8c4df0b800f04b132cdf13872015e2867f4555ddc5bb2e056b6dd826cc3d6",
+      "bytes": 103059
+     },
+     {
+      "source_id": "okooo",
+      "url": "https://www.okooo.com/livecenter/danchang/?date=21082",
+      "sha256": "c520309ea98f16203ecd8e7aed9928b0aa14bc6540813df8a8a2661c1eec241b",
+      "bytes": 1461068
+     },
+     {
+      "source_id": "okooo_half_full",
+      "url": "https://www.okooo.com/danchang/banquan/?lotteryNo=21082",
+      "sha256": "7a89466b6df1629b1efe5d6ffd1ea90a0cc94f43346c0e5200575d69ce39834b",
+      "bytes": 2117874
+     }
+    ],
+    "replay_agrees": true
+   },
+   {
+    "issue": "24041",
+    "slot": 328,
+    "play": "bq",
+    "half_time": "1-1",
+    "full_time": "1-1",
+    "old_option": "胜-平",
+    "new_option": "平-平",
+    "settlement_sp": 5.17,
+    "database_option": "平-平",
+    "database_sp": {
+     "平-平": 5.17
+    },
+    "corroborating_sources": [
+     "okooo",
+     "okooo_half_full",
+     "sportsmole",
+     "transfermarkt"
+    ],
+    "sources": [
+     {
+      "source_id": "sportsmole",
+      "url": "https://www.sportsmole.co.uk/football/serie-b/lecco-vs-cittadella_game_186458.html",
+      "sha256": "798ec97804f0412b4a7125bddc538374d7eb26bb002948313f8659c3f176bec2",
+      "bytes": 83533
+     },
+     {
+      "source_id": "transfermarkt",
+      "url": "https://www.transfermarkt.com/calcio-lecco-1912_as-cittadella/index/spielbericht/4112692",
+      "sha256": "6c94ce91c5ecaca0f1822a1b19efbd43647bf1c329eb7d7ac4ebbbec567b7e4b",
+      "bytes": 189195
+     },
+     {
+      "source_id": "okooo",
+      "url": "https://www.okooo.com/livecenter/danchang/?date=24041",
+      "sha256": "4c0e7592895b8edaf49b2f8c8cd12e2f7716ebc769d5fc199c3f77714bb9647d",
+      "bytes": 1535719
+     },
+     {
+      "source_id": "okooo_half_full",
+      "url": "https://www.okooo.com/danchang/banquan/?lotteryNo=24041",
+      "sha256": "9a87b29f9c41ca3bf129150913282832a03b3277bdc15a9d9d4d71392cef04a3",
+      "bytes": 2197260
+     }
+    ],
+    "replay_agrees": true
+   }
+  ],
+  "replay": {
+   "evidence_files_verified": 8,
+   "all_hashes_match": true,
+   "all_values_reproduced": true
+  },
+  "backup": {
+   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/nowscore_history_replay.before_bj479_half_full_update.sqlite",
+   "quick_check": "ok",
+   "holds_original_options": true
+  },
+  "verified": true
+ },
  "receipt": {
   "data_sha256": "e37597091f0375c28a3c080db111dbb66a620e444ebc336ba5a3c8638c522f7b",
   "halftime_correction_batch_id": "d43e7e12b4b5bf99451491cf172b8b99508db50c09f741b555ce8c5685260a14",
   "corrected_halftime_observations": 15,
   "corrected_halftime_fixtures": 3,
   "correction_batch_id": "601dc2b6f9a56e828bc646a1f528a2d987eeb2db3c755de5c1b9ce54cfa33b16",
-  "corrected_options": 86
+  "corrected_options": 86,
+  "half_full_correction_batch_id": "f8d3dc47e6665da4f596bd584af92c19f77ef4c69b39946c64f6ea4342b8d4c7",
+  "corrected_half_full_observations": 2
  },
  "conclusion": {
   "verified": true,
   "fixtures": 3,
   "observations": 15,
+  "half_full_verified": true,
   "full_time_unchanged": true,
   "limitations": [
    "Corroboration is external: the 500 and Nowscore sources carry the same wrong half-time value, so neither can corroborate its own correction.",
-   "Replaying the build from the archived raw bytes reproduces the source's wrong half-time value by design; this correction is a separately recorded layer, exactly as the earlier SP correction is.",
-   "Half-time is excluded from the decision basis (see src/decision_api); no betting, SP or settlement derivation consumes the corrected field."
+   "Replaying the build from the archived raw bytes reproduces the source's original values by design; both corrections are separately recorded layers, exactly as the earlier SP correction is.",
+   "observation.payload_json keeps the source's own bytes and is deliberately not rewritten, so any re-derivation from the payload shows the source's original values.",
+   "The half-time score IS an input to the bq half/full derivation (src/nowscore_settlement.py expected_option), so the half-time batch alone left two fixtures whose half/full settlement contradicted the corrected half time. The second batch corrects those options and relocates the settlement SP, whose value both sites publish identically; the remaining rows were already consistent."
   ]
  }
 }

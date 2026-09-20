@@ -39,7 +39,7 @@ export SETTLEMENT_DB="$BEIJING_LOT_DATA_ROOT/settlement/20260907_history_five_pl
 `build_database(run_root, output)` 不覆盖已有库。原始证据验证在写入前执行，
 数据与最终 receipt 同事务；失败产物没有有效构建封印，不能使用。
 新增历史批次走新的完整汇集与重建，不将不同库直接拼接。
-重建产生来源原始值，不自动包含之后人工核验的 SP 更正或半场比分更正。
+重建产生来源原始值，不自动包含之后人工核验的 SP 更正、半场比分更正或半全场结算更正。
 
 ## 修正缺失比分 SP
 
@@ -108,8 +108,48 @@ DOM 感知提取，并要求**至少两个独立来源给出完全一致的半�
 ```
 
 交付与验收入口：`quarto/260_settlement_halftime_correction.qmd`。
-半场比分不参与任何下注、SP 或结算推导（`src/decision_api` 将其排除在决策依据之外），
-故该更正只修正记录与展示，不影响既有结果。
+半场比分不参与 `spf` / `bf` / `jq` / `ds` 的推导，也不参与下注决策
+（`src/decision_api` 将结果类字段排除在决策依据之外）；但它**是** `bq` 半全场结算的推导输入，
+因此半场更正后必须检查下游半全场彩果是否随之失配（见下节）。
+
+## 修正半全场结算
+
+构建逻辑（`src/nowscore_settlement.py` 的 `expected_option`）由半场结果与全场结果推导 `bq`
+中奖选项。源站的半场错误因此同时产出错误的半全场彩果，并把开奖 SP 挂在了错误的选项上。
+
+通用入口为 `scripts/apply_settlement_half_full_update.py`，对应
+`src/settlement_half_full_update.py::apply_half_full_update(..., approval_note=...)`。
+它更正 `observation.expected_option` 并把 `option_sp` 中**同一个 SP 值**移到真正中奖的选项；
+**不新造 SP**（SP 是派彩数据，两个站点逐场相同，只是归属错了）。
+
+```sh
+.venv/bin/python scripts/apply_settlement_half_full_update.py \
+  --database "$SETTLEMENT_DB" --ledger "$HALF_FULL_LEDGER" \
+  --backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-half-full-update.sqlite" \
+  --data-root "$BEIJING_LOT_DATA_ROOT" --mountpoint "$SETTLEMENT_MOUNT" \
+  --approval-note '已批准的裁决编号与依据'
+```
+
+半全场的印证比半场多一道闸门：来源给出的彩果必须等于**由已更正的半场推导出的**选项，
+所以源站无法用它自己错误推导的选项再主张一次；同时要求该场已记录的 SP 与来源发布的 SP
+逐值相同，目标选项原本必须没有 SP。任一不满足即整批拒绝。
+
+`half_full_correction` 与 `half_full_correction_batch` 保存原/新彩果、SP、半场与全场比分、
+印证来源与审计备注。`observation.payload_json` **刻意不重写**，保留源站自己的字节。
+
+事务、备份、幂等语义与前述更正一致。独立复核沿用同一脚本，附上第 2 批账本与备份：
+
+```sh
+.venv/bin/python scripts/verify_settlement_halftime_correction.py \
+  --database "$SETTLEMENT_DB" --ledger "$HALFTIME_LEDGER" \
+  --backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-halftime-update.sqlite" \
+  --half-full-ledger "$HALF_FULL_LEDGER" \
+  --half-full-backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-half-full-update.sqlite" \
+  --out results/bj479_halftime_correction_v1/correction_verification.json
+```
+
+回归检查（应恒为 0 条不一致）：对每个 `bq` 完场观测，`expected_option` 必须等于
+「半场结果-全场结果」。
 
 ## R 与 QMD
 
@@ -123,3 +163,4 @@ quarto render quarto/10_settlement_external_storage.qmd --execute --no-cache \
 
 迁移后的 SQLite、迁移前备份、审计库已在外置盘；原始采集 bundle、批次计划和
 补值原始 HTML 尚需按其 manifest 定位，不能仅凭三个 SQLite 声称已完成全部证据归档。
+

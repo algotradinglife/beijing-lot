@@ -9,11 +9,27 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.settlement_halftime_evidence import EXTRACTORS, corroborate  # noqa: E402
+from src.settlement_halftime_evidence import (  # noqa: E402
+    EXTRACTORS,
+    HALF_FULL_EXTRACTORS,
+    corroborate,
+    corroborate_half_full,
+    half_full_option,
+)
 
 
-FIXTURE = {"home": "甲队", "away": "乙队", "date": "2021-08-06",
+FIXTURE = {"home": "甲队", "away": "乙队", "date": "2021-08-06", "slot": 90,
            "ft_home": 2, "ft_away": 3, "away_en": "Cork City"}
+
+OKOOO_LIVECENTER = ('<table><tr><td>90</td><td>爱甲</td><td>08-07 02:45</td><td>完</td>'
+                    '<td>[2] 甲队 (-1)</td><td>2 - 3</td><td class="dzname">[9] 乙队'
+                    '<td><span class="font_red">2-2</span></td></td>'
+                    '<td class="weather_icon"></td><td class="blockbox">4.22 3.40 2.12</td>'
+                    '<td class="ctrl_result">0</td></tr></table>').encode("gbk")
+
+OKOOO_HALF_FULL = ('<table><tr><td>90 爱甲</td><td>02:40</td><td>甲队 乙队</td><td>16.07</td>'
+                   '<td>投注区</td><td>全</td><td></td><td>2-3</td><td>1-0</td>'
+                   '<td>析</td></tr></table>').encode("gbk")
 
 GSA = b"""<html><body><div>Full Time 2 - 3 Cork City FC</div>
 <div>1st Half 2 - 2 Killian Brouder ( 2 - 2 ) 41'</div></body></html>"""
@@ -99,3 +115,67 @@ def test_corroborate_refuses_a_single_source() -> None:
 def test_corroborate_refuses_disagreement_rather_than_voting() -> None:
     with pytest.raises(ValueError, match="disagree on half time"):
         corroborate({"a": {"home": 2, "away": 2}, "b": {"home": 2, "away": 1}})
+
+
+def test_okooo_livecenter_reads_the_half_time_from_the_red_cell() -> None:
+    assert EXTRACTORS["okooo"](OKOOO_LIVECENTER, FIXTURE) == {
+        "home": 2, "away": 2, "ft_home": 2, "ft_away": 3}
+
+
+def test_okooo_livecenter_rejects_a_page_without_the_slot() -> None:
+    with pytest.raises(ValueError, match="exactly one row for slot 91"):
+        EXTRACTORS["okooo"](OKOOO_LIVECENTER, dict(FIXTURE, slot=91))
+
+
+def test_okooo_half_full_reads_the_settlement_code_and_its_sp() -> None:
+    assert HALF_FULL_EXTRACTORS["okooo_half_full"](OKOOO_HALF_FULL, FIXTURE) == {
+        "option": "平-负", "sp": 16.07, "ft_home": 2, "ft_away": 3}
+
+
+def test_okooo_half_full_rejects_a_page_whose_full_time_is_not_the_fixture() -> None:
+    with pytest.raises(ValueError, match="not the expected fixture"):
+        HALF_FULL_EXTRACTORS["okooo_half_full"](OKOOO_HALF_FULL,
+                                                dict(FIXTURE, ft_home=1, ft_away=1))
+
+
+@pytest.mark.parametrize("source", sorted(HALF_FULL_EXTRACTORS))
+def test_every_half_full_extractor_fails_closed_on_an_unrelated_page(source: str) -> None:
+    with pytest.raises(ValueError):
+        HALF_FULL_EXTRACTORS[source](b"<html><body>nothing here</body></html>", FIXTURE)
+
+
+def test_half_full_option_matches_the_build_derivation() -> None:
+    assert half_full_option((2, 2), (2, 3)) == "平-负"
+    assert half_full_option((1, 0), (1, 1)) == "胜-平"
+    assert half_full_option((1, 1), (1, 1)) == "平-平"
+    assert half_full_option((0, 1), (3, 1)) == "负-胜"
+
+
+def test_corroborate_half_full_accepts_the_option_the_corrected_half_time_implies() -> None:
+    settled = corroborate_half_full((2, 2), (2, 3),
+                                    {"okooo_half_full": {"option": "平-负", "sp": 16.07}})
+    assert settled == {"option": "平-负", "sp": 16.07}
+
+
+def test_corroborate_half_full_refuses_the_option_the_source_inherited_from_its_error() -> None:
+    with pytest.raises(ValueError, match="disagrees with the corrected half time"):
+        corroborate_half_full((2, 2), (2, 3),
+                              {"okooo_half_full": {"option": "胜-负", "sp": 16.07}})
+
+
+def test_corroborate_half_full_refuses_a_missing_sp_rather_than_guessing() -> None:
+    with pytest.raises(ValueError, match="settlement SP"):
+        corroborate_half_full((2, 2), (2, 3),
+                              {"okooo_half_full": {"option": "平-负", "sp": None}})
+
+
+def test_corroborate_half_full_refuses_disagreeing_sps() -> None:
+    with pytest.raises(ValueError, match="settlement SP"):
+        corroborate_half_full((2, 2), (2, 3),
+                              {"a": {"option": "平-负", "sp": 16.07},
+                               "b": {"option": "平-负", "sp": 15.0}})
+
+
+def test_corroborate_half_full_refuses_without_any_source() -> None:
+    with pytest.raises(ValueError, match="at least one half/full settlement source"):
+        corroborate_half_full((2, 2), (2, 3), {})

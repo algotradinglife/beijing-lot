@@ -1,6 +1,6 @@
 ---
-title: "半场比分外部印证更正（#479）"
-subtitle: "3 场「半场进球数 > 全场进球数」的独立核实、更正与回执"
+title: "半场比分及其下游半全场结算的外部印证更正（#479）"
+subtitle: "3 场「半场进球数 > 全场进球数」的独立核实、两批更正与回执"
 params:
   verification_json: "results/bj479_halftime_correction_v1/correction_verification.json"
 execute:
@@ -10,9 +10,13 @@ execute:
 format: html
 ---
 
-本报告记录 #479 中 3 场「半场进球数 > 全场进球数」异常的处置：**仅更正半场比分**，
-并以两个独立第三方赛果档案逐场印证。输入为保留的证据原始字节与 sealed 库审计表；
-本报告**只读**，不联网、不重抓。
+本报告记录 #479 的处置，分两批：
+
+1. **半场比分**（3 场）—— 被源站自身全场比分否定的半场值，以独立第三方赛果档案逐场印证。
+2. **半全场结算**（2 场）—— 构建逻辑由半场推导 `bq` 中奖选项，因此第 1 批之后这两场的
+   半全场彩果与 SP 归属必须一并更正。
+
+输入为保留的证据原始字节与 sealed 库审计表；本报告**只读**，不联网、不重抓。
 
 ```{r}
 invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
@@ -21,27 +25,33 @@ stopifnot(is.character(params$verification_json), length(params$verification_jso
           !is.na(params$verification_json), file.exists(params$verification_json))
 v <- jsonlite::fromJSON(params$verification_json, simplifyVector = FALSE)
 stopifnot(identical(v$schema, "bj479_halftime_correction_verification_v1"))
+stopifnot(!is.null(v$half_full))
 ```
 
 ## 结论摘要
 
 ```{r}
 cat("判定通过：", v$conclusion$verified, "\n")
-cat("涉及期次：", v$conclusion$fixtures, "｜更正观测：", v$conclusion$observations, "\n")
+cat("第 1 批（半场比分）涉及期次：", v$conclusion$fixtures,
+    "｜更正观测：", v$conclusion$observations, "\n")
+cat("第 2 批（半全场结算）判定通过：", v$conclusion$half_full_verified,
+    "｜更正观测：", v$half_full$batch_rows, "\n")
 cat("全场比分未变：", v$conclusion$full_time_unchanged, "\n")
-cat("证据文件复核：", v$replay$evidence_files_verified, "个，哈希全部匹配：",
-    v$replay$all_hashes_match, "\n")
-cat("库内值全部由证据复现：", v$replay$all_values_reproduced, "\n")
-cat("备份 quick_check：", v$backup$quick_check, "｜仍保存原值：",
-    v$backup$holds_original_values, "\n")
-cat("\n更正批次：", v$batch_id, "\n")
-cat("执行时间：", v$applied_at, "\n")
+cat("证据文件复核：", v$replay$evidence_files_verified + v$half_full$replay$evidence_files_verified,
+    "个，哈希全部匹配：", v$replay$all_hashes_match && v$half_full$replay$all_hashes_match, "\n")
+cat("库内值全部由证据复现：",
+    v$replay$all_values_reproduced && v$half_full$replay$all_values_reproduced, "\n")
+cat("备份 quick_check：", v$backup$quick_check, "｜第 1 批备份仍保存原值：",
+    v$backup$holds_original_values, "｜第 2 批备份仍保存原彩果：",
+    v$half_full$backup$holds_original_options, "\n")
+cat("\n第 1 批批次号：", v$batch_id, "\n")
+cat("第 2 批批次号：", v$half_full$batch_id, "\n")
 ```
 
 **这 3 场的全场比分本来就是对的**，需要更正的是被源站自身全场比分否定的半场值。
 500 源与 Nowscore 源携带**同一个**错值，因此两者都不能自证；更正依据只能是第三方赛果档案。
 
-## 逐场更正与印证来源
+## 第 1 批：半场比分
 
 ```{r}
 rows <- lapply(v$corrections, function(c) {
@@ -56,21 +66,50 @@ rows <- lapply(v$corrections, function(c) {
 tibble::as_tibble(do.call(rbind, rows))
 ```
 
+## 第 2 批：半全场彩果与 SP 归属
+
+构建逻辑（`src/nowscore_settlement.py` 的 `expected_option`）由**半场结果 + 全场结果**
+推导 `bq` 中奖选项，所以源站的错误半场同时产出了错误的半全场彩果，并把开奖 SP 挂在了
+错误的选项上。**SP 的数值是对的**（澳客与 Nowscore 两个站点逐场相同），只是归属需要更正。
+
+```{r}
+hf <- lapply(v$half_full$corrections, function(c) {
+  data.frame(
+    期次 = c$issue, slot = c$slot, 玩法 = c$play,
+    半场 = c$half_time, 全场 = c$full_time,
+    原彩果 = c$old_option, 新彩果 = c$new_option,
+    开奖SP = c$settlement_sp,
+    库内彩果 = c$database_option,
+    复放一致 = c$replay_agrees, stringsAsFactors = FALSE)
+})
+tibble::as_tibble(do.call(rbind, hf))
+```
+
+第 3 场（21082/94，半场 1-0、全场 1-1）的彩果 `胜-平` 在更正前后**结果一致**，故不在本批内。
+
 ## 证据来源明细（逐来源提取值）
 
 ```{r}
-src <- do.call(rbind, lapply(v$corrections, function(c) {
+src1 <- do.call(rbind, lapply(v$corrections, function(c) {
   do.call(rbind, lapply(c$sources, function(s) data.frame(
-    期次 = c$issue, slot = c$slot, 来源 = s$source_id,
-    半场 = s$half_time, 全场 = s$full_time,
+    批次 = "半场比分", 期次 = c$issue, slot = c$slot, 来源 = s$source_id,
+    提取值 = paste0(s$half_time, " / 全场 ", s$full_time),
     字节 = s$bytes, sha256 = substr(s$sha256, 1, 16), stringsAsFactors = FALSE)))
 }))
-tibble::as_tibble(src)
+src2 <- do.call(rbind, lapply(v$half_full$corrections, function(c) {
+  do.call(rbind, lapply(c$sources, function(s) data.frame(
+    批次 = "半全场结算", 期次 = c$issue, slot = c$slot, 来源 = s$source_id,
+    提取值 = paste0(c$new_option, " @ ", c$settlement_sp),
+    字节 = s$bytes, sha256 = substr(s$sha256, 1, 16), stringsAsFactors = FALSE)))
+}))
+tibble::as_tibble(rbind(src1, src2))
 ```
 
 ```{r}
-links <- unique(unlist(lapply(v$corrections, function(c)
-  vapply(c$sources, function(s) s$url, character(1)))))
+links <- unique(c(
+  unlist(lapply(v$corrections, function(c) vapply(c$sources, function(s) s$url, character(1)))),
+  unlist(lapply(v$half_full$corrections, function(c)
+    vapply(c$sources, function(s) s$url, character(1))))))
 cat(paste0("- ", links, collapse = "\n"), "\n")
 ```
 
@@ -79,18 +118,22 @@ cat(paste0("- ", links, collapse = "\n"), "\n")
 ```{r}
 rc <- v$receipt
 cat("构建回执 data_sha256（更正前快照）：", rc$data_sha256, "\n")
-cat("回执登记的更正批次：", rc$halftime_correction_batch_id, "\n")
-cat("回执登记的更正观测数：", rc$corrected_halftime_observations, "\n")
-cat("此前 SP 更正批次（未受影响）：", rc$correction_batch_id, "\n")
-cat("此前 SP 更正观测数（未受影响）：", rc$corrected_options, "\n")
+cat("半场更正批次：", rc$halftime_correction_batch_id,
+    "（", rc$corrected_halftime_observations, " 观测）\n")
+cat("半全场更正批次：", rc$half_full_correction_batch_id,
+    "（", rc$corrected_half_full_observations, " 观测）\n")
+cat("此前 SP 更正批次（未受影响）：", rc$correction_batch_id,
+    "（", rc$corrected_options, " 观测）\n")
 cat("当前库文件 sha256：", v$database_sha256, "\n")
 ```
 
 构建回执中的 `data_sha256` **保留为更正前的构建快照哈希**，与 `registry/settlement-current.json`
-的 `hash_note` 一致；注册表登记的是更正后的文件哈希。更正前状态另有 SQLite 备份可查：
+的 `hash_note` 一致；注册表登记的是更正后的文件哈希，并在 `corrections` 数组中登记三次更正的
+批次与备份。更正前状态另有 SQLite 备份可查：
 
 ```{r}
-cat("备份路径：", v$backup$path, "\n")
+cat("第 1 批备份：", v$backup$path, "\n")
+cat("第 2 批备份：", v$half_full$backup$path, "\n")
 cat("库路径：", v$database, "\n")
 ```
 
@@ -103,14 +146,17 @@ cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
 实现与测试：
 
 - `src/settlement_halftime_evidence.py` — 逐来源 DOM 感知提取 + ≥2 独立来源一致才采纳；
-  单一来源、来源分歧、全场比分与期次不符一律**失败关闭**。
-- `src/settlement_halftime_update.py` — 事务写入：审批备注必填、路径互斥、账本哈希即批次号、
-  证据哈希复核、目标行必须仍是账本记录的旧值、备份 `quick_check`、失败整体回滚、重跑幂等。
-- `scripts/apply_settlement_halftime_update.py` / `scripts/verify_settlement_halftime_correction.py`
-  — 薄入口。
+  单一来源、来源分歧、全场比分与期次不符一律**失败关闭**。半全场另有一道闸门：来源给出的
+  彩果必须等于**由已更正的半场推导出的**选项，源站无法用它自己错误推导的选项再主张一次。
+- `src/settlement_halftime_update.py` / `src/settlement_half_full_update.py` — 事务写入：
+  审批备注必填、路径互斥、账本哈希即批次号、证据哈希复核、目标行必须仍是账本记录的旧值、
+  备份在写入**之前**完成并 `quick_check`、失败整体回滚、重跑幂等。
+- `scripts/apply_settlement_halftime_update.py`、`scripts/apply_settlement_half_full_update.py`、
+  `scripts/verify_settlement_halftime_correction.py` — 薄入口。
 - 测试：`tests/test_settlement_halftime_evidence.py`、
   `tests/scripts/test_apply_settlement_halftime_update.py`、
-  `tests/scripts/test_verify_settlement_halftime_correction.py`（共 32 项，全通过）。
+  `tests/scripts/test_apply_settlement_half_full_update.py`、
+  `tests/scripts/test_verify_settlement_halftime_correction.py`（共 57 项，全通过）。
 
 ## 局限
 
@@ -120,8 +166,12 @@ cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
 
 补充说明：
 
-- 半场比分**不参与任何下注、SP 或结算推导**（`src/decision_api` 明确将其排除在决策依据之外），
-  故本次更正不影响任何既有结果，只修正记录与展示。
-- 从封存原始字节重放构建，**按设计**仍会产生源站的错误半场值；本次更正是与 SP 更正同样的
-  **独立记录层**，不是对构建逻辑的改写。
+- 半场比分**是** `bq` 半全场结算的推导输入。早先「半场不参与任何结算推导」的判断是**错误的**，
+  并已被第 1 批引入的库内矛盾证伪：全库 103,981 条可解析的 `bq` 完场观测中，第 1 批之后
+  恰好有 2 条不满足「彩果 = 半场结果-全场结果」；第 2 批应用后该不变量恢复为 **0 条不一致**。
+- `halftime_score` 不参与 `spf` / `bf` / `jq` / `ds` 的推导，也不参与下注决策
+  （`src/decision_api` 将结果类字段排除在决策依据之外）。
+- `observation.payload_json` 保留源站自己的字节，**刻意不重写**；因此从载荷重新推导会得到
+  源站的原始值，两次更正都是记录在案之上的独立层 —— 与更早的 SP 更正一致。
+- 从封存原始字节重放构建，**按设计**仍会产生源站的原始值。
 - 本交付未移除 `halftime_exceeds_fulltime` 探针 —— 它是真阳性，源站确有此矛盾。

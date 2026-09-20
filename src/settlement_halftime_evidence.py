@@ -160,12 +160,110 @@ def extract_transfermarkt(payload: bytes, fixture: dict) -> dict:
                  {"home": home, "away": away, "ft_home": ft_home, "ft_away": ft_away}, fixture)
 
 
+def _okooo_soup(payload: bytes) -> BeautifulSoup:
+    """okooo serves GB2312 pages; decoding as UTF-8 would silently mangle team names."""
+    for encoding in ("gbk", "gb18030"):
+        try:
+            return BeautifulSoup(payload.decode(encoding), "html.parser")
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("okooo: page is not decodable as GB2312")
+
+
+def _okooo_row(soup: BeautifulSoup, slot: int, minimum_cells: int, source: str) -> list:
+    """Return the single row for ``slot``; its slot cell is the first cell."""
+    rows = []
+    for tr in soup.find_all("tr"):
+        tds = tr.find_all("td", recursive=False)
+        if len(tds) < minimum_cells:
+            continue
+        text = tds[0].get_text(" ", strip=True)
+        ident = re.match(r"^(\d+)(?:\s|$)", text)
+        if ident and int(ident.group(1)) == slot:
+            rows.append(tds)
+    if len(rows) != 1:
+        raise ValueError(f"{source}: expected exactly one row for slot {slot}, found {len(rows)}")
+    return rows[0]
+
+
+def extract_okooo_livecenter(payload: bytes, fixture: dict) -> dict:
+    """okooo's live centre prints the half time in a red cell inside the away-team cell."""
+    soup = _okooo_soup(payload)
+    tds = _okooo_row(soup, fixture["slot"], 7, "okooo")
+    ft = re.fullmatch(r"(\d+)\s*-\s*(\d+)", tds[5].get_text(" ", strip=True))
+    if ft is None:
+        raise ValueError("okooo: unreadable full time score")
+    halves = set()
+    for nested in tds[6].find_all("td"):
+        children = nested.find_all(recursive=False)
+        if len(children) != 1 or children[0].name != "span":
+            continue
+        if "font_red" not in (children[0].get("class") or []):
+            continue
+        m = re.fullmatch(r"(\d+)\s*-\s*(\d+)", children[0].get_text(" ", strip=True))
+        if m:
+            halves.add((int(m.group(1)), int(m.group(2))))
+    home, away = _unique(halves, "okooo", "half time")
+    return _gate("okooo", {"home": home, "away": away,
+                           "ft_home": int(ft.group(1)), "ft_away": int(ft.group(2))}, fixture)
+
+
+# okooo's half/full page encodes the settlement as "<half>-<full>" in the 3/1/0 domain,
+# with 3 = home win, 1 = draw, 0 = away win; this project spells them 胜/平/负.
+_RESULT_CODES = {"3": "胜", "1": "平", "0": "负"}
+
+
+def outcome(home: int, away: int) -> str:
+    return "胜" if home > away else "负" if home < away else "平"
+
+
+def half_full_option(half_time: tuple[int, int], full_time: tuple[int, int]) -> str:
+    """The half/full winning option, matching the build's own derivation exactly."""
+    return outcome(*half_time) + "-" + outcome(*full_time)
+
+
+def extract_okooo_half_full(payload: bytes, fixture: dict) -> dict:
+    """okooo's half/full page prints the settlement code and its settlement SP.
+
+    Columns: slot+league, kickoff, teams, settlement SP, betting area, quick pick, all,
+    pick, full-time score, settlement code, analysis.
+    """
+    soup = _okooo_soup(payload)
+    tds = _okooo_row(soup, fixture["slot"], 9, "okooo_half_full")
+    ft = re.fullmatch(r"(\d+)\s*-\s*(\d+)", tds[7].get_text(" ", strip=True))
+    if ft is None:
+        raise ValueError("okooo_half_full: unreadable full time score")
+    code = re.fullmatch(r"([0-3])\s*-\s*([0-3])", tds[8].get_text(" ", strip=True))
+    if code is None:
+        raise ValueError("okooo_half_full: unreadable settlement code")
+    sp_text = tds[3].get_text(" ", strip=True)
+    sp = None
+    if sp_text:
+        try:
+            sp = float(sp_text)
+        except ValueError as exc:
+            raise ValueError(f"okooo_half_full: unreadable settlement SP {sp_text!r}") from exc
+    claim = {"option": _RESULT_CODES[code.group(1)] + "-" + _RESULT_CODES[code.group(2)],
+             "sp": sp, "ft_home": int(ft.group(1)), "ft_away": int(ft.group(2))}
+    if (claim["ft_home"], claim["ft_away"]) != (fixture["ft_home"], fixture["ft_away"]):
+        raise ValueError(
+            f"okooo_half_full: full time {(claim['ft_home'], claim['ft_away'])} "
+            f"is not the expected fixture {(fixture['ft_home'], fixture['ft_away'])}")
+    return claim
+
+
+HALF_FULL_EXTRACTORS: dict[str, Callable[[bytes, dict], dict]] = {
+    "okooo_half_full": extract_okooo_half_full,
+}
+
+
 EXTRACTORS: dict[str, Callable[[bytes, dict], dict]] = {
     "globalsportsarchive": extract_globalsportsarchive,
     "24score": extract_24score,
     "sportsmole": extract_sportsmole,
     "footballcritic": extract_footballcritic,
     "transfermarkt": extract_transfermarkt,
+    "okooo": extract_okooo_livecenter,
 }
 
 
@@ -183,3 +281,29 @@ def corroborate(claims: dict[str, dict]) -> tuple[int, int]:
     if len(pairs) != 1:
         raise ValueError(f"independent sources disagree on half time: {sorted(pairs)}")
     return pairs.pop()
+
+
+def corroborate_half_full(half_time: tuple[int, int], full_time: tuple[int, int],
+                          claims: dict[str, dict]) -> dict:
+    """Return the corroborated half/full settlement option and its settlement SP.
+
+    The option is not taken on trust: it must equal the one derived from the
+    *corrected* half time and the full time, so a source that inherited the
+    half-time error cannot re-assert itself here. Every source that publishes an SP
+    must publish the same value; a missing SP is refused rather than guessed.
+    """
+    if not claims:
+        raise ValueError("need at least one half/full settlement source")
+    expected = half_full_option(half_time, full_time)
+    options = {c["option"] for c in claims.values()}
+    if options != {expected}:
+        raise ValueError(
+            f"half/full settlement {sorted(options)} disagrees with the corrected half time "
+            f"{expected}")
+    sps = {c["sp"] for c in claims.values()}
+    if len(sps) != 1 or None in sps:
+        raise ValueError(f"sources disagree on the half/full settlement SP: {sorted(sps, key=str)}")
+    sp = sps.pop()
+    if sp < 1:
+        raise ValueError(f"half/full settlement SP {sp} is below 1")
+    return {"option": expected, "sp": sp}
