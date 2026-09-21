@@ -57,7 +57,7 @@ def archived_snapshots(directory: Path) -> dict:
             raise ValueError(f"an archive manifest names no usable archive: {manifest}")
         if file_identity(archive)[0] != document.get("archive_sha256"):
             raise ValueError(f"the archive does not match its manifest: {archive}")
-        archived[document["snapshot_sha256"]] = archive.name
+        archived[document["snapshot_sha256"]] = {**document, "archive_name": archive.name}
     return archived
 
 
@@ -206,6 +206,11 @@ def prune_backups(directory: Path, *, keep: int, apply: bool, release: Path | No
                          if path.is_file() and path.name.endswith(SUFFIX)),
                         key=lambda path: (path.stat().st_mtime, path.name))
     if not candidates:
+        if archived_snapshots(directory):
+            # Every snapshot is compacted: nothing is left for retention to thin, and saying so
+            # is a result, not a failure.
+            return {"directory": str(directory), "keep": [], "anchored": [], "remove": [],
+                    "removed": False, "freed_bytes": 0, "compacted": True}
         raise ValueError(f"no *{SUFFIX} snapshots in {directory}")
     unrecognised = [path.name for path in candidates if not looks_like_snapshot(path)]
     if unrecognised:
@@ -220,7 +225,9 @@ def prune_backups(directory: Path, *, keep: int, apply: bool, release: Path | No
                    else [path for path in candidates if path.name == wanted])
         if matches:
             anchored.update(path.name for path in matches)
-        elif claim.get("sha256") in archived:
+        elif (claim.get("sha256") in archived if claim.get("sha256")
+              else any(manifest_snapshot.get("snapshot") == wanted
+                       for manifest_snapshot in archived.values())):
             # Compacted after its replay passed: the archive is the evidence now, and archives
             # are never candidates, so the anchor is resolved without protecting a snapshot.
             pass

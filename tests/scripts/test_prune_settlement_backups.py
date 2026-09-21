@@ -222,6 +222,44 @@ def test_rejects_a_non_positive_keep(tmp_path: Path) -> None:
         prune_backups(root, keep=0, apply=True)
 
 
+def test_a_fully_compacted_directory_is_a_result_not_an_error(tmp_path: Path) -> None:
+    """Every snapshot archived is the healthiest state, not a failure."""
+    root = tmp_path / "backups" / "release"
+    root.mkdir(parents=True)
+    manifest = {"snapshot": "a.sqlite", "snapshot_sha256": "sha-a",
+                "archive": "a.sqlite.zst", "archive_sha256": "archive-sha"}
+    (root / "a.sqlite.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (root / "a.sqlite.zst").write_bytes(b"compacted")
+    original = prune_backups.__globals__["file_identity"]
+    prune_backups.__globals__["file_identity"] = lambda path: (
+        "archive-sha" if path.name.endswith(".zst") else "sha-a", 1)
+    try:
+        result = prune_backups(root, keep=1, apply=True)
+    finally:
+        prune_backups.__globals__["file_identity"] = original
+    assert result["compacted"] is True
+    assert result["remove"] == []
+
+
+def test_a_path_only_claim_resolves_through_the_archive_manifest(tmp_path: Path) -> None:
+    """A table that stores no hash still resolves: the manifest names the snapshot it holds."""
+    root = tmp_path / "backups" / "release"
+    root.mkdir(parents=True)
+    (root / "a.sqlite.manifest.json").write_text(json.dumps(
+        {"snapshot": "a.sqlite", "snapshot_sha256": "sha-a", "archive": "a.sqlite.zst",
+         "archive_sha256": "archive-sha"}), encoding="utf-8")
+    (root / "a.sqlite.zst").write_bytes(b"compacted")
+    original = prune_backups.__globals__["file_identity"]
+    prune_backups.__globals__["file_identity"] = lambda path: (
+        "archive-sha" if path.name.endswith(".zst") else "sha-a", 1)
+    try:
+        result = prune_backups(root, keep=1, apply=True,
+                               protect=[{"path": "/somewhere/a.sqlite", "sha256": None}])
+    finally:
+        prune_backups.__globals__["file_identity"] = original
+    assert result["compacted"] is True
+
+
 def test_rejects_a_directory_without_snapshots(tmp_path: Path) -> None:
     """An empty backup directory is a mistake, not a no-op."""
     root = tmp_path / "backups" / "release"
