@@ -33,7 +33,7 @@ stopifnot(length(v$additions) == 5L, !is.null(v$gap_fill))
 stopifnot(isTRUE(v$conclusion$verified))
 stopifnot(isTRUE(v$replay$all_values_reproduced), isTRUE(v$replay$all_hashes_match))
 stopifnot(isTRUE(v$receipt_bound), isTRUE(v$backup$additions_absent_before))
-stopifnot(v$backup$quick_check == "ok", length(v$capture_rebind_mismatches) == 0L)
+stopifnot(v$backup$quick_check == "ok", length(v$capture_mismatches) == 0L)
 stopifnot(v$recorded_evidence_files == v$replay$evidence_files_verified)
 ```
 
@@ -50,7 +50,7 @@ cat("缺口回填期次：", paste(unlist(v$receipt$gap_filled_issues), collapse
 cat("证据文件复核：", v$replay$evidence_files_verified, "个，哈希全部匹配：",
     v$replay$all_hashes_match, "｜库内值全部由证据复现：", v$replay$all_values_reproduced, "\n")
 cat("库内登记的证据文件：", v$recorded_evidence_files, "｜capture 重绑不符：",
-    length(v$capture_rebind_mismatches), "\n")
+    length(v$capture_mismatches), "\n")
 cat("备份 quick_check：", v$backup$quick_check,
     "｜恢复前该 5 期确实为空：", v$backup$additions_absent_before,
     "｜回执与库内登记一致：", v$receipt_bound, "\n")
@@ -149,20 +149,30 @@ cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
 - `scripts/apply_issue_recovery.py`、`scripts/verify_settlement_issue_recovery.py` — 薄入口与只读复放。
 - 测试：`tests/test_settlement_issue_recovery.py`、
   `tests/scripts/test_build_issue_recovery_ledger.py`、
-  `tests/scripts/test_verify_settlement_issue_recovery.py`（共 **57** 项，全通过）。
+  `tests/scripts/test_verify_settlement_issue_recovery.py`（共 **66** 项，全通过）。
   覆盖：正常路径、跨玩法场次不一致、结算比分与彩果矛盾（新增期次**与**缺口期次两条路径）、
   让球回退（归档完全不报让球的新增期次，以及**缺口期次由备份提供让球**）、归档无开奖SP、
   归档提出库外选项、身份不符、证据被篡改、缺场次、写入中途失败整体回滚（含恢复表不残留）、
   **备份未完成时预留文件被清理**、重跑幂等（含两个缺口期次分别核对、**取消场次的空向量**）、
-  **值／选项／payload／审计向量／证据哈希被改动后重跑必须拒绝**、参考赔率残留、被替换向量
-  被改写、**中奖选项行被删除**、**多余的空选项**、payload 被改写（新增期次与缺口期次各一）、
-  复放检出丢失或**多余**的行、**判定不通过时命令必须非零退出**，以及三个入口脚本的 `main`。
+  **值／选项／payload／审计向量／证据哈希被改动后重跑必须拒绝**、**备份指向库自身或指向恢复后
+  副本必须拒绝**、**重复键冒充缺失场次必须拒绝**、参考赔率残留、被替换向量被改写、
+  **中奖选项行被删除**、**多余的空选项**、payload 被改写（新增期次与缺口期次各一）、
+  复放检出丢失或**多余**的行、**删除回填行并同步改计数**、**观测键被搬移**、capture URL 被改、
+  证据清单被改、**判定不通过时命令必须非零退出**，以及三个入口脚本的 `main`。
 
-**闸门（全部失败关闭）**：恢复的期次必须一条观测都没有；归档的场次数必须等于账本；5 个玩法
-必须给出一致的**场次→`native_match_id` 映射**（不是只比场次数）；归档行的 `native_match_id`
-必须与库一致；缺口场次集合必须等于账本；归档报出的彩果必须等于由比分推导的选项（新增期次与
-缺口期次**都**要过这道闸）；归档不得提出库里没有的选项；归档每个玩法必须恰好报出一个中奖选项；
-取消场次不得被回填。
+**闸门（全部失败关闭）**，按调用方分别说明：
+
+- **新增期次**：该期次必须一条观测都没有；归档的场次数必须等于账本；5 个玩法必须给出一致的
+  **场次→`native_match_id` 映射**（不是只比场次数）；归档行与库内行必须是**双射**（重复键不算
+  数）；归档行的 `native_match_id` 必须与库一致；归档每个玩法**最多**报出一个中奖选项。
+- **结果交叉校验**：归档报出的彩果必须等于由比分推导的选项。这条闸门**只在比分（或比分加已公布
+  的让球）能唯一确定选项时才适用** —— 归档板对很多场次留空让球格，取消场次也不报选项，此时
+  如实记录 `missing_or_invalid_handicap` / `unrecognized_archive_result` 审计码而**不臆造**结果。
+- **缺口期次**：应回填集合由**备份（未结算）∩ 归档（已结算）**推导，必须等于账本、且每个应回填
+  场次的 5 个玩法都在内；归档行的 `native_match_id` 必须与库一致；归档不得提出库里没有的选项；
+  归档必须恰好报出一个中奖选项；取消场次不得被回填。
+- **域与向量的差异**：跨玩法场次一致性只在**新增期次**上强制（缺口期次沿用库自身已有的场次）；
+  新增期次保留归档给出的选项域，缺口期次保留**库自身**的选项域。
 
 **开奖SP 必须整体替换。** 直播板在未结算场次里往「开奖SP」列放的是**赛前参考赔率**
 （三个选项都有值），结算后才只有一个选项带开奖SP。因此缺口回填把整条向量换成归档板的结算记录，

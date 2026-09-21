@@ -126,28 +126,36 @@ def _stored_vector(con, observation_id: int) -> list[dict]:
         "ORDER BY rowid", (observation_id,))]
 
 
-def settlement_vector_matches(stored: list[dict], archive_row: dict) -> bool:
-    """True when a stored vector records the archive's settlement SP and nothing else.
+def expected_settlement_vector(before_vector: list[dict], archive_row: dict) -> list[dict]:
+    """The vector a gap-filled row must hold, derived from external evidence.
 
-    The archive publishes only the option that settled, while the release keeps whatever
-    option domain its own source published (the live board lists every option). The
-    comparison is therefore by option name: every option the archive names must carry its
-    settlement SP, and every other option must carry none.
+    The release keeps the option domain its own source published (the live board lists
+    every option), while the archive publishes only the option that settled. The expected
+    vector therefore keeps the pre-recovery domain and ordering, carries the archive's
+    settlement SP for every option the archive names, and carries nothing for the rest.
+    Comparing against this exact list rejects an invented option, a dropped option and a
+    surviving reference odd alike.
     """
-    names = [row["option"] for row in stored]
-    if len(set(names)) != len(names):
-        return False
     archived = {o["option"]: o for o in archive_row["options"]}
-    # A stored vector that lost the winning row must not pass: every option the archive
-    # names has to be present, not merely every stored option accounted for.
-    if set(archived) - set(names):
-        return False
-    for row in stored:
+    expected = []
+    for row in before_vector:
         a = archived.get(row["option"])
-        want = ((a["raw_sp"], a["sp"], a["cell_id"]) if a is not None else (None, None, None))
-        if (row["raw_sp"], row["sp"], row["cell_id"]) != want:
-            return False
-    return True
+        expected.append({"option": row["option"],
+                         "raw_sp": a["raw_sp"] if a is not None else None,
+                         "sp": a["sp"] if a is not None else None,
+                         "cell_id": a["cell_id"] if a is not None else None})
+    if set(archived) - {row["option"] for row in before_vector}:
+        raise ValueError("archive names options the pre-recovery row does not carry")
+    return expected
+
+
+def _vector_for(con, issue: str, slot: int, play: str) -> list[dict]:
+    """A row's stored option vector, read by fixture key so it works on the backup too."""
+    return [{"option": o, "raw_sp": r, "sp": s, "cell_id": c} for o, r, s, c in con.execute(
+        """SELECT s.option, s.raw_sp, s.sp, s.cell_id FROM option_sp s
+           JOIN observation o USING(observation_id)
+           WHERE o.issue=? AND o.slot=? AND o.play=? ORDER BY s.rowid""",
+        (issue, slot, play))]
 
 
 def _fixture_map(rows: list[dict]) -> dict[str, dict[int, str]]:
@@ -270,13 +278,54 @@ def _gap_targets(con, item: dict) -> list[tuple]:
     return targets
 
 
-def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict]) -> dict:
+def _open_pre_recovery_backup(recorded: str | None, database: Path, additions: list[dict],
+                              gap_fills: list[dict]):
+    """Open the batch's backup after proving it is a genuine pre-recovery snapshot.
+
+    The recorded path is itself mutable database content, so it is only trusted once it is
+    shown not to alias the release and not to contain any part of the recovery. A caller
+    that wants an independent anchor should use the replay script, which takes the backup
+    from its own arguments.
+    """
+    if not recorded:
+        raise ValueError("This batch records no pre-recovery backup")
+    path = Path(recorded).resolve()
+    if path == database.resolve():
+        raise ValueError("The recorded pre-recovery backup is the release database itself")
+    if not path.is_file():
+        raise ValueError(f"The recorded pre-recovery backup {path} is unavailable")
+    con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        tables = {row[0] for row in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if tables & {"issue_recovery_batch", "issue_recovery_gap", "issue_recovery_capture"}:
+            raise ValueError("The recorded backup already contains a recovery batch")
+        for item in additions:
+            held = con.execute("SELECT COUNT(*) FROM observation WHERE issue=?",
+                               (item["issue"],)).fetchone()[0]
+            if held:
+                raise ValueError(f"The recorded backup already holds issue {item['issue']}")
+        for item in gap_fills:
+            unsettled = con.execute(
+                "SELECT COUNT(*) FROM observation WHERE issue=? AND (score='' OR score='-')",
+                (item["issue"],)).fetchone()[0]
+            if unsettled < item["expected_gap_fixtures"]:
+                raise ValueError(f"The recorded backup does not hold issue "
+                                 f"{item['issue']}'s gap fixtures unsettled")
+    except Exception:
+        con.close()
+        raise
+    return con
+
+
+def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict],
+                    database: Path) -> dict:
     """Re-read the evidence and confirm the stored recovery still matches it.
 
-    The idempotent path must not certify a damaged recovery, so counts alone are not
-    enough: every added row, payload and option is compared against the bytes the ledger
-    binds, and every completed value is re-derived from the archive rather than read back
-    from the audit table that recorded it.
+    The rerun must not certify a damaged recovery, so it does not enumerate the audit
+    table it is meant to corroborate: the required completions are derived from the
+    archive and the authenticated pre-recovery backup, and the audit rows, the recovered
+    observations and their option vectors must all match that derivation exactly.
     """
     added = 0
     for item in additions:
@@ -287,16 +336,18 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                       payload_json
                FROM observation WHERE issue=?""", (issue,)).fetchall()
         rows = [row for entry in item["evidence"] for row in _parse_evidence(entry, issue)]
-        if len(stored) != len(rows):
-            raise ValueError(f"issue {issue}: stored {len(stored)} rows, evidence holds "
-                             f"{len(rows)}")
+        archive_keys = [(r["slot"], r["play"]) for r in rows]
+        stored_keys = [(r[1], r[2]) for r in stored]
+        # A bijection, not merely equal counts: a duplicated key must not stand in for a
+        # missing archive fixture.
+        if sorted(stored_keys) != sorted(archive_keys):
+            raise ValueError(f"issue {issue}: stored rows are not the archive's fixtures")
+        if len(set(archive_keys)) != len(archive_keys) or len(set(stored_keys)) != len(stored_keys):
+            raise ValueError(f"issue {issue}: duplicate fixture keys")
         by_key = {(r["slot"], r["play"]): r for r in rows}
         for (observation_id, slot, play, native_id, status, score, halftime, expected,
              source_sha256, source_url, received_at, payload) in stored:
-            row = by_key.get((slot, play))
-            if row is None:
-                raise ValueError(f"issue {issue} slot {slot} {play}: stored row absent "
-                                 f"from the evidence")
+            row = by_key[(slot, play)]
             held = (native_id, status, score, halftime, expected, source_sha256,
                     source_url, received_at,
                     json.dumps(json.loads(payload), ensure_ascii=False))
@@ -312,69 +363,94 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
 
     if not gap_fills:
         return {"added_observations": added, "gap_observations": 0}
-    recorded_backup = con.execute(
-        "SELECT backup_path FROM issue_recovery_batch WHERE batch_id=?", (batch,)).fetchone()
-    if recorded_backup is None or not Path(recorded_backup[0]).is_file():
-        raise ValueError("The pre-recovery backup recorded by this batch is unavailable, so "
-                         "the completed rows cannot be re-derived from external evidence")
-    before_con = sqlite3.connect(f"file:{Path(recorded_backup[0]).resolve()}?mode=ro", uri=True)
+    recorded_backup = con.execute("SELECT backup_path FROM issue_recovery_batch "
+                                  "WHERE batch_id=?", (batch,)).fetchone()
+    before_con = _open_pre_recovery_backup(recorded_backup[0] if recorded_backup else None,
+                                          database, additions, gap_fills)
     try:
         gaps = 0
         for item in gap_fills:
             issue = item["issue"]
             archive = {(row["slot"], row["play"]): row
                        for entry in item["evidence"] for row in _parse_evidence(entry, issue)}
-            for (observation_id, slot, play, native_id, new_score, new_halftime, new_option,
-                 new_options, evidence_sha256, old_payload_sha256) in con.execute(
-                    """SELECT observation_id, slot, play, native_match_id, new_score,
-                              new_halftime_score, new_expected_option, new_options_json,
-                              evidence_sha256, old_payload_sha256
+            if len({slot for slot, _ in archive}) != item["expected_fixtures"]:
+                raise ValueError(f"issue {issue}: archive holds "
+                                 f"{len({slot for slot, _ in archive})} fixtures, ledger "
+                                 f"expects {item['expected_fixtures']}")
+            # The completions this batch owes are exactly the fixtures the backup held
+            # unsettled that the archive settles.
+            unsettled = {(slot, play) for slot, play in before_con.execute(
+                "SELECT slot, play FROM observation WHERE issue=? AND (score='' OR score='-')",
+                (issue,))}
+            required = {key for key, row in archive.items()
+                        if key in unsettled and SETTLED_SCORE.match(row["score"] or "")}
+            owed_slots = sorted({slot for slot, _ in required})
+            if owed_slots != item["expected_gap_slots"]:
+                raise ValueError(f"issue {issue}: owed slots differ from the ledger's")
+            if len(required) != len(owed_slots) * len(PLAYS):
+                raise ValueError(f"issue {issue}: {len(required)} completions are owed for "
+                                 f"{len(owed_slots)} fixtures, so a play is missing")
+
+            audited = {row[:2] for row in con.execute(
+                "SELECT slot, play FROM issue_recovery_gap WHERE batch_id=? AND issue=?",
+                (batch, issue))}
+            if audited != required:
+                raise ValueError(f"issue {issue}: the audit rows are not the owed completions")
+            # The audit row's own recorded settlement vector and evidence hash must still
+            # describe the archive, not merely exist.
+            for (slot, play, new_options, evidence_sha256) in con.execute(
+                    """SELECT slot, play, new_options_json, evidence_sha256
                        FROM issue_recovery_gap WHERE batch_id=? AND issue=?""", (batch, issue)):
                 source = archive.get((slot, play))
                 if source is None:
                     raise ValueError(f"issue {issue} slot {slot} {play}: no archive row")
-                held = con.execute(
-                    """SELECT native_match_id, score, halftime_score, expected_option,
-                              payload_json FROM observation WHERE observation_id=?""",
-                    (observation_id,)).fetchone()
-                before = before_con.execute(
-                    """SELECT payload_json FROM observation
-                       WHERE issue=? AND slot=? AND play=?""", (issue, slot, play)).fetchone()
-                if before is None:
-                    raise ValueError(f"issue {issue} slot {slot} {play}: absent from the "
-                                     f"pre-recovery backup")
-                payload = before[0]
-                # The pre-recovery payload supplies the handicap the archive omits, and it
-                # comes from the backup so the database under verification cannot supply it.
-                derived = settled_option(source, json.loads(payload))
-                if held is None or (held[0], held[1], held[2], held[3]) != (
-                        native_id, new_score, new_halftime, new_option):
-                    raise ValueError(f"issue {issue} slot {slot} {play}: completed values changed")
-                if native_id != source["native_match_id"]:
-                    raise ValueError(f"issue {issue} slot {slot} {play}: row identity changed")
-                if held[4] != payload:
-                    raise ValueError(f"issue {issue} slot {slot} {play}: pre-recovery payload "
-                                     f"changed")
-                if hashlib.sha256(payload.encode()).hexdigest() != old_payload_sha256:
-                    raise ValueError(f"issue {issue} slot {slot} {play}: payload binding changed")
-                if derived != new_option or derived != _reported_result(issue, source):
-                    raise ValueError(f"issue {issue} slot {slot} {play}: completion disagrees "
-                                     f"with the archive")
-                if (source["score"], source["halftime_score"]) != (new_score, new_halftime):
-                    raise ValueError(f"issue {issue} slot {slot} {play}: completion disagrees "
-                                     f"with the archive")
                 if new_options != json.dumps(_settlement_vector(source), ensure_ascii=False):
                     raise ValueError(f"issue {issue} slot {slot} {play}: recorded settlement "
                                      f"vector changed")
                 if evidence_sha256 != source["source_sha256"]:
                     raise ValueError(f"issue {issue} slot {slot} {play}: recorded evidence "
                                      f"changed")
-                if not settlement_vector_matches(_stored_vector(con, observation_id), source):
+
+            # Every observation of the issue must either hold its derived completion or be
+            # untouched, so an extra completed row cannot hide.
+            for (observation_id, slot, play, native_id, score, halftime, option, payload) in (
+                    con.execute("""SELECT observation_id, slot, play, native_match_id, score,
+                                          halftime_score, expected_option, payload_json
+                                   FROM observation WHERE issue=?""", (issue,))):
+                key = (slot, play)
+                source = archive.get(key)
+                if key not in required:
+                    before = before_con.execute(
+                        """SELECT score, halftime_score, expected_option, payload_json
+                           FROM observation WHERE issue=? AND slot=? AND play=?""",
+                        (issue, slot, play)).fetchone()
+                    if before is None or (score, halftime, option, payload) != before:
+                        raise ValueError(f"issue {issue} slot {slot} {play}: an observation "
+                                         f"outside the owed completions was changed")
+                    continue
+                before = before_con.execute(
+                    """SELECT score, halftime_score, payload_json FROM observation
+                       WHERE issue=? AND slot=? AND play=?""", (issue, slot, play)).fetchone()
+                if before is None:
+                    raise ValueError(f"issue {issue} slot {slot} {play}: absent from the "
+                                     f"pre-recovery backup")
+                derived = settled_option(source, json.loads(before[2]))
+                if (native_id, score, halftime, option) != (
+                        source["native_match_id"], source["score"], source["halftime_score"],
+                        derived) or derived != _reported_result(issue, source):
+                    raise ValueError(f"issue {issue} slot {slot} {play}: the completion "
+                                     f"disagrees with the archive")
+                if payload != before[2]:
+                    raise ValueError(f"issue {issue} slot {slot} {play}: pre-recovery payload "
+                                     f"changed")
+                expected_vector = expected_settlement_vector(
+                    _vector_for(before_con, issue, slot, play), source)
+                if _stored_vector(con, observation_id) != expected_vector:
                     raise ValueError(f"issue {issue} slot {slot} {play}: stored options changed")
                 gaps += 1
+        return {"added_observations": added, "gap_observations": gaps}
     finally:
         before_con.close()
-    return {"added_observations": added, "gap_observations": gaps}
 
 
 def recover_issues(database, ledger_path, backup_path, *, approval_note):
@@ -411,7 +487,7 @@ def recover_issues(database, ledger_path, backup_path, *, approval_note):
                 "SELECT added_observations, gap_observations FROM issue_recovery_batch "
                 "WHERE batch_id=?", (batch,)).fetchone()
             if prior:
-                verified = _verify_applied(con, batch, additions, gap_fills)
+                verified = _verify_applied(con, batch, additions, gap_fills, database)
                 if (verified["added_observations"] != prior[0]
                         or verified["gap_observations"] != prior[1]):
                     raise ValueError("Previously recovered row counts changed")
@@ -493,17 +569,11 @@ def recover_issues(database, ledger_path, backup_path, *, approval_note):
                 # settles. The archive's record is the settlement one, so the whole vector
                 # is replaced and the reference vector is preserved as evidence.
                 replaced_vector = _stored_vector(con, observation_id)
-                archived = {o["option"]: o for o in source["options"]}
-                for option, raw_sp, sp, cell_id in con.execute(
-                        "SELECT option, raw_sp, sp, cell_id FROM option_sp "
-                        "WHERE observation_id=?", (observation_id,)).fetchall():
-                    a = archived.get(option)
-                    want = ((a["raw_sp"], a["sp"], a["cell_id"]) if a is not None
-                            else (None, None, None))
-                    if (raw_sp, sp, cell_id) != want:
-                        con.execute("UPDATE option_sp SET raw_sp=?, sp=?, cell_id=? "
-                                    "WHERE observation_id=? AND option=?",
-                                    (want[0], want[1], want[2], observation_id, option))
+                for want in expected_settlement_vector(replaced_vector, source):
+                    con.execute("UPDATE option_sp SET raw_sp=?, sp=?, cell_id=? "
+                                "WHERE observation_id=? AND option=?",
+                                (want["raw_sp"], want["sp"], want["cell_id"],
+                                 observation_id, want["option"]))
                 changed = con.execute(
                     """UPDATE observation SET score=?, halftime_score=?, expected_option=?
                        WHERE observation_id=? AND score=? AND halftime_score=?""",

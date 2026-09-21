@@ -24,6 +24,14 @@ PLAY_LABELS = {5: ("胜", "2.10"), 6: ("3", "5.50"), 7: ("上单", "3.30"),
                8: ("2:1", "8.00"), 9: ("胜-胜", "4.20")}
 
 
+# The option domain the live board publishes for each play, taken from the release.
+DOMAINS = {"spf": ("胜", "平", "负"),
+           "jq": ("0球", "1球", "2球", "3球", "4球", "5球", "6球", "7+球"),
+           "ds": ("上+单", "上+双", "下+单", "下+双"),
+           "bf": ("1:0", "2:1", "1:1", "0:0"),
+           "bq": ("胜-胜", "胜-平", "胜-负", "平-胜", "平-平", "平-负", "负-胜", "负-平", "负-负")}
+
+
 def archive_page(issue: str, typeid: int, fixtures, handicap: str = "+0") -> bytes:
     """Minimal contract-valid archive page: identity, headers and settled rows."""
     title = "单场进球数" if typeid == 6 else TITLE[typeid]
@@ -98,29 +106,32 @@ def gap_db(tmp: Path, *, unsettled=((1, "2-1"),), cancelled=(2,), handicap=0) ->
     """A release whose live-board capture left some fixtures unplayed and cancelled others.
 
     The live board fills the settlement column with pre-match reference odds while a
-    fixture is unplayed, so every unsettled row carries a full three-option vector.
+    fixture is unplayed, so every unsettled row carries its play's whole option domain.
     """
     path = tmp / "db.sqlite"
     con = sqlite3.connect(path)
     try:
         _schema(con)
-        con.execute("INSERT INTO capture VALUES (?,?,?,?,?)",
-                    ("26092", 5, "https://cp.nowscore.com/buy/DanChang.aspx?all=1",
-                     "2026-09-06T13:05:51+00:00", "a" * 64))
+        for typeid in sorted(PLAY_LABELS):
+            con.execute("INSERT INTO capture VALUES (?,?,?,?,?)",
+                        ("26092", typeid, "https://cp.nowscore.com/buy/DanChang.aspx?all=1",
+                         "2026-09-06T13:05:51+00:00", "a" * 64))
         oid = 0
-        for slot, _ in unsettled:
-            oid += 1
-            con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (oid, "26092", slot, "spf", str(1000 + slot), "22:25", "-", "-", None,
-                         "a" * 64, "", "", json.dumps({"handicap": handicap})))
-            for option, sp in (("胜", 3.28), ("平", 2.49), ("负", 3.40)):
-                con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)",
-                            (oid, option, f"{sp:.2f}", sp, f"ref-{option}"))
-        for slot in cancelled:
-            oid += 1
-            con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                        (oid, "26092", slot, "spf", str(1000 + slot), "取消", "-", "-", None,
-                         "a" * 64, "", "", "{}"))
+        for play, options in DOMAINS.items():
+            for slot, _ in unsettled:
+                oid += 1
+                con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            (oid, "26092", slot, play, str(1000 + slot), "22:25", "-", "-",
+                             None, "a" * 64, "", "", json.dumps({"handicap": handicap})))
+                for index, option in enumerate(options):
+                    con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)",
+                                (oid, option, f"{3.0 + index:.2f}", 3.0 + index,
+                                 f"ref-{option}"))
+            for slot in cancelled:
+                oid += 1
+                con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            (oid, "26092", slot, play, str(1000 + slot), "取消", "-", "-",
+                             None, "a" * 64, "", "", "{}"))
         con.commit()
     finally:
         con.close()
@@ -219,7 +230,7 @@ def test_replaces_the_reference_odds_the_live_board_published(tmp_path: Path) ->
         db, "SELECT new_options_json, replaced_options_json FROM issue_recovery_gap")[0]
     assert json.loads(new_options) == [{"option": "胜", "raw_sp": "2.10", "sp": 2.10,
                                         "cell_id": "archive_result_1"}]
-    assert [o["sp"] for o in json.loads(replaced)] == [3.28, 2.49, 3.40]
+    assert [o["sp"] for o in json.loads(replaced)] == [3.0, 4.0, 5.0]
 
 
 def test_completes_unsettled_fixtures_and_leaves_cancelled_ones_alone(tmp_path: Path) -> None:
@@ -227,7 +238,7 @@ def test_completes_unsettled_fixtures_and_leaves_cancelled_ones_alone(tmp_path: 
     result = recover_issues(db, gap_ledger(tmp_path), tmp_path / "backup.sqlite",
                             approval_note="owner approved")
 
-    assert result["status"] == "applied" and result["gap_observations"] == 1
+    assert result["status"] == "applied" and result["gap_observations"] == 5
     gap = rows(db, "SELECT old_score, new_score, old_expected_option, new_expected_option "
                    "FROM issue_recovery_gap")[0]
     assert gap == ("-", "2-1", None, "胜")
@@ -235,10 +246,10 @@ def test_completes_unsettled_fixtures_and_leaves_cancelled_ones_alone(tmp_path: 
     # the live board, which remains the primary source for those rows.
     assert rows(db, "SELECT COUNT(*), SUM(replaced_sha256 IS NULL) "
                     "FROM issue_recovery_capture")[0] == (5, 5)
-    assert rows(db, "SELECT COUNT(*) FROM capture WHERE issue='26092'")[0][0] == 1
+    assert rows(db, "SELECT COUNT(*) FROM capture WHERE issue='26092'")[0][0] == 5
     # A cancelled fixture legitimately has no result, so it is neither completed nor recorded.
     assert rows(db, "SELECT score FROM observation WHERE slot=2")[0] == ("-",)
-    assert rows(db, "SELECT COUNT(*) FROM issue_recovery_gap")[0][0] == 1
+    assert rows(db, "SELECT COUNT(*) FROM issue_recovery_gap")[0][0] == 5
 
 
 def test_uses_the_release_handicap_when_the_archive_leaves_the_line_empty(
@@ -306,7 +317,7 @@ def test_repeating_a_gap_ledger_is_a_verified_no_op(tmp_path: Path) -> None:
     path = gap_ledger(tmp_path)
     recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
     again = recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
-    assert again == {"status": "already_applied", "added_observations": 0, "gap_observations": 1}
+    assert again == {"status": "already_applied", "added_observations": 0, "gap_observations": 5}
     assert not (tmp_path / "other.sqlite").exists()
 
 
@@ -398,12 +409,15 @@ def test_two_gap_issues_are_verified_per_issue(tmp_path: Path) -> None:
     """Gap accounting is keyed by issue, so a second issue must not break the rerun."""
     db = gap_db(tmp_path)
     con = sqlite3.connect(db)
-    con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (99, "26093", 5, "spf", "1005", "22:25", "-", "-", None, "a" * 64, "", "",
-                 json.dumps({"handicap": 0})))
-    for option, sp in (("胜", 3.28), ("平", 2.49), ("负", 3.40)):
-        con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)", (99, option, f"{sp:.2f}", sp,
-                                                                 f"ref-{option}"))
+    oid = 98
+    for play, options in DOMAINS.items():
+        oid += 1
+        con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (oid, "26093", 5, play, "1005", "22:25", "-", "-", None, "a" * 64, "", "",
+                     json.dumps({"handicap": 0})))
+        for index, option in enumerate(options):
+            con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)",
+                        (oid, option, f"{3.0 + index:.2f}", 3.0 + index, f"ref-{option}"))
     con.commit()
     con.close()
     doc = json.loads(gap_ledger(tmp_path).read_text(encoding="utf-8"))
@@ -421,11 +435,11 @@ def test_two_gap_issues_are_verified_per_issue(tmp_path: Path) -> None:
         Path(entry["path"]).write_bytes(Path(entry["path"]).read_bytes())
     path = ledger(tmp_path, doc, "two-gaps.json")
     result = recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
-    assert result["gap_observations"] == 2
+    assert result["gap_observations"] == 10
     again = recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
-    assert again["status"] == "already_applied" and again["gap_observations"] == 2
+    assert again["status"] == "already_applied" and again["gap_observations"] == 10
     assert sorted(rows(db, "SELECT issue, COUNT(*) FROM issue_recovery_gap GROUP BY issue")) == [
-        ("26092", 1), ("26093", 1)]
+        ("26092", 5), ("26093", 5)]
 
 
 def test_an_addition_whose_archive_omits_the_handicap_is_accepted(tmp_path: Path) -> None:
@@ -494,6 +508,74 @@ def test_an_extra_blank_added_option_refuses_the_rerun(tmp_path: Path) -> None:
     con.commit()
     con.close()
     with pytest.raises(ValueError, match="recovered options changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_backup_pointing_at_the_release_refuses_the_rerun(tmp_path: Path) -> None:
+    """The recorded backup path is database content, so aliasing the release must fail."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_batch SET backup_path=?", (str(db.resolve()),))
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="is the release database itself"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_backup_that_is_not_pre_recovery_refuses_the_rerun(tmp_path: Path) -> None:
+    """A copy taken after the recovery cannot serve as the pre-recovery anchor."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    import shutil
+    shutil.copyfile(db, tmp_path / "post-recovery-copy.sqlite")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_batch SET backup_path=?",
+                (str((tmp_path / "post-recovery-copy.sqlite").resolve()),))
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="already contains a recovery batch"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_changed_recorded_settlement_vector_refuses_the_rerun(tmp_path: Path) -> None:
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_gap SET new_options_json='[]'")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="recorded settlement vector changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_changed_recorded_evidence_hash_refuses_the_rerun(tmp_path: Path) -> None:
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_gap SET evidence_sha256=?", ("f" * 64,))
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="disagrees with the archive|evidence"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_duplicated_added_row_refuses_the_rerun(tmp_path: Path) -> None:
+    """Equal counts are not enough: the stored keys must be the archive's keys."""
+    db = addition_db(tmp_path)
+    path = addition_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM observation WHERE issue='23075' AND slot=2 AND play='spf'")
+    con.execute("""INSERT INTO observation VALUES
+        (999, '23075', 1, 'spf', '1001', '完场', '2-1', '1-0', '胜', 'x', 'x', 'x', '{}')""")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="not the archive's fixtures|duplicate fixture keys"):
         recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
 
 

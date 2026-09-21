@@ -308,6 +308,7 @@
    "role": "gap_fill"
   }
  ],
+ "evidence_manifest_agrees": true,
  "ledger_authorization": "Owner approved (2026-09-21): recover the five quarantined issues and complete issue 26092's unsettled fixtures from the source's own archive board, recorded as an audited layer on the sealed release.",
  "additions": [
   {
@@ -622,7 +623,7 @@
   "mismatches": [],
   "replay_agrees": true
  },
- "capture_rebind_mismatches": [],
+ "capture_mismatches": [],
  "recorded_evidence_files": 30,
  "replay": {
   "evidence_files_verified": 30,
@@ -632,7 +633,8 @@
  "backup": {
   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/nowscore_history_replay.before_bj479_issue_recovery.sqlite",
   "quick_check": "ok",
-  "additions_absent_before": true
+  "additions_absent_before": true,
+  "is_pre_recovery_snapshot": true
  },
  "receipt": {
   "data_sha256": "e37597091f0375c28a3c080db111dbb66a620e444ebc336ba5a3c8638c522f7b",
@@ -665,7 +667,9 @@
    "The recovery is a recorded layer, not a rebuild: the release bundle binds its request URLs into the source scope, so re-verifying it would require re-capturing all 8,325 pages. The original build receipt and its hashes are preserved in issue_recovery_batch.original_receipt_json.",
    "observation.payload_json keeps the source's own bytes and is deliberately not rewritten, so re-deriving from the payload of a gap-filled row shows the live board's unsettled values rather than the archive's.",
    "For fixtures whose archive row leaves the handicap cell empty, the settled option is derived from the release's own handicap and the archive's score, and must equal the result the archive reports. Replay takes that handicap from the pre-recovery backup.",
-   "The live board publishes pre-match reference odds in the settlement column while a fixture is unplayed; gap-filled rows had that vector replaced by the archive's settlement SP, and the replaced vector is preserved in issue_recovery_gap.replaced_options_json."
+   "The live board publishes pre-match reference odds in the settlement column while a fixture is unplayed; gap-filled rows had that vector replaced by the archive's settlement SP over the release's own option domain, and the replaced vector is preserved in issue_recovery_gap.replaced_options_json.",
+   "An archive row may legitimately settle no option (a cancelled fixture), so an added observation with no options is expected rather than a defect. The result cross-check on added rows therefore applies only where the score alone, or the score plus a published line, determines an option.",
+   "The batch's recorded backup path is database content; replay ignores it and uses the backup given on the command line, and it requires that backup to still be a pre-recovery snapshot."
   ]
  }
 }

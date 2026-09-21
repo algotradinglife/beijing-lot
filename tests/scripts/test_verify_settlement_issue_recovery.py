@@ -17,7 +17,7 @@ from scripts.verify_settlement_issue_recovery import build_report, main  # noqa:
 from src.nowscore_settlement import ARCHIVE_SLUGS, TITLE  # noqa: E402
 from src.settlement_issue_recovery import recover_issues  # noqa: E402
 
-LABELS = {5: ("胜", "2.10"), 6: ("3", "5.50"), 7: ("上单", "3.30"),
+LABELS = {5: ("胜", "2.10"), 6: ("3", "5.50"), 7: ("上+单", "3.30"),
           8: ("2:1", "8.00"), 9: ("胜-胜", "4.20")}
 ADDED = "23075"
 
@@ -77,13 +77,23 @@ def _database(tmp: Path) -> Path:
             con.execute("INSERT INTO capture VALUES (?,?,?,?,?)",
                         ("26092", typeid, "https://cp.nowscore.com/buy/DanChang.aspx?all=1",
                          "2026-09-06T13:05:51+00:00", "a" * 64))
-        con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (1, "26092", 362, "spf", "1362", "22:25", "-", "-", None, "a" * 64, "", "",
-                     json.dumps({"handicap": 0})))
-        # The live board published reference odds in the settlement column while unplayed.
-        for option, sp in (("胜", 3.28), ("平", 2.49), ("负", 3.40)):
-            con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)",
-                        (1, option, f"{sp:.2f}", sp, f"ref-{option}"))
+        # The live board published reference odds in the settlement column while unplayed,
+        # for every play, so each row carries its play's whole option domain.
+        domains = {"spf": ("胜", "平", "负"),
+                   "jq": ("0球", "1球", "2球", "3球", "4球", "5球", "6球", "7+球"),
+                   "ds": ("上+单", "上+双", "下+单", "下+双"),
+                   "bf": ("1:0", "2:1", "1:1", "0:0"),
+                   "bq": ("胜-胜", "胜-平", "胜-负", "平-胜", "平-平", "平-负", "负-胜", "负-平",
+                          "负-负")}
+        oid = 0
+        for play, options in domains.items():
+            oid += 1
+            con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (oid, "26092", 362, play, "1362", "22:25", "-", "-", None, "a" * 64,
+                         "", "", json.dumps({"handicap": 0})))
+            for index, option in enumerate(options):
+                con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)",
+                            (oid, option, f"{3.0 + index:.2f}", 3.0 + index, f"ref-{option}"))
         con.commit()
     finally:
         con.close()
@@ -123,9 +133,9 @@ def test_replay_reproduces_every_recovered_value(tmp_path: Path) -> None:
     assert report["replay"] == {"evidence_files_verified": 10, "all_hashes_match": True,
                                 "all_values_reproduced": True}
     assert report["additions"][0]["replayed_observations"] == 10
-    assert report["gap_fill"]["observations"] == 1 and report["gap_fill"]["replay_agrees"]
+    assert report["gap_fill"]["observations"] == 5 and report["gap_fill"]["replay_agrees"]
     assert report["recorded_evidence_files"] == 10
-    assert report["capture_rebind_mismatches"] == []
+    assert report["capture_mismatches"] == []
     assert report["backup"]["additions_absent_before"] is True
     assert report["receipt_bound"] is True
     assert report["receipt"]["effective_source"].endswith("_and_archive_recovery")
@@ -223,6 +233,55 @@ def test_replay_catches_an_extra_added_observation(tmp_path: Path) -> None:
     report = build_report(db, ledger, backup)
     assert report["conclusion"]["verified"] is False
     assert report["additions"][0]["mismatch_count"] >= 1
+
+
+def test_replay_catches_a_deleted_completion_with_adjusted_counts(tmp_path: Path) -> None:
+    """The owed completions come from the backup and the archive, not from the audit table."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM issue_recovery_gap WHERE slot=362 AND play='spf'")
+    con.execute("UPDATE issue_recovery_batch SET gap_observations=134")
+    con.execute("UPDATE receipt SET payload_json=json_set(payload_json, "
+                "'$.gap_filled_observations', 134)")
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["gap_fill"]["mismatches"]
+
+
+def test_replay_catches_a_moved_observation_key(tmp_path: Path) -> None:
+    """The observation must sit at the key the evidence names."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET slot=999 WHERE observation_id=1")
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_catches_a_capture_url_change(tmp_path: Path) -> None:
+    """Recorded capture provenance is validated, not merely displayed."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_capture SET url='https://example.invalid/x' "
+                "WHERE issue=? AND typeid=5", (ADDED,))
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["capture_mismatches"]
+
+
+def test_replay_catches_a_tampered_evidence_manifest(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_batch SET evidence_manifest_json='[]'")
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["evidence_manifest_agrees"] is False
 
 
 def test_replay_refuses_tampered_evidence(tmp_path: Path) -> None:
