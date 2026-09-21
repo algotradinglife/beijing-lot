@@ -1,0 +1,30 @@
+{
+ "schema": "bj479_issue_recovery_sample_v1",
+ "batch_id": "e9de2d240e8b32a29696f9fbe459ff80247979cbffab91f8a70b75c5646b7d61",
+ "database": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
+ "seed": 3,
+ "sampled_fixtures": [
+  "20082/27 (addition)",
+  "20082/135 (addition)",
+  "20123/62 (addition)",
+  "20123/274 (addition)",
+  "20123/282 (addition)",
+  "20123/326 (addition)",
+  "23075/94 (addition)",
+  "24014/101 (addition)",
+  "24014/111 (addition)",
+  "25114/10 (addition)",
+  "25114/24 (addition)",
+  "25114/85 (addition)",
+  "25114/109 (addition)",
+  "25114/132 (addition)",
+  "25114/136 (addition)",
+  "25114/177 (addition)"
+ ],
+ "checked_observations": 80,
+ "evidence_files_verified": 25,
+ "mismatches": [],
+ "mismatch_count": 0,
+ "agrees": true,
+ "scope": "This proves the sampled fixtures, not the whole recovery; the full replay remains the acceptance evidence for the batch."
+}

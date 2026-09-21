@@ -150,13 +150,36 @@ def expected_settlement_vector(before_vector: list[dict], archive_row: dict) -> 
     return expected
 
 
-def _vector_for(con, issue: str, slot: int, play: str) -> list[dict]:
-    """A row's stored option vector, read by fixture key so it works on the backup too."""
-    return [{"option": o, "raw_sp": r, "sp": s, "cell_id": c} for o, r, s, c in con.execute(
-        """SELECT s.option, s.raw_sp, s.sp, s.cell_id FROM option_sp s
-           JOIN observation o USING(observation_id)
-           WHERE o.issue=? AND o.slot=? AND o.play=? ORDER BY s.rowid""",
-        (issue, slot, play))]
+def option_vectors_by_id(con, issue: str) -> dict[int, list[dict]]:
+    """Every option vector of one issue, keyed by observation id, in a single query.
+
+    Reading them one row at a time probed the option table thousands of times, which
+    dominated the runtime on the external disk; this keeps it to one pass per issue.
+    """
+    out: dict[int, list[dict]] = {}
+    for oid, option, raw_sp, sp, cell_id in con.execute(
+            """SELECT s.observation_id, s.option, s.raw_sp, s.sp, s.cell_id
+               FROM option_sp s JOIN observation o USING(observation_id)
+               WHERE o.issue=? ORDER BY s.observation_id, s.rowid""", (issue,)):
+        out.setdefault(oid, []).append(
+            {"option": option, "raw_sp": raw_sp, "sp": sp, "cell_id": cell_id})
+    return out
+
+
+def option_vectors_for(con, issue: str) -> dict[tuple[int, str], list[dict]]:
+    """Every option vector of one issue, keyed by fixture, in a single query.
+
+    Reading them one fixture at a time made the replay scan the option table thousands of
+    times, which dominated its runtime; this keeps it to one pass per issue.
+    """
+    out: dict[tuple[int, str], list[dict]] = {}
+    for slot, play, option, raw_sp, sp, cell_id in con.execute(
+            """SELECT o.slot, o.play, s.option, s.raw_sp, s.sp, s.cell_id
+               FROM observation o JOIN option_sp s USING(observation_id)
+               WHERE o.issue=? ORDER BY o.slot, o.play, s.rowid""", (issue,)):
+        out.setdefault((slot, play), []).append(
+            {"option": option, "raw_sp": raw_sp, "sp": sp, "cell_id": cell_id})
+    return out
 
 
 def _fixture_map(rows: list[dict]) -> dict[str, dict[int, str]]:
@@ -350,6 +373,7 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
     added = 0
     for item in additions:
         issue = item["issue"]
+        vectors = option_vectors_by_id(con, issue)
         stored = con.execute(
             """SELECT observation_id, slot, play, native_match_id, status, score,
                       halftime_score, expected_option, source_sha256, source_url, received_at,
@@ -377,7 +401,7 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                     json.dumps(json.loads(canonical(row)), ensure_ascii=False))
             if held != want:
                 raise ValueError(f"issue {issue} slot {slot} {play}: recovered values changed")
-            if _stored_vector(con, observation_id) != _settlement_vector(row):
+            if vectors.get(observation_id, []) != _settlement_vector(row):
                 raise ValueError(f"issue {issue} slot {slot} {play}: recovered options changed")
             added += 1
 
@@ -425,6 +449,8 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                 raise ValueError(f"issue {issue}: two audit rows share a fixture key")
             if set(audited) != required:
                 raise ValueError(f"issue {issue}: the audit rows are not the owed completions")
+            # One pass over each side's option vectors, keyed by fixture.
+            vectors_now, vectors_before = option_vectors_for(con, issue), option_vectors_for(before_con, issue)
             # Iterate the owed keys, not the surviving observations, so a deleted row cannot
             # shrink the check.
             for slot, play in sorted(required):
@@ -448,7 +474,7 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                                      f"pre-recovery backup")
                 derived = settled_option(source, json.loads(before[2]))
                 expected_vector = expected_settlement_vector(
-                    _vector_for(before_con, issue, slot, play), source)
+                    vectors_before.get((slot, play), []), source)
                 # The observation, and the audit row that records it, must both agree with
                 # evidence the recovery cannot have rewritten.
                 if (native_id, score, halftime, option) != (
@@ -459,7 +485,7 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                 if payload != before[2]:
                     raise ValueError(f"issue {issue} slot {slot} {play}: pre-recovery payload "
                                      f"changed")
-                if _stored_vector(con, observation_id) != expected_vector:
+                if vectors_now.get((slot, play), []) != expected_vector:
                     raise ValueError(f"issue {issue} slot {slot} {play}: stored options changed")
                 if (audit_id, audit_native, audit_score, audit_halftime, audit_option) != (
                         observation_id, native_id, score, halftime, option):
@@ -474,7 +500,7 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                 if audit_payload_sha256 != hashlib.sha256(before[2].encode()).hexdigest():
                     raise ValueError(f"issue {issue} slot {slot} {play}: recorded payload "
                                      f"binding changed")
-                if audit_replaced != json.dumps(_vector_for(before_con, issue, slot, play),
+                if audit_replaced != json.dumps(vectors_before.get((slot, play), []),
                                                 ensure_ascii=False):
                     raise ValueError(f"issue {issue} slot {slot} {play}: recorded replaced "
                                      f"vector changed")
@@ -486,17 +512,17 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
             # - same keys, same multiplicity, same values, same vectors - so a deletion, a
             # duplicate or an edit to an untouched fixture cannot hide behind the owed-key
             # loop.
-            def outside(con):
+            def outside(con, vectors):
                 # A Counter, not a dict: a duplicated key must not overwrite its twin.
                 return Counter(
                     (slot, play, native, score, halftime, option, payload,
-                     json.dumps(_vector_for(con, issue, slot, play), ensure_ascii=False))
+                     json.dumps(vectors.get((slot, play), []), ensure_ascii=False))
                     for (slot, play, native, score, halftime, option, payload) in con.execute(
                         """SELECT slot, play, native_match_id, score, halftime_score,
                                   expected_option, payload_json FROM observation
                            WHERE issue=?""", (issue,))
                     if (slot, play) not in required)
-            if outside(con) != outside(before_con):
+            if outside(con, vectors_now) != outside(before_con, vectors_before):
                 raise ValueError(f"issue {issue}: an observation outside the owed completions "
                                  f"was changed")
         return {"added_observations": added, "gap_observations": gaps}

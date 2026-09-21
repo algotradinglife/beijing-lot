@@ -13,7 +13,11 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.verify_settlement_issue_recovery import build_report, main  # noqa: E402
+from scripts.verify_settlement_issue_recovery import (  # noqa: E402
+    build_report,
+    build_sample_report,
+    main,
+)
 from src.nowscore_settlement import ARCHIVE_SLUGS, TITLE  # noqa: E402
 from src.settlement_issue_recovery import recover_issues  # noqa: E402
 
@@ -397,6 +401,20 @@ def test_replay_accepts_an_option_less_added_row(tmp_path: Path) -> None:
     assert report["additions"][0]["replayed_observations"] == 10
 
 
+def test_replay_catches_self_consistent_addition_totals(tmp_path: Path) -> None:
+    """The recorded totals must equal the totals replay derived, not merely each other."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_batch SET added_fixtures=1, added_observations=5")
+    con.execute("UPDATE receipt SET payload_json=json_set(payload_json, "
+                "'$.recovered_fixtures', 1, '$.recovered_observations', 5)")
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["addition_totals_agree"] is False
+
+
 def test_replay_refuses_tampered_evidence(tmp_path: Path) -> None:
     db, ledger, backup = _applied(tmp_path)
     item = json.loads(ledger.read_text(encoding="utf-8"))["gap_fills"][0]["evidence"][0]
@@ -439,3 +457,33 @@ def test_the_command_fails_when_the_report_does_not_verify(tmp_path: Path) -> No
     assert main(["--database", str(db), "--ledger", str(ledger), "--backup", str(backup),
                  "--out", str(out)]) == 1
     assert json.loads(out.read_text(encoding="utf-8"))["conclusion"]["verified"] is False
+
+
+def test_sample_check_reproduces_a_sampled_fixture(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    report = build_sample_report(db, ledger, backup, 2, seed=0)
+    assert report["agrees"] is True
+    assert report["mismatch_count"] == 0
+    assert report["checked_observations"] > 0
+    assert "not the whole recovery" in report["scope"]
+
+
+def test_sample_check_catches_a_changed_sampled_row(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET score='9-9' WHERE issue='26092'")
+    con.commit()
+    con.close()
+    # A large sample covers every fixture, so the changed row must be caught.
+    report = build_sample_report(db, ledger, backup, 500, seed=0)
+    assert report["agrees"] is False
+    assert any(m["issue"] == "26092" for m in report["mismatches"])
+
+
+def test_sample_check_refuses_a_ledger_the_batch_does_not_record(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    other = tmp_path / "other-ledger.json"
+    other.write_text(ledger.read_text(encoding="utf-8").replace("26092", "26093"),
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="does not match the ledger"):
+        build_sample_report(db, other, backup, 1)

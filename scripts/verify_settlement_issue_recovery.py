@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import random
 import sqlite3
 import sys
 from collections import Counter
@@ -31,7 +32,8 @@ if str(ROOT) not in sys.path:
 
 from src.nowscore_settlement import canonical, expected_option, parse_page  # noqa: E402
 from src.settlement_issue_recovery import (  # noqa: E402
-    SETTLED_SCORE, expected_settlement_vector, settled_option)
+    SETTLED_SCORE, expected_settlement_vector, option_vectors_by_id,
+    option_vectors_for, settled_option)
 
 
 def _sha256(path: Path) -> str:
@@ -65,15 +67,6 @@ def _replay_evidence(entry: dict) -> tuple[dict, list]:
 def _vector(row: dict) -> list[dict]:
     return [{"option": o["option"], "raw_sp": o["raw_sp"], "sp": o["sp"],
              "cell_id": o["cell_id"]} for o in row["options"]]
-
-
-def _vector_for(con, issue: str, slot: int, play: str) -> list[dict]:
-    """A row's option vector read by fixture key, so it works on the backup as well."""
-    return [{"option": o, "raw_sp": r, "sp": s, "cell_id": c} for o, r, s, c in con.execute(
-        """SELECT s.option, s.raw_sp, s.sp, s.cell_id FROM option_sp s
-           JOIN observation o USING(observation_id)
-           WHERE o.issue=? AND o.slot=? AND o.play=? ORDER BY s.rowid""",
-        (issue, slot, play))]
 
 
 def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
@@ -121,6 +114,7 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
             rows, sources = _replay_evidence(entry)
             evidence_checked += len(sources)
             issue = entry["issue"]
+            vectors = option_vectors_by_id(con, issue)
             fixtures = {slot for slot, _ in rows}
             mismatches = []
             stored = con.execute(
@@ -147,7 +141,7 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                         row["halftime_score"], expected_option(row), row["source_sha256"],
                         row["source_url"], row["received_at"],
                         json.dumps(json.loads(canonical(row)), ensure_ascii=False))
-                stored_vector = _vector_for(con, issue, slot, play)
+                stored_vector = vectors.get(observation_id, [])
                 if held != want or stored_vector != _vector(row):
                     mismatches.append({"slot": slot, "play": play, "database": list(held),
                                        "replayed": list(want),
@@ -186,6 +180,10 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                 (batch_id, issue)).fetchall()
             audited = {(row[0], row[1]): row[2:] for row in audit_rows}
             slots = sorted({slot for slot, _ in required})
+            # One pass over each side's option vectors, keyed by fixture: reading them per
+            # row scanned the option table thousands of times.
+            vectors_now = option_vectors_for(con, issue)
+            vectors_before = option_vectors_for(backup_con, issue)
             issue_mismatches = []
             # A dictionary silently drops a duplicate key, so multiplicity is checked first.
             if len(audited) != len(audit_rows):
@@ -224,7 +222,7 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                 if before is not None and held is not None:
                     derived = settled_option(row, json.loads(before[0]))
                     expected_vector = expected_settlement_vector(
-                        _vector_for(backup_con, issue, slot, play), row)
+                        vectors_before.get((slot, play), []), row)
                     ok = (
                         # the observation must sit at the key the evidence names and hold
                         # the derived completion
@@ -237,12 +235,12 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                         and held[8] == before[0]
                         # and the vector is exactly what the backup's option domain implies
                         # once the archive's settlement is applied
-                        and _vector_for(con, issue, slot, play) == expected_vector
+                        and vectors_now.get((slot, play), []) == expected_vector
                         # the preserved reference vector is evidence, so it must still be
                         # what the backup held
                         and recorded_replaced is not None
                         and recorded_replaced[0] == json.dumps(
-                            _vector_for(backup_con, issue, slot, play), ensure_ascii=False)
+                            vectors_before.get((slot, play), []), ensure_ascii=False)
                         # every audit binding is checked against external evidence
                         and audit is not None
                         and (audit[0], audit[1], audit[2], audit[3], audit[4]) == (
@@ -260,21 +258,21 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                          "replayed": [issue, slot, play, row["native_match_id"], row["score"],
                                       row["halftime_score"], derived],
                          "backup_identity": before[3] if before else None,
-                         "database_options": _vector_for(con, issue, slot, play),
+                         "database_options": vectors_now.get((slot, play), []),
                          "expected_options": expected_vector})
             # Everything outside the owed completions must be exactly as the backup left it
             # - same keys, same multiplicity, same values, same vectors.
-            def outside(con):
+            def outside(con, vectors):
                 # A Counter, not a dict: a duplicated key must not overwrite its twin.
                 return Counter(
                     (slot, play, native, score, halftime, option, payload,
-                     json.dumps(_vector_for(con, issue, slot, play), ensure_ascii=False))
+                     json.dumps(vectors.get((slot, play), []), ensure_ascii=False))
                     for (slot, play, native, score, halftime, option, payload) in con.execute(
                         """SELECT slot, play, native_match_id, score, halftime_score,
                                   expected_option, payload_json FROM observation
                            WHERE issue=?""", (issue,))
                     if (slot, play) not in required)
-            if outside(con) != outside(backup_con):
+            if outside(con, vectors_now) != outside(backup_con, vectors_before):
                 issue_mismatches.append({"outside_completions_changed": True})
             gap_fixtures_seen |= {(issue, slot) for slot in slots}
             gap_observations_seen += len(required)
@@ -335,6 +333,11 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
         con.close()
         backup_con.close()
 
+    # The recorded addition totals must equal the totals this replay derived itself, so
+    # they cannot certify themselves through two mutable database records.
+    addition_totals_agree = (
+        sum(a["replayed_fixtures"] for a in additions) == added_fixtures
+        and sum(a["replayed_observations"] for a in additions) == added_observations)
     receipt_bound = all(receipt.get(k) == v for k, v in (
         ("issue_recovery_batch_id", batch_id),
         ("recovered_fixtures", added_fixtures),
@@ -344,7 +347,7 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
     ))
     verified = bool(all_agree and not capture and recorded_evidence == evidence_checked
                     and empty_before and quick == "ok" and receipt_bound
-                    and manifest_agrees and backup_is_pre_recovery)
+                    and manifest_agrees and backup_is_pre_recovery and addition_totals_agree)
     return {
         "schema": "bj479_issue_recovery_verification_v1",
         "database": str(database),
@@ -372,6 +375,7 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
             "recovered_observations", "gap_filled_issues", "gap_filled_fixtures",
             "gap_filled_observations", "issue_recovery_batch_id")},
         "receipt_bound": receipt_bound,
+        "addition_totals_agree": addition_totals_agree,
         "conclusion": {
             "verified": verified,
             "recorded_added_fixtures": added_fixtures,
@@ -409,17 +413,141 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
     }
 
 
+def build_sample_report(database: Path, ledger_path: Path, backup_path: Path,
+                        count: int, seed: int = 0) -> dict:
+    """Spot-check randomly chosen recovered fixtures against the bound evidence.
+
+    The full replay is the one-time acceptance evidence for a batch and costs minutes
+    (hashing the whole release plus parsing every archived page). This is the routine
+    check: it parses only the sampled issues' pages and compares every play of each
+    sampled fixture, so it runs in seconds. It proves the sample, not the population, and
+    says so in its own output.
+
+    Only what the recovery actually changed is compared: for an added issue every row
+    must equal the archive, while for a gap-filled issue only the owed completions are
+    compared and their payloads must still equal the pre-recovery backup.
+    """
+    ledger_bytes = ledger_path.read_bytes()
+    ledger = json.loads(ledger_bytes)
+    if ledger.get("schema") != "bj479_issue_recovery_ledger_v1":
+        raise ValueError("Wrong ledger schema")
+    batch_id = hashlib.sha256(ledger_bytes).hexdigest()
+    database, backup = database.resolve(), Path(backup_path).resolve()
+
+    con = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    backup_con = sqlite3.connect(f"file:{backup}?mode=ro", uri=True)
+    try:
+        recorded = con.execute("SELECT batch_id FROM issue_recovery_batch").fetchall()
+        if len(recorded) != 1 or recorded[0][0] != batch_id:
+            raise ValueError("Recorded batch does not match the ledger")
+        # Candidate fixtures per role: every fixture of an added issue, and only the owed
+        # completions of a gap-filled issue.
+        # Candidate fixtures come from the release (cheap); what is compared against is
+        # the bound evidence.
+        candidates = []
+        for entry in ledger["additions"]:
+            candidates += [(entry["issue"], row[0], "addition") for row in con.execute(
+                "SELECT DISTINCT slot FROM observation WHERE issue=?", (entry["issue"],))]
+        for entry in ledger["gap_fills"]:
+            candidates += [(entry["issue"], slot, "gap_fill")
+                           for slot in entry["expected_gap_slots"]]
+        candidates = sorted(set(candidates))
+        if not candidates:
+            raise ValueError("No recovered fixtures to sample")
+        picked = sorted(random.Random(seed).sample(candidates, min(count, len(candidates))))
+
+        by_issue = {entry["issue"]: entry for entry in
+                    ledger["additions"] + ledger["gap_fills"]}
+        parsed, sources, mismatches, checked = {}, 0, [], 0
+        for issue in sorted({i for i, _, _ in picked}):
+            rows, issue_sources = _replay_evidence(by_issue[issue])
+            parsed[issue] = rows
+            sources += len(issue_sources)
+        for issue, slot, role in picked:
+            vectors = option_vectors_by_id(con, issue)
+            vectors_before = option_vectors_for(backup_con, issue)
+            for play in ("spf", "jq", "ds", "bf", "bq"):
+                row = parsed[issue].get((slot, play))
+                held = con.execute(
+                    """SELECT observation_id, native_match_id, status, score, halftime_score,
+                              expected_option, source_sha256, payload_json
+                       FROM observation WHERE issue=? AND slot=? AND play=?""",
+                    (issue, slot, play)).fetchone()
+                checked += 1
+                if row is None or held is None:
+                    mismatches.append({"issue": issue, "slot": slot, "play": play,
+                                       "evidence_row": row is not None,
+                                       "database_row": held is not None})
+                    continue
+                # Only the fields the recovery actually changes are compared, and they
+                # differ by path: an added row must equal the archive in every column and
+                # in its canonical payload, while a gap fill keeps the live board's
+                # status, source hash and pre-recovery payload and only gains the result.
+                before = backup_con.execute(
+                    """SELECT payload_json FROM observation
+                       WHERE issue=? AND slot=? AND play=?""",
+                    (issue, slot, play)).fetchone()
+                if role == "addition":
+                    want = [row["native_match_id"], row["status"], row["score"],
+                            row["halftime_score"], expected_option(row),
+                            row["source_sha256"],
+                            json.dumps(json.loads(canonical(row)), ensure_ascii=False)]
+                    held_norm = list(held[1:7]) + [json.dumps(json.loads(held[7]),
+                                                              ensure_ascii=False)]
+                    expected = _vector(row)
+                else:
+                    # A gap fill derives the completion with the handicap the backup held,
+                    # exactly as the applier did; the archive row has no line of its own.
+                    derived = settled_option(row, json.loads(before[0])) if before else None
+                    want = [row["native_match_id"], row["score"], row["halftime_score"],
+                            derived, before[0] if before else None]
+                    held_norm = [held[1], held[3], held[4], held[5], held[7]]
+                    # The vector must be the backup's option domain with the archive's
+                    # settlement applied, not the archive's single settled option.
+                    expected = expected_settlement_vector(
+                        vectors_before.get((slot, play), []), row)
+                if held_norm != want or vectors.get(held[0], []) != expected:
+                    mismatches.append({"issue": issue, "slot": slot, "play": play,
+                                       "role": role, "database": held_norm,
+                                       "replayed": want,
+                                       "database_options": vectors.get(held[0], []),
+                                       "replayed_options": expected})
+    finally:
+        con.close()
+        backup_con.close()
+    return {
+        "schema": "bj479_issue_recovery_sample_v1",
+        "batch_id": batch_id,
+        "database": str(database),
+        "seed": seed,
+        "sampled_fixtures": [f"{issue}/{slot} ({role})" for issue, slot, role in picked],
+        "checked_observations": checked,
+        "evidence_files_verified": sources,
+        "mismatches": mismatches[:10],
+        "mismatch_count": len(mismatches),
+        "agrees": not mismatches,
+        "scope": "This proves the sampled fixtures, not the whole recovery; the full "
+                 "replay remains the acceptance evidence for the batch.",
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", required=True, type=Path)
     parser.add_argument("--ledger", required=True, type=Path)
     parser.add_argument("--backup", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--sample", type=int, default=0,
+                        help="spot-check this many randomly chosen fixtures across all "
+                             "five plays instead of replaying the whole batch")
+    parser.add_argument("--seed", type=int, default=0, help="sampling seed")
     args = parser.parse_args(argv)
-    report = build_report(args.database, args.ledger, args.backup)
+    report = (build_sample_report(args.database, args.ledger, args.backup, args.sample,
+                                 args.seed) if args.sample else
+              build_report(args.database, args.ledger, args.backup))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
-    verified = report["conclusion"]["verified"]
+    verified = report["conclusion"]["verified"] if "conclusion" in report else report["agrees"]
     print(json.dumps({"out": str(args.out), "verified": verified}, ensure_ascii=False))
     # A rejected recovery must fail the acceptance command, not just report itself.
     return 0 if verified else 1

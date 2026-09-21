@@ -656,6 +656,7 @@
   "issue_recovery_batch_id": "e9de2d240e8b32a29696f9fbe459ff80247979cbffab91f8a70b75c5646b7d61"
  },
  "receipt_bound": true,
+ "addition_totals_agree": true,
  "conclusion": {
   "verified": true,
   "recorded_added_fixtures": 1413,
