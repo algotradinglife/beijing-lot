@@ -1,0 +1,50 @@
+{
+  "schema": "bj479_issue_addition_verification_v1",
+  "database": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live/release.sqlite",
+    "sha256": "b0e97c6f738ad7b7d651148f134fac84aaef9a0455864e12961dcb516642f405"
+  },
+  "bundle": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live/bundle",
+    "manifest_sha256": "68c247c28f4168bd99d0bae45fd71adec5698fda9d72fd8f55ef30dd6350cfdb"
+  },
+  "backup": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live/before.sqlite"
+  },
+  "issues_owed": [
+    "26093",
+    "26094"
+  ],
+  "issues_already_present": [],
+  "issues_ineligible": [
+    {
+      "issue": "26095",
+      "problems": [
+        "67/spf: abnormal status carries a result",
+        "67/jq: abnormal status carries a result",
+        "67/ds: abnormal status carries a result",
+        "67/bf: abnormal status carries a result",
+        "67/bq: abnormal status carries a result"
+      ]
+    },
+    {
+      "issue": "26096",
+      "problems": [
+        "396/spf: not a completed settlement",
+        "397/spf: no settled score",
+        "398/spf: no settled score",
+        "399/spf: no settled score",
+        "400/spf: no settled score"
+      ]
+    }
+  ],
+  "checked_observations": 2480,
+  "checked_fixtures": 496,
+  "content_sha256": "0e2933f45204853fbcd6491350ee34a905a7bb94f14924b95f2eb4bcc6f0fbba",
+  "mismatches": [],
+  "conclusion": {
+    "verified": true,
+    "void": false,
+    "note": "an empty owed set means the backup already carried every bundled issue; nothing was added to verify"
+  }
+}
