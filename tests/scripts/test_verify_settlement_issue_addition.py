@@ -280,3 +280,55 @@ def test_replay_rejects_a_batch_that_added_an_ineligible_issue(tmp_path: Path) -
     assert report["conclusion"]["verified"] is False
     assert any("did not add exactly the eligible set" in item.get("reason", "")
                for item in report["mismatches"])
+
+
+def test_replay_catches_an_ineligible_issue_that_was_added_anyway(tmp_path: Path) -> None:
+    """Excluding the rejected issue from the checks must not excuse it being present.
+
+    The batch can claim it added only the eligible issue; the release is compared against
+    the backup independently, so a rejected issue that leaked in is caught.
+    """
+    db = release(tmp_path)
+    settled = bundle(tmp_path / "a", issue="26093")
+    unstarted = bundle(tmp_path / "b", issue="26094", status="未开赛", ft="", ht="",
+                       settle=False)
+    merged = tmp_path / "a" / "bundle-26093"
+    manifest = json.loads((merged / "manifest.json").read_text(encoding="utf-8"))
+    other = json.loads((unstarted / "manifest.json").read_text(encoding="utf-8"))
+    import shutil
+    for entry in other["captures"]:
+        shutil.copy(unstarted / "raw" / (entry["sha256"] + ".html"), merged / "raw")
+    manifest["captures"].extend(other["captures"])
+    manifest["requested_issues"] = ["26093", "26094"]
+    (merged / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    backup = tmp_path / "before.sqlite"
+    add_issues(db, merged, backup, approval_note="n")
+    # Smuggle the ineligible issue in, as a bad batch would.
+    con = sqlite3.connect(db)
+    con.execute("""INSERT INTO observation SELECT observation_id+900000, '26094', slot, play,
+                   native_match_id, status, score, halftime_score, expected_option,
+                   source_sha256, source_url, received_at, payload_json FROM observation
+                   WHERE issue='26093'""")
+    con.commit()
+    con.close()
+    report = build_report(db, merged, backup)
+    assert report["conclusion"]["verified"] is False
+    assert any("the contract rejects" in item.get("reason", "")
+               for item in report["mismatches"])
+
+
+def test_replay_rejects_a_bundle_with_an_empty_page(applied, tmp_path: Path) -> None:
+    """The applier's parsed-domain validation is reused, so replay rejects the same bundle."""
+    db, _, backup = applied
+    root = bundle(tmp_path / "hollow")
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    entry = next(item for item in manifest["captures"] if item["typeid"] == 7)
+    (root / "raw" / (entry["sha256"] + ".html")).unlink()
+    import hashlib as _hashlib
+    empty = _hashlib.sha256(b"").hexdigest()
+    (root / "raw" / (empty + ".html")).write_bytes(b"")
+    entry["sha256"] = empty
+    entry["classification"] = "source_empty"
+    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="miss a play"):
+        build_report(db, root, backup)

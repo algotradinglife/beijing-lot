@@ -203,7 +203,7 @@ def test_accepts_a_bucket_the_source_never_prices(tmp_path: Path) -> None:
                                              settle=False))
     result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
     assert result["status"] == "added"
-    assert result["resolved_fixtures"] == len(PLAYS)
+    assert result["resolved_fixtures"] == 1
     assert rows(db, "SELECT expected_option FROM observation "
                     "WHERE issue='26093' AND play='bf'")[0][0] == "胜其他"
 
@@ -307,6 +307,29 @@ def test_leaves_the_build_receipt_untouched(tmp_path: Path) -> None:
     add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
     assert rows(db, "SELECT payload_json FROM receipt")[0][0] == before
     assert rows(db, "SELECT COUNT(*) FROM issue_addition_batch")[0][0] == 1
+
+
+def test_refuses_a_fixture_whose_plays_disagree(tmp_path: Path) -> None:
+    """Four settled plays and one postponed play describe one fixture inconsistently.
+
+    Accepting it would strand the postponed play: a later run skips the issue because the
+    release already carries it, and the gap recovery needs all five plays to be empty.
+    """
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="延期",
+                                             ft="-", ht="-", settle=False))
+    result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
+    assert result["status"] == "nothing_to_add"
+    assert "plays disagree" in result["skipped"][0]["problems"][0]
+    assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='26093'")[0][0] == 0
+
+
+def test_counts_resolved_fixtures_not_observations(tmp_path: Path) -> None:
+    """The batch metric must count fixtures, so it can be read against added_fixtures."""
+    db = release(tmp_path)
+    result = add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
+    assert result["resolved_fixtures"] == result["added_fixtures"] == 1
 
 
 def test_skips_an_issue_the_release_already_carries(tmp_path: Path) -> None:

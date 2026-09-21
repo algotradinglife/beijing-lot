@@ -20,6 +20,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.nowscore_settlement import PLAYS, canonical, expected_option, parse_page  # noqa: E402
 from src.settlement_issue_addition import (  # noqa: E402
+    bundle_rows,
     canonical_content_sha256,
     issue_verdict,
     read_bundle,
@@ -49,11 +50,14 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
         # acceptance contract, not from any table the release can edit. An issue the
         # contract rejects must be absent from the release, so a batch that quietly added
         # one is caught rather than excused.
-        parsed = {issue: bundle_rows_for(bundle, issue) for issue in requested}
+        # The applier's parsed-domain validation is reused, not reimplemented: a bundle it
+        # rejects (an empty page leaving a play missing) must not look eligible here.
+        parsed = bundle_rows(bundle)
         owed, already, ineligible = [], [], []
         for issue in requested:
-            if before.execute("SELECT 1 FROM observation WHERE issue=? LIMIT 1",
-                              (issue,)).fetchone():
+            was_present = before.execute(
+                "SELECT 1 FROM observation WHERE issue=? LIMIT 1", (issue,)).fetchone()
+            if was_present:
                 already.append(issue)
                 continue
             resolved, problems = issue_verdict(parsed[issue])
@@ -125,24 +129,24 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
                     mismatches.append({"issue": issue, "typeid": entry["typeid"],
                                        "reason": "capture record is not the bundle's page"})
 
+        # An issue the contract rejects must still be absent from the release, so a batch
+        # that quietly added one is caught rather than excused by its own claim.
+        for item in ineligible:
+            added_anyway = con.execute(
+                "SELECT COUNT(*) FROM observation WHERE issue=?", (item["issue"],)).fetchone()[0]
+            if added_anyway:
+                mismatches.append({"issue": item["issue"],
+                                   "reason": "the release carries an issue the contract "
+                                             "rejects",
+                                   "observations": added_anyway,
+                                   "problems": item["problems"]})
         # The batch's own claim: content hash over the canonical order, not insertion order.
-        # A cursor is consumed by fetchone(), so ask the schema question afresh instead of
-        # reusing one; reusing it silently skipped the added-set reconciliation.
         def _has_batch_table() -> bool:
             return con.execute(
                 "SELECT 1 FROM sqlite_master WHERE name='issue_addition_batch'"
             ).fetchone() is not None
 
         recorded_content = None
-        if _has_batch_table():
-            row = con.execute(
-                "SELECT added_issues, content_sha256 FROM issue_addition_batch "
-                "WHERE bundle_sha256=?", (bundle["sha256"],)).fetchone()
-            if row:
-                recorded_content = row[1]
-                if json.loads(row[0]) != owed:
-                    mismatches.append({"reason": "batch added a different issue set",
-                                       "recorded": json.loads(row[0]), "derived": owed})
         if _has_batch_table() and (owed or ineligible):
             row = con.execute(
                 "SELECT added_issues FROM issue_addition_batch WHERE bundle_sha256=?",
@@ -151,6 +155,11 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
                 mismatches.append({"reason": "the batch did not add exactly the eligible set",
                                    "recorded": json.loads(row[0]),
                                    "derived": owed, "ineligible": ineligible})
+        if _has_batch_table():
+            row = con.execute(
+                "SELECT content_sha256 FROM issue_addition_batch WHERE bundle_sha256=?",
+                (bundle["sha256"],)).fetchone()
+            recorded_content = row[0] if row else None
         if owed and recorded_content is not None:
             actual = canonical_content_sha256(con, owed)
             if actual != recorded_content:
@@ -175,17 +184,6 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
     finally:
         con.close()
         before.close()
-
-
-def bundle_rows_for(bundle: dict, issue: str) -> list[dict]:
-    """Parse one issue's pages from the bundle (the raw bytes are the anchor)."""
-    rows: list[dict] = []
-    for entry in bundle["manifest"]["captures"]:
-        if entry["issue"] != issue:
-            continue
-        payload = (bundle["root"] / "raw" / (entry["sha256"] + ".html")).read_bytes()
-        rows.extend(_replayed(entry, payload))
-    return rows
 
 
 def main(argv=None):

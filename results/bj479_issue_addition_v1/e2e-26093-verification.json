@@ -2,7 +2,7 @@
   "schema": "bj479_issue_addition_verification_v1",
   "database": {
     "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-addition/release.sqlite",
-    "sha256": "944dd2b3f1298ce4f030d2f8d899b9ecb97f1e77121996dcbda993a844740571"
+    "sha256": "78660afd7cfd65d5d5c5955135db230c9be4c4558eef2ddfb4b887edeba027b9"
   },
   "bundle": {
     "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/.tmpwork/e2e/bundle-26093",

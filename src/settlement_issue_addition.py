@@ -165,26 +165,28 @@ def bundle_rows(bundle: dict) -> dict[str, list[dict]]:
 
 
 def issue_verdict(rows: list[dict]) -> tuple[int, list[str]]:
-    """Return how many fixtures are resolved, plus every reason the issue cannot be added.
+    r"""Return how many *fixtures* are resolved, plus every reason the issue cannot be added.
 
-    The rule is deliberately narrower than the release build's, because an addition must
-    not freeze a transient value:
+    A fixture is judged as a whole, because its five plays are five views of one match and
+    the addition must not create a fixture the release can never complete. A fixture is
+    resolved when all five of its plays are settled, or when all five report no result. A
+    fixture whose plays disagree -- four settled and one postponed, say -- is refused: the
+    postponed play would later be skipped by the addition (the issue is already present) and
+    cannot be gap-filled either, because that path requires all five plays of a fixture to
+    be empty.
 
-    * a fixture priced on exactly the option its score implies is settled;
-    * a fixture whose derived bucket the source does not price is settled only when its
-      status is one the release records for completed rows (empty or ``完场``) -- the live
-      board reports a running score under a play status such as ``下`` and would otherwise
-      be frozen as final;
-    * a fixture is resolved with no result only when its status is explicitly abnormal and
-      it carries neither a score nor a priced option, which is exactly what the release
-      holds for 取消/推迟/中断/腰斩/延期/待定.
+    Per row the rule is deliberately narrower than the release build's, because an addition
+    must not freeze a transient value:
 
-    Anything else is a reason to refuse the whole issue. Refusing rather than adding a
-    partly finished issue matters because a later run skips an issue the release already
-    carries, and the recovery layer can only complete a fixture whose score is empty in
-    *all* five plays.
+    * settled: the score matches ``\d+-\d+``, the derived option is among the options the
+      play offers, and either exactly one option carries the SP and it is that one, or the
+      play prices nothing for the derived bucket and the status is one the release records
+      for completed rows (empty or ``完场``). The live board reports a running score under a
+      play status such as ``下``, so status matters for the unpriced case;
+    * no result: the status is explicitly abnormal, the score is empty or a dash, and no
+      option carries an SP -- exactly what the release's 5,750 abnormal rows look like.
     """
-    resolved = 0
+    by_slot: dict[int, list[tuple[str, str]]] = {}
     problems: list[str] = []
     for row in rows:
         status = row.get("status") or ""
@@ -197,19 +199,32 @@ def issue_verdict(rows: list[dict]) -> tuple[int, list[str]]:
         if status in ABNORMAL:
             if priced or score not in EMPTY:
                 problems.append(f"{key}: abnormal status carries a result")
+                by_slot.setdefault(row["slot"], []).append(("problem", key))
             else:
-                resolved += 1
+                by_slot.setdefault(row["slot"], []).append(("none", key))
             continue
         if not _SETTLED_SCORE.match(score):
             problems.append(f"{key}: no settled score")
+            by_slot.setdefault(row["slot"], []).append(("problem", key))
         elif derived not in offered:
             problems.append(f"{key}: the derived result is not among the offered options")
+            by_slot.setdefault(row["slot"], []).append(("problem", key))
         elif len(priced) == 1 and priced[0]["option"] == derived:
-            resolved += 1
+            by_slot.setdefault(row["slot"], []).append(("settled", key))
         elif not priced and status in _COMPLETED_STATUSES:
-            resolved += 1
+            by_slot.setdefault(row["slot"], []).append(("settled", key))
         else:
             problems.append(f"{key}: not a completed settlement")
+            by_slot.setdefault(row["slot"], []).append(("problem", key))
+
+    resolved = 0
+    for slot, verdicts in by_slot.items():
+        kinds = {kind for kind, _ in verdicts}
+        if kinds == {"settled"} or kinds == {"none"}:
+            resolved += 1
+        elif "problem" not in kinds:
+            problems.append(f"slot {slot}: plays disagree on whether the fixture has a result "
+                            f"({sorted(kinds)})")
     return resolved, problems
 
 
