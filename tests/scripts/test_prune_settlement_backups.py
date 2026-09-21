@@ -12,6 +12,7 @@ for path in (str(ROOT), str(ROOT / "tests")):
     if path not in sys.path:
         sys.path.insert(0, path)
 
+from scripts.archive_settlement_backup import compress  # noqa: E402
 from scripts.prune_settlement_backups import (authorize_directory,  # noqa: E402
                                               file_identity, prune_backups,
                                               replay_anchors)
@@ -222,42 +223,52 @@ def test_rejects_a_non_positive_keep(tmp_path: Path) -> None:
         prune_backups(root, keep=0, apply=True)
 
 
-def test_a_fully_compacted_directory_is_a_result_not_an_error(tmp_path: Path) -> None:
-    """Every snapshot archived is the healthiest state, not a failure."""
+def compacted(tmp_path: Path, *names: str) -> Path:
+    """A backup directory whose snapshots are real archives, made by the real tool."""
     root = tmp_path / "backups" / "release"
     root.mkdir(parents=True)
-    manifest = {"snapshot": "a.sqlite", "snapshot_sha256": "sha-a",
-                "archive": "a.sqlite.zst", "archive_sha256": "archive-sha"}
-    (root / "a.sqlite.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    (root / "a.sqlite.zst").write_bytes(b"compacted")
-    original = prune_backups.__globals__["file_identity"]
-    prune_backups.__globals__["file_identity"] = lambda path: (
-        "archive-sha" if path.name.endswith(".zst") else "sha-a", 1)
-    try:
-        result = prune_backups(root, keep=1, apply=True)
-    finally:
-        prune_backups.__globals__["file_identity"] = original
+    for index, name in enumerate(names):
+        path = root / name
+        connection = sqlite3.connect(path)
+        connection.execute("CREATE TABLE observation (observation_id TEXT)")
+        connection.execute("INSERT INTO observation VALUES (?)", (name,))
+        connection.commit()
+        connection.close()
+        os.utime(path, (1_700_000_000 + index * 60, 1_700_000_000 + index * 60))
+        digest, _ = file_identity(path)
+        document = tmp_path / f"report-{index}.json"
+        document.write_text(json.dumps({"conclusion": {"verified": True},
+                                        "backup": {"path": str(path), "sha256": digest}}),
+                            encoding="utf-8")
+        compress(path, report=document, apply=True)
+    return root
+
+
+def test_a_fully_compacted_directory_is_a_result_not_an_error(tmp_path: Path) -> None:
+    """Every snapshot archived is the healthiest state, not a failure."""
+    root = compacted(tmp_path, "a.sqlite")
+    result = prune_backups(root, keep=1, apply=True)
     assert result["compacted"] is True
     assert result["remove"] == []
 
 
 def test_a_path_only_claim_resolves_through_the_archive_manifest(tmp_path: Path) -> None:
     """A table that stores no hash still resolves: the manifest names the snapshot it holds."""
-    root = tmp_path / "backups" / "release"
-    root.mkdir(parents=True)
-    (root / "a.sqlite.manifest.json").write_text(json.dumps(
-        {"snapshot": "a.sqlite", "snapshot_sha256": "sha-a", "archive": "a.sqlite.zst",
-         "archive_sha256": "archive-sha"}), encoding="utf-8")
-    (root / "a.sqlite.zst").write_bytes(b"compacted")
-    original = prune_backups.__globals__["file_identity"]
-    prune_backups.__globals__["file_identity"] = lambda path: (
-        "archive-sha" if path.name.endswith(".zst") else "sha-a", 1)
-    try:
-        result = prune_backups(root, keep=1, apply=True,
-                               protect=[{"path": "/somewhere/a.sqlite", "sha256": None}])
-    finally:
-        prune_backups.__globals__["file_identity"] = original
+    root = compacted(tmp_path, "a.sqlite")
+    result = prune_backups(root, keep=1, apply=True,
+                           protect=[{"path": "/somewhere/a.sqlite", "sha256": None}])
     assert result["compacted"] is True
+
+
+def test_an_archive_whose_contents_do_not_match_its_manifest_is_refused(tmp_path: Path) -> None:
+    """An edited manifest cannot retire an anchor by naming an unrelated archive."""
+    root = compacted(tmp_path, "a.sqlite", "b.sqlite")
+    manifests = sorted(root.glob("*.manifest.json"))
+    document = json.loads(manifests[0].read_text(encoding="utf-8"))
+    document["snapshot_sha256"] = "a-hash-that-is-not-in-this-archive"
+    manifests[0].write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(ValueError, match="does not hold the snapshot it claims"):
+        prune_backups(root, keep=1, apply=True)
 
 
 def test_rejects_a_directory_without_snapshots(tmp_path: Path) -> None:

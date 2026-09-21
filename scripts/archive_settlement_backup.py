@@ -97,6 +97,14 @@ def verified_precondition(report: Path, snapshot: Path) -> dict:
     if Path(recorded).resolve() != Path(snapshot).resolve():
         raise ValueError(f"the replay report verified a different backup ({recorded}), so it "
                          f"does not justify compressing {Path(snapshot).name}")
+    # Bound to the bytes, not the pathname: a snapshot replaced after its replay would
+    # otherwise be compressed on the strength of a report about different bytes.
+    expected = (document.get("backup") or {}).get("sha256")
+    if not expected:
+        raise ValueError(f"the replay report records no backup content hash, so it cannot "
+                         f"establish which bytes passed: {report}")
+    if expected != file_identity(snapshot)[0]:
+        raise ValueError(f"the snapshot is not the one the replay verified: {Path(snapshot).name}")
     return document
 
 
@@ -112,8 +120,10 @@ def compress(snapshot: Path, *, report: Path, apply: bool) -> dict:
         raise ValueError(f"not a snapshot: {snapshot}")
     document = verified_precondition(report, snapshot)
     archive, manifest = archive_path(snapshot), manifest_path(snapshot)
-    if archive.exists() or manifest.exists():
+    if manifest.exists():
         raise ValueError(f"an archive already exists for {snapshot.name}")
+    # An archive without a manifest is an interrupted attempt: it is adopted rather than
+    # refused, because refusing would block every later attempt at the same snapshot.
     snapshot_sha256, snapshot_bytes = file_identity(snapshot)
     result = {"snapshot": str(snapshot), "snapshot_sha256": snapshot_sha256,
               "snapshot_bytes": snapshot_bytes, "archive": str(archive),
@@ -122,8 +132,9 @@ def compress(snapshot: Path, *, report: Path, apply: bool) -> dict:
     if not apply:
         result["status"] = "dry_run"
         return result
-    subprocess.run(["zstd", COMPRESS_LEVEL, "-q", "-T0", "-o", str(archive), str(snapshot)],
-                   check=True)
+    if not archive.exists():
+        subprocess.run(["zstd", COMPRESS_LEVEL, "-q", "-T0", "-o", str(archive), str(snapshot)],
+                       check=True)
     archive_sha256, archive_bytes = file_identity(archive)
     # Prove the archive is the snapshot before the original goes: a compression that cannot be
     # read back is not evidence, and the one thing that must not happen is a silent loss.
@@ -140,7 +151,10 @@ def compress(snapshot: Path, *, report: Path, apply: bool) -> dict:
     if reader.wait() != 0 or digest.hexdigest() != snapshot_sha256:
         archive.unlink()
         raise ValueError("the archive does not decompress to the snapshot; nothing removed")
-    manifest.write_text(json.dumps(
+    # Published atomically: a truncated manifest under its final name would make every later
+    # retention pass refuse and every retry report an existing archive.
+    manifest_tmp = manifest.with_name(manifest.name + ".tmp")
+    manifest_tmp.write_text(json.dumps(
         {"snapshot": snapshot.name, "snapshot_sha256": snapshot_sha256,
          "snapshot_bytes": snapshot_bytes, "archive": archive.name,
          "archive_sha256": archive_sha256, "archive_bytes": archive_bytes,
@@ -150,6 +164,7 @@ def compress(snapshot: Path, *, report: Path, apply: bool) -> dict:
                  "records the snapshot's content hash; this manifest ties that hash to the "
                  "archive that now holds those bytes."},
         ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(manifest_tmp, manifest)
     snapshot.unlink()
     result.update({"status": "archived", "archive_sha256": archive_sha256,
                    "archive_bytes": archive_bytes, "manifest": str(manifest),

@@ -29,6 +29,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from scripts.archive_settlement_backup import (file_identity,  # noqa: E402
+                                               materialize_snapshot)
 
 from src.nowscore_settlement import canonical, expected_option, parse_page  # noqa: E402
 from src.settlement_issue_recovery import (  # noqa: E402
@@ -367,7 +369,8 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
         "recorded_evidence_files": recorded_evidence,
         "replay": {"evidence_files_verified": evidence_checked, "all_hashes_match": True,
                    "all_values_reproduced": all_agree},
-        "backup": {"path": str(backup), "quick_check": quick,
+        "backup": {"path": str(backup), "sha256": file_identity(backup)[0],
+                   "quick_check": quick,
                    "additions_absent_before": empty_before,
                    "is_pre_recovery_snapshot": backup_is_pre_recovery},
         "receipt": {k: receipt.get(k) for k in (

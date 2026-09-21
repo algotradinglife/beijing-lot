@@ -18,7 +18,8 @@ import sqlite3
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts.archive_settlement_backup import materialize_snapshot  # noqa: E402
+from scripts.archive_settlement_backup import (file_identity,  # noqa: E402
+                                               materialize_snapshot)
 from src.nowscore_settlement import PLAYS, canonical, expected_option, parse_page  # noqa: E402
 from src.settlement_issue_addition import (  # noqa: E402
     bundle_rows,
@@ -171,7 +172,9 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
             "database": {"path": str(database), "sha256": hashlib.sha256(
                 database.read_bytes()).hexdigest()},
             "bundle": {"path": str(bundle_root), "manifest_sha256": bundle["sha256"]},
-            "backup": {"path": str(backup_path)},
+            # The bytes, not just the pathname: an archive made later on the strength of this
+            # report has to be able to prove it compressed the snapshot that passed.
+            "backup": {"path": str(backup_path), "sha256": file_identity(backup_path)[0]},
             "issues_owed": owed, "issues_already_present": already,
             "issues_ineligible": ineligible,
             "checked_observations": checked_observations, "checked_fixtures": checked_plays,

@@ -26,6 +26,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.archive_settlement_backup import materialize_snapshot  # noqa: E402
 from src.settlement_storage import validate_settlement_storage  # noqa: E402
 
 SUFFIX = ".sqlite"
@@ -53,10 +54,17 @@ def archived_snapshots(directory: Path) -> dict:
             raise ValueError(f"an archive manifest cannot be read, so its anchor cannot be "
                              f"ruled out: {manifest} ({error})") from error
         archive = Path(directory) / str(document.get("archive") or "")
-        if not document.get("snapshot_sha256") or not archive.is_file():
+        if (not document.get("snapshot_sha256") or not archive.is_file()
+                or archive.suffix != ARCHIVE_SUFFIX or archive.name.endswith(SUFFIX)):
             raise ValueError(f"an archive manifest names no usable archive: {manifest}")
         if file_identity(archive)[0] != document.get("archive_sha256"):
             raise ValueError(f"the archive does not match its manifest: {archive}")
+        # The manifest's claim about what the archive *holds* is checked, not trusted: an
+        # edited manifest could otherwise retire any anchor by naming a valid but unrelated
+        # archive, and the snapshot it stood for would become an ordinary deletion candidate.
+        with materialize_snapshot(archive) as held:
+            if file_identity(held)[0] != document["snapshot_sha256"]:
+                raise ValueError(f"the archive does not hold the snapshot it claims: {archive}")
         archived[document["snapshot_sha256"]] = {**document, "archive_name": archive.name}
     return archived
 

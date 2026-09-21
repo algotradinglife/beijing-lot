@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from scripts.archive_settlement_backup import (archive_path, compress,  # noqa: E402
-                                               materialize_snapshot,
+                                               file_identity, materialize_snapshot,
                                                verified_precondition)
 
 pytestmark = pytest.mark.skipif(shutil.which("zstd") is None, reason="zstd is not installed")
@@ -34,7 +34,10 @@ def report(tmp_path: Path, backup: Path, *, verified: bool = True) -> Path:
     """A replay report in the shape the verifiers write."""
     path = tmp_path / "verification.json"
     path.write_text(json.dumps({"conclusion": {"verified": verified},
-                                "backup": {"path": str(backup)}}), encoding="utf-8")
+                                "backup": {"path": str(backup),
+                                           "sha256": (file_identity(backup)[0]
+                                                      if Path(backup).is_file() else "absent")}}),
+                    encoding="utf-8")
     return path
 
 
@@ -94,13 +97,47 @@ def test_refuses_to_archive_twice(tmp_path: Path) -> None:
         compress(target, report=report(tmp_path, target), apply=True)
 
 
-def test_a_corrupt_archive_leaves_the_snapshot_in_place(tmp_path: Path) -> None:
-    """Nothing is removed unless the archive decompresses to the same bytes."""
+def test_a_corrupt_leftover_archive_leaves_the_snapshot_in_place(tmp_path: Path) -> None:
+    """An interrupted attempt is adopted only if it really holds the snapshot."""
     target = snapshot(tmp_path)
     archive_path(target).write_bytes(b"not a zstd stream")
-    with pytest.raises(ValueError, match="already exists"):
+    with pytest.raises(ValueError):
         compress(target, report=report(tmp_path, target), apply=True)
     assert target.exists()
+    assert not (tmp_path / "before.sqlite.manifest.json").exists()
+
+
+def test_an_interrupted_archive_is_adopted(tmp_path: Path) -> None:
+    """An archive left without its manifest is completed, not refused forever."""
+    target = snapshot(tmp_path)
+    archive = archive_path(target)
+    subprocess.run(["zstd", "-q", "-o", str(archive), str(target)], check=True)
+    result = compress(target, report=report(tmp_path, target), apply=True)
+    assert result["status"] == "archived"
+    assert not target.exists()
+    assert (tmp_path / "before.sqlite.manifest.json").exists()
+
+
+def test_a_report_without_a_content_hash_is_refused(tmp_path: Path) -> None:
+    """A report that does not say which bytes passed cannot authorise compression."""
+    target = snapshot(tmp_path)
+    path = tmp_path / "verification.json"
+    path.write_text(json.dumps({"conclusion": {"verified": True},
+                                "backup": {"path": str(target)}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="no backup content hash"):
+        compress(target, report=path, apply=True)
+
+
+def test_a_snapshot_replaced_after_verification_is_refused(tmp_path: Path) -> None:
+    """A passing report for bytes that are no longer there does not carry over."""
+    target = snapshot(tmp_path)
+    document = report(tmp_path, target)
+    connection = sqlite3.connect(target)
+    connection.execute("INSERT INTO observation VALUES (99999, 'rewritten')")
+    connection.commit()
+    connection.close()
+    with pytest.raises(ValueError, match="not the one the replay verified"):
+        compress(target, report=document, apply=True)
 
 
 def test_materialize_decompresses_and_cleans_up(tmp_path: Path) -> None:
