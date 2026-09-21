@@ -85,6 +85,11 @@ def _database(tmp: Path) -> Path:
                    "bf": ("1:0", "2:1", "1:1", "0:0"),
                    "bq": ("胜-胜", "胜-平", "胜-负", "平-胜", "平-平", "平-负", "负-胜", "负-平",
                           "负-负")}
+        # An untouched fixture that is neither an owed completion nor an addition, so the
+        # outside-set comparison has something real to protect.
+        con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (900, "26092", 999, "spf", "1999", "完场", "2-1", "1-0", "胜", "a" * 64,
+                     "", "", "{}"))
         oid = 0
         for play, options in domains.items():
             oid += 1
@@ -361,14 +366,15 @@ def test_replay_catches_the_remaining_audit_bindings(tmp_path: Path) -> None:
 
 
 def test_replay_catches_a_deleted_outside_set_observation(tmp_path: Path) -> None:
-    """The replay's outside-set comparison is bidirectional too."""
+    """Deleting an untouched, non-addition observation must fail on its own."""
     db, ledger, backup = _applied(tmp_path)
     con = sqlite3.connect(db)
     con.execute("DELETE FROM observation WHERE issue='26092' AND slot=999")
-    con.execute("DELETE FROM observation WHERE issue=? AND slot=2 AND play='spf'", (ADDED,))
     con.commit()
     con.close()
-    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert any("outside_completions_changed" in m for m in report["gap_fill"]["mismatches"])
 
 
 def test_replay_accepts_an_option_less_added_row(tmp_path: Path) -> None:
