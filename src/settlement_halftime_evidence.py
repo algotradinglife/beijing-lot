@@ -36,6 +36,8 @@ from typing import Callable
 
 from bs4 import BeautifulSoup
 
+from src.okooo_prekick_sp import okooo_soup
+
 MIN_INDEPENDENT_SOURCES = 2
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -160,16 +162,6 @@ def extract_transfermarkt(payload: bytes, fixture: dict) -> dict:
                  {"home": home, "away": away, "ft_home": ft_home, "ft_away": ft_away}, fixture)
 
 
-def _okooo_soup(payload: bytes) -> BeautifulSoup:
-    """okooo serves GB2312 pages; decoding as UTF-8 would silently mangle team names."""
-    for encoding in ("gbk", "gb18030"):
-        try:
-            return BeautifulSoup(payload.decode(encoding), "html.parser")
-        except UnicodeDecodeError:
-            continue
-    raise ValueError("okooo: page is not decodable as GB2312")
-
-
 def _okooo_row(soup: BeautifulSoup, slot: int, minimum_cells: int, source: str) -> list:
     """Return the single row for ``slot``; its slot cell is the first cell."""
     rows = []
@@ -188,7 +180,7 @@ def _okooo_row(soup: BeautifulSoup, slot: int, minimum_cells: int, source: str) 
 
 def extract_okooo_livecenter(payload: bytes, fixture: dict) -> dict:
     """okooo's live centre prints the half time in a red cell inside the away-team cell."""
-    soup = _okooo_soup(payload)
+    soup = okooo_soup(payload)
     tds = _okooo_row(soup, fixture["slot"], 7, "okooo")
     ft = re.fullmatch(r"(\d+)\s*-\s*(\d+)", tds[5].get_text(" ", strip=True))
     if ft is None:
@@ -228,7 +220,7 @@ def extract_okooo_half_full(payload: bytes, fixture: dict) -> dict:
     Columns: slot+league, kickoff, teams, settlement SP, betting area, quick pick, all,
     pick, full-time score, settlement code, analysis.
     """
-    soup = _okooo_soup(payload)
+    soup = okooo_soup(payload)
     tds = _okooo_row(soup, fixture["slot"], 9, "okooo_half_full")
     ft = re.fullmatch(r"(\d+)\s*-\s*(\d+)", tds[7].get_text(" ", strip=True))
     if ft is None:

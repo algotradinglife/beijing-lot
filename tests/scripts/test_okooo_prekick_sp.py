@@ -114,3 +114,57 @@ def test_publishes_hash_verified_non_executable_bundle(tmp_path: Path) -> None:
         handle.write(b"tamper")
     with pytest.raises(okooo.OkoooParseError, match="checksum mismatch"):
         okooo.verify_bundle(bundle)
+
+
+# --- Real-page evidence ---------------------------------------------------------------
+#
+# The synthetic pages above were the only evidence this parser had, and they are UTF-8 with a
+# tidier structure than the site serves. Okooo serves GB2312, so a UTF-8 decode of the real
+# page substitutes most of its text; these examples pin the real bytes.
+
+REAL_PAGE = ROOT / "tests" / "fixtures" / "okooo" / "livecenter-21082.html.gz"
+
+
+def real_page_bytes() -> bytes:
+    import gzip
+    return gzip.open(REAL_PAGE, "rb").read()
+
+
+def test_real_page_is_gb2312_and_decodes_cleanly() -> None:
+    """The served page declares gb2312 and must decode strictly, not by substitution."""
+    payload = real_page_bytes()
+    assert b"gb2312" in payload[:2000].lower()
+    with pytest.raises(UnicodeDecodeError):
+        payload.decode("utf-8")
+    assert len(payload.decode("gb18030")) > len(payload) / 4
+
+
+def test_real_page_yields_readable_chinese_names() -> None:
+    """Team and league names must survive: a mangled name is worse than a refused page.
+
+    Measured on this page: reading it as UTF-8 with substitution left 14 Han characters in the
+    parsed fields; reading it as the GB2312 it declares leaves 3,820.
+    """
+    rows = okooo.parse_issue_page(real_page_bytes(), "21082")
+    assert len(rows) > 300
+    named = [row for row in rows if row.home and row.away]
+    assert len(named) > 380
+    joined = " ".join(f"{row.league}{row.home}{row.away}" for row in named)
+    assert "\ufffd" not in joined
+    han = sum(1 for char in joined if "\u4e00" <= char <= "\u9fff")
+    assert han > 3000, f"only {han} Han characters survived; the decode is substituting"
+    assert any("J联赛" == row.league for row in rows)
+    assert any("仙台七夕" == row.home for row in rows)
+
+
+def test_real_page_leaves_no_replacement_character_in_any_field() -> None:
+    """Every produced field is free of the substitution character, not just the names."""
+    for row in okooo.parse_issue_page(real_page_bytes(), "21082"):
+        for value in (row.league, row.home, row.away, row.kickoff_text, row.match_id):
+            assert "\ufffd" not in value, (row.match_idx, value)
+
+
+def test_refuses_a_page_that_decodes_under_no_encoding() -> None:
+    """An undecodable page is refused; it never becomes a plausible-looking fixture."""
+    with pytest.raises(okooo.OkoooParseError):
+        okooo.okooo_soup(b"\xff\xfe\x00\x81\x40\xff\xff")

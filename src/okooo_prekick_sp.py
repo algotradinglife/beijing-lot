@@ -17,6 +17,8 @@ from typing import Any, Mapping, Sequence
 from bs4 import BeautifulSoup
 
 
+_OKOOO_ENCODINGS = ("utf-8", "gbk", "gb18030")
+
 MARKET_PATHS = {
     "correct_score": "cs",
     "half_full": "htft",
@@ -70,12 +72,26 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _soup(payload: bytes) -> BeautifulSoup:
-    return BeautifulSoup(payload.decode("utf-8", errors="replace"), "html.parser")
+def okooo_soup(payload: bytes) -> BeautifulSoup:
+    """Parse an Okooo page without ever mangling its text.
+
+    Okooo serves GB2312 and the pages declare it. Decoding with ``errors="replace"`` looked
+    harmless and was not: on a real 1.4 MB livecenter page it substituted 32,616 characters
+    and left two Han characters standing, so every team and league name it produced was
+    unreadable while the page still "parsed". Try the encodings strictly and refuse when none
+    decodes: a page that cannot be decoded must fail loudly rather than yield a plausible
+    fixture built from replacement characters.
+    """
+    for encoding in _OKOOO_ENCODINGS:
+        try:
+            return BeautifulSoup(payload.decode(encoding), "html.parser")
+        except UnicodeDecodeError:
+            continue
+    raise OkoooParseError(f"okooo: page decodes under none of {_OKOOO_ENCODINGS}")
 
 
 def reject_block_page(payload: bytes, source_url: str = "") -> None:
-    soup = _soup(payload)
+    soup = okooo_soup(payload)
     title = soup.title.get_text(" ", strip=True) if soup.title else ""
     text = " ".join(soup.get_text(" ", strip=True).split())
     if title in {"405", "403"} or "访问的URL有可能对网站造成安全威胁" in text:
@@ -88,7 +104,7 @@ def reject_block_page(payload: bytes, source_url: str = "") -> None:
 
 def parse_issue_page(payload: bytes, issue: str) -> list[IssueMatch]:
     reject_block_page(payload)
-    soup = _soup(payload)
+    soup = okooo_soup(payload)
     matches: list[IssueMatch] = []
     for node in soup.select("tr[matchid]"):
         match_id = str(node.get("matchid") or "").strip()
@@ -154,7 +170,7 @@ def _candidate_headers(table: Any, width: int) -> tuple[str, ...]:
 
 def parse_history_page(payload: bytes, source_url: str = "") -> list[HistoryRow]:
     reject_block_page(payload, source_url)
-    soup = _soup(payload)
+    soup = okooo_soup(payload)
     candidates: list[tuple[Any, list[tuple[int, tuple[str, ...], str, int]]]] = []
     for table in soup.select("table"):
         rows: list[tuple[int, tuple[str, ...], str, int]] = []
