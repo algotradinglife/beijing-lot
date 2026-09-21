@@ -21,7 +21,7 @@ from src.nowscore_issue_inventory import rate_limited_transport  # noqa: E402
 from src.nowscore_live_issues import (  # noqa: E402
     last_kickoff,
     live_issues,
-    next_issue_after,
+    pending_issues,
 )
 from src.nowscore_settlement import PLAYS, source_url  # noqa: E402
 
@@ -29,20 +29,22 @@ BOARD_URL = "https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5"
 BUNDLE_SCHEMA = "nowscore_history_batch_v1"
 
 
-def release_max_issue(database: Path) -> str:
-    """Return the newest issue the release carries, read-only.
+def release_issues(database: Path) -> set[str]:
+    """Return the issues the release carries, read-only.
 
-    Issue identifiers sort chronologically, so this is the release's own notion of "up to
-    here", never a number a caller supplies.
+    Membership decides what is pending. The newest issue alone is not enough: an issue the
+    board advertises, that the applier refuses, and that a later issue overtakes would drop
+    below a "newest issue" watermark and never be retried.
     """
     con = sqlite3.connect(Path(database).resolve().as_uri() + "?mode=ro", uri=True)
     try:
-        row = con.execute("SELECT MAX(issue) FROM observation").fetchone()
+        rows = con.execute("SELECT DISTINCT issue FROM observation").fetchall()
     finally:
         con.close()
-    if not row or not row[0]:
+    carried = {row[0] for row in rows}
+    if not carried:
         raise ValueError("release carries no observations")
-    return row[0]
+    return carried
 
 
 def capture_issues(database: Path, run_root: Path, *, timeout_seconds: float,
@@ -68,19 +70,33 @@ def capture_issues(database: Path, run_root: Path, *, timeout_seconds: float,
             return rate_limited_transport(url, timeout, lock_path=lock,
                                           interval=interval_seconds)
         transport = paced
+    board_started = now()
     board = transport(BOARD_URL, timeout_seconds)
     if board["status"] != 200:
         raise ValueError(f"live board returned {board['status']}")
     listing = live_issues(board["payload"])
-    known_max = release_max_issue(database)
-    pending = next_issue_after(listing["issues"], known_max)
-    if not pending:
-        return {"status": "up_to_date", "release_max": known_max,
-                "advertised": listing["issues"], "current": listing["current"],
-                "next_check_after": _serialise(last_kickoff(board["payload"]))}
+    carried = release_issues(database)
+    pending = pending_issues(listing["issues"], carried)
+    next_check = _serialise(last_kickoff(board["payload"]))
 
+    # The board response authorises the decision, so it is kept either way: the advertised
+    # list and the scheduling reading must be replayable without another request.
     (run_root / "raw").mkdir(parents=True)
-    captures, received = [], now().isoformat()
+    board_sha = hashlib.sha256(board["payload"]).hexdigest()
+    (run_root / "raw" / (board_sha + ".html")).write_bytes(board["payload"])
+    (run_root / "board.receipt.json").write_text(json.dumps(
+        {"url": BOARD_URL, "received_at": board_started.isoformat(), "sha256": board_sha,
+         "byte_count": len(board["payload"]), "advertised": listing["issues"],
+         "current": listing["current"], "is_current": listing["is_current"],
+         "release_carried": sorted(carried), "pending": pending,
+         "next_check_after": next_check}, ensure_ascii=False), encoding="utf-8")
+    if not pending:
+        return {"status": "up_to_date", "bundle": str(run_root),
+                "release_issues": len(carried),
+                "advertised": listing["issues"], "current": listing["current"],
+                "next_check_after": next_check}
+
+    captures = []
     for issue in pending:
         for typeid in sorted(PLAYS):
             url = source_url(issue, typeid)
@@ -91,21 +107,23 @@ def capture_issues(database: Path, run_root: Path, *, timeout_seconds: float,
             payload = response["payload"]
             sha = hashlib.sha256(payload).hexdigest()
             (run_root / "raw" / (sha + ".html")).write_bytes(payload)
+            # Sampled after the response: a paced batch takes minutes, and these timestamps
+            # become the page provenance the applier persists.
             captures.append({"issue": issue, "typeid": typeid, "url": url,
-                             "received_at": received, "sha256": sha,
+                             "received_at": now().isoformat(), "sha256": sha,
                              "classification": "data", "byte_count": len(payload)})
     manifest = {"schema": BUNDLE_SCHEMA, "source": "nowscore",
                 "board_url": BOARD_URL, "board_current": listing["current"],
                 "board_is_current": listing["is_current"],
-                "release_max_at_capture": known_max,
+                "board_sha256": board_sha,
+                "release_carried_at_capture": sorted(carried),
                 "batch": {"batch_id": f"live-{pending[0]}-{pending[-1]}",
                           "issues": pending},
                 "controls": [], "captures": captures, "requested_issues": pending}
     (run_root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False),
                                             encoding="utf-8")
-    return {"status": "captured", "bundle": str(run_root), "release_max": known_max,
-            "added": pending, "pages": len(captures),
-            "next_check_after": _serialise(last_kickoff(board["payload"]))}
+    return {"status": "captured", "bundle": str(run_root), "pending": pending,
+            "pages": len(captures), "next_check_after": next_check}
 
 
 def _serialise(moment):

@@ -18,14 +18,15 @@ No fetching happens here: the caller supplies the page bytes.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 _SELECT = re.compile(r"id=['\"]dropIssueNum['\"].*?</select>", re.S)
 _OPTION = re.compile(r"value=['\"](\d{5,6})['\"]")
 _CURRENT = re.compile(r"var\s+IssueNum\s*=\s*['\"](\d{5,6})['\"]")
 _IS_CURRENT = re.compile(r"var\s+IsCurrentIssue\s*=\s*['\"](\w+)['\"]")
-_KICKOFF = re.compile(r"<td[^>]*>\s*(\d{2}):(\d{2})\s*</td>")
-_PAGE_DATE = re.compile(r"name=['\"](\d{4}-\d{2}-\d{2})['\"]")
+_ROW = re.compile(r"<tr\b.*?</tr>", re.S)
+_ROW_DATE = re.compile(r"name=['\"](\d{4}-\d{2}-\d{2})['\"]")
+_CLOCK = re.compile(r"<td[^>]*>\s*(\d{2}):(\d{2})\s*</td>")
 
 
 class LiveIssueError(ValueError):
@@ -58,38 +59,50 @@ def live_issues(payload: bytes) -> dict:
             "is_current": (flagged.group(1).lower() == "true") if flagged else None}
 
 
-def next_issue_after(issues: list[str], known_max: str) -> list[str]:
-    """Return the advertised issues newer than ``known_max``, oldest first.
+def pending_issues(advertised: list[str], release_issues) -> list[str]:
+    """Return the advertised issues the release does not already carry, oldest first.
 
-    Issue identifiers sort chronologically, so the comparison is a string one. A known_max
-    the board no longer lists means the gap is wider than the list; that is reported by the
-    caller as "too far behind" rather than silently treated as nothing to add.
+    Membership, not the release's newest issue, decides what is pending. Using the newest
+    issue as a watermark loses an issue that was advertised, refused, and then overtaken: a
+    later issue settles, the release's maximum moves past the refused one, and every later run
+    skips it while the board still advertises it.
+
+    The board only lists the issues still on sale, so a gap older than the list cannot be
+    sized from it: when the release's newest issue is older than the oldest advertised one,
+    the number of missing issues is unknown and the caller is told so rather than given [].
     """
-    newer = [issue for issue in issues if issue > known_max]
-    if not newer:
+    advertised = sorted(advertised)
+    if not advertised:
+        raise LiveIssueError("the board advertised no issues")
+    carried = {str(issue) for issue in release_issues}
+    if carried == set(advertised):
         return []
-    oldest_advertised = min(issues)
-    if known_max < oldest_advertised and known_max not in issues:
-        missing = f"the board lists {oldest_advertised} and later; {known_max} is not on it"
-        raise LiveIssueError(f"cannot tell how many issues are missing: {missing}")
-    return sorted(newer)
+    if carried and max(carried) < advertised[0] and not (carried & set(advertised)):
+        raise LiveIssueError(
+            f"cannot tell how many issues are missing: the board lists {advertised[0]} and "
+            f"later, the release newest is {max(carried)}")
+    return [issue for issue in advertised if issue not in carried]
 
 
-def last_kickoff(payload: bytes, *, today: datetime | None = None) -> datetime | None:
-    """Estimate when the last advertised fixture starts, to schedule the next check.
+def last_kickoff(payload: bytes) -> datetime | None:
+    """Estimate when the round's last fixture starts, to schedule the next check.
 
-    The board renders kickoff times without a date and carries the round's date in a row
-    attribute, so the date is taken from the page and the time from the latest cell. Returns
-    None when the page does not carry both, which makes the caller fall back to a fixed
-    polling interval rather than guessing.
+    A round can span days, so the date is read from each fixture's own row rather than from
+    whichever row happens to come first, and the latest paired (date, kickoff) wins. The
+    board renders times without a zone and is a China-facing site, so the result carries the
+    source's +08:00 offset; returning naive time would make the scheduling decision depend on
+    the reader's locale. Returns None when no row yields both, so the caller polls instead.
     """
     html = payload.decode("utf-8", "replace")
-    date = _PAGE_DATE.search(html)
-    if date is None:
+    paired: list[datetime] = []
+    for row in _ROW.finditer(html):
+        date = _ROW_DATE.search(row.group(0))
+        clock = _CLOCK.search(row.group(0))
+        if date is None or clock is None:
+            continue
+        paired.append(datetime.fromisoformat(date.group(1)).replace(
+            hour=int(clock.group(1)), minute=int(clock.group(2)),
+            tzinfo=timezone(timedelta(hours=8))))
+    if not paired:
         return None
-    times = _KICKOFF.findall(html)
-    if not times:
-        return None
-    latest = max(times)
-    day = datetime.fromisoformat(date.group(1))
-    return day.replace(hour=int(latest[0]), minute=int(latest[1])) + timedelta(minutes=1)
+    return max(paired) + timedelta(minutes=1)

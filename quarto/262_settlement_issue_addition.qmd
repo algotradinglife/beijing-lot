@@ -2,7 +2,7 @@
 title: "新期次的增量入库（结算发布库追加层）"
 subtitle: "用采集批次把新结算期次追加进封印发布库，不再全量重建"
 params:
-  verification_json: "results/bj479_issue_addition_v1/e2e-26093-verification.json"
+  verification_json: "results/bj479_issue_addition_v1/e2e-live-verification.json"
 execute:
   error: false
   cache: false
@@ -155,8 +155,15 @@ var IssueNum = "26096"; var IsCurrentIssue = "True";
   --database "$SETTLEMENT_DB" --run-root "$NEW_BATCH_RUN_ROOT"
 ```
 
-它**不写发布库**（采集与追加分开可审），失败时留下原始页面但不写 manifest，于是应用器的域校验
-会拒绝它，而不是追加一个残缺期次。
+它**不写发布库**（采集与追加分开可审）。要点：
+
+- **待补集合按「成员」判定，不按「最新期次水位线」** —— 否则被拒绝的期次一旦被更晚的期次越过，
+  就再也不会被重试。看板只列仍在售的期次，所以当发布库的最新期次比看板最老的还老时，缺失数量
+  无法从列表判定，此时**报错而不是返回空**。
+- **看板响应本身被保存**（`raw/<sha256>.html` + `board.receipt.json`：URL、采集时间、哈希、
+  当时的广告列表与待补集合），所以「为什么这次只补这些」可以离线复现，不需要再发请求。
+- 每页的 `received_at` 在**该页到达之后**采样，不是批次开始时间。
+- 失败时留下原始页面但不写 manifest，于是应用器的域校验会拒绝它，而不是追加一个残缺期次。
 
 ## 局限
 
