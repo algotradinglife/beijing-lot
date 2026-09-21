@@ -178,3 +178,21 @@ def test_the_apply_command_applies_a_ledger(tmp_path: Path) -> None:
         "--approval-note", "owner approved"])
     assert code == 0
     assert backup.exists()
+
+
+def test_the_ledger_command_derives_a_gap_fill(tmp_path: Path) -> None:
+    """The gap-fill branch derives the owed slots from the release, not from a flag."""
+    raw = evidence_dir(tmp_path, "26092", settled=(1,), cancelled=(2,))
+    db = database(tmp_path, "26092", unsettled=(1,), cancelled=(2,))
+    out = tmp_path / "ledger.json"
+    assert build_issue_recovery_ledger.main([
+        "--data-root", str(tmp_path), "--database", str(db), "--evidence-dir", str(raw),
+        "--output", str(out), "--authorization", "owner approved",
+        "--gap-fill", "26092:2"]) == 0
+    doc = json.loads(out.read_text(encoding="utf-8"))
+    assert doc["additions"] == []
+    entry = doc["gap_fills"][0]
+    assert entry["issue"] == "26092" and entry["expected_fixtures"] == 2
+    # The cancelled fixture has no result, so only slot 1 is owed.
+    assert entry["expected_gap_slots"] == [1] and entry["expected_gap_fixtures"] == 1
+    assert len(entry["evidence"]) == 5

@@ -176,13 +176,19 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
             # The audit rows are read in full, then validated field by field against the
             # archive, the backup and the stored observation - their keys alone are not
             # evidence.
-            audited = {(row[0], row[1]): row[2:] for row in con.execute(
+            audit_rows = con.execute(
                 """SELECT slot, play, observation_id, native_match_id, new_score,
                           new_halftime_score, new_expected_option, new_options_json,
-                          evidence_sha256, old_payload_sha256, replaced_options_json
-                   FROM issue_recovery_gap WHERE batch_id=? AND issue=?""", (batch_id, issue))}
+                          evidence_sha256, old_payload_sha256, replaced_options_json,
+                          old_score, old_halftime_score
+                   FROM issue_recovery_gap WHERE batch_id=? AND issue=?""",
+                (batch_id, issue)).fetchall()
+            audited = {(row[0], row[1]): row[2:] for row in audit_rows}
             slots = sorted({slot for slot, _ in required})
             issue_mismatches = []
+            # A dictionary silently drops a duplicate key, so multiplicity is checked first.
+            if len(audited) != len(audit_rows):
+                issue_mismatches.append({"duplicate_audit_keys": len(audit_rows) - len(audited)})
             if set(audited) != required:
                 issue_mismatches.append({"audit_rows": sorted(audited),
                                          "owed_completions": sorted(required)})
@@ -243,7 +249,9 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                             row["halftime_score"], derived)
                         and audit[5] == json.dumps(_vector(row), ensure_ascii=False)
                         and audit[6] == row["source_sha256"]
-                        and audit[7] == hashlib.sha256(before[0].encode()).hexdigest())
+                        and audit[7] == hashlib.sha256(before[0].encode()).hexdigest()
+                        # the recorded pre-recovery values must be the backup's
+                        and audit[9] == before[1] and audit[10] == before[2])
                 if not ok:
                     issue_mismatches.append(
                         {"slot": slot, "play": play,

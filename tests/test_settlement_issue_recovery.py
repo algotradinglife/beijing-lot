@@ -628,12 +628,59 @@ def test_a_partial_play_completion_is_refused_before_the_backup(tmp_path: Path) 
                 "WHERE issue='26092' AND slot=1 AND play='jq'")
     con.commit()
     con.close()
-    with pytest.raises(ValueError, match="so a play is missing"):
+    with pytest.raises(ValueError, match="not the expected five-play product"):
         recover_issues(db, gap_ledger(tmp_path), tmp_path / "b.sqlite",
                        approval_note="owner approved")
     assert not (tmp_path / "b.sqlite").exists(), "a refused run must not leave a backup"
     assert rows(db, "SELECT score FROM observation WHERE issue='26092' AND slot=1 AND "
                     "play='spf'")[0] == ("-",)
+
+
+def test_a_missing_play_with_a_duplicate_refuses_before_the_backup(tmp_path: Path) -> None:
+    """A count is not the invariant: a missing play plus a duplicated one keeps the total."""
+    db = gap_db(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET score='2-1', halftime_score='1-0', expected_option='3球' "
+                "WHERE issue='26092' AND slot=1 AND play='jq'")
+    con.execute("""INSERT INTO observation VALUES
+        (500, '26092', 1, 'spf', '1001', '22:25', '-', '-', NULL, 'a'*64, '', '',
+         '{"handicap": 0}')""")
+    for index, option in enumerate(DOMAINS["spf"]):
+        con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)",
+                    (500, option, f"{3.0 + index:.2f}", 3.0 + index, f"ref-{option}"))
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="share a fixture key|five-play product"):
+        recover_issues(db, gap_ledger(tmp_path), tmp_path / "b.sqlite",
+                       approval_note="owner approved")
+    assert not (tmp_path / "b.sqlite").exists()
+
+
+def test_a_duplicate_audit_key_refuses_the_rerun(tmp_path: Path) -> None:
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("""INSERT INTO issue_recovery_gap VALUES
+        (999, (SELECT batch_id FROM issue_recovery_batch), '26092', 1, 'spf', '1001',
+         '-', '9-9', '-', '0-0', NULL, '负', '[]', '[]', 'x', 'x', 'x', 'x')""")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="share a fixture key"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_change_outside_the_owed_completions_refuses_the_rerun(tmp_path: Path) -> None:
+    """A cancelled fixture is not an owed completion, so editing it must still be caught."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET score='3-3' WHERE issue='26092' AND slot=2")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="outside the owed completions was changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
 
 
 def test_refuses_when_evidence_bytes_do_not_match_the_ledger(tmp_path: Path) -> None:

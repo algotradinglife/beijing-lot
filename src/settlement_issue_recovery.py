@@ -276,11 +276,16 @@ def _gap_targets(con, item: dict) -> list[tuple]:
     slots = sorted({t[2] for t in targets})
     if slots != item["expected_gap_slots"]:
         raise ValueError(f"issue {issue}: settled slots differ from the ledger's expected slots")
-    # Every owed fixture must be completed for all five plays, or the batch would commit a
-    # recovery the verifiers then refuse.
-    if len(targets) != len(slots) * len(PLAYS):
-        raise ValueError(f"issue {issue}: {len(targets)} completions for {len(slots)} fixtures, "
-                         f"so a play is missing")
+    # Every owed fixture must be completed exactly once for each of the five plays, or the
+    # batch would commit a recovery the verifiers then refuse. A count is not enough: a
+    # missing play plus a duplicated one keeps the total right.
+    expected_product = {(slot, play) for slot in slots for play in PLAYS.values()}
+    keys = [(t[2], t[3]) for t in targets]
+    if len(set(keys)) != len(keys):
+        raise ValueError(f"issue {issue}: two completions share a fixture key")
+    if set(keys) != expected_product:
+        raise ValueError(f"issue {issue}: the completions are not the expected five-play "
+                         f"product for the owed slots")
     return targets
 
 
@@ -400,8 +405,15 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
             audited = {(row[0], row[1]): row[2:] for row in con.execute(
                 """SELECT slot, play, observation_id, native_match_id, new_score,
                           new_halftime_score, new_expected_option, new_options_json,
-                          evidence_sha256, old_payload_sha256, replaced_options_json
+                          evidence_sha256, old_payload_sha256, replaced_options_json,
+                          old_score, old_halftime_score
                    FROM issue_recovery_gap WHERE batch_id=? AND issue=?""", (batch, issue))}
+            # A dictionary would silently drop a duplicate key, so multiplicity is checked
+            # before the mapping is used.
+            audit_rows = con.execute("SELECT COUNT(*) FROM issue_recovery_gap "
+                                     "WHERE batch_id=? AND issue=?", (batch, issue)).fetchone()[0]
+            if audit_rows != len(audited):
+                raise ValueError(f"issue {issue}: two audit rows share a fixture key")
             if set(audited) != required:
                 raise ValueError(f"issue {issue}: the audit rows are not the owed completions")
             # Iterate the owed keys, not the surviving observations, so a deleted row cannot
@@ -410,7 +422,7 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                 source = archive[(slot, play)]
                 (audit_id, audit_native, audit_score, audit_halftime, audit_option,
                  audit_options, audit_evidence, audit_payload_sha256,
-                 audit_replaced) = audited[(slot, play)]
+                 audit_replaced, audit_old_score, audit_old_halftime) = audited[(slot, play)]
                 stored = con.execute(
                     """SELECT observation_id, native_match_id, score, halftime_score,
                               expected_option, payload_json FROM observation
@@ -457,7 +469,24 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                                                 ensure_ascii=False):
                     raise ValueError(f"issue {issue} slot {slot} {play}: recorded replaced "
                                      f"vector changed")
+                if audit_old_score != before[0] or audit_old_halftime != before[1]:
+                    raise ValueError(f"issue {issue} slot {slot} {play}: recorded pre-recovery "
+                                     f"values changed")
                 gaps += 1
+            # Anything outside the owed completions must be exactly as the backup left it,
+            # so an edit to an untouched fixture cannot hide behind the owed-key loop.
+            for (slot, play, score, halftime, option, payload) in con.execute(
+                    """SELECT slot, play, score, halftime_score, expected_option, payload_json
+                       FROM observation WHERE issue=?""", (issue,)):
+                if (slot, play) in required:
+                    continue
+                before = before_con.execute(
+                    """SELECT score, halftime_score, expected_option, payload_json
+                       FROM observation WHERE issue=? AND slot=? AND play=?""",
+                    (issue, slot, play)).fetchone()
+                if before is None or (score, halftime, option, payload) != before:
+                    raise ValueError(f"issue {issue} slot {slot} {play}: an observation "
+                                     f"outside the owed completions was changed")
         return {"added_observations": added, "gap_observations": gaps}
     finally:
         before_con.close()

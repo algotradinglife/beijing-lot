@@ -324,7 +324,37 @@ def test_replay_catches_a_changed_audit_field(tmp_path: Path) -> None:
         sub.mkdir()
         db, ledger, backup = _applied(sub)
         con = sqlite3.connect(db)
-        con.execute(f"UPDATE issue_recovery_gap SET {column}={value}")
+        con.execute(f"UPDATE issue_recovery_gap SET {column}={value} "
+                    "WHERE slot=362 AND play='spf'")
+        con.commit()
+        con.close()
+        assert build_report(db, ledger, backup)["conclusion"]["verified"] is False, column
+
+
+def test_replay_catches_a_duplicate_audit_key(tmp_path: Path) -> None:
+    """The audit table only makes observation_id unique, so multiplicity is checked."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("""INSERT INTO issue_recovery_gap VALUES
+        (999, (SELECT batch_id FROM issue_recovery_batch), '26092', 362, 'spf', '1362',
+         '-', '9-9', '-', '0-0', NULL, '负', '[]', '[]', 'x', 'x', 'x', 'x')""")
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["gap_fill"]["mismatches"]
+
+
+def test_replay_catches_the_remaining_audit_bindings(tmp_path: Path) -> None:
+    for column, value in (("observation_id", "9999"), ("new_halftime_score", "'9-9'"),
+                          ("old_payload_sha256", "'f' * 64"), ("old_score", "'9-9'"),
+                          ("old_halftime_score", "'9-9'"), ("replaced_options_json", "'[]'")):
+        sub = tmp_path / column
+        sub.mkdir()
+        db, ledger, backup = _applied(sub)
+        con = sqlite3.connect(db)
+        con.execute(f"UPDATE issue_recovery_gap SET {column}={value} "
+                    "WHERE slot=362 AND play='spf'")
         con.commit()
         con.close()
         assert build_report(db, ledger, backup)["conclusion"]["verified"] is False, column
