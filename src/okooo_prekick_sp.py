@@ -72,22 +72,43 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+_CHARSET_DECLARATION = re.compile(rb"""charset\s*=\s*["']?([\w-]+)""", re.I)
+
+
+def declared_encoding(payload: bytes) -> str | None:
+    """Return the charset the page declares, or None.
+
+    A successful strict decode does not establish the *correct* encoding: a GB2312 page whose
+    bytes also happen to be valid UTF-8 decodes "successfully" as UTF-8 into different
+    characters (``鲁`` became ``³``), with no error and no replacement character. The
+    declaration is therefore the first thing to honour, not a last resort.
+    """
+    match = _CHARSET_DECLARATION.search(payload[:4096])
+    if match is None:
+        return None
+    return match.group(1).decode("ascii", "replace").lower()
+
+
 def okooo_soup(payload: bytes) -> BeautifulSoup:
     """Parse an Okooo page without ever mangling its text.
 
     Okooo serves GB2312 and the pages declare it. Decoding with ``errors="replace"`` looked
     harmless and was not: on a real 1.4 MB livecenter page it substituted 32,616 characters
     and left two Han characters standing, so every team and league name it produced was
-    unreadable while the page still "parsed". Try the encodings strictly and refuse when none
-    decodes: a page that cannot be decoded must fail loudly rather than yield a plausible
-    fixture built from replacement characters.
+    unreadable while the page still "parsed".
+
+    The declared charset wins; the encodings below are only a fallback for a page that declares
+    nothing. Every attempt is strict, and a page no encoding can read is refused rather than
+    yielding a plausible fixture built from replacement characters.
     """
-    for encoding in _OKOOO_ENCODINGS:
+    declared = declared_encoding(payload)
+    candidates = ([declared] if declared else []) + list(_OKOOO_ENCODINGS)
+    for encoding in dict.fromkeys(candidates):
         try:
             return BeautifulSoup(payload.decode(encoding), "html.parser")
-        except UnicodeDecodeError:
+        except (UnicodeDecodeError, LookupError):
             continue
-    raise OkoooParseError(f"okooo: page decodes under none of {_OKOOO_ENCODINGS}")
+    raise OkoooParseError(f"okooo: page decodes under none of {candidates}")
 
 
 def reject_block_page(payload: bytes, source_url: str = "") -> None:

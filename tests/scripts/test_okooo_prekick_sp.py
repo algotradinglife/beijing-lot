@@ -164,6 +164,20 @@ def test_real_page_leaves_no_replacement_character_in_any_field() -> None:
             assert "\ufffd" not in value, (row.match_idx, value)
 
 
+def test_honours_the_declared_charset_over_a_lucky_utf8_decode() -> None:
+    """A strict decode is not proof of the right encoding.
+
+    GB2312 bytes that also form valid UTF-8 decode "successfully" as UTF-8 into different
+    characters, with no error and no replacement character, so the declared charset has to win.
+    """
+    payload = "<html><head><meta charset=gb2312></head><body><p>鲁</p></body></html>".encode(
+        "gb2312")
+    assert payload.decode("utf-8")  # the bytes really are valid UTF-8
+    assert "鲁" in okooo.okooo_soup(payload).get_text()
+    assert okooo.declared_encoding(payload) == "gb2312"
+    assert okooo.declared_encoding(b"<html><body><p>x</p></body></html>") is None
+
+
 def test_refuses_a_page_that_decodes_under_no_encoding() -> None:
     """An undecodable page is refused; it never becomes a plausible-looking fixture."""
     with pytest.raises(okooo.OkoooParseError):
