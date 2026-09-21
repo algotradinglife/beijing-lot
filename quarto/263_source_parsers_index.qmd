@@ -135,3 +135,69 @@ cat(sprintf("- 仓库内真实页面样本总数（含其他模块）：**%d** �
 这个工具本身栽过两次，都已由回归测试钉住：第一版把**字符串里出现 `.html`** 当证据（误报过多）；
 第二版只认字面量 `fixtures/x.html`，于是**漏判**了用 `Path(...) / "fixtures" / "page.gz"` +
 `gzip.open` 读取的测试（`settlement_halftime_evidence` 补了夹具后仍被标红）。
+
+## 本轮交付记录
+
+本次交付把「四个源的解析能不能复用以至未来」这件事，从**口头盘点**变成**可核对的索引 + 可复现的审计 + 有真实页面支撑的测试**。
+
+### 提交链（当前可达）
+
+| 提交 | 内容 |
+|---|---|
+| `a43764f6` | 澳客页面**严格解码**（发现并修复静默损坏中文的缺陷，合成夹具掩盖了它） |
+| `fa830f11` | 声明编码优先（修掉上一提交引入的歧义字节回归） |
+| `e2101f2b` | 索引 + 审计脚本 + 交付文档 |
+| `8571b7f4` | 半场证据模块的真实页面夹具；审计改为读**提交版本**；索引逐行对着提交核对 |
+| `b56bb624` | 审计报告绑定其来源版本 |
+| `77bb6b94` | 身份校验改走提取器实际调用的解码绑定；修正 500 行与文档措辞 |
+| `a6132d17` | 唯一解码点 `_soup`；每案例**非 ASCII 探针**；修正计数器与 backfill 行 |
+| `fd15f6da`、`1806821f` | 报告分别绑定 `a6132d17`、`49d5011a` |
+| `49d5011a` | 记录哪些页面**无法**暴露解码变化（诚实残余） |
+
+提交 SHA 在共用检出上可能被改写；**内容**是本记录的权威对象。
+
+### 验证与结果
+
+```sh
+# 半场证据模块：真实页面驱动的提取器契约
+.venv/bin/python -m pytest tests/test_settlement_halftime_evidence.py -q
+#   61 passed
+
+# 审计工具与澳客解码
+.venv/bin/python -m pytest tests/scripts/test_audit_source_parsers.py tests/scripts/test_okooo_prekick_sp.py -q
+#   17 passed
+
+# 审计产物（读提交版本，绑定 revision + 文件数 + 内容哈希）
+.venv/bin/python scripts/audit_source_parsers.py --out results/source_parser_audit_v1/audit.json
+
+# 交付文档
+quarto render quarto/263_source_parsers_index.qmd
+```
+
+**注入验证**（证明用例真的能失败，而不只是通过）：
+
+| 注入 | 结果 |
+|---|---|
+| 拉丁解码器改 `ascii/replace` | **5 个用例失败**（globalsportsarchive、24score、sportsmole、footballcritic、transfermarkt） |
+| 澳客解码器改 `utf-8/replace` | **3 个用例失败** |
+| 恢复 | 61 全过 |
+
+### 交付审查
+
+`codex review` 五轮，**结论：无阻塞问题**。前四轮各抓到实质问题，均已修复并加了回归：
+
+1. 产物从**工作区**生成（含他人在途文件）→ 无法从干净检出复现；索引里**三个在任何版本都不存在的 Titan 模块名**；`parse_archive` 只清点却被当成归档解析；漏了 ZGZCW 来源。
+2. 身份校验**连续两版都证明不了任何事**（先自设解码器，后从源模块导入）；livecenter 案例无页面摘要致字节校验被静默跳过；500 的「显式状态」声明不成立（真实推导在 `multimarket_p0.build_settlement_truth`）。
+3. 只有澳客用例能因解码出错而失败；渲染计数器数的是已废弃标签；`backfill/parser.py` 被夸大能力。
+
+### 已知缺口（留档，未处理）
+
+| 解析器 | 状态 |
+|---|---|
+| `scripts/verify_nowscore_bf_history.py` | 测试只内联构造页面 |
+| `src/nowscore_bjdc_sp_history.py` | 测试只内联构造 |
+| `scripts/replay_settlement_quarantine.py` | 测试只内联构造 |
+| `src/correct_score_price_history.py` | 页面经 `okooo_prekick_sp`，本身无页面字节；可复用澳客夹具 |
+| `scripts/update_beidan_nowscore_sqlite.py` | **无任何测试** |
+
+另有一个**未被本交付覆盖的同类缺陷线索**：`#476`（Nowscore SP 解析失败被静默转为缺失值）与本轮修掉的澳客静默替换属同一类；`#477`（用变异测试建立门禁）与本轮手工注入实验同旨 —— 两者都值得纳入既有 issue 的处置。
