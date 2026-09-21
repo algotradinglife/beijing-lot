@@ -27,7 +27,8 @@ def main(argv=None):
     print(json.dumps(recover_issues(args.database, args.ledger, args.backup,
                                     approval_note=args.approval_note),
                      ensure_ascii=False))
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

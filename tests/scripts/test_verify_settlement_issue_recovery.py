@@ -13,12 +13,13 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.verify_settlement_issue_recovery import build_report  # noqa: E402
+from scripts.verify_settlement_issue_recovery import build_report, main  # noqa: E402
 from src.nowscore_settlement import ARCHIVE_SLUGS, TITLE  # noqa: E402
 from src.settlement_issue_recovery import recover_issues  # noqa: E402
 
 LABELS = {5: ("胜", "2.10"), 6: ("3", "5.50"), 7: ("上单", "3.30"),
           8: ("2:1", "8.00"), 9: ("胜-胜", "4.20")}
+ADDED = "23075"
 
 
 def _page(issue: str, typeid: int, fixtures) -> bytes:
@@ -69,11 +70,18 @@ def _database(tmp: Path) -> Path:
                     (json.dumps({"schema": "nowscore_audit_v1", "data_sha256": "e" * 64}),))
         for typeid in sorted(LABELS):
             con.execute("INSERT INTO capture VALUES (?,?,?,?,?)",
+                        (ADDED, typeid, "https://cp.nowscore.com/buy/DanChang.aspx?all=1",
+                         "2026-09-06T13:05:51+00:00", "a" * 64))
+            con.execute("INSERT INTO capture VALUES (?,?,?,?,?)",
                         ("26092", typeid, "https://cp.nowscore.com/buy/DanChang.aspx?all=1",
                          "2026-09-06T13:05:51+00:00", "a" * 64))
         con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (1, "26092", 362, "spf", "1362", "22:25", "-", "-", None, "a" * 64, "", "", "{}"))
-        con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)", (1, "胜", "", None, "c1"))
+                    (1, "26092", 362, "spf", "1362", "22:25", "-", "-", None, "a" * 64, "", "",
+                     json.dumps({"handicap": 0})))
+        # The live board published reference odds in the settlement column while unplayed.
+        for option, sp in (("胜", 3.28), ("平", 2.49), ("负", 3.40)):
+            con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)",
+                        (1, option, f"{sp:.2f}", sp, f"ref-{option}"))
         con.commit()
     finally:
         con.close()
@@ -82,14 +90,19 @@ def _database(tmp: Path) -> Path:
 
 def _ledger(tmp: Path, *, issue="26092") -> Path:
     fixtures = {typeid: [(362, "2-1", "1-0", *LABELS[typeid])] for typeid in sorted(LABELS)}
-    entry = {"issue": issue, "expected_fixtures": 1, "expected_gap_fixtures": 1,
-             "expected_gap_slots": [362],
-             "evidence": [_evidence(tmp, issue, typeid, fixtures[typeid])
-                          for typeid in sorted(LABELS)]}
+    gap = {"issue": issue, "expected_fixtures": 1, "expected_gap_fixtures": 1,
+           "expected_gap_slots": [362],
+           "evidence": [_evidence(tmp, issue, typeid, fixtures[typeid])
+                        for typeid in sorted(LABELS)]}
+    addition = {"issue": ADDED, "expected_fixtures": 2,
+                "evidence": [_evidence(tmp, ADDED, typeid,
+                                       [(1, "2-1", "1-0", *LABELS[typeid]),
+                                        (2, "2-1", "1-0", *LABELS[typeid])])
+                             for typeid in sorted(LABELS)]}
     path = tmp / "ledger.json"
     path.write_text(json.dumps({"schema": "bj479_issue_recovery_ledger_v1",
                                 "authorization": "owner approved",
-                                "additions": [], "gap_fills": [entry]}), encoding="utf-8")
+                                "additions": [addition], "gap_fills": [gap]}), encoding="utf-8")
     return path
 
 
@@ -104,20 +117,56 @@ def test_replay_reproduces_every_recovered_value(tmp_path: Path) -> None:
     report = build_report(db, ledger, backup)
 
     assert report["conclusion"]["verified"] is True
-    assert report["replay"] == {"evidence_files_verified": 5, "all_hashes_match": True,
+    assert report["replay"] == {"evidence_files_verified": 10, "all_hashes_match": True,
                                 "all_values_reproduced": True}
+    assert report["additions"][0]["replayed_observations"] == 10
     assert report["gap_fill"]["observations"] == 1 and report["gap_fill"]["replay_agrees"]
-    assert report["recorded_evidence_files"] == 5
+    assert report["recorded_evidence_files"] == 10
     assert report["capture_rebind_mismatches"] == []
-    assert report["backup"]["gap_fixtures_unsettled_before"] is True
+    assert report["backup"]["additions_absent_before"] is True
+    assert report["receipt_bound"] is True
     assert report["receipt"]["effective_source"].endswith("_and_archive_recovery")
+
+
+def test_replay_catches_reference_odds_left_in_the_settlement_column(tmp_path: Path) -> None:
+    """The regression that made the first delivery wrong: the live board's reference odds
+    must not be readable as the settled SP."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE option_sp SET raw_sp='3.28', sp=3.28, cell_id='ref-胜' WHERE option='胜'")
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["gap_fill"]["mismatches"]
+
+
+def test_replay_catches_a_wrong_settlement_sp(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE option_sp SET sp=9.99 WHERE option='胜'")
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+
+
+def test_replay_catches_a_missing_or_extra_added_row(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM observation WHERE issue=? AND slot=2 AND play='spf'", (ADDED,))
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["additions"][0]["mismatch_count"] >= 1
 
 
 def test_replay_refuses_tampered_evidence(tmp_path: Path) -> None:
     db, ledger, backup = _applied(tmp_path)
     item = json.loads(ledger.read_text(encoding="utf-8"))["gap_fills"][0]["evidence"][0]
     Path(item["path"]).write_bytes(b"<html>tampered</html>")
-    with pytest.raises(ValueError, match="evidence hash mismatch"):
+    with pytest.raises(ValueError, match="does not match the ledger"):
         build_report(db, ledger, backup)
 
 
@@ -140,3 +189,18 @@ def test_replay_refuses_a_ledger_that_does_not_match_the_recorded_batch(tmp_path
     ledger.write_text(json.dumps(doc), encoding="utf-8")
     with pytest.raises(ValueError, match="does not match the ledger"):
         build_report(db, ledger, backup)
+
+
+def test_the_command_fails_when_the_report_does_not_verify(tmp_path: Path) -> None:
+    """A rejected recovery must not exit successfully from the acceptance command."""
+    db, ledger, backup = _applied(tmp_path)
+    out = tmp_path / "report.json"
+    assert main(["--database", str(db), "--ledger", str(ledger), "--backup", str(backup),
+                 "--out", str(out)]) == 0
+    con = sqlite3.connect(db)
+    con.execute("UPDATE option_sp SET sp=9.99 WHERE option='胜'")
+    con.commit()
+    con.close()
+    assert main(["--database", str(db), "--ledger", str(ledger), "--backup", str(backup),
+                 "--out", str(out)]) == 1
+    assert json.loads(out.read_text(encoding="utf-8"))["conclusion"]["verified"] is False

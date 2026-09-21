@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts import apply_issue_recovery, build_issue_recovery_ledger  # noqa: E402
 from scripts.build_issue_recovery_ledger import build_ledger  # noqa: E402
 from src.nowscore_settlement import ARCHIVE_SLUGS, TITLE  # noqa: E402
 
@@ -51,12 +52,30 @@ def evidence_dir(tmp: Path, issue: str, settled=(1,), cancelled=()) -> Path:
 
 
 def database(tmp: Path, issue: str, unsettled=(1,), cancelled=()) -> Path:
+    """A release shaped like the sealed one, so the applier can run against it too."""
     path = tmp / "db.sqlite"
     con = sqlite3.connect(path)
     try:
-        con.execute("CREATE TABLE observation (issue TEXT, slot INTEGER, play TEXT, score TEXT)")
+        con.execute("""CREATE TABLE capture (issue TEXT, typeid INTEGER, source_url TEXT,
+            received_at TEXT, sha256 TEXT, PRIMARY KEY(issue,typeid))""")
+        con.execute("""CREATE TABLE observation (observation_id INTEGER PRIMARY KEY, issue TEXT,
+            slot INTEGER, play TEXT, native_match_id TEXT, status TEXT, score TEXT,
+            halftime_score TEXT, expected_option TEXT, source_sha256 TEXT, source_url TEXT,
+            received_at TEXT, payload_json TEXT)""")
+        con.execute("""CREATE TABLE option_sp (observation_id INTEGER, option TEXT,
+            raw_sp TEXT, sp REAL, cell_id TEXT)""")
+        con.execute("""CREATE TABLE finding (issue TEXT, slot INTEGER, play TEXT, code TEXT,
+            detail TEXT, source_sha256 TEXT)""")
+        con.execute("CREATE TABLE receipt (payload_json TEXT)")
+        con.execute("INSERT INTO receipt VALUES (?)",
+                    (json.dumps({"schema": "nowscore_audit_v1", "data_sha256": "e" * 64}),))
+        oid = 0
         for slot in unsettled + cancelled:
-            con.execute("INSERT INTO observation VALUES (?,?,?,?)", (issue, slot, "spf", "-"))
+            oid += 1
+            con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (oid, issue, slot, "spf", str(1000 + slot), "22:25", "-", "-", None,
+                         "a" * 64, "", "", json.dumps({"handicap": 0})))
+            con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)", (oid, "胜", "3.28", 3.28, "c1"))
         con.commit()
     finally:
         con.close()
@@ -124,3 +143,38 @@ def test_ledger_round_trips_through_json(tmp_path: Path) -> None:
     db = database(tmp_path, "23075", unsettled=(1,))
     ledger = build_ledger(db, raw, [("23075", 1)], [], "owner approved")
     assert json.loads(json.dumps(ledger))["additions"][0]["expected_fixtures"] == 1
+
+
+def test_the_ledger_command_writes_a_ledger(tmp_path: Path) -> None:
+    """The entry point is thin, but it must produce a ledger the applier accepts."""
+    raw = evidence_dir(tmp_path, "23075", settled=(1,))
+    db = database(tmp_path, "23075", unsettled=())
+    out = tmp_path / "ledger.json"
+    code = build_issue_recovery_ledger.main([
+        "--data-root", str(tmp_path),
+        "--database", str(db), "--evidence-dir", str(raw), "--output", str(out),
+        "--authorization", "owner approved", "--addition", "23075:1"])
+    assert code == 0
+    doc = json.loads(out.read_text(encoding="utf-8"))
+    assert doc["schema"] == "bj479_issue_recovery_ledger_v1"
+    assert doc["additions"][0]["issue"] == "23075"
+    assert doc["additions"][0]["expected_fixtures"] == 1
+    assert len(doc["additions"][0]["evidence"]) == 5
+    assert all(e["byte_count"] > 0 for e in doc["additions"][0]["evidence"])
+
+
+def test_the_apply_command_applies_a_ledger(tmp_path: Path) -> None:
+    raw = evidence_dir(tmp_path, "23075", settled=(1,))
+    db = database(tmp_path, "23075", unsettled=())
+    out = tmp_path / "ledger.json"
+    build_issue_recovery_ledger.main([
+        "--data-root", str(tmp_path),
+        "--database", str(db), "--evidence-dir", str(raw), "--output", str(out),
+        "--authorization", "owner approved", "--addition", "23075:1"])
+    backup = tmp_path / "backup.sqlite"
+    code = apply_issue_recovery.main([
+        "--data-root", str(tmp_path),
+        "--database", str(db), "--ledger", str(out), "--backup", str(backup),
+        "--approval-note", "owner approved"])
+    assert code == 0
+    assert backup.exists()

@@ -112,7 +112,7 @@ def build_ledger(database: Path, evidence_dir: Path, additions, gap_fills, autho
     }
 
 
-def main() -> None:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", required=True, type=Path)
     parser.add_argument("--evidence-dir", required=True, type=Path)
@@ -122,7 +122,7 @@ def main() -> None:
     parser.add_argument("--authorization", required=True)
     parser.add_argument("--addition", action="append", default=[], metavar="ISSUE:FIXTURES")
     parser.add_argument("--gap-fill", action="append", default=[], metavar="ISSUE:FIXTURES")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     validate_settlement_storage(args.data_root, [args.database], mountpoint=args.mountpoint)
 
@@ -139,7 +139,8 @@ def main() -> None:
                  f"slots {entry['expected_gap_slots'][0]}..{entry['expected_gap_slots'][-1]}"
                  if "expected_gap_fixtures" in entry else "")
         print(f"  {entry['issue']}: {entry['expected_fixtures']} fixtures{extra}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

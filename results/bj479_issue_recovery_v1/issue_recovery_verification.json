@@ -1,10 +1,10 @@
 {
  "schema": "bj479_issue_recovery_verification_v1",
  "database": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
- "database_sha256": "80458bf0e6c84976da70bd15d2656829e980bbcf3f9f25e42660cec29577021d",
+ "database_sha256": "77bc8926a0d7228e092c9d81fe8c9559dc6b9308414a339b12b153e56ee7192a",
  "batch_id": "e9de2d240e8b32a29696f9fbe459ff80247979cbffab91f8a70b75c5646b7d61",
- "applied_at": "2026-09-21T01:26:40.074483+00:00",
- "note": "Owner approved (2026-09-21): recover the five quarantined issues and complete issue 26092's unsettled fixtures from the source's own archive board, recorded as an audited layer on the sealed release.",
+ "applied_at": "2026-09-21T02:00:57.066631+00:00",
+ "note": "Owner approved: recover the five quarantined issues and complete 26092's 27 unsettled fixtures from the source's own archive board, replacing the reference odds the live board published in the settlement column.",
  "recorded_backup": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/nowscore_history_replay.before_bj479_issue_recovery.sqlite",
  "evidence_manifest": [
   {
@@ -14,7 +14,8 @@
    "sha256": "d9aaa04029ade3b14ffe76903a5efbac9044053958963eb995611eadb2558c56",
    "url": "https://cp.nowscore.com/beijingdanchang/rangqiushengpingfu/kaijiang_dc_5_20082.html",
    "received_at": "2026-09-21T00:27:41.880000+00:00",
-   "byte_count": 257952
+   "byte_count": 257952,
+   "role": "addition"
   },
   {
    "issue": "20082",
@@ -23,7 +24,8 @@
    "sha256": "5e9de6c0b56f9f52717232ea92e4a69b6e979b11ddc580ee4401a2a68b761a30",
    "url": "https://cp.nowscore.com/beijingdanchang/zongjinqiuhu/kaijiang_dc_6_20082.html",
    "received_at": "2026-09-21T00:27:44.060000+00:00",
-   "byte_count": 254003
+   "byte_count": 254003,
+   "role": "addition"
   },
   {
    "issue": "20082",
@@ -32,7 +34,8 @@
    "sha256": "d3cda97c72d5120d63261d61b53315e3c0994fa2df59d0af3a140d8a75531864",
    "url": "https://cp.nowscore.com/beijingdanchang/shangxiapandanshuang/kaijiang_dc_7_20082.html",
    "received_at": "2026-09-21T00:27:46.230000+00:00",
-   "byte_count": 254989
+   "byte_count": 254989,
+   "role": "addition"
   },
   {
    "issue": "20082",
@@ -41,7 +44,8 @@
    "sha256": "f36d3e214d9512b21f12bd8afabb73c0fcca2e4e796ef1b6de74873b373c55f8",
    "url": "https://cp.nowscore.com/beijingdanchang/bifen/kaijiang_dc_8_20082.html",
    "received_at": "2026-09-21T00:27:48.410000+00:00",
-   "byte_count": 254530
+   "byte_count": 254530,
+   "role": "addition"
   },
   {
    "issue": "20082",
@@ -50,7 +54,8 @@
    "sha256": "efeadb4cea0639d8de11349b99dc5afee80d97ceb219ed617a0feb0575cbff0a",
    "url": "https://cp.nowscore.com/beijingdanchang/banquanchangshengfu/kaijiang_dc_9_20082.html",
    "received_at": "2026-09-21T00:27:50.580000+00:00",
-   "byte_count": 255194
+   "byte_count": 255194,
+   "role": "addition"
   },
   {
    "issue": "20123",
@@ -59,7 +64,8 @@
    "sha256": "4341250ec1e58b78ed1b6858dcc1ceef13ef5a9c3fda74ef7525f26459f390f9",
    "url": "https://cp.nowscore.com/beijingdanchang/rangqiushengpingfu/kaijiang_dc_5_20123.html",
    "received_at": "2026-09-21T00:27:52.920000+00:00",
-   "byte_count": 560458
+   "byte_count": 560458,
+   "role": "addition"
   },
   {
    "issue": "20123",
@@ -68,7 +74,8 @@
    "sha256": "d777046f2178a390e5b42a6f342fbedeca70ad21f1705001f2f2d7aae9a9f063",
    "url": "https://cp.nowscore.com/beijingdanchang/zongjinqiuhu/kaijiang_dc_6_20123.html",
    "received_at": "2026-09-21T00:27:55.120000+00:00",
-   "byte_count": 553434
+   "byte_count": 553434,
+   "role": "addition"
   },
   {
    "issue": "20123",
@@ -77,7 +84,8 @@
    "sha256": "bd2010393a87a0f3f28c18831f02bcf250217dee1ba4074ba76fffeaf84a2cd1",
    "url": "https://cp.nowscore.com/beijingdanchang/shangxiapandanshuang/kaijiang_dc_7_20123.html",
    "received_at": "2026-09-21T00:27:57.360000+00:00",
-   "byte_count": 555687
+   "byte_count": 555687,
+   "role": "addition"
   },
   {
    "issue": "20123",
@@ -86,7 +94,8 @@
    "sha256": "d68d1672283af7b426e76bcab44e09f2fa192ab25bf05e7b8d9cc75ac33705d0",
    "url": "https://cp.nowscore.com/beijingdanchang/bifen/kaijiang_dc_8_20123.html",
    "received_at": "2026-09-21T00:27:59.550000+00:00",
-   "byte_count": 554697
+   "byte_count": 554697,
+   "role": "addition"
   },
   {
    "issue": "20123",
@@ -95,7 +104,8 @@
    "sha256": "43a003d5c88c9750410dd0f0083e017f64dddb44ee45964dce80bd2ea5fa3b40",
    "url": "https://cp.nowscore.com/beijingdanchang/banquanchangshengfu/kaijiang_dc_9_20123.html",
    "received_at": "2026-09-21T00:28:01.760000+00:00",
-   "byte_count": 556209
+   "byte_count": 556209,
+   "role": "addition"
   },
   {
    "issue": "23075",
@@ -104,7 +114,8 @@
    "sha256": "37311f5e20076964688cf622b6afd5f66e0109c479ed5ee227a4509a217614f2",
    "url": "https://cp.nowscore.com/beijingdanchang/rangqiushengpingfu/kaijiang_dc_5_23075.html",
    "received_at": "2026-09-21T00:28:03.950000+00:00",
-   "byte_count": 246337
+   "byte_count": 246337,
+   "role": "addition"
   },
   {
    "issue": "23075",
@@ -113,7 +124,8 @@
    "sha256": "d0a8d683de43c03092c7aa3878049f595fe80b701d8629b181fda003085afbf1",
    "url": "https://cp.nowscore.com/beijingdanchang/zongjinqiuhu/kaijiang_dc_6_23075.html",
    "received_at": "2026-09-21T00:28:06.150000+00:00",
-   "byte_count": 242994
+   "byte_count": 242994,
+   "role": "addition"
   },
   {
    "issue": "23075",
@@ -122,7 +134,8 @@
    "sha256": "d7b3bfbec83ce61332fd0ee3cf22c4475816a620d3ea59ff0a088ff864d45d05",
    "url": "https://cp.nowscore.com/beijingdanchang/shangxiapandanshuang/kaijiang_dc_7_23075.html",
    "received_at": "2026-09-21T00:28:08.350000+00:00",
-   "byte_count": 244006
+   "byte_count": 244006,
+   "role": "addition"
   },
   {
    "issue": "23075",
@@ -131,7 +144,8 @@
    "sha256": "98a2a7756152b1f38dc986d910315184d06f335f361c62f578f7c803a7b7b3b0",
    "url": "https://cp.nowscore.com/beijingdanchang/bifen/kaijiang_dc_8_23075.html",
    "received_at": "2026-09-21T00:28:10.510000+00:00",
-   "byte_count": 243520
+   "byte_count": 243520,
+   "role": "addition"
   },
   {
    "issue": "23075",
@@ -140,7 +154,8 @@
    "sha256": "757069052c97113428f689aa78681567e13c5eacf587e177cc0c0a4e6601c17d",
    "url": "https://cp.nowscore.com/beijingdanchang/banquanchangshengfu/kaijiang_dc_9_23075.html",
    "received_at": "2026-09-21T00:28:12.700000+00:00",
-   "byte_count": 244213
+   "byte_count": 244213,
+   "role": "addition"
   },
   {
    "issue": "24014",
@@ -149,7 +164,8 @@
    "sha256": "b7e43decbbc0456ad85b7fc9630163a415c866394ff8ad15aa2c0015afd29141",
    "url": "https://cp.nowscore.com/beijingdanchang/rangqiushengpingfu/kaijiang_dc_5_24014.html",
    "received_at": "2026-09-21T00:28:14.910000+00:00",
-   "byte_count": 304847
+   "byte_count": 304847,
+   "role": "addition"
   },
   {
    "issue": "24014",
@@ -158,7 +174,8 @@
    "sha256": "47b531c03be27168a7a768f98b8c717a3b334a6e03c11608a8a26a69cf71c4ef",
    "url": "https://cp.nowscore.com/beijingdanchang/zongjinqiuhu/kaijiang_dc_6_24014.html",
    "received_at": "2026-09-21T00:28:17.090000+00:00",
-   "byte_count": 300579
+   "byte_count": 300579,
+   "role": "addition"
   },
   {
    "issue": "24014",
@@ -167,7 +184,8 @@
    "sha256": "9937d901e48d024937a31a296deb0bdb1ce7e543fba48c1d66deabfb131157fd",
    "url": "https://cp.nowscore.com/beijingdanchang/shangxiapandanshuang/kaijiang_dc_7_24014.html",
    "received_at": "2026-09-21T00:28:19.250000+00:00",
-   "byte_count": 301686
+   "byte_count": 301686,
+   "role": "addition"
   },
   {
    "issue": "24014",
@@ -176,7 +194,8 @@
    "sha256": "e9e546d15e2ceffde7a6859c2f5a7ad84db902aba3820e1ebbf37569e15a31fb",
    "url": "https://cp.nowscore.com/beijingdanchang/bifen/kaijiang_dc_8_24014.html",
    "received_at": "2026-09-21T00:28:21.460000+00:00",
-   "byte_count": 301169
+   "byte_count": 301169,
+   "role": "addition"
   },
   {
    "issue": "24014",
@@ -185,7 +204,8 @@
    "sha256": "0b751b815baac7e6ad03f76679aedd215d0dea31b270750e3b339ed4bf64ab2f",
    "url": "https://cp.nowscore.com/beijingdanchang/banquanchangshengfu/kaijiang_dc_9_24014.html",
    "received_at": "2026-09-21T00:28:23.620000+00:00",
-   "byte_count": 301926
+   "byte_count": 301926,
+   "role": "addition"
   },
   {
    "issue": "25114",
@@ -194,7 +214,8 @@
    "sha256": "13fcf9a0a3526ee97b3d4ec4030e1225731d0ec9e88147d47f7eb61c9c653d5c",
    "url": "https://cp.nowscore.com/beijingdanchang/rangqiushengpingfu/kaijiang_dc_5_25114.html",
    "received_at": "2026-09-21T00:28:25.860000+00:00",
-   "byte_count": 380809
+   "byte_count": 380809,
+   "role": "addition"
   },
   {
    "issue": "25114",
@@ -203,7 +224,8 @@
    "sha256": "78b4e82ba3f5d332039c5f7f16a7edfd3f4561c9bd2b3d0bc7cfa7f56eaf6a33",
    "url": "https://cp.nowscore.com/beijingdanchang/zongjinqiuhu/kaijiang_dc_6_25114.html",
    "received_at": "2026-09-21T00:28:28.070000+00:00",
-   "byte_count": 376333
+   "byte_count": 376333,
+   "role": "addition"
   },
   {
    "issue": "25114",
@@ -212,7 +234,8 @@
    "sha256": "5a453351433cc3f50f61c9e9872c748823bb3d15ac4c9523a5826136e9bfba27",
    "url": "https://cp.nowscore.com/beijingdanchang/shangxiapandanshuang/kaijiang_dc_7_25114.html",
    "received_at": "2026-09-21T00:28:30.250000+00:00",
-   "byte_count": 377844
+   "byte_count": 377844,
+   "role": "addition"
   },
   {
    "issue": "25114",
@@ -221,7 +244,8 @@
    "sha256": "ccba5a64d6709e12680609f3cec5cf324c7c907c63804eda16661542329644e9",
    "url": "https://cp.nowscore.com/beijingdanchang/bifen/kaijiang_dc_8_25114.html",
    "received_at": "2026-09-21T00:28:32.430000+00:00",
-   "byte_count": 377167
+   "byte_count": 377167,
+   "role": "addition"
   },
   {
    "issue": "25114",
@@ -230,7 +254,8 @@
    "sha256": "0a0b726aff0c264140e6c8eba85603444dee01407dd6772a0644825e5b36c964",
    "url": "https://cp.nowscore.com/beijingdanchang/banquanchangshengfu/kaijiang_dc_9_25114.html",
    "received_at": "2026-09-21T00:28:34.630000+00:00",
-   "byte_count": 378193
+   "byte_count": 378193,
+   "role": "addition"
   },
   {
    "issue": "26092",
@@ -239,7 +264,8 @@
    "sha256": "e7e0f0e7c1f7ca62e81836148efc06cc1378fb4af4d102bfcf9f7d1f8fc1468b",
    "url": "https://cp.nowscore.com/beijingdanchang/rangqiushengpingfu/kaijiang_dc_5_26092.html",
    "received_at": "2026-09-21T00:28:36.890000+00:00",
-   "byte_count": 477002
+   "byte_count": 477002,
+   "role": "gap_fill"
   },
   {
    "issue": "26092",
@@ -248,7 +274,8 @@
    "sha256": "f88c6c7d19d505079264db49698a55a522ee6cff9b9f5f0078bb79808e40fdf6",
    "url": "https://cp.nowscore.com/beijingdanchang/zongjinqiuhu/kaijiang_dc_6_26092.html",
    "received_at": "2026-09-21T00:28:39.120000+00:00",
-   "byte_count": 471709
+   "byte_count": 471709,
+   "role": "gap_fill"
   },
   {
    "issue": "26092",
@@ -257,7 +284,8 @@
    "sha256": "f671ac26296bbffbc9382ad50224368ab8fb6d4962f4e76870e6d6b2694ea861",
    "url": "https://cp.nowscore.com/beijingdanchang/shangxiapandanshuang/kaijiang_dc_7_26092.html",
    "received_at": "2026-09-21T00:28:41.300000+00:00",
-   "byte_count": 473599
+   "byte_count": 473599,
+   "role": "gap_fill"
   },
   {
    "issue": "26092",
@@ -266,7 +294,8 @@
    "sha256": "ab829caea8e29bf86105ce7b26a87d3b7a40525e89f25ec7a26be6c0404fd393",
    "url": "https://cp.nowscore.com/beijingdanchang/bifen/kaijiang_dc_8_26092.html",
    "received_at": "2026-09-21T00:28:43.530000+00:00",
-   "byte_count": 472771
+   "byte_count": 472771,
+   "role": "gap_fill"
   },
   {
    "issue": "26092",
@@ -275,7 +304,8 @@
    "sha256": "758ea2e53d403a18aca0e4b7d70e7e7dc721612b43cf79d9cd8c55ef23ed642e",
    "url": "https://cp.nowscore.com/beijingdanchang/banquanchangshengfu/kaijiang_dc_9_26092.html",
    "received_at": "2026-09-21T00:28:45.780000+00:00",
-   "byte_count": 474029
+   "byte_count": 474029,
+   "role": "gap_fill"
   }
  ],
  "ledger_authorization": "Owner approved (2026-09-21): recover the five quarantined issues and complete issue 26092's unsettled fixtures from the source's own archive board, recorded as an audited layer on the sealed release.",
@@ -487,7 +517,9 @@
   }
  ],
  "gap_fill": {
-  "issue": "26092",
+  "issues": [
+   "26092"
+  ],
   "fixtures": [
    362,
    363,
@@ -518,6 +550,75 @@
    388
   ],
   "observations": 135,
+  "per_issue": [
+   {
+    "issue": "26092",
+    "fixtures": [
+     362,
+     363,
+     364,
+     365,
+     366,
+     367,
+     368,
+     369,
+     370,
+     371,
+     372,
+     373,
+     374,
+     375,
+     376,
+     377,
+     378,
+     379,
+     380,
+     381,
+     382,
+     383,
+     384,
+     385,
+     386,
+     387,
+     388
+    ],
+    "observations": 135,
+    "sources": [
+     {
+      "typeid": 5,
+      "url": "https://cp.nowscore.com/beijingdanchang/rangqiushengpingfu/kaijiang_dc_5_26092.html",
+      "sha256": "e7e0f0e7c1f7ca62e81836148efc06cc1378fb4af4d102bfcf9f7d1f8fc1468b",
+      "bytes": 477002
+     },
+     {
+      "typeid": 6,
+      "url": "https://cp.nowscore.com/beijingdanchang/zongjinqiuhu/kaijiang_dc_6_26092.html",
+      "sha256": "f88c6c7d19d505079264db49698a55a522ee6cff9b9f5f0078bb79808e40fdf6",
+      "bytes": 471709
+     },
+     {
+      "typeid": 7,
+      "url": "https://cp.nowscore.com/beijingdanchang/shangxiapandanshuang/kaijiang_dc_7_26092.html",
+      "sha256": "f671ac26296bbffbc9382ad50224368ab8fb6d4962f4e76870e6d6b2694ea861",
+      "bytes": 473599
+     },
+     {
+      "typeid": 8,
+      "url": "https://cp.nowscore.com/beijingdanchang/bifen/kaijiang_dc_8_26092.html",
+      "sha256": "ab829caea8e29bf86105ce7b26a87d3b7a40525e89f25ec7a26be6c0404fd393",
+      "bytes": 472771
+     },
+     {
+      "typeid": 9,
+      "url": "https://cp.nowscore.com/beijingdanchang/banquanchangshengfu/kaijiang_dc_9_26092.html",
+      "sha256": "758ea2e53d403a18aca0e4b7d70e7e7dc721612b43cf79d9cd8c55ef23ed642e",
+      "bytes": 474029
+     }
+    ],
+    "mismatch_count": 0,
+    "replay_agrees": true
+   }
+  ],
   "mismatches": [],
   "replay_agrees": true
  },
@@ -531,8 +632,7 @@
  "backup": {
   "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/nowscore_history_replay.before_bj479_issue_recovery.sqlite",
   "quick_check": "ok",
-  "additions_absent_before": true,
-  "gap_fixtures_unsettled_before": true
+  "additions_absent_before": true
  },
  "receipt": {
   "data_sha256": "e37597091f0375c28a3c080db111dbb66a620e444ebc336ba5a3c8638c522f7b",
@@ -553,6 +653,7 @@
   "gap_filled_observations": 135,
   "issue_recovery_batch_id": "e9de2d240e8b32a29696f9fbe459ff80247979cbffab91f8a70b75c5646b7d61"
  },
+ "receipt_bound": true,
  "conclusion": {
   "verified": true,
   "recorded_added_fixtures": 1413,
@@ -563,7 +664,8 @@
    "The recovered rows come from the source's own archive board, not from an independent provider, so they carry the source's own values; 澳客 corroborates a strict subset of the fixtures and was checked separately.",
    "The recovery is a recorded layer, not a rebuild: the release bundle binds its request URLs into the source scope, so re-verifying it would require re-capturing all 8,325 pages. The original build receipt and its hashes are preserved in issue_recovery_batch.original_receipt_json.",
    "observation.payload_json keeps the source's own bytes and is deliberately not rewritten, so re-deriving from the payload of a gap-filled row shows the live board's unsettled values rather than the archive's.",
-   "For fixtures whose archive row leaves the handicap cell empty, the settled option is derived from the release's own handicap and the archive's score, and must equal the result the archive reports."
+   "For fixtures whose archive row leaves the handicap cell empty, the settled option is derived from the release's own handicap and the archive's score, and must equal the result the archive reports. Replay takes that handicap from the pre-recovery backup.",
+   "The live board publishes pre-match reference odds in the settlement column while a fixture is unplayed; gap-filled rows had that vector replaced by the archive's settlement SP, and the replaced vector is preserved in issue_recovery_gap.replaced_options_json."
   ]
  }
 }

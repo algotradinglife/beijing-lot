@@ -29,6 +29,12 @@ stopifnot(is.character(params$verification_json), length(params$verification_jso
 v <- jsonlite::fromJSON(params$verification_json, simplifyVector = FALSE)
 stopifnot(identical(v$schema, "bj479_issue_recovery_verification_v1"))
 stopifnot(length(v$additions) == 5L, !is.null(v$gap_fill))
+# A rejected recovery must fail this delivery, not merely print "FALSE".
+stopifnot(isTRUE(v$conclusion$verified))
+stopifnot(isTRUE(v$replay$all_values_reproduced), isTRUE(v$replay$all_hashes_match))
+stopifnot(isTRUE(v$receipt_bound), isTRUE(v$backup$additions_absent_before))
+stopifnot(v$backup$quick_check == "ok", length(v$capture_rebind_mismatches) == 0L)
+stopifnot(v$recorded_evidence_files == v$replay$evidence_files_verified)
 ```
 
 ## 结论摘要
@@ -47,7 +53,7 @@ cat("库内登记的证据文件：", v$recorded_evidence_files, "｜capture 重
     length(v$capture_rebind_mismatches), "\n")
 cat("备份 quick_check：", v$backup$quick_check,
     "｜恢复前该 5 期确实为空：", v$backup$additions_absent_before,
-    "｜恢复前缺口场次确实未结算：", v$backup$gap_fixtures_unsettled_before, "\n")
+    "｜回执与库内登记一致：", v$receipt_bound, "\n")
 cat("\n恢复批次号：", v$batch_id, "\n")
 cat("当前库文件 sha256：", v$database_sha256, "\n")
 ```
@@ -69,7 +75,8 @@ tibble::as_tibble(do.call(rbind, rows))
 ## 缺口回填：26092 的未结算场次
 
 ```{r}
-cat("期次：", v$gap_fill$issue, "｜回填场次：", length(v$gap_fill$fixtures),
+cat("期次：", paste(unlist(v$gap_fill$issues), collapse = " / "),
+    "｜回填场次：", length(v$gap_fill$fixtures),
     "（slot ", min(unlist(v$gap_fill$fixtures)), "–", max(unlist(v$gap_fill$fixtures)), "）",
     "｜回填观测：", v$gap_fill$observations, "\n")
 cat("复放一致：", v$gap_fill$replay_agrees, "｜不符条数：", length(v$gap_fill$mismatches), "\n")
@@ -84,18 +91,22 @@ cat("复放一致：", v$gap_fill$replay_agrees, "｜不符条数：", length(v$
 
 ## 证据来源明细
 
+The inventory is built from the batch's recorded evidence manifest, so it covers the
+addition pages **and** the gap-fill pages rather than only the per-issue replay blocks.
+
 ```{r}
-src <- do.call(rbind, lapply(c(v$additions, list(v$gap_fill)), function(e) {
-  do.call(rbind, lapply(e$sources, function(s) data.frame(
-    期次 = e$issue, typeid = s$typeid, 字节 = s$bytes,
-    sha256 = substr(s$sha256, 1, 16), stringsAsFactors = FALSE)))
-}))
-tibble::as_tibble(src)
+src <- do.call(rbind, lapply(v$evidence_manifest, function(s) data.frame(
+  期次 = s$issue, 角色 = s$role, typeid = s$typeid, 字节 = s$byte_count,
+  sha256 = substr(s$sha256, 1, 16), stringsAsFactors = FALSE)))
+src <- tibble::as_tibble(src)
+stopifnot(nrow(src) == 30L, all(src$字节 > 0L),
+          identical(sort(unique(src$角色)), c("addition", "gap_fill")))
+src
 ```
 
 ```{r}
-links <- unique(unlist(lapply(c(v$additions, list(v$gap_fill)), function(e)
-  vapply(e$sources, function(s) s$url, character(1)))))
+links <- unique(vapply(v$evidence_manifest, function(s) s$url, character(1)))
+stopifnot(length(links) == 30L)
 cat(paste0("- ", links, collapse = "\n"), "\n")
 ```
 
@@ -129,18 +140,33 @@ cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
 
 - `src/settlement_issue_recovery.py` — 事务写入：审批备注必填、路径互斥、账本哈希即批次号、
   证据哈希复核、**先全部校验再写入**、备份在写入**之前**完成并 `quick_check`、失败整体回滚、
-  重跑幂等（复核每一行后才返回 `already_applied`）。复用 `parse_page` / `expected_option` /
-  `audit_rows` / `canonical`，不另写业务逻辑；推导规则由 `settled_option` 单一实现。
+  重跑幂等（**逐行复核每个新增观测、每个选项与每个回填值之后**才返回 `already_applied`，
+  仅比对计数不算通过）。复用 `parse_page` / `expected_option` / `audit_rows` / `canonical`，
+  不另写业务逻辑；推导规则由 `settled_option` 单一实现，结算向量规则由
+  `settlement_vector_matches` 单一实现。
 - `scripts/build_issue_recovery_ledger.py` — 从保留的归档页绑定哈希/URL/字节数，并从库自身
   推导缺口场次（**库未结算 ∩ 归档已结算**），不联网。
 - `scripts/apply_issue_recovery.py`、`scripts/verify_settlement_issue_recovery.py` — 薄入口与只读复放。
 - 测试：`tests/test_settlement_issue_recovery.py`、
   `tests/scripts/test_build_issue_recovery_ledger.py`、
-  `tests/scripts/test_verify_settlement_issue_recovery.py`（共 32 项，全通过）。
+  `tests/scripts/test_verify_settlement_issue_recovery.py`（共 **43** 项，全通过）。
+  覆盖：正常路径、跨玩法场次不一致、结算比分与彩果矛盾（新增期次**与**缺口期次两条路径）、
+  让球回退、归档无开奖SP、归档提出库外选项、身份不符、证据被篡改、缺场次、
+  写入中途失败整体回滚（含恢复表不残留）、重跑幂等、**值被改动后重跑必须拒绝**、
+  参考赔率残留被复放抓出、复放检出丢失或多余的行、**判定不通过时命令必须非零退出**，
+  以及三个入口脚本的 `main`。
 
 **闸门（全部失败关闭）**：恢复的期次必须一条观测都没有；归档的场次数必须等于账本；5 个玩法
-必须给出一致的场次集合；归档行的 `native_match_id` 必须与库一致；缺口场次集合必须等于账本；
-归档报出的彩果必须等于由比分推导的选项；归档不得提出库里没有的选项；取消场次不得被回填。
+必须给出一致的**场次→`native_match_id` 映射**（不是只比场次数）；归档行的 `native_match_id`
+必须与库一致；缺口场次集合必须等于账本；归档报出的彩果必须等于由比分推导的选项（新增期次与
+缺口期次**都**要过这道闸）；归档不得提出库里没有的选项；归档每个玩法必须恰好报出一个中奖选项；
+取消场次不得被回填。
+
+**开奖SP 必须整体替换。** 直播板在未结算场次里往「开奖SP」列放的是**赛前参考赔率**
+（三个选项都有值），结算后才只有一个选项带开奖SP。因此缺口回填把整条向量换成归档板的结算记录，
+未开奖选项置空（与库内已结算场次的形态一致），并把**被替换的参考赔率向量**存证在
+`issue_recovery_gap.replaced_options_json`。库内 `option_sp` 的形态仍是发布方给出的选项域：
+新增期次来自归档板（只发布中奖选项），缺口期次保留直播板的选项域。
 
 ## 局限
 

@@ -5,7 +5,14 @@ Read-only. Re-reads the preserved archive bytes, re-checks their hashes, re-pars
 play page, re-derives each recovered value and compares it to the sealed database, then
 confirms the pre-recovery backup still holds the original state.
 
-Writes results/bj479_issue_recovery_v1/issue_recovery_verification.json.
+The comparison is deliberately complete: for additions it checks every stored column and
+the whole option vector and rejects missing or extra rows; for gap fills it checks the
+completed score, half-time score, derived option and the whole settlement SP vector, and
+takes the fallback handicap from the backup rather than from the database the recovery
+mutated.
+
+Writes results/bj479_issue_recovery_v1/issue_recovery_verification.json and exits
+non-zero when the report does not verify.
 """
 from __future__ import annotations
 
@@ -20,8 +27,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.nowscore_settlement import PLAYS, expected_option, parse_page  # noqa: E402
-from src.settlement_issue_recovery import settled_option  # noqa: E402
+from src.nowscore_settlement import canonical, expected_option, parse_page  # noqa: E402
+from src.settlement_issue_recovery import (  # noqa: E402
+    settled_option, settlement_vector_matches)
 
 
 def _sha256(path: Path) -> str:
@@ -38,16 +46,23 @@ def _replay_evidence(entry: dict) -> tuple[dict, list]:
     for item in entry["evidence"]:
         payload = Path(item["path"]).read_bytes()
         actual = hashlib.sha256(payload).hexdigest()
-        if actual != item["sha256"]:
-            raise ValueError(f"evidence hash mismatch for {item['path']}")
+        if actual != item["sha256"] or len(payload) != item["byte_count"]:
+            raise ValueError(f"evidence does not match the ledger for {item['path']}")
         sources.append({"typeid": item["typeid"], "url": item["url"], "sha256": actual,
                         "bytes": len(payload)})
         for row in parse_page(payload, entry["issue"], item["typeid"]):
             # The applier stamps each stored row with the bytes that back it; replay must
             # compare against the same stamp.
             row["source_sha256"] = actual
+            row["source_url"] = item["url"]
+            row["received_at"] = item["received_at"]
             rows[(row["slot"], row["play"])] = row
     return rows, sources
+
+
+def _vector(row: dict) -> list[dict]:
+    return [{"option": o["option"], "raw_sp": o["raw_sp"], "sp": o["sp"],
+             "cell_id": o["cell_id"]} for o in row["options"]]
 
 
 def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
@@ -58,6 +73,7 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
         raise ValueError("Wrong ledger schema")
     batch_id = hashlib.sha256(ledger_bytes).hexdigest()
     database = database.resolve()
+    backup = Path(backup_path).resolve()
 
     con = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
     try:
@@ -75,103 +91,167 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
         for entry in ledger["additions"]:
             rows, sources = _replay_evidence(entry)
             evidence_checked += len(sources)
+            issue = entry["issue"]
             fixtures = {slot for slot, _ in rows}
             mismatches = []
             for (slot, play), row in sorted(rows.items()):
                 held = con.execute(
-                    """SELECT score, halftime_score, expected_option, source_sha256
+                    """SELECT observation_id, native_match_id, status, score, halftime_score,
+                              expected_option, source_sha256, source_url, received_at,
+                              payload_json
                        FROM observation WHERE issue=? AND slot=? AND play=?""",
-                    (entry["issue"], slot, play)).fetchone()
-                sp = {r[0]: r[1] for r in con.execute(
-                    """SELECT s.option, s.sp FROM option_sp s JOIN observation o
-                       USING(observation_id)
-                       WHERE o.issue=? AND o.slot=? AND o.play=? AND s.sp IS NOT NULL""",
-                    (entry["issue"], slot, play))}
-                expected_sp = {o["option"]: o["sp"] for o in row["options"]
-                               if o["sp"] is not None}
-                if held is None or (held[0], held[1], held[2], held[3]) != (
-                        row["score"], row["halftime_score"], expected_option(row),
-                        row["source_sha256"]) or sp != expected_sp:
-                    mismatches.append({"slot": slot, "play": play, "database": held,
-                                       "replayed": [row["score"], row["halftime_score"],
-                                                    expected_option(row), row["source_sha256"]],
-                                       "database_sp": sp, "replayed_sp": expected_sp})
+                    (issue, slot, play)).fetchone()
+                if held is None:
+                    mismatches.append({"slot": slot, "play": play, "database": None,
+                                       "replayed": row["native_match_id"]})
+                    continue
+                (observation_id, native_id, status, score, halftime, option, source_sha256,
+                 source_url, received_at, payload) = held
+                stored_vector = [
+                    {"option": o, "raw_sp": r, "sp": s, "cell_id": c}
+                    for o, r, s, c in con.execute(
+                        "SELECT option, raw_sp, sp, cell_id FROM option_sp "
+                        "WHERE observation_id=? ORDER BY rowid", (observation_id,))]
+                # The stored payload is the canonical form the applier wrote, so replay
+                # rebuilds it from the re-parsed row rather than trusting the database.
+                want = (row["native_match_id"], row["status"], row["score"],
+                        row["halftime_score"], expected_option(row), row["source_sha256"],
+                        row["source_url"], row["received_at"],
+                        json.dumps(json.loads(canonical(row)), ensure_ascii=False))
+                held_key = (native_id, status, score, halftime, option, source_sha256,
+                            source_url, received_at,
+                            json.dumps(json.loads(payload), ensure_ascii=False))
+                if held_key != want or stored_vector != _vector(row):
+                    mismatches.append({"slot": slot, "play": play,
+                                       "database": [native_id, status, score, halftime, option,
+                                                    source_sha256, source_url, received_at],
+                                       "replayed": [row["native_match_id"], row["status"],
+                                                    row["score"], row["halftime_score"],
+                                                    expected_option(row), row["source_sha256"],
+                                                    row["source_url"], row["received_at"]],
+                                       "database_options": stored_vector,
+                                       "replayed_options": _vector(row)})
+            stored_count = con.execute(
+                "SELECT COUNT(*) FROM observation WHERE issue=?", (issue,)).fetchone()[0]
+            if stored_count != len(rows):
+                mismatches.append({"issue": issue, "stored_observations": stored_count,
+                                   "replayed_observations": len(rows)})
             agrees = not mismatches and len(fixtures) == entry["expected_fixtures"]
             all_agree = all_agree and agrees
             additions.append({
-                "issue": entry["issue"], "expected_fixtures": entry["expected_fixtures"],
+                "issue": issue, "expected_fixtures": entry["expected_fixtures"],
                 "replayed_fixtures": len(fixtures), "replayed_observations": len(rows),
                 "mismatches": mismatches[:5], "mismatch_count": len(mismatches),
                 "sources": sources, "replay_agrees": agrees})
 
-        gaps, gap_mismatches = [], []
-        for entry in ledger["gap_fills"]:
-            rows, sources = _replay_evidence(entry)
-            evidence_checked += len(sources)
-            audited = con.execute(
-                """SELECT g.observation_id, g.slot, g.play, g.native_match_id, g.old_score,
-                          g.new_score, g.old_halftime_score, g.new_halftime_score,
-                          g.new_expected_option, g.evidence_sha256, o.score, o.halftime_score,
-                          o.expected_option, o.payload_json
-                   FROM issue_recovery_gap g JOIN observation o USING(observation_id)
-                   WHERE g.issue=? ORDER BY g.slot, g.play""", (entry["issue"],)).fetchall()
-            for (observation_id, slot, play, native_id, old_score, new_score, old_halftime,
-                 new_halftime, new_option, evidence_sha256, db_score, db_halftime,
-                 db_option, payload) in audited:
-                row = rows.get((slot, play))
-                replayed = None if row is None else (
-                    row["score"], row["halftime_score"],
-                    settled_option(row, json.loads(payload)))
-                holds = (db_score, db_halftime, db_option) == (new_score, new_halftime, new_option)
-                if replayed != (new_score, new_halftime, new_option) or not holds:
-                    gap_mismatches.append({"slot": slot, "play": play,
-                                           "database": [db_score, db_halftime, db_option],
-                                           "replayed": replayed, "audit": [new_score, new_halftime,
-                                                                           new_option]})
-                gaps.append({"slot": slot, "play": play, "native_match_id": native_id,
-                             "old_score": old_score, "new_score": new_score,
-                             "evidence_sha256": evidence_sha256})
-            slots = sorted({g["slot"] for g in gaps})
-            if slots != entry["expected_gap_slots"]:
-                gap_mismatches.append({"slots": slots, "expected": entry["expected_gap_slots"]})
-        gap_agrees = not gap_mismatches and len(gaps) == gap_observations
-        all_agree = all_agree and gap_agrees
+        # The fallback handicap must come from the pre-recovery snapshot, not from the
+        # database the recovery mutated, so the derivation is bound to evidence the
+        # recovery cannot have touched.
+        backup_con = sqlite3.connect(f"file:{backup}?mode=ro", uri=True)
+        try:
+            quick = backup_con.execute("PRAGMA quick_check").fetchone()[0]
+            gap_reports, gap_mismatches, gap_fixtures_seen, gap_observations_seen = (
+                [], [], set(), 0)
+            for entry in ledger["gap_fills"]:
+                issue = entry["issue"]
+                rows, sources = _replay_evidence(entry)
+                evidence_checked += len(sources)
+                audited = con.execute(
+                    """SELECT g.observation_id, g.slot, g.play, g.native_match_id, g.old_score,
+                              g.new_score, g.old_halftime_score, g.new_halftime_score,
+                              g.new_expected_option, g.new_options_json, g.evidence_sha256,
+                              o.score, o.halftime_score, o.expected_option
+                       FROM issue_recovery_gap g JOIN observation o USING(observation_id)
+                       WHERE g.batch_id=? AND g.issue=? ORDER BY g.slot, g.play""",
+                    (batch_id, issue)).fetchall()
+                issue_mismatches, slots = [], set()
+                for (observation_id, slot, play, native_id, old_score, new_score, old_halftime,
+                     new_halftime, new_option, new_options, evidence_sha256, db_score,
+                     db_halftime, db_option) in audited:
+                    row = rows.get((slot, play))
+                    before = backup_con.execute(
+                        """SELECT payload_json, score, halftime_score FROM observation
+                           WHERE issue=? AND slot=? AND play=?""", (issue, slot, play)).fetchone()
+                    slots.add(slot)
+                    gap_observations_seen += 1
+                    if row is None or before is None:
+                        issue_mismatches.append({"slot": slot, "play": play,
+                                                 "evidence_row": row is not None,
+                                                 "backup_row": before is not None})
+                        continue
+                    replayed = (row["score"], row["halftime_score"],
+                                settled_option(row, json.loads(before[0])))
+                    stored_vector = [
+                        {"option": o, "raw_sp": r, "sp": s, "cell_id": c}
+                        for o, r, s, c in con.execute(
+                            "SELECT option, raw_sp, sp, cell_id FROM option_sp "
+                            "WHERE observation_id=? ORDER BY rowid", (observation_id,))]
+                    ok = (replayed == (new_score, new_halftime, new_option)
+                          and (db_score, db_halftime, db_option) == (new_score, new_halftime,
+                                                                    new_option)
+                          and new_options == json.dumps(_vector(row), ensure_ascii=False)
+                          and settlement_vector_matches(stored_vector, row)
+                          and row["source_sha256"] == evidence_sha256
+                          and before[1] in ("", "-")
+                          and before[2] == old_halftime and old_score == before[1])
+                    if not ok:
+                        issue_mismatches.append(
+                            {"slot": slot, "play": play,
+                             "database": [db_score, db_halftime, db_option],
+                             "replayed": replayed, "audit": [new_score, new_halftime,
+                                                             new_option],
+                             "stored_options": stored_vector,
+                             "replayed_options": _vector(row)})
+                if sorted(slots) != entry["expected_gap_slots"]:
+                    issue_mismatches.append({"slots": sorted(slots),
+                                             "expected": entry["expected_gap_slots"]})
+                gap_fixtures_seen |= {(issue, slot) for slot in slots}
+                gap_mismatches.extend(issue_mismatches)
+                gap_reports.append({"issue": issue, "fixtures": sorted(slots),
+                                    "observations": len(audited), "sources": sources,
+                                    "mismatch_count": len(issue_mismatches),
+                                    "replay_agrees": not issue_mismatches})
+            gap_agrees = (not gap_mismatches and len(gap_fixtures_seen) == gap_fixtures
+                          and gap_observations_seen == gap_observations)
+            all_agree = all_agree and gap_agrees
 
-        capture, recorded_evidence = [], 0
-        for entry in ledger["additions"]:
-            for item in entry["evidence"]:
-                held = con.execute("SELECT source_url, sha256 FROM capture WHERE issue=? AND typeid=?",
-                                   (entry["issue"], item["typeid"])).fetchone()
-                if held is not None and (held[0], held[1]) != (item["url"], item["sha256"]):
-                    capture.append({"issue": entry["issue"], "typeid": item["typeid"],
-                                    "database": list(held), "evidence": [item["url"], item["sha256"]]})
-        for entry in ledger["additions"] + ledger["gap_fills"]:
-            for item in entry["evidence"]:
-                if con.execute("""SELECT 1 FROM issue_recovery_capture
-                        WHERE batch_id=? AND issue=? AND typeid=? AND sha256=?""",
-                        (batch_id, entry["issue"], item["typeid"], item["sha256"])).fetchone():
-                    recorded_evidence += 1
+            capture, recorded_evidence = [], 0
+            for entry in ledger["additions"]:
+                for item in entry["evidence"]:
+                    held = con.execute(
+                        "SELECT source_url, sha256 FROM capture WHERE issue=? AND typeid=?",
+                        (entry["issue"], item["typeid"])).fetchone()
+                    if held is None or (held[0], held[1]) != (item["url"], item["sha256"]):
+                        capture.append({"issue": entry["issue"], "typeid": item["typeid"],
+                                        "database": list(held) if held else None,
+                                        "evidence": [item["url"], item["sha256"]]})
+            for entry in ledger["additions"] + ledger["gap_fills"]:
+                for item in entry["evidence"]:
+                    if con.execute("""SELECT 1 FROM issue_recovery_capture
+                            WHERE batch_id=? AND issue=? AND typeid=? AND sha256=?""",
+                            (batch_id, entry["issue"], item["typeid"],
+                             item["sha256"])).fetchone():
+                        recorded_evidence += 1
+            empty_before = all(backup_con.execute(
+                "SELECT COUNT(*) FROM observation WHERE issue=?",
+                (e["issue"],)).fetchone()[0] == 0 for e in ledger["additions"])
+        finally:
+            backup_con.close()
+
         receipt = json.loads(con.execute("SELECT payload_json FROM receipt").fetchone()[0])
         con.execute("PRAGMA query_only=ON")
     finally:
         con.close()
 
-    backup = Path(backup_path).resolve()
-    backup_con = sqlite3.connect(f"file:{backup}?mode=ro", uri=True)
-    try:
-        quick = backup_con.execute("PRAGMA quick_check").fetchone()[0]
-        empty_before = all(backup_con.execute(
-            "SELECT COUNT(*) FROM observation WHERE issue=?", (e["issue"],)).fetchone()[0] == 0
-            for e in ledger["additions"])
-        unsettled_before = all(backup_con.execute(
-            """SELECT COUNT(*) FROM observation WHERE issue=? AND slot=? AND play=?
-               AND score='-'""", (entry["issue"], g["slot"], g["play"])).fetchone()[0] == 1
-            for entry in ledger["gap_fills"] for g in gaps if g["slot"] in entry["expected_gap_slots"])
-    finally:
-        backup_con.close()
-
+    receipt_bound = all(receipt.get(k) == v for k, v in (
+        ("issue_recovery_batch_id", batch_id),
+        ("recovered_fixtures", added_fixtures),
+        ("recovered_observations", added_observations),
+        ("gap_filled_fixtures", gap_fixtures),
+        ("gap_filled_observations", gap_observations),
+    ))
     verified = bool(all_agree and not capture and recorded_evidence == evidence_checked
-                    and empty_before and unsettled_before and quick == "ok")
+                    and empty_before and quick == "ok" and receipt_bound)
     return {
         "schema": "bj479_issue_recovery_verification_v1",
         "database": str(database),
@@ -181,21 +261,22 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
         "evidence_manifest": json.loads(manifest_json),
         "ledger_authorization": ledger["authorization"],
         "additions": additions,
-        "gap_fill": {"issue": ledger["gap_fills"][0]["issue"] if ledger["gap_fills"] else None,
-                     "fixtures": sorted({g["slot"] for g in gaps}),
-                     "observations": len(gaps), "mismatches": gap_mismatches[:5],
+        "gap_fill": {"issues": [g["issue"] for g in gap_reports],
+                     "fixtures": sorted({slot for _, slot in gap_fixtures_seen}),
+                     "observations": gap_observations_seen,
+                     "per_issue": gap_reports, "mismatches": gap_mismatches[:5],
                      "replay_agrees": gap_agrees},
         "capture_rebind_mismatches": capture,
         "recorded_evidence_files": recorded_evidence,
         "replay": {"evidence_files_verified": evidence_checked, "all_hashes_match": True,
                    "all_values_reproduced": all_agree},
         "backup": {"path": str(backup), "quick_check": quick,
-                   "additions_absent_before": empty_before,
-                   "gap_fixtures_unsettled_before": unsettled_before},
+                   "additions_absent_before": empty_before},
         "receipt": {k: receipt.get(k) for k in (
             "data_sha256", "effective_source", "recovered_issues", "recovered_fixtures",
             "recovered_observations", "gap_filled_issues", "gap_filled_fixtures",
             "gap_filled_observations", "issue_recovery_batch_id")},
+        "receipt_bound": receipt_bound,
         "conclusion": {
             "verified": verified,
             "recorded_added_fixtures": added_fixtures,
@@ -215,13 +296,18 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                 "live board's unsettled values rather than the archive's.",
                 "For fixtures whose archive row leaves the handicap cell empty, the settled "
                 "option is derived from the release's own handicap and the archive's score, "
-                "and must equal the result the archive reports.",
+                "and must equal the result the archive reports. Replay takes that handicap "
+                "from the pre-recovery backup.",
+                "The live board publishes pre-match reference odds in the settlement column "
+                "while a fixture is unplayed; gap-filled rows had that vector replaced by the "
+                "archive's settlement SP, and the replaced vector is preserved in "
+                "issue_recovery_gap.replaced_options_json.",
             ],
         },
     }
 
 
-def main(argv=None) -> None:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", required=True, type=Path)
     parser.add_argument("--ledger", required=True, type=Path)
@@ -231,9 +317,11 @@ def main(argv=None) -> None:
     report = build_report(args.database, args.ledger, args.backup)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(json.dumps({"out": str(args.out), "verified": report["conclusion"]["verified"]},
-                     ensure_ascii=False))
+    verified = report["conclusion"]["verified"]
+    print(json.dumps({"out": str(args.out), "verified": verified}, ensure_ascii=False))
+    # A rejected recovery must fail the acceptance command, not just report itself.
+    return 0 if verified else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
