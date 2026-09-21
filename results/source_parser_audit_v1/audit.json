@@ -1,0 +1,220 @@
+{
+  "schema": "source_parser_audit_v1",
+  "root": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "parsers": [
+    {
+      "parser": "scripts/replay_settlement_quarantine.py",
+      "tests": [
+        "tests/scripts/test_replay_settlement_quarantine.py"
+      ],
+      "page_bytes": "no committed bytes; inline samples only"
+    },
+    {
+      "parser": "scripts/update_beidan_nowscore_sqlite.py",
+      "tests": [],
+      "page_bytes": "untested"
+    },
+    {
+      "parser": "scripts/verify_nowscore_bf_history.py",
+      "tests": [
+        "tests/test_nowscore_bf_derivations.py",
+        "tests/test_verify_nowscore_bf_history.py"
+      ],
+      "page_bytes": "no committed bytes, no named sample"
+    },
+    {
+      "parser": "src/bj396_settlement/pipeline.py",
+      "tests": [
+        "tests/backtest_combo/test_simulator.py",
+        "tests/scripts/test_cutoff_walkforward.py",
+        "tests/scripts/test_low_n_match_selector.py",
+        "tests/scripts/test_verify_settlement_issue_addition.py",
+        "tests/test_bj396_settlement.py",
+        "tests/test_bj399_n7_mixed_closeout_addendum.py",
+        "tests/test_dynamic_allocator.py",
+        "tests/test_fixed_expert_moe.py",
+        "tests/test_fundamentals_pipeline.py",
+        "tests/test_low_n_eu_value_data.py",
+        "tests/test_low_n_eu_value_selector.py",
+        "tests/test_low_n_selector_data.py",
+        "tests/test_low_n_third_outcome_protection.py",
+        "tests/test_multin_fixed_rn.py",
+        "tests/test_multin_r_diagnostic.py",
+        "tests/test_multin_top2_r0.py",
+        "tests/test_n6_chronology_sync.py",
+        "tests/test_n6_n7_portfolio.py",
+        "tests/test_n6_support_transfer_grid.py",
+        "tests/test_n7_chronology_sync.py",
+        "tests/test_n7_cutoff_walkforward.py",
+        "tests/test_n7_mixed_full_history.py",
+        "tests/test_n7_support_shape.py",
+        "tests/test_n7_support_transfer_grid.py",
+        "tests/test_n7_variant_extension.py",
+        "tests/test_paired_value_r3_n7.py",
+        "tests/test_qeu_dynamic_r_n7.py",
+        "tests/test_qeu_support_depth.py",
+        "tests/test_qeu_threshold_n7.py",
+        "tests/test_top2_factorial.py",
+        "tests/test_top2_n7_stable.py",
+        "tests/test_value_veto_r3_n7.py"
+      ],
+      "page_bytes": "committed source bytes"
+    },
+    {
+      "parser": "src/correct_score_price_history.py",
+      "tests": [
+        "tests/scripts/test_correct_score_price_history.py"
+      ],
+      "page_bytes": "no committed bytes, no named sample"
+    },
+    {
+      "parser": "src/forward_snapshot/collector.py",
+      "tests": [
+        "tests/decision_api/test_operations_status_v2.py",
+        "tests/live_collector/test_scraper_mock.py",
+        "tests/test_bj248_forward_snapshot.py",
+        "tests/test_bj248_rework.py",
+        "tests/track_b/test_etl.py"
+      ],
+      "page_bytes": "committed source bytes"
+    },
+    {
+      "parser": "src/forward_snapshot/store.py",
+      "tests": [
+        "tests/scripts/test_bj90_source_locator.py",
+        "tests/scripts/test_settle_bj193_regime_meta_policy_gate_b.py",
+        "tests/test_adhoc_betting.py",
+        "tests/test_bj248_forward_snapshot.py",
+        "tests/test_bj248_rework.py",
+        "tests/test_freeze_v0.py",
+        "tests/titan_clean/test_clean_stores.py",
+        "tests/titan_clean/test_historical_id_map.py",
+        "tests/titan_clean/test_mapping_capture.py"
+      ],
+      "page_bytes": "committed source bytes"
+    },
+    {
+      "parser": "src/freeze_review.py",
+      "tests": [
+        "tests/scripts/test_freeze_review.py"
+      ],
+      "page_bytes": "committed source bytes"
+    },
+    {
+      "parser": "src/fundamentals_census.py",
+      "tests": [
+        "tests/test_fundamentals_census.py",
+        "tests/test_fundamentals_pipeline.py"
+      ],
+      "page_bytes": "committed source bytes"
+    },
+    {
+      "parser": "src/live_collector/parser.py",
+      "tests": [
+        "tests/backfill/test_parser.py",
+        "tests/backfill/test_scraper_issue_list.py",
+        "tests/live_collector/test_db.py",
+        "tests/live_collector/test_parser.py",
+        "tests/live_collector/test_scraper_mock.py",
+        "tests/scripts/test_analyse_settlement_quarantine_rendered.py",
+        "tests/scripts/test_audit_source_parsers.py",
+        "tests/scripts/test_freeze_review.py",
+        "tests/scripts/test_manage_decision_dashboard.py",
+        "tests/scripts/test_okooo_prekick_sp.py",
+        "tests/scripts/test_run_live_issue_check.py",
+        "tests/test_bj396_settlement.py",
+        "tests/test_fundamentals_census.py",
+        "tests/test_nowscore_archive.py",
+        "tests/test_nowscore_history_assembly.py",
+        "tests/test_nowscore_issue_inventory.py",
+        "tests/test_nowscore_live_issues.py",
+        "tests/test_settlement_issue_addition.py"
+      ],
+      "page_bytes": "committed bytes and inline samples"
+    },
+    {
+      "parser": "src/nowscore_bjdc_sp_history.py",
+      "tests": [
+        "tests/scripts/test_nowscore_bjdc_sp_history.py"
+      ],
+      "page_bytes": "no committed bytes; inline samples only"
+    },
+    {
+      "parser": "src/nowscore_issue_inventory.py",
+      "tests": [
+        "tests/test_nowscore_history_capture.py",
+        "tests/test_nowscore_history_plan.py",
+        "tests/test_nowscore_issue_inventory.py"
+      ],
+      "page_bytes": "committed source bytes"
+    },
+    {
+      "parser": "src/nowscore_settlement.py",
+      "tests": [
+        "tests/scripts/test_build_issue_recovery_ledger.py",
+        "tests/scripts/test_verify_settlement_issue_recovery.py",
+        "tests/test_nowscore_archive.py",
+        "tests/test_nowscore_bf_derivations.py",
+        "tests/test_nowscore_history_assembly.py",
+        "tests/test_nowscore_history_capture.py",
+        "tests/test_nowscore_manual_all_one.py",
+        "tests/test_nowscore_replay.py",
+        "tests/test_nowscore_settlement.py",
+        "tests/test_settlement_issue_addition.py",
+        "tests/test_settlement_issue_recovery.py"
+      ],
+      "page_bytes": "committed source bytes"
+    },
+    {
+      "parser": "src/okooo_prekick_sp.py",
+      "tests": [
+        "tests/scripts/test_correct_score_price_history.py",
+        "tests/scripts/test_okooo_prekick_sp.py"
+      ],
+      "page_bytes": "committed bytes and inline samples"
+    },
+    {
+      "parser": "src/settlement_halftime_evidence.py",
+      "tests": [
+        "tests/test_settlement_halftime_evidence.py"
+      ],
+      "page_bytes": "no committed bytes, no named sample"
+    },
+    {
+      "parser": "src/settlement_sp_supplement.py",
+      "tests": [
+        "tests/test_settlement_sp_supplement.py",
+        "tests/test_settlement_sp_update.py"
+      ],
+      "page_bytes": "committed source bytes"
+    }
+  ],
+  "real_page_fixtures": [
+    "tests/fixtures/backfill/issue_26049.html",
+    "tests/fixtures/backfill/trade_index_bjdc_20260919.html",
+    "tests/fixtures/fundamentals_census/nowscore-1326813.gz",
+    "tests/fixtures/fundamentals_census/nowscore-1870517.html.gz",
+    "tests/fixtures/fundamentals_census/nowscore-2701744.gz",
+    "tests/fixtures/fundamentals_census/nowscore-2910880.gz",
+    "tests/fixtures/fundamentals_census/nowscore-js-2701744.gz",
+    "tests/fixtures/fundamentals_census/nowscore-js-2910880.gz",
+    "tests/fixtures/fundamentals_census/roster-20064.gz",
+    "tests/fixtures/fundamentals_census/titan-1870517.html.gz",
+    "tests/fixtures/fundamentals_census/titan-2701744.gz",
+    "tests/fixtures/fundamentals_census/titan-2910880.gz",
+    "tests/fixtures/live_collector/bjdc500_26051.html",
+    "tests/fixtures/live_collector/kaijiang_500_26051.html",
+    "tests/fixtures/live_collector/zgzcw_bet_lottery200.html",
+    "tests/fixtures/mapping/500.html",
+    "tests/fixtures/mapping/nowscore.html",
+    "tests/fixtures/okooo/livecenter-21082.html.gz"
+  ],
+  "without_source_bytes": [
+    "scripts/replay_settlement_quarantine.py",
+    "scripts/update_beidan_nowscore_sqlite.py",
+    "scripts/verify_nowscore_bf_history.py",
+    "src/correct_score_price_history.py",
+    "src/nowscore_bjdc_sp_history.py",
+    "src/settlement_halftime_evidence.py"
+  ]
+}

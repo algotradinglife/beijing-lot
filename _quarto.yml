@@ -20,6 +20,7 @@ project:
     - quarto/260_settlement_halftime_correction.qmd
     - quarto/261_settlement_issue_recovery.qmd
     - quarto/262_settlement_issue_addition.qmd
+    - quarto/263_source_parsers_index.qmd
 
 execute:
   freeze: false
