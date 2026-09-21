@@ -41,6 +41,7 @@ from src.nowscore_settlement import (
     expected_option,
     hash_json_texts,
     parse_page,
+    source_url,
 )
 
 BUNDLE_SCHEMA = "nowscore_history_batch_v1"
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS issue_addition_batch (
     batch_id TEXT PRIMARY KEY, bundle_sha256 TEXT NOT NULL, approval_note TEXT NOT NULL,
     created_at TEXT NOT NULL, added_issues TEXT NOT NULL, skipped_issues TEXT NOT NULL,
     added_observations INTEGER NOT NULL, added_fixtures INTEGER NOT NULL,
-    unsettled_fixtures INTEGER NOT NULL, content_sha256 TEXT NOT NULL)
+    resolved_fixtures INTEGER NOT NULL, content_sha256 TEXT NOT NULL)
 """
 _ROW_DDL = """
 CREATE TABLE IF NOT EXISTS issue_addition (
@@ -65,6 +66,9 @@ CREATE TABLE IF NOT EXISTS issue_addition_capture (
     PRIMARY KEY(batch_id, issue, typeid))
 """
 _SETTLED_SCORE = re.compile(r"^\d+-\d+$")
+# Statuses the release records for a completed fixture. The live board also uses a play
+# status (下/上) while a match is running, and a running score must never be frozen.
+_COMPLETED_STATUSES = {"", "完场"}
 
 
 def canonical_content_sha256(con: sqlite3.Connection, issues: list[str]) -> str:
@@ -103,6 +107,19 @@ def read_bundle(root: Path) -> dict:
     if seen != expected:
         raise ValueError("Bundle does not cover requested issue/play domain")
     for entry in captures:
+        # The release build validates these too; a weaker boundary here would let arbitrary
+        # provenance into a release the replay then certifies.
+        if entry.get("url") != source_url(entry["issue"], entry["typeid"]):
+            raise ValueError(f"Capture URL is not the source's for {entry['issue']}/"
+                             f"{entry['typeid']}")
+        try:
+            received = datetime.fromisoformat(entry["received_at"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"Capture time is not an ISO timestamp for {entry['issue']}/"
+                             f"{entry['typeid']}") from exc
+        if received.tzinfo is None:
+            raise ValueError(f"Capture time lacks a timezone for {entry['issue']}/"
+                             f"{entry['typeid']}")
         payload = (root / "raw" / (entry["sha256"] + ".html")).read_bytes()
         if hashlib.sha256(payload).hexdigest() != entry["sha256"]:
             raise ValueError(f"Bundle bytes changed for {entry['issue']}/{entry['typeid']}")
@@ -132,43 +149,68 @@ def bundle_rows(bundle: dict) -> dict[str, list[dict]]:
         keys = {(row["slot"], row["play"]) for row in rows}
         if len(keys) != len(rows):
             raise ValueError(f"Bundle repeats an observation key for issue {issue}")
+        # The manifest naming five plays is not enough: a page classified source_empty is
+        # skipped, so the parsed rows must still cover every play of every fixture. An
+        # appended issue that misses a key can never be completed, because a later run
+        # skips an issue the release already carries.
+        by_slot: dict[int, set[str]] = {}
+        for row in rows:
+            by_slot.setdefault(row["slot"], set()).add(row["play"])
+        incomplete = {slot: sorted(plays) for slot, plays in by_slot.items()
+                      if plays != set(PLAYS.values())}
+        if incomplete:
+            raise ValueError(f"Bundle's parsed rows miss a play for issue {issue}: "
+                             f"{sorted(incomplete)[:5]}")
     return by_issue
 
 
-def issue_state(rows: list[dict]) -> tuple[int, list[str]]:
-    """Return how many fixtures carry a settlement, plus the ones that do not.
+def issue_verdict(rows: list[dict]) -> tuple[int, list[str]]:
+    """Return how many fixtures are resolved, plus every reason the issue cannot be added.
 
-    The rule mirrors what the release build accepts, because a rule invented here would
-    reject the release's own legitimate rows: a fixture is settled when exactly one option
-    carries an SP and that option is the one its score implies, or when the source publishes
-    no SP for a bucket that legitimately has none (the score pools into ``胜其他`` and
-    friends), or when the fixture is explicitly cancelled or postponed. The live board
-    publishes pre-match reference odds in the settlement column while a fixture is unplayed,
-    so "a value is present" is not the test; the *derived* option must be the one offered.
+    The rule is deliberately narrower than the release build's, because an addition must
+    not freeze a transient value:
+
+    * a fixture priced on exactly the option its score implies is settled;
+    * a fixture whose derived bucket the source does not price is settled only when its
+      status is one the release records for completed rows (empty or ``完场``) -- the live
+      board reports a running score under a play status such as ``下`` and would otherwise
+      be frozen as final;
+    * a fixture is resolved with no result only when its status is explicitly abnormal and
+      it carries neither a score nor a priced option, which is exactly what the release
+      holds for 取消/推迟/中断/腰斩/延期/待定.
+
+    Anything else is a reason to refuse the whole issue. Refusing rather than adding a
+    partly finished issue matters because a later run skips an issue the release already
+    carries, and the recovery layer can only complete a fixture whose score is empty in
+    *all* five plays.
     """
-    settled = 0
-    unsettled: list[str] = []
+    resolved = 0
+    problems: list[str] = []
     for row in rows:
+        status = row.get("status") or ""
+        score = row.get("score") or ""
         options = row.get("options", [])
         derived = expected_option(row)
         offered = {option["option"] for option in options}
-        with_sp = [option for option in options if option.get("sp") is not None]
-        if row.get("status") in ABNORMAL:
-            if with_sp:
-                unsettled.append(f"{row['slot']}/{row['play']} (abnormal but priced)")
+        priced = [option for option in options if option.get("sp") is not None]
+        key = f"{row['slot']}/{row['play']}"
+        if status in ABNORMAL:
+            if priced or score not in EMPTY:
+                problems.append(f"{key}: abnormal status carries a result")
             else:
-                settled += 1
+                resolved += 1
             continue
-        if _SETTLED_SCORE.match(row.get("score") or "") and derived in offered:
-            if len(with_sp) == 1 and with_sp[0]["option"] == derived:
-                settled += 1
-                continue
-            # A bucket the source never prices, such as 胜其他, is settled with no SP.
-            if not with_sp and derived.endswith("其他"):
-                settled += 1
-                continue
-        unsettled.append(f"{row['slot']}/{row['play']}")
-    return settled, unsettled
+        if not _SETTLED_SCORE.match(score):
+            problems.append(f"{key}: no settled score")
+        elif derived not in offered:
+            problems.append(f"{key}: the derived result is not among the offered options")
+        elif len(priced) == 1 and priced[0]["option"] == derived:
+            resolved += 1
+        elif not priced and status in _COMPLETED_STATUSES:
+            resolved += 1
+        else:
+            problems.append(f"{key}: not a completed settlement")
+    return resolved, problems
 
 
 def existing_issues(con: sqlite3.Connection) -> set[str]:
@@ -270,21 +312,22 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
                         **verified}
 
         present = existing_issues(con)
-        additions, skipped, unsettled_total = [], [], 0
+        additions, skipped = [], []
         for issue in requested:
             if issue in present:
                 skipped.append({"issue": issue, "reason": "already in the release"})
                 continue
-            settled, unsettled = issue_state(rows_by_issue[issue])
-            if not settled:
-                skipped.append({"issue": issue, "reason": "no fixture has settled yet",
-                                "fixtures": unsettled[:10]})
+            resolved, problems = issue_verdict(rows_by_issue[issue])
+            if problems:
+                skipped.append({"issue": issue,
+                                "reason": "not a completed settlement; nothing was added",
+                                "problems": problems[:10]})
                 continue
-            # The release build accepts unsettled fixtures too, and the recovery layer
-            # completes them from the archive later, so they are carried and counted
-            # rather than dropped: dropping one would leave a key no run could fill.
-            unsettled_total += len(unsettled)
             additions.append(issue)
+        if not additions:
+            con.rollback()
+            return {"status": "nothing_to_add", "skipped": skipped}
+
         if not additions:
             con.rollback()
             return {"status": "nothing_to_add", "skipped": skipped}
@@ -317,11 +360,12 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
         con.execute(_CAPTURE_DDL)
         now = datetime.now(timezone.utc).isoformat()
 
-        added_observations = added_fixtures = 0
+        added_observations = added_fixtures = resolved_fixtures = 0
         for issue in additions:
             rows = rows_by_issue[issue]
             added_observations += len(rows)
             added_fixtures += len({row["slot"] for row in rows})
+            resolved_fixtures += issue_verdict(rows)[0]
             for entry in bundle["manifest"]["captures"]:
                 if entry["issue"] != issue:
                     continue
@@ -358,11 +402,11 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
                     (batch, bundle["sha256"], approval_note.strip(), now,
                      json.dumps(additions, ensure_ascii=False),
                      json.dumps(skipped, ensure_ascii=False), added_observations,
-                     added_fixtures, unsettled_total, content))
+                     added_fixtures, resolved_fixtures, content))
         con.commit()
         return {"status": "added", "added_issues": additions, "skipped": skipped,
                 "added_observations": added_observations, "added_fixtures": added_fixtures,
-                "unsettled_fixtures": unsettled_total, "content_sha256": content}
+                "resolved_fixtures": resolved_fixtures, "content_sha256": content}
     except BaseException:
         con.rollback()
         if reserved_backup is not None and reserved_backup.exists():

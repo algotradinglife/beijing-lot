@@ -18,7 +18,12 @@ for path in (str(ROOT), str(ROOT / "tests")):
 
 from scripts.verify_settlement_issue_addition import build_report, main  # noqa: E402
 from src.settlement_issue_addition import add_issues  # noqa: E402
-from test_settlement_issue_addition import bundle, live_page, release, rows  # noqa: E402
+from test_settlement_issue_addition import (  # noqa: E402
+    bundle,
+    release,
+    replace_play,
+    rows,
+)
 
 
 @pytest.fixture()
@@ -193,7 +198,85 @@ def test_main_writes_the_report_and_exits_nonzero_when_it_rejects(applied, tmp_p
 def test_replay_catches_a_changed_live_page_in_the_bundle(applied, tmp_path: Path) -> None:
     """A rebuilt bundle with a different settlement must not match the release."""
     db, root, backup = applied
-    other = bundle(tmp_path / "other", issue="26093", ft="1-1", ht="0-0")
+    other = bundle(tmp_path / "other", issue="26093")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET score='4-4' WHERE issue='26093'")
+    con.commit()
+    con.close()
     report = build_report(db, other, backup)
     assert report["conclusion"]["verified"] is False
     assert report["mismatches"]
+
+
+def test_replay_catches_a_changed_source_url(applied) -> None:
+    """Provenance is observable through the R query interface, so it is verified too."""
+    db, root, backup = applied
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET source_url='https://example.invalid/x' "
+                "WHERE issue='26093' AND play='spf'")
+    con.commit()
+    con.close()
+    report = build_report(db, root, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["mismatches"]
+
+
+def test_replay_catches_a_changed_received_at(applied) -> None:
+    """A falsified collection time must not pass as verified."""
+    db, root, backup = applied
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET received_at='2020-01-01T00:00:00+00:00' "
+                "WHERE issue='26093' AND play='jq'")
+    con.commit()
+    con.close()
+    report = build_report(db, root, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["mismatches"]
+
+
+def test_replay_reconciles_a_mixed_bundle_with_the_added_set(tmp_path: Path) -> None:
+    """A bundle may hold one settled issue and one that is not ready.
+
+    The applier adds only the eligible one, so the replay must derive the same eligible set
+    from the bundle's own bytes and must not report the skipped issue as missing.
+    """
+    db = release(tmp_path)
+    settled = bundle(tmp_path / "a", issue="26093")
+    unstarted = bundle(tmp_path / "b", issue="26094", status="未开赛", ft="", ht="",
+                       settle=False)
+    # one bundle carrying both issues, as a capture batch would
+    merged = tmp_path / "a" / "bundle-26093"
+    manifest = json.loads((merged / "manifest.json").read_text(encoding="utf-8"))
+    other = json.loads((unstarted / "manifest.json").read_text(encoding="utf-8"))
+    import shutil
+    for entry in other["captures"]:
+        shutil.copy(unstarted / "raw" / (entry["sha256"] + ".html"), merged / "raw")
+    manifest["captures"].extend(other["captures"])
+    manifest["requested_issues"] = ["26093", "26094"]
+    (merged / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    backup = tmp_path / "before.sqlite"
+    committed = add_issues(db, merged, backup, approval_note="n")
+    assert committed["status"] == "added"
+    assert committed["added_issues"] == ["26093"]
+    assert committed["skipped"][0]["issue"] == "26094"
+    report = build_report(db, merged, backup)
+    assert report["issues_owed"] == ["26093"]
+    assert [item["issue"] for item in report["issues_ineligible"]] == ["26094"]
+    assert report["conclusion"]["verified"] is True
+    assert report["mismatches"] == []
+
+
+def test_replay_rejects_a_batch_that_added_an_ineligible_issue(tmp_path: Path) -> None:
+    """The recorded added set must equal the eligible set the bytes imply."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    backup = tmp_path / "before.sqlite"
+    add_issues(db, root, backup, approval_note="n")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_addition_batch SET added_issues='[]'")
+    con.commit()
+    con.close()
+    report = build_report(db, root, backup)
+    assert report["conclusion"]["verified"] is False
+    assert any("did not add exactly the eligible set" in item.get("reason", "")
+               for item in report["mismatches"])

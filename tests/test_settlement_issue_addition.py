@@ -4,6 +4,7 @@ The page builder mirrors the live board's markup (``dropIssueNum`` selector, lab
 cells, ``row_N`` fixtures) because the appended rows must come from the same parser the
 release build uses.
 """
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -176,14 +177,15 @@ def test_refuses_an_issue_whose_fixture_is_not_settled(tmp_path: Path) -> None:
     root = bundle(tmp_path, reference=True, status="未开赛", ft="", ht="")
     result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
     assert result["status"] == "nothing_to_add"
-    assert result["skipped"][0]["reason"] == "no fixture has settled yet"
+    assert result["skipped"][0]["reason"].startswith("not a completed settlement")
+    assert result["skipped"][0]["problems"]
     assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='26093'")[0][0] == 0
 
 
 def test_accepts_a_cancelled_fixture_with_no_options(tmp_path: Path) -> None:
     """A cancelled fixture reports no result and is legitimately option-less."""
     db = release(tmp_path)
-    root = bundle(tmp_path, settle=False, status="取消", ft="取消", ht="-")
+    root = bundle(tmp_path, settle=False, status="取消", ft="-", ht="-")
     result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
     assert result["status"] == "added"
     assert result["added_observations"] == len(PLAYS)
@@ -201,27 +203,110 @@ def test_accepts_a_bucket_the_source_never_prices(tmp_path: Path) -> None:
                                              settle=False))
     result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
     assert result["status"] == "added"
-    assert result["unsettled_fixtures"] == 0
+    assert result["resolved_fixtures"] == len(PLAYS)
     assert rows(db, "SELECT expected_option FROM observation "
                     "WHERE issue='26093' AND play='bf'")[0][0] == "胜其他"
 
 
-def test_adds_an_issue_that_still_has_unsettled_fixtures(tmp_path: Path) -> None:
-    """A settled issue with an unplayed fixture is carried and counted, not dropped.
+def test_refuses_an_issue_with_a_fixture_that_is_still_playing(tmp_path: Path) -> None:
+    """A running fixture must never be frozen as final, and nothing may be added.
 
-    Dropping the fixture would leave a key no later run could fill, because the addition
-    skips an issue the release already carries; the recovery layer completes such a row
-    from the archive instead.
+    The live board reports a play status such as 下 while a match runs and a running score.
+    Adding it would freeze a transient value, and a later run would skip the issue because
+    the release already carries it, so the whole issue is refused instead.
     """
     db = release(tmp_path)
     root = bundle(tmp_path)
-    replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="未开赛",
-                                             ft="", ht="", settle=False))
+    replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="下",
+                                             ft="3-1", ht="1-0", settle=False))
     result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
-    assert result["status"] == "added"
-    assert result["added_observations"] == len(PLAYS)
-    assert result["unsettled_fixtures"] == 1
-    assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='26093'")[0][0] == len(PLAYS)
+    assert result["status"] == "nothing_to_add"
+    assert "not a completed settlement" in result["skipped"][0]["problems"][0]
+    assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='26093'")[0][0] == 0
+    assert not (tmp_path / "backup.sqlite").exists()
+
+
+def test_refuses_an_abnormal_fixture_that_carries_a_result(tmp_path: Path) -> None:
+    """The release holds abnormal rows with score '-' and no derived result; a score is a contradiction."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="中断",
+                                             ft="2-1", ht="1-0", settle=False))
+    result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
+    assert result["status"] == "nothing_to_add"
+    assert "abnormal status carries a result" in result["skipped"][0]["problems"][0]
+
+
+def test_refuses_a_bundle_whose_page_carries_no_rows(tmp_path: Path) -> None:
+    """A source_empty page passes the manifest check but leaves a play missing."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    entry = next(e for e in manifest["captures"] if e["typeid"] == 7)
+    (root / "raw" / (entry["sha256"] + ".html")).write_bytes(b"")
+    entry["classification"] = "source_empty"
+    entry["sha256"] = hashlib.sha256(b"").hexdigest()
+    (root / "raw" / (entry["sha256"] + ".html")).write_bytes(b"")
+    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="miss a play"):
+        add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
+    assert not (tmp_path / "backup.sqlite").exists()
+
+
+def test_refuses_a_capture_url_that_is_not_the_source(tmp_path: Path) -> None:
+    """The build validates capture identity; a weaker boundary here would let it drift."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    manifest["captures"][0]["url"] = "https://example.invalid/anything"
+    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="Capture URL"):
+        add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
+
+
+def test_refuses_a_capture_time_without_a_timezone(tmp_path: Path) -> None:
+    """Collection time is evidence, so it must be an explicit instant."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    manifest["captures"][0]["received_at"] = "2026-09-21T12:00:00"
+    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="timezone"):
+        add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
+
+
+def test_a_failure_after_writing_rolls_back_and_releases_the_backup(
+        tmp_path: Path, monkeypatch) -> None:
+    """Nothing may be half-written, and the reserved backup must not be left behind."""
+    db = release(tmp_path)
+    before = rows(db, "SELECT COUNT(*) FROM observation")[0][0]
+    import src.settlement_issue_addition as module
+    monkeypatch.setattr(module, "canonical_content_sha256",
+                        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    with pytest.raises(RuntimeError, match="boom"):
+        add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
+    assert rows(db, "SELECT COUNT(*) FROM observation")[0][0] == before
+    assert not (tmp_path / "backup.sqlite").exists()
+    monkeypatch.undo()
+    assert add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite",
+                      approval_note="n")["status"] == "added"
+
+
+def test_refuses_a_backup_path_that_already_exists(tmp_path: Path) -> None:
+    """Refusing an existing path keeps a prior snapshot from being overwritten."""
+    db = release(tmp_path)
+    (tmp_path / "backup.sqlite").write_bytes(b"occupied")
+    with pytest.raises(FileExistsError):
+        add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
+
+
+def test_leaves_the_build_receipt_untouched(tmp_path: Path) -> None:
+    """The addition records its own batch; the build's receipt stays the build's."""
+    db = release(tmp_path)
+    before = rows(db, "SELECT payload_json FROM receipt")[0][0]
+    add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
+    assert rows(db, "SELECT payload_json FROM receipt")[0][0] == before
+    assert rows(db, "SELECT COUNT(*) FROM issue_addition_batch")[0][0] == 1
 
 
 def test_skips_an_issue_the_release_already_carries(tmp_path: Path) -> None:

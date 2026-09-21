@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.nowscore_settlement import PLAYS, canonical, expected_option, parse_page  # noqa: E402
 from src.settlement_issue_addition import (  # noqa: E402
     canonical_content_sha256,
+    issue_verdict,
     read_bundle,
 )
 from src.settlement_issue_recovery import option_vectors_for  # noqa: E402
@@ -44,19 +45,31 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
     con = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
     before = sqlite3.connect(backup_path.resolve().as_uri() + "?mode=ro", uri=True)
     try:
-        # The set to check comes from the bundle, not from any table the release can edit.
-        owed = [issue for issue in requested
-                if not before.execute("SELECT 1 FROM observation WHERE issue=? LIMIT 1",
-                                      (issue,)).fetchone()]
-        already = [issue for issue in requested if issue not in owed]
+        # The set to check is derived from the bundle's own bytes using the declared
+        # acceptance contract, not from any table the release can edit. An issue the
+        # contract rejects must be absent from the release, so a batch that quietly added
+        # one is caught rather than excused.
+        parsed = {issue: bundle_rows_for(bundle, issue) for issue in requested}
+        owed, already, ineligible = [], [], []
+        for issue in requested:
+            if before.execute("SELECT 1 FROM observation WHERE issue=? LIMIT 1",
+                              (issue,)).fetchone():
+                already.append(issue)
+                continue
+            resolved, problems = issue_verdict(parsed[issue])
+            if problems or not resolved:
+                ineligible.append({"issue": issue,
+                                   "problems": problems[:5] or ["no fixture has settled"]})
+                continue
+            owed.append(issue)
         mismatches: list[dict] = []
         checked_observations = checked_plays = 0
         for issue in owed:
-            rows_by_key = {(row["slot"], row["play"]): row
-                           for row in bundle_rows_for(bundle, issue)}
+            rows_by_key = {(row["slot"], row["play"]): row for row in parsed[issue]}
             stored = con.execute(
                 """SELECT observation_id, slot, play, native_match_id, status, score,
-                          halftime_score, expected_option, source_sha256, payload_json
+                          halftime_score, expected_option, source_sha256, payload_json,
+                          source_url, received_at
                    FROM observation WHERE issue=?""", (issue,)).fetchall()
             if not stored:
                 mismatches.append({"issue": issue, "reason": "issue is missing entirely"})
@@ -64,7 +77,7 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
             vectors = option_vectors_for(con, issue)
             seen: Counter = Counter()
             for (observation_id, slot, play, native, status, score, halftime, option,
-                 source, payload) in stored:
+                 source, payload, source_url, received_at) in stored:
                 seen[(slot, play)] += 1
                 checked_observations += 1
                 row = rows_by_key.get((slot, play))
@@ -72,10 +85,14 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
                     mismatches.append({"issue": issue, "slot": slot, "play": play,
                                        "reason": "the bundle carries no such fixture"})
                     continue
+                # Provenance is observable through the R query interface, so it is
+                # compared too: a false source URL or collection time is a defect even when
+                # the payload is untouched.
                 want = (row["native_match_id"], row["status"], row["score"],
                         row["halftime_score"], expected_option(row), row["source_sha256"],
-                        canonical(row))
-                held = (native, status, score, halftime, option, source, payload)
+                        canonical(row), row["source_url"], row["received_at"])
+                held = (native, status, score, halftime, option, source, payload,
+                        source_url, received_at)
                 want_vector = Counter(sorted(
                     (option_row["option"], option_row["raw_sp"], option_row["sp"],
                      option_row["cell_id"]) for option_row in row["options"]))
@@ -109,9 +126,15 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
                                        "reason": "capture record is not the bundle's page"})
 
         # The batch's own claim: content hash over the canonical order, not insertion order.
-        table = con.execute("SELECT 1 FROM sqlite_master WHERE name='issue_addition_batch'")
+        # A cursor is consumed by fetchone(), so ask the schema question afresh instead of
+        # reusing one; reusing it silently skipped the added-set reconciliation.
+        def _has_batch_table() -> bool:
+            return con.execute(
+                "SELECT 1 FROM sqlite_master WHERE name='issue_addition_batch'"
+            ).fetchone() is not None
+
         recorded_content = None
-        if table.fetchone():
+        if _has_batch_table():
             row = con.execute(
                 "SELECT added_issues, content_sha256 FROM issue_addition_batch "
                 "WHERE bundle_sha256=?", (bundle["sha256"],)).fetchone()
@@ -120,6 +143,14 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
                 if json.loads(row[0]) != owed:
                     mismatches.append({"reason": "batch added a different issue set",
                                        "recorded": json.loads(row[0]), "derived": owed})
+        if _has_batch_table() and (owed or ineligible):
+            row = con.execute(
+                "SELECT added_issues FROM issue_addition_batch WHERE bundle_sha256=?",
+                (bundle["sha256"],)).fetchone()
+            if row and sorted(json.loads(row[0])) != sorted(owed):
+                mismatches.append({"reason": "the batch did not add exactly the eligible set",
+                                   "recorded": json.loads(row[0]),
+                                   "derived": owed, "ineligible": ineligible})
         if owed and recorded_content is not None:
             actual = canonical_content_sha256(con, owed)
             if actual != recorded_content:
@@ -132,6 +163,7 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
             "bundle": {"path": str(bundle_root), "manifest_sha256": bundle["sha256"]},
             "backup": {"path": str(backup_path)},
             "issues_owed": owed, "issues_already_present": already,
+            "issues_ineligible": ineligible,
             "checked_observations": checked_observations, "checked_fixtures": checked_plays,
             "content_sha256": recorded_content,
             "mismatches": mismatches,
