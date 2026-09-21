@@ -173,12 +173,17 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                 (issue,))}
             required = {key for key, row in rows.items()
                         if key in unsettled and SETTLED_SCORE.match(row["score"] or "")}
-            audited = {row for row in con.execute(
-                "SELECT slot, play FROM issue_recovery_gap WHERE batch_id=? AND issue=?",
-                (batch_id, issue))}
+            # The audit rows are read in full, then validated field by field against the
+            # archive, the backup and the stored observation - their keys alone are not
+            # evidence.
+            audited = {(row[0], row[1]): row[2:] for row in con.execute(
+                """SELECT slot, play, observation_id, native_match_id, new_score,
+                          new_halftime_score, new_expected_option, new_options_json,
+                          evidence_sha256, old_payload_sha256, replaced_options_json
+                   FROM issue_recovery_gap WHERE batch_id=? AND issue=?""", (batch_id, issue))}
             slots = sorted({slot for slot, _ in required})
             issue_mismatches = []
-            if audited != required:
+            if set(audited) != required:
                 issue_mismatches.append({"audit_rows": sorted(audited),
                                          "owed_completions": sorted(required)})
             if slots != entry["expected_gap_slots"]:
@@ -193,15 +198,20 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                     """SELECT payload_json, score, halftime_score, native_match_id
                        FROM observation WHERE issue=? AND slot=? AND play=?""",
                     (issue, slot, play)).fetchone()
-                held = con.execute(
-                    """SELECT issue, slot, play, native_match_id, score, halftime_score,
-                              expected_option, payload_json
+                # Exactly one observation per owed key, so a duplicate cannot hide behind
+                # the first row while the vector is read across both.
+                stored_at_key = con.execute(
+                    """SELECT observation_id, issue, slot, play, native_match_id, score,
+                              halftime_score, expected_option, payload_json
                        FROM observation WHERE issue=? AND slot=? AND play=?""",
-                    (issue, slot, play)).fetchone()
-                recorded_replaced = con.execute(
-                    "SELECT replaced_options_json FROM issue_recovery_gap "
-                    "WHERE batch_id=? AND issue=? AND slot=? AND play=?",
-                    (batch_id, issue, slot, play)).fetchone()
+                    (issue, slot, play)).fetchall()
+                if len(stored_at_key) != 1:
+                    issue_mismatches.append({"slot": slot, "play": play,
+                                             "observations_at_key": len(stored_at_key)})
+                    continue
+                held = stored_at_key[0]
+                audit = audited.get((slot, play))
+                recorded_replaced = (audit[8],) if audit is not None else None
                 derived = expected_vector = None
                 ok = False
                 if before is not None and held is not None:
@@ -211,13 +221,13 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                     ok = (
                         # the observation must sit at the key the evidence names and hold
                         # the derived completion
-                        (held[0], held[1], held[2]) == (issue, slot, play)
-                        and (held[3], held[4], held[5], held[6]) == (
+                        (held[1], held[2], held[3]) == (issue, slot, play)
+                        and (held[4], held[5], held[6], held[7]) == (
                             row["native_match_id"], row["score"], row["halftime_score"],
                             derived)
                         and before[3] == row["native_match_id"]
                         # the pre-recovery payload is never rewritten
-                        and held[7] == before[0]
+                        and held[8] == before[0]
                         # and the vector is exactly what the backup's option domain implies
                         # once the archive's settlement is applied
                         and _vector_for(con, issue, slot, play) == expected_vector
@@ -225,7 +235,15 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                         # what the backup held
                         and recorded_replaced is not None
                         and recorded_replaced[0] == json.dumps(
-                            _vector_for(backup_con, issue, slot, play), ensure_ascii=False))
+                            _vector_for(backup_con, issue, slot, play), ensure_ascii=False)
+                        # every audit binding is checked against external evidence
+                        and audit is not None
+                        and (audit[0], audit[1], audit[2], audit[3], audit[4]) == (
+                            held[0], row["native_match_id"], row["score"],
+                            row["halftime_score"], derived)
+                        and audit[5] == json.dumps(_vector(row), ensure_ascii=False)
+                        and audit[6] == row["source_sha256"]
+                        and audit[7] == hashlib.sha256(before[0].encode()).hexdigest())
                 if not ok:
                     issue_mismatches.append(
                         {"slot": slot, "play": play,

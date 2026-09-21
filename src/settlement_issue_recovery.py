@@ -273,8 +273,14 @@ def _gap_targets(con, item: dict) -> list[tuple]:
     if len(fixtures) != item["expected_gap_fixtures"]:
         raise ValueError(f"issue {issue}: settled {len(fixtures)} gap fixtures, ledger expects "
                          f"{item['expected_gap_fixtures']}")
-    if sorted({t[2] for t in targets}) != item["expected_gap_slots"]:
+    slots = sorted({t[2] for t in targets})
+    if slots != item["expected_gap_slots"]:
         raise ValueError(f"issue {issue}: settled slots differ from the ledger's expected slots")
+    # Every owed fixture must be completed for all five plays, or the batch would commit a
+    # recovery the verifiers then refuse.
+    if len(targets) != len(slots) * len(PLAYS):
+        raise ValueError(f"issue {issue}: {len(targets)} completions for {len(slots)} fixtures, "
+                         f"so a play is missing")
     return targets
 
 
@@ -391,43 +397,28 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                 raise ValueError(f"issue {issue}: {len(required)} completions are owed for "
                                  f"{len(owed_slots)} fixtures, so a play is missing")
 
-            audited = {row[:2] for row in con.execute(
-                "SELECT slot, play FROM issue_recovery_gap WHERE batch_id=? AND issue=?",
-                (batch, issue))}
-            if audited != required:
+            audited = {(row[0], row[1]): row[2:] for row in con.execute(
+                """SELECT slot, play, observation_id, native_match_id, new_score,
+                          new_halftime_score, new_expected_option, new_options_json,
+                          evidence_sha256, old_payload_sha256, replaced_options_json
+                   FROM issue_recovery_gap WHERE batch_id=? AND issue=?""", (batch, issue))}
+            if set(audited) != required:
                 raise ValueError(f"issue {issue}: the audit rows are not the owed completions")
-            # The audit row's own recorded settlement vector and evidence hash must still
-            # describe the archive, not merely exist.
-            for (slot, play, new_options, evidence_sha256) in con.execute(
-                    """SELECT slot, play, new_options_json, evidence_sha256
-                       FROM issue_recovery_gap WHERE batch_id=? AND issue=?""", (batch, issue)):
-                source = archive.get((slot, play))
-                if source is None:
-                    raise ValueError(f"issue {issue} slot {slot} {play}: no archive row")
-                if new_options != json.dumps(_settlement_vector(source), ensure_ascii=False):
-                    raise ValueError(f"issue {issue} slot {slot} {play}: recorded settlement "
-                                     f"vector changed")
-                if evidence_sha256 != source["source_sha256"]:
-                    raise ValueError(f"issue {issue} slot {slot} {play}: recorded evidence "
-                                     f"changed")
-
-            # Every observation of the issue must either hold its derived completion or be
-            # untouched, so an extra completed row cannot hide.
-            for (observation_id, slot, play, native_id, score, halftime, option, payload) in (
-                    con.execute("""SELECT observation_id, slot, play, native_match_id, score,
-                                          halftime_score, expected_option, payload_json
-                                   FROM observation WHERE issue=?""", (issue,))):
-                key = (slot, play)
-                source = archive.get(key)
-                if key not in required:
-                    before = before_con.execute(
-                        """SELECT score, halftime_score, expected_option, payload_json
-                           FROM observation WHERE issue=? AND slot=? AND play=?""",
-                        (issue, slot, play)).fetchone()
-                    if before is None or (score, halftime, option, payload) != before:
-                        raise ValueError(f"issue {issue} slot {slot} {play}: an observation "
-                                         f"outside the owed completions was changed")
-                    continue
+            # Iterate the owed keys, not the surviving observations, so a deleted row cannot
+            # shrink the check.
+            for slot, play in sorted(required):
+                source = archive[(slot, play)]
+                (audit_id, audit_native, audit_score, audit_halftime, audit_option,
+                 audit_options, audit_evidence, audit_payload_sha256,
+                 audit_replaced) = audited[(slot, play)]
+                stored = con.execute(
+                    """SELECT observation_id, native_match_id, score, halftime_score,
+                              expected_option, payload_json FROM observation
+                       WHERE issue=? AND slot=? AND play=?""", (issue, slot, play)).fetchall()
+                if len(stored) != 1:
+                    raise ValueError(f"issue {issue} slot {slot} {play}: expected exactly one "
+                                     f"observation, found {len(stored)}")
+                (observation_id, native_id, score, halftime, option, payload) = stored[0]
                 before = before_con.execute(
                     """SELECT score, halftime_score, payload_json FROM observation
                        WHERE issue=? AND slot=? AND play=?""", (issue, slot, play)).fetchone()
@@ -435,6 +426,10 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                     raise ValueError(f"issue {issue} slot {slot} {play}: absent from the "
                                      f"pre-recovery backup")
                 derived = settled_option(source, json.loads(before[2]))
+                expected_vector = expected_settlement_vector(
+                    _vector_for(before_con, issue, slot, play), source)
+                # The observation, and the audit row that records it, must both agree with
+                # evidence the recovery cannot have rewritten.
                 if (native_id, score, halftime, option) != (
                         source["native_match_id"], source["score"], source["halftime_score"],
                         derived) or derived != _reported_result(issue, source):
@@ -443,10 +438,25 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                 if payload != before[2]:
                     raise ValueError(f"issue {issue} slot {slot} {play}: pre-recovery payload "
                                      f"changed")
-                expected_vector = expected_settlement_vector(
-                    _vector_for(before_con, issue, slot, play), source)
                 if _stored_vector(con, observation_id) != expected_vector:
                     raise ValueError(f"issue {issue} slot {slot} {play}: stored options changed")
+                if (audit_id, audit_native, audit_score, audit_halftime, audit_option) != (
+                        observation_id, native_id, score, halftime, option):
+                    raise ValueError(f"issue {issue} slot {slot} {play}: the audit row does not "
+                                     f"record the stored observation")
+                if audit_options != json.dumps(_settlement_vector(source), ensure_ascii=False):
+                    raise ValueError(f"issue {issue} slot {slot} {play}: recorded settlement "
+                                     f"vector changed")
+                if audit_evidence != source["source_sha256"]:
+                    raise ValueError(f"issue {issue} slot {slot} {play}: recorded evidence "
+                                     f"changed")
+                if audit_payload_sha256 != hashlib.sha256(before[2].encode()).hexdigest():
+                    raise ValueError(f"issue {issue} slot {slot} {play}: recorded payload "
+                                     f"binding changed")
+                if audit_replaced != json.dumps(_vector_for(before_con, issue, slot, play),
+                                                ensure_ascii=False):
+                    raise ValueError(f"issue {issue} slot {slot} {play}: recorded replaced "
+                                     f"vector changed")
                 gaps += 1
         return {"added_observations": added, "gap_observations": gaps}
     finally:

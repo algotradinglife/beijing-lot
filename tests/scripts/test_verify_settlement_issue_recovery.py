@@ -284,6 +284,52 @@ def test_replay_catches_a_tampered_evidence_manifest(tmp_path: Path) -> None:
     assert report["evidence_manifest_agrees"] is False
 
 
+def test_replay_catches_an_invented_losing_option(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("INSERT INTO option_sp VALUES (1, 'bogus', NULL, NULL, NULL)")
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_catches_a_dropped_losing_option(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM option_sp WHERE observation_id=1 AND option='负'")
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_catches_a_duplicated_gap_observation(tmp_path: Path) -> None:
+    """A second observation at an owed key must not hide behind the first."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("""INSERT INTO observation VALUES
+        (999, '26092', 362, 'spf', '1362', '完场', '9-9', '0-0', '胜', 'x', 'x', 'x', '{}')""")
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["gap_fill"]["mismatches"]
+
+
+def test_replay_catches_a_changed_audit_field(tmp_path: Path) -> None:
+    """The audit row is validated against evidence, not merely read for its keys."""
+    for column, value in (("new_score", "'9-9'"), ("new_expected_option", "'负'"),
+                          ("native_match_id", "'9999'"), ("evidence_sha256", "'f' * 64"),
+                          ("new_options_json", "'[]'")):
+        sub = tmp_path / column
+        sub.mkdir()
+        db, ledger, backup = _applied(sub)
+        con = sqlite3.connect(db)
+        con.execute(f"UPDATE issue_recovery_gap SET {column}={value}")
+        con.commit()
+        con.close()
+        assert build_report(db, ledger, backup)["conclusion"]["verified"] is False, column
+
+
 def test_replay_refuses_tampered_evidence(tmp_path: Path) -> None:
     db, ledger, backup = _applied(tmp_path)
     item = json.loads(ledger.read_text(encoding="utf-8"))["gap_fills"][0]["evidence"][0]

@@ -149,7 +149,7 @@ cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
 - `scripts/apply_issue_recovery.py`、`scripts/verify_settlement_issue_recovery.py` — 薄入口与只读复放。
 - 测试：`tests/test_settlement_issue_recovery.py`、
   `tests/scripts/test_build_issue_recovery_ledger.py`、
-  `tests/scripts/test_verify_settlement_issue_recovery.py`（共 **66** 项，全通过）。
+  `tests/scripts/test_verify_settlement_issue_recovery.py`（共 **74** 项，全通过）。
   覆盖：正常路径、跨玩法场次不一致、结算比分与彩果矛盾（新增期次**与**缺口期次两条路径）、
   让球回退（归档完全不报让球的新增期次，以及**缺口期次由备份提供让球**）、归档无开奖SP、
   归档提出库外选项、身份不符、证据被篡改、缺场次、写入中途失败整体回滚（含恢复表不残留）、
@@ -157,8 +157,11 @@ cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
   **值／选项／payload／审计向量／证据哈希被改动后重跑必须拒绝**、**备份指向库自身或指向恢复后
   副本必须拒绝**、**重复键冒充缺失场次必须拒绝**、参考赔率残留、被替换向量被改写、
   **中奖选项行被删除**、**多余的空选项**、payload 被改写（新增期次与缺口期次各一）、
-  复放检出丢失或**多余**的行、**删除回填行并同步改计数**、**观测键被搬移**、capture URL 被改、
-  证据清单被改、**判定不通过时命令必须非零退出**，以及三个入口脚本的 `main`。
+  复放检出丢失或**多余**的行、**删除回填行并同步改计数**、**删除回填观测但保留审计行**、
+  **同一键出现重复观测**、**观测键被搬移**、capture URL 被改、证据清单被改、
+  **缺口向量被塞入或删掉未开奖选项**、**审计记录各绑定字段被逐个篡改**、
+  **部分玩法回填在写入前即被拒绝**、**判定不通过时命令必须非零退出**，
+  以及三个入口脚本的 `main`。
 
 **闸门（全部失败关闭）**，按调用方分别说明：
 

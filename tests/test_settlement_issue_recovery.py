@@ -579,6 +579,63 @@ def test_a_duplicated_added_row_refuses_the_rerun(tmp_path: Path) -> None:
         recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
 
 
+def test_an_invented_losing_option_refuses_the_rerun(tmp_path: Path) -> None:
+    """The recovered vector keeps the release's own domain, so an added option is a defect."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("INSERT INTO option_sp VALUES (1, 'bogus', NULL, NULL, NULL)")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="stored options changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_dropped_losing_option_refuses_the_rerun(tmp_path: Path) -> None:
+    """Dropping a losing option shrinks the release's domain and must be refused."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM option_sp WHERE observation_id=1 AND option='负'")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="stored options changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_deleted_gap_observation_refuses_the_rerun(tmp_path: Path) -> None:
+    """Keeping the audit row while deleting the observation must not shrink the check."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM observation WHERE issue='26092' AND slot=1 AND play='spf'")
+    con.execute("UPDATE issue_recovery_batch SET gap_observations=4")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="expected exactly one observation"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_partial_play_completion_is_refused_before_the_backup(tmp_path: Path) -> None:
+    """A batch that would commit an unverifiable recovery must not write at all."""
+    db = gap_db(tmp_path)
+    con = sqlite3.connect(db)
+    # slot 1's jq play is already settled, so only four plays are owed for it.
+    con.execute("UPDATE observation SET score='2-1', halftime_score='1-0', expected_option='3球' "
+                "WHERE issue='26092' AND slot=1 AND play='jq'")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="so a play is missing"):
+        recover_issues(db, gap_ledger(tmp_path), tmp_path / "b.sqlite",
+                       approval_note="owner approved")
+    assert not (tmp_path / "b.sqlite").exists(), "a refused run must not leave a backup"
+    assert rows(db, "SELECT score FROM observation WHERE issue='26092' AND slot=1 AND "
+                    "play='spf'")[0] == ("-",)
+
+
 def test_refuses_when_evidence_bytes_do_not_match_the_ledger(tmp_path: Path) -> None:
     db = addition_db(tmp_path)
     path = addition_ledger(tmp_path)
