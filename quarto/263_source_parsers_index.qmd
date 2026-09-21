@@ -45,7 +45,7 @@ stopifnot(length(a$parsers) >= 10L, length(a$real_page_fixtures) >= 10L)
 | | `live_collector/parser.py::parse_bet_page_zgzcw` | **独立来源**：足彩网的投注页（`zgzcw_bet_lottery200.html`） | 与 500 是两套页面结构，别混用 |
 | | `scripts/scrape_500_bjdc.py` | 期次列表、场次、实时 SP | 作为脚本可导入，不作为包 |
 | | `settlement_sp_supplement.py` | 补值页（期/场、主客、赛事、开赛时间、比分） | 只处理空 SP，不覆盖非空 |
-| | `backfill/parser.py` | 开奖/交易索引页 | — |
+| | `backfill/parser.py::parse_issue_html` | **仅开奖（结算）页**的场次行 | 不解析交易索引页、也不发现期号；索引页发现属于 `live_collector/parser.py::parse_issue_list` |
 | **titan** | `fundamentals_census.py::analysis_record` | 分析页（`source` 取 `nowscore` 或 `titan`）：事实身份、数据数组、实际表格单元格 | 是**两源共用**的解析器；UTF-8 严格解码，畸形字节即抛 |
 | | `titan_clean/snapshots.py` | 历史 1x2 长表 → 截止时点快照横截面 | **禁止前瞻使用**（诊断用） |
 | | `titan_clean/historical_id_map.py` | **期次/场次 → 供应商 ID 的独立映射通道** | 该通道不进入 Titan 特征物化；只导出映射，不含球队/赔率/比分/标签 |
@@ -63,9 +63,9 @@ rows <- a$parsers
 nature <- vapply(rows, function(r) r$page_bytes, character(1))
 cat(sprintf("- 页面解析器：**%d** 个；`tests/fixtures/` 下真实页面样本：**%d** 个。\n",
             length(rows), length(a$real_page_fixtures)))
-cat(sprintf("- 有已提交源字节作证据：**%d** 个（其中同时含内联样本 %d 个）。\n",
-            sum(grepl("^committed", nature)),
-            sum(grepl("committed bytes and inline", nature))))
+cat(sprintf("- 静态信号为**读到夹具**（`reads fixtures`）：**%d** 个（其中同时定义内联样本 %d 个）。\n",
+            sum(grepl("^reads fixtures", nature)),
+            sum(grepl("reads fixtures and defines inline", nature))))
 cat(sprintf("- 其中**测试里找不到夹具引用**：%d 个。\n", length(a$without_fixture_reference)))
 ```
 

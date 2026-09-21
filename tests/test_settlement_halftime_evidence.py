@@ -236,9 +236,9 @@ def _production_text(case: dict, payload: bytes) -> str:
     passing, because the scores they compare are ASCII while a private helper decoded the
     identity correctly. These are the decoders production actually uses.
     """
-    # Read the name through the module under test: that binding is what its extractors call.
-    # Importing the decoder straight from its own module instead would pass even after the
-    # extractors had been pointed at a different decoder.
+    # Read through the module under test: that binding is what its extractors call. Importing
+    # the decoder from its own module instead would still pass if the extractors had been pointed
+    # at a different decoder, which is how the first version of this check proved nothing.
     from src import settlement_halftime_evidence as evidence
     if case["source_id"].startswith("okooo"):
         return evidence.okooo_soup(payload).get_text(" ", strip=True)
@@ -251,8 +251,16 @@ def test_the_preserved_page_is_that_fixture(case: dict) -> None:
     token = case["identity_token"]
     assert token, f"{case['page']} records no identity token"
     payload = _page(case)
-    assert token in _production_text(case, payload), (
+    text = _production_text(case, payload)
+    assert token in text, (
         f"{case['page']} does not mention {token} under the extractor's own decoding")
+    # An ASCII identity token survives any decoder, so also require the page's own non-ASCII text:
+    # a decoder that substitutes characters loses it, which is the regression this guards.
+    assert "\ufffd" not in text, f"{case['page']} decoded with replacement characters"
+    fragment = case["non_ascii_fragment"]
+    if fragment:
+        assert fragment in text, (
+            f"{case['page']} lost its non-ASCII text {fragment!r} under the extractor's decoding")
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")

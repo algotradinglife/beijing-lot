@@ -42,8 +42,13 @@ MIN_INDEPENDENT_SOURCES = 2
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
+def _soup(payload: bytes) -> BeautifulSoup:
+    """The single place these pages are decoded, so every extractor shares one behaviour."""
+    return BeautifulSoup(payload.decode("utf-8", errors="replace"), "html.parser")
+
+
 def _text(payload: bytes) -> str:
-    return BeautifulSoup(payload.decode("utf-8", errors="replace"), "html.parser").get_text(" ", strip=True)
+    return _soup(payload).get_text(" ", strip=True)
 
 
 def _fixture_date(fixture: dict) -> date:
@@ -84,7 +89,7 @@ def extract_24score(payload: bytes, fixture: dict) -> dict:
     """24score prints `FT:FT (HT:HT)` in the head-to-head score cell of the match row."""
     d = _fixture_date(fixture)
     anchor = f"{d.day:02d}.{d.month:02d}.{d.year % 100:02d}"
-    soup = BeautifulSoup(payload.decode("utf-8", errors="replace"), "html.parser")
+    soup = _soup(payload)
     cells = []
     for tr in soup.find_all("tr"):
         if anchor not in tr.get_text(" ", strip=True):

@@ -1,6 +1,6 @@
 {
   "schema": "halftime_evidence_fixtures_v1",
-  "note": "Pages preserved during the #479 half-time corroboration, with the identity that drives each extractor. Identity and expected values come from the correction ledgers that produced the applied changes; original bytes are committed gzipped so the extractors are exercised against what the sources actually served. A case carries the fixture fields its extractor reads: the identity fields come from the ledger, plus  where the extractor needs the board row. Okooo serves GB2312, so its pages identify a fixture by the Chinese names on the board; the identity example decodes with the declared charset before looking. Each case records the token that identifies its fixture inside that page, taken from the page itself: a Latin source spells the club in its own language, Okooo spells it in Chinese. A case without a token would mean the page does not identify the fixture. Every case records the digest of the preserved page, including the Okooo livecenter page shared with the Okooo module's fixtures; the byte-identity check is required, not optional.",
+  "note": "Pages preserved during the #479 half-time corroboration, with the identity that drives each extractor. Identity and expected values come from the correction ledgers that produced the applied changes; original bytes are committed gzipped so the extractors are exercised against what the sources actually served. A case carries the fixture fields its extractor reads: the identity fields come from the ledger, plus  where the extractor needs the board row. Okooo serves GB2312, so its pages identify a fixture by the Chinese names on the board; the identity example decodes with the declared charset before looking. Each case records the token that identifies its fixture inside that page, taken from the page itself: a Latin source spells the club in its own language, Okooo spells it in Chinese. A case without a token would mean the page does not identify the fixture. Every case records the digest of the preserved page, including the Okooo livecenter page shared with the Okooo module's fixtures; the byte-identity check is required, not optional. Each case also records a non-ASCII fragment from its page, or null when the source served none; a decode that substitutes characters loses it. The fragment is recorded without internal whitespace because the text helpers normalise whitespace; null means the source served no non-ASCII text at all. The fragment is taken from what the correct decode surfaces, without internal whitespace; null means the source served no non-ASCII text at all.",
   "cases": [
     {
       "issue": "21082",
@@ -19,7 +19,8 @@
       "recorded_half": "3-2",
       "ft": "2-3",
       "page_sha256": "e767b5d0256bb264131a7c2d3c781b798b733e7ea9cc4bb41134a07bfff62245",
-      "identity_token": "Cork City"
+      "identity_token": "Cork City",
+      "non_ascii_fragment": "đá"
     },
     {
       "issue": "21082",
@@ -38,7 +39,8 @@
       "recorded_half": "3-2",
       "ft": "2-3",
       "page_sha256": "d7e8c4df0b800f04b132cdf13872015e2867f4555ddc5bb2e056b6dd826cc3d6",
-      "identity_token": "Cork City"
+      "identity_token": "Cork City",
+      "non_ascii_fragment": "Кабинтили"
     },
     {
       "issue": "21082",
@@ -57,7 +59,8 @@
       "recorded_half": "2-0",
       "ft": "1-1",
       "page_sha256": "1a4c2bed230f1dca4de43c65bd871ef96b1fd6c6cbc6f5f5ae7fa522ee72eb64",
-      "identity_token": "Cercle Brugge"
+      "identity_token": "Cercle Brugge",
+      "non_ascii_fragment": "©"
     },
     {
       "issue": "21082",
@@ -76,7 +79,8 @@
       "recorded_half": "2-0",
       "ft": "1-1",
       "page_sha256": "2d6ee076fb2e91c5c59d6c37a9341a95154c4af7c9a7bab194305f55928b66f0",
-      "identity_token": "Cercle Brugge"
+      "identity_token": "Cercle Brugge",
+      "non_ascii_fragment": "í"
     },
     {
       "issue": "24041",
@@ -95,7 +99,8 @@
       "recorded_half": "2-1",
       "ft": "1-1",
       "page_sha256": "798ec97804f0412b4a7125bddc538374d7eb26bb002948313f8659c3f176bec2",
-      "identity_token": "Cittadella"
+      "identity_token": "Cittadella",
+      "non_ascii_fragment": "©"
     },
     {
       "issue": "24041",
@@ -114,7 +119,8 @@
       "recorded_half": "2-1",
       "ft": "1-1",
       "page_sha256": "6c94ce91c5ecaca0f1822a1b19efbd43647bf1c329eb7d7ac4ebbbec567b7e4b",
-      "identity_token": "Cittadella"
+      "identity_token": "Cittadella",
+      "non_ascii_fragment": "ță"
     },
     {
       "issue": "21082",
@@ -136,7 +142,8 @@
       "recorded_option": "胜-负",
       "sp": 16.07,
       "page_sha256": "7a89466b6df1629b1efe5d6ffd1ea90a0cc94f43346c0e5200575d69ce39834b",
-      "identity_token": "科克城"
+      "identity_token": "科克城",
+      "non_ascii_fragment": "由于合作方业务调整，无法继续为店铺专用网址提供数据支持，因此提交店铺功能已关闭，给您造成的不便深表歉意，如有问题请联系店铺咨询！"
     },
     {
       "issue": "24041",
@@ -158,7 +165,8 @@
       "recorded_option": "胜-平",
       "sp": 5.17,
       "page_sha256": "9a87b29f9c41ca3bf129150913282832a03b3277bdc15a9d9d4d71392cef04a3",
-      "identity_token": "奇塔代拉"
+      "identity_token": "奇塔代拉",
+      "non_ascii_fragment": "由于合作方业务调整，无法继续为店铺专用网址提供数据支持，因此提交店铺功能已关闭，给您造成的不便深表歉意，如有问题请联系店铺咨询！"
     },
     {
       "issue": "21082",
@@ -177,7 +185,8 @@
       "expected_half": "2-2",
       "ft": "2-3",
       "page_sha256": "c520309ea98f16203ecd8e7aed9928b0aa14bc6540813df8a8a2661c1eec241b",
-      "identity_token": "科克城"
+      "identity_token": "科克城",
+      "non_ascii_fragment": "本站仅提供网址导航，所有视频及视听节目均为外链。所有视频及视听节目均不在本站网页展示，仅为用户提供导航服务。本站并不制作生产任何体育赛事节目，也并不是网络电视台"
     }
   ]
 }
