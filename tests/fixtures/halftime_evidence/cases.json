@@ -1,6 +1,6 @@
 {
   "schema": "halftime_evidence_fixtures_v1",
-  "note": "Pages preserved during the #479 half-time corroboration, with the identity that drives each extractor. Identity and expected values come from the correction ledgers that produced the applied changes; original bytes are committed gzipped so the extractors are exercised against what the sources actually served. A case carries the fixture fields its extractor reads: the identity fields come from the ledger, plus  where the extractor needs the board row. Okooo serves GB2312, so its pages identify a fixture by the Chinese names on the board; the identity example decodes with the declared charset before looking. Each case records the token that identifies its fixture inside that page, taken from the page itself: a Latin source spells the club in its own language, Okooo spells it in Chinese. A case without a token would mean the page does not identify the fixture.",
+  "note": "Pages preserved during the #479 half-time corroboration, with the identity that drives each extractor. Identity and expected values come from the correction ledgers that produced the applied changes; original bytes are committed gzipped so the extractors are exercised against what the sources actually served. A case carries the fixture fields its extractor reads: the identity fields come from the ledger, plus  where the extractor needs the board row. Okooo serves GB2312, so its pages identify a fixture by the Chinese names on the board; the identity example decodes with the declared charset before looking. Each case records the token that identifies its fixture inside that page, taken from the page itself: a Latin source spells the club in its own language, Okooo spells it in Chinese. A case without a token would mean the page does not identify the fixture. Every case records the digest of the preserved page, including the Okooo livecenter page shared with the Okooo module's fixtures; the byte-identity check is required, not optional.",
   "cases": [
     {
       "issue": "21082",
@@ -176,7 +176,7 @@
       },
       "expected_half": "2-2",
       "ft": "2-3",
-      "page_sha256": null,
+      "page_sha256": "c520309ea98f16203ecd8e7aed9928b0aa14bc6540813df8a8a2661c1eec241b",
       "identity_token": "科克城"
     }
   ]

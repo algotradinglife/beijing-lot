@@ -3,7 +3,6 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -216,8 +215,8 @@ def test_real_page_evidence_covers_every_extractor() -> None:
 @pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")
 def test_extractor_reads_the_half_time_from_the_preserved_page(case: dict) -> None:
     payload = _page(case)
-    if case.get("page_sha256"):
-        assert hashlib.sha256(payload).hexdigest() == case["page_sha256"]
+    # required, not optional: a case without a digest would let a synthetic page stand in
+    assert hashlib.sha256(payload).hexdigest() == case["page_sha256"]
     got = _REAL_EXTRACTORS[case["source_id"]](payload, case["fixture"])
     if case["source_id"] in HALF_FULL_EXTRACTORS:
         # the half-full board answers with the settlement option and its price, not a score
@@ -229,19 +228,21 @@ def test_extractor_reads_the_half_time_from_the_preserved_page(case: dict) -> No
         assert (got["ft_home"], got["ft_away"]) == (case["fixture"]["ft_home"], case["fixture"]["ft_away"])
 
 
-def _page_text(payload: bytes) -> str:
-    """Decode a preserved page with the charset it declares, not with a guess.
+def _production_text(case: dict, payload: bytes) -> str:
+    """The text the extractor's OWN decoding path produces.
 
-    Okooo serves GB2312: decoding its pages as UTF-8 loses the Chinese names that identify the
-    fixture, which is the same substitution that made the Okooo parser produce unreadable teams.
+    Reading the page with a decoder written for this test would prove nothing: swapping the
+    extractors' decoding back to UTF-8 with errors="replace" left every one of these examples
+    passing, because the scores they compare are ASCII while a private helper decoded the
+    identity correctly. These are the decoders production actually uses.
     """
-    declared = re.search(rb'charset=["\']?([\w-]+)', payload[:4096])
-    for encoding in ([declared.group(1).decode("ascii")] if declared else []) + ["utf-8", "gb18030"]:
-        try:
-            return payload.decode(encoding)
-        except (UnicodeDecodeError, LookupError):
-            continue
-    raise AssertionError("no encoding decodes this page")
+    # Read the name through the module under test: that binding is what its extractors call.
+    # Importing the decoder straight from its own module instead would pass even after the
+    # extractors had been pointed at a different decoder.
+    from src import settlement_halftime_evidence as evidence
+    if case["source_id"].startswith("okooo"):
+        return evidence.okooo_soup(payload).get_text(" ", strip=True)
+    return evidence._text(payload)
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")
@@ -249,8 +250,9 @@ def test_the_preserved_page_is_that_fixture(case: dict) -> None:
     """A page that is not this fixture's must not be read as evidence for it."""
     token = case["identity_token"]
     assert token, f"{case['page']} records no identity token"
-    assert token in _page_text(_page(case)), (
-        f"{case['page']} does not mention {token}, so it is not this fixture's page")
+    payload = _page(case)
+    assert token in _production_text(case, payload), (
+        f"{case['page']} does not mention {token} under the extractor's own decoding")
 
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")

@@ -41,7 +41,7 @@ stopifnot(length(a$parsers) >= 10L, length(a$real_page_fixtures) >= 10L)
 | | `nowscore_settlement.py::parse_archive_page` | 归档板（含直播板隐藏的场次）的结算行 | 由 `parse_page` 按版式调用，不是独立入口 |
 | | `nowscore_issue_inventory.py::parse_archive` | **仅清点**：应答有效性、场次数、场次序号边界 | **不解析结算数据** —— 想取归档结算要用上一行 |
 | | `nowscore_live_issues.py` | 直播板自带的期号与当前期号 | 只列仍在售的期次 |
-| **500** | `live_collector/parser.py::parse_bet_page_500`<br>`::parse_kaijiang`、`::parse_livescore_500_all` | 投注页、开奖页、比分页 | 只有它给出 `cancel`/`postpone`/`void_sp1` 的显式状态 |
+| **500** | `live_collector/parser.py::parse_bet_page_500`<br>`::parse_kaijiang`、`::parse_livescore_500_all` | 投注页、开奖页、已完赛场次的比分对 | **不返回任何状态字段**（既无 `cancel`/`postpone`，也无 `void_sp1`）—— 作废/推迟/SP=1 由 `multimarket_p0.py::build_settlement_truth` 另行推导（依据状态文本，含 Nowscore 侧），不要指望这三个函数区分 |
 | | `live_collector/parser.py::parse_bet_page_zgzcw` | **独立来源**：足彩网的投注页（`zgzcw_bet_lottery200.html`） | 与 500 是两套页面结构，别混用 |
 | | `scripts/scrape_500_bjdc.py` | 期次列表、场次、实时 SP | 作为脚本可导入，不作为包 |
 | | `settlement_sp_supplement.py` | 补值页（期/场、主客、赛事、开赛时间、比分） | 只处理空 SP，不覆盖非空 |
@@ -115,10 +115,10 @@ cat(sprintf("- 仓库内真实页面样本总数（含其他模块）：**%d** �
 页面字节的 sha256 与留存清单一致；页面里的身份标记确实是该场次；同一页面换一个全场比分后
 **必须被闸门拒绝**。
 
-反过来说，**已有真实样本**的解析器（`nowscore_settlement`、`nowscore_issue_inventory`、
-`settlement_sp_supplement`、`live_collector/parser`、`fundamentals_census`、`forward_snapshot/*`、
-`bj396_settlement/pipeline`、`freeze_review`、`okooo_prekick_sp`）是这条线上的正面样本 ——
-尤其 `okooo_prekick_sp` 现在是**真实样本 + 内联样本并存**。
+报告里**读到夹具**（`reads fixtures`）的 5 个解析器是这条线上的正面样本：`live_collector/parser`、
+`okooo_prekick_sp`（这两个同时也有内联样本）、`fundamentals_census`、`forward_snapshot/collector`、
+`settlement_halftime_evidence`（本轮补齐）。其余判定（`inline samples only`、
+`no fixture reference…`、`untested`）都只是提示，不是结论。
 
 ## 工具与局限
 
