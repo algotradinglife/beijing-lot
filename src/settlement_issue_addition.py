@@ -59,6 +59,11 @@ CREATE TABLE IF NOT EXISTS issue_addition (
     score TEXT NOT NULL, halftime_score TEXT NOT NULL, expected_option TEXT,
     source_sha256 TEXT NOT NULL, payload_sha256 TEXT NOT NULL)
 """
+_ANCHOR_DDL = """
+CREATE TABLE IF NOT EXISTS issue_addition_anchor (
+    batch_id TEXT PRIMARY KEY, backup_path TEXT NOT NULL, backup_sha256 TEXT NOT NULL,
+    backup_bytes INTEGER NOT NULL, recorded_at TEXT NOT NULL)
+"""
 _CAPTURE_DDL = """
 CREATE TABLE IF NOT EXISTS issue_addition_capture (
     batch_id TEXT NOT NULL, issue TEXT NOT NULL, typeid INTEGER NOT NULL, url TEXT NOT NULL,
@@ -242,6 +247,17 @@ def existing_issues(con: sqlite3.Connection) -> set[str]:
     return {row[0] for row in con.execute("SELECT DISTINCT issue FROM observation")}
 
 
+def _file_identity(path: Path) -> tuple[str, int]:
+    """Content hash and byte length of `path`: how a snapshot is identified, not by name."""
+    digest = hashlib.sha256()
+    length = 0
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 22), b""):
+            digest.update(chunk)
+            length += len(chunk)
+    return digest.hexdigest(), length
+
+
 def _verify_added(con: sqlite3.Connection, batch: str, issues: list[str]) -> dict:
     """Check the rows this batch claims to have added. Self-consistency only.
 
@@ -331,10 +347,19 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
                     raise ValueError("Previously added row count changed")
                 if canonical_content_sha256(con, json.loads(prior[0])) != prior[2]:
                     raise ValueError("Previously added content changed")
+                anchored = con.execute(
+                    "SELECT backup_path, backup_sha256, backup_bytes FROM issue_addition_anchor "
+                    "WHERE batch_id=?", (batch,)).fetchone() if con.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='issue_addition_anchor'").fetchone() \
+                    else None
+                # A retry writes nothing, so its --backup argument is not an anchor: report
+                # the anchor the committed batch recorded, never the retry's argument.
                 con.rollback()
                 return {"status": "already_applied", "batch_id": batch,
-                        "backup": str(backup_path), "added_issues": json.loads(prior[0]),
-                        **verified}
+                        "backup": anchored[0] if anchored else None,
+                        "backup_sha256": anchored[1] if anchored else None,
+                        "backup_bytes": anchored[2] if anchored else None,
+                        "added_issues": json.loads(prior[0]), **verified}
 
         present = existing_issues(con)
         additions, skipped = [], []
@@ -383,6 +408,7 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
         con.execute(_BATCH_DDL)
         con.execute(_ROW_DDL)
         con.execute(_CAPTURE_DDL)
+        con.execute(_ANCHOR_DDL)
         now = datetime.now(timezone.utc).isoformat()
 
         added_observations = added_fixtures = resolved_fixtures = 0
@@ -428,8 +454,14 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
                      json.dumps(additions, ensure_ascii=False),
                      json.dumps(skipped, ensure_ascii=False), added_observations,
                      added_fixtures, resolved_fixtures, content))
+        # The snapshot's identity is bound to the batch in the same transaction: a committed
+        # addition must never be reachable without the anchor that keeps its backup alive.
+        anchor_sha256, anchor_bytes = _file_identity(backup_path)
+        con.execute("INSERT INTO issue_addition_anchor VALUES (?,?,?,?,?)",
+                    (batch, str(backup_path), anchor_sha256, anchor_bytes, now))
         con.commit()
         return {"status": "added", "batch_id": batch, "backup": str(backup_path),
+                "backup_sha256": anchor_sha256, "backup_bytes": anchor_bytes,
                 "added_issues": additions, "skipped": skipped,
                 "added_observations": added_observations, "added_fixtures": added_fixtures,
                 "resolved_fixtures": resolved_fixtures, "content_sha256": content}

@@ -34,8 +34,11 @@ def main(argv=None):
                          approval_note=args.approval_note)
     receipt["approval_note"] = args.approval_note
     receipt["applied_at"] = datetime.now(timezone.utc).isoformat()
-    (args.bundle / "applied.json").write_text(
-        json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
+    if receipt.get("status") == "added":
+        # Only a new application writes the receipt. A retry must not replace the committed
+        # batch's recorded anchor with its own now-meaningless --backup argument.
+        (args.bundle / "applied.json").write_text(
+            json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(receipt, ensure_ascii=False))
     return 0
 

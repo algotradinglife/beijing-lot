@@ -111,8 +111,24 @@ def test_records_a_failure_instead_of_raising(tmp_path: Path) -> None:
     assert result["needs_approval"] is False
 
 
+def test_a_same_day_rerun_keeps_the_outstanding_approval(tmp_path: Path) -> None:
+    """The verdict comes from the bundle already on disk, so it cannot silently clear."""
+    db = release_at(tmp_path)
+    updates = tmp_path / "updates"
+    first = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
+                      transport=transport_for(board(current="26093",
+                                                    issues=("26093", "26092"))), now=NOW)
+    assert first["needs_approval"] is True
+    second = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
+                       transport=transport_for(board()), now=NOW)
+    assert second["status"] == "already_captured_today"
+    assert second["needs_approval"] is True
+    assert second["eligible"] == ["26093"]
+    assert second["bindings"]["manifest_sha256"] == first["bindings"]["manifest_sha256"]
+
+
 def test_does_not_overwrite_the_same_days_bundle(tmp_path: Path) -> None:
-    """A second run on the same day keeps the first run's evidence."""
+    """A second run on the same day keeps the first run's capture bytes."""
     db = release_at(tmp_path)
     updates = tmp_path / "updates"
     first = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
@@ -122,8 +138,11 @@ def test_does_not_overwrite_the_same_days_bundle(tmp_path: Path) -> None:
     marker.write_text('{"kept": true}', encoding="utf-8")
     second = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
                        transport=transport_for(board()), now=NOW)
-    assert second["status"] == "already_captured_today"
     assert json.loads(marker.read_text(encoding="utf-8"))["kept"] is True
+    # A bundle that cannot be read is a recorded failure, not a silent skip.
+    assert second["status"] == "failed"
+    assert second["unjudged_bundle"] == first["bundle"]
+    assert Path(second["status_file"]).exists()
 
 
 def test_prunes_backups_as_part_of_the_run(tmp_path: Path) -> None:

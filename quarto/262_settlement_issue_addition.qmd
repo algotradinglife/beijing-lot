@@ -21,9 +21,14 @@ format: html
 
 ```{r}
 invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+# Resolve the project root from this document, not from the working directory: a chunk
+# rendered on its own runs in the document's folder, and `execute-dir: project` does
+# not apply to it.
+root <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+e_path <- file.path(root, params$verification_json)
 stopifnot(requireNamespace("jsonlite", quietly = TRUE))
 stopifnot(is.character(params$verification_json), length(params$verification_json) == 1L,
-          !is.na(params$verification_json), file.exists(params$verification_json))
+          !is.na(params$verification_json), file.exists(e_path))
 v <- jsonlite::fromJSON(params$verification_json, simplifyVector = FALSE)
 stopifnot(identical(v$schema, "bj479_issue_addition_verification_v1"))
 # A rejected addition must fail this delivery, not merely print "FALSE".
@@ -176,10 +181,18 @@ var IssueNum = "26096"; var IsCurrentIssue = "True";
 该 bundle 的 `applied.json`（含本次备份路径），使该快照成为不可删除的复放锚点。
 
 保留策略不能是「保留最近 N 份」：复放要用**该批次当时的库**推导它欠哪些期次，新快照替代不了。
-因此被批次引用的快照**永不删除**（锚点取自发布库批次表、登记表 corrections 与 bundle 回执），
-只有未被引用的余量才按数量精简；删除前还须通过目录与身份校验（非符号链接、位于 `backups` 之下、
-每个候选是带 `observation` 表的可读 SQLite 快照、发布库显式排除、不认识的 `*.sqlite` 直接拒绝）。
-状态文件绑定发布库哈希、本次清单哈希、判定实现哈希与调用参数。
+因此被批次引用的快照**永不删除**（锚点取自发布库批次表、`issue_addition_anchor` 表、登记表
+corrections 与 bundle 回执），只有未被引用的余量才按数量精简。
+
+**锚点按内容身份匹配而非文件名**：带哈希的证据要求候选哈希相同，所以改名或改回执既不能让被锚定
+的快照变成可弃，也不能保护无关文件；**找不到的锚点直接拒绝整次清理**（读不到证据意味着存在无法
+排除的依赖），除非登记表把它记为 `retired_anchors`。**追加层把锚点写进与批次同一事务**，因此
+已提交的追加不可能处于「批次在库、锚点不在」的状态。
+
+删除前还须通过**物理身份**校验：目录或其父级是符号链接即拒绝、目录内符号链接条目即拒绝、
+发布库按 `(st_dev, st_ino)` 排除、每个候选是带 `observation` 表的可读 SQLite 快照、不认识的
+`*.sqlite` 直接拒绝。状态文件绑定发布库哈希、清单哈希、**六个实现文件**哈希、所读证据哈希与
+全部调用参数；同日重跑从既有 bundle 重新判定，不会静默清掉待处理批准。
 
 ## 局限
 

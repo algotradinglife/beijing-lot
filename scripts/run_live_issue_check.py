@@ -18,24 +18,24 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.capture_live_issues import capture_issues  # noqa: E402
-from scripts.prune_settlement_backups import (prune_backups,  # noqa: E402
-                                             replay_protected_backups)
+from scripts.prune_settlement_backups import prune_backups, replay_anchors  # noqa: E402
 from src.settlement_issue_addition import bundle_rows, issue_verdict, read_bundle  # noqa: E402
 
 # The rules that decide what is actionable: hashed into every status so a stored verdict can
 # be tied to the implementation that produced it.
 _IMPLEMENTATION = ("src/settlement_issue_addition.py", "src/nowscore_settlement.py",
-                   "scripts/capture_live_issues.py", "src/nowscore_live_issues.py")
+                   "scripts/capture_live_issues.py", "src/nowscore_live_issues.py",
+                   "scripts/run_live_issue_check.py", "scripts/prune_settlement_backups.py")
 
 
-def _manifest_sha256(bundle_dir, reported_existing: bool) -> str | None:
-    """The captured manifest's hash, or None when this run captured nothing to bind.
+def _manifest_sha256(bundle_dir) -> str | None:
+    """The judged bundle's manifest hash, or None when this run judged no bundle.
 
-    A bundle this run did not write — one already captured today — is not re-read: whatever
-    sits there is another run's evidence, and a manifest that cannot be parsed is a state to
+    A bundle captured earlier today is bound too: the verdict is read from its bytes, so the
+    status has to name which bytes those were. A manifest that cannot be parsed is a state to
     report rather than a reason to lose the status file.
     """
-    if not bundle_dir or reported_existing:
+    if not bundle_dir:
         return None
     try:
         return read_bundle(Path(bundle_dir)).get("sha256")
@@ -81,44 +81,68 @@ def run_check(database: Path, updates_root: Path, backups_root: Path, *, keep: i
                                    now=now)
         except Exception as error:                      # noqa: BLE001 - recorded, not swallowed
             state = {"status": "failed", "error": f"{type(error).__name__}: {error}"}
-    # An alert is only useful when it is actionable: a round still in progress is pending
-    # but cannot be added, so it is reported with its reasons instead of asking for approval.
-    if state.get("status") == "captured":
-        bundle_doc = read_bundle(Path(state["bundle"]))
-        parsed = bundle_rows(bundle_doc)
-        eligible, ineligible = [], []
-        for issue in state["pending"]:
-            resolved, problems = issue_verdict(parsed[issue])
-            if problems:
-                ineligible.append({"issue": issue, "problems": problems[:5]})
-            else:
-                eligible.append(issue)
-        state["eligible"] = eligible
-        state["ineligible"] = ineligible
+    # An alert is only useful when it is actionable: a round still in progress is pending but
+    # cannot be added, so it is reported with its reasons instead of asking for approval. A
+    # bundle captured earlier today is judged from its own bytes rather than skipped, so a
+    # second run cannot quietly clear an outstanding approval request.
+    bundle_path = Path(state["bundle"]) if state.get("bundle") else None
+    judgeable = (state.get("status") == "captured"
+                 or (state.get("status") == "already_captured_today" and bundle_path
+                     and (bundle_path / "manifest.json").is_file()))
+    if judgeable:
+        try:
+            document = read_bundle(bundle_path)
+            parsed = bundle_rows(document)
+            issues = state.get("pending") or document["manifest"]["requested_issues"]
+            eligible, ineligible = [], []
+            for issue in issues:
+                resolved, problems = issue_verdict(parsed[issue])
+                if problems:
+                    ineligible.append({"issue": issue, "problems": problems[:5]})
+                else:
+                    eligible.append(issue)
+            state["pending"] = list(issues)
+            state["eligible"] = eligible
+            state["ineligible"] = ineligible
+        except Exception as error:                      # noqa: BLE001 - recorded, not swallowed
+            state["status"] = "failed"
+            state["error"] = f"{type(error).__name__}: {error}"
+            state["unjudged_bundle"] = state.get("bundle")
     pruned = None
     if backups_root and Path(backups_root).is_dir():
         # Retention failures are recorded like any other: the check's job is to report the
         # state, and a refusal to delete is a state, not a reason to lose the status file.
         try:
-            protect = replay_protected_backups(database, registry=registry,
-                                               bundles_root=updates_root)
+            claims, retired = replay_anchors(database, registry=registry,
+                                             bundles_root=updates_root)
             pruned = prune_backups(Path(backups_root), keep=keep, apply=True,
-                                   release=database, protect=protect)
+                                   release=database, protect=claims, retired=retired)
         except Exception as error:                      # noqa: BLE001 - recorded, not swallowed
             pruned = {"status": "refused", "error": f"{type(error).__name__}: {error}"}
     state["checked_at"] = clock().isoformat()
     state["pruned"] = pruned
+    if isinstance(pruned, dict):
+        # A refused prune still says which directory it was asked to prune.
+        pruned["directory"] = str(backups_root) if backups_root else None
     bundle_dir = state.get("bundle")
     # A status an operator can act on has to name what it judged: the bundle it read, the
     # release it compared against, and the rules that produced the verdict.
     state["bindings"] = {
         "release": {"path": str(database), "sha256": _file_sha256(database)},
-        "manifest_sha256": _manifest_sha256(bundle_dir,
-                                            state.get("status") == "already_captured_today"),
+        "manifest_sha256": _manifest_sha256(bundle_dir if judgeable else None),
         "implementation": {str(path): _file_sha256(Path(path))
                            for path in (implementation or _IMPLEMENTATION)},
+        # The evidence the verdict and the retention decision were read from, by identity:
+        # edited anchor evidence must not produce the same bindings as the original.
+        "evidence": {"registry": {"path": str(registry) if registry else None,
+                                  "sha256": _file_sha256(registry) if registry else None},
+                     "receipts": {str(receipt): _file_sha256(receipt) for receipt in
+                                  sorted(Path(updates_root).glob("*/applied.json"))}
+                     if updates_root else {}},
         "parameters": {"keep_backups": keep, "timeout": timeout_seconds,
                        "request_interval": interval_seconds,
+                       "database": str(database), "updates_root": str(updates_root),
+                       "backups_root": str(backups_root) if backups_root else None,
                        "registry": str(registry) if registry else None},
     }
     state["needs_approval"] = bool(state.get("eligible"))

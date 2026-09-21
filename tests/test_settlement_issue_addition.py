@@ -301,11 +301,47 @@ def test_repeating_the_same_bundle_is_a_verified_no_op(tmp_path: Path) -> None:
     """The guard re-checks the rows it added, then reports already_applied."""
     db = release(tmp_path)
     root = bundle(tmp_path)
-    add_issues(db, root, tmp_path / "first.sqlite", approval_note="n")
+    first = add_issues(db, root, tmp_path / "first.sqlite", approval_note="n")
     again = add_issues(db, root, tmp_path / "second.sqlite", approval_note="n")
     assert again["status"] == "already_applied"
     assert again["mismatches"] == []
     assert not (tmp_path / "second.sqlite").exists()
+    # The retry reports the anchor the committed batch recorded, not its own argument.
+    assert again["backup"] == first["backup"]
+    assert again["backup_sha256"] == first["backup_sha256"]
+    assert again["backup_sha256"] and again["backup_bytes"] > 0
+
+
+def test_the_anchor_is_bound_to_the_batch_in_the_same_transaction(tmp_path: Path) -> None:
+    """A committed addition can never be reachable without the anchor for its snapshot."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    result = add_issues(db, root, tmp_path / "first.sqlite", approval_note="n")
+    con = sqlite3.connect(db)
+    anchored = con.execute("SELECT batch_id, backup_path, backup_sha256, backup_bytes "
+                           "FROM issue_addition_anchor").fetchall()
+    con.close()
+    assert len(anchored) == 1
+    assert anchored[0][0] == result["batch_id"]
+    assert anchored[0][1] == result["backup"]
+    assert anchored[0][2] == result["backup_sha256"]
+    assert anchored[0][3] == (tmp_path / "first.sqlite").stat().st_size
+
+
+def test_a_failed_addition_leaves_no_anchor_behind(tmp_path: Path) -> None:
+    """The anchor is part of the transaction, so a rollback removes it too."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    add_issues(db, root, tmp_path / "first.sqlite", approval_note="n")
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM observation WHERE issue='26093'")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError):
+        add_issues(db, root, tmp_path / "second.sqlite", approval_note="n")
+    con = sqlite3.connect(db)
+    assert con.execute("SELECT COUNT(*) FROM issue_addition_anchor").fetchone()[0] == 1
+    con.close()
 
 
 def test_a_changed_added_row_refuses_the_rerun(tmp_path: Path) -> None:
