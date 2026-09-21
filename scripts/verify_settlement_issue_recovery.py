@@ -160,18 +160,28 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                     """SELECT g.observation_id, g.slot, g.play, g.native_match_id, g.old_score,
                               g.new_score, g.old_halftime_score, g.new_halftime_score,
                               g.new_expected_option, g.new_options_json, g.evidence_sha256,
-                              o.score, o.halftime_score, o.expected_option
+                              g.replaced_options_json, g.old_payload_sha256, g.native_match_id,
+                              o.score, o.halftime_score, o.expected_option, o.payload_json,
+                              o.native_match_id
                        FROM issue_recovery_gap g JOIN observation o USING(observation_id)
                        WHERE g.batch_id=? AND g.issue=? ORDER BY g.slot, g.play""",
                     (batch_id, issue)).fetchall()
                 issue_mismatches, slots = [], set()
                 for (observation_id, slot, play, native_id, old_score, new_score, old_halftime,
-                     new_halftime, new_option, new_options, evidence_sha256, db_score,
-                     db_halftime, db_option) in audited:
+                     new_halftime, new_option, new_options, evidence_sha256,
+                     replaced_options, old_payload_sha256, audited_native_id, db_score,
+                     db_halftime, db_option, db_payload, db_native_id) in audited:
                     row = rows.get((slot, play))
                     before = backup_con.execute(
                         """SELECT payload_json, score, halftime_score FROM observation
                            WHERE issue=? AND slot=? AND play=?""", (issue, slot, play)).fetchone()
+                    before_vector = [
+                        {"option": o, "raw_sp": r, "sp": s, "cell_id": c}
+                        for o, r, s, c in backup_con.execute(
+                            "SELECT s.option, s.raw_sp, s.sp, s.cell_id FROM option_sp s "
+                            "JOIN observation o USING(observation_id) "
+                            "WHERE o.issue=? AND o.slot=? AND o.play=? ORDER BY s.rowid",
+                            (issue, slot, play))]
                     slots.add(slot)
                     gap_observations_seen += 1
                     if row is None or before is None:
@@ -193,7 +203,15 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                           and settlement_vector_matches(stored_vector, row)
                           and row["source_sha256"] == evidence_sha256
                           and before[1] in ("", "-")
-                          and before[2] == old_halftime and old_score == before[1])
+                          and before[2] == old_halftime and old_score == before[1]
+                          # The pre-recovery payload is never rewritten, so it must equal
+                          # the backup's and still hash as the batch recorded.
+                          and db_payload == before[0]
+                          and hashlib.sha256(db_payload.encode()).hexdigest() == old_payload_sha256
+                          and (db_native_id, audited_native_id) == (native_id, native_id)
+                          # The replaced reference vector is evidence too: it must be what
+                          # the backup held before the recovery.
+                          and replaced_options == json.dumps(before_vector, ensure_ascii=False))
                     if not ok:
                         issue_mismatches.append(
                             {"slot": slot, "play": play,

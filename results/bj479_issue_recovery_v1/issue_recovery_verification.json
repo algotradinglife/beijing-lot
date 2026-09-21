@@ -1,9 +1,9 @@
 {
  "schema": "bj479_issue_recovery_verification_v1",
  "database": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
- "database_sha256": "77bc8926a0d7228e092c9d81fe8c9559dc6b9308414a339b12b153e56ee7192a",
+ "database_sha256": "96534370613b87041b8e8f1963ffd27c317e46b38dc06d9679d75f32d0a141cd",
  "batch_id": "e9de2d240e8b32a29696f9fbe459ff80247979cbffab91f8a70b75c5646b7d61",
- "applied_at": "2026-09-21T02:00:57.066631+00:00",
+ "applied_at": "2026-09-21T02:17:22.603180+00:00",
  "note": "Owner approved: recover the five quarantined issues and complete 26092's 27 unsettled fixtures from the source's own archive board, replacing the reference odds the live board published in the settlement column.",
  "recorded_backup": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/nowscore_history_replay.before_bj479_issue_recovery.sqlite",
  "evidence_manifest": [

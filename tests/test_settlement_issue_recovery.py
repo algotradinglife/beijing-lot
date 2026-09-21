@@ -354,6 +354,116 @@ def test_a_failure_during_the_write_rolls_everything_back(tmp_path: Path) -> Non
     assert (tmp_path / "backup.sqlite").exists()
 
 
+def test_a_missing_winning_option_refuses_the_rerun(tmp_path: Path) -> None:
+    """Dropping the settled option while blank rows remain must not pass verification."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM option_sp WHERE option='胜'")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="stored options changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_payload_only_change_refuses_the_rerun(tmp_path: Path) -> None:
+    """The stored payload is the canonical evidence-derived record, so it is compared too."""
+    db = addition_db(tmp_path)
+    path = addition_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET payload_json='{\"tampered\": true}' "
+                "WHERE issue='23075' AND slot=1 AND play='spf'")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="recovered values changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_tampered_pre_recovery_payload_refuses_the_rerun(tmp_path: Path) -> None:
+    """A gap row's payload supplies the fallback handicap, so it must still hash as recorded."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET payload_json='{\"handicap\": 3}' WHERE slot=1")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="pre-recovery payload changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_two_gap_issues_are_verified_per_issue(tmp_path: Path) -> None:
+    """Gap accounting is keyed by issue, so a second issue must not break the rerun."""
+    db = gap_db(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (99, "26093", 5, "spf", "1005", "22:25", "-", "-", None, "a" * 64, "", "",
+                 json.dumps({"handicap": 0})))
+    for option, sp in (("胜", 3.28), ("平", 2.49), ("负", 3.40)):
+        con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)", (99, option, f"{sp:.2f}", sp,
+                                                                 f"ref-{option}"))
+    con.commit()
+    con.close()
+    doc = json.loads(gap_ledger(tmp_path).read_text(encoding="utf-8"))
+    fixtures = [(5, "2-1", "1-0", *PLAY_LABELS[typeid]) for typeid in sorted(PLAY_LABELS)]
+    doc["gap_fills"].append(
+        {"issue": "26093", "expected_fixtures": 1, "expected_gap_fixtures": 1,
+         "expected_gap_slots": [5],
+         "evidence": [evidence(tmp_path, "26093", typeid,
+                               [(5, "2-1", "1-0", PLAY_LABELS[typeid][0],
+                                 PLAY_LABELS[typeid][1])])
+                      for typeid in sorted(PLAY_LABELS)]})
+    doc["gap_fills"][1]["evidence"] = [
+        dict(e, path=str(e["path"]).replace("26092", "26093")) for e in doc["gap_fills"][1]["evidence"]]
+    for entry in doc["gap_fills"][1]["evidence"]:
+        Path(entry["path"]).write_bytes(Path(entry["path"]).read_bytes())
+    path = ledger(tmp_path, doc, "two-gaps.json")
+    result = recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    assert result["gap_observations"] == 2
+    again = recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+    assert again["status"] == "already_applied" and again["gap_observations"] == 2
+    assert sorted(rows(db, "SELECT issue, COUNT(*) FROM issue_recovery_gap GROUP BY issue")) == [
+        ("26092", 1), ("26093", 1)]
+
+
+def test_an_addition_whose_archive_omits_the_handicap_is_accepted(tmp_path: Path) -> None:
+    """Many archive rows leave the line empty; the audit records that rather than guessing."""
+    db = addition_db(tmp_path)
+    path = addition_ledger(tmp_path, handicap="")
+    result = recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    assert result["status"] == "applied"
+    assert rows(db, "SELECT DISTINCT expected_option FROM observation "
+                    "WHERE play='spf'") == [(None,)]
+    assert rows(db, "SELECT DISTINCT expected_option FROM observation "
+                    "WHERE play='bf'") == [("2:1",)]
+    assert rows(db, "SELECT COUNT(*) FROM finding WHERE code='missing_or_invalid_handicap' "
+                    "AND play='spf'")[0][0] == 2
+
+
+def test_an_incomplete_backup_is_removed_when_the_run_fails(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A reserved-but-empty backup must not survive a failed run and block the retry."""
+    db = addition_db(tmp_path)
+    backup = tmp_path / "b.sqlite"
+
+    real_connect = sqlite3.connect
+
+    def connect(target, *args, **kwargs):
+        # Fail the destination connection, which the applier opens only after it has
+        # reserved the backup path.
+        if str(target) == str(backup):
+            raise sqlite3.OperationalError("backup failed")
+        return real_connect(target, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    with pytest.raises(sqlite3.OperationalError, match="backup failed"):
+        recover_issues(db, addition_ledger(tmp_path), backup, approval_note="owner approved")
+    assert not backup.exists(), "the reserved empty backup must be cleaned up"
+    assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='23075'")[0][0] == 0
+
+
 def test_refuses_when_evidence_bytes_do_not_match_the_ledger(tmp_path: Path) -> None:
     db = addition_db(tmp_path)
     path = addition_ledger(tmp_path)

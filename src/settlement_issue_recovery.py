@@ -69,7 +69,8 @@ _GAP_DDL = """CREATE TABLE IF NOT EXISTS issue_recovery_gap (
     old_halftime_score TEXT NOT NULL, new_halftime_score TEXT NOT NULL,
     old_expected_option TEXT, new_expected_option TEXT NOT NULL,
     new_options_json TEXT NOT NULL, replaced_options_json TEXT NOT NULL,
-    evidence_sha256 TEXT NOT NULL, note TEXT NOT NULL, applied_at TEXT NOT NULL,
+    old_payload_sha256 TEXT NOT NULL, evidence_sha256 TEXT NOT NULL, note TEXT NOT NULL,
+    applied_at TEXT NOT NULL,
     PRIMARY KEY (observation_id))"""
 
 
@@ -135,7 +136,14 @@ def settlement_vector_matches(stored: list[dict], archive_row: dict) -> bool:
     """
     if not stored:
         return False
+    names = [row["option"] for row in stored]
+    if len(set(names)) != len(names):
+        return False
     archived = {o["option"]: o for o in archive_row["options"]}
+    # A stored vector that lost the winning row must not pass: every option the archive
+    # names has to be present, not merely every stored option accounted for.
+    if set(archived) - set(names):
+        return False
     for row in stored:
         a = archived.get(row["option"])
         want = ((a["raw_sp"], a["sp"], a["cell_id"]) if a is not None else (None, None, None))
@@ -254,7 +262,7 @@ def _gap_targets(con, item: dict) -> list[tuple]:
                 raise ValueError(f"issue {issue} slot {slot} {play_name}: archive names options "
                                  f"the release does not carry")
             targets.append((observation_id, issue, slot, play_name, native_id, score,
-                            halftime, expected, source, new_option))
+                            halftime, expected, source, new_option, payload))
     fixtures = {(t[1], t[2]) for t in targets}
     if len(fixtures) != item["expected_gap_fixtures"]:
         raise ValueError(f"issue {issue}: settled {len(fixtures)} gap fixtures, ledger expects "
@@ -268,15 +276,17 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
     """Re-read the evidence and confirm the stored recovery still matches it.
 
     The idempotent path must not certify a damaged recovery, so counts alone are not
-    enough: every added row, every added option and every completed value is compared
-    against the bytes the ledger binds.
+    enough: every added row, payload and option is compared against the bytes the ledger
+    binds, and every completed value is re-derived from the archive rather than read back
+    from the audit table that recorded it.
     """
     added = 0
     for item in additions:
         issue = item["issue"]
         stored = con.execute(
             """SELECT observation_id, slot, play, native_match_id, status, score,
-                      halftime_score, expected_option, source_sha256, source_url, received_at
+                      halftime_score, expected_option, source_sha256, source_url, received_at,
+                      payload_json
                FROM observation WHERE issue=?""", (issue,)).fetchall()
         rows = [row for entry in item["evidence"] for row in _parse_evidence(entry, issue)]
         if len(stored) != len(rows):
@@ -284,19 +294,21 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                              f"{len(rows)}")
         by_key = {(r["slot"], r["play"]): r for r in rows}
         for (observation_id, slot, play, native_id, status, score, halftime, expected,
-             source_sha256, source_url, received_at) in stored:
+             source_sha256, source_url, received_at, payload) in stored:
             row = by_key.get((slot, play))
             if row is None:
                 raise ValueError(f"issue {issue} slot {slot} {play}: stored row absent "
                                  f"from the evidence")
             held = (native_id, status, score, halftime, expected, source_sha256,
-                    source_url, received_at)
+                    source_url, received_at,
+                    json.dumps(json.loads(payload), ensure_ascii=False))
             want = (row["native_match_id"], row["status"], row["score"],
                     row["halftime_score"], expected_option(row), row["source_sha256"],
-                    row["source_url"], row["received_at"])
+                    row["source_url"], row["received_at"],
+                    json.dumps(json.loads(canonical(row)), ensure_ascii=False))
             if held != want:
                 raise ValueError(f"issue {issue} slot {slot} {play}: recovered values changed")
-            if _stored_vector(con, observation_id) != _settlement_vector(row):
+            if not settlement_vector_matches(_stored_vector(con, observation_id), row):
                 raise ValueError(f"issue {issue} slot {slot} {play}: recovered options changed")
             added += 1
 
@@ -305,21 +317,32 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
         issue = item["issue"]
         archive = {(row["slot"], row["play"]): row
                    for entry in item["evidence"] for row in _parse_evidence(entry, issue)}
-        for (observation_id, slot, play, new_score, new_halftime, new_option,
-             new_options, evidence_sha256) in con.execute(
-                """SELECT observation_id, slot, play, new_score, new_halftime_score,
-                          new_expected_option, new_options_json, evidence_sha256
+        for (observation_id, slot, play, native_id, new_score, new_halftime, new_option,
+             old_payload_sha256) in con.execute(
+                """SELECT observation_id, slot, play, native_match_id, new_score,
+                          new_halftime_score, new_expected_option, old_payload_sha256
                    FROM issue_recovery_gap WHERE batch_id=? AND issue=?""", (batch, issue)):
             source = archive.get((slot, play))
-            if source is None or source["source_sha256"] != evidence_sha256:
-                raise ValueError(f"issue {issue} slot {slot} {play}: gap evidence changed")
+            if source is None:
+                raise ValueError(f"issue {issue} slot {slot} {play}: no archive row")
             held = con.execute(
-                """SELECT score, halftime_score, expected_option FROM observation
-                   WHERE observation_id=?""", (observation_id,)).fetchone()
-            if held != (new_score, new_halftime, new_option):
+                """SELECT native_match_id, score, halftime_score, expected_option, payload_json
+                   FROM observation WHERE observation_id=?""", (observation_id,)).fetchone()
+            if held is None or held[0] != source["native_match_id"]:
+                raise ValueError(f"issue {issue} slot {slot} {play}: row identity changed")
+            # The payload is the pre-recovery record and is never rewritten, so it must
+            # still hash as recorded; it supplies the handicap the archive omits.
+            payload = held[4]
+            if hashlib.sha256(payload.encode()).hexdigest() != old_payload_sha256:
+                raise ValueError(f"issue {issue} slot {slot} {play}: pre-recovery payload "
+                                 f"changed")
+            derived = settled_option(source, json.loads(payload))
+            if (held[1], held[2], held[3]) != (new_score, new_halftime, new_option):
                 raise ValueError(f"issue {issue} slot {slot} {play}: completed values changed")
-            if new_options != json.dumps(_settlement_vector(source), ensure_ascii=False):
-                raise ValueError(f"issue {issue} slot {slot} {play}: completed options changed")
+            if (source["score"], source["halftime_score"], derived) != (
+                    new_score, new_halftime, new_option):
+                raise ValueError(f"issue {issue} slot {slot} {play}: completion disagrees "
+                                 f"with the archive")
             if not settlement_vector_matches(_stored_vector(con, observation_id), source):
                 raise ValueError(f"issue {issue} slot {slot} {play}: stored options changed")
             gaps += 1
@@ -436,7 +459,7 @@ def recover_issues(database, ledger_path, backup_path, *, approval_note):
                             (batch, item["issue"], entry["typeid"], entry["url"],
                              entry["sha256"], entry["received_at"], entry["byte_count"], None))
             for (observation_id, issue, slot, play, native_id, score, halftime, expected,
-                 source, new_option) in targets:
+                 source, new_option, payload) in targets:
                 # The live board publishes pre-match reference odds in the settlement
                 # column while a fixture is unplayed, and the single settlement SP once it
                 # settles. The archive's record is the settlement one, so the whole vector
@@ -461,12 +484,13 @@ def recover_issues(database, ledger_path, backup_path, *, approval_note):
                 if changed.rowcount != 1:
                     raise ValueError("Conditional gap update did not affect exactly one row")
                 con.execute("INSERT INTO issue_recovery_gap VALUES "
-                            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                             (observation_id, batch, issue, slot, play, native_id, score,
                              source["score"], halftime, source["halftime_score"], expected,
                              new_option, json.dumps(_settlement_vector(source),
                                                     ensure_ascii=False),
                              json.dumps(replaced_vector, ensure_ascii=False),
+                             hashlib.sha256(payload.encode()).hexdigest(),
                              source["source_sha256"], note, now))
                 gap_observations += 1
 

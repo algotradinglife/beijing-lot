@@ -162,6 +162,35 @@ def test_replay_catches_a_missing_or_extra_added_row(tmp_path: Path) -> None:
     assert report["additions"][0]["mismatch_count"] >= 1
 
 
+def test_replay_catches_a_replaced_reference_vector(tmp_path: Path) -> None:
+    """The replaced reference odds are evidence: rewriting them must fail the replay."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE issue_recovery_gap SET replaced_options_json='[]'")
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_catches_a_payload_only_change(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET payload_json='{\"tampered\": true}' "
+                "WHERE issue=? AND slot=1 AND play='spf'", (ADDED,))
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_catches_a_deleted_winning_option(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM option_sp WHERE observation_id=1 AND option='胜'")
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
 def test_replay_refuses_tampered_evidence(tmp_path: Path) -> None:
     db, ledger, backup = _applied(tmp_path)
     item = json.loads(ledger.read_text(encoding="utf-8"))["gap_fills"][0]["evidence"][0]
