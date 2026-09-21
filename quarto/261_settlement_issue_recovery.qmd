@@ -149,7 +149,7 @@ cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
 - `scripts/apply_issue_recovery.py`、`scripts/verify_settlement_issue_recovery.py` — 薄入口与只读复放。
 - 测试：`tests/test_settlement_issue_recovery.py`、
   `tests/scripts/test_build_issue_recovery_ledger.py`、
-  `tests/scripts/test_verify_settlement_issue_recovery.py`（静态枚举共 **85** 项：模块 48、构建/应用 11、复放 26；全通过）。
+  `tests/scripts/test_verify_settlement_issue_recovery.py`（静态枚举共 **89** 项：模块 48、构建/应用 11、复放 30；全通过）。
 
   按**调用方**分别列出已覆盖的失败路径。归类依据是实际调用：模块测试调用 `recover_issues`
   （含写入前闸门与重跑守卫；**22** 个用例会再次调用 `recover_issues` 从而触发重跑守卫），
