@@ -1,0 +1,165 @@
+---
+title: "被隔离期次与缺口场次的归档页恢复（#479 项 3）"
+subtitle: "5 期整页隔离 + 26092 的 27 场未结算场次，从源站归档板恢复为记录在案的审计层"
+params:
+  verification_json: "results/bj479_issue_recovery_v1/issue_recovery_verification.json"
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+#479 排查出两个采集缺口，本报告是它们的收尾：
+
+1. **5 期整页隔离**（20082 / 20123 / 23075 / 24014 / 25114）—— 直播板
+   （`DanChang.aspx`）对每一期都**永久隐藏**一部分场次，整页因此触发 `RosterConflict`
+   而被隔离，这 5 期在库中**一条观测都没有**。
+2. **26092 的 27 场未结算**（slot 362–388）—— 该期在**开赛前**采集，直播板当时没有结果；
+   另有 2 场（slot 190 / 227）是**取消**，本来就没有结果。
+
+源站自己的**归档板**（`kaijiang_dc_<typeid>_<issue>.html`）对这 6 期是完整的：它渲染直播板
+隐藏的全部场次，并在该轮结束后保留结果。本报告记录从归档板恢复的数据层，**只读**，不联网。
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+stopifnot(requireNamespace("jsonlite", quietly = TRUE))
+stopifnot(is.character(params$verification_json), length(params$verification_json) == 1L,
+          !is.na(params$verification_json), file.exists(params$verification_json))
+v <- jsonlite::fromJSON(params$verification_json, simplifyVector = FALSE)
+stopifnot(identical(v$schema, "bj479_issue_recovery_verification_v1"))
+stopifnot(length(v$additions) == 5L, !is.null(v$gap_fill))
+```
+
+## 结论摘要
+
+```{r}
+cat("判定通过：", v$conclusion$verified, "\n")
+cat("恢复期次：", paste(unlist(v$receipt$recovered_issues), collapse = " / "),
+    "｜新增场次：", v$conclusion$recorded_added_fixtures,
+    "｜新增观测：", v$conclusion$recorded_added_observations, "\n")
+cat("缺口回填期次：", paste(unlist(v$receipt$gap_filled_issues), collapse = " / "),
+    "｜回填场次：", v$conclusion$recorded_gap_fixtures,
+    "｜回填观测：", v$conclusion$recorded_gap_observations, "\n")
+cat("证据文件复核：", v$replay$evidence_files_verified, "个，哈希全部匹配：",
+    v$replay$all_hashes_match, "｜库内值全部由证据复现：", v$replay$all_values_reproduced, "\n")
+cat("库内登记的证据文件：", v$recorded_evidence_files, "｜capture 重绑不符：",
+    length(v$capture_rebind_mismatches), "\n")
+cat("备份 quick_check：", v$backup$quick_check,
+    "｜恢复前该 5 期确实为空：", v$backup$additions_absent_before,
+    "｜恢复前缺口场次确实未结算：", v$backup$gap_fixtures_unsettled_before, "\n")
+cat("\n恢复批次号：", v$batch_id, "\n")
+cat("当前库文件 sha256：", v$database_sha256, "\n")
+```
+
+## 恢复明细：5 个被隔离期次
+
+```{r}
+rows <- lapply(v$additions, function(a) {
+  data.frame(
+    期次 = a$issue, 预期场次 = a$expected_fixtures,
+    复放场次 = a$replayed_fixtures, 复放观测 = a$replayed_observations,
+    不符条数 = a$mismatch_count, 复放一致 = a$replay_agrees, stringsAsFactors = FALSE)
+})
+tibble::as_tibble(do.call(rbind, rows))
+```
+
+每期都是 **5 个玩法 × 全部场次**，因此观测数 = 场次 × 5。
+
+## 缺口回填：26092 的未结算场次
+
+```{r}
+cat("期次：", v$gap_fill$issue, "｜回填场次：", length(v$gap_fill$fixtures),
+    "（slot ", min(unlist(v$gap_fill$fixtures)), "–", max(unlist(v$gap_fill$fixtures)), "）",
+    "｜回填观测：", v$gap_fill$observations, "\n")
+cat("复放一致：", v$gap_fill$replay_agrees, "｜不符条数：", length(v$gap_fill$mismatches), "\n")
+```
+
+**取消场次不被回填。** slot 190 / 227 在直播板与归档板**都**没有结果（归档板写作 `取消`，
+直播板留 `-`），两者语义一致 —— 它们**本来就没有结果**，因此既不回填也不进审计表。
+回填后 26092 仅剩这 2 场 × 5 玩法 = 10 条无结果观测。
+
+归档板对**开赛前采集**的场次会留空**让球**格。此时中奖选项仍由比分推导，但让球取自
+**库自身**的记录（直播板有值），并要求推导结果与归档板报出的彩果**一致** —— 两者不符即失败关闭。
+
+## 证据来源明细
+
+```{r}
+src <- do.call(rbind, lapply(c(v$additions, list(v$gap_fill)), function(e) {
+  do.call(rbind, lapply(e$sources, function(s) data.frame(
+    期次 = e$issue, typeid = s$typeid, 字节 = s$bytes,
+    sha256 = substr(s$sha256, 1, 16), stringsAsFactors = FALSE)))
+}))
+tibble::as_tibble(src)
+```
+
+```{r}
+links <- unique(unlist(lapply(c(v$additions, list(v$gap_fill)), function(e)
+  vapply(e$sources, function(s) s$url, character(1)))))
+cat(paste0("- ", links, collapse = "\n"), "\n")
+```
+
+证据原始字节保留在 `audits/bj479-quarantine-recovery-v1/raw/`（30 个归档页），
+账本为同目录的 `recovery-ledger.json`。
+
+## 回执绑定
+
+```{r}
+rc <- v$receipt
+cat("构建回执 data_sha256（恢复前快照）：", rc$data_sha256, "\n")
+cat("有效来源：", rc$effective_source, "\n")
+cat("恢复批次：", rc$issue_recovery_batch_id,
+    "（", rc$recovered_fixtures, " 场 / ", rc$recovered_observations, " 观测）\n")
+cat("缺口回填：", rc$gap_filled_fixtures, " 场 / ", rc$gap_filled_observations, " 观测\n")
+cat("授权：", v$ledger_authorization, "\n")
+cat("备份：", v$backup$path, "\n")
+```
+
+`issue_recovery_batch.original_receipt_json` 保留**恢复前**的构建回执，`data_sha256` 因此仍是
+恢复前的快照哈希；`registry/settlement-current.json` 的 `hash_note` 已同步说明，注册表登记的是
+**恢复后**的文件哈希，并在 `corrections` 数组中登记本批次与备份。
+
+## 校验与失败关闭
+
+```{r}
+cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
+```
+
+实现与测试：
+
+- `src/settlement_issue_recovery.py` — 事务写入：审批备注必填、路径互斥、账本哈希即批次号、
+  证据哈希复核、**先全部校验再写入**、备份在写入**之前**完成并 `quick_check`、失败整体回滚、
+  重跑幂等（复核每一行后才返回 `already_applied`）。复用 `parse_page` / `expected_option` /
+  `audit_rows` / `canonical`，不另写业务逻辑；推导规则由 `settled_option` 单一实现。
+- `scripts/build_issue_recovery_ledger.py` — 从保留的归档页绑定哈希/URL/字节数，并从库自身
+  推导缺口场次（**库未结算 ∩ 归档已结算**），不联网。
+- `scripts/apply_issue_recovery.py`、`scripts/verify_settlement_issue_recovery.py` — 薄入口与只读复放。
+- 测试：`tests/test_settlement_issue_recovery.py`、
+  `tests/scripts/test_build_issue_recovery_ledger.py`、
+  `tests/scripts/test_verify_settlement_issue_recovery.py`（共 32 项，全通过）。
+
+**闸门（全部失败关闭）**：恢复的期次必须一条观测都没有；归档的场次数必须等于账本；5 个玩法
+必须给出一致的场次集合；归档行的 `native_match_id` 必须与库一致；缺口场次集合必须等于账本；
+归档报出的彩果必须等于由比分推导的选项；归档不得提出库里没有的选项；取消场次不得被回填。
+
+## 局限
+
+```{r}
+cat(paste0("- ", unlist(v$conclusion$limitations), collapse = "\n"), "\n")
+```
+
+补充说明：
+
+- **这是记录层，不是重建。** sealed 发布的 bundle 把**每个请求的 URL 算作源范围**，
+  `verify_history_replay_origin` 只允许变 `generated_at` / `implementation_sha256` /
+  `plan_sha256`，不允许改范围。因此把这 6 期改由归档页提供，会让现有 84 个批次回执**全部失效**，
+  只能全量重抓 8,325 页（实测原采集耗时 **13.1 小时**，平均 5.67 秒/页 —— 13 小时是**限速**
+  而非数据量）。为 6 期数据付这个代价不划算，故改为审计层。恢复的期次**本就不在**原发布内，
+  缺口期次以本层**覆盖**，消费方按并集使用。
+- **来源同一性。** 恢复数据来自源站**自己的**归档板，不是独立第三方；澳客（`okooo`）可独立
+  印证的场次是归档板的**严格子集**（六期都是），已另行核对。因此本层不声称独立印证。
+- **`capture` 的重绑只发生在恢复期次上**：这 5 期的主来源变为归档页（被顶替的直播页哈希记在
+  `issue_recovery_capture.replaced_sha256`）。26092 的 `capture` **不变** —— 直播板仍是那 27 场
+  的主来源，归档页只是补上了结果，其证据记在 `issue_recovery_capture` 与 `issue_recovery_gap`。
+- `observation.payload_json` 保留源站自己的字节，**刻意不重写**；因此从缺口行的载荷重新推导，
+  得到的是直播板的未结算值，而非归档板的结果。

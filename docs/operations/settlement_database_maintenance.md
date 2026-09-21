@@ -187,6 +187,51 @@ finding 记录的是**构建当时**在源站字节里观察到的事实，因�
 若某期次的**内嵌 JS 阵容**列出了可见行没有的场次（源站会隐藏部分场次），该页会被整体隔离
 （`source_roster_conflict`）。此时改用该期次的**归档开奖页**重抓，它渲染全部场次。
 
+## 恢复被隔离期次与缺口场次
+
+直播板对每一期都**永久隐藏**一部分场次，整页因此可能被隔离；且直播板若在**开赛前**采集，
+就没有该轮的结果。归档开奖页对这些期次是完整的。
+
+**重建不可行。** sealed 发布的 bundle 把**每个请求的 URL 算作源范围**，
+`verify_history_replay_origin` 只允许变 `generated_at` / `implementation_sha256` /
+`plan_sha256`，不允许改范围。因此把这 6 期改由归档页提供，会让现有 84 个批次回执**全部失效**，
+只能全量重抓 8,325 页（实测原采集 13.1 小时，平均 5.67 秒/页 —— 13 小时是**限速**而非数据量）。
+为 6 期数据付这个代价不划算，故改为**记录在案的审计层**。
+
+先建账本（读库、不联网），再应用，最后只读复放：
+
+```sh
+.venv/bin/python scripts/build_issue_recovery_ledger.py \
+  --data-root "$BEIJING_LOT_DATA_ROOT" --database "$SETTLEMENT_DB" \
+  --evidence-dir "$BEIJING_LOT_DATA_ROOT/audits/bj479-quarantine-recovery-v1/raw" \
+  --output "$RECOVERY_LEDGER" --authorization '已批准的依据' \
+  --addition 20082:206 --addition 20123:458 --addition 23075:196 \
+  --addition 24014:245 --addition 25114:308 --gap-fill 26092:388
+
+.venv/bin/python scripts/apply_issue_recovery.py \
+  --data-root "$BEIJING_LOT_DATA_ROOT" --database "$SETTLEMENT_DB" \
+  --ledger "$RECOVERY_LEDGER" --backup "$RECOVERY_BACKUP" \
+  --approval-note '已批准的裁决编号与依据'
+
+.venv/bin/python scripts/verify_settlement_issue_recovery.py \
+  --database "$SETTLEMENT_DB" --ledger "$RECOVERY_LEDGER" --backup "$RECOVERY_BACKUP" \
+  --out results/bj479_issue_recovery_v1/issue_recovery_verification.json
+```
+
+账本从库自身推导缺口场次（**库未结算 ∩ 归档已结算**），因此**取消场次不会被回填** ——
+直播板留 `-`、归档板写作 `取消`，两者都表示没有结果，语义一致。
+
+闸门（全部失败关闭）：恢复的期次必须**一条观测都没有**；归档的场次数必须等于账本；5 个玩法
+必须给出一致的场次集合；归档行的 `native_match_id` 必须与库一致；缺口场次集合必须等于账本；
+归档报出的彩果必须等于**由比分推导**的选项；归档不得提出库里没有的选项。归档板对开赛前采集
+的场次会留空让球格，此时让球取自**库自身**的记录。
+
+`capture` 的重绑只发生在**恢复期次**上（被顶替的直播页哈希记在
+`issue_recovery_capture.replaced_sha256`）；缺口期次的 `capture` **不变** —— 直播板仍是那批
+场次的主来源，归档证据记在 `issue_recovery_capture` 与 `issue_recovery_gap`。
+交付文档见 [QMD 261](../quarto/261_settlement_issue_recovery.qmd)。
+
+
 ## R 与 QMD
 
 见 [R 查询示例](nowscore_settlement_queries.md)。完整查询接口仍是

@@ -18,6 +18,7 @@ project:
     - quarto/11_issue_discovery_contract.qmd
     - quarto/257_settlement_quarantine_replay.qmd
     - quarto/260_settlement_halftime_correction.qmd
+    - quarto/261_settlement_issue_recovery.qmd
 
 execute:
   freeze: false
