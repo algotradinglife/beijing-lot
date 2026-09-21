@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import gzip
+import hashlib
+import json
+import re
 import sys
 from pathlib import Path
 
@@ -16,6 +20,11 @@ from src.settlement_halftime_evidence import (  # noqa: E402
     corroborate_half_full,
     half_full_option,
 )
+
+# The module's own registries, so an extractor that is added without a preserved page fails the
+# coverage example below rather than going unnoticed.
+_REAL_EXTRACTORS = dict(EXTRACTORS)
+_REAL_EXTRACTORS.update(HALF_FULL_EXTRACTORS)
 
 
 FIXTURE = {"home": "甲队", "away": "乙队", "date": "2021-08-06", "slot": 90,
@@ -179,3 +188,75 @@ def test_corroborate_half_full_refuses_disagreeing_sps() -> None:
 def test_corroborate_half_full_refuses_without_any_source() -> None:
     with pytest.raises(ValueError, match="at least one half/full settlement source"):
         corroborate_half_full((2, 2), (2, 3), {})
+
+
+# --- Real pages the sources actually served ------------------------------------------------
+#
+# Every extractor above is otherwise only exercised against markup this file builds, which is
+# how the Okooo parser stayed green while it destroyed the team names: a page that is only ever
+# seen as the author's idea of it proves nothing about the source. These cases drive each
+# extractor with the bytes preserved during the #479 corroboration, and the identity that comes
+# with them is the record of the change those pages authorized.
+
+_FIXTURES = Path(__file__).parent / "fixtures" / "halftime_evidence"
+_CASE_DATA = json.loads((_FIXTURES / "cases.json").read_text(encoding="utf-8"))
+_CASES = _CASE_DATA["cases"]
+def _page(case: dict) -> bytes:
+    path = (_FIXTURES / case["page"]).resolve()
+    assert path.exists(), f"missing preserved page {case['page']}"
+    return gzip.open(path, "rb").read()
+
+
+def test_real_page_evidence_covers_every_extractor() -> None:
+    """An extractor added without preserved page bytes should fail here, not pass unnoticed."""
+    covered = {case["source_id"] for case in _CASES}
+    assert covered == set(_REAL_EXTRACTORS), sorted(set(_REAL_EXTRACTORS) - covered)
+
+
+@pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")
+def test_extractor_reads_the_half_time_from_the_preserved_page(case: dict) -> None:
+    payload = _page(case)
+    if case.get("page_sha256"):
+        assert hashlib.sha256(payload).hexdigest() == case["page_sha256"]
+    got = _REAL_EXTRACTORS[case["source_id"]](payload, case["fixture"])
+    if case["source_id"] in HALF_FULL_EXTRACTORS:
+        # the half-full board answers with the settlement option and its price, not a score
+        assert got["option"] == case["expected_option"]
+        assert got["sp"] == pytest.approx(case["sp"])
+        assert (got["ft_home"], got["ft_away"]) == (case["fixture"]["ft_home"], case["fixture"]["ft_away"])
+    else:
+        assert (got["home"], got["away"]) == tuple(int(p) for p in case["expected_half"].split("-"))
+        assert (got["ft_home"], got["ft_away"]) == (case["fixture"]["ft_home"], case["fixture"]["ft_away"])
+
+
+def _page_text(payload: bytes) -> str:
+    """Decode a preserved page with the charset it declares, not with a guess.
+
+    Okooo serves GB2312: decoding its pages as UTF-8 loses the Chinese names that identify the
+    fixture, which is the same substitution that made the Okooo parser produce unreadable teams.
+    """
+    declared = re.search(rb'charset=["\']?([\w-]+)', payload[:4096])
+    for encoding in ([declared.group(1).decode("ascii")] if declared else []) + ["utf-8", "gb18030"]:
+        try:
+            return payload.decode(encoding)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    raise AssertionError("no encoding decodes this page")
+
+
+@pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")
+def test_the_preserved_page_is_that_fixture(case: dict) -> None:
+    """A page that is not this fixture's must not be read as evidence for it."""
+    token = case["identity_token"]
+    assert token, f"{case['page']} records no identity token"
+    assert token in _page_text(_page(case)), (
+        f"{case['page']} does not mention {token}, so it is not this fixture's page")
+
+
+@pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")
+def test_the_preserved_page_still_fails_closed_on_another_fixture(case: dict) -> None:
+    """The real page passed through the gate must reject a different fixture's score."""
+    payload = _page(case)
+    other = dict(case["fixture"], ft_home=case["fixture"]["ft_home"] + 1)
+    with pytest.raises(ValueError):
+        _REAL_EXTRACTORS[case["source_id"]](payload, other)

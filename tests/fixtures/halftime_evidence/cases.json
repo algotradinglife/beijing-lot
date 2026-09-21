@@ -1,0 +1,183 @@
+{
+  "schema": "halftime_evidence_fixtures_v1",
+  "note": "Pages preserved during the #479 half-time corroboration, with the identity that drives each extractor. Identity and expected values come from the correction ledgers that produced the applied changes; original bytes are committed gzipped so the extractors are exercised against what the sources actually served. A case carries the fixture fields its extractor reads: the identity fields come from the ledger, plus  where the extractor needs the board row. Okooo serves GB2312, so its pages identify a fixture by the Chinese names on the board; the identity example decodes with the declared charset before looking. Each case records the token that identifies its fixture inside that page, taken from the page itself: a Latin source spells the club in its own language, Okooo spells it in Chinese. A case without a token would mean the page does not identify the fixture.",
+  "cases": [
+    {
+      "issue": "21082",
+      "slot": 90,
+      "source_id": "globalsportsarchive",
+      "page": "gsa-21082-90.html.gz",
+      "fixture": {
+        "home": "戈尔韦联",
+        "away": "科克城",
+        "date": "2021-08-06",
+        "ft_home": 2,
+        "ft_away": 3,
+        "away_en": "Cork City"
+      },
+      "expected_half": "2-2",
+      "recorded_half": "3-2",
+      "ft": "2-3",
+      "page_sha256": "e767b5d0256bb264131a7c2d3c781b798b733e7ea9cc4bb41134a07bfff62245",
+      "identity_token": "Cork City"
+    },
+    {
+      "issue": "21082",
+      "slot": 90,
+      "source_id": "24score",
+      "page": "24score-21082-90.html.gz",
+      "fixture": {
+        "home": "戈尔韦联",
+        "away": "科克城",
+        "date": "2021-08-06",
+        "ft_home": 2,
+        "ft_away": 3,
+        "away_en": "Cork City"
+      },
+      "expected_half": "2-2",
+      "recorded_half": "3-2",
+      "ft": "2-3",
+      "page_sha256": "d7e8c4df0b800f04b132cdf13872015e2867f4555ddc5bb2e056b6dd826cc3d6",
+      "identity_token": "Cork City"
+    },
+    {
+      "issue": "21082",
+      "slot": 94,
+      "source_id": "sportsmole",
+      "page": "sportsmole-21082-94.html.gz",
+      "fixture": {
+        "home": "布鲁日",
+        "away": "色格拉",
+        "date": "2021-08-06",
+        "ft_home": 1,
+        "ft_away": 1,
+        "away_en": "Cercle Brugge"
+      },
+      "expected_half": "1-0",
+      "recorded_half": "2-0",
+      "ft": "1-1",
+      "page_sha256": "1a4c2bed230f1dca4de43c65bd871ef96b1fd6c6cbc6f5f5ae7fa522ee72eb64",
+      "identity_token": "Cercle Brugge"
+    },
+    {
+      "issue": "21082",
+      "slot": 94,
+      "source_id": "footballcritic",
+      "page": "footballcritic-21082-94.html.gz",
+      "fixture": {
+        "home": "布鲁日",
+        "away": "色格拉",
+        "date": "2021-08-06",
+        "ft_home": 1,
+        "ft_away": 1,
+        "away_en": "Cercle Brugge"
+      },
+      "expected_half": "1-0",
+      "recorded_half": "2-0",
+      "ft": "1-1",
+      "page_sha256": "2d6ee076fb2e91c5c59d6c37a9341a95154c4af7c9a7bab194305f55928b66f0",
+      "identity_token": "Cercle Brugge"
+    },
+    {
+      "issue": "24041",
+      "slot": 328,
+      "source_id": "sportsmole",
+      "page": "sportsmole-24041-328.html.gz",
+      "fixture": {
+        "home": "莱科",
+        "away": "奇塔代拉",
+        "date": "2024-04-01",
+        "ft_home": 1,
+        "ft_away": 1,
+        "away_en": "Cittadella"
+      },
+      "expected_half": "1-1",
+      "recorded_half": "2-1",
+      "ft": "1-1",
+      "page_sha256": "798ec97804f0412b4a7125bddc538374d7eb26bb002948313f8659c3f176bec2",
+      "identity_token": "Cittadella"
+    },
+    {
+      "issue": "24041",
+      "slot": 328,
+      "source_id": "transfermarkt",
+      "page": "transfermarkt-24041-328.html.gz",
+      "fixture": {
+        "home": "莱科",
+        "away": "奇塔代拉",
+        "date": "2024-04-01",
+        "ft_home": 1,
+        "ft_away": 1,
+        "away_en": "Cittadella"
+      },
+      "expected_half": "1-1",
+      "recorded_half": "2-1",
+      "ft": "1-1",
+      "page_sha256": "6c94ce91c5ecaca0f1822a1b19efbd43647bf1c329eb7d7ac4ebbbec567b7e4b",
+      "identity_token": "Cittadella"
+    },
+    {
+      "issue": "21082",
+      "slot": 90,
+      "source_id": "okooo_half_full",
+      "page": "okooo-banquan-21082.html.gz",
+      "fixture": {
+        "home": "戈尔韦联",
+        "away": "科克城",
+        "date": "2021-08-06",
+        "ft_home": 2,
+        "ft_away": 3,
+        "away_en": "Cork City",
+        "slot": 90
+      },
+      "expected_half": "2-2",
+      "ft": "2-3",
+      "expected_option": "平-负",
+      "recorded_option": "胜-负",
+      "sp": 16.07,
+      "page_sha256": "7a89466b6df1629b1efe5d6ffd1ea90a0cc94f43346c0e5200575d69ce39834b",
+      "identity_token": "科克城"
+    },
+    {
+      "issue": "24041",
+      "slot": 328,
+      "source_id": "okooo_half_full",
+      "page": "okooo-banquan-24041.html.gz",
+      "fixture": {
+        "home": "莱科",
+        "away": "奇塔代拉",
+        "date": "2024-04-01",
+        "ft_home": 1,
+        "ft_away": 1,
+        "away_en": "Cittadella",
+        "slot": 328
+      },
+      "expected_half": "1-1",
+      "ft": "1-1",
+      "expected_option": "平-平",
+      "recorded_option": "胜-平",
+      "sp": 5.17,
+      "page_sha256": "9a87b29f9c41ca3bf129150913282832a03b3277bdc15a9d9d4d71392cef04a3",
+      "identity_token": "奇塔代拉"
+    },
+    {
+      "issue": "21082",
+      "slot": 90,
+      "source_id": "okooo",
+      "page": "../okooo/livecenter-21082.html.gz",
+      "fixture": {
+        "home": "戈尔韦联",
+        "away": "科克城",
+        "date": "2021-08-06",
+        "ft_home": 2,
+        "ft_away": 3,
+        "away_en": "Cork City",
+        "slot": 90
+      },
+      "expected_half": "2-2",
+      "ft": "2-3",
+      "page_sha256": null,
+      "identity_token": "科克城"
+    }
+  ]
+}

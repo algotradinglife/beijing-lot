@@ -19,31 +19,46 @@ format: html
 
 ```{r}
 invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+# Resolve the project root from this document, not from the working directory: a chunk rendered
+# on its own runs in the document's folder, and `execute-dir: project` does not apply to it.
+root <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+a_path <- file.path(root, params$audit_json)
 stopifnot(requireNamespace("jsonlite", quietly = TRUE))
 stopifnot(is.character(params$audit_json), length(params$audit_json) == 1L,
-          !is.na(params$audit_json), file.exists(params$audit_json))
-a <- jsonlite::fromJSON(params$audit_json, simplifyVector = FALSE)
-stopifnot(identical(a$schema, "source_parser_audit_v1"))
+          !is.na(params$audit_json), file.exists(a_path))
+a <- jsonlite::fromJSON(a_path, simplifyVector = FALSE)
+stopifnot(identical(a$schema, "source_parser_audit_v3"))
 stopifnot(length(a$parsers) >= 10L, length(a$real_page_fixtures) >= 10L)
 ```
 
 ## 各源解析实现索引
 
-| 源 | 权威模块 | 解析什么 | 已知坑 |
+每行的模块与函数都在**提交版本**里逐个核对过（`git cat-file -e` + `def` 检查）。
+
+| 源 | 权威模块 / 函数 | 解析什么 | 已知坑 |
 |---|---|---|---|
-| **Nowscore** | `src/nowscore_settlement.py::parse_page` | 直播板五玩法：场次、比分、半场、选项与 SP | 直播板**隐藏**部分场次；未结算时结算列放的是赛前参考赔率 |
-| | `src/nowscore_issue_inventory.py::parse_archive` | 归档板（含直播板隐藏的场次） | 按**版式**分派，不按期号位数 |
-| | `src/nowscore_live_issues.py` | 直播板的期次列表与当前期号 | 只列仍在售的期次 |
-| **500** | `scripts/scrape_500_bjdc.py` | 期次列表、场次、实时 SP | 作为脚本可导入，不作为包 |
-| | `src/settlement_sp_supplement.py` | 补值页（期/场、主客、赛事、开赛时间、比分） | 只处理空 SP，不覆盖非空 |
-| | `src/live_collector/parser.py`、`src/backfill/parser.py` | 开奖/交易索引页 | — |
-| **titan** | `src/titan_clean/*`（`discovery`/`settlement`/`store`） | fixture 级数据 | **无北单期次映射**，不能作期次级来源 |
-| **澳客** | `src/okooo_prekick_sp.py` | 期次页、SP 历史页 | **GB2312**；`livecenter` 对海外 IP 返回 405 |
-| | `src/settlement_halftime_evidence.py` | 半场赛果（多来源对照） | 每源单独提取，要求≥2 独立来源一致 |
+| **Nowscore** | `nowscore_settlement.py::parse_page` | 直播板五玩法的场次、比分、半场、选项与 SP；**按版式分派** | 直播板会**隐藏**部分场次；未结算时结算列放的是赛前参考赔率 |
+| | `nowscore_settlement.py::parse_archive_page` | 归档板（含直播板隐藏的场次）的结算行 | 由 `parse_page` 按版式调用，不是独立入口 |
+| | `nowscore_issue_inventory.py::parse_archive` | **仅清点**：应答有效性、场次数、场次序号边界 | **不解析结算数据** —— 想取归档结算要用上一行 |
+| | `nowscore_live_issues.py` | 直播板自带的期号与当前期号 | 只列仍在售的期次 |
+| **500** | `live_collector/parser.py::parse_bet_page_500`<br>`::parse_kaijiang`、`::parse_livescore_500_all` | 投注页、开奖页、比分页 | 只有它给出 `cancel`/`postpone`/`void_sp1` 的显式状态 |
+| | `live_collector/parser.py::parse_bet_page_zgzcw` | **独立来源**：足彩网的投注页（`zgzcw_bet_lottery200.html`） | 与 500 是两套页面结构，别混用 |
+| | `scripts/scrape_500_bjdc.py` | 期次列表、场次、实时 SP | 作为脚本可导入，不作为包 |
+| | `settlement_sp_supplement.py` | 补值页（期/场、主客、赛事、开赛时间、比分） | 只处理空 SP，不覆盖非空 |
+| | `backfill/parser.py` | 开奖/交易索引页 | — |
+| **titan** | `fundamentals_census.py::analysis_record` | 分析页（`source` 取 `nowscore` 或 `titan`）：事实身份、数据数组、实际表格单元格 | 是**两源共用**的解析器；UTF-8 严格解码，畸形字节即抛 |
+| | `titan_clean/snapshots.py` | 历史 1x2 长表 → 截止时点快照横截面 | **禁止前瞻使用**（诊断用） |
+| | `titan_clean/historical_id_map.py` | **期次/场次 → 供应商 ID 的独立映射通道** | 该通道不进入 Titan 特征物化；只导出映射，不含球队/赔率/比分/标签 |
+| **澳客** | `okooo_prekick_sp.py` | 期次页、SP 历史页 | **GB2312**；`livecenter` 对海外 IP 返回 405 |
+| | `settlement_halftime_evidence.py` | 半场赛果（六来源对照） | 每源单独提取，要求 ≥2 独立来源一致 |
 
 ## 证据审计结果
 
 ```{r}
+# The report is generated from a committed revision, not from the working tree, so it can be
+# reproduced from a clean checkout; it binds exactly what it read.
+cat(sprintf("- 审计来自提交版本 `%s`，扫描 **%d** 个已跟踪 Python 文件，内容哈希 `%s`。\n",
+            substr(a$revision, 1, 10), a$scanned_files, substr(a$scanned_sha256, 1, 16)))
 rows <- a$parsers
 nature <- vapply(rows, function(r) r$page_bytes, character(1))
 cat(sprintf("- 页面解析器：**%d** 个；`tests/fixtures/` 下真实页面样本：**%d** 个。\n",
@@ -51,25 +66,54 @@ cat(sprintf("- 页面解析器：**%d** 个；`tests/fixtures/` 下真实页面�
 cat(sprintf("- 有已提交源字节作证据：**%d** 个（其中同时含内联样本 %d 个）。\n",
             sum(grepl("^committed", nature)),
             sum(grepl("committed bytes and inline", nature))))
-cat(sprintf("- **无已提交源字节**：%d 个，见下节。\n", length(a$without_source_bytes)))
+cat(sprintf("- 其中**测试里找不到夹具引用**：%d 个。\n", length(a$without_fixture_reference)))
 ```
 
-## 无已提交源字节的解析器（风险清单）
+## 测试里找不到夹具引用的解析器
 
 ```{r}
-for (name in unlist(a$without_source_bytes)) cat(sprintf("- `%s`\n", name))
+for (name in unlist(a$without_fixture_reference)) cat(sprintf("- `%s`\n", name))
 ```
 
-按风险排序与处置建议：
+**这份清单是提示，不是结论。** 静态关联不可靠 —— 例如 `tests/test_nowscore_settlement.py`
+开头就写着它不用 500 夹具，而夹具由别的测试消费；因此「找不到引用」只说明**该去看**，不说明
+真的没有页面字节。下面是在此基础上**人工核对过**的风险排序：
 
-| 解析器 | 为什么重要 | 建议 |
+| 解析器 | 核对结果 | 建议 |
 |---|---|---|
-| `src/settlement_halftime_evidence.py` | **已对发布库应用过半场与半全场更正**，是证据来源 | 优先补真实页面样本（澳客/500/第三方各一） |
-| `scripts/verify_nowscore_bf_history.py` | 校验脚本，结论依赖页面结构 | 补真实「Sp值变化表」页面 |
-| `src/nowscore_bjdc_sp_history.py` | 历史 SP 采集 | 补真实页面 |
-| `scripts/replay_settlement_quarantine.py` | 隔离回放 | 补真实隔离页 |
-| `src/correct_score_price_history.py` | 比分价格历史（页面经 `okooo_prekick_sp`） | 复用澳客夹具，另补其自身页面 |
-| `scripts/update_beidan_nowscore_sqlite.py` | 无任何测试 | 先补测试，再谈夹具 |
+| `src/settlement_halftime_evidence.py` | ✅ **已补**：9 个真实页面夹具（6 源）+ 27 个用例，见下节 | 已完成 |
+| `scripts/verify_nowscore_bf_history.py` | 测试只内联构造页面 | 补真实「Sp值变化表」页面 |
+| `src/nowscore_bjdc_sp_history.py` | 测试只内联构造 | 补真实页面 |
+| `scripts/replay_settlement_quarantine.py` | 测试只内联构造 | 补真实隔离页 |
+| `src/correct_score_price_history.py` | 页面经 `okooo_prekick_sp`，本身无页面字节 | 复用澳客夹具，另补其自身页面 |
+| `scripts/update_beidan_nowscore_sqlite.py` | **无任何测试** | 先补测试，再谈夹具 |
+
+## 半场证据模块的真实页面夹具
+
+`tests/fixtures/halftime_evidence/` 现在保存了 #479 佐证时留存的**原始页面**（4.53 MB 原始、
+0.25 MB gzip），连同驱动每个提取器的场次身份（`cases.json`，取自产生已应用更正的台账）：
+
+```{r}
+fixture_dir <- file.path(root, "tests", "fixtures", "halftime_evidence")
+case_data <- jsonlite::fromJSON(file.path(fixture_dir, "cases.json"), simplifyVector = FALSE)
+sources <- unique(vapply(case_data$cases, function(c) c$source_id, character(1)))
+cat(sprintf("- 夹具页：**%d** 个；覆盖提取器：**%d** 个（%s）。\n",
+            length(case_data$cases), length(sources), paste(sort(sources), collapse = "、")))
+cat(sprintf("- 仓库内真实页面样本总数（含其他模块）：**%d** 个。\n", length(a$real_page_fixtures)))
+```
+
+| 来源 | 页面 | 覆盖的提取器 |
+|---|---|---|
+| globalsportsarchive | `gsa-21082-90` | `extract_globalsportsarchive` |
+| 24score | `24score-21082-90` | `extract_24score` |
+| sportsmole | `sportsmole-21082-94`、`-24041-328` | `extract_sportsmole` |
+| footballcritic | `footballcritic-21082-94` | `extract_footballcritic` |
+| transfermarkt | `transfermarkt-21082-90`、`-24041-328` | `extract_transfermarkt` |
+| 澳客（直播板 / 半全场板） | `livecenter-21082`、`banquan-21082`、`banquan-24041` | `extract_okooo_livecenter`、`extract_okooo_half_full` |
+
+每个来源都被**真实页面**驱动，断言其半场比分（或半全场的结算代号与 SP），并额外验证三件事：
+页面字节的 sha256 与留存清单一致；页面里的身份标记确实是该场次；同一页面换一个全场比分后
+**必须被闸门拒绝**。
 
 反过来说，**已有真实样本**的解析器（`nowscore_settlement`、`nowscore_issue_inventory`、
 `settlement_sp_supplement`、`live_collector/parser`、`fundamentals_census`、`forward_snapshot/*`、
@@ -84,7 +128,10 @@ for (name in unlist(a$without_source_bytes)) cat(sprintf("- `%s`\n", name))
 .venv/bin/python scripts/audit_source_parsers.py --out results/source_parser_audit_v1/audit.json
 ```
 
-**它只做一个机械判断**：测试是否读了 `tests/fixtures/` 下的文件（或 `.gz`、`read_bytes()`）。
-它**不能**判断内联样本是否忠实于真实页面 —— 「无已提交源字节」是提示，不是结论；上表的风险排序
-是人工核对过的（例如 `settlement_halftime_evidence` 的测试确实只内联构造 HTML）。
-更早的一版分类器把「字符串里出现 `.html`」当成证据，因此误报过多，已收紧并加了回归测试。
+**它只做一件事**：在命名该解析器的测试里，是否存在「指向 `tests/fixtures/` 的路径 + 一次读取」。
+它**不给出结论** —— 静态关联本来就不可靠，`tests/test_nowscore_settlement.py` 就声明自己不使用
+500 夹具。所以「找不到夹具引用」是**提示该去看**，不是「确实没有页面字节」。上表的定级是人工核对的。
+
+这个工具本身栽过两次，都已由回归测试钉住：第一版把**字符串里出现 `.html`** 当证据（误报过多）；
+第二版只认字面量 `fixtures/x.html`，于是**漏判**了用 `Path(...) / "fixtures" / "page.gz"` +
+`gzip.open` 读取的测试（`settlement_halftime_evidence` 补了夹具后仍被标红）。
