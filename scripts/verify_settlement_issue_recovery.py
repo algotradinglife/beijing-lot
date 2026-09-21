@@ -173,8 +173,9 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                      db_halftime, db_option, db_payload, db_native_id) in audited:
                     row = rows.get((slot, play))
                     before = backup_con.execute(
-                        """SELECT payload_json, score, halftime_score FROM observation
-                           WHERE issue=? AND slot=? AND play=?""", (issue, slot, play)).fetchone()
+                        """SELECT payload_json, score, halftime_score, native_match_id
+                           FROM observation WHERE issue=? AND slot=? AND play=?""",
+                        (issue, slot, play)).fetchone()
                     before_vector = [
                         {"option": o, "raw_sp": r, "sp": s, "cell_id": c}
                         for o, r, s, c in backup_con.execute(
@@ -208,7 +209,12 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                           # the backup's and still hash as the batch recorded.
                           and db_payload == before[0]
                           and hashlib.sha256(db_payload.encode()).hexdigest() == old_payload_sha256
-                          and (db_native_id, audited_native_id) == (native_id, native_id)
+                          # Identity is compared with the archive and the pre-recovery
+                          # backup, not with the audit row that lives in the same mutable
+                          # database as the observation it is meant to corroborate.
+                          and db_native_id == row["native_match_id"]
+                          and audited_native_id == row["native_match_id"]
+                          and before[3] == row["native_match_id"]
                           # The replaced reference vector is evidence too: it must be what
                           # the backup held before the recovery.
                           and replaced_options == json.dumps(before_vector, ensure_ascii=False))

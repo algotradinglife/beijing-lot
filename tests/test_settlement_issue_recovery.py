@@ -464,6 +464,39 @@ def test_an_incomplete_backup_is_removed_when_the_run_fails(
     assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='23075'")[0][0] == 0
 
 
+def test_a_cancelled_addition_with_no_options_is_accepted(tmp_path: Path) -> None:
+    """The release holds 250 added observations with no options, so an empty vector is
+    legitimate and must survive both the apply and the verified rerun."""
+    db = addition_db(tmp_path)
+    entry = {"issue": "23075", "expected_fixtures": 2,
+             "evidence": [evidence(tmp_path, "23075", typeid,
+                                   [(1, "2-1", "1-0", *PLAY_LABELS[typeid]),
+                                    (2, "取消", "-", "", "")])
+                          for typeid in sorted(PLAY_LABELS)]}
+    path = ledger(tmp_path, {"schema": "bj479_issue_recovery_ledger_v1",
+                             "additions": [entry], "gap_fills": []}, "cancelled.json")
+    result = recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    assert result["added_observations"] == 10
+    assert rows(db, "SELECT COUNT(*) FROM option_sp WHERE observation_id IN "
+                    "(SELECT observation_id FROM observation WHERE slot=2)")[0][0] == 0
+    again = recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+    assert again == {"status": "already_applied", "added_observations": 10,
+                     "gap_observations": 0}
+
+
+def test_an_extra_blank_added_option_refuses_the_rerun(tmp_path: Path) -> None:
+    """Additions keep exact archive-vector equality, so an invented blank option fails."""
+    db = addition_db(tmp_path)
+    path = addition_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("INSERT INTO option_sp VALUES (1, 'bogus', NULL, NULL, NULL)")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="recovered options changed"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
 def test_refuses_when_evidence_bytes_do_not_match_the_ledger(tmp_path: Path) -> None:
     db = addition_db(tmp_path)
     path = addition_ledger(tmp_path)

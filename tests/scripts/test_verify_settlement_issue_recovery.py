@@ -22,11 +22,12 @@ LABELS = {5: ("胜", "2.10"), 6: ("3", "5.50"), 7: ("上单", "3.30"),
 ADDED = "23075"
 
 
-def _page(issue: str, typeid: int, fixtures) -> bytes:
+def _page(issue: str, typeid: int, fixtures, handicap: str = "+0") -> bytes:
     title = "单场进球数" if typeid == 6 else TITLE[typeid]
     rows = "".join(
         f'<tr id="row_{slot}"><td>{slot}</td><td>测试赛事</td><td>09-29 22:00</td>'
-        f'<td>主{slot}队 (<b>+0</b>)</td><td>{score}</td><td>客{slot}队</td>'
+        f'<td>主{slot}队' + (f' (<b>{handicap}</b>)' if handicap else '') +
+        f'</td><td>{score}</td><td>客{slot}队</td>'
         f'<td>{halftime}</td><td><span class="spitems">{label}</span></td>'
         f'<td title="开奖SP"><a href="/sp/danchang/{issue}_{slot}_{typeid}.html">'
         f'<u>{sp}</u></a></td><td>8.65</td><td>4.67</td><td>1.28</td><td>平手</td>'
@@ -41,9 +42,10 @@ def _page(issue: str, typeid: int, fixtures) -> bytes:
             f'{title}</a></li></ul><table><tr class="ttis">{header}</tr>{rows}</table>').encode()
 
 
-def _evidence(tmp: Path, issue: str, typeid: int, fixtures) -> dict:
-    payload = _page(issue, typeid, fixtures)
-    path = tmp / f"nowscore-archive-{typeid}-{issue}.html"
+def _evidence(tmp: Path, issue: str, typeid: int, fixtures,
+              handicap: str = "+0") -> dict:
+    payload = _page(issue, typeid, fixtures, handicap)
+    path = tmp / f"nowscore-archive-{typeid}-{issue}-{handicap}.html"
     path.write_bytes(payload)
     return {"typeid": typeid, "path": str(path), "sha256": hashlib.sha256(payload).hexdigest(),
             "url": f"https://cp.nowscore.com/beijingdanchang/{ARCHIVE_SLUGS[typeid]}/"
@@ -88,11 +90,11 @@ def _database(tmp: Path) -> Path:
     return path
 
 
-def _ledger(tmp: Path, *, issue="26092") -> Path:
+def _ledger(tmp: Path, *, issue="26092", handicap="+0") -> Path:
     fixtures = {typeid: [(362, "2-1", "1-0", *LABELS[typeid])] for typeid in sorted(LABELS)}
     gap = {"issue": issue, "expected_fixtures": 1, "expected_gap_fixtures": 1,
            "expected_gap_slots": [362],
-           "evidence": [_evidence(tmp, issue, typeid, fixtures[typeid])
+           "evidence": [_evidence(tmp, issue, typeid, fixtures[typeid], handicap)
                         for typeid in sorted(LABELS)]}
     addition = {"issue": ADDED, "expected_fixtures": 2,
                 "evidence": [_evidence(tmp, ADDED, typeid,
@@ -106,8 +108,9 @@ def _ledger(tmp: Path, *, issue="26092") -> Path:
     return path
 
 
-def _applied(tmp: Path) -> tuple[Path, Path, Path]:
-    db, ledger, backup = _database(tmp), _ledger(tmp), tmp / "backup.sqlite"
+def _applied(tmp: Path, *, handicap="+0") -> tuple[Path, Path, Path]:
+    db, ledger, backup = (_database(tmp), _ledger(tmp, handicap=handicap),
+                          tmp / "backup.sqlite")
     recover_issues(db, ledger, backup, approval_note="owner approved")
     return db, ledger, backup
 
@@ -189,6 +192,37 @@ def test_replay_catches_a_deleted_winning_option(tmp_path: Path) -> None:
     con.commit()
     con.close()
     assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_reproduces_a_gap_completed_with_the_backup_handicap(tmp_path: Path) -> None:
+    """When the archive omits the line, replay must take the handicap from the backup."""
+    db, ledger, backup = _applied(tmp_path, handicap="")
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is True
+    assert report["gap_fill"]["replay_agrees"] is True
+
+
+def test_replay_catches_a_gap_payload_changed_away_from_the_backup(tmp_path: Path) -> None:
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE observation SET payload_json='{\"handicap\": 2}' WHERE observation_id=1")
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_catches_an_extra_added_observation(tmp_path: Path) -> None:
+    """An invented row must fail the count and identity comparison, not just a deletion."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("INSERT INTO observation VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (9999, ADDED, 7, "spf", "1007", "完场", "1-0", "0-0", "胜", "a" * 64, "", "",
+                 "{}"))
+    con.commit()
+    con.close()
+    report = build_report(db, ledger, backup)
+    assert report["conclusion"]["verified"] is False
+    assert report["additions"][0]["mismatch_count"] >= 1
 
 
 def test_replay_refuses_tampered_evidence(tmp_path: Path) -> None:
