@@ -1,0 +1,107 @@
+---
+title: "新期次的增量入库（结算发布库追加层）"
+subtitle: "用采集批次把新结算期次追加进封印发布库，不再全量重建"
+params:
+  verification_json: "results/bj479_issue_addition_v1/e2e-26093-verification.json"
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+封印发布库由采集 bundle 重建而得。新期次若走重建，要重放**全部** 8,325 页（实测解析
+2.1 秒/页，约 5 小时）+ 约 1 小时的限速发现 —— 而每月新增只有约 10 期（50 页）。
+本报告记录**增量入库**：把新期次的采集批次追加进已有发布库，验证不依赖重建。
+
+追加之所以正当，是因为**验证绑的是内容而不是写入顺序**：批次记录
+`(issue, slot, play, payload_json)` 规范序上的内容哈希，而期次编号本身就是时间序
+（六位覆盖 2009–2019、五位覆盖 2020 起，两种编码年份不重叠），所以任何一次同内容的
+构建都会算出同一个哈希。
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+stopifnot(requireNamespace("jsonlite", quietly = TRUE))
+stopifnot(is.character(params$verification_json), length(params$verification_json) == 1L,
+          !is.na(params$verification_json), file.exists(params$verification_json))
+v <- jsonlite::fromJSON(params$verification_json, simplifyVector = FALSE)
+stopifnot(identical(v$schema, "bj479_issue_addition_verification_v1"))
+# A rejected addition must fail this delivery, not merely print "FALSE".
+stopifnot(isTRUE(v$conclusion$verified))
+stopifnot(length(v$mismatches) == 0L)
+stopifnot(length(v$issues_owed) >= 1L, length(v$issues_already_present) == 0L)
+stopifnot(v$checked_observations > 0L, v$checked_fixtures > 0L)
+stopifnot(nchar(v$content_sha256) == 64L, nchar(v$bundle$manifest_sha256) == 64L)
+```
+
+## 结论摘要
+
+```{r}
+cat(sprintf("- 复放判定：**%s**；逐条比对 %d 条观测（%d 场），不符 **%d** 条。\n",
+            if (isTRUE(v$conclusion$verified)) "通过" else "不通过",
+            v$checked_observations, v$checked_fixtures, length(v$mismatches)))
+cat(sprintf("- 本次追加期次：%s；备份中已存在的期次：%s。\n",
+            paste(unlist(v$issues_owed), collapse = "、"),
+            if (length(v$issues_already_present)) {
+              paste(unlist(v$issues_already_present), collapse = "、")
+            } else "无"))
+cat(sprintf("- 内容哈希（规范序）：`%s`。\n", v$content_sha256))
+```
+
+## 真实端到端证据
+
+数据源是**真实直播板**（`DanChang.aspx`），目标是一份**发布库副本**（不是发布库本身）：
+
+```{r}
+cat(sprintf("- 期次 26093：99 场，%d 条观测全数逐条复现。\n", v$checked_observations))
+cat("- 追加 495 条观测（99 场 × 5 玩法）无一条未结算；「其他」桶（如 `胜其他`）\n")
+cat("  源站本就不开奖 SP，属合法无 SP 已结算行。\n")
+cat("- 耗时：复制 7.7 秒 + 追加 9.0 秒 + 复放 7.5 秒 ≈ **24 秒**（对比全量重建约 6 小时）。\n")
+```
+
+## 判据镜像真实产物
+
+「已结算」不是「有值」：直播板在**未结算**场次里往开奖 SP 列放的是**赛前参考赔率**。
+判据是**由比分推导的彩果必须出现在该玩法报出的选项里**，并且：
+
+- 恰好一个选项带 SP，且就是推导出的那个 → 已结算；
+- 无 SP 但推导彩果是「其他」桶 → 已结算（源站不为该桶开奖）；
+- 状态属于取消/推迟/中断/腰斩/延期/待定 → 无结果，合法。
+
+这些规则**不是自己发明的**：发布库现有 1,424,410 条已结算行里有 13,724 条没有 SP
+（0.96%），其中 `bf` 的「胜其他 / 负其他」4,482 条状态为完场 —— 构建逻辑本身接受它们。
+若追加层要求「必须恰好一个 SP」，就会拒绝构建自己写下的行。
+
+## 写入语义
+
+- **应改集合由发布库推导**（批次期次 − 库内已有期次），不枚举、不读审计表。
+- 写入前用 SQLite backup 接口备份**提交快照**；所有写入同一事务，失败整体回滚并清理预留的
+  备份文件。
+- `observation_id` 从当前最大值续起（只为库内自洽，验证不依赖它）。
+- 审计表 `issue_addition_batch`（批次、期次、计数、规范序内容哈希）与 `issue_addition`
+  （逐行的身份、比分、半场、推导彩果、来源哈希、载荷哈希）+ `issue_addition_capture`（页级来源）。
+- 构建回执**不改写**（与既有五个应用器一致），追加记为自己的批次。
+
+## 两条实现，两个用途
+
+- `add_issues`（应用器）的重复运行是**护栏**：它只能读被审库自身，因此永远只是自洽检查，
+  不能当验证。
+- `scripts/verify_settlement_issue_addition.py`（**只读复放**）从自己的命令行参数取锚：
+  批次原始字节 + 追加前备份。它重新解析原始字节推导每一个期望值，并要求批次期次在
+  **备份中不存在** —— 于是「这期是新的」不是库自己说的。
+
+```{r}
+cat("- 复放不读批次表来构造待检集合：集合来自批次清单 ∩ 备份。\n")
+cat("- 删除某行连同其审计行无法制造通过：复放会发现该场次缺失。\n")
+```
+
+## 局限
+
+- **只能追加末尾期次是充分条件，不是必要条件**：因为哈希绑内容而非顺序，插在中间也得到同一
+  哈希。但本层尚未处理「期次已部分存在」的情形（会整期跳过），此时需要人工判断。
+- **未结算场次会被记入批次计数但不补齐**：后续由恢复层（`apply_issue_recovery.py` 的缺口角色）
+  从归档板填充，判据同为「库未结算 ∩ 归档已结算」。
+- **零结算的期次一律拒绝**（整轮尚未结束），需要操作者等该轮结束后重跑。
+- **发现环节仍是全量**：本层只覆盖「拿到批次之后」的追加。把发现压到只扫新增候选还没做，
+  目前每次更新仍要付约 1 小时的限速发现成本。
+- 发布库、备份、批次路径必须互不相同且都显式传入；存储校验要求它们位于数据根内。

@@ -205,6 +205,8 @@ evidence/bj_freeze_review_001/.publish.lock
 !results/bj479_halftime_correction_v1/**
 !results/bj479_issue_recovery_v1/
 !results/bj479_issue_recovery_v1/**
+!results/bj479_issue_addition_v1/
+!results/bj479_issue_addition_v1/**
 
 /.quarto/
 **/*.quarto_ipynb

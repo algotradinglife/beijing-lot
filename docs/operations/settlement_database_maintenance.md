@@ -258,6 +258,50 @@ finding 记录的是**构建当时**在源站字节里观察到的事实，因�
 
 交付文档见 [QMD 261](../quarto/261_settlement_issue_recovery.qmd)。
 
+## 新期次的增量入库
+
+封印发布库不因新期次而重建。新期次作为**一个采集批次**追加：
+
+```sh
+.venv/bin/python scripts/apply_settlement_issue_addition.py \
+  --database "$SETTLEMENT_DB" --bundle "$NEW_BATCH_RUN_ROOT" \
+  --backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-issue-addition.sqlite" \
+  --data-root "$BEIJING_LOT_DATA_ROOT" --mountpoint "$SETTLEMENT_MOUNT" \
+  --approval-note '已批准：新增期次 <编号>'
+```
+
+`manifest.json` 必须覆盖该批期次的**全部五个玩法**（缺一页会被拒绝，因为漏掉的场次以后
+没有补的入口）。应改集合由发布库推导（`批次期次 − 库内已有期次`）；整期已在库中 → 
+`nothing_to_add`；整期尚无任何结算 → 拒绝（该轮还没结束，稍后重跑即可）。
+
+「已结算」的判据**镜像构建语义**：由比分推导的彩果必须出现在该玩法报出的选项里，且
+恰好一个选项带 SP 并等于该彩果；「其他」桶（`胜其他` 等）源站本就不开奖 SP，属合法；
+取消/推迟/中断/腰斩/延期/待定 无结果，合法。**不要**用「有值即已结算」——直播板在未结算
+场次里放的是赛前参考赔率。未结算的场次会被记入批次计数但不补齐，后续由上一节的缺口
+角色从归档板填充。
+
+写入前用 SQLite backup 接口备份提交快照，所有写入同一事务，失败整体回滚并清理预留文件；
+重复同一批次返回 `already_applied` 并核验已写入的行。构建回执**不改写**，追加记在自己的
+`issue_addition_batch` / `issue_addition` / `issue_addition_capture` 三张表里。
+
+独立复核（**只读**，锚来自自己的参数）：
+
+```sh
+.venv/bin/python scripts/verify_settlement_issue_addition.py \
+  --database "$SETTLEMENT_DB" --bundle "$NEW_BATCH_RUN_ROOT" \
+  --backup "$BEIJING_LOT_DATA_ROOT/settlement/backups/before-issue-addition.sqlite" \
+  --out results/bj479_issue_addition_v1/verification.json
+```
+
+复放重新解析批次原始字节推导每个期望值，并要求批次期次在**追加前备份中不存在** ——
+「这期是新的」不由库自证。退出码非零即拒绝。此复放很快（数秒，只有读取整库哈希那一步
+随缓存波动），与恢复层那次不同：那里的完整复放要重放全部 30 个归档页。
+
+**实测量级**：真实直播板追加一期（26093，99 场 495 条观测）—— 复制 7.7 秒、追加 9.0 秒、
+复放 7.5 秒，合计约 **24 秒**；对照全量重建约 6 小时。
+
+交付与验收入口：`quarto/262_settlement_issue_addition.qmd`。
+
 ## R 与 QMD
 
 见 [R 查询示例](nowscore_settlement_queries.md)。完整查询接口仍是

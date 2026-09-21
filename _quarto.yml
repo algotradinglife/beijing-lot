@@ -19,6 +19,7 @@ project:
     - quarto/257_settlement_quarantine_replay.qmd
     - quarto/260_settlement_halftime_correction.qmd
     - quarto/261_settlement_issue_recovery.qmd
+    - quarto/262_settlement_issue_addition.qmd
 
 execute:
   freeze: false

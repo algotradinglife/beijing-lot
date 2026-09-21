@@ -1,0 +1,27 @@
+{
+  "schema": "bj479_issue_addition_verification_v1",
+  "database": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-addition/release.sqlite",
+    "sha256": "a77290ec04d4acaa0a1eea8445146f8512b914c8a27391b77f1e404c8aa161d5"
+  },
+  "bundle": {
+    "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/.tmpwork/e2e/bundle-26093",
+    "manifest_sha256": "28aa8e66edead6e1d5ccfdfd82bb00af2a507893f06cc9743e222cb2e9c5bab6"
+  },
+  "backup": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-addition/before.sqlite"
+  },
+  "issues_owed": [
+    "26093"
+  ],
+  "issues_already_present": [],
+  "checked_observations": 495,
+  "checked_fixtures": 495,
+  "content_sha256": "6a0a96ca8940e39a862362ea76c789f0ab0e0d654acc4516f3d342c7e311a863",
+  "mismatches": [],
+  "conclusion": {
+    "verified": true,
+    "void": false,
+    "note": "an empty owed set means the backup already carried every bundled issue; nothing was added to verify"
+  }
+}
