@@ -5,6 +5,7 @@
 - [R / Quarto workflow](operations/rstudio_quarto_data_workflow.md): setup, environment, commands, testing.
 - [Analysis data contracts](data/analysis_contracts.md): types, keys, provenance, R/Python boundaries.
 - [Operations](operations/): collectors, databases, dashboards, snapshots, restore.
+- [Settlement data reference](operations/settlement_data_reference.md): the Nowscore settlement line — every path, the release's tables and fields, the code that maintains them, the routine flow, and issue #479.
 - [Research](research/): methods, diagnostic findings, dated evidence.
 - [Research notes](research-notes/): existing notebook/wiki evidence; not lifecycle authority.
 - [Strategy](strategy/): existing strategy contracts and historical explanations.
