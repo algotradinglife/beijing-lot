@@ -23,10 +23,15 @@ format: html
 
 ```{r}
 invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+# Resolve the project root from this document, not from the working directory: a chunk
+# rendered on its own runs in the document's folder, and `execute-dir: project` does
+# not apply to it.
+root <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+v_path <- file.path(root, params$verification_json)
 stopifnot(requireNamespace("jsonlite", quietly = TRUE))
 stopifnot(is.character(params$verification_json), length(params$verification_json) == 1L,
-          !is.na(params$verification_json), file.exists(params$verification_json))
-v <- jsonlite::fromJSON(params$verification_json, simplifyVector = FALSE)
+          !is.na(params$verification_json), file.exists(v_path))
+v <- jsonlite::fromJSON(v_path, simplifyVector = FALSE)
 stopifnot(identical(v$schema, "bj479_issue_recovery_verification_v1"))
 stopifnot(length(v$additions) == 5L, !is.null(v$gap_fill))
 # A rejected recovery must fail this delivery, not merely print "FALSE".
