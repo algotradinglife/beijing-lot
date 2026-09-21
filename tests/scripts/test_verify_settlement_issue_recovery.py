@@ -360,6 +360,37 @@ def test_replay_catches_the_remaining_audit_bindings(tmp_path: Path) -> None:
         assert build_report(db, ledger, backup)["conclusion"]["verified"] is False, column
 
 
+def test_replay_catches_a_deleted_outside_set_observation(tmp_path: Path) -> None:
+    """The replay's outside-set comparison is bidirectional too."""
+    db, ledger, backup = _applied(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM observation WHERE issue='26092' AND slot=999")
+    con.execute("DELETE FROM observation WHERE issue=? AND slot=2 AND play='spf'", (ADDED,))
+    con.commit()
+    con.close()
+    assert build_report(db, ledger, backup)["conclusion"]["verified"] is False
+
+
+def test_replay_accepts_an_option_less_added_row(tmp_path: Path) -> None:
+    """A cancelled fixture the archive settles no option for is legitimate, not a defect."""
+    db = _database(tmp_path)
+    gap = json.loads(_ledger(tmp_path).read_text(encoding="utf-8"))["gap_fills"]
+    addition = {"issue": ADDED, "expected_fixtures": 2,
+                "evidence": [_evidence(tmp_path, ADDED, typeid,
+                                       [(1, "2-1", "1-0", *LABELS[typeid]),
+                                        (2, "取消", "-", "", "")])
+                             for typeid in sorted(LABELS)]}
+    path = tmp_path / "cancelled.json"
+    path.write_text(json.dumps({"schema": "bj479_issue_recovery_ledger_v1",
+                                "authorization": "owner approved",
+                                "additions": [addition], "gap_fills": gap}), encoding="utf-8")
+    backup = tmp_path / "backup.sqlite"
+    recover_issues(db, path, backup, approval_note="owner approved")
+    report = build_report(db, path, backup)
+    assert report["conclusion"]["verified"] is True
+    assert report["additions"][0]["replayed_observations"] == 10
+
+
 def test_replay_refuses_tampered_evidence(tmp_path: Path) -> None:
     db, ledger, backup = _applied(tmp_path)
     item = json.loads(ledger.read_text(encoding="utf-8"))["gap_fills"][0]["evidence"][0]

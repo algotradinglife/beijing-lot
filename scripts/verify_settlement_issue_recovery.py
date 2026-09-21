@@ -22,6 +22,7 @@ import hashlib
 import json
 import sqlite3
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -261,20 +262,20 @@ def build_report(database: Path, ledger_path: Path, backup_path: Path) -> dict:
                          "backup_identity": before[3] if before else None,
                          "database_options": _vector_for(con, issue, slot, play),
                          "expected_options": expected_vector})
-            # Anything outside the owed completions must be exactly as the backup left it,
-            # so an extra completion or a stray edit cannot hide.
-            for (slot, play, score, halftime, option, payload) in con.execute(
-                    """SELECT slot, play, score, halftime_score, expected_option, payload_json
-                       FROM observation WHERE issue=?""", (issue,)):
-                if (slot, play) in required:
-                    continue
-                before = backup_con.execute(
-                    """SELECT score, halftime_score, expected_option, payload_json
-                       FROM observation WHERE issue=? AND slot=? AND play=?""",
-                    (issue, slot, play)).fetchone()
-                if before is None or (score, halftime, option, payload) != before:
-                    issue_mismatches.append({"slot": slot, "play": play,
-                                             "changed_outside_completions": True})
+            # Everything outside the owed completions must be exactly as the backup left it
+            # - same keys, same multiplicity, same values, same vectors.
+            def outside(con):
+                # A Counter, not a dict: a duplicated key must not overwrite its twin.
+                return Counter(
+                    (slot, play, native, score, halftime, option, payload,
+                     json.dumps(_vector_for(con, issue, slot, play), ensure_ascii=False))
+                    for (slot, play, native, score, halftime, option, payload) in con.execute(
+                        """SELECT slot, play, native_match_id, score, halftime_score,
+                                  expected_option, payload_json FROM observation
+                           WHERE issue=?""", (issue,))
+                    if (slot, play) not in required)
+            if outside(con) != outside(backup_con):
+                issue_mismatches.append({"outside_completions_changed": True})
             gap_fixtures_seen |= {(issue, slot) for slot in slots}
             gap_observations_seen += len(required)
             gap_mismatches.extend(issue_mismatches)

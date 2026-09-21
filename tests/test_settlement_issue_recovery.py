@@ -683,6 +683,48 @@ def test_a_change_outside_the_owed_completions_refuses_the_rerun(tmp_path: Path)
         recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
 
 
+def test_a_settled_duplicate_at_an_owed_key_refuses_before_the_backup(tmp_path: Path) -> None:
+    """The product must hold exactly one observation per owed key, settled or not."""
+    db = gap_db(tmp_path)
+    con = sqlite3.connect(db)
+    con.execute("""INSERT INTO observation VALUES
+        (500, '26092', 1, 'spf', '1001', '完场', '2-1', '1-0', '胜', 'a'*64, '', '', '{}')""")
+    for option in DOMAINS["spf"]:
+        con.execute("INSERT INTO option_sp VALUES (?,?,?,?,?)", (500, option, None, None, None))
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="expected exactly one observation"):
+        recover_issues(db, gap_ledger(tmp_path), tmp_path / "b.sqlite",
+                       approval_note="owner approved")
+    assert not (tmp_path / "b.sqlite").exists()
+
+
+def test_a_deleted_outside_set_observation_refuses_the_rerun(tmp_path: Path) -> None:
+    """A cancelled fixture is outside the owed set, so deleting it must still be caught."""
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM observation WHERE issue='26092' AND slot=2 AND play='spf'")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="outside the owed completions"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
+def test_a_duplicated_outside_set_observation_refuses_the_rerun(tmp_path: Path) -> None:
+    db = gap_db(tmp_path)
+    path = gap_ledger(tmp_path)
+    recover_issues(db, path, tmp_path / "backup.sqlite", approval_note="owner approved")
+    con = sqlite3.connect(db)
+    con.execute("""INSERT INTO observation VALUES
+        (500, '26092', 2, 'spf', '1002', '取消', '-', '-', NULL, 'a'*64, '', '', '{}')""")
+    con.commit()
+    con.close()
+    with pytest.raises(ValueError, match="outside the owed completions"):
+        recover_issues(db, path, tmp_path / "other.sqlite", approval_note="owner approved")
+
+
 def test_refuses_when_evidence_bytes_do_not_match_the_ledger(tmp_path: Path) -> None:
     db = addition_db(tmp_path)
     path = addition_ledger(tmp_path)

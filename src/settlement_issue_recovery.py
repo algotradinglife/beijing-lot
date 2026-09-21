@@ -35,6 +35,7 @@ import hashlib
 import json
 import re
 import sqlite3
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -286,6 +287,14 @@ def _gap_targets(con, item: dict) -> list[tuple]:
     if set(keys) != expected_product:
         raise ValueError(f"issue {issue}: the completions are not the expected five-play "
                          f"product for the owed slots")
+    # The product must hold exactly one observation per key in the release, settled or not:
+    # a settled duplicate would otherwise slip past this gate and be refused only later.
+    for slot, play in sorted(expected_product):
+        held = con.execute("SELECT COUNT(*) FROM observation WHERE issue=? AND slot=? AND play=?",
+                           (issue, slot, play)).fetchone()[0]
+        if held != 1:
+            raise ValueError(f"issue {issue} slot {slot} {play}: expected exactly one "
+                             f"observation, found {held}")
     return targets
 
 
@@ -473,20 +482,23 @@ def _verify_applied(con, batch: str, additions: list[dict], gap_fills: list[dict
                     raise ValueError(f"issue {issue} slot {slot} {play}: recorded pre-recovery "
                                      f"values changed")
                 gaps += 1
-            # Anything outside the owed completions must be exactly as the backup left it,
-            # so an edit to an untouched fixture cannot hide behind the owed-key loop.
-            for (slot, play, score, halftime, option, payload) in con.execute(
-                    """SELECT slot, play, score, halftime_score, expected_option, payload_json
-                       FROM observation WHERE issue=?""", (issue,)):
-                if (slot, play) in required:
-                    continue
-                before = before_con.execute(
-                    """SELECT score, halftime_score, expected_option, payload_json
-                       FROM observation WHERE issue=? AND slot=? AND play=?""",
-                    (issue, slot, play)).fetchone()
-                if before is None or (score, halftime, option, payload) != before:
-                    raise ValueError(f"issue {issue} slot {slot} {play}: an observation "
-                                     f"outside the owed completions was changed")
+            # Everything outside the owed completions must be exactly as the backup left it
+            # - same keys, same multiplicity, same values, same vectors - so a deletion, a
+            # duplicate or an edit to an untouched fixture cannot hide behind the owed-key
+            # loop.
+            def outside(con):
+                # A Counter, not a dict: a duplicated key must not overwrite its twin.
+                return Counter(
+                    (slot, play, native, score, halftime, option, payload,
+                     json.dumps(_vector_for(con, issue, slot, play), ensure_ascii=False))
+                    for (slot, play, native, score, halftime, option, payload) in con.execute(
+                        """SELECT slot, play, native_match_id, score, halftime_score,
+                                  expected_option, payload_json FROM observation
+                           WHERE issue=?""", (issue,))
+                    if (slot, play) not in required)
+            if outside(con) != outside(before_con):
+                raise ValueError(f"issue {issue}: an observation outside the owed completions "
+                                 f"was changed")
         return {"added_observations": added, "gap_observations": gaps}
     finally:
         before_con.close()
