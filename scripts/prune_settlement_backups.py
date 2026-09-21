@@ -34,6 +34,31 @@ BATCH_TABLES = ("sp_correction_batch", "halftime_correction_batch",
                 "half_full_correction_batch", "finding_supersession_batch",
                 "issue_recovery_batch", "issue_addition_batch")
 ANCHOR_TABLES = ("issue_addition_anchor",)
+ARCHIVE_SUFFIX = ".zst"
+MANIFEST_SUFFIX = ".manifest.json"
+
+
+def archived_snapshots(directory: Path) -> dict:
+    """Map each archived snapshot's content hash to the archive that now holds those bytes.
+
+    A snapshot compressed after its replay passed is still the batch's evidence, so the anchor
+    has to resolve to the archive. The manifest is checked against the archive it names, so an
+    edited manifest cannot claim to hold bytes it does not.
+    """
+    archived = {}
+    for manifest in sorted(Path(directory).glob("*" + MANIFEST_SUFFIX)):
+        try:
+            document = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise ValueError(f"an archive manifest cannot be read, so its anchor cannot be "
+                             f"ruled out: {manifest} ({error})") from error
+        archive = Path(directory) / str(document.get("archive") or "")
+        if not document.get("snapshot_sha256") or not archive.is_file():
+            raise ValueError(f"an archive manifest names no usable archive: {manifest}")
+        if file_identity(archive)[0] != document.get("archive_sha256"):
+            raise ValueError(f"the archive does not match its manifest: {archive}")
+        archived[document["snapshot_sha256"]] = archive.name
+    return archived
 
 
 def file_identity(path: Path) -> tuple[str, int]:
@@ -186,6 +211,7 @@ def prune_backups(directory: Path, *, keep: int, apply: bool, release: Path | No
     if unrecognised:
         raise ValueError(f"not settlement snapshots, refusing to touch them: {unrecognised}")
     identities = {path.name: file_identity(path)[0] for path in candidates}
+    archived = archived_snapshots(directory)
     anchored, unresolved = set(), []
     for claim in claims:
         wanted = Path(claim["path"]).name
@@ -194,7 +220,16 @@ def prune_backups(directory: Path, *, keep: int, apply: bool, release: Path | No
                    else [path for path in candidates if path.name == wanted])
         if matches:
             anchored.update(path.name for path in matches)
-        elif wanted not in retired:
+        elif claim.get("sha256") in archived:
+            # Compacted after its replay passed: the archive is the evidence now, and archives
+            # are never candidates, so the anchor is resolved without protecting a snapshot.
+            pass
+        elif wanted in retired and not any(path.name == wanted for path in candidates):
+            # Retirement records a snapshot that is gone. A file still sitting under that name
+            # is not the retired one — it may be a rewritten anchor — so it is refused rather
+            # than exempted, and stays protected by that refusal.
+            pass
+        else:
             unresolved.append(wanted)
     if unresolved:
         raise ValueError("recorded anchors are missing from this directory, so nothing can be "

@@ -18,6 +18,7 @@ import sqlite3
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from scripts.archive_settlement_backup import materialize_snapshot  # noqa: E402
 from src.nowscore_settlement import PLAYS, canonical, expected_option, parse_page  # noqa: E402
 from src.settlement_issue_addition import (  # noqa: E402
     bundle_rows,
@@ -192,7 +193,8 @@ def main(argv=None):
     for name in ('database', 'bundle', 'backup', 'out'):
         parser.add_argument('--' + name, required=True, type=Path)
     args = parser.parse_args(argv)
-    report = build_report(args.database, args.bundle, args.backup)
+    with materialize_snapshot(args.backup) as backup:
+        report = build_report(args.database, args.bundle, backup)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"out": str(args.out),

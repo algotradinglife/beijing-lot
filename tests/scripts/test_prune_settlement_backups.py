@@ -125,6 +125,29 @@ def test_refuses_when_a_recorded_anchor_is_missing(tmp_path: Path) -> None:
         prune_backups(root, keep=1, apply=True, protect=["vanished.sqlite"])
 
 
+def test_a_retired_name_that_is_present_is_refused(tmp_path: Path) -> None:
+    """Retirement records a snapshot that is gone, so a file under that name is not it.
+
+    Exempting it would let a rewritten anchor — same name, different bytes — become an
+    ordinary deletion candidate.
+    """
+    root = directory(tmp_path, "anchor.sqlite", "b.sqlite")
+    claim = {"path": "/elsewhere/anchor.sqlite", "sha256": "a-hash-that-does-not-match"}
+    with pytest.raises(ValueError, match="missing from this directory"):
+        prune_backups(root, keep=1, apply=True, protect=[claim],
+                      retired={"anchor.sqlite"})
+    assert (root / "anchor.sqlite").exists()
+
+
+def test_a_retired_name_that_is_absent_is_allowed(tmp_path: Path) -> None:
+    """The documented absence is the case retirement exists for."""
+    root = directory(tmp_path, "a.sqlite", "b.sqlite")
+    claim = {"path": "/elsewhere/gone.sqlite", "sha256": "a-hash-that-does-not-match"}
+    result = prune_backups(root, keep=1, apply=True, protect=[claim],
+                           retired={"gone.sqlite"})
+    assert result["remove"] == ["a.sqlite"]
+
+
 def test_allows_a_registry_retired_anchor(tmp_path: Path) -> None:
     """An anchor recorded as retired is a documented absence, not an unresolvable one."""
     root = directory(tmp_path, "a.sqlite", "b.sqlite")

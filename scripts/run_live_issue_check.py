@@ -11,6 +11,7 @@ is not reported as a service failure.
 """
 import argparse
 import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
@@ -19,7 +20,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.capture_live_issues import capture_issues  # noqa: E402
 from scripts.prune_settlement_backups import prune_backups, replay_anchors  # noqa: E402
-from src.settlement_issue_addition import bundle_rows, issue_verdict, read_bundle  # noqa: E402
+from src.settlement_issue_addition import (bundle_rows,  # noqa: E402
+                                          existing_issues, issue_verdict, read_bundle)
 
 # The rules that decide what is actionable: hashed into every status so a stored verdict can
 # be tied to the implementation that produced it.
@@ -39,7 +41,7 @@ def _manifest_sha256(bundle_dir) -> str | None:
         return None
     try:
         return read_bundle(Path(bundle_dir)).get("sha256")
-    except (OSError, ValueError):
+    except (OSError, ValueError, TypeError, AttributeError):
         return None
 
 
@@ -94,6 +96,14 @@ def run_check(database: Path, updates_root: Path, backups_root: Path, *, keep: i
             document = read_bundle(bundle_path)
             parsed = bundle_rows(document)
             issues = state.get("pending") or document["manifest"]["requested_issues"]
+            # An issue the release already carries is not pending, however it got there: an
+            # operator who applied the bundle mid-day must not be asked to approve it again.
+            connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+            try:
+                carried = existing_issues(connection)
+            finally:
+                connection.close()
+            issues = [issue for issue in issues if issue not in carried]
             eligible, ineligible = [], []
             for issue in issues:
                 resolved, problems = issue_verdict(parsed[issue])
@@ -104,6 +114,10 @@ def run_check(database: Path, updates_root: Path, backups_root: Path, *, keep: i
             state["pending"] = list(issues)
             state["eligible"] = eligible
             state["ineligible"] = ineligible
+            # Bound from the document that was judged, not re-read: a manifest that cannot be
+            # parsed has already been recorded as a failure, and reading it again could raise
+            # before the status is written.
+            state["manifest_sha256"] = document.get("sha256")
         except Exception as error:                      # noqa: BLE001 - recorded, not swallowed
             state["status"] = "failed"
             state["error"] = f"{type(error).__name__}: {error}"
@@ -129,7 +143,8 @@ def run_check(database: Path, updates_root: Path, backups_root: Path, *, keep: i
     # release it compared against, and the rules that produced the verdict.
     state["bindings"] = {
         "release": {"path": str(database), "sha256": _file_sha256(database)},
-        "manifest_sha256": _manifest_sha256(bundle_dir if judgeable else None),
+        "manifest_sha256": state.get("manifest_sha256")
+                            or _manifest_sha256(bundle_dir if judgeable else None),
         "implementation": {str(path): _file_sha256(Path(path))
                            for path in (implementation or _IMPLEMENTATION)},
         # The evidence the verdict and the retention decision were read from, by identity:

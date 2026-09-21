@@ -127,6 +127,45 @@ def test_a_same_day_rerun_keeps_the_outstanding_approval(tmp_path: Path) -> None
     assert second["bindings"]["manifest_sha256"] == first["bindings"]["manifest_sha256"]
 
 
+def test_a_malformed_manifest_still_leaves_a_status_file(tmp_path: Path) -> None:
+    """Judging a broken bundle must not raise before the state is recorded."""
+    db = release_at(tmp_path)
+    updates = tmp_path / "updates"
+    first = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
+                      transport=transport_for(board(current="26093",
+                                                    issues=("26093", "26092"))), now=NOW)
+    (Path(first["bundle"]) / "manifest.json").write_text("[]", encoding="utf-8")
+    result = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
+                       transport=transport_for(board()), now=NOW)
+    assert result["status"] == "failed"
+    assert json.loads(Path(result["status_file"]).read_text(encoding="utf-8"))["status"] == "failed"
+
+
+def test_an_applied_bundle_is_not_asked_for_approval_again(tmp_path: Path) -> None:
+    """Once the operator applies it, the same-day check must stop requesting approval."""
+    db = release_at(tmp_path)
+    updates = tmp_path / "updates"
+    first = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
+                      transport=transport_for(board(current="26093",
+                                                    issues=("26093", "26092"))), now=NOW)
+    assert first["needs_approval"] is True
+    connection = sqlite3.connect(db)
+    # Copy a real row rather than guessing the observation schema, and change only the issue.
+    columns = [row[1] for row in connection.execute("PRAGMA table_info(observation)")]
+    values = list(connection.execute("SELECT * FROM observation LIMIT 1").fetchone())
+    values[columns.index("issue")] = "26093"
+    values[columns.index("observation_id")] = connection.execute(
+        "SELECT MAX(observation_id)+1 FROM observation").fetchone()[0]
+    connection.execute(f"INSERT INTO observation VALUES ({','.join('?' * len(columns))})",
+                       values)
+    connection.commit()
+    connection.close()
+    second = run_check(db, updates, None, keep=1, timeout_seconds=5, interval_seconds=2,
+                       transport=transport_for(board()), now=NOW)
+    assert second["eligible"] == []
+    assert second["needs_approval"] is False
+
+
 def test_does_not_overwrite_the_same_days_bundle(tmp_path: Path) -> None:
     """A second run on the same day keeps the first run's capture bytes."""
     db = release_at(tmp_path)
