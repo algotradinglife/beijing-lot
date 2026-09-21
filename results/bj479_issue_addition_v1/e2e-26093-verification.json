@@ -2,7 +2,7 @@
   "schema": "bj479_issue_addition_verification_v1",
   "database": {
     "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-addition/release.sqlite",
-    "sha256": "78660afd7cfd65d5d5c5955135db230c9be4c4558eef2ddfb4b887edeba027b9"
+    "sha256": "69a6c252c47d41e19ffc0ee3163541df978b20b4061bf6dda78dfcfcf37cf037"
   },
   "bundle": {
     "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/.tmpwork/e2e/bundle-26093",
@@ -17,7 +17,7 @@
   "issues_already_present": [],
   "issues_ineligible": [],
   "checked_observations": 495,
-  "checked_fixtures": 495,
+  "checked_fixtures": 99,
   "content_sha256": "6a0a96ca8940e39a862362ea76c789f0ab0e0d654acc4516f3d342c7e311a863",
   "mismatches": [],
   "conclusion": {

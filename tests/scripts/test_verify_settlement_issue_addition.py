@@ -45,6 +45,7 @@ def test_replay_reproduces_an_appended_issue(applied) -> None:
     assert report["issues_already_present"] == []
     assert report["mismatches"] == []
     assert report["checked_observations"] == 5
+    assert report["checked_fixtures"] == 1
 
 
 def test_replay_proves_the_issue_was_absent_from_the_backup(applied) -> None:
@@ -232,6 +233,35 @@ def test_replay_catches_a_changed_received_at(applied) -> None:
     report = build_report(db, root, backup)
     assert report["conclusion"]["verified"] is False
     assert report["mismatches"]
+
+
+def test_replay_accepts_a_bundle_that_also_carries_a_present_issue(tmp_path: Path) -> None:
+    """A supported bundle may hold an issue the release already has.
+
+    The applier skips it and adds the newly settled one; the replay verifies that one and
+    must not fail merely because the bundle also named an issue already in the release.
+    """
+    db = release(tmp_path, issues=("26092",))
+    existing = bundle(tmp_path / "a", issue="26092")
+    added = bundle(tmp_path / "b", issue="26093")
+    merged = tmp_path / "a" / "bundle-26092"
+    manifest = json.loads((merged / "manifest.json").read_text(encoding="utf-8"))
+    other = json.loads((added / "manifest.json").read_text(encoding="utf-8"))
+    import shutil
+    for entry in other["captures"]:
+        shutil.copy(added / "raw" / (entry["sha256"] + ".html"), merged / "raw")
+    manifest["captures"].extend(other["captures"])
+    manifest["requested_issues"] = ["26092", "26093"]
+    (merged / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    backup = tmp_path / "before.sqlite"
+    committed = add_issues(db, merged, backup, approval_note="n")
+    assert committed["added_issues"] == ["26093"]
+    assert committed["skipped"][0]["issue"] == "26092"
+    report = build_report(db, merged, backup)
+    assert report["issues_owed"] == ["26093"]
+    assert report["issues_already_present"] == ["26092"]
+    assert report["conclusion"]["verified"] is True
+    assert report["mismatches"] == []
 
 
 def test_replay_reconciles_a_mixed_bundle_with_the_added_set(tmp_path: Path) -> None:

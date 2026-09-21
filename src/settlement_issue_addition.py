@@ -69,6 +69,9 @@ _SETTLED_SCORE = re.compile(r"^\d+-\d+$")
 # Statuses the release records for a completed fixture. The live board also uses a play
 # status (下/上) while a match is running, and a running score must never be frozen.
 _COMPLETED_STATUSES = {"", "完场"}
+# The score markers the gap recovery can still fill. `EMPTY` also holds `--`, which the
+# recovery's predicate does not select, so accepting it would strand the fixture.
+_RECOVERABLE_EMPTY = {"", "-"}
 
 
 def canonical_content_sha256(con: sqlite3.Connection, issues: list[str]) -> str:
@@ -197,7 +200,7 @@ def issue_verdict(rows: list[dict]) -> tuple[int, list[str]]:
         priced = [option for option in options if option.get("sp") is not None]
         key = f"{row['slot']}/{row['play']}"
         if status in ABNORMAL:
-            if priced or score not in EMPTY:
+            if priced or score not in _RECOVERABLE_EMPTY:
                 problems.append(f"{key}: abnormal status carries a result")
                 by_slot.setdefault(row["slot"], []).append(("problem", key))
             else:

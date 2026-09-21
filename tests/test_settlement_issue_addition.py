@@ -325,6 +325,17 @@ def test_refuses_a_fixture_whose_plays_disagree(tmp_path: Path) -> None:
     assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='26093'")[0][0] == 0
 
 
+def test_refuses_an_empty_marker_the_recovery_cannot_fill(tmp_path: Path) -> None:
+    """`--` is an empty marker the gap recovery does not select, so it would strand."""
+    db = release(tmp_path)
+    root = bundle(tmp_path)
+    replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="延期",
+                                             ft="--", ht="--", settle=False))
+    result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
+    assert result["status"] == "nothing_to_add"
+    assert "abnormal status carries a result" in result["skipped"][0]["problems"][0]
+
+
 def test_counts_resolved_fixtures_not_observations(tmp_path: Path) -> None:
     """The batch metric must count fixtures, so it can be read against added_fixtures."""
     db = release(tmp_path)

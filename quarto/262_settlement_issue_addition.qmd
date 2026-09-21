@@ -29,7 +29,9 @@ stopifnot(identical(v$schema, "bj479_issue_addition_verification_v1"))
 # A rejected addition must fail this delivery, not merely print "FALSE".
 stopifnot(isTRUE(v$conclusion$verified))
 stopifnot(length(v$mismatches) == 0L)
-stopifnot(length(v$issues_owed) >= 1L, length(v$issues_already_present) == 0L)
+# A bundle may legitimately carry an issue the release already holds; the applier skips it
+# and the replay verifies the rest, so only the eligible set has to be non-empty.
+stopifnot(length(v$issues_owed) >= 1L)
 stopifnot(v$checked_observations > 0L, v$checked_fixtures > 0L)
 stopifnot(nchar(v$content_sha256) == 64L, nchar(v$bundle$manifest_sha256) == 64L)
 ```
@@ -69,7 +71,8 @@ cat("- 耗时：复制 7.7 秒 + 追加 9.0 秒 + 复放 7.5 秒 ≈ **24 秒**�
   并且
   - 恰好一个选项带 SP 且就是推导出的那个；或
   - 无选项带 SP，且状态是发布库记录**已完成**行时用的那两种（空串或 `完场`）。
-- **无结果**：状态属于取消/推迟/中断/腰斩/延期/待定，且**比分为空或横杠、且没有带 SP 的选项**。
+- **无结果**：状态属于取消/推迟/中断/腰斩/延期/待定，且**比分为空或单个横杠 `-`、且没有带 SP 的选项**。
+  注意 `--` **不**算 —— 恢复层的缺口判据只选 `''` 和 `'-'`，接受 `--` 会把该场次搁死。
 - **其余一律拒绝整期。**
 
 **场次是判定单位，不是行。** 一个场次的五个玩法是同一场比赛的五个视角，所以要求它们**状态一致**：

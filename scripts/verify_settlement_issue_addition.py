@@ -116,7 +116,7 @@ def build_report(database: Path, bundle_root: Path, backup_path: Path) -> dict:
                 if key not in seen:
                     mismatches.append({"issue": issue, "slot": key[0], "play": key[1],
                                        "reason": "the bundle's fixture is missing"})
-            checked_plays += len(rows_by_key)
+            checked_plays += len({slot for slot, _ in rows_by_key})
             # Capture identity is evidence too: it must still be the bundle's page.
             recorded = {(row[0], row[1]): (row[2], row[3], row[4]) for row in con.execute(
                 "SELECT issue, typeid, source_url, received_at, sha256 FROM capture WHERE issue=?",
