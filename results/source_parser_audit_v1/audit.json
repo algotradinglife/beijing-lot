@@ -1,26 +1,20 @@
 {
-  "schema": "source_parser_audit_v1",
-  "root": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "schema": "source_parser_audit_v3",
+  "revision": "8571b7f4149e95cbef9ac13761cf8df72a0bf294",
+  "scanned_files": 1368,
+  "scanned_sha256": "7d4da2e0d4139e22a3b91f305722374068bdaffc81b46fd93f67673cbc20a125",
   "parsers": [
     {
       "parser": "scripts/replay_settlement_quarantine.py",
       "tests": [
         "tests/scripts/test_replay_settlement_quarantine.py"
       ],
-      "page_bytes": "no committed bytes; inline samples only"
+      "page_bytes": "inline samples only"
     },
     {
       "parser": "scripts/update_beidan_nowscore_sqlite.py",
       "tests": [],
       "page_bytes": "untested"
-    },
-    {
-      "parser": "scripts/verify_nowscore_bf_history.py",
-      "tests": [
-        "tests/test_nowscore_bf_derivations.py",
-        "tests/test_verify_nowscore_bf_history.py"
-      ],
-      "page_bytes": "no committed bytes, no named sample"
     },
     {
       "parser": "src/bj396_settlement/pipeline.py",
@@ -58,14 +52,14 @@
         "tests/test_top2_n7_stable.py",
         "tests/test_value_veto_r3_n7.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "no fixture reference in the tests that name it"
     },
     {
       "parser": "src/correct_score_price_history.py",
       "tests": [
         "tests/scripts/test_correct_score_price_history.py"
       ],
-      "page_bytes": "no committed bytes, no named sample"
+      "page_bytes": "no fixture reference in the tests that name it"
     },
     {
       "parser": "src/forward_snapshot/collector.py",
@@ -76,7 +70,7 @@
         "tests/test_bj248_rework.py",
         "tests/track_b/test_etl.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "reads fixtures"
     },
     {
       "parser": "src/forward_snapshot/store.py",
@@ -87,18 +81,17 @@
         "tests/test_bj248_forward_snapshot.py",
         "tests/test_bj248_rework.py",
         "tests/test_freeze_v0.py",
-        "tests/titan_clean/test_clean_stores.py",
         "tests/titan_clean/test_historical_id_map.py",
         "tests/titan_clean/test_mapping_capture.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "no fixture reference in the tests that name it"
     },
     {
       "parser": "src/freeze_review.py",
       "tests": [
         "tests/scripts/test_freeze_review.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "no fixture reference in the tests that name it"
     },
     {
       "parser": "src/fundamentals_census.py",
@@ -106,7 +99,7 @@
         "tests/test_fundamentals_census.py",
         "tests/test_fundamentals_pipeline.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "reads fixtures"
     },
     {
       "parser": "src/live_collector/parser.py",
@@ -128,16 +121,17 @@
         "tests/test_nowscore_history_assembly.py",
         "tests/test_nowscore_issue_inventory.py",
         "tests/test_nowscore_live_issues.py",
+        "tests/test_settlement_halftime_evidence.py",
         "tests/test_settlement_issue_addition.py"
       ],
-      "page_bytes": "committed bytes and inline samples"
+      "page_bytes": "reads fixtures and defines inline samples"
     },
     {
       "parser": "src/nowscore_bjdc_sp_history.py",
       "tests": [
         "tests/scripts/test_nowscore_bjdc_sp_history.py"
       ],
-      "page_bytes": "no committed bytes; inline samples only"
+      "page_bytes": "inline samples only"
     },
     {
       "parser": "src/nowscore_issue_inventory.py",
@@ -146,7 +140,7 @@
         "tests/test_nowscore_history_plan.py",
         "tests/test_nowscore_issue_inventory.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "no fixture reference in the tests that name it"
     },
     {
       "parser": "src/nowscore_settlement.py",
@@ -154,16 +148,14 @@
         "tests/scripts/test_build_issue_recovery_ledger.py",
         "tests/scripts/test_verify_settlement_issue_recovery.py",
         "tests/test_nowscore_archive.py",
-        "tests/test_nowscore_bf_derivations.py",
         "tests/test_nowscore_history_assembly.py",
         "tests/test_nowscore_history_capture.py",
-        "tests/test_nowscore_manual_all_one.py",
         "tests/test_nowscore_replay.py",
         "tests/test_nowscore_settlement.py",
         "tests/test_settlement_issue_addition.py",
         "tests/test_settlement_issue_recovery.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "no fixture reference in the tests that name it"
     },
     {
       "parser": "src/okooo_prekick_sp.py",
@@ -171,14 +163,15 @@
         "tests/scripts/test_correct_score_price_history.py",
         "tests/scripts/test_okooo_prekick_sp.py"
       ],
-      "page_bytes": "committed bytes and inline samples"
+      "page_bytes": "reads fixtures and defines inline samples"
     },
     {
       "parser": "src/settlement_halftime_evidence.py",
       "tests": [
+        "tests/scripts/test_audit_source_parsers.py",
         "tests/test_settlement_halftime_evidence.py"
       ],
-      "page_bytes": "no committed bytes, no named sample"
+      "page_bytes": "reads fixtures"
     },
     {
       "parser": "src/settlement_sp_supplement.py",
@@ -186,7 +179,7 @@
         "tests/test_settlement_sp_supplement.py",
         "tests/test_settlement_sp_update.py"
       ],
-      "page_bytes": "committed source bytes"
+      "page_bytes": "no fixture reference in the tests that name it"
     }
   ],
   "real_page_fixtures": [
@@ -202,6 +195,15 @@
     "tests/fixtures/fundamentals_census/titan-1870517.html.gz",
     "tests/fixtures/fundamentals_census/titan-2701744.gz",
     "tests/fixtures/fundamentals_census/titan-2910880.gz",
+    "tests/fixtures/halftime_evidence/24score-21082-90.html.gz",
+    "tests/fixtures/halftime_evidence/footballcritic-21082-94.html.gz",
+    "tests/fixtures/halftime_evidence/gsa-21082-90.html.gz",
+    "tests/fixtures/halftime_evidence/okooo-banquan-21082.html.gz",
+    "tests/fixtures/halftime_evidence/okooo-banquan-24041.html.gz",
+    "tests/fixtures/halftime_evidence/sportsmole-21082-94.html.gz",
+    "tests/fixtures/halftime_evidence/sportsmole-24041-328.html.gz",
+    "tests/fixtures/halftime_evidence/transfermarkt-21082-90.html.gz",
+    "tests/fixtures/halftime_evidence/transfermarkt-24041-328.html.gz",
     "tests/fixtures/live_collector/bjdc500_26051.html",
     "tests/fixtures/live_collector/kaijiang_500_26051.html",
     "tests/fixtures/live_collector/zgzcw_bet_lottery200.html",
@@ -209,12 +211,14 @@
     "tests/fixtures/mapping/nowscore.html",
     "tests/fixtures/okooo/livecenter-21082.html.gz"
   ],
-  "without_source_bytes": [
-    "scripts/replay_settlement_quarantine.py",
+  "without_fixture_reference": [
     "scripts/update_beidan_nowscore_sqlite.py",
-    "scripts/verify_nowscore_bf_history.py",
+    "src/bj396_settlement/pipeline.py",
     "src/correct_score_price_history.py",
-    "src/nowscore_bjdc_sp_history.py",
-    "src/settlement_halftime_evidence.py"
+    "src/forward_snapshot/store.py",
+    "src/freeze_review.py",
+    "src/nowscore_issue_inventory.py",
+    "src/nowscore_settlement.py",
+    "src/settlement_sp_supplement.py"
   ]
 }
