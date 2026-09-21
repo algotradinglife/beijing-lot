@@ -329,6 +329,36 @@ slot 190/227 的处置）。
 **实测量级**：一次例行更新 = 1 次期号请求 + 每新增期 5 页 + 追加 + 复放。四期共 21 个请求
 约 45 秒，加上追加与复放合计约 1 分钟级；对照全量重建约 6 小时。
 
+### 例行检查与保留策略
+
+例行发现不必人工记：定时器只是**采集 + 判定**，从不写发布库。
+
+```sh
+.venv/bin/python scripts/run_live_issue_check.py \
+  --database "$SETTLEMENT_DB" --updates-root "$DATA_ROOT/settlement/updates" \
+  --backups-root "$DATA_ROOT/settlement/backups/20260907_history_five_play_v2" \
+  --keep-backups 2
+```
+
+- 它解析采集到的页面，**只把真正可入库的期次标为待批准**（`needs_approval`）；进行中的
+  期次会连同原因记入 `ineligible`，不产生需要人工处理的假信号。
+- 状态写入 `settlement/updates/status-<日期>.json`，因此待办状态在**文件**里而不是靠退出码；
+  源站或磁盘不可用时记为 `failed`，不会让定时器进入失败状态。
+- 同一天的第二次运行不会覆盖第一次的采集证据（报告 `already_captured_today`）。
+- 同时清理备份目录，但**保留的是「没有被批次引用」的那些**：复放必须用**该批次当时的库**
+  才能推出哪些期次算是欠的，新快照替代不了它，所以**被记录的锚点永不删除**，与新旧无关。
+  锚点从三处读取：发布库的批次表、`registry/settlement-current.json` 的 corrections、
+  以及每个已应用 bundle 里的 `applied.json` 回执。
+- 删除前先验身份：目录不能是符号链接、必须位于 `backups` 之下、每个候选必须是带
+  `observation` 表的可读 SQLite 快照，发布库被显式排除；**不认识的 `*.sqlite` 会让整次清理
+  拒绝执行**，而不是被当成可弃文件。
+- 状态文件除结论外还绑定输入与规则：发布库路径与内容哈希、本次 bundle 的清单哈希、
+  判定所用实现（`src/settlement_issue_addition.py` 等四个文件）的哈希、以及调用参数。
+
+systemd 用户单元：`ops/systemd/user/beijing-lot-live-issue-check.{service,timer}`，
+每 6 小时一次（带 5 分钟随机延迟）。**追加仍需人工批准** —— 写入封印库按本项目的惯例
+需要显式授权备注。
+
 交付与验收入口：`quarto/262_settlement_issue_addition.qmd`。
 
 ## R 与 QMD

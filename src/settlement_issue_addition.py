@@ -332,7 +332,8 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
                 if canonical_content_sha256(con, json.loads(prior[0])) != prior[2]:
                     raise ValueError("Previously added content changed")
                 con.rollback()
-                return {"status": "already_applied", "added_issues": json.loads(prior[0]),
+                return {"status": "already_applied", "batch_id": batch,
+                        "backup": str(backup_path), "added_issues": json.loads(prior[0]),
                         **verified}
 
         present = existing_issues(con)
@@ -428,7 +429,8 @@ def add_issues(database: Path, bundle_root: Path, backup_path: Path, *,
                      json.dumps(skipped, ensure_ascii=False), added_observations,
                      added_fixtures, resolved_fixtures, content))
         con.commit()
-        return {"status": "added", "added_issues": additions, "skipped": skipped,
+        return {"status": "added", "batch_id": batch, "backup": str(backup_path),
+                "added_issues": additions, "skipped": skipped,
                 "added_observations": added_observations, "added_fixtures": added_fixtures,
                 "resolved_fixtures": resolved_fixtures, "content_sha256": content}
     except BaseException:

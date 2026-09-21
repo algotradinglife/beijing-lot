@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Beijing-Lot live issue check four times a day
+
+[Timer]
+# A quarter-hour offset: the board is queried once per run, and the offset keeps it away
+# from the top-of-hour load the source sees from everyone else.
+OnCalendar=*-*-* 00/6:17:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

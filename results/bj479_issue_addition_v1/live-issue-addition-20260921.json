@@ -1,0 +1,41 @@
+{
+  "schema": "bj479_issue_addition_verification_v1",
+  "database": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
+    "sha256": "f868803c38d4dc926ba817d260f46d3ae84c78d07157639f3ca8206e438dc1ae"
+  },
+  "bundle": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/live-issue-addition-20260921",
+    "manifest_sha256": "64f7ec1368d16a4c5aaba9d2235fa521e041b1aa89e3a22fb826c214722e4fef"
+  },
+  "backup": {
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2/before-issue-addition-20260921.sqlite"
+  },
+  "issues_owed": [
+    "26093",
+    "26094",
+    "26095"
+  ],
+  "issues_already_present": [],
+  "issues_ineligible": [
+    {
+      "issue": "26096",
+      "problems": [
+        "396/spf: not a completed settlement",
+        "397/spf: no settled score",
+        "398/spf: no settled score",
+        "399/spf: no settled score",
+        "400/spf: no settled score"
+      ]
+    }
+  ],
+  "checked_observations": 2940,
+  "checked_fixtures": 588,
+  "content_sha256": "5bcc0a3d8ca7ff96c8aca611f823afb7c18bf413ad94e564c0717f3d848c6244",
+  "mismatches": [],
+  "conclusion": {
+    "verified": true,
+    "void": false,
+    "note": "an empty owed set means the backup already carried every bundled issue; nothing was added to verify"
+  }
+}

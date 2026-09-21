@@ -1,0 +1,19 @@
+[Unit]
+Description=Beijing-Lot settlement: check the live board for newly settled issues (capture only)
+Documentation=file:///home/drwho1985/workspace/algotradinglife/beijing-lot/docs/operations/settlement_database_maintenance.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/drwho1985/workspace/algotradinglife/beijing-lot
+ExecStart=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python \
+  scripts/run_live_issue_check.py \
+  --database /run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite \
+  --updates-root /run/media/drwho1985/Sandisk/data/beijing-lot/settlement/updates \
+  --backups-root /run/media/drwho1985/Sandisk/data/beijing-lot/settlement/backups/20260907_history_five_play_v2 \
+  --keep-backups 2 \
+  --registry /run/media/drwho1985/Sandisk/data/beijing-lot/registry/settlement-current.json
+# A check that cannot reach the source or the disk is not a failed service; the status file
+# records it, so the timer keeps a regular cadence instead of entering a failed state.
+SuccessExitStatus=0
+TimeoutStartSec=900
