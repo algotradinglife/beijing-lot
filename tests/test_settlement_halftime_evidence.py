@@ -245,6 +245,17 @@ def _production_text(case: dict, payload: bytes) -> str:
     return evidence._text(payload)
 
 
+def test_every_case_says_whether_its_page_can_expose_a_decode_change() -> None:
+    """A page of pure ASCII bytes cannot fail on a decode change, and says so.
+
+    One preserved page (sportsmole's) is ASCII with an HTML entity where a non-ASCII character
+    would be, so no probe can detect a charset change there. Recording it keeps the residual
+    visible instead of implying the examples cover it.
+    """
+    insensitive = {c["page"] for c in _CASES if not c["decode_probe_sensitive"]}
+    assert insensitive <= {"sportsmole-24041-328.html.gz"}, insensitive
+
+
 @pytest.mark.parametrize("case", _CASES, ids=lambda c: f"{c['source_id']}-{c['issue']}-{c['slot']}")
 def test_the_preserved_page_is_that_fixture(case: dict) -> None:
     """A page that is not this fixture's must not be read as evidence for it."""
