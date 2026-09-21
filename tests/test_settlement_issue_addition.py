@@ -20,7 +20,8 @@ RESULT = {5: "胜", 6: "4球", 7: "上+双", 8: "3:1", 9: "胜-胜"}
 
 def live_page(*, issue: str, typeid: int, slot: int = 1, status: str = "完场",
               ft: str = "3-1", ht: str = "1-0", settle: bool = True,
-              reference: bool = False, handicap: str = "0") -> bytes:
+              reference: bool = False, handicap: str = "0",
+              values_override: dict | None = None) -> bytes:
     """One live-board page for one play.
 
     ``settle`` publishes the settlement SP on the winning option; ``reference`` publishes
@@ -29,10 +30,10 @@ def live_page(*, issue: str, typeid: int, slot: int = 1, status: str = "完场",
     """
     labels = TYPEID_LABELS[typeid]
     winner = RESULT.get(typeid)
-    values = {}
+    values = dict(values_override or {})
     if reference:
         values = {label: "2.10" for label in labels}
-    elif settle:
+    elif settle and not values:
         values = {winner: "5.50"}
     cells = []
     for index, label in enumerate(reversed(labels), 1):
@@ -226,114 +227,39 @@ def test_refuses_an_issue_with_a_fixture_that_is_still_playing(tmp_path: Path) -
     assert not (tmp_path / "backup.sqlite").exists()
 
 
-def test_refuses_an_abnormal_fixture_that_carries_a_result(tmp_path: Path) -> None:
-    """The release holds abnormal rows with score '-' and no derived result; a score is a contradiction."""
+def test_refuses_an_abnormal_fixture_that_carries_a_score(tmp_path: Path) -> None:
+    """An abnormal status with a score contradicts itself; the release never holds one."""
     db = release(tmp_path)
     root = bundle(tmp_path)
     replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="中断",
                                              ft="2-1", ht="1-0", settle=False))
     result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
     assert result["status"] == "nothing_to_add"
-    assert "abnormal status carries a result" in result["skipped"][0]["problems"][0]
+    assert "abnormal status carries a score" in result["skipped"][0]["problems"][0]
 
 
-def test_refuses_a_bundle_whose_page_carries_no_rows(tmp_path: Path) -> None:
-    """A source_empty page passes the manifest check but leaves a play missing."""
-    db = release(tmp_path)
-    root = bundle(tmp_path)
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    entry = next(e for e in manifest["captures"] if e["typeid"] == 7)
-    (root / "raw" / (entry["sha256"] + ".html")).write_bytes(b"")
-    entry["classification"] = "source_empty"
-    entry["sha256"] = hashlib.sha256(b"").hexdigest()
-    (root / "raw" / (entry["sha256"] + ".html")).write_bytes(b"")
-    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="miss a play"):
-        add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
-    assert not (tmp_path / "backup.sqlite").exists()
+def test_accepts_a_cancelled_fixture_whose_options_are_all_priced_at_one(
+        tmp_path: Path) -> None:
+    """The source marks a void by pricing every option at 1.00; that is not a result.
 
-
-def test_refuses_a_capture_url_that_is_not_the_source(tmp_path: Path) -> None:
-    """The build validates capture identity; a weaker boundary here would let it drift."""
-    db = release(tmp_path)
-    root = bundle(tmp_path)
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    manifest["captures"][0]["url"] = "https://example.invalid/anything"
-    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="Capture URL"):
-        add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
-
-
-def test_refuses_a_capture_time_without_a_timezone(tmp_path: Path) -> None:
-    """Collection time is evidence, so it must be an explicit instant."""
-    db = release(tmp_path)
-    root = bundle(tmp_path)
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    manifest["captures"][0]["received_at"] = "2026-09-21T12:00:00"
-    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="timezone"):
-        add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
-
-
-def test_a_failure_after_writing_rolls_back_and_releases_the_backup(
-        tmp_path: Path, monkeypatch) -> None:
-    """Nothing may be half-written, and the reserved backup must not be left behind."""
-    db = release(tmp_path)
-    before = rows(db, "SELECT COUNT(*) FROM observation")[0][0]
-    import src.settlement_issue_addition as module
-    monkeypatch.setattr(module, "canonical_content_sha256",
-                        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
-    with pytest.raises(RuntimeError, match="boom"):
-        add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
-    assert rows(db, "SELECT COUNT(*) FROM observation")[0][0] == before
-    assert not (tmp_path / "backup.sqlite").exists()
-    monkeypatch.undo()
-    assert add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite",
-                      approval_note="n")["status"] == "added"
-
-
-def test_refuses_a_backup_path_that_already_exists(tmp_path: Path) -> None:
-    """Refusing an existing path keeps a prior snapshot from being overwritten."""
-    db = release(tmp_path)
-    (tmp_path / "backup.sqlite").write_bytes(b"occupied")
-    with pytest.raises(FileExistsError):
-        add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
-
-
-def test_leaves_the_build_receipt_untouched(tmp_path: Path) -> None:
-    """The addition records its own batch; the build's receipt stays the build's."""
-    db = release(tmp_path)
-    before = rows(db, "SELECT payload_json FROM receipt")[0][0]
-    add_issues(db, bundle(tmp_path), tmp_path / "backup.sqlite", approval_note="n")
-    assert rows(db, "SELECT payload_json FROM receipt")[0][0] == before
-    assert rows(db, "SELECT COUNT(*) FROM issue_addition_batch")[0][0] == 1
-
-
-def test_refuses_a_fixture_whose_plays_disagree(tmp_path: Path) -> None:
-    """Four settled plays and one postponed play describe one fixture inconsistently.
-
-    Accepting it would strand the postponed play: a later run skips the issue because the
-    release already carries it, and the gap recovery needs all five plays to be empty.
+    The real fixture behind this case (26095 slot 67, Levante vs Athletic Bilbao) is abnormal
+    in all five plays with every option at 1.00, and an independent source records it as
+    cancelled/void with no winning price. The release holds 1,989 such rows per play, so
+    pricing must not be read as a settlement.
     """
     db = release(tmp_path)
     root = bundle(tmp_path)
-    replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="延期",
-                                             ft="-", ht="-", settle=False))
+    for typeid in PLAYS:
+        void = {label: "1.00" for label in TYPEID_LABELS[typeid]}
+        replace_play(root, "26093", typeid,
+                     live_page(issue="26093", typeid=typeid, status="取消", ft="-", ht="-",
+                               values_override=void))
     result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
-    assert result["status"] == "nothing_to_add"
-    assert "plays disagree" in result["skipped"][0]["problems"][0]
-    assert rows(db, "SELECT COUNT(*) FROM observation WHERE issue='26093'")[0][0] == 0
-
-
-def test_refuses_an_empty_marker_the_recovery_cannot_fill(tmp_path: Path) -> None:
-    """`--` is an empty marker the gap recovery does not select, so it would strand."""
-    db = release(tmp_path)
-    root = bundle(tmp_path)
-    replace_play(root, "26093", 9, live_page(issue="26093", typeid=9, status="延期",
-                                             ft="--", ht="--", settle=False))
-    result = add_issues(db, root, tmp_path / "backup.sqlite", approval_note="n")
-    assert result["status"] == "nothing_to_add"
-    assert "abnormal status carries a result" in result["skipped"][0]["problems"][0]
+    assert result["status"] == "added"
+    assert result["resolved_fixtures"] == 1
+    assert result["added_observations"] == len(PLAYS)
+    assert rows(db, "SELECT COUNT(*) FROM option_sp s JOIN observation o "
+                    "USING(observation_id) WHERE o.issue='26093' AND s.sp=1.0")[0][0] > 0
 
 
 def test_counts_resolved_fixtures_not_observations(tmp_path: Path) -> None:

@@ -186,8 +186,9 @@ def issue_verdict(rows: list[dict]) -> tuple[int, list[str]]:
       play prices nothing for the derived bucket and the status is one the release records
       for completed rows (empty or ``完场``). The live board reports a running score under a
       play status such as ``下``, so status matters for the unpriced case;
-    * no result: the status is explicitly abnormal, the score is empty or a dash, and no
-      option carries an SP -- exactly what the release's 5,750 abnormal rows look like.
+    * no result: the status is explicitly abnormal and the score is empty or a dash. The
+      options may be priced -- 1.00 on every cell marks a void, and the reference odds quoted
+      before a fixture was called off are kept too -- so pricing is deliberately not tested.
     """
     by_slot: dict[int, list[tuple[str, str]]] = {}
     problems: list[str] = []
@@ -200,8 +201,13 @@ def issue_verdict(rows: list[dict]) -> tuple[int, list[str]]:
         priced = [option for option in options if option.get("sp") is not None]
         key = f"{row['slot']}/{row['play']}"
         if status in ABNORMAL:
-            if priced or score not in _RECOVERABLE_EMPTY:
-                problems.append(f"{key}: abnormal status carries a result")
+            # A cancelled or postponed fixture carries no result whatever its option cells
+            # hold: the source writes 1.00 on every option for a void, and it may still show
+            # the reference odds it quoted before the fixture was called off. The release
+            # holds both shapes (5,335 cancelled rows per play), and an independent source
+            # records the same fixtures as cancelled/void, so pricing is not a signal here.
+            if score not in _RECOVERABLE_EMPTY:
+                problems.append(f"{key}: abnormal status carries a score")
                 by_slot.setdefault(row["slot"], []).append(("problem", key))
             else:
                 by_slot.setdefault(row["slot"], []).append(("none", key))

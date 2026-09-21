@@ -1,32 +1,23 @@
 {
   "schema": "bj479_issue_addition_verification_v1",
   "database": {
-    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live/release.sqlite",
-    "sha256": "b0e97c6f738ad7b7d651148f134fac84aaef9a0455864e12961dcb516642f405"
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live2/release.sqlite",
+    "sha256": "949c3a1d477e5cafddad7aca2581e123cb97b611e08631cfd778e84e1cef2808"
   },
   "bundle": {
-    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live/bundle",
-    "manifest_sha256": "68c247c28f4168bd99d0bae45fd71adec5698fda9d72fd8f55ef30dd6350cfdb"
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live2/bundle",
+    "manifest_sha256": "f6cccc648af0a2fada0bf7c1e4850e4332c7e246534d70a2964ba0e6175c16fe"
   },
   "backup": {
-    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live/before.sqlite"
+    "path": "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/work/e2e-live2/before.sqlite"
   },
   "issues_owed": [
     "26093",
-    "26094"
+    "26094",
+    "26095"
   ],
   "issues_already_present": [],
   "issues_ineligible": [
-    {
-      "issue": "26095",
-      "problems": [
-        "67/spf: abnormal status carries a result",
-        "67/jq: abnormal status carries a result",
-        "67/ds: abnormal status carries a result",
-        "67/bf: abnormal status carries a result",
-        "67/bq: abnormal status carries a result"
-      ]
-    },
     {
       "issue": "26096",
       "problems": [
@@ -38,9 +29,9 @@
       ]
     }
   ],
-  "checked_observations": 2480,
-  "checked_fixtures": 496,
-  "content_sha256": "0e2933f45204853fbcd6491350ee34a905a7bb94f14924b95f2eb4bcc6f0fbba",
+  "checked_observations": 2940,
+  "checked_fixtures": 588,
+  "content_sha256": "b8a27830e1cc1d99ce98e15f4156df022ccb0e8d6e037c7d8b171909ea9de334",
   "mismatches": [],
   "conclusion": {
     "verified": true,
