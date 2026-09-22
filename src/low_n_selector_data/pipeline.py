@@ -23,7 +23,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from src.issue_codes import issue_year
+from src.issue_codes import SOURCE_ISSUE_DATE_SOURCE, issue_year
 from src.divergence_materializer.data import (
     attach_native_labels,
     load_development_labels,
@@ -109,6 +109,19 @@ def _verify_proxy_parts(proxy_root: Path) -> str:
             raise ContractError(f"proxy source part hash mismatch: {relative}")
     payload = json.dumps(consumed, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def issue_codes_without_a_contract_year(roles: pd.DataFrame) -> list[str]:
+    """Return the issue codes whose year did not come from the contract source.
+
+    A named check, not an inline comparison: an example that reads the constant only proves the
+    constant exists, while an example that calls this proves the panel actually accepts what the
+    producer emits -- the mistake this exists to catch was the comparison and the emitter
+    disagreeing on a spelling.
+    """
+    return roles.loc[
+        ~roles["issue_date_source"].eq(SOURCE_ISSUE_DATE_SOURCE), "issue_code"
+    ].astype(str).tolist()
 
 
 def locate_data_root(repo_root: Path, explicit: Path | None = None) -> Path:
@@ -239,12 +252,9 @@ def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str,
     proxy = data_root / PROXY_RELATIVE
     labels_path = data_root / LABEL_SQLITE_RELATIVE
     roles = load_issue_roles(candidate)
-    if not roles["issue_date_source"].eq("SOURCE_ISSUE_CODE_YEAR").all():
-        missing = roles.loc[
-            ~roles["issue_date_source"].eq("SOURCE_ISSUE_CODE_YEAR"),
-            "issue_code",
-        ].tolist()
-        raise ContractError(f"selector chronology lacks registry years: {missing[:5]}")
+    missing = issue_codes_without_a_contract_year(roles)
+    if missing:
+        raise ContractError(f"selector chronology lacks issue-code years: {missing[:5]}")
     proxy_parts_sha256 = _verify_proxy_parts(proxy)
     panel = load_proxy_panel(proxy, roles, horizons=(HORIZON,))
     panel = panel[

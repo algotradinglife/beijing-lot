@@ -174,3 +174,29 @@ def test_semantic_frame_hash_is_row_order_invariant_and_value_sensitive() -> Non
 
     assert stable_frame_sha(frame) == stable_frame_sha(shuffled)
     assert stable_frame_sha(frame) != stable_frame_sha(changed)
+
+
+def test_the_selector_consumer_accepts_the_value_the_producer_emits(tmp_path: Path) -> None:
+    """The consumer's expected label must be the producer's actual label.
+
+    This is the example that was missing. The producer was covered and the consumer was not, so
+    when the two disagreed on the spelling of a value neither of them invented, every valid
+    inventory failed _input_panel with a ContractError and no test noticed. Asserting on the
+    constant the consumer imports is what ties the two ends together.
+    """
+    from src.low_n_selector_data import pipeline as selector
+
+    candidate = tmp_path / "candidate.sqlite"
+    with sqlite3.connect(candidate) as connection:
+        connection.execute(
+            "CREATE TABLE inventory(issue_code TEXT, match_idx INTEGER, kickoff_ts TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO inventory VALUES (?,?,?)",
+            [(f"19{index:04d}", 1, "2019-01-01 12:00:00") for index in range(808)],
+        )
+
+    roles = load_issue_roles(candidate)
+    assert selector.issue_codes_without_a_contract_year(roles) == [], (
+        "the selector compares issue_date_source against a value the producer does not emit"
+    )
