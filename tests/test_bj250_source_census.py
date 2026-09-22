@@ -69,15 +69,6 @@ def test_lineage_deduplicates_same_root() -> None:
     assert rows[1]["independent_evidence"] is False
 
 
-def test_p34_capture_full_match_key_uses_row_idx_not_playid() -> None:
-    columns = {"issue", "playid", "row_idx", "fetched_at", "match_id", "outcome_code"}
-    assert census.capture_match_key_columns(columns) == (
-        "issue",
-        "fetched_at",
-        "row_idx",
-    )
-
-
 def test_historical_proxy_role_fails_closed_without_profiled_proxy_surface() -> None:
     spec = next(item for item in census.SOURCES if item.source_id == "beidan_xlsm")
     assert (

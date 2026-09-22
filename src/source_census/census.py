@@ -234,12 +234,6 @@ def profile_field_lane(
     )
 
 
-def capture_match_key_columns(columns: set[str]) -> tuple[str, ...]:
-    """p34 snapshot match identity; playid is a play type, never a match key."""
-    required = ("issue", "fetched_at", "row_idx")
-    return required if all(column in columns for column in required) else ()
-
-
 def _key_expr(columns: tuple[str, ...]) -> str:
     return " || '|' || ".join(f"CAST({_q(column)} AS TEXT)" for column in columns)
 
