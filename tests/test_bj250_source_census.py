@@ -603,41 +603,60 @@ def test_intersection_levels_have_one_definition(tmp_path: Path) -> None:
 
 
 def test_the_producer_emits_every_declared_intersection_level(tmp_path: Path) -> None:
-    """Call the emitter itself, not the fixture that agrees with the verifier.
+    """Call the emitter itself, on both branches it has.
 
-    The earlier example checked the fixture against the verifier and inherited the blind spot it
-    was meant to close: the producer's levels were still literals, so omitting one left it green
-    while production packages failed verification. These examples read the emitter's own output,
-    on the path where no source is present and on the path where the stores exist but hold
-    nothing.
+    The earlier version checked the fixture against the verifier and inherited the blind spot it
+    was meant to close; the version after that created the wrong stores, so both calls took the
+    missing-source branch and a dropped level still escaped. These use the paths the emitter
+    actually reads, with the schema it actually queries and no rows in it.
     """
-    rows = census._intersections(tmp_path)                       # no sources at all
-    assert {row["level"] for row in rows} == set(census.INTERSECTION_LEVELS)
+    import sqlite3
 
-    # stores present but empty: the levels must not depend on finding rows
-    (tmp_path / "beidan_live.db").write_bytes(b"")
-    (tmp_path / "derived/500_bjdc").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "derived/500_bjdc/500_bjdc.sqlite").write_bytes(b"")
+    # branch one: no source present at all
+    assert {row["level"] for row in census._intersections(tmp_path)} == set(
+        census.INTERSECTION_LEVELS)
+
+    # branch two: both stores present, matching the schema the emitter queries, holding nothing
+    xlsm_dir = tmp_path / "derived/beidan_xlsm"
+    xlsm_dir.mkdir(parents=True)
+    with sqlite3.connect(xlsm_dir / "beidan_xlsm.sqlite") as connection:
+        connection.execute("CREATE TABLE matches (issue TEXT, home TEXT, away TEXT, kickoff_ts TEXT)")
+    with sqlite3.connect(tmp_path / "beidan_features.db") as connection:
+        connection.execute("CREATE TABLE matches (issue TEXT, home TEXT, away TEXT, kickoff TEXT)")
+
     rows = census._intersections(tmp_path)
-    assert {row["level"] for row in rows} == set(census.INTERSECTION_LEVELS)
-    assert "NATIVE_KEY_INTERSECTION" not in {row["level"] for row in rows}
+    levels = {row["level"] for row in rows}
+    assert levels == set(census.INTERSECTION_LEVELS)
+    assert "NATIVE_KEY_INTERSECTION" not in levels
+    candidate = next(row for row in rows if row["level"] == census.LEVEL_CANDIDATE_MAPPED_RANGE)
+    assert (candidate["lower_bound"], candidate["upper_bound"]) == (0, 0), (
+        "empty stores must report empty query results, not a missing branch")
 
 
-def test_the_emitter_names_its_levels_from_the_contract() -> None:
-    """No level literal in the emitter: the contract is the only place they are written.
+def test_every_emitter_takes_its_level_from_the_contract() -> None:
+    """Both emitters must name the level through a contract binding.
 
-    Hard-coded names in the emitter are what let it drift from the verifier once already.
+    Scanning one function let a literal restored in the other pass; keying on an uppercase suffix
+    also let a computed literal through. The check is structural: whatever is assigned to a
+    "level" key has to be one of the approved names.
     """
     import ast
 
-    source = (Path(census.__file__)).read_text(encoding="utf-8")
+    source = Path(census.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
-    fn = next(node for node in ast.walk(tree)
-              if isinstance(node, ast.FunctionDef) and node.name == "_intersections")
-    literals = [
-        node.value
-        for node in ast.walk(fn)
-        if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        and node.value.isupper() and node.value.endswith(("PRESENT", "RANGE", "INTERSECTION"))
-    ]
-    assert literals == [], f"the emitter still names levels literally: {literals}"
+    emitters = [node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef)
+                and node.name in ("_intersections", "_candidate_mapping")]
+    assert len(emitters) == 2, "expected both emitters to be present"
+    allowed = {"LEVEL_RAW_PRESENT", "LEVEL_CANDIDATE_MAPPED_RANGE", "LEVEL_CANONICAL_CAUSAL"}
+    for function in emitters:
+        seen = 0
+        for node in ast.walk(function):
+            if not isinstance(node, ast.Dict):
+                continue
+            for key, value in zip(node.keys, node.values):
+                if isinstance(key, ast.Constant) and key.value == "level":
+                    seen += 1
+                    assert isinstance(value, ast.Name) and value.id in allowed, (
+                        f"{function.name} names a level without the contract: {ast.dump(value)}")
+        assert seen, f"{function.name} emits no levels at all"
