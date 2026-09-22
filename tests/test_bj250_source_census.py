@@ -197,7 +197,7 @@ def test_r8_crosswalk_requires_the_bound_asset_hash_before_inheritance() -> None
     )
     assert census.hist40_baseline_applies("beidan_xlsm", "0" * 64) is False
     assert (
-        census.hist40_baseline_applies("bjdc_500_capture", row["r8_content_sha256"])
+        census.hist40_baseline_applies("a_source_without_a_baseline_record", row["r8_content_sha256"])
         is False
     )
     assert census.hist40_field_baseline_applies(row, row["r8_content_sha256"]) is True

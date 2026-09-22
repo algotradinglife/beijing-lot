@@ -240,11 +240,6 @@ def capture_match_key_columns(columns: set[str]) -> tuple[str, ...]:
     return required if all(column in columns for column in required) else ()
 
 
-def _capture_logical_match_key_columns(columns: set[str]) -> tuple[str, ...]:
-    required = ("issue", "row_idx")
-    return required if all(column in columns for column in required) else ()
-
-
 def _key_expr(columns: tuple[str, ...]) -> str:
     return " || '|' || ".join(f"CAST({_q(column)} AS TEXT)" for column in columns)
 
@@ -551,11 +546,8 @@ def _field_family(table: str, column: str, admissible_use: str | None = None) ->
 
 
 def _scope(spec: SourceSpec) -> str:
-    return (
-        " WHERE market_key = 'handicap_3way'"
-        if spec.source_id == "bjdc_500_capture"
-        else ""
-    )
+    """No registered source narrows its scope; the 500 capture was the only one that did."""
+    return ""
 
 
 def _join_scope(scope: str, condition: str) -> str:
@@ -675,14 +667,8 @@ def _source_aggregate(
         select.append(f"COUNT(DISTINCT {_q(spec.issue_column)}) AS issue_count")
     else:
         select.append("-1 AS issue_count")
-    match_keys = (
-        _capture_logical_match_key_columns(columns)
-        if spec.source_id == "bjdc_500_capture"
-        else tuple(
-            key
-            for key in (spec.issue_column, spec.match_column)
-            if key and key in columns
-        )
+    match_keys = tuple(
+        key for key in (spec.issue_column, spec.match_column) if key and key in columns
     )
     if len(match_keys) >= 2:
         select.append(f"COUNT(DISTINCT {_key_expr(match_keys)}) AS match_count")
@@ -804,14 +790,8 @@ def _coverage_count_expr(spec: SourceSpec, columns: set[str]) -> tuple[str, str]
         if spec.issue_column in columns
         else "-1"
     )
-    match_keys = (
-        _capture_logical_match_key_columns(columns)
-        if spec.source_id == "bjdc_500_capture"
-        else tuple(
-            key
-            for key in (spec.issue_column, spec.match_column)
-            if key and key in columns
-        )
+    match_keys = tuple(
+        key for key in (spec.issue_column, spec.match_column) if key and key in columns
     )
     match = f"COUNT(DISTINCT {_key_expr(match_keys)})" if len(match_keys) >= 2 else "-1"
     return issue, match
@@ -832,11 +812,7 @@ def _coverage_row(
     value = c.execute(
         f"SELECT COUNT(*), {expr[0]}, {expr[1]} FROM {_q(spec.coverage_table)}{query_scope}"
     ).fetchone()
-    grain = (
-        "P34_OUTCOME_CELL"
-        if spec.source_id == "bjdc_500_capture"
-        else "SOURCE_COVERAGE_RECORD"
-    )
+    grain = "SOURCE_COVERAGE_RECORD"
     return {
         "source_id": spec.source_id,
         "period": period,
@@ -981,18 +957,9 @@ def _proxy_coverage_by_period(c: sqlite3.Connection) -> list[dict[str, object]]:
 def _duplicate_profile(
     c: sqlite3.Connection, spec: SourceSpec, columns: set[str]
 ) -> dict[str, object]:
-    if spec.source_id == "bjdc_500_capture":
-        keys = [
-            key
-            for key in ("issue", "playid", "fetched_at", "row_idx", "outcome_code")
-            if key in columns
-        ]
-    else:
-        keys = [
-            key
-            for key in (spec.issue_column, spec.match_column)
-            if key and key in columns
-        ]
+    keys = [
+        key for key in (spec.issue_column, spec.match_column) if key and key in columns
+    ]
     if len(keys) < 2:
         return {
             "source_id": spec.source_id,
@@ -1021,25 +988,6 @@ def _duplicate_profile(
 def _m_per_issue(
     c: sqlite3.Connection, spec: SourceSpec, columns: set[str]
 ) -> list[dict[str, object]]:
-    if spec.source_id == "bjdc_500_capture":
-        logical_keys = _capture_logical_match_key_columns(columns)
-        if not logical_keys:
-            return []
-        scope = _join_scope(
-            _scope(spec), " AND ".join(f"{_q(key)} IS NOT NULL" for key in logical_keys)
-        )
-        rows = c.execute(
-            f"SELECT {_q('issue')}, COUNT(DISTINCT {_q('row_idx')}) FROM {_q(spec.coverage_table)}{scope} GROUP BY {_q('issue')} ORDER BY {_q('issue')}"
-        ).fetchall()
-        return [
-            {
-                "source_id": spec.source_id,
-                "issue": str(issue),
-                "m_matches": int(matches),
-                "semantics": "P34_LOGICAL_MATCHES_BY_ISSUE_AND_ROW_IDX",
-            }
-            for issue, matches in rows
-        ]
     if spec.issue_column not in columns or spec.match_column not in columns:
         return []
     scope = _join_scope(
@@ -1135,51 +1083,6 @@ def _snapshot_completeness(
                     "missing_or_invalid_vector_rows": int(row[2]) - int(row[6] or 0),
                 }
             )
-    if spec.source_id == "bjdc_500_capture" and "live_market_sp_snapshots" in tables:
-        rows = c.execute(
-            """
-            SELECT COUNT(*) AS cells,
-                   COUNT(DISTINCT issue || '|' || fetched_at || '|' || row_idx) AS snapshot_matches,
-                   SUM(CASE WHEN sp IS NOT NULL THEN 1 ELSE 0 END) AS non_null_cells,
-                   SUM(CASE WHEN sp IS NULL OR sp <= 0 THEN 1 ELSE 0 END) AS bad_sp
-            FROM live_market_sp_snapshots
-            WHERE market_key='handicap_3way'
-            """
-        ).fetchone()
-        triples = c.execute(
-            """
-            SELECT COUNT(*) FROM (
-                SELECT issue, fetched_at, row_idx
-                FROM live_market_sp_snapshots
-                WHERE market_key='handicap_3way'
-                GROUP BY issue, fetched_at, row_idx
-                HAVING COUNT(DISTINCT outcome_code)=3
-                   AND SUM(CASE WHEN sp IS NOT NULL AND sp > 0 THEN 1 ELSE 0 END)=3
-            )
-            """
-        ).fetchone()[0]
-        out.append(
-            {
-                "source_id": spec.source_id,
-                "market": "handicap_3way",
-                "snapshot_horizon": "observed_capture",
-                "time_semantics": "MUTABLE_UNFROZEN",
-                "proxy_policy_id": "NOT_APPLICABLE_FORWARD_CAPTURE",
-                "vector_semantics": "P34_OUTCOME_CELL_TRIPLET",
-                "admissible_use": "RAW_ONLY_PENDING_CLOCK_AND_SEAL",
-                "role_gate_eligible": False,
-                "downstream_requirement": "SEAL_AND_DEFINE_CLOCK_POLICY_IN_252",
-                "vector_row_count": int(rows[1]),
-                "physical_cell_count": int(rows[0]),
-                "non_null_physical_cell_count": int(rows[2] or 0),
-                "distinct_matches_with_vector": int(rows[1]),
-                "complete_vector_row_count": int(triples),
-                "valid_vector_row_count": int(triples),
-                "distinct_matches_with_valid_vector": int(triples),
-                "native_identity_valid_match_count": int(triples),
-                "missing_or_invalid_vector_rows": int(rows[1]) - int(triples),
-            }
-        )
     return out
 
 
