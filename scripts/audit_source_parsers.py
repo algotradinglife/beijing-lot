@@ -116,6 +116,36 @@ def evidence_nature(blobs: str) -> str:
     return "no fixture reference in the tests that name it"
 
 
+
+# Curated disposition of the parsers that lack preserved page bytes. It lives here rather than only
+# in prose so that an entry naming a file the repository does not track fails a test, instead of
+# sitting in a gap list that nobody can act on -- which is exactly what happened to a script that
+# existed only on one machine's disk.
+GAP_REGISTER = {
+    "src/nowscore_bjdc_sp_history.py": {
+        "status": "open",
+        "why": "historical SP collection; its tests build the page inline",
+        "next": "add a preserved page",
+    },
+    "src/correct_score_price_history.py": {
+        "status": "open",
+        "why": "its pages arrive through okooo_prekick_sp, so it holds no page bytes of its own",
+        "next": "reuse the committed Okooo fixtures, and add one page of its own",
+    },
+    "scripts/replay_settlement_quarantine.py": {
+        "status": "owned-elsewhere",
+        "issue": 480,
+        "why": "produced by #480's delivery, and within that issue's remaining scope",
+    },
+    "scripts/update_beidan_nowscore_sqlite.py": {
+        "status": "deprecated-line",
+        "why": ("the beidan_xlsm line is being retired; the script is still referenced by "
+                "backfill_beidan_nowscore_lines.py and eu_proxy_backfill, so testing it is not "
+                "obviously worth the work"),
+    },
+}
+
+
 def audit(root: Path, revision: str = "HEAD") -> dict:
     """Return one row per parser: its tests, and the static fixture signal in them.
 
@@ -139,6 +169,7 @@ def audit(root: Path, revision: str = "HEAD") -> dict:
             "".join(f"{name}\0{files[name]}\0" for name in sorted(files)).encode("utf-8")).hexdigest(),
         "parsers": rows,
         "real_page_fixtures": fixture_inventory(root, revision),
+        "gap_register": GAP_REGISTER,
         # No static fixture reference: a prompt to look, not a verdict (see evidence_nature).
         "without_fixture_reference": [row["parser"] for row in rows
                                       if row["page_bytes"].startswith("no fixture reference")

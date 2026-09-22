@@ -135,3 +135,22 @@ def test_rejects_a_revision_with_no_python(committed: Path) -> None:
                  _git(committed, "mktree").strip()).strip()
     with pytest.raises(SystemExit):
         revision_files(committed, empty)
+
+
+def test_every_registered_gap_is_a_tracked_parser() -> None:
+    """A gap list may only name parsers the repository tracks.
+
+    One entry in the delivery's gap list named a script that existed only on one machine's disk:
+    it had no history and no guard test, so "add a preserved page for it" was not actionable. The
+    register is checked as data here, against the scan of this checkout.
+    """
+    from scripts.audit_source_parsers import GAP_REGISTER
+
+    root = Path(__file__).resolve().parents[2]
+    assert (root / "src").is_dir(), "the project checkout"
+    scanned = {row["parser"] for row in audit(root, "HEAD")["parsers"]}
+    assert GAP_REGISTER, "the register should not be empty"
+    for gap, entry in GAP_REGISTER.items():
+        assert entry["status"] in {"open", "owned-elsewhere", "deprecated-line"}, gap
+        assert entry.get("why"), gap
+        assert gap in scanned, f"{gap} is registered but is not a tracked parser"

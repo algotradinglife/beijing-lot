@@ -190,14 +190,34 @@ quarto render quarto/263_source_parsers_index.qmd
 2. 身份校验**连续两版都证明不了任何事**（先自设解码器，后从源模块导入）；livecenter 案例无页面摘要致字节校验被静默跳过；500 的「显式状态」声明不成立（真实推导在 `multimarket_p0.build_settlement_truth`）。
 3. 只有澳客用例能因解码出错而失败；渲染计数器数的是已废弃标签；`backfill/parser.py` 被夸大能力。
 
-### 已知缺口（留档，未处理）
+### 已知缺口（登记表，从审计产物渲染）
 
-| 解析器 | 状态 |
-|---|---|
-| `scripts/verify_nowscore_bf_history.py` | 测试只内联构造页面 |
-| `src/nowscore_bjdc_sp_history.py` | 测试只内联构造 |
-| `scripts/replay_settlement_quarantine.py` | 测试只内联构造 |
-| `src/correct_score_price_history.py` | 页面经 `okooo_prekick_sp`，本身无页面字节；可复用澳客夹具 |
-| `scripts/update_beidan_nowscore_sqlite.py` | **无任何测试** |
+缺口以**数据**形式登记在 `scripts/audit_source_parsers.py` 的 `GAP_REGISTER` 里，随审计产物输出，
+并有测试强制**每一项都必须是仓库已跟踪的解析器**。
+
+```{r}
+status_label <- c(open = "**待做**", `owned-elsewhere` = "归其他 issue",
+                  `deprecated-line` = "所属线在退役")
+reg <- a$gap_register
+for (name in names(reg)) {
+  entry <- reg[[name]]
+  label <- status_label[[entry$status]]
+  extra <- if (!is.null(entry$issue)) sprintf("（#%s）", entry$issue) else ""
+  cat(sprintf("- `%s` — %s%s：%s\n", name, label, extra, entry$why))
+}
+```
+
+**真正需要决策的只有 2 项**（状态 `open`）：`src/nowscore_bjdc_sp_history.py`、
+`src/correct_score_price_history.py`（后者最省，可复用已提交的澳客夹具）。其余两项已各有归属，
+不构成本项的额外工作。
+
+### 本次订正
+
+初版缺口清单有**一处错误**，已修正：清单里列了 `scripts/verify_nowscore_bf_history.py`，但该文件
+**只存在于磁盘、不在版本库**（无提交历史、无对应 guard 测试）—— 它进入清单是因为早期排查扫的是
+工作区而非提交版本。要求「为它补真实页面证据」因此根本无从下手。
+
+这一处也是把缺口改成**登记表 + 强制校验**的原因：登记项若是仓库外的文件，测试直接失败，
+清单不会再长期带着无法执行的条目。
 
 另有一个**未被本交付覆盖的同类缺陷线索**：`#476`（Nowscore SP 解析失败被静默转为缺失值）与本轮修掉的澳客静默替换属同一类；`#477`（用变异测试建立门禁）与本轮手工注入实验同旨 —— 两者都值得纳入既有 issue 的处置。

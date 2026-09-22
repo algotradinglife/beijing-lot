@@ -1,6 +1,6 @@
 {
   "schema": "source_parser_audit_v3",
-  "revision": "af88515411e2ff7b3c7a9eab8ad86fe5b55c974b",
+  "revision": "4614331271b9dd80482016942067b6984ebe1ddb",
   "scanned_files": 1368,
   "scanned_sha256": "1c522638dc9d02274d21bfbf4ba3246a797dfcac23c0b771a097069ba16fd762",
   "parsers": [
@@ -211,6 +211,27 @@
     "tests/fixtures/mapping/nowscore.html",
     "tests/fixtures/okooo/livecenter-21082.html.gz"
   ],
+  "gap_register": {
+    "src/nowscore_bjdc_sp_history.py": {
+      "status": "open",
+      "why": "historical SP collection; its tests build the page inline",
+      "next": "add a preserved page"
+    },
+    "src/correct_score_price_history.py": {
+      "status": "open",
+      "why": "its pages arrive through okooo_prekick_sp, so it holds no page bytes of its own",
+      "next": "reuse the committed Okooo fixtures, and add one page of its own"
+    },
+    "scripts/replay_settlement_quarantine.py": {
+      "status": "owned-elsewhere",
+      "issue": 480,
+      "why": "produced by #480's delivery, and within that issue's remaining scope"
+    },
+    "scripts/update_beidan_nowscore_sqlite.py": {
+      "status": "deprecated-line",
+      "why": "the beidan_xlsm line is being retired; the script is still referenced by backfill_beidan_nowscore_lines.py and eu_proxy_backfill, so testing it is not obviously worth the work"
+    }
+  },
   "without_fixture_reference": [
     "scripts/update_beidan_nowscore_sqlite.py",
     "src/bj396_settlement/pipeline.py",
