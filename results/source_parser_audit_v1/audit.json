@@ -1,8 +1,8 @@
 {
   "schema": "source_parser_audit_v3",
-  "revision": "4614331271b9dd80482016942067b6984ebe1ddb",
+  "revision": "0c0c7122bc217b7c588a47c4b594724f956fd19e",
   "scanned_files": 1368,
-  "scanned_sha256": "1c522638dc9d02274d21bfbf4ba3246a797dfcac23c0b771a097069ba16fd762",
+  "scanned_sha256": "5c933d4186d8fa2dd1f5c29bd225676159be7df0350c8469c58dbceaa810cfb9",
   "parsers": [
     {
       "parser": "scripts/replay_settlement_quarantine.py",
