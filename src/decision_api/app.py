@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from src.issue_codes import IssueCodeError, issue_year
+
 import csv
 import hashlib
 import hmac
@@ -7619,10 +7621,10 @@ def _joint_leg_meta_for_issue(path_text: str, issue: str) -> dict[tuple[int, str
 
 
 def _issue_year(issue: str) -> int | None:
-    if len(issue) < 2 or not issue[:2].isdigit():
+    try:
+        return issue_year(issue)
+    except IssueCodeError:
         return None
-    year = 2000 + int(issue[:2])
-    return year if 2000 <= year <= 2099 else None
 
 
 def _available_issues(conn: sqlite3.Connection, *, limit: int = 80, include_replay: bool = True) -> list[dict[str, Any]]:

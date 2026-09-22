@@ -13,6 +13,8 @@ Timepoints within a 12-col block: 初=0, 赛前1小时=1, 赛前10小时=2, 终=
 """
 from __future__ import annotations
 
+from src.issue_codes import IssueCodeError, issue_year
+
 import sqlite3
 from typing import Dict, Iterator, List, Optional, Tuple
 
@@ -121,8 +123,8 @@ def _num(v) -> bool:
 
 def season_year(issue) -> Optional[int]:
     try:
-        return 2000 + int(str(issue)[:2])
-    except (ValueError, TypeError):
+        return issue_year(issue)
+    except IssueCodeError:
         return None
 
 

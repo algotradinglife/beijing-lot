@@ -6,6 +6,8 @@ fallback. Empty archive responses remain distinct from transport/parser errors.
 """
 from __future__ import annotations
 
+from src.issue_codes import issue_year
+
 from collections import Counter
 from datetime import datetime, timezone
 import hashlib
@@ -734,7 +736,7 @@ def merge_batches(
         raise ValueError("batch set does not completely cover plan")
     present = [issue for issue in plan["candidates"] if captures[issue]["classification"] == "present"]
     empty = [issue for issue in plan["candidates"] if captures[issue]["classification"] == "source_empty"]
-    per_year = Counter(2000 + int(issue[:2]) for issue in present)
+    per_year = Counter(issue_year(issue) for issue in present)
     modern_gaps = []
     for year in range(
         plan["candidate_contract"]["modern"]["start_year"],

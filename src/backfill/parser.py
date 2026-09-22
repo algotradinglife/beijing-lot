@@ -8,6 +8,8 @@ drift (extra whitespace, missing nbsp cells) does not break parsing.
 """
 from __future__ import annotations
 
+from src.issue_codes import issue_year
+
 import re
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
@@ -70,9 +72,7 @@ class MatchRow:
 
 def _issue_to_year(issue: str) -> int:
     """Map 5-digit YYNNN (post-2020) or 6-digit YYMMNN (pre-2020) to a 4-digit year."""
-    issue = str(issue)
-    yy = int(issue[:2])
-    return 2000 + yy
+    return issue_year(issue)
 
 
 def _kickoff_iso(issue: str, mmdd_hhmm: str) -> str | None:

@@ -1,6 +1,8 @@
 """Build and verify the #254 reproducible source-schema handoff."""
 from __future__ import annotations
 
+from src.issue_codes import issue_year
+
 import hashlib
 import json
 from pathlib import Path
@@ -156,7 +158,7 @@ def _proxy_years(snapshot: Path) -> list[int]:
     issue_codes = features.loc[
         features["namespace"].eq("historical_proxy"), "issue_code"
     ].astype("string")
-    return sorted({2000 + int(code[:2]) for code in issue_codes if len(code) >= 2})
+    return sorted({issue_year(code) for code in issue_codes})
 
 
 def _req_evidence_frame(proxy_years: list[int]) -> pd.DataFrame:

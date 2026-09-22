@@ -11,6 +11,8 @@ decision epoch) applied per target with explicit EvaluationEpoch receipts.
 
 from __future__ import annotations
 
+from src.issue_codes import issue_year
+
 import gzip
 import hashlib
 import itertools
@@ -2441,7 +2443,7 @@ def _issues_ledger(
     )
     for issue in discovered:
         issue = str(issue)
-        year = int(issue[:2]) + 2000 if issue[:2] in {"22", "23", "24", "25", "26"} else int(issue[:4])
+        year = issue_year(issue)
         included = bool(bundles.loc[bundles["issue"].astype(str).eq(issue), "native_included"].any())
         info = receipt_by_issue.get(issue, {})
         disposition = info.get("disposition", "")
