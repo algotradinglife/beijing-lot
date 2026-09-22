@@ -200,7 +200,9 @@ quarto render quarto/263_source_parsers_index.qmd
 
 ```{r}
 status_label <- c(open = "**待做**", resolved = "**已补**", blocked = "**受阻**",
-                  `owned-elsewhere` = "归其他 issue", `deprecated-line` = "所属线在退役")
+                  `owned-elsewhere` = "归其他 issue", `deprecated-line` = "所属线在退役",
+                  `source-retired` = "**来源已退役**")
+stopifnot(all(vapply(a$gap_register, function(e) !is.null(status_label[[e$status]]), logical(1))))
 reg <- a$gap_register
 for (name in names(reg)) {
   entry <- reg[[name]]
@@ -212,17 +214,11 @@ for (name in names(reg)) {
 }
 ```
 
-`nowscore_bjdc_sp_history` 已补真实页面证据（见下节）。`correct_score_price_history` 受阻的
-**只是两种输入中的一种**：它的 context 输入（`live.nowscore.com/analysis/{id}cn.html`，含快照
-归一化所读的 `最后更新` 标记）**已有留存**（`tests/fixtures/fundamentals_census/nowscore-*.gz`）；
-缺的是与之配对的 **Crown 波胆面板**（把留存的 `analysisJs/data{id}.js` 当作它传入会抛
-`Crown correct-score table missing`）。另一来源澳客的历史路径
-（`/soccer/match/{id}/{market}/change/{provider}/`）需要**已登录的浏览器会话**：既有采集器
-`scripts/manage_correct_score_price_history.py` 驱动 **Windows Chrome + 已登录 profile**
-（`/mnt/c/Users/hhusl/AppData/Local/OkoooCollectorProfile`），而本机是**原生 Linux**（无 `/mnt/c`）、
-无该会话、且走海外出口。实测：`curl_cffi` 四种浏览器指纹 **0/5**、无头 Chrome 与 **Playwright 真浏览器**
-均被 WAF 挡，人工从中国侧打开该 URL 也**落到登录页**；而 `/` 与 `/livecenter/danchang/` 均为 200 ——
-即**任何客户端改动都替代不了那个会话**。其余两项已各有归属。
+`nowscore_bjdc_sp_history` 已补真实页面证据（见下节）。`correct_score_price_history` 的来源
+**按决定退役**：澳客不适用于密集采集，只保留用于**信息核对**，因此该线不再需要澳客输入；它保留
+另一来源（Nowscore crown）。该路径的实测记录见 `#487`：`curl_cffi` 四指纹 0/5、无头 Chrome、
+真实 Playwright、已登录会话、国内侧出口**均为 405**，而站主人工打开看到的是登录页、且该期次本就
+无数据。其余两项已各有归属。
 
 ### Nowscore SP 历史页的真实证据
 

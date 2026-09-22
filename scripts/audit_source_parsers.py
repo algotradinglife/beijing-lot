@@ -130,23 +130,15 @@ GAP_REGISTER = {
         "evidence": "tests/fixtures/nowscore_sp_history/, tests/scripts/test_nowscore_bjdc_sp_history_real_pages.py",
     },
     "src/correct_score_price_history.py": {
-        "status": "blocked",
-        "why": ("one input of two is missing, and the other source's collector cannot run on this "
-                "host. Context input: already preserved (tests/fixtures/fundamentals_census/"
-                "nowscore-*.gz are https://live.nowscore.com/analysis/{id}cn.html pages carrying the "
-                "最后更新 marker the normalisation reads). Crown correct-score panel: absent -- "
-                "feeding the preserved analysisJs data{id}.js in its place raises 'Crown "
-                "correct-score table missing'. The Okooo history path "
-                "(/soccer/match/{id}/{market}/change/{provider}/) needs an authenticated browser "
-                "session: manage_correct_score_price_history.py drives Windows Chrome against the "
-                "logged-in profile /mnt/c/Users/hhusl/AppData/Local/OkoooCollectorProfile, and this "
-                "host is native Linux with no /mnt/c, no session and an overseas egress. Measured: "
-                "curl_cffi's four browser fingerprints 0/5, headless Chrome and a Playwright browser "
-                "both get the WAF page, and the human opening the URL from China lands on a login "
-                "page -- while / and /livecenter/danchang/ return 200. No client change substitutes "
-                "for the missing session."),
-        "next": ("obtain the Crown correct-score panel (run the live refresh loop once and keep its "
-                 "captures), and reach the Okooo history path from a China-side egress"),
+        "status": "source-retired",
+        "why": ("Okooo is dropped from this line by decision: the source is not suited to dense "
+                "collection and is kept for information verification instead. Its history path "
+                "answered 405 to every client tried -- plain requests, four curl_cffi fingerprints "
+                "(0/5), headless Chrome, a real Playwright browser, a logged-in browser session and "
+                "a China-side egress -- while the owner opening it manually saw a login page and, "
+                "for the issue in question, no data at all. The line keeps its other source."),
+        "next": ("pin a preserved Crown correct-score panel for tests, obtainable by running the "
+                 "live refresh loop once and keeping its captures; no Okooo input is needed"),
         "reusable_inputs": ["tests/fixtures/fundamentals_census/nowscore-2910880.gz",
                             "tests/fixtures/fundamentals_census/nowscore-2910880.provenance.json"],
     },
