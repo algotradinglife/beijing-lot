@@ -131,16 +131,20 @@ GAP_REGISTER = {
     },
     "src/correct_score_price_history.py": {
         "status": "blocked",
-        "why": ("one input of two is missing, and the other source's page is WAF-blocked at its own "
-                "path. Context input: already preserved (tests/fixtures/fundamentals_census/"
+        "why": ("one input of two is missing, and the other source's collector cannot run on this "
+                "host. Context input: already preserved (tests/fixtures/fundamentals_census/"
                 "nowscore-*.gz are https://live.nowscore.com/analysis/{id}cn.html pages carrying the "
                 "最后更新 marker the normalisation reads). Crown correct-score panel: absent -- "
                 "feeding the preserved analysisJs data{id}.js in its place raises 'Crown "
-                "correct-score table missing'. Okooo history path "
-                "(/soccer/match/{id}/{market}/change/{provider}/): the Aliyun WAF answers 405 to this "
-                "host, measured 0/5 with four curl_cffi browser fingerprints and 405 again from "
-                "headless Chrome, while / and /livecenter/danchang/ return 200 -- so it is a "
-                "path-level rule that no client change defeats."),
+                "correct-score table missing'. The Okooo history path "
+                "(/soccer/match/{id}/{market}/change/{provider}/) needs an authenticated browser "
+                "session: manage_correct_score_price_history.py drives Windows Chrome against the "
+                "logged-in profile /mnt/c/Users/hhusl/AppData/Local/OkoooCollectorProfile, and this "
+                "host is native Linux with no /mnt/c, no session and an overseas egress. Measured: "
+                "curl_cffi's four browser fingerprints 0/5, headless Chrome and a Playwright browser "
+                "both get the WAF page, and the human opening the URL from China lands on a login "
+                "page -- while / and /livecenter/danchang/ return 200. No client change substitutes "
+                "for the missing session."),
         "next": ("obtain the Crown correct-score panel (run the live refresh loop once and keep its "
                  "captures), and reach the Okooo history path from a China-side egress"),
         "reusable_inputs": ["tests/fixtures/fundamentals_census/nowscore-2910880.gz",
