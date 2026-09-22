@@ -155,3 +155,19 @@ def test_every_registered_gap_is_a_tracked_parser() -> None:
                                    "deprecated-line"}, gap
         assert entry.get("why"), gap
         assert gap in scanned, f"{gap} is registered but is not a tracked parser"
+
+
+def test_a_registered_reusable_input_exists() -> None:
+    """If the register names an input that is already preserved, it has to be there.
+
+    The first version of this entry claimed no copy of either input existed; the context pages
+    were already committed under tests/fixtures/fundamentals_census, so the claim was too strong
+    and the reusable inputs are now named.
+    """
+    from scripts.audit_source_parsers import GAP_REGISTER
+
+    root = Path(__file__).resolve().parents[2]
+    named = [name for entry in GAP_REGISTER.values() for name in entry.get("reusable_inputs", [])]
+    assert named, "the blocked entry should name what is already usable"
+    for name in named:
+        assert (root / name).is_file(), f"{name} is registered as reusable but is not committed"

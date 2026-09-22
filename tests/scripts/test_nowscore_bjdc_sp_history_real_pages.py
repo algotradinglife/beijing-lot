@@ -59,11 +59,13 @@ def test_a_real_history_page_parses_to_its_recorded_vectors(case: dict) -> None:
     labels, vectors = parse_history_page(_page(case), case["typeid"], KICKOFF[case["issue"]])
     assert labels == ("0球", "1球", "2球", "3球", "4球", "5球", "6球", "7+球")
     assert len(vectors) == 234
-    first = vectors[0]
+    first, last = vectors[0], vectors[-1]
     assert first.source_ts_hkt == "2026-09-04T10:20+08:00"
     assert first.values == (0.0, 0.0, 0.0, 3.0, 3.0, 3.0, 0.0, 0.0)
-    # the last vector is the most recent, which is what an as-of selection consumes
-    assert vectors[-1].source_ts_hkt > first.source_ts_hkt
+    # the last vector is the most recent, which is what an as-of selection consumes: pin it too,
+    # because asserting only that its timestamp is later leaves its prices free to change
+    assert last.source_ts_hkt == "2026-09-04T20:41+08:00"
+    assert last.values == (0.0, 0.0, 5.76, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 @pytest.mark.parametrize("case", [c for c in CASES if not c["has_vectors"]],
@@ -88,6 +90,28 @@ def test_an_unsupported_market_is_refused_for_a_real_page(case: dict) -> None:
     """The gate must hold on real input, not only on constructed input."""
     with pytest.raises((NowscoreHistoryError, ValueError)):
         parse_history_page(_page(case), 99, KICKOFF[case["issue"]])
+
+
+@pytest.mark.parametrize("case", [c for c in CASES if c["has_vectors"]],
+                         ids=lambda c: c["page"].split(".")[0])
+def test_a_real_page_with_a_changed_title_is_refused(case: dict) -> None:
+    """The title gate must be observable: a page that is not a history page is refused.
+
+    Without this, removing the title check changed no example, because every preserved page
+    happens to carry it.
+    """
+    payload = _page(case).replace("Sp值变化表".encode(), "Sp值变化图".encode())
+    with pytest.raises(NowscoreHistoryError, match="title"):
+        parse_history_page(payload, case["typeid"], KICKOFF[case["issue"]])
+
+
+@pytest.mark.parametrize("case", [c for c in CASES if c["has_vectors"]],
+                         ids=lambda c: c["page"].split(".")[0])
+def test_a_real_page_with_an_out_of_window_kickoff_is_refused(case: dict) -> None:
+    """The plausible-time window must be observable, so a wrong fixture cannot be fitted to it."""
+    far = KICKOFF[case["issue"]] + timedelta(days=900)
+    with pytest.raises(NowscoreHistoryError):
+        parse_history_page(_page(case), case["typeid"], far)
 
 
 @pytest.mark.parametrize("case", [c for c in CASES if c["has_vectors"]],

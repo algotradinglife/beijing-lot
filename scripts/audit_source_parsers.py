@@ -131,11 +131,18 @@ GAP_REGISTER = {
     },
     "src/correct_score_price_history.py": {
         "status": "blocked",
-        "why": ("its inputs are the Okooo history page, which returns 405 to this host's egress, "
-                "and Nowscore crown odds/context payloads, of which no copy is preserved "
-                "(results/data_collection/correct_score_price_history_v1 does not exist)"),
-        "next": ("fetch from an egress Okooo accepts, or run the live refresh loop once and keep "
-                 "its captures, then pin the payloads as fixtures"),
+        "why": ("one input is missing rather than both. Its context input is already preserved: "
+                "tests/fixtures/fundamentals_census/nowscore-*.gz are "
+                "https://live.nowscore.com/analysis/{id}cn.html pages carrying the 最后更新 marker "
+                "the snapshot normalisation reads. What is missing is the paired Crown "
+                "correct-score panel; feeding the preserved analysisJs data{id}.js in its place "
+                "raises 'Crown correct-score table missing'. The Okooo history page that could "
+                "supply the other source answers 405 to this host's egress."),
+        "next": ("obtain the Crown correct-score panel -- from an egress that source accepts, or by "
+                 "running the live refresh loop once and keeping its captures -- then pin it beside "
+                 "the analysis page already committed"),
+        "reusable_inputs": ["tests/fixtures/fundamentals_census/nowscore-2910880.gz",
+                            "tests/fixtures/fundamentals_census/nowscore-2910880.provenance.json"],
     },
     "scripts/replay_settlement_quarantine.py": {
         "status": "owned-elsewhere",
