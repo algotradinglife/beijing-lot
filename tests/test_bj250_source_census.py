@@ -636,12 +636,15 @@ def test_the_producer_emits_every_declared_intersection_level(tmp_path: Path) ->
 def test_a_package_whose_levels_leave_the_contract_is_refused(tmp_path: Path) -> None:
     """The verifier is what protects a production build, so prove it refuses a drifted package.
 
-    Three earlier versions of this guard tried to prove the emitters stayed on the contract by
-    scanning their source: first the fixture only, then two emitters, then an enumeration -- each
-    one escaped (a helper returning the key by zip, a direct CSV write, a shadowed comprehension
-    target). Static scanning keeps losing that race. What actually stops a rename reaching a
-    published package is that build_package verifies its own output, so the example tampers with
-    the artifact, re-manifests it so every hash agrees, and requires the verifier to refuse it.
+    Four earlier versions of this guard tried to prove the emitters stayed on the contract by
+    reading their source: the fixture only, two emitters, an enumeration, then scope-aware
+    resolution. Each escaped -- a helper returning the key by zip, a direct CSV write, a
+    comprehension target shadowed by a generator bound to literals. Static scanning keeps losing
+    that race, so what is tested instead is the boundary a production build runs: build_package
+    verifies its own output, and that verifier is reachable from a test where build_package is not.
+
+    The manifest's semantic hash is refreshed with the tampered file and the checksums and anchor
+    are regenerated, so nothing is stale: rejection has to come from the closure check alone.
     """
     for mutate, description in (
         (lambda lines: lines[:-1], "a level is missing"),
@@ -651,9 +654,16 @@ def test_a_package_whose_levels_leave_the_contract_is_refused(tmp_path: Path) ->
         artifact = package / "tables" / "intersection_levels.csv"
         lines = artifact.read_text(encoding="utf-8").strip().splitlines()
         artifact.write_text("\n".join(mutate(lines)) + "\n", encoding="utf-8")
-        _remanifest(package)                       # make the hash chain consistent again
+
+        manifest_path = package / "MANIFEST.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["semantic_hashes"]["tables/intersection_levels.csv"] = census.sha256_file(artifact)
+        manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+        _remanifest(package)
         anchor = census.package_anchor(package)
+
         verdict = census.verify_package(package, trusted_anchor=anchor)
         assert verdict["verified"] is False, f"the verifier accepted a package where {description}"
-        assert any("intersection closure" in problem for problem in verdict["problems"]), (
-            f"expected the closure check to fire when {description}: {verdict['problems']}")
+        assert all("intersection closure" in problem for problem in verdict["problems"]), (
+            f"rejection must come from the contract, not a stale hash, when {description}: "
+            f"{verdict['problems']}")
