@@ -137,15 +137,6 @@ PLAN_ROWS: tuple[dict[str, str], ...] = (
         "rationale": "Live settlements are after-event truth; canonical settlement "
         "namespace is physically separate (REQ-DS05).",
     },
-    # --- 500_bjdc.sqlite ---
-    {
-        "legacy_database": "500_bjdc.sqlite",
-        "legacy_table": "live_sp_snapshots",
-        "verdict": "REDIRECT",
-        "replacement": "market_observation + market_quote (sp_1x2)",
-        "rationale": "500.bjdc live SP captures with fetched_at are prospective "
-        "timestamped captures; REDIRECT to canonical observation tables.",
-    },
 )
 
 
