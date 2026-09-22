@@ -633,55 +633,27 @@ def test_the_producer_emits_every_declared_intersection_level(tmp_path: Path) ->
         "empty stores must report empty query results, not a missing branch")
 
 
-def test_every_emitter_takes_its_level_from_the_contract() -> None:
-    """Every place a level reaches a package must draw it from the contract.
+def test_a_package_whose_levels_leave_the_contract_is_refused(tmp_path: Path) -> None:
+    """The verifier is what protects a production build, so prove it refuses a drifted package.
 
-    Two earlier versions of this guard were too narrow: one scanned only _intersections, letting a
-    literal restored in _candidate_mapping pass; the next left build_fixture_package out, so its
-    comprehension could be replaced by three literals -- the same duplicated contract, back again.
-    So the check enumerates the emitters instead of listing them: a new one fails until it is
-    accounted for. A level value has to be an approved binding, or a loop variable drawn from
-    INTERSECTION_LEVELS itself.
+    Three earlier versions of this guard tried to prove the emitters stayed on the contract by
+    scanning their source: first the fixture only, then two emitters, then an enumeration -- each
+    one escaped (a helper returning the key by zip, a direct CSV write, a shadowed comprehension
+    target). Static scanning keeps losing that race. What actually stops a rename reaching a
+    published package is that build_package verifies its own output, so the example tampers with
+    the artifact, re-manifests it so every hash agrees, and requires the verifier to refuse it.
     """
-    import ast
-
-    source = Path(census.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    bindings = {"LEVEL_RAW_PRESENT", "LEVEL_CANDIDATE_MAPPED_RANGE", "LEVEL_CANONICAL_CAUSAL"}
-
-    emitters = []
-    for function in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
-        if any(isinstance(d, ast.Dict)
-               and any(isinstance(k, ast.Constant) and k.value == "level" for k in d.keys)
-               for d in ast.walk(function)):
-            emitters.append(function)
-    assert sorted(f.name for f in emitters) == [
-        "_candidate_mapping", "_intersections", "build_fixture_package",
-    ], "a new emitter appeared; account for it here rather than letting it drift"
-
-    for function in emitters:
-        # loop variables this function draws from the contract
-        from_contract = set()
-        for comprehension in ast.walk(function):
-            generators = getattr(comprehension, "generators", None)
-            if not generators:
-                continue
-            for generator in generators:
-                if isinstance(generator.iter, ast.Name) or (
-                        isinstance(generator.iter, ast.Attribute)):
-                    name = ast.unparse(generator.iter).split(".")[-1]
-                    if name == "INTERSECTION_LEVELS" and isinstance(generator.target, ast.Name):
-                        from_contract.add(generator.target.id)
-
-        seen = 0
-        for node in ast.walk(function):
-            if not isinstance(node, ast.Dict):
-                continue
-            for key, value in zip(node.keys, node.values):
-                if not (isinstance(key, ast.Constant) and key.value == "level"):
-                    continue
-                seen += 1
-                ok = (isinstance(value, ast.Name)
-                      and (value.id in bindings or value.id in from_contract))
-                assert ok, f"{function.name} names a level without the contract: {ast.unparse(value)}"
-        assert seen, f"{function.name} builds no levels at all"
+    for mutate, description in (
+        (lambda lines: lines[:-1], "a level is missing"),
+        (lambda lines: [line.replace("RAW_PRESENT", "RENAMED_LEVEL") for line in lines], "a level is renamed"),
+    ):
+        package = census.build_fixture_package(tmp_path / description.replace(" ", "_"))
+        artifact = package / "tables" / "intersection_levels.csv"
+        lines = artifact.read_text(encoding="utf-8").strip().splitlines()
+        artifact.write_text("\n".join(mutate(lines)) + "\n", encoding="utf-8")
+        _remanifest(package)                       # make the hash chain consistent again
+        anchor = census.package_anchor(package)
+        verdict = census.verify_package(package, trusted_anchor=anchor)
+        assert verdict["verified"] is False, f"the verifier accepted a package where {description}"
+        assert any("intersection closure" in problem for problem in verdict["problems"]), (
+            f"expected the closure check to fire when {description}: {verdict['problems']}")
