@@ -68,12 +68,6 @@ DATABASE_INVENTORY: tuple[dict[str, str], ...] = (
         "family": contract.FAMILY_INTERNAL_HISTORICAL,
         "description": "Derived nowscore table built from the xlsm workbook",
     },
-    {
-        "key": "500_bjdc",
-        "path": "data/derived/500_bjdc/500_bjdc.sqlite",
-        "family": contract.FAMILY_BEIJING,
-        "description": "500.bjdc live SP captures and settlement scrapes",
-    },
 )
 
 
@@ -247,9 +241,6 @@ CLOCK_EVIDENCE: dict[str, dict[str, str]] = {
         "snapshot_ts": contract.CLOCK_TIMESTAMPED_UTC,
         "settled_ts": contract.CLOCK_TIMESTAMPED_LOCAL,
     },
-    "500_bjdc": {
-        "fetched_at": contract.CLOCK_TIMESTAMPED_LOCAL,
-    },
 }
 
 # Which (issue, match_idx) pairs identify matches in each database.
@@ -267,7 +258,6 @@ TIMESTAMP_COLUMNS: dict[str, tuple[str, ...]] = {
     "beidan_features": ("kickoff",),
     "beidan_history": ("kickoff_ts", "fetched_at"),
     "beidan_live": ("kickoff_ts", "created_ts", "snapshot_ts", "settled_ts"),
-    "500_bjdc": ("fetched_at",),
 }
 
 

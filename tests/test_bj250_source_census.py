@@ -262,7 +262,7 @@ def test_source_feature_availability_consumes_field_level_lanes() -> None:
     assert label["present"] is False
 
 
-def test_source_routing_truth_table_covers_all_seven_sources() -> None:
+def test_source_routing_truth_table_covers_every_registered_source() -> None:
     inventory = [
         {
             "source_id": spec.source_id,
@@ -279,9 +279,11 @@ def test_source_routing_truth_table_covers_all_seven_sources() -> None:
     assert rows["beidan_features"]["advance_to_252"] is False
     assert rows["beidan_history"]["advance_to_251"] is False
     assert rows["beidan_history"]["advance_to_252"] is False
-    for source_id in ("beidan_live", "bjdc_500_capture"):
-        assert rows[source_id]["advance_to_251"] is True
-        assert rows[source_id]["advance_to_252"] is True
+    # bjdc_500_capture used to sit beside beidan_live here; that source is retired, so the
+    # census no longer registers it and there is no routing row to assert.
+    assert rows["beidan_live"]["advance_to_251"] is True
+    assert rows["beidan_live"]["advance_to_252"] is True
+    assert "bjdc_500_capture" not in rows
     for source_id in ("beidan_modeling_plus", "beidan_nowscore"):
         assert rows[source_id]["advance_to_251"] is False
         assert rows[source_id]["advance_to_252"] is False

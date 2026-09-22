@@ -394,37 +394,6 @@ SOURCES = (
         "Mutable live collector; its existing clock is capture-only.",
     ),
     SourceSpec(
-        "bjdc_500_capture",
-        "derived/500_bjdc/500_bjdc.sqlite",
-        "bjdc_500_capture",
-        "raw_capture",
-        "strict_forward_candidate",
-        "STRICT_FORWARD_CANDIDATE",
-        True,
-        "live_market_sp_snapshots",
-        "issue",
-        "row_idx",
-        "fetched_at",
-        "source_updated_at_hkt",
-        "fetched_at_utc",
-        (
-            "issue",
-            "playid",
-            "row_idx",
-            "market_key",
-            "fetched_at",
-            "source_updated_at_hkt",
-            "fetched_at_utc",
-            "home",
-            "away",
-            "outcome_code",
-            "sp",
-            "sale_cutoff_hkt",
-            "match_id",
-        ),
-        "Raw p34 capture: issue+fetched_at+row_idx identifies a snapshot match; playid is the p34 play type, never match identity. Strict promotion needs populated normalized source_updated_at_hkt and fetched_at_utc fields plus a sealed receipt; legacy fetched_at/source_updatetime fields only identify raw snapshot grain.",
-    ),
-    SourceSpec(
         "beidan_modeling_plus",
         "derived/beidan_xlsm/beidan_modeling_plus_2026.sqlite",
         "beidan_xlsm",
@@ -1295,54 +1264,6 @@ def _intersections(data_root: Path) -> list[dict[str, object]]:
             "decision": "HISTORICAL_PROXY_ONLY",
         }
     ]
-    live, raw = (
-        data_root / "beidan_live.db",
-        data_root / "derived/500_bjdc/500_bjdc.sqlite",
-    )
-    if live.exists() and raw.exists():
-        a, b = _connect(live), _connect(raw)
-        try:
-            lk = [
-                (str(i), int(m))
-                for i, m in a.execute(
-                    "SELECT issue,match_idx FROM matches WHERE issue IS NOT NULL AND match_idx IS NOT NULL"
-                )
-            ]
-            rk = [
-                (str(i), int(m))
-                for i, m in b.execute(
-                    "SELECT issue,match_idx FROM matches WHERE issue IS NOT NULL AND match_idx IS NOT NULL"
-                )
-            ]
-            n = native_key_intersection(lk, rk)
-            rows.append(
-                {
-                    "level": "NATIVE_KEY_INTERSECTION",
-                    "left_source": "beidan_live.matches",
-                    "right_source": "bjdc_500_capture.matches",
-                    "mapping_assumption": "identical native issue+match_idx",
-                    "lower_bound": n,
-                    "upper_bound": n,
-                    "authoritative": True,
-                    "decision": "EXACT_NATIVE_ONLY",
-                }
-            )
-        finally:
-            a.close()
-            b.close()
-    else:
-        rows.append(
-            {
-                "level": "NATIVE_KEY_INTERSECTION",
-                "left_source": "beidan_live.matches",
-                "right_source": "bjdc_500_capture.matches",
-                "mapping_assumption": "identical native issue+match_idx",
-                "lower_bound": "NOT_EVALUATED_MISSING_SOURCE",
-                "upper_bound": "NOT_EVALUATED_MISSING_SOURCE",
-                "authoritative": True,
-                "decision": "MISSING_SOURCE",
-            }
-        )
     xp, fp = (
         data_root / "derived/beidan_xlsm/beidan_xlsm.sqlite",
         data_root / "beidan_features.db",
