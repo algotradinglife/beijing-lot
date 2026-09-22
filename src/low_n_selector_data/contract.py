@@ -22,7 +22,6 @@ MASS_BIN_EDGES = tuple(index / 20 for index in range(21))
 PROXY_CONTAINER_RELATIVE = "derived/bj268/eu_proxy_backfill_v3"
 PROXY_RELATIVE = f"{PROXY_CONTAINER_RELATIVE}/eu_odds_proxy_v3"
 CANDIDATE_SQLITE_RELATIVE = f"{PROXY_CONTAINER_RELATIVE}/candidate.sqlite"
-ISSUE_REGISTRY_RELATIVE = "derived/500_bjdc/500_bjdc.sqlite"
 LABEL_SQLITE_RELATIVE = "derived/beidan_xlsm/beidan_xlsm.sqlite"
 ACCEPTED_238_RELATIVE = (
     "derived/bj238_divergence_materializer_v4r3/"

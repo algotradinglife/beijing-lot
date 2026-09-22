@@ -15,6 +15,7 @@ from src.low_n_selector_data.pipeline import (
     _mass_bin,
     stable_frame_sha,
 )
+from src.issue_codes import SOURCE_ISSUE_DATE_SOURCE
 from src.divergence_materializer.data import load_issue_roles
 
 
@@ -78,27 +79,32 @@ def test_long_form_cell_grain_is_exact_m_times_3() -> None:
     assert cells["is_omitted"].sum() == 1
 
 
-def test_registry_year_cannot_be_overridden_by_late_kickoff(tmp_path: Path) -> None:
+def test_the_issue_year_cannot_be_overridden_by_a_late_kickoff(tmp_path: Path) -> None:
+    """An issue spanning a year boundary keeps the year its code names.
+
+    The kickoff extrema stay descriptive: the inventory here reaches into 2020, and the issue is
+    still 2019.
+    """
     candidate = tmp_path / "candidate.sqlite"
     registry = tmp_path / "registry.sqlite"
     with sqlite3.connect(candidate) as connection:
         connection.execute(
             "CREATE TABLE inventory(issue_code TEXT, match_idx INTEGER, kickoff_ts TEXT)"
         )
-        rows = [("x", 1, "2018-12-31 16:00:00"), ("x", 2, "2020-09-08 21:00:00")]
+        rows = [("190101", 2, "2020-09-08 21:00:00")]
         rows.extend(
-            (f"z{index:03d}", 1, "2019-01-01 12:00:00")
-            for index in range(807)
+            ("190101", 1, "2018-12-31 16:00:00")
+            if index == 101
+            else (f"19{index:04d}", 1, "2019-01-01 12:00:00")
+            for index in range(808)
         )
         connection.executemany("INSERT INTO inventory VALUES (?,?,?)", rows)
     with sqlite3.connect(registry) as connection:
         connection.execute("CREATE TABLE issues(issue TEXT, year INTEGER)")
-        rows = [("x", 2019)] + [(f"z{index:03d}", 2019) for index in range(807)]
-        connection.executemany("INSERT INTO issues VALUES (?,?)", rows)
-    roles = load_issue_roles(candidate, registry)
-    row = roles[roles["issue_code"].eq("x")].iloc[0]
+    roles = load_issue_roles(candidate)
+    row = roles[roles["issue_code"].eq("190101")].iloc[0]
     assert row["issue_year"] == 2019
-    assert row["issue_date_source"] == "SOURCE_ISSUE_REGISTRY_YEAR"
+    assert row["issue_date_source"] == SOURCE_ISSUE_DATE_SOURCE
     assert row["issue_anchor_ts"] == pd.Timestamp("2018-12-31 16:00:00")
     assert row["issue_latest_kickoff_ts"] == pd.Timestamp("2020-09-08 21:00:00")
 

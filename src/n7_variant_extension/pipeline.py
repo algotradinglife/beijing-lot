@@ -1584,8 +1584,7 @@ def scientific_frames(repo_root: Path, data_root: Path | None = None) -> dict[st
     from src.low_n_selector_data.pipeline import load_issue_roles
 
     candidate = data_root / "derived/bj268/eu_proxy_backfill_v3/candidate.sqlite"
-    registry = data_root / "derived/500_bjdc/500_bjdc.sqlite"
-    roles = load_issue_roles(candidate, registry)
+    roles = load_issue_roles(candidate)
     panel = _extension_panel(repo_root, data_root, roles)
     eligible, boundary = _pre_extension_boundary(panel)
     history = base["history"]

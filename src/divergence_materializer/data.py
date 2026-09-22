@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import pyarrow.dataset as pads
 
+from src.issue_codes import SOURCE_ISSUE_DATE_SOURCE, IssueCodeError, issue_year
+
 from .contract import (
     CALIBRATION_YEAR,
     FIT_END,
@@ -33,14 +35,13 @@ def _connect_read_only(path: Path) -> sqlite3.Connection:
     return connection
 
 
-def load_issue_roles(
-    candidate_sqlite: Path,
-    issue_registry_sqlite: Path,
-) -> pd.DataFrame:
-    """Assign issue roles from the authoritative registry year.
+def load_issue_roles(candidate_sqlite: Path) -> pd.DataFrame:
+    """Assign issue roles from the year the issue code names.
 
-    Kickoff extrema remain descriptive timing fields.  They never override the
-    registry partition because an issue can legitimately span a year boundary.
+    The year is derived (see `src.issue_codes`), not read: the store that used to answer this was
+    the retired 500 live-refresh database, whose `issues.year` agreed with the derivation on every
+    row it held. Kickoff extrema remain descriptive timing fields; they never override the
+    partition, because an issue can legitimately span a year boundary.
     """
 
     with _connect_read_only(candidate_sqlite) as connection:
@@ -62,45 +63,30 @@ def load_issue_roles(
             """,
             connection,
         )
-    with _connect_read_only(issue_registry_sqlite) as connection:
-        registry = pd.read_sql_query(
-            """
-            SELECT CAST(issue AS TEXT) AS issue_code, year AS registry_year
-            FROM issues
-            WHERE issue IS NOT NULL
-            """,
-            connection,
-        )
     if issues["issue_code"].duplicated().any():
         raise DataContractError("candidate inventory has duplicate issue identities")
-    if registry["issue_code"].duplicated().any():
-        raise DataContractError("issue registry has duplicate issue identities")
 
-    result = issues.merge(registry, on="issue_code", how="left", validate="one_to_one")
+    # Fail closed on a malformed code: it names no year, and dating its rows by whatever the value
+    # starts with would silently mis-partition the chronology.
+    try:
+        derived = issues["issue_code"].map(issue_year)
+    except IssueCodeError as error:
+        raise DataContractError(
+            f"candidate inventory holds an issue code with no year: {error}"
+        ) from error
+    result = issues.copy()
+    result["issue_year"] = derived.astype("Int64")
     result["issue_anchor_ts"] = pd.to_datetime(
         result["issue_anchor_ts"], errors="coerce"
     )
     result["issue_latest_kickoff_ts"] = pd.to_datetime(
         result["issue_latest_kickoff_ts"], errors="coerce"
     )
-    registry_year = pd.to_numeric(result["registry_year"], errors="coerce").astype(
-        "Int64"
-    )
-    fallback_year = result["issue_anchor_ts"].dt.year.astype("Int64")
-    result["issue_year"] = registry_year.fillna(fallback_year)
-    result["issue_date_source"] = np.where(
-        registry_year.notna(),
-        "SOURCE_ISSUE_REGISTRY_YEAR",
-        np.where(
-            fallback_year.notna(),
-            "FALLBACK_EARLIEST_VALID_KICKOFF_YEAR",
-            "MISSING_ISSUE_REGISTRY_YEAR",
-        ),
-    )
+    # Every row has a year now, so there is no fallback and no unknown-date role: the code is
+    # the source, and the label says so.
+    result["issue_date_source"] = SOURCE_ISSUE_DATE_SOURCE
 
     def role(year: object, anchor: object) -> str:
-        if pd.isna(year):
-            return "excluded_unknown_date"
         value = int(year)
         if value >= SEALED_START_YEAR:
             return "sealed_feature_only"

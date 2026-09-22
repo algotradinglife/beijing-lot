@@ -774,7 +774,6 @@ def _extension_history(
 
     # Shared loaders (same sources as #360/#383).
     candidate = data_root / "derived/bj268/eu_proxy_backfill_v3/candidate.sqlite"
-    registry = data_root / "derived/500_bjdc/500_bjdc.sqlite"
     proxy = data_root / "derived/bj268/eu_proxy_backfill_v3/eu_odds_proxy_v3"
     label_sqlite = data_root / "derived/beidan_xlsm/beidan_xlsm.sqlite"
 
@@ -2534,8 +2533,7 @@ def scientific_frames(
     )
 
     candidate = data_root / "derived/bj268/eu_proxy_backfill_v3/candidate.sqlite"
-    registry = data_root / "derived/500_bjdc/500_bjdc.sqlite"
-    roles = _load_issue_roles(candidate, registry)
+    roles = _load_issue_roles(candidate)
     bj396 = _load_396_package(repo_root)
     extension_panel = _extension_panel(repo_root, data_root, roles)
     timing_for_attrs = _load_extension_timing(repo_root, data_root)

@@ -17,6 +17,8 @@ from src.source_schema.publication import (
     atomic_write_parquet,
 )
 
+from src.issue_codes import SOURCE_ISSUE_DATE_SOURCE
+
 from .contract import CONTRACT_VERSION, HORIZONS, MODEL_VERSION, OUTCOMES
 from .data import (
     attach_native_labels,
@@ -32,7 +34,6 @@ class BuildInputs:
     candidate_sqlite: Path
     proxy_root: Path
     label_sqlite: Path
-    issue_registry_sqlite: Path
     verification_json: Path
 
 
@@ -251,7 +252,7 @@ def _source_receipt(
         "label_source": str(inputs.label_sqlite),
         "consumed_development_label_rows": int(len(labels)),
         "consumed_development_labels_sha256": _frame_sha256(labels),
-        "issue_registry_source": str(inputs.issue_registry_sqlite),
+        "issue_year_source": SOURCE_ISSUE_DATE_SOURCE,
         "consumed_issue_roles_sha256": _frame_sha256(roles),
         "label_boundary": "allow-listed pre-2024 issues only",
     }
@@ -260,7 +261,7 @@ def _source_receipt(
 def build_package(inputs: BuildInputs, target: Path) -> dict[str, object]:
     """Build one immutable #238 experiment package."""
 
-    roles = load_issue_roles(inputs.candidate_sqlite, inputs.issue_registry_sqlite)
+    roles = load_issue_roles(inputs.candidate_sqlite)
     panel = load_proxy_panel(inputs.proxy_root, roles)
     development_issues = set(
         roles.loc[

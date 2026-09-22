@@ -23,6 +23,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from src.issue_codes import issue_year
 from src.divergence_materializer.data import (
     attach_native_labels,
     load_development_labels,
@@ -44,7 +45,6 @@ from .contract import (
     CONTRACT_ID,
     FEATURE_KEY,
     HORIZON,
-    ISSUE_REGISTRY_RELATIVE,
     LABEL_KEY,
     LABEL_SQLITE_RELATIVE,
     MASS_BIN_EDGES,
@@ -116,7 +116,6 @@ def locate_data_root(repo_root: Path, explicit: Path | None = None) -> Path:
     candidates.extend([repo_root / "data", repo_root.parents[1] / "data"])
     required = (
         CANDIDATE_SQLITE_RELATIVE,
-        ISSUE_REGISTRY_RELATIVE,
         LABEL_SQLITE_RELATIVE,
         ACCEPTED_238_RELATIVE,
     )
@@ -237,13 +236,12 @@ def _control_model() -> Pipeline:
 
 def _input_panel(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str]]:
     candidate = data_root / CANDIDATE_SQLITE_RELATIVE
-    registry = data_root / ISSUE_REGISTRY_RELATIVE
     proxy = data_root / PROXY_RELATIVE
     labels_path = data_root / LABEL_SQLITE_RELATIVE
-    roles = load_issue_roles(candidate, registry)
-    if not roles["issue_date_source"].eq("SOURCE_ISSUE_REGISTRY_YEAR").all():
+    roles = load_issue_roles(candidate)
+    if not roles["issue_date_source"].eq("SOURCE_ISSUE_CODE_YEAR").all():
         missing = roles.loc[
-            ~roles["issue_date_source"].eq("SOURCE_ISSUE_REGISTRY_YEAR"),
+            ~roles["issue_date_source"].eq("SOURCE_ISSUE_CODE_YEAR"),
             "issue_code",
         ].tolist()
         raise ContractError(f"selector chronology lacks registry years: {missing[:5]}")
@@ -983,12 +981,17 @@ def _verify_delivery_artifacts(
     return True
 
 
-def _independent_temporal_oracle(data_root: Path, features: pd.DataFrame) -> bool:
-    with _connect_read_only(data_root / ISSUE_REGISTRY_RELATIVE) as connection:
-        registry = pd.read_sql_query(
-            "SELECT CAST(issue AS TEXT) AS issue, year AS registry_year FROM issues",
-            connection,
-        )
+def _temporal_consistency_oracle(data_root: Path, features: pd.DataFrame) -> bool:
+    """Check the frame's chronology against the code, and its timing against the inventory.
+
+    The timing half is an independent read: the candidate inventory is a different source from the
+    feature frame, so agreement there still means something. The year half is a contract check --
+    it used to read the retired registry, which was independent once, and now compares the frame's
+    years with the year each issue code names. That catches a corrupted frame; it can no longer
+    catch a disagreement between two sources, and says so rather than pretending otherwise.
+    """
+    registry = pd.DataFrame({"issue": features["issue"].astype(str).unique()})
+    registry["code_year"] = registry["issue"].map(issue_year)
     with _connect_read_only(data_root / CANDIDATE_SQLITE_RELATIVE) as connection:
         timing = pd.read_sql_query(
             """
@@ -1019,9 +1022,9 @@ def _independent_temporal_oracle(data_root: Path, features: pd.DataFrame) -> boo
         "oracle_decision_ts"
     ].transform("min")
     return bool(
-        oracle["registry_year"].notna().all()
+        oracle["code_year"].notna().all()
         and oracle["oracle_kickoff_ts"].notna().all()
-        and oracle["issue_year"].eq(oracle["registry_year"].astype(int)).all()
+        and oracle["issue_year"].eq(oracle["code_year"].astype(int)).all()
         and oracle["fixture_kickoff_ts"].eq(oracle["oracle_kickoff_ts"]).all()
         and oracle["fixture_decision_ts"].eq(oracle["oracle_decision_ts"]).all()
         and oracle["issue_anchor_ts"].eq(oracle["oracle_issue_anchor_ts"]).all()
@@ -1119,7 +1122,7 @@ def verify_package(repo_root: Path, target: Path, explicit_data_root: Path | Non
     )
     if not temporal:
         raise AssertionError("temporal contract failed")
-    independent_temporal = _independent_temporal_oracle(data_root, features)
+    independent_temporal = _temporal_consistency_oracle(data_root, features)
     if not independent_temporal:
         raise AssertionError("independent registry/time oracle failed")
     label_separation = not any(

@@ -5,12 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+
+import pytest
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from src.divergence_materializer.contract import HORIZONS, OUTCOMES
+from src.issue_codes import SOURCE_ISSUE_DATE_SOURCE
 from src.divergence_materializer.data import (
     attach_native_labels,
     load_development_labels,
@@ -25,41 +28,58 @@ def _sqlite(path: Path, statements: str) -> None:
         connection.executescript(statements)
 
 
-def test_issue_roles_use_source_dates_and_keep_missing_historical_dates_sealed(
-    tmp_path: Path,
-) -> None:
+def test_issue_roles_take_the_year_from_the_code_not_from_kickoff(tmp_path: Path) -> None:
+    """The year comes from the issue code, so kickoff cannot move it and no kickoff cannot lose it.
+
+    Both properties used to depend on the registry: a late kickoff could not override the recorded
+    year, and an issue whose inventory held no usable kickoff still got its year from the table.
+    The code answers both now -- a missing kickoff no longer makes the year unknown, which is
+    stronger than what the table could offer.
+    """
     candidate = tmp_path / "candidate.sqlite"
     registry = tmp_path / "registry.sqlite"
     with sqlite3.connect(candidate) as connection:
         connection.execute(
-            """
-            CREATE TABLE inventory(
-                issue_code TEXT, match_idx INTEGER, kickoff_ts TEXT
-            )
-            """
+            "CREATE TABLE inventory(issue_code TEXT, match_idx INTEGER, kickoff_ts TEXT)"
         )
-        rows = [
-            (f"issue-{index:03d}", 1, "2020-01-01 12:00:00") for index in range(806)
-        ]
+        rows = [(f"20{index:04d}", 1, "2020-01-01 12:00:00") for index in range(806)]
         rows.extend(
             [
-                ("looks-old-but-is-2022", 1, "2022-06-01 12:00:00"),
-                ("no-kickoff-2025", 1, None),
+                ("220101", 1, "2022-06-01 12:00:00"),
+                ("250101", 1, None),
             ]
         )
         connection.executemany("INSERT INTO inventory VALUES(?,?,?)", rows)
     with sqlite3.connect(registry) as connection:
         connection.execute("CREATE TABLE issues(issue TEXT, year INTEGER)")
-        connection.execute("INSERT INTO issues VALUES('no-kickoff-2025', 2025)")
+        connection.execute("INSERT INTO issues VALUES('250101', 2025)")
 
-    roles = load_issue_roles(candidate, registry).set_index("issue_code")
+    roles = load_issue_roles(candidate).set_index("issue_code")
 
-    assert roles.loc["looks-old-but-is-2022", "temporal_role"] == "tune"
-    assert roles.loc["no-kickoff-2025", "temporal_role"] == "sealed_feature_only"
-    assert (
-        roles.loc["no-kickoff-2025", "issue_date_source"]
-        == "SOURCE_ISSUE_REGISTRY_YEAR"
-    )
+    assert roles.loc["220101", "temporal_role"] == "tune"
+    assert roles.loc["220101", "issue_year"] == 2022
+    assert roles.loc["250101", "temporal_role"] == "sealed_feature_only"
+    assert roles.loc["250101", "issue_year"] == 2025, "the code, not the absent kickoff"
+    assert roles.loc["250101", "issue_date_source"] == SOURCE_ISSUE_DATE_SOURCE
+
+
+def test_an_issue_code_with_no_year_stops_the_run(tmp_path: Path) -> None:
+    """A malformed code must fail rather than be dated by whatever it starts with."""
+    from src.divergence_materializer.data import DataContractError
+
+    candidate = tmp_path / "candidate.sqlite"
+    with sqlite3.connect(candidate) as connection:
+        connection.execute(
+            "CREATE TABLE inventory(issue_code TEXT, match_idx INTEGER, kickoff_ts TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO inventory VALUES(?,?,?)",
+            [(f"20{index:04d}", 1, "2020-01-01 12:00:00") for index in range(807)]
+            + [("no-kickoff-2025", 1, "2022-06-01 12:00:00")],
+        )
+
+    with pytest.raises(DataContractError):
+        load_issue_roles(candidate)
 
 
 def test_label_reader_physically_queries_only_allow_list(tmp_path: Path) -> None:

@@ -19,7 +19,6 @@ def main() -> int:
     parser.add_argument("--candidate-sqlite", type=Path, required=True)
     parser.add_argument("--proxy-root", type=Path, required=True)
     parser.add_argument("--label-sqlite", type=Path, required=True)
-    parser.add_argument("--issue-registry-sqlite", type=Path, required=True)
     parser.add_argument("--verification-json", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -28,7 +27,6 @@ def main() -> int:
             candidate_sqlite=args.candidate_sqlite,
             proxy_root=args.proxy_root,
             label_sqlite=args.label_sqlite,
-            issue_registry_sqlite=args.issue_registry_sqlite,
             verification_json=args.verification_json,
         ),
         args.output,

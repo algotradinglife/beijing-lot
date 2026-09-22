@@ -15,6 +15,13 @@ from __future__ import annotations
 
 ISSUE_CODE_LENGTHS = (5, 6)
 
+#: The value an issue's `issue_date_source` carries: it names the issue-level authority for the
+#: year, which is this module. The value itself is deliberately unchanged from when that authority
+#: was a registry table, because sealed packages record it and are replayed against it -- renaming
+#: the value fails the replay of packages that are already frozen. The name is what a reader
+#: follows; the value is what the seals hold.
+SOURCE_ISSUE_DATE_SOURCE = "SOURCE_ISSUE_REGISTRY_YEAR"
+
 #: First code that uses the five-digit form, and the first that uses the six-digit form.
 _FIVE_DIGIT_FROM_YY = 20
 

@@ -68,3 +68,32 @@ def test_the_fixture_records_where_it_came_from() -> None:
     codes = [code for code, _ in fixture["rows"]]
     assert len(set(codes)) == len(codes), "issue codes are unique in the registry"
     assert {len(code) for code in codes} <= {5, 6}
+
+
+def test_the_producer_emits_the_contract_label(tmp_path) -> None:
+    """The label pipelines assert on must be the one the producer writes.
+
+    They compare against the name as a string, so nothing but this example keeps the producer's
+    value and the contract's value the same word.
+    """
+    import sqlite3
+
+    from src.divergence_materializer.data import load_issue_roles
+    from src.issue_codes import SOURCE_ISSUE_DATE_SOURCE
+
+    candidate = tmp_path / "candidate.sqlite"
+    codes = [f"14{n:04d}" for n in range(1, 405)] + [f"26{n:03d}" for n in range(1, 405)]
+    with sqlite3.connect(candidate) as connection:
+        connection.execute(
+            "CREATE TABLE inventory (issue_code TEXT, match_idx INTEGER, kickoff_ts TEXT)"
+        )
+        connection.executemany(
+            "INSERT INTO inventory VALUES (?, ?, ?)",
+            [(code, 1, "2026-01-01 12:00:00") for code in codes],
+        )
+
+    roles = load_issue_roles(candidate)
+    assert roles["issue_date_source"].eq(SOURCE_ISSUE_DATE_SOURCE).all()
+    assert roles["issue_year"].notna().all()
+    assert roles["issue_year"].eq(roles["issue_code"].map(issue_year)).all()
+    assert set(roles["issue_year"]) == {2014, 2026}
