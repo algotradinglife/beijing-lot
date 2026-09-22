@@ -216,7 +216,10 @@ for (name in names(reg)) {
 **只是两种输入中的一种**：它的 context 输入（`live.nowscore.com/analysis/{id}cn.html`，含快照
 归一化所读的 `最后更新` 标记）**已有留存**（`tests/fixtures/fundamentals_census/nowscore-*.gz`）；
 缺的是与之配对的 **Crown 波胆面板**（把留存的 `analysisJs/data{id}.js` 当作它传入会抛
-`Crown correct-score table missing`），而另一来源澳客历史页对本机出口返回 405。其余两项已各有归属。
+`Crown correct-score table missing`）。另一来源澳客的历史路径
+（`/soccer/match/{id}/{market}/change/{provider}/`）被**阿里云 WAF 路径级拦截**：实测 `curl_cffi`
+四种浏览器指纹 **0/5 成功**，改用**无头 Chrome 仍返回 405**，而 `/` 与 `/livecenter/danchang/`
+均为 **200** —— 即**换客户端解决不了**，需要中国侧出口。其余两项已各有归属。
 
 ### Nowscore SP 历史页的真实证据
 

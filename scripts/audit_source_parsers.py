@@ -131,16 +131,18 @@ GAP_REGISTER = {
     },
     "src/correct_score_price_history.py": {
         "status": "blocked",
-        "why": ("one input is missing rather than both. Its context input is already preserved: "
-                "tests/fixtures/fundamentals_census/nowscore-*.gz are "
-                "https://live.nowscore.com/analysis/{id}cn.html pages carrying the 最后更新 marker "
-                "the snapshot normalisation reads. What is missing is the paired Crown "
-                "correct-score panel; feeding the preserved analysisJs data{id}.js in its place "
-                "raises 'Crown correct-score table missing'. The Okooo history page that could "
-                "supply the other source answers 405 to this host's egress."),
-        "next": ("obtain the Crown correct-score panel -- from an egress that source accepts, or by "
-                 "running the live refresh loop once and keeping its captures -- then pin it beside "
-                 "the analysis page already committed"),
+        "why": ("one input of two is missing, and the other source's page is WAF-blocked at its own "
+                "path. Context input: already preserved (tests/fixtures/fundamentals_census/"
+                "nowscore-*.gz are https://live.nowscore.com/analysis/{id}cn.html pages carrying the "
+                "最后更新 marker the normalisation reads). Crown correct-score panel: absent -- "
+                "feeding the preserved analysisJs data{id}.js in its place raises 'Crown "
+                "correct-score table missing'. Okooo history path "
+                "(/soccer/match/{id}/{market}/change/{provider}/): the Aliyun WAF answers 405 to this "
+                "host, measured 0/5 with four curl_cffi browser fingerprints and 405 again from "
+                "headless Chrome, while / and /livecenter/danchang/ return 200 -- so it is a "
+                "path-level rule that no client change defeats."),
+        "next": ("obtain the Crown correct-score panel (run the live refresh loop once and keep its "
+                 "captures), and reach the Okooo history path from a China-side egress"),
         "reusable_inputs": ["tests/fixtures/fundamentals_census/nowscore-2910880.gz",
                             "tests/fixtures/fundamentals_census/nowscore-2910880.provenance.json"],
     },
