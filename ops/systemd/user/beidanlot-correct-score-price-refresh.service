@@ -6,9 +6,12 @@ PartOf=beidanlot-decision-dashboard.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/workspace/soccer/beijing-lot
-Environment=PYTHONPATH=%h/workspace/soccer/beijing-lot:%h/workspace/soccer/beijing-lot/src
+WorkingDirectory=%h/workspace/algotradinglife/beijing-lot
+Environment=PYTHONPATH=%h/workspace/algotradinglife/beijing-lot:%h/workspace/algotradinglife/beijing-lot/src
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=%h/workspace/soccer/beijing-lot/.venv/bin/python scripts/live_correct_score_price_refresh_loop.py --db data/derived/500_bjdc/500_bjdc.sqlite --issue current --interval 60 --observation-horizon-minutes 1440 --observation-bucket-minutes 30 --prefreeze-minutes 10 --freeze-grace-minutes 20 --retry-backoff-minutes 60 --page-attempts 3 --page-retry-delay 2
+ExecStart=%h/workspace/algotradinglife/beijing-lot/.venv/bin/python scripts/live_correct_score_price_refresh_loop.py --db data/derived/500_bjdc/500_bjdc.sqlite --issue current --interval 60 --observation-horizon-minutes 1440 --observation-bucket-minutes 30 --prefreeze-minutes 10 --freeze-grace-minutes 20 --retry-backoff-minutes 60 --page-attempts 3 --page-retry-delay 2
 Restart=always
 RestartSec=10
+
+[Install]
+WantedBy=default.target

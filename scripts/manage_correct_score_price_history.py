@@ -49,9 +49,13 @@ from src.okooo_prekick_sp import (  # noqa: E402
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 DEFAULT_CAPTURE_ROOT = ROOT / "results/data_collection/correct_score_price_history_v1"
 DEFAULT_REPLAY_ROOT = ROOT / "results/research/correct_score_price_segment_replay_v1"
-DEFAULT_CHROME = Path("/mnt/c/Program Files/Google/Chrome/Application/chrome.exe")
-DEFAULT_AUTH_PROFILE = Path("/mnt/c/Users/hhusl/AppData/Local/OkoooCollectorProfile")
-DEFAULT_NOWSCORE_PROFILE = Path("/mnt/c/Temp/BeidanNowscoreCorrectScoreCollector")
+# This host is the machine the project runs on: native Ubuntu, not WSL, so Chrome is the Linux
+# build and the profiles are Linux directories. The Windows paths this used to carry (/mnt/c/...)
+# belonged to the WSL setup the project migrated away from.
+DEFAULT_CHROME = Path("/usr/bin/google-chrome-stable")
+DEFAULT_PROFILE_ROOT = Path.home() / ".local/share/beijing-lot"
+DEFAULT_AUTH_PROFILE = DEFAULT_PROFILE_ROOT / "okooo-collector-profile"
+DEFAULT_NOWSCORE_PROFILE = DEFAULT_PROFILE_ROOT / "nowscore-correct-score-collector"
 CDP_DUMP_HELPER = ROOT / "scripts/chrome_dump_via_cdp.mjs"
 
 SNAPSHOT_FIELDS = (
@@ -215,14 +219,8 @@ def write_csv(path: Path, rows: list[Mapping[str, Any]], fields: tuple[str, ...]
         writer.writerows(rows)
 
 
-def chrome_path_argument(path: Path, windows_chrome: bool) -> str:
-    resolved = path.expanduser().resolve()
-    if not windows_chrome:
-        return str(resolved)
-    converted = subprocess.run(
-        ["wslpath", "-w", str(resolved)], capture_output=True, text=True, timeout=5, check=True,
-    )
-    return converted.stdout.strip()
+def chrome_path_argument(path: Path) -> str:
+    return str(path.expanduser().resolve())
 
 
 class ChromeDumpFetcher:
@@ -230,9 +228,8 @@ class ChromeDumpFetcher:
         self.executable = executable.expanduser().resolve()
         if not self.executable.is_file():
             raise FileNotFoundError(f"Chrome executable missing: {self.executable}")
-        windows_chrome = str(self.executable).startswith("/mnt/")
         user_data_dir.expanduser().mkdir(parents=True, exist_ok=True)
-        self.profile_argument = chrome_path_argument(user_data_dir, windows_chrome)
+        self.profile_argument = chrome_path_argument(user_data_dir)
         self.profile_directory = profile_directory
 
     def fetch(self, url: str) -> tuple[bytes, str]:
