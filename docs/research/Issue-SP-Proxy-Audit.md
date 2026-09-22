@@ -38,7 +38,7 @@ The replay consumes only the contract-named sources:
 | #268 candidate SQLite | 213,263 fixtures, 808 issues, 9,596,835 resolved quote rows across 15 bookmakers and three horizons | Supplies exact fixture inventory and relative quote provenance |
 | #238 materializer | 1,916,376 accepted probability cells | `1 / Q_EU_RAW_1X2` is evaluated explicitly as a fair-odds proxy; `Q_EU_BJLINE` remains the probability source |
 | #216 strict panel | latest snapshot at or before each exact issue decision epoch | 274 strict vectors survive, all in one 2026 issue |
-| `500_bjdc.sqlite:issues` | 2,144 issue records and year coverage | Used to assert candidate issue existence; only the ordered logical `issues` table is hashed so unrelated live writes cannot perturb replay |
+| `500_bjdc.sqlite:issues` | 2,144 issue records and year coverage | Used to assert candidate issue existence; only the ordered logical `issues` table is hashed so unrelated live writes cannot perturb replay. **Retired store:** the gate now asks whether the issue code names a year (`src/issue_codes.is_issue_code`), and the store is still a declared mandatory input, which keeps the audit from reaching a positive disposition — see #490 |
 
 No canonical source is modified. No 0.65 payout factor, outcome label or ROI is
 used in this data-readiness decision.
