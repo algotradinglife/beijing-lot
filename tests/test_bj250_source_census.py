@@ -634,29 +634,54 @@ def test_the_producer_emits_every_declared_intersection_level(tmp_path: Path) ->
 
 
 def test_every_emitter_takes_its_level_from_the_contract() -> None:
-    """Both emitters must name the level through a contract binding.
+    """Every place a level reaches a package must draw it from the contract.
 
-    Scanning one function let a literal restored in the other pass; keying on an uppercase suffix
-    also let a computed literal through. The check is structural: whatever is assigned to a
-    "level" key has to be one of the approved names.
+    Two earlier versions of this guard were too narrow: one scanned only _intersections, letting a
+    literal restored in _candidate_mapping pass; the next left build_fixture_package out, so its
+    comprehension could be replaced by three literals -- the same duplicated contract, back again.
+    So the check enumerates the emitters instead of listing them: a new one fails until it is
+    accounted for. A level value has to be an approved binding, or a loop variable drawn from
+    INTERSECTION_LEVELS itself.
     """
     import ast
 
     source = Path(census.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
-    emitters = [node for node in ast.walk(tree)
-                if isinstance(node, ast.FunctionDef)
-                and node.name in ("_intersections", "_candidate_mapping")]
-    assert len(emitters) == 2, "expected both emitters to be present"
-    allowed = {"LEVEL_RAW_PRESENT", "LEVEL_CANDIDATE_MAPPED_RANGE", "LEVEL_CANONICAL_CAUSAL"}
+    bindings = {"LEVEL_RAW_PRESENT", "LEVEL_CANDIDATE_MAPPED_RANGE", "LEVEL_CANONICAL_CAUSAL"}
+
+    emitters = []
+    for function in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+        if any(isinstance(d, ast.Dict)
+               and any(isinstance(k, ast.Constant) and k.value == "level" for k in d.keys)
+               for d in ast.walk(function)):
+            emitters.append(function)
+    assert sorted(f.name for f in emitters) == [
+        "_candidate_mapping", "_intersections", "build_fixture_package",
+    ], "a new emitter appeared; account for it here rather than letting it drift"
+
     for function in emitters:
+        # loop variables this function draws from the contract
+        from_contract = set()
+        for comprehension in ast.walk(function):
+            generators = getattr(comprehension, "generators", None)
+            if not generators:
+                continue
+            for generator in generators:
+                if isinstance(generator.iter, ast.Name) or (
+                        isinstance(generator.iter, ast.Attribute)):
+                    name = ast.unparse(generator.iter).split(".")[-1]
+                    if name == "INTERSECTION_LEVELS" and isinstance(generator.target, ast.Name):
+                        from_contract.add(generator.target.id)
+
         seen = 0
         for node in ast.walk(function):
             if not isinstance(node, ast.Dict):
                 continue
             for key, value in zip(node.keys, node.values):
-                if isinstance(key, ast.Constant) and key.value == "level":
-                    seen += 1
-                    assert isinstance(value, ast.Name) and value.id in allowed, (
-                        f"{function.name} names a level without the contract: {ast.dump(value)}")
-        assert seen, f"{function.name} emits no levels at all"
+                if not (isinstance(key, ast.Constant) and key.value == "level"):
+                    continue
+                seen += 1
+                ok = (isinstance(value, ast.Name)
+                      and (value.id in bindings or value.id in from_contract))
+                assert ok, f"{function.name} names a level without the contract: {ast.unparse(value)}"
+        assert seen, f"{function.name} builds no levels at all"
