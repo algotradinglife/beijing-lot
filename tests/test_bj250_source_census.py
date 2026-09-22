@@ -600,3 +600,44 @@ def test_intersection_levels_have_one_definition(tmp_path: Path) -> None:
     anchor = census.package_anchor(package)
     assert census.verify_package(package, trusted_anchor=anchor)["verified"] is True, (
         census.verify_package(package, trusted_anchor=anchor)["problems"])
+
+
+def test_the_producer_emits_every_declared_intersection_level(tmp_path: Path) -> None:
+    """Call the emitter itself, not the fixture that agrees with the verifier.
+
+    The earlier example checked the fixture against the verifier and inherited the blind spot it
+    was meant to close: the producer's levels were still literals, so omitting one left it green
+    while production packages failed verification. These examples read the emitter's own output,
+    on the path where no source is present and on the path where the stores exist but hold
+    nothing.
+    """
+    rows = census._intersections(tmp_path)                       # no sources at all
+    assert {row["level"] for row in rows} == set(census.INTERSECTION_LEVELS)
+
+    # stores present but empty: the levels must not depend on finding rows
+    (tmp_path / "beidan_live.db").write_bytes(b"")
+    (tmp_path / "derived/500_bjdc").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "derived/500_bjdc/500_bjdc.sqlite").write_bytes(b"")
+    rows = census._intersections(tmp_path)
+    assert {row["level"] for row in rows} == set(census.INTERSECTION_LEVELS)
+    assert "NATIVE_KEY_INTERSECTION" not in {row["level"] for row in rows}
+
+
+def test_the_emitter_names_its_levels_from_the_contract() -> None:
+    """No level literal in the emitter: the contract is the only place they are written.
+
+    Hard-coded names in the emitter are what let it drift from the verifier once already.
+    """
+    import ast
+
+    source = (Path(census.__file__)).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    fn = next(node for node in ast.walk(tree)
+              if isinstance(node, ast.FunctionDef) and node.name == "_intersections")
+    literals = [
+        node.value
+        for node in ast.walk(fn)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        and node.value.isupper() and node.value.endswith(("PRESENT", "RANGE", "INTERSECTION"))
+    ]
+    assert literals == [], f"the emitter still names levels literally: {literals}"

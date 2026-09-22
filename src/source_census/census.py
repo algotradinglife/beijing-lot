@@ -1239,7 +1239,7 @@ def _candidate_mapping(
     upper = sum(key in f_upper for key in x_upper)
     return [
         {
-            "level": "CANDIDATE_MAPPED_RANGE",
+            "level": LEVEL_CANDIDATE_MAPPED_RANGE,
             "left_source": "beidan_xlsm.matches",
             "right_source": "beidan_features.matches",
             "mapping_assumption": "lower=issue+normalized_home+normalized_away+calendar_date; upper=issue+normalized_home+normalized_away",
@@ -1259,12 +1259,15 @@ INTERSECTION_LEVELS = (
     "CANDIDATE_MAPPED_RANGE",
     "CANONICAL_CAUSAL_INTERSECTION",
 )
+# the producer names these rather than repeating the literals, so a change to the contract is a
+# change at its single definition instead of a hunt through the emitters
+LEVEL_RAW_PRESENT, LEVEL_CANDIDATE_MAPPED_RANGE, LEVEL_CANONICAL_CAUSAL = INTERSECTION_LEVELS
 
 
 def _intersections(data_root: Path) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = [
         {
-            "level": "RAW_PRESENT",
+            "level": LEVEL_RAW_PRESENT,
             "left_source": "beidan_xlsm.market_snapshots",
             "right_source": "beidan_xlsm.matches",
             "mapping_assumption": "native fields only",
@@ -1288,7 +1291,7 @@ def _intersections(data_root: Path) -> list[dict[str, object]]:
     else:
         rows.append(
             {
-                "level": "CANDIDATE_MAPPED_RANGE",
+                "level": LEVEL_CANDIDATE_MAPPED_RANGE,
                 "left_source": "beidan_xlsm.matches",
                 "right_source": "beidan_features.matches",
                 "mapping_assumption": "unavailable",
@@ -1300,7 +1303,7 @@ def _intersections(data_root: Path) -> list[dict[str, object]]:
         )
     rows.append(
         {
-            "level": "CANONICAL_CAUSAL_INTERSECTION",
+            "level": LEVEL_CANONICAL_CAUSAL,
             "left_source": "all",
             "right_source": "all",
             "mapping_assumption": "frozen identity+temporal policy required",
