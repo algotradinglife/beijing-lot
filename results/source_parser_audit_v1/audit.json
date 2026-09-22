@@ -1,6 +1,6 @@
 {
   "schema": "source_parser_audit_v3",
-  "revision": "a242d44145e93042d987c1823327c48d25ae48ff",
+  "revision": "f60db3ae419b041aaa288b50f4be0a1ebcd43279",
   "scanned_files": 1369,
   "scanned_sha256": "7cd7696a563366ef17d6e20c4ddb9a70030a39e5f63d1ccdf7f79f3c6c68c924",
   "parsers": [
