@@ -1,8 +1,8 @@
 {
   "schema": "source_parser_audit_v3",
-  "revision": "966f1fa253a7b8243f40926d53b3ac265bf4b38b",
-  "scanned_files": 1368,
-  "scanned_sha256": "5c933d4186d8fa2dd1f5c29bd225676159be7df0350c8469c58dbceaa810cfb9",
+  "revision": "9d2bba7fd6e60601aab8cedea83c44357b6a3ab0",
+  "scanned_files": 1369,
+  "scanned_sha256": "fa8b7f901ae9da23d6075b1c0b73b2611dceb8ab8d73e64463aad528b2427406",
   "parsers": [
     {
       "parser": "scripts/replay_settlement_quarantine.py",
@@ -113,6 +113,7 @@
         "tests/scripts/test_audit_source_parsers.py",
         "tests/scripts/test_freeze_review.py",
         "tests/scripts/test_manage_decision_dashboard.py",
+        "tests/scripts/test_nowscore_bjdc_sp_history_real_pages.py",
         "tests/scripts/test_okooo_prekick_sp.py",
         "tests/scripts/test_run_live_issue_check.py",
         "tests/test_bj396_settlement.py",
@@ -129,9 +130,10 @@
     {
       "parser": "src/nowscore_bjdc_sp_history.py",
       "tests": [
-        "tests/scripts/test_nowscore_bjdc_sp_history.py"
+        "tests/scripts/test_nowscore_bjdc_sp_history.py",
+        "tests/scripts/test_nowscore_bjdc_sp_history_real_pages.py"
       ],
-      "page_bytes": "inline samples only"
+      "page_bytes": "reads fixtures and defines inline samples"
     },
     {
       "parser": "src/nowscore_issue_inventory.py",
@@ -209,6 +211,9 @@
     "tests/fixtures/live_collector/zgzcw_bet_lottery200.html",
     "tests/fixtures/mapping/500.html",
     "tests/fixtures/mapping/nowscore.html",
+    "tests/fixtures/nowscore_sp_history/ns-21082_1_5.html.gz",
+    "tests/fixtures/nowscore_sp_history/ns-21082_1_6.html.gz",
+    "tests/fixtures/nowscore_sp_history/ns-26092_1_6.html.gz",
     "tests/fixtures/okooo/livecenter-21082.html.gz"
   ],
   "gap_register": {
