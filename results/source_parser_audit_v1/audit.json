@@ -1,8 +1,8 @@
 {
   "schema": "source_parser_audit_v3",
-  "revision": "701939b3ecf75d2f3802d5ebb0cd63a5a9712ef4",
+  "revision": "6ae7e026984fb2fbc609057cfff6330f8b4074c8",
   "scanned_files": 1369,
-  "scanned_sha256": "fa8b7f901ae9da23d6075b1c0b73b2611dceb8ab8d73e64463aad528b2427406",
+  "scanned_sha256": "7cd7696a563366ef17d6e20c4ddb9a70030a39e5f63d1ccdf7f79f3c6c68c924",
   "parsers": [
     {
       "parser": "scripts/replay_settlement_quarantine.py",
@@ -96,6 +96,7 @@
     {
       "parser": "src/fundamentals_census.py",
       "tests": [
+        "tests/scripts/test_audit_source_parsers.py",
         "tests/test_fundamentals_census.py",
         "tests/test_fundamentals_pipeline.py"
       ],
