@@ -199,20 +199,49 @@ quarto render quarto/263_source_parsers_index.qmd
 并有测试强制**每一项都必须是仓库已跟踪的解析器**。
 
 ```{r}
-status_label <- c(open = "**待做**", `owned-elsewhere` = "归其他 issue",
-                  `deprecated-line` = "所属线在退役")
+status_label <- c(open = "**待做**", resolved = "**已补**", blocked = "**受阻**",
+                  `owned-elsewhere` = "归其他 issue", `deprecated-line` = "所属线在退役")
 reg <- a$gap_register
 for (name in names(reg)) {
   entry <- reg[[name]]
   label <- status_label[[entry$status]]
   extra <- if (!is.null(entry$issue)) sprintf("（#%s）", entry$issue) else ""
   cat(sprintf("- `%s` — %s%s：%s\n", name, label, extra, entry$why))
+  unblock <- entry[["next"]]
+  if (!is.null(unblock)) cat(sprintf("    解除条件：%s\n", unblock))
 }
 ```
 
-**真正需要决策的只有 2 项**（状态 `open`）：`src/nowscore_bjdc_sp_history.py`、
-`src/correct_score_price_history.py`（后者最省，可复用已提交的澳客夹具）。其余两项已各有归属，
+`nowscore_bjdc_sp_history` 已补真实页面证据（见下节），`correct_score_price_history` 受阻于
+**输入本身取不到**（澳客 405、crown 载荷无留存），已写明解除条件。其余两项已各有归属，
 不构成本项的额外工作。
+
+### Nowscore SP 历史页的真实证据
+
+从源站历史端点（`https://cp.nowscore.com/sp/danchang/{期次}_{场次}_{玩法}.html`）取回三个真实页面
+入库（5.7 KB gzip），连同摘要与预期：
+
+```{r}
+ns <- jsonlite::fromJSON(file.path(root, "tests", "fixtures", "nowscore_sp_history", "cases.json"),
+                         simplifyVector = FALSE)
+cat(sprintf("- 真实页面 **%d** 个；其中有向量的 %d 个、源站已清除历史的 %d 个。\n",
+            length(ns$cases), sum(vapply(ns$cases, function(c) isTRUE(c$has_vectors), logical(1))),
+            sum(vapply(ns$cases, function(c) !isTRUE(c$has_vectors), logical(1)))))
+```
+
+解析器在这些页面上**与源站一致**：实质页面解出 234 个向量（标签与首末向量值均已钉住），
+而两个陈旧页面被**正确拒绝** —— 源站会清除旧期次的历史，这与「历史为空」不是一回事。
+
+**注入验证**（两组都必须让用例变红）：
+
+| 注入 | 结果 |
+|---|---|
+| 页面解码改 `ascii/replace` | **3 个用例失败** |
+| 放行表头闸门（模拟选择器漂移） | **1 个用例失败** |
+| 恢复 | 10 全过 |
+
+第二组起初**没被抓住** —— 因为每个夹具页面的表头恰好都匹配它登记的玩法。补入「用 typeid-6 的
+真实页面按 typeid-5 解析必须被拒绝」这一用例后，闸门被放行才可见。
 
 ### 本次订正
 

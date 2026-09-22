@@ -1,0 +1,33 @@
+{
+  "schema": "nowscore_sp_history_fixtures_v1",
+  "note": "Pages fetched from the source's own history endpoint (https://cp.nowscore.com/sp/danchang/{issue}_{match_idx}_{typeid}.html) on 2026-09-22 and kept gzipped. Two of them carry no vectors: the source purges an old issue's history, and the parser must refuse such a page rather than answer with an empty or stale read.",
+  "cases": [
+    {
+      "page": "ns-26092_1_6.html.gz",
+      "issue": "26092",
+      "match_idx": 1,
+      "typeid": 6,
+      "has_vectors": true,
+      "source_bytes": 32578,
+      "sha256": "49372f460a26f186f4c6cc02289a2fe1020f79c9a386ff24dc9a325c99f3a8c1"
+    },
+    {
+      "page": "ns-21082_1_6.html.gz",
+      "issue": "21082",
+      "match_idx": 1,
+      "typeid": 6,
+      "has_vectors": false,
+      "source_bytes": 941,
+      "sha256": "9e4a9952752ebbaec2ecbaa18da02a7c654feeda00537f0bd74e991af0da5a99"
+    },
+    {
+      "page": "ns-21082_1_5.html.gz",
+      "issue": "21082",
+      "match_idx": 1,
+      "typeid": 5,
+      "has_vectors": false,
+      "source_bytes": 827,
+      "sha256": "40932f2d8b1c41b475335af27fa4d52b29a6bece1f4666dd0d00ebaac288934a"
+    }
+  ]
+}

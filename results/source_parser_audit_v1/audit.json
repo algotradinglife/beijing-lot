@@ -1,6 +1,6 @@
 {
   "schema": "source_parser_audit_v3",
-  "revision": "0c0c7122bc217b7c588a47c4b594724f956fd19e",
+  "revision": "966f1fa253a7b8243f40926d53b3ac265bf4b38b",
   "scanned_files": 1368,
   "scanned_sha256": "5c933d4186d8fa2dd1f5c29bd225676159be7df0350c8469c58dbceaa810cfb9",
   "parsers": [
@@ -213,14 +213,14 @@
   ],
   "gap_register": {
     "src/nowscore_bjdc_sp_history.py": {
-      "status": "open",
-      "why": "historical SP collection; its tests build the page inline",
-      "next": "add a preserved page"
+      "status": "resolved",
+      "why": "three pages fetched from the source's history endpoint; the parser agrees with them (234 vectors on a live issue's page) and refuses the two whose history the source purged",
+      "evidence": "tests/fixtures/nowscore_sp_history/, tests/scripts/test_nowscore_bjdc_sp_history_real_pages.py"
     },
     "src/correct_score_price_history.py": {
-      "status": "open",
-      "why": "its pages arrive through okooo_prekick_sp, so it holds no page bytes of its own",
-      "next": "reuse the committed Okooo fixtures, and add one page of its own"
+      "status": "blocked",
+      "why": "its inputs are the Okooo history page, which returns 405 to this host's egress, and Nowscore crown odds/context payloads, of which no copy is preserved (results/data_collection/correct_score_price_history_v1 does not exist)",
+      "next": "fetch from an egress Okooo accepts, or run the live refresh loop once and keep its captures, then pin the payloads as fixtures"
     },
     "scripts/replay_settlement_quarantine.py": {
       "status": "owned-elsewhere",

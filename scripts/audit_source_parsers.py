@@ -123,14 +123,19 @@ def evidence_nature(blobs: str) -> str:
 # existed only on one machine's disk.
 GAP_REGISTER = {
     "src/nowscore_bjdc_sp_history.py": {
-        "status": "open",
-        "why": "historical SP collection; its tests build the page inline",
-        "next": "add a preserved page",
+        "status": "resolved",
+        "why": ("three pages fetched from the source's history endpoint; the parser agrees with "
+                "them (234 vectors on a live issue's page) and refuses the two whose history the "
+                "source purged"),
+        "evidence": "tests/fixtures/nowscore_sp_history/, tests/scripts/test_nowscore_bjdc_sp_history_real_pages.py",
     },
     "src/correct_score_price_history.py": {
-        "status": "open",
-        "why": "its pages arrive through okooo_prekick_sp, so it holds no page bytes of its own",
-        "next": "reuse the committed Okooo fixtures, and add one page of its own",
+        "status": "blocked",
+        "why": ("its inputs are the Okooo history page, which returns 405 to this host's egress, "
+                "and Nowscore crown odds/context payloads, of which no copy is preserved "
+                "(results/data_collection/correct_score_price_history_v1 does not exist)"),
+        "next": ("fetch from an egress Okooo accepts, or run the live refresh loop once and keep "
+                 "its captures, then pin the payloads as fixtures"),
     },
     "scripts/replay_settlement_quarantine.py": {
         "status": "owned-elsewhere",

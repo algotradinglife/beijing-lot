@@ -151,6 +151,7 @@ def test_every_registered_gap_is_a_tracked_parser() -> None:
     scanned = {row["parser"] for row in audit(root, "HEAD")["parsers"]}
     assert GAP_REGISTER, "the register should not be empty"
     for gap, entry in GAP_REGISTER.items():
-        assert entry["status"] in {"open", "owned-elsewhere", "deprecated-line"}, gap
+        assert entry["status"] in {"open", "resolved", "blocked", "owned-elsewhere",
+                                   "deprecated-line"}, gap
         assert entry.get("why"), gap
         assert gap in scanned, f"{gap} is registered but is not a tracked parser"
