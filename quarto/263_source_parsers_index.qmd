@@ -56,7 +56,10 @@ stopifnot(length(a$parsers) >= 10L, length(a$real_page_fixtures) >= 10L)
 
 ```{r}
 # The report is generated from a committed revision, not from the working tree, so it can be
-# reproduced from a clean checkout; it binds exactly what it read.
+# reproduced from a clean checkout; it binds exactly what it read. `revision` names the commit
+# whose src/scripts/tests were scanned -- the commit that stores the report comes after it, so HEAD
+# is normally one ahead. `scanned_sha256` over those files, not the revision label, is the identity
+# to compare when asking whether a report describes the code in front of you.
 cat(sprintf("- 审计来自提交版本 `%s`，扫描 **%d** 个已跟踪 Python 文件，内容哈希 `%s`。\n",
             substr(a$revision, 1, 10), a$scanned_files, substr(a$scanned_sha256, 1, 16)))
 rows <- a$parsers
