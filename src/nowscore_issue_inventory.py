@@ -742,7 +742,7 @@ def merge_batches(
         plan["candidate_contract"]["modern"]["start_year"],
         plan["candidate_contract"]["modern"]["end_year"] + 1,
     ):
-        values = sorted(int(issue[2:]) for issue in present if int(issue[:2]) == year % 100)
+        values = sorted(int(issue[2:]) for issue in present if issue_year(issue) == year)
         if values:
             observed = set(values)
             modern_gaps.extend(
