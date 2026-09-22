@@ -30,6 +30,19 @@ class IssueCodeError(ValueError):
     """An issue code that cannot name a year."""
 
 
+def is_issue_code(issue: object) -> bool:
+    """True when the value is a code that names a year. The non-raising companion to `issue_year`.
+
+    For callers that report on data rather than acting on it: an audit flags a code it cannot read
+    instead of stopping the run.
+    """
+    try:
+        issue_year(issue)
+    except IssueCodeError:
+        return False
+    return True
+
+
 def issue_year(issue: object) -> int:
     """Return the year an issue code names.
 

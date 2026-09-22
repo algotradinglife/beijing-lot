@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.issue_codes import IssueCodeError, issue_year
+from src.issue_codes import IssueCodeError, is_issue_code, issue_year
 
 FIXTURE = Path(__file__).parent / "fixtures" / "issue_codes" / "registry_years.json"
 
@@ -97,3 +97,14 @@ def test_the_producer_emits_the_contract_label(tmp_path) -> None:
     assert roles["issue_year"].notna().all()
     assert roles["issue_year"].eq(roles["issue_code"].map(issue_year)).all()
     assert set(roles["issue_year"]) == {2014, 2026}
+
+
+@pytest.mark.parametrize("code", ["26092", "090918", "191205", "20011"])
+def test_a_code_that_names_a_year_is_recognised(code: str) -> None:
+    assert is_issue_code(code) is True
+
+
+@pytest.mark.parametrize("code", ["", "26", "26a92", "1234567", "０２６０９２", None, "19011"])
+def test_a_code_that_names_no_year_is_not_recognised(code) -> None:
+    """The non-raising companion exists for callers that report instead of stopping."""
+    assert is_issue_code(code) is False

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from src.issue_codes import is_issue_code
+
 import hashlib
 import json
 import sqlite3
@@ -299,7 +301,6 @@ def _identities(
     *,
     candidate_available: bool,
     beidan_available: bool,
-    registry_available: bool,
 ) -> pd.DataFrame:
     if candidate_available:
         with _connect(paths.candidate) as connection:
@@ -343,14 +344,9 @@ def _identities(
                 "beidan_provider_match_id",
             ]
         )
-    if registry_available:
-        with _connect(paths.registry) as connection:
-            registry = pd.read_sql_query(
-                "SELECT CAST(issue AS TEXT) AS issue_code, year AS registry_year FROM issues",
-                connection,
-            )
-    else:
-        registry = pd.DataFrame(columns=["issue_code", "registry_year"])
+    # The year used to come from a registry table in the retired 500 store. It comes from the
+    # issue code now, so nothing is read here: "the registry knows this issue" became "the code
+    # names a year", and the store's retirement no longer disables the identity check below.
     if candidate.duplicated(["issue_code", "match_idx"]).any():
         raise ValueError("candidate inventory identity is not unique")
     if historical.duplicated(["issue_code", "match_idx"]).any():
@@ -358,7 +354,6 @@ def _identities(
     result = candidate.merge(
         historical, on=["issue_code", "match_idx"], how="left", validate="one_to_one"
     )
-    result = result.merge(registry, on="issue_code", how="left", validate="many_to_one")
     if result.empty:
         return pd.DataFrame(
             {
@@ -373,7 +368,7 @@ def _identities(
         )
     candidate_utc = _to_utc(result["candidate_kickoff"], naive_timezone=SHANGHAI)
     beidan_utc = _to_utc(result["beidan_kickoff"], naive_timezone=SHANGHAI)
-    agrees = result["registry_year"].notna() & (
+    agrees = result["issue_code"].map(is_issue_code) & (
         result["beidan_kickoff"].isna() | (candidate_utc == beidan_utc)
     )
     result["kickoff_utc"] = candidate_utc.dt.strftime("%Y-%m-%dT%H:%M:%SZ").astype(
@@ -682,7 +677,6 @@ def load_all_cells(paths: AuditPaths, inventory: pd.DataFrame) -> pd.DataFrame:
         paths,
         candidate_available=present["eu_proxy_backfill"],
         beidan_available=present["beidan_xlsm"],
-        registry_available=present["issue_registry"],
     )
     frames: list[pd.DataFrame] = []
     if present["beidan_xlsm"]:
