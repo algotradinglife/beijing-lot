@@ -405,7 +405,7 @@ def test_clean_fixture_requires_and_accepts_external_anchor(tmp_path: Path) -> N
         ),
         (
             "tables/intersection_levels.csv",
-            "NATIVE_KEY_INTERSECTION",
+            "CANDIDATE_MAPPED_RANGE",
             "FORGED_INTERSECTION",
             "semantic hash mismatch: tables/intersection_levels.csv",
         ),
@@ -577,3 +577,26 @@ def test_write_once_publication_refuses_replacement(tmp_path: Path) -> None:
     with pytest.raises(FileExistsError):
         census.build_fixture_package(package)
     assert (package / "REPORT.md").read_bytes() == original
+
+
+def test_intersection_levels_have_one_definition(tmp_path: Path) -> None:
+    """The verifier, the fixture and the producer must agree on the level set.
+
+    They were written out separately once. When the native-key overlap went away with the retired
+    500 store, the producer stopped emitting it while the verifier still demanded it, so every
+    production package failed verification -- and the fixture, which agreed with itself, kept the
+    tests green. These examples pin the single definition to what each side actually uses.
+    """
+    import csv
+
+    package = census.build_fixture_package(tmp_path / "package")
+    with (package / "tables/intersection_levels.csv").open(encoding="utf-8") as handle:
+        emitted = {row["level"] for row in csv.DictReader(handle)}
+    assert emitted == set(census.INTERSECTION_LEVELS), (
+        "the fixture must emit exactly the levels the package contract declares")
+    assert "NATIVE_KEY_INTERSECTION" not in emitted, (
+        "the native-key overlap was computed against the retired 500 store and has no producer")
+    # a package built to the contract verifies, so the two sides cannot drift apart silently
+    anchor = census.package_anchor(package)
+    assert census.verify_package(package, trusted_anchor=anchor)["verified"] is True, (
+        census.verify_package(package, trusted_anchor=anchor)["problems"])

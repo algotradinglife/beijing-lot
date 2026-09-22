@@ -1251,6 +1251,16 @@ def _candidate_mapping(
     ]
 
 
+# The intersection levels a package must contain. One definition, used by the verifier and by the
+# fixture builder: when these were written out twice they drifted, and the fixture agreeing with
+# itself hid a verifier that rejected every package production actually emitted.
+INTERSECTION_LEVELS = (
+    "RAW_PRESENT",
+    "CANDIDATE_MAPPED_RANGE",
+    "CANONICAL_CAUSAL_INTERSECTION",
+)
+
+
 def _intersections(data_root: Path) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = [
         {
@@ -1955,13 +1965,8 @@ def verify_package(
         levels = {
             r["level"] for r in _read_csv(package / "tables/intersection_levels.csv")
         }
-        if levels != {
-            "RAW_PRESENT",
-            "NATIVE_KEY_INTERSECTION",
-            "CANDIDATE_MAPPED_RANGE",
-            "CANONICAL_CAUSAL_INTERSECTION",
-        }:
-            problems.append("four-level intersection closure mismatch")
+        if levels != set(INTERSECTION_LEVELS):
+            problems.append("three-level intersection closure mismatch")
     return {"verified": not problems, "problems": problems}
 
 
@@ -2149,12 +2154,7 @@ def build_fixture_package(package: Path) -> Path:
         "hist40_scope_overrides": [dict(row) for row in HIST40_SCOPE_OVERRIDES],
         "intersection_levels": [
             {"level": level}
-            for level in (
-                "RAW_PRESENT",
-                "NATIVE_KEY_INTERSECTION",
-                "CANDIDATE_MAPPED_RANGE",
-                "CANONICAL_CAUSAL_INTERSECTION",
-            )
+            for level in INTERSECTION_LEVELS
         ],
         "field_profile": [{"source_id": "beidan_xlsm", "status": "fixture"}],
         "coverage_by_source": [{"source_id": "beidan_xlsm", "rows": 1}],
