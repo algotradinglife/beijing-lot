@@ -1,0 +1,683 @@
+---
+title: "N7 函数接口合同与夹具端到端基线"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: true
+execute:
+  error: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| label: setup
+# Delivery entry point for issue #500.
+#
+# Scope: the N7 reusable function interfaces and a runnable end-to-end baseline on
+# a DETERMINISTIC SYNTHETIC fixture. This document demonstrates that the contracts
+# hold and that the pipeline runs; it is NOT a strategy validation and reports no
+# empirical edge. Every number below is produced by the fixture, not by real data.
+#
+# No network access, no database writes, no historical fitting: all three are
+# excluded by the contract this delivers against.
+
+root <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+if (!grepl("beijing-lot$", root)) root <- normalizePath(".")
+
+for (module in c("probability_exploration.R", "dixon_coles_grid.R",
+                 "fundamentals_score_shape.R", "fundamentals_total_market.R",
+                 "fundamentals_market_comparison.R")) {
+  path <- file.path(root, "r", module)
+  if (file.exists(path)) source(path)
+}
+source(file.path(root, "r", "n7_experiment_contract.R"))
+# n7_pipeline_types.R must load before n7_pipeline_value.R: the value layer boxes
+# domain rows and tables into the S7 types declared there.
+for (module in c("n7_pipeline_contracts.R", "n7_pipeline_inputs.R",
+                 "n7_pipeline_fixture.R", "n7_pipeline_epoch.R",
+                 "n7_pipeline_candidates.R", "n7_pipeline_types.R",
+                 "n7_pipeline_value.R")) {
+  source(file.path(root, "r", module))
+}
+suppressMessages({library(tibble); library(dplyr); library(tidyr)})
+
+CONSTANTS <- n7_pipeline_constants()
+knitr::kable(tibble::tibble(
+  常量 = names(unlist(CONSTANTS)),
+  值 = unlist(lapply(CONSTANTS, function(x) as.character(x)))),
+  caption = "合同常量：显式传入，函数不依赖全局默认")
+```
+
+## 一、范围与边界
+
+本交付实现 issue #500 的 N7 函数接口合同：固定表 schema 与 typed empty、
+ID 与时间契约、读取适配器、DC 概率投影、构组/结构/枚举、估值/出资/冻结/结算，
+以及多期回放。**全部结论来自确定性合成夹具**，用于证明接口与端到端链路可运行。
+
+- 不采集、不读库、不写库、不联网；
+- 不拟合历史、不调参、不宣称实证收益；
+- 决策端函数不接收真实赛果或结算 SP；结算端只在冻结计划之后运行。
+
+```{r schema-table}
+#| label: schema-table
+# Every table declares one authoritative schema; empty results keep that schema.
+schemas <- n7_table_schemas()
+knitr::kable(
+  tibble::tibble(
+    表 = names(schemas),
+    列数 = vapply(schemas, function(s) length(s$columns), integer(1)),
+    列 = vapply(schemas, function(s) paste(s$columns, collapse = ", "), character(1))),
+  caption = "15 张表的固定 schema（列序即契约）")
+
+empty_ok <- vapply(names(schemas), function(t) {
+  e <- n7_typed_empty(t)
+  isTRUE(tryCatch({ n7_validate_table(e, t); TRUE }, error = function(err) FALSE))
+}, logical(1))
+stopifnot(all(empty_ok))
+```
+
+## 二、夹具与决策历元
+
+夹具生成一个自洽的赛前世界：先有真实 W/D/L 三元组，再由它派生欧赔（带水位、逐公司噪声）
+与总进球盘，最后派生赛前 SP。因此**去水后的欧赔均值应当还原生成三元组**——这是夹具内部
+一致性的可检验证据，而不是一个假设。
+
+```{r fixture-build}
+#| label: fixture-build
+ISSUE <- "26097"
+DECISION_DATE <- "2026-09-22"
+CUTOFF <- list(cutoff_utc = as.POSIXct(paste(DECISION_DATE, "12:00:00"), tz = "UTC"),
+               issue_id = ISSUE)
+# 2026-09-22 12:00Z is 20:00 Asia/Shanghai on the decision day; kickoffs land on D+1.
+
+issue <- n7_make_fixture_issue(ISSUE, DECISION_DATE, n_fixtures = 56L,
+                               seed = 42L, kickoff_hour = 9L)
+inputs <- n7_read_inputs(n7_fixture_source(issue), ISSUE, CUTOFF)
+
+# Internal consistency: de-vigging the mean euro odds recovers the generator truth.
+mean_euro <- inputs$euro |>
+  group_by(fixture_id) |>
+  summarise(h = mean(odds_home), d = mean(odds_draw), a = mean(odds_away), .groups = "drop")
+inv <- 1 / as.matrix(mean_euro[, c("h", "d", "a")])
+recovered <- inv / rowSums(inv)
+identifiable <- match(mean_euro$fixture_id, rownames(issue$truth))
+max_recovery_error <- max(abs(recovered - issue$truth[identifiable, ]))
+
+tibble::tibble(
+  项 = c("合成场次", "每场公司数", "欧赔行数", "总进球行数", "赛前 SP 行数",
+         "去水还原最大绝对误差"),
+  值 = c(nrow(issue$fixtures), 3L, nrow(issue$euro), nrow(issue$totals),
+         nrow(issue$prematch_sp), sprintf("%.5f", max_recovery_error))) |>
+  knitr::kable(caption = "确定性合成夹具（seed = 42）")
+```
+
+所有生成行的 `source_url` 都以 `synthetic://` 开头，夹具结果不可能被误认作实测量。
+
+```{r epoch-prepare}
+#| label: epoch-prepare
+EPOCH <- n7_prepare_epoch(
+  inputs, CUTOFF, N7_DECISION_TZ,
+  euro_policy = list(members = c("c01", "c02", "c03"), missing = "error"),
+  totals_policy = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
+
+PROJECTED <- n7_project_probabilities(EPOCH, CUTOFF, rho = CONSTANTS$rho,
+                                      total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
+
+tibble::tibble(
+  项 = c("输入场次", "决策窗口内场次", "历元排除", "拟合成功", "投影排除",
+         "残差 median", "残差 max", "拟合 rho"),
+  值 = c(nrow(inputs$fixtures), nrow(EPOCH$fixtures), nrow(EPOCH$exclusions),
+         nrow(PROJECTED$fit), nrow(PROJECTED$exclusions),
+         sprintf("%.5f", median(PROJECTED$fit$residual)),
+         sprintf("%.5f", max(PROJECTED$fit$residual)),
+         unique(PROJECTED$fit$rho))) |>
+  knitr::kable(caption = "决策历元与 DC 投影")
+```
+
+### 2.1 大小球真的进入了总进球拟合
+
+合同要求大小球必须实际影响拟合。若它只是装饰，总进球不会随它变化，模型就会
+悄悄退化为纯欧赔路径。下面用改变大小球价格的方式直接检验这一点。
+
+```{r ou-effect}
+#| label: ou-effect
+project_with_scale <- function(scale) {
+  shifted <- EPOCH
+  shifted$totals_selected$over_decimal <- shifted$totals_selected$over_decimal * scale
+  n7_project_probabilities(shifted, CUTOFF, rho = CONSTANTS$rho,
+                           total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
+}
+BASE <- project_with_scale(1)
+SHIFTED <- project_with_scale(0.85)
+
+tibble::tibble(
+  设定 = c("原始大小球", "大球水位下调 15%"),
+  平均总进球 = c(mean(BASE$fit$lambda_home + BASE$fit$lambda_away),
+                 mean(SHIFTED$fit$lambda_home + SHIFTED$fit$lambda_away)),
+  首场W概率 = c(BASE$probabilities$probability[1], SHIFTED$probabilities$probability[1])) |>
+  knitr::kable(caption = "大小球驱动总进球拟合（合同关键回归）")
+
+stopifnot(!isTRUE(all.equal(BASE$fit$lambda_home, SHIFTED$fit$lambda_home)))
+```
+
+## 三、构组、结构与枚举
+
+构组决定**哪些场次**组成一个 7 腿组；结构决定**每条腿保留几个选项**。两者预算不同，
+必须分离。`pattern` 是长度 7、取值 1/2/3 的整数向量，不是预算昵称。
+
+```{r structure-space}
+#| label: structure-space
+PATTERN_MAIN <- c(3L, 3L, 3L, 3L, 2L, 2L, 2L)
+
+construct_and_structure <- function(pattern, groups_wanted, seed = 1L) {
+  groups <- n7_construct_candidates(EPOCH$fixtures, PROJECTED$probabilities, CUTOFF,
+                                    CONSTANTS$n_legs, "entropy_balanced",
+                                    groups_wanted, seed)
+  structure <- n7_apply_structure(groups$group_legs, PROJECTED$probabilities, CUTOFF,
+                                  pattern, "entropy_desc")
+  list(groups = groups, structure = structure)
+}
+
+table_patterns <- list(c(3L,3L,3L,3L,2L,2L,2L), c(3L,3L,2L,2L,2L,2L,2L),
+                       c(3L,2L,2L,2L,2L,2L,2L), c(3L,3L,3L,2L,2L,2L,1L),
+                       c(3L,3L,2L,2L,2L,2L,1L), c(3L,2L,2L,2L,2L,2L,1L),
+                       c(2L,2L,2L,2L,2L,2L,1L), c(2L,2L,2L,2L,2L,1L,1L))
+single <- construct_and_structure(PATTERN_MAIN, 1L)
+
+tibble::tibble(
+  pattern = vapply(table_patterns, function(p) paste(p, collapse = ""), character(1)),
+  完整空间 = vapply(table_patterns, function(p) {
+    s <- n7_apply_structure(single$groups$group_legs, PROJECTED$probabilities,
+                            CUTOFF, p, "entropy_desc")
+    as.integer(s$support_summary$support_size[1])
+  }, integer(1))) |>
+  knitr::kable(caption = "结构与预算分离：pattern 决定完整合法空间")
+```
+
+```{r ticket-enumeration}
+#| label: ticket-enumeration
+MAIN <- construct_and_structure(PATTERN_MAIN, 4L)
+ENUMERATED <- n7_enumerate_tickets(MAIN$groups$group_legs, PROJECTED$probabilities,
+                                   CUTOFF, MAIN$structure$supports)
+
+legs_per_ticket <- table(ENUMERATED$ticket_legs$ticket_id)
+tibble::tibble(
+  项 = c("组数", "每组支持选项", "物理票数", "每票腿数", "原始概率范围"),
+  值 = c(length(unique(MAIN$groups$group_legs$group_id)),
+         paste(unique(MAIN$structure$support_summary$support_size), collapse = "/"),
+         nrow(ENUMERATED$tickets), unique(legs_per_ticket),
+         sprintf("%.3e – %.3e", min(ENUMERATED$tickets$probability),
+                 max(ENUMERATED$tickets$probability)))) |>
+  knitr::kable(caption = "枚举：每组合法空间 648，四组共 2592 张物理票")
+```
+
+## 四、估值、出资与三种显式配置
+
+估值按合同口径：`gross_est = unit_cny x payout_factor x probability x prod(adjusted SP)`，
+`ev_net_est = gross_est - unit_cny`（单位是元）。派奖系数**只在票级施加一次**。
+排序首版为 `probability_desc`（候选硬支持空间内按概率降序，`rank` 与 `cumulative_mass`
+均按候选计算）；EV 对照需**完整估值**，缺失即报错而不静默回退。
+SP 变换规则固定：`SP > 10` 取 4.5，`SP = 10` 不变；**任一条腿缺 SP 则整票 EV 为 NA**，
+不做部分替代。
+
+```{r valuation}
+#| label: valuation
+BUILT_A <- n7_build_decision(EPOCH$fixtures, PROJECTED$probabilities, EPOCH$sp_selected,
+                             CUTOFF, list(PATTERN_MAIN), "entropy_balanced", 4L, 1L,
+                             CONSTANTS, 1L, 6L)
+RANKED_A <- n7_rank_tickets(BUILT_A$valued, BUILT_A$tickets$candidate_tickets,
+                            CUTOFF)
+
+tibble::tibble(
+  项 = c("支持票数", "有估值票数", "EV 范围", "EV 中位数", "SP 乘积最低", "SP 乘积最高"),
+  值 = c(nrow(BUILT_A$valued), sum(!is.na(BUILT_A$valued$ev_net_est)),
+         sprintf("%.4f 至 %.4f", min(RANKED_A$ev_net_est), max(RANKED_A$ev_net_est)),
+         sprintf("%.4f", median(RANKED_A$ev_net_est)),
+         sprintf("%.1f", min(BUILT_A$valued$sp_product_est)),
+         sprintf("%.1f", max(BUILT_A$valued$sp_product_est)))) |>
+  knitr::kable(caption = "票级估值（合成 SP）")
+```
+
+```{r allocations}
+#| label: allocations
+CONFIGS <- n7_allocation_configs(CONSTANTS)
+allocation_summary <- lapply(names(CONFIGS), function(name) {
+  config <- CONFIGS[[name]]
+  result <- n7_run_allocation(config, EPOCH$fixtures, PROJECTED$probabilities,
+                              EPOCH$sp_selected, CUTOFF, CONSTANTS, 1L, 6L)
+  per_group <- sort(as.integer(table(result$funded$funded$group_id)))
+  tibble::tibble(
+    配置 = name,
+    说明 = config$label,
+    支持票数 = nrow(result$built$valued),
+    买进票数 = nrow(result$funded$funded),
+    投入元 = sum(result$funded$purchases$stake_cny),
+    组数 = length(result$funded$diagnostics$admitted_groups),
+    每组票数 = paste(per_group, collapse = "/"))
+}) |> dplyr::bind_rows()
+
+knitr::kable(allocation_summary, caption = "三种显式配置（合同要求逐一演示）")
+```
+
+配置 A 是 4 组 x 128 注（1024 元）；配置 B 混合 3333222 与 2222221 两种结构共 8 组；
+配置 C 展示**结构内截断**：3222221 支持 96 张而只买 80 张。
+
+## 五、冻结与结算
+
+结算是唯一读取赛果的环节，且只读取**冻结后**的计划。逐票状态：
+
+- `WON`：七腿全部命中，`payout = unit_cny x 0.65 x prod(settled SP)`；
+- `LOST`：至少一腿已知且不同，派彩 0；
+- `PENDING`：存在尚未结算的腿，**不计为输**；
+- `SPECIAL:*`：取消或异常赛果，交既有权威结算逻辑，不擅自按 W/D/L 处理。
+
+```{r settlement}
+#| label: settlement
+# The synthetic oracle: each fixture settles to its argmax outcome, priced deterministically.
+synthetic_settlements <- function(issue_obj, issue_id, available_at = "2026-10-01 00:00:00") {
+  truth <- as.data.frame(issue_obj$truth)
+  truth$fixture_id <- rownames(issue_obj$truth)
+  long <- tidyr::pivot_longer(truth, cols = tidyselect::all_of(n7_outcomes()),
+                              names_to = "outcome", values_to = "truth")
+  long |>
+    dplyr::group_by(fixture_id) |>
+    dplyr::slice_max(truth, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      issue_id = issue_id, fixture_id = fixture_id, outcome = outcome,
+      settled_sp = 1 / (truth * 0.92) + 0.5,
+      label_available_at = as.POSIXct(available_at, tz = "UTC"),
+      status = "settled", source_url = "synthetic://n7-pipeline/settlement")
+}
+
+SETTLEMENTS <- synthetic_settlements(issue, ISSUE)
+AS_OF <- as.POSIXct("2026-10-05 00:00:00", tz = "UTC")
+CONFIG_A <- CONFIGS[["A"]]
+PLAN_A <- n7_run_allocation(CONFIG_A, EPOCH$fixtures, PROJECTED$probabilities,
+                            EPOCH$sp_selected, CUTOFF, CONSTANTS, 1L, 6L)$plan
+
+SETTLED_A <- n7_settle_plan(PLAN_A, SETTLEMENTS, AS_OF, CONSTANTS$unit_cny,
+                            CONSTANTS$payout_factor)
+
+knitr::kable(
+  SETTLED_A$issue_returns |>
+    dplyr::rename(期次 = issue_id, 总投入 = stake_cny, 已结算投入 = settled_stake_cny,
+                  待结算投入 = pending_stake_cny, 回款 = payout_cny, 净收益 = net_cny,
+                  ROI = roi),
+  caption = "配置 A 的期末口径（ROI 分母只含已结算投入）")
+
+knitr::kable(
+  SETTLED_A$ticket_returns |>
+    dplyr::count(status) |>
+    dplyr::rename(状态 = status, 票数 = n),
+  caption = "逐票结算状态")
+```
+
+### 5.1 未结算不等于输
+
+把结算时点提前到标签可用之前，全部票必须变成 `PENDING`，且**已结算投入为 0、ROI 为 NA**。
+
+```{r pending-check}
+#| label: pending-check
+EARLY <- n7_settle_plan(PLAN_A, SETTLEMENTS,
+                        as.POSIXct("2026-09-23 00:00:00", tz = "UTC"),
+                        CONSTANTS$unit_cny, CONSTANTS$payout_factor)
+tibble::tibble(
+  项 = c("LOST 票数", "PENDING 票数", "已结算投入", "待结算投入", "ROI"),
+  值 = c(sum(EARLY$ticket_returns$status == "LOST"),
+         sum(EARLY$ticket_returns$status == "PENDING"),
+         EARLY$issue_returns$settled_stake_cny,
+         EARLY$issue_returns$pending_stake_cny,
+         ifelse(is.na(EARLY$issue_returns$roi), "NA",
+                sprintf("%.4f", EARLY$issue_returns$roi)))) |>
+  knitr::kable(caption = "标签不可用时全部挂起，绝不记作输")
+
+stopifnot(sum(EARLY$ticket_returns$status == "LOST") == 0L)
+stopifnot(EARLY$issue_returns$settled_stake_cny == 0)
+```
+
+### 5.2 冻结票集不受结算影响
+
+```{r freeze-check}
+#| label: freeze-check
+FUNDED_BEFORE <- PLAN_A$funded$ticket_id
+invisible(n7_settle_plan(PLAN_A, SETTLEMENTS, AS_OF, CONSTANTS$unit_cny,
+                         CONSTANTS$payout_factor))
+identical(FUNDED_BEFORE, PLAN_A$funded$ticket_id)
+```
+
+## 六、多期回放
+
+回放按 cutoff 时间顺序调用**同一个生产决策函数**，把累计已购账本向前传递，
+最后才结算。决策循环内任何一步都看不到赛果。
+
+```{r replay}
+#| label: replay
+build_epoch <- function(issue_id, decision_date, seed, n_fixtures = 56L) {
+  cutoff <- list(cutoff_utc = as.POSIXct(paste(decision_date, "12:00:00"), tz = "UTC"),
+                 issue_id = issue_id)
+  fixture <- n7_make_fixture_issue(issue_id, decision_date, n_fixtures = n_fixtures,
+                                   seed = seed, kickoff_hour = 9L)
+  raw <- n7_read_inputs(n7_fixture_source(fixture), issue_id, cutoff)
+  prepared <- n7_prepare_epoch(raw, cutoff, N7_DECISION_TZ,
+                               list(members = c("c01", "c02", "c03"), missing = "error"),
+                               list(companies = NULL, line = "nearest_main",
+                                    watermark = "decimal"))
+  projected <- n7_project_probabilities(prepared, cutoff, CONSTANTS$rho,
+                                        c(0.1, 16), 1e-10)
+  list(fixture = fixture, cutoff = cutoff,
+       inputs = list(fixtures = prepared$fixtures,
+                     probabilities = projected$probabilities,
+                     sp = prepared$sp_selected))
+}
+
+EPOCH_1 <- build_epoch("26097", "2026-09-22", 42L)
+EPOCH_2 <- build_epoch("26098", "2026-09-23", 43L)
+EPOCH_3 <- build_epoch("26099", "2026-09-24", 44L)
+
+ALL_SETTLEMENTS <- dplyr::bind_rows(lapply(
+  list(EPOCH_1, EPOCH_2, EPOCH_3),
+  function(e) synthetic_settlements(e$fixture, e$cutoff$issue_id)))
+
+POLICIES <- list(allocation = CONFIGS[["A"]], max_reuse = 1L, max_overlap = 6L, seed = 1L)
+REPLAY <- n7_replay_issue(list(EPOCH_1$inputs, EPOCH_2$inputs, EPOCH_3$inputs),
+                          list(EPOCH_1$cutoff, EPOCH_2$cutoff, EPOCH_3$cutoff),
+                          ALL_SETTLEMENTS, AS_OF, POLICIES, CONSTANTS)
+
+tibble::tibble(
+  项 = c("期数", "票数", "总投入", "已结算投入", "待结算投入", "回款", "净收益", "ROI"),
+  值 = c(REPLAY$metrics$n_epochs, REPLAY$metrics$n_tickets,
+         REPLAY$metrics$total_stake_cny, REPLAY$metrics$settled_stake_cny,
+         REPLAY$metrics$pending_stake_cny, REPLAY$metrics$payout_cny,
+         sprintf("%.2f", REPLAY$metrics$net_cny),
+         sprintf("%.4f", REPLAY$metrics$roi))) |>
+  knitr::kable(caption = "多期回放汇总（合成夹具，非策略结论）")
+```
+
+## 七、测试与验收证据
+
+```{r test-counts}
+#| label: test-counts
+# Read the test files to count declared blocks, so this table cannot drift from the
+# suite the way a hand-written number would.
+count_blocks <- function(path) {
+  if (!file.exists(path)) return(NA_integer_)
+  lines <- readLines(path, warn = FALSE)
+  sum(grepl("test_that[(]", lines))
+}
+test_files <- c("test-n7-pipeline-contracts.R", "test-n7-pipeline-epoch.R",
+                "test-n7-pipeline-candidates.R", "test-n7-pipeline-types.R",
+                "test-n7-pipeline-value.R")
+tibble::tibble(
+  测试文件 = test_files,
+  测试块 = vapply(file.path(root, "tests", "testthat", test_files), count_blocks, integer(1))) |>
+  knitr::kable(caption = "R 测试：每个项目函数都有对应行为测试")
+```
+
+运行：
+
+```bash
+R_LIBS=$PWD/r_lib Rscript tests/testthat.R
+```
+
+关键回归覆盖：空输入、少于 7 场、概率不合法、缺大小球、缺赛前 SP、SP = 10 与 > 10、
+跨日界、预算耗尽、同组不同 pattern、重复提交、两组共享比赛、pending 结算、0.65 只乘一次、
+改变赛果不改变冻结票集。
+
+## 八、现有实现的复用与取代
+
+| 目标接口 | 复用/取代 | 说明 |
+|---|---|---|
+| `n7_project_probabilities` | 复用 `project_n7_market_inputs` / `total_market_constraint` / `total_constrained_projection` | DC + 普通欧赔 + 大小球主路径，**不**用 `n7_euro_probabilities` 的纯欧赔路径 |
+| 组/票身份 | 复用 `n7_physical_ticket_key` | 物理票身份，跨结构共享 ticket_id |
+| 组准入 | 复用 `n7_group_admission` | 复用与重叠上限 |
+| 日界与窗口 | 复用 `n7_decision_window` | 不自造第二套时间框架 |
+| 旧 SP 资格过滤 | **不引入** | 旧研究默认规则不带入新接口 |
+
+`constants` 显式包含 `n_legs=7`、`issue_budget_cny=1024`、`unit_cny=2`、
+`payout_factor=0.65`、`rho=-0.14`、`sp_threshold=10`、`sp_replacement=4.5`；
+函数不偷偷依赖全局常量。
+
+## 九、逐函数接口加固与巨型函数拆分
+
+本节记录在函数层面完成的边界加固。判定标准是：**Roxygen 的 `@param` 列了几条约束，
+就必须有几条测试**；契约靠测试钉死，不靠注释声明。
+
+### 9.1 参数判定基线
+
+`checkmate` 的默认判定**比表面看起来宽松**，直接使用会在边界上静默放行。以下四条是
+实测结论，已写入 `r/n7_pipeline_contracts.R` 的 `@section 参数判定规范`：
+
+| 断言 | 默认行为 | 必须显式补充 |
+|---|---|---|
+| `assert_numeric(NA)` | 通过 | `any.missing = FALSE` |
+| `assert_numeric(NA, finite = TRUE)` | **仍然通过**（`finite` 不隐含 `any.missing`） | `any.missing = FALSE` |
+| `assert_string("")` | 通过 | `min.chars = 1` |
+| `assert_count()` | 无 `na.rm` 参数；`na.ok` 默认 `FALSE` | 无需额外参数 |
+
+`assert_integerish()` 自带整数溢出保护，直接覆盖了此前两处手工修复的 `as.integer()`
+越界缺陷，因此不再另加范围判定。每条断言都带 `.var.name`，使报错指名参数而不是 `Element 1`。
+
+### 9.2 领域类型（S7）
+
+S7 只用于**内部领域对象**，绝不替代 tibble 公共接口（AGENTS 要求 R 分析表一律用 tibble）：
+
+| 类型 | 用途 | 关键约束 |
+|---|---|---|
+| `N7SpQuote` | 单条赛前 SP 报价 | 16 条校验；构造与每次 `@<-` 赋值都校验，赋值失败**保持原对象不变** |
+| `N7DomainTable` | 表级领域包装 | 校验列集合**与列序**，`select()` 造成的列重排会被捕获 |
+
+`n7_sp_quote_from_row()` / `n7_sp_quotes_to_tibble()` / `n7_domain_table_data()` 是唯一的
+进出通道。dplyr 的 `filter`/`arrange`/`group_by`/`summarise`/`left_join`/`mutate`/`slice`
+在内层 tibble 上无需改动即可工作。
+
+### 9.3 契约缺口补全
+
+`ranked` 与 `candidate_tickets` 此前没有 schema 声明，导致两张表可以带着错误的列集合
+或列序流过边界。现已补入 `n7_table_schemas()`（13 → **15 张表**），并按名字而非位置存取。
+
+`patterns` / `unit_caps` 由位置索引改为**具名索引**。此前实测：`n7_fund_groups(...,
+unit_caps = c(96L))` 配两个 pattern 会静默返回成功并**关闭 issue 预算天花板**；具名后
+报 `no unit cap declared for pattern p2222221`。
+
+### 9.4 巨型函数拆分
+
+两处最大的函数按**阶段边界**拆分，每个子函数是独立可测单元：
+
+| 巨型函数 | 拆分前 | 拆分后 |
+|---|---|---|
+| `n7_fund_groups` | 365 行 | **176 行** |
+| `n7_diagnose_depth` | 282 行 | **190 行** |
+
+抽出的七个具名子函数：
+
+| 子函数 | 行数 | 职责 |
+|---|---|---|
+| `n7_select_funding_candidates` | 90 | 选哪些 candidate 参与 + 定优先序 |
+| `n7_resolve_allocations` | 76 | 解析 pattern/unit_cap 为逐候选额度 |
+| `n7_allocate_budget_units` | 46 | 预算按优先级分配 + 票预留 |
+| `n7_fund_admitted_groups` | 75 | 逐组准入、选票、生成台账 |
+| `n7_visible_settlements` | 71 | 解析权威结算标签 + 三类冲突检测 |
+| `n7_candidate_support_grid` | 69 | 按腿序重建合法组合 |
+| `n7_payout_for_candidate` | 63 | 七腿全中才派彩 + PENDING 判定 |
+
+**拆分是等价重构**：每抽出一个子函数都立刻重跑该文件全部测试块作为等价性证据。
+过程中测试确实抓出三个真实缺陷（子函数残留 `constants$unit_cny` 而参数名为 `unit_cny`；
+循环初始化行被一并搬走而**覆盖传入参数**，会导致同一张票被买两次；票去重种子留在被搬走的
+代码里），全部在任何提交前修复。
+
+### 9.5 拆分过程中新增覆盖
+
+| 子函数 | 新增测试覆盖 |
+|---|---|
+| `n7_visible_settlements` | 只读本期/可用/已结算；三类冲突各自报错；status 缺失保留为 PENDING |
+| `n7_candidate_support_grid` | 按腿序而非行序枚举；`allowed=FALSE` 的腿被排除 |
+| `n7_payout_for_candidate` | 七腿全中才派彩；结果未知不派彩；中奖但缺 SP 标记 `sp_missing` |
+
+另有一处既有缺陷在补测时暴露：`n7_visible_settlements` 会检测**第三类**冲突 —— 同一
+`(issue, fixture)` 上 `settled_sp` 互相矛盾。取最后一行会让派彩依赖行序，此前没有测试
+覆盖，现已补上。
+## 十、局限与未决
+
+- 全部结果来自**合成夹具**，不构成任何策略或收益结论；
+- `rho=-0.14` 为合同冻结值，本交付**不重新标定**；
+- 未实现软结构偏好（#495）；请求未实现的 soft policy 报 `UNSUPPORTED_POLICY`；
+- 未实现经验 `support_gate` 与自适应资金优化（#497），不足历史一律 `NO_HISTORY`；
+- 真实覆盖与收益研究仍按 #493–#498 的原生依赖推进，数据端 #499 并行；
+- 本 QMD 由夹具驱动，不读取实库，因此不与 #499 的数据交付耦合。
+
+## 十一、codex review 记录
+
+下表保留此前评审与修复记录；本轮独立收尾结果见末节，历史评审不替代最终修订核验。
+被评审的文件以 SHA-256 记录如下，PI 可在合入前据此核对最终产物。
+
+```bash
+CODEX_HOME=$PWD/.tmpwork/codexhome \
+  codex exec -c sandbox_mode='"danger-full-access"' --cd $PWD - < <prompt>
+```
+
+| 文件 | SHA-256 |
+|---|---|
+| `r/n7_pipeline_contracts.R` | `149019fb1d4c0dc6dc7a417e767439510e30f90425740f4a4a12f974a8b761ef` |
+| `r/n7_pipeline_inputs.R` | `6d34bc2ccc6e5f24b1462d2dc227379622a77d60248dcccbb0ca60e49e13e189` |
+| `r/n7_pipeline_fixture.R` | `c099b4028b13260cf9693c406d3aeef2ca0bf87235ec3351d9d26ddc1833548b` |
+| `r/n7_pipeline_epoch.R` | `5902eceff786e6101a365cfef453a79b4a39f5a9327adfc23a4a067aa13e415a` |
+| `r/n7_pipeline_candidates.R` | `bb37a49b1f4f8171ccde8049d2922fea804cdac67e4b27192c2b5a9f0aea7dc8` |
+| `r/n7_pipeline_types.R` | `5977d7a768dc6330f50cfc4fc92e059cdbc7b9ba1e9d2e29612a8d8ade375186` |
+| `r/n7_pipeline_value.R` | `68b6551a0edbe776e3b1b17d040fcf5aa931ec1259a75a99229e38107a75d354` |
+| `tests/testthat/test-n7-pipeline-contracts.R` | `5b0b4cfac7d6a16a122856a536f26b2df64b48222b5b11b9faa5e93d8b2d24d9` |
+| `tests/testthat/test-n7-pipeline-epoch.R` | `848bb6d3983a2121db02cdb5ad9941c8c0e1c8a9d52c35bfa896c6cde1cdac54` |
+| `tests/testthat/test-n7-pipeline-candidates.R` | `69c1862c4823c36c6e32589c6517bbb9bf8adf5d145f293c3e78b73e9b2ecb1f` |
+| `tests/testthat/test-n7-pipeline-types.R` | `1f1dff1a70675ba0ed91ce4d0b32553132eb28f90c05127921b43a26effce230` |
+| `tests/testthat/test-n7-pipeline-value.R` | `a569f9ef08ac5452d837bbac6eb1c4cd43d93aab376c3cbe5ecdfd197bae63ae` |
+
+**检查命令与结果**
+
+```bash
+R_LIBS=$PWD/r_lib Rscript -e 'library(testthat)
+for (f in c("test-n7-pipeline-contracts.R","test-n7-pipeline-epoch.R",
+            "test-n7-pipeline-candidates.R","test-n7-pipeline-types.R",
+            "test-n7-pipeline-value.R"))
+  test_file(file.path("tests/testthat", f), reporter="summary")'
+# 272 个 test_that 块全部通过，0 失败，0 warning
+
+TMPDIR=$PWD/.tmpwork/qtmp XDG_CACHE_HOME=$PWD/.tmpwork/qtmp \
+  DENO_DIR=$PWD/.tmpwork/deno \
+  quarto render quarto/n7_pipeline_contracts.qmd --no-cache
+# 0 个 cell-output-error
+```
+
+本次另外执行了 `R_LIBS=$PWD/r_lib Rscript --vanilla tests/testthat.R`；全仓检查未通过，
+失败包含 analysis-interfaces、dixon-coles-grid、fundamentals-market-comparison、
+fundamentals-total-market 和 n7-493-probe-report 等，输出达到10条失败展示上限。
+完整日志保留，不将专项通过称为全仓通过，也不在本次越界修复其他模块。
+
+Quarto 在只读 sandbox 下需要显式可写的 `TMPDIR`/`XDG_CACHE_HOME`/`DENO_DIR`；
+否则会在初始化 Sass 缓存时报 `Read-only file system` 或 `unable to open database file`。
+
+**逐轮发现与修复**
+
+| 轮次 | 级别 | 主要发现 | 处理 |
+|---|---|---|---|
+| 1–2 | blocker + medium | 时间戳偏移、EV 口径、大小球水位反转、预算账本未使用、跨 epoch 预算重复支出 | 已修复 |
+| 3–4 | medium | 深度诊断把数字编码当赛果、跨 issue 账本共享、`SPECIAL` 被 `LOST` 压过、ticket 唯一性、`purchases` 未满足自身 schema | 已修复 |
+| 5–6 | medium | 已开赛夹具仍可买、现金未覆盖空 issue、SP 冲突仅在最新时刻校验、重复显式组破坏诊断 | 已修复 |
+| 7–8 | medium | 现金按配置上限而非 issue 预算、重复组仍产生 14 字符票串、分配可越过 1,024 上限 | 已修复 |
+| 9–10 | medium + low | 缺 `support_rank`、同刻 SP 冲突、空 `n_special`、支持内排名与购买次序不一致、资金按比例摊薄而非按优先级 | 已修复 |
+| 11–12 | medium | 缺 status 仍派彩、同组不同结构被丢弃、诊断排名与购买排名不一致、显式 `group_order` 被重建顺序覆盖 | 已修复 |
+| 13 | **blocking ×2 + major ×6** | 见下表：复合主键未强制、整数负向溢出、票额上限静默通过、零额度组占用准入、诊断用概率而非权威 rank、空分支返回合同不一致 | 已修复并补回归 |
+
+**第 13 轮（逐函数加固后的复评）明细**
+
+本轮判定**不通过**，暴露的缺陷全部位于此前「259 个测试块全绿」的代码中 —— 全绿不等于钉死。
+
+| 编号 | 级别 | 缺陷 | 后果 | 状态 |
+|---|---|---|---|---|
+| 1 | blocking | `candidate_tickets`/`ranked` 声明了复合主键，但 `n7_validate_table()` 的 `keys` 是可选项、默认 `NULL`，从不校验 | 重复 `(candidate_id, ticket_id)` 被重复排序并**重复购买、重复扣款** | 主键写入 schema，校验自动执行 |
+| 2 | blocking | 整数转换只守 `.Machine$integer.max`，不守下界 | 负向溢出经 `as.integer()` 只发 warning 并落成 `NA_integer_`，即数据边界上的静默缺失 | 双向范围检查，报错而非 warning |
+| 3 | major | `unit_cap`/`unit_caps` 的校验位于循环内 | 空候选时 `NA`/`Inf`/`-1`/`1.5` 全部静默通过 | 校验前置到循环之前 |
+| 4 | major | `n7_fund_groups()` 用 `config$unit_cap` 取值 | R 的 `$` **部分匹配**对只声明 `unit_caps` 的配置返回长度 2 向量，交给长度 1 参数 | 改用具名判断 |
+| 5 | major | 组在**购买之前**就登记 `admitted` | 零额度的首组会占掉比赛集合，`max_reuse=1` 时挡住真正会买的后续组 | 登记移到实际购买之后 |
+| 6 | major | 注释称 `ranked$rank` 权威，实现却按 `probability` 重排 | EV 排名购买的赢家被诊断报成概率排名，`support_rank` 与购买口径不一致 | 改用权威 `rank` 列 |
+| 7 | major | 空分支返回 `tickets` 形状、非空返回 `ranked` 形状 | 列集合随分支变化，下游取 `candidate_id` 时静默算错；并产生 3 条长期 warning | 两分支统一为 `ranked` schema |
+| 8 | minor | 文档写 `13 张表`、`n7_contracts()` | 实际 15 张表、函数名为 `n7_table_schemas()` | 已更正 |
+
+**第 14 轮（第 2 次复评）明细**
+
+本轮 codex 做了上一轮没有的关键动作：**在进程内逐个回退修复，检验回归测试是否真的会失败**。
+结论是仍有缺口，且部分测试无判别力。
+
+| 编号 | 级别 | 缺陷 | 后果 | 状态 |
+|---|---|---|---|---|
+| 1 | blocking | 主键校验只接进校验器，未接进 `n7_rank_tickets()` 与 `n7_fund_groups()` 真实入口 | 重复引用仍能走完排序与购买，生成两条购买记录 | 两个入口改为调用完整 schema 校验 |
+| 2 | blocking | 整数下界写成 `-.Machine$integer.max - 1`，放过了 `-2147483648` | 该值在 R 中保留给 `NA_integer_`，仍静默落成 NA | 下界收紧为 `-.Machine$integer.max` |
+| 3 | major | 票额校验只在子函数内，`n7_fund_groups()` 空候选时提前返回绕过 | 公共入口仍接受 `NA`/`Inf`/`-1`/`1.5` | 抽出 `n7_check_unit_caps()`，在两个入口都调用 |
+| 4 | major | 诊断用 `match(ticket_id)` 单键匹配 | 共享票会取到其他 candidate 的行，`support_rank` 依赖行序 | 改用 `(candidate_id, ticket_id)` 复合键 |
+| 5 | major | 空分支把 `spent_before`/`remaining`/`fixture_sets` 清零 | 等于告诉下一期该 issue 从未买过，会重复购买已付费的票 | 账本状态提到提前返回之前计算 |
+| 6 | major | 「诊断改用权威 rank」这条修复**回退后整个测试文件仍全绿** | 该修复没有测试保护 | 补共享票 + 行序不变性用例 |
+
+第 6 条是本轮最有价值的发现：它证明「测试全绿」与「修复受保护」是两件事。
+本轮新增 6 个测试块，并逐个回退验证其判别力。
+
+其中第 1 条是**资金级**缺陷：同一物理票被生成两条购买记录、各扣 2 元。第 4 条是 R 语言特性导致的静默错配，
+代码表面完全正确，只有构造反例才会暴露。
+
+
+## 十二、独立收尾核验（2026-09-24）
+
+本任务只使用合成夹具，不抓取或删除原始数据。用户已在本会话明确批准以原始来源链接
+作为本轮数据接入的追溯要求（#493 comment 5792943945、#499 comment 5792943573），
+该具体决定不是“不保留任何项目原始数据”的全局规则。本交付无需再请求同一授权。
+
+本轮实际使用项目 `r_lib`，不依赖交互式 `.Rprofile`；checkmate 2.3.4、S7 0.2.2
+已在 DESCRIPTION 声明，checkmate 的精确版本补入 renv.lock，S7 原已锁定。
+未安装或升级包，后续环境安装仍使用 pak。
+
+独立回归判别试验：正常生产函数的共享票测试通过；仅在隔离 R 进程的函数对象中
+把复合键匹配改回 ticket_id 单键后，同一测试失败（1个失败断言）。共享源码未被改动。
+`keys=NULL` 现明确表示沿用schema主键，只有schema未声明键时才不检查唯一性。
+
+本次为已有函数管道的收尾，不新增 targets 调度系统或新的缓存契约；
+没有历史学习或真实策略验收。正式测试、渲染、第四轮审阅的结果将在本节记录。
+
+
+### 本轮实测结果与未完成项
+
+- 专项命令：`R_LIBS=$PWD/r_lib Rscript --vanilla -e 'testthat::test_dir("tests/testthat", filter="^n7-pipeline-", reporter="summary", stop_on_failure=TRUE)'`。
+  保存的结果对象独立汇总：272个test_that块，0失败、0错误、0warning、0跳过。
+- 渲染命令：`R_LIBS=$PWD/r_lib TMPDIR=$PWD/.tmpwork/n7-final/tmp XDG_CACHE_HOME=$PWD/.tmpwork/n7-final/cache DENO_DIR=$PWD/.tmpwork/n7-final/deno R_PROFILE_USER=/dev/null R_ENVIRON_USER=/dev/null quarto render quarto/n7_pipeline_contracts.qmd --no-cache --execute`。
+  首次干净渲染成功，24张表、0个cell-output-error。补充本节后再次执行同一命令。
+- 共享票生产函数回退试验：正常通过；隔离内存中回退后1个断言失败；未改共享源码。
+- 第四轮命令：`codex review - < .tmpwork/n7-final/review-prompt.txt`。
+  首次因 usage limit 中断；重试已完成，发现1条P2：部分 ranked 输入会把权威排名2重编号成1。已改为返回匹配行的权威 rank，并补部分输入及缺失排名断言；第五轮确认生产修复有效，并发现旧rank-bounds用例仍只传第一张票（3条断言失败）。已把该用例改为传完整ranked、保留购买子集；独立定点检查7条断言通过。第六轮复核已完成：No actionable findings；不等同于全仓检查或PI验收。
+- 最终核验文件清单：`docs/reviews/issue-500-closeout-checks.json`。其哈希表示本次检查文件身份，
+  代码及测试以第六轮无新增问题的复核为准；QMD自身哈希放在外部清单，避免自引用。
+- 尚不具备全仓验收/关闭条件：最终review已补齐，全仓检查缺口仍需PI路由。
+  已通过的专项不因额度耗尽反复重跑；后续代码变更才重跑相关检查。
+
+本轮新增修复的判别试验：隔离进程内将权威rank返回回退为局部位置，新增测试产生2个失败断言；正常版本通过。未提供命中票排名时support_rank为NA，不猜测未知排名。
+
+### 最终独立复核
+
+命令：`codex review - < .tmpwork/n7-final/review-round6-prompt.txt`。
+结论：`No actionable findings in this scoped handoff`。
+审阅覆盖本QMD、七个模块、五个测试文件、接口合同及直接依赖；本节与外部清单为审阅结束后补入的证据记录。
+已确认：完整ranked输入的rank-bounds测试7条断言通过；共享票复合键、权威排名返回值、重复购买及零额度准入回归具有判别力；keys=NULL文档与行为一致。
+第六轮读取时整套专项仍在运行，因此其无新增问题结论不冒充整套测试结论。
+
+全仓缺口路由建议提交#500由PI处理：测试入口的相对路径/函数加载问题（dixon-coles-grid、fundamentals-market-comparison、fundamentals-total-market、n7-493-probe-report）和analysis-interfaces数据库依赖应独立修复。尚未创建或改变原生依赖，不将建议写成已完成派工。
+
+最终修正后重新运行五文件专项：272个测试块，0失败、0错误、0warning、0跳过（`.tmpwork/n7-final/tests-final.rds`）。命令与上文专项一致，保存结果后用testthat的as.data.frame方法汇总；第六轮审阅之后未修改生产函数或测试。补齐本节后再次执行上文干净会话渲染命令。
+
+
+## 十三、PI 最终验收与范围裁决
+
+用户明确指定本会话承担PI职责，并授权完成#500验收与关闭。最终16文件哈希复核一致，五文件专项272块全部通过，最终codex review无新增可操作问题，干净会话渲染24张表且无执行错误。上述代码与测试在复核后未改动。
+
+全仓失败进行了独立归属验证：在新R进程仅执行analysis-interfaces、dixon-coles-grid、fundamentals-market-comparison、fundamentals-total-market、n7-market-projection、n7-493-probe-report、ou-total-market七个文件，不加载/执行任何n7-pipeline专项，仍有10条失败断言、26个错误（35个结果块）。数据库测试的临时旧目录与clean_v1接口冲突；四个文件source不存在的probability_exploration.R；probe和OU测试未加载被测函数。结果对象保存在`.tmpwork/n7-pi/unrelated-tests.rds`。
+
+PI裁决：接受#500的合成夹具函数接口和端到端基线交付。全仓测试失败仍然是失败，并未豁免为通过；其独立修复与N7持续集成补齐已归入[后续任务#502](https://github.com/algotradinglife/beijing-lot/issues/502)，原生parent为#492，Project为BJ Prediction & Betting，状态Inbox。#502不作为已完成接口交付的阻塞依赖。
+
+本次验收不代表真实数据收益验证、完整仓库验收或合并授权；数据#499与实验#493继续按原生图推进。保留#493依赖#500的已完成证据关系，不删除历史依赖来伪造解阻。PI负责将#500关闭为completed并将Project状态设为Done。

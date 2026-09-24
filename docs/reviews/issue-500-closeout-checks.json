@@ -1,0 +1,74 @@
+{
+  "issue": 500,
+  "review_status": "ROUND_6_NO_ACTIONABLE_FINDINGS",
+  "tests": {
+    "blocks": 272,
+    "failed": 0,
+    "warnings": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "files": {
+    "quarto/n7_pipeline_contracts.qmd": "bef19523232731cc2b80ea88cec589f01682667a70aa226cca095b8af3ab7989",
+    "r/n7_pipeline_epoch.R": "5902eceff786e6101a365cfef453a79b4a39f5a9327adfc23a4a067aa13e415a",
+    "r/n7_pipeline_fixture.R": "c099b4028b13260cf9693c406d3aeef2ca0bf87235ec3351d9d26ddc1833548b",
+    "r/n7_pipeline_inputs.R": "6d34bc2ccc6e5f24b1462d2dc227379622a77d60248dcccbb0ca60e49e13e189",
+    "r/n7_pipeline_types.R": "5977d7a768dc6330f50cfc4fc92e059cdbc7b9ba1e9d2e29612a8d8ade375186",
+    "r/n7_pipeline_candidates.R": "bb37a49b1f4f8171ccde8049d2922fea804cdac67e4b27192c2b5a9f0aea7dc8",
+    "r/n7_pipeline_value.R": "68b6551a0edbe776e3b1b17d040fcf5aa931ec1259a75a99229e38107a75d354",
+    "r/n7_pipeline_contracts.R": "149019fb1d4c0dc6dc7a417e767439510e30f90425740f4a4a12f974a8b761ef",
+    "tests/testthat/test-n7-pipeline-contracts.R": "5b0b4cfac7d6a16a122856a536f26b2df64b48222b5b11b9faa5e93d8b2d24d9",
+    "tests/testthat/test-n7-pipeline-value.R": "a569f9ef08ac5452d837bbac6eb1c4cd43d93aab376c3cbe5ecdfd197bae63ae",
+    "tests/testthat/test-n7-pipeline-epoch.R": "848bb6d3983a2121db02cdb5ad9941c8c0e1c8a9d52c35bfa896c6cde1cdac54",
+    "tests/testthat/test-n7-pipeline-candidates.R": "69c1862c4823c36c6e32589c6517bbb9bf8adf5d145f293c3e78b73e9b2ecb1f",
+    "tests/testthat/test-n7-pipeline-types.R": "1f1dff1a70675ba0ed91ce4d0b32553132eb28f90c05127921b43a26effce230",
+    "DESCRIPTION": "ad37e3c6378a765f00753e130e59f1cf9ddc9755b1b0a6b68e54437834453698",
+    "renv.lock": "affca2d82c80a7b5c4986b587639dff9aff0792be1e5cd699580d6062dcd61a6",
+    "docs/strategy/n7_pipeline_function_contracts.md": "fc1fccc6b87c6f4f42fbb1b4111f32043799acd1568d6a70a45399aefe72aa52",
+    "r/dixon_coles_grid.R": "66373c2f79bcaba9a0e51b734118ff320d97304ab4b6ae9493798eedfe75c106",
+    "r/fundamentals_total_market.R": "87649d2221ad40a0c2fb3e3a28c185347080c38128ad03eddfe7cfcf563fe98b",
+    "r/fundamentals_market_comparison.R": "667edcaf78fb39d58b16a3f3b879e45d76070e3c22a2c8bbb83685d2ad338d27",
+    "r/n7_experiment_contract.R": "62d508b9f6c4916b6b096f859a84ba50bd29c0cd9800c2596c4a6a84e740363b"
+  },
+  "acceptance_status": "PI_ACCEPTED_SYNTHETIC_INTERFACE_BASELINE",
+  "review_command": "codex review - < .tmpwork/n7-final/review-round6-prompt.txt",
+  "review_findings_resolved": [
+    "Round 4: preserve authoritative rank for partial ranked input",
+    "Round 5: supply full ranked to rank-bounds test while retaining purchase subset"
+  ],
+  "mutation_checks": {
+    "composite_key_rollback_failures": 1,
+    "authoritative_rank_rollback_failures": 2
+  },
+  "documentation_note": "QMD final evidence section was completed after round 6; implementation and tests unchanged after review.",
+  "render": {
+    "clean_session": true,
+    "cache": false,
+    "tables": 24,
+    "cell_output_errors": 0,
+    "reported_warnings": 14,
+    "warning_note": "Same aggregate render warning count as prior verified render; zero cell-output-error. Zero-warning claim applies to test suite only."
+  },
+  "followup_issue": 502,
+  "full_repository_tests": "FAILED_INDEPENDENT_REMEDIATION_502",
+  "pi_scope": "Synthetic fixture delivery accepted; not full-repository acceptance or merge approval",
+  "accepted_workspace_files": {
+    "quarto/n7_pipeline_contracts.qmd": "bef19523232731cc2b80ea88cec589f01682667a70aa226cca095b8af3ab7989",
+    "r/n7_pipeline_epoch.R": "5902eceff786e6101a365cfef453a79b4a39f5a9327adfc23a4a067aa13e415a",
+    "r/n7_pipeline_fixture.R": "c099b4028b13260cf9693c406d3aeef2ca0bf87235ec3351d9d26ddc1833548b",
+    "r/n7_pipeline_inputs.R": "6d34bc2ccc6e5f24b1462d2dc227379622a77d60248dcccbb0ca60e49e13e189",
+    "r/n7_pipeline_types.R": "5977d7a768dc6330f50cfc4fc92e059cdbc7b9ba1e9d2e29612a8d8ade375186",
+    "r/n7_pipeline_candidates.R": "bb37a49b1f4f8171ccde8049d2922fea804cdac67e4b27192c2b5a9f0aea7dc8",
+    "r/n7_pipeline_value.R": "68b6551a0edbe776e3b1b17d040fcf5aa931ec1259a75a99229e38107a75d354",
+    "r/n7_pipeline_contracts.R": "149019fb1d4c0dc6dc7a417e767439510e30f90425740f4a4a12f974a8b761ef",
+    "tests/testthat/test-n7-pipeline-contracts.R": "5b0b4cfac7d6a16a122856a536f26b2df64b48222b5b11b9faa5e93d8b2d24d9",
+    "tests/testthat/test-n7-pipeline-value.R": "a569f9ef08ac5452d837bbac6eb1c4cd43d93aab376c3cbe5ecdfd197bae63ae",
+    "tests/testthat/test-n7-pipeline-epoch.R": "848bb6d3983a2121db02cdb5ad9941c8c0e1c8a9d52c35bfa896c6cde1cdac54",
+    "tests/testthat/test-n7-pipeline-candidates.R": "69c1862c4823c36c6e32589c6517bbb9bf8adf5d145f293c3e78b73e9b2ecb1f",
+    "tests/testthat/test-n7-pipeline-types.R": "1f1dff1a70675ba0ed91ce4d0b32553132eb28f90c05127921b43a26effce230",
+    "DESCRIPTION": "f4473d54c9adf78752f3fcb25e21e43253758d6ebfdfdd83884054013ab751c6",
+    "renv.lock": "35411699779f8aec084890d008430f78c7d9a363fec79947e362aabaf55ffe36",
+    "docs/strategy/n7_pipeline_function_contracts.md": "fc1fccc6b87c6f4f42fbb1b4111f32043799acd1568d6a70a45399aefe72aa52"
+  },
+  "publication_note": "Isolated from origin/main. DESCRIPTION includes only checkmate/S7 additions; unrelated workspace dependency edits excluded. Additional prerequisite modules are unchanged copies used by the accepted pipeline."
+}
