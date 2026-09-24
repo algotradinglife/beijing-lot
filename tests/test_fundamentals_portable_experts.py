@@ -5,8 +5,8 @@ import pytest
 from tests.test_fundamentals_calibrated_draw import frozen
 from src.fundamentals_portable_experts import freeze_portable_experts,load_portable_experts,predict_portable_expert,_portable_path
 from src.fundamentals_retrained_experts import fit_experts,save_frozen_experts
-from src.temporal_learning.provenance import implementation_closure
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.provenance import implementation_closure
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 
 @pytest.fixture
@@ -64,5 +64,5 @@ def test_portable_preflights_before_pickle_and_rejects_tampering(portable,monkey
     def forbidden(*args):raise AssertionError('unpickle before source checks')
     monkeypatch.setattr(module.pickle,'loads',forbidden)
     with pytest.raises(ValueError,match='bindings incomplete'):load_portable_experts(manifest,**args)
-    manifest.write_text(raw);(source/'runtime/src/temporal_learning/core.py').write_text('changed')
+    manifest.write_text(raw);(source/'runtime/packages/beidan/inst/python/beidan_backend/temporal_learning/core.py').write_text('changed')
     with pytest.raises(ValueError,match='implementation'):load_portable_experts(manifest,**args)

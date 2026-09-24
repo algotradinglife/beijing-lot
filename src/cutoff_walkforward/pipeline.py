@@ -22,7 +22,7 @@ from src.low_n_selector_data.pipeline import (
     locate_data_root,
 )
 from src.source_schema.publication import atomic_publish_directory
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter,
     AvailabilityPolicy,
     Cutoff,
@@ -30,7 +30,7 @@ from src.temporal_learning import (
     prepare_learning_context,
     verify_implementation_closure,
 )
-from src.temporal_learning.core import stable_frame_hash, stable_json_hash
+from beidan_backend.temporal_learning.core import stable_frame_hash, stable_json_hash
 
 from .contract import (
     AVAILABILITY_POLICY,

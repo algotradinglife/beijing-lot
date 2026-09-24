@@ -58,7 +58,7 @@ from src.n7_mixed_full_history.pipeline import (
     sha256_file,
 )
 from src.source_schema.publication import atomic_write_json, atomic_write_text
-from src.temporal_learning import implementation_closure
+from beidan_backend.temporal_learning import implementation_closure
 
 CONTRACT_ID = "BJ-UNIFIED-N7-MIXED-CLOSEOUT-001/v1"
 ISSUE_NUMBER = 399

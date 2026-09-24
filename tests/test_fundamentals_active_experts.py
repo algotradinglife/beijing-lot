@@ -1,8 +1,8 @@
 import hashlib,json,sys
 import pandas as pd
 import pytest
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash
 from src.fundamentals_active_experts import predict_active_experts
 
 

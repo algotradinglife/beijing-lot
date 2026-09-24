@@ -14,7 +14,7 @@ from src.cutoff_mapping.api import (
     replay_gate,
     replay_mapped,
 )
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter,
     AvailabilityPolicy,
     Cutoff,
@@ -24,7 +24,7 @@ from src.temporal_learning import (
     implementation_closure,
     temporal_cache_key,
 )
-from src.temporal_learning.example_selector import select_cutoff_threshold
+from beidan_backend.temporal_learning.example_selector import select_cutoff_threshold
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -296,7 +296,7 @@ def test_recency_weights_are_monotone_reconciled_and_retain_prior() -> None:
         cutoff,
         source_hashes={"source": "x"},
         repository_root=REPO_ROOT,
-        implementation_modules=("src.temporal_learning.example_selector",),
+        implementation_modules=("beidan_backend.temporal_learning.example_selector",),
         availability=AvailabilityFilter(policy=OBSERVED),
         intended_use="HISTORICAL_DIAGNOSTIC",
         weighting_policy=WeightingPolicy.expanding_exponential(365.0, minimum_ess=10),
@@ -312,7 +312,7 @@ def test_recency_weights_are_monotone_reconciled_and_retain_prior() -> None:
         cutoff,
         source_hashes={"source": "x"},
         repository_root=REPO_ROOT,
-        implementation_modules=("src.temporal_learning.example_selector",),
+        implementation_modules=("beidan_backend.temporal_learning.example_selector",),
         availability=AvailabilityFilter(policy=OBSERVED),
         intended_use="HISTORICAL_DIAGNOSTIC",
         weighting_policy=WeightingPolicy.recent_state_blend(4, 0.7, minimum_ess=5),
@@ -443,7 +443,7 @@ def test_second_selection_client_uses_same_cutoff_and_is_future_invariant() -> N
         history,
         cutoff,
         repository_root=REPO_ROOT,
-        implementation_modules=("src.temporal_learning.example_selector",),
+        implementation_modules=("beidan_backend.temporal_learning.example_selector",),
         score_column="score",
         binary_label_column="binary_label",
         source_hashes={"synthetic": "selector"},
@@ -458,7 +458,7 @@ def test_second_selection_client_uses_same_cutoff_and_is_future_invariant() -> N
         pd.concat([history, future], ignore_index=True),
         cutoff,
         repository_root=REPO_ROOT,
-        implementation_modules=("src.temporal_learning.example_selector",),
+        implementation_modules=("beidan_backend.temporal_learning.example_selector",),
         score_column="score",
         binary_label_column="binary_label",
         source_hashes={"synthetic": "selector"},

@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from src.fundamentals_signal_rates import fit_signal_rates, predict_signal_rates
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 
 
 def test_conditional_rates_shrinkage_boost_and_missing_support():

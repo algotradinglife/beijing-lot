@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pandas as pd
 import pytest
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 from src.fundamentals_n7_baseline import n7_baseline_plan
 from src.fundamentals_n67_overlay import n67_overlay_plan,overlay_any_hit,settle_n67_overlay
 

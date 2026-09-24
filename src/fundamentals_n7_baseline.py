@@ -10,9 +10,9 @@ import json
 import math
 import numpy as np
 import pandas as pd
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.provenance import implementation_closure
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.provenance import implementation_closure
 from src.n7_support_shape.pipeline import _rank_shape_pair
 from src.n7_support_transfer_grid.pipeline import _maximal_assignment
 

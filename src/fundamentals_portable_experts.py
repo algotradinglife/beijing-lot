@@ -7,9 +7,9 @@ import hashlib
 import json
 import pickle
 from pathlib import Path
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.provenance import implementation_closure,verify_implementation_closure
-from src.temporal_learning.predictor_clock import require_prior_predictor_clock
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.provenance import implementation_closure,verify_implementation_closure
+from beidan_backend.temporal_learning.predictor_clock import require_prior_predictor_clock
 from src.fundamentals_calibrated_draw import predict_calibrated_draw
 from src.fundamentals_retrained_experts import predict_experts
 

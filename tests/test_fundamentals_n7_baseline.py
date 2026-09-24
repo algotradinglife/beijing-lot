@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 from src.fundamentals_n7_baseline import archive_n7_inputs,n7_baseline_plan,settle_n7_baseline
 
 

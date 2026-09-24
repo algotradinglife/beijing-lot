@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from src.fundamentals_retrained_experts import fit_experts, predict_experts, predict_frozen_file
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 
 
 @pytest.fixture

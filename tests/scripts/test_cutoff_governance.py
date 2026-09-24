@@ -25,7 +25,7 @@ def _minimal_repo(tmp_path: Path) -> Path:
     (tmp_path / "docs/research").mkdir(parents=True)
     (tmp_path / "docs/research/temporal-function-inventory.csv").write_text(
         "path,function,learned_operation,cutoff_interface,status,source_or_label_max,receipt_replay,migration_priority\n"
-        "src/temporal_learning/core.py,prepare_learning_context,test,explicit,MIGRATED,strict,replay,P0\n",
+        "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py,prepare_learning_context,test,explicit,MIGRATED,strict,replay,P0\n",
         encoding="utf-8",
     )
     return tmp_path
@@ -55,7 +55,7 @@ def test_shared_import_does_not_authorize_unrelated_fit(tmp_path: Path) -> None:
     root = _minimal_repo(tmp_path)
     _freeze_baseline(root)
     (root / "src/bad.py").write_text(
-        "from src.temporal_learning import prepare_learning_context\n\n"
+        "from beidan_backend.temporal_learning import prepare_learning_context\n\n"
         "def unrelated(model, x):\n    return model.fit(x)\n",
         encoding="utf-8",
     )
@@ -85,3 +85,18 @@ def test_hard_coded_temporal_global_in_script_is_rejected(tmp_path: Path) -> Non
     _freeze_baseline(root)
     (root / "scripts/bad.py").write_text("TUNE_YEAR = 2024\n", encoding="utf-8")
     assert any("hidden_temporal_global" in item for item in violations(root))
+
+
+def test_bundled_backend_is_scanned_but_wheel_build_copy_is_not(tmp_path: Path) -> None:
+    root = _minimal_repo(tmp_path)
+    _freeze_baseline(root)
+    base = root / "packages/beidan/inst/python"
+    generated = base / "build/lib/beidan_backend/bad.py"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("def train(model, x):\n    return model.fit(x)\n")
+    assert violations(root) == []
+    source = base / "beidan_backend/bad.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(generated.read_text())
+    assert any("beidan_backend/bad.py" in item and "direct_historical_fit" in item
+               for item in violations(root))

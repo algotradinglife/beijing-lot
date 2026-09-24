@@ -5,8 +5,8 @@ import json
 import numpy as np
 import pandas as pd
 from src.conditional_score.model import grid_basis
-from src.temporal_learning.core import Cutoff
-from src.temporal_learning.diagnostic_labels import diagnostic_label_clock
+from beidan_backend.temporal_learning.core import Cutoff
+from beidan_backend.temporal_learning.diagnostic_labels import diagnostic_label_clock
 
 
 def read_score_archive(source_root, *, clock_horizon, label_delay_hours):

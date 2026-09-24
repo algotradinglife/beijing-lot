@@ -3,8 +3,8 @@ import argparse,hashlib,json,pickle,sys
 from pathlib import Path
 import pandas as pd
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash,utc
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash,utc
 from src.fundamentals_cv_experts import cross_validate_experts
 from src.fundamentals_retrained_experts import fit_experts,save_frozen_experts
 from src.fundamentals_signal_rate_cv import cross_validate_signal_rates
