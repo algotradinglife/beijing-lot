@@ -1,0 +1,45 @@
+---
+title: "合并后同步正式本地工作区"
+format: html
+execute:
+  error: false
+  cache: false
+---
+
+用户要求：PR 合并后默认同步正式本地 main，并将此行为写入 AGENTS.md。
+
+## 行为与范围
+
+规则要求自动 fetch 并更新正式工作目录，核验远端合并提交已包含在本地 main。
+存在分叉时保留本地提交并合入远端；未提交工作先保护再恢复，不把无关提交一并推送。
+冲突或已被迁包取代的本地文件保存在工作区外，留下恢复清单。
+
+本次同步 #505 时，本地原有 37 个未推送提交，已保留；远端合并提交
+`7090ed0702d3a24d97ed32dcc85587ced8420125` 已合入正式本地 main。
+19 个重叠或旧路径文件另行保留，其他未提交工作恢复。
+
+## 验证
+
+本交付只修改操作规则，不引入函数或改变算法，无需新增函数测试。
+使用干净会话渲染本 QMD，并对 AGENTS.md 与本报告执行 codex review。
+同步的实际验收使用以下只读命令；本地领先远端不等于同步失败，但必须明确保留的本地工作。
+
+```bash
+git merge-base --is-ancestor origin/main main
+git rev-list --left-right --count main...origin/main
+git diff --name-only --diff-filter=U
+git status --short
+```
+
+正式包源码位于仓库内 `packages/beidan`。个人安装库和临时验收工作区不是源码的正式位置。
+
+## 审阅记录
+
+独立审阅命令：`codex review --uncommitted`。审阅结论及对应提交记录在本交付 PR 中；
+合并前由 PI 核验最终差异，仅在没有未解决的可操作问题时接受。
+
+验收结果：独立 `codex review --uncommitted` 无可操作问题；干净渲染成功，`git diff --check` 通过。
+
+- 已审阅 AGENTS.md SHA-256：`a379bc4537895ffceec7cff08d98c9fac48f2e565c91238b909ce3b7aaab386f`。
+- QMD 审阅主体 SHA-256（追加本验收记录之前）：`f5b0ea5872a0a6d8b2aef61c0b8751080c979179ff78dfca554635bd089dedba`。
+- 本追加记录仅记录验收结果，不改变规则或执行逻辑。
