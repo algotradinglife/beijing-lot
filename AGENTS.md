@@ -76,6 +76,13 @@
 - Use transactions; define conflicts, duplicate handling, repeated-run behavior, and rollback.
 - Test rollback and repeated execution; release connections/resources on both success and failure.
 
+## CI participation (owner-mandated default)
+
+- Agents do not participate in CI by default. Do not configure, add, trigger, monitor, retry, repair, or optimize CI workflows unless the user explicitly requests CI work.
+- Do not introduce CI coverage gaps or CI status as agent-imposed acceptance/merge gates, create CI follow-up issues, or repeatedly remind the user about CI.
+- Continue required local tests, reproducible QMD rendering, code review, and PI acceptance. Never report unrun or failed CI as passed.
+- Respect enforced GitHub branch protection. If it actually prevents an authorized merge, report that concrete blocker once; do not bypass protection or start CI remediation without explicit instruction.
+
 ## Tests and acceptance
 
 - Use `testthat` in `tests/testthat/` and `pytest` in the relevant `tests/` area.
@@ -90,7 +97,7 @@
 - Verify key QMD in a fresh process with declared inputs, execution enabled, cache/freeze bypassed, and errors fatal.
 - Rendering does not replace function tests; HTML containing execution errors fails acceptance.
 - Inspect key rendered tables/figures for missing content, units, and labels; identify input snapshots and parameters.
-- CI must cover affected function tests, data contracts, key QMD renders, and applicable cutoff governance checks.
+- Verify affected function tests, data contracts, key QMD renders, and applicable cutoff governance checks locally.
 - Report changed behavior, function/test mapping, exact check commands/results, and reasons for skipped checks.
 - Every delivery must pass `codex review` covering its QMD, reusable implementation, tests, and data contracts before PI acceptance.
 - Record the reviewed revision or file hashes, review command, findings, and resolutions in the delivery QMD; a successful process exit alone is not acceptance.
