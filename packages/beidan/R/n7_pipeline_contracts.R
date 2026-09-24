@@ -445,43 +445,117 @@ n7_cutoff_utc <- function(cutoff) {
   cutoff$cutoff_utc
 }
 
-# --- explicit business constants --------------------------------------------
-#
-# The contract's constants block: n_legs, issue budget, unit stake, payout factor,
-# rho, SP threshold and SP replacement. They are declared here so the pipeline can
-# be exercised without sourcing the older research modules, and they are passed
-# into functions explicitly rather than read from the session. The defaults match
-# the frozen project values; a caller may override any of them.
+# --- session business constants ---------------------------------------------
 
-#' 合同的常量块
-#'
-#' 显式接收它们，不偷偷依赖全局常量。默认值即项目冻结值，调用方可覆盖任意一项。
-#'
-#'
-#' @return n_legs            integer 标量，固定 7
-#' issue_budget_cny  double，单期总预算 CNY 1024
-#' unit_cny          double，单票本金 CNY 2
-#' payout_factor     double，票级派彩系数 0.65（只乘一次）
-#' rho               double，Dixon-Coles 相关参数 -0.14（冻结值，本交付不重新标定）
-#' sp_threshold      double，SP 替换阈值 10（> 10 才替换）
-#' sp_replacement    double，SP 替换值 4.5
-#'
-n7_pipeline_constants <- function() {
-  list(n_legs = 7L,
-       issue_budget_cny = 1024,
-       unit_cny = 2,
-       payout_factor = 0.65,
-       rho = -0.14,
-       sp_threshold = 10,
-       sp_replacement = 4.5)
+#' Construct the immutable defaults used to initialize and reset session settings
+#' @return Named list of the seven default business parameters.
+#' @noRd
+n7_constant_defaults <- function() {
+  return(list(n_legs = 7L, issue_budget_cny = 1024, unit_cny = 2,
+              payout_factor = 0.65, rho = -0.14,
+              sp_threshold = 10, sp_replacement = 4.5))
 }
 
-#' 固定腿数守卫
+.n7_session_constants <- new.env(parent = emptyenv())
+
+#' Validate a complete session-settings candidate without changing stored values
+#' @param candidate Complete named list of finite, unclassed numeric scalars.
+#' @return Validated list, with n_legs normalized to integer; invalid values error.
+#' @noRd
+n7_validate_constants <- function(candidate) {
+  checkmate::assert_list(candidate, names = "unique", .var.name = "constants")
+  checkmate::assert_names(names(candidate), identical.to = names(n7_constant_defaults()),
+                          .var.name = "names(constants)")
+  for (field in names(candidate)) {
+    value <- candidate[[field]]
+    checkmate::assert_numeric(value, len = 1L, any.missing = FALSE,
+                              finite = TRUE, .var.name = field)
+    checkmate::assert_true(!is.object(value) && is.null(dim(value)),
+                           .var.name = paste(field, "must be an unclassed numeric scalar"))
+  }
+  checkmate::assert_true(candidate$n_legs == 7, .var.name = "n_legs must be 7")
+  candidate$n_legs <- 7L
+  checkmate::assert_true(candidate$issue_budget_cny >= 0, .var.name = "issue_budget_cny >= 0")
+  checkmate::assert_true(candidate$unit_cny > 0, .var.name = "unit_cny must be positive")
+  checkmate::assert_true(candidate$payout_factor > 0 && candidate$payout_factor <= 1,
+                         .var.name = "payout_factor in (0, 1]")
+  dc_validate_rho(candidate$rho)
+  checkmate::assert_true(candidate$sp_threshold > 1, .var.name = "sp_threshold > 1")
+  checkmate::assert_true(candidate$sp_replacement > 0, .var.name = "sp_replacement > 0")
+  checkmate::assert_true(candidate$sp_replacement <= candidate$sp_threshold,
+                         .var.name = "sp_replacement must not exceed sp_threshold")
+  return(candidate)
+}
+
+#' 合同的常量块（当前会话内可读写）
 #'
+#' 读取或更新本 R 会话内的业务常量快照。默认值即项目冻结值；命名参数给出局部
+#' 覆盖。**下游计算函数仍然显式接收这些常量作为参数**，配置构造器 n7_allocation_configs() 的默认参数会读取当前快照。
 #'
+#' @param ...     命名的局部更新，名字必须属于常量键集合；可一次给多个。
+#'   · 未命名参数                  -> stop()
+#'   · 未知字段名                  -> stop()
+#'   · 重复字段名                  -> stop()
+#'   · 取值非法（见下）             -> stop()
+#' @param reset   长度 1 的逻辑标量。TRUE 表示把会话常量恢复为冻结默认值。
+#'   · 非逻辑 / 长度 != 1 / NA      -> stop()
+#'   · `reset = TRUE` 同时给了 `...` -> stop()（"重置"与"更新"是互斥意图）
 #'
+#' @return 完整常量列表快照（长度恒为 7、名字恒为合同键集合）。零参调用返回当前
+#'   会话值；带更新时先校验**整个候选快照**再更新内存，因此任何非法输入都是原子的
+#'   失败，会话状态保持调用前原样。
 #'
-n7_legs <- function() n7_pipeline_constants()$n_legs
+#' @section 取值约束:
+#' · n_legs            固定 7；接受数值 7 并归一化为 integer 7L
+#' · issue_budget_cny  >= 0（CNY）
+#' · unit_cny          > 0（CNY）
+#' · payout_factor     (0, 1]
+#' · rho               [-0.5, 0.5]
+#' · sp_threshold      > 1
+#' · sp_replacement    > 0 且 <= sp_threshold
+#' 全部取值必须为无类、无维度的有限数值标量；NULL / NA / NaN / Inf / 非标量 / 类型错误一律 stop()。
+#'
+#' @section 会话状态:
+#' 状态存于包私有环境，随会话存续，绝不写入磁盘、`options()` 或全局环境；新进程
+#' 重新从默认值开始；devtools::load_all() 重新加载包也恢复默认值。
+#' 每次返回的都是独立快照，修改返回值不影响会话状态。
+#'
+n7_pipeline_constants <- function(..., reset = FALSE) {
+  checkmate::assert_flag(reset, na.ok = FALSE, .var.name = "reset")
+  updates <- list(...)
+  if (reset) {
+    checkmate::assert_true(length(updates) == 0L,
+                           .var.name = "reset cannot be combined with updates")
+    .n7_session_constants$values <- n7_constant_defaults()
+  } else if (length(updates)) {
+    checkmate::assert_true(!is.null(names(updates)) && !anyNA(names(updates)) &&
+                             all(nzchar(names(updates))),
+                           .var.name = "every update must be named")
+    checkmate::assert_true(!anyDuplicated(names(updates)),
+                           .var.name = "duplicate update names are forbidden")
+    checkmate::assert_names(names(updates), subset.of = names(n7_constant_defaults()),
+                            .var.name = "update names")
+    candidate <- .n7_session_constants$values
+    candidate[names(updates)] <- updates
+    candidate <- n7_validate_constants(candidate)
+    .n7_session_constants$values <- candidate
+  }
+  return(.n7_session_constants$values)
+}
+
+.n7_session_constants$values <- n7_constant_defaults()
+
+#' 固定腿数守卫（结构常量，与会话常量解耦）
+#'
+#' @return 恒为 integer 7L。
+#'
+#' @details n_legs 是**结构**属性：它决定一张票有几条腿，改它会改变表形状而非
+#'   估值参数。因此本守卫返回固定常量，绝不读取会话可变的 n7_pipeline_constants()；
+#'   否则一次会话内更新就能让结构层在运行中途改变形状。用 n7_pipeline_constants()
+#'   更新 n_legs 也会被拒绝（固定为 7）。
+n7_legs <- function() {
+  return(7L)
+}
 
 # The shared experiment-contract helpers (ticket identity, group admission) are
 # written against a bare N7_LEGS. Defining it here keeps them usable from this

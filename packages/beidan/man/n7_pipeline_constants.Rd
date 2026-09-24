@@ -2,19 +2,45 @@
 % Please edit documentation in R/n7_pipeline_contracts.R
 \name{n7_pipeline_constants}
 \alias{n7_pipeline_constants}
-\title{合同的常量块}
+\title{合同的常量块（当前会话内可读写）}
 \usage{
-n7_pipeline_constants()
+n7_pipeline_constants(..., reset = FALSE)
+}
+\arguments{
+\item{...}{命名的局部更新，名字必须属于常量键集合；可一次给多个。
+· 未命名参数                  -> stop()
+· 未知字段名                  -> stop()
+· 重复字段名                  -> stop()
+· 取值非法（见下）             -> stop()}
+
+\item{reset}{长度 1 的逻辑标量。TRUE 表示把会话常量恢复为冻结默认值。
+· 非逻辑 / 长度 != 1 / NA      -> stop()
+· \code{reset = TRUE} 同时给了 \code{...} -> stop()（"重置"与"更新"是互斥意图）}
 }
 \value{
-n_legs            integer 标量，固定 7
-issue_budget_cny  double，单期总预算 CNY 1024
-unit_cny          double，单票本金 CNY 2
-payout_factor     double，票级派彩系数 0.65（只乘一次）
-rho               double，Dixon-Coles 相关参数 -0.14（冻结值，本交付不重新标定）
-sp_threshold      double，SP 替换阈值 10（> 10 才替换）
-sp_replacement    double，SP 替换值 4.5
+完整常量列表快照（长度恒为 7、名字恒为合同键集合）。零参调用返回当前
+会话值；带更新时先校验\strong{整个候选快照}再更新内存，因此任何非法输入都是原子的
+失败，会话状态保持调用前原样。
 }
 \description{
-显式接收它们，不偷偷依赖全局常量。默认值即项目冻结值，调用方可覆盖任意一项。
+读取或更新本 R 会话内的业务常量快照。默认值即项目冻结值；命名参数给出局部
+覆盖。\strong{下游计算函数仍然显式接收这些常量作为参数}，配置构造器 n7_allocation_configs() 的默认参数会读取当前快照。
+}
+\section{取值约束}{
+
+· n_legs            固定 7；接受数值 7 并归一化为 integer 7L
+· issue_budget_cny  >= 0（CNY）
+· unit_cny          > 0（CNY）
+· payout_factor     (0, 1]
+· rho               [-0.5, 0.5]
+· sp_threshold      > 1
+· sp_replacement    > 0 且 <= sp_threshold
+全部取值必须为无类、无维度的有限数值标量；NULL / NA / NaN / Inf / 非标量 / 类型错误一律 stop()。
+}
+
+\section{会话状态}{
+
+状态存于包私有环境，随会话存续，绝不写入磁盘、\code{options()} 或全局环境；新进程
+重新从默认值开始；devtools::load_all() 重新加载包也恢复默认值。
+每次返回的都是独立快照，修改返回值不影响会话状态。
 }
