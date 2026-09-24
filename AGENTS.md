@@ -13,6 +13,13 @@
 - Executors report evidence and propose graph changes; they must not silently redefine the graph.
 - `.research/graph.yaml` and `.research/tasks/*.yaml` are derived caches or notes only; resolve mismatches in GitHub's favor and refresh them.
 
+## Local synchronization after merge (owner-mandated default)
+
+- After merging a PR, automatically fetch the remote and synchronize `main` in the primary local checkout before reporting completion. Updating only an isolated worktree is insufficient; no additional user confirmation is needed for this synchronization.
+- Preserve local commits and uncommitted work. Fast-forward when possible; when histories diverge, preserve the local history and merge the remote branch locally. Never force-reset local work or publish unrelated local commits as part of synchronization.
+- Before updating a dirty checkout, protect tracked and untracked changes with recoverable backups. Restore unrelated work afterward; preserve colliding or superseded files outside the active source tree with an explicit recovery inventory rather than silently overwriting them or reintroducing obsolete implementations.
+- Verify that the remote merge commit is an ancestor of the primary local `main`, the delivered files exist there, and no merge conflicts remain. Report any remaining local-only commits or changes accurately; do not claim identical branches when they differ.
+
 ## Engineering principles (owner-mandated)
 
 - Delete obsolete code; no compatibility layers, migrations for old behavior, or fallback paths.
