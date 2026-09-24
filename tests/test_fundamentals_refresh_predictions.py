@@ -2,7 +2,7 @@ import json,hashlib
 from pathlib import Path
 import pandas as pd
 import pytest
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 from src.fundamentals_refresh_predictions import save_refresh_prediction,verify_refresh_predictions,refresh_input_hash,validate_refresh_candidate,freeze_refresh_report_inputs
 
 

@@ -42,12 +42,12 @@ from src.n7_mixed_full_history.pipeline import (
 from src.n7_support_shape.pipeline import _ticket_units as shape_ticket_units
 from src.n7_support_transfer_grid.pipeline import _ticket_units as grid_ticket_units
 from src.source_schema.publication import atomic_publish_directory
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     Cutoff,
     implementation_closure,
     verify_implementation_closure,
 )
-from src.temporal_learning.core import stable_frame_hash as temporal_frame_sha
+from beidan_backend.temporal_learning.core import stable_frame_hash as temporal_frame_sha
 
 from .contract import (
     BOOTSTRAP_DRAWS,

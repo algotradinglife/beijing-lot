@@ -38,7 +38,7 @@ def prepare_issue_learning_context(history, cutoff, *, source_hashes, repository
     if weighting_policy.kind!="EXPANDING_EQUAL":
         raise TemporalContractError("Issue partition currently requires EXPANDING_EQUAL weights")
     arguments=dict(source_hashes=source_hashes,repository_root=repository_root,
-        implementation_modules=tuple(dict.fromkeys(("src.temporal_learning.issue_partitions",*implementation_modules))),
+        implementation_modules=tuple(dict.fromkeys(("beidan_backend.temporal_learning.issue_partitions",*implementation_modules))),
         implementation_distributions=implementation_distributions,availability=availability,
         intended_use=intended_use,partition_policy=PartitionPolicy(kind="FIXED_PRIOR_FIT",
             tune_years=0,calibration_years=0,minimum_fit_years=1),weighting_policy=weighting_policy)

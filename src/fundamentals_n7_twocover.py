@@ -2,7 +2,7 @@
 import copy
 from src.fundamentals_n7_baseline import n7_baseline_plan, settle_n7_baseline
 from src.fundamentals_n67_overlay import overlay_any_hit
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 
 def n7_twocover_plan(frame, *, cutoffs, strategy, max_groups, unit_cny, payout_factor, allocation_seed):

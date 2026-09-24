@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from src.fundamentals_n7_single import n7_single_plan,next_overlap_group,settle_n7_single
 from src.fundamentals_n7_baseline import settle_n7_baseline
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 
 
 @pytest.fixture

@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from tests.test_fundamentals_calibrated_draw import frozen
 from src.fundamentals_draw_versions import read_draw_version,predict_draw_version
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 
 @pytest.fixture
@@ -83,5 +83,6 @@ def test_inherited_pythonpath_cannot_override_archived_runtime(catalog,monkeypat
         repository_root=root,python=sys.executable)
     receipt=result.attrs['prediction_receipt']
     assert receipt['runtime_root']==str(archive)
-    assert all(Path(p).is_relative_to(archive/'src') for p in receipt['imported_sources'])
+    assert all(Path(p).is_relative_to(archive) for p in receipt['imported_sources'])
+    assert str(archive/'packages/beidan/inst/python/beidan_backend/temporal_learning/core.py') in receipt['imported_sources']
     assert str(archive/'src/fundamentals_retrained_experts.py') in receipt['imported_sources']

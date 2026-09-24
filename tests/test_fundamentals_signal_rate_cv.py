@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from src.fundamentals_signal_rate_cv import cross_validate_signal_rates
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 
 
 def test_second_stage_cv_and_post_cutoff_invariance():

@@ -8,10 +8,10 @@ import hashlib
 import json
 import numpy as np
 import pandas as pd
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash, utc
-from src.temporal_learning.diagnostic_labels import diagnostic_label_clock
-from src.temporal_learning.predictor_clock import require_prior_predictor_clock
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash, utc
+from beidan_backend.temporal_learning.diagnostic_labels import diagnostic_label_clock
+from beidan_backend.temporal_learning.predictor_clock import require_prior_predictor_clock
 
 
 def read_refresh_features(prior, experiment, clean_study, *, train_count, test_count, initial_issues):
@@ -161,7 +161,7 @@ def repair_refresh_training_clocks(study, audit_path, output, *, source_root):
     original/audit source bytes and independently replay each clock. Never open
     test labels, overwrite a study, or fit. Return the new study directory.
     """
-    from src.temporal_learning.predictor_clock import diagnostic_predictor_clock,validate_training_predictor_clocks
+    from beidan_backend.temporal_learning.predictor_clock import diagnostic_predictor_clock,validate_training_predictor_clocks
     study=Path(study);output=Path(output);source_root=Path(source_root)
     if output.exists():raise FileExistsError(output)
     prior=json.loads((study/'input-receipt.json').read_text());audit=json.loads(Path(audit_path).read_text())

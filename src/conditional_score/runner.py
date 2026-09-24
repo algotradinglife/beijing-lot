@@ -4,9 +4,9 @@ import json
 import numpy as np
 import pandas as pd
 from src.conditional_score.model import fit_remapper, predict_remapper, score_metrics
-from src.temporal_learning.core import (Cutoff, TemporalContractError, stable_json_hash,
+from beidan_backend.temporal_learning.core import (Cutoff, TemporalContractError, stable_json_hash,
                                        AvailabilityPolicy)
-from src.temporal_learning.provenance import implementation_closure
+from beidan_backend.temporal_learning.provenance import implementation_closure
 from src.fundamentals_n7_single import n7_single_plan, settle_n7_single
 
 

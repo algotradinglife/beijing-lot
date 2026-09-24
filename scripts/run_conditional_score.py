@@ -5,8 +5,8 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from src.conditional_score.archive import read_score_archive
 from src.conditional_score.runner import run_experiment
-from src.temporal_learning.core import Cutoff,WeightingPolicy
-from src.temporal_learning.issue_partitions import IssuePartitionPolicy as PartitionPolicy
+from beidan_backend.temporal_learning.core import Cutoff,WeightingPolicy
+from beidan_backend.temporal_learning.issue_partitions import IssuePartitionPolicy as PartitionPolicy
 
 if __name__=="__main__":
     p=argparse.ArgumentParser(description=__doc__)

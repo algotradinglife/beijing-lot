@@ -49,14 +49,14 @@ from src.source_schema.publication import (
     atomic_write_json,
     atomic_write_parquet,
 )
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityPolicy,
     Cutoff,
     WeightingPolicy,
     implementation_closure,
     verify_implementation_closure,
 )
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 from .contract import (
     ALLOWED_VERDICTS,

@@ -13,14 +13,14 @@ import numpy as np
 import pandas as pd
 from sklearn.tree import DecisionTreeClassifier, export_text
 
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter, AvailabilityPolicy, Cutoff, PartitionPolicy,
     WeightingPolicy, prepare_learning_context, temporal_client,
 )
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.predictor_clock import validate_training_predictor_clocks
-from src.temporal_learning.replay import validate_model_chronology
-from src.temporal_learning.provenance import verify_implementation_closure
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.predictor_clock import validate_training_predictor_clocks
+from beidan_backend.temporal_learning.replay import validate_model_chronology
+from beidan_backend.temporal_learning.provenance import verify_implementation_closure
 
 
 def tree_identity(tree):
@@ -133,7 +133,7 @@ def fit_experts(history, cutoff, *, features, training_issues, source_hashes,
     return result
 
 
-from src.temporal_learning.replay import prediction_scope
+from beidan_backend.temporal_learning.replay import prediction_scope
 
 def predict_experts(artifact, frame, cutoff):
     """Predict from frozen models; target inputs never contain outcome columns.

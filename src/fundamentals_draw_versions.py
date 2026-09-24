@@ -4,12 +4,12 @@ import hashlib
 import json
 import subprocess
 import warnings
-from src.temporal_learning.replay import HistoricalReplayWarning
+from beidan_backend.temporal_learning.replay import HistoricalReplayWarning
 from pathlib import Path
 import pandas as pd
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.predictor_clock import require_prior_predictor_clock
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.predictor_clock import require_prior_predictor_clock
 
 
 def read_draw_version(catalog_path, version, *, repository_root):

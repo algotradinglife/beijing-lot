@@ -1,0 +1,156 @@
+---
+title: "beidan R package：安装、Python 后端与迁移验收"
+format: html
+params:
+  python: ""
+execute:
+  error: false
+  warning: true
+  cache: false
+---
+
+# 范围
+
+本交付对应 #504。N7 固定夹具接口迁入 `packages/beidan`，Python 时间治理唯一实现迁入
+`inst/python/beidan_backend/temporal_learning`。R 包加载不初始化 Python；调用者显式选择解释器。
+本次保持固定参数与业务口径，不作真实收益结论。源码迁移后旧实现删除，历史审阅记录保留为历史证据。
+
+```{r}
+library(beidan)
+stopifnot(!reticulate::py_available(initialize = FALSE))
+tibble::tibble(package = "beidan", version = as.character(packageVersion("beidan")),
+               python_initialized_on_load = FALSE) |> knitr::kable()
+```
+
+# 不依赖脚本加载顺序的 R 调用
+
+```{r}
+constants <- n7_pipeline_constants()
+issue <- n7_make_fixture_issue("00123", "2026-09-22", n_fixtures = 14L)
+cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz="UTC"))
+inputs <- n7_read_inputs(n7_fixture_source(issue), "00123", cutoff)
+epoch <- n7_prepare_epoch(inputs, cutoff, "Asia/Shanghai",
+  list(members=c("c01","c02","c03"), missing="error"),
+  list(companies=NULL,line="nearest_main",watermark="decimal"))
+projection <- n7_project_probabilities(epoch, cutoff, constants$rho, c(0.1,16),1e-10)
+projection$probabilities |> head(9) |> knitr::kable()
+stopifnot(nrow(projection$probabilities) == 42L)
+```
+
+# 随包 Python 与表转换
+
+解释器通过文档参数传入，依赖必须预先安装；渲染过程中不安装任何软件。
+
+```{r}
+stopifnot(is.character(params$python), length(params$python)==1L, nzchar(params$python))
+backend <- n7_python_backend(params$python)
+py_cutoff <- n7_learning_cutoff("00123", cutoff$cutoff_utc, backend)
+returned <- n7_r_table(n7_python_table(inputs$fixtures, "fixtures", backend), "fixtures")
+stopifnot(identical(returned$fixture_id, inputs$fixtures$fixture_id),
+          identical(attr(returned$kickoff_at,"tzone"),"UTC"))
+tibble::tibble(issue_id=reticulate::py_to_r(py_cutoff$target_issue),
+  cutoff=reticulate::py_to_r(py_cutoff$cutoff_ts$isoformat()),
+  fixture_rows=nrow(returned)) |> knitr::kable()
+```
+
+# 验收命令与边界
+
+- 环境准备：`pak::local_install("packages/beidan")`；Python 使用已声明解释器安装 `packages/beidan/inst/python`。
+- R 包：`R CMD build packages/beidan`，`R CMD check --no-manual beidan_0.1.0.tar.gz`。
+- 桥接检查设置 `BEIDAN_TEST_PYTHON`；Python 后端与受影响调用方使用该解释器运行 pytest。
+- 本报告：`quarto render quarto/beidan_package.qmd --no-cache --execute -P python:/absolute/path/to/python`。
+- 原 N7 端到端报告：`quarto/n7_pipeline_contracts.qmd`，改为加载已安装包。
+- 文档、命名空间和纯概率依赖归入包；其他研究比较函数继续在仓库调用公开包接口。
+- Python 实现身份收据同时支持显式仓库根和显式安装资源根；不同实现或源变更仍须重新冻结，不能复用旧收据。
+- 默认不参与 CI。本地检查结果与独立审阅记录见下节。
+
+
+# 函数与验证映射
+
+| 实现 | 验证入口 | 覆盖内容 |
+|---|---|---|
+| contracts / inputs / fixture | `test-n7-pipeline-contracts.R` | 表类型、复合主键、输入契约、合成数据身份 |
+| epoch 与纯概率依赖 | `test-n7-pipeline-epoch.R`、`test-market-primitives.R` | 自然日窗口、时点报价、概率投影、解析可核验的大小球反解与修正边界 |
+| candidates | `test-n7-pipeline-candidates.R` | 构组、结构、枚举、硬约束 |
+| types | `test-n7-pipeline-types.R` | 内部 S7 对象与公共 tibble 边界 |
+| value | `test-n7-pipeline-value.R` | 排名、物理票去重、资金、冻结、结算及深度 |
+| python-backend | `test-python-backend.R` | 显式解释器、环境覆盖拒绝、UTC、NA、整数范围、15 张空表、干净进程加载 |
+| Python temporal_learning | `tests/python/test_backend.py` 及仓库受影响 Python 测试 | 安装后调用、cutoff、传递实现收据、父包初始化文件、变更拒绝、隔离回放 |
+| cutoff 静态检查 | `tests/scripts/test_cutoff_governance.py` | 新包源码继续受治理；轮子构建目录不是源码入口 |
+
+迁移后的 R 测试位于 `packages/beidan/tests/testthat/`；仓库 `tests/testthat.R` 也调用包测试，避免搬迁后从标准入口漏测。
+这里的检查不证明未受本次修改影响的旧研究流程通过。
+
+# 本地验收证据
+
+- 独立安装：R 包由 `pak::local_install()` 安装到独立库；Python 后端实际构建 wheel 后安装到独立目录。Python 使用 `-I`、在 `/tmp` 中验证安装位置、保留前导零的 cutoff 和实现收据重放。
+- 跨语言专项：45 条断言通过，0 失败、0 warning、0 跳过；包含审阅后新增的缺失值及解释器覆盖回归。
+- 受影响 Python 测试：121 通过、2 跳过；两项需要未挂载的历史研究数据。2 条 warning 是测试内训练样本回放提示。随后新增的包源码扫描回归所在文件 7 项通过。
+- 渲染：包报告的 3 张执行结果表、原 N7 报告 24 张表，均无 `cell-output-error`。已核对包版本、未初始化 Python、`00123` 身份、UTC 截止时间、14 场及 42 条赛果概率。
+- 全部 15 张表的 typed-empty R→Python→R 保持一致；缺失整数/布尔值在 Python 中为真正缺失值，返回 R 后不变成零或 FALSE。
+- 完整 `R CMD check --no-manual`（包括包测试）为 `Status: OK`。之后的来源绑定与公共导出范围收尾分别通过 Python 回归、S7/桥接专项和概率依赖专项；最新构建另执行 `R CMD check --no-manual --no-tests`，检查安装、命名空间与帮助文件为 `Status: OK`。这个增量静态检查不替代此前完整测试。
+
+运行环境的 R 依赖版本由仓库 `renv.lock` 记录，Python 依赖由 `requirements.txt` 记录；本次使用 R 4.6.1、Quarto 1.10.18、reticulate 1.46.0、pandas 3.0.3。帮助文件使用 roxygen2 8.1.0 生成，其版本记入包配置。
+
+# 独立审阅
+
+第一轮执行 `codex review --uncommitted`，发现两项 P2：
+
+1. R 整数 NA 与逻辑 NA 未保留为 pandas 缺失值。现显式使用 `Int32` / `boolean`，返回时恢复对应 R 缺失类型；验证 Python 的 `isna()` 与完整往返结果。
+2. 首次初始化时 `RETICULATE_PYTHON` 可以覆盖显式解释器，但句柄仍声称使用请求路径。现初始化后重新核验实际解释器；独立 R 子进程设置冲突环境变量，确认拒绝。
+
+两项修复均有调用生产函数的回归测试。第三轮 `codex review --uncommitted` 未发现新增可操作回归，独立执行的 R 包测试通过，扩大后的 Python 检查为 232 通过、2 个历史数据测试跳过。
+
+
+第二轮审阅发现一项 P2：wheel 安装副本与显式仓库根可以不一致，使收据描述另一份代码。
+现按导入时的后端实现身份校验声明根与实际加载文件；相同源码的搬迁副本仍可重放，不同副本或导入后源码变化会被拒绝。
+新增两条独立回归覆盖仓库副本分歧及子进程导入后文件变化；27 项相关来源绑定与隔离回放测试通过。
+
+## 复现命令
+
+先按包 README 准备 R 库与 Python 环境。下面的路径变量必须由调用者显式设置；依赖安装不发生在函数或渲染过程中。
+
+```bash
+export R_LIBS=/absolute/path/to/prepared/r-library
+export BEIDAN_TEST_PYTHON=/absolute/path/to/prepared/python
+R CMD build packages/beidan
+R CMD check --no-manual beidan_0.1.0.tar.gz
+PYTHONPATH="$PWD/packages/beidan/inst/python:$PWD" "$BEIDAN_TEST_PYTHON" -m pytest -q -rs \
+  packages/beidan/tests/python \
+  tests/scripts/test_cutoff_governance.py \
+  tests/scripts/test_cutoff_hardening.py \
+  tests/scripts/test_cutoff_mapping.py \
+  tests/scripts/test_fixed_prior_fit.py \
+  tests/test_conditional_score.py \
+  tests/test_fundamentals_active_experts.py \
+  tests/test_fundamentals_calibrated_draw.py \
+  tests/test_fundamentals_cv_experts.py \
+  tests/test_fundamentals_draw_versions.py \
+  tests/test_fundamentals_expert_refresh.py \
+  tests/test_fundamentals_n67_overlay.py \
+  tests/test_fundamentals_n7_baseline.py \
+  tests/test_fundamentals_n7_single.py \
+  tests/test_fundamentals_portable_experts.py \
+  tests/test_fundamentals_refresh_predictions.py \
+  tests/test_fundamentals_retrained_experts.py \
+  tests/test_fundamentals_signal_rate_cv.py \
+  tests/test_fundamentals_signal_rates.py \
+  tests/test_fundamentals_training_replay.py
+TMPDIR=/absolute/path/to/writable/tmp \
+XDG_CACHE_HOME=/absolute/path/to/writable/cache \
+DENO_DIR=/absolute/path/to/writable/deno \
+R_PROFILE_USER=/dev/null R_ENVIRON_USER=/dev/null \
+quarto render quarto/beidan_package.qmd --no-cache --execute -P python:"$BEIDAN_TEST_PYTHON"
+# 使用相同可写目录与干净会话配置渲染原 N7 报告：
+quarto render quarto/n7_pipeline_contracts.qmd --no-cache --execute
+```
+
+
+## 最终产物核对
+
+当前包共有 280 个 R 测试块。完整检查后新增的 S7 公共边界及纯概率依赖测试也已执行通过。
+S7 领域构造器和转换辅助函数保留在内部命名空间，公共表接口使用 tibble。
+
+[最终源码与测试 SHA-256 清单](../docs/research/reviews/beidan-package-reviewed-files.json)记录本次审阅涉及的实际文件，包括本 QMD。清单自身不参与自身哈希。
+第三轮审阅结论：迁移、后端身份绑定和调用方未发现可操作回归；本节只补充验证记录，不改变已审阅的分析执行逻辑。
+历史数据依赖的两项跳过保留为适用范围限制，不计作通过；本包的合成端到端验收不依赖这些数据。

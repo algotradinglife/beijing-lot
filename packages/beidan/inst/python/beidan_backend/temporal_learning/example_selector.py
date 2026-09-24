@@ -48,7 +48,7 @@ def select_cutoff_threshold(
         repository_root=repository_root,
         implementation_modules=tuple(
             dict.fromkeys(
-                ("src.temporal_learning.example_selector", *implementation_modules)
+                ("beidan_backend.temporal_learning.example_selector", *implementation_modules)
             )
         ),
         implementation_distributions=("numpy", "pandas"),

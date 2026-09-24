@@ -7,8 +7,8 @@ from tests.test_fundamentals_draw_versions import catalog
 from src.fundamentals_calibrated_draw import load_calibrated_draw, predict_calibrated_draw
 from src.fundamentals_draw_versions import predict_draw_version
 from src.fundamentals_signal_rates import predict_signal_rates
-from src.temporal_learning import Cutoff
-from src.temporal_learning.replay import prediction_scope, HistoricalReplayWarning
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.replay import prediction_scope, HistoricalReplayWarning
 import sys
 
 

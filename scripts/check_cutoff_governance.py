@@ -82,7 +82,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         if node.name in DUPLICATE_TEMPORAL_FUNCTIONS and not self.relative.startswith(
-            "src/temporal_learning/"
+            "packages/beidan/inst/python/beidan_backend/temporal_learning/"
         ):
             self.hard_violations.append(
                 f"{self.relative}:{node.lineno}: duplicated temporal utility {node.name}"
@@ -202,7 +202,7 @@ class _OccurrenceVisitor(ast.NodeVisitor):
 def collect_occurrences(root: Path = ROOT) -> tuple[list[dict[str, Any]], list[str]]:
     occurrences: list[dict[str, Any]] = []
     hard: list[str] = []
-    for directory in (root / "src", root / "scripts"):
+    for directory in (root / "src", root / "scripts", root / "packages" / "beidan" / "inst" / "python" / "beidan_backend"):
         for path in sorted(directory.rglob("*.py")):
             relative = path.relative_to(root).as_posix()
             try:
@@ -293,7 +293,7 @@ def violations(root: Path = ROOT) -> list[str]:
         }
         if not required.issubset(header):
             found.append("temporal-function inventory lacks required columns")
-        if "src/temporal_learning/core.py" not in inventory.read_text(encoding="utf-8"):
+        if "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py" not in inventory.read_text(encoding="utf-8"):
             found.append("temporal-function inventory lacks shared core")
     return sorted(set(found))
 

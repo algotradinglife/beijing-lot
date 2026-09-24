@@ -9,6 +9,16 @@
     ]
   },
   "Packages": {
+    "checkmate": {
+      "Package": "checkmate",
+      "Version": "2.3.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Imports": [
+        "backports (>= 1.1.0)",
+        "utils"
+      ]
+    },
     "DBI": {
       "Package": "DBI",
       "Version": "1.3.0",

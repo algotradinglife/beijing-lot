@@ -30,8 +30,8 @@ from src.n7_support_transfer_grid.pipeline import (
 )
 from src.qeu_threshold_n7.pipeline import prepare_match_actions
 from src.source_schema.publication import atomic_publish_directory
-from src.temporal_learning import implementation_closure, verify_implementation_closure
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning import implementation_closure, verify_implementation_closure
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 from .contract import (
     ALLOWED_VERDICTS,
