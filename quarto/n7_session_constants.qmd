@@ -1,0 +1,80 @@
+---
+title: "N7 会话参数：读取、修改与恢复默认值"
+format: html
+execute:
+  error: false
+  cache: false
+  freeze: false
+---
+
+本次按用户要求为 `n7_pipeline_constants()` 增加当前 R 会话内的读写能力。
+不写配置文件；新 R 会话从默认值开始。计算仍显式接收参数快照，修改会话参数
+不会回写此前取出的列表。这里验证接口，不作历史拟合或收益结论。
+
+```{r}
+pkgload::load_all("../packages/beidan", quiet = TRUE)
+defaults <- n7_pipeline_constants(reset = TRUE)
+snapshot <- n7_pipeline_constants()
+updated <- n7_pipeline_constants(rho = -0.18, issue_budget_cny = 512)
+stopifnot(updated$rho == -0.18, updated$issue_budget_cny == 512,
+          snapshot$rho == -0.14, n7_pipeline_constants()$rho == -0.18)
+tibble::tibble(parameter = names(defaults),
+               default = unlist(defaults, use.names = FALSE),
+               current = unlist(updated, use.names = FALSE)) |>
+  knitr::kable()
+```
+
+写入采用先校验再整体更新：任何一个字段非法，所有字段都保持原值。
+不接受未知字段、无名或重复字段、缺失/非有限/非标量数值。
+`reset = TRUE` 与字段更新不能同时使用。
+
+```{r}
+before <- n7_pipeline_constants()
+failure <- tryCatch(n7_pipeline_constants(rho = -0.12, unit_cny = 0),
+                    error = identity)
+stopifnot(inherits(failure, "error"), identical(before, n7_pipeline_constants()))
+restored <- n7_pipeline_constants(reset = TRUE)
+stopifnot(identical(restored, defaults))
+tibble::tibble(check = c("非法更新原子拒绝", "恢复默认值"), passed = TRUE) |>
+  knitr::kable()
+```
+
+日常使用时，在包目录运行 `devtools::load_all(".")`，随后
+`constants <- n7_pipeline_constants(rho = -0.18)`。
+`constants` 是返回值快照；单独调用 setter 不会自动更新调用者已有的变量。
+七场结构仍固定为 7；该接口不把 N7 算法推广为任意场数算法。
+开发时重新执行 `devtools::load_all(".")` 会重新加载包并恢复默认值；请在加载后
+执行本次需要的参数更新。`rho` 沿用现有模型校验范围，SP 阈值须大于 1。
+
+## 验收记录
+
+对应测试覆盖默认读取、部分更新、重置、非法值与失败原子性、快照独立性和新进程隔离。
+实现位于 `packages/beidan/R/n7_pipeline_contracts.R`；测试与帮助文档随实现更新。
+默认不参与 CI。
+
+
+### 最终验证与审阅
+
+- session 专项 203 条断言，contracts 专项 516 条断言；均零失败、零警告、零跳过。
+- 独立进程验收验证写入、快照隔离、失败原子性及新进程默认值；全部通过。包重载恢复默认值已通过 pkgload 实测。
+- QMD 干净执行成功，2 张结果表、无执行错误。
+- `codex review --uncommitted`：无可操作问题。审阅进程缺少 R 库路径，未重复运行测试；上述运行验证由控制侧显式设置项目 R 库完成。
+- dsh 实现初稿；监督代理修复标量类型、下游边界、测试清理和文档。dsh 自行扩大的 value 测试被停止，没有完整结果，不计为通过。
+
+复现（从仓库根目录，R 库由环境预先配置）：
+
+```sh
+Rscript --vanilla -e 'pkgload::load_all("packages/beidan"); testthat::test_file("packages/beidan/tests/testthat/test-session-constants.R"); testthat::test_file("packages/beidan/tests/testthat/test-n7-pipeline-contracts.R")'
+quarto render quarto/n7_session_constants.qmd --no-cache --execute
+```
+
+审阅文件 SHA-256（本节为审阅后附加的验证记录）：
+
+| 文件 | SHA-256 |
+|---|---|
+| `packages/beidan/R/n7_pipeline_contracts.R` | `23369d336f8490c730c4f2afdd554cfd712173abeb03b5a73b02c9cc4ba48bb5` |
+| `packages/beidan/man/n7_pipeline_constants.Rd` | `d452e6d81df612ab8fc955970159de16f6febf0978da659cc1e56534b3b95980` |
+| `packages/beidan/man/n7_legs.Rd` | `c7cfc27b94f6456b91a1e9dbf6e6bce03db00777b9119967bff280953e4f9c92` |
+| `packages/beidan/tests/testthat/test-n7-pipeline-contracts.R` | `1e6af730fa9bddb839bd8be3a14e09b09882bf15c3078d6f0c48734b231d1fe7` |
+| `packages/beidan/tests/testthat/test-session-constants.R` | `04297bf0171ce585719c1e069ea5380290ca552741873fe1f1c27726be9f4865` |
+| QMD 正文（不含本节） | `d1f7e7271ed444a56ebd1cef740f730e3cc6ec012d761ab9b48c81e8fe49918c` |
