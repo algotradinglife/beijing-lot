@@ -480,7 +480,8 @@ testthat::test_that('n7_cutoff_utc 返回单个 UTC 时刻并继承全部校验'
 })
 
 testthat::test_that('n7_pipeline_constants 的键集合与取值恰如合同冻结值', {
-  constants <- n7_pipeline_constants()
+  # 本文件只保证默认值；会话读写契约在 test-session-constants.R 里逐条覆盖。
+  constants <- n7_pipeline_constants(reset = TRUE)
   testthat::expect_type(constants, 'list')
   testthat::expect_setequal(
     names(constants),
@@ -495,11 +496,15 @@ testthat::test_that('n7_pipeline_constants 的键集合与取值恰如合同冻�
   testthat::expect_identical(constants$sp_replacement, 4.5)
 })
 
-testthat::test_that('n7_legs 恒等于常量与 N7_LEGS', {
+testthat::test_that('n7_legs 是固定结构常量，不随会话常量漂移', {
   testthat::expect_identical(n7_legs(), 7L)
   testthat::expect_type(n7_legs(), 'integer')
-  testthat::expect_identical(n7_legs(), n7_pipeline_constants()$n_legs)
   testthat::expect_identical(n7_legs(), N7_LEGS)
+  # 结构层与会话可变层解耦：更新会话常量后，n7_legs() 必须纹丝不动。
+  on.exit(n7_pipeline_constants(reset = TRUE), add = TRUE)
+  n7_pipeline_constants(rho = -0.3, issue_budget_cny = 99)
+  testthat::expect_identical(n7_legs(), 7L)
+  testthat::expect_identical(n7_legs(), n7_pipeline_constants()$n_legs)
 })
 
 
