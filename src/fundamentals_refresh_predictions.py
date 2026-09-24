@@ -2,7 +2,7 @@
 import hashlib,json
 from pathlib import Path
 import pandas as pd
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 from src.fundamentals_draw_versions import read_draw_version
 
 
@@ -73,7 +73,7 @@ def verify_refresh_predictions(study,*,repository_root):
     study=Path(study);contract=json.loads((study/'contract.json').read_text())
     features=json.loads((study/'test-features.json').read_text())
     keys=['issue_code','slot','provider_id'];identities=[[r[k] for k in keys] for r in features]
-    from src.temporal_learning import Cutoff
+    from beidan_backend.temporal_learning import Cutoff
     cuts=[Cutoff.decision_epoch(r['issue_code'],contract['cutoffs'][r['issue_code']][str(r['slot'])]).cutoff_ts.isoformat() for r in features]
     frozen=json.loads((study/'models-frozen.json').read_text())
     for name,h in frozen['files'].items():
@@ -150,7 +150,7 @@ def verify_refresh_input_snapshots(study, *, prior, experiment, clean_study):
     No fitting, model loading or writes.
     """
     from src.fundamentals_expert_refresh import read_refresh_features,attach_refresh_labels
-    from src.temporal_learning import Cutoff
+    from beidan_backend.temporal_learning import Cutoff
     study=Path(study);contract=json.loads((study/'contract.json').read_text())
     payload=json.loads((study/'input-receipt.json').read_text())
     if stable_json_hash(payload['receipt'])!=payload['seal']:raise ValueError('Input receipt changed')

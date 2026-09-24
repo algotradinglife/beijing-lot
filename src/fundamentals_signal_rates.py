@@ -6,15 +6,15 @@ The shared learning context owns admission, weights, ESS and provenance.
 from pathlib import Path
 from numbers import Real
 import math
-from src.temporal_learning.replay import prediction_scope,validate_model_chronology
+from beidan_backend.temporal_learning.replay import prediction_scope,validate_model_chronology
 
 import numpy as np
 import pandas as pd
 
-from src.temporal_learning import (AvailabilityFilter, AvailabilityPolicy, Cutoff,
+from beidan_backend.temporal_learning import (AvailabilityFilter, AvailabilityPolicy, Cutoff,
     PartitionPolicy, WeightingPolicy, prepare_learning_context, temporal_client)
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.predictor_clock import require_prior_predictor_clock,validate_training_predictor_clocks
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.predictor_clock import require_prior_predictor_clock,validate_training_predictor_clocks
 
 
 @temporal_client

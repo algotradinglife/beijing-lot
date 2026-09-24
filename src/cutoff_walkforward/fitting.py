@@ -8,7 +8,7 @@ from typing import Mapping
 import pandas as pd
 
 from src.cutoff_mapping.api import MappingResult, fit_cutoff_mapping
-from src.temporal_learning import AvailabilityPolicy, Cutoff, WeightingPolicy
+from beidan_backend.temporal_learning import AvailabilityPolicy, Cutoff, WeightingPolicy
 
 from .contract import (
     AVAILABILITY_POLICY,

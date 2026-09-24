@@ -6,9 +6,9 @@ import pandas as pd
 import pytest
 from src.conditional_score.model import (NUMERIC,grid_basis,tilt_scores,score_metrics,fit_remapper,predict_remapper)
 from src.conditional_score.runner import build_comparison_plan
-from src.temporal_learning.core import (Cutoff,AvailabilityPolicy,AvailabilityFilter,
+from beidan_backend.temporal_learning.core import (Cutoff,AvailabilityPolicy,AvailabilityFilter,
     WeightingPolicy,TemporalContractError)
-from src.temporal_learning.issue_partitions import (IssuePartitionPolicy as PartitionPolicy,
+from beidan_backend.temporal_learning.issue_partitions import (IssuePartitionPolicy as PartitionPolicy,
     prepare_issue_learning_context as prepare_learning_context)
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -153,7 +153,7 @@ def test_runner_end_to_end(sample,tmp_path):
     from unittest.mock import patch
     from importlib import metadata
     original_version=metadata.version
-    with patch("src.temporal_learning.provenance.metadata.version",
+    with patch("beidan_backend.temporal_learning.provenance.metadata.version",
                side_effect=lambda name: "different-version" if name=="numpy" else original_version(name)):
         with pytest.raises(TemporalContractError,match="implementation closure"):
             verify_experiment(out,identical,repository_root=ROOT)
@@ -203,7 +203,7 @@ def test_archive_contract(tmp_path):
 
 
 def test_model_cache_identity_and_fit_ess(sample):
-    from src.temporal_learning.issue_partitions import bind_model_receipt
+    from beidan_backend.temporal_learning.issue_partitions import bind_model_receipt
     f,p,b,h,a=sample
     cut=Cutoff.decision_epoch("000012","2010-01-13T00:00:00Z")
     k=kwargs(cut,"GLOBAL")

@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from src.fundamentals_cv_experts import cross_validate_experts
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 
 
 @pytest.mark.parametrize("expert_names", [("draw", "high"), ("draw",), ("high",)])
@@ -63,7 +63,7 @@ def test_cv_prior_windows_identity_purge_and_future_mutation(expert_names):
 
 
 def test_diagnostic_predictor_clocks_are_strict_and_not_availability():
-    from src.temporal_learning.predictor_clock import diagnostic_predictor_clock, require_prior_predictor_clock
+    from beidan_backend.temporal_learning.predictor_clock import diagnostic_predictor_clock, require_prior_predictor_clock
     cutoff = Cutoff.decision_epoch('100101','2010-01-02T12:00:00Z')
     x = diagnostic_predictor_clock(['2010-01-01'], ['2010-01-02T11:00:00Z'],
         cutoff=cutoff, timezone='Asia/Shanghai', source_hashes={'saved':'sha'})

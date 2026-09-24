@@ -5,7 +5,7 @@ import itertools
 import math
 import pandas as pd
 from src.fundamentals_n7_baseline import rank_double_candidates,settle_n7_baseline
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 
 def overlay_any_hit(components):

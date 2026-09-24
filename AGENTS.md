@@ -35,7 +35,7 @@
 - All R analysis tables must use `tibble`; manipulate them with tidyverse and appropriate related libraries.
 - Convert database, Python, and Rcpp tabular outputs to validated tibbles at the R boundary, including typed empty tables.
 - Follow tidy data: variables in columns, observations in rows, each type of observational unit in its own table.
-- Put R functions in `r/`, Python modules in `src/`, QMD in `quarto/`, and keep command entry points thin.
+- Put reusable package R functions in `packages/beidan/R/` and the bundled Python backend in `packages/beidan/inst/python/beidan_backend/`. Keep repository research clients in `r/` and `src/`, QMD in `quarto/`, and command entry points thin.
 - QMD declares inputs, organizes analysis, and presents results; extract reusable functions into modules.
 - Develop reusable functions in R, Python called through `reticulate`, or C++ exposed through `Rcpp` wrappers.
 - Keep reusable implementations outside QMD; use one authoritative implementation per business/storage contract.
@@ -85,7 +85,7 @@
 
 ## Tests and acceptance
 
-- Use `testthat` in `tests/testthat/` and `pytest` in the relevant `tests/` area.
+- Use `testthat` in `packages/beidan/tests/testthat/` for package functions and `tests/testthat/` for repository clients; use `pytest` in the relevant `tests/` area.
 - Map every project function to tests, including helpers and functions defined in QMD; untested existing functions remain gaps.
 - Add/update and run corresponding tests with each function change; bug fixes require regression tests.
 - Test observable behavior and contracts: normal inputs, relevant boundaries/missing/empty inputs, and failure paths.
@@ -140,7 +140,7 @@
 - Sparse recent evidence must fail closed or shrink to the frozen long-history prior.
 - Recent-state blends must equal `(1-alpha) * long_history + alpha * recent_state`, with both distributions normalized and component masses reconciled separately.
 - Multiplying recent rows within one global normalization is not an accepted blend.
-- All chronology machinery must come from `src/temporal_learning`, including R/QMD and imported-function usage.
+- All chronology machinery must come from `packages/beidan/inst/python/beidan_backend/temporal_learning`, including R/QMD and imported-function usage.
 - Research clients supply domain fit/predict/select callbacks only; do not copy cutoff, availability, partition, weighting, ESS, cache, receipt, runner, or replay utilities.
 - New direct historical fitting outside shared learning contexts and duplicated temporal helpers fail governance checks.
 - Replace/delete obsolete implementations without compatibility wrappers.

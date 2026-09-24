@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.optimize import milp,Bounds,LinearConstraint
 from src.fundamentals_n7_baseline import n7_baseline_plan,rank_double_candidates
 from src.fundamentals_n7_twocover import settle_n7_twocover
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 
 def next_overlap_group(frame, existing_groups, *, cutoffs, max_uses, max_pair_overlap):

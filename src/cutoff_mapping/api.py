@@ -13,7 +13,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter,
     AvailabilityPolicy,
     Cutoff,
@@ -25,7 +25,7 @@ from src.temporal_learning import (
     temporal_client,
     verify_implementation_closure,
 )
-from src.temporal_learning.core import stable_frame_hash, stable_json_hash, utc
+from beidan_backend.temporal_learning.core import stable_frame_hash, stable_json_hash, utc
 
 from .contract import (
     CONTRACT_ID,

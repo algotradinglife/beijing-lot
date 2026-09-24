@@ -7,15 +7,15 @@ import hashlib
 import json
 import pickle
 import warnings
-from src.temporal_learning.replay import prediction_scope, HistoricalReplayWarning
+from beidan_backend.temporal_learning.replay import prediction_scope, HistoricalReplayWarning
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src.fundamentals_retrained_experts import predict_experts
 from src.fundamentals_signal_rates import predict_signal_rates, validate_draw_weight
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.provenance import implementation_closure, verify_implementation_closure
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.provenance import implementation_closure, verify_implementation_closure
 
 
 CALIBRATED_DRAW_VERSION = '1.1.0'

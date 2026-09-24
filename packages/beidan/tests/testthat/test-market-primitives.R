@@ -1,0 +1,30 @@
+testthat::test_that('fixed goal-mean changes respect both relative limits', {
+  testthat::expect_equal(bounded_market_lambdas(c(2,1), c(10,.1), 1, .2), c(2.4,.8))
+  testthat::expect_equal(bounded_market_lambdas(c(2,1), c(10,.1), 0, .2), c(2,1))
+  testthat::expect_equal(bounded_market_lambdas(c(2,1), c(10,.1), 1, 0), c(2,1))
+  testthat::expect_error(bounded_market_lambdas(c(NA,1), c(2,1), .1, .2), 'Positive paired')
+  testthat::expect_error(bounded_market_lambdas(c(2,1), c(2,1), NA, .2), 'Invalid correction')
+  testthat::expect_error(bounded_market_lambdas(c(2,1), c(2,1), .1, 1), 'Invalid correction')
+})
+
+testthat::test_that('Asian total inversion recovers an analytically known mean', {
+  zero <- exp(-2)
+  testthat::expect_equal(asian_total_probability(2, .5), 1-zero)
+  testthat::expect_equal(asian_total_probability(2, .25), (1-zero)/(1-zero+.5*zero))
+  quote <- tibble::tibble(company='c', line=.5, over_hk=1/(1-zero)-1, under_hk=1/zero-1)
+  result <- total_market_constraint(quote, c(.1,10))
+  testthat::expect_equal(result$lambda_total, 2, tolerance=1e-8)
+  testthat::expect_s3_class(result$companies, 'tbl_df')
+  testthat::expect_error(total_market_constraint(dplyr::bind_rows(quote,quote), c(.1,10)), 'Invalid OU')
+})
+
+testthat::test_that('symmetric independent scoring has symmetric ordinary outcomes', {
+  projection <- market_score_projection(c(1,1), -1, 1e-10, 0)
+  testthat::expect_equal(projection$fields$ordinary_W, projection$fields$ordinary_L)
+  testthat::expect_lt(projection$fields$W, projection$fields$ordinary_W)
+  testthat::expect_equal(sum(projection$grid$probability), 1, tolerance=1e-9)
+  draw <- sum(stats::dpois(0:30,1)^2)
+  fitted <- total_constrained_projection(2, c((1-draw)/2, draw, (1-draw)/2), 0, 1e-10, 0)
+  testthat::expect_equal(fitted$fields$lambda_home, 1, tolerance=1e-6)
+  testthat::expect_lt(fitted$fields$market_residual, 1e-7)
+})

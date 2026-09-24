@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 
 from src.fundamentals_signal_rates import fit_signal_rates, predict_signal_rates
-from src.temporal_learning import (AvailabilityFilter, AvailabilityPolicy, Cutoff,
+from beidan_backend.temporal_learning import (AvailabilityFilter, AvailabilityPolicy, Cutoff,
     PartitionPolicy, WeightingPolicy, WalkForwardRunner, prepare_learning_context,
     temporal_client)
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 
 @temporal_client

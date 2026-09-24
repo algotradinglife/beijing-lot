@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from src.fundamentals_expert_refresh import attach_refresh_labels
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--study',required=True);a=p.parse_args();study=Path(a.study)
  for name in ['training-data.json','training-exclusions.json']:

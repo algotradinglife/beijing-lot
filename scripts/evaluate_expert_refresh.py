@@ -3,9 +3,9 @@ import argparse, copy, hashlib, json, sys
 from pathlib import Path
 import pandas as pd
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning.provenance import implementation_closure
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.provenance import implementation_closure
 from src.fundamentals_draw_versions import predict_draw_version
 from src.fundamentals_refresh_predictions import save_refresh_prediction,freeze_refresh_report_inputs,bind_legacy_catalog_roots,frozen_candidate_files
 

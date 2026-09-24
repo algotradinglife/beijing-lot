@@ -1,0 +1,8 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^inst/python/.*__pycache__.*$
+^inst/python/.*\.pyc$
+^inst/python/.*\.egg-info.*$
+^tests/python/__pycache__$
+^tests/python/\.pytest_cache$
+^inst/python/build$

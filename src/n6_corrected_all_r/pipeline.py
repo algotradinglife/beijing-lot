@@ -509,7 +509,7 @@ def _implementation_hashes() -> dict[str, str]:
         "contract.py": sha256_file(Path(__file__).with_name("contract.py")),
         "pipeline.py": sha256_file(Path(__file__)),
         "cutoff_mapping/api.py": sha256_file(repo_src / "cutoff_mapping/api.py"),
-        "temporal_learning/core.py": sha256_file(repo_src / "temporal_learning/core.py"),
+        "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py": sha256_file(repo_src.parent / "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py"),
     }
 
 

@@ -4,8 +4,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from src.fundamentals_expert_refresh import read_refresh_features,attach_refresh_labels,calibration_rows
-from src.temporal_learning import Cutoff
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.core import stable_json_hash
 
 
 def test_attach_labels_identity_completion_clocks_and_empty():
@@ -93,7 +93,7 @@ def test_snapshot_split_is_label_free_and_hash_bound(tmp_path):
 
 def test_clock_repair_preserves_inputs_and_rejects_drift(tmp_path):
     from src.fundamentals_expert_refresh import repair_refresh_training_clocks
-    from src.temporal_learning.predictor_clock import diagnostic_predictor_clock
+    from beidan_backend.temporal_learning.predictor_clock import diagnostic_predictor_clock
     root=tmp_path;study=root/'old';study.mkdir();raw=root/'source.json';raw.write_text('source')
     sources={'source.json':hashlib.sha256(raw.read_bytes()).hexdigest()}
     c=dict(cutoff_issue='002',cutoff_ts='2010-01-03T00:00:00Z')

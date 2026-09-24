@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter, AvailabilityPolicy, Cutoff, PartitionPolicy,
     TemporalContractError, WeightingPolicy, prepare_learning_context,
 )
@@ -21,7 +21,7 @@ def test_fixed_prior_fit_excludes_target_future_and_preserves_empty_splits():
     kwargs = dict(
         cutoff=Cutoff.decision_epoch("100105", "2010-01-12T15:01:00Z"),
         source_hashes={"fixture": "test"}, repository_root=Path(__file__).resolve().parents[2],
-        implementation_modules=("src.temporal_learning.core",),
+        implementation_modules=("beidan_backend.temporal_learning.core",),
         availability=AvailabilityFilter(AvailabilityPolicy.historical_proxy("TEST")),
         intended_use="HISTORICAL_DIAGNOSTIC",
         partition_policy=PartitionPolicy("FIXED_PRIOR_FIT", 0, 0, 1),

@@ -5,13 +5,13 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import brier_score_loss
 from src.fundamentals_retrained_experts import fit_experts, predict_experts
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter, AvailabilityPolicy, PartitionPolicy, WeightingPolicy,
     WalkForwardRunner, prepare_learning_context, temporal_client,
 )
-from src.temporal_learning.core import stable_json_hash
-from src.temporal_learning import Cutoff
-from src.temporal_learning.predictor_clock import require_prior_predictor_clock
+from beidan_backend.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning import Cutoff
+from beidan_backend.temporal_learning.predictor_clock import require_prior_predictor_clock
 
 
 @temporal_client

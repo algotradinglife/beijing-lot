@@ -6,9 +6,14 @@ import sys
 from pathlib import Path
 
 # The parent chooses the frozen runtime; never inherit another version's src.
-sys.path.insert(0,str(Path.cwd()))
+runtime = Path.cwd().resolve()
+backend_root = runtime / 'packages/beidan/inst/python'
+if not (backend_root / 'beidan_backend/__init__.py').is_file():
+    raise ValueError('Frozen runtime is missing the bundled Python backend')
+sys.path.insert(0,str(runtime))
+sys.path.insert(0,str(backend_root))
 import pandas as pd
-from src.temporal_learning import Cutoff
+from beidan_backend.temporal_learning import Cutoff
 
 if __name__=='__main__':
     request=json.load(sys.stdin);entry=request['entry'];root=Path(request['root'])
@@ -21,8 +26,9 @@ if __name__=='__main__':
     else:
         from src.fundamentals_retrained_experts import predict_frozen_file,predict_experts
     for name,module in list(sys.modules.items()):
-        if name=='src' or name.startswith('src.'):
-            if not getattr(module,'__file__',None) or not Path(module.__file__).resolve().is_relative_to(Path.cwd()/'src'):
+        if name=='src' or name.startswith('src.') or name=='beidan_backend' or name.startswith('beidan_backend.'):
+            expected_root = backend_root / 'beidan_backend' if name.startswith('beidan_backend') else runtime / 'src'
+            if not getattr(module,'__file__',None) or not Path(module.__file__).resolve().is_relative_to(expected_root):
                 raise ValueError('Imported implementation escaped the frozen runtime: '+name)
     for record,decision in zip(request['records'],request['decisions']):
         cutoff=Cutoff.decision_epoch(record['issue_code'],decision)
@@ -47,8 +53,9 @@ if __name__=='__main__':
         rows.extend(json.loads(result.to_json(orient='records',double_precision=15)))
     imported={}
     for name,module in list(sys.modules.items()):
-        if name=='src' or name.startswith('src.'):
-            if not getattr(module,'__file__',None) or not Path(module.__file__).resolve().is_relative_to(Path.cwd()/'src'):
+        if name=='src' or name.startswith('src.') or name=='beidan_backend' or name.startswith('beidan_backend.'):
+            expected_root = backend_root / 'beidan_backend' if name.startswith('beidan_backend') else runtime / 'src'
+            if not getattr(module,'__file__',None) or not Path(module.__file__).resolve().is_relative_to(expected_root):
                 raise ValueError('Imported implementation escaped the frozen runtime: '+name)
             path=Path(module.__file__).resolve()
             imported[str(path)]=hashlib.sha256(path.read_bytes()).hexdigest()

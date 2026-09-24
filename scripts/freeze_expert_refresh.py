@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime,timezone
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from src.fundamentals_calibrated_draw import load_calibrated_draw
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--study',required=True);a=p.parse_args();study=Path(a.study).resolve()
  if (study/'test-labels.json').exists():raise ValueError('Freeze must precede test label collection')

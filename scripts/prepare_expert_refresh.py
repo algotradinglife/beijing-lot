@@ -3,7 +3,7 @@ import argparse,json,sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from src.fundamentals_expert_refresh import read_refresh_features,repair_refresh_training_clocks
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 if __name__=='__main__':
  p=argparse.ArgumentParser()
  for name in ['prior','experiment','clean-study','output']:p.add_argument('--'+name,required=name=='output')

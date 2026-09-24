@@ -26,21 +26,7 @@ execute:
 root <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
 if (!grepl("beijing-lot$", root)) root <- normalizePath(".")
 
-for (module in c("probability_exploration.R", "dixon_coles_grid.R",
-                 "fundamentals_score_shape.R", "fundamentals_total_market.R",
-                 "fundamentals_market_comparison.R")) {
-  path <- file.path(root, "r", module)
-  if (file.exists(path)) source(path)
-}
-source(file.path(root, "r", "n7_experiment_contract.R"))
-# n7_pipeline_types.R must load before n7_pipeline_value.R: the value layer boxes
-# domain rows and tables into the S7 types declared there.
-for (module in c("n7_pipeline_contracts.R", "n7_pipeline_inputs.R",
-                 "n7_pipeline_fixture.R", "n7_pipeline_epoch.R",
-                 "n7_pipeline_candidates.R", "n7_pipeline_types.R",
-                 "n7_pipeline_value.R")) {
-  source(file.path(root, "r", module))
-}
+library(beidan)
 suppressMessages({library(tibble); library(dplyr); library(tidyr)})
 
 CONSTANTS <- n7_pipeline_constants()
@@ -118,7 +104,7 @@ tibble::tibble(
 ```{r epoch-prepare}
 #| label: epoch-prepare
 EPOCH <- n7_prepare_epoch(
-  inputs, CUTOFF, N7_DECISION_TZ,
+  inputs, CUTOFF, "Asia/Shanghai",
   euro_policy = list(members = c("c01", "c02", "c03"), missing = "error"),
   totals_policy = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
 
@@ -361,7 +347,7 @@ build_epoch <- function(issue_id, decision_date, seed, n_fixtures = 56L) {
   fixture <- n7_make_fixture_issue(issue_id, decision_date, n_fixtures = n_fixtures,
                                    seed = seed, kickoff_hour = 9L)
   raw <- n7_read_inputs(n7_fixture_source(fixture), issue_id, cutoff)
-  prepared <- n7_prepare_epoch(raw, cutoff, N7_DECISION_TZ,
+  prepared <- n7_prepare_epoch(raw, cutoff, "Asia/Shanghai",
                                list(members = c("c01", "c02", "c03"), missing = "error"),
                                list(companies = NULL, line = "nearest_main",
                                     watermark = "decimal"))
@@ -412,14 +398,14 @@ test_files <- c("test-n7-pipeline-contracts.R", "test-n7-pipeline-epoch.R",
                 "test-n7-pipeline-value.R")
 tibble::tibble(
   测试文件 = test_files,
-  测试块 = vapply(file.path(root, "tests", "testthat", test_files), count_blocks, integer(1))) |>
+  测试块 = vapply(file.path(root, "packages", "beidan", "tests", "testthat", test_files), count_blocks, integer(1))) |>
   knitr::kable(caption = "R 测试：每个项目函数都有对应行为测试")
 ```
 
 运行：
 
 ```bash
-R_LIBS=$PWD/r_lib Rscript tests/testthat.R
+BEIDAN_TEST_PYTHON=/absolute/path/to/python R CMD check --no-manual beidan_0.1.0.tar.gz
 ```
 
 关键回归覆盖：空输入、少于 7 场、概率不合法、缺大小球、缺赛前 SP、SP = 10 与 > 10、
@@ -448,7 +434,7 @@ R_LIBS=$PWD/r_lib Rscript tests/testthat.R
 ### 9.1 参数判定基线
 
 `checkmate` 的默认判定**比表面看起来宽松**，直接使用会在边界上静默放行。以下四条是
-实测结论，已写入 `r/n7_pipeline_contracts.R` 的 `@section 参数判定规范`：
+实测结论，已写入 `packages/beidan/R/n7_pipeline_contracts.R` 的 `@section 参数判定规范`：
 
 | 断言 | 默认行为 | 必须显式补充 |
 |---|---|---|
@@ -531,7 +517,7 @@ unit_caps = c(96L))` 配两个 pattern 会静默返回成功并**关闭 issue �
 ## 十一、codex review 记录
 
 下表保留此前评审与修复记录；本轮独立收尾结果见末节，历史评审不替代最终修订核验。
-被评审的文件以 SHA-256 记录如下，PI 可在合入前据此核对最终产物。
+以下路径和 SHA-256 属于迁包前 #500 的历史快照，不能用于验证当前包源码。#504 的迁移后检查与审阅证据见 `beidan_package.qmd`。
 
 ```bash
 CODEX_HOME=$PWD/.tmpwork/codexhome \

@@ -14,7 +14,7 @@ from src.cutoff_hardening.package import (
     sha256_file,
     verify_package,
 )
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter,
     AvailabilityPolicy,
     Cutoff,

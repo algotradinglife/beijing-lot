@@ -12,7 +12,7 @@ import pandas as pd
 
 from src.low_n_selector_data.pipeline import _input_panel, locate_data_root
 from src.source_schema.publication import atomic_publish_directory
-from src.temporal_learning import AvailabilityPolicy, Cutoff, WeightingPolicy
+from beidan_backend.temporal_learning import AvailabilityPolicy, Cutoff, WeightingPolicy
 
 from .api import (
     CutoffContractError,
@@ -246,10 +246,10 @@ def build_package(
                 "contract.py": sha256_file(Path(__file__).with_name("contract.py")),
                 "package.py": sha256_file(Path(__file__)),
                 "temporal_learning/core.py": sha256_file(
-                    repo_root / "src/temporal_learning/core.py"
+                    repo_root / "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py"
                 ),
                 "temporal_learning/example_selector.py": sha256_file(
-                    repo_root / "src/temporal_learning/example_selector.py"
+                    repo_root / "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py"
                 ),
             },
             "deliveries": {
@@ -285,10 +285,10 @@ def verify_package(
         "contract.py": sha256_file(Path(__file__).with_name("contract.py")),
         "package.py": sha256_file(Path(__file__)),
         "temporal_learning/core.py": sha256_file(
-            repo_root / "src/temporal_learning/core.py"
+            repo_root / "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py"
         ),
         "temporal_learning/example_selector.py": sha256_file(
-            repo_root / "src/temporal_learning/example_selector.py"
+            repo_root / "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py"
         ),
     }
     if manifest.get("implementation") != expected_implementation:

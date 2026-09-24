@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 from src.fundamentals_n7_single import settle_n7_single
-from src.temporal_learning.provenance import verify_implementation_closure
+from beidan_backend.temporal_learning.provenance import verify_implementation_closure
 
 
 def verify_experiment(output, replay, *, repository_root):

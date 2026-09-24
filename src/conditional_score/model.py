@@ -8,7 +8,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from src.temporal_learning.core import (Cutoff, AvailabilityPolicy, AvailabilityFilter,
+from beidan_backend.temporal_learning.core import (Cutoff, AvailabilityPolicy, AvailabilityFilter,
     PartitionPolicy, WeightingPolicy, temporal_client,
     stable_json_hash, TemporalContractError)
 
@@ -24,7 +24,7 @@ NUMERIC = (
 MODEL_VERSION = "422-score-remap-0.1.1"
 
 # Domain clients retain the standard context call; issue partitioning is shared.
-from src.temporal_learning.issue_partitions import (
+from beidan_backend.temporal_learning.issue_partitions import (
     prepare_issue_learning_context as prepare_learning_context, bind_model_receipt)
 
 

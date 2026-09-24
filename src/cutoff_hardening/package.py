@@ -17,7 +17,7 @@ import pandas as pd
 from scripts.check_cutoff_governance import violations
 from src.cutoff_mapping.package import scientific_frames as mapping_frames
 from src.source_schema.publication import atomic_publish_directory
-from src.temporal_learning import (
+from beidan_backend.temporal_learning import (
     AvailabilityFilter,
     AvailabilityPolicy,
     Cutoff,
@@ -25,8 +25,8 @@ from src.temporal_learning import (
     implementation_closure,
     prepare_learning_context,
 )
-from src.temporal_learning.core import stable_frame_hash
-from src.temporal_learning.example_selector import select_cutoff_threshold
+from beidan_backend.temporal_learning.core import stable_frame_hash
+from beidan_backend.temporal_learning.example_selector import select_cutoff_threshold
 
 from .contract import CONTRACT_ID, NOTEBOOK_PATH, REPORT_PATH, RESULT_PACKAGE
 
@@ -213,7 +213,7 @@ def scientific_frames(repo_root: Path, data_root: Path | None = None) -> dict[st
     required_closure = {
         "src/cutoff_mapping/contract.py",
         "src/low_n_selector_data/pipeline.py",
-        "src/temporal_learning/core.py",
+        "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py",
     }
     decision = {
         "contract": CONTRACT_ID,

@@ -3,7 +3,7 @@ import argparse,hashlib,json,sys
 from pathlib import Path
 import pandas as pd
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from src.temporal_learning.core import stable_json_hash
+from beidan_backend.temporal_learning.core import stable_json_hash
 from src.fundamentals_refresh_predictions import save_refresh_prediction,refresh_input_hash,verify_refresh_predictions,freeze_refresh_report_inputs
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--output',required=True);a=p.parse_args();s=Path(a.output);s.mkdir()
