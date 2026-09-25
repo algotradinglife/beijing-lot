@@ -33,7 +33,7 @@ schedule_file <- file.path(work_dir, "schedule.rds")
 market_dir <- file.path(work_dir, "market_inputs")
 markets_file <- file.path(work_dir, "markets.rds")
 refresh_markets <- FALSE
-market_slots <- 39L # 先以一场跑通；核对后改为所需场号。
+market_slots <- c(81L, 82L, 84L, 85L, 87L, 90L, 91L, 96L, 98L) # 已实采的9场9/27比赛。
 totals_company_ids <- "8" # Titan 大小球公司8：Bet365；不是欧赔公司ID。
 settlements_file <- file.path(work_dir, "settlements.rds")
 
@@ -48,7 +48,7 @@ schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
 # 直接填写北京时间；这是待核对的回放示例，不代表数据已满足该时点。
 # 之后采集的数据不能冒充当时已经可见的历史快照。
 decision_at <- lubridate::ymd_hms(
-  "2026-09-25 20:00:00", tz = "Asia/Shanghai"
+  "2026-09-26 20:00:00", tz = "Asia/Shanghai"
 )
 
 # 先测试决策流程；拿到真实结算数据后，再填写复盘时点。
@@ -201,7 +201,7 @@ if (!is.null(identity_result)) {
 
 使用赛程的 `provider_id_nowscore` 访问 Titan。函数核对 Titan 的原生比赛 ID、双方名称和开赛时间；不匹配的场次在 `coverage` 显示错误。欧赔保存各公司带时间戳的历史报价，平均由第6节固定成员规则计算。大小球从 Titan 手机历史接口读取完整年月日时间，香港盘水位加1转为十进制赔率。公司 ID 的欧赔与大小球命名空间不同，不能直接互换。
 
-`market_slots` 控制采集场次；默认先试第39场。将 `refresh_markets <- TRUE` 后执行本块联网采集，成功后改回 `FALSE` 重用快照。采集时间和源报价时间分别保存；历史报价允许用于注明口径的研究，不声称本地当时已观测。北单赛前SP缺失保持空表。
+`market_slots` 控制采集场次；默认使用已实采的9场9月27日比赛（83场身份不一致，保留排除记录）。将 `refresh_markets <- TRUE` 后执行本块联网采集，成功后改回 `FALSE` 重用快照。采集时间和源报价时间分别保存；历史报价允许用于注明口径的研究，不声称本地当时已观测。北单赛前SP缺失保持空表。
 
 ```{r}
 #| label: market-source
@@ -242,7 +242,7 @@ if (!is.null(schedule)) {
 ```{r}
 #| label: prepare-decision
 epoch <- NULL
-euro_members <- character() # 核对真实公司ID后，在此填写参与平均的至少两家公司。
+euro_members <- c("281", "115", "82", "177", "432") # Bet365、William Hill、Ladbrokes、Pinnacle、HKJC；固定5家。
 if (!is.null(inputs)) print(sort(unique(inputs$euro$company_id)))
 if (!is.null(inputs) && !is.null(decision_at) && length(euro_members) >= 2L) {
   market_policy <- list(
@@ -262,7 +262,7 @@ if (!is.null(inputs) && !is.null(decision_at) && length(euro_members) >= 2L) {
 ```{r}
 #| label: probabilities
 projected <- NULL
-if (!is.null(epoch)) {
+if (!is.null(epoch) && nrow(epoch$fixtures) > 0L) {
   projected <- beidan::estimate_match_probabilities(epoch, model_config)
   knitr::kable(projected$probabilities)
 } else cat("未执行概率计算：先完成步骤6。\n")
@@ -282,7 +282,7 @@ strategy_config <- list(
   ranking = "probability_desc", budget_cny = 160,
   max_reuse = 1L, max_overlap = 6L, seed = 1L, unit_cap = 80L
 )
-if (!is.null(projected)) {
+if (!is.null(projected) && nrow(projected$fixtures) >= settings$n_legs) {
   result <- beidan::parlay_build_plan(projected, strategy_config)
   knitr::kable(result$plan$group_legs)
   knitr::kable(result$funded$purchases)
@@ -316,11 +316,25 @@ if (!is.null(result) && !is.null(settlements) && !is.null(settlement_at)) {
 
 ```{r}
 #| label: progress
+schedule_count <- if (is.null(schedule)) 0L else nrow(schedule)
+market_count <- if (is.null(markets)) 0L else sum(markets$coverage$status == "ok")
+admitted_count <- if (is.null(epoch)) 0L else nrow(epoch$fixtures)
+probability_count <- if (is.null(projected)) 0L else nrow(projected$probabilities)
+purchase_count <- if (is.null(result)) 0L else nrow(result$funded$purchases)
+settled_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status != "PENDING")
+pending_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status == "PENDING")
+diagnostic_count <- if (is.null(diagnosis)) 0L else sum(diagnosis$status != "PENDING")
 knitr::kable(tibble::tibble(
-  stage = c("赛程", "市场输入", "决策准备", "概率", "计划", "结算"),
-  ready = c(!is.null(schedule), !is.null(inputs), !is.null(epoch),
-            !is.null(projected), !is.null(result), !is.null(settled))
+  stage = c("赛程", "两市场采集", "决策准入场数", "概率行数", "购买票数", "已结算票数", "待结算票数", "可用诊断行数"),
+  count = c(schedule_count, market_count, admitted_count, probability_count,
+            purchase_count, settled_count, pending_count, diagnostic_count)
 ))
+if (!is.null(decision_at) && decision_at > Sys.time()) {
+  cat("当前为决策前预备诊断，尚未到正式决策时点，不表示计划已经正式冻结。\n")
+}
+if (!purchase_count || !settled_count || pending_count > 0L || !diagnostic_count) {
+  cat("尚未完成真实结算全流程；零张票、全部pending或空诊断均不算完成。\n")
+}
 ```
 
 ## 用户报错复盘

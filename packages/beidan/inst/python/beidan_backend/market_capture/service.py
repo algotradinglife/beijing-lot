@@ -100,6 +100,7 @@ def parse_markets(fixture: dict, euro_body: bytes, totals_bodies: dict[str, byte
                     over_decimal=row.odds["over"]+1, under_decimal=row.odds["under"]+1,
                     source_url=over_under_history_url(pid,int(company_id),kickoff)))
         diagnostics.extend(dict(market="totals",company_id=company_id,reason=k,count=v) for k,v in counts.items())
+    diagnostics = [dict(fixture_id=fixture["fixture_id"], **row) for row in diagnostics]
     return dict(euro=euro, totals=totals, companies=companies, diagnostics=diagnostics,
                 identity={**identity,"kickoff_at":identity["kickoff_at"].isoformat()})
 
@@ -124,7 +125,7 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
         raise ValueError("Duplicate fixture/provider IDs")
     directory = Path(raw_dir) / str(uuid.uuid4())
     directory.mkdir(parents=True,exist_ok=False)
-    result = dict(euro=[],totals=[],companies=[],diagnostics=[],coverage=[],captures=[])
+    result = dict(euro=[],totals=[],companies=[],diagnostics=[],coverage=[],captures=[],identities=[])
     last_request = None
     for fixture in fixtures:
         pid = fixture['provider_id_nowscore']
@@ -136,8 +137,10 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
                 if pages is None:
                     if last_request is not None:
                         time.sleep(max(0,1-(time.monotonic()-last_request)))
-                    last_request=time.monotonic()
-                    response=fetch_issue_page(url,timeout=timeout,retries=retries,backoff_sec=1)
+                    try:
+                        response=fetch_issue_page(url,timeout=timeout,retries=retries,backoff_sec=1)
+                    finally:
+                        last_request=time.monotonic()
                     body, observed = response.body, response.observed_at
                 else:
                     page=pages[url]
@@ -156,6 +159,7 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
                     sha256=hashlib.sha256(body).hexdigest()))
                 bodies[market]=body
             parsed=parse_markets(fixture,bodies['euro'],{c:bodies[f'total_{c}'] for c in totals_company_ids})
+            result['identities'].append(dict(fixture))
             for key in ('euro','totals','companies','diagnostics'):
                 result[key].extend(parsed[key])
             result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='ok',detail='',

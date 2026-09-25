@@ -53,6 +53,8 @@ def test_replay_preserves_original_observation_and_repeat_runs(tmp_path,fixture,
     assert a['euro']==b['euro']
     assert a['receipt_path']!=b['receipt_path']
     assert all(Path(c['raw_path']).read_bytes()==pages[c['source_url']]['body'] for c in a['captures'])
+    assert a['identities']==[fixture]
+    assert all(row['fixture_id']==fixture['fixture_id'] for row in a['diagnostics'])
     assert len(a['captures'])==2
     assert '2026-09-26' in a['captures'][0]['observed_at']
 
@@ -84,12 +86,14 @@ def test_live_orchestration_uses_bounded_fetch_and_spacing(tmp_path,fixture,page
     from types import SimpleNamespace
     calls=[]
     sleeps=[]
+    clock=[10.0]
     def fake_fetch(url,**kwargs):
         calls.append((url,kwargs))
+        clock[0] += 1.01  # one internal retry plus response time
         return SimpleNamespace(body=pages[url]['body'],observed_at=pages[url]['observed_at'])
     monkeypatch.setattr(service,'fetch_issue_page',fake_fetch)
     monkeypatch.setattr(service.time,'sleep',sleeps.append)
-    monkeypatch.setattr(service.time,'monotonic',lambda:10)
+    monkeypatch.setattr(service.time,'monotonic',lambda:clock[0])
     result=fetch_markets([fixture],str(tmp_path),['8'],timeout=7,retries=1)
     assert result['coverage'][0]['status']=='ok'
     assert len(calls)==2

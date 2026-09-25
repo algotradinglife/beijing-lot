@@ -53,13 +53,15 @@ fetch_match_markets <- function(schedule, raw_dir, backend,
   }
   templates <- list(
     companies = tibble::tibble(market = character(), company_id = character(), company_name = character()),
-    diagnostics = tibble::tibble(market = character(), company_id = character(), reason = character(), count = integer()),
+    diagnostics = tibble::tibble(fixture_id = character(), market = character(), company_id = character(), reason = character(), count = integer()),
     coverage = tibble::tibble(fixture_id = character(), status = character(), detail = character(), euro_rows = integer(), totals_rows = integer()),
+    identities = tibble::tibble(fixture_id = character(), provider_id_nowscore = character(), home_nowscore = character(), away_nowscore = character(), kickoff_at = character()),
     captures = tibble::tibble(fixture_id = character(), market = character(), source_url = character(), observed_at = character(), raw_path = character(), sha256 = character())
   )
   for (table in names(templates)) {
     result[[table]] <- if (length(result[[table]])) dplyr::bind_rows(result[[table]]) else templates[[table]]
   }
+  result$identities$kickoff_at <- issue_schedule_timestamp(result$identities$kickoff_at, "kickoff_at")
   result$captures$observed_at <- issue_schedule_timestamp(result$captures$observed_at, "observed_at")
   result$companies <- dplyr::distinct(result$companies)
   return(result)
@@ -79,6 +81,19 @@ fetch_match_markets <- function(schedule, raw_dir, backend,
 match_inputs_from_capture <- function(schedule, markets) {
   if (!tibble::is_tibble(schedule)) stop("schedule must be a tibble")
   checkmate::assert_list(markets)
+  if (is.null(markets$identities)) stop("markets lacks captured identity; replay raw capture")
+  identity <- markets$identities
+  idx <- match(identity$fixture_id, schedule$fixture_key)
+  if (anyNA(idx) || anyDuplicated(identity$fixture_id) ||
+      !all(identity$provider_id_nowscore == schedule$provider_id_nowscore[idx]) ||
+      !all(identity$home_nowscore == schedule$home_nowscore[idx]) ||
+      !all(identity$away_nowscore == schedule$away_nowscore[idx]) ||
+      !all(as.numeric(identity$kickoff_at) == as.numeric(schedule$kickoff_at[idx]))) {
+    stop("Captured identity differs from current schedule; recapture/reconcile")
+  }
+  if (!all(c(markets$euro$fixture_id, markets$totals$fixture_id) %in% identity$fixture_id)) {
+    stop("Market fixture IDs do not match captured identity")
+  }
   fixtures <- dplyr::transmute(schedule, issue_id, fixture_id = fixture_key, slot,
     provider_id = provider_id_nowscore, kickoff_at, handicap, sale_state,
     source_url = source_url_nowscore)

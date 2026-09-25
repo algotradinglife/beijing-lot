@@ -32,6 +32,13 @@ testthat::test_that("real Titan capture converts through the R boundary and exis
   testthat::expect_identical(lubridate::tz(empty$euro$quote_at), "Asia/Shanghai")
   testthat::expect_error(fetch_match_markets(schedule, tempfile(), backend, retries = 4), "<= 3")
   testthat::expect_error(fetch_match_markets(schedule, tempfile(), backend, totals_company_ids = c("8", "8")), "duplicat")
+  changed <- schedule
+  changed$provider_id_nowscore <- "9999999"
+  testthat::expect_error(match_inputs_from_capture(changed, result), "Captured identity differs")
+  changed <- schedule
+  changed$kickoff_at <- changed$kickoff_at + 86400
+  testthat::expect_error(match_inputs_from_capture(changed, result), "Captured identity differs")
+  testthat::expect_true(all(result$diagnostics$fixture_id == "26098:39"))
   bad <- result
   bad$euro$fixture_id[1] <- "unmatched"
   testthat::expect_error(match_inputs_from_capture(schedule, bad), "do not match")
