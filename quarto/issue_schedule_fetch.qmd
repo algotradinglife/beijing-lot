@@ -1,0 +1,127 @@
+---
+title: "整期真实赛程采集接口"
+format: html
+execute:
+  error: false
+  cache: false
+  freeze: false
+---
+
+## 合同
+
+Issue #514：`fetch_issue_schedule(issue_id, raw_dir, ...)` 返回每期每场一行的规范 tibble。输入期号保留前导零，raw_dir 显式给出原始响应保存位置，采集与解析分离。CSV 用 readr 独立导出。
+
+500.com 提供场号/身份/北单让球及来源停售字段；Nowscore 必须 all=1 包含完场并提供开赛信息。跨源按期号场号对齐且检查身份，不把停售视为完场。规范 match_status/sale_state 与 raw_display 分列；明确未知。不推测仅时分字段的完整日期。北京时间显式解析，时间戳与观测时间绑定。
+
+## 独立验收预期
+
+冻结 26098 原始页面：两源146场，唯一场号1–146，Nowscore前5场finished，第6场截止不因此判finished。测试完场、推迟、取消、中断、未知、仅时分、跨日、不合法日期、错期、错误页、重复键和身份冲突，普通测试离线。真实观察不得用作过去已知状态。
+
+## 存储范围
+
+当前 config/persistent_data_layout.json 缺失。本轮显式临时目录仅用于验收，不冒称持久数据域；不改正式数据库。
+
+## 验证与审阅
+
+待实现后填入实际命令、结果、哈希与限制。
+
+控制侧证据补充：DSH sandbox 隐藏其他 /tmp 路径，冻结原始样本副本在 `.schedule-control/snapshots/`（仅开发输入，不提交）。Nowscore 单元格 title 实际有 `截止时间：2026-09-25 12:55` 等完整时间，可据其解析 sale_end_at；不能仅凭显示 HH:mm 猜日期。应优先查看原始 HTML 属性。
+
+来源身份限制：冻结26098有25行名字差异（如克鲁比/赫尔辛基预备队），让球均一致。不能用模糊距离假装身份已核验。允许选择 Nowscore 作为主赛程，保留500候选字段和显式identity诊断；未验证字段不偷偷合并为权威值。正常获取完整赛程不应被来源简称差异全部阻断，但冲突必须可见且下游不得当verified。
+
+## 更正：跨午夜真实日期（控制侧发现）
+
+Nowscore row name 是销售分组日，不能拼成自然开赛日。26098第11场 `M[11][2]=new Date(2026,8,26,00,00,00)`（JS月份从0起），截止title为9/25 23:55，显示开赛00:00，因此明确9/26 00:00。全146场的M日期与“完整截止日期向后寻找显示开赛时分”的候选一致。完场M时间部分可能赛中更新，例如第1场14:02:11而原始显示13:00，不能直接用M整个timestamp替换计划开赛。
+
+实现必须验证证据一致：保留原始分组日，M日期和显示时分作为开赛证据，和完整截止时间候选核对；不固定+5/+10分钟，不按行序猜日期。缺失或矛盾证据明确拒绝/未知，不能假装确定。全场 kickoff_at >= 同源sale_end_at。第11场及多日午夜、长预售/异常延赛纳入回归。
+
+## 可重放的真实验收输入
+
+两份完整冻结响应使用显式 `SCHEDULE_SNAPSHOT_DIR` 指向目录；必须含 `500.raw.html` 和 `nowscore.all.raw.html`。这不是隐藏默认数据库。原始500响应 SHA-256 为 `afa066b61abdfcddba60df64810bd13e59acadfa7f83f74402970a7470955e04`；Nowscore为 `fbc8271d3d12d08cb02b13eb16f1d9a338ec0365a3908d18dc292c1e23096553`。采集时刻分别为北京时间2026-09-25 21:38:55.362121和21:44:39.900629。
+
+控制侧独立预期在 `scripts/acceptance/data/issue_26098_kickoff_expected.csv`，逐场记录北京时间开赛与截止；它不由被测函数重算。该冻结快照的后续真实状态变化不修改这些预期。原始响应来自上述两条URL，不代表当前实时状态。
+
+```{r}
+#| label: load-explicit-snapshot
+#| echo: true
+project_root <- Sys.getenv("BEIDAN_PROJECT_ROOT")
+stopifnot(nzchar(project_root), dir.exists(project_root))
+pkgload::load_all(file.path(project_root, "packages/beidan"), quiet = TRUE)
+schedule_snapshot_dir <- Sys.getenv("SCHEDULE_SNAPSHOT_DIR")
+python <- Sys.getenv("RETICULATE_PYTHON")
+stopifnot(nzchar(schedule_snapshot_dir), nzchar(python))
+backend <- beidan::python_backend(python)
+source(file.path(project_root, "scripts/acceptance/issue_schedule.R"))
+```
+
+```{r}
+#| label: first-midnight-and-finished
+schedule |>
+  dplyr::filter(slot %in% c(1L, 5L, 6L, 10L, 11L, 17L, 36L, 146L)) |>
+  dplyr::transmute(
+    场号 = slot, 主队 = home_name, 客队 = away_name,
+    开赛北京时间 = format(lubridate::with_tz(kickoff_at, "Asia/Shanghai"), "%Y-%m-%d %H:%M"),
+    截止北京时间 = format(lubridate::with_tz(sale_end_at, "Asia/Shanghai"), "%Y-%m-%d %H:%M"),
+    比赛状态 = match_status, 销售状态 = sale_state,
+    原始显示 = raw_display_nowscore
+  ) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: identity-diagnostics
+schedule |>
+  dplyr::count(identity_method, name = "场数") |>
+  knitr::kable()
+```
+
+## 使用与限制
+
+正常入口先通过 `python_backend()` 显式选择项目解释器，再调用 `fetch_issue_schedule("26098", raw_dir = 已指定的目录, backend = backend)`。返回每期每场一行tibble，读取来源的原始响应与观测记录单独保存。CSV按需 `readr::write_csv(schedule, path)`；不会替用户下注或抓取欧赔。
+
+本次赛程不是完整的 `read_match_inputs()` 五表输入。后续接欧赔与大小球时，再按来源比赛标识完成适配；不伪造缺少的报价或把当前观测状态当成历史已知状态。比赛状态 `unknown` 不等于未开赛，销售截止不等于完场。
+
+旧脚本兼有数据库落盘、SP和结算解析，本轮不改变其历史采集合同。package新增纯赛程解析采用现有来源选择器及字段证据，使用已声明的BeautifulSoup/lxml和标准库，不引入重复的存储或历史学习框架。
+
+## 控制侧验证记录
+
+环境：R_LIBS 指向项目现有 r_lib，RETICULATE_PYTHON 显式选择项目 .venv/bin/python。BEIDAN_PROJECT_ROOT 指定代码检出；SCHEDULE_SNAPSHOT_DIR 指定上述冻结响应目录。Quarto 使用可写 TMPDIR、XDG_CACHE_HOME、DENO_DIR。不参与 CI。
+
+- Python：`PYTHONPATH=packages/beidan/inst/python "$RETICULATE_PYTHON" -m pytest packages/beidan/tests/python/test_issue_schedule.py -q`，73 passed。覆盖解析、错期、身份、状态/时间分离、跨午夜、超时重试、证据保留、编码及边界。
+- R：`Rscript --vanilla -e 'testthat::test_local("packages/beidan", filter="^issue-schedule$", reporter="summary")'`（另设 BEIDAN_TEST_PYTHON），57条断言通过，无失败/警告/跳过。真实reticulate边界包括None、标量、标识符和时间类型。
+- 独立R验收：完整26098真实公开入口，146场逐一核对黄金开赛/截止时刻；前5finished、第6销售截止但比赛unknown；89场纠正分组日和自然日不同的问题。
+- 有限联网验证：146场，观测时5 finished、1 live、140 unknown；slot11北京2026-09-26 00:00，开赛均不早于同源截止。状态只代表这次观测。
+- `quarto render quarto/issue_schedule_fetch.qmd --no-cache --execute`：新R进程、冻结/缓存关闭，真实验收表渲染通过。最初相对工作目录不明确导致一次失败，改成显式BEIDAN_PROJECT_ROOT后通过。
+- walkthrough市场/结算未接通，仅真实赛程和缺输入门禁验收；未执行部分不计通过。普通专项测试不联网，全仓测试未运行，变更不触及既有概率/串场算法。
+
+DSH产生中间错误并越界运行全包测试，已停止；其退出或输出未作为验收。控制侧修正日期比较方向、销售状态误推比赛状态、原始观测时间、R桥、网络失败保留及数值边界后独立验证。
+
+最终codex review覆盖QMD、实现、测试、数据契约和walkthrough；审阅发现与最终哈希将在完成后追加。
+
+### 第一轮独立审阅及修复
+
+`codex review --uncommitted` 独立复现三项：P1未核验次源比分回填、P2异常场号静默丢弃、P2walkthrough结算观察时间非UTC。分别修为仅主源比分、异常index报错、北京时间输入转换到同一UTC时刻。新增回归直接调用生产解析/合并函数；walkthrough回归提取并执行实际QMD代码，检查缺输入不生成方案且结算时间保留实际时刻。修复后Python专项77 passed；R专项57断言通过；walkthrough门禁/配置回归通过。第二轮审阅绑定最终文件哈希。
+
+### 正式入口交付复盘
+
+曾提前复制 walkthrough 到正式目录，而该目录的 package 尚未同步，导致用户遇到 `fetch_issue_schedule not exported`。已增加加载后的公开接口检查；交付前还须在正式路径验证源码加载和安装版导出。仅复制 QMD 或验证隔离工作树不足以证明用户入口可用。
+
+### 第二轮独立审阅及修复
+
+正常连接后的 `codex review --base origin/main` 找到三项 P2：主源缺 ID 时混用次源命名空间、500 畸形 fid 静默略过、Nowscore 接受零场号。已分别去掉次源 ID 回填、仅对明确 fid=-1 占位行报告排除且对异常 ID 报错、拒绝异常及非正场号，并增加生产函数回归。Python 专项85 passed；R专项57条断言通过。walkthrough 同时按用户要求直接配置北京时间，结算API边界转换为UTC；实际QMD回归覆盖默认未结算与两处转换。
+
+第三轮复审另发现次源独有场次的保留路径与ID校验不一致。校验现检查两个显式来源ID，不要求缺失的主源ID被填充；端到端缺一源场次回归确认保留四场且不跨命名空间填值。Python最终86 passed。
+
+第四轮复审发现解析器接受单数字小时 `0:00` 而校验器只接受 `00:00`。现按小时/分钟数值比较，原显示文本保留；端到端单数字小时回归通过。Python最终87 passed。
+
+第五轮复审补充三项畸形输入缺陷：Nowscore URL ID数字前缀被截取、坏停售日期误作缺失、让球文本删除内部加号。已使用完整URL查询参数校验（保留前导零）、拒绝坏日期但允许缺失/纯时分、直接解析原数值文本。新增完整采集及边界回归，Python100 passed、R57条断言通过。walkthrough增加在线/缓存提示与北京时间采集时间展示，避免把旧快照误认为在线结果。
+
+第六轮复审发现带引号HTTP charset未正确优先于meta声明，已采用标准库Message解析并加入有/无冲突meta回归。按用户最新要求，R公开时间列及typed empty统一Asia/Shanghai；内部Python时刻不变，旧RDS读取显式换时区。默认打印slot11为9/26 00:00且底层时间点不变。最终Python102 passed，R66条断言通过。
+
+## Final review attestation
+
+2026-09-26 最终 `codex review` 完成，结论：**No actionable remaining defects found against origin/main, including uncommitted changes.** 审阅覆盖实现、tests、数据契约与两份QMD。独立复核102项Python测试、66条R断言、walkthrough验收和两份干净QMD渲染通过；全仓测试未运行，不参与CI。
+
+命令：`timeout 360 codex review 'Review entire git diff origin/main including committed and uncommitted code, tests, QMD and contracts. Use /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python for Python tests. Set R_LIBS=/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib and RETICULATE_PYTHON plus BEIDAN_TEST_PYTHON to that interpreter. Latest user requirement: public R schedule timestamps and typed empty use Asia/Shanghai preserving numeric instants; internal Python UTC retained. Review this change and quoted HTTP charset fix plus previous parser fixes. Report any actionable remaining defects. Do not modify source files.'`
+
+实际审阅文件SHA-256及本节之前正文hash记录在 `docs/reviews/issue_schedule_review_manifest.json`，控制侧已逐个核对一致。此前网络失败不算审阅通过；后续各轮真实发现及修复已在正文逐项记录，本次结论绑定全部修复后的文件。
