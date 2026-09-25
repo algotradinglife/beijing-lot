@@ -1,0 +1,122 @@
+---
+title: "可变场数串场接口与决策上下文"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 范围与合同
+
+工程 #512。同一方案各组使用同一个正整数 `n_legs`，默认 7；不同方案可使用不同场数。场数是模拟策略参数，不宣称任意场数均可在真实渠道下单。结构每位为 1/2/3，长度等于场数。全空间增长为 `3^n_legs`，大场数枚举受计算资源限制。
+
+正常使用路径为读取整期数据、按决策时点准备比赛、计算单场概率、构建串场计划、按观察时点结算及诊断。示例数据只替换数据源，不替换实际生产函数。
+
+| 函数 | 输入 | 输出与边界 |
+|---|---|---|
+| `read_match_inputs` | 数据源、期号 | 整期五张 typed tibble，允许跨日；无决策截断 |
+| `prepare_match_inputs` | inputs、decision_at、market_policy | 单一期号由输入推导，多期拒绝；显式保存 cutoff；北京时间次日窗口 |
+| `estimate_match_probabilities` | epoch、model_config | 概率、拟合、排除项及决策上下文；rho 默认 -0.14 |
+| `parlay_settings` | 命名更新或 reset | 会话快照；新会话恢复默认；不包含单场 rho |
+| `parlay_build_plan` | projected、strategy_config、历史购买状态 | 候选、排名、购买与冻结计划；跨决策资金和复用约束 |
+| `parlay_settle_plan` | plan、settlements、as_of | 使用冻结单价、派彩系数和场数；待定/特殊结果独立 |
+| `parlay_diagnose_plan` | result、settlements、as_of | 结构命中深度与资金覆盖、收益 |
+| `parlay_replay_issue` | 绑定上下文的决策对象序列、策略、结算观察 | 顺序回放与整期累计资金台账 |
+
+决策时点与结算观察时点不合并。整期预算与本次额度不合并。计划冻结后不再读取会话设置。单场欧赔/大小球概率与北单 SP 估值角色分离。
+
+## 数据与时间约束
+
+数据输入沿用 package schema，标识符为字符，保留前导零；表的行粒度、键、类型与空表 schema 由可执行合同校验。用户决策时间为带时区 POSIXct；接口规范化为 UTC 表示同一瞬间，决策自然日按 Asia/Shanghai。只有严格早于 cutoff 可见的报价和状态进入决策。共享历史学习仍由 bundled temporal_learning 负责；本重构不引入拟合、学习或独立 chronology 实现。
+
+## 验收矩阵
+
+| 合同 | 独立验收 |
+|---|---|
+| 场数可配置 | 6、7、8 场各跑完整正常路径 |
+| 单方案同场数 | 结构长度不符及混合组拒绝 |
+| 上下文 | 单期推导、多期拒绝、来源上下文保留 |
+| 因果 | cutoff 后状态变更不能影响此前计划 |
+| 冻结 | session 修改场数/单价后旧计划结算不变 |
+| 资金 | 重复票不重复扣款、整期额度、跨次复用重叠 |
+| 边界 | typed-empty、缺失、非法参数、Python真实转换 |
+
+## 验证记录
+
+控制侧在稳定源码上执行 `Rscript --vanilla tests/testthat.R`，退出码 0：package 1,805 条成功断言，repository 388 条成功断言；零失败、零错误、零警告。两项既有 fundamentals 集成测试因未提供其专用 integration bundle 跳过，不属于本次修改，未计为通过。此前迭代运行中的失败与被中止运行不计为最终证据。
+
+环境显式设置 `R_LIBS=/tmp/parlay-test-lib:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib`，`BEIDAN_TEST_PYTHON` 与 `BEIJING_LOT_VENV_PYTHON` 均为 `/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python`。两个变量分别供 package 和 repository 客户端选择解释器；工作树不依赖隐式 `.venv` 路径。
+
+- bundled Python：`PYTHONPATH=packages/beidan/inst/python <上述解释器> -m pytest packages/beidan/tests/python -q`，5 passed。
+- `pak::local_install("packages/beidan", lib="/tmp/parlay-test-lib", dependencies=FALSE, upgrade=FALSE, ask=FALSE)` 后在干净进程加载安装版 0.2.0；同一独立验收脚本再次通过，未导出旧 `n7_` 函数。
+- 控制侧正常流程覆盖 6/7/8 场、三日 400 CNY 整期预算、三次同组加深购买、真实命中排名、冻结参数与未来状态不变性。
+- 六份 QMD 均以 `quarto render ... --execute --no-cache` 在新进程执行，`cache/freeze` 关闭且错误致命；实际 HTML 错误块均为 0。主体 pipeline、match status、lubridate、session、package 报告分别有 24、7、3、3、4 张表；本交付报告包含实际正常流程结果表。
+- 渲染显式指定可写 `TMPDIR=/tmp/parlay-render-tmp`、`XDG_CACHE_HOME=/tmp/parlay-render-cache`、`DENO_DIR=/tmp/parlay-render-deno` 与项目 R 库；package 报告另传 `-P python:<上述解释器>`。
+
+以上路径仅记录本次验证环境，不是函数或报告中的隐藏输入。重现时显式提供自己的库和解释器路径，包依赖须在渲染前安装。
+
+## 七场基线对照
+
+重构前版本 `42103a3dffc91534d2d64ff430c844100d5bb2b3` 的隔离副本，使用期号00123、seed42、14场（北京时间2026-09-23 12:00起每半小时一场）、2026-09-22 20:00决策、3222221结构与80注额度：支持票96，购买80，支持概率质量为0.12756645286981655。控制侧保存该实际输出用于最终数值及票键对照；不是从新实现反推期望。
+
+## 正常使用路径验收
+
+以下代码从合成数据源走实际公共接口，独立断言来自控制侧，覆盖三个场数和结算冻结。数据为显式 synthetic，不用于报告真实命中率或收益结论。
+
+```{r}
+#| label: setup
+repo <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+pkgload::load_all(file.path(repo, "packages", "beidan"), quiet = TRUE)
+```
+
+```{r}
+#| label: public-flow
+source(file.path(repo, "scripts", "acceptance", "parlay_api.R"), local = TRUE)
+knitr::kable(acceptance_results, caption = "同一方案统一场数；金额单位CNY")
+```
+
+## 函数与测试映射
+
+| 实现单元 | 自动化测试 |
+|---|---|
+| `parlay_settings` 及默认值/原子写入校验 | package `test-session-constants.R`、`test-parlay-variable-legs.R` |
+| `read_match_inputs` 与源转换/typed schema | package `test-n7-pipeline-contracts.R`、`test-n7-match-status-acceptance.R` |
+| `prepare_match_inputs`、`.PrepareMatchInputs`、报价/状态选择器 | package `test-n7-pipeline-epoch.R`、`test-n7-match-status.R`、`test-n7-lubridate.R` |
+| `estimate_match_probabilities`、`.EstimateMatchProbabilities`、模型校验 | package `test-n7-pipeline-epoch.R`、`test-market-primitives.R` |
+| 构组、结构宽度、支持集与票枚举 helper | package `test-n7-pipeline-candidates.R`、`test-parlay-variable-legs.R`；repository `test-parlay-interface-regressions.R` |
+| `parlay_build_plan`、策略与历史校验、资金与冻结 helper | package `test-n7-pipeline-value.R`、`test-parlay-variable-legs.R`；repository `test-parlay-public-flow.R` |
+| `parlay_settle_plan`、`parlay_diagnose_plan` 与可见标签/排名 helper | package `test-n7-pipeline-value.R`、`test-parlay-valuation-boundary.R`；独立正常流程冻结及真实排名断言 |
+| `parlay_replay_issue` 与累计台账 | package `test-n7-pipeline-value.R`；独立三日 400 CNY 上限、手工串联与回放一致性 |
+| `python_backend`、`learning_cutoff`、R/Python table boundaries | package `test-python-backend.R`、`tests/python/test_backend.py` |
+| S7 行/表领域对象 | package `test-n7-pipeline-types.R` |
+
+测试文件保留原有历史文件名，执行内容使用新接口；没有旧名字兼容层。私有装配函数通过相应生产路径与低层单元测试覆盖，不要求用户直接拼装中间表。
+
+## 实现侧与控制侧差异
+
+第一轮 dsh 越过明确测试范围启动全包测试，控制侧已终止该进程并保留差异；该轮不计作验收。第二轮仅修改源码和调用方，未执行 R。控制侧发现并修复残留时区变量、旧结算参数、空候选宽度、示例配置嵌套、历史购买未累计与历史组重复追加；另补了实际支持空间上限和腿序验证。第三轮 review 已无可操作问题；最终运行证据见上文。
+
+
+## Codex review
+
+独立审阅覆盖实现、schema、测试及 QMD。第一轮命令为显式设置上述 `R_LIBS` 后运行 `codex review --uncommitted`；第二、三轮使用 `codex review -`，标准输入要求只读检查全部未提交差异、核对前轮修复、不重复启动全套测试、不参与 CI。第三轮明确报告 “No actionable defects identified”。审阅没有把测试待完成或进程退出 0 当成验收。
+
+| 轮次 | 发现 | 修复与回归 |
+|---|---|---|
+| 1 | 非空票配空腿表产生伪 EV（P2） | 票和腿的标识集合必须匹配，腿数必须为同一正数 |
+| 2 | 同组连续加深重复登记历史（P1） | 每个组只登记一次；真实三次公共调用及回放均买到三张不同票，累计 6 CNY |
+| 2 | 局部缺腿误当更短票（P2） | 完整 fixture/outcome 对必须重建同一个物理票键；另拒绝重复腿与孤立腿 |
+| 3 | 无可操作问题 | 控制侧随后完成上述稳定源码全套测试、安装版验收和最终渲染 |
+
+决策上下文、状态与报价可见性仍通过显式 cutoff 传递；未新增历史训练、调参或缓存实现。既有 Python chronology/receipt 权威实现保持在 `beidan_backend.temporal_learning`，本次只改其 R 入口命名并验证实际跨语言边界。来源 URL 与原始数据保留合同不因本次接口整理而放宽。
+
+<!-- REVIEW-ATTESTATION -->
+
+### Reviewed file identities
+
+完整文件清单见 [parlay_api_reviewed_files.csv](parlay_api_reviewed_files.csv)，共 116 个现存交付文件；清单自身 SHA-256 为 `e3264dbfc4563b5379ea8490b5c35d34c40132e8d44f114d9f33d284b9ab01ab`。本 QMD 行的哈希只覆盖上述标记之前的内容，审阅后附加的身份记录不参与其自身哈希，避免递归。其余条目均为完整文件字节的 SHA-256；旧接口帮助文件的删除由 PR diff 记录。
+
+此清单绑定稳定源码、测试、schema、README/Rd 和报告正文；不是把旧交付的历史哈希改成当前值。
+
+最终验收审阅（第 4 轮，`codex review -`，显式项目 `R_LIBS`）：**No actionable findings**。独立审阅逐项核对全部 116 条清单与 staged bytes、QMD 正文边界及清单摘要一致，并核对现有日志与渲染产物支持上述证据；两项跳过明确排除，未重复运行全套测试。此段为审阅后追加的结果记录。

@@ -7,15 +7,18 @@ execute:
   freeze: false
 ---
 
+> 当前可执行示例已迁移到 #512 接口。下文原有测试计数、审阅记录和哈希属于此前交付的历史证据；本次重构的验收以 [parlay_api_contract.qmd](parlay_api_contract.qmd) 为准。
+
+
 #508 的独立合成验收。比赛状态与销售、结算状态分离，只有决策前实际获知的 scheduled 允许参与构组。没有状态证据时排除；不使用后来取消或完场的信息改写过去。
 
 ```{r}
 pkgload::load_all("../packages/beidan", quiet = TRUE)
 cutoff <- list(issue_id = "00123", cutoff_utc = lubridate::ymd_hms("2026-09-22 12:00:00", tz = "UTC"))
 kickoff_at <- lubridate::with_tz(lubridate::ymd_hms("2026-09-23 12:00:00", tz = "Asia/Shanghai"), "UTC") + lubridate::dminutes(seq(0, by = 15, length.out = 14L))
-example <- n7_make_fixture_issue("00123", kickoff_at)
-inputs <- n7_read_inputs(n7_fixture_source(example), "00123")
-baseline <- n7_select_match_status(inputs$fixtures, inputs$match_status, cutoff)
+example <- make_example_issue("00123", kickoff_at)
+inputs <- read_match_inputs(example_match_source(example), "00123")
+baseline <- match_select_status(inputs$fixtures, inputs$match_status, cutoff)
 stopifnot(nrow(baseline$fixtures) == 14L)
 knitr::kable(baseline$selected_status)
 ```
@@ -26,21 +29,21 @@ future$status <- "cancelled"
 future$status_at <- cutoff$cutoff_utc + lubridate::dseconds(1)
 future$available_at <- cutoff$cutoff_utc + lubridate::dseconds(1)
 changed <- dplyr::bind_rows(inputs$match_status, future)
-stopifnot(identical(baseline, n7_select_match_status(inputs$fixtures, changed, cutoff)))
+stopifnot(identical(baseline, match_select_status(inputs$fixtures, changed, cutoff)))
 at_cutoff <- future
 at_cutoff$status_at <- cutoff$cutoff_utc
 at_cutoff$available_at <- cutoff$cutoff_utc
-stopifnot(identical(baseline, n7_select_match_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, at_cutoff), cutoff)))
+stopifnot(identical(baseline, match_select_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, at_cutoff), cutoff)))
 visible <- future
 visible$status_at <- cutoff$cutoff_utc - lubridate::dseconds(1)
 visible$available_at <- cutoff$cutoff_utc - lubridate::dseconds(1)
-filtered <- n7_select_match_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, visible), cutoff)
+filtered <- match_select_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, visible), cutoff)
 stopifnot(nrow(filtered$fixtures) == 13L, nrow(filtered$exclusions) == 1L)
 knitr::kable(filtered$exclusions)
 ```
 
 ```{r}
-empty <- n7_select_match_status(inputs$fixtures, n7_typed_empty("match_status"), cutoff)
+empty <- match_select_status(inputs$fixtures, match_typed_empty("match_status"), cutoff)
 stopifnot(nrow(empty$fixtures) == 0L, nrow(empty$exclusions) == 14L,
           identical(empty$fixtures, inputs$fixtures[0, ]))
 knitr::kable(tibble::tibble(check = c("14 场 scheduled 准入", "未来取消不改写历史", "cutoff 相等不可见", "已知取消排除", "无状态证据全部排除"), passed = TRUE))
@@ -57,12 +60,15 @@ knitr::kable(tibble::tibble(check = c("14 场 scheduled 准入", "未来取消�
 ```{r}
 probabilities <- tidyr::expand_grid(fixture_id = inputs$fixtures$fixture_id, outcome = c("W", "D", "L")) |>
   dplyr::mutate(probability = rep(c(0.5, 0.3, 0.2), nrow(inputs$fixtures)))
-constants <- n7_pipeline_constants(reset = TRUE)
-config <- n7_allocation_configs(constants)$C
-first <- n7_run_allocation(config, inputs$fixtures, probabilities, inputs$prematch_sp,
-  cutoff, constants, max_reuse = 1L, max_overlap = 0L, match_status = inputs$match_status)
-second <- n7_run_allocation(config, inputs$fixtures, probabilities, inputs$prematch_sp,
-  cutoff, constants, max_reuse = 1L, max_overlap = 0L, match_status = changed)
+constants <- parlay_settings(reset = TRUE)
+config <- parlay_allocation_configs(constants)$C
+# 只有状态台账不同：投影对象把台账与 cutoff 一起绑定，因此两次调用的差异仅来自状态可见性。
+project_with <- function(status_ledger) {
+  list(cutoff = cutoff, fixtures = inputs$fixtures, probabilities = probabilities,
+       prematch_sp = inputs$prematch_sp, match_status = status_ledger)
+}
+first <- parlay_build_plan(project_with(inputs$match_status), config)
+second <- parlay_build_plan(project_with(changed), config)
 stopifnot(identical(first, second))
 knitr::kable(first$built$groups$group_legs)
 ```
@@ -71,17 +77,20 @@ knitr::kable(first$built$groups$group_legs)
 
 ```{r}
 multi_kickoff <- lubridate::ymd_hms(c("2026-09-23 04:00:00", "2026-09-24 04:00:00"), tz = "UTC")
-multi <- n7_make_fixture_issue("00123", multi_kickoff)
-source <- n7_fixture_source(multi)
+multi <- make_example_issue("00123", multi_kickoff)
+source <- example_match_source(multi)
 original <- source
-whole <- n7_read_inputs(source, "00123")
-next_cutoff <- cutoff
-next_cutoff$cutoff_utc <- cutoff$cutoff_utc + lubridate::ddays(1)
-euro_policy <- list(members = c("c01", "c02", "c03"), missing = "error")
-totals_policy <- list(companies = NULL, line = "nearest_main", watermark = "decimal")
-epoch1 <- n7_prepare_epoch(whole, cutoff, euro_policy = euro_policy, totals_policy = totals_policy)
-epoch2 <- n7_prepare_epoch(whole, next_cutoff, euro_policy = euro_policy, totals_policy = totals_policy)
+whole <- read_match_inputs(source, "00123")
+# 公共入口只接决策时点：期号由整期输入推导，cutoff 在内部按该时点构造。
+next_decision_at <- cutoff$cutoff_utc + lubridate::ddays(1)
+market_policy <- list(
+  euro = list(members = c("c01", "c02", "c03"), missing = "error"),
+  totals = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
+epoch1 <- prepare_match_inputs(whole, cutoff$cutoff_utc, market_policy)
+epoch2 <- prepare_match_inputs(whole, next_decision_at, market_policy)
 stopifnot(nrow(whole$fixtures) == 2L, identical(source, original),
+          identical(epoch1$cutoff$issue_id, cutoff$issue_id),
+          identical(epoch1$cutoff$cutoff_utc, cutoff$cutoff_utc),
           identical(epoch1$fixtures$fixture_id, whole$fixtures$fixture_id[1]),
           identical(epoch2$fixtures$fixture_id, whole$fixtures$fixture_id[2]))
 knitr::kable(tibble::tibble(stage = c("整期读取", "9月22日决策", "9月23日决策"), matches = c(nrow(whole$fixtures), nrow(epoch1$fixtures), nrow(epoch2$fixtures))))

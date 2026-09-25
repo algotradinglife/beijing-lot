@@ -9,7 +9,7 @@
 # top of the range; an SP exactly at the threshold is left alone. A missing SP for
 # ANY leg makes the whole product unavailable rather than partially substituted,
 # because a product with an imputed leg is not an estimate of the ticket.
-n7_transform_sp <- function(sp, threshold, replacement) {
+parlay_transform_sp <- function(sp, threshold, replacement) {
   # .var.name makes each message name the parameter rather than "Element 1".
   # checkmate's lower = is inclusive, so the strict tests are explicit: a threshold
   # of exactly 1 would rewrite every priced SP, and a replacement of exactly 0
@@ -17,12 +17,12 @@ n7_transform_sp <- function(sp, threshold, replacement) {
   checkmate::assert_numeric(threshold, len = 1L, any.missing = FALSE, finite = TRUE,
                             .var.name = "sp_threshold")
   if (threshold <= 1) {
-    stop("n7_transform_sp: sp_threshold must be a finite value above 1; got ", threshold)
+    stop("parlay_transform_sp: sp_threshold must be a finite value above 1; got ", threshold)
   }
   checkmate::assert_numeric(replacement, len = 1L, any.missing = FALSE, finite = TRUE,
                             .var.name = "sp_replacement")
   if (replacement <= 0) {
-    stop("n7_transform_sp: sp_replacement must be a positive finite value; got ",
+    stop("parlay_transform_sp: sp_replacement must be a positive finite value; got ",
          replacement)
   }
   # SP must be a real number vector. Coercing text here would only warn and hand
@@ -36,7 +36,7 @@ n7_transform_sp <- function(sp, threshold, replacement) {
   ifelse(values > threshold, replacement, values)
 }
 
-# n7_value_tickets(tickets, ticket_legs, prematch_sp, cutoff, sp_threshold,
+# parlay_value_tickets(tickets, ticket_legs, prematch_sp, cutoff, sp_threshold,
 #                  sp_replacement, unit_cny, payout_factor)
 #   -> valued tickets
 #
@@ -49,7 +49,7 @@ n7_transform_sp <- function(sp, threshold, replacement) {
 #' Operates on explicit inputs. Invalid contracts raise errors; no network,
 #' package installation or database writes occur.
 #' @param tickets Enumerated ticket tibble, or the enumeration result list where required by plan freezing.
-#' @param ticket_legs Tibble keyed by ticket_id and fixture_id with the selected W/D/L outcome.
+#' @param ticket_legs Tibble keyed by ticket_id and fixture_id with the selected W/D/L outcome. Its complete fixture/outcome pairs must reproduce each canonical physical ticket_id.
 #' @param prematch_sp Pre-cutoff SP tibble; an empty table is allowed and causes unavailable estimated EV.
 #' @param cutoff Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.
 #' @param sp_threshold Single-match SP threshold above which the replacement is used for estimation only.
@@ -57,35 +57,38 @@ n7_transform_sp <- function(sp, threshold, replacement) {
 #' @param unit_cny Positive numeric cost of one physical ticket, in CNY.
 #' @param payout_factor Positive ticket-level payout factor, applied once.
 #' @return A ticket tibble with estimated gross return and net EV in CNY; missing SP gives NA EV.
-n7_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_threshold,
+parlay_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_threshold,
                              sp_replacement, unit_cny, payout_factor) {
-  n7_require_cutoff(cutoff)
-  n7_validate_table(tickets, "tickets", keys = "ticket_id")
-  n7_validate_table(ticket_legs, "ticket_legs")
-  n7_validate_table(prematch_sp, "prematch_sp")
-  # The same threshold/replacement pair n7_transform_sp enforces. Validating it in
+  match_require_cutoff(cutoff)
+  match_validate_table(tickets, "tickets", keys = "ticket_id")
+  match_validate_table(ticket_legs, "ticket_legs", keys = c("ticket_id", "fixture_id"))
+  match_validate_table(prematch_sp, "prematch_sp")
+  # The same threshold/replacement pair parlay_transform_sp enforces. Validating it in
   # only one of the two would let a bad constant price tickets here while the
   # transform still refuses it.
   checkmate::assert_numeric(sp_threshold, len = 1L, any.missing = FALSE, finite = TRUE,
                             lower = 1, .var.name = "sp_threshold")
   if (sp_threshold <= 1) {
-    stop("n7_value_tickets: sp_threshold must be above 1; got ", sp_threshold)
+    stop("parlay_value_tickets: sp_threshold must be above 1; got ", sp_threshold)
   }
   checkmate::assert_numeric(sp_replacement, len = 1L, any.missing = FALSE, finite = TRUE,
                             lower = 0, .var.name = "sp_replacement")
   if (sp_replacement <= 0) {
-    stop("n7_value_tickets: sp_replacement must be positive; got ", sp_replacement)
+    stop("parlay_value_tickets: sp_replacement must be positive; got ", sp_replacement)
   }
   checkmate::assert_numeric(unit_cny, len = 1L, any.missing = FALSE, finite = TRUE,
                             lower = 0, .var.name = "unit_cny")
-  if (unit_cny <= 0) stop("n7_value_tickets: unit_cny must be positive; got ", unit_cny)
+  if (unit_cny <= 0) stop("parlay_value_tickets: unit_cny must be positive; got ", unit_cny)
   checkmate::assert_numeric(payout_factor, len = 1L, any.missing = FALSE, finite = TRUE,
                             lower = 0, upper = 1, .var.name = "payout_factor")
   if (payout_factor <= 0) {
-    stop("n7_value_tickets: payout_factor must lie in (0,1]; got ", payout_factor)
+    stop("parlay_value_tickets: payout_factor must lie in (0,1]; got ", payout_factor)
+  }
+  if (!setequal(tickets$ticket_id, ticket_legs$ticket_id)) {
+    stop("parlay_value_tickets: ticket identifiers must match the ticket legs exactly")
   }
   if (!nrow(tickets)) {
-    empty <- n7_typed_empty("tickets")
+    empty <- match_typed_empty("tickets")
     return(empty)
   }
   # SP must be pre-cutoff. A quote at or after the cutoff is not available to the
@@ -93,13 +96,26 @@ n7_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_thres
   usable_sp <- prematch_sp[prematch_sp$quote_at < cutoff$cutoff_utc, , drop = FALSE]
 
   out <- tickets
-  leg_count <- table(ticket_legs$ticket_id)
+  # The plan width comes from the tickets themselves, so valuation works for any
+  # n_legs the plan was built with instead of a fixed seven. ticket_legs is NOT a
+  # group_legs table, so the width is read from its own leg counts; a plan that
+  # mixed widths would already have been refused at enumeration.
+  widths <- unique(as.integer(table(ticket_legs$ticket_id)))
+  if (length(widths) != 1L || widths < 1L) {
+    stop("parlay_value_tickets: every ticket must have the same positive leg count")
+  }
+  plan_legs <- widths
   for (i in seq_len(nrow(out))) {
     ticket_id <- out$ticket_id[i]
     legs <- ticket_legs[ticket_legs$ticket_id == ticket_id, , drop = FALSE]
-    if (nrow(legs) != n7_legs()) {
-      stop("n7_value_tickets: ticket ", ticket_id, " has ", nrow(legs),
-           " legs, expected ", n7_legs())
+    if (nrow(legs) != plan_legs) {
+      stop("parlay_value_tickets: ticket ", ticket_id, " has ", nrow(legs),
+           " legs, expected ", plan_legs)
+    }
+    physical_id <- parlay_physical_ticket_key(
+      legs$fixture_id, match(legs$outcome, match_outcomes()))
+    if (!identical(ticket_id, physical_id)) {
+      stop("parlay_value_tickets: ticket legs do not match the physical ticket identity")
     }
     sps <- rep(NA_real_, nrow(legs))
     for (leg_index in seq_len(nrow(legs))) {
@@ -114,14 +130,14 @@ n7_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_thres
         by_instant <- split(row$sp_raw, as.numeric(row$quote_at))
         conflicting <- vapply(by_instant, function(v) length(unique(v)) > 1L, logical(1))
         if (any(conflicting)) {
-          stop("n7_value_tickets: conflicting SP quotes at one instant for fixture ",
+          stop("parlay_value_tickets: conflicting SP quotes at one instant for fixture ",
                legs$fixture_id[leg_index], " outcome ", legs$outcome[leg_index])
         }
         row <- row[order(row$quote_at), , drop = FALSE]
         sps[leg_index] <- row$sp_raw[nrow(row)]
       }
     }
-    adjusted <- n7_transform_sp(sps, sp_threshold, sp_replacement)
+    adjusted <- parlay_transform_sp(sps, sp_threshold, sp_replacement)
     if (anyNA(adjusted)) {
       out$sp_product_est[i] <- NA_real_
       out$ev_net_est[i] <- NA_real_
@@ -135,7 +151,7 @@ n7_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_thres
     gross_est <- unit_cny * payout_factor * out$probability[i] * product_sp
     out$ev_net_est[i] <- gross_est - unit_cny
   }
-  n7_validate_table(out, "tickets", keys = "ticket_id")
+  match_validate_table(out, "tickets", keys = "ticket_id")
 }
 
 # --- group-level construction of the whole decision --------------------------
@@ -151,40 +167,46 @@ n7_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_thres
 #' @param prematch_sp Pre-cutoff SP tibble; an empty table is allowed and causes unavailable estimated EV.
 #' @param cutoff Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.
 #' @param match_status Required match-status observation ledger; a missing ledger errors and an empty one excludes every fixture.
-#' @param patterns Named list of length-seven vectors of allowed outcome counts (1, 2 or 3).
+#' @param patterns Named list of n_legs-long vectors of allowed outcome counts (1, 2 or 3).
 #' @param construction Explicit group construction policy, including supplied groups when applicable.
 #' @param max_candidates Positive integer limit on constructed fixture groups.
 #' @param seed Explicit integer seed for deterministic construction.
-#' @param constants Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.
-#' @param max_reuse Positive integer limit on fixture reuse across distinct purchased groups.
-#' @param max_overlap Integer upper limit on shared fixtures between distinct purchased groups.
+#' @param constants Named business constants returned by parlay_settings(); values are passed explicitly, never learned here.
 #' @return A list of group, structure, ticket and valuation tables without settlement information.
-n7_build_decision <- function(fixtures, probabilities, prematch_sp, cutoff,
+.BuildDecisionTables <- function(fixtures, probabilities, prematch_sp, cutoff,
                               match_status, patterns, construction, max_candidates,
-                              seed, constants, max_reuse, max_overlap) {
+                              seed, constants) {
   # constants$n_legs is read immediately below, and a NULL list would make it NULL
   # rather than fail. The other constants are read further down the same call.
   checkmate::assert_list(constants, names = "named", .var.name = "constants")
   required_constants <- c("n_legs", "unit_cny", "payout_factor", "sp_threshold")
   missing_constants <- setdiff(required_constants, names(constants))
   if (length(missing_constants)) {
-    stop("n7_build_decision: constants is missing ",
+    stop(".BuildDecisionTables: constants is missing ",
          paste(missing_constants, collapse = ", "))
   }
-  # patterns is a list of length-7 integer vectors. An empty list would build no
-  # structures at all and silently produce an empty decision.
+  # patterns is a list of integer vectors, each as long as the plan's n_legs. An
+  # empty list would build no structures at all and silently produce an empty
+  # decision; a pattern of the wrong width is a structural mismatch, not something
+  # to pad or truncate.
   checkmate::assert_list(patterns, min.len = 1L, .var.name = "patterns")
-  checkmate::assert_count(max_reuse, .var.name = "max_reuse")
-  checkmate::assert_count(max_overlap, .var.name = "max_overlap")
-  groups <- n7_construct_candidates(fixtures, probabilities, cutoff,
-                                    constants$n_legs, construction,
+  n_legs <- constants$n_legs
+  checkmate::assert_count(n_legs, positive = TRUE, .var.name = "constants$n_legs")
+  wrong_width <- vapply(patterns, function(p) length(p) != n_legs, logical(1))
+  if (any(wrong_width)) {
+    stop(".BuildDecisionTables: every pattern must have ", n_legs,
+         " legs; pattern(s) ", paste(which(wrong_width), collapse = ", "),
+         " disagree")
+  }
+  groups <- parlay_construct_groups(fixtures, probabilities, cutoff,
+                                    n_legs, construction,
                                     max_candidates, seed, match_status)
   # Every pattern in the allocation is applied over the same groups, each under its
   # own candidate label. Applying only patterns[[1]] would silently ignore the rest
   # of a mixed allocation, and sharing one label would collide distinct structures.
   structures <- lapply(seq_along(patterns), function(index) {
     label <- paste0("p", paste(patterns[[index]], collapse = ""))
-    n7_apply_structure(groups$group_legs, probabilities, cutoff,
+    parlay_apply_structure(groups$group_legs, probabilities, cutoff,
                        patterns[[index]], "entropy_desc", candidate_label = label)
   })
   supports <- dplyr::bind_rows(lapply(structures, function(s) s$supports))
@@ -192,8 +214,9 @@ n7_build_decision <- function(fixtures, probabilities, prematch_sp, cutoff,
   exhausted <- unlist(lapply(structures, function(s) s$exhausted))
   structure <- list(supports = supports, support_summary = support_summary,
                     exhausted = exhausted, per_pattern = structures)
-  tickets <- n7_enumerate_tickets(groups$group_legs, probabilities, cutoff, supports)
-  valued <- n7_value_tickets(tickets$tickets, tickets$ticket_legs, prematch_sp,
+  tickets <- parlay_enumerate_tickets(groups$group_legs, probabilities, cutoff, supports,
+                                       n_legs = constants$n_legs)
+  valued <- parlay_value_tickets(tickets$tickets, tickets$ticket_legs, prematch_sp,
                              cutoff, constants$sp_threshold, constants$sp_replacement,
                              constants$unit_cny, constants$payout_factor)
   list(groups = groups, structure = structure, tickets = tickets, valued = valued)
@@ -203,7 +226,7 @@ n7_build_decision <- function(fixtures, probabilities, prematch_sp, cutoff,
 
 # Rank tickets inside the hard legal support space.
 #
-#   n7_rank_tickets(tickets, candidate_tickets, cutoff, ranking)
+#   parlay_rank_tickets(tickets, candidate_tickets, cutoff, ranking)
 #     -> candidate_id, ticket_id, rank, cumulative_mass  (+ probability, ev_net_est)
 #
 # The contract's first version ranks by descending probability ("probability_desc").
@@ -221,18 +244,18 @@ n7_build_decision <- function(fixtures, probabilities, prematch_sp, cutoff,
 #' @param cutoff Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.
 #' @param ranking Ranking policy: probability_desc or ev_desc; EV ranking requires available values.
 #' @return A ranked tibble with candidate-specific integer rank and unnormalised cumulative probability.
-n7_rank_tickets <- function(tickets, candidate_tickets, cutoff,
+parlay_rank_tickets <- function(tickets, candidate_tickets, cutoff,
                             ranking = "probability_desc") {
-  n7_require_cutoff(cutoff)
-  n7_validate_table(tickets, "tickets", keys = "ticket_id")
+  match_require_cutoff(cutoff)
+  match_validate_table(tickets, "tickets", keys = "ticket_id")
   # Full schema validation, not just a column presence check. candidate_tickets
   # declares the composite key (candidate_id, ticket_id); a duplicated reference
   # would otherwise be ranked twice and then BOUGHT twice, charging the issue budget
   # for the same physical ticket. Enforcing the declared key here is what makes that
   # declaration load-bearing on the real purchase path.
-  n7_validate_table(candidate_tickets, "candidate_tickets")
+  match_validate_table(candidate_tickets, "candidate_tickets")
   if (!ranking %in% c("probability_desc", "ev_desc")) {
-    stop("n7_rank_tickets: ranking must be 'probability_desc' or 'ev_desc', got ", ranking)
+    stop("parlay_rank_tickets: ranking must be 'probability_desc' or 'ev_desc', got ", ranking)
   }
   if (!nrow(candidate_tickets)) {
     return(tibble::tibble(
@@ -243,11 +266,11 @@ n7_rank_tickets <- function(tickets, candidate_tickets, cutoff,
   merged <- merge(as.data.frame(candidate_tickets), as.data.frame(tickets),
                   by = "ticket_id", all.x = TRUE, sort = FALSE)
   if (anyNA(merged$probability)) {
-    stop("n7_rank_tickets: candidate_tickets references tickets outside the table")
+    stop("parlay_rank_tickets: candidate_tickets references tickets outside the table")
   }
   if (identical(ranking, "ev_desc") && anyNA(merged$ev_net_est)) {
     # No silent fallback: an incomplete valuation cannot support an EV comparison.
-    stop("n7_rank_tickets: ev_desc requires a complete valuation; ",
+    stop("parlay_rank_tickets: ev_desc requires a complete valuation; ",
          sum(is.na(merged$ev_net_est)), " of ", nrow(merged), " candidate tickets have no EV")
   }
   score <- if (identical(ranking, "ev_desc")) merged$ev_net_est else merged$probability
@@ -284,16 +307,16 @@ n7_rank_tickets <- function(tickets, candidate_tickets, cutoff,
 #' @param payout_factor  长度 1 的数，派彩系数。
 #' @return list(payout, sp_missing)：payout 为该候选全部中奖票的派彩合计；
 #'   sp_missing 表示存在中奖票但 SP 尚不可用。
-#' @details 一张票只有在**全部七条腿**都与实现结果一致时才派彩。必须检查每一张已购
+#' @details 一张票只有在**全部腿**都与实现结果一致时才派彩。必须检查每一张已购
 #'   票，而不只是第一张：一个结构会买很多票，其中任何一张都可能是赢家。
 #'
 #' 中奖但 SP 尚不可用的票是 PENDING 而不是输：结算层同样拒绝结算它，诊断必须给出
 #' 一致的结论。
 #'
 #' 两侧都以 W/D/L 字符串比较：数值编码串永不相等，会把一笔中奖购买报成未中。
-n7_payout_for_candidate <- function(picked, ticket_strings, occupied, legs, visible,
+parlay_payout_for_candidate <- function(picked, ticket_strings, occupied, legs, visible,
                                      issue_id, unit_cny, payout_factor) {
-    # A ticket pays only if the realised result matches all seven of its legs. Every
+    # A ticket pays only if the realised result matches all of its legs. Every
     # purchased ticket must be checked, not just the first: a structure buys many
     # tickets and any one of them can be the winner.
     payout <- 0
@@ -312,7 +335,7 @@ n7_payout_for_candidate <- function(picked, ticket_strings, occupied, legs, visi
           # would make the payout depend on row order, exactly as in settlement.
           usable <- unique(row$settled_sp[!is.na(row$settled_sp)])
           if (length(usable) > 1L) {
-            stop("n7_diagnose_depth: conflicting settled SP for issue ", issue_id,
+            stop("parlay_diagnose_plan: conflicting settled SP for issue ", issue_id,
                  " fixture ", fixture_id)
           }
           if (!length(usable)) return(NA_real_)
@@ -336,19 +359,19 @@ n7_payout_for_candidate <- function(picked, ticket_strings, occupied, legs, visi
 #' @param candidates tibble，supports 表（含 candidate_id、fixture_id、outcome、allowed）。
 #' @param group_legs tibble，group_legs 表（含 group_id、fixture_id、leg_order）。
 #' @return 具名 list：名字为 candidate_id，值为该候选全部合法组合的字符串向量
-#'   （每串七位，按腿序拼接 W/D/L）。
+#'   （每串 n_legs 位，按腿序拼接 W/D/L）。
 #' @details 从候选**自己的支撑表**重建，而不是另算一套：诊断因此不可能与枚举实际
 #'   产出的组合不一致。
 #'
 #' 枚举必须按**与实现串相同的腿序**：取首次出现的行序会让组合串依赖行序，于是
 #' 成员判定与 support_mass 会在行被重排时改变。
 #'
-#' 重复的显式组会把同一场比赛列多次；按比赛折叠为一条腿，使组合串保持七位，
+#' 重复的显式组会把同一场比赛列多次；按比赛折叠为一条腿，使组合串保持 n_legs 位，
 #' 与枚举比较的实现串一致。
 #'
 #' 没有 allowed 结果的腿会产生空选项集，从而该候选一个组合都没有 —— 这是合法的
 #' 结果（该结构已被完全排除），不是错误。
-n7_candidate_support_grid <- function(candidates, group_legs) {
+parlay_candidate_support_grid <- function(candidates, group_legs) {
   checkmate::assert_data_frame(candidates, .var.name = "candidates")
   checkmate::assert_data_frame(group_legs, .var.name = "group_legs")
   # The legal combinations of each candidate, rebuilt from its support table so the
@@ -362,13 +385,13 @@ n7_candidate_support_grid <- function(candidates, group_legs) {
     reference <- reference[order(reference$leg_order), , drop = FALSE]
     reference <- reference[!duplicated(reference$fixture_id), , drop = FALSE]
     # A repeated explicit group lists a fixture more than once; collapse to one leg
-    # per fixture so the combination strings stay seven long, matching the realised
+    # per fixture so the combination strings stay n_legs long, matching the realised
     # string that enumeration compares against.
     fixture_ids <- reference$fixture_id[reference$fixture_id %in% block$fixture_id]
     fixture_ids <- unique(fixture_ids)
     options <- lapply(fixture_ids, function(f) {
       allowed <- block$outcome[block$fixture_id == f & block$allowed]
-      n7_outcomes()[n7_outcomes() %in% allowed]
+      match_outcomes()[match_outcomes() %in% allowed]
     })
     grid <- expand.grid(options, KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
     apply(grid, 1L, paste, collapse = "")
@@ -386,15 +409,15 @@ n7_candidate_support_grid <- function(candidates, group_legs) {
 #' @details 只允许读权威标签：**本期**、在 as_of 前**可用**、且真正**已结算**。
 #'   别期的标签，或一条状态被取消却仍带 outcome 的行，会去结算一个与它无关的方案。
 #'
-#' 同一 (issue, fixture) 上标签互相冲突是数据错误 —— 与 n7_settle_plan 一致。这项
+#' 同一 (issue, fixture) 上标签互相冲突是数据错误 —— 与 parlay_settle_plan 一致。这项
 #' 检查在**每一条可见行**上做，而不只是被买中的那张赢票触及的行，这样诊断的结论就
 #' 不依赖于恰好买了哪张票，也不依赖行序。
 #'
 #' status 为 NA 的行**不是**已结算行：丢掉它会让诊断把该腿当成完整并把这票记成
-#' 输。保留它，使该腿解析为 PENDING 与金额未知，与 n7_settle_plan 保持一致。
-n7_visible_settlements <- function(settlements, issue_id, as_of) {
+#' 输。保留它，使该腿解析为 PENDING 与金额未知，与 parlay_settle_plan 保持一致。
+parlay_visible_settlements <- function(settlements, issue_id, as_of) {
   checkmate::assert_data_frame(settlements, .var.name = "settlements")
-  n7_check_character_id(issue_id, "issue_id")
+  match_check_character_id(issue_id, "issue_id")
   checkmate::assert_posixct(as_of, len = 1L, any.missing = FALSE, .var.name = "as_of")
   # Only authoritative labels may be read: the right issue, available by as_of, and
   # actually settled. A foreign issue's label or a cancelled row that still carries an
@@ -403,7 +426,7 @@ n7_visible_settlements <- function(settlements, issue_id, as_of) {
                            settlements$label_available_at <= as_of, , drop = FALSE]
   visible <- visible[visible$issue_id == issue_id, , drop = FALSE]
   # Conflicting labels for one (issue, fixture) are a data error, exactly as in
-  # n7_settle_plan. Checking this up front -- on every visible row, not only the rows
+  # parlay_settle_plan. Checking this up front -- on every visible row, not only the rows
   # a purchased winner touches -- keeps the diagnostic's verdict independent of which
   # ticket happened to be bought and of row order.
   if (nrow(visible)) {
@@ -413,25 +436,25 @@ n7_visible_settlements <- function(settlements, issue_id, as_of) {
         if (!field %in% names(block)) next
         values <- unique(as.character(block[[field]]))
         if (length(values) > 1L && field == "outcome") {
-          stop("n7_diagnose_depth: conflicting settlement outcomes for issue ",
+          stop("parlay_diagnose_plan: conflicting settlement outcomes for issue ",
                block$issue_id[1], " fixture ", block$fixture_id[1])
         }
         if (length(values) > 1L && field == "status" &&
             any(values != "settled")) {
-          stop("n7_diagnose_depth: conflicting settlement status for issue ",
+          stop("parlay_diagnose_plan: conflicting settlement status for issue ",
                block$issue_id[1], " fixture ", block$fixture_id[1])
         }
       }
       usable <- unique(block$settled_sp[!is.na(block$settled_sp)])
       if (length(usable) > 1L) {
-        stop("n7_diagnose_depth: conflicting settled SP for issue ",
+        stop("parlay_diagnose_plan: conflicting settled SP for issue ",
              block$issue_id[1], " fixture ", block$fixture_id[1])
       }
     }
   }
   # A row whose status is MISSING is not a settled row: dropping it would let the
   # diagnostic treat the leg as complete and book the ticket as a loss. Keep it so the
-  # leg resolves to PENDING with an unknown amount, matching n7_settle_plan.
+  # leg resolves to PENDING with an unknown amount, matching parlay_settle_plan.
   if ("status" %in% names(visible)) {
     status_lower <- tolower(as.character(visible$status))
     visible <- visible[is.na(status_lower) | status_lower == "settled", , drop = FALSE]
@@ -461,7 +484,7 @@ n7_visible_settlements <- function(settlements, issue_id, as_of) {
 #'
 #' 注资严格限制在该候选自己的额度内：上限是声明的方案，剩余 issue 预算是最外层
 #' 天花板。绝不借用其他候选的额度，否则会把混合配置抹平。
-n7_fund_admitted_groups <- function(allocations, ranked, group_legs, admitted,
+parlay_fund_admitted_groups <- function(allocations, ranked, group_legs, admitted,
                                     selected_ticket_ids, budget_units_left,
                                     max_reuse, max_overlap, unit_cny,
                                     issue_id = NULL, epoch_at = NULL) {
@@ -480,7 +503,7 @@ n7_fund_admitted_groups <- function(allocations, ranked, group_legs, admitted,
     fixtures_of_group <- sort(unique(legs$fixture_id))
     # Admission is a constraint on FIXTURE SETS, not on structures: two patterns over
     # the same fixtures still share those fixtures for reuse/overlap purposes.
-    verdict <- n7_group_admission(
+    verdict <- parlay_group_admission(
       prior_groups = lapply(admitted, function(x) x$fixtures),
       candidate = fixtures_of_group, max_reuse = max_reuse, max_overlap = max_overlap)
     if (!isTRUE(verdict$admitted)) {
@@ -506,7 +529,13 @@ n7_fund_admitted_groups <- function(allocations, ranked, group_legs, admitted,
     # consume its fixture set for reuse/overlap: with max_reuse = 1, a zero-allowance
     # first group would block a later group that shares its fixtures -- even though
     # the first group never placed a ticket on them.
-    admitted[[length(admitted) + 1L]] <- list(group_id = group_id, fixtures = fixtures_of_group)
+    existing <- which(vapply(admitted, function(x) identical(x$group_id, group_id), logical(1)))
+    if (!length(existing)) {
+      admitted[[length(admitted) + 1L]] <- list(group_id = group_id, fixtures = fixtures_of_group)
+    } else if (!identical(sort(admitted[[existing[1L]]]$fixtures), fixtures_of_group)) {
+      stop("parlay_fund_admitted_groups: one group identity names conflicting fixture sets")
+    }
+
     chosen <- group_tickets[seq_len(take), , drop = FALSE]
     funded_ids <- c(funded_ids, chosen$ticket_id)
     selected_ticket_ids <- c(selected_ticket_ids, chosen$ticket_id)
@@ -531,13 +560,13 @@ n7_fund_admitted_groups <- function(allocations, ranked, group_legs, admitted,
 #' @param unit_cap  长度 1 的非负整数或 NULL，所有结构共用的票额上限。
 #' @param unit_caps 具名数值向量或 NULL，按结构键索引的票额上限。
 #' @return 不可见地返回 TRUE；不合法时抛错。
-#' @details 抽取成独立函数，是因为公共入口 `n7_fund_groups()` 会在调用
-#'   `n7_resolve_allocations()` 之前提前返回。校验若只放在 resolver 内，空候选
+#' @details 抽取成独立函数，是因为 `.FundGroups()` 会在调用
+#'   `parlay_resolve_allocations()` 之前提前返回。校验若只放在 resolver 内，空候选
 #'   输入就会绕过全部检查并静默接受 NA/Inf/-1/1.5 这样的上限。
 #'
 #' `assert_count` 已拒绝 NA、负值与非整值；此处再补有限性与上界，避免
 #' `as.integer()` 的溢出保护把越界值变成 NA。
-n7_check_unit_caps <- function(unit_cap, unit_caps) {
+parlay_check_unit_caps <- function(unit_cap, unit_caps) {
   if (!is.null(unit_cap)) {
     checkmate::assert_count(unit_cap, positive = FALSE, .var.name = "unit_cap")
   }
@@ -545,10 +574,10 @@ n7_check_unit_caps <- function(unit_cap, unit_caps) {
     checkmate::assert_numeric(unit_caps, any.missing = FALSE, finite = TRUE,
                               lower = 0, .var.name = "unit_caps")
     if (any(unit_caps != trunc(unit_caps))) {
-      stop("n7_fund_groups: unit_caps must be whole ticket counts")
+      stop(".FundGroups: unit_caps must be whole ticket counts")
     }
     if (any(unit_caps > .Machine$integer.max)) {
-      stop("n7_fund_groups: unit_caps exceeds the integer range")
+      stop(".FundGroups: unit_caps exceeds the integer range")
     }
   }
   invisible(TRUE)
@@ -557,7 +586,7 @@ n7_check_unit_caps <- function(unit_cap, unit_caps) {
 #'
 #' @param candidate_labels 字符向量，已定序的 candidate_id（形如 '<集合>|<结构键>'）。
 #' @param pattern_keys     字符向量，已声明结构的键，顺序即声明顺序。
-#' @param patterns         具名 list，名字为结构键，值为长度 7 的整数向量。
+#' @param patterns         具名 list，名字为结构键，值为长度 n_legs 的整数向量。
 #' @param unit_cap         长度 1 的整数或 NULL，所有结构共用的票额上限。
 #' @param unit_caps        具名数值向量或 NULL，按结构键索引的票额上限。
 #' @return list，每项含 candidate_id、group_id、pattern、cap_tickets。
@@ -567,13 +596,13 @@ n7_check_unit_caps <- function(unit_cap, unit_caps) {
 #'
 #' unit_caps 按结构键索引而非按位置：两个恰好对齐的平行 list 一旦被改动就会静默
 #' 错配，而错误的票额上限不会在输出里显形。缺名即报错，而不是退化成 NULL。
-n7_resolve_allocations <- function(candidate_labels, pattern_keys, patterns,
+parlay_resolve_allocations <- function(candidate_labels, pattern_keys, patterns,
                                    unit_cap = NULL, unit_caps = NULL) {
   # Validate both cap forms BEFORE the loop, so an illegal cap fails even when the
   # candidate list is empty. Inside the loop an empty list would skip every check and
   # report success for NA/Inf/-1/1.5 -- a cap that is wrong but never exercised.
   # assert_count already rejects NA, negatives and non-whole values.
-  n7_check_unit_caps(unit_cap, unit_caps)
+  parlay_check_unit_caps(unit_cap, unit_caps)
   n_groups <- length(candidate_labels)
   label_of <- function(candidate_id) sub("^.*[|]", "", candidate_id)
   allocations <- vector("list", n_groups)
@@ -581,7 +610,7 @@ n7_resolve_allocations <- function(candidate_labels, pattern_keys, patterns,
     label <- label_of(candidate_labels[i])
     slot <- match(label, pattern_keys)
     if (is.na(slot)) {
-      stop("n7_fund_groups: candidate ", candidate_labels[i],
+      stop(".FundGroups: candidate ", candidate_labels[i],
            " does not match any declared pattern")
     }
     entry <- patterns[[slot]]
@@ -596,7 +625,7 @@ n7_resolve_allocations <- function(candidate_labels, pattern_keys, patterns,
     cap <- if (!is.null(unit_caps)) {
       key <- pattern_keys[[slot]]
       if (is.null(names(unit_caps)) || !key %in% names(unit_caps)) {
-        stop("n7_fund_groups: no unit cap declared for pattern ", key,
+        stop(".FundGroups: no unit cap declared for pattern ", key,
              "; unit_caps must be named by pattern key (",
              paste(pattern_keys, collapse = ", "), ")")
       }
@@ -629,10 +658,10 @@ n7_resolve_allocations <- function(candidate_labels, pattern_keys, patterns,
 #'
 #' 预留时跟踪前面 candidate 已经占掉的票：只看历史期会把本次调用中已被前面
 #' candidate 买走的组合也算进来，从而错误地扣掉后面 candidate 本可使用的额度。
-n7_allocate_budget_units <- function(allocations, ranked, budget_cny, unit_cny,
+parlay_allocate_budget_units <- function(allocations, ranked, budget_cny, unit_cny,
                                      prior_purchases = NULL, prior_fixture_sets = NULL) {
   n_groups <- length(allocations)
-  prior_purchases <- prior_purchases %||% n7_typed_empty("purchases")
+  prior_purchases <- prior_purchases %||% match_typed_empty("purchases")
   spent_before <- sum(prior_purchases$stake_cny)
   prior_msets <- prior_fixture_sets %||% list()
   committed_ticket_ids <- as.character(prior_purchases$ticket_id)
@@ -678,7 +707,7 @@ n7_allocate_budget_units <- function(allocations, ranked, budget_cny, unit_cny,
 #' 选出本次注资参与的 candidate，并确定它们的优先顺序
 #'
 #' @param ranked_labels 字符向量，ranked 表里出现过的全部 candidate_id（去重）。
-#' @param pattern_keys  字符向量，已声明结构的键（'p' + 七位数字），顺序即声明顺序。
+#' @param pattern_keys  字符向量，已声明结构的键（'p' + n_legs 位数字），顺序即声明顺序。
 #' @param n_groups      长度 1 的正整数，本次分配声明的分组数。
 #' @param group_order   字符向量或 NULL，调用方指定的注资优先级。
 #' @return 字符向量：按最终注资顺序排列的 candidate_id。
@@ -694,7 +723,7 @@ n7_allocate_budget_units <- function(allocations, ranked, budget_cny, unit_cny,
 #'
 #' 去重发生在 (集合, 结构) **配对**上而非集合上：只按集合去重会丢掉同一批比赛上
 #' 另一个合法结构，留下一个可投却未投的票。
-n7_select_funding_candidates <- function(ranked_labels, pattern_keys, n_groups,
+parlay_select_funding_candidates <- function(ranked_labels, pattern_keys, n_groups,
                                         group_order = NULL) {
   candidate_labels <- ranked_labels
   set_of <- function(candidate_id) sub("[|].*$", "", candidate_id)
@@ -772,11 +801,11 @@ n7_select_funding_candidates <- function(ranked_labels, pattern_keys, n_groups,
     known <- unique(c(ranked_labels, sub("[|].*$", "", ranked_labels)))
     unknown <- setdiff(ordered, known)
     if (length(unknown)) {
-      stop("n7_fund_groups: group_order names a group that was not ranked: ",
+      stop(".FundGroups: group_order names a group that was not ranked: ",
            paste(unknown, collapse = ", "))
     }
     if (all(is.na(priority))) {
-      stop("n7_fund_groups: group_order names a group that was not ranked")
+      stop(".FundGroups: group_order names a group that was not ranked")
     }
     candidate_labels <- candidate_labels[order(is.na(priority), priority,
                                                seq_along(candidate_labels))]
@@ -788,11 +817,11 @@ n7_select_funding_candidates <- function(ranked_labels, pattern_keys, n_groups,
 #'
 #' Operates on explicit inputs. Invalid contracts raise errors; no network,
 #' package installation or database writes occur.
-#' @param group_legs Tibble keyed by group_id and fixture_id, with seven ordered legs per group.
+#' @param group_legs Tibble keyed by group_id and fixture_id, with n_legs ordered legs per group.
 #' @param ranked Ranked tibble with candidate-specific authoritative rank and cumulative mass.
-#' @param patterns Named list of length-seven vectors of allowed outcome counts (1, 2 or 3).
+#' @param patterns Named list of n_legs-long vectors of allowed outcome counts (1, 2 or 3).
 #' @param budget_cny Nonnegative available budget in CNY, bounded by the explicit issue budget.
-#' @param constants Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.
+#' @param constants Named business constants returned by parlay_settings(); values are passed explicitly, never learned here.
 #' @param max_reuse Positive integer limit on fixture reuse across distinct purchased groups.
 #' @param max_overlap Integer upper limit on shared fixtures between distinct purchased groups.
 #' @param group_order Character candidate priority order, or NULL to use the declared order.
@@ -803,7 +832,7 @@ n7_select_funding_candidates <- function(ranked_labels, pattern_keys, n_groups,
 #' @param unit_caps Named nonnegative integer caps keyed by structure, or NULL.
 #' @param prior_fixture_sets Named list of fixture identifiers in groups bought earlier in this issue.
 #' @return A list of purchases, funded tickets, admitted fixture sets and budget diagnostics. Empty inputs retain the prior ledger.
-n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
+.FundGroups <- function(group_legs, ranked, patterns, budget_cny, constants,
                            max_reuse, max_overlap, group_order = NULL, unit_cap = NULL,
                            prior_purchases = NULL, issue_id = NULL, epoch_at = NULL,
                            unit_caps = NULL, prior_fixture_sets = NULL) {
@@ -813,13 +842,13 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   required_constants <- c("issue_budget_cny", "unit_cny", "payout_factor")
   missing_constants <- setdiff(required_constants, names(constants))
   if (length(missing_constants)) {
-    stop("n7_fund_groups: constants is missing ",
+    stop(".FundGroups: constants is missing ",
          paste(missing_constants, collapse = ", "))
   }
   checkmate::assert_numeric(budget_cny, len = 1L, any.missing = FALSE, finite = TRUE,
                             .var.name = "budget_cny")
   if (budget_cny < 0) {
-    stop("n7_fund_groups: budget_cny must be non-negative; got ", budget_cny)
+    stop(".FundGroups: budget_cny must be non-negative; got ", budget_cny)
   }
   # max_reuse and max_overlap are the group-admission caps. An NA cap would make
   # every admission comparison NA and silently admit nothing (or everything),
@@ -836,30 +865,30 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   checkmate::assert_list(patterns, min.len = 1L, names = "unique",
                          .var.name = "patterns")
   if (is.null(names(patterns)) || any(!nzchar(names(patterns)))) {
-    stop("n7_fund_groups: patterns must be a named list; names are the structure keys")
+    stop(".FundGroups: patterns must be a named list; names are the structure keys")
   }
   derived_keys <- vapply(patterns, function(p) paste0("p", paste(p, collapse = "")),
                          character(1))
   if (!identical(unname(names(patterns)), unname(derived_keys))) {
     mismatched <- names(patterns)[names(patterns) != derived_keys]
-    stop("n7_fund_groups: pattern name(s) ",
+    stop(".FundGroups: pattern name(s) ",
          paste(mismatched, collapse = ", "),
          " do not match their contents")
   }
   # 上限本身必须先合法，再谈它挂在哪个 pattern 名下。这一步放在所有提前返回之前：
   # 空候选不该让 NA/Inf/-1/1.5 这样的上限静默通过。
-  n7_check_unit_caps(unit_cap, unit_caps)
+  parlay_check_unit_caps(unit_cap, unit_caps)
   # unit_caps 必须按 pattern 名索引。两个恰好对齐的平行 list 一旦被改动就会静默
   # 错配，而错误的票额上限不会在输出里显形，所以这里要求名字完整。
   if (!is.null(unit_caps)) {
     checkmate::assert_numeric(unit_caps, names = "unique", .var.name = "unit_caps")
     if (is.null(names(unit_caps))) {
-      stop("n7_fund_groups: unit_caps must be named by pattern key (",
+      stop(".FundGroups: unit_caps must be named by pattern key (",
            paste(derived_keys, collapse = ", "), ")")
     }
     missing_caps <- setdiff(derived_keys, names(unit_caps))
     if (length(missing_caps)) {
-      stop("n7_fund_groups: no unit cap declared for pattern ",
+      stop(".FundGroups: no unit cap declared for pattern ",
            paste(missing_caps, collapse = ", "),
            "; unit_caps must be named by pattern key")
     }
@@ -869,7 +898,7 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   # the purchase path would let a duplicated reference through the empty-candidate
   # return and, more importantly, would leave the declaration unenforced wherever a
   # caller reaches this function directly.
-  n7_validate_table(ranked, "ranked", keys = c("candidate_id", "ticket_id"))
+  match_validate_table(ranked, "ranked", keys = c("candidate_id", "ticket_id"))
   # The ISSUE budget is an absolute ceiling on everything bought on one issue. A
   # config may declare a smaller demo limit, but never a larger one: an allocation
   # alone must not be able to spend past CNY1,024.
@@ -879,7 +908,7 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   # "nothing bought THIS call", not "this issue has no history": zeroing spent_before
   # or dropping fixture_sets would tell the next epoch the issue was untouched and
   # invite rebuying tickets that were already paid for.
-  prior_purchases <- prior_purchases %||% n7_typed_empty("purchases")
+  prior_purchases <- prior_purchases %||% match_typed_empty("purchases")
   prior_msets <- prior_fixture_sets %||% list()
   spent_before <- sum(prior_purchases$stake_cny)
   remaining <- budget_cny - spent_before
@@ -887,8 +916,8 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   affordable <- floor(remaining / constants$unit_cny)
   empty_exit <- function() {
     fixture_sets <- prior_msets
-    list(purchases = n7_typed_empty("purchases"),
-         funded = n7_typed_empty("ranked"),
+    list(purchases = match_typed_empty("purchases"),
+         funded = match_typed_empty("ranked"),
          fixture_sets = fixture_sets,
          diagnostics = list(n_groups = 0L,
                             admitted_groups = names(prior_msets),
@@ -932,15 +961,15 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   # pattern to every set: config B is "8 groups: 4 at 3333222 and 4 at 2222221", so
   # taking both structures on all 8 sets would double the candidate count and halve
   # each cap, which is not the declared plan.
-  candidate_labels <- n7_select_funding_candidates(ranked_labels, pattern_keys,
+  candidate_labels <- parlay_select_funding_candidates(ranked_labels, pattern_keys,
                                                  n_groups, group_order)
   n_groups <- length(candidate_labels)
   if (!n_groups) {
     return(empty_exit())
   }
-  allocations <- n7_resolve_allocations(candidate_labels, pattern_keys, patterns,
+  allocations <- parlay_resolve_allocations(candidate_labels, pattern_keys, patterns,
                                            unit_cap, unit_caps)
-  budget_plan <- n7_allocate_budget_units(allocations, ranked, budget_cny,
+  budget_plan <- parlay_allocate_budget_units(allocations, ranked, budget_cny,
                                               constants$unit_cny,
                                               prior_purchases, prior_fixture_sets)
   allocations <- budget_plan$allocations
@@ -964,7 +993,7 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   # budget plan, not per-candidate allowances.
   selected_ticket_ids <- as.character(prior_purchases$ticket_id)
   budget_units_left <- affordable
-  funding <- n7_fund_admitted_groups(allocations, ranked, group_legs, admitted,
+  funding <- parlay_fund_admitted_groups(allocations, ranked, group_legs, admitted,
                                        selected_ticket_ids, budget_units_left,
                                        max_reuse, max_overlap, constants$unit_cny,
                                        issue_id, epoch_at)
@@ -982,12 +1011,12 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
   # One row per BOUGHT ticket, taken from the purchase ledger and tied to the
   # CANDIDATE that bought it. A ticket id is shared by every structure over the same
   # fixture set, so a bare id lookup would report candidates that bought nothing.
-  bought <- if (length(purchases)) dplyr::bind_rows(purchases) else n7_typed_empty("purchases")
+  bought <- if (length(purchases)) dplyr::bind_rows(purchases) else match_typed_empty("purchases")
   funded <- if (nrow(bought)) {
     pick <- match(paste(bought$ticket_id, bought$candidate_id),
                   paste(ranked$ticket_id, ranked$candidate_id))
     if (anyNA(pick)) {
-      stop("n7_fund_groups: a purchase has no matching ranked candidate")
+      stop(".FundGroups: a purchase has no matching ranked candidate")
     }
     ranked[pick, , drop = FALSE]
   } else {
@@ -1018,27 +1047,41 @@ n7_fund_groups <- function(group_legs, ranked, patterns, budget_cny, constants,
 #' package installation or database writes occur.
 #' @param issue_id Nonempty character issue identifier, preserving leading zeros.
 #' @param epoch_utc One UTC POSIXct decision instant.
-#' @param group_legs Tibble keyed by group_id and fixture_id, with seven ordered legs per group.
+#' @param group_legs Tibble keyed by group_id and fixture_id, with n_legs ordered legs per group.
 #' @param structure Structural support result containing candidates and their legal outcome masks.
 #' @param tickets Enumerated ticket tibble, or the enumeration result list where required by plan freezing.
 #' @param valued Ticket tibble with probability and estimated value fields.
 #' @param funded Funded candidate ticket table produced by allocation.
 #' @param purchases Purchase ledger tibble with issue_id, ticket_id and stake_cny.
-#' @param constants Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.
+#' @param constants Named business constants returned by parlay_settings(); values are passed explicitly, never learned here.
 #' @param policies Explicit named policy settings; no historical tuning is performed by this function.
 #' @return A frozen plan list with receipt and immutable input identities.
-n7_freeze_plan <- function(issue_id, epoch_utc, group_legs, structure, tickets,
+.FreezeParlayPlan <- function(issue_id, epoch_utc, group_legs, structure, tickets,
                            valued, funded, purchases, constants, policies) {
-  n7_check_character_id(issue_id, "issue_id")
+  match_check_character_id(issue_id, "issue_id")
   # The epoch is the freeze's chronology anchor: a character or non-UTC instant
   # would pass through unread and make the frozen artifact wrongly replayable.
   checkmate::assert_posixct(epoch_utc, len = 1L, any.missing = FALSE,
                             .var.name = "epoch_utc")
   checkmate::assert_list(constants, names = "named", .var.name = "constants")
+  # Freeze the plan width alongside unit_cny/payout_factor. Settlement reads these
+  # values back from the plan, so a later session update can never re-price or
+  # re-shape an already frozen plan.
+  #
+  # An EMPTY plan (no fixtures survived selection) has no group legs to read a width
+  # from. That is not a width of zero: it is the declared plan width with nothing
+  # built, so the frozen width uses the declared n_legs and a following
+  # settle/diagnose call returns typed-empty instead of erroring on 0 == 7.
+  n_legs <- parlay_structure_legs(group_legs)
+  frozen_constants <- constants
+  if (n_legs == 0L) n_legs <- as.integer(constants$n_legs)
+  frozen_constants$n_legs <- n_legs
+  checkmate::assert_true(as.integer(constants$n_legs) == n_legs,
+                         .var.name = "constants$n_legs must match the plan width")
   list(
     issue_id = issue_id,
     epoch_utc = epoch_utc,
-    constants = constants,
+    constants = frozen_constants,
     policies = policies,
     group_legs = group_legs,
     supports = structure$supports,
@@ -1051,7 +1094,7 @@ n7_freeze_plan <- function(issue_id, epoch_utc, group_legs, structure, tickets,
 
 # --- settlement (post-freeze only) ------------------------------------------
 
-# n7_settle_plan(plan, settlements, as_of, unit_cny, payout_factor)
+# parlay_settle_plan(plan, settlements, as_of)
 #   -> list(ticket_returns, group_returns, issue_returns)
 #
 # Chronology: this is the only function that reads outcomes, and it reads a FROZEN
@@ -1066,23 +1109,34 @@ n7_freeze_plan <- function(issue_id, epoch_utc, group_legs, structure, tickets,
 #'
 #' Operates on explicit inputs. Invalid contracts raise errors; no network,
 #' package installation or database writes occur.
-#' @param plan Frozen plan returned by n7_freeze_plan().
+#' @param plan Frozen plan returned by parlay_build_plan(); it carries the frozen
+#'   n_legs, unit_cny and payout_factor, so settlement cannot be re-priced or
+#'   re-shaped by a later session change.
 #' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
 #' @param as_of UTC POSIXct instant limiting visible settlement labels.
-#' @param unit_cny Positive numeric cost of one physical ticket, in CNY.
-#' @param payout_factor Positive ticket-level payout factor, applied once.
 #' @return A list of ticket, group and issue return tibbles; unresolved outcomes remain pending.
-n7_settle_plan <- function(plan, settlements, as_of, unit_cny, payout_factor) {
-  n7_validate_table(settlements, "settlements")
+parlay_settle_plan <- function(plan, settlements, as_of) {
+  match_validate_table(settlements, "settlements")
   if (!inherits(as_of, "POSIXct") || !identical(attr(as_of, "tzone"), "UTC")) {
-    stop("n7_settle_plan: as_of must be a UTC POSIXct instant")
+    stop("parlay_settle_plan: as_of must be a UTC POSIXct instant")
   }
+  # The frozen constants are the authority. Passing unit/payout in again would let a
+  # caller re-price a plan that was already frozen with different values.
+  if (!is.list(plan) || is.null(plan$constants)) {
+    stop("parlay_settle_plan: plan must be a frozen plan with a constants block")
+  }
+  unit_cny <- plan$constants$unit_cny
+  payout_factor <- plan$constants$payout_factor
+  plan_n_legs <- plan$constants$n_legs
   if (length(unit_cny) != 1L || !is.finite(unit_cny) || unit_cny <= 0) {
-    stop("n7_settle_plan: unit_cny must be positive")
+    stop("parlay_settle_plan: plan unit_cny must be positive")
   }
   if (length(payout_factor) != 1L || !is.finite(payout_factor) ||
       payout_factor <= 0 || payout_factor > 1) {
-    stop("n7_settle_plan: payout_factor must lie in (0,1]")
+    stop("parlay_settle_plan: plan payout_factor must lie in (0,1]")
+  }
+  if (length(plan_n_legs) != 1L || !is.finite(plan_n_legs) || plan_n_legs < 1) {
+    stop("parlay_settle_plan: plan n_legs must be a positive whole number")
   }
   funded <- plan$funded
   ticket_legs <- plan$ticket_legs
@@ -1112,6 +1166,13 @@ n7_settle_plan <- function(plan, settlements, as_of, unit_cny, payout_factor) {
   for (i in seq_len(nrow(funded))) {
     ticket_id <- funded$ticket_id[i]
     legs <- ticket_legs[ticket_legs$ticket_id == ticket_id, , drop = FALSE]
+    # A ticket whose leg count disagrees with the frozen plan width is a corrupted
+    # plan, not a settlement question: paying it would settle a ticket the plan
+    # never froze.
+    if (nrow(legs) != as.integer(plan_n_legs)) {
+      stop("parlay_settle_plan: ticket ", ticket_id, " has ", nrow(legs),
+           " legs but the frozen plan declares ", as.integer(plan_n_legs))
+    }
     # Every leg is examined. Stopping at the first unavailable label would leave a
     # ticket PENDING even when a later leg is already a known miss, which wrongly
     # keeps its stake out of the settled denominator.
@@ -1131,13 +1192,13 @@ n7_settle_plan <- function(plan, settlements, as_of, unit_cny, payout_factor) {
       # Conflicting labels or odds for one key are a data error, not a row-order
       # choice: picking a row silently would make the payout depend on row order.
       if (nrow(row) > 1L && length(unique(row$outcome)) > 1L) {
-        stop("n7_settle_plan: conflicting settlement outcomes for issue ",
+        stop("parlay_settle_plan: conflicting settlement outcomes for issue ",
              plan$issue_id, " fixture ", fixture_id)
       }
       if (nrow(row) > 1L) {
         usable <- unique(row$settled_sp[!is.na(row$settled_sp)])
         if (length(usable) > 1L) {
-          stop("n7_settle_plan: conflicting settled SP for issue ", plan$issue_id,
+          stop("parlay_settle_plan: conflicting settled SP for issue ", plan$issue_id,
                " fixture ", fixture_id)
         }
       }
@@ -1147,7 +1208,7 @@ n7_settle_plan <- function(plan, settlements, as_of, unit_cny, payout_factor) {
       # Conflicting statuses for one key are a data error, never a row-order choice.
       statuses <- unique(tolower(as.character(row$status)))
       if (length(statuses) > 1L) {
-        stop("n7_settle_plan: conflicting settlement status for issue ", plan$issue_id,
+        stop("parlay_settle_plan: conflicting settlement status for issue ", plan$issue_id,
              " fixture ", fixture_id)
       }
       settlement_status <- tolower(as.character(row$status[1]))
@@ -1164,7 +1225,7 @@ n7_settle_plan <- function(plan, settlements, as_of, unit_cny, payout_factor) {
       }
       if (!identical(observed, expected)) {
         # An abnormal/cancelled label is not a plain miss; flag it distinctly.
-        leg_status[leg_index] <- if (observed %in% n7_outcomes()) "LOST" else "SPECIAL"
+        leg_status[leg_index] <- if (observed %in% match_outcomes()) "LOST" else "SPECIAL"
         next
       }
       # Prefer any USABLE odds among the rows for this key. Taking row 1 would make
@@ -1236,113 +1297,375 @@ n7_settle_plan <- function(plan, settlements, as_of, unit_cny, payout_factor) {
 
 # The contract requires three demonstrations, each named explicitly rather than
 # chosen by an optimiser:
-#   A: four groups of the 3333222 structure (4 x 128 units = 512 units)
-#   B: four groups of 3333222 plus four groups of 2222221 (4 x 128 + 4 x 64)
-#   C: 96 supported tickets with 80 bought, to show truncation inside a structure
-#' Construct the fixed demonstration allocation policies
+#   A: four groups of the wide structure (4 x 128 units = 512 units)
+#   B: four groups of wide plus four groups of narrow (4 x 128 + 4 x 64)
+#   C: supported tickets with a cap below the whole space, to show truncation
+#
+# Each returned configuration is COMPLETE and can be handed straight to
+# parlay_build_plan() with no second constants argument: it carries its own settings
+# snapshot plus every reuse/overlap/seed/construction default.
+#' Construct the fixed demonstration strategy configurations
 #'
 #' Operates on explicit inputs. Invalid contracts raise errors; no network,
 #' package installation or database writes occur.
-#' @param constants Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.
-#' @return A named list of allocation configurations; these are examples, not fitted strategies.
-n7_allocation_configs <- function(constants = n7_pipeline_constants()) {
-  # constants drives every budget below. A NULL or partial list would silently
+#' @param settings Named business settings snapshot with the complete key set:
+#'   n_legs, issue_budget_cny, unit_cny, payout_factor, sp_threshold,
+#'   sp_replacement. parlay_settings() supplies the session snapshot by default.
+#' @return A named list of complete strategy configurations for parlay_build_plan().
+#'   These are illustrative presets, not empirically optimised settings: the wide and
+#'   narrow widths are demonstrations, not a claim about which width pays.
+parlay_allocation_configs <- function(settings = parlay_settings()) {
+  # settings drives every budget below. A NULL or partial list would silently
   # produce budget_cny = numeric(0) and propagate an empty budget through the
-  # whole allocation, so require the full contract constant block.
-  checkmate::assert_list(constants, names = "named", .var.name = "constants")
-  required <- c("n_legs", "unit_cny", "issue_budget_cny", "payout_factor")
-  missing <- setdiff(required, names(constants))
-  if (length(missing)) {
-    stop("n7_allocation_configs: constants is missing ",
-         paste(missing, collapse = ", "))
+  # whole allocation, so require the full contract settings block.
+  parlay_validate_settings(settings)
+  n_legs <- as.integer(settings$n_legs)
+  # Patterns are generated from the plan width instead of being written out for
+  # seven legs, so the same three demonstrations describe a 6-, 7- or 8-leg plan.
+  # Each shape is a depth profile repeated/truncated to n_legs: "wide" leans on
+  # total support, "narrow" concentrates on fewer outcomes per leg. The named
+  # pattern keys ("p" + digits) remain both the candidate label and the unit_caps
+  # index, so pattern/cap association still cannot silently misalign.
+  depth_profile <- function(profile) {
+    as.integer(rep_len(profile, n_legs))
   }
-  checkmate::assert_numeric(constants$unit_cny, len = 1L, any.missing = FALSE,
-                            finite = TRUE, .var.name = "constants$unit_cny")
-  if (constants$unit_cny <= 0) {
-    stop("n7_allocation_configs: constants$unit_cny must be positive; got ",
-         constants$unit_cny)
+  pattern <- function(values) {
+    values <- depth_profile(values)
+    stats::setNames(list(values), paste0("p", paste(values, collapse = "")))
   }
+  wide <- pattern(c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
+  narrow <- pattern(c(2L, 2L, 2L, 2L, 2L, 2L, 1L))
+  mixed <- pattern(c(3L, 2L, 2L, 2L, 2L, 2L, 1L))
+  # Every configuration declares the same construction, ranking, seed and admission
+  # defaults; only the patterns, group count, cap and budget differ. They are
+  # written out in full rather than merged from a shared template so a caller can
+  # read one block and know exactly what will be built.
+  config_defaults <- function() list(
+    construction_method = "entropy_balanced", ranking = "probability_desc",
+    max_reuse = 1L, max_overlap = n_legs - 1L, seed = 1L)
   list(
     # unit_cap is how many tickets a group may buy under this allocation: the
     # group's share of the budget, not the size of its whole structural space.
-    # patterns 是**具名** list，名字就是结构键（"p" + 七位数字）。这个名字同时是
-    # candidate_label 的来源和 unit_caps 的索引键，因此 pattern 与 cap 的对应关系
-    # 不再依赖两个平行 list 的下标对齐：改坏一个会在取值时报错，而不是静默错配。
-    A = list(name = "A", label = "4 groups x 3333222 (128 units each)",
-             patterns = list(p3333222 = c(3L, 3L, 3L, 3L, 2L, 2L, 2L)),
-             n_groups = 4L, unit_cap = 128L,
-             budget_cny = 4L * 128L * constants$unit_cny),
+    A = c(list(name = "A", label = paste0("4 groups x wide (128 units each, ", n_legs, " legs)"),
+               settings = settings, patterns = wide, n_groups = 4L, unit_cap = 128L,
+               budget_cny = 4L * 128L * settings$unit_cny), config_defaults()),
     # 4 x 96 + 4 x 32 = 512 units = 1024 CNY, the contract's mixed demonstration.
     # Each group draws the pattern in its own slot and the per-slot ticket cap;
-    # unit_caps 按同一组名字索引，所以 "4 组用 96" 与 "4 组用 32" 的对应不可能错位。
-    B = list(name = "B", label = "4 groups x 3333222 (96 each) + 4 groups x 2222221 (32 each)",
-             patterns = list(p3333222 = c(3L, 3L, 3L, 3L, 2L, 2L, 2L),
-                             p2222221 = c(2L, 2L, 2L, 2L, 2L, 2L, 1L)),
-             n_groups = 8L, unit_caps = c(p3333222 = 96L, p2222221 = 32L),
-             budget_cny = (4L * 96L + 4L * 32L) * constants$unit_cny),
-    C = list(name = "C", label = "96 supported tickets, 80 bought",
-             patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
-             n_groups = 1L, unit_cap = 80L,
-             budget_cny = 80L * constants$unit_cny))
+    # unit_caps is indexed by pattern name, so the association between the
+    # "4 groups at 96" and "4 groups at 32" halves can never silently misalign.
+    B = c(list(name = "B", label = paste0("4 groups x wide (96 each) + 4 groups x narrow (32 each), ", n_legs, " legs)"),
+           settings = settings, patterns = c(wide, narrow), n_groups = 8L,
+           unit_caps = stats::setNames(c(96L, 32L), c(names(wide), names(narrow))),
+           budget_cny = (4L * 96L + 4L * 32L) * settings$unit_cny), config_defaults()),
+    C = c(list(name = "C", label = paste0("supported tickets, capped (", n_legs, " legs)"),
+               settings = settings, patterns = mixed, n_groups = 1L, unit_cap = 80L,
+               budget_cny = 80L * settings$unit_cny), config_defaults()))
 }
 
 # Run one allocation end to end: construct, structure, enumerate, value, fund.
-#' Build and fund one explicit allocation policy
-#'
-#' Operates on explicit inputs. Invalid contracts raise errors; no network,
-#' package installation or database writes occur.
-#' @param config One explicit configuration from n7_allocation_configs().
-#' @param fixtures Validated fixture tibble containing issue identity, kickoff time and handicap.
-#' @param probabilities Tibble keyed by fixture_id and outcome, with nonnegative W/D/L probabilities summing to one per fixture.
-#' @param prematch_sp Pre-cutoff SP tibble; an empty table is allowed and causes unavailable estimated EV.
-#' @param cutoff Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.
-#' @param match_status Required match-status observation ledger; a missing ledger errors and an empty one excludes every fixture.
-#' @param constants Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.
-#' @param max_reuse Positive integer limit on fixture reuse across distinct purchased groups.
-#' @param max_overlap Integer upper limit on shared fixtures between distinct purchased groups.
-#' @param seed Explicit integer seed for deterministic construction.
-#' @param prior_purchases Tibble of prior physical purchases; duplicates must not be bought again.
-#' @param prior_fixture_sets Named list of fixture identifiers in groups bought earlier in this issue.
-#' @return A list containing config, built tables, probabilities, ranked tickets, funding and frozen plan.
-n7_run_allocation <- function(config, fixtures, probabilities, prematch_sp, cutoff,
-                              match_status, constants, max_reuse, max_overlap,
-                              seed = 1L,
-                              prior_purchases = NULL, prior_fixture_sets = NULL) {
-  # entropy_balanced deals groups round-robin over the 7-leg blocks, so B needs
-  # 8 x 7 = 56 fixtures. When the priced slate is shorter than that, fewer groups
-  # are formed and the shortfall is reported rather than silently ignored.
-  built <- n7_build_decision(fixtures, probabilities, prematch_sp, cutoff,
-                             match_status, config$patterns, "entropy_balanced",
-                             config$n_groups, seed, constants, max_reuse, max_overlap)
+#
+# .BuildParlayPlan is the AUTHORITATIVE private engine. It takes explicit tables and
+# an explicit cutoff, and is the only place the funding/freezing algorithm lives.
+# parlay_build_plan() is a thin facade over it that binds a projection object to the
+# same context; the two never re-implement each other. Low-level tests exercise this
+# engine directly with tables, while the public normal flow exercises the facade.
+#
+# @param projected Bound projection from estimate_match_probabilities(). It carries
+#   the cutoff, the selected fixtures/status and the pre-match SP, so the engine
+#   cannot be handed a projection from a different decision instant.
+# @param config One explicit strategy configuration.
+# @param prior_purchases Optional tibble of prior purchases for this issue.
+# @param prior_fixture_sets Optional named list of fixture sets bought earlier.
+#' Build a plan using explicit bound context and prior tables
+#' @param projected Bound match projection with cutoff and validated input tibbles.
+#' @param config Complete strategy list including a settings snapshot.
+#' @param prior_purchases Optional purchases tibble; CNY stake per physical ticket.
+#' @param prior_fixture_sets Named list of fixture IDs for all purchased groups.
+#' @return Full result with frozen plan and cumulative history; no settlement read.
+#' @details Internal engine used after public strategy/history validation.
+.BuildParlayPlan <- function(projected, config, prior_purchases = NULL,
+                             prior_fixture_sets = NULL) {
+  context <- parlay_projection_context(projected)
+  fixtures <- projected$fixtures
+  probabilities <- projected$probabilities
+  prematch_sp <- projected$prematch_sp
+  cutoff <- context$cutoff
+  match_status <- projected$match_status
+  constants <- config$settings
+  # entropy_balanced deals groups round-robin over n_legs blocks, so a mixed
+  # allocation needs that many fixtures per group. When the priced slate is shorter
+  # than that, fewer groups are formed and the shortfall is reported rather than
+  # silently ignored.
+  built <- .BuildDecisionTables(fixtures, probabilities, prematch_sp, cutoff,
+                             match_status, config$patterns, config$construction_method,
+                             config$n_groups, config$seed, constants)
   # Rank the VALUED tickets: built$tickets$tickets is the raw enumeration, whose
   # ev_net_est is still NA by construction.
-  ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets,
-                            cutoff, config$ranking %||% "probability_desc")
-  funded <- n7_fund_groups(built$groups$group_legs, ranked, config$patterns,
-                           config$budget_cny, constants, max_reuse, max_overlap,
+  ranked <- parlay_rank_tickets(built$valued, built$tickets$candidate_tickets,
+                            cutoff, config$ranking)
+  funded <- .FundGroups(built$groups$group_legs, ranked, config$patterns,
+                           config$budget_cny, constants, config$max_reuse,
+                           config$max_overlap,
                            # config$name is the authority for which cap form applies. Reading
                            # config$unit_cap directly is unsafe: R's $ does PARTIAL matching, so
-                           # for a config that declares only unit_caps (B) it silently returns
+                           # for a config that declares only unit_caps it silently returns
                            # unit_caps -- a length-2 vector handed to a length-1 parameter.
                            unit_cap = if ("unit_cap" %in% names(config)) config$unit_cap else NULL,
                            unit_caps = if ("unit_caps" %in% names(config)) config$unit_caps else NULL,
                            prior_purchases = prior_purchases,
                            prior_fixture_sets = prior_fixture_sets,
                            issue_id = cutoff$issue_id, epoch_at = cutoff$cutoff_utc)
-  plan <- n7_freeze_plan(cutoff$issue_id, cutoff$cutoff_utc, built$groups$group_legs,
+  plan <- .FreezeParlayPlan(cutoff$issue_id, cutoff$cutoff_utc, built$groups$group_legs,
                          built$structure, built$tickets, built$valued,
                          funded$funded, funded$purchases, constants,
-                         list(allocation = config$name, max_reuse = max_reuse,
-                              max_overlap = max_overlap))
+                         list(allocation = config$name, max_reuse = config$max_reuse,
+                              max_overlap = config$max_overlap,
+                              model_config = projected$model_config,
+                              market_policy = projected$market_policy))
+  # history is the object the next call for this issue must be handed: purchases and
+  # their fixture sets travel TOGETHER, so a later call can neither forget what was
+  # bought nor re-open a group it already deepened.
+  history <- list(purchases = dplyr::bind_rows(
+    prior_purchases %||% match_typed_empty("purchases"), funded$purchases),
+    fixture_sets = funded$fixture_sets)
   # probabilities is returned alongside built so diagnostics can rebuild support
   # without reaching back into the caller's inputs.
-  list(config = config, built = built, probabilities = probabilities, ranked = ranked,
-       funded = funded, plan = plan)
+  list(config = config, cutoff = cutoff, constants = constants,
+       built = built, probabilities = probabilities, ranked = ranked,
+       funded = funded, plan = plan, history = history)
+}
+
+# Bind a projection object to the context its engine needs. Every public entrypoint
+# that consumes a projection goes through this one check, so "the projection's
+# cutoff is the decision instant" is enforced in exactly one place.
+#' Validate the decision context on a probability projection
+#' @param projected List containing cutoff, fixtures, probabilities, prematch_sp and match_status.
+#' @return Invisibly a list containing the validated cutoff; errors on missing or mismatched issue identity.
+parlay_projection_context <- function(projected) {
+  if (!is.list(projected)) {
+    stop("parlay_projection_context: projected must be a projection object")
+  }
+  for (field in c("cutoff", "fixtures", "probabilities", "prematch_sp", "match_status")) {
+    if (is.null(projected[[field]])) {
+      stop("parlay_projection_context: projected is missing ", field)
+    }
+  }
+  match_require_cutoff(projected$cutoff)
+  checkmate::assert_data_frame(projected$fixtures, .var.name = "projected$fixtures")
+  checkmate::assert_character(projected$match_status$status, min.len = 0L,
+                              .var.name = "projected$match_status")
+  # The projection's cutoff is bound to the fixture slate it carries. A hand-assembled
+  # projection whose cutoff names another issue would otherwise price and buy one
+  # issue's fixtures under a different decision identity.
+  if ("issue_id" %in% names(projected$fixtures)) {
+    stray <- setdiff(unique(as.character(projected$fixtures$issue_id)),
+                     as.character(projected$cutoff$issue_id))
+    if (length(stray)) {
+      stop("parlay_projection_context: projected fixtures belong to issue ",
+           paste(stray, collapse = ", "), " but the cutoff is bound to '",
+           projected$cutoff$issue_id, "'")
+    }
+  }
+  invisible(list(cutoff = projected$cutoff))
+}
+
+# Validate one explicit strategy configuration. An UNKNOWN field is refused rather
+# than ignored: a misspelled budget would otherwise leave the real ceiling at its
+# default and change what the plan buys. The settings snapshot is required in full.
+#' Validate a complete explicit strategy configuration
+#' @param strategy_config Named list of settings, structures, allocation and admission controls.
+#' @return The input invisibly; invalid or unknown fields raise errors even for empty decisions.
+parlay_validate_strategy_config <- function(strategy_config) {
+  checkmate::assert_list(strategy_config, names = "unique",
+                         .var.name = "strategy_config")
+  allowed <- c("name", "label", "settings", "patterns", "construction_method",
+               "n_groups", "ranking", "budget_cny", "max_reuse", "max_overlap",
+               "seed", "unit_cap", "unit_caps")
+  unknown <- setdiff(names(strategy_config), allowed)
+  if (length(unknown)) {
+    stop("parlay_validate_strategy_config: unknown field(s) ",
+         paste(unknown, collapse = ", "), "; allowed fields are ",
+         paste(allowed, collapse = ", "))
+  }
+  required <- c("settings", "patterns", "construction_method", "n_groups",
+                "ranking", "budget_cny", "max_reuse", "max_overlap", "seed")
+  missing <- setdiff(required, names(strategy_config))
+  if (length(missing)) {
+    stop("parlay_validate_strategy_config: strategy_config is missing ",
+         paste(missing, collapse = ", "))
+  }
+  # settings is the complete frozen snapshot: n_legs, unit_cny, payout_factor,
+  # sp_threshold, sp_replacement, issue_budget_cny. A partial snapshot would read
+  # NULL deep inside the engine instead of failing here.
+  parlay_validate_settings(strategy_config$settings)
+  checkmate::assert_list(strategy_config$patterns, min.len = 1L, names = "unique",
+                         .var.name = "strategy_config$patterns")
+  n_legs <- as.integer(strategy_config$settings$n_legs)
+  wrong_width <- vapply(strategy_config$patterns,
+                        function(p) length(p) != n_legs, logical(1))
+  if (any(wrong_width)) {
+    stop("parlay_validate_strategy_config: every pattern must have ", n_legs,
+         " legs; pattern(s) ", paste(which(wrong_width), collapse = ", "),
+         " disagree")
+  }
+  checkmate::assert_string(strategy_config$name, min.chars = 1L,
+                           .var.name = "strategy_config$name")
+  checkmate::assert_string(strategy_config$construction_method, min.chars = 1L,
+                           .var.name = "strategy_config$construction_method")
+  checkmate::assert_string(strategy_config$ranking, min.chars = 1L,
+                           .var.name = "strategy_config$ranking")
+  checkmate::assert_count(strategy_config$n_groups, positive = TRUE,
+                          .var.name = "strategy_config$n_groups")
+  checkmate::assert_count(strategy_config$max_reuse, positive = TRUE,
+                          .var.name = "strategy_config$max_reuse")
+  checkmate::assert_count(strategy_config$max_overlap,
+                          .var.name = "strategy_config$max_overlap")
+  checkmate::assert_numeric(strategy_config$budget_cny, len = 1L, any.missing = FALSE,
+                            finite = TRUE, lower = 0,
+                            .var.name = "strategy_config$budget_cny")
+  checkmate::assert_count(strategy_config$seed,
+                          .var.name = "strategy_config$seed")
+  parlay_check_unit_caps(
+    if ("unit_cap" %in% names(strategy_config)) strategy_config$unit_cap else NULL,
+    if ("unit_caps" %in% names(strategy_config)) strategy_config$unit_caps else NULL)
+  invisible(strategy_config)
+}
+
+# Prior history: either the object returned by a previous parlay_build_plan()/call,
+# a list(purchases=, fixture_sets=), or NULL. The two parts are validated together
+# because dropping the fixture sets is what silently re-opens already-bought groups.
+#' Validate paired cumulative purchases and group identities
+#' @param prior_purchases NULL or list(purchases, fixture_sets). Purchases are a typed tibble with CNY stakes; sets are named character vectors.
+#' @return Validated list of purchases and fixture sets. Detached, duplicate, nonpositive or unmatched records raise errors.
+parlay_validate_prior_state <- function(prior_purchases) {
+  if (is.null(prior_purchases)) {
+    return(list(purchases = NULL, fixture_sets = NULL))
+  }
+  # A bare purchase tibble is REFUSED, not silently accepted. Purchases without their
+  # fixture sets would let a later decision re-open a group it already deepened, so
+  # the two halves must travel together. Callers pass the `history` object returned by
+  # an earlier parlay_build_plan(), which is exactly list(purchases=, fixture_sets=).
+  if (is.data.frame(prior_purchases)) {
+    stop("parlay_validate_prior_state: prior_purchases must carry purchases AND ",
+         "fixture_sets together; pass the `history` object from an earlier ",
+         "parlay_build_plan() call instead of a bare purchases tibble")
+  }
+  if (!is.list(prior_purchases)) {
+    stop("parlay_validate_prior_state: prior_purchases must be NULL or ",
+         "list(purchases=, fixture_sets=)")
+  }
+  purchases <- prior_purchases$purchases
+  fixture_sets <- prior_purchases$fixture_sets
+  if (is.null(purchases)) {
+    stop("parlay_validate_prior_state: prior history is missing purchases")
+  }
+  match_validate_table(purchases, "purchases")
+  # fixture_sets is REQUIRED: the contract is that purchases and their fixture sets
+  # are never detached. A caller with no prior groups states an empty list.
+  if (is.null(fixture_sets)) {
+    stop("parlay_validate_prior_state: prior history is missing fixture_sets; ",
+         "the purchases and their fixture sets must travel together")
+  }
+  if (!is.list(fixture_sets)) {
+    stop("parlay_validate_prior_state: prior history fixture_sets must be a list")
+  }
+  checkmate::assert_character(purchases$group_id, any.missing = FALSE, min.chars = 1,
+                              .var.name = "prior purchases group_id")
+  checkmate::assert_character(purchases$ticket_id, any.missing = FALSE, min.chars = 1,
+                              .var.name = "prior purchases ticket_id")
+  if (anyDuplicated(paste(purchases$issue_id, purchases$ticket_id))) {
+    stop("parlay_validate_prior_state: duplicate prior physical purchase")
+  }
+  if (any(!is.finite(purchases$stake_cny)) || any(purchases$stake_cny <= 0)) {
+    stop("parlay_validate_prior_state: prior stakes must be positive and finite")
+  }
+  if (length(fixture_sets) && (is.null(names(fixture_sets)) ||
+      anyNA(names(fixture_sets)) || any(!nzchar(names(fixture_sets))) ||
+      anyDuplicated(names(fixture_sets)))) {
+    stop("parlay_validate_prior_state: fixture_sets must have unique nonempty group names")
+  }
+  if (!setequal(names(fixture_sets), unique(purchases$group_id))) {
+    stop("parlay_validate_prior_state: fixture_sets must match exactly the purchased groups")
+  }
+  for (ids in fixture_sets) {
+    checkmate::assert_character(ids, min.len = 1L, any.missing = FALSE,
+                                min.chars = 1L, unique = TRUE,
+                                .var.name = "prior fixture identifiers")
+  }
+  return(list(purchases = purchases, fixture_sets = fixture_sets))
+}
+
+#' Build one issue's parlay plan from a bound projection
+#'
+#' Operates on explicit inputs. Invalid contracts raise errors; no network,
+#' package installation or database writes occur.
+#' @param projected Projection returned by estimate_match_probabilities(). It binds
+#'   the decision cutoff, the selected fixtures, the status ledger and the pre-match
+#'   SP, so the plan cannot be built against a different instant than the one the
+#'   probabilities were projected for.
+#' @param strategy_config One explicit strategy configuration, normally from
+#'   parlay_allocation_configs(). It carries the full settings snapshot plus
+#'   patterns, construction_method, n_groups, ranking, budget_cny, max_reuse,
+#'   max_overlap, seed and the unit cap form.
+#' @param prior_purchases Previous history for the SAME issue: the `history` object
+#'   returned by an earlier call, or list(purchases=, fixture_sets=). NULL means this
+#'   is the issue's first decision.
+#' @return A list with config, cutoff, constants, built, probabilities,
+#'   ranked, funded, plan and history. `history` is what the next call must receive.
+parlay_build_plan <- function(projected, strategy_config, prior_purchases = NULL) {
+  parlay_validate_strategy_config(strategy_config)
+  prior <- parlay_validate_prior_state(prior_purchases)
+  context <- parlay_projection_context(projected)
+  .ValidatePriorBinding(prior, context$cutoff, strategy_config)
+  .BuildParlayPlan(projected, strategy_config,
+                   prior_purchases = prior$purchases,
+                   prior_fixture_sets = prior$fixture_sets)
+}
+
+# Bind the running ledger to THIS decision. A prior history that belongs to another
+# issue, that was bought at or after the current decision instant, or that was built
+# under a different leg width cannot be carried forward: each of those would let a
+# decision reuse money or groups it never had. The ledger records its own issue and
+# purchase instant, so the check is done against evidence rather than a caller claim.
+#' Bind prior purchase history to the next decision
+#' @param prior Validated purchases/fixture_sets list.
+#' @param cutoff Explicit issue_id and UTC cutoff_utc decision context.
+#' @param config Strategy containing the explicit plan-level settings snapshot.
+#' @return TRUE invisibly; future/missing purchase times, another issue or differing leg counts error.
+.ValidatePriorBinding <- function(prior, cutoff, config) {
+  purchases <- prior$purchases
+  if (is.null(purchases) || !nrow(purchases)) {
+    return(invisible(TRUE))
+  }
+  issues <- unique(as.character(purchases$issue_id))
+  if (length(issues) != 1L || !identical(issues, as.character(cutoff$issue_id))) {
+    stop("parlay_build_plan: prior purchases belong to issue ",
+         paste(issues, collapse = ", "), " but this decision is for '",
+         cutoff$issue_id, "'")
+  }
+  if ("epoch_at" %in% names(purchases)) {
+    times <- purchases$epoch_at
+    if (anyNA(times) || any(!is.finite(as.numeric(times)))) {
+      stop("parlay_build_plan: prior purchase instants must be finite and nonmissing")
+    }
+    if (length(times) && any(times >= cutoff$cutoff_utc)) {
+      stop("parlay_build_plan: prior purchases must have been made strictly before ",
+           "the current decision instant")
+    }
+  }
+  widths <- vapply(prior$fixture_sets %||% list(),
+                   function(set) length(as.character(set)), integer(1))
+  if (length(widths) && any(widths != config$settings$n_legs)) {
+    stop("parlay_build_plan: prior fixture sets mix leg widths (",
+         paste(sort(unique(widths)), collapse = ", "), "); this plan uses ",
+         config$settings$n_legs)
+  }
+  invisible(TRUE)
 }
 # --- multi-issue replay and depth diagnostics -------------------------------
 
-# n7_diagnose_depth(candidates, probabilities, group_legs, ranked, purchased,
-#                   settlements, as_of, unit_cny, payout_factor)
+# .DiagnoseParlayPlan(candidates, probabilities, group_legs, ranked, purchased,
+#                   ticket_legs, candidate_tickets, settlements, as_of, unit_cny, payout_factor, issue_id)
 #   -> candidate_id, group_id, k, support_mass, selected_mass, true_rank, hit,
 #      stake_cny, gross_cny, net_cny, status
 #
@@ -1353,34 +1676,34 @@ n7_run_allocation <- function(config, fixtures, probabilities, prematch_sp, cuto
 # The full-space rank is diagnostic; it must never be used to make the decision.
 #
 # It consumes the pipeline's own tables rather than a bespoke structure, so the
-# diagnostic cannot drift from what was actually bought.
-#' Diagnose realised support depth and ticket returns
-#'
-#' Operates on explicit inputs. Invalid contracts raise errors; no network,
-#' package installation or database writes occur.
-#' @param candidates Structural support tibble keyed by candidate_id, fixture_id and outcome.
-#' @param probabilities Tibble keyed by fixture_id and outcome, with nonnegative W/D/L probabilities summing to one per fixture.
-#' @param group_legs Tibble keyed by group_id and fixture_id, with seven ordered legs per group.
-#' @param ranked Ranked tibble with candidate-specific authoritative rank and cumulative mass.
-#' @param purchased Selected physical ticket tibble with candidate attribution.
-#' @param ticket_legs Tibble keyed by ticket_id and fixture_id with the selected W/D/L outcome.
-#' @param candidate_tickets Tibble of unique candidate_id/ticket_id associations; physical tickets may be shared.
-#' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
-#' @param as_of UTC POSIXct instant limiting visible settlement labels.
-#' @param unit_cny Positive numeric cost of one physical ticket, in CNY.
-#' @param payout_factor Positive ticket-level payout factor, applied once.
-#' @param issue_id Nonempty character issue identifier, preserving leading zeros.
-#' @return A tibble with one row per candidate. Authoritative support ranks are retained for partial rankings; unavailable ranks are NA. Pending and mask-excluded results are distinguished.
-n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, purchased,
+# diagnostic cannot drift from what was actually bought. This is the AUTHORITATIVE
+# engine; parlay_diagnose_plan() is the thin public facade that pulls those tables
+# out of a build result and reads unit_cny/payout_factor from its FROZEN constants
+# rather than from a detached argument.
+#' Diagnose explicit candidate support and purchased tickets
+#' @param candidates Candidate support tibble.
+#' @param probabilities Match outcome probability tibble.
+#' @param group_legs Group-to-fixture ordering tibble.
+#' @param ranked Candidate-specific ranking tibble.
+#' @param purchased Physical purchase tibble with CNY stakes.
+#' @param ticket_legs Ticket-to-fixture-outcome tibble.
+#' @param candidate_tickets Unique candidate/ticket associations.
+#' @param settlements Actual outcomes, settled SP and label availability tibble.
+#' @param as_of UTC POSIXct settlement observation instant.
+#' @param unit_cny Frozen positive CNY cost per ticket.
+#' @param payout_factor Frozen ticket-level payout multiplier.
+#' @param issue_id Single character issue identifier.
+#' @return Candidate diagnostic tibble; unavailable outcomes remain pending, empty input is typed.
+.DiagnoseParlayPlan <- function(candidates, probabilities, group_legs, ranked, purchased,
                               ticket_legs, candidate_tickets, settlements, as_of,
                               unit_cny, payout_factor, issue_id) {
-  n7_validate_table(settlements, "settlements")
-  n7_validate_table(group_legs, "group_legs")
+  match_validate_table(settlements, "settlements")
+  match_validate_table(group_legs, "group_legs")
   if (!inherits(as_of, "POSIXct") || !identical(attr(as_of, "tzone"), "UTC")) {
-    stop("n7_diagnose_depth: as_of must be a UTC POSIXct instant")
+    stop("parlay_diagnose_plan: as_of must be a UTC POSIXct instant")
   }
   if (length(unit_cny) != 1L || !is.finite(unit_cny) || unit_cny <= 0) {
-    stop("n7_diagnose_depth: unit_cny must be positive")
+    stop("parlay_diagnose_plan: unit_cny must be positive")
   }
   empty <- tibble::tibble(
     candidate_id = character(0), group_id = character(0), k = integer(0),
@@ -1390,11 +1713,11 @@ n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, pur
     net_cny = numeric(0), status = character(0))
   if (!nrow(candidates)) return(empty)
 
-  visible <- n7_visible_settlements(settlements, issue_id, as_of)
-  wide <- n7_probability_wide(probabilities)
-  candidate_support <- n7_candidate_support_grid(candidates, group_legs)
+  visible <- parlay_visible_settlements(settlements, issue_id, as_of)
+  wide <- parlay_probability_wide(probabilities)
+  candidate_support <- parlay_candidate_support_grid(candidates, group_legs)
   # The realised string of each ticket, in its group's leg order.
-  ticket_strings <- n7_ticket_strings(ticket_legs, group_legs)
+  ticket_strings <- parlay_ticket_strings(ticket_legs, group_legs)
   rows <- list()
   # One row per CANDIDATE. The supports table holds one row per outcome, so iterate
   # the distinct candidate ids rather than every support row.
@@ -1429,7 +1752,10 @@ n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, pur
     occupied <- if (complete) paste(realised[legs$fixture_id], collapse = "") else NA_character_
 
     # The candidate's FULL legal space, ranked by raw probability.
-    support <- n7_outcomes()
+    if (nrow(legs) * log(3) > log(.Machine$integer.max)) {
+      stop("parlay_diagnose_plan: full outcome space exceeds the representable integer range")
+    }
+    support <- match_outcomes()
     full_combos <- expand.grid(rep(list(support), nrow(legs)), KEEP.OUT.ATTRS = FALSE,
                                stringsAsFactors = FALSE)
     combo_strings <- apply(full_combos, 1L, paste, collapse = "")
@@ -1456,16 +1782,16 @@ n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, pur
     # Rank by sorting the PAIRS together. Sorting the strings separately from the
     # probabilities would pair a probability with the wrong combination and produce a
     # rank that is simply wrong -- bounded, plausible, and incorrect.
-    # Ties break by TICKET ID, exactly as n7_rank_tickets orders a candidate's
+    # Ties break by TICKET ID, exactly as parlay_rank_tickets orders a candidate's
     # tickets. Breaking ties by outcome string instead would make a rank-1 purchase
     # report a different rank whenever probabilities are uniform.
-    # n7_ticket_strings returns ONE string per ticket; indexing it with positions
-    # from the leg table (seven rows per ticket) would read the wrong elements.
+    # parlay_ticket_strings returns ONE string per ticket; indexing it with positions
+    # from the leg table (n_legs rows per ticket) would read the wrong elements.
     # Build the (candidate, combination) -> ticket map from the ticket table itself,
     # once, so every combination resolves to its own ticket id.
     # Map each combination string to the ticket that encodes it, WITHIN this
-    # candidate. n7_ticket_strings returns a vector NAMED by ticket id, so the names
-    # carry the alignment; indexing it positionally against the seven-row-per-ticket
+    # candidate. parlay_ticket_strings returns a vector NAMED by ticket id, so the names
+    # carry the alignment; indexing it positionally against the n_legs-row-per-ticket
     # leg table reads the wrong elements.
     # SUPPORT rank is the position a BUYER could have seen, so it must follow the
     # SAME ranking the purchase used -- ranked$rank is authoritative (it honours the
@@ -1504,7 +1830,7 @@ n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, pur
     }
     own_ranked <- data.frame(ticket_id = own_ids, score = own_scores,
                              stringsAsFactors = FALSE)
-    string_lookup <- n7_ticket_strings(ticket_legs, group_legs)
+    string_lookup <- parlay_ticket_strings(ticket_legs, group_legs)
     pair_strings <- unname(string_lookup[as.character(own_ranked$ticket_id)])
     keep <- !is.na(pair_strings)
     pair_table <- data.frame(score = own_ranked$score[keep],
@@ -1512,7 +1838,7 @@ n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, pur
                              string = pair_strings[keep],
                              stringsAsFactors = FALSE)
     # rank is 1 = best, so ascending; probability is larger = better, so descending.
-    # Ties break on ticket id in both cases, matching n7_rank_tickets.
+    # Ties break on ticket id in both cases, matching parlay_rank_tickets.
     use_rank <- "rank" %in% names(ranked)
     pair_table <- if (use_rank) {
       pair_table[order(pair_table$score, pair_table$ticket_id), , drop = FALSE]
@@ -1552,12 +1878,12 @@ n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, pur
       purchased[purchased$ticket_id %in% mine, , drop = FALSE]
     }
     ordered <- ranked[ranked$candidate_id == candidate_id, , drop = FALSE]
-    payout_result <- n7_payout_for_candidate(picked, ticket_strings, occupied, legs,
+    payout_result <- parlay_payout_for_candidate(picked, ticket_strings, occupied, legs,
                                              visible, issue_id, unit_cny, payout_factor)
     payout <- payout_result$payout
     sp_missing <- payout_result$sp_missing
     # A matching ticket with unavailable SP cannot be valued yet, so the diagnostic
-    # stays PENDING exactly as n7_settle_plan does -- it is not a loss.
+    # stays PENDING exactly as parlay_settle_plan does -- it is not a loss.
     status <- if (!complete || isTRUE(sp_missing)) "PENDING" else
       if (!isTRUE(in_support)) "MASK_EXCLUDED" else "IN_SUPPORT"
     # Support mass is the summed probability of the candidate's own legal space,
@@ -1583,11 +1909,40 @@ n7_diagnose_depth <- function(candidates, probabilities, group_legs, ranked, pur
   dplyr::bind_rows(rows)
 }
 
-# n7_ticket_strings(ticket_legs, group_legs) -> named character vector
+#' Diagnose realised support depth and ticket returns for a built plan
+#'
+#' Operates on explicit inputs. Invalid contracts raise errors; no network,
+#' package installation or database writes occur.
+#' @param result Build result returned by parlay_build_plan(). It already carries
+#'   the bound cutoff and the tables the diagnostic consumes, so nothing is
+#'   reassembled by the caller.
+#' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+#' @param as_of UTC POSIXct instant limiting visible settlement labels.
+#' @return A tibble with one row per candidate, exactly as the private depth engine
+#'   produces. `unit_cny` and `payout_factor` come from the result's FROZEN constants,
+#'   never from a detached argument or a later session change.
+parlay_diagnose_plan <- function(result, settlements, as_of) {
+  if (!is.list(result) || is.null(result$built) || is.null(result$ranked) ||
+      is.null(result$funded) || is.null(result$cutoff)) {
+    stop("parlay_diagnose_plan: result must be a build result from parlay_build_plan()")
+  }
+  constants <- result$constants
+  if (is.null(constants)) {
+    stop("parlay_diagnose_plan: result must carry its frozen constants block")
+  }
+  .DiagnoseParlayPlan(
+    result$built$structure$supports, result$probabilities,
+    result$built$groups$group_legs, result$ranked,
+    result$funded$purchases, result$built$tickets$ticket_legs,
+    result$built$tickets$candidate_tickets, settlements, as_of,
+    constants$unit_cny, constants$payout_factor, result$cutoff$issue_id)
+}
+
+# parlay_ticket_strings(ticket_legs, group_legs) -> named character vector
 #
 # The outcome string of every ticket, in its group's leg order, so a realised result
 # can be compared to a specific ticket without relying on row order.
-n7_ticket_strings <- function(ticket_legs, group_legs) {
+parlay_ticket_strings <- function(ticket_legs, group_legs) {
   # Subsetting a non-data.frame with $ silently yields NULL, which would make this
   # return a zero-length result rather than report a bad call.
   checkmate::assert_data_frame(ticket_legs, .var.name = "ticket_legs")
@@ -1610,13 +1965,13 @@ n7_ticket_strings <- function(ticket_legs, group_legs) {
     if (length(owner)) {
       # Collapse the reference to ONE leg per fixture first. A repeated explicit
       # group lists a fixture more than once, so an uncollapsed reference would take
-      # the block to fourteen legs and produce a fourteen-character string that can
-      # never equal a seven-character realised result.
+      # the block to repeated legs and produce an over-long string that can
+      # never equal an n_legs-character realised result.
       order_ref <- group_legs[group_legs$group_id == owner[1], , drop = FALSE]
       order_ref <- order_ref[order(order_ref$leg_order), , drop = FALSE]
       order_ref <- order_ref[!duplicated(order_ref$fixture_id), , drop = FALSE]
       keep <- match(order_ref$fixture_id, block$fixture_id)
-      if (anyNA(keep)) stop("n7_ticket_strings: fixture ordering contains unmatched identifiers")
+      if (anyNA(keep)) stop("parlay_ticket_strings: fixture ordering contains unmatched identifiers")
       block <- block[keep, , drop = FALSE]
     }
     # The realised string is compared with a W/D/L string, so codes must be rendered
@@ -1626,91 +1981,66 @@ n7_ticket_strings <- function(ticket_legs, group_legs) {
   out
 }
 
-# n7_replay_issue(decision_inputs, decision_cutoffs, settlements, as_of, policies,
-#                 constants)
+# .ReplayIssue(projected_decisions, strategy_config, settlements, as_of)
 #   -> list(plans, purchases, settled, depth, metrics)
 #
-# Calls the SAME production decision function once per cutoff, in cutoff order,
-# passing the cumulative purchase ledger forward so reuse and overlap caps are
-# enforced across the whole sequence rather than per epoch. Settlement happens
-# only at the end: no decision in this loop can see an outcome.
-#' Replay decisions in time order using the accumulated purchase ledger
-#'
-#' Operates on explicit inputs. Invalid contracts raise errors; no network,
-#' package installation or database writes occur.
-#' @param decision_inputs List of epoch-specific input tables, excluding settlement labels.
-#' @param decision_cutoffs Ordered list of explicit issue-relative decision cutoffs.
-#' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
-#' @param as_of UTC POSIXct instant limiting visible settlement labels.
-#' @param policies Explicit named policy settings; no historical tuning is performed by this function.
-#' @param constants Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.
-#' @return A list of decisions, plans, purchases, settlement, depth and aggregate metrics.
-n7_replay_issue <- function(decision_inputs, decision_cutoffs, settlements, as_of,
-                            policies, constants) {
-  if (length(decision_inputs) != length(decision_cutoffs)) {
-    stop("n7_replay_issue: one cutoff per decision input is required")
-  }
-  order_index <- order(vapply(decision_cutoffs, function(c) as.numeric(c$cutoff_utc), numeric(1)))
+# Calls the SAME production decision function once per bound projection, in cutoff
+# order, passing the cumulative purchase ledger forward so reuse and overlap caps
+# are enforced across the whole sequence rather than per decision. Settlement
+# happens only at the end: no decision in this loop can see an outcome.
+#
+# It is ONE issue by construction: every projection must carry the same issue_id.
+# A caller that genuinely needs several issues calls this function once per issue
+# and combines the ledgers itself, rather than hiding parallelism behind an
+# argument that changes the function's meaning.
+#
+# This is the AUTHORITATIVE engine; parlay_replay_issue() is the thin public facade
+# that validates the sequence and then delegates here.
+#' Replay one issue through the authoritative public plan builder
+#' @param projected_decisions List of projections with their own bound cutoff.
+#' @param strategy_config Complete explicit strategy snapshot.
+#' @param settlements Outcome/SP/availability tibble, consumed only after planning.
+#' @param as_of UTC POSIXct settlement observation time.
+#' @return Plans, cumulative purchases, returns, depth and metrics; no external side effects.
+.ReplayIssue <- function(projected_decisions, strategy_config, settlements, as_of) {
+  order_index <- order(vapply(projected_decisions,
+                              function(p) as.numeric(p$cutoff$cutoff_utc), numeric(1)))
   plans <- list()
   purchases <- list()
   results <- list()
-  # The running issue-level purchase ledger. Each epoch receives everything bought
-  # before it, so reuse and overlap caps hold across epochs and no physical ticket
-  # is bought twice. Freezing the ledger BEFORE settlement is what keeps this
-  # causal: the loop below finishes before any label is read.
-  ledger <- n7_typed_empty("purchases")
+  # The running issue-level purchase ledger. Each decision receives everything
+  # bought before it, so reuse and overlap caps hold across decisions and no
+  # physical ticket is bought twice. Freezing the ledger BEFORE settlement is what
+  # keeps this causal: the loop below finishes before any label is read.
+  ledger <- match_typed_empty("purchases")
   ledger_sets <- list()
-  cxh <- constants
   for (step in order_index) {
-    inputs <- decision_inputs[[step]]
-    cutoff <- decision_cutoffs[[step]]
-    config <- policies$allocation
-    # Budget, reuse and overlap are ISSUE-level facts. A replay may cover several
-    # issues, so each one gets only its OWN history: handing issue B the tickets and
-    # spending of issue A would starve it of budget and forbid its legitimate groups.
-    own <- if (nrow(ledger)) {
-      ledger[as.character(ledger$issue_id) == as.character(cutoff$issue_id), , drop = FALSE]
-    } else {
-      ledger
-    }
-    own_sets <- ledger_sets[names(ledger_sets) %in%
-                              as.character(own$group_id)]
-    result <- n7_run_allocation(config, inputs$fixtures, inputs$probabilities,
-                               inputs$sp, cutoff, inputs$match_status, constants,
-                               policies$max_reuse, policies$max_overlap, policies$seed,
-                               prior_purchases = own,
-                               prior_fixture_sets = own_sets)
+    projected <- projected_decisions[[step]]
+    result <- parlay_build_plan(projected, strategy_config,
+                                prior_purchases = list(purchases = ledger,
+                                                       fixture_sets = ledger_sets))
     plans[[length(plans) + 1L]] <- result$plan
     results[[length(results) + 1L]] <- result
     bought <- result$funded$purchases
     if (nrow(bought)) {
       ledger <- dplyr::bind_rows(ledger, bought)
-      ledger_sets <- c(ledger_sets, result$funded$fixture_sets)
+      ledger_sets <- result$funded$fixture_sets
       purchases[[length(purchases) + 1L]] <- bought
     }
   }
-  all_purchases <- if (length(purchases)) dplyr::bind_rows(purchases) else n7_typed_empty("purchases")
-  # Two epochs of the SAME issue must never collide on a physical ticket. The
-  # purchase key is (issue_id, ticket_id): two different issues sharing fixture and
-  # outcome identities are legitimately separate purchases, not a collision.
-  if (nrow(all_purchases)) {
-    purchase_key <- paste(all_purchases$issue_id, all_purchases$ticket_id)
-    if (anyDuplicated(purchase_key)) {
-      stop("n7_replay_issue: a physical ticket was bought more than once on one issue")
-    }
+  all_purchases <- if (length(purchases)) dplyr::bind_rows(purchases) else match_typed_empty("purchases")
+  # Two decisions of the SAME issue must never collide on a physical ticket. One
+  # replay covers one issue, so the ticket id alone is the collision key.
+  if (nrow(all_purchases) && anyDuplicated(all_purchases$ticket_id)) {
+    stop("parlay_replay_issue: a physical ticket was bought more than once on one issue")
   }
-  settled <- lapply(plans, function(p) n7_settle_plan(p, settlements, as_of,
-                                                    constants$unit_cny,
-                                                    constants$payout_factor))
+  # Settlement reads the frozen constants from each plan, so a later session
+  # change cannot re-price a plan that was already frozen.
+  settled <- lapply(plans, function(p) parlay_settle_plan(p, settlements, as_of))
   # Depth diagnostics run only AFTER every decision is frozen: they are the one
   # place a realised result is allowed to meet the decision that was made.
   depth <- dplyr::bind_rows(lapply(results, function(result) {
-    n7_diagnose_depth(result$built$structure$supports, result$probabilities,
-                      result$built$groups$group_legs, result$ranked,
-                      result$funded$purchases, result$built$tickets$ticket_legs,
-                      result$built$tickets$candidate_tickets,
-                      settlements, as_of, constants$unit_cny, constants$payout_factor,
-                      result$plan$issue_id)
+    parlay_diagnose_plan(result, settlements, as_of)
   }))
   ticket_returns <- if (length(settled)) {
     dplyr::bind_rows(lapply(settled, function(x) x$ticket_returns))
@@ -1720,7 +2050,7 @@ n7_replay_issue <- function(decision_inputs, decision_cutoffs, settlements, as_o
                    payout_cny = numeric(0), net_cny = numeric(0))
   }
   stake <- sum(ticket_returns$stake_cny)
-  # Special results stay in their own bucket, mirroring n7_settle_plan.
+  # Special results stay in their own bucket, mirroring parlay_settle_plan.
   settled_stake <- sum(ticket_returns$stake_cny[
     !ticket_returns$status %in% c("PENDING", "SPECIAL")])
   pending_stake <- sum(ticket_returns$stake_cny[ticket_returns$status == "PENDING"])
@@ -1737,18 +2067,47 @@ n7_replay_issue <- function(decision_inputs, decision_cutoffs, settlements, as_o
     net_cny = payout - settled_stake,
     roi = if (settled_stake > 0) (payout - settled_stake) / settled_stake else NA_real_)
   # The three stake buckets PARTITION total stake, so subtracting them yields zero.
-  # Cash is what the replay's ISSUES left unspent: each issue is entitled to its own
-  # budget, so the allowance scales with the number of distinct issues covered.
-  # Every issue the replay COVERED is entitled to a budget, whether or not it ended
-  # up buying anything: an issue that spent nothing leaves its whole allowance as
-  # cash. The allowance is the ISSUE budget (CNY1,024), not the allocation config's
+  # Cash is what the replay's ISSUE left unspent: one replay is one issue, entitled
+  # to its own ISSUE budget. An issue that spent nothing leaves its whole allowance
+  # as cash. The allowance is the ISSUE budget (CNY1,024), not the strategy config's
   # own demo limit -- a config that spends less than the issue budget simply leaves
   # the rest unspent.
-  issue_ids <- unique(vapply(decision_cutoffs,
-                             function(c) as.character(c$issue_id), character(1)))
-  allowance <- constants$issue_budget_cny * length(issue_ids)
+  allowance <- strategy_config$settings$issue_budget_cny
   metrics$cash_cny <- max(0, allowance - stake)
   metrics$gross_cny <- payout
   list(plans = plans, purchases = all_purchases, settled = ticket_returns,
        depth = depth, metrics = metrics)
+}
+
+#' Replay one issue's decisions in time order using the accumulated purchase ledger
+#'
+#' Operates on explicit inputs. Invalid contracts raise errors; no network,
+#' package installation or database writes occur.
+#' @param projected_decisions List of projection objects from
+#'   estimate_match_probabilities(), each already bound to its own decision cutoff.
+#'   Every element must belong to the SAME issue: this function replays one issue,
+#'   and a mixed-issue sequence is refused rather than silently split.
+#' @param strategy_config One explicit strategy configuration applied to every
+#'   decision in the sequence.
+#' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+#' @param as_of UTC POSIXct instant limiting visible settlement labels.
+#' @return A list of plans, purchases, settlement, depth and aggregate metrics for
+#'   the replayed issue.
+parlay_replay_issue <- function(projected_decisions, strategy_config, settlements, as_of) {
+  if (!is.list(projected_decisions) || !length(projected_decisions)) {
+    stop("parlay_replay_issue: projected_decisions must be a non-empty list of projections")
+  }
+  parlay_validate_strategy_config(strategy_config)
+  cutoff_of <- function(p) {
+    parlay_projection_context(p)
+    p$cutoff
+  }
+  cutoffs <- lapply(projected_decisions, cutoff_of)
+  issues <- unique(vapply(cutoffs, function(c) as.character(c$issue_id), character(1)))
+  if (length(issues) != 1L) {
+    stop("parlay_replay_issue: one replay covers one issue; got ",
+         length(issues), " (", paste(issues, collapse = ", "),
+         "). Replay each issue separately and combine the ledgers explicitly.")
+  }
+  .ReplayIssue(projected_decisions, strategy_config, settlements, as_of)
 }

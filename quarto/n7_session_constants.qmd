@@ -7,17 +7,21 @@ execute:
   freeze: false
 ---
 
-本次按用户要求为 `n7_pipeline_constants()` 增加当前 R 会话内的读写能力。
+> 当前可执行示例已迁移到 #512 接口。下文原有测试计数、审阅记录和哈希属于此前交付的历史证据；本次重构的验收以 [parlay_api_contract.qmd](parlay_api_contract.qmd) 为准。
+
+
+#512 将固定七场的常量块改为可变场数的串场参数块 `parlay_settings()`：同一方案只用一个
+`n_legs`（默认 7，整数 >=1），`rho` 移出会话参数、成为显式 model 参数。本次验证会话读写接口。
 不写配置文件；新 R 会话从默认值开始。计算仍显式接收参数快照，修改会话参数
 不会回写此前取出的列表。这里验证接口，不作历史拟合或收益结论。
 
 ```{r}
 pkgload::load_all("../packages/beidan", quiet = TRUE)
-defaults <- n7_pipeline_constants(reset = TRUE)
-snapshot <- n7_pipeline_constants()
-updated <- n7_pipeline_constants(rho = -0.18, issue_budget_cny = 512)
-stopifnot(updated$rho == -0.18, updated$issue_budget_cny == 512,
-          snapshot$rho == -0.14, n7_pipeline_constants()$rho == -0.18)
+defaults <- parlay_settings(reset = TRUE)
+snapshot <- parlay_settings()
+updated <- parlay_settings(n_legs = 6L, issue_budget_cny = 512)
+stopifnot(updated$n_legs == 6L, updated$issue_budget_cny == 512,
+          snapshot$n_legs == 7L, parlay_settings()$n_legs == 6L)
 tibble::tibble(parameter = names(defaults),
                default = unlist(defaults, use.names = FALSE),
                current = unlist(updated, use.names = FALSE)) |>
@@ -29,22 +33,24 @@ tibble::tibble(parameter = names(defaults),
 `reset = TRUE` 与字段更新不能同时使用。
 
 ```{r}
-before <- n7_pipeline_constants()
-failure <- tryCatch(n7_pipeline_constants(rho = -0.12, unit_cny = 0),
+before <- parlay_settings()
+failure <- tryCatch(parlay_settings(n_legs = 8L, unit_cny = 0),
                     error = identity)
-stopifnot(inherits(failure, "error"), identical(before, n7_pipeline_constants()))
-restored <- n7_pipeline_constants(reset = TRUE)
+stopifnot(inherits(failure, "error"), identical(before, parlay_settings()))
+restored <- parlay_settings(reset = TRUE)
 stopifnot(identical(restored, defaults))
 tibble::tibble(check = c("非法更新原子拒绝", "恢复默认值"), passed = TRUE) |>
   knitr::kable()
 ```
 
 日常使用时，在包目录运行 `devtools::load_all(".")`，随后
-`constants <- n7_pipeline_constants(rho = -0.18)`。
+`settings <- parlay_settings(n_legs = 6L)`。
 `constants` 是返回值快照；单独调用 setter 不会自动更新调用者已有的变量。
-七场结构仍固定为 7；该接口不把 N7 算法推广为任意场数算法。
+同一方案的场数由 `n_legs` 决定且默认 7：接受 6/7/8 等任意整数 >=1，不设臆测上界，
+真实限制只是整数表示范围。结构长度、枚举、资金、冻结与结算都按该场数工作。
 开发时重新执行 `devtools::load_all(".")` 会重新加载包并恢复默认值；请在加载后
-执行本次需要的参数更新。`rho` 沿用现有模型校验范围，SP 阈值须大于 1。
+执行本次需要的参数更新。`rho` 已移出会话参数块，作为显式 model 参数传给
+`estimate_match_probabilities()`，其范围仍由既有校验决定；SP 阈值须大于 1。
 
 ## 验收记录
 
