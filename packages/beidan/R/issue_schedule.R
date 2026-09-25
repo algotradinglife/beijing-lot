@@ -108,9 +108,10 @@ issue_schedule_empty <- function() {
 #'   调用方的显式动作，直接用 `readr::write_csv()`）。原始响应在解析之前先落盘，
 #'   且每次采集写入独立子目录，不会覆盖既有快照。
 #'
-#'   比赛状态只依据来源给出的证据判定：Nowscore 的 `完场` 才是 finished，
-#'   `截止` 且无比分是 unknown，裸 `HH:mm` 是**销售显示**而不是比赛状态，
-#'   `cansale = TRUE` 也**不会**把它升级为 scheduled。
+#'   比赛状态采用同页 `M[slot][4]` 明确状态码，并核对其原生比赛ID；
+#'   源脚本定义0为未开赛。状态码原文保留于 `match_status_raw`，混合销售
+#'   显示仍保留于 `raw_display_nowscore`。缺少明确状态码或状态文本时为unknown；
+#'   `截止`、裸 `HH:mm`、未来开赛时间及 `cansale` 均不能单独推断scheduled。
 #' @export
 fetch_issue_schedule <- function(issue_id, raw_dir, backend, timeout = 25,
                                  retries = 2L, pages = NULL) {
