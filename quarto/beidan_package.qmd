@@ -28,9 +28,9 @@ tibble::tibble(package = "beidan", version = as.character(packageVersion("beidan
 
 ```{r}
 constants <- n7_pipeline_constants()
-kickoffs <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + seq(0, by = 900, length.out = 14L)
+kickoffs <- lubridate::with_tz(lubridate::ymd_hms("2026-09-23 12:00:00", tz = "Asia/Shanghai"), "UTC") + lubridate::dminutes(seq(0, by = 15, length.out = 14L))
 issue <- n7_make_fixture_issue("00123", kickoffs)
-cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz="UTC"))
+cutoff <- list(issue_id = "00123", cutoff_utc = lubridate::ymd_hms("2026-09-22 12:00:00", tz="UTC"))
 inputs <- n7_read_inputs(n7_fixture_source(issue), "00123")
 epoch <- n7_prepare_epoch(inputs, cutoff, "Asia/Shanghai",
   list(members=c("c01","c02","c03"), missing="error"),
@@ -157,3 +157,6 @@ S7 领域构造器和转换辅助函数保留在内部命名空间，公共表�
 [最终源码与测试 SHA-256 清单](../docs/research/reviews/beidan-package-reviewed-files.json)记录本次审阅涉及的实际文件，包括本 QMD。清单自身不参与自身哈希。
 第三轮审阅结论：迁移、后端身份绑定和调用方未发现可操作回归；本节只补充验证记录，不改变已审阅的分析执行逻辑。
 历史数据依赖的两项跳过保留为适用范围限制，不计作通过；本包的合成端到端验收不依赖这些数据。
+
+
+日期管理示例现按 #510 使用 lubridate；原审阅记录保留为当时证据，当前日期边界验收见 `n7_lubridate.qmd`。

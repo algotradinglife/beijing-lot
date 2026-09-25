@@ -191,20 +191,24 @@ n7_decision_epochs <- function(local_dates, hour = N7_DECISION_HOUR, tz = N7_DEC
 # ---- Forward window and eligibility -----------------------------------------
 
 # The half-open natural-day window of one decision epoch, returned as UTC
-# instants. The boundary is built from the local CALENDAR date rather than by
-# adding 24h, so a zone with a DST transition would still land on local midnight.
+# instants. The boundary is built from the LOCAL CALENDAR date in `tz` and the
+# next calendar day is reached with lubridate's calendar period (+ lubridate::days),
+# never by adding 24 hours, so a zone with a DST transition still lands on local
+# midnight: 2026-03-08 America/New_York is a 23-hour day and 2026-11-01 a 25-hour
+# day. Building midnight with lubridate::ymd() also makes the wall clock explicit
+# instead of relying on as.POSIXct()'s implicit "00:00:00" completion.
 n7_decision_window <- function(epoch_utc, tz = N7_DECISION_TZ) {
   epoch <- n7_utc_seconds(epoch_utc, "n7_decision_window: epoch_utc")
   if (length(epoch) != 1L) stop("n7_decision_window: epoch_utc must be one instant")
   if (!is.character(tz) || length(tz) != 1L || is.na(tz) || !tz %in% OlsonNames()) {
     stop("n7_decision_window: tz is not a known Olson timezone name: ", tz)
   }
-  local_date <- format(as.POSIXct(epoch, origin = "1970-01-01", tz = "UTC"),
-                       "%Y-%m-%d", tz = tz)
-  start_date <- format(as.Date(local_date) + 1, "%Y-%m-%d")
-  end_date <- format(as.Date(local_date) + 2, "%Y-%m-%d")
-  start <- as.POSIXct(paste(start_date, "00:00:00"), tz = tz)
-  end <- as.POSIXct(paste(end_date, "00:00:00"), tz = tz)
+  instant <- as.POSIXct(epoch, origin = "1970-01-01", tz = "UTC")
+  # The local calendar date the epoch falls on, as a Date rather than a string:
+  # Date arithmetic below is then a calendar operation, not text reformatting.
+  local_date <- lubridate::as_date(lubridate::with_tz(instant, tz), tz = tz)
+  start <- lubridate::ymd(format(local_date + lubridate::days(1)), tz = tz)
+  end <- lubridate::ymd(format(local_date + lubridate::days(2)), tz = tz)
   if (anyNA(start) || anyNA(end)) {
     stop("n7_decision_window: the natural-day boundary could not be built")
   }

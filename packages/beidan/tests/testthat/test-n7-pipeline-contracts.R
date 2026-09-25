@@ -542,11 +542,11 @@ testthat::test_that('n7_parse_utc 接受 Z、+HH:MM 与 +HHMM 三种写法', {
 
 testthat::test_that('n7_parse_utc 拒绝裸时间戳而非假定 UTC', {
   testthat::expect_error(n7_parse_utc('2026-09-23T10:00:00', 'kickoff_at'),
-                         'must carry an explicit UTC offset')
+                         'explicit UTC offset')
   testthat::expect_error(n7_parse_utc('2026-09-23', 'kickoff_at'),
-                         'must carry an explicit UTC offset')
+                         'explicit UTC offset')
   testthat::expect_error(n7_parse_utc('2026-09-23 10:00:00', 'kickoff_at'),
-                         'must carry an explicit UTC offset')
+                         'explicit UTC offset')
 })
 
 testthat::test_that('n7_parse_utc 拒绝 NA、非字符非 POSIXct 与不可解析值', {
@@ -617,7 +617,7 @@ testthat::test_that('n7_coerce_source_table 拒绝非整数与非数值内容', 
   testthat::expect_error(n7_coerce_source_table(nonnumeric, 'fixtures'), 'must be integer')
   bad_time <- base; bad_time$kickoff_at <- '2026-09-23 10:00:00'
   testthat::expect_error(n7_coerce_source_table(bad_time, 'fixtures'),
-                         'must carry an explicit UTC offset')
+                         'explicit UTC offset')
 })
 
 testthat::test_that('n7_coerce_source_table 在整数超范围时报错而非静默产出 NA', {

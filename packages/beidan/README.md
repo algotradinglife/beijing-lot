@@ -25,11 +25,11 @@ For the full repository environment, use its pinned `requirements.txt`, which in
 library(beidan)
 constants <- n7_pipeline_constants()
 # kickoff_at is an explicit UTC POSIXct vector; the fixture count follows from it.
-kickoffs <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + seq(0, by = 900, length.out = 14L)
+kickoffs <- lubridate::with_tz(lubridate::ymd_hms("2026-09-23 12:00:00", tz = "Asia/Shanghai"), "UTC") + lubridate::dminutes(seq(0, by = 15, length.out = 14L))
 fixture <- n7_make_fixture_issue("00123", kickoffs)
 backend <- n7_python_backend("/absolute/path/to/.venv/bin/python")
 cutoff <- n7_learning_cutoff(
-  "00123", as.POSIXct("2026-09-22 12:00:00", tz = "UTC"), backend
+  "00123", lubridate::ymd_hms("2026-09-22 12:00:00", tz = "UTC"), backend
 )
 # Reading is whole-issue: no cutoff argument, no date filtering.
 inputs <- n7_read_inputs(n7_fixture_source(fixture), "00123")
