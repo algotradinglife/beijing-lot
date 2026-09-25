@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 
 from src.nowscore_issue_inventory import INVENTORY_SCHEMA, archive_url, canonical, digest
-from src.nowscore_settlement import PLAYS, source_url
+from src.nowscore_settlement import PLAYS, source_url, settlement_parser, settlement_labels
 
 
 def make_history_capture_plan(
@@ -73,6 +73,10 @@ def make_history_capture_plan(
         for name in ("nowscore_history_plan.py", "nowscore_history_capture.py", "nowscore_history_assembly.py", "nowscore_issue_inventory.py",
                      "nowscore_settlement.py", "nowscore_bjdc_sp_history.py", "multimarket_p0.py")
     }
+    implementation.update({
+        "settlement/" + Path(module.__file__).name: digest(Path(module.__file__).read_bytes())
+        for module in (settlement_parser, settlement_labels)
+    })
     plan = {
         "schema": "nowscore_history_capture_plan_v1",
         "source": "nowscore",

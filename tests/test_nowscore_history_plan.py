@@ -97,3 +97,17 @@ def test_cli_preserves_inputs_and_refuses_overwrite(inventory, tmp_path, capsys)
     assert json.loads(source.read_text()) == inventory
     with pytest.raises(FileExistsError):
         main(argv)
+
+@pytest.mark.parametrize('module_name', ['settlement_parser', 'settlement_labels'])
+def test_relocated_parser_change_invalidates_plan(inventory, tmp_path, monkeypatch, module_name):
+    import src.nowscore_history_plan as module
+    imported = getattr(module, module_name)
+    original_path = __import__('pathlib').Path(imported.__file__)
+    isolated = tmp_path / original_path.name
+    isolated.write_bytes(original_path.read_bytes())
+    monkeypatch.setattr(imported, '__file__', str(isolated))
+    plan = make_plan(inventory)
+    assert 'settlement/' + original_path.name in plan['implementation_sha256']
+    isolated.write_bytes(isolated.read_bytes() + b'\n# changed parser identity\n')
+    with pytest.raises(ValueError, match='implementation'):
+        validate_history_capture_plan(plan, inventory)
