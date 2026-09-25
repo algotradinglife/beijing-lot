@@ -13,16 +13,16 @@
 #'   · 非字符 / 零长度 / 含 NA / 含空串 -> stop()
 #' @return 字符向量，形如 synthetic://n7-pipeline/<kind>/<key>。
 #' @details 前缀固定为 synthetic://，使任何下游都能一眼分辨合成数据与实测数据。
-n7_fixture_source_url <- function(kind, key) {
+example_source_url <- function(kind, key) {
   if (!is.character(kind) || length(kind) != 1L || is.na(kind) || !nzchar(kind)) {
-    stop("n7_fixture_source_url: kind must be one non-empty label")
+    stop("example_source_url: kind must be one non-empty label")
   }
   # Vectorised over key: see the note on the key check below.
   # key is vectorised: callers build it with sprintf() over a slot vector so the
   # whole column is produced in one tibble() expression. Require non-empty
   # strings, not a scalar.
   if (!is.character(key) || !length(key) || anyNA(key) || any(!nzchar(key))) {
-    stop("n7_fixture_source_url: key must be non-empty label(s)")
+    stop("example_source_url: key must be non-empty label(s)")
   }
   paste0("synthetic://n7-pipeline/", kind, "/", key)
 }
@@ -37,7 +37,7 @@ n7_fixture_source_url <- function(kind, key) {
 #'   对欧赔去水得到的是每家公司各自的 noisy 三元组（以 truth 为中心），而**不是**
 #'   truth 本身。truth 是底层参数，赔率是围绕它的抽样。因此不要断言"去水还原 truth"。
 #'
-#' @param issue_id     长度 1 的合法字符标识符（经 n7_check_character_id）。
+#' @param issue_id     长度 1 的合法字符标识符（经 match_check_character_id）。
 #'   · 长度 != 1 -> stop()（本生成器只命名一期）
 #' @param kickoff_at   非空、有限、非 NA 的 UTC POSIXct 向量。每个元素一场比赛。
 #'   · 非 POSIXct / 零长度 / 含 NA / 非有限 -> stop()
@@ -47,7 +47,7 @@ n7_fixture_source_url <- function(kind, key) {
 #' @param margin       长度 1 的正有限数值，用于给赔率加水位。
 #'   · <= 0 会产出 Inf 赔率，NA 会产出 NA 赔率，两者都静默 -> stop()
 #' @param match_status 长度 1 的字符，本期的比赛状态报告取值：scheduled（默认）
-#'   或任意 n7_match_statuses() 中的非 scheduled 取值。
+#'   或任意 match_status_levels() 中的非 scheduled 取值。
 #'   · 非法取值 -> stop()
 #'
 #' @return list(fixtures, euro, totals, prematch_sp, match_status, truth)，前五张为
@@ -55,61 +55,61 @@ n7_fixture_source_url <- function(kind, key) {
 #' @details 生成器**不推断决策 epoch**：kickoff_at 就是调用方声明的开赛时刻。
 #'   报价与初始状态报告都取每场 kickoff_at - 36 小时，再叠加已声明的小幅公司错开，
 #'   与任何 cutoff 无关 —— 因此跨日的整期读取能保留全部比赛日，而哪一天属于哪个
-#'   决策窗口由 n7_prepare_epoch 独占决定。
+#'   决策窗口由 prepare_match_inputs 独占决定。
 #'
 #'   match_status 是**显式合成**的观测台账：每场一条报告，status_at 等于 available_at
 #'   （合成源同时报告事件与观测），绝不从任何真实赛果或最终记录推导 —— 否则测试会
 #'   依赖"已知结果"而不是"当时看到了什么"。需要"事后观测"的测试自行 bind_rows 追加，
 #'   从而显式表达"这条报告在 cutoff 之后才出现"。
-n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
+make_example_issue <- function(issue_id, kickoff_at, n_companies = 3L,
                                   seed = 1L, margin = 1.06,
                                   match_status = "scheduled") {
-  n7_check_character_id(issue_id, "issue_id")
+  match_check_character_id(issue_id, "issue_id")
   # Exactly one issue: this generator names one issue, and a longer id would reach
   # tibble() and die there with a column-size error that names neither the argument
   # nor the cause.
   if (length(issue_id) != 1L) {
-    stop("n7_make_fixture_issue: issue_id must name exactly one issue; got ",
+    stop("make_example_issue: issue_id must name exactly one issue; got ",
          length(issue_id))
   }
   # kickoff_at is the explicit kickoff schedule. The fixture COUNT is derived from
   # it, not from a separate n_fixtures argument that could disagree with the vector.
   if (!inherits(kickoff_at, "POSIXct")) {
-    stop("n7_make_fixture_issue: kickoff_at must be a POSIXct vector")
+    stop("make_example_issue: kickoff_at must be a POSIXct vector")
   }
   if (!length(kickoff_at)) {
-    stop("n7_make_fixture_issue: kickoff_at must not be empty; it names the fixtures")
+    stop("make_example_issue: kickoff_at must not be empty; it names the fixtures")
   }
   if (anyNA(kickoff_at)) {
-    stop("n7_make_fixture_issue: kickoff_at must not be NA")
+    stop("make_example_issue: kickoff_at must not be NA")
   }
   if (any(!is.finite(as.numeric(kickoff_at)))) {
-    stop("n7_make_fixture_issue: kickoff_at must be finite")
+    stop("make_example_issue: kickoff_at must be finite")
   }
   # A non-UTC vector is converted explicitly rather than relabelled: the instant is
   # preserved, only the zone attribute changes, and the contract requires UTC.
   kickoff_utc <- lubridate::with_tz(kickoff_at, "UTC")
   if (!is.numeric(n_companies) || length(n_companies) != 1L || is.na(n_companies) ||
       !is.finite(n_companies) || n_companies != floor(n_companies) || n_companies < 1) {
-    stop("n7_make_fixture_issue: n_companies must be one positive whole number")
+    stop("make_example_issue: n_companies must be one positive whole number")
   }
   # margin overrounds the odds, so it must be strictly positive and finite;
   # margin = 0 yields Inf odds and margin = NA yields NA odds, both silently.
   if (!is.numeric(margin) || length(margin) != 1L || is.na(margin) ||
       !is.finite(margin) || margin <= 0) {
-    stop("n7_make_fixture_issue: margin must be one positive finite number")
+    stop("make_example_issue: margin must be one positive finite number")
   }
   if (!is.numeric(seed) || length(seed) != 1L || is.na(seed) || !is.finite(seed)) {
-    stop("n7_make_fixture_issue: seed must be one finite number")
+    stop("make_example_issue: seed must be one finite number")
   }
   if (!is.character(match_status) || length(match_status) != 1L ||
-      is.na(match_status) || !match_status %in% n7_match_statuses()) {
-    stop("n7_make_fixture_issue: match_status must be one of ",
-         paste(n7_match_statuses(), collapse = ", "))
+      is.na(match_status) || !match_status %in% match_status_levels()) {
+    stop("make_example_issue: match_status must be one of ",
+         paste(match_status_levels(), collapse = ", "))
   }
   set.seed(seed)
 
-  slot_values <- n7_check_slot(seq_along(kickoff_utc), "kickoff_at")
+  slot_values <- match_check_slot(seq_along(kickoff_utc), "kickoff_at")
   company_ids <- sprintf("c%02d", seq_len(n_companies))
 
   fixtures <- tibble::tibble(
@@ -120,7 +120,7 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
     kickoff_at = kickoff_utc,
     handicap = as.integer(sample(c(-1L, 0L, 0L, 0L, 1L), length(slot_values), replace = TRUE)),
     sale_state = rep("open", length(slot_values)),
-    source_url = n7_fixture_source_url("fixture", sprintf("%s_%03d", issue_id, slot_values)))
+    source_url = example_source_url("fixture", sprintf("%s_%03d", issue_id, slot_values)))
 
   # A mild home edge plus per-fixture noise. Dirichlet keeps triples valid.
   truth <- matrix(NA_real_, nrow = length(slot_values), ncol = 3L)
@@ -129,7 +129,7 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
     base <- pmax(base, 0.02)
     truth[i, ] <- base / sum(base)
   }
-  colnames(truth) <- n7_outcomes()
+  colnames(truth) <- match_outcomes()
   rownames(truth) <- fixtures$fixture_id
 
   # Quotes and the initial synthetic status report are observed before each kickoff.
@@ -159,7 +159,7 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
         odds_home = 1 / (noisy[1] * margin),
         odds_draw = 1 / (noisy[2] * margin),
         odds_away = 1 / (noisy[3] * margin),
-        source_url = n7_fixture_source_url(
+        source_url = example_source_url(
           "euro", paste0(fixtures$fixture_id[i], "_", company_ids[company_index])))
     }
   }
@@ -179,7 +179,7 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
           line = as.double(line),
           over_decimal = 1 / (over * margin),
           under_decimal = 1 / ((1 - over) * margin),
-          source_url = n7_fixture_source_url(
+          source_url = example_source_url(
             "totals",
             paste0(fixtures$fixture_id[i], "_", company_ids[company_index], "_", line)))
       }
@@ -191,13 +191,13 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
   # what makes SP valuation differ from probability without inventing drift.
   sp_rows <- list()
   for (i in seq_len(nrow(fixtures))) {
-    for (outcome in n7_outcomes()) {
+    for (outcome in match_outcomes()) {
       sp_rows[[length(sp_rows) + 1L]] <- tibble::tibble(
         fixture_id = fixtures$fixture_id[i],
         outcome = outcome,
         quote_at = quote_at[i],
         sp_raw = 1 / (truth[i, outcome] * 0.92),
-        source_url = n7_fixture_source_url("sp", paste0(fixtures$fixture_id[i], "_", outcome)))
+        source_url = example_source_url("sp", paste0(fixtures$fixture_id[i], "_", outcome)))
     }
   }
   prematch_sp <- dplyr::bind_rows(sp_rows)
@@ -212,7 +212,7 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
     status = rep(match_status, length(slot_values)),
     status_at = status_at,
     available_at = status_at,
-    source_url = n7_fixture_source_url("match_status", fixtures$fixture_id))
+    source_url = example_source_url("match_status", fixtures$fixture_id))
 
   list(fixtures = fixtures, euro = euro, totals = totals, prematch_sp = prematch_sp,
        match_status = match_status_table, truth = truth)
@@ -220,26 +220,26 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
 
 #' 把一个或多个已生成的期包装成 read_inputs 的 source
 #'
-#' @param ...  一个或多个由 n7_make_fixture_issue 返回的 list，每个必须含
+#' @param ...  一个或多个由 make_example_issue 返回的 list，每个必须含
 #'   fixtures/euro/totals/prematch_sp/match_status 五张表。
 #'   · 无参数                      -> stop()
 #'   · 任一参数非 list             -> stop()，并点名第几个参数
 #'   · 任一参数缺表                 -> stop()，并点名缺了哪些
-#' @return 可直接传给 n7_read_inputs 的 source list（kind = "frames"）。
+#' @return 可直接传给 read_match_inputs 的 source list（kind = "frames"）。
 #' @details 各期的同名表被纵向 bind_rows 合并；期号由 fixtures$issue_id 携带，
-#'   因此多期 source 仍由 n7_read_inputs 的 issue_ids 参数筛选。
-n7_fixture_source <- function(...) {
+#'   因此多期 source 仍由 read_match_inputs 的 issue_ids 参数筛选。
+example_match_source <- function(...) {
   issues <- list(...)
-  if (!length(issues)) stop("n7_fixture_source: at least one issue is required")
+  if (!length(issues)) stop("example_match_source: at least one issue is required")
   for (i in seq_along(issues)) {
     issue <- issues[[i]]
     if (!is.list(issue)) {
-      stop("n7_fixture_source: argument ", i, " must be a generated issue list")
+      stop("example_match_source: argument ", i, " must be a generated issue list")
     }
     missing <- setdiff(c("fixtures", "euro", "totals", "prematch_sp", "match_status"),
                        names(issue))
     if (length(missing)) {
-      stop("n7_fixture_source: argument ", i, " is missing ", paste(missing, collapse = ", "))
+      stop("example_match_source: argument ", i, " is missing ", paste(missing, collapse = ", "))
     }
   }
   list(kind = "frames",

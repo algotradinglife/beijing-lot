@@ -1,16 +1,18 @@
 Package: beidan
-Title: Beijing Single-Match N7 Research Pipeline
-Version: 0.1.0
+Title: Beijing Match and Parlay Research Pipeline
+Version: 0.2.0
 Authors@R: person("Beijing Lot", "Contributors", role = c("aut", "cre"), email = "hh.earlydays@gmail.com")
-Description: Explicit-input N7 probability projection, ticket construction,
-    constrained allocation, settlement and diagnostics with synthetic fixtures.
+Description: Explicit-input match probability projection and configurable
+    parlay group construction, ticket valuation, constrained allocation,
+    settlement and diagnostics with synthetic fixtures. One plan uses a single
+    leg count (6, 7 or 8), with a session-scoped parlay settings block.
     Includes the shared Python cutoff-driven historical learning backend.
 License: file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.3.0)
 Imports: checkmate, S7, tibble, dplyr, tidyr, lubridate,
     reticulate, rlang, stats, utils
-Suggests: testthat (>= 3.0.0), callr, knitr
+Suggests: testthat (>= 3.0.0), callr, knitr, pkgload
 Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
 Config/roxygen2/version: 8.1.0

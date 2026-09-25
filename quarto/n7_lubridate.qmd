@@ -7,6 +7,9 @@ execute:
   freeze: false
 ---
 
+> 当前可执行示例已迁移到 #512 接口。下文原有测试计数、审阅记录和哈希属于此前交付的历史证据；本次重构的验收以 [parlay_api_contract.qmd](parlay_api_contract.qmd) 为准。
+
+
 #510 本次仅统一输入时间解析、合成器固定时长与次日自然日窗口的日期管理，使用已有依赖 lubridate。公共时间列仍为 UTC POSIXct；数据为明确标注的合成输入，不涉及真实采集或历史学习。数值 epoch 和空表类型构造不机械替换。
 
 ## 正常使用流程（mock 数据源）
@@ -18,16 +21,17 @@ kickoff_at <- rep(lubridate::ymd_hms(
   tz = "Asia/Shanghai"), each = 7L) +
   lubridate::dminutes(rep(seq(0, by = 30, length.out = 7L), 2L))
 kickoff_at <- lubridate::with_tz(kickoff_at, "UTC")
-mock_source <- n7_fixture_source(n7_make_fixture_issue("00123", kickoff_at))
-inputs <- n7_read_inputs(mock_source, "00123")
+mock_source <- example_match_source(make_example_issue("00123", kickoff_at))
+inputs <- read_match_inputs(mock_source, "00123")
 stopifnot(nrow(inputs$fixtures) == 14L)
 knitr::kable(inputs$fixtures[, c("issue_id", "fixture_id", "kickoff_at")])
-cutoff <- list(issue_id = "00123", cutoff_utc = lubridate::with_tz(
-  lubridate::ymd_hms("2026-09-22 20:00:00", tz = "Asia/Shanghai"), "UTC"))
-epoch <- n7_prepare_epoch(inputs, cutoff,
-  euro_policy = list(members = c("c01", "c02", "c03"), missing = "error"),
-  totals_policy = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
-stopifnot(nrow(epoch$fixtures) == 7L, nrow(inputs$fixtures) == 14L)
+decision_at <- lubridate::ymd_hms("2026-09-22 20:00:00", tz = "Asia/Shanghai")
+market_policy <- list(
+  euro = list(members = c("c01", "c02", "c03"), missing = "error"),
+  totals = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
+epoch <- prepare_match_inputs(inputs, decision_at, market_policy)
+stopifnot(nrow(epoch$fixtures) == 7L, nrow(inputs$fixtures) == 14L,
+          identical(epoch$cutoff$cutoff_utc, lubridate::with_tz(decision_at, "UTC")))
 knitr::kable(epoch$fixtures[, c("fixture_id", "kickoff_at")])
 ```
 
@@ -37,12 +41,12 @@ knitr::kable(epoch$fixtures[, c("fixture_id", "kickoff_at")])
 
 ```{r}
 instant <- lubridate::ymd_hms("2026-09-22 20:00:00.25", tz = "Asia/Shanghai")
-parsed <- beidan:::n7_parse_utc(instant, "independent instant")
+parsed <- beidan:::match_parse_utc(instant, "independent instant")
 stopifnot(identical(as.numeric(parsed), as.numeric(instant)),
           identical(attr(parsed, "tzone"), "UTC"))
 for (item in list(c("2026-03-07T17:00:00Z", 23),
                   c("2026-10-31T16:00:00Z", 25))) {
-  window <- beidan:::n7_decision_window(item[[1]], "America/New_York")
+  window <- beidan:::match_decision_window(item[[1]], "America/New_York")
   hours <- as.numeric(difftime(lubridate::ymd_hms(window$end_utc),
                               lubridate::ymd_hms(window$start_utc), units = "hours"))
   stopifnot(hours == as.numeric(item[[2]]))
@@ -51,7 +55,7 @@ for (item in list(c("2026-03-07T17:00:00Z", 23),
 
 ## 验证范围
 
-函数/测试映射：`n7_parse_utc` 的偏移、亚秒、空值和非法输入；`n7_make_fixture_issue` 的固定报价提前时长；`n7_decision_window` 的自然日和 DST；`n7_select_match_status` 的严格 cutoff。新增 `test-n7-lubridate.R`，保留既有契约、epoch 和状态回归。
+函数/测试映射：`match_parse_utc` 的偏移、亚秒、空值和非法输入；`make_example_issue` 的固定报价提前时长；`match_decision_window` 的自然日和 DST；`match_select_status` 的严格 cutoff。新增 `test-n7-lubridate.R`，保留既有契约、epoch 和状态回归。
 
 无新增依赖，无生产抓取，无 CI 工作。后续输入真实数据时仅替换 source。
 
@@ -74,7 +78,7 @@ for (item in list(c("2026-03-07T17:00:00Z", 23),
 | `packages/beidan/R/n7_pipeline_fixture.R` | `203c24b9cc29dd18a478d11efb73ef1e14e6d51a5b370b3427fef74db7dcf21c` |
 | `packages/beidan/R/n7_pipeline_inputs.R` | `6ffac2f1402b790522667a34f7f65a185777c7bc36516dd1df0f0d99962cb0c0` |
 | `packages/beidan/README.md` | `0feab1ef7f78d9f68701fada6edf171299e444714db0a30386881e391b509f3f` |
-| `packages/beidan/man/n7_parse_utc.Rd` | `20a6dfeca1c4c0dc125e220efe14dfbf397e4e278431151d0232dd14638864b4` |
+| `packages/beidan/man/match_parse_utc.Rd` | `20a6dfeca1c4c0dc125e220efe14dfbf397e4e278431151d0232dd14638864b4` |
 | `packages/beidan/tests/testthat/test-n7-pipeline-contracts.R` | `50db7fbd558d5981cc9ebf8073cac156b659e48c6fc90b04cde4464184751d8d` |
 | `quarto/beidan_package.qmd` | `0438eb398fd186bdb82ee3b6d3a432ff7031509b1454347dd0db4194c0cd2071` |
 | `quarto/n7_match_status.qmd` | `2fbf01be937afdcb90f8eefa51174ca9c24db2074a408653b4698d5b24bfc58a` |

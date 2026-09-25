@@ -23,13 +23,11 @@ execute:
 # No network access, no database writes, no historical fitting: all three are
 # excluded by the contract this delivers against.
 
-root <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
-if (!grepl("beijing-lot$", root)) root <- normalizePath(".")
-
-library(beidan)
+root <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+pkgload::load_all(file.path(root, "packages", "beidan"), quiet = TRUE)
 suppressMessages({library(tibble); library(dplyr); library(tidyr)})
 
-CONSTANTS <- n7_pipeline_constants()
+CONSTANTS <- parlay_settings()
 knitr::kable(tibble::tibble(
   常量 = names(unlist(CONSTANTS)),
   值 = unlist(lapply(CONSTANTS, function(x) as.character(x)))),
@@ -49,7 +47,7 @@ ID 与时间契约、读取适配器、DC 概率投影、构组/结构/枚举、
 ```{r schema-table}
 #| label: schema-table
 # Every table declares one authoritative schema; empty results keep that schema.
-schemas <- n7_table_schemas()
+schemas <- match_table_schemas()
 knitr::kable(
   tibble::tibble(
     表 = names(schemas),
@@ -58,8 +56,8 @@ knitr::kable(
   caption = "15 张表的固定 schema（列序即契约）")
 
 empty_ok <- vapply(names(schemas), function(t) {
-  e <- n7_typed_empty(t)
-  isTRUE(tryCatch({ n7_validate_table(e, t); TRUE }, error = function(err) FALSE))
+  e <- match_typed_empty(t)
+  isTRUE(tryCatch({ match_validate_table(e, t); TRUE }, error = function(err) FALSE))
 }, logical(1))
 stopifnot(all(empty_ok))
 ```
@@ -82,9 +80,9 @@ CUTOFF <- list(cutoff_utc = lubridate::ymd_hms(paste(DECISION_DATE, "12:00:00"),
 
 # kickoff_at is an explicit UTC POSIXct vector; the fixture count is its length.
 KICKOFFS <- lubridate::ymd_hms("2026-09-23 01:00:00", tz = "UTC") + lubridate::dminutes(seq(0, by = 15, length.out = 56L))
-issue <- n7_make_fixture_issue(ISSUE, KICKOFFS, seed = 42L)
+issue <- make_example_issue(ISSUE, KICKOFFS, seed = 42L)
 # Reading is whole-issue: no cutoff argument and no date filtering.
-inputs <- n7_read_inputs(n7_fixture_source(issue), ISSUE)
+inputs <- read_match_inputs(example_match_source(issue), ISSUE)
 
 # Internal consistency: de-vigging the mean euro odds recovers the generator truth.
 mean_euro <- inputs$euro |>
@@ -107,13 +105,20 @@ tibble::tibble(
 
 ```{r epoch-prepare}
 #| label: epoch-prepare
-EPOCH <- n7_prepare_epoch(
-  inputs, CUTOFF, "Asia/Shanghai",
-  euro_policy = list(members = c("c01", "c02", "c03"), missing = "error"),
-  totals_policy = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
+# 公共正常路径：读入整期 -> 按决策时点准备一期 -> 用显式 model_config 投影概率。
+# 期号、cutoff 与选中表都由接口自己推导/绑定，调用方不再手工拼装。
+DECISION_AT <- CUTOFF$cutoff_utc
+MARKET_POLICY <- list(
+  euro = list(members = c("c01", "c02", "c03"), missing = "error"),
+  totals = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
+MODEL_CONFIG <- list(rho = -0.14, total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
 
-PROJECTED <- n7_project_probabilities(EPOCH, CUTOFF, rho = CONSTANTS$rho,
-                                      total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
+EPOCH <- prepare_match_inputs(inputs, DECISION_AT, MARKET_POLICY)
+PROJECTED <- estimate_match_probabilities(EPOCH, MODEL_CONFIG)
+
+# 投影自带绑定上下文：cutoff、选中场次、状态台账与赛前 SP 与概率一起返回，
+# 下游 parlay_build_plan() 直接消费，不存在"另拼一张表"的错配空间。
+BOUND <- PROJECTED
 
 tibble::tibble(
   项 = c("输入场次", "决策窗口内场次", "历元排除", "拟合成功", "投影排除",
@@ -136,8 +141,7 @@ tibble::tibble(
 project_with_scale <- function(scale) {
   shifted <- EPOCH
   shifted$totals_selected$over_decimal <- shifted$totals_selected$over_decimal * scale
-  n7_project_probabilities(shifted, CUTOFF, rho = CONSTANTS$rho,
-                           total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
+  estimate_match_probabilities(shifted, MODEL_CONFIG)
 }
 BASE <- project_with_scale(1)
 SHIFTED <- project_with_scale(0.85)
@@ -162,11 +166,11 @@ stopifnot(!isTRUE(all.equal(BASE$fit$lambda_home, SHIFTED$fit$lambda_home)))
 PATTERN_MAIN <- c(3L, 3L, 3L, 3L, 2L, 2L, 2L)
 
 construct_and_structure <- function(pattern, groups_wanted, seed = 1L) {
-  groups <- n7_construct_candidates(EPOCH$fixtures, PROJECTED$probabilities, CUTOFF,
+  groups <- parlay_construct_groups(EPOCH$fixtures, PROJECTED$probabilities, CUTOFF,
                                     CONSTANTS$n_legs, "entropy_balanced",
                                     groups_wanted, seed,
                                     match_status = inputs$match_status)
-  structure <- n7_apply_structure(groups$group_legs, PROJECTED$probabilities, CUTOFF,
+  structure <- parlay_apply_structure(groups$group_legs, PROJECTED$probabilities, CUTOFF,
                                   pattern, "entropy_desc")
   list(groups = groups, structure = structure)
 }
@@ -180,7 +184,7 @@ single <- construct_and_structure(PATTERN_MAIN, 1L)
 tibble::tibble(
   pattern = vapply(table_patterns, function(p) paste(p, collapse = ""), character(1)),
   完整空间 = vapply(table_patterns, function(p) {
-    s <- n7_apply_structure(single$groups$group_legs, PROJECTED$probabilities,
+    s <- parlay_apply_structure(single$groups$group_legs, PROJECTED$probabilities,
                             CUTOFF, p, "entropy_desc")
     as.integer(s$support_summary$support_size[1])
   }, integer(1))) |>
@@ -190,7 +194,7 @@ tibble::tibble(
 ```{r ticket-enumeration}
 #| label: ticket-enumeration
 MAIN <- construct_and_structure(PATTERN_MAIN, 4L)
-ENUMERATED <- n7_enumerate_tickets(MAIN$groups$group_legs, PROJECTED$probabilities,
+ENUMERATED <- parlay_enumerate_tickets(MAIN$groups$group_legs, PROJECTED$probabilities,
                                    CUTOFF, MAIN$structure$supports)
 
 legs_per_ticket <- table(ENUMERATED$ticket_legs$ticket_id)
@@ -215,10 +219,10 @@ SP 变换规则固定：`SP > 10` 取 4.5，`SP = 10` 不变；**任一条腿缺
 
 ```{r valuation}
 #| label: valuation
-BUILT_A <- n7_build_decision(EPOCH$fixtures, PROJECTED$probabilities, EPOCH$sp_selected,
+BUILT_A <- .BuildDecisionTables(EPOCH$fixtures, PROJECTED$probabilities, EPOCH$prematch_sp,
                              CUTOFF, inputs$match_status, list(PATTERN_MAIN), "entropy_balanced", 4L, 1L,
-                             CONSTANTS, 1L, 6L)
-RANKED_A <- n7_rank_tickets(BUILT_A$valued, BUILT_A$tickets$candidate_tickets,
+                             CONSTANTS)
+RANKED_A <- parlay_rank_tickets(BUILT_A$valued, BUILT_A$tickets$candidate_tickets,
                             CUTOFF)
 
 tibble::tibble(
@@ -233,12 +237,10 @@ tibble::tibble(
 
 ```{r allocations}
 #| label: allocations
-CONFIGS <- n7_allocation_configs(CONSTANTS)
+CONFIGS <- parlay_allocation_configs(CONSTANTS)
 allocation_summary <- lapply(names(CONFIGS), function(name) {
   config <- CONFIGS[[name]]
-  result <- n7_run_allocation(config, EPOCH$fixtures, PROJECTED$probabilities,
-                              EPOCH$sp_selected, CUTOFF, inputs$match_status,
-                              CONSTANTS, 1L, 6L)
+  result <- parlay_build_plan(BOUND, config)
   per_group <- sort(as.integer(table(result$funded$funded$group_id)))
   tibble::tibble(
     配置 = name,
@@ -271,7 +273,7 @@ knitr::kable(allocation_summary, caption = "三种显式配置（合同要求逐
 synthetic_settlements <- function(issue_obj, issue_id, available_at = "2026-10-01 00:00:00") {
   truth <- as.data.frame(issue_obj$truth)
   truth$fixture_id <- rownames(issue_obj$truth)
-  long <- tidyr::pivot_longer(truth, cols = tidyselect::all_of(n7_outcomes()),
+  long <- tidyr::pivot_longer(truth, cols = tidyselect::all_of(match_outcomes()),
                               names_to = "outcome", values_to = "truth")
   long |>
     dplyr::group_by(fixture_id) |>
@@ -287,12 +289,9 @@ synthetic_settlements <- function(issue_obj, issue_id, available_at = "2026-10-0
 SETTLEMENTS <- synthetic_settlements(issue, ISSUE)
 AS_OF <- lubridate::ymd_hms("2026-10-05 00:00:00", tz = "UTC")
 CONFIG_A <- CONFIGS[["A"]]
-PLAN_A <- n7_run_allocation(CONFIG_A, EPOCH$fixtures, PROJECTED$probabilities,
-                            EPOCH$sp_selected, CUTOFF, inputs$match_status,
-                            CONSTANTS, 1L, 6L)$plan
+PLAN_A <- parlay_build_plan(BOUND, CONFIG_A)$plan
 
-SETTLED_A <- n7_settle_plan(PLAN_A, SETTLEMENTS, AS_OF, CONSTANTS$unit_cny,
-                            CONSTANTS$payout_factor)
+SETTLED_A <- parlay_settle_plan(PLAN_A, SETTLEMENTS, AS_OF)
 
 knitr::kable(
   SETTLED_A$issue_returns |>
@@ -314,9 +313,8 @@ knitr::kable(
 
 ```{r pending-check}
 #| label: pending-check
-EARLY <- n7_settle_plan(PLAN_A, SETTLEMENTS,
-                        lubridate::ymd_hms("2026-09-23 00:00:00", tz = "UTC"),
-                        CONSTANTS$unit_cny, CONSTANTS$payout_factor)
+EARLY <- parlay_settle_plan(PLAN_A, SETTLEMENTS,
+                        lubridate::ymd_hms("2026-09-23 00:00:00", tz = "UTC"))
 tibble::tibble(
   项 = c("LOST 票数", "PENDING 票数", "已结算投入", "待结算投入", "ROI"),
   值 = c(sum(EARLY$ticket_returns$status == "LOST"),
@@ -336,8 +334,7 @@ stopifnot(EARLY$issue_returns$settled_stake_cny == 0)
 ```{r freeze-check}
 #| label: freeze-check
 FUNDED_BEFORE <- PLAN_A$funded$ticket_id
-invisible(n7_settle_plan(PLAN_A, SETTLEMENTS, AS_OF, CONSTANTS$unit_cny,
-                         CONSTANTS$payout_factor))
+invisible(parlay_settle_plan(PLAN_A, SETTLEMENTS, AS_OF))
 identical(FUNDED_BEFORE, PLAN_A$funded$ticket_id)
 ```
 
@@ -349,24 +346,17 @@ identical(FUNDED_BEFORE, PLAN_A$funded$ticket_id)
 ```{r replay}
 #| label: replay
 build_epoch <- function(issue_id, decision_date, seed, n_fixtures = 56L) {
-  cutoff <- list(cutoff_utc = lubridate::ymd_hms(paste(decision_date, "12:00:00"), tz = "UTC"),
-                 issue_id = issue_id)
+  decision_at <- lubridate::ymd_hms(paste(decision_date, "12:00:00"), tz = "UTC")
   # One kickoff per wanted fixture, on the day after the decision date.
   kickoffs <- lubridate::ymd_hms(paste(lubridate::ymd(decision_date) + lubridate::days(1), "01:00:00"), tz = "UTC") +
     lubridate::dminutes(seq(0, by = 15, length.out = n_fixtures))
-  fixture <- n7_make_fixture_issue(issue_id, kickoffs, seed = seed)
-  raw <- n7_read_inputs(n7_fixture_source(fixture), issue_id)
-  prepared <- n7_prepare_epoch(raw, cutoff, "Asia/Shanghai",
-                               list(members = c("c01", "c02", "c03"), missing = "error"),
-                               list(companies = NULL, line = "nearest_main",
-                                    watermark = "decimal"))
-  projected <- n7_project_probabilities(prepared, cutoff, CONSTANTS$rho,
-                                        c(0.1, 16), 1e-10)
-  list(fixture = fixture, cutoff = cutoff,
-       inputs = list(fixtures = prepared$fixtures,
-                     probabilities = projected$probabilities,
-                     sp = prepared$sp_selected,
-                     match_status = prepared$match_status))
+  fixture <- make_example_issue(issue_id, kickoffs, seed = seed)
+  raw <- read_match_inputs(example_match_source(fixture), issue_id)
+  # 期号由输入推导，不需要调用方再声明 issue_id。
+  prepared <- prepare_match_inputs(raw, decision_at, MARKET_POLICY)
+  estimated <- estimate_match_probabilities(prepared, MODEL_CONFIG)
+  # 公共回放按"一期"组织：投影对象自带 cutoff、选中场次、状态台账与赛前 SP。
+  list(fixture = fixture, cutoff = prepared$cutoff, projection = estimated)
 }
 
 EPOCH_1 <- build_epoch("26097", "2026-09-22", 42L)
@@ -377,19 +367,23 @@ ALL_SETTLEMENTS <- dplyr::bind_rows(lapply(
   list(EPOCH_1, EPOCH_2, EPOCH_3),
   function(e) synthetic_settlements(e$fixture, e$cutoff$issue_id)))
 
-POLICIES <- list(allocation = CONFIGS[["A"]], max_reuse = 1L, max_overlap = 6L, seed = 1L)
-REPLAY <- n7_replay_issue(list(EPOCH_1$inputs, EPOCH_2$inputs, EPOCH_3$inputs),
-                          list(EPOCH_1$cutoff, EPOCH_2$cutoff, EPOCH_3$cutoff),
-                          ALL_SETTLEMENTS, AS_OF, POLICIES, CONSTANTS)
+# 一次回放只覆盖一期；三期分别回放后在这里汇总台账。把多期藏进一个参数会让
+# "回放一期" 的语义和资金归属同时变得含糊，所以这里显式展开。
+REPLAY <- lapply(list(EPOCH_1, EPOCH_2, EPOCH_3), function(e) {
+  parlay_replay_issue(list(e$projection), CONFIGS[["A"]], ALL_SETTLEMENTS, AS_OF)
+})
+REPLAY_METRICS <- tibble::tibble(
+  期次 = vapply(list(EPOCH_1, EPOCH_2, EPOCH_3),
+                function(e) e$cutoff$issue_id, character(1)),
+  票数 = vapply(REPLAY, function(r) r$metrics$n_tickets, integer(1)),
+  总投入 = vapply(REPLAY, function(r) r$metrics$total_stake_cny, numeric(1)),
+  已结算投入 = vapply(REPLAY, function(r) r$metrics$settled_stake_cny, numeric(1)),
+  待结算投入 = vapply(REPLAY, function(r) r$metrics$pending_stake_cny, numeric(1)),
+  回款 = vapply(REPLAY, function(r) r$metrics$payout_cny, numeric(1)),
+  净收益 = vapply(REPLAY, function(r) r$metrics$net_cny, numeric(1)),
+  ROI = vapply(REPLAY, function(r) r$metrics$roi, numeric(1)))
 
-tibble::tibble(
-  项 = c("期数", "票数", "总投入", "已结算投入", "待结算投入", "回款", "净收益", "ROI"),
-  值 = c(REPLAY$metrics$n_epochs, REPLAY$metrics$n_tickets,
-         REPLAY$metrics$total_stake_cny, REPLAY$metrics$settled_stake_cny,
-         REPLAY$metrics$pending_stake_cny, REPLAY$metrics$payout_cny,
-         sprintf("%.2f", REPLAY$metrics$net_cny),
-         sprintf("%.4f", REPLAY$metrics$roi))) |>
-  knitr::kable(caption = "多期回放汇总（合成夹具，非策略结论）")
+knitr::kable(REPLAY_METRICS, caption = "多期回放汇总（合成夹具，非策略结论）")
 ```
 
 ## 七、测试与验收证据
@@ -426,15 +420,16 @@ BEIDAN_TEST_PYTHON=/absolute/path/to/python R CMD check --no-manual beidan_0.1.0
 
 | 目标接口 | 复用/取代 | 说明 |
 |---|---|---|
-| `n7_project_probabilities` | 复用 `project_n7_market_inputs` / `total_market_constraint` / `total_constrained_projection` | DC + 普通欧赔 + 大小球主路径，**不**用 `n7_euro_probabilities` 的纯欧赔路径 |
-| 组/票身份 | 复用 `n7_physical_ticket_key` | 物理票身份，跨结构共享 ticket_id |
-| 组准入 | 复用 `n7_group_admission` | 复用与重叠上限 |
-| 日界与窗口 | 复用 `n7_decision_window` | 不自造第二套时间框架 |
+| `estimate_match_probabilities` | 复用 `total_market_constraint` / `total_constrained_projection` | DC + 普通欧赔 + 大小球主路径，**不**用纯欧赔归一化代替让球概率映射 |
+| 组/票身份 | 复用 `parlay_physical_ticket_key` | 物理票身份，跨结构共享 ticket_id |
+| 组准入 | 复用 `parlay_group_admission` | 复用与重叠上限 |
+| 日界与窗口 | 复用 `match_decision_window` | 不自造第二套时间框架 |
 | 旧 SP 资格过滤 | **不引入** | 旧研究默认规则不带入新接口 |
 
-`constants` 显式包含 `n_legs=7`、`issue_budget_cny=1024`、`unit_cny=2`、
-`payout_factor=0.65`、`rho=-0.14`、`sp_threshold=10`、`sp_replacement=4.5`；
-函数不偷偷依赖全局常量。
+会话参数快照 `parlay_settings()` 显式包含 `n_legs=7`、`issue_budget_cny=1024`、
+`unit_cny=2`、`payout_factor=0.65`、`sp_threshold=10`、`sp_replacement=4.5`；
+函数不偷偷依赖全局常量。单场 `rho=-0.14`、`total_bounds` 与 `tail_tolerance`
+不属于会话快照，而是 `estimate_match_probabilities()` 的 `model_config` 参数。
 
 ## 九、逐函数接口加固与巨型函数拆分
 
@@ -462,19 +457,19 @@ S7 只用于**内部领域对象**，绝不替代 tibble 公共接口（AGENTS �
 
 | 类型 | 用途 | 关键约束 |
 |---|---|---|
-| `N7SpQuote` | 单条赛前 SP 报价 | 16 条校验；构造与每次 `@<-` 赋值都校验，赋值失败**保持原对象不变** |
-| `N7DomainTable` | 表级领域包装 | 校验列集合**与列序**，`select()` 造成的列重排会被捕获 |
+| `MatchSpQuote` | 单条赛前 SP 报价 | 16 条校验；构造与每次 `@<-` 赋值都校验，赋值失败**保持原对象不变** |
+| `MatchDomainTable` | 表级领域包装 | 校验列集合**与列序**，`select()` 造成的列重排会被捕获 |
 
-`n7_sp_quote_from_row()` / `n7_sp_quotes_to_tibble()` / `n7_domain_table_data()` 是唯一的
+`match_sp_quote_from_row()` / `match_sp_quotes_to_tibble()` / `match_domain_table_data()` 是唯一的
 进出通道。dplyr 的 `filter`/`arrange`/`group_by`/`summarise`/`left_join`/`mutate`/`slice`
 在内层 tibble 上无需改动即可工作。
 
 ### 9.3 契约缺口补全
 
 `ranked` 与 `candidate_tickets` 此前没有 schema 声明，导致两张表可以带着错误的列集合
-或列序流过边界。现已补入 `n7_table_schemas()`（13 → **15 张表**），并按名字而非位置存取。
+或列序流过边界。现已补入 `match_table_schemas()`（13 → **15 张表**），并按名字而非位置存取。
 
-`patterns` / `unit_caps` 由位置索引改为**具名索引**。此前实测：`n7_fund_groups(...,
+`patterns` / `unit_caps` 由位置索引改为**具名索引**。此前实测：`.FundGroups(...,
 unit_caps = c(96L))` 配两个 pattern 会静默返回成功并**关闭 issue 预算天花板**；具名后
 报 `no unit cap declared for pattern p2222221`。
 
@@ -484,20 +479,20 @@ unit_caps = c(96L))` 配两个 pattern 会静默返回成功并**关闭 issue �
 
 | 巨型函数 | 拆分前 | 拆分后 |
 |---|---|---|
-| `n7_fund_groups` | 365 行 | **176 行** |
-| `n7_diagnose_depth` | 282 行 | **190 行** |
+| `.FundGroups` | 365 行 | **176 行** |
+| `.DiagnoseParlayPlan` | 282 行 | **190 行** |
 
 抽出的七个具名子函数：
 
 | 子函数 | 行数 | 职责 |
 |---|---|---|
-| `n7_select_funding_candidates` | 90 | 选哪些 candidate 参与 + 定优先序 |
-| `n7_resolve_allocations` | 76 | 解析 pattern/unit_cap 为逐候选额度 |
-| `n7_allocate_budget_units` | 46 | 预算按优先级分配 + 票预留 |
-| `n7_fund_admitted_groups` | 75 | 逐组准入、选票、生成台账 |
-| `n7_visible_settlements` | 71 | 解析权威结算标签 + 三类冲突检测 |
-| `n7_candidate_support_grid` | 69 | 按腿序重建合法组合 |
-| `n7_payout_for_candidate` | 63 | 七腿全中才派彩 + PENDING 判定 |
+| `parlay_select_funding_candidates` | 90 | 选哪些 candidate 参与 + 定优先序 |
+| `parlay_resolve_allocations` | 76 | 解析 pattern/unit_cap 为逐候选额度 |
+| `parlay_allocate_budget_units` | 46 | 预算按优先级分配 + 票预留 |
+| `parlay_fund_admitted_groups` | 75 | 逐组准入、选票、生成台账 |
+| `parlay_visible_settlements` | 71 | 解析权威结算标签 + 三类冲突检测 |
+| `parlay_candidate_support_grid` | 69 | 按腿序重建合法组合 |
+| `parlay_payout_for_candidate` | 63 | 七腿全中才派彩 + PENDING 判定 |
 
 **拆分是等价重构**：每抽出一个子函数都立刻重跑该文件全部测试块作为等价性证据。
 过程中测试确实抓出三个真实缺陷（子函数残留 `constants$unit_cny` 而参数名为 `unit_cny`；
@@ -508,11 +503,11 @@ unit_caps = c(96L))` 配两个 pattern 会静默返回成功并**关闭 issue �
 
 | 子函数 | 新增测试覆盖 |
 |---|---|
-| `n7_visible_settlements` | 只读本期/可用/已结算；三类冲突各自报错；status 缺失保留为 PENDING |
-| `n7_candidate_support_grid` | 按腿序而非行序枚举；`allowed=FALSE` 的腿被排除 |
-| `n7_payout_for_candidate` | 七腿全中才派彩；结果未知不派彩；中奖但缺 SP 标记 `sp_missing` |
+| `parlay_visible_settlements` | 只读本期/可用/已结算；三类冲突各自报错；status 缺失保留为 PENDING |
+| `parlay_candidate_support_grid` | 按腿序而非行序枚举；`allowed=FALSE` 的腿被排除 |
+| `parlay_payout_for_candidate` | 七腿全中才派彩；结果未知不派彩；中奖但缺 SP 标记 `sp_missing` |
 
-另有一处既有缺陷在补测时暴露：`n7_visible_settlements` 会检测**第三类**冲突 —— 同一
+另有一处既有缺陷在补测时暴露：`parlay_visible_settlements` 会检测**第三类**冲突 —— 同一
 `(issue, fixture)` 上 `settled_sp` 互相矛盾。取最后一行会让派彩依赖行序，此前没有测试
 覆盖，现已补上。
 ## 十、局限与未决
@@ -591,14 +586,14 @@ Quarto 在只读 sandbox 下需要显式可写的 `TMPDIR`/`XDG_CACHE_HOME`/`DEN
 
 | 编号 | 级别 | 缺陷 | 后果 | 状态 |
 |---|---|---|---|---|
-| 1 | blocking | `candidate_tickets`/`ranked` 声明了复合主键，但 `n7_validate_table()` 的 `keys` 是可选项、默认 `NULL`，从不校验 | 重复 `(candidate_id, ticket_id)` 被重复排序并**重复购买、重复扣款** | 主键写入 schema，校验自动执行 |
+| 1 | blocking | `candidate_tickets`/`ranked` 声明了复合主键，但 `match_validate_table()` 的 `keys` 是可选项、默认 `NULL`，从不校验 | 重复 `(candidate_id, ticket_id)` 被重复排序并**重复购买、重复扣款** | 主键写入 schema，校验自动执行 |
 | 2 | blocking | 整数转换只守 `.Machine$integer.max`，不守下界 | 负向溢出经 `as.integer()` 只发 warning 并落成 `NA_integer_`，即数据边界上的静默缺失 | 双向范围检查，报错而非 warning |
 | 3 | major | `unit_cap`/`unit_caps` 的校验位于循环内 | 空候选时 `NA`/`Inf`/`-1`/`1.5` 全部静默通过 | 校验前置到循环之前 |
-| 4 | major | `n7_fund_groups()` 用 `config$unit_cap` 取值 | R 的 `$` **部分匹配**对只声明 `unit_caps` 的配置返回长度 2 向量，交给长度 1 参数 | 改用具名判断 |
+| 4 | major | `.FundGroups()` 用 `config$unit_cap` 取值 | R 的 `$` **部分匹配**对只声明 `unit_caps` 的配置返回长度 2 向量，交给长度 1 参数 | 改用具名判断 |
 | 5 | major | 组在**购买之前**就登记 `admitted` | 零额度的首组会占掉比赛集合，`max_reuse=1` 时挡住真正会买的后续组 | 登记移到实际购买之后 |
 | 6 | major | 注释称 `ranked$rank` 权威，实现却按 `probability` 重排 | EV 排名购买的赢家被诊断报成概率排名，`support_rank` 与购买口径不一致 | 改用权威 `rank` 列 |
 | 7 | major | 空分支返回 `tickets` 形状、非空返回 `ranked` 形状 | 列集合随分支变化，下游取 `candidate_id` 时静默算错；并产生 3 条长期 warning | 两分支统一为 `ranked` schema |
-| 8 | minor | 文档写 `13 张表`、`n7_contracts()` | 实际 15 张表、函数名为 `n7_table_schemas()` | 已更正 |
+| 8 | minor | 文档写 `13 张表`、`n7_contracts()` | 实际 15 张表、函数名为 `match_table_schemas()` | 已更正 |
 
 **第 14 轮（第 2 次复评）明细**
 
@@ -607,9 +602,9 @@ Quarto 在只读 sandbox 下需要显式可写的 `TMPDIR`/`XDG_CACHE_HOME`/`DEN
 
 | 编号 | 级别 | 缺陷 | 后果 | 状态 |
 |---|---|---|---|---|
-| 1 | blocking | 主键校验只接进校验器，未接进 `n7_rank_tickets()` 与 `n7_fund_groups()` 真实入口 | 重复引用仍能走完排序与购买，生成两条购买记录 | 两个入口改为调用完整 schema 校验 |
+| 1 | blocking | 主键校验只接进校验器，未接进 `parlay_rank_tickets()` 与 `.FundGroups()` 真实入口 | 重复引用仍能走完排序与购买，生成两条购买记录 | 两个入口改为调用完整 schema 校验 |
 | 2 | blocking | 整数下界写成 `-.Machine$integer.max - 1`，放过了 `-2147483648` | 该值在 R 中保留给 `NA_integer_`，仍静默落成 NA | 下界收紧为 `-.Machine$integer.max` |
-| 3 | major | 票额校验只在子函数内，`n7_fund_groups()` 空候选时提前返回绕过 | 公共入口仍接受 `NA`/`Inf`/`-1`/`1.5` | 抽出 `n7_check_unit_caps()`，在两个入口都调用 |
+| 3 | major | 票额校验只在子函数内，`.FundGroups()` 空候选时提前返回绕过 | 公共入口仍接受 `NA`/`Inf`/`-1`/`1.5` | 抽出 `parlay_check_unit_caps()`，在两个入口都调用 |
 | 4 | major | 诊断用 `match(ticket_id)` 单键匹配 | 共享票会取到其他 candidate 的行，`support_rank` 依赖行序 | 改用 `(candidate_id, ticket_id)` 复合键 |
 | 5 | major | 空分支把 `spent_before`/`remaining`/`fixture_sets` 清零 | 等于告诉下一期该 issue 从未买过，会重复购买已付费的票 | 账本状态提到提前返回之前计算 |
 | 6 | major | 「诊断改用权威 rank」这条修复**回退后整个测试文件仍全绿** | 该修复没有测试保护 | 补共享票 + 行序不变性用例 |

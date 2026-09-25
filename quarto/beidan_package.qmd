@@ -9,6 +9,9 @@ execute:
   cache: false
 ---
 
+> 当前可执行示例已迁移到 #512 接口。下文原有测试计数、审阅记录和哈希属于此前交付的历史证据；本次重构的验收以 [parlay_api_contract.qmd](parlay_api_contract.qmd) 为准。
+
+
 # 范围
 
 本交付对应 #504。N7 固定夹具接口迁入 `packages/beidan`，Python 时间治理唯一实现迁入
@@ -16,7 +19,8 @@ execute:
 本次保持固定参数与业务口径，不作真实收益结论。源码迁移后旧实现删除，历史审阅记录保留为历史证据。
 
 ```{r}
-library(beidan)
+repo <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+pkgload::load_all(file.path(repo, "packages", "beidan"), quiet = TRUE)
 stopifnot(!reticulate::py_available(initialize = FALSE))
 tibble::tibble(package = "beidan", version = as.character(packageVersion("beidan")),
                python_initialized_on_load = FALSE) |> knitr::kable()
@@ -27,15 +31,15 @@ tibble::tibble(package = "beidan", version = as.character(packageVersion("beidan
 # 不依赖脚本加载顺序的 R 调用
 
 ```{r}
-constants <- n7_pipeline_constants()
+constants <- parlay_settings()
 kickoffs <- lubridate::with_tz(lubridate::ymd_hms("2026-09-23 12:00:00", tz = "Asia/Shanghai"), "UTC") + lubridate::dminutes(seq(0, by = 15, length.out = 14L))
-issue <- n7_make_fixture_issue("00123", kickoffs)
-cutoff <- list(issue_id = "00123", cutoff_utc = lubridate::ymd_hms("2026-09-22 12:00:00", tz="UTC"))
-inputs <- n7_read_inputs(n7_fixture_source(issue), "00123")
-epoch <- n7_prepare_epoch(inputs, cutoff, "Asia/Shanghai",
-  list(members=c("c01","c02","c03"), missing="error"),
-  list(companies=NULL,line="nearest_main",watermark="decimal"))
-projection <- n7_project_probabilities(epoch, cutoff, constants$rho, c(0.1,16),1e-10)
+issue <- make_example_issue("00123", kickoffs)
+decision_at <- lubridate::ymd_hms("2026-09-22 20:00:00", tz = "Asia/Shanghai")
+inputs <- read_match_inputs(example_match_source(issue), "00123")
+epoch <- prepare_match_inputs(inputs, decision_at, list(
+  euro = list(members = c("c01", "c02", "c03"), missing = "error"),
+  totals = list(companies = NULL, line = "nearest_main", watermark = "decimal")))
+projection <- estimate_match_probabilities(epoch, model_config = list(rho = -0.14, total_bounds = c(0.1, 16), tail_tolerance = 1e-10))
 projection$probabilities |> head(9) |> knitr::kable()
 stopifnot(nrow(projection$probabilities) == 42L)
 ```
@@ -46,9 +50,9 @@ stopifnot(nrow(projection$probabilities) == 42L)
 
 ```{r}
 stopifnot(is.character(params$python), length(params$python)==1L, nzchar(params$python))
-backend <- n7_python_backend(params$python)
-py_cutoff <- n7_learning_cutoff("00123", cutoff$cutoff_utc, backend)
-returned <- n7_r_table(n7_python_table(inputs$fixtures, "fixtures", backend), "fixtures")
+backend <- python_backend(params$python)
+py_cutoff <- learning_cutoff("00123", epoch$cutoff$cutoff_utc, backend)
+returned <- r_table(python_table(inputs$fixtures, "fixtures", backend), "fixtures")
 stopifnot(identical(returned$fixture_id, inputs$fixtures$fixture_id),
           identical(attr(returned$kickoff_at,"tzone"),"UTC"))
 tibble::tibble(issue_id=reticulate::py_to_r(py_cutoff$target_issue),
@@ -59,7 +63,7 @@ tibble::tibble(issue_id=reticulate::py_to_r(py_cutoff$target_issue),
 # 验收命令与边界
 
 - 环境准备：`pak::local_install("packages/beidan")`；Python 使用已声明解释器安装 `packages/beidan/inst/python`。
-- R 包：`R CMD build packages/beidan`，`R CMD check --no-manual beidan_0.1.0.tar.gz`。
+- R 包：`R CMD build packages/beidan`，`R CMD check --no-manual beidan_0.2.0.tar.gz`。
 - 桥接检查设置 `BEIDAN_TEST_PYTHON`；Python 后端与受影响调用方使用该解释器运行 pytest。
 - 本报告：`quarto render quarto/beidan_package.qmd --no-cache --execute -P python:/absolute/path/to/python`。
 - 原 N7 端到端报告：`quarto/n7_pipeline_contracts.qmd`，改为加载已安装包。

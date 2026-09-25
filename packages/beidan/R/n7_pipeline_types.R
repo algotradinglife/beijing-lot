@@ -19,17 +19,17 @@
 #' @param quote_at   长度 1 的 POSIXct，报价采集时点，不得为 NA。
 #' @param source_url 长度 1 的非空字符串，报价来源。
 #'
-#' @return 一个 N7SpQuote 对象。
+#' @return 一个 MatchSpQuote 对象。
 #'
 #' @details 校验在**构造时**与**每次属性赋值时**执行；校验失败时原对象保持不变。
 #'   这样「一条 SP 报价」在整个生命周期内都不可能处于非法状态，下游函数因此不必
 #'   重复判断 sp_raw 是否为正、outcome 是否为 W/D/L。
 #'
 #'   注意：时区不做强制。报价时点的**是否早于 cutoff** 由使用方按契约判断
-#'   （见 n7_latest_quote_before），本类型只保证它是个真实时刻。
+#'   （见 match_latest_quote_before），本类型只保证它是个真实时刻。
 #' @usage NULL
-n7_sp_quote_class <- S7::new_class(
-  "N7SpQuote",
+match_sp_quote_class <- S7::new_class(
+  "MatchSpQuote",
   properties = list(
     fixture_id = S7::class_character,
     outcome    = S7::class_character,
@@ -44,7 +44,7 @@ n7_sp_quote_class <- S7::new_class(
       problems <- c(problems, "fixture_id must be one non-empty string")
     }
     if (length(self@outcome) != 1L || is.na(self@outcome) ||
-        !self@outcome %in% n7_outcomes()) {
+        !self@outcome %in% match_outcomes()) {
       problems <- c(problems, "outcome must be one of W, D, L")
     }
     if (length(self@sp_raw) != 1L || is.na(self@sp_raw) ||
@@ -61,26 +61,26 @@ n7_sp_quote_class <- S7::new_class(
     if (length(problems)) problems else NULL
   }
 )
-#' 把 prematch_sp 表的一行转为 N7SpQuote
+#' 把 prematch_sp 表的一行转为 MatchSpQuote
 #'
 #' @param row 长度为 1 的 list 或一行 data.frame，须含 prematch_sp 的全部列：
 #'   fixture_id, outcome, quote_at, sp_raw, source_url。
 #'   · 缺列      -> stop()（列出缺失的列名）
-#'   · 列值非法  -> 由 N7SpQuote 的 validator 报错，错误信息说明违反哪条规则
-#' @return 一个 N7SpQuote 对象。
+#'   · 列值非法  -> 由 MatchSpQuote 的 validator 报错，错误信息说明违反哪条规则
+#' @return 一个 MatchSpQuote 对象。
 #' @details 这是 tibble 与领域类型之间的唯一入口。缺列必须显式报错：若用 $ 取值，
 #'   缺列只会得到 NULL 并静默构造出一个字段为空的报价。
-n7_sp_quote_from_row <- function(row) {
+match_sp_quote_from_row <- function(row) {
   checkmate::assert_data_frame(row, max.rows = 1L, .var.name = "row")
   if (nrow(row) != 1L) {
-    stop("n7_sp_quote_from_row: row must hold exactly one row; got ", nrow(row))
+    stop("match_sp_quote_from_row: row must hold exactly one row; got ", nrow(row))
   }
   required <- c("fixture_id", "outcome", "quote_at", "sp_raw", "source_url")
   missing <- setdiff(required, names(row))
   if (length(missing)) {
-    stop("n7_sp_quote_from_row: row is missing ", paste(missing, collapse = ", "))
+    stop("match_sp_quote_from_row: row is missing ", paste(missing, collapse = ", "))
   }
-  n7_sp_quote_class(
+  match_sp_quote_class(
     fixture_id = as.character(row$fixture_id[[1L]]),
     outcome    = as.character(row$outcome[[1L]]),
     sp_raw     = as.numeric(row$sp_raw[[1L]]),
@@ -89,20 +89,20 @@ n7_sp_quote_from_row <- function(row) {
   )
 }
 
-#' 把 N7SpQuote 列表转回 tibble
+#' 把 MatchSpQuote 列表转回 tibble
 #'
-#' @param quotes N7SpQuote 对象的 list（可为空 list）。
-#'   · 含非 N7SpQuote 元素 -> stop()（点名第几个元素）
+#' @param quotes MatchSpQuote 对象的 list（可为空 list）。
+#'   · 含非 MatchSpQuote 元素 -> stop()（点名第几个元素）
 #' @return tibble，列与类型与 prematch_sp 契约表完全一致；空输入返回 typed-empty 表。
 #' @details 这是领域类型回到对外接口的唯一出口。领域类型**绝不**直接返回给调用方：
 #'   AGENTS.md 要求所有 R 分析表是 tibble。
-n7_sp_quotes_to_tibble <- function(quotes) {
+match_sp_quotes_to_tibble <- function(quotes) {
   checkmate::assert_list(quotes, .var.name = "quotes")
-  if (!length(quotes)) return(n7_typed_empty("prematch_sp"))
+  if (!length(quotes)) return(match_typed_empty("prematch_sp"))
   bad <- which(!vapply(quotes, S7::S7_inherits, logical(1),
-                       class = n7_sp_quote_class))
+                       class = match_sp_quote_class))
   if (length(bad)) {
-    stop("n7_sp_quotes_to_tibble: element ", bad[[1L]], " is not an N7SpQuote")
+    stop("match_sp_quotes_to_tibble: element ", bad[[1L]], " is not an MatchSpQuote")
   }
   tibble::tibble(
     fixture_id = vapply(quotes, function(q) q@fixture_id, character(1)),
@@ -116,24 +116,24 @@ n7_sp_quotes_to_tibble <- function(quotes) {
 #' 一张已验证列契约的域内表
 #'
 #' @param table tibble（必须是 data.frame）。
-#' @param domain 长度 1 的非空字符串，表的域名（对应 n7_table_schemas() 的名字），
+#' @param domain 长度 1 的非空字符串，表的域名（对应 match_table_schemas() 的名字），
 #'   或 "ranked"/"candidate_tickets" 这类值层内部表。
 #'
-#' @return 一个 N7DomainTable 对象。
+#' @return 一个 MatchDomainTable 对象。
 #'
 #' @details 这是 S7 表级类型的通用底座。它保证：
 #'   - `table` 确实是 data.frame，且非 NULL；
 #'   - 列集合与列序与声明一致（对已声明 schema 的表）；
 #'   - 空表仍是完整的 typed-empty（列集合不因零行而丢失）。
 #'
-#'   与逐行类型（N7SpQuote）的分工：逐行类型挡的是「一条记录非法」，本类型挡的是
+#'   与逐行类型（MatchSpQuote）的分工：逐行类型挡的是「一条记录非法」，本类型挡的是
 #'   「一张表与它自己的契约不符」。value 层的多数缺陷属于后者。
 #'
 #'   \strong{不做}的事：本类型不校验跨表关系（如 ranked$ticket_id 是否都在
 #'   tickets 表里）。跨表关系由使用方按契约判断，因为只有使用方知道两张表的角色。
 #' @usage NULL
-n7_domain_table_class <- S7::new_class(
-  "N7DomainTable",
+match_domain_table_class <- S7::new_class(
+  "MatchDomainTable",
   properties = list(
     table  = S7::class_data.frame,
     domain = S7::class_character
@@ -144,7 +144,7 @@ n7_domain_table_class <- S7::new_class(
       problems <- c(problems, "domain must be one non-empty string")
     }
     if (length(problems)) return(problems)
-    schema <- n7_table_schemas()[[self@domain]]
+    schema <- match_table_schemas()[[self@domain]]
     if (!is.null(schema)) {
       if (!identical(names(self@table), schema$columns)) {
         problems <- c(problems, sprintf(
@@ -161,25 +161,25 @@ n7_domain_table_class <- S7::new_class(
 #'
 #' @param table  tibble。
 #' @param domain 长度 1 的非空字符串，域名。
-#' @return 一个 N7DomainTable 对象。
-#' @details 这是 tibble 进入域内表类型的唯一入口。对已在 n7_table_schemas() 中
+#' @return 一个 MatchDomainTable 对象。
+#' @details 这是 tibble 进入域内表类型的唯一入口。对已在 match_table_schemas() 中
 #'   声明的域名，列集合与列序会在构造时校验；对值层内部表（ranked 等），只校验
 #'   它确实是 data.frame。
-n7_domain_table <- function(table, domain) {
+match_domain_table <- function(table, domain) {
   checkmate::assert_data_frame(table, .var.name = "table")
   checkmate::assert_string(domain, min.chars = 1L, .var.name = "domain")
-  n7_domain_table_class(table = tibble::as_tibble(table), domain = domain)
+  match_domain_table_class(table = tibble::as_tibble(table), domain = domain)
 }
 
 #' 把域内表转回 tibble
 #'
-#' @param object 一个 N7DomainTable 对象。
+#' @param object 一个 MatchDomainTable 对象。
 #' @return 内层 tibble。
 #' @details 这是域内表回到对外接口的唯一出口。AGENTS.md 要求所有 R 分析表是
 #'   tibble，因此域内表**绝不**直接返回给调用方：返回前一律先转回 tibble。
-n7_domain_table_data <- function(object) {
-  if (!S7::S7_inherits(object, n7_domain_table_class)) {
-    stop("n7_domain_table_data: object must be an N7DomainTable")
+match_domain_table_data <- function(object) {
+  if (!S7::S7_inherits(object, match_domain_table_class)) {
+    stop("match_domain_table_data: object must be an MatchDomainTable")
   }
   object@table
 }
