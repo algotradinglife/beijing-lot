@@ -764,3 +764,19 @@ def test_absent_or_clock_only_deadline_remains_unknown():
 def test_quoted_http_charset_takes_precedence(body):
     from beidan_backend.issue_schedule.decode import decode_response
     assert decode_response(body.encode("utf-8"), 'text/html; charset="utf-8"') == body
+
+
+def test_real_alias_display_and_title_are_kept_independently():
+    left = parse_500_rows((FIXTURES / '500.aliases.html').read_bytes().decode('gb18030'),
+        issue_id='26098', observed_at=OBSERVED, source_url='https://trade.500.com/bjdc/?expect=26098')
+    right = parse_nowscore_rows((FIXTURES / 'nowscore.aliases.html').read_text(),
+        issue_id='26098', observed_at=OBSERVED, source_url='https://cp.nowscore.com/buy/DanChang.aspx?all=1&issueNum=26098')
+    rows, _ = _canonical(left, right)
+    by_slot = {r['slot']: r for r in rows}
+    assert by_slot[77]['home_display_500'] == '克鲁比04'
+    assert by_slot[77]['home_title_500'] == '赫尔辛基预备队'
+    assert by_slot[77]['away_display_500'] == '查普斯'
+    assert by_slot[77]['away_title_500'] == '耶尔文佩'
+    assert by_slot[77]['home_display_nowscore'] == '克鲁比'
+    assert by_slot[33]['home_display_500'] == '都柏林大学'
+    assert by_slot[33]['home_display_nowscore'] == '都柏林'

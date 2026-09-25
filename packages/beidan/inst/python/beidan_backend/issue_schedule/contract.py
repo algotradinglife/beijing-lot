@@ -96,6 +96,17 @@ def canonical_columns() -> tuple[str, ...]:
         "source_url_nowscore",
         "raw_display_nowscore",
         "raw_display_500",
+        "home_display_500",
+        "home_title_500",
+        "away_display_500",
+        "away_title_500",
+        "home_display_nowscore",
+        "home_title_nowscore",
+        "away_display_nowscore",
+        "away_title_nowscore",
+        "league_500",
+        "league_nowscore",
+
     )
 
 

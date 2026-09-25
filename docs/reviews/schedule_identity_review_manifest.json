@@ -1,0 +1,31 @@
+{
+  "issue": 516,
+  "review_command": "codex review (entire git diff origin/main; explicit project runtimes and persistent TMPDIR)",
+  "files": {
+    "packages/beidan/DESCRIPTION": "740b57bc29c72804a7d5576fe239adf9e30c2c3fdb4487f4cc889647c94d17d9",
+    "packages/beidan/NAMESPACE": "bb256a080daecc3d92fbb9a835e5549abfd182d07edcdd498cebe75dca5fcd80",
+    "packages/beidan/R/issue_schedule.R": "ed05781b546551d5946b16124456a2637ee727899f58b0efa42d156cbe768ecf",
+    "packages/beidan/R/schedule_identity.R": "5fe37890e556c67d5797183b2d64f1e1e73aea22fd3657ea73c621e428f1f918",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py": "222ab80dee52303f63d78d0726156c9c01ed93793af8cb7ab887bf6ffd67dc24",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py": "71be39db6d6a3175c0b4adf2e7ca29f3e5706d4aa72ab22709226d5b48e9c6e8",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py": "39b08f65a75910b6d397bee195a00a702eac0fcedd4ddf7fe30ef9a77b115c20",
+    "packages/beidan/man/jev_schedule_answers.Rd": "360c19e980b43bba3e4f9b216472ebffa84c3852ff8d69f4c9bf8b25b76171c0",
+    "packages/beidan/man/jev_schedule_judge.Rd": "bd1decd43d3c69e51cdea4a71b5779707d9ebc570e8a2ce921294961ef431d27",
+    "packages/beidan/man/jev_schedule_request.Rd": "668ce6a36b98fe0067fd76c543228d8abd469a3926f34dddf7e25cf8c52d6ec1",
+    "packages/beidan/man/judge_schedule_identity.Rd": "c9e72ecfc7c04c64dab525e7da4e38d46d8d84901c4a9ad2537ddbbc3f3f5c96",
+    "packages/beidan/man/replay_schedule_identity.Rd": "f2f9aee20e12d2df6ea94c5e507a8bead617420e9d2a8643e18a293e3d3fb371",
+    "packages/beidan/man/schedule_alias_exact.Rd": "812dbb116cb0977511f3ba7c08f7a6bc4cf24fe4cd1e4d355cf452b02320ee95",
+    "packages/beidan/man/schedule_identity_items.Rd": "14b9de7027e7026304824d84f10a0fedbd47642ef1137004b68f5960ea73330b",
+    "packages/beidan/man/schedule_identity_validate_answers.Rd": "ab9d858a4e3bbada4e3aa7c36f15352ea0741cd7eceeecac556323669c928177",
+    "packages/beidan/tests/python/fixtures/500.aliases.html": "8fd316b53d0f50c5ebfbedd63569f028f9ffa3dd01739a0a4da2dfd1b0cdc40d",
+    "packages/beidan/tests/python/fixtures/nowscore.aliases.html": "d1b2e29d9ee5c2ff0655920993acd16605163f2c73b4d4920e47e490cdcc080a",
+    "packages/beidan/tests/python/test_issue_schedule.py": "05bd1e0264f5fd3bbad74a006cf2918a3cc09aaf94eba5b73153af36aa348d6b",
+    "packages/beidan/tests/testthat/fixtures/schedule_identity/jev_receipt.rds": "f66884d10b4608dd25b2f03c74f79b40a8e08881f270bd7914f7ccaf7110d7d7",
+    "packages/beidan/tests/testthat/fixtures/schedule_identity/schedule.rds": "3ac816c69ed4673e82a4e7104cf7c6b69d9318f1fdc65b7ee80d657f1b0a339c",
+    "packages/beidan/tests/testthat/test-schedule-identity.R": "821a6c168b1da553831f783c6eb415751710e72f6f6ec3ea11455372ce533039",
+    "quarto/26098_walkthrough.qmd": "e7b2a7b641c2c7a7c7e569f51f44fc4945dec6a000c68e947c224ee32fe2c455",
+    "scripts/acceptance/issue_schedule_walkthrough.R": "c3accb0d70d75ecc465d591c8d560d631016cc8d26d470d8ec787c728975ca38",
+    "scripts/acceptance/walkthrough_analysis_checks.R": "86e18a61bcf8e001674ab7e59c5716dca3197978cb8129c997b7b98755fce3ae"
+  },
+  "delivery_qmd_body_sha256": "f9374d4702426ebd5b74b424f889b3750d7821da018cef53a2b930f4012bfbb0"
+}

@@ -38,7 +38,8 @@ issue_schedule_columns <- function() {
     "provider_id_500", "provider_id_nowscore", "home_500", "away_500",
     "home_nowscore", "away_nowscore", "identity_method", "identity_note",
     "observed_at", "source_url_500", "source_url_nowscore",
-    "raw_display_nowscore", "raw_display_500")
+    "raw_display_nowscore", "raw_display_500",
+    "home_display_500", "home_title_500", "away_display_500", "away_title_500", "home_display_nowscore", "home_title_nowscore", "away_display_nowscore", "away_title_nowscore", "league_500", "league_nowscore")
 }
 
 #' 规范赛程表各列的类型契约
