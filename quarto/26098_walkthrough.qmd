@@ -321,18 +321,19 @@ market_count <- if (is.null(markets)) 0L else sum(markets$coverage$status == "ok
 admitted_count <- if (is.null(epoch)) 0L else nrow(epoch$fixtures)
 probability_count <- if (is.null(projected)) 0L else nrow(projected$probabilities)
 purchase_count <- if (is.null(result)) 0L else nrow(result$funded$purchases)
-settled_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status != "PENDING")
+settled_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status %in% c("WON", "LOST"))
 pending_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status == "PENDING")
+special_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status == "SPECIAL")
 diagnostic_count <- if (is.null(diagnosis)) 0L else sum(diagnosis$status != "PENDING")
 knitr::kable(tibble::tibble(
-  stage = c("赛程", "两市场采集", "决策准入场数", "概率行数", "购买票数", "已结算票数", "待结算票数", "可用诊断行数"),
+  stage = c("赛程", "两市场采集", "决策准入场数", "概率行数", "购买票数", "已结算票数", "待结算票数", "特殊待处理票数", "可用诊断行数"),
   count = c(schedule_count, market_count, admitted_count, probability_count,
-            purchase_count, settled_count, pending_count, diagnostic_count)
+            purchase_count, settled_count, pending_count, special_count, diagnostic_count)
 ))
 if (!is.null(decision_at) && decision_at > Sys.time()) {
   cat("当前为决策前预备诊断，尚未到正式决策时点，不表示计划已经正式冻结。\n")
 }
-if (!purchase_count || !settled_count || pending_count > 0L || !diagnostic_count) {
+if (!purchase_count || !settled_count || pending_count > 0L || special_count > 0L || !diagnostic_count) {
   cat("尚未完成真实结算全流程；零张票、全部pending或空诊断均不算完成。\n")
 }
 ```

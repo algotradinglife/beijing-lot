@@ -99,3 +99,17 @@ def test_live_orchestration_uses_bounded_fetch_and_spacing(tmp_path,fixture,page
     assert len(calls)==2
     assert all(kwargs==dict(timeout=7,retries=1,backoff_sec=1) for _,kwargs in calls)
     assert sleeps==[1]
+
+
+def test_unusable_total_history_is_partial_not_success(tmp_path,fixture,pages):
+    bad=copy.deepcopy(pages)
+    url=next(u for u in bad if 'Handicap' in u)
+    rows=json.loads(bad[url]['body'])
+    for row in rows:
+        row['HomeOdds']='bad'
+    bad[url]['body']=json.dumps(rows).encode()
+    out=fetch_markets([fixture],str(tmp_path),['8'],pages=bad)
+    assert out['coverage'][0]['status']=='partial'
+    assert out['coverage'][0]['euro_rows']==1208
+    assert out['coverage'][0]['totals_rows']==0
+    assert out['euro'] and not out['totals']

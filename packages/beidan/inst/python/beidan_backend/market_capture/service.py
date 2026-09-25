@@ -162,7 +162,8 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
             result['identities'].append(dict(fixture))
             for key in ('euro','totals','companies','diagnostics'):
                 result[key].extend(parsed[key])
-            result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='ok',detail='',
+            complete = bool(parsed['euro']) and bool(parsed['totals'])
+            result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='ok' if complete else 'partial',detail='' if complete else 'No usable pregame quotes in one or both markets',
                 euro_rows=len(parsed['euro']),totals_rows=len(parsed['totals'])))
         except (ValueError,KeyError,RuntimeError,OSError) as exc:
             result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='error',detail=str(exc),euro_rows=0,totals_rows=0))
