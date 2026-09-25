@@ -45,9 +45,9 @@ testthat::test_that('column order and type are enforced, not silently repaired',
   testthat::expect_error(match_validate_table(extra, 'fixtures'), 'columns must be exactly')
 })
 
-testthat::test_that('a non-UTC POSIXct column is rejected at the boundary', {
+testthat::test_that('an unsupported timezone is rejected at the boundary', {
   bad <- match_typed_empty('euro')
-  bad$quote_at <- as.POSIXct(character(0), tz = 'Asia/Shanghai')
+  bad$quote_at <- as.POSIXct(character(0), tz = 'Europe/London')
   testthat::expect_error(match_validate_table(bad, 'euro'), 'must carry tz UTC')
 })
 
@@ -283,7 +283,7 @@ testthat::test_that('match_validate_table 强制列集合、列序与列类型',
 
 testthat::test_that('match_validate_table 对零长度 POSIXct 也校验时区', {
   data <- match_typed_empty('settlements')
-  data$label_available_at <- as.POSIXct(character(0), tz = 'Asia/Shanghai')
+  data$label_available_at <- as.POSIXct(character(0), tz = 'Europe/London')
   testthat::expect_error(match_validate_table(data, 'settlements'), 'must carry tz UTC')
 })
 

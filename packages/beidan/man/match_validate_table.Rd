@@ -25,7 +25,7 @@ match_validate_table(data, table, keys = NULL)
 \details{
 列：names(data) 必须与 schema$columns 完全相同（含顺序）
 类型：character/integer/double/logical/POSIXct 精确匹配（不宽恕 double vs integer）
-POSIXct：必须携带 tzone == "UTC"；零长度列同样校验
+POSIXct：必须携带 UTC 或 Asia/Shanghai 时区；零长度列同样校验
 主键：keys 组合不得重复。keys 未显式给出时采用 schema$keys，
 因此声明了复合主键的表（candidate_tickets、ranked）在任何调用点都被强制唯一，
 而不是依赖每个调用方记得传 keys
