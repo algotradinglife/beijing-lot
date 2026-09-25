@@ -11,8 +11,8 @@ execute:
 
 ```{r}
 pkgload::load_all("../packages/beidan", quiet = TRUE)
-cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
-kickoff_at <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + seq(0, by = 900, length.out = 14L)
+cutoff <- list(issue_id = "00123", cutoff_utc = lubridate::ymd_hms("2026-09-22 12:00:00", tz = "UTC"))
+kickoff_at <- lubridate::with_tz(lubridate::ymd_hms("2026-09-23 12:00:00", tz = "Asia/Shanghai"), "UTC") + lubridate::dminutes(seq(0, by = 15, length.out = 14L))
 example <- n7_make_fixture_issue("00123", kickoff_at)
 inputs <- n7_read_inputs(n7_fixture_source(example), "00123")
 baseline <- n7_select_match_status(inputs$fixtures, inputs$match_status, cutoff)
@@ -23,8 +23,8 @@ knitr::kable(baseline$selected_status)
 ```{r}
 future <- inputs$match_status[1, ]
 future$status <- "cancelled"
-future$status_at <- cutoff$cutoff_utc + 1
-future$available_at <- cutoff$cutoff_utc + 1
+future$status_at <- cutoff$cutoff_utc + lubridate::dseconds(1)
+future$available_at <- cutoff$cutoff_utc + lubridate::dseconds(1)
 changed <- dplyr::bind_rows(inputs$match_status, future)
 stopifnot(identical(baseline, n7_select_match_status(inputs$fixtures, changed, cutoff)))
 at_cutoff <- future
@@ -32,8 +32,8 @@ at_cutoff$status_at <- cutoff$cutoff_utc
 at_cutoff$available_at <- cutoff$cutoff_utc
 stopifnot(identical(baseline, n7_select_match_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, at_cutoff), cutoff)))
 visible <- future
-visible$status_at <- cutoff$cutoff_utc - 1
-visible$available_at <- cutoff$cutoff_utc - 1
+visible$status_at <- cutoff$cutoff_utc - lubridate::dseconds(1)
+visible$available_at <- cutoff$cutoff_utc - lubridate::dseconds(1)
 filtered <- n7_select_match_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, visible), cutoff)
 stopifnot(nrow(filtered$fixtures) == 13L, nrow(filtered$exclusions) == 1L)
 knitr::kable(filtered$exclusions)
@@ -70,13 +70,13 @@ knitr::kable(first$built$groups$group_legs)
 ## 整期读取与决策窗口分离
 
 ```{r}
-multi_kickoff <- as.POSIXct(c("2026-09-23 04:00:00", "2026-09-24 04:00:00"), tz = "UTC")
+multi_kickoff <- lubridate::ymd_hms(c("2026-09-23 04:00:00", "2026-09-24 04:00:00"), tz = "UTC")
 multi <- n7_make_fixture_issue("00123", multi_kickoff)
 source <- n7_fixture_source(multi)
 original <- source
 whole <- n7_read_inputs(source, "00123")
 next_cutoff <- cutoff
-next_cutoff$cutoff_utc <- cutoff$cutoff_utc + 86400
+next_cutoff$cutoff_utc <- cutoff$cutoff_utc + lubridate::ddays(1)
 euro_policy <- list(members = c("c01", "c02", "c03"), missing = "error")
 totals_policy <- list(companies = NULL, line = "nearest_main", watermark = "decimal")
 epoch1 <- n7_prepare_epoch(whole, cutoff, euro_policy = euro_policy, totals_policy = totals_policy)
@@ -169,3 +169,6 @@ quarto render quarto/n7_match_status.qmd --no-cache --execute
 | `quarto/beidan_package.qmd` | `13ace70bfd24b23a367677bc80b38fea2765a50c3237e5094c8d1367ed0c6cd0` |
 | `quarto/n7_pipeline_contracts.qmd` | `7d7832d37359f2ec67b6c365f129050d25096ee356697bb945d7ed39a2aee402` |
 | 本QMD正文（追加验收记录之前） | `ac6e1048b7b752fde984c95fd5176bee1786d74adeec367597aec4b1cd2a7ea4` |
+
+
+日期管理示例现按 #510 使用 lubridate；原审阅记录保留为当时证据，当前日期边界验收见 `n7_lubridate.qmd`。

@@ -1,0 +1,87 @@
+---
+title: "N7 日期管理：整期读取与北京时间决策"
+format: html
+execute:
+  error: false
+  cache: false
+  freeze: false
+---
+
+#510 本次仅统一输入时间解析、合成器固定时长与次日自然日窗口的日期管理，使用已有依赖 lubridate。公共时间列仍为 UTC POSIXct；数据为明确标注的合成输入，不涉及真实采集或历史学习。数值 epoch 和空表类型构造不机械替换。
+
+## 正常使用流程（mock 数据源）
+
+```{r}
+pkgload::load_all("../packages/beidan", quiet = TRUE)
+kickoff_at <- rep(lubridate::ymd_hms(
+  c("2026-09-23 12:00:00", "2026-09-24 12:00:00"),
+  tz = "Asia/Shanghai"), each = 7L) +
+  lubridate::dminutes(rep(seq(0, by = 30, length.out = 7L), 2L))
+kickoff_at <- lubridate::with_tz(kickoff_at, "UTC")
+mock_source <- n7_fixture_source(n7_make_fixture_issue("00123", kickoff_at))
+inputs <- n7_read_inputs(mock_source, "00123")
+stopifnot(nrow(inputs$fixtures) == 14L)
+knitr::kable(inputs$fixtures[, c("issue_id", "fixture_id", "kickoff_at")])
+cutoff <- list(issue_id = "00123", cutoff_utc = lubridate::with_tz(
+  lubridate::ymd_hms("2026-09-22 20:00:00", tz = "Asia/Shanghai"), "UTC"))
+epoch <- n7_prepare_epoch(inputs, cutoff,
+  euro_policy = list(members = c("c01", "c02", "c03"), missing = "error"),
+  totals_policy = list(companies = NULL, line = "nearest_main", watermark = "decimal"))
+stopifnot(nrow(epoch$fixtures) == 7L, nrow(inputs$fixtures) == 14L)
+knitr::kable(epoch$fixtures[, c("fixture_id", "kickoff_at")])
+```
+
+## 独立边界验收
+
+时区转换只改变显示时区，不能丢失亚秒；固定 36 小时使用 duration，次日窗口遵守当地日历而非固定 24 小时。
+
+```{r}
+instant <- lubridate::ymd_hms("2026-09-22 20:00:00.25", tz = "Asia/Shanghai")
+parsed <- beidan:::n7_parse_utc(instant, "independent instant")
+stopifnot(identical(as.numeric(parsed), as.numeric(instant)),
+          identical(attr(parsed, "tzone"), "UTC"))
+for (item in list(c("2026-03-07T17:00:00Z", 23),
+                  c("2026-10-31T16:00:00Z", 25))) {
+  window <- beidan:::n7_decision_window(item[[1]], "America/New_York")
+  hours <- as.numeric(difftime(lubridate::ymd_hms(window$end_utc),
+                              lubridate::ymd_hms(window$start_utc), units = "hours"))
+  stopifnot(hours == as.numeric(item[[2]]))
+}
+```
+
+## 验证范围
+
+函数/测试映射：`n7_parse_utc` 的偏移、亚秒、空值和非法输入；`n7_make_fixture_issue` 的固定报价提前时长；`n7_decision_window` 的自然日和 DST；`n7_select_match_status` 的严格 cutoff。新增 `test-n7-lubridate.R`，保留既有契约、epoch 和状态回归。
+
+无新增依赖，无生产抓取，无 CI 工作。后续输入真实数据时仅替换 source。
+
+
+## 实际检查与审阅
+
+- 控制侧回归 `testthat::test_local("packages/beidan", filter="n7-lubridate|n7-pipeline-contracts|n7-pipeline-epoch|n7-match-status", reporter="summary", stop_on_failure=TRUE)`：888 条断言通过，0 failure/error/warning/skip。
+- 控制侧先复现原实现将非 UTC `.25` 秒时间截断 0.25 秒；现在精确保留。
+- dsh 越界启动估值测试后被停止，交付声明不作为证据；以上均为控制侧独立执行。
+- 渲染命令：`quarto render quarto/n7_lubridate.qmd --no-cache --execute`，新 R 进程且 cache/freeze 关闭。R 库和可写 TMPDIR/XDG_CACHE_HOME/DENO_DIR 显式由环境传入。
+- 未运行全仓和 CI；本次没有 Python 后端修改。历史 QMD 原有哈希仍只指历史版本。
+
+首轮 `codex review --uncommitted` 发现 P2：lubridate 会把 24:01、秒61归一化成另一时刻。已增加钟面范围校验与回归，同时拒绝结尾换行；修复后重新审阅。
+
+审阅命令：`R_LIBS=<project r_lib> codex review --uncommitted`。审阅清单 SHA-256（本节外的 QMD 正文单独绑定，避免自引用）：
+
+| 文件 | SHA-256 |
+|---|---|
+| `packages/beidan/R/n7_experiment_contract.R` | `987983521e491f5176506089dc10733b9cb1cd66096740e4da024b6c41794972` |
+| `packages/beidan/R/n7_pipeline_fixture.R` | `203c24b9cc29dd18a478d11efb73ef1e14e6d51a5b370b3427fef74db7dcf21c` |
+| `packages/beidan/R/n7_pipeline_inputs.R` | `6ffac2f1402b790522667a34f7f65a185777c7bc36516dd1df0f0d99962cb0c0` |
+| `packages/beidan/README.md` | `0feab1ef7f78d9f68701fada6edf171299e444714db0a30386881e391b509f3f` |
+| `packages/beidan/man/n7_parse_utc.Rd` | `20a6dfeca1c4c0dc125e220efe14dfbf397e4e278431151d0232dd14638864b4` |
+| `packages/beidan/tests/testthat/test-n7-pipeline-contracts.R` | `50db7fbd558d5981cc9ebf8073cac156b659e48c6fc90b04cde4464184751d8d` |
+| `quarto/beidan_package.qmd` | `0438eb398fd186bdb82ee3b6d3a432ff7031509b1454347dd0db4194c0cd2071` |
+| `quarto/n7_match_status.qmd` | `2fbf01be937afdcb90f8eefa51174ca9c24db2074a408653b4698d5b24bfc58a` |
+| `quarto/n7_pipeline_contracts.qmd` | `e3ad1fda18b750866d6577376bb68edef6d59c17d47a9d228c9e90f357c44e67` |
+| `packages/beidan/tests/testthat/test-n7-lubridate.R` | `e559ddf33363df63521e68ab246aba2831dc35a33e03089d1b7b649969c93d4f` |
+| 本 QMD 审阅清单前正文 | `02a35acb559146feb0b1bfbf0655b58a94bca345ceee77a7801f32116a03d131` |
+
+最终审阅结果：第二轮 `codex review --uncommitted` 未发现可操作回归，审阅进程也独立通过相关专项测试与 `git diff --check`。上表实现/测试/文档哈希对应该轮审阅；本段仅追加结果。
+
+四份 QMD 已在新 R 进程无缓存执行成功：本报告、`n7_match_status.qmd`、`n7_pipeline_contracts.qmd`、`beidan_package.qmd`。逐一检查 HTML 实际错误块为 0；表格分别为 3、7、24、4（本报告包含审阅清单）。安装版已用 `pak::local_install()` 更新到显式项目库；干净进程确认加载路径及亚秒/非法时刻行为。

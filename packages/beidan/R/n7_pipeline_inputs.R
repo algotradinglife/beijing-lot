@@ -34,45 +34,50 @@ n7_source_csv_columns <- function() {
 #'
 #' @param value  字符向量（ISO-8601 带显式 UTC 偏移的字符串），或 POSIXct 向量。
 #'   允许零长度。字符形式：
-#'   · 必须携带显式偏移（尾部 Z、+HH:MM 或 +HHMM）-> 裸时间戳报错
+#'   · 必须携带显式偏移（尾部 Z、±HH:MM 或 ±HHMM）-> 裸时间戳报错
+#'   · 秒的小数部分允许，且原样保留（"….250Z" 的亚秒不会被截断）
 #'   · NA                -> stop()
 #'   · 非字符非 POSIXct  -> stop()
-#'   · 无法解析          -> stop()
-#'   POSIXct 形式：非 UTC 时区的会先转换到 UTC 再返回。
+#'   · 无法解析 / 形状不完整（尾巴带垃圾）-> stop()
+#'   POSIXct 形式：非 UTC 时区只改显示时区（with_tz），**不重解析**，因此非整秒
+#'   瞬时值精确保留；NA/Inf/-Inf 一律报错。
 #' @param what   长度 1 的非空字符标签，仅用于错误信息；同时校验它自己。
 #' @return UTC 时区的 POSIXct 向量。
-#' @details 裸时间戳被拒绝而不是假定为 UTC：在这里猜会静默平移 cutoff，从而错误地
-#'   纳入或排除一笔报价。所有可接受的写法都被归一到 strptime 唯一认识的形式——
-#'   尾部 Z 变 +0000，带冒号的偏移去掉冒号；否则 strptime 对 "+08:00" 返回 NA，
-#'   而一个把墙钟部分当 UTC 的兜底会把每笔报价按其偏移量平移。
+#' @details 字符输入先校验完整 ISO-8601 形状与合法偏移范围，再用
+#'   lubridate::ymd_hms 解析；禁止推测裸时间戳的时区或忽略尾部内容。
+#'   POSIXct 通过 with_tz 转为 UTC，保留原始瞬时值及亚秒精度。
 n7_parse_utc <- function(value, what) {
   if (!is.character(what) || length(what) != 1L || is.na(what) || !nzchar(what)) {
     stop("n7_parse_utc: what must be a single non-empty label")
   }
   if (inherits(value, "POSIXct")) {
-    if (!identical(attr(value, "tzone"), "UTC")) {
-      return(as.POSIXct(format(value, tz = "UTC", usetz = TRUE), tz = "UTC", format = "%Y-%m-%d %H:%M:%S"))
+    converted <- lubridate::with_tz(value, "UTC")
+    if (anyNA(converted) || any(!is.finite(as.numeric(converted)))) {
+      stop("n7_parse_utc: ", what, " must not be NA, NaN or infinite")
     }
-    return(value)
+    return(converted)
   }
   if (!is.character(value)) stop("n7_parse_utc: ", what, " must be character or POSIXct")
   if (anyNA(value)) stop("n7_parse_utc: ", what, " must not be NA")
-  if (any(!grepl("(Z|[+-][0-9]{2}:?[0-9]{2})$", value))) {
-    stop("n7_parse_utc: ", what, " must carry an explicit UTC offset")
+  # Reject permissive parser extensions before interpreting an instant.
+  iso_shape <- "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-](?:[01][0-9]|2[0-3]):?[0-5][0-9])\\z"
+  if (any(!grepl(iso_shape, value, perl = TRUE))) {
+    stop("n7_parse_utc: ", what,
+         " must be ISO-8601 with an explicit UTC offset ",
+         "(YYYY-MM-DDTHH:MM:SS[.fff]Z|+HH:MM|+HHMM)")
   }
-  # Normalise every accepted spelling to the one form strptime understands:
-  # a trailing Z becomes +0000 and a colon-bearing offset loses its colon. Without
-  # this, strptime returns NA for "+08:00" and a fallback that formatted the
-  # wall-clock part as UTC would shift every quote by its offset -- admitting
-  # post-cutoff rows as if they were early.
-  normalised <- sub("Z$", "+0000", value)
-  normalised <- sub("([+-][0-9]{2}):([0-9]{2})$", "\\1\\2", normalised)
-  parsed <- as.POSIXct(strptime(normalised, format = "%Y-%m-%dT%H:%M:%S%z", tz = "UTC"))
-  if (anyNA(parsed) || !identical(attr(parsed, "tzone"), "UTC")) {
-    attr(parsed, "tzone") <- "UTC"
+  # lubridate normalizes some invalid clocks (24:01 and second 61); fail closed.
+  if (any(as.integer(substr(value, 12L, 13L)) > 23L |
+          as.integer(substr(value, 15L, 16L)) > 59L |
+          as.integer(substr(value, 18L, 19L)) > 60L)) {
+    stop("n7_parse_utc: ", what, " is not a parseable UTC instant")
   }
-  if (anyNA(parsed)) stop("n7_parse_utc: ", what, " is not a parseable UTC instant")
-  parsed
+  parsed <- lubridate::ymd_hms(value, tz = "UTC", quiet = TRUE)
+  if (anyNA(parsed) || !inherits(parsed, "POSIXct")) {
+    stop("n7_parse_utc: ", what, " is not a parseable UTC instant")
+  }
+  attr(parsed, "tzone") <- "UTC"
+  return(parsed)
 }
 
 #' 把一张 CSV 数据框强制转换为其声明的 tibble schema
