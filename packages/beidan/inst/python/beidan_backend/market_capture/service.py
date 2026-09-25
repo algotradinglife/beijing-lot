@@ -157,6 +157,7 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
                 result['captures'].append(dict(fixture_id=fixture['fixture_id'],market=market,
                     source_url=url,observed_at=stamp.astimezone(BJT).isoformat(),raw_path=str(path),
                     sha256=hashlib.sha256(body).hexdigest()))
+                (directory/'receipt.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
                 bodies[market]=body
             parsed=parse_markets(fixture,bodies['euro'],{c:bodies[f'total_{c}'] for c in totals_company_ids})
             result['identities'].append(dict(fixture))

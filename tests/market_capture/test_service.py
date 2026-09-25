@@ -113,3 +113,16 @@ def test_unusable_total_history_is_partial_not_success(tmp_path,fixture,pages):
     assert out['coverage'][0]['euro_rows']==1208
     assert out['coverage'][0]['totals_rows']==0
     assert out['euro'] and not out['totals']
+
+
+def test_interrupted_parse_keeps_observation_receipt(tmp_path,fixture,pages,monkeypatch):
+    import beidan_backend.market_capture.service as service
+    def interrupt(*args,**kwargs):
+        raise KeyboardInterrupt()
+    monkeypatch.setattr(service,'parse_markets',interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        fetch_markets([fixture],str(tmp_path),['8'],pages=pages)
+    receipt=json.loads(next(tmp_path.glob('*/receipt.json')).read_text())
+    assert len(receipt['captures'])==2
+    assert all(c['observed_at'] and c['source_url'] for c in receipt['captures'])
+    assert all(Path(c['raw_path']).exists() for c in receipt['captures'])
