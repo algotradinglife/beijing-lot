@@ -35,6 +35,11 @@ probabilities 每场 3 行（W/D/L），fit 每场 1 行。
 每场比赛的 issue_id 必须与 cutoff 绑定的期号一致。投影失败的比赛连同原因
 记入 fit 表，而不是被静默跳过。
 
+投影边界再次用 epoch_inputs$match_status 保留的历史台账校验可见性：直接调用
+本函数（绕过 n7_prepare_epoch）时，任何在\strong{本} cutoff 当时不可见或非
+scheduled 的比赛都必须报错，而不是被照常定价——那会让调用方拿别的时刻的
+选择结果给现在定价。
+
 瑞典盘三项为决策三元组；普通 W/D/L 仅作为诊断信息挂在 fit 表上，
 绝不作为投注赛果使用。
 }

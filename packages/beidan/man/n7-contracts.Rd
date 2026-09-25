@@ -50,7 +50,7 @@ S7 仅用于管道\strong{内部}的领域对象（如 SP 报价、结构、票�
 
 \section{表类型契约}{
 
-15 张表由 \code{n7_table_schemas()} 唯一声明，边界处由
+16 张表由 \code{n7_table_schemas()} 唯一声明，边界处由
 \code{n7_validate_table()} 校验列集合、列序、列类型与主键。
 }
 

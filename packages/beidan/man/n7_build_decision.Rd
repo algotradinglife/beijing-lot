@@ -9,6 +9,7 @@ n7_build_decision(
   probabilities,
   prematch_sp,
   cutoff,
+  match_status,
   patterns,
   construction,
   max_candidates,
@@ -26,6 +27,8 @@ n7_build_decision(
 \item{prematch_sp}{Pre-cutoff SP tibble; an empty table is allowed and causes unavailable estimated EV.}
 
 \item{cutoff}{Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.}
+
+\item{match_status}{Required match-status observation ledger; a missing ledger errors and an empty one excludes every fixture.}
 
 \item{patterns}{Named list of length-seven vectors of allowed outcome counts (1, 2 or 3).}
 

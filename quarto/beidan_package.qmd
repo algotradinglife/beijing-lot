@@ -22,13 +22,16 @@ tibble::tibble(package = "beidan", version = as.character(packageVersion("beidan
                python_initialized_on_load = FALSE) |> knitr::kable()
 ```
 
+本次 #508 更新示例调用；原 #504 的审阅哈希与结论仅描述当时版本。当前验收见 `n7_match_status.qmd`。
+
 # 不依赖脚本加载顺序的 R 调用
 
 ```{r}
 constants <- n7_pipeline_constants()
-issue <- n7_make_fixture_issue("00123", "2026-09-22", n_fixtures = 14L)
+kickoffs <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + seq(0, by = 900, length.out = 14L)
+issue <- n7_make_fixture_issue("00123", kickoffs)
 cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz="UTC"))
-inputs <- n7_read_inputs(n7_fixture_source(issue), "00123", cutoff)
+inputs <- n7_read_inputs(n7_fixture_source(issue), "00123")
 epoch <- n7_prepare_epoch(inputs, cutoff, "Asia/Shanghai",
   list(members=c("c01","c02","c03"), missing="error"),
   list(companies=NULL,line="nearest_main",watermark="decimal"))

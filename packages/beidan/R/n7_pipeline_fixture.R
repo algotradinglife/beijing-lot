@@ -29,7 +29,7 @@ n7_fixture_source_url <- function(kind, key) {
 
 #' 构造一期的合成夹具
 #'
-#' n_fixtures 场比赛被放在同一个本地日历日上，开赛时间错开。每场获得一个让球数、
+#' kickoff_at 的每个元素生成一场比赛，因此一期可以跨多个比赛日。每场获得一个让球数、
 #' 一个真实底层 W/D/L 三元组、一组欧赔报价、若干盘口的大小球报价，以及一个赛前 SP
 #' 三元组。概率先生成、赔率由概率导出，因此夹具自洽。
 #'
@@ -39,27 +39,31 @@ n7_fixture_source_url <- function(kind, key) {
 #'
 #' @param issue_id     长度 1 的合法字符标识符（经 n7_check_character_id）。
 #'   · 长度 != 1 -> stop()（本生成器只命名一期）
-#' @param local_date   长度 1 的 YYYY-MM-DD 字符串，且必须是真实存在的日历日期。
-#'   · 非字符 / 长度 != 1 / NA / 非补零写法（如 2026-9-2）-> stop()
-#'   · 不存在的日期（如 2026-02-30）                      -> stop()
-#' @param n_fixtures   长度 1 的正整数。<= 0、小数、NA、非有限 -> stop()
+#' @param kickoff_at   非空、有限、非 NA 的 UTC POSIXct 向量。每个元素一场比赛。
+#'   · 非 POSIXct / 零长度 / 含 NA / 非有限 -> stop()
+#'   · 非 UTC 时区的 POSIXct 会被显式转换到 UTC 后再使用。
 #' @param n_companies  长度 1 的正整数。<= 0、小数           -> stop()
 #' @param seed         长度 1 的有限数值。
-#' @param tz           长度 1 的非空时区名，必须存在于 OlsonNames() 中。
-#'   · 未知时区 -> stop()（否则 as.POSIXct 会静默退回 UTC，使每个开赛时刻偏移）
-#' @param kickoff_hour 长度 1 的整数，取值 0..23。
-#'   · 越界 -> stop()（否则日期运算会静默回绕，产出没人要求的时间轴）
 #' @param margin       长度 1 的正有限数值，用于给赔率加水位。
 #'   · <= 0 会产出 Inf 赔率，NA 会产出 NA 赔率，两者都静默 -> stop()
+#' @param match_status 长度 1 的字符，本期的比赛状态报告取值：scheduled（默认）
+#'   或任意 n7_match_statuses() 中的非 scheduled 取值。
+#'   · 非法取值 -> stop()
 #'
-#' @return list(fixtures, euro, totals, prematch_sp, truth)，前四张为 tibble，
-#'   truth 为 n_fixtures x 3 的数值矩阵（行名 fixture_id，列名 W/D/L）。
-#' @details 开赛时间落在 D+1（决策窗口内）：local_date 是决策日 D，20:00 Asia/Shanghai
-#'   的 epoch 能看到它们，而报价被放在 D 的上午，因此严格早于 cutoff。
-n7_make_fixture_issue <- function(issue_id, local_date, n_fixtures = 10L,
-                                  n_companies = 3L, seed = 1L, tz = "Asia/Shanghai",
-                                  kickoff_hour = 19L,
-                                  margin = 1.06) {
+#' @return list(fixtures, euro, totals, prematch_sp, match_status, truth)，前五张为
+#'   tibble，truth 为 length(kickoff_at) x 3 的数值矩阵（行名 fixture_id，列名 W/D/L）。
+#' @details 生成器**不推断决策 epoch**：kickoff_at 就是调用方声明的开赛时刻。
+#'   报价与初始状态报告都取每场 kickoff_at - 36 小时，再叠加已声明的小幅公司错开，
+#'   与任何 cutoff 无关 —— 因此跨日的整期读取能保留全部比赛日，而哪一天属于哪个
+#'   决策窗口由 n7_prepare_epoch 独占决定。
+#'
+#'   match_status 是**显式合成**的观测台账：每场一条报告，status_at 等于 available_at
+#'   （合成源同时报告事件与观测），绝不从任何真实赛果或最终记录推导 —— 否则测试会
+#'   依赖"已知结果"而不是"当时看到了什么"。需要"事后观测"的测试自行 bind_rows 追加，
+#'   从而显式表达"这条报告在 cutoff 之后才出现"。
+n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
+                                  seed = 1L, margin = 1.06,
+                                  match_status = "scheduled") {
   n7_check_character_id(issue_id, "issue_id")
   # Exactly one issue: this generator names one issue, and a longer id would reach
   # tibble() and die there with a column-size error that names neither the argument
@@ -68,31 +72,26 @@ n7_make_fixture_issue <- function(issue_id, local_date, n_fixtures = 10L,
     stop("n7_make_fixture_issue: issue_id must name exactly one issue; got ",
          length(issue_id))
   }
-  # Zero-padded ISO date only: "2026-9-2" would parse, but it makes the generated
-  # calendar date look like something the caller did not ask for.
-  if (!is.character(local_date) || length(local_date) != 1L || is.na(local_date) ||
-      !grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", local_date)) {
-    stop("n7_make_fixture_issue: local_date must be one YYYY-MM-DD string")
+  # kickoff_at is the explicit kickoff schedule. The fixture COUNT is derived from
+  # it, not from a separate n_fixtures argument that could disagree with the vector.
+  if (!inherits(kickoff_at, "POSIXct")) {
+    stop("n7_make_fixture_issue: kickoff_at must be a POSIXct vector")
   }
-  # A non-existent calendar date is a caller error, not an invitation to roll over.
-  if (is.na(as.Date(local_date, format = "%Y-%m-%d"))) {
-    stop("n7_make_fixture_issue: local_date is not a real calendar date: ", local_date)
+  if (!length(kickoff_at)) {
+    stop("n7_make_fixture_issue: kickoff_at must not be empty; it names the fixtures")
   }
-  if (!is.numeric(n_fixtures) || length(n_fixtures) != 1L || is.na(n_fixtures) ||
-      !is.finite(n_fixtures) || n_fixtures != floor(n_fixtures) || n_fixtures < 1) {
-    stop("n7_make_fixture_issue: n_fixtures must be one positive whole number")
+  if (anyNA(kickoff_at)) {
+    stop("n7_make_fixture_issue: kickoff_at must not be NA")
   }
-  slot_values <- n7_check_slot(seq_len(as.integer(n_fixtures)), "n_fixtures")
+  if (any(!is.finite(as.numeric(kickoff_at)))) {
+    stop("n7_make_fixture_issue: kickoff_at must be finite")
+  }
+  # A non-UTC vector is converted explicitly rather than relabelled: the instant is
+  # preserved, only the zone attribute changes, and the contract requires UTC.
+  kickoff_utc <- lubridate::with_tz(kickoff_at, "UTC")
   if (!is.numeric(n_companies) || length(n_companies) != 1L || is.na(n_companies) ||
       !is.finite(n_companies) || n_companies != floor(n_companies) || n_companies < 1) {
     stop("n7_make_fixture_issue: n_companies must be one positive whole number")
-  }
-  # kickoff_hour indexes a local calendar hour: a value outside 0..23 would be
-  # silently wrapped by the date arithmetic, producing a timeline nobody asked for.
-  if (!is.numeric(kickoff_hour) || length(kickoff_hour) != 1L || is.na(kickoff_hour) ||
-      !is.finite(kickoff_hour) || kickoff_hour != floor(kickoff_hour) ||
-      kickoff_hour < 0 || kickoff_hour > 23) {
-    stop("n7_make_fixture_issue: kickoff_hour must be one whole hour in 0..23")
   }
   # margin overrounds the odds, so it must be strictly positive and finite;
   # margin = 0 yields Inf odds and margin = NA yields NA odds, both silently.
@@ -103,37 +102,15 @@ n7_make_fixture_issue <- function(issue_id, local_date, n_fixtures = 10L,
   if (!is.numeric(seed) || length(seed) != 1L || is.na(seed) || !is.finite(seed)) {
     stop("n7_make_fixture_issue: seed must be one finite number")
   }
-  # An unknown timezone must be refused: as.POSIXct would silently fall back to UTC
-  # and shift every kickoff by the intended offset.
-  if (!is.character(tz) || length(tz) != 1L || is.na(tz) || !nzchar(tz)) {
-    stop("n7_make_fixture_issue: tz must be one non-empty timezone name")
-  }
-  if (!tz %in% OlsonNames()) {
-    stop("n7_make_fixture_issue: tz is not a known timezone: ", tz)
+  if (!is.character(match_status) || length(match_status) != 1L ||
+      is.na(match_status) || !match_status %in% n7_match_statuses()) {
+    stop("n7_make_fixture_issue: match_status must be one of ",
+         paste(n7_match_statuses(), collapse = ", "))
   }
   set.seed(seed)
 
-  # local_date is the DECISION day D. Kickoffs land on D+1 (the decision window),
-  # so the 20:00 Asia/Shanghai epoch on D sees them, and quotes are placed a few
-  # hours before kickoff, i.e. after that epoch and before the first kickoff.
-  # 30-minute stagger keeps kickoffs inside the D+1 natural day for issues up to
-  # 48 fixtures, so a full 4-group slate fits in one decision window.
-  kickoff_local <- as.POSIXct(paste(local_date, sprintf("%02d:00:00", kickoff_hour)),
-                              tz = tz) + 86400 + (slot_values - 1L) * 900
-  kickoff_utc <- as.POSIXct(format(kickoff_local, tz = "UTC", usetz = TRUE), tz = "UTC")
-  # Quotes are placed on the decision day D, a few hours before the 20:00
-  # Asia/Shanghai epoch, so they are strictly pre-cutoff and the as-of rule has
-  # something to select from. They are deliberately NOT tied to kickoff: a quote
-  # taken after the decision is not an input to that decision.
-  # Quotes are spread across the pre-cutoff morning but capped so that even a large
-  # slate stays strictly before the 20:00 Asia/Shanghai epoch. Tying the offset to
-  # the slot index would push late slots past the cutoff and silently drop them.
-  spread_minutes <- if (length(slot_values) > 1L) {
-    min(8, floor(540 / (length(slot_values) - 1L)))
-  } else 0
-  quote_local <- as.POSIXct(paste(local_date, "08:00:00"), tz = tz) +
-    (slot_values - 1L) * spread_minutes * 60
-  quote_at <- as.POSIXct(format(quote_local, tz = "UTC", usetz = TRUE), tz = "UTC")
+  slot_values <- n7_check_slot(seq_along(kickoff_utc), "kickoff_at")
+  company_ids <- sprintf("c%02d", seq_len(n_companies))
 
   fixtures <- tibble::tibble(
     issue_id = rep(issue_id, length(slot_values)),
@@ -155,21 +132,31 @@ n7_make_fixture_issue <- function(issue_id, local_date, n_fixtures = 10L,
   colnames(truth) <- n7_outcomes()
   rownames(truth) <- fixtures$fixture_id
 
-  company_ids <- sprintf("c%02d", seq_len(n_companies))
+  # Quotes and the initial synthetic status report are observed before each kickoff.
+  # The -36h anchor is declared here and is deliberately NOT coupled to any cutoff:
+  # generation must not guess a decision epoch, and a quote placed relative to the
+  # cutoff would move whenever the caller changed the decision day.
+  quote_at <- kickoff_utc - 36 * 3600
+  # A small per-company offset keeps the synthetic feed from looking like one
+  # simultaneous snapshot, while staying inside the declared -36h anchor.
+  company_offset <- seq(0, 120, length.out = length(company_ids))
+  status_at <- quote_at
+
   euro_rows <- list()
   for (i in seq_len(nrow(fixtures))) {
-    for (company in company_ids) {
+    for (company_index in seq_along(company_ids)) {
       # Per-company noise makes the mean non-trivial; margin overrounds it.
       noisy <- truth[i, ] * exp(stats::runif(3L, -0.03, 0.03))
       noisy <- noisy / sum(noisy)
       euro_rows[[length(euro_rows) + 1L]] <- tibble::tibble(
         fixture_id = fixtures$fixture_id[i],
-        company_id = company,
-        quote_at = quote_at[i],
+        company_id = company_ids[company_index],
+        quote_at = quote_at[i] + company_offset[company_index],
         odds_home = 1 / (noisy[1] * margin),
         odds_draw = 1 / (noisy[2] * margin),
         odds_away = 1 / (noisy[3] * margin),
-        source_url = n7_fixture_source_url("euro", paste0(fixtures$fixture_id[i], "_", company)))
+        source_url = n7_fixture_source_url(
+          "euro", paste0(fixtures$fixture_id[i], "_", company_ids[company_index])))
     }
   }
   euro <- dplyr::bind_rows(euro_rows)
@@ -178,18 +165,19 @@ n7_make_fixture_issue <- function(issue_id, local_date, n_fixtures = 10L,
   lines <- c(2.5, 3.5)
   totals_rows <- list()
   for (i in seq_len(nrow(fixtures))) {
-    for (company in company_ids) {
+    for (company_index in seq_along(company_ids)) {
       for (line in lines) {
         over <- stats::plogis(2.4 - 0.55 * line + stats::runif(1L, -0.15, 0.15))
         totals_rows[[length(totals_rows) + 1L]] <- tibble::tibble(
           fixture_id = fixtures$fixture_id[i],
-          company_id = company,
-          quote_at = quote_at[i],
+          company_id = company_ids[company_index],
+          quote_at = quote_at[i] + company_offset[company_index],
           line = as.double(line),
           over_decimal = 1 / (over * margin),
           under_decimal = 1 / ((1 - over) * margin),
           source_url = n7_fixture_source_url(
-            "totals", paste0(fixtures$fixture_id[i], "_", company, "_", line)))
+            "totals",
+            paste0(fixtures$fixture_id[i], "_", company_ids[company_index], "_", line)))
       }
     }
   }
@@ -210,14 +198,26 @@ n7_make_fixture_issue <- function(issue_id, local_date, n_fixtures = 10L,
   }
   prematch_sp <- dplyr::bind_rows(sp_rows)
 
+  # A synthetic OBSERVATION, not a derived fact: one report per fixture, taken 36
+  # hours before kickoff. status_at equals available_at because the synthetic source
+  # reports the event and its observation at the same instant; nothing here is
+  # inferred from a real-world final record.
+  match_status_table <- tibble::tibble(
+    issue_id = rep(issue_id, length(slot_values)),
+    fixture_id = fixtures$fixture_id,
+    status = rep(match_status, length(slot_values)),
+    status_at = status_at,
+    available_at = status_at,
+    source_url = n7_fixture_source_url("match_status", fixtures$fixture_id))
+
   list(fixtures = fixtures, euro = euro, totals = totals, prematch_sp = prematch_sp,
-       truth = truth)
+       match_status = match_status_table, truth = truth)
 }
 
 #' 把一个或多个已生成的期包装成 read_inputs 的 source
 #'
 #' @param ...  一个或多个由 n7_make_fixture_issue 返回的 list，每个必须含
-#'   fixtures/euro/totals/prematch_sp 四张表。
+#'   fixtures/euro/totals/prematch_sp/match_status 五张表。
 #'   · 无参数                      -> stop()
 #'   · 任一参数非 list             -> stop()，并点名第几个参数
 #'   · 任一参数缺表                 -> stop()，并点名缺了哪些
@@ -232,7 +232,8 @@ n7_fixture_source <- function(...) {
     if (!is.list(issue)) {
       stop("n7_fixture_source: argument ", i, " must be a generated issue list")
     }
-    missing <- setdiff(c("fixtures", "euro", "totals", "prematch_sp"), names(issue))
+    missing <- setdiff(c("fixtures", "euro", "totals", "prematch_sp", "match_status"),
+                       names(issue))
     if (length(missing)) {
       stop("n7_fixture_source: argument ", i, " is missing ", paste(missing, collapse = ", "))
     }
@@ -242,5 +243,6 @@ n7_fixture_source <- function(...) {
          fixtures = dplyr::bind_rows(lapply(issues, function(x) x$fixtures)),
          euro = dplyr::bind_rows(lapply(issues, function(x) x$euro)),
          totals = dplyr::bind_rows(lapply(issues, function(x) x$totals)),
-         prematch_sp = dplyr::bind_rows(lapply(issues, function(x) x$prematch_sp))))
+         prematch_sp = dplyr::bind_rows(lapply(issues, function(x) x$prematch_sp)),
+         match_status = dplyr::bind_rows(lapply(issues, function(x) x$match_status))))
 }

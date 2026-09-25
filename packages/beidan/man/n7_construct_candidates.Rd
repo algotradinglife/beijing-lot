@@ -11,7 +11,8 @@ n7_construct_candidates(
   n_legs,
   construction,
   max_candidates,
-  seed = 1L
+  seed = 1L,
+  match_status
 )
 }
 \arguments{
@@ -31,9 +32,14 @@ n7_construct_candidates(
 \item{max_candidates}{长度 1 的正整数。}
 
 \item{seed}{整数标量，控制 entropy_balanced 的确定性抽样。}
+
+\item{match_status}{tibble，比赛状态台账（语义见 n7_select_match_status）。
+\strong{必填且无默认值}：附加在末尾以保持既有位置调用的可读性，但缺失即 stop()，
+因为"没有台账"与"台账为空"是两件事，前者是输入契约错误。}
 }
 \value{
-list(groups, group_legs, diagnostics)，均为 tibble。
+list(groups, group_legs, diagnostics); diagnostics$status_exclusions
+records each fixture excluded by its visible match status.，均为 tibble。
 }
 \description{
 构造候选组
@@ -42,4 +48,10 @@ list(groups, group_legs, diagnostics)，均为 tibble。
 不执行完整的 7-of-N 枚举：那是组合爆炸，且契约禁止声称全局最优。
 决策绑定到\strong{一期}：拿别的期号的比赛对着本 cutoff 定价，会让回放买到
 不属于它自己赛程的比赛。
+
+比赛可见性由唯一的共享选择器 n7_select_match_status() 决定，且使用完全相同的
+cutoff：本函数不自己实现一套状态判定，因此从 fixtures 直接构造候选与经由
+n7_prepare_epoch 构造得到同一批比赛。台账的关系键已经由输入边界
+（n7_read_inputs 或 n7_prepare_epoch）对着完整帧校验过，因此这里直接把同一份
+fixtures 交给选择器，不再另做关系检查。
 }

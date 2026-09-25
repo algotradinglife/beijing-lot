@@ -17,17 +17,18 @@ value_fixture <- function(n_fixtures = 56L, seed = 42L) {
   # The decision cutoff sits BEFORE the slate kicks off. A fixture that already
   # kicked off cannot be decided on, and the allocation path enforces that, so the
   # cutoff must precede the earliest kickoff rather than follow it.
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = n_fixtures,
-                                 seed = seed, kickoff_hour = 9L)
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', n_fixtures),
+                                 seed = seed)
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'),
                  issue_id = '26097')
-  inputs <- n7_read_inputs(n7_fixture_source(issue), '26097', cutoff)
+  inputs <- n7_read_inputs(n7_fixture_source(issue), '26097')
   prepared <- n7_prepare_epoch(inputs, cutoff, N7_DECISION_TZ,
                                list(members = c('c01', 'c02', 'c03'), missing = 'error'),
                                list(companies = NULL, line = 'nearest_main',
                                     watermark = 'decimal'))
   projected <- n7_project_probabilities(prepared, cutoff, -0.14, c(0.1, 16), 1e-10)
   list(issue = issue, fixtures = prepared$fixtures, sp = prepared$sp_selected,
+       match_status = prepared$match_status,
        probabilities = projected$probabilities, cutoff = cutoff,
        constants = n7_pipeline_constants())
 }
@@ -65,6 +66,7 @@ testthat::test_that('the SP transform applies the threshold rule exactly as spec
 testthat::test_that('valuation prices a ticket from its own legs and applies 0.65 once', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
                              1L, 1L, fx$constants, 1L, 6L)
   valued <- built$valued
@@ -97,6 +99,7 @@ testthat::test_that('valuation prices a ticket from its own legs and applies 0.6
 testthat::test_that('a ticket missing any leg SP gets NA rather than a partial product', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
                              1L, 1L, fx$constants, 1L, 6L)
   # Every ticket in a group spans all seven of its fixtures, so removing one
@@ -121,6 +124,7 @@ testthat::test_that('a ticket missing any leg SP gets NA rather than a partial p
 testthat::test_that('SP quoted at or after the cutoff cannot price a ticket', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
                              1L, 1L, fx$constants, 1L, 6L)
   late <- fx$sp
@@ -135,6 +139,7 @@ testthat::test_that('SP quoted at or after the cutoff cannot price a ticket', {
 testthat::test_that('ranking is probability-first inside each candidate support', {
   fx <- value_fixture(n_fixtures = 28L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
                              2L, 1L, fx$constants, 1L, 6L)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
@@ -173,6 +178,7 @@ testthat::test_that('allocation A funds 1024 CNY as four groups of the 3333222 s
   fx <- value_fixture()
   config <- n7_allocation_configs(fx$constants)[['A']]
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   testthat::expect_equal(nrow(result$funded$purchases), 512L)
   testthat::expect_equal(sum(result$funded$purchases$stake_cny), 1024)
@@ -186,6 +192,7 @@ testthat::test_that('allocation B mixes two structures across eight groups', {
   fx <- value_fixture()
   config <- n7_allocation_configs(fx$constants)[['B']]
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   funded <- result$funded$funded
   labels <- sub('^.*[|]', '', funded$candidate_id)
@@ -224,6 +231,7 @@ testthat::test_that('allocation C buys 80 of its 96 supported tickets', {
   fx <- value_fixture()
   config <- n7_allocation_configs(fx$constants)[['C']]
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   # The 3222221 structure spans 96 tickets; the budget only buys 80, which is the
   # in-structure truncation the contract asks to demonstrate.
@@ -236,6 +244,7 @@ testthat::test_that('the funded set is the top of the ranking, not an arbitrary 
   fx <- value_fixture(n_fixtures = 28L)
   config <- n7_allocation_configs(fx$constants)[['A']]
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   for (group_id in unique(result$funded$funded$group_id)) {
     in_group <- result$ranked[result$ranked$group_id == group_id, , drop = FALSE]
@@ -248,6 +257,7 @@ testthat::test_that('the funded set is the top of the ranking, not an arbitrary 
 testthat::test_that('budget constraints are enforced and validated', {
   fx <- value_fixture(n_fixtures = 28L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
                              2L, 1L, fx$constants, 1L, 6L)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
@@ -271,6 +281,7 @@ testthat::test_that('budget constraints are enforced and validated', {
 testthat::test_that('a group failing admission is skipped, not silently refilled', {
   fx <- value_fixture(n_fixtures = 28L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
                              2L, 1L, fx$constants, 1L, 6L)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
@@ -290,6 +301,7 @@ testthat::test_that('a frozen plan is immutable with respect to later settlement
   fx <- value_fixture(n_fixtures = 28L)
   config <- n7_allocation_configs(fx$constants)[['A']]
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   plan <- result$plan
   funded_before <- plan$funded$ticket_id
@@ -304,6 +316,7 @@ testthat::test_that('a frozen plan is immutable with respect to later settlement
 testthat::test_that('settlement multiplies the settled SP once and applies 0.65 once', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -333,6 +346,7 @@ testthat::test_that('settlement multiplies the settled SP once and applies 0.65 
 testthat::test_that('an unsettled leg yields PENDING, never a loss', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -360,6 +374,7 @@ testthat::test_that('an unsettled leg yields PENDING, never a loss', {
 testthat::test_that('labels not yet available as of the settlement instant are invisible', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -377,6 +392,7 @@ testthat::test_that('labels not yet available as of the settlement instant are i
 testthat::test_that('a correctly-predicted but unpriced win is pending, not a fabricated payout', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -399,6 +415,7 @@ testthat::test_that('a correctly-predicted but unpriced win is pending, not a fa
 testthat::test_that('an abnormal settlement label is reported separately from a loss', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -423,6 +440,7 @@ testthat::test_that('an abnormal settlement label is reported separately from a 
 testthat::test_that('a known miss settles as LOST with zero payout', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -466,8 +484,10 @@ testthat::test_that('the whole decision is reproducible from the same inputs', {
   fx <- value_fixture(n_fixtures = 28L)
   config <- n7_allocation_configs(fx$constants)[['A']]
   first <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                              fx$constants, 1L, 6L)
   second <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   testthat::expect_identical(first$plan$funded$ticket_id, second$plan$funded$ticket_id)
   testthat::expect_identical(first$ranked$ticket_id, second$ranked$ticket_id)
@@ -501,7 +521,9 @@ testthat::test_that('an epoch bound to one issue rejects fixtures from another',
   fx <- value_fixture(n_fixtures = 14L)
   strayed <- fx$fixtures
   strayed$issue_id[1] <- '99999'
-  bare <- list(fixtures = strayed, euro = n7_typed_empty('euro'),
+  stray_status <- fx$match_status
+  stray_status$issue_id[stray_status$fixture_id == strayed$fixture_id[1]] <- '99999'
+  bare <- list(match_status = stray_status, fixtures = strayed, euro = n7_typed_empty('euro'),
                totals = n7_typed_empty('totals'),
                prematch_sp = n7_typed_empty('prematch_sp'))
   testthat::expect_error(
@@ -514,7 +536,7 @@ testthat::test_that('an epoch bound to one issue rejects fixtures from another',
 
 testthat::test_that('projection refuses quotes at or after the cutoff', {
   fx <- value_fixture(n_fixtures = 14L)
-  inputs <- n7_read_inputs(n7_fixture_source(fx$issue), '26097', fx$cutoff)
+  inputs <- n7_read_inputs(n7_fixture_source(fx$issue), '26097')
   prepared <- n7_prepare_epoch(inputs, fx$cutoff, N7_DECISION_TZ,
                                list(members = c('c01', 'c02', 'c03'), missing = 'error'),
                                list(companies = NULL, line = 'nearest_main',
@@ -536,6 +558,7 @@ testthat::test_that('projection refuses quotes at or after the cutoff', {
 testthat::test_that('settlement is keyed on issue and fixture together', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -568,6 +591,7 @@ testthat::test_that('settlement is keyed on issue and fixture together', {
 testthat::test_that('a known miss settles even when another leg is unknown', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -596,6 +620,7 @@ testthat::test_that('a known miss settles even when another leg is unknown', {
 testthat::test_that('a special result is not booked as a realised loss', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -626,6 +651,7 @@ testthat::test_that('the replay never rebuys a physical ticket across epochs', {
   second <- value_fixture(n_fixtures = 56L, seed = 43L)
   # The fixture rows must carry the issue the cutoff names.
   second$fixtures$issue_id <- '26098'
+  second$match_status$issue_id <- '26098'
   cutoffs <- list(
     list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097'),
     list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26098'))
@@ -635,9 +661,9 @@ testthat::test_that('the replay never rebuys a physical ticket across epochs', {
   policies <- list(allocation = n7_allocation_configs(first$constants)[['A']],
                    max_reuse = 1L, max_overlap = 6L, seed = 1L)
   replayed <- n7_replay_issue(
-    list(list(fixtures = first$fixtures, probabilities = first$probabilities, sp = first$sp),
+    list(list(fixtures = first$fixtures, probabilities = first$probabilities, sp = first$sp, match_status = first$match_status),
          list(fixtures = second$fixtures, probabilities = second$probabilities,
-              sp = second$sp)),
+              sp = second$sp, match_status = second$match_status)),
     cutoffs, settlements, as.POSIXct('2026-10-05 00:00:00', tz = 'UTC'),
     policies, first$constants)
   # The same physical ticket must never be bought twice.
@@ -654,7 +680,7 @@ testthat::test_that('the replay never rebuys a physical ticket across epochs', {
 testthat::test_that('an exhausted hard mask yields zero support instead of aborting', {
   fx <- value_fixture(n_fixtures = 14L)
   grouped <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L)
+                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L, match_status = fx$match_status)
   target <- grouped$group_legs$fixture_id[1]
   # Forbid every outcome of one leg: the group cannot be invested in at all.
   forbidden <- tibble::tibble(fixture_id = rep(target, 3), outcome = n7_outcomes())
@@ -670,7 +696,7 @@ testthat::test_that('an exhausted hard mask yields zero support instead of abort
 testthat::test_that('entropy-balanced construction spreads difficulty across groups', {
   fx <- value_fixture(n_fixtures = 28L)
   grouped <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 4L, 1L)
+                                     fx$constants$n_legs, 'entropy_balanced', 4L, 1L, match_status = fx$match_status)
   membership <- grouped$group_legs
   # Groups are disjoint and each has exactly seven legs.
   testthat::expect_equal(length(unique(membership$group_id)), 4L)
@@ -693,6 +719,7 @@ testthat::test_that('depth diagnostics recognise a purchased winner', {
   # demonstrably won would be reported as a miss with zero payout.
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -722,6 +749,7 @@ testthat::test_that('depth diagnostics recognise a purchased winner', {
 testthat::test_that('depth diagnostics ignore foreign and unsettled labels', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -752,15 +780,16 @@ testthat::test_that('replay partitions the ledger by issue', {
   second <- value_fixture(n_fixtures = 56L, seed = 43L)
   # The fixture rows must carry the issue the cutoff names.
   second$fixtures$issue_id <- '26098'
+  second$match_status$issue_id <- '26098'
   cutoff_of <- function(fx, issue_id, epoch) {
     list(cutoff_utc = as.POSIXct(epoch, tz = 'UTC'), issue_id = issue_id)
   }
   policies <- list(allocation = n7_allocation_configs(first$constants)[['A']],
                    max_reuse = 1L, max_overlap = 6L, seed = 1L)
   inputs <- list(list(fixtures = first$fixtures, probabilities = first$probabilities,
-                      sp = first$sp),
+                      sp = first$sp, match_status = first$match_status),
                  list(fixtures = second$fixtures, probabilities = second$probabilities,
-                      sp = second$sp))
+                      sp = second$sp, match_status = second$match_status))
   # Distinct issues: each is entitled to the full issue budget.
   separate <- n7_replay_issue(inputs,
     list(cutoff_of(first, '26097', '2026-09-22 12:00:00'),
@@ -777,6 +806,7 @@ testthat::test_that('a special leg outranks a plain miss on the same ticket', {
   # would move its stake into the settled denominator and distort ROI.
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -804,6 +834,7 @@ testthat::test_that('a special leg outranks a plain miss on the same ticket', {
 testthat::test_that('conflicting settlement statuses are refused', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -828,7 +859,7 @@ testthat::test_that('conflicting settlement statuses are refused', {
 
 testthat::test_that('projection rejects fixtures belonging to another issue', {
   fx <- value_fixture(n_fixtures = 14L)
-  inputs <- n7_read_inputs(n7_fixture_source(fx$issue), '26097', fx$cutoff)
+  inputs <- n7_read_inputs(n7_fixture_source(fx$issue), '26097')
   prepared <- n7_prepare_epoch(inputs, fx$cutoff, N7_DECISION_TZ,
                                list(members = c('c01', 'c02', 'c03'), missing = 'error'),
                                list(companies = NULL, line = 'nearest_main',
@@ -842,7 +873,7 @@ testthat::test_that('projection rejects fixtures belonging to another issue', {
 testthat::test_that('exhausting the last leg still enumerates to a typed-empty result', {
   fx <- value_fixture(n_fixtures = 14L)
   grouped <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L)
+                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L, match_status = fx$match_status)
   group_id <- grouped$group_legs$group_id[1]
   legs <- grouped$group_legs[grouped$group_legs$group_id == group_id, , drop = FALSE]
   legs <- legs[order(legs$leg_order), , drop = FALSE]
@@ -868,7 +899,7 @@ testthat::test_that('default candidate ids compose with funding', {
   # or the ordinary apply -> enumerate -> rank -> fund sequence buys nothing.
   fx <- value_fixture(n_fixtures = 14L)
   grouped <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L)
+                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L, match_status = fx$match_status)
   pattern <- c(3L, 2L, 2L, 2L, 2L, 2L, 1L)
   structure <- n7_apply_structure(grouped$group_legs, fx$probabilities, fx$cutoff,
                                   pattern, 'entropy_desc')
@@ -887,7 +918,7 @@ testthat::test_that('default candidate ids compose with funding', {
 testthat::test_that('a requested funding order is honoured before allocation', {
   fx <- value_fixture(n_fixtures = 28L)
   grouped <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 2L, 1L)
+                                     fx$constants$n_legs, 'entropy_balanced', 2L, 1L, match_status = fx$match_status)
   pattern <- c(1L, 1L, 1L, 1L, 1L, 1L, 1L)
   structure <- n7_apply_structure(grouped$group_legs, fx$probabilities, fx$cutoff,
                                   pattern, 'entropy_desc')
@@ -916,6 +947,7 @@ testthat::test_that('depth diagnostics reject conflicting settlements on any pur
   # exactly as n7_settle_plan does.
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -943,6 +975,7 @@ testthat::test_that('duplicate settlement rows with one usable SP settle the sam
   # first: NA-first would be PENDING while valid-first would pay.
   fx <- value_fixture(n_fixtures = 14L)
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(fx$fixtures$fixture_id[1:7])),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -977,6 +1010,7 @@ testthat::test_that('a repeated explicit group still yields usable diagnostics',
   fx <- value_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(ids, ids)),
                              1L, 1L, fx$constants, 1L, 6L)
@@ -1037,7 +1071,7 @@ testthat::test_that('allocation refuses a slate that had already kicked off', {
   late <- list(cutoff_utc = fx$cutoff$cutoff_utc + 5 * 86400, issue_id = '26097')
   testthat::expect_error(
     n7_run_allocation(n7_allocation_configs(fx$constants)[['A']], fx$fixtures,
-                      fx$probabilities, fx$sp, late, fx$constants, 1L, 6L),
+                      fx$probabilities, fx$sp, late, fx$constants, 1L, 6L, match_status = fx$match_status),
     'already kicked off')
 })
 
@@ -1052,9 +1086,9 @@ testthat::test_that('replay cash covers every issue the replay spanned', {
   empty$probabilities <- fx$probabilities[0, , drop = FALSE]
   empty$sp <- fx$sp[0, , drop = FALSE]
   replayed <- n7_replay_issue(
-    list(list(fixtures = fx$fixtures, probabilities = fx$probabilities, sp = fx$sp),
+    list(list(fixtures = fx$fixtures, probabilities = fx$probabilities, sp = fx$sp, match_status = fx$match_status),
          list(fixtures = empty$fixtures, probabilities = empty$probabilities,
-              sp = empty$sp)),
+              sp = empty$sp, match_status = empty$match_status)),
     list(list(cutoff_utc = fx$cutoff$cutoff_utc, issue_id = '26097'),
          list(cutoff_utc = fx$cutoff$cutoff_utc, issue_id = '26099')),
     n7_typed_empty('settlements'), as.POSIXct('2026-10-05 00:00:00', tz = 'UTC'),
@@ -1074,6 +1108,7 @@ testthat::test_that('an allocation cannot spend past the issue budget', {
   config$budget_cny <- 1280
   config$unit_cap <- 160L
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   testthat::expect_equal(sum(result$funded$purchases$stake_cny),
                          fx$constants$issue_budget_cny)
@@ -1089,6 +1124,7 @@ testthat::test_that('support and full-space ranks are reported separately', {
   fx <- value_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
                              list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
@@ -1118,6 +1154,7 @@ testthat::test_that('conflicting SP quotes at one instant are refused', {
   fx <- value_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
   target <- built$tickets$ticket_legs[1, , drop = FALSE]
@@ -1140,6 +1177,7 @@ testthat::test_that('empty settlement output keeps the same schema as populated'
   fx <- value_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
@@ -1172,6 +1210,7 @@ testthat::test_that('funding follows priority order, not a proportional split', 
                  patterns = named_patterns(c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
                  n_groups = 2L, unit_cap = 80L, budget_cny = 160)
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   units <- as.integer(table(result$funded$purchases$candidate_id))
   testthat::expect_equal(sum(units), 80L)
@@ -1191,7 +1230,7 @@ testthat::test_that('a fixture outside the decision window is refused', {
     n7_construct_candidates(shifted, fx$probabilities, fx$cutoff, 7L,
                             list(mode = 'explicit',
                                  groups = list(fx$fixtures$fixture_id[1:7])),
-                            1L, 1L),
+                            1L, 1L, match_status = fx$match_status),
     'outside the decision window')
 })
 
@@ -1202,6 +1241,7 @@ testthat::test_that('conflicting SP quotes at an older instant are refused', {
   fx <- value_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
   target <- built$tickets$ticket_legs[1, , drop = FALSE]
@@ -1230,6 +1270,7 @@ testthat::test_that('a missing settlement status never authorises a payout', {
   fx <- value_fixture(n_fixtures = 56L)
   ids <- fx$fixtures$fixture_id[1:7]
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
@@ -1259,6 +1300,7 @@ testthat::test_that('distinct structures over one fixture set are all funded', {
                                            c(2L, 2L, 2L, 2L, 2L, 2L, 2L)),
                  n_groups = 1L, unit_cap = 1L, budget_cny = 4)
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   testthat::expect_equal(nrow(result$funded$purchases), 2L)
   testthat::expect_equal(sum(result$funded$purchases$stake_cny), 4)
@@ -1277,7 +1319,7 @@ testthat::test_that('diagnostic ranks use the same tie-break as purchasing', {
   uniform$probability <- 1 / 3
   built <- n7_build_decision(fx$fixtures, uniform, fx$sp, fx$cutoff,
                              list(c(2L, 2L, 2L, 2L, 2L, 2L, 2L)),
-                             list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
+                             list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L, match_status = fx$match_status)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
   settlements <- synthetic_settlements(fx$issue)
   aligned <- settlements[settlements$fixture_id %in% ids, , drop = FALSE]
@@ -1306,7 +1348,7 @@ testthat::test_that('the full-space rank never depends on the mask', {
   uniform$probability <- 1 / 3
   built <- n7_build_decision(fx$fixtures, uniform, fx$sp, fx$cutoff,
                              list(c(2L, 2L, 2L, 2L, 2L, 2L, 2L)),
-                             list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
+                             list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L, match_status = fx$match_status)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
   # Independently rank every one of the 3^7 combinations, ties broken by string.
   grid <- expand.grid(rep(list(n7_outcomes()), 7), stringsAsFactors = FALSE)
@@ -1349,7 +1391,7 @@ testthat::test_that('group_order may name a structure the disjoint share did not
   second <- fx$fixtures$fixture_id[8:14]
   patterns <- list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L), c(2L, 2L, 2L, 2L, 2L, 2L, 2L))
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff, patterns,
-                             list(groups = list(first, second)), 2L, 1L, fx$constants, 1L, 6L)
+                             list(groups = list(first, second)), 2L, 1L, fx$constants, 1L, 6L, match_status = fx$match_status)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
   labels <- unique(ranked$candidate_id)
   set_of_first <- paste(first, collapse = '+')
@@ -1367,6 +1409,7 @@ testthat::test_that('an unknown group_order name is rejected even beside a valid
   fx <- value_fixture(n_fixtures = 56L)
   ids <- fx$fixtures$fixture_id[1:7]
   built <- n7_build_decision(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                             fx$match_status,
                              list(c(1L, 1L, 1L, 1L, 1L, 1L, 1L)),
                              list(groups = list(ids)), 1L, 1L, fx$constants, 1L, 6L)
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
@@ -1497,7 +1540,7 @@ testthat::test_that('n7_build_decision 要求完整 constants 与非空 patterns
   empty <- function(patterns, constants) {
     n7_build_decision(n7_typed_empty('fixtures'), n7_typed_empty('probabilities'),
                       n7_typed_empty('prematch_sp'), cutoff, patterns,
-                      list(), 4L, 1L, constants, 1L, 1L)
+                      list(), 4L, 1L, constants, 1L, 1L, match_status = n7_typed_empty('match_status'))
   }
   # 回归：此前该函数完全没有守卫，constants$n_legs 为 NULL 时不报错。
   testthat::expect_error(empty(list(c(3L,3L,3L,3L,2L,2L,2L)), NULL), 'constants')
@@ -1687,6 +1730,7 @@ testthat::test_that('拆分出的子函数不改变原行为', {
   fx <- value_fixture(n_fixtures = 56L)
   config <- n7_allocation_configs(fx$constants)$A
   result <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                               fx$constants, 1L, 6L)
   testthat::expect_s3_class(result$ranked, 'tbl_df')
   testthat::expect_true(is.list(result$funded))
@@ -1808,6 +1852,7 @@ testthat::test_that('空与非空的出资返回合同一致', {
   fx <- value_fixture(n_fixtures = 56L)
   config <- n7_allocation_configs(fx$constants)$A
   full <- n7_run_allocation(config, fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
+                              fx$match_status,
                             fx$constants, 1L, 6L)$funded
   # 外层字段与 funded 的列集合都必须一致。
   testthat::expect_identical(names(empty), names(full))
@@ -1825,7 +1870,7 @@ testthat::test_that('config 的 $ 部分匹配不会串味到 unit_cap', {
   # 因此 B 必须能跑通，而不是在长度断言上炸掉。
   fx <- value_fixture(n_fixtures = 56L)
   result <- n7_run_allocation(configs$B, fx$fixtures, fx$probabilities, fx$sp,
-                              fx$cutoff, fx$constants, 1L, 6L)
+                              fx$cutoff, fx$constants, 1L, 6L, match_status = fx$match_status)
   testthat::expect_s3_class(result$funded$funded, 'tbl_df')
 })
 

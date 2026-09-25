@@ -32,11 +32,17 @@ R为公共接口，表一律tibble；Python只复用现有存储/temporal_learni
 ## 函数签名与返回
 
 ```r
-n7_read_inputs(source, issue_ids, cutoff)
-# -> list(fixtures, euro, totals, prematch_sp), 无结算表；source为显式连接/路径和适配器
+n7_read_inputs(source, issue_ids)
+# -> list(fixtures, euro, totals, prematch_sp, match_status), 无结算表；source为显式连接/路径和适配器
+# 整期读取：没有cutoff形参、不按时间过滤；缺失match_status表报错，空台账排除全部比赛
+
+n7_make_fixture_issue(issue_id, kickoff_at, n_companies, seed, margin, match_status)
+# kickoff_at为非空有限UTC POSIXct向量，场次数即其长度；不推断决策epoch
+# 不再有local_date/n_fixtures/kickoff_hour/tz；报价与初始状态报告锚在kickoff_at-36h
 
 n7_prepare_epoch(inputs, cutoff, tz, euro_policy, totals_policy)
-# -> list(fixtures, euro_mean, totals_selected, sp_selected, exclusions)
+# -> list(fixtures, euro_mean, totals_selected, sp_selected, match_status, status_selected, exclusions)
+# 独占D+1决策窗口与as-of状态选择；inputs$match_status必填
 # 北京时间D20:00；同一期D+1整日；逐公司逐市场quote_at<cutoff最近值
 # euro_policy指定成员与缺失规则，平均赔率后去水；totals_policy指定公司/盘口取值规则
 
@@ -46,8 +52,8 @@ n7_project_probabilities(epoch_inputs, cutoff, rho, total_bounds, tail_tolerance
 # rho由调用方传-0.14；大小球必须实际进入拟合，失败场排除并保留原因
 
 n7_construct_candidates(fixtures, probabilities, cutoff, n_legs,
-                        construction, max_candidates, seed)
-# -> list(groups, group_legs, diagnostics)
+                        construction, max_candidates, seed, match_status)
+# -> list(groups, group_legs, diagnostics)；match_status为必填台账，先按共享选择器过滤
 # construction首版支持显式给定组和确定性难度均衡构组；不枚举全场次7选N
 # 难度基线采用归一化熵；并列fixture_id。输出被截断标志，不声称全局最优
 

@@ -10,6 +10,7 @@ n7_run_allocation(
   probabilities,
   prematch_sp,
   cutoff,
+  match_status,
   constants,
   max_reuse,
   max_overlap,
@@ -28,6 +29,8 @@ n7_run_allocation(
 \item{prematch_sp}{Pre-cutoff SP tibble; an empty table is allowed and causes unavailable estimated EV.}
 
 \item{cutoff}{Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.}
+
+\item{match_status}{Required match-status observation ledger; a missing ledger errors and an empty one excludes every fixture.}
 
 \item{constants}{Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.}
 
