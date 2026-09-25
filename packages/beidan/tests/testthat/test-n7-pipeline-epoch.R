@@ -263,16 +263,17 @@ testthat::test_that('match_latest_quote_before 在同一时刻取值冲突时报
   testthat::expect_equal(nrow(selected), 1L)
 })
 
-testthat::test_that('match_latest_quote_before 冲突检查覆盖非最新时刻', {
-  # 回归：冲突曾经只在最新时刻检查，早期时刻的冲突会被漏掉。
+testthat::test_that('match_latest_quote_before 只对实际选中的最新时刻检查冲突', {
+  # 真实Titan分钟级旧报价可有并列冲突，不影响最新无歧义报价。
   cutoff <- as.POSIXct('2026-09-22 12:00:00', tz = 'UTC')
   early <- as.POSIXct('2026-09-22 08:00:00', tz = 'UTC')
   late <- as.POSIXct('2026-09-22 10:00:00', tz = 'UTC')
   quotes <- tibble::tibble(
     fixture_id = 'f1', company_id = 'c1', quote_at = c(early, early, late),
     odds_home = c(2.0, 2.7, 2.1), odds_draw = 3.0, odds_away = 4.0, source_url = 'u')
-  testthat::expect_error(match_latest_quote_before(quotes, cutoff, c('odds_home')),
-                         'conflicting odds_home values at one instant')
+  selected <- match_latest_quote_before(quotes, cutoff, c('odds_home'))
+  testthat::expect_equal(nrow(selected), 1L)
+  testthat::expect_equal(selected$odds_home, quotes$odds_home[3L])
 })
 
 testthat::test_that('match_latest_quote_before 按 fixture 与 company 各自独立选行', {
@@ -569,4 +570,16 @@ testthat::test_that('合约束值 rho 不在会话参数里，而是 model_confi
   # rho 属于单场模型参数；会话快照不含它，因此冻结值必须显式传入 model_config。
   testthat::expect_false('rho' %in% names(parlay_settings()))
   testthat::expect_silent(match_validate_rho(-0.14))
+})
+
+testthat::test_that("euro policy excludes unrelated companies and fixtures before conflicts", {
+  fx <- epoch_fixture()
+  euro <- fx$inputs$euro
+  baseline <- match_euro_mean(euro, fx$cutoff$cutoff_utc, default_euro(), fx$inputs$fixtures)
+  extra <- euro[rep(1L, 2L), ]
+  extra$company_id <- "not-a-member"
+  extra$odds_home <- c(2, 3)
+  actual <- match_euro_mean(dplyr::bind_rows(euro, extra), fx$cutoff$cutoff_utc,
+                            default_euro(), fx$inputs$fixtures)
+  testthat::expect_equal(actual, baseline)
 })

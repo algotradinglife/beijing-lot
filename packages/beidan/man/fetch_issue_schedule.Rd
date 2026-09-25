@@ -48,7 +48,8 @@ fetch_issue_schedule(
 调用方的显式动作，直接用 \code{readr::write_csv()}）。原始响应在解析之前先落盘，
 且每次采集写入独立子目录，不会覆盖既有快照。
 
-比赛状态只依据来源给出的证据判定：Nowscore 的 \code{完场} 才是 finished，
-\code{截止} 且无比分是 unknown，裸 \code{HH:mm} 是\strong{销售显示}而不是比赛状态，
-\code{cansale = TRUE} 也\strong{不会}把它升级为 scheduled。
+比赛状态采用同页 \code{M[slot][4]} 明确状态码，并核对其原生比赛ID；
+源脚本定义0为未开赛。状态码原文保留于 \code{match_status_raw}，混合销售
+显示仍保留于 \code{raw_display_nowscore}。缺少明确状态码或状态文本时为unknown；
+\code{截止}、裸 \code{HH:mm}、未来开赛时间及 \code{cansale} 均不能单独推断scheduled。
 }

@@ -595,7 +595,9 @@ def test_full_26098_replay_matches_independent_golden_evidence(tmp_path):
         assert row["kickoff_at"] >= row["sale_end_at"]
     by_slot = {row["slot"]: row for row in result.rows}
     assert [by_slot[slot]["match_status"] for slot in range(1, 6)] == ["finished"] * 5
-    assert by_slot[6]["match_status"] == "unknown"
+    assert by_slot[6]["match_status"] == "scheduled"
+    assert by_slot[6]["match_status_raw"] == "M[6][4]=0"
+    assert all(by_slot[s]["match_status"] == "scheduled" for s in [81,82,83,84,85,87,90,91,96,98])
     assert by_slot[11]["kickoff_at"].astimezone(beijing).isoformat() == (
         "2026-09-26T00:00:00+08:00"
     )
@@ -812,3 +814,40 @@ def test_real_alias_display_and_title_are_kept_independently():
     assert by_slot[77]['home_display_nowscore'] == '克鲁比'
     assert by_slot[33]['home_display_500'] == '都柏林大学'
     assert by_slot[33]['home_display_nowscore'] == '都柏林'
+
+@pytest.mark.parametrize('code,expected', [(0,'scheduled'),(-1,'finished'),(4,'finished'),(1,'live'),(2,'live'),(3,'live'),(5,'live'),(-10,'cancelled'),(-99,'cancelled'),(-14,'postponed'),(-12,'abandoned'),(-13,'abandoned'),(-11,'unknown'),(99,'unknown')])
+def test_explicit_page_state_is_not_sale_or_kickoff_inference(code, expected):
+    row = _row(1, status_token='截止', extras={'status_code': code}, can_sale=False)
+    rows, _ = _canonical([], [row])
+    assert rows[0]['match_status'] == expected
+    assert rows[0]['match_status_raw'] == f'M[1][4]={code}'
+    assert rows[0]['raw_display_nowscore'] == '截止'
+
+
+def test_status_codes_bind_native_id_and_reject_bad_literals():
+    from beidan_backend.issue_schedule.sources import parse_nowscore_status_codes
+    assert parse_nowscore_status_codes('<script>M[81][0]=2996482;M[81][4]=0;</script>') == {81:('2996482',0)}
+    assert parse_nowscore_status_codes('<script>M[81][0]=2996482;</script>') == {}
+    for body in ('M[1][4]=0;', 'M[1][0]=1;M[1][4]=false;', 'M[1][0]=1;M[1][4]=0;M[1][4]=-1;'):
+        with pytest.raises(SourceParseError):
+            parse_nowscore_status_codes('<script>'+body+'</script>')
+    native = _nowscore_rows()[1].provider_match_id
+    slot = _nowscore_rows()[1].slot
+    page = NOWSCORE_MINI + f'<script>M[{slot}][0]={native};M[{slot}][4]=0;</script>'
+    assert _nowscore_rows(page)[1].extras['status_code'] == 0
+    with pytest.raises(SourceParseError, match='identity differs'):
+        _nowscore_rows(NOWSCORE_MINI+f'<script>M[{slot}][0]=99999;M[{slot}][4]=0;</script>')
+
+
+def test_contradictory_display_and_state_are_not_silently_selected():
+    from beidan_backend.issue_schedule.crosscheck import CrossSourceError
+    with pytest.raises(CrossSourceError, match='conflicting'):
+        _canonical([], [_row(1,status_token='完场',extras={'status_code':0})])
+
+
+@pytest.mark.parametrize("suffix", ["M[ 1 ][4]=-1;", "M[1][4]=;"])
+def test_status_assignment_variations_do_not_hide_conflicts(suffix):
+    from beidan_backend.issue_schedule.sources import parse_nowscore_status_codes
+    with pytest.raises(SourceParseError, match="duplicate or malformed"):
+        parse_nowscore_status_codes("<script>M[1][0]=123;M[1][4]=0;"+suffix+"</script>")
+    assert parse_nowscore_status_codes("<script>M [ 1 ] [ 0 ] = 123; M [1][ 4 ] = 0;</script>") == {1:("123",0)}

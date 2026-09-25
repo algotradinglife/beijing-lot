@@ -71,9 +71,9 @@ match_convert_water <- function(value, convention, what) {
 #' @param value_columns  非空字符向量，参与冲突检查的列名。
 #'   · 非字符 / 零长度 / 含 NA / 含空串 -> stop()
 #' @return quotes 的子集，每个键只保留其最新时刻的那一行。
-#' @details 同一时刻出现两个不同取值是真实的源冲突，按行序解决会让选择依赖于
-#'   文件顺序，因此直接报错。冲突检查在去重之前进行——先去重恰好会丢掉这个守卫
-#'   要抓的那一行。
+#' @details 实际选中的最新时刻出现两个不同取值时直接报错，不按行序猜测。
+#'   较早时刻的冲突保留在原始输入中，不阻断有明确最新值的选择。
+#'   在最新时刻保留全部并列行进行检查，再对相同取值去重。
 match_latest_quote_before <- function(quotes, cutoff_utc, value_columns) {
   # A non-POSIXct cutoff would be compared against POSIXct by implicit coercion and
   # silently match nothing, so a missing quote set would look like a quiet market.
@@ -92,6 +92,10 @@ match_latest_quote_before <- function(quotes, cutoff_utc, value_columns) {
   admitted <- quotes[quotes$quote_at < cutoff_utc, , drop = FALSE]
   if (!nrow(admitted)) return(quotes[0, , drop = FALSE])
   keys <- intersect(c("fixture_id", "company_id", "line", "outcome"), names(admitted))
+  admitted <- admitted |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(keys))) |>
+    dplyr::filter(quote_at == max(quote_at)) |>
+    dplyr::ungroup()
   admitted <- admitted[order(admitted$quote_at), , drop = FALSE]
 
   # Conflict guard, applied BEFORE deduplication: two rows sharing a key and an
@@ -147,6 +151,7 @@ match_euro_mean <- function(euro, cutoff_utc, policy, fixtures) {
   if (!missing_rule %in% c("error", "drop_member")) {
     stop("match_euro_mean: euro_policy$missing must be 'error' or 'drop_member'")
   }
+  euro <- euro[euro$company_id %in% members & euro$fixture_id %in% fixtures$fixture_id, , drop = FALSE]
   selected <- match_latest_quote_before(euro, cutoff_utc,
                                      c("odds_home", "odds_draw", "odds_away"))
   selected <- selected[selected$company_id %in% members, , drop = FALSE]

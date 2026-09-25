@@ -89,6 +89,32 @@ class ProviderRow:
     extras: dict[str, Any] = field(default_factory=dict)
 
 
+
+def parse_nowscore_status_codes(text: str) -> dict[int, tuple[str, int]]:
+    """Read explicit M[slot][4] state bound to M[slot][0] native identity.
+
+    Source semantics: cp.nowscore.com/js/buy/bdLive.js?2019 MatchState.
+    Missing state stays absent; malformed/duplicate literals or missing IDs fail.
+    This reads source bytes only and does not infer state from kickoff or sale.
+    """
+    values = {}
+    scripts = BeautifulSoup(text, "html.parser").find_all("script")
+    for script in scripts:
+        for slot, field, value in re.findall(r"M\s*\[\s*(\d+)\s*\]\s*\[\s*(0|4)\s*\]\s*=\s*([^;]*);", script.get_text()):
+            key = (int(slot), int(field))
+            value = value.strip()
+            if key in values or not re.fullmatch(r"-?\d+", value):
+                raise SourceParseError("duplicate or malformed nowscore status identity literal")
+            values[key] = value
+    result = {}
+    for (slot, field), value in values.items():
+        if field == 4:
+            native = values.get((slot, 0))
+            if native is None or not native.isdigit() or int(native) <= 0:
+                raise SourceParseError("nowscore state missing valid native identity")
+            result[slot] = (native, int(value))
+    return result
+
 def parse_nowscore_rows(
     text: str, *, issue_id: str, observed_at: str, source_url: str
 ) -> list[ProviderRow]:
@@ -105,6 +131,7 @@ def parse_nowscore_rows(
     soup = BeautifulSoup(text, "html.parser")
     _assert_nowscore_issue(soup, issue_id)
     kickoff_dates, date_problems = parse_nowscore_kickoff_dates(text)
+    status_codes = parse_nowscore_status_codes(text)
     rows: list[ProviderRow] = []
     for tr in soup.select("tr[id^=row_]"):
         match = _ROW_ID_RE.match(tr.get("id") or "")
@@ -117,6 +144,9 @@ def parse_nowscore_rows(
         if slot <= 0:
             raise SourceParseError("nowscore match row has invalid slot")
         provider_match_id = _nowscore_provider_id(tr)
+        state_evidence = status_codes.get(slot)
+        if state_evidence and state_evidence[0] != provider_match_id:
+            raise SourceParseError("nowscore status native identity differs from row")
         status_cell = cells[3]
         display = _text(status_cell)
         sale_end_raw = _attr_title(status_cell.get("title"))
@@ -134,6 +164,7 @@ def parse_nowscore_rows(
             "home_title": _team_label(cells[4])[1],
             "away_display": _team_label(cells[7])[0],
             "away_title": _team_label(cells[7])[1],
+            "status_code": state_evidence[1] if state_evidence else None,
             "polygoal": tr.get("polygoal"),
             "matchid": tr.get("matchid"),
             "halftime_score": _text(cells[8]) or None,
