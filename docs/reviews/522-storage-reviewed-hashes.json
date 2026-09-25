@@ -1,0 +1,6 @@
+{
+  "packages/beidan/R/parlay_storage.R": "481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f",
+  "packages/beidan/tests/testthat/test-parlay-storage.R": "019e1510caee39ccdc58338c43724aba8a50eed2536ae4a6124a398925a7f7f1",
+  "packages/beidan/NAMESPACE": "bc53784427f86f4ea4713e9e2b7f1026b5ed0170a31d0b20faee10fb4af52cd4",
+  "quarto/26098_walkthrough.qmd": "f05587bf5621cc0d39ff5879403c736d6ebf0878351789a884274a3723efa219"
+}
