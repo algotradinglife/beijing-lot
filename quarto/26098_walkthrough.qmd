@@ -1,0 +1,250 @@
+---
+title: "26098：真实数据交互式全流程"
+format:
+  html:
+    toc: true
+    code-fold: false
+execute:
+  error: false
+  cache: false
+  freeze: false
+---
+
+这份文档用于在 Positron **从上到下逐块执行**。修改参数、代码或上游数据后，从受影响的块继续向下执行；不要沿用旧的下游对象。整篇渲染不会自动联网，只有显式开启采集才请求网站。尚未提供市场或结算数据时，对应步骤显示未就绪，不算验收通过，不生成模拟报价。
+
+## 1. 项目与本次参数
+
+第一次使用先在 Positron 把工作目录设为仓库根目录，或设置 `BEIDAN_PROJECT_DIR`。下面显式声明项目位置、Python、数据目录和决策时刻。依赖须事先安装。
+
+```{r}
+#| label: configuration
+project_dir <- Sys.getenv("BEIDAN_PROJECT_DIR", unset = "")
+if (!nzchar(project_dir)) {
+  project_dir <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+}
+project_dir <- normalizePath(project_dir, mustWork = TRUE)
+package_dir <- file.path(project_dir, "packages", "beidan")
+python <- Sys.getenv("RETICULATE_PYTHON", unset = file.path(project_dir, ".venv", "bin", "python"))
+issue_id <- "26098"
+
+# 一次性设置的工作产物目录，可改为自己的明确路径。
+work_dir <- file.path(project_dir, "inputs", "26098_walkthrough")
+schedule_file <- file.path(work_dir, "schedule.rds")
+market_dir <- file.path(work_dir, "market_inputs")
+settlements_file <- file.path(work_dir, "settlements.rds")
+
+# 首次现场采集时改为 TRUE，采集后改回 FALSE，避免反复请求。
+refresh_schedule <- FALSE
+# 可指定保存过的规范 schedule.rds；不会使用旧的错误 schedule.csv。
+schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
+
+# 选择实际要回放/执行的北京时间，例如 "2026-09-25 20:00:00"。
+# 不默认替你选择过去或未来时点；当前采集不能伪装为过去可见。
+decision_text <- Sys.getenv("BEIDAN_DECISION_AT", unset = "")
+settlement_text <- Sys.getenv("BEIDAN_SETTLEMENT_AT", unset = "")
+decision_at <- if (nzchar(decision_text)) lubridate::ymd_hms(decision_text, tz = "Asia/Shanghai") else NULL
+settlement_at <- if (nzchar(settlement_text)) {
+  lubridate::with_tz(lubridate::ymd_hms(settlement_text, tz = "Asia/Shanghai"), "UTC")
+} else NULL
+stopifnot(is.null(decision_at) || !is.na(decision_at),
+          is.null(settlement_at) || !is.na(settlement_at))
+```
+
+## 2. 加载源码并确认接口
+
+使用你选择的 `devtools::load_all()` 读取源码目录。重载包后会话设置恢复默认。Python 已初始化后改动后端代码或更换包目录，需要重启 R，避免保留旧模块。
+
+```{r}
+#| label: load-package
+devtools::load_all(package_dir, quiet = TRUE)
+stopifnot(all(c("raw_dir", "backend", "pages") %in%
+                names(formals(beidan::fetch_issue_schedule))))
+print(utils::packageVersion("beidan"))
+print(args(beidan::fetch_issue_schedule))
+settings <- beidan::parlay_settings(reset = TRUE)
+model_config <- list(rho = -0.14, total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
+```
+
+## 3. 采集或读取赛程快照
+
+正式函数默认请求 Nowscore 的 `all=1` 页面，包含完场。原始字节、URL 和真实采集时间由采集器保存，CSV 导出是独立动作。读取旧快照不会把观测时间刷新为现在。
+
+```{r}
+#| label: schedule-source
+schedule <- NULL
+if (refresh_schedule) {
+  backend <- beidan::python_backend(python)
+  schedule <- beidan::fetch_issue_schedule(
+    issue_id, raw_dir = file.path(work_dir, "raw"), backend = backend
+  )
+  dir.create(dirname(schedule_file), recursive = TRUE, showWarnings = FALSE)
+  saveRDS(schedule, schedule_file)
+} else if (file.exists(schedule_file)) {
+  schedule <- readRDS(schedule_file)
+} else {
+  cat("未就绪：将 refresh_schedule 改为 TRUE 后执行本块，或提供 BEIDAN_SCHEDULE_RDS。\n")
+}
+```
+
+## 4. 核对真实赛程，先阻止时间错误向后传播
+
+开赛时间、截止时间、比赛状态、销售状态、原始显示分列。`unknown` 不是 scheduled；`截止` 不代表完场。页面分组日期不是自然开赛日期，不再自行拼接时分。两源队名差异仍须核对，不能靠去掉女足/U21等词强行匹配。
+
+```{r}
+#| label: schedule-checks
+if (!is.null(schedule)) {
+  testthat::expect_s3_class(schedule, "tbl_df")
+  testthat::expect_identical(names(schedule), beidan::issue_schedule_columns())
+  testthat::expect_true(all(schedule$issue_id == issue_id))
+  testthat::expect_equal(anyDuplicated(schedule$fixture_key), 0L)
+  testthat::expect_false(anyNA(schedule$kickoff_at))
+  testthat::expect_false(anyNA(schedule$observed_at))
+  known_end <- !is.na(schedule$sale_end_at)
+  testthat::expect_true(all(schedule$kickoff_at[known_end] >= schedule$sale_end_at[known_end]))
+  # 用户指出的真实跨午夜回归，不以代码自己的推导结果作为预期。
+  testthat::expect_equal(
+    as.numeric(schedule$kickoff_at[schedule$slot == 11L]),
+    as.numeric(lubridate::ymd_hms("2026-09-26 00:00:00", tz = "Asia/Shanghai"))
+  )
+  schedule_view <- schedule |>
+    dplyr::mutate(kickoff_beijing = lubridate::with_tz(kickoff_at, "Asia/Shanghai"),
+                  sale_end_beijing = lubridate::with_tz(sale_end_at, "Asia/Shanghai")) |>
+    dplyr::select(slot, home_name, away_name, handicap, kickoff_beijing,
+                  sale_end_beijing, match_status, sale_state, identity_method)
+  knitr::kable(schedule_view)
+  print(attr(schedule, "diagnostics"))
+  dir.create(work_dir, recursive = TRUE, showWarnings = FALSE)
+  readr::write_csv(schedule, file.path(work_dir, "schedule.csv"))
+}
+```
+
+## 5. 接入真实市场数据
+
+这里与“采集赛程”是两件事。`fetch_issue_schedule()` 不会产生欧赔、大小球或历史状态。市场适配器须提供 `fixtures.csv`、`euro.csv`、`totals.csv`、`prematch_sp.csv`、`match_status.csv`；缺 SP 可以提供有正确表头的空表，不伪造 SP。比赛身份映射、源报价时间及真实状态证据也需要由适配器提供。
+
+**当前市场适配尚未在本手册中接通。** 将正式适配器产物放到上述显式 `market_dir` 后，可继续执行；不可把刚采到的 unknown 状态改成 scheduled 以绕过筛选。
+
+```{r}
+#| label: market-source
+inputs <- NULL
+required_tables <- c("fixtures", "euro", "totals", "prematch_sp", "match_status")
+required_files <- file.path(market_dir, paste0(required_tables, ".csv"))
+if (all(file.exists(required_files))) {
+  inputs <- beidan::read_match_inputs(
+    list(kind = "csv_dir", path = market_dir), issue_ids = issue_id
+  )
+  testthat::expect_true(all(inputs$fixtures$issue_id == issue_id))
+  knitr::kable(tibble::tibble(table = names(inputs), rows = vapply(inputs, nrow, integer(1))))
+} else {
+  cat("未就绪：真实市场输入尚缺以下文件：\n", paste(required_files[!file.exists(required_files)], collapse = "\n"))
+}
+```
+
+## 6. 指定公司规则，准备决策窗口
+
+先查看真实输入的公司 ID，再填写 `euro_members`。不使用 mock 公司的 c01/c02/c03，不把单家公司替代多公司平均。决策时刻只在上面的参数块设置一次；期号由单期输入推导。
+
+```{r}
+#| label: prepare-decision
+epoch <- NULL
+euro_members <- character() # 核对真实公司ID后，在此填写参与平均的至少两家公司。
+if (!is.null(inputs)) print(sort(unique(inputs$euro$company_id)))
+if (!is.null(inputs) && !is.null(decision_at) && length(euro_members) >= 2L) {
+  market_policy <- list(
+    euro = list(members = euro_members, missing = "error"),
+    totals = list(companies = NULL, line = "nearest_main", watermark = "decimal")
+  )
+  epoch <- beidan::prepare_match_inputs(inputs, decision_at, market_policy)
+  knitr::kable(epoch$fixtures)
+  knitr::kable(epoch$exclusions)
+} else {
+  cat("未就绪：需要真实 inputs、明确的 decision_at 和欧赔平均公司名单。\n")
+}
+```
+
+## 7. 单场概率
+
+```{r}
+#| label: probabilities
+projected <- NULL
+if (!is.null(epoch)) {
+  projected <- beidan::estimate_match_probabilities(epoch, model_config)
+  p_sums <- projected$probabilities |>
+    dplyr::group_by(fixture_id) |>
+    dplyr::summarise(total = sum(probability), .groups = "drop")
+  testthat::expect_true(all(abs(p_sums$total - 1) < 1e-8))
+  knitr::kable(projected$probabilities)
+} else cat("未执行概率计算：先完成步骤6。\n")
+```
+
+## 8. 串场方案
+
+本次展示七场、3222221、最多80注的方案；它是可修改的明确策略，并非已验证盈利策略。整期1024元与本次160元区分。`n_legs` 改动时结构长度也必须修改。
+
+```{r}
+#| label: plan
+result <- NULL
+strategy_config <- list(
+  name = "26098-interactive", settings = settings,
+  patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
+  construction_method = "entropy_balanced", n_groups = 1L,
+  ranking = "probability_desc", budget_cny = 160,
+  max_reuse = 1L, max_overlap = 6L, seed = 1L, unit_cap = 80L
+)
+if (!is.null(projected)) {
+  result <- beidan::parlay_build_plan(projected, strategy_config)
+  testthat::expect_equal(anyDuplicated(result$funded$purchases$ticket_id), 0L)
+  testthat::expect_true(sum(result$funded$purchases$stake_cny) <= strategy_config$budget_cny)
+  knitr::kable(result$plan$group_legs)
+  knitr::kable(result$funded$purchases)
+} else cat("未生成下注计划：先完成步骤7。\n")
+```
+
+此步骤只生成计划，不执行真实下单。下一次决策继续传入 `prior_purchases = result$history`；不能只传购买表，否则会丢失复用/重叠上下文。准备多个决策对象后，可用 `parlay_replay_issue()` 回放整期，不需要手写资金循环。
+
+## 9. 真实结算与深度复盘
+
+只读取已准备好的规范结算 tibble RDS（其 schema 由 package 校验）。没有结算数据就保持未就绪，不能为了跑通把已购票设成中奖。
+
+```{r}
+#| label: settlement
+settlements <- NULL
+settled <- NULL
+diagnosis <- NULL
+if (file.exists(settlements_file)) settlements <- readRDS(settlements_file)
+if (!is.null(result) && !is.null(settlements) && !is.null(settlement_at)) {
+  beidan::match_validate_table(settlements, "settlements")
+  settled <- beidan::parlay_settle_plan(result$plan, settlements, as_of = settlement_at)
+  diagnosis <- beidan::parlay_diagnose_plan(result, settlements, as_of = settlement_at)
+  knitr::kable(settled$ticket_returns)
+  knitr::kable(diagnosis)
+} else cat("未结算：需要已冻结计划、真实结算表和明确的 settlement_at。\n")
+```
+
+## 10. 本次执行到哪里
+
+成功渲染只表示已执行的部分无错误；未接通市场和结算不能标为全流程通过。
+
+```{r}
+#| label: progress
+knitr::kable(tibble::tibble(
+  stage = c("赛程", "市场输入", "决策准备", "概率", "计划", "结算"),
+  ready = c(!is.null(schedule), !is.null(inputs), !is.null(epoch),
+            !is.null(projected), !is.null(result), !is.null(settled))
+))
+```
+
+## 用户报错复盘
+
+每次用户反馈错误，记录原始调用、实际/预期、最小复现、根因、漏检环节、受影响数据、回归测试和修复审阅。优先修正函数与测试；仅将跨任务可复用经验写入 skill，不能以修改说明代替修复。
+
+| 已出现的问题 | 根因/漏检 | 本手册处理 |
+|---|---|---|
+| unused argument | 源码、安装版或会话旧绑定不同步；当时未先核对实际函数 | 明确源码目录并检查真实签名；使用命名空间调用 |
+| 第1–5场不见 | 默认页面隐藏完场，未核对完整性选项 | 正式入口请求 all=1，保留来源证据 |
+| 状态列混入HH:mm | 网页显示复用一列，原始文本误当业务状态 | 独立状态/销售/时间/原始显示，unknown不猜 |
+| slot11日期提前一天 | 将销售分组日期当自然开赛日；缺少开赛/截止交叉检验 | 黄金场次断言、所有可比较行kickoff>=sale_end，原始错误CSV隔离 |
+
+## 验证与局限
+
+赛程抓取入口的验收及 reviewed hashes 见 `issue_schedule_fetch.qmd`。此手册包含真实数据接入尚未就绪的门禁，未运行的市场/计划/结算块不宣称通过；其公共接口正常路径回归见 `parlay_api_contract.qmd`。最终审阅记录在本任务收尾时补充。
