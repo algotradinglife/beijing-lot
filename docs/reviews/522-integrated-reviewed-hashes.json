@@ -1,0 +1,20 @@
+{
+  "docs/reviews/522-storage-reviewed-hashes.json": "5f1e6d457059fd38455be156b024d4336ab9c4b3d8e6f0bac3e366304448ced1",
+  "packages/beidan/NAMESPACE": "5e6e5c56704f91cc61b529fc0adfa77a4e026ce4c1b3a64efd598df851fa58a4",
+  "packages/beidan/R/issue_settlements.R": "c977b09ae14f7c59c8c2cc0b4bdf7e6c1b2b47cfce421b226fbb8109360a68d1",
+  "packages/beidan/R/n7_pipeline_contracts.R": "9fb1239690aa5cce8bf150d153b5747fede1112430d8bc1ef5049645430117a7",
+  "packages/beidan/R/parlay_storage.R": "481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f",
+  "packages/beidan/inst/python/beidan_backend/settlement/__init__.py": "0f73a20d8385857a05ca2acafd37695a57cb43b5d954663f937f469a73039621",
+  "packages/beidan/inst/python/beidan_backend/settlement/labels.py": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712",
+  "packages/beidan/inst/python/beidan_backend/settlement/parser.py": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b",
+  "packages/beidan/man/fetch_issue_settlements.Rd": "736445e75020e979916d1ae027904c3ec0102bb298c8a41fda89f2ad5158f9e1",
+  "packages/beidan/man/match_validate_table.Rd": "3ea57ff8c5b2a599a7e72b75060c0ddb84e0538aa64f8c638a6c6bb29a627547",
+  "packages/beidan/man/parlay_check_saved_result.Rd": "36e08e1b5faed6a4a253b487c5b42bfd2f567b78b68eb30b99b8378fe125d367",
+  "packages/beidan/man/parlay_read_result.Rd": "5ead2896855ee8313b8df9a1b2b81a1a022e73c2f93d5095407710da208e94a1",
+  "packages/beidan/man/parlay_save_result.Rd": "cf7dfd9511eca3883d49f3ad689a13e799b2dd5b1d30267bf2b26c211589bd4f",
+  "packages/beidan/tests/testthat/fixtures/settlement/finished.html": "1408c4c86a0de7f8821986f4dca22c8e78f4c9ee293673903d156ca16aacd5b4",
+  "packages/beidan/tests/testthat/test-issue-settlements.R": "592e737ae1e029c6b71883e1666bda019f5180f3e760cdc8f10ff74214610dda",
+  "packages/beidan/tests/testthat/test-n7-pipeline-contracts.R": "a957b9970be1bfcfcee834fccfb86a022a3d7065f3d08a3f4ca90142ee5cd0f2",
+  "packages/beidan/tests/testthat/test-parlay-storage.R": "019e1510caee39ccdc58338c43724aba8a50eed2536ae4a6124a398925a7f7f1",
+  "quarto/26098_walkthrough.qmd": "8c8f1d387ddb21e55634d917ec25d088ac54e8e99c82747393977b5c36886a87"
+}
