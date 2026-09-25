@@ -251,22 +251,31 @@ n7_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 
 #' 准备一个决策 epoch 的输入
 #'
-#' @param inputs         list，含 fixtures/euro/totals/prematch_sp 四张表
+#' @param inputs         list，含 fixtures/euro/totals/prematch_sp/match_status 五张表
 #'   （通常来自 n7_read_inputs）。每张表经 n7_validate_table 校验。
+#'   match_status 是**必填**台账：缺失即输入契约错误（stop()），不得回退到任何
+#'   其它可见性来源；typed-empty 台账合法，它表示没有可见状态、因而排除全部比赛。
 #' @param cutoff         temporal_learning 对象，经 n7_require_cutoff 校验。
 #' @param tz             决策日边界时区，必须等于 N7_DECISION_TZ。
 #'   · 其它取值 -> stop()（本管道的决策日边界是固定的）
 #' @param euro_policy    欧赔策略，语义见 n7_euro_mean。
 #' @param totals_policy  大小球策略，语义见 n7_totals_selected。
 #'
-#' @return list(fixtures, euro_mean, totals_selected, sp_selected, exclusions)，
-#'   每项为 tibble。
+#' @return list(fixtures, euro_mean, totals_selected, sp_selected, match_status,
+#'   status_selected, exclusions)，每项为 tibble。
+#'   · match_status     输入台账的原样保留，供下游（投影）重新校验
+#'   · status_selected  被采纳的那条 scheduled 报告，每场一行
 #' @details 决策 epoch 是本地日 D 的 20:00 Asia/Shanghai，窗口是整个 D+1。
-#'   只有当开赛落在该窗口内、且 cutoff 之前存在可用欧赔报价时，比赛才会被保留。
-#'   被剔除的比赛连同原因记入 exclusions 表，因此剔除是可审计的而不是静默的。
+#'   只有当开赛落在该窗口内、cutoff 之前存在可用欧赔报价、**且 cutoff 当时可见的
+#'   最新状态是 scheduled** 时，比赛才会被保留。被剔除的比赛连同原因记入
+#'   exclusions 表，因此剔除是可审计的而不是静默的。
 #'
 #'   期号绑定：一个 epoch 就是一期。携带其它 issue_id 的比赛会被拒绝，
 #'   否则它会在错误的决策日下被定价、分组、买入。
+#'
+#'   可见性判断全部委托给唯一的共享选择器 n7_select_match_status()：本函数不自己
+#'   比较 status、也不读 fixtures$sale_state。sale_state 是售卖通道状态，与比赛
+#'   是否发生是两件事，用前者替代后者会在比赛被取消时仍然开卖。
 n7_prepare_epoch <- function(inputs, cutoff, tz = N7_DECISION_TZ,
                              euro_policy, totals_policy) {
   n7_require_cutoff(cutoff)
@@ -279,6 +288,13 @@ n7_prepare_epoch <- function(inputs, cutoff, tz = N7_DECISION_TZ,
   euro <- n7_validate_table(inputs$euro, "euro")
   totals <- n7_validate_table(inputs$totals, "totals")
   sp <- n7_validate_table(inputs$prematch_sp, "prematch_sp")
+  # Missing is an input-contract error; an empty ledger is a legitimate observation
+  # of "nothing was visible" and must not be confused with the former.
+  if (is.null(inputs$match_status)) {
+    stop("n7_prepare_epoch: inputs$match_status is required; a missing status ledger ",
+         "is an input-contract error, not an empty one")
+  }
+  match_status <- n7_validate_match_status(inputs$match_status, fixtures = fixtures_all)
 
   exclusions <- list()
   note <- function(fixture_id, reason) {
@@ -307,6 +323,26 @@ n7_prepare_epoch <- function(inputs, cutoff, tz = N7_DECISION_TZ,
     note(fixture_id, "kickoff outside decision window")
   }
 
+  # Visibility: the ONE shared selector decides which fixtures had a visible
+  # scheduled status at the cutoff.
+  #
+  # The window filter runs FIRST, so `fixtures` here is already a slice. Relation
+  # keys were validated at the raw input boundary (n7_read_inputs) against the FULL
+  # fixture frame, and that validation is repeated above by
+  # n7_validate_match_status(inputs$match_status, fixtures = fixtures_all). The
+  # selector itself therefore never re-derives a relation from the slice: a ledger
+  # row for a fixture this epoch dropped is simply ignored, not reported as unknown.
+  status <- n7_select_match_status(fixtures, match_status, cutoff)
+  if (nrow(status$exclusions)) {
+    for (i in seq_len(nrow(status$exclusions))) {
+      exclusions[[length(exclusions) + 1L]] <- tibble::tibble(
+        scope = "epoch", issue_id = status$exclusions$issue_id[i],
+        fixture_id = status$exclusions$fixture_id[i],
+        reason = status$exclusions$reason[i])
+    }
+  }
+  fixtures <- status$fixtures
+
   euro_mean <- n7_euro_mean(euro, cutoff_utc, euro_policy, fixtures)
   usable <- !is.na(euro_mean$odds_home)
   for (fixture_id in euro_mean$fixture_id[!usable]) {
@@ -320,6 +356,7 @@ n7_prepare_epoch <- function(inputs, cutoff, tz = N7_DECISION_TZ,
 
   list(fixtures = fixtures, euro_mean = euro_mean,
        totals_selected = selected_totals, sp_selected = selected_sp,
+       match_status = match_status, status_selected = status$selected_status,
        exclusions = if (length(exclusions)) dplyr::bind_rows(exclusions) else n7_typed_empty("exclusions"))
 }
 
@@ -345,6 +382,11 @@ n7_prepare_epoch <- function(inputs, cutoff, tz = N7_DECISION_TZ,
 #' @details 只有开赛落在决策窗口内、且报价严格早于 cutoff 的比赛才参与投影；
 #'   每场比赛的 issue_id 必须与 cutoff 绑定的期号一致。投影失败的比赛连同原因
 #'   记入 fit 表，而不是被静默跳过。
+#'
+#'   投影边界再次用 epoch_inputs$match_status 保留的历史台账校验可见性：直接调用
+#'   本函数（绕过 n7_prepare_epoch）时，任何在**本** cutoff 当时不可见或非
+#'   scheduled 的比赛都必须报错，而不是被照常定价——那会让调用方拿别的时刻的
+#'   选择结果给现在定价。
 #'
 #'   瑞典盘三项为决策三元组；普通 W/D/L 仅作为诊断信息挂在 fit 表上，
 #'   绝不作为投注赛果使用。
@@ -386,6 +428,29 @@ n7_project_probabilities <- function(epoch_inputs, cutoff, rho, total_bounds,
     if (length(stray)) {
       stop("n7_project_probabilities: fixtures belong to issue(s) ",
            paste(stray, collapse = ", "), ", not ", cutoff$issue_id)
+    }
+  }
+  # Re-validate the fixtures against the RETAINED status history. Handing the same
+  # fixtures a second, later cutoff would otherwise let a fixture whose visible
+  # status was `cancelled` be projected anyway: the selection happened in
+  # prepare_epoch against a different instant, and this function is public.
+  # The ledger is schema-validated first; the relation to fixtures is intentionally
+  # NOT re-derived here: prepare_epoch sliced fixtures before selecting, so `fixtures`
+  # is a subset of the frame the ledger was validated against at the input boundary.
+  # Joining the full ledger's keys against this slice would manufacture a false
+  # "unknown match" for every fixture the epoch legitimately dropped.
+  if (nrow(fixtures)) {
+    if (is.null(epoch_inputs$match_status)) {
+      stop("n7_project_probabilities: epoch_inputs$match_status is required to ",
+           "revalidate fixture visibility at this cutoff")
+    }
+    revalidated <- n7_select_match_status(
+      fixtures, n7_validate_match_status(epoch_inputs$match_status), cutoff)
+    if (nrow(revalidated$exclusions)) {
+      stop("n7_project_probabilities: fixture(s) are not visible as scheduled at ",
+           "this cutoff: ",
+           paste(paste0(revalidated$exclusions$fixture_id, " (",
+                        revalidated$exclusions$reason, ")"), collapse = "; "))
     }
   }
 

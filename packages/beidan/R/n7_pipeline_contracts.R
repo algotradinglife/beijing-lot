@@ -34,7 +34,7 @@
 #' 下游某处才暴露非法状态。S7 对象不得出现在模块的公开返回结构中。
 #'
 #' @section 表类型契约:
-#' 15 张表由 `n7_table_schemas()` 唯一声明，边界处由
+#' 16 张表由 `n7_table_schemas()` 唯一声明，边界处由
 #' `n7_validate_table()` 校验列集合、列序、列类型与主键。
 #'
 #' @details 本模块只定义函数；导入时不触发任何 I/O，不联网，不写库。
@@ -49,7 +49,7 @@ NULL
 
 # --- table schemas ----------------------------------------------------------
 
-#' 本管道 15 张表的唯一权威声明
+#' 本管道 16 张表的唯一权威声明
 #'
 #' 都对着它校验，因此契约漂移会在边界处变成错误，而不是下游的静默列错位。
 #'
@@ -91,6 +91,16 @@ n7_table_schemas <- function() {
       types = c(fixture_id = "character", outcome = "character",
                 quote_at = "POSIXct", sp_raw = "double",
                 source_url = "character")),
+    # match_status 是**观测台账**，不是 fixtures 上的一个可变"最新状态"字段：
+    # 每行一次观测，键为 (issue_id, fixture_id, available_at)。把最新状态写回
+    # fixtures 会让"cutoff 当时可见什么"无法重建，也让事后取消能改写过去的决策。
+    match_status = list(
+      columns = c("issue_id", "fixture_id", "status", "status_at", "available_at",
+                  "source_url"),
+      types = c(issue_id = "character", fixture_id = "character",
+                status = "character", status_at = "POSIXct",
+                available_at = "POSIXct", source_url = "character"),
+      keys = c("issue_id", "fixture_id", "available_at")),
     # candidate_id/ticket_id 是 candidate 与物理票之间的多对多链接表：同一张物理票
     # 可被多个结构引用（契约：同物理票跨 candidate 仅一个 ticket_id），因此这张表
     # 的主键是 (candidate_id, ticket_id)，而不是任一单列。

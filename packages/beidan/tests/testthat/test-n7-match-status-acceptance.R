@@ -1,0 +1,104 @@
+testthat::test_that("whole-issue reading is independent of decision day", {
+  times <- as.POSIXct(c("2026-09-23 04:00:00", "2026-09-24 04:00:00"), tz = "UTC")
+  synthetic <- n7_make_fixture_issue("00123", times)
+  source <- n7_fixture_source(synthetic)
+  original <- source
+  inputs <- n7_read_inputs(source, "00123")
+  testthat::expect_identical(inputs$fixtures$kickoff_at, times)
+  testthat::expect_false("cutoff" %in% names(formals(n7_read_inputs)))
+  testthat::expect_false(any(c("local_date", "n_fixtures", "kickoff_hour", "tz") %in%
+                              names(formals(n7_make_fixture_issue))))
+  first <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
+  second <- first
+  second$cutoff_utc <- first$cutoff_utc + 86400
+  ep <- list(members = c("c01", "c02", "c03"), missing = "error")
+  tp <- list(companies = NULL, line = "nearest_main", watermark = "decimal")
+  early <- n7_prepare_epoch(inputs, first, euro_policy = ep, totals_policy = tp)
+  later <- n7_prepare_epoch(inputs, second, euro_policy = ep, totals_policy = tp)
+  testthat::expect_identical(early$fixtures$fixture_id, inputs$fixtures$fixture_id[1])
+  testthat::expect_identical(later$fixtures$fixture_id, inputs$fixtures$fixture_id[2])
+  testthat::expect_identical(source, original)
+  testthat::expect_identical(inputs, n7_read_inputs(source, "00123"))
+})
+
+testthat::test_that("status availability uses exact typed instants and composite match identity", {
+  synthetic <- n7_make_fixture_issue("00123", as.POSIXct("2026-09-23 04:00:00", tz = "UTC"))
+  cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
+  earlier <- synthetic$match_status
+  earlier$status_at <- cutoff$cutoff_utc - 0.8
+  earlier$available_at <- cutoff$cutoff_utc - 0.8
+  later <- earlier
+  later$status <- "cancelled"
+  later$status_at <- cutoff$cutoff_utc - 0.2
+  later$available_at <- cutoff$cutoff_utc - 0.2
+  ledger <- dplyr::bind_rows(earlier, later)
+  result <- n7_select_match_status(synthetic$fixtures, ledger, cutoff)
+  testthat::expect_equal(nrow(result$fixtures), 0L)
+  testthat::expect_identical(result$exclusions$reason, "match status: cancelled")
+  later$status_at <- cutoff$cutoff_utc
+  later$available_at <- cutoff$cutoff_utc
+  result <- n7_select_match_status(synthetic$fixtures, dplyr::bind_rows(earlier, later), cutoff)
+  testthat::expect_identical(result$fixtures, synthetic$fixtures)
+  wrong <- earlier
+  wrong$issue_id <- "00999"
+  result <- n7_select_match_status(synthetic$fixtures, wrong, cutoff)
+  testthat::expect_equal(nrow(result$fixtures), 0L)
+  testthat::expect_identical(result$exclusions$reason, "no match status before cutoff")
+})
+
+testthat::test_that("source boundary rejects absent histories and orphan reports before filtering", {
+  synthetic <- n7_make_fixture_issue("00123", as.POSIXct("2026-09-23 04:00:00", tz = "UTC"))
+  source <- n7_fixture_source(synthetic)
+  missing <- source
+  missing$tables$match_status <- NULL
+  testthat::expect_error(n7_read_inputs(missing, "00123"), "match_status")
+  orphan <- source
+  orphan$tables$match_status$fixture_id <- "not-in-source"
+  testthat::expect_error(n7_read_inputs(orphan, "00123"), "fixture|match|reference")
+  empty <- source
+  empty$tables$match_status <- n7_typed_empty("match_status")
+  testthat::expect_identical(n7_read_inputs(empty, "00123")$match_status,
+                            n7_typed_empty("match_status"))
+})
+
+testthat::test_that("future cancellation cannot rewrite selected candidates or funded tickets", {
+  times <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + seq(0, by = 900, length.out = 14)
+  synthetic <- n7_make_fixture_issue("00123", times)
+  cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
+  probabilities <- tidyr::expand_grid(fixture_id = synthetic$fixtures$fixture_id,
+                                      outcome = c("W", "D", "L")) |>
+    dplyr::mutate(probability = rep(c(0.5, 0.3, 0.2), 14))
+  constants <- n7_pipeline_constants(reset = TRUE)
+  config <- n7_allocation_configs(constants)$C
+  original <- n7_run_allocation(config, synthetic$fixtures, probabilities,
+    synthetic$prematch_sp, cutoff, constants, 1L, 0L, match_status = synthetic$match_status)
+  future <- synthetic$match_status[1, ]
+  future$status <- "cancelled"
+  future$status_at <- cutoff$cutoff_utc + 1
+  future$available_at <- cutoff$cutoff_utc + 1
+  changed <- n7_run_allocation(config, synthetic$fixtures, probabilities,
+    synthetic$prematch_sp, cutoff, constants, 1L, 0L,
+    match_status = dplyr::bind_rows(synthetic$match_status, future))
+  testthat::expect_identical(changed, original)
+  future$status_at <- cutoff$cutoff_utc - 1
+  future$available_at <- cutoff$cutoff_utc - 1
+  excluded <- n7_construct_candidates(synthetic$fixtures, probabilities, cutoff, 7L,
+    "entropy_balanced", 2L, seed = 1L,
+    match_status = dplyr::bind_rows(synthetic$match_status, future))
+  testthat::expect_false(future$fixture_id %in% excluded$group_legs$fixture_id)
+  testthat::expect_identical(excluded$diagnostics$status_exclusions$reason, "match status: cancelled")
+})
+
+testthat::test_that("synthetic schedules preserve simultaneous games and subsecond instants", {
+  times <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + c(0, 0, 0.25)
+  synthetic <- n7_make_fixture_issue("00123", times)
+  testthat::expect_identical(synthetic$fixtures$kickoff_at, times)
+  testthat::expect_identical(synthetic$fixtures$slot, 1:3)
+  testthat::expect_equal(length(unique(synthetic$fixtures$fixture_id)), 3L)
+})
+
+testthat::test_that("status selector binds fixture issue to cutoff identity", {
+  synthetic <- n7_make_fixture_issue("00999", as.POSIXct("2026-09-23 04:00:00", tz = "UTC"))
+  cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
+  testthat::expect_error(n7_select_match_status(synthetic$fixtures, synthetic$match_status, cutoff), "issue")
+})

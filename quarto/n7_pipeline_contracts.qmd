@@ -64,6 +64,8 @@ empty_ok <- vapply(names(schemas), function(t) {
 stopifnot(all(empty_ok))
 ```
 
+本次 #508 将示例更新为显式开赛时间与状态历史输入；原 #500 审阅记录保留为历史证据，当前改动验收见 `n7_match_status.qmd`。
+
 ## 二、夹具与决策历元
 
 夹具生成一个自洽的赛前世界：先有真实 W/D/L 三元组，再由它派生欧赔（带水位、逐公司噪声）
@@ -78,9 +80,11 @@ CUTOFF <- list(cutoff_utc = as.POSIXct(paste(DECISION_DATE, "12:00:00"), tz = "U
                issue_id = ISSUE)
 # 2026-09-22 12:00Z is 20:00 Asia/Shanghai on the decision day; kickoffs land on D+1.
 
-issue <- n7_make_fixture_issue(ISSUE, DECISION_DATE, n_fixtures = 56L,
-                               seed = 42L, kickoff_hour = 9L)
-inputs <- n7_read_inputs(n7_fixture_source(issue), ISSUE, CUTOFF)
+# kickoff_at is an explicit UTC POSIXct vector; the fixture count is its length.
+KICKOFFS <- as.POSIXct("2026-09-23 01:00:00", tz = "UTC") + seq(0, by = 900, length.out = 56L)
+issue <- n7_make_fixture_issue(ISSUE, KICKOFFS, seed = 42L)
+# Reading is whole-issue: no cutoff argument and no date filtering.
+inputs <- n7_read_inputs(n7_fixture_source(issue), ISSUE)
 
 # Internal consistency: de-vigging the mean euro odds recovers the generator truth.
 mean_euro <- inputs$euro |>
@@ -160,7 +164,8 @@ PATTERN_MAIN <- c(3L, 3L, 3L, 3L, 2L, 2L, 2L)
 construct_and_structure <- function(pattern, groups_wanted, seed = 1L) {
   groups <- n7_construct_candidates(EPOCH$fixtures, PROJECTED$probabilities, CUTOFF,
                                     CONSTANTS$n_legs, "entropy_balanced",
-                                    groups_wanted, seed)
+                                    groups_wanted, seed,
+                                    match_status = inputs$match_status)
   structure <- n7_apply_structure(groups$group_legs, PROJECTED$probabilities, CUTOFF,
                                   pattern, "entropy_desc")
   list(groups = groups, structure = structure)
@@ -211,7 +216,7 @@ SP 变换规则固定：`SP > 10` 取 4.5，`SP = 10` 不变；**任一条腿缺
 ```{r valuation}
 #| label: valuation
 BUILT_A <- n7_build_decision(EPOCH$fixtures, PROJECTED$probabilities, EPOCH$sp_selected,
-                             CUTOFF, list(PATTERN_MAIN), "entropy_balanced", 4L, 1L,
+                             CUTOFF, inputs$match_status, list(PATTERN_MAIN), "entropy_balanced", 4L, 1L,
                              CONSTANTS, 1L, 6L)
 RANKED_A <- n7_rank_tickets(BUILT_A$valued, BUILT_A$tickets$candidate_tickets,
                             CUTOFF)
@@ -232,7 +237,8 @@ CONFIGS <- n7_allocation_configs(CONSTANTS)
 allocation_summary <- lapply(names(CONFIGS), function(name) {
   config <- CONFIGS[[name]]
   result <- n7_run_allocation(config, EPOCH$fixtures, PROJECTED$probabilities,
-                              EPOCH$sp_selected, CUTOFF, CONSTANTS, 1L, 6L)
+                              EPOCH$sp_selected, CUTOFF, inputs$match_status,
+                              CONSTANTS, 1L, 6L)
   per_group <- sort(as.integer(table(result$funded$funded$group_id)))
   tibble::tibble(
     配置 = name,
@@ -282,7 +288,8 @@ SETTLEMENTS <- synthetic_settlements(issue, ISSUE)
 AS_OF <- as.POSIXct("2026-10-05 00:00:00", tz = "UTC")
 CONFIG_A <- CONFIGS[["A"]]
 PLAN_A <- n7_run_allocation(CONFIG_A, EPOCH$fixtures, PROJECTED$probabilities,
-                            EPOCH$sp_selected, CUTOFF, CONSTANTS, 1L, 6L)$plan
+                            EPOCH$sp_selected, CUTOFF, inputs$match_status,
+                            CONSTANTS, 1L, 6L)$plan
 
 SETTLED_A <- n7_settle_plan(PLAN_A, SETTLEMENTS, AS_OF, CONSTANTS$unit_cny,
                             CONSTANTS$payout_factor)
@@ -344,9 +351,11 @@ identical(FUNDED_BEFORE, PLAN_A$funded$ticket_id)
 build_epoch <- function(issue_id, decision_date, seed, n_fixtures = 56L) {
   cutoff <- list(cutoff_utc = as.POSIXct(paste(decision_date, "12:00:00"), tz = "UTC"),
                  issue_id = issue_id)
-  fixture <- n7_make_fixture_issue(issue_id, decision_date, n_fixtures = n_fixtures,
-                                   seed = seed, kickoff_hour = 9L)
-  raw <- n7_read_inputs(n7_fixture_source(fixture), issue_id, cutoff)
+  # One kickoff per wanted fixture, on the day after the decision date.
+  kickoffs <- as.POSIXct(paste(as.Date(decision_date) + 1L, "01:00:00"), tz = "UTC") +
+    seq(0, by = 900, length.out = n_fixtures)
+  fixture <- n7_make_fixture_issue(issue_id, kickoffs, seed = seed)
+  raw <- n7_read_inputs(n7_fixture_source(fixture), issue_id)
   prepared <- n7_prepare_epoch(raw, cutoff, "Asia/Shanghai",
                                list(members = c("c01", "c02", "c03"), missing = "error"),
                                list(companies = NULL, line = "nearest_main",
@@ -356,7 +365,8 @@ build_epoch <- function(issue_id, decision_date, seed, n_fixtures = 56L) {
   list(fixture = fixture, cutoff = cutoff,
        inputs = list(fixtures = prepared$fixtures,
                      probabilities = projected$probabilities,
-                     sp = prepared$sp_selected))
+                     sp = prepared$sp_selected,
+                     match_status = prepared$match_status))
 }
 
 EPOCH_1 <- build_epoch("26097", "2026-09-22", 42L)
@@ -395,7 +405,7 @@ count_blocks <- function(path) {
 }
 test_files <- c("test-n7-pipeline-contracts.R", "test-n7-pipeline-epoch.R",
                 "test-n7-pipeline-candidates.R", "test-n7-pipeline-types.R",
-                "test-n7-pipeline-value.R")
+                "test-n7-pipeline-value.R", "test-n7-match-status.R")
 tibble::tibble(
   测试文件 = test_files,
   测试块 = vapply(file.path(root, "packages", "beidan", "tests", "testthat", test_files), count_blocks, integer(1))) |>

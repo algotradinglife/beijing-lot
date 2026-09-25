@@ -1,13 +1,5 @@
-# Shared harness: one synthetic issue, one cutoff, default policies.
-epoch_fixture <- function(n_fixtures = 10L, seed = 42L, local_date = '2026-09-22') {
-  issue <- n7_make_fixture_issue('26097', local_date, n_fixtures = n_fixtures, seed = seed)
-  cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  inputs <- n7_read_inputs(n7_fixture_source(issue), '26097', cutoff)
-  list(issue = issue, cutoff = cutoff, inputs = inputs)
-}
-
-default_euro <- function() list(members = c('c01', 'c02', 'c03'), missing = 'error')
-default_totals <- function() list(companies = NULL, line = 'nearest_main', watermark = 'decimal')
+# Shared harness (epoch_fixture, default_euro, default_totals) lives in
+# helper-n7-fixtures.R so every N7 test file builds the same synthetic world.
 
 testthat::test_that('HK water is converted explicitly and never guessed', {
   testthat::expect_equal(n7_hk_to_decimal(0.9), 1.9)
@@ -71,6 +63,8 @@ testthat::test_that('fixtures outside the decision window are excluded with a re
   shifted <- fx$inputs
   # Push every kickoff a week later, out of the D+1 window.
   shifted$fixtures$kickoff_at <- shifted$fixtures$kickoff_at + 7 * 86400
+  # The ledger is keyed by (issue_id, fixture_id), not by kickoff, so the visible
+  # scheduled report still covers these fixtures; only the window rejects them.
   prepared <- n7_prepare_epoch(shifted, fx$cutoff, N7_DECISION_TZ,
                                default_euro(), default_totals())
   testthat::expect_equal(nrow(prepared$fixtures), 0L)
@@ -144,7 +138,9 @@ testthat::test_that('a fixture with no over/under quote is excluded, never euro-
 
 testthat::test_that('an empty epoch yields typed empty probabilities and fit', {
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  empty_inputs <- n7_read_inputs(list(kind = 'frames', tables = list()), '26097', cutoff)
+  empty_inputs <- n7_read_inputs(list(kind = 'frames',
+                                      tables = list(match_status = n7_typed_empty('match_status'))),
+                                 '26097')
   prepared <- n7_prepare_epoch(empty_inputs, cutoff, N7_DECISION_TZ,
                                default_euro(), default_totals())
   testthat::expect_equal(nrow(prepared$fixtures), 0L)
@@ -484,8 +480,13 @@ testthat::test_that('n7_prepare_epoch 拒绝携带其它期号的比赛', {
     issue_id = '26098', fixture_id = 'f1', slot = 1L, provider_id = 'p',
     kickoff_at = as.POSIXct('2026-09-23 02:00:00', tz = 'UTC'), handicap = 0L,
     sale_state = 'open', source_url = 'synthetic://x')
+  instant <- as.POSIXct('2026-09-22 08:00:00', tz = 'UTC')
+  stray_ledger <- tibble::tibble(
+    issue_id = '26098', fixture_id = 'f1', status = 'scheduled',
+    status_at = instant, available_at = instant, source_url = 'synthetic://x')
   inputs <- list(fixtures = stray, euro = n7_typed_empty('euro'),
-                 totals = n7_typed_empty('totals'), prematch_sp = n7_typed_empty('prematch_sp'))
+                 totals = n7_typed_empty('totals'), prematch_sp = n7_typed_empty('prematch_sp'),
+                 match_status = stray_ledger)
   testthat::expect_error(
     n7_prepare_epoch(inputs, cutoff, euro_policy = list(members = 'c1'),
                      totals_policy = list(watermark = 'decimal')),
@@ -506,8 +507,11 @@ testthat::test_that('n7_prepare_epoch 只保留开赛落在 D+1 窗口内的比�
   euro <- tibble::tibble(
     fixture_id = c('f_in','f_before','f_after'), company_id = 'c1', quote_at = instant,
     odds_home = 2.0, odds_draw = 3.0, odds_away = 4.0, source_url = 'synthetic://x')
+  ledger <- tibble::tibble(
+    issue_id = '26097', fixture_id = c('f_in','f_before','f_after'), status = 'scheduled',
+    status_at = instant, available_at = instant, source_url = 'synthetic://x')
   inputs <- list(fixtures = fixtures, euro = euro, totals = n7_typed_empty('totals'),
-                 prematch_sp = n7_typed_empty('prematch_sp'))
+                 prematch_sp = n7_typed_empty('prematch_sp'), match_status = ledger)
   epoch <- n7_prepare_epoch(inputs, cutoff, euro_policy = list(members = 'c1'),
                             totals_policy = list(watermark = 'decimal'))
   testthat::expect_identical(epoch$fixtures$fixture_id, 'f_in')
@@ -519,12 +523,13 @@ testthat::test_that('n7_prepare_epoch 只保留开赛落在 D+1 窗口内的比�
 testthat::test_that('n7_prepare_epoch 的空输入返回带完整列的空表', {
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
   inputs <- list(fixtures = n7_typed_empty('fixtures'), euro = n7_typed_empty('euro'),
-                 totals = n7_typed_empty('totals'), prematch_sp = n7_typed_empty('prematch_sp'))
+                 totals = n7_typed_empty('totals'), prematch_sp = n7_typed_empty('prematch_sp'),
+                 match_status = n7_typed_empty('match_status'))
   epoch <- n7_prepare_epoch(inputs, cutoff, euro_policy = list(members = 'c1'),
                             totals_policy = list(watermark = 'decimal'))
   testthat::expect_setequal(names(epoch),
                             c('fixtures','euro_mean','totals_selected','sp_selected',
-                              'exclusions'))
+                              'match_status','status_selected','exclusions'))
   testthat::expect_equal(nrow(epoch$fixtures), 0L)
   testthat::expect_equal(nrow(epoch$exclusions), 0L)
 })

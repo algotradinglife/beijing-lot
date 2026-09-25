@@ -97,17 +97,32 @@ n7_group_identity <- function(fixture_ids) {
 #'   · 开赛落在 D+1 决策窗口之外的比赛 -> stop()
 #' @param probabilities tibble，probabilities 表；每场必须 W/D/L 齐全且行和为 1。
 #' @param cutoff        temporal_learning 对象。
+#' @param match_status tibble，比赛状态台账（语义见 n7_select_match_status）。
+#'   **必填且无默认值**：附加在末尾以保持既有位置调用的可读性，但缺失即 stop()，
+#'   因为"没有台账"与"台账为空"是两件事，前者是输入契约错误。
 #' @param n_legs        长度 1 的正整数（本管道固定为 7）。
 #' @param construction  显式的 fixture-id 组 list，或 "entropy_balanced"。
 #' @param max_candidates 长度 1 的正整数。
 #' @param seed          整数标量，控制 entropy_balanced 的确定性抽样。
-#' @return list(groups, group_legs, diagnostics)，均为 tibble。
+#' @return list(groups, group_legs, diagnostics); diagnostics$status_exclusions
+#'   records each fixture excluded by its visible match status.，均为 tibble。
 #' @details 不执行完整的 7-of-N 枚举：那是组合爆炸，且契约禁止声称全局最优。
 #'   决策绑定到**一期**：拿别的期号的比赛对着本 cutoff 定价，会让回放买到
 #'   不属于它自己赛程的比赛。
+#'
+#'   比赛可见性由唯一的共享选择器 n7_select_match_status() 决定，且使用完全相同的
+#'   cutoff：本函数不自己实现一套状态判定，因此从 fixtures 直接构造候选与经由
+#'   n7_prepare_epoch 构造得到同一批比赛。台账的关系键已经由输入边界
+#'   （n7_read_inputs 或 n7_prepare_epoch）对着完整帧校验过，因此这里直接把同一份
+#'   fixtures 交给选择器，不再另做关系检查。
 n7_construct_candidates <- function(fixtures, probabilities, cutoff, n_legs,
-                                    construction, max_candidates, seed = 1L) {
+                                    construction, max_candidates, seed = 1L,
+                                    match_status) {
   n7_require_cutoff(cutoff)
+  # Select FIRST, then validate the survivors: a fixture that is not visible as
+  # scheduled at this cutoff must never reach the group builder.
+  status_selection <- n7_select_match_status(fixtures, match_status, cutoff)
+  fixtures <- status_selection$fixtures
   n7_validate_table(fixtures, "fixtures", keys = c("issue_id", "fixture_id"))
   # The decision is bound to ONE issue. Pricing another issue's fixtures against this
   # cutoff would let a replay purchase matches outside its own slate.
@@ -145,7 +160,8 @@ n7_construct_candidates <- function(fixtures, probabilities, cutoff, n_legs,
   wide <- n7_probability_wide(probabilities)
   usable <- intersect(fixtures$fixture_id, wide$fixture_id)
   diagnostics <- list(n_fixtures = nrow(fixtures), n_priced = length(usable),
-                      truncated = FALSE, dropped = 0L)
+                      truncated = FALSE, dropped = 0L,
+                      status_exclusions = status_selection$exclusions)
 
   if (!length(usable)) {
     return(list(groups = n7_typed_empty("group_legs"),

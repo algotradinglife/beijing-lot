@@ -131,8 +131,8 @@ testthat::test_that('unexpected or missing csv columns are rejected', {
 
 testthat::test_that('read_inputs returns typed empty tables for an empty source', {
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  result <- n7_read_inputs(list(kind = 'frames', tables = list()), '26097', cutoff)
-  testthat::expect_setequal(names(result), c('fixtures', 'euro', 'totals', 'prematch_sp'))
+  result <- n7_read_inputs(n7_empty_frames(), '26097')
+  testthat::expect_setequal(names(result), c('fixtures', 'euro', 'totals', 'prematch_sp', 'match_status'))
   for (table in names(result)) {
     testthat::expect_equal(nrow(result[[table]]), 0L)
     testthat::expect_silent(n7_validate_table(result[[table]], table))
@@ -141,17 +141,17 @@ testthat::test_that('read_inputs returns typed empty tables for an empty source'
 
 testthat::test_that('read_inputs never returns a settlement table', {
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 8L, seed = 7L)
-  result <- n7_read_inputs(n7_fixture_source(issue), '26097', cutoff)
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 8L), seed = 7L)
+  result <- n7_read_inputs(n7_fixture_source(issue), '26097')
   testthat::expect_false('settlements' %in% names(result))
 })
 
 testthat::test_that('read_inputs filters to the requested issues only', {
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  a <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 8L, seed = 1L)
-  b <- n7_make_fixture_issue('26098', '2026-09-23', n_fixtures = 8L, seed = 2L)
+  a <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 8L), seed = 1L)
+  b <- n7_make_fixture_issue('26098', n7_kickoff_window('2026-09-23', 8L), seed = 2L)
   source <- n7_fixture_source(a, b)
-  result <- n7_read_inputs(source, '26097', cutoff)
+  result <- n7_read_inputs(source, '26097')
   testthat::expect_true(all(result$fixtures$issue_id == '26097'))
   testthat::expect_equal(nrow(result$fixtures), 8L)
   testthat::expect_equal(nrow(result$euro), 8L * 3L)
@@ -159,15 +159,15 @@ testthat::test_that('read_inputs filters to the requested issues only', {
 
 testthat::test_that('network-like sources are refused', {
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  testthat::expect_error(n7_read_inputs(list(kind = 'http', url = 'http://example.com'), '26097', cutoff),
+  testthat::expect_error(n7_read_inputs(list(kind = 'http', url = 'http://example.com'), '26097'),
                          'network sources are not permitted')
-  testthat::expect_error(n7_read_inputs(list(kind = 'csv_dir', path = '/nonexistent-xyz'), '26097', cutoff),
+  testthat::expect_error(n7_read_inputs(list(kind = 'csv_dir', path = '/nonexistent-xyz'), '26097'),
                          'existing directory')
 })
 
 testthat::test_that('the synthetic fixture is internally consistent and deterministic', {
-  a <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 8L, seed = 11L)
-  b <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 8L, seed = 11L)
+  a <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 8L), seed = 11L)
+  b <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 8L), seed = 11L)
   testthat::expect_identical(a$fixtures, b$fixtures)
   testthat::expect_identical(a$truth, b$truth)
 
@@ -194,7 +194,7 @@ testthat::test_that('the synthetic fixture is internally consistent and determin
 testthat::test_that('n7_table_schemas 自身不变量：列无重复且 types 与 columns 对齐', {
   schemas <- n7_table_schemas()
   testthat::expect_type(schemas, 'list')
-  testthat::expect_length(schemas, 15L)
+  testthat::expect_length(schemas, 16L)
   for (name in names(schemas)) {
     schema <- schemas[[name]]
     testthat::expect_true(length(schema$columns) > 0L)
@@ -208,7 +208,8 @@ testthat::test_that('n7_table_schemas 自身不变量：列无重复且 types �
 })
 
 testthat::test_that('n7_table_schemas 覆盖合同要求的全部表', {
-  expected <- c('fixtures','euro','totals','prematch_sp','candidate_tickets','ranked',
+  expected <- c('fixtures','euro','totals','prematch_sp','match_status',
+                'candidate_tickets','ranked',
                 'probabilities','fit','group_legs','supports','tickets','ticket_legs',
                 'purchases','settlements','exclusions')
   testthat::expect_setequal(names(n7_table_schemas()), expected)
@@ -511,11 +512,11 @@ testthat::test_that('n7_legs 是固定结构常量，不随会话常量漂移', 
 # --- 逐函数边界测试（inputs）-----------------------------------------------
 # 每个函数按其 roxygen @param 契约逐条写用例：正常输入、边界、空/缺失、失败路径。
 
-testthat::test_that('n7_source_csv_columns 只暴露磁盘上可出现的四张表', {
+testthat::test_that('n7_source_csv_columns 只暴露磁盘上可出现的五张表', {
   columns <- n7_source_csv_columns()
   testthat::expect_type(columns, 'list')
   testthat::expect_setequal(names(columns),
-                            c('fixtures','euro','totals','prematch_sp'))
+                            c('fixtures','euro','totals','prematch_sp','match_status'))
   # settlements 绝不能在列契约里，否则磁盘源就能把赛果带进决策输入。
   testthat::expect_false('settlements' %in% names(columns))
   for (name in names(columns)) {
@@ -690,8 +691,8 @@ testthat::test_that('n7_read_fixture_source 的 frames 分支要求 tables 是 l
                          'source$tables must be a list', fixed = TRUE)
   testthat::expect_error(n7_read_fixture_source(list(kind = 'frames', tables = 1)),
                          'source$tables must be a list', fixed = TRUE)
-  # 空 tables 合法：四张表都退化成 typed-empty。
-  out <- n7_read_fixture_source(list(kind = 'frames', tables = list()))
+  # 显式空状态台账合法；缺失台账另有拒绝测试。
+  out <- n7_read_fixture_source(n7_empty_frames())
   testthat::expect_setequal(names(out), names(n7_source_csv_columns()))
   for (name in names(out)) {
     testthat::expect_equal(nrow(out[[name]]), 0L)
@@ -708,22 +709,33 @@ testthat::test_that('n7_read_fixture_source 的 csv_dir 分支要求目录存在
                          'must be an existing directory')
 })
 
-testthat::test_that('n7_read_inputs 校验 issue_ids 与 cutoff', {
-  source <- list(kind = 'frames', tables = list())
-  cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  testthat::expect_error(n7_read_inputs(source, 26097, cutoff), 'must be character')
-  testthat::expect_error(n7_read_inputs(source, NA_character_, cutoff), 'must not be NA')
-  testthat::expect_error(n7_read_inputs(source, '', cutoff), 'must not be empty')
-  testthat::expect_error(n7_read_inputs(source, ' 26097', cutoff), 'must not be padded')
-  testthat::expect_error(n7_read_inputs(source, '26097', NULL), 'explicit cutoff is required')
+testthat::test_that('n7_read_inputs 校验 issue_ids 且不再接受 cutoff', {
+  source <- n7_empty_frames()
+  testthat::expect_error(n7_read_inputs(source, 26097), 'must be character')
+  testthat::expect_error(n7_read_inputs(source, NA_character_), 'must not be NA')
+  testthat::expect_error(n7_read_inputs(source, ''), 'must not be empty')
+  testthat::expect_error(n7_read_inputs(source, ' 26097'), 'must not be padded')
+  # 读取是整期的：接口不再有 cutoff 形参，多余的实参一律报错而不是被忽略。
+  testthat::expect_error(n7_read_inputs(source, '26097', list(issue_id = '26097')),
+                         'unused argument')
 })
 
-testthat::test_that('n7_read_inputs 返回四张表且永不含 settlements', {
+testthat::test_that('n7_read_inputs 在 frames 源缺少 match_status 表时报错', {
+  # 缺表是输入契约错误：把"源里没有这张表"读成"没有可见状态"会让一期比赛
+  # 因为一个读取缺陷而被静默排除，因此绝不回退成 typed-empty。
   source <- list(kind = 'frames', tables = list())
-  cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  result <- n7_read_inputs(source, '26097', cutoff)
+  testthat::expect_error(n7_read_inputs(source, '26097'),
+                         'has no match_status table')
+  # 显式给一张零行表则合法，表达"确实没有任何可见报告"。
+  explicit <- list(kind = 'frames',
+                   tables = list(match_status = n7_typed_empty('match_status')))
+  testthat::expect_silent(n7_read_inputs(explicit, '26097'))
+})
+
+testthat::test_that('n7_read_inputs 返回五张表且永不含 settlements', {
+  result <- n7_read_inputs(n7_empty_frames(), '26097')
   testthat::expect_setequal(names(result),
-                            c('fixtures','euro','totals','prematch_sp'))
+                            c('fixtures','euro','totals','prematch_sp','match_status'))
   testthat::expect_false('settlements' %in% names(result))
   for (name in names(result)) {
     testthat::expect_s3_class(result[[name]], 'tbl_df')
@@ -740,14 +752,37 @@ testthat::test_that('n7_read_inputs 按 issue_ids 过滤 fixtures 并按 fixture
     fixture_id = c('f1','f2','f3'), company_id = 'c1',
     quote_at = '2026-09-23T09:00:00Z', odds_home = '2.0', odds_draw = '3.0',
     odds_away = '4.0', source_url = 'u', stringsAsFactors = FALSE)
-  source <- list(kind = 'frames', tables = list(fixtures = fixtures, euro = euro))
-  cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  result <- n7_read_inputs(source, '26097', cutoff)
+  ledger <- data.frame(
+    issue_id = c('26097','26098'), fixture_id = c('f1','f3'), status = 'scheduled',
+    status_at = '2026-09-22T08:00:00Z', available_at = '2026-09-22T08:00:00Z',
+    source_url = 'u', stringsAsFactors = FALSE)
+  source <- list(kind = 'frames',
+                 tables = list(fixtures = fixtures, euro = euro, match_status = ledger))
+  result <- n7_read_inputs(source, '26097')
   # 只保留属于被请求期号的 fixtures。
   testthat::expect_setequal(result$fixtures$fixture_id, c('f1','f2'))
   testthat::expect_true(all(result$fixtures$issue_id == '26097'))
   # 依赖表按保留下来的 fixture_id 过滤，f3 必须被剔除。
   testthat::expect_setequal(result$euro$fixture_id, c('f1','f2'))
+  # 台账按复合键 (issue_id, fixture_id) 过滤：26098 的行不随 fixture_id 撞号进来。
+  testthat::expect_setequal(result$match_status$issue_id, '26097')
+})
+
+testthat::test_that('n7_read_inputs 在过滤之前、对着完整 fixtures 校验台账关系键', {
+  # 一条指向根本不存在的比赛的台账行，无论它属于哪一期，都必须在输入边界报错，
+  # 而不是在过滤后因为"没匹配上"被静默丢弃。
+  fixtures <- data.frame(
+    issue_id = '26097', fixture_id = 'f1', slot = '1', provider_id = 'p',
+    kickoff_at = '2026-09-23T10:00:00Z', handicap = '0', sale_state = 's',
+    source_url = 'u', stringsAsFactors = FALSE)
+  ledger <- data.frame(
+    issue_id = '26098', fixture_id = 'ghost', status = 'scheduled',
+    status_at = '2026-09-22T08:00:00Z', available_at = '2026-09-22T08:00:00Z',
+    source_url = 'u', stringsAsFactors = FALSE)
+  source <- list(kind = 'frames',
+                 tables = list(fixtures = fixtures, match_status = ledger))
+  testthat::expect_error(n7_read_inputs(source, '26097'),
+                         'not in fixtures')
 })
 
 testthat::test_that('n7_read_inputs 在期号无匹配时返回全部 typed-empty', {
@@ -759,9 +794,13 @@ testthat::test_that('n7_read_inputs 在期号无匹配时返回全部 typed-empt
     fixture_id = 'f1', company_id = 'c1', quote_at = '2026-09-23T09:00:00Z',
     odds_home = '2.0', odds_draw = '3.0', odds_away = '4.0', source_url = 'u',
     stringsAsFactors = FALSE)
-  source <- list(kind = 'frames', tables = list(fixtures = fixtures, euro = euro))
-  cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26098')
-  result <- n7_read_inputs(source, '26098', cutoff)
+  ledger <- data.frame(
+    issue_id = '26097', fixture_id = 'f1', status = 'scheduled',
+    status_at = '2026-09-22T08:00:00Z', available_at = '2026-09-22T08:00:00Z',
+    source_url = 'u', stringsAsFactors = FALSE)
+  source <- list(kind = 'frames',
+                 tables = list(fixtures = fixtures, euro = euro, match_status = ledger))
+  result <- n7_read_inputs(source, '26098')
   for (name in names(result)) {
     testthat::expect_equal(nrow(result[[name]]), 0L)
     # 空结果仍必须带完整列集合，否则下游无法无差别 rbind。
@@ -774,11 +813,11 @@ testthat::test_that('n7_read_inputs 对 fixtures 强制 (issue_id, fixture_id) �
     issue_id = '26097', fixture_id = c('f1','f1'), slot = c('1','2'), provider_id = 'p',
     kickoff_at = '2026-09-23T10:00:00Z', handicap = '0', sale_state = 's',
     source_url = 'u', stringsAsFactors = FALSE)
-  source <- list(kind = 'frames', tables = list(fixtures = duplicated_rows))
-  cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  testthat::expect_error(n7_read_inputs(source, '26097', cutoff), 'duplicate key')
+  source <- list(kind = 'frames',
+                 tables = list(fixtures = duplicated_rows,
+                               match_status = n7_typed_empty('match_status')))
+  testthat::expect_error(n7_read_inputs(source, '26097'), 'duplicate key')
 })
-
 
 # --- 逐函数边界测试（fixture）----------------------------------------------
 # 夹具是所有下游测试的基准：夹具错了会污染每一个断言，因此这里必须详尽。
@@ -810,10 +849,12 @@ testthat::test_that('n7_fixture_source_url 拒绝非法 kind 与 key', {
   testthat::expect_error(n7_fixture_source_url('fixture', c('a', NA)), 'key must be non-empty')
 })
 
-testthat::test_that('n7_make_fixture_issue 产出自洽的四张表与 truth 矩阵', {
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 5L, n_companies = 2L)
+testthat::test_that('n7_make_fixture_issue 产出自洽的五张表与 truth 矩阵', {
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 5L),
+                                 n_companies = 2L)
   testthat::expect_setequal(names(issue),
-                            c('fixtures','euro','totals','prematch_sp','truth'))
+                            c('fixtures','euro','totals','prematch_sp','match_status','truth'))
+  testthat::expect_equal(nrow(issue$match_status), 5L)
   testthat::expect_equal(nrow(issue$fixtures), 5L)
   testthat::expect_equal(nrow(issue$euro), 5L * 2L)
   testthat::expect_equal(nrow(issue$totals), 5L * 2L * 2L)
@@ -828,8 +869,8 @@ testthat::test_that('n7_make_fixture_issue 产出自洽的四张表与 truth 矩
 })
 
 testthat::test_that('n7_make_fixture_issue 的概率三元组和为 1 且赔率自洽', {
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 4L, n_companies = 3L,
-                                 margin = 1.06)
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 4L),
+                                 n_companies = 3L, margin = 1.06)
   testthat::expect_equal(unname(rowSums(issue$truth)), rep(1, 4L), tolerance = 1e-12)
   testthat::expect_silent(n7_check_probability_sum(issue$truth))
   # 赔率按 margin 加水位，因此隐含概率之和必须精确等于 margin。这是真正
@@ -848,132 +889,140 @@ testthat::test_that('n7_make_fixture_issue 的概率三元组和为 1 且赔率�
 })
 
 testthat::test_that('n7_make_fixture_issue 是确定性的：同 seed 同结果', {
-  a <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 4L, seed = 7L)
-  b <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 4L, seed = 7L)
+  a <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 4L), seed = 7L)
+  b <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 4L), seed = 7L)
   testthat::expect_identical(a$truth, b$truth)
   testthat::expect_identical(a$fixtures, b$fixtures)
   # 不同 seed 必须产出不同结果，否则 seed 参数形同虚设。
-  c <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 4L, seed = 8L)
+  c <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 4L), seed = 8L)
   testthat::expect_false(identical(a$truth, c$truth))
 })
 
-testthat::test_that('n7_make_fixture_issue 校验 local_date 的格式与真实性', {
-  testthat::expect_error(n7_make_fixture_issue('26097', '2026-9-2'), 'YYYY-MM-DD')
-  testthat::expect_error(n7_make_fixture_issue('26097', '20260922'), 'YYYY-MM-DD')
-  testthat::expect_error(n7_make_fixture_issue('26097', '22/09/2026'), 'YYYY-MM-DD')
-  testthat::expect_error(n7_make_fixture_issue('26097', NA), 'YYYY-MM-DD')
-  testthat::expect_error(n7_make_fixture_issue('26097', 20260922), 'YYYY-MM-DD')
-  testthat::expect_error(n7_make_fixture_issue('26097', c('2026-09-22','2026-09-23')),
-                         'YYYY-MM-DD')
-  # 格式对但日期不存在，必须报错而不是让 as.Date 悄悄回绕。
-  testthat::expect_error(n7_make_fixture_issue('26097', '2026-02-30'), 'real calendar date')
-  testthat::expect_error(n7_make_fixture_issue('26097', '2026-13-01'), 'real calendar date')
+testthat::test_that('n7_make_fixture_issue 校验 kickoff_at 是显式的 UTC POSIXct 向量', {
+  # 接口精化：开赛时刻由调用方显式给出，生成器不再推断决策 epoch。
+  testthat::expect_error(n7_make_fixture_issue('26097', '2026-09-23'), 'must be a POSIXct')
+  testthat::expect_error(n7_make_fixture_issue('26097', as.Date('2026-09-23')),
+                         'must be a POSIXct')
+  testthat::expect_error(n7_make_fixture_issue('26097', as.POSIXct(character(0), tz = 'UTC')),
+                         'must not be empty')
+  testthat::expect_error(
+    n7_make_fixture_issue('26097', as.POSIXct(c('2026-09-23 04:00:00', NA), tz = 'UTC')),
+    'must not be NA')
+  testthat::expect_error(n7_make_fixture_issue('26097', as.POSIXct(Inf, origin = '1970-01-01', tz = 'UTC')),
+                         'must be finite')
+  # 多场比赛可以同时开赛；身份由独立的比赛 ID 区分。
+  repeated <- as.POSIXct(rep('2026-09-23 04:00:00', 2L), tz = 'UTC')
+  testthat::expect_identical(n7_make_fixture_issue('26097', repeated)$fixtures$kickoff_at, repeated)
+})
+
+testthat::test_that('n7_make_fixture_issue 从非空 kickoff_at 向量推断比赛数', {
+  # 场次数由向量长度决定，不存在一个会与向量打架的 n_fixtures 形参。
+  two_days <- as.POSIXct(c('2026-09-23 04:00:00', '2026-09-24 04:00:00'), tz = 'UTC')
+  issue <- n7_make_fixture_issue('26097', two_days)
+  testthat::expect_equal(nrow(issue$fixtures), 2L)
+  testthat::expect_equal(dim(issue$truth), c(2L, 3L))
+  testthat::expect_equal(nrow(issue$match_status), 2L)
+  testthat::expect_identical(issue$fixtures$kickoff_at, two_days)
+  # 非 UTC 的 POSIXct 保留瞬时、只改时区属性。
+  shanghai <- as.POSIXct(two_days, tz = 'Asia/Shanghai')
+  converted <- n7_make_fixture_issue('26097', shanghai)
+  testthat::expect_identical(as.numeric(converted$fixtures$kickoff_at), as.numeric(two_days))
+  testthat::expect_identical(attr(converted$fixtures$kickoff_at, 'tzone'), 'UTC')
 })
 
 testthat::test_that('n7_make_fixture_issue 校验 issue_id', {
-  testthat::expect_error(n7_make_fixture_issue(26097, '2026-09-22'), 'must be character')
-  testthat::expect_error(n7_make_fixture_issue(NA_character_, '2026-09-22'), 'must not be NA')
-  testthat::expect_error(n7_make_fixture_issue('', '2026-09-22'), 'must not be empty')
+  kicks <- n7_kickoff_window('2026-09-22', 2L)
+  testthat::expect_error(n7_make_fixture_issue(26097, kicks), 'must be character')
+  testthat::expect_error(n7_make_fixture_issue(NA_character_, kicks), 'must not be NA')
+  testthat::expect_error(n7_make_fixture_issue('', kicks), 'must not be empty')
   # 长度 != 1 必须在此处报错，而不是崩在 tibble() 的列长检查里。
-  testthat::expect_error(n7_make_fixture_issue(c('a','b'), '2026-09-22'),
+  testthat::expect_error(n7_make_fixture_issue(c('a','b'), kicks),
                          'must name exactly one issue')
 })
 
-testthat::test_that('n7_make_fixture_issue 校验 n_fixtures 与 n_companies', {
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', n_fixtures = 0L),
+testthat::test_that('n7_make_fixture_issue 校验 n_companies', {
+  kicks <- n7_kickoff_window('2026-09-22', 2L)
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, n_companies = 0L),
                          'positive whole number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', n_fixtures = -1L),
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, n_companies = 2.5),
                          'positive whole number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', n_fixtures = 1.5),
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, n_companies = NA),
                          'positive whole number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', n_fixtures = NA),
-                         'positive whole number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', n_fixtures = '5'),
-                         'positive whole number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', n_companies = 0L),
-                         'positive whole number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', n_companies = 2.5),
-                         'positive whole number')
+  # n_fixtures 已从接口移除：多余的具名实参必须报错，而不是被静默忽略。
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, n_fixtures = 4L),
+                         'unused argument')
 })
 
-testthat::test_that('n7_make_fixture_issue 校验 kickoff_hour 在 0..23', {
-  # 回归：越界的小时会被日期运算静默回绕，产出没人要求的时间轴。
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', kickoff_hour = 25L),
-                         'whole hour in 0..23')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', kickoff_hour = -1L),
-                         'whole hour in 0..23')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', kickoff_hour = 23.5),
-                         'whole hour in 0..23')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', kickoff_hour = NA),
-                         'whole hour in 0..23')
-  # 边界值 0 与 23 必须放行。
-  testthat::expect_silent(n7_make_fixture_issue('26097','2026-09-22', kickoff_hour = 0L))
-  testthat::expect_silent(n7_make_fixture_issue('26097','2026-09-22', kickoff_hour = 23L))
+testthat::test_that('n7_make_fixture_issue 不再接受 local_date/kickoff_hour/tz', {
+  # 接口精化的另一半：决策 epoch 不属于生成器，这些形参必须彻底消失，不留兼容层。
+  kicks <- n7_kickoff_window('2026-09-22', 2L)
+  for (argument in c('local_date', 'kickoff_hour', 'tz')) {
+    testthat::expect_error(do.call(n7_make_fixture_issue,
+                                   stats::setNames(list('26097', kicks, 'x'), c('issue_id', 'kickoff_at', argument))),
+                           'unused argument')
+  }
 })
 
 testthat::test_that('n7_make_fixture_issue 校验 margin 为正有限值', {
-  # 回归：margin = 0 产出 Inf 赔率，margin = NA 产出 NA 赔率，两者都静默。
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', margin = 0),
+  kicks <- n7_kickoff_window('2026-09-22', 2L)
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, margin = 0),
                          'positive finite number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', margin = -1),
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, margin = -1),
                          'positive finite number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', margin = NA),
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, margin = NA),
                          'positive finite number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', margin = Inf),
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, margin = Inf),
                          'positive finite number')
-  testthat::expect_silent(n7_make_fixture_issue('26097','2026-09-22', margin = 1.06))
+  testthat::expect_silent(n7_make_fixture_issue('26097', kicks, margin = 1.06))
 })
 
-testthat::test_that('n7_make_fixture_issue 校验 tz 是已知时区', {
-  # 回归：未知时区会让 as.POSIXct 静默退回 UTC，使每个开赛时刻偏移。
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', tz = 'No/Such'),
-                         'not a known timezone')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', tz = ''),
-                         'non-empty timezone name')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', tz = NA),
-                         'non-empty timezone name')
-  testthat::expect_silent(n7_make_fixture_issue('26097','2026-09-22', tz = 'Asia/Shanghai'))
-  testthat::expect_silent(n7_make_fixture_issue('26097','2026-09-22', tz = 'UTC'))
+testthat::test_that('n7_make_fixture_issue 的合成状态报告是一条显式观测', {
+  kicks <- n7_kickoff_window('2026-09-22', 3L)
+  issue <- n7_make_fixture_issue('26097', kicks, match_status = 'scheduled')
+  testthat::expect_true(all(issue$match_status$status == 'scheduled'))
+  # status_at == available_at：合成源同时报告事件与观测。
+  testthat::expect_identical(issue$match_status$status_at, issue$match_status$available_at)
+  # 时间与 cutoff 解耦，锚在各自的 kickoff_at - 36h 上。
+  testthat::expect_identical(issue$match_status$available_at, kicks - 36 * 3600)
+  # 非 scheduled 取值也合法，用于构造"决策当时已知已取消"的场景。
+  cancelled <- n7_make_fixture_issue('26097', kicks, match_status = 'cancelled')
+  testthat::expect_true(all(cancelled$match_status$status == 'cancelled'))
+  testthat::expect_error(n7_make_fixture_issue('26097', kicks, match_status = 'nope'),
+                         'must be one of')
 })
 
 testthat::test_that('n7_make_fixture_issue 校验 seed', {
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', seed = NA), 'finite number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', seed = Inf), 'finite number')
-  testthat::expect_error(n7_make_fixture_issue('26097','2026-09-22', seed = c(1,2)), 'finite number')
+  testthat::expect_error(n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 3L), seed = NA), 'finite number')
+  testthat::expect_error(n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 3L), seed = Inf), 'finite number')
+  testthat::expect_error(n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 3L), seed = c(1,2)), 'finite number')
 })
 
-testthat::test_that('n7_make_fixture_issue 把开赛放在决策窗口内且报价严格早于 cutoff', {
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 3L, kickoff_hour = 10L)
-  # 开赛落在 D+1：local_date 是决策日 D。
-  kickoff_local <- format(issue$fixtures$kickoff_at, '%Y-%m-%d %H:%M', tz = 'Asia/Shanghai')
-  testthat::expect_true(all(substr(kickoff_local, 1L, 10L) == '2026-09-23'))
-  # 报价落在决策日 D 的上午，因此严格早于当日 20:00 CST（12:00Z）的 cutoff。
-  cutoff <- as.POSIXct('2026-09-22 12:00:00', tz = 'UTC')
-  testthat::expect_true(all(issue$euro$quote_at < cutoff))
-  testthat::expect_true(all(issue$totals$quote_at < cutoff))
-  testthat::expect_true(all(issue$prematch_sp$quote_at < cutoff))
-  # 报价也必须严格早于开赛，否则它就不是赛前信息。
-  testthat::expect_true(all(issue$euro$quote_at < issue$fixtures$kickoff_at[1]))
+testthat::test_that('n7_make_fixture_issue 把报价与状态锚在各自的 kickoff_at - 36h', {
+  kicks <- n7_kickoff_window('2026-09-22', 3L)
+  issue <- n7_make_fixture_issue('26097', kicks)
+  # 报价与任何 cutoff 无关：它只相对本场开赛。公司错开是已声明的小幅偏移。
+  matched_kickoff <- issue$fixtures$kickoff_at[match(issue$euro$fixture_id, issue$fixtures$fixture_id)]
+  testthat::expect_true(all(issue$euro$quote_at >= matched_kickoff - 36 * 3600))
+  testthat::expect_true(all(issue$euro$quote_at <= matched_kickoff - 36 * 3600 + 120))
+  testthat::expect_true(all(issue$prematch_sp$quote_at == rep(kicks, each = 3L) - 36 * 3600))
+  # 报价必须严格早于开赛，否则它就不是赛前信息。
+  testthat::expect_true(all(issue$euro$quote_at < matched_kickoff))
 })
 
-testthat::test_that('n7_make_fixture_issue 的开赛时间在 48 场内保持同一自然日', {
-  # 30 分钟错开必须让整期赛程留在 D+1 这一天内，否则决策窗口会切掉尾部。
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 48L, kickoff_hour = 10L)
-  kickoff_local <- format(issue$fixtures$kickoff_at, '%Y-%m-%d', tz = 'Asia/Shanghai')
-  testthat::expect_true(all(kickoff_local == '2026-09-23'))
-})
-
-testthat::test_that('n7_make_fixture_issue 的报价在 48 场内仍严格早于 cutoff', {
-  # 大期程也不得让尾部报价越过 20:00 CST 的 epoch。
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 48L)
-  cutoff <- as.POSIXct('2026-09-22 12:00:00', tz = 'UTC')
-  testthat::expect_true(all(issue$euro$quote_at < cutoff))
-  testthat::expect_true(all(issue$totals$quote_at < cutoff))
-  testthat::expect_true(all(issue$prematch_sp$quote_at < cutoff))
+testthat::test_that('n7_make_fixture_issue 保留跨日的同一期赛程', {
+  # 多日赛程不再是生成器拼出来的：调用方给出两天，两天的比赛都留在同一期里。
+  two_days <- as.POSIXct(c('2026-09-23 04:00:00', '2026-09-24 04:00:00'), tz = 'UTC')
+  issue <- n7_make_fixture_issue('26097', two_days)
+  days <- format(issue$fixtures$kickoff_at, '%Y-%m-%d', tz = 'UTC')
+  testthat::expect_identical(unique(days), c('2026-09-23', '2026-09-24'))
+  # 大期程也不得让尾部报价越过任何已声明的锚点。
+  many <- n7_kickoff_window('2026-09-22', 56L, step_seconds = 0)
+  big <- n7_make_fixture_issue('26097', many)
+  testthat::expect_true(all(big$euro$quote_at <= many[1] - 36 * 3600 + 120))
 })
 
 testthat::test_that('n7_make_fixture_issue 的每行都带 synthetic source_url', {
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 3L)
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 3L))
   for (name in c('fixtures','euro','totals','prematch_sp')) {
     urls <- issue[[name]]$source_url
     testthat::expect_true(all(grepl('^synthetic://n7-pipeline/', urls)))
@@ -982,7 +1031,7 @@ testthat::test_that('n7_make_fixture_issue 的每行都带 synthetic source_url'
 })
 
 testthat::test_that('n7_make_fixture_issue 的 fixture_id 与 slot 一致且唯一', {
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 6L)
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 6L))
   testthat::expect_identical(issue$fixtures$fixture_id,
                              sprintf('26097_%03d', 1:6))
   testthat::expect_identical(issue$fixtures$slot, 1:6)
@@ -995,7 +1044,7 @@ testthat::test_that('n7_fixture_source 要求至少一个期', {
 })
 
 testthat::test_that('n7_fixture_source 拒绝非期 list 与缺表的期', {
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 2L)
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 2L))
   testthat::expect_error(n7_fixture_source(list(a = 1)), 'is missing')
   testthat::expect_error(n7_fixture_source('x'), 'must be a generated issue list')
   incomplete <- issue; incomplete$euro <- NULL
@@ -1005,14 +1054,14 @@ testthat::test_that('n7_fixture_source 拒绝非期 list 与缺表的期', {
 })
 
 testthat::test_that('n7_fixture_source 包装单期与多期', {
-  one <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = 3L, seed = 1L)
+  one <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', 3L), seed = 1L)
   source <- n7_fixture_source(one)
   testthat::expect_identical(source$kind, 'frames')
   testthat::expect_setequal(names(source$tables),
-                            c('fixtures','euro','totals','prematch_sp'))
+                            c('fixtures','euro','totals','prematch_sp','match_status'))
   testthat::expect_equal(nrow(source$tables$fixtures), 3L)
   # 多期：同名表纵向合并，期号由 issue_id 携带。
-  two <- n7_make_fixture_issue('26098', '2026-09-22', n_fixtures = 4L, seed = 2L)
+  two <- n7_make_fixture_issue('26098', n7_kickoff_window('2026-09-22', 4L), seed = 2L)
   source2 <- n7_fixture_source(one, two)
   testthat::expect_equal(nrow(source2$tables$fixtures), 7L)
   testthat::expect_setequal(unique(source2$tables$fixtures$issue_id),
