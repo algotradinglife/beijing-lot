@@ -22,7 +22,7 @@ NULL
 #'   Python 后端的 `canonical_columns()` 必须逐列一致。主键是
 #'   `(issue_id, slot)`；`slot` 是那期内的场号。
 #'
-#'   时间列（`kickoff_at` / `sale_end_at` / `observed_at`）一律为 **UTC**
+#'   时间列（`kickoff_at` / `sale_end_at` / `observed_at`）一律为北京时间 **Asia/Shanghai**
 #'   POSIXct。`kickoff_hhmm` 与 `sale_end_raw` 保留来源的原始显示文本，
 #'   与解析后的时刻分开存放：来源只给了 `HH:mm` 时 `kickoff_at` 为 `NA`，
 #'   绝不借用期号日期补全。
@@ -46,7 +46,7 @@ issue_schedule_columns <- function() {
 #' @return 具名字符向量，名字为列名，值为
 #'   `"character"` / `"integer"` / `"double"` / `"POSIXct"`。
 #' @details 类型在 R 边界强制转换，不做静默的隐式解析：时间列必须已经是带
-#'   时区的 POSIXct（后端返回 ISO-8601 UTC 字符串，由本模块显式解析），
+#'   Asia/Shanghai 时区的 POSIXct（后端 UTC 时刻由本模块显式转换），
 #'   `slot` 必须是整数。
 #' @export
 issue_schedule_types <- function() {
@@ -74,7 +74,7 @@ issue_schedule_empty <- function() {
       character = character(0),
       integer = integer(0),
       double = numeric(0),
-      POSIXct = lubridate::as_datetime(numeric(0), tz = "UTC"),
+      POSIXct = lubridate::as_datetime(numeric(0), tz = "Asia/Shanghai"),
       stop("issue_schedule_empty: unsupported type ", types[[column]])
     )
   }
@@ -252,7 +252,7 @@ issue_schedule_column_vector <- function(values, what) {
   if (inherits(template, "POSIXct")) {
     return(do.call(c, lapply(values, function(value) {
       if (is.null(value) || !length(value) || (is.atomic(value) && all(is.na(value)))) {
-        return(lubridate::as_datetime(NA_real_, tz = "UTC"))
+        return(lubridate::as_datetime(NA_real_, tz = "Asia/Shanghai"))
       }
       value
     })))
@@ -267,7 +267,7 @@ issue_schedule_column_vector <- function(values, what) {
 #' @param data data.frame，列集合必须与 [issue_schedule_columns()] 完全一致。
 #' @return 规范 tibble。
 #' @details 缺列 / 多列一律 `stop()`：不静默丢列，也不让调用方以为数据被采纳。
-#'   时间列按 ISO-8601 解析为 UTC；`NA` 原样保留。
+#'   时间列按 ISO-8601 解析为北京时间 Asia/Shanghai；`NA` 原样保留。
 #' @keywords internal
 issue_schedule_coerce <- function(data) {
   expected <- issue_schedule_columns()
@@ -359,17 +359,17 @@ issue_schedule_double <- function(value, what) {
   return(as.numeric(numeric_value))
 }
 
-#' 把 ISO-8601 字符串列解析为 UTC POSIXct
+#' 把 ISO-8601 字符串列解析为北京时间 POSIXct
 #'
 #' @param value 字符向量（UTC 或带偏移的 ISO-8601），允许 NA。
 #' @param what 长度 1 的列名标签，仅用于错误信息。
-#' @return UTC POSIXct 向量。
+#' @return Asia/Shanghai POSIXct 向量。
 #' @details `NA` 与空串均为 `NA`（来源确实没有给出时刻）。可解析但带非 UTC
-#'   偏移的字符串按同一时刻换算到 UTC；不可解析的非空值 `stop()`——把解析失败
+#'   偏移的字符串按同一时刻换算到 Asia/Shanghai；不可解析的非空值 `stop()`——把解析失败
 #'   变成静默缺失值会伪造"来源没给时间"的假象。
 #' @keywords internal
 issue_schedule_timestamp <- function(value, what) {
-  if (inherits(value, "POSIXct")) return(lubridate::with_tz(value, "UTC"))
+  if (inherits(value, "POSIXct")) return(lubridate::with_tz(value, "Asia/Shanghai"))
   value <- as.character(value)
   out <- lubridate::as_datetime(rep(NA_real_, length(value)), tz = "UTC")
   present <- !is.na(value) & nzchar(value)
@@ -382,7 +382,7 @@ issue_schedule_timestamp <- function(value, what) {
     }
     out[present] <- parsed
   }
-  attr(out, "tzone") <- "UTC"
+  attr(out, "tzone") <- "Asia/Shanghai"
   return(out)
 }
 

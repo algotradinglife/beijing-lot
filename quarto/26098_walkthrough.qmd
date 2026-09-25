@@ -38,17 +38,24 @@ refresh_schedule <- FALSE
 # 可指定保存过的规范 schedule.rds；不会使用旧的错误 schedule.csv。
 schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
 
-# 选择实际要回放/执行的北京时间，例如 "2026-09-25 20:00:00"。
-# 不默认替你选择过去或未来时点；当前采集不能伪装为过去可见。
-decision_text <- Sys.getenv("BEIDAN_DECISION_AT", unset = "")
-settlement_text <- Sys.getenv("BEIDAN_SETTLEMENT_AT", unset = "")
-decision_at <- if (nzchar(decision_text)) lubridate::ymd_hms(decision_text, tz = "Asia/Shanghai") else NULL
-settlement_at <- if (nzchar(settlement_text)) {
-  lubridate::with_tz(lubridate::ymd_hms(settlement_text, tz = "Asia/Shanghai"), "UTC")
-} else NULL
+# 直接填写北京时间；这是待核对的回放示例，不代表数据已满足该时点。
+# 之后采集的数据不能冒充当时已经可见的历史快照。
+decision_at <- lubridate::ymd_hms(
+  "2026-09-25 20:00:00", tz = "Asia/Shanghai"
+)
+
+# 先测试决策流程；拿到真实结算数据后，再填写复盘时点。
+settlement_at <- NULL
+# settlement_at <- lubridate::ymd_hms(
+#   "2026-09-28 20:00:00", tz = "Asia/Shanghai"
+# )
 stopifnot(is.null(decision_at) || !is.na(decision_at),
           is.null(settlement_at) || !is.na(settlement_at))
 ```
+
+`decision_at` 是下注决策时点，用于限制当时可见的赛程、状态和报价；`settlement_at` 是复盘时点，用于限制可使用的结算信息，不是单场完场时间。两者直接在本块填写，无须设置环境变量。`settlement_at = NULL` 表示结算步骤尚未就绪。
+
+这里的决策时间只是示例。若快照采集晚于该时点，且没有可信的历史可用时间证据，则不能据此还原该时点的决策；应先核对实际输入再确定时间。
 
 ## 2. 加载源码并确认接口
 
@@ -57,6 +64,9 @@ stopifnot(is.null(decision_at) || !is.na(decision_at),
 ```{r}
 #| label: load-package
 devtools::load_all(package_dir, quiet = TRUE)
+if (!"fetch_issue_schedule" %in% getNamespaceExports("beidan")) {
+  stop("当前加载的 beidan 源码缺少 fetch_issue_schedule；请先同步已验收的 package 代码，再重新加载。")
+}
 stopifnot(all(c("raw_dir", "backend", "pages") %in%
                 names(formals(beidan::fetch_issue_schedule))))
 print(utils::packageVersion("beidan"))
@@ -73,6 +83,7 @@ model_config <- list(rho = -0.14, total_bounds = c(0.1, 16), tail_tolerance = 1e
 #| label: schedule-source
 schedule <- NULL
 if (refresh_schedule) {
+  message("正在请求网站采集当前赛程")
   backend <- beidan::python_backend(python)
   schedule <- beidan::fetch_issue_schedule(
     issue_id, raw_dir = file.path(work_dir, "raw"), backend = backend
@@ -80,9 +91,23 @@ if (refresh_schedule) {
   dir.create(dirname(schedule_file), recursive = TRUE, showWarnings = FALSE)
   saveRDS(schedule, schedule_file)
 } else if (file.exists(schedule_file)) {
-  schedule <- readRDS(schedule_file)
+  message("读取本地快照，未请求网站：", schedule_file)
+  schedule <- readRDS(schedule_file) |>
+    dplyr::mutate(dplyr::across(where(lubridate::is.POSIXct),
+      ~ lubridate::with_tz(.x, "Asia/Shanghai")))
 } else {
   cat("未就绪：将 refresh_schedule 改为 TRUE 后执行本块，或提供 BEIDAN_SCHEDULE_RDS。\n")
+}
+```
+
+`refresh_schedule = FALSE` 只读取本地快照，结果不会自动更新。需要网站当前结果时，在执行本块前运行 `refresh_schedule <- TRUE`，然后重跑本块；采集成功后可设回 `FALSE`。下方时间是采集时间，不保证来源网站本身已更新。
+
+```{r}
+#| label: schedule-freshness
+if (!is.null(schedule)) {
+  print(dplyr::distinct(dplyr::transmute(
+    schedule, observed_at_bjt = lubridate::with_tz(observed_at, "Asia/Shanghai")
+  )))
 }
 ```
 
@@ -214,8 +239,8 @@ diagnosis <- NULL
 if (file.exists(settlements_file)) settlements <- readRDS(settlements_file)
 if (!is.null(result) && !is.null(settlements) && !is.null(settlement_at)) {
   beidan::match_validate_table(settlements, "settlements")
-  settled <- beidan::parlay_settle_plan(result$plan, settlements, as_of = settlement_at)
-  diagnosis <- beidan::parlay_diagnose_plan(result, settlements, as_of = settlement_at)
+  settled <- beidan::parlay_settle_plan(result$plan, settlements, as_of = lubridate::with_tz(settlement_at, "UTC"))
+  diagnosis <- beidan::parlay_diagnose_plan(result, settlements, as_of = lubridate::with_tz(settlement_at, "UTC"))
   knitr::kable(settled$ticket_returns)
   knitr::kable(diagnosis)
 } else cat("未结算：需要已冻结计划、真实结算表和明确的 settlement_at。\n")

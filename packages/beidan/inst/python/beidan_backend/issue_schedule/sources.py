@@ -30,10 +30,12 @@ from __future__ import annotations
 
 import re
 import math
+import warnings
 from html import unescape as html_unescape
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlsplit, parse_qs
 
 from bs4 import BeautifulSoup
 
@@ -43,7 +45,6 @@ NOWSCORE_STATUS_FINISHED = "完场"
 NOWSCORE_STATUS_CLOSED = "截止"
 
 _ROW_ID_RE = re.compile(r"^row_(\d+)$")
-_PROVIDER_ID_RE = re.compile(r"Panlu\.aspx\?id=(\d+)", re.I)
 _KICKOFF_TITLE_RE = re.compile(r"比赛时间\s*[：:]\s*(\d{1,2}:\d{2})")
 _CLOSING_TITLE_RE = re.compile(r"截止时间\s*[：:]\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})")
 _CLOCK_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
@@ -108,12 +109,14 @@ def parse_nowscore_rows(
     for tr in soup.select("tr[id^=row_]"):
         match = _ROW_ID_RE.match(tr.get("id") or "")
         if match is None:
-            continue
+            raise SourceParseError("nowscore match row has invalid slot")
         cells = tr.find_all("td", recursive=False)
         if len(cells) < 9:
             raise SourceParseError("truncated nowscore schedule row")
         slot = int(match.group(1))
-        provider_match = _PROVIDER_ID_RE.search(tr.decode())
+        if slot <= 0:
+            raise SourceParseError("nowscore match row has invalid slot")
+        provider_match_id = _nowscore_provider_id(tr)
         status_cell = cells[3]
         display = _text(status_cell)
         sale_end_raw = _attr_title(status_cell.get("title"))
@@ -137,7 +140,7 @@ def parse_nowscore_rows(
         rows.append(
             ProviderRow(
                 provider="nowscore",
-                provider_match_id=provider_match.group(1) if provider_match else "",
+                provider_match_id=provider_match_id,
                 slot=slot,
                 league=_text(cells[1]),
                 home_name=home,
@@ -157,7 +160,7 @@ def parse_nowscore_rows(
                 raw_row=tr.decode(),
                 observed_at=observed_at,
                 source_url=source_url,
-                kelly_url=_provider_url(provider_match.group(1)) if provider_match else None,
+                kelly_url=_provider_url(provider_match_id) if provider_match_id else None,
                 extras=extras,
             )
         )
@@ -190,10 +193,11 @@ def parse_500_rows(
         if not info:
             raise SourceParseError("500 match row has no value fields")
         fid = tr.get("fid")
-        if fid is None or not fid.lstrip("-").isdigit() or int(fid) <= 0:
-            # Cancelled placeholders (fid=-1) are kept by the old page format;
-            # they carry no match and must not be mistaken for one.
+        if fid == "-1":
+            warnings.warn("500 excluded one fid=-1 placeholder row", UserWarning)
             continue
+        if fid is None or not fid.isdigit() or int(fid) <= 0:
+            raise SourceParseError("500 match row has invalid fid")
         cells = tr.find_all("td", recursive=False)
         if len(cells) < 9:
             raise SourceParseError("truncated nowscore schedule row")
@@ -348,8 +352,15 @@ def _attr_instant(title: str | None) -> str | None:
     """Extract ``截止时间：YYYY-MM-DD HH:MM`` from a title attribute."""
     if not title:
         return None
-    match = _CLOSING_TITLE_RE.search(title)
-    return match.group(1) if match else None
+    text = title.strip()
+    match = _CLOSING_TITLE_RE.fullmatch(text)
+    if match:
+        return match.group(1)
+    clock = re.sub(r"^截止时间\s*[：:]\s*", "", text)
+    if _is_clock(clock):
+        return None
+    raise SourceParseError(f"invalid sales deadline: {title!r}")
+
 
 
 def _parse_sale_end(title: str | None) -> datetime | None:
@@ -363,12 +374,31 @@ def _parse_sale_end(title: str | None) -> datetime | None:
     text = _attr_instant(title)
     if text is None:
         return None
-    parsed = datetime.strptime(text, "%Y-%m-%d %H:%M")
+    try:
+        parsed = datetime.strptime(text, "%Y-%m-%d %H:%M")
+    except ValueError as error:
+        raise SourceParseError(f"invalid sales deadline: {title!r}") from error
     return parsed.replace(tzinfo=timezone(timedelta(hours=8)))
 
 
 def _attr_title(title: str | None) -> str | None:
     return title.strip() if title else None
+
+
+def _nowscore_provider_id(row: Any) -> str:
+    """Parse complete Panlu query IDs; reject malformed or conflicting identifiers."""
+    ids = set()
+    for link in row.select("a[href]"):
+        url = urlsplit(link["href"])
+        if not url.path.lower().endswith("/panlu.aspx"):
+            continue
+        values = parse_qs(url.query, keep_blank_values=True).get("id", [])
+        if len(values) != 1 or not values[0].isascii() or not values[0].isdigit() or int(values[0]) <= 0:
+            raise SourceParseError("invalid nowscore provider id")
+        ids.add(values[0])
+    if len(ids) > 1:
+        raise SourceParseError("conflicting nowscore provider ids")
+    return next(iter(ids), "")
 
 
 def _provider_url(provider_match_id: str) -> str:
@@ -405,7 +435,7 @@ def _score_or_none(value: str | None) -> str | None:
 def _to_float(value: Any) -> float | None:
     if value is None:
         return None
-    text = str(value).replace("+", "").strip()
+    text = str(value).strip()
     if not text:
         return None
     try:

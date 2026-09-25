@@ -15,6 +15,6 @@ issue_schedule_types()
 }
 \details{
 类型在 R 边界强制转换，不做静默的隐式解析：时间列必须已经是带
-时区的 POSIXct（后端返回 ISO-8601 UTC 字符串，由本模块显式解析），
+Asia/Shanghai 时区的 POSIXct（后端 UTC 时刻由本模块显式转换），
 \code{slot} 必须是整数。
 }

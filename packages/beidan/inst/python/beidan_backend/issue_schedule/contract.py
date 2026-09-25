@@ -412,8 +412,9 @@ def validate_canonical(rows: list[dict[str, Any]]) -> None:
                 )
         kickoff = row["kickoff_at"]
         if kickoff is not None and row["kickoff_hhmm"] is not None:
-            resolved = kickoff.astimezone(SOURCE_TZ).strftime("%H:%M")
-            if resolved != row["kickoff_hhmm"]:
+            local_kickoff = kickoff.astimezone(SOURCE_TZ)
+            resolved = (local_kickoff.hour, local_kickoff.minute)
+            if resolved != tuple(int(part) for part in row["kickoff_hhmm"].split(":")):
                 raise IssueScheduleError(
                     f"slot {row['slot']}: kickoff_at {kickoff.isoformat()} disagrees "
                     f"with kickoff_hhmm {row['kickoff_hhmm']!r}"
@@ -433,7 +434,9 @@ def validate_canonical(rows: list[dict[str, Any]]) -> None:
                 f"slot {row['slot']}: kickoff {kickoff.isoformat()} is before its own "
                 f"sales deadline {closing.isoformat()}"
             )
-        if not str(row["provider_id"]).strip() and row["identity_method"] not in (
+        if not any(str(row[key]).strip() for key in (
+            "provider_id_500", "provider_id_nowscore"
+        )) and row["identity_method"] not in (
             "unresolved",
             "conflict",
         ):

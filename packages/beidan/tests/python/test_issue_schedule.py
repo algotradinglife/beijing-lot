@@ -649,3 +649,118 @@ def test_500_malformed_index_never_silently_drops_match(bad_index):
     with pytest.raises(SourceParseError, match="index"):
         parse_500_rows(page, issue_id="26098", observed_at=OBSERVED,
                        source_url="https://trade.500.com/bjdc/?expect=26098")
+
+
+def test_missing_primary_id_never_uses_secondary_namespace():
+    left = _row(1, provider="500", provider_match_id="500-only", home_name="Other")
+    right = _row(1, provider_match_id="")
+    rows, _ = _canonical([left], [right])
+    assert rows[0]["provider_id"] == ""
+    assert rows[0]["provider_id_500"] == "500-only"
+    assert rows[0]["identity_method"] == "conflict"
+
+
+@pytest.mark.parametrize("bad_fid", ["broken1495168", "", "0", "-2"])
+def test_500_malformed_id_is_not_a_placeholder(bad_fid):
+    import re
+    page = re.sub(r'fid=[\"\']1495168[\"\']', 'fid="' + bad_fid + '"', PAGE_500_MINI.decode("gb18030"), count=1)
+    assert page != PAGE_500_MINI.decode("gb18030")
+    with pytest.raises(SourceParseError, match="fid"):
+        parse_500_rows(page, issue_id="26098", observed_at=OBSERVED,
+                       source_url="https://trade.500.com/bjdc/?expect=26098")
+
+
+@pytest.mark.parametrize("bad_slot", ["0", "broken"])
+def test_nowscore_invalid_slot_rejected(bad_slot):
+    page = NOWSCORE_MINI.replace('row_1"', 'row_' + bad_slot + '"', 1)
+    assert page != NOWSCORE_MINI
+    with pytest.raises(SourceParseError, match="slot"):
+        parse_nowscore_rows(page, issue_id="26098", observed_at=OBSERVED,
+                           source_url="https://cp.nowscore.com/buy/DanChang.aspx?all=1&issueNum=26098")
+
+
+def test_500_missing_fid_fails_and_documented_placeholder_is_reported():
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(PAGE_500_MINI.decode("gb18030"), "lxml")
+    row = soup.select_one("tr.vs_lines")
+    del row["fid"]
+    with pytest.raises(SourceParseError, match="fid"):
+        parse_500_rows(str(soup), issue_id="26098", observed_at=OBSERVED,
+                       source_url="https://trade.500.com/bjdc/?expect=26098")
+    row["fid"] = "-1"
+    with pytest.warns(UserWarning, match="excluded one fid=-1 placeholder"):
+        rows = parse_500_rows(str(soup), issue_id="26098", observed_at=OBSERVED,
+                              source_url="https://trade.500.com/bjdc/?expect=26098")
+    assert [row.slot for row in rows] == [6, 11, 146]
+
+
+def test_unequal_slot_sets_retain_secondary_without_primary_id(tmp_path):
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(NOWSCORE_MINI, "lxml")
+    soup.select_one("#row_1").decompose()
+    result = _fetch(tmp_path, nowscore=str(soup).encode("utf-8"))
+    rows = result.rows
+    assert len(rows) == 4
+    row = next(row for row in rows if row["slot"] == 1)
+    assert row["provider_id"] == ""
+    assert row["provider_id_nowscore"] == ""
+    assert row["provider_id_500"] == "1495168"
+    assert row["kickoff_at"] is None
+    assert row["identity_method"] == "provider_id"
+    assert any("primary source nowscore published no row" in note for note in result.diagnostics)
+
+
+def test_single_digit_kickoff_hour_is_preserved_and_valid(tmp_path):
+    page = NOWSCORE_MINI.replace(">00:00<", ">0:00<")
+    assert page != NOWSCORE_MINI
+    result = _fetch(tmp_path, nowscore=page.encode("utf-8"))
+    row = next(row for row in result.rows if row["slot"] == 11)
+    assert row["kickoff_hhmm"] == "0:00"
+    assert row["kickoff_at"].astimezone(SOURCE_TZ).isoformat() == "2026-09-26T00:00:00+08:00"
+
+
+@pytest.mark.parametrize("bad_id", ["3094768broken", "", "0", "3094768&id=123"])
+def test_nowscore_complete_provider_id_is_validated(tmp_path, bad_id):
+    page = NOWSCORE_MINI.replace("Panlu.aspx?id=3094768", "Panlu.aspx?id=" + bad_id)
+    with pytest.raises(SourceParseError, match="provider id"):
+        _fetch(tmp_path, nowscore=page.encode("utf-8"))
+
+
+def test_nowscore_id_leading_zeros_preserved(tmp_path):
+    page = NOWSCORE_MINI.replace("Panlu.aspx?id=3094768", "Panlu.aspx?id=003094768")
+    row = _fetch(tmp_path, nowscore=page.encode("utf-8")).rows[0]
+    assert row["provider_id"] == "003094768"
+
+
+@pytest.mark.parametrize("deadline", ["2026-09-XX 12:55", "2026-09-31 12:55", "2026-09-25 12:55broken"])
+def test_malformed_deadline_is_not_absent(tmp_path, deadline):
+    page = NOWSCORE_MINI.replace("2026-09-25 12:55", deadline)
+    assert page != NOWSCORE_MINI
+    with pytest.raises(SourceParseError, match="deadline"):
+        _fetch(tmp_path, nowscore=page.encode("utf-8"))
+
+
+@pytest.mark.parametrize("value", ["1+2", "++1", "1+"])
+def test_handicap_embedded_plus_rejected(value):
+    from beidan_backend.issue_schedule.sources import _to_float
+    with pytest.raises(SourceParseError, match="handicap"):
+        _to_float(value)
+
+
+def test_nowscore_conflicting_links_rejected(tmp_path):
+    page = NOWSCORE_MINI.replace("Panlu.aspx?id=3094768", "Panlu.aspx?id=123", 1)
+    with pytest.raises(SourceParseError, match="conflicting"):
+        _fetch(tmp_path, nowscore=page.encode("utf-8"))
+
+
+def test_absent_or_clock_only_deadline_remains_unknown():
+    from beidan_backend.issue_schedule.sources import _parse_sale_end, _to_float
+    assert _parse_sale_end(None) is None
+    assert _parse_sale_end("截止时间：12:55") is None
+    assert _to_float("+1") == 1.0
+
+
+@pytest.mark.parametrize("body", ["中文", '<meta charset="gb2312">中文'])
+def test_quoted_http_charset_takes_precedence(body):
+    from beidan_backend.issue_schedule.decode import decode_response
+    assert decode_response(body.encode("utf-8"), 'text/html; charset="utf-8"') == body

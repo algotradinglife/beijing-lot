@@ -282,9 +282,7 @@ def build_canonical_rows(
                 or (left.sale_end_raw if left else None),
                 "sale_end_date_source": "title-attribute" if sale_end_at else "absent",
                 "score": pick_score(right),
-                "provider_id": (picked.provider_match_id if picked else "")
-                or (left.provider_match_id if left else "")
-                or (right.provider_match_id if right else ""),
+                "provider_id": picked.provider_match_id if picked else "",
                 "provider_id_500": left.provider_match_id if left else "",
                 "provider_id_nowscore": right.provider_match_id if right else "",
                 "home_500": left.home_name if left else "",

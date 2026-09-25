@@ -17,7 +17,7 @@ issue_schedule_columns()
 Python 后端的 \code{canonical_columns()} 必须逐列一致。主键是
 \verb{(issue_id, slot)}；\code{slot} 是那期内的场号。
 
-时间列（\code{kickoff_at} / \code{sale_end_at} / \code{observed_at}）一律为 \strong{UTC}
+时间列（\code{kickoff_at} / \code{sale_end_at} / \code{observed_at}）一律为北京时间 \strong{Asia/Shanghai}
 POSIXct。\code{kickoff_hhmm} 与 \code{sale_end_raw} 保留来源的原始显示文本，
 与解析后的时刻分开存放：来源只给了 \code{HH:mm} 时 \code{kickoff_at} 为 \code{NA}，
 绝不借用期号日期补全。

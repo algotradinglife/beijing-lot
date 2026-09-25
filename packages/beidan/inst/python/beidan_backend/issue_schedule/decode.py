@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import codecs
 import re
+from email.message import Message
 
 #: Charset aliases whose real coverage is wider than the label suggests. A page
 #: labelled gb2312 that contains GBK-only characters is normal on Chinese sites,
@@ -29,7 +30,6 @@ _META_HTTP_EQUIV_RE = re.compile(
     rb"""<meta[^>]+http-equiv\s*=\s*["']?content-type["']?[^>]+content\s*=\s*["'][^"']*charset=([A-Za-z0-9_\-]+)""",
     re.I,
 )
-_HEADER_CHARSET_RE = re.compile(r"charset\s*=\s*([A-Za-z0-9_\-]+)", re.I)
 
 
 class DecodeError(ValueError):
@@ -49,9 +49,11 @@ def declared_charset(body: bytes, content_type: str | None = None) -> str:
     @raises DecodeError when no charset is declared at all.
     """
     if content_type:
-        match = _HEADER_CHARSET_RE.search(content_type)
-        if match:
-            return _normalise(match.group(1))
+        header = Message()
+        header["Content-Type"] = content_type
+        charset = header.get_content_charset()
+        if charset:
+            return _normalise(charset)
     head = body[:4096]
     match = _META_CHARSET_RE.search(head) or _META_HTTP_EQUIV_RE.search(head)
     if match:

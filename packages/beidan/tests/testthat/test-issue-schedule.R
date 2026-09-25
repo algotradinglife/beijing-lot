@@ -12,7 +12,7 @@ testthat::test_that('issue schedule column and type contracts are aligned', {
   testthat::expect_identical(nrow(empty), 0L)
   testthat::expect_identical(names(empty), columns)
   testthat::expect_s3_class(empty$kickoff_at, 'POSIXct')
-  testthat::expect_identical(attr(empty$kickoff_at, 'tzone'), 'UTC')
+  testthat::expect_identical(attr(empty$kickoff_at, 'tzone'), 'Asia/Shanghai')
 })
 
 testthat::test_that('rows with real None fields become an equal-length tibble', {
@@ -58,7 +58,7 @@ testthat::test_that('coerce rejects fractional slots, bad numbers and non-charac
 
 testthat::test_that('timestamp parsing keeps NA and refuses unparsable instants', {
   parsed <- beidan:::issue_schedule_timestamp(c('2026-09-25T05:00:00Z', NA, ''), 'kickoff_at')
-  testthat::expect_identical(attr(parsed, 'tzone'), 'UTC')
+  testthat::expect_identical(attr(parsed, 'tzone'), 'Asia/Shanghai')
   testthat::expect_true(is.na(parsed[[2]]))
   testthat::expect_true(is.na(parsed[[3]]))
   testthat::expect_identical(format(parsed[[1]], '%Y-%m-%dT%H:%M:%S', tz = 'UTC'), '2026-09-25T05:00:00')
@@ -108,6 +108,9 @@ testthat::test_that('offline replay through reticulate returns the canonical tib
   testthat::expect_type(result$slot, 'integer')
   testthat::expect_s3_class(result$kickoff_at, 'POSIXct')
 
+  for (column in c('kickoff_at', 'sale_end_at', 'observed_at')) {
+    testthat::expect_identical(attr(result[[column]], 'tzone'), 'Asia/Shanghai')
+  }
   slot11 <- result[result$slot == 11L, ]
   testthat::expect_identical(format(slot11$kickoff_at, '%Y-%m-%dT%H:%M:%S',
                                     tz = 'Asia/Shanghai'), '2026-09-26T00:00:00')
@@ -173,4 +176,17 @@ testthat::test_that('Python mixed identifiers and nonfinite numbers fail convers
   }
   testthat::expect_error(beidan:::issue_schedule_double(Inf, 'handicap'), 'nonfinite')
   testthat::expect_error(beidan:::issue_schedule_double(NaN, 'handicap'), 'nonfinite')
+})
+
+
+testthat::test_that("all public schedule time columns use Beijing without shifting instants", {
+  empty <- issue_schedule_empty()
+  for (column in c("kickoff_at", "sale_end_at", "observed_at")) {
+    testthat::expect_identical(attr(empty[[column]], "tzone"), "Asia/Shanghai")
+  }
+  instant <- lubridate::ymd_hms("2026-09-25 16:00:00", tz = "UTC")
+  actual <- beidan:::issue_schedule_timestamp(instant, "kickoff_at")
+  testthat::expect_identical(attr(actual, "tzone"), "Asia/Shanghai")
+  testthat::expect_equal(as.numeric(actual), as.numeric(instant))
+  testthat::expect_identical(format(actual, "%Y-%m-%d %H:%M:%S"), "2026-09-26 00:00:00")
 })

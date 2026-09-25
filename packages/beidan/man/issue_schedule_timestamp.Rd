@@ -2,7 +2,7 @@
 % Please edit documentation in R/issue_schedule.R
 \name{issue_schedule_timestamp}
 \alias{issue_schedule_timestamp}
-\title{把 ISO-8601 字符串列解析为 UTC POSIXct}
+\title{把 ISO-8601 字符串列解析为北京时间 POSIXct}
 \usage{
 issue_schedule_timestamp(value, what)
 }
@@ -12,14 +12,14 @@ issue_schedule_timestamp(value, what)
 \item{what}{长度 1 的列名标签，仅用于错误信息。}
 }
 \value{
-UTC POSIXct 向量。
+Asia/Shanghai POSIXct 向量。
 }
 \description{
-把 ISO-8601 字符串列解析为 UTC POSIXct
+把 ISO-8601 字符串列解析为北京时间 POSIXct
 }
 \details{
 \code{NA} 与空串均为 \code{NA}（来源确实没有给出时刻）。可解析但带非 UTC
-偏移的字符串按同一时刻换算到 UTC；不可解析的非空值 \code{stop()}——把解析失败
+偏移的字符串按同一时刻换算到 Asia/Shanghai；不可解析的非空值 \code{stop()}——把解析失败
 变成静默缺失值会伪造"来源没给时间"的假象。
 }
 \keyword{internal}

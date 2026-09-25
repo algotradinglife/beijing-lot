@@ -17,6 +17,6 @@ issue_schedule_coerce(data)
 }
 \details{
 缺列 / 多列一律 \code{stop()}：不静默丢列，也不让调用方以为数据被采纳。
-时间列按 ISO-8601 解析为 UTC；\code{NA} 原样保留。
+时间列按 ISO-8601 解析为北京时间 Asia/Shanghai；\code{NA} 原样保留。
 }
 \keyword{internal}
