@@ -41,6 +41,7 @@ settlements_file <- file.path(work_dir, "settlements.rds")
 refresh_schedule <- FALSE
 # 身份判定与采集独立；FALSE 重放保存的真实 Jev 响应。
 refresh_identity <- FALSE
+refresh_settlements <- FALSE
 identity_receipt_file <- file.path(work_dir, "identity_receipt.rds")
 # 可指定保存过的规范 schedule.rds；不会使用旧的错误 schedule.csv。
 schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
@@ -282,29 +283,56 @@ strategy_config <- list(
   ranking = "probability_desc", budget_cny = 160,
   max_reuse = 1L, max_overlap = 6L, seed = 1L, unit_cap = 80L
 )
-if (!is.null(projected) && nrow(projected$fixtures) >= settings$n_legs) {
+# 已保存的方案优先重读；最新报价不会改变既有方案。
+plan_file <- file.path(work_dir, "plans", paste0(issue_id, "-",
+  format(decision_at, "%Y%m%d-%H%M%S", tz = "Asia/Shanghai"), ".rds"))
+save_decision <- FALSE # 决策时点到达、检查方案后设 TRUE；预览无需保存。
+if (file.exists(plan_file)) {
+  result <- beidan::parlay_read_result(plan_file, issue_id, decision_at)
+  message("重读已保存方案：", plan_file)
+} else if (!is.null(projected) && nrow(projected$fixtures) >= settings$n_legs) {
+
   result <- beidan::parlay_build_plan(projected, strategy_config)
+  if (save_decision) {
+    dir.create(dirname(plan_file), recursive = TRUE, showWarnings = FALSE)
+    beidan::parlay_save_result(result, plan_file, recorded_at = Sys.time())
+  } else message("当前为未保存预览，尚不能作为后续真实结算基线。")
+} else cat("未生成下注计划：先完成步骤7。\n")
+if (!is.null(result)) {
   knitr::kable(result$plan$group_legs)
   knitr::kable(result$funded$purchases)
-} else cat("未生成下注计划：先完成步骤7。\n")
+}
 ```
 
 此步骤只生成计划，不执行真实下单。下一次决策继续传入 `prior_purchases = result$history`；不能只传购买表，否则会丢失复用/重叠上下文。准备多个决策对象后，可用 `parlay_replay_issue()` 回放整期，不需要手写资金循环。
 
 ## 9. 真实结算与深度复盘
 
-只读取已准备好的规范结算 tibble RDS（其 schema 由 package 校验）。没有结算数据就保持未就绪，不能为了跑通把已购票设成中奖。
+刷新时采集真实赛果和开奖 SP，否则读取已保存快照。标签可用时间取真实观测时间；未完场或未开奖仍等待。结算始终重读已保存方案，不能用新行情重建后冒充原决策。
 
 ```{r}
 #| label: settlement
 settlements <- NULL
 settled <- NULL
 diagnosis <- NULL
-if (file.exists(settlements_file)) settlements <- readRDS(settlements_file)
-if (!is.null(result) && !is.null(settlements) && !is.null(settlement_at)) {
-  beidan::match_validate_table(settlements, "settlements")
-  settled <- beidan::parlay_settle_plan(result$plan, settlements, as_of = lubridate::with_tz(settlement_at, "UTC"))
-  diagnosis <- beidan::parlay_diagnose_plan(result, settlements, as_of = lubridate::with_tz(settlement_at, "UTC"))
+if (refresh_settlements && !is.null(schedule)) {
+  backend <- beidan::python_backend(python)
+  settlements <- beidan::fetch_issue_settlements(
+    schedule, raw_dir = file.path(work_dir, "settlement_raw"), backend = backend
+  )
+  dir.create(dirname(settlements_file), recursive = TRUE, showWarnings = FALSE)
+  saveRDS(settlements, settlements_file)
+} else if (file.exists(settlements_file)) settlements <- readRDS(settlements_file)
+if (!is.null(settlements)) {
+  knitr::kable(settlements)
+  print(attr(settlements, "diagnostics"))
+}
+if (file.exists(plan_file) && !is.null(settlements) && !is.null(settlement_at)) {
+  result <- beidan::parlay_read_result(plan_file, issue_id, decision_at)
+  settlement_input <- dplyr::mutate(settlements,
+    label_available_at = lubridate::with_tz(label_available_at, "UTC"))
+  settled <- beidan::parlay_settle_plan(result$plan, settlement_input, as_of = lubridate::with_tz(settlement_at, "UTC"))
+  diagnosis <- beidan::parlay_diagnose_plan(result, settlement_input, as_of = lubridate::with_tz(settlement_at, "UTC"))
   knitr::kable(settled$ticket_returns)
   knitr::kable(diagnosis)
 } else cat("未结算：需要已冻结计划、真实结算表和明确的 settlement_at。\n")
@@ -367,9 +395,20 @@ if (!purchase_count || !settled_count || pending_count > 0L || special_count > 0
 
 函数与测试映射：R身份items/request及两序列化helper、judge/replay对应`test-schedule-identity.R`；R赛程schema对应`test-issue-schedule.R`；Python来源截止保留对应`test_issue_schedule.py`。开发端`issue_schedule_walkthrough.R`验证本第4节真实回执离线重放，分析文档不包含testthat。审阅文件hash与本节之前QMD正文hash记录于`docs/reviews/518-context-review-manifest.json`。
 
+<!--
+方案持久化开发记录（#522）
+
+独立开发测试：`testthat::test_file("packages/beidan/tests/testthat/test-parlay-storage.R")`，21条断言通过，0失败/警告。测试不在本分析流程执行。`codex review` 对 storage 实现、测试、帮助及本文件第8/9节复审，结论无可操作缺陷；首轮发现的购买身份/时点绑定和结算/累计账本不一致已修复。审阅命令与日志保留在开发工作树 `.freeze-control/review2.log`；所审实现及本节追加前QMD的SHA256见 `docs/reviews/522-storage-reviewed-hashes.json`。完整QMD集成执行尚待盘口与结算接口合入验证；不代表正式决策或结算完成。
+-->
 <!-- #520 development evidence (not an analysis/test block):
 Reviewed runtime revision 95d18baa404b8b6ebede4ac79c4eeecac49204a8.
 Commands, findings/resolutions, actual data limits and reviewed file hashes:
 ../docs/reviews/520-market-review.md
 ../docs/reviews/520-market-reviewed-hashes.json
+-->
+
+<!-- #521/#522 final integrated review: no actionable defects.
+Evidence/commands/limits: ../docs/reviews/522-integrated-review.md
+Reviewed hashes including this QMD before this attestation: ../docs/reviews/522-integrated-reviewed-hashes.json
+Clean actual-data render passed; preview80tickets is not a saved20:00 decision or completed settlement.
 -->
