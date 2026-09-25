@@ -23,7 +23,7 @@ if (!nzchar(project_dir)) {
   project_dir <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
 }
 project_dir <- normalizePath(project_dir, mustWork = TRUE)
-package_dir <- file.path(project_dir, "packages", "beidan")
+package_dir <- Sys.getenv("BEIDAN_PACKAGE_DIR", unset = file.path(project_dir, "packages", "beidan"))
 python <- Sys.getenv("RETICULATE_PYTHON", unset = file.path(project_dir, ".venv", "bin", "python"))
 issue_id <- "26098"
 
@@ -31,6 +31,10 @@ issue_id <- "26098"
 work_dir <- file.path(project_dir, "inputs", "26098_walkthrough")
 schedule_file <- file.path(work_dir, "schedule.rds")
 market_dir <- file.path(work_dir, "market_inputs")
+markets_file <- file.path(work_dir, "markets.rds")
+refresh_markets <- FALSE
+market_slots <- 39L # 先以一场跑通；核对后改为所需场号。
+totals_company_ids <- "8" # Titan 大小球公司8：Bet365；不是欧赔公司ID。
 settlements_file <- file.path(work_dir, "settlements.rds")
 
 # 首次现场采集时改为 TRUE，采集后改回 FALSE，避免反复请求。
@@ -101,7 +105,7 @@ if (refresh_schedule) {
 }
 ```
 
-`refresh_schedule = FALSE` 只读取本地快照，结果不会自动更新。需要网站当前结果时，在执行本块前运行 `refresh_schedule <- TRUE`，然后重跑本块；采集成功后可设回 `FALSE`。下方时间是采集时间，不保证来源网站本身已更新。
+`refresh_schedule = FALSE` 只读取本地快照，结果不会自动更新。需要网站当前结果时，在执行本块前运行 `refresh_schedule <- FALSE`，然后重跑本块；采集成功后可设回 `FALSE`。下方时间是采集时间，不保证来源网站本身已更新。
 
 ```{r}
 #| label: schedule-freshness
@@ -193,26 +197,43 @@ if (!is.null(identity_result)) {
 }
 ```
 
-## 5. 接入真实市场数据
+## 5. 采集真实欧赔与大小球
 
-这里与“采集赛程”是两件事。`fetch_issue_schedule()` 不会产生欧赔、大小球或历史状态。市场适配器须提供 `fixtures.csv`、`euro.csv`、`totals.csv`、`prematch_sp.csv`、`match_status.csv`；缺 SP 可以提供有正确表头的空表，不伪造 SP。比赛身份映射、源报价时间及真实状态证据也需要由适配器提供。
+使用赛程的 `provider_id_nowscore` 访问 Titan。函数核对 Titan 的原生比赛 ID、双方名称和开赛时间；不匹配的场次在 `coverage` 显示错误。欧赔保存各公司带时间戳的历史报价，平均由第6节固定成员规则计算。大小球从 Titan 手机历史接口读取完整年月日时间，香港盘水位加1转为十进制赔率。公司 ID 的欧赔与大小球命名空间不同，不能直接互换。
 
-**当前市场适配尚未在本手册中接通。** 将正式适配器产物放到上述显式 `market_dir` 后，可继续执行；不可把刚采到的 unknown 状态改成 scheduled 以绕过筛选。
+`market_slots` 控制采集场次；默认先试第39场。将 `refresh_markets <- TRUE` 后执行本块联网采集，成功后改回 `FALSE` 重用快照。采集时间和源报价时间分别保存；历史报价允许用于注明口径的研究，不声称本地当时已观测。北单赛前SP缺失保持空表。
 
 ```{r}
 #| label: market-source
+markets <- NULL
 inputs <- NULL
-required_tables <- c("fixtures", "euro", "totals", "prematch_sp", "match_status")
-required_files <- file.path(market_dir, paste0(required_tables, ".csv"))
-if (all(file.exists(required_files))) {
-  inputs <- beidan::read_match_inputs(
-    list(kind = "csv_dir", path = market_dir), issue_ids = issue_id
-  )
-  knitr::kable(tibble::tibble(table = names(inputs), rows = vapply(inputs, nrow, integer(1))))
-} else {
-  cat("未就绪：真实市场输入尚缺以下文件：\n", paste(required_files[!file.exists(required_files)], collapse = "\n"))
+market_schedule <- NULL
+if (!is.null(schedule)) {
+  market_schedule <- dplyr::filter(schedule, slot %in% market_slots)
+  if (refresh_markets) {
+    markets <- beidan::fetch_match_markets(
+      market_schedule, raw_dir = file.path(work_dir, "market_raw"),
+      backend = beidan::python_backend(python), totals_company_ids = totals_company_ids
+    )
+    saveRDS(markets, markets_file)
+  } else if (file.exists(markets_file)) {
+    markets <- readRDS(markets_file)
+  } else {
+    cat("尚无盘口快照：将 refresh_markets 改为 TRUE 后重跑本块。\n")
+  }
+  if (!is.null(markets)) {
+    knitr::kable(markets$coverage)
+    knitr::kable(markets$companies)
+    knitr::kable(utils::head(markets$euro, 10))
+    knitr::kable(utils::head(markets$totals, 10))
+    knitr::kable(dplyr::select(markets$captures, fixture_id, market, observed_at, source_url))
+    inputs <- beidan::match_inputs_from_capture(market_schedule, markets)
+  }
 }
 ```
+
+`quote_at` 是网站历史报价时间，`observed_at` 是这次真正采集时间，均按北京时间展示。
+当前赛程状态不能倒填到过去：如果现有状态台账晚于 `decision_at`，第6节仍会排除该场。盘口采集成功不等于历史状态已经补齐，更不能将 `unknown` 改成 `scheduled` 来绕过它。当前可先核对本节真实报价，随后按实际状态台账继续决策流程。
 
 ## 6. 指定公司规则，准备决策窗口
 
