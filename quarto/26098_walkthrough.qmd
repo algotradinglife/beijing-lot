@@ -35,6 +35,9 @@ settlements_file <- file.path(work_dir, "settlements.rds")
 
 # 首次现场采集时改为 TRUE，采集后改回 FALSE，避免反复请求。
 refresh_schedule <- FALSE
+# 身份判定与采集独立；FALSE 重放保存的真实 Jev 响应。
+refresh_identity <- FALSE
+identity_receipt_file <- file.path(work_dir, "identity_receipt.rds")
 # 可指定保存过的规范 schedule.rds；不会使用旧的错误 schedule.csv。
 schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
 
@@ -125,6 +128,68 @@ if (!is.null(schedule)) {
   print(attr(schedule, "diagnostics"))
   dir.create(work_dir, recursive = TRUE, showWarnings = FALSE)
   readr::write_csv(schedule, file.path(work_dir, "schedule.csv"))
+}
+```
+
+### 两源别名与完整比赛上下文
+
+下面将原始显示名、title 别名、对手身份和两源联赛一起检查。第77场客队的500 title“耶尔文佩”与Nowscore精确对应，这也是主队身份判定的证据。开赛时间来自Nowscore，不能把一个统一时间当作两源各自确认；两源截止时间可能不同，也不等同于开赛时间。
+
+```{r}
+#| label: schedule-identity-evidence
+identity_items <- NULL
+identity_result <- NULL
+if (!is.null(schedule)) {
+  identity_items <- beidan::schedule_identity_items(schedule)
+  identity_items |>
+    dplyr::filter(slot %in% c(33L, 77L)) |>
+    dplyr::mutate(dplyr::across(where(is.list),
+      ~ vapply(.x, paste, collapse = " / ", FUN.VALUE = character(1)))) |>
+    dplyr::select(dplyr::any_of(c("slot", "side", "aliases_500", "aliases_nowscore",
+      "opponent_aliases_500", "opponent_aliases_nowscore", "opponent_exact_alias",
+      "league_500", "league_nowscore", "kickoff_at",
+      "sale_end_raw_500", "sale_end_raw_nowscore"))) |>
+    knitr::kable()
+}
+```
+
+`refresh_identity = FALSE` 不联网，默认重放本地响应；没有本地产物时尝试随包保存的本期真实响应，并校验是否与当前证据一致。不一致会显示error，需要显式刷新，不能静默套用旧结果。只有 `refresh_identity = TRUE` 才向Jev发送未精确匹配的队名对；凭据通过当前会话 `TYPESAFE_API_KEY` 提供，不写入文档。新判定只在获得有效真实响应后保存。模型概率是判定不确定性，不是比赛身份的外部证明。
+
+```{r}
+#| label: schedule-identity-judge
+if (!is.null(schedule)) {
+  if (refresh_identity) {
+    identity_result <- beidan::judge_schedule_identity(schedule, judge = beidan::jev_schedule_judge)
+    receipt <- attr(identity_result, "judge_receipt")
+    if (!is.null(receipt)) {
+      dir.create(dirname(identity_receipt_file), recursive = TRUE, showWarnings = FALSE)
+      saveRDS(receipt, identity_receipt_file)
+    }
+  } else {
+    replay_file <- if (file.exists(identity_receipt_file)) identity_receipt_file else
+      file.path(package_dir, "tests", "testthat", "fixtures", "schedule_identity", "jev_context_receipt.rds")
+    identity_result <- if (file.exists(replay_file))
+      beidan::replay_schedule_identity(schedule, readRDS(replay_file)) else
+      beidan::judge_schedule_identity(schedule)
+  }
+  identity_result |> dplyr::count(method, review_state) |> knitr::kable()
+  identity_result |>
+    dplyr::filter(method != "exact_alias") |>
+    dplyr::select(slot, side, choice, p_same, p_different, p_review, confidence, margin, review_state) |>
+    knitr::kable()
+  if (!is.null(attr(identity_result, "judge_error"))) print(attr(identity_result, "judge_error"))
+}
+```
+
+匹配结果独立于原始赛程，不自动覆盖来源ID或队名。`review` 保留人工复核；`error`/`unavailable` 不能当作匹配成功。原第77场主队孤立判定分布为同队0.39、不同队0.33、待复核0.28；下表展示当前上下文结果，不保证一定超过自动阈值。
+
+```{r}
+#| label: schedule-identity-comparison
+if (!is.null(identity_result)) {
+  identity_result |>
+    dplyr::filter(slot == 77L, side == "home") |>
+    dplyr::select(slot, side, p_same, p_different, p_review, review_state, model) |>
+    knitr::kable()
 }
 ```
 
@@ -251,3 +316,17 @@ knitr::kable(tibble::tibble(
 ## 验证与局限
 
 赛程抓取入口的验收及 reviewed hashes 见 `issue_schedule_fetch.qmd`。此手册包含真实数据接入尚未就绪的门禁，未运行的市场/计划/结算块不宣称通过；其公共接口正常路径回归见 `parlay_api_contract.qmd`。最终审阅记录在本任务收尾时补充。
+
+## #518 比赛上下文身份判定
+
+本轮将#516独立身份检查并入本文件第4节，唯一人工入口不再跳转到另一QMD。保留对手两源显示/title、确定性精确匹配、期号/场号、联赛、Nowscore开赛来源及两源各自截止原文。后者不是独立开赛时间证据，不用统一后的时间假造“双源一致”。历史#516审阅材料保存在`docs/reviews/516-schedule-identity-historical.md`，当时请求/响应保留供比较。
+
+新版赛程增加`sale_end_raw_500`与`sale_end_raw_nowscore`两个原始证据列；旧快照缺列时须用新版采集或保存的原始页面重新解析，不能合成补列。Jev结果独立保存，不改变下游赛程主键。普通测试与walkthrough开发验收均在包测试/独立acceptance脚本，分析文档不执行testthat。
+
+实际对比：Jev 1.13.0 一次新批量调用后，77场主队从0.39/0.33/0.28变为0.46/0.27/0.27，仍待复核；33场主队为0.88/0.01/0.11，达到当前自动阈值。全部292个队名对中266精确、22自动、4待复核。本次没有反复请求选择更喜欢的答案；上下文增加支持，但不替代人工裁决。
+
+## #518 最终审阅与验证
+
+2026-09-26，`codex review` 审阅全部 `git diff origin/main`（实现、tests、真实收据、原walkthrough第4节和归档文档），结论：**No actionable defects found**。命令为 `codex review "Review all diff origin/main for #518 including staged implementation, tests, real fixtures, integrated walkthrough section4 and archive move. Focus opponent aliases/exact evidence, source-specific time semantics (unified kickoff is only Nowscore), request validation and saved receipt replay with current evidence, no new Jev network calls. All functions require tests; code/provenance hashes bind new helpers. Independent checks use explicit R_LIBS=/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib TMPDIR=/home/drwho1985/workspace/algotradinglife/beijing-lot-identity/.identity-control/tmp RETICULATE_PYTHON and BEIDAN_TEST_PYTHON=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python. Project Python same path. No CI or all-repo tests. Inspect QMD, tests, data contracts. Report only actionable defects, do not edit files."`；显式指定项目Python、R_LIBS及可写TMPDIR。review独立复跑107项Python和两份R测试；未再次请求Jev，未参与CI。控制侧179条R断言全部通过，独立walkthrough缺输入/真实保存输入两路径通过，本文件在干净R会话、cache/freeze关闭条件下渲染通过。未接通市场和结算，未声明全流程下注或全仓测试通过。
+
+函数与测试映射：R身份items/request及两序列化helper、judge/replay对应`test-schedule-identity.R`；R赛程schema对应`test-issue-schedule.R`；Python来源截止保留对应`test_issue_schedule.py`。开发端`issue_schedule_walkthrough.R`验证本第4节真实回执离线重放，分析文档不包含testthat。审阅文件hash与本节之前QMD正文hash记录于`docs/reviews/518-context-review-manifest.json`。

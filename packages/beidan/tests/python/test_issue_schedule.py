@@ -380,6 +380,38 @@ def test_raw_display_keeps_the_mixed_sale_text_not_a_second_status():
     assert rows[0]["match_status"] == "unknown"
 
 
+def test_reconcile_preserves_each_source_sale_cutoff_separately():
+    left = _row(1, provider="500", sale_end_raw="2026-09-25 12:50", sale_end_at=None)
+    right = _row(1, sale_end_raw="2026-09-25 12:55")
+    rows, _ = _canonical([left], [right])
+    assert rows[0]["sale_end_raw_500"] == "2026-09-25 12:50"
+    assert rows[0]["sale_end_raw_nowscore"] == "2026-09-25 12:55"
+    # Distinct sales cutoffs; never merged, never a kickoff estimate.
+    assert rows[0]["sale_end_raw_500"] != rows[0]["sale_end_raw_nowscore"]
+
+
+def test_reconcile_keeps_absent_source_cutoff_explicit():
+    rows, _ = _canonical([_row(1, provider="500", sale_end_raw=None, sale_end_at=None)], [])
+    assert rows[0]["sale_end_raw_500"] is None
+    assert rows[0]["sale_end_raw_nowscore"] is None
+
+
+def test_500_parser_exposes_endtime_as_its_own_sale_cutoff():
+    rows = parse_500_rows(
+        PAGE_500_MINI.decode("gb18030"), issue_id="26098", observed_at=OBSERVED, source_url="u"
+    )
+    assert rows[0].sale_end_raw == "2026-09-25 12:50"
+    # 500's endTime is a sale cutoff and never a dated instant/kickoff.
+    assert rows[0].sale_end_at is None
+    assert rows[0].kickoff_hhmm == "13:00"
+
+
+def test_nowscore_parser_exposes_cutoff_title_as_its_own_sale_cutoff():
+    rows = {row.slot: row for row in _nowscore_rows()}
+    assert rows[1].sale_end_raw == "截止时间：2026-09-25 12:55"  # raw title preserved verbatim
+    assert rows[1].sale_end_at is not None
+
+
 def test_duplicate_slot_in_one_source_is_rejected_not_collapsed():
     from beidan_backend.issue_schedule.crosscheck import CrossSourceError
 

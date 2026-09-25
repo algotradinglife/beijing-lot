@@ -7,6 +7,9 @@ testthat::test_that('issue schedule column and type contracts are aligned', {
   testthat::expect_identical(types[["kickoff_at"]], 'POSIXct')
   testthat::expect_true('kickoff_group_date' %in% columns)
   testthat::expect_true(all(c('match_status', 'match_status_raw', 'raw_display_nowscore') %in% columns))
+  testthat::expect_true(all(c('sale_end_raw_500', 'sale_end_raw_nowscore') %in% columns))
+  testthat::expect_identical(types[['sale_end_raw_500']], 'character')
+  testthat::expect_identical(types[['sale_end_raw_nowscore']], 'character')
   empty <- issue_schedule_empty()
   testthat::expect_s3_class(empty, 'tbl_df')
   testthat::expect_identical(nrow(empty), 0L)
@@ -115,6 +118,13 @@ testthat::test_that('offline replay through reticulate returns the canonical tib
   testthat::expect_identical(format(slot11$kickoff_at, '%Y-%m-%dT%H:%M:%S',
                                     tz = 'Asia/Shanghai'), '2026-09-26T00:00:00')
   testthat::expect_identical(slot11$kickoff_date_source, 'js-kickoff-date')
+
+  # Each source's own sale cutoff is preserved separately and verbatim.
+  testthat::expect_true('sale_end_raw_500' %in% names(result))
+  testthat::expect_type(result$sale_end_raw_500, 'character')
+  testthat::expect_type(result$sale_end_raw_nowscore, 'character')
+  testthat::expect_true(any(nzchar(result$sale_end_raw_500)))
+  testthat::expect_true(any(nzchar(result$sale_end_raw_nowscore)))
 
   slot6 <- result[result$slot == 6L, ]
   testthat::expect_identical(slot6$match_status, 'unknown')
