@@ -1,0 +1,100 @@
+---
+title: "赛程别名与 Jev 身份判定（#516 开发验收）"
+format: html
+execute:
+  echo: true
+  error: false
+  cache: false
+  freeze: false
+---
+
+这是可逐块执行的开发版本，尚未通过最终审阅。采集和身份判定分开；判定不会修改比赛、来源ID或下注数据。真实输入为26098整期的146场已保存页面，采集时间为北京时间2026-09-25 21:38:55（500）与21:44:39（Nowscore），不是网站当前状态。
+
+## 1. 加载开发包与已声明输入
+
+在Positron中先把工作目录切到本工作树，再逐块执行；打开文件本身不会改变R工作目录。也可通过`BEIDAN_IDENTITY_PROJECT`显式指定根目录。仓库已附真实输入和一次Jev响应的可重放小型RDS夹具，默认离线即可运行；`input_file` 可改为你通过新版 `fetch_issue_schedule()` 保存的RDS。旧版缺少显示/title字段的RDS必须重新解析原始页面或采集。
+
+```{r}
+#| label: setup
+project_dir <- Sys.getenv("BEIDAN_IDENTITY_PROJECT", unset = "")
+if (!nzchar(project_dir)) {
+  project_dir <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+}
+package_dir <- file.path(project_dir, "packages", "beidan")
+devtools::load_all(package_dir, quiet = TRUE)
+input_file <- file.path(package_dir, "tests", "testthat", "fixtures", "schedule_identity", "schedule.rds")
+result_file <- file.path(project_dir, ".identity-control", "identity.rds")
+saved_jev_file <- file.path(package_dir, "tests", "testthat", "fixtures", "schedule_identity", "jev_receipt.rds")
+run_jev <- FALSE
+schedule <- readRDS(input_file)
+items <- beidan::schedule_identity_items(schedule)
+```
+
+## 2. 检查原始证据
+
+第77场500显示“克鲁比04”，其链接title为“赫尔辛基预备队”；客队显示“查普斯”，title为“耶尔文佩”。Nowscore分别显示“克鲁比”“耶尔文佩”。第33场“都柏林大学／都柏林”保留供判定，不能仅因子串相同就自动确认。
+
+```{r}
+#| label: original-evidence
+items |>
+  dplyr::filter(slot %in% c(33L, 77L)) |>
+  dplyr::mutate(dplyr::across(c(aliases_500, aliases_nowscore),
+    ~ vapply(.x, paste, collapse = " / ", FUN.VALUE = character(1)))) |>
+  dplyr::select(slot, side, aliases_500, aliases_nowscore, league_500, league_nowscore) |>
+  knitr::kable()
+```
+
+## 3. 精确匹配后批量调用 Jev
+
+`run_jev=FALSE` 不发送请求：若存在已保存真实响应则按当前证据和阈值重新校验、计算状态；否则未精确匹配项显示unavailable。要进行一次真实语义判定，在本R会话配置 `TYPESAFE_API_KEY`，再将 `run_jev <- TRUE` 后执行下一块。不要把密钥写入QMD。缺少凭据或请求失败会明确显示状态，不会假装判定通过。
+
+通过R的httr2调用官方HTTP接口，与聊天工具无关。仅发送未解决队名对；模型回答same_team/different_team/manual_review及其分布。自动状态要求最高概率至少0.85、领先第二名至少0.50；manual_review始终待复核。这是语义判断，不能当作来源ID已经被证明一致。
+
+```{r}
+#| label: judge
+if (!run_jev && file.exists(saved_jev_file)) {
+  judgments <- beidan::replay_schedule_identity(schedule, readRDS(saved_jev_file))
+  message("读取已保存的真实 Jev 判定，本块未发新请求")
+} else {
+  judgments <- beidan::judge_schedule_identity(
+    schedule, judge = if (run_jev) beidan::jev_schedule_judge else NULL,
+    auto_accept = 0.85, minimum_margin = 0.50
+  )
+}
+judgments |> dplyr::count(method, review_state) |> knitr::kable()
+judgments |>
+  dplyr::filter(method != "exact_alias") |>
+  dplyr::select(slot, side, choice, p_same, p_different, p_review, confidence, margin, review_state) |>
+  knitr::kable()
+```
+
+## 4. 显式保存后人工复核
+
+```{r}
+#| label: persist
+dir.create(dirname(result_file), recursive = TRUE, showWarnings = FALSE)
+saveRDS(judgments, result_file)
+```
+
+RDS保留原始别名、链接、实际模型、完整分布和请求/响应正文（无凭据）。不会把Jev结果自动写回赛程或建立全局别名字典。保存的判定只对应这次证据；证据变化应重新判定。
+
+## 验收范围
+
+测试覆盖原始DOM显示/title、男女/年龄/预备队反例、缺失凭据、异常回答及空表。离线测试使用可辨认的test-judge，不冒充真实Jev；真实调用另行记录。真实一次批量调用已完成：Jev 1.13.0 对26个未解决队名对给出21个auto和5个review；第77场主队同队概率0.39、第33场主队0.75，均待复核，未通过重复请求挑选更喜欢的答案。第77场客队由title别名精确对应。最终review及文件hash待补。
+
+
+## 本地验证记录
+
+- 公开函数：`schedule_identity_items()`构造可检查的队名对；`judge_schedule_identity()`完成确定性别名匹配与显式judge调用；`jev_schedule_judge()`使用httr2对接[官方TypeSafe HTTP API](https://docs.typesafe.ai/api)。
+- Python专项103项通过（含原146场时刻回放）；R既有赛程66条断言、新身份判定66条断言通过。新增函数及helper均通过直接或真实调用链测试；HTTP普通测试使用httr2的mock，不联网。
+- 真实Jev一次批量26问：实际模型jev-1.13.0；21 auto/5 review。全分布与实际请求/响应在声明的`jev-live.rds`，没有将人工答案或mock标成模型结果。
+- `quarto render quarto/schedule_identity.qmd --no-cache --execute` 在干净R进程通过。R_LIBS指向项目r_lib；临时目录显式设在持久工作树`.identity-control/tmp`，避免宿主默认临时盘额度导致无输出。未运行全仓检查，不参与CI。
+- 原始页面保存在声明的`.identity-control/snapshots`和raw收据目录；两份测试HTML只截取33/77场，保留显示和title，不替代原始响应。
+
+## Final review attestation
+
+2026-09-26 最终 `codex review` 结论：**No actionable defects found in the diff against origin/main.** 审阅范围为全部暂存改动、R接口/收据重放、Python别名证据、tests、数据契约与两份QMD。独立复跑103项Python测试和132条R断言通过，未再次请求Jev。
+
+命令：`codex review 'Review all git diff origin/main for #516, including staged R identity/judge/replay APIs, Python original aliases, tests and QMD. Previous findings fixed: portable package-contained real fixtures and replay of actual response under current validation/policy; implementation hash now includes request/response/replay helpers and supplied judge. Use Python /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python, R_LIBS=/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib, TMPDIR=/home/drwho1985/workspace/algotradinglife/beijing-lot-identity/.identity-control/tmp (host default temp quota full). No new Jev requests. Verify final code/tests/docs/contracts; do not modify files; report actionable defects.'`
+
+首轮两项P2（不可移植输入、旧判定绕过当前校验）和第二轮两项P2（遗漏helper/adapter实现绑定、夹具位于包外）均已修复、补回归并复审。最终文件hash与本节之前正文hash见 `docs/reviews/schedule_identity_review_manifest.json`，控制侧逐项核对一致。控制侧独立完成包目录测试、真实walkthrough验收及两QMD干净渲染；最后一轮review检查QMD但未重复渲染。未运行全仓测试，不参与CI。
