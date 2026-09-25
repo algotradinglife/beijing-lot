@@ -366,3 +366,10 @@ if (!purchase_count || !settled_count || pending_count > 0L || special_count > 0
 2026-09-26，`codex review` 审阅全部 `git diff origin/main`（实现、tests、真实收据、原walkthrough第4节和归档文档），结论：**No actionable defects found**。命令为 `codex review "Review all diff origin/main for #518 including staged implementation, tests, real fixtures, integrated walkthrough section4 and archive move. Focus opponent aliases/exact evidence, source-specific time semantics (unified kickoff is only Nowscore), request validation and saved receipt replay with current evidence, no new Jev network calls. All functions require tests; code/provenance hashes bind new helpers. Independent checks use explicit R_LIBS=/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib TMPDIR=/home/drwho1985/workspace/algotradinglife/beijing-lot-identity/.identity-control/tmp RETICULATE_PYTHON and BEIDAN_TEST_PYTHON=/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python. Project Python same path. No CI or all-repo tests. Inspect QMD, tests, data contracts. Report only actionable defects, do not edit files."`；显式指定项目Python、R_LIBS及可写TMPDIR。review独立复跑107项Python和两份R测试；未再次请求Jev，未参与CI。控制侧179条R断言全部通过，独立walkthrough缺输入/真实保存输入两路径通过，本文件在干净R会话、cache/freeze关闭条件下渲染通过。未接通市场和结算，未声明全流程下注或全仓测试通过。
 
 函数与测试映射：R身份items/request及两序列化helper、judge/replay对应`test-schedule-identity.R`；R赛程schema对应`test-issue-schedule.R`；Python来源截止保留对应`test_issue_schedule.py`。开发端`issue_schedule_walkthrough.R`验证本第4节真实回执离线重放，分析文档不包含testthat。审阅文件hash与本节之前QMD正文hash记录于`docs/reviews/518-context-review-manifest.json`。
+
+<!-- #520 development evidence (not an analysis/test block):
+Reviewed runtime revision 95d18baa404b8b6ebede4ac79c4eeecac49204a8.
+Commands, findings/resolutions, actual data limits and reviewed file hashes:
+../docs/reviews/520-market-review.md
+../docs/reviews/520-market-reviewed-hashes.json
+-->

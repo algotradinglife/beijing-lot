@@ -1,0 +1,33 @@
+{
+  "revision": "95d18baa404b8b6ebede4ac79c4eeecac49204a8",
+  "files": {
+    "docs/reviews/520-status-evidence.md": "36875493695272467bd884a8a0e5b919f3f9dad3e349c2247bc9125076e09c5c",
+    "docs/reviews/520-status-review-hashes.json": "144b1e702955bdd6902d457e24346752caba19add0f3f3ceda59a17f31280737",
+    "docs/reviews/520-status-source.json": "d3de2e6ea092a5644c20766acde6a6645f9199f1c3a9ed668556c8c121e68789",
+    "packages/beidan/NAMESPACE": "dab06beae10433adcc75cfbd31a25f9d9ed310f87c72126696f4cd61105af91d",
+    "packages/beidan/R/issue_schedule.R": "7bd5c781a836ac97c59df6d058b2520d4b79904d190aec6894d5476aa89f5a5c",
+    "packages/beidan/R/match_markets.R": "91a7c4f7e4639ad603bdef1153b138e563c7757f51fe47a68dd03a39213ece66",
+    "packages/beidan/R/n7_pipeline_epoch.R": "fc76c65d87510d890cb26eefa6d76d79dc9d10a6d9346bb95662853bfd8a8cf4",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py": "87039186f9636ec28f2d260aaa3cee2916602e2691e23cd1c91d4bf4331481ac",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py": "8b453f706cbb9d629759ab7794a4fd67f44e23408c95f92bc2b29a1da54034d7",
+    "packages/beidan/inst/python/beidan_backend/market_capture/__init__.py": "0284ed1a85a2ba7c614f574f0b4a8f9ed03173348c6644aa3b3eb1dbc0e60265",
+    "packages/beidan/inst/python/beidan_backend/market_capture/history.py": "e8b79f27447578c80eea820f1065a1a71305d4f2adacca6455cd886db8ea11c8",
+    "packages/beidan/inst/python/beidan_backend/market_capture/service.py": "8e0af226ced67a9a6e6f5332a07c9751453d03c8c19f548f01d9b7301e7ed5d5",
+    "packages/beidan/man/fetch_issue_schedule.Rd": "6a982190bae47dc0e56d537751cee0e8a2bab4a77d05c5f1a8ad6c13d3a34c88",
+    "packages/beidan/man/fetch_match_markets.Rd": "f43e94f8d307d74228ccc683f32917aaecc3fb5d593d56e04f3e4cb4561d7e39",
+    "packages/beidan/man/match_inputs_from_capture.Rd": "9515db1ea5b57f09927e90c8a3d382563fd7a30d35bb86ca819768b02543bcd1",
+    "packages/beidan/man/match_latest_quote_before.Rd": "4e422df314aff8c991b466fc72695583ef589a48dcca8055b04fba2d049775ab",
+    "packages/beidan/tests/python/fixtures/nowscore.bdLive.js": "4dfbe4ca443149c756a1a39be9cc635b1f57541e460c390870533ed327f7d9d9",
+    "packages/beidan/tests/python/test_issue_schedule.py": "af86e048b5b34f3458bc9e54cf2678f80e604a642b7132a96e91eb2c5c49ecdd",
+    "packages/beidan/tests/testthat/fixtures/market_capture/euro.json": "769de74d27a013db8c433159bb59b80a6778576da666861d95cd527f3d752f49",
+    "packages/beidan/tests/testthat/fixtures/market_capture/euro.raw": "fc99b532a545edc8433e2d4f1286ee5c50007059a76d6c77246f21ef685d2385",
+    "packages/beidan/tests/testthat/fixtures/market_capture/total_history.json": "176660bab5e13c966f830b4f699580892a7db2e7694f10123aa34a44ec1b3c3a",
+    "packages/beidan/tests/testthat/fixtures/market_capture/total_history.raw": "2f91c80483c628b051897fd5eeaef013a9f96a7c6fc08f40e498124c3e8db649",
+    "packages/beidan/tests/testthat/test-match-markets.R": "a42124f59934ebba36e465ccae4c42a58967e55b7b7bfdb44f3a5c30f76c1efb",
+    "packages/beidan/tests/testthat/test-n7-pipeline-epoch.R": "a7281cb2b523bbc2ce14857755d83e625f94914dd1673148c9c00cd1c5bdfcad",
+    "quarto/26098_walkthrough.qmd": "8971038818c994fd2673e0b884a83d4a516fa8d971ab3d8e4419b7e6306c572c",
+    "src/nowscore_score_model_history.py": "1d2e92436fba80e25dd7e4b02f7a334dc803f08e634d3215e3a6bfafdf5ddde8",
+    "tests/market_capture/test_service.py": "b7ac6227d713b78562ce0396dc1edd631d4ea5868b29e31c51709b5db1ea9ca4",
+    "tests/testthat/test-26098-walkthrough-progress.R": "197ff687fbf1a476a599be19973e5eeadb6f3d4801e12da6a51753b8ce7115d8"
+  }
+}
