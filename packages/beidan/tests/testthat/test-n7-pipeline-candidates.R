@@ -1,15 +1,15 @@
 # Build a priced epoch with enough fixtures for a multi-group slate.
 candidate_fixture <- function(n_fixtures = 28L, seed = 42L) {
-  issue <- n7_make_fixture_issue('26097', '2026-09-22', n_fixtures = n_fixtures,
-                                 seed = seed, kickoff_hour = 10L)
+  issue <- n7_make_fixture_issue('26097', n7_kickoff_window('2026-09-22', n_fixtures),
+                                 seed = seed)
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
-  inputs <- n7_read_inputs(n7_fixture_source(issue), '26097', cutoff)
+  inputs <- n7_read_inputs(n7_fixture_source(issue), '26097')
   prepared <- n7_prepare_epoch(inputs, cutoff, N7_DECISION_TZ,
                                list(members = c('c01', 'c02', 'c03'), missing = 'error'),
                                list(companies = NULL, line = 'nearest_main', watermark = 'decimal'))
   projected <- n7_project_probabilities(prepared, cutoff, -0.14, c(0.1, 16), 1e-10)
   list(fixtures = prepared$fixtures, probabilities = projected$probabilities,
-       cutoff = cutoff)
+       match_status = prepared$match_status, cutoff = cutoff)
 }
 
 testthat::test_that('normalised entropy is bounded and ordered as expected', {
@@ -37,9 +37,9 @@ testthat::test_that('the wide probability view validates and adds entropy', {
 testthat::test_that('entropy-balanced construction is deterministic and balanced', {
   fx <- candidate_fixture(n_fixtures = 28L)
   first <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                   'entropy_balanced', 4L, seed = 1L)
+                                   'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
   second <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 4L, seed = 1L)
+                                    'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
   testthat::expect_identical(first$group_legs, second$group_legs)
   testthat::expect_equal(length(unique(first$group_legs$group_id)), 4L)
   testthat::expect_equal(nrow(first$group_legs), 28L)
@@ -55,7 +55,7 @@ testthat::test_that('entropy-balanced construction is deterministic and balanced
 testthat::test_that('construction reports truncation instead of claiming full coverage', {
   fx <- candidate_fixture(n_fixtures = 28L)
   capped <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 2L, seed = 1L)
+                                    'entropy_balanced', 2L, seed = 1L, match_status = fx$match_status)
   testthat::expect_equal(length(unique(capped$group_legs$group_id)), 2L)
   testthat::expect_true(capped$diagnostics$truncated)
   testthat::expect_gt(capped$diagnostics$dropped, 0L)
@@ -65,17 +65,20 @@ testthat::test_that('explicit groups are validated for shape and pricing', {
   fx <- candidate_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   explicit <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                      list(groups = list(ids)), 4L, seed = 1L)
+                                      list(groups = list(ids)), 4L, seed = 1L,
+                                      match_status = fx$match_status)
   testthat::expect_equal(length(unique(explicit$group_legs$group_id)), 1L)
   testthat::expect_equal(explicit$group_legs$fixture_id, ids)
 
   testthat::expect_error(
     n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                            list(groups = list(ids[1:5])), 4L, seed = 1L),
+                            list(groups = list(ids[1:5])), 4L, seed = 1L,
+                            match_status = fx$match_status),
     'has 5 legs, expected 7')
   testthat::expect_error(
     n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                            list(groups = list(c(ids[1:6], 'not-a-fixture'))), 4L, seed = 1L),
+                            list(groups = list(c(ids[1:6], 'not-a-fixture'))), 4L, seed = 1L,
+                            match_status = fx$match_status),
     'references unpriced fixtures')
 })
 
@@ -83,14 +86,14 @@ testthat::test_that('unknown construction modes are refused', {
   fx <- candidate_fixture(n_fixtures = 14L)
   testthat::expect_error(
     n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                            'magic', 4L, seed = 1L),
+                            'magic', 4L, seed = 1L, match_status = fx$match_status),
     "must be 'entropy_balanced'")
 })
 
 testthat::test_that('the 3333222 pattern spans exactly 648 tickets per group', {
   fx <- candidate_fixture(n_fixtures = 28L)
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 4L, seed = 1L)
+                                    'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
   structure <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
                                   c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
   testthat::expect_true(all(structure$support_summary$support_size == 648L))
@@ -108,7 +111,7 @@ testthat::test_that('the documented pattern space sizes match the contract table
   expected <- c(648L, 288L, 192L, 216L, 144L, 96L, 64L, 32L)
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L)
+                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
   for (i in seq_along(table_patterns)) {
     structure <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
                                     table_patterns[[i]], 'entropy_desc')
@@ -120,7 +123,7 @@ testthat::test_that('the documented pattern space sizes match the contract table
 testthat::test_that('structure patterns must be seven values drawn from 1, 2, 3', {
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L)
+                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
   testthat::expect_error(
     n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff, c(3L, 3L, 3L), 'entropy_desc'),
     'pattern must be 7 integers')
@@ -137,7 +140,7 @@ testthat::test_that('structure patterns must be seven values drawn from 1, 2, 3'
 testthat::test_that('more uncertain legs receive the larger depths', {
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L)
+                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
   group_id <- groups$group_legs$group_id[1]
   legs <- groups$group_legs[groups$group_legs$group_id == group_id, , drop = FALSE]
   structure <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
@@ -165,7 +168,7 @@ testthat::test_that('more uncertain legs receive the larger depths', {
 testthat::test_that('a hard forbidden outcome is excluded and never topped up', {
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L)
+                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
   group_id <- groups$group_legs$group_id[1]
   legs <- groups$group_legs[groups$group_legs$group_id == group_id, , drop = FALSE]
   wide_for_test <- n7_probability_wide(fx$probabilities)
@@ -200,7 +203,7 @@ testthat::test_that('support_mass is the raw mass before any renormalisation', {
   # 3/3/3/3/2/2/2 structure the raw mass must equal the product of kept masses.
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L)
+                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
   group_id <- groups$group_legs$group_id[1]
   structure <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
                                   c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
@@ -225,7 +228,7 @@ testthat::test_that('support_mass is the raw mass before any renormalisation', {
 testthat::test_that('enumeration expands the support product and keeps raw probabilities', {
   fx <- candidate_fixture(n_fixtures = 28L)
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 4L, seed = 1L)
+                                    'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
   structure <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
                                   c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
   tickets <- n7_enumerate_tickets(groups$group_legs, fx$probabilities, fx$cutoff,
@@ -257,7 +260,8 @@ testthat::test_that('a ticket supported by two structures keeps one physical ide
   fx <- candidate_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    list(groups = list(ids, ids)), 4L, seed = 1L)
+                                    list(groups = list(ids, ids)), 4L, seed = 1L,
+                                      match_status = fx$match_status)
   structure <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
                                   c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
   tickets <- n7_enumerate_tickets(groups$group_legs, fx$probabilities, fx$cutoff,
@@ -276,7 +280,8 @@ testthat::test_that('two structures over one fixture set share ticket identities
   fx <- candidate_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    list(groups = list(ids)), 4L, seed = 1L)
+                                    list(groups = list(ids)), 4L, seed = 1L,
+                                      match_status = fx$match_status)
   group_id <- unique(groups$group_legs$group_id)
   # Two structural variants over the same group, expressed as two candidate ids.
   wide_supports <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
@@ -306,7 +311,8 @@ testthat::test_that('a group whose only leg loses all support is refused', {
   fx <- candidate_fixture(n_fixtures = 14L)
   ids <- fx$fixtures$fixture_id[1:7]
   groups <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    list(groups = list(ids)), 4L, seed = 1L)
+                                    list(groups = list(ids)), 4L, seed = 1L,
+                                      match_status = fx$match_status)
   supports <- n7_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
                                  c(1L, 1L, 1L, 1L, 1L, 1L, 1L), 'entropy_desc')$supports
   # Ban every outcome at one leg.
@@ -335,7 +341,8 @@ testthat::test_that('empty groups yield typed empty enumeration output', {
 
   constructed <- n7_construct_candidates(n7_typed_empty('fixtures'),
                                          n7_typed_empty('probabilities'), cutoff, 7L,
-                                         'entropy_balanced', 4L, seed = 1L)
+                                         'entropy_balanced', 4L, seed = 1L,
+                                         match_status = n7_typed_empty('match_status'))
   testthat::expect_equal(nrow(constructed$group_legs), 0L)
   testthat::expect_silent(n7_validate_table(constructed$group_legs, 'group_legs'))
 })
@@ -461,15 +468,30 @@ testthat::test_that('n7_construct_candidates 校验 cutoff 与 n_legs/max_candid
   cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'), issue_id = '26097')
   fixtures <- n7_typed_empty('fixtures')
   probabilities <- n7_typed_empty('probabilities')
+  ledger <- n7_typed_empty('match_status')
   testthat::expect_error(
-    n7_construct_candidates(fixtures, probabilities, NULL, 7L, list(), 4L),
+    n7_construct_candidates(fixtures, probabilities, NULL, 7L, list(), 4L, match_status = ledger),
     'explicit cutoff is required')
   testthat::expect_error(
-    n7_construct_candidates(fixtures, probabilities, cutoff, 0L, list(), 4L),
+    n7_construct_candidates(fixtures, probabilities, cutoff, 0L, list(), 4L, match_status = ledger),
     'n_legs must be positive')
   testthat::expect_error(
-    n7_construct_candidates(fixtures, probabilities, cutoff, 7L, list(), 0L),
+    n7_construct_candidates(fixtures, probabilities, cutoff, 7L, list(), 0L, match_status = ledger),
     'max_candidates must be positive')
+})
+
+testthat::test_that('n7_construct_candidates 强制要求 match_status 台账', {
+  # 缺失台账是输入契约错误：没有台账与台账为空是两件事，前者绝不能静默通过。
+  # match_status 是无默认值的形参，因此漏传在 R 的参数匹配阶段就失败。
+  fx <- candidate_fixture(n_fixtures = 14L)
+  testthat::expect_error(
+    n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
+                            'entropy_balanced', 4L, seed = 1L),
+    'match_status')
+  empty <- n7_construct_candidates(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
+                                   'entropy_balanced', 4L, seed = 1L,
+                                   match_status = n7_typed_empty('match_status'))
+  testthat::expect_equal(nrow(empty$group_legs), 0L)
 })
 
 testthat::test_that('n7_construct_candidates 拒绝其它期号的比赛', {
@@ -479,8 +501,14 @@ testthat::test_that('n7_construct_candidates 拒绝其它期号的比赛', {
     issue_id = '26098', fixture_id = 'f1', slot = 1L, provider_id = 'p',
     kickoff_at = as.POSIXct('2026-09-23 02:00:00', tz = 'UTC'), handicap = 0L,
     sale_state = 'open', source_url = 'synthetic://x')
+  stray_ledger <- tibble::tibble(
+    issue_id = '26098', fixture_id = 'f1', status = 'scheduled',
+    status_at = as.POSIXct('2026-09-22 08:00:00', tz = 'UTC'),
+    available_at = as.POSIXct('2026-09-22 08:00:00', tz = 'UTC'),
+    source_url = 'synthetic://x')
   testthat::expect_error(
-    n7_construct_candidates(stray, n7_typed_empty('probabilities'), cutoff, 7L, list(), 4L),
+    n7_construct_candidates(stray, n7_typed_empty('probabilities'), cutoff, 7L, list(), 4L,
+                            match_status = stray_ledger),
     'fixtures belong to issue')
 })
 
@@ -490,14 +518,21 @@ testthat::test_that('n7_construct_candidates 拒绝已开赛与窗口外的比�
     issue_id = '26097', fixture_id = 'f1', slot = 1L, provider_id = 'p',
     kickoff_at = as.POSIXct('2026-09-22 10:00:00', tz = 'UTC'), handicap = 0L,
     sale_state = 'open', source_url = 'synthetic://x')
+  bound_ledger <- tibble::tibble(
+    issue_id = '26097', fixture_id = 'f1', status = 'scheduled',
+    status_at = as.POSIXct('2026-09-22 08:00:00', tz = 'UTC'),
+    available_at = as.POSIXct('2026-09-22 08:00:00', tz = 'UTC'),
+    source_url = 'synthetic://x')
   testthat::expect_error(
-    n7_construct_candidates(already, n7_typed_empty('probabilities'), cutoff, 7L, list(), 4L),
+    n7_construct_candidates(already, n7_typed_empty('probabilities'), cutoff, 7L, list(), 4L,
+                            match_status = bound_ledger),
     'already kicked off')
   # 决策窗口是 D+1：2026-09-22 16:00Z .. 2026-09-23 16:00Z。
   outside <- already
   outside$kickoff_at <- as.POSIXct('2026-09-25 02:00:00', tz = 'UTC')
   testthat::expect_error(
-    n7_construct_candidates(outside, n7_typed_empty('probabilities'), cutoff, 7L, list(), 4L),
+    n7_construct_candidates(outside, n7_typed_empty('probabilities'), cutoff, 7L, list(), 4L,
+                            match_status = bound_ledger),
     'outside the decision window')
 })
 

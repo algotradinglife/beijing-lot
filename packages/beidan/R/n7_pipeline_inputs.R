@@ -13,8 +13,9 @@
 #' 与 tibble schema 保持一致；由下方读取器在边界处改名并改型。
 #'
 #' @return 具名 list，名字为表名，值为该表 CSV 必须携带且仅可携带的列名。
-#' @details 只覆盖可在磁盘上出现的四张表：fixtures、euro、totals、prematch_sp。
-#'   settlements 与其余派生表不在其中，因此磁盘源无法把赛果混进决策输入。
+#' @details 只覆盖可在磁盘上出现的五张表：fixtures、euro、totals、prematch_sp、
+#'   match_status。settlements 与其余派生表不在其中，因此磁盘源无法把赛果混进
+#'   决策输入。
 n7_source_csv_columns <- function() {
   list(
     fixtures = c("issue_id", "fixture_id", "slot", "provider_id", "kickoff_at",
@@ -23,7 +24,9 @@ n7_source_csv_columns <- function() {
              "odds_away", "source_url"),
     totals = c("fixture_id", "company_id", "quote_at", "line", "over_decimal",
                "under_decimal", "source_url"),
-    prematch_sp = c("fixture_id", "outcome", "quote_at", "sp_raw", "source_url")
+    prematch_sp = c("fixture_id", "outcome", "quote_at", "sp_raw", "source_url"),
+    match_status = c("issue_id", "fixture_id", "status", "status_at",
+                     "available_at", "source_url")
   )
 }
 
@@ -172,18 +175,27 @@ n7_normalise_outcome <- function(value, what = "outcome") {
 #' @param source  list，必须含 kind。
 #'   · 非 list                      -> stop()
 #'   · 缺 kind                      -> stop()
-#'   · kind == "frames"：必须含 list 型 tables；缺某张表按 typed-empty 处理
-#'   · kind == "csv_dir"：必须含 path，且指向已存在目录；缺某张 CSV 按 typed-empty 处理
+#'   · kind == "frames"：必须含 list 型 tables；缺 match_status 表 -> stop()
+#'   · kind == "csv_dir"：必须含 path，且指向已存在目录；缺 match_status.csv -> stop()
 #'   · 其它 kind（含任何网络源）    -> stop()
-#' @return 具名 list，四张表（fixtures/euro/totals/prematch_sp），均为已校验 tibble。
+#' @return 具名 list，五张表（fixtures/euro/totals/prematch_sp/match_status），均为
+#'   已校验 tibble。
 #' @details CSV 一律以 colClasses = "character" 读入：否则 read.csv 会在契约校验看到
 #'   之前，把全数字的 issue_id 或带前导零的 id 变成数值。
+#'
+#'   match_status 是**必需的观测台账**：源没有提供它，是一个输入契约错误，必须报错，
+#'   绝不回退成 typed-empty。把"源里没有这张表"读成"没有可见状态"会让一期比赛因为
+#'   一个读取缺陷而被静默排除。其余表缺失时退化为 typed-empty（它们的缺失含义明确）。
 n7_read_fixture_source <- function(source) {
   if (!is.list(source)) stop("n7_read_fixture_source: source must be a list")
   if (is.null(source$kind)) stop("n7_read_fixture_source: source$kind is required")
   if (identical(source$kind, "frames")) {
     tables <- source$tables
     if (!is.list(tables)) stop("n7_read_fixture_source: source$tables must be a list")
+    if (is.null(tables[["match_status"]])) {
+      stop("n7_read_fixture_source: source$tables has no match_status table; a missing ",
+           "status ledger is an input-contract error and is never read as empty")
+    }
     out <- list()
     for (table in names(n7_source_csv_columns())) {
       out[[table]] <- if (is.null(tables[[table]])) {
@@ -198,6 +210,11 @@ n7_read_fixture_source <- function(source) {
     directory <- source$path
     if (!is.character(directory) || length(directory) != 1L || !dir.exists(directory)) {
       stop("n7_read_fixture_source: source$path must be an existing directory")
+    }
+    status_file <- file.path(directory, "match_status.csv")
+    if (!file.exists(status_file)) {
+      stop("n7_read_fixture_source: ", status_file, " is missing; a missing status ",
+           "ledger is an input-contract error and is never read as empty")
     }
     out <- list()
     for (table in names(n7_source_csv_columns())) {
@@ -223,17 +240,32 @@ n7_read_fixture_source <- function(source) {
 #' @param source    夹具 source 描述符，语义同 n7_read_fixture_source。
 #' @param issue_ids 字符向量，要保留的期号；经 n7_check_character_id 校验
 #'   （非字符/含 NA/空串/带空白 -> stop()）。零长度表示不保留任何行。
-#' @param cutoff    temporal_learning 对象，经 n7_require_cutoff 校验后接受。
-#' @return list(fixtures, euro, totals, prematch_sp)，均为已校验 tibble。
+#' @return list(fixtures, euro, totals, prematch_sp, match_status)，均为已校验 tibble。
 #'   返回结构中不含 settlements。
-#' @details issue_ids 把行限制在请求的期号上。cutoff 为接口对称性而接受并校验，
-#'   但按报价时间过滤发生在 n7_prepare_epoch —— as-of 规则归它所有。赛果表不出现在
-#'   返回结构中，因此决策侧在构造上就看不到 outcome。
-n7_read_inputs <- function(source, issue_ids, cutoff) {
+#' @details 读取是**整期**的：没有任何 cutoff 参数，也不按时间过滤，因此一期内
+#'   每一天的比赛都被完整保留。哪一天属于哪个决策窗口、哪条报告在 cutoff 当时可见，
+#'   一律归 n7_prepare_epoch 与 n7_select_match_status 决定 —— 在这里先按时间裁剪
+#'   会丢掉后续"事后取消"的观测，从而无法证明未来报告不能改写过去的决策。
+#'
+#'   source 表**不被修改**：过滤只产出新的子集，调用方传进来的 data.frame 保持原样。
+#'
+#'   match_status 的关系键在过滤**之前**、对着**原始的完整** fixtures 校验：一条
+#'   指向根本不存在的比赛的台账行，无论它属于哪一期，都必须在输入边界报错，而不是
+#'   在过滤后因为"没匹配上"被静默丢弃。过滤之后只按 (issue_id, fixture_id) 复合键
+#'   保留属于被请求期的行。因此台账里"本期但被裁掉"的比赛仍被视为已知比赛。
+#'
+#'   缺失 match_status **表**是输入契约错误（frames 源的 tables 里没有该键、CSV 目录里
+#'   没有该文件），必须报错；**不允许**回退成 typed-empty。typed-empty 只能由调用方
+#'   显式提供一个零行的 match_status 表来表达"确实没有任何可见报告"。
+n7_read_inputs <- function(source, issue_ids) {
   n7_check_character_id(issue_ids, "issue_ids")
-  n7_require_cutoff(cutoff)
   inputs <- n7_read_fixture_source(source)
   fixtures <- inputs$fixtures
+  if (!"match_status" %in% names(inputs)) {
+    stop("n7_read_inputs: source provides no match_status table; a missing status ",
+         "ledger is an input-contract error, not an empty one")
+  }
+  raw_status <- n7_validate_match_status(inputs$match_status, fixtures = fixtures)
   if (nrow(fixtures)) {
     fixtures <- fixtures[fixtures$issue_id %in% issue_ids, , drop = FALSE]
   }
@@ -242,11 +274,19 @@ n7_read_inputs <- function(source, issue_ids, cutoff) {
     if (!nrow(data) || !length(fixture_ids)) return(data[0, , drop = FALSE])
     data[data$fixture_id %in% fixture_ids, , drop = FALSE]
   }
+  # Composite-key filter on typed columns: a same-numbered fixture in another issue
+  # is a different match and must not ride along with this issue's fixtures.
+  match_status <- if (nrow(raw_status)) {
+    raw_status[raw_status$issue_id %in% issue_ids, , drop = FALSE]
+  } else {
+    raw_status
+  }
   result <- list(
     fixtures = n7_validate_table(fixtures, "fixtures", keys = c("issue_id", "fixture_id")),
     euro = n7_validate_table(keep(inputs$euro), "euro"),
     totals = n7_validate_table(keep(inputs$totals), "totals"),
-    prematch_sp = n7_validate_table(keep(inputs$prematch_sp), "prematch_sp"))
+    prematch_sp = n7_validate_table(keep(inputs$prematch_sp), "prematch_sp"),
+    match_status = n7_validate_match_status(match_status, fixtures = fixtures))
   if ("settlements" %in% names(result)) {
     stop("n7_read_inputs: decision inputs must not carry settlements")
   }

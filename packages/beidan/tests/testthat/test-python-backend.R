@@ -20,8 +20,8 @@ testthat::test_that('table roundtrips preserve identifiers, UTC, missing and emp
   python <- Sys.getenv('BEIDAN_TEST_PYTHON')
   testthat::skip_if(!nzchar(python), 'Set BEIDAN_TEST_PYTHON for cross-language checks')
   backend <- n7_python_backend(python)
-  issue <- n7_make_fixture_issue('00123', '2026-09-22', n_fixtures=7L)
-  for (name in c('fixtures', 'euro', 'totals', 'prematch_sp')) {
+  issue <- n7_make_fixture_issue('00123', n7_kickoff_window('2026-09-22', 7L))
+  for (name in c('fixtures', 'euro', 'totals', 'prematch_sp', 'match_status')) {
     input <- tibble::as_tibble(lapply(issue[[name]], unname))
     testthat::expect_equal(n7_r_table(n7_python_table(input, name, backend), name), input)
     empty <- n7_typed_empty(name)
@@ -40,7 +40,7 @@ testthat::test_that('Python conversion rejects integer overflow and naive timest
   python <- Sys.getenv('BEIDAN_TEST_PYTHON')
   testthat::skip_if(!nzchar(python), 'Set BEIDAN_TEST_PYTHON for cross-language checks')
   backend <- n7_python_backend(python)
-  input <- n7_make_fixture_issue('00123', '2026-09-22', n_fixtures=7L)$fixtures
+  input <- n7_make_fixture_issue('00123', n7_kickoff_window('2026-09-22', 7L))$fixtures
   data <- n7_python_table(input, 'fixtures', backend)
   builtins <- reticulate::import_builtins(convert=FALSE)
   data$`__setitem__`('slot', builtins$int('9007199254740993'))
@@ -84,7 +84,7 @@ testthat::test_that('nullable integers and booleans remain missing in both langu
   python <- Sys.getenv('BEIDAN_TEST_PYTHON')
   testthat::skip_if(!nzchar(python), 'Set BEIDAN_TEST_PYTHON for cross-language checks')
   backend <- n7_python_backend(python)
-  input <- n7_make_fixture_issue('00123', '2026-09-22', n_fixtures=7L)$fixtures
+  input <- n7_make_fixture_issue('00123', n7_kickoff_window('2026-09-22', 7L))$fixtures
   input$handicap[1] <- NA_integer_
   data <- n7_python_table(input, 'fixtures', backend)
   testthat::expect_true(reticulate::py_to_r(data$handicap$isna()$iloc$`__getitem__`(0L)))

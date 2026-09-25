@@ -13,6 +13,8 @@
 #' @export n7_make_fixture_issue
 #' @export n7_fixture_source
 #' @export n7_read_inputs
+#' @export n7_match_statuses
+#' @export n7_select_match_status
 #' @export n7_prepare_epoch
 #' @export n7_project_probabilities
 #' @export n7_construct_candidates

@@ -8,7 +8,7 @@ n7_fixture_source(...)
 }
 \arguments{
 \item{...}{一个或多个由 n7_make_fixture_issue 返回的 list，每个必须含
-fixtures/euro/totals/prematch_sp 四张表。
+fixtures/euro/totals/prematch_sp/match_status 五张表。
 · 无参数                      -> stop()
 · 任一参数非 list             -> stop()，并点名第几个参数
 · 任一参数缺表                 -> stop()，并点名缺了哪些}

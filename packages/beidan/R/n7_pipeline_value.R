@@ -150,6 +150,7 @@ n7_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_thres
 #' @param probabilities Tibble keyed by fixture_id and outcome, with nonnegative W/D/L probabilities summing to one per fixture.
 #' @param prematch_sp Pre-cutoff SP tibble; an empty table is allowed and causes unavailable estimated EV.
 #' @param cutoff Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.
+#' @param match_status Required match-status observation ledger; a missing ledger errors and an empty one excludes every fixture.
 #' @param patterns Named list of length-seven vectors of allowed outcome counts (1, 2 or 3).
 #' @param construction Explicit group construction policy, including supplied groups when applicable.
 #' @param max_candidates Positive integer limit on constructed fixture groups.
@@ -159,8 +160,8 @@ n7_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_thres
 #' @param max_overlap Integer upper limit on shared fixtures between distinct purchased groups.
 #' @return A list of group, structure, ticket and valuation tables without settlement information.
 n7_build_decision <- function(fixtures, probabilities, prematch_sp, cutoff,
-                              patterns, construction, max_candidates, seed,
-                              constants, max_reuse, max_overlap) {
+                              match_status, patterns, construction, max_candidates,
+                              seed, constants, max_reuse, max_overlap) {
   # constants$n_legs is read immediately below, and a NULL list would make it NULL
   # rather than fail. The other constants are read further down the same call.
   checkmate::assert_list(constants, names = "named", .var.name = "constants")
@@ -177,7 +178,7 @@ n7_build_decision <- function(fixtures, probabilities, prematch_sp, cutoff,
   checkmate::assert_count(max_overlap, .var.name = "max_overlap")
   groups <- n7_construct_candidates(fixtures, probabilities, cutoff,
                                     constants$n_legs, construction,
-                                    max_candidates, seed)
+                                    max_candidates, seed, match_status)
   # Every pattern in the allocation is applied over the same groups, each under its
   # own candidate label. Applying only patterns[[1]] would silently ignore the rest
   # of a mixed allocation, and sharing one label would collide distinct structures.
@@ -1295,6 +1296,7 @@ n7_allocation_configs <- function(constants = n7_pipeline_constants()) {
 #' @param probabilities Tibble keyed by fixture_id and outcome, with nonnegative W/D/L probabilities summing to one per fixture.
 #' @param prematch_sp Pre-cutoff SP tibble; an empty table is allowed and causes unavailable estimated EV.
 #' @param cutoff Explicit cutoff object with cutoff_utc (UTC POSIXct) and character issue_id. Decision inputs must precede it.
+#' @param match_status Required match-status observation ledger; a missing ledger errors and an empty one excludes every fixture.
 #' @param constants Named business constants returned by n7_pipeline_constants(); values are passed explicitly, never learned here.
 #' @param max_reuse Positive integer limit on fixture reuse across distinct purchased groups.
 #' @param max_overlap Integer upper limit on shared fixtures between distinct purchased groups.
@@ -1303,14 +1305,15 @@ n7_allocation_configs <- function(constants = n7_pipeline_constants()) {
 #' @param prior_fixture_sets Named list of fixture identifiers in groups bought earlier in this issue.
 #' @return A list containing config, built tables, probabilities, ranked tickets, funding and frozen plan.
 n7_run_allocation <- function(config, fixtures, probabilities, prematch_sp, cutoff,
-                              constants, max_reuse, max_overlap, seed = 1L,
+                              match_status, constants, max_reuse, max_overlap,
+                              seed = 1L,
                               prior_purchases = NULL, prior_fixture_sets = NULL) {
   # entropy_balanced deals groups round-robin over the 7-leg blocks, so B needs
   # 8 x 7 = 56 fixtures. When the priced slate is shorter than that, fewer groups
   # are formed and the shortfall is reported rather than silently ignored.
   built <- n7_build_decision(fixtures, probabilities, prematch_sp, cutoff,
-                             config$patterns, "entropy_balanced", config$n_groups,
-                             seed, constants, max_reuse, max_overlap)
+                             match_status, config$patterns, "entropy_balanced",
+                             config$n_groups, seed, constants, max_reuse, max_overlap)
   # Rank the VALUED tickets: built$tickets$tickets is the raw enumeration, whose
   # ev_net_est is still NA by construction.
   ranked <- n7_rank_tickets(built$valued, built$tickets$candidate_tickets,
@@ -1673,8 +1676,8 @@ n7_replay_issue <- function(decision_inputs, decision_cutoffs, settlements, as_o
     own_sets <- ledger_sets[names(ledger_sets) %in%
                               as.character(own$group_id)]
     result <- n7_run_allocation(config, inputs$fixtures, inputs$probabilities,
-                               inputs$sp, cutoff, constants, policies$max_reuse,
-                               policies$max_overlap, policies$seed,
+                               inputs$sp, cutoff, inputs$match_status, constants,
+                               policies$max_reuse, policies$max_overlap, policies$seed,
                                prior_purchases = own,
                                prior_fixture_sets = own_sets)
     plans[[length(plans) + 1L]] <- result$plan

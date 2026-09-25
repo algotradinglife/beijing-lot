@@ -10,12 +10,13 @@ n7_read_fixture_source(source)
 \item{source}{list，必须含 kind。
 · 非 list                      -> stop()
 · 缺 kind                      -> stop()
-· kind == "frames"：必须含 list 型 tables；缺某张表按 typed-empty 处理
-· kind == "csv_dir"：必须含 path，且指向已存在目录；缺某张 CSV 按 typed-empty 处理
+· kind == "frames"：必须含 list 型 tables；缺 match_status 表 -> stop()
+· kind == "csv_dir"：必须含 path，且指向已存在目录；缺 match_status.csv -> stop()
 · 其它 kind（含任何网络源）    -> stop()}
 }
 \value{
-具名 list，四张表（fixtures/euro/totals/prematch_sp），均为已校验 tibble。
+具名 list，五张表（fixtures/euro/totals/prematch_sp/match_status），均为
+已校验 tibble。
 }
 \description{
 读取一个夹具 source 描述符
@@ -23,4 +24,8 @@ n7_read_fixture_source(source)
 \details{
 CSV 一律以 colClasses = "character" 读入：否则 read.csv 会在契约校验看到
 之前，把全数字的 issue_id 或带前导零的 id 变成数值。
+
+match_status 是\strong{必需的观测台账}：源没有提供它，是一个输入契约错误，必须报错，
+绝不回退成 typed-empty。把"源里没有这张表"读成"没有可见状态"会让一期比赛因为
+一个读取缺陷而被静默排除。其余表缺失时退化为 typed-empty（它们的缺失含义明确）。
 }

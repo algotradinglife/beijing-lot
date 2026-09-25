@@ -1,0 +1,171 @@
+---
+title: "N7 比赛状态：决策时点可见性与准入"
+format: html
+execute:
+  error: false
+  cache: false
+  freeze: false
+---
+
+#508 的独立合成验收。比赛状态与销售、结算状态分离，只有决策前实际获知的 scheduled 允许参与构组。没有状态证据时排除；不使用后来取消或完场的信息改写过去。
+
+```{r}
+pkgload::load_all("../packages/beidan", quiet = TRUE)
+cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
+kickoff_at <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + seq(0, by = 900, length.out = 14L)
+example <- n7_make_fixture_issue("00123", kickoff_at)
+inputs <- n7_read_inputs(n7_fixture_source(example), "00123")
+baseline <- n7_select_match_status(inputs$fixtures, inputs$match_status, cutoff)
+stopifnot(nrow(baseline$fixtures) == 14L)
+knitr::kable(baseline$selected_status)
+```
+
+```{r}
+future <- inputs$match_status[1, ]
+future$status <- "cancelled"
+future$status_at <- cutoff$cutoff_utc + 1
+future$available_at <- cutoff$cutoff_utc + 1
+changed <- dplyr::bind_rows(inputs$match_status, future)
+stopifnot(identical(baseline, n7_select_match_status(inputs$fixtures, changed, cutoff)))
+at_cutoff <- future
+at_cutoff$status_at <- cutoff$cutoff_utc
+at_cutoff$available_at <- cutoff$cutoff_utc
+stopifnot(identical(baseline, n7_select_match_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, at_cutoff), cutoff)))
+visible <- future
+visible$status_at <- cutoff$cutoff_utc - 1
+visible$available_at <- cutoff$cutoff_utc - 1
+filtered <- n7_select_match_status(inputs$fixtures, dplyr::bind_rows(inputs$match_status, visible), cutoff)
+stopifnot(nrow(filtered$fixtures) == 13L, nrow(filtered$exclusions) == 1L)
+knitr::kable(filtered$exclusions)
+```
+
+```{r}
+empty <- n7_select_match_status(inputs$fixtures, n7_typed_empty("match_status"), cutoff)
+stopifnot(nrow(empty$fixtures) == 0L, nrow(empty$exclusions) == 14L,
+          identical(empty$fixtures, inputs$fixtures[0, ]))
+knitr::kable(tibble::tibble(check = c("14 场 scheduled 准入", "未来取消不改写历史", "cutoff 相等不可见", "已知取消排除", "无状态证据全部排除"), passed = TRUE))
+```
+
+仅用合成数据验证接口。不声称已完成真实来源状态采集；真实输入需保留实际观察时间及原始来源链接/响应。
+
+## 验收记录
+
+实现与函数测试由 dsh 执行；控制侧独立运行以上断言和包相关测试，并在最终 codex review 后记录命令、结论及文件哈希。
+
+## 构组及下注计划不变性
+
+```{r}
+probabilities <- tidyr::expand_grid(fixture_id = inputs$fixtures$fixture_id, outcome = c("W", "D", "L")) |>
+  dplyr::mutate(probability = rep(c(0.5, 0.3, 0.2), nrow(inputs$fixtures)))
+constants <- n7_pipeline_constants(reset = TRUE)
+config <- n7_allocation_configs(constants)$C
+first <- n7_run_allocation(config, inputs$fixtures, probabilities, inputs$prematch_sp,
+  cutoff, constants, max_reuse = 1L, max_overlap = 0L, match_status = inputs$match_status)
+second <- n7_run_allocation(config, inputs$fixtures, probabilities, inputs$prematch_sp,
+  cutoff, constants, max_reuse = 1L, max_overlap = 0L, match_status = changed)
+stopifnot(identical(first, second))
+knitr::kable(first$built$groups$group_legs)
+```
+
+## 整期读取与决策窗口分离
+
+```{r}
+multi_kickoff <- as.POSIXct(c("2026-09-23 04:00:00", "2026-09-24 04:00:00"), tz = "UTC")
+multi <- n7_make_fixture_issue("00123", multi_kickoff)
+source <- n7_fixture_source(multi)
+original <- source
+whole <- n7_read_inputs(source, "00123")
+next_cutoff <- cutoff
+next_cutoff$cutoff_utc <- cutoff$cutoff_utc + 86400
+euro_policy <- list(members = c("c01", "c02", "c03"), missing = "error")
+totals_policy <- list(companies = NULL, line = "nearest_main", watermark = "decimal")
+epoch1 <- n7_prepare_epoch(whole, cutoff, euro_policy = euro_policy, totals_policy = totals_policy)
+epoch2 <- n7_prepare_epoch(whole, next_cutoff, euro_policy = euro_policy, totals_policy = totals_policy)
+stopifnot(nrow(whole$fixtures) == 2L, identical(source, original),
+          identical(epoch1$fixtures$fixture_id, whole$fixtures$fixture_id[1]),
+          identical(epoch2$fixtures$fixture_id, whole$fixtures$fixture_id[2]))
+knitr::kable(tibble::tibble(stage = c("整期读取", "9月22日决策", "9月23日决策"), matches = c(nrow(whole$fixtures), nrow(epoch1$fixtures), nrow(epoch2$fixtures))))
+```
+
+## 最终验证与审阅
+
+本次 #508 同时完成比赛状态历史准入与整期输入/决策窗口解耦。所有示例为合成数据，未采集真实状态、未改派彩规则，也未进行历史学习或参数校准。
+
+| 函数/边界 | 对应测试文件 | 最终通过断言数 |
+|---|---|---:|
+| 选择器、状态校验、读取边界 | test-n7-match-status.R | 107 |
+| 控制侧独立多日/时间精度/因果/空结果验收 | test-n7-match-status-acceptance.R | 27 |
+| 构组入口和状态排除诊断 | test-n7-pipeline-candidates.R | 135 |
+| 生成器、输入适配、schema及typed-empty | test-n7-pipeline-contracts.R | 533 |
+| epoch、概率投影与时间边界 | test-n7-pipeline-epoch.R | 123 |
+| S7领域表契约 | test-n7-pipeline-types.R | 65 |
+| 构组/预算/冻结/回放/结算回归 | test-n7-pipeline-value.R | 337 |
+| 真实R/Python转换（含match_status及空表） | test-python-backend.R | 48 |
+
+上述最终文件测试均零失败、零警告、零跳过。整套 N7 首轮复核在 b9dd9e34 上通过 1322 条；最终增量增加5条断言，独立重跑 acceptance/status/epoch 共257条通过，value 最终337条通过。跨语言48条使用真实声明的Python解释器运行，未用mock代替。
+
+- 主体审阅：`codex review --base origin/main`，对应 `b9dd9e3425f52c3cf643342cea5d5fa250c25411`，无可操作回归；审阅进程独立跑1322条并执行本QMD。
+- 增量审阅：`codex review --commit 71cdfabf`，对应空投影必需历史表及未来报价/标签不变性回归。第一次因GitHub GraphQL EOF未能给出验收；live graph重读成功后重试，结论无可操作回归，独立重跑257条通过。
+- dsh初稿由控制侧修复并复核：修正遗漏的调用方、原始/切片台账关系、亚秒时间与同时开赛、缺表与空表区别、跨日测试时段；第一次dsh越界value测试被停止，不计作通过。最终结论依据上述实测及审阅。
+- `quarto/n7_match_status.qmd`、`quarto/n7_pipeline_contracts.qmd`、`quarto/beidan_package.qmd` 使用干净R进程、执行开启、cache/freeze绕过，HTML无执行错误，关键表完整。
+- 不运行无关全仓研究数据测试；本次无Python实现变更，以真实桥接测试覆盖新表的往返契约。未参与CI。
+
+复现命令（从仓库根运行；事先声明项目R库与Python解释器）：
+
+```sh
+R_LIBS=/path/to/project/r_lib \
+BEIDAN_TEST_PYTHON=/path/to/project/.venv/bin/python \
+RETICULATE_PYTHON=/path/to/project/.venv/bin/python \
+Rscript --vanilla -e 'testthat::test_local("packages/beidan", filter="n7-pipeline|n7-match-status|python-backend", reporter="summary", stop_on_failure=TRUE)'
+R_LIBS=/path/to/project/r_lib codex review --base origin/main
+R_LIBS=/path/to/project/r_lib codex review --commit 71cdfabf
+TMPDIR=/writable/tmp XDG_CACHE_HOME=/writable/cache DENO_DIR=/writable/deno \
+quarto render quarto/n7_match_status.qmd --no-cache --execute
+```
+
+其余两份报告使用经 `pak::local_install()` 安装的本版package；`beidan_package.qmd` 另传 `-P python:/path/to/project/.venv/bin/python`。验证环境为 R 4.6.1、testthat 3.3.2、lubridate 1.9.5、Quarto 1.10.18。R库/缓存路径仅由环境声明，不写入函数或自动安装。
+
+### Reviewed SHA-256
+
+下表绑定最终受审文件；本节为审阅完成后追加的证据，不改变运行代码。QMD自身取本节追加前正文的哈希，避免自引用。
+
+| 文件 | SHA-256 |
+|---|---|
+| `docs/strategy/n7_match_status_contract.md` | `3d5720c881897b2ba47d77f23e7685cb9c1419ec4239d4d899d401b97293f359` |
+| `docs/strategy/n7_pipeline_function_contracts.md` | `83774d556de58a7a90c25b49d421e891b474b19ae2251e985f899281a10ab3e8` |
+| `packages/beidan/NAMESPACE` | `dfc450a5a33bbdb5993a96d3a0cb981cb274beb6869526c86b916837a7d3839d` |
+| `packages/beidan/R/beidan-package.R` | `75ad1030b8321d004504135e7b33235ed990b923285c43cb0652be9210b85b36` |
+| `packages/beidan/R/n7_pipeline_candidates.R` | `b886b804472b6872a411a299c3c0323752a39bf095ff4b83f1cf61cca42c1b08` |
+| `packages/beidan/R/n7_pipeline_contracts.R` | `8dd995afd486f47f2a69c9cc7ae5204185cfe3dbbd35cbec41bd9c7dcbe0ff80` |
+| `packages/beidan/R/n7_pipeline_epoch.R` | `07d04ff4d6906136162396ba8ef5a25373acc57a40ae780dee6940045beb43ee` |
+| `packages/beidan/R/n7_pipeline_fixture.R` | `86ebfbe5cb77bd74a4f07d6ed63874f67c183ff66ce353ff139200fe41ed7b3e` |
+| `packages/beidan/R/n7_pipeline_inputs.R` | `bf1f7b894a8c5be582282c2fd2025f4f580de24bc503689bff956ef2fc8a6480` |
+| `packages/beidan/R/n7_pipeline_match_status.R` | `a87d7791ffbeb571269c65a18da5088b0ea103adc2ee721e727da5100dea82f5` |
+| `packages/beidan/R/n7_pipeline_value.R` | `4ff7c3012b2e814b2cf18c78971a563d3471e1110dbafff4d1b4283ba4f2f82f` |
+| `packages/beidan/README.md` | `b376bb372c246fd39e04726491abb5abfedfc4f940084f8ea3b0517e70446f1c` |
+| `packages/beidan/man/n7-contracts.Rd` | `e9d60c8636bb43130cdf868cca339b001c7f399e8cc9c566bc9ceafa8fb97f2c` |
+| `packages/beidan/man/n7_build_decision.Rd` | `82530f04e1df42fc9c5dc96383a60ebfc6d8e7dfa8b7a4303ab9761beb1deb05` |
+| `packages/beidan/man/n7_construct_candidates.Rd` | `225967462618cd917697e512260fb3836690789de8459a0618bb9ed4ab86de9e` |
+| `packages/beidan/man/n7_fixture_source.Rd` | `d6e8924c53de1a20af904fa240b7e0a18165202d4c938b3b9c95f074ac6a466c` |
+| `packages/beidan/man/n7_make_fixture_issue.Rd` | `138672a5978127a7f5c308be685e3dec98103d0c6687681fea88622c56488d7a` |
+| `packages/beidan/man/n7_match_statuses.Rd` | `6f4f790c43dc747d7635c3c7d5550b0da331c45a7e4bb114a21ad79cc5e5eb36` |
+| `packages/beidan/man/n7_prepare_epoch.Rd` | `e8b8b27f9e7192434a6ddd5e335fadbc32b12cd5d33afbfb999ca6c25593d143` |
+| `packages/beidan/man/n7_project_probabilities.Rd` | `d8bf070328448e7cb94be5be36d26405863dccaeb07e06001dacce4653eb2cdb` |
+| `packages/beidan/man/n7_read_fixture_source.Rd` | `4d5c9109de4b8f3769453c9f76628e084ead830d31afb7431558ba31be0bd02e` |
+| `packages/beidan/man/n7_read_inputs.Rd` | `427ee5c8268e519d8590060d4fc148682bd8cef550107e073521fa7a93dd50aa` |
+| `packages/beidan/man/n7_run_allocation.Rd` | `2a2f80fd9fa2597a3d7bc935f08c24a26e1da100e89e3749186325c8a1f3d365` |
+| `packages/beidan/man/n7_select_match_status.Rd` | `29fd72d96400d243112787b2d9039c7d52bfa6e29bcc5b059b5ff70bc43946ea` |
+| `packages/beidan/man/n7_source_csv_columns.Rd` | `f5f3e021d4c97fc0851f74f134cdb41dc399c76f65bdce8bb002e37b57a8e9bf` |
+| `packages/beidan/man/n7_table_schemas.Rd` | `8af9915068e99ec20cded588b9fecdec2fa2af4921685fb302ba114f9063b9ab` |
+| `packages/beidan/man/n7_validate_match_status.Rd` | `a78dc0a74941b35fdff4092aaf7a5bcff7092612d0255a0b773004510ba996e7` |
+| `packages/beidan/tests/testthat/helper-n7-fixtures.R` | `efe2ef5e2ef3c333a137b1a19ad1d5a02aa0df6b6a567af05be150b92ceb1b70` |
+| `packages/beidan/tests/testthat/test-n7-match-status-acceptance.R` | `5334a7f0c41fab35d3de3d65df604fac61ec2537866719f391e77c9bee7d80e6` |
+| `packages/beidan/tests/testthat/test-n7-match-status.R` | `678a047c9d6ddfa61cf2602d01aec9bbecd7a2b319535c0311bbff0e26564691` |
+| `packages/beidan/tests/testthat/test-n7-pipeline-candidates.R` | `015c22195c4ff7ca170de17747898d682321413d511088a6105b1c6132526358` |
+| `packages/beidan/tests/testthat/test-n7-pipeline-contracts.R` | `7452641758606228be3cde00fe5b8842de24dea6a37c60b8f2d29246ceff8468` |
+| `packages/beidan/tests/testthat/test-n7-pipeline-epoch.R` | `575deea826fe914586eb1217419c39c140cd2d431e6df28af54ef8c7b28cbbd5` |
+| `packages/beidan/tests/testthat/test-n7-pipeline-value.R` | `fab8c4a46983adf600b40903313d6d54fbc1badd856e3e624f950b6a05ce6b3d` |
+| `packages/beidan/tests/testthat/test-python-backend.R` | `4120c0a7995f853d531dfa56b9d9c33222f80b03429dd21e2d37686f3ec53485` |
+| `quarto/beidan_package.qmd` | `13ace70bfd24b23a367677bc80b38fea2765a50c3237e5094c8d1367ed0c6cd0` |
+| `quarto/n7_pipeline_contracts.qmd` | `7d7832d37359f2ec67b6c365f129050d25096ee356697bb945d7ed39a2aee402` |
+| 本QMD正文（追加验收记录之前） | `ac6e1048b7b752fde984c95fd5176bee1786d74adeec367597aec4b1cd2a7ea4` |

@@ -22,6 +22,7 @@ n7_source_csv_columns()
 
 与 tibble schema 保持一致；由下方读取器在边界处改名并改型。
 
-只覆盖可在磁盘上出现的四张表：fixtures、euro、totals、prematch_sp。
-settlements 与其余派生表不在其中，因此磁盘源无法把赛果混进决策输入。
+只覆盖可在磁盘上出现的五张表：fixtures、euro、totals、prematch_sp、
+match_status。settlements 与其余派生表不在其中，因此磁盘源无法把赛果混进
+决策输入。
 }
