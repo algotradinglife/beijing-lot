@@ -1,0 +1,22 @@
+{
+  "issue": 518,
+  "review": "codex review of staged diff origin/main",
+  "files": {
+    "docs/reviews/516-schedule-identity-historical.md": "7fe964c8fa43646d8aea23a4ea2f0d02039091a3e04a3c390ce685880930fd68",
+    "packages/beidan/R/issue_schedule.R": "9f6322bc1437684f66aed129d9becdded9708caa62d7dc5b51e3a25f481aafaf",
+    "packages/beidan/R/schedule_identity.R": "8918792d66f77527d7c19e2ef9eeed6a7ce9a7dccd905b9556de78467542bf6c",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py": "f7fe1343ed3e431438b2eea6e20baf0c81f7df34b1e3e0596cd8ddb2b5e4f0e3",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py": "6ec81fff0af9b2b151136e47a0e42f3ec2057e9def5ab70e3646f855fa4bc875",
+    "packages/beidan/man/jev_schedule_request.Rd": "07a964e6513eb38d1b6cb29fe5b2389e05c71830648dc70dfa6b497532e50714",
+    "packages/beidan/man/schedule_identity_iso.Rd": "e8bfe900ffdae3a1cd2f9d87b13e2872515a0e62446f79f4460de7a464c14aa1",
+    "packages/beidan/man/schedule_identity_items.Rd": "91c2b60ef82dacba007ed136da3b347f571a51df7746c12d05bcea97f237dde4",
+    "packages/beidan/man/schedule_identity_scalar.Rd": "1d48eaa983cca4d5271de9d77a4412263f6b82fec63214334d25e12ca298c83f",
+    "packages/beidan/tests/python/test_issue_schedule.py": "cd7465b9816e1792053df4205d0c6aefeb766571cbedd63a9caea2d7f44a96ee",
+    "packages/beidan/tests/testthat/fixtures/schedule_identity/jev_context_receipt.rds": "427ed5d955c6670260e175af85a57e4017ddcad5ff93ec9788bcadacf0899300",
+    "packages/beidan/tests/testthat/fixtures/schedule_identity/schedule.rds": "defee72754934d7677615539d51f8e86b40a79a7cc829ba3d5c50607c5889976",
+    "packages/beidan/tests/testthat/test-issue-schedule.R": "14eecf242ab2b6b1f5c76bc59b0eb7d650e2a6b12f3505123adc79e9270aeb37",
+    "packages/beidan/tests/testthat/test-schedule-identity.R": "c50f14459e22fcfbbe8e916c4eaa9e413ca47a5a1217b6d86acfb1b688bf33b2",
+    "scripts/acceptance/issue_schedule_walkthrough.R": "da45c5e74120ae04d91a5d0b4f68856dda4c4afc5b6164daade4eb3bc9247577"
+  },
+  "delivery_qmd_body_sha256": "508b10f8cab784b5bcba1ad9455fd43ab50cb2c5609311a6ad3840c9aa39b360"
+}

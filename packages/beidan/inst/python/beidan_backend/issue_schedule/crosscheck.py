@@ -280,6 +280,12 @@ def build_canonical_rows(
                 "sale_end_at": sale_end_at,
                 "sale_end_raw": (right.sale_end_raw if right else None)
                 or (left.sale_end_raw if left else None),
+                # Each provider's own sale cutoff is preserved verbatim and
+                # separately: 500's ``endTime`` and nowscore's ``截止时间：``
+                # title are *different* sales cutoffs, never one kickoff estimate
+                # and never merged into a single agreement claim.
+                "sale_end_raw_500": left.sale_end_raw if left else None,
+                "sale_end_raw_nowscore": right.sale_end_raw if right else None,
                 "sale_end_date_source": "title-attribute" if sale_end_at else "absent",
                 "score": pick_score(right),
                 "provider_id": picked.provider_match_id if picked else "",

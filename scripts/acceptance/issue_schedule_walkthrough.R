@@ -47,3 +47,9 @@ sys.source(script, envir = real_walkthrough)
 sys.source(file.path(project_root, "scripts/acceptance/walkthrough_analysis_checks.R"),
            envir = real_walkthrough)
 cat("Real schedule analysis checks passed outside QMD; missing markets remain untested.\n")
+testthat::expect_s3_class(real_walkthrough$identity_result, "tbl_df")
+testthat::expect_equal(nrow(real_walkthrough$identity_result), 292L)
+testthat::expect_false(any(real_walkthrough$identity_result$review_state %in% c("error", "unavailable")))
+testthat::expect_true(all(real_walkthrough$identity_items$opponent_exact_alias[
+  real_walkthrough$identity_items$slot == 77L & real_walkthrough$identity_items$side == "home"]))
+cat("Integrated section 4 saved-context replay passed without network.\n")

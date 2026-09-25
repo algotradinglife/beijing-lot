@@ -11,9 +11,19 @@ schedule_identity_items(schedule)
 }
 \value{
 A tibble with one row per fixture side, stable item_id, original aliases,
-provider IDs, league, source URLs and Beijing observation time. Empty input
-returns the same typed columns. No network or persistence side effects.
+opposite-side aliases from both sources (\code{opponent_aliases_500} /
+\code{opponent_aliases_nowscore}) and the deterministic
+\code{opponent_exact_alias} verdict computed with \code{\link[=schedule_alias_exact]{schedule_alias_exact()}},
+provider IDs, league, source URLs, source-specific sale-cutoff raw text
+(\code{sale_end_raw_500} / \code{sale_end_raw_nowscore}) and Beijing observation time.
+Empty input returns the same typed columns. No network or persistence side
+effects.
 }
 \description{
 Build team-name evidence pairs without changing the schedule
+}
+\details{
+The opposite side is carried as \emph{context} for the judge, not as proof:
+a matching opponent name does not identify the judged side, so
+\code{opponent_exact_alias} is evidence only and never sets \code{choice} on its own.
 }
