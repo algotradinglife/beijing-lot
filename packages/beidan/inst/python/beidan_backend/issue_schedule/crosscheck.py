@@ -252,6 +252,18 @@ def build_canonical_rows(
                 nowscore_score=right.score,
                 can_sale=right.can_sale,
             )
+            state_code = right.extras.get("status_code")
+            if state_code is not None:
+                # MatchState in the source bdLive.js defines these codes.
+                state_token = {0: "未开赛", 1: "上", 2: "中场", 3: "下", 4: "完场",
+                    5: "点", -1: "完场", -10: "取消", -99: "取消", -11: "待定",
+                    -12: "腰斩", -13: "中断", -14: "推迟"}.get(state_code, "")
+                coded_status = classify_match_status(nowscore_token=state_token,
+                    nowscore_score=None, can_sale=None)
+                if match_status != "unknown" and coded_status != "unknown" and match_status != coded_status:
+                    raise CrossSourceError(f"slot {slot}: conflicting nowscore state code/display")
+                match_status = coded_status
+                note += f";match-status-source=M[{slot}][4]"
         else:
             match_status = "unknown"
             note += ";match-status-absent (500 publishes no match status)"
@@ -271,11 +283,11 @@ def build_canonical_rows(
                 "kickoff_group_date": group_date,
                 "kickoff_date_source": date_source,
                 "match_status": match_status,
-                # The raw column keeps the *display string* the source published,
-                # whatever it was (``完场``/``截止``/``23:25``/empty). It is a copy
-                # of the display, never a second, differently-classified status,
-                # so a mixed sale display can never be read as match status.
-                "match_status_raw": display_nowscore if match_status != "unknown" else None,
+                # Preserve the exact state-code evidence when supplied; the
+                # independent raw_display_nowscore retains the mixed sale cell.
+                "match_status_raw": (f"M[{slot}][4]={right.extras['status_code']}"
+                    if right and right.extras.get("status_code") is not None
+                    else display_nowscore if match_status != "unknown" else None),
                 "sale_state": sale_state,
                 "sale_end_at": sale_end_at,
                 "sale_end_raw": (right.sale_end_raw if right else None)
