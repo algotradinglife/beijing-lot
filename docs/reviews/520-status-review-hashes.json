@@ -1,0 +1,9 @@
+{
+  "docs/reviews/520-status-source.json": "d3de2e6ea092a5644c20766acde6a6645f9199f1c3a9ed668556c8c121e68789",
+  "packages/beidan/R/issue_schedule.R": "7bd5c781a836ac97c59df6d058b2520d4b79904d190aec6894d5476aa89f5a5c",
+  "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py": "87039186f9636ec28f2d260aaa3cee2916602e2691e23cd1c91d4bf4331481ac",
+  "packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py": "8b453f706cbb9d629759ab7794a4fd67f44e23408c95f92bc2b29a1da54034d7",
+  "packages/beidan/man/fetch_issue_schedule.Rd": "6a982190bae47dc0e56d537751cee0e8a2bab4a77d05c5f1a8ad6c13d3a34c88",
+  "packages/beidan/tests/python/fixtures/nowscore.bdLive.js": "4dfbe4ca443149c756a1a39be9cc635b1f57541e460c390870533ed327f7d9d9",
+  "packages/beidan/tests/python/test_issue_schedule.py": "af86e048b5b34f3458bc9e54cf2678f80e604a642b7132a96e91eb2c5c49ecdd"
+}
