@@ -17,4 +17,18 @@ Named request body, with no credential or side effects.
 \description{
 Build the exact evidence and typed questions sent to Jev
 }
+\details{
+Evidence carries complete fixture context (issue/slot, both sides and
+opponents from both sources, leagues, provider IDs, source URLs) so the judge
+can weigh the judged side against a full fixture rather than a bare slot.
+\code{opponent_exact_alias} is deterministic support whose provenance is named; a
+matching opponent is context only and is never presented as identity proof.
+\code{kickoff_at} is the canonical unified instant; its origin is stated as the
+Nowscore JS kickoff date plus displayed clock, \strong{not} as cross-source
+agreement, and \code{kickoff_hhmm}/\code{kickoff_date_source} are its provenance. The
+two sources' sale cutoffs (\code{sale_end_raw_500} / \code{sale_end_raw_nowscore}) are
+preserved separately as \emph{different} sales deadlines, never kickoff estimates
+and never summed into one shared instant. Missing evidence is sent explicitly
+as \code{null}; timestamps are ISO-8601 Beijing time. No +/- minutes are guessed.
+}
 \keyword{internal}

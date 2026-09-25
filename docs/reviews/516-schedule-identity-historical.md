@@ -1,3 +1,7 @@
+# #516 历史审阅记录
+
+此文件仅保留当时的交付与review证据，不是操作入口。当前统一入口为 `quarto/26098_walkthrough.qmd` 第4节。
+
 ---
 title: "赛程别名与 Jev 身份判定（#516 开发验收）"
 format: html

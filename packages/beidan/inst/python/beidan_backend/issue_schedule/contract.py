@@ -80,6 +80,8 @@ def canonical_columns() -> tuple[str, ...]:
         "sale_state",
         "sale_end_at",
         "sale_end_raw",
+        "sale_end_raw_500",
+        "sale_end_raw_nowscore",
         "sale_end_date_source",
         "score",
         "provider_id",

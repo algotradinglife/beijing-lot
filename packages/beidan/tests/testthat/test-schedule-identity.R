@@ -10,9 +10,15 @@ identity_schedule_fixture <- function() {
   s$away_500 <- s$away_title_500 <- c("耶尔文佩", "布雷流浪者")
   s$away_display_500 <- c("查普斯", "布雷流浪者")
   s$away_nowscore <- s$away_display_nowscore <- c("耶尔文佩", "布雷流浪者")
-  s$league_500 <- s$league_nowscore <- c("芬甲", "爱甲")
+  s$league_500 <- c("芬甲", "爱甲")
+  s$league_nowscore <- c("芬甲", "爱超")
   s$provider_id_500 <- c("1370919", "1382740")
   s$provider_id_nowscore <- c("2921946", "2939061")
+  s$kickoff_at <- lubridate::ymd_hms(c("2026-09-25 20:00:00", "2026-09-25 22:30:00"), tz = "Asia/Shanghai")
+  s$kickoff_hhmm <- c("20:00", "22:30")
+  s$kickoff_date_source <- rep("js-kickoff-date", 2)
+  s$sale_end_raw_500 <- c("2026-09-25 19:50", "2026-09-25 22:20")
+  s$sale_end_raw_nowscore <- c("2026-09-25 19:55", "2026-09-25 22:25")
   s$source_url_500 <- rep("https://trade.500.com/bjdc/?expect=26098", 2)
   s$source_url_nowscore <- rep("https://cp.nowscore.com/buy/DanChang.aspx?all=1&issueNum=26098", 2)
   s
@@ -114,7 +120,9 @@ testthat::test_that("real HTTP adapter batches and validates typed Jev response"
   testthat::expect_identical(out$model, "jev-test")
   receipt <- attr(out, "judge_receipt")
   testthat::expect_false(grepl("fake-key", paste(capture.output(str(receipt)), collapse = "")))
-  testthat::expect_true(all(c("克鲁比04", "赫尔辛基预备队") %in% receipt$request$state$items[[1]]$aliases_500))
+  testthat::expect_true(all(c("克鲁比04", "赫尔辛基预备队") %in% receipt$request$state$items[[1]]$side_aliases_500))
+  testthat::expect_true("耶尔文佩" %in% receipt$request$state$items[[1]]$opponent_aliases_500)
+  testthat::expect_true(receipt$request$state$items[[1]]$opponent_exact_alias$value)
   testthat::expect_error(jev_schedule_judge(items, api_key = "x", timeout = 0))
 })
 
@@ -146,25 +154,103 @@ testthat::test_that("receipts bind input evidence and decision thresholds", {
   testthat::expect_identical(attr(attr(a, "generated_at"), "tzone"), "Asia/Shanghai")
 })
 
-testthat::test_that("real saved response replays current policy without network", {
+testthat::test_that("obsolete saved receipt is rejected instead of replayed as fresh", {
   fixture <- testthat::test_path("fixtures", "schedule_identity")
-  s <- readRDS(file.path(fixture, "schedule.rds"))
   receipt <- readRDS(file.path(fixture, "jev_receipt.rds"))
   httr2::local_mocked_responses(function(req) stop("replay must not use network"))
+  # The saved real receipt predates the opposite-side/kickoff/sale evidence
+  # contract. Its request must not be replayed as a fresh inference. NOTE: the
+  # saved schedule.rds also predates the two source sale-end raw columns, so the
+  # current fixture supplies the current-schema schedule; control regenerates the
+  # real RDS from saved raw bytes and runs one new inference.
+  testthat::expect_true(all(c("opponent_aliases_500", "kickoff_at_nowscore",
+    "sale_end_raw_500") %in% names(receipt$request$state$items[[1]])) == FALSE)
+  s <- identity_schedule_fixture()
   a <- replay_schedule_identity(s, receipt)
-  testthat::expect_equal(sum(a$review_state == "auto"), 21)
-  testthat::expect_equal(sum(a$review_state == "review"), 5)
-  testthat::expect_identical(a$review_state[a$slot==77L & a$side=="home"], "review")
-  testthat::expect_identical(a$review_state[a$slot==33L & a$side=="home"], "review")
-  testthat::expect_identical(attr(a,"judge_receipt"), receipt)
-  testthat::expect_identical(attr(a,"evidence_hash"), rlang::hash(schedule_identity_items(s)))
-  b <- replay_schedule_identity(s, receipt, auto_accept = 1, minimum_margin = 1)
-  testthat::expect_true(sum(b$review_state == "auto") < sum(a$review_state == "auto"))
-  s$home_title_500[s$slot==77L] <- "different evidence"
-  testthat::expect_true(any(replay_schedule_identity(s, receipt)$review_state == "error"))
+  testthat::expect_true(any(a$review_state == "error"))
+  testthat::expect_true(all(!is.na(a$choice)))
+  testthat::expect_identical(attr(a, "evidence_hash"), rlang::hash(schedule_identity_items(s)))
   bad <- receipt
   bad$response$answers[[1]]$probabilities$same_team <- -1
-  testthat::expect_true(any(replay_schedule_identity(readRDS(file.path(fixture,"schedule.rds")),bad)$review_state == "error"))
+  testthat::expect_true(any(replay_schedule_identity(s, bad)$review_state == "error"))
+})
+
+testthat::test_that("opposite-side aliases and exact support come from both sources", {
+  s <- identity_schedule_fixture()
+  items <- schedule_identity_items(s)
+  slot77_home <- items[items$slot == 77L & items$side == "home", ]
+  testthat::expect_true("耶尔文佩" %in% slot77_home$opponent_aliases_500[[1]])
+  testthat::expect_true("耶尔文佩" %in% slot77_home$opponent_aliases_nowscore[[1]])
+  testthat::expect_true(slot77_home$opponent_exact_alias)
+  slot33_home <- items[items$slot == 33L & items$side == "home", ]
+  testthat::expect_true("布雷流浪者" %in% slot33_home$opponent_aliases_500[[1]])
+  testthat::expect_true("布雷流浪者" %in% slot33_home$opponent_aliases_nowscore[[1]])
+  testthat::expect_true(slot33_home$opponent_exact_alias)
+  # Judged side's own exact support is independent of the opponent's.
+  testthat::expect_true(slot77_home$opponent_exact_alias)
+  testthat::expect_false(schedule_alias_exact(slot77_home$aliases_500[[1]], slot77_home$aliases_nowscore[[1]]))
+})
+
+testthat::test_that("changed opponent name flips exact support and binds hashes", {
+  s <- identity_schedule_fixture()
+  a <- judge_schedule_identity(s)
+  request_a <- beidan:::jev_schedule_request(schedule_identity_items(s), "m")
+  s$away_nowscore[1] <- s$away_display_nowscore[1] <- s$away_title_nowscore[1] <- "另一个队"
+  items <- schedule_identity_items(s)
+  testthat::expect_false(items$opponent_exact_alias[items$slot == 77L & items$side == "home"])
+  testthat::expect_false(identical(attr(a, "evidence_hash"), rlang::hash(items)))
+  testthat::expect_false(identical(request_a, beidan:::jev_schedule_request(items, "m")))
+})
+
+testthat::test_that("kickoff origin and per-source sale cutoffs are preserved without agreement claims", {
+  items <- schedule_identity_items(identity_schedule_fixture())
+  request <- beidan:::jev_schedule_request(items, "m")
+  evidence <- request$state$items[["26098:77:home"]]
+  testthat::expect_identical(evidence$kickoff_at_nowscore, "2026-09-25T20:00:00+0800")
+  testthat::expect_identical(evidence$kickoff_hhmm, "20:00")
+  testthat::expect_identical(evidence$kickoff_date_source, "js-kickoff-date")
+  testthat::expect_match(evidence$kickoff_at_nowscore_explanation, "NOT cross-source agreement")
+  testthat::expect_match(evidence$sale_cutoff_note, "DIFFERENT")
+  testthat::expect_identical(evidence$sale_end_raw_500, "2026-09-25 19:50")
+  testthat::expect_identical(evidence$sale_end_raw_nowscore, "2026-09-25 19:55")
+  testthat::expect_false(identical(evidence$sale_end_raw_500, evidence$sale_end_raw_nowscore))
+  testthat::expect_false(any(grepl("agreement", tolower(evidence$kickoff_at_nowscore_explanation)) &&
+    !grepl("NOT cross-source agreement", evidence$kickoff_at_nowscore_explanation)))
+  testthat::expect_false(grepl("kickoff", evidence$sale_cutoff_note, ignore.case = TRUE) &&
+    grepl("estimate", evidence$sale_cutoff_note) && !grepl("neither is a kickoff estimate", evidence$sale_cutoff_note))
+})
+
+testthat::test_that("missing evidence is explicit and invalid datetime types fail", {
+  s <- identity_schedule_fixture()
+  s$kickoff_at[1] <- lubridate::as_datetime(NA_real_, tz = "Asia/Shanghai")
+  s$kickoff_hhmm[1] <- NA_character_
+  s$kickoff_date_source[1] <- "absent"
+  s$sale_end_raw_500[1] <- NA_character_
+  items <- schedule_identity_items(s)
+  testthat::expect_true(is.na(items$kickoff_at[1]))
+  request <- beidan:::jev_schedule_request(items, "m")
+  evidence <- request$state$items[["26098:77:home"]]
+  testthat::expect_true(is.null(evidence$kickoff_at_nowscore) || is.na(evidence$kickoff_at_nowscore))
+  testthat::expect_true(is.null(evidence$sale_end_raw_500) || is.na(evidence$sale_end_raw_500))
+  testthat::expect_error(schedule_identity_items(s[s$slot == 1L, !names(s) %in% "kickoff_at"]), "evidence")
+  testthat::expect_error(
+    schedule_identity_items(within(s, kickoff_at <- rep(NA, nrow(s)))), "kickoff_at must be POSIXct")
+  testthat::expect_error(beidan:::jev_schedule_request(items[0, ], "m"), "must not be empty")
+  testthat::expect_error(beidan:::schedule_identity_iso(as.Date("2026-09-25")), "must be POSIXct")
+})
+
+testthat::test_that("opponent exact support keeps women age and reserve distinctions", {
+  exact <- beidan:::schedule_alias_exact
+  testthat::expect_false(exact("上海女足", "上海男足"))
+  testthat::expect_false(exact("England U21", "England U19"))
+  testthat::expect_false(exact("赫尔辛基预备队", "赫尔辛基"))
+  testthat::expect_false(exact("耶尔文佩", "耶尔文佩女足"))
+  s <- identity_schedule_fixture()
+  s$away_nowscore[1] <- s$away_display_nowscore[1] <- s$away_title_nowscore[1] <- "耶尔文佩女足"
+  items <- schedule_identity_items(s)
+  testthat::expect_false(items$opponent_exact_alias[items$slot == 77L & items$side == "home"])
+  testthat::expect_true(all(items$league_exact[items$slot == 77L]))
+  testthat::expect_false(any(items$league_exact[items$slot == 33L]))
 })
 
 testthat::test_that("implementation receipts bind response helpers and adapters", {
@@ -178,4 +264,27 @@ testthat::test_that("implementation receipts bind response helpers and adapters"
                                 .package = "beidan")
   third <- judge_schedule_identity(s, identity_fake_answers)
   testthat::expect_false(identical(attr(first,"implementation_hash"), attr(third,"implementation_hash")))
+})
+
+testthat::test_that("context response replays through production without network", {
+  fixture <- testthat::test_path("fixtures", "schedule_identity")
+  schedule <- readRDS(file.path(fixture, "schedule.rds"))
+  receipt <- readRDS(file.path(fixture, "jev_context_receipt.rds"))
+  httr2::local_mocked_responses(function(req) stop("replay must not contact network"))
+  result <- replay_schedule_identity(schedule, receipt)
+  testthat::expect_equal(nrow(result), 292L)
+  testthat::expect_false(any(result$review_state %in% c("error", "unavailable")))
+  testthat::expect_true(result$opponent_exact_alias[result$slot == 77L & result$side == "home"])
+  testthat::expect_identical(attr(result, "judge_receipt"), receipt)
+  schedule$away_title_500[schedule$slot == 77L] <- "altered opponent evidence"
+  testthat::expect_true(any(replay_schedule_identity(schedule, receipt)$review_state == "error"))
+})
+
+testthat::test_that("context serialization helpers bind the implementation receipt", {
+  s <- identity_schedule_fixture()
+  before <- judge_schedule_identity(s)
+  original <- beidan:::schedule_identity_iso
+  testthat::local_mocked_bindings(schedule_identity_iso = function(value) original(value), .package = "beidan")
+  after <- judge_schedule_identity(s)
+  testthat::expect_false(identical(attr(before,"implementation_hash"),attr(after,"implementation_hash")))
 })
