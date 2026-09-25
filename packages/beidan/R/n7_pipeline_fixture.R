@@ -135,10 +135,14 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
   # Quotes and the initial synthetic status report are observed before each kickoff.
   # The -36h anchor is declared here and is deliberately NOT coupled to any cutoff:
   # generation must not guess a decision epoch, and a quote placed relative to the
-  # cutoff would move whenever the caller changed the decision day.
-  quote_at <- kickoff_utc - 36 * 3600
+  # cutoff would move whenever the caller changed the decision day. The fixed span
+  # is a lubridate duration (dhours), not "36 * 3600 seconds" arithmetic, so the
+  # declared quantity and the code read the same and the span stays an exact
+  # physical 36 hours across any zone.
+  quote_at <- kickoff_utc - lubridate::dhours(36)
   # A small per-company offset keeps the synthetic feed from looking like one
-  # simultaneous snapshot, while staying inside the declared -36h anchor.
+  # simultaneous snapshot, while staying inside the declared -36h anchor. dseconds()
+  # keeps the unit explicit and preserves fractional company offsets.
   company_offset <- seq(0, 120, length.out = length(company_ids))
   status_at <- quote_at
 
@@ -151,7 +155,7 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
       euro_rows[[length(euro_rows) + 1L]] <- tibble::tibble(
         fixture_id = fixtures$fixture_id[i],
         company_id = company_ids[company_index],
-        quote_at = quote_at[i] + company_offset[company_index],
+        quote_at = quote_at[i] + lubridate::dseconds(company_offset[company_index]),
         odds_home = 1 / (noisy[1] * margin),
         odds_draw = 1 / (noisy[2] * margin),
         odds_away = 1 / (noisy[3] * margin),
@@ -171,7 +175,7 @@ n7_make_fixture_issue <- function(issue_id, kickoff_at, n_companies = 3L,
         totals_rows[[length(totals_rows) + 1L]] <- tibble::tibble(
           fixture_id = fixtures$fixture_id[i],
           company_id = company_ids[company_index],
-          quote_at = quote_at[i] + company_offset[company_index],
+          quote_at = quote_at[i] + lubridate::dseconds(company_offset[company_index]),
           line = as.double(line),
           over_decimal = 1 / (over * margin),
           under_decimal = 1 / ((1 - over) * margin),

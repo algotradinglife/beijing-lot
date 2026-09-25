@@ -76,12 +76,12 @@ stopifnot(all(empty_ok))
 #| label: fixture-build
 ISSUE <- "26097"
 DECISION_DATE <- "2026-09-22"
-CUTOFF <- list(cutoff_utc = as.POSIXct(paste(DECISION_DATE, "12:00:00"), tz = "UTC"),
+CUTOFF <- list(cutoff_utc = lubridate::ymd_hms(paste(DECISION_DATE, "12:00:00"), tz = "UTC"),
                issue_id = ISSUE)
 # 2026-09-22 12:00Z is 20:00 Asia/Shanghai on the decision day; kickoffs land on D+1.
 
 # kickoff_at is an explicit UTC POSIXct vector; the fixture count is its length.
-KICKOFFS <- as.POSIXct("2026-09-23 01:00:00", tz = "UTC") + seq(0, by = 900, length.out = 56L)
+KICKOFFS <- lubridate::ymd_hms("2026-09-23 01:00:00", tz = "UTC") + lubridate::dminutes(seq(0, by = 15, length.out = 56L))
 issue <- n7_make_fixture_issue(ISSUE, KICKOFFS, seed = 42L)
 # Reading is whole-issue: no cutoff argument and no date filtering.
 inputs <- n7_read_inputs(n7_fixture_source(issue), ISSUE)
@@ -280,12 +280,12 @@ synthetic_settlements <- function(issue_obj, issue_id, available_at = "2026-10-0
     dplyr::transmute(
       issue_id = issue_id, fixture_id = fixture_id, outcome = outcome,
       settled_sp = 1 / (truth * 0.92) + 0.5,
-      label_available_at = as.POSIXct(available_at, tz = "UTC"),
+      label_available_at = lubridate::ymd_hms(available_at, tz = "UTC"),
       status = "settled", source_url = "synthetic://n7-pipeline/settlement")
 }
 
 SETTLEMENTS <- synthetic_settlements(issue, ISSUE)
-AS_OF <- as.POSIXct("2026-10-05 00:00:00", tz = "UTC")
+AS_OF <- lubridate::ymd_hms("2026-10-05 00:00:00", tz = "UTC")
 CONFIG_A <- CONFIGS[["A"]]
 PLAN_A <- n7_run_allocation(CONFIG_A, EPOCH$fixtures, PROJECTED$probabilities,
                             EPOCH$sp_selected, CUTOFF, inputs$match_status,
@@ -315,7 +315,7 @@ knitr::kable(
 ```{r pending-check}
 #| label: pending-check
 EARLY <- n7_settle_plan(PLAN_A, SETTLEMENTS,
-                        as.POSIXct("2026-09-23 00:00:00", tz = "UTC"),
+                        lubridate::ymd_hms("2026-09-23 00:00:00", tz = "UTC"),
                         CONSTANTS$unit_cny, CONSTANTS$payout_factor)
 tibble::tibble(
   项 = c("LOST 票数", "PENDING 票数", "已结算投入", "待结算投入", "ROI"),
@@ -349,11 +349,11 @@ identical(FUNDED_BEFORE, PLAN_A$funded$ticket_id)
 ```{r replay}
 #| label: replay
 build_epoch <- function(issue_id, decision_date, seed, n_fixtures = 56L) {
-  cutoff <- list(cutoff_utc = as.POSIXct(paste(decision_date, "12:00:00"), tz = "UTC"),
+  cutoff <- list(cutoff_utc = lubridate::ymd_hms(paste(decision_date, "12:00:00"), tz = "UTC"),
                  issue_id = issue_id)
   # One kickoff per wanted fixture, on the day after the decision date.
-  kickoffs <- as.POSIXct(paste(as.Date(decision_date) + 1L, "01:00:00"), tz = "UTC") +
-    seq(0, by = 900, length.out = n_fixtures)
+  kickoffs <- lubridate::ymd_hms(paste(lubridate::ymd(decision_date) + lubridate::days(1), "01:00:00"), tz = "UTC") +
+    lubridate::dminutes(seq(0, by = 15, length.out = n_fixtures))
   fixture <- n7_make_fixture_issue(issue_id, kickoffs, seed = seed)
   raw <- n7_read_inputs(n7_fixture_source(fixture), issue_id)
   prepared <- n7_prepare_epoch(raw, cutoff, "Asia/Shanghai",
@@ -677,3 +677,6 @@ Quarto 在只读 sandbox 下需要显式可写的 `TMPDIR`/`XDG_CACHE_HOME`/`DEN
 PI裁决：接受#500的合成夹具函数接口和端到端基线交付。全仓测试失败仍然是失败，并未豁免为通过；其独立修复与N7持续集成补齐已归入[后续任务#502](https://github.com/algotradinglife/beijing-lot/issues/502)，原生parent为#492，Project为BJ Prediction & Betting，状态Inbox。#502不作为已完成接口交付的阻塞依赖。
 
 本次验收不代表真实数据收益验证、完整仓库验收或合并授权；数据#499与实验#493继续按原生图推进。保留#493依赖#500的已完成证据关系，不删除历史依赖来伪造解阻。PI负责将#500关闭为completed并将Project状态设为Done。
+
+
+日期管理示例现按 #510 使用 lubridate；原审阅记录保留为当时证据，当前日期边界验收见 `n7_lubridate.qmd`。
