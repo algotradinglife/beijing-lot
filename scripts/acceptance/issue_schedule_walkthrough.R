@@ -38,3 +38,12 @@ for (call in calls) {
   testthat::expect_equal(as.numeric(actual), as.numeric(walkthrough$settlement_at))
 }
 cat("Walkthrough missing-input gate, direct BJT configuration and actual as_of boundary passed.\n")
+
+# Real fixture checks run outside the analysis document.
+Sys.setenv(BEIDAN_SCHEDULE_RDS = file.path(project_root,
+  "packages/beidan/tests/testthat/fixtures/schedule_identity/schedule.rds"))
+real_walkthrough <- new.env(parent = globalenv())
+sys.source(script, envir = real_walkthrough)
+sys.source(file.path(project_root, "scripts/acceptance/walkthrough_analysis_checks.R"),
+           envir = real_walkthrough)
+cat("Real schedule analysis checks passed outside QMD; missing markets remain untested.\n")

@@ -130,6 +130,10 @@ def parse_nowscore_rows(
         score = _text(cells[6])
         can_sale = tr.get("cansale")
         extras = {
+            "home_display": _team_label(cells[4])[0],
+            "home_title": _team_label(cells[4])[1],
+            "away_display": _team_label(cells[7])[0],
+            "away_title": _team_label(cells[7])[1],
             "polygoal": tr.get("polygoal"),
             "matchid": tr.get("matchid"),
             "halftime_score": _text(cells[8]) or None,
@@ -230,6 +234,10 @@ def parse_500_rows(
                 observed_at=observed_at,
                 source_url=source_url,
                 extras={
+                    "home_display": _team_label(cells[3])[0],
+                    "home_title": _team_label(cells[3])[1],
+                    "away_display": _team_label(cells[5])[0],
+                    "away_title": _team_label(cells[5])[1],
                     "disabled": info.get("disabled", ""),
                     "bg_color": info.get("bgColor", ""),
                     "home_rank": info.get("homeTeamRank"),
@@ -454,3 +462,11 @@ def _to_bool(value: Any) -> bool | None:
     if text not in {"true", "false"}:
         raise SourceParseError(f"invalid cansale flag: {value!r}")
     return text == "true"
+
+
+def _team_label(cell: Any) -> tuple[str, str]:
+    """Preserve the team anchor's displayed name and optional title independently."""
+    anchor = cell.find("a")
+    if anchor is None:
+        return _text(cell), ""
+    return _text(anchor), (anchor.get("title") or "").strip()
