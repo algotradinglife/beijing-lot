@@ -4,10 +4,12 @@
 \name{beidan-package}
 \alias{beidan}
 \alias{beidan-package}
-\title{Beijing N7 research pipeline}
+\title{Beijing parlay research pipeline}
 \description{
-Explicit-input functions for reproducible N7 research. Loading the package
-does not initialize Python, fetch data or write to databases.
+Explicit-input functions for reproducible parlay research: generic match
+inputs/probabilities, a session-scoped parlay parameter block, and
+parlay group/ticket/strategy contracts. Loading the package does not
+initialize Python, fetch data or write to databases.
 }
 \author{
 \strong{Maintainer}: Beijing Lot Contributors \email{hh.earlydays@gmail.com}

@@ -34,12 +34,12 @@
 #' 下游某处才暴露非法状态。S7 对象不得出现在模块的公开返回结构中。
 #'
 #' @section 表类型契约:
-#' 16 张表由 `n7_table_schemas()` 唯一声明，边界处由
-#' `n7_validate_table()` 校验列集合、列序、列类型与主键。
+#' 16 张表由 `match_table_schemas()` 唯一声明，边界处由
+#' `match_validate_table()` 校验列集合、列序、列类型与主键。
 #'
 #' @details 本模块只定义函数；导入时不触发任何 I/O，不联网，不写库。
 
-#' @name n7-contracts
+#' @name parlay-contracts
 #' @keywords internal
 NULL
 
@@ -60,10 +60,10 @@ NULL
 #'
 #' · 每张表的 columns 无重复
 #' · 每张表的 names(types) == columns
-#' · 所有类型取值都在 n7_typed_empty 可构造的集合内
+#' · 所有类型取值都在 match_typed_empty 可构造的集合内
 #'
 #' @details 列序本身是契约的一部分：typed-empty 表按此列序返回，下游可以依赖位置访问稳定。
-n7_table_schemas <- function() {
+match_table_schemas <- function() {
   list(
     fixtures = list(
       columns = c("issue_id", "fixture_id", "slot", "provider_id", "kickoff_at",
@@ -109,7 +109,7 @@ n7_table_schemas <- function() {
       types = c(candidate_id = "character", ticket_id = "character"),
       keys = c("candidate_id", "ticket_id")),
     # ranked 是 value 层的排序视图：每个 candidate 的票按分数降序，并列按 ticket_id
-    # 定序。列名此前只是隐式约定（n7_fund_groups 直接用 $candidate_id/$ticket_id
+    # 定序。列名此前只是隐式约定（.FundGroups 直接用 $candidate_id/$ticket_id
     # 反复抓取），现在改为显式契约，使缺列或列序错位在边界处报错。
     ranked = list(
       columns = c("candidate_id", "ticket_id", "group_id", "probability",
@@ -178,27 +178,27 @@ n7_table_schemas <- function() {
 #'
 #'
 #' @details 调用方不得依赖除此之外的取值顺序或大小写。
-n7_outcomes <- function() c("W", "D", "L")
+match_outcomes <- function() c("W", "D", "L")
 
 #' 返回一张带完整列集合与列类型的空表
 #'
 #' 空结果保留板式，使空表与有表可以无差别 rbind，"没有行"与"形状不对"
 #' 保持可区分。
 #'
-#' @param table  长度恰为 1 的字符标量，取值必须属于 names(n7_table_schemas())。
+#' @param table  长度恰为 1 的字符标量，取值必须属于 names(match_table_schemas())。
 #'   · 非字符 / 长度 != 1 / NA / 空串  -> stop()
 #'   · 未知表名                        -> stop()，错误信息列出合法取值
 #'
 #'
-n7_typed_empty <- function(table) {
+match_typed_empty <- function(table) {
   if (!is.character(table) || length(table) != 1L || is.na(table) || !nzchar(table)) {
-    stop("n7_typed_empty: table must be a single non-empty table name; got ",
+    stop("match_typed_empty: table must be a single non-empty table name; got ",
          paste(utils::capture.output(utils::str(table)), collapse = " "))
   }
-  schema <- n7_table_schemas()[[table]]
+  schema <- match_table_schemas()[[table]]
   if (is.null(schema)) {
-    stop("n7_typed_empty: unknown table ", table, "; known tables are ",
-         paste(names(n7_table_schemas()), collapse = ", "))
+    stop("match_typed_empty: unknown table ", table, "; known tables are ",
+         paste(names(match_table_schemas()), collapse = ", "))
   }
   out <- stats::setNames(vector("list", length(schema$columns)), schema$columns)
   for (column in schema$columns) {
@@ -209,7 +209,7 @@ n7_typed_empty <- function(table) {
       double = numeric(0),
       logical = logical(0),
       POSIXct = as.POSIXct(character(0), tz = "UTC"),
-      stop("n7_typed_empty: unsupported type ", type))
+      stop("match_typed_empty: unsupported type ", type))
   }
   tibble::as_tibble(out)
 }
@@ -220,7 +220,7 @@ n7_typed_empty <- function(table) {
 #'
 #' @param data    data.frame（含 tibble）。
 #'   · 非 data.frame -> stop()
-#' @param table   长度恰为 1 的字符标量，属于 names(n7_table_schemas())。
+#' @param table   长度恰为 1 的字符标量，属于 names(match_table_schemas())。
 #'   · 非字符 / 长度 != 1 / NA / 空串 / 未知表名 -> stop()
 #' @param keys    校验唯一性的列名。NULL 表示沿用 schema 自己声明的 keys；
 #'   若 schema 也没有声明，则不校验唯一性。
@@ -235,16 +235,16 @@ n7_typed_empty <- function(table) {
 #'   因此声明了复合主键的表（candidate_tickets、ranked）在任何调用点都被强制唯一，
 #'   而不是依赖每个调用方记得传 keys
 #'
-n7_validate_table <- function(data, table, keys = NULL) {
+match_validate_table <- function(data, table, keys = NULL) {
   if (!is.character(table) || length(table) != 1L || is.na(table) || !nzchar(table)) {
-    stop("n7_validate_table: table must be a single non-empty table name")
+    stop("match_validate_table: table must be a single non-empty table name")
   }
-  schema <- n7_table_schemas()[[table]]
+  schema <- match_table_schemas()[[table]]
   if (is.null(schema)) {
-    stop("n7_validate_table: unknown table ", table, "; known tables are ",
-         paste(names(n7_table_schemas()), collapse = ", "))
+    stop("match_validate_table: unknown table ", table, "; known tables are ",
+         paste(names(match_table_schemas()), collapse = ", "))
   }
-  if (!is.data.frame(data)) stop("n7_validate_table: ", table, " must be a data frame")
+  if (!is.data.frame(data)) stop("match_validate_table: ", table, " must be a data frame")
   # A schema may DECLARE its own key. Enforcing it here rather than relying on each
   # caller to pass keys means a table cannot be validated as if it had no key: a
   # duplicated composite key would otherwise flow straight through, and a structure
@@ -253,20 +253,20 @@ n7_validate_table <- function(data, table, keys = NULL) {
   if (is.null(keys) && !is.null(schema$keys)) keys <- schema$keys
   if (!is.null(keys)) {
     if (!is.character(keys) || anyNA(keys) || any(!nzchar(keys))) {
-      stop("n7_validate_table: keys must be non-empty column names, or NULL")
+      stop("match_validate_table: keys must be non-empty column names, or NULL")
     }
     if (!length(keys)) {
-      stop("n7_validate_table: keys must be NULL to use the schema's declared key ",
+      stop("match_validate_table: keys must be NULL to use the schema's declared key ",
            "(or to skip the check when the schema declares none), not an empty vector")
     }
     unknown <- setdiff(keys, schema$columns)
     if (length(unknown)) {
-      stop("n7_validate_table: keys name column(s) not in ", table, ": ",
+      stop("match_validate_table: keys name column(s) not in ", table, ": ",
            paste(unknown, collapse = ", "))
     }
   }
   if (!identical(names(data), schema$columns)) {
-    stop("n7_validate_table: ", table, " columns must be exactly ",
+    stop("match_validate_table: ", table, " columns must be exactly ",
          paste(schema$columns, collapse = ", "), "; got ",
          paste(names(data), collapse = ", "))
   }
@@ -281,18 +281,18 @@ n7_validate_table <- function(data, table, keys = NULL) {
       POSIXct = inherits(value, "POSIXct"),
       FALSE)
     if (!ok) {
-      stop("n7_validate_table: ", table, "$", column, " must be ", type,
+      stop("match_validate_table: ", table, "$", column, " must be ", type,
            "; got ", paste(class(value), collapse = "/"))
     }
     # Checked even when empty: R preserves tzone on zero-length POSIXct, so an
     # empty column with the wrong zone is still a contract breach.
     if (type == "POSIXct" && !identical(attr(value, "tzone"), "UTC")) {
-      stop("n7_validate_table: ", table, "$", column, " must carry tz UTC")
+      stop("match_validate_table: ", table, "$", column, " must carry tz UTC")
     }
   }
   if (!is.null(keys)) {
     if (nrow(data) && anyDuplicated(data[keys])) {
-      stop("n7_validate_table: ", table, " has duplicate key (",
+      stop("match_validate_table: ", table, " has duplicate key (",
            paste(keys, collapse = ", "), ")")
     }
   }
@@ -311,14 +311,14 @@ n7_validate_table <- function(data, table, keys = NULL) {
 #'   · 含空串 ""            -> stop()
 #'   · 首尾有空白           -> stop()（空白是数据错误，不是格式）
 #' @param what   长度 1 的非空字符，仅用于错误信息；同时校验它自己。
-n7_check_character_id <- function(value, what) {
+match_check_character_id <- function(value, what) {
   if (!is.character(what) || length(what) != 1L || is.na(what) || !nzchar(what)) {
-    stop("n7_check_character_id: what must be a single non-empty label")
+    stop("match_check_character_id: what must be a single non-empty label")
   }
-  if (!is.character(value)) stop("n7_check_character_id: ", what, " must be character")
-  if (anyNA(value)) stop("n7_check_character_id: ", what, " must not be NA")
-  if (any(!nzchar(value))) stop("n7_check_character_id: ", what, " must not be empty")
-  if (any(trimws(value) != value)) stop("n7_check_character_id: ", what, " must not be padded")
+  if (!is.character(value)) stop("match_check_character_id: ", what, " must be character")
+  if (anyNA(value)) stop("match_check_character_id: ", what, " must not be NA")
+  if (any(!nzchar(value))) stop("match_check_character_id: ", what, " must not be empty")
+  if (any(trimws(value) != value)) stop("match_check_character_id: ", what, " must not be padded")
   invisible(value)
 }
 
@@ -334,18 +334,18 @@ n7_check_character_id <- function(value, what) {
 #' @details 范围检查必须发生在强转之前：as.integer() 对超范围值只发 warning 并
 #'   静默产出 NA，调用方会误以为校验通过。按 AGENTS.md「绝不把解析失败静默变成
 #'   缺失值」，这里必须报错。
-n7_check_slot <- function(value, what = "slot") {
+match_check_slot <- function(value, what = "slot") {
   if (!is.character(what) || length(what) != 1L || is.na(what) || !nzchar(what)) {
-    stop("n7_check_slot: what must be a single non-empty label")
+    stop("match_check_slot: what must be a single non-empty label")
   }
-  if (!is.numeric(value)) stop("n7_check_slot: ", what, " must be numeric")
-  if (anyNA(value) || any(!is.finite(value))) stop("n7_check_slot: ", what, " must be finite")
+  if (!is.numeric(value)) stop("match_check_slot: ", what, " must be numeric")
+  if (anyNA(value) || any(!is.finite(value))) stop("match_check_slot: ", what, " must be finite")
   if (any(value < 1 | value != floor(value))) {
-    stop("n7_check_slot: ", what, " must be positive whole numbers")
+    stop("match_check_slot: ", what, " must be positive whole numbers")
   }
   # Guard BEFORE coercion: as.integer() would silently return NA past the range.
   if (any(value > .Machine$integer.max)) {
-    stop("n7_check_slot: ", what, " exceeds the integer range: ",
+    stop("match_check_slot: ", what, " exceeds the integer range: ",
          format(max(value), scientific = FALSE))
   }
   as.integer(value)
@@ -367,32 +367,32 @@ n7_check_slot <- function(value, what = "slot") {
 #' @param tolerance 长度 1 的正有限数值。
 #'   · 非数值 / 长度 != 1 / NA / <= 0 / 非有限 -> stop()
 #' @param what      长度 1 的非空字符标签。
-n7_check_probability_sum <- function(triples, tolerance = 1e-9, what = "probability") {
+match_check_probability_sum <- function(triples, tolerance = 1e-9, what = "probability") {
   if (!is.character(what) || length(what) != 1L || is.na(what) || !nzchar(what)) {
-    stop("n7_check_probability_sum: what must be a single non-empty label")
+    stop("match_check_probability_sum: what must be a single non-empty label")
   }
   if (!is.numeric(tolerance) || length(tolerance) != 1L || is.na(tolerance) ||
       !is.finite(tolerance) || tolerance <= 0) {
-    stop("n7_check_probability_sum: tolerance must be one positive finite number")
+    stop("match_check_probability_sum: tolerance must be one positive finite number")
   }
   if (!is.matrix(triples) && !is.data.frame(triples)) {
-    stop("n7_check_probability_sum: ", what, " must be a matrix or data frame")
+    stop("match_check_probability_sum: ", what, " must be a matrix or data frame")
   }
   # Catch non-numeric columns BEFORE as.matrix(), which would otherwise coerce a
   # data frame to a character matrix and turn a type error into a value error.
   if (is.data.frame(triples) &&
       !all(vapply(triples, function(col) is.numeric(col) || is.integer(col), logical(1)))) {
-    stop("n7_check_probability_sum: ", what, " must contain only numeric columns")
+    stop("match_check_probability_sum: ", what, " must contain only numeric columns")
   }
   values <- as.matrix(triples)
-  if (!is.numeric(values)) stop("n7_check_probability_sum: ", what, " must be numeric")
+  if (!is.numeric(values)) stop("match_check_probability_sum: ", what, " must be numeric")
   if (anyNA(values) || any(!is.finite(values))) {
-    stop("n7_check_probability_sum: ", what, " must be finite")
+    stop("match_check_probability_sum: ", what, " must be finite")
   }
-  if (any(values < 0)) stop("n7_check_probability_sum: ", what, " must be non-negative")
+  if (any(values < 0)) stop("match_check_probability_sum: ", what, " must be non-negative")
   sums <- rowSums(values)
   if (any(abs(sums - 1) > tolerance)) {
-    stop("n7_check_probability_sum: ", what, " rows must sum to 1; worst deviation ",
+    stop("match_check_probability_sum: ", what, " rows must sum to 1; worst deviation ",
          format(max(abs(sums - 1)), digits = 3))
   }
   invisible(values)
@@ -421,61 +421,64 @@ n7_check_probability_sum <- function(triples, tolerance = 1e-9, what = "probabil
 # reticulate bridge. This pipeline does not invent a second time framework, so the
 # only thing validated here is that a real cutoff was supplied and that it carries
 # the instants this layer needs. Anything stricter belongs to temporal_learning.
-n7_require_cutoff <- function(cutoff) {
-  if (is.null(cutoff)) stop("n7_require_cutoff: an explicit cutoff is required")
-  if (!is.list(cutoff)) stop("n7_require_cutoff: cutoff must be a temporal_learning object")
+match_require_cutoff <- function(cutoff) {
+  if (is.null(cutoff)) stop("match_require_cutoff: an explicit cutoff is required")
+  if (!is.list(cutoff)) stop("match_require_cutoff: cutoff must be a temporal_learning object")
   for (field in c("cutoff_utc", "issue_id")) {
     if (is.null(cutoff[[field]])) {
-      stop("n7_require_cutoff: cutoff is missing ", field)
+      stop("match_require_cutoff: cutoff is missing ", field)
     }
   }
   if (!inherits(cutoff$cutoff_utc, "POSIXct")) {
-    stop("n7_require_cutoff: cutoff$cutoff_utc must be POSIXct")
+    stop("match_require_cutoff: cutoff$cutoff_utc must be POSIXct")
   }
   if (!identical(attr(cutoff$cutoff_utc, "tzone"), "UTC")) {
-    stop("n7_require_cutoff: cutoff$cutoff_utc must be UTC")
+    stop("match_require_cutoff: cutoff$cutoff_utc must be UTC")
   }
-  length(cutoff$cutoff_utc) == 1L || stop("n7_require_cutoff: cutoff must be a single instant")
+  length(cutoff$cutoff_utc) == 1L || stop("match_require_cutoff: cutoff must be a single instant")
+  if (anyNA(cutoff$cutoff_utc) || !is.finite(as.numeric(cutoff$cutoff_utc))) {
+    stop("match_require_cutoff: cutoff must be a finite nonmissing instant")
+  }
   # issue_id must be exactly ONE issue: a cutoff binds a single decision, and a
   # multi-valued id would make every downstream issue filter ambiguous.
   if (length(cutoff$issue_id) != 1L) {
-    stop("n7_require_cutoff: cutoff$issue_id must name exactly one issue; got ",
+    stop("match_require_cutoff: cutoff$issue_id must name exactly one issue; got ",
          length(cutoff$issue_id))
   }
-  n7_check_character_id(cutoff$issue_id, "cutoff$issue_id")
+  match_check_character_id(cutoff$issue_id, "cutoff$issue_id")
   invisible(cutoff)
 }
 
 #' 取出 cutoff 的时刻，供本层比较使用
 #'
 #'
-#' @param cutoff  同 n7_require_cutoff；本函数先调用它，因此继承其全部判定。
-n7_cutoff_utc <- function(cutoff) {
-  n7_require_cutoff(cutoff)
+#' @param cutoff  同 match_require_cutoff；本函数先调用它，因此继承其全部判定。
+match_cutoff_utc <- function(cutoff) {
+  match_require_cutoff(cutoff)
   cutoff$cutoff_utc
 }
 
 # --- session business constants ---------------------------------------------
 
 #' Construct the immutable defaults used to initialize and reset session settings
-#' @return Named list of the seven default business parameters.
+#' @return Named list of the six default business parameters.
 #' @noRd
-n7_constant_defaults <- function() {
+parlay_constant_defaults <- function() {
   return(list(n_legs = 7L, issue_budget_cny = 1024, unit_cny = 2,
-              payout_factor = 0.65, rho = -0.14,
+              payout_factor = 0.65,
               sp_threshold = 10, sp_replacement = 4.5))
 }
 
-.n7_session_constants <- new.env(parent = emptyenv())
+.parlay_session_settings <- new.env(parent = emptyenv())
 
 #' Validate a complete session-settings candidate without changing stored values
 #' @param candidate Complete named list of finite, unclassed numeric scalars.
 #' @return Validated list, with n_legs normalized to integer; invalid values error.
 #' @noRd
-n7_validate_constants <- function(candidate) {
-  checkmate::assert_list(candidate, names = "unique", .var.name = "constants")
-  checkmate::assert_names(names(candidate), identical.to = names(n7_constant_defaults()),
-                          .var.name = "names(constants)")
+parlay_validate_settings <- function(candidate) {
+  checkmate::assert_list(candidate, names = "unique", .var.name = "settings")
+  checkmate::assert_names(names(candidate), identical.to = names(parlay_constant_defaults()),
+                          .var.name = "names(settings)")
   for (field in names(candidate)) {
     value <- candidate[[field]]
     checkmate::assert_numeric(value, len = 1L, any.missing = FALSE,
@@ -483,13 +486,19 @@ n7_validate_constants <- function(candidate) {
     checkmate::assert_true(!is.object(value) && is.null(dim(value)),
                            .var.name = paste(field, "must be an unclassed numeric scalar"))
   }
-  checkmate::assert_true(candidate$n_legs == 7, .var.name = "n_legs must be 7")
-  candidate$n_legs <- 7L
+  # n_legs is an integer count of at least one leg. There is no speculative upper
+  # bound: 6, 7 and 8 are the contracted widths, and anything larger is limited by
+  # the real numeric/allocation guard at enumeration instead of an invented cap.
+  checkmate::assert_true(candidate$n_legs >= 1, .var.name = "n_legs must be at least 1")
+  checkmate::assert_true(candidate$n_legs == trunc(candidate$n_legs),
+                         .var.name = "n_legs must be a whole number")
+  checkmate::assert_true(candidate$n_legs <= .Machine$integer.max,
+                         .var.name = "n_legs must be representable as an integer")
+  candidate$n_legs <- as.integer(candidate$n_legs)
   checkmate::assert_true(candidate$issue_budget_cny >= 0, .var.name = "issue_budget_cny >= 0")
   checkmate::assert_true(candidate$unit_cny > 0, .var.name = "unit_cny must be positive")
   checkmate::assert_true(candidate$payout_factor > 0 && candidate$payout_factor <= 1,
                          .var.name = "payout_factor in (0, 1]")
-  dc_validate_rho(candidate$rho)
   checkmate::assert_true(candidate$sp_threshold > 1, .var.name = "sp_threshold > 1")
   checkmate::assert_true(candidate$sp_replacement > 0, .var.name = "sp_replacement > 0")
   checkmate::assert_true(candidate$sp_replacement <= candidate$sp_threshold,
@@ -497,78 +506,66 @@ n7_validate_constants <- function(candidate) {
   return(candidate)
 }
 
-#' 合同的常量块（当前会话内可读写）
+#' 合同的串场参数块（当前会话内可读写）
 #'
-#' 读取或更新本 R 会话内的业务常量快照。默认值即项目冻结值；命名参数给出局部
-#' 覆盖。**下游计算函数仍然显式接收这些常量作为参数**，配置构造器 n7_allocation_configs() 的默认参数会读取当前快照。
+#' 读取或更新本 R 会话内的串场参数快照。默认值即项目冻结值；命名参数给出局部
+#' 覆盖。**下游计算函数仍然显式接收这些参数作为参数**，配置构造器
+#' parlay_allocation_configs() 的默认参数会读取当前快照。
 #'
-#' @param ...     命名的局部更新，名字必须属于常量键集合；可一次给多个。
+#' @param ...     命名的局部更新，名字必须属于参数键集合；可一次给多个。
 #'   · 未命名参数                  -> stop()
 #'   · 未知字段名                  -> stop()
 #'   · 重复字段名                  -> stop()
 #'   · 取值非法（见下）             -> stop()
-#' @param reset   长度 1 的逻辑标量。TRUE 表示把会话常量恢复为冻结默认值。
+#' @param reset 长度 1 的逻辑标量。TRUE 恢复会话默认值，不能与命名更新同时使用。
 #'   · 非逻辑 / 长度 != 1 / NA      -> stop()
-#'   · `reset = TRUE` 同时给了 `...` -> stop()（"重置"与"更新"是互斥意图）
 #'
-#' @return 完整常量列表快照（长度恒为 7、名字恒为合同键集合）。零参调用返回当前
+#' @return 完整参数列表快照（长度恒为 6、名字恒为合同键集合）。零参调用返回当前
 #'   会话值；带更新时先校验**整个候选快照**再更新内存，因此任何非法输入都是原子的
 #'   失败，会话状态保持调用前原样。
 #'
 #' @section 取值约束:
-#' · n_legs            固定 7；接受数值 7 并归一化为 integer 7L
+#' · n_legs            整数 >= 1（默认 7）；接受整数值并归一化为 integer
 #' · issue_budget_cny  >= 0（CNY）
 #' · unit_cny          > 0（CNY）
 #' · payout_factor     (0, 1]
-#' · rho               [-0.5, 0.5]
 #' · sp_threshold      > 1
 #' · sp_replacement    > 0 且 <= sp_threshold
 #' 全部取值必须为无类、无维度的有限数值标量；NULL / NA / NaN / Inf / 非标量 / 类型错误一律 stop()。
+#' n_legs 只受真实整数表示范围限制，不设臆测的任意上限。
+#'
+#' @section 一个方案只有一个场数:
+#' n_legs 是**方案级**结构属性：同一方案内所有组、所有结构共用同一场数，
+#' 结构长度必须等于它。混用场数在结构层与结算层都会显式报错。
 #'
 #' @section 会话状态:
 #' 状态存于包私有环境，随会话存续，绝不写入磁盘、`options()` 或全局环境；新进程
 #' 重新从默认值开始；devtools::load_all() 重新加载包也恢复默认值。
-#' 每次返回的都是独立快照，修改返回值不影响会话状态。
+#' 每次返回的都是独立快照，修改返回值不影响会话状态。冻结的 n_legs/unit/payout
+#' 保存在方案里，之后的会话改动不会改写已冻结方案。
 #'
-n7_pipeline_constants <- function(..., reset = FALSE) {
+parlay_settings <- function(..., reset = FALSE) {
   checkmate::assert_flag(reset, na.ok = FALSE, .var.name = "reset")
   updates <- list(...)
-  if (reset) {
-    checkmate::assert_true(length(updates) == 0L,
-                           .var.name = "reset cannot be combined with updates")
-    .n7_session_constants$values <- n7_constant_defaults()
-  } else if (length(updates)) {
+  if (reset && length(updates)) {
+    stop("parlay_settings: reset cannot be combined with updates")
+  }
+  candidate <- if (reset) parlay_constant_defaults() else .parlay_session_settings$values
+  if (length(updates)) {
     checkmate::assert_true(!is.null(names(updates)) && !anyNA(names(updates)) &&
                              all(nzchar(names(updates))),
                            .var.name = "every update must be named")
     checkmate::assert_true(!anyDuplicated(names(updates)),
                            .var.name = "duplicate update names are forbidden")
-    checkmate::assert_names(names(updates), subset.of = names(n7_constant_defaults()),
+    checkmate::assert_names(names(updates), subset.of = names(parlay_constant_defaults()),
                             .var.name = "update names")
-    candidate <- .n7_session_constants$values
     candidate[names(updates)] <- updates
-    candidate <- n7_validate_constants(candidate)
-    .n7_session_constants$values <- candidate
+    candidate <- parlay_validate_settings(candidate)
   }
-  return(.n7_session_constants$values)
+  if (reset || length(updates)) {
+    .parlay_session_settings$values <- candidate
+  }
+  return(.parlay_session_settings$values)
 }
 
-.n7_session_constants$values <- n7_constant_defaults()
-
-#' 固定腿数守卫（结构常量，与会话常量解耦）
-#'
-#' @return 恒为 integer 7L。
-#'
-#' @details n_legs 是**结构**属性：它决定一张票有几条腿，改它会改变表形状而非
-#'   估值参数。因此本守卫返回固定常量，绝不读取会话可变的 n7_pipeline_constants()；
-#'   否则一次会话内更新就能让结构层在运行中途改变形状。用 n7_pipeline_constants()
-#'   更新 n_legs 也会被拒绝（固定为 7）。
-n7_legs <- function() {
-  return(7L)
-}
-
-# The shared experiment-contract helpers (ticket identity, group admission) are
-# written against a bare N7_LEGS. Defining it here keeps them usable from this
-# pipeline without sourcing an unrelated research module; the value is the same
-# fixed 7 the contract requires.
-N7_LEGS <- 7L
+.parlay_session_settings$values <- parlay_constant_defaults()

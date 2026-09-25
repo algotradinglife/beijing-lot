@@ -1,36 +1,35 @@
-#' Beijing N7 research pipeline
+#' Beijing parlay research pipeline
 #'
-#' Explicit-input functions for reproducible N7 research. Loading the package
-#' does not initialize Python, fetch data or write to databases.
+#' Explicit-input functions for reproducible parlay research: generic match
+#' inputs/probabilities, a session-scoped parlay parameter block, and
+#' parlay group/ticket/strategy contracts. Loading the package does not
+#' initialize Python, fetch data or write to databases.
 #' @importFrom rlang .data
 #' @keywords internal
 "_PACKAGE"
 
-#' @export n7_pipeline_constants
-#' @export n7_table_schemas
-#' @export n7_typed_empty
-#' @export n7_validate_table
-#' @export n7_make_fixture_issue
-#' @export n7_fixture_source
-#' @export n7_read_inputs
-#' @export n7_match_statuses
-#' @export n7_select_match_status
-#' @export n7_prepare_epoch
-#' @export n7_project_probabilities
-#' @export n7_construct_candidates
-#' @export n7_apply_structure
-#' @export n7_enumerate_tickets
-#' @export n7_value_tickets
-#' @export n7_rank_tickets
-#' @export n7_freeze_plan
-#' @export n7_settle_plan
-#' @export n7_diagnose_depth
-#' @export n7_replay_issue
-#' @export n7_allocation_configs
-#' @export n7_run_allocation
-#' @export n7_build_decision
-#' @export n7_fund_groups
-#' @export n7_outcomes
+#' @export parlay_settings
+#' @export match_table_schemas
+#' @export match_typed_empty
+#' @export match_validate_table
+#' @export make_example_issue
+#' @export example_match_source
+#' @export read_match_inputs
+#' @export match_status_levels
+#' @export match_select_status
+#' @export prepare_match_inputs
+#' @export estimate_match_probabilities
+#' @export parlay_construct_groups
+#' @export parlay_apply_structure
+#' @export parlay_enumerate_tickets
+#' @export parlay_value_tickets
+#' @export parlay_rank_tickets
+#' @export parlay_settle_plan
+#' @export parlay_diagnose_plan
+#' @export parlay_replay_issue
+#' @export parlay_allocation_configs
+#' @export parlay_build_plan
+#' @export match_outcomes
 #' @export bounded_market_lambdas
 #' @export market_score_projection
 #' @export asian_total_probability
