@@ -406,3 +406,9 @@ Commands, findings/resolutions, actual data limits and reviewed file hashes:
 ../docs/reviews/520-market-review.md
 ../docs/reviews/520-market-reviewed-hashes.json
 -->
+
+<!-- #521/#522 final integrated review: no actionable defects.
+Evidence/commands/limits: ../docs/reviews/522-integrated-review.md
+Reviewed hashes including this QMD before this attestation: ../docs/reviews/522-integrated-reviewed-hashes.json
+Clean actual-data render passed; preview80tickets is not a saved20:00 decision or completed settlement.
+-->
