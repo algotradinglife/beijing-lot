@@ -102,3 +102,49 @@ testthat::test_that("status selector binds fixture issue to cutoff identity", {
   cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
   testthat::expect_error(n7_select_match_status(synthetic$fixtures, synthetic$match_status, cutoff), "issue")
 })
+
+testthat::test_that("future quotes and labels do not affect the visible epoch or ticket selection", {
+  kickoff <- as.POSIXct("2026-09-23 04:00:00", tz = "UTC") + seq(0, by = 900, length.out = 7)
+  synthetic <- n7_make_fixture_issue("00123", kickoff)
+  source <- n7_fixture_source(synthetic)
+  altered <- source
+  cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
+  for (table in c("euro", "totals", "prematch_sp")) {
+    late <- source$tables[[table]]
+    late$quote_at <- cutoff$cutoff_utc + 1
+    if (table == "euro") late$odds_home <- late$odds_home + 10
+    if (table == "totals") late$over_decimal <- late$over_decimal + 10
+    if (table == "prematch_sp") late$sp_raw <- late$sp_raw + 10
+    altered$tables[[table]] <- dplyr::bind_rows(source$tables[[table]], late)
+  }
+  altered$tables$settlements <- tibble::tibble(outcome = "W", settled_sp = 999)
+  ep <- list(members = c("c01", "c02", "c03"), missing = "error")
+  tp <- list(companies = NULL, line = "nearest_main", watermark = "decimal")
+  first <- n7_prepare_epoch(n7_read_inputs(source, "00123"), cutoff,
+                            euro_policy = ep, totals_policy = tp)
+  second <- n7_prepare_epoch(n7_read_inputs(altered, "00123"), cutoff,
+                             euro_policy = ep, totals_policy = tp)
+  testthat::expect_identical(second, first)
+  p1 <- n7_project_probabilities(first, cutoff, -0.14, c(0.1, 16), 1e-10)
+  p2 <- n7_project_probabilities(second, cutoff, -0.14, c(0.1, 16), 1e-10)
+  testthat::expect_identical(p2, p1)
+  constants <- n7_pipeline_constants(reset = TRUE)
+  config <- n7_allocation_configs(constants)$C
+  d1 <- n7_run_allocation(config, first$fixtures, p1$probabilities, first$sp_selected,
+    cutoff, constants = constants, max_reuse = 1L, max_overlap = 0L, match_status = first$match_status)
+  d2 <- n7_run_allocation(config, second$fixtures, p2$probabilities, second$sp_selected,
+    cutoff, constants = constants, max_reuse = 1L, max_overlap = 0L, match_status = second$match_status)
+  testthat::expect_identical(d2, d1)
+})
+
+testthat::test_that("empty projections still require an explicit status-history contract", {
+  cutoff <- list(issue_id = "00123", cutoff_utc = as.POSIXct("2026-09-22 12:00:00", tz = "UTC"))
+  empty <- list(fixtures = n7_typed_empty("fixtures"), euro = n7_typed_empty("euro"),
+    totals = n7_typed_empty("totals"), prematch_sp = n7_typed_empty("prematch_sp"),
+    match_status = n7_typed_empty("match_status"))
+  epoch <- n7_prepare_epoch(empty, cutoff, euro_policy = list(members = "c01"),
+                            totals_policy = list(watermark = "decimal"))
+  testthat::expect_equal(nrow(n7_project_probabilities(epoch, cutoff, -0.14, c(0.1,16), 1e-10)$probabilities), 0L)
+  epoch$match_status <- NULL
+  testthat::expect_error(n7_project_probabilities(epoch, cutoff, -0.14, c(0.1,16), 1e-10), "match_status")
+})

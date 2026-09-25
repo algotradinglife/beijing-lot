@@ -439,19 +439,16 @@ n7_project_probabilities <- function(epoch_inputs, cutoff, rho, total_bounds,
   # is a subset of the frame the ledger was validated against at the input boundary.
   # Joining the full ledger's keys against this slice would manufacture a false
   # "unknown match" for every fixture the epoch legitimately dropped.
-  if (nrow(fixtures)) {
-    if (is.null(epoch_inputs$match_status)) {
-      stop("n7_project_probabilities: epoch_inputs$match_status is required to ",
-           "revalidate fixture visibility at this cutoff")
-    }
-    revalidated <- n7_select_match_status(
-      fixtures, n7_validate_match_status(epoch_inputs$match_status), cutoff)
-    if (nrow(revalidated$exclusions)) {
-      stop("n7_project_probabilities: fixture(s) are not visible as scheduled at ",
-           "this cutoff: ",
-           paste(paste0(revalidated$exclusions$fixture_id, " (",
-                        revalidated$exclusions$reason, ")"), collapse = "; "))
-    }
+  if (is.null(epoch_inputs[["match_status"]])) {
+    stop("n7_project_probabilities: epoch_inputs$match_status is required to ",
+         "revalidate fixture visibility at this cutoff")
+  }
+  revalidated <- n7_select_match_status(fixtures, epoch_inputs[["match_status"]], cutoff)
+  if (nrow(revalidated$exclusions)) {
+    stop("n7_project_probabilities: fixture(s) are not visible as scheduled at ",
+         "this cutoff: ",
+         paste(paste0(revalidated$exclusions$fixture_id, " (",
+                      revalidated$exclusions$reason, ")"), collapse = "; "))
   }
 
   probabilities <- list()
