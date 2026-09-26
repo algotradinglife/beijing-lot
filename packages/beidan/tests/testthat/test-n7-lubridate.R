@@ -165,14 +165,14 @@ testthat::test_that("fixture quotes sit exactly at the declared fixed offsets", 
                              as.numeric(kickoff) - 36 * 3600)
 })
 
-testthat::test_that("the decision window is the next half-open local calendar day", {
+testthat::test_that("20:00 Beijing preserves the following half-open natural day", {
   # 2026-09-22 20:00 Asia/Shanghai == 12:00Z; the window is 09-23 local.
   window <- match_decision_window("2026-09-22T12:00:00Z", "Asia/Shanghai")
-  testthat::expect_identical(window$start_utc, "2026-09-22T16:00:00Z")
-  testthat::expect_identical(window$end_utc, "2026-09-23T16:00:00Z")
+  testthat::expect_equal(window$start_utc, lubridate::ymd_hms("2026-09-22T16:00:00Z"))
+  testthat::expect_equal(window$end_utc, lubridate::ymd_hms("2026-09-23T16:00:00Z"))
 
-  start <- lubridate::ymd_hms(window$start_utc)
-  end <- lubridate::ymd_hms(window$end_utc)
+  start <- window$start_utc
+  end <- window$end_utc
   fixture <- make_example_issue("00123", c(start - lubridate::dseconds(0.25),
     start, end - lubridate::dseconds(0.25), end))
   inputs <- read_match_inputs(example_match_source(fixture), "00123")
@@ -184,33 +184,38 @@ testthat::test_that("the decision window is the next half-open local calendar da
 
 })
 
-testthat::test_that("DST transitions give the correct 23-hour and 25-hour local days", {
-  # America/New_York springs forward on 2026-03-08 and falls back on 2026-11-01.
-  # A correct local-calendar boundary yields 23 h and 25 h; adding a fixed 24 h
-  # would land an hour off local midnight on both dates.
-  spring <- match_decision_window("2026-03-07T17:00:00Z", "America/New_York")
-  spring_hours <- as.numeric(difftime(lubridate::ymd_hms(spring$end_utc),
-                                      lubridate::ymd_hms(spring$start_utc),
-                                      units = "hours"))
-  testthat::expect_equal(spring_hours, 23)
-  testthat::expect_identical(format(lubridate::with_tz(lubridate::ymd_hms(spring$start_utc),
-                                                       "America/New_York"), "%H:%M:%S"),
-                             "00:00:00")
+testthat::test_that("daytime decisions begin four hours later with exact half-open boundaries", {
+  decision <- lubridate::ymd_hms("2026-09-26T02:49:57.5Z")
+  window <- match_decision_window(decision, "Asia/Shanghai")
+  testthat::expect_equal(window$start_utc, lubridate::ymd_hms("2026-09-26T06:49:57.5Z"))
+  testthat::expect_equal(window$end_utc, lubridate::ymd_hms("2026-09-27T06:49:57.5Z"))
+  start <- window$start_utc
+  end <- window$end_utc
+  fixture <- make_example_issue("00123", c(start - lubridate::dseconds(0.25),
+    start, end - lubridate::dseconds(0.25), end))
+  inputs <- read_match_inputs(example_match_source(fixture), "00123")
+  epoch <- prepare_engine(inputs,
+    list(issue_id = "00123", cutoff_utc = decision),
+    list(members = c("c01", "c02", "c03"), missing = "error"),
+    list(companies = NULL, line = "nearest_main", watermark = "decimal"))
+  testthat::expect_identical(epoch$fixtures$fixture_id,
+    fixture$fixtures$fixture_id[c(2L, 3L)])
+})
 
-  fall <- match_decision_window("2026-10-31T16:00:00Z", "America/New_York")
-  fall_hours <- as.numeric(difftime(lubridate::ymd_hms(fall$end_utc),
-                                    lubridate::ymd_hms(fall$start_utc),
-                                    units = "hours"))
-  testthat::expect_equal(fall_hours, 25)
-  testthat::expect_identical(format(lubridate::with_tz(lubridate::ymd_hms(fall$end_utc),
-                                                       "America/New_York"), "%H:%M:%S"),
-                             "00:00:00")
-
-  # An ordinary day is still exactly 24 h.
-  plain <- match_decision_window("2026-09-22T12:00:00Z", "America/New_York")
-  testthat::expect_equal(as.numeric(difftime(lubridate::ymd_hms(plain$end_utc),
-                                             lubridate::ymd_hms(plain$start_utc),
-                                             units = "hours")), 24)
+testthat::test_that("DST transitions preserve four-hour lead and 24 elapsed-hour duration", {
+  for (decision in c("2026-03-07T17:00:00Z", "2026-10-31T16:00:00Z")) {
+    window <- match_decision_window(decision, "America/New_York")
+    start <- window$start_utc
+    end <- window$end_utc
+    testthat::expect_equal(as.numeric(difftime(start,
+      lubridate::ymd_hms(decision), units = "hours")), 4)
+    testthat::expect_equal(as.numeric(difftime(end, start, units = "hours")), 24)
+    testthat::expect_identical(window,
+      match_decision_window(decision, "Asia/Shanghai"))
+    testthat::expect_false(identical(
+      format(lubridate::with_tz(start, "America/New_York"), "%H:%M:%S"),
+      format(lubridate::with_tz(end, "America/New_York"), "%H:%M:%S")))
+  }
 })
 
 testthat::test_that("report visibility at the cutoff keeps subsecond exclusion exact", {
@@ -278,4 +283,17 @@ testthat::test_that("clock overflow and terminal newlines cannot normalize to va
   }
   testthat::expect_error(match_parse_utc("2026-01-01T12:00:00Z\n", "clock"),
                          "explicit UTC offset")
+})
+
+testthat::test_that("window validation and legacy eligibility preserve their contracts", {
+  testthat::expect_error(match_decision_window(as.POSIXct(NA_real_,
+    origin = "1970-01-01", tz = "UTC")), 'one finite instant')
+  testthat::expect_error(match_decision_window(as.POSIXct(numeric(),
+    origin = "1970-01-01", tz = "UTC")), 'one finite instant')
+  fixtures <- tibble::tibble(match_id = 'm1', issue = '26098',
+    kickoff_utc = '2026-09-26T06:49:57Z')
+  result <- match_eligible_fixtures(fixtures, '2026-09-26T02:49:57Z')
+  testthat::expect_identical(result$eligible$match_id, 'm1')
+  testthat::expect_identical(result$eligible$window_start_utc, '2026-09-26T06:49:57Z')
+  testthat::expect_identical(result$eligible$window_end_utc, '2026-09-27T06:49:57Z')
 })

@@ -34,20 +34,14 @@ MATCH_DECISION_HOUR <- 20L
 # Local timezone of the decision hour.
 MATCH_DECISION_TZ <- "Asia/Shanghai"
 
-# The decision window is the NEXT CALENDAR DAY in Beijing time. For a decision
-# epoch at local date D 20:00 the window is local [D+1 00:00, D+2 00:00), which
-# is 4 to 28 hours after the epoch. These two offsets are the same rule expressed
-# in hours and are asserted to agree with the calendar boundary in the tests.
-#
-# This REPLACED the earlier rolling 24h window. The contract that owns this
-# delivery was updated to the natural-day window precisely so that a decision is
-# never taken near the pre-kickoff sale edge.
+# Rolling elapsed-hour bounds: four-hour lead, followed by a 24-hour horizon.
+# At 20:00 Beijing these bounds coincide with the next local calendar day.
 MATCH_WINDOW_START_HOURS <- 4
 MATCH_WINDOW_END_HOURS <- 28
 
 # Sale-state values a fixture may carry. Only NOT_FOR_SALE / SUSPENDED /
 # CANCELLED / RESCHEDULED are exclusion evidence; UNKNOWN is admitted as a
-# regular candidate because the natural-day window (not a per-match minute
+# regular candidate because the four-hour window lead (not a per-match minute
 # threshold) is what provides the margin, and it is never reported as verified
 # sellable.
 #
@@ -156,10 +150,10 @@ match_decision_epoch <- function(local_date, hour = MATCH_DECISION_HOUR, tz = MA
   match_utc_iso(as.numeric(local), "match_decision_epoch: epoch")
 }
 
-# The decision epoch a fixture belongs to. The window of local date D is the next
-# natural day [D+1 00:00, D+2 00:00), so a fixture kicking off on local date L is
-# decided at the epoch of date L-1. Deriving it by subtracting one local CALENDAR
-# day (rather than 24 hours) keeps the mapping exact across a DST transition.
+# Calendar label for the regular 20:00 Beijing schedule, not an inverse mapping
+# for arbitrary daytime decision instants. A kickoff on local date L is assigned
+# to the previous local date. This calendar labeling preserves local dates across
+# DST; eligibility itself uses match_decision_window elapsed-hour bounds.
 match_epoch_date <- function(kickoff_utc, tz = MATCH_DECISION_TZ) {
   if (!is.character(kickoff_utc) || anyNA(kickoff_utc)) {
     stop("match_epoch_date: kickoff_utc must be non-missing character")
@@ -190,39 +184,39 @@ match_decision_epochs <- function(local_dates, hour = MATCH_DECISION_HOUR, tz = 
 
 # ---- Forward window and eligibility -----------------------------------------
 
-# The half-open natural-day window of one decision epoch, returned as UTC
-# instants. The boundary is built from the LOCAL CALENDAR date in `tz` and the
-# next calendar day is reached with lubridate's calendar period (+ lubridate::days),
-# never by adding 24 hours, so a zone with a DST transition still lands on local
-# midnight: 2026-03-08 America/New_York is a 23-hour day and 2026-11-01 a 25-hour
-# day. Building midnight with lubridate::ymd() also makes the wall clock explicit
-# instead of relying on as.POSIXct()'s implicit "00:00:00" completion.
+#' Build a rolling decision window
+#' @md
+#'
+#' @param epoch_utc One finite POSIXct decision instant or a whole-second
+#'   ISO-8601 UTC string. POSIXct fractions are preserved.
+#' @param tz One valid Olson timezone name. The window uses elapsed hours and
+#'   therefore denotes the same instants in every timezone.
+#' @return A list of UTC POSIXct instants, `start_utc` and `end_utc`, defining
+#'   the half-open interval [decision + 4 hours, decision + 28 hours).
+#' @details Invalid instants or timezones raise an error. There are no side
+#'   effects. At 20:00 Beijing this is the following natural day; daytime
+#'   decisions retain the same four-hour lead and 24 elapsed-hour horizon.
 match_decision_window <- function(epoch_utc, tz = MATCH_DECISION_TZ) {
-  epoch <- match_utc_seconds(epoch_utc, "match_decision_window: epoch_utc")
-  if (length(epoch) != 1L) stop("match_decision_window: epoch_utc must be one instant")
+  epoch <- if (inherits(epoch_utc, "POSIXct")) as.numeric(epoch_utc) else
+    match_utc_seconds(epoch_utc, "match_decision_window: epoch_utc")
+  if (length(epoch) != 1L || !is.finite(epoch))
+    stop("match_decision_window: epoch_utc must be one finite instant")
   if (!is.character(tz) || length(tz) != 1L || is.na(tz) || !tz %in% OlsonNames()) {
     stop("match_decision_window: tz is not a known Olson timezone name: ", tz)
   }
   instant <- as.POSIXct(epoch, origin = "1970-01-01", tz = "UTC")
-  # The local calendar date the epoch falls on, as a Date rather than a string:
-  # Date arithmetic below is then a calendar operation, not text reformatting.
-  local_date <- lubridate::as_date(lubridate::with_tz(instant, tz), tz = tz)
-  start <- lubridate::ymd(format(local_date + lubridate::days(1)), tz = tz)
-  end <- lubridate::ymd(format(local_date + lubridate::days(2)), tz = tz)
-  if (anyNA(start) || anyNA(end)) {
-    stop("match_decision_window: the natural-day boundary could not be built")
-  }
-  list(start_utc = match_utc_iso(as.numeric(start), "match_decision_window: start"),
-       end_utc = match_utc_iso(as.numeric(end), "match_decision_window: end"))
+  start <- instant + lubridate::dhours(MATCH_WINDOW_START_HOURS)
+  end <- instant + lubridate::dhours(MATCH_WINDOW_END_HOURS)
+  list(start_utc = start, end_utc = end)
 }
 
-# Fixtures eligible at one decision epoch: kickoff inside the next-calendar-day
-# window AND not excluded by explicit sale-state or schedule-anomaly evidence.
+# Fixtures eligible at one decision epoch: kickoff inside the rolling 24-hour
+# window starting four elapsed hours after the decision AND not excluded by
+# explicit sale-state or schedule-anomaly evidence.
 #   eligible  <=>  window_start <= kickoff < window_end
 #              AND sale_state is not an exclusion state
 #              AND no recorded cutoff contradicts the kickoff
-# The window is half-open so a kickoff exactly at the next local midnight belongs
-# to the window and one exactly at the following midnight does not.
+# The lower boundary is included and the upper boundary is excluded.
 #
 # Returns list(eligible = <tibble>, excluded = <tibble>) so that every
 # non-investment reason is counted instead of being dropped.
@@ -241,8 +235,8 @@ match_eligible_fixtures <- function(fixtures, epoch_utc, tz = MATCH_DECISION_TZ)
   epoch <- match_utc_seconds(epoch_utc, "match_eligible_fixtures: epoch_utc")
   if (length(epoch) != 1L) stop("match_eligible_fixtures: epoch_utc must be one instant")
   window <- match_decision_window(epoch_utc, tz = tz)
-  window_start <- match_utc_seconds(window$start_utc, "match_eligible_fixtures: window start")
-  window_end <- match_utc_seconds(window$end_utc, "match_eligible_fixtures: window end")
+  window_start <- as.numeric(window$start_utc)
+  window_end <- as.numeric(window$end_utc)
   kickoff <- match_utc_seconds(fixtures$kickoff_utc, "match_eligible_fixtures: kickoff_utc")
 
   # Explicit sale-state evidence. A missing column means no evidence was supplied
@@ -293,8 +287,8 @@ match_eligible_fixtures <- function(fixtures, epoch_utc, tz = MATCH_DECISION_TZ)
   out <- tibble::tibble(
     match_id = fixtures$match_id, issue = fixtures$issue,
     kickoff_utc = fixtures$kickoff_utc,
-    window_start_utc = window$start_utc,
-    window_end_utc = window$end_utc,
+    window_start_utc = match_utc_iso(window_start, "window start"),
+    window_end_utc = match_utc_iso(window_end, "window end"),
     epoch_utc = match_utc_iso(rep(epoch, length(kickoff)), "match_eligible_fixtures: epoch"),
     hours_to_kickoff = (kickoff - epoch) / 3600,
     sale_state = sale_state,

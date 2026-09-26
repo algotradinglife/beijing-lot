@@ -314,11 +314,10 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
          cutoff$issue_id, "'")
   }
 
-  # Window filter. match_decision_window owns the day-boundary rule and speaks
-  # ISO-8601 UTC strings, so convert at the boundary rather than duplicating it.
-  window <- match_decision_window(match_utc_iso(as.numeric(cutoff_utc), "cutoff"), MATCH_DECISION_TZ)
-  window_start <- match_parse_utc(window$start_utc, "window$start_utc")
-  window_end <- match_parse_utc(window$end_utc, "window$end_utc")
+  # Preserve the cutoff's fractional seconds through the shared rolling window.
+  window <- match_decision_window(cutoff_utc, MATCH_DECISION_TZ)
+  window_start <- window$start_utc
+  window_end <- window$end_utc
   in_window <- fixtures_all$kickoff_at >= window_start & fixtures_all$kickoff_at < window_end
   fixtures <- fixtures_all[in_window, , drop = FALSE]
   for (fixture_id in fixtures_all$fixture_id[!in_window]) {

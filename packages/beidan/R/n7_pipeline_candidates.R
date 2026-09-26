@@ -163,18 +163,17 @@ parlay_construct_groups <- function(fixtures, probabilities, cutoff, n_legs,
   }
   # The allocation path must be as bound to the cutoff as projection is: a fixture
   # that had already kicked off cannot be purchased, and a fixture outside the D+1
-  # natural-day decision window is not part of this decision either.
+  # rolling decision window is not part of this decision either.
   if ("kickoff_at" %in% names(fixtures)) {
     cutoff_bound <- match_cutoff_utc(cutoff)
     if (any(fixtures$kickoff_at <= cutoff_bound)) {
       stop("parlay_construct_groups: fixtures already kicked off at the cutoff ",
            "are not eligible")
     }
-    # match_decision_window takes the ISO-8601 UTC string form of the epoch.
-    window <- match_decision_window(match_utc_iso(as.numeric(cutoff_bound),
-                                            "parlay_construct_groups: cutoff"))
-    window_start <- match_parse_utc(window$start_utc, "window start")
-    window_end <- match_parse_utc(window$end_utc, "window end")
+    # Keep subsecond boundaries identical to input preparation.
+    window <- match_decision_window(cutoff_bound)
+    window_start <- window$start_utc
+    window_end <- window$end_utc
     outside <- fixtures$kickoff_at < window_start | fixtures$kickoff_at >= window_end
     if (any(outside)) {
       stop("parlay_construct_groups: fixture(s) outside the decision window ",

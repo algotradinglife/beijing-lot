@@ -10,7 +10,7 @@ execute:
 > 当前可执行示例已迁移到 #512 接口。下文原有测试计数、审阅记录和哈希属于此前交付的历史证据；本次重构的验收以 [parlay_api_contract.qmd](parlay_api_contract.qmd) 为准。
 
 
-#510 本次仅统一输入时间解析、合成器固定时长与次日自然日窗口的日期管理，使用已有依赖 lubridate。公共时间列仍为 UTC POSIXct；数据为明确标注的合成输入，不涉及真实采集或历史学习。数值 epoch 和空表类型构造不机械替换。
+#510 本次仅统一输入时间解析、合成器固定时长与决策后4小时起的24小时窗口日期管理，使用已有依赖 lubridate。公共时间列仍为 UTC POSIXct；数据为明确标注的合成输入，不涉及真实采集或历史学习。数值 epoch 和空表类型构造不机械替换。
 
 ## 正常使用流程（mock 数据源）
 
@@ -37,25 +37,25 @@ knitr::kable(epoch$fixtures[, c("fixture_id", "kickoff_at")])
 
 ## 独立边界验收
 
-时区转换只改变显示时区，不能丢失亚秒；固定 36 小时使用 duration，次日窗口遵守当地日历而非固定 24 小时。
+时区转换只改变显示时区，不能丢失亚秒；固定 36 小时使用 duration，决策窗口使用固定经过时长：决策后4小时开始，持续24小时。
 
 ```{r}
 instant <- lubridate::ymd_hms("2026-09-22 20:00:00.25", tz = "Asia/Shanghai")
 parsed <- beidan:::match_parse_utc(instant, "independent instant")
 stopifnot(identical(as.numeric(parsed), as.numeric(instant)),
           identical(attr(parsed, "tzone"), "UTC"))
-for (item in list(c("2026-03-07T17:00:00Z", 23),
-                  c("2026-10-31T16:00:00Z", 25))) {
+for (item in list(c("2026-03-07T17:00:00Z", 24),
+                  c("2026-10-31T16:00:00Z", 24))) {
   window <- beidan:::match_decision_window(item[[1]], "America/New_York")
-  hours <- as.numeric(difftime(lubridate::ymd_hms(window$end_utc),
-                              lubridate::ymd_hms(window$start_utc), units = "hours"))
+  hours <- as.numeric(difftime(window$end_utc,
+                              window$start_utc, units = "hours"))
   stopifnot(hours == as.numeric(item[[2]]))
 }
 ```
 
 ## 验证范围
 
-函数/测试映射：`match_parse_utc` 的偏移、亚秒、空值和非法输入；`make_example_issue` 的固定报价提前时长；`match_decision_window` 的自然日和 DST；`match_select_status` 的严格 cutoff。新增 `test-n7-lubridate.R`，保留既有契约、epoch 和状态回归。
+函数/测试映射：`match_parse_utc` 的偏移、亚秒、空值和非法输入；`make_example_issue` 的固定报价提前时长；`match_decision_window` 的滚动窗口、亚秒边界和 DST；`match_select_status` 的严格 cutoff。新增 `test-n7-lubridate.R`，保留既有契约、epoch 和状态回归。
 
 无新增依赖，无生产抓取，无 CI 工作。后续输入真实数据时仅替换 source。
 
