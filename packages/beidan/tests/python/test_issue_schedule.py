@@ -27,8 +27,8 @@ from beidan_backend.issue_schedule.contract import (
     resolve_kickoff_at,
 )
 from beidan_backend.issue_schedule.crosscheck import (
+    CrossSourceError,
     build_canonical_rows,
-    normalize_team_name,
     pick_score,
     reconcile_identity,
 )
@@ -330,23 +330,23 @@ def test_nowscore_mini_has_a_cansale_true_closed_clock_row():
 # --------------------------------------------------------------------------- #
 
 
-def test_identity_names_are_not_stripped_of_team_words():
-    assert normalize_team_name("赫尔辛基预备队") != normalize_team_name("克鲁比")
-    assert normalize_team_name("女足 A 队") != normalize_team_name("A 队")
-
-
-def test_identity_conflict_stays_visible():
-    left = _row(1, provider="500", home_name="克鲁比", away_name="B")
-    right = _row(1, home_name="赫尔辛基预备队", away_name="B")
+def test_same_issue_slot_aligns_despite_different_names_and_handicap():
+    left = _row(1, provider="500", home_name="克鲁比", away_name="B", handicap=1.0)
+    right = _row(1, home_name="赫尔辛基预备队", away_name="Other", handicap=0.0)
     verdict = reconcile_identity(left, right)
-    assert verdict.method == "conflict"
-    assert verdict.verified is False
+    assert verdict.method == "slot"
+    assert verdict.verified is True
+    rows, diagnostics = _canonical([left], [right])
+    assert rows[0]["home_500"] == "克鲁比"
+    assert rows[0]["home_name"] == "赫尔辛基预备队"
+    assert rows[0]["handicap"] == 0.0
+    assert any("handicap differs" in note for note in diagnostics)
+    assert not any("identity conflict" in note for note in diagnostics)
 
 
-def test_identity_verifies_on_normalized_names_and_equal_handicap():
-    left = _row(1, provider="500", home_name="A 队", away_name="B 队", handicap=1.0)
-    right = _row(1, home_name="a队", away_name="b队", handicap=1.0)
-    assert reconcile_identity(left, right).verified is True
+def test_different_slots_cannot_align():
+    with pytest.raises(CrossSourceError, match="different issue slots"):
+        reconcile_identity(_row(1, provider="500"), _row(2))
 
 
 def test_single_source_slot_is_unverified():
@@ -673,7 +673,7 @@ def test_unverified_secondary_score_never_fills_primary_score():
     left = _row(1, provider="500", home_name="Other", score="4-0")
     right = _row(1, score=None)
     rows, _ = _canonical([left], [right])
-    assert rows[0]["identity_method"] == "conflict"
+    assert rows[0]["identity_method"] == "slot"
     assert rows[0]["score"] is None
     assert rows[0]["home_name"] == right.home_name
 
@@ -691,7 +691,7 @@ def test_missing_primary_id_never_uses_secondary_namespace():
     rows, _ = _canonical([left], [right])
     assert rows[0]["provider_id"] == ""
     assert rows[0]["provider_id_500"] == "500-only"
-    assert rows[0]["identity_method"] == "conflict"
+    assert rows[0]["identity_method"] == "slot"
 
 
 @pytest.mark.parametrize("bad_fid", ["broken1495168", "", "0", "-2"])

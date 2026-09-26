@@ -1,0 +1,10 @@
+{
+  "packages/beidan/R/issue_schedule.R": "7fb9e201cd77eece039009a98bb535dd07c46c371fee9d12a34bd897fee8e914",
+  "packages/beidan/man/fetch_issue_schedule.Rd": "e9d8f5d05a8b033e083556f0c2ce261fdfb7025dbdede5542eacb22292338614",
+  "packages/beidan/inst/python/beidan_backend/issue_schedule/__init__.py": "e15e8fc90881b98de740830dae9c4b5a049c5b42dc1cd9c60b9cb9b420b7a21c",
+  "packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py": "82ce60acbc716a7b59978197ed0924af487ad4d45a7830f00a0946b0e2e993f2",
+  "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497",
+  "packages/beidan/tests/python/test_issue_schedule.py": "c0374ddef7cbd1d64e60d128839625cdf42fd2c1ae3e654fe0beaef409e9a0d2",
+  "packages/beidan/tests/testthat/test-issue-schedule.R": "1f45abe09106cc30999630d7d42d7238ae9aac368724b8ef9c30d44585ff9885",
+  "quarto/26098_walkthrough.qmd": "540a41c9db54c88db03d7e33779e7f96af01fce23a93b06790646d7399117930"
+}

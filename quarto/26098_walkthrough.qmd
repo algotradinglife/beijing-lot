@@ -39,10 +39,7 @@ settlements_file <- file.path(work_dir, "settlements.rds")
 
 # 首次现场采集时改为 TRUE，采集后改回 FALSE，避免反复请求。
 refresh_schedule <- FALSE
-# 身份判定与采集独立；FALSE 重放保存的真实 Jev 响应。
-refresh_identity <- FALSE
 refresh_settlements <- FALSE
-identity_receipt_file <- file.path(work_dir, "identity_receipt.rds")
 # 可指定保存过的规范 schedule.rds；不会使用旧的错误 schedule.csv。
 schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
 
@@ -119,7 +116,7 @@ if (!is.null(schedule)) {
 
 ## 4. 查看真实赛程
 
-开赛时间、截止时间、比赛状态、销售状态、原始显示分列。状态优先使用 Nowscore 原生状态码：`M[][4] = 0` 明确表示未开赛（scheduled）；倒计时或截止显示不覆盖原生码。缺少状态证据才是 `unknown`；`截止` 不代表完场。页面分组日期不是自然开赛日期，不再自行拼接时分。两源队名差异仍须核对，不能靠去掉女足/U21等词强行匹配。
+开赛时间、截止时间、比赛状态、销售状态、原始显示分列。状态优先使用 Nowscore 原生状态码：`M[][4] = 0` 明确表示未开赛（scheduled）；倒计时或截止显示不覆盖原生码。缺少状态证据才是 `unknown`；`截止` 不代表完场。页面分组日期不是自然开赛日期，不再自行拼接时分。本期两源按期号和 slot 对齐，队名差异仅保留为来源信息。
 
 ```{r}
 #| label: schedule-checks
@@ -136,67 +133,22 @@ if (!is.null(schedule)) {
 }
 ```
 
-### 两源别名与完整比赛上下文
+### 按期号与场号对齐
 
-下面将原始显示名、title 别名、对手身份和两源联赛一起检查。第77场客队的500 title“耶尔文佩”与Nowscore精确对应，这也是主队身份判定的证据。开赛时间来自Nowscore，不能把一个统一时间当作两源各自确认；两源截止时间可能不同，也不等同于开赛时间。
+当前期以 `(issue_id, slot)` 对齐两源赛程，不使用队名相似度或 JEV 判定。两源各自的页面期号必须正确，单源重复 slot 会报错；只有一个来源的场次明确标记为 `provider_id`。队名保留原文供查看，不因简称、译名或别名差异产生身份 conflict。让球、时间、状态仍分别保留自身诊断。
 
 ```{r}
-#| label: schedule-identity-evidence
-identity_items <- NULL
-identity_result <- NULL
+#| label: schedule-slot-alignment
 if (!is.null(schedule)) {
-  identity_items <- beidan::schedule_identity_items(schedule)
-  identity_items |>
-    dplyr::filter(slot %in% c(33L, 77L)) |>
-    dplyr::mutate(dplyr::across(where(is.list),
-      ~ vapply(.x, paste, collapse = " / ", FUN.VALUE = character(1)))) |>
-    dplyr::select(dplyr::any_of(c("slot", "side", "aliases_500", "aliases_nowscore",
-      "opponent_aliases_500", "opponent_aliases_nowscore", "opponent_exact_alias",
-      "league_500", "league_nowscore", "kickoff_at",
-      "sale_end_raw_500", "sale_end_raw_nowscore"))) |>
+  schedule |> dplyr::count(identity_method) |> knitr::kable()
+  schedule |>
+    dplyr::select(issue_id, slot, identity_method, home_name, away_name,
+                  home_500, away_500, home_nowscore, away_nowscore) |>
     knitr::kable()
 }
 ```
 
-`refresh_identity = FALSE` 不联网，默认重放本地响应；没有本地产物时尝试随包保存的本期真实响应，并校验是否与当前证据一致。不一致会显示error，需要显式刷新，不能静默套用旧结果。只有 `refresh_identity = TRUE` 才向Jev发送未精确匹配的队名对；凭据通过当前会话 `TYPESAFE_API_KEY` 提供，不写入文档。新判定只在获得有效真实响应后保存。模型概率是判定不确定性，不是比赛身份的外部证明。
-
-```{r}
-#| label: schedule-identity-judge
-if (!is.null(schedule)) {
-  if (refresh_identity) {
-    identity_result <- beidan::judge_schedule_identity(schedule, judge = beidan::jev_schedule_judge)
-    receipt <- attr(identity_result, "judge_receipt")
-    if (!is.null(receipt)) {
-      dir.create(dirname(identity_receipt_file), recursive = TRUE, showWarnings = FALSE)
-      saveRDS(receipt, identity_receipt_file)
-    }
-  } else {
-    replay_file <- if (file.exists(identity_receipt_file)) identity_receipt_file else
-      file.path(package_dir, "tests", "testthat", "fixtures", "schedule_identity", "jev_context_receipt.rds")
-    identity_result <- if (file.exists(replay_file))
-      beidan::replay_schedule_identity(schedule, readRDS(replay_file)) else
-      beidan::judge_schedule_identity(schedule)
-  }
-  identity_result |> dplyr::count(method, review_state) |> knitr::kable()
-  identity_result |>
-    dplyr::filter(method != "exact_alias") |>
-    dplyr::select(slot, side, choice, p_same, p_different, p_review, confidence, margin, review_state) |>
-    knitr::kable()
-  if (!is.null(attr(identity_result, "judge_error"))) print(attr(identity_result, "judge_error"))
-}
-```
-
-匹配结果独立于原始赛程，不自动覆盖来源ID或队名。`review` 保留人工复核；`error`/`unavailable` 不能当作匹配成功。原第77场主队孤立判定分布为同队0.39、不同队0.33、待复核0.28；下表展示当前上下文结果，不保证一定超过自动阈值。
-
-```{r}
-#| label: schedule-identity-comparison
-if (!is.null(identity_result)) {
-  identity_result |>
-    dplyr::filter(slot == 77L, side == "home") |>
-    dplyr::select(slot, side, p_same, p_different, p_review, review_state, model) |>
-    knitr::kable()
-}
-```
+本节不需要 JEV 凭据。Titan 盘口使用 Nowscore 原生比赛 ID；北单 slot 不是 Titan ID，两者不可互换。
 
 ## 5. 采集真实欧赔与大小球
 
@@ -429,3 +381,5 @@ Clean actual-data render passed; preview80tickets is not a saved20:00 decision o
 <!-- Frozen-run review: ../docs/reviews/26098-frozen-run-20260926.md; reviewed QMD SHA-256 before attestation: 84e38c1a5489ba8a1f3c31253641c3a89c55bc931a23572e261dd0aa1f72f9a1. No findings. Actual saved plan; 80 pending, settlement incomplete. -->
 
 <!-- #526 final review: ../docs/reviews/526-rolling-window.md; reviewed hashes before attestation: ../docs/reviews/526-reviewed-hashes.json. Two findings fixed; final codex review no actionable findings. Real80 tickets PENDING. -->
+
+<!-- #528 slot alignment review: ../docs/reviews/528-slot-alignment.md; hashes before attestation: ../docs/reviews/528-reviewed-hashes.json. Final codex review no actionable findings. -->
