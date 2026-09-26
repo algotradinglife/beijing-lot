@@ -34,7 +34,7 @@ fetch_issue_schedule(
 }
 \value{
 列契约见 \code{\link[=issue_schedule_columns]{issue_schedule_columns()}} 的 tibble。附加属性：
-· \code{diagnostics}：跨源身份冲突等\strong{显式诊断}（字符向量）
+· \code{diagnostics}：让球差异、缺失来源或时间异常等\strong{显式诊断}（字符向量）
 · \code{identity_summary}：每种身份判定方法的计数
 · \code{written}：实际写入的文件路径（\code{raw_dir} 内，每次采集独立目录）
 · \code{source_urls}：本次采集使用的两个来源 URL
@@ -47,6 +47,9 @@ fetch_issue_schedule(
 原始字节 + 解析行 JSON + 元数据回执，\strong{不碰数据库，也不写 CSV}（CSV 是
 调用方的显式动作，直接用 \code{readr::write_csv()}）。原始响应在解析之前先落盘，
 且每次采集写入独立子目录，不会覆盖既有快照。
+
+两源页面各自校验期号后，以 \verb{(issue_id, slot)} 对齐；不同名称不产生身份冲突。
+原始队名均保留，规范字段沿用 Nowscore 主来源，无需 JEV。
 
 比赛状态采用同页 \code{M[slot][4]} 明确状态码，并核对其原生比赛ID；
 源脚本定义0为未开赛。状态码原文保留于 \code{match_status_raw}，混合销售

@@ -107,6 +107,7 @@ testthat::test_that('offline replay through reticulate returns the canonical tib
   testthat::expect_s3_class(result, 'tbl_df')
   testthat::expect_identical(names(result), issue_schedule_columns())
   testthat::expect_identical(nrow(result), 4L)
+  testthat::expect_identical(result$identity_method[result$slot == 1L], 'slot')
   testthat::expect_identical(result$issue_id, rep('26098', 4L))
   testthat::expect_type(result$slot, 'integer')
   testthat::expect_s3_class(result$kickoff_at, 'POSIXct')

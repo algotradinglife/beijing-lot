@@ -1,25 +1,7 @@
-"""Cross-source identity reconciliation, driven by measured evidence.
+"""Align issue schedules by the source-validated issue and within-issue slot.
 
-The frozen 26098 snapshot is the specification. Measured there:
-
-* Both sources expose exactly 146 rows with slots 1..146, so slot is a usable
-  *candidate* join key — but slot alone is not identity, so it is always checked
-  against at least one independent signal before a match is called verified.
-* Provider IDs are unrelated (500 uses ``fid``, nowscore ``Panlu.aspx?id=``), so
-  they can never be compared across sources; they only order rows *within* one.
-* The handicap agrees on all 146 slots.
-* Team names still differ on 25 of 146 slots (``克鲁比`` vs
-  ``赫尔辛基预备队``), and those differences are *not* decoration. An earlier
-  rule stripped ``女足``/``U21``/``预备队``/``青年队`` and accepted directional
-  containment; that rule would equate a men's side with the women's, senior with
-  reserve, and U19 with U21 — different teams. It is deleted, not tuned.
-
-So the strategy is deliberately narrow: **exact names modulo whitespace,
-punctuation, width and case** may verify a slot. Everything else stays
-``unresolved`` with a visible diagnostic. A wrong "verified" is far more
-expensive than an unresolved row: the canonical table keeps both providers'
-original spellings in their own columns, and only the primary source's fields
-(nowscore by default) are ever promoted to the canonical values.
+Team spellings remain provenance, not an identity gate. Provider ID namespaces
+remain separate; canonical match fields continue to come from Nowscore.
 """
 
 from __future__ import annotations
@@ -36,10 +18,6 @@ from .contract import (
     to_utc,
 )
 from .sources import ProviderRow
-
-#: Punctuation, width and spacing only. Deliberately *not* a list of football
-#: words: removing ``预备队``/``U21``/``女足`` changes which team a name denotes.
-_PUNCTUATION_RE = re.compile(r"[\s·．.。\-—_()（）\[\]【】]")
 
 #: A real score is ``home-away`` with plain digits on both sides. Anything else
 #: (``析 亚 欧``, ``-``, empty, free text) is *not* a score and is reported as
@@ -68,49 +46,10 @@ class IdentityVerdict:
     verified: bool
 
 
-def normalize_team_name(name: str) -> str:
-    """Build a comparison key by removing punctuation/width/spacing only.
-
-    @param name Raw team name from either source.
-    @return A comparison key. This is *only* a comparison key — the canonical
-        table keeps each source's original spelling in its own column.
-    @details The key never drops a word that carries team identity: a name that
-        differs by ``预备队``, ``U21``, ``女足`` or ``青年队`` produces different
-        keys, because those are different teams.
-    """
-    text = (name or "").strip()
-    text = text.replace("（", "(").replace("）", ")")
-    text = _PUNCTUATION_RE.sub("", text)
-    return text.upper()
-
-
-def name_agreement(left: str, right: str) -> tuple[bool, str]:
-    """Decide whether two team names denote the same club.
-
-    @param left One source's spelling.
-    @param right The other source's spelling.
-    @return ``(agrees, note)``. Agreement is raw equality, or equality after
-        removing punctuation/width/spacing. No containment, no edit distance and
-        no decoration stripping: measured 26098 differences such as
-        ``克鲁比``/``赫尔辛基预备队`` are *not* agreement and must stay visible.
-    """
-    if not left or not right:
-        return False, "one source published an empty name"
-    raw_left, raw_right = left.strip(), right.strip()
-    if raw_left == raw_right:
-        return True, "exact"
-    norm_left, norm_right = normalize_team_name(raw_left), normalize_team_name(raw_right)
-    if not norm_left or not norm_right:
-        return False, "name normalized to empty"
-    if norm_left == norm_right:
-        return True, "normalized-equal"
-    return False, "normalized-names-disagree"
-
-
 def identity_candidates(
     rows_500: list[ProviderRow], rows_nowscore: list[ProviderRow]
 ) -> dict[int, tuple[ProviderRow | None, ProviderRow | None]]:
-    """Pair rows by slot without asserting identity.
+    """Pair rows by the within-issue slot; source parsers validate issue identity.
 
     @param rows_500 Rows from 500.
     @param rows_nowscore Rows from nowscore.
@@ -141,39 +80,17 @@ def _index_by_slot(rows: list[ProviderRow], provider: str) -> dict[int, Provider
 def reconcile_identity(
     row_500: ProviderRow | None, row_nowscore: ProviderRow | None
 ) -> IdentityVerdict:
-    """Reconcile one slot across sources and report the method used.
+    """Align two rows by slot after each source page passed issue validation.
 
-    @param row_500 The 500 row, or ``None``.
-    @param row_nowscore The nowscore row, or ``None``.
-    @return An ``IdentityVerdict`` naming the evidence that was used.
-    @details Rules:
-        · both sides present, *both* names agree exactly modulo
-          punctuation/width/spacing, and the handicaps agree ->
-          ``normalized_name``, verified.
-        · both sides present but a name or handicap disagrees -> ``conflict``,
-          not verified. This is the normal outcome for a provider abbreviation
-          such as ``克鲁比`` vs ``赫尔辛基预备队``: it stays visible.
-        · only one side present -> ``provider_id`` for that side alone, *not*
-          verified, because a single source cannot corroborate itself.
-        · neither side present -> ``unresolved``.
+    Both rows with the same slot are aligned regardless of team spelling or
+    handicap. Names stay in source columns; handicap discrepancies remain
+    separate data diagnostics. A missing source is explicitly single-source.
+    Different slots raise CrossSourceError instead of asserting alignment.
     """
     if row_500 is not None and row_nowscore is not None:
-        home_ok, home_note = name_agreement(row_500.home_name, row_nowscore.home_name)
-        away_ok, away_note = name_agreement(row_500.away_name, row_nowscore.away_name)
-        handicap_ok = row_500.handicap == row_nowscore.handicap
-        if home_ok and away_ok and handicap_ok:
-            note = "home=" + home_note + ";away=" + away_note + ";handicap=equal"
-            return IdentityVerdict("normalized_name", note, verified=True)
-        problems = []
-        if not home_ok:
-            problems.append(f"home: {home_note}")
-        if not away_ok:
-            problems.append(f"away: {away_note}")
-        if not handicap_ok:
-            problems.append(
-                f"handicap: {row_500.handicap!r} != {row_nowscore.handicap!r}"
-            )
-        return IdentityVerdict("conflict", ";".join(problems), verified=False)
+        if row_500.slot != row_nowscore.slot:
+            raise CrossSourceError("cannot align different issue slots")
+        return IdentityVerdict("slot", "same validated issue and slot", verified=True)
     if row_500 is not None:
         return IdentityVerdict(
             "provider_id", "only 500 published this slot; single-source, unverified", verified=False
@@ -224,8 +141,8 @@ def build_canonical_rows(
                 "slot is retained from the other source only"
             )
         verdict = reconcile_identity(left, right)
-        if verdict.method == "conflict":
-            diagnostics.append(f"slot {slot}: identity conflict ({verdict.note})")
+        if left is not None and right is not None and left.handicap != right.handicap:
+            diagnostics.append(f"slot {slot}: handicap differs (500={left.handicap}, nowscore={right.handicap}); primary nowscore retained")
         home_name = picked.home_name if picked else (left or right).home_name
         away_name = picked.away_name if picked else (left or right).away_name
         handicap = picked.handicap if picked else (left or right).handicap
