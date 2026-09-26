@@ -33,7 +33,7 @@ schedule_file <- file.path(work_dir, "schedule.rds")
 market_dir <- file.path(work_dir, "market_inputs")
 markets_file <- file.path(work_dir, "markets.rds")
 refresh_markets <- FALSE
-market_slots <- c(81L, 82L, 84L, 85L, 87L, 90L, 91L, 96L, 98L) # 已实采的9场9/27比赛。
+market_slots <- c(52L, 56L, 57L, 61L, 63:78) # 当前窗口的真实采集候选；coverage记录排除。
 totals_company_ids <- "8" # Titan 大小球公司8：Bet365；不是欧赔公司ID。
 settlements_file <- file.path(work_dir, "settlements.rds")
 
@@ -46,14 +46,14 @@ identity_receipt_file <- file.path(work_dir, "identity_receipt.rds")
 # 可指定保存过的规范 schedule.rds；不会使用旧的错误 schedule.csv。
 schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
 
-# 直接填写北京时间；这是待核对的回放示例，不代表数据已满足该时点。
-# 之后采集的数据不能冒充当时已经可见的历史快照。
+# 本次实盘数据流程验证：采集完成后固定决策时间，已冻结方案。
+# 这是一次即时决策，不代表每晚20点策略的回测。
 decision_at <- lubridate::ymd_hms(
-  "2026-09-26 20:00:00", tz = "Asia/Shanghai"
+  "2026-09-26 12:18:05", tz = "Asia/Shanghai"
 )
 
 # 先测试决策流程；拿到真实结算数据后，再填写复盘时点。
-settlement_at <- NULL
+settlement_at <- decision_at
 # settlement_at <- lubridate::ymd_hms(
 #   "2026-09-28 20:00:00", tz = "Asia/Shanghai"
 # )
@@ -63,7 +63,7 @@ stopifnot(is.null(decision_at) || !is.na(decision_at),
 
 `decision_at` 是下注决策时点，用于限制当时可见的赛程、状态和报价；`settlement_at` 是复盘时点，用于限制可使用的结算信息，不是单场完场时间。两者直接在本块填写，无须设置环境变量。`settlement_at = NULL` 表示结算步骤尚未就绪。
 
-这里的决策时间只是示例。若快照采集晚于该时点，且没有可信的历史可用时间证据，则不能据此还原该时点的决策；应先核对实际输入再确定时间。
+本次在北京时间 **2026-09-26 12:18:05** 冻结方案，选场窗口为 **9月26日16:18:05至9月27日16:18:05（不含结束时刻）**。默认重读此次快照及方案；新决策需要重新采集并另设决策时点。10:49的次日窗口方案及12:15的空方案保留为试跑证据，不是本次正式方案，也不计作真实购买。当前入选比赛尚未完场。
 
 ## 2. 加载源码并确认接口
 
@@ -106,7 +106,7 @@ if (refresh_schedule) {
 }
 ```
 
-`refresh_schedule = FALSE` 只读取本地快照，结果不会自动更新。需要网站当前结果时，在执行本块前运行 `refresh_schedule <- FALSE`，然后重跑本块；采集成功后可设回 `FALSE`。下方时间是采集时间，不保证来源网站本身已更新。
+`refresh_schedule = FALSE` 只读取本地快照，结果不会自动更新。需要网站当前结果时，在执行本块前运行 `refresh_schedule <- TRUE`，然后重跑本块；采集成功后可设回 `FALSE`。下方时间是采集时间，不保证来源网站本身已更新。
 
 ```{r}
 #| label: schedule-freshness
@@ -202,7 +202,7 @@ if (!is.null(identity_result)) {
 
 使用赛程的 `provider_id_nowscore` 访问 Titan。函数核对 Titan 的原生比赛 ID、双方名称和开赛时间；不匹配的场次在 `coverage` 显示错误。欧赔保存各公司带时间戳的历史报价，平均由第6节固定成员规则计算。大小球从 Titan 手机历史接口读取完整年月日时间，香港盘水位加1转为十进制赔率。公司 ID 的欧赔与大小球命名空间不同，不能直接互换。
 
-`market_slots` 控制采集场次；默认使用已实采的9场9月27日比赛（83场身份不一致，保留排除记录）。将 `refresh_markets <- TRUE` 后执行本块联网采集，成功后改回 `FALSE` 重用快照。采集时间和源报价时间分别保存；历史报价允许用于注明口径的研究，不声称本地当时已观测。北单赛前SP缺失保持空表。
+`market_slots` 控制采集场次；本次从决策后4小时起的24小时窗口选择候选，按开赛时间推进采集，身份不符者保留排除记录。本次是流程验证的有限候选集，不声称完成全期最优搜索。将 `refresh_markets <- TRUE` 后执行本块联网采集，成功后改回 `FALSE` 重用快照。采集时间和源报价时间分别保存；历史报价允许用于注明口径的研究，不声称本地当时已观测。北单赛前SP缺失保持空表。
 
 ```{r}
 #| label: market-source
@@ -229,6 +229,16 @@ if (!is.null(schedule)) {
     knitr::kable(utils::head(markets$totals, 10))
     knitr::kable(dplyr::select(markets$captures, fixture_id, market, observed_at, source_url))
     inputs <- beidan::match_inputs_from_capture(market_schedule, markets)
+    # 本次快照的明确排除；保留原始盘口和原因，不填补缺失公司。
+    input_exclusions <- tibble::tribble(
+      ~fixture_id, ~reason,
+      "26098:56", "Bet365最新欧赔同一时间戳存在冲突",
+      "26098:70", "固定欧赔平均名单缺少公司82",
+      "26098:76", "固定欧赔平均名单缺少公司432"
+    )
+    knitr::kable(input_exclusions)
+    inputs <- purrr::map(inputs, ~ dplyr::filter(.x,
+      !fixture_id %in% input_exclusions$fixture_id))
   }
 }
 ```
@@ -237,6 +247,8 @@ if (!is.null(schedule)) {
 当前赛程状态不能倒填到过去：如果现有状态台账晚于 `decision_at`，第6节仍会排除该场。盘口采集成功不等于历史状态已经补齐，更不能将 `unknown` 改成 `scheduled` 来绕过它。当前可先核对本节真实报价，随后按实际状态台账继续决策流程。
 
 ## 6. 指定公司规则，准备决策窗口
+
+窗口为 `[decision_at + 4小时, decision_at + 28小时)`：开始边界包含，结束边界不包含。20:00决策对应次日整天；其他时点按同样的4小时提前量平移，不再硬等次日00:00。
 
 先查看真实输入的公司 ID，再填写 `euro_members`。不使用 mock 公司的 c01/c02/c03，不把单家公司替代多公司平均。决策时刻只在上面的参数块设置一次；期号由单期输入推导。
 
@@ -251,7 +263,8 @@ if (!is.null(inputs) && !is.null(decision_at) && length(euro_members) >= 2L) {
     totals = list(companies = NULL, line = "nearest_main", watermark = "decimal")
   )
   epoch <- beidan::prepare_match_inputs(inputs, decision_at, market_policy)
-  knitr::kable(epoch$fixtures)
+  knitr::kable(dplyr::mutate(epoch$fixtures,
+    dplyr::across(where(lubridate::is.POSIXct), ~ lubridate::with_tz(.x, "Asia/Shanghai"))))
   knitr::kable(epoch$exclusions)
 } else {
   cat("未就绪：需要真实 inputs、明确的 decision_at 和欧赔平均公司名单。\n")
@@ -412,3 +425,7 @@ Evidence/commands/limits: ../docs/reviews/522-integrated-review.md
 Reviewed hashes including this QMD before this attestation: ../docs/reviews/522-integrated-reviewed-hashes.json
 Clean actual-data render passed; preview80tickets is not a saved20:00 decision or completed settlement.
 -->
+
+<!-- Frozen-run review: ../docs/reviews/26098-frozen-run-20260926.md; reviewed QMD SHA-256 before attestation: 84e38c1a5489ba8a1f3c31253641c3a89c55bc931a23572e261dd0aa1f72f9a1. No findings. Actual saved plan; 80 pending, settlement incomplete. -->
+
+<!-- #526 final review: ../docs/reviews/526-rolling-window.md; reviewed hashes before attestation: ../docs/reviews/526-reviewed-hashes.json. Two findings fixed; final codex review no actionable findings. Real80 tickets PENDING. -->

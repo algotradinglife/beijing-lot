@@ -1183,7 +1183,7 @@ testthat::test_that('funding follows priority order, not a proportional split', 
 })
 
 testthat::test_that('a fixture outside the decision window is refused', {
-  # The D+1 natural-day window is part of the contract: a slate that kicks off later
+  # The rolling 24-hour window is part of the contract: a slate that kicks off later
   # than the window is not part of this decision.
   fx <- value_fixture(n_fixtures = 56L)
   shifted <- fx$fixtures
