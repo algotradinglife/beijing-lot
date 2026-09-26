@@ -55,20 +55,25 @@ def validate_fixture(fixture: dict) -> datetime:
 
 
 def parse_markets(fixture: dict, euro_body: bytes, totals_bodies: dict[str, bytes]) -> dict:
-    """Validate Titan identity then return all valid timed pregame company quotes.
+    """Align native ID, warn on names/time, then return timed pregame quotes.
 
     Euro decimal prices and totals Hong Kong prices converted to decimal. Company
     namespaces remain separate. Missing/invalid rows are counted, never replaced.
     """
     kickoff = validate_fixture(fixture)
     identity = titan_identity(euro_body)
-    if (str(identity["ScheduleID"]) != fixture["provider_id_nowscore"] or
-        identity["kickoff_at"] != kickoff or
-        identity["hometeam_cn"] != fixture["home_nowscore"] or
-        identity["guestteam_cn"] != fixture["away_nowscore"]):
-        raise ValueError("Titan/Nowscore fixture identity mismatch")
+    if str(identity["ScheduleID"]) != fixture["provider_id_nowscore"]:
+        raise ValueError(f"Titan/Nowscore native ID mismatch: Titan={identity['ScheduleID']}, Nowscore={fixture['provider_id_nowscore']}")
     pid = fixture["provider_id_nowscore"]
     euro, totals, companies, diagnostics = [], [], [], []
+    for label, expected, actual in (
+        ("home_name", fixture["home_nowscore"], identity["hometeam_cn"]),
+        ("away_name", fixture["away_nowscore"], identity["guestteam_cn"]),
+        ("kickoff_at", kickoff.astimezone(BJT).isoformat(), identity["kickoff_at"].isoformat()),
+    ):
+        if expected != actual:
+            diagnostics.append(dict(market="identity", company_id="",
+                reason=f"warning: {label} differs; Nowscore={expected}; Titan={actual}", count=1))
     seen = set()
     for entry in _js_array(euro_body.decode("utf-8-sig"), "game"):
         parts = entry.split("|")
@@ -164,7 +169,10 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
             for key in ('euro','totals','companies','diagnostics'):
                 result[key].extend(parsed[key])
             complete = bool(parsed['euro']) and bool(parsed['totals'])
-            result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='ok' if complete else 'partial',detail='' if complete else 'No usable pregame quotes in one or both markets',
+            notices = [row['reason'] for row in parsed['diagnostics'] if row['market'] == 'identity']
+            if not complete:
+                notices.append('No usable pregame quotes in one or both markets')
+            result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='ok' if complete else 'partial',detail='; '.join(notices),
                 euro_rows=len(parsed['euro']),totals_rows=len(parsed['totals'])))
         except (ValueError,KeyError,RuntimeError,OSError) as exc:
             result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='error',detail=str(exc),euro_rows=0,totals_rows=0))

@@ -37,7 +37,13 @@ testthat::test_that("real Titan capture converts through the R boundary and exis
   testthat::expect_error(match_inputs_from_capture(changed, result), "Captured identity differs")
   changed <- schedule
   changed$kickoff_at <- changed$kickoff_at + 86400
-  testthat::expect_error(match_inputs_from_capture(changed, result), "Captured identity differs")
+  testthat::expect_warning(updated <- match_inputs_from_capture(changed, result), "Captured names/kickoff differ")
+  testthat::expect_equal(nrow(updated$euro), nrow(result$euro))
+  testthat::expect_equal(as.numeric(updated$fixtures$kickoff_at), as.numeric(changed$kickoff_at))
+  changed <- schedule
+  changed$home_nowscore <- "另一译名"
+  testthat::expect_warning(updated <- match_inputs_from_capture(changed, result), "Captured names/kickoff differ")
+  testthat::expect_equal(nrow(updated$totals), nrow(result$totals))
   testthat::expect_true(all(result$diagnostics$fixture_id == "26098:39"))
   bad <- result
   bad$euro$fixture_id[1] <- "unmatched"
