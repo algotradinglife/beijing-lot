@@ -1,7 +1,8 @@
 #' Capture real Titan European and total markets for a schedule subset
 #'
 #' Captures full pregame quote histories, without averaging or cutoff selection.
-#' Nowscore fixture ID, both names and kickoff must match Titan's native metadata.
+#' The Nowscore native fixture ID must match Titan. Name/kickoff differences
+#' are warnings in diagnostics and coverage$detail, not rejection conditions.
 #' Network requests are spaced at least one second apart. Raw responses and an
 #' observation receipt are saved before parsing. Failed fixtures remain in coverage.
 #' @param schedule Schedule tibble from [fetch_issue_schedule()], optionally filtered.
@@ -69,6 +70,9 @@ fetch_match_markets <- function(schedule, raw_dir, backend,
 
 #' Connect captured markets and observed schedule to existing match inputs
 #'
+#' Native IDs bind the capture. Name/kickoff changes warn rather than reject;
+#' current schedule values are retained. Titan source differences are recorded
+#' in markets$diagnostics and coverage$detail.
 #' Does not infer historical scheduled status from a later finished/unknown row.
 #' Actual observed_at is used for status availability. Historical market quotes
 #' may be inspected independently when the old status ledger is unavailable.
@@ -85,11 +89,16 @@ match_inputs_from_capture <- function(schedule, markets) {
   identity <- markets$identities
   idx <- match(identity$fixture_id, schedule$fixture_key)
   if (anyNA(idx) || anyDuplicated(identity$fixture_id) ||
-      !all(identity$provider_id_nowscore == schedule$provider_id_nowscore[idx]) ||
-      !all(identity$home_nowscore == schedule$home_nowscore[idx]) ||
-      !all(identity$away_nowscore == schedule$away_nowscore[idx]) ||
-      !all(as.numeric(identity$kickoff_at) == as.numeric(schedule$kickoff_at[idx]))) {
-    stop("Captured identity differs from current schedule; recapture/reconcile")
+      !all(identity$provider_id_nowscore == schedule$provider_id_nowscore[idx])) {
+    stop("Captured identity differs from current schedule: fixture/native ID mismatch")
+  }
+  changed <- identity$home_nowscore != schedule$home_nowscore[idx] |
+    identity$away_nowscore != schedule$away_nowscore[idx] |
+    as.numeric(identity$kickoff_at) != as.numeric(schedule$kickoff_at[idx])
+  if (any(changed, na.rm = TRUE)) {
+    warning("Captured names/kickoff differ from current schedule for ",
+      paste(identity$fixture_id[which(changed)], collapse = ", "),
+      "; native IDs match; current schedule values retained", call. = FALSE)
   }
   if (!all(c(markets$euro$fixture_id, markets$totals$fixture_id) %in% identity$fixture_id)) {
     stop("Market fixture IDs do not match captured identity")

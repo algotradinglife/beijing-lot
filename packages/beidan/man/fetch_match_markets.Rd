@@ -40,7 +40,8 @@ never synthesized. Source quote time is distinct from actual observed_at.
 }
 \description{
 Captures full pregame quote histories, without averaging or cutoff selection.
-Nowscore fixture ID, both names and kickoff must match Titan's native metadata.
+The Nowscore native fixture ID must match Titan. Name/kickoff differences
+are warnings in diagnostics and coverage$detail, not rejection conditions.
 Network requests are spaced at least one second apart. Raw responses and an
 observation receipt are saved before parsing. Failed fixtures remain in coverage.
 }

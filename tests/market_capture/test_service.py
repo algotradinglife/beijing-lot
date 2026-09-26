@@ -33,11 +33,22 @@ def test_real_identity_and_histories(fixture):
     assert quote['over_decimal']==quote['under_decimal']==1.9
     assert all(r['quote_at'] < fixture['kickoff_at'] for r in result['totals'])
 
-@pytest.mark.parametrize('field,value',[('provider_id_nowscore','2997422'),('home_nowscore','阿特拉斯'),('away_nowscore','蒂华纳'),('kickoff_at','2026-09-25T11:00:00+08:00')])
-def test_wrong_identity_rejected(fixture,field,value):
-    fixture[field]=value
-    with pytest.raises(ValueError,match='mismatch'):
+def test_wrong_native_id_rejected(fixture):
+    fixture['provider_id_nowscore']='2997422'
+    with pytest.raises(ValueError,match='native ID mismatch'):
         parse_markets(fixture,(ROOT/'euro.raw').read_bytes(),{})
+
+@pytest.mark.parametrize('field,value',[('home_nowscore','不同译名'),('away_nowscore','另一译名'),('kickoff_at','2026-09-26T12:00:00+08:00')])
+def test_names_and_time_warn_without_losing_quotes(fixture,field,value,tmp_path,pages):
+    fixture[field]=value
+    from beidan_backend.market_capture.history import over_under_history_url
+    old_total=next(url for url in pages if '1x2d' not in url)
+    pages[over_under_history_url(fixture['provider_id_nowscore'],8,validate_fixture(fixture))]=pages.pop(old_total)
+    result=fetch_markets([fixture],str(tmp_path),['8'],pages=pages)
+    assert result['coverage'][0]['status']=='ok'
+    assert 'warning:' in result['coverage'][0]['detail']
+    assert result['euro'] and result['totals']
+    assert any(r['market']=='identity' and r['reason'].startswith('warning:') for r in result['diagnostics'])
 
 @pytest.mark.parametrize('field,value',[('provider_id_nowscore','../x'),('fixture_id',''),('home_nowscore',None),('kickoff_at','2026-09-26T11:00:00')])
 def test_invalid_fixture_before_network(fixture,field,value):
@@ -126,3 +137,14 @@ def test_interrupted_parse_keeps_observation_receipt(tmp_path,fixture,pages,monk
     assert len(receipt['captures'])==2
     assert all(c['observed_at'] and c['source_url'] for c in receipt['captures'])
     assert all(Path(c['raw_path']).exists() for c in receipt['captures'])
+
+
+def test_slot63_real_translated_names_keep_quotes():
+    fixture=dict(fixture_id='26098:63',provider_id_nowscore='3007685',
+        home_nowscore='纽波特郡',away_nowscore='格里姆斯比',kickoff_at='2026-09-26T22:00:00+08:00')
+    result=parse_markets(fixture,(ROOT/'slot63-euro.raw').read_bytes(),{})
+    assert result['euro']
+    warnings=[row for row in result['diagnostics'] if row['market']=='identity']
+    assert len(warnings)==2
+    assert any('纽波特郡' in row['reason'] and 'Titan=纽波特' in row['reason'] for row in warnings)
+    assert any('格里姆斯比' in row['reason'] and 'Titan=格林斯比' in row['reason'] for row in warnings)
