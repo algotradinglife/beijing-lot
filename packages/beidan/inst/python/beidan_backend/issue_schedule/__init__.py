@@ -28,8 +28,6 @@ from .contract import (
 from .crosscheck import (
     CrossSourceError,
     identity_candidates,
-    name_agreement,
-    normalize_team_name,
     pick_score,
     reconcile_identity,
 )
@@ -68,9 +66,7 @@ __all__ = [
     "fetch_issue_page",
     "fetch_issue_schedule",
     "identity_candidates",
-    "name_agreement",
     "new_fetch_directory",
-    "normalize_team_name",
     "nowscore_url",
     "parse_500_rows",
     "parse_nowscore_kickoff_dates",

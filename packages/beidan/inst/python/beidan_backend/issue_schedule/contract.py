@@ -43,7 +43,7 @@ KICKOFF_DATE_SOURCES = ("js-kickoff-date", "absent")
 SALE_STATES = ("open", "closed", "unknown")
 
 #: Identity agreement between the two sources for a slot.
-IDENTITY_MATCH_METHODS = ("provider_id", "normalized_name", "unresolved", "conflict")
+IDENTITY_MATCH_METHODS = ("provider_id", "slot", "unresolved")
 
 _ISSUE_RE = re.compile(r"^[0-9]{4,}$")
 _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
@@ -451,7 +451,6 @@ def validate_canonical(rows: list[dict[str, Any]]) -> None:
             "provider_id_500", "provider_id_nowscore"
         )) and row["identity_method"] not in (
             "unresolved",
-            "conflict",
         ):
             raise IssueScheduleError(
                 f"slot {row['slot']}: no provider id at all but identity_method is "
