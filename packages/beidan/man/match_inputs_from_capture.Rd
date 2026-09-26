@@ -17,6 +17,9 @@ internal contract uses UTC instants; display with lubridate::with_tz when needed
 prematch_sp is typed empty because European prices are not beidan SP.
 }
 \description{
+Native IDs bind the capture. Name/kickoff changes warn rather than reject;
+current schedule values are retained. Titan source differences are recorded
+in markets$diagnostics and coverage$detail.
 Does not infer historical scheduled status from a later finished/unknown row.
 Actual observed_at is used for status availability. Historical market quotes
 may be inspected independently when the old status ledger is unavailable.
