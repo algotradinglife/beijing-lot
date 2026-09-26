@@ -543,3 +543,24 @@ testthat::test_that('parlay_enumerate_tickets 校验 cutoff', {
                          match_typed_empty('supports'), 7L),
     'explicit cutoff is required')
 })
+
+testthat::test_that('group construction preserves fractional cutoff window boundaries', {
+  fx <- candidate_fixture(n_fixtures = 7L)
+  fx$cutoff$cutoff_utc <- fx$cutoff$cutoff_utc + lubridate::dseconds(0.5)
+  start <- fx$cutoff$cutoff_utc + lubridate::dhours(4)
+  end <- fx$cutoff$cutoff_utc + lubridate::dhours(28)
+  fx$fixtures$kickoff_at[] <- start
+  fx$fixtures$kickoff_at[7] <- end - lubridate::dseconds(0.25)
+  testthat::expect_no_error(parlay_construct_groups(fx$fixtures, fx$probabilities,
+    fx$cutoff, 7L, 'entropy_balanced', 1L, seed = 1L,
+    match_status = fx$match_status))
+  fx$fixtures$kickoff_at[1] <- start - lubridate::dseconds(0.25)
+  testthat::expect_error(parlay_construct_groups(fx$fixtures, fx$probabilities,
+    fx$cutoff, 7L, 'entropy_balanced', 1L, seed = 1L,
+    match_status = fx$match_status), 'outside the decision window')
+  fx$fixtures$kickoff_at[1] <- start
+  fx$fixtures$kickoff_at[7] <- end
+  testthat::expect_error(parlay_construct_groups(fx$fixtures, fx$probabilities,
+    fx$cutoff, 7L, 'entropy_balanced', 1L, seed = 1L,
+    match_status = fx$match_status), 'outside the decision window')
+})
