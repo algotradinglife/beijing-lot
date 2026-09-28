@@ -1,0 +1,795 @@
+---
+title: "#493 N7 实验口径、冻结基线与最小回放"
+subtitle: "决策时点 20:00 Asia/Shanghai、1024 元期预算、三结构同预算对照"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: true
+execute:
+  echo: true
+  cache: false
+  freeze: false
+  error: false
+  warning: false
+---
+
+```{r setup}
+# The delivery is read from the frozen artifacts of one declared run, so the
+# document is reproducible without re-reading the live store. Re-running the
+# driver regenerates the same artifact directory; see "复现" at the end.
+root <- normalizePath("..")
+if (!dir.exists(file.path(root, "r"))) root <- normalizePath(".")
+project_lib <- file.path(root, "r_lib")
+if (dir.exists(project_lib)) .libPaths(c(project_lib, .libPaths()))
+artifact_dir <- file.path(root, "results", "n7_493_baseline_v7")
+if (!dir.exists(artifact_dir)) stop("missing artifact directory: ", artifact_dir)
+read_artifact <- function(name) {
+  path <- file.path(artifact_dir, name)
+  if (!file.exists(path)) stop("missing artifact: ", path)
+  tibble::as_tibble(read.csv(path, stringsAsFactors = FALSE, check.names = FALSE))
+}
+metrics <- read_artifact("metrics.csv")
+epoch_ledger <- read_artifact("epoch_ledger.csv")
+groups <- read_artifact("groups.csv")
+settled <- read_artifact("settled_groups.csv")
+epoch_scope <- read_artifact("epoch_scope.csv")
+receipt <- jsonlite::fromJSON(file.path(artifact_dir, "receipt.json"))
+```
+
+## 交付性质：**替代输入的工程诊断，不是合同约定的概率底座**
+
+> **本节是 PI 于 #493 合同核验后新增的限定，优先于本文其它表述。**
+>
+> 合同要求的是"**Nowscore 欧赔平均 ＋ 大小球约束 ＋ DC rho=−0.14**"的链路。
+> 本交付**没有**满足前两项：
+> 1. **来源不符**：实际输入是 `beidan_live.db::snapshots` 的 **500.com 门户平均欧赔**，
+>    不是 Nowscore；且该表 `source` 在 1,623,942/1,623,942 行都是字面量 `"merged"`，
+>    逐行上游身份不可恢复。
+> 2. **大小球约束未接入**：`n7_euro_probabilities()` 调 `jc_fit_rates_free()`，
+>    进球总均值是**欧赔拟合的副产物**，不是由大小球输入约束得到的。
+>
+> 因此（这一点不因窗口口径更新而改变）：**本文的全部收益数字只能读作"替代输入下的工程诊断"**，
+> **不能**用于宣布约定底座已完成，**也不能**据此解除 #494 的输入前提。
+> 合同没有输入时应**如实记录未满足**，而不是自行降级合同——本交付此前没有把这一点写在
+> 显眼位置，属于报告缺陷，现已更正。
+>
+> **另外：本议题合同正文在 PI 核验后被用户更新。** 新口径把前瞻窗口从"滚动 24 小时"
+> 改为**次日自然日 `[次日00:00, 次次日00:00)`**，并明确**不要求为研究重建逐场临场停售
+> 分钟阈值**，要求**删除/停用**该统一推定对常规候选的依赖，只保留明确不可售与赛程异常检查。
+> 本交付已按新口径重写（v7）；旧 v5/v6 的"逐场停售准入"实现**已删除**，不是保留为回退路径。
+>
+> `rho = −0.14` 是**用户明确指定的本轮固定研究参数**（见下），
+> 不声称最优、也不声称是历史窗口内的选择结果；旧 rho 表不可重建属于**旧证据缺口**，
+> **不构成本轮固定 −0.14 计算的阻塞项**。
+
+## 范围
+
+本文是 #493 的交付与验收入口。合同要求：核验真实可用的历史输入与已发布快照、
+给出既有研究的复用矩阵、核验并复用权威实现、建立期/决策时点/场/组/票的数据合同并
+做最小回放（真实数据至少一期）、保留三种同预算结构对照、并给出覆盖/收益/风险指标。
+
+**本文不做的**：不选择复用/重叠上限的具体数值（留给 #496），不宣称正收益，
+不把回测收益当作投产依据，不修改已发布的原始数据，不合并/关闭任何 issue。
+
+## 冻结口径（合同固定，本文逐条实现）
+
+| 常量 | 值 | 实现位置 |
+|---|---|---|
+| 期预算上限 | 1024 元/期 | `N7_PERIOD_BUDGET_CNY` |
+| 单位注额 | 2 元/注 | `N7_UNIT_CNY` |
+| 腿数 | N = 7 | `N7_LEGS` |
+| 每日决策时刻 | 20:00 Asia/Shanghai | `N7_DECISION_HOUR` / `N7_DECISION_TZ` |
+| 前瞻窗口 | **次日自然日 `[次日00:00, 次次日00:00)`**（= 决策后 4–28 小时） | `N7_WINDOW_START_HOURS` / `N7_WINDOW_END_HOURS`、`n7_decision_window()` |
+| 停售判定 | **不使用统一 `kickoff−N 分钟` 推定**；仅按**明确停售/暂停/取消/改期证据**排除 | `N7_SALE_STATES`、`N7_SALE_STATE_EXCLUSIONS` |
+| 赛程异常 | 记录的 `截止时间` 晚于开赛时间 → 排除并计数 | `KICKOFF_CONTRADICTED_BY_SALE_CUTOFF` |
+| 票级派奖系数 | 0.65，整票一次 | `N7_PAYOUT_FACTOR` |
+| SP 估算规则 | 赛前 SP > 10 估为 4.5，否则保留原值 | `N7_SP_ESTIMATE_THRESHOLD/VALUE` |
+| DC 依赖参数 | rho = −0.14 | `--rho`（显式传参） |
+
+口径要点，逐条对应合同：
+
+- **余额不每日重置**：`余额 = 1024 − 本期累计实际投入`，跨日共用；派奖不回补额度。
+- **合格场不足 7 场则不投**，不补票、不缩减腿数。
+- **不可行则减组或不投**，不强制买齐。
+- **复用/重叠**只在"本期已买过的不同七场组"之间计数；组身份 = 实际七场集合，
+  同组加深不算新组；同一张物理票在一期内不得重复购买；首轮不加倍。
+- **合法票 = 按原始组合概率的 TopK**，不重新归一化、不补票到 K。
+- **SP 估算规则不用于概率、不用于结算**：概率只来自欧赔，结算只用实际 SP 与权威实现。
+- **不可结算 ≠ 输**：估算收益与实际收益分开呈现。
+- **决策面向的历史学习一律走 `src/temporal_learning` 并显式 cutoff**；本轮不引入新的
+  历史学习（rho 为固定回顾性设置，见下）。
+
+## 输入与来源身份（交付 1 的核心结论）
+
+完整核验见 `docs/research/n7_493_input_audit.md` 与
+`results/n7_493_input_audit_v1/{coverage,companies,timestamps,gaps,exclusions,source_hashes}.csv`。
+
+**交付 1 的裁定（直说不足）：决策时刻可用的 Nowscore 期次/市场 = 0 个。**
+Nowscore 欧赔 1X2 与大小球在 26087–26097 这 10 个期次（26090 整期缺失）**没有任何一个是
+决策时刻可用的**；**已抓取的存档里不存在**任何可用的 Nowscore 欧赔/大小球时间序列。
+
+### 后续核验的更正与新增发现
+
+针对"Nowscore 欧赔平均与大小球能否取到每天 20:00 前最近有效快照"做了**小范围、时间证据优先**
+的专项核验，完整记录见 `docs/research/n7_493_input_availability_verification.md`。
+核验**更正了本交付上一版 audit 的一处遗漏**，并确认了两条线索：
+
+| 核验项 | 结论 |
+|---|---|
+| Nowscore **欧赔平均** 20:00 前最近快照 | **0 期**。北单 SP 历史页（`nowscore_bjdc_sp_history.py`，typeid 5 = `handicap_3way`）**确实带源时间标签** `source_ts_hkt`，但仓库里**没有任何 typeid=5 的抓取存档**：`nowscore_only/20260905_bf_history` 的 130 条**全部是 typeid=8（比分）** |
+| Nowscore **大小球** 20:00 前最近快照 | **0 期**。typeid 6 = `total_goals` 的抓取存档不存在 |
+| **新增**：500.com 前瞻**总进球**序列 | **存在**。`500_bjdc.live_market_sp_snapshots` 中 `capture_classification='forward_complete_open'` 且 `market_key='total_goals'` 共 **2,206,104 行 / 19 期**（26075–26096），`sale_status` 全部 `open`，带 `fetched_at_utc` + `source_updated_at_hkt` + `sale_cutoff_hkt` |
+| 同序列是否含 1X2 | **不含**：`forward_complete_open` 只有 `correct_score`(3.4M) 与 `total_goals`(2.2M)，`handicap_3way` = **0 行** |
+| 与本次回放 27 期的交集 | **12 期**（26075–26079, 26081–26086, 26088） |
+| 停售与窗口 | **#493 合同正文已被用户更新**（见下）：窗口改为**次日自然日**，并明确**不再重建逐场停售分钟阈值**、要求**删除/停用**统一推定对常规候选的依赖。本交付据此重写：停售不再是准入闸门，只保留**明确不可售证据**与**赛程异常**检查。此前"10 分钟众数"的结论也一并作废——它来自对 `nowscore_bjdc_matches.schedule_date + kickoff_time` 的连接，而该 `kickoff_time` 对大量行是占位符 `00:00`，凭空造出约 1435 分钟差值，"加 1440 归一"又把假差值读成众数 |
+| SQLite disk I/O error | **未能复现**：输入库 `quick_check=ok`、三种打开方式均 OK；51 GB/6.9 GB/1.1 GB 库的 scoped 读取均 OK；只读 WAL 构造实验也 OK |
+| `live.nowscore.com/odds/match/{id}.htm` 外壳页 | **外壳页本身无赔率表**（0 个 `<table>`），赔率由 AJAX 端点加载 |
+| `/odds/3in1Odds.aspx?companyid={cid}&id={match_id}` | **⚠️ 更正：可用，且带逐条时间戳。** 用 26082 第 1 场（`id=3049291`）实测 **HTTP 200 / 47,654 B**，返回**三张表**：亚盘、**大小球**（`大\|盘\|小`）、**欧赔**（`主\|和局\|客`），每行带 `变化` 列 = `MM-DD HH:MM`；实测 **130 个标签 / 70 个不同值**，范围 **08-02 18:11 → 08-05 01:28** |
+| 先前的"站点限流"判断 | **错误，已撤回**：实为 **cookie 软封**；换干净 cookie jar（无痕等价）后同端点恢复 200 |
+| `cp.nowscore.com/buy/DanChang.aspx?TypeID=5\|6&issueNum=…` | **有真实抓取但事后**：`nowscore_only/20260905_pilot` 含 typeid 5（欧赔）与 6（大小球）各 12 条、带 `received_at`；但交集期次 **26082** 的抓取在 **2026-09-05T09:18Z**，而该期最早停售为 **2026-08-04 23:55**，**晚约 31 天**；页面 `初盘`/`变化` 均为 **0** 次，170 个时间 token 是各场**停售截止时间**而非赔率变更时间 |
+| 另一条带时间戳的家族 | `src/nowscore_score_model_history.py` 解析 `1x2d.titan007.com/{id}.js`（欧赔）与 `m.titan007.com/HandicapDataInterface.ashx`（大小球）→ `snapshot_ts_hkt`，自述类别 `third_party_timestamped_archive`，**磁盘上无任何抓取包** |
+
+**更正后的关键判断（必须与上面的"0 期可用"一起读）**：
+Nowscore 的**欧赔与大小球带时间戳变更日志是存在的、且能对到我们的期次**，
+只是**尚未被采集**。它**不能**直接升格为决策时刻证据，因为：
+① 它是**回溯取得、时间戳由源方自述**，属 AGENTS.md 的
+"historical timestamp proxies are diagnostic only"（与本交付给 `beidan_xlsm` 的
+`RETROSPECTIVE_RELATIVE_PROXY` 同类）；② 合同**禁止本轮新增采集**，
+3,800 场 × 多公司不在 #493 授权内；③ 需要 cookie 生命周期与速率管理。
+**是否采纳该来源作为前瞻/可截断的 as-of 证据，需 PI 裁决；我不自行升格，也不启动采集。**
+
+**这仍是合同级偏离，且未被本轮消解**：那条前瞻总进球序列是 **500.com 而非 Nowscore**，
+且**没有配套的前瞻 1X2**，所以"用同一来源同时定标 1X2 与总进球"依然不可能。
+本轮回放**未接入**它——接入需要新的 reader、市场对齐与测试，属于待 PI 路由的下一步。
+
+| 事实 | 数值 |
+|---|---|
+| `inputs/danchang_*.csv` 覆盖 | 仅 26087–26097（26090 全缺）；只有 init/curr 两个状态，96.4% 的行两者不同 |
+| 这些 CSV 的行级时间戳 | **没有**；`inputs/nowscore_raw/` 67/67 个原始响应里**零**个时间 token |
+| 采集器是否落盘时间 | **没有**：`RawResponse.fetched_at` 在内存里存在，`write_raw()` 只写正文，该字段被丢弃 |
+| 唯一时间证据 | 文件 mtime 窗口 **2026-09-22T15:02:23+08:00 … 15:05:16+08:00**（单次事后读取） |
+| 该窗口与结算的关系 | 晚于 26087–26096 全部结算；也晚于 `quarto/275` 自述的决策时刻 13:55 共 69 分钟 |
+
+（以下覆盖率数字来自交付 1 的核验，其**期次范围为 44 期**——比本文回放的
+**27 期**宽，两者不是同一集合；本文回放自身的可用性漏斗见下一节。）
+
+**唯一在决策时刻真正可得的赔率序列**是 `beidan_live.db::snapshots`：
+500.com `pjoz` 与 cp.zgzcw.com `esp_N` 的**门户平均欧赔**，`snapshot_ts` 是**真实观测到的
+UTC 轮询时刻**。它有两个硬伤：
+
+1. **来源身份不满足合同**：`source` 在 **1,623,942/1,623,942** 行都是字面量 `"merged"`，
+   逐行上游身份**不可恢复**；`grep -rn -i nowscore src/live_collector/` **0 命中**，
+   采集器只访问 `trade.500.com` / `zx.500.com` / `cp.zgzcw.com` / `live.500.com`。
+2. **决策时刻覆盖不足**：5,562 个候选 (场, 决策时点) 中只有 3,861（**69.4%**）
+   有至少一条 `snapshot_ts ≤ epoch` 且 `eu_h` 非空的快照；**1,701（30.6%）完全没有盘前快照**。
+   按期次从 **13.8%（26052）** 到 100%（26065/26067/26075）。
+   **5,578 场中 1,552 场（27.8%）的首条快照晚于开赛**。
+
+```{r}
+identity <- tibble::tibble(
+  项目 = c("存储", "欧赔时间序列", "结算", "期数", "场数", "快照行数", "结算行数",
+           "合同指定来源", "实际来源是否等于合同来源"),
+  值 = c(receipt$source_identity$store, receipt$source_identity$euro_odds,
+         receipt$source_identity$settlement, length(receipt$issues),
+         receipt$n_fixtures, receipt$n_snapshots, receipt$n_settlement,
+         receipt$source_identity$contract_mandated_source,
+         as.character(receipt$source_identity$source_matches_contract)))
+knitr::kable(identity, caption = "本次回放绑定的输入身份")
+```
+
+**因此本次回放不是 Nowscore 口径的复现**，而是"门户平均欧赔在决策时刻可得"的复现。
+这是一个**合同级偏离**：它需要 PI 决定是接受降级来源，还是先补 `src/forward_snapshot/`
+（仓库里唯一看起来正确的 Nowscore 前瞻采集器，但目前**落盘 0 条**：没有 store 根、
+`BEIJING_LOT_DATA_ROOT` 未设置）。**补采集器只能产生新证据，不能产生历史。**
+
+### 其它被核查并判为不足的材料
+
+| 材料 | 规模 | 为什么不足 |
+|---|---|---|
+| `inputs/eu_odds_26087_26095.csv` | 1,634 场 | **前视**：`sp_close_*` 的 `sp_ts_raw` 有 **602/1634 = 36.84%** 晚于开赛（与 `rows_after_kick>0` 的 602 行零矛盾）；`eu_w/d/l` 100% 有值但**无任何时间戳**；**仓库里没有生成该文件的代码**（`grep -rl sp_at_2h` 只命中 `quarto/275`），无法重建；且缺 276/1910 = 14.4% 的场次 |
+| `data/derived/beidan_xlsm/beidan_xlsm.sqlite::market_snapshots` | euro_1x2 11,716,140 行 + over_under 14,059,368 行 | **没有任何时间列**；唯一像时间的 `matches.ts_10h` = `kickoff − 600 分钟`（50,000/50,000 抽样精确）→ **是算出来的网格标签，不是观测时刻**；项目自述 `causal_grade="RETROSPECTIVE_RELATIVE_PROXY"`、`strict_forward_rows=0` |
+| `500_bjdc::matches.avg_odds_*` / `beidan_history::historical_matches.avg_eu_*` / `beidan_features::matches.p_open_*/p_close_*` | 78,292 / 38,422 / 190,511 场 | 每场只有一个（或两个无时间的）状态，没有序列 |
+| `inputs/26097_results.csv` | 0 数据行 | 空结果，不是解析失败 |
+
+**代理等级**：只有 `beidan_live.db::snapshots`（EV-11）、`500_bjdc::live_sp_snapshots`（EV-14，只有北单 SP）、
+`500_bjdc::market_sp_capture_batches`（EV-16，只有比分/总进球 SP）达到 **OBSERVED_AVAILABILITY**；
+**没有任何一项 Nowscore 证据被评为 OBSERVED_AVAILABILITY**。
+
+### 对 `quarto/275` 的独立复核差异
+
+- "47 个原始响应" → 实际 **67** 个。
+- "33.5%（548/1634）SP 晚于开球" → **不可复现**；实测为 **602/1634 = 36.84%**。
+- `eu_odds` 声称来源为 nowscore `1x2/{matchid}.js` → 仓库中**不存在该 endpoint，也不存在生成器**，无法验证。
+- 275 的 review finding #6（无 cutoff 强制）**未修复**，且比其自述更严重：可用性证据本身不存在。
+
+## 决策时点与可用性
+
+每一场属于唯一一个决策时点：本地日期 D 的 20:00 决策对应的窗口是**次日自然日**
+`[D+1 00:00, D+2 00:00)`（= 决策后 4–28 小时，半开区间），该场开赛落在其中。
+时区证据是实测的：`matches.kickoff_ts` 是 **naive 本地 Asia/Shanghai**，
+而 `snapshots.snapshot_ts` 是 **UTC**（26083/26085 共 627 场中，最后一条欧赔变动距
+`kickoff_ts` 的中位数为 −7.91 小时，444 场落在 −8 小时箱内）。该解释是
+`n7_read_fixtures(kickoff_tz=)` 的**显式参数**，不是隐藏常量。
+
+```{r}
+scope_summary <- tibble::tibble(
+  指标 = c("决策时点数（期×日）", "次日自然日窗口内合格场",
+           "窗口外/赛程自相矛盾排除",
+           "有决策时刻前快照的场", "无可用报价排除"),
+  值 = c(nrow(epoch_scope), sum(epoch_scope$n_eligible),
+         sum(epoch_scope$n_excluded_window), sum(epoch_scope$n_priced),
+         sum(epoch_scope$n_excluded_quote)))
+knitr::kable(scope_summary, caption = "可用性漏斗（全部期次的合计）")
+```
+
+```{r}
+# 每个决策时点实际可用的合格场数分布，直接显示"够不够 7 场"这一约束的紧度。
+knitr::kable(
+  tibble::tibble(有可用报价的时点数 = sum(epoch_scope$n_priced > 0L),
+                 完全没有可用报价的时点数 = sum(epoch_scope$n_priced == 0L)),
+  caption = "决策时点的报价可用性")
+availability <- epoch_scope |>
+  dplyr::transmute(eligible = n_eligible, priced = n_priced) |>
+  dplyr::summarise(
+    时点数 = dplyr::n(),
+    中位合格场 = stats::median(eligible),
+    中位有报价场 = stats::median(priced),
+    不足七场的时点数 = sum(priced < 7L))
+knitr::kable(availability, caption = "合格场数是否达到 7 场")
+
+# 逐期看：每一期的决策时点里，有多少个真的凑得齐 7 场。
+per_issue <- epoch_scope |>
+  dplyr::group_by(issue) |>
+  dplyr::summarise(决策时点 = dplyr::n(),
+                   完全无报价 = sum(n_priced == 0L),
+                   不足七场 = sum(n_priced < 7L),
+                   可投时点 = sum(n_priced >= 7L),
+                   .groups = "drop")
+knitr::kable(per_issue, caption = "逐期决策时点可用性（不足七场则不投）")
+```
+
+**这就是交付 1 最重要的可用性结论**：`n_priced == 0` 的时点几乎都是
+"该期的赔率序列还没开始采集"。逐期对比可见，多数期的首条快照出现在该期首场比赛
+**之后**（例如 26084 首场在 08-08、序列 08-11 才开始；26086 首场 08-15、序列 08-18 才开始），
+因此这些期最前面的 2–4 个决策时点根本没有决策期赔率可读。
+这不是建模问题，是输入覆盖问题，必须记录而不能用"补齐"掩盖。
+
+## 概率底座
+
+- 欧赔 1X2 去水 → `jc_fit_rates_free(p_target, rho)` 在**零让球线**上定出 (λh, λa) →
+  `jc_rates_at_handicap(λh, λa, 该场北单让球线, rho)` 得到该场让球胜平负概率。
+- 让球口径与权威结算同源：`settlements.result_code` = `sign(fthg + handicap_line − ftag)`，
+  实测 3596/3596 一致；`dixon_coles_score_grid` 用的正是同一约定。
+- **本轮不使用大小球输入**：合同写的是"大小球约束总进球"，本轮以
+  "1X2 单独定标、总进球为副产物"替代。原因是**决策时刻可用的 Nowscore 大小球快照不存在**；
+  专项核验另发现一条 500.com 前瞻总进球序列（与本次交集 12/27 期），但**来源不符且无配套前瞻
+  1X2**，本轮未接入。这是输入缺失下的显式偏离，不是方法更优。详见"输入与来源身份"一节与
+  `docs/research/n7_493_input_availability_verification.md`。
+- rho = −0.14 固定传参，不重新选择。
+
+**显式近似声明（必须读）**：一张票的概率是**七场边际概率的乘积**
+（`N7_PROBABILITY_MODEL = "INDEPENDENT_ACROSS_FIXTURES_PRODUCT_OF_MARGINALS"`，
+同时写进 `receipt.json`）。Dixon-Coles 只刻画**同一场**内两队的比分相关，
+它**不构成场与场之间独立的证据**。因此本轮的组合概率与组合排名是
+"独立乘积近似"下的量，**不是一个拟合出来的七场联合模型**。
+真实跨场相关（同联赛同时段、天气、赛程拥挤等）会让极端组合的真实概率高于此处的乘积，
+这一点必须与下面的收益表一起读。
+
+**rho 口径不一致的披露**（交付 3）：`.tmpwork/rho_final.csv` 744 期中 737 期取 −0.14、
+7 期取 −0.12，且 428+ 期带 `rho_backfilled = True`（选择来自目标期之后）；
+`quarto/258` 的配置与收据记 −0.12，`quarto/259` 用 rho = 0 作端口保真基线，
+`quarto/274`/`275` 用 −0.14。**本轮固定 −0.14，并同时声明它不是 cutoff 合规的
+窗口内选择结果。** 关注区间 −0.2..−0.1 不是已证明最优区间。
+
+## 结构对照定义
+
+```{r}
+defs <- tibble::tibble(
+  结构 = c("4x128", "8x64", "4x96+4x32"),
+  组数 = c(4L, 8L, 8L),
+  每票数 = c("128×4", "64×8", "96×4 + 32×4"),
+  总票数 = c(512L, 512L, 512L),
+  总金额 = c(1024, 1024, 1024))
+knitr::kable(defs, caption = "三种同预算（1024 元）结构定义；96 与 32 是 3222221 / 2222211 档位名，不是硬掩码")
+```
+
+## 真实数据回放结果
+
+```{r}
+# 金额口径必须分列，不能合成一个"净收益/ROI"。总投入是全部已花的钱；
+# 可结算投入才是已结算净收益和回收倍数的分母；待结算投入既不是收益也不是亏损。
+shown <- c("structure", "期数", "决策时点数", "组数", "票数",
+           "总投入", "可结算投入", "待结算投入", "已知回款",
+           "已结算净收益", "已结算净ROI", "回收倍数",
+           "截至当前回款减累计投入", "最终净收益", "最终净收益口径")
+knitr::kable(metrics[, shown], digits = 4,
+             caption = "三结构对照：金额分母分列（已结算净收益/净ROI/回收倍数只以可结算投入为分母）")
+# The support of each row, stated from the artifact rather than hardcoded prose.
+support <- metrics[, c("structure", "期数", "决策时点数", "组数")]
+knitr::kable(support, caption = "各结构的实际支持期数与决策时点数")
+```
+
+**估算收益与实际收益必须分开读**。下表左半是**决策时刻**的估算：用该次轮询自带的
+北单 SP、按固定规则（SP > 10 估为 4.5，SP ≤ 10 原值保留）算出的每张票"若命中则赔付"，
+再按该票的原始组合概率加权求和，得到"估算期望回收"。它**只用决策时刻的信息**，
+不含任何赛后信息。右半是**实际结算**回收。两者**不混算、不相互替代**。
+
+```{r}
+estimated <- c("structure", "可估算组数", "估算期望回收", "估算期望净收益",
+               "估算期望回收倍数", "总投入", "已知回款", "已结算净收益", "回收倍数")
+knitr::kable(metrics[, estimated], digits = 4,
+             caption = "决策时刻估算（左）与实际结算（右）分列，不混算")
+```
+
+```{r}
+# 未投原因分布：这一张表说明"钱为什么没花出去"，与收益表同等重要。
+reasons <- as.data.frame(table(结构 = epoch_ledger$structure, 原因 = epoch_ledger$reason))
+reasons <- reasons[reasons$Freq > 0, ]
+knitr::kable(reasons, caption = "决策时点未投/投注原因分布")
+```
+
+```{r}
+# groups 每组一行，所以 max(stake_cny) 是"最大单组投入"，不是"单期最大投入"。
+# 期预算是跨该期所有决策时点共享的，必须先按 (结构, 期) 汇总再取最大值，否则这张
+# 表根本不能证明 1024 元的天花板成立。
+period_stake <- groups |>
+  dplyr::group_by(structure, issue) |>
+  dplyr::summarise(期投入 = sum(stake_cny), 期组数 = dplyr::n(),
+                   期票数 = sum(tickets), .groups = "drop")
+budget <- period_stake |>
+  dplyr::group_by(structure) |>
+  dplyr::summarise(期数 = dplyr::n(), 总投入 = sum(期投入),
+                   单期最大投入 = max(期投入), 单期最小投入 = min(期投入),
+                   预算利用率 = sum(期投入) / (dplyr::n() * 1024),
+                   .groups = "drop")
+knitr::kable(budget, caption = "预算执行：按 (结构, 期) 汇总后的单期投入，必须全部 ≤ 1024 元")
+```
+
+```{r}
+# 断言，而不是只展示：任何一期超过 1024 元都必须让文档渲染失败。
+over <- period_stake[period_stake$期投入 > 1024, , drop = FALSE]
+if (nrow(over)) stop("a period exceeded the 1024 CNY ceiling: ", nrow(over), " period(s)")
+stopifnot(all(period_stake$期投入 > 0))
+nrow(period_stake)
+```
+
+```{r}
+# 命中深度：命中组合在该组 3^7 个组合里按原始概率排第几。数值越小说明命中越"浅"。
+hit_depth <- settled |>
+  dplyr::filter(settleable, covered) |>
+  dplyr::transmute(structure, issue, epoch_utc, group, tickets, true_rank,
+                   掩码排除 = mask_excluded)
+knitr::kable(hit_depth, caption = "命中组及其深度（true_rank / 2187）")
+```
+
+```{r}
+unsettleable <- settled |>
+  dplyr::filter(!settleable) |>
+  dplyr::count(structure, reason)
+knitr::kable(unsettleable, caption = "不可结算组：计入投入但排除在回收分母之外，不计为输")
+```
+
+## 输入覆盖口径统一（PI 核验要求）
+
+此前报告里出现过几组互不相等的"合格场"数字，容易被读成矛盾。经复核，**它们的差别
+主要来自期次范围与窗口规则不同，不是同一口径下的算术冲突**；本交付上一版给出的
+"5,562 → 4,327 是加入 24 小时窗口"的解释**是错的，现更正**。
+
+| 口径 | 分子/分母 | 比例 | 期次范围 | 窗口与准入规则 |
+|---|---|---|---|---|
+| 交付 1 审计 | 3,861 / 5,562 | 69.4% | **44 期** | `[epoch, epoch+24h)`；**已含 24 小时窗口**（`MANIFEST.json` 的 `epoch_definition` 明确记录） |
+| v5 回放 | 3,433 / 4,327 | 79.4% | 27 期 | `(epoch, epoch+24h]` + **统一 10 分钟停售众数** |
+| v6 回放 | 1,648 / 1,804 | 91.4% | 27 期 | 同上窗口 + **逐场停售准入**（该实现**已按合同更新删除**） |
+| **v7 回放（本交付）** | **3,220 / 4,232** | **76.1%** | 27 期 | **次日自然日 `[次日00:00, 次次日00:00)`**；无停售闸门 |
+
+逐层解释：
+
+- **5,562 vs 4,327：期次范围不同。** 审计的候选集覆盖 **44 期**（含 26087、26089、
+  26091–26097、25012、26052、26054、26056、26058、26062、26073 等 v7 未纳入的期次），
+  v7 只覆盖合同声明的 **27 期**。两者不是同一集合，不能直接相减。
+- **4,327 → 4,232（−95）：赛程自相矛盾。** 记录的 `截止时间` 晚于 `kickoff_ts` 的 95 场
+  被排除（`KICKOFF_CONTRADICTED_BY_SALE_CUTOFF`）。这是 v7 唯一的窗口外剔除，
+  因为每个场次按 `n7_epoch_date` 只归属一个决策期。
+- **4,232 → 3,220（−1,012）：决策时点无可用报价。** 该场在决策时点之前
+  没有非空欧赔快照，按"不得用下注后报价回填"的规则退出。
+
+**证据缺口（新增披露）**：审计的 **5,562 / 3,861 并未写入交付 1 的任何产物**
+（`coverage.csv` 是逐证据源的行数，不含逐期候选数），只存在于审计文档里的一段探针输出。
+因此该数字**无法从交付 1 的产物复算**；要真正统一口径，需要把它落成可复算的产物。
+本交付不为此重新做大范围扫描，故在此**如实标注为未复算**。
+
+**支持期数由产物推导，不写死。** 三结构实际有下注的期数见下表
+（`metrics.csv` 的 `期数` 列），**不是**全部 27 期；收益结论只在这些期上成立。
+
+## 回溯变化记录的证据分级与有界验证计划（PI 核验要求）
+
+`live.nowscore.com/odds/3in1Odds.aspx` 在**干净 cookie jar + Referer** 下可返回
+HTTP 200 与三张表（亚盘/大小球/欧赔），每行带 `MM-DD HH:MM` 变化时间。
+本交付对它的定位是：
+
+- **证据等级 = 来源自述的回溯记录（source-asserted retrospective）**，属**诊断级**。
+  按 AGENTS.md 的分级，它**可以**用于明确标注的回溯性诊断与"按来源时间截断"的研究，
+  **不能**单凭时间标签升级为"观测到的可用性"或"有文档的保守安全边界"。
+- `MM-DD HH:MM` **缺年份、缺时区、缺公司/市场身份**，且**覆盖面完整性未验证**。
+  在补齐这四项之前，不得用它作准入判定。
+- **不得把抓取时刻当作历史报价时刻**：必须保留原始响应与抓取时刻，
+  与历史报价时间分开存储。
+- 本交付**不主张** 3in1 是唯一可用路径，也**不**用它替换合同来源；
+  本评论**未授权任何新的采集**。
+
+**有界验证计划（待授权，本轮不执行）**：先确认 20:00 前的欧赔与大小球**可否重建**，
+再决定是否扩量。最小范围：
+
+1. 选取 **1 个期次、不超过 5 场**，且该期在 `beidan_live.db` 中确有决策时点快照可比对。
+2. 对每场取一次 `3in1Odds.aspx`，**原样保存响应体 + 抓取时刻 + cookie jar 状态**。
+3. 校验：`MM-DD HH:MM` 的**年份推断规则**、**时区**、**公司/市场身份**是否可确定；
+   与同期已有 500.com 欧赔序列在**同一时刻**的取值是否一致。
+4. 记录**覆盖面完整性**：返回行是否覆盖该场全部变化，还是被截断。
+5. 输出：一份明确标注证据等级的可重建性结论。**只有该结论为"可重建"且经 PI 授权后**，
+   才讨论扩量与接入回放。
+
+## 工程夹具验证的边界
+
+以下边界由 `tests/testthat/test-n7-experiment-replay.R` 的工程夹具固定（不依赖真实数据）：
+
+| 边界 | 夹具 | 断言 |
+|---|---|---|
+| 跨日预算共享 | 2 个时点、每时点 1 组 96 票 | 余额 832 → 640，不每日重置 |
+| 跨日预算耗尽 | 第 1 日买满 1024 | 第 2 日 `BUDGET_EXHAUSTED`，投入不超过 1024 |
+| 不可行（不足 7 场） | 某时点只有 6 场有报价 | `INSUFFICIENT_PRICED_FIXTURES`，不投 |
+| 计划完成 | 计划组数买齐 | `PLAN_COMPLETE` |
+| 少投 | 期结束时仍有余额 | 余额保留并记录，不补票 |
+| 掩码饱和 | 屏蔽 2 个 (场, 赛果) 单元 | 合法组合 972 = 2×3⁵×2，不补票到 K |
+| 不重新归一化 | 同上 | 每张票概率仍是原始乘积，合计 < 1 |
+| 并列稳定 | 全部组合等概率 | 两次调用结果相同 |
+| 不可结算 | 某腿无结算行 / 无实际 SP | `settleable=FALSE`、`payout=NA`，不计为输 |
+| 票级 0.65 | 命中组 | 派彩 = 2×0.65×∏SP，系数只出现一次 |
+
+## 复用矩阵（交付 2）
+
+完整矩阵见 `docs/research/n7_493_reuse_matrix.md`（45 行 × 10 列）与
+`results/n7_493_reuse_matrix_v1/{matrix.csv,MANIFEST.json}`。
+计数：**REUSE 21 / PENDING 23 / UNUSABLE 1**。
+
+**一句话结论**：#424–#459 的 N7 研究产物**全部只存在于未合并的 `codex/*` 栈式分支**。
+`main` 上没有任何 `quarto/134..159`、没有任何
+`r/n7_{sleeve,capital,prefix,quality,group_exchange,expanded,joint}_*`、也没有对应
+`src/` 模块。在能跑的分支树上这些测试**是绿的**，所以**代码**是 REUSE 级；
+但作为 #493 在 `main` 上可达的交付物，八个议题**全部是 PENDING**。
+
+| 议题 | 裁定 | 依据 |
+|---|---|---|
+| #424 | PENDING | 仅作为回顾性研究 CLOSED/Done；PR #426/#428 只合入 `codex/424-research-base`，`main` 未变 |
+| #425 | PENDING | 仅分支存在，PR #432 OPEN，结论 `NO_STABLE_FRONTIER` |
+| #427 | PENDING | 未交付任何东西：无分支/PR/文件/提交 |
+| #439 | PENDING | 仅分支存在，PR #440 OPEN；引用的 `audits/issue439-union-v3` 在持久根上不存在 |
+| #451 | PENDING | 仅分支存在，PR #452 OPEN；结论为保留原深度 |
+| #453 | PENDING | 仅分支存在，PR #454 OPEN，栈在 #451 上 |
+| #455 | PENDING | 仅分支存在，PR #456 OPEN，栈在 #453 上 |
+| #459 | PENDING | 仅分支存在，PR #460 OPEN；495 期研究为暴露式回顾 |
+| DC 链 | PENDING | 权威 R 模块在 `main` 上**未跟踪**；4 个被 source 的依赖缺失；`main` 上测试报错、分支上通过 |
+| `main` 共享基建 | REUSE | `src/temporal_learning`、`src/ticket_policy/fixed_n7.py`、`src/nowscore_settlement.py`、`freeze_v0` 等已提交且绿 |
+
+组件级裁定（本次实际使用的部分）：
+
+| 组件 | 裁定 | 依据 |
+|---|---|---|
+| `r/dixon_coles_grid.R` | **REUSE** | 纯算术；让球口径与权威结算同源（3596/3596） |
+| `r/joint_basket_dc_fit.R` | **REUSE** | 43 断言通过；1X2 定标 + 让球读取 |
+| `r/n7_fixture_portfolio.R` | **REUSE** | 224 断言通过；覆盖档位/均衡分组/掩码 TopK |
+| `r/joint_basket_settlement.R` | **REUSE** | 122 断言通过；0.65 单次票级 |
+| `r/n7_market_projection.R` | **PENDING** | 依赖模块缺失，测试 ERROR；收据自述 `AH_UNAVAILABLE` |
+| `r/fundamentals_total_market.R` | **PENDING** | 依赖 `score_coverage_choices`（全仓未定义），测试 ERROR |
+| `r/fundamentals_market_comparison.R` | **PENDING** | 模块不自洽 |
+| `r/ou_total_market.R` | **PENDING** | 其测试文件不 source 它，15 个断言失败/报错 |
+| `.tmpwork/rho_final.csv` | **UNUSABLE（作为 cutoff 证据）** | 428+ 期回填；产出脚本缺失；被 gitignore |
+| `quarto/259` 的 rho=0 | **UNUSABLE（作为预测口径）** | 仅端口保真 |
+
+**唯一的 UNUSABLE 是语义冲突，不是前视污染**：#459 的 `minimum_sp: 1.3` 资格门槛
+（#451/#453/#455 同款）违反 #493 "SP/难度不得作为基础资格过滤" 的规则。
+在已检查的选择模块中**没有发现**任何后 cutoff 污染（它们都委派给 `src/temporal_learning`）。
+
+**Review 不等于验收**：#425/#439/#451/#453/#455/#459 仍是 OPEN + Project Review；
+Project Review 不是验收。只有 #424 是 Done，且只是回顾性研究
+（`historical_admission=false`，暴露式 2010 数据）。
+
+**证据缺口**：#439/#451/#453/#455/#459 引用的 `audits/issueNNN-*` 目录在
+`/run/media/drwho1985/Sandisk/data/beijing-lot` 下不存在（只有 `reports/issueNNN-*` HTML），
+因此这些期的冻结计划网格无法在本机独立重放。
+
+权威实现核验的完整证据（含 `main` 不含任何这些 `r/` 模块、缺失重建脚本、
+测试逐文件实况）见 `docs/research/n7_493_implementation_verification.md`。
+
+## 证据缺口与限制
+
+**输入类（交付 1，均为实测数字，详见 `docs/research/n7_493_input_audit.md`）**
+
+1. **来源身份不符（blocker）**：合同要求 Nowscore 欧赔/大小球，决策时刻可用的 Nowscore
+   期次/市场为 **0**。实际使用 500.com/ zgzcw 门户平均欧赔，且 `source` 100% 为 `"merged"`，
+   上游身份不可恢复。
+2. **Nowscore 全类材料零时间戳**：4 个解析 CSV 与 67/67 原始响应均无时间 token；
+   `write_raw()` 丢弃 `fetched_at`；唯一时间是事后 mtime 窗口。
+3. **决策时刻覆盖不足**：30.6%（1,701/5,562）候选 (场, 决策时点) 无盘前快照；
+   按期次最差 13.8%；27.8%（1,552/5,578）的场次首条快照晚于开赛。
+4. **`eu_odds_26087_26095.csv` 有前视**：36.84%（602/1634）的 `sp_close_*` 行时间晚于开赛；
+   该文件**无生成器、无原始响应**，无法重建。
+5. **唯一多时点欧赔/大小球序列无时间**：`beidan_xlsm::market_snapshots` 无时间列，
+   `ts_10h` 是计算标签；项目自述 `strict_forward_rows = 0`，只能作诊断。
+6. **决策时刻大小球只有降级来源，且未接入**：合同要求的"大小球约束总进球"本轮未使用，
+   概率仅由 1X2 定标——这是输入缺失下的显式偏离。专项核验（见"输入与来源身份"一节）
+   发现 `500_bjdc.live_market_sp_snapshots` 中存在前瞻分类的总进球序列
+   （`forward_complete_open` + `total_goals`，2,206,104 行 / 19 期 / 与本次交集 12 期），
+   但它是 **500.com 而非 Nowscore**，且**无配套前瞻 1X2**，因此不能消解该偏离。
+7. **`src/forward_snapshot/` 落盘 0 条**：它是仓库里唯一可能产生前瞻 Nowscore 证据的机制，
+   但没有 store 根；且它**只能产生新证据，不能产生历史**。
+
+**方法类**
+
+8. **rho 的旧证据缺口（按 PI 核验降级处理）**：历史 rho 表（`.tmpwork/rho_final.csv`，
+   744 期中 737 期取 −0.14、7 期取 −0.12，428+ 期带 `rho_backfilled = True`）**不可重建**：
+   产出脚本 `build_dixon_coles_inputs.py` 不在仓库中，该表被 gitignore。
+   **这记录为"旧证据缺口"，不构成本轮的阻塞项**：`rho = −0.14` 是**用户明确指定的本轮固定
+   研究参数**，不是从该旧表选出的结果，本轮的 −0.14 计算**不依赖**旧表。
+   披露要求：不得宣称 −0.14 最优、不得宣称它是窗口内选择结果；
+   本轮链路只使用显式参数、可重建输入与实现哈希。
+9. **结算覆盖不全**：`settlements` 3287 行（本子集）< 对应 `matches` 行数；部分腿没有结算行，
+   相关组按"不可结算"处理并单独计数，**不计为输**。
+10. **`settled_ts` 不可用作结算时刻**：它是批量写入时间，在两种时区解释下都无法与开赛对齐。
+11. **复用/重叠上限是工程示例值**（`max_reuse = 1`、`max_overlap = 0`），
+    不是选定策略阈值；合同把数值留给 #496。
+12. **样本量与支持度**：结果覆盖合同声明的 **27 期**（合格场 4,232，其中 3,220 有决策时点报价）；
+    本轮**三结构全部为负**，但样本量小、尾部集中，**负收益同样不构成 edge 的反证**。
+    收益对尾部敏感，必须与"尾部集中度_最大单组"和"真实组合排名"一起读。
+13. **只跑了一组 rho**：本轮不做 rho 敏感性寻优，也不宣称 −0.14 最优。
+
+**交付可达性类（交付 2/3）**
+
+14. **DC 链未合并**：`main` 不含 `r/dixon_coles_grid.R` 等模块，它们来自未合并 PR #485；
+    `quarto/258` 自述的测试全绿在本工作树**不可复现**（4 个被 source 的模块缺失，
+    4 个测试文件在 `main` 上 ERROR）。
+15. **#424–#459 的 N7 产物全部只在未合并分支上**，作为 #493 可达交付物全部是 PENDING；
+    Project Review **不等于**验收。
+16. **停售推定已按合同删除**：旧"10 分钟众数"结论因占位符连接而作废（见上）。合同更新后**不再重建逐场停售分钟阈值**，v7 已删除该准入闸门，只保留**明确不可售证据**（`N7_SALE_STATES`）与**赛程异常**检查。**本子集没有可用的明确不可售/取消/改期证据**，因此 v7 的 `sale_state` 全部为 `UNKNOWN`——这意味着**本轮没有一场被证实"当时可售"**，这是未决项，不是已验证结论。
+17. **95 场"停售时间晚于开赛时间"的自相矛盾记录**：全部落在 `kickoff_ts` 为占位符 `T00:00:00` 的行上（真实时刻的行 0 例）。两者必有其一为错，无法判定窗口归属，因此**显式排除并计数**（`KICKOFF_CONTRADICTED_BY_SALE_CUTOFF`），不静默偏向任何一侧。
+    对 8.2% 在 5 分钟截止的场次偏保守、对 11.1% 在 20–25 分钟截止的场次偏宽松。
+17. **SQLite disk I/O error 未能复现**：输入库与三个大库的 scoped 读取均正常；
+    可归因的风险点（大范围全表扫描、只读 exFAT 可移动挂载）已登记但**未证实**。
+
+## 复现
+
+```sh
+# 1) 函数测试（在 tests/testthat 下运行）
+cd tests/testthat
+R_LIBS=$PWD/../../r_lib Rscript --vanilla -e 'library(testthat);
+  for (f in c("test-n7-experiment-contract.R","test-n7-experiment-replay.R",
+              "test-n7-experiment-inputs.R")) test_file(f)'
+
+# 2) 重新生成冻结产物（只读存储，只写 --output）
+#    期次列表见下方 receipt$issues；示例：
+R_LIBS=$PWD/r_lib Rscript --vanilla scripts/run_n7_experiment_baseline.R \
+  --issues 26051,26053,26055 --output results/n7_493_baseline_v7 --workers 16
+
+# 3) 渲染本文
+quarto render quarto/493_n7_experiment_baseline.qmd
+```
+
+```{r}
+cat("本次回放期次：", paste(receipt$issues, collapse = ", "), "\n")
+cat("artifact seal:", receipt$seal, "\n")
+hashes <- tibble::as_tibble(read.csv(file.path(artifact_dir, "implementation_hashes.csv"),
+                                     stringsAsFactors = FALSE))
+knitr::kable(hashes, caption = "被绑定的实现文件 sha256（收据同源）")
+```
+
+## codex review 记录
+
+## codex review 记录
+
+### 环境事实（必须记录）
+
+`codex` 0.154.0 的内层只读沙箱在本机**无法创建 namespace**
+（`bwrap: No permissions to create a new namespace`），且 Codex CLI 的凭据默认不在
+工作区内。前两次尝试因此**没有产生任何裁定**：
+
+| 尝试 | 命令 | 结果 |
+|---|---|---|
+| 1 | `CODEX_HOME=<空目录> codex review -c sandbox_mode='"read-only"'` | 401 Unauthorized（`CODEX_HOME` 被指到空目录，未读到凭据） |
+| 2 | `CODEX_HOME=<工作区凭据> codex review -c sandbox_mode='"read-only"'` | 凭据可用，但 `bwrap` 无法创建 namespace，review 在读文件前**失败关闭**，无裁定 |
+| 3 | `CODEX_HOME=<工作区凭据> codex review -c sandbox_mode='"danger-full-access"'` | **完成**，给出 3 项 High + 9 项 Medium |
+
+第 3 次把 codex 自身的内层沙箱关掉；外层 DSH 沙箱仍是 `workspace-write`，
+prompt 明确要求只读、不得修改文件。凭据复制到 `.tmpwork/codexhome/`（gitignore 覆盖）。
+
+审查对象（prompt 全文见 `docs/reviews/issue-493-review-prompt.txt`）：
+`r/n7_experiment_{contract,replay,inputs}.R`、三个 `tests/testthat/test-n7-experiment-*.R`、
+`scripts/run_n7_experiment_baseline.R`、本 QMD、
+`docs/research/n7_493_implementation_verification.md`、`results/n7_493_baseline_*/{metrics.csv,receipt.json}`。
+
+### 第一轮裁定
+
+> Blocking/high-severity findings remain: mixed-size plans can exceed the period ceiling,
+> supported reader timestamps cannot reach the selector, and purchased tickets are not
+> frozen in the artifact. The rho backfill limitation and source gaps are disclosed
+> honestly; the three scoped implementation hashes match the receipt.
+
+### 第一轮发现与处理（12 项，全部已修复并加回归用例）
+
+| # | 级别 | 发现 | 处理 |
+|---|---|---|---|
+| 1 | High | `n7_run_period_plan` 只用**下一组**的票数判断可负担性；`c(32L, 512L)` 混合计划会买满 1088 元并返回负余额而不报错 | 改为按**累计计划成本**逐组试算，并对每次实际购买断言不越过天花板；新增混合规模回归用例（断言 `≤1024`、只开 32 票组、余额 ≥ 0） |
+| 2 | High | `n7_read_snapshots` 原样返回时间戳，其自身测试用无 `Z` 形式；把 reader 输出喂给 `n7_select_snapshots` 会立即失败 | reader 在边界**严格解析并规范化**为 `...Z`；新增 reader→selector 集成用例与"非 UTC 时间戳必须报错"用例 |
+| 3 | High | `tickets` 被构造但从未写出、也未进封条，冻结基线因此不绑定"买了哪些票" | 写出 `tickets.csv`，并把 tickets 表、`seed`、driver 自身 sha256 一并纳入封条 |
+| 4 | Medium | `n7_group_admission` 算了 `prior_keys` 却未去重，同一组买两次会被算成"第三次使用" | 先按规范 group key 去重再计复用/重叠 |
+| 5 | Medium | 无条件 `as.numeric()` 把空串/非数字变成 NA 并只给 warning，选择器会把损坏记录当作"当时没有报价" | 新增 `n7_stored_numeric`/`n7_stored_integer`：**只有真正的 SQL NULL 可以变 NA**，转换失败即停止；fixtures/snapshots/settlements 全部套用 |
+| 6 | Medium | 唯一性只查 `(match_id, snapshot_ts, source)`，两个来源同一时刻给出不同赔率时 `which.max()` 静默取先出现的行 | 同一最新时刻的报价若不一致则**拒绝**（无来源选择策略），并加行序不变性用例；数值一致则视为同一观测 |
+| 7 | Medium | 结算算术在 replay 里又写了一遍，而 QMD 声称使用权威实现 | `n7_settle_group` 改为调用 `r/joint_basket_settlement.R::jb_basket_gross`；新增与权威 API 的一致性用例 |
+| 8 | Medium | 整期无票时 `bind_rows()` 返回零列 tibble，违反自身的契约校验 | `n7_run_period_plan` 用 typed template 起底；新增"整期不可行仍返回契约 schema"用例 |
+| 9 | Medium | 缺结算行的组被当成"覆盖未命中"，加入不可观测组会拉低覆盖率 | 新增 `outcome_known` 列，覆盖率只在**已知结果**组上计算，并单列"未知结果组数"；新增回归用例 |
+| 10 | Medium | QMD 的 `max(stake_cny)` 是"最大单组投入"而非"单期最大投入"，无法证明 1024 天花板 | 改为先按 `(structure, issue)` 汇总再取最大，并**断言**任何一期 `> 1024` 即渲染失败 |
+| 11 | Medium | 合同要求估算收益与实际收益分开呈现，但 driver 从未调用 `n7_sp_estimate()` | 实现：把决策时刻 SP 三元组带入 priced/probabilities，新增 `n7_estimated_expected_return()`（固定 SP 规则、只用轮询自带 SP），settled 表新增 `estimated_expected_return_cny`，metrics 新增估算列，QMD 单列一张"估算 vs 实际"表 |
+| 12 | Medium | 跨场独立乘积近似没有声明 | 新增契约常量 `N7_PROBABILITY_MODEL`，写入 receipt，并在 QMD"概率底座"显式声明它不是拟合的七场联合模型 |
+
+修复后测试（本机实测，cwd = `tests/testthat`）：
+
+| 文件 | 断言数 | 结果 |
+|---|---|---|
+| `test-n7-experiment-contract.R` | 203 | 0 fail / 0 error |
+| `test-n7-experiment-replay.R` | 203 | 0 fail / 0 error |
+| `test-n7-experiment-inputs.R` | 92 | 0 fail / 0 error |
+| **合计** | **498** | 全部通过 |
+
+（该表为**当前版本**的实测断言数，每次修改后重新运行；历史轮次的断言数见下方
+`codex review` 记录，两者口径不同，不相互替代。）
+
+PI 合同核验后共做了两轮修改：（a）把停售判定从**样本众数**换成**逐场证据**并修正收益口径；
+（b）**合同正文随后更新为次日自然日窗口**，据此**删除**逐场停售准入、重写窗口与赛程异常检查。
+冻结产物是 `results/n7_493_baseline_v7/`（seal
+`05bf1d82201922ee4ec5112d80f43cb4db9bc963d0d178be7387d72a36d80979`）。
+
+**这次修改彻底改变了结论，必须明确记录。** v5 报告 8x64 结构"净收益 +4,310.70、
+ROI 1.2053"，**v7 在合同口径与正确分母下是 已结算净收益 −5,075.36、回收倍数 0.747**。
+旧的正收益是两处缺陷叠加的产物：
+
+1. **口径混用**：4,310.70 是"可结算部分净额"（25,302.70 − 20,992），
+   分母里没有待结算的 3,328 元；1.2053 是"可结算部分回收倍数"，
+   **不是全投入 ROI**。旧表把它命名为"净收益/实际投入ROI"，是错的。
+2. **窗口与停售口径错误**：旧实现用"滚动 24 小时 + 统一停售提前量"，
+   既不符合合同更新后的**次日自然日窗口**，也用样本统计替代了逐场证据。
+
+v7 在合同口径下**三种结构全部为负**，且**最终净收益一律标记为"未定"**
+（存在待结算投入）。这才是本替代输入下的诚实结论。
+这一点必须如实记录，不能被读成"更严的口径带来了更好的收益"。
+**`4x96+4x32` 的结果相对修复前发生了实质变化**，这正是发现 1 的预期后果：
+修复前该结构有若干期累计投入越过 1024 元，修复后按 `(structure, issue)` 汇总的
+81 个期中**最大单期投入恰为 1024、越界 0 期**。
+第二、三轮修复（同刻冲突比较扩展到位、单票组矩阵维度、非有限/越界/NaN 数值、
+整数 `NA` 保留值、kickoff 表示严格性）**不改变真实数据结果**：
+v2、v3、v4 的三结构指标**逐项完全相同**，说明更严的边界检查没有拒绝任何一条真实记录。
+
+### 第二轮 `codex review`（第一轮修复后）
+
+命令同上（`sandbox_mode='"danger-full-access"'`，prompt 见
+`docs/reviews/issue-493-review-prompt-round2.txt`，逐条列出第一轮 12 项修复）。
+
+> No blocker/high-severity findings remain, but four medium-severity correctness issues
+> require fixes. The twelve reported remedies are present; rho backfill and source
+> limitations remain disclosed honestly.
+
+第二轮发现（4 项 Medium，全部已修复并加回归用例）：
+
+| # | 级别 | 发现 | 处理 |
+|---|---|---|---|
+| 13 | Medium | 同刻冲突检测只比较欧赔，两行 1X2 相同但 SP 不同时会静默取第一行，反转行序即可改变估算收益（探针实测 SP 2 vs 9） | 比较**全部被消费字段**（`eu_h/eu_d/eu_a/sp_3/sp_1/sp_0`，含缺失性差异）；新增"仅 SP 冲突"与"缺失性冲突"回归用例 |
+| 14 | Medium | 单票组时 `vapply` 退化为向量，`apply(leg_sp, 1L, prod)` 报 `dim(X) must have a positive length` | 显式构造 票×腿 矩阵；新增"单票组估算"回归用例（`K = 1` 合法） |
+| 15 | Medium | `n7_stored_numeric('Inf')` 返回无穷、`n7_stored_integer('2147483648')` 只给 warning 就变成 NA | 非有限值一律拒绝；整数在强制转换**之前**检查可表示范围；新增溢出/非有限/真 NULL 对照用例 |
+| 16 | Medium | kickoff 解析接受合法前缀并忽略尾随内容（`2026-05-02T20:00:00Z` 被当成 20:00 本地时间，位移 8 小时） | 要求**精确**的声明形式并做往返校验；新增带时区后缀/空格/尾随垃圾的回归用例 |
+
+### 第三轮 `codex review`（第二轮修复后）
+
+> No blocker/high-severity findings. Fixes 13, 14, and 16 appear addressed; fix 15 retains
+> two medium-severity boundary defects confirmed with read-only R probes.
+
+第三轮发现（2 项 Medium，均针对我自己的修复 15，已修复并加回归用例）：
+
+| # | 级别 | 发现 | 处理 |
+|---|---|---|---|
+| 17 | Medium | `n7_stored_numeric(c(Inf, NaN))` 在**数值型**列上走了提前返回分支，完全绕过有限性校验；数据库 REAL 列正是走这条分支 | 重构为所有输入路径**统一**经过同一套校验：NaN 单独命名并拒绝、`±Inf` 在数值与文本两条路径上都拒绝；新增数值型 `Inf`/`-Inf`/`NaN` 与文本型对照用例 |
+| 18 | Medium | 我上一轮的整数范围把 `-2147483648` 判为合法，但 R 把该值**保留给 `NA_integer_`**，`as.integer()` 会把它变成缺失值 | 下界改为 `-.Machine$integer.max`；新增该值文本/数值两种形式的拒绝用例，并确认 `-2147483647` 仍可往返 |
+
+### 第四轮 `codex review`（第三轮修复后）
+
+> Both round-4 fixes are correct; no remaining or newly introduced problems were found in
+> these changes. Read-only boundary checks passed for non-finite rejection, integer limits,
+> genuine NA preservation, and empty vectors. The full 404-assertion suite was not rerun
+> because its fixtures write temporary files.
+
+**第四轮无任何发现，审查收敛。** review 未运行测试套件（其沙箱只读），
+测试由本机执行：**404 断言、0 失败**。
+
+### 第五轮 `codex review`（停售提前量 5→10 分钟修正后）
+
+> No remaining or newly introduced blocking findings in the round-5 change. Read-only
+> boundary probes passed; the v5 receipt binds the 10-minute constant and current
+> implementation hashes, and v4/v5 metrics are identical. The modal-cutoff limitation
+> remains explicitly disclosed.
+
+**第五轮无遗留或新增发现。** review 未运行测试套件（其沙箱只读），
+测试由本机执行：**407 断言、0 失败**。
+
+### 被审文件哈希（第五轮审查时的内容）
+
+| 文件 | sha256 |
+|---|---|
+| `r/n7_experiment_contract.R` | `71fe36e6d6465f934ff4a8a0dca1127f6dd805fdbd74b2eaf0ca3567cc4041d8` |
+| `docs/research/n7_493_input_availability_verification.md` | `0efdd5e0e9819bd471ebbf0bc8be212afd1c81b2b57266f474c635152ed7f428` |
+| `tests/testthat/test-n7-experiment-contract.R` | `657515c7aa1f835603c40ae7075e7f9d9f0a864d415427439d4bfcc5e17f59e1` |
+
+（第四轮时 `r/n7_experiment_contract.R` 为
+`5bf49012b430dd56a832549db9f17200ebe9789a0f2452bf7af50a2bdd89423b`，
+本次因停售常量与证据注释而变更。其余文件的哈希与第四轮相同。）
+
+| 文件 | sha256（第四轮，未变者） |
+|---|---|
+| `r/n7_experiment_contract.R`（第四轮值） | `5bf49012b430dd56a832549db9f17200ebe9789a0f2452bf7af50a2bdd89423b` |
+| `r/n7_experiment_replay.R` | `a02d8771649b43ce2bd9995a23aacaf43fb8840de291861038857f93afd2787c` |
+| `r/n7_experiment_inputs.R` | `e9bc14e791898c3066d00587796336dd91eccc2b6284f28f8b21011a24009b6b` |
+| `scripts/run_n7_experiment_baseline.R` | `9e067b468836f30734f4d4a0aada7dc325a58c740fc8c5018624d828f7648674` |
+| `tests/testthat/test-n7-experiment-contract.R` | `f2ba8093d732a1debe4fd07d7bc641d63edb19d05bacf6d48c9a8943593b5982` |
+| `tests/testthat/test-n7-experiment-replay.R` | `1e83a8bf48358a70e011933f15e4989e3f86e5d2c051fb9f18d809f9cf7cbf33` |
+| `tests/testthat/test-n7-experiment-inputs.R` | `76cea148ba03fb6866966e5ac51d82d18707171bd1673b4990b1fb2980f92a6a` |
+| `docs/reviews/issue-493-review-prompt-round4.txt` | `750d5259e7e5cca058cff65f18b9d4a0ef2709a05ca5c8cd783b12c4e30a3a86` |
+
+实现与测试的哈希同时被冻结产物的 `receipt.json` → `implementation_hashes` 绑定，
+seal = `05bf1d82201922ee4ec5112d80f43cb4db9bc963d0d178be7387d72a36d80979`。
+（上表哈希为第五轮记录；第七轮被审文件哈希见本节末尾的第七轮记录。）
+
+> **注意**：本节（review 记录）是在第四轮审查之后写入 QMD 的，因此
+> `quarto/493_n7_experiment_baseline.qmd` 自身的哈希在审查后又发生了变化
+> （审查时为 `3f94912c26f9d2a15c316a7e98f471ea322f8c534766c1bb80d7db1e9fa975af`）。
+> 实现、测试与数据契约文件的哈希在审查后**未再变动**。
+> 本交付**仍需 PI 在 live Issue Graph 上做最终验收**。
+
+### 收敛轨迹
+
+| 轮次 | 结论 | 发现数 |
+|---|---|---|
+| 1 | Blocking/high-severity findings remain | 3 High + 9 Medium |
+| 2 | No blocker/high-severity findings remain | 4 Medium |
+| 3 | No blocker/high-severity findings | 2 Medium（均针对第 2 轮修复本身） |
+| 4 | Both fixes are correct; no remaining or newly introduced problems | **0** |
+| 5 | No remaining or newly introduced blocking findings（停售提前量修正后） | **0** |
+| 6 | 合同核验后重审：0 High，5 Medium（口径/证据分级/覆盖分母） | 5 Medium |
+| 7 | 合同更新为**次日自然日窗口**后重审：0 High，5 Medium + 1 Low | 5 Medium + 1 Low |
+| 8 | 上轮 6 项修复后重审：0 High，3 Medium + 2 Low | 3 Medium + 2 Low |
+
+### 第六至八轮：合同核验后的三次重审
+
+| 轮次 | 触发变更 | 裁定 |
+|---|---|---|
+| 6 | PI 合同核验后：收益口径分列、逐场停售、证据分级、rho 降级 | **0 High**；5 Medium（含"遗漏 cutoff 列会绕过排除"与"全待结算组合无法出报表"） |
+| 7 | **#493 合同正文更新为次日自然日窗口**，删除逐场停售准入 | **0 High**；5 Medium + 1 Low（模板残留、解析截断、`n7_epoch_date` 无测试、join 基数未强制、QMD 支持期数写死） |
+| 8 | 上轮 6 项修复 | **0 High**；3 Medium + 2 Low（零行输入 schema、终止符过宽、QMD 窗口/覆盖表述不一致、废弃注释、历史断言数算错） |
+
+第八轮中，审查者独立复算并确认：**498 断言全通过**、QMD 全新进程渲染无执行错误、
+自然日窗口边界为 **+4 小时（含）/ +28 小时（不含）**、cutoff 摘要
+`e693bd789af3c1eb6c5fc5d26fe44640de1a3450d9b8fc23c64d5fc8cb66e211` 与 receipt 一致、
+**8 个实现哈希全部匹配**、产物复算得 **4,232 合格 / 3,220 有报价 / 27 输入期 / 95 排除**、
+各结构支持 **26 期**。
+
+**本轮被审文件哈希（第八轮修复后）**：
+
+| 文件 | sha256 |
+|---|---|
+| `r/n7_experiment_contract.R` | `62d508b9f6c4916b6b096f859a84ba50bd29c0cd9800c2596c4a6a84e740363b` |
+| `r/n7_experiment_replay.R` | `3ac56918017143e957a2f2cf7adcfc03292b2690ddc2d30bed0e6db953a750ca` |
+| `r/n7_experiment_inputs.R` | `7940f06d65d0d5c21727e2e678b3df69d675852dadfbc80fb704af8bd82bc901` |
+| `scripts/run_n7_experiment_baseline.R` | `7ff1e907d45533a79d42f68ff72aa25c3b16bc026237333f63c85015ad8f9440` |
+| `tests/testthat/test-n7-experiment-contract.R` | `a33dd837b2a75b374cce8abe348b8d5ef1e783aca4b2f8a85cc5c1ea65428671` |
+| `tests/testthat/test-n7-experiment-replay.R` | `b6fd4a8e747bc312d01b91e5f8a614a8eb268aaade3167284cc2692549940fee` |
+| `tests/testthat/test-n7-experiment-inputs.R` | `152d3c48661985003c985242b22cdd045ffa0c9cc9ec576286c355e203f4a8ca` |
+
+> 第八轮发现（零行 schema、终止符、QMD 表述、注释、断言数）已在**本轮修复**，
+> 因此上述哈希**晚于**第八轮审查；修复内容为：`reason` 强制 `as.character()`、
+> 终止符收紧为 `("|[[:space:]]|</|$)`、QMD 窗口与覆盖表述统一、废弃注释删除、
+> 断言数更正为 **498**。**最终版本仍需 PI 验收。**

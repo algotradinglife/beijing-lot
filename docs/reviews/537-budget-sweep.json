@@ -1,0 +1,197 @@
+{
+  "issue": 537,
+  "accepted_at": "2026-09-27T08:30:05.843003+00:00",
+  "scope": "Local frozen-input candidate/depth/budget experiment; no historical fitting, scraping, actual bets, commit or push.",
+  "delivery_qmd": "quarto/parlay_combination_lab.qmd",
+  "qmd_sha256": "40d9b67ba70db99f730bc8d4eece752cb4954b057abf9cb0f046173f903131e5",
+  "html": "quarto/parlay_combination_lab.html",
+  "html_sha256": "b7fc8f696e005384d07d46f303e30dc82c672497369942c7c53c869bd17a95b5",
+  "reviewed_files": {
+    "packages/beidan/R/parlay_role_groups.R": "e4ec856d0ae99bfebd5b50e767dac34501c1051d22434ac1ba10d46f253f09d7",
+    "packages/beidan/R/parlay_role_portfolio.R": "5b0283d3075b7b35901c46904e1d811dcbe850f8dc76209bbd01d70a52838eba",
+    "packages/beidan/R/parlay_role_scores.R": "aa8672aaa18b390a5653ee9e022a77777374ec2e5585d2d67fb9967f302106f6",
+    "packages/beidan/R/parlay_role_shared.R": "9e521aed40a23b216bd21232af0d66f2729c98c2ada7df6cc9451eecf1a9543c",
+    "packages/beidan/tests/testthat/test-parlay-role-groups.R": "ab424ab18d8ffe417af72c558e1c3ecf6033048705e0e9903bf9298545e97fee",
+    "packages/beidan/tests/testthat/test-parlay-role-portfolio.R": "9c2554740c6701e0355d16f7a865e78900f3b83aad07f4762dd4d5af8f1178f0",
+    "packages/beidan/tests/testthat/test-parlay-role-review.R": "bee74da16293efb1114d7d6de482c6c184fd0c89ec7f1f62239c47818bf46c94",
+    "packages/beidan/tests/testthat/test-parlay-role-scores.R": "8f43b01b1c513de9b491bb2f9b50b65c609250817af75862e9f10dbb635ad6bd",
+    "tests/testthat/test-role-strategy-independent.R": "da50ba3dde082b3cc1d5846082b5e56c2c1ef2d6c878f75f74a3dee42b1153c5",
+    "tests/testthat/test-budget-sweep-independent.R": "b11ba1443d8bae98783fd6100891bc04b711072736c8b515945d5454ae652b72",
+    "packages/beidan/man/parlay_construct_role_groups.Rd": "f51205aabbb78dc9820ece8e4006b47a127fec9ddb4328f2faf37b90f126abcd",
+    "packages/beidan/man/parlay_evaluate_portfolio.Rd": "af0454d7ce4117ff5fd830cadb0872c9e4f9e2f688704cf27ac88fb390b2757e",
+    "docs/strategy/role-round-robin-contract.md": "a395ef7503b6e2d1ace3ca355cb61ed7967bdafbb3411e02c87202a741bf194e"
+  },
+  "input_hashes": {
+    "inputs/26098_walkthrough/print/26098-20260926-195204.rds": "d5658ae5476d2b014e960f855d67cd06dd65d83cf90363ac911984bda436b5c9",
+    "inputs/26098_walkthrough/print/prematch-sp-20260926-231551-replayed.rds": "c7b6be53dde3fb439950110adb6ba9e98b083cc42e52f2698bd3d201f010d5be"
+  },
+  "tests": {
+    "blocks": 41,
+    "assertions": 284,
+    "failures": 0,
+    "warnings": 0,
+    "skips": 0,
+    "command": "R_LIBS=\"$PWD/r_lib\" Rscript - <<'RS'\ndevtools::load_all(\"packages/beidan\",quiet=TRUE)\nfiles <- c(list.files(\"packages/beidan/tests/testthat\",pattern=\"^test-parlay-role-.*[.]R$\",full.names=TRUE),\"tests/testthat/test-role-strategy-independent.R\",\"tests/testthat/test-budget-sweep-independent.R\")\nfor(f in files) testthat::test_file(f,stop_on_failure=TRUE,reporter=\"summary\")\nRS",
+    "evidence": [
+      ".run-control/budget-sweep/final-tests.log",
+      ".run-control/budget-sweep/review-fix-tests.log",
+      ".run-control/budget-sweep/review-final.log"
+    ],
+    "note": "Initial scoped run281 assertions; final mutation and betting-sheet regressions raise total to284. Final codex reviewer independently reran all six files on final source."
+  },
+  "function_test_mapping": {
+    "parlay_role_scores and shared role helpers": [
+      "packages/beidan/tests/testthat/test-parlay-role-scores.R",
+      "tests/testthat/test-role-strategy-independent.R"
+    ],
+    "parlay_construct_role_groups and generation helpers": [
+      "packages/beidan/tests/testthat/test-parlay-role-groups.R",
+      "tests/testthat/test-budget-sweep-independent.R"
+    ],
+    "parlay_evaluate_portfolio and selection/result/improvement helpers": [
+      "packages/beidan/tests/testthat/test-parlay-role-portfolio.R",
+      "packages/beidan/tests/testthat/test-parlay-role-review.R",
+      "tests/testthat/test-role-strategy-independent.R",
+      "tests/testthat/test-budget-sweep-independent.R"
+    ]
+  },
+  "review": {
+    "command": "codex review - < .run-control/budget-sweep/review-final-prompt.txt",
+    "initial_findings": [
+      {
+        "priority": "P2",
+        "finding": "Embedded probability table could diverge from validated probability argument and contradict final summary.",
+        "resolution": "Require both probability table hashes equal frozen identity; regression mutates only embedded table and expects rejection."
+      }
+    ],
+    "final_findings": [],
+    "final_conclusion": "No actionable findings in requested scope.",
+    "logs": [
+      ".run-control/budget-sweep/review.log",
+      ".run-control/budget-sweep/review-final.log"
+    ]
+  },
+  "render": {
+    "command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+    "log": ".run-control/budget-sweep/render-final.log",
+    "cache": false,
+    "freeze": false,
+    "errors_fatal": true,
+    "tables": 24,
+    "cell_output_errors": 0,
+    "budget_matrix": [
+      {
+        "stage": "final",
+        "objective": "probability",
+        "purchased_tickets": "192",
+        "cost_cny": "384",
+        "expected_winning_tickets": "0.317944",
+        "ev_net_cny": "NA",
+        "ev_available": "FALSE",
+        "unspent_cny": "128",
+        "complete_groups": "3",
+        "planned_groups": "16",
+        "scenario_id": "1",
+        "group_budget_cny": "128",
+        "budget_cny": "512",
+        "candidate_groups": "16"
+      },
+      {
+        "stage": "final",
+        "objective": "probability",
+        "purchased_tickets": "192",
+        "cost_cny": "384",
+        "expected_winning_tickets": "0.317944",
+        "ev_net_cny": "NA",
+        "ev_available": "FALSE",
+        "unspent_cny": "640",
+        "complete_groups": "3",
+        "planned_groups": "16",
+        "scenario_id": "2",
+        "group_budget_cny": "128",
+        "budget_cny": "1024",
+        "candidate_groups": "16"
+      },
+      {
+        "stage": "final",
+        "objective": "probability",
+        "purchased_tickets": "240",
+        "cost_cny": "480",
+        "expected_winning_tickets": "0.361782",
+        "ev_net_cny": "NA",
+        "ev_available": "FALSE",
+        "unspent_cny": "32",
+        "complete_groups": "3",
+        "planned_groups": "16",
+        "scenario_id": "3",
+        "group_budget_cny": "160",
+        "budget_cny": "512",
+        "candidate_groups": "16"
+      },
+      {
+        "stage": "final",
+        "objective": "probability",
+        "purchased_tickets": "240",
+        "cost_cny": "480",
+        "expected_winning_tickets": "0.361782",
+        "ev_net_cny": "NA",
+        "ev_available": "FALSE",
+        "unspent_cny": "544",
+        "complete_groups": "3",
+        "planned_groups": "16",
+        "scenario_id": "4",
+        "group_budget_cny": "160",
+        "budget_cny": "1024",
+        "candidate_groups": "16"
+      },
+      {
+        "stage": "final",
+        "objective": "probability",
+        "purchased_tickets": "192",
+        "cost_cny": "384",
+        "expected_winning_tickets": "0.304038",
+        "ev_net_cny": "NA",
+        "ev_available": "FALSE",
+        "unspent_cny": "128",
+        "complete_groups": "2",
+        "planned_groups": "16",
+        "scenario_id": "5",
+        "group_budget_cny": "192",
+        "budget_cny": "512",
+        "candidate_groups": "16"
+      },
+      {
+        "stage": "final",
+        "objective": "probability",
+        "purchased_tickets": "288",
+        "cost_cny": "576",
+        "expected_winning_tickets": "0.393978",
+        "ev_net_cny": "NA",
+        "ev_available": "FALSE",
+        "unspent_cny": "448",
+        "complete_groups": "3",
+        "planned_groups": "16",
+        "scenario_id": "6",
+        "group_budget_cny": "192",
+        "budget_cny": "1024",
+        "candidate_groups": "16"
+      }
+    ],
+    "selected_plan_check": {
+      "groups": 3,
+      "legs_per_group": 7,
+      "unique_fixtures": 21,
+      "actual_cost_cny": 480,
+      "unspent_cny": 544,
+      "budget_cny": 1024
+    }
+  },
+  "limitations": [
+    "Finite candidate search and greedy admission, not global optimum.",
+    "Expected winning ticket count is not union probability, historical hit rate or profitability.",
+    "Saved SP was observed after frozen cutoff and is excluded from valuation.",
+    "Only related tests were run; no full repository test claim.",
+    "Local delivery only, not committed/pushed."
+  ],
+  "implementation_attribution": "Actual DSH initial and bounded corrective execution; supervisor migrated existing tests/manuals; PI corrected remaining integration defects, independently tested and reviewed."
+}

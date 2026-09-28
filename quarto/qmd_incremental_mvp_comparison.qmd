@@ -1,0 +1,94 @@
+---
+title: "knitr 与 targets：增量开发实测"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 范围与判据
+
+工程任务 #501 的补充实验。同一份五行合成 CSV、同一组 R 函数、
+同一 Python/reticulate 边界；不进行历史学习，不涉及策略效果。
+目标是检验非交互式局部修改是否正确失效，以及维护依赖的工作量。
+
+knitr 使用三个缓存块 `matches → errors → summary`，手工声明 `dependson`
+及输入、外部源码、环境清单哈希。R 源码使用保守的整文件哈希。
+targets 使用已有 13 节点图，R 函数依赖自动发现，Python 文件显式登记。
+两种实现都必须在新增外部依赖时更新声明；均不保证未登记依赖的失效。
+
+## 实测证据
+
+```{r}
+knitr_evidence <- jsonlite::read_json("docs/research/qmd_incremental_mvp/knitr-verification.json")
+targets_evidence <- jsonlite::read_json("docs/research/qmd_incremental_mvp/targets-comparison-verification.json")
+rows <- list()
+for (engine in c("knitr", "targets")) {
+  evidence <- if (engine == "knitr") knitr_evidence else targets_evidence
+  for (scenario in names(evidence$scenarios)) {
+    record <- evidence$scenarios[[scenario]]
+    nodes <- if (engine == "knitr") record$executed_blocks else record$changed
+    rows[[length(rows) + 1L]] <- tibble::tibble(
+      engine = engine, scenario = scenario,
+      elapsed_seconds = if (is.null(record$elapsed_seconds)) NA_real_ else record$elapsed_seconds,
+      executed = paste(unlist(nodes), collapse = ", ")
+    )
+  }
+}
+knitr::kable(dplyr::bind_rows(rows), digits = 3)
+```
+
+通过条件是执行记录及实际 tibble 数值断言，不以耗时判断缓存命中。
+正常情况下 A 组均值 0.065，B 组 NA；有效输入修改后 A 为 0.125；
+临时将 Python 误差乘以 0.5 后 A 为 0.0325，恢复源码后回到 0.065。
+非法数值必须终止本次执行，修复后恢复；ID 的前导零和缺失位置始终保留。
+knitr 使用新进程、`--no-cache` 验证全部三个计算块执行且结果一致；
+targets 使用全新 store，报告禁用 knitr cache/freeze。
+
+这些时间是小数据、单次运行的观测，两个实验可能并发，且报告内容不同。
+因此不能据此宣布哪个引擎更快，也不能外推到大数据。未重复测量、未控制机器负载。
+无变更时 targets 连报告也能跳过；knitr 仍需启动 Quarto 并渲染展示。
+
+## Jev 决策
+
+```{r}
+#| results: asis
+cat(readLines("docs/research/qmd_incremental_mvp/cache-decision.md"), sep = "\n")
+```
+
+Jev 是基于提交证据的一次辅助判断，不是正确性证明，也不参与运行时缓存判定。
+原始请求、回答保存在同目录 `jev-comparison.json`；仍由测试验证缓存失效。
+
+## 复现与测试映射
+
+先按原 MVP 的 pak 精确版本清单设置共享 R 库及项目 Python。
+新增时间记录依赖 lubridate 1.9.5 / timechange 0.4.0 已登记到清单。
+
+```bash
+Rscript --vanilla scripts/setup_qmd_incremental_mvp.R
+Rscript --vanilla scripts/verify_qmd_incremental_mvp.R
+Rscript --vanilla scripts/compare_qmd_incremental_mvp.R
+cp results/qmd_incremental_mvp/verification.json docs/research/qmd_incremental_mvp/targets-comparison-verification.json
+Rscript --vanilla -e 'testthat::test_file("tests/testthat/test-qmd-incremental-mvp.R", stop_on_failure=TRUE)'
+.venv/bin/python -m pytest tests/test_qmd_incremental_mvp.py -q
+mypy --strict --follow-imports=skip src/qmd_incremental_mvp.py
+quarto render quarto/qmd_incremental_mvp_comparison.qmd --execute-dir . --no-cache
+```
+
+本次没有新增业务函数，原函数及跨语言契约继续由 testthat/pytest 覆盖；
+两份 verifier 是可执行的集成测试，对 QMD 的实际计算、失效和失败路径断言。
+GitHub Actions 增加了 knitr verifier，远端运行结果尚未取得。
+本次报告重放已保存的 Jev 回答，不要求重新调用模型或得到同一选择。
+
+## 审查与限制
+
+```{r}
+#| results: asis
+cat(readLines("docs/research/qmd_incremental_mvp/comparison-review.md"), sep = "\n")
+```
+
+失败渲染可能留有旧 HTML；执行失败时不得把旧文件当作新结果验收。
+这个比较不改变现有生产流水线，不关闭 Issue，也不代表全仓测试通过。

@@ -69,7 +69,12 @@ testthat::test_that("future cancellation cannot rewrite selected candidates or f
                                       outcome = c("W", "D", "L")) |>
     dplyr::mutate(probability = rep(c(0.5, 0.3, 0.2), 14))
   constants <- parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(constants)$C
+  # Block 8 public path: explicit policy, no purchased group count.
+  config <- parlay_strategy_config(
+    constants, name = "acceptance", construction_policy = list(max_candidates = 2L, seed = 1L),
+    patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
+    objective = "probability", max_reuse = 1L, max_overlap = 6L,
+    spend_limit_cny = 160)
   # Both calls run the public plan API; only the status ledger differs, and the
   # projection binds it so the comparison stays about status visibility alone.
   project <- function(match_status) {
@@ -87,7 +92,7 @@ testthat::test_that("future cancellation cannot rewrite selected candidates or f
   future$status_at <- cutoff$cutoff_utc - 1
   future$available_at <- cutoff$cutoff_utc - 1
   excluded <- parlay_construct_groups(synthetic$fixtures, probabilities, cutoff, 7L,
-    "entropy_balanced", 2L, seed = 1L,
+    "fixture_round_robin", 2L, seed = 1L,
     match_status = dplyr::bind_rows(synthetic$match_status, future))
   testthat::expect_false(future$fixture_id %in% excluded$group_legs$fixture_id)
   testthat::expect_identical(excluded$diagnostics$status_exclusions$reason, "match status: cancelled")
@@ -131,7 +136,12 @@ testthat::test_that("future quotes and labels do not affect the visible epoch or
   p2 <- estimate_engine(second, cutoff, -0.14, c(0.1, 16), 1e-10)
   testthat::expect_identical(p2, p1)
   constants <- parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(constants)$C
+  # Block 8 public path: explicit policy, no purchased group count.
+  config <- parlay_strategy_config(
+    constants, name = "acceptance", construction_policy = list(max_candidates = 2L, seed = 1L),
+    patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
+    objective = "probability", max_reuse = 1L, max_overlap = 6L,
+    spend_limit_cny = 160)
   projection <- function(epoch, estimated) {
     list(cutoff = cutoff, fixtures = epoch$fixtures,
          probabilities = estimated$probabilities,

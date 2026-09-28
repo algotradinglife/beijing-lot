@@ -1,10 +1,10 @@
 {
   "audit_mode": "candidate",
-  "built_at_utc": "2026-08-16T06:04:33.977766+00:00",
-  "code_hash": "fbed4aeb60108b2262d38500e37ab165d0aa5a6ee441dfd64dc760752d43111f",
+  "built_at_utc": "2026-09-22T05:24:14.978868+00:00",
+  "code_hash": "05a01abe1cab6b53dbafc1d394b0919f5abc5d99b8de1a2e2ac0cc02283fa96a",
   "contract_version": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001",
   "contract_version_tag": "v1",
-  "database_count": 7,
+  "database_count": 6,
   "disposition": "CONTRACT_FROZEN_CANDIDATE",
   "environment": {
     "matplotlib": "3.10.9",
@@ -14,8 +14,8 @@
     "scipy": "1.17.1"
   },
   "issue": 234,
-  "legacy_market_snapshot_rows": 52703208,
-  "live_snapshot_rows": 1498607,
+  "legacy_market_snapshot_rows": 51551016,
+  "live_snapshot_rows": 1623942,
   "milestone": "M1",
   "notebook_hash": "1285fa1310b1df6b6ccff2145eec4d67105929af8836364da07feadc4324b508",
   "notebook_hash_mode": "semantic_source_cells_v1",
@@ -29,8 +29,8 @@
   "parent_issue": 232,
   "payout_factor_bj": 0.65,
   "payout_factor_forbidden_in_tables": true,
-  "producer_commit_sha": "784a23badf38d51bb2aee6d7687479e425d1af80",
-  "requirements_hash": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
+  "producer_commit_sha": "4087ab703c59b7bc09237a3b9bc765f5f4fd0352",
+  "requirements_hash": "39709c49578ec7fa0b71b2c8a255091e8d50338e07b797def0b0abd0637ee9d3",
   "reviewed_commit_sha": "PR_HEAD",
   "selected_sources": {
     "beijing": "beijing_official_interface",
@@ -68,5 +68,5 @@
     "football_data:2425_I1.csv": "79d87a5b18771e066ac7419b7876bfd9771a68ca117a9712375d6bc9685abee3",
     "football_data:2425_SP1.csv": "c086e96d6a53f6e6c0fce4e35db0d1728c773b4362323da0161a34769e315a36"
   },
-  "table_count": 63
+  "table_count": 26
 }

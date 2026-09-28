@@ -1,0 +1,219 @@
+{
+  "issue": 544,
+  "status": "独立 codex review 通过：无剩余 P1/P2 问题",
+  "review_command": "codex review -c 'sandbox_mode=\"danger-full-access\"' - < .run-control/portfolio-risk/review-prompt.txt",
+  "reviewed_files": [
+    {
+      "path": "packages/beidan/R/parlay_exploration.R",
+      "sha256": "b3405cb633ac077c575319612a8dcfa22aeb512e0f1d9030c1e84b549c1ae93a"
+    },
+    {
+      "path": "packages/beidan/R/parlay_risk.R",
+      "sha256": "feaca8f5d629534e0ad269e93beb438a1d55ad220030d883e8ae2aa855cb36a5"
+    },
+    {
+      "path": "packages/beidan/R/parlay_frontier.R",
+      "sha256": "b97b81ba122bbbd9771a4754fffd0de19962a579a913b5962a76f2deead186c4"
+    },
+    {
+      "path": "packages/beidan/R/parlay_fixed_depth_curve.R",
+      "sha256": "b68cefb19bd2449ec9f741982c9aca5d0b2b00c8af7a6a0beb99d71593672fef"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-exploration.R",
+      "sha256": "93b5150a2f989d479f125e8aba476df04082bdb6d1d9bbe9fccb60984a6d8c13"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-risk.R",
+      "sha256": "b37cd079fceab838a9d32ec5522241168fc2b413dafbe7352cf029d541e16cdc"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-frontier.R",
+      "sha256": "cbb24a03b6e5126a4c77521798f89ca249210e0460b760118761c5206274fcaf"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-fixed-depth-curve.R",
+      "sha256": "3b655900e20f0f93d08915999758ca1fac239e2fcddbbb6483e9a404de655712"
+    },
+    {
+      "path": "packages/beidan/man/parlay_explore_portfolios.Rd",
+      "sha256": "a8a38aa6e53ff61161882e8273c6220ceb800f7a8846185a9fb62a2fcdd42ccc"
+    },
+    {
+      "path": "packages/beidan/man/parlay_compare_risk.Rd",
+      "sha256": "b9281ac2d5e01936af9e5a05372d68582150ac1777f35a6d0baada8140ab77b3"
+    },
+    {
+      "path": "packages/beidan/man/parlay_frontier.Rd",
+      "sha256": "a47ebdbed2c06b2fada5b717ae7376e8e9fb11fd9ea266f401e5274d67dab285"
+    },
+    {
+      "path": "packages/beidan/man/parlay_fixed_depth_curve.Rd",
+      "sha256": "4e39fa79629008d5d785c899be64bbdcb36a0209f5cd55653e29e055020a087c"
+    },
+    {
+      "path": "packages/beidan/NAMESPACE",
+      "sha256": "0040fc9f5eb2231865958bce6981dd57da4755ca9afc3690d6e8ec7441f73919"
+    },
+    {
+      "path": "quarto/parlay_combination_lab.qmd",
+      "sha256": "56cbd211877757d788d2ff96aea000f98e239b9bb059eeceb0cc97318b8e213a"
+    },
+    {
+      "path": "tests/testthat/test-542-exploration-independent.R",
+      "sha256": "5bfe0f942564a9828abf4663ce25697cddbd78eb065a138c2ed72360138bf6c6"
+    },
+    {
+      "path": "tests/testthat/test-544-portfolio-risk-independent.R",
+      "sha256": "dcc288354ef8894f004f1b713871710c2fccf84f7af27d8bafbd409d0f41f358"
+    },
+    {
+      "path": "packages/beidan/R/parlay_role_portfolio.R",
+      "sha256": "7be4fafe30e4ca699d3af52e23445554ea360ed7aa8ec83624eb011ea89b7173"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-role-portfolio.R",
+      "sha256": "52f4b668af4678e8ce36aebe579db8cd6374397db3b3d68480e26a33d19b1036"
+    }
+  ],
+  "scope": "Four-pattern budget/coverage/reference-return research; no historical learning or live bets",
+  "input": {
+    "path": "inputs/26098_walkthrough/three_plans_20260928/plans.rds",
+    "sha256": "be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3"
+  },
+  "acceptance": "PI accepted after fresh no-cache render and numeric/visual verification",
+  "findings": [
+    {
+      "round": 1,
+      "priority": "P2",
+      "finding": "Optional evaluator cutoff_hash allowed deletion and retiming",
+      "resolution": "Require both evaluator receipt cutoff and cutoff_hash unconditionally; added absent/malformed binding regressions",
+      "status": "fixed; round2 confirmed"
+    },
+    {
+      "round": 2,
+      "priority": "P2",
+      "finding": "Final-only depth plans lacked original cutoff binding",
+      "resolution": "Authoritative role result now embeds cutoff_hash; depth requires it and rejects coherently retimed ledgers",
+      "status": "fixed; final review confirmed"
+    }
+  ],
+  "local_checks": {
+    "command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" Rscript .run-control/portfolio-risk/check.R",
+    "tests": [
+      {
+        "file": "packages/beidan/tests/testthat/test-parlay-role-portfolio.R",
+        "blocks": 18,
+        "assertions": 110,
+        "failed": 0,
+        "warnings": 0,
+        "errors": 0,
+        "_row": "packages/beidan/tests/testthat/test-parlay-role-portfolio.R"
+      },
+      {
+        "file": "packages/beidan/tests/testthat/test-parlay-exploration.R",
+        "blocks": 7,
+        "assertions": 94,
+        "failed": 0,
+        "warnings": 0,
+        "errors": 0,
+        "_row": "packages/beidan/tests/testthat/test-parlay-exploration.R"
+      },
+      {
+        "file": "packages/beidan/tests/testthat/test-parlay-frontier.R",
+        "blocks": 8,
+        "assertions": 46,
+        "failed": 0,
+        "warnings": 0,
+        "errors": 0,
+        "_row": "packages/beidan/tests/testthat/test-parlay-frontier.R"
+      },
+      {
+        "file": "packages/beidan/tests/testthat/test-parlay-fixed-depth-curve.R",
+        "blocks": 9,
+        "assertions": 55,
+        "failed": 0,
+        "warnings": 0,
+        "errors": 0,
+        "_row": "packages/beidan/tests/testthat/test-parlay-fixed-depth-curve.R"
+      },
+      {
+        "file": "packages/beidan/tests/testthat/test-parlay-risk.R",
+        "blocks": 8,
+        "assertions": 80,
+        "failed": 0,
+        "warnings": 0,
+        "errors": 0,
+        "_row": "packages/beidan/tests/testthat/test-parlay-risk.R"
+      },
+      {
+        "file": "tests/testthat/test-542-exploration-independent.R",
+        "blocks": 2,
+        "assertions": 21,
+        "failed": 0,
+        "warnings": 0,
+        "errors": 0,
+        "_row": "tests/testthat/test-542-exploration-independent.R"
+      },
+      {
+        "file": "tests/testthat/test-544-portfolio-risk-independent.R",
+        "blocks": 2,
+        "assertions": 15,
+        "failed": 0,
+        "warnings": 0,
+        "errors": 0,
+        "_row": "tests/testthat/test-544-portfolio-risk-independent.R"
+      }
+    ],
+    "scope": "Affected functions and QMD integration only; not full repository tests"
+  },
+  "development_notes": [
+    "Initial risk test fixture accidentally shadowed pattern inside sequential tibble evaluation; corrected fixture, production unchanged.",
+    "Adding cutoff_hash exposed R dollar partial matching for optional cutoff lookup; exact [[ ]] access fixed it; full suite now passes.",
+    "DSH frontier implementation was reviewed and extended; risk DSH attempt timed out after 300s without code, supervised Codex agent completed it."
+  ],
+  "historical_learning": false,
+  "limitations": [
+    "Model estimates under independent fixtures, not empirical calibrated outcomes",
+    "Reference pre-cutoff SP and single 0.65 payout factor; actual settlement may differ",
+    "Frontiers cover the configured grid and candidate pools, not a global optimum",
+    "No automatic parameter selection, betting, publication, settlement reads or CI work"
+  ],
+  "review_result": "No actionable P1/P2 findings remain; seven targeted test files passed; cutoff binding and retiming protections verified.",
+  "review_log_sha256": "ab5165ce51b643fe50957715d68d50f500a24fd4f3c32c1d054de884fc4381f5",
+  "render_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+  "render": {
+    "html_sha256": "238d50209261a8f7e913bf8412883ac24354a66b7c312a03400e40e367915c73",
+    "tables": 12,
+    "plots": 3,
+    "execution_errors": 0,
+    "scenarios": 14,
+    "prefix_points": 38,
+    "exact_joint_states": 531441,
+    "numeric_table_invariance": true,
+    "reviewed_hashes_match": true,
+    "input_unchanged": true,
+    "exit_code": 0,
+    "log_sha256": "fa2ddd7dbf46bec10b1fb95beb8fa2b919f983a6f6bf436caa07ec147d4d9efe"
+  },
+  "validation_command": ".venv/bin/python .run-control/portfolio-risk/check_html.py",
+  "function_test_mapping": {
+    "parlay_explore_portfolios": "test-parlay-exploration.R",
+    "parlay_compare_risk and private risk helpers": "test-parlay-risk.R and test-544-portfolio-risk-independent.R",
+    "parlay_frontier and numeric validator": "test-parlay-frontier.R",
+    "parlay_fixed_depth_curve": "test-parlay-fixed-depth-curve.R",
+    "parlay_evaluate_portfolio/.parlay_role_result cutoff provenance": "test-parlay-role-portfolio.R",
+    "QMD actual chunks and manual selection": "test-542-exploration-independent.R and test-544-portfolio-risk-independent.R; full fresh render"
+  },
+  "graph_verification": "Root read live #544 immediately before PI acceptance: Task, parent #533, no blockedBy/blocking, Open/Review. Reviewer GitHub access was unavailable; root live read succeeded.",
+  "accepted_at": "2026-09-28T01:03:55.239936+00:00",
+  "visual_inspection": "Three plots checked: full-cost view, <=512 CNY zoom, fixed-group depth; 12 rendered tables present; no execution errors.",
+  "github_completion": {
+    "issue": 544,
+    "state": "CLOSED",
+    "project_status": "Done",
+    "blockedBy": [],
+    "blocking": [],
+    "comment": "https://github.com/algotradinglife/beijing-lot/issues/544#issuecomment-5861524863"
+  }
+}

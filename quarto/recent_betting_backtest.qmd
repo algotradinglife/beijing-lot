@@ -1,0 +1,138 @@
+---
+title: "近期下注回测：结构、信号分歧与SP收益门槛"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 范围与阅读口径
+
+本报告比较26098期的两个历史决策时点：9月26日19:52与9月28日00:27（均为北京时间）。同一时点的不同下注单是替代方案，不能当成多个独立样本。这些规则在看到结果后提出，以下是反事实诊断，不是样本外策略验证。
+
+先重放原票，再用同一冻结概率和当时真实北单SP重建候选。构造函数不接收结算数据；不重新训练概率模型、不改变原冻结票。SP用于收益估算，不替代欧赔平均与大小球映射得到的概率。单场SP大于10时，估值替换为4.5；结算按实际SP，票级0.65只乘一次。
+
+```{r}
+#| label: setup
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+source(file.path(root,"r/recent_frozen_backtest.R"))
+source(file.path(root,"r/recent_sp_replay.R"))
+source(file.path(root,"r/recent_price_backtest.R"))
+source(file.path(root,"r/recent_backtest_summary.R"))
+backend <- beidan::python_backend(file.path(root,".venv/bin/python"))
+input_files <- tibble::tribble(~name,~path,~sha256,
+ "old","inputs/26098_walkthrough/print/26098-20260926-195204.rds","d5658ae5476d2b014e960f855d67cd06dd65d83cf90363ac911984bda436b5c9",
+ "old_alternative","inputs/26098_walkthrough/print/26098-195204-3333222-256.rds","cbcc9303bbce6b7089be5768dcd395494a4b3fe00414b219eded46ad94869af5",
+ "old_settlement","inputs/26098_walkthrough/print/settlement-20260928-192221.rds","de4cfd4615013f9d0c31763c480486d7a6d70c4def4073e48d66fc6ef530b403",
+ "new","inputs/26098_walkthrough/three_plans_20260928/plans.rds","be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3",
+ "new_settlement","inputs/26098_walkthrough/three_plans_20260928/settlement-20260928-204413.rds","bdc2cbd2d4a07c25973b6a2e7fb577766825669c290606fc8a73e5a5b12421e9")
+paths <- setNames(file.path(root,input_files$path),input_files$name)
+stopifnot(identical(unname(vapply(paths,digest::digest,character(1),file=TRUE,algo="sha256")),input_files$sha256))
+replay <- RecentSpReplay(paths[["old"]],backend)
+sources <- list(Sep26=RecentSpSource(replay),Sep28=readRDS(paths[["new"]]))
+settlements <- list(Sep26=readRDS(paths[["old_settlement"]]),Sep28=readRDS(paths[["new_settlement"]]))
+knitr::kable(input_files)
+```
+
+9月26日原冻结对象没有单独SP表，但其原始赛程HTML保存了19:38:21采集的SP。现通过已有解析器离线重放，49场均恢复三赛果报价；原字节hash与当时source.json一致，早于19:52冻结。23:15的后采SP不参与构造。新研究对象与原下注票分开保存。
+
+```{r}
+#| label: chronology
+chronology <- tibble::tibble(epoch=names(sources),
+ cutoff=purrr::map_chr(sources,~format(.x$outputs[[1]]$evaluated$cutoff$cutoff_utc,tz="Asia/Shanghai")),
+ model_fixtures=purrr::map_int(sources,~n_distinct(.x$outputs[[1]]$pool$probabilities$fixture_id)),
+ latest_sp=purrr::map_chr(sources,~format(max(.x$outputs[[1]]$pool$prematch_sp$quote_at),tz="Asia/Shanghai")),
+ settlement_as_of=purrr::map_chr(settlements,~format(.x$as_of,tz="Asia/Shanghai")))
+knitr::kable(chronology)
+knitr::kable(tibble::tibble(raw_path=replay$receipt$raw_path,raw_sha256=replay$receipt$raw_hash))
+```
+
+26097文档记载投入1024、回款约2059、净收益约1035，但概率来源与当前模型不同，且缺标准冻结凭据。因此只作为旧结算记录，不并入本次策略效果统计。
+
+## 原票核算：两张180元属于同一组
+
+```{r}
+#| label: original-replay
+old <- recent_frozen_backtest(paths[["old"]],paths[["old_alternative"]],
+ paths[["old_settlement"]],replay$source$cutoff)
+knitr::kable(old$summary |> select(scenario,stake_cny,payout_cny,net_cny,pending_stake_cny),digits=2)
+knitr::kable(old$winning_tickets |> filter(grepl("^published",scenario)) |>
+ select(scenario,group_id,ticket_id,stake_cny,payout_cny),digits=2)
+```
+
+第102场以ALL/SP=1结算，使同组两张不同赛果票同时中奖，各回180.02元。该组应合计回款360.05元，不能以其中一张的回款与整组成本比较。原3333222另外一组回811.82元，整份净收益为+147.87元。原3222221整份净收益为−407.95元。
+
+`published`是原票精确重放；`fixed`保持原四组比赛，但按当前算法重新分配角色并重新选票，即使同结构也不保证与原掩码一致。四结构此处的总成本不同，不按净收益直接宣称某结构普遍占优。
+
+## 新规则的受控对照
+
+四种结构3333222、3332222、3322221、3222221，分别覆盖648、432、144、96个完整赛果组合。每种构造12个候选组，按角色3→2→1轮流选场，入选时限制每场最多复用2次、任意两组最多重叠2场。候选上限12是本次计算边界，不宣称穷举最优。
+
+- `original`：现有模型角色排序。
+- `disagreement_role3`：模型Top2与SP最低两项不一致时，优先把组内该场移入三选；与一致的三选场交换，保持该组比赛集合与结构不变。不是全局重新搜索比赛。
+- `nonnegative_ev`：先筛掉预计整组净收益小于0或不可估的候选，再选组。
+- `role1_low_sp`：模型Top1概率至少0.5、且该赛果原始SP不高于阈值时，只允许该场作为单选；不满足的候选先排除。没有替换搜索，候选不足会留现金。
+- 组合门槛同时执行上述两项。所有票仍按模型概率排序，未改成逐票EV排序。
+
+组命中概率记为q、整组成本C。在通常只有一个实际赛果组合的模型下，条件平均回款必须满足 `E[回款|命中] >= C/q` 才达到估计盈亏平衡；q=0.25时为4C。此处是平均回款门槛，不要求每张中奖票都超过4C。取消场次可能导致多票同时中，实际结算按票累计。
+
+```{r}
+#| label: policy-matrix
+settings <- tibble::tribble(~regime,~group_cap,~total_cap,~sp_threshold,
+ "matched",192,384,2,
+ "native",256,512,2,
+ "low_sp_2.5",256,512,2.5)
+knitr::kable(settings)
+experiments <- list()
+for(epoch in names(sources)) for(i in seq_len(nrow(settings))) {
+ key <- paste(epoch,settings$regime[i],sep="_")
+ experiments[[key]] <- RecentPriceBacktest(sources[[epoch]],
+   group_budget_cny=settings$group_cap[i],budget_cny=settings$total_cap[i],
+   low_sp_threshold=settings$sp_threshold[i])
+}
+```
+
+`matched`用于相同192元单组上限/384元总额度比较；`native`恢复256元单组上限/512元总额度，3222221每组仍以全覆盖192元封顶。`low_sp_2.5`只改变低SP阈值。两项阈值均为事先列出的敏感性场景，没有用本次结算选择最优阈值。上述总额度是对照实验条件，不改变不限总预算的生产使用约定。
+
+```{r}
+#| label: realized-summary
+summaries <- list()
+for(key in names(experiments)) {
+ epoch <- strsplit(key,"_",fixed=TRUE)[[1]][1]
+ summaries[[key]] <- RecentBacktestSummary(experiments[[key]],
+   settlements[[epoch]]$settlements,settlements[[epoch]]$as_of)
+}
+```
+
+<!-- RESULTS -->
+
+## 局限与下一步
+
+这只有两个决策时点，且同属26098期，不能估计长期命中率、最大回撤或证明获利能力。北单赛前SP只是决策时可见价格，实际结算SP仍可能变化。概率模型的校准误差与比赛间独立性假设也会影响EV和回本概率。
+
+本次分歧规则只改变组内角色，高概率低SP规则只筛已有候选；没有宣称实现了“收益驱动的全局选场”。共享场次互补掩码的前次诊断见[失利复盘](26098_loss_review.html)：能减少单场共同淘汰比例，但回本概率未必改善，不能当成免费保险。本轮保持复用约束不变，避免将掩码策略和SP筛选的影响混在一起。
+
+## 复现与验收
+
+无需网络；依赖上述原始输入、项目R库及显式`.venv/bin/python`。从干净会话执行，禁用缓存与freeze，错误即失败。测试在开发流程单独执行，不在分析文档中运行testthat。
+
+```{r}
+#| label: evidence
+implementation_files <- c("r/recent_frozen_backtest.R","r/recent_sp_replay.R",
+ "r/recent_price_backtest.R","r/recent_backtest_summary.R",
+ "tests/testthat/test-recent-frozen-backtest.R","tests/testthat/test-recent-sp-replay.R",
+ "tests/testthat/test-recent-price-backtest.R","tests/testthat/test-recent-backtest-summary.R")
+knitr::kable(tibble::tibble(path=implementation_files,
+ sha256=vapply(file.path(root,implementation_files),digest::digest,character(1),file=TRUE,algo="sha256")))
+cat("生成时间（北京时间）：",format(Sys.time(),tz="Asia/Shanghai"),"\n")
+```
+
+验收记录与最终被评审文件hash见 `docs/reviews/546-recent-backtest.json`。本轮未训练、校准或历史寻优；传递调用为角色评分/候选构造、SP估值、受约束准入、固定概率联合模拟与独立结算。所有构造均沿用各自冻结cutoff及输入绑定，结算仅在构造完成后进入汇总。用于新目标期的学习或调参仍须单独走历史cutoff学习契约。

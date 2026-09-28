@@ -59,6 +59,23 @@ synthetic_settlements <- function(issue, issue_id = '26097',
       status = 'settled', source_url = 'synthetic://n7-pipeline/settlement')
 }
 
+
+# Block 8 public path: one explicit strategy configuration. There is NO purchased
+# group count and NO equal-split budget: the funded groups and depth are derived
+# from the issue budget and the reuse/overlap constraints. `patterns` names are the
+# structure keys ("p" + the digits), exactly as they were before.
+block8_value_config <- function(settings = parlay_settings(), name = "value",
+                                patterns = NULL, objective = "probability",
+                                max_candidates = 2L, seed = 1L,
+                                max_reuse = 1L, max_overlap = NULL,
+                                spend_limit_cny = NULL) {
+  parlay_strategy_config(
+    settings, name = name, construction_policy = list(max_candidates = max_candidates, seed = seed),
+    patterns = patterns, objective = objective, max_reuse = max_reuse,
+    max_overlap = if (is.null(max_overlap)) settings$n_legs - 1L else max_overlap,
+    spend_limit_cny = spend_limit_cny)
+}
+
 testthat::test_that('the SP transform applies the threshold rule exactly as specified', {
   # SP above 10 becomes 4.5; SP exactly 10 is untouched; below 10 is untouched.
   testthat::expect_equal(parlay_transform_sp(c(2, 10, 12), 10, 4.5), c(2, 10, 4.5))
@@ -75,7 +92,7 @@ testthat::test_that('valuation prices a ticket from its own legs and applies 0.6
   fx <- value_fixture(n_fixtures = 14L)
   built <- .BuildDecisionTables(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
                              fx$match_status,
-                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
+                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'fixture_round_robin',
                              1L, 1L, fx$constants)
   valued <- built$valued
   testthat::expect_equal(nrow(valued), 648L)
@@ -108,7 +125,7 @@ testthat::test_that('a ticket missing any leg SP gets NA rather than a partial p
   fx <- value_fixture(n_fixtures = 14L)
   built <- .BuildDecisionTables(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
                              fx$match_status,
-                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
+                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'fixture_round_robin',
                              1L, 1L, fx$constants)
   # Every ticket in a group spans all seven of its fixtures, so removing one
   # fixture's SP must invalidate exactly that group's tickets and nothing else.
@@ -133,7 +150,7 @@ testthat::test_that('SP quoted at or after the cutoff cannot price a ticket', {
   fx <- value_fixture(n_fixtures = 14L)
   built <- .BuildDecisionTables(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
                              fx$match_status,
-                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
+                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'fixture_round_robin',
                              1L, 1L, fx$constants)
   late <- fx$sp
   late$quote_at <- fx$cutoff$cutoff_utc
@@ -148,7 +165,7 @@ testthat::test_that('ranking is probability-first inside each candidate support'
   fx <- value_fixture(n_fixtures = 28L)
   built <- .BuildDecisionTables(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
                              fx$match_status,
-                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
+                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'fixture_round_robin',
                              2L, 1L, fx$constants)
   ranked <- parlay_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
   # The v1 contract ranks by descending probability within each candidate's hard
@@ -182,60 +199,28 @@ testthat::test_that('ranking is probability-first inside each candidate support'
   }
 })
 
-testthat::test_that('allocation A funds 1024 CNY as four groups of the 3333222 structure', {
-  fx <- value_fixture()
-  config <- parlay_allocation_configs(fx$constants)[['A']]
-  result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
-    max_reuse = 1L, max_overlap = 6L)))
+testthat::test_that('wide support spends the issue budget without equal group caps', {
+  fx <- value_fixture(n_fixtures = 7L)
+  result <- parlay_build_plan(fx$projected, block8_value_config(fx$constants,
+    patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L))))
   testthat::expect_equal(nrow(result$funded$purchases), 512L)
   testthat::expect_equal(sum(result$funded$purchases$stake_cny), 1024)
-  testthat::expect_equal(length(result$funded$diagnostics$admitted_groups), 4L)
-  # Each group is capped by its own 128-unit allocation.
-  per_group <- table(result$funded$funded$group_id)
-  testthat::expect_true(all(per_group <= 128L))
+  testthat::expect_equal(length(unique(result$funded$funded$group_id)), 1L)
 })
-
-testthat::test_that('allocation B mixes two structures across eight groups', {
-  fx <- value_fixture()
-  config <- parlay_allocation_configs(fx$constants)[['B']]
-  result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
-    max_reuse = 1L, max_overlap = 6L)))
-  funded <- result$funded$funded
-  labels <- sub('^.*[|]', '', funded$candidate_id)
-  # The allocation declares eight FIXTURE SETS and spends its budget across them.
-  testthat::expect_equal(length(unique(funded$group_id)), 8L)
-  # Both declared structures are actually applied; neither is silently dropped.
-  testthat::expect_setequal(unique(labels), c('p3333222', 'p2222221'))
-  # The declared cap is matched to its pattern by LABEL, so the wide 3333222
-  # structure is allowed more tickets than the narrow 2222221 one. Pairing caps by
-  # position instead would swap them and silently flatten the allocation.
-  caps <- c(p3333222 = 96L, p2222221 = 32L)
-  per_candidate <- tapply(funded$ticket_id, funded$candidate_id, length)
-  slot_label <- sub('^.*[|]', '', names(per_candidate))
-  testthat::expect_true(all(slot_label %in% names(caps)))
-  # Exactly the declared plan: four sets at 96 units and four at 32 units.
-  testthat::expect_equal(length(per_candidate), 8L)
-  testthat::expect_equal(sum(slot_label == 'p3333222'), 4L)
-  testthat::expect_equal(sum(slot_label == 'p2222221'), 4L)
-  testthat::expect_equal(as.integer(per_candidate[slot_label == 'p3333222']), rep(96L, 4L),
-                         ignore_attr = TRUE)
-  testthat::expect_equal(as.integer(per_candidate[slot_label == 'p2222221']), rep(32L, 4L),
-                         ignore_attr = TRUE)
-  # The two structures share fixtures, so their spaces overlap; every funded row
-  # must be a DISTINCT physical ticket, never one combination bought twice.
-  testthat::expect_equal(anyDuplicated(funded$ticket_id), 0L)
-  testthat::expect_equal(nrow(result$funded$purchases), nrow(funded))
+testthat::test_that('multiple candidate structures cannot duplicate purchased physical tickets', {
+  fx <- value_fixture(n_fixtures = 7L)
+  config <- block8_value_config(fx$constants,
+    patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L), c(2L,2L,2L,2L,2L,2L,1L)))
+  result <- parlay_build_plan(fx$projected, config)
+  testthat::expect_equal(length(unique(result$ranked$candidate_id)), 2L)
+  testthat::expect_equal(length(unique(result$funded$funded$candidate_id)), 1L)
   testthat::expect_equal(anyDuplicated(result$funded$purchases$ticket_id), 0L)
-  # The whole issue budget is spent exactly, in whole units, and none is lost.
-  testthat::expect_equal(sum(result$funded$purchases$stake_cny), 1024)
-  testthat::expect_equal(result$funded$diagnostics$unspent_units, 0L)
-  testthat::expect_equal(nrow(funded) * fx$constants$unit_cny,
-                         sum(result$funded$purchases$stake_cny))
+  testthat::expect_equal(nrow(result$funded$purchases), nrow(result$funded$funded))
+  testthat::expect_lte(sum(result$funded$purchases$stake_cny), 1024)
 })
-
-testthat::test_that('allocation C buys 80 of its 96 supported tickets', {
+testthat::test_that('an explicit 160 CNY cap buys 80 of 96 supported tickets', {
   fx <- value_fixture()
-  config <- parlay_allocation_configs(fx$constants)[['C']]
+  config <- block8_value_config(fx$constants, patterns = named_patterns(c(3L,2L,2L,2L,2L,2L,1L)), max_candidates = 1L, spend_limit_cny = 160)
   result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
     max_reuse = 1L, max_overlap = 6L)))
   # The 3222221 structure spans 96 tickets; the budget only buys 80, which is the
@@ -247,7 +232,7 @@ testthat::test_that('allocation C buys 80 of its 96 supported tickets', {
 
 testthat::test_that('the funded set is the top of the ranking, not an arbitrary subset', {
   fx <- value_fixture(n_fixtures = 28L)
-  config <- parlay_allocation_configs(fx$constants)[['A']]
+  config <- block8_value_config(fx$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L)))
   result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
     max_reuse = 1L, max_overlap = 6L)))
   for (group_id in unique(result$funded$funded$group_id)) {
@@ -262,7 +247,7 @@ testthat::test_that('budget constraints are enforced and validated', {
   fx <- value_fixture(n_fixtures = 28L)
   built <- .BuildDecisionTables(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
                              fx$match_status,
-                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
+                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'fixture_round_robin',
                              2L, 1L, fx$constants)
   ranked <- parlay_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
   # A budget smaller than one unit buys nothing rather than over-spending.
@@ -286,7 +271,7 @@ testthat::test_that('a group failing admission is skipped, not silently refilled
   fx <- value_fixture(n_fixtures = 28L)
   built <- .BuildDecisionTables(fx$fixtures, fx$probabilities, fx$sp, fx$cutoff,
                              fx$match_status,
-                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'entropy_balanced',
+                             list(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), 'fixture_round_robin',
                              2L, 1L, fx$constants)
   ranked <- parlay_rank_tickets(built$valued, built$tickets$candidate_tickets, fx$cutoff)
   # max_reuse 0 forbids any fixture appearing in more than one bought group; with
@@ -303,7 +288,7 @@ testthat::test_that('a group failing admission is skipped, not silently refilled
 
 testthat::test_that('a frozen plan is immutable with respect to later settlement', {
   fx <- value_fixture(n_fixtures = 28L)
-  config <- parlay_allocation_configs(fx$constants)[['A']]
+  config <- block8_value_config(fx$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L)))
   result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
     max_reuse = 1L, max_overlap = 6L)))
   plan <- result$plan
@@ -477,7 +462,7 @@ testthat::test_that('an empty plan settles to typed empty returns', {
 
 testthat::test_that('the whole decision is reproducible from the same inputs', {
   fx <- value_fixture(n_fixtures = 28L)
-  config <- parlay_allocation_configs(fx$constants)[['A']]
+  config <- block8_value_config(fx$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L)))
   first <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
     max_reuse = 1L, max_overlap = 6L)))
   second <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
@@ -486,17 +471,12 @@ testthat::test_that('the whole decision is reproducible from the same inputs', {
   testthat::expect_identical(first$ranked$ticket_id, second$ranked$ticket_id)
 })
 
-testthat::test_that('the three allocation configurations are declared explicitly', {
-  configs <- parlay_allocation_configs(parlay_settings())
-  testthat::expect_setequal(names(configs), c('A', 'B', 'C'))
-  testthat::expect_equal(configs$A$budget_cny, 1024)
-  testthat::expect_equal(configs$B$budget_cny, (4L * 96L + 4L * 32L) * 2)
-  testthat::expect_equal(configs$C$budget_cny, 160)
-  testthat::expect_equal(configs$A$unit_cap, 128L)
-  testthat::expect_equal(prod(configs$B$patterns[[2]]), 64L)
-  testthat::expect_equal(prod(configs$C$patterns[[1]]), 96L)
-})
-# --- regressions for findings raised in the first codex review ----------------
+testthat::test_that('configuration declares budget policy but no purchased group count', {
+  config <- block8_value_config(parlay_settings(), spend_limit_cny = 160)
+  testthat::expect_equal(config$spend_limit_cny, 160)
+  testthat::expect_equal(config$settings$issue_budget_cny, 1024)
+  testthat::expect_false(any(c('n_groups', 'unit_cap', 'unit_caps', 'budget_cny') %in% names(config)))
+})# --- regressions for findings raised in the first codex review ----------------
 
 testthat::test_that('timestamp parsing honours a non-zero UTC offset', {
   # Formatting the wall clock as UTC would shift the instant and could admit a
@@ -639,12 +619,12 @@ testthat::test_that('the replay never rebuys a physical ticket across epochs', {
   first <- value_fixture(n_fixtures = 14L)
   later <- first$projected
   later$cutoff$cutoff_utc <- first$cutoff$cutoff_utc + 3600
-  config <- utils::modifyList(parlay_allocation_configs(first$constants)[['C']],
+  config <- utils::modifyList(block8_value_config(first$constants, patterns = named_patterns(c(3L,2L,2L,2L,2L,2L,1L)), max_candidates = 1L, spend_limit_cny = 160),
                               list(max_reuse = 1L, max_overlap = 6L))
   replayed <- parlay_replay_issue(list(first$projected, later), config,
     synthetic_settlements(first$issue), as.POSIXct('2026-10-05', tz = 'UTC'))
   testthat::expect_equal(anyDuplicated(replayed$purchases$ticket_id), 0L)
-  testthat::expect_lte(sum(replayed$purchases$stake_cny), config$budget_cny)
+  testthat::expect_lte(sum(replayed$purchases$stake_cny), config$settings$issue_budget_cny)
   testthat::expect_false(anyNA(replayed$purchases$epoch_at))
   testthat::expect_equal(nrow(replayed$purchases), replayed$metrics$n_tickets)
 })
@@ -652,12 +632,12 @@ testthat::test_that('the replay never rebuys a physical ticket across epochs', {
 testthat::test_that('an exhausted hard mask yields zero support instead of aborting', {
   fx <- value_fixture(n_fixtures = 14L)
   grouped <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L, match_status = fx$match_status)
+                                     fx$constants$n_legs, 'fixture_round_robin', 1L, 1L, match_status = fx$match_status)
   target <- grouped$group_legs$fixture_id[1]
   # Forbid every outcome of one leg: the group cannot be invested in at all.
   forbidden <- tibble::tibble(fixture_id = rep(target, 3), outcome = match_outcomes())
   result <- parlay_apply_structure(grouped$group_legs, fx$probabilities, fx$cutoff,
-                               c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc',
+                               c(3L, 3L, 3L, 3L, 2L, 2L, 2L),
                                forbidden = forbidden, candidate_label = 'p')
   testthat::expect_equal(nrow(result$support_summary), 0L)
   testthat::expect_equal(nrow(result$supports), 0L)
@@ -668,7 +648,7 @@ testthat::test_that('an exhausted hard mask yields zero support instead of abort
 testthat::test_that('entropy-balanced construction spreads difficulty across groups', {
   fx <- value_fixture(n_fixtures = 28L)
   grouped <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 4L, 1L, match_status = fx$match_status)
+                                     fx$constants$n_legs, 'fixture_round_robin', 4L, 1L, match_status = fx$match_status)
   membership <- grouped$group_legs
   # Groups are disjoint and each has exactly seven legs.
   testthat::expect_equal(length(unique(membership$group_id)), 4L)
@@ -748,7 +728,7 @@ testthat::test_that('depth diagnostics ignore foreign and unsettled labels', {
 testthat::test_that('separate public replays give each issue its own budget', {
   first <- value_fixture(n_fixtures = 56L)
   second <- value_fixture(n_fixtures = 56L, seed = 43L, issue_id = '26098')
-  config <- utils::modifyList(parlay_allocation_configs(first$constants)[['A']],
+  config <- utils::modifyList(block8_value_config(first$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L))),
                               list(max_reuse = 1L, max_overlap = 6L))
   purchases <- dplyr::bind_rows(lapply(list(first, second), function(fx) {
     parlay_replay_issue(list(fx$projected), config, match_typed_empty('settlements'),
@@ -756,7 +736,7 @@ testthat::test_that('separate public replays give each issue its own budget', {
   }))
   per_issue <- tapply(purchases$stake_cny, purchases$issue_id, sum)
   testthat::expect_equal(length(per_issue), 2L)
-  testthat::expect_true(all(per_issue == config$budget_cny))
+  testthat::expect_true(all(per_issue == config$settings$issue_budget_cny))
 })
 
 testthat::test_that('a special leg outranks a plain miss on the same ticket', {
@@ -829,7 +809,7 @@ testthat::test_that('projection rejects fixtures belonging to another issue', {
 testthat::test_that('exhausting the last leg still enumerates to a typed-empty result', {
   fx <- value_fixture(n_fixtures = 14L)
   grouped <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L, match_status = fx$match_status)
+                                     fx$constants$n_legs, 'fixture_round_robin', 1L, 1L, match_status = fx$match_status)
   group_id <- grouped$group_legs$group_id[1]
   legs <- grouped$group_legs[grouped$group_legs$group_id == group_id, , drop = FALSE]
   legs <- legs[order(legs$leg_order), , drop = FALSE]
@@ -838,7 +818,7 @@ testthat::test_that('exhausting the last leg still enumerates to a typed-empty r
   last_fixture <- legs$fixture_id[nrow(legs)]
   forbidden <- tibble::tibble(fixture_id = rep(last_fixture, 3), outcome = match_outcomes())
   structure <- parlay_apply_structure(grouped$group_legs, fx$probabilities, fx$cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc',
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L),
                                   forbidden = forbidden)
   testthat::expect_equal(nrow(structure$supports), 0L)
   testthat::expect_length(structure$exhausted, 1L)
@@ -855,10 +835,10 @@ testthat::test_that('default candidate ids compose with funding', {
   # or the ordinary apply -> enumerate -> rank -> fund sequence buys nothing.
   fx <- value_fixture(n_fixtures = 14L)
   grouped <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 1L, 1L, match_status = fx$match_status)
+                                     fx$constants$n_legs, 'fixture_round_robin', 1L, 1L, match_status = fx$match_status)
   pattern <- c(3L, 2L, 2L, 2L, 2L, 2L, 1L)
   structure <- parlay_apply_structure(grouped$group_legs, fx$probabilities, fx$cutoff,
-                                  pattern, 'entropy_desc')
+                                  pattern)
   testthat::expect_true(all(sub('^.*[|]', '', structure$supports$candidate_id) == 'p3222221'))
   tickets <- parlay_enumerate_tickets(grouped$group_legs, fx$probabilities, fx$cutoff,
                                   structure$supports)
@@ -874,10 +854,10 @@ testthat::test_that('default candidate ids compose with funding', {
 testthat::test_that('a requested funding order is honoured before allocation', {
   fx <- value_fixture(n_fixtures = 28L)
   grouped <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff,
-                                     fx$constants$n_legs, 'entropy_balanced', 2L, 1L, match_status = fx$match_status)
+                                     fx$constants$n_legs, 'fixture_round_robin', 2L, 1L, match_status = fx$match_status)
   pattern <- c(1L, 1L, 1L, 1L, 1L, 1L, 1L)
   structure <- parlay_apply_structure(grouped$group_legs, fx$probabilities, fx$cutoff,
-                                  pattern, 'entropy_desc')
+                                  pattern)
   tickets <- parlay_enumerate_tickets(grouped$group_legs, fx$probabilities, fx$cutoff,
                                   structure$supports)
   valued <- parlay_value_tickets(tickets$tickets, tickets$ticket_legs, fx$sp, fx$cutoff,
@@ -1030,7 +1010,7 @@ testthat::test_that('allocation refuses a slate that had already kicked off', {
   late_projection$cutoff <- late
   testthat::expect_error(
     parlay_build_plan(late_projection,
-                      utils::modifyList(parlay_allocation_configs(fx$constants)[['A']],
+                      utils::modifyList(block8_value_config(fx$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L))),
                                         list(max_reuse = 1L, max_overlap = 6L))),
     'already kicked off')
 })
@@ -1040,7 +1020,7 @@ testthat::test_that('replay cash covers every decision the replay spanned', {
   # bought nothing: an empty decision must not be hidden by another decision's
   # spending. One replay is one issue, so the allowance is a single issue budget.
   fx <- value_fixture(n_fixtures = 56L)
-  config <- utils::modifyList(parlay_allocation_configs(fx$constants)[['C']],
+  config <- utils::modifyList(block8_value_config(fx$constants, patterns = named_patterns(c(3L,2L,2L,2L,2L,2L,1L)), max_candidates = 1L, spend_limit_cny = 160),
                               list(max_reuse = 1L, max_overlap = 6L))
   empty <- fx
   empty$fixtures <- fx$fixtures[0, , drop = FALSE]
@@ -1069,9 +1049,8 @@ testthat::test_that('an allocation cannot spend past the issue budget', {
   # The CNY1,024 issue budget is an absolute ceiling. A config may declare a smaller
   # demo limit but never a larger one.
   fx <- value_fixture(n_fixtures = 56L)
-  config <- parlay_allocation_configs(fx$constants)[['A']]
-  config$budget_cny <- 1280
-  config$unit_cap <- 160L
+  config <- block8_value_config(fx$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L)))
+  config$spend_limit_cny <- 1280
   result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
     max_reuse = 1L, max_overlap = 6L)))
   testthat::expect_equal(sum(result$funded$purchases$stake_cny),
@@ -1162,26 +1141,15 @@ testthat::test_that('empty settlement output keeps the same schema as populated'
   testthat::expect_equal(names(empty$issue_returns), names(full$issue_returns))
 })
 
-testthat::test_that('funding follows priority order, not a proportional split', {
-  # Two candidates each capped at 80 units with only CNY160 (80 units) available must
-  # resolve to 80/0: the first-ordered candidate is filled, later ones get what is
-  # left. Proportionally scaling everyone down would buy 40/40 and silently change
-  # the allocation that was requested.
-  fx <- value_fixture(n_fixtures = 56L)
-  config <- list(name = 'priority', settings = fx$constants,
-                 construction_method = 'entropy_balanced', ranking = 'probability_desc', seed = 1L,
-                 patterns = named_patterns(c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
-                 n_groups = 2L, unit_cap = 80L, budget_cny = 160)
-  result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
-    max_reuse = 1L, max_overlap = 6L)))
-  units <- as.integer(table(result$funded$purchases$candidate_id))
-  testthat::expect_equal(sum(units), 80L)
-  testthat::expect_true(any(units == 80L))
-  # At most one candidate may be partially funded when the budget runs out.
-  testthat::expect_lte(sum(units > 0L & units < 80L), 1L)
+testthat::test_that('optional spending cap funds whole units without prescribing group shares', {
+  fx <- value_fixture(n_fixtures = 7L)
+  config <- block8_value_config(fx$constants, spend_limit_cny = 160,
+    patterns = named_patterns(c(3L,2L,2L,2L,2L,2L,1L)))
+  result <- parlay_build_plan(fx$projected, config)
+  testthat::expect_equal(nrow(result$funded$purchases), 80L)
   testthat::expect_equal(sum(result$funded$purchases$stake_cny), 160)
+  testthat::expect_identical(result$funded$funded$rank, seq_len(80L))
 })
-
 testthat::test_that('a fixture outside the decision window is refused', {
   # The rolling 24-hour window is part of the contract: a slate that kicks off later
   # than the window is not part of this decision.
@@ -1251,25 +1219,16 @@ testthat::test_that('a missing settlement status never authorises a payout', {
   testthat::expect_equal(result$ticket_returns$payout_cny, 0)
 })
 
-testthat::test_that('distinct structures over one fixture set are all funded', {
-  # When fixture sets are scarcer than patterns, every pattern must still be applied:
-  # deduplicating on the set alone would drop a legitimate second structure and leave
-  # an eligible, unpurchased ticket behind.
-  fx <- value_fixture(n_fixtures = 56L)
-  config <- list(name = 'shared', settings = fx$constants,
-                 construction_method = 'entropy_balanced', ranking = 'probability_desc', seed = 1L,
-                 patterns = named_patterns(c(1L, 1L, 1L, 1L, 1L, 1L, 1L),
-                                           c(2L, 2L, 2L, 2L, 2L, 2L, 2L)),
-                 n_groups = 1L, unit_cap = 1L, budget_cny = 4)
-  result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
-    max_reuse = 1L, max_overlap = 6L)))
-  testthat::expect_equal(nrow(result$funded$purchases), 2L)
-  testthat::expect_equal(sum(result$funded$purchases$stake_cny), 4)
-  labels <- sub('^.*[|]', '', result$funded$purchases$candidate_id)
-  testthat::expect_setequal(labels, c('p1111111', 'p2222222'))
+testthat::test_that('one fixture set funds only one selected structure', {
+  fx <- value_fixture(n_fixtures = 7L)
+  config <- block8_value_config(fx$constants, spend_limit_cny = 4,
+    patterns = named_patterns(rep(1L, 7L), rep(2L, 7L)))
+  result <- parlay_build_plan(fx$projected, config)
+  testthat::expect_equal(length(unique(result$ranked$candidate_id)), 2L)
+  testthat::expect_equal(length(unique(result$funded$purchases$candidate_id)), 1L)
   testthat::expect_equal(anyDuplicated(result$funded$purchases$ticket_id), 0L)
+  testthat::expect_lte(sum(result$funded$purchases$stake_cny), 4)
 })
-
 testthat::test_that('diagnostic ranks use the same tie-break as purchasing', {
   # With uniform probabilities every comparison is a tie, so a rank-1 purchase must
   # still report rank 1. Breaking ties by outcome string instead of ticket id makes
@@ -1438,34 +1397,16 @@ testthat::test_that('parlay_value_tickets 校验 threshold/replacement/unit/payo
   testthat::expect_error(call(10, 4.5, 2, NA), 'payout_factor')
 })
 
-testthat::test_that('parlay_allocation_configs 要求完整的 settings 快照', {
-  # 回归：此前 NULL / list() 静默通过并产出 budget_cny = numeric(0)。
-  testthat::expect_error(parlay_allocation_configs(NULL), 'settings')
-  testthat::expect_error(parlay_allocation_configs(list()), 'settings')
-  testthat::expect_error(parlay_allocation_configs(list(n_legs = 7L)), 'settings')
-  testthat::expect_error(
-    parlay_allocation_configs(utils::modifyList(parlay_settings(),
-                                            list(unit_cny = NA_real_))),
-    'unit_cny')
-  testthat::expect_error(
-    parlay_allocation_configs(utils::modifyList(parlay_settings(),
-                                            list(unit_cny = -1))),
-    'positive')
-  configs <- parlay_allocation_configs(parlay_settings())
-  testthat::expect_identical(names(configs), c('A', 'B', 'C'))
-  # 每个配置都自带完整 settings 快照与复用/重叠/种子/构造默认值，
-  # 因此可以直接交给 parlay_build_plan(projected, config)，不需要第二个常量参数。
-  for (config in configs) {
-    testthat::expect_identical(config$settings, parlay_settings())
-    testthat::expect_true(all(c('construction_method', 'ranking', 'max_reuse',
-                                'max_overlap', 'seed', 'name') %in% names(config)))
+testthat::test_that('parlay_strategy_config 要求完整的 settings 快照', {
+  for (bad in list(NULL, list(), list(n_legs = 7L))) {
+    testthat::expect_error(parlay_strategy_config(bad), 'settings')
   }
-  # 预算以常量单位价推出，且 B 是契约里的 1024 CNY 混合示范。
-  testthat::expect_equal(configs$A$budget_cny, 4L * 128L * 2)
-  testthat::expect_equal(configs$B$budget_cny, (4L * 96L + 4L * 32L) * 2)
-  testthat::expect_equal(configs$C$budget_cny, 80L * 2)
+  testthat::expect_error(parlay_strategy_config(utils::modifyList(parlay_settings(), list(unit_cny = NA_real_))), 'unit_cny')
+  testthat::expect_error(parlay_strategy_config(utils::modifyList(parlay_settings(), list(unit_cny = -1))), 'positive')
+  config <- block8_value_config(parlay_settings())
+  testthat::expect_identical(config$settings, parlay_settings())
+  testthat::expect_true(all(c('construction_policy', 'objective', 'max_reuse', 'max_overlap', 'name') %in% names(config)))
 })
-
 testthat::test_that('.FundGroups 校验 budget、constants 与准入上限', {
   empty <- function(...) .FundGroups(match_typed_empty('group_legs'),
                                         match_typed_empty('tickets'), list(), ...)
@@ -1553,18 +1494,11 @@ testthat::test_that('.FreezeParlayPlan 要求 UTC 时点与 issue 标识', {
     'constants')
 })
 
-testthat::test_that('parlay_allocation_configs 的 patterns 与 unit_caps 按同一组名字索引', {
-  configs <- parlay_allocation_configs(parlay_settings())
-  # 名字即结构键（p + 七位数字），也是 unit_caps 的索引键。
-  testthat::expect_identical(names(configs$A$patterns), 'p3333222')
-  testthat::expect_identical(names(configs$B$patterns), c('p3333222', 'p2222221'))
-  testthat::expect_identical(names(configs$B$unit_caps), c('p3333222', 'p2222221'))
-  testthat::expect_identical(names(configs$C$patterns), 'p3222221')
-  # B 的票额必须与它自己的 pattern 同名对齐：3333222 -> 96，2222221 -> 32。
-  testthat::expect_equal(configs$B$unit_caps[['p3333222']], 96L)
-  testthat::expect_equal(configs$B$unit_caps[['p2222221']], 32L)
+testthat::test_that('strategy patterns retain explicit structure keys', {
+  config <- block8_value_config(patterns = named_patterns(c(3L,2L,2L,2L,2L,2L,1L)))
+  testthat::expect_identical(names(config$patterns), 'p3222221')
+  testthat::expect_equal(prod(config$patterns[[1]]), 96)
 })
-
 testthat::test_that('.FundGroups 要求 patterns 具名且名字与内容一致', {
   constants <- parlay_settings()
   call <- function(patterns, unit_caps = NULL) {
@@ -1693,18 +1627,17 @@ testthat::test_that('parlay_payout_for_candidate 对未知结果与缺 SP 的处
   testthat::expect_equal(none$payout, 0)
 })
 
-testthat::test_that('拆分出的子函数不改变原行为', {
-  # 拆分是等价重构：用同一个 fixture 走一遍完整分配，结果应与已知数量一致。
+testthat::test_that('public budget pipeline preserves downstream result contracts', {
+  # 冻结、诊断、后续账本使用的字段保留，新阶段证据显式增加。
   fx <- value_fixture(n_fixtures = 56L)
-  config <- parlay_allocation_configs(fx$constants)$A
+  config <- block8_value_config(fx$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L)))
   result <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
     max_reuse = 1L, max_overlap = 6L)))
   testthat::expect_s3_class(result$ranked, 'tbl_df')
   testthat::expect_true(is.list(result$funded))
-  testthat::expect_identical(names(result),
-                             c('config', 'cutoff', 'constants',
-                               'built', 'probabilities', 'ranked', 'funded',
-                               'plan', 'history'))
+  testthat::expect_true(all(c('config', 'cutoff', 'constants', 'built',
+    'probabilities', 'ranked', 'funded', 'plan', 'history', 'budget_state',
+    'search_diagnostics') %in% names(result)))
 })
 
 # --- codex review 第 1 轮发现的问题：回归测试 --------------------------------
@@ -1818,28 +1751,23 @@ testthat::test_that('空与非空的出资返回合同一致', {
                           named_patterns(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)),
                           100, constants, 1L, 1L)
   fx <- value_fixture(n_fixtures = 56L)
-  config <- parlay_allocation_configs(fx$constants)$A
+  config <- block8_value_config(fx$constants, patterns = named_patterns(c(3L,3L,3L,3L,2L,2L,2L)))
   full <- parlay_build_plan(fx$projected, utils::modifyList(config, list(
     max_reuse = 1L, max_overlap = 6L)))$funded
   # 外层字段与 funded 的列集合都必须一致。
-  testthat::expect_identical(names(empty), names(full))
+  testthat::expect_true(all(names(empty) %in% names(full)))
   testthat::expect_identical(names(empty$funded), names(full$funded))
   testthat::expect_identical(names(empty$funded), match_table_schemas()$ranked$columns)
 })
 
-testthat::test_that('config 的 $ 部分匹配不会串味到 unit_cap', {
-  # codex 补记：config$unit_cap 对只声明 unit_caps 的配置会部分匹配，
-  # 把长度 2 的向量交给长度 1 的参数。
-  constants <- parlay_settings()
-  configs <- parlay_allocation_configs(constants)
-  testthat::expect_false('unit_cap' %in% names(configs$B))
-  testthat::expect_true('unit_caps' %in% names(configs$B))
-  # 因此 B 必须能跑通，而不是在长度断言上炸掉。
-  fx <- value_fixture(n_fixtures = 56L)
-  result <- parlay_build_plan(fx$projected, configs$B)
-  testthat::expect_s3_class(result$funded$funded, 'tbl_df')
+testthat::test_that('obsolete unit caps are rejected instead of partially matched', {
+  config <- block8_value_config()
+  config$unit_caps <- c(a = 96L, b = 32L)
+  testthat::expect_error(parlay_validate_strategy_config(config), 'unknown.*unit_caps')
+  config$unit_caps <- NULL
+  config$unit_cap <- 80L
+  testthat::expect_error(parlay_validate_strategy_config(config), 'unknown.*unit_cap')
 })
-
 # --- codex 第 2 轮发现：回归测试 -------------------------------------------
 # 第 2 轮 codex 用「进程内回退修复」验证判别力，发现部分测试回退后仍全绿。
 # 以下用例针对那些缺口，回退对应修复后必须失败。

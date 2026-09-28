@@ -1,0 +1,39 @@
+{
+  "reviewed_hashes": {
+    "packages/beidan/R/issue_prematch_sp.R": "592ece2af6fc279f25eb934dbe7821b365b348d545bbb6ca50780253e41f3621",
+    "packages/beidan/inst/python/beidan_backend/prematch_sp.py": "29a3507581e05986c773fe87125de1cebfa4d28727ab2b8d133e9e7bf8cfd37e",
+    "tests/test_prematch_sp_capture.py": "bbd15e0cdcffd709a99570218da36d12b2ac55eac5f0fbb13f7025940bbceacc",
+    "packages/beidan/tests/testthat/test-issue-prematch-sp.R": "3e08fa86a154cb1690f9a747db2cb77263aaec538c9d368324c4efbee32ef06f",
+    "packages/beidan/man/fetch_issue_prematch_sp.Rd": "511de12a2b0c6fe5bbf2fadd92dc6a5013422be7b89b82a2872f1e60d4df1ffc"
+  },
+  "qmd_sha256": "0a5e89c7e8c78dee0b4f63ef8bcce0c6a7d809091d972c41abd9754f33469f72",
+  "review_command": "codex review [scoped prompts in .run-control/prematch-sp-review.log and .run-control/prematch-sp-review-final.log]",
+  "findings": [],
+  "tests": {
+    "python": ".venv/bin/python -m pytest tests/test_prematch_sp_capture.py -q",
+    "python_passed": 8,
+    "R": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE); testthat::test_file(\"packages/beidan/tests/testthat/test-issue-prematch-sp.R\",stop_on_failure=TRUE)'",
+    "R_assertions_passed": 17,
+    "failures": 0,
+    "warnings": 0
+  },
+  "real_capture": {
+    "fixtures": 75,
+    "quotes": 225,
+    "already_kicked_off": 68,
+    "not_live_prematch": 3,
+    "usable_at_original_freeze": 0,
+    "observation_beijing": "2026-09-26 23:15:51",
+    "snapshot": "inputs/26098_walkthrough/print/prematch-sp-20260926-231551-replayed.rds",
+    "offline_replay": "identical values and observation times"
+  },
+  "render_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+  "limitations": [
+    "floating Beidan reference SP, not guaranteed settlement price",
+    "quote_at is observed availability, not provider update time",
+    "no historical backfill to19:52",
+    "persistent_data_layout configuration/checker absent in checkout; used explicit current walkthrough capture directory, no migration or deletion",
+    "CI not involved"
+  ],
+  "review_conclusion": "Initial full scoped review clear; final labels.py receipt binding review clear."
+}

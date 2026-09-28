@@ -2,7 +2,7 @@
 % Please edit documentation in R/n7_pipeline_candidates.R
 \name{parlay_probability_wide}
 \alias{parlay_probability_wide}
-\title{概率的宽表视图：每场一行，列为 W/D/L}
+\title{N7 管道的组构造、结构支撑与票枚举}
 \usage{
 parlay_probability_wide(probabilities)
 }
@@ -14,8 +14,20 @@ parlay_probability_wide(probabilities)
 · 任一行和不为 1 -> stop()}
 }
 \value{
-tibble：fixture_id, W, D, L, entropy。
+tibble：fixture_id, W, D, L。仅做概率合同校验与宽表转换，不派生任何指标列。
 }
 \description{
+三个可分离的步骤，各有自己的契约：
+parlay_construct_groups  选择\strong{哪些比赛}组成一个 n_legs 腿组
+parlay_apply_structure       选择每条腿\strong{保留几个选项}
+parlay_enumerate_tickets     把受支撑的空间展开成物理票
+}
+\details{
+保持三步分离很重要：'选哪些比赛'与'每场投多少'是两个不同的决策、
+对应不同的预算；契约要求结构是长度 n_legs 的整数向量，而不是预算的代号。
+本模块只定义函数，导入时不触发任何 I/O。
 概率的宽表视图：每场一行，列为 W/D/L
+
+本函数不隐式计算熵或其它难度指标。调用方需要熵时必须显式自行计算，
+共享整理函数不得暗中替算法做决定。
 }

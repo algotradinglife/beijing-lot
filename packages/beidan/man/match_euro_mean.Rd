@@ -2,7 +2,7 @@
 % Please edit documentation in R/n7_pipeline_epoch.R
 \name{match_euro_mean}
 \alias{match_euro_mean}
-\title{按 euro_policy 对成员公司的欧赔求均值并去水}
+\title{按 euro_policy 对每家公司欧赔去水，再对概率等权平均}
 \usage{
 match_euro_mean(euro, cutoff_utc, policy, fixtures)
 }
@@ -19,13 +19,15 @@ match_euro_mean(euro, cutoff_utc, policy, fixtures)
 \item{fixtures}{tibble，至少含 fixture_id；决定输出行序。}
 }
 \value{
-tibble，每场一行：fixture_id, odds_home, odds_draw, odds_away, n_members。
+tibble，每场一行：fixture_id, prob_home, prob_draw, prob_away, n_members。
+prob_* 为普通胜平负概率（非让球），有效三项之和为1。
 }
 \description{
-按 euro_policy 对成员公司的欧赔求均值并去水
+按 euro_policy 对每家公司欧赔去水，再对概率等权平均
 }
 \details{
 euro_policy$members 列出参与的公司，euro_policy$missing 声明成员缺报价
 时的行为。完全没有报价算"cutoff 前没有报价"，不算成员集违规；只有成员集被
-部分覆盖才是需要由策略决定的那种缺陷。
+部分覆盖才是需要由策略决定的那种缺陷。drop_member 使用现有成员的去水概率求均值，
+至少需要两家公司；不足两家时概率为 NA，n_members 保留实际数量。
 }

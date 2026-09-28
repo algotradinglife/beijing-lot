@@ -1,0 +1,9 @@
+{
+  "packages/beidan/inst/python/beidan_backend/market_capture/history.py": "ab1759db7502740be04e6fee789a14add28ecc33b65bef98cfdc89cec9fd0aba",
+  "packages/beidan/inst/python/beidan_backend/market_capture/service.py": "17b04521f70f1b7fd122618b5ea37d3e9afe2a33ff367eaa512a44b8cced8829",
+  "tests/market_capture/test_service.py": "36d43a897207d4879dc434dde490bec4234cf4833e7df1cb974c7b9219540220",
+  "packages/beidan/tests/testthat/test-match-markets.R": "9b5b606e423c88a1d438dd001d131bf86f572f5da830122e21ea1c9087defff1",
+  "quarto/26098_walkthrough.qmd": "267b885f7214a0c2b4f03efe6e647c7cac872b4f86857aef69b24bc0636a18b4",
+  "packages/beidan/tests/testthat/fixtures/market_capture/slot57-euro.raw": "41365bb17158aca15936371fae2f2e98f475688d42b19957a5783d33d43ac6ae",
+  "packages/beidan/tests/testthat/fixtures/market_capture/slot57-euro.json": "9dded1a712f5c3c7160c431e09835f845111861466aade76acb8649e0a380f8f"
+}

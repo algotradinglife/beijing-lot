@@ -1,0 +1,276 @@
+---
+title: "26098 三结构失利复盘：概率分歧、角色分配与共同淘汰"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 范围与口径
+
+复盘北京时间2026年9月28日00:27:54冻结的三份**替代方案**，不是三份独立保险，也不代表实际订单。模型与北单赛前SP固定在原决策时点；结算另行接入。W/D/L均指北单让球胜平负。对照是在看到本期结果后提出的诊断，不能冒充样本外验证，也不会改变原下注单。
+
+```{r}
+#| label: inputs
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+source(file.path(root,"r/parlay_loss_counterfactual.R"))
+source(file.path(root,"r/parlay_loss_mask_experiment.R"))
+plans_path <- file.path(root,"inputs/26098_walkthrough/three_plans_20260928/plans.rds")
+settlement_path <- file.path(root,"inputs/26098_walkthrough/three_plans_20260928/settlement-20260928-204413.rds")
+stopifnot(digest::digest(file=plans_path,algo="sha256")==
+  "be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3",
+  digest::digest(file=settlement_path,algo="sha256")==
+  "bdc2cbd2d4a07c25973b6a2e7fb577766825669c290606fc8a73e5a5b12421e9")
+x <- readRDS(plans_path)
+s <- readRDS(settlement_path)
+cat("冻结北京时间：",format(x$outputs[[1]]$evaluated$cutoff$cutoff_utc,tz="Asia/Shanghai"),"\n")
+cat("结算观测北京时间：",format(s$as_of,tz="Asia/Shanghai"),"\n")
+```
+
+## 原方案：哪里已经确定失效
+
+```{r}
+#| label: original-settlement
+settled_rows <- exposure_rows <- leg_rows <- other_error_rows <- role_rows <- list()
+for (pattern in names(x$outputs)) {
+  final <- x$outputs[[pattern]]$evaluated$final
+  role_rows[[pattern]] <- final$plan$supports |>
+    filter(fixture_id=="26098:134",allowed) |>
+    inner_join(distinct(final$plan$purchases,candidate_id,group_id),
+      by="candidate_id",relationship="many-to-one") |>
+    group_by(group_id) |> summarise(role=n(),mask=paste(sort(outcome),collapse="/"),.groups="drop") |>
+    mutate(pattern=pattern)
+  settled <- beidan::parlay_settle_plan(final$plan,s$settlements,s$as_of)
+  settled_rows[[pattern]] <- settled$issue_returns |>
+    mutate(pattern=pattern,won=sum(settled$ticket_returns$status=="WON"),
+      lost=sum(settled$ticket_returns$status=="LOST"),
+      pending=sum(settled$ticket_returns$status=="PENDING"))
+  other_errors <- final$plan$ticket_legs |>
+    semi_join(final$plan$purchases,by="ticket_id") |>
+    left_join(s$settlements |> select(fixture_id,actual=outcome),by="fixture_id",relationship="many-to-one") |>
+    group_by(ticket_id) |>
+    summarise(other_errors=sum(fixture_id!="26098:134" & !is.na(actual) & actual!=outcome),.groups="drop")
+  other_error_rows[[pattern]] <- tibble::tibble(pattern=pattern,
+    still_wrong_without134=sum(other_errors$other_errors>0),
+    not_yet_wrong_without134=sum(other_errors$other_errors==0))
+  exposure_rows[[pattern]] <- beidan:::.ParlayLossExposure(final) |> mutate(pattern=pattern)
+  leg_rows[[pattern]] <- final$plan$ticket_legs |>
+    semi_join(final$plan$purchases,by="ticket_id") |>
+    left_join(s$settlements |> select(fixture_id,actual_outcome=outcome),
+      by="fixture_id",relationship="many-to-one") |>
+    group_by(fixture_id) |>
+    summarise(tickets=n(),known_wrong=sum(!is.na(actual_outcome) & outcome!=actual_outcome),
+      unknown=sum(is.na(actual_outcome)),.groups="drop") |> mutate(pattern=pattern)
+}
+knitr::kable(bind_rows(settled_rows) |> select(pattern,stake_cny,won,lost,pending,payout_cny,net_cny))
+knitr::kable(bind_rows(leg_rows))
+knitr::kable(bind_rows(other_error_rows))
+```
+
+忽略134这一腿后，原方案仍分别有233、230、178张票因其他已知结果失败；剩余23、26、14张只是尚未被其他已知赛果淘汰，并非已中奖。这是原票归因，不是新掩码重新选票的结算。
+
+单腿错误可以同时出现在同一张票上，因此各场淘汰票数不能相加作为独立损失归因。对未结束/结算SP不唯一的场次，保留未知；已有错误腿的票则已确定未中。
+
+## 赛前市场分歧与角色分配
+
+```{r}
+#| label: market-and-roles
+baseline <- x$outputs[["3333222"]]$evaluated$final
+market <- beidan:::.ParlayLossMarketComparison(baseline$probabilities,
+  baseline$prematch_sp,baseline$cutoff)
+knitr::kable(market)
+market_hits <- market |>
+  inner_join(s$settlements |> select(fixture_id,actual_outcome=outcome),
+    by="fixture_id",relationship="many-to-one") |>
+  filter(outcome==actual_outcome) |>
+  transmute(fixture_id,actual_outcome,model_rank,sp_rank,
+    model_top2=model_rank<=2,sp_top2=sp_rank<=2)
+knitr::kable(market_hits)
+knitr::kable(market_hits |> summarise(settled_matches=n(),
+  model_top1=sum(model_rank==1),sp_top1=sum(sp_rank==1),
+  model_top2=sum(model_top2),sp_top2=sum(sp_top2)))
+knitr::kable(bind_rows(role_rows) |> group_by(pattern) |>
+  mutate(group=paste0("G",row_number())) |> ungroup() |> select(pattern,group,role,mask))
+knitr::kable(x$outputs[["3333222"]]$pool$scores |>
+  filter(fixture_id=="26098:134") |> select(-allowed_outcomes))
+knitr::kable(x$outputs[["3333222"]]$pool$role_legs |>
+  filter(fixture_id=="26098:134") |> select(group_slot,role,round,retained_probability))
+```
+
+134场模型把让平排第三，北单赛前原始SP把让平排第二。SP是独立的价格排序信号，本报告不把其倒数直接认定为真实概率，也不以赛后4.28代替赛前3.44。收益估值仍按既定单场SP大于10替换为4.5，排序信号则使用原始SP。
+
+上表的8场中，模型Top2覆盖7场、原始SP Top2覆盖5场。SP保护134让平，却会遗漏129、132、135的实际赛果。因此，当前证据反对直接全面替换模型排序，更支持将分歧作为窄覆盖风险提示。支持数很小且来自同一期，不能证明某信号长期优于另一信号。
+
+当前双选适配分数为 `1-min(p)`，三选适配分数为 `min(p)`；两份榜单完全反向，不能当作两份独立证据。134在双选榜排第4、三选榜排第9；原候选池确实提供了134担任三选的组。是否最终采用还取决于组内其他场次、购票深度、组排名及重叠约束。
+
+## 复用的实际风险
+
+```{r}
+#| label: exposure
+exposure <- bind_rows(exposure_rows)
+knitr::kable(exposure |> filter(fixture_id=="26098:134"))
+ggplot(exposure |> mutate(slot=sub("^26098:","",fixture_id)),
+  aes(slot,outcome,fill=knockout_fraction)) +
+  geom_tile() + facet_wrap(~pattern,ncol=1) +
+  scale_fill_gradient(low="white",high="#b2182b",limits=c(0,1),
+    labels=scales::label_percent(),name="直接淘汰投入") +
+  labs(x="26098期场次编号",y="假设发生的北单赛果") + theme_minimal()
+```
+
+原模型给134让平22.37%的概率，该赛果一旦发生，三份替代方案都会出局。因此三份同时失败并非三次独立小概率事件，不能把三份方案各自失败概率相乘。
+
+直接淘汰比例的分母是方案实际投入：某赛果发生时，持有该场其他赛果的票会淘汰；不含这场的票不受其直接影响。剩余投入仍可能因其他场次错误而损失，**存活不等于中奖，更不等于回本**。
+
+当时窗口仅12场，而两个7场组需要14个位置，至少复用2场。禁止复用最多只能买一组。三个7场组若任意两组最多重叠2场，其并集至少为 `21-3×2=15` 场，因此这12场窗口最多允许两组。数量约束本身不能决定应复用哪种角色。
+
+## 有界对照
+
+下游使用同一冻结概率、SP和决策时点。固定组对照保持每组投入上限256元和原结构；变换角色时通过互换保持结构不变。无复用对照可能少买一组，必须与同成本原方案前缀比较，不能用少花钱造成的少亏损声称策略更好。
+
+```{r}
+#| label: counterfactuals
+experiments <- ParlayLossCounterfactuals(x)
+experiments$metadata <- experiments$metadata |>
+  filter(!scenario %in% c("sp_masks","diverse_masks"))
+for (pattern in names(x$outputs)) {
+  for (mode in c("sp_all","sp_one_134","diversify_shared")) {
+    id <- paste(pattern,mode,sep=":")
+    e <- ParlayLossMaskExperiment(x$outputs[[pattern]],mode)
+    experiments$results[[id]] <- e
+    experiments$metadata <- bind_rows(experiments$metadata,
+      tibble::tibble(scenario_id=id,pattern=pattern,scenario=mode,status="ok",
+        note="独立事后掩码诊断；固定组和结构；原概率排序票；不改生产Top-role规则",
+        cost_cny=sum(e$final$plan$purchases$stake_cny)))
+  }
+}
+knitr::kable(experiments$metadata)
+# fixed_replay is verified by the client, not counted as a separate strategy.
+risk_ids <- experiments$metadata |> filter(status=="ok",scenario!="fixed_replay") |> pull(scenario_id)
+risk <- beidan::parlay_compare_risk(list(
+  summary=tibble::tibble(scenario_id=risk_ids),
+  results=experiments$results[risk_ids],cutoff=experiments$cutoff),
+  method="exact",include_group_prefixes=TRUE)
+risk_table <- risk$summary |>
+  left_join(experiments$metadata |> select(scenario_id,pattern,scenario),
+    by="scenario_id",relationship="many-to-one")
+knitr::kable(risk_table |> select(pattern,scenario,prefix_groups,cost_cny,
+  hit_probability,break_even_probability,expected_net_cny))
+```
+
+`baseline` 是原始冻结票；`slot134_role3` 在两个原组内互换角色保护134；`sp_all` 对各腿按北单原始SP选择允许赛果；`sp_one_134` 仅在按组ID排序的第一个组改变134覆盖。`diversify_shared`对每个共享场次枚举最多9种掩码配对，要求两个组的赛果并集包含W/D/L，并在此限制下最大化两个组的单腿保留概率之和；它不使用结算标签，也不保证实际TopN购票后仍无集中风险。所有新掩码的票仍按原模型概率排名，未把SP当成概率模型。`no_reuse` 和 `shared_role3` 从原候选池重新选组，属于另一层实验，不能与固定组单因素变化混为一谈。`shared_role3`不可行只说明当前候选池不足，不证明所有可能构造都不可行。
+
+```{r}
+#| label: comparison-outcomes
+cf_rows <- cf_exposure <- depth_rows <- list()
+for (id in risk_ids) {
+  final <- experiments$results[[id]]$final
+  settled <- beidan::parlay_settle_plan(final$plan,s$settlements,s$as_of)
+  compatibility <- final$plan$ticket_legs |>
+    left_join(s$settlements |> select(fixture_id,actual=outcome),
+      by="fixture_id",relationship="many-to-one") |>
+    group_by(ticket_id) |>
+    summarise(known_errors=sum(!is.na(actual) & outcome!=actual),.groups="drop")
+  depth_rows[[id]] <- final$ranked |>
+    inner_join(compatibility,by="ticket_id",relationship="many-to-one") |>
+    group_by(candidate_id) |>
+    summarise(best_possible_rank=if(any(known_errors==0)) min(rank[known_errors==0]) else NA_integer_,
+      compatible_legal_tickets=sum(known_errors==0),.groups="drop") |>
+    left_join(final$plan$purchases |> count(candidate_id,name="bought_tickets"),
+      by="candidate_id",relationship="one-to-one") |> mutate(scenario_id=id)
+  cf_rows[[id]] <- settled$issue_returns |> mutate(scenario_id=id,
+    won=sum(settled$ticket_returns$status=="WON"),
+    lost=sum(settled$ticket_returns$status=="LOST"),
+    pending=sum(settled$ticket_returns$status=="PENDING"))
+  cf_exposure[[id]] <- beidan:::.ParlayLossExposure(final) |> mutate(scenario_id=id)
+}
+comparison_settlement <- bind_rows(cf_rows) |>
+  mutate(settled_net_cny=net_cny,final_net_cny=if_else(pending==0L,net_cny,NA_real_))
+comparison_exposure <- bind_rows(cf_exposure)
+knitr::kable(comparison_settlement |> select(scenario_id,stake_cny,won,lost,pending,payout_cny,settled_net_cny,final_net_cny))
+knitr::kable(comparison_exposure |> filter(fixture_id=="26098:134"))
+knitr::kable(bind_rows(depth_rows) |> group_by(scenario_id) |>
+  mutate(group=paste0("G",row_number())) |> ungroup() |>
+  select(scenario_id,group,best_possible_rank,compatible_legal_tickets,bought_tickets))
+exposure_summary <- comparison_exposure |> group_by(scenario_id) |>
+  summarise(max_knockout=max(knockout_fraction),
+    total_knockout_events=sum(knockout_fraction>=1-1e-12),.groups="drop")
+knitr::kable(exposure_summary)
+ggplot(risk_table |> filter(prefix_groups>0),
+  aes(cost_cny,break_even_probability,color=scenario,shape=factor(prefix_groups))) +
+  geom_point(size=2.5) + facet_wrap(~pattern) +
+  scale_y_continuous(labels=scales::label_percent()) +
+  labs(x="实际投入（元）",y="模型回本概率",shape="组数",color="对照") + theme_minimal()
+# Declared derived output for independent inspection; always regenerated, never read as a cache.
+report_output <- file.path(root,".run-control/545-review/report-results.rds")
+dir.create(dirname(report_output),recursive=TRUE,showWarnings=FALSE)
+saveRDS(list(metadata=experiments$metadata,risk=risk,market=market,
+  exposure=comparison_exposure,exposure_summary=exposure_summary,
+  depth=bind_rows(depth_rows),settlement=comparison_settlement,
+  inputs=c(plans=digest::digest(file=plans_path,algo="sha256"),
+    settlement=digest::digest(file=settlement_path,algo="sha256"))),report_output)
+```
+
+结算表的 `settled_net_cny` 仅为已判定票的净额；存在待定票时 `final_net_cny` 为NA，不把未结算票当作0回款，也不能声称已经救回或盈利。
+
+## 分析结论与改进建议
+
+**不建议直接用北单SP排序替换模型排序。** 本期SP保护了134，却漏掉其他三场实际赛果；等投入的全面SP掩码对照也降低了原模型下的命中、回本和预期净收益。这些模型指标依赖原概率，不能独立证明原模型正确；它们揭示了更换信号的代价，而不是验证真值。
+
+**优先把跨组共同淘汰风险加入展示与选入检查。** 只限制复用次数/重叠场数，仍允许重复排除同一个赛果。应同时展示每个共享场次的两个掩码、实际购票的赛果投入分布和100%共同淘汰事件。分散掩码是可检验的切入点，不能只看合法掩码并集，还要重新检查TopN购票后的暴露。具体上限需后续多期检验，不在本期结果上调出一个看似最优阈值。
+
+互补覆盖消除了三个方案的单赛果100%淘汰事件，但并未同时改善全部目标：
+
+| 结构（等投入） | 最大单赛果淘汰比例：原→互补 | 模型回本概率：原→互补 | 模型期望净收益（元）：原→互补 |
+|---|---:|---:|---:|
+|3333222（512元）|100%→94.14%|29.76%→28.43%|139.55→215.87|
+|3322221（512元）|100%→84.38%|24.31%→22.29%|247.41→137.76|
+|3222221（384元）|100%→75.00%|19.25%→13.89%|174.56→164.49|
+
+尤其3333222的期望净收益上升、回本概率却下降，说明高回款尾部与更稳定回本并非同一目标。94.14%的单场淘汰比例仍然很高，不能因为不再等于100%就称为充分分散。互补后的待定票分别只有2、9、3张；目前没有证据声称已救回本金。建议先展示命中/回本/收益/集中度的取舍，由后续跨期证据决定约束强度，而非立即硬编码全部互补。
+
+**角色调整与深度必须一起评估。** 3333222把134升为三选时，原模型回本概率从约29.76%升至31.01%，但两组在现有已知赛果下的最佳可能中奖排名为168和146，均超出前128注，故仍已确定全输。该排名是部分结算下的乐观下界，不是最终中奖票的精确排名。其他结构可能仍有待定票，不能把尚未淘汰写成已经救回。
+
+**市场分歧适合先作为复核信号。** 对模型与SP前二不一致的场次，比较三选、互补双选、降低复用等选择，代价用同投入的联合命中、回本与期望净收益呈现。避免用互为反向的双选/三选榜单，把单一模型判断误当多重证据。
+
+**下一阶段验证应按期推进。** 本报告先冻结机制，不自动应用新下注规则。未来对新增期及合法历史快照做同窗口、同实际投入对照，分别统计救回期、因此丢失期、回本、净收益与回撤；参数选择只使用当时可用的先前数据。当前单期证据足以确认共同淘汰与深度截断机制，不足以宣称任何新规则能稳定盈利。
+
+## 证据与限制
+
+本期观察只能区分机制，不能估计长期改进幅度。模型联合风险使用不同场次独立、同场共享一个赛果的假设；即使精确枚举，仍存在模型误差。单腿修复、模型命中上升和实际回本是三个不同结果。
+
+```{r}
+#| label: provenance
+knitr::kable(tibble::tibble(input=c(plans_path,settlement_path),
+  sha256=c(digest::digest(file=plans_path,algo="sha256"),
+    digest::digest(file=settlement_path,algo="sha256"))))
+knitr::kable(s$settlements)
+knitr::kable(tibble::tibble(method=risk$receipt$method,
+  joint_states=risk$receipt$joint_state_count,
+  evaluated_states=risk$receipt$evaluated_states,
+  implementation_hash=risk$receipt$implementation_hash,
+  source_hash=risk$receipt$source_hash))
+```
+
+## 验收记录
+
+函数与测试映射：`parlay_loss_diagnostic.R` 的四个内部函数由同名 package testthat 文件验证；`ParlayLossCounterfactuals()` 对应 `tests/testthat/test-parlay-loss-counterfactual.R`；`ParlayLossMaskExperiment()` 对应 `tests/testthat/test-parlay-loss-mask-experiment.R`。QMD不执行testthat。
+
+首轮 `codex review` 发现原evaluation未先验证、仅验证候选池的P2缺口。现已在构造任何对照前调用权威风险输入验证，并核对pool与原receipt的cutoff/settings/概率/SP绑定；新增5条早失败回归通过。第二轮审查未发现剩余可操作问题。最终审查及干净渲染的机器可读记录见 `docs/reviews/545-loss-review.json`。未开展CI，也未改动历史下注单或上线新策略。
+
+```{r}
+#| label: reviewed-files
+review_path <- file.path(root,"docs/reviews/545-loss-review.json")
+review_record <- jsonlite::read_json(review_path,simplifyVector=TRUE)
+knitr::kable(tibble::as_tibble(review_record$files))
+cat("审查命令：",review_record$review_command,"\n")
+cat("函数检查：",review_record$test_commands,"\n")
+cat("渲染命令：",review_record$render_command,"\n")
+```

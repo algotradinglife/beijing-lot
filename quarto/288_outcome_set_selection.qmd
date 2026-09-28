@@ -1,0 +1,403 @@
+---
+title: "288 赛果组合集合选择：同成本下联合排序的覆盖优势（四变体）"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  data_root: !expr Sys.getenv("BEIJING_LOT_DATA", unset = "/run/media/drwho1985/Sandisk/data/beijing-lot")
+  audit_subdir: "audits/joint-basket-oos-v1"
+  bundle_subdir: "runtime/state/issue425-input-v1/bundles"
+  label_subdir: "audits/joint-full-v3/settlement-inputs"
+  unit_cny: 2
+  n_legs: 7
+  random_grids: 40
+---
+
+```{r setup}
+library(dplyr); library(tidyr); library(readr); library(tibble); library(ggplot2)
+root <- normalizePath(".", mustWork = TRUE)
+source(file.path(root, "r", "joint_basket_coverage.R"))
+source(file.path(root, "r", "joint_basket_construction.R"))
+source(file.path(root, "r", "joint_basket_inputs.R"))
+
+# Input roots resolve from one declared data root, overridable via
+# BEIJING_LOT_DATA, so default execution does not depend on a personal mount path.
+audit <- file.path(params$data_root, params$audit_subdir)
+bundle_dir <- file.path(params$data_root, params$bundle_subdir)
+label_root <- file.path(params$data_root, params$label_subdir)
+for (d in c(audit, bundle_dir, label_root)) {
+  if (!dir.exists(d)) stop("missing declared input directory: ", d)
+}
+cfg <- list(unit_cny = params$unit_cny, grid_size = 3^params$n_legs)
+
+baskets <- read_csv(file.path(audit, "baskets.csv"), show_col_types = FALSE,
+                    col_types = cols(issue = col_character(), .default = col_guess()))
+gross <- read_csv(file.path(audit, "basket_gross.csv"), show_col_types = FALSE,
+                  col_types = cols(issue = col_character(), .default = col_guess()))
+legs <- read_csv(file.path(audit, "legs.csv"), show_col_types = FALSE,
+                 col_types = cols(issue = col_character(), provider_id = col_character(),
+                                  .default = col_guess()))
+
+# baskets.csv carries `group`; basket_gross.csv carries `basket`. Join one-to-one
+# and fail closed on any unmatched or duplicated key.
+stopifnot(!anyDuplicated(baskets[c("issue", "group")]))
+stopifnot(!anyDuplicated(gross[c("issue", "basket")]))
+bg <- baskets |>
+  select(issue, group, mass, hit, rank_full, restricted_mass, rank_restricted, all_top2) |>
+  inner_join(gross |> select(issue, basket, tickets, gross_if_hit) |>
+               rename(group = basket),
+             by = c("issue", "group"), relationship = "one-to-one")
+
+stopifnot(nrow(bg) == nrow(baskets))
+stopifnot(nrow(bg) == nrow(gross))
+stopifnot(!anyNA(bg$mass), !anyNA(bg$hit), !anyNA(bg$tickets))
+bg <- bg |> mutate(per_ticket = gross_if_hit / (tickets * cfg$unit_cny))
+stopifnot(all(is.finite(bg$per_ticket)))
+```
+
+## 结论摘要
+
+本轮检验四个「按赛果集合」构造的选票变体。**本交付只建立一条集合几何事实：**
+
+> 在固定预算下，买入集合的成本是 `|S| * unit_cny`，与 S 的内容无关。
+> 因此对任一固定概率网格，**按联合概率取最大的 D 个元组，覆盖的概率质量
+> 不小于任何其他 D 元集合**——包括任何腿级约束构造。
+
+**本交付不预测收益，不评估校准，也不主张任何构造会盈利。**
+
+| 变体 | 主张 | 本交付能说什么 |
+|---|---|---|
+| 剪枝到 Top1 | 空间缩小 ⇒ 同预算更深 | 买下剪枝空间要付 `3^(7-k)` 张票；k=7 时与直接买 1 个元组是同一注 |
+| 留 x2/x3 给次优组合 | 空间内深度超中位 | 空间内深度是**条件量**；付钱的是无条件覆盖 |
+| 允许跳过深层元组 | 深处赔率高可补偿 | 覆盖几何上跳过严格不优；**派彩方向不在本交付范围** |
+| 逐腿浮动到第三赛果 | 逐腿胜率 40-50%/70-80% | top1→top2 成本 ×2^7；再 top2→top3 成本 ×(3/2)^7。覆盖增益不超过对应倍数，均匀腿时两者相等 |
+
+**在本文所用的模型下**（各腿概率独立相乘构造联合网格），联合概率是腿概率的**乘积**；按该乘积排序即按联合概率排序。腿级**约束**（固定每腿保留几个赛果）并不等于按乘积取最大元组——例如「每腿 top1」只取乘积最大的那一个，而「每腿 top2」会纳入乘积较小的组合，
+而按乘积排序自动利用了「所有腿都高」的信息。
+
+## 输入与契约
+
+```{r inputs}
+tibble(
+  item = c("baskets 行数", "期数", "fixtures 行数", "每篮网格大小",
+           "rank_full 最小值", "rank_full 最大值", "join 后行数"),
+  value = c(as.character(nrow(baskets)), as.character(n_distinct(baskets$issue)),
+            as.character(nrow(legs)), as.character(cfg$grid_size),
+            as.character(min(bg$rank_full)), as.character(max(bg$rank_full)),
+            as.character(nrow(bg))))
+```
+
+**契约**：
+
+- `baskets.csv` 的篮子键是 `group`（**不是** `basket`）；`basket_gross.csv` 用 `basket`。
+  两者按 `(issue, group)` 一对一 join，键重复或行数不符即 `stopifnot` 失败。
+- `issue` 与 `provider_id` 以字符串读入，保留前导零。
+- `gross_if_hit` 是篮子在其**记录注数**下的派彩总额，随注数线性缩放。
+- `legs.csv::outcome` = `净胜球 + 让球` 的方向，与结算权威 `expected_option` 一致。
+- bundle 的 `expanded_pool.fixtures` 携带 `p_W/p_D/p_L`（DC 比分网格投影）
+  与 `q_W/q_D/q_L`（欧赔市场概率），二者在 99.79% 的场上不同。**本交付只用 `p_*`。**
+
+## 一、成本等价
+
+```{r cost-identity}
+w <- c(1L, 2L, 3L)
+nl <- as.integer(params$n_legs)
+tibble(
+  construct = c("每腿 top1（1 个元组）", "每腿 top2（2^7 = 128）", "买满 3^7"),
+  width = w,
+  set_size = w^nl,
+  cost_cny = w^nl * cfg$unit_cny)
+```
+
+## 二、中心命题：同成本下连续购买覆盖不少于腿约束集
+
+对每个随机网格，分别**显式枚举**腿约束集在网格中的下标并求和，
+与同成本的连续 top-D 比较。
+
+```{r equal-cost}
+set.seed(20260921)
+cmp <- bind_rows(lapply(seq_len(params$random_grids), function(s) {
+  m <- matrix(stats::runif(3 * params$n_legs), nrow = params$n_legs)
+  pv <- m / rowSums(m)
+  jb_equal_cost_compare(pv, 2L)
+}))
+
+stopifnot(all(cmp$legset_size == cmp$cost_tickets))
+
+summary_cmp <- cmp |>
+  summarise(mean_legset = mean(legset_coverage),
+            mean_contiguous = mean(contiguous_coverage),
+            mean_advantage = mean(advantage),
+            min_advantage = min(advantage),
+            share_contiguous_ge = mean(advantage >= -1e-12),
+            lift_pct = (mean(contiguous_coverage) / mean(legset_coverage) - 1) * 100)
+summary_cmp
+```
+
+```{r equal-cost-figure, fig.height = 3.2}
+cmp |>
+  select(legset_coverage, contiguous_coverage) |>
+  pivot_longer(everything(), names_to = "rule", values_to = "coverage") |>
+  ggplot(aes(rule, coverage)) +
+  geom_boxplot() +
+  labs(x = NULL, y = "同成本覆盖概率",
+       title = "每腿 top2 乘积集 vs 同成本连续 top-128（40 个随机网格，合成示例）") +
+  theme_minimal()
+```
+
+**这是合成示例，不是观测到的篮子结果。** 它说明的是几何性质，不是历史表现。
+
+## 三、变体一：剪枝到 Top1
+
+```{r prune}
+tibble(
+  k_pruned = 0:7,
+  remaining_space = 3^(7 - (0:7)),
+  cost_tickets = 3^(7 - (0:7)),
+  cost_cny = 3^(7 - (0:7)) * cfg$unit_cny)
+```
+
+**k=7 时空间为 1、成本为 1 张票**——与「直接买最可能的那一个元组」是同一注，
+不存在免费深度。
+
+## 四、变体二：留 x2/x3 给次优组合
+
+限制到「每腿 top2」后空间为 128。**条件于落在空间内**，深度确实超中位：
+
+```{r restricted-depth}
+inside <- bg |> filter(all_top2)
+stopifnot(nrow(inside) > 0)
+tibble(
+  metric = c("空间大小", "空间内篮子数", "空间内中位 rank_restricted",
+             "均匀分布理论中位", "无条件命中率（观测）", "同成本连续 top-128 覆盖（观测）"),
+  value = c("128", as.character(nrow(inside)),
+            as.character(median(inside$rank_restricted)), "64.5",
+            sprintf("%.5f", mean(bg$all_top2)),
+            sprintf("%.5f", mean(bg$rank_full <= 128))))
+```
+
+**深度超中位是条件量。** 付钱的是**无条件**覆盖，而它由 `restricted_mass`
+（空间总概率质量）决定。在本数据上它低于同成本的连续 top-128；
+一般地，连续 top-D 覆盖不低于任何 D 元集合（等号在特定对称情形下成立）。
+
+## 五、变体三：允许跳过深层元组
+
+```{r payout-by-rank}
+edges <- c(0, 1, 3, 5, 10, 21, 50, 100, 200, 463, 2187)
+band <- bind_rows(lapply(seq_len(length(edges) - 1), function(i) {
+  lo <- edges[i]; hi <- edges[i + 1]
+  sub <- bg |> filter(rank_full > lo, rank_full <= hi)
+  hit_sub <- sub |> filter(hit)
+  tibble(band = sprintf("(%d, %d]", lo, hi),
+         baskets = nrow(sub), hits = nrow(hit_sub),
+         mean_per_ticket_on_hits = if (nrow(hit_sub)) mean(hit_sub$per_ticket) else NA_real_)
+}))
+band
+```
+
+**这是一张对已结算结果的描述表，不是事前规则。** `rank_full` 在结算后才可知。
+它所示的派彩-排名关系**不用于、也不能用于选场**。
+
+## 六、变体四：逐腿浮动到第三赛果
+
+```{r per-leg}
+labels <- jb_read_labels(label_root)
+labels <- labels |> mutate(issue = as.character(issue), slot = as.integer(slot))
+stopifnot(!anyDuplicated(labels[c("issue", "slot", "provider_id")]))
+
+files <- sort(list.files(bundle_dir, pattern = "[.]json[.]gz$", full.names = TRUE))
+stopifnot(length(files) > 0)
+
+skipped <- list()
+leg_stats <- bind_rows(lapply(files, function(f) {
+  b <- tryCatch(jsonlite::fromJSON(gzfile(f), simplifyDataFrame = TRUE),
+                error = function(e) NULL)
+  if (is.null(b) || !"expanded_pool" %in% names(b)) {
+    skipped[[length(skipped) + 1]] <<- tibble(file = basename(f), reason = "unreadable bundle")
+    return(NULL)
+  }
+  iss <- as.character(b$issue)
+  fx <- as_tibble(b$expanded_pool$fixtures)
+  need <- c("p_W", "p_D", "p_L", "provider_id", "slot")
+  if (!all(need %in% names(fx))) {
+    skipped[[length(skipped) + 1]] <<- tibble(file = basename(f), reason = "missing fixture columns")
+    return(NULL)
+  }
+  lb <- labels |> filter(issue == iss)
+  if (!nrow(lb)) {
+    skipped[[length(skipped) + 1]] <<- tibble(file = basename(f), reason = "issue absent from labels")
+    return(NULL)
+  }
+  # One admission decision, shared with the automated tests in
+  # tests/testthat/test-joint-basket-coverage.R (see jb_admit_pairing).
+  reason <- jb_admit_pairing(fx, lb, caller = paste0("bundle ", basename(f)))
+  if (!is.null(reason)) {
+    skipped[[length(skipped) + 1]] <<- tibble(file = basename(f), reason = reason)
+    return(NULL)
+  }
+  idx <- match(paste(fx$slot, fx$provider_id), paste(lb$slot, lb$provider_id))
+  pv <- as.matrix(fx[, c("p_W", "p_D", "p_L"), drop = FALSE])
+  oc <- lb$outcome[idx]
+  if (length(oc) != nrow(pv) || anyNA(oc)) {
+    skipped[[length(skipped) + 1]] <<- tibble(file = basename(f), reason = "missing settled direction")
+    return(NULL)
+  }
+  nr <- nrow(pv)
+  is1 <- logical(nr); is2 <- logical(nr)
+  for (j in seq_len(nr)) {
+    o <- order(-pv[j, ])
+    is1[j] <- oc[j] == o[1]
+    is2[j] <- oc[j] %in% o[seq_len(2L)]
+  }
+  tibble(issue = iss, leg = seq_len(nr), pmax = apply(pv, 1, max),
+         is_top1 = as.integer(is1), is_top2 = as.integer(is2))
+}))
+
+skip_tbl <- if (length(skipped)) bind_rows(skipped) else tibble(file = character(), reason = character())
+stopifnot(nrow(leg_stats) > 0)
+
+tibble(excluded_bundles = nrow(skip_tbl),
+       analysed_issues = length(unique(leg_stats$issue)))
+```
+
+```{r per-leg-exclusions}
+if (nrow(skip_tbl)) {
+  skip_tbl |> count(reason, name = "bundles") |> arrange(desc(bundles))
+} else {
+  tibble(reason = "无排除", bundles = 0L)
+}
+```
+
+```{r per-leg-table}
+p1 <- mean(leg_stats$is_top1)
+p2 <- mean(leg_stats$is_top2)
+tibble(
+  metric = c("腿数", "期数", "逐腿 top1 命中率（观测）", "逐腿 top2 命中率（观测）",
+             "假设独立时的 top1^7", "假设独立时的 top2^7",
+             "每票 top1（假设独立）", "每票 top2（假设独立）", "每票倍数"),
+  value = c(as.character(nrow(leg_stats)), as.character(n_distinct(leg_stats$issue)),
+            sprintf("%.4f", p1), sprintf("%.4f", p2),
+            sprintf("%.6f", p1^7), sprintf("%.6f", p2^7),
+            sprintf("%.8f", p1^7 / 1), sprintf("%.8f", p2^7 / 2^7),
+            sprintf("%.2fx", (p1^7 / 1) / (p2^7 / 2^7))))
+```
+
+> **上表的 7 次方是「假设各腿独立、且命中率同质」的假定计算，不是实测的篮子表现。**
+> 它只用来说明「成本 ×2^7」远大于「覆盖增益」这一量级关系。
+> 真实的篮子命中率还取决于腿间相关性与选场方式，本交付不估计它。
+
+```{r per-leg-band}
+leg_stats |>
+  mutate(band = cut(pmax, c(0, .35, .40, .45, .50, .55, .60, .70, 1))) |>
+  group_by(band) |>
+  summarise(n = n(), top1 = mean(is_top1), top2 = mean(is_top2), pmax = mean(pmax)) |>
+  ungroup()
+```
+
+## 七、验证与限制
+
+```{r verify}
+checks <- tibble(
+  check = c("join 为一对一且行数守恒",
+            "腿约束集大小等于同成本票数",
+            "连续购买在同成本下覆盖不低于腿约束集",
+            "空间内中位 rank 低于均匀中位",
+            "逐腿 top1 命中率落在 40-50%",
+            "逐腿 top2 命中率落在 70-80%"),
+  passed = c(
+    nrow(bg) == nrow(baskets) && nrow(bg) == nrow(gross),
+    all(cmp$legset_size == cmp$cost_tickets),
+    all(cmp$advantage >= -1e-12),
+    median(inside$rank_restricted) < 64.5,
+    mean(leg_stats$is_top1) >= 0.40 && mean(leg_stats$is_top1) <= 0.50,
+    mean(leg_stats$is_top2) >= 0.70 && mean(leg_stats$is_top2) <= 0.80))
+checks
+```
+
+```{r verify-gate}
+stopifnot(all(checks$passed))
+```
+
+**限制**：
+
+1. **本交付不预测收益。** 它只建立集合几何事实。任何关于派彩或盈亏的结论
+   都超出本交付的范围。
+2. **独立同质假设。** 第 6 节的 7 次方假定腿间独立且命中率同质。真实篮子
+   还受腿间相关与选场影响，本交付不估计。
+3. **bundle 子集。** 第 6 节用幸存的 100 个 bundle（其中 90 期与 labels 匹配），
+   **不是 254 的完整池**——`audits/issue435-next100-v1/candidates-added45-v1/bundles/`
+   在磁盘上缺失。排除原因见上表。
+4. **合成示例。** 第 2 节的 40 个网格是合成随机概率，用于演示几何性质，
+   不是实测或历史结果。
+5. **覆盖 ≠ 校准。** 逐腿命中率落在业务方区间只说明与经验一致，
+   不构成校准证明；校准需要预测-观测对照与不确定性度量。
+
+## 八、代码评审记录（codex review）
+
+本交付在写入前经过四轮对抗式代码评审（`codex exec --dangerously-bypass-approvals-and-sandbox`，
+因该环境的 bubblewrap 无法创建 user namespace，沙箱内执行会失败）。
+
+```{r review-hashes}
+tibble(
+  # 本表哈希是 codex 最终 ACCEPT 时评审的三个工件；  # 此后仅本节的哈希行发生变化，故 QMD 若再次改动，其自身哈希需重新计算。
+  artifact = c("r/joint_basket_coverage.R",
+               "tests/testthat/test-joint-basket-coverage.R",
+               "quarto/288_outcome_set_selection.qmd"),
+  sha256 = c("d8ca3b784043c425a5d9fe096725d11a3f5fd9c87802abe1c27855f243f26c8e",
+             "a0166f5e10caedcbb95212724737548ad44b08645ad4f288cb9ffb0ea20cc774",
+             "8d94af3d67ca7317847de39f1c9b5c8db840751acea42c01bbd33d05cb8b7e74"))
+```
+
+**已修复的评审发现**（每条附处置）：
+
+| # | 严重度 | 发现 | 处置 |
+|---|---|---|---|
+| 1 | blocker | QMD 用「永远亏」等**收益结论**，超出集合几何的范围 | 删除全部收益/派彩结论；QMD 明确声明不预测收益 |
+| 2 | high | 逐腿命中率取 7 次方**假定独立同质**，却当作实测呈现 | 标注为「假设独立同质」的假定计算，非实测篮子表现 |
+| 3 | high | bundle 与结算的**让球不一致**会让赛果方向反转却不报错 | 提取 `jb_admit_pairing`，缺列/NA/不一致一律排除。注：标签侧的让球缺失会在读取阶段直接中止，未必表现为「排除」 |
+| 4 | high | fixture 侧**未查重**，一笔标签可被两行 fixture 消费 | 同一函数内对两侧 `(slot, provider_id)` 查重 |
+| 5 | high | 标签 join 静默吞掉解析失败；无排除计数 | 逐 bundle 排除并**在表中报告原因与计数**。仍使用 `match(paste(...))`，但已先做键查重与空值校验，故不再静默；计数单位为 **bundle**，非 fixture |
+| 6 | medium | 整数契约未强制：`depth = 1.9` 静默取 1 | `jb_check_count` 拒绝非整、非有限、越界值 |
+| 7 | medium | `jb_legset_coverage` 校验列而不校验取值，`(2,-1,0)` 通过 | `jb_check_pv` 强制非负、有限、非缺失、归一 |
+| 8 | medium | QMD 绕过模块校验器 | chunk 调用 `jb_admit_pairing`，由它调用 `jb_check_pv`，失败即排除 |
+| 9 | medium | 测试**同义反复**：用外积去比边际乘积 | 改为**显式枚举**腿集网格下标并在同一网格上求和 |
+| 10 | medium | 「非均匀腿必然严格更优」为假（7 条相同偏斜腿打平） | 改为等号情形测试，`advantage == 0` |
+| 11 | medium | 报出 67.5% 剪枝数字，但其计算是合成网格 | 移除该数字；合成内容明确标注「合成示例」 |
+| 12 | medium | 个人绝对路径；验收只打印布尔值不中断渲染 | 路径移入 `params` 并可经 `BEIJING_LOT_DATA` 覆盖；`verify-gate` 用 `stopifnot` 失败即中止 |
+| 13 | medium | 成本倍数写错：`2^7` 属 top1→top2，非 top2→top3 | 更正为 `2^7` 与 `(3/2)^7` 两段分别标注 |
+| 14 | medium | 「任何按腿构造都对联合质量盲」过度推广（每腿 top1 即乘积最大者） | 收窄为「腿级**约束**不等于按乘积取最大元组」 |
+| 15 | medium | 回归测试只校验独立表达式，不驱动 QMD 的准入逻辑 | 提取 `jb_admit_pairing` 供 QMD 与测试**共用**，测试直接驱动该函数 |
+| 16 | medium | 身份值缺失被接受：`paste()` 把 `NA` 变成字符串 `"NA"`，两个无关的缺失 fixture 会互相匹配 | 在构造键**之前**校验身份值；`slot` 与 `provider_id` 两侧的 `NA` 与空串一律拒绝 |
+| 17 | medium | 测试未覆盖**标签侧**身份列缺失与空值，移除守卫仍全过 | 补齐两侧 `slot`/`provider_id` 的缺列、`NA`、空串全部身份回归 |
+
+**评审结论**：第七轮 `codex` 评审给出 **ACCEPT**——三个工件哈希一致，全部攻击面均被拒绝，150 项断言通过，渲染 exit 0 且六项验收谓词全为 `TRUE`。
+
+**未决事项（环境限制，非本交付缺陷）**：
+
+- **GitHub Issue Graph 不可读。** `gh` CLI 在本会话未认证，`gh issue view` 失败。
+  按 AGENTS.md 的 fail-closed 要求，本交付**不主张**任何生命周期或 PI 验收结论，
+  仅提交证据并等待 PI 在可读图状态下裁定。
+- **完整测试套件有 5 项既存失败**（非本交付引入）：4 项源自 `r/probability_exploration.R`
+  这一从未纳入 git 的文件，1 项需要数据库连接。本交付相关套件
+  `joint-basket-coverage` 全部通过。
+
+**复现命令**：
+
+```bash
+# 函数测试
+TMPDIR=$PWD/.tmpwork R_LIBS_USER=$PWD/r_lib Rscript -e \
+  'library(testthat);library(tibble);library(dplyr);test_file("tests/testthat/test-joint-basket-coverage.R")'
+
+# 交付渲染（缓存与冻结均绕过，错误致命）
+QUARTO_CACHE=$PWD/.tmpwork/qcache XDG_CACHE_HOME=$PWD/.tmpwork/qcache \
+  TMPDIR=$PWD/.tmpwork R_LIBS_USER=$PWD/r_lib \
+  quarto render quarto/288_outcome_set_selection.qmd
+
+# 评审
+codex exec --dangerously-bypass-approvals-and-sandbox "<评审提示>"
+```

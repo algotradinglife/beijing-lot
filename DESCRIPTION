@@ -24,4 +24,10 @@ Imports:
     withr,
     vctrs,
     purrr,
-    renv
+    renv,
+    targets,
+    tarchetypes,
+    quarto,
+    tibble,
+    dplyr,
+    readr

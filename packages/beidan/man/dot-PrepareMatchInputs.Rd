@@ -4,7 +4,13 @@
 \alias{.PrepareMatchInputs}
 \title{准备一个决策 epoch 的输入（内部引擎，显式 cutoff）}
 \usage{
-.PrepareMatchInputs(inputs, cutoff, euro_policy, totals_policy)
+.PrepareMatchInputs(
+  inputs,
+  cutoff,
+  euro_policy,
+  totals_policy,
+  window_hours = c(MATCH_WINDOW_START_HOURS, MATCH_WINDOW_END_HOURS)
+)
 }
 \arguments{
 \item{inputs}{list，含 fixtures/euro/totals/prematch_sp/match_status 五张表
@@ -17,10 +23,14 @@ match_status 是\strong{必填}台账：缺失即输入契约错误（stop()）�
 \item{euro_policy}{欧赔策略，语义见 match_euro_mean。}
 
 \item{totals_policy}{大小球策略，语义见 match_totals_selected。}
+
+\item{window_hours}{长度 2 的数值向量 c(start, end)，滚动决策窗口的经过小时
+边界；默认 c(4, 28)。转发给权威 match_decision_window()：设为 c(2, 26)
+只改变窗口边界，不移动 cutoff，也不改变报价/状态的严格 as-of 时刻。非法边界报错。}
 }
 \value{
 list(fixtures, euro_mean, totals_selected, prematch_sp, match_status,
-status_selected, exclusions)，每项为 tibble。
+status_selected, exclusions, window)。除 window 凭证外，每项为 tibble。
 · match_status     输入台账的原样保留，供下游（投影）重新校验
 · status_selected  被采纳的那条 scheduled 报告，每场一行
 }
@@ -28,7 +38,7 @@ status_selected, exclusions)，每项为 tibble。
 准备一个决策 epoch 的输入（内部引擎，显式 cutoff）
 }
 \details{
-决策 epoch 是本地日 D 的 20:00 Asia/Shanghai，窗口是整个 D+1。
+窗口是 cutoff 加上显式经过小时边界，左闭右开；默认 4–28 小时。
 只有当开赛落在该窗口内、cutoff 之前存在可用欧赔报价、\strong{且 cutoff 当时可见的
 最新状态是 scheduled} 时，比赛才会被保留。被剔除的比赛连同原因记入
 exclusions 表，因此剔除是可审计的而不是静默的。

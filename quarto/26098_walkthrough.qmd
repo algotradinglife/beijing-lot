@@ -10,7 +10,7 @@ execute:
   freeze: false
 ---
 
-这份文档用于在 Positron **从上到下逐块执行**。修改参数、代码或上游数据后，从受影响的块继续向下执行；不要沿用旧的下游对象。整篇渲染不会自动联网，只有显式开启采集才请求网站。尚未提供市场或结算数据时，对应步骤显示未就绪，不算验收通过，不生成模拟报价。
+这份文档用于在 Positron **从上到下逐块执行**。修改参数、代码或上游数据后，从受影响的块继续向下执行；不要沿用旧的下游对象。是否联网由下方 `refresh_*` 开关明确控制；离线复核时须将采集开关设为 `FALSE`。尚未提供市场或结算数据时，对应步骤显示未就绪，不算验收通过，不生成模拟报价。
 
 ## 1. 项目与本次参数
 
@@ -32,35 +32,28 @@ work_dir <- file.path(project_dir, "inputs", "26098_walkthrough")
 schedule_file <- file.path(work_dir, "schedule.rds")
 market_dir <- file.path(work_dir, "market_inputs")
 markets_file <- file.path(work_dir, "markets.rds")
-refresh_markets <- FALSE
-market_slots <- c(52L, 56L, 57L, 61L, 63:78) # 当前窗口的真实采集候选；coverage记录排除。
+refresh_markets <- TRUE
+
 totals_company_ids <- "8" # Titan 大小球公司8：Bet365；不是欧赔公司ID。
 settlements_file <- file.path(work_dir, "settlements.rds")
 
 # 首次现场采集时改为 TRUE，采集后改回 FALSE，避免反复请求。
-refresh_schedule <- FALSE
+refresh_schedule <- TRUE
 refresh_settlements <- FALSE
 # 可指定保存过的规范 schedule.rds；不会使用旧的错误 schedule.csv。
 schedule_file <- Sys.getenv("BEIDAN_SCHEDULE_RDS", unset = schedule_file)
 
-# 本次实盘数据流程验证：采集完成后固定决策时间，已冻结方案。
-# 这是一次即时决策，不代表每晚20点策略的回测。
-decision_at <- lubridate::ymd_hms(
-  "2026-09-26 12:18:05", tz = "Asia/Shanghai"
-)
-
-# 先测试决策流程；拿到真实结算数据后，再填写复盘时点。
-settlement_at <- decision_at
-# settlement_at <- lubridate::ymd_hms(
-#   "2026-09-28 20:00:00", tz = "Asia/Shanghai"
-# )
-stopifnot(is.null(decision_at) || !is.na(decision_at),
-          is.null(settlement_at) || !is.na(settlement_at))
+# 本次交互决策在第6块、采集完成后取实际执行时间。
+# 离线复核已保存快照时可显式填写历史时点；默认NULL使用当前时间。
+replay_decision_at <- NULL
+decision_at <- NULL
+# 历史冻结方案独立用于第9块复盘，刷新行情不会改写它。
+frozen_decision_at <- lubridate::ymd_hms("2026-09-26 12:18:05", tz = "Asia/Shanghai")
+settlement_plan_file <- file.path(work_dir, "plans", "26098-20260926-121805.rds")
+settlement_at <- NULL # 第9块采集/读取结算后取实际复盘时间。
 ```
 
-`decision_at` 是下注决策时点，用于限制当时可见的赛程、状态和报价；`settlement_at` 是复盘时点，用于限制可使用的结算信息，不是单场完场时间。两者直接在本块填写，无须设置环境变量。`settlement_at = NULL` 表示结算步骤尚未就绪。
-
-本次在北京时间 **2026-09-26 12:18:05** 冻结方案，选场窗口为 **9月26日16:18:05至9月27日16:18:05（不含结束时刻）**。默认重读此次快照及方案；新决策需要重新采集并另设决策时点。10:49的次日窗口方案及12:15的空方案保留为试跑证据，不是本次正式方案，也不计作真实购买。当前入选比赛尚未完场。
+正常路径是刷新/读取数据后执行第6块，以该块执行时间作为本次决策时点，并计算其后4至28小时的比赛。默认每次重跑第6块会形成新的预览时点，后续块应随之重跑。离线复核时显式设置 `replay_decision_at`，只使用该时点前可见的数据；历史复核不是当前新方案。原12:18:05冻结方案只供第9块结算，不替代第6–8块的当前计算；本文件不会自动下注或保存新方案。
 
 ## 2. 加载源码并确认接口
 
@@ -70,7 +63,7 @@ stopifnot(is.null(decision_at) || !is.na(decision_at),
 #| label: load-package
 devtools::load_all(package_dir, quiet = TRUE)
 if (!"fetch_issue_schedule" %in% getNamespaceExports("beidan")) {
-  stop("当前加载的 beidan 源码缺少 fetch_issue_schedule；请先同步已验收的 package 代码，再重新加载。")
+  stop("当前加载的 beidan 源码缺少 fetch_issue_schedule；请同步包含此接口的 package 开发源码，再重新加载。")
 }
 print(utils::packageVersion("beidan"))
 print(args(beidan::fetch_issue_schedule))
@@ -154,16 +147,27 @@ if (!is.null(schedule)) {
 
 使用赛程的 `provider_id_nowscore` 访问 Titan。函数以相同原生比赛 ID 对齐。双方名称或开赛时间不同只记录警告，保留盘口；`coverage$status = "ok"` 且 `detail` 含 `warning` 表示数据可用但有来源差异。仅原生 ID 不一致等真正无法绑定数据的问题显示错误。欧赔保存各公司带时间戳的历史报价，平均由第6节固定成员规则计算。大小球从 Titan 手机历史接口读取完整年月日时间，香港盘水位加1转为十进制赔率。公司 ID 的欧赔与大小球命名空间不同，不能直接互换。
 
-`market_slots` 控制采集场次；本次从决策后4小时起的24小时窗口选择候选，按开赛时间推进采集，名称和时间差异在警告中保留。本次是流程验证的有限候选集，不声称完成全期最优搜索。将 `refresh_markets <- TRUE` 后执行本块联网采集，成功后改回 `FALSE` 重用快照。采集时间和源报价时间分别保存；历史报价允许用于注明口径的研究，不声称本地当时已观测。北单赛前SP缺失保持空表。
+从完整赛程按本块执行时点后4至28小时选择所有比赛，不按slot编号截断。采集参考时点在请求前记录；第6块仍在采集后取实际决策时点，按同一规则重新准入。跨边界的场次和缺报价会明确列出，不补造数据。将 `refresh_markets <- TRUE` 后执行本块联网采集，成功后改回 `FALSE` 重用快照。采集时间和源报价时间分别保存；历史报价允许用于注明口径的研究，不声称本地当时已观测。同一次采集同时获取北单赛前SP，各来源保留自己的时间与原始凭证；采集完成后再确定决策时点。
 
 ```{r}
 #| label: market-source
+#| results: asis
 markets <- NULL
 inputs <- NULL
 market_schedule <- NULL
+uncaptured <- NULL
 if (!is.null(schedule)) {
-  market_schedule <- dplyr::filter(schedule, slot %in% market_slots)
-  if (refresh_markets) {
+  capture_reference_at <- if (is.null(replay_decision_at)) {
+    lubridate::with_tz(Sys.time(), "Asia/Shanghai")
+  } else replay_decision_at
+  capture_selection <- beidan::match_market_schedule(schedule, capture_reference_at)
+  market_schedule <- capture_selection$schedule
+  print(knitr::kable(dplyr::select(market_schedule, slot, kickoff_at, home_nowscore, away_nowscore)))
+  print(knitr::kable(dplyr::count(capture_selection$excluded, reason, name = "fixture_count")))
+  if (refresh_markets && !is.null(replay_decision_at)) {
+    stop("历史回放请关闭 refresh_markets；不能把现在采集的数据冒充历史快照。")
+  }
+  if (refresh_markets && nrow(market_schedule) > 0L) {
     markets <- beidan::fetch_match_markets(
       market_schedule, raw_dir = file.path(work_dir, "market_raw"),
       backend = beidan::python_backend(python), totals_company_ids = totals_company_ids
@@ -175,25 +179,33 @@ if (!is.null(schedule)) {
     cat("尚无盘口快照：将 refresh_markets 改为 TRUE 后重跑本块。\n")
   }
   if (!is.null(markets)) {
-    knitr::kable(markets$coverage)
-    knitr::kable(markets$companies)
-    knitr::kable(utils::head(markets$euro, 10))
-    knitr::kable(utils::head(markets$totals, 10))
-    knitr::kable(dplyr::select(markets$captures, fixture_id, market, observed_at, source_url))
-    inputs <- beidan::match_inputs_from_capture(market_schedule, markets)
-    # 本次快照的明确排除；保留原始盘口和原因，不填补缺失公司。
-    input_exclusions <- tibble::tribble(
-      ~fixture_id, ~reason,
-      "26098:56", "Bet365最新欧赔同一时间戳存在冲突",
-      "26098:70", "固定欧赔平均名单缺少公司82",
-      "26098:76", "固定欧赔平均名单缺少公司432"
-    )
-    knitr::kable(input_exclusions)
-    inputs <- purrr::map(inputs, ~ dplyr::filter(.x,
-      !fixture_id %in% input_exclusions$fixture_id))
+    if (is.null(markets[["prematch_sp"]])) {
+      message("此历史快照未采集北单赛前SP：明确记为缺失，不以今天的SP回填。")
+      markets$prematch_sp <- beidan:::match_typed_empty("prematch_sp")
+    }
+    print(knitr::kable(utils::head(markets$prematch_sp, 12)))
+    print(markets$prematch_sp_receipt_path)
+    print(knitr::kable(markets$coverage))
+    print(knitr::kable(markets$companies))
+    print(knitr::kable(utils::head(markets$euro, 10)))
+    print(knitr::kable(utils::head(markets$totals, 10)))
+    print(knitr::kable(dplyr::select(markets$captures, fixture_id, market, observed_at, source_url)))
+    uncaptured <- dplyr::anti_join(
+      dplyr::select(market_schedule, fixture_key, slot, kickoff_at),
+      markets$coverage, by = c("fixture_key" = "fixture_id"))
+    if (nrow(uncaptured)) {
+      cat("\n窗口内仍有", nrow(uncaptured), "场未采集盘口；将 refresh_markets 设为 TRUE 后重跑第5块。\n\n")
+      print(knitr::kable(uncaptured))
+    }
+    # Retain the complete fixture universe: absent quotes become explicit exclusions
+    # in step6, rather than disappearing behind the captured subset.
+    inputs <- beidan::match_inputs_from_capture(schedule, markets)
+
   }
 }
 ```
+
+Titan 欧赔历史列表按新记录在前排列；同一公司、同一分钟有多条时，保留来源中靠前的一条。先按报价时间选决策前最新时点，再使用该时点的来源顺序；原始字节保留全部记录，`diagnostics` 的 `same_minute_superseded_rows` 记录被替代条数。较早时点的不同报价不会阻断最新报价选择。
 
 `quote_at` 是网站历史报价时间，`observed_at` 是这次真正采集时间，均按北京时间展示。
 当前赛程状态不能倒填到过去：如果现有状态台账晚于 `decision_at`，第6节仍会排除该场。盘口采集成功不等于历史状态已经补齐，更不能将 `unknown` 改成 `scheduled` 来绕过它。当前可先核对本节真实报价，随后按实际状态台账继续决策流程。
@@ -202,21 +214,33 @@ if (!is.null(schedule)) {
 
 窗口为 `[decision_at + 4小时, decision_at + 28小时)`：开始边界包含，结束边界不包含。20:00决策对应次日整天；其他时点按同样的4小时提前量平移，不再硬等次日00:00。
 
-先查看真实输入的公司 ID，再填写 `euro_members`。不使用 mock 公司的 c01/c02/c03，不把单家公司替代多公司平均。决策时刻只在上面的参数块设置一次；期号由单期输入推导。
+缺少个别公司时对名单内每家公司的普通欧赔先按 `p = (1/odds) / sum(1/odds)` 去水，再将三项概率分别等权平均，至少两家；不足两家只排除该场并显示原因。`n_members` 显示实际公司数。
+
+先查看真实输入的公司 ID，再填写 `euro_members`。不使用 mock 公司的 c01/c02/c03，不把单家公司替代多公司平均。决策时刻在本块开始时取实际北京时间；期号由单期输入推导。
 
 ```{r}
 #| label: prepare-decision
 epoch <- NULL
-euro_members <- c("281", "115", "82", "177", "432") # Bet365、William Hill、Ladbrokes、Pinnacle、HKJC；固定5家。
+projected <- NULL
+result <- NULL
+# 报价/赛程读取或采集已经结束，不能继续沿用上次决策的时间。
+decision_at <- if (is.null(replay_decision_at)) {
+  lubridate::with_tz(Sys.time(), "Asia/Shanghai")
+} else {
+  lubridate::with_tz(replay_decision_at, "Asia/Shanghai")
+}
+print(decision_at)
+euro_members <- c("281", "115", "82", "177", "432") # Bet365、William Hill、Ladbrokes、Pinnacle、HKJC；候选5家，至少2家可用。
 if (!is.null(inputs)) print(sort(unique(inputs$euro$company_id)))
 if (!is.null(inputs) && !is.null(decision_at) && length(euro_members) >= 2L) {
   market_policy <- list(
-    euro = list(members = euro_members, missing = "error"),
+    euro = list(members = euro_members, missing = "drop_member"),
     totals = list(companies = NULL, line = "nearest_main", watermark = "decimal")
   )
   epoch <- beidan::prepare_match_inputs(inputs, decision_at, market_policy)
   knitr::kable(dplyr::mutate(epoch$fixtures,
     dplyr::across(where(lubridate::is.POSIXct), ~ lubridate::with_tz(.x, "Asia/Shanghai"))))
+  knitr::kable(epoch$euro_mean) # n_members 为该场实际参加平均的公司数。
   knitr::kable(epoch$exclusions)
 } else {
   cat("未就绪：需要真实 inputs、明确的 decision_at 和欧赔平均公司名单。\n")
@@ -225,51 +249,65 @@ if (!is.null(inputs) && !is.null(decision_at) && length(euro_members) >= 2L) {
 
 ## 7. 单场概率
 
+第6块的 `prob_home / prob_draw / prob_away` 是各公司分别去水后的平均普通胜平负概率。本块直接结合大小球和 Dixon–Coles 模型生成比分分布，再按北单让球数计算让球胜平负；不重复去水。
+
 ```{r}
 #| label: probabilities
 projected <- NULL
 if (!is.null(epoch) && nrow(epoch$fixtures) > 0L) {
   projected <- beidan::estimate_match_probabilities(epoch, model_config)
   knitr::kable(projected$probabilities)
-} else cat("未执行概率计算：先完成步骤6。\n")
+} else if (is.null(epoch)) {
+  cat("未执行概率计算：第6块尚未生成 epoch，请检查该块输入或报错。\n")
+} else {
+  cat("第6块已执行，但准入比赛为0；以下为排除原因。\n")
+  knitr::kable(dplyr::count(epoch$exclusions, reason, name = "fixture_count"))
+}
 ```
 
 ## 8. 串场方案
 
-本次展示七场、3222221、最多80注的方案；它是可修改的明确策略，并非已验证盈利策略。整期1024元与本次160元区分。`n_legs` 改动时结构长度也必须修改。
+组数由预算和分配结果决定，不再填写 `n_groups`。本期资金上限来自 `settings$issue_budget_cny`（默认1024元），每注2元；先扣除传入的本期历史购票。`spend_limit_cny = NULL` 表示本次不另设金额上限，也不要求花完余额。当前为七场、3222221结构；改变 `n_legs` 时须相应调整结构长度。
+
+本块先搜索候选组，再比较新增组与已有组下一注的边际价值。`max_candidates = 128` 只限制候选搜索量，不决定最终组数。候选组合超过上限时按固定种子抽样，搜索诊断会标明不穷尽；分配采用贪心基线，不宣称全局最优。`min_support_mass = 0` 是尚未历史校准的默认值，可显式提高结构覆盖门槛。
+
+当前无完整北单赛前SP，因此使用 `objective = "probability"`：提高预计命中的票数，不是直接最大化收益，也不是“至少中一组”的概率。每组累计覆盖可单独解释，重叠组的覆盖率不能相加当作联合命中概率。单场复用和两组重叠约束仍按整个期内已购组执行。
 
 ```{r}
 #| label: plan
+#| results: asis
 result <- NULL
 strategy_config <- list(
   name = "26098-interactive", settings = settings,
   patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
-  construction_method = "entropy_balanced", n_groups = 1L,
-  ranking = "probability_desc", budget_cny = 160,
-  max_reuse = 1L, max_overlap = 6L, seed = 1L, unit_cap = 80L
+  construction_policy = list(max_candidates = 128L, seed = 1L),
+  objective = "probability", min_support_mass = 0,
+  max_reuse = 1L, max_overlap = 6L, spend_limit_cny = NULL
 )
-# 已保存的方案优先重读；最新报价不会改变既有方案。
+# 预览可反复计算；历史冻结方案只在第9块重读，不替换当前策略。
+prior_purchases <- NULL # 如本期已有实际购买，改为上一次方案的 history。
 plan_file <- file.path(work_dir, "plans", paste0(issue_id, "-",
   format(decision_at, "%Y%m%d-%H%M%S", tz = "Asia/Shanghai"), ".rds"))
 save_decision <- FALSE # 决策时点到达、检查方案后设 TRUE；预览无需保存。
-if (file.exists(plan_file)) {
-  result <- beidan::parlay_read_result(plan_file, issue_id, decision_at)
-  message("重读已保存方案：", plan_file)
-} else if (!is.null(projected) && nrow(projected$fixtures) >= settings$n_legs) {
+if (!is.null(projected)) {
 
-  result <- beidan::parlay_build_plan(projected, strategy_config)
+  result <- beidan::parlay_build_plan(projected, strategy_config, prior_purchases)
   if (save_decision) {
     dir.create(dirname(plan_file), recursive = TRUE, showWarnings = FALSE)
     beidan::parlay_save_result(result, plan_file, recorded_at = Sys.time())
   } else message("当前为未保存预览，尚不能作为后续真实结算基线。")
 } else cat("未生成下注计划：先完成步骤7。\n")
 if (!is.null(result)) {
-  knitr::kable(result$plan$group_legs)
-  knitr::kable(result$funded$purchases)
+  plan_summary <- beidan::parlay_plan_summary(result)
+  print(knitr::kable(result$budget_state))
+  print(knitr::kable(result$search_diagnostics))
+  print(knitr::kable(plan_summary$groups))
+  print(knitr::kable(plan_summary$tickets))
+  print(knitr::kable(utils::head(result$funded$trace, 20)))
 }
 ```
 
-此步骤只生成计划，不执行真实下单。下一次决策继续传入 `prior_purchases = result$history`；不能只传购买表，否则会丢失复用/重叠上下文。准备多个决策对象后，可用 `parlay_replay_issue()` 回放整期，不需要手写资金循环。
+此步骤只生成计划，不执行真实下单。只有确实按该方案购买后，下一次决策才传入 `prior_purchases = result$history`；未购买的预览不能扣减实盘余额。不能只传购买表，否则会丢失复用/重叠上下文。准备多个决策对象后，可用 `parlay_replay_issue()` 回放整期，不需要手写资金循环。
 
 ## 9. 真实结算与深度复盘
 
@@ -292,12 +330,14 @@ if (!is.null(settlements)) {
   knitr::kable(settlements)
   print(attr(settlements, "diagnostics"))
 }
-if (file.exists(plan_file) && !is.null(settlements) && !is.null(settlement_at)) {
-  result <- beidan::parlay_read_result(plan_file, issue_id, decision_at)
+settlement_at <- lubridate::with_tz(Sys.time(), "Asia/Shanghai")
+if (file.exists(settlement_plan_file) && !is.null(settlements)) {
+  settled_result <- beidan::parlay_read_result(settlement_plan_file, issue_id, frozen_decision_at)
+  message("本块复盘历史冻结方案：", settlement_plan_file)
   settlement_input <- dplyr::mutate(settlements,
     label_available_at = lubridate::with_tz(label_available_at, "UTC"))
-  settled <- beidan::parlay_settle_plan(result$plan, settlement_input, as_of = lubridate::with_tz(settlement_at, "UTC"))
-  diagnosis <- beidan::parlay_diagnose_plan(result, settlement_input, as_of = lubridate::with_tz(settlement_at, "UTC"))
+  settled <- beidan::parlay_settle_plan(settled_result$plan, settlement_input, as_of = lubridate::with_tz(settlement_at, "UTC"))
+  diagnosis <- beidan::parlay_diagnose_plan(settled_result, settlement_input, as_of = lubridate::with_tz(settlement_at, "UTC"))
   knitr::kable(settled$ticket_returns)
   knitr::kable(diagnosis)
 } else cat("未结算：需要已冻结计划、真实结算表和明确的 settlement_at。\n")
@@ -311,6 +351,8 @@ if (file.exists(plan_file) && !is.null(settlements) && !is.null(settlement_at)) 
 #| label: progress
 schedule_count <- if (is.null(schedule)) 0L else nrow(schedule)
 market_count <- if (is.null(markets)) 0L else sum(markets$coverage$status == "ok")
+capture_window_count <- if (is.null(market_schedule)) 0L else nrow(market_schedule)
+uncaptured_count <- if (is.null(uncaptured)) 0L else nrow(uncaptured)
 admitted_count <- if (is.null(epoch)) 0L else nrow(epoch$fixtures)
 probability_count <- if (is.null(projected)) 0L else nrow(projected$probabilities)
 purchase_count <- if (is.null(result)) 0L else nrow(result$funded$purchases)
@@ -319,8 +361,8 @@ pending_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status
 special_count <- if (is.null(settled)) 0L else sum(settled$ticket_returns$status == "SPECIAL")
 diagnostic_count <- if (is.null(diagnosis)) 0L else sum(diagnosis$status != "PENDING")
 knitr::kable(tibble::tibble(
-  stage = c("赛程", "两市场采集", "决策准入场数", "概率行数", "购买票数", "已结算票数", "待结算票数", "特殊待处理票数", "可用诊断行数"),
-  count = c(schedule_count, market_count, admitted_count, probability_count,
+  stage = c("赛程", "采集窗口内场数", "窗口内未采集场数", "两市场采集", "决策准入场数", "概率行数", "本次预览票数", "历史冻结方案已结算票数", "历史冻结方案待结算票数", "历史冻结方案特殊待处理票数", "历史冻结方案可用诊断行数"),
+  count = c(schedule_count, capture_window_count, uncaptured_count, market_count, admitted_count, probability_count,
             purchase_count, settled_count, pending_count, special_count, diagnostic_count)
 ))
 if (!is.null(decision_at) && decision_at > Sys.time()) {
@@ -385,3 +427,31 @@ Clean actual-data render passed; preview80tickets is not a saved20:00 decision o
 <!-- #528 slot alignment review: ../docs/reviews/528-slot-alignment.md; hashes before attestation: ../docs/reviews/528-reviewed-hashes.json. Final codex review no actionable findings. -->
 
 <!-- #530 market warnings review: ../docs/reviews/530-market-warnings.md; hashes before attestation: ../docs/reviews/530-reviewed-hashes.json. Final codex review no actionable findings. -->
+
+<!-- #532 reviews: docs/reviews/532-interactive-cutoff.md and docs/reviews/532-source-order.md. Source-order correction resolves slot57; 21 Python tests and 36 R assertions pass. Full-flow acceptance remains separate. Hashes precede this evidence annotation. -->
+
+<!-- #532 available-company acceptance: ../docs/reviews/532-members.md; hashes532-members-hashes.json before this annotation. 159 assertions pass, codex review reports no defects, clean saved-real-data render yields19 fixtures/57 probabilities/80 preview tickets. Settlement remains pending. -->
+
+<!-- #532 per-company de-vig: ../docs/reviews/532-devig.md; reviewed hashes532-devig-hashes.json before annotation. 162 assertions passed; codex review found no defects; real snapshot render19 fixtures/57 probabilities/80 preview tickets. -->
+
+<!-- Calculation correctness evidence: docs/reviews/532-devig.md records isolated old-algorithm mutation causing5 failed assertions in the actual testthat suite. No tests embedded in the analysis. -->
+
+
+## #533 Block 8 验收记录
+
+预算驱动接口已接通，组数和各组覆盖深度由实际分配产生。以 **2026-09-26 17:51:58 北京时间**的已保存真实快照复核：19场准入、128个候选、自动2组192注，投入384元，余额640元。该结果是历史快照回放，当前执行应使用第6块的新时点。
+
+相关函数及调用方913条断言通过；核心、整合及补充 `codex review` 均已完成，发现已修复。干净会话渲染并核验预算、组汇总和逐票表内容。没有自动保存或下注，历史冻结方案仍待结算。当前概率目标不代表收益最优。
+
+详细命令、测试映射、输入、限制和审阅结论见 [#533 本地验收](../docs/reviews/533-block8.md)，源码及输入哈希见 [#533 哈希清单](../docs/reviews/533-block8-hashes.json)。测试代码留在 testthat 文件，不放入分析块。
+
+
+### 后续修正：采集窗口必须覆盖完整赛程
+
+前一轮验收使用固定20场报价快照，不能把它解释为完整窗口只有这些比赛。手动复核发现 slot 79–120 被固定名单漏掉：在2026-09-26 19:28北京时间，完整赛程窗口内有52场，旧报价子集只有7场在窗口内。
+
+第5块现调用 `match_market_schedule(schedule, capture_reference_at)` 从完整赛程选择，不设slot上限；复用决策准备的同一时间窗口函数。旧快照缺少的场次单独列出，完整赛程仍传入第6块，缺赔率按原因排除。需要补采时重载第2块，设置 `refresh_markets <- TRUE`、`replay_decision_at <- NULL`，再执行第5–8块。选择窗口本身不代表盘口已采集成功或比赛已准入。
+
+本次窗口修正：函数18条断言、原QMD实际代码块20条断言通过，独立 Codex review 无可操作发现；完整离线渲染确认52场窗口、45场未采集提示，未冒称已补齐报价。详见 [窗口修正验收](../docs/reviews/533-capture-window.md)。
+
+<!-- #540 reviewed implementation SHA256: {"packages/beidan/R/parlay_role_groups.R": "afba29c785037a456907657bd99d385b5ef130e4c4716a498d4a26f584092aba", "packages/beidan/R/parlay_role_portfolio.R": "26d25027c67319514720db3ef30d4947094fa3e17d641e55c5a60f2194d4f069", "packages/beidan/R/parlay_role_shared.R": "9e521aed40a23b216bd21232af0d66f2729c98c2ada7df6cc9451eecf1a9543c", "packages/beidan/R/match_markets.R": "b2e416008231c25e844144f001622196569e242bd3e0cb05ee1768a55b7a0c62"}. Reviews: codex review - < .run-control/portfolio-interface/review-final-prompt.txt and review-budget-types-prompt.txt. Findings, resolutions, checks and final QMD hashes: ../docs/reviews/540-portfolio-interface.json. Function tests run outside this QMD. -->

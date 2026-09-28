@@ -59,6 +59,8 @@ def parse_markets(fixture: dict, euro_body: bytes, totals_bodies: dict[str, byte
 
     Euro decimal prices and totals Hong Kong prices converted to decimal. Company
     namespaces remain separate. Missing/invalid rows are counted, never replaced.
+    Euro ties use the first source row (Titan newest-first); raw bytes retain all
+    rows and diagnostics count superseded same-minute quotes.
     """
     kickoff = validate_fixture(fixture)
     identity = titan_identity(euro_body)
@@ -87,7 +89,13 @@ def parse_markets(fixture: dict, euro_body: bytes, totals_bodies: dict[str, byte
             continue
         company, rows, counts = parse_euro_history_js(euro_body, kickoff_hkt=kickoff, company_id=int(parts[0]))
         companies.append(dict(market="euro", company_id=parts[0], company_name=company))
+        seen_instants = set()
+        counts["same_minute_superseded_rows"] = 0
         for row in rows:
+            if row.snapshot_ts_hkt in seen_instants:
+                counts["same_minute_superseded_rows"] += 1
+                continue
+            seen_instants.add(row.snapshot_ts_hkt)
             if row.complete and all(math.isfinite(x) and x > 1 for x in row.odds.values()):
                 euro.append(dict(fixture_id=fixture["fixture_id"], company_id=parts[0],
                     quote_at=datetime.fromisoformat(row.snapshot_ts_hkt).isoformat(timespec="seconds"), odds_home=row.odds["home"],

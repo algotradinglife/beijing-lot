@@ -1,0 +1,15 @@
+{
+  "review_command": "codex review -c 'sandbox_mode=\"danger-full-access\"' - < .run-control/three-plan-settlement/review.txt",
+  "review_result": "Independent R and raw response verification confirmed counts, original mask exclusion, zero pending tickets, and no assumed actual orders. No actionable findings.",
+  "hashes": {
+    "quarto/26098_three_structure_settlement.qmd": "c56184971b90bf7585fc5e7647242719c51b6e68e5c2a6a4eeded90d6d694b6a",
+    "inputs/26098_walkthrough/three_plans_20260928/plans.rds": "be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3",
+    "inputs/26098_walkthrough/three_plans_20260928/settlement-20260928-204413.rds": "bdc2cbd2d4a07c25973b6a2e7fb577766825669c290606fc8a73e5a5b12421e9",
+    "packages/beidan/R/n7_pipeline_value.R": "a86718dc0ad93d6142604457e337f9ae66af9c09408c6541ce0f527390a82e5c"
+  },
+  "render": "quarto render quarto/26098_three_structure_settlement.qmd --to html --no-cache",
+  "execution_errors": 0,
+  "direct_checks": "Each purchased ticket contains fixture26098:134 with outcome other than actual D; original6 masks exclude D; all704 LOST,0PENDING; costs512/512/384 and payouts0.",
+  "data_source": "https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum=26098",
+  "as_of_beijing": "2026-09-28 20:44:13"
+}

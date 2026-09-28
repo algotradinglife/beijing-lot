@@ -167,11 +167,11 @@ PATTERN_MAIN <- c(3L, 3L, 3L, 3L, 2L, 2L, 2L)
 
 construct_and_structure <- function(pattern, groups_wanted, seed = 1L) {
   groups <- parlay_construct_groups(EPOCH$fixtures, PROJECTED$probabilities, CUTOFF,
-                                    CONSTANTS$n_legs, "entropy_balanced",
+                                    CONSTANTS$n_legs, "fixture_round_robin",
                                     groups_wanted, seed,
                                     match_status = inputs$match_status)
   structure <- parlay_apply_structure(groups$group_legs, PROJECTED$probabilities, CUTOFF,
-                                  pattern, "entropy_desc")
+                                  pattern)
   list(groups = groups, structure = structure)
 }
 
@@ -185,7 +185,7 @@ tibble::tibble(
   pattern = vapply(table_patterns, function(p) paste(p, collapse = ""), character(1)),
   完整空间 = vapply(table_patterns, function(p) {
     s <- parlay_apply_structure(single$groups$group_legs, PROJECTED$probabilities,
-                            CUTOFF, p, "entropy_desc")
+                            CUTOFF, p)
     as.integer(s$support_summary$support_size[1])
   }, integer(1))) |>
   knitr::kable(caption = "结构与预算分离：pattern 决定完整合法空间")
@@ -220,7 +220,7 @@ SP 变换规则固定：`SP > 10` 取 4.5，`SP = 10` 不变；**任一条腿缺
 ```{r valuation}
 #| label: valuation
 BUILT_A <- .BuildDecisionTables(EPOCH$fixtures, PROJECTED$probabilities, EPOCH$prematch_sp,
-                             CUTOFF, inputs$match_status, list(PATTERN_MAIN), "entropy_balanced", 4L, 1L,
+                             CUTOFF, inputs$match_status, list(PATTERN_MAIN), "fixture_round_robin", 4L, 1L,
                              CONSTANTS)
 RANKED_A <- parlay_rank_tickets(BUILT_A$valued, BUILT_A$tickets$candidate_tickets,
                             CUTOFF)
@@ -237,26 +237,35 @@ tibble::tibble(
 
 ```{r allocations}
 #| label: allocations
-CONFIGS <- parlay_allocation_configs(CONSTANTS)
+CONFIGS <- list(
+  A = parlay_strategy_config(CONSTANTS, name = "full-budget",
+       patterns = list(main = c(3L, 2L, 2L, 2L, 2L, 2L, 1L))),
+  B = parlay_strategy_config(CONSTANTS, name = "mixed-support",
+       patterns = list(wide = c(3L, 3L, 3L, 3L, 2L, 2L, 2L),
+                       small = c(2L, 2L, 2L, 2L, 2L, 1L, 1L))),
+  C = parlay_strategy_config(CONSTANTS, name = "limited-spend",
+       patterns = list(main = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
+       spend_limit_cny = 160)
+)
 allocation_summary <- lapply(names(CONFIGS), function(name) {
   config <- CONFIGS[[name]]
   result <- parlay_build_plan(BOUND, config)
   per_group <- sort(as.integer(table(result$funded$funded$group_id)))
   tibble::tibble(
     配置 = name,
-    说明 = config$label,
+    说明 = config$name,
     支持票数 = nrow(result$built$valued),
     买进票数 = nrow(result$funded$funded),
     投入元 = sum(result$funded$purchases$stake_cny),
-    组数 = length(result$funded$diagnostics$admitted_groups),
+    组数 = nrow(result$summary$groups),
     每组票数 = paste(per_group, collapse = "/"))
 }) |> dplyr::bind_rows()
 
-knitr::kable(allocation_summary, caption = "三种显式配置（合同要求逐一演示）")
+knitr::kable(allocation_summary, caption = "三种预算与结构策略（组数由分配结果产生）")
 ```
 
-配置 A 是 4 组 x 128 注（1024 元）；配置 B 混合 3333222 与 2222221 两种结构共 8 组；
-配置 C 展示**结构内截断**：3222221 支持 96 张而只买 80 张。
+配置 A 使用 3222221 结构和整期预算；配置 B 让 3333222 与 2222211 结构竞争资金；
+配置 C 将本次支出限制为 160 元（最多 80 注）。各配置的实际组数与每组深度均由预算和复用约束推导，不预设组数。
 
 ## 五、冻结与结算
 

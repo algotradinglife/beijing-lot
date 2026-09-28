@@ -1,0 +1,90 @@
+---
+title: "预算—覆盖曲线：如何选择串场参数（研究草案）"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  error: false
+  cache: false
+  freeze: false
+---
+
+本研究读取 #543 的冻结方案，不刷新数据、不重新选场、不读取结算、不修改下注单。目标是定义后续参数选择的方法；以下单期对照不能证明历史盈利，也不自动成为下注规则。
+
+## 当前曲线的含义
+
+现有实验台的纵轴是各票概率之和，即预计命中票数。组内票互斥，概率和可以解释为本组命中率；跨组有重叠且可能同时命中，所以全方案的和不是至少命中一组的概率。当前自动研究候选只是在预算下最大化这一代理指标。
+
+单组固定场次及结构，合法票的无条件概率按降序为 p1,…,pK。投入 b 元时，d=min(floor(b/2),K)，覆盖 C(b)=sum(p1,…,pd)。追加一注的覆盖增量为 p[d+1]，每元增量为 p[d+1]/2。结构全覆盖上限 S=sum(p1,…,pK)；C/S 衡量结构内买入深度，C 才是无条件命中率，二者必须同时显示。真赛果被结构排除时，不管投入多少都不会命中。
+
+## 冻结选场的投入深度对照
+
+每种结构固定其已选两组，分别改变单组金额；各点取合法TopN。此表不重新选组，不能当作各金额下重新优化后的最优前沿。北单赛前SP仅作估值参考，实际结算价格可能不同。
+
+```{r}
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+input_path <- file.path(root,"inputs/26098_walkthrough/three_plans_20260928/plans.rds")
+a <- readRDS(input_path)
+rows <- list()
+for (pattern in names(a$outputs)) {
+  ranked <- tibble::as_tibble(a$outputs[[pattern]]$evaluated$final$frontier$ranked)
+  for (cap in c(64,128,192,256,384,1296)) {
+    bought <- ranked |> dplyr::filter(rank<=floor(cap/2))
+    rows[[length(rows)+1L]] <- tibble::tibble(pattern=pattern,group_cap_cny=cap,
+      actual_cost_cny=2*nrow(bought),expected_winning_tickets=sum(bought$probability),
+      estimated_net_cny=sum(bought$ev_net_est),
+      sp_complete=all(is.finite(bought$ev_net_est)))
+  }
+}
+curves <- dplyr::bind_rows(rows) |>
+  dplyr::distinct(pattern,actual_cost_cny,expected_winning_tickets,estimated_net_cny,sp_complete,.keep_all=TRUE)
+knitr::kable(curves,digits=4)
+ggplot2::ggplot(curves,ggplot2::aes(actual_cost_cny,expected_winning_tickets,colour=pattern))+
+  ggplot2::geom_line()+ggplot2::geom_point()+
+  ggplot2::labs(x="Actual cost (CNY)",y="Expected winning ticket count",colour="Pattern")+
+  ggplot2::theme_minimal()
+```
+
+## 两类曲线分开看
+
+1. 固定组的深度曲线：回答下一笔钱是多买同组低排名票，还是另开一组。它的边际概率递减。
+2. 每个金额重新选组的方案前沿：回答结构、深度、组数与约束的整体配置。不同点可能是不同比赛和票，不能把相邻差额当成某一张票的边际价值。完整优化且预算为上限时最优覆盖不应下降；有限贪心搜索可能有波动，需要标为搜索结果，不强行平滑。
+
+## 参数筛选路线
+
+先冻结同一时点、概率、报价、候选池和搜索努力；结构可比较3333222/3322221/3222221/2222211。单组金额按2元整数单位扫描，并包含各结构全覆盖端点。先固定用户批准的复用/重叠限制，再另画限制敏感性图。每一配置都保留实际支出、组数、结构覆盖上限和已买覆盖。
+
+第一轮以覆盖—实际成本前沿缩小范围：删除同约束、同数据下成本更高且覆盖更低的点。但这只是覆盖目标的预筛，不能永久删除收益更好的低覆盖配置；收益前沿须单独计算。
+
+第二轮评价同一套联合赛果下的方案回款分布：至少中一组概率、回本概率P(回款≥成本)、期望净收益、亏损分位数。共享比赛在每次模拟中只抽一次结果，所有组共用；不得按组独立抽签。先做模型内模拟，再验证模型偏差。无有效SP时只研究覆盖，不用欧赔冒充北单SP。零投入点单列，ROI和回本率不与投注点混比。
+
+第三轮只对少数前沿配置微调，采用相同搜索额度，再重新评价。覆盖肘部仅用来选候选范围，不能直接证明最佳金额：拐点受坐标缩放、网格步长和结构截断影响。追求概率/成本比也常偏向极少票，不能单独使用。
+
+## 收益与停投
+
+票t的参考回款倍数为a_t=0.65×乘积(各腿有效SP)，单票参考期望净收益为2(p_t a_t−1)。SP>10按4.5估值的既定口径保留，原始SP不改。按概率排序的后续票可能有更高或更低的EV，所以概率曲线边际递减不意味着收益曲线边际也递减。若维持TopN前缀约束，应比较完整前缀的净收益，不能用“第一张负EV票就停止”作为通用规则。
+
+总预算NULL用于充分探索可行空间，不构成全部购买指令。未来选择器可以输出建议实际投入，也必须允许不投。只凭覆盖曲线和未校准的赛前SP，无法确定合理金额或保证盈利。
+
+## 历史验证：深度、累计概率与收益
+
+按每期决策前信息重建候选结构，记录真赛果是否在结构内、若在则其排名D和累计概率C(D)、各深度的实际结算净收益。掩码外结果单列失败类别，不在分析中丢弃；只统计结构内命中会夸大覆盖率。
+
+按结构覆盖S、购买覆盖C、深度、报价可用性等少量预定义层分层，报告期数及误差范围。重叠组并非独立样本，以期或连续期块评估不确定性。每次调参只用目标期之前且已可见的历史，冻结选择后再看下一期结果；外层评估整个选择程序，不能在同一批历史反复挑最佳再报告成绩。任何学习实现须走仓库共享时间学习模块，不能在本QMD临时拟合选择器。
+
+统计上难分胜负时，优先稳定邻域内成本较低、复用较少的配置，而非追逐某一期最高点。覆盖不足或样本过少应报告未知，不创造固定阈值。
+
+## 建议下一次讨论的最小实验
+
+固定当前复用2/重叠2，以四种结构×单组投入扫描生成两类曲线；每个参数点共用相同模拟赛果，比较至少中一组、回本概率和参考净收益。先展示前沿候选而不自动选“冠军”。历史数据就绪后，以逐期前推验证决定目标函数、门槛和实际资金配置。
+
+关于调参与评估分离，参考 [scikit-learn 官方嵌套交叉验证说明](https://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html)。本项目存在时间约束，须采用时间前推而非随机折分。多目标前沿的参考背景：[Stanford CVX 风险—收益权衡示例](https://www.cvxgrp.org/cvx_short_course/docs/exercises/notebooks/13.3.html)；此处采用的是比较思路，并非把股票均值—方差模型直接套到北单。
+
+```{r}
+knitr::kable(tibble::tibble(input="inputs/26098_walkthrough/three_plans_20260928/plans.rds",
+  sha256=digest::digest(file=input_path,algo="sha256"),
+  cutoff_beijing=format(a$epoch$cutoff$cutoff_utc,tz="Asia/Shanghai")))
+```
+
+审查、冻结文件哈希及数值复核记录：`docs/reviews/budget-curve-selection-research.json`。本文只提出研究路线；参数选择规则仍待讨论确认及时间前推验证。

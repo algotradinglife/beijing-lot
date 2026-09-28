@@ -191,12 +191,22 @@ match_decision_epochs <- function(local_dates, hour = MATCH_DECISION_HOUR, tz = 
 #'   ISO-8601 UTC string. POSIXct fractions are preserved.
 #' @param tz One valid Olson timezone name. The window uses elapsed hours and
 #'   therefore denotes the same instants in every timezone.
-#' @return A list of UTC POSIXct instants, `start_utc` and `end_utc`, defining
-#'   the half-open interval [decision + 4 hours, decision + 28 hours).
-#' @details Invalid instants or timezones raise an error. There are no side
-#'   effects. At 20:00 Beijing this is the following natural day; daytime
-#'   decisions retain the same four-hour lead and 24 elapsed-hour horizon.
-match_decision_window <- function(epoch_utc, tz = MATCH_DECISION_TZ) {
+#' @param window_hours Length-2 finite numeric vector of non-negative, strictly
+#'   increasing elapsed hours `c(start, end)` bounding the half-open window
+#'   `[decision + start, decision + end)`. Defaults to the contract's
+#'   `c(4, 28)`. Classed values (`Date`, `difftime`, `POSIXct`) and arrays are
+#'   rejected.
+#' @return A list with `window_hours` (the resolved bounds) and the UTC POSIXct
+#'   instants `start_utc` and `end_utc`, defining the half-open interval
+#'   `[decision + window_hours[1], decision + window_hours[2])`.
+#' @details Invalid instants, timezones or hour bounds raise an error. There are
+#'   no side effects. At 20:00 Beijing the default `c(4, 28)` is the following
+#'   natural day; daytime decisions retain the same four-hour lead and 24
+#'   elapsed-hour horizon. Supplying `c(2, 26)` changes the window bounds without
+#'   moving the decision instant or the quote/status cutoff.
+match_decision_window <- function(epoch_utc, tz = MATCH_DECISION_TZ,
+                                  window_hours = c(MATCH_WINDOW_START_HOURS,
+                                                   MATCH_WINDOW_END_HOURS)) {
   epoch <- if (inherits(epoch_utc, "POSIXct")) as.numeric(epoch_utc) else
     match_utc_seconds(epoch_utc, "match_decision_window: epoch_utc")
   if (length(epoch) != 1L || !is.finite(epoch))
@@ -204,10 +214,17 @@ match_decision_window <- function(epoch_utc, tz = MATCH_DECISION_TZ) {
   if (!is.character(tz) || length(tz) != 1L || is.na(tz) || !tz %in% OlsonNames()) {
     stop("match_decision_window: tz is not a known Olson timezone name: ", tz)
   }
+  if (!is.numeric(window_hours) || !is.null(attr(window_hours, "class")) ||
+      !is.null(dim(window_hours)) || length(window_hours) != 2L ||
+      any(!is.finite(window_hours)) || window_hours[1L] < 0 ||
+      window_hours[2L] <= window_hours[1L]) {
+    stop("window_hours must be two finite non-negative strictly increasing numbers")
+  }
+  hours <- as.numeric(window_hours)
   instant <- as.POSIXct(epoch, origin = "1970-01-01", tz = "UTC")
-  start <- instant + lubridate::dhours(MATCH_WINDOW_START_HOURS)
-  end <- instant + lubridate::dhours(MATCH_WINDOW_END_HOURS)
-  list(start_utc = start, end_utc = end)
+  start <- instant + lubridate::dhours(hours[1L])
+  end <- instant + lubridate::dhours(hours[2L])
+  list(window_hours = hours, start_utc = start, end_utc = end)
 }
 
 # Fixtures eligible at one decision epoch: kickoff inside the rolling 24-hour

@@ -12,20 +12,33 @@ the decision cutoff, the selected fixtures, the status ledger and the pre-match
 SP, so the plan cannot be built against a different instant than the one the
 probabilities were projected for.}
 
-\item{strategy_config}{One explicit strategy configuration, normally from
-parlay_allocation_configs(). It carries the full settings snapshot plus
-patterns, construction_method, n_groups, ranking, budget_cny, max_reuse,
-max_overlap, seed and the unit cap form.}
+\item{strategy_config}{One explicit Block 8 strategy configuration, normally from
+\code{\link[=parlay_strategy_config]{parlay_strategy_config()}}. It carries the full settings snapshot plus patterns,
+a construction policy (max_candidates, seed), objective, min_support_mass,
+max_reuse/max_overlap and an optional spend_limit_cny. There is no purchased
+group count: how many groups are funded is derived by the allocation.}
 
 \item{prior_purchases}{Previous history for the SAME issue: the \code{history} object
 returned by an earlier call, or list(purchases=, fixture_sets=). NULL means this
 is the issue's first decision.}
 }
 \value{
-A list with config, cutoff, constants, built, probabilities,
-ranked, funded, plan and history. \code{history} is what the next call must receive.
+A list with config, cutoff, constants, built, probabilities, ranked,
+funded, plan, history and the extra stage evidence \code{summary}, \code{search},
+\code{frontier}, \code{selection}, \code{budget_state} and \code{search_diagnostics}. \code{history} is what the next call must receive.
+\code{plan}, \code{funded} and \code{history} keep the shapes immutable save, settlement and
+diagnosis consume; \code{funded} carries the derived \code{n_groups} in its diagnostics.
 }
 \description{
-Operates on explicit inputs. Invalid contracts raise errors; no network,
-package installation or database writes occur.
+Runs the four authoritative Block 8 decision stages over one bound projection:
+budget state, candidate generation, coverage frontier and constrained portfolio
+allocation. Operates on explicit inputs. Invalid contracts raise errors; no
+network, package installation or database writes occur.
+}
+\details{
+The funded group count is an OUTPUT of the budget and constraints, not
+an input. Group admission (reuse/overlap) counts DISTINCT funded groups, and
+one structure per selected group is enforced. This is a greedy approximation:
+no global-optimality claim is made, and the probability objective is the
+expected COUNT of winning tickets (sum of marginals), never a union.
 }

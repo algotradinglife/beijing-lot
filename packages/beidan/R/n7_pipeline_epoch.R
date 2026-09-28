@@ -121,14 +121,14 @@ match_latest_quote_before <- function(quotes, cutoff_utc, value_columns) {
   selected
 }
 
-# Average euro odds across the policy's member companies, then de-vig.
+# De-vig each member company, then average the resulting probabilities.
 #
 # euro_policy$members lists the company_ids that participate, and
 # euro_policy$missing says what to do when a member has no quote. Averaging only
 # the companies that happen to be present would let the member set drift with
 # coverage, which is exactly the defect the contract calls out, so the default is
 # to fail and require an explicit rule.
-#' 按 euro_policy 对成员公司的欧赔求均值并去水
+#' 按 euro_policy 对每家公司欧赔去水，再对概率等权平均
 #'
 #' @param euro        tibble，euro 表（经 match_validate_table 校验前的原始输入）。
 #' @param cutoff_utc  长度 1 的非 NA POSIXct。
@@ -137,10 +137,12 @@ match_latest_quote_before <- function(quotes, cutoff_utc, value_columns) {
 #'   · members 非字符/零长度/有重复 -> stop()
 #'   · missing 非 "error"/"drop_member" -> stop()
 #' @param fixtures    tibble，至少含 fixture_id；决定输出行序。
-#' @return tibble，每场一行：fixture_id, odds_home, odds_draw, odds_away, n_members。
+#' @return tibble，每场一行：fixture_id, prob_home, prob_draw, prob_away, n_members。
+#'   prob_* 为普通胜平负概率（非让球），有效三项之和为1。
 #' @details euro_policy$members 列出参与的公司，euro_policy$missing 声明成员缺报价
 #'   时的行为。完全没有报价算"cutoff 前没有报价"，不算成员集违规；只有成员集被
-#'   部分覆盖才是需要由策略决定的那种缺陷。
+#'   部分覆盖才是需要由策略决定的那种缺陷。drop_member 使用现有成员的去水概率求均值，
+#'   至少需要两家公司；不足两家时概率为 NA，n_members 保留实际数量。
 match_euro_mean <- function(euro, cutoff_utc, policy, fixtures) {
   if (!is.list(policy)) stop("match_euro_mean: euro_policy must be a list")
   members <- policy$members
@@ -158,9 +160,9 @@ match_euro_mean <- function(euro, cutoff_utc, policy, fixtures) {
   fixture_ids <- fixtures$fixture_id
   result <- tibble::tibble(
     fixture_id = fixture_ids,
-    odds_home = rep(NA_real_, length(fixture_ids)),
-    odds_draw = rep(NA_real_, length(fixture_ids)),
-    odds_away = rep(NA_real_, length(fixture_ids)),
+    prob_home = rep(NA_real_, length(fixture_ids)),
+    prob_draw = rep(NA_real_, length(fixture_ids)),
+    prob_away = rep(NA_real_, length(fixture_ids)),
     n_members = rep(0L, length(fixture_ids)))
   for (i in seq_along(fixture_ids)) {
     rows <- selected[selected$fixture_id == fixture_ids[i], , drop = FALSE]
@@ -172,7 +174,8 @@ match_euro_mean <- function(euro, cutoff_utc, policy, fixtures) {
       stop("match_euro_mean: fixture ", fixture_ids[i], " is missing euro members ",
            paste(setdiff(members, present), collapse = ", "))
     }
-    if (!length(present)) next
+    result$n_members[i] <- length(present)
+    if (missing_rule == "drop_member" && length(present) < 2L) next
     # Conflict guard: one value per member at the selected instant.
     for (company in present) {
       rows_c <- rows[rows$company_id == company, , drop = FALSE]
@@ -183,9 +186,12 @@ match_euro_mean <- function(euro, cutoff_utc, policy, fixtures) {
              " company ", company)
       }
     }
-    result$odds_home[i] <- mean(rows$odds_home)
-    result$odds_draw[i] <- mean(rows$odds_draw)
-    result$odds_away[i] <- mean(rows$odds_away)
+    implied <- 1 / as.matrix(rows[, c("odds_home", "odds_draw", "odds_away")])
+    company_probabilities <- sweep(implied, 1L, rowSums(implied), "/")
+    average <- colMeans(company_probabilities)
+    result$prob_home[i] <- average[1L]
+    result$prob_draw[i] <- average[2L]
+    result$prob_away[i] <- average[3L]
     result$n_members[i] <- length(present)
   }
   result
@@ -263,12 +269,15 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #' @param cutoff         temporal_learning 对象，经 match_require_cutoff 校验。
 #' @param euro_policy    欧赔策略，语义见 match_euro_mean。
 #' @param totals_policy  大小球策略，语义见 match_totals_selected。
+#' @param window_hours   长度 2 的数值向量 c(start, end)，滚动决策窗口的经过小时
+#'   边界；默认 c(4, 28)。转发给权威 match_decision_window()：设为 c(2, 26)
+#'   只改变窗口边界，不移动 cutoff，也不改变报价/状态的严格 as-of 时刻。非法边界报错。
 #'
 #' @return list(fixtures, euro_mean, totals_selected, prematch_sp, match_status,
-#'   status_selected, exclusions)，每项为 tibble。
+#'   status_selected, exclusions, window)。除 window 凭证外，每项为 tibble。
 #'   · match_status     输入台账的原样保留，供下游（投影）重新校验
 #'   · status_selected  被采纳的那条 scheduled 报告，每场一行
-#' @details 决策 epoch 是本地日 D 的 20:00 Asia/Shanghai，窗口是整个 D+1。
+#' @details 窗口是 cutoff 加上显式经过小时边界，左闭右开；默认 4–28 小时。
 #'   只有当开赛落在该窗口内、cutoff 之前存在可用欧赔报价、**且 cutoff 当时可见的
 #'   最新状态是 scheduled** 时，比赛才会被保留。被剔除的比赛连同原因记入
 #'   exclusions 表，因此剔除是可审计的而不是静默的。
@@ -281,8 +290,10 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #'   是否发生是两件事，用前者替代后者会在比赛被取消时仍然开卖。
 #'
 #'   这是显式表的权威内部实现；公共入口 prepare_match_inputs() 负责从输入推导期号、
-#'   构造 cutoff 并把选中 SP 暴露为 prematch_sp，两者不重复算法。
-.PrepareMatchInputs <- function(inputs, cutoff, euro_policy, totals_policy) {
+#'   构造 cutoff、把选中 SP 暴露为 prematch_sp 并附上解析后的窗口凭证，两者不重复算法。
+.PrepareMatchInputs <- function(inputs, cutoff, euro_policy, totals_policy,
+                                window_hours = c(MATCH_WINDOW_START_HOURS,
+                                                 MATCH_WINDOW_END_HOURS)) {
   match_require_cutoff(cutoff)
   cutoff_utc <- match_cutoff_utc(cutoff)
   fixtures_all <- match_validate_table(inputs$fixtures, "fixtures",
@@ -315,7 +326,7 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
   }
 
   # Preserve the cutoff's fractional seconds through the shared rolling window.
-  window <- match_decision_window(cutoff_utc, MATCH_DECISION_TZ)
+  window <- match_decision_window(cutoff_utc, MATCH_DECISION_TZ, window_hours)
   window_start <- window$start_utc
   window_end <- window$end_utc
   in_window <- fixtures_all$kickoff_at >= window_start & fixtures_all$kickoff_at < window_end
@@ -345,9 +356,10 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
   fixtures <- status$fixtures
 
   euro_mean <- match_euro_mean(euro, cutoff_utc, euro_policy, fixtures)
-  usable <- !is.na(euro_mean$odds_home)
+  usable <- !is.na(euro_mean$prob_home)
   for (fixture_id in euro_mean$fixture_id[!usable]) {
-    note(fixture_id, "no euro quote before cutoff")
+    n_members <- euro_mean$n_members[match(fixture_id, euro_mean$fixture_id)]
+    note(fixture_id, if (n_members > 0L) "fewer than two euro companies before cutoff" else "no euro quote before cutoff")
   }
   fixtures <- fixtures[usable, , drop = FALSE]
   euro_mean <- euro_mean[usable, , drop = FALSE]
@@ -355,7 +367,7 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
   selected_totals <- match_totals_selected(totals, cutoff_utc, totals_policy, fixtures)
   selected_sp <- match_latest_quote_before(sp, cutoff_utc, c("sp_raw"))
 
-  list(fixtures = fixtures, euro_mean = euro_mean,
+  list(window = window, fixtures = fixtures, euro_mean = euro_mean,
        totals_selected = selected_totals, prematch_sp = selected_sp,
        match_status = match_status, status_selected = status$selected_status,
        exclusions = if (length(exclusions)) dplyr::bind_rows(exclusions) else match_typed_empty("exclusions"))
@@ -384,12 +396,19 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #'   match_euro_mean，market_policy$totals 传给 match_totals_selected。
 #'   · 缺 euro 或 totals -> stop()
 #'   · 未知顶层名字 -> stop()
-#' @return list(cutoff, market_policy, decision_at, fixtures, euro_mean,
+#' @param window_hours 长度 2 的数值向量 c(start, end)，滚动决策窗口的经过小时
+#'   边界；默认 c(4, 28)。转发给 .PrepareMatchInputs() 与权威
+#'   match_decision_window()：设为 c(2, 26) 只改变窗口边界，不移动 decision_at
+#'   对应的 cutoff，也不改变报价/状态的严格 as-of 时刻。非法边界报错。
+#' @return list(cutoff, market_policy, decision_at, window, fixtures, euro_mean,
 #'   totals_selected, prematch_sp, match_status, status_selected, exclusions)。
-#'   cutoff 由 fixtures 的期号与 decision_at 归一化后的 UTC 瞬时构成。
+#'   cutoff 由 fixtures 的期号与 decision_at 归一化后的 UTC 瞬时构成；window
+#'   为 list(window_hours, start_utc, end_utc)，即解析后的窗口凭证。
 #' @details 决策窗口与可见性规则全部委托给权威内部实现 .PrepareMatchInputs；
 #'   本入口只负责"从输入推导唯一期号"这一件事。
-prepare_match_inputs <- function(inputs, decision_at, market_policy) {
+prepare_match_inputs <- function(inputs, decision_at, market_policy,
+                                 window_hours = c(MATCH_WINDOW_START_HOURS,
+                                                  MATCH_WINDOW_END_HOURS)) {
   checkmate::assert_posixct(decision_at, len = 1L, any.missing = FALSE,
                             .var.name = "decision_at")
   if (length(attr(decision_at, "tzone")) != 1L ||
@@ -427,9 +446,10 @@ prepare_match_inputs <- function(inputs, decision_at, market_policy) {
   cutoff <- list(cutoff_utc = lubridate::with_tz(decision_at, "UTC"),
                  issue_id = issues)
   prepared <- .PrepareMatchInputs(inputs, cutoff, market_policy$euro,
-                                  market_policy$totals)
+                                  market_policy$totals, window_hours)
   c(list(cutoff = cutoff, market_policy = market_policy,
-         decision_at = lubridate::with_tz(decision_at, "UTC")), prepared)
+         decision_at = lubridate::with_tz(decision_at, "UTC")),
+    prepared)
 }
 
 # .EstimateMatchProbabilities(epoch_inputs, cutoff, rho, total_bounds, tail_tolerance)
@@ -550,8 +570,8 @@ prepare_match_inputs <- function(inputs, decision_at, market_policy) {
       note(fixture_id, "no over/under quote before cutoff")
       next
     }
-    inverse <- 1 / as.numeric(row[1, c("odds_home", "odds_draw", "odds_away")])
-    target <- inverse / sum(inverse)
+    target <- as.numeric(row[1, c("prob_home", "prob_draw", "prob_away")])
+    match_check_probability_sum(matrix(target, nrow = 1L))
     constraint <- tryCatch(
       total_market_constraint(
         # total_market_constraint inverts HK water as 1/(1+water). The selected

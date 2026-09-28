@@ -22,10 +22,10 @@ before use.
 ## Reviewed-SHA binding (REQ-DS07/DS10)
 
 - reviewed_commit_sha: `PR_HEAD`
-- producer_commit_sha: `784a23badf38d51bb2aee6d7687479e425d1af80`
-- code_hash (src/source_schema): `fbed4aeb60108b2262d38500e37ab165d0aa5a6ee441dfd64dc760752d43111f`
+- producer_commit_sha: `4087ab703c59b7bc09237a3b9bc765f5f4fd0352`
+- code_hash (src/source_schema): `05a01abe1cab6b53dbafc1d394b0919f5abc5d99b8de1a2e2ac0cc02283fa96a`
 - notebook_hash: `1285fa1310b1df6b6ccff2145eec4d67105929af8836364da07feadc4324b508`
-- requirements_hash: `4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78`
+- requirements_hash: `39709c49578ec7fa0b71b2c8a255091e8d50338e07b797def0b0abd0637ee9d3`
 
 ## Upstream source hashes (recorded at build)
 
@@ -74,4 +74,4 @@ before use.
 }
 ```
 
-Built at 2026-08-16T06:04:33.977766+00:00.
+Built at 2026-09-22T05:24:14.978868+00:00.

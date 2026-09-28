@@ -9,36 +9,6 @@
 #'   对应不同的预算；契约要求结构是长度 n_legs 的整数向量，而不是预算的代号。
 #'   本模块只定义函数，导入时不触发任何 I/O。
 
-#' W/D/L 三元组的归一化熵
-#'
-#' @param triple 数值向量，长度必须为 3。
-#'   · 非数值        -> stop()（不得经 as.numeric 静默变成 NaN）
-#'   · 长度 != 3     -> stop()
-#'   · 含 NA / 非有限 -> stop()
-#'   · 含负值        -> stop()
-#'   · 总和 <= 0     -> stop()
-#' @return 长度 1 的数值，取值 `[0, 1]`。
-#' @details 1 表示三路均分，0 表示某个结果确定。这是契约指定的难度基线。
-#'   大于 1 的输入（如 c(1,1,1)）会被按比例归一化。
-parlay_normalised_entropy <- function(triple) {
-  # Catch non-numeric BEFORE as.numeric(): coercion would only warn and hand back
-  # NaN, and a NaN entropy would silently rank a fixture as "hardest".
-  if (!is.numeric(triple)) {
-    stop("parlay_normalised_entropy: triple must be numeric")
-  }
-  values <- as.numeric(triple)
-  if (length(values) != 3L || anyNA(values) || any(!is.finite(values))) {
-    stop("parlay_normalised_entropy: need three finite values")
-  }
-  if (any(values < 0)) stop("parlay_normalised_entropy: probabilities must be non-negative")
-  total <- sum(values)
-  if (total <= 0) stop("parlay_normalised_entropy: probabilities must have positive mass")
-  p <- values / total
-  positive <- p > 0
-  entropy <- -sum(p[positive] * log(p[positive]))
-  entropy / log(3)
-}
-
 #' 概率的宽表视图：每场一行，列为 W/D/L
 #'
 #' @param probabilities tibble，probabilities 表（经 match_validate_table 校验）。
@@ -46,12 +16,14 @@ parlay_normalised_entropy <- function(triple) {
 #'   · 缺任一 W/D/L 列 -> stop()
 #'   · 出现缺口（某场缺某结果）-> stop()
 #'   · 任一行和不为 1 -> stop()
-#' @return tibble：fixture_id, W, D, L, entropy。
+#' @return tibble：fixture_id, W, D, L。仅做概率合同校验与宽表转换，不派生任何指标列。
+#' @details 本函数不隐式计算熵或其它难度指标。调用方需要熵时必须显式自行计算，
+#'   共享整理函数不得暗中替算法做决定。
 parlay_probability_wide <- function(probabilities) {
   match_validate_table(probabilities, "probabilities")
   if (!nrow(probabilities)) {
     return(tibble::tibble(fixture_id = character(0), W = numeric(0),
-                          D = numeric(0), L = numeric(0), entropy = numeric(0)))
+                          D = numeric(0), L = numeric(0)))
   }
   wide <- tidyr::pivot_wider(probabilities, names_from = "outcome",
                              values_from = "probability")
@@ -61,7 +33,6 @@ parlay_probability_wide <- function(probabilities) {
   matrix_values <- as.matrix(wide[, match_outcomes()])
   if (anyNA(matrix_values)) stop("parlay_probability_wide: probabilities have gaps")
   match_check_probability_sum(matrix_values)
-  wide$entropy <- apply(matrix_values, 1, parlay_normalised_entropy)
   wide
 }
 
@@ -129,9 +100,9 @@ parlay_structure_legs <- function(group_legs) {
 #'   **必填且无默认值**：附加在末尾以保持既有位置调用的可读性，但缺失即 stop()，
 #'   因为"没有台账"与"台账为空"是两件事，前者是输入契约错误。
 #' @param n_legs        长度 1 的正整数（方案级场数）。
-#' @param construction  显式的 fixture-id 组 list，或 "entropy_balanced"。
+#' @param construction  显式的 fixture-id 组 list，或 "fixture_round_robin"。
 #' @param max_candidates 长度 1 的正整数。
-#' @param seed          整数标量，控制 entropy_balanced 的确定性抽样。
+#' @param seed          整数标量；保留为确定性种子参数，当前构造不消耗随机数。
 #' @return list(groups, group_legs, diagnostics); diagnostics$status_exclusions
 #'   records each fixture excluded by its visible match status.，均为 tibble。
 #' @details 不执行完整的 n_legs-of-N 枚举：那是组合爆炸，且契约禁止声称全局最优。
@@ -222,15 +193,17 @@ parlay_construct_groups <- function(fixtures, probabilities, cutoff, n_legs,
     return(list(groups = legs, group_legs = legs, diagnostics = diagnostics))
   }
 
-  if (!identical(construction, "entropy_balanced")) {
-    stop("parlay_construct_groups: construction must be 'entropy_balanced' or a list with $groups")
+  if (!identical(construction, "fixture_round_robin")) {
+    stop("parlay_construct_groups: construction must be 'fixture_round_robin' or a list with $groups")
   }
 
-  # Deterministic difficulty-balanced construction: order fixtures by entropy
-  # (descending, ties by fixture_id so the result is reproducible), then deal them
-  # into groups round-robin so every group gets a similar difficulty mix.
+  # Deterministic round-robin construction: order fixtures by fixture_id (ascending)
+  # and deal them round-robin into groups. This is a fixture-selection baseline for
+  # the legacy group builder, NOT a difficulty-balancing rule: it makes no claim
+  # about which group is easier, and it does not consult any probability-derived
+  # difficulty metric. Role-based construction is a separate API.
   ordered <- wide[match(usable, wide$fixture_id), , drop = FALSE]
-  ordered <- ordered[order(-ordered$entropy, ordered$fixture_id), , drop = FALSE]
+  ordered <- ordered[order(ordered$fixture_id), , drop = FALSE]
   n_groups_avail <- floor(nrow(ordered) / n_legs)
   n_groups <- min(n_groups_avail, max_candidates)
   if (n_groups < n_groups_avail) diagnostics$truncated <- TRUE
@@ -243,11 +216,9 @@ parlay_construct_groups <- function(fixtures, probabilities, cutoff, n_legs,
 
   rows <- list()
   used <- character(0)
-  # Deal round-robin rather than in contiguous blocks. Taking blocks would put the
-  # seven hardest fixtures in one group and the seven easiest in another, which is
-  # not "entropy balanced" and would concentrate risk instead of spreading it.
-  # Only the first n_groups * n_legs fixtures are dealt; the remainder are dropped
-  # and already counted in diagnostics$dropped.
+  # Deal round-robin rather than in contiguous blocks, so consecutive fixture ids are
+  # spread across groups. Only the first n_groups * n_legs fixtures are dealt; the
+  # remainder are dropped and already counted in diagnostics$dropped.
   dealt <- split(ordered$fixture_id[seq_len(n_groups * n_legs)],
                  rep(seq_len(n_groups), length.out = n_groups * n_legs))
   for (g in seq_len(n_groups)) {
@@ -309,8 +280,8 @@ parlay_outcome_rank <- function(triple) {
 #' @param cutoff        temporal_learning 对象。
 #' @param pattern       长度 n_legs 的整数向量，元素取 1/2/3，表示"该条腿保留几个选项"。
 #'   · 长度与组场数不一致 / 取值超出 1..3 -> stop()
-#' @param assignment    "entropy_desc"（默认，越不确定的腿给越多选项）
-#'                      或 "by_leg_order"（按 leg_order 位置施加 pattern）。
+#' @param pattern       长度 n_legs 的整数向量，元素取 1/2/3，表示"该条腿保留几个选项"。
+#'   · 长度与组场数不一致 / 取值超出 1..3 -> stop()
 #' @param forbidden     硬掩码。与结构掩码取交集，且绝不用其它结果补足：被硬禁掉
 #'                      一个选项的腿就是支撑更少，不得被顶替。
 #' @param candidate_label 区分叠加在**同一**比赛集合上的多种结构。
@@ -319,12 +290,14 @@ parlay_outcome_rank <- function(triple) {
 #'   group_id 是排序后的比赛集合因而被共享；candidate_id 必须按结构唯一，使两种
 #'   结构能被独立排名与注资。否则同一组上的结构 A 与 B 会在 candidate_id 上撞车，
 #'   它们的支撑集会被合并。
+#'
+#'   每条腿的角色由权威的 parlay_role_scores() 决定：在每个固定组内，按排序后的
+#'   pattern 角色 3→2→1 依次处理，每一步在该角色榜上选取分数最高、且尚未被本组
+#'   占用的成员（分数并列按 fixture_id 升序）。被选中的角色即该腿最终保持的角色。
+#'   本函数不复制任何评分逻辑，也不按熵重排角色。
 parlay_apply_structure <- function(group_legs, probabilities, cutoff, pattern,
-                               assignment = "entropy_desc", forbidden = NULL,
+                               forbidden = NULL,
                                candidate_label = NULL) {
-  if (!identical(assignment, "entropy_desc")) {
-    stop("parlay_apply_structure: assignment must be 'entropy_desc'")
-  }
   match_require_cutoff(cutoff)
   match_validate_table(group_legs, "group_legs")
   if (!nrow(group_legs)) {
@@ -345,6 +318,9 @@ parlay_apply_structure <- function(group_legs, probabilities, cutoff, pattern,
          " integers drawn from 1, 2, 3")
   }
   wide <- parlay_probability_wide(probabilities)
+  # The authoritative role ranking. Scoring lives in parlay_role_scores() only; this
+  # structure pass consumes its rank column instead of re-deriving p1 / p1+p2 / p3.
+  role_scores <- parlay_role_scores(probabilities, cutoff)
   group_ids <- unique(group_legs$group_id)
   supports <- list()
   summaries <- list()
@@ -380,16 +356,34 @@ parlay_apply_structure <- function(group_legs, probabilities, cutoff, pattern,
     }
     rows <- wide[match(legs$fixture_id, wide$fixture_id), , drop = FALSE]
 
-    # Determine depth per leg.
-    if (identical(assignment, "entropy_desc")) {
-      # Most uncertain legs get the largest depths. Ties break by leg_order so the
-      # result is stable.
-      rank_order <- order(-rows$entropy, legs$leg_order)
-      depths <- integer(n_legs)
-      sorted_pattern <- sort(pattern, decreasing = TRUE)
-      depths[rank_order] <- sorted_pattern
-    } else {
-      depths <- as.integer(pattern)
+    # Assign roles inside this FIXED group: process the sorted pattern roles from 3
+    # down to 2 down to 1, each time picking the highest-ranked still-unassigned
+    # member in that role's ranking. Ties inside one role are already broken by
+    # fixture_id in parlay_role_scores(). The chosen role is the leg's FINAL role and
+    # its authoritative outcome mask is recorded per leg; neither is re-derived later.
+    # The kept outcomes come from the SAME authoritative role row that assigned the
+    # leg, captured at assignment time. Re-deriving them here with
+    # parlay_outcome_rank() would drop the role scorer's nine-decimal tie handling and
+    # let a near-tie keep a different outcome than the role definition (AGENTS.md:48,
+    # one authoritative implementation per contract).
+    allowed_by_leg <- vector("list", n_legs)
+    assigned <- logical(n_legs)
+    for (role in sort(as.integer(pattern), decreasing = TRUE)) {
+      ranked <- role_scores[role_scores$role == role, , drop = FALSE]
+      ranked <- ranked[order(ranked$rank), , drop = FALSE]
+      # Keep only members of THIS group that are still unassigned, in role-rank order.
+      order_in_group <- match(ranked$fixture_id, legs$fixture_id)
+      keep <- !is.na(order_in_group) & !assigned[order_in_group]
+      ranked_members <- order_in_group[keep]
+      # Every member is priced for every role, so a pick is always available while a
+      # leg is unassigned; a missing pick would mean the role table is incomplete.
+      if (!length(ranked_members)) {
+        stop("parlay_apply_structure: no unassigned member for role ", role,
+             " in group ", group_id)
+      }
+      pick <- ranked_members[[1L]]
+      allowed_by_leg[[pick]] <- ranked$allowed_outcomes[[which(keep)[[1L]]]]
+      assigned[pick] <- TRUE
     }
 
     # Support size is the PRODUCT of per-leg depths; structure_mass is the
@@ -400,9 +394,10 @@ parlay_apply_structure <- function(group_legs, probabilities, cutoff, pattern,
     for (leg_index in seq_len(n_legs)) {
       triple <- as.numeric(rows[leg_index, match_outcomes()])
       names(triple) <- match_outcomes()
-      rank_order <- parlay_outcome_rank(triple)
-      keep <- match_outcomes()[rank_order][seq_len(depths[leg_index])]
-      leg_allowed <- match_outcomes() %in% keep
+      # Consume the selected role's authoritative outcome mask directly. The role
+      # scorer already fixed which outcomes this leg keeps, near ties included; no
+      # second ranking pass runs here and the mask is never topped up.
+      leg_allowed <- match_outcomes() %in% allowed_by_leg[[leg_index]]
       if (!is.null(forbidden) && nrow(forbidden)) {
         banned_here <- forbidden$outcome[forbidden$fixture_id == legs$fixture_id[leg_index]]
         leg_allowed <- leg_allowed & !(match_outcomes() %in% banned_here)

@@ -1,0 +1,13 @@
+{
+  "scope": "Read-only frozen-group budget depth diagnosis and future parameter selection research; no strategy or lifecycle changes",
+  "qmd_sha256": "6bde01f7c4bb6eb24f318c12edbfb11b39c96ce2c082cd7e7c3c50e14700eed3",
+  "html_sha256": "fb2ed35d63cbb63f4f3bfc792e7a82314fc2734871bbd332f9043a0e2ed21613",
+  "input": "inputs/26098_walkthrough/three_plans_20260928/plans.rds",
+  "input_sha256": "be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3",
+  "review_command": "codex review -c sandbox_mode=\"danger-full-access\" - < .run-control/budget-curve-research/review.txt",
+  "review_result": "No actionable errors. Reviewer independently checked all table values against frozen ranks and recomputed ticket-level reference EV. Reviewer GitHub check unavailable; root successfully read #533 graph. No lifecycle mutation attempted.",
+  "review_log": ".run-control/budget-curve-research/review.log",
+  "checks": "All three fixed-group probability/cost endpoints reconciled; marginal coverage decreases; SP estimates finite.\n",
+  "render": "Clean no-cache Quarto render, 2 tables, 1 figure, zero cell-output-error",
+  "limitations": "Single frozen issue, fixed selected groups; no outcome simulation, historical profitability validation, or executable parameter selector implemented."
+}

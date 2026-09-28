@@ -4,7 +4,8 @@
 \alias{prepare_match_inputs}
 \title{从整期输入推导一期决策上下文}
 \usage{
-prepare_match_inputs(inputs, decision_at, market_policy)
+prepare_match_inputs(inputs, decision_at, market_policy,
+  window_hours = c(MATCH_WINDOW_START_HOURS, MATCH_WINDOW_END_HOURS))
 }
 \arguments{
 \item{inputs}{list，含 fixtures/euro/totals/prematch_sp/match_status 五张表
@@ -18,11 +19,13 @@ prepare_match_inputs(inputs, decision_at, market_policy)
 match_euro_mean，market_policy$totals 传给 match_totals_selected。
 · 缺 euro 或 totals -> stop()
 · 未知顶层名字 -> stop()}
+\item{window_hours}{Length-2 finite unclassed numeric elapsed-hour bounds, non-negative and strictly increasing. Defaults to c(4, 28); changing these bounds never shifts the quote/status cutoff.}
 }
 \value{
-list(cutoff, market_policy, decision_at, fixtures, euro_mean,
+list(cutoff, market_policy, decision_at, window, fixtures, euro_mean,
 totals_selected, prematch_sp, match_status, status_selected, exclusions)。
-cutoff 由 fixtures 的期号与 decision_at 归一化后的 UTC 瞬时构成。
+cutoff 由 fixtures 的期号与 decision_at 归一化后的 UTC 瞬时构成；window
+为 list(window_hours, start_utc, end_utc)，即解析后的窗口凭证。
 }
 \description{
 从整期输入推导一期决策上下文

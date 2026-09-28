@@ -1,0 +1,11 @@
+# #532 available-company average
+
+Owner approved available listed companies with a minimum of two. `match_euro_mean` now returns NA prices with the actual n_members when drop_member has fewer than two companies. `.PrepareMatchInputs` excludes only that fixture with an explicit reason. The strict error policy remains available. The original QMD selects drop_member, displays n_members and removes hardcoded missing-company exclusions. No raw quotes were changed.
+
+Validation: `.run-control/532-members-tests.log` records149 epoch assertions plus10 actual QMD-block assertions passed. Commands used fresh `Rscript --vanilla`, `devtools::load_all("packages/beidan")` and testthat::test_file for packages/beidan/tests/testthat/test-n7-pipeline-epoch.R and tests/testthat/test-26098-walkthrough.R, with writable TMPDIR and explicit R_LIBS/RETICULATE_PYTHON. Tests cover two/three usable companies, one-company fixture exclusion without blocking peers, zero quotes and strict policy errors.
+
+A clean Quarto process rendered a verification copy of the original QMD with only refresh_schedule/refresh_markets switched FALSE, using the saved real snapshots and no cache. Original interactive refresh flags were preserved. Command: `quarto render .run-control/532-validation.qmd --no-cache --execute` with explicit TMPDIR/R_LIBS/RETICULATE_PYTHON/XDG_CACHE_HOME/DENO_DIR. Result19 admitted fixtures,57 probability rows and80 preview tickets; slot74 retained with four companies. Original frozen plan remains separate:80 pending tickets,0 settled. This verifies decision flow, not completed settlement. HTML and log: .run-control/532-validation.html and532-members-render.log.
+
+`codex review` scoped to the changed implementation, tests and QMD blocks5–6 reported no defects and independently passed the epoch tests; it inspected but did not render QMD. Full prompt/output: .run-control/532-members-review.log. PI rendered and inspected the real tables as above. Reviewed file hashes:532-members-hashes.json, before the QMD attestation below. Local pak install succeeded. No CI work or merge/closure claimed.
+
+Lesson: hardcoded exclusions from one capture become stale on refresh. Missing-company handling belongs in the market policy and per-fixture coverage contract, with actual company counts shown in the analysis.

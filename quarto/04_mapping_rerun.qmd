@@ -1,0 +1,333 @@
+---
+title: "500 结算审计：数据校验与定点修正"
+params:
+  do_fix: false
+format: html
+execute:
+  error: false
+---
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+stopifnot(l10n_info()[["UTF-8"]])
+
+library(tidyverse)
+library(glue)
+library(DBI)
+library(RSQLite)
+source("r/quarto_helpers.R")
+source("r/mapping_engine.R")
+source("r/settlement_corrections.R")
+source("r/settlement_remaining_audit.R")
+void_decisions <- jsonlite::fromJSON("quarto/settlement_void_decisions.json", simplifyVector = FALSE)
+data_root <- beijing_data_root()
+settlement_db <- file.path(data_root, "control", "settlement_500", "settlement.sqlite")
+
+```
+
+## 1. 加载原始数据
+
+```{r}
+merged <- read_settlement(settlement_db)
+n_total <- nrow(merged)
+n_settled <- sum(merged$settlement_state == "settled", na.rm = TRUE)
+n_issues <- n_distinct(merged$issue_code)
+cat(glue("宽表 {n_total} 行 | settled {n_settled} | 期次 {n_issues}"))
+```
+
+### 人工确认的比分更正清单（QMD 更正层）
+
+清单来源：`quarto/settlement_corrections.json`，27场按用户确认及处理授权更正。
+每次从原始数据库加载，核对比赛ID、原比分、总进球及上下单双后，在内存中应用更正。
+后续统计使用更正后的 `merged`；保留已有SP，不补造缺失玩法，不改写原始数据库。
+已有SPF和比分玩法选项随比分重新派生，不代表对应SP已得到独立核实。
+下方逐字段前后值是本次QMD应用记录，不是数据库写回回执。
+证据仅用于历史结算核实，不证明赛前可用性。原值冲突时停止渲染。
+
+```{r}
+corrections <- jsonlite::fromJSON("quarto/settlement_corrections.json") %>% as_tibble()
+stopifnot(!anyDuplicated(corrections$correction_id),
+          !anyDuplicated(corrections[c("issue_code", "issue_slot")]))
+correction_review <- corrections %>%
+  left_join(
+    merged %>% select(issue_code, issue_slot, local_500_fid, home_score, away_score) %>%
+      rename(current_fid = local_500_fid),
+    by = c("issue_code", "issue_slot"), relationship = "many-to-one"
+  ) %>%
+  mutate(
+    current_check = case_when(
+      is.na(current_fid) ~ "目标不存在",
+      current_fid != local_500_fid ~ "比赛 ID 冲突",
+      is.na(home_score) | is.na(away_score) ~ "当前比分缺失",
+      home_score == old_home_score & away_score == old_away_score ~ "原值匹配，待执行",
+      home_score == new_home_score & away_score == new_away_score ~ "当前已是新值（非执行回执）",
+      TRUE ~ "当前值冲突，需复核"
+    )
+  )
+correction_review %>%
+  transmute(更正编号 = correction_id, 期号 = issue_code, slot = issue_slot,
+            比赛 = paste(home_team, "vs", away_team),
+            原比分 = paste(old_home_score, old_away_score, sep = "-"),
+            新比分 = paste(new_home_score, new_away_score, sep = "-"),
+            审核状态 = review_status, 当前检查 = current_check,
+            证据 = paste0("[核查来源](", primary_evidence_url, ")")) %>%
+  knitr::kable()
+```
+
+### 本次更正前后值
+
+```{r}
+original_merged <- merged
+overlay <- apply_settlement_corrections(original_merged, corrections)
+merged <- overlay$data
+cat(glue("已在QMD内存中应用 {nrow(corrections)} 场更正；原始数据库未改写。\n"))
+overlay$receipt %>% knitr::kable()
+```
+
+### 已确认的上下单双更正（以 Nowscore 为准）
+
+清单：`quarto/settlement_ds_corrections.json`保留28场确认记录（含新增23093/303）。
+其中23054/335、25033/221已被下方人工无效结算决策取代，不再应用单一中奖选项。
+本节应用其余26场选项及SP更正。500解析问题仍是待验证假设。
+
+```{r}
+ds_corrections <- jsonlite::fromJSON("quarto/settlement_ds_corrections.json") %>% as_tibble()
+ds_corrections <- exclude_void_play_corrections(ds_corrections, void_decisions, "ds")
+ds_overlay <- apply_play_corrections(merged, ds_corrections, "ds")
+merged <- ds_overlay$data
+cat(glue("已在QMD内存中应用 {nrow(ds_corrections)} 场上下单双更正。\n"))
+ds_overlay$receipt %>% knitr::kable()
+```
+
+### 已确认的总进球更正（以 Nowscore 为准）
+
+清单：`quarto/settlement_jq_corrections.json`。用户在知悉未找到正式彩票结算公告后，
+曾确认23054/335、24051/90、25033/221采用Nowscore总进球选项5、2、4，SP均为1.00。
+这3条单一中奖选项现已被人工无效结算决策取代；原清单只保留为历史审计记录，不再应用。
+Nowscore的“完场”只是源站状态，不是普通彩票结算的证明。
+24051/90有[比赛中止战报](https://www.sofoot.com/breves/match-arrete-et-lancers-de-fumigenes-scenes-irreelles-a-troyes)，
+25033/221有[联赛延期公告](https://www.legab.it/news/pisa-mantova-rinviata-a-domani)；
+二者都不能替代北单正式结算公告，继续保留特殊SP核查标记。
+
+```{r}
+jq_corrections <- jsonlite::fromJSON("quarto/settlement_jq_corrections.json") %>% as_tibble()
+jq_corrections %>% select(correction_id, issue_code, issue_slot, new_option, new_sp) %>% knitr::kable()
+jq_corrections <- exclude_void_play_corrections(jq_corrections, void_decisions, "jq")
+jq_overlay <- apply_play_corrections(merged, jq_corrections, "jq")
+merged <- jq_overlay$data
+jq_overlay$receipt %>% knitr::kable()
+```
+
+### 最终人工决策：六场已核查玩法全部选项 SP=1
+
+决策来源：`quarto/settlement_void_decisions.json`，证据类别为用户结算假设，**不是官方无效公告**。
+仅23054/335、24051/90、25033/221及新增140706/115、141112/49、25053/250的SPF、总进球、上下单双生效，
+共18个场次玩法、90个选项。新增三场原始SPF选项及SP为空；由本次明确人工决策提供全部选项SP=1的覆盖，非源站开奖值。
+单场每投入1元返还1元，不乘0.65；串关该场任意选项通过，SP乘数为1。
+这是人工覆盖的计奖语义，不是已接入所有生产回测入口的声明。
+`merged`清空这18个场次玩法的唯一中奖选项，玩法状态标为`manual_void`；
+行状态为`manual_void_partial`（比分及半全场玩法不在此次授权范围），原始数据库不改。
+需要逐选项数据的后续分析应使用`void_option_settlements`，不可再用唯一中奖选项筛选。
+
+```{r}
+void_overlay <- apply_manual_void_decisions(merged, void_decisions)
+merged <- void_overlay$data
+void_option_settlements <- void_overlay$options
+void_overlay$receipt %>% knitr::kable()
+void_option_settlements %>% knitr::kable()
+```
+
+## 2. SPF 校验：比分 + 让球 → 重算 vs 提取值
+
+```{r}
+spf_check <- merged %>%
+  filter(settlement_state == "settled",
+         !is.na(result_code_spf), !is.na(handicap_line), !is.na(home_score)) %>%
+  mutate(
+    adj = home_score + handicap_line,
+    recompute = case_when(
+      adj > away_score ~ "3",
+      adj == away_score ~ "1",
+      TRUE ~ "0"
+    ),
+    mismatch = recompute != result_code_spf
+  )
+
+n_spf <- nrow(spf_check)
+n_bad <- sum(spf_check$mismatch)
+cat(glue("SPF 校验: {n_spf - n_bad}/{n_spf} 通过, {n_bad} 不一致 ({round(n_bad*100/max(1,n_spf), 4)}%)"))
+```
+
+### 不一致行明细
+
+```{r}
+if (n_bad > 0) {
+  spf_check %>%
+    filter(mismatch) %>%
+    mutate(expected_opt = case_when(
+      adj > away_score ~ "胜", adj == away_score ~ "平", TRUE ~ "负"
+    )) %>%
+    select(issue_code, issue_slot, home_score, away_score, handicap_line,
+           result_code_spf, winning_option_spf, expected_opt, winning_sp_spf) %>%
+    print(n = 30)
+} else {
+  cat("✅ 全部一致，无 SPF 不一致行")
+}
+```
+
+### 原始数据的 Nowscore 状态交叉审计（更正前历史快照）
+
+此处读取已有 `settlement_mismatch_audit`，保留原始数据的历史审计证据，
+不是应用比分及上下单双清单后的剩余异常列表。各清单应用时均校验其覆盖玩法。
+`scripts/audit_500_play_mismatches.py` 只写审计表，不修改结算数据。
+推迟、取消或中断不能单凭当前状态决定历史彩票结算，必须另查当期结算依据。
+
+```{r}
+audit_con <- dbConnect(RSQLite::SQLite(), settlement_db, flags = RSQLite::SQLITE_RO)
+audit_exists <- dbGetQuery(audit_con, "SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='settlement_mismatch_audit'")$n == 1
+if (audit_exists) {
+  audit <- dbReadTable(audit_con, "settlement_mismatch_audit") %>% as_tibble()
+  audit %>%
+    arrange(issue_code, issue_slot, play_type) %>%
+    select(issue_code, issue_slot, play_type,
+           home_score_500, away_score_500, expected_option, extracted_option, extracted_sp,
+           nowscore_status, home_score_ns, away_score_ns, polygoal_ns, unique_sp_ns,
+           source_url, audited_at_utc)
+} else {
+  cat("尚未生成 mismatch audit；请先运行 audit_500_play_mismatches.py")
+}
+dbDisconnect(audit_con)
+```
+
+### 更正后的剩余异常审计（总进球 / 上下单双）
+
+从原玩法表全量重算，逐字段投射已确认更正，不直接把旧审计表当作当前异常列表。
+分母保留原玩法表状态；人工无效场次单列，缺失字段不算通过。
+旧审计的Nowscore状态来自TypeID=5历史页面，只作状态证据，**其中SP不是总进球或上下单双SP**。
+只有本次补查的对应玩法页面才在下表提供Nowscore中奖选项及SP；其余未查值留空。
+
+```{r}
+raw_plays <- local({
+  con <- dbConnect(RSQLite::SQLite(), settlement_db, flags = RSQLite::SQLITE_RO)
+  on.exit(dbDisconnect(con))
+  dbGetQuery(con, "SELECT * FROM raw_settlement_play_row WHERE play_type IN ('jq','ds')")
+})
+remaining_audit <- audit_remaining_settlements(raw_plays, original_merged, merged) %>% as_tibble()
+remaining_audit %>% count(play_type, audit_class) %>% knitr::kable()
+cat(glue("原始选项不一致 {sum(remaining_audit$original_mismatch)} 条；更正后仍不一致 {sum(remaining_audit$current_mismatch)} 条。\n"))
+fresh_evidence <- jsonlite::fromJSON("quarto/settlement_missing_audit_evidence.json") %>% as_tibble() %>%
+  select(issue_code, issue_slot, play_type, nowscore_status, ns_home, ns_away,
+         nowscore_option, nowscore_sp, source_url, observed_at_utc)
+old_evidence <- if (audit_exists) {
+  audit %>% select(issue_code, issue_slot, play_type, nowscore_status,
+                   source_url, audited_at_utc) %>%
+    rename(old_ns_status = nowscore_status, old_source_url = source_url)
+} else {
+  tibble(issue_code = character(), issue_slot = integer(), play_type = character(),
+         old_ns_status = character(), old_source_url = character(), audited_at_utc = character())
+}
+remaining_detail <- remaining_audit %>%
+  filter(audit_class != "无本轮异常") %>%
+  left_join(old_evidence, by = c("issue_code", "issue_slot", "play_type"), relationship = "one-to-one") %>%
+  left_join(fresh_evidence, by = c("issue_code", "issue_slot", "play_type"), relationship = "one-to-one") %>%
+  mutate(nowscore_status = coalesce(nowscore_status, old_ns_status),
+         source_url = coalesce(source_url, old_source_url),
+         evidence_time = coalesce(observed_at_utc, audited_at_utc))
+remaining_detail %>%
+  filter(startsWith(audit_class, "待核查")) %>%
+  arrange(issue_code, issue_slot, play_type) %>%
+  select(issue_code, issue_slot, play_type, home_score, away_score,
+         original_option, original_sp, winning_option, winning_sp, expected_option,
+         audit_class, nowscore_status, nowscore_option, nowscore_sp, source_url, evidence_time) %>%
+  knitr::kable()
+```
+
+### 五场漏审记录：补查证据与当前处理结果
+
+```{r}
+fresh_evidence %>%
+  left_join(remaining_audit %>% select(issue_code, issue_slot, play_type, home_score, away_score,
+                                     original_option, original_sp, audit_class),
+            by = c("issue_code", "issue_slot", "play_type"), relationship = "one-to-one") %>%
+  select(issue_code, issue_slot, play_type, home_score, away_score, original_option, original_sp,
+         nowscore_status, ns_home, ns_away, nowscore_option, nowscore_sp) %>% knitr::kable()
+```
+
+140706/115：推迟；141112/49：取消。两场页面多个参考SP仍有数值，不视为唯一开奖选项；用户现已确认按人工无效结算处理。
+150903/169：已改2–3并派生SPF负，保留SP。[俱乐部报道索引](https://www.selfoss.net/knattspyrna/moya/news/category/6/saeti-i-fyrstu-deild-tryggt)支持2–3，直接正文抓取失败。
+23093/303：已改总进球4、SP3.753；上下单双上双、SP3.0546，比分3–1不变。
+25053/250：Nowscore取消，总进球8个选项及上下单双4个选项均为SP=1，已按用户新增确认加入无效结算清单。
+完整多选项证据保存在`settlement_missing_audit_evidence.json`。
+
+140706/115：原期页面日期2014-07-20，挪威足协记载实际比赛为[2014-09-05，2–1](https://www.fotball.no/fotballdata/kamp/?fiksId=5904833)。
+141112/49：[PSV公告](https://www.psv.nl/en/media/article/estoril-psv-abandoned-after-one-half)证实2014-11-27半场3–2中断；
+[UEFA记录](https://www.uefa.com/uefaeuropaleague/news/021b-0e8e749624c9-4b22b7aef1f0-1000--psv-ensure-progress-after-estoril-epic/)证实次日续赛后3–3。
+这两场Nowscore并无唯一开奖选项，参考SP不得当作开奖SP；现按用户明确确认执行人工无效结算，不宣称已找到正式彩票公告。
+
+## 3. 按让球数分布
+
+```{r}
+merged %>%
+  filter(settlement_state == "settled", !is.na(handicap_line)) %>%
+  count(handicap_line) %>%
+  arrange(handicap_line) %>%
+  mutate(pct = round(n * 100 / sum(n), 1)) %>%
+  mutate(label = glue("让球{sprintf('%+g', handicap_line)}: {n} 行 ({pct}%)")) %>%
+  pull(label) %>% cat(sep = "\n")
+```
+
+## 4. 原始数据写保护
+
+本报告已使用确认清单的内存更正层。禁止再把内存派生值通过旧的SPF修正流程写回源表；
+数据库写回需要独立的逐表事务审计。请保持 `do_fix: false`。
+
+```{r}
+if (isTRUE(params$do_fix)) {
+  stop("本报告只应用内存更正层；请保持 do_fix: false，不允许旧SPF写回流程")
+}
+```
+
+## 5. 修正后校验
+
+```{r}
+merged <- apply_settlement_corrections(read_settlement(settlement_db), corrections)$data
+merged <- apply_play_corrections(merged, ds_corrections, "ds")$data
+merged <- apply_play_corrections(merged, jq_corrections, "jq")$data
+final_void <- apply_manual_void_decisions(merged, void_decisions)
+merged <- final_void$data
+stopifnot(identical(void_option_settlements, final_void$options),
+          nrow(void_option_settlements) == 90L,
+          all(void_option_settlements$sp == 1),
+          all(void_option_settlements$parlay_pass),
+          all(void_option_settlements$single_refund_per_unit == 1))
+spf_final <- merged %>%
+  filter(settlement_state == "settled", !is.na(result_code_spf), !is.na(handicap_line), !is.na(home_score)) %>%
+  mutate(
+    adj = home_score + handicap_line,
+    recompute = case_when(adj > away_score ~ "3", adj == away_score ~ "1", TRUE ~ "0"),
+    mismatch = recompute != result_code_spf
+  )
+n_final <- sum(spf_final$mismatch)
+cat(glue("✅ 修正后校验: {nrow(spf_final)} 行, 不一致 {n_final} ({round(n_final*100/max(1,nrow(spf_final)),4)}%)"))
+```
+
+## 6. 宽表状态
+
+```{r}
+cat("玩法覆盖:\n")
+merged %>%
+  summarise(across(starts_with("winning_option_"), ~ sum(!is.na(.)))) %>%
+  pivot_longer(everything(), names_to = "play", values_to = "n") %>%
+  mutate(pct = round(n * 100 / nrow(merged), 1),
+         label = glue("  {sub('winning_option_', '', play)}: {n} ({pct}%)")) %>%
+  pull(label) %>% cat(sep = "\n")
+
+cat("\n让球数分布:\n")
+merged %>%
+  filter(settlement_state == "settled", !is.na(handicap_line)) %>%
+  count(handicap_line) %>%
+  arrange(handicap_line) %>%
+  mutate(pct = round(n * 100 / sum(n), 1)) %>%
+  mutate(label = glue("  {sprintf('%+g', handicap_line)}: {n} 行 ({pct}%)")) %>%
+  pull(label) %>% cat(sep = "\n")
+```

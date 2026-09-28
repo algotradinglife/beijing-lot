@@ -11,7 +11,10 @@ parlay_settle_plan(plan, settlements, as_of)
 n_legs, unit_cny and payout_factor, so settlement cannot be re-priced or
 re-shaped by a later session change.}
 
-\item{settlements}{Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.}
+\item{settlements}{Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+Explicit status all_options_one requires outcome ALL and SP=1, and is a
+neutral parlay leg, not a prediction hit. Single-leg and all-neutral tickets
+remain SPECIAL; refunds are not inferred.}
 
 \item{as_of}{UTC POSIXct instant limiting visible settlement labels.}
 }

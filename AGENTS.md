@@ -55,6 +55,7 @@
 
 - Record direct dependencies, reproducible versions, and required R/Python/Quarto runtimes in project configuration.
 - Install dependencies during environment setup, never during function execution or QMD rendering.
+- Use `pak` for R package installation, updates, and dependency management. Use other installers only to bootstrap `pak` itself when it is unavailable.
 - Select the project Python interpreter explicitly for R/Python calls; fail clearly on incorrect environments.
 - Render QMD from a clean session with declared inputs and parameters, independent of RStudio globals or manual execution order.
 - Do not depend on undeclared local files, personal paths, or restored workspaces.
@@ -116,7 +117,8 @@
 
 ### Scope and chronology
 
-- Every decision-facing historical learning, calibration, tuning, selection, ranking, gate, or optimization function must accept an explicit cutoff object.
+- Every decision-facing historical learning, calibration, tuning, selection, ranking, gate, or optimization function must receive an explicit cutoff, either as a standalone cutoff object or embedded in an explicitly passed decision object (for example, `portfolio$cutoff`). An embedded cutoff satisfies this requirement; do not require a redundant standalone cutoff argument.
+- Validate the embedded cutoff and its binding to the object's input snapshots and derived artifacts. Missing, malformed, or inconsistent cutoff context must fail closed; never infer it from the current clock, hidden globals, or mutable session state. Changing the cutoff requires rebuilding the affected decision artifacts, not merely editing their cutoff field. All chronology, receipt, and cache requirements below apply equally to both forms.
 - This includes preprocessing, thresholds, support depth, hyperparameters, seeds, expert admission, routing, allocation, bankroll gates, league/team effects, regimes, embeddings, priors, shrinkage, imputation, normalization, and availability gates.
 - Admit actual source data and available labels strictly before cutoff; derive every fit/tune/calibration partition within that prior window.
 - Fail closed on missing chronology or insufficient history.

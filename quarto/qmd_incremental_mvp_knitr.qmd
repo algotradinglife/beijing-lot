@@ -1,0 +1,101 @@
+---
+title: "knitr 增量缓存对照（合成数据）"
+format:
+  html:
+    embed-resources: true
+params:
+  config: "config/qmd_incremental_mvp/run.json"
+  audit_dir: null
+execute:
+  cache: true
+  freeze: false
+  error: false
+---
+
+复用 #501 的同一份 CSV、R 函数及 Python 实现。ID 保留前导零；
+平方误差无量纲；缺失标签不参与均值，全部缺失的组返回 NA。
+此文档只支持 real 模式。原型、历史学习和生产缓存均不在本对照范围内。
+
+```{r}
+#| label: setup
+#| cache: false
+#| include: false
+source("r/python_bridge.R")
+source("r/qmd_incremental_mvp.R")
+cfg <- jsonlite::read_json(params$config, simplifyVector = TRUE)
+stopifnot(identical(cfg$mode, "real"), file.exists(cfg$python))
+python_sources <- c("src/qmd_incremental_mvp.py", "r/python_bridge.R")
+dependency_files <- c("r/qmd_incremental_mvp.R", python_sources, cfg$input,
+                      params$config, "config/qmd_incremental_mvp/runtime.json",
+                      "config/qmd_incremental_mvp/packages.json")
+stopifnot(all(file.exists(dependency_files)))
+identities <- tools::md5sum(dependency_files)
+# Conservative file-level R identity includes every helper and schema constant.
+# Package/runtime changes require setup and the version manifests to be updated.
+environment_key <- list(R = R.version.string, python = normalizePath(cfg$python),
+                        manifests = identities[c("config/qmd_incremental_mvp/runtime.json",
+                                                 "config/qmd_incremental_mvp/packages.json")])
+r_key <- list(identities["r/qmd_incremental_mvp.R"], environment_key)
+if (!is.null(params$audit_dir)) {
+  dir.create(params$audit_dir, recursive = TRUE, showWarnings = FALSE)
+}
+```
+
+```{r}
+#| label: matches
+#| include: false
+#| cache.extra: !expr list(r_key, identities[c(cfg$input, params$config)])
+if (!is.null(params$audit_dir)) cat("matches\n", file = file.path(params$audit_dir, "executed.txt"), append = TRUE)
+matches <- mvp_read(cfg$input)
+```
+
+```{r}
+#| label: errors
+#| include: false
+#| dependson: matches
+#| cache.extra: !expr list(r_key, identities[python_sources])
+if (!is.null(params$audit_dir)) cat("errors\n", file = file.path(params$audit_dir, "executed.txt"), append = TRUE)
+errors <- mvp_errors(matches, cfg$python, getwd(), python_sources)
+```
+
+```{r}
+#| label: summary
+#| include: false
+#| dependson: errors
+#| cache.extra: !expr r_key
+if (!is.null(params$audit_dir)) cat("summary\n", file = file.path(params$audit_dir, "executed.txt"), append = TRUE)
+summary_table <- mvp_summary(errors)
+```
+
+## 结果
+
+```{r}
+#| label: display
+#| cache: false
+display <- jsonlite::read_json("config/qmd_incremental_mvp/display.json", simplifyVector = TRUE)
+knitr::kable(errors)
+knitr::kable(dplyr::mutate(summary_table, mean_error = round(mean_error, display$digits)),
+             caption = display$title)
+```
+
+## 输入身份与复现
+
+```{r}
+#| label: provenance
+#| cache: false
+knitr::kable(tibble::tibble(path = names(identities), md5 = unname(identities)))
+if (!is.null(params$audit_dir)) {
+  saveRDS(list(matches = matches, errors = errors, summary = summary_table),
+          file.path(params$audit_dir, "values.rds"))
+}
+```
+
+从项目根目录执行 `quarto render quarto/qmd_incremental_mvp_knitr.qmd --execute-dir .`。
+隔离变更测试：`Rscript --vanilla scripts/compare_qmd_incremental_mvp.R`。
+验收必须另用 `--no-cache` 完整重算。`audit_dir` 仅供测试，显式指定后记录
+实际执行块并导出 tibble；生产使用保持 null。Python 模块对象不会存入块缓存。
+
+这里手工维护三块之间的依赖及外部文件哈希。R 文件任何修改都会使三块失效，
+这是保守的正确性选择，不宣称具备 targets 的函数级依赖精度。
+新增外部文件或 Python 导入必须加入清单。失败渲染可能留下旧 HTML，
+只有成功退出并通过数值检查的本次结果才可验收。

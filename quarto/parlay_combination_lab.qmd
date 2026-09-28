@@ -1,0 +1,273 @@
+---
+title: "串场组合实验台：预算、覆盖与回本"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: true
+  cache: false
+  freeze: false
+  error: false
+params:
+  input: "inputs/26098_walkthrough/three_plans_20260928/plans.rds"
+  selected_scenario_id: null
+  selected_prefix_groups: null
+---
+
+先比较参数，再由人选择。使用同一份冻结概率和北单赛前 SP，对四种结构探索单组投入；**不设置总预算上限**，实际选入时约束每场最多复用两次、两组最多重叠两场。不读取结算、不联网、不发布下注单。四种结构按替代方案比较，复用上限按单个方案计算。本页结果是模型估计，不能视为历史收益证明。
+
+## 1. 输入和参数
+
+在 Positron 从本块顺序执行即可。各结构全覆盖成本分别为1296、288、192、64元；固定投入超过结构上限时截断，相同配置只计算一次。
+
+```{r}
+#| label: lab-setup
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+input_relative <- "inputs/26098_walkthrough/three_plans_20260928/plans.rds"
+if (exists("params") && !is.null(params$input)) input_relative <- params$input
+input_path <- file.path(root,input_relative)
+bundle <- readRDS(input_path)
+source_result <- list(probabilities=bundle$projected$probabilities,
+  constants=bundle$outputs[[1]]$evaluated$final$constants)
+cutoff <- bundle$projected$cutoff
+decision_sp <- bundle$epoch$prematch_sp
+unit_cny <- source_result$constants$unit_cny
+patterns <- list(
+  p3333222=c(3L,3L,3L,3L,2L,2L,2L),
+  p3322221=c(3L,3L,2L,2L,2L,2L,1L),
+  p3222221=c(3L,2L,2L,2L,2L,2L,1L),
+  p2222211=c(2L,2L,2L,2L,2L,1L,1L))
+n_candidates <- as.integer(dplyr::n_distinct(source_result$probabilities$fixture_id))
+group_budgets_cny <- c(64,128,192,256)
+pattern_catalog <- tibble::tibble(pattern=names(patterns),
+  full_cover_units=vapply(patterns,prod,numeric(1))) |>
+  dplyr::mutate(full_cover_cny=full_cover_units*unit_cny)
+knitr::kable(tibble::tibble(期号=cutoff$issue_id,
+  冻结北京时间=format(cutoff$cutoff_utc,"%Y-%m-%d %H:%M:%S",tz="Asia/Shanghai"),
+  比赛数=n_candidates,输入=input_relative,
+  SHA256=digest::digest(file=input_path,algo="sha256")))
+knitr::kable(pattern_catalog)
+```
+
+## 2. 角色排行榜和候选组
+
+每场都拥有三个适配分数：单选取最大概率、双选取前两项之和、三选取最小概率。角色按3→2→1安排，各组逐轮蛇形选场。候选组可以共享比赛，复用和重叠限制在选入方案时生效。
+
+```{r}
+#| label: role-rankings
+role_scores <- beidan::parlay_role_scores(source_result$probabilities,cutoff)
+knitr::kable(role_scores |>
+  dplyr::arrange(dplyr::desc(role),rank) |>
+  dplyr::mutate(allowed_outcomes=sapply(allowed_outcomes,paste,collapse="/")),digits=4)
+knitr::kable(tibble::tibble(赛前SP场数=dplyr::n_distinct(decision_sp$fixture_id),
+  赛前SP行数=nrow(decision_sp)))
+```
+
+```{r}
+#| label: role-candidates
+portfolios <- list()
+for (key in names(patterns)) {
+  portfolios[[key]] <- beidan::parlay_construct_role_groups(
+    role_scores,cutoff,settings=source_result$constants,pattern=patterns[[key]],
+    n_candidates=n_candidates,probabilities=source_result$probabilities,
+    prematch_sp=decision_sp)
+}
+knitr::kable(tibble::tibble(pattern=names(portfolios),
+  candidate_groups=vapply(portfolios,function(x) nrow(x$groups),integer(1))))
+```
+
+## 3. 批量比较单组投入
+
+固定64、128、192、256元，另加各结构的全覆盖端点。探索阶段关闭微调。没有 `budget_cny` 列表示总预算不限；这用于列举候选方案，不表示应全部购买。
+
+```{r}
+#| label: exploration-scenarios
+scenario_requests <- dplyr::bind_rows(
+  tidyr::crossing(pattern_catalog,requested_group_cny=group_budgets_cny),
+  dplyr::mutate(pattern_catalog,requested_group_cny=full_cover_cny)) |>
+  dplyr::mutate(group_budget_cny=floor(pmin(requested_group_cny,full_cover_cny)/unit_cny)*unit_cny)
+scenarios <- scenario_requests |>
+  dplyr::distinct(pattern,group_budget_cny) |>
+  dplyr::arrange(pattern,group_budget_cny) |>
+  dplyr::mutate(max_reuse=2L,max_overlap=2L,
+    scenario_id=sprintf("S%03d",dplyr::row_number()),.before=1)
+exploration <- beidan::parlay_explore_portfolios(portfolios,scenarios,objective="probability")
+knitr::kable(exploration$summary,digits=5)
+```
+
+`exploration$results[["S001"]]$selection` 显示选入或跳过原因，`$tickets` 是实际购票明细。不同投入下允许重新选组，所以本块不是固定成员的纯深度实验。
+
+## 4. 联合赛果下的命中和回本
+
+每个场次只产生一个赛果，共享场次的所有组复用这个赛果。各方案使用同一赛果空间。小规模精确枚举；超过上限时使用共同随机样本。当前12场最多531441个联合状态，可以精确求和。场次之间暂按独立处理；精确枚举消除了抽样误差，**没有消除概率模型误差**。
+
+每个情景内按实际已购票覆盖概率从高到低排列组，依次看前0、1、2…组。横轴统一为实际花费。回本指总回款不小于实际投入，零投入的回本概率不定义。赛前 SP 只取冻结前可用值；单场 `SP>10 → 4.5`，票级回款系数只乘一次0.65。缺少所需 SP 的前缀保留覆盖指标，收益相关指标为缺失。
+
+```{r}
+#| label: joint-risk
+risk <- beidan::parlay_compare_risk(exploration,method="auto",
+  n_draws=20000L,seed=544L,max_exact_states=600000L)
+budget_comparison <- risk$summary |>
+  dplyr::left_join(scenarios,by="scenario_id",relationship="many-to-one")
+knitr::kable(budget_comparison,digits=5)
+```
+
+用 `risk$receipt$ordered_groups[["S001"]]` 查看该情景的组排序；前缀为2就是这个列表的前两组。
+
+`expected_winning_tickets` 是预计命中票数；`hit_probability` 才是至少命中一次的概率。`break_even_probability` 是回本概率，`expected_net_cny` 是参考期望净收益，`net_p05_cny` 是净收益分布的5%分位数。前三者不能互相替代。
+
+```{r}
+#| label: budget-curves
+plot_data <- budget_comparison |>
+  dplyr::filter(cost_cny>0) |>
+  tidyr::pivot_longer(c(hit_probability,break_even_probability,expected_net_cny,net_p05_cny),
+    names_to="metric",values_to="value")
+ggplot2::ggplot(plot_data,ggplot2::aes(cost_cny,value,colour=pattern,
+  group=interaction(pattern,group_budget_cny)))+
+  ggplot2::geom_line(na.rm=TRUE)+ggplot2::geom_point(na.rm=TRUE)+
+  ggplot2::facet_wrap(~metric,scales="free_y")+
+  ggplot2::labs(x="Actual spend (CNY)",y="Model estimate",colour="Structure")+
+  ggplot2::theme_minimal()
+```
+
+每条线连接同一结构、同一单组投入下的组数前缀。点是离散配置，不承诺两点之间的连续预算效果。单点曲线本来就没有连线。
+
+全覆盖端点会压缩低投入区域。下图放大512元以内的配置，方便比较接近的点；这只是显示范围，不是总预算限制。
+
+```{r}
+#| label: budget-curves-zoom
+ggplot2::ggplot(dplyr::filter(plot_data,cost_cny<=512),
+  ggplot2::aes(cost_cny,value,colour=pattern,
+    group=interaction(pattern,group_budget_cny)))+
+  ggplot2::geom_line(na.rm=TRUE)+ggplot2::geom_point(na.rm=TRUE)+
+  ggplot2::facet_wrap(~metric,scales="free_y")+
+  ggplot2::labs(x="Actual spend (CNY), zoom <= 512",y="Model estimate",colour="Structure")+
+  ggplot2::theme_minimal()
+```
+
+
+## 5. 固定成员后的覆盖深度
+
+每种结构取全覆盖情景选中的成员和掩码，再改变每组购买深度。这里不重新选场，用来区分“组本身保留多少可能性”和“预算买到了其中多少”。`structure_probability` 是掩码内全部合法票的概率质量；`coverage_probability` 是已买前缀的无条件概率；两者之比 `retained_fraction` 是结构内的条件覆盖比例。
+
+```{r}
+#| label: fixed-depth
+full_scenarios <- scenarios |>
+  dplyr::group_by(pattern) |>
+  dplyr::slice_max(group_budget_cny,n=1,with_ties=FALSE) |>
+  dplyr::ungroup()
+fixed_plans <- stats::setNames(lapply(full_scenarios$scenario_id,
+  function(id) exploration$results[[id]]$final),full_scenarios$pattern)
+depth_curve <- beidan::parlay_fixed_depth_curve(fixed_plans,
+  sort(unique(c(0,group_budgets_cny,pattern_catalog$full_cover_cny))))
+knitr::kable(depth_curve,digits=5)
+ggplot2::ggplot(depth_curve,ggplot2::aes(cost_cny,coverage_probability,colour=group_id))+
+  ggplot2::geom_line()+ggplot2::geom_point()+ggplot2::facet_wrap(~pattern)+
+  ggplot2::labs(x="Group spend (CNY)",y="Unconditional coverage",colour="Fixed group")+
+  ggplot2::theme_minimal()+ggplot2::theme(legend.position="none")
+```
+
+同组按概率 TopN 购买时覆盖单调增加，但净收益未必单调增加。不要用第一张负期望票作为通用停止规则：按概率排序不等于按期望收益排序。
+
+## 6. 展示候选前沿
+
+在相同复用/重叠上限内跨结构比较，分别保留“成本—命中概率”和“成本—期望净收益”前沿，避免把收益较好但覆盖较低的配置提前丢弃。现金作为零投入参考单列，不参与这些正投入前沿。前沿只针对本次网格，不等于全局最优。
+
+```{r}
+#| label: coverage-frontier
+frontier <- beidan::parlay_frontier(budget_comparison)
+knitr::kable(frontier |>
+  dplyr::filter(coverage_frontier | return_frontier) |>
+  dplyr::select(scenario_id,pattern,group_budget_cny,prefix_groups,cost_cny,
+    hit_probability,break_even_probability,expected_net_cny,net_p05_cny,
+    coverage_frontier,return_frontier),digits=5)
+knitr::kable(frontier |> dplyr::filter(cost_cny==0) |>
+  dplyr::select(scenario_id,prefix_groups,cost_cny,hit_probability,expected_net_cny) |>
+  dplyr::slice_head(n=1))
+```
+
+## 7. 人工选择后再微调
+
+默认两个选择参数均为空，只展示前沿。看过图表后填写情景编号和组数前缀；微调总额限制为该前缀的实际花费。微调可能重新选组，其目标仍为预计命中票数，不保证回本概率上升，所以必须重新评价风险。
+
+```{r}
+#| label: choose-scenario
+selected_scenario_id <- NULL
+selected_prefix_groups <- NULL
+if (exists("params")) {
+  if (!is.null(params$selected_scenario_id)) selected_scenario_id <- params$selected_scenario_id
+  if (!is.null(params$selected_prefix_groups)) selected_prefix_groups <- params$selected_prefix_groups
+}
+selection_is_explicit <- !is.null(selected_scenario_id) || !is.null(selected_prefix_groups)
+selected_config <- budget_comparison[0,]
+if (selection_is_explicit) {
+  stopifnot(is.character(selected_scenario_id),length(selected_scenario_id)==1L,
+    !is.na(selected_scenario_id),is.numeric(selected_prefix_groups),
+    length(selected_prefix_groups)==1L,!is.na(selected_prefix_groups),
+    selected_prefix_groups>=1,selected_prefix_groups==floor(selected_prefix_groups))
+  selected_config <- budget_comparison |>
+    dplyr::filter(scenario_id==selected_scenario_id,prefix_groups==selected_prefix_groups,cost_cny>0)
+  stopifnot(nrow(selected_config)==1L)
+  knitr::kable(selected_config,digits=5)
+} else {
+  cat("尚未指定研究配置；不自动挑选冠军，也不生成下注单。")
+}
+```
+
+```{r}
+#| label: refine-selected
+role_evaluation <- NULL
+if (nrow(selected_config)==1L) {
+  role_evaluation <- beidan::parlay_evaluate_portfolio(
+    portfolios[[selected_config$pattern[[1]]]],
+    group_budget_cny=selected_config$group_budget_cny[[1]],
+    budget_cny=selected_config$cost_cny[[1]],
+    constraints=list(max_reuse=selected_config$max_reuse[[1]],
+      max_overlap=selected_config$max_overlap[[1]]),improve=TRUE,
+    improvement_policy=list(max_passes=1L,rank_window=2L,max_evaluations=8L))
+  refined_risk <- beidan::parlay_compare_risk(list(
+    results=list(refined=role_evaluation),cutoff=cutoff,
+    summary=tibble::tibble(scenario_id="refined")),include_group_prefixes=FALSE)
+  print(knitr::kable(role_evaluation$metrics,digits=5))
+  print(knitr::kable(refined_risk$summary,digits=5))
+}
+```
+
+```{r}
+#| label: selected-plan
+if (!is.null(role_evaluation)) {
+  print(knitr::kable(role_evaluation$final$plan$group_legs))
+  print(knitr::kable(role_evaluation$selection))
+  print(knitr::kable(utils::head(role_evaluation$tickets,30),digits=5))
+}
+```
+
+## 8. 复现与解释边界
+
+当前没有读取历史结算、拟合参数或自动选出正式配置。今后的历史检验必须按决策时点向前滚动，用当时可获得的数据；不能通过本期赛后结果挑最优参数。SP 是冻结报价下的参考估值，模型独立性、概率误差和结算差异都可能改变实际收益。
+
+```{r}
+#| label: provenance
+knitr::kable(tibble::tibble(输入SHA256=digest::digest(file=input_path,algo="sha256"),
+  情景数=nrow(scenarios),前缀点数=nrow(risk$summary),
+  生成北京时间=format(Sys.time(),"%Y-%m-%d %H:%M:%S",tz="Asia/Shanghai"),
+  R版本=R.version.string,beidan版本=as.character(utils::packageVersion("beidan"))))
+str(risk$receipt,max.level=1)
+```
+
+函数测试在开发时独立执行，不在本页运行。当前验收、review命令及文件哈希见 `docs/reviews/544-portfolio-risk.json`；此前版本记录见 `docs/reviews/542-exploration-first.json`。收据绑定冻结时点、数据、参数和实现身份。
+
+```{r}
+#| label: review-evidence
+review_path <- file.path(root,"docs/reviews/544-portfolio-risk.json")
+if (file.exists(review_path)) {
+  review_record <- jsonlite::read_json(review_path,simplifyVector=TRUE)
+  cat("审查状态：",review_record$status,"\n")
+  cat("审查命令：",review_record$review_command,"\n")
+  knitr::kable(tibble::as_tibble(review_record$reviewed_files))
+} else {
+  cat("本开发版本尚未完成独立验收，审查记录待生成。")
+}
+```

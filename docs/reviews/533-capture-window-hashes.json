@@ -1,0 +1,33 @@
+{
+  "generated_at": "2026-09-26T19:36:18.823151+08:00",
+  "files": {
+    "packages/beidan/R/market_schedule.R": "17e2317c7579ec4035b76ee53450487e9b54d06139e6dc5d0d827159092d6ce2",
+    "packages/beidan/NAMESPACE": "3fe2d96cfddf88a256e306f4aa0fae234fe5d902ffb9e8559cc30dafa2e17e26",
+    "packages/beidan/man/match_market_schedule.Rd": "9c62978c1d46381378397bdb8c050c01661b88bb5070755edd39742fc64407c2",
+    "packages/beidan/tests/testthat/test-market-schedule.R": "683015335272660c2b1a31347830df5892e92b53cc4b2c166c04465eda206c96",
+    "tests/testthat/test-26098-walkthrough.R": "cdf084cc6d51c7700ec64975cd51c3b917057061db4500e821d67e377c55fc0a",
+    "quarto/26098_walkthrough.qmd": "fa42d9144e188227d173c9f4a01785f7015020bfa2e91655ff84a44b76a364fb",
+    "packages/beidan/R/n7_experiment_contract.R": "646d923d46d8de26101b95df17740cce06e45f2027556f6d1abbd17bceb9201a",
+    "packages/beidan/R/n7_pipeline_epoch.R": "ec1d89892ef70bf32d1928180da8998de8cb6329facdae7f716128da970c2449",
+    "packages/beidan/R/match_markets.R": "49b7b9c002bf0bec0e9cae29cf6fcd00b8f926b5afc9e51adf0bdf8f3ff074a2",
+    "docs/reviews/533-capture-window.md": "0eaa4a0237a0061d5150ded24aa600782963bdf8098f46d6fd39424693640bd8"
+  },
+  "inputs": {
+    "inputs/26098_walkthrough/schedule.rds": "43fbf0a420e057578583aebbfb577f55a4a296329305c1f23904dd8aaeb6e501",
+    "inputs/26098_walkthrough/markets.rds": "70b41d36540c09f9d41a625e5594ec6c7f5a94be1f3787c66cd30c2660062b0c"
+  },
+  "render_source_sha256": "511c2056b10f1ce45b58226b1827905b3ca777d4a74a34225eb246a18c03dcb6",
+  "render_html_sha256": "2fe9f0f2c2be18afac8e0bafb054dbe1224650b9e1df30d6283c8821fe39a133",
+  "review_command": [
+    "codex",
+    "review",
+    "Review only follow-up capture-window fix: NEW packages/beidan/R/market_schedule.R and test-market-schedule.R, exported match_market_schedule and its Rd, modifications to quarto/26098_walkthrough.qmd Block5/progress to replace hardcoded market_slots20 up to78 with shared full-schedule window, and added actual Block5 regression in tests/testthat/test-26098-walkthrough.R. Prior #533 implementation has clean reviews and is out of scope. Use read-only inspection, no test reruns, no CI, no scraping. Tests: new function18 assertions, original QMD blocks plus added regression20 all pass. Verify all future slots within shared [reference+4h,reference+28h) admitted to capture; input full schedule retained with explicit missing coverage instead of silent subset; no fabricated availability; reference before capture vs actual decision after capture is intentional and chronology remains enforced at step6. Current complete saved schedule at19:28 has52 fixtures, old captured20 contain7 in window. Report only actionable defects, no edits."
+  ],
+  "review_conclusion": "No actionable defects found within the requested scope. Capture selection includes every slot in the shared half-open window, retains the full schedule downstream, and leaves availability enforcement to step 6 without fabricating evidence. Review was read-only; no tests, CI, or scraping were run.\nNo actionable defects found within the requested scope. Capture selection includes every slot in the shared half-open window, retains the full schedule downstream, and leaves availability enforcement to step 6 without fabricating evidence. Review was read-only; no tests, CI, or scraping were run.",
+  "tests": {
+    "function_assertions": 18,
+    "QMD_assertions": 20,
+    "failures": 0,
+    "warnings": 0
+  }
+}

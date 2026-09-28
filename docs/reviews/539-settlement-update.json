@@ -1,0 +1,77 @@
+{
+  "issue": 539,
+  "generated_at": "2026-09-27T13:18:54.893406+00:00",
+  "review": {
+    "command": "codex review - < .run-control/26098-settlement-update/review-prompt.txt",
+    "result": "No actionable correctness findings",
+    "log": ".run-control/26098-settlement-update/codex-review.log",
+    "scope": "Explicit SP1 cancellation path, frozen inputs, reports and corresponding tests. Unrelated workspace changes excluded. Only acceptance comments appended after review; executable QMD chunks unchanged."
+  },
+  "reviewed_sha256": {
+    "quarto/26098_betting_plan.qmd": "a5273822c16127b31690e8fc9a1790fd518f3dd63199f0bfd92c686358de1d4e",
+    "quarto/26098_betting_plan_3333222.qmd": "9a334b16727e7699a8a967c4c895d2c08ef738f5e6f7bcbe496f87871eb0f450",
+    "quarto/_26098_settlement_update.qmd": "dd25b27e92eddfc5aa52a461ee41f647a66c7c0bd94c9af8027579cb64fa3939",
+    "packages/beidan/inst/python/beidan_backend/settlement/__init__.py": "23d60f61eeeaf2ed16faf6edccacea27bcf3ab87a88f2bcd3c46fe4a9fb1fc33",
+    "packages/beidan/R/issue_settlements.R": "7014e9715e6e033819f80ac2fadd4a18d12ea6a140f50fb30bfac715b59d5727",
+    "packages/beidan/R/n7_pipeline_value.R": "a86718dc0ad93d6142604457e337f9ae66af9c09408c6541ce0f527390a82e5c",
+    "packages/beidan/man/fetch_issue_settlements.Rd": "da375e48c63367351d8d51b9d8bb044de0a38cfa1c11086297453ab468c68d9c",
+    "packages/beidan/man/parlay_settle_plan.Rd": "6af9ce49ef334368fbb2da3d13ea95fe14e91ab242830a94a6ed75c9f006f052",
+    "packages/beidan/tests/testthat/test-settlement-neutral-leg.R": "5279ea99f64db1b9dafe1fbf13703ad0e4239a253e58b8bc42c0f62d2a31f88b",
+    "packages/beidan/tests/testthat/test-issue-settlements.R": "cc3820ca06c2ae83aafcb06eab93abf42da6174e7fddcfc4af22bd59f00f8a2d",
+    "packages/beidan/tests/testthat/test-n7-pipeline-value.R": "bdbedc060fb07c03b88dd87b9ccfdf5d4134ff926f40682a8ac87973996f53df",
+    "packages/beidan/tests/testthat/fixtures/settlement/cancelled-all-one.html": "59bd2d8aaa963683c0c89e3b0d434cfd43da23d1a464220dbf6835c3e1a97625",
+    "tests/test_issue_settlements_capture.py": "2ee68399f4576df8422cac9918d50a80a2a50fea3d779746c3ae496d4510a092"
+  },
+  "input_sha256": {
+    "inputs/26098_walkthrough/print/26098-20260926-195204.rds": "d5658ae5476d2b014e960f855d67cd06dd65d83cf90363ac911984bda436b5c9",
+    "inputs/26098_walkthrough/print/26098-195204-3333222-256.rds": "cbcc9303bbce6b7089be5768dcd395494a4b3fe00414b219eded46ad94869af5",
+    "inputs/26098_walkthrough/print/settlement-20260927-210244-neutral.rds": "341b675f2e5990492bd5abec5ecba57773161ef44bbc03dd66441a4de9affbcf",
+    "inputs/26098_walkthrough/print/settlement-source-20260927-210244.json": "1fdac811b9cac375b3f427f99b217fa170467217bcbda81c06cccfabd06a83b5"
+  },
+  "validation": {
+    "r_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE); for(f in c(\"test-issue-settlements.R\",\"test-settlement-neutral-leg.R\",\"test-n7-pipeline-value.R\")) testthat::test_file(file.path(\"packages/beidan/tests/testthat\",f),stop_on_failure=TRUE)'",
+    "r_assertions": 351,
+    "r_failures": 0,
+    "r_warnings": 0,
+    "r_skips": 0,
+    "python_command": ".venv/bin/python -m pytest tests/test_issue_settlements_capture.py -q",
+    "python_passed": 12,
+    "independent_command": ".venv/bin/python .run-control/26098-settlement-update/independent-check.py",
+    "independent_tickets": 896,
+    "html_frozen_ticket_comparison": "Both rendered sheets preserve all previously published ticket ranks, outcomes and costs (384+512).",
+    "render_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/{26098_betting_plan,26098_betting_plan_3333222}.qmd --to html --no-cache (each separately)",
+    "html_execution_errors": 0
+  },
+  "results": {
+    "as_of_beijing": "2026-09-27 21:02:44",
+    "normal_finished": 25,
+    "cancelled_observed_all_three_sp1": 1,
+    "pending_fixtures": [
+      118,
+      120
+    ],
+    "original": {
+      "stake": 768,
+      "lost": 378,
+      "pending": 6,
+      "won": 0,
+      "payout": 0,
+      "known_net": -756
+    },
+    "alternative": {
+      "stake": 1024,
+      "lost": 503,
+      "pending": 9,
+      "won": 0,
+      "payout": 0,
+      "known_net": -1006
+    }
+  },
+  "limitations": [
+    "Partial settlement, not final ROI.",
+    "Assumes frozen sheets were purchased; no order receipt.",
+    "Single/all-neutral cancellation refunds not inferred; remain SPECIAL.",
+    "Main repository changes remain local; only static Sites source published."
+  ],
+  "site_commit": "783a038a500dcef54753525e911687858fe3d49f"
+}

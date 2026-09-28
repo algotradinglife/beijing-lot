@@ -147,7 +147,8 @@ def parse_euro_history_js(
         )
     if not snapshots:
         raise ScoreModelHistoryError(f"Titan Euro company history empty: {company_id}")
-    snapshots.sort(key=lambda row: (row.snapshot_ts_hkt, row.raw_row_sha256))
+    # Stable chronological sort preserves Titan newest-first order within a minute.
+    snapshots.sort(key=lambda row: row.snapshot_ts_hkt)
     return company_name, snapshots, counters
 
 

@@ -1,0 +1,89 @@
+---
+title: "QMD 增量开发 MVP"
+format:
+  html:
+    embed-resources: true
+params:
+  store: "results/qmd_incremental_mvp/store"
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 范围与输入
+
+Issue [#501](https://github.com/algotradinglife/beijing-lot/issues/501)。
+本报告仅使用五行**合成数据**验证工程流程，不是预测、策略或收益证据。
+没有历史学习函数；cutoff 治理不适用于此纯诊断样例，扩展到历史学习时必须复用 temporal_learning。
+
+```{r}
+receipt <- targets::tar_read(receipt, store = params$store)
+receipt$mode
+```
+
+模式 `prototype` 表示 dummy 输出，不可用于验收；`real` 表示真实计算合成输入。
+ID 为字符并保留前导零；概率为 double；标签仅允许 0、1、NA。
+Python 中缺失标签显式转换为 None，返回 R 后恢复 NA_real_。
+Python 返回 `list[SquaredError]`，TypedDict 将分数限定为 `float | None`；
+mypy 做静态检查，R 边界拒绝字符串、整数、非有限值及缺失位置不一致的结果。
+类型注解不提供运行时强制保证，因此两层检查同时保留。
+
+## 逐行计算
+
+```{r}
+knitr::kable(targets::tar_read(errors, store = params$store))
+```
+
+平方误差无量纲，仅对已观察标签计算。缺失标签不按零值处理。
+
+## 分组诊断
+
+```{r}
+display <- targets::tar_read(display, store = params$store)
+knitr::kable(targets::tar_read(display_table, store = params$store),
+             caption = display$title)
+```
+
+A 组共三行，其中两行可计算，平均平方误差为 0.065；B 组全部缺失，均值必须为 NA。
+原型模式不应满足上述数值预期。空输入应返回具有相同列类型的零行 tibble。
+
+## 复现与验证
+
+环境依赖通过 `Rscript --vanilla scripts/setup_qmd_incremental_mvp.R` 使用 pak 和精确版本清单安装到用户级共享库。
+Python 运行时及测试依赖见 config/qmd_incremental_mvp/，本轮 R 4.6.1 / Python 3.14.4 / Quarto 1.10.18。
+Python 平方误差仅用于验证语言边界；实际简单数值分析优先留在 R。
+
+从仓库根目录、依赖已安装的环境运行：
+
+```bash
+Rscript --vanilla scripts/run_qmd_incremental_mvp.R prototype
+Rscript --vanilla scripts/run_qmd_incremental_mvp.R compute
+Rscript --vanilla scripts/run_qmd_incremental_mvp.R report
+Rscript --vanilla scripts/run_qmd_incremental_mvp.R verify
+```
+
+`compute` 只更新到汇总节点，`report` 更新全部必要下游，`verify` 在隔离副本中验证
+首次构建、无变化复用、R/Python 修改失效、失败修复恢复和独立 store 重建。
+所有完整报告禁用 knitr cache/freeze；targets store 是单独的计算缓存。
+
+函数测试映射：`mvp_validate`、`mvp_read`、`mvp_errors`、`mvp_summary`
+对应 `tests/testthat/test-qmd-incremental-mvp.R`；`squared_errors`
+对应 `tests/test_qmd_incremental_mvp.py`。桥接集成测试运行真实 Python。
+
+## 输入与实现身份
+
+```{r}
+str(receipt)
+```
+
+## 审查与局限
+
+```{r}
+#| results: asis
+cat(readLines("docs/research/qmd_incremental_mvp/review.md"), sep = "\n")
+```
+
+检查结果见
+`results/qmd_incremental_mvp/verification.json`。文件不存在或审查有阻断问题时尚未验收。
+此 MVP 只示范已声明的依赖；新增 Python helper 或外部输入必须显式登记。

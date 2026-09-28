@@ -27,11 +27,11 @@ parlay_construct_groups(
 
 \item{n_legs}{长度 1 的正整数（方案级场数）。}
 
-\item{construction}{显式的 fixture-id 组 list，或 "entropy_balanced"。}
+\item{construction}{显式的 fixture-id 组 list，或 "fixture_round_robin"。}
 
 \item{max_candidates}{长度 1 的正整数。}
 
-\item{seed}{整数标量，控制 entropy_balanced 的确定性抽样。}
+\item{seed}{整数标量；保留为确定性种子参数，当前构造不消耗随机数。}
 
 \item{match_status}{tibble，比赛状态台账（语义见 match_select_status）。
 \strong{必填且无默认值}：附加在末尾以保持既有位置调用的可读性，但缺失即 stop()，

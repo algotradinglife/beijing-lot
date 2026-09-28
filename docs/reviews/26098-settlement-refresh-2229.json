@@ -1,0 +1,46 @@
+{
+  "as_of_beijing": "2026-09-27 22:29:27",
+  "review_command": "codex review - < .run-control/settlement-refresh-2229/review.txt",
+  "review_log": ".run-control/settlement-refresh-2229/review.log",
+  "review_result": "independent reviewer reproduced ticket/group counts, frozen inputs unchanged, no invented SP, neutral cancellation, one payout factor",
+  "checks": {
+    "unchanged_frozen_tickets": 896,
+    "original": {
+      "stake": 768,
+      "hit_awaiting_sp": 2,
+      "lost": 380,
+      "undecided": 2
+    },
+    "3333222": {
+      "stake": 1024,
+      "hit_awaiting_sp": 2,
+      "lost": 507,
+      "undecided": 3
+    },
+    "confirmed_payout": 0,
+    "final_net": null,
+    "render_errors": 0,
+    "independent_settlement_check": ".run-control/26098-settlement-update/independent-check.py"
+  },
+  "hashes": {
+    "quarto/26098_betting_plan.qmd": "455817e5f273dd493925f0932e56b0fb0eaf3107704d06256b2b106158958a9e",
+    "quarto/26098_betting_plan_3333222.qmd": "07e4ab3e7c847ccefa24c2c5b904f615072d9310cfa82ba4d5e2a65715cc8962",
+    "quarto/_26098_settlement_update.qmd": "8a604a774e5c1c97a7aafa5ff74a2e02ee248dddccdf94007656bdbfccb7530a",
+    "inputs/26098_walkthrough/print/settlement-20260927-222927.rds": "c5e7d58b574746a104252d4a31a6e55ecd1bed20015d458ea15a0ebaecad2427",
+    "inputs/26098_walkthrough/print/settlement-source-20260927-222927.json": "940e86517a23b34cdb1009d90f51e659a339b6198fe48a19beb13cc519fa64c3"
+  },
+  "storage_note": "Optional persistent_data_layout skill paths absent on this checkout; used existing explicitly identified issue snapshot/raw collector paths. No storage migration.",
+  "final_hashes": {
+    "quarto/26098_betting_plan.qmd": "455817e5f273dd493925f0932e56b0fb0eaf3107704d06256b2b106158958a9e",
+    "quarto/26098_betting_plan_3333222.qmd": "07e4ab3e7c847ccefa24c2c5b904f615072d9310cfa82ba4d5e2a65715cc8962",
+    "quarto/_26098_settlement_update.qmd": "8af725b75e90bff99744695e33c643a211be699983f4b3bd29bda6e8b90e0f5d",
+    "inputs/26098_walkthrough/print/settlement-20260927-222927.rds": "c5e7d58b574746a104252d4a31a6e55ecd1bed20015d458ea15a0ebaecad2427",
+    "inputs/26098_walkthrough/print/settlement-source-20260927-222927.json": "940e86517a23b34cdb1009d90f51e659a339b6198fe48a19beb13cc519fa64c3"
+  },
+  "publication": {
+    "version": 4,
+    "commit_sha": "b5f8f0280f0c9cac15cf0b2f27b36f1a22c87639",
+    "status": "succeeded",
+    "url": "https://beidan-26098-plan.a0938626152.chatgpt.site"
+  }
+}

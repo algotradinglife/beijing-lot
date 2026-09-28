@@ -1,0 +1,149 @@
+---
+title: "26098期 · 未来2–26小时下注单"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  input: "inputs/26098_walkthrough/three_plans_20260928/plans.rds"
+  pattern: "3333222"
+---
+
+```{r}
+#| label: frozen-plan
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+artifact <- readRDS(file.path(root,params$input))
+stopifnot(identical(digest::digest(file=file.path(root,artifact$input_path),algo="sha256"),artifact$input_hash))
+receipt <- jsonlite::read_json(file.path(root,"docs/reviews/543-three-structure-plans.json"),simplifyVector=TRUE)
+stopifnot(identical(receipt$input_hash,artifact$input_hash))
+for (path in names(receipt$code_hashes)) {
+  stopifnot(identical(digest::digest(file=file.path(root,path),algo="sha256"),receipt$code_hashes[[path]]))
+}
+selected <- artifact$outputs[[params$pattern]]
+if (is.null(selected)) stop("Requested pattern is not complete")
+result <- selected$evaluated$final
+sheet <- beidan::parlay_betting_sheet(result,artifact$bundle$capture_selection$schedule)
+sheet$groups <- dplyr::arrange(sheet$groups,dplyr::desc(coverage_probability),group_id)
+cn <- c(W="胜",D="平",L="负")
+window <- artifact$epoch$window
+```
+
+**结构 `r params$pattern` · `r nrow(sheet$groups)` 组 · `r nrow(sheet$tickets)` 注 · 合计 `r sum(sheet$tickets$cost_cny)` 元**
+
+冻结时点：**`r format(result$cutoff$cutoff_utc,"%Y-%m-%d %H:%M:%S",tz="Asia/Shanghai")` 北京时间**。比赛窗口为 **`r format(window$start_utc,"%m-%d %H:%M:%S",tz="Asia/Shanghai")` 至 `r format(window$end_utc,"%m-%d %H:%M:%S",tz="Asia/Shanghai")`**，包含起点、不包含终点。
+
+**总预算不设上限；每组投入 min(256元，全覆盖成本)。每场最多用于2组，两组最多重叠2场。** 本页是三种独立备选方案之一；约束分别作用于每份方案，不能把三份合并视作仍满足同一复用上限。未自动下单。
+
+## 按命中概率排列的组
+
+这里的命中概率按单场独立近似相乘，再对本组实际所选互斥赛果票求和。各组已按该数值降序排列；跨组有重叠，不能直接相加解释为“至少中一组”的概率。
+
+```{r}
+knitr::kable(dplyr::transmute(sheet$groups,
+  组别=display_label,结构=structure,全覆盖注数=support_size,
+  实购注数=funded_tickets,投入元=cost_cny,
+  本组命中概率=sprintf("%.2f%%",100*coverage_probability)),escape=TRUE)
+```
+
+<style>
+.selection-table td:first-child, .selection-table td:nth-child(3) {
+  background-color: #e0f2fe !important; color: #0c4a6e; font-weight: 600;
+}
+.selection-table td.pick {
+  background-color: #d1fae5 !important; color: #065f46; font-weight: 700;
+}
+.selection-table td { border: 1px solid #cbd5e1; padding: 9px; }
+@media print {
+  .selection-table { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+</style>
+
+## 分组勾选表
+
+**蓝底标明所选场次，绿底加 ✓ 标明已选赛果；未选赛果不着色。**
+
+**胜、平、负均指北单让球胜平负。** 主队让球为负表示主队让球。选项后的百分数是模型概率，不是 SP。勾选表仅表示所买票的选项并集；3333222、3322221 的并集不能直接展开全买，必须使用下方逐注明细。
+
+```{r}
+#| label: group-sheets
+#| results: asis
+for (label in sheet$groups$display_label) {
+  group <- dplyr::filter(sheet$groups,display_label==label)
+  rows <- dplyr::filter(sheet$matches,display_label==label) |>
+    dplyr::mutate(选项=sprintf("%s%s %.1f%%",dplyr::if_else(selected,"✓ ",""),
+      unname(cn[outcome]),100*probability)) |>
+    dplyr::select(slot,kickoff_at,home_name,away_name,handicap,outcome,选项) |>
+    tidyr::pivot_wider(names_from=outcome,values_from=选项) |>
+    dplyr::arrange(slot) |>
+    dplyr::transmute(场次=slot,
+      开赛北京时间=format(kickoff_at,"%m-%d %H:%M",tz="Asia/Shanghai"),
+      对阵=paste(home_name,"vs",away_name),主队让球=handicap,胜=W,平=D,负=L)
+  cat(sprintf("\n\n### %s · %d注 / %g元 · 命中概率 %.2f%%\n\n",
+    label,group$funded_tickets,group$cost_cny,100*group$coverage_probability))
+  group_html <- knitr::kable(rows,format="html",escape=TRUE,
+    table.attr='class="selection-table"')
+  cat(gsub('(<td)([^>]*>\\s*✓)', '\\1 class="pick"\\2',
+    group_html,perl=TRUE),"\n")
+}
+```
+
+## 逐注明细：每注2元
+
+只购买以下列出的票；不追加倍数、不补买未列出的组合。
+
+```{r}
+#| label: exact-tickets
+#| results: asis
+for (label in sheet$groups$display_label) {
+  rows <- dplyr::filter(sheet$ticket_legs,display_label==label)
+  slots <- dplyr::distinct(rows,slot) |> dplyr::arrange(slot)
+  wide <- rows |> dplyr::mutate(场次=paste0("场",slot),赛果=unname(cn[outcome])) |>
+    dplyr::select(ticket_id,场次,赛果) |> tidyr::pivot_wider(names_from=场次,values_from=赛果)
+  detail <- dplyr::filter(sheet$tickets,display_label==label) |>
+    dplyr::select(ticket_id,support_rank,cost_cny) |>
+    dplyr::left_join(wide,by="ticket_id",relationship="one-to-one") |>
+    dplyr::arrange(support_rank) |>
+    dplyr::select(组内排名=support_rank,dplyr::all_of(paste0("场",slots$slot)),金额元=cost_cny)
+  cat(sprintf("\n\n### %s 逐注清单\n\n",label))
+  print(knitr::kable(detail,escape=TRUE))
+}
+```
+
+## 数据、计算与复现
+
+来自 500/Nowscore 真实赛程和 Titan 普通欧赔、大小球；同批采集北单赛前 SP。普通欧赔先逐家公司去水再平均（候选5家，至少2家），Dixon–Coles 的 rho=-0.14，再根据北单让球计算概率。组内按结构允许空间的票概率选 TopN；角色按3→2→1全组轮选，候选组数由实际准入场数决定，用现有排名起点方法覆盖各起点，再按约束贪心选入并微调（本次1轮、邻近排名±3、最多8次尝试）。**这不是穷举所有组合或全局最优证明。** 资金、排序使用覆盖概率；SP仅供估值，SP>10按4.5估值，票级回款系数0.65。
+
+```{r}
+#| label: provenance
+knitr::kable(tibble::tibble(项目=c("冻结输入","输入SHA256","方案快照","代码快照SHA256","候选起点数","准入比赛数","窗口小时"),
+  值=c(artifact$input_path,artifact$input_hash,params$input,receipt$code_snapshot_hash,as.character(artifact$n_candidates),
+    as.character(nrow(artifact$epoch$fixtures)),paste(artifact$bundle$window_hours,collapse="–"))))
+```
+
+```{r}
+#| label: source-table
+knitr::kable(artifact$bundle$markets$captures |>
+  dplyr::transmute(场次=fixture_id,市场=market,
+    采集北京时间=format(observed_at,"%m-%d %H:%M:%S",tz="Asia/Shanghai"),来源=source_url),escape=TRUE)
+```
+
+```{r}
+#| label: exclusions
+#| results: asis
+if (nrow(artifact$epoch$exclusions)) print(knitr::kable(artifact$epoch$exclusions))
+if (nrow(artifact$projected$exclusions)) print(knitr::kable(artifact$projected$exclusions))
+```
+
+从仓库根目录按冻结输入重算：
+
+```bash
+R_LIBS="$PWD/r_lib" RETICULATE_PYTHON="$PWD/.venv/bin/python" Rscript r/replay_three_structure_plans.R replay docs/reviews/543-three-structure-plans.json inputs/26098_walkthrough/three_plans_20260928/frozen_inputs.rds inputs/26098_walkthrough/three_plans_20260928/replay.rds
+```
+
+当前页面重渲染只读取冻结票据，不刷新行情或更改方案。验证和审查证据记录于 `docs/reviews/543-three-structure-plans.json`；测试代码不在分析文档内执行。

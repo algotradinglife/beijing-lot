@@ -12,34 +12,43 @@ candidate_fixture <- function(n_fixtures = 28L, seed = 42L) {
        match_status = prepared$match_status, cutoff = cutoff)
 }
 
-testthat::test_that('normalised entropy is bounded and ordered as expected', {
-  testthat::expect_equal(parlay_normalised_entropy(c(1, 0, 0)), 0)
-  testthat::expect_equal(parlay_normalised_entropy(c(1/3, 1/3, 1/3)), 1, tolerance = 1e-12)
-  even <- parlay_normalised_entropy(c(1/3, 1/3, 1/3))
-  skewed <- parlay_normalised_entropy(c(0.8, 0.1, 0.1))
-  testthat::expect_gt(even, skewed)
-  testthat::expect_error(parlay_normalised_entropy(c(0.5, 0.5)), 'three finite values')
-  testthat::expect_error(parlay_normalised_entropy(c(0, 0, 0)), 'positive mass')
-})
-
-testthat::test_that('the wide probability view validates and adds entropy', {
+testthat::test_that('the wide probability view validates and returns only W/D/L columns', {
   fx <- candidate_fixture(n_fixtures = 14L)
   wide <- parlay_probability_wide(fx$probabilities)
   testthat::expect_equal(nrow(wide), 14L)
-  testthat::expect_true(all(c('fixture_id', 'W', 'D', 'L', 'entropy') %in% names(wide)))
-  testthat::expect_true(all(wide$entropy >= 0 & wide$entropy <= 1))
+  testthat::expect_identical(names(wide), c('fixture_id', 'W', 'D', 'L'))
+  testthat::expect_false('entropy' %in% names(wide))
+  testthat::expect_identical(wide$fixture_id, sort(fx$probabilities$fixture_id) |>
+                               unique())
+  testthat::expect_type(wide$fixture_id, 'character')
+  testthat::expect_type(wide$W, 'double')
   testthat::expect_silent(match_check_probability_sum(as.matrix(wide[, c('W', 'D', 'L')])))
 
   empty <- parlay_probability_wide(match_typed_empty('probabilities'))
   testthat::expect_equal(nrow(empty), 0L)
+  testthat::expect_identical(names(empty), c('fixture_id', 'W', 'D', 'L'))
+  testthat::expect_type(empty$fixture_id, 'character')
+  testthat::expect_type(empty$W, 'double')
 })
 
-testthat::test_that('entropy-balanced construction is deterministic and balanced', {
+testthat::test_that('the wide probability view refuses invalid sums and gaps', {
+  fx <- candidate_fixture(n_fixtures = 4L)
+  bad_sum <- fx$probabilities
+  bad_sum$probability[bad_sum$fixture_id == bad_sum$fixture_id[1]] <-
+    c(0.5, 0.2, 0.2)
+  testthat::expect_error(parlay_probability_wide(bad_sum), 'sum')
+
+  gap <- fx$probabilities[!(fx$probabilities$fixture_id == fx$probabilities$fixture_id[1] &
+                              fx$probabilities$outcome == 'L'), , drop = FALSE]
+  testthat::expect_error(parlay_probability_wide(gap))
+})
+
+testthat::test_that('fixture round-robin construction is deterministic and shaped', {
   fx <- candidate_fixture(n_fixtures = 28L)
   first <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                   'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
+                                   'fixture_round_robin', 4L, seed = 1L, match_status = fx$match_status)
   second <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 4L, seed = 1L, match_status = fx$match_status)
   testthat::expect_identical(first$group_legs, second$group_legs)
   testthat::expect_equal(length(unique(first$group_legs$group_id)), 4L)
   testthat::expect_equal(nrow(first$group_legs), 28L)
@@ -55,7 +64,7 @@ testthat::test_that('entropy-balanced construction is deterministic and balanced
 testthat::test_that('construction reports truncation instead of claiming full coverage', {
   fx <- candidate_fixture(n_fixtures = 28L)
   capped <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 2L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 2L, seed = 1L, match_status = fx$match_status)
   testthat::expect_equal(length(unique(capped$group_legs$group_id)), 2L)
   testthat::expect_true(capped$diagnostics$truncated)
   testthat::expect_gt(capped$diagnostics$dropped, 0L)
@@ -87,15 +96,15 @@ testthat::test_that('unknown construction modes are refused', {
   testthat::expect_error(
     parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
                             'magic', 4L, seed = 1L, match_status = fx$match_status),
-    "must be 'entropy_balanced'")
+    "must be 'fixture_round_robin'")
 })
 
 testthat::test_that('the 3333222 pattern spans exactly 648 tickets per group', {
   fx <- candidate_fixture(n_fixtures = 28L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 4L, seed = 1L, match_status = fx$match_status)
   structure <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
   testthat::expect_true(all(structure$support_summary$support_size == 648L))
   testthat::expect_true(all(structure$support_summary$structure_mass > 0))
   testthat::expect_true(all(structure$support_summary$structure_mass <= 1))
@@ -111,10 +120,10 @@ testthat::test_that('the documented pattern space sizes match the contract table
   expected <- c(648L, 288L, 192L, 216L, 144L, 96L, 64L, 32L)
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 1L, seed = 1L, match_status = fx$match_status)
   for (i in seq_along(table_patterns)) {
     structure <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                    table_patterns[[i]], 'entropy_desc')
+                                    table_patterns[[i]])
     testthat::expect_equal(structure$support_summary$support_size[1], expected[i],
                            info = paste('pattern', paste(table_patterns[[i]], collapse = '')))
   }
@@ -123,52 +132,56 @@ testthat::test_that('the documented pattern space sizes match the contract table
 testthat::test_that('structure patterns must be seven values drawn from 1, 2, 3', {
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 1L, seed = 1L, match_status = fx$match_status)
   testthat::expect_error(
-    parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff, c(3L, 3L, 3L), 'entropy_desc'),
+    parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff, c(3L, 3L, 3L)),
     'pattern must be 7 integers')
   testthat::expect_error(
     parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                       c(4L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc'),
+                       c(4L, 3L, 3L, 3L, 2L, 2L, 2L)),
     'pattern must be 7 integers')
-  testthat::expect_error(
-    parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                       c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'nonsense'),
-    "assignment must be 'entropy_desc'")
 })
 
-testthat::test_that('more uncertain legs receive the larger depths', {
+testthat::test_that('roles are assigned 3->2->1 by the authoritative role scores', {
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 1L, seed = 1L, match_status = fx$match_status)
   group_id <- groups$group_legs$group_id[1]
   legs <- groups$group_legs[groups$group_legs$group_id == group_id, , drop = FALSE]
   structure <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
-  # Candidate ids carry their structure label, so address the one candidate
-  # that the pattern above actually produced.
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
   candidate_id <- unique(structure$supports$candidate_id)[1]
   depth_by_fixture <- vapply(legs$fixture_id, function(f) {
     sum(structure$supports$allowed[structure$supports$candidate_id == candidate_id &
                                      structure$supports$fixture_id == f])
   }, numeric(1))
-  wide <- parlay_probability_wide(fx$probabilities)
-  entropy_by_fixture <- wide$entropy[match(legs$fixture_id, wide$fixture_id)]
-  # The most uncertain leg must not have a smaller depth than the least uncertain.
-  most <- which.max(entropy_by_fixture)
-  least <- which.min(entropy_by_fixture)
-  testthat::expect_gte(depth_by_fixture[most], depth_by_fixture[least])
-  # entropy_desc hands out the pattern's own depths, so the multiset must match it.
+  # The pattern multiset must be handed out exactly: 3,3,3,3,2,2,2.
   testthat::expect_true(all(sort(depth_by_fixture, decreasing = TRUE) == c(3, 3, 3, 3, 2, 2, 2)))
-  # The ordering must be by entropy: most uncertain largest, least smallest.
-  testthat::expect_equal(unname(depth_by_fixture[most]), max(depth_by_fixture))
-  testthat::expect_equal(unname(depth_by_fixture[least]), min(depth_by_fixture))
+
+  # Reproduce the contract explicitly from the role ranking: within this fixed group
+  # each role takes the highest-ranked unassigned member, walking the ACTUAL pattern
+  # 3,3,3,3,2,2,2 in descending order. Every leg of the group receives exactly one
+  # role; the pattern multiset, not the unique role set {3,2,1}, defines the walk.
+  scores <- beidan:::parlay_role_scores(fx$probabilities, fx$cutoff)
+  assigned <- character(0)
+  expected_fixture <- character(0)
+  expected_role <- integer(0)
+  for (role in sort(as.integer(c(3L, 3L, 3L, 3L, 2L, 2L, 2L)), decreasing = TRUE)) {
+    ranked <- scores[scores$role == role & scores$fixture_id %in% legs$fixture_id, , drop = FALSE]
+    ranked <- ranked[order(ranked$rank), , drop = FALSE]
+    pick <- ranked$fixture_id[!ranked$fixture_id %in% assigned][1]
+    assigned <- c(assigned, pick)
+    expected_fixture <- c(expected_fixture, pick)
+    expected_role <- c(expected_role, role)
+  }
+  testthat::expect_equal(unname(depth_by_fixture),
+                         unname(expected_role[match(legs$fixture_id, expected_fixture)]))
 })
 
 testthat::test_that('a hard forbidden outcome is excluded and never topped up', {
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 1L, seed = 1L, match_status = fx$match_status)
   group_id <- groups$group_legs$group_id[1]
   legs <- groups$group_legs[groups$group_legs$group_id == group_id, , drop = FALSE]
   wide_for_test <- parlay_probability_wide(fx$probabilities)
@@ -176,7 +189,7 @@ testthat::test_that('a hard forbidden outcome is excluded and never topped up', 
   best_outcome <- match_outcomes()[parlay_outcome_rank(as.numeric(leg_row[1, match_outcomes()]))[1]]
   banned <- tibble::tibble(fixture_id = legs$fixture_id[1], outcome = best_outcome)
   structure <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc', banned)
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), banned)
   candidate_id <- unique(structure$supports$candidate_id)[1]
   banned_row <- structure$supports[structure$supports$candidate_id == candidate_id &
                                      structure$supports$fixture_id == banned$fixture_id &
@@ -191,11 +204,60 @@ testthat::test_that('a hard forbidden outcome is excluded and never topped up', 
   testthat::expect_false(banned$outcome %in% kept$outcome)
   # Support shrank by exactly one leg-outcome; no substitute was admitted.
   baseline <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                 c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
+                                 c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
   baseline_id <- unique(baseline$supports$candidate_id)[1]
   depth_before <- sum(baseline$supports$allowed[baseline$supports$fixture_id == banned$fixture_id &
                                                   baseline$supports$candidate_id == baseline_id])
   testthat::expect_equal(structure$support_summary$support_size[1], 648L %/% depth_before * (depth_before - 1L))
+})
+
+testthat::test_that('near-tied probabilities keep the authoritative role outcome mask', {
+  # Regression for #535: the fixed-group structure pass must consume the selected
+  # role's authoritative allowed_outcomes rather than re-ranking with
+  # parlay_outcome_rank(), which lacks the role scorer's nine-decimal tie handling.
+  cutoff <- list(cutoff_utc = as.POSIXct('2026-09-22 12:00:00', tz = 'UTC'),
+                 issue_id = '26097')
+  probabilities <- tibble::tibble(
+    fixture_id = rep('f1', 3L), outcome = c('W', 'D', 'L'),
+    probability = c(0.4, 0.4000000001, 0.1999999999))
+  legs <- tibble::tibble(group_id = 'f1', fixture_id = 'f1', leg_order = 1L)
+
+  # Pin the disagreement that motivates the test: the authoritative role-1 mask is W
+  # while the unrounded rank would keep D.
+  authoritative <- parlay_role_scores(probabilities, cutoff)
+  role1 <- authoritative[authoritative$role == 1L, , drop = FALSE]
+  testthat::expect_identical(role1$allowed_outcomes[[1]], 'W')
+  testthat::expect_identical(
+    match_outcomes()[parlay_outcome_rank(c(0.4, 0.4000000001, 0.1999999999))[1]], 'D')
+
+  structure <- parlay_apply_structure(legs, probabilities, cutoff, 1L)
+  kept <- structure$supports$outcome[structure$supports$allowed]
+  testthat::expect_identical(kept, 'W')
+
+  # The retained mass is the authoritative kept mass, not the re-ranked substitute.
+  testthat::expect_equal(structure$support_summary$support_size, 1L)
+  testthat::expect_equal(structure$support_summary$support_mass, 0.4)
+  testthat::expect_equal(structure$support_summary$structure_mass, 0.4)
+
+  # Banning the non-kept D must NOT exhaust the leg: W is still retained.
+  ban_d <- tibble::tibble(fixture_id = 'f1', outcome = 'D')
+  ban_d_structure <- parlay_apply_structure(legs, probabilities, cutoff, 1L, ban_d)
+  testthat::expect_identical(ban_d_structure$supports$outcome[ban_d_structure$supports$allowed], 'W')
+  testthat::expect_equal(ban_d_structure$support_summary$support_size, 1L)
+  testthat::expect_equal(ban_d_structure$support_summary$support_mass, 0.4)
+
+  # Banning the authoritative kept W must exhaust the leg with no top-up to D.
+  ban_w <- tibble::tibble(fixture_id = 'f1', outcome = 'W')
+  ban_w_structure <- parlay_apply_structure(legs, probabilities, cutoff, 1L, ban_w)
+  testthat::expect_equal(nrow(ban_w_structure$supports), 0L)
+  testthat::expect_equal(nrow(ban_w_structure$support_summary), 0L)
+  testthat::expect_identical(ban_w_structure$exhausted, 'f1|p1')
+
+  # The mask is invariant to the caller's row order: the role scorer sorts internally.
+  permuted <- probabilities[c(3L, 1L, 2L), , drop = FALSE]
+  permuted_structure <- parlay_apply_structure(legs, permuted, cutoff, 1L)
+  testthat::expect_identical(permuted_structure$supports$outcome[permuted_structure$supports$allowed], 'W')
+  testthat::expect_equal(permuted_structure$support_summary$support_mass, 0.4)
 })
 
 testthat::test_that('support_mass is the raw mass before any renormalisation', {
@@ -203,10 +265,10 @@ testthat::test_that('support_mass is the raw mass before any renormalisation', {
   # 3/3/3/3/2/2/2 structure the raw mass must equal the product of kept masses.
   fx <- candidate_fixture(n_fixtures = 14L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 1L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 1L, seed = 1L, match_status = fx$match_status)
   group_id <- groups$group_legs$group_id[1]
   structure <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
   candidate_id <- unique(structure$supports$candidate_id)[1]
   wide <- parlay_probability_wide(fx$probabilities)
   legs <- groups$group_legs[groups$group_legs$group_id == group_id, , drop = FALSE]
@@ -228,9 +290,9 @@ testthat::test_that('support_mass is the raw mass before any renormalisation', {
 testthat::test_that('enumeration expands the support product and keeps raw probabilities', {
   fx <- candidate_fixture(n_fixtures = 28L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                    'entropy_balanced', 4L, seed = 1L, match_status = fx$match_status)
+                                    'fixture_round_robin', 4L, seed = 1L, match_status = fx$match_status)
   structure <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
   tickets <- parlay_enumerate_tickets(groups$group_legs, fx$probabilities, fx$cutoff,
                                   structure$supports)
   testthat::expect_equal(nrow(tickets$tickets), 4L * 648L)
@@ -263,7 +325,7 @@ testthat::test_that('a ticket supported by two structures keeps one physical ide
                                     list(groups = list(ids, ids)), 4L, seed = 1L,
                                       match_status = fx$match_status)
   structure <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
   tickets <- parlay_enumerate_tickets(groups$group_legs, fx$probabilities, fx$cutoff,
                                   structure$supports)
   # The same fixture set IS the same group: group_id is the sorted fixture set, so
@@ -285,9 +347,9 @@ testthat::test_that('two structures over one fixture set share ticket identities
   group_id <- unique(groups$group_legs$group_id)
   # Two structural variants over the same group, expressed as two candidate ids.
   wide_supports <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                      c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')$supports
+                                      c(3L, 3L, 3L, 3L, 2L, 2L, 2L))$supports
   narrow_supports <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                        c(2L, 2L, 2L, 2L, 2L, 2L, 2L), 'entropy_desc')$supports
+                                        c(2L, 2L, 2L, 2L, 2L, 2L, 2L))$supports
   narrow_supports$candidate_id <- paste0(group_id, '#b')
   combined <- dplyr::bind_rows(wide_supports, narrow_supports)
   groups_b <- groups
@@ -314,7 +376,7 @@ testthat::test_that('a group whose only leg loses all support is refused', {
                                     list(groups = list(ids)), 4L, seed = 1L,
                                       match_status = fx$match_status)
   supports <- parlay_apply_structure(groups$group_legs, fx$probabilities, fx$cutoff,
-                                 c(1L, 1L, 1L, 1L, 1L, 1L, 1L), 'entropy_desc')$supports
+                                 c(1L, 1L, 1L, 1L, 1L, 1L, 1L))$supports
   # Ban every outcome at one leg.
   leg_fixture <- ids[1]
   supports$allowed[supports$fixture_id == leg_fixture] <- FALSE
@@ -335,13 +397,13 @@ testthat::test_that('empty groups yield typed empty enumeration output', {
   testthat::expect_silent(match_validate_table(tickets$ticket_legs, 'ticket_legs'))
 
   structure <- parlay_apply_structure(empty_groups, match_typed_empty('probabilities'), cutoff,
-                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L), 'entropy_desc')
+                                  c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
   testthat::expect_equal(nrow(structure$candidates), 0L)
   testthat::expect_silent(match_validate_table(structure$supports, 'supports'))
 
   constructed <- parlay_construct_groups(match_typed_empty('fixtures'),
                                          match_typed_empty('probabilities'), cutoff, 7L,
-                                         'entropy_balanced', 4L, seed = 1L,
+                                         'fixture_round_robin', 4L, seed = 1L,
                                          match_status = match_typed_empty('match_status'))
   testthat::expect_equal(nrow(constructed$group_legs), 0L)
   testthat::expect_silent(match_validate_table(constructed$group_legs, 'group_legs'))
@@ -356,47 +418,23 @@ testthat::test_that('the group identity depends on the fixture set, not its orde
 # --- 逐函数边界测试（candidates）--------------------------------------------
 # review 在此文件累计指出 13 处问题，因此边界必须钉死。
 
-testthat::test_that('parlay_normalised_entropy 对均分返回 1、对确定返回 0', {
-  testthat::expect_equal(parlay_normalised_entropy(c(1/3, 1/3, 1/3)), 1)
-  testthat::expect_equal(parlay_normalised_entropy(c(1, 0, 0)), 0)
-  testthat::expect_equal(parlay_normalised_entropy(c(0.5, 0.25, 0.25)),
-                         parlay_normalised_entropy(c(2, 1, 1)))
-  # 结果恒在 [0, 1]。
-  for (triple in list(c(1/3,1/3,1/3), c(0.5,0.3,0.2), c(1,0,0), c(0.8,0.1,0.1))) {
-    value <- parlay_normalised_entropy(triple)
-    testthat::expect_gte(value, 0)
-    testthat::expect_lte(value, 1)
-  }
-})
-
-testthat::test_that('parlay_normalised_entropy 拒绝非数值、长度错、NA、负值与零质量', {
-  # 回归：此前非数值只 warning 并产出 NaN，而 NaN 会被当作'最难'排序。
-  testthat::expect_error(parlay_normalised_entropy(c('a','b','c')), 'must be numeric')
-  testthat::expect_error(parlay_normalised_entropy('abc'), 'must be numeric')
-  testthat::expect_error(parlay_normalised_entropy(c(0.5, 0.5)), 'three finite values')
-  testthat::expect_error(parlay_normalised_entropy(c(0.5, 0.5, 0.5, 0.5)), 'three finite values')
-  testthat::expect_error(parlay_normalised_entropy(c(0.5, NA, 0.5)), 'three finite values')
-  testthat::expect_error(parlay_normalised_entropy(c(0.5, Inf, 0.5)), 'three finite values')
-  testthat::expect_error(parlay_normalised_entropy(c(-1, 1, 1)), 'must be non-negative')
-  testthat::expect_error(parlay_normalised_entropy(c(0, 0, 0)), 'positive mass')
-})
-
-testthat::test_that('parlay_probability_wide 产出每场一行且列为 W/D/L/entropy', {
+testthat::test_that('parlay_probability_wide 产出每场一行且仅含 W/D/L 列', {
   probabilities <- tibble::tibble(
     fixture_id = rep(c('f1','f2'), each = 3L),
     outcome = rep(match_outcomes(), 2L),
     probability = c(0.5, 0.3, 0.2, 1/3, 1/3, 1/3))
   wide <- parlay_probability_wide(probabilities)
   testthat::expect_equal(nrow(wide), 2L)
-  testthat::expect_identical(names(wide), c('fixture_id', match_outcomes(), 'entropy'))
+  testthat::expect_identical(names(wide), c('fixture_id', match_outcomes()))
   testthat::expect_equal(wide$W[wide$fixture_id == 'f1'], 0.5)
-  testthat::expect_equal(wide$entropy[wide$fixture_id == 'f2'], 1)
 })
 
 testthat::test_that('parlay_probability_wide 在空表上返回带完整列的空表', {
   wide <- parlay_probability_wide(match_typed_empty('probabilities'))
   testthat::expect_equal(nrow(wide), 0L)
-  testthat::expect_identical(names(wide), c('fixture_id', match_outcomes(), 'entropy'))
+  testthat::expect_identical(names(wide), c('fixture_id', match_outcomes()))
+  testthat::expect_type(wide$fixture_id, 'character')
+  testthat::expect_type(wide$W, 'double')
 })
 
 testthat::test_that('parlay_probability_wide 拒绝缺结果、有缺口与行和不为 1', {
@@ -486,10 +524,10 @@ testthat::test_that('parlay_construct_groups 强制要求 match_status 台账', 
   fx <- candidate_fixture(n_fixtures = 14L)
   testthat::expect_error(
     parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                            'entropy_balanced', 4L, seed = 1L),
+                            'fixture_round_robin', 4L, seed = 1L),
     'match_status')
   empty <- parlay_construct_groups(fx$fixtures, fx$probabilities, fx$cutoff, 7L,
-                                   'entropy_balanced', 4L, seed = 1L,
+                                   'fixture_round_robin', 4L, seed = 1L,
                                    match_status = match_typed_empty('match_status'))
   testthat::expect_equal(nrow(empty$group_legs), 0L)
 })
@@ -552,15 +590,15 @@ testthat::test_that('group construction preserves fractional cutoff window bound
   fx$fixtures$kickoff_at[] <- start
   fx$fixtures$kickoff_at[7] <- end - lubridate::dseconds(0.25)
   testthat::expect_no_error(parlay_construct_groups(fx$fixtures, fx$probabilities,
-    fx$cutoff, 7L, 'entropy_balanced', 1L, seed = 1L,
+    fx$cutoff, 7L, 'fixture_round_robin', 1L, seed = 1L,
     match_status = fx$match_status))
   fx$fixtures$kickoff_at[1] <- start - lubridate::dseconds(0.25)
   testthat::expect_error(parlay_construct_groups(fx$fixtures, fx$probabilities,
-    fx$cutoff, 7L, 'entropy_balanced', 1L, seed = 1L,
+    fx$cutoff, 7L, 'fixture_round_robin', 1L, seed = 1L,
     match_status = fx$match_status), 'outside the decision window')
   fx$fixtures$kickoff_at[1] <- start
   fx$fixtures$kickoff_at[7] <- end
   testthat::expect_error(parlay_construct_groups(fx$fixtures, fx$probabilities,
-    fx$cutoff, 7L, 'entropy_balanced', 1L, seed = 1L,
+    fx$cutoff, 7L, 'fixture_round_robin', 1L, seed = 1L,
     match_status = fx$match_status), 'outside the decision window')
 })

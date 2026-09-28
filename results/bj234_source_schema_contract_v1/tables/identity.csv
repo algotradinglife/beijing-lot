@@ -4,5 +4,5 @@ beidan_xlsm,matches,"issue,match_idx",195269,192709,2560
 beidan_xlsm,official_500_settlements,"issue,match_idx",74295,74295,0
 beidan_xlsm,outcome_features,"issue,match_idx",585807,192709,393098
 beidan_history,historical_matches,"issue,match_idx",38463,38463,0
-beidan_live,matches,"issue,match_idx",5155,5155,0
-beidan_live,settlements,"issue,match_idx",3349,3349,0
+beidan_live,matches,"issue,match_idx",5578,5578,0
+beidan_live,settlements,"issue,match_idx",3596,3596,0

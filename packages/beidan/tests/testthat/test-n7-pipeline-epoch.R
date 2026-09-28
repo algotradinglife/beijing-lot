@@ -322,14 +322,14 @@ testthat::test_that('match_euro_mean 对成员公司求均值并报告覆盖数'
   euro <- tibble::tibble(
     fixture_id = 'f1', company_id = c('c1','c2'),
     quote_at = as.POSIXct('2026-09-22 08:00:00', tz = 'UTC'),
-    odds_home = c(2.0, 4.0), odds_draw = c(3.0, 3.0), odds_away = c(4.0, 2.0),
+    odds_home = c(2.0, 3.0), odds_draw = c(4.0, 3.0), odds_away = c(4.0, 1.5),
     source_url = 'synthetic://x')
   result <- match_euro_mean(euro, cutoff, list(members = c('c1','c2'), missing = 'error'),
                          fixtures)
   testthat::expect_equal(nrow(result), 1L)
-  testthat::expect_identical(result$odds_home, 3.0)
-  testthat::expect_identical(result$odds_draw, 3.0)
-  testthat::expect_identical(result$odds_away, 3.0)
+  testthat::expect_equal(result$prob_home, 3/8)
+  testthat::expect_equal(result$prob_draw, 1/4)
+  testthat::expect_equal(result$prob_away, 3/8)
   testthat::expect_identical(result$n_members, 2L)
 })
 
@@ -349,7 +349,7 @@ testthat::test_that('match_euro_mean 的 missing 策略决定成员缺报价时�
     'is missing euro members c2')
   dropped <- match_euro_mean(euro, cutoff,
                           list(members = c('c1','c2'), missing = 'drop_member'), fixtures)
-  testthat::expect_identical(dropped$odds_home, 2.0)
+  testthat::expect_true(is.na(dropped$prob_home))
   testthat::expect_identical(dropped$n_members, 1L)
 })
 
@@ -363,7 +363,7 @@ testthat::test_that('match_euro_mean 对完全没有报价的比赛不报成员�
   result <- match_euro_mean(match_typed_empty('euro'), cutoff,
                          list(members = c('c1','c2'), missing = 'error'), fixtures)
   testthat::expect_equal(nrow(result), 1L)
-  testthat::expect_true(is.na(result$odds_home))
+  testthat::expect_true(is.na(result$prob_home))
   testthat::expect_identical(result$n_members, 0L)
 })
 
@@ -539,7 +539,7 @@ testthat::test_that('prepare_engine 的空输入返回带完整列的空表', {
                           list(watermark = 'decimal'))
   testthat::expect_setequal(names(epoch),
                             c('fixtures','euro_mean','totals_selected','prematch_sp',
-                              'match_status','status_selected','exclusions'))
+                              'match_status','status_selected','exclusions','window'))
   testthat::expect_equal(nrow(epoch$fixtures), 0L)
   testthat::expect_equal(nrow(epoch$exclusions), 0L)
 })
@@ -582,4 +582,36 @@ testthat::test_that("euro policy excludes unrelated companies and fixtures befor
   actual <- match_euro_mean(dplyr::bind_rows(euro, extra), fx$cutoff$cutoff_utc,
                             default_euro(), fx$inputs$fixtures)
   testthat::expect_equal(actual, baseline)
+})
+
+
+testthat::test_that("one-company fixture is excluded without blocking other fixtures", {
+  fx <- epoch_fixture()
+  id <- fx$inputs$fixtures$fixture_id[1]
+  partial <- fx$inputs
+  partial$euro <- dplyr::filter(partial$euro, fixture_id != id | company_id == "c01")
+  prepared <- prepare_engine(partial, fx$cutoff,
+    list(members = c("c01", "c02", "c03"), missing = "drop_member"), default_totals())
+  testthat::expect_equal(nrow(prepared$fixtures), 9L)
+  testthat::expect_false(id %in% prepared$fixtures$fixture_id)
+  testthat::expect_true(all(prepared$euro_mean$n_members == 3L))
+  testthat::expect_true(any(prepared$exclusions$fixture_id == id &
+    prepared$exclusions$reason == "fewer than two euro companies before cutoff"))
+})
+
+
+testthat::test_that("company margin rescaling leaves probabilities and projection unchanged", {
+  fx <- epoch_fixture()
+  base <- prepare_engine(fx$inputs, fx$cutoff, default_euro(), default_totals())
+  changed <- fx$inputs
+  member <- changed$euro$company_id == "c02"
+  for (column in c("odds_home", "odds_draw", "odds_away")) {
+    changed$euro[[column]][member] <- changed$euro[[column]][member] * 1.2
+  }
+  actual <- prepare_engine(changed, fx$cutoff, default_euro(), default_totals())
+  testthat::expect_equal(actual$euro_mean, base$euro_mean, tolerance = 1e-12)
+  a <- estimate_engine(base, fx$cutoff, rho = -0.14, total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
+  b <- estimate_engine(actual, fx$cutoff, rho = -0.14, total_bounds = c(0.1, 16), tail_tolerance = 1e-10)
+  testthat::expect_equal(b$probabilities, a$probabilities, tolerance = 1e-7)
+  testthat::expect_equal(nrow(b$probabilities), 30L)
 })

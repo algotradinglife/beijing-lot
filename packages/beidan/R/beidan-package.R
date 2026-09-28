@@ -27,7 +27,12 @@
 #' @export parlay_settle_plan
 #' @export parlay_diagnose_plan
 #' @export parlay_replay_issue
-#' @export parlay_allocation_configs
+#' @export parlay_strategy_config
+#' @export parlay_budget_state
+#' @export parlay_generate_candidates
+#' @export parlay_coverage_frontier
+#' @export parlay_allocate_portfolio
+#' @export parlay_plan_summary
 #' @export parlay_build_plan
 #' @export match_outcomes
 #' @export bounded_market_lambdas

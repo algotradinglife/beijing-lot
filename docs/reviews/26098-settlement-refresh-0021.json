@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-09-28 00:21:48 Asia/Shanghai",
+  "review_command": "codex review - < .run-control/settlement-refresh-0021/review.txt",
+  "review": "No actionable findings; frozen hashes unchanged; outcome counts verified; net NA correct",
+  "reviewed_hashes": {
+    "quarto/26098_betting_plan.qmd": "10a2469fa4e6eb60d292db5c49c96ba9c029776c6c393845a10677482f29a9e9",
+    "quarto/26098_betting_plan_3333222.qmd": "761f570f92c8fcfd1c70a0eff62153f9971df7abb49ba5603add28b251b2557e",
+    "quarto/_26098_settlement_update.qmd": "a24cdee50cf628e81cc1cc59dcfe9a954afa6f0d007f1512a2728d22baa860cc",
+    "inputs/26098_walkthrough/print/settlement-20260928-002148.rds": "690962721e1af05bcfaeb4f2da1efa4ecc8aece31172c8695f7d1fd1e0f35e76",
+    "inputs/26098_walkthrough/print/settlement-source-20260928-002148.json": "b8958626b4e3f4b68ec86155bc3da607b200828836b4fea62c3f501ed1144258"
+  },
+  "checks": [
+    "896 frozen tickets unchanged",
+    "896 tickets independently reconciled",
+    "known outcomes independently reconciled: 2/382 and 3/509",
+    "both QMD renders passed without errors"
+  ],
+  "publication": {
+    "version": 5,
+    "commit_sha": "2a3e146fbf4424e60ca63d1f9a5fb504604b70fa",
+    "status": "succeeded",
+    "url": "https://beidan-26098-plan.a0938626152.chatgpt.site"
+  }
+}

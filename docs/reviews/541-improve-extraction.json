@@ -1,0 +1,155 @@
+{
+  "issue": 541,
+  "acceptance": "passed",
+  "generated_at": "2026-09-27T14:39:02.366726+00:00",
+  "scope": "Extract internal first-improvement driver; remove redundant public evaluator cutoff argument; keep constructor cutoff binding including empty pool; migrate callers and original QMD.",
+  "review_command": "codex review - < .run-control/improve-extraction/review-prompt.txt",
+  "review_log": ".run-control/improve-extraction/review.log",
+  "findings": [],
+  "reviewed_sha256": {
+    "AGENTS.md": "505fb6ac10cd7e44cf5df1b824c707fb48a50969931d63cb85e3107301e457f2",
+    "packages/beidan/R/parlay_role_portfolio.R": "d2e69db8f9915baad0d3f1085277bdd42916d64b4abf9ab43515edf8c38405bd",
+    "packages/beidan/R/parlay_role_groups.R": "e46dada52e9a23dccc836b2a0447abc09be60623b070c5ecaba8e6c00cded54d",
+    "packages/beidan/R/parlay_role_shared.R": "9e521aed40a23b216bd21232af0d66f2729c98c2ada7df6cc9451eecf1a9543c",
+    "packages/beidan/man/parlay_evaluate_portfolio.Rd": "aa2dd482a4ffa57434cc3ce4b0993f770ec77d29b7d4afa7cb84c682ea507a13",
+    "packages/beidan/man/parlay_construct_role_groups.Rd": "8f00562690f50d658b7dd20d586e43e1ce14c19587511cff0f127b258be5210e",
+    "quarto/parlay_combination_lab.qmd": "94fa15d86b5cce4e1acaf51202736d1ed4b458f73637669a004f372a0890db9e",
+    "docs/strategy/role-round-robin-contract.md": "a669d360ad471f626dfa8058557f7c34b05bbd1e4b7f68c5a0db8ff58cb48b34",
+    "packages/beidan/tests/testthat/test-parlay-role-portfolio.R": "ee556f8b738a8598a688d70ca9a85b1502efbe24bf177e03cda14ef603ea2019",
+    "packages/beidan/tests/testthat/test-parlay-role-review.R": "9680d32ae15806ce37fc11279ac9b4af3e97d23d759ac56e875135968a905c68",
+    "packages/beidan/tests/testthat/test-parlay-role-groups.R": "f2a9d1253b87f3c48ebd4682e4487599892ac120ea1a550dab4b266b62ba2ca2",
+    "packages/beidan/tests/testthat/test-parlay-role-improve.R": "d72e84dae3535f84c82f03588062f42c32bd31f304be49f4229084afd36a4d44",
+    "tests/testthat/test-role-strategy-independent.R": "ee0491b842aef0d8e7b762dc2afeeb87df8ffa60d02cb6bb70b772efb48c82b4",
+    "tests/testthat/test-budget-sweep-independent.R": "9effeaefd20201fa6838b3190e41ac30bf019ee91c2c197038134e7551c8dbdb",
+    "tests/testthat/test-540-portfolio-interface-independent.R": "fca81777167f6b006e130b001a91af7c02e8bf8aff4ec2e02c79151a55418612",
+    "tests/testthat/test-541-embedded-cutoff-independent.R": "254c462e390ca1e0be93268086efa0faaa644e04904c138511647bc4a20b2d26"
+  },
+  "input": {
+    "path": "inputs/26098_walkthrough/print/26098-20260926-195204.rds",
+    "sha256": "d5658ae5476d2b014e960f855d67cd06dd65d83cf90363ac911984bda436b5c9"
+  },
+  "tests": [
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-portfolio.R",
+      "blocks": 17,
+      "passed": 106,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    },
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-review.R",
+      "blocks": 5,
+      "passed": 46,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    },
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-groups.R",
+      "blocks": 11,
+      "passed": 50,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    },
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-improve.R",
+      "blocks": 4,
+      "passed": 29,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/testthat/test-role-strategy-independent.R",
+      "blocks": 4,
+      "passed": 33,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/testthat/test-budget-sweep-independent.R",
+      "blocks": 5,
+      "passed": 54,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/testthat/test-540-portfolio-interface-independent.R",
+      "blocks": 2,
+      "passed": 38,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    },
+    {
+      "file": "tests/testthat/test-541-embedded-cutoff-independent.R",
+      "blocks": 2,
+      "passed": 16,
+      "failed": 0,
+      "error": 0,
+      "warning": 0,
+      "skipped": 0
+    }
+  ],
+  "test_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" Rscript .run-control/improve-extraction/test-suite.R",
+  "test_summary": {
+    "blocks": 50,
+    "passed": 372,
+    "failed": 0,
+    "error": 0,
+    "warning": 0,
+    "skipped": 0
+  },
+  "function_test_mapping": {
+    "parlay_evaluate_portfolio": [
+      "test-parlay-role-portfolio.R",
+      "test-parlay-role-review.R",
+      "test-541-embedded-cutoff-independent.R",
+      "three migrated independent suites"
+    ],
+    "parlay_construct_role_groups": [
+      "test-parlay-role-groups.R",
+      "test-541-embedded-cutoff-independent.R"
+    ],
+    ".parlay_role_improve_portfolio": [
+      "test-parlay-role-improve.R: disabled,accepted gain 1.625 to1.6255,public integration,no gain,maxpass,maxattempt,empty,immutability",
+      "test-role-strategy-independent.R"
+    ]
+  },
+  "comparison": {
+    "command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" Rscript .run-control/improve-extraction/compare.R",
+    "result": "12 complete old/new evaluation results equal; improve on/off, probability/EV, zero/shallow/full caps",
+    "baseline_sha256": "26d25027c67319514720db3ef30d4947094fa3e17d641e55c5a60f2194d4f069"
+  },
+  "render": {
+    "command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+    "tables": 20,
+    "errors": 0,
+    "table_text_equal_before_except_generation_time": true,
+    "excluded_cell": "table20 本次生成北京时间 only",
+    "html_sha256": "b85bb0df805653f41d89436647df4aec654ef8e56be635107fba2a2e2ee7b68f"
+  },
+  "dsh": {
+    "actual_command": "timeout 360 dsh --profile headless <task argument>",
+    "exit_code": 124,
+    "completed_by": "DSH produced source/docs/test migrations; supervising Codex finished direct tests and minor cleanup; root independently validated, reviewed and rendered"
+  },
+  "limitations": [
+    "Local implementation only; no commit/push/merge in this task.",
+    "No whole-repository tests; scoped changed paths only.",
+    "Historical input missing prematchSP; QMD probability-only remains explicit.",
+    "Existing candidate objects must be reconstructed; no compatibility layer."
+  ],
+  "review_summary": "No actionable bugs found. Reviewer independently checked scoped tests and 12 baseline comparisons; root completed fresh QMD render separately."
+}

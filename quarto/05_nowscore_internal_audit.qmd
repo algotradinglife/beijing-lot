@@ -1,0 +1,180 @@
+---
+title: "Nowscore 独立数据源：状态、比分与 SP 内部审计"
+params:
+  audit_db: "data/derived/nowscore_only/20260905_pilot/pilot_closed.sqlite"
+execute:
+  error: false
+  cache: false
+  freeze: false
+format: html
+---
+
+本报告只读取新建的 Nowscore 数据库，不读取 500、旧合并表或人工更正清单。
+这是指定期次的验证样本，不代表全历史覆盖。原始页面、采集时间和 SHA256 保留在同一采集目录。
+历史页面的抓取时间不证明历史赛前可用性；本结果不接入生产计奖或回测。
+
+```{r}
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+library(DBI)
+library(RSQLite)
+library(dplyr)
+source("r/nowscore_audit.R")
+a <- read_nowscore_audit(params$audit_db)
+stopifnot(a$receipt$source == "nowscore", !a$receipt$production_enabled)
+```
+
+## 覆盖与来源
+
+```{r}
+cat(sprintf("请求 %s 期；成功留存 %s 个页面；解析 %s 场、%s 个场次玩法、%s 个选项。\n",
+            length(a$receipt$requested_issues), a$receipt$capture_count,
+            a$receipt$matches, a$receipt$observations, a$receipt$options))
+cat("期号：", paste(a$receipt$requested_issues, collapse = "、"), "\n")
+cat("页面失败或解析失败：", length(a$receipt$capture_failures), "\n")
+if (length(a$receipt$capture_failures)) print(a$receipt$capture_failures)
+a$observations %>% count(play, status, name = "场次玩法数") %>% knitr::kable()
+```
+
+## 原始观察的审计规则与异常汇总
+
+按页面标签保留 SPF 3、总进球 8、上下单双 4、比分 25、半全场 9 个选项，空值不补零。
+原始观察中的比分玩法读取折叠表，不用显示顺序或汇总 SP 推断中奖选项。
+下方另列用户确认的比分推导补全层，不覆盖原始观察。
+“完场”不等于已证实正常彩票结算；停售不自动推断完场。
+
+- `option_score_mismatch`：唯一非空 SP 对应选项与比分推导不符。
+- `full_domain_all_one`：完整选项域全部 SP=1，仅标记特殊结算形态，不等同官方无效公告。
+- `single_option_sp_one`：仅一个选项 SP=1，需要单独核查。
+- `abnormal_without_all_one`：异常状态但并非全选项 SP=1，可能是未结算参考向量。
+- `finished_multiple_sp` / `finished_missing_sp`：完场但多个或没有非空 SP。
+- `summary_sp_without_option`：比分玩法有行级汇总 SP，但完整选项表为空；两者分别保留，不自动补值。
+- `cross_play_*`：各玩法页面身份、状态、比分等不一致。
+- `missing_*` / `invalid_*` / `malformed_*` / `option_domain_mismatch`：覆盖或字段问题。
+
+同一场次可有多个标记；这些是待核查发现，不全是已证实的数据错误。
+任何标记均不自动触发比分修正、退款或计奖。无标记也不代表取得官方结算凭证。
+
+```{r}
+a$findings %>% count(code, sort = TRUE, name = "标记条数") %>% knitr::kable()
+cat("涉及比赛：", nrow(distinct(a$findings, issue, slot)), "\n")
+```
+
+## 具体期号、slot 与原始选项 SP
+
+```{r}
+vectors <- a$options %>% group_by(observation_id) %>%
+  summarise(原始选项SP = paste(paste0(option, "=", ifelse(nzchar(raw_sp), raw_sp, "∅")), collapse = "；"), .groups = "drop")
+a$observations$汇总SP <- vapply(a$observations$payload_json, function(x) {
+  jsonlite::fromJSON(x)$summary_sp_raw
+}, character(1))
+detail <- a$findings %>%
+  left_join(a$observations, by = c("issue", "slot", "play", "source_sha256"), relationship = "many-to-many") %>%
+  left_join(vectors, by = "observation_id", relationship = "many-to-one") %>%
+  select(issue, slot, play, status, score, halftime_score, expected_option, code, detail,
+         原始选项SP, 汇总SP, source_url, received_at, source_sha256)
+detail %>% arrange(issue, slot, play, code) %>% knitr::kable()
+```
+
+## 重放回执
+
+```{r}
+cat("原始清单 SHA256：", a$receipt$manifest_sha256, "\n")
+cat("解析结果 SHA256：", a$receipt$data_sha256, "\n")
+cat("审计结果 SHA256：", a$receipt$audit_sha256, "\n")
+cat("证据类别：", a$receipt$evidence_class, "\n")
+```
+
+## 用户确认：空历史页不阻止比分选项推导
+
+用户确认了本次128场：比分推导“胜其他／平其他／负其他”，SP采用源站汇总开奖值。
+历史页为空仅表示该端点无历史记录，不再将其作为本次补全的阻碍；不据此证明源站后台的存储原因。
+原始25个空选项、原始比分、原始审计标记全部保留。
+证据类别为 `user_confirmed_score_summary_derivation`，不是历史页佐证或官方结算公告。
+仅本次明确列出的记录生效，不自动扩展到未来期次或特殊SP=1比赛。
+
+```{r}
+stopifnot(nrow(a$derivations) == a$derivation_receipt$approved_derivations,
+          !a$derivation_receipt$production_enabled,
+          all(a$derivations$derived_sp > 1))
+approved_options <- a$effective_options %>% filter(evidence_class %in% c("user_confirmed_score_summary_derivation", "history_supported_score_summary_derivation"))
+stopifnot(nrow(approved_options) == nrow(a$derivations),
+          all(is.na(approved_options$sp)), all(approved_options$effective_sp > 1))
+cat("用户确认补全：", nrow(a$derivations), "场；原始表未改写。\n")
+a$derivations %>% select(issue, slot, derived_option, derived_sp, evidence_class, decision_id) %>% knitr::kable()
+cat("补全后剩余标记：", nrow(a$effective_findings), "条，涉及",
+    nrow(distinct(a$effective_findings, issue, slot)), "场。\n")
+a$effective_findings %>% count(code, sort = TRUE, name = "剩余标记") %>% knitr::kable()
+```
+
+后续读取有效选项应使用 `effective_option_sp.effective_sp`，同时保留 `evidence_class` 和 `decision_id`。
+本报告不代表生产回测或计奖入口已切换。
+
+## 历史页支持的比分补全
+
+26082/23：比分0-5，负其他，开奖SP=56.7144（历史页56.71）。
+26082/39：比分6-1，胜其他，开奖SP=9.4130（历史页9.41）。
+规则要求原始比分选项域完整但全空，五玩法赛果一致，历史最新行为唯一正值选项，
+该选项与比分一致且SP按两位小数一致，历史不存在不同单选向量。
+补全采用原始开奖SP精度；保留历史原始字节、哈希、选项和SP作为证据。
+这是Nowscore内部佐证，不是官方公告或赛前可用性证明。
+
+```{r}
+a$derivations %>% filter(evidence_class == "history_supported_score_summary_derivation") %>%
+  select(issue, slot, derived_option, derived_sp, evidence_class) %>% knitr::kable()
+```
+
+## 人工裁决：五玩法全选项结算SP=1
+
+23054/335、24051/90、25033/221：原始五玩法各有一个SP=1，其余空值补为1。
+130408/82、130511/3、141112/49：异常状态、无比分、比分开奖SP=1，
+经用户人工裁决将五玩法全选项结算SP设为1。原始参考SP及推迟/中断/取消状态不变。
+本次收尾另外纳入130408/151、130509/138、130509/142、130511/80、140706/115、
+150903/57、150903/71、150903/381、23054/140。以上均保留原始数据，不标为官方公告已核实，
+不自动扩展到未来或未列明的比赛。
+不新增退票属性；退票与串关处理由后续策略结算代码根据比赛状态和SP判断。
+
+```{r}
+manual <- a$manual_all_one
+stopifnot(nrow(manual) == a$manual_receipt$options,
+          sum(manual$original_raw_sp == "" & is.na(manual$original_sp)) == a$manual_receipt$newly_filled_options,
+          sum(manual$original_raw_sp == "0.00" & is.na(manual$original_sp)) == a$manual_receipt$reviewed_original_zero_options,
+          all(manual$effective_sp == 1), !a$manual_receipt$production_enabled)
+cat("人工裁决：", a$manual_receipt$matches, "场；新增填充",
+    a$manual_receipt$newly_filled_options, "个选项；共", nrow(manual), "个选项SP=1。\n")
+manual %>% group_by(issue, slot, play) %>%
+  summarise(选项数 = n(), 原有SP为1 = sum(original_sp == 1, na.rm = TRUE),
+            参考SP改为1 = sum(!is.na(original_sp) & original_sp != 1),
+            新填空选项 = sum(original_raw_sp == "" & is.na(original_sp)),
+            原始零值裁决 = sum(original_raw_sp == "0.00" & is.na(original_sp)), .groups = "drop") %>% knitr::kable()
+manual %>% select(issue, slot, play, option, original_raw_sp, original_sp, effective_sp, decision_id) %>% knitr::kable()
+```
+
+## 原始零值的单独裁决
+
+130408/151：原始HTML哈希校验与离线解析重放确认，比分7个、半全场1个0.00来自源站。
+无法证明零值的后台含义，不将其宣称为占位值，也不将零值视为正常结算SP。
+基于五玩法均推迟、无比分、比分开奖SP=1及用户授权，单独人工裁决49个结算选项为1。
+原始0.00与其解析后的NULL均保留；仅显式`--zero-target 130408:151`授权该例外。
+原始invalid_sp标记仍在finding表中，其结算层处理由裁决记录解释。
+
+```{r}
+manual %>% filter(original_raw_sp == "0.00") %>%
+  select(issue, slot, play, option, original_raw_sp, original_sp, effective_sp) %>% knitr::kable()
+```
+
+## 特殊结算提示与样本收尾验收
+
+完整五玩法原始49选项均为SP=1、异常状态一致且无其他发现的场次，
+归入`special_settlement_notice`，不修改选项、不混入待修复异常。
+它们仍是特殊结算记录，不是普通唯一中奖比赛，也不是已核实官方公告。
+本次只验收12期诊断样本；全历史扩展、生产切换和策略退票计算尚未启动。
+
+```{r}
+a$special_notices %>% select(issue, slot, status, code) %>% knitr::kable()
+stopifnot(nrow(a$special_notices) == a$manual_receipt$special_notice_matches,
+          nrow(a$effective_findings) == 0L,
+          nrow(a$effective_options) == nrow(a$options),
+          !anyDuplicated(a$effective_options[c("observation_id", "option")]))
+cat("当前样本待处理结算异常：", nrow(a$effective_findings), "；特殊结算提示：",
+    nrow(a$special_notices), "场；原始审计标记：", nrow(a$findings), "条（保留）。\n")
+```

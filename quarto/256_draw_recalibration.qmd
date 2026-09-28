@@ -1,0 +1,273 @@
+---
+title: "让平可达性：q_D 的 cutoff 驱动校准评估"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 结论摘要
+
+保存的比分映射让平腿 `q_D` 系统性低估平局约 **+1.89pp**（整体 25.18% vs 实际 27.07%），
+且**在 744 期 68,826 场中一次都没有成为 argmax**——任何基于 argmax 的选赛果规则在结构上都
+不可能选中平局，而平局实际占 27.07%。
+
+本轮用 `src/draw_recalibration` 做**逐期 walk-forward 的单调（isotonic）校准**，只使用严格早于
+目标期决策时刻的标签。校准后：
+
+1. **压缩被修正**：整体 `q_D` 25.18% → 校准后 27.15%，实际 27.07%，偏差从 **+1.89pp 降到 −0.09pp**。
+2. **平局变得可达**：**340 场**（0.50%）的平局胜出 argmax，此前为 **0 场**。
+3. **这 340 场确有超额**：实际平局率 **32.06%**，比整体基线 27.07% 高 **+4.99pp**。
+4. **但不能盈利**：等额单场 ROI **−31.92%**（投入 680 元、毛派彩 462.9 元），命中率 32.06% 远低于
+   0.65 派彩系数所需的约 54%。
+5. **对整体 Top1 命中率无改善**：原规则 43.92%，校准规则 43.88%（−0.04pp）——因为校准只移动了
+   0.50% 的场次，且移动的场次本身概率不高。
+
+**主判断：校准修好了 `q_D` 的校准误差，让平局从"结构上不可达"变为"可达但无价值"。**
+它解决了**可达性**问题，没有解决**盈利性**问题。
+
+```{r}
+library(dplyr); library(tidyr); library(readr); library(tibble); library(ggplot2)
+root <- normalizePath(".", mustWork = TRUE)
+out <- file.path(root, ".tmpwork")
+walk <- file.path(out, "walk_forward.csv")
+truth <- file.path(out, "calib_truth.csv")
+stopifnot(file.exists(walk), file.exists(truth))
+cfg <- list(
+  unit_cny = 2, payout_factor = 0.65,
+  source = "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-line-gap-v1/fixtures.csv",
+  module = "src/draw_recalibration/calibrate.py",
+  contract = "src/temporal_learning/core.py"
+)
+```
+
+## 输入与契约
+
+校准的输入是 `handicap-line-gap-v1` 的逐场记录：每场带**完整比分矩阵**（而非让球分歧）
+推导出的净胜球分布，以及保存的 `q_W/q_D/q_L`。矩阵来源与 243/244 交付一致，本文件不重建矩阵。
+
+```{r}
+f <- read_csv(cfg$source, show_col_types = FALSE) |>
+  mutate(issue = as.character(issue))
+adm <- read_csv(walk, show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id)) |>
+  filter(calibration_admissible)
+tibble(
+  指标 = c("源场次", "源期数", "可用校准场次", "可用校准期数", "不可用期数",
+           "每期可用先验期数(中位)", "校准提升上限(中位)"),
+  值 = c(nrow(f), n_distinct(f$issue), nrow(adm), n_distinct(adm$issue),
+         n_distinct(f$issue) - n_distinct(adm$issue),
+         round(median(adm$prior_issue_count)), round(median(adm$maximum_uplift), 4))
+)
+```
+
+**校准契约**（`src/temporal_learning`，非本模块自建）：
+
+| 项目 | 取值 |
+|---|---|
+| cutoff | 逐期 `DECISION_EPOCH_<issue>`，取该期最早决策时刻 |
+| 可用性策略 | `HISTORICAL_PROXY`（期号日期 + 1 天为标签边界） |
+| intended_use | `HISTORICAL_DIAGNOSTIC`（时间戳为代理，不授权前瞻使用） |
+| 分区 | `FIXED_PRIOR_FIT`（无调参/校准切分，仅诊断） |
+| 加权 | `EXPANDING_EQUAL`，ESS 下限 100 |
+| 目标期排除 | 按 cutoff 时间**与**目标期身份双重排除 |
+
+## 一、校准是否修正了压缩
+
+```{r}
+cal_tbl <- adm |>
+  mutate(bin = factor(paste0("Q", ntile(calibrated_q_D, 5)), levels = paste0("Q", 1:5))) |>
+  group_by(bin) |>
+  summarise(场次 = n(), 校准后qD = mean(calibrated_q_D), 原始qD = mean(`_q_D`),
+            实际平局 = mean(`_is_draw`), .groups = "drop") |>
+  mutate(校准后差额pp = 100 * (实际平局 - 校准后qD),
+         原始差额pp = 100 * (实际平局 - 原始qD))
+cal_tbl |> mutate(across(where(is.numeric), \(x) round(x, 4))) |> knitr::kable()
+```
+
+整体偏差从 **+1.89pp** 降到 **−0.09pp**。分档看，原始 `q_D` 的差额随档位单调放大
+（+1.44 → +2.98pp），校准后压到 **−1.56 到 +1.14pp** 的噪声带。
+
+**校准改善了水平，也改善了形状**；残余的 Q5 −1.56pp 说明高端仍有轻微高估。
+
+## 二、平局是否变得可达
+
+```{r}
+reach <- tibble(
+  状态 = c("原始 q_D 胜出 argmax", "校准后胜出 argmax"),
+  场次 = c(sum(adm$argmax_is_draw_uncalibrated), sum(adm$argmax_is_draw)),
+  占比 = c(mean(adm$argmax_is_draw_uncalibrated), mean(adm$argmax_is_draw))
+) |> mutate(占比 = sprintf("%.3f%%", 100 * 占比))
+reach |> knitr::kable()
+```
+
+原始 `q_D` 在全部 68,826 场（含不可用期**同样为 0**）从未胜出。校准打开了这条路径。
+
+## 三、这 340 场是否有超额
+
+```{r}
+draws <- adm |> filter(argmax_is_draw)
+base_rate <- mean(adm$`_is_draw`)
+tibble(
+  指标 = c("场次数", "涉及期数", "实际平局率", "整体基线平局率", "超额(pp)",
+           "校准后 q_D 均值", "校准差额(pp)", "q_W 均值", "q_L 均值"),
+  值 = c(nrow(draws), n_distinct(draws$issue), round(mean(draws$`_is_draw`), 4),
+         round(base_rate, 4), round(100 * (mean(draws$`_is_draw`) - base_rate), 2),
+         round(mean(draws$calibrated_q_D), 4),
+         round(100 * (mean(draws$`_is_draw`) - mean(draws$calibrated_q_D)), 2),
+         round(mean(draws$q_W), 4), round(mean(draws$q_L), 4))
+)
+```
+
+**超额 +4.99pp 是真实的**，且方向正确。但校准后的 `q_D` 均值 0.4422 **高于**实际 0.3206
+（−12.16pp），说明这些场次被校准**过度提升**了——isotonic 在 `q_D` 尾部把曲线拉得过高。
+
+## 四、能否盈利
+
+```{r}
+truth <- read_csv(truth, show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id))
+rules <- truth |>
+  mutate(rule_raw = if_else(`_q_D` > pmax(q_W, q_L), "D", if_else(q_W >= q_L, "W", "L")),
+         rule_cal = if_else(argmax_is_draw, "D", if_else(q_W >= q_L, "W", "L"))) |>
+  filter(!is.na(spf_sp), !is.na(truth))
+
+ledger <- bind_rows(lapply(c("rule_raw", "rule_cal"), function(rule) {
+  s <- rules
+  hit <- s[[rule]] == s$truth
+  gross <- cfg$unit_cny * cfg$payout_factor * s$spf_sp * as.numeric(hit)
+  tibble(规则 = rule, 场次 = nrow(s), 投入 = nrow(s) * cfg$unit_cny,
+         毛派彩 = round(sum(gross), 2), 命中率 = round(mean(hit), 4),
+         ROI = sprintf("%+.2f%%", 100 * (sum(gross) - nrow(s) * cfg$unit_cny) / (nrow(s) * cfg$unit_cny)))
+}))
+draw_only <- rules |> filter(rule_cal == "D")
+ledger <- bind_rows(ledger, tibble(
+  规则 = "仅校准选平局", 场次 = nrow(draw_only), 投入 = nrow(draw_only) * cfg$unit_cny,
+  毛派彩 = round(sum(cfg$unit_cny * cfg$payout_factor * draw_only$spf_sp * as.numeric(draw_only$truth == "D")), 2),
+  命中率 = round(mean(draw_only$truth == "D"), 4),
+  ROI = { g <- sum(cfg$unit_cny * cfg$payout_factor * draw_only$spf_sp * as.numeric(draw_only$truth == "D"))
+          sprintf("%+.2f%%", 100 * (g - nrow(draw_only) * cfg$unit_cny) / (nrow(draw_only) * cfg$unit_cny)) }))
+ledger |> knitr::kable()
+```
+
+**命中率 32.06% 远低于 0.65 系数所需的约 54%。** 校准让平局可选，但它选中的场次仍是负期望。
+注意这是**单场等额**的描述性账本，不是 7 串 1 回测。
+
+## 五、逐年稳定性
+
+```{r}
+adm |>
+  mutate(yr = 2000 + as.integer(substr(issue, 1, 2))) |>
+  group_by(yr) |>
+  summarise(场次 = n(), 校准选D = sum(argmax_is_draw),
+            选D命中 = round(mean(`_is_draw`[argmax_is_draw]), 4),
+            校准qD = round(mean(calibrated_q_D[argmax_is_draw]), 4), .groups = "drop") |>
+  knitr::kable()
+```
+
+**极其不稳定**：2010 年 101 场（命中 40.6%），2012 年仅 35 场（22.9%），2013 年 **2 场**，
+2014 年 3 场，2015 年 1 场。样本量在 2012 年后塌陷——这正是"可达但无实用价值"的量化证明：
+**340 场里 299 场（88%）集中在头两年。**
+
+## 六、对 7 串 1 篮子框架的影响
+
+我们的篮子框架从 32,613 条腿里选了 8,456 条平局腿（`outcome=2`，即让平）。
+校准后的 argmax 只在 **77 条腿**上判定平局最优：
+
+```{r}
+legs <- read_csv("/run/media/drwho1985/Sandisk/data/beijing-lot/audits/joint-basket-oos-v1/legs.csv",
+                 show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id))
+key <- c("issue", "slot", "provider_id")
+overlap <- legs |>
+  left_join(adm |> select(all_of(key), argmax_is_draw), by = key) |>
+  filter(!is.na(argmax_is_draw))
+tibble(
+  指标 = c("可匹配腿数", "框架选择平局的腿", "校准判定平局最优的腿",
+           "两者交集", "框架选平局但校准不认可的腿"),
+  值 = c(nrow(overlap), sum(overlap$outcome == 2), sum(overlap$argmax_is_draw),
+         sum(overlap$outcome == 2 & overlap$argmax_is_draw),
+         sum(overlap$outcome == 2 & !overlap$argmax_is_draw))
+)
+```
+
+**框架选的平局腿与校准认可的平局腿几乎不重合**（交集远小于任一单独数量）。
+这解释了为什么校准无法改善篮子：**它认可的是完全不同的那批场次，而框架选的是另一批。**
+
+## 验收证据
+
+```{r}
+receipt <- list(
+  status = "COMPUTED_PENDING_REVIEW",
+  source = list(path = cfg$source,
+                sha256 = digest::digest(file = cfg$source, algo = "sha256")),
+  contract = list(path = cfg$contract,
+                  sha256 = digest::digest(file = file.path(root, cfg$contract), algo = "sha256")),
+  module = list(path = cfg$module,
+                sha256 = digest::digest(file = file.path(root, cfg$module), algo = "sha256")),
+  counts = list(fixtures = nrow(f), issues = n_distinct(f$issue),
+                admissible = nrow(adm), draw_argmax = sum(adm$argmax_is_draw)),
+  historical_learning = "WALK_FORWARD_DECISION_EPOCH",
+  intended_use = "HISTORICAL_DIAGNOSTIC",
+  availability_policy = "HISTORICAL_PROXY",
+  tests = "tests/draw_recalibration/test_calibrate.py"
+)
+jsonlite::write_json(receipt, file.path(out, "draw-recalib-receipt.json"),
+                     auto_unbox = TRUE, pretty = TRUE, digits = NA)
+cat(sprintf("源哈希 %s\n契约哈希 %s\n模块哈希 %s\n",
+            substr(receipt$source$sha256, 1, 16),
+            substr(receipt$contract$sha256, 1, 16),
+            substr(receipt$module$sha256, 1, 16)))
+```
+
+| 检查 | 命令 | 结果 |
+|---|---|---|
+| 模块测试 | `./.venv/bin/python -m pytest tests/draw_recalibration/test_calibrate.py` | **15 passed** |
+| cutoff 因果性 | 同上 `test_walk_forward_is_causal_in_the_target_probability` | 目标期标签翻转不改其校准 |
+| 时间切分 | 同上 `test_walk_forward_flags_inadmissible_early_issues` | 早期窗口 ESS 不足时标记而非拟合 |
+| R 全量测试 | `Rscript tests/testthat.R` | 全部通过（仅 2 项既有 skip，与本交付无关） |
+| 估计量等价 | `jb_conditional_logit` vs `survival::clogit`（n=3,000） | 系数差 **0**（完全相同） |
+| 无 attach 依赖 | `test-joint-basket-probability-audit.R` 新增回归 | survival 未 attach 时正常工作 |
+| QMD 渲染 | `quarto render quarto/256_draw_recalibration.qmd` | exit 0，HTML 含全部关键数字 |
+
+**顺带修复的既有缺陷（本次工作暴露）**：`jb_conditional_logit` 原实现调用 `survival::clogit`，
+但 `clogit` 需要两个它自己不导入的名字——formula 里无限定的 `strata()`，以及它在
+**调用者帧**里求值的裸 `coxph()`。两者都只在 `survival` 被 attach 时才能解析，因此
+`jb_conditional_logit` 在未 attach 的会话中必然失败（`Rscript tests/testthat.R` 的报错即此）。
+现在由实现自身提供这两个绑定，**保持 `clogit` 的原始条件似然实现不变**，数值结果与
+attach 后的 `clogit` 完全一致（差 0）。这不是兼容层，而是移除了对会话状态的隐藏依赖。
+
+**合规缺口（必须记录）**：`codex review` 未执行——额度耗尽。
+按 AGENTS.md「Skipped or failed required checks do not pass」，本交付**未经 PI 验收**。
+
+## 边界与限制
+
+- **可用性证据等级**：`HISTORICAL_PROXY`。标签边界由期号日期 + 1 天推导，
+  是时间戳代理而非**观测到的**结算可用性，因此**不授权前瞻使用**。
+- **校准过拟合尾部**：340 场的 `calibrated_q_D` 均值 0.4422 高于实际 0.3206（−12.16pp）。
+  isotonic 在 `q_D` 高端把曲线拉得过高，样本越少越严重。
+- **样本塌陷**：2013–2015 合计仅 6 场。任何"校准提升平局策略"的推论都不成立。
+- **未回归整体框架**：本文件只做**单场描述性**评估；不重跑 7 串 1 篮子的联合概率与配票。
+- **矩阵来源未重建**：输入沿用 243/244 的保存比分矩阵，本文件不从三分类概率反推比分。
+- **投注口径**：`unit_cny = 2`、`payout_factor = 0.65`，与既有框架一致，非北单 SP。
+
+## 判断
+
+`q_D` 的压缩是**真实的模型缺陷**，校准能修好它（偏差 +1.89pp → −0.09pp），
+并让平局从**结构上不可达**（0/68,826）变为**可达**（340 场，超额 +4.99pp）。
+
+但可达**不等于**有价值：
+
+1. 命中率 32.06%，远低于 0.65 系数所需的约 54% → **ROI −31.92%**
+2. 校准在 `q_D` 尾部**过度提升**，选中的场次被高估 12.16pp
+3. 88% 的可选场次挤在 2010–2011 两年，2013 年仅 2 场
+4. 与框架实际选的 8,456 条平局腿**几乎不重合**
+
+**因此：不要把校准后的平局 argmax 接入选赛果或 7 串 1 构建。**
+它最大的价值是**诊断**——它证明了此前的"平局永不被选中"不是巧合，而是 `q_D` 压缩的必然结果；
+并且证明了**即使修好压缩，平局档仍然不盈利**。这排除了"平局是被埋没的机会"这一假设，
+把优化重心推回**场次组合与配票**（P1/P2），那里才有边际收益空间。

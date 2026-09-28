@@ -1,0 +1,64 @@
+{
+  "issue": 535,
+  "review_commands": [
+    "codex review - < .run-control/remove-entropy-535/review-prompt.txt",
+    "codex review - < .run-control/remove-entropy-535/review-final-prompt.txt"
+  ],
+  "review_findings": [
+    {
+      "severity": "P2",
+      "problem": "Fixed-group supports discarded authoritative role outcome masks for near ties",
+      "resolution": "Consume selected role allowed_outcomes directly then apply forbidden without top-up; near-tie regression pins W vs D and exhaustion."
+    }
+  ],
+  "final_review": "No actionable findings",
+  "reviewed_hashes": {
+    "packages/beidan/R/parlay_role_shared.R": "e2a4580bd4dbab69021c74c995be22e59c7ee1bce688c391afdce4e010b763df",
+    "packages/beidan/R/parlay_role_portfolio.R": "79ac7c2c51a901eabd6311acdddda58c4440378a213125080e3826222dce146c",
+    "packages/beidan/R/n7_pipeline_candidates.R": "a187624c23a495d6bb62e187a4b9619912379b529b9cea58648078d57bc8a506",
+    "packages/beidan/R/parlay_budget_allocation.R": "79c3a20eed920ac40b2d2be1da4ba0325ff7133119742eda6fba9efd91a32834",
+    "packages/beidan/R/parlay_role_scores.R": "aa8672aaa18b390a5653ee9e022a77777374ec2e5585d2d67fb9967f302106f6",
+    "packages/beidan/R/n7_pipeline_value.R": "74026b61027f23ea02a0aee1d44a458d7ec636b6653b734b7506a0307fbf15d9",
+    "packages/beidan/R/parlay_restructure_plan.R": "9c9f5b41a8c6f4bbeb30be159607f99c63fe800077cc08970b4193e28366eb36",
+    "packages/beidan/tests/testthat/test-n7-pipeline-value.R": "bdbedc060fb07c03b88dd87b9ccfdf5d4134ff926f40682a8ac87973996f53df",
+    "packages/beidan/tests/testthat/test-parlay-variable-legs.R": "4ef1314d5419de966901c95bde14b36a8d4c7741e4946cfc9fe10bec7eebed97",
+    "packages/beidan/tests/testthat/test-n7-match-status.R": "8d2255a44567c6976c9c6e5946ee09c2991db8e55891c897827e552355e75ea9",
+    "packages/beidan/tests/testthat/test-n7-pipeline-candidates.R": "c99cd2bb5f3764dd1850bde9cef0a6d8ecad5cf4b6f8963c6084cc86feb9fdc7",
+    "packages/beidan/tests/testthat/test-n7-match-status-acceptance.R": "d1b2dd3543bb5632896ce9974ff1348b66b63d058796b168aaa50fcdfc227741",
+    "packages/beidan/man/parlay_apply_structure.Rd": "28cb8c33d795db5d46fff27ec30500bd22adad42bbf62f2e5ef871221948c7a4",
+    "packages/beidan/man/parlay_restructure_plan.Rd": "90ede83ac8a6a96277e4e73a7255d81620299b5d4523fe094ef31f1151389cdc",
+    "packages/beidan/man/parlay_coverage_frontier.Rd": "be24f6409b59bfab1eae5b594f63e8b0e0223cc107f6596f8d73d7d167d6f193",
+    "packages/beidan/man/parlay_role_scores.Rd": "95f03e0a5c19ff1096a6f4f730358791c15474af28c68e48ee7c60fe847f4a92",
+    "packages/beidan/man/parlay_construct_groups.Rd": "22da0d74970e5ea392746c7e52f0a6b617ce76f1fa2c4ac31259324585f6231f",
+    "packages/beidan/man/parlay_probability_wide.Rd": "fc170906a72c1ac3fff9fbfe605852e381d29a0d286a35a90566d7f73f2e7414",
+    "packages/beidan/man/parlay_normalised_entropy.Rd": null,
+    "quarto/parlay_combination_lab.qmd": "222c69f9f153ce2bb13643b390dda8190d8b011e4518dffc256752b30547ab37",
+    "quarto/n7_pipeline_contracts.qmd": "363e71c550377c7d0842e93eb3a51aa626a4701f3e017de2ffd01e39b6ed91e3"
+  },
+  "tests": {
+    "candidates_final": 134,
+    "contracts": 541,
+    "value": 311,
+    "budget_allocation": 172,
+    "restructure": 25,
+    "role_groups": 56,
+    "role_portfolio": 68,
+    "role_scores": 37,
+    "variable_legs": 73,
+    "match_status": 109,
+    "match_status_acceptance": 27,
+    "role_review": 47,
+    "independent_role_strategy": 33
+  },
+  "test_notes": "134 candidate assertions rerun after near-tie fix; other scoped suites passed immediately before localized fix. All zero failures/warnings. Independent manual hard-expectation script also passed. No full-repo or CI checks.",
+  "status": "accepted",
+  "render": {
+    "tables": 24,
+    "execution_errors": 0,
+    "has_new_role_comparison": true,
+    "html_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/quarto/parlay_combination_lab.html",
+    "log": ".run-control/remove-entropy-535/render-pi.log",
+    "html_sha256": "7af07fff7ddb580ca97e1a8bf10640c2dfe42ef6d890f1a057f810de009a4f06",
+    "hashes_verified": true
+  }
+}

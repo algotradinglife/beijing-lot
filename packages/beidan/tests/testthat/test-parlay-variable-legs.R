@@ -40,6 +40,24 @@ leg_pattern <- function(n_legs) {
   as.integer(pmax(1L, pmin(3L, seq(3L, 1L, length.out = n_legs))))
 }
 
+# Block 8 public path: one explicit strategy configuration for an arbitrary plan
+# width. There is no fixed group count; the funded groups are derived from the
+# budget and the reuse/overlap constraints. `wide` is the contract's 3333222-style
+# depth profile (repeated/truncated to n_legs), `narrow` its 2222221 counterpart.
+block8_leg_config <- function(n_legs, name = "legs") {
+  wide <- as.integer(rep_len(c(3L, 3L, 3L, 3L, 2L, 2L, 2L), n_legs))
+  narrow <- as.integer(rep_len(c(2L, 2L, 2L, 2L, 2L, 2L, 1L), n_legs))
+  pattern <- function(values) {
+    stats::setNames(list(values), paste0("p", paste(values, collapse = "")))
+  }
+  parlay_strategy_config(
+    parlay_settings(), name = name,
+    construction_policy = list(max_candidates = 2L, seed = 1L),
+    patterns = c(pattern(wide), pattern(narrow)),
+    objective = "probability", max_reuse = 1L, max_overlap = n_legs - 1L,
+    spend_limit_cny = 16)
+}
+
 # --- 会话参数：可变宽度 -----------------------------------------------------
 
 testthat::test_that('parlay_settings 默认 7，接受 6/8 与任意整数 >=1', {
@@ -76,7 +94,7 @@ for (WIDTH in c(6L, 7L, 8L)) {
       parlay_settings(n_legs = width, unit_cny = 2, payout_factor = 0.65)
 
       groups <- parlay_construct_groups(fx$fixtures, fx$probabilities,
-                                        fx$cutoff, width, 'entropy_balanced',
+                                        fx$cutoff, width, 'fixture_round_robin',
                                         2L, seed = 1L,
                                         match_status = fx$match_status)
       # 每组恰好 width 条腿。
@@ -86,7 +104,7 @@ for (WIDTH in c(6L, 7L, 8L)) {
 
       pattern <- leg_pattern(width)
       structure <- parlay_apply_structure(groups$group_legs, fx$probabilities,
-                                          fx$cutoff, pattern, 'entropy_desc')
+                                          fx$cutoff, pattern)
       testthat::expect_true(nrow(structure$supports) > 0L)
 
       tickets <- parlay_enumerate_tickets(groups$group_legs,
@@ -102,7 +120,7 @@ for (WIDTH in c(6L, 7L, 8L)) {
                                      unit_cny = 2, payout_factor = 0.65)
       ranked <- parlay_rank_tickets(valued, tickets$candidate_tickets, fx$cutoff)
 
-      config <- parlay_allocation_configs(parlay_settings())[['A']]
+      config <- block8_leg_config(width)
       result <- parlay_build_plan(fx$projected, config)
       testthat::expect_identical(result$plan$constants$n_legs, width)
       testthat::expect_identical(parlay_structure_legs(result$plan$group_legs), width)
@@ -118,7 +136,7 @@ for (WIDTH in c(6L, 7L, 8L)) {
 testthat::test_that('结构 pattern 与组宽度不一致时显式报错', {
   fx <- leg_fixture(6L, n_fixtures = 6L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities,
-                                    fx$cutoff, 6L, 'entropy_balanced', 1L, seed = 1L,
+                                    fx$cutoff, 6L, 'fixture_round_robin', 1L, seed = 1L,
                                     match_status = fx$match_status)
   # 用七位 pattern 套六场组：必须报错，而不是补齐或截断。
   testthat::expect_error(
@@ -130,10 +148,10 @@ testthat::test_that('结构 pattern 与组宽度不一致时显式报错', {
 testthat::test_that('parlay_enumerate_tickets 拒绝与组宽度不符的 n_legs', {
   fx <- leg_fixture(6L, n_fixtures = 6L)
   groups <- parlay_construct_groups(fx$fixtures, fx$probabilities,
-                                    fx$cutoff, 6L, 'entropy_balanced', 1L, seed = 1L,
+                                    fx$cutoff, 6L, 'fixture_round_robin', 1L, seed = 1L,
                                     match_status = fx$match_status)
   structure <- parlay_apply_structure(groups$group_legs, fx$probabilities,
-                                      fx$cutoff, leg_pattern(6L), 'entropy_desc')
+                                      fx$cutoff, leg_pattern(6L))
   testthat::expect_error(
     parlay_enumerate_tickets(groups$group_legs, fx$probabilities, fx$cutoff,
                              structure$supports, n_legs = 7L),
@@ -152,7 +170,7 @@ testthat::test_that('.BuildDecisionTables 拒绝与 n_legs 不符的 pattern', {
   testthat::expect_error(
     .BuildDecisionTables(fx$fixtures, fx$probabilities,
                           fx$issue$prematch_sp, fx$cutoff, fx$match_status,
-                          patterns = list(rep(2L, 6L)), construction = 'entropy_balanced',
+                          patterns = list(rep(2L, 6L)), construction = 'fixture_round_robin',
                           max_candidates = 1L, seed = 1L,
                           constants = parlay_settings()),
     'every pattern must have 7 legs')
@@ -165,7 +183,7 @@ testthat::test_that('冻结的 n_legs/unit/payout 不被之后的 session 改动
   fx <- leg_fixture(width, n_fixtures = width)
   parlay_settings(reset = TRUE)
   parlay_settings(n_legs = width, unit_cny = 2, payout_factor = 0.65)
-  config <- parlay_allocation_configs(parlay_settings())[['A']]
+  config <- block8_leg_config(width)
   result <- parlay_build_plan(fx$projected, config)
   frozen <- result$plan
   # 之后的 session 改动：宽度、单价、赔付因子全部改掉。
@@ -205,7 +223,7 @@ testthat::test_that('公共路径保留显式决策上下文，结算读取冻�
   fx <- leg_fixture(width, n_fixtures = width * 2L)
   parlay_settings(reset = TRUE)
   parlay_settings(n_legs = width, unit_cny = 2, payout_factor = 0.65)
-  config <- parlay_allocation_configs(parlay_settings())[['A']]
+  config <- block8_leg_config(width)
   result <- parlay_build_plan(fx$projected, config)
   # 上下文随输出返回：cutoff 与投影对象都在结果里，不需要调用方重新拼装。
   testthat::expect_identical(result$cutoff$issue_id, '26097')
@@ -224,7 +242,7 @@ testthat::test_that('投影必须在两个边界都绑定同一 cutoff，拒绝�
   width <- 7L
   fx <- leg_fixture(width, n_fixtures = width * 2L)
   parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(parlay_settings())[['A']]
+  config <- block8_leg_config(width)
   # 非投影对象、缺字段、cutoff 与 fixtures 不同期，都必须显式报错。
   testthat::expect_error(parlay_build_plan(list(), config), 'projected')
   broken <- fx$projected
@@ -238,7 +256,7 @@ testthat::test_that('投影必须在两个边界都绑定同一 cutoff，拒绝�
 testthat::test_that('策略配置拒绝未知字段与缺字段，不做静默回退', {
   fx <- leg_fixture(7L, n_fixtures = 14L)
   parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(parlay_settings())[['A']]
+  config <- block8_leg_config(7L)
   # 拼错的预算字段不能被忽略——否则真实上限会退回默认值。
   typo <- utils::modifyList(config, list(budgt_cny = 160))
   typo$budget_cny <- NULL
@@ -255,7 +273,7 @@ testthat::test_that('同一期多次决策共享账本与复用/重叠上限', {
   width <- 7L
   fx <- leg_fixture(width, n_fixtures = width * 4L)
   parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(parlay_settings())[['C']]
+  config <- block8_leg_config(width)
   first <- parlay_build_plan(fx$projected, config)
   # 第二次决策拿回第一次的 history：已买过的物理票不得重复扣款。
   testthat::expect_error(parlay_build_plan(fx$projected, config,
@@ -295,7 +313,7 @@ testthat::test_that('投影后的未来状态变更不能改写既有决策', {
   width <- 7L
   fx <- leg_fixture(width, n_fixtures = width * 2L)
   parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(parlay_settings())[['A']]
+  config <- block8_leg_config(width)
   baseline <- parlay_build_plan(fx$projected, config)
   # 一个在 cutoff 之后才可见的取消状态：不得进入本决策。
   later <- fx$match_status[1L, ]
@@ -317,7 +335,7 @@ testthat::test_that('空投影返回 typed-empty 计划而不是报错', {
     prematch_sp = match_typed_empty('prematch_sp'),
     match_status = match_typed_empty('match_status'))
   parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(parlay_settings())[['A']]
+  config <- block8_leg_config(7L)
   result <- parlay_build_plan(empty_projection, config)
   testthat::expect_identical(nrow(result$funded$purchases), 0L)
   testthat::expect_identical(names(result$funded$purchases),

@@ -1,0 +1,215 @@
+---
+title: "数据采集与清理实验台"
+format:
+  html:
+    toc: true
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+用于在 Positron 逐块检查采集、解析结果和输入清理。默认使用 **26098 的真实本地快照**，不联网、不构造下注方案。读取快照是在检查已解析数据，不等于重新运行网页解析器。修改采集器或解析器后，可开启对应采集块；自动化原始响应回放及回归测试保留在包的 testthat / Python 测试中，不在这里执行。
+
+每次修正函数后重新 `load_all()`，再从受影响的块向下运行；Python 后端代码改变后重启 R。所有时间按北京时间展示，`quote_at`（来源报价时间）、`observed_at`（真实采集时间）、`label_available_at`（结算标签可用时间）分别保留。
+
+## 1. 加载与参数
+
+先将 Positron 工作目录设为仓库或其子目录。四个采集开关独立控制，默认全部关闭。`inspect_slots` 只控制重点检查和联网盘口采集范围，**不会截断整期赛程**；设为 `NULL` 可检查全部场次。开启赛前SP采集时，仅向采集器传入尚未开赛的场次，来源停售状态仍由函数核验。
+
+```{r}
+#| label: data-lab-config
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+package_dir <- file.path(root,"packages/beidan")
+python <- file.path(root,".venv/bin/python")
+implementation_files <- sort(c(
+  list.files(file.path(package_dir,"R"),pattern="[.]R$",full.names=TRUE),
+  list.files(file.path(package_dir,"inst/python/beidan_backend"),pattern="[.]py$",recursive=TRUE,full.names=TRUE)))
+implementation_hashes <- tibble::tibble(
+  file=substring(implementation_files,nchar(package_dir)+2L),
+  sha256=purrr::map_chr(implementation_files,~digest::digest(file=.x,algo="sha256")))
+implementation_hash <- digest::digest(implementation_hashes,algo="sha256")
+devtools::load_all(package_dir,quiet=TRUE)
+issue_id <- "26098"
+inspect_slots <- c(11L,12L,13L,56L,63L,77L)
+refresh_schedule <- FALSE
+refresh_markets <- FALSE
+refresh_sp <- FALSE
+refresh_settlements <- FALSE
+# NULL：以已读取快照中最晚实际观测时间之后1秒作清理检查时点。
+# 可填带 Asia/Shanghai 时区的 POSIXct，检查具体历史时点的排除原因。
+replay_at <- NULL
+source_dir <- file.path(root,"inputs/26098_walkthrough")
+schedule_path <- file.path(source_dir,"schedule.rds")
+markets_path <- file.path(source_dir,"markets.rds")
+sp_path <- file.path(source_dir,"print/prematch-sp-20260926-231551-replayed.rds")
+settlements_path <- file.path(source_dir,"settlements.rds")
+# 新采集单独保存，不覆盖 walkthrough 的快照。
+run_dir <- file.path(root,"inputs/data_collection_lab",
+  paste0(format(Sys.time(),"%Y%m%d-%H%M%OS6",tz="Asia/Shanghai"),"-",Sys.getpid()))
+backend <- NULL
+if (any(c(refresh_schedule,refresh_markets,refresh_sp,refresh_settlements))) {
+  backend <- beidan::python_backend(python)
+  dir.create(run_dir,recursive=TRUE,showWarnings=FALSE)
+}
+market_policy <- list(
+  euro=list(members=c("281","115","82","177","432"),missing="drop_member"),
+  totals=list(companies=NULL,line="nearest_main",watermark="decimal"))
+knitr::kable(tibble::tibble(
+  环节=c("赛程","欧赔与大小球","北单赛前SP","结算"),
+  函数=c("fetch_issue_schedule","fetch_match_markets","fetch_issue_prematch_sp","fetch_issue_settlements"),
+  联网=c(refresh_schedule,refresh_markets,refresh_sp,refresh_settlements)))
+```
+
+## 2. 整期赛程与日期清理
+
+`fetch_issue_schedule()` 同时处理两源采集、解析和规范化；当前期按期号与 slot 对齐。slot 不是 Titan 原生比赛 ID。`kickoff_group_date` 是页面分组日期，不能直接当作自然开赛日期；以完整 `kickoff_at` 为准。没有具体时间的记录保持缺失，不能用停售时间猜造开赛时刻。
+
+```{r}
+#| label: data-lab-schedule
+if (refresh_schedule) {
+  schedule <- beidan::fetch_issue_schedule(issue_id,file.path(run_dir,"schedule_raw"),backend)
+  schedule_path <- file.path(run_dir,"schedule.rds")
+  saveRDS(schedule,schedule_path)
+} else {
+  schedule <- readRDS(schedule_path)
+}
+stopifnot(tibble::is_tibble(schedule),all(schedule$issue_id==issue_id),
+  !anyDuplicated(schedule$fixture_key),!anyDuplicated(schedule$slot))
+schedule <- schedule |>
+  dplyr::mutate(dplyr::across(where(lubridate::is.POSIXct),
+    ~lubridate::with_tz(.x,"Asia/Shanghai")))
+focus <- if (is.null(inspect_slots)) schedule else dplyr::filter(schedule,slot %in% inspect_slots)
+knitr::kable(dplyr::count(schedule,match_status,sale_state,name="场数"))
+knitr::kable(dplyr::select(focus,slot,home_name,away_name,kickoff_at,
+  kickoff_group_date,sale_end_at,match_status,observed_at))
+knitr::kable(dplyr::filter(schedule,is.na(kickoff_at)) |>
+  dplyr::select(slot,home_name,away_name,kickoff_hhmm,raw_display_nowscore))
+print(attr(schedule,"diagnostics"))
+```
+
+## 3. 来源身份与原文对照
+
+这里保留两源名字与原始链接，供人工核对。简称和悬停别名的差别不自动视为不同比赛。先核对 slot 和原生 ID，再查看让球、时间、状态的差异；不在本报告重写另一套匹配或日期解析规则。
+
+```{r}
+#| label: data-lab-identity
+knitr::kable(dplyr::select(focus,slot,fixture_key,provider_id_nowscore,
+  home_500,home_title_500,home_nowscore,away_500,away_nowscore,
+  handicap,identity_method,source_url_500,source_url_nowscore))
+```
+
+## 4. 欧赔和大小球采集、重复报价与覆盖
+
+联网时只采集 `focus`，便于小样本调试；读取时保留快照的全部数据，以免为了展示删掉输入。欧赔保留各公司报价，大小球采用自身公司 ID 空间；不能把欧赔公司 ID 直接用于大小球。`diagnostics` 展示解析与同分钟去重原因，`coverage` 展示失败及缺失，不将其填为零报价。
+
+```{r}
+#| label: data-lab-markets
+if (refresh_markets) {
+  markets <- beidan::fetch_match_markets(focus,file.path(run_dir,"market_raw"),backend,
+    totals_company_ids="8")
+  markets_path <- file.path(run_dir,"markets.rds")
+  saveRDS(markets,markets_path)
+} else {
+  markets <- readRDS(markets_path)
+}
+knitr::kable(dplyr::count(markets$coverage,status))
+knitr::kable(markets$companies)
+knitr::kable(dplyr::filter(markets$coverage,fixture_id %in% focus$fixture_key))
+knitr::kable(markets$diagnostics |> dplyr::group_by(market,reason) |>
+  dplyr::summarise(记录数=sum(count),.groups="drop"))
+knitr::kable(markets$euro |> dplyr::filter(fixture_id %in% focus$fixture_key) |>
+  dplyr::arrange(fixture_id,company_id,dplyr::desc(quote_at)) |> head(30))
+knitr::kable(markets$totals |> dplyr::filter(fixture_id %in% focus$fixture_key) |>
+  dplyr::arrange(fixture_id,company_id,dplyr::desc(quote_at)) |> head(30))
+knitr::kable(markets$captures |> dplyr::filter(fixture_id %in% focus$fixture_key) |>
+  dplyr::select(fixture_id,market,observed_at,source_url,raw_path,sha256))
+```
+
+## 5. 北单赛前 SP 与结算分开检查
+
+北单赛前SP不能用欧赔替代；本块保留 `sp_raw` 原值，**不在采集清理时将大于10的SP改成4.5**，该变换属于策略估值。结算使用真实结算SP。未完场、取消或推迟不能擅自补结算。两种数据分别查看，结算不会进入第6块的赛前输入。
+
+```{r}
+#| label: data-lab-sp-settlements
+if (refresh_sp) {
+  sp_schedule <- dplyr::filter(schedule,!is.na(kickoff_at),kickoff_at>Sys.time())
+  if (nrow(sp_schedule)>0L) {
+    prematch_sp <- beidan::fetch_issue_prematch_sp(sp_schedule,file.path(run_dir,"sp_raw"),backend)
+  } else {
+    prematch_sp <- beidan::match_typed_empty("prematch_sp")
+    attr(prematch_sp,"diagnostics") <- tibble::tibble(reason="no_future_fixture: 未发起SP采集请求")
+  }
+  sp_path <- file.path(run_dir,"prematch_sp.rds")
+  saveRDS(prematch_sp,sp_path)
+} else {
+  prematch_sp <- readRDS(sp_path)
+}
+if (refresh_settlements) {
+  settlements <- beidan::fetch_issue_settlements(schedule,file.path(run_dir,"settlement_raw"),backend)
+  settlements_path <- file.path(run_dir,"settlements.rds")
+  saveRDS(settlements,settlements_path)
+} else {
+  settlements <- readRDS(settlements_path)
+}
+beidan::match_validate_table(prematch_sp,"prematch_sp")
+beidan::match_validate_table(settlements,"settlements")
+knitr::kable(tibble::tibble(数据=c("赛前SP","结算"),行数=c(nrow(prematch_sp),nrow(settlements)),
+  场数=c(dplyr::n_distinct(prematch_sp$fixture_id),dplyr::n_distinct(settlements$fixture_id))))
+knitr::kable(dplyr::filter(prematch_sp,fixture_id %in% focus$fixture_key))
+knitr::kable(settlements)
+print(attr(prematch_sp,"diagnostics"))
+print(attr(settlements,"diagnostics"))
+```
+
+## 6. 清理成算法输入，查看哪些比赛可用
+
+`match_inputs_from_capture()` 校验采集身份并生成规范输入；`prepare_match_inputs()` 负责时点、状态、比赛窗口和可用报价选择。默认检查时点来自本次实际读取的赛程/市场/SP观测记录，**只是快照诊断基准，不是实际下注决策或历史可得性证明**。历史市场报价与真实采集时间不可互换。
+
+欧赔是每家公司先去水再等权平均，名单内至少两家公司。输出为普通胜平负概率；尚未结合大小球推算北单让球胜平负。准入窗口沿用现有函数的 `[时点+4小时, 时点+28小时)`。后续优化先看排除原因，不通过修改状态或时间强行让比赛进入。
+
+```{r}
+#| label: data-lab-preparation
+inputs <- beidan::match_inputs_from_capture(schedule,markets)
+inputs$prematch_sp <- prematch_sp
+observation_times <- c(schedule$observed_at,markets$captures$observed_at,prematch_sp$quote_at)
+if (is.null(replay_at)) {
+  stopifnot(length(observation_times)>0L,any(!is.na(observation_times)))
+  decision_at <- lubridate::with_tz(max(observation_times,na.rm=TRUE)+1,"Asia/Shanghai")
+} else {
+  decision_at <- lubridate::with_tz(replay_at,"Asia/Shanghai")
+}
+epoch <- beidan::prepare_match_inputs(inputs,decision_at,market_policy)
+print(decision_at)
+knitr::kable(dplyr::mutate(epoch$fixtures,dplyr::across(where(lubridate::is.POSIXct),
+  ~lubridate::with_tz(.x,"Asia/Shanghai"))))
+knitr::kable(epoch$euro_mean)
+knitr::kable(dplyr::mutate(epoch$totals_selected,dplyr::across(where(lubridate::is.POSIXct),
+  ~lubridate::with_tz(.x,"Asia/Shanghai"))))
+knitr::kable(dplyr::count(epoch$exclusions,reason,name="场数"))
+knitr::kable(epoch$exclusions)
+```
+
+## 7. 输入来源与下一步实验
+
+每次运行记录输入路径与内容哈希。采集器保留原始响应和回执；直接读取RDS不会重新抓取或重放解析。新采集的原始字节与快照在 `run_dir`，不会覆盖已有 walkthrough 数据。需要下次使用新快照时，把第1块对应路径改为新文件路径；不要只保留R会话中的对象。
+
+```{r}
+#| label: data-lab-provenance
+input_paths <- c(schedule=schedule_path,markets=markets_path,sp=sp_path,settlements=settlements_path)
+knitr::kable(tibble::tibble(数据=names(input_paths),文件=unname(input_paths),
+  SHA256=purrr::map_chr(input_paths,~digest::digest(file=.x,algo="sha256"))))
+print(list(schedule_receipt=attr(schedule,"receipt_path"),market_receipt=markets$receipt_path,
+  sp_receipt=attr(prematch_sp,"receipt_path"),settlement_receipt=attr(settlements,"receipt_path")))
+print(list(package_dir=package_dir,package_version=as.character(utils::packageVersion("beidan")),
+  implementation_hash=implementation_hash,R_version=R.version.string,python=python,
+  generated_at=lubridate::with_tz(Sys.time(),"Asia/Shanghai"),decision_at=decision_at,
+  market_policy=market_policy))
+```
+
+逐个环节推进：先用第2–3块核对日期和身份，再用第4块检查报价解析与缺失，之后在第5块核对北单SP与结算来源，最后用第6块观察清理规则对准入比赛的影响。发现问题后修正对应包函数和回归测试，再重跑受影响块；不在QMD中追加一次性的业务修补逻辑。
+
+本轮只新增交互文档，复用现有函数。验收记录见 `docs/reviews/data-collection-lab.json`；默认离线运行没有验证网站当前可访问性，也没有重新采集历史原始响应。
+
+<!-- Acceptance: codex review - < .run-control/data-lab-review-final.txt; final review: no remaining actionable findings. Initial2 findings (empty SP schedule, selected totals timezone) corrected. Regression test5 assertions passed; no function implementations changed. Reviewed QMD body SHA256 9bfc05d37c4ed5d4d0188b0b1cafb9c4c362e13dfee095c329940f88f0b07a3d; test SHA256 34c22c24efc175ef37ad16ca24979b2669a1b4d69c44140f69b44116b0a6eed1. Final file hash and render evidence: ../docs/reviews/data-collection-lab.json. -->

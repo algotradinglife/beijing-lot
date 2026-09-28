@@ -1,0 +1,395 @@
+---
+title: "#493 阶段一：Nowscore 3in1 单场输入身份探测（修正版 2）"
+subtitle: 样本 26085/5（provider_match_id=3061587）· 3 次顶层请求（逐跳次数未证实）· 诊断性交付
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    embed-resources: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+library(tibble)
+library(knitr)
+
+# All reusable helpers live in r/n7_493_probe_report.R and are unit tested.
+module_candidates <- file.path(c(".", "..", "../.."), "r", "n7_493_probe_report.R")
+module_path <- module_candidates[file.exists(module_candidates)][1]
+if (is.na(module_path)) stop("r/n7_493_probe_report.R not found")
+source(module_path)
+root <- n7_probe_find_root()
+probe_dir <- file.path(root, "results", "data_collection", "n7_493_3in1_probe_v1")
+manifest <- jsonlite::fromJSON(file.path(probe_dir, "diagnostics_manifest.json"),
+                               simplifyVector = FALSE)
+provenance <- jsonlite::fromJSON(file.path(probe_dir, "ledger_provenance.json"),
+                                 simplifyVector = FALSE)
+```
+
+## 交付性质
+
+**诊断性探测，不是 #493 验收，也不解除 #493 → #494 依赖。** 授权见 issue #493
+`2026-09-23T04:01:22Z`；**本版为离线修正版**，**未新增任何源站采集请求**。
+
+本版修正了 PI `04:38:34Z` 指出的四项缺陷，**并修正了随后两轮 `codex review` 发现的
+High/Medium 缺陷**（见第 7 节，其中**未解决的发现如实列为未解决**）。
+
+| 项 | 值 |
+|---|---|
+| 样本 | 26085 / match_idx 5 / `provider_match_id=3061587` |
+| 页面标题（实测） | 卡利亞里VS阿雷素，指数走势-捷报指数 |
+| 开赛（北京本地） | 2026-08-15 00:30 |
+| 决策时点 | D=2026-08-14 20:00（Asia/Shanghai） |
+| **顶层请求** | **3 次**（**逐跳尝试总数未证实**；**无可继续使用的额度**） |
+
+## 一、修正 1：默认视图**有**公司身份锚点
+
+PI 指出 `raw/base_no_company.html` 第 7199 行写着
+`document.getElementById("net3").className = "selected";`。**已核实，PI 正确。**
+
+- 默认（无 `companyid`）视图确定为 **`companyid=3`（`Crow*`）**；
+- "无标签、形态与聚合序列一致"**撤回**；
+- 仅与澳*一家比较便称"远密于任一单家公司"**撤回**。
+
+**结论范围仅限本页面**；**全站是否存在平均历史未判定**。
+
+```{r}
+#| label: anchor
+tibble::tibble(
+  item = c("默认视图 companyid", "公司标签", "选择器条目数",
+           "选择器含平均条目", "页面\"平均\"出现次数"),
+  value = c(as.character(manifest$default_view_identity$companyid),
+            as.character(manifest$default_view_identity$company_label),
+            as.character(manifest$market_label_evidence$company_selector_entries),
+            as.character(manifest$market_label_evidence$selector_has_average_entry),
+            as.character(manifest$market_label_evidence$average_string_occurrences))
+) |> knitr::kable(caption = "公司身份锚点（页面自证）")
+```
+
+## 二、修正 2：完整请求账本与**真实**墙钟
+
+原 `manifest.json` 被第二次调用**覆写**，缺默认页请求。**已重建** `requests.jsonl`，
+**逐字段标注来源**，**不可恢复的字段留空而不编造**。
+
+```{r}
+#| label: ledger
+led <- n7_probe_read_ledger(file.path(probe_dir, "requests.jsonl"))
+knitr::kable(
+  led[, c("label", "kind", "status", "status_provenance", "duration_ms",
+          "duration_provenance", "hop", "hop_provenance")],
+  caption = "重建的完整请求账本（base 的状态/时长/起始时刻已不可恢复，如实留空）")
+```
+
+| 量 | 值 | 依据 |
+|---|---|---|
+| **已重建的顶层请求** | **3** | `requests.jsonl` 中 3 条 `outcome`（**重建**；该账本**不可再用于派发**） |
+| **实际逐跳尝试总数** | **未证实** | 重定向是否发生 = `UNKNOWN`；一跳或多跳皆与 3 条顶层记录相容 |
+| **剩余可用额度** | **不可计算，按 0 处理** | 额度按**逐跳尝试**计；分子未证实 ⇒ **无可继续使用的额度** |
+| 已记录请求时长之和 | **206 ms** | **不含 base**；**不等于墙钟** |
+| **墙钟下界** | **79.585247 s** | base 与末次 **body 写入 mtime**，均为观测值 |
+| 墙钟推断值 | 79.905 s | 假设 base 在其 mtime 前 0.32 s 开始——**推断，非实测** |
+| **是否满足 300 s 上限** | **`UNVERIFIED`（无法证实）** | 首次尝试的**起始时刻缺失**；下界**不能**约束起点 |
+
+**下界不是上限合规证明**：`79.585 s` 只能说明两次 body 写入相隔多久，
+**不能**证明整次探测在 300 s 内完成。**body 写入时刻 ≠ HTTP 完成时刻**。
+
+**如实记录的缺口**：base 的 `http_status`、时长、起始时刻、`cookie_jar_id` **均缺失**；
+每次尝试的 `hop`/`redirect_to`/`error` **均缺失**——**保存的响应体无法证明未发生重定向**。
+
+## 三、修正 3：预算实现的可证明边界（**仍有未解决项，见第 7 节**）
+
+原实现自动跟随跳转且预算只记一次、跨进程重置。**已重构**（`src/n7_493_probe.py`）：
+
+| 缺陷 | 修正 |
+|---|---|
+| 墙钟上限未真正生效（新预算无起点） | 起点与**截止时刻在首次预留时确定并持久化**；等待**之后重新检查**；单请求超时收紧为 `min(20s, 剩余墙钟)` |
+| 2 s 间隔可被**整秒截断**绕过 | 计时改用**亚秒 epoch 浮点**，不再经 ISO 整秒 |
+| 中断/并发下跨进程记账不可靠 | 尝试在**派发前**以 reservation 记录**持久预留**；账本用 `flock` **独占串行化** |
+| 重定向可**离开授权范围** | 每一跳校验**主机与 fixture**，越界**拒绝且不发出**并记录 `rejected_redirect` |
+| 重复运行**覆写**原始响应 | 原始体文件名带 **attempt_id**，**不可变** |
+
+**离线模拟测试**：`tests/scripts/test_probe_n7_493_3in1_identity.py`、
+`tests/scripts/test_n7_493_probe_analysis.py`、`tests/scripts/test_n7_493_probe_entrypoints.py`
+（**共 82 项**）与 `tests/testthat/test-n7-493-probe-report.R`（**30 项断言**），
+**全部通过，不发任何请求**。
+
+```{r}
+#| label: tests
+cat(".venv/bin/python -m pytest tests/scripts/test_probe_n7_493_3in1_identity.py \\\n")
+cat("  tests/scripts/test_n7_493_probe_analysis.py \\\n")
+cat("  tests/scripts/test_n7_493_probe_entrypoints.py -q -p no:cacheprovider\n")
+cat("结果：82 passed\n")
+cat("R: Rscript --vanilla -e 'library(testthat);library(tibble);library(jsonlite);source(\"r/n7_493_probe_report.R\");test_file(\"tests/testthat/test-n7-493-probe-report.R\",reporter=\"summary\")'\n")
+cat("结果：30 assertions passed\n")
+```
+
+## 四、修正 4：`companyid=0` 是**偏离**
+
+`companyid=0` **不在**页面所列 18 家公司中：该取值是**试探猜值**、**无页面依据**、
+**偏离**已审要求"**不猜测平均 cid**"。其**空页**（0 行）**不构成**关于平均身份的**有力证据**。
+
+## 五、页面结构与诊断结果
+
+三张表：**亚盘**（主/盘/客）、**大小球**（大/盘/小）、**欧赔 1X2**（主/和局/客）。
+选择器共 **18 家单一博彩公司**。
+
+```{r}
+#| label: diagnostics
+diagnostics <- n7_probe_read_diagnostics(file.path(probe_dir, "diagnostics.csv"))
+last_col <- grep("^last_before_epoch_ASSUMED", names(diagnostics), value = TRUE)
+before_col <- grep("^rows_strictly_before_epoch_ASSUMED", names(diagnostics), value = TRUE)
+shown <- diagnostics[, c("view", "view_note", "market", "rows_total",
+                         "rows_prematch", before_col, last_col,
+                         "last_before_epoch_values")]
+knitr::kable(shown, caption = paste0(
+  "按视图 × 市场。时间列假定年份 2026、假定 UTC+8，**仅诊断**，非已验证 UTC，",
+  "也不构成截止前可得性证明。"))
+```
+
+## 六、核心结论
+
+**1) 欧赔平均历史序列：`NOT_ESTABLISHED`（本页面未能确证）** —— 选择器 **18 条全为
+单家公司、无"平均"条目**；默认视图已确证为 **`companyid=3`（Crow*）单家公司**。
+**结论范围仅限本页面；全站是否存在平均历史未判定。**
+
+**2) 大小球：`AVAILABLE_PER_COMPANY`** —— 默认视图盘前 12 行，盘口线含 `2.5`、`2.5/3`。
+
+**3) 两市场"截止前最近"的**回溯**时间戳不同**（欧赔 **19:02**、大小球 **18:30**，
+**均为假定 UTC+8**）。这**只是回溯记录的时间戳差异**；由于
+`availability_evidence = NOT_PROVEN`，**不能**据此断言当时的可得性或截止合规性。
+
+**4) 证据等级**：`TZ_UNDECIDED`、`YEAR_ASSUMED`、`availability_evidence = NOT_PROVEN`。
+本次为**事后回溯抓取**，**不得**表述为"当时可售"。
+
+## 七、`codex review` 记录（必需证据）
+
+| 项 | 值 |
+|---|---|
+| 命令 | `codex exec -c sandbox_mode='"danger-full-access"' --cd $PWD - < docs/reviews/issue-493-review-prompt-round19.txt` |
+| 结果 | **exit 0**；日志 `.tmpwork/n7_493_review_r19.log` |
+| **该轮**（历史记录：round 20/21 的复核；**非当前轮**）已复核通过 | `net3` 锚点、18 家公司、0 次"平均"、`companyid=0` 偏离披露、CSV 与 SHA-256 一致、无凭据落盘、**82 项 Python + 30 项 R 断言**通过；测试与渲染**均无源站采集请求** |
+| **历史轮次**（round 10/11） | 见 `docs/reviews/issue-493-review-prompt-round1[012].txt`；**其结论不构成本修订的验收证据** |
+
+**该轮（历史上的 round 17）发现的 High/Medium 与处置**（**历史记录，非当前轮**）：
+
+| # | 严重度 | 问题 | 处置 |
+|---|---|---|---|
+| 1 | High | 墙钟上限未真正生效 | 截止时刻持久化 + 等待后复查 + 收紧单请求超时 |
+| 2 | High | 2 s 间隔可被整秒截断绕过 | 改用亚秒 epoch 计时 |
+| 3 | High | 中断/并发下跨进程记账不可靠 | 派发前持久预留 + `flock` 串行化 |
+| 4 | High | 重定向可离开授权范围 | 逐跳校验主机与 fixture，越界拒绝 |
+| 5 | Medium | 重建账本给缺失证据强加事实 | **逐字段 provenance**，不可恢复留空 |
+| 6 | Medium | 用下界声称满足上限 | 标记 **`UNVERIFIED`** 并说明下界不约束起点 |
+| 7 | Medium | 重复运行覆写原始响应 | 文件名带 attempt_id，不可变 |
+| 8 | Medium | 诊断时间口径不一致 | 假设写入**字段名**；删除"合法/实证印证"表述 |
+| 9 | Medium | 函数测试与组织治理未满足 | 逻辑移入 `src/n7_493_probe*.py`，脚本变薄，测试增至 **82 项 Python + 30 项 R 断言**，QMD 改用 tibble |
+| 10 | Medium | 交付缺必需 review 证据 | 本节 |
+
+**`codex review` 未解决的发现（如实保留，未声称已解决）**：
+
+| # | 严重度 | 未解决项 |
+|---|---|---|
+| A | Medium | **真实传输下的取消行为未验证**：调用方在 worker + 截止时刻 join 下**必定返回**；`close()` 已移出截止路径（放入 daemon 线程），并有**阻塞式 close 的离线测试**。**未解决**：被放弃的 worker 线程**无法强制终止**，其 socket 释放**无界**；真实网络下未实测 |
+| B | Medium | **并发排除已由插桩测试证明**（有锁时临界区占用峰值 1、**去掉锁后为 2** 的变异验证）；但**真实多进程**（非线程）下的竞争**未实测** |
+| C | Medium | **历史 2 s 间隔仍为 `UNVERIFIED`**：重建账本无法证明原始运行的间隔合规（见第 2 节） |
+
+
+## 八、实现哈希与产物哈希
+
+```{r}
+#| label: impl-hashes
+source(file.path(root, "r", "n7_493_probe_report.R"))
+reviewed_record <- jsonlite::fromJSON(
+  file.path(root, "docs/reviews/issue-493-reviewed-revision.json"),
+  simplifyVector = FALSE)
+reviewed_path <- file.path(root, "docs/reviews/issue-493-reviewed-revision.json")
+compared <- n7_probe_compare_reviewed(root, reviewed_path)
+knitr::kable(compared, caption = paste0(
+  "冻结的受审修订（round ", reviewed_record$review_round, "，冻结于 ",
+  reviewed_record$frozen_at, "）与当前文件的 SHA-256 比对"))
+stopifnot(nrow(compared) > 0)
+cat("当前文件与冻结受审修订全部一致：",
+    all(compared$matches), "\n")
+if (!all(compared$matches)) {
+  cat("不一致的文件：",
+      paste(compared$file[!compared$matches], collapse = ", "), "\n")
+}
+```
+
+```{r}
+#| label: freeze-note
+# Read the round out of the frozen record instead of restating it in prose: a
+# hand-written round number drifts every time the freeze advances, and the
+# rendered page then contradicts the record it claims to cite.
+cat(sprintf(
+  paste0("**\u6ce8**\uff1a\u53d7\u5ba1\u4fee\u8ba2\u7531 ",
+         "`docs/reviews/issue-493-reviewed-revision.json` ",
+         "**\u51bb\u7ed3\u6807\u8bc6**\uff08round %s\uff09\uff0c",
+         "\u672c QMD \u4e0b\u8282\u76f4\u63a5\u6bd4\u5bf9\u5f53\u524d\u6587\u4ef6\u4e0e\u8be5\u51bb\u7ed3\u8bb0\u5f55\uff1b",
+         "**\u672c\u8282\u4e4b\u5916\u7684\u5185\u5bb9\u5728\u51bb\u7ed3\u540e\u672a\u518d\u6539\u52a8**\u3002"),
+  reviewed_record$review_round))
+```
+
+```{r}
+#| label: artifact-hashes
+artifacts <- n7_probe_validate_artifacts(
+  root, "results/data_collection/n7_493_3in1_probe_v1/SHA256SUMS")
+knitr::kable(artifacts, caption = "原始响应与产物哈希：**逐个与磁盘字节比对**（不匹配即失败）")
+```
+
+**Cookie 秘密一律未保存**（仅匿名 `cookie_jar_id`）。
+
+## 九、Titan 来源切换核验（**只读,无新采集**）
+
+PI 评论 2026-09-23T07:38:43Z 要求核验 Titan 多公司均值能力。**完整报告见
+`docs/research/n7_493_titan_source_verification.md`**；本节为交付入口摘要。
+
+### 9.1 原生载体:**在已列明检索范围内未找到**
+
+| 检验（`OBSERVED`,`beijing-lot-market-odds`） | 结果 |
+|---|---|
+| `nowscore-retirement-titan-continuation.md` | **未跟踪文件** |
+| 该工作区分支 `feat/market-odds-parser-closure` | **无 upstream**;**不在 `origin/main`** |
+| 172 个远端分支中承载该工作的 | **0** |
+| 自该分支发起的 PR | **0** |
+| `registry/market-odds-snapshot-and-storage-v1.json` | **未跟踪** |
+| `prev_day_2000` 在 `origin/main` 的 `snapshots.py` | **不存在**（main 仅 `initial/final/10h/1h`） |
+
+**按 AGENTS.md,本地文件不能替代或重建图状态** —— 该文档**不能自动变更 #493 合同**。
+
+### 9.2 三件事必须分开处理
+
+| # | 事项 | 状态 |
+|---|---|---|
+| 1 | **来源切换** | 有本地文档与实现;**已列明检索范围内未找到原生图载体**(有界结论) |
+| 2 | **固定多公司聚合口径** | `MEAN_ALL` 已登记,**但成员集合未固定** |
+| 3 | **历史可用性证据** | `prev_day_2000` **本工作区已验证**(**仅欧赔**) |
+
+### 9.3 口径分歧（**最关键**）
+
+文档称共识取"**权威公司集合**"均值,并称已实现;**代码实为全体均值**：
+
+```python
+# src/market_odds_serving.py::euro_consensus_rows —— 无任何成员过滤
+for row in snapshot_set.rows:
+    if row.home_odds is None or row.draw_odds is None or row.away_odds is None:
+        continue
+    by_kind[row.kind].append(row)
+ws = [r.home_odds for r in companies]
+out.append(dict(..., odds_w=sum(ws) / len(ws), ..., company_count=len(companies)))
+```
+
+代码内 `AUTHORITATIVE` / `member_set` / tier 常量:**0 处**。
+registry 自身已列为 `open_item`（5 家 vs 9 家未定）。
+**实测单场次去重公司 294 家**。**294 家全量均值 ≠ 5/9 家权威均值**。
+
+### 9.4 核验结果汇总
+
+| PI 问题 | 结论 | 证据类型 |
+|---|---|---|
+| 原生 issue/PR 及状态 | 在**已列明检索范围内未找到**（见 9.1） | **`OBSERVED_BOUNDED`** |
+| 250,166 场次 | **证实**（捕获表实测 250,166 行） | `OBSERVED` |
+| **5.3 亿行** | **未逐行证实**：200 场均值 1,817.3 行/场 × 250,166 ≈ **4.55 亿**；107 GB 库无法在本次预算内全扫 | **不是已验证事实** |
+| 179 家公司 | **证实**（另一场次复现；单场达 294 家） | `OBSERVED` |
+| Titan `companyid` = Nowscore | **不支持**：Titan 库内 `47` 无行,Pinnacle 实为 `177` | `OBSERVED` |
+| **#493 样本映射** | **0 / 50 命中**。样本 id 2.91M–3.06M / **2026 年**;Titan 库 253K–2.66M / **2010–2024 全 15 年**(全量枚举) | `OBSERVED` |
+| `prev_day_2000` 覆盖 | 40 场 **9,148 行**,不变量**违反 0**;仅欧赔;**但存在时区口径矛盾(见 9.6)** | `OBSERVED` |
+| **大小球 20:00 前带时间历史** | 控制库**无大小球表**;`endpoint_kind` CHECK 仅 `analysis`/`handicap` | `OBSERVED` |
+| 欧赔共识固定成员 | **未固定**;缺失成员**会静默改变基准** | `DECLARED` |
+
+### 9.5 时区线索清单（选项 C）
+
+**市场线（Titan）已有具名对照校验**：
+`snapshots.py:129` 与 `test_snapshots.py:322` 记录 —— 场次 **356276 / 356278 / 357841**
+的字面量字段与欧赔页自身 `kickoff_utc` **完全相等**；对 kickoff 施加上海偏移会使
+已发布开赛时间**提前 8 小时**。契约 `A-5` 亦按 naive `Asia/Shanghai` 解析。
+类别:`DECLARED`（**未**在本次重新独立复核）。
+
+**#493 探针自身:维持独立标注，不因上述线索升级**：
+
+| 项 | 状态 |
+|---|---|
+| `TZ_UNDECIDED` / `YEAR_ASSUMED=2026` / `TZ_ASSUMED="UTC+8"` | **全部维持为假设** |
+
+**关键区分**:市场线的 `Asia/Shanghai` 针对 **Titan 源**;#493 的 `UTC+8` 针对 **Nowscore 源**。
+**两者是不同来源的证据,不能互相移植。PI 点名某时区不构成证据升级。**
+
+### 9.6 ⚠️ 新发现:`prev_day_2000` 存在**时区口径矛盾**
+
+代码注释与 receipt 声称市场时间是 naive `Asia/Shanghai`,同时 `kickoff_at_utc()`
+声称 kickoff 字面量**已是 UTC**;但 `previous_day_slice()` **直接取字面量的日历日**,
+**未做 UTC→Shanghai 转换**:
+
+```python
+def previous_day_slice(kickoff: datetime) -> datetime:
+    day = kickoff.date() - timedelta(days=1)   # 字面量自己的日期,未转时区
+    return datetime(day.year, day.month, day.day, _PREV_DAY_SLICE_HOUR, 0)
+```
+
+**实测反例**(`OBSERVED`):字面量 `2020,1-1,01,18,00,00` →
+
+| | 值 |
+|---|---|
+| `_parse_kickoff` | `2020-01-01 18:00` |
+| `kickoff_at_utc()` | `2020-01-01T18:00:00Z` |
+| `previous_day_slice()` | **`2019-12-31 20:00`** |
+
+若字面量确为 UTC,该场次在上海是 **2020-01-02 02:00**,"前一天 20:00(北京)"
+应为 **2020-01-01 20:00**,代码**差了整整一天**。
+
+**两者不能同时成立。** 本次**不裁决**哪一方错误(需 Titan 源方证据),
+但**该矛盾解决前 `prev_day_2000` 语义不可依赖**。受影响:kickoff 落在
+**16:00–24:00 UTC**(北京次日 00:00–08:00)的场次。§3.2 的"违反 0 条"**只验证切片
+早于目标**,**不验证目标日期是否正确**,故**不能**排除该缺陷。
+
+### 9.7 原始字节保留:治理差异
+
+文档提出"**原始字节不保留**",依据是 `registry` 的 `raw-retention` 决策
+(`"basis": "owner standing instruction"`)。核验:
+
+- 该 registry **未跟踪、不在 `origin/main`**;**未找到**指向该 "owner standing instruction" 的**原生记录**;
+- 该决策自身 `open_item` 要求"**BEFORE any raw deletion**"先核验 capture 表 —— **未见核验记录**;
+- 本仓 `AGENTS.md` 要求「**Preserve original bytes**」「**Preserve raw responses for offline parsing replay**」;
+- Titan 控制库保留了**指向**原始字节的**元数据**（`raw_path`/`raw_sha256` 均 `NOT NULL`,`clean_v1/raw/` 存在）。
+  **字节本身的存在性与哈希一致性本次未核验** —— 元数据非空**不等于**字节仍在。
+
+**处置**:不依本地文档改写 #493 保留要求;**请 PI 出具已授权决策及其适用范围**。
+
+## 十、未决项与下一步建议
+
+| # | 未决项 | 建议 |
+|---|---|---|
+| 1 | **欧赔平均身份** | 需源方**标识或文档**锚定；**全站范围**需另行取证 |
+| 2 | **时区 / 年份** | 保持 `TZ_UNDECIDED` / `YEAR_ASSUMED`；页内时间轴自洽**不替代**权威证据 |
+| 3 | **证据等级** | 本链路只能达 `NOT_PROVEN`；**是否接受诊断级输入**需用户决定 |
+| 4 | **墙钟上限合规** | **`UNVERIFIED`**；如需证明须**重新授权** |
+| 5 | **逐跳计数** | **`redirect_occurrence = UNKNOWN`**：保存的响应体**无法证明未发生重定向**；逐跳计数**仅由离线测试覆盖，未实测** |
+| 6 | **Titan 原生载体** | **已列明检索范围内未找到** issue/PR（**有界结论**）；registry 与共识服务**未跟踪/未合并**（见第 9 节） |
+| 7 | **共识成员集合** | **未固定**；当前为全体均值。**定下来之前"平均"一词不可指代该服务输出** |
+| 8 | **#493 → Titan 映射** | 样本与 Titan 库**零重叠**；"既有映射桥直接可用"**未证实** |
+| 9 | **原始字节保留** | 本地文档与 `AGENTS.md` **存在差异**；**请 PI 出具已授权决策及适用范围** |
+| 10 | **大小球历史** | 控制库**无大小球表**;不得以初/终值替代 |
+| 11 | **`prev_day_2000` 时区矛盾** | `kickoff` 声明为 UTC 与切片取"北京前一天 20:00" **不能同时成立**;**解决前语义不可依赖**(见 9.6) |
+
+## 十一、边界声明
+
+**仅此样本**；**未新增任何源站采集请求**；**未扩至其余 25 场**、**未切换来源**、
+**未启动下注回测或 #494**、**未变更状态/依赖**、**未改写已发布原始数据**。
+
+**第 9 节的 Titan 核验同样为只读**。准确表述如下（**区分两类请求**）：
+
+- **未发起任何源站采集请求**（无 Nowscore、无 Titan、无任何抓取）；
+- 为核实原生载体，使用了**只读的 GitHub API 查询**（`gh pr list` / `gh issue list`）
+  与只读 `git` 命令 —— **这是网络请求**，**不应笼统并入"无网络"表述**；
+- **未写入 `data/`**；**未修改任何 GitHub 图状态**（仅读）；**未在
+  `beijing-lot-market-odds` 工作区产生任何写入**。
+
+其中 `DECLARED`、`UNVERIFIED`、`OBSERVED_BOUNDED` 项**不因本节出现而升级为已证实**。
+本节为**声明性说明** —— 声明本身**不能回溯证明**未发生写入或图变更。
+**剩余请求数不作为自动续跑授权**（**本次已明确：剩余额度按 0 处理**）。**保留 #493 → #494 依赖**。本交付为**诊断性探测**，
+**不代表 #493 验收**。

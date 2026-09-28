@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from src.titan_clean.discovery import _decode_payload, parse_euro_1x2_quotes, parse_fixture_identity
 
 import pytest
 
@@ -192,3 +193,61 @@ def test_malformed_time_cannot_disappear_from_an_otherwise_valid_snapshot():
             derive_fixture_snapshot(con, 'b', '00123')
     finally:
         con.close()
+
+
+def test_decode_payload_utf16_bom() -> None:
+    text = 'var matchname="Test";\r\nMatchTime="2010,4,3,12,30,0";\r\n'
+    utf16 = b"\xff\xfe" + text.encode("utf-16-le")  # 带 BOM
+    assert _decode_payload(utf16) == text
+    assert _decode_payload(text.encode("utf-8")) == text
+
+
+def test_decode_payload_no_bom_utf16() -> None:
+    # 去掉 BOM 的 UTF-16 由 charset-normalizer 检测
+    text = 'var matchname="Test";\r\ngame=Array("a");'
+    utf16_no_bom = text.encode("utf-16")[2:]  # 去掉 BOM
+    assert _decode_payload(utf16_no_bom) == text
+
+
+def test_decode_payload_gb18030_chinese_not_misdetected() -> None:
+    # 短 GB18030 中文片段容易被误检为 big5/cp949；三层策略应先走已知源编码
+    text = 'var matchname="里尔";game=Array("a");'
+    assert _decode_payload(text.encode("gb18030")) == text
+
+
+def test_decode_payload_utf8_bom_and_ascii() -> None:
+    assert _decode_payload(b"\xef\xbb\xbf" + b'var matchname="x";') == 'var matchname="x";'
+    assert _decode_payload(b'var matchname="ok";') == 'var matchname="ok";'
+
+
+def test_decode_payload_no_decoder_succeeds() -> None:
+    # fallback_encoding=None 且无法解码时抛错（检测器不可用时）
+    try:
+        import charset_normalizer  # noqa: F401
+        detector_available = True
+    except ImportError:
+        detector_available = False
+    if not detector_available:
+        with pytest.raises(UnicodeDecodeError):
+            _decode_payload(b"\xff\xfd\xfe\xfb", fallback_encoding=None)
+    # 乱码文本会被 parse_fixture_identity 的结构校验拒绝（game=Array 缺失）
+    import src.titan_clean.discovery as discovery_mod
+    text = _decode_payload(b"\x80\x81\x82\x83\xff\xfe\xfd", fallback_encoding=None)
+    assert "game" not in text or "Array" not in text
+
+
+def test_utf16_legacy_fixture_parses() -> None:
+    text = (
+        'var matchname="English Premier League";\r\n'
+        'MatchTime="2010,4,3,12,30,0";\r\n'
+        'hometeamID=61;\r\nguestteamID=384;\r\n'
+        'game=Array("16|13527428|10BET|1.82|3.39|4.29|40|30|30|100|1.9|3.4|4.1|45|30|25|100|0.9|0.9|0.9|2010,4,3,12,29,0|10BET(英国)|1|0");'
+    )
+    payload = text.encode("utf-16")
+    ident = parse_fixture_identity(payload, provider_fixture_id="289498")
+    assert ident.kickoff_source_raw == "2010,4,3,12,30,0"
+    assert ident.home_team_source_id == "61"
+    quotes = parse_euro_1x2_quotes(payload)
+    assert len(quotes) == 2  # 开盘 + 即时
+    assert quotes[0].home_odds == 1.82
+    assert quotes[1].home_odds == 1.9

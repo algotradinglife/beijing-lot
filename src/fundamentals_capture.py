@@ -26,7 +26,11 @@ CAPTURE_SCHEMA = "bj408_capture_batch_v1"
 MAX_BYTES = 10 * 1024 * 1024
 TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
 SOURCE_HOSTS = {"nowscore": frozenset({"cp.nowscore.com", "live.nowscore.com"}),
-                "titan": frozenset({"zq.titan007.com"})}
+                # zq hosts the analysis page; vip hosts the odds pages (OverDown_n.aspx,
+                # AsianOdds_n.aspx). Both carry the same tables the over/under parser reads
+                # (table#odds, table#oddsDetail, .analyhead), verified against a directly
+                # fetched OverDown page, so the odds host is a capture target in its own right.
+                "titan": frozenset({"zq.titan007.com", "vip.titan007.com"})}
 
 
 def capture_documents(documents: list[dict], output_dir: str | Path, *, fetch=None,

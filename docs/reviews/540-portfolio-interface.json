@@ -1,0 +1,119 @@
+{
+  "issue": 540,
+  "generated_at": "2026-09-27T14:08:03.797776+00:00",
+  "reviewed_sha256": {
+    "packages/beidan/R/parlay_role_groups.R": "afba29c785037a456907657bd99d385b5ef130e4c4716a498d4a26f584092aba",
+    "packages/beidan/R/parlay_role_portfolio.R": "26d25027c67319514720db3ef30d4947094fa3e17d641e55c5a60f2194d4f069",
+    "packages/beidan/R/parlay_role_shared.R": "9e521aed40a23b216bd21232af0d66f2729c98c2ada7df6cc9451eecf1a9543c",
+    "packages/beidan/R/match_markets.R": "b2e416008231c25e844144f001622196569e242bd3e0cb05ee1768a55b7a0c62",
+    "packages/beidan/man/parlay_construct_role_groups.Rd": "5b2788a0a0059b5f115d0da3cbe1ddd5617fe87645941628474ad557fbd61427",
+    "packages/beidan/man/parlay_evaluate_portfolio.Rd": "8104ef804c0afef14084b482e8921181ff13160027862221b27c7e8371f7bb0c",
+    "packages/beidan/man/fetch_match_markets.Rd": "15486c58bad5b0c2b9dfeeb8ec14d020962093f0d97d78f0916e6b3c16fceb75",
+    "packages/beidan/man/match_inputs_from_capture.Rd": "4f914b926d9a5e99f78a40176f9bab71e3c95689ec09052610488f0d6701c2d4",
+    "packages/beidan/tests/testthat/test-parlay-role-portfolio.R": "4c63565ebef738b439fd36aedc706164f8eece52f804e65fb0d0293e4e1007ab",
+    "packages/beidan/tests/testthat/test-parlay-role-review.R": "8b3d864a8ff56ccaf9053458873e7fb2db2609d253150d7bc40ddf5b41ab7d1a",
+    "packages/beidan/tests/testthat/test-parlay-role-groups.R": "9f0a379c4a9337bf5550b6ddb6100f0ac55227c5453c63eeaa247928f50b8ec3",
+    "packages/beidan/tests/testthat/test-match-markets.R": "edeb94fa730f6d34972183db3b6925517cc1afc2c468e72244ed1f3014cc046d",
+    "packages/beidan/tests/testthat/test-issue-prematch-sp.R": "3e08fa86a154cb1690f9a747db2cb77263aaec538c9d368324c4efbee32ef06f",
+    "tests/testthat/test-role-strategy-independent.R": "1eb34eae8c60622e3e6747b0c442f32b057776e3fa91b26b9943805ffd6620b0",
+    "tests/testthat/test-budget-sweep-independent.R": "98de4f64afd31f31010fc7a3e5357d5616f1ff86f0d136483f4f9caa883ab86a",
+    "tests/testthat/test-540-portfolio-interface-independent.R": "eec3ac48964051e01b0c310c681b25a590fa1cd2f7160f02ece7cc1bfaa50974",
+    "quarto/parlay_combination_lab.qmd": "2e94592d75ae0da5c2635850d148f2da970e9df797797e521c21fc41eca88658",
+    "quarto/26098_walkthrough.qmd": "b83a20627548a0f01226c8138982d8e3aee650016a529c1e9626cc51136b6d0c",
+    "docs/strategy/role-round-robin-contract.md": "3db671ad122d2fe91d61a6070d78333477d9940e53adc77e172f9a6f1a70a7a1"
+  },
+  "input": {
+    "path": "inputs/26098_walkthrough/print/26098-20260926-195204.rds",
+    "sha256": "d5658ae5476d2b014e960f855d67cd06dd65d83cf90363ac911984bda436b5c9"
+  },
+  "function_test_mapping": {
+    "parlay_construct_role_groups, SP binding helper": "test-parlay-role-groups.R; test-parlay-role-portfolio.R; test-540-portfolio-interface-independent.R",
+    "parlay_evaluate_portfolio, selection/depth/metrics/improvement helpers": "test-parlay-role-portfolio.R; test-parlay-role-review.R; test-role-strategy-independent.R; test-budget-sweep-independent.R; test-540-portfolio-interface-independent.R",
+    "fetch_match_markets, match_inputs_from_capture": "test-match-markets.R (real reticulate replay, partial Titan failure with successful SP, identity/handicap mismatch)",
+    "fetch_issue_prematch_sp (unchanged dependency)": "test-issue-prematch-sp.R"
+  },
+  "checks": {
+    "R_assertions": 374,
+    "failures": 0,
+    "warnings": 0,
+    "skips": 0,
+    "by_suite": {
+      "role_portfolio": 97,
+      "role_review": 46,
+      "role_groups": 47,
+      "budget_independent": 54,
+      "role_independent": 33,
+      "interface_independent": 38,
+      "market_capture": 42,
+      "prematch_sp": 17
+    },
+    "commands": [
+      "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE); testthat::test_file(\"<mapped test file>\",stop_on_failure=TRUE)'",
+      "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+      "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/26098_walkthrough.qmd --to html --no-cache"
+    ],
+    "logs": [
+      ".run-control/portfolio-interface/portfolio-retest.log",
+      ".run-control/portfolio-interface/budget-retest.log",
+      ".run-control/portfolio-interface/targeted-tests.log",
+      ".run-control/portfolio-interface/independent-final.log",
+      ".run-control/portfolio-interface/market-tests-final.log",
+      ".run-control/portfolio-interface/market-tests.log",
+      ".run-control/portfolio-interface/final-suite.log"
+    ],
+    "render_results": {
+      "quarto/parlay_combination_lab.html": {
+        "tables": 20,
+        "execution_errors": 0,
+        "sha256": "591ce297eee4dd8e5a39ba4c5d217ab215ed41c0b1ef4e28766a1d405ce9cd09"
+      },
+      "quarto/26098_walkthrough.html": {
+        "tables": 19,
+        "execution_errors": 0,
+        "sha256": "e3d756b0c81eb766293fc977a57cc009acb97feb9ec86bdf2fe8719c3b4e1e20"
+      }
+    },
+    "final_suite_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE); files<-c(file.path(\"packages/beidan/tests/testthat\",c(\"test-parlay-role-portfolio.R\",\"test-parlay-role-review.R\",\"test-parlay-role-groups.R\",\"test-match-markets.R\",\"test-issue-prematch-sp.R\")),file.path(\"tests/testthat\",c(\"test-role-strategy-independent.R\",\"test-budget-sweep-independent.R\",\"test-540-portfolio-interface-independent.R\"))); for(f in files) testthat::test_file(f,reporter=\"summary\",stop_on_failure=TRUE)'"
+  },
+  "reviews": {
+    "initial": "One P2: SP rows incorrectly required successful Titan identities; fixed via separately captured SP native-ID/handicap identities, regression included.",
+    "final_command": "codex review - < .run-control/portfolio-interface/review-final-prompt.txt",
+    "final_result": "No remaining actionable findings within requested scope",
+    "incremental_command": "codex review - < .run-control/portfolio-interface/review-budget-types-prompt.txt",
+    "incremental_result": "No actionable findings; focused final-function budget guard checks passed",
+    "resolutions": [
+      "Independent SP capture survives Titan failure; mismatched native ID/handicap still rejected.",
+      "Huge finite budgets capped before integer conversion.",
+      "Date/difftime/matrix budgets explicitly rejected; checkmate numeric-scalar test alone is permissive.",
+      "Only obsolete cumulative-history expectations removed; original relevant numerical and constraint regressions preserved."
+    ]
+  },
+  "implementation_execution": {
+    "DSH": "Actual dsh --profile headless, bounded 600s; exit124 after core/man/test draft. Codex supervision completed caller migration and final fixes, verified 277 owned assertions independently.",
+    "DSH_log": ".run-control/portfolio-interface/dsh.log"
+  },
+  "limitations": [
+    "Historical frozen 26098 input has no pre-cutoff Beijing SP; probability-mode evaluation succeeds with EV unavailable. No later SP backfill.",
+    "Greedy feasible selection within finite candidate pool is not globally maximal group count or global optimum.",
+    "Issue-level cash adjustments and confirmed purchase bookkeeping remain outside evaluator.",
+    "No new live scraping or actual purchases; capture integration verified with saved raw responses.",
+    "No CI or full-repository test run; scoped function/integration tests and relevant fresh QMD renders.",
+    "Main repository changes remain local; no commit/push/merge."
+  ],
+  "results": {
+    "default_both_null": {
+      "candidate_groups": 16,
+      "selected_groups": 3,
+      "tickets": 288,
+      "cost_cny": 576,
+      "unspent_cny": null,
+      "ev_available": false
+    },
+    "full_cover_3333222": {
+      "selected_groups": 4,
+      "tickets": 2592,
+      "cost_cny": 5184
+    }
+  },
+  "acceptance": "passed"
+}

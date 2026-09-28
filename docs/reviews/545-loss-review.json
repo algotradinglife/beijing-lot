@@ -1,0 +1,100 @@
+{
+  "issue": 545,
+  "status": "PI_accepted",
+  "files": [
+    {
+      "path": "packages/beidan/R/parlay_loss_diagnostic.R",
+      "sha256": "d7aaabb9a5a5594b29aea9c7eb08492917c159ae39ab1b18864fceb62d823e20"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-loss-diagnostic.R",
+      "sha256": "e1efee1ad5b7b34d876270b16b7ea6f6875f4101b705d5333b36b718720371cd"
+    },
+    {
+      "path": "r/parlay_loss_counterfactual.R",
+      "sha256": "bd29260014ed5f69b1ff238afdce71f97b72bb02d7d2b5d8dfdf47f1d880fc2b"
+    },
+    {
+      "path": "tests/testthat/test-parlay-loss-counterfactual.R",
+      "sha256": "1ab5b430ef98441d637acb9436e43a811daf2e902598ae94edccd20ce9ffef38"
+    },
+    {
+      "path": "r/parlay_loss_mask_experiment.R",
+      "sha256": "59ddd2d7f7496aeb7c2209f66977b45ab274591189b8b4444a03459542f1e533"
+    },
+    {
+      "path": "tests/testthat/test-parlay-loss-mask-experiment.R",
+      "sha256": "69541594ba02cc36d7042e6558c43c017636372e4fd2350d60f0b8751851f2c7"
+    },
+    {
+      "path": "quarto/26098_loss_review.qmd",
+      "sha256": "0d357fac763e946e3c3b784b23bc8ad7b57f4e49af6027b93b193ebd14708487"
+    }
+  ],
+  "review_command": "R_LIBS=$PWD/r_lib codex review -c 'sandbox_mode=\"danger-full-access\"' - < .run-control/545-review/review-final-prompt.txt ; R_LIBS=$PWD/r_lib codex review -c 'sandbox_mode=\"danger-full-access\"' - < .run-control/545-review/review-visual-prompt.txt",
+  "test_commands": "R_LIBS=$PWD/r_lib Rscript .run-control/545-review/check.R (equivalent file-specific checks recorded in diagnostic-tests.log, counterfactual-tests-final.log and mask-tests.log)",
+  "render_command": "R_LIBS=$PWD/r_lib RETICULATE_PYTHON=$PWD/.venv/bin/python TMPDIR=$PWD/.run-control/tmp XDG_CACHE_HOME=$PWD/.run-control/cache DENO_DIR=$PWD/.run-control/deno quarto render quarto/26098_loss_review.qmd --to html --no-cache",
+  "findings": [
+    {
+      "round": 1,
+      "severity": "P2",
+      "finding": "Original evaluation not validated before alternatives",
+      "resolution": "Mandatory RiskPrepare plus pool/original receipt binding; five regression tests"
+    },
+    {
+      "round": 2,
+      "result": "No remaining actionable findings; PI verifies final rendered artifact"
+    },
+    {
+      "round": 3,
+      "result": "No remaining actionable issues; seven recorded source hashes and QMD numeric claims verified. PI final clean render pending."
+    },
+    {
+      "round": 4,
+      "result": "No actionable issues; seven hashes verified; reversing only axis-label changes reproduces prior reviewed QMD hash."
+    }
+  ],
+  "input_files": [
+    {
+      "path": "inputs/26098_walkthrough/three_plans_20260928/plans.rds",
+      "sha256": "be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3"
+    },
+    {
+      "path": "inputs/26098_walkthrough/three_plans_20260928/settlement-20260928-204413.rds",
+      "sha256": "bdc2cbd2d4a07c25973b6a2e7fb577766825669c290606fc8a73e5a5b12421e9"
+    }
+  ],
+  "tests": {
+    "blocks": 12,
+    "assertions": 113,
+    "failures": 0,
+    "warnings": 0,
+    "skips": 0,
+    "logs": [
+      ".run-control/545-review/diagnostic-tests.log",
+      ".run-control/545-review/counterfactual-tests-final.log",
+      ".run-control/545-review/mask-tests.log"
+    ]
+  },
+  "review_log": ".run-control/545-review/review-final.log",
+  "visual_fix": "Heatmap x axis shortened fixture IDs to slot numbers to avoid overlap; numeric data unchanged.",
+  "visual_review_log": ".run-control/545-review/review-visual.log",
+  "render": {
+    "tables": 21,
+    "plots": 2,
+    "execution_errors": 0,
+    "source_hashes_match": true,
+    "input_hashes_match": true,
+    "html_sha256": "1becc7f21665a086e81471e6eecfb93d662d60905478798e1b9f1cf041b23947",
+    "log": ".run-control/545-review/render-accepted.log"
+  },
+  "independent_numeric_check": ".run-control/545-review/verify-final.log",
+  "limitations": [
+    "Single issue retrospective mechanism diagnosis, not prospective strategy validation",
+    "Settlement snapshot at 2026-09-28 20:44:13 Asia/Shanghai; some counterfactual tickets remain pending",
+    "Scoped tests only; no claim of full repository regression pass"
+  ],
+  "graph_status": "CLOSED / Project2 Done; parent533 OPEN; blockedBy=[]; blocking=[]; verified live",
+  "report_results_sha256": "ce6e77c20b6791c8bdf1b6d879db7ec7ca3afef4a98060ab48ae2bb7b5710c34",
+  "completion_comment": "https://github.com/algotradinglife/beijing-lot/issues/545#issuecomment-5870928873"
+}

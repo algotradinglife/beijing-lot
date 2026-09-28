@@ -1,0 +1,252 @@
+{
+  "issue": 543,
+  "acceptance": "passed",
+  "input_path": "inputs/26098_walkthrough/three_plans_20260928/frozen_inputs.rds",
+  "input_hash": "f8edd497d0d401c44b630c6df8d3c044f175d87c4adf62dd94352198673c3f38",
+  "code_hashes": {
+    "packages/beidan/R/beidan-package.R": "417faf50c5f14cd3ce19e34e19db81c1fbfd185ecc0ba23f40b9ebf77b24929c",
+    "packages/beidan/R/dixon_coles_grid.R": "66373c2f79bcaba9a0e51b734118ff320d97304ab4b6ae9493798eedfe75c106",
+    "packages/beidan/R/fundamentals_market_comparison.R": "6e9880ff5df8571a9c56ba394f0a2a6c225b64be8b636b915486846caf9354ce",
+    "packages/beidan/R/fundamentals_total_market.R": "37657e4f461573d3df4bfbe204d8986cfd94a9dcfaa74b40d290242f3835be4f",
+    "packages/beidan/R/issue_prematch_sp.R": "592ece2af6fc279f25eb934dbe7821b365b348d545bbb6ca50780253e41f3621",
+    "packages/beidan/R/issue_schedule.R": "7fb9e201cd77eece039009a98bb535dd07c46c371fee9d12a34bd897fee8e914",
+    "packages/beidan/R/issue_settlements.R": "7014e9715e6e033819f80ac2fadd4a18d12ea6a140f50fb30bfac715b59d5727",
+    "packages/beidan/R/market_schedule.R": "b433f3219c6bf33dcb582b4972423ae4ac9dd1947a23f744d578d53b0d761623",
+    "packages/beidan/R/match_markets.R": "b2e416008231c25e844144f001622196569e242bd3e0cb05ee1768a55b7a0c62",
+    "packages/beidan/R/n7_experiment_contract.R": "ac054e9987f9f45353696bedd903bb371b85a953f2fcb301ea145badeb4b6747",
+    "packages/beidan/R/n7_pipeline_candidates.R": "a187624c23a495d6bb62e187a4b9619912379b529b9cea58648078d57bc8a506",
+    "packages/beidan/R/n7_pipeline_contracts.R": "01a96616aa417db18c47946fd02f556405f3b0747c9ac8a3270a8db2c79db734",
+    "packages/beidan/R/n7_pipeline_epoch.R": "34c40e9362f8af589d664010ff2def3e89f5b151c09ff839c4db694d361a9494",
+    "packages/beidan/R/n7_pipeline_fixture.R": "c2f11506041b235408fa7fc3d7299d4294def9db82c020b491cea330c4bfcf99",
+    "packages/beidan/R/n7_pipeline_inputs.R": "f0eb9c1f7fcb8406925b8f25dae942ba3c4783483b223d1d139703f0be5496b7",
+    "packages/beidan/R/n7_pipeline_match_status.R": "c2c328579a95e55203bf067273c8ceac4e226915ced358bea2715f42c17ed216",
+    "packages/beidan/R/n7_pipeline_types.R": "f355ec0f2949c3ed88df13a555e456e60f959175ffda6ac6718723e3f09bdfec",
+    "packages/beidan/R/n7_pipeline_value.R": "a86718dc0ad93d6142604457e337f9ae66af9c09408c6541ce0f527390a82e5c",
+    "packages/beidan/R/parlay_betting_sheet.R": "5729fd755a05c9c0bee821632e102f5d277473d2c6039843ad4da63143b3eb81",
+    "packages/beidan/R/parlay_budget_allocation.R": "79c3a20eed920ac40b2d2be1da4ba0325ff7133119742eda6fba9efd91a32834",
+    "packages/beidan/R/parlay_exploration.R": "007592906018b2817c26f6cc13fdf00baa669f22df6360c2b8bce9ff6e681d99",
+    "packages/beidan/R/parlay_plan_summary.R": "e38c9f917616385a02141519f508edc94323d39bece123a16e51211a91858d14",
+    "packages/beidan/R/parlay_restructure_plan.R": "9c9f5b41a8c6f4bbeb30be159607f99c63fe800077cc08970b4193e28366eb36",
+    "packages/beidan/R/parlay_role_groups.R": "e46dada52e9a23dccc836b2a0447abc09be60623b070c5ecaba8e6c00cded54d",
+    "packages/beidan/R/parlay_role_portfolio.R": "d2e69db8f9915baad0d3f1085277bdd42916d64b4abf9ab43515edf8c38405bd",
+    "packages/beidan/R/parlay_role_scores.R": "aa8672aaa18b390a5653ee9e022a77777374ec2e5585d2d67fb9967f302106f6",
+    "packages/beidan/R/parlay_role_shared.R": "9e521aed40a23b216bd21232af0d66f2729c98c2ada7df6cc9451eecf1a9543c",
+    "packages/beidan/R/parlay_storage.R": "481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f",
+    "packages/beidan/R/python-backend.R": "820a0db0aea37c6d0dba4ab2ae45c5edc264cf5478761b3a80cf527991083662",
+    "packages/beidan/R/schedule_identity.R": "8918792d66f77527d7c19e2ef9eeed6a7ce9a7dccd905b9556de78467542bf6c",
+    "packages/beidan/inst/python/beidan_backend/__init__.py": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/__init__.py": "e15e8fc90881b98de740830dae9c4b5a049c5b42dc1cd9c60b9cb9b420b7a21c",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py": "82ce60acbc716a7b59978197ed0924af487ad4d45a7830f00a0946b0e2e993f2",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/decode.py": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/fetch.py": "101f3182184bce3d5c631e312f525413e308e96b33757da7314b0d5cb9f125b6",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/service.py": "f7c01dc3afab44d82d1dcdbb812f3e934baa2b58e906b110acb960ca74db6e3a",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py": "8b453f706cbb9d629759ab7794a4fd67f44e23408c95f92bc2b29a1da54034d7",
+    "packages/beidan/inst/python/beidan_backend/issue_schedule/store.py": "a455839715c3fa790359e33ed4c07f6145f60cf41354fe1e1fadf390ed09bfdc",
+    "packages/beidan/inst/python/beidan_backend/market_capture/__init__.py": "0284ed1a85a2ba7c614f574f0b4a8f9ed03173348c6644aa3b3eb1dbc0e60265",
+    "packages/beidan/inst/python/beidan_backend/market_capture/history.py": "ab1759db7502740be04e6fee789a14add28ecc33b65bef98cfdc89cec9fd0aba",
+    "packages/beidan/inst/python/beidan_backend/market_capture/service.py": "17b04521f70f1b7fd122618b5ea37d3e9afe2a33ff367eaa512a44b8cced8829",
+    "packages/beidan/inst/python/beidan_backend/prematch_sp.py": "29a3507581e05986c773fe87125de1cebfa4d28727ab2b8d133e9e7bf8cfd37e",
+    "packages/beidan/inst/python/beidan_backend/settlement/__init__.py": "23d60f61eeeaf2ed16faf6edccacea27bcf3ab87a88f2bcd3c46fe4a9fb1fc33",
+    "packages/beidan/inst/python/beidan_backend/settlement/labels.py": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712",
+    "packages/beidan/inst/python/beidan_backend/settlement/parser.py": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py": "ccd29d150d00fd8e8ce5874b52bd394b792d80fdc33a01ebd42fc206ed5ec735",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/diagnostic_labels.py": "7902947518b0567d8cd7b35a4a51f8118d8ef7b29539a9cdd551ca8b59d41e73",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/issue_partitions.py": "c7a8f85e7ce09ba0587ff5146477fbcfc661c3a67a8d9e6024c7dc6744ae5e2b",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/predictor_clock.py": "1556153ef70fd0d875d3eee2932c8deccaccc29a226bc8f3ac73086b0b8dd01a",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/replay.py": "ff9a3890404a87484283ddd10b3960762397942c92af9231b9417cf081ddb61a",
+    "r/build_three_structure_plans.R": "0d04f5ce3fb828cd22fe35c150d8e42a3a3c20c1b888f961fc83e5d34e20913b",
+    "r/replay_three_structure_plans.R": "022dc48cd15bb5f62685b7832680aff46ad8ee0da73d2d06a7fb36b948455d13"
+  },
+  "code_snapshot": "inputs/26098_walkthrough/three_plans_20260928/code-snapshot.tar.gz",
+  "code_snapshot_hash": "a38bf56b4157404ebb552d65db48ad2843b9a762e9371eed38c4ab373a4e3e1e",
+  "source_scope": "All package R and bundled Python sources plus builder/replay entrypoints, a conservative superset of transitive implementation dependencies",
+  "cutoff_beijing": "2026-09-28 00:27:54",
+  "window_hours": [
+    2,
+    26
+  ],
+  "budget_cny": null,
+  "group_budget_cny": 256,
+  "max_reuse": 2,
+  "max_overlap": 2,
+  "improvement_policy": {
+    "max_passes": 1,
+    "rank_window": 3,
+    "max_evaluations": 8
+  },
+  "storage_note": "Current checkout has no config/persistent_data_layout.json or check_persistent_data_layout.py; retained established inputs/26098_walkthrough path and preserved raw capture bytes. No archive migration or alternate data root was created.",
+  "resolved_findings": [
+    "Initial review: added complete upstream implementation manifest, frozen source archive, replay-time source/input checks, and mutation regressions.",
+    "Initial sheet generation wrongly passed full-issue schedule containing missing kickoff outside the chosen window. Sheet now receives the declared captured window schedule; full raw schedule remains in frozen inputs."
+  ],
+  "validation": {
+    "window_assertions": 205,
+    "delivery_assertions": 84,
+    "failures": 0,
+    "warnings": 0,
+    "skips": 0,
+    "renders": {
+      "3333222": {
+        "path": "quarto/26098_20260928_3333222.html",
+        "sha256": "814c3b6394ee690385bc830901a91623b90af7632b86ec473ac3b2899f6e7e1f",
+        "tables": 7,
+        "table_rows": [
+          2,
+          7,
+          7,
+          128,
+          128,
+          7,
+          24
+        ],
+        "errors": 0,
+        "cost_cny": 512,
+        "tickets": 256,
+        "groups": 2
+      },
+      "3322221": {
+        "path": "quarto/26098_20260928_3322221.html",
+        "sha256": "df73c0c6a58f3cc3c31260558946ba919ac13da9e4c9efd1864313e5b6a35eb7",
+        "tables": 7,
+        "table_rows": [
+          2,
+          7,
+          7,
+          128,
+          128,
+          7,
+          24
+        ],
+        "errors": 0,
+        "cost_cny": 512,
+        "tickets": 256,
+        "groups": 2
+      },
+      "3222221": {
+        "path": "quarto/26098_20260928_3222221.html",
+        "sha256": "fc6791f0e950b41025d0c81e3903b77937511e1493088706d5ae10cce632dcd0",
+        "tables": 7,
+        "table_rows": [
+          2,
+          7,
+          7,
+          96,
+          96,
+          7,
+          24
+        ],
+        "errors": 0,
+        "cost_cny": 384,
+        "tickets": 192,
+        "groups": 2
+      }
+    }
+  },
+  "review_command": "codex review -c 'sandbox_mode=\"danger-full-access\"' - < .run-control/current-three-plans/review-final-prompt.txt",
+  "reviewed_hashes": {
+    "r/build_three_structure_plans.R": "0d04f5ce3fb828cd22fe35c150d8e42a3a3c20c1b888f961fc83e5d34e20913b",
+    "r/replay_three_structure_plans.R": "022dc48cd15bb5f62685b7832680aff46ad8ee0da73d2d06a7fb36b948455d13",
+    "quarto/26098_three_structure_plans.qmd": "dde423cd54a578e3c4028032517cdb34a30b7cd2487ddf7497b21da8e2a8428a",
+    "tests/testthat/test-543-three-structure-plans.R": "a6a5043de9e24d393ca4674a9956d7626fcb71d8c642f19b91c000092ad11580",
+    "packages/beidan/tests/testthat/test-explicit-decision-window.R": "ea7a9e3f4e4eeb4d901e3e4f71a8f5ed922a9e6257439abee066e9d06d482ba5",
+    "docs/strategy/role-round-robin-contract.md": "5d53ff9b915d24dd1f002ea3611feadf7b74c2eda3ae5d0ef673439868d0382d"
+  },
+  "plans_hash": "be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3",
+  "review_result": "No actionable correctness issues found within #543 scope. Reviewer verified 56 implementation hashes, input and source archive, independently reran 84 assertions, and inspected all three rendered pages.",
+  "review_log": ".run-control/current-three-plans/review-final.log",
+  "review_log_hash": "9f3361162f007ce19884a16a233b47e903149f97ca955aa96bcb660e17ef123b",
+  "checks": {
+    "window_tests": "R_LIBS=$PWD/r_lib Rscript: test-explicit-decision-window.R, test-market-schedule.R, test-n7-pipeline-epoch.R",
+    "delivery_tests": "R_LIBS=$PWD/r_lib Rscript: testthat::test_file(\"tests/testthat/test-543-three-structure-plans.R\", reporter=\"summary\", stop_on_failure=TRUE)",
+    "render": "R_LIBS=$PWD/r_lib RETICULATE_PYTHON=$PWD/.venv/bin/python TMPDIR=$PWD/.run-control/tmp XDG_CACHE_HOME=$PWD/.run-control/cache DENO_DIR=$PWD/.run-control/deno quarto render quarto/26098_three_structure_plans.qmd --to html --no-cache -P pattern:<quoted structure>; copied successful default-path output per structure",
+    "ci": "Not participated, per owner instruction"
+  },
+  "publication": {
+    "site_version": 6,
+    "source_commit": "4071b3c65488e21fe334ec4b842fc170a3fcca68",
+    "deployment_id": "appgdep_6ab9484d3c488191b524281a2ca97b32",
+    "status": "succeeded",
+    "live_checks": [
+      {
+        "pattern": "3333222",
+        "url": "https://beidan-26098-plan.a0938626152.chatgpt.site/20260928/3333222/",
+        "http_status": 200,
+        "table_rows": [
+          2,
+          7,
+          7,
+          128,
+          128,
+          7,
+          24
+        ]
+      },
+      {
+        "pattern": "3322221",
+        "url": "https://beidan-26098-plan.a0938626152.chatgpt.site/20260928/3322221/",
+        "http_status": 200,
+        "table_rows": [
+          2,
+          7,
+          7,
+          128,
+          128,
+          7,
+          24
+        ]
+      },
+      {
+        "pattern": "3222221",
+        "url": "https://beidan-26098-plan.a0938626152.chatgpt.site/20260928/3222221/",
+        "http_status": 200,
+        "table_rows": [
+          2,
+          7,
+          7,
+          96,
+          96,
+          7,
+          24
+        ]
+      }
+    ],
+    "visual_check": "Inspected live 3333222 page screenshot: summary, probabilities, dates, all group legs and entry to exact-ticket tables readable."
+  },
+  "presentation_followups": [
+    {
+      "change": "Blue selected-fixture columns and green checked-outcome backgrounds; exact print colors",
+      "qmd_sha256": "dde423cd54a578e3c4028032517cdb34a30b7cd2487ddf7497b21da8e2a8428a",
+      "review_command": "codex review -c sandbox_mode=\"danger-full-access\" - < .run-control/543-highlight/review.txt",
+      "review_log": ".run-control/543-highlight/review.log",
+      "review_result": "No actionable findings; adversarial escaping check and all selected-cell mappings passed",
+      "checks": [
+        {
+          "pattern": "3333222",
+          "selected_cells": 36,
+          "fixture_rows": 14,
+          "table_contents_unchanged": true,
+          "html_sha256": "814c3b6394ee690385bc830901a91623b90af7632b86ec473ac3b2899f6e7e1f"
+        },
+        {
+          "pattern": "3322221",
+          "selected_cells": 30,
+          "fixture_rows": 14,
+          "table_contents_unchanged": true,
+          "html_sha256": "df73c0c6a58f3cc3c31260558946ba919ac13da9e4c9efd1864313e5b6a35eb7"
+        },
+        {
+          "pattern": "3222221",
+          "selected_cells": 28,
+          "fixture_rows": 14,
+          "table_contents_unchanged": true,
+          "html_sha256": "fc6791f0e950b41025d0c81e3903b77937511e1493088706d5ae10cce632dcd0"
+        }
+      ],
+      "previous_qmd_hash": "8a2c0de18aacb286e85b7dd74caaf7f53133b76378fd3602a7def195f2cded62"
+    }
+  ]
+}

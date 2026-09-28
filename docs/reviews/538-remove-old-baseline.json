@@ -1,0 +1,35 @@
+{
+  "issue": 538,
+  "accepted_at": "2026-09-27T09:13:16.457153+00:00",
+  "qmd": "quarto/parlay_combination_lab.qmd",
+  "qmd_sha256": "ac55f3b456a1f303589839d08028bb9f6c60b434bc315fc4fe6b11e36e05328a",
+  "html_sha256": "f93515a7591b66260025be4e2ff7ced860b92f58e7d635e6211c79c9f06f736c",
+  "reviewed_analysis_sha256": "4fdb043900344f608ce0e07aa662f77a8b13b877bb89c1b23be90c38600239fc",
+  "checks": {
+    "retained_R_chunks": 10,
+    "tables_before": 24,
+    "tables_after": 21,
+    "errors": 0,
+    "all_retained_tables_equal": true
+  },
+  "review": {
+    "command": "codex review - < .run-control/remove-old-baseline/review-prompt.txt",
+    "findings": [],
+    "log": ".run-control/remove-old-baseline/review.log"
+  },
+  "render": {
+    "command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+    "log": ".run-control/remove-old-baseline/render.log"
+  },
+  "comparison": {
+    "command": ".venv/bin/python .run-control/remove-old-baseline/check.py",
+    "excluded_tables_before_indices": [
+      3,
+      4,
+      5
+    ],
+    "sole_excluded_value": "本次生成北京时间"
+  },
+  "function_tests": "Not rerun: no function or retained R code changes; all10 retained chunks byte-identical, all21 retained rendered tables compared. No testthat added to QMD.",
+  "delivery": "Local QMD and HTML updated; no commit or push."
+}

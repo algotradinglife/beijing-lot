@@ -17,10 +17,13 @@ project:
     - quarto/10_settlement_external_storage.qmd
     - quarto/11_issue_discovery_contract.qmd
     - quarto/257_settlement_quarantine_replay.qmd
+    - quarto/258_dixon_coles_score_grid.qmd
+    - quarto/259_dc_rebase_handicap_line_gap.qmd
     - quarto/260_settlement_halftime_correction.qmd
     - quarto/261_settlement_issue_recovery.qmd
     - quarto/262_settlement_issue_addition.qmd
-    - quarto/263_source_parsers_index.qmd
+    - quarto/272_selection_allocation_audit.qmd
+    - quarto/288_outcome_set_selection.qmd
 
 execute:
   freeze: false

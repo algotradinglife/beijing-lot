@@ -35,15 +35,17 @@ testthat::test_that('a group needs an exact unique ordering of all its legs', {
   testthat::expect_error(parlay_apply_structure(legs, probabilities, cutoff, rep(1L, 6L)))
 })
 
-testthat::test_that('all demonstration configurations have complete independent fields', {
-  configs <- parlay_allocation_configs(parlay_settings(reset = TRUE))
-  testthat::expect_named(configs, c('A', 'B', 'C'))
-  for (name in names(configs)) {
-    testthat::expect_identical(configs[[name]]$name, name)
-    testthat::expect_true(all(c('settings', 'patterns', 'construction_method',
-      'ranking', 'max_reuse', 'max_overlap', 'seed') %in% names(configs[[name]])))
-    testthat::expect_false(any(names(configs[[name]]) == ''))
-  }
+testthat::test_that('budget configuration has one explicit source per control', {
+  config <- parlay_strategy_config(parlay_settings(reset = TRUE), name = 'example',
+    patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
+    construction_policy = list(max_candidates = 1L, seed = 1L), spend_limit_cny = 160)
+  testthat::expect_identical(config$name, 'example')
+  testthat::expect_true(all(c('settings', 'patterns', 'construction_policy',
+    'objective', 'min_support_mass', 'max_reuse', 'max_overlap') %in% names(config)))
+  testthat::expect_false(any(c('n_groups', 'ranking', 'budget_cny', 'unit_cap', 'seed') %in% names(config)))
+  testthat::expect_equal(config$settings$issue_budget_cny, 1024)
+  testthat::expect_equal(config$spend_limit_cny, 160)
+  testthat::expect_false(any(names(config) == ''))
 })
 
 testthat::test_that('the public namespace exposes only the new interface contract', {

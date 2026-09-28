@@ -39,3 +39,20 @@ test_that("settlement capture crosses Python boundary as Beijing typed tibble", 
   expect_error(fetch_issue_settlements(schedule, tempfile(), backend, pages=list(body="html", observed_at="x")), "raw")
   expect_error(fetch_issue_settlements(schedule, tempfile(), backend, pages=list(body=pages$body)))
 })
+
+test_that("explicit all-one cancellation survives the R/Python boundary without a WDL label", {
+  python <- Sys.getenv("RETICULATE_PYTHON")
+  skip_if(!nzchar(python), "explicit Python interpreter required")
+  path <- test_path("fixtures", "settlement", "cancelled-all-one.html")
+  schedule <- tibble::tibble(issue_id="25053",slot=1L,fixture_key="25053:1",
+    provider_id_nowscore="123",handicap=0)
+  x <- fetch_issue_settlements(schedule,tempfile(),python_backend(python),
+    pages=list(body=readBin(path,"raw",n=file.info(path)$size),
+      observed_at="2026-09-27T21:02:44+08:00"))
+  expect_silent(match_validate_table(x,"settlements"))
+  expect_identical(x$status,"all_options_one")
+  expect_identical(x$outcome,"ALL")
+  expect_equal(x$settled_sp,1)
+  expect_equal(lubridate::tz(x$label_available_at),"Asia/Shanghai")
+  expect_equal(nrow(attr(x,"diagnostics")),0)
+})

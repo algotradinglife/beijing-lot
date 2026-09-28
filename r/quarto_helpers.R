@@ -9,12 +9,18 @@ beijing_data_root <- function() {
   normalizePath(root)
 }
 
+# The clean Titan/settlement/discovery stores live under <data root>/clean_v1,
+# per the BJ-UNIFIED-DATA-SOURCE-SCHEMA-001 physical-isolation layout.
+clean_root <- function(root = beijing_data_root()) {
+  file.path(root, "clean_v1")
+}
+
 connect_titan <- function(root = beijing_data_root()) {
-  DBI::dbConnect(RSQLite::SQLite(), file.path(root, "control", "titan", "control.sqlite"), flags = RSQLite::SQLITE_RO)
+  DBI::dbConnect(RSQLite::SQLite(), file.path(clean_root(root), "control", "titan", "control.sqlite"), flags = RSQLite::SQLITE_RO)
 }
 
 connect_discovery <- function(root = beijing_data_root()) {
-  DBI::dbConnect(RSQLite::SQLite(), file.path(root, "control", "external_id_discovery", "discovery.sqlite"), flags = RSQLite::SQLITE_RO)
+  DBI::dbConnect(RSQLite::SQLite(), file.path(clean_root(root), "control", "external_id_discovery", "discovery.sqlite"), flags = RSQLite::SQLITE_RO)
 }
 
 sql_table_count <- function(con, table) {

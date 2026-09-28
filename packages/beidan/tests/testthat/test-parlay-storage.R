@@ -10,7 +10,12 @@ storage_result <- function() {
   projection <- list(cutoff = cutoff, fixtures = prepared$fixtures,
     probabilities = estimated$probabilities, prematch_sp = prepared$prematch_sp,
     match_status = prepared$match_status, fit = estimated$fit, exclusions = estimated$exclusions)
-  config <- parlay_allocation_configs(parlay_settings(reset = TRUE))[["A"]]
+  # Block 8 public path: the configuration carries the explicit policy and declares
+  # no purchased group count. The storage pipeline only needs a real non-empty build.
+  config <- parlay_strategy_config(
+    parlay_settings(reset = TRUE), name = "storage", construction_policy = list(max_candidates = 2L, seed = 1L),
+    patterns = list(p3333222 = c(3L, 3L, 3L, 3L, 2L, 2L, 2L)),
+    objective = "probability", max_reuse = 1L, max_overlap = 6L)
   parlay_build_plan(projection, config)
 }
 

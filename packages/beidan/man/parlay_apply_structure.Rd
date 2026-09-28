@@ -9,7 +9,6 @@ parlay_apply_structure(
   probabilities,
   cutoff,
   pattern,
-  assignment = "entropy_desc",
   forbidden = NULL,
   candidate_label = NULL
 )
@@ -23,9 +22,6 @@ parlay_apply_structure(
 
 \item{pattern}{长度 n_legs 的整数向量，元素取 1/2/3，表示"该条腿保留几个选项"。
 · 长度与组场数不一致 / 取值超出 1..3 -> stop()}
-
-\item{assignment}{"entropy_desc"（默认，越不确定的腿给越多选项）
-或 "by_leg_order"（按 leg_order 位置施加 pattern）。}
 
 \item{forbidden}{硬掩码。与结构掩码取交集，且绝不用其它结果补足：被硬禁掉
 一个选项的腿就是支撑更少，不得被顶替。}
@@ -43,4 +39,9 @@ pattern 不是预算代号：同样的总支撑量可以由不同分布产生，
 group_id 是排序后的比赛集合因而被共享；candidate_id 必须按结构唯一，使两种
 结构能被独立排名与注资。否则同一组上的结构 A 与 B 会在 candidate_id 上撞车，
 它们的支撑集会被合并。
+
+每条腿的角色由权威的 parlay_role_scores() 决定：在每个固定组内，按排序后的
+pattern 角色 3→2→1 依次处理，每一步在该角色榜上选取分数最高、且尚未被本组
+占用的成员（分数并列按 fixture_id 升序）。被选中的角色即该腿最终保持的角色。
+本函数不复制任何评分逻辑，也不按熵重排角色。
 }

@@ -1,0 +1,83 @@
+## 命中与结算更新
+
+```{r}
+#| label: settlement-update
+settlement_path <- file.path(root,params$settlements)
+settlement_snapshot <- readRDS(settlement_path)
+settled <- beidan::parlay_settle_plan(result$plan,
+  settlement_snapshot$settlements,settlement_snapshot$as_of)
+status_cn <- c(WON="中奖",LOST="未中",PENDING="待结算",SPECIAL="特殊结算待核")
+settlement_time <- format(settlement_snapshot$as_of,"%Y-%m-%d %H:%M:%S",tz="Asia/Shanghai")
+# 完场比分可确认赛果，即使该场SP仍未公布；只在展示层区分，不填造结算SP。
+source_rows <- tibble::as_tibble(jsonlite::fromJSON(file.path(root,params$source_rows))) |>
+  dplyr::transmute(fixture_id=paste0(issue,":",slot),来源状态=status,来源比分=score,confirmed_outcome)
+outcome_returns <- result$plan$ticket_legs |>
+  dplyr::semi_join(result$plan$purchases,by="ticket_id") |>
+  dplyr::left_join(source_rows,by="fixture_id",relationship="many-to-one") |>
+  dplyr::left_join(dplyr::select(settlement_snapshot$settlements,fixture_id,settlement_status=status),
+    by="fixture_id",relationship="many-to-one") |>
+  dplyr::mutate(neutral=!is.na(settlement_status)&settlement_status=="all_options_one",
+    known=neutral|!is.na(confirmed_outcome),
+    miss=!neutral&!is.na(confirmed_outcome)&outcome!=confirmed_outcome) |>
+  dplyr::group_by(ticket_id) |>
+  dplyr::summarise(赛果判定=dplyr::case_when(any(miss)~"未中",all(known)~"命中",TRUE~"赛果未决"),.groups="drop")
+result_groups <- result$plan$purchases |>
+  dplyr::left_join(outcome_returns,by="ticket_id",relationship="one-to-one") |>
+  dplyr::left_join(dplyr::select(settled$ticket_returns,ticket_id,status,payout_cny),
+    by="ticket_id",relationship="one-to-one") |>
+  dplyr::group_by(group_id) |>
+  dplyr::summarise(投入元=sum(stake_cny),命中注数=sum(赛果判定=="命中"),
+    未中注数=sum(赛果判定=="未中"),赛果未决注数=sum(赛果判定=="赛果未决"),
+    命中待SP注数=sum(赛果判定=="命中" & status=="PENDING"),
+    已确认返奖元=sum(payout_cny),
+    组净收益元=if (all(赛果判定=="未中" | status=="WON")) sum(payout_cny)-sum(stake_cny) else NA_real_,
+    .groups="drop")
+knitr::kable(tibble::tibble(方案投入元=sum(result_groups$投入元),
+  赛果命中注数=sum(result_groups$命中注数),未中注数=sum(result_groups$未中注数),
+  赛果未决注数=sum(result_groups$赛果未决注数),命中待SP注数=sum(result_groups$命中待SP注数),
+  已确认返奖元=sum(result_groups$已确认返奖元),全单净收益元=sum(result_groups$组净收益元)),escape=TRUE)
+```
+
+**结算观测：`r settlement_time` 北京时间。本页所购票已全部完成结算。**
+按本页冻结下注单假设购买核算；没有实际订单回执。未分配资金不计入投入。
+赛果命中与返奖结算分开：命中但缺SP不填造返奖。尚有待SP或未决票时，全单净收益留空；“已确认返奖0元”不表示最终返奖为0。
+
+```{r}
+#| label: settled-groups
+knitr::kable(dplyr::select(sheet$groups,group_id,display_label) |>
+  dplyr::left_join(result_groups,by="group_id",relationship="one-to-one") |>
+  dplyr::select(-group_id) |> dplyr::rename(组别=display_label),escape=TRUE)
+```
+
+- G01、G03 已全部判定未中；G02 两版均命中2注；G04 原方案未中，3333222方案命中1注。
+- 102场纽约红牛—圣路易斯城：来源标记**取消**，胜、平、负三个选项均明确公布 **SP=1**。本串关按中性腿计入，不当作预测命中、不推定退款。单关或全部取消的票仍留待特殊处理。
+- 已完场27场；取消1场。118场1:0，胜的结算SP为2.14；120场0:1，负的结算SP为4.93。全部所需结算SP已公布。进行中的即时比分和赛前参考SP不参与结算。
+- 返奖按冻结方案的每注金额 × **一次0.65** × 各腿实际结算SP乘积计算；不使用赛前SP的人工调整值。逐注表的 `NA` 表示尚不能确认。
+
+### 逐场赛果与结算SP
+
+```{r}
+#| label: settled-fixtures
+knitr::kable(settlement_snapshot$schedule |>
+  dplyr::select(fixture_id=fixture_key,slot,home_name,away_name,handicap) |>
+  dplyr::left_join(source_rows,by="fixture_id",relationship="one-to-one") |>
+  dplyr::left_join(dplyr::select(settlement_snapshot$settlements,fixture_id,outcome,settled_sp,status),
+    by="fixture_id",relationship="one-to-one") |>
+  dplyr::arrange(slot) |>
+  dplyr::transmute(场次=slot,对阵=paste(home_name,"vs",away_name),主队让球=handicap,
+    状态=dplyr::case_when(status=="all_options_one"~"取消，三个SP=1",
+      status=="settled"~"完场",来源状态=="完场"~"完场，待结算SP",TRUE~paste0("待结算（",dplyr::if_else(来源状态=="","未开赛",来源状态),"）")),
+    完场比分=dplyr::if_else(来源状态=="完场",来源比分,"—"),
+    让球赛果=dplyr::coalesce(unname(cn[dplyr::coalesce(outcome,confirmed_outcome)]),"—"),结算SP=settled_sp),escape=TRUE)
+```
+
+来源：[Nowscore 本期北单让球胜平负](https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum=26098)。
+结算快照：`r params$settlements`；SHA-256：`r digest::digest(file=settlement_path,algo="sha256")`。
+原始页面 SHA-256：`r settlement_snapshot$receipt$sha256`。
+逐场展示快照 SHA-256：`r digest::digest(file=file.path(root,params$source_rows),algo="sha256")`。
+
+<!-- Settlement refresh review: codex review - < .run-control/settlement-refresh-2229/review.txt; known-outcome counts and group accounting independently reproduced; 896 frozen tickets unchanged; both clean renders passed. Reviewed source hashes: {"quarto/26098_betting_plan.qmd": "455817e5f273dd493925f0932e56b0fb0eaf3107704d06256b2b106158958a9e", "quarto/26098_betting_plan_3333222.qmd": "07e4ab3e7c847ccefa24c2c5b904f615072d9310cfa82ba4d5e2a65715cc8962", "quarto/_26098_settlement_update.qmd": "8a604a774e5c1c97a7aafa5ff74a2e02ee248dddccdf94007656bdbfccb7530a", "inputs/26098_walkthrough/print/settlement-20260927-222927.rds": "c5e7d58b574746a104252d4a31a6e55ecd1bed20015d458ea15a0ebaecad2427", "inputs/26098_walkthrough/print/settlement-source-20260927-222927.json": "940e86517a23b34cdb1009d90f51e659a339b6198fe48a19beb13cc519fa64c3"}. Evidence: docs/reviews/26098-settlement-refresh-2229.json. -->
+
+<!-- Refresh 2026-09-28 00:21:48: reviewed pre-evidence hashes and commands in docs/reviews/26098-settlement-refresh-0021.json. codex review: no actionable findings. -->
+
+<!-- Final settlement review: codex review - < .run-control/settlement-refresh-final/review.txt. No actionable findings. Reviewed hashes and verification in docs/reviews/26098-settlement-final.json. -->

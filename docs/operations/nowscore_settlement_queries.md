@@ -7,7 +7,8 @@
 source("r/nowscore_query.R")
 data_root <- Sys.getenv("BEIJING_LOT_DATA_ROOT")
 stopifnot(nzchar(data_root), dir.exists(data_root))
-db_path <- file.path(data_root, "settlement/20260907_history_five_play_v2/nowscore_history_replay.sqlite")
+reference <- jsonlite::read_json(file.path(data_root, "registry/settlement-current.json"))
+db_path <- file.path(data_root, reference$database)
 
 # 单场五玩法
 x <- query_nowscore_settlement(db_path, issue = "23084", slot = 131)
@@ -39,3 +40,5 @@ x$receipt
 数据目录独立于 worktree。当前主机在运行 R 前设置 `BEIJING_LOT_DATA_ROOT=/run/media/drwho1985/Sandisk/data/beijing-lot`，其他主机显式设置自己的挂载目录。原始 `source_url` 对应 Nowscore；修正后的 SP 来源见 `sp_source`、`sp_source_url`，原值见 `original_raw_sp`、`original_sp`，说明见 `correction_note`。
 
 生成和修正入口：[结算库维护](settlement_database_maintenance.md)。
+
+原始批次、计划、汇集文件及补值证据的迁移目录见数据根目录下 `registry/settlement-evidence-archives.json`；归档成员读取需验证对应 SHA-256。

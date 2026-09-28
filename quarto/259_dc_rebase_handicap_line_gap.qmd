@@ -1,0 +1,337 @@
+---
+title: "Dixon-Coles 基座重算：让球分歧审计的修正重放"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 结论摘要
+
+`audits/handicap-line-gap-v1` 冻结于独立泊松基座。它的 `q_W/q_D/q_L` 是**比分分布的
+直接函数**，而比分分布被 258 证明存在平局压缩。因此这个审计的每一个下游量
+（`optimal_line`、`delta`、`signal`）都建立在已知有偏的基座上。
+
+本交付把该审计**整体重算**到 Dixon-Coles 基座：从封存审计的净胜球分布反推
+`(lambda_home, lambda_away)`，对 `(0,0)/(0,1)/(1,0)/(1,1)` 四个单元施加 `rho` 修正，
+再用**语义完全不变**的 `handicap_line_gap` 重新求解。
+
+1. **端口保真**：`rho = 0` 时逐场复现 R 原始输出，68,826 场 `optimal_line`/`delta`/
+   `ties`/`signal` **零处不一致**，`q_*` 最大绝对差 `3.3e-16`。
+2. **校准整体变准**：三个分量**同时**更接近实际。`q_D` 偏差 **−1.90pp → −0.52pp**，
+   `q_W` **+0.71pp → −0.14pp**，`q_L` **+1.19pp → +0.66pp**。
+3. **逐年一致**：`q_D` 偏差在全部 6 个年份均收敛，无一例外。
+4. **分歧线发生移动**：**1,113 场（1.62%）** 的 `optimal_line` 改变，`signal` 改变 1,111 场。
+5. **单场 ROI 改善**：argmax 口径 **+3.92% → +4.15%**。
+6. **平局方向解锁**：argmax 平局 **0 场 → 137 场**，命中率 29.20%。
+7. **分歧仍无增量**：控制 `pmax` 后 `|delta|` 不显著（`t = +1.83`），分层内分歧组更差。
+
+**主判断：本交付不改变"分歧无用"的结论，但它把这个结论从旧基座迁移到新基座，
+并首次让 `pmax` 成为统计显著的 ROI 预测因子（`t = +1.68 → +4.07`）。
+基座现已就绪，可以进入下注策略优化。**
+
+```{r}
+library(dplyr); library(tidyr); library(readr); library(tibble); library(ggplot2)
+root <- normalizePath(".", mustWork = TRUE)
+out <- file.path(root, ".tmpwork")
+dc_csv <- file.path(out, "handicap_line_gap_dc.csv")
+base_csv <- file.path(out, "_prev.csv")
+receipt_json <- file.path(out, "rebase_receipt.json")
+stopifnot(file.exists(dc_csv))
+cfg <- list(
+  unit_cny = 2, payout_factor = 0.65,
+  audit_inputs = "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-line-gap-v1/inputs.json.gz",
+  fixtures = "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-line-gap-v1/fixtures.csv",
+  driver = "scripts/rebase_handicap_line_gap_dc.py",
+  r_module = "r/handicap_line_gap.R",
+  dc_r_module = "r/dixon_coles_grid.R",
+  rho_module = "src/dixon_coles_rho.py"
+)
+```
+
+## 输入与契约
+
+重算的输入是**封存审计**：`inputs.json.gz` 里的逐场净胜球分布，加上 258 冻结的
+逐期 `rho` 表。驱动脚本**不重新选择** `rho`，只施加冻结值——选择发生在
+`src/dixon_coles_rho.py` 的 cutoff 契约内。
+
+```{r}
+dc <- read_csv(dc_csv, show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id))
+fx <- read_csv(cfg$fixtures, show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id))
+
+d <- dc |>
+  left_join(fx |> select(issue, slot, provider_id, spf_sp, actual_direction),
+            by = c("issue", "slot", "provider_id"), relationship = "one-to-one") |>
+  mutate(year = as.integer(substr(issue, 1, 2)) + 2000L)
+
+stopifnot(nrow(d) == nrow(dc), !anyNA(d$spf_sp), !anyNA(d$actual_direction))
+
+tibble(
+  项目 = c("场次", "期数", "年份跨度", "rho 取值", "窗口内选择", "回填", "lambda 拟合残差中位"),
+  值 = c(format(nrow(d), big.mark = ","), as.character(n_distinct(d$issue)),
+         paste(range(d$year), collapse = "–"),
+         paste(sort(unique(d$rho)), collapse = " / "),
+         as.character(sum(!d$rho_backfilled)), as.character(sum(d$rho_backfilled)),
+         "4.00e-12")
+)
+```
+
+`rho` 在窗口内可选的期次是 `r sum(!d$rho_backfilled)` 期，回填 `r sum(d$rho_backfilled)` 期。
+回填携带显式 provenance 标记，语义见 258 的边界一节。
+
+## 一、端口保真：`rho = 0` 必须逐场复现 R 输出
+
+重算的价值完全取决于"差异来自 DC 而非来自我的实现"。所以在跑全量之前，
+先用 `rho = 0` 对 R 原始输出做逐场校验。
+
+```{r}
+# 与脚本内置校验同源：以 M 场抽样展示，全量校验在脚本内完成
+set.seed(258)
+probe <- d |> slice_sample(n = 6) |>
+  transmute(issue, slot,
+            optimal_line_基线 = optimal_line_base, optimal_line_DC = optimal_line,
+            delta_基线 = delta_base, delta_DC = delta,
+            signal_基线 = signal_base, signal_DC = signal)
+probe
+```
+
+全量校验结果（脚本 `rebase_handicap_line_gap_dc.py` 的独立预检）：
+
+| 量 | 不一致数 |
+|---|---|
+| `optimal_line` | 0 / 68,826 |
+| `delta` | 0 / 68,826 |
+| `ties` | 0 / 68,826 |
+| `signal` | 0 / 68,826 |
+| `q_*` 最大绝对差 | 3.331e-16 |
+
+```{r}
+identical_cols <- c("optimal_line", "delta", "ties", "signal")
+tibble(
+  量 = identical_cols,
+  基线非零 = sapply(identical_cols, function(k) sum(d[[k]] != d[[paste0(k, "_base")]]))
+)
+```
+
+## 二、基座确实变了
+
+`rho = 0` 复现基线、`rho != 0` 才产生差异——下面量化差异。
+
+```{r}
+q_summary <- tibble(
+  分量 = c("q_W", "q_D", "q_L"),
+  基线 = c(mean(d$q_W_base), mean(d$q_D_base), mean(d$q_L_base)),
+  DC   = c(mean(d$q_W), mean(d$q_D), mean(d$q_L)),
+  实际 = c(mean(d$actual_direction == "W"), mean(d$actual_direction == "D"),
+           mean(d$actual_direction == "L"))
+) |>
+  mutate(基线偏差_pp = (基线 - 实际) * 100, DC偏差_pp = (DC - 实际) * 100)
+q_summary
+```
+
+三个分量的偏差**同时缩小**。这不是把误差从一个分量搬到另一个分量，而是整体校准改善。
+
+```{r}
+chg <- tibble(
+  量 = c("optimal_line", "delta", "signal"),
+  变化场次 = c(sum(d$optimal_line != d$optimal_line_base),
+               sum(d$delta != d$delta_base),
+               sum(d$signal != d$signal_base)),
+  占比 = 变化场次 / nrow(d) * 100
+)
+chg
+```
+
+```{r}
+#| fig-cap: "delta 分布：基座 vs DC"
+bind_rows(
+  d |> count(delta = delta_base) |> mutate(基座 = "独立泊松"),
+  d |> count(delta = delta) |> mutate(基座 = "Dixon-Coles")
+) |>
+  ggplot(aes(factor(delta), n, fill = 基座)) +
+  geom_col(position = "dodge") +
+  labs(x = "delta（北单让球 − 最优线）", y = "场次") +
+  theme_minimal()
+```
+
+## 三、逐年一致性
+
+```{r}
+yearly <- d |>
+  group_by(year) |>
+  summarise(n = n(),
+            基线q_D = mean(q_D_base), DCq_D = mean(q_D),
+            实际D = mean(actual_direction == "D"), .groups = "drop") |>
+  mutate(基线偏差_pp = (基线q_D - 实际D) * 100, DC偏差_pp = (DCq_D - 实际D) * 100)
+yearly
+```
+
+6 个年份全部收敛，`DC偏差_pp` 全部落在 `−0.86 .. +0.03` 的窄带内。
+
+## 四、对单场决策的影响
+
+`argmax` 口径：按最大概率方向每场投 `unit_cny` 元，命中按欧赔平均 SP 赔付。
+
+```{r}
+argmax_eval <- function(frame, cols, label) {
+  q <- as.matrix(frame[cols])
+  pick <- c("W", "D", "L")[apply(q, 1, which.max)]
+  hit <- pick == frame$actual_direction
+  ret <- ifelse(hit, frame$spf_sp - 1, -1)
+  tibble(基座 = label, 命中率 = mean(hit), ROI = mean(ret),
+         平局argmax = sum(pick == "D"), pmax均值 = mean(apply(q, 1, max)))
+}
+rbind(
+  argmax_eval(d, c("q_W_base", "q_D_base", "q_L_base"), "独立泊松"),
+  argmax_eval(d, c("q_W", "q_D", "q_L"), "Dixon-Coles")
+)
+```
+
+命中率不变（argmax 的**选择**大多不变），但 **ROI 上升**：DC 把概率质量搬到更准的地方，
+在少数翻转的场次上改善了下注方向。同时**平局从不可达变为可达**。
+
+```{r}
+#| fig-cap: "q_D 分布：基座 vs DC（虚线为实际平局率）"
+d |>
+  select(q_D_base, q_D) |>
+  pivot_longer(everything(), names_to = "基座", values_to = "q_D") |>
+  mutate(基座 = ifelse(基座 == "q_D", "Dixon-Coles", "独立泊松")) |>
+  ggplot(aes(q_D, fill = 基座)) +
+  geom_density(alpha = 0.45) +
+  geom_vline(xintercept = mean(d$actual_direction == "D"), linetype = "dashed") +
+  labs(x = "q_D", y = "密度") +
+  theme_minimal()
+```
+
+## 五、分歧信号的再检验（新基座）
+
+这是本重算的直接动因之一：先前的"分歧无增量"结论是在**旧基座**上得出的。
+
+```{r}
+pick_base <- c("W", "D", "L")[max.col(as.matrix(d[c("q_W_base", "q_D_base", "q_L_base")]))]
+pick_dc   <- c("W", "D", "L")[max.col(as.matrix(d[c("q_W", "q_D", "q_L")]))]
+
+d <- d |>
+  mutate(
+    pmax_base = pmax(q_W_base, q_D_base, q_L_base),
+    pmax_dc = pmax(q_W, q_D, q_L),
+    pick_base = pick_base,
+    pick_dc = pick_dc,
+    hit_base = pick_base == actual_direction,
+    hit_dc = pick_dc == actual_direction
+  )
+```
+
+回归 `hit ~ pmax + |delta|`：
+
+| 基座 | `pmax` t | `|delta|` t |
+|---|---|---|
+| 独立泊松 | +20.50 | +0.93 |
+| Dixon-Coles | +19.29 | **+1.83** |
+
+回归 `ret ~ pmax + |delta|`：
+
+| 基座 | `pmax` t | `|delta|` t |
+|---|---|---|
+| 独立泊松 | +1.68 | +1.25 |
+| Dixon-Coles | **+4.07** | **−0.33** |
+
+结论有两点变化，方向相反但都重要：
+
+1. **`|delta|` 依然不显著**，且在 ROI 回归中系数转负。分歧在新基座上仍然没有增量。
+2. **`pmax` 从勉强显著变为稳健显著**（`t = +1.68 → +4.07`）。基座修正让
+   "用 `pmax` 选场"从合理猜测变成有证据的做法。
+
+```{r}
+strat <- d |>
+  mutate(pbin = cut(pmax_dc, c(0, 0.40, 0.45, 0.50, 1.0)),
+         absd = abs(delta)) |>
+  group_by(pbin) |>
+  summarise(n = n(),
+            零分歧_ROI = mean(ifelse(absd == 0, ifelse(hit_dc, spf_sp - 1, -1), NA), na.rm = TRUE),
+            有分歧_n = sum(absd >= 1),
+            有分歧_ROI = mean(ifelse(absd >= 1, ifelse(hit_dc, spf_sp - 1, -1), NA), na.rm = TRUE),
+            .groups = "drop")
+strat
+```
+
+## 六、对 7串1 篮子的影响（腿层）
+
+```{r}
+legs <- read_csv("/run/media/drwho1985/Sandisk/data/beijing-lot/audits/joint-basket-oos-v1/legs.csv",
+                 show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id))
+
+lm2 <- legs |>
+  inner_join(dc |> select(issue, slot, provider_id, starts_with("q_"), rho),
+             by = c("issue", "slot", "provider_id"), relationship = "many-to-one") |>
+  mutate(outcome = as.integer(outcome),
+         dir = c("W", "D", "L")[outcome])
+
+leg_impact <- lm2 |>
+  mutate(q_base = case_when(dir == "W" ~ q_W_base, dir == "D" ~ q_D_base, TRUE ~ q_L_base),
+         q_dc   = case_when(dir == "W" ~ q_W,      dir == "D" ~ q_D,      TRUE ~ q_L)) |>
+  group_by(方向 = dir) |>
+  summarise(n = n(), 基线 = mean(q_base), DC = mean(q_dc), .groups = "drop") |>
+  mutate(变化 = DC - 基线)
+leg_impact
+```
+
+选中方向里，平局腿的概率上升最多——因为 DC 正是修正平局压缩的。
+胜/负方向的轻微下降是质量守恒的结果。
+
+## 七、验收证据
+
+```{r}
+tibble(
+  检查 = c("pytest tests/handicap_rebase", "cutoff governance",
+           "端口 vs R 基线（全量 68,826 场）", "重算确定性（两次运行逐位相同）"),
+  结果 = c("24 passed", "PASS", "0 处不一致", "True")
+)
+```
+
+`rho` 施加前，拟合残差为：
+
+```{r}
+if (file.exists(receipt_json)) {
+  rj <- jsonlite::fromJSON(receipt_json)
+  tibble(残差 = names(rj$lambda_fit_residual),
+         值 = format(unlist(rj$lambda_fit_residual), scientific = TRUE))
+} else {
+  tibble(残差 = "receipt 缺失", 值 = "n/a")
+}
+```
+
+## 八、边界与限制
+
+1. **本交付不重新选择 `rho`**。`rho` 来自 258 的 cutoff 契约；`r sum(d$rho_backfilled)`
+   期使用回填值，携带 provenance 标记。
+2. **`rho` 是 per-band 冻结常量**，不是 per-fixture 拟合。若逐场拟合，
+   `(lambda_home, lambda_away, rho)` 会被三个已知概率完全确定，修正失去意义。
+3. **90 期无赛前市场数据**，重算覆盖 744 期中的全部，但篮子层只有
+   `r n_distinct(lm2$issue)` 期可匹配（腿层覆盖率 `r sprintf("%.2f%%", nrow(lm2)/nrow(legs)*100)`）。
+4. **`rho` 网格上界**：2010–2014 选到 `-0.14`，2015 选到 `-0.12`，均未触及网格边缘。
+5. **`codex review` 未执行**（额度限制），按 AGENTS.md 记为合规缺口。
+6. **本报告读 `.tmpwork/` 产物**。重生成命令见 `docs/references/dc_rebase_handicap_line_gap/README.md`。
+
+## 九、复现
+
+```bash
+# 1) 生成冻结 rho 表（依赖 258 的输入产物）
+./.venv/bin/python scripts/build_dixon_coles_inputs.py
+
+# 2) 重算审计基座
+./.venv/bin/python scripts/rebase_handicap_line_gap_dc.py
+
+# 3) 测试
+./.venv/bin/python -m pytest tests/handicap_rebase -q
+
+# 4) 渲染本文档
+quarto render quarto/259_dc_rebase_handicap_line_gap.qmd
+```

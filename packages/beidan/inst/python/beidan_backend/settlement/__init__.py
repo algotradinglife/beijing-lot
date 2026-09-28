@@ -18,6 +18,8 @@ def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None
     schedule rows bind issue_id, slot, fixture_key, provider_id_nowscore and
     handicap. Only an exact native ID/handicap match, explicit finished status,
     unique settled option and matching final score produces a settlement.
+    A cancelled, closed row explicitly publishing all three SPF options at 1
+    produces all_options_one, never a predicted W/D/L result or inferred refund.
     label_available_at is observation time, never inferred kickoff/end time.
     Offline pages requires body bytes and its original observed_at timestamp.
     Returns settlements, diagnostics, and a durable receipt path.
@@ -83,6 +85,14 @@ def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None
             reason = 'missing_source_fixture'
         elif row['native_match_id'] != fixture['provider_id_nowscore'] or row['handicap'] != fixture['handicap']:
             reason = 'identity_or_handicap_mismatch'
+        elif (row['status'] == '取消' and row['can_sale'] == 'false'
+              and not row['parse_errors'] and len(row['options']) == 3
+              and {o['option'] for o in row['options']} == {'胜', '平', '负'}
+              and all(o['sp'] == 1 for o in row['options'])):
+            settlements.append({'issue_id': issue, 'fixture_id': fixture['fixture_key'],
+                'outcome': 'ALL', 'settled_sp': 1.0, 'label_available_at': observed,
+                'status': 'all_options_one', 'source_url': url})
+            continue
         elif row['status'] != '完场':
             reason = 'not_finished'
         elif row['can_sale'] != 'false' or row['parse_errors']:

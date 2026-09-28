@@ -1,0 +1,452 @@
+[
+  {
+    "issue_code": "140706",
+    "issue_slot": 115,
+    "play_type": "jq",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=6&issueNum=140706",
+    "observed_at_utc": "2026-09-05T08:48:25.562200+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "推迟",
+    "ns_home": null,
+    "ns_away": null,
+    "nowscore_option": null,
+    "nowscore_sp": null,
+    "filled_cells": [
+      {
+        "option": "0",
+        "sp": 14.45
+      },
+      {
+        "option": "1",
+        "sp": 3.23
+      },
+      {
+        "option": "2",
+        "sp": 3.48
+      },
+      {
+        "option": "3",
+        "sp": 6.76
+      },
+      {
+        "option": "4",
+        "sp": 11.57
+      },
+      {
+        "option": "5",
+        "sp": 17.73
+      },
+      {
+        "option": "6",
+        "sp": 38.75
+      },
+      {
+        "option": "7+",
+        "sp": 56.66
+      }
+    ],
+    "row_text": " 115 挪甲 00:00 推迟 莫达伦 - 特罗姆瑟 - 亚 欧 析 荐 sp 14.45 3.23 3.48 6.76 11.57 17.73 38.75 56.66 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_jq.php?expect=140706",
+    "current_500": [
+      [
+        115,
+        428150,
+        2,
+        1,
+        "0",
+        1,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "140706",
+    "issue_slot": 115,
+    "play_type": "ds",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=7&issueNum=140706",
+    "observed_at_utc": "2026-09-05T08:48:25.562785+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "推迟",
+    "ns_home": null,
+    "ns_away": null,
+    "nowscore_option": null,
+    "nowscore_sp": null,
+    "filled_cells": [
+      {
+        "option": "上+单",
+        "sp": 3.59
+      },
+      {
+        "option": "上+双",
+        "sp": 3.72
+      },
+      {
+        "option": "下+单",
+        "sp": 4.48
+      },
+      {
+        "option": "下+双",
+        "sp": 4.33
+      }
+    ],
+    "row_text": " 115 挪甲 00:00 推迟 莫达伦 - 特罗姆瑟 - 亚 欧 析 荐 SP 3.59 3.72 4.48 4.33 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_ds.php?expect=140706",
+    "current_500": [
+      [
+        115,
+        428150,
+        2,
+        1,
+        "上+单",
+        1,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "141112",
+    "issue_slot": 49,
+    "play_type": "jq",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=6&issueNum=141112",
+    "observed_at_utc": "2026-09-05T08:48:25.563315+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "取消",
+    "ns_home": null,
+    "ns_away": null,
+    "nowscore_option": null,
+    "nowscore_sp": null,
+    "filled_cells": [
+      {
+        "option": "0",
+        "sp": 11.07
+      },
+      {
+        "option": "1",
+        "sp": 6.37
+      },
+      {
+        "option": "2",
+        "sp": 4.64
+      },
+      {
+        "option": "3",
+        "sp": 4.47
+      },
+      {
+        "option": "4",
+        "sp": 6.74
+      },
+      {
+        "option": "5",
+        "sp": 10.49
+      },
+      {
+        "option": "6",
+        "sp": 24.23
+      },
+      {
+        "option": "7+",
+        "sp": 34.04
+      }
+    ],
+    "row_text": " 49 欧罗巴 04:05 取消 埃斯托里 - 埃因霍温 - 亚 欧 析 荐 sp 11.07 6.37 4.64 4.47 6.74 10.49 24.23 34.04 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_jq.php?expect=141112",
+    "current_500": [
+      [
+        49,
+        455967,
+        3,
+        3,
+        "0",
+        1,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "141112",
+    "issue_slot": 49,
+    "play_type": "ds",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=7&issueNum=141112",
+    "observed_at_utc": "2026-09-05T08:48:26.398956+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "取消",
+    "ns_home": null,
+    "ns_away": null,
+    "nowscore_option": null,
+    "nowscore_sp": null,
+    "filled_cells": [
+      {
+        "option": "上+单",
+        "sp": 3.19
+      },
+      {
+        "option": "上+双",
+        "sp": 5.16
+      },
+      {
+        "option": "下+单",
+        "sp": 4.75
+      },
+      {
+        "option": "下+双",
+        "sp": 3.53
+      }
+    ],
+    "row_text": " 49 欧罗巴 04:05 取消 埃斯托里 - 埃因霍温 - 亚 欧 析 荐 SP 3.19 5.16 4.75 3.53 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_ds.php?expect=141112",
+    "current_500": [
+      [
+        49,
+        455967,
+        3,
+        3,
+        "上+单",
+        1,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "150903",
+    "issue_slot": 169,
+    "play_type": "jq",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=6&issueNum=150903",
+    "observed_at_utc": "2026-09-05T08:48:26.608306+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "完场",
+    "ns_home": 2,
+    "ns_away": 3,
+    "nowscore_option": "5",
+    "nowscore_sp": 13.167,
+    "filled_cells": [
+      {
+        "option": "5",
+        "sp": 13.167
+      }
+    ],
+    "row_text": " 169 冰岛甲 21:00 完场 塞尔福斯 2-3 托尔阿克 2-2 亚 欧 析 荐 sp 13.167 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_jq.php?expect=150903",
+    "current_500": [
+      [
+        169,
+        516625,
+        4,
+        3,
+        "5",
+        13.17,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "150903",
+    "issue_slot": 169,
+    "play_type": "ds",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=7&issueNum=150903",
+    "observed_at_utc": "2026-09-05T08:48:26.698650+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "完场",
+    "ns_home": 2,
+    "ns_away": 3,
+    "nowscore_option": "上+单",
+    "nowscore_sp": 2.851,
+    "filled_cells": [
+      {
+        "option": "上+单",
+        "sp": 2.851
+      }
+    ],
+    "row_text": " 169 冰岛甲 21:00 完场 塞尔福斯 2-3 托尔阿克 2-2 亚 欧 析 荐 SP 2.8510 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_ds.php?expect=150903",
+    "current_500": [
+      [
+        169,
+        516625,
+        4,
+        3,
+        "上+单",
+        2.85,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "23093",
+    "issue_slot": 303,
+    "play_type": "jq",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=6&issueNum=23093",
+    "observed_at_utc": "2026-09-05T08:48:27.223505+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "完场",
+    "ns_home": 3,
+    "ns_away": 1,
+    "nowscore_option": "4",
+    "nowscore_sp": 3.753,
+    "filled_cells": [
+      {
+        "option": "4",
+        "sp": 3.753
+      }
+    ],
+    "row_text": " 303 挪甲 21:00 完场 莫达伦 3-1 布莱尼 1-1 亚 欧 析 荐 sp 3.753 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_jq.php?expect=23093",
+    "current_500": [
+      [
+        303,
+        1076063,
+        3,
+        1,
+        "3",
+        3.75,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "23093",
+    "issue_slot": 303,
+    "play_type": "ds",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=7&issueNum=23093",
+    "observed_at_utc": "2026-09-05T08:48:28.803916+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "完场",
+    "ns_home": 3,
+    "ns_away": 1,
+    "nowscore_option": "上+双",
+    "nowscore_sp": 3.0546,
+    "filled_cells": [
+      {
+        "option": "上+双",
+        "sp": 3.0546
+      }
+    ],
+    "row_text": " 303 挪甲 21:00 完场 莫达伦 3-1 布莱尼 1-1 亚 欧 析 荐 SP 3.0546 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_ds.php?expect=23093",
+    "current_500": [
+      [
+        303,
+        1076063,
+        3,
+        1,
+        "上+单",
+        3.05,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "25053",
+    "issue_slot": 250,
+    "play_type": "jq",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=6&issueNum=25053",
+    "observed_at_utc": "2026-09-05T08:48:29.057145+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "取消",
+    "ns_home": null,
+    "ns_away": null,
+    "nowscore_option": null,
+    "nowscore_sp": null,
+    "filled_cells": [
+      {
+        "option": "0",
+        "sp": 1
+      },
+      {
+        "option": "1",
+        "sp": 1
+      },
+      {
+        "option": "2",
+        "sp": 1
+      },
+      {
+        "option": "3",
+        "sp": 1
+      },
+      {
+        "option": "4",
+        "sp": 1
+      },
+      {
+        "option": "5",
+        "sp": 1
+      },
+      {
+        "option": "6",
+        "sp": 1
+      },
+      {
+        "option": "7+",
+        "sp": 1
+      }
+    ],
+    "row_text": " 250 荷乙 22:30 取消 海牙 - 特尔斯达 - 亚 欧 析 荐 sp 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_jq.php?expect=25053",
+    "current_500": [
+      [
+        250,
+        1196942,
+        0,
+        1,
+        "7+",
+        1,
+        "settled",
+        null
+      ]
+    ]
+  },
+  {
+    "issue_code": "25053",
+    "issue_slot": 250,
+    "play_type": "ds",
+    "source_url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=7&issueNum=25053",
+    "observed_at_utc": "2026-09-05T08:48:29.312401+00:00",
+    "fetch_status": "ok",
+    "nowscore_status": "取消",
+    "ns_home": null,
+    "ns_away": null,
+    "nowscore_option": null,
+    "nowscore_sp": null,
+    "filled_cells": [
+      {
+        "option": "上+单",
+        "sp": 1
+      },
+      {
+        "option": "上+双",
+        "sp": 1
+      },
+      {
+        "option": "下+单",
+        "sp": 1
+      },
+      {
+        "option": "下+双",
+        "sp": 1
+      }
+    ],
+    "row_text": " 250 荷乙 22:30 取消 海牙 - 特尔斯达 - 亚 欧 析 荐 SP 1.00 1.00 1.00 1.00 ",
+    "source_500_url": "https://trade.500.com/bjdc/project_fq_ds.php?expect=25053",
+    "current_500": [
+      [
+        250,
+        1196942,
+        0,
+        1,
+        "下+双",
+        1,
+        "settled",
+        null
+      ]
+    ]
+  }
+]

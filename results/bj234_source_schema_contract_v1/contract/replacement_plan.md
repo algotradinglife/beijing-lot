@@ -22,7 +22,6 @@ Obsolete ambiguous schemas are **removed from the accepted interface** rather th
 | beidan_live.db | snapshots | REDIRECT | market_observation + market_quote (sp_1x2 + euro_1x2) | Live snapshots with snapshot_ts (TIMESTAMPED_UTC) are the primary prospective causal source; REDIRECT to canonical observation tables. |
 | beidan_live.db | matches | REDIRECT | fixture + team_alias (fid alias) | Live matches carry fid; canonical fixture keeps source_match_key and resolves fid via alias crosswalk. |
 | beidan_live.db | settlements | REDIRECT | settlement (source='live_collector') | Live settlements are after-event truth; canonical settlement namespace is physically separate (REQ-DS05). |
-| 500_bjdc.sqlite | live_sp_snapshots | REDIRECT | market_observation + market_quote (sp_1x2) | 500.bjdc live SP captures with fetched_at are prospective timestamped captures; REDIRECT to canonical observation tables. |
 
 ## Contract checklist
 

@@ -1,0 +1,27 @@
+{
+  "schema": "n7_493_reviewed_revision_v1",
+  "issue": 493,
+  "review_round": 24,
+  "frozen_at": "2026-09-23T08:59:24Z",
+  "review_command": "codex exec -c sandbox_mode='\"danger-full-access\"' --cd $PWD - < docs/reviews/issue-493-review-prompt-round24.txt",
+  "files": {
+    "src/n7_493_probe.py": "58da18f17b8660417b39c3454271527e4c0084d2588059681260a9b1dc21c354",
+    "src/n7_493_probe_analysis.py": "9c48fb97ebb624714d540a2589b9237741ef16b4fbf05219082e455937ae441f",
+    "scripts/probe_n7_493_3in1_identity.py": "5a7e0c2a86acc3cd9cf28f5294b5924bc9ca7aa3b559d26b3a7cfa0a8529687a",
+    "scripts/rebuild_n7_493_probe_ledger.py": "14428d03b5699deeb356558b093b5fb5ec5ea10bf339141d277edd9b8150cffa",
+    "scripts/analyze_n7_493_3in1_probe.py": "d193a9fba3b3a0019f01aa2fd02aa8b25607cbf04e0402a2366a721bea72647f",
+    "tests/scripts/test_probe_n7_493_3in1_identity.py": "1f07e3d92d1248d36f08a9f706ae801daf8665bd39dcb6ae6a72d9d9afe5e005",
+    "tests/scripts/test_n7_493_probe_analysis.py": "3ef72298f51a18bef436c27940036994c4f57dd14daa618bdcb29d8380eaa45a",
+    "tests/scripts/test_n7_493_probe_entrypoints.py": "ccb414b470cecc4db4c8c6a895c2d5859a58819aa21ee68c20faa593ae83cec1",
+    "r/n7_493_probe_report.R": "a45f179b15791c2de8c94d39aeafe9c699aa144157061cf2b04ad8b61371ff87",
+    "tests/testthat/test-n7-493-probe-report.R": "274ba11a89a0a218d4673c329aa4d957464f325f373897861b18fffe9ee0b52d",
+    "quarto/493_n7_input_probe.qmd": "b44816c00465af737bb6a6c0fd94e9488ed5e66c424c58ee9faeed6219aa1eba",
+    "docs/research/n7_493_titan_source_verification.md": "941d9248d2af497cea9b6327f5ba942f4669b17ac31835869ce82495eb997afb",
+    "scripts/freeze_n7_493_reviewed_revision.py": "1c6417bada54f3ee7f93a3dfae2c80a01bc72efcd36f6915b5d12524a46dd178",
+    "results/data_collection/n7_493_3in1_probe_v1/SHA256SUMS": "a8400540285169a68e2b9d9e8aca16b1df6b154135373f459d1eb7a0bc3ee1e9",
+    "results/data_collection/n7_493_3in1_probe_v1/manifest.json": "499839dd7a16c7330b5ad332a3bd2000dc25899a4cccf6adb22706cab17c6ed8",
+    "results/data_collection/n7_493_3in1_probe_v1/ledger_provenance.json": "94a7d7aee070f60ca40f3803977e31a5437f825e1aef901e7a6ac467cb67cf02",
+    "results/data_collection/n7_493_3in1_probe_v1/diagnostics.csv": "29656f8f5b5dfd5fb137db13ecdf21b25890a3f49a291e9e92ddcf70ef8b7b49",
+    "results/data_collection/n7_493_3in1_probe_v1/requests.jsonl": "7de79f94f33e6284af6a6e7de95cd16e87920acf9f48a9e4741cb173b324b6f8"
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "generated_at": "2026-09-26T19:11:01.371839+08:00",
+  "scope": "#533 local acceptance; no commit/push/merge asserted",
+  "reviewed_files": {
+    "packages/beidan/NAMESPACE": "c3679fd122a943ec8eefc416e9b3b66557747912b1326fb0d2613a8e4bb49be0",
+    "packages/beidan/R/beidan-package.R": "417faf50c5f14cd3ce19e34e19db81c1fbfd185ecc0ba23f40b9ebf77b24929c",
+    "packages/beidan/R/n7_pipeline_contracts.R": "01a96616aa417db18c47946fd02f556405f3b0747c9ac8a3270a8db2c79db734",
+    "packages/beidan/R/n7_pipeline_value.R": "b8f681be075d210b269ef96b77b193c7a474cbbb4664211774600ef596a7e4fe",
+    "packages/beidan/R/parlay_budget_allocation.R": "34936db45cf7d117cd7fb2fbd65b56e79dfc64d5eec9e53d1a99db8b0df2ec54",
+    "packages/beidan/R/parlay_plan_summary.R": "e38c9f917616385a02141519f508edc94323d39bece123a16e51211a91858d14",
+    "quarto/26098_walkthrough.qmd": "c03a29f8c389968a09ad8c68242f1f6186cbd2258c9ce07708cd0718d9fb79a0",
+    "quarto/n7_pipeline_contracts.qmd": "59c72a913be04b179eb2ca8a68ff79793e1d5fd04888e57b36ba77dc26d5dd51",
+    "quarto/n7_match_status.qmd": "d7416f3a16c803142c994096e308f3314d162f58e48bb6399ca979e4f594601a",
+    "scripts/acceptance/parlay_api.R": "3a1cf611659bc2d70ab50d554c5c6ae77ad1ded2958a0760fdac3b74cff1f504",
+    "tests/testthat/test-parlay-interface-regressions.R": "6133659abac0156b050153003d6af868eabe72f4b29e6a4967a1181c559ff937",
+    "tests/testthat/test-26098-walkthrough.R": "45ba4d92a6d9d400178ff2af19de83302497a31aa5d457ee1bd061201880dc18",
+    "docs/strategy/block8-budget-allocation-contract.md": "b68cf5c4fb341d829c2002730ae6f912dfecdbbc85cb4e9b69be447f64f4929e",
+    "docs/reviews/533-block8.md": "995777c2046b1963799f8e39b1d35b6d5d54c690b25e3ecadf39c75e231123ab",
+    "packages/beidan/tests/testthat/test-parlay-budget-allocation.R": "ea4c17f1ca87052d8afba22bfccff70c44e80c7ebc8330fe4a9f711be5f7a348",
+    "packages/beidan/tests/testthat/test-parlay-plan-summary.R": "8c2cdfbff69bdcd5ae728cb7e252878f0d14c9269cbf7a7d59c008a023f7a1b7",
+    "packages/beidan/tests/testthat/test-parlay-block8-build-plan.R": "f42bfcc4fb1e514808a00747b5e85b6ed47b24f90762975799624f2d61f725ee",
+    "packages/beidan/tests/testthat/test-parlay-storage.R": "73f9d70a67cc874010fe3c4131b807b2a990a9e43cbe9de0e964304244af99c0",
+    "packages/beidan/tests/testthat/test-n7-match-status.R": "2f5d92c27952e76e78c34d7baee3606469ee9094af2597771209ad5bac34a489",
+    "packages/beidan/tests/testthat/test-n7-match-status-acceptance.R": "1bd43534b7090bf77855c43589802f7d9724820729c74e3c07f5408fe19a57b7",
+    "packages/beidan/tests/testthat/test-n7-pipeline-value.R": "8e4be7dc496d289e6c1deba0888b80c1f7856cf0136db766acf75d385fb684fd",
+    "packages/beidan/tests/testthat/test-parlay-variable-legs.R": "2f2682db2becbbda28f20b2f19612430e857d9e36d53d398f9e21162dcc44ed2",
+    "packages/beidan/man/parlay_strategy_config.Rd": "6f297d7b1925ef1a9043fecd7865a03fb529f8feb6e688a0ac00183c9671b7a6",
+    "packages/beidan/man/parlay_budget_state.Rd": "3912d9cc519b1eb42a9157dce8042955764839396f5d0ae76eed4781b9294d99",
+    "packages/beidan/man/parlay_generate_candidates.Rd": "feca88be266266c48708307fb8bc602f9735bceeb3908cf111469be718bc6aec",
+    "packages/beidan/man/parlay_coverage_frontier.Rd": "b8b0d88191a5b16b7123a2cc90ebc38d7ec2a2ddaeaf62d0ffc8731071a1aa40",
+    "packages/beidan/man/parlay_allocate_portfolio.Rd": "6ec85c800d94594c40a168b2f72cbbad8f3a181d09320340e47758eaf1cf3b94",
+    "packages/beidan/man/parlay_plan_summary.Rd": "4733b1d2eef953885276305a61fad4ba8188cba6023ee2e867c3204622e78094",
+    "packages/beidan/man/parlay_build_plan.Rd": "3401d8477699e0b6f18b40709f8a65ee685b15c8271f5d130581ea8bbb875a70",
+    "packages/beidan/man/parlay_settings.Rd": "b34278f8a37c42dd5a223926335e6a8dd7cdcffae459bbe3ad1ca91b9892aaa7"
+  },
+  "transitive_package_r": {
+    "packages/beidan/R/beidan-package.R": "417faf50c5f14cd3ce19e34e19db81c1fbfd185ecc0ba23f40b9ebf77b24929c",
+    "packages/beidan/R/dixon_coles_grid.R": "66373c2f79bcaba9a0e51b734118ff320d97304ab4b6ae9493798eedfe75c106",
+    "packages/beidan/R/fundamentals_market_comparison.R": "6e9880ff5df8571a9c56ba394f0a2a6c225b64be8b636b915486846caf9354ce",
+    "packages/beidan/R/fundamentals_total_market.R": "37657e4f461573d3df4bfbe204d8986cfd94a9dcfaa74b40d290242f3835be4f",
+    "packages/beidan/R/issue_schedule.R": "7fb9e201cd77eece039009a98bb535dd07c46c371fee9d12a34bd897fee8e914",
+    "packages/beidan/R/issue_settlements.R": "c977b09ae14f7c59c8c2cc0b4bdf7e6c1b2b47cfce421b226fbb8109360a68d1",
+    "packages/beidan/R/match_markets.R": "49b7b9c002bf0bec0e9cae29cf6fcd00b8f926b5afc9e51adf0bdf8f3ff074a2",
+    "packages/beidan/R/n7_experiment_contract.R": "646d923d46d8de26101b95df17740cce06e45f2027556f6d1abbd17bceb9201a",
+    "packages/beidan/R/n7_pipeline_candidates.R": "f4b7f78aff1e251f7fbedf7a4a595963f91d64d76d9151d6ee6d2fbd71a081dd",
+    "packages/beidan/R/n7_pipeline_contracts.R": "01a96616aa417db18c47946fd02f556405f3b0747c9ac8a3270a8db2c79db734",
+    "packages/beidan/R/n7_pipeline_epoch.R": "ec1d89892ef70bf32d1928180da8998de8cb6329facdae7f716128da970c2449",
+    "packages/beidan/R/n7_pipeline_fixture.R": "c2f11506041b235408fa7fc3d7299d4294def9db82c020b491cea330c4bfcf99",
+    "packages/beidan/R/n7_pipeline_inputs.R": "f0eb9c1f7fcb8406925b8f25dae942ba3c4783483b223d1d139703f0be5496b7",
+    "packages/beidan/R/n7_pipeline_match_status.R": "c2c328579a95e55203bf067273c8ceac4e226915ced358bea2715f42c17ed216",
+    "packages/beidan/R/n7_pipeline_types.R": "f355ec0f2949c3ed88df13a555e456e60f959175ffda6ac6718723e3f09bdfec",
+    "packages/beidan/R/n7_pipeline_value.R": "b8f681be075d210b269ef96b77b193c7a474cbbb4664211774600ef596a7e4fe",
+    "packages/beidan/R/parlay_budget_allocation.R": "34936db45cf7d117cd7fb2fbd65b56e79dfc64d5eec9e53d1a99db8b0df2ec54",
+    "packages/beidan/R/parlay_plan_summary.R": "e38c9f917616385a02141519f508edc94323d39bece123a16e51211a91858d14",
+    "packages/beidan/R/parlay_storage.R": "481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f",
+    "packages/beidan/R/python-backend.R": "820a0db0aea37c6d0dba4ab2ae45c5edc264cf5478761b3a80cf527991083662",
+    "packages/beidan/R/schedule_identity.R": "8918792d66f77527d7c19e2ef9eeed6a7ce9a7dccd905b9556de78467542bf6c"
+  },
+  "inputs": {
+    "inputs/26098_walkthrough/schedule.rds": "ef92ed3c5ffabfbec645387fe7f3856dda00612b5d2d40a05ef24b9e0659ec89",
+    "inputs/26098_walkthrough/markets.rds": "ec633e9bdc1ec59951db9e4f6d75f23c75cb39149cdb5cdafe5d429b8020d029",
+    "inputs/26098_walkthrough/settlements.rds": "f9156e8ae9e3877c9ec7d711133514a78e5a806caddefb1fc5a8e7953cf29f12",
+    "inputs/26098_walkthrough/plans/26098-20260926-121805.rds": "bd5cb9c5f7b2f400011fa8251f5cdb359d10d469e4dfbfaec7a1706e66136e39"
+  },
+  "decision_at": "2026-09-26T17:51:58+08:00",
+  "render_source": {
+    ".run-control/533-validation.qmd": "3f480bfb423545ccac15a3ae1dc7633f2c45135e48654ce569f584af95e056cf"
+  },
+  "review_commands_and_conclusions": [
+    {
+      "log": ".run-control/533-core-review.log",
+      "sha256": "2bbedf59185f23e59596f62028016a6e0a5d493536475488b410076c2ac53376",
+      "command": [
+        "codex",
+        "review",
+        "Review issue533 core ONLY: untracked packages/beidan/R/parlay_budget_allocation.R and packages/beidan/tests/testthat/test-parlay-budget-allocation.R against docs/strategy/block8-budget-allocation-contract.md stages1-4. Focus budget double spend, native chronology binding, zero/NA, candidate legal coverage and physical ticket duplicate, overlap/reuse with prior, correct opening-versus-deepening greedy and expected-count not union metric, EV missingness and candidate locking. Report actionable bugs with exact lines. No edits. Stage5/facade/QMD not implemented yet and a separate agent is editing value.R; ignore those evolving integration changes."
+      ],
+      "conclusion": "The scoped test file passes, but additional reproductions expose budget overspending, incorrect probability-objective selection, and unbound fixture membership that undermines admission constraints. Stage 5 and evolving integration changes were excluded.\n\nFull review comments:\n\n- [P1] Reconcile the budget state with the actual prior ledger — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_budget_allocation.R:683-690\n  When a budget state was computed before additional purchases, the allocator accepts it alongside the updated prior ledger without comparing `spent_before_cny` to actual prior spending or bounding availability by the remaining issue cap. I reproduced a state from `parlay_budget_state(settings, NULL, cutoff)` combined with valid prior spending of CNY1,024: allocation added CNY18, returning CNY1,042 of history against the CNY1,024 cap. Reconcile these inputs and reject stale or inconsistent budgets before purchasing.\n\n- [P2] Validate probability ordering as well as EV ordering — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_budget_allocation.R:733-737\n  When a valid `ev_desc` frontier is passed with `objective = \"probability\"`, this check is skipped and the greedy loop still advances in EV rank order. With probabilities `(0.6, 0.3, 0.1)`, valid SP `(1.1, 9, 9)` and CNY2 available, I reproduced purchasing the 0.3 ticket instead of the 0.6 ticket. Reject incompatible probability ordering, just as EV mode does, or explicitly rebuild the ranking for the requested objective.\n\n- [P1] Bind allocation fixture sets to the frontier's physical tickets — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_budget_allocation.R:1012-1017\n  When supplied `group_legs` retain group IDs and width but contain different fixtures, the binding check passes. Allocation then checks reuse/overlap against those replacement fixtures while buying the original frontier tickets, and persists the replacement sets into history. I reproduced purchases on `f1/f2/f3` with history recording `ghost1/ghost2/ghost3`; this can bypass prior-fixture constraints and corrupt subsequent admission decisions. Validate group membership against the frontier's ticket legs/supports, not merely its width, consistent with the input-identity binding requirement in [AGENTS.md:74](AGENTS.md#L74).\nThe scoped test file passes, but additional reproductions expose budget overspending, incorrect probability-objective selection, and unbound fixture membership that undermines admission constraints. Stage 5 and evolving integration changes were excluded.\n\nFull review comments:\n\n- [P1] Reconcile the budget state with the actual prior ledger — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_budget_allocation.R:683-690\n  When a budget state was computed before additional purchases, the allocator accepts it alongside the updated prior ledger without comparing `spent_before_cny` to actual prior spending or bounding availability by the remaining issue cap. I reproduced a state from `parlay_budget_state(settings, NULL, cutoff)` combined with valid prior spending of CNY1,024: allocation added CNY18, returning CNY1,042 of history against the CNY1,024 cap. Reconcile these inputs and reject stale or inconsistent budgets before purchasing.\n\n- [P2] Validate probability ordering as well as EV ordering — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_budget_allocation.R:733-737\n  When a valid `ev_desc` frontier is passed with `objective = \"probability\"`, this check is skipped and the greedy loop still advances in EV rank order. With probabilities `(0.6, 0.3, 0.1)`, valid SP `(1.1, 9, 9)` and CNY2 available, I reproduced purchasing the 0.3 ticket instead of the 0.6 ticket. Reject incompatible probability ordering, just as EV mode does, or explicitly rebuild the ranking for the requested objective.\n\n- [P1] Bind allocation fixture sets to the frontier's physical tickets — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_budget_allocation.R:1012-1017\n  When supplied `group_legs` retain group IDs and width but contain different fixtures, the binding check passes. Allocation then checks reuse/overlap against those replacement fixtures while buying the original frontier tickets, and persists the replacement sets into history. I reproduced purchases on `f1/f2/f3` with history recording `ghost1/ghost2/ghost3`; this can bypass prior-fixture constraints and corrupt subsequent admission decisions. Validate group membership against the frontier's ticket legs/supports, not merely its width, consistent with the input-identity binding requirement in [AGENTS.md:74](AGENTS.md#L74)."
+    },
+    {
+      "log": ".run-control/533-core-review2.log",
+      "sha256": "ff4d0b84465532c63f0405f8dc5b0ada0fa4df1b643a5826dba19dfa7eb94468",
+      "command": [
+        "codex",
+        "review",
+        "Re-review ONLY parlay_budget_allocation.R and test-parlay-budget-allocation.R for three prior findings fixed since first review: reconcile budget state with actual prior spent/remaining cap, reject probability objective with non-probability-ranked tickets, bind supplied group_legs to frontier snapshot group_legs. Core tests170 assertions passed in .run-control/533-pi-core-tests.log (one transient namespace warning during independent DSH integration). Integration value.R is being edited by DSH; do not review/run that evolving path or modify files. Inspect fixes and regressions, report remaining actionable core defects only."
+      ],
+      "conclusion": "Within the requested two-file scope, all three prior findings are addressed with regression tests; no remaining actionable defects were identified. Reviewed the supplied test log without rerunning tests or inspecting the evolving value.R integration; no files were modified.\nWithin the requested two-file scope, all three prior findings are addressed with regression tests; no remaining actionable defects were identified. Reviewed the supplied test log without rerunning tests or inspecting the evolving value.R integration; no files were modified."
+    },
+    {
+      "log": ".run-control/533-final-review.log",
+      "sha256": "1089b4eb5052be4c0b549a71fedbd57e584afdfe5c4ef6241bd4413234658027",
+      "command": [
+        "codex",
+        "review",
+        "Review only issue #533 budget-derived Block8 integration: packages/beidan/R/parlay_budget_allocation.R, parlay_plan_summary.R, changed n7_pipeline_value.R and central exports; corresponding test-parlay-budget-allocation, test-parlay-plan-summary, test-parlay-block8-build-plan, test-parlay-storage, test-n7-match-status*, test-n7-pipeline-value, test-parlay-variable-legs; tests/testthat/test-26098-walkthrough.R; original quarto/26098_walkthrough.qmd and changed preset usages in n7_pipeline_contracts.qmd/n7_match_status.qmd; docs/strategy/block8-budget-allocation-contract.md. Ignore unrelated workspace changes and preexisting #532 probability/capture fixes. No editing, CI, network scraping, or whole-package tests. Tests value/variable-legs are currently being adapted by another agent; review implementation and contract first and read final tests later. Core172 assertions and original QMD blocks15 assertions passed .run-control/533-root-tests.log. Prior core review3 findings fixed and verified: detached budgets, misranked probability, substituted group legs. Review financial correctness, chronological prior purchases, no duplicate physical tickets, one structure per group, reuse/overlap, truthful unconditional coverage summary, typed-empty and save/settle/diagnose compatibility. Probability is expected winning ticket count, not union or profit optimization. Candidate sampling is intentionally bounded greedy baseline. All source tests use R_LIBS=$PWD/r_lib TMPDIR=$PWD/.run-control/tmp and devtools::load_all source, not installed old version. Report only actionable findings with exact file/line and reproduction. Never terminate other processes."
+      ],
+      "conclusion": "No actionable defects found within the requested #533 scope. All eight scoped package test files and the walkthrough’s 15 assertions passed using the source-loaded package; no whole-package tests, CI, or scraping were run.\nNo actionable defects found within the requested #533 scope. All eight scoped package test files and the walkthrough’s 15 assertions passed using the source-loaded package; no whole-package tests, CI, or scraping were run."
+    },
+    {
+      "log": ".run-control/533-supplement-review.log",
+      "sha256": "ec20dff125b94e79ccbe0db74a83da73668356749a083f77c62b66eac299352f",
+      "command": [
+        "codex",
+        "review",
+        "Supplementary final review for #533 ONLY changes made after the clean full integration review in .run-control/533-final-review.log: packages/beidan/R/parlay_plan_summary.R now filters ticket_legs/group_legs to actual purchases before formatting (same outputs, performance fix); original quarto/26098_walkthrough.qmd Block8 explicitly print(kable) with results: asis; scripts/acceptance/parlay_api.R and tests/testthat/test-parlay-interface-regressions.R now use new explicit configuration instead of removed presets/fixed group count. Verify these changes preserve substantive budget/chronology/settlement checks rather than weaken them, inspect docs/reviews/533-block8.md for accurate limitations. Source tests final summary23, interface17, publicflow106, QMDblocks15 passed; full earlier review ran all8 package files clean. Clean real snapshot QMD render has11 tables,192 unique rendered ticket outcomes,2groups384CNY, no execution errors (533-render-final.log, 533-render-tables.json). Read-only code review: no editing, no rerunning tests, no CI, no network, no other scope; do not wait for or terminate other processes. Report actionable defects only, or clear no-findings conclusion."
+      ],
+      "conclusion": "No actionable defects found in the scoped supplementary changes. Purchase-only formatting preserves summary semantics, explicit table printing fixes rendering, and configuration updates retain substantive budget, chronology, settlement, and replay assertions. Documented limitations match the inspected evidence; no tests, network access, CI, or process controls were run.\nNo actionable defects found in the scoped supplementary changes. Purchase-only formatting preserves summary semantics, explicit table printing fixes rendering, and configuration updates retain substantive budget, chronology, settlement, and replay assertions. Documented limitations match the inspected evidence; no tests, network access, CI, or process controls were run."
+    }
+  ],
+  "checks": {
+    "assertions": 913,
+    "failures": 0,
+    "warnings": 0,
+    "whole_repository_tests": "not run",
+    "CI": "not participating",
+    "actual_purchase": false
+  },
+  "render_output": {
+    ".run-control/533-validation.html": "b1e15c26e4627bdb0187bc106b5183bf1cef2307fa24c992bf9c70a6789306a3"
+  },
+  "render_verified": {
+    "tables": 11,
+    "errors": 0,
+    "unique_ticket_rows": 192,
+    "group_rows": 2,
+    "cost_cny": 384
+  }
+}

@@ -14,7 +14,7 @@ match_inputs_from_capture(schedule, markets)
 \value{
 Validated match input list for \code{\link[=prepare_match_inputs]{prepare_match_inputs()}}. Its existing
 internal contract uses UTC instants; display with lubridate::with_tz when needed.
-prematch_sp is typed empty because European prices are not beidan SP.
+prematch_sp comes from the same capture's independently fetched Beijing SP.
 }
 \description{
 Native IDs bind the capture. Name/kickoff changes warn rather than reject;

@@ -1,0 +1,254 @@
+---
+title: "273 8 期复盘：可下单时间口径下的期望收益审计"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+---
+
+```{r setup}
+library(dplyr); library(tidyr); library(tibble)
+# Quarto executes in the QMD's own directory, so locate the repo root by walking up.
+find_root <- function(start = '.') {
+  p <- normalizePath(start, mustWork = TRUE)
+  for (i in 1:6) {
+    if (file.exists(file.path(p, 'r', 'joint_basket_layers.R'))) return(p)
+    p <- dirname(p)
+  }
+  stop('repo root not found from ', start)
+}
+root <- find_root()
+source(file.path(root, 'r', 'joint_basket_layers.R'))
+
+cfg <- list(n = 7L, unit_cny = 2, payout_factor = 0.65,
+            issue_units = 512L, n_bundles = 4L, n_high = 3L, hi_depth = 2L, key = 'ev')
+
+src <- file.path(root, '.tmpwork', '_multi_flat.rds')
+eu  <- file.path(root, '.tmpwork', '_q_fixed.rds')
+stopifnot(file.exists(src), file.exists(eu))
+d <- readRDS(src) |> as_tibble() |> mutate(cert = pmax(qW, qD, qL))
+```
+
+## 结论摘要
+
+用**现有可得的盘口数据**把结果推出来，结论与"方案 B 赚 +330%"相反：
+
+1. **已实现 ROI 是 +330.6%**（8 期、8192 元投入、35275 元毛回报），但 **t 检验 p = 0.101**，
+   95% 置信区间 **[−84.0%, +745.3%]**，**不显著**。4/8 期 −100%，26087 一期就占毛回报的 35%。
+2. **模型自评的期望 ROI 只有 −2.1%**（同一批 8 期、同一配置）。`ev = q·SP·0.65` 本身就是
+   每单位的期望毛回报，把已出资组合的 `ev` 加权求和即得期望收益，**不需要等结果**。
+   若不挑选、平均买全部 648 个组合，期望 ROI 是 **−25.9%**。
+3. **模型的"高期望"并不预示实际获胜**：逐期 `exp_roi` 与 `real_roi` 的相关为
+   **−0.294（p = 0.48）**，Spearman −0.381（p = 0.35）。真正赚钱的 26091 期望最低（−19.6%），
+   期望最高的 26089 反而不是最赚的。
+4. **本项目已冻结的 784 期样本外审计给出 ROI ≈ −1.23%**（见交付 272），与本文的 −2.1% 同向。
+   两者的共同缺陷也一样：254 交付已写明其池是
+   `EXPOSED_FIXTURE_RELATIVE_REVIEW_NOT_SIMULTANEOUS_TICKET`——**不是一张可同时下单的 7 串 1**。
+5. **时间口径仍然是错的。** 本表 SP 是每场各自**开赛前约 2 分钟**的收盘价（中位 +2.0 分），
+   而真实下单是每期一个统一下单时点。除最早一场外，其余各场均构成 look-ahead。
+
+**主判断：在现有数据上，7 串 1 的结构性期望收益是**轻微为负**（≈ −1% ~ −2%），
+"+330%" 是 8 期重尾抽样的一次幸运抽取，不是 edge 的证据，也不应作为策略预期收益使用。**
+
+## 输入与契约
+
+| 项 | 值 |
+| --- | --- |
+| 固定 N | 7 |
+| 单位注额 `unit_cny` | 2 元 |
+| 派奖系数 `payout_factor` | 0.65（最后一次性施加） |
+| 每期注数 `issue_units` | 512（= 1024 元） |
+| 篮子数 `n_bundles` | 4 |
+| 主配置 | `n_high = 3, hi_depth = 2, key = 'ev'` |
+
+输入是工作产物 `.tmpwork/_multi_flat.rds`（1708 场 / 8 期，北单 SP 去水 + DC 拟合）
+与 `.tmpwork/_q_fixed.rds`（1654 场欧赔可比子集，含让球基底的欧赔 DC 概率）。
+**两者的 SP 均为收盘价**：逐期 `kickoff − sp_ts` 中位数 +2.0 分钟，26089 为 −20.0 分钟（滚球）。
+
+```{r}
+bundle_row <- function(one, n_high, hi_depth, n_bundles, key, issue_units, b) {
+  bb <- jt_pick_fixtures(one, n_high, b - 1L); if (is.null(bb)) return(NULL)
+  sh <- jt_leg_shape(bb, hi_depth, 3L)
+  fd <- jt_fund(bb, sh, issue_units %/% n_bundles, key)   # 已出资集合
+  al <- jt_fund(bb, sh, 1000000L, key)                    # 整个截断空间
+  fu <- fd$funded
+  stake <- sum(fu$units) * cfg$unit_cny
+  tibble(issue = one$issue[1], bundle = b, n_space = al$n_space, n_funded = nrow(fu),
+         stake_cny = stake, gross_cny = fd$gross_cny,
+         exp_gross_cny = cfg$unit_cny * sum(fu$units * fu$ev),
+         space_mean_ev = mean(al$funded$ev), space_max_ev = max(al$funded$ev),
+         pct_ev_gt1 = 100 * mean(al$funded$ev > 1))
+}
+run_cfg <- function(n_high, n_bundles = 4L, key = 'ev', issue_units = 512L) {
+  bind_rows(lapply(sort(unique(d$issue)), function(i)
+    bind_rows(lapply(seq_len(n_bundles), function(b)
+      bundle_row(d |> filter(issue == i), n_high, 2L, n_bundles, key, issue_units, b)))))
+}
+main <- run_cfg(cfg$n_high)
+```
+
+## 一、主结果：已实现 vs 模型自评期望
+
+```{r}
+tibble(
+  口径 = c('已实现 (结果发生后)', '模型自评期望 (结果发生前)', '全空间平均 (不挑选)'),
+  投入元 = c(sum(main$stake_cny), sum(main$stake_cny), sum(main$stake_cny)),
+  毛回报元 = c(sum(main$gross_cny), sum(main$exp_gross_cny), sum(main$stake_cny) * mean(main$space_mean_ev)),
+  ROI = c(sum(main$gross_cny), sum(main$exp_gross_cny),
+          sum(main$stake_cny) * mean(main$space_mean_ev)) / sum(main$stake_cny) - 1
+) |> mutate(毛回报元 = round(毛回报元), ROI = sprintf('%+.1f%%', 100 * ROI))
+```
+
+```{r}
+per <- main |> group_by(issue) |>
+  summarise(stake = sum(stake_cny), gross = sum(gross_cny), exp_gross = sum(exp_gross_cny),
+            max_ev = max(space_max_ev), .groups = 'drop') |>
+  mutate(real_roi = 100 * (gross - stake) / stake, exp_roi = 100 * (exp_gross - stake) / stake,
+         exp_gross = round(exp_gross)) |>
+  select(issue, stake, gross, real_roi, exp_gross, exp_roi, max_ev)
+per |> mutate(across(c(real_roi, exp_roi), ~ sprintf('%+.1f%%', .x))) |>
+  rename(期号 = issue, 投入 = stake, 毛回报 = gross, 已实现ROI = real_roi,
+         期望毛回报 = exp_gross, 期望ROI = exp_roi, 全空间最大ev = max_ev)
+```
+
+## 二、期望 ROI 随 `n_high` 变化
+
+已实现的最优 `n_high` 是 3，但**期望收益随 `n_high` 单调下降**——
+即"已实现最优"与"模型自评最优"不一致，这本身是拟合噪声的迹象。
+
+```{r}
+gr <- bind_rows(lapply(c(2L, 3L, 4L, 5L, 6L, 7L), function(nh) {
+  r <- run_cfg(nh)
+  tibble(n_high = nh, stake = sum(r$stake_cny), real_roi = 100 * (sum(r$gross_cny) - sum(r$stake_cny)) / sum(r$stake_cny),
+         exp_roi = 100 * (sum(r$exp_gross_cny) - sum(r$stake_cny)) / sum(r$stake_cny),
+         space_mean_roi = 100 * (mean(r$space_mean_ev) - 1), max_ev = max(r$space_max_ev),
+         pct_ev_gt1 = mean(r$pct_ev_gt1))
+}))
+gr |> mutate(across(c(real_roi, exp_roi, space_mean_roi, pct_ev_gt1), ~ round(.x, 2))) |>
+  rename(已实现ROI = real_roi, 期望ROI = exp_roi, 全空间平均ROI = space_mean_roi,
+         全空间最大ev = max_ev, ev大于1占比 = pct_ev_gt1)
+```
+
+## 三、预算网格
+
+```{r}
+bg <- bind_rows(lapply(c(128L, 256L, 512L, 1024L, 2048L, 4096L), function(u) {
+  r <- run_cfg(cfg$n_high, issue_units = u)
+  tibble(每期注数 = u, 每期金额 = u * cfg$unit_cny, 每注组合数 = u %/% cfg$n_bundles,
+         投入 = sum(r$stake_cny), 已实现ROI = 100 * (sum(r$gross_cny) - sum(r$stake_cny)) / sum(r$stake_cny),
+         期望ROI = 100 * (sum(r$exp_gross_cny) - sum(r$stake_cny)) / sum(r$stake_cny))
+}))
+bg |> mutate(across(c(已实现ROI, 期望ROI), ~ round(.x, 2)))
+```
+
+## 四、概率来源：北单 vs 欧赔（可比池）
+
+四个臂的收益一律用北单 SP。选场与排序是两个独立旋钮，必须分别切换，
+否则 `cert` 会跟着 `q` 一起变，得到被混淆的结论。
+
+```{r}
+e <- readRDS(eu) |> as_tibble()
+e$cert_bd <- pmax(e$qW, e$qD, e$qL); e$cert_eu <- pmax(e$qhW, e$qhD, e$qhL)
+arm <- function(sel, rk) {
+  st <- 0; gr <- 0; hit <- 0L
+  for (i in sort(unique(e$issue))) {
+    one <- e |> filter(issue == i); one$cert <- if (sel == 'bd') one$cert_bd else one$cert_eu
+    if (nrow(one) < 28L) next
+    for (b in 1:4) {
+      bb <- jt_pick_fixtures(one, cfg$n_high, b - 1L); if (is.null(bb)) next
+      if (rk == 'eu') { bb$qW <- bb$qhW; bb$qD <- bb$qhD; bb$qL <- bb$qhL }
+      f <- jt_fund(bb, jt_leg_shape(bb, cfg$hi_depth, 3L), 128L, cfg$key)
+      st <- st + f$stake_cny; gr <- gr + f$gross_cny; hit <- hit + as.integer(f$gross_cny > 0)
+    }
+  }
+  tibble(选场来源 = sel, 排序来源 = rk, 投入 = st, 毛回报 = round(gr),
+         ROI = sprintf('%+.1f%%', 100 * (gr - st) / st), 中奖注数 = hit)
+}
+bind_rows(lapply(c('bd','eu'), function(s) bind_rows(lapply(c('bd','eu'), function(k) arm(s, k)))))
+```
+
+## 五、为什么 "+330%" 不足为凭
+
+```{r}
+x <- per$real_roi
+se <- sd(x) / sqrt(length(x))
+ci <- mean(x) + c(-1, 1) * qt(0.975, length(x) - 1) * se
+set.seed(1); bs <- replicate(20000, mean(sample(x, replace = TRUE)))
+tibble(
+  指标 = c('逐期 ROI', '均值', '标准差', 't 统计量', 'p 值 (双尾, df=7)',
+           '95% CI (t)', '95% CI (bootstrap)', 'P(ROI < 0) bootstrap',
+           '模型期望与实际的相关', 'Spearman rho'),
+  值 = c(paste(sprintf('%+.1f%%', x), collapse = ' '), sprintf('%+.1f%%', mean(x)),
+         sprintf('%.1f', sd(x)), sprintf('%.3f', mean(x) / se), sprintf('%.3f', 2 * pt(-abs(mean(x) / se), 7)),
+         sprintf('[%+.1f%%, %+.1f%%]', ci[1], ci[2]),
+         sprintf('[%+.1f%%, %+.1f%%]', quantile(bs, .025), quantile(bs, .975)),
+         sprintf('%.1f%%', 100 * mean(bs < 0)),
+         sprintf('%+.3f (p=%.2f)', cor(x, per$exp_roi), cor.test(x, per$exp_roi)$p.value),
+         sprintf('%+.3f (p=%.2f)', suppressWarnings(cor(x, per$exp_roi, method='spearman')),
+                 suppressWarnings(cor.test(x, per$exp_roi, method='spearman')$p.value))))
+```
+
+0.65 是一次性的 35% 税收。要让 `ev > 1`，模型必须比市场隐含概率准
+`1 / 0.65 = 1.54` 倍。实测 DC 残差仅 0.0335，模型与市场的典型分歧远小于 54%，
+因此那 9.08% 的 `ev > 1` 组合更可能是**模型过度自信**，而不是真实错价。
+换言之 **−2.1% 已经是偏乐观的上界**。
+
+## 六、留一期法
+
+```{r}
+g <- per$gross; s <- per$stake
+tibble(去掉 = per$issue, 剩余ROI = sprintf('%+.1f%%',
+       100 * (sum(g) - g - (sum(s) - s)) / (sum(s) - s))) |>
+  bind_rows(tibble(去掉 = '26087 + 26095',
+                   剩余ROI = sprintf('%+.1f%%', 100 * (sum(g) - g[1] - g[8] - (sum(s) - s[1] - s[8])) / (sum(s) - s[1] - s[8]))))
+```
+
+结果对"去掉任何单期"都稳健，但**这不构成 edge 的证据**：
+它只说明 8 期样本里不止一次幸运命中，而模型自评的期望仍然是负的。
+
+## 七、与 784 期冻结审计的关系
+
+交付 272 的冻结样本外审计（`joint-basket-oos-v1`，784 期）报告 ROI ≈ **−1.23%**，
+本文 8 期的**模型自评期望**是 −2.1%，两者同向且量级接近。
+两个口径共享同一个缺陷：254 交付已明确标注其池为
+`EXPOSED_FIXTURE_RELATIVE_REVIEW_NOT_SIMULTANEOUS_TICKET`，
+即"按各场自己的决策时刻算出的复盘池，**不是一张可同时下单的 7 串 1**"。
+
+## 八、局限与治理状态
+
+| 项 | 状态 |
+| --- | --- |
+| 时间口径 | **不满足**。SP 为收盘价（中位开赛前 2.0 分），非统一下单时点 → look-ahead |
+| 参数选择 | `n_high = 3` 是在同一 8 期上选出 → 样本内过拟合，本文不据此授权任何参数 |
+| 样本量 | 8 期 / 32 注；重尾，均值不显著 |
+| cutoff receipt | **未提供**。本交付是**诊断性审计**，不是 decision-facing 学习，故不产出可用参数 |
+| 输入 | 依赖工作产物 `.tmpwork/_multi_flat.rds`（未纳入冻结契约）→ 复现性缺口 |
+| 函数测试 | 新增 `tests/testthat/test-joint-basket-layers.R`：**43 项断言全通过**，含单组合截断回归用例 |
+| 既有测试缺口 | 全套件另有 **5 项既有失败，与本次改动无关**：4 个测试 `source('../../r/probability_exploration.R')`（该文件已不存在）；`test-analysis-interfaces.R` 连不上 Titan 数据库 |
+| codex review | 未运行 |
+
+## 附录：`jt_fund` 单组合缺陷修复
+
+当截断空间只剩 1 行（如 `n_high = 7, hi_depth = 1`）时，
+`vapply(..., numeric(nrow(cube)))` 会退化成裸向量，
+随后 `apply(q, 1, prod)` 报 `dim(X)的值必需是正数`。
+已在 `r/joint_basket_layers.R` 中显式 `matrix(..., nrow = n_cube)` 修正。
+
+```{r}
+one <- d |> filter(issue == sort(unique(d$issue))[1])
+bb <- jt_pick_fixtures(one, 7L, 0L)
+f7 <- jt_fund(bb, jt_leg_shape(bb, 1L, 1L), 8L, 'ev')
+tibble(场景 = 'n_high=7, hi_depth=1', 截断空间 = f7$n_space, 已出资 = nrow(f7$funded),
+       投入元 = f7$stake_cny)
+```
+
+## 复现
+
+```bash
+export TMPDIR=$PWD/.tmpwork R_LIBS_USER=$PWD/r_lib
+quarto render quarto/273_uniform_cut_expected_return.qmd
+```

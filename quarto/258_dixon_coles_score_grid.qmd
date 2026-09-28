@@ -1,0 +1,294 @@
+---
+title: "Dixon-Coles 修正：修复比分映射的平局压缩"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 结论摘要
+
+比分映射把欧赔翻译到北单让球空间时用**独立泊松**建网格。独立泊松假设主客进球独立，
+而真实足球有低比分聚集（0-0、1-1 出现得比独立假设更多），所以它的 `P(net=0)`
+**系统性低估平局**。实测（744 期、38,079 场、0 让球）：`q_D` 均值 0.2640，实际平局率 0.2888，
+**偏差 −2.49pp**；`q_D > 0.33` 的场次只有 **1 场**，平局在 68,826 场中**一次都没有成为 argmax**。
+
+本轮用 **Dixon-Coles 低比分相关修正**替换独立假设：对 `(0,0)`、`(0,1)`、`(1,0)`、`(1,1)`
+四个单元施加单一依赖参数 `rho` 的 tau 修正。`rho` 通过 `src/temporal_learning` 的 cutoff 契约
+逐期 walk-forward 选择并冻结。
+
+1. **压缩被修正**：全量偏差 **−2.49pp → +0.47pp（缩小 5.3 倍）**，逐年一致。
+2. **校准变得干净**：按 `q_D` 十分位看，偏差从单调恶化变为 **−2.41..+1.04pp** 的噪声带。
+3. **`q_D` 上限打开**：0.3395 → 0.3707；`q_D > 0.33` 的场次 **1 → 729**。
+4. **平局变得可达但依然罕见**：平局 argmax **0 → 49 场（0.129%）**。
+5. **这 49 场没有超额**：实际平局率 **26.53%**，低于基线 28.88%（−2.35pp）。
+
+**主判断：DC 修正解决了 `q_D` 的**校准**问题，让三路概率整体变准；但平局作为单一赛果
+选择仍不可行——这不是模型缺陷，而是任务结构使然（见 §五）。**
+
+```{r}
+library(dplyr); library(tidyr); library(readr); library(tibble); library(ggplot2)
+root <- normalizePath(".", mustWork = TRUE)
+out <- file.path(root, ".tmpwork")
+lam_csv <- file.path(out, "lam_with_dc.csv")
+rho_csv <- file.path(out, "rho_final.csv")
+stopifnot(file.exists(lam_csv), file.exists(rho_csv))
+cfg <- list(
+  unit_cny = 2, payout_factor = 0.65,
+  source = "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/handicap-line-gap-v1/fixtures.csv",
+  r_module = "r/dixon_coles_grid.R",
+  py_module = "src/dixon_coles_rho.py",
+  contract = "src/temporal_learning/core.py",
+  rho_selected = -0.12
+)
+```
+
+## 输入与契约
+
+输入是 `handicap-line-gap-v1` 的逐场记录加上从 `projected.json` / 243 的
+`inputs.json.gz` 净胜球分布反推的 `(lambda_home, lambda_away)`。本文件不重建比分矩阵。
+
+```{r}
+f <- read_csv(cfg$source, show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id))
+lam <- read_csv(lam_csv, show_col_types = FALSE) |>
+  mutate(issue = as.character(issue), provider_id = as.character(provider_id))
+rho_tbl <- read_csv(rho_csv, show_col_types = FALSE) |>
+  mutate(issue_code = as.character(issue_code))
+tibble(
+  指标 = c("源场次", "源期数", "反推 lambda 场次", "覆盖期数", "rho 覆盖期数",
+           "窗口内选择期数", "回填期数"),
+  值 = c(nrow(f), n_distinct(f$issue), nrow(lam), n_distinct(lam$issue),
+         sum(!is.na(rho_tbl$rho)), sum(!rho_tbl$rho_backfilled), sum(rho_tbl$rho_backfilled))
+) |> knitr::kable()
+```
+
+## 一、根因：独立泊松压缩平局
+
+`q_D` 与独立泊松投影**完全一致**（差 1.28e-11），说明压缩发生在泊松这一步，而不是欧赔输入。
+独立泊松只有 `(lambda_home, lambda_away)` 两个参数，恰好匹配 0 让球的两个独立方程——
+`_fit_poisson_rates` 在 1,376/1,376 场全部成功，所以**不是可辨识性问题**。
+
+压缩量随盘口变化（同一批 1,472 场）：
+
+```{r}
+gap_tbl <- tibble(
+  盘口 = c(0, -1, -2, 1, 2),
+  场次 = c(721, 501, 111, 105, 26),
+  欧赔平赔 = c(0.2847, 0.2522, 0.1753, 0.2511, 0.1716),
+  独立泊松 = c(0.2594, 0.2411, 0.2108, 0.2398, 0.2113)
+) |>
+  mutate(偏差pp = round(100 * (独立泊松 - 欧赔平赔), 2))
+knitr::kable(gap_tbl, caption = "独立泊松相对欧赔去水的平局偏差（1,472 场）")
+```
+
+0 让球 **−2.53pp**、−1 让球 −1.11pp，但 −2/+2 让球反而是 **+3.55/+3.96pp**。
+**符号会翻转**，说明不是单调压缩而是分布形状错配——单一偏移量修正不够，必须改模型形状。
+
+## 二、rho 的 cutoff 驱动选择
+
+`rho` 决定网格携带多少平局质量，若用将被打分的期来选就会把答案泄进问题。
+因此它只在先验窗口内选择、冻结，并附机器可读 receipt。全部时序机制来自
+`src/temporal_learning`，本模块只提供领域回调。
+
+```{r}
+yr <- rho_tbl |>
+  mutate(year = 2000 + as.integer(substr(issue_code, 1, 2))) |>
+  group_by(year) |>
+  summarise(期数 = n(), rho = first(rho), 回填 = sum(rho_backfilled), .groups = "drop")
+knitr::kable(yr, caption = "逐期冻结的 rho（窗口内选择 + 显式回填）")
+```
+
+**窗口内选择的 316 期中，rho 只取两个值：−0.12（2013–2014）与 −0.08（2015）**，
+标准差 0.0059。这与独立拟合的 −0.16 及 Dixon & Coles (1997) 的 **−0.13** 一致——
+不是过拟合出来的数字。
+
+**关于回填（本轮的一个受约束决策）**：`COMPLETE_PRIOR_YEARS` 契约要求
+`tune_years`/`calibration_years` 均为 ≥1 的整数年，所以最少需要 **3 个完整先验年**，
+2010–2012 期无法在窗口内选择。PI 决定"先用上再说"，因此对 428 期实施**显式回填**：
+携带**最早**的窗口内选择（−0.12），并写入 `rho_backfilled` 与 `backfill_provenance` 两列，
+使回填值绝不可能被呈现为窗口内选择。取最早值而非最新值，是为了让前视距离最小。
+
+## 三、全量效果
+
+```{r}
+z <- f |> filter(handicap == 0) |>
+  inner_join(lam |> select(issue, slot, provider_id, q_D_independent, q_D_dc, rho),
+             by = c("issue", "slot", "provider_id")) |>
+  mutate(is_draw = actual_direction == "D")
+
+overall <- tibble(
+  口径 = c("独立泊松", "DC 修正", "实际平局率"),
+  平局概率均值 = c(mean(z$q_D_independent), mean(z$q_D_dc), mean(z$is_draw))
+) |>
+  mutate(偏差pp = round(100 * (平局概率均值 - mean(z$is_draw)), 2))
+knitr::kable(overall, caption = "全量 744 期 / 38,079 场（handicap = 0）")
+```
+
+**偏差 −2.49pp → +0.47pp。** 逐年提升一致：
+
+```{r}
+zy <- z |>
+  mutate(year = 2000 + as.integer(substr(issue, 1, 2))) |>
+  group_by(year) |>
+  summarise(场次 = n(), 独立泊松 = mean(q_D_independent), DC = mean(q_D_dc),
+            .groups = "drop") |>
+  mutate(提升pp = round(100 * (DC - 独立泊松), 2))
+knitr::kable(zy, caption = "逐年平局概率提升")
+```
+
+## 四、校准质量：十分位
+
+```{r}
+dec <- z |>
+  mutate(bin = ntile(q_D_dc, 10)) |>
+  group_by(bin) |>
+  summarise(n = n(), q_D = mean(q_D_dc), 实际 = mean(is_draw), .groups = "drop") |>
+  mutate(偏差pp = round(100 * (实际 - q_D), 2))
+knitr::kable(dec, caption = "DC 修正后按 q_D 十分位的校准")
+```
+
+DC 修正后偏差落在 **−2.41..+1.04pp** 区间，且不再单调恶化——最高分位（0.3246）与实际
+（0.3220）几乎重合。对照 256 的全局 isotonic 校准，DC 是在**模型层**修好了形状，
+而不是在概率上打补丁。
+
+## 五、平局可达性：可达但结构性罕见
+
+```{r}
+for (nm in c("独立泊松", "DC 修正")) {
+  col <- if (nm == "独立泊松") "q_D_independent" else "q_D_dc"
+  z[[paste0("am_", col)]] <- z[[col]] > pmax(z$q_W, z$q_L)
+}
+reach <- tibble(
+  模型 = c("独立泊松", "DC 修正"),
+  平局argmax场次 = c(sum(z$am_q_D_independent), sum(z$am_q_D_dc)),
+  占比 = round(100 * c(mean(z$am_q_D_independent), mean(z$am_q_D_dc)), 3),
+  该子集实际平局率 = c(NA_real_, round(mean(z$is_draw[z$am_q_D_dc]), 4))
+)
+knitr::kable(reach, caption = "平局成为 argmax 的场次（基线平局率 0.2888）")
+```
+
+**可达性从 0 变成 49 场，但这 49 场的实际平局率 26.53% 低于基线。**
+
+这不是校准不足，而是**任务结构**决定的。平局要胜出必须 `q_D > max(q_W, q_L)`，
+在均匀对阵下：
+
+```{r}
+sweep <- tibble(
+  lambda = c(0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 2.0),
+  W = c(0.2771, 0.3078, 0.3295, 0.3460, 0.3593, 0.3703, 0.3877),
+  D = c(0.4458, 0.3843, 0.3410, 0.3080, 0.2814, 0.2593, 0.2246),
+  L = c(0.2771, 0.3078, 0.3295, 0.3460, 0.3593, 0.3703, 0.3877)
+) |>
+  mutate(argmax = if_else(D > pmax(W, L), "D", "W/L"))
+knitr::kable(sweep, caption = "均匀对阵（lambda_home = lambda_away）下的 argmax")
+```
+
+**平局只在两队实力接近且总进球期望低（λ≈0.6–1.0）时胜出**——这正是足球的真实结构：
+低进球比赛里 0-0/1-1 确实是最高概率结果。样本中满足
+`|λh−λa|<0.15 且 λh+λa<2.0` 的只有 **73 场（0.19%）**。
+
+**所以"平局很少成为单一最高概率结果"是事实，不是缺陷。**
+欧赔原生在 150 期窗口上做到 0.65%，DC 在全量 744 期上做到 0.129%，两者反映同一结构。
+
+## 六、对 7 串 1 篮子的含义
+
+平局作为**单一赛果选择**不可行：覆盖率 <0.2%，且子集命中率不高于基线。
+DC 修正的价值在别处：
+
+1. **三路概率整体变准**——所有使用 `q` 的下游（含不败、非平局等组合）都受益于
+   消除 2.5pp 的系统性低估；
+2. **联合概率不再被压缩污染**——此前 `q_D` 偏低会同时扭曲 `P(≥1)` 与排序；
+3. **但没有打开"选平局"这条盈利路径**——256 的结论依然成立。
+
+## 七、篮子层重算（694 期 / 4,196 篮子）
+
+在 `joint-basket-oos-v1` 上把 DC 修正推进到**篮子层**。lambda 从 243 的
+`inputs.json.gz` 全量反推；注意该文件 68,826 行是 **68,826 个唯一 fixture**
+（每行有各自的 `handicap`，但同一场的 net-goal 分布与 handicap 无关），
+因此从**任意** handicap 行都能反推同一个 lambda。
+
+```{r}
+basket_tbl <- tibble(
+  口径 = c("腿的选中赛果均值", "平局腿 (n=7,624)", "W 腿 (n=10,585)", "L 腿 (n=11,163)",
+           "单腿积（联合）", "期望 ROI"),
+  独立泊松 = c(0.3686, 0.2470, 0.3975, 0.4243, 0.000978, -0.9613),
+  DC修正 = c(0.3689, 0.2566, 0.3914, 0.4241, 0.000984, -0.9610),
+  变化 = c("+0.06%", "+0.96pp", "-0.61pp", "-0.02pp", "+0.56%", "+0.03pp")
+)
+knitr::kable(basket_tbl, caption = "篮子层 DC 修正效果（694 期，全腿可修）")
+```
+
+**DC 把平局腿抬高 +0.96pp，但篮子整体几乎不变**：平局腿只占 23%，
+且 W 腿被轻微压低（−0.61pp）——两者近似抵消。实际（事后）ROI 为 **−4.53%**
+（312/4,196 命中），与 255 的全量 −1.23% 方向一致（此处少了收益较高的早期 90 期）。
+
+**一个必须声明的口径限制**：`baskets.mass` 是篮子**覆盖的 3^7 元组集合**的联合概率和
+（均值 0.0709），而 `legs.csv` 只保存**被选中的那一个元组**（概率均值 0.00098）。
+两者比值 **72 倍**、相关仅 **0.34**，所以 `mass` **无法**从 legs 忠实重建。
+本表报告的是同口径的前后对比，不是重算的 `mass`。
+
+## 验收证据
+
+| 检查 | 命令 | 结果 |
+|---|---|---|
+| Python 模块测试 | `./.venv/bin/python -m pytest tests/dixon_coles_rho/` | **34 passed** |
+| 闭式 vs 网格一致性 | `_draw_probability` vs R `dixon_coles_score_grid` | 1.4/1.1: 0.2663448543（一致） |
+| rho=0 退化 | `test_dixon_coles_grid.R` | 与 `illustrative_score_grid` 差 **4.9e-12** |
+| 目标期因果性 | `test_selection_is_causal_in_the_target_issue` | 翻转最新期标签不改其 rho |
+| **cutoff 起全部标签突变不变性** | `test_selection_is_invariant_to_all_labels_at_or_after_the_cutoff_issue` | 突变 cutoff 期及之后**全部**标签，rho 不变；突变先验窗口则 fit 改变（证明不变性来自排除，而非惰性） |
+| 真实数据因果性验证 | 320 期历史，翻转目标期/未来全部标签 | rho 恒为 −0.14，**不变** |
+| R 网格测试 | `Rscript -e 'test_file("tests/testthat/test-dixon-coles-grid.R")'` | **32 断言全绿** |
+| 受影响 R 测试 | fundamentals-total-market (28) / market-comparison (24) / n7-market-projection (34) | **全绿** |
+| 必填 rho | `expect_error(market_score_projection(c(1.8,0.9),-1L,1e-10))` | 缺失即报错 |
+| 全量偏差 | 38,079 场 | −2.49pp → **+0.47pp** |
+| **端到端投影（真 R 链）** | `run_n7_market_projection.R`，rho=0 与 rho=−0.12 各跑一次 | 两次均 exit 0，23,585 场 / 294 期 |
+| 端到端 `q_D`（0 让球） | 同一批 12,607 场 | 0.2631 → **0.2925（+2.93pp）** |
+| 端到端平局 argmax | 同上 | **0 → 15 场** |
+| method 记录 | `out.json` 的 `parameters.method` | `..._1X2_DIXON_COLES`，`rho=−0.12` |
+| `q_D` 提升覆盖面 | 23,585 场 | **14,931 场（63.31%）**提升，5,430 场 >3pp |
+
+**合规缺口（必须记录）**：
+- `codex review` **未执行**（额度耗尽）。按 AGENTS.md「Skipped or failed required checks do not
+  pass」，本交付**未经 PI 验收**。
+- 428 期使用**回填 rho**，其选择来自目标期之后的数据。已用 `rho_backfilled` 与
+  `backfill_provenance` 显式标记，但这是 PI 明确批准的权宜决策，而非满足 cutoff 契约。
+
+## 边界与限制
+
+- **回填不是窗口内选择**：`2010–2012` 的 428 期 rho 取自 2013 起的窗口内估计。
+  PI 已决定"先用上再说"，理由是 rho 为单一稳定常数（跨度仅 −0.12..−0.08），
+  且后续会单独采集基本面历史以做更准的估计。
+- **`(b)` 在契约内不可行**：`PartitionPolicy` 要求 tune/calibration 为 ≥1 整数年，
+  故 `COMPLETE_PRIOR_YEARS` 最少需 3 个完整先验年，无法放宽到 2011 起可用。
+- `lambda` 由 243 的净胜球分布反推，不是原始比分矩阵；反推误差中位 6.15e-12。
+- **784 期端到端重跑的实际可达上限是 694 期**。硬约束不在 OU，而在**市场数据的
+  历史起点**：`joint-basket-oos-v1` 的 784 期中，**90 期（`100708..101120`）没有任何
+  欧赔/大小球来源**，占 9.9% 的 legs 与 463 个篮子。已穷尽搜索全部 15 个
+  `markets/releases/*`（含 `market-cleaning-*` 全系列与
+  `market-cleaning-priority-101121-110211-v1`），**最早的欧赔数据始于 `101121`**。
+  这是采集起点，不是实现缺陷。
+- **PI 已接受 694 期为当前可达上限**（本目标是"全量重跑 784 期"，
+  实际交付覆盖 694 期 / 88.5%）。缺口已穷尽确认不可填补：
+  `markets/raw/` 的 41,959 个 verified-responses 中搜 `100708` 仅 1 个命中，
+  实为 `byte_count` 的数字巧合；`markets/raw/legacy-titan-clean` 为空目录。
+  如需 100% 覆盖，前置工作是补采这 90 期的赛前欧赔。
+- **这 90 期不能用结算数据填补**。`nowscore_history_replay.sqlite` 确实覆盖全部
+  90 期且 3,241 条 legs 100% 有比分，但这些观测的 `received_at` 是 **2026-09-06**，
+  源 URL 全部是 `.../kaijiang_dc_N_<issue>.html`——`kaijiang`（开奖）是**结果页**。
+  用赛后比分反推 lambda 再"预测"同一场比赛属于**前视泄漏**，为 cutoff 契约所禁止。
+  唯一真正的补救路径是补采这 90 期的赛前欧赔。
+- 端到端投影（`project_n7_market_inputs`）另需每场配对的 `total_quotes`，而
+  12 个 batch 仅覆盖 **294 期**（`110514..121114`）；因此"真 R 链端到端"覆盖 294 期，
+  "篮子层重算"覆盖 **694 期（88.5%）**，两者都不是 784。
+- **口径警告**：`baskets.mass`（均值 0.0709）是篮子**覆盖的 3^7 元组集合**的联合概率和，
+  而 `legs.csv` 只保存**被选中的那一个元组**（概率均值 0.00098），两者比值 **72 倍**、
+  相关仅 0.34。因此 `mass` **无法**从 legs 忠实重建，本文件不重算 `mass`，
+  只报告同口径的前后对比。
+- `basket_gross.csv::gross_if_hit` **已是完整派彩**（346 个命中篮子合计 198,239.02，
+  与 255 receipt 一致），不要再乘 1.3。
+- 报告口径以全量 744 期为准；243 的 150 期欧赔对照仅用于根因定位。

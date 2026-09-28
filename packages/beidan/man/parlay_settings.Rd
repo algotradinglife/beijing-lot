@@ -24,7 +24,7 @@ parlay_settings(..., reset = FALSE)
 \description{
 读取或更新本 R 会话内的串场参数快照。默认值即项目冻结值；命名参数给出局部
 覆盖。\strong{下游计算函数仍然显式接收这些参数作为参数}，配置构造器
-parlay_allocation_configs() 的默认参数会读取当前快照。
+parlay_strategy_config() 的默认参数会读取当前快照。
 }
 \section{取值约束}{
 
@@ -51,3 +51,4 @@ n_legs 是\strong{方案级}结构属性：同一方案内所有组、所有结�
 每次返回的都是独立快照，修改返回值不影响会话状态。冻结的 n_legs/unit/payout
 保存在方案里，之后的会话改动不会改写已冻结方案。
 }
+

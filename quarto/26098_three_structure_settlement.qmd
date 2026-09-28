@@ -1,0 +1,80 @@
+---
+title: "26098：9月28日三份冻结下注单核对"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本核对消费已冻结的三份替代方案，不重选票、不改概率。按票面假设购买，不代表存在实际订单。赛果全部采用北单让球胜平负，未结束的比赛不推定为输。
+
+```{r}
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+plans_path <- file.path(root,"inputs/26098_walkthrough/three_plans_20260928/plans.rds")
+settlement_path <- file.path(root,"inputs/26098_walkthrough/three_plans_20260928/settlement-20260928-204413.rds")
+x <- readRDS(plans_path)
+s <- readRDS(settlement_path)
+cat("结算观测北京时间：",format(s$as_of,tz="Asia/Shanghai"),"\n")
+```
+
+```{r}
+summary_rows <- group_rows <- support_rows <- list()
+for (key in names(x$outputs)) {
+  result <- x$outputs[[key]]$evaluated$final
+  settled <- beidan::parlay_settle_plan(result$plan,s$settlements,s$as_of)
+  summary_rows[[key]] <- dplyr::mutate(settled$issue_returns,structure=key,
+    won=sum(settled$ticket_returns$status=="WON"),
+    lost=sum(settled$ticket_returns$status=="LOST"),
+    pending=sum(settled$ticket_returns$status=="PENDING"))
+  group_rows[[key]] <- settled$group_returns |>
+    dplyr::left_join(x$outputs[[key]]$sheet$groups |>
+      dplyr::select(group_id,display_label),by="group_id",relationship="one-to-one") |>
+    dplyr::mutate(structure=key)
+  support_rows[[key]] <- result$built$structure$supports |>
+    dplyr::filter(fixture_id=="26098:134",allowed) |>
+    dplyr::semi_join(result$plan$purchases,by="candidate_id") |>
+    dplyr::group_by(candidate_id) |>
+    dplyr::summarise(covered=paste(sort(unique(outcome)),collapse="/"),.groups="drop") |>
+    dplyr::left_join(dplyr::distinct(result$plan$purchases,candidate_id,group_id),
+      by="candidate_id",relationship="one-to-one") |>
+    dplyr::left_join(x$outputs[[key]]$sheet$groups |>
+      dplyr::select(group_id,display_label),by="group_id",relationship="one-to-one") |>
+    dplyr::mutate(structure=key)
+}
+summary_table <- dplyr::bind_rows(summary_rows)
+knitr::kable(summary_table |> dplyr::select(structure,stake_cny,won,lost,pending,payout_cny,net_cny))
+knitr::kable(dplyr::bind_rows(group_rows) |>
+  dplyr::select(structure,display_label,stake_cny,n_won,n_lost,n_pending,payout_cny,net_cny))
+```
+
+三份各两组，704注全部已判定未中。仍有部分比赛未结束或缺SP，但每张票都已有确定错误的一腿，故不再存在待定中奖机会。
+
+## 共同淘汰原因
+
+```{r}
+knitr::kable(s$schedule |>
+  dplyr::filter(slot==134) |>
+  dplyr::select(slot,fixture_id=fixture_key,home_name,away_name,handicap) |>
+  dplyr::left_join(s$settlements,by="fixture_id",relationship="one-to-one"))
+knitr::kable(dplyr::bind_rows(support_rows) |>
+  dplyr::select(structure,display_label,covered))
+```
+
+134场莱昂—华雷斯，主队让1球，北单实际结果为**让平D**，结算SP为4.28。六组全部复用了这一场：四组只保留W/L，两组只保留L，没有任何一组保留D。因此即使把各组现有掩码内的票全部买满，也不能命中。这里可以明确定位到共同场次的赛果排除，而不只是TopN购买深度不足；一次结果不足以证明长期参数失效。
+
+来源：[Nowscore 26098期北单](https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum=26098)。W/D/L分别指让胜/让平/让负，不是普通胜平负。
+
+```{r}
+knitr::kable(s$settlements)
+knitr::kable(attr(s$settlements,"diagnostics"))
+knitr::kable(tibble::tibble(input=c(plans_path,settlement_path),
+  sha256=c(digest::digest(file=plans_path,algo="sha256"),
+    digest::digest(file=settlement_path,algo="sha256"))))
+cat("原始结算来源回执：",s$receipt_path,"\n")
+```
+
+验证使用现有 `parlay_settle_plan()`；本次无业务函数修改。独立核对检查每张已购票都包含134场，且未选择D，并核对六组掩码均排除D。审查命令、文件哈希与结论保存在 `docs/reviews/26098-three-settlement.json`。

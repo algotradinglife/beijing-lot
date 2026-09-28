@@ -61,7 +61,7 @@ knitr::kable(tibble::tibble(check = c("14 场 scheduled 准入", "未来取消�
 probabilities <- tidyr::expand_grid(fixture_id = inputs$fixtures$fixture_id, outcome = c("W", "D", "L")) |>
   dplyr::mutate(probability = rep(c(0.5, 0.3, 0.2), nrow(inputs$fixtures)))
 constants <- parlay_settings(reset = TRUE)
-config <- parlay_allocation_configs(constants)$C
+config <- parlay_strategy_config(constants, patterns = list(main = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)), spend_limit_cny = 160)
 # 只有状态台账不同：投影对象把台账与 cutoff 一起绑定，因此两次调用的差异仅来自状态可见性。
 project_with <- function(status_ledger) {
   list(cutoff = cutoff, fixtures = inputs$fixtures, probabilities = probabilities,

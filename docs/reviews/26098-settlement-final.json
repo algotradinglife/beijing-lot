@@ -1,0 +1,16 @@
+{
+  "review_command": "codex review - < .run-control/settlement-refresh-final/review.txt",
+  "review": "No actionable findings; totals reproduced; frozen hashes unchanged",
+  "reviewed_hashes": {
+    "quarto/26098_betting_plan.qmd": "726a1d2108b3ca7a42116c4829b11325871b21b5cebf488406fc06fd3bdbcee0",
+    "quarto/26098_betting_plan_3333222.qmd": "d13fe082e444067c7c9d5f0577955e3a16167e6a4e124a6a4383e5ce9b3c6969",
+    "quarto/_26098_settlement_update.qmd": "c273e45b89626300c3adb01eda03a26f090c881d8f75d206dd14ac08dd1345a4",
+    "inputs/26098_walkthrough/print/settlement-20260928-192221.rds": "de4cfd4615013f9d0c31763c480486d7a6d70c4def4073e48d66fc6ef530b403",
+    "inputs/26098_walkthrough/print/settlement-source-20260928-192221.json": "d9d0d30edc6775fb47ca7ab97ba114630b4a2ace02b82790b4f7ca2009f1678f"
+  },
+  "checks": [
+    "Both clean Quarto renders passed",
+    "896 tickets unchanged",
+    "896 settlement calculations independently verified"
+  ]
+}

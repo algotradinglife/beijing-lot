@@ -207,7 +207,7 @@ parlay_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_t
   structures <- lapply(seq_along(patterns), function(index) {
     label <- paste0("p", paste(patterns[[index]], collapse = ""))
     parlay_apply_structure(groups$group_legs, probabilities, cutoff,
-                       patterns[[index]], "entropy_desc", candidate_label = label)
+                       patterns[[index]], candidate_label = label)
   })
   supports <- dplyr::bind_rows(lapply(structures, function(s) s$supports))
   support_summary <- dplyr::bind_rows(lapply(structures, function(s) s$support_summary))
@@ -1113,6 +1113,9 @@ parlay_select_funding_candidates <- function(ranked_labels, pattern_keys, n_grou
 #'   n_legs, unit_cny and payout_factor, so settlement cannot be re-priced or
 #'   re-shaped by a later session change.
 #' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+#'   Explicit status all_options_one requires outcome ALL and SP=1, and is a
+#'   neutral parlay leg, not a prediction hit. Single-leg and all-neutral tickets
+#'   remain SPECIAL; refunds are not inferred.
 #' @param as_of UTC POSIXct instant limiting visible settlement labels.
 #' @return A list of ticket, group and issue return tibbles; unresolved outcomes remain pending.
 parlay_settle_plan <- function(plan, settlements, as_of) {
@@ -1178,6 +1181,7 @@ parlay_settle_plan <- function(plan, settlements, as_of) {
     # keeps its stake out of the settled denominator.
     leg_status <- rep("WON", nrow(legs))
     leg_sp <- rep(NA_real_, nrow(legs))
+    neutral_leg <- rep(FALSE, nrow(legs))
     for (leg_index in seq_len(nrow(legs))) {
       fixture_id <- legs$fixture_id[leg_index]
       expected <- legs$outcome[leg_index]
@@ -1219,6 +1223,21 @@ parlay_settle_plan <- function(plan, settlements, as_of) {
         leg_status[leg_index] <- "PENDING"
         next
       }
+      if (settlement_status == "all_options_one") {
+        if (!identical(observed, "ALL") || anyNA(row$settled_sp) ||
+            any(row$settled_sp != 1)) {
+          stop("parlay_settle_plan: all_options_one requires ALL and SP=1")
+        }
+        # Explicit source publication for every option: neutral parlay leg,
+        # not a prediction hit. Single-ticket refunds remain special handling.
+        if (plan_n_legs == 1L) {
+          leg_status[leg_index] <- "SPECIAL"
+        } else {
+          leg_sp[leg_index] <- 1
+          neutral_leg[leg_index] <- TRUE
+        }
+        next
+      }
       if (settlement_status != "settled") {
         leg_status[leg_index] <- "SPECIAL"
         next
@@ -1245,7 +1264,7 @@ parlay_settle_plan <- function(plan, settlements, as_of) {
     # SPECIAL (cancelled/void) leg outranks it: the ticket cannot be settled normally,
     # so booking it as LOST would push its stake into the settled denominator and
     # distort ROI.
-    status <- if (any(leg_status == "SPECIAL")) "SPECIAL" else
+    status <- if (all(neutral_leg) || any(leg_status == "SPECIAL")) "SPECIAL" else
       if (any(leg_status == "LOST")) "LOST" else
         if (any(leg_status == "PENDING")) "PENDING" else "WON"
     stake <- unit_cny
@@ -1293,210 +1312,93 @@ parlay_settle_plan <- function(plan, settlements, as_of) {
   list(ticket_returns = ticket_returns, group_returns = group_returns,
        issue_returns = issue_returns)
 }
-# --- explicit allocation configurations -------------------------------------
 
-# The contract requires three demonstrations, each named explicitly rather than
-# chosen by an optimiser:
-#   A: four groups of the wide structure (4 x 128 units = 512 units)
-#   B: four groups of wide plus four groups of narrow (4 x 128 + 4 x 64)
-#   C: supported tickets with a cap below the whole space, to show truncation
-#
-# Each returned configuration is COMPLETE and can be handed straight to
-# parlay_build_plan() with no second constants argument: it carries its own settings
-# snapshot plus every reuse/overlap/seed/construction default.
-#' Construct the fixed demonstration strategy configurations
+# --- explicit Block 8 strategy configuration ---------------------------------
+
+# The Block 8 public path takes ONE strategy configuration carrying every explicit
+# policy the five stages consume. There is no purchased group count: how many
+# groups are funded is an OUTPUT of the allocation, derived from the budget and the
+# reuse/overlap constraints. The obsolete fixed n_groups/equal-split path was
+# removed rather than kept behind a compatibility switch, so a caller cannot
+# silently fall back to a fixed group count.
+#' Construct a Block 8 budget-derived strategy configuration
 #'
 #' Operates on explicit inputs. Invalid contracts raise errors; no network,
 #' package installation or database writes occur.
 #' @param settings Named business settings snapshot with the complete key set:
 #'   n_legs, issue_budget_cny, unit_cny, payout_factor, sp_threshold,
 #'   sp_replacement. parlay_settings() supplies the session snapshot by default.
-#' @return A named list of complete strategy configurations for parlay_build_plan().
-#'   These are illustrative presets, not empirically optimised settings: the wide and
-#'   narrow widths are demonstrations, not a claim about which width pays.
-parlay_allocation_configs <- function(settings = parlay_settings()) {
-  # settings drives every budget below. A NULL or partial list would silently
-  # produce budget_cny = numeric(0) and propagate an empty budget through the
-  # whole allocation, so require the full contract settings block.
+#' @param name Length-1 nonempty character configuration name, carried into the
+#'   frozen plan's policies for audit.
+#' @param patterns Named list of `n_legs`-long integer vectors (each value 1, 2 or
+#'   3): the legal mask per structure. Names are the structure keys.
+#' @param construction_policy Explicit list with `max_candidates` and `seed`. When
+#'   supplied it is the sole source of the search bound and deterministic seed.
+#' @param objective Either "probability" (expected NUMBER of winning tickets,
+#'   the sum of marginal masses -- not a union) or "ev" (marginal net EV per
+#'   ticket, requiring a complete valid pre-cutoff SP valuation).
+#' @param min_support_mass Single number in `0..1`: minimum total legal support
+#'   mass a candidate must carry to be admitted. 0 is the uncalibrated default.
+#' @param max_reuse Positive whole number of distinct funded groups a fixture may
+#'   appear in, INCLUDING prior purchased groups.
+#' @param max_overlap Whole number in 0..n_legs: how many fixtures a new group may
+#'   share with a prior/selected group.
+#' @param spend_limit_cny Optional single nonnegative CNY ceiling for this
+#'   decision. NULL (default) means no additional cap; the issue budget remains the
+#'   absolute ceiling.
+#' @return A complete strategy configuration list for [parlay_build_plan()]. It
+#'   carries its own settings snapshot plus patterns, construction_policy,
+#'   objective, admission and optional spend-limit fields.
+#' @details This constructor makes NO optimality claim and declares no purchased
+#'   group count. Under a "probability" objective the returned plan optimises the
+#'   expected COUNT of winning tickets, which is not a union probability and not a
+#'   financial-return claim.
+#' @export
+parlay_strategy_config <- function(settings = parlay_settings(), name = "block8",
+                                   patterns = NULL,
+                                   construction_policy = list(max_candidates = 32L, seed = 1L),
+                                   objective = "probability", min_support_mass = 0,
+                                   max_reuse = 1L, max_overlap = NULL,
+                                   spend_limit_cny = NULL) {
   parlay_validate_settings(settings)
-  n_legs <- as.integer(settings$n_legs)
-  # Patterns are generated from the plan width instead of being written out for
-  # seven legs, so the same three demonstrations describe a 6-, 7- or 8-leg plan.
-  # Each shape is a depth profile repeated/truncated to n_legs: "wide" leans on
-  # total support, "narrow" concentrates on fewer outcomes per leg. The named
-  # pattern keys ("p" + digits) remain both the candidate label and the unit_caps
-  # index, so pattern/cap association still cannot silently misalign.
-  depth_profile <- function(profile) {
-    as.integer(rep_len(profile, n_legs))
-  }
-  pattern <- function(values) {
-    values <- depth_profile(values)
-    stats::setNames(list(values), paste0("p", paste(values, collapse = "")))
-  }
-  wide <- pattern(c(3L, 3L, 3L, 3L, 2L, 2L, 2L))
-  narrow <- pattern(c(2L, 2L, 2L, 2L, 2L, 2L, 1L))
-  mixed <- pattern(c(3L, 2L, 2L, 2L, 2L, 2L, 1L))
-  # Every configuration declares the same construction, ranking, seed and admission
-  # defaults; only the patterns, group count, cap and budget differ. They are
-  # written out in full rather than merged from a shared template so a caller can
-  # read one block and know exactly what will be built.
-  config_defaults <- function() list(
-    construction_method = "entropy_balanced", ranking = "probability_desc",
-    max_reuse = 1L, max_overlap = n_legs - 1L, seed = 1L)
-  list(
-    # unit_cap is how many tickets a group may buy under this allocation: the
-    # group's share of the budget, not the size of its whole structural space.
-    A = c(list(name = "A", label = paste0("4 groups x wide (128 units each, ", n_legs, " legs)"),
-               settings = settings, patterns = wide, n_groups = 4L, unit_cap = 128L,
-               budget_cny = 4L * 128L * settings$unit_cny), config_defaults()),
-    # 4 x 96 + 4 x 32 = 512 units = 1024 CNY, the contract's mixed demonstration.
-    # Each group draws the pattern in its own slot and the per-slot ticket cap;
-    # unit_caps is indexed by pattern name, so the association between the
-    # "4 groups at 96" and "4 groups at 32" halves can never silently misalign.
-    B = c(list(name = "B", label = paste0("4 groups x wide (96 each) + 4 groups x narrow (32 each), ", n_legs, " legs)"),
-           settings = settings, patterns = c(wide, narrow), n_groups = 8L,
-           unit_caps = stats::setNames(c(96L, 32L), c(names(wide), names(narrow))),
-           budget_cny = (4L * 96L + 4L * 32L) * settings$unit_cny), config_defaults()),
-    C = c(list(name = "C", label = paste0("supported tickets, capped (", n_legs, " legs)"),
-               settings = settings, patterns = mixed, n_groups = 1L, unit_cap = 80L,
-               budget_cny = 80L * settings$unit_cny), config_defaults()))
+  if (is.null(patterns)) patterns <- list(all = rep(3L, settings$n_legs))
+  if (is.null(max_overlap)) max_overlap <- settings$n_legs - 1L
+  config <- list(name = name, settings = settings, patterns = patterns,
+                 construction_policy = construction_policy, objective = objective,
+                 min_support_mass = min_support_mass, max_reuse = max_reuse,
+                 max_overlap = max_overlap, spend_limit_cny = spend_limit_cny)
+  parlay_validate_strategy_config(config)
+  config
 }
 
-# Run one allocation end to end: construct, structure, enumerate, value, fund.
-#
-# .BuildParlayPlan is the AUTHORITATIVE private engine. It takes explicit tables and
-# an explicit cutoff, and is the only place the funding/freezing algorithm lives.
-# parlay_build_plan() is a thin facade over it that binds a projection object to the
-# same context; the two never re-implement each other. Low-level tests exercise this
-# engine directly with tables, while the public normal flow exercises the facade.
-#
-# @param projected Bound projection from estimate_match_probabilities(). It carries
-#   the cutoff, the selected fixtures/status and the pre-match SP, so the engine
-#   cannot be handed a projection from a different decision instant.
-# @param config One explicit strategy configuration.
-# @param prior_purchases Optional tibble of prior purchases for this issue.
-# @param prior_fixture_sets Optional named list of fixture sets bought earlier.
-#' Build a plan using explicit bound context and prior tables
-#' @param projected Bound match projection with cutoff and validated input tibbles.
-#' @param config Complete strategy list including a settings snapshot.
-#' @param prior_purchases Optional purchases tibble; CNY stake per physical ticket.
-#' @param prior_fixture_sets Named list of fixture IDs for all purchased groups.
-#' @return Full result with frozen plan and cumulative history; no settlement read.
-#' @details Internal engine used after public strategy/history validation.
-.BuildParlayPlan <- function(projected, config, prior_purchases = NULL,
-                             prior_fixture_sets = NULL) {
-  context <- parlay_projection_context(projected)
-  fixtures <- projected$fixtures
-  probabilities <- projected$probabilities
-  prematch_sp <- projected$prematch_sp
-  cutoff <- context$cutoff
-  match_status <- projected$match_status
-  constants <- config$settings
-  # entropy_balanced deals groups round-robin over n_legs blocks, so a mixed
-  # allocation needs that many fixtures per group. When the priced slate is shorter
-  # than that, fewer groups are formed and the shortfall is reported rather than
-  # silently ignored.
-  built <- .BuildDecisionTables(fixtures, probabilities, prematch_sp, cutoff,
-                             match_status, config$patterns, config$construction_method,
-                             config$n_groups, config$seed, constants)
-  # Rank the VALUED tickets: built$tickets$tickets is the raw enumeration, whose
-  # ev_net_est is still NA by construction.
-  ranked <- parlay_rank_tickets(built$valued, built$tickets$candidate_tickets,
-                            cutoff, config$ranking)
-  funded <- .FundGroups(built$groups$group_legs, ranked, config$patterns,
-                           config$budget_cny, constants, config$max_reuse,
-                           config$max_overlap,
-                           # config$name is the authority for which cap form applies. Reading
-                           # config$unit_cap directly is unsafe: R's $ does PARTIAL matching, so
-                           # for a config that declares only unit_caps it silently returns
-                           # unit_caps -- a length-2 vector handed to a length-1 parameter.
-                           unit_cap = if ("unit_cap" %in% names(config)) config$unit_cap else NULL,
-                           unit_caps = if ("unit_caps" %in% names(config)) config$unit_caps else NULL,
-                           prior_purchases = prior_purchases,
-                           prior_fixture_sets = prior_fixture_sets,
-                           issue_id = cutoff$issue_id, epoch_at = cutoff$cutoff_utc)
-  plan <- .FreezeParlayPlan(cutoff$issue_id, cutoff$cutoff_utc, built$groups$group_legs,
-                         built$structure, built$tickets, built$valued,
-                         funded$funded, funded$purchases, constants,
-                         list(allocation = config$name, max_reuse = config$max_reuse,
-                              max_overlap = config$max_overlap,
-                              model_config = projected$model_config,
-                              market_policy = projected$market_policy))
-  # history is the object the next call for this issue must be handed: purchases and
-  # their fixture sets travel TOGETHER, so a later call can neither forget what was
-  # bought nor re-open a group it already deepened.
-  history <- list(purchases = dplyr::bind_rows(
-    prior_purchases %||% match_typed_empty("purchases"), funded$purchases),
-    fixture_sets = funded$fixture_sets)
-  # probabilities is returned alongside built so diagnostics can rebuild support
-  # without reaching back into the caller's inputs.
-  list(config = config, cutoff = cutoff, constants = constants,
-       built = built, probabilities = probabilities, ranked = ranked,
-       funded = funded, plan = plan, history = history)
-}
-
-# Bind a projection object to the context its engine needs. Every public entrypoint
-# that consumes a projection goes through this one check, so "the projection's
-# cutoff is the decision instant" is enforced in exactly one place.
-#' Validate the decision context on a probability projection
-#' @param projected List containing cutoff, fixtures, probabilities, prematch_sp and match_status.
-#' @return Invisibly a list containing the validated cutoff; errors on missing or mismatched issue identity.
-parlay_projection_context <- function(projected) {
-  if (!is.list(projected)) {
-    stop("parlay_projection_context: projected must be a projection object")
-  }
-  for (field in c("cutoff", "fixtures", "probabilities", "prematch_sp", "match_status")) {
-    if (is.null(projected[[field]])) {
-      stop("parlay_projection_context: projected is missing ", field)
-    }
-  }
-  match_require_cutoff(projected$cutoff)
-  checkmate::assert_data_frame(projected$fixtures, .var.name = "projected$fixtures")
-  checkmate::assert_character(projected$match_status$status, min.len = 0L,
-                              .var.name = "projected$match_status")
-  # The projection's cutoff is bound to the fixture slate it carries. A hand-assembled
-  # projection whose cutoff names another issue would otherwise price and buy one
-  # issue's fixtures under a different decision identity.
-  if ("issue_id" %in% names(projected$fixtures)) {
-    stray <- setdiff(unique(as.character(projected$fixtures$issue_id)),
-                     as.character(projected$cutoff$issue_id))
-    if (length(stray)) {
-      stop("parlay_projection_context: projected fixtures belong to issue ",
-           paste(stray, collapse = ", "), " but the cutoff is bound to '",
-           projected$cutoff$issue_id, "'")
-    }
-  }
-  invisible(list(cutoff = projected$cutoff))
-}
-
-# Validate one explicit strategy configuration. An UNKNOWN field is refused rather
-# than ignored: a misspelled budget would otherwise leave the real ceiling at its
-# default and change what the plan buys. The settings snapshot is required in full.
-#' Validate a complete explicit strategy configuration
-#' @param strategy_config Named list of settings, structures, allocation and admission controls.
-#' @return The input invisibly; invalid or unknown fields raise errors even for empty decisions.
+# Validate one Block 8 strategy configuration. An UNKNOWN field is refused rather
+# than ignored: a misspelled bound would otherwise leave the real policy at its
+# default and change what the plan buys. There is no n_groups field: funded group
+# count is an output, so a configuration that declares one is a contract error.
+#' Validate a complete Block 8 strategy configuration
+#' @param strategy_config Named list from [parlay_strategy_config()].
+#' @return The input invisibly; invalid or unknown fields raise errors even for
+#'   empty decisions.
+#' @noRd
 parlay_validate_strategy_config <- function(strategy_config) {
   checkmate::assert_list(strategy_config, names = "unique",
                          .var.name = "strategy_config")
-  allowed <- c("name", "label", "settings", "patterns", "construction_method",
-               "n_groups", "ranking", "budget_cny", "max_reuse", "max_overlap",
-               "seed", "unit_cap", "unit_caps")
+  allowed <- c("name", "label", "settings", "patterns", "construction_policy",
+               "objective", "min_support_mass", "max_reuse", "max_overlap",
+               "spend_limit_cny")
   unknown <- setdiff(names(strategy_config), allowed)
   if (length(unknown)) {
     stop("parlay_validate_strategy_config: unknown field(s) ",
          paste(unknown, collapse = ", "), "; allowed fields are ",
          paste(allowed, collapse = ", "))
   }
-  required <- c("settings", "patterns", "construction_method", "n_groups",
-                "ranking", "budget_cny", "max_reuse", "max_overlap", "seed")
+  required <- c("settings", "patterns", "construction_policy", "objective",
+                "min_support_mass", "max_reuse", "max_overlap", "name")
   missing <- setdiff(required, names(strategy_config))
   if (length(missing)) {
     stop("parlay_validate_strategy_config: strategy_config is missing ",
          paste(missing, collapse = ", "))
   }
-  # settings is the complete frozen snapshot: n_legs, unit_cny, payout_factor,
-  # sp_threshold, sp_replacement, issue_budget_cny. A partial snapshot would read
-  # NULL deep inside the engine instead of failing here.
   parlay_validate_settings(strategy_config$settings)
   checkmate::assert_list(strategy_config$patterns, min.len = 1L, names = "unique",
                          .var.name = "strategy_config$patterns")
@@ -1508,26 +1410,48 @@ parlay_validate_strategy_config <- function(strategy_config) {
          " legs; pattern(s) ", paste(which(wrong_width), collapse = ", "),
          " disagree")
   }
-  checkmate::assert_string(strategy_config$name, min.chars = 1L,
-                           .var.name = "strategy_config$name")
-  checkmate::assert_string(strategy_config$construction_method, min.chars = 1L,
-                           .var.name = "strategy_config$construction_method")
-  checkmate::assert_string(strategy_config$ranking, min.chars = 1L,
-                           .var.name = "strategy_config$ranking")
-  checkmate::assert_count(strategy_config$n_groups, positive = TRUE,
-                          .var.name = "strategy_config$n_groups")
+  policy <- strategy_config$construction_policy
+  checkmate::assert_list(policy, names = "unique",
+                         .var.name = "strategy_config$construction_policy")
+  unknown_policy <- setdiff(names(policy), c("max_candidates", "seed"))
+  if (length(unknown_policy)) {
+    stop("parlay_validate_strategy_config: unknown construction_policy field(s) ",
+         paste(unknown_policy, collapse = ", "))
+  }
+  missing_policy <- setdiff(c("max_candidates", "seed"), names(policy))
+  if (length(missing_policy)) {
+    stop("parlay_validate_strategy_config: construction_policy is missing ",
+         paste(missing_policy, collapse = ", "))
+  }
+  checkmate::assert_count(policy$max_candidates, positive = TRUE,
+                          .var.name = "strategy_config$construction_policy$max_candidates")
+  checkmate::assert_count(policy$seed,
+                          .var.name = "strategy_config$construction_policy$seed")
+  checkmate::assert_string(strategy_config$objective, min.chars = 1L)
+  if (!strategy_config$objective %in% c("probability", "ev")) {
+    stop("parlay_validate_strategy_config: objective must be 'probability' or ",
+         "'ev', got ", strategy_config$objective)
+  }
+  checkmate::assert_numeric(strategy_config$min_support_mass, len = 1L,
+                            any.missing = FALSE, finite = TRUE, lower = 0, upper = 1,
+                            .var.name = "strategy_config$min_support_mass")
   checkmate::assert_count(strategy_config$max_reuse, positive = TRUE,
                           .var.name = "strategy_config$max_reuse")
   checkmate::assert_count(strategy_config$max_overlap,
                           .var.name = "strategy_config$max_overlap")
-  checkmate::assert_numeric(strategy_config$budget_cny, len = 1L, any.missing = FALSE,
-                            finite = TRUE, lower = 0,
-                            .var.name = "strategy_config$budget_cny")
-  checkmate::assert_count(strategy_config$seed,
-                          .var.name = "strategy_config$seed")
-  parlay_check_unit_caps(
-    if ("unit_cap" %in% names(strategy_config)) strategy_config$unit_cap else NULL,
-    if ("unit_caps" %in% names(strategy_config)) strategy_config$unit_caps else NULL)
+  if (strategy_config$max_overlap > n_legs) {
+    stop("parlay_validate_strategy_config: max_overlap must not exceed n_legs ",
+         n_legs)
+  }
+  if (!is.null(strategy_config$spend_limit_cny)) {
+    checkmate::assert_numeric(strategy_config$spend_limit_cny, len = 1L,
+                              any.missing = FALSE, finite = TRUE, lower = 0,
+                              .var.name = "strategy_config$spend_limit_cny")
+  }
+  if (!is.null(strategy_config$name)) {
+    checkmate::assert_string(strategy_config$name, min.chars = 1L,
+                             .var.name = "strategy_config$name")
+  }
   invisible(strategy_config)
 }
 
@@ -1595,31 +1519,147 @@ parlay_validate_prior_state <- function(prior_purchases) {
   return(list(purchases = purchases, fixture_sets = fixture_sets))
 }
 
+# Bind a projection object to the context its engine needs. Every public entrypoint
+# that consumes a projection goes through this one check, so "the projection's
+# cutoff is the decision instant" is enforced in exactly one place.
+#' Validate the decision context on a probability projection
+#' @param projected List containing cutoff, fixtures, probabilities, prematch_sp and match_status.
+#' @return Invisibly a list containing the validated cutoff; errors on missing or mismatched issue identity.
+parlay_projection_context <- function(projected) {
+  if (!is.list(projected)) {
+    stop("parlay_projection_context: projected must be a projection object")
+  }
+  for (field in c("cutoff", "fixtures", "probabilities", "prematch_sp", "match_status")) {
+    if (is.null(projected[[field]])) {
+      stop("parlay_projection_context: projected is missing ", field)
+    }
+  }
+  match_require_cutoff(projected$cutoff)
+  checkmate::assert_data_frame(projected$fixtures, .var.name = "projected$fixtures")
+  checkmate::assert_character(projected$match_status$status, min.len = 0L,
+                              .var.name = "projected$match_status")
+  # The projection's cutoff is bound to the fixture slate it carries. A hand-assembled
+  # projection whose cutoff names another issue would otherwise price and buy one
+  # issue's fixtures under a different decision identity.
+  if ("issue_id" %in% names(projected$fixtures)) {
+    stray <- setdiff(unique(as.character(projected$fixtures$issue_id)),
+                     as.character(projected$cutoff$issue_id))
+    if (length(stray)) {
+      stop("parlay_projection_context: projected fixtures belong to issue ",
+           paste(stray, collapse = ", "), " but the cutoff is bound to '",
+           projected$cutoff$issue_id, "'")
+    }
+  }
+  invisible(list(cutoff = projected$cutoff))
+}
+
 #' Build one issue's parlay plan from a bound projection
 #'
-#' Operates on explicit inputs. Invalid contracts raise errors; no network,
-#' package installation or database writes occur.
+#' Runs the four authoritative Block 8 decision stages over one bound projection:
+#' budget state, candidate generation, coverage frontier and constrained portfolio
+#' allocation. Operates on explicit inputs. Invalid contracts raise errors; no
+#' network, package installation or database writes occur.
 #' @param projected Projection returned by estimate_match_probabilities(). It binds
 #'   the decision cutoff, the selected fixtures, the status ledger and the pre-match
 #'   SP, so the plan cannot be built against a different instant than the one the
 #'   probabilities were projected for.
-#' @param strategy_config One explicit strategy configuration, normally from
-#'   parlay_allocation_configs(). It carries the full settings snapshot plus
-#'   patterns, construction_method, n_groups, ranking, budget_cny, max_reuse,
-#'   max_overlap, seed and the unit cap form.
+#' @param strategy_config One explicit Block 8 strategy configuration, normally from
+#'   [parlay_strategy_config()]. It carries the full settings snapshot plus patterns,
+#'   a construction policy (max_candidates, seed), objective, min_support_mass,
+#'   max_reuse/max_overlap and an optional spend_limit_cny. There is no purchased
+#'   group count: how many groups are funded is derived by the allocation.
 #' @param prior_purchases Previous history for the SAME issue: the `history` object
 #'   returned by an earlier call, or list(purchases=, fixture_sets=). NULL means this
 #'   is the issue's first decision.
-#' @return A list with config, cutoff, constants, built, probabilities,
-#'   ranked, funded, plan and history. `history` is what the next call must receive.
+#' @return A list with config, cutoff, constants, built, probabilities, ranked,
+#'   funded, plan, history and the extra stage evidence `summary`, `search`,
+#'   `frontier`, `selection`, `budget_state` and `search_diagnostics`. `history` is what the next call must receive.
+#'   `plan`, `funded` and `history` keep the shapes immutable save, settlement and
+#'   diagnosis consume; `funded` carries the derived `n_groups` in its diagnostics.
+#' @details The funded group count is an OUTPUT of the budget and constraints, not
+#'   an input. Group admission (reuse/overlap) counts DISTINCT funded groups, and
+#'   one structure per selected group is enforced. This is a greedy approximation:
+#'   no global-optimality claim is made, and the probability objective is the
+#'   expected COUNT of winning tickets (sum of marginals), never a union.
 parlay_build_plan <- function(projected, strategy_config, prior_purchases = NULL) {
   parlay_validate_strategy_config(strategy_config)
   prior <- parlay_validate_prior_state(prior_purchases)
   context <- parlay_projection_context(projected)
   .ValidatePriorBinding(prior, context$cutoff, strategy_config)
-  .BuildParlayPlan(projected, strategy_config,
-                   prior_purchases = prior$purchases,
-                   prior_fixture_sets = prior$fixture_sets)
+  cutoff <- context$cutoff
+  settings <- strategy_config$settings
+  patterns <- strategy_config$patterns
+  policy <- strategy_config$construction_policy
+
+  # --- stage 1: budget state (prior ledger in, affordable units out) ---------
+  budget_state <- parlay_budget_state(settings, prior_purchases, cutoff,
+                                      spend_limit_cny = strategy_config$spend_limit_cny)
+
+  # --- stage 2: bounded candidate search over the eligible slate ------------
+  search <- parlay_generate_candidates(projected, settings, policy)
+  # `group_legs` is the shared group universe the later stages consume. The
+  # frontier is never built from a fixture set that stage 2 did not admit.
+  group_legs <- search$group_legs
+  # `n_legs` comes from the artifact itself (0 for a typed-empty universe), so an
+  # empty decision does not invent a width.
+  n_legs <- parlay_structure_legs(group_legs)
+  if (!nrow(group_legs)) n_legs <- as.integer(settings$n_legs)
+
+  # --- stage 3: coverage frontier over the legal support space ---------------
+  frontier_policy <- list(min_support_mass = strategy_config$min_support_mass,
+                          max_depth = budget_state$affordable_units,
+                          ranking = if (strategy_config$objective == "ev") "ev_desc" else "probability_desc")
+  frontier_result <- parlay_coverage_frontier(projected, group_legs, patterns,
+                                              settings, frontier_policy)
+
+  # --- stage 4: constrained greedy portfolio allocation ---------------------
+  allocation <- parlay_allocate_portfolio(
+    frontier_result, group_legs, budget_state, prior_purchases, cutoff,
+    list(max_reuse = strategy_config$max_reuse,
+         max_overlap = strategy_config$max_overlap),
+    strategy_config$objective)
+
+  # --- stage 5: human-readable summary --------------------------------------
+  funded_tickets <- dplyr::semi_join(frontier_result$ranked,
+    allocation$purchases, by = c("candidate_id", "ticket_id"))
+
+  # --- freeze the decision ---------------------------------------------------
+  built <- list(groups = list(group_legs = group_legs,
+                              diagnostics = search$diagnostics),
+                structure = list(supports = frontier_result$supports),
+                tickets = list(tickets = frontier_result$tickets,
+                               ticket_legs = frontier_result$ticket_legs,
+                               candidate_tickets = frontier_result$candidate_tickets),
+                valued = frontier_result$tickets)
+  plan <- .FreezeParlayPlan(cutoff$issue_id, cutoff$cutoff_utc, group_legs,
+                            built$structure, built$tickets, built$valued,
+                            funded_tickets, allocation$purchases, settings,
+                            list(allocation = strategy_config$name,
+                                 objective = strategy_config$objective,
+                                 max_reuse = strategy_config$max_reuse,
+                                 max_overlap = strategy_config$max_overlap,
+                                 model_config = projected$model_config,
+                                 market_policy = projected$market_policy))
+  # `funded` is the ranked-shaped selection table plus the allocation ledger, so
+  # the save/settle/diagnose consumers keep reading the same shapes they did on
+  # the frozen path: `funded$purchases` and `funded$fixture_sets` are the ledger,
+  # and `funded$funded` is the ranked-derived selection.
+  funded <- list(purchases = allocation$purchases,
+                 funded = funded_tickets,
+                 fixture_sets = allocation$history$fixture_sets,
+                 diagnostics = allocation$diagnostics,
+                 trace = allocation$trace,
+                 selected = allocation$selected,
+                 history = allocation$history)
+  history <- allocation$history
+  result <- list(config = strategy_config, cutoff = cutoff, constants = settings,
+       built = built, probabilities = projected$probabilities,
+       ranked = frontier_result$ranked, funded = funded, plan = plan,
+       history = history, search = search,
+       budget_state = budget_state, search_diagnostics = search$diagnostics,
+       frontier = frontier_result, selection = allocation)
+  result$summary <- parlay_plan_summary(result)
+  result
 }
 
 # Bind the running ledger to THIS decision. A prior history that belongs to another
@@ -1917,6 +1957,9 @@ parlay_build_plan <- function(projected, strategy_config, prior_purchases = NULL
 #'   the bound cutoff and the tables the diagnostic consumes, so nothing is
 #'   reassembled by the caller.
 #' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+#'   Explicit status all_options_one requires outcome ALL and SP=1, and is a
+#'   neutral parlay leg, not a prediction hit. Single-leg and all-neutral tickets
+#'   remain SPECIAL; refunds are not inferred.
 #' @param as_of UTC POSIXct instant limiting visible settlement labels.
 #' @return A tibble with one row per candidate, exactly as the private depth engine
 #'   produces. `unit_cny` and `payout_factor` come from the result's FROZEN constants,
@@ -2090,6 +2133,9 @@ parlay_ticket_strings <- function(ticket_legs, group_legs) {
 #' @param strategy_config One explicit strategy configuration applied to every
 #'   decision in the sequence.
 #' @param settlements Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+#'   Explicit status all_options_one requires outcome ALL and SP=1, and is a
+#'   neutral parlay leg, not a prediction hit. Single-leg and all-neutral tickets
+#'   remain SPECIAL; refunds are not inferred.
 #' @param as_of UTC POSIXct instant limiting visible settlement labels.
 #' @return A list of plans, purchases, settlement, depth and aggregate metrics for
 #'   the replayed issue.

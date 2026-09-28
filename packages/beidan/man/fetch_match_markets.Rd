@@ -2,7 +2,7 @@
 % Please edit documentation in R/match_markets.R
 \name{fetch_match_markets}
 \alias{fetch_match_markets}
-\title{Capture real Titan European and total markets for a schedule subset}
+\title{Capture European, total and Beijing pre-match SP markets together}
 \usage{
 fetch_match_markets(
   schedule,
@@ -29,11 +29,16 @@ fetch_match_markets(
 \item{retries}{Integer transient retries, zero through three.}
 
 \item{pages}{NULL for live capture, or URL-named list of lists with raw body and
-original ISO observed_at for deterministic offline replay.}
+original ISO observed_at for deterministic offline replay.
+Nonempty replay must also contain the issue's Nowscore SPF page URL.}
 }
 \value{
 List of tibbles euro, totals, companies, diagnostics, coverage, captures,
-and receipt_path. Public timestamps use Asia/Shanghai. Euro prices are decimal;
+receipt_path, prematch_sp, prematch_sp_identities and prematch_sp_receipt_path.
+prematch_sp_identities binds its fixture/native IDs and handicap to the schedule.
+The SP table is
+independently observed Beijing handicap SP, with diagnostics in its attributes.
+Public timestamps use Asia/Shanghai. Euro prices are decimal;
 total Hong Kong prices are converted to decimal by adding one. No SP is inferred.
 Empty schedule returns typed empty tables without requests. Missing data is
 never synthesized. Source quote time is distinct from actual observed_at.

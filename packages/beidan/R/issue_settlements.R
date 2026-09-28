@@ -8,9 +8,11 @@
 #' @param retries 非负整数，额外重试次数，默认2。
 #' @param pages NULL 表示联网；离线回放用 list(body=原始raw字节,
 #'   observed_at=带时区ISO8601原始采集时间)。不得把旧响应标为当前采集。
-#' @return settlements 契约 tibble，包含 issue_id、fixture_id、outcome(W/D/L)、
+#' @return settlements 契约 tibble，包含 issue_id、fixture_id、outcome(W/D/L或ALL)、
 #'   settled_sp、label_available_at(北京时间POSIXct)、status、source_url。
-#'   未完场或未有唯一开奖SP不产生结算行；空结果保持列类型。
+#'   普通未完场或未有唯一开奖SP不产生结算行；取消且停售、来源明确列出
+#'   胜平负三个SP均为1时输出 status=all_options_one、outcome=ALL，
+#'   不计预测命中。空结果保持列类型。
 #'   diagnostics 属性记录未接纳原因，receipt_path 属性记录原始证据回执位置。
 #' @details 不推断开奖发布时间；label_available_at 为实际观测时刻。
 #'   原始响应先持久化再解析。调用会联网及写文件，导入无副作用。

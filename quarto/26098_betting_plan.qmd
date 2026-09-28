@@ -1,0 +1,145 @@
+---
+title: "26098期下注单"
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-title: "下注单目录"
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+  warning: true
+params:
+  input: "inputs/26098_walkthrough/print/26098-20260926-195204.rds"
+  settlements: "inputs/26098_walkthrough/print/settlement-20260928-192221.rds"
+  source_rows: "inputs/26098_walkthrough/print/settlement-source-20260928-192221.json"
+---
+
+<style>
+body { color: #162a35; }
+h1, h2, h3 { color: #173d3a; }
+table { width:100%; font-size:13px; border-collapse:collapse; margin:12px 0 24px; }
+table th, table td { border:1px solid #d1d5db; padding:6px 8px; text-align:center; }
+table th { background:#edf3f2; font-weight:600; }
+table td.pick { background:#d1fae5 !important; color:#065f46; font-weight:700; }
+.plan-note { border-left:4px solid #14806b; padding:12px 16px; background:#f0f8f5; }
+@media print {
+  #quarto-margin-sidebar, .quarto-title-meta { display:none; }
+  body { font-size:11px; }
+  table { font-size:10px; break-inside:auto; }
+  tr { break-inside:avoid; }
+  thead { display:table-header-group; }
+  * { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+}
+</style>
+
+```{r}
+#| label: setup
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+input_path <- file.path(root,params$input)
+bundle <- readRDS(input_path)
+result <- bundle$result
+sheet <- beidan::parlay_betting_sheet(result,bundle$schedule)
+stopifnot(identical(result$cutoff$issue_id,"26098"))
+cn <- c(W="胜",D="平",L="负")
+funded_cny <- sum(sheet$tickets$cost_cny)
+decision_text <- format(result$cutoff$cutoff_utc,"%Y-%m-%d %H:%M:%S",tz="Asia/Shanghai")
+```
+
+<div class="plan-note">
+
+**`r nrow(sheet$groups)`组 · `r nrow(sheet$tickets)`注 · 合计`r funded_cny`元**  
+方案时点：**`r decision_text` 北京时间**。本页从固定方案快照生成，重渲染不会重新选场、改变票或自动下单。
+
+</div>
+
+{{< include _26098_settlement_update.qmd >}}
+
+## 资金分配
+
+```{r}
+knitr::kable(dplyr::transmute(sheet$groups,
+  组别=display_label,场数=result$constants$n_legs,结构=structure,
+  注数=funded_tickets,金额元=cost_cny,
+  本组累计概率=sprintf("%.2f%%",100*coverage_probability)),escape=TRUE)
+```
+
+整期上限 **`r result$budget_state$issue_budget_cny`元**；此前购买 **`r result$budget_state$spent_before_cny`元**；本次分配 **`r funded_cny`元**；本次可用预算未分配 **`r result$funded$diagnostics$unspent_cny`元**。每注 **`r result$constants$unit_cny`元**，不追加倍数。
+
+## 分组跟单表
+
+绿色“✓”表示该赛果在本组所选票中出现。胜、平、负均按**北单让球胜平负**解释，让球数从主队视角列示。赛果下方数字为模型概率，**不是SP**。
+
+逐场勾选的并集不一定等于实际购买的全部组合；**实际注数、金额及逐注明细为准**，不要自行展开成额外复式。
+
+```{r}
+#| label: group-sheets
+#| results: asis
+for (label in sheet$groups$display_label) {
+  group <- dplyr::filter(sheet$groups,display_label==label)
+  rows <- dplyr::filter(sheet$matches,display_label==label) |>
+    dplyr::mutate(选项=sprintf("%s%s %.1f%%",dplyr::if_else(selected,"✓ ",""),
+      unname(cn[outcome]),100*probability)) |>
+    dplyr::select(leg_order,slot,kickoff_at,home_name,away_name,handicap,outcome,选项) |>
+    tidyr::pivot_wider(names_from=outcome,values_from=选项) |>
+    dplyr::arrange(slot) |>
+    dplyr::transmute(序=dplyr::row_number(),场次=slot,
+      开赛北京时间=format(kickoff_at,"%m-%d %H:%M",tz="Asia/Shanghai"),
+      对阵=paste(home_name,"vs",away_name),主队让球=sprintf("%+d",as.integer(handicap)),
+      胜=W,平=D,负=L)
+  cat(sprintf("\n\n### %s · %s · %d注 / %g元\n\n",label,group$structure,group$funded_tickets,group$cost_cny))
+  print(knitr::kable(rows,escape=TRUE))
+  cat(sprintf("\n\n结构允许%d注；本次选择%d注。本组累计概率 %.2f%%。\n\n",group$support_size,
+    group$funded_tickets,100*group$coverage_probability))
+}
+```
+
+## 逐注明细
+
+每行一注；列标题按北单场次编号升序排列，与上方分组表一致，单元格为该场的让球赛果。按方案的结构内排名列出，仅包含实际分配的票。
+
+```{r}
+#| label: exact-tickets
+#| results: asis
+for (label in sheet$groups$display_label) {
+  rows <- dplyr::filter(sheet$ticket_legs,display_label==label)
+  slots <- dplyr::distinct(rows,leg_order,slot) |> dplyr::arrange(slot)
+  wide <- rows |>
+    dplyr::mutate(场次=paste0("场",slot),赛果=unname(cn[outcome])) |>
+    dplyr::select(ticket_id,场次,赛果) |>
+    tidyr::pivot_wider(names_from=场次,values_from=赛果)
+  detail <- dplyr::filter(sheet$tickets,display_label==label) |>
+    dplyr::select(ticket_id,support_rank,cost_cny) |>
+    dplyr::left_join(wide,by="ticket_id",relationship="one-to-one") |>
+    dplyr::left_join(dplyr::select(settled$ticket_returns,ticket_id,status,payout_cny,net_cny),by="ticket_id",relationship="one-to-one") |>
+    dplyr::left_join(outcome_returns,by="ticket_id",relationship="one-to-one") |>
+    dplyr::mutate(结算状态=unname(status_cn[status]),已确认返奖元=dplyr::if_else(status %in% c("PENDING","SPECIAL"),NA_real_,payout_cny),已确认净收益元=net_cny) |>
+    dplyr::arrange(support_rank) |>
+    dplyr::select(排名=support_rank,dplyr::all_of(paste0("场",slots$slot)),金额元=cost_cny,赛果判定,结算状态,已确认返奖元,已确认净收益元)
+  cat(sprintf("\n\n### %s 逐注表（%d注，合计%g元）\n\n",label,nrow(detail),sum(detail$金额元)))
+  print(knitr::kable(detail,escape=TRUE))
+}
+```
+
+## 方案口径与来源
+
+- 本次使用本地赛程和盘口快照重新计算：`r result$search_diagnostics$n_eligible`场准入，搜索`r result$search_diagnostics$examined_count`个候选组。有限候选搜索加贪心分配，不代表全局最优。
+- 普通欧赔各公司先分别去水，再等权平均；结合大小球与Dixon–Coles（ρ = −0.14）计算北单让球概率。
+- 当前目标为预计命中票数，北单赛前SP缺失，未列收益预测或虚构SP。本组累计概率不能直接相加当作整份方案命中概率。
+- 本页不混入12:18的旧冻结方案及其结算数据，也不自动将本次分配记为实际购买。
+- 固定输入：`r params$input`；SHA-256：`r digest::digest(file=input_path,algo="sha256")`。
+
+<script>
+for (const cell of document.querySelectorAll('td')) {
+  if (cell.textContent.trim().startsWith('✓')) cell.classList.add('pick');
+}
+</script>
+
+<!-- Delivery acceptance: 17 testthat assertions pass; codex review found missing-whole-ticket-leg guard, fixed with regression; final codex review clear pass. Clean no-cache render passed. Independent HTML comparison reconciles384 exact tickets/2688 outcomes/768CNY and numeric slot ordering. Reviewed source/input hashes, commands and findings: ../docs/reviews/26098-betting-sheet.json. No CI, no automatic order placement. -->
+
+<!-- Settlement update #539: frozen ticket inputs preserved. Review and reproducibility evidence: ../docs/reviews/539-settlement-update.json. -->
+
+<!-- #539 codex review: codex review - < .run-control/26098-settlement-update/review-prompt.txt; result: no actionable correctness findings. Reviewed implementation SHA256: {"packages/beidan/inst/python/beidan_backend/settlement/__init__.py": "23d60f61eeeaf2ed16faf6edccacea27bcf3ab87a88f2bcd3c46fe4a9fb1fc33", "packages/beidan/R/issue_settlements.R": "7014e9715e6e033819f80ac2fadd4a18d12ea6a140f50fb30bfac715b59d5727", "packages/beidan/R/n7_pipeline_value.R": "a86718dc0ad93d6142604457e337f9ae66af9c09408c6541ce0f527390a82e5c"}; full QMD/test/input hashes and validation results: docs/reviews/539-settlement-update.json. -->

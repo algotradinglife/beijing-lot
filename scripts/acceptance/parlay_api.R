@@ -24,10 +24,9 @@ for (n_legs in c(6L, 7L, 8L)) {
   strategy_config <- list(
     name = 'acceptance', settings = settings,
     patterns = stats::setNames(list(pattern), pattern_name),
-    construction_method = 'entropy_balanced', n_groups = 1L,
-    ranking = 'probability_desc', budget_cny = 160,
-    max_reuse = 2L, max_overlap = n_legs - 1L, seed = 1L,
-    unit_cap = 80L
+    construction_policy = list(max_candidates = 1L, seed = 1L),
+    objective = 'probability', min_support_mass = 0, spend_limit_cny = 160,
+    max_reuse = 2L, max_overlap = n_legs - 1L
   )
   result <- parlay_build_plan(projected, strategy_config)
   testthat::expect_identical(result$plan$constants$n_legs, n_legs)
@@ -35,13 +34,12 @@ for (n_legs in c(6L, 7L, 8L)) {
   testthat::expect_equal(nrow(result$funded$purchases), min(prod(pattern), 80L))
   testthat::expect_true(sum(result$funded$purchases$stake_cny) <= 160)
   testthat::expect_false(anyDuplicated(result$funded$purchases$ticket_id) > 0L)
-  if (n_legs == 7L) {
-    # Observed from pre-refactor revision 42103a3, not recomputed from new helpers.
-    testthat::expect_equal(sum(result$built$valued$probability), 0.12756645286981655,
-                           tolerance = 1e-12)
-    testthat::expect_identical(result$funded$purchases$ticket_id[1L],
-      '00123_005:1|00123_006:1|00123_007:1|00123_008:1|00123_010:1|00123_013:1|00123_014:1')
-  }
+  # Search examines one candidate; funded count and depth remain budget outputs.
+  testthat::expect_equal(result$search_diagnostics$examined_count, 1L)
+  testthat::expect_equal(result$budget_state$available_cny, 160)
+  testthat::expect_equal(result$summary$groups$support_size, prod(pattern))
+  testthat::expect_equal(result$summary$groups$coverage_probability,
+    sum(result$funded$funded$probability))
   wrong <- strategy_config
   wrong$patterns <- list(wrong = c(pattern, 1L))
   testthat::expect_error(parlay_build_plan(projected, wrong))
@@ -99,6 +97,7 @@ print(acceptance_results)
 
 # Same issue, three independent daily decisions carry their own cutoff in each object.
 settings <- parlay_settings(reset = TRUE)
+settings$issue_budget_cny <- 400
 days <- lubridate::ymd_hms(c('2026-09-23 12:00:00', '2026-09-24 12:00:00', '2026-09-25 12:00:00'),
                           tz = 'Asia/Shanghai')
 kickoff_at <- lubridate::with_tz(rep(days, each = 7L) +
@@ -112,9 +111,9 @@ third <- estimate_match_probabilities(prepare_match_inputs(inputs,
   decision_at + lubridate::days(2), market_policy))
 strategy_config <- list(name = 'replay-acceptance', settings = settings,
   patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
-  construction_method = 'entropy_balanced', n_groups = 1L,
-  ranking = 'probability_desc', budget_cny = 400,
-  max_reuse = 1L, max_overlap = 6L, seed = 1L, unit_cap = 80L)
+  construction_policy = list(max_candidates = 1L, seed = 1L),
+  objective = 'probability', min_support_mass = 0, spend_limit_cny = 160,
+  max_reuse = 1L, max_overlap = 6L)
 replay <- parlay_replay_issue(list(first, second, third), strategy_config,
   match_typed_empty('settlements'),
   lubridate::ymd_hms('2026-09-25 00:00:00', tz = 'UTC'))
@@ -159,8 +158,8 @@ testthat::expect_error(parlay_build_plan(second, strategy_config, bad_history), 
 # Deepen the SAME group at three distinct instants without consuming extra reuse.
 # Every history must remain acceptable as the next call's public input.
 deepen_config <- strategy_config
-deepen_config$unit_cap <- 1L
-deepen_config$budget_cny <- 10
+deepen_config$spend_limit_cny <- 2
+deepen_config$settings$issue_budget_cny <- 10
 deepen_projections <- lapply(0:2, function(offset) {
   estimate_match_probabilities(prepare_match_inputs(inputs,
     decision_at + lubridate::hours(offset), market_policy))

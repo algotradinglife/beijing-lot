@@ -1,0 +1,346 @@
+---
+title: "联合选票 7 串 1 构建：cutoff 内样本外覆盖对账"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  source_root: "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/joint-full-v3/settlement-inputs"
+  output_root: "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/joint-basket-oos-v1"
+  budget_cny: 256
+  unit_cny: 2
+  payout_factor: 0.65
+---
+
+## 这一轮在测什么
+
+构建规则（[`r/joint_basket_construction.R`](r/joint_basket_construction.R)）：
+
+1. **选场**：在冻结池内无参数贪心。每期开 `floor(场次/7)` 个互不相交的篮子；每个篮子的 7 场依次挑选，每一步选"使本篮 top-N 联合质量最大"的那一场。没有任何事后选出的阈值（`m2 ≥ 0.75` 已弃用）。
+2. **选票**：每个篮子在 3⁷ = 2187 个元组中按冻结模型联合概率降序，买前 `n_i` 注。不用"每场选 2 个赛果"。
+3. **分配**：精确 DP 求 `min Σ log(1 − c_i)` s.t. `Σn_i = N`。篮子间场次不相交且模型视场次独立，所以 `P(≥1) = 1 − Π(1 − c_i)` 是**等式**。
+
+**要回答的问题**：模型给出的 `P(≥1)`，与实际结算命中的频率是否一致？
+
+对账同时做两个层级：**期级**（每期一个 Bernoulli(期望覆盖)）与**篮级**（每个已买篮子一个 Bernoulli(c_i)，样本量大得多）。
+
+## 这一轮不是什么
+
+- **不是**可交易回测：`expanded_pool$mode` 为 `EXPOSED_FIXTURE_RELATIVE_REVIEW_NOT_SIMULTANEOUS_TICKET`，即按各场自己的决策时刻算出的复盘池，**不是一张可同时下单的 7 串 1**。
+- **不是**完整历史：本 universe 是按 cohort 挑选的子集，结算库实际有 1660 期。
+- `historical_admission` 全程保持 `false`。可用性证据等级是**历史时间戳代理**，只能做诊断。
+
+（simultaneity 只影响"这些篮子历史上是否买得到"，**不影响覆盖对账本身**——对账检验的是每场概率的校准与篮子构造的算术。）
+
+```{r setup}
+library(dplyr); library(tidyr); library(readr); library(tibble); library(purrr); library(jsonlite); library(digest); library(ggplot2)
+# Quarto sets the working directory to THIS DOCUMENT'S directory (quarto/),
+# not the project root, whenever the file is rendered directly. Bare
+# source("r/...") therefore could never resolve, and the document was
+# unreproducible from a clean session. Resolve from the file's own location.
+root <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+source(file.path(root, "r", "joint_basket_construction.R"))
+source(file.path(root, "r", "joint_basket_inputs.R"))
+stopifnot(!is.null(params$source_root), !is.null(params$output_root))
+src <- params$source_root
+out <- params$output_root
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+
+impl_files <- file.path(root, c("r/joint_basket_construction.R", "r/joint_basket_inputs.R",
+                "quarto/254_joint_basket_out_of_sample.qmd"))
+impl_hashes_start <- vapply(impl_files, function(f) digest::digest(file = f, algo = "sha256"), character(1))
+
+catalogue <- jb_read_catalog(src)
+labels <- jb_read_labels(src)
+n_verified <- jb_verify_bundle_hashes(catalogue)
+catalogue_sha <- jb_sha256_file(file.path(src, "catalog.json"))
+labels_sha <- jb_sha256_file(file.path(src, "labels.json"))
+```
+
+```{r walkforward}
+K_GRID <- c(16, 32, 64, 128, 256, 512)
+order_issues <- sort(catalogue$issue)
+rows <- vector("list", length(order_issues)); basket_rows <- vector("list", length(order_issues))
+leg_rows <- vector("list", length(order_issues))
+for (i in seq_along(order_issues)) {
+  iss <- order_issues[i]
+  row <- catalogue[catalogue$issue == iss, ]
+  bundle <- jb_read_bundle(row$path, row$sha256)
+  design <- jb_issue_design(bundle, labels)
+  pf <- jb_construct_portfolio(design$pv, params$budget_cny, params$unit_cny)
+  hits <- jb_realised_hits(pf, design$pv, design$outcomes)
+  rows[[i]] <- tibble(issue = iss, cohort = row$cohort, n_fixtures = nrow(design$pv),
+                      n_groups = pf$n_groups, n_bought_groups = sum(pf$allocation > 0L),
+                      n_tickets = pf$n_tickets, stake = pf$n_tickets * params$unit_cny,
+                      expected_coverage = pf$expected_coverage,
+                      any_hit = any(hits, na.rm = TRUE))
+  # Frozen leg composition: the identity of every fixture bought in every basket.
+  # Later settlement work reads this file instead of re-deriving the portfolio.
+  leg_rows[[i]] <- bind_rows(lapply(seq_along(pf$groups), function(g) {
+    if (pf$allocation[g] <= 0L) return(NULL)
+    tibble(issue = iss, cohort = row$cohort, basket = g, leg = seq_len(7),
+           fixture_index = pf$groups[[g]], slot = bundle$fixtures$slot[pf$groups[[g]]],
+           provider_id = bundle$fixtures$provider_id[pf$groups[[g]]],
+           handicap = bundle$fixtures$handicap[pf$groups[[g]]],
+           outcome = design$outcomes[pf$groups[[g]]], tickets = pf$allocation[g])
+  }))
+  br <- vector("list", pf$n_groups)
+  for (g in seq_along(pf$groups)) {
+    if (pf$allocation[g] <= 0L) next
+    idx <- pf$groups[[g]]
+    pvg <- design$pv[idx, , drop = FALSE]; oc <- design$outcomes[idx]
+    grid <- jb_basket_joint_grid(pvg); ord <- order(grid, decreasing = TRUE); cdf <- cumsum(grid[ord])
+    # rank of the settled tuple in the full 3^7 ranking (1 = most likely)
+    rank_full <- match(jb_tuple_index(oc), ord)
+    # the "per-leg outcome selection" design: keep each leg's top-2 outcomes
+    top2 <- t(vapply(seq_len(7), function(j) order(-pvg[j, ])[1:2], integer(2)))
+    in2 <- vapply(seq_len(7), function(j) oc[j] %in% top2[j, ], logical(1))
+    rank_res <- jb_restricted_rank(pvg, top2, oc)
+    fm <- vapply(K_GRID, function(kk) cdf[min(kk, length(cdf))], numeric(1))
+    br[[g]] <- tibble(issue = iss, cohort = row$cohort, group = g, tickets = pf$allocation[g],
+                      mass = pf$masses[g], hit = hits[g], rank_full = rank_full,
+                      model_mean_rank = sum(seq_along(grid) * grid[ord]),
+                      all_top2 = all(in2),
+                      restricted_mass = prod(vapply(seq_len(7), function(j) sum(pvg[j, top2[j, ]]), numeric(1))),
+                      rank_restricted = rank_res) |>
+      bind_cols(as_tibble(as.list(stats::setNames(fm, paste0("fm", K_GRID)))))
+  }
+  basket_rows[[i]] <- bind_rows(br)
+  if (i %% 50 == 0) writeLines(paste0("issue ", i, " / ", length(order_issues)), file.path(out, "progress.txt"))
+}
+issues <- bind_rows(rows)
+baskets <- bind_rows(basket_rows)
+legs <- bind_rows(leg_rows)
+write_csv(issues, file.path(out, "issues.csv"))
+write_csv(baskets, file.path(out, "baskets.csv"))
+write_csv(legs, file.path(out, "legs.csv"))
+```
+
+## 期级对账
+
+```{r issue-level}
+wilson <- function(k, n, z = 1.96) {
+  p <- k / n; d <- 1 + z^2 / n
+  c((p + z^2 / (2 * n)) / d - z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / d,
+    (p + z^2 / (2 * n)) / d + z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / d)
+}
+issue_summary <- function(d, label) {
+  n <- nrow(d); k <- sum(d$any_hit)
+  ci <- wilson(k, n)
+  tibble(scope = label, issues = n, expected = mean(d$expected_coverage),
+         realised = k / n, ci_low = ci[1], ci_high = ci[2],
+         diff = k / n - mean(d$expected_coverage),
+         covered = ci[1] <= mean(d$expected_coverage) && mean(d$expected_coverage) <= ci[2])
+}
+issue_tbl <- bind_rows(issue_summary(issues, "ALL"), issue_summary(issues, "ORIGINAL"),
+                       issue_summary(issues, "ADDITIONAL"))
+issue_tbl |> mutate(across(c(expected, realised, ci_low, ci_high, diff), ~ round(.x, 4))) |> knitr::kable()
+```
+
+```{r issue-plot, fig.width=7, fig.height=4}
+issues |> ggplot(aes(expected_coverage)) +
+  geom_histogram(bins = 30, fill = "grey70", colour = "white") +
+  geom_vline(xintercept = mean(issues$expected_coverage), linetype = 2) +
+  labs(x = "模型期望覆盖 P(≥1)", y = "期数", title = "期望覆盖分布") + theme_minimal()
+```
+
+## 篮级对账（主检验）
+
+```{r basket-level}
+basket_summary <- function(d, label) {
+  n <- nrow(d); k <- sum(d$hit); ci <- wilson(k, n)
+  tibble(scope = label, baskets = n, expected = mean(d$mass), realised = k / n,
+         ci_low = ci[1], ci_high = ci[2], diff = k / n - mean(d$mass),
+         covered = ci[1] <= mean(d$mass) && mean(d$mass) <= ci[2])
+}
+basket_tbl <- bind_rows(basket_summary(baskets, "ALL"), basket_summary(baskets, "ORIGINAL"),
+                        basket_summary(baskets, "ADDITIONAL"))
+basket_tbl |> mutate(across(c(expected, realised, ci_low, ci_high, diff), ~ round(.x, 4))) |> knitr::kable()
+```
+
+```{r calibration}
+calib <- baskets |>
+  mutate(bin = cut(mass, breaks = c(0, .05, .10, .15, .20, .30, .50, 1),
+                   include.lowest = TRUE, right = FALSE)) |>
+  group_by(bin) |>
+  summarise(baskets = n(), expected = mean(mass), realised = mean(hit), .groups = "drop") |>
+  mutate(diff = realised - expected,
+         se = sqrt(expected * (1 - expected) / baskets),
+         z = diff / se)
+calib |> mutate(across(c(expected, realised, diff, se, z), ~ round(.x, 4))) |> knitr::kable()
+```
+
+```{r calib-plot, fig.width=6, fig.height=4}
+calib |> ggplot(aes(expected, realised)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  geom_errorbar(aes(ymin = realised - 1.96 * se, ymax = realised + 1.96 * se), width = 0.004) +
+  geom_point(aes(size = baskets)) +
+  labs(x = "篮级期望覆盖 c_i", y = "实际命中率", title = "篮级校准") + theme_minimal()
+```
+
+## 命中排名诊断：“选赛果”能否在联合框架下实施
+
+“选赛果”在联合框架下等价于对每场做**支撑限制** `S_j ⊆ {胜,平,负}`：只在 `∏S_j` 内排序买注。受限空间是原空间子集，故 `C_限制(N) ≤ C_全空间(N)` **恒成立**——固定 N 注时，限制**永远不会**提高模型期望覆盖。因此限制法只有在**模型对前 N 名之外的排序不可靠**时才可能划算。
+
+判定它需要比二元命中指标锋利得多的量：**命中组合的排名** `r`（1 = 最可能）。
+
+```{r rank-diagnostic}
+rq <- quantile(baskets$rank_full, c(.10, .25, .50, .75, .90, .99))
+tibble(统计量 = c("p10", "p25", "中位", "p75", "p90", "p99", "均值"),
+       `实际排名 r` = c(unname(rq), mean(baskets$rank_full)),
+       `模型隐含均值` = c(rep(NA_real_, 6), mean(baskets$model_mean_rank))) |>
+  mutate(across(where(is.numeric), ~ round(.x, 1))) |> knitr::kable()
+```
+
+**深度校准曲线**：模型在前 k 名的累计质量 `F_model(k)` 对实际概率 `F_real(k) = P(r ≤ k)`。逐点配对检验比篮级聚合更细。
+
+```{r depth-curve}
+depth <- tibble(k = K_GRID) |>
+  mutate(F_model = vapply(k, function(kk) mean(baskets[[paste0("fm", kk)]]), numeric(1)),
+         F_real = vapply(k, function(kk) mean(baskets$rank_full <= kk), numeric(1)),
+         diff = F_real - F_model,
+         z = vapply(k, function(kk) {
+           d <- as.numeric(baskets$rank_full <= kk) - baskets[[paste0("fm", kk)]]
+           mean(d) / (sd(d) / sqrt(length(d)))
+         }, numeric(1)))
+depth |> mutate(across(c(F_model, F_real, diff, z), ~ round(.x, 4))) |> knitr::kable()
+```
+
+```{r depth-plot, fig.width=6.5, fig.height=4}
+depth |> select(k, `模型 F_model` = F_model, `实际 F_real` = F_real) |>
+  pivot_longer(-k) |>
+  ggplot(aes(k, value, colour = name)) + geom_line() + geom_point() +
+  scale_x_log10() +
+  labs(x = "深度 k（注数）", y = "P(命中组合落入前 k 名)", colour = NULL,
+       title = "深度校准：模型 vs 实际") + theme_minimal()
+```
+
+**限制法的直接评估**——同一个票数（每篮 128 注）下两种设计的正面对比：
+
+```{r restriction}
+tibble(`设计（每篮 128 注）` = c("全空间 取前 128 名", "每场 Top2 买满受限空间"),
+       `实际覆盖` = c(mean(baskets$rank_full <= 128), mean(baskets$all_top2)),
+       `模型期望覆盖` = c(mean(baskets$fm128), mean(baskets$restricted_mass))) |>
+  mutate(across(where(is.numeric), ~ round(.x, 4))) |> knitr::kable()
+```
+
+```{r restriction-rank}
+surv <- filter(baskets, all_top2)
+# Contract: the restricted rank exists exactly for the tuples that live inside
+# the restricted space. A silent NA here once hid a base-mismatch bug.
+stopifnot(identical(is.na(baskets$rank_restricted), !baskets$all_top2))
+cat(sprintf("真实组合 7 条腿全部落在各自 Top2 内的比例 = %.4f\n", mean(baskets$all_top2)))
+cat(sprintf("此时它在受限空间（128 个元组）内的排名：中位 %.0f，p75 %.0f\n",
+            median(surv$rank_restricted), quantile(surv$rank_restricted, .75)))
+cat(sprintf("对照：它在全空间（2187 个元组）内的排名中位 %.0f\n", median(baskets$rank_full)))
+```
+
+**读法**：限制法**按你说的方式起作用**——在它保留的那批组合里，排名确实被压得更靠前（全空间中位 62 → 受限空间中位 29），所以同样的钱能“买得更深”。但**深度买到了，质量没有**：只有 13.99% 的真实组合 7 条腿全在 Top2 内，其余全部被这个支撑限制直接排除；等额 128 注下，限制法实际覆盖 13.99%，而全空间取前 128 名实际覆盖 23.44%，**净损失 9.44pp**。上面的逐点 `z` 值（最大 1.29）说明**没有可利用的错误排序**：模型在 k=16 到 512 全程校准，实际平均排名（627）与模型隐含平均排名（623）几乎相同。因此限制法在本数据上是**被严格支配**的，不是一条独立的可选路线。
+
+## 交付绑定
+
+```{r receipt}
+impl_hashes_end <- vapply(impl_files, function(f) digest::digest(file = f, algo = "sha256"), character(1))
+stopifnot(identical(impl_hashes_start, impl_hashes_end))
+
+receipt <- list(
+  scope = "joint-probability 7-leg basket construction, out-of-sample coverage reconciliation",
+  source_root = src,
+  output_root = out,
+  catalog_sha256 = catalogue_sha,
+  labels_sha256 = labels_sha,
+  bundles_verified = n_verified,
+  bundle_sha256 = unname(vapply(catalogue$path, jb_sha256_file, character(1))),
+  budget_cny = params$budget_cny, unit_cny = params$unit_cny,
+  payout_factor = params$payout_factor,
+  issues = nrow(issues), baskets = nrow(baskets),
+  expected_coverage_mean = mean(issues$expected_coverage),
+  realised_hit_rate = mean(issues$any_hit),
+  basket_expected_mean = mean(baskets$mass), basket_realised_rate = mean(baskets$hit),
+  historical_admission = FALSE,
+  availability_evidence = "HISTORICAL_TIMESTAMP_PROXY_DIAGNOSTIC_ONLY",
+  purchase_feasibility = "NOT_SIMULTANEOUS_TICKET_EXPOSED_FIXTURE_RELATIVE_POOL",
+  implementation = as.list(impl_hashes_end),
+  # Bind the emitted artifacts by CONTENT. digest(path) would hash the path
+  # string, not the file, and the binding would be vacuous.
+  results_sha256 = jb_sha256_file(file.path(out, "issues.csv")),
+  baskets_sha256 = jb_sha256_file(file.path(out, "baskets.csv")),
+  legs_sha256 = jb_sha256_file(file.path(out, "legs.csv")),
+  leg_rows = nrow(legs),
+  rank_median = median(baskets$rank_full),
+  rank_model_mean = mean(baskets$model_mean_rank),
+  depth_max_abs_z = max(abs(depth$z)),
+  coverage_full_128 = mean(baskets$rank_full <= 128),
+  coverage_restricted_top2 = mean(baskets$all_top2),
+  generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+)
+write_json(receipt, file.path(out, "receipt.json"), auto_unbox = TRUE, pretty = TRUE, digits = NA)
+cat(sprintf("期=%d 篮=%d  期级: 期望 %.4f 实际 %.4f  篮级: 期望 %.4f 实际 %.4f\n",
+  nrow(issues), nrow(baskets), mean(issues$expected_coverage), mean(issues$any_hit),
+  mean(baskets$mass), mean(baskets$hit)))
+```
+
+## 结论与边界
+
+```{r verdict}
+cat(sprintf("期级：期望 %.4f，实际 %.4f，95%% Wilson [%.4f, %.4f]，%s\n",
+  issue_tbl$expected[1], issue_tbl$realised[1], issue_tbl$ci_low[1], issue_tbl$ci_high[1],
+  if (issue_tbl$covered[1]) "区间覆盖期望（校准成立）" else "区间不含期望（校准不成立）"))
+cat(sprintf("篮级：期望 %.4f，实际 %.4f，95%% Wilson [%.4f, %.4f]，%s\n",
+  basket_tbl$expected[1], basket_tbl$realised[1], basket_tbl$ci_low[1], basket_tbl$ci_high[1],
+  if (basket_tbl$covered[1]) "区间覆盖期望（校准成立）" else "区间不含期望（校准不成立）"))
+cat(sprintf("深度：命中组合全空间排名中位 %.0f；模型隐含平均排名 %.0f vs 实际 %.0f；深度曲线最大 |z|=%.2f\n",
+  median(baskets$rank_full), mean(baskets$model_mean_rank), mean(baskets$rank_full), max(abs(depth$z))))
+cat(sprintf("限制法（每篮 128 注）：全空间 %.4f vs 每场Top2买满 %.4f\n",
+  mean(baskets$rank_full <= 128), mean(baskets$all_top2)))
+```
+
+**必须随结论一起读的边界：**
+
+1. **universe 是 cohort 挑选子集**（`ORIGINAL` 484 期 + `ADDITIONAL` 300 期），不是完整历史；结算库实际有 1660 期。两个 cohort 是**采集批次（provenance）标签**，不是策略、市场或质量区分：期号无交集，但日期区间重叠（121003–121114），且与年份几乎完全共线（`ORIGINAL` 只含 2010–2012，`ADDITIONAL` 只含 2012–2014）。因此分 cohort 的对比主要是**时间构成差异**，结论以 `ALL` 为准；控制年份后的对账见 `quarto/255_joint_basket_return.qmd`。
+2. **篮子不是可同时下单的票**：`mode = EXPOSED_FIXTURE_RELATIVE_REVIEW_NOT_SIMULTANEOUS_TICKET`。
+3. **可用性证据是历史时间戳代理**，不是观测到的可用性，故 `historical_admission = false`。
+4. **构建本身不含拟合**：选场与选票都由目标期自己的冻结概率决定，无跨期参数、无训练分区、无缓存。
+5. **未含回款**：本轮只对账覆盖（`P(≥1)`），未使用 `option_sp` 真实 SP，故没有任何收益结论。**回款结论见 `quarto/255_joint_basket_return.qmd`**，它读取本文件冻结的 `legs.csv`/`baskets.csv` 并校验下方哈希。
+6. **“选赛果”限制法已评估并判为被支配**：它是本空间的**支撑限制**，买满受限空间即可解析算出；同票数下始终低于全空间，且逐点深度校准未发现可利用的错误排序。
+7. **本文件的产物哈希绑定曾失效，现已修复**：原实现写作 `digest(path, algo = "sha256")`，它哈希的是**路径字符串的 R 序列化**而非文件内容，因此绑定与数据无关（实测 `digest("abc")` = `9f7b8da9…` ≠ `sha256("abc")` = `ba7816bf…`）。已改用 `jb_sha256_file()`（`digest(file = path)`），并加回归测试钉住该契约。**254 的 `results_sha256`/`baskets_sha256`/`legs_sha256` 只有在本版本及之后才是有效的**；更早的 receipt 不可用于内容校验。catalog/labels/bundle 哈希一直走 `jb_sha256_file()`，未受影响。
+
+## 函数与测试映射
+
+| 实现 | 对应自动化验证 |
+|---|---|
+| `jb_outcome_index`：结算净胜推导 W/D/L | `test-joint-basket-construction.R`（含让球恰好打平、缺失、长度不齐的失败路径） |
+| `jb_basket_joint_grid` / `jb_basket_joint_probs`：3ⁿ 联合概率枚举与排序 | 同上（质量守恒、降序、非法分布拒绝） |
+| `jb_tuple_index`：混合进制元组索引 | 同上（与未排序枚举逐格一致） |
+| `jb_top_mass`：top-n 质量和（部分排序） | 同上（与完全排序对照，含 n=0 与 n>length） |
+| `jb_greedy_select_group`：无参数贪心选场 | 同上（7 场互异、确定性、池不足与重复拒绝） |
+| `jb_allocate_tickets`：精确 DP 分配 | 同上（与穷举分配逐例一致；含单篮、零票、买满全空间的数值边界） |
+| `jb_basket_masses` / `jb_expected_coverage`：覆盖面 | 同上（单篮退化为质量和；不相交退化为独立恒等式） |
+| `jb_basket_hit` / `jb_realised_hits`：实际命中 | 同上（**按排名而非元组索引**判定；穷举 9 个元组 × 所有 n） |
+| `jb_construct_portfolio`：篮子组合 | 同上（互不相交、票数用尽、确定性、池不足与预算不足拒绝） |
+| `jb_read_catalog` / `jb_read_labels` / `jb_read_bundle` / `jb_issue_design`：输入边界 | 同上（哈希篡改、非完场、夹具未结算、让球不一致、重复身份、缺文件全部 fail closed） |
+
+## 验证命令与结果
+
+```bash
+Rscript -e 'library(testthat); testthat::test_file("tests/testthat/test-joint-basket-construction.R")'
+# FAIL 0 | PASS 223
+```
+
+- 784 个 bundle 哈希全量校验通过（7.3 秒）；`receipt.json` 绑定 `bundles_verified = 784`。
+- 渲染结尾重算实现哈希并与开头比对（`stopifnot(identical(impl_hashes_start, impl_hashes_end))`）。
+- 构建无随机源、无拟合、无跨期参数，故两次渲染结果逐位可复现。
+
+## `codex review` 状态：**未执行（合规缺口）**
+
+本轮**没有**通过 `codex review`：本机 Codex CLI 额度已耗尽，用户指示暂时跳过。
+
+依据 AGENTS.md「Skipped or failed required checks do not pass」，**本交付不构成通过验收**，也不得据此关闭任何 Issue。待补：
+
+1. 额度恢复后执行 `codex review -c sandbox_mode='"read-only"'`，审查对象为 `r/joint_basket_construction.R`、`r/joint_basket_inputs.R`、本 QMD、`tests/testthat/test-joint-basket-construction.R` 与 `_quarto.yml` 改动。
+2. 将审查命令、被审修订哈希、findings 与处置写回本节。
+3. 按 AGENTS.md 走实时 Issue Graph 补救；本交付未新增或改写任何图关系。

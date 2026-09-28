@@ -1,0 +1,40 @@
+{
+  "status": "accepted",
+  "scope": "new standalone collection and cleaning QMD; existing public functions reused",
+  "review_command": "codex review - < .run-control/data-lab-review-final.txt",
+  "review_log": ".run-control/data-lab-review-final.log",
+  "findings": {
+    "initial": 2,
+    "final": 0,
+    "resolutions": [
+      "skip SP collector on empty future schedule with explicit typed-empty diagnostic",
+      "convert selected totals UTC instants to Asia/Shanghai for display"
+    ]
+  },
+  "tests": {
+    "command": "R_LIBS=\"$PWD/r_lib\" Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE);testthat::test_file(\"tests/testthat/test-data-collection-lab.R\",stop_on_failure=TRUE)'",
+    "passed": 5,
+    "failed": 0,
+    "warnings": 0,
+    "mapping": "actual QMD SP/settlement block with no future fixtures and NULL backend; ensures no collection call"
+  },
+  "hashes": {
+    "quarto/data_collection_lab.qmd": "5ae77122df9fda383d448d91d1d1c488023cdcda4ff5db8ca25531033ddf7a8c",
+    "tests/testthat/test-data-collection-lab.R": "34c22c24efc175ef37ad16ca24979b2669a1b4d69c44140f69b44116b0a6eed1"
+  },
+  "render_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/data_collection_lab.qmd --to html --no-cache",
+  "limitations": [
+    "Default offline snapshot inspection, not raw HTML parser replay",
+    "No live website availability test or collection performed",
+    "Existing native-ID-matched name/kickoff differences remain visible warnings",
+    "No CI or whole-repository test run; no reusable function implementation changed"
+  ],
+  "created_at": "2026-09-27T01:20:36.125423+00:00",
+  "render": {
+    "exit_code": 0,
+    "tables": 21,
+    "execution_errors": 0,
+    "source_difference_warnings": 1,
+    "log": ".run-control/data-lab-render-delivery.log"
+  }
+}

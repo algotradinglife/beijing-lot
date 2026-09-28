@@ -1,0 +1,444 @@
+---
+title: "274 26097 期跟单表（北单口径）"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+  warning: false
+---
+
+<style>
+table.track { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0 6px; }
+table.track th, table.track td { border: 1px solid #d1d5db; padding: 4px 6px; text-align: center; }
+table.track th { background: #f3f4f6; font-weight: 600; }
+table.track td.vs { text-align: left; white-space: nowrap; }
+td.pick { background: #d1fae5; font-weight: 700; color: #065f46; }
+td.rec { color: #065f46; font-weight: 600; }
+.ok { color: #059669; font-weight: 700; }
+.bad { color: #dc2626; font-weight: 700; }
+.pend { color: #9ca3af; }
+table.settle { border-collapse: collapse; margin: 6px 0 18px; font-size: 13px; }
+table.settle th, table.settle td { border: 1px solid #d1d5db; padding: 4px 10px; text-align: center; }
+table.settle th { background: #f3f4f6; }
+tr.total td { background: #fef3c7; font-weight: 700; }
+</style>
+
+```{r setup}
+library(dplyr); library(tidyr); library(tibble); library(jsonlite); library(knitr)
+find_root <- function(start = '.') {
+  p <- normalizePath(start, mustWork = TRUE)
+  for (i in 1:6) { if (file.exists(file.path(p, 'r', 'joint_basket_layers.R'))) return(p); p <- dirname(p) }
+  stop('repo root not found')
+}
+root <- find_root()
+source(file.path(root, 'r', 'joint_basket_dc_fit.R'))
+source(file.path(root, 'r', 'dixon_coles_grid.R'))
+source(file.path(root, 'r', 'joint_basket_layers.R'))
+
+cfg <- list(n = 7L, unit_cny = 2, payout_factor = 0.65, n_bundles = 4L,
+            units_per_bundle = 128L, n_high = 3L, hi_depth = 2L, lo_depth = 3L, rho = -0.14)
+base <- readRDS(file.path(root, '.tmpwork', '_d97_base.rds')) |> as_tibble()
+spf  <- fromJSON(file.path(root, '.tmpwork', '_26097_spf.json'), simplifyVector = FALSE)
+jq   <- fromJSON(file.path(root, '.tmpwork', '_26097_jq.json'),  simplifyVector = FALSE)
+```
+
+## 结论摘要
+
+本期 26097 的选场与选赛果，**全部基于北单**：`p = 北单让球胜平负 SP 比例去水`，
+总进球期望来自北单总进球，`jc_fit_rates(p, exp_total, hcp, -0.14)`
+（北单 SPF 本身即让球口径，在 `hcp` 上拟合是对的）。
+
+跟单表列出每一场**胜 / 平 / 负三个赛果及其 SP**，**推荐选项已高亮**（绿色底），
+最右列为**命中状态**；结果出来后填 `inputs/26097_results.csv` 重新渲染即可自动结算。
+
+> **不要把模型自评的 +17.4% 当预期收益。** 26097 的 DC 残差中位 0.0582，
+> 是 8 期研究水平（0.0273）的约 1.9 倍，`ev>1` 组合占比同步从 9.08% 升到 16.59%。
+> 合理预期是**接近盈亏平衡或略负**（8 期研究自评 −2.1%，784 期冻结样本外 −1.23%）。
+
+## 输入与契约
+
+| 项 | 值 |
+| --- | --- |
+| 期次 | 26097 |
+| 概率来源 | **北单让球胜平负 SP**（`cp.nowscore.com` TypeID=5）+ **北单总进球 SP**（TypeID=6） |
+| 收益来源 | 北单让球胜平负 SP |
+| 固定 N | 7 |
+| 单位注额 | 2 元 |
+| 派奖系数 | 0.65（最后一次性施加） |
+| 派彩 SP | **结算 SP**（500 开奖页终值），**不是**下单时的计划 SP——两者会漂移，见第六节 |
+| 篮子 | 4 个，每篮 3 高 + 4 低，截断 2×2×2×3×3×3×3 = 648 |
+| 每篮出资 | 128 注 × 2 元 = 256 元，每期 1024 元 |
+| 结果输入 | `inputs/26097_results.csv`（列：`slot,outcome`，outcome 取 胜/平/负） |
+
+```{r}
+spmap <- list()
+for (r in spf) {
+  o <- suppressWarnings(as.numeric(unlist(lapply(r$options, function(x) x$sp))))
+  nm <- unlist(lapply(r$options, function(x) x$option))
+  if (length(o) >= 3 && all(c('胜','平','负') %in% nm))
+    spmap[[as.character(r$slot)]] <- c(W = o[match('胜', nm)], D = o[match('平', nm)], L = o[match('负', nm)])
+  else if (length(o) >= 3) spmap[[as.character(r$slot)]] <- o[1:3]
+}
+jqmap <- list()
+for (r in jq) {
+  v <- suppressWarnings(as.numeric(unlist(lapply(r$options, function(x) x$sp))))
+  if (length(v) == 8) jqmap[[as.character(r$slot)]] <- v
+}
+exp_total <- function(v) {
+  if (length(v) != 8 || any(!is.finite(v)) || any(v <= 1)) return(NA_real_)
+  pr <- 1/v; pr <- pr/sum(pr); sum(pr * c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5))
+}
+
+out <- list(); k <- 0L; skipped <- character(0)
+for (i in seq_len(nrow(base))) {
+  s <- as.character(base$slot[i]); sp <- spmap[[s]]; jv <- jqmap[[s]]
+  tot <- if (is.null(jv)) NA_real_ else exp_total(jv)
+  if (is.null(sp) || any(!is.finite(sp)) || any(sp <= 1)) { skipped <- c(skipped, s); next }
+  if (!is.finite(tot)) { skipped <- c(skipped, s); next }
+  p  <- jc_devig(sp)
+  pr <- tryCatch(jc_fit_rates(p, tot, as.integer(base$hcp[i]), cfg$rho), error = function(e) NULL)
+  if (is.null(pr) || !is.finite(pr$residual)) { skipped <- c(skipped, s); next }
+  k <- k + 1L
+  out[[k]] <- tibble(slot = base$slot[i], league = base$league[i], home = base$home[i],
+    away = base$away[i], hcp = as.integer(base$hcp[i]), kick = base$kick[i],
+    exp_total = pr$expected_total, residual = pr$residual,
+    pW = p[1], pD = p[2], pL = p[3], qW = pr$fitted[1], qD = pr$fitted[2], qL = pr$fitted[3],
+    spW = sp[1], spD = sp[2], spL = sp[3])
+}
+d <- bind_rows(out) |> mutate(cert = pmax(qW, qD, qL))
+
+# --- results input: fill inputs/26097_results.csv to settle -------------------
+OUT_CN <- c(W = '胜', D = '平', L = '负')
+results_csv <- file.path(root, 'inputs', '26097_results.csv')
+actual <- NULL
+if (file.exists(results_csv)) {
+  rr <- utils::read.csv(results_csv, stringsAsFactors = FALSE, colClasses = 'character')
+  if (!all(c('slot', 'outcome') %in% names(rr))) stop('results csv needs columns slot,outcome')
+  map <- c('胜' = 'W', '平' = 'D', '负' = 'L', 'W' = 'W', 'D' = 'D', 'L' = 'L')
+  o <- unname(map[rr$outcome])
+  if (anyNA(o)) stop('results csv outcome must be 胜/平/负 (or W/D/L)')
+  actual <- stats::setNames(o, rr$slot)
+}
+
+# --- settled SP: the authoritative payout odds --------------------------------
+# Plan-time SP (spf/jq above) drives funding and the ev ranking, which is correct:
+# that is what a bettor sees when placing. But the PAYOUT must use the settled SP,
+# per the project rule (quarto/255_joint_basket_return.qmd):
+#   派彩 = unit_cny x payout_factor x prod(7 legs 的官方 SP) = 2 x 0.65 x prod(SP)
+# 500.com finalises SP at settlement and it drifts from plan-time SP, so valuing a
+# winning ticket at plan SP overstates or understates the real return.
+settled_sp_csv <- file.path(root, 'inputs', '26097_settled_sp.csv')
+settled_sp <- NULL
+if (file.exists(settled_sp_csv)) {
+  ss <- utils::read.csv(settled_sp_csv, stringsAsFactors = FALSE)
+  if (!all(c('slot', 'winning_sp') %in% names(ss))) stop('settled sp csv needs columns slot,winning_sp')
+  ss <- ss[!is.na(ss$winning_sp) & ss$winning_sp > 0, , drop = FALSE]
+  settled_sp <- stats::setNames(ss$winning_sp, as.character(ss$slot))
+}
+known_slots <- if (is.null(actual)) character(0) else names(actual)
+# jt_fund needs a concrete dirn; 'X' is an unreachable sentinel so unknown legs cannot match.
+d$dirn <- unname(vapply(as.character(d$slot), function(s) {
+  a <- unname(actual[as.character(s)]); if (length(a) == 0 || is.na(a)) 'X' else a }, character(1)))
+
+B <- lapply(seq_len(cfg$n_bundles), function(b) {
+  bb <- jt_pick_fixtures(d, cfg$n_high, b - 1L)
+  list(bb = bb, sh = jt_leg_shape(bb, cfg$hi_depth, cfg$lo_depth))
+})
+```
+
+```{r}
+# The gate must compare entered results against the slots the tickets actually
+# use, not against every fitted fixture: the results csv only ever covers ticket
+# legs, so 'length(known_slots) >= nrow(d)' compared 13 legs to 20 fitted
+# fixtures and could never report 全部可结算 even when every leg was known.
+ticket_slots <- unique(unlist(lapply(B, function(x) as.character(x$bb$slot))))
+n_ticket <- length(ticket_slots)
+n_known_ticket <- sum(ticket_slots %in% known_slots)
+tibble(项目 = c('可用场次', '拟合成功', '因总进球缺失被剔除', '残差 mean', '残差 median', '残差 max',
+               '跟单表涉及场次', '已录入结果场次', '跟单状态'),
+       值 = c(nrow(base), nrow(d), length(skipped),
+              sprintf('%.5f', mean(d$residual)), sprintf('%.5f', median(d$residual)),
+              sprintf('%.5f', max(d$residual)),
+              n_ticket, n_known_ticket,
+              if (n_known_ticket == 0) '未开始（全部待定）' else if (n_known_ticket >= n_ticket) '全部可结算' else '部分结算')) |> kable()
+```
+
+## 一、拟合诊断：为什么不能相信「正期望」
+
+`ev = q × SP × 0.65` 本身就是每单位的期望毛回报，但**残差决定了它的可信度**。
+
+```{r}
+diag <- bind_rows(lapply(seq_along(B), function(b) {
+  bb <- B[[b]]$bb; sh <- B[[b]]$sh
+  al <- jt_fund(bb, sh, 1000000L, 'ev')$funded
+  fu <- jt_fund(bb, sh, cfg$units_per_bundle, 'ev')$funded
+  tibble(组合 = b, 全空间平均ev = mean(al$ev), 全空间最大ev = max(al$ev),
+         pct_gt1 = 100*mean(al$ev > 1), 出资均值ev = mean(fu$ev))
+}))
+bind_rows(
+  tibble(口径 = '26097 (本版)', 全空间平均ev = mean(diag$全空间平均ev),
+         全空间最大ev = max(diag$全空间最大ev), ev大于1占比 = sprintf('%.2f%%', mean(diag$pct_gt1)),
+         出资均值ev = mean(diag$出资均值ev)),
+  tibble(口径 = '8 期研究对照', 全空间平均ev = 0.7406, 全空间最大ev = 2.0093,
+         ev大于1占比 = '9.08%', 出资均值ev = 0.9790)) |> kable(digits = 4)
+```
+
+出资均值 `ev = 1.174` 要成立，模型必须在被选组合上比市场准约 `1.174 / 0.65 = 1.81` 倍，
+而 0.65 抽水本身已要求 ≥ 1.54 倍。结合 1.9 倍的残差退化，这更可能是拟合噪声。
+
+## 二、跟单表
+
+绿色底为**推荐**（高确定性腿保留前 2，低确定性腿保留前 3）；最右列为命中状态。
+
+```{r, results = 'asis'}
+hcp_txt <- function(h) if (h == 0L) '0' else sprintf('%+d', h)
+for (b in seq_along(B)) {
+  bb <- B[[b]]$bb; sh <- B[[b]]$sh
+  if (knitr::is_html_output()) {
+    cat(sprintf('<h3>组合 %d</h3>\n', b))
+    cat('<table class="track"><thead><tr><th>腿</th><th>角色</th><th>场序</th><th>联赛</th><th>对阵</th><th>让球</th><th>胜 SP</th><th>平 SP</th><th>负 SP</th><th>推荐</th><th>命中</th></tr></thead><tbody>\n')
+  }
+  rows <- list()
+  for (i in seq_len(nrow(bb))) {
+    # unname() matters: bb$qW[i] already carries the name 'W', and c(W = c(W = x))
+    # would name the entry 'W.W', making sc[['W']] an out-of-bounds subscript.
+    sc <- c(W = unname(bb$qW[i]), D = unname(bb$qD[i]), L = unname(bb$qL[i]))
+    sp <- c(W = unname(bb$spW[i]), D = unname(bb$spD[i]), L = unname(bb$spL[i]))
+    keep <- unname(names(sort(sc, decreasing = TRUE))[seq_len(sh[i])])
+    a <- unname(actual[as.character(bb$slot[i])])
+    a <- if (length(a) == 0) NA_character_ else a
+    stat <- if (is.na(a)) list(txt = '待定', cls = 'pend')
+            else if (a %in% keep) list(txt = paste0(OUT_CN[[a]], ' ✓'), cls = 'ok')
+            else list(txt = paste0(OUT_CN[[a]], ' ✗'), cls = 'bad')
+    if (knitr::is_html_output()) {
+      cells <- vapply(c('W','D','L'), function(o)
+        sprintf('<td class="%s">%.2f</td>', if (o %in% keep) 'pick' else '', sp[[o]]), character(1))
+      cat(sprintf('<tr><td>%d</td><td>%s</td><td>%d</td><td>%s</td><td class="vs">%s vs %s</td><td>%s</td>%s%s%s<td class="rec">%s</td><td><span class="%s">%s</span></td></tr>\n',
+        i, ifelse(bb$role[i] == 'high', '高', '低'), bb$slot[i], bb$league[i],
+        bb$home[i], bb$away[i], hcp_txt(bb$hcp[i]), cells[1], cells[2], cells[3],
+        paste(OUT_CN[keep], collapse = ' / '), stat$cls, stat$txt))
+    } else {
+      rows[[length(rows) + 1L]] <- tibble(腿 = i, 角色 = ifelse(bb$role[i] == 'high', '高', '低'),
+        场序 = bb$slot[i], 对阵 = sprintf('%s vs %s', bb$home[i], bb$away[i]),
+        让球 = hcp_txt(bb$hcp[i]), 胜 = sp[['W']], 平 = sp[['D']], 负 = sp[['L']],
+        推荐 = paste(vapply(keep, function(o) paste0('[', OUT_CN[[o]], ']'), character(1)), collapse = ' '),
+        命中 = stat$txt)
+    }
+  }
+  if (knitr::is_html_output()) cat('</tbody></table>\n') else print(kable(bind_rows(rows)))
+}
+```
+
+## 三、结算收益
+
+结果未录入时显示「待定」；把实际赛果写进 `inputs/26097_results.csv` 后重新渲染，本节自动结算。
+
+> **派彩用结算 SP，不是计划 SP。** 计划 SP 决定下单时的出资与 `ev` 排序（这正确——
+> 那是下注时能看到的价格）；但**派彩按项目口径**用结算终值：
+> `派彩 = 2 × 0.65 × ∏(7 条腿的结算 SP)`
+> （与 `quarto/255_joint_basket_return.qmd`、`r/joint_basket_settlement.R::jb_official_sp` 一致）。
+> 500 在开奖时确定各选项终值 SP，**与下单时不同**，故两者必须分开列示。
+
+```{r, results = 'asis'}
+# Payout uses SETTLED SP; the funding/ev ranking above deliberately keeps plan SP.
+settled_price <- function(bb, fu) {
+  hit <- fu$is_actual
+  if (!any(hit)) return(0)
+  legs <- as.character(bb$slot)
+  if (is.null(settled_sp) || !all(legs %in% names(settled_sp))) return(NA_real_)
+  prod(unname(settled_sp[legs]))
+}
+S <- bind_rows(lapply(seq_along(B), function(b) {
+  bb <- B[[b]]$bb; sh <- B[[b]]$sh
+  f <- jt_fund(bb, sh, cfg$units_per_bundle, 'ev'); fu <- f$funded
+  ready <- all(as.character(bb$slot) %in% known_slots)
+  stake <- sum(fu$units) * cfg$unit_cny
+  n_hit <- if (ready) sum(fu$is_actual) else NA_integer_
+  sp_settled <- if (ready) settled_price(bb, fu) else NA_real_
+  gross <- if (ready && !is.na(sp_settled)) sum(fu$units[fu$is_actual]) * cfg$unit_cny * cfg$payout_factor * sp_settled else NA_real_
+  tibble(组合 = as.character(b), 投入 = stake,
+         中奖注数 = n_hit,
+         结算SP = sp_settled,
+         毛回报 = gross,
+         净收益 = ifelse(is.na(gross), NA_real_, gross - stake))
+}))
+tot <- tibble(组合 = '合计', 投入 = sum(S$投入),
+              中奖注数 = if (all(is.na(S$中奖注数))) NA_integer_ else sum(S$中奖注数, na.rm = TRUE),
+              结算SP = NA_real_,
+              毛回报 = if (all(is.na(S$毛回报))) NA_real_ else sum(S$毛回报, na.rm = TRUE),
+              净收益 = if (all(is.na(S$净收益))) NA_real_ else sum(S$净收益, na.rm = TRUE))
+fmt <- function(x) ifelse(is.na(x), '待定', formatC(x, format = 'f', big.mark = ',', digits = 0))
+fmtsp <- function(x) ifelse(is.na(x), '待定', ifelse(x == 0, '—', formatC(x, format = 'f', digits = 6)))
+S2 <- bind_rows(S, tot)
+if (knitr::is_html_output()) {
+  cat('<table class="settle"><thead><tr><th>组合</th><th>投入(元)</th><th>中奖注数</th><th>结算累计 SP</th><th>毛回报(元)</th><th>净收益(元)</th></tr></thead><tbody>\n')
+  for (i in seq_len(nrow(S2))) {
+    cls <- if (S2$组合[i] == '合计') ' class="total"' else ''
+    cat(sprintf('<tr%s><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n',
+      cls, S2$组合[i], fmt(S2$投入[i]), fmt(S2$中奖注数[i]), fmtsp(S2$结算SP[i]), fmt(S2$毛回报[i]), fmt(S2$净收益[i])))
+  }
+  cat('</tbody></table>\n')
+} else {
+  print(kable(S2 |> mutate(across(where(is.numeric), fmt))))
+}
+```
+
+```{r}
+if (all(is.na(S$净收益))) {
+  cat('结算状态：未开始。各组合投入 256 元，合计 1024 元，等待结果录入。\n')
+} else {
+  money <- function(x) formatC(x, format = 'f', big.mark = ',', digits = 0)
+  cat(sprintf('结算状态：投入 %s 元，毛回报 %s 元，净收益 %s 元（ROI %+.1f%%）。\n',
+    money(sum(S$投入)), money(sum(S$毛回报, na.rm = TRUE)), money(sum(S$净收益, na.rm = TRUE)),
+    100 * sum(S$净收益, na.rm = TRUE) / sum(S$投入)))
+}
+```
+
+### 3.1 逐票核对（赛果组合、累计 SP、出资排序）
+
+每张票只买 `units_per_bundle` = 128 注，从截断后的 648 个组合里**按 `ev` 降序**取。
+下表让每一票都可核对：实际赛果组合、它的累计 SP、抽水后单注回报，
+以及它在**全部 648 个组合中的 ev 排名**——排名高于 128 才会被买进。
+
+```{r, results = 'asis'}
+# Full 648-space enumeration, so the ev rank is comparable across funded/not-funded.
+ticket_detail <- bind_rows(lapply(seq_along(B), function(b) {
+  bb <- B[[b]]$bb; sh <- B[[b]]$sh
+  f <- jt_fund(bb, sh, cfg$units_per_bundle, 'ev'); fu <- f$funded
+  sup <- lapply(seq_len(7L), function(i) {
+    sc <- stats::setNames(c(bb$qW[[i]], bb$qD[[i]], bb$qL[[i]]), c('W','D','L'))
+    unname(names(sort(sc, decreasing = TRUE))[seq_len(sh[i])]) })
+  idx <- expand.grid(rep(list(seq_len(3L)), 7L), KEEP.OUT.ATTRS = FALSE)
+  cube <- matrix(vapply(seq_len(7L), function(i) c('W','D','L')[idx[[i]]], character(nrow(idx))), nrow = nrow(idx))
+  keep <- rep(TRUE, nrow(cube))
+  for (i in seq_len(7L)) keep <- keep & (cube[, i] %in% sup[[i]])
+  cube <- cube[keep, , drop = FALSE]
+  q <- matrix(vapply(seq_len(7L), function(i) c(bb$qW[[i]], bb$qD[[i]], bb$qL[[i]])[match(cube[,i], c('W','D','L'))], numeric(nrow(cube))), nrow = nrow(cube))
+  sp <- matrix(vapply(seq_len(7L), function(i) c(bb$spW[[i]], bb$spD[[i]], bb$spL[[i]])[match(cube[,i], c('W','D','L'))], numeric(nrow(cube))), nrow = nrow(cube))
+  tb <- tibble(combo = apply(cube, 1, paste0, collapse = ''),
+               prob = apply(q, 1, prod), price = apply(sp, 1, prod))
+  tb <- tb |> mutate(ev = prob * price * 0.65)
+  tb <- tb |> arrange(desc(ev), combo) |> mutate(ev_rank = row_number())
+  act <- paste(bb$dirn, collapse = '')
+  row <- tb[tb$combo == act, , drop = FALSE]
+  known <- all(as.character(bb$slot) %in% known_slots)
+  tibble(组合 = b, known = known, combo = act,
+         prob = if (nrow(row)) row$prob[1] else NA_real_,
+         price = if (nrow(row)) row$price[1] else NA_real_,
+         ev = if (nrow(row)) row$ev[1] else NA_real_,
+         ev_rank = if (nrow(row)) row$ev_rank[1] else NA_integer_,
+         funded = act %in% fu$combo,
+         hit = if (known) any(fu$is_actual) else NA,
+         units = if (known) sum(fu$units[fu$is_actual]) else NA_integer_,
+         # plan SP (what the ticket was priced at when placed)
+         plan_price = if (known) fu$price[fu$is_actual][1] %||% NA_real_ else NA_real_,
+         # settled SP (authoritative payout odds)
+         settled_price = if (known && any(fu$is_actual) && !is.null(settled_sp)) prod(unname(settled_sp[as.character(bb$slot)])) else if (known) NA_real_ else NA_real_,
+         payout = if (known && any(fu$is_actual) && !is.null(settled_sp)) 2 * 0.65 * prod(unname(settled_sp[as.character(bb$slot)])) else if (known) 0 else NA_real_)
+}))
+money2 <- function(x) ifelse(is.na(x), '待定', formatC(x, format = 'f', big.mark = ',', digits = 2))
+if (knitr::is_html_output()) {
+  cat('<table class="settle"><thead><tr><th>组合</th><th>实际赛果组合</th><th>概率</th><th>计划累计 SP</th><th>结算累计 SP</th><th>ev</th><th>ev 排序(/648)</th><th>是否买进</th><th>中奖注数</th><th>单注毛回报(元)</th></tr></thead><tbody>\n')
+  for (i in seq_len(nrow(ticket_detail))) {
+    d <- ticket_detail[i, ]
+    cat(sprintf('<tr><td>%d</td><td class="vs">%s</td><td>%.6f</td><td>%.2f</td><td>%s</td><td>%.4f</td><td>%d</td><td>%s</td><td>%s</td><td>%s</td></tr>\n',
+      d$组合, d$combo, d$prob, d$price, fmtsp(d$settled_price), d$ev, d$ev_rank,
+      ifelse(d$funded, '<span class="ok">是</span>', '<span class="bad">否（超出出资线）</span>'),
+      ifelse(is.na(d$units), '待定', as.character(d$units)), money2(d$payout)))
+  }
+  cat('</tbody></table>\n')
+} else {
+  print(kable(ticket_detail |> mutate(across(where(is.numeric), ~round(.x, 4)))))
+}
+```
+
+**读法**：`是否买进` 为「否」的组合，其 ev 排名在 128 之外，那 256 元注定归零——
+不是「差一点命中」，而是该组合从未在该票的出资范围内。
+
+### 3.2 中奖票的逐腿累计 SP 与抽水
+
+```{r, results = 'asis'}
+winning <- ticket_detail |> filter(!is.na(hit) & hit)
+if (nrow(winning) == 0) {
+  cat('当前无中奖票（或结果尚未录入）。\n')
+} else {
+  for (w in seq_len(nrow(winning))) {
+    b <- winning$组合[w]
+    bb <- B[[b]]$bb
+    cat(sprintf('<h4>组合 %d —— 累计 SP %.6f</h4>\n', b, winning$price[w]))
+    if (knitr::is_html_output()) {
+      cat('<table class="track"><thead><tr><th>腿</th><th>场序</th><th>对阵</th><th>让球</th><th>实际</th><th>计划 SP</th><th>结算 SP</th><th>累计结算 SP</th></tr></thead><tbody>\n')
+    }
+    run <- 1; run_settled <- 1; rows_w <- list()
+    for (i in seq_len(nrow(bb))) {
+      o <- bb$dirn[i]
+      spv <- c(W = unname(bb$spW[i]), D = unname(bb$spD[i]), L = unname(bb$spL[i]))[[o]]
+      run <- run * spv
+      sslot <- as.character(bb$slot[i])
+      sps <- if (!is.null(settled_sp) && sslot %in% names(settled_sp)) unname(settled_sp[[sslot]]) else NA_real_
+      if (!is.na(sps)) run_settled <- run_settled * sps
+      if (knitr::is_html_output()) {
+        cat(sprintf('<tr><td>%d</td><td>%d</td><td class="vs">%s vs %s</td><td>%s</td><td>%s</td><td>%.2f</td><td>%s</td><td>%s</td></tr>\n',
+          i, bb$slot[i], bb$home[i], bb$away[i], hcp_txt(bb$hcp[i]), OUT_CN[[o]], spv,
+          ifelse(is.na(sps), '待定', sprintf('%.2f', sps)),
+          ifelse(is.na(sps), '待定', sprintf('%.6f', run_settled))))
+      } else {
+        rows_w[[length(rows_w) + 1L]] <- tibble(腿 = i, 场序 = bb$slot[i], 实际 = OUT_CN[[o]], SP = spv, 累计 = run)
+      }
+    }
+    if (knitr::is_html_output()) cat('</tbody></table>\n') else print(kable(bind_rows(rows_w), digits = 6))
+    cat(sprintf('<p><b>计划</b>累计 SP = %.6f（下单时定价）；<b>结算</b>累计 SP = %s（派彩依据）。<br>派彩 = 2 × 0.65 × %s = <b>%s 元</b>；净收益 = %s − 256 = <b>%s 元</b>。</p>\n',
+      winning$price[w], fmtsp(winning$settled_price), fmtsp(winning$settled_price),
+      money2(winning$payout[w]), money2(winning$payout[w]), money2(winning$payout[w] - 256)))
+  }
+}
+```
+
+## 四、如何更新结果
+
+> **当前状态：已录入 13/13 场，全部可结算。** 赛果取自 500.com 官方开奖页
+> （`trade.500.com/bjdc/?expect=26097`），用项目自带的
+> `scripts/collect_500_historical_settlement.py::parse_settlement` 解析；
+> 13 场的让球盘口与跟单表逐场一致，作为身份匹配校验。
+> Nowscore 的 26097 页只列出未开赛场次，不含已完赛结果，故未采用。
+
+1. 把已完赛场次的赛果写进 `inputs/26097_results.csv`：
+
+   ```
+   slot,outcome
+   17,胜
+   20,胜
+   19,负
+   ```
+
+   `slot` 用跟单表里的「场序」，`outcome` 取 `胜`/`平`/`负`（也接受 `W`/`D`/`L`）。
+   只写已完赛的场次即可，未写的场次显示「待定」。
+
+2. 重新渲染，HTML 自动更新命中状态与结算：
+
+   ```bash
+   export TMPDIR=$PWD/.tmpwork R_LIBS_USER=$PWD/r_lib
+   quarto render quarto/274_bj26097_plan.qmd
+   ```
+
+## 五、风险与预期
+
+- **不要把 +17.4% 当预期。** 见第一节：残差退化 1.9 倍、`ev>1` 占比从 9.08% 升到 16.59%。
+  按模型自身的校准水平，合理预期是**接近盈亏平衡或略负**。
+- 8 期研究的模型自评期望是 **−2.1%**；本项目 784 期冻结样本外审计是 **−1.23%**。
+- 该结构的赔付来自 7 腿连乘的高方差，不是正期望：8 期中 4 期归零。
+- 单腿结构性期望约 −35%（北单 booksum 1.00183 × 0.65 派奖系数）。
+- **篮子必然重叠**：只有 20 场可拟合，4 篮需 28 场；实际用到 13 个唯一场次、9 场被复用。
+  7 串 1 允许同一场出现在不同票上，但篮子不独立。
+- **时间口径**：26097 的 SP 是期次开始前抓取的盘口，与「每期统一下注」一致。
+
+## 六、局限
+
+- 输入是工作产物（`.tmpwork/_d97_base.rds`、`_26097_spf.json`、`_26097_jq.json`），未纳入冻结契约。
+- slot 18/22/23 因总进球 SP 缺失被剔除（上游票务缺口，非解析失败）。
+- `rho = -0.14` 为冻结值，未在 26097 上重新标定。
+- 未运行 `codex review`。

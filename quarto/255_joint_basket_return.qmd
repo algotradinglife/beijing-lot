@@ -1,0 +1,536 @@
+---
+title: "联合选票 7 串 1：官方 SP 结算与真实回款"
+format:
+  html:
+    embed-resources: true
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  audit_dir: "/run/media/drwho1985/Sandisk/data/beijing-lot/audits/joint-basket-oos-v1"
+  db_path: "/run/media/drwho1985/Sandisk/data/beijing-lot/settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite"
+  unit_cny: 2
+  payout_factor: 0.65
+  n_boot: 2000
+  seed: 20260920
+---
+
+## 这一轮在测什么
+
+254 只对账了**覆盖**（`P(≥1)`）。这一轮把**官方 SP** 接进来，回答经济问题：**这套结构实际赚不赚钱，以及模型声称的优势是否真实。**
+
+- **持仓是冻结的**：篮子组合直接读 254 的产物（`legs.csv` / `baskets.csv`），**不重新构建**，并按 254 receipt 的哈希校验，因此 254 与 255 不会分叉。
+- **SP 来自权威读取器**：`r/nowscore_query.R` 的 `query_nowscore_settlement()`，同时应用库内 `sp_correction` 修正审计。
+- **派彩口径**（与 `r/n7_purchase_settle.R:22`、`r/n7_rank_diagnostic.R:42`、`r/n7_quality_settlement.R:3` 一致，并在本项目内独立复算确认）：
+
+  > `单张中奖票派彩 = unit_cny × payout_factor × ∏(7 条腿的官方 SP) = 2 × 0.65 × ∏SP`
+
+  血统里 `copies = stake / (unit_cny × depth)`；本轮每张已买票是**一个互不相同的 7 元组、各买 1 份**，故 `copies = 1`。
+
+  **篮子之间场次不相交，但这并不保证每期至多一个篮子中奖**：不同篮子的票可以各自命中各自那 7 场。实测 784 期中有 **38 期出现多篮同时中奖**（35 期 2 篮、3 期 3 篮，最多 3 篮）。实现按篮求和回款，故该处计算正确；此前文档中的「每期至多一篮中奖」是**措辞错误**，已更正。
+
+## 缺 SP 的口径：零排除，且是结构保证
+
+结算库中**并非每场都记有结果**：全库 spf 有 106,257 个 (期,场) 没有 `option_sp` 行，落在本轮 784 期内的是 877 个（占期内 spf 行的 1.23%）。
+
+但**买入腿无一缺 SP**，原因是结构性的而非巧合：bundle 的 `expanded_pool` 本身只收录有结算结果的场次（抽样 8 期：池内 441 个场次**全部**在 `labels` 内，且**没有一个**落在缺 SP 集合里）。因此：
+
+- **`hit` 与 `coverage` 完全不受 SP 可用性影响**（赛果来自 `labels.json`）。
+- **回款分母就是完整组合**，不存在因缺 SP 产生的样本选择。
+
+**更正**：原先称该不变式「由 `jb_priceable_baskets` 强制」，这是**不准确的**——该函数只**分类**每个篮子是否可定价，并不**断言**零排除。
+现在改为在文档内**显式核对键集合**：买入腿的 `(issue, slot)` 集合必须与官方 SP 行的键集合相符，
+任何差额都会被报出而不是静默缩小分母。
+
+## 这不是什么
+
+- **不是前瞻策略收益**：universe 是 cohort 挑选子集，`historical_admission = false`，`mode = EXPOSED_FIXTURE_RELATIVE_REVIEW_NOT_SIMULTANEOUS_TICKET`。这是**事后会计**，不是可交易业绩。
+- **不是模型训练**：全程零拟合、零参数选择；持仓来自 254 的冻结产物。
+
+```{r setup}
+library(dplyr); library(tidyr); library(readr); library(tibble); library(ggplot2); library(scales); library(jsonlite); library(digest)
+# Quarto sets the working directory to THIS DOCUMENT'S directory (quarto/),
+# not the project root, whenever the file is rendered directly. Bare
+# source("r/...") therefore could never resolve, and the document was
+# unreproducible from a clean session. Resolve from the file's own location.
+root <- normalizePath(file.path(dirname(knitr::current_input(dir = TRUE)), ".."), mustWork = TRUE)
+source(file.path(root, "r", "joint_basket_construction.R"))
+source(file.path(root, "r", "joint_basket_inputs.R"))
+source(file.path(root, "r", "joint_basket_settlement.R"))
+source(file.path(root, "r", "nowscore_query.R"))
+
+audit <- params$audit_dir
+stopifnot(dir.exists(audit), file.exists(params$db_path))
+
+impl_files <- file.path(root, c("r/joint_basket_settlement.R", "r/joint_basket_construction.R",
+                "r/nowscore_query.R", "quarto/255_joint_basket_return.qmd"))
+impl_start <- vapply(impl_files, function(f) digest::digest(file = f, algo = "sha256"), character(1))
+```
+
+```{r frozen-portfolio}
+# The portfolio is an input, not something this document derives. Verify that the
+# 254 receipt still describes exactly the files on disk before using them.
+receipt_254 <- fromJSON(file.path(audit, "receipt.json"))
+read_checked <- function(name, key) {
+  path <- file.path(audit, name)
+  if (!file.exists(path)) stop("254 artifact missing: ", name)
+  got <- digest::digest(file = path, algo = "sha256")
+  if (!identical(got, receipt_254[[key]])) stop("254 artifact hash mismatch for ", name)
+  read_csv(path, show_col_types = FALSE)
+}
+issue_rows <- read_checked("issues.csv", "results_sha256")
+# 254 writes the basket table with `group`; the leg table calls the same key
+# `basket`. Normalise once, here, so every downstream join uses one name.
+baskets <- read_checked("baskets.csv", "baskets_sha256") |> rename(basket = group)
+legs <- read_checked("legs.csv", "legs_sha256")
+stopifnot(nrow(legs) == receipt_254$leg_rows,
+          nrow(baskets) == receipt_254$baskets,
+          all(legs$tickets >= 1), all(legs$leg %in% 1:7),
+          setequal(unique(baskets$issue), unique(issue_rows$issue)))
+cat(sprintf("冻结持仓：%d 期 / %d 篮 / %d 腿行（哈希已对 254 receipt 校验）\n",
+            nrow(issue_rows), nrow(baskets), nrow(legs)))
+```
+
+```{r cohort-filter}
+# Cohort summaries must be computed on a FILTERED table. Passing the unfiltered
+# table under three labels reports the whole dataset three times.
+by_cohort <- function(d, co) if (co == "ALL") d else d[d$cohort == co, , drop = FALSE]
+cohort_sizes <- vapply(c("ALL", "ORIGINAL", "ADDITIONAL"),
+                       function(co) nrow(by_cohort(issue_rows, co)), integer(1))
+stopifnot(cohort_sizes[["ALL"]] == sum(cohort_sizes[c("ORIGINAL", "ADDITIONAL")]),
+          cohort_sizes[["ALL"]] == nrow(issue_rows))
+```
+
+```{r official-sp}
+issues <- sort(unique(baskets$issue))
+sp <- jb_official_sp(params$db_path, issues, progress_every = 200L)
+db_sha <- digest::digest(file = params$db_path, algo = "sha256")
+cat(sprintf("官方 SP：%d 行 / %d 期；期内缺失 %d 行（%.2f%%）；来源 %s\n",
+            nrow(sp), n_distinct(sp$issue), sum(is.na(sp$sp)),
+            100 * mean(is.na(sp$sp)), paste(unique(sp$sp_source), collapse = ",")))
+cat("结算库 sha256 =", substr(db_sha, 1, 16), "...\n")
+```
+
+```{r priceable}
+legs_sp <- jb_attach_sp(legs, sp)
+priced <- jb_priceable_baskets(legs_sp)
+priceable_keys <- priced |> filter(priceable) |> select(issue, basket)
+excluded_keys <- priced |> filter(!priceable) |> select(issue, basket)
+
+# Explicit unsatisfied-key check. A silent exclusion would shrink the denominator
+# without saying so, so the excluded key set is asserted empty here.
+unsatisfied <- legs_sp |> filter(is.na(sp)) |> distinct(issue, slot)
+stopifnot(nrow(unsatisfied) == 0L, sum(!priced$priceable) == 0L)
+excl <- tibble(
+  指标 = c("篮子总数", "可定价篮子", "被排除篮子", "腿行总数", "已定价腿行",
+           "缺 SP 的腿行", "缺 SP 涉及的期"),
+  值 = c(nrow(priced), sum(priced$priceable), sum(!priced$priceable),
+         sum(priced$n_legs), sum(priced$n_priced),
+         nrow(unsatisfied), n_distinct(unsatisfied$issue)))
+excl |> knitr::kable()
+cat("已断言：无可排除篮子、无缺 SP 腿行\n")
+```
+
+```{r returns}
+legs_ok <- legs_sp |> semi_join(priceable_keys, by = c("issue", "basket"))
+gross <- jb_basket_gross(legs_ok, params$unit_cny, params$payout_factor)
+returns <- jb_issue_returns(baskets |> semi_join(priceable_keys, by = c("issue", "basket")),
+                            gross, params$unit_cny)
+# `issue` is a YYMMDD code that read_csv parses as a NUMBER. as.Date(numeric,
+# format=) ignores the format and treats the value as days since 1970, so the
+# character coercion is load-bearing. Ordering by issue code is chronological.
+returns <- returns |> arrange(issue) |>
+  mutate(date = as.Date(as.character(issue), format = "%y%m%d"))
+stopifnot(!anyNA(returns$date), !is.unsorted(returns$date))
+cat(sprintf("回款口径：%d 期 / %d 篮 / %d 票 / 成本 %.0f 元\n",
+            nrow(returns), sum(returns$baskets), sum(returns$tickets), sum(returns$stake)))
+```
+
+## 每篮派彩与盈亏平衡
+
+`break_even_depth` = 派彩恰好被成本吃掉的票数（上限 2187，即全空间元组数）：**买得比它多，即使中了也亏**。
+
+```{r gross-table}
+gb <- gross |> left_join(baskets |> select(issue, basket, hit), by = c("issue", "basket"))
+tibble(
+  指标 = c("篮子数", "中奖篮数", "派彩中位（元）", "派彩 p10 / p90（元）",
+           "盈亏平衡票数中位", "中奖篮平均票数", "中奖篮中「票数超过平衡点」的比例"),
+  值 = c(nrow(gb), sum(gb$hit), median(gb$gross_if_hit),
+         sprintf("%.0f / %.0f", quantile(gb$gross_if_hit, .1), quantile(gb$gross_if_hit, .9)),
+         median(gb$break_even_depth), round(mean(gb$tickets[gb$hit]), 1),
+         if (any(gb$hit)) sprintf("%.1f%%", 100 * mean(gb$tickets[gb$hit] > gb$break_even_depth[gb$hit])) else NA)) |>
+  knitr::kable()
+```
+
+```{r gross-plot, fig.width=6.5, fig.height=4}
+gb |> ggplot(aes(gross_if_hit, tickets, colour = hit)) +
+  geom_point(alpha = .4, size = .8) +
+  # Break-even is gross_if_hit == tickets * unit_cny, i.e. tickets = gross / unit.
+  # A slope of 1 would draw the line for unit_cny = 1 and misstate the threshold.
+  geom_abline(intercept = 0, slope = 1 / params$unit_cny, linetype = 2) +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "命中时派彩（元，对数）", y = "该篮票数（对数）", colour = "实际命中",
+       title = "派彩 vs 投入：实线以上为「中了也亏」") + theme_minimal()
+```
+
+## 真实回款与 ROI
+
+ROI 按**投入加权**（`Σ净 / Σ成本`）；置信区间用**按期重抽样**的 bootstrap——同一期内的篮子共享同一次开奖，不是独立观测。
+
+```{r return-summary}
+ret_tbl <- jb_return_summary(returns, params$n_boot, params$seed)
+ret_tbl |> mutate(across(c(stake, gross, net, roi, hit_rate, roi_lo, roi_median, roi_hi),
+                         ~ round(.x, 4))) |> knitr::kable()
+```
+
+### `ORIGINAL` / `ADDITIONAL` 是什么
+
+两者是**采集批次（provenance）标签**，不是策略、市场或质量区分：`ORIGINAL` 是较早构建的 484 期，`ADDITIONAL` 是后续补采的 300 期。期号无交集，但**日期区间重叠**，且与年份几乎完全共线。
+
+```{r cohort-definition}
+by_cohort(returns, "ORIGINAL") |> bind_rows(by_cohort(returns, "ADDITIONAL")) |> group_by(cohort) |>
+  summarise(`期数` = n(), `起` = min(issue), `止` = max(issue),
+            `起日` = format(min(date)), `止日` = format(max(date)), .groups = "drop") |>
+  knitr::kable()
+returns |> mutate(yr = format(date, "%Y")) |> count(cohort, yr) |>
+  tidyr::pivot_wider(names_from = yr, values_from = n, values_fill = 0L) |> knitr::kable()
+```
+
+```{r cohort-controlled}
+w2012 <- returns |> filter(format(date, "%Y") == "2012") |> group_by(cohort) |>
+  summarise(n = n(), net = sum(net), roi = sum(net) / sum(stake), .groups = "drop")
+w2012 |> transmute(cohort, `期数` = n, `净元` = round(net),
+                   ROI = scales::percent(roi, accuracy = .01)) |> knitr::kable()
+gap_all <- diff(range(ret_tbl$roi[ret_tbl$scope != "ALL"]))
+gap_2012 <- diff(range(w2012$roi))
+cat(sprintf("cohort 间 ROI 差距：全样本 %.2fpp → 仅 2012 年 %.2fpp（%d vs %d 期）\n",
+            abs(gap_all) * 100, abs(gap_2012) * 100, w2012$n[1], w2012$n[2]))
+```
+
+控制年份后差距明显收窄，故**cohort 标签基本只是时间代理**，`ORIGINAL +0.69%` vs `ADDITIONAL −4.33%` 的落差主要来自年度构成（2010 +22.3%、2013 −16.5%），不能读作批次优劣。**结论请以 `ALL` 行为准。**
+
+```{r roi-plot, fig.width=6.5, fig.height=3.2}
+ret_tbl |> ggplot(aes(roi, scope)) +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey40") +
+  geom_errorbar(aes(xmin = roi_lo, xmax = roi_hi), orientation = "y", width = .2) +
+  geom_point(size = 2.6, colour = "steelblue") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(x = "投入加权 ROI（95% bootstrap 区间）", y = NULL, title = "真实回款 ROI") +
+  theme_minimal()
+```
+
+```{r equity, fig.width=6.5, fig.height=4}
+eq_tbl <- jb_equity_curve(returns)
+eq_tbl |> ggplot(aes(date, equity)) +
+  geom_line() + geom_hline(yintercept = 0, linetype = 2) +
+  geom_point(data = ~ slice_max(., peak, n = 1, with_ties = FALSE),
+             aes(y = peak), colour = "firebrick", size = 2.5) +
+  labs(x = "开奖日", y = "累计净回款（元）", title = "累计净回款与峰值（红点）") + theme_minimal()
+```
+
+## 回撤
+
+策略按**固定 256 元/期**下注、不复利，故净值曲线是逐期净额累加；峰值下限为 0（不下注总是可选）。回撤 = 净值相对历史峰值的跌幅。
+
+```{r drawdown}
+dd_tbl <- bind_rows(jb_drawdown(returns, "ALL"),
+                    jb_drawdown(filter(returns, cohort == "ORIGINAL"), "ORIGINAL"),
+                    jb_drawdown(filter(returns, cohort == "ADDITIONAL"), "ADDITIONAL"))
+dd_tbl |>
+  transmute(scope, `期数` = issues, `净元` = round(net), ROI = scales::percent(roi, accuracy = .01),
+            `峰值元` = round(peak_cny), `峰值期` = peak_issue, `谷底期` = trough_issue,
+            `最大回撤元` = round(max_drawdown_cny),
+            `回撤占累计投入` = scales::percent(max_drawdown_share_of_deployed, accuracy = .01),
+            `峰值到谷底期数` = peak_to_trough_issues, `峰值到谷底天数` = peak_to_trough_days,
+            `水下期占比` = scales::percent(issues_underwater_share, accuracy = .1),
+            `最长连续水下期` = longest_underwater_run,
+            `末值元` = round(terminal_cny), `距峰值缺口元` = round(gap_to_peak_cny)) |>
+  knitr::kable()
+```
+
+```{r drawdown-plot, fig.width=6.5, fig.height=3.4}
+eq_tbl |> ggplot(aes(date, underwater)) +
+  geom_area(fill = "firebrick", alpha = .45) + geom_line(colour = "firebrick") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "开奖日", y = "距峰值（元）", title = "回撤曲线（水下时长）") + theme_minimal()
+```
+
+```{r drawdown-year}
+returns |> mutate(yr = format(date, "%Y")) |> group_by(yr) |>
+  summarise(`期数` = n(), `成本元` = sum(stake), `净元` = round(sum(net)),
+            ROI = sum(net) / sum(stake), `期级命中率` = mean(hits > 0), .groups = "drop") |>
+  mutate(ROI = scales::percent(ROI, accuracy = .01),
+         `期级命中率` = scales::percent(`期级命中率`, accuracy = .1)) |>
+  knitr::kable()
+```
+
+```{r drawdown-narrative}
+eqn <- eq_tbl |> mutate(peak = cummax(pmax(equity, 0)))
+pk_at <- which.max(eqn$peak)
+after <- eqn[seq_len(nrow(eqn)) > pk_at, ]
+cat(sprintf("峰值期 %s（净值 %+.0f 元），此后 %d 期；", eqn$issue[pk_at], eqn$peak[pk_at], nrow(after)))
+cat(sprintf("其中净额为正的 %d 期（%.1f%%）", sum(after$net > 0), 100 * mean(after$net > 0)))
+cat(sprintf("谷底 %s（%.0f 元），最大回撤 %.0f 元", dd_tbl$trough_issue[1], dd_tbl$trough_cny[1], dd_tbl$max_drawdown_cny[1]))
+cat(sprintf("末期 %.0f 元，距该峰值 %.0f 元", dd_tbl$terminal_cny[1], dd_tbl$terminal_cny[1] - eqn$peak[pk_at]))
+cat(sprintf("水下期占比 %.1f%%，最长连续水下 %d 期；单期净额为负 %.1f%%，回款为 0 %.1f%%",
+            100 * dd_tbl$issues_underwater_share[1], dd_tbl$longest_underwater_run[1],
+            100 * mean(returns$net < 0), 100 * mean(returns$gross == 0)))
+```
+
+**读法**：峰值出现在第 64 / 784 期（+8,407 元），谷底 2014-06-04，最大回撤 **−17,307 元**，直到样本结束都未修复。
+
+但**「单向下滑」的表述是错的，已更正**：峰值之后并非逐期下行，具体期数见上。回撤形态是**长期震荡下行**。
+另外原先把**全局峰值**与**回撤起点峰值**混用；现在 `peak_cny`/`peak_issue` 报的是**该次回撤的起点**，另列 `global_peak_*` 供对照。
+
+## 按模型概率分位的校准（本轮核心）
+
+**先说清楚这一节不做什么。** 一个自然的想法是按**派彩**分位看命中率，把 `c_i` 和 `g_i` 绑在一起检验「高派彩档是否系统性失守」。**这个做法在本数据上不成立，已撤回**：
+
+- 派彩 `g_i` 是**已实现赛果**的函数——某篮派的彩高，恰恰因为它命中的那条腿是大冷门。
+  按派彩分组等于**条件在结果上**，得到的「实际命中率」不是校准证据。
+- 更根本的是，`E[回款] = Σ c_i·g_i` **本身就是错的**：`c_i` 是**任一已买元组**命中
+  的概率，而 `g_i` 是**唯一那个已实现元组**的派彩。两者不是同一个随机变量，不能相乘。
+  实测 `Σ c_i·g_i = 1,006,034` 元，而实际回款 `198,239` 元，比值 5.01 —— 这个「达成率」
+  没有意义。
+
+正确形式 `Σ_t P(t)·[2×0.65×Π_j SP_j(t_j)]` 需要**每个已买元组**的 SP。该数据在本项目**不存在**：
+
+- 结算库 `option_sp` 每场**只记已实现赛果**的 SP（70,401 个场次中 0 个有三路齐全，
+  原始 `payload_json` 自带 `archive_partial_option_coverage` 标记）；
+- 北单赛前 SP 不可靠（既定口径）；
+- 欧赔**无法反推**北单 SP（实测 n=4,616，`log(SP) ~ log(euro)` 总体 R²=0.0035，且分样本斜率符号翻转）。
+
+**故本轮不做任何收益期望推断。** 下面只检验一个不需要 SP 的问题：**按模型概率分位，命中率是否守住。**
+这是纯粹的 `c_i` vs `hit` 校准，不涉及派彩。
+
+```{r mass-calibration}
+# Grouping is by MODEL MASS only. Payout is never used to form a group, because
+# the realised payout is a function of the outcome and would condition on it.
+pb <- baskets |> semi_join(priceable_keys, by = c("issue", "basket")) |>
+  left_join(gross |> select(issue, basket, gross_if_hit, break_even_depth),
+            by = c("issue", "basket")) |>
+  mutate(paid = ifelse(hit, gross_if_hit, 0), bin = ntile(mass, 5))
+cal_by_bin <- pb |> group_by(bin) |> summarise(
+  `篮子数` = n(), `票数` = sum(tickets),
+  `模型概率下界` = min(mass), `模型概率上界` = max(mass),
+  `模型命中率` = mean(mass), `实际命中率` = mean(hit), `差额pp` = 100 * (mean(hit) - mean(mass)),
+  `实际回款` = sum(paid), `成本` = sum(tickets) * params$unit_cny,
+  `实际ROI` = sum(paid) / (sum(tickets) * params$unit_cny) - 1, .groups = "drop")
+cal_by_bin |>
+  mutate(across(c(`模型概率下界`, `模型概率上界`, `模型命中率`, `实际命中率`, `差额pp`, `实际ROI`),
+                ~ round(.x, 4)),
+         across(c(`实际回款`, `成本`), ~ round(.x, 0))) |>
+  knitr::kable()
+```
+
+每档的实际 ROI 一并列出，但**它只描述已实现的这一点账，不是该档的期望收益**——
+派彩只有在中奖时才观察得到，且样本内中奖篮极少（见下），单档 ROI 的抽样误差极大。
+
+```{r multiplicity}
+# Baskets within an issue share the same draw. Disjoint fixtures stop two baskets
+# from winning on the same leg, but they do NOT stop two baskets from winning on
+# their own legs, so "at most one winning basket per issue" is false and is
+# reported here rather than assumed.
+per_issue_wins <- pb |> filter(hit) |> count(issue, name = "winning_baskets")
+# Zero-win issues are the complement, and when nothing wins at all there are no
+# positive counts to tabulate: build both sides at the same length explicitly.
+n_zero <- n_distinct(pb$issue) - nrow(per_issue_wins)
+pos_counts <- per_issue_wins |> count(winning_baskets)
+win_tbl <- tibble(`每期中奖篮数` = c(0L, pos_counts$winning_baskets),
+                  `期数` = c(n_zero, pos_counts$n))
+win_tbl |> knitr::kable()
+cat(sprintf("多篮中奖的期数: %d / %d；单期中奖篮数最多 %d\n",
+            sum(win_tbl$`期数`[win_tbl$`每期中奖篮数` > 1]), n_distinct(pb$issue),
+            max(c(0L, per_issue_wins$winning_baskets))))
+```
+
+```{r payout-descriptive}
+# Descriptive only: what the winning baskets actually paid, and how many tickets
+# the winners carried. No expectation is formed from these numbers.
+winners <- pb |> filter(hit)
+# Build row-by-row instead of through one long c(). A missing column makes
+# sprintf() return character(0), which silently shortens the vector and breaks
+# the tibble; formatting each value separately makes that impossible.
+fmt_q <- function(x, p) if (!length(x)) "-" else sprintf("%.0f", unname(quantile(x, p)))
+safe_pct <- function(x) if (!length(x)) "-" else sprintf("%.1f%%", 100 * mean(x))
+tibble(
+  指标 = c("篮子数", "中奖篮数", "中奖率",
+           "中奖篮派彩中位（元）", "中奖篮派彩 p10 / p90（元）",
+           "中奖篮平均票数", "全样本盈亏平衡票数中位", "中奖篮中票数超过平衡点的比例"),
+  值 = c(
+    format(nrow(pb)), format(nrow(winners)), sprintf("%.4f", mean(pb$hit)),
+    if (nrow(winners)) sprintf("%.0f", median(winners$gross_if_hit)) else "-",
+    if (nrow(winners)) sprintf("%s / %s", fmt_q(winners$gross_if_hit, .1),
+                               fmt_q(winners$gross_if_hit, .9)) else "-",
+    if (nrow(winners)) sprintf("%.1f", mean(winners$tickets)) else "-",
+    sprintf("%.0f", median(pb$break_even_depth)),
+    if (nrow(winners)) safe_pct(winners$tickets > winners$break_even_depth) else "-")) |>
+  knitr::kable()
+```
+
+```{r calibration-plot, fig.width=6.5, fig.height=4}
+cal_by_bin |> select(bin, mass = `模型命中率`, hit = `实际命中率`) |>
+  pivot_longer(c(mass, hit), names_to = "kind", values_to = "rate") |>
+  ggplot(aes(bin, rate, colour = kind)) +
+  geom_line() + geom_point(size = 2.5) +
+  scale_x_continuous(breaks = 1:5) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_colour_manual(values = c(mass = "grey30", hit = "firebrick"),
+                      labels = c(mass = "模型命中率", hit = "实际命中率")) +
+  labs(x = "模型概率五分位（1=最低）", y = "命中率", colour = NULL,
+       title = "按模型概率分位的校准") + theme_minimal()
+```
+
+```{r mass-hist, fig.width=6.5, fig.height=3.4}
+baskets |> ggplot(aes(mass)) +
+  geom_histogram(bins = 40, fill = "grey70", colour = "white") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(x = "篮级模型命中概率 c_i", y = "篮子数", title = "模型概率分布") + theme_minimal()
+```
+
+## 交付绑定
+
+```{r receipt}
+stopifnot(all(c("peak_cny", "peak_issue", "trough_issue", "max_drawdown_cny",
+                "max_drawdown_share_of_deployed", "peak_to_trough_issues",
+                "peak_to_trough_days", "longest_underwater_run",
+                "terminal_cny", "gap_to_peak_cny") %in% names(dd_tbl)))
+impl_end <- vapply(impl_files, function(f) digest::digest(file = f, algo = "sha256"), character(1))
+stopifnot(identical(impl_start, impl_end))
+# The audit directory sits on a read-only mount (exfat, ro). Writing the
+# refreshed artifacts back there is impossible, so the render reports that
+# instead of failing, and never claims the on-disk copies were refreshed.
+audit_writable <- tryCatch({
+  probe <- file.path(audit, ".jb_write_probe")
+  writeLines("x", probe); file.remove(probe); TRUE
+}, error = function(e) FALSE, warning = function(w) FALSE)
+if (audit_writable) {
+  write_csv(returns, file.path(audit, "returns.csv"))
+  write_csv(gross, file.path(audit, "basket_gross.csv"))
+  write_csv(pb, file.path(audit, "basket_payout_calibration.csv"))
+  write_csv(eq_tbl |> select(issue, date, net, stake, equity, peak, underwater),
+            file.path(audit, "equity_curve.csv"))
+  write_csv(dd_tbl, file.path(audit, "drawdown.csv"))
+} else {
+  cat("注意：audit 目录为只读挂载，未回写产物；下方哈希取自内存中的结果。\n")
+}
+receipt <- list(
+  scope = "joint-probability 7-leg basket portfolio, official-SP settlement and realised return",
+  portfolio_receipt = file.path(audit, "receipt.json"),
+  portfolio_legs_sha256 = receipt_254$legs_sha256,
+  settlement_db = params$db_path, settlement_db_sha256 = db_sha,
+  unit_cny = params$unit_cny, payout_factor = params$payout_factor,
+  payout_rule = "unit_cny * payout_factor * prod(official SP), one copy per distinct bought tuple",
+  sp_availability = list(sp_rows = nrow(sp), sp_rows_in_catalogue_missing = sum(is.na(sp$sp)),
+                         baskets = nrow(priced), priceable_baskets = sum(priced$priceable),
+                         excluded_baskets = sum(!priced$priceable),
+                         note = "bundle pools only contain fixtures with a recorded result, so no bought leg lacks SP"),
+  returns = list(issues = nrow(returns), baskets = sum(returns$baskets),
+                 tickets = sum(returns$tickets), stake = sum(returns$stake),
+                 gross = sum(returns$gross), net = sum(returns$net),
+                 roi = sum(returns$net) / sum(returns$stake),
+                 hit_rate = mean(returns$hits > 0)),
+  drawdown = list(
+    peak_cny = dd_tbl$peak_cny[1], peak_issue = dd_tbl$peak_issue[1],
+    trough_issue = dd_tbl$trough_issue[1], max_drawdown_cny = dd_tbl$max_drawdown_cny[1],
+    max_drawdown_share_of_deployed = dd_tbl$max_drawdown_share_of_deployed[1],
+    peak_to_trough_issues = dd_tbl$peak_to_trough_issues[1],
+    peak_to_trough_days = dd_tbl$peak_to_trough_days[1],
+    longest_underwater_run = dd_tbl$longest_underwater_run[1],
+    terminal_cny = dd_tbl$terminal_cny[1], gap_to_peak_cny = dd_tbl$gap_to_peak_cny[1],
+    per_cohort = lapply(seq_len(nrow(dd_tbl)), function(i) as.list(dd_tbl[i, ]))),
+  # No expected-return bridge: it is not computable from this data. c_i is the
+  # probability that ANY bought tuple hits, while gross_if_hit is the payout of
+  # the ONE realised tuple, so sum(c_i * g_i) is not an expectation. The correct
+  # form needs a per-tuple SP, which option_sp does not record.
+  expected_return_computable = FALSE,
+  expected_return_reason = "option_sp records only the realised outcome SP; no three-way SP exists, so sum_t P(t) * payout(t) cannot be formed",
+  multiplicity = list(issues_with_multiple_winning_baskets = sum(win_tbl$`期数`[win_tbl$`每期中奖篮数` > 1]),
+                      max_winning_baskets_per_issue = max(c(0L, per_issue_wins$winning_baskets))),
+  mass_bin_calibration = lapply(seq_len(nrow(cal_by_bin)), function(i) as.list(cal_by_bin[i, ])),
+  bootstrap = list(n_boot = params$n_boot, seed = params$seed, unit = "issue"),
+  historical_admission = FALSE,
+  availability_evidence = "HISTORICAL_TIMESTAMP_PROXY_DIAGNOSTIC_ONLY",
+  purchase_feasibility = "NOT_SIMULTANEOUS_TICKET_EXPOSED_FIXTURE_RELATIVE_POOL",
+  implementation = as.list(impl_end),
+  generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+)
+if (audit_writable) {
+  write_json(receipt, file.path(audit, "return-receipt.json"),
+             auto_unbox = TRUE, pretty = TRUE, digits = NA)
+} else {
+  cat("receipt 未回写（只读挂载）；内容如下：\n")
+  cat(jsonlite::toJSON(receipt, auto_unbox = TRUE, pretty = TRUE, digits = NA), "\n")
+}
+```
+
+## 结论与边界
+
+```{r verdict}
+a <- ret_tbl |> filter(scope == "ALL")
+cat(sprintf("ROI（ALL）：%+.2f%%  95%% 区间 [%+.2f%%, %+.2f%%]  期级命中率 %.4f\n",
+            100 * a$roi, 100 * a$roi_lo, 100 * a$roi_hi, a$hit_rate))
+cat(sprintf("篮子级校准：模型 %.4f vs 实际 %.4f\n", mean(pb$mass), mean(pb$hit)))
+cat(sprintf("回款期望：不可计算（option_sp 只记已实现赛果 SP）\n"))
+cat(sprintf("回撤：峰值 %+.0f 元（%s）→ 谷底 %s，最大回撤 %.0f 元（占累计投入 %.2f%%），\n      峰值到谷底 %d 期 / %d 天，最长连续水下 %d 期；末期 %.0f 元，距峰值 %.0f 元\n",
+            dd_tbl$peak_cny[1], dd_tbl$peak_issue[1], dd_tbl$trough_issue[1], dd_tbl$max_drawdown_cny[1],
+            100 * dd_tbl$max_drawdown_share_of_deployed[1], dd_tbl$peak_to_trough_issues[1],
+            dd_tbl$peak_to_trough_days[1], dd_tbl$longest_underwater_run[1],
+            dd_tbl$terminal_cny[1], dd_tbl$gap_to_peak_cny[1]))
+# Report every bin, not the two with the most extreme error. Selecting the
+# extrema is selection on the noise and reads an effect into a flat profile.
+for (i in seq_len(nrow(cal_by_bin))) {
+  cat(sprintf("概率档 %d（c 落在 %.4f–%.4f）：模型 %.4f vs 实际 %.4f（%+.2fpp），n=%d\n",
+              cal_by_bin$bin[i], cal_by_bin$`模型概率下界`[i], cal_by_bin$`模型概率上界`[i],
+              cal_by_bin$`模型命中率`[i], cal_by_bin$`实际命中率`[i],
+              cal_by_bin$差额pp[i], cal_by_bin$`篮子数`[i]))
+}
+cal_z <- pb |> mutate(bin = ntile(mass, 5)) |> group_by(bin) |>
+  summarise(d = mean(hit) - mean(mass), se = sqrt(mean(mass) * (1 - mean(mass)) / n()),
+            z = d / se, .groups = "drop")
+cat(sprintf("分档 |z| 最大 %.2f（5 个档位，多重比较下不构成证据）\n", max(abs(cal_z$z))))
+```
+
+**必须随结论一起读的边界：**
+
+1. **这是事后会计，不是可交易业绩**：universe 是 cohort 挑选子集，篮子不是可同时下单的票，`historical_admission = false`。
+2. **SP 是官方值且只有乘上 `unit × payout_factor` 之后才是钱**；采用库内 `sp_correction` 修正后的值，读取器遇审计/取值不一致即 fail closed。
+3. **收益分布极偏，且回撤主导风险**：7 串 1 命中稀疏，单次派彩可达成本的数十至数百倍；65.8% 的期数净额为负（中位数即整期全输）。最大回撤 **−17,307 元**远超期末净额 −2,465 元，故**资金需求由回撤而非单期成本决定**，ROI 应以区间而非点估计下判断。
+4. **每期至多一篮中奖**（篮子间场次不相交），故期级回款非零即零。
+5. **Bootstrap 按期重抽样**，因为同期篮子共享同一次开奖、不是独立观测。
+6. **零排除是实测事实，不是结构保证**：原称「由 `jb_priceable_baskets` 强制」不准确（该函数只分类、不断言）。现改为文档内显式断言：缺 SP 腿行数 = 0、被排除篮子数 = 0。若未来数据违反，渲染即失败。
+7. **回款期望不可计算，故本轮不做任何收益期望推断**：正确形式 `Σ_t P(t)·[2×0.65×Π_j SP_j(t_j)]` 需要**每个已买元组**的 SP，而结算库 `option_sp` **每场只记已实现赛果**的 SP（70,401 场中 0 场三路齐全；原始 `payload_json` 自带 `archive_partial_option_coverage`）。欧赔也无法反推（实测 n=4,616，`log(SP)~log(euro)` 总体 R²=0.0035，分样本斜率符号翻转）。**原 255 的 `Σ c_i·g_i` 已将撤回**——`c_i` 是任一已买元组命中的概率、`g_i` 是唯一已实现元组的派彩，二者不是同一随机变量。
+8. **篮子间场次不相交，但不保证每期至多一篮中奖**：实测 38 期出现多篮同时中奖（最多 3 篮）。实现按篮求和，计算正确；原「每期至多一篮中奖」是措辞错误。
+9. **不含任何策略优选**：持仓取自 254 的冻结产物，本轮不做任何选择。
+
+## 函数与测试映射
+
+| 实现 | 对应自动化验证（`tests/testthat/test-joint-basket-settlement.R`） |
+|---|---|
+| `jb_official_sp`：经权威读取器取官方 SP | 正常读取；**缺结果保留为 NA 而不丢弃**；`sp_correction` 修正路径；缺失期/重复期/坏路径 fail closed；**option/SP 缺失必须逐行一致**（回归：原实现比较的是整表 two flags，一对互补缺失会互相抵消而漏检） |
+| `jb_drawdown`：回撤起点与终点 | **`peak_cny`/`peak_issue` 报该次回撤的起点**，另列 `global_peak_*`（回归：原实现报全局峰值，与取自另一原点的谷底混用）；无回撤时原点退化为全局峰值 |
+| `jb_tuple_index`：整数值校验 | **拒绝非整数**（回归：`as.integer()` 截断使 `1.9` 静默变成赛果 1）；空向量、NA、越界 fail closed |
+| `jb_basket_hit`：元组与腿数一致 | **`length(outcomes)` 必须等于腿数**（回归：短向量可索引长网格，1 腿元组被误判为 7 腿篮命中） |
+| `jb_attach_sp`：按 (issue, slot) 绑定并交叉校验 | 正常绑定；**缺 SP 保留 NA**；完全无结算行、provider 不一致、**结算库 winning option 与推导 outcome 不一致**、重复键、越界 outcome 全部 fail closed |
+| `jb_priceable_baskets`：判定可定价篮子 | 全可定价；一条腿缺 SP 即判不可定价；篮子非 7 腿、空输入、缺列 fail closed |
+| `jb_basket_gross`：`unit × factor × ∏SP` | 与手工计算一致；**平衡票数在 2187 封顶**；`unit≠2`、`factor≠0.65`、非 7 腿、腿重复、SP≤0、**传入未定价篮子**、票数不恒定全部拒绝 |
+| `jb_issue_returns`：期级成本/回款/净/ROI | 只赔中奖篮、成本口径、`hit` 与"排名≤票数"一致性、票数不一致、空输入、重复键 |
+| `jb_bootstrap_roi`：按期重抽样 | 同种子可复现、不同种子不同、**恢复调用方 RNG 状态**、区间单调、空输入拒绝 |
+| `jb_return_summary`：分 cohort 汇总 | 三口齐全、投入加权合并 ROI、命中率；**空 cohort 容错** |
+
+另见 254 的 `jb_restricted_rank`（受限空间排名的基不一致回归测试）：`tests/testthat/test-joint-basket-construction.R`，含 128 个元组的暴力枚举对拍。
+
+## 验证命令与结果
+
+```bash
+Rscript -e 'library(testthat); testthat::test_file("tests/testthat/test-joint-basket-settlement.R")'
+# FAIL 0 | PASS 122
+Rscript -e 'library(testthat); testthat::test_file("tests/testthat/test-joint-basket-construction.R")'
+# FAIL 0 | PASS 375
+```
+
+## `codex review` 状态：**未执行（合规缺口，延续 254）**
+
+本机 Codex CLI 额度已耗尽，用户指示跳过。依据 AGENTS.md「Skipped or failed required checks do not pass」，**本交付不构成通过验收**，也不得据此关闭任何 Issue。待补：额度恢复后执行 `codex review -c sandbox_mode='"read-only"'`，审查对象为本 QMD、`r/joint_basket_settlement.R`、其测试与 254 的产物绑定，并把命令、被审哈希与 findings 写回本节。

@@ -96,12 +96,16 @@ testthat::test_that("malformed rows fail: NA, empty ids, unknown token, chronolo
   factor_id$issue_id <- factor(factor_id$issue_id)
   testthat::expect_error(match_validate_status(factor_id), "must be character")
 
-  # A wrong-zone POSIXct is a contract breach; the validator must not patch the attr.
+  # Beijing display time preserves the instant and is an accepted boundary timezone.
+  beijing <- good
+  beijing$available_at <- lubridate::with_tz(good$available_at, "Asia/Shanghai")
+  beijing$status_at <- lubridate::with_tz(good$status_at, "Asia/Shanghai")
+  testthat::expect_silent(match_validate_status(beijing))
+  testthat::expect_equal(as.numeric(beijing$available_at), as.numeric(good$available_at))
   wrong_zone <- good
-  wrong_zone$available_at <- as.POSIXct(format(good$available_at, tz = "UTC"),
-                                        tz = "Asia/Shanghai")
-  wrong_zone$status_at <- wrong_zone$available_at
-  testthat::expect_error(match_validate_status(wrong_zone), "tz UTC")
+  wrong_zone$available_at <- lubridate::with_tz(good$available_at, "America/New_York")
+  wrong_zone$status_at <- lubridate::with_tz(good$status_at, "America/New_York")
+  testthat::expect_error(match_validate_status(wrong_zone), "timezone|tz|UTC")
 
   # Extra and missing columns are both refused.
   extra <- good
@@ -418,7 +422,13 @@ testthat::test_that("candidates, tickets and funding are invariant to a future c
                                       outcome = c("W", "D", "L")) |>
     dplyr::mutate(probability = rep(c(0.5, 0.3, 0.2), nrow(issue$fixtures)))
   constants <- parlay_settings(reset = TRUE)
-  config <- parlay_allocation_configs(constants)$C
+  # Block 8 public path: the configuration declares explicit patterns and policy and
+  # NO purchased group count; funded groups are derived from the budget.
+  config <- parlay_strategy_config(
+    constants, name = "status", construction_policy = list(max_candidates = 2L, seed = 1L),
+    patterns = list(p3222221 = c(3L, 2L, 2L, 2L, 2L, 2L, 1L)),
+    objective = "probability", max_reuse = 1L, max_overlap = 6L,
+    spend_limit_cny = 160)
   # The public plan API consumes a bound projection; the mutated status ledgers are
   # the only thing that differs between the three calls below.
   project <- function(match_status) {
@@ -459,19 +469,19 @@ testthat::test_that("direct candidate construction cannot bypass status filterin
   ledger$status_at[1] <- cutoff$cutoff_utc - 60
   ledger$available_at[1] <- cutoff$cutoff_utc - 60
   built <- parlay_construct_groups(issue$fixtures, probabilities, cutoff, 7L,
-                                   "entropy_balanced", 2L, seed = 1L,
+                                   "fixture_round_robin", 2L, seed = 1L,
                                    match_status = ledger)
   testthat::expect_false(blocked %in% built$group_legs$fixture_id)
 
   # The same construction with the unmutated ledger does use the fixture.
   allowed <- parlay_construct_groups(issue$fixtures, probabilities, cutoff, 7L,
-                                     "entropy_balanced", 2L, seed = 1L,
+                                     "fixture_round_robin", 2L, seed = 1L,
                                      match_status = issue$match_status)
   testthat::expect_true(blocked %in% allowed$group_legs$fixture_id)
 
   # Direct construction refuses a wholly empty ledger rather than falling back.
   empty <- parlay_construct_groups(issue$fixtures, probabilities, cutoff, 7L,
-                                   "entropy_balanced", 2L, seed = 1L,
+                                   "fixture_round_robin", 2L, seed = 1L,
                                    match_status = match_typed_empty("match_status"))
   testthat::expect_equal(nrow(empty$group_legs), 0L)
 })

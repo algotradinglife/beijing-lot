@@ -1,0 +1,30 @@
+{
+  "issue": 534,
+  "status": "accepted",
+  "reviewed_hashes": {
+    "packages/beidan/R/parlay_role_portfolio.R": "056ee6bd62665ee2e6f07c29b5b8c798b8aecb52c518e61eeac8809ae099e4e4",
+    "packages/beidan/tests/testthat/test-parlay-role-portfolio.R": "f7ea3ded31a7082218b58a05b30ecf2607f937cd81a090bd2c221dc59e4d0cc3",
+    "quarto/parlay_combination_lab.qmd": "49adb3dbb765c14b73d4128541b347fbe8463e29b976b5a3ee655f7391de053a"
+  },
+  "review_command": "codex review - < .run-control/role-cleanup-534/review-prompt.txt",
+  "review_log": ".run-control/role-cleanup-534/review.log",
+  "findings": 0,
+  "tests": {
+    "blocks": 36,
+    "assertions": 241,
+    "failures": 0,
+    "warnings": 0
+  },
+  "equivalence": {
+    "script": ".run-control/role-cleanup-534/independent-equivalence.R",
+    "log": ".run-control/role-cleanup-534/independent-equivalence.log",
+    "result": "identical excluding four explicit implementation identity hashes"
+  },
+  "render_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+  "render": {
+    "log": ".run-control/role-cleanup-534/render.log",
+    "execution_errors": 0,
+    "tables": 22,
+    "metrics": "stage objective purchased_tickets cost_cny expected_winning_tickets ev_net_cny ev_available unspent_cny complete_groups planned_groups initial probability 512 1024 0.6707400 NA FALSE 0 4 4 final probability 512 1024 0.6708468 NA FALSE 0 4 4"
+  }
+}

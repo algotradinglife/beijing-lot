@@ -50,3 +50,20 @@ def test_repository_clients_import_without_pythonpath():
     env = dict(os.environ)
     env.pop('PYTHONPATH', None)
     subprocess.run([sys.executable, '-c', 'import src.nowscore_settlement; import src.nowscore_bjdc_sp_history'], env=env, check=True)
+
+
+def test_cancelled_all_options_one_is_observed_not_predicted(tmp_path):
+    body = page(5, status='取消', ft='-', ht='-', values={'胜':'1','平':'1','负':'1'})
+    result = call(tmp_path, body=body)
+    assert not result['diagnostics']
+    assert result['settlements'][0]['status'] == 'all_options_one'
+    assert result['settlements'][0]['outcome'] == 'ALL'
+    assert result['settlements'][0]['settled_sp'] == 1
+    assert result['settlements'][0]['label_available_at'] == '2026-09-26T10:00:00+08:00'
+    for invalid in [body.replace(b'cansale="false"', b'cansale="true"'),
+                    page(5, status='取消', values={'胜':'1'}),
+                    page(5, status='取消', values={'胜':'1','平':'1','负':'2'}),
+                    page(5, status='20:00', values={'胜':'1','平':'1','负':'1'})]:
+        assert not call(tmp_path, body=invalid)['settlements']
+    schedule = [dict(issue_id='25053', slot=1, fixture_key='25053:1', provider_id_nowscore='999', handicap=0)]
+    assert not call(tmp_path, body=body, schedule=schedule)['settlements']

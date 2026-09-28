@@ -25,7 +25,7 @@ def test_real_identity_and_histories(fixture):
     identity=titan_identity(euro)
     assert identity['kickoff_at'].isoformat()=='2026-09-26T11:00:00+08:00'
     result=parse_markets(fixture,euro,{'8':(ROOT/'total_history.raw').read_bytes()})
-    assert len(result['euro'])==1208
+    assert len(result['euro'])==1190
     assert len(result['totals'])==43
     assert len({r['company_id'] for r in result['euro']})==130
     quote=next(r for r in result['totals'] if r['quote_at']=='2026-09-25T18:08:58+08:00')
@@ -121,7 +121,7 @@ def test_unusable_total_history_is_partial_not_success(tmp_path,fixture,pages):
     bad[url]['body']=json.dumps(rows).encode()
     out=fetch_markets([fixture],str(tmp_path),['8'],pages=bad)
     assert out['coverage'][0]['status']=='partial'
-    assert out['coverage'][0]['euro_rows']==1208
+    assert out['coverage'][0]['euro_rows']==1190
     assert out['coverage'][0]['totals_rows']==0
     assert out['euro'] and not out['totals']
 
@@ -148,3 +148,30 @@ def test_slot63_real_translated_names_keep_quotes():
     assert len(warnings)==2
     assert any('纽波特郡' in row['reason'] and 'Titan=纽波特' in row['reason'] for row in warnings)
     assert any('格里姆斯比' in row['reason'] and 'Titan=格林斯比' in row['reason'] for row in warnings)
+
+
+def test_slot57_same_minute_uses_newest_source_row():
+    from beidan_backend.market_capture.history import parse_euro_history_js
+    from datetime import datetime
+    body = (ROOT / "slot57-euro.raw").read_bytes()
+    fixture = dict(fixture_id="26098:57", provider_id_nowscore="3007123",
+                   home_nowscore="source alias", away_nowscore="source alias",
+                   kickoff_at="2026-09-26T22:00:00+08:00")
+    stamp = "2026-09-26T17:14:00+08:00"
+    _, history, _ = parse_euro_history_js(body, kickoff_hkt=datetime.fromisoformat(fixture["kickoff_at"]), company_id=281)
+    # Parser retains all source evidence and stable same-minute source order.
+    tied = [r for r in history if datetime.fromisoformat(r.snapshot_ts_hkt) == datetime.fromisoformat(stamp)]
+    assert [r.odds["home"] for r in tied] == [1.57, 1.5, 1.53]
+    result = parse_markets(fixture, body, {})
+    rows = [r for r in result["euro"] if r["company_id"] == "281" and r["quote_at"] == stamp]
+    assert len(rows) == 1
+    assert (rows[0]["odds_home"], rows[0]["odds_draw"], rows[0]["odds_away"]) == (1.57, 4.1, 5.25)
+    assert any(r["company_id"] == "281" and r["reason"] == "same_minute_superseded_rows" and r["count"] >= 2 for r in result["diagnostics"])
+    # Changing source order changes the winner: no hash/value sort may override it.
+    a = b"1.57|4.1|5.25|09-26 17:14|0.95|0.90|0.90|2026"
+    b = b"1.5|4.2|5.75|09-26 17:14|0.91|0.93|0.99|2026"
+    assert a + b";" + b in body
+    reordered = body.replace(a + b";" + b, b + b";" + a)
+    changed = parse_markets(fixture, reordered, {})
+    winner = next(r for r in changed["euro"] if r["company_id"] == "281" and r["quote_at"] == stamp)
+    assert winner["odds_home"] == 1.5

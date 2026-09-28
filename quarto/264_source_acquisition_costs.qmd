@@ -1,0 +1,126 @@
+---
+title: "北单采集路径与请求成本清单"
+date: 2026-09-22
+params:
+  evidence: "docs/research/source_acquisition_costs_20260922/evidence.json"
+  matches: 100
+  selected_matches: 10
+  issues: 20
+  issues_per_batch: 10
+execute:
+  error: false
+  cache: false
+  freeze: false
+format:
+  html:
+    embed-resources: true
+---
+
+## 结论与计量口径
+
+优先按**需要的字段与时间粒度**选端点：整期页/批量 XML → 单场数据文件 → 单场详情页 → 必要时浏览器交互。同一响应在原始字节层保存一次，供多个解析消费者使用。
+
+本报告是当前工作区代码与离线测试的路径盘点，没有对目标网站发起请求，也没有改变采集器。请求数是已知身份、首次成功、无重定向时的**应用层请求计划数**，不含重试、认证、额外发现或浏览器子资源。并发减少等待，不减少请求数。字节量、线上 p50/p95、实际费用尚未测量，不能将下列公式当成实测耗时或覆盖保证。
+
+`N` 为目标场数，`K` 为明确需要逐场历史的子集，`P` 为所需玩法数，`C` 为所需公司数，`I` 为期数，`B` 为每批期数。一次响应覆盖多行，不代表必然覆盖冻结 roster 的每场比赛或每家公司。
+
+## 路径清单
+
+| 来源 / 所需数据 | 路径（占位符不是可直接执行的请求） | 请求成本 | 已有实现 / 可省之处 | 边界 |
+|---|---|---|---|---|
+| Nowscore 当期场次与一个玩法页面值 | `cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID={5..9}&issueNum={issue}` | 1/期/玩法 | `nowscore_settlement.source_url/parse_page`；同页还可解析期号、场次和身份 | 页面可能隐藏场次；未结算值不能当结算 SP |
+| Nowscore 在售期号发现 | 复用上述直播页的期号选项、`IssueNum/IsCurrentIssue` | 已有适用响应时新增 0；冷启动 1 | `nowscore_live_issues.live_issues` | 在售列表不等于历史全量目录；跨任务复用尚未统一 |
+| Nowscore **真实当前期**欧赔与大小球截面 | `/data/op5.xml`、`/data/dx5.xml` | 两市场合计 2/轮 | `nowscore_danchang_odds.market_url`；响应含多个场次/公司；`harvest_danchang_odds` 已避免当期按公司重复抓 | 必须核对 XML 的 `issueNum`；不是全时序赔率，也不保证公司全集 |
+| Nowscore 历史期次市场截面 | `/handle/1x2.aspx?issuenum={issue}&typeid=5&companyid={c}`；大小球为 `OverUnder.aspx` | 每期 `C欧赔+C大小球` | 同一公司整期一次，不需逐场 | 历史端点可用性/完整性未线上复测；不是自动取得赛前某时刻的快照 |
+| Nowscore 平均胜率、平均返还率 | `/handle/1x2.aspx?...&companyid=-1`、`-2` | 另加 2/期 | 仅需求明确时抓；当前和历史均查询端点 | 上游平均口径不能未经核对就用本地均值替代 |
+| Nowscore 五玩法结算采集 | 五个 TypeID；六位旧期号走 `/beijingdanchang/{slug}/kaijiang_dc_{typeid}_{issue}.html` | 数据 `5I`；现有受控批次总计 `5I+2ceil(I/B)` | `nowscore_history_plan/capture` 已按期抓取；含每批前后两个控制页 | 控制请求是验收协议，不能作为“重复页”删除；场次覆盖与 SP 完整性仍需校验 |
+| Nowscore 单场单玩法 SP 变化历史 | `/sp/danchang/{issue}_{slot}_{typeid}.html` | 已知身份 `NP`；已知子集 `KP` | `nowscore_bjdc_sp_history.parse_history_page` 一页解析多个时间点及选项 | 旧历史可能被源清除；页面存在不等于历史存在；不能用最新值替代历史 |
+| Nowscore 当前 SPF 前瞻采集器 | 期次页 + 每场 SP 历史页 | 无失败且非空时 `1+N`/轮 | `forward_snapshot.collect_issue` 已有原始响应 receipt | 改为 `1+K` 会减少覆盖范围；当前代码仍抓全部返回行，未实施子集策略 |
+| Nowscore 单场基本面/战绩/欧赔详情 | `live.nowscore.com/analysis/{id}cn.html` + `/analysisJs/data{id}.js` + `1x2.NowScore.com/{id}.js` | 现有详情脚本 `3N` | `scrape_nowscore_match_details.scrape_one`；只需一种数据可研究单端点采集 | 现脚本三次请求后才检查 HTML 被拦截；需先定义独立端点是否可继续，不能一律短路 |
+| Titan 当期源内发现 | `data.titan007.com/soccer_scheduleid.js` | 冷启动 1 | `titan_clean.discovery` 一次发现多个 fixture ID | 不代表北单 roster；历史冻结 roster/桥接成本另算 |
+| Titan 单场多公司欧赔数据 | `1x2d.titan007.com/{fixture_id}.js` | 已有冻结 ID 时 `N` | 一个文件含多条公司/时间记录，由权威解析器处理 | 不必按公司逐页；响应中的时间记录不保证完整历史；事后抓取不证明赛前可用 |
+| Titan 另需分析与亚盘 | `zq.titan007.com/analysis/{id}cn.htm` + `vip.titan007.com/AsianOdds_n.aspx?id={id}` | 全量三端点共 `3N` | `collect_titan_historical_fixtures --skip-aux` 已可仅抓欧赔，成本 `N` | 少抓辅助字段属于需求裁剪；不等价于完整基本面；仍需共享分钟预算 |
+| 澳客 期次比赛 ID 与比分页面 | `www.okooo.com/livecenter/danchang/?date={issue}` | 1/期 | `okooo_prekick_sp.issue_url/parse_issue_page`；已有真实页夹具 | GB2312 系编码；已有文档报告海外 IP 405，当前可访问性未复测 |
+| 澳客 单场市场历史 | `/soccer/match/{id}/{cs\|htft\|ah\|overunder}/change/{provider}/` | 已知 ID 时 `NPC`；新取期次 ID 再加 1 | `history_url/parse_history_page`；一次历史页含多个行 | 市场与公司 ID 明确；不保证四市场每场都可用；相对时间需锚定开赛时间 |
+| 500 历史路径（已退役） | `trade.500.com/bjdc/?expect={issue}`；`zx.500.com/zqdc/kaijiang.php?playid={p}&expect={issue}` | 1/期/页型或玩法 | 留存代码用于辨认旧产物；不据此重启该线 | 旧映射脚本还有 500+Nowscore 两页路径，代码存在不代表当前可作为权威生产方案 |
+| 足彩网 ZGZCW 历史辅助路径 | `cp.zgzcw.com/lottery/bdplayvsforJsp.action?lotteryId=200` | 1/响应 | `live_collector.scraper.fetch_zgzcw_bet` 与独立解析器 | 与 500 独立来源；当前维护状态/在线覆盖未验证，不计入已验证推荐路径 |
+
+请求路径依据保存在 `evidence.json`：每条包含文件路径、工作区全文件 SHA256 和带行号的代码摘录。源码 HEAD 仅为背景，**不是**把未提交内容冒充成该提交。
+
+## 已实现与仍需改进
+
+**已经实现：** Nowscore 当期两份整期 XML；历史按公司整期查询；五玩法按期批量并保留控制页；Titan 单场多公司文件与 `--skip-aux`；SP 历史页一次解析多个时间点。
+
+**可优先改进：** 同一采集轮的 roster 页面在期号发现、身份映射、当前值解析间共享；按明确字段需求拆开 Nowscore 三端点详情请求；对不再需要的辅助页停止重复请求；仅在需要新观察时重新抓取，已有相同原始响应可离线重解析。
+
+需要纠正两个误区：`harvest_danchang_odds` 默认将输入列表末期视为当前期，这是调用约定，不能当源端证据；虽然 `collect` 会拒绝 `issueNum` 不符的响应，调用者仍应先用直播页确认真实当前期。其 `write_raw` 保存的是已解码文本、固定文件名会覆盖，因此不能把它宣传为完整原始字节归档或前瞻 receipt。
+
+当前工作区 Titan 辅助补抓判断只检查 analysis 捕获；这不能证明 handicap 完整。该实现的额外重复请求/失败代价没有纳入理想公式，也未在本任务修复。
+
+## 可重算请求量例子
+
+这些是需求与端点粒度的对照，不是声称生产系统当前正在逐场抓整期数据。缩小范围或字段集合的例子明确标记为**需求裁剪**。
+
+```{r}
+#| label: request-cost-scenarios
+invisible(Sys.setlocale("LC_CTYPE", "C.UTF-8"))
+stopifnot(requireNamespace("tibble", quietly=TRUE), requireNamespace("dplyr", quietly=TRUE),
+          requireNamespace("jsonlite", quietly=TRUE), requireNamespace("knitr", quietly=TRUE))
+root <- normalizePath(file.path(dirname(knitr::current_input(dir=TRUE)), ".."), mustWork=TRUE)
+evidence <- jsonlite::fromJSON(file.path(root, params$evidence), simplifyVector=FALSE)
+stopifnot(identical(evidence$schema, "source_acquisition_cost_evidence_v1"), length(evidence$sources) >= 15L)
+N <- as.integer(params$matches)
+K <- as.integer(params$selected_matches)
+I <- as.integer(params$issues)
+B <- as.integer(params$issues_per_batch)
+stopifnot(!anyNA(c(N,K,I,B)), N > 0L, K > 0L, K <= N, I > 0L, B > 0L,
+          identical(as.numeric(c(N,K,I,B)), as.numeric(c(params$matches,params$selected_matches,params$issues,params$issues_per_batch))))
+costs <- tibble::tribble(
+  ~场景, ~比较请求数, ~建议请求数, ~性质,
+  "当期两市场：假设逐场两请求 vs 整期 XML", 2*N, 2, "条件等价：仅响应实际覆盖字段/场次；整期路径已实现",
+  "历史两市场：假设每场每公司 vs 3家欧赔+2家大小球整期", 5*N, 5, "条件等价：同一期同公司同截面；整期路径已实现",
+  "仅需欧赔：Titan 默认三端点 vs skip-aux", 3*N, N, "需求裁剪：不取分析与亚盘",
+  "SP 历史：全期 vs K场单玩法", 1+N, 1+K, "需求裁剪：未采其余场历史；建议，未实现",
+  "五玩法受控批次：数据请求 vs 含控制页总量", 5*I, 5*I+2*ceiling(I/B), "必要额外成本：不能删除控制页"
+)
+costs <- costs |> dplyr::mutate(请求差额=比较请求数-建议请求数)
+stopifnot(nrow(costs)==5L, all(costs$建议请求数>0), costs$建议请求数[5]==5*I+2*ceiling(I/B))
+knitr::kable(costs, caption=paste0("单位：次；N=",N,"，K=",K,"，I=",I,"，B=",B,"。不含重试和身份发现，SP例子已显式计入1次期次页。"))
+```
+
+## 复用规则与完整成本
+
+复用条件至少绑定来源、完整 URL/参数、身份、采集轮或允许的 freshness、认证/语言等会改变响应的上下文。保持原采集时间与字节哈希；重新解析不生成“刚抓到”的时间。URL 相同而采集时点不同，通常是两个不同观察，尤其是赔率与 SP。
+
+同一次成功响应可以同时提供主客队、比分、多个玩法的可推导赛果；但**不能由比分推导实际结算 SP**，作废规则及需要独立来源的核验不能省。列表页、单场历史、源端更新时间和实际接收时间的含义均不同。
+
+总网络请求数 = 数据请求 + 必要发现 + 控制请求 + 重试 + 重定向 + 浏览器子资源。工程成本还包括响应字节/磁盘、端点失败率、p50/p95 耗时、浏览器 CPU/内存、模型调用/费用和人工冲突复核。当前没有这些线上测量数据，不填虚构的秒数或金额。批量页减少请求的同时可能增加单响应体积，必须一起计量。
+
+前瞻与历史学习使用仍服从原有 cutoff、可用性及缓存约束；本报告没有拟合、选择或历史学习函数。Jev/jev-ultrafast 在这里仅是可能的异常理解/必要页面交互工具，固定端点路径不需要模型逐步导航。
+
+## Issue Graph 与验证边界
+
+已读取现场 issueType、parent/subIssues、blockedBy/blocking 和 Project membership/Status，快照见相邻 `issue-graph.json`。#483 仍受 #481、#482 阻塞，且 blocking #484。本报告不更改这些关系，也不授权绕过容量或运行态前置要求。#474 的请求预算、#476 的解析失败语义仍需各自验收；#487 是已有解析器证据清单的对照入口。拟议的共享响应与按需请求尚未建立新图关系，交由 PI 路由。
+
+本次仅新增 QMD 与证据快照，没有新增或修改项目函数；函数/测试变更映射不适用。为核对路径依据，执行以下已有测试：
+
+```sh
+.venv/bin/python -m pytest tests/test_nowscore_danchang_odds.py tests/test_nowscore_history_plan.py tests/test_nowscore_history_capture.py tests/test_bj248_forward_snapshot.py tests/scripts/test_nowscore_bjdc_sp_history_real_pages.py tests/scripts/test_okooo_prekick_sp.py -q
+```
+
+结果：**95 passed in 3.19s**。分别覆盖整期/公司 URL 与字段契约、受控批次请求计划与捕获、前瞻逐场历史链、真实 SP 历史页和澳客真实页面解析。离线通过不证明今天源端仍可访问。未运行全量 R/Python 测试：没有实现变更；QMD 内参数/计算断言随渲染执行。
+
+```sh
+quarto render quarto/264_source_acquisition_costs.qmd --execute --no-cache
+```
+
+本报告计算仅依赖声明参数与随附证据快照；不读取生产数据库，不要求个人数据盘路径，不在渲染时抓取网络或安装依赖。R 运行时和依赖沿用仓库环境。本次交付审查记录将在完成后附于下方。
+
+
+## 交付审查与渲染结果
+
+执行 `codex review`，精确命令、三个被审文件的 SHA256 与结论保存在 `docs/research/source_acquisition_costs_20260922/review-receipt.json`。被审 QMD 正文 SHA256：`9cd76bedd5d3d0ac89f6327d3425a3db25f6b71b7f3bddeecdd7a4bc8c2bbc07`。结果：**无阻塞发现**；审查核对 16 份源码摘录/哈希及 7 条现场图快照，无需修复。评审后仅追加本审查记录。
+
+主代理完成全量 Quarto 渲染（退出码 0），检查两个 HTML 表格的字段、单位与计算结果；评审代理独立通过测试和 R 计算断言，但未执行完整渲染。示例请求数依次为 2、5、100、11、104，控制请求没有遗漏。
+
+验证环境：R 4.6.1、Quarto 1.10.18、tibble 3.3.1、dplyr 1.2.1、jsonlite 2.0.0、knitr 1.51。未安装依赖或修改生产调度。PI 接受及实施优化均不属于本次已完成事项。

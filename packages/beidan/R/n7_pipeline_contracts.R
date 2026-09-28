@@ -511,7 +511,7 @@ parlay_validate_settings <- function(candidate) {
 #'
 #' 读取或更新本 R 会话内的串场参数快照。默认值即项目冻结值；命名参数给出局部
 #' 覆盖。**下游计算函数仍然显式接收这些参数作为参数**，配置构造器
-#' parlay_allocation_configs() 的默认参数会读取当前快照。
+#' parlay_strategy_config() 的默认参数会读取当前快照。
 #'
 #' @param ...     命名的局部更新，名字必须属于参数键集合；可一次给多个。
 #'   · 未命名参数                  -> stop()

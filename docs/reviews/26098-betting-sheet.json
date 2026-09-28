@@ -1,0 +1,69 @@
+{
+  "scope": "26098 printing artifact, fresh calculation from latest local inputs, no real orders",
+  "decision_at": "2026-09-26T19:52:04+08:00",
+  "funded_groups": 4,
+  "tickets": 384,
+  "stake_cny": 768,
+  "unallocated_cny": 256,
+  "input": {
+    "inputs/26098_walkthrough/print/26098-20260926-195204.rds": "d5658ae5476d2b014e960f855d67cd06dd65d83cf90363ac911984bda436b5c9"
+  },
+  "reviewed_files": {
+    "packages/beidan/R/parlay_betting_sheet.R": "5729fd755a05c9c0bee821632e102f5d277473d2c6039843ad4da63143b3eb81",
+    "packages/beidan/tests/testthat/test-parlay-betting-sheet.R": "7dfb06346d29d471e4793922cbb8c57e1e03a3a636146b1ae93466f9f602bc53",
+    "packages/beidan/NAMESPACE": "c37102f5f89174986555b33e83047c873dbd7d2492fd67209d197c68db4103e3",
+    "packages/beidan/man/parlay_betting_sheet.Rd": "ee870ca04eec04b20d02f91daf6b5cf4087ea049291263e43637f259354435fe",
+    "quarto/26098_betting_plan.qmd": "8911c7bbef753310ab0c17acc73d25ab61d26a6473900c73e7933dd77c13d140"
+  },
+  "transitive_package_r": {
+    "packages/beidan/R/n7_pipeline_epoch.R": "ec1d89892ef70bf32d1928180da8998de8cb6329facdae7f716128da970c2449",
+    "packages/beidan/R/match_markets.R": "49b7b9c002bf0bec0e9cae29cf6fcd00b8f926b5afc9e51adf0bdf8f3ff074a2",
+    "packages/beidan/R/beidan-package.R": "417faf50c5f14cd3ce19e34e19db81c1fbfd185ecc0ba23f40b9ebf77b24929c",
+    "packages/beidan/R/schedule_identity.R": "8918792d66f77527d7c19e2ef9eeed6a7ce9a7dccd905b9556de78467542bf6c",
+    "packages/beidan/R/n7_experiment_contract.R": "646d923d46d8de26101b95df17740cce06e45f2027556f6d1abbd17bceb9201a",
+    "packages/beidan/R/n7_pipeline_fixture.R": "c2f11506041b235408fa7fc3d7299d4294def9db82c020b491cea330c4bfcf99",
+    "packages/beidan/R/parlay_plan_summary.R": "e38c9f917616385a02141519f508edc94323d39bece123a16e51211a91858d14",
+    "packages/beidan/R/python-backend.R": "820a0db0aea37c6d0dba4ab2ae45c5edc264cf5478761b3a80cf527991083662",
+    "packages/beidan/R/n7_pipeline_match_status.R": "c2c328579a95e55203bf067273c8ceac4e226915ced358bea2715f42c17ed216",
+    "packages/beidan/R/parlay_storage.R": "481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f",
+    "packages/beidan/R/n7_pipeline_inputs.R": "f0eb9c1f7fcb8406925b8f25dae942ba3c4783483b223d1d139703f0be5496b7",
+    "packages/beidan/R/fundamentals_total_market.R": "37657e4f461573d3df4bfbe204d8986cfd94a9dcfaa74b40d290242f3835be4f",
+    "packages/beidan/R/issue_schedule.R": "7fb9e201cd77eece039009a98bb535dd07c46c371fee9d12a34bd897fee8e914",
+    "packages/beidan/R/n7_pipeline_types.R": "f355ec0f2949c3ed88df13a555e456e60f959175ffda6ac6718723e3f09bdfec",
+    "packages/beidan/R/parlay_betting_sheet.R": "5729fd755a05c9c0bee821632e102f5d277473d2c6039843ad4da63143b3eb81",
+    "packages/beidan/R/n7_pipeline_candidates.R": "f4b7f78aff1e251f7fbedf7a4a595963f91d64d76d9151d6ee6d2fbd71a081dd",
+    "packages/beidan/R/market_schedule.R": "17e2317c7579ec4035b76ee53450487e9b54d06139e6dc5d0d827159092d6ce2",
+    "packages/beidan/R/issue_settlements.R": "c977b09ae14f7c59c8c2cc0b4bdf7e6c1b2b47cfce421b226fbb8109360a68d1",
+    "packages/beidan/R/parlay_budget_allocation.R": "34936db45cf7d117cd7fb2fbd65b56e79dfc64d5eec9e53d1a99db8b0df2ec54",
+    "packages/beidan/R/fundamentals_market_comparison.R": "6e9880ff5df8571a9c56ba394f0a2a6c225b64be8b636b915486846caf9354ce",
+    "packages/beidan/R/n7_pipeline_value.R": "b8f681be075d210b269ef96b77b193c7a474cbbb4664211774600ef596a7e4fe",
+    "packages/beidan/R/dixon_coles_grid.R": "66373c2f79bcaba9a0e51b734118ff320d97304ab4b6ae9493798eedfe75c106",
+    "packages/beidan/R/n7_pipeline_contracts.R": "01a96616aa417db18c47946fd02f556405f3b0747c9ac8a3270a8db2c79db734"
+  },
+  "reviews": [
+    {
+      "log": ".run-control/26098-sheet-review.log",
+      "command": [
+        "codex",
+        "review",
+        "Review only NEW packages/beidan/R/parlay_betting_sheet.R, test-parlay-betting-sheet.R, export/man, and quarto/26098_betting_plan.qmd. It generates a printable report from an explicit immutable computed result, reference styling from274 but probabilities remain latest normal euro mean+OU DC. Check exact purchased tickets/stakes not expanded union, handicap/outcome ordering/identity, no fabricated SP/settlement or wrong stale plan, escaping.16 function assertions passed; live saved local input49fixtures ->4groups384tickets768CNY, clean QMD render passed. Do not rerun tests, edit, invoke CI/network, or inspect unrelated WIP. Report actionable findings only."
+      ],
+      "conclusion": "The ticket-leg reconciliation can accept an incomplete printable purchase ledger. Tests and rendering were not rerun, as requested.\n\nReview comment:\n\n- [P2] Check leg coverage against every purchased ticket — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_betting_sheet.R:42-44\n  If all leg rows for one purchased ticket are missing, `table(ticket_legs$ticket_id)` omits that ticket entirely, so this reconciliation passes as long as the remaining tickets have the expected leg count. The report still counts and charges for the missing ticket but prints missing outcomes in its exact-ticket table. Check that the leg-table ticket IDs equal `summary$tickets$ticket_id` before checking counts, and add a regression case deleting an entire ticket's legs. This also enforces the unmatched-key requirement in [AGENTS.md:70](AGENTS.md#L70).\nThe ticket-leg reconciliation can accept an incomplete printable purchase ledger. Tests and rendering were not rerun, as requested.\n\nReview comment:\n\n- [P2] Check leg coverage against every purchased ticket — /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/parlay_betting_sheet.R:42-44\n  If all leg rows for one purchased ticket are missing, `table(ticket_legs$ticket_id)` omits that ticket entirely, so this reconciliation passes as long as the remaining tickets have the expected leg count. The report still counts and charges for the missing ticket but prints missing outcomes in its exact-ticket table. Check that the leg-table ticket IDs equal `summary$tickets$ticket_id` before checking counts, and add a regression case deleting an entire ticket's legs. This also enforces the unmatched-key requirement in [AGENTS.md:70](AGENTS.md#L70)."
+    },
+    {
+      "log": ".run-control/26098-sheet-review2.log",
+      "command": [
+        "codex",
+        "review",
+        "Re-review only parlay_betting_sheet.R and test-parlay-betting-sheet.R fix for missing entire-ticket legs: exact equality of leg IDs with purchased IDs now enforced before cardinality; regression deletes entire first purchased ticket legs. Also review small QMD display change in quarto/26098_betting_plan.qmd: both group matches and exact-ticket slot columns sorted numerically by slot (not lexical leg order), values still keyed by fixture/ticket. Prior review only finding P2 in .run-control/26098-sheet-review.log. Read-only, no tests/renders/CI/network. Report any remaining actionable defects; otherwise clear pass."
+      ],
+      "conclusion": "Clear pass for the scoped changes: ticket-ID set equality catches entirely missing purchased-ticket legs, with a matching regression case. Both QMD displays sort integer slots numerically while preserving keyed outcomes. No tests, renders, CI, or network operations were run.\nClear pass for the scoped changes: ticket-ID set equality catches entirely missing purchased-ticket legs, with a matching regression case. Both QMD displays sort integer slots numerically while preserving keyed outcomes. No tests, renders, CI, or network operations were run."
+    }
+  ],
+  "test_command": "R_LIBS=$PWD/r_lib TMPDIR=$PWD/.run-control/tmp Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE); testthat::test_file(\"packages/beidan/tests/testthat/test-parlay-betting-sheet.R\", reporter=\"summary\", stop_on_failure=TRUE)'",
+  "test_assertions": 17,
+  "test_failures": 0,
+  "render_command": "R_LIBS=$PWD/r_lib TMPDIR=$PWD/.run-control/tmp XDG_CACHE_HOME=$PWD/.run-control/cache DENO_DIR=$PWD/.run-control/deno quarto render quarto/26098_betting_plan.qmd --to html --execute --no-cache",
+  "HTML_validation": "384 unique ticket IDs,2688 keyed outcomes,384 amounts exactly reconcile original plan ledgers; all slot columns numeric ascending",
+  "visual_check": "Headless Chrome screenshot reviewed: green picks, team names, handicap and funds legible. App Browser unavailable; isolated headless artifact rendering used."
+}

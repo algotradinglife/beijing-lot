@@ -1,0 +1,109 @@
+{
+  "status": "accepted",
+  "generated_at": "2026-09-26T17:38:04.785074+00:00",
+  "issue": 533,
+  "tests": [
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-groups.R",
+      "blocks": 10,
+      "passed": 56,
+      "failed": 0,
+      "warnings": 0
+    },
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-portfolio.R",
+      "blocks": 10,
+      "passed": 68,
+      "failed": 0,
+      "warnings": 0
+    },
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-review.R",
+      "blocks": 5,
+      "passed": 47,
+      "failed": 0,
+      "warnings": 0
+    },
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-role-scores.R",
+      "blocks": 7,
+      "passed": 37,
+      "failed": 0,
+      "warnings": 0
+    },
+    {
+      "file": "tests/testthat/test-role-strategy-independent.R",
+      "blocks": 4,
+      "passed": 33,
+      "failed": 0,
+      "warnings": 0
+    }
+  ],
+  "review_command": "codex review - < .run-control/role-review-final-prompt.txt",
+  "review_rounds": [
+    {
+      "log": ".run-control/role-review-initial.log",
+      "findings": 8,
+      "resolution": "fixed with regression tests"
+    },
+    {
+      "log": ".run-control/role-review-second.log",
+      "findings": 5,
+      "resolution": "fixed with regression tests"
+    },
+    {
+      "log": ".run-control/role-review-third.log",
+      "findings": 2,
+      "resolution": "fixed and tested"
+    },
+    {
+      "log": ".run-control/role-review-final.log",
+      "findings": 0,
+      "result": "No actionable findings;241 scoped assertions and independent duplicate-round probe passed"
+    }
+  ],
+  "reviewed_hashes": {
+    "packages/beidan/R/parlay_role_shared.R": "125ba0e8cc64ea1e0ee603acf903f6b8289dcf7eacd56afde8fe8d1452726e9e",
+    "packages/beidan/R/parlay_role_portfolio.R": "e5b0c5a34426c7cd787497feb3224232b6e10e22ba519f4f0defe627cd1687f7",
+    "packages/beidan/R/parlay_role_groups.R": "b8df4837267e6538efe4c39071a43bcc8cc37543494b239f1a1660f875a9615c",
+    "packages/beidan/R/parlay_role_scores.R": "f810c37a90800fe3ff12dfc0a9ade2b630e99a75de6ace5061c0b69cbe4caa83",
+    "packages/beidan/tests/testthat/test-parlay-role-portfolio.R": "0ab2a80719518870611e97997e7c93b6b84bdb1978084ddf898962d9be7829c6",
+    "packages/beidan/tests/testthat/test-parlay-role-scores.R": "8f43b01b1c513de9b491bb2f9b50b65c609250817af75862e9f10dbb635ad6bd",
+    "packages/beidan/tests/testthat/test-parlay-role-review.R": "4d2e2fd8635abf75db3920e43fb46da7b9111b74deaae0692946407247ab9c05",
+    "packages/beidan/tests/testthat/test-parlay-role-groups.R": "2f35c27fd7053c11e86057ea910d568d12135178672f70916a925167a8345f55",
+    "tests/testthat/test-role-strategy-independent.R": "27bde3741189a07c9d3e6eb53bbdbf1b225ffb222ff0dc3f99aa2ee0a35fefb5",
+    "quarto/parlay_combination_lab.qmd": "cf1a1d368bc2313d7260980d1e938e3bae5c709597cdaa5bc9c158119a3620e8",
+    "docs/strategy/role-round-robin-contract.md": "8920609e18037b53588d84cbad6e4d3ee061db568af7acd16e95d0129c95bba3",
+    "packages/beidan/NAMESPACE": "ae6e93ad4e5435e78d122507854b6322e47537a5001c3fc5ca8f748d9f306351",
+    "packages/beidan/man/parlay_role_scores.Rd": "ea7ae22c4e2d3206cb4860c973fd31e51951be9fd519baf9c726f8ecbb694bf5",
+    "packages/beidan/man/parlay_construct_role_groups.Rd": "8618b81d939aa17c2b5106d27f52b1f7c6a212b9a0e67e4d8022dd766f941f42",
+    "packages/beidan/man/parlay_evaluate_portfolio.Rd": "6d4c0e442e269ac987e708c277d05314329190e48ee8495b789647e42fc7c162"
+  },
+  "render_command": "R_LIBS=\"$PWD/r_lib\" RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/parlay_combination_lab.qmd --to html --no-cache",
+  "limits": [
+    "Local bounded improvement, no global optimality claim",
+    "Probability objective is expected winning ticket count, not union probability or profit",
+    "Post-freeze SP not backfilled; EV unavailable for this frozen 26098 example",
+    "No CI, repository-wide tests, git publication or issue closure"
+  ],
+  "test_command": "R_LIBS=\"$PWD/r_lib\" Rscript .run-control/check-role-tests.R",
+  "function_test_mapping": {
+    "parlay_role_scores": "packages/beidan/tests/testthat/test-parlay-role-scores.R",
+    "parlay_construct_role_groups": "packages/beidan/tests/testthat/test-parlay-role-groups.R",
+    "parlay_evaluate_portfolio": "packages/beidan/tests/testthat/test-parlay-role-portfolio.R",
+    "review regressions": "packages/beidan/tests/testthat/test-parlay-role-review.R",
+    "independent arithmetic": "tests/testthat/test-role-strategy-independent.R",
+    "internal helpers": "exercised through corresponding public-function and helper behavior tests"
+  },
+  "render": {
+    "exit_code": 0,
+    "tables": 22,
+    "execution_errors": 0,
+    "receipt_visible": true,
+    "metrics": "stage objective purchased_tickets cost_cny expected_winning_tickets ev_net_cny ev_available unspent_cny complete_groups planned_groups initial probability 512 1024 0.6707400 NA FALSE 0 4 4 final probability 512 1024 0.6708468 NA FALSE 0 4 4",
+    "html_sha256": "be562917e70509f56c5caf403cbc495e295bbde031c3aa1c9d4a793e537cd1b0",
+    "log": ".run-control/role-render-delivery.log"
+  },
+  "accepted_at": "2026-09-26T17:39:51.837641+00:00",
+  "all_reviewed_hashes_verified": true
+}
