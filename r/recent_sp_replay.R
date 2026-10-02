@@ -1,18 +1,23 @@
 #' Recover contemporaneously observed SP from a frozen schedule response
 #' @param source_path Path to the Sep26 frozen plan bundle, including schedule receipts.
 #' @param backend Explicit project python_backend handle; no network is used.
+#' @param raw_paths Named list with nowscore_raw and source_meta file paths.
+#'   Original bytes may be relocated; their identity is verified against source metadata.
 #' @return List(quotes tibble, receipt, source result). Receipt binds source/raw/meta
 #'   hashes, original observation and cutoff. Every model fixture must have W/D/L.
 #' @details Reads original bytes and reuses the authoritative SP parser. Missing
 #'   bytes, changed source hash, late observation, missing quotes or invalid frozen
 #'   plans error. It never advances quote time, modifies the old plan, or writes.
-RecentSpReplay <- function(source_path,backend) {
+RecentSpReplay <- function(source_path,backend,raw_paths) {
   checkmate::assert_file_exists(source_path)
   source <- readRDS(source_path)
   beidan:::parlay_check_saved_result(source$result)
   cutoff <- source$result$cutoff
   beidan:::match_require_cutoff(cutoff)
-  paths <- attr(source$schedule,"written")
+  checkmate::assert_list(raw_paths,names="unique")
+  if (!setequal(names(raw_paths),c("nowscore_raw","source_meta"))) stop("raw_paths requires nowscore_raw and source_meta")
+  for (path in raw_paths) checkmate::assert_file_exists(path)
+  paths <- raw_paths
   meta <- jsonlite::read_json(paths$source_meta)
   raw_hash <- digest::digest(file=paths$nowscore_raw,algo="sha256")
   if (!identical(raw_hash,meta$raw_sha256$nowscore)) stop("raw source hash mismatch")
@@ -62,11 +67,16 @@ RecentSpSource <- function(replay) {
   if (!identical(replay$source$cutoff,replay$receipt$cutoff) ||
       !identical(rlang::hash(replay$quotes),replay$receipt$quotes_hash)) stop("replay binding mismatch")
   p <- replay$source$probabilities; cutoff <- replay$source$cutoff
-  pool <- beidan::parlay_construct_role_groups(beidan::parlay_role_scores(p,cutoff),
-    cutoff,replay$source$constants,pattern=c(3L,3L,3L,3L,2L,2L,2L),n_candidates=1L,
-    probabilities=p,prematch_sp=replay$quotes)
+  matches <- tidyr::pivot_wider(p,names_from=outcome,values_from=probability) |>
+    dplyr::rename(win=W,draw=D,lose=L)
+  filtered <- beidan::filter_outcome_matches(matches,replay$quotes,cutoff)
+  admitted <- filtered$matches; attr(admitted,"filter_receipt") <- filtered$receipt
+  ranked <- beidan::rank_outcome_selections(beidan::prepare_outcome_selections(admitted),cutoff)
+  pool <- beidan::parlay_construct_role_groups(ranked,
+    replay$source$constants,pattern=c(3L,3L,3L,3L,2L,2L,2L),max_candidates=1L,
+    prematch_sp=replay$quotes)
   evaluated <- beidan::parlay_evaluate_portfolio(pool,group_budget_cny=256,
-    budget_cny=NULL,constraints=list(max_reuse=2L,max_overlap=2L),improve=FALSE)
+    budget_cny=NULL,reuse_policy=list(max_reuse=2L),overlap_policy=list(max_overlap=2L),improve=FALSE)
   evaluated$receipt$recovered_source <- replay$receipt
   return(list(outputs=list(recovered=list(evaluated=evaluated,pool=pool))))
 }

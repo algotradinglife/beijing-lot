@@ -99,7 +99,8 @@
       allowed_outcomes = list()),
     legs = tibble::tibble(
       group_slot = integer(0), group_id = character(0), fixture_id = character(0),
-      role = integer(0), round = integer(0), allowed_outcomes = list(),
+      selection_id = integer(0), round = integer(0), base_role = integer(0),
+      n_outcomes = integer(0), allowed_outcomes = list(),
       retained_probability = numeric(0)),
     groups = tibble::tibble(
       group_slot = integer(0), group_id = character(0), complete = logical(0)),
@@ -115,40 +116,4 @@
       package_units = integer(0), package_cost_cny = numeric(0),
       package_score = numeric(0), selected = logical(0), reason = character(0)),
     stop(".parlay_role_typed_empty: unknown shape ", what))
-}
-
-#' Typed-empty evaluation tables for the role portfolio stage
-#'
-#' Internal. `parlay_evaluate_portfolio()` must return ONE shape whether it found
-#' work or not: `improve = TRUE` and `improve = FALSE` share it exactly, and only
-#' the `changes` table differs (typed-empty when improvement is disabled).
-#' @param what One of "metrics", "group_summary", "tickets", "changes".
-#' @return The typed-empty tibble for that shape.
-#' @noRd
-.parlay_role_eval_empty <- function(what) {
-  switch(what,
-    metrics = tibble::tibble(
-      stage = character(0), objective = character(0), purchased_tickets = integer(0),
-      cost_cny = numeric(0), expected_winning_tickets = numeric(0),
-      ev_net_cny = numeric(0), ev_available = logical(0), unspent_cny = numeric(0),
-      complete_groups = integer(0), planned_groups = integer(0)),
-    group_summary = tibble::tibble(
-      group_slot = integer(0), group_id = character(0), complete = logical(0),
-      tickets = integer(0), cost_cny = numeric(0),
-      expected_winning_tickets = numeric(0), ev_net_cny = numeric(0),
-      ev_available = logical(0), unspent_cny = numeric(0),
-      role1_fixture = character(0), role2_fixture = character(0),
-      role3_fixture = character(0)),
-    tickets = tibble::tibble(
-      group_slot = integer(0), group_id = character(0), ticket_id = character(0),
-      rank = integer(0), probability = numeric(0), cost_cny = numeric(0),
-      sp_product_est = numeric(0), ev_net_est = numeric(0),
-      ev_available = logical(0), legal = logical(0), objective_value = numeric(0)),
-    changes = tibble::tibble(
-      pass = integer(0), move = character(0), group_slot_a = integer(0),
-      group_slot_b = integer(0), fixture_a = character(0), fixture_b = character(0),
-      round_a = integer(0), round_b = integer(0), old_fixture = character(0), new_fixture = character(0),
-      role = integer(0), objective_before = numeric(0), objective_after = numeric(0),
-      delta = numeric(0), accepted = logical(0)),
-    stop(".parlay_role_eval_empty: unknown shape ", what))
 }

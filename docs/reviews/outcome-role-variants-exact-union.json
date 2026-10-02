@@ -1,0 +1,15 @@
+{
+  "grid_states": 6561,
+  "tickets": 384,
+  "spent_cny": 768,
+  "manual_union": 0.3432,
+  "reported_union": 0.3432,
+  "manual_ev_net_cny": 864.3462,
+  "reported_ev_net_cny": 864.3462,
+  "method": "Independent exhaustive3^8 weighted outcome grid over actual384owned tickets; linear ticket EV using declared raw SP3 and one0.65 factor",
+  "cutoff": {
+    "issue_id": "26098",
+    "cutoff_utc": "2026-09-26 12:00:00"
+  },
+  "code_hash": "e0280f4ceda2585e922b59ed14068eda"
+}

@@ -1,0 +1,210 @@
+{
+  "scope": "Mandatory actual owned complementary purchasing; atomic deterministic seed/partner closure; 3322222/3332221/3333221 retrospective research only",
+  "hashes": {
+    "packages/beidan/R/parlay_ranked_portfolio.R": "43077daad26d7136e44b24fc16d327863a11b2e0eeb202a72e52a7ec19bbd71f",
+    "packages/beidan/R/parlay_forced_complement.R": "d8281dcecf4dab75097f95657296694bbfcac16be9b23663818a83b8f2ab14e3",
+    "packages/beidan/tests/testthat/test-parlay-forced-complement.R": "99cd283777d83fb3b293259397b2664144c34ab9a106ca67f1cda17ee007ccf1",
+    "packages/beidan/tests/testthat/test-parlay-forced-funding.R": "3abea8871f7b3c2d1d931c194e234713fca22f13980c0cdb8fcb3f01664ea0e5",
+    "packages/beidan/tests/testthat/test-parlay-ranked-portfolio.R": "6c320d9470560785bbbc9794065758c3d7dc0d42243ccf16390623db794ad069",
+    "packages/beidan/man/parlay_evaluate_portfolio.Rd": "96bea40d093156bea595008db4309b20b264c5ab60e8d95f939765b500b7841f",
+    "r/forced_complement_replay.R": "e13964dff4f46865c58b36126503becdce9606c702041e13f4ff108c010d04f5",
+    "r/ranked_outcome_replay.R": "2a25943569976f229ce78741a317ed19d5ef97282ecd3f299d3761d2b82d3267",
+    "tests/testthat/test-forced-complement-replay.R": "28da655172ab803190524ead7e0b0f1ac463c5921b97c661d951026cda0f2c79",
+    "tests/testthat/test-ranked-outcome-replay.R": "9ce43f6e9f653bc16080789de4662a13694196bcd09da9c3ecc1fcbda89ebf08",
+    "scripts/replay_forced_complement.R": "d9dc3c446365d9ef761a7928751d0f9f5890b41befff458180d8a5c2cfcf20a8",
+    "scripts/forced_complement_worker.R": "1193a0d250dbf68f90ba6e6a41d87b6a4a787f5461d1726d13c081eff094cb8b",
+    "scripts/settle_forced_complement.R": "0154784aa738a1d734cf37cb09b0d5ece95db1f8cead541f578fbd6de7f14235",
+    "r/parlay_structure_compression.R": "f8a027a78f6ffe4622ab1ae50e772db66d78a9295a0a0a5e2683a859fc7e9cd2",
+    "tests/testthat/test-parlay-structure-compression.R": "46222c3d3cb6a99d7aa9814e7adb3bc1a34345eeb931e68812aeaca0962df987",
+    "tests/testthat/test-classify-chain-qmd-path.R": "91b2195a966b823814964a9c2a83c9699f694b920134fbcc0dab9880cbcb378b",
+    "docs/reviews/forced-complement-original-qmd.txt": "36033188eb3907ca37be984894bea2aefa8bb4db21785625e43c19a2d78425d6"
+  },
+  "checks": {
+    "tests": "PASS331 consolidated assertions:63 helper/29 atomic/190 portfolio/31 research/18 replay;0fail/warn/skip",
+    "review": "PASS final Codex review; prior P2 external fixture fixed. Independently418 scoped assertions,9 ledgers,owned masks,constraints,hashes,freeze-before-label ordering,payouts,failure layers and fresh HTML verified. No remaining actionable findings.",
+    "replay": "PASS: nine immutable decisions frozen before settlement access; nine fully settled cases, original source version 5016d3412782bcbb. results.rds SHA256 ccedf110da948998a5c075f6dafd28940aa3d34105b57b33a97ee1b57f087b69.",
+    "render": "PASS fresh process, --no-cache, writable explicit TMPDIR/XDG_CACHE_HOME/DENO_DIR;104 tables,0 execution errors; source and result identities unchanged.",
+    "PI": "PASS scoped PI acceptance: explicit objective, actual owned complementary buying and demotion, atomic rejection,9 historical cases,418 checks, reviewed source hashes and104-table clean report verified. Legacy33 errors retained as out-of-scope evidence; no full-repository/profitability/optimality claim.",
+    "compression_caller": "PASS57: demotion obligation refuses orphan template, 0 cost/admission rollback, non-trigger demotion still buys128, source immutability and receipt bindings",
+    "legacy_callers": "33 unsupported-old-argument errors across7 testfiles. Constructor SHA matches preserved prechange bytes; not a clean current interface or full-repository PASS. Evidence docs/reviews/forced-complement-legacy-caller-evidence.json",
+    "qmd_paths": "PASS30; 0 failures/errors/warnings under declared repository TMPDIR; outside-root fixture uses repository parent. Actual QMD expressions cover relative and absolute decision paths."
+  },
+  "function_test_mapping": {
+    ".parlay_forced_complement_obligations/.parlay_forced_complement_audit": "63 assertions; exact raw ranks, demotion,strictthreshold,actualowned masks,noorphan/multipleowner/duplicatekey,empty",
+    ".parlay_ranked_stage_group/.parlay_ranked_fund/.parlay_ranked_improve/.parlay_ranked_freeze": "29 transaction incl simultaneous obligations+190 portfolio assertions; money/reuse/overlap/dedup rollback and committed actual directions; obsolete invalid micro move prevented",
+    "ReplayForcedComplement": "31 assertions; threelegal spaces288/216/324,rawrankTop1Dsingle,physicaldedupafterdemotion,input/cutoffbinding,invalidinputs",
+    "DiagnoseRankedReplay/ReplayRankedOutcomes/VerifyRankedReplayReceipt": "18 assertions; pendinglabels, sourceimmutability,actualmandatoryprotection,typedemptydiagnostic",
+    "EvaluateCompressedTemplates": "57 assertions; shared funding enforced after triple demotion; orphan rejection vs genuine non-trigger purchase; masks/receipt and original input immutability",
+    "QMD startup and forced-result receipt/decision reads": "PASS30; 0 failures/errors/warnings under declared repository TMPDIR; outside-root fixture uses repository parent. Actual QMD expressions cover relative and absolute decision paths."
+  },
+  "commands": {
+    "tests": "R_LIBS=\"$PWD/r_lib\" Rscript .run-control/check-forced-complement.R",
+    "replay": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/replay_forced_complement.R",
+    "review": "codex review - < .run-control/forced-complement-review-prompt.txt",
+    "render": "R_LIBS=\"$PWD/r_lib\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache",
+    "bounded_review": "codex exec - < .run-control/forced-complement-final-review-prompt.txt",
+    "parallel_workers": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/forced_complement_worker.R PATTERN (3332221 and 3333221)",
+    "parallel_settlement": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/settle_forced_complement.R",
+    "compression_caller": "R_LIBS=\"$PWD/r_lib\" Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE); x<-as.data.frame(testthat::test_file(\"tests/testthat/test-parlay-structure-compression.R\",reporter=\"summary\")); stopifnot(sum(x$failed)==0L,!any(x$error),sum(x$warning)==0L)'",
+    "caller_inventory": "R_LIBS=\"$PWD/r_lib\" Rscript .run-control/check-forced-complement-callers.R (exit1; diagnosed33 preexisting old-argument errors, compression expectations subsequently fixed)",
+    "final_review": "codex review - < .run-control/forced-complement-final-artifact-review-prompt.txt",
+    "qmd_paths": "R_LIBS=\"$PWD/r_lib\" Rscript - using testthat::test_file(\"tests/testthat/test-classify-chain-qmd-path.R\") and failure/error/warning assertions; full log .run-control/forced-complement-qmd-path-tests.log",
+    "final_followup_review": "codex review - < .run-control/forced-complement-followup-review-prompt.txt"
+  },
+  "result_path": "inputs/forced_complement_replay/5016d3412782bcbb/results.rds",
+  "delegation": {
+    "mode": "DSH_TOOLS_MODE=native --profile headless",
+    "version": "0.1.5-rc.2",
+    "accepted_unit": "helper implementation third bounded task; root corrected exact ordering, actualownedfilter and physicalkeys, completed transaction integration",
+    "rejected_attempts": [
+      "first incorrect trigger unreachable report",
+      "second unfinished fictitiousfundgroup_tickets and invalidmaskfixture draft; retained .run-control/forced-complement-original/dsh-v2-rejected.R.txt"
+    ]
+  },
+  "limitations": [
+    "Finite greedy closure, no exhaustive/backtracking optimum claim",
+    "No proof that perfixture complementary marginal protection places allactualoutcomes in one funded ticket",
+    "Exploratory Top1single mayfail; not productionclassification",
+    "Historical diagnosis not prospective availability proof; no fits/tunes, thresholds not picked by settledROI",
+    "Sep26 pre-cutoffSP absent so EV remainsNA",
+    "No CI/fullrepository claim; originalinputs/sources retained",
+    "Seven legacy caller testfiles retain33 unsupported removed-constructor-argument errors; unchanged constructor bytes verified, separate evidence inventory; no full-repository pass claim."
+  ],
+  "review_logs": [
+    ".run-control/forced-complement-review.log",
+    ".run-control/forced-complement-final-review.log",
+    ".run-control/forced-complement-final-artifact-review.log",
+    ".run-control/forced-complement-end-review.log",
+    ".run-control/forced-complement-followup-review.log"
+  ],
+  "test_log": ".run-control/forced-complement-consolidated-tests.log",
+  "test_driver_sha256": "fd198092c168625c35f9f01530ed929eb804e02b74bcc7093d5efad7f52d365e",
+  "compression_test_log": ".run-control/forced-complement-compression-tests.log",
+  "passing_scope_assertions": 418,
+  "review_findings": [
+    {
+      "review_log": ".run-control/forced-complement-review.log",
+      "findings": "No actionable source correctness/governance findings; original5 suites passed; nine-case results/render pending."
+    },
+    {
+      "review_log": ".run-control/forced-complement-final-review.log",
+      "findings": "No actionable findings in worker/finalizer/QMD scope; actual executor binding and9-before-label validation verified;29 funding assertions independently passed."
+    },
+    {
+      "review_log": ".run-control/forced-complement-final-artifact-review.log",
+      "findings": "No actionable findings in compression helper/tests/current QMD scope.57 assertions evidence, receipt-order independence and matching hashes verified. Historical results/current HTML absent or older; explicitly unverified."
+    },
+    {
+      "review_log": ".run-control/forced-complement-end-review.log",
+      "findings": "P2 outside-root fixture was inside repository when TMPDIR is repository-local. No purchasing correctness defect found.",
+      "resolution": "Fixture now explicitly uses repository parent; 30 assertions passed with required TMPDIR."
+    },
+    {
+      "review_log": ".run-control/forced-complement-followup-review.log",
+      "findings": "No actionable findings; independently418 assertions and nine-case accounting/chronology/current HTML verified; P2 resolved."
+    }
+  ],
+  "performance_probe": {
+    "scope": "Diagnostic only; isolated copy, unchanged production source/model version. No settlement labels used.",
+    "baseline_file": ".run-control/ticket-enumeration-perf/baseline.rds",
+    "baseline_command": "R_LIBS=\"$PWD/r_lib\" Rscript .run-control/ticket-enumeration-perf/baseline.R",
+    "baseline_elapsed_seconds": 24.456,
+    "candidate_groups": 20,
+    "profile_file": ".run-control/forced-complement-profile.rds",
+    "enumeration_inclusive_cpu_percent": 77.68,
+    "warning": "Inclusive profile percentages overlap; 20-group funding probe does not profile the full exact portfolio union.",
+    "DSH_task": ".run-control/ticket-enumeration-perf/task.txt",
+    "DSH_log": ".run-control/ticket-enumeration-perf/dsh.log",
+    "optimized_status": "DSH completed; isolated200 assertions, exact full funding parity and two-round Codex review PASS. Not adopted in primary; final historical/data/render artifact review pending.",
+    "optimized_elapsed_seconds": 5.349,
+    "speed_ratio": 4.572069545709478,
+    "full_funding_return_identical": true,
+    "acceptance_file": ".run-control/ticket-enumeration-perf/acceptance.rds",
+    "independent_tests": {
+      "assertions": 200,
+      "failed": 0,
+      "warning": 0,
+      "log": ".run-control/ticket-enumeration-perf/independent-tests-v2.log",
+      "results": ".run-control/ticket-enumeration-perf/independent-tests-v2.rds"
+    },
+    "optimized_source_sha256": "60683e26fcee7b5b48880b2177ca223ae8966bba80c77e3a5987fe8b42f96162",
+    "reviews": [
+      {
+        "command": "codex review - < .run-control/ticket-enumeration-perf/review-prompt.txt",
+        "log": ".run-control/ticket-enumeration-perf/review.log",
+        "findings": "2P3 boundary coverage gaps: distinct alias first owner and missing fixture parity; no implementation regression found.",
+        "resolution": "Alias and missing fixture parity cases added; v2 independent200 assertions passed,0fail/warn."
+      },
+      {
+        "command": "codex review - < .run-control/ticket-enumeration-perf/review-v2-prompt.txt",
+        "log": ".run-control/ticket-enumeration-perf/review-v2.log",
+        "findings": "BothP3 addressed; no remaining actionable regression within scope."
+      }
+    ],
+    "DSH_delivery": {
+      "exit": 0,
+      "log": ".run-control/ticket-enumeration-perf/dsh.log",
+      "verified_copy_changes": [
+        "R/n7_pipeline_candidates.R"
+      ],
+      "verified_copy_new_files": [
+        "tests/testthat/test-parlay-enumerate-perf.R"
+      ],
+      "notes": "DSH reported downstream tests and synthetic alias benchmarks; authoritative root evidence remains independent200 assertions and real20-group full funding parity. Synthetic benchmark reuses same fixture set across20 aliases, not the real24.456-second workload."
+    },
+    "baseline_selected_groups": 0,
+    "baseline_purchased_tickets": 0,
+    "baseline_limit": "20-group prefix lacks complete partners; zero ledger parity does not by itself prove nonzero funds. Admitted subset and transactional fixtures supplement it.",
+    "admitted_subset": {
+      "groups": 6,
+      "tickets": 768,
+      "stake_cny": 1536,
+      "old_elapsed_seconds": 6.485,
+      "new_elapsed_seconds": 1.0,
+      "complete_fund_identical": true,
+      "evidence": ".run-control/ticket-enumeration-perf/admitted-acceptance.rds",
+      "log": ".run-control/ticket-enumeration-perf/admitted-parity.log",
+      "scope": "label-free diagnostic subset, not full49fixture forecast or official nine-case substitute"
+    },
+    "index_task": {
+      "task": ".run-control/ticket-enumeration-perf/index-task.txt",
+      "log": ".run-control/ticket-enumeration-perf/index-dsh.log",
+      "DSH_exit": 0,
+      "changes": "copied fund partner/group indexes and audit owned legs only; root uses dplyr composite-key grouping instead of delimiter key",
+      "status": "Independent316 assertions passed; scoped review no actionable findings; not adopted in primary.",
+      "full_control": ".run-control/ticket-enumeration-perf/full-control.R",
+      "full_control_status": "Completed in161.340seconds; full49fixture3332221 business outputs identical to original frozen decision; implementation identities remain distinct; no labels."
+    }
+  },
+  "model_source_archive": {
+    "inventory": ".run-control/forced-complement-model-5016d3412782bcbb/inventory.json",
+    "files": 43,
+    "purpose": "Preserve exact in-flight model source bytes for independent replay before any possible later optimized implementation adoption."
+  },
+  "frozen_seven_audit": {
+    "scope": "Seven frozen decisions, no settlement reads, not full nine-case acceptance",
+    "results": ".run-control/forced-complement-frozen-seven-audit.rds",
+    "log": ".run-control/forced-complement-frozen-seven-audit.log",
+    "checks": "source identity,final purchase hash,role legs hash,no duplicate purchased physical IDs,all owned complement obligations satisfied",
+    "Sep28_fallback": "3333221 actually3332221; same purchased physical ticket set as3332221, different full ledger metadata. Not an independent four-triple comparison."
+  },
+  "render_orchestration": {
+    "launcher": ".run-control/forced-complement-render-launch.py",
+    "log": ".run-control/forced-complement-render.log",
+    "receipt": ".run-control/forced-complement-render-receipt.json",
+    "exit_marker": ".run-control/forced-complement-render-exit.txt",
+    "condition": "successful nine-case finalization exit0 and results.rds present; refuse input mutation during render",
+    "command": "quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache",
+    "environment": "explicit writable TMPDIR/XDG_CACHE_HOME/DENO_DIR,project R_LIBS",
+    "status": "Completed initial fresh final render; final acceptance metadata rerender uses unchanged reviewed QMD and result bytes."
+  },
+  "PI_acceptance": {
+    "time": "2026-10-02T05:24:59.388261+00:00",
+    "reviewed_qmd_sha256": "36033188eb3907ca37be984894bea2aefa8bb4db21785625e43c19a2d78425d6",
+    "results_sha256": "ccedf110da948998a5c075f6dafd28940aa3d34105b57b33a97ee1b57f087b69",
+    "review_log_sha256": "126357a3ed728226a8159e561622af971e8834a140e4232b31438cf9498a5317",
+    "render_evidence": ".run-control/forced-complement-final-render-check.json",
+    "scope": "Goal objective satisfied in current local delivery; no unrelated source staged or merged."
+  },
+  "reviewed_qmd_archive": "Original accepted QMD bytes retained; current QMD adds3332222 under separate acceptance."
+}

@@ -1,0 +1,745 @@
+# Package tests for the ranked-selection portfolio evaluator
+# (parlay_evaluate_portfolio) in R/parlay_ranked_portfolio.R.
+#
+# The evaluator is exercised through the real classify -> prepare -> rank ->
+# construct -> evaluate chain and only through the public entry point, so the tests
+# bind the observable contract (funding walk, de-duplication, policy admission,
+# budgets, coverage, provenance) rather than an internal implementation detail.
+# Coverage expectations are hand-computed from the fixture probabilities.
+
+rp_cutoff <- function(issue_id = "26098") {
+  list(issue_id = issue_id,
+       cutoff_utc = as.POSIXct("2026-09-26 12:00:00", tz = "UTC"))
+}
+
+rp_settings <- function(n_legs) {
+  settings <- parlay_settings()
+  settings$n_legs <- as.integer(n_legs)
+  settings
+}
+
+# One fixture per row; `p` is the canonical win/draw/lose triple.
+rp_matches <- function(ids, p) {
+  p <- lapply(p, as.numeric)
+  tibble::tibble(
+    fixture_id = as.character(ids),
+    win = vapply(p, `[[`, numeric(1), 1L),
+    draw = vapply(p, `[[`, numeric(1), 2L),
+    lose = vapply(p, `[[`, numeric(1), 3L))
+}
+
+rp_ranked <- function(matches, cutoff = rp_cutoff()) {
+  rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
+}
+
+# "triple": role 3 is the strongest direction (win-draw heavy).
+# "double": role 2 is the strongest direction (win-lose heavy).
+rp_triple <- c(0.40, 0.30, 0.30)
+rp_double <- c(0.60, 0.15, 0.25)
+
+rp_fixtures <- function(kinds) {
+  ids <- sprintf("F%02d", seq_along(kinds))
+  p <- lapply(kinds, function(kind) switch(kind,
+    triple = rp_triple,
+    double = rp_double,
+    stop("unknown kind")))
+  rp_matches(ids, p)
+}
+
+rp_pool <- function(kinds, n_legs = 2L, pattern = c(3L, 2L), max_candidates = 3L,
+                    prematch_sp = match_typed_empty("prematch_sp")) {
+  parlay_construct_role_groups(
+    rp_ranked(rp_fixtures(kinds)), rp_settings(n_legs), pattern = pattern,
+    max_candidates = max_candidates, prematch_sp = prematch_sp)
+}
+
+# The homogeneous two-leg chain: two triple fixtures and two double fixtures, so
+# every emitted group is one triple leg plus one double leg.
+rp_homogeneous <- function(...) rp_pool(c("triple", "triple", "double", "double"),
+                                        ...)
+
+rp_unlimited <- function() {
+  list(reuse_policy = list(max_reuse = NULL), overlap_policy = list(max_overlap = NULL))
+}
+
+rp_evaluate <- function(portfolio, budget_cny = NULL, group_budget_cny = 256,
+                        reuse_policy = list(max_reuse = NULL),
+                        overlap_policy = list(max_overlap = NULL), improve = FALSE) {
+  parlay_evaluate_portfolio(portfolio, budget_cny = budget_cny,
+                            group_budget_cny = group_budget_cny,
+                            reuse_policy = reuse_policy,
+                            overlap_policy = overlap_policy, improve = improve)
+}
+
+test_that("homogeneous chain funds real tickets with actual coverage and receipt", {
+  portfolio <- rp_homogeneous()
+  expect_gt(nrow(portfolio$role_legs), 0L)
+  result <- rp_evaluate(portfolio, budget_cny = 6, group_budget_cny = 4,
+                        improve = FALSE)
+
+  expect_true(all(c("summary", "group_selection", "purchases", "funded_ledger",
+                    "rejections", "selection", "changes", "plan", "receipt")
+                  %in% names(result)))
+  # Every funded group here owns its own disjoint fixtures, so the whole-portfolio
+  # union coverage equals the sum over funded groups of their own coverage.
+  expect_identical(result$summary$new_ticket_count, result$summary$tickets)
+  expect_true(result$summary$spent_cny > 0)
+  expect_true(result$summary$actual_coverage > 0)
+  expect_true(result$summary$actual_coverage <= 1 + 1e-12)
+  # Money is charged once per physical ticket, at the one unit cost.
+  expect_identical(anyDuplicated(result$purchases$ticket_id), 0L)
+  unit_cny <- as.numeric(parlay_settings()$unit_cny)
+  expect_equal(result$summary$spent_cny, nrow(result$purchases) * unit_cny,
+               tolerance = 0)
+  # A bounded total budget leaves a real unspent remainder.
+  expect_equal(result$summary$unspent_cny, 6 - result$summary$spent_cny,
+               tolerance = 1e-9)
+  # The receipt binds the exact input, cutoff and parameters.
+  expect_identical(result$receipt$issue_id, "26098")
+  expect_identical(result$receipt$budget_cny, 6)
+  expect_identical(result$receipt$group_budget_cny, 4)
+  expect_false(result$receipt$improve)
+  expect_true(nzchar(result$receipt$portfolio_hash))
+  expect_true(nzchar(result$receipt$ranked_selections_hash))
+  expect_true(nzchar(result$receipt$code_hash))
+})
+
+test_that("the overlap rule exempts a shared true triple but never reuse", {
+  admit <- beidan:::.parlay_ranked_admit
+  # The admitted group g1 is a triple A beside the ordinary double B.
+  admitted <- list(list(fixture_set = c("A", "B"), group_id = "g1",
+                        role3_fixtures = "A"))
+  no_reuse <- list(max_reuse = NULL)
+
+  # A shared TRUE triple is exempt from the pairwise overlap: the candidate A+C is
+  # admitted even under overlap cap 0 because A is role 3 on BOTH sides.
+  triple <- admit(c("A", "C"), admitted, no_reuse, list(max_overlap = 0L),
+                  role3_fixtures = "A")
+  expect_true(triple$allowed)
+  expect_identical(triple$reason, "")
+  # The exemption does not widen the boundary: a shared ordinary double still counts,
+  # so B+C is refused under overlap cap 0 ...
+  ordinary <- admit(c("B", "C"), admitted, no_reuse, list(max_overlap = 0L),
+                    role3_fixtures = "C")
+  expect_false(ordinary$allowed)
+  expect_identical(ordinary$reason, "overlap_cap_exceeded")
+  # ... and the exempt triple alone is exactly the max_overlap = 0 boundary, while a
+  # second counted shared fixture breaks the very same cap.
+  both <- admit(c("A", "B"), admitted, no_reuse, list(max_overlap = 0L),
+                role3_fixtures = "A")
+  expect_false(both$allowed)
+  expect_identical(both$reason, "overlap_cap_exceeded")
+  # max_overlap = 1 admits that one counted shared fixture.
+  expect_true(admit(c("A", "B"), admitted, no_reuse, list(max_overlap = 1L),
+                    role3_fixtures = "A")$allowed)
+  # A triple exempt on only ONE side still counts: here B is role 3 for the
+  # candidate but an ordinary double for g1.
+  one_sided <- admit(c("B", "C"), admitted, no_reuse, list(max_overlap = 0L),
+                     role3_fixtures = "B")
+  expect_false(one_sided$allowed)
+  expect_identical(one_sided$reason, "overlap_cap_exceeded")
+  # Explicit empty role sets mean no exemption; missing arguments fail.
+  expect_error(admit(c("A", "C"), admitted, no_reuse, list(max_overlap = 0L)),
+               "missing")
+  expect_true(admit(c("C", "D"), admitted, no_reuse, list(max_overlap = 0L),
+                    role3_fixtures = character(0))$allowed)
+  expect_false(admit(c("A", "C"), admitted, no_reuse, list(max_overlap = 0L),
+                     role3_fixtures = character(0))$allowed)
+  # Reuse is NOT exempt: the same shared true triple is still counted by max_reuse,
+  # so reuse cap 1 refuses the candidate the overlap rule admitted.
+  reuse <- admit(c("A", "C"), admitted, list(max_reuse = 1L),
+                 list(max_overlap = 0L), role3_fixtures = "A")
+  expect_false(reuse$allowed)
+  expect_identical(reuse$reason, "reuse_cap_exceeded")
+})
+
+test_that("the overlap exemption compares the two groups' own role-3 sets", {
+  counted <- beidan:::.parlay_ranked_counted_overlap
+  # Shared triple: both sides carry A as role 3.
+  expect_identical(counted(c("A", "C"), "A", c("A", "B"), "A"), 0L)
+  # The shared fixture is role 3 on only one side, so it counts.
+  expect_identical(counted(c("A", "C"), "A", c("A", "B"), "B"), 1L)
+  # A shared ordinary double counts.
+  expect_identical(counted(c("B", "C"), "C", c("A", "B"), "A"), 1L)
+  # A true triple plus a shared double counts exactly the double.
+  expect_identical(counted(c("A", "B"), "A", c("A", "B"), "A"), 1L)
+  # No shared fixture counts zero; explicit empty sets exempt nothing.
+  expect_identical(counted(c("C", "D"), "C", c("A", "B"), "A"), 0L)
+  expect_identical(counted(c("A", "C"), character(0), c("A", "B"), character(0)), 1L)
+  expect_error(counted(c("A", "C"), NULL, c("A", "B"), character(0)))
+})
+
+# The public classify -> rank -> construct -> evaluate chain with a shared TRUE
+# triple: F01/F02/F03 are role-3 triples and F04/F05 the ordinary doubles. The
+# constructor emits F01+F04 and F01+F05, which share F01 as their role-3 triple and
+# otherwise carry disjoint ordinary doubles.
+rp_shared_triple_pool <- function() {
+  parlay_construct_role_groups(
+    rp_ranked(rp_fixtures(c("triple", "triple", "triple", "double", "double"))),
+    rp_settings(2L), pattern = c(3L, 2L), max_candidates = 8L)
+}
+
+test_that("a shared true triple is exempt from overlap but not from reuse", {
+  portfolio <- rp_shared_triple_pool()
+  legs <- portfolio$role_legs
+  # Pin the actual construction rather than trusting fixture ids: every emitted
+  # group is exactly one actual role-3 triple plus one actual role-2 double.
+  expect_identical(sort(unique(as.character(legs$fixture_id[legs$role == 3L]))),
+                   c("F01", "F02", "F03"))
+  # Every emitted group is exactly one actual role-3 triple plus one role-2 double.
+  expect_identical(nrow(legs), 12L)
+  expect_identical(sum(as.integer(legs$role) == 3L), 6L)
+  expect_identical(sum(as.integer(legs$role) == 2L), 6L)
+  # The two groups the walk actually funds are the ones sharing F01 as their triple.
+  pair <- c("F01+F04", "F01+F05")
+  ids <- unique(as.character(legs$group_id))
+  a <- ids[startsWith(ids, pair[1])]
+  b <- ids[startsWith(ids, pair[2])]
+  expect_length(a, 1L)
+  expect_length(b, 1L)
+  sets <- lapply(c(a, b), function(g) sort(as.character(
+    legs$fixture_id[as.character(legs$group_id) == g])))
+  expect_identical(sort(intersect(sets[[1]], sets[[2]])), "F01")
+  expect_identical(as.character(legs$fixture_id[as.character(legs$group_id) == a &
+                                                  legs$role == 3L]), "F01")
+  expect_identical(as.character(legs$fixture_id[as.character(legs$group_id) == b &
+                                                  legs$role == 3L]), "F01")
+
+  # overlap cap 0 admits both groups, because the F01 triple they share is exempt ...
+  exempt <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        reuse_policy = list(max_reuse = 2L),
+                        overlap_policy = list(max_overlap = 0L), improve = FALSE)
+  admitted <- as.character(exempt$selection$group_id[exempt$selection$admitted])
+  expect_true(all(c(a, b) %in% admitted))
+  expect_identical(exempt$summary$selected_groups, 2L)
+  expect_true(all(exempt$selection$reason[exempt$selection$group_id %in% c(a, b)] ==
+                    "admitted"))
+  # ... and the two groups still own two distinct physical tickets charged once each.
+  expect_identical(anyDuplicated(exempt$purchases$ticket_id), 0L)
+  expect_identical(
+    length(unique(as.character(portfolio$role_legs$fixture_id[
+      as.character(portfolio$role_legs$group_id) %in% c(a, b)]))), 3L)
+  # The exemption is what admits the second group: with overlap cap 0 and a
+  # DISJOINT-triple policy-free comparison the walk would have refused it.
+  expect_false(any(exempt$rejections$group_id %in% c(a, b)))
+
+  # ... but reuse counts ALL fixtures. max_reuse = 1 cannot fund `b` at all, because
+  # b reuses the F01 triple and reuse has no exemption; the walk funds a different,
+  # fully disjoint group instead.
+  strict <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        reuse_policy = list(max_reuse = 1L),
+                        overlap_policy = list(max_overlap = 0L), improve = FALSE)
+  strict_funded <- as.character(strict$purchases$group_id)
+  expect_false(b %in% strict_funded)
+  expect_true("reuse_cap_exceeded" %in%
+                strict$rejections$reason[strict$rejections$group_id == b])
+  # No funded group may reuse a fixture, which is exactly what max_reuse = 1 means.
+  expect_identical(anyDuplicated(as.character(legs$fixture_id[
+    as.character(legs$group_id) %in% strict_funded])), 0L)
+})
+
+test_that("a shared ordinary double is still refused under overlap cap zero", {
+  # Only doubles are available, so the constructor falls back to three role-2 legs:
+  # F01+F02, F01+F03 and F02+F03, each a pair of shared ORDINARY doubles. No leg is a
+  # true triple, so nothing is exempt and overlap cap 0 funds exactly one group.
+  pool <- rp_pool(c("double", "double", "double"), max_candidates = 8L)
+  legs <- pool$role_legs
+  expect_identical(nrow(legs), 6L)
+  expect_true(all(as.integer(legs$role) == 2L))
+  # Every pair of constructed groups shares exactly one ordinary double.
+  groups <- unique(as.character(legs$group_id))
+  expect_length(groups, 3L)
+  for (i in seq_len(length(groups) - 1L)) {
+    for (j in (i + 1L):length(groups)) {
+      first <- as.character(legs$fixture_id[as.character(legs$group_id) == groups[i]])
+      second <- as.character(legs$fixture_id[as.character(legs$group_id) == groups[j]])
+      expect_length(intersect(first, second), 1L)
+    }
+  }
+
+  result <- rp_evaluate(pool, budget_cny = NULL, group_budget_cny = 2,
+                        reuse_policy = list(max_reuse = NULL),
+                        overlap_policy = list(max_overlap = 0L), improve = FALSE)
+  # The shared ordinary double is counted, so only one group can be funded.
+  expect_identical(result$summary$selected_groups, 1L)
+  expect_identical(nrow(result$selection[result$selection$admitted, , drop = FALSE]),
+                   1L)
+  expect_true(all(result$rejections$reason == "overlap_cap_exceeded"))
+  # No two funded groups share a fixture.
+  funded <- as.character(result$purchases$group_id)
+  expect_length(unique(funded), 1L)
+})
+
+test_that("a shared fixture that is a role-2 fallback is not a triple", {
+  # Only doubles are available, so every leg is a role-2 fallback double. A shared
+  # fallback fixture must be counted and refused under overlap cap zero.
+  pool <- rp_pool(c("double", "double", "double"), max_candidates = 8L)
+  result <- rp_evaluate(pool, budget_cny = NULL, group_budget_cny = 2,
+                        reuse_policy = list(max_reuse = NULL),
+                        overlap_policy = list(max_overlap = 0L), improve = FALSE)
+  # The construction genuinely fell back: no leg is role 3.
+  expect_true(nrow(pool$substitutions) > 0L)
+  expect_true(all(as.integer(pool$role_legs$role) == 2L))
+  expect_identical(result$summary$selected_groups, 1L)
+  expect_identical(nrow(result$selection[result$selection$admitted, , drop = FALSE]),
+                   1L)
+  expect_true("overlap_cap_exceeded" %in% result$rejections$reason)
+})
+
+test_that("the frozen plan records the triple-overlap exemption", {
+  portfolio <- rp_shared_triple_pool()
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        reuse_policy = list(max_reuse = 2L),
+                        overlap_policy = list(max_overlap = 0L), improve = FALSE)
+  expect_true(isTRUE(result$plan$policies$overlap_role3_exemption))
+  # The resolved limits are still recorded UNCHANGED, never rewritten to NULL.
+  expect_identical(result$plan$policies$max_reuse, 2L)
+  expect_identical(result$plan$policies$max_overlap, 0L)
+})
+
+test_that("an unlimited total budget reports NA unspent rather than a fake zero", {
+  portfolio <- rp_homogeneous()
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        improve = FALSE)
+  expect_true(is.na(result$summary$unspent_cny))
+  expect_true(result$summary$new_ticket_count > 0)
+})
+
+test_that("group_budget NULL buys the full legal support space", {
+  portfolio <- rp_homogeneous()
+  full <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = NULL,
+                      improve = FALSE)
+  capped <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 1,
+                        improve = FALSE)
+  # The full-support decision can only own at least as many tickets as the capped one.
+  expect_gte(full$summary$new_ticket_count, capped$summary$new_ticket_count)
+  # A group budget above the full support cost behaves like the full space.
+  generous <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 1e6,
+                          improve = FALSE)
+  expect_identical(generous$summary$new_ticket_count,
+                   full$summary$new_ticket_count)
+})
+
+test_that("a zero or sub-unit budget buys nothing and consumes no constraint", {
+  portfolio <- rp_homogeneous()
+  zero <- rp_evaluate(portfolio, budget_cny = 0, group_budget_cny = 0,
+                      improve = FALSE)
+  expect_identical(zero$summary$new_ticket_count, 0L)
+  expect_identical(zero$summary$spent_cny, 0)
+  expect_identical(zero$summary$actual_coverage, 0)
+  expect_identical(nrow(zero$purchases), 0L)
+  # Every candidate group is then refused for having nothing fundable, not admitted.
+  expect_false(any(zero$selection$admitted))
+})
+
+test_that("the group cap is floored to whole units and never exceeds full support", {
+  portfolio <- rp_homogeneous()
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2.75,
+                        improve = FALSE)
+  # 2.75 / unit 1 floors to 2 units per group.
+  expect_true(all(result$group_selection$tickets <= result$group_selection$legal_space))
+  expect_true(all(result$group_selection$group_units <= 2L))
+})
+
+test_that("the reuse policy refuses a group without consuming later budget or limits", {
+  portfolio <- rp_homogeneous()
+  # max_reuse = 1 permits each fixture only once across all funded groups. The
+  # constructor emits disjoint groups, so this policy must not break them; the
+  # observable invariant is that no fixture is ever funded twice.
+  strict <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        reuse_policy = list(max_reuse = 1L),
+                        overlap_policy = list(max_overlap = NULL), improve = FALSE)
+  expect_true(all(strict$rejections$reason %in%
+                    c("reuse_cap_exceeded", "no_new_tickets")))
+  # A refused group owns no tickets and spends nothing.
+  refused_ids <- strict$rejections$group_id
+  expect_false(any(refused_ids %in% strict$purchases$group_id))
+  expect_equal(sum(strict$selection$spent_cny[!strict$selection$admitted]), 0,
+               tolerance = 0)
+  # Every fixture appears at most once in the funded plan.
+  funded_legs <- portfolio$role_legs[
+    as.character(portfolio$role_legs$group_id) %in% strict$purchases$group_id, ,
+    drop = FALSE]
+  expect_identical(anyDuplicated(as.character(funded_legs$fixture_id)), 0L)
+})
+
+test_that("the admission rules refuse reuse and overlap with the exact reason", {
+  admit <- beidan:::.parlay_ranked_admit
+  admitted <- list(list(fixture_set = c("A", "B"), group_id = "g1",
+                        role3_fixtures = character(0)))
+
+  # Unlimited policies never refuse.
+  expect_true(admit(c("A", "B"), admitted, list(max_reuse = NULL),
+                    list(max_overlap = NULL), role3_fixtures = character(0))$allowed)
+  # Reuse cap 1: fixture A already appears, so a second appearance is refused.
+  reuse <- admit(c("A", "C"), admitted, list(max_reuse = 1L),
+                 list(max_overlap = NULL), role3_fixtures = character(0))
+  expect_false(reuse$allowed)
+  expect_identical(reuse$reason, "reuse_cap_exceeded")
+  # Overlap cap 0: one shared fixture is already too much.
+  overlap <- admit(c("A", "C"), admitted, list(max_reuse = NULL),
+                   list(max_overlap = 0L), role3_fixtures = character(0))
+  expect_false(overlap$allowed)
+  expect_identical(overlap$reason, "overlap_cap_exceeded")
+  # A disjoint candidate is admitted by both policies.
+  expect_true(admit(c("C", "D"), admitted, list(max_reuse = 1L),
+                    list(max_overlap = 0L), role3_fixtures = character(0))$allowed)
+  # Overlap cap 1 tolerates exactly one shared fixture.
+  expect_true(admit(c("A", "C"), admitted, list(max_reuse = NULL),
+                    list(max_overlap = 1L), role3_fixtures = character(0))$allowed)
+})
+
+test_that("physical tickets bought by one group are never charged to a second group", {
+  portfolio <- rp_homogeneous()
+  loose <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = NULL,
+                       improve = FALSE)
+  # Money counts once per physical ticket even when the legal spaces overlap.
+  unit_cny <- as.numeric(parlay_settings()$unit_cny)
+  expect_identical(anyDuplicated(loose$purchases$ticket_id), 0L)
+  expect_equal(loose$summary$spent_cny, nrow(loose$purchases) * unit_cny,
+               tolerance = 0)
+  # The funded ledger is the same authoritative ledger as the purchases.
+  expect_identical(loose$funded_ledger$ticket_id, loose$purchases$ticket_id)
+})
+
+test_that("missing pre-match SP leaves EV unavailable while coverage stays usable", {
+  portfolio <- rp_homogeneous()
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        improve = FALSE)
+  expect_true(result$summary$new_ticket_count > 0)
+  expect_false(result$summary$ev_available)
+  expect_true(is.na(result$summary$ev_net_cny))
+  # Coverage remains a real usable number with no SP at all.
+  expect_true(result$summary$actual_coverage > 0)
+})
+
+test_that("a raw pre-match SP above 10 is preserved rather than replaced", {
+  matches <- rp_fixtures(c("triple", "triple", "double", "double"))
+  cutoff <- rp_cutoff()
+  # Quote EVERY fixture's outcomes far above the old 10 replacement threshold, so a
+  # funded ticket cannot be blanked merely because a sibling has no quote.
+  ids <- as.character(matches$fixture_id)
+  sp <- tibble::tibble(
+    fixture_id = rep(ids, each = 3L),
+    outcome = rep(c("W", "D", "L"), times = length(ids)),
+    quote_at = rep(as.POSIXct("2026-09-26 10:00:00", tz = "UTC"), 3L * length(ids)),
+    sp_raw = rep(25.5, 3L * length(ids)),
+    source_url = rep("test://sp", 3L * length(ids)))
+  portfolio <- parlay_construct_role_groups(
+    rp_ranked(matches, cutoff), rp_settings(2L), pattern = c(3L, 2L),
+    max_candidates = 3L, prematch_sp = sp)
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        improve = FALSE)
+  expect_true(result$summary$new_ticket_count > 0)
+  # The two-leg product of the preserved 25.5 quotes is used verbatim: 25.5^2.
+  expect_true(all(abs(result$purchases$sp_product_est - 25.5^2) < 1e-9))
+  expect_true(result$summary$ev_available)
+  expect_true(is.finite(result$summary$ev_net_cny))
+})
+
+test_that("a single leg with no usable quote makes that ticket's EV unavailable", {
+  matches <- rp_fixtures(c("triple", "triple", "double", "double"))
+  cutoff <- rp_cutoff()
+  # Only F01 is quoted, so any ticket touching an unquoted fixture has NA EV.
+  sp <- tibble::tibble(
+    fixture_id = rep("F01", 3L), outcome = c("W", "D", "L"),
+    quote_at = rep(as.POSIXct("2026-09-26 10:00:00", tz = "UTC"), 3L),
+    sp_raw = rep(3.5, 3L), source_url = rep("test://sp", 3L))
+  portfolio <- parlay_construct_role_groups(
+    rp_ranked(matches, cutoff), rp_settings(2L), pattern = c(3L, 2L),
+    max_candidates = 3L, prematch_sp = sp)
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 2,
+                        improve = FALSE)
+  expect_true(result$summary$new_ticket_count > 0)
+  expect_true(any(is.na(result$purchases$ev_net_est)))
+  expect_false(result$summary$ev_available)
+  # Coverage is still a real number even though EV is unavailable.
+  expect_true(result$summary$actual_coverage > 0)
+})
+
+test_that("an empty typed pool returns one consistent zero shape", {
+  # An empty prepare -> rank chain is the real "no fixtures" entry, not a sliced
+  # table, so the pool is built exactly as a caller would build it.
+  empty_matches <- tibble::tibble(
+    fixture_id = character(0), win = numeric(0), draw = numeric(0),
+    lose = numeric(0))
+  portfolio <- parlay_construct_role_groups(
+    rp_ranked(empty_matches), rp_settings(2L), pattern = c(3L, 2L))
+  expect_identical(nrow(portfolio$groups), 0L)
+  expect_identical(portfolio$generation_status$stop_reason, "empty_inputs")
+
+  for (flag in c(FALSE, TRUE)) {
+    result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = NULL,
+                          improve = flag)
+    expect_identical(result$summary$new_ticket_count, 0L)
+    expect_identical(result$summary$spent_cny, 0)
+    expect_identical(result$summary$selected_groups, 0L)
+    expect_identical(nrow(result$purchases), 0L)
+    expect_identical(nrow(result$group_selection), 0L)
+    expect_identical(nrow(result$changes), 0L)
+    expect_identical(nrow(result$rejections), 0L)
+    # The typed-empty ledger keeps its full column contract.
+    expect_true(all(c("group_slot", "group_id", "ticket_id", "rank", "probability",
+                      "cost_cny", "sp_product_est", "ev_net_est")
+                    %in% names(result$purchases)))
+  }
+})
+
+test_that("malformed inputs fail closed before any funding", {
+  portfolio <- rp_homogeneous()
+
+  expect_error(rp_evaluate(list(), improve = FALSE), "portfolio")
+
+  # A swapped cutoff hash.
+  bad_cutoff <- portfolio
+  bad_cutoff$cutoff_hash <- "not-the-real-hash"
+  expect_error(rp_evaluate(bad_cutoff, improve = FALSE), "cutoff")
+
+  # A tampered ranked-selection hash.
+  bad_ranked <- portfolio
+  bad_ranked$ranked_selections_hash <- "not-the-real-hash"
+  expect_error(rp_evaluate(bad_ranked, improve = FALSE), "hash")
+
+  # A tampered allowed mask that the ranking stage never produced.
+  bad_mask <- portfolio
+  bad_mask$role_legs$allowed_outcomes[[1]] <- c("W")
+  expect_error(rp_evaluate(bad_mask, improve = FALSE), "mask")
+
+  # A leg role that disagrees with the recorded actual pattern.
+  bad_role <- portfolio
+  bad_role$role_legs$role[1] <- if (bad_role$role_legs$role[1] == 3L) 2L else 3L
+  expect_error(rp_evaluate(bad_role, improve = FALSE), "actual_pattern")
+
+  # A duplicated (group, round) leg.
+  bad_dup <- portfolio
+  bad_dup$role_legs$round[2] <- bad_dup$role_legs$round[1]
+  expect_error(rp_evaluate(bad_dup, improve = FALSE), "duplicated")
+
+  # Malformed policy containers.
+  expect_error(rp_evaluate(portfolio, reuse_policy = list(max_reuse = 0L),
+                           overlap_policy = list(max_overlap = 0L),
+                           improve = FALSE), "reuse_policy")
+  expect_error(rp_evaluate(portfolio, reuse_policy = list(max_reuse = 1L),
+                           overlap_policy = list(max_overlap = -1L),
+                           improve = FALSE), "overlap_policy")
+  expect_error(rp_evaluate(portfolio, reuse_policy = list(max_reuse = 1L, x = 1L),
+                           overlap_policy = list(max_overlap = 0L),
+                           improve = FALSE), "unknown")
+  expect_error(rp_evaluate(portfolio, reuse_policy = list(),
+                           overlap_policy = list(max_overlap = 0L),
+                           improve = FALSE), "named list")
+
+  # Malformed budgets.
+  expect_error(rp_evaluate(portfolio, budget_cny = -1, improve = FALSE), "budget_cny")
+  expect_error(rp_evaluate(portfolio, budget_cny = Inf, improve = FALSE), "budget_cny")
+  expect_error(rp_evaluate(portfolio, group_budget_cny = NA_real_,
+                           improve = FALSE), "group_budget_cny")
+  expect_error(rp_evaluate(portfolio, improve = NA), "improve")
+})
+
+test_that("a pool mixing actual structures is refused before any money moves", {
+  portfolio <- rp_homogeneous()
+  # Two homogeneous groups where one group is recorded as a different structure.
+  # The recorded pattern is what the split-portfolio contract governs, so the guard
+  # must name both structures and refuse the whole evaluation.
+  mixed <- portfolio
+  groups <- unique(as.character(mixed$group_patterns$group_id))
+  if (length(groups) < 2L) skip("fixture produced a single group")
+  mixed$group_patterns$actual_pattern[[2]] <- rev(
+    mixed$group_patterns$actual_pattern[[2]])
+
+  # The leg validator also refuses this inconsistency; either way the evaluation
+  # must fail closed and must NOT return a funded plan.
+  error <- tryCatch(
+    rp_evaluate(mixed, budget_cny = 8, group_budget_cny = 4, improve = FALSE),
+    error = function(e) e)
+  expect_s3_class(error, "error")
+  expect_match(conditionMessage(error), "actual_pattern|split portfolio")
+})
+
+test_that("the homogeneity guard names the conflicting structures directly", {
+  guard <- beidan:::.parlay_ranked_require_homogeneous_structure
+  homogeneous <- tibble::tibble(actual_pattern = list(c(3L, 2L), c(3L, 2L)))
+  expect_true(guard(homogeneous, 2L))
+
+  mixed <- tibble::tibble(actual_pattern = list(c(3L, 2L), c(2L, 2L)))
+  expect_error(guard(mixed, 2L), "split portfolio by actual_pattern")
+  expect_error(guard(mixed, 2L), "2,2")
+
+  # Nothing to mix: an empty pattern table passes.
+  expect_true(guard(tibble::tibble(actual_pattern = list()), 2L))
+
+  # A pattern of the wrong width is refused rather than silently compared.
+  short <- tibble::tibble(actual_pattern = list(c(3L, 2L), c(2L)))
+  expect_error(guard(short, 2L), "2-round actual_pattern")
+})
+
+test_that("improve FALSE returns a typed-empty change table and improve TRUE is a real stage", {
+  portfolio <- rp_homogeneous()
+  args <- list(budget_cny = NULL, group_budget_cny = 2,
+               reuse_policy = list(max_reuse = NULL),
+               overlap_policy = list(max_overlap = NULL))
+
+  baseline <- do.call(rp_evaluate, c(list(portfolio = portfolio, improve = FALSE), args))
+  improved <- do.call(rp_evaluate, c(list(portfolio = portfolio, improve = TRUE), args))
+
+  expect_identical(nrow(baseline$changes), 0L)
+  expect_false(baseline$diagnostics$improvement_enabled)
+  expect_true(improved$diagnostics$improvement_enabled)
+
+  # The improvement stage is real: it evaluates candidate moves and never lowers the
+  # actual whole-portfolio union coverage.
+  expect_gte(improved$diagnostics$evaluations, 0L)
+  expect_gte(improved$summary$actual_coverage,
+             baseline$summary$actual_coverage - 1e-12)
+  # Source pool and improved view are preserved separately.
+  expect_identical(baseline$initial$purchases$ticket_id,
+                   improved$initial$purchases$ticket_id)
+})
+
+test_that("the improvement stage evaluates every legal move and accepts none illegally", {
+  # The ranked-selection table carries exactly ONE authoritative direction per
+  # (fixture, role): `prepare_outcome_selections()` emits the single classifier
+  # choice and `rank_outcome_selections()` ranks that one choice. A funded leg's mask
+  # is therefore already the only ranked direction for its (fixture, role), so there
+  # is no alternative direction to move to and the stage must evaluate honestly
+  # rather than invent one. What is asserted here is the OBSERVABLE contract: the
+  # stage runs, is enabled, and never lowers the actual union coverage.
+  portfolio <- rp_pool(c("triple", "triple", "triple", "double", "double", "double"),
+                       n_legs = 2L, pattern = c(3L, 2L), max_candidates = 3L)
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = 4,
+                        improve = TRUE)
+  expect_true(result$summary$new_ticket_count > 0L)
+  expect_true(result$diagnostics$improvement_enabled)
+  expect_gte(result$diagnostics$evaluations, 0L)
+  # Only a strict union gain may be recorded as an accepted move.
+  if (result$diagnostics$accepted_moves > 0L) {
+    expect_gt(nrow(result$changes), 0L)
+    expect_true(all(result$changes$delta > 0))
+  } else {
+    expect_identical(nrow(result$changes), 0L)
+  }
+})
+
+test_that("every ranked leg mask is the only ranked direction for its fixture and role", {
+  # This documents WHY the improvement stage has no legal alternative move on a real
+  # pool: the ranked table has one row per (fixture, role). If that ever changes, this
+  # test fails and the improvement stage's move space must be re-examined.
+  portfolio <- rp_homogeneous()
+  ranked <- portfolio$ranked_selections
+  keys <- paste(as.character(ranked$fixture_id), as.integer(ranked$role))
+  expect_identical(anyDuplicated(keys), 0L)
+})
+
+test_that("the evaluator never mutates the source portfolio", {
+  portfolio <- rp_homogeneous()
+  before <- rlang::hash(portfolio)
+  invisible(rp_evaluate(portfolio, budget_cny = 6, group_budget_cny = 2, improve = TRUE))
+  expect_identical(rlang::hash(portfolio), before)
+})
+
+test_that("down-rank continuation buys past an already-bought ticket", {
+  # A pool whose groups share fixtures: the second group must skip the physical
+  # tickets the first group already bought and continue down its own rank.
+  portfolio <- rp_pool(c("triple", "triple", "double", "double"),
+                       n_legs = 2L, pattern = c(3L, 2L), max_candidates = 4L)
+  result <- rp_evaluate(portfolio, budget_cny = NULL, group_budget_cny = NULL,
+                        improve = FALSE)
+  expect_identical(anyDuplicated(result$purchases$ticket_id), 0L)
+  # Every selected group reports its actual owned coverage, recomputed (not nominal).
+  admitted <- result$group_selection[result$group_selection$admitted, , drop = FALSE]
+  if (nrow(admitted)) {
+    expect_true(all(admitted$actual_coverage >= 0))
+    expect_true(all(admitted$actual_coverage <= 1 + 1e-12))
+  }
+})
+
+test_that("exact union handles overlaps, duplicate and nested ticket events", {
+  probabilities <- tibble::tibble(
+    fixture_id=rep(c("A","B","C"),each=3),
+    outcome=rep(c("W","D","L"),3),
+    probability=c(.6,.2,.2,.5,.3,.2,.4,.3,.3))
+  legs <- tibble::tibble(
+    ticket_id=c("AB","AB","AC","AC"),
+    fixture_id=c("A","B","A","C"), outcome=rep("W",4),leg_order=rep(1:2,2))
+  expect_equal(beidan:::.parlay_ranked_union_coverage(c("AB","AC"),legs,probabilities),
+               .6*(.5+.4-.5*.4), tolerance=1e-12)
+  duplicate <- dplyr::bind_rows(legs,dplyr::mutate(legs[legs$ticket_id=="AB",],ticket_id="copy"))
+  expect_equal(beidan:::.parlay_ranked_union_coverage(c("AB","AC","copy"),duplicate,probabilities),
+               .42, tolerance=1e-12)
+  nested <- dplyr::bind_rows(legs,tibble::tibble(ticket_id="A",fixture_id="A",outcome="W",leg_order=1L))
+  expect_equal(beidan:::.parlay_ranked_union_coverage(c("AB","AC","A"),nested,probabilities),
+               .6, tolerance=1e-12)
+})
+
+test_that("24 disjoint fixtures require no global outcome grid", {
+  matches <- tibble::tibble(fixture_id=sprintf("L%02d",1:24),win=.6,draw=.15,lose=.25)
+  pool <- parlay_construct_role_groups(rp_ranked(matches),rp_settings(1L),2L)
+  result <- rp_evaluate(pool,group_budget_cny=2,
+    reuse_policy=list(max_reuse=1L),overlap_policy=list(max_overlap=0L))
+  expect_equal(result$summary$actual_coverage,1-.4^24,tolerance=1e-12)
+  expect_equal(nrow(result$purchases),24L)
+  expect_equal(result$summary$spent_cny,48)
+  expect_identical(result$plan$policies$max_reuse,1L)
+  expect_identical(result$plan$policies$max_overlap,0L)
+})
+
+test_that("forced complement blocks the previously profitable but invalid local mask move", {
+  matches <- tibble::tibble(fixture_id=sprintf("26098:%03d",1:7),
+    win=c(.4,.36,.38,.45,.5,.5,.55),draw=c(.3,.32,.31,.22,.2,.35,.15),
+    lose=c(.3,.32,.31,.33,.3,.15,.3))
+  pool <- parlay_construct_role_groups(rp_ranked(matches),rp_settings(7L),
+    c(3L,3L,3L,2L,2L,2L,2L))
+  before <- rp_evaluate(pool,budget_cny=512,group_budget_cny=256)
+  after <- rp_evaluate(pool,budget_cny=512,group_budget_cny=256,improve=TRUE)
+  expect_equal(before$summary$actual_coverage,.345657926,tolerance=1e-12)
+  expect_equal(after$summary$actual_coverage,before$summary$actual_coverage)
+  expect_equal(nrow(after$changes),0L)
+  expect_true(all(after$complement$satisfied))
+  expect_equal(sum(after$purchases$cost_cny),512)
+  expect_identical(anyDuplicated(after$purchases$ticket_id),0L)
+  # All tickets use identical seven fixtures: independently sum mutually exclusive masses.
+  expect_equal(after$summary$actual_coverage,sum(after$purchases$probability),tolerance=1e-12)
+  expect_setequal(unique(after$plan$ticket_legs$fixture_id),matches$fixture_id)
+})
+
+test_that("improvement of fixture allocation updates the frozen group legs", {
+  matches <- tibble::tibble(fixture_id=c("A","B","C","D"),
+    win=c(.60,.59,.58,.57),draw=c(.15,.16,.17,.18),lose=rep(.25,4))
+  pool <- parlay_construct_role_groups(rp_ranked(matches),rp_settings(2L),c(2L,2L),max_candidates=1L)
+  baseline <- rp_evaluate(pool,budget_cny=2,group_budget_cny=2)
+  result <- rp_evaluate(pool,budget_cny=2,group_budget_cny=2,improve=TRUE)
+  expect_equal(baseline$summary$actual_coverage,.6*.57,tolerance=1e-12)
+  expect_equal(result$summary$actual_coverage,.6*.59,tolerance=1e-12)
+  expect_gt(nrow(result$changes),0L)
+  expect_setequal(result$plan$group_legs$fixture_id,c("A","B"))
+  expected <- dplyr::filter(result$final$role_legs,group_id %in% result$group_selection$group_id[result$group_selection$admitted])
+  expect_setequal(paste(result$plan$group_legs$group_id,result$plan$group_legs$fixture_id),
+                  paste(expected$group_id,expected$fixture_id))
+})
+
+
+test_that("incoming target, fallback ledger and package identity cannot be altered", {
+  pool <- rp_homogeneous()
+  altered <- pool
+  altered$pattern <- c(2L, 2L)
+  expect_error(rp_evaluate(altered), "target pattern")
+  fallback <- rp_pool(c("double", "double", "double"), max_candidates=1L)
+  fallback$substitutions <- fallback$substitutions[0, ]
+  expect_error(rp_evaluate(fallback), "substitution records")
+  altered <- pool
+  first <- which(altered$role_legs$group_id == altered$role_legs$group_id[1])[1]
+  current <- altered$role_legs$fixture_id[first]
+  replacement <- setdiff(altered$ranked_selections$fixture_id[
+    altered$ranked_selections$role == altered$role_legs$role[first]], current)[1]
+  altered$role_legs$fixture_id[first] <- replacement
+  expect_error(rp_evaluate(altered), "constructor group identity")
+})
+
+
+test_that("fallback selection IDs bind to the actual allowed mask", {
+  pool <- rp_pool(c("double", "double", "double"), max_candidates=1L)
+  expect_no_warning(rp_evaluate(pool))
+  pool$substitutions$selection_id[1] <- 999L
+  expect_error(rp_evaluate(pool), "substitution direction")
+})

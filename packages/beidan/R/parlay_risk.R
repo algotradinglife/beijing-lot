@@ -45,69 +45,22 @@
 #'   units or ledgers error. No fitting, persistence or settlement input is used.
 #' @noRd
 .ParlayRiskPrepare <- function(evaluation, cutoff) {
-  checkmate::assert_list(evaluation)
-  result <- evaluation$final
-  parlay_check_saved_result(result)
-  match_require_cutoff(result$cutoff)
-  if (!identical(result$cutoff, cutoff) || !identical(evaluation$cutoff, cutoff)) stop("risk cutoff mismatch")
-  # The evaluator receipt is the frozen chronology binding; final provenance
-  # has a different schema and cannot substitute for this mandatory hash.
-  if (!identical(evaluation$receipt$cutoff, cutoff) ||
-      !identical(evaluation$receipt$cutoff_hash,
-        rlang::hash(list(as.character(cutoff$issue_id), as.numeric(cutoff$cutoff_utc))))) {
-    stop("risk missing or mismatched frozen cutoff binding")
-  }
-  settings <- result$constants
-  parlay_validate_settings(settings)
-  if (!identical(settings, result$plan$constants)) stop("risk frozen settings mismatch")
-  p <- match_validate_table(result$probabilities, "probabilities", keys = c("fixture_id", "outcome"))
-  match_check_character_id(p$fixture_id, "fixture_id")
-  if (anyNA(p$outcome) || any(!p$outcome %in% match_outcomes())) stop("invalid probability outcomes")
-  if (is.object(p$probability) || !is.null(dim(p$probability))) stop("probabilities must be plain numeric")
+  pool <- .parlay_ranked_validate_evaluation(evaluation)
+  if (!identical(evaluation$cutoff, cutoff)) stop("risk cutoff mismatch")
+  p <- pool$probabilities
+  sp <- pool$prematch_sp
+  settings <- pool$settings
   wide <- parlay_probability_wide(p)
-  sp <- .parlay_role_validate_prematch_sp(result$prematch_sp, cutoff)
-  hashes <- list(probability_hash = rlang::hash(p), prematch_sp_hash = rlang::hash(sp))
-  for (container in list(result$provenance, evaluation$receipt)) {
-    if (!is.list(container) || any(vapply(container[c("probability_hash", "prematch_sp_hash")], is.null, logical(1)))) stop("risk missing provenance hash")
-    for (name in names(hashes)) {
-      if (!is.null(container[[name]]) && !identical(container[[name]], hashes[[name]])) stop("risk ", name, " mismatch")
-    }
-    if (!is.null(container[["cutoff"]]) && !identical(container[["cutoff"]], cutoff)) stop("risk receipt cutoff mismatch")
-    if (!is.null(container[["cutoff_hash"]]) && !identical(container[["cutoff_hash"]],
-        rlang::hash(list(as.character(cutoff$issue_id), as.numeric(cutoff$cutoff_utc))))) stop("risk cutoff hash mismatch")
+  purchases <- evaluation$plan$purchases
+  legs <- evaluation$plan$ticket_legs
+  tickets <- match_typed_empty("tickets")
+  if (nrow(evaluation$purchases)) {
+    tickets <- tibble::tibble(ticket_id=evaluation$purchases$ticket_id,
+      group_id=evaluation$purchases$group_id,
+      probability=evaluation$purchases$probability,
+      sp_product_est=evaluation$purchases$sp_product_est,
+      ev_net_est=evaluation$purchases$ev_net_est)
   }
-  tickets <- match_validate_table(result$plan$tickets, "tickets", keys = "ticket_id")
-  legs <- match_validate_table(result$plan$ticket_legs, "ticket_legs", keys = c("ticket_id", "fixture_id"))
-  purchases <- match_validate_table(result$plan$purchases, "purchases", keys = "ticket_id")
-  for (name in c("ticket_id", "group_id", "candidate_id")) match_check_character_id(purchases[[name]], name)
-  if (is.object(purchases$stake_cny) || !is.null(dim(purchases$stake_cny)) ||
-      anyNA(purchases$stake_cny) || any(!is.finite(purchases$stake_cny)) ||
-      any(purchases$stake_cny <= 0) ||
-      any(abs(purchases$stake_cny / settings$unit_cny - round(purchases$stake_cny / settings$unit_cny)) > 1e-9)) stop("invalid purchased stake units")
-  selected <- match(purchases$ticket_id, tickets$ticket_id)
-  if (anyNA(selected)) stop("purchased physical ticket absent from plan")
-  tickets <- tickets[selected, , drop = FALSE]
-  legs <- legs[legs$ticket_id %in% tickets$ticket_id, , drop = FALSE]
-  p_key <- paste(p$fixture_id, p$outcome, sep = "\r")
-  for (i in seq_len(nrow(tickets))) {
-    tl <- legs[legs$ticket_id == tickets$ticket_id[i], , drop = FALSE]
-    if (nrow(tl) != settings$n_legs || anyNA(tl$outcome) || any(!tl$outcome %in% match_outcomes())) stop("invalid purchased ticket legs")
-    group_fixtures <- result$plan$group_legs$fixture_id[result$plan$group_legs$group_id == purchases$group_id[i]]
-    if (!setequal(tl$fixture_id, group_fixtures)) stop("purchased ticket group mismatch")
-    index <- match(paste(tl$fixture_id, tl$outcome, sep = "\r"), p_key)
-    if (anyNA(index)) stop("ticket fixture absent from probabilities")
-    probability <- prod(p$probability[index])
-    if (!is.finite(tickets$probability[i]) || abs(tickets$probability[i] - probability) > 1e-12) stop("saved ticket probability mismatch")
-    tickets$probability[i] <- probability
-  }
-  tickets <- parlay_value_tickets(tickets, legs, sp, cutoff, settings$sp_threshold,
-    settings$sp_replacement, settings$unit_cny, settings$payout_factor)
-  saved_values <- match_validate_table(result$plan$valued, "tickets", keys = "ticket_id")
-  saved_index <- match(tickets$ticket_id, saved_values$ticket_id)
-  if (anyNA(saved_index) || !isTRUE(all.equal(
-      saved_values[saved_index, c("probability", "sp_product_est", "ev_net_est"), drop = FALSE],
-      tickets[, c("probability", "sp_product_est", "ev_net_est"), drop = FALSE],
-      tolerance = 1e-12, check.attributes = FALSE))) stop("saved valuation disagrees with bound inputs or settings")
   tickets$payout_cny <- purchases$stake_cny * settings$payout_factor * tickets$sp_product_est
   if (any(!is.na(tickets$payout_cny) & !is.finite(tickets$payout_cny))) stop("nonfinite ticket payout")
   return(list(probabilities = .ParlayRiskCanonical(p, c("fixture_id", "outcome")),
@@ -280,9 +233,9 @@ parlay_compare_risk <- function(exploration, method = "auto", n_draws = 20000L,
     probability_normalization = "validated W/D/L rows; floating-point roundoff normalization",
     ordered_groups = ordered_groups, source_hash = rlang::hash(exploration),
     source_hashes = stats::setNames(lapply(ids, function(id) {
-      x <- exploration$results[[id]]$final
-      return(list(plan = rlang::hash(x$plan), probabilities = rlang::hash(x$probabilities),
-        settings = rlang::hash(x$constants), prematch_sp = rlang::hash(x$prematch_sp)))
+      x <- exploration$results[[id]]
+      return(list(plan = rlang::hash(x$plan), probabilities = rlang::hash(x$portfolio$probabilities),
+        settings = rlang::hash(x$portfolio$settings), prematch_sp = rlang::hash(x$portfolio$prematch_sp)))
     }), ids), implementation_hash = .ParlayRiskCodeHash(), historical_learning = FALSE)
   return(list(summary = summary, receipt = receipt, cutoff = cutoff))
 }

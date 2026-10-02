@@ -1,0 +1,149 @@
+root <- rprojroot::find_root(rprojroot::has_file('packages/beidan/DESCRIPTION'))
+devtools::load_all(file.path(root,'packages/beidan'),quiet=TRUE)
+source(file.path(root,'r/ranked_outcome_replay.R'))
+source(file.path(root,'r/parlay_structure_compression.R'))
+compression_hashes <- c('r/parlay_structure_compression.R'=digest::digest(
+  file.path(root,'r/parlay_structure_compression.R'),file=TRUE,algo='sha256'))
+compression_cutoff <- list(issue_id='T',cutoff_utc=as.POSIXct('2026-09-25',tz='UTC'))
+compression_settings <- beidan::parlay_settings()
+compression_settings$n_legs<-7L;compression_settings$unit_cny<-2
+compression_settings$payout_factor<-.65
+compression_matches <- tibble::tibble(fixture_id=c(sprintf('T:T%02d',1:3),sprintf('T:D%02d',1:4)),
+ win=c(rep(.3,3),rep(.15,4)),draw=c(rep(.3,3),rep(.6,4)),lose=c(rep(.4,3),rep(.25,4)))
+compression_pool <- beidan::parlay_construct_role_groups(
+ beidan::rank_outcome_selections(beidan::prepare_outcome_selections(compression_matches),compression_cutoff),
+ compression_settings,c(3L,3L,3L,2L,2L,2L,2L),max_candidates=1L)
+compression_base <- list(pool=compression_pool,
+ selections=beidan::prepare_outcome_selections(compression_matches),
+ evaluation=beidan::parlay_evaluate_portfolio(compression_pool,budget_cny=NULL,
+ group_budget_cny=256,reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE))
+
+test_that('both compressed spaces, probability masses, cost and source immutability are correct',{
+ before<-rlang::hash(compression_base)
+ a<-EvaluateCompressedTemplates(compression_base,'3322222',compression_hashes)
+ b<-EvaluateCompressedTemplates(compression_base,'3332221',compression_hashes)
+ expect_identical(rlang::hash(compression_base),before)
+ expect_equal(a$group_metrics$legal_space,288L)
+ expect_equal(b$group_metrics$legal_space,216L)
+ expect_equal(a$group_metrics$structure_mass,.7*.85^4,tolerance=1e-12)
+ expect_equal(b$group_metrics$structure_mass,.6*.85^3,tolerance=1e-12)
+ expect_equal(nrow(a$evaluation$purchases),0L)
+ expect_true(all(a$evaluation$rejections$reason=='forced_complement_unavailable'))
+ expect_equal(nrow(a$evaluation$complement),0L)
+ expect_equal(nrow(b$evaluation$purchases),128L)
+ expect_equal(a$evaluation$summary$spent_cny,0)
+ expect_equal(b$evaluation$summary$spent_cny,256)
+ expect_equal(a$group_metrics$conditional_coverage,
+  a$group_metrics$owned_coverage/a$group_metrics$structure_mass)
+ expect_equal(b$group_metrics$conditional_coverage,
+  b$group_metrics$owned_coverage/b$group_metrics$structure_mass)
+ expect_equal(a$group_metrics$conditional_coverage,0)
+ expect_true(all(b$group_metrics$conditional_coverage>=128/216))
+ expect_equal(a$receipt$parameters$max_reuse,4L)
+ expect_true(a$evaluation$plan$policies$overlap_role3_exemption)
+})
+
+test_that('Top1 is a probability rank, not a hardcoded win; unmodified masks survive',{
+ a<-EvaluateCompressedTemplates(compression_base,'3322222',compression_hashes)
+ b<-EvaluateCompressedTemplates(compression_base,'3332221',compression_hashes)
+ demoted<-dplyr::filter(a$evaluation$final$role_legs,fixture_id=='T:T01')
+ expect_equal(demoted$role,2L)
+ expect_identical(demoted$allowed_outcomes[[1]],c('L','W'))
+ single<-dplyr::filter(b$evaluation$final$role_legs,role==1L)
+ expect_identical(single$fixture_id,'T:D01')
+ expect_identical(single$allowed_outcomes[[1]],'D')
+ unchanged<-dplyr::filter(a$evaluation$final$role_legs,startsWith(fixture_id,'T:D'))
+ expect_true(all(vapply(unchanged$allowed_outcomes,identical,logical(1),c('D','L'))))
+ expect_setequal(a$evaluation$final$role_legs$fixture_id,compression_matches$fixture_id)
+ expect_equal(nrow(a$evaluation$plan$group_legs),0L)
+ expect_setequal(b$evaluation$plan$group_legs$fixture_id,compression_matches$fixture_id)
+})
+
+test_that('authoritative settlement counts a single loss and only one payout factor',{
+ b<-EvaluateCompressedTemplates(compression_base,'3332221',compression_hashes)
+ labels<-tibble::tibble(issue_id='T',fixture_id=compression_matches$fixture_id,
+ outcome=c(rep('L',3),rep('D',4)),settled_sp=3,
+ label_available_at=as.POSIXct('2026-09-26',tz='UTC'),status='settled',source_url='https://example.test/labels')
+ hit<-beidan::parlay_settle_plan(b$evaluation$plan,labels,as.POSIXct('2026-09-27',tz='UTC'))
+ expect_equal(hit$issue_returns$payout_cny,2*.65*3^7,tolerance=1e-10)
+ labels$outcome[labels$fixture_id=='T:D01']<-'L'
+ miss<-beidan::parlay_settle_plan(b$evaluation$plan,labels,as.POSIXct('2026-09-27',tz='UTC'))
+ expect_equal(miss$issue_returns$payout_cny,0)
+ expect_equal(miss$issue_returns$net_cny,-256)
+})
+
+test_that('each original group preserves its own different seven-fixture set',{
+ matches<-dplyr::bind_rows(compression_matches[1:3,],tibble::tibble(
+ fixture_id=sprintf('T:D%02d',1:8),win=.15,draw=.6,lose=.25))
+ pool<-beidan::parlay_construct_role_groups(beidan::rank_outcome_selections(
+ beidan::prepare_outcome_selections(matches),compression_cutoff),compression_settings,
+ c(3L,3L,3L,2L,2L,2L,2L),max_candidates=2L)
+ base<-list(pool=pool,selections=beidan::prepare_outcome_selections(matches),
+ evaluation=beidan::parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=256,
+ reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE))
+ expect_equal(base$evaluation$summary$selected_groups,2L)
+ a<-EvaluateCompressedTemplates(base,'3322222',compression_hashes)
+ expect_equal(nrow(a$group_metrics),2L)
+ for(id in a$group_metrics$group_id) expect_setequal(
+  dplyr::filter(a$evaluation$final$role_legs,group_id==id)$fixture_id,
+  dplyr::filter(base$evaluation$final$role_legs,group_id==id)$fixture_id)
+ expect_equal(a$evaluation$summary$selected_groups,0L)
+ expect_true(all(a$evaluation$rejections$reason=="forced_complement_unavailable"))
+ expect_equal(a$evaluation$summary$spent_cny,0)
+ expect_identical(anyDuplicated(a$evaluation$purchases$ticket_id),0L)
+})
+
+test_that('no triples and no original purchases have honest actual/empty outputs',{
+ matches<-tibble::tibble(fixture_id=sprintf('T:N%02d',1:7),win=.6,draw=.15,lose=.25)
+ pool<-beidan::parlay_construct_role_groups(beidan::rank_outcome_selections(
+ beidan::prepare_outcome_selections(matches),compression_cutoff),compression_settings,
+ c(3L,3L,3L,2L,2L,2L,2L),max_candidates=1L)
+ base<-list(pool=pool,selections=beidan::prepare_outcome_selections(matches),
+ evaluation=beidan::parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=256,
+ reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE))
+ b<-EvaluateCompressedTemplates(base,'3332221',compression_hashes)
+ expect_equal(b$group_metrics$actual_pattern,'2222221')
+ expect_equal(b$group_metrics$legal_space,64L)
+ expect_equal(b$evaluation$summary$spent_cny,128)
+ single<-dplyr::filter(b$evaluation$final$role_legs,role==1L)
+ expect_identical(single$allowed_outcomes[[1]],'W')
+ base$evaluation<-beidan::parlay_evaluate_portfolio(pool,budget_cny=0,group_budget_cny=256,
+ reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+ empty<-EvaluateCompressedTemplates(base,'3332221',compression_hashes)
+ expect_s3_class(empty$group_metrics,'tbl_df')
+ expect_equal(nrow(empty$group_metrics),0L)
+ expect_equal(empty$evaluation$summary$spent_cny,0)
+})
+
+test_that('changed cutoff, purchases, admission and invalid research inputs fail',{
+ changed<-compression_base;changed$evaluation$cutoff$cutoff_utc<-NULL
+ expect_error(EvaluateCompressedTemplates(changed,'3332221',compression_hashes),'receipt mismatch')
+ changed<-compression_base;changed$evaluation$purchases$cost_cny[1]<-4
+ expect_error(EvaluateCompressedTemplates(changed,'3332221',compression_hashes),'receipt mismatch')
+ changed<-compression_base;changed$evaluation$group_selection$admitted<-FALSE
+ expect_error(EvaluateCompressedTemplates(changed,'3332221',compression_hashes),'admission')
+ expect_error(EvaluateCompressedTemplates(compression_base,'3332222',compression_hashes))
+ expect_error(EvaluateCompressedTemplates(compression_base,'3332221',c(code='not-sha256')))
+ expect_error(EvaluateCompressedTemplates(compression_base,'3332221',unname(compression_hashes)))
+})
+
+
+test_that('a demoted triple without raw third-draw obligation still buys full capped support',{
+ matches<-compression_matches
+ matches$win[1:3]<-.30;matches$draw[1:3]<-.34;matches$lose[1:3]<-.36
+ pool<-beidan::parlay_construct_role_groups(beidan::rank_outcome_selections(
+  beidan::prepare_outcome_selections(matches),compression_cutoff),compression_settings,
+  c(3L,3L,3L,2L,2L,2L,2L),max_candidates=1L)
+ base<-list(pool=pool,selections=beidan::prepare_outcome_selections(matches),
+  evaluation=beidan::parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=256,
+   reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE))
+ a<-EvaluateCompressedTemplates(base,'3322222',compression_hashes)
+ expect_equal(nrow(a$evaluation$purchases),128L)
+ expect_equal(a$evaluation$summary$spent_cny,256)
+ expect_equal(a$evaluation$summary$selected_groups,1L)
+ expect_true(all(a$group_metrics$conditional_coverage>=128/288))
+ expect_equal(nrow(a$evaluation$rejections),0L)
+ expect_equal(nrow(a$evaluation$complement),0L)
+ expect_identical(a$receipt$forced_complement,a$evaluation$plan$policies$forced_complement)
+ expect_identical(a$receipt$forced_complement$rule_id,'raw_draw_top3_strict20_actual_owned_v1')
+})

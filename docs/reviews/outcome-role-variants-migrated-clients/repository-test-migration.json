@@ -1,0 +1,57 @@
+{
+  "scope": "Independent repository tests migrated to classifier-ranked public contracts",
+  "files": [
+    {
+      "original": "tests/testthat/test-540-portfolio-interface-independent.R",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-540-portfolio-interface-independent.R.txt",
+      "sha256": "fca81777167f6b006e130b001a91af7c02e8bf8aff4ec2e02c79151a55418612",
+      "replacement": "tests/testthat/test-540-portfolio-interface-independent.R"
+    },
+    {
+      "original": "tests/testthat/test-541-embedded-cutoff-independent.R",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-541-embedded-cutoff-independent.R.txt",
+      "sha256": "254c462e390ca1e0be93268086efa0faaa644e04904c138511647bc4a20b2d26",
+      "replacement": "tests/testthat/test-541-embedded-cutoff-independent.R"
+    },
+    {
+      "original": "tests/testthat/test-542-exploration-independent.R",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-542-exploration-independent.R.txt",
+      "sha256": "5bfe0f942564a9828abf4663ce25697cddbd78eb065a138c2ed72360138bf6c6",
+      "replacement": "tests/testthat/test-542-exploration-independent.R"
+    },
+    {
+      "original": "tests/testthat/test-544-portfolio-risk-independent.R",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-544-portfolio-risk-independent.R.txt",
+      "sha256": "dcc288354ef8894f004f1b713871710c2fccf84f7af27d8bafbd409d0f41f358",
+      "replacement": "tests/testthat/test-544-portfolio-risk-independent.R"
+    },
+    {
+      "original": "tests/testthat/test-budget-sweep-independent.R",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-budget-sweep-independent.R.txt",
+      "sha256": "9effeaefd20201fa6838b3190e41ac30bf019ee91c2c197038134e7551c8dbdb",
+      "replacement": "tests/testthat/test-budget-sweep-independent.R"
+    },
+    {
+      "original": "tests/testthat/test-role-strategy-independent.R",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-role-strategy-independent.R.txt",
+      "sha256": "ee0491b842aef0d8e7b762dc2afeeb87df8ffa60d02cb6bb70b772efb48c82b4",
+      "replacement": "tests/testthat/test-role-strategy-independent.R"
+    }
+  ],
+  "retired_expectations": [
+    "Arbitrary role assignment contrary to classifier",
+    "Manual alteration of bound candidate pools",
+    "SP > 10 replaced by 4.5",
+    "Retired improvement_policy/constraints/objective API",
+    "Whole-package affordability instead of current prefix-unit buying"
+  ],
+  "preserved_guards": [
+    "Independent legal-support numeric enumeration",
+    "Independent joint settlement-state numeric enumeration",
+    "Explicit immutable cutoff and source mutation rejection",
+    "Cash bounds and unit floors",
+    "Reuse quota with actual-triple exemption",
+    "QMD explicit scenario/prefix interaction",
+    "Input immutability and portfolio improvement monotonicity"
+  ]
+}

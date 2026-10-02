@@ -1,0 +1,56 @@
+test_that('mandatory complementary groups commit atomically with actual owned outcomes', {
+  cutoff<-list(issue_id='T',cutoff_utc=as.POSIXct('2026-09-25',tz='UTC'))
+  matches<-tibble::tibble(fixture_id=c('T:x','T:y'),
+    win=c(.45,.6),draw=c(.22,.3),lose=c(.33,.1))
+  settings<-parlay_settings();settings$n_legs<-2L
+  ranked<-rank_outcome_selections(prepare_outcome_selections(matches),cutoff)
+  pool<-parlay_construct_role_groups(ranked,settings,c(2L,2L),max_candidates=NULL)
+  funded<-parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=4,
+    reuse_policy=list(max_reuse=2L),overlap_policy=list(max_overlap=2L),improve=FALSE)
+  expect_equal(funded$summary$selected_groups,2L)
+  expect_equal(funded$summary$spent_cny,8)
+  expect_equal(nrow(funded$purchases),4L)
+  expect_equal(anyDuplicated(funded$purchases$ticket_id),0L)
+  expect_true(all(funded$complement$satisfied))
+  expect_length(funded$complement$main_groups[[1]],1L)
+  expect_length(funded$complement$protect_groups[[1]],1L)
+  expect_false(identical(funded$complement$main_groups[[1]],funded$complement$protect_groups[[1]]))
+  expect_equal(funded$plan$policies$forced_complement$threshold,.20)
+  for (cap in c(0,2,4,6)) {
+    limited<-parlay_evaluate_portfolio(pool,budget_cny=cap,group_budget_cny=4,
+      reuse_policy=list(max_reuse=2L),overlap_policy=list(max_overlap=2L),improve=FALSE)
+    expect_equal(limited$summary$spent_cny,0)
+    expect_equal(limited$summary$selected_groups,0L)
+  }
+  for (constraint in c('reuse','overlap')) {
+    rejected<-parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=4,
+      reuse_policy=list(max_reuse=if(constraint=='reuse')1L else 2L),
+      overlap_policy=list(max_overlap=if(constraint=='overlap')0L else 2L),improve=FALSE)
+    expect_equal(rejected$summary$spent_cny,0)
+    expect_true('forced_complement_unavailable' %in% rejected$rejections$reason)
+  }
+  improved<-parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=4,
+    reuse_policy=list(max_reuse=2L),overlap_policy=list(max_overlap=2L),improve=TRUE)
+  expect_true(all(improved$complement$satisfied))
+})
+
+test_that('multiple complementary obligations resolve together or roll back as one bundle',{
+  cutoff<-list(issue_id='T',cutoff_utc=as.POSIXct('2026-09-25',tz='UTC'))
+  matches<-tibble::tibble(fixture_id=c('T:x','T:y','T:z'),
+    win=c(.45,.44,.6),draw=c(.22,.23,.3),lose=c(.33,.33,.1))
+  settings<-parlay_settings();settings$n_legs<-3L
+  pool<-parlay_construct_role_groups(
+    rank_outcome_selections(prepare_outcome_selections(matches),cutoff),
+    settings,c(2L,2L,2L),max_candidates=NULL)
+  valid<-parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=8,
+    reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+  expect_setequal(valid$complement$fixture_id,c('T:x','T:y'))
+  expect_true(all(valid$complement$satisfied))
+  expect_gte(valid$summary$selected_groups,2L)
+  expect_equal(anyDuplicated(valid$purchases$ticket_id),0L)
+  blocked<-parlay_evaluate_portfolio(pool,budget_cny=8,group_budget_cny=8,
+    reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+  expect_equal(blocked$summary$spent_cny,0)
+  expect_equal(blocked$summary$selected_groups,0L)
+  expect_equal(nrow(blocked$purchases),0L)
+})

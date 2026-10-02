@@ -1,0 +1,92 @@
+# Finalize already frozen parallel decisions; do not fit or construct after labels.
+# Reproducible three-epoch/three-structure comparison, every decision before labels.
+root<-rprojroot::find_root(rprojroot::has_file('packages/beidan/DESCRIPTION'))
+devtools::load_all(file.path(root,'packages/beidan'),quiet=TRUE)
+source(file.path(root,'r/forced_complement_replay.R'))
+source(file.path(root,'r/ranked_outcome_replay.R'))
+files<-c('r/forced_complement_replay.R','r/ranked_outcome_replay.R',
+ 'scripts/replay_forced_complement.R',file.path('packages/beidan/R',
+ sort(list.files(file.path(root,'packages/beidan/R'),pattern='\\.R$'))))
+hashes<-setNames(vapply(file.path(root,files),digest::digest,character(1),file=TRUE,algo='sha256'),files)
+version<-substr(rlang::hash(hashes),1,16)
+output<-file.path(root,'inputs/forced_complement_replay',version)
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+manifest<-tibble::tribble(~epoch,~input,~settlement,
+ '2026-09-26','inputs/26098_walkthrough/print/26098-20260926-195204.rds','inputs/selective_double/settlements/26098.rds',
+ '2026-09-28','inputs/26098_walkthrough/three_plans_20260928/plans.rds','inputs/selective_double/settlements/26098.rds',
+ '2026-09-30','inputs/26101_plans_20260930/half_hour/frozen_inputs.rds','inputs/26101_plans_20260930/half_hour/settlement-latest-check-20261001.rds')
+jobs<-list()
+stopifnot(version == '5016d3412782bcbb')
+execution_files<-c('scripts/forced_complement_worker.R','scripts/settle_forced_complement.R')
+execution_hashes<-setNames(vapply(file.path(root,execution_files),digest::digest,character(1),file=TRUE,algo='sha256'),execution_files)
+for(i in seq_len(nrow(manifest))) {
+ row<-manifest[i,];frozen<-readRDS(file.path(root,row$input))
+ if(i==1L){p<-frozen$result$probabilities;cutoff<-frozen$result$cutoff;sp<-beidan::match_typed_empty('prematch_sp')}
+ else {p<-frozen$projected$probabilities;cutoff<-frozen$projected$cutoff;sp<-frozen$projected$prematch_sp}
+ settings<-beidan::parlay_settings();settings$n_legs<-7L;settings$unit_cny<-2;settings$payout_factor<-.65
+ for(pattern in c('3322222','3332221','3333221')) {
+  path<-file.path(output,paste0(row$epoch,'-',pattern,'-decision.rds'))
+  executor<-'scripts/replay_forced_complement.R'
+  if(i==1L && pattern!='3322222') {
+   temp<-file.path(root,'.run-control/forced-complement-parallel',basename(path))
+   evidence<-readRDS(file.path(root,'.run-control/forced-complement-parallel',paste0(pattern,'-execution.rds')))
+   stopifnot(identical(evidence$input_sha256,digest::digest(file.path(root,row$input),file=TRUE,algo='sha256')),
+    identical(evidence$decision_sha256,digest::digest(temp,file=TRUE,algo='sha256')),
+    identical(evidence$executor_sha256,unname(execution_hashes['scripts/forced_complement_worker.R'])),
+    identical(evidence$cutoff,cutoff))
+   if(file.exists(path))stopifnot(identical(rlang::hash(readRDS(path)),rlang::hash(readRDS(temp))))
+   else stopifnot(file.copy(temp,path,overwrite=FALSE))
+   executor<-evidence$executor
+  }
+  replay<-readRDS(path);receipt<-replay$receipt
+  stopifnot(identical(receipt$cutoff,cutoff),identical(receipt$pattern,pattern),
+   identical(receipt$probability_hash,rlang::hash(p)),identical(receipt$prematch_sp_hash,rlang::hash(sp)),
+   identical(receipt$settings_hash,rlang::hash(settings)),
+   identical(receipt$implementation_hash,rlang::hash(list(formals(ReplayForcedComplement),body(ReplayForcedComplement)))),
+   identical(receipt$core_code_hash,beidan:::.parlay_ranked_code_hash()),
+   identical(receipt$final_purchase_hash,rlang::hash(replay$evaluation$purchases)),
+   identical(receipt$final_role_legs_hash,rlang::hash(replay$pool$legs)))
+  jobs[[length(jobs)+1L]]<-list(row=row,pattern=pattern,
+   decision_path=as.character(fs::path_rel(path,start=root)),
+   executor=executor,executor_sha256=digest::digest(file.path(root,executor),file=TRUE,algo='sha256'),
+   decision_sha256=digest::digest(path,file=TRUE,algo='sha256'),
+   input_sha256=digest::digest(file.path(root,row$input),file=TRUE,algo='sha256'))
+ }
+}
+stopifnot(length(jobs)==9L)
+# Receipt persisted before first settlement read; no forecasts are recomputed here.
+saveRDS(list(jobs=jobs,code_hashes=hashes,execution_code_hashes=execution_hashes),
+ file.path(output,'all-decisions-before-labels.rds'))
+# All nine decisions exist before opening any settlement.
+summary<-list();protection<-list();misses<-list();metrics<-list();receipts<-list();forced<-list()
+for(job in jobs) {
+ replay<-readRDS(file.path(root,job$decision_path))
+ labels<-readRDS(file.path(root,job$row$settlement))
+ report<-DiagnoseRankedReplay(replay,labels$settlements,lubridate::with_tz(labels$as_of,'UTC'))
+ stopifnot(identical(job$decision_sha256,digest::digest(file.path(root,job$decision_path),file=TRUE,algo='sha256')))
+ returns <- report$returns$issue_returns
+ if(!nrow(returns)) returns <- tibble::tibble(issue_id=replay$evaluation$cutoff$issue_id,
+   stake_cny=0,settled_stake_cny=0,pending_stake_cny=0,special_stake_cny=0,
+   payout_cny=0,net_cny=0,roi=NA_real_)
+ summary[[length(summary)+1L]]<-dplyr::mutate(returns,
+  epoch=job$row$epoch,target_pattern=job$pattern,
+  actual_patterns=paste(unique(replay$group_metrics$actual_pattern),collapse=','),
+  candidates=nrow(replay$group_metrics),admitted_groups=replay$evaluation$summary$selected_groups,
+  tickets=nrow(replay$evaluation$purchases),won_groups=sum(report$returns$group_returns$n_won>0),
+  coverage=replay$evaluation$summary$actual_coverage,
+  estimated_net_cny=replay$evaluation$summary$ev_net_cny)
+ protection[[length(protection)+1L]]<-dplyr::mutate(report$protection,epoch=job$row$epoch,pattern=job$pattern)
+ misses[[length(misses)+1L]]<-dplyr::mutate(report$misses,epoch=job$row$epoch,pattern=job$pattern)
+ metrics[[length(metrics)+1L]]<-dplyr::mutate(replay$group_metrics,epoch=job$row$epoch,pattern=job$pattern)
+ forced[[length(forced)+1L]]<-dplyr::mutate(replay$evaluation$complement,epoch=job$row$epoch,pattern=job$pattern)
+ receipts[[length(receipts)+1L]]<-c(job,list(settlement_sha256=digest::digest(
+  file.path(root,job$row$settlement),file=TRUE,algo='sha256'),receipt=replay$receipt))
+ saveRDS(report,file.path(output,paste0(job$row$epoch,'-',job$pattern,'-settlement.rds')))
+}
+result<-list(summary=dplyr::bind_rows(summary),protection=dplyr::bind_rows(protection),
+ forced=dplyr::bind_rows(forced),misses=dplyr::bind_rows(misses),group_metrics=dplyr::bind_rows(metrics),receipts=receipts,code_hashes=hashes,execution_code_hashes=execution_hashes)
+stopifnot(identical(hashes,setNames(vapply(file.path(root,files),digest::digest,character(1),file=TRUE,algo='sha256'),files)))
+stopifnot(all(vapply(jobs,function(job)identical(job$decision_sha256,digest::digest(file.path(root,job$decision_path),file=TRUE,algo='sha256')),logical(1))))
+saveRDS(result,file.path(output,'results.rds'))
+cat('RESULT',sub(paste0(root,'/'),'',file.path(output,'results.rds'),fixed=TRUE),'\n')
+print(result$summary,width=150)

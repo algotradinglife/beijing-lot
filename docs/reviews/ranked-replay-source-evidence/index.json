@@ -1,0 +1,10 @@
+{
+  "r/ranked_outcome_replay.R": {
+    "aab2d7716597b7c87ace2b18533f54379cdba3c9a99f093310fb566ef3672edd": "docs/reviews/ranked-replay-source-evidence/aab2d7716597b7c87ace2b18533f54379cdba3c9a99f093310fb566ef3672edd.R.txt",
+    "97a1adde05d48cd4cdf41fa53b90f6b0c39f91adbd728001e31b272ad03934e6": "docs/reviews/ranked-replay-source-evidence/97a1adde05d48cd4cdf41fa53b90f6b0c39f91adbd728001e31b272ad03934e6.R.txt"
+  },
+  "scripts/replay_recent_ranked_outcomes.R": {
+    "d75613932e621746bf90f2cddf13ce2469af278a3d9a8fcc7eda1f63accfe2d5": "docs/reviews/ranked-replay-source-evidence/d75613932e621746bf90f2cddf13ce2469af278a3d9a8fcc7eda1f63accfe2d5.R.txt",
+    "d33af1cac8978fa96352bb61be17e79c23f9184cbaede4e17d070eb3cb4a6ab4": "docs/reviews/ranked-replay-source-evidence/d33af1cac8978fa96352bb61be17e79c23f9184cbaede4e17d070eb3cb4a6ab4.R.txt"
+  }
+}

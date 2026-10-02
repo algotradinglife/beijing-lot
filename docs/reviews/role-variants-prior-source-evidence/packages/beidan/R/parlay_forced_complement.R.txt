@@ -1,0 +1,157 @@
+# Forced-complement obligations for actual role-2 legs (research internals).
+#
+# A "forced complement" is the second double of one fixture that must be bought
+# together with the first: the classifier of a live double returns TWO entries
+# whenever the LOWEST-ranked raw outcome is the draw and the draw probability is
+# strictly above 0.20, so the same fixture carries a main double and a protecting
+# double that shares its top1. This file owns only the two pure decision-side
+# helpers the research client needs:
+#   * which fixtures OWE a complement at all (obligations); and
+#   * whether the purchase ledger actually discharged that obligation with TWO
+#     DIFFERENT physical owners (audit).
+# Nothing here fits, reads labels or the clock, or writes state.
+
+#' Forced-complement obligations of the admitted pool
+#'
+#' Internal. A fixture OWES a forced complement when it is carried by at least one
+#' ACTUAL role-2 leg and its raw probabilities put the draw at RANK 3 with
+#' `pD > 0.20` strictly. The test is the RAW rank, not the length or content of the
+#' [classify_outcomes()] list: a demoted role-2 leg whose triple classifier returned
+#' only the whole triple still owes a complement, while a fixture never carried by a
+#' role-2 leg (a role-3-only or role-1-only fixture) never does.
+#' @param pool Normalized pool with `cutoff`, `legs` and `probabilities`. `cutoff` is
+#'   validated by [match_require_cutoff()]; `probabilities` is the authoritative W/D/L
+#'   long table; `legs` needs `fixture_id`, `role` and `allowed_outcomes`.
+#' @return A typed tibble with one row per owing fixture:
+#'   `fixture_id` (character), `top1`/`top2` (character, raw rank 1 and 2),
+#'   `draw_probability` (double), `main_mask` and `protect_mask` (list of the two
+#'   required outcome sets). Zero obligations returns the same typed-empty shape.
+#' @noRd
+.parlay_forced_complement_obligations <- function(pool) {
+  if (!is.list(pool)) stop("parlay_forced_complement_obligations: pool must be a list")
+  match_require_cutoff(pool$cutoff)
+  probabilities <- match_validate_table(pool$probabilities, "probabilities")
+  legs <- pool$legs
+  if (!is.data.frame(legs)) {
+    stop("parlay_forced_complement_obligations: pool$legs must be a data frame")
+  }
+  for (field in c("fixture_id", "role", "allowed_outcomes")) {
+    if (!field %in% names(legs)) {
+      stop("parlay_forced_complement_obligations: pool$legs is missing column ", field)
+    }
+  }
+  empty <- tibble::tibble(
+    fixture_id = character(0), top1 = character(0), top2 = character(0),
+    draw_probability = numeric(0), main_mask = list(), protect_mask = list())
+  role2 <- as.character(legs$fixture_id[as.integer(legs$role) == 2L])
+  fixtures <- sort(unique(role2))
+  if (!length(fixtures)) return(empty)
+  wide <- parlay_probability_wide(probabilities)
+  rows <- list()
+  for (fixture_id in fixtures) {
+    row <- wide[wide$fixture_id == fixture_id, , drop = FALSE]
+    if (!nrow(row)) {
+      stop("parlay_forced_complement_obligations: role-2 fixture ", fixture_id,
+           " is missing from pool$probabilities")
+    }
+    triple <- as.numeric(row[1L, match_outcomes()])
+    ranking <- order(-triple,seq_len(3L))
+    draw_probability <- triple[2L]
+    if (match_outcomes()[ranking][3L] != "D" || draw_probability <= 0.20) next
+    ranked <- match_outcomes()[ranking]
+    rows[[length(rows) + 1L]] <- tibble::tibble(
+      fixture_id = fixture_id, top1 = ranked[1L], top2 = ranked[2L],
+      draw_probability = as.numeric(draw_probability),
+      main_mask = list(ranked[c(1L, 2L)]), protect_mask = list(ranked[c(1L, 3L)]))
+  }
+  if (!length(rows)) return(empty)
+  out <- dplyr::bind_rows(rows)
+  out <- out[order(out$fixture_id), , drop = FALSE]
+  tibble::as_tibble(out[, c("fixture_id", "top1", "top2", "draw_probability",
+                            "main_mask", "protect_mask")])
+}
+
+#' Audit whether the ledger discharged the forced complements
+#'
+#' Internal. For every owing fixture it scans the ACTUAL role-2 legs of the groups
+#' that OWN purchases, keeps the groups whose leg mask for that fixture is exactly
+#' the main or the protect mask (set equality), and then requires each such group's
+#' OWN tickets to realize that whole mask for the fixture: the union of the
+#' fixture's outcomes over the group's OWN `ticket_id`s must equal the mask. A group
+#' with the right mask but a missing bought outcome counts for nothing, and it may
+#' never borrow another owner's legs. The obligation is satisfied only by TWO
+#' DIFFERENT groups, one main and one protect. Role-3 legs never count.
+#' @param pool Normalized pool, as for [.parlay_forced_complement_obligations()].
+#' @param purchases Purchase ledger with `group_id` and `ticket_id`; a `ticket_id`
+#'   has exactly one physical owning `group_id`.
+#' @param ticket_legs Ticket composition with `ticket_id`, `fixture_id`, `outcome`;
+#'   `leg_order` is accepted and ignored.
+#' @return A typed tibble with one row per owing fixture: `fixture_id` (character),
+#'   `main_groups`/`protect_groups` (list of the qualifying owning group ids) and
+#'   `satisfied` (logical, TRUE only when both lists are non-empty). Zero obligations
+#'   returns the same typed-empty shape.
+#' @noRd
+.parlay_forced_complement_audit <- function(pool, purchases, ticket_legs) {
+  match_require_cutoff(pool$cutoff)
+  legs <- pool$legs
+  if (!is.data.frame(purchases)) {
+    stop("parlay_forced_complement_audit: purchases must be a data frame")
+  }
+  if (!is.data.frame(ticket_legs)) {
+    stop("parlay_forced_complement_audit: ticket_legs must be a data frame")
+  }
+  for (field in c("group_id", "ticket_id")) {
+    if (!field %in% names(purchases)) {
+      stop("parlay_forced_complement_audit: purchases is missing column ", field)
+    }
+  }
+  for (field in c("ticket_id", "fixture_id", "outcome")) {
+    if (!field %in% names(ticket_legs)) {
+      stop("parlay_forced_complement_audit: ticket_legs is missing column ", field)
+    }
+  }
+  if(anyDuplicated(purchases$ticket_id))
+    stop("forced complement audit: ticket_id must have one physical owner")
+  if(anyDuplicated(ticket_legs[c("ticket_id","fixture_id")]))
+    stop("forced complement audit: duplicate ticket fixture key")
+  if(!"group_id" %in% names(legs)) stop("forced complement audit: legs missing group_id")
+  owned_pool <- pool
+  owned_pool$legs <- dplyr::semi_join(legs,dplyr::distinct(purchases,group_id),by="group_id")
+  obligations <- .parlay_forced_complement_obligations(owned_pool)
+  out <- tibble::tibble(fixture_id = as.character(obligations$fixture_id),
+                        main_groups = vector("list", nrow(obligations)),
+                        protect_groups = vector("list", nrow(obligations)),
+                        satisfied = rep(FALSE, nrow(obligations)))
+  if (!nrow(obligations)) return(out)
+  owner <- split(as.character(purchases$ticket_id), as.character(purchases$group_id))
+  leg_ticket <- as.character(ticket_legs$ticket_id)
+  leg_fixture <- as.character(ticket_legs$fixture_id)
+  leg_outcome <- as.character(ticket_legs$outcome)
+  for (i in seq_len(nrow(obligations))) {
+    fixture_id <- as.character(obligations$fixture_id[i])
+    main <- sort(unique(as.character(obligations$main_mask[[i]])))
+    protect <- sort(unique(as.character(obligations$protect_mask[[i]])))
+    carried <- legs[as.character(legs$fixture_id) == fixture_id &
+                      as.integer(legs$role) == 2L, , drop = FALSE]
+    main_groups <- character(0)
+    protect_groups <- character(0)
+    for (j in seq_len(nrow(carried))) {
+      group_id <- as.character(carried$group_id[j])
+      tickets <- owner[[group_id]]
+      if (is.null(tickets)) next
+      mask <- sort(unique(as.character(carried$allowed_outcomes[[j]])))
+      target <- if (setequal(mask, main)) main else
+        if (setequal(mask, protect)) protect else next
+      # Only THIS owner's own tickets may realize the mask: the union of the
+      # fixture's outcomes over them must equal the mask exactly.
+      bought <- leg_ticket %in% as.character(tickets) & leg_fixture == fixture_id
+      if (!setequal(unique(leg_outcome[bought]), target)) next
+      if (setequal(mask, main)) main_groups <- union(main_groups, group_id)
+      else protect_groups <- union(protect_groups, group_id)
+    }
+    out$main_groups[[i]] <- main_groups
+    out$protect_groups[[i]] <- protect_groups
+    out$satisfied[i] <- length(main_groups) > 0L && length(protect_groups) > 0L
+  }
+  out
+}

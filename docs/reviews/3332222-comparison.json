@@ -1,0 +1,43 @@
+{
+  "scope": "3332222 additional historical strategy comparison; existing implementation unchanged",
+  "hashes": {
+    "scripts/replay_3332222_comparison.R": "058f5204996e2af0e7e8ed519160bb960631377ef1ef02b4a8bd5029f10e385b",
+    "tests/testthat/test-3332222-comparison.R": "0e4831ebbe0da586c4906dc40f423507ae23e34f0a784465362c301ecf216616",
+    "r/ranked_outcome_replay.R": "2a25943569976f229ce78741a317ed19d5ef97282ecd3f299d3761d2b82d3267",
+    "docs/reviews/role-variants-prior-source-evidence/classify_outcomes_before_role_variants.qmd.txt": "273bb0127f55af217e4fc111c5a965d00adae765aa0ecd2feac23bb187b0c482"
+  },
+  "checks": {
+    "tests": "PASS31 assertions,0fail/error/warning",
+    "source_review": "PASS codex review v4; no actionable findings; source hashes stable",
+    "results": "PASS: three frozen decision artifacts; 26Sep five groups/640 tickets/1280 CNY stake/0 payout; 28Sep four groups/512 tickets/1024 CNY stake/0 payout; 30Sep zero purchases; no pending or special settlement stake",
+    "render": "PASS: fresh no-cache render exit0; 109 tables, zero cell-output-error; immutable before/after result hashes verified",
+    "artifact_review": "PASS final Codex review after default CLI authentication restored; no actionable findings,31 assertions,109tables0executionerrors",
+    "PI": "PASS PI verifies current frozen results/source identities and independent artifact verdict; no profitable-default inference"
+  },
+  "commands": {
+    "tests": "R_LIBS=\"$PWD/r_lib\" Rscript - using testthat::test_file(\"tests/testthat/test-3332222-comparison.R\") and failure/error/warning assertions",
+    "source_review": "codex review - < .run-control/3332222-comparison/review-v4-prompt.txt",
+    "replay": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/replay_3332222_comparison.R",
+    "render": "R_LIBS=\"$PWD/r_lib\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache",
+    "artifact_review": "codex review - < .run-control/3332222-comparison/artifact-review-prompt.txt (default ChatGPT login restored; artifact-review-auth-restored.log)"
+  },
+  "source_review_log": ".run-control/3332222-comparison/review-v4.log",
+  "test_log": ".run-control/3332222-comparison/tests-v4.log",
+  "result_path": "inputs/3332222_comparison/f989887167bd041f/results.rds",
+  "findings_resolved": [
+    "Input SHA capture before reading and after computing",
+    "Settlement SHA capture before reading and after diagnosis",
+    "Pending/special stake guard",
+    "Complete visible group labels required even if every ticket already LOST"
+  ],
+  "limits": [
+    "Three dates,not profitability proof",
+    "NoSP26 EV must remainNA",
+    "Original nine decision artifacts unchanged",
+    "No CI/fullrepo/adopted-performance claim"
+  ],
+  "artifact_review_log": ".run-control/3332222-comparison/artifact-review-shell.log",
+  "render_receipt": ".run-control/3332222-comparison/render-receipt.json",
+  "qmd_source_preservation": "Prior3332222 QMD bytes retained; this evidence does not authorize or review the new #553 implementation",
+  "final_artifact_review": "docs/reviews/3332222-artifact-review-auth-restored.json"
+}

@@ -1,0 +1,52 @@
+{
+  "command": "R_LIBS=project/r_lib Rscript tests/testthat.R",
+  "exit_code": 1,
+  "log": ".run-control/role-variants-repository-tests.log",
+  "status": "FAIL; not a full repository pass",
+  "observed_failures": [
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-budget-allocation.R",
+      "trigger": "Earlier tests persist issue_budget_cny8; budget-state tests expect1024",
+      "examples": "1000/1024 historical CNY expenditures rejected against8CNY cap; derived unit budget4 versus512"
+    },
+    {
+      "file": "packages/beidan/tests/testthat/test-parlay-exploration.R",
+      "trigger": "Retired constructor call uses n_candidates/probabilities plus role score input",
+      "error": "unused arguments (n_candidates=3, probabilities=probabilities)"
+    }
+  ],
+  "report_limits": "Report prints first10 failures and says50more; repository-client phase did not execute after package failure. Three inherited retired score-evaluator test files executed in this run before they were archived/removed to match primary deletions; replacement scoped suites separately pass. No CI work.",
+  "baseline_evidence": [
+    {
+      "path": "packages/beidan/R/parlay_budget_allocation.R",
+      "sha256": "79c3a20eed920ac40b2d2be1da4ba0325ff7133119742eda6fba9efd91a32834",
+      "in_baseline": true,
+      "unchanged": true
+    },
+    {
+      "path": "packages/beidan/R/parlay_exploration.R",
+      "sha256": "b3405cb633ac077c575319612a8dcfa22aeb512e0f1d9030c1e84b549c1ae93a",
+      "in_baseline": true,
+      "unchanged": true
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-budget-allocation.R",
+      "sha256": "ea4c17f1ca87052d8afba22bfccff70c44e80c7ebc8330fe4a9f711be5f7a348",
+      "in_baseline": false,
+      "unchanged": false
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-exploration.R",
+      "sha256": "93b5150a2f989d479f125e8aba476df04082bdb6d1d9bbe9fccb60984a6d8c13",
+      "in_baseline": false,
+      "unchanged": false
+    }
+  ],
+  "previous_constructor_evidence": {
+    "path": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_ranked_group_construction.R.txt",
+    "sha256": "33c37cede69fd07cf79ae624f7f50f5d337d9699df25c8abfd5bbdca52cb816d",
+    "already_used_max_candidates": true,
+    "no_n_candidates_formal": true
+  },
+  "scope": "Existing errors and settings isolation gaps are accurately inventoried; no evidence of full-repository success; new pipeline checks independently scoped."
+}

@@ -1,0 +1,174 @@
+{
+  "r/ranked_outcome_replay.R": {
+    "sha256": "d357df86a9700715e66cde88eed849355b154110844d2e83428a0851303b99ce",
+    "archive": "docs/reviews/forced-complement-prior-source/d357df86a9700715e66cde88eed849355b154110844d2e83428a0851303b99ce.txt"
+  },
+  "scripts/replay_recent_ranked_outcomes.R": {
+    "sha256": "2bc23a566e2b2682dae5c1fc79789ee9348dde0955f55ebef3ce51bfb2d51b63",
+    "archive": "docs/reviews/forced-complement-prior-source/2bc23a566e2b2682dae5c1fc79789ee9348dde0955f55ebef3ce51bfb2d51b63.txt"
+  },
+  "r/parlay_structure_compression.R": {
+    "sha256": "3cfcc9699e1c0787c667e132ce5e1c7679a4466f173a501b0365c6baab4fcbfa",
+    "archive": "docs/reviews/forced-complement-prior-source/3cfcc9699e1c0787c667e132ce5e1c7679a4466f173a501b0365c6baab4fcbfa.txt"
+  },
+  "scripts/replay_compressed_structures.R": {
+    "sha256": "c04b4288946bcf140d8bcc4e4332ad6a0f705f12fccab9b816da45a917223f9c",
+    "archive": "docs/reviews/forced-complement-prior-source/c04b4288946bcf140d8bcc4e4332ad6a0f705f12fccab9b816da45a917223f9c.txt"
+  },
+  "packages/beidan/R/parlay_risk.R": {
+    "sha256": "feaca8f5d629534e0ad269e93beb438a1d55ad220030d883e8ae2aa855cb36a5",
+    "archive": "docs/reviews/forced-complement-prior-source/feaca8f5d629534e0ad269e93beb438a1d55ad220030d883e8ae2aa855cb36a5.txt"
+  },
+  "packages/beidan/R/parlay_frontier.R": {
+    "sha256": "b97b81ba122bbbd9771a4754fffd0de19962a579a913b5962a76f2deead186c4",
+    "archive": "docs/reviews/forced-complement-prior-source/b97b81ba122bbbd9771a4754fffd0de19962a579a913b5962a76f2deead186c4.txt"
+  },
+  "packages/beidan/R/n7_pipeline_epoch.R": {
+    "sha256": "34c40e9362f8af589d664010ff2def3e89f5b151c09ff839c4db694d361a9494",
+    "archive": "docs/reviews/forced-complement-prior-source/34c40e9362f8af589d664010ff2def3e89f5b151c09ff839c4db694d361a9494.txt"
+  },
+  "packages/beidan/R/match_markets.R": {
+    "sha256": "b2e416008231c25e844144f001622196569e242bd3e0cb05ee1768a55b7a0c62",
+    "archive": "docs/reviews/forced-complement-prior-source/b2e416008231c25e844144f001622196569e242bd3e0cb05ee1768a55b7a0c62.txt"
+  },
+  "packages/beidan/R/beidan-package.R": {
+    "sha256": "417faf50c5f14cd3ce19e34e19db81c1fbfd185ecc0ba23f40b9ebf77b24929c",
+    "archive": "docs/reviews/forced-complement-prior-source/417faf50c5f14cd3ce19e34e19db81c1fbfd185ecc0ba23f40b9ebf77b24929c.txt"
+  },
+  "packages/beidan/R/schedule_identity.R": {
+    "sha256": "8918792d66f77527d7c19e2ef9eeed6a7ce9a7dccd905b9556de78467542bf6c",
+    "archive": "docs/reviews/forced-complement-prior-source/8918792d66f77527d7c19e2ef9eeed6a7ce9a7dccd905b9556de78467542bf6c.txt"
+  },
+  "packages/beidan/R/n7_experiment_contract.R": {
+    "sha256": "ac054e9987f9f45353696bedd903bb371b85a953f2fcb301ea145badeb4b6747",
+    "archive": "docs/reviews/forced-complement-prior-source/ac054e9987f9f45353696bedd903bb371b85a953f2fcb301ea145badeb4b6747.txt"
+  },
+  "packages/beidan/R/n7_pipeline_fixture.R": {
+    "sha256": "c2f11506041b235408fa7fc3d7299d4294def9db82c020b491cea330c4bfcf99",
+    "archive": "docs/reviews/forced-complement-prior-source/c2f11506041b235408fa7fc3d7299d4294def9db82c020b491cea330c4bfcf99.txt"
+  },
+  "packages/beidan/R/parlay_fixed_depth_curve.R": {
+    "sha256": "b68cefb19bd2449ec9f741982c9aca5d0b2b00c8af7a6a0beb99d71593672fef",
+    "archive": "docs/reviews/forced-complement-prior-source/b68cefb19bd2449ec9f741982c9aca5d0b2b00c8af7a6a0beb99d71593672fef.txt"
+  },
+  "packages/beidan/R/parlay_plan_summary.R": {
+    "sha256": "e38c9f917616385a02141519f508edc94323d39bece123a16e51211a91858d14",
+    "archive": "docs/reviews/forced-complement-prior-source/e38c9f917616385a02141519f508edc94323d39bece123a16e51211a91858d14.txt"
+  },
+  "packages/beidan/R/parlay_role_shared.R": {
+    "sha256": "b645b362dc8ade2273505f8034f93616cfc70accfaef577db258d0f06bed6c1a",
+    "archive": "docs/reviews/forced-complement-prior-source/b645b362dc8ade2273505f8034f93616cfc70accfaef577db258d0f06bed6c1a.txt"
+  },
+  "packages/beidan/R/python-backend.R": {
+    "sha256": "820a0db0aea37c6d0dba4ab2ae45c5edc264cf5478761b3a80cf527991083662",
+    "archive": "docs/reviews/forced-complement-prior-source/820a0db0aea37c6d0dba4ab2ae45c5edc264cf5478761b3a80cf527991083662.txt"
+  },
+  "packages/beidan/R/parlay_role_portfolio.R": {
+    "sha256": "a4cb740d496fe718071ca46bdb0cd69d0fda74f79de2927d65e75dd60123ed2c",
+    "archive": "docs/reviews/forced-complement-prior-source/a4cb740d496fe718071ca46bdb0cd69d0fda74f79de2927d65e75dd60123ed2c.txt"
+  },
+  "packages/beidan/R/n7_pipeline_match_status.R": {
+    "sha256": "c2c328579a95e55203bf067273c8ceac4e226915ced358bea2715f42c17ed216",
+    "archive": "docs/reviews/forced-complement-prior-source/c2c328579a95e55203bf067273c8ceac4e226915ced358bea2715f42c17ed216.txt"
+  },
+  "packages/beidan/R/parlay_storage.R": {
+    "sha256": "481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f",
+    "archive": "docs/reviews/forced-complement-prior-source/481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f.txt"
+  },
+  "packages/beidan/R/n7_pipeline_inputs.R": {
+    "sha256": "f0eb9c1f7fcb8406925b8f25dae942ba3c4783483b223d1d139703f0be5496b7",
+    "archive": "docs/reviews/forced-complement-prior-source/f0eb9c1f7fcb8406925b8f25dae942ba3c4783483b223d1d139703f0be5496b7.txt"
+  },
+  "packages/beidan/R/fundamentals_total_market.R": {
+    "sha256": "37657e4f461573d3df4bfbe204d8986cfd94a9dcfaa74b40d290242f3835be4f",
+    "archive": "docs/reviews/forced-complement-prior-source/37657e4f461573d3df4bfbe204d8986cfd94a9dcfaa74b40d290242f3835be4f.txt"
+  },
+  "packages/beidan/R/issue_schedule.R": {
+    "sha256": "7fb9e201cd77eece039009a98bb535dd07c46c371fee9d12a34bd897fee8e914",
+    "archive": "docs/reviews/forced-complement-prior-source/7fb9e201cd77eece039009a98bb535dd07c46c371fee9d12a34bd897fee8e914.txt"
+  },
+  "packages/beidan/R/n7_pipeline_types.R": {
+    "sha256": "f355ec0f2949c3ed88df13a555e456e60f959175ffda6ac6718723e3f09bdfec",
+    "archive": "docs/reviews/forced-complement-prior-source/f355ec0f2949c3ed88df13a555e456e60f959175ffda6ac6718723e3f09bdfec.txt"
+  },
+  "packages/beidan/R/parlay_betting_sheet.R": {
+    "sha256": "5729fd755a05c9c0bee821632e102f5d277473d2c6039843ad4da63143b3eb81",
+    "archive": "docs/reviews/forced-complement-prior-source/5729fd755a05c9c0bee821632e102f5d277473d2c6039843ad4da63143b3eb81.txt"
+  },
+  "packages/beidan/R/n7_pipeline_candidates.R": {
+    "sha256": "a187624c23a495d6bb62e187a4b9619912379b529b9cea58648078d57bc8a506",
+    "archive": "docs/reviews/forced-complement-prior-source/a187624c23a495d6bb62e187a4b9619912379b529b9cea58648078d57bc8a506.txt"
+  },
+  "packages/beidan/R/parlay_ranked_group_construction.R": {
+    "sha256": "33c37cede69fd07cf79ae624f7f50f5d337d9699df25c8abfd5bbdca52cb816d",
+    "archive": "docs/reviews/forced-complement-prior-source/33c37cede69fd07cf79ae624f7f50f5d337d9699df25c8abfd5bbdca52cb816d.txt"
+  },
+  "packages/beidan/R/market_schedule.R": {
+    "sha256": "b433f3219c6bf33dcb582b4972423ae4ac9dd1947a23f744d578d53b0d761623",
+    "archive": "docs/reviews/forced-complement-prior-source/b433f3219c6bf33dcb582b4972423ae4ac9dd1947a23f744d578d53b0d761623.txt"
+  },
+  "packages/beidan/R/rank_outcome_selections.R": {
+    "sha256": "1c3b419ea65be567dc1c5c7a1a5449fb1cb7fd5e30265f19f4a93ef0de2628df",
+    "archive": "docs/reviews/forced-complement-prior-source/1c3b419ea65be567dc1c5c7a1a5449fb1cb7fd5e30265f19f4a93ef0de2628df.txt"
+  },
+  "packages/beidan/R/issue_settlements.R": {
+    "sha256": "7014e9715e6e033819f80ac2fadd4a18d12ea6a140f50fb30bfac715b59d5727",
+    "archive": "docs/reviews/forced-complement-prior-source/7014e9715e6e033819f80ac2fadd4a18d12ea6a140f50fb30bfac715b59d5727.txt"
+  },
+  "packages/beidan/R/parlay_budget_allocation.R": {
+    "sha256": "79c3a20eed920ac40b2d2be1da4ba0325ff7133119742eda6fba9efd91a32834",
+    "archive": "docs/reviews/forced-complement-prior-source/79c3a20eed920ac40b2d2be1da4ba0325ff7133119742eda6fba9efd91a32834.txt"
+  },
+  "packages/beidan/R/fundamentals_market_comparison.R": {
+    "sha256": "6e9880ff5df8571a9c56ba394f0a2a6c225b64be8b636b915486846caf9354ce",
+    "archive": "docs/reviews/forced-complement-prior-source/6e9880ff5df8571a9c56ba394f0a2a6c225b64be8b636b915486846caf9354ce.txt"
+  },
+  "packages/beidan/R/parlay_role_groups.R": {
+    "sha256": "b87d9cf80a3143784efffc9b256969ba4a4c335a173b696da27f4b1c6e0bd94f",
+    "archive": "docs/reviews/forced-complement-prior-source/b87d9cf80a3143784efffc9b256969ba4a4c335a173b696da27f4b1c6e0bd94f.txt"
+  },
+  "packages/beidan/R/parlay_exploration.R": {
+    "sha256": "b3405cb633ac077c575319612a8dcfa22aeb512e0f1d9030c1e84b549c1ae93a",
+    "archive": "docs/reviews/forced-complement-prior-source/b3405cb633ac077c575319612a8dcfa22aeb512e0f1d9030c1e84b549c1ae93a.txt"
+  },
+  "packages/beidan/R/parlay_role_scores.R": {
+    "sha256": "aa8672aaa18b390a5653ee9e022a77777374ec2e5585d2d67fb9967f302106f6",
+    "archive": "docs/reviews/forced-complement-prior-source/aa8672aaa18b390a5653ee9e022a77777374ec2e5585d2d67fb9967f302106f6.txt"
+  },
+  "packages/beidan/R/prepare_outcome_selections.R": {
+    "sha256": "4366d02d075e3e7a70bec898c6a96f2fa10c3e14683eda196de1749dcc7e8290",
+    "archive": "docs/reviews/forced-complement-prior-source/4366d02d075e3e7a70bec898c6a96f2fa10c3e14683eda196de1749dcc7e8290.txt"
+  },
+  "packages/beidan/R/n7_pipeline_value.R": {
+    "sha256": "a86718dc0ad93d6142604457e337f9ae66af9c09408c6541ce0f527390a82e5c",
+    "archive": "docs/reviews/forced-complement-prior-source/a86718dc0ad93d6142604457e337f9ae66af9c09408c6541ce0f527390a82e5c.txt"
+  },
+  "packages/beidan/R/dixon_coles_grid.R": {
+    "sha256": "66373c2f79bcaba9a0e51b734118ff320d97304ab4b6ae9493798eedfe75c106",
+    "archive": "docs/reviews/forced-complement-prior-source/66373c2f79bcaba9a0e51b734118ff320d97304ab4b6ae9493798eedfe75c106.txt"
+  },
+  "packages/beidan/R/parlay_restructure_plan.R": {
+    "sha256": "9c9f5b41a8c6f4bbeb30be159607f99c63fe800077cc08970b4193e28366eb36",
+    "archive": "docs/reviews/forced-complement-prior-source/9c9f5b41a8c6f4bbeb30be159607f99c63fe800077cc08970b4193e28366eb36.txt"
+  },
+  "packages/beidan/R/n7_pipeline_contracts.R": {
+    "sha256": "01a96616aa417db18c47946fd02f556405f3b0747c9ac8a3270a8db2c79db734",
+    "archive": "docs/reviews/forced-complement-prior-source/01a96616aa417db18c47946fd02f556405f3b0747c9ac8a3270a8db2c79db734.txt"
+  },
+  "packages/beidan/R/issue_prematch_sp.R": {
+    "sha256": "592ece2af6fc279f25eb934dbe7821b365b348d545bbb6ca50780253e41f3621",
+    "archive": "docs/reviews/forced-complement-prior-source/592ece2af6fc279f25eb934dbe7821b365b348d545bbb6ca50780253e41f3621.txt"
+  },
+  "packages/beidan/R/classify_outcomes.R": {
+    "sha256": "5f4103abcee0eff963e4b1a76d568187ddaee7364888a04c462c4e7dd09052ee",
+    "archive": "docs/reviews/forced-complement-prior-source/5f4103abcee0eff963e4b1a76d568187ddaee7364888a04c462c4e7dd09052ee.txt"
+  },
+  "packages/beidan/R/parlay_ranked_portfolio.R": {
+    "sha256": "bcff252d3008f3630b88f703c3aea6dec922afee3d66cd30140576a1d5b0fd70",
+    "archive": "docs/reviews/forced-complement-prior-source/bcff252d3008f3630b88f703c3aea6dec922afee3d66cd30140576a1d5b0fd70.txt"
+  },
+  "packages/beidan/R/parlay_loss_diagnostic.R": {
+    "sha256": "d7aaabb9a5a5594b29aea9c7eb08492917c159ae39ab1b18864fceb62d823e20",
+    "archive": "docs/reviews/forced-complement-prior-source/d7aaabb9a5a5594b29aea9c7eb08492917c159ae39ab1b18864fceb62d823e20.txt"
+  }
+}

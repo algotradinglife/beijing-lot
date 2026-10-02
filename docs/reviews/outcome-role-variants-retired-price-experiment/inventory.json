@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "source": "r/recent_price_backtest.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/recent_price_backtest.R.txt",
+      "sha256": "07d59b0cb9e2e5140f848df4e8c77b20607a0aa8d51009c99f8656213cb933e1",
+      "reason": "Old all-role score/gate experiment replaced by classified ranked exploration; frozen results preserved, not regenerated"
+    },
+    {
+      "source": "quarto/recent_betting_backtest.qmd",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/recent_betting_backtest.qmd.txt",
+      "sha256": "7c518b52675b6a75704a66ef6bc540f75f5a43c94d6b08614f69a65a26caf984",
+      "reason": "Old all-role score/gate experiment replaced by classified ranked exploration; frozen results preserved, not regenerated"
+    },
+    {
+      "source": "tests/testthat/test-recent-price-backtest.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/test-recent-price-backtest.R.txt",
+      "sha256": "536d5ad7f01c328d39604e4adff7a0f3d4b3e0b0bd47c332967ba9c83e217f3a",
+      "reason": "Old all-role score/gate experiment replaced by classified ranked exploration; frozen results preserved, not regenerated"
+    },
+    {
+      "source": "r/build_three_structure_plans.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/build_three_structure_plans.R.txt",
+      "sha256": "0d04f5ce3fb828cd22fe35c150d8e42a3a3c20c1b888f961fc83e5d34e20913b",
+      "reason": "#543 old-rule reproduction entry point; frozen outputs retained; current generation demonstrated in original QMD"
+    },
+    {
+      "source": "r/parlay_loss_counterfactual.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/parlay_loss_counterfactual.R.txt",
+      "sha256": "bd29260014ed5f69b1ff238afdce71f97b72bb02d7d2b5d8dfdf47f1d880fc2b",
+      "reason": "Frozen old-rule counterfactual client cannot operate on current ranked sources; retained as evidence, no regenerated historical result"
+    },
+    {
+      "source": "tests/testthat/test-parlay-loss-counterfactual.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/test-parlay-loss-counterfactual.R.txt",
+      "sha256": "1ab5b430ef98441d637acb9436e43a811daf2e902598ae94edccd20ce9ffef38",
+      "reason": "Frozen old-rule counterfactual client cannot operate on current ranked sources; retained as evidence, no regenerated historical result"
+    },
+    {
+      "source": "quarto/26098_loss_review.qmd",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/26098_loss_review.qmd.txt",
+      "sha256": "0d357fac763e946e3c3b784b23bc8ad7b57f4e49af6027b93b193ebd14708487",
+      "reason": "Frozen old-rule counterfactual client cannot operate on current ranked sources; retained as evidence, no regenerated historical result"
+    },
+    {
+      "source": "r/replay_three_structure_plans.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/replay_three_structure_plans.R.txt",
+      "sha256": "022dc48cd15bb5f62685b7832680aff46ad8ee0da73d2d06a7fb36b948455d13",
+      "reason": "Retired #543 old-rule replay contract; old frozen plans and original source bytes retained as evidence. Current independent purchase, cutoff, receipt and replay contracts tested by ranked-outcome-replay and current package suites."
+    },
+    {
+      "source": "tests/testthat/test-543-three-structure-plans.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/test-543-three-structure-plans.R.txt",
+      "sha256": "a6a5043de9e24d393ca4674a9956d7626fcb71d8c642f19b91c000092ad11580",
+      "reason": "Retired #543 old-rule replay contract; old frozen plans and original source bytes retained as evidence. Current independent purchase, cutoff, receipt and replay contracts tested by ranked-outcome-replay and current package suites."
+    },
+    {
+      "source": "r/parlay_loss_mask_experiment.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/parlay_loss_mask_experiment.R.txt",
+      "sha256": "59ddd2d7f7496aeb7c2209f66977b45ab274591189b8b4444a03459542f1e533",
+      "reason": "Old retrospective custom-mask client depends on deleted .parlay_role_packages/select/result and obsolete frozen evaluation interface. Retained as byte evidence, not rerun under current policy. Current optional classified variant and actual-mask tests replace executable path."
+    },
+    {
+      "source": "tests/testthat/test-parlay-loss-mask-experiment.R",
+      "archive": "docs/reviews/outcome-role-variants-retired-price-experiment/test-parlay-loss-mask-experiment.R.txt",
+      "sha256": "69541594ba02cc36d7042e6558c43c017636372e4fd2350d60f0b8751851f2c7",
+      "reason": "Old retrospective custom-mask client depends on deleted .parlay_role_packages/select/result and obsolete frozen evaluation interface. Retained as byte evidence, not rerun under current policy. Current optional classified variant and actual-mask tests replace executable path."
+    }
+  ]
+}

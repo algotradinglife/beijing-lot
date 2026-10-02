@@ -1,0 +1,69 @@
+test_that("the actual QMD startup locates one repository from supported working directories", {
+  repository <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+  document <- readLines(file.path(repository, "quarto/classify_outcomes_contract.qmd"))
+  start <- match("```{r}", document) + 1L
+  end <- start + match("```", document[start:length(document)]) - 2L
+  startup <- parse(text = document[start:end])[1:2]
+  for (directory in c(repository, file.path(repository, "quarto"),
+                      file.path(repository, "packages/beidan"))) {
+    withr::with_dir(directory, {
+      environment <- new.env(parent = globalenv())
+      expect_no_warning(eval(startup, envir = environment))
+      expect_equal(normalizePath(environment$root), normalizePath(repository))
+      expect_true(file.exists(file.path(environment$root, "packages/beidan/DESCRIPTION")))
+    })
+  }
+})
+
+test_that("the QMD root locator fails explicitly outside the repository", {
+  repository <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+  document <- readLines(file.path(repository, "quarto/classify_outcomes_contract.qmd"))
+  locator <- parse(text = document[match("```{r}", document) + 1L])
+  external_parent <- normalizePath(dirname(repository), mustWork=TRUE)
+  expect_false(startsWith(paste0(external_parent,"/"),paste0(repository,"/")))
+  directory <- withr::local_tempdir(tmpdir=external_parent)
+  expect_false(startsWith(normalizePath(directory),paste0(repository,"/")))
+  withr::with_dir(directory, {
+    expect_error(eval(locator, envir = new.env()), "No root directory found")
+  })
+})
+
+test_that("actual forced-result QMD receipt and decision reads use repository-relative paths", {
+  repository <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+  document <- readLines(file.path(repository,"quarto/classify_outcomes_contract.qmd"))
+  begin <- match("```{r forced-complement-results}",document)+1L
+  end <- begin+match("```",document[begin:length(document)])-2L
+  expressions <- as.list(parse(text=document[begin:end]))
+  receipt_loop <- Filter(function(x) is.call(x) && identical(x[[1L]],as.name("for")) &&
+    identical(x[[2L]],as.name("record")),expressions)[[1L]]
+  decision_read <- Filter(function(x) is.call(x) && identical(x[[1L]],as.name("<-")) &&
+    identical(x[[2L]],as.name("all_double_30")),expressions)[[1L]]
+  # Synthetic path-only input: never open actual settlement labels in this test.
+  directory <- withr::local_tempdir(tmpdir=repository)
+  decision <- file.path(directory,"decision.rds")
+  input <- file.path(directory,"input.rds")
+  settlement <- file.path(directory,"synthetic-settlement.rds")
+  fixture <- list(path_only=TRUE)
+  for(path in c(decision,input,settlement)) saveRDS(fixture,path)
+  relative <- function(path) substring(path,nchar(repository)+2L)
+  record <- list(decision_path=relative(decision),
+    decision_sha256=digest::digest(decision,file=TRUE,algo="sha256"),
+    input_sha256=digest::digest(input,file=TRUE,algo="sha256"),
+    settlement_sha256=digest::digest(settlement,file=TRUE,algo="sha256"),
+    row=list(input=relative(input),settlement=relative(settlement)))
+  for(path_mode in c("relative","absolute")) {
+    current_record <- record
+    if(path_mode=="absolute") current_record$decision_path <- decision
+    for(directory in c(repository,file.path(repository,"quarto"),
+                       file.path(repository,"packages/beidan"))) {
+      withr::with_dir(directory,{
+        environment <- list2env(list(root=repository,
+          forced=list(receipts=list(current_record)),all_double_receipt=current_record),
+          parent=globalenv())
+        expect_no_error(eval(receipt_loop,envir=environment))
+        expect_no_error(eval(decision_read,envir=environment))
+        expect_identical(environment$all_double_30,fixture)
+      })
+    }
+  }
+})

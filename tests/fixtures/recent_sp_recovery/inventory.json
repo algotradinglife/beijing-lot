@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "path": "tests/fixtures/recent_sp_recovery/26098.nowscore.raw.html",
+      "sha256": "cd1b28ecd3561af40e3c8d2fd37205c3be62bf2275cd97ce003b100e043b3f57"
+    },
+    {
+      "path": "tests/fixtures/recent_sp_recovery/26098.source.json",
+      "sha256": "e2da818d130f344c073932e1a57027b4f57110aef584b7f7f619b8d9d115bcae"
+    }
+  ]
+}

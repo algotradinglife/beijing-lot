@@ -7,11 +7,19 @@ LossDiagnosticFixture <- function(budget = 2) {
     outcome = rep(c("W", "D", "L"), 2), probability = c(.6,.3,.1,.5,.3,.2))
   sp <- dplyr::mutate(dplyr::select(p, fixture_id, outcome),
     quote_at = cutoff$cutoff_utc - 60, sp_raw = rep(c(2,4,3),2), source_url = "fixture://loss")
-  settings <- parlay_settings(); settings$n_legs <- 1L
-  pool <- parlay_construct_role_groups(parlay_role_scores(p,cutoff),cutoff,
-    settings,pattern=1L,n_candidates=2L,probabilities=p,prematch_sp=sp)
-  return(parlay_evaluate_portfolio(pool,group_budget_cny=budget,
-    constraints=list(max_reuse=1L,max_overlap=0L),improve=FALSE)$final)
+  fixtures <- tibble::tibble(issue_id="00001",fixture_id=c("a","b"),slot=1:2,
+    provider_id="synthetic",kickoff_at=cutoff$cutoff_utc+c(5,6)*3600,
+    handicap=0L,sale_state="open",source_url="fixture://loss")
+  status <- tibble::tibble(issue_id="00001",fixture_id=c("a","b"),status="scheduled",
+    status_at=cutoff$cutoff_utc-60,available_at=cutoff$cutoff_utc-60,source_url="fixture://status")
+  projected <- list(cutoff=cutoff,fixtures=fixtures,probabilities=p,prematch_sp=sp,match_status=status)
+  settings <- parlay_constant_defaults(); settings$n_legs <- 1L
+  config <- parlay_strategy_config(settings,patterns=list(p1=1L),
+    construction_policy=list(max_candidates=2L,seed=1L),max_reuse=1L,max_overlap=0L,
+    spend_limit_cny=2*budget)
+  result <- parlay_build_plan(projected,config)
+  result$prematch_sp <- sp
+  result
 }
 
 test_that("actual stakes and untouched tickets define exposure", {

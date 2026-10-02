@@ -1,0 +1,91 @@
+root <- rprojroot::find_root(rprojroot::has_file('packages/beidan/DESCRIPTION'))
+devtools::load_all(file.path(root,'packages/beidan'),quiet=TRUE)
+source(file.path(root,'r/ranked_outcome_replay.R'))
+test_that('3332222 has432 legal tickets and buys128 under the unchanged replay policy',{
+ settings<-beidan::parlay_settings();settings$n_legs<-7L
+ cutoff<-list(issue_id='T',cutoff_utc=as.POSIXct('2026-09-25',tz='UTC'))
+ p<-tibble::tibble(fixture_id=rep(paste0('T:',1:7),each=3L),outcome=rep(c('W','D','L'),7L),
+  probability=c(rep(c(.4,.3,.3),3L),rep(c(.15,.6,.25),4L)))
+ before<-rlang::hash(p)
+ x<-ReplayRankedOutcomes(p,cutoff,settings,c(3L,3L,3L,2L,2L,2L,2L),
+  beidan::match_typed_empty('prematch_sp'),256,list(max_reuse=4L),list(max_overlap=3L))
+ expect_identical(rlang::hash(p),before)
+ expect_identical(x$evaluation$cutoff,cutoff)
+ expect_equal(x$evaluation$summary$selected_groups,1L)
+ expect_equal(x$evaluation$summary$spent_cny,256)
+ expect_equal(nrow(x$evaluation$purchases),128L)
+ expect_true(all(x$evaluation$group_selection$legal_space==432L))
+ expect_true(all(x$evaluation$group_selection$actual_pattern=='3332222'))
+ expect_equal(sum(x$evaluation$final$role_legs$role==3L),3L)
+ expect_equal(sum(x$evaluation$final$role_legs$role==2L),4L)
+ expect_false(anyDuplicated(x$evaluation$purchases$ticket_id)>0)
+ report<-DiagnoseRankedReplay(x,beidan::match_typed_empty('settlements'),
+  as.POSIXct('2026-09-26',tz='UTC'))
+ expect_true(all(report$returns$ticket_returns$status=='PENDING'))
+ expect_equal(report$returns$issue_returns$pending_stake_cny,256)
+ expect_identical(rlang::hash(p),before)
+})
+
+test_that('thin driver executes input mutation and complete-settlement guards',{
+ expressions<-parse(file.path(root,'scripts/replay_3332222_comparison.R'))
+ loops<-Filter(function(e)is.call(e)&&identical(e[[1]],as.name('for')),as.list(expressions))
+ input_guard<-Filter(function(e)is.call(e)&&identical(e[[1]],as.name('stopifnot'))&&
+  grepl('input_sha256, digest',paste(deparse(e),collapse=' '),fixed=TRUE),as.list(loops[[1]][[4]]))
+ expect_length(input_guard,2L)
+ directory<-withr::local_tempdir();input_path<-file.path(directory,'snapshot.rds')
+ saveRDS(list(probability=.4),input_path)
+ input_sha256<-digest::digest(input_path,file=TRUE,algo='sha256')
+ expect_silent(eval(input_guard[[1]]))
+ saveRDS(list(probability=.5),input_path)
+ expect_error(eval(input_guard[[2]]),'not TRUE')
+ settlement_guard<-Filter(function(e)is.call(e)&&identical(e[[1]],as.name('stopifnot'))&&
+  grepl('pending_stake_cny',paste(deparse(e),collapse=' '),fixed=TRUE),as.list(loops[[2]][[4]]))
+ expect_length(settlement_guard,1L)
+ z<-tibble::tibble(pending_stake_cny=0,special_stake_cny=0)
+ expect_silent(eval(settlement_guard[[1]]))
+ z$pending_stake_cny<-256
+ expect_error(eval(settlement_guard[[1]]),'not TRUE')
+ z$pending_stake_cny<-0;z$special_stake_cny<-256
+ expect_error(eval(settlement_guard[[1]]),'not TRUE')
+})
+
+test_that('settlement identity guards reject mutation after reading and diagnosis',{
+ expressions<-parse(file.path(root,'scripts/replay_3332222_comparison.R'))
+ loops<-Filter(function(e)is.call(e)&&identical(e[[1]],as.name('for')),as.list(expressions))
+ guards<-Filter(function(e)is.call(e)&&identical(e[[1]],as.name('stopifnot'))&&
+  grepl('settlement_sha256, digest',paste(deparse(e),collapse=' '),fixed=TRUE),as.list(loops[[2]][[4]]))
+ expect_length(guards,2L)
+ directory<-withr::local_tempdir();settlement_path<-file.path(directory,'labels.rds')
+ saveRDS(list(outcome='W'),settlement_path)
+ settlement_sha256<-digest::digest(settlement_path,file=TRUE,algo='sha256')
+ expect_silent(eval(guards[[1]]));expect_silent(eval(guards[[2]]))
+ saveRDS(list(outcome='D'),settlement_path)
+ expect_error(eval(guards[[1]]),'not TRUE');expect_error(eval(guards[[2]]),'not TRUE')
+})
+
+test_that('already-lost tickets do not hide missing group-leg results',{
+ settings<-beidan::parlay_settings();settings$n_legs<-7L
+ cutoff<-list(issue_id='T',cutoff_utc=as.POSIXct('2026-09-25',tz='UTC'))
+ p<-tibble::tibble(fixture_id=rep(paste0('T:',1:7),each=3L),outcome=rep(c('W','D','L'),7L),
+  probability=c(rep(c(.4,.3,.3),3L),rep(c(.15,.6,.25),4L)))
+ x<-ReplayRankedOutcomes(p,cutoff,settings,c(3L,3L,3L,2L,2L,2L,2L),
+  beidan::match_typed_empty('prematch_sp'),256,list(max_reuse=4L),list(max_overlap=3L))
+ labels<-tibble::tibble(issue_id='T',fixture_id=paste0('T:',1:6),outcome='W',
+  settled_sp=2,label_available_at=as.POSIXct('2026-09-26',tz='UTC'),
+  status='settled',source_url='https://example.test/settlement')
+ report<-DiagnoseRankedReplay(x,labels,as.POSIXct('2026-09-27',tz='UTC'))
+ expect_equal(report$returns$issue_returns$pending_stake_cny,0)
+ expect_true(all(report$returns$ticket_returns$status=='LOST'))
+ expect_true(anyNA(report$group_legs$actual))
+ expressions<-parse(file.path(root,'scripts/replay_3332222_comparison.R'))
+ loops<-Filter(function(e)is.call(e)&&identical(e[[1]],as.name('for')),as.list(expressions))
+ guard<-Filter(function(e)is.call(e)&&identical(e[[1]],as.name('stopifnot'))&&
+  grepl('group_legs',paste(deparse(e),collapse=' '),fixed=TRUE),as.list(loops[[2]][[4]]))
+ expect_length(guard,1L)
+ expect_error(eval(guard[[1]]),'not TRUE')
+ labels<-dplyr::bind_rows(labels,tibble::tibble(issue_id='T',fixture_id='T:7',outcome='W',
+  settled_sp=2,label_available_at=as.POSIXct('2026-09-26',tz='UTC'),status='settled',
+  source_url='https://example.test/settlement'))
+ report<-DiagnoseRankedReplay(x,labels,as.POSIXct('2026-09-27',tz='UTC'))
+ expect_silent(eval(guard[[1]]))
+})

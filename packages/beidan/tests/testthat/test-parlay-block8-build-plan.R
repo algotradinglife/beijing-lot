@@ -37,6 +37,7 @@ block8_projection <- function(fixture_ids, probabilities, issue_id = "26097",
 }
 
 testthat::test_that("a strategy config carries explicit block-8 policy and no group count", {
+  withr::defer(parlay_settings(reset=TRUE))
   cfg <- parlay_strategy_config(parlay_settings(n_legs = 2L), name = "demo",
                                 construction_policy = list(max_candidates = 5L, seed = 7L),
                                 patterns = list(p33 = c(3L, 3L)),
@@ -69,6 +70,7 @@ testthat::test_that("a strategy config carries explicit block-8 policy and no gr
 })
 
 testthat::test_that("the funded group count is an output, not a declared input", {
+  withr::defer(parlay_settings(reset=TRUE))
   # Two disjoint single-leg groups. The budget decides how many groups are funded:
   # the config never states one. A cap of two units opens both groups; a cap of six
   # units still funds two groups (deepening, not a third group), so n_groups is
@@ -93,6 +95,7 @@ testthat::test_that("the funded group count is an output, not a declared input",
 })
 
 testthat::test_that("the prior ledger supplies the actual budget balance", {
+  withr::defer(parlay_settings(reset=TRUE))
   projected <- block8_projection(c("f1", "f2"),
                                  list(c(.60, .25, .15), c(.55, .30, .15)))
   cfg <- parlay_strategy_config(parlay_settings(n_legs = 1L, issue_budget_cny = 8),
@@ -119,6 +122,7 @@ testthat::test_that("the prior ledger supplies the actual budget balance", {
 })
 
 testthat::test_that("the public plan keeps the immutable save/settle/diagnose shapes", {
+  withr::defer(parlay_settings(reset=TRUE))
   projected <- block8_projection(c("f1", "f2"),
                                  list(c(.60, .25, .15), c(.55, .30, .15)))
   cfg <- parlay_strategy_config(parlay_settings(n_legs = 1L, issue_budget_cny = 16),
@@ -145,6 +149,7 @@ testthat::test_that("the public plan keeps the immutable save/settle/diagnose sh
 })
 
 testthat::test_that("an empty projection yields a typed-empty plan with no invented width", {
+  withr::defer(parlay_settings(reset=TRUE))
   projected <- block8_projection(character(0), list())
   cfg <- parlay_strategy_config(parlay_settings(n_legs = 7L),
                                 name = "empty", construction_policy = list(max_candidates = 4L, seed = 1L),
@@ -162,6 +167,7 @@ testthat::test_that("an empty projection yields a typed-empty plan with no inven
 })
 
 testthat::test_that("a foreign-issue or future prior ledger is refused", {
+  withr::defer(parlay_settings(reset=TRUE))
   projected <- block8_projection(c("f1", "f2"),
                                  list(c(.60, .25, .15), c(.55, .30, .15)))
   cfg <- parlay_strategy_config(parlay_settings(n_legs = 1L, issue_budget_cny = 16),
@@ -183,6 +189,7 @@ testthat::test_that("a foreign-issue or future prior ledger is refused", {
 })
 
 testthat::test_that("missing SP stays unavailable under a probability objective", {
+  withr::defer(parlay_settings(reset=TRUE))
   projected <- block8_projection(c("f1", "f2"),
                                  list(c(.60, .25, .15), c(.55, .30, .15)))
   cfg <- parlay_strategy_config(parlay_settings(n_legs = 1L, issue_budget_cny = 8),

@@ -1,0 +1,59 @@
+{
+  "scope": "Fixed-template compression six historical cases; all-role reuse4/shared-role3 overlap exemption; current1–25h saleclosure, no actual purchases",
+  "hashes": {
+    "r/parlay_structure_compression.R": "3cfcc9699e1c0787c667e132ce5e1c7679a4466f173a501b0365c6baab4fcbfa",
+    "tests/testthat/test-parlay-structure-compression.R": "1f77c7e891c9bcf28efe82b5774a2a0dd90b3bdcd04d2d9e56c9b2f73324a922",
+    "scripts/replay_compressed_structures.R": "c04b4288946bcf140d8bcc4e4332ad6a0f705f12fccab9b816da45a917223f9c",
+    "quarto/classify_outcomes_contract.qmd": "08cf6553b66d83bc32ca111b686f9f629d4b1b834a1f67854803bb575a023101",
+    ".run-control/freeze-current-closure.R": "37de361da8b3f21090f61e4db9cbf1961bc9b29881fd62bc5f375a156300eb89",
+    "packages/beidan/R/parlay_ranked_portfolio.R": "bcff252d3008f3630b88f703c3aea6dec922afee3d66cd30140576a1d5b0fd70",
+    "packages/beidan/tests/testthat/test-parlay-ranked-portfolio.R": "c06fc897750f399a41796938346360c1d77a054600a5a8c8d370237a54ddf51b",
+    "packages/beidan/man/parlay_evaluate_portfolio.Rd": "4ff164a44f8161326162a7ffd64616984f75db94042c373fb1e67b016d884162",
+    "r/ranked_outcome_replay.R": "d357df86a9700715e66cde88eed849355b154110844d2e83428a0851303b99ce",
+    "tests/testthat/test-ranked-outcome-replay.R": "ccd203d3db4249e67d6aa2a2389e7db0bd7a4a080764644b558337323549d3b8",
+    "tests/testthat/test-compressed-replay-freeze.R": "559ecb15c65c452772c71e38594f7e681812d818f06f256666286f11a8b12dac"
+  },
+  "checks": {
+    "tests": "PASS189 portfolio+18 replay+44 compression+38 immutable-replay assertions;0fail/warn/skip",
+    "replay": "PASS six cases, independent decision frozen before labels",
+    "review": "PASS final bounded codex review; no actionable findings, both round1 findings resolved; QMD08cf6553b66d83bc32ca111b686f9f629d4b1b834a1f67854803bb575a023101",
+    "render": "PASS fresh --no-cache enabled execution;0 execution errors;90 tables; six comparisons and15 closed fixtures inspected",
+    "PI": "PASS reviewed hashes equal current files; actual fallback structures and zero purchase currentclosure verified; actual betting remains blocked by official closure",
+    "remote": "PASS external direct HTTPS HTTP200,90 tables, six comparison and closure markers; proxy route TLS EOF, direct route successful"
+  },
+  "commands": {
+    "review": "codex review - < .run-control/compression-review-prompt.txt",
+    "compression": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/replay_compressed_structures.R",
+    "render": "R_LIBS=\"$PWD/r_lib\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache",
+    "remote": "curl -4 --noproxy \"*\" --http1.1 --fail --connect-timeout 10 --max-time 20 https://imagination-drops-syndicate-country.trycloudflare.com/"
+  },
+  "function_test_mapping": {
+    "EvaluateCompressedTemplates": "44 assertions: W/D/L probability ordering, separate seven-fixture groups, mask preservation, legal-space costs, exact payout and single loss, empty tables, tampered receipts rejection",
+    ".parlay_ranked_counted_overlap and admission/fund/freeze": "189 portfolio assertions; triple shared exemption and reuse retained",
+    "ReplayRankedOutcomes/DiagnoseRankedReplay/VerifyRankedReplayReceipt": "18 repository assertions",
+    "replay persistence": "38 isolated sandbox assertions: unchanged frozen bytes on repeated run; tampered decision rejects without rewrite or settlement mutation"
+  },
+  "limitations": [
+    "Fixed original 3/1/3 purchased templates, not all-fixture optimum",
+    "Sep30 actual2222221, not3332221",
+    "Sep26 repeated full reconstruction deliberately stopped, not a completed new run",
+    "No CI/full repository test claim",
+    "Official Oct1-4 saleclosure blocks current actual plan; no SP fabricated"
+  ],
+  "review_history": [
+    "Round1:2 P2 findings: overwrote old decisions; second structure frozen after first settlement opened.",
+    "Fixed: output directory keyed by entrypoint SHA; conflicting decision rejects; all six frozen before separate settlement phase; regression38 PASS.",
+    "Round2: no actionable findings; independently reran portfolio/compression/persistence tests and checked six receipts."
+  ],
+  "results_path": "inputs/compressed_structure_comparison/c04b4288946bcf14/results.rds",
+  "html_sha256": "2aa7b2e74c204de89d80236e6d5d82a2e3c6aef3a8a7d95050c0ad4fa2e24bf0",
+  "remote_url": "https://imagination-drops-syndicate-country.trycloudflare.com/",
+  "remote_runtime": {
+    "http_pid": 2400896,
+    "cloudflare_pid": 2401197,
+    "http_session": 50084,
+    "cloudflare_session": 79332,
+    "public_directory": ".run-control/public-compression",
+    "type": "Cloudflare quick tunnel; runtime link, not permanent hosting"
+  }
+}

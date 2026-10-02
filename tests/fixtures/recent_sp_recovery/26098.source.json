@@ -1,0 +1,53 @@
+{
+ "issue_id": "26098",
+ "urls": {
+  "500": "https://trade.500.com/bjdc/?expect=26098",
+  "nowscore": "https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum=26098"
+ },
+ "fetch_id": "20260926T113820.724175Z",
+ "request_started_at": "2026-09-26T11:38:20.724175+00:00",
+ "observed_at": {
+  "500": "2026-09-26T11:38:21.082676+00:00",
+  "nowscore": "2026-09-26T11:38:21.598147+00:00"
+ },
+ "observed_at_canonical": "2026-09-26T11:38:21.598147+00:00",
+ "offline": false,
+ "parser": "beidan_backend.issue_schedule",
+ "parser_files_sha256": {
+  "__init__.py": "e15e8fc90881b98de740830dae9c4b5a049c5b42dc1cd9c60b9cb9b420b7a21c",
+  "contract.py": "82ce60acbc716a7b59978197ed0924af487ad4d45a7830f00a0946b0e2e993f2",
+  "crosscheck.py": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497",
+  "decode.py": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c",
+  "fetch.py": "101f3182184bce3d5c631e312f525413e308e96b33757da7314b0d5cb9f125b6",
+  "service.py": "f7c01dc3afab44d82d1dcdbb812f3e934baa2b58e906b110acb960ca74db6e3a",
+  "sources.py": "8b453f706cbb9d629759ab7794a4fd67f44e23408c95f92bc2b29a1da54034d7",
+  "store.py": "a455839715c3fa790359e33ed4c07f6145f60cf41354fe1e1fadf390ed09bfdc"
+ },
+ "content_type": {
+  "500": "text/html;charset=gb2312",
+  "nowscore": "text/html; charset=utf-8"
+ },
+ "primary": "nowscore",
+ "parse": {
+  "failed": null
+ },
+ "encoding": {
+  "500": "gb18030",
+  "nowscore": "utf-8"
+ },
+ "row_counts": {
+  "500": 146,
+  "nowscore": 146
+ },
+ "diagnostics": [],
+ "identity_summary": {
+  "provider_id": 0,
+  "slot": 146,
+  "unresolved": 0
+ },
+ "raw_sha256": {
+  "500": "72bdb9631312d5538c9d8bb13c34d6b0ea8c7fecb10f185a064faa4991d054a3",
+  "nowscore": "cd1b28ecd3561af40e3c8d2fd37205c3be62bf2275cd97ce003b100e043b3f57"
+ },
+ "recorded_at": "2026-09-26T11:38:22.389733+00:00"
+}

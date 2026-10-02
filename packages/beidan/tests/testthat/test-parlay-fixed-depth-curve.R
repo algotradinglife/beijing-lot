@@ -2,20 +2,25 @@
 #' @param quotes Logical; include pre-match SP of two for every outcome.
 #' @param budget Finite per-group CNY spending.
 #' @param tie Logical; make the two legal tickets equiprobable.
+#' @param issue_budget Unused issue spending setting, CNY.
 #' @return Saved final plan with two legal tickets and no external side effects.
-fixed_depth_plan <- function(quotes = TRUE, budget = 2, tie = FALSE) {
+fixed_depth_plan <- function(quotes = TRUE, budget = 2, tie = FALSE, issue_budget = 1024) {
   cutoff <- list(issue_id = "26098", cutoff_utc = as.POSIXct("2026-09-26 12:00:00", tz = "UTC"))
   probabilities <- tibble::tibble(fixture_id = rep(c("26098:1", "26098:2"), each = 3),
-    outcome = rep(c("W", "D", "L"), 2), probability = c(.6, .3, .1, .7, .2, .1))
+    outcome = rep(c("W", "D", "L"), 2), probability = c(.5, .4, .1, .7, .2, .1))
   if (tie) probabilities$probability[1:3] <- c(.45, .45, .1)
   sp <- if (quotes) dplyr::mutate(dplyr::select(probabilities, fixture_id, outcome),
     quote_at = cutoff$cutoff_utc - 60, sp_raw = 2, source_url = "test") else
     match_typed_empty("prematch_sp")
   settings <- parlay_settings(); settings$n_legs <- 2L
-  pool <- parlay_construct_role_groups(parlay_role_scores(probabilities, cutoff),
-    cutoff, settings, c(2L, 1L), 1L, probabilities, prematch_sp = sp)
-  return(parlay_evaluate_portfolio(pool, budget, NULL,
-    constraints = list(max_reuse = 2L, max_overlap = 2L), improve = FALSE)$final)
+  settings$issue_budget_cny <- issue_budget
+  matches <- tidyr::pivot_wider(probabilities, names_from = outcome, values_from = probability) |>
+    dplyr::rename(win = W, draw = D, lose = L)
+  ranked <- rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
+  pool <- parlay_construct_role_groups(ranked, settings, c(2L, 1L),
+    max_candidates = 1L, prematch_sp = sp)
+  return(parlay_evaluate_portfolio(pool, group_budget_cny=budget, budget_cny=NULL,
+    reuse_policy=list(max_reuse=2L), overlap_policy=list(max_overlap=2L), improve = FALSE))
 }
 
 test_that("fixed depth curves match frozen prefixes, unit floors and saturation", {
@@ -28,9 +33,9 @@ test_that("fixed depth curves match frozen prefixes, unit floors and saturation"
   expect_equal(x$structure_probability, rep(.63, 6))
   expect_equal(x$purchased_tickets, c(0L, 0L, 1L, 1L, 2L, 2L))
   expect_equal(x$cost_cny, c(0, 0, 2, 2, 4, 4))
-  expect_equal(x$coverage_probability, c(0, 0, .42, .42, .63, .63))
-  expect_equal(x$retained_fraction, c(0, 0, 2/3, 2/3, 1, 1))
-  expect_equal(x$expected_net_cny, c(0, 0, .184, .184, -.724, -.724))
+  expect_equal(x$coverage_probability, c(0, 0, .35, .35, .63, .63))
+  expect_equal(x$retained_fraction, c(0, 0, 5/9, 5/9, 1, 1))
+  expect_equal(x$expected_net_cny, c(0, 0, -.18, -.18, -.724, -.724))
   expect_identical(x$group_budget_cny, caps)
   expect_identical(rlang::hash(plan), before)
 })
@@ -39,110 +44,106 @@ test_that("missing selected EV stays unknown but zero depth is zero", {
   x <- parlay_fixed_depth_curve(list(p = fixed_depth_plan(FALSE)), c(0, 2, 4))
   expect_equal(x$expected_net_cny[1], 0)
   expect_true(all(is.na(x$expected_net_cny[-1])))
-  expect_equal(x$coverage_probability, c(0, .42, .63))
+  expect_equal(x$coverage_probability, c(0, .35, .63))
 })
 
-test_that("candidate and group identities isolate shared physical ticket ranks", {
+test_that("current evaluation bindings reject source, plan and ledger mutations", {
   plan <- fixed_depth_plan()
-  duplicate <- plan$ranked
-  duplicate$candidate_id <- "other"
-  duplicate$group_id <- "othergroup"
-  duplicate$rank <- rev(duplicate$rank)
-  duplicate$probability <- rev(duplicate$probability)
-  duplicate$ev_net_est <- rep(999, nrow(duplicate))
-  plan$ranked <- dplyr::bind_rows(duplicate, plan$ranked)
-  links <- plan$built$tickets$candidate_tickets
-  links$candidate_id <- "other"
-  plan$built$tickets$candidate_tickets <- dplyr::bind_rows(links, plan$built$tickets$candidate_tickets)
-  x <- parlay_fixed_depth_curve(list(p = plan), 2)
-  expect_equal(x$coverage_probability, .42)
-  expect_equal(x$expected_net_cny, .184)
-})
-
-test_that("typed empty curves and zero structure mass are explicit", {
-  plan <- fixed_depth_plan()
-  full <- parlay_fixed_depth_curve(list(p = plan), 2)
-  for (empty in list(parlay_fixed_depth_curve(list(), numeric()),
-                    parlay_fixed_depth_curve(list(p = plan), numeric()),
-                    parlay_fixed_depth_curve(list(p = fixed_depth_plan(budget = 0)), 2))) {
-    expect_equal(nrow(empty), 0)
-    expect_identical(names(empty), names(full))
-    expect_identical(vapply(empty, typeof, character(1)), vapply(full, typeof, character(1)))
+  for (field in c("portfolio", "plan", "purchases", "receipt")) {
+    bad <- plan; bad[[field]] <- NULL
+    expect_error(parlay_fixed_depth_curve(list(p=bad),2))
   }
-  plan$ranked$probability[] <- 0
-  expect_error(parlay_fixed_depth_curve(list(p = plan), c(0, 2)), "authoritative")
+  bad <- plan; bad$portfolio$probabilities$probability[1] <- .1
+  expect_error(parlay_fixed_depth_curve(list(p=bad),2))
+  bad <- plan; bad$plan$purchases$stake_cny[1] <- 4
+  expect_error(parlay_fixed_depth_curve(list(p=bad),2),"binding")
+  bad <- plan; bad$final$role_legs$allowed_outcomes[[1]] <- "W"
+  expect_error(parlay_fixed_depth_curve(list(p=bad),2),"binding")
+  expect_error(parlay_fixed_depth_curve(list(p=plan,other=fixed_depth_plan(FALSE)),2),"share")
 })
 
-test_that("invalid caps, plans, support and ranks fail closed", {
+test_that("empty caps, empty lists and unpurchased plans keep typed schema", {
   plan <- fixed_depth_plan()
-  for (caps in list(NA_real_, NaN, Inf, -1, "2", matrix(2), as.Date("2026-01-01"))) {
-    expect_error(parlay_fixed_depth_curve(list(p = plan), caps))
+  a <- parlay_fixed_depth_curve(list(),numeric())
+  b <- parlay_fixed_depth_curve(list(p=plan),numeric())
+  c <- parlay_fixed_depth_curve(list(p=fixed_depth_plan(budget=0)),2)
+  expect_identical(a,b); expect_identical(a,c)
+  expect_error(parlay_fixed_depth_curve(list(p=plan),-1))
+  expect_error(parlay_fixed_depth_curve(list(p=plan),NA_real_))
+  expect_error(parlay_fixed_depth_curve(list(p=plan),matrix(2)))
+})
+
+test_that("independent masks reject a manually rebound illegal final selection", {
+  plan <- fixed_depth_plan()
+  plan$final$role_legs$allowed_outcomes[[1]] <- "W"
+  plan$receipt$final_role_legs_hash <- rlang::hash(plan$final$role_legs)
+  expect_error(parlay_fixed_depth_curve(list(p=plan),2),"mask|outcome|selection")
+})
+
+test_that("probability sum tolerance survives one and multiple full-triple legs", {
+  for (n in 1:2) {
+    cutoff <- list(issue_id="26098",cutoff_utc=lubridate::ymd_hms("2026-09-26 12:00:00",tz="UTC"))
+    matches <- tibble::tibble(fixture_id=paste0("F",seq_len(n)),
+      win=.4,draw=.3,lose=.3000000005)
+    ranked <- rank_outcome_selections(prepare_outcome_selections(matches),cutoff)
+    settings <- parlay_constant_defaults();settings$n_legs <- as.integer(n)
+    pool <- parlay_construct_role_groups(ranked,settings,rep(3L,n),max_candidates=1L)
+    result <- parlay_evaluate_portfolio(pool,group_budget_cny=NULL,
+      reuse_policy=list(max_reuse=1L),overlap_policy=list(max_overlap=0L),improve=FALSE)
+    curve <- parlay_fixed_depth_curve(list(p=result),2*3^n)
+    expect_equal(curve$support_size,as.integer(3^n))
+    expect_equal(curve$structure_probability,(1.0000000005)^n,tolerance=1e-12)
+    expect_equal(curve$coverage_probability,(1.0000000005)^n,tolerance=1e-12)
+    expect_identical(result$portfolio$probabilities$probability,
+      rep(c(.4,.3,.3000000005),n))
   }
-  expect_error(parlay_fixed_depth_curve(list(plan), 2))
-  expect_error(parlay_fixed_depth_curve(list(p = plan, p = plan), 2))
-  bad <- plan; bad$cutoff$issue_id <- "different"
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2))
-  bad <- plan; bad$ranked$rank[] <- 1L
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2), "ranks")
-  bad <- plan; bad$ranked$probability[] <- NA_real_
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2))
-  bad <- plan; bad$ranked$probability[] <- 1
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2), "authoritative")
-  bad <- plan; bad$ranked$ev_net_est[] <- Inf
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2), "EV")
-  bad <- plan; bad$built$tickets$candidate_tickets <- bad$built$tickets$candidate_tickets[0, ]
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2), "disagree")
-  bad <- plan; bad$ranked$group_id <- "wrong"
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2), "missing")
 })
 
-test_that("altered EV and mixed decision/source contexts are rejected", {
+test_that("fixed depth independently refuses manually rebound purchase values", {
   plan <- fixed_depth_plan()
-  bad <- plan; bad$ranked$ev_net_est[bad$ranked$rank == 2L] <- NA_real_
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 0), "authoritative")
-  bad <- plan; bad$probabilities$probability[1:3] <- c(.5, .4, .1)
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2), "provenance")
-  bad <- plan; bad$prematch_sp$sp_raw[] <- 3
-  expect_error(parlay_fixed_depth_curve(list(p = bad), 2), "provenance")
-  expect_error(parlay_fixed_depth_curve(list(p = plan, other = fixed_depth_plan(FALSE)), 2), "share")
-  bad <- plan; bad$constants$payout_factor <- .6; bad$plan$constants <- bad$constants
-  expect_error(parlay_fixed_depth_curve(list(p = plan, other = bad), 2), "share")
-  bad <- plan; bad$cutoff$cutoff_utc <- bad$cutoff$cutoff_utc + 1
-  expect_error(parlay_fixed_depth_curve(list(p = plan, other = bad), 2))
-  bad <- plan; bad$ranked$rank[] <- 0L
-  expect_error(parlay_fixed_depth_curve(list(p = bad), numeric()), "ranks")
-})
-
-test_that("incidental issue budgets do not split the shared business context", {
-  plan <- fixed_depth_plan()
-  other <- plan
-  other$constants$issue_budget_cny <- 2048
-  other$plan$constants <- other$constants
-  x <- parlay_fixed_depth_curve(list(a = plan, b = other), c(0, 2))
-  expect_equal(x$coverage_probability, c(0, .42, 0, .42))
-})
-
-
-test_that("rank order follows frozen probability ranking and canonical ties", {
-  for (tie in c(FALSE, TRUE)) {
-    plan <- fixed_depth_plan(tie = tie)
-    expect_equal(nrow(parlay_fixed_depth_curve(list(p = plan), 2)), 1L)
-    plan$ranked$rank <- rev(plan$ranked$rank)
-    expect_error(parlay_fixed_depth_curve(list(p = plan), 2), "rank order")
+  for (field in c("probability","sp_product_est","ev_net_est")) {
+    bad <- plan;bad$purchases[[field]][1] <- 999
+    bad$receipt$final_purchase_hash <- rlang::hash(bad$purchases)
+    expect_error(parlay_fixed_depth_curve(list(p=bad),2),"probability|valuation")
   }
 })
 
 
-test_that("cutoff provenance rejects missing bindings and consistent retiming", {
+test_that("funding and frozen issue stay independently bound after hash rebinding", {
   plan <- fixed_depth_plan()
-  missing <- plan; missing$provenance$cutoff_hash <- NULL
-  expect_error(parlay_fixed_depth_curve(list(p = missing), 2), "cutoff provenance")
-  plan$cutoff$cutoff_utc <- plan$cutoff$cutoff_utc + 60
-  plan$plan$epoch_utc <- plan$plan$epoch_utc + 60
-  plan$plan$purchases$epoch_at <- plan$plan$purchases$epoch_at + 60
-  plan$funded$purchases$epoch_at <- plan$funded$purchases$epoch_at + 60
-  plan$history$purchases$epoch_at <- plan$history$purchases$epoch_at + 60
-  # The pre-existing ledger checks accept this internally consistent retiming.
-  expect_true(beidan:::parlay_check_saved_result(plan))
-  expect_error(parlay_fixed_depth_curve(list(p = plan), 2), "cutoff provenance")
+  mutations <- list(
+    function(p) {p$plan$funded <- dplyr::bind_rows(p$plan$funded,p$plan$funded);p},
+    function(p) {p$plan$funded$group_id[1] <- "wrong";p},
+    function(p) {p$plan$funded$stake_cny[1] <- 4;p},
+    function(p) {p$plan$issue_id <- "26099";p},
+    function(p) {p$receipt$issue_id <- "26099";p},
+    function(p) {p$plan$purchases$issue_id[1] <- "26099";p},
+    function(p) {p$plan$purchases$epoch_at[1] <- p$cutoff$cutoff_utc+60;p})
+  for (mutate in mutations) {
+    bad <- mutate(plan);bad$receipt$plan_hash <- rlang::hash(bad$plan)
+    expect_error(parlay_fixed_depth_curve(list(p=bad),2),"funding|issue|cutoff")
+    expect_error(parlay_compare_risk(list(results=list(p=bad),cutoff=bad$cutoff,
+      summary=tibble::tibble(scenario_id="p"))),
+      "funding|issue|cutoff")
+  }
+})
+
+test_that("fixed depth compares explicit funding alternatives despite unused issue budgets", {
+  a <- fixed_depth_plan(issue_budget=1024)
+  b <- fixed_depth_plan(issue_budget=2048)
+  curves <- parlay_fixed_depth_curve(list(a=a,b=b),c(2,4))
+  expect_equal(curves$coverage_probability,c(.35,.63,.35,.63))
+  expect_equal(curves$cost_cny,c(2,4,2,4))
+})
+
+test_that("physical ticket identities cannot be aliased by rebinding receipts", {
+  bad <- fixed_depth_plan()
+  id <- bad$purchases$ticket_id[1]
+  bad$purchases$ticket_id[1] <- "alias"
+  for (table in c("funded","purchases","ticket_legs")) {
+    bad$plan[[table]]$ticket_id[bad$plan[[table]]$ticket_id==id] <- "alias"
+  }
+  bad$receipt$final_purchase_hash <- rlang::hash(bad$purchases)
+  bad$receipt$plan_hash <- rlang::hash(bad$plan)
+  expect_error(parlay_fixed_depth_curve(list(p=bad),2),"physical ticket identity")
 })

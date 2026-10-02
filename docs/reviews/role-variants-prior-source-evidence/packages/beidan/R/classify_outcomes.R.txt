@@ -1,0 +1,56 @@
+#' Classify North single-handicap win/draw/lose probabilities
+#'
+#' Rank the three probabilities by decreasing value, breaking equal
+#' probabilities in the fixed order `win`, `draw`, `lose`. The values are the
+#' North single-handicap W/D/L probabilities of one fixture; they are consumed
+#' exactly as supplied and are never renormalized.
+#'
+#' @param win Numeric scalar, finite and within `[0, 1]`: the win probability.
+#' @param draw Numeric scalar, finite and within `[0, 1]`: the draw probability.
+#' @param lose Numeric scalar, finite and within `[0, 1]`: the lose probability.
+#'   For every argument, `NA`, empty, vector, character and logical values are
+#'   errors.
+#'
+#' @return An unnamed list of unnamed character vectors whose values are drawn
+#'   from `"win"`, `"draw"` and `"lose"`. With `ranked` the decreasing
+#'   probability order:
+#'   * `list(c("win", "draw", "lose"))` when the largest minus the smallest
+#'     probability is at most `0.10` plus a `1e-15` numerical boundary
+#'     tolerance (triple, canonical order);
+#'   * `list(ranked[1:2], ranked[c(1, 3)])` when the lowest-ranked name is
+#'     `"draw"` and `draw > 0.20` strictly;
+#'   * `list(ranked[1:2])` otherwise.
+#'
+#'   A single outcome is never returned, not even for `(1, 0, 0)`. The
+#'   returned values name outcomes; they are never rankings or classification
+#'   text.
+#' @section Errors:
+#' Each argument must be a finite numeric scalar in `[0, 1]`, and the three
+#' values must sum to `1` within `1e-9`. Invalid input raises an error; values
+#' are never normalized, imputed or silently coerced.
+#' @details Pure arithmetic. The function performs no fitting, reads no labels,
+#'   clock or IO, and keeps no mutable state.
+#' @examples
+#' classify_outcomes(win = 0.45, draw = 0.22, lose = 0.33)
+#' classify_outcomes(0.40, 0.30, 0.30)
+#' classify_outcomes(0.45, 0.33, 0.22)
+#' classify_outcomes(0.50, 0.20, 0.30)
+#' classify_outcomes(0.38, 0.31, 0.31)
+#' @export
+classify_outcomes <- function(win, draw, lose) {
+  checkmate::assert_number(win, lower = 0, upper = 1, finite = TRUE)
+  checkmate::assert_number(draw, lower = 0, upper = 1, finite = TRUE)
+  checkmate::assert_number(lose, lower = 0, upper = 1, finite = TRUE)
+  if (abs(win + draw + lose - 1) > 1e-9) {
+    stop("win, draw and lose must sum to one within 1e-9", call. = FALSE)
+  }
+  probabilities <- c(win, draw, lose)
+  ranknames <- c("win", "draw", "lose")[order(-probabilities, c(1L, 2L, 3L))]
+  if (max(probabilities) - min(probabilities) <= 0.10 + 1e-15) {
+    return(list(c("win", "draw", "lose")))
+  }
+  if (ranknames[3L] == "draw" && draw > 0.20) {
+    return(list(ranknames[1:2], ranknames[c(1L, 3L)]))
+  }
+  return(list(ranknames[1:2]))
+}
