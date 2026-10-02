@@ -1,0 +1,78 @@
+{
+  "render_command": "R_LIBS=project/r_lib TMPDIR=worktree/.run-control/tmp XDG_CACHE_HOME=worktree/.run-control/cache DENO_DIR=worktree/.run-control/deno quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache",
+  "log": ".run-control/role-variants-render-v6.log",
+  "returncode": 0,
+  "table_count": 56,
+  "execution_errors": 0,
+  "synthetic_budget_trace": [
+    [
+      "scenario",
+      "selected_groups",
+      "tickets",
+      "spent_cny",
+      "actual_coverage"
+    ],
+    [
+      "256元",
+      "1",
+      "128",
+      "256",
+      "0.2046071"
+    ],
+    [
+      "512元",
+      "2",
+      "256",
+      "512",
+      "0.2840041"
+    ],
+    [
+      "1024元",
+      "3",
+      "384",
+      "768",
+      "0.3432106"
+    ],
+    [
+      "总预算NULL",
+      "3",
+      "384",
+      "768",
+      "0.3432106"
+    ]
+  ],
+  "real_purchase_summary": [
+    [
+      "selected_groups",
+      "new_ticket_count",
+      "spent_cny",
+      "unspent_cny",
+      "group_budget_cny",
+      "nominal_coverage",
+      "actual_coverage",
+      "tickets",
+      "ev_available",
+      "ev_net_cny",
+      "objective_basis",
+      "unspent_basis"
+    ],
+    [
+      "1",
+      "128",
+      "256",
+      "NA",
+      "256",
+      "0.1448491",
+      "0.1448491",
+      "128",
+      "TRUE",
+      "78.79412",
+      "probability that at least one owned physical ticket wins",
+      "unlimited budget; NA not 0"
+    ]
+  ],
+  "frozen_inputs_verified": 36,
+  "source_hashes_verified": 26,
+  "html_sha256": "ae1d54ba30ed8debf967baa3d192441e1002ade7a8d2a976a209ea7fb126079f",
+  "qmd_sha256": "ac44d0cb83727fbd7b741b1fa830e9e222f20310c216c5e087dfba32a856ff1a"
+}

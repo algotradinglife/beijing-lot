@@ -1,0 +1,592 @@
+---
+title: "场次分类、排名、构组与购买：函数小链路"
+format:
+  html:
+    embed-resources: true
+params:
+  input_inventory: inputs/role_variants_acceptance/input-inventory.json
+  forced_replay: inputs/forced_complement_replay/5016d3412782bcbb/results.rds
+  compression_replay: inputs/compressed_structure_comparison/c04b4288946bcf14/results.rds
+  current_closure: inputs/26101_plans_20261002_1_25h/closure_decision.rds
+  real_snapshot: inputs/26101_plans_20260930/half_hour/frozen_inputs.rds
+  historical_replay: inputs/ranked_recent_replay/results-2026-09-28_2026-09-30.rds
+execute:
+  cache: false
+  error: false
+---
+
+本页是#553开发和验收入口。概率固定为北单让球胜平负：win让胜、draw让平、lose让负。Top1严格大于50%归单选；否则Top1−Top3不超过10个百分点归三选，其余归双选。同概率按win、draw、lose确定，三选输出固定胜平负顺序。阈值由讨论预先确定，不按历史收益拟合。
+
+单选提供Top1，并在Top2、Top3分别严格大于20%时添加对应保护双选，仍归单选榜。双选基础为Top1＋Top2，Top3严格大于20%时可增加Top1＋Top3，不限赛果身份。保护只是可选，不强制购买。Top1决策前最近北单赛前SP严格小于2则过滤整场；SP等于2或缺失保留，缺失明确标记；不替换SP>10。
+
+输入三个有限[0,1]概率，合计容差1e-9，不自动归一化。base_role是归类角色，n_outcomes是该变种实际赛果数。成本、票空间及三选重叠豁免使用实际赛果；同一次运行只用一种预设模式，但允许保护双选导致实际模式不同。测试在QMD之外执行。最终review与PI尚未完成时，下方记录不得解读为正式接受。
+
+```{r setup}
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+parameters <- if (exists("params",inherits=FALSE)) params else
+  rmarkdown::yaml_front_matter(file.path(root,"quarto/classify_outcomes_contract.qmd"))$params
+examples <- tibble::tribble(
+  ~case, ~win, ~draw, ~lose,
+  "单选及两种保护", .55,.23,.22,
+  "20%边界不保护", .60,.20,.20,
+  "50%边界双选", .50,.30,.20,
+  "双选及第三赛果保护", .45,.28,.27,
+  "三选边界", .40,.30,.30)
+examples <- dplyr::mutate(examples,
+  selections=purrr::pmap(list(win,draw,lose),beidan::classify_outcomes),
+  base_role=purrr::map_int(selections,attr,"base_role"),
+  choices=purrr::map(selections,lengths))
+knitr::kable(dplyr::select(examples,-selections,-choices))
+beidan::classify_outcomes(win=.55,draw=.23,lose=.22)
+```
+
+## 合成夹具：过滤→分类→排名
+
+以下概率和SP均为显式合成数据，只验接口和资金计算，不证明市场可用性或策略收益。北京时间2026-09-26 20:00固定为决策点，cutoff内部保留相同瞬间的UTC表示。第9场Top1 SP=1.99应排除，其余场保留。收据显式随matches携带，排名会重放过滤验证，不依赖会话全局。
+
+```{r synthetic-inputs}
+decision_at <- lubridate::ymd_hms("2026-09-26 20:00:00",tz="Asia/Shanghai")
+cutoff <- list(issue_id="26098",cutoff_utc=lubridate::with_tz(decision_at,"UTC"))
+chain_matches <- tibble::tribble(
+  ~fixture_id, ~win, ~draw, ~lose,
+  "26098:001",.40,.30,.30,
+  "26098:002",.36,.32,.32,
+  "26098:003",.38,.31,.31,
+  "26098:004",.45,.33,.22,
+  "26098:005",.48,.27,.25,
+  "26098:006",.50,.35,.15,
+  "26098:007",.47,.29,.24,
+  "26098:008",.55,.23,.22,
+  "26098:009",.80,.12,.08)
+chain_sp <- tidyr::expand_grid(fixture_id=chain_matches$fixture_id,outcome=c("W","D","L")) |>
+  dplyr::mutate(quote_at=cutoff$cutoff_utc-60,
+    sp_raw=dplyr::if_else(fixture_id=="26098:009" & outcome=="W",1.99,3),
+    source_url="synthetic://declared-quotes")
+chain_filtered <- beidan::filter_outcome_matches(chain_matches,chain_sp,cutoff)
+knitr::kable(dplyr::mutate(chain_filtered$audit,
+  quote_at=lubridate::with_tz(quote_at,"Asia/Shanghai")))
+chain_admitted <- chain_filtered$matches
+attr(chain_admitted,"filter_receipt") <- chain_filtered$receipt
+chain_selections <- beidan::prepare_outcome_selections(chain_admitted)
+ranked_coverage <- beidan::rank_outcome_selections(chain_selections,cutoff,"coverage")
+ranked_balance <- beidan::rank_outcome_selections(chain_selections,cutoff,"balance")
+rank_comparison <- dplyr::bind_rows(
+  dplyr::mutate(ranked_coverage,priority="coverage"),
+  dplyr::mutate(ranked_balance,priority="balance"))
+knitr::kable(dplyr::mutate(dplyr::select(rank_comparison,
+  priority,fixture_id,selection_id,base_role,n_outcomes,outcomes,
+  coverage_probability,entropy,p3,rank),
+  outcomes=purrr::map_chr(outcomes,paste,collapse="+")))
+```
+
+覆盖优先按每个变种的覆盖概率排序；均衡优先按所选赛果归一化entropy排序。三选覆盖概率都为1，覆盖优先沿用p3排序，均衡优先用entropy。每个类别各有连续独立排名，保护变种不会与基础方向共享rank。
+
+## 循环构组与购买：同预设模式、不同实际成本
+
+本次合成链路统一预设3332221。按3→2→1逐轮给各组取项，各榜游标连续、到末尾循环；组内同场不重复。NULL不设候选数上限，有限状态重复停止，不代表穷举所有组合。单选位置选保护双选时，实际模式变为3332222；216注和432注分别需要全覆盖432元和864元，均以每组最多256元购买。
+
+```{r synthetic-construction}
+settings <- beidan::parlay_settings()
+settings$n_legs <- 7L
+settings$unit_cny <- 2
+settings$payout_factor <- .65
+pattern <- c(3L,3L,3L,2L,2L,2L,1L)
+pool <- beidan::parlay_construct_role_groups(ranked_coverage,settings,
+  pattern=pattern,max_candidates=NULL,prematch_sp=chain_sp)
+knitr::kable(pool$groups)
+knitr::kable(dplyr::mutate(pool$group_patterns,
+  target_pattern=purrr::map_chr(target_pattern,paste,collapse=""),
+  actual_pattern=purrr::map_chr(actual_pattern,paste,collapse="")))
+knitr::kable(dplyr::mutate(pool$role_legs,
+  allowed_outcomes=purrr::map_chr(allowed_outcomes,paste,collapse="+")))
+knitr::kable(pool$substitutions)
+```
+
+```{r synthetic-purchase}
+evaluation <- beidan::parlay_evaluate_portfolio(pool,
+  budget_cny=NULL,group_budget_cny=256,
+  reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+knitr::kable(tibble::as_tibble(evaluation$summary))
+knitr::kable(evaluation$group_selection)
+knitr::kable(evaluation$rejections)
+knitr::kable(dplyr::slice_head(evaluation$purchases,n=12))
+```
+
+三选仍计入每场复用；只有两组都实际全三选的共同场次不计入重叠。base_role1的保护双选仍计入重叠并按两个赛果计算票空间。完整账本为evaluation$purchases，组内赛果为pool$role_legs。下节展示实际购买的保护方向，不要求每个可选变种都被购买。
+
+## 增组时：允许方向与实际购买方向
+
+以下仍是同一合成候选池，只改变总预算以观察购入组数；每组上限仍256元，复用4、非共同实际三选重叠3。最后一行总预算NULL。展示允许掩码和实际购买票中出现的赛果，避免把“可选保护”误读为“已经保护”。组数不一定随预算增加，因为还有复用、重叠和合法票约束。
+
+```{r protection-trace}
+trace_scenarios <- tibble::tibble(
+  scenario=c("256元","512元","1024元","总预算NULL"),
+  budget_cny=c(256,512,1024,NA_real_))
+trace_summaries <- vector("list",nrow(trace_scenarios))
+trace_directions <- vector("list",nrow(trace_scenarios))
+for (i in seq_len(nrow(trace_scenarios))) {
+  trace_budget <- trace_scenarios$budget_cny[[i]]
+  trace_result <- beidan::parlay_evaluate_portfolio(pool,
+    budget_cny=if(is.na(trace_budget)) NULL else trace_budget,
+    group_budget_cny=256,reuse_policy=list(max_reuse=4L),
+    overlap_policy=list(max_overlap=3L),improve=FALSE)
+  trace_summaries[[i]] <- dplyr::mutate(tibble::as_tibble(trace_result$summary),
+    scenario=trace_scenarios$scenario[[i]])
+  bought_groups <- dplyr::distinct(trace_result$purchases,group_id)
+  selected_masks <- dplyr::semi_join(pool$role_legs,bought_groups,by="group_id")
+  bought_directions <- dplyr::inner_join(
+    dplyr::select(trace_result$purchases,ticket_id,group_id),
+    dplyr::select(trace_result$plan$ticket_legs,ticket_id,fixture_id,outcome),
+    by="ticket_id",relationship="one-to-many") |>
+    dplyr::distinct(group_id,fixture_id,outcome) |>
+    dplyr::group_by(group_id,fixture_id) |>
+    dplyr::summarise(purchased_outcomes=list(sort(unique(outcome))),
+      actual_outcome_count=dplyr::n_distinct(outcome),.groups="drop")
+  trace_directions[[i]] <- dplyr::left_join(selected_masks,bought_directions,
+    by=c("group_id","fixture_id"),relationship="one-to-one") |>
+    dplyr::mutate(scenario=trace_scenarios$scenario[[i]])
+}
+knitr::kable(dplyr::select(dplyr::bind_rows(trace_summaries),
+  scenario,selected_groups,tickets,spent_cny,actual_coverage))
+knitr::kable(dplyr::bind_rows(trace_directions) |>
+  dplyr::select(scenario,group_id,fixture_id,base_role,selection_id,n_outcomes,
+    allowed_outcomes,purchased_outcomes,actual_outcome_count) |>
+  dplyr::mutate(allowed_outcomes=purrr::map_chr(allowed_outcomes,paste,collapse="+"),
+    purchased_outcomes=purrr::map_chr(purchased_outcomes,paste,collapse="+")))
+```
+
+## 真实冻结数据：新规则小链路
+
+复用26101期已保存概率与赛前SP，参数real_snapshot声明路径。不联网、不读赛后结果、不重新校准；保持原冻结cutoff，不将旧输入伪装成当前决策。与合成例分开运行，本段统一预设3332222，关闭微调展示原始构组。
+
+```{r real-inputs}
+real_snapshot_path <- file.path(root,parameters$real_snapshot)
+real_snapshot <- readRDS(real_snapshot_path)
+real_projected <- real_snapshot$projected
+stopifnot(identical(real_projected$cutoff,real_snapshot$epoch$cutoff))
+real_cutoff <- real_projected$cutoff
+knitr::kable(tibble::tibble(input=parameters$real_snapshot,
+  sha256=digest::digest(real_snapshot_path,file=TRUE,algo="sha256"),
+  issue_id=real_cutoff$issue_id,
+  decision_beijing=lubridate::with_tz(real_cutoff$cutoff_utc,"Asia/Shanghai")))
+real_matches <- real_projected$probabilities |>
+  tidyr::pivot_wider(names_from=outcome,values_from=probability) |>
+  dplyr::rename(win=W,draw=D,lose=L)
+real_filtered <- beidan::filter_outcome_matches(real_matches,
+  real_projected$prematch_sp,real_cutoff)
+knitr::kable(dplyr::mutate(real_filtered$audit,
+  quote_at=lubridate::with_tz(quote_at,"Asia/Shanghai")))
+real_admitted <- real_filtered$matches
+attr(real_admitted,"filter_receipt") <- real_filtered$receipt
+```
+
+```{r real-ranking}
+real_ranked <- beidan::rank_outcome_selections(
+  beidan::prepare_outcome_selections(real_admitted),real_cutoff,"coverage")
+knitr::kable(dplyr::mutate(real_ranked,
+  outcomes=purrr::map_chr(outcomes,paste,collapse="+")))
+```
+
+```{r real-construction}
+real_pool <- beidan::parlay_construct_role_groups(real_ranked,
+  real_snapshot$settings,pattern=c(3L,3L,3L,2L,2L,2L,2L),
+  max_candidates=NULL,prematch_sp=real_projected$prematch_sp)
+knitr::kable(dplyr::mutate(real_pool$group_patterns,
+  target_pattern=purrr::map_chr(target_pattern,paste,collapse=""),
+  actual_pattern=purrr::map_chr(actual_pattern,paste,collapse="")))
+knitr::kable(dplyr::mutate(real_pool$role_legs,
+  allowed_outcomes=purrr::map_chr(allowed_outcomes,paste,collapse="+")))
+knitr::kable(real_pool$substitutions)
+```
+
+```{r real-purchase}
+real_evaluation <- beidan::parlay_evaluate_portfolio(real_pool,
+  budget_cny=NULL,group_budget_cny=256,
+  reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+knitr::kable(tibble::as_tibble(real_evaluation$summary))
+knitr::kable(real_evaluation$group_selection)
+knitr::kable(real_evaluation$rejections)
+knitr::kable(dplyr::slice_head(real_evaluation$purchases,n=12))
+```
+
+本例12场中，26101:26和26101:28分别因Top1 SP为1.96和1.69被排除，剩余8场双选、2场单选，没有三选。3332222位置因此按已批准的3→2规则全部成为2222222；23个候选最终只购买1组128注、256元。七场组从8场双选中取场，任意两组至少共同6场，超过非三选重叠上限3，所以增加总预算不能多买组。模型覆盖为14.48491%，不是命中复盘结果。
+
+收益字段是冻结概率、原始赛前SP和一次0.65票级系数的模型估值，缺SP保留NA，不是结算返奖。本段不生成正式下注单，不筛掉负预期结果来美化报告。下方历史章节只展示归档旧规则及其冻结身份，与本轮新分类结果分开。
+
+## 输入字节身份
+
+以下清单绑定本页已声明的冻结数据与历史证据。文件均在项目内，不读取原机器个人路径；复制保留原字节和原收据，不重算旧决策。结算文件仅用于下方已冻结历史结果的核验，不进入上方新规则分类、排名或构组。
+
+```{r input-identities}
+input_inventory <- jsonlite::read_json(file.path(root,parameters$input_inventory))
+for (entry in input_inventory$files) {
+  stopifnot(identical(digest::digest(file.path(root,entry$path),file=TRUE,
+    algo="sha256"),entry$sha256))
+}
+knitr::kable(tibble::tibble(
+  file=purrr::map_chr(input_inventory$files,"path"),
+  sha256=purrr::map_chr(input_inventory$files,"sha256")))
+```
+
+## 前几次下注窗口：强制保护前的冻结对照
+
+本段读取归档旧规则在9月28、30日两个冻结时点的重构结果，不按结算结果调整门槛、选场或预算。三选最大概率差10个百分点、让平第三且严格大于20%的互补双选规则保持不变；目标3332222，无候选数或总预算上限，每组256元，复用4、非三选重叠3，关闭微调。两组共同以角色3使用的场次不占重叠额度；实际为双选的替补场仍计入。复用上限仍适用于全部场次。实际模式由当时概率分类和三选不足替补决定。
+
+之前将三选计入重叠的回放已被本轮口径取代，原始产物及哈希清单保留在 `inputs/ranked_recent_replay/all_roles_overlap_evidence/`，仅作审计对照。
+
+这是在各次原可用场次集合上重新构造的模拟购买，不是当时真实购买记录，也不是同预算的策略胜负证明。28日及30日各12场。26日的49场全量重构在转入下文固定下注模板的结构比较后停止，不计作本轮完整重构结果；其旧冻结下注模板仅用于下文对照，无可用于原cutoff的已存赛前SP，估值保持NA。结算SP仅在冻结购买文件以后读取；待结算不算未中，特殊状态不强行当普通输赢。
+
+旧版生成入口为 scripts/replay_recent_ranked_outcomes.R；强制保护的归档来源身份见下文，旧入口不作为新版可运行接口。本段旧命令从显式清单重建独立购买文件，再调用已有 `parlay_settle_plan()` 结算。QMD读取其声明的产物并核对代码、原输入、结算和决策文件哈希；不为展示重复执行昂贵候选构造。每次同一场只计一次分类资格，另表记录最终是否真的买入两个互补方向。
+
+```{r historical-replay}
+historical_parameters <- if (exists("params",inherits=FALSE)) params else
+  rmarkdown::yaml_front_matter(file.path(root,"quarto/classify_outcomes_contract.qmd"))$params
+historical <- readRDS(file.path(root,historical_parameters$historical_replay))
+prior_sources <- jsonlite::read_json(file.path(root,"docs/reviews/forced-complement-prior-source/inventory.json"))
+for (relative in names(historical$code_hashes)) {
+  original_source <- prior_sources[[relative]]
+  stopifnot(!is.null(original_source),identical(original_source$sha256,unname(historical$code_hashes[[relative]])))
+  stopifnot(identical(digest::digest(file.path(root,original_source$archive),file=TRUE,algo="sha256"),
+                      unname(historical$code_hashes[[relative]])))
+}
+for (relative in names(historical$decision_code_hashes)) {
+  archived <- historical$decision_code_archives[[relative]]
+  location <- if(is.null(archived)) prior_sources[[relative]]$archive else archived
+  stopifnot(identical(digest::digest(file.path(root,location),file=TRUE,algo="sha256"),
+                      unname(historical$decision_code_hashes[[relative]])))
+}
+for (record in historical$receipts) {
+  stopifnot(identical(digest::digest(file.path(root,record$input),file=TRUE,algo="sha256"),record$input_sha256),
+            identical(digest::digest(file.path(root,record$settlement),file=TRUE,algo="sha256"),record$settlement_sha256),
+            identical(digest::digest(file.path(root,record$decision_path),file=TRUE,algo="sha256"),record$decision_hash))
+}
+knitr::kable(dplyr::select(historical$summary,epoch,issue_id,fixtures,actual_pattern,
+  candidates,groups,won_groups,stake_cny,payout_cny,net_cny,roi,
+  coverage,estimated_net_cny,pending_stake_cny,special_stake_cny))
+knitr::kable(historical$group_returns)
+```
+
+### 互补保护是否实际购买
+
+“可互补”是分类提供两个方向；“买了互补”必须两个不同方向都进入购买组。仅复用两次但方向相同，仍不算互补保护；统计根据实际买入票的赛果，不能从组的允许掩码推断。`admitted_directions`保留允许方向数，`complementary_bought`还要求实际票跨组覆盖三项赛果。未选入任何组的场次同样保留。
+
+```{r historical-protection}
+knitr::kable(historical$protection |>
+  dplyr::group_by(epoch) |>
+  dplyr::summarise(eligible=dplyr::n(),
+    purchased=sum(purchased_groups>0L),
+    complementary_bought=sum(complementary_bought),
+    draw_protected=sum(draw_protected),.groups="drop"))
+knitr::kable(historical$protection)
+```
+
+本段完整重构样本只有两个决策时点，且实际资金不同，盈利不能证明规则具有长期正期望。重点查看新增覆盖、实际命中、回款和互补落实是否一致；不依据其中某次高收益把阈值挑成生产默认。审核、专项测试和渲染记录见 `docs/reviews/triple-overlap-quota.json`；旧口径记录见 `docs/reviews/triple-overlap-prior-acceptance.json`。
+
+原构造代码与刷新诊断代码分别保留哈希；仅结算刷新使用 `--settle-existing`，核验原输入、cutoff、SP、settings、package代码及构造函数正文不变，绝不重排或改写购买文件。审阅前诊断代码作为原字节证据存于 `docs/reviews/ranked-replay-source-evidence/`，只校验或读取AST，不作为运行接口加载。
+
+## 128注下的结构压缩：强制保护前的冻结对照
+
+本段为强制保护前的冻结证据，绑定归档代码，不用当前实现重新冒充旧结果。本段固定此前模拟购买的七场模板（26日3组、28日1组、30日3组），不重新搜索所有场次。3322222将原三选中Top1+Top2覆盖最大的那场降为双选；3332221将原双选中Top1概率最大的那场作为探索性胆。其余原方向保留，同概率按场次ID确定。三选不足不凭空补三选，实际结构另列。不按结算选胆，不改变生产分类函数。
+
+每组最多128注，每注2元，投入取256元与全覆盖成本的较小值；总预算不限，复用4次，两组非共同三选重叠最多3场。六个决策全部先冻结，再统一打开结算标签；输出目录由入口代码哈希区分，已有不同内容的决策禁止覆盖；历史重放只作诊断。
+
+```{r compression-comparison}
+compression <- readRDS(file.path(root,historical_parameters$compression_replay))
+for (relative in names(compression$code_hashes)) {
+  original_source <- prior_sources[[relative]]
+  stopifnot(!is.null(original_source),identical(original_source$sha256,unname(compression$code_hashes[[relative]])))
+  stopifnot(identical(digest::digest(file.path(root,original_source$archive),file=TRUE,algo="sha256"),unname(compression$code_hashes[[relative]])))
+}
+for (record in compression$receipts) {
+  stopifnot(identical(digest::digest(file.path(root,record$original_decision),file=TRUE,algo="sha256"),record$original_decision_sha256),
+    identical(digest::digest(file.path(root,record$original_input),file=TRUE,algo="sha256"),record$original_input_sha256),
+    identical(digest::digest(file.path(root,record$settlement),file=TRUE,algo="sha256"),record$settlement_sha256),
+    identical(digest::digest(fs::path_abs(record$decision_path,start=root),file=TRUE,algo="sha256"),record$decision_sha256))
+}
+knitr::kable(tibble::as_tibble(compression$original_baseline))
+knitr::kable(tibble::as_tibble(compression$summary),digits=4)
+knitr::kable(dplyr::select(compression$group_metrics,epoch,target_pattern,actual_pattern,
+  legal_space,stake_cny,structure_mass,owned_coverage,conditional_coverage),digits=4)
+knitr::kable(tibble::as_tibble(compression$misses))
+```
+
+structure_mass是允许空间的模型概率；owned_coverage是实际买入票概率，两者之比是允许空间中的资金覆盖深度。压缩也可能排除真实赛果，不能只看128/合法注数。
+
+两种结构26日、28日均未中。30日单选版本实际为2222221，三组投入384元，比2222222的768元减半，保留同一中奖票，回款3335.81元；模型总体覆盖率也从34.29%降至22.67%。这不足以证明稳定盈利。暂以不设胆的3322222作为下一轮研究基线，3332221保留为探索对照，不根据三次收益确定生产最优。
+
+## 当前26101期：1–25小时窗口与停售核验
+
+[财政部2026年彩票市场休市公告](https://zhs.mof.gov.cn/zhengcefabu/202512/t20251225_3980205.htm)规定10月1日00:00至10月4日24:00休市。Nowscore售卖状态与公告一致。以下全部停售，**不是可执行下注单**，未购买、未发生资金支出。原始页面、公告字节、链接与采集时间均保留。
+
+```{r current-sale-closure}
+closure <- readRDS(file.path(root,historical_parameters$current_closure))
+for (relative in names(closure$hashes)) {
+  stopifnot(identical(digest::digest(file.path(root,relative),file=TRUE,algo="sha256"),unname(closure$hashes[[relative]])))
+}
+stopifnot(all(closure$roster$sale_state=="closed"),closure$planned_tickets==0L)
+knitr::kable(tibble::tibble(decision_beijing=format(closure$cutoff,tz="Asia/Shanghai"),
+  from_beijing=format(closure$cutoff+lubridate::hours(1),tz="Asia/Shanghai"),
+  to_beijing=format(closure$cutoff+lubridate::hours(25),tz="Asia/Shanghai"),
+  fixtures=nrow(closure$roster),planned_groups=closure$planned_groups,
+  planned_tickets=closure$planned_tickets,planned_stake_cny=closure$planned_stake_cny))
+knitr::kable(dplyr::select(closure$roster,slot,home_name,away_name,kickoff_at,sale_state,
+  source_url_500,source_url_nowscore))
+```
+
+专项测试、审阅和渲染记录见`docs/reviews/compressed-structure-comparison.json`。测试在QMD之外执行。当前正式下注未完成；休市是执行障碍，恢复销售后需要重新采集并冻结新窗口。
+
+
+## 归档旧规则：强制互补购买的三种结构
+
+本段记录已冻结的旧规则实验；当前#553已撤销这一强制购买规则。旧实验把互补从可选方向升级为购买约束。实际双选场次中，原概率排名第三为让平、且概率严格大于20%，一旦选入，就必须在两个不同组的自有购买票中实现Top1＋Top2与Top1＋让平。可选掩码、另组持有票、三选覆盖都不替代这个双选义务。三选降为双选时按原概率重新判定。
+
+种子与伙伴组按固定名义覆盖顺序暂存，伙伴引入的其他义务继续展开，全部满足才提交。无法满足则整批回滚，不消耗资金或复用额度。该算法有限、确定，不穷举也不回溯全部伙伴组合；可能错过其他可行搭配，不宣称全局最优。不同赛果跨组被保护，也不保证同一组包含所有真实赛果。
+
+本轮重新使用各次原冻结概率与可用场次：3322222、3332221、3333221，统一每组最多128注/256元、总预算NULL、全部角色复用最多4次、两组共同三选不计入重叠，其余最多3场。3333221为4三选、2双选、1探索性Top1胆，全空间324注；三选不足显示实际结构。单选仅研究，不改变生产分类函数。单选由对应双选基底中Top1概率最大的场次降为胆，赛果同概率按W/D/L、场次同分按ID。九个决策全部冻结后才读取结算。
+
+旧对照绑定归档源字节，仅作历史证据，不执行旧实现。旧研究入口为r/forced_complement_replay.R，旧顺序命令为Rscript scripts/replay_forced_complement.R；它们只作已冻结规则证据，不作为新版接口或可运行复现承诺。本次26日两个单选结构另用scripts/forced_complement_worker.R并行执行相同研究函数，保存独立执行回执；scripts/settle_forced_complement.R核验并汇总九份已冻结决策后才读取结算。运行方式不会改变场次、cutoff或购买规则。专项测试在QMD之外执行；最终文件身份、审阅及命令见docs/reviews/forced-complement-purchase.json。
+
+
+```{r forced-complement-results}
+prior_role_sources <- jsonlite::read_json(file.path(root,
+  "docs/reviews/role-variants-prior-source-evidence/inventory.json"))
+forced <- readRDS(file.path(root,historical_parameters$forced_replay))
+knitr::kable(tibble::tibble(pattern=c("3322222","3332221","3333221"),
+  full_space=c(288L,216L,324L),maximum_tickets=128L,
+  full_cost_cny=c(576,432,648),maximum_group_cny=256,
+  ticket_count_fraction=c(128/288,128/216,128/324)),digits=4)
+
+for(relative in names(forced$execution_code_hashes)) {
+  preserved <- Filter(function(entry) identical(entry$source,relative),
+    prior_role_sources$entries)
+  stopifnot(length(preserved)==1L,
+    identical(preserved[[1L]]$sha256,unname(forced$execution_code_hashes[[relative]])),
+    identical(digest::digest(file.path(root,preserved[[1L]]$archive),file=TRUE,
+      algo="sha256"),unname(forced$execution_code_hashes[[relative]])))
+}
+for(relative in names(forced$code_hashes)) {
+  preserved <- Filter(function(entry) identical(entry$source,relative),
+    prior_role_sources$entries)
+  stopifnot(length(preserved)==1L,
+    identical(preserved[[1L]]$sha256,unname(forced$code_hashes[[relative]])),
+    identical(digest::digest(file.path(root,preserved[[1L]]$archive),file=TRUE,
+      algo="sha256"),unname(forced$code_hashes[[relative]])))
+}
+for(record in forced$receipts) {
+  stopifnot(identical(digest::digest(fs::path_abs(record$decision_path,start=root),file=TRUE,algo="sha256"),record$decision_sha256),
+    identical(digest::digest(file.path(root,record$row$input),file=TRUE,algo="sha256"),record$input_sha256),
+    identical(digest::digest(file.path(root,record$row$settlement),file=TRUE,algo="sha256"),record$settlement_sha256))
+}
+stopifnot(nrow(forced$summary)==9L,all(forced$forced$satisfied))
+scope_26_record <- Filter(function(x) identical(x$row$epoch,"2026-09-26") &&
+  identical(x$pattern,"3322222"),forced$receipts)[[1]]
+scope_26 <- readRDS(file.path(root,scope_26_record$row$input))
+scope_26 <- dplyr::semi_join(scope_26$schedule,
+  dplyr::distinct(scope_26$result$probabilities,fixture_id),
+  by=c("fixture_key"="fixture_id"))
+stopifnot(nrow(scope_26)==49L,!anyDuplicated(scope_26$fixture_key),!anyNA(scope_26$kickoff_at),
+  all(as.numeric(scope_26$kickoff_at)>
+    as.numeric(scope_26_record$receipt$cutoff$cutoff_utc)))
+knitr::kable(tibble::tibble(epoch="2026-09-26",fixtures=nrow(scope_26),
+  earliest_kickoff_beijing=lubridate::with_tz(min(scope_26$kickoff_at),"Asia/Shanghai"),
+  latest_kickoff_beijing=lubridate::with_tz(max(scope_26$kickoff_at),"Asia/Shanghai")))
+all_double_receipt <- Filter(function(x) identical(x$row$epoch,"2026-09-30") &&
+  identical(x$pattern,"3322222"),forced$receipts)[[1]]
+all_double_30 <- readRDS(fs::path_abs(all_double_receipt$decision_path,start=root))
+# The old classifier choices are frozen evidence, not a call to deleted logic.
+old_main_30 <- all_double_30$ranked |>
+  dplyr::filter(selection_id==1L) |>
+  dplyr::transmute(fixture_id,main_mask=outcomes)
+obligations_30 <- all_double_30$ranked |>
+  dplyr::filter(selection_id==2L) |>
+  dplyr::transmute(fixture_id,protect_mask=outcomes) |>
+  dplyr::left_join(old_main_30,by="fixture_id",relationship="one-to-one")
+stopifnot(dplyr::n_distinct(all_double_30$pool$probabilities$fixture_id)==12L,
+  nrow(obligations_30)==10L,all(unlist(all_double_30$pool$group_patterns$actual_pattern)==2L))
+knitr::kable(obligations_30 |>
+  dplyr::mutate(main_mask=purrr::map_chr(main_mask,paste,collapse="+"),
+    protect_mask=purrr::map_chr(protect_mask,paste,collapse="+")))
+
+knitr::kable(dplyr::arrange(forced$summary,epoch,target_pattern),digits=4)
+# These nine saved cases are fully settled; distinguish structure from purchased depth.
+stopifnot(all(forced$summary$pending_stake_cny==0),
+          all(forced$summary$special_stake_cny==0))
+structural_misses <- forced$misses |>
+  dplyr::distinct(epoch,pattern,group_id) |>
+  dplyr::count(epoch,pattern,name="structural_missed_groups")
+failure_layers <- forced$summary |>
+  dplyr::left_join(structural_misses,by=c("epoch","target_pattern"="pattern"),
+                   relationship="one-to-one") |>
+  dplyr::mutate(structural_missed_groups=tidyr::replace_na(structural_missed_groups,0L),
+    depth_missed_groups=admitted_groups-won_groups-structural_missed_groups)
+stopifnot(all(failure_layers$depth_missed_groups>=0))
+knitr::kable(dplyr::select(failure_layers,epoch,target_pattern,admitted_groups,
+  won_groups,structural_missed_groups,depth_missed_groups))
+
+knitr::kable(forced$forced |>
+  dplyr::mutate(main_groups=purrr::map_chr(main_groups,paste,collapse=" / "),
+    protect_groups=purrr::map_chr(protect_groups,paste,collapse=" / ")))
+knitr::kable(forced$protection)
+knitr::kable(forced$misses |>
+  dplyr::mutate(allowed_outcomes=purrr::map_chr(allowed_outcomes,paste,collapse="+")))
+knitr::kable(forced$group_metrics |>
+  dplyr::group_by(epoch,pattern,actual_pattern) |>
+  dplyr::summarise(candidates=dplyr::n(),admitted=sum(admitted),
+    spent_cny=sum(spent_cny),.groups="drop"))
+```
+
+未买入的互补候选不属于未中；最终保护必须以实际自有票审计为准。零购买的对照仍保留一行，投入、回款和净收益均为0，ROI为NA。新回放重新构组且投入不同，与旧固定模板比较包含选场、组数和结构变化，不能把收益差异全部归因于强制互补。26日重新使用原冻结概率池的49场，均有开赛时间且晚于原决策时点；这不是旧固定模板的相同场次集合，也不重新裁成某个当前窗口。26日无原cutoff可用赛前SP，预计收益保持NA；不以结算SP倒填估值。最终报告应同时看实际模式、资金、命中和单选失败，不能只看覆盖概率。
+
+本轮30日的3322222实际为全双选：12场中10场触发强制互补，只有2场可单次出现。在非三选重叠上限3下，两个七场组至少需要8场不共享场次，三组至少需要3场只出现一次的场次；这些单次出现的场次都不能承担双选互补义务。这里只有2场满足条件，所以该全双选对照不存在非空可行方案。四组及以上也违反12场容纳下的两组重叠3界限。这个判断不推广到单选版本；单选版本的零购买仅表示当前有限候选及贪心伙伴搜索未找到可行包，不证明全局不可行。
+
+
+9月28日的`3333221`因三选位置不足按已批准规则由双选接替，实际结构为`3332221`；两种目标结构最后买入的物理票集合相同（购买表的组别／排名记录不完全相同）。因此这一天不能作为“四场三选优于三场三选”的独立比较证据。页面同时报告目标结构和实际结构，不把降级方案冒充目标配置。
+
+本轮金额为保存结算数据下的历史模拟，单位为元。26日3322222选入9组，投入2304、回款2123.89，净亏180.11；3332221选入6组，投入1536、回款1666.00，净赚130.00；3333221选入4组，投入1024、回款922.22，净亏101.78。28日各目标结构均投入1024、回款0；30日均未买入，零损益不是盈利或命中。26日102场按保存结算规则为ALL、单场SP=1，因此一个组可以有不止一张获奖物理票；这不代表重复购买同一票。
+
+26日3322222的7个未中组中，5个漏了实际赛果、2个结构包含实际赛果但命中票未进入实际购买的128注；3332221分别为4个和1个，3333221为3个和0个。28日3322222分别为3个和1个，两个单选目标均为4个结构漏赛果、0个深度漏票。每场两方向都实际买入的保护义务全部满足，仍不保证同一组包含所有实际赛果，也不保证命中票进入资金覆盖深度。单选仅作探索；这些结果支持继续分别研究结构覆盖和票内深度，不能凭26日一例盈利敲定生产结构，更不能把28日降级后相同的两份票当独立证据。
+
+## 计算耗时诊断
+
+规则本身采用有限的确定性伙伴搜索；耗时还来自实现中的重复构表。对9月26日已冻结的3332221候选池取前20组，仅运行资金分配、不开结算标签：原实现24.456秒，隔离副本批量构表后5.349秒，完整返回对象（票、赛果、排名、所有权、投入及约束结果）`identical()`。约4.57倍的提升是该20组探针的结果，不能外推为完整回测的耗时承诺；抽样CPU分析中枚举函数占77.68%的包含调用时间，这些包含调用占比不能相加，也没有覆盖完整组合联合概率的计算。
+
+该20组截断池缺少完整伙伴，原版与优化版均为零购买，不能单凭这个基准证明非零购买路径。另用已冻结实际选入的6组子池作无标签诊断：768注、1536元，完整资金分配结果一致，原版6.485秒、优化版1.000秒。该子池仍只是性能对照，不替代完整49场候选池的九组历史决策。
+
+隔离优化对照共有200条断言通过，首次Codex审阅提出的不同组别名首位归属、缺失比赛关系两项测试缺口已补齐并复审通过。缺失比赛概率返回NA、不存在候选组返回空表，是原枚举函数已有的诊断行为；本轮性能对照没有改变它们，也没有据此宣称所有入口都已对缺失关系封闭失败。优化尚未采用；本页九组历史结果仍绑定原实现，运行中的冻结来源身份不变。性能证据与审阅日志在`docs/reviews/forced-complement-purchase.json`的`performance_probe`项中记录，不能代替历史结算和本页最终渲染验收。
+
+## 本轮验收记录
+
+以下为本轮实际审阅文件的SHA-256、检查命令和发现处理记录。测试运行独立于分析，不在此页面执行testthat。渲染过程校验文件身份；最终PI验收在新会话渲染和结果核验后记录。本轮还核验固定模板压缩客户端：三选降为双选后若触发原始让平Top3义务且无伙伴，资金与准入均回滚；不触发时仍正常购买128注，对应57条断言通过。七个旧接口测试文件仍传入已撤销的n_candidates/probabilities参数，共33个错误；构组源码SHA与本轮修改前的保存字节相同。该缺口记录在docs/reviews/forced-complement-legacy-caller-evidence.json，不作为当前可复用接口，也不宣称全仓测试通过。
+
+```{r forced-complement-acceptance}
+forced_acceptance <- jsonlite::read_json(file.path(root,
+  "docs/reviews/forced-complement-purchase.json"),simplifyVector=TRUE)
+for(relative in names(forced_acceptance$hashes)) {
+  preserved <- Filter(function(entry) identical(entry$source,relative),
+    prior_role_sources$entries)
+  stopifnot(length(preserved)==1L,
+    identical(preserved[[1L]]$sha256,unname(forced_acceptance$hashes[[relative]])),
+    identical(digest::digest(file.path(root,preserved[[1L]]$archive),file=TRUE,
+      algo="sha256"),unname(forced_acceptance$hashes[[relative]])))
+}
+knitr::kable(tibble::tibble(check=names(forced_acceptance$checks),
+  result=unlist(forced_acceptance$checks)))
+knitr::kable(tibble::tibble(command=names(forced_acceptance$commands),
+  invocation=paste0("<code>",htmltools::htmlEscape(unlist(forced_acceptance$commands)),"</code>")),
+  format="html",escape=FALSE)
+knitr::kable(tibble::tibble(file=names(forced_acceptance$hashes),
+  reviewed_sha256=unlist(forced_acceptance$hashes)))
+```
+
+## 归档旧规则：3332222历史对照
+
+本轮只新增结构，不改胆或赛前SP筛选规则。复用ReplayRankedOutcomes以及已验收的强制互补购买路径；仍按覆盖概率排名、总预算不限、每组256元/128注、所有角色复用4、非共同三选重叠3，关闭微调。3332222完整空间432注，128注仅占票数29.63%，并非概率覆盖率。三种原日期均先冻结新方案，再读取结算；原九份方案不改写。原QMD验收源字节保存于docs/reviews/forced-complement-original-qmd.txt，新展示单独审阅。
+
+```{r comparison-3332222}
+comparison333 <- readRDS(file.path(root,
+  "inputs/3332222_comparison/f989887167bd041f/results.rds"))
+for(relative in names(comparison333$code_hashes)) {
+  preserved <- Filter(function(entry) identical(entry$source,relative),
+    prior_role_sources$entries)
+  stopifnot(length(preserved)==1L,
+    identical(preserved[[1L]]$sha256,unname(comparison333$code_hashes[[relative]])),
+    identical(digest::digest(file.path(root,preserved[[1L]]$archive),file=TRUE,
+      algo="sha256"),unname(comparison333$code_hashes[[relative]])))
+}
+for(record in comparison333$receipts) {
+  stopifnot(identical(digest::digest(fs::path_abs(record$decision_path,start=root),file=TRUE,algo="sha256"),record$decision_sha256),
+    identical(digest::digest(file.path(root,record$row$input),file=TRUE,algo="sha256"),record$input_sha256),
+    identical(digest::digest(file.path(root,record$row$settlement),file=TRUE,algo="sha256"),record$settlement_sha256))
+}
+stopifnot(nrow(comparison333$summary)==3L,all(comparison333$summary$pending_stake_cny==0),
+  all(comparison333$summary$special_stake_cny==0),
+  all(comparison333$summary$depth_missed_groups>=0))
+knitr::kable(dplyr::arrange(comparison333$summary,epoch),digits=4)
+comparison_table <- dplyr::bind_rows(
+  dplyr::select(forced$summary,epoch,target_pattern,actual_patterns,admitted_groups,
+    tickets,stake_cny,payout_cny,net_cny,roi,won_groups),
+  dplyr::select(comparison333$summary,epoch,target_pattern,actual_patterns,admitted_groups,
+    tickets,stake_cny,payout_cny,net_cny,roi,won_groups)) |>
+  dplyr::arrange(epoch,target_pattern)
+knitr::kable(comparison_table,digits=4)
+```
+
+投入不同，不将收益差异全部归因于结构。零购买不算命中或盈利；目标与实际结构同时展示，降级后相同物理票不作为独立证据。26日赛前SP缺失，仍不使用结算SP填补估值。每种结构仅三个历史日期，不能据此挑选长期盈利默认值。
+
+### 3332222新增检查与审阅记录
+
+新增回归测试在QMD之外运行，包含432注结构、128注实际投入、输入及结算改写拒绝、未结算和特殊状态拒绝，以及“票已判负但组内仍缺赛果”的边界。源码专项审阅已通过；实际三日期结果、渲染与PI验收分别记录，不能以源码审阅代替结果验收。
+
+```{r comparison-3332222-acceptance}
+accept333 <- jsonlite::read_json(file.path(root,"docs/reviews/3332222-comparison.json"))
+for(relative in names(accept333$hashes)) {
+  preserved <- Filter(function(entry) identical(entry$source,relative),
+    prior_role_sources$entries)
+  stopifnot(length(preserved)==1L,
+    identical(preserved[[1L]]$sha256,unname(accept333$hashes[[relative]])),
+    identical(digest::digest(file.path(root,preserved[[1L]]$archive),file=TRUE,
+      algo="sha256"),unname(accept333$hashes[[relative]])))
+}
+knitr::kable(tibble::tibble(check=names(accept333$checks),result=unlist(accept333$checks)))
+knitr::kable(tibble::tibble(file=names(accept333$hashes),sha256=unlist(accept333$hashes)))
+knitr::kable(tibble::tibble(command=names(accept333$commands),invocation=paste0("<code>",htmltools::htmlEscape(unlist(accept333$commands)),"</code>")),
+  format="html",escape=FALSE)
+```
+
+
+## #553开发验收状态
+
+本节记录新规则链路的开发与验收证据；旧回测保持各自冻结源码身份。测试在QMD之外运行。
+
+|函数或内部阶段|对应外部自动测试|
+|---|---|
+|classify_outcomes|test-classify-outcomes.R|
+|filter_outcome_matches及原始SP/来源/截止守卫|test-filter-outcome-matches.R|
+|prepare_outcome_selections及typed empty/schema|test-prepare-outcome-selections.R|
+|rank_outcome_selections及过滤重放/变种排名|test-rank-outcome-selections.R|
+|parlay_construct_role_groups及游标/循环/物理组去重|test-parlay-role-groups.R、test-parlay-ranked-portfolio.R|
+|parlay_evaluate_portfolio及资金/复用/重叠/微调|test-parlay-ranked-portfolio.R|
+|独立手算收益、actual_pattern、精确union、源码改写拒绝与概率和容差贯通|test-role-variants-acceptance.R|
+|ReplayRankedOutcomes、DiagnoseRankedReplay、VerifyRankedReplayReceipt|tests/testthat/test-ranked-outcome-replay.R|
+
+除最后一行外，测试均位于packages/beidan/tests/testthat。构组只允许3→2替补，缺少单选不改用双选榜；单选榜内的保护双选仍是合法条目。同一物理场次与掩码仅因排列不同不重复产生候选。构组收据绑定实现及依赖版本，购买拒绝缺失或过期的构组身份。分类与购买均承认1e-9概率和容差，不修改或归一化原始输入。默认CLI的ChatGPT登录现已恢复；此前401日志保留。早期开发工作树源码第二轮及产物审阅通过，但不替代此次main集成验收。早期全仓runner发现的跨测试持久设置泄漏和旧score-table调用已修复或迁移；本次完整runner状态、当前源码及产物审阅、PI结论分别由下方收据记录。专项通过不表示全仓通过。
+
+```{r outcome-variants-development-evidence}
+variants_evidence <- jsonlite::read_json(file.path(root,"docs/reviews/outcome-role-variants.json"))
+for(relative in names(variants_evidence$hashes)) {
+  stopifnot(identical(digest::digest(file.path(root,relative),file=TRUE,algo="sha256"),
+    unname(variants_evidence$hashes[[relative]])))
+}
+knitr::kable(tibble::tibble(check=names(variants_evidence$checks),
+  result=unlist(variants_evidence$checks)))
+knitr::kable(tibble::tibble(file=names(variants_evidence$hashes),
+  sha256=unlist(variants_evidence$hashes)))
+knitr::kable(tibble::tibble(command=names(variants_evidence$commands),
+  invocation=paste0("<code>",htmltools::htmlEscape(unlist(variants_evidence$commands)),"</code>")),
+  format="html",escape=FALSE)
+knitr::kable(tibble::tibble(
+  review=purrr::map_chr(variants_evidence$reviews,"name"),
+  command=purrr::map_chr(variants_evidence$reviews,"command"),
+  result=purrr::map_chr(variants_evidence$reviews,"result"),
+  finding=purrr::map_chr(variants_evidence$reviews,"finding"),
+  resolution=purrr::map_chr(variants_evidence$reviews,"resolution"),
+  input_hashes=purrr::map_chr(variants_evidence$reviews,"input_hashes")))
+```
+
+## #553接口集成与验收
+
+本次集成同步串场实验台到分类→过滤→prepare→rank→构组→购买链路，购买返回portfolio来源、冻结plan、summary及purchases账本。上方专项测试、全仓失败和历史审阅描述属于各自保存版本的证据，不表示此次集成已通过；历史冻结输入及归档源码身份不改写。具体集成检查、审阅输入哈希、发现和修复、PI状态以上方机器可读收据为准。完整runner与专项检查分别报告，未通过检查不标为通过。
+
+
+新增消费接口的自动测试映射：
+
+|当前接口或内部阶段|对应外部自动测试|
+|---|---|
+|共享 evaluation 校验：来源、掩码、物理票、funded/purchases对账、期号/时点、概率及原始SP估值|test-parlay-fixed-depth-curve.R、test-parlay-risk.R|
+|parlay_explore_portfolios、parlay_compare_risk、parlay_fixed_depth_curve|同名package测试及542/544独立repository测试|
+|RecentBacktestSummary、RecentSummaryExposure|tests/testthat/test-recent-backtest-summary.R|
+|RecentSpReplay显式原始文件、来源时间及字节身份|tests/testthat/test-recent-sp-replay.R|
+|独立构组/资金/时点/真实QMD块与测试辅助函数|540/541/542/544、budget-sweep-independent、role-strategy-independent|
+
+复盘：完整runner启动后须保持被测源码和测试文件稳定。此次有一轮运行期间补了review回归测试，旧进程已加载的实现与新测试不属同一版本，因此主动终止并另启稳定版本验证；该中间日志不作为最终验收证据。原始HTML与旧源码归档保留原始空白、编码及字节哈希，不为格式检查改写。

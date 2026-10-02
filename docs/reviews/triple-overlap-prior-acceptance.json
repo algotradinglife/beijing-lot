@@ -1,0 +1,65 @@
+{
+  "scope": "Fixed confirmed policy on Sep26/Sep28/Sep30 frozen probability universes, retrospective diagnostic only",
+  "hashes": {
+    "r/ranked_outcome_replay.R": "d357df86a9700715e66cde88eed849355b154110844d2e83428a0851303b99ce",
+    "tests/testthat/test-ranked-outcome-replay.R": "ccd203d3db4249e67d6aa2a2389e7db0bd7a4a080764644b558337323549d3b8",
+    "quarto/classify_outcomes_contract.qmd": "8b00ad30e86f4d8308a835821e921ec32e7716624a13fbe9cda7efeb09452a41",
+    "scripts/replay_recent_ranked_outcomes.R": "366fac3d381e8ea63d81e60a66c7445743850b41010a7e63098f2a0475e7e97a"
+  },
+  "commands": {
+    "tests": "R_LIBS=\"$PWD/r_lib\" Rscript -e 'testthat::test_file(\"tests/testthat/test-ranked-outcome-replay.R\")'",
+    "replay": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/replay_recent_ranked_outcomes.R",
+    "settlement_refresh": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/replay_recent_ranked_outcomes.R --settle-existing",
+    "review": "codex review bounded prompts; .run-control/ranked-replay-final-acceptance-review.log; staged entrypoint reviewed with exact hash",
+    "render": "R_LIBS=\"$PWD/r_lib\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache"
+  },
+  "checks": {
+    "tests": "PASS18 assertions,0failure/warning/skip",
+    "review": "PASS final bounded review after actual-protection, subset-receipt and original provenance/hash fixes",
+    "replay": "PASS all three epochs: 922/36/117 candidates, 3/1/3 admitted groups; pending/special stake zero; each purchase frozen before labels opened",
+    "render": "PASS fresh process --no-cache, writable TMPDIR/XDG_CACHE_HOME/DENO_DIR; 84 HTML tables,0 execution-error cells; all3 epochs, settlement/coverage/protection tables and both actual patterns inspected",
+    "pi": "ACCEPTED final reviewed hashes verified; all3 immutable purchase/input identities validated in refresh and QMD; returns and actual purchased protection tables inspected",
+    "settlement_refresh": "PASS --settle-existing preserves original decision and input hashes, archived original sources, unchanged package hashes and builder AST; actual purchased ticket-leg protection recalculated",
+    "independent": "Sep26 admitted group_slot254 covers every actual outcome in its legal mask but winning ticket ranks177/432, outside purchased128; authoritative group-space enumeration/ranking reused"
+  },
+  "review_history": [
+    "Actual purchased ticket legs, not allowed masks, determine draw protection; partial-funding regression added.",
+    "Subset receipts appended consecutively.",
+    "Settlement refresh preserves original generation hashes and inert source-byte archive; unchanged package implementation and original builder AST verified.",
+    "Refresh compares original frozen purchase/input byte hashes before diagnosis; mutations rejected."
+  ],
+  "limitations": "Three frozen historical epochs, differing universes and spend, no equal-budget performance claim or tuned production defaults. Sep26 prematch SP unavailable before cutoff, estimated EV NA. Actual settlement only after decision freeze. No historical fits/calibrations. No full-repository or CI claim. Large Sep26 candidate set is computationally expensive. Local persistent-data layout contract files referenced by storage skill absent; outputs use explicit existing repository inputs paths, no storage migration performed.",
+  "results": [
+    {
+      "epoch": "2026-09-26",
+      "groups": 3,
+      "stake_cny": 768,
+      "won_groups": 0,
+      "payout_cny": 0,
+      "net_cny": -768,
+      "eligible_complementary": 34,
+      "complementary_bought": 1
+    },
+    {
+      "epoch": "2026-09-28",
+      "groups": 1,
+      "stake_cny": 256,
+      "won_groups": 0,
+      "payout_cny": 0,
+      "net_cny": -256,
+      "eligible_complementary": 6,
+      "complementary_bought": 0
+    },
+    {
+      "epoch": "2026-09-30",
+      "groups": 3,
+      "stake_cny": 768,
+      "won_groups": 1,
+      "payout_cny": 3335.80964405,
+      "net_cny": 2567.80964405,
+      "eligible_complementary": 10,
+      "complementary_bought": 7
+    }
+  ],
+  "artifact_sha256": "95c1bc9eb96956448e960c2484bd086451c149c9b1a4e76920d801401c54e1f9"
+}

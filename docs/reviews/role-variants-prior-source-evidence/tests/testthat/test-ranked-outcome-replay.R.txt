@@ -1,0 +1,65 @@
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+source(file.path(root,"r/ranked_outcome_replay.R"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+
+test_that("replay separates frozen selection from settlement and keeps missing labels pending", {
+  settings<-beidan::parlay_settings();settings$n_legs<-2L
+  probabilities<-tibble::tibble(fixture_id=rep(c("T:1","T:2","T:3"),each=3),
+    outcome=rep(c("W","D","L"),3),probability=c(.45,.22,.33,.6,.15,.25,.55,.15,.30))
+  cutoff<-list(issue_id="T",cutoff_utc=as.POSIXct("2026-09-25",tz="UTC"))
+  replay<-ReplayRankedOutcomes(probabilities,cutoff,settings,c(2L,2L),
+    beidan::match_typed_empty("prematch_sp"),NULL,
+    list(max_reuse=2L),list(max_overlap=2L))
+  before<-rlang::hash(replay)
+  labels<-tibble::tibble(issue_id="T",fixture_id=c("T:1","T:2","T:3"),
+    outcome="W",settled_sp=2,label_available_at=as.POSIXct("2026-09-26",tz="UTC"),
+    status="settled",source_url="https://example.test/settlement")
+  report<-DiagnoseRankedReplay(replay,labels,as.POSIXct("2026-09-27",tz="UTC"))
+  expect_identical(rlang::hash(replay),before)
+  expect_equal(sum(report$returns$ticket_returns$payout_cny),
+    2*.65*4*sum(report$returns$ticket_returns$status=="WON"))
+  expect_true(report$protection$draw_protected)
+  expect_equal(report$protection$purchased_groups,2L)
+  expect_true(report$protection$complementary_bought)
+  expect_equal(report$protection$purchased_directions,2L)
+  labels$outcome<-"D"
+  changed<-DiagnoseRankedReplay(replay,labels,as.POSIXct("2026-09-27",tz="UTC"))
+  expect_identical(rlang::hash(replay),before)
+  expect_gt(nrow(changed$misses),0L)
+  pending<-DiagnoseRankedReplay(replay,labels,as.POSIXct("2026-09-25",tz="UTC"))
+  expect_true(all(pending$returns$ticket_returns$status=="PENDING"))
+  expect_error(ReplayRankedOutcomes(probabilities,NULL,settings,c(2L,2L),
+    beidan::match_typed_empty("prematch_sp"),NULL,list(max_reuse=2L),
+    list(max_overlap=2L)),"cutoff")
+})
+
+
+test_that("nominal complementary masks cannot masquerade as actual ticket protection", {
+  settings<-beidan::parlay_settings();settings$n_legs<-2L
+  p<-tibble::tibble(fixture_id=rep(c("T:1","T:2","T:3"),each=3),
+    outcome=rep(c("W","D","L"),3),probability=c(.45,.22,.33,.6,.15,.25,.55,.15,.30))
+  cutoff<-list(issue_id="T",cutoff_utc=as.POSIXct("2026-09-25",tz="UTC"))
+  replay<-ReplayRankedOutcomes(p,cutoff,settings,c(2L,2L),
+    beidan::match_typed_empty("prematch_sp"),2,
+    list(max_reuse=NULL),list(max_overlap=NULL))
+  labels<-beidan::match_typed_empty("settlements")
+  report<-DiagnoseRankedReplay(replay,labels,as.POSIXct("2026-09-27",tz="UTC"))
+  expect_equal(report$protection$admitted_directions,0L)
+  expect_false(report$protection$draw_protected)
+  expect_false(report$protection$complementary_bought)
+  expect_equal(report$protection$purchased_directions,0L)
+})
+
+test_that("settlement refresh rejects changed original purchase or source bytes", {
+  directory<-withr::local_tempdir()
+  decision<-file.path(directory,"decision.rds");input<-file.path(directory,"input.rds")
+  saveRDS(list(purchases="original"),decision);saveRDS(list(probability=.4),input)
+  receipt<-list(decision_hash=digest::digest(decision,file=TRUE,algo="sha256"),
+    input_sha256=digest::digest(input,file=TRUE,algo="sha256"))
+  expect_true(VerifyRankedReplayReceipt(decision,input,receipt))
+  expect_error(VerifyRankedReplayReceipt(decision,input,NULL),"Missing original")
+  saveRDS(list(purchases="altered"),decision)
+  expect_error(VerifyRankedReplayReceipt(decision,input,receipt),"hash mismatch")
+  saveRDS(list(purchases="original"),decision);saveRDS(list(probability=.5),input)
+  expect_error(VerifyRankedReplayReceipt(decision,input,receipt),"hash mismatch")
+})

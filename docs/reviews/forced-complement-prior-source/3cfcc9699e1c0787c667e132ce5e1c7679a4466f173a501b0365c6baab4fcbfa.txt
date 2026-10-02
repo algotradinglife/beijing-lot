@@ -1,0 +1,115 @@
+#' Compare compressed structures on frozen, originally purchased fixture groups
+#'
+#' @param replay Frozen ReplayRankedOutcomes output with a validated constructor
+#'   pool, embedded cutoff and immutable original purchase/leg receipts. Its
+#'   original evaluation must have improvement disabled and seven legs per group.
+#' @param pattern String "3322222" or "3332221". The former demotes the triple
+#'   with greatest Top1+Top2 mass; the latter makes the double with greatest Top1
+#'   probability a single. Probability ties use W/D/L; fixture ties use fixture_id.
+#' @param implementation_hashes Explicit, non-empty named character SHA256 source
+#'   inventory; supplied by the caller, bound to the returned research receipt.
+#' @return List(selections, pool, evaluation, group_metrics, receipt). The pool is
+#'   an explicit fixed-template counterfactual, not a public constructor output.
+#'   group_metrics is a tibble, one row per original purchased group: structure
+#'   mass, legal space, actually owned coverage, conditional coverage and CNY cost.
+#'   Empty original purchases return typed empty tables. Fewer triples are kept
+#'   and the actual pattern is reported; no unavailable triple is invented.
+#' @details No labels, fitting, clock, I/O or mutation. Every original seven-fixture
+#'   group is transformed separately; original unmodified masks are preserved.
+#'   Funding, ranking, overlap, physical-ticket deduplication, exact probability
+#'   union and plan freezing reuse the package implementations. Each group has
+#'   CNY256 maximum, CNY2 tickets, unlimited total budget, fixture reuse4, pairwise
+#'   overlap3 excluding shared role3 on both sides. Improvement remains disabled.
+#'   Probabilities are never renormalized. Missing SP keeps expected return NA.
+#'   Missing/altered cutoff, base receipts, invalid pattern/hash inventory, changed
+#'   original group admission or an incompatible source template fails closed.
+EvaluateCompressedTemplates <- function(replay, pattern, implementation_hashes) {
+  checkmate::assert_choice(pattern, c("3322222", "3332221"))
+  checkmate::assert_character(implementation_hashes, min.len=1L, any.missing=FALSE,
+    pattern="^[0-9a-f]{64}$")
+  checkmate::assert_character(names(implementation_hashes),
+    len=length(implementation_hashes), any.missing=FALSE, min.chars=1L, unique=TRUE)
+  if (!is.list(replay) || is.null(replay$pool) || is.null(replay$evaluation))
+    stop("Missing frozen replay pool/evaluation")
+  pool <- beidan:::.parlay_ranked_validate_pool(replay$pool)
+  original <- replay$evaluation
+  if (!identical(original$cutoff,pool$cutoff) ||
+      !identical(original$receipt$portfolio_hash,rlang::hash(replay$pool)) ||
+      !identical(original$receipt$final_purchase_hash,rlang::hash(original$purchases)) ||
+      !identical(original$receipt$final_role_legs_hash,rlang::hash(original$final$role_legs)))
+    stop("Original cutoff/pool/purchase/leg receipt mismatch")
+  if (!identical(original$receipt$improve,FALSE) || pool$n_legs!=7L ||
+      pool$settings$unit_cny!=2 || pool$settings$payout_factor!=.65)
+    stop("Fixed templates require seven legs, CNY2, payout .65, improve FALSE")
+  admitted <- dplyr::filter(original$group_selection,admitted)
+  if (anyDuplicated(admitted$group_id) || anyDuplicated(admitted$group_slot) ||
+      !setequal(admitted$group_id,unique(original$purchases$group_id)))
+    stop("Original admission does not match frozen purchases")
+  legs <- dplyr::semi_join(original$final$role_legs,admitted,
+    by=c("group_id","group_slot"))
+  wide <- beidan:::parlay_probability_wide(pool$probabilities)
+  transformed <- lapply(admitted$group_id,function(id) {
+    block <- dplyr::filter(legs,group_id==id)
+    if (nrow(block)!=7L || anyDuplicated(block$fixture_id) ||
+        any(!block$role %in% c(2L,3L)) || sum(block$role==3L)>3L)
+      stop("Original template requires seven distinct fixtures, roles2/3, at most3 triples")
+    probabilities <- as.matrix(wide[match(block$fixture_id,wide$fixture_id),c("W","D","L")])
+    ordering <- lapply(seq_len(7L),function(i)
+      colnames(probabilities)[order(-probabilities[i,],seq_len(3L))])
+    if (pattern=="3322222" && sum(block$role==3L)>2L) {
+      indices <- which(block$role==3L)
+      mass <- vapply(indices,function(i) sum(probabilities[i,ordering[[i]][1:2]]),0)
+      chosen <- indices[order(-mass,block$fixture_id[indices])[1L]]
+      block$role[chosen] <- 2L
+      block$allowed_outcomes[[chosen]] <- ordering[[chosen]][1:2]
+    } else if (pattern=="3332221") {
+      indices <- which(block$role==2L)
+      mass <- vapply(indices,function(i) probabilities[i,ordering[[i]][1L]],0)
+      chosen <- indices[order(-mass,block$fixture_id[indices])[1L]]
+      block$role[chosen] <- 1L
+      block$allowed_outcomes[[chosen]] <- ordering[[chosen]][1L]
+    }
+    block$retained_probability <- vapply(seq_len(7L),function(i)
+      sum(probabilities[i,block$allowed_outcomes[[i]]]),0)
+    block <- dplyr::arrange(block,dplyr::desc(role),round)
+    block$round <- seq_len(7L)
+    return(block)
+  })
+  transformed <- if(length(transformed)) dplyr::bind_rows(transformed) else legs
+  target <- as.integer(strsplit(pattern,"",fixed=TRUE)[[1L]])
+  patterns <- dplyr::select(admitted,group_slot,group_id) |>
+    dplyr::mutate(target_pattern=rep(list(target),dplyr::n()),
+      actual_pattern=lapply(group_id,function(id)
+        as.integer(transformed$role[transformed$group_id==id])))
+  research <- list(legs=transformed,group_patterns=patterns,
+    probabilities=pool$probabilities,prematch_sp=pool$prematch_sp,
+    cutoff=pool$cutoff,cutoff_hash=pool$cutoff_hash,settings=pool$settings,n_legs=7L)
+  reuse <- list(max_reuse=4L); overlap <- list(max_overlap=3L)
+  fund <- beidan:::.parlay_ranked_fund(research,256,NULL,reuse,overlap)
+  summary <- beidan:::.parlay_ranked_summary(fund,research,NULL,256)
+  plan <- beidan:::.parlay_ranked_freeze(research,fund,fund$purchases,NULL,reuse,overlap)
+  structure <- transformed |> dplyr::group_by(group_slot,group_id) |>
+    dplyr::summarise(structure_mass=prod(retained_probability),.groups="drop")
+  metrics <- summary$group_selection |>
+    dplyr::select(group_slot,group_id,target_pattern,actual_pattern,legal_space,
+      admitted,owned_coverage=actual_coverage,stake_cny=spent_cny) |>
+    dplyr::left_join(structure,by=c("group_slot","group_id"),relationship="one-to-one") |>
+    dplyr::mutate(conditional_coverage=dplyr::if_else(structure_mass>0,
+      owned_coverage/structure_mass,NA_real_))
+  receipt <- list(research_mode="fixed_fixture_template_compression",
+    cutoff=pool$cutoff,cutoff_hash=pool$cutoff_hash,
+    original_pool_hash=rlang::hash(replay$pool),
+    original_purchase_hash=rlang::hash(original$purchases),
+    original_admission_hash=rlang::hash(admitted),
+    transformed_legs_hash=rlang::hash(transformed),
+    final_purchase_hash=rlang::hash(fund$purchases),
+    probability_hash=rlang::hash(pool$probabilities),prematch_sp_hash=rlang::hash(pool$prematch_sp),
+    implementation_hashes=implementation_hashes,core_code_hash=beidan:::.parlay_ranked_code_hash(),
+    parameters=list(pattern=pattern,group_budget_cny=256,budget_cny=NULL,max_reuse=4L,
+      max_overlap=3L,overlap_role3_exemption=TRUE,improve=FALSE))
+  evaluation <- list(cutoff=pool$cutoff,summary=summary$summary,
+    group_selection=summary$group_selection,purchases=fund$purchases,plan=plan,
+    final=list(role_legs=transformed),rejections=fund$rejections,receipt=receipt)
+  return(list(selections=replay$selections,pool=research,evaluation=evaluation,
+    group_metrics=metrics,receipt=receipt))
+}

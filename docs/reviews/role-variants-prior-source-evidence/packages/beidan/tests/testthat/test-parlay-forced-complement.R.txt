@@ -1,0 +1,252 @@
+# Package tests for the forced-complement research internals. The fixtures are
+# deliberately minimal: a three-row W/D/L probability table, a role-2 leg block and
+# a ticket/purchase ledger. They exercise the helpers directly; the seven-leg
+# end-to-end integration stays with the root replay client and is not duplicated
+# here.
+
+forced_cutoff <- function(issue_id = "T") {
+  list(issue_id = issue_id,
+       cutoff_utc = as.POSIXct("2026-09-25 00:00:00", tz = "UTC"))
+}
+
+# One fixture's authoritative W/D/L long table; probabilities sum to one.
+forced_probabilities <- function(fixture_id, win, draw, lose) {
+  tibble::tibble(
+    fixture_id = fixture_id,
+    outcome = c("W", "D", "L"),
+    probability = c(win, draw, lose))
+}
+
+# A minimal pool: cutoff plus the normalized fields the helpers read. `legs` is one
+# row per (group, fixture) with the actual role and the retained mask.
+forced_pool <- function(fixture_id, win, draw, lose,
+                        legs = tibble::tibble(group_id = character(0),
+                                              fixture_id = character(0),
+                                              role = integer(0),
+                                              allowed_outcomes = list())) {
+  list(cutoff = forced_cutoff(),
+       probabilities = forced_probabilities(fixture_id, win, draw, lose),
+       legs = legs)
+}
+
+forced_leg <- function(group_id, fixture_id, mask, role = 2L) {
+  tibble::tibble(group_id = group_id, fixture_id = fixture_id,
+                 role = as.integer(role), allowed_outcomes = list(mask))
+}
+
+test_that("the authoritative classifier returns the two ordered doubles", {
+  # The raw-rank rule this helper applies must agree with the shipped classifier for
+  # both live directions: top-two first, then the complementary [1, 3] protection.
+  expect_identical(classify_outcomes(0.45, 0.22, 0.33),
+                   list(c("win", "lose"), c("win", "draw")))
+  expect_identical(classify_outcomes(0.316, 0.235, 0.449),
+                   list(c("lose", "win"), c("lose", "draw")))
+})
+
+test_that("obligations name the two raw-rank masks for a W-top1 fixture", {
+  pool <- forced_pool("A", 0.45, 0.22, 0.33,
+                      forced_leg("G1", "A", c("W", "L")))
+  out <- .parlay_forced_complement_obligations(pool)
+  expect_s3_class(out, "tbl_df")
+  expect_identical(names(out),
+                   c("fixture_id", "top1", "top2", "draw_probability",
+                     "main_mask", "protect_mask"))
+  expect_identical(nrow(out), 1L)
+  expect_identical(out$fixture_id, "A")
+  expect_identical(out$top1, "W")
+  expect_identical(out$top2, "L")
+  expect_identical(out$draw_probability, 0.22)
+  expect_identical(out$main_mask[[1]], c("W", "L"))
+  expect_identical(out$protect_mask[[1]], c("W", "D"))
+  # The raw masks reproduce the classifier's own two entries.
+  expect_identical(list(out$main_mask[[1]], out$protect_mask[[1]]),
+                   lapply(classify_outcomes(0.45, 0.22, 0.33),
+                          function(x) unname(c(win = "W", draw = "D", lose = "L")[x])))
+})
+
+test_that("obligations name the two raw-rank masks for an L-top1 fixture", {
+  pool <- forced_pool("A", 0.316, 0.235, 0.449,
+                      forced_leg("G1", "A", c("L", "W")))
+  out <- .parlay_forced_complement_obligations(pool)
+  expect_identical(nrow(out), 1L)
+  expect_identical(out$top1, "L")
+  expect_identical(out$top2, "W")
+  expect_identical(out$draw_probability, 0.235)
+  expect_identical(out$main_mask[[1]], c("L", "W"))
+  expect_identical(out$protect_mask[[1]], c("L", "D"))
+})
+
+test_that("the 0.20 draw boundary is strict", {
+  # pD == 0.20 exactly does not owe a complement; 0.21 does.
+  at <- forced_pool("A", 0.45, 0.20, 0.35, forced_leg("G1", "A", c("W", "L")))
+  expect_identical(nrow(.parlay_forced_complement_obligations(at)), 0L)
+  above <- forced_pool("A", 0.44, 0.21, 0.35, forced_leg("G1", "A", c("W", "L")))
+  expect_identical(nrow(.parlay_forced_complement_obligations(above)), 1L)
+})
+
+test_that("a fixture whose raw rank 3 is not the draw never owes a complement", {
+  # draw is rank 2 here, so there is no [1, 3] protection double.
+  pool <- forced_pool("A", 0.50, 0.30, 0.20, forced_leg("G1", "A", c("W", "D")))
+  expect_identical(nrow(.parlay_forced_complement_obligations(pool)), 0L)
+})
+
+test_that("fixtures without an actual role-2 leg never owe a complement", {
+  empty <- forced_pool("A", 0.45, 0.22, 0.33)
+  out <- .parlay_forced_complement_obligations(empty)
+  expect_identical(nrow(out), 0L)
+  expect_identical(names(out),
+                   c("fixture_id", "top1", "top2", "draw_probability",
+                     "main_mask", "protect_mask"))
+  expect_type(out$fixture_id, "character")
+  expect_type(out$draw_probability, "double")
+  expect_type(out$main_mask, "list")
+  # Role 3 alone does not owe, and neither does role 1 alone.
+  role3 <- forced_pool("A", 0.45, 0.22, 0.33,
+                       forced_leg("G1", "A", c("W", "D", "L"), role = 3L))
+  expect_identical(nrow(.parlay_forced_complement_obligations(role3)), 0L)
+  role1 <- forced_pool("A", 0.45, 0.22, 0.33,
+                       forced_leg("G1", "A", "W", role = 1L))
+  expect_identical(nrow(.parlay_forced_complement_obligations(role1)), 0L)
+})
+
+test_that("a demoted role-2 leg owes even when the classifier returns a triple", {
+  # max - min = 0.092 <= 0.10, so the classifier returns only the whole triple; the
+  # raw rank still puts D last with pD = 0.272 > 0.20, so the obligation stands.
+  expect_identical(classify_outcomes(0.364, 0.272, 0.364),
+                   list(c("win", "draw", "lose")))
+  pool <- forced_pool("A", 0.364, 0.272, 0.364,
+                      forced_leg("G1", "A", c("W", "L")))
+  out <- .parlay_forced_complement_obligations(pool)
+  expect_identical(nrow(out), 1L)
+  expect_identical(out$main_mask[[1]], c("W", "L"))
+  expect_identical(out$protect_mask[[1]], c("W", "D"))
+})
+
+test_that("raw-rank ties break in canonical W/D/L order", {
+  # W and L tie at the top: top1 is W, top2 is L, and D is still rank 3.
+  pool <- forced_pool("A", 0.38, 0.24, 0.38, forced_leg("G1", "A", c("W", "L")))
+  out <- .parlay_forced_complement_obligations(pool)
+  expect_identical(out$top1, "W")
+  expect_identical(out$top2, "L")
+  expect_identical(out$main_mask[[1]], c("W", "L"))
+})
+
+test_that("a missing cutoff fails closed", {
+  pool <- forced_pool("A", 0.45, 0.22, 0.33, forced_leg("G1", "A", c("W", "L")))
+  pool$cutoff <- NULL
+  expect_error(.parlay_forced_complement_obligations(pool), "cutoff")
+  pool$cutoff <- list(issue_id = "T",
+                      cutoff_utc = as.POSIXct("2026-09-25", tz = "Asia/Shanghai"))
+  expect_error(.parlay_forced_complement_obligations(pool), "UTC|POSIXct")
+})
+
+test_that("an owned group's own tickets can discharge both directions", {
+  pool <- forced_pool("A", 0.45, 0.22, 0.33,
+                      dplyr::bind_rows(forced_leg("G1", "A", c("W", "L")),
+                                       forced_leg("G2", "A", c("W", "D"))))
+  purchases <- tibble::tibble(group_id = c("G1", "G1", "G2", "G2"),
+                              ticket_id = c("t1", "t1b", "t2", "t2b"))
+  ticket_legs <- tibble::tibble(
+    ticket_id = c("t1", "t1b", "t2", "t2b"),
+    fixture_id = "A",
+    outcome = c("W", "L", "W", "D"),
+    leg_order = c(1L, 2L, 1L, 2L))
+  out <- .parlay_forced_complement_audit(pool, purchases, ticket_legs)
+  expect_identical(nrow(out), 1L)
+  expect_identical(names(out),
+                   c("fixture_id", "main_groups", "protect_groups", "satisfied"))
+  expect_identical(out$main_groups[[1]], "G1")
+  expect_identical(out$protect_groups[[1]], "G2")
+  expect_true(out$satisfied)
+})
+
+test_that("one outcome is insufficient and a missing bought outcome is false", {
+  pool <- forced_pool("A", 0.45, 0.22, 0.33,
+                      dplyr::bind_rows(forced_leg("G1", "A", c("W", "L")),
+                                       forced_leg("G2", "A", c("W", "D"))))
+  purchases <- tibble::tibble(group_id = c("G1", "G1", "G2", "G2"),
+                              ticket_id = c("t1", "t1b", "t2", "t2b"))
+  # G2 owns only the W leg of its (W, D) mask: the group qualifies as the protect
+  # owner only if its OWN tickets cover BOTH outcomes, so nothing is satisfied.
+  partial <- tibble::tibble(ticket_id = c("t1", "t1b", "t2"),
+                            fixture_id = "A", outcome = c("W", "L", "W"),
+                            leg_order = c(1L, 2L, 1L))
+  out <- .parlay_forced_complement_audit(pool, purchases, partial)
+  expect_identical(out$main_groups[[1]], "G1")
+  expect_identical(out$protect_groups[[1]], character(0))
+  expect_false(out$satisfied)
+})
+
+test_that("a group may not borrow another owner's tickets or role-3 legs", {
+  pool <- forced_pool("A", 0.45, 0.22, 0.33,
+                      dplyr::bind_rows(forced_leg("G1", "A", c("W", "L")),
+                                       forced_leg("G2", "A", c("W", "D"))))
+  # Only G1 owns a purchase. G2's (W, D) leg exists in the pool but G2 bought
+  # nothing, so its mask may not be discharged from G1's tickets.
+  purchases <- tibble::tibble(group_id = c("G1","G1"), ticket_id = c("t1","t1b"))
+  ticket_legs <- tibble::tibble(
+    ticket_id = c("t1", "t1b"), fixture_id = "A", outcome = c("W", "L"),
+    leg_order = c(1L, 2L))
+  out <- .parlay_forced_complement_audit(pool, purchases, ticket_legs)
+  expect_identical(out$main_groups[[1]], "G1")
+  expect_identical(out$protect_groups[[1]], character(0))
+  expect_false(out$satisfied)
+
+  # A role-3 leg carries the whole triple, never a two-outcome complement.
+  role3 <- forced_pool("A", 0.45, 0.22, 0.33,
+                       dplyr::bind_rows(forced_leg("G1", "A", c("W", "L")),
+                                        forced_leg("G2", "A", c("W", "D", "L"),
+                                                   role = 3L)))
+  out3 <- .parlay_forced_complement_audit(
+    role3, purchases,
+    tibble::tibble(ticket_id = c("t1", "t1b"), fixture_id = "A",
+                   outcome = c("W", "L"), leg_order = c(1L, 2L)))
+  expect_identical(out3$protect_groups[[1]], character(0))
+  expect_false(out3$satisfied)
+})
+
+test_that("the audit returns the typed-empty shape when nothing is owed", {
+  pool <- forced_pool("A", 0.50, 0.30, 0.20)
+  out <- .parlay_forced_complement_audit(
+    pool, tibble::tibble(group_id = character(0), ticket_id = character(0)),
+    tibble::tibble(ticket_id = character(0), fixture_id = character(0),
+                   outcome = character(0), leg_order = integer(0)))
+  expect_identical(nrow(out), 0L)
+  expect_identical(names(out),
+                   c("fixture_id", "main_groups", "protect_groups", "satisfied"))
+  expect_type(out$fixture_id, "character")
+  expect_type(out$main_groups, "list")
+  expect_type(out$satisfied, "logical")
+})
+
+test_that("the audit fails closed on a missing cutoff and malformed ledgers", {
+  pool <- forced_pool("A", 0.45, 0.22, 0.33, forced_leg("G1", "A", c("W", "L")))
+  purchases <- tibble::tibble(group_id = c("G1","G1"), ticket_id = c("t1","t1b"))
+  ticket_legs <- tibble::tibble(ticket_id = c("t1", "t1b"), fixture_id = "A",
+                                outcome = c("W", "L"), leg_order = c(1L, 2L))
+  expect_error(.parlay_forced_complement_audit(pool, purchases, ticket_legs),
+               NA)
+  pool$cutoff <- NULL
+  expect_error(.parlay_forced_complement_audit(pool, purchases, ticket_legs),
+               "cutoff")
+  good <- forced_pool("A", 0.45, 0.22, 0.33, forced_leg("G1", "A", c("W", "L")))
+  expect_error(.parlay_forced_complement_audit(
+    good, tibble::tibble(group_id = "G1"), ticket_legs), "ticket_id")
+  expect_error(.parlay_forced_complement_audit(
+    good, purchases, tibble::tibble(ticket_id = "t1")), "fixture_id")
+})
+
+
+test_that("unbought candidates do not create obligations and raw near ties stay exact",{
+  pool <- forced_pool("A",.34999999999,.30,.35000000001,
+    forced_leg("G1","A",c("L","W")))
+  expect_identical(.parlay_forced_complement_obligations(pool)$top1,"L")
+  out <- .parlay_forced_complement_audit(pool,
+    tibble::tibble(group_id=character(),ticket_id=character()),
+    tibble::tibble(ticket_id=character(),fixture_id=character(),outcome=character()))
+  expect_equal(nrow(out),0L)
+  purchases<-tibble::tibble(group_id=c("G1","G2"),ticket_id=c("same","same"))
+  legs<-tibble::tibble(ticket_id="same",fixture_id="A",outcome="L")
+  expect_error(.parlay_forced_complement_audit(pool,purchases,legs),"physical owner")
+  expect_error(.parlay_forced_complement_audit(pool,purchases[1,],dplyr::bind_rows(legs,legs)),"duplicate ticket fixture")
+})

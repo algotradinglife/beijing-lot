@@ -1,0 +1,12 @@
+{
+  "command": "R_LIBS=project/r_lib TMPDIR=worktree/.run-control/tmp XDG_CACHE_HOME=worktree/.run-control/cache DENO_DIR=worktree/.run-control/deno quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache",
+  "log": ".run-control/role-variants-render-v8.log",
+  "exit_code": 0,
+  "tables": 56,
+  "execution_errors": 0,
+  "html_sha256": "183e7b16a761b8af401e25174ddcc92eafaef510a50cc91826255c7dbe19ca69",
+  "qmd_sha256": "ce6cc05d1b935a1318e68f03e88ce857420cd60ca474b84289183b6a9aaf1345",
+  "source_hashes_verified": 26,
+  "change_since_artifact_review": "Acceptance metadata only; QMD code, implementation and declared input snapshots unchanged",
+  "generated_at": "2026-10-02T08:42:31.829490+00:00"
+}

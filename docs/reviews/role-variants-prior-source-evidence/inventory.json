@@ -1,0 +1,295 @@
+{
+  "scope": "Preserved source bytes for old forced-complement and3332222 frozen artifacts; evidence only, never executed as compatibility code",
+  "entries": [
+    {
+      "source": "r/forced_complement_replay.R",
+      "sha256": "e13964dff4f46865c58b36126503becdce9606c702041e13f4ff108c010d04f5",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/r/forced_complement_replay.R.txt"
+    },
+    {
+      "source": "r/ranked_outcome_replay.R",
+      "sha256": "2a25943569976f229ce78741a317ed19d5ef97282ecd3f299d3761d2b82d3267",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/r/ranked_outcome_replay.R.txt"
+    },
+    {
+      "source": "scripts/replay_forced_complement.R",
+      "sha256": "d9dc3c446365d9ef761a7928751d0f9f5890b41befff458180d8a5c2cfcf20a8",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/scripts/replay_forced_complement.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/beidan-package.R",
+      "sha256": "417faf50c5f14cd3ce19e34e19db81c1fbfd185ecc0ba23f40b9ebf77b24929c",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/beidan-package.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/classify_outcomes.R",
+      "sha256": "5f4103abcee0eff963e4b1a76d568187ddaee7364888a04c462c4e7dd09052ee",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/classify_outcomes.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/dixon_coles_grid.R",
+      "sha256": "66373c2f79bcaba9a0e51b734118ff320d97304ab4b6ae9493798eedfe75c106",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/dixon_coles_grid.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/fundamentals_market_comparison.R",
+      "sha256": "6e9880ff5df8571a9c56ba394f0a2a6c225b64be8b636b915486846caf9354ce",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/fundamentals_market_comparison.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/fundamentals_total_market.R",
+      "sha256": "37657e4f461573d3df4bfbe204d8986cfd94a9dcfaa74b40d290242f3835be4f",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/fundamentals_total_market.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/issue_prematch_sp.R",
+      "sha256": "592ece2af6fc279f25eb934dbe7821b365b348d545bbb6ca50780253e41f3621",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/issue_prematch_sp.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/issue_schedule.R",
+      "sha256": "7fb9e201cd77eece039009a98bb535dd07c46c371fee9d12a34bd897fee8e914",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/issue_schedule.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/issue_settlements.R",
+      "sha256": "7014e9715e6e033819f80ac2fadd4a18d12ea6a140f50fb30bfac715b59d5727",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/issue_settlements.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/market_schedule.R",
+      "sha256": "b433f3219c6bf33dcb582b4972423ae4ac9dd1947a23f744d578d53b0d761623",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/market_schedule.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/match_markets.R",
+      "sha256": "b2e416008231c25e844144f001622196569e242bd3e0cb05ee1768a55b7a0c62",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/match_markets.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_experiment_contract.R",
+      "sha256": "ac054e9987f9f45353696bedd903bb371b85a953f2fcb301ea145badeb4b6747",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_experiment_contract.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_candidates.R",
+      "sha256": "a187624c23a495d6bb62e187a4b9619912379b529b9cea58648078d57bc8a506",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_candidates.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_contracts.R",
+      "sha256": "01a96616aa417db18c47946fd02f556405f3b0747c9ac8a3270a8db2c79db734",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_contracts.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_epoch.R",
+      "sha256": "34c40e9362f8af589d664010ff2def3e89f5b151c09ff839c4db694d361a9494",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_epoch.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_fixture.R",
+      "sha256": "c2f11506041b235408fa7fc3d7299d4294def9db82c020b491cea330c4bfcf99",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_fixture.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_inputs.R",
+      "sha256": "f0eb9c1f7fcb8406925b8f25dae942ba3c4783483b223d1d139703f0be5496b7",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_inputs.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_match_status.R",
+      "sha256": "c2c328579a95e55203bf067273c8ceac4e226915ced358bea2715f42c17ed216",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_match_status.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_types.R",
+      "sha256": "f355ec0f2949c3ed88df13a555e456e60f959175ffda6ac6718723e3f09bdfec",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_types.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/n7_pipeline_value.R",
+      "sha256": "a86718dc0ad93d6142604457e337f9ae66af9c09408c6541ce0f527390a82e5c",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/n7_pipeline_value.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_betting_sheet.R",
+      "sha256": "5729fd755a05c9c0bee821632e102f5d277473d2c6039843ad4da63143b3eb81",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_betting_sheet.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_budget_allocation.R",
+      "sha256": "79c3a20eed920ac40b2d2be1da4ba0325ff7133119742eda6fba9efd91a32834",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_budget_allocation.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_exploration.R",
+      "sha256": "b3405cb633ac077c575319612a8dcfa22aeb512e0f1d9030c1e84b549c1ae93a",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_exploration.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_fixed_depth_curve.R",
+      "sha256": "b68cefb19bd2449ec9f741982c9aca5d0b2b00c8af7a6a0beb99d71593672fef",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_fixed_depth_curve.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_forced_complement.R",
+      "sha256": "d8281dcecf4dab75097f95657296694bbfcac16be9b23663818a83b8f2ab14e3",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_forced_complement.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_frontier.R",
+      "sha256": "b97b81ba122bbbd9771a4754fffd0de19962a579a913b5962a76f2deead186c4",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_frontier.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_loss_diagnostic.R",
+      "sha256": "d7aaabb9a5a5594b29aea9c7eb08492917c159ae39ab1b18864fceb62d823e20",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_loss_diagnostic.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_plan_summary.R",
+      "sha256": "e38c9f917616385a02141519f508edc94323d39bece123a16e51211a91858d14",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_plan_summary.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_ranked_group_construction.R",
+      "sha256": "33c37cede69fd07cf79ae624f7f50f5d337d9699df25c8abfd5bbdca52cb816d",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_ranked_group_construction.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_ranked_portfolio.R",
+      "sha256": "43077daad26d7136e44b24fc16d327863a11b2e0eeb202a72e52a7ec19bbd71f",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_ranked_portfolio.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_restructure_plan.R",
+      "sha256": "9c9f5b41a8c6f4bbeb30be159607f99c63fe800077cc08970b4193e28366eb36",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_restructure_plan.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_risk.R",
+      "sha256": "feaca8f5d629534e0ad269e93beb438a1d55ad220030d883e8ae2aa855cb36a5",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_risk.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_role_groups.R",
+      "sha256": "b87d9cf80a3143784efffc9b256969ba4a4c335a173b696da27f4b1c6e0bd94f",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_role_groups.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_role_portfolio.R",
+      "sha256": "a4cb740d496fe718071ca46bdb0cd69d0fda74f79de2927d65e75dd60123ed2c",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_role_portfolio.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_role_scores.R",
+      "sha256": "aa8672aaa18b390a5653ee9e022a77777374ec2e5585d2d67fb9967f302106f6",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_role_scores.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_role_shared.R",
+      "sha256": "b645b362dc8ade2273505f8034f93616cfc70accfaef577db258d0f06bed6c1a",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_role_shared.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/parlay_storage.R",
+      "sha256": "481e83d173e3dc3fda0a19a564673c9d6bcc30728771d5ce07c46bc65769051f",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/parlay_storage.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/prepare_outcome_selections.R",
+      "sha256": "4366d02d075e3e7a70bec898c6a96f2fa10c3e14683eda196de1749dcc7e8290",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/prepare_outcome_selections.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/python-backend.R",
+      "sha256": "820a0db0aea37c6d0dba4ab2ae45c5edc264cf5478761b3a80cf527991083662",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/python-backend.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/rank_outcome_selections.R",
+      "sha256": "1c3b419ea65be567dc1c5c7a1a5449fb1cb7fd5e30265f19f4a93ef0de2628df",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/rank_outcome_selections.R.txt"
+    },
+    {
+      "source": "packages/beidan/R/schedule_identity.R",
+      "sha256": "8918792d66f77527d7c19e2ef9eeed6a7ce9a7dccd905b9556de78467542bf6c",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/R/schedule_identity.R.txt"
+    },
+    {
+      "source": "scripts/forced_complement_worker.R",
+      "sha256": "1193a0d250dbf68f90ba6e6a41d87b6a4a787f5461d1726d13c081eff094cb8b",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/scripts/forced_complement_worker.R.txt"
+    },
+    {
+      "source": "scripts/settle_forced_complement.R",
+      "sha256": "0154784aa738a1d734cf37cb09b0d5ece95db1f8cead541f578fbd6de7f14235",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/scripts/settle_forced_complement.R.txt"
+    },
+    {
+      "source": "scripts/replay_3332222_comparison.R",
+      "sha256": "058f5204996e2af0e7e8ed519160bb960631377ef1ef02b4a8bd5029f10e385b",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/scripts/replay_3332222_comparison.R.txt"
+    },
+    {
+      "source": "packages/beidan/tests/testthat/test-parlay-forced-complement.R",
+      "sha256": "99cd283777d83fb3b293259397b2664144c34ab9a106ca67f1cda17ee007ccf1",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/tests/testthat/test-parlay-forced-complement.R.txt"
+    },
+    {
+      "source": "packages/beidan/tests/testthat/test-parlay-forced-funding.R",
+      "sha256": "3abea8871f7b3c2d1d931c194e234713fca22f13980c0cdb8fcb3f01664ea0e5",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/tests/testthat/test-parlay-forced-funding.R.txt"
+    },
+    {
+      "source": "packages/beidan/tests/testthat/test-parlay-ranked-portfolio.R",
+      "sha256": "6c320d9470560785bbbc9794065758c3d7dc0d42243ccf16390623db794ad069",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/tests/testthat/test-parlay-ranked-portfolio.R.txt"
+    },
+    {
+      "source": "packages/beidan/man/parlay_evaluate_portfolio.Rd",
+      "sha256": "96bea40d093156bea595008db4309b20b264c5ab60e8d95f939765b500b7841f",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/packages/beidan/man/parlay_evaluate_portfolio.Rd.txt"
+    },
+    {
+      "source": "tests/testthat/test-forced-complement-replay.R",
+      "sha256": "28da655172ab803190524ead7e0b0f1ac463c5921b97c661d951026cda0f2c79",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/tests/testthat/test-forced-complement-replay.R.txt"
+    },
+    {
+      "source": "tests/testthat/test-ranked-outcome-replay.R",
+      "sha256": "9ce43f6e9f653bc16080789de4662a13694196bcd09da9c3ecc1fcbda89ebf08",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/tests/testthat/test-ranked-outcome-replay.R.txt"
+    },
+    {
+      "source": "r/parlay_structure_compression.R",
+      "sha256": "f8a027a78f6ffe4622ab1ae50e772db66d78a9295a0a0a5e2683a859fc7e9cd2",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/r/parlay_structure_compression.R.txt"
+    },
+    {
+      "source": "tests/testthat/test-parlay-structure-compression.R",
+      "sha256": "46222c3d3cb6a99d7aa9814e7adb3bc1a34345eeb931e68812aeaca0962df987",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/tests/testthat/test-parlay-structure-compression.R.txt"
+    },
+    {
+      "source": "tests/testthat/test-classify-chain-qmd-path.R",
+      "sha256": "91b2195a966b823814964a9c2a83c9699f694b920134fbcc0dab9880cbcb378b",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/tests/testthat/test-classify-chain-qmd-path.R.txt"
+    },
+    {
+      "source": "docs/reviews/forced-complement-original-qmd.txt",
+      "sha256": "36033188eb3907ca37be984894bea2aefa8bb4db21785625e43c19a2d78425d6",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/docs/reviews/forced-complement-original-qmd.txt.txt"
+    },
+    {
+      "source": "tests/testthat/test-3332222-comparison.R",
+      "sha256": "0e4831ebbe0da586c4906dc40f423507ae23e34f0a784465362c301ecf216616",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/tests/testthat/test-3332222-comparison.R.txt"
+    },
+    {
+      "source": "docs/reviews/role-variants-prior-source-evidence/classify_outcomes_before_role_variants.qmd.txt",
+      "sha256": "273bb0127f55af217e4fc111c5a965d00adae765aa0ecd2feac23bb187b0c482",
+      "archive": "docs/reviews/role-variants-prior-source-evidence/classify_outcomes_before_role_variants.qmd.txt"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "scope": "Current clean-session execution-enabled renders, no cache/freeze; input and source bindings checked",
+  "documents": [
+    {
+      "document": "quarto/classify_outcomes_contract.qmd",
+      "html": "quarto/classify_outcomes_contract.html",
+      "html_sha256": "f4e00a8faeb54f2d44e4f5bf46c8efcf24b07c14a289aca453689a7ecb880312",
+      "tables": 57,
+      "cell_output_errors": 0,
+      "headings": [
+        "合成夹具：过滤→分类→排名",
+        "循环构组与购买：同预设模式、不同实际成本",
+        "增组时：允许方向与实际购买方向",
+        "真实冻结数据：新规则小链路",
+        "输入字节身份",
+        "前几次下注窗口：强制保护前的冻结对照",
+        "128注下的结构压缩：强制保护前的冻结对照",
+        "当前26101期：1–25小时窗口与停售核验",
+        "归档旧规则：强制互补购买的三种结构",
+        "计算耗时诊断",
+        "本轮验收记录",
+        "归档旧规则：3332222历史对照",
+        "#553开发验收状态",
+        "#553接口集成与验收"
+      ]
+    },
+    {
+      "document": "quarto/parlay_combination_lab.qmd",
+      "html": "quarto/parlay_combination_lab.html",
+      "html_sha256": "9c60b3a16308e2401219aeb78826e5a59a4ac662f956a1e1ea1d777d9d32949f",
+      "tables": 13,
+      "cell_output_errors": 0,
+      "headings": [
+        "Table of contents",
+        "1. 输入和参数",
+        "2. 角色排行榜和候选组",
+        "3. 批量比较单组投入",
+        "4. 联合赛果下的命中和回本",
+        "5. 固定成员后的覆盖深度",
+        "6. 展示候选前沿",
+        "7. 人工选择后再微调",
+        "8. 复现与解释边界",
+        "#553接口集成范围（待验证）"
+      ]
+    }
+  ],
+  "synthetic_summary": {
+    "groups": 3,
+    "physical_tickets": 384,
+    "spent_cny": 768,
+    "actual_union_probability": 0.3432106,
+    "model_ev_net_cny": 864.3462
+  },
+  "all_current_source_hashes_match": true,
+  "historical_artifacts": "Frozen old decisions remain old source identities; not regenerated",
+  "complete_repository_runner": "FAIL: stable package phase PASS; current remaining11 assertion failures/31error blocks in13 unchanged tests, full-test inventory recorded.",
+  "command_cells_equal_original_json": true,
+  "literal_command_count": 24
+}

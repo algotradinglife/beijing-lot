@@ -1,0 +1,123 @@
+# Explicit local snapshot replay; all reusable decision/diagnostic code lives in r/.
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+source(file.path(root,"r/ranked_outcome_replay.R"))
+manifest <- tibble::tribble(
+  ~epoch,~input,~settlement,
+  "2026-09-26", "inputs/26098_walkthrough/print/26098-20260926-195204.rds",
+  "inputs/selective_double/settlements/26098.rds",
+  "2026-09-28", "inputs/26098_walkthrough/three_plans_20260928/plans.rds",
+  "inputs/selective_double/settlements/26098.rds",
+  "2026-09-30", "inputs/26101_plans_20260930/half_hour/frozen_inputs.rds",
+  "inputs/26101_plans_20260930/half_hour/settlement-latest-check-20261001.rds")
+code_files <- c("r/ranked_outcome_replay.R","scripts/replay_recent_ranked_outcomes.R",
+  sort(list.files(file.path(root,"packages/beidan/R"),pattern="\\.R$",
+                  full.names=FALSE)) |> file.path("packages/beidan/R", x=_))
+code_hashes <- stats::setNames(vapply(file.path(root,code_files),
+  digest::digest,character(1),file=TRUE,algo="sha256"),code_files)
+output_dir <- file.path(root,"inputs/ranked_recent_replay")
+dir.create(output_dir,recursive=TRUE,showWarnings=FALSE)
+summaries <- list();protections<-list();group_returns<-list();receipts<-list()
+arguments <- commandArgs(trailingOnly=TRUE)
+settle_existing <- "--settle-existing" %in% arguments
+selected_epochs <- setdiff(arguments,"--settle-existing")
+indices <- if(length(selected_epochs)) which(manifest$epoch %in% selected_epochs) else c(2L,3L,1L) # Independent epochs: smaller snapshots first.
+stopifnot(length(indices)>0L)
+result_name <- if(length(selected_epochs))
+  paste0("results-",paste(selected_epochs,collapse="_"),".rds") else "results.rds"
+decision_code_hashes <- code_hashes
+decision_code_archives <- list()
+if (settle_existing) {
+  previous <- readRDS(file.path(output_dir,result_name))
+  decision_code_hashes <- if(is.null(previous$decision_code_hashes))
+    previous$code_hashes else previous$decision_code_hashes
+  inventory <- jsonlite::read_json(file.path(root,
+    "docs/reviews/ranked-replay-source-evidence/index.json"))
+  for (file in names(decision_code_hashes)) {
+    original_hash <- unname(decision_code_hashes[[file]])
+    if (!identical(original_hash,unname(code_hashes[[file]]))) {
+      archived <- inventory[[file]][[original_hash]]
+      if (is.null(archived)) stop("Original decision source unavailable: ",file)
+      stopifnot(identical(digest::digest(file.path(root,archived),file=TRUE,
+                                      algo="sha256"),original_hash))
+      decision_code_archives[[file]] <- archived
+    }
+  }
+  # Any package implementation change requires fresh decision construction.
+  package_files <- grep("^packages/beidan/R/",names(code_hashes),value=TRUE)
+  stopifnot(identical(code_hashes[package_files],decision_code_hashes[package_files]))
+  original_client <- decision_code_archives[["r/ranked_outcome_replay.R"]]
+  if (!is.null(original_client)) {
+    expressions <- parse(file=file.path(root,original_client),keep.source=FALSE)
+    original <- expressions[[which(vapply(expressions, function(x)
+      is.call(x) && identical(x[[1L]],as.name("<-")) &&
+        identical(x[[2L]],as.name("ReplayRankedOutcomes")),logical(1)))]]
+    stopifnot(identical(deparse(original[[3L]][[2L]]),deparse(formals(ReplayRankedOutcomes))),
+              identical(deparse(original[[3L]][[3L]]),deparse(body(ReplayRankedOutcomes))))
+  }
+}
+for(i in indices) {
+  row<-manifest[i,]; cat("START",row$epoch,"\n");flush.console()
+  frozen<-readRDS(file.path(root,row$input))
+  if(i==1L) {
+    probabilities<-frozen$result$probabilities;cutoff<-frozen$result$cutoff
+    sp<-beidan::match_typed_empty("prematch_sp")
+  } else {
+    probabilities<-frozen$projected$probabilities;cutoff<-frozen$projected$cutoff
+    sp<-frozen$projected$prematch_sp
+  }
+  settings<-beidan::parlay_settings();settings$n_legs<-7L
+  settings$unit_cny<-2;settings$payout_factor<-.65
+  decision_path<-file.path(output_dir,paste0(row$epoch,"-decision.rds"))
+  if (settle_existing) {
+    # Only diagnosis is refreshed: never rerank or modify the frozen purchase.
+    originals <- Filter(function(record) !is.null(record) &&
+      identical(record$epoch,row$epoch),previous$receipts)
+    if(length(originals)!=1L) stop("Missing unique original epoch receipt")
+    VerifyRankedReplayReceipt(decision_path,file.path(root,row$input),originals[[1L]])
+    replay<-readRDS(decision_path)
+    expected<-beidan::prepare_outcome_selections(probabilities |>
+      tidyr::pivot_wider(names_from=outcome,values_from=probability) |>
+      dplyr::rename(win=W,draw=D,lose=L))
+    stopifnot(identical(replay$evaluation$cutoff,cutoff),
+      identical(attr(replay$ranked,"input_snapshot"),expected),
+      identical(replay$pool$prematch_sp,sp),
+      identical(replay$pool$settings,settings))
+  } else {
+    replay<-ReplayRankedOutcomes(probabilities,cutoff,settings,c(3L,3L,3L,2L,2L,2L,2L),
+      sp,256,list(max_reuse=4L),list(max_overlap=3L))
+    # Freeze the label-free decision BEFORE opening any settlement object.
+    saveRDS(replay,decision_path)
+  }
+  decision_hash<-digest::digest(decision_path,file=TRUE,algo="sha256")
+  labels<-readRDS(file.path(root,row$settlement))
+  report<-DiagnoseRankedReplay(replay,labels$settlements,
+                              lubridate::with_tz(labels$as_of,"UTC"))
+  stopifnot(identical(decision_hash,digest::digest(decision_path,file=TRUE,algo="sha256")))
+  sums<-report$returns$issue_returns
+  summaries[[i]]<-dplyr::mutate(sums,epoch=row$epoch,
+    fixtures=dplyr::n_distinct(probabilities$fixture_id),
+    candidates=nrow(replay$pool$groups),groups=replay$evaluation$summary$selected_groups,
+    won_groups=sum(report$returns$group_returns$n_won>0),
+    coverage=replay$evaluation$summary$actual_coverage,
+    estimated_net_cny=replay$evaluation$summary$ev_net_cny,
+    actual_pattern=paste(replay$pool$group_patterns$actual_pattern[[1]],collapse=""))
+  protections[[i]]<-dplyr::mutate(report$protection,epoch=row$epoch)
+  group_returns[[i]]<-dplyr::mutate(report$returns$group_returns,epoch=row$epoch)
+  receipts[[length(receipts)+1L]]<-list(epoch=row$epoch,cutoff=cutoff,decision_hash=decision_hash,
+    decision_path=file.path("inputs/ranked_recent_replay",basename(decision_path)),
+    input=row$input,input_sha256=digest::digest(file.path(root,row$input),file=TRUE,algo="sha256"),
+    settlement=row$settlement,settlement_sha256=digest::digest(file.path(root,row$settlement),file=TRUE,algo="sha256"),
+    as_of=labels$as_of,receipt=replay$evaluation$receipt)
+  saveRDS(report,file.path(output_dir,paste0(row$epoch,"-settlement.rds")))
+  cat("DONE",row$epoch,"groups",replay$evaluation$summary$selected_groups,
+      "net",sums$net_cny,"\n");flush.console()
+}
+result<-list(summary=dplyr::bind_rows(summaries),protection=dplyr::bind_rows(protections),
+  group_returns=dplyr::bind_rows(group_returns),receipts=receipts,code_hashes=code_hashes,
+  decision_code_hashes=decision_code_hashes,decision_code_archives=decision_code_archives,
+  parameters=list(pattern=c(3L,3L,3L,2L,2L,2L,2L),max_candidates=NULL,budget_cny=NULL,
+    group_budget_cny=256,max_reuse=4L,max_overlap=3L,
+    overlap_basis="shared fixtures except role3 in both groups",improve=FALSE))
+saveRDS(result,file.path(output_dir,result_name))
+print(result$summary,width=180)

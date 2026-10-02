@@ -1,0 +1,53 @@
+root <- rprojroot::find_root(rprojroot::has_file('packages/beidan/DESCRIPTION'))
+devtools::load_all(file.path(root,'packages/beidan'),quiet=TRUE)
+source(file.path(root,'r/forced_complement_replay.R'))
+test_that('three research structures have exact support cost and exploratory singles',{
+  cutoff<-list(issue_id='T',cutoff_utc=as.POSIXct('2026-09-25',tz='UTC'))
+  settings<-beidan::parlay_settings();settings$n_legs<-7L
+  for(pattern in c('3322222','3332221','3333221')) {
+    triples<-sum(strsplit(pattern,'')[[1]]=='3')
+    matches<-tibble::tibble(fixture_id=paste0('T:',seq_len(7)),
+      win=c(rep(.4,triples),rep(.15,7-triples)),
+      draw=c(rep(.3,triples),rep(.6,7-triples)),
+      lose=c(rep(.3,triples),rep(.25,7-triples)))
+    probabilities<-matches |> tidyr::pivot_longer(c(win,draw,lose),names_to='outcome',values_to='probability')
+    probabilities$outcome<-unname(c(win='W',draw='D',lose='L')[probabilities$outcome])
+    before<-rlang::hash(probabilities)
+    x<-ReplayForcedComplement(probabilities,cutoff,beidan::match_typed_empty('prematch_sp'),settings,pattern)
+    expect_identical(rlang::hash(probabilities),before)
+    expect_identical(x$evaluation$cutoff,cutoff)
+    expect_true(all(x$group_metrics$actual_pattern==pattern))
+    expect_true(all(x$group_metrics$legal_space==switch(pattern,'3322222'=288L,'3332221'=216L,'3333221'=324L)))
+    expect_true(all(x$group_metrics$spent_cny<=256))
+    expect_false(anyDuplicated(x$evaluation$purchases$ticket_id)>0)
+    if(pattern!='3322222') {
+      single<-dplyr::filter(x$evaluation$final$role_legs,role==1L)
+      expect_true(all(vapply(single$allowed_outcomes,identical,logical(1),'D')))
+      expect_true(all(single$retained_probability==.6))
+    }
+    expect_identical(x$receipt$final_purchase_hash,rlang::hash(x$evaluation$purchases))
+  }
+})
+test_that('research cutoff and structure fail closed',{
+  s<-beidan::parlay_settings()
+  expect_error(ReplayForcedComplement(NULL,NULL,NULL,s,'wrong'))
+  expect_error(ReplayForcedComplement(NULL,NULL,NULL,s,'3333221'))
+})
+
+test_that('single demotion deduplicates complementary base groups that collapse to one mask',{
+  settings<-beidan::parlay_settings();settings$n_legs<-7L
+  matches<-tibble::tibble(fixture_id=paste0('T:',1:7),
+    win=c(rep(.4,3),rep(.45,3),.5),
+    draw=c(rep(.3,3),rep(.4,3),.21),
+    lose=c(rep(.3,3),rep(.15,3),.29))
+  probabilities<-matches |> tidyr::pivot_longer(c(win,draw,lose),
+    names_to='outcome',values_to='probability')
+  probabilities$outcome<-unname(c(win='W',draw='D',lose='L')[probabilities$outcome])
+  x<-ReplayForcedComplement(probabilities,
+    list(issue_id='T',cutoff_utc=as.POSIXct('2026-09-25',tz='UTC')),
+    beidan::match_typed_empty('prematch_sp'),settings,'3332221')
+  expect_equal(nrow(x$group_metrics),1L)
+  expect_equal(x$evaluation$summary$selected_groups,1L)
+  expect_equal(x$evaluation$summary$spent_cny,256)
+  expect_equal(nrow(x$evaluation$purchases),128L)
+})

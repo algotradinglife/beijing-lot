@@ -1,0 +1,185 @@
+{
+  "scope": "Declared QMD frozen input snapshots; exact bytes, no recomputation or receipt rewriting",
+  "files": [
+    {
+      "path": "inputs/26101_plans_20260930/half_hour/frozen_inputs.rds",
+      "sha256": "9e02f4ad8d42027607d57a42567b5cc735a0244b4ae4e65a084b1b244c0d2bfb",
+      "bytes": 482695
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/results.rds",
+      "sha256": "ccedf110da948998a5c075f6dafd28940aa3d34105b57b33a97ee1b57f087b69",
+      "bytes": 210131
+    },
+    {
+      "path": "inputs/3332222_comparison/f989887167bd041f/results.rds",
+      "sha256": "7fa9d3c67c5899d7d2b332a2c7f6c3a35ae5ffa0f5565fea0544881fe481e41c",
+      "bytes": 3360
+    },
+    {
+      "path": "inputs/compressed_structure_comparison/c04b4288946bcf14/results.rds",
+      "sha256": "fe078c76817ea9980d10bebfcfd877b1abdaa49b1f814411fa74f7400aa05267",
+      "bytes": 7202
+    },
+    {
+      "path": "inputs/26101_plans_20261002_1_25h/closure_decision.rds",
+      "sha256": "1659491b948934fc86925a9ea676c67fd4ddc712338231294152e795b620374f",
+      "bytes": 2658
+    },
+    {
+      "path": "inputs/ranked_recent_replay/results-2026-09-28_2026-09-30.rds",
+      "sha256": "6a8db31c01f2c74a088fa78305904dafcc5ff60d342921b8a1cc273a25e462bb",
+      "bytes": 4713
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-26-3322222-decision.rds",
+      "sha256": "a13cc82234a3d097a7c7556901d8aae096a50fa8dc86d8ba2dd549f2a1eb7c9c",
+      "bytes": 614968
+    },
+    {
+      "path": "inputs/26098_walkthrough/print/26098-20260926-195204.rds",
+      "sha256": "d5658ae5476d2b014e960f855d67cd06dd65d83cf90363ac911984bda436b5c9",
+      "bytes": 2027068
+    },
+    {
+      "path": "inputs/selective_double/settlements/26098.rds",
+      "sha256": "0d97a633a7e6812642635fc8193aa58c200cb857e8ee06ce574f0cf7507b657c",
+      "bytes": 1853
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-26-3332221-decision.rds",
+      "sha256": "fd1b9a24e8b59afc41232eb3864e91b3604cc8f2db12e2d152e933cb80ed5eef",
+      "bytes": 236071
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-26-3333221-decision.rds",
+      "sha256": "b0b4a0a1bed6207ba788ee45c6f37e9460bce0734c471b4c4d2c4baaf31ba631",
+      "bytes": 555304
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-28-3322222-decision.rds",
+      "sha256": "4dda74f54560d1cedecabc3be3574baec998ce794da2b1eebf1a023e0289c0d4",
+      "bytes": 40785
+    },
+    {
+      "path": "inputs/26098_walkthrough/three_plans_20260928/plans.rds",
+      "sha256": "be865dd56ebc7042820d413baad90784139b20f04286ec01d14f5dfdfb3b9ba3",
+      "bytes": 1300509
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-28-3332221-decision.rds",
+      "sha256": "d3d8dca667e74e3ad12b1d0d4a722c5245b240d5d2020b125dd49101f119bb97",
+      "bytes": 40896
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-28-3333221-decision.rds",
+      "sha256": "2e322b10940c63254bd24bb98c934f12fbdeaf1756e9f4a58bbd3b940661ff4e",
+      "bytes": 41209
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-30-3322222-decision.rds",
+      "sha256": "d8c2b665780f3288cc61f66963be0ed8caad465a92c7010acfe7871e0adc577b",
+      "bytes": 26197
+    },
+    {
+      "path": "inputs/26101_plans_20260930/half_hour/settlement-latest-check-20261001.rds",
+      "sha256": "4b62d3ae97eb14c60c63859a911175f632e8124cbb1979138e5ad286f2a690e1",
+      "bytes": 2573
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-30-3332221-decision.rds",
+      "sha256": "191a2481c91759f705915e36081257822300ddcbabf63f0589f04ac19c397a07",
+      "bytes": 30325
+    },
+    {
+      "path": "inputs/forced_complement_replay/5016d3412782bcbb/2026-09-30-3333221-decision.rds",
+      "sha256": "35d9b56b1f3c41d8f9db312565b131d42874ef9791a7a2dcb1492b25bbcb08da",
+      "bytes": 30568
+    },
+    {
+      "path": "inputs/3332222_comparison/f989887167bd041f/2026-09-28-decision.rds",
+      "sha256": "e2e2e8937434b7b96eeedbe95e2f1b38b2c70eef81af49918708dda65a07f206",
+      "bytes": 110406
+    },
+    {
+      "path": "inputs/3332222_comparison/f989887167bd041f/2026-09-30-decision.rds",
+      "sha256": "86aaea22e9ee7ed2e8607b1c42c2ee77422c24e82b9d9eed9866de5b0bcc5373",
+      "bytes": 36249
+    },
+    {
+      "path": "inputs/3332222_comparison/f989887167bd041f/2026-09-26-decision.rds",
+      "sha256": "acd5c5700eca4d9d03f8b5b3768f87a38e844e05ec27d25aefc615ccfa312460",
+      "bytes": 444095
+    },
+    {
+      "path": "inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-26-3322222-decision.rds",
+      "sha256": "afe4e9ccd184412eb1f365d4d53847473b405089216ebbbfece37a587f47295f",
+      "bytes": 25425
+    },
+    {
+      "path": "inputs/ranked_recent_replay/all_roles_overlap_evidence/2026-09-26-decision.rds",
+      "sha256": "b7a9c147ed26826e38ebf51fbd4c5e9c588c175546b3c35c96d360c466103109",
+      "bytes": 417725
+    },
+    {
+      "path": "inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-26-3332221-decision.rds",
+      "sha256": "7b328d594a361a2ebc89188aabdf1b99f24dc4b3a218db2789f544ddf4087378",
+      "bytes": 25555
+    },
+    {
+      "path": "inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-28-3322222-decision.rds",
+      "sha256": "18e59aff71b28162dff063d1066a7a758a079bdc5442f810a4b9f410864cde94",
+      "bytes": 14256
+    },
+    {
+      "path": "inputs/ranked_recent_replay/all_roles_overlap_evidence/2026-09-28-decision.rds",
+      "sha256": "5be35e8508539eeafd6392b0996f771ae8085cee3d0537dce3bd9d5721ad680f",
+      "bytes": 39556
+    },
+    {
+      "path": "inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-28-3332221-decision.rds",
+      "sha256": "4ad3a5d88b682bead99baeea9ccbf167a7549f2730721d46de3ab887cf9e78ac",
+      "bytes": 14167
+    },
+    {
+      "path": "inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-30-3322222-decision.rds",
+      "sha256": "750368b01fe9ee9016bb98305d8bf3b519ecf86fcfcd950abb7f88cfc08a7fde",
+      "bytes": 28791
+    },
+    {
+      "path": "inputs/ranked_recent_replay/all_roles_overlap_evidence/2026-09-30-decision.rds",
+      "sha256": "cb6ac33e16a2347b6bf528a211e82eb7fffa0e2cf96bf779fdf25bd880f6fb2d",
+      "bytes": 117952
+    },
+    {
+      "path": "inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-30-3332221-decision.rds",
+      "sha256": "911a18f27161ca133b35cffe94ac06935c0ac9330f6a00dc3a8e35115b0e6a69",
+      "bytes": 18569
+    },
+    {
+      "path": "inputs/ranked_recent_replay/2026-09-28-decision.rds",
+      "sha256": "812a0255af6b2196018496fbc942f5b196198afe9c0adb38a7605e0d9c38fde1",
+      "bytes": 110222
+    },
+    {
+      "path": "inputs/ranked_recent_replay/2026-09-30-decision.rds",
+      "sha256": "c19da94d2e8c428d90ce8efe597bcf76f9017cec329dfd9d7c32ac379f960307",
+      "bytes": 117910
+    },
+    {
+      "path": "inputs/26101_plans_20261002_1_25h/schedule.rds",
+      "sha256": "663068986640c663aa0f1f181553a5c3e8432a9c4a8fe6a61db6df0d1230487a",
+      "bytes": 11543
+    },
+    {
+      "path": "inputs/26101_plans_20261002_1_25h/official_notice.raw.html",
+      "sha256": "83c127455b4a45cbfa5609305192929ce0954e9d2b55eac2c5d9b6608de2af25",
+      "bytes": 16147
+    },
+    {
+      "path": "inputs/26101_plans_20261002_1_25h/official_notice.raw.receipt.json",
+      "sha256": "63cf66e98b1386cc2323da3b8d52d323bd503bb7485247a486ba77ac2055f0ff",
+      "bytes": 527
+    }
+  ]
+}

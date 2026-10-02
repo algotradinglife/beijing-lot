@@ -2,7 +2,7 @@
 #'
 #' Evaluate every scenario without local improvement, using the existing portfolio
 #' evaluator. Nothing is fitted, fetched, persisted, or purchased. Coverage is the
-#' expected number of winning tickets, not a union hit or profit probability.
+#' exact union probability that at least one purchased ticket wins; EV uses raw SP.
 #'
 #' @param portfolios Nonempty uniquely named list of objects returned by
 #'   [parlay_construct_role_groups()]. Every pool must have valid bound inputs and
@@ -14,12 +14,10 @@
 #'   whole numeric `max_reuse` (at least one) and `max_overlap` (at least zero).
 #'   Missing values are forbidden in required columns. Extra descriptive columns
 #'   are retained, but may not collide with output metric names.
-#' @param objective Either `"probability"` or `"ev"`, passed to the evaluator.
-#'   EV requires complete valid pre-cutoff SP for evaluated candidates.
 #' @return List with `summary` (input columns plus final metric columns), `results`
 #'   (evaluation objects named by scenario_id), and the shared `cutoff`. Summary
-#'   metrics are objective, purchased_tickets, cost_cny, expected_winning_tickets,
-#'   ev_net_cny, ev_available, unspent_cny, complete_groups, planned_groups. EV is
+#'   metrics include selected_groups, new_ticket_count, spent_cny, actual_coverage,
+#'   nominal_coverage, ev_net_cny, ev_available and unspent_cny. EV is
 #'   missing when unavailable. Zero scenarios return the same typed empty summary
 #'   and an empty named list; all pools and input schemas are still validated.
 #' @details Invalid schemas, conflicting metric names, altered pool hashes, or
@@ -31,11 +29,10 @@
 #'   validation delegates to a zero-budget evaluation, avoiding duplicate chronology
 #'   rules. Results preserve evaluator receipts and always have improve = FALSE.
 #' @export
-parlay_explore_portfolios <- function(portfolios, scenarios, objective = "probability") {
+parlay_explore_portfolios <- function(portfolios, scenarios) {
   checkmate::assert_list(portfolios, min.len = 1L, any.missing = FALSE)
   checkmate::assert_character(names(portfolios), len = length(portfolios),
                              any.missing = FALSE, min.chars = 1L, unique = TRUE)
-  checkmate::assert_choice(objective, c("probability", "ev"))
   checkmate::assert_true(tibble::is_tibble(scenarios))
   checkmate::assert_character(names(scenarios), any.missing = FALSE,
                              min.chars = 1L, unique = TRUE)
@@ -63,8 +60,8 @@ parlay_explore_portfolios <- function(portfolios, scenarios, objective = "probab
   # Probability objective here validates structure without requiring optional SP.
   probes <- lapply(portfolios, function(pool) {
     parlay_evaluate_portfolio(pool, group_budget_cny = 0, budget_cny = 0,
-      constraints = list(max_reuse = 1L, max_overlap = 0L),
-      improve = FALSE, objective = "probability")
+      reuse_policy = list(max_reuse = 1L), overlap_policy = list(max_overlap = 0L),
+      improve = FALSE)
   })
   cutoff <- portfolios[[1L]][["cutoff"]]
   if (any(!vapply(portfolios, function(pool) {
@@ -81,7 +78,7 @@ parlay_explore_portfolios <- function(portfolios, scenarios, objective = "probab
   canonical <- c("scenario_id", "pattern", "group_budget_cny", "budget_cny",
                  "max_reuse", "max_overlap")
   scenarios <- scenarios[c(canonical, setdiff(names(scenarios), canonical))]
-  template <- dplyr::select(probes[[1L]]$metrics, -dplyr::any_of(c("stage", "group_budget_cny", "budget_cny")))
+  template <- tibble::as_tibble(probes[[1L]]$summary[names(probes[[1L]]$summary) != "group_budget_cny"])
   template <- template[0, , drop = FALSE]
   if (any(names(template) %in% names(scenarios))) stop("scenario columns collide with output metrics")
   results <- stats::setNames(vector("list", nrow(scenarios)), scenarios$scenario_id)
@@ -90,10 +87,10 @@ parlay_explore_portfolios <- function(portfolios, scenarios, objective = "probab
     row <- scenarios[i, , drop = FALSE]
     evaluation <- parlay_evaluate_portfolio(portfolios[[row$pattern]],
       group_budget_cny = row$group_budget_cny, budget_cny = if (budget_unlimited) NULL else row$budget_cny,
-      constraints = list(max_reuse = row$max_reuse, max_overlap = row$max_overlap),
-      improve = FALSE, objective = objective)
+      reuse_policy = list(max_reuse = row$max_reuse),
+      overlap_policy = list(max_overlap = row$max_overlap), improve = FALSE)
     results[[i]] <- evaluation
-    metrics <- evaluation$metrics[evaluation$metrics$stage == "final", names(template), drop = FALSE]
+    metrics <- tibble::as_tibble(evaluation$summary[names(template)])
     rows[[i]] <- dplyr::bind_cols(row, metrics)
   }
   summary <- if (length(rows)) dplyr::bind_rows(rows) else dplyr::bind_cols(scenarios, template)

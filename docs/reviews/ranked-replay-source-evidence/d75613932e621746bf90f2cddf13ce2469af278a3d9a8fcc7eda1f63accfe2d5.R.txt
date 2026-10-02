@@ -1,0 +1,67 @@
+# Explicit local snapshot replay; all reusable decision/diagnostic code lives in r/.
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+source(file.path(root,"r/ranked_outcome_replay.R"))
+manifest <- tibble::tribble(
+  ~epoch,~input,~settlement,
+  "2026-09-26", "inputs/26098_walkthrough/print/26098-20260926-195204.rds",
+  "inputs/selective_double/settlements/26098.rds",
+  "2026-09-28", "inputs/26098_walkthrough/three_plans_20260928/plans.rds",
+  "inputs/selective_double/settlements/26098.rds",
+  "2026-09-30", "inputs/26101_plans_20260930/half_hour/frozen_inputs.rds",
+  "inputs/26101_plans_20260930/half_hour/settlement-latest-check-20261001.rds")
+code_files <- c("r/ranked_outcome_replay.R","scripts/replay_recent_ranked_outcomes.R",
+  sort(list.files(file.path(root,"packages/beidan/R"),pattern="\\.R$",
+                  full.names=FALSE)) |> file.path("packages/beidan/R", x=_))
+code_hashes <- stats::setNames(vapply(file.path(root,code_files),
+  digest::digest,character(1),file=TRUE,algo="sha256"),code_files)
+output_dir <- file.path(root,"inputs/ranked_recent_replay")
+dir.create(output_dir,recursive=TRUE,showWarnings=FALSE)
+summaries <- list();protections<-list();group_returns<-list();receipts<-list()
+for(i in seq_len(nrow(manifest))) {
+  row<-manifest[i,]; cat("START",row$epoch,"\n");flush.console()
+  frozen<-readRDS(file.path(root,row$input))
+  if(i==1L) {
+    probabilities<-frozen$result$probabilities;cutoff<-frozen$result$cutoff
+    sp<-beidan::match_typed_empty("prematch_sp")
+  } else {
+    probabilities<-frozen$projected$probabilities;cutoff<-frozen$projected$cutoff
+    sp<-frozen$projected$prematch_sp
+  }
+  settings<-beidan::parlay_settings();settings$n_legs<-7L
+  settings$unit_cny<-2;settings$payout_factor<-.65
+  replay<-ReplayRankedOutcomes(probabilities,cutoff,settings,c(3L,3L,3L,2L,2L,2L,2L),
+    sp,256,list(max_reuse=2L),list(max_overlap=3L))
+  # Freeze the label-free decision to disk BEFORE opening any settlement object.
+  decision_path<-file.path(output_dir,paste0(row$epoch,"-decision.rds"))
+  saveRDS(replay,decision_path)
+  decision_hash<-digest::digest(decision_path,file=TRUE,algo="sha256")
+  labels<-readRDS(file.path(root,row$settlement))
+  report<-DiagnoseRankedReplay(replay,labels$settlements,
+                              lubridate::with_tz(labels$as_of,"UTC"))
+  stopifnot(identical(decision_hash,digest::digest(decision_path,file=TRUE,algo="sha256")))
+  sums<-report$returns$issue_returns
+  summaries[[i]]<-dplyr::mutate(sums,epoch=row$epoch,
+    fixtures=dplyr::n_distinct(probabilities$fixture_id),
+    candidates=nrow(replay$pool$groups),groups=replay$evaluation$summary$selected_groups,
+    won_groups=sum(report$returns$group_returns$n_won>0),
+    coverage=replay$evaluation$summary$actual_coverage,
+    estimated_net_cny=replay$evaluation$summary$ev_net_cny,
+    actual_pattern=paste(replay$pool$group_patterns$actual_pattern[[1]],collapse=""))
+  protections[[i]]<-dplyr::mutate(report$protection,epoch=row$epoch)
+  group_returns[[i]]<-dplyr::mutate(report$returns$group_returns,epoch=row$epoch)
+  receipts[[i]]<-list(epoch=row$epoch,cutoff=cutoff,decision_hash=decision_hash,
+    decision_path=file.path("inputs/ranked_recent_replay",basename(decision_path)),
+    input=row$input,input_sha256=digest::digest(file.path(root,row$input),file=TRUE,algo="sha256"),
+    settlement=row$settlement,settlement_sha256=digest::digest(file.path(root,row$settlement),file=TRUE,algo="sha256"),
+    as_of=labels$as_of,receipt=replay$evaluation$receipt)
+  saveRDS(report,file.path(output_dir,paste0(row$epoch,"-settlement.rds")))
+  cat("DONE",row$epoch,"groups",replay$evaluation$summary$selected_groups,
+      "net",sums$net_cny,"\n");flush.console()
+}
+result<-list(summary=dplyr::bind_rows(summaries),protection=dplyr::bind_rows(protections),
+  group_returns=dplyr::bind_rows(group_returns),receipts=receipts,code_hashes=code_hashes,
+  parameters=list(pattern=c(3L,3L,3L,2L,2L,2L,2L),max_candidates=NULL,budget_cny=NULL,
+    group_budget_cny=256,max_reuse=2L,max_overlap=3L,improve=FALSE))
+saveRDS(result,file.path(output_dir,"results.rds"))
+print(result$summary,width=180)

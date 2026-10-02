@@ -17,8 +17,11 @@ exploration_fixture <- function(pattern = c(2L, 1L), seconds = 0, altered = FALS
   quotes <- if (is.null(sp)) match_typed_empty("prematch_sp") else
     dplyr::mutate(dplyr::select(probabilities, fixture_id, outcome),
       quote_at = cutoff$cutoff_utc - 60, sp_raw = sp, source_url = "test")
-  return(parlay_construct_role_groups(parlay_role_scores(probabilities, cutoff), cutoff,
-    settings, pattern = pattern, n_candidates = 3L, probabilities = probabilities, prematch_sp = quotes))
+  matches <- tidyr::pivot_wider(probabilities, names_from = outcome, values_from = probability) |>
+    dplyr::rename(win = W, draw = D, lose = L)
+  ranked <- rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
+  return(parlay_construct_role_groups(ranked, settings, pattern = pattern,
+    max_candidates = 3L, prematch_sp = quotes))
 }
 
 #' Create explicit deterministic scenario cases.
@@ -40,14 +43,15 @@ test_that("exploration reproduces direct evaluation for every structure and cons
   expect_identical(actual$cutoff, pools$p21$cutoff)
   for (i in seq_len(nrow(scenarios))) {
     row <- scenarios[i, ]
-    direct <- parlay_evaluate_portfolio(pools[[row$pattern]], row$group_budget_cny,
-      row$budget_cny, constraints = list(max_reuse = row$max_reuse, max_overlap = row$max_overlap), improve = FALSE)
-    metric <- direct$metrics[direct$metrics$stage == "final", ]
-    expect_equal(actual$summary$cost_cny[i], metric$cost_cny)
-    expect_equal(actual$summary$expected_winning_tickets[i], metric$expected_winning_tickets)
-    expect_equal(actual$results[[i]]$final$funded$purchases, direct$final$funded$purchases)
+    direct <- parlay_evaluate_portfolio(pools[[row$pattern]], budget_cny=row$budget_cny,
+      group_budget_cny=row$group_budget_cny, reuse_policy=list(max_reuse=row$max_reuse),
+      overlap_policy=list(max_overlap=row$max_overlap), improve=FALSE)
+    metric <- direct$summary
+    expect_equal(actual$summary$spent_cny[i], metric$spent_cny)
+    expect_equal(actual$summary$actual_coverage[i], metric$actual_coverage)
+    expect_equal(actual$results[[i]]$purchases, direct$purchases)
     expect_false(actual$results[[i]]$receipt$improve)
-    expect_lte(actual$summary$cost_cny[i], row$budget_cny)
+    expect_lte(actual$summary$spent_cny[i], row$budget_cny)
   }
   expect_true(all(!actual$summary$ev_available))
   expect_true(all(is.na(actual$summary$ev_net_cny)))
@@ -57,13 +61,13 @@ test_that("zero budgets, capped support and empty scenarios retain typed contrac
   pools <- list(p21 = exploration_fixture())
   rows <- exploration_scenarios()[rep(1L, 3L), ]
   rows$scenario_id <- c("zero", "full", "over")
-  rows$group_budget_cny <- c(0, 4, 100)
+  rows$group_budget_cny <- c(0, 8, 100)
   rows$budget_cny <- c(0, 100, 100)
   actual <- parlay_explore_portfolios(pools, rows)
-  expect_equal(actual$summary$cost_cny[1], 0)
-  expect_equal(actual$summary$purchased_tickets[1], 0L)
-  expect_equal(actual$summary$cost_cny[2], actual$summary$cost_cny[3])
-  expect_equal(actual$summary$expected_winning_tickets[2], actual$summary$expected_winning_tickets[3])
+  expect_equal(actual$summary$spent_cny[1], 0)
+  expect_equal(actual$summary$new_ticket_count[1], 0L)
+  expect_equal(actual$summary$spent_cny[2], actual$summary$spent_cny[3])
+  expect_equal(actual$summary$actual_coverage[2], actual$summary$actual_coverage[3])
   empty <- parlay_explore_portfolios(pools, rows[0, ])
   expect_s3_class(empty$summary, "tbl_df")
   expect_equal(nrow(empty$summary), 0L)
@@ -96,7 +100,7 @@ test_that("exploration rejects malformed scenario schemas and values", {
     bad <- rows; bad[[column]] <- 1.5
     expect_error(parlay_explore_portfolios(pools, bad), "whole")
   }
-  bad <- rows; bad$cost_cny <- 4
+  bad <- rows; bad$spent_cny <- 4
   expect_error(parlay_explore_portfolios(pools, bad), "collide")
   expect_error(parlay_explore_portfolios(pools, rows, objective="unknown"))
 })
@@ -125,8 +129,8 @@ test_that("omitted total budgets are explicitly unlimited and share empty schema
   before <- rlang::hash(list(pools, unbounded))
   unlimited <- parlay_explore_portfolios(pools, unbounded)
   capped <- parlay_explore_portfolios(pools, rows)
-  expect_gt(unlimited$summary$cost_cny, 2)
-  expect_lte(capped$summary$cost_cny, 2)
+  expect_gt(unlimited$summary$spent_cny, 2)
+  expect_lte(capped$summary$spent_cny, 2)
   expect_true(unlimited$summary$budget_unlimited)
   expect_identical(unlimited$summary$budget_cny, NA_real_)
   expect_false(capped$summary$budget_unlimited)

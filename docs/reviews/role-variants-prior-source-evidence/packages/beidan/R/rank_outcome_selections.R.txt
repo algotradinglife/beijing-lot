@@ -1,0 +1,387 @@
+# Rank the outcome selections of a fixture pool (#534).
+#
+# Consumes the authoritative `prepare_outcome_selections()` table and returns the
+# same rows with one appended integer `rank`. A fixture's primary selection
+# (`selection_id == 1`) controls the fixture's ranking; complementary directions
+# of the same fixture share that rank. Ranks are computed independently inside
+# each role so a role-3 fixture is never compared with a role-2 fixture. No
+# labels, clock or IO are read and no model is fitted.
+
+# The derived columns `prepare_outcome_selections()` adds. They are stripped when
+# reconstructing the original fixture rows so the recomputation below uses only
+# source evidence.
+.rank_outcome_derived_columns <- function() {
+  c("selection_id", "outcomes", "role",
+    "coverage_probability", "entropy", "p3")
+}
+
+#' Hash the loaded implementation that produced a ranking receipt
+#'
+#' Internal. Conservative transitive binding of the loaded `beidan` namespace
+#' code, not of a file path: the formals and body of [rank_outcome_selections()]
+#' and of every namespace symbol its body reaches, including the
+#' [prepare_outcome_selections()], [classify_outcomes()] and
+#' [match_require_cutoff()] implementations it depends on.
+#'
+#' @return A single non-empty character hash, or the literal `"unavailable"`
+#'   when the namespace cannot be inspected at all.
+#' @noRd
+.rank_outcome_code_hash <- function() {
+  ns <- tryCatch(asNamespace("beidan"), error = function(e) NULL)
+  if (is.null(ns)) return("unavailable")
+  roots <- c(
+    "rank_outcome_selections", "prepare_outcome_selections",
+    "classify_outcomes", "match_require_cutoff"
+  )
+  parts <- c("beidan-schema:rank_outcome_selections:1")
+  seen <- new.env(parent = emptyenv())
+  visit <- function(name) {
+    if (!nzchar(name) || exists(name, envir = seen, inherits = FALSE)) {
+      return(invisible(NULL))
+    }
+    assign(name, TRUE, envir = seen)
+    fn <- tryCatch(get(name, envir = ns, inherits = FALSE), error = function(e) NULL)
+    if (!is.function(fn)) {
+      parts <<- c(parts, paste0(
+        name, "=",
+        paste(utils::capture.output(utils::str(fn)), collapse = " ")
+      ))
+      return(invisible(NULL))
+    }
+    parts <<- c(
+      parts,
+      paste0(name, "::formals=",
+             paste(utils::capture.output(base::args(fn)), collapse = " ")),
+      paste0(name, "::body=", paste(deparse(body(fn)), collapse = " "))
+    )
+    symbols <- all.names(body(fn), functions = TRUE, unique = TRUE)
+    for (symbol in symbols) {
+      if (exists(symbol, envir = ns, inherits = FALSE)) visit(symbol)
+    }
+    invisible(NULL)
+  }
+  for (name in roots) visit(name)
+  hash <- rlang::hash(parts)
+  if (is.null(hash) || !nzchar(hash)) "unavailable" else hash
+}
+
+#' Hash the frozen cutoff identity and instant of a ranking receipt
+#'
+#' Internal. The receipt binds exactly the two fields that identify a decision:
+#' the issue id (as character) and the UTC instant (as numeric), using the SAME
+#' scheme as the candidate pool's authoritative `cutoff_hash`. It carries no
+#' clock, no inferred instant and no hidden state; the caller's validated cutoff
+#' is the only input.
+#'
+#' @param cutoff A cutoff already accepted by [match_require_cutoff()].
+#' @return A single 32-hex-character `rlang` hash of the cutoff identity.
+#' @noRd
+.rank_outcome_cutoff_hash <- function(cutoff) {
+  rlang::hash(list(as.character(cutoff$issue_id),
+                   as.numeric(cutoff$cutoff_utc)))
+}
+
+#' Rank prepared outcome selections by coverage or balance
+#'
+#' Validate an authoritative [prepare_outcome_selections()] table, then append one
+#' integer `rank`. A fixture is represented by its primary selection
+#' (`selection_id == 1`); every complementary direction of the same fixture in the
+#' same role receives that identical rank, so the rank is a property of the
+#' fixture, not of an individual direction. Ranks are computed independently
+#' within each role (`3` first, then `2`) and are sequential and unique per
+#' fixture inside a role.
+#'
+#' @param selections A `tibble` returned by [prepare_outcome_selections()]. It
+#'   must contain the source columns `fixture_id` (character), `win`, `draw` and
+#'   `lose` (numeric), the derived columns `selection_id` (integer), `outcomes`
+#'   (list), `role` (integer, currently only `2` or `3`),
+#'   `coverage_probability`, `entropy` and `p3` (double), plus any additional
+#'   source columns. A pre-existing `rank` column is rejected. The function does
+#'   not mutate `selections`.
+#' @param cutoff Explicit decision cutoff validated by [match_require_cutoff()]:
+#'   a `temporal_learning`-style list carrying a single UTC `cutoff_utc` and one
+#'   `issue_id`. The cutoff is supplied by the caller and is never inferred from
+#'   the clock or hidden state.
+#' @param priority One of `"coverage"` or `"balance"` (default `"coverage"`;
+#'   the default `c("coverage", "balance")` resolves to `"coverage"`). Coverage
+#'   ranks a role-2 fixture by `coverage_probability` descending then normalized
+#'   `entropy` descending, and a role-3 fixture by `p3` descending then `entropy`
+#'   descending. Balance ranks a role-2 fixture by `entropy` descending then
+#'   `coverage_probability` descending, and a role-3 fixture by `entropy`
+#'   descending then `p3` descending. Remaining ties are broken by
+#'   `fixture_id` ascending.
+#'
+#' @return A `tibble` with the columns of `selections` plus an appended integer
+#'   `rank`, ordered by `role` descending (`3` then `2`), `rank` ascending and
+#'   `selection_id` ascending. Source columns and the actual directional metrics
+#'   are preserved unchanged. An empty `selections` returns a typed-empty tibble
+#'   with the same columns and integer `rank`.
+#'
+#'   The returned tibble carries provenance attributes:
+#'   * `cutoff`: the validated cutoff object, unchanged.
+#'   * `cutoff_hash`: `rlang::hash(list(as.character(cutoff$issue_id),
+#'     as.numeric(cutoff$cutoff_utc)))`, the frozen cutoff receipt. It uses the
+#'     SAME scheme as the pool's authoritative `cutoff_hash`, so the exact cutoff
+#'     identity and instant this ranking was built for can be verified before the
+#'     ranking is trusted again. A ranking whose `cutoff` attribute is retimed
+#'     without rebuilding no longer reproduces this hash.
+#'   * `input_snapshot`: the EXACT original pre-rank `selections` table supplied by
+#'     the caller, preserved as explicit table state (never a hidden global). It
+#'     keeps the caller's original row order and any source attributes, so the
+#'     pre-rank input can be re-ranked and verified downstream. It never contains a
+#'     `rank` column.
+#'   * `input_hash`: `rlang::hash(selections)`, binding the exact supplied table; it
+#'     verifies against `input_snapshot` because
+#'     `rlang::hash(input_snapshot) == input_hash` by construction.
+#'   * `priority`: the resolved `"coverage"` or `"balance"` policy.
+#'   * `code_hash`: a transitive hash of the loaded implementation
+#'     ([rank_outcome_selections()], [prepare_outcome_selections()],
+#'     [classify_outcomes()] and [match_require_cutoff()]).
+#'
+#'   The receipt binds the *supplied* table; it is not proof that the source rows
+#'   were observed before the cutoff. No learning, availability or fitting claim
+#'   is made and no clock value is recorded.
+#'
+#' @section Errors:
+#' `selections` is an error when it is not a tibble, when a required column is
+#' missing or has the wrong type, when a `rank` column already exists, when a
+#' `(fixture_id, selection_id)` key is duplicated, when a source column differs
+#' across the rows of one fixture, when `role` is not `2` or `3`, when the
+#' recomputed [prepare_outcome_selections()] table disagrees on keys,
+#' `outcomes`, `role` or any metric beyond `1e-12`, or when `win`, `draw` and
+#' `lose` no longer satisfy [classify_outcomes()]. `cutoff` is an error when it
+#' is missing or malformed, and `priority` is an error when it is not exactly
+#' `"coverage"` or `"balance"`.
+#'
+#' @section Provenance:
+#' The cutoff is explicit caller context; it is validated and carried through
+#' untouched. The function reads no labels, no clock and no IO, performs no
+#' fitting and adds no scraping or quote-receipt gate. It does not recreate
+#' shared chronology or reuse a cross-cutoff cache.
+#'
+#' @examples
+#' cutoff <- list(
+#'   issue_id = "26098",
+#'   cutoff_utc = as.POSIXct("2026-09-26 11:52:04", tz = "UTC")
+#' )
+#' matches <- tibble::tibble(
+#'   fixture_id = c("A", "D"),
+#'   win = c(0.45, 0.50),
+#'   draw = c(0.22, 0.35),
+#'   lose = c(0.33, 0.15)
+#' )
+#' rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
+#' rank_outcome_selections(prepare_outcome_selections(matches), cutoff, "balance")
+#' @export
+rank_outcome_selections <- function(selections, cutoff,
+                                    priority = c("coverage", "balance")) {
+  if (identical(priority, c("coverage", "balance"))) {
+    priority <- "coverage"
+  }
+  if (!is.character(priority) || length(priority) != 1L || is.na(priority) ||
+      !priority %in% c("coverage", "balance")) {
+    stop("`priority` must be exactly \"coverage\" or \"balance\".", call. = FALSE)
+  }
+
+  match_require_cutoff(cutoff)
+
+  if (!tibble::is_tibble(selections)) {
+    stop("`selections` must be a tibble.", call. = FALSE)
+  }
+  if ("rank" %in% names(selections)) {
+    stop(
+      "`selections` already contains a `rank` column; refusing to overwrite.",
+      call. = FALSE
+    )
+  }
+
+  required_source <- c("fixture_id", "win", "draw", "lose")
+  derived <- .rank_outcome_derived_columns()
+  missing_columns <- setdiff(c(required_source, derived), names(selections))
+  if (length(missing_columns) > 0L) {
+    stop(
+      sprintf(
+        "`selections` is missing required column(s): %s.",
+        paste(missing_columns, collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  require_type <- function(name, ok, expected) {
+    if (!ok) {
+      stop(
+        sprintf("`selections$%s` must be %s.", name, expected),
+        call. = FALSE
+      )
+    }
+  }
+  require_type("fixture_id", is.character(selections[["fixture_id"]]),
+               "a character vector")
+  require_type("selection_id", is.integer(selections[["selection_id"]]),
+               "an integer vector")
+  require_type("outcomes", is.list(selections[["outcomes"]]),
+               "a list column")
+  require_type("role", is.integer(selections[["role"]]),
+               "an integer vector")
+  for (metric in c("coverage_probability", "entropy", "p3")) {
+    require_type(metric, is.double(selections[[metric]]), "a double vector")
+  }
+  for (probability in c("win", "draw", "lose")) {
+    require_type(probability, is.numeric(selections[[probability]]),
+                 "a numeric vector")
+  }
+
+  if (anyNA(selections[["selection_id"]])) {
+    stop("`selections$selection_id` must be non-missing.", call. = FALSE)
+  }
+  if (any(selections[["selection_id"]] < 1L)) {
+    stop("`selections$selection_id` must be positive.", call. = FALSE)
+  }
+  if (anyNA(selections[["role"]]) ||
+      any(!selections[["role"]] %in% c(2L, 3L))) {
+    stop(
+      "`selections$role` must contain only 2 or 3; role 1 is reserved.",
+      call. = FALSE
+    )
+  }
+
+  keys <- paste(selections[["fixture_id"]], selections[["selection_id"]],
+                sep = "\r")
+  if (anyDuplicated(keys)) {
+    stop(
+      "`selections` contains duplicate (fixture_id, selection_id) keys.",
+      call. = FALSE
+    )
+  }
+
+  source_columns <- setdiff(names(selections), derived)
+  fixture_values <- selections[["fixture_id"]]
+  unique_fixtures <- unique(fixture_values)
+  group_index <- match(fixture_values, unique_fixtures)
+  for (column in source_columns) {
+    values <- selections[[column]]
+    for (group in seq_along(unique_fixtures)) {
+      members <- values[group_index == group]
+      first <- members[[1L]]
+      consistent <- all(vapply(
+        members,
+        function(value) identical(value, first),
+        logical(1)
+      ))
+      if (!consistent) {
+        stop(
+          sprintf(
+            "`selections$%s` is inconsistent across rows of one fixture.",
+            column
+          ),
+          call. = FALSE
+        )
+      }
+    }
+  }
+
+  unique_rows <- selections[!duplicated(fixture_values), source_columns,
+                            drop = FALSE]
+  recomputed <- prepare_outcome_selections(unique_rows)
+
+  sort_keys <- function(table) {
+    table[order(table[["fixture_id"]], table[["selection_id"]],
+                method = "radix"), , drop = FALSE]
+  }
+  actual <- sort_keys(selections)
+  expected <- sort_keys(recomputed)
+  if (nrow(actual) != nrow(expected) ||
+      !identical(actual[["fixture_id"]], expected[["fixture_id"]]) ||
+      !identical(actual[["selection_id"]], expected[["selection_id"]])) {
+    stop(
+      paste0(
+        "`selections` choices do not match the recomputed ",
+        "prepare_outcome_selections() keys; missing or extra selections."
+      ),
+      call. = FALSE
+    )
+  }
+  if (!identical(actual[["outcomes"]], expected[["outcomes"]]) ||
+      !identical(actual[["role"]], expected[["role"]])) {
+    stop(
+      "`selections` outcomes and role do not match the recomputed classifier.",
+      call. = FALSE
+    )
+  }
+  for (metric in c("coverage_probability", "entropy", "p3")) {
+    observed <- actual[[metric]]
+    reference <- expected[[metric]]
+    matches <- (is.na(observed) & is.na(reference)) |
+      (!is.na(observed) & !is.na(reference) &
+         abs(observed - reference) <= 1e-12)
+    if (!all(matches)) {
+      stop(
+        sprintf(
+          "`selections$%s` does not match the recomputed metric.",
+          metric
+        ),
+        call. = FALSE
+      )
+    }
+  }
+  for (column in source_columns) {
+    if (!identical(actual[[column]], expected[[column]])) {
+      stop(
+        sprintf(
+          "`selections$%s` source column does not match the recomputation.",
+          column
+        ),
+        call. = FALSE
+      )
+    }
+  }
+
+  input_hash <- rlang::hash(selections)
+  metadata <- list(
+    cutoff = cutoff,
+    cutoff_hash = .rank_outcome_cutoff_hash(cutoff),
+    input_hash = input_hash,
+    input_snapshot = selections,
+    priority = priority,
+    code_hash = .rank_outcome_code_hash()
+  )
+
+  ranked <- actual
+  ranked[["rank"]] <- NA_integer_
+  if (nrow(ranked) > 0L) {
+    for (role_value in sort(unique(ranked[["role"]]), decreasing = TRUE)) {
+      role_rows <- which(ranked[["role"]] == role_value)
+      primary_rows <- role_rows[ranked[["selection_id"]][role_rows] == 1L]
+      ord <- if (role_value == 2L) {
+        if (priority == "coverage") {
+          order(-ranked[["coverage_probability"]][primary_rows],
+                -ranked[["entropy"]][primary_rows],
+                ranked[["fixture_id"]][primary_rows], method = "radix")
+        } else {
+          order(-ranked[["entropy"]][primary_rows],
+                -ranked[["coverage_probability"]][primary_rows],
+                ranked[["fixture_id"]][primary_rows], method = "radix")
+        }
+      } else if (priority == "coverage") {
+        order(-ranked[["p3"]][primary_rows],
+              -ranked[["entropy"]][primary_rows],
+              ranked[["fixture_id"]][primary_rows], method = "radix")
+      } else {
+        order(-ranked[["entropy"]][primary_rows],
+              -ranked[["p3"]][primary_rows],
+              ranked[["fixture_id"]][primary_rows], method = "radix")
+      }
+      ordered_fixtures <- ranked[["fixture_id"]][primary_rows][ord]
+      ranked[["rank"]][role_rows] <- as.integer(
+        match(ranked[["fixture_id"]][role_rows], ordered_fixtures)
+      )
+    }
+    ranked <- ranked[order(-ranked[["role"]], ranked[["rank"]],
+                           ranked[["selection_id"]], method = "radix"),
+                     , drop = FALSE]
+  }
+  ranked[["rank"]] <- as.integer(ranked[["rank"]])
+
+  do.call(structure, c(list(ranked), metadata))
+}

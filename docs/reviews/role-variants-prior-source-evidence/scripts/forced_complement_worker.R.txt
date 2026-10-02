@@ -1,0 +1,23 @@
+# Thin label-free worker; domain implementation stays in the shared research module.
+root<-rprojroot::find_root(rprojroot::has_file('packages/beidan/DESCRIPTION'))
+devtools::load_all(file.path(root,'packages/beidan'),quiet=TRUE)
+source(file.path(root,'r/forced_complement_replay.R'))
+pattern<-commandArgs(trailingOnly=TRUE)
+stopifnot(length(pattern)==1L,pattern %in% c('3332221','3333221'))
+input<-'inputs/26098_walkthrough/print/26098-20260926-195204.rds'
+frozen<-readRDS(file.path(root,input))
+settings<-beidan::parlay_settings();settings$n_legs<-7L;settings$unit_cny<-2;settings$payout_factor<-.65
+replay<-ReplayForcedComplement(frozen$result$probabilities,frozen$result$cutoff,
+ beidan::match_typed_empty('prematch_sp'),settings,pattern)
+output<-file.path(root,'.run-control/forced-complement-parallel')
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+path<-file.path(output,paste0('2026-09-26-',pattern,'-decision.rds'))
+if(file.exists(path)) {
+ stopifnot(identical(rlang::hash(readRDS(path)),rlang::hash(replay)))
+} else saveRDS(replay,path)
+saveRDS(list(input=input,input_sha256=digest::digest(file.path(root,input),file=TRUE,algo='sha256'),
+ cutoff=replay$evaluation$cutoff,decision_sha256=digest::digest(path,file=TRUE,algo='sha256'),
+ executor='scripts/forced_complement_worker.R',executor_sha256=digest::digest(
+ file.path(root,'scripts/forced_complement_worker.R'),file=TRUE,algo='sha256')),
+ file.path(output,paste0(pattern,'-execution.rds')))
+cat('WORKER FROZEN',pattern,'groups',replay$evaluation$summary$selected_groups,'\n')

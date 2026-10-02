@@ -1,0 +1,83 @@
+#' Rebuild a research portfolio with mandatory complement purchasing
+#'
+#' @param probabilities Valid long tibble of fixture_id, W/D/L outcome, probability.
+#' @param cutoff Explicit original issue_id/cutoff_utc decision context, validated
+#'   by the shared package boundary; never inferred from clock or labels.
+#' @param prematch_sp Valid raw pre-cutoff SP tibble; typed empty preserves EV NA.
+#' @param settings Explicit seven-leg/CNY2/.65 business settings.
+#' @param pattern One of 3322222,3332221,3333221. Single variants construct the
+#'   corresponding double base and demote the strongest actual double to Top1.
+#'   Equal probabilities use W/D/L; equal fixtures use fixture_id ascending.
+#' @return Replay-shaped list plus group_metrics and receipt. Candidate construction
+#'   has no arbitrary cap. Single variants are explicitly research pools, never
+#'   claimed to be valid public constructor outputs. Actual fallback roles reported.
+#'   No labels, fitting, IO or clock; immutable inputs remain unchanged. Final
+#'   purchase uses the authoritative mandatory-complement package funding path,
+#'   CNY256/group, unlimited total budget, all-role reuse4, shared-role3-exempt
+#'   overlap3 and no improvement. Missing chronology/invalid constants fail closed.
+ReplayForcedComplement <- function(probabilities, cutoff, prematch_sp, settings, pattern) {
+  checkmate::assert_choice(pattern,c('3322222','3332221','3333221'))
+  beidan:::match_require_cutoff(cutoff)
+  beidan::match_validate_table(probabilities,'probabilities')
+  beidan::match_validate_table(prematch_sp,'prematch_sp')
+  if(settings$n_legs!=7L || settings$unit_cny!=2 || settings$payout_factor!=.65)
+    stop('Research requires seven legs, CNY2 and one .65 payout factor')
+  roles <- as.integer(strsplit(pattern,'',fixed=TRUE)[[1]])
+  base_roles <- replace(roles,roles==1L,2L)
+  matches <- probabilities |> tidyr::pivot_wider(names_from=outcome,values_from=probability) |>
+    dplyr::rename(win=W,draw=D,lose=L)
+  selections <- beidan::prepare_outcome_selections(matches)
+  ranked <- beidan::rank_outcome_selections(selections,cutoff,priority='coverage')
+  candidates <- beidan::parlay_construct_role_groups(ranked,settings,base_roles,
+    max_candidates=NULL,prematch_sp=prematch_sp)
+  pool <- beidan:::.parlay_ranked_validate_pool(candidates)
+  if(any(roles==1L) && nrow(pool$legs)) {
+    wide <- beidan:::parlay_probability_wide(probabilities)
+    blocks <- lapply(unique(pool$legs$group_id),function(id) {
+      block <- dplyr::filter(pool$legs,group_id==id)
+      indices <- which(block$role==2L)
+      mass <- vapply(indices,function(i) max(unlist(wide[
+        match(block$fixture_id[i],wide$fixture_id),c('W','D','L')])),0)
+      chosen <- indices[order(-mass,block$fixture_id[indices])[1L]]
+      row <- unlist(wide[match(block$fixture_id[chosen],wide$fixture_id),c('W','D','L')])
+      top1 <- c('W','D','L')[order(-row,seq_len(3L))[1L]]
+      block$role[chosen] <- 1L;block$allowed_outcomes[[chosen]] <- top1
+      block$retained_probability[chosen] <- max(row)
+      block <- dplyr::arrange(block,dplyr::desc(role),round)
+      block$round <- seq_len(7L)
+      block$group_id <- paste0(beidan:::.parlay_role_group_id(block$fixture_id),'@',
+        as.numeric(cutoff$cutoff_utc),':research-',pattern,':',
+        substr(rlang::hash(beidan:::.parlay_role_package_key(block)),1,12))
+      block
+    })
+    identities <- vapply(blocks,function(block)block$group_id[1],character(1))
+    blocks <- blocks[!duplicated(identities)]
+    pool$legs <- dplyr::bind_rows(blocks)
+    pool$group_patterns <- pool$legs |> dplyr::group_by(group_slot,group_id) |>
+      dplyr::summarise(target_pattern=list(roles),actual_pattern=list(as.integer(role)),.groups='drop')
+  }
+  reuse <- list(max_reuse=4L);overlap <- list(max_overlap=3L)
+  fund <- beidan:::.parlay_ranked_fund(pool,256,NULL,reuse,overlap)
+  summary <- beidan:::.parlay_ranked_summary(fund,pool,NULL,256)
+  plan <- beidan:::.parlay_ranked_freeze(pool,fund,fund$purchases,NULL,reuse,overlap)
+  mass <- pool$legs |> dplyr::group_by(group_slot,group_id) |>
+    dplyr::summarise(structure_mass=prod(retained_probability),.groups='drop')
+  metrics <- summary$group_selection |>
+    dplyr::left_join(mass,by=c('group_slot','group_id'),relationship='one-to-one') |>
+    dplyr::mutate(conditional_coverage=dplyr::if_else(structure_mass>0,
+      actual_coverage/structure_mass,NA_real_))
+  receipt <- list(cutoff=cutoff,cutoff_hash=pool$cutoff_hash,
+    probability_hash=rlang::hash(probabilities),prematch_sp_hash=rlang::hash(prematch_sp),
+    settings_hash=rlang::hash(settings),constructor_hash=rlang::hash(candidates),
+    final_role_legs_hash=rlang::hash(pool$legs),final_purchase_hash=rlang::hash(fund$purchases),
+    implementation_hash=rlang::hash(list(formals(ReplayForcedComplement),body(ReplayForcedComplement))),
+    core_code_hash=beidan:::.parlay_ranked_code_hash(),pattern=pattern,
+    forced_complement=plan$policies$forced_complement,
+    mode='all available fixtures; exploratory Top1 single; mandatory complement',
+    parameters=list(group_budget_cny=256,budget_cny=NULL,max_reuse=4L,max_overlap=3L,improve=FALSE))
+  evaluation <- list(cutoff=cutoff,summary=summary$summary,
+    group_selection=summary$group_selection,purchases=fund$purchases,
+    rejections=fund$rejections,complement=fund$complement,plan=plan,final=list(role_legs=pool$legs),receipt=receipt)
+  list(selections=selections,ranked=ranked,pool=pool,evaluation=evaluation,
+    group_metrics=metrics,receipt=receipt)
+}

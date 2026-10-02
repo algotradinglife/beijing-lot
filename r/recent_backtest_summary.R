@@ -1,3 +1,26 @@
+#' Attribute eliminated stake from independently validated ranked purchases
+#' @param prepared Canonical result of beidan's authoritative risk preparation.
+#' @return Tibble of fixture/outcome knockout and surviving actual stake, CNY.
+#' Empty purchases return a typed empty table. No labels or IO are used.
+RecentSummaryExposure <- function(prepared) {
+  if (!nrow(prepared$purchases)) return(beidan:::.ParlayLossExposureEmpty())
+  total <- sum(prepared$purchases$stake_cny)
+  grid <- prepared$probabilities |> dplyr::select(fixture_id, outcome)
+  purchased_legs <- prepared$legs |>
+    dplyr::inner_join(prepared$purchases |> dplyr::select(ticket_id, stake_cny),
+      by = "ticket_id", relationship = "many-to-one") |>
+    dplyr::rename(selected_outcome = outcome)
+  eliminated <- grid |>
+    dplyr::left_join(purchased_legs, by = "fixture_id", relationship = "many-to-many") |>
+    dplyr::group_by(fixture_id, outcome) |>
+    dplyr::summarise(knockout_cny = sum(stake_cny[!is.na(selected_outcome) &
+      selected_outcome != outcome], na.rm = TRUE), .groups = "drop")
+  eliminated |> dplyr::mutate(plan_stake_cny = total,
+    knockout_fraction = knockout_cny / total, surviving_cny = total - knockout_cny) |>
+    dplyr::select(fixture_id, outcome, plan_stake_cny, knockout_cny,
+      knockout_fraction, surviving_cny)
+}
+
 #' Summarise frozen research alternatives without feeding labels into selection
 #' @param experiment Named results, metadata tibble with scenario_id, bound cutoff.
 #' @param settlements Valid settlement tibble; labels are used for evaluation only.
@@ -20,8 +43,8 @@ RecentBacktestSummary <- function(experiment, settlements, as_of) {
   for (id in experiment$metadata$scenario_id) {
     evaluation <- experiment$results[[id]]
     prepared <- beidan:::.ParlayRiskPrepare(evaluation, experiment$cutoff)
-    actual <- beidan::parlay_settle_plan(evaluation$final$plan, settlements, as_of)
-    exposure <- beidan:::.ParlayLossExposure(evaluation$final)
+    actual <- beidan::parlay_settle_plan(evaluation$plan, settlements, as_of)
+    exposure <- RecentSummaryExposure(prepared)
     values <- prepared$tickets |>
       dplyr::select(ticket_id, probability, payout_cny) |>
       dplyr::left_join(prepared$purchases |> dplyr::select(ticket_id, group_id, stake_cny),
@@ -52,5 +75,5 @@ RecentBacktestSummary <- function(experiment, settlements, as_of) {
     groups = dplyr::bind_rows(groups), ticket_returns = dplyr::bind_rows(ticket_returns),
     exposures = dplyr::bind_rows(exposures), receipt = list(cutoff = experiment$cutoff, as_of = as_of,
       experiment_hash = rlang::hash(experiment), settlement_hash = rlang::hash(settlements),
-      implementation_hash = rlang::hash(body(RecentBacktestSummary)), settlement_used_for_selection = FALSE))
+      implementation_hash = rlang::hash(list(body(RecentBacktestSummary), body(RecentSummaryExposure))), settlement_used_for_selection = FALSE))
 }

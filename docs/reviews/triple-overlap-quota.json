@@ -1,0 +1,36 @@
+{
+  "scope": "Shared-role3 overlap exemption, all-role reuse4; completed reconstructed28/30epochs,26 fixed templates only",
+  "hashes": {
+    "packages/beidan/R/parlay_ranked_portfolio.R": "bcff252d3008f3630b88f703c3aea6dec922afee3d66cd30140576a1d5b0fd70",
+    "packages/beidan/tests/testthat/test-parlay-ranked-portfolio.R": "c06fc897750f399a41796938346360c1d77a054600a5a8c8d370237a54ddf51b",
+    "packages/beidan/man/parlay_evaluate_portfolio.Rd": "4ff164a44f8161326162a7ffd64616984f75db94042c373fb1e67b016d884162",
+    "quarto/classify_outcomes_contract.qmd": "08cf6553b66d83bc32ca111b686f9f629d4b1b834a1f67854803bb575a023101",
+    "scripts/replay_recent_ranked_outcomes.R": "2bc23a566e2b2682dae5c1fc79789ee9348dde0955f55ebef3ce51bfb2d51b63",
+    "r/ranked_outcome_replay.R": "d357df86a9700715e66cde88eed849355b154110844d2e83428a0851303b99ce",
+    "tests/testthat/test-ranked-outcome-replay.R": "ccd203d3db4249e67d6aa2a2389e7db0bd7a4a080764644b558337323549d3b8"
+  },
+  "checks": {
+    "tests": "PASS189 package assertions +18 replay assertions;0fail/warn/skip; clean process explicit failure exit guard",
+    "review": "PASS final combined review; see compressed-structure-comparison.json",
+    "replay": "PASS28/30 full reconstruction; 26 old fixed templates only, no repeat full-run claim",
+    "render": "PASS final fresh QMD;90 tables,0execution errors",
+    "pi": "PASS reviewed hashes and final tables"
+  },
+  "function_test_mapping": {
+    ".parlay_ranked_counted_overlap / .parlay_ranked_admit": "direct shared triple, mixed-role, empty explicit sets, null/missing rejection, ordinary overlap/reuse boundaries",
+    ".parlay_ranked_group_space / .parlay_ranked_fund / .parlay_ranked_freeze": "public classified/ranked pool shared-triple admission, ordinary and fallback double rejection, reuse retained, frozen exemption receipt",
+    "ReplayRankedOutcomes / DiagnoseRankedReplay / VerifyRankedReplayReceipt": "18 replay, actual purchased protection, settlement, immutable decision/input hash assertions"
+  },
+  "review_history": [
+    "DSH implementation completed with192 assertions; controller removed unused helper and nullable/default compatibility paths; final suite rerun required.",
+    "Controller final189+18 assertions PASS; codex review final scoped sources clean. No default/nullable compatibility path and no unused role-lookup helper remain.",
+    "Final scope narrowed to28/30 complete reconstruction plus separate26/28/30 fixed-template compression; previous manifest archived as triple-overlap-quota-before-compression.json."
+  ],
+  "limitations": "No change to fixture reuse exemption in this task. No model fitting/tuning, no SP changes, no CI/full repository claim. Old all-role-overlap decisions retained in inputs/ranked_recent_replay/all_roles_overlap_evidence with inventory.",
+  "commands": {
+    "tests": "R_LIBS=\"$PWD/r_lib\" Rscript -e 'devtools::load_all(\"packages/beidan\",quiet=TRUE);a<-testthat::test_file(\"packages/beidan/tests/testthat/test-parlay-ranked-portfolio.R\");b<-testthat::test_file(\"tests/testthat/test-ranked-outcome-replay.R\");stopifnot(!any(as.data.frame(a)$failed>0),!any(as.data.frame(a)$error),!any(as.data.frame(b)$failed>0),!any(as.data.frame(b)$error))'",
+    "review": "codex review \"$(cat .run-control/triple-overlap-review-prompt.txt)\"; log .run-control/triple-overlap-review.log",
+    "replay": "R_LIBS=\"$PWD/r_lib\" Rscript scripts/replay_recent_ranked_outcomes.R 2026-09-28 2026-09-30",
+    "render": "R_LIBS=\"$PWD/r_lib\" TMPDIR=\"$PWD/.run-control/tmp\" XDG_CACHE_HOME=\"$PWD/.run-control/cache\" DENO_DIR=\"$PWD/.run-control/deno\" quarto render quarto/classify_outcomes_contract.qmd --to html --no-cache"
+  }
+}

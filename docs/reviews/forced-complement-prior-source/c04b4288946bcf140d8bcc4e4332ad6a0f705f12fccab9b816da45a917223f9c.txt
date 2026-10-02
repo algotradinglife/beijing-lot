@@ -1,0 +1,75 @@
+# Fixed historical fixture templates, explicit source identities, labels opened after freezing.
+devtools::load_all('packages/beidan',quiet=TRUE)
+source('r/ranked_outcome_replay.R');source('r/parlay_structure_compression.R')
+source_dir <- 'inputs/ranked_recent_replay/all_roles_overlap_evidence'
+output_dir <- file.path('inputs/compressed_structure_comparison',
+ substr(digest::digest('scripts/replay_compressed_structures.R',file=TRUE,algo='sha256'),1,16))
+dir.create(output_dir,recursive=TRUE,showWarnings=FALSE)
+original <- readRDS(file.path(source_dir,'results.rds'))
+source_files <- c('r/parlay_structure_compression.R','r/ranked_outcome_replay.R',
+ 'scripts/replay_compressed_structures.R',file.path('packages/beidan/R',
+ sort(list.files('packages/beidan/R',pattern='\\.R$'))))
+code_hashes <- stats::setNames(vapply(source_files,digest::digest,character(1),
+ file=TRUE,algo='sha256'),source_files)
+source_inventory<-jsonlite::read_json(file.path(source_dir,'inventory.json'))
+summary_rows<-list();group_metrics<-list();misses<-list();receipts<-list(); frozen_jobs<-list()
+for(record in original$receipts) {
+ path<-file.path(source_dir,basename(record$decision_path))
+ VerifyRankedReplayReceipt(path,record$input,record)
+ inventory_row<-Filter(function(x) identical(x$archived_path,path),source_inventory$files)
+ stopifnot(length(inventory_row)==1L,identical(inventory_row[[1L]]$sha256,record$decision_hash))
+ base<-readRDS(path)
+ stopifnot(identical(base$evaluation$cutoff,record$cutoff))
+ for(pattern in c('3322222','3332221')) {
+  cat('START',record$epoch,pattern,'\n');flush.console()
+  before<-rlang::hash(base)
+  compressed<-EvaluateCompressedTemplates(base,pattern,code_hashes)
+  stopifnot(identical(rlang::hash(base),before))
+  frozen_path<-file.path(output_dir,paste0(record$epoch,'-',pattern,'-decision.rds'))
+  if(file.exists(frozen_path)) {
+   stopifnot(identical(rlang::hash(readRDS(frozen_path)),rlang::hash(compressed)))
+  } else saveRDS(compressed,frozen_path)
+  frozen_hash<-digest::digest(frozen_path,file=TRUE,algo='sha256')
+  frozen_jobs[[length(frozen_jobs)+1L]] <- list(record=record,pattern=pattern,
+   original_path=path,frozen_path=frozen_path,frozen_hash=frozen_hash,
+   template_groups=sum(base$evaluation$group_selection$admitted))
+ }
+}
+# Every comparison is frozen before any target settlement is opened.
+for(job in frozen_jobs) {
+ record<-job$record;pattern<-job$pattern;path<-job$original_path
+ frozen_path<-job$frozen_path;frozen_hash<-job$frozen_hash
+ compressed<-readRDS(frozen_path)
+ labels<-readRDS(record$settlement)
+ report<-DiagnoseRankedReplay(compressed,labels$settlements,
+  lubridate::with_tz(labels$as_of,'UTC'))
+ stopifnot(identical(frozen_hash,digest::digest(frozen_path,file=TRUE,algo='sha256')))
+ sums<-report$returns$issue_returns
+ summary_rows[[length(summary_rows)+1L]]<-dplyr::mutate(sums,
+  epoch=record$epoch,target_pattern=pattern,
+  actual_pattern=paste(unique(compressed$group_metrics$actual_pattern),collapse=','),
+  template_groups=job$template_groups,
+  admitted_groups=compressed$evaluation$summary$selected_groups,
+  tickets=nrow(compressed$evaluation$purchases),
+  won_groups=sum(report$returns$group_returns$n_won>0),
+  coverage=compressed$evaluation$summary$actual_coverage,
+  estimated_net_cny=compressed$evaluation$summary$ev_net_cny)
+ group_metrics[[length(group_metrics)+1L]]<-dplyr::mutate(compressed$group_metrics,
+  epoch=record$epoch,case=pattern)
+ misses[[length(misses)+1L]]<-dplyr::mutate(report$misses,epoch=record$epoch,case=pattern)
+ receipts[[length(receipts)+1L]]<-list(epoch=record$epoch,pattern=pattern,
+  cutoff=record$cutoff,original_decision=path,original_decision_sha256=record$decision_hash,
+  original_input=record$input,original_input_sha256=record$input_sha256,
+  settlement=record$settlement,settlement_sha256=digest::digest(record$settlement,file=TRUE,algo='sha256'),
+  decision_path=frozen_path,decision_sha256=frozen_hash,receipt=compressed$receipt)
+ saveRDS(report,file.path(output_dir,paste0(record$epoch,'-',pattern,'-settlement.rds')))
+ cat('DONE',record$epoch,pattern,'net',sums$net_cny,'\n');flush.console()
+}
+
+result<-list(summary=dplyr::bind_rows(summary_rows),group_metrics=dplyr::bind_rows(group_metrics),
+ misses=dplyr::bind_rows(misses),receipts=receipts,code_hashes=code_hashes,
+ original_baseline=original$summary,
+ parameters=list(group_budget_cny=256,budget_cny=NULL,max_reuse=4L,max_overlap=3L,
+ overlap_role3_exemption=TRUE,mode='fixed original purchased fixture templates'))
+saveRDS(result,file.path(output_dir,'results.rds'))
+print(result$summary,width=160)

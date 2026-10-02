@@ -1,0 +1,47 @@
+{
+  "scope": "Preexisting removed-constructor-argument tests, not accepted clean current interfaces",
+  "constructor_file": "packages/beidan/R/parlay_ranked_group_construction.R",
+  "unchanged_constructor_sha256": "33c37cede69fd07cf79ae624f7f50f5d337d9699df25c8abfd5bbdca52cb816d",
+  "archive": "docs/reviews/forced-complement-prior-source/33c37cede69fd07cf79ae624f7f50f5d337d9699df25c8abfd5bbdca52cb816d.txt",
+  "current_formals": ["ranked_selections", "settings", "pattern", "max_candidates", "prematch_sp"],
+  "observed_error": "unused arguments (n_candidates, probabilities)",
+  "counts": [
+    {
+      "test_file": "packages/beidan/tests/testthat/test-parlay-exploration.R",
+      "errors": 7,
+      "assertions_failed": 0
+    },
+    {
+      "test_file": "packages/beidan/tests/testthat/test-parlay-loss-diagnostic.R",
+      "errors": 6,
+      "assertions_failed": 0
+    },
+    {
+      "test_file": "packages/beidan/tests/testthat/test-parlay-fixed-depth-curve.R",
+      "errors": 9,
+      "assertions_failed": 0
+    },
+    {
+      "test_file": "tests/testthat/test-role-strategy-independent.R",
+      "errors": 2,
+      "assertions_failed": 0
+    },
+    {
+      "test_file": "tests/testthat/test-541-embedded-cutoff-independent.R",
+      "errors": 2,
+      "assertions_failed": 0
+    },
+    {
+      "test_file": "tests/testthat/test-540-portfolio-interface-independent.R",
+      "errors": 2,
+      "assertions_failed": 0
+    },
+    {
+      "test_file": "tests/testthat/test-budget-sweep-independent.R",
+      "errors": 5,
+      "assertions_failed": 0
+    }
+  ],
+  "total_errors": 33,
+  "log": ".run-control/forced-complement-callers-tests.log"
+}

@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "source": "packages/beidan/tests/testthat/test-parlay-fixed-depth-curve.R",
+      "revision": "f4ae6f31",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-parlay-fixed-depth-curve.R.txt",
+      "sha256": "3b655900e20f0f93d08915999758ca1fac239e2fcddbbb6483e9a404de655712",
+      "replacement": "packages/beidan/tests/testthat/test-parlay-fixed-depth-curve.R"
+    },
+    {
+      "source": "packages/beidan/tests/testthat/test-parlay-risk.R",
+      "revision": "f4ae6f31",
+      "archive": "docs/reviews/outcome-role-variants-migrated-clients/test-parlay-risk.R.txt",
+      "sha256": "b37cd079fceab838a9d32ec5522241168fc2b413dafbe7352cf029d541e16cdc",
+      "replacement": "packages/beidan/tests/testthat/test-parlay-risk.R"
+    }
+  ]
+}

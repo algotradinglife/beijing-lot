@@ -19,7 +19,7 @@ params:
 
 ## 1. 输入和参数
 
-在 Positron 从本块顺序执行即可。各结构全覆盖成本分别为1296、288、192、64元；固定投入超过结构上限时截断，相同配置只计算一次。
+在 Positron 从本块顺序执行即可。目标模式的名义成本分别为1296、288、192、64元；实际全覆盖端点在构组后按实际掩码计算。固定投入超过实际空间上限时截断，相同配置只计算一次。
 
 ```{r}
 #| label: lab-setup
@@ -29,8 +29,11 @@ input_relative <- "inputs/26098_walkthrough/three_plans_20260928/plans.rds"
 if (exists("params") && !is.null(params$input)) input_relative <- params$input
 input_path <- file.path(root,input_relative)
 bundle <- readRDS(input_path)
-source_result <- list(probabilities=bundle$projected$probabilities,
-  constants=bundle$outputs[[1]]$evaluated$final$constants)
+settings <- beidan::parlay_settings()
+settings$n_legs <- 7L
+settings$unit_cny <- 2
+settings$payout_factor <- .65
+source_result <- list(probabilities=bundle$projected$probabilities,constants=settings)
 cutoff <- bundle$projected$cutoff
 decision_sp <- bundle$epoch$prematch_sp
 unit_cny <- source_result$constants$unit_cny
@@ -39,28 +42,36 @@ patterns <- list(
   p3322221=c(3L,3L,2L,2L,2L,2L,1L),
   p3222221=c(3L,2L,2L,2L,2L,2L,1L),
   p2222211=c(2L,2L,2L,2L,2L,1L,1L))
-n_candidates <- as.integer(dplyr::n_distinct(source_result$probabilities$fixture_id))
+n_matches <- as.integer(dplyr::n_distinct(source_result$probabilities$fixture_id))
 group_budgets_cny <- c(64,128,192,256)
 pattern_catalog <- tibble::tibble(pattern=names(patterns),
-  full_cover_units=vapply(patterns,prod,numeric(1))) |>
-  dplyr::mutate(full_cover_cny=full_cover_units*unit_cny)
+  nominal_units=vapply(patterns,prod,numeric(1))) |>
+  dplyr::mutate(nominal_cny=nominal_units*unit_cny)
 knitr::kable(tibble::tibble(期号=cutoff$issue_id,
   冻结北京时间=format(cutoff$cutoff_utc,"%Y-%m-%d %H:%M:%S",tz="Asia/Shanghai"),
-  比赛数=n_candidates,输入=input_relative,
+  比赛数=n_matches,输入=input_relative,
   SHA256=digest::digest(file=input_path,algo="sha256")))
 knitr::kable(pattern_catalog)
 ```
 
 ## 2. 角色排行榜和候选组
 
-每场都拥有三个适配分数：单选取最大概率、双选取前两项之和、三选取最小概率。角色按3→2→1安排，各组逐轮蛇形选场。候选组可以共享比赛，复用和重叠限制在选入方案时生效。
+Top1严格大于50%归单选，Top2、Top3分别严格大于20%时添加对应保护双选；否则Top1−Top3不超过10个百分点归三选，其余归双选。双选Top3严格大于20%时添加保护变种。按变种覆盖概率排名，三选同覆盖时按p3排名。角色按3→2→1安排，各榜游标连续并循环。候选组可以共享比赛，复用和重叠限制在选入方案时生效。
 
 ```{r}
 #| label: role-rankings
-role_scores <- beidan::parlay_role_scores(source_result$probabilities,cutoff)
-knitr::kable(role_scores |>
-  dplyr::arrange(dplyr::desc(role),rank) |>
-  dplyr::mutate(allowed_outcomes=sapply(allowed_outcomes,paste,collapse="/")),digits=4)
+matches <- source_result$probabilities |>
+  dplyr::select(fixture_id,outcome,probability) |>
+  tidyr::pivot_wider(names_from=outcome,values_from=probability) |>
+  dplyr::rename(win=W,draw=D,lose=L)
+filtered <- beidan::filter_outcome_matches(matches,decision_sp,cutoff)
+admitted <- filtered$matches
+attr(admitted,"filter_receipt") <- filtered$receipt
+selections <- beidan::prepare_outcome_selections(admitted)
+ranked <- beidan::rank_outcome_selections(selections,cutoff,"coverage")
+knitr::kable(ranked |>
+  dplyr::arrange(dplyr::desc(base_role),rank) |>
+  dplyr::mutate(outcomes=purrr::map_chr(outcomes,paste,collapse="/")),digits=4)
 knitr::kable(tibble::tibble(赛前SP场数=dplyr::n_distinct(decision_sp$fixture_id),
   赛前SP行数=nrow(decision_sp)))
 ```
@@ -70,13 +81,21 @@ knitr::kable(tibble::tibble(赛前SP场数=dplyr::n_distinct(decision_sp$fixture
 portfolios <- list()
 for (key in names(patterns)) {
   portfolios[[key]] <- beidan::parlay_construct_role_groups(
-    role_scores,cutoff,settings=source_result$constants,pattern=patterns[[key]],
-    n_candidates=n_candidates,probabilities=source_result$probabilities,
+    ranked,settings=source_result$constants,pattern=patterns[[key]],
+    max_candidates=NULL,
     prematch_sp=decision_sp)
 }
 knitr::kable(tibble::tibble(pattern=names(portfolios),
   candidate_groups=vapply(portfolios,function(x) nrow(x$groups),integer(1))))
+pattern_catalog <- pattern_catalog |>
+  dplyr::mutate(full_cover_units=vapply(portfolios,function(pool) {
+    spaces <- vapply(pool$group_patterns$actual_pattern,prod,numeric(1))
+    if (length(spaces)) max(spaces) else 0
+  },numeric(1)),full_cover_cny=full_cover_units*unit_cny)
+knitr::kable(pattern_catalog)
 ```
+
+目标模式只指定角色位置。单选榜的保护双选会将该位置的实际赛果数从1增为2；三选不足时允许3→2替补，缺少单选不以双选替补。实际合法票数为各位置实际赛果数之积，可能高于或低于目标模式的名义票数。下表中的全覆盖端点取同一模式所有候选组实际空间的最大值；空候选池的端点为0。
 
 ## 3. 批量比较单组投入
 
@@ -93,11 +112,11 @@ scenarios <- scenario_requests |>
   dplyr::arrange(pattern,group_budget_cny) |>
   dplyr::mutate(max_reuse=2L,max_overlap=2L,
     scenario_id=sprintf("S%03d",dplyr::row_number()),.before=1)
-exploration <- beidan::parlay_explore_portfolios(portfolios,scenarios,objective="probability")
+exploration <- beidan::parlay_explore_portfolios(portfolios,scenarios)
 knitr::kable(exploration$summary,digits=5)
 ```
 
-`exploration$results[["S001"]]$selection` 显示选入或跳过原因，`$tickets` 是实际购票明细。不同投入下允许重新选组，所以本块不是固定成员的纯深度实验。
+`exploration$results[["S001"]]$selection` 显示选入或跳过原因，`$purchases` 是实际购票明细；`$portfolio`保留候选来源，`$plan`为冻结购买方案，`$summary`记录spent_cny、new_ticket_count和actual_coverage。不同投入下允许重新选组，所以本块不是固定成员的纯深度实验。
 
 ## 4. 联合赛果下的命中和回本
 
@@ -159,7 +178,7 @@ full_scenarios <- scenarios |>
   dplyr::slice_max(group_budget_cny,n=1,with_ties=FALSE) |>
   dplyr::ungroup()
 fixed_plans <- stats::setNames(lapply(full_scenarios$scenario_id,
-  function(id) exploration$results[[id]]$final),full_scenarios$pattern)
+  function(id) exploration$results[[id]]),full_scenarios$pattern)
 depth_curve <- beidan::parlay_fixed_depth_curve(fixed_plans,
   sort(unique(c(0,group_budgets_cny,pattern_catalog$full_cover_cny))))
 knitr::kable(depth_curve,digits=5)
@@ -190,7 +209,7 @@ knitr::kable(frontier |> dplyr::filter(cost_cny==0) |>
 
 ## 7. 人工选择后再微调
 
-默认两个选择参数均为空，只展示前沿。看过图表后填写情景编号和组数前缀；微调总额限制为该前缀的实际花费。微调可能重新选组，其目标仍为预计命中票数，不保证回本概率上升，所以必须重新评价风险。
+默认两个选择参数均为空，只展示前沿。看过图表后填写情景编号和组数前缀；微调总额限制为该前缀的实际花费。微调可能重新选组，其目标为自有物理票至少命中一次的精确联合覆盖概率，不保证回本概率上升，所以必须重新评价风险。
 
 ```{r}
 #| label: choose-scenario
@@ -224,13 +243,12 @@ if (nrow(selected_config)==1L) {
     portfolios[[selected_config$pattern[[1]]]],
     group_budget_cny=selected_config$group_budget_cny[[1]],
     budget_cny=selected_config$cost_cny[[1]],
-    constraints=list(max_reuse=selected_config$max_reuse[[1]],
-      max_overlap=selected_config$max_overlap[[1]]),improve=TRUE,
-    improvement_policy=list(max_passes=1L,rank_window=2L,max_evaluations=8L))
+    reuse_policy=list(max_reuse=selected_config$max_reuse[[1]]),
+    overlap_policy=list(max_overlap=selected_config$max_overlap[[1]]),improve=TRUE)
   refined_risk <- beidan::parlay_compare_risk(list(
     results=list(refined=role_evaluation),cutoff=cutoff,
     summary=tibble::tibble(scenario_id="refined")),include_group_prefixes=FALSE)
-  print(knitr::kable(role_evaluation$metrics,digits=5))
+  print(knitr::kable(tibble::as_tibble(role_evaluation$summary),digits=5))
   print(knitr::kable(refined_risk$summary,digits=5))
 }
 ```
@@ -238,9 +256,9 @@ if (nrow(selected_config)==1L) {
 ```{r}
 #| label: selected-plan
 if (!is.null(role_evaluation)) {
-  print(knitr::kable(role_evaluation$final$plan$group_legs))
+  print(knitr::kable(role_evaluation$plan$group_legs))
   print(knitr::kable(role_evaluation$selection))
-  print(knitr::kable(utils::head(role_evaluation$tickets,30),digits=5))
+  print(knitr::kable(utils::head(role_evaluation$purchases,30),digits=5))
 }
 ```
 
@@ -257,7 +275,7 @@ knitr::kable(tibble::tibble(输入SHA256=digest::digest(file=input_path,algo="sh
 str(risk$receipt,max.level=1)
 ```
 
-函数测试在开发时独立执行，不在本页运行。当前验收、review命令及文件哈希见 `docs/reviews/544-portfolio-risk.json`；此前版本记录见 `docs/reviews/542-exploration-first.json`。收据绑定冻结时点、数据、参数和实现身份。
+函数测试在开发时独立执行，不在本页运行。此前冻结版本的验收、review命令及文件哈希见 `docs/reviews/544-portfolio-risk.json`；此前版本记录见 `docs/reviews/542-exploration-first.json`。收据绑定冻结时点、数据、参数和实现身份。
 
 ```{r}
 #| label: review-evidence
@@ -271,3 +289,7 @@ if (file.exists(review_path)) {
   cat("本开发版本尚未完成独立验收，审查记录待生成。")
 }
 ```
+
+## #553接口集成范围（待验证）
+
+本次同步分类、过滤、prepare、rank、构组及购买接口，探索汇总使用新版summary字段，固定深度接收完整购买评价对象。原输入冻结身份与历史审阅记录保持原义；旧记录不能证明本次接口更新已验收。本次未运行函数测试、QMD渲染或codex review，最终集成验证与PI验收待记录。

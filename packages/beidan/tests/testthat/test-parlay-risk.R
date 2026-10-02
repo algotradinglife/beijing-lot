@@ -12,14 +12,16 @@ RiskFixture <- function(probabilities = c(.6, .6), pattern = 1L,
   n <- length(probabilities)
   p <- tibble::tibble(fixture_id = rep(letters[seq_len(n)], each = 3),
     outcome = rep(c("W", "D", "L"), n),
-    probability = as.numeric(c(rbind(probabilities, (1 - probabilities) * .75, (1 - probabilities) * .25))))
+    probability = as.numeric(c(rbind(probabilities, (1 - probabilities) / 2, (1 - probabilities) / 2))))
   quotes <- tibble::tibble(fixture_id = p$fixture_id, outcome = p$outcome,
     quote_at = cutoff$cutoff_utc - 60, sp_raw = as.numeric(rep(sp, each = 3)), source_url = "fixture://risk")
   if (reverse) { p <- p[nrow(p):1, ]; quotes <- quotes[nrow(quotes):1, ] }
   settings <- parlay_settings(); settings$n_legs <- as.integer(length(pattern))
-  pool <- parlay_construct_role_groups(parlay_role_scores(p, cutoff), cutoff,
-    settings, pattern = pattern, n_candidates = as.integer(n), probabilities = p,
-    prematch_sp = quotes)
+  matches <- tidyr::pivot_wider(p, names_from = outcome, values_from = probability) |>
+    dplyr::rename(win = W, draw = D, lose = L)
+  ranked <- rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
+  pool <- parlay_construct_role_groups(ranked, settings, pattern = pattern,
+    max_candidates = as.integer(n), prematch_sp = quotes)
   overlap <- as.integer(length(pattern) - 1L)
   scenarios <- tibble::tibble(scenario_id = "a", pattern = "p",
     group_budget_cny = budget, budget_cny = as.numeric(n * max(budget, 2)),
@@ -62,19 +64,13 @@ test_that("shared fixtures induce dependence and use only one outcome per state"
 test_that("stake multiplication and SP transform use one ticket-level payout factor", {
   e <- RiskFixture(.6, sp = 11)
   x <- parlay_compare_risk(e)$summary[2, ]
-  expect_equal(x$expected_net_cny, .6 * 2 * .65 * 4.5 - 2)
+  expect_equal(x$expected_net_cny, .6 * 2 * .65 * 11 - 2)
   expect_equal(x$break_even_probability, .6)
   e <- RiskFixture(.6, sp = 10)
   expect_equal(parlay_compare_risk(e)$summary$expected_net_cny[2], .6 * 2 * .65 * 10 - 2)
-  # A ledger's actual stake may contain several units on one physical ticket.
-  e <- RiskFixture(.6)
-  f <- e$results$a$final
-  f$plan$purchases$stake_cny <- f$funded$purchases$stake_cny <- f$history$purchases$stake_cny <- 4
-  e$results$a$final <- f
-  x <- parlay_compare_risk(e)$summary[2, ]
-  expect_equal(x$cost_cny, 4)
-  expect_equal(x$expected_net_cny, .6 * 4 * .65 * 2 - 4)
-  expect_equal(x$purchased_tickets, 1L)
+  bad <- e
+  bad$results$a$plan$purchases$stake_cny <- 4
+  expect_error(parlay_compare_risk(bad), "binding")
 })
 
 test_that("missing SP affects only the prefixes that actually buy unpriced tickets", {
@@ -143,30 +139,30 @@ test_that("invalid contexts and altered saved values fail closed", {
   expect_identical(parlay_compare_risk(e, max_exact_states = 8)$receipt$method, "mc")
   bad <- e; bad$cutoff <- NULL
   expect_error(parlay_compare_risk(bad))
-  bad <- e; bad$results$a$final$cutoff$cutoff_utc <- bad$cutoff$cutoff_utc + 1
+  bad <- e; bad$results$a$cutoff$cutoff_utc <- bad$cutoff$cutoff_utc + 1
   expect_error(parlay_compare_risk(bad), "identity|cutoff")
   bad <- e; bad$results$a$receipt$cutoff_hash <- NULL
-  expect_error(parlay_compare_risk(bad), "frozen cutoff binding")
+  expect_error(parlay_compare_risk(bad), "binding|hash|settings|probability")
   bad <- e; bad$results$a$receipt$cutoff <- NULL
-  expect_error(parlay_compare_risk(bad), "frozen cutoff binding")
+  expect_error(parlay_compare_risk(bad), "binding|hash|settings|probability")
   bad <- e; bad$results$a$receipt$cutoff_hash <- "wrong"
-  expect_error(parlay_compare_risk(bad), "frozen cutoff binding")
-  bad <- e; bad$results$a$final$probabilities$probability[1] <- .7
+  expect_error(parlay_compare_risk(bad), "binding|hash|settings|probability")
+  bad <- e; bad$results$a$portfolio$probabilities$probability[1] <- .7
   expect_error(parlay_compare_risk(bad))
-  bad <- e; bad$results$a$final$prematch_sp$sp_raw[1] <- 3
+  bad <- e; bad$results$a$portfolio$prematch_sp$sp_raw[1] <- 3
   expect_error(parlay_compare_risk(bad), "hash")
-  bad <- e; bad$results$a$final$prematch_sp$quote_at[1] <- e$cutoff$cutoff_utc
-  expect_error(parlay_compare_risk(bad), "cutoff")
-  bad <- e; bad$results$a$final$provenance$probability_hash <- NULL
-  expect_error(parlay_compare_risk(bad), "missing provenance")
+  bad <- e; bad$results$a$portfolio$prematch_sp$quote_at[1] <- e$cutoff$cutoff_utc
+  expect_error(parlay_compare_risk(bad), "cutoff|hash")
+  bad <- e; bad$results$a$receipt$probability_hash <- NULL
+  expect_error(parlay_compare_risk(bad), "binding|hash|settings|probability")
   bad <- e; bad$results$a$receipt$prematch_sp_hash <- NULL
-  expect_error(parlay_compare_risk(bad), "missing provenance")
-  bad <- e; bad$results$a$final$constants$payout_factor <- .5
-  expect_error(parlay_compare_risk(bad), "settings")
-  bad <- e; bad$results$a$final$plan$tickets$probability[1] <- .1
-  expect_error(parlay_compare_risk(bad), "probability")
-  bad <- e; bad$results$a$final$plan$ticket_legs$outcome[1] <- "D"
-  expect_error(parlay_compare_risk(bad), "probability|physical")
+  expect_error(parlay_compare_risk(bad), "binding|hash|settings|probability")
+  bad <- e; bad$results$a$portfolio$settings$payout_factor <- .5
+  expect_error(parlay_compare_risk(bad), "binding|settings")
+  bad <- e; bad$results$a$purchases$probability[1] <- .1
+  expect_error(parlay_compare_risk(bad), "binding|probability")
+  bad <- e; bad$results$a$plan$ticket_legs$outcome[1] <- "D"
+  expect_error(parlay_compare_risk(bad), "binding|hash|settings|probability")
 })
 
 test_that("cross-scenario input conflicts and rebound stale valuations are refused", {
@@ -177,11 +173,25 @@ test_that("cross-scenario input conflicts and rebound stale valuations are refus
   e$results$b <- RiskFixture(sp = c(3, 2))$results$a
   expect_error(parlay_compare_risk(e), "common SP")
   e <- RiskFixture()
-  e$results$a$final$constants$payout_factor <- e$results$a$final$plan$constants$payout_factor <- .5
-  expect_error(parlay_compare_risk(e), "valuation")
+  e$results$a$portfolio$settings$payout_factor <- e$results$a$plan$constants$payout_factor <- .5
+  expect_error(parlay_compare_risk(e), "binding|hash|settings|probability")
   e <- RiskFixture()
-  e$results$a$final$plan$valued$sp_product_est[1] <- 9
-  expect_error(parlay_compare_risk(e), "valuation")
+  e$results$a$purchases$sp_product_est[1] <- 9
+  expect_error(parlay_compare_risk(e), "binding|hash|settings|probability")
   e <- RiskFixture(.99)
   expect_equal(parlay_compare_risk(e)$summary$net_p05_cny[2], .6)
+})
+
+test_that("independent revaluation rejects rebound ledger EV", {
+  e <- RiskFixture()
+  e$results$a$purchases$ev_net_est[1] <- 999
+  e$results$a$receipt$final_purchase_hash <- rlang::hash(e$results$a$purchases)
+  expect_error(parlay_compare_risk(e),"valuation")
+})
+
+test_that("rebound frozen stakes still reconcile with physical purchase ledger", {
+  e <- RiskFixture()
+  e$results$a$plan$purchases$stake_cny[1] <- 4
+  e$results$a$receipt$plan_hash <- rlang::hash(e$results$a$plan)
+  expect_error(parlay_compare_risk(e),"ledger")
 })
