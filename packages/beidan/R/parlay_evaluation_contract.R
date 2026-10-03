@@ -10,11 +10,16 @@
   if (!identical(evaluation$cutoff, pool$cutoff) ||
       !identical(receipt$cutoff, pool$cutoff) ||
       !identical(receipt$cutoff_hash, pool$cutoff_hash)) stop("evaluation cutoff binding mismatch")
+  producer <- receipt$producer
+  if (!is.character(producer) || length(producer) != 1L || is.na(producer) ||
+      !producer %in% c("parlay_evaluate_portfolio", "parlay_select_groups")) {
+    stop("evaluation producer binding missing or invalid")
+  }
   expected <- list(portfolio_hash=rlang::hash(evaluation$portfolio),
     probability_hash=rlang::hash(pool$probabilities), prematch_sp_hash=rlang::hash(pool$prematch_sp),
     settings_hash=rlang::hash(pool$settings), final_purchase_hash=rlang::hash(evaluation$purchases),
     final_role_legs_hash=rlang::hash(evaluation$final$role_legs), plan_hash=rlang::hash(evaluation$plan),
-    code_hash=.rank_outcome_code_hash(roots=c("parlay_construct_role_groups","parlay_evaluate_portfolio")))
+    code_hash=.rank_outcome_code_hash(roots=c("parlay_construct_role_groups",producer)))
   for (field in names(expected)) {
     if (!identical(receipt[[field]], expected[[field]])) stop("evaluation binding mismatch: ",field)
   }

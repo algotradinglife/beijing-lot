@@ -1,0 +1,128 @@
+{
+  "status": "Codex review PASS；P1/P2已解决，专项验收通过；全仓结果另列",
+  "review_command": "codex review - < .run-control/select-groups-repair/review-delta-prompt.txt",
+  "reviewed_files": [
+    {
+      "path": "packages/beidan/R/parlay_select_groups.R",
+      "sha256": "d38aff98f1dae59a32ff84abe1056a5e210c0ce8c2029bcf44ebdd1c348c33cd"
+    },
+    {
+      "path": "packages/beidan/R/parlay_ranked_portfolio.R",
+      "sha256": "2326817eab053b06afbdda968fe298b3db36010a6a7a2cbaca7dc9e896547320"
+    },
+    {
+      "path": "packages/beidan/R/parlay_evaluation_contract.R",
+      "sha256": "c58b49ab877a68e2b0aabc4c6b26ca45a14ba6ad35777c4f9ed624c2f02bbf43"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-select-groups.R",
+      "sha256": "5507dc879aafb74cfc643923eb1f5b12c367171df37e2901a5dd8be1b7ae25ef"
+    },
+    {
+      "path": "packages/beidan/man/parlay_select_groups.Rd",
+      "sha256": "c5b66141c46a8b31049e5d6ac47d9a9936e7f234c399d104ead93aa2cec55c38"
+    },
+    {
+      "path": "quarto/parlay_select_groups_contract.qmd",
+      "sha256": "eadafd4f6c54555a19afa1be1b12c8462964d49e135095ceadceae187e86bbfb"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-parlay-select-groups-mixed-ev.R",
+      "sha256": "5d79c2dd07d4fcaf53bb7f7dde48c2e4cc7ab578f75c3c6498f3cca00196a40f"
+    }
+  ],
+  "findings": [
+    {
+      "priority": "P1",
+      "finding": "截断去重与补额顺序不一致、后续重排改变票账本",
+      "resolution": "共享购买事务，一次冻结返回evaluation；回归包含保护变种小额度",
+      "status": "resolved, reviewed"
+    },
+    {
+      "priority": "P2",
+      "finding": "EV测试复用生产输出概率",
+      "resolution": "按输入概率独立枚举全部赛果状态，独立计算各组与整体期望",
+      "status": "resolved, reviewed"
+    },
+    {
+      "priority": "test strengthening",
+      "finding": "拒绝候选对排名影响的单一案例可能全部拒绝",
+      "resolution": "新增独立混合EV夹具，122条断言检验实际入选与拒绝并存及每轮最大边际覆盖",
+      "status": "resolved, reviewed"
+    }
+  ],
+  "tests_command": "Rscript tests/testthat.R",
+  "scope": "本次只修复选择器及共享冻结边界，原分类/概率/场次构造不变，不参与CI",
+  "limitations": [
+    "模型收益不等于结算收益",
+    "贪心不保证全局最优",
+    "旧pool返回删除，使用selected$evaluation",
+    "全仓检查另行报告，不冒充专项通过"
+  ],
+  "checks": {
+    "affected_suites": "4 suites,471 assertions,0 failures; code unchanged after completion",
+    "selector_suites": "16 test blocks /350 assertions, 0 failures; main228 +mixed122",
+    "render": "15 tables,0 execution errors; frozen actual ledger assertions all TRUE",
+    "full_runner": {
+      "command": "Rscript tests/testthat.R",
+      "exit_code": 1,
+      "package_phase": "PASS, 13 skipped integration cases explicitly reported",
+      "repository_clients": "FAIL; log reports first 10 failures and 98 more",
+      "log": ".run-control/select-groups-repair/full-tests.log",
+      "log_sha256": "74d70df414730c2d0f1442031970c05ff96ceb528845b828f3c0b8ce3603277a",
+      "known_baseline": "unchanged tracked test-26098-walkthrough-progress.R independently fails on undeclared market_schedule; supplementary old untracked clients expect obsolete role columns, removed helpers or unavailable source modules. No whole-repository PASS claimed."
+    }
+  },
+  "review_log": ".run-control/select-groups-repair/review-delta.log",
+  "review_log_sha256": "32e240d411f09ef6009e84bdd6fa39f0ecaabcd03b70f0224367f2f5c24646f8",
+  "reviews": [
+    {
+      "round": 1,
+      "verdict": "NOT PASS",
+      "finding": "P2独立EV计算不足",
+      "log": ".run-control/select-groups-repair/review.log"
+    },
+    {
+      "round": 2,
+      "verdict": "PASS",
+      "log": ".run-control/select-groups-repair/review-final.log"
+    },
+    {
+      "round": 3,
+      "verdict": "PASS",
+      "log": ".run-control/select-groups-repair/review-delta.log"
+    }
+  ],
+  "pi_acceptance": {
+    "scope": "专项实现、相关函数测试、完整包内阶段、执行QMD、独立源码/增量review通过；仓库客户端阶段失败，不作为全仓验收或合并声明",
+    "reviewed_source_unchanged": true,
+    "by": "user-authorized Codex PI"
+  },
+  "render": {
+    "command": "TMPDIR=/tmp XDG_CACHE_HOME=/tmp/beidan-quarto-cache DENO_DIR=/tmp/beidan-deno quarto render quarto/parlay_select_groups_contract.qmd --to html --no-cache",
+    "tables": 15,
+    "execution_errors": 0,
+    "html_sha256": "8e7acb59148e0c92412c5754adcbe32421508761b58e23fc10dd726c0bd7bf84",
+    "all_ledger_assertions_passed": true,
+    "reviewed_source_unchanged": true
+  },
+  "results": {
+    "ev": {
+      "groups": 4,
+      "cost_cny": 1024,
+      "model_ev_cny": 235.67286,
+      "coverage": 0.357398
+    },
+    "coverage": {
+      "groups": 4,
+      "cost_cny": 1024,
+      "model_ev_cny": 20.67988,
+      "coverage": 0.378098
+    },
+    "actual_settlement_used": false
+  },
+  "notes": [
+    "Roxygen generation reported unrelated existing unresolved help links; its out-of-scope tracked help changes were restored. No dependencies installed, no source data changed, no CI work, no merge.",
+    "Final receipt/check metadata updated after source review; reviewed implementation/tests/QMD hashes unchanged. Rendered numerical tables and execution assertions independently inspected by PI."
+  ]
+}

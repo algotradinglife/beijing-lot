@@ -910,35 +910,12 @@
   list(state=state,reason="admitted")
 }
 
-#' Fund the ranked candidate pool under the explicit budget and policies
-#'
-#' Internal. The bounded successor funding walk:
-#'   1. every complete group is enumerated once and its NOMINAL priority computed
-#'      as the probability mass of its legal top-N tickets for its actual group cap;
-#'   2. groups are visited in the initial nominal order (mass descending, stable
-#'      group id tie) and never re-sorted dynamically;
-#'   3. triggering actual double fixtures require both purchased directions in
-#'      different groups. Seeds and partners are staged in stable nominal order;
-#'      partner obligations expand the finite bundle. No combinatorial search or
-#'      backtracking is claimed. Missing partners roll back every tentative purchase.
-#'   4. a group with no new physical ticket is rejected `no_new_tickets` without
-#'      consuming a constraint or cash; an admitted group is checked for reuse and
-#'      overlap and a refusal consumes nothing;
-#'   4. an admitted group buys its rank-ordered tickets, SKIPPING physical tickets
-#'      already bought anywhere in this decision, continuing DOWN the rank until the
-#'      wanted units, the remaining total budget or the legal space is exhausted;
-#'   5. spent cash, new tickets and the group's ACTUAL coverage are recorded from
-#'      the owned new tickets only.
-#' @param pool Validated pool list from [.parlay_ranked_validate_pool()].
-#' @param group_budget_cny Validated per-group budget, or `NULL`.
-#' @param budget_cny Validated total budget, or `NULL`.
-#' @param reuse_policy Validated reuse policy.
-#' @param overlap_policy Validated overlap policy.
-#' @return A list with the per-group spaces, the nominal ordering, the purchases
-#'   ledger, the selection audit and the rejections.
+#' Prepare shared group spaces and nominal quotas
+#' @param pool Validated candidate pool.
+#' @param group_budget_cny Per-group CNY ceiling or NULL for full support.
+#' @return List of enumerated spaces and a typed nominal tibble; no IO.
 #' @noRd
-.parlay_ranked_fund <- function(pool, group_budget_cny, budget_cny, reuse_policy,
-                                overlap_policy) {
+.PrepareRankedFunding <- function(pool, group_budget_cny) {
   settings <- pool$settings
   unit_cny <- as.numeric(settings$unit_cny)
   groups <- pool$legs
@@ -973,6 +950,41 @@
   nominal <- nominal[order(-nominal$nominal_coverage, nominal$group_id), ,
                      drop = FALSE]
 
+  return(list(spaces = spaces, nominal = nominal))
+}
+
+#' Fund the ranked candidate pool under the explicit budget and policies
+#'
+#' Internal. The bounded successor funding walk:
+#'   1. every complete group is enumerated once and its NOMINAL priority computed
+#'      as the probability mass of its legal top-N tickets for its actual group cap;
+#'   2. groups are visited in the initial nominal order (mass descending, stable
+#'      group id tie) and never re-sorted dynamically;
+#'   3. triggering actual double fixtures require both purchased directions in
+#'      different groups. Seeds and partners are staged in stable nominal order;
+#'      partner obligations expand the finite bundle. No combinatorial search or
+#'      backtracking is claimed. Missing partners roll back every tentative purchase.
+#'   4. a group with no new physical ticket is rejected `no_new_tickets` without
+#'      consuming a constraint or cash; an admitted group is checked for reuse and
+#'      overlap and a refusal consumes nothing;
+#'   4. an admitted group buys its rank-ordered tickets, SKIPPING physical tickets
+#'      already bought anywhere in this decision, continuing DOWN the rank until the
+#'      wanted units, the remaining total budget or the legal space is exhausted;
+#'   5. spent cash, new tickets and the group's ACTUAL coverage are recorded from
+#'      the owned new tickets only.
+#' @param pool Validated pool list from [.parlay_ranked_validate_pool()].
+#' @param group_budget_cny Validated per-group budget, or `NULL`.
+#' @param budget_cny Validated total budget, or `NULL`.
+#' @param reuse_policy Validated reuse policy.
+#' @param overlap_policy Validated overlap policy.
+#' @return A list with the per-group spaces, the nominal ordering, the purchases
+#'   ledger, the selection audit and the rejections.
+#' @noRd
+.parlay_ranked_fund <- function(pool, group_budget_cny, budget_cny, reuse_policy,
+                                overlap_policy) {
+  prepared <- .PrepareRankedFunding(pool, group_budget_cny)
+  spaces <- prepared$spaces
+  nominal <- prepared$nominal
   state <- list(bought=character(),spent=0,admitted=list(),purchases=list(),
                 ticket_legs=list(),selection=list())
   rejections <- list()
@@ -1525,6 +1537,32 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
   overlap <- .parlay_ranked_validate_overlap_policy(overlap_policy)
 
   fund <- .parlay_ranked_fund(pool, group_budget_cny, budget_cny, reuse, overlap)
+  return(.FinalizeRankedEvaluation(portfolio, pool, fund, budget_cny,
+    group_budget_cny, reuse, overlap, improve,
+    producer = "parlay_evaluate_portfolio", objective = "coverage",
+    order_rule = "initial nominal legal-topN mass, descending; stable group_id tie",
+    dynamic_resort = FALSE))
+}
+
+#' Freeze and summarize one authoritative funding ledger
+#' @param portfolio Original candidate pool with bound inputs.
+#' @param pool Validated normalized pool.
+#' @param fund Shared funding ledger including spaces and actual purchases.
+#' @param budget_cny Total CNY ceiling or NULL.
+#' @param group_budget_cny Per-group CNY ceiling or NULL.
+#' @param reuse Validated fixture reuse policy.
+#' @param overlap Validated pair overlap policy.
+#' @param improve Whether to apply the existing bounded improvement step.
+#' @param producer Public decision entry point bound into the receipt.
+#' @param objective Declared selection objective.
+#' @param order_rule Human-readable group ordering rule.
+#' @param dynamic_resort Whether ordering uses the actual admitted ledger.
+#' @param selection_policy Explicit selector gate parameters; empty for the ordinary evaluator.
+#' @return Evaluation with frozen plan, purchases, summaries and code receipt.
+#' @noRd
+.FinalizeRankedEvaluation <- function(portfolio, pool, fund, budget_cny,
+  group_budget_cny, reuse, overlap, improve, producer, objective,
+  order_rule, dynamic_resort, selection_policy = list()) {
   initial_summary <- .parlay_ranked_summary(fund, pool, budget_cny,
                                             group_budget_cny)
   improvement <- .parlay_ranked_improve(pool, fund, group_budget_cny, budget_cny,
@@ -1547,10 +1585,11 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
     prematch_sp_hash = rlang::hash(pool$prematch_sp),
     settings_hash = rlang::hash(pool$settings),
     code_hash = .rank_outcome_code_hash(roots = c(
-      "parlay_construct_role_groups", "parlay_evaluate_portfolio")),
+      "parlay_construct_role_groups", producer)),
+    producer = producer, selection_policy = selection_policy,
     budget_cny = budget_cny, group_budget_cny = group_budget_cny,
     reuse_policy = reuse, overlap_policy = overlap, improve = improve,
-    objective = "coverage",
+    objective = objective,
     # The only overlap concession is an ACTUAL shared triple (all three outcomes
     # selected in BOTH groups); it is keyed on the realized outcome combination, not
     # on base_role. Protective variants are selectable and never mandatory, so no
@@ -1558,10 +1597,12 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
     overlap_exemption = "shared_actual_triple_only",
     sp_policy = "raw pre-match SP; no >10 replacement; missing SP leaves EV NA")
   diagnostics <- list(
-    objective = "coverage",
-    objective_basis = "exact probability that at least one owned physical ticket wins",
-    group_order = "initial nominal legal-topN mass, descending; stable group_id tie",
-    dynamic_resort = FALSE,
+    objective = objective,
+    objective_basis = if (objective == "ev")
+      "model net expectation of actual new physical tickets" else
+      "exact probability that at least one owned physical ticket wins",
+    group_order = order_rule,
+    dynamic_resort = dynamic_resort,
     dedup_identity = "physical ticket (fixture, outcome) pairs",
     ev_available = final_summary$summary$ev_available,
     unspent_cny = final_summary$summary$unspent_cny,
@@ -1569,7 +1610,7 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
     evaluations = improvement$evaluations,
     accepted_moves = improvement$accepted,
     improvement_enabled = isTRUE(improve))
-  list(portfolio = portfolio,
+  return(list(portfolio = portfolio,
        summary = final_summary$summary,
        group_selection = final_summary$group_selection,
        purchases = best$purchases,
@@ -1588,5 +1629,5 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
                     summary = final_summary$summary,
                     group_selection = final_summary$group_selection,
                     purchases = best$purchases, selection = best$selection,
-                    rejections = best$rejections))
+                    rejections = best$rejections)))
 }
