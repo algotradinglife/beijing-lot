@@ -1,0 +1,173 @@
+---
+title: "候选组选取：准确购买账本与边际贡献"
+format:
+  html:
+    embed-resources: true
+    toc: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  snapshot: inputs/26101_plans_20260930/half_hour/frozen_inputs.rds
+  review_record: docs/reviews/parlay-select-groups-repair.json
+---
+
+本页修复 `parlay_select_groups()` 的 P1：旧选择器先截断再去重，后续购买却先去重再补满额度，并会重新排序，因此两份账本不一致。新选择器共用购买事务、一次完成选组和记账，直接返回冻结 `evaluation`。原有候选构造和普通评估入口保留各自功能；旧的受限 `pool` 返回路径已删除，不再建议第二次购买。
+
+只使用已声明的26101冻结快照，不联网、不读结算、不生成正式下注单、不拟合、不以历史收益选择参数。这里展示的是模型预期与覆盖，不是实际盈利。R函数测试在QMD之外执行。本次不参与CI。
+
+## 1. 加载与输入身份
+
+```{r setup}
+root <- rprojroot::find_root(rprojroot::has_file("packages/beidan/DESCRIPTION"))
+devtools::load_all(file.path(root,"packages/beidan"),quiet=TRUE)
+parameters <- if (exists("params",inherits=FALSE)) params else
+  rmarkdown::yaml_front_matter(file.path(root,"quarto/parlay_select_groups_contract.qmd"))$params
+snapshot_path <- file.path(root,parameters$snapshot)
+snapshot <- readRDS(snapshot_path)
+projected <- snapshot$projected
+stopifnot(identical(projected$cutoff,snapshot$epoch$cutoff))
+cutoff <- projected$cutoff
+knitr::kable(tibble::tibble(input=parameters$snapshot,
+  sha256=digest::digest(snapshot_path,file=TRUE,algo="sha256"),
+  issue_id=cutoff$issue_id,
+  decision_beijing=format(cutoff$cutoff_utc,tz="Asia/Shanghai"),
+  fixtures=dplyr::n_distinct(projected$probabilities$fixture_id)))
+```
+
+## 2. 分类、排名、构造候选
+
+3333222 为预设模式；缺三选时按原规则用双选接替，资金按实际赛果宽度计算。Top1赛前北单SP<2整场过滤。未缺失SP不作大值替换。
+
+```{r pool}
+matches <- projected$probabilities |>
+  tidyr::pivot_wider(names_from=outcome,values_from=probability) |>
+  dplyr::rename(win=W,draw=D,lose=L)
+filtered <- beidan::filter_outcome_matches(matches,projected$prematch_sp,cutoff)
+admitted <- filtered$matches
+attr(admitted,"filter_receipt") <- filtered$receipt
+ranked <- beidan::rank_outcome_selections(
+  beidan::prepare_outcome_selections(admitted),cutoff,"coverage")
+pool <- beidan::parlay_construct_role_groups(ranked,snapshot$settings,
+  pattern=c(3L,3L,3L,3L,2L,2L,2L),max_candidates=NULL,
+  prematch_sp=projected$prematch_sp)
+knitr::kable(pool$groups)
+```
+
+## 3. 一次选组、一次冻结
+
+每轮暂算剩余各组：先剔除已买物理票，再沿概率排序补至单组额度；预算只够部分票时按实际可买单位评估。先检查复用/重叠和新增EV门槛，再比较候选。`ev`选新增票模型净期望最大者；`coverage`选实际整体覆盖增量最大者，同值按group_id。这里总预算1024元、单组256元、复用与重叠不设限、关闭微调，以隔离选组目标。
+
+`min_group_ev_cny=NULL`：ev默认要求新增净EV>0，coverage无EV门槛。EV缺SP时拒绝；coverage无门槛可买但EV为NA。未入选的候选不影响下一轮排序或资金。两目标均为贪心，无全局最优承诺；覆盖增量因补票及约束改变，不承诺逐轮非增。阈值不由本例收益拟合。
+
+```{r selection}
+budget_cny <- 1024
+group_budget_cny <- 256
+sel_ev <- beidan::parlay_select_groups(pool,"ev",budget_cny=budget_cny,
+  group_budget_cny=group_budget_cny)
+sel_cov <- beidan::parlay_select_groups(pool,"coverage",budget_cny=budget_cny,
+  group_budget_cny=group_budget_cny)
+knitr::kable(dplyr::bind_rows(sel_ev$summary,sel_cov$summary),digits=6)
+knitr::kable(sel_ev$selection,digits=6)
+knitr::kable(sel_cov$selection,digits=6)
+knitr::kable(sel_ev$excluded)
+```
+
+## 4. 使用最终结果，而非再次购买
+
+`selected$evaluation`直接用于方案查看、风险诊断和结算。只存在这一份实际票账本，没有“预计购买→重新定价”的二次步。
+
+```{r evaluation}
+evaluation <- sel_ev$evaluation
+knitr::kable(tibble::as_tibble(evaluation$summary))
+knitr::kable(dplyr::filter(evaluation$group_selection,admitted))
+knitr::kable(dplyr::slice_head(evaluation$purchases,n=12))
+knitr::kable(evaluation$plan$group_legs)
+```
+
+对账检查必须执行断言，失败中止渲染。独立函数测试另外按3^n全赛果枚举覆盖，并手算一次票级0.65系数的EV；不以本页汇总自证公式。
+
+```{r reconciliation}
+checks <- list()
+for (objective in c("ev","coverage")) {
+  selected <- if(objective=="ev") sel_ev else sel_cov
+  e <- selected$evaluation
+  checks[[objective]] <- tibble::tibble(objective=objective,
+    tickets=nrow(e$purchases)==sum(selected$selection$new_ticket_count),
+    cost=isTRUE(all.equal(sum(e$purchases$cost_cny),selected$summary$cost_cny)),
+    frozen_cost=isTRUE(all.equal(sum(e$plan$funded$stake_cny),selected$summary$cost_cny)),
+    unique_tickets=!anyDuplicated(e$purchases$ticket_id),
+    coverage=isTRUE(all.equal(e$summary$actual_coverage,selected$summary$coverage)),
+    ev=isTRUE(all.equal(e$summary$ev_net_cny,selected$summary$model_ev_cny)),
+    partition=setequal(c(selected$selection$group_id,selected$excluded$group_id),pool$groups$group_id))
+  stopifnot(all(unlist(dplyr::select(checks[[objective]],-objective))))
+  beidan:::.parlay_ranked_validate_evaluation(e)
+}
+knitr::kable(dplyr::bind_rows(checks))
+```
+
+## 5. P1 回归：保护变种共享票、每组仅4元
+
+三场显式合成概率 .55/.23/.22，各有单选和两个保护双选，基础分类仍为1。本例每组两场，模式11，27个候选。小额度会暴露旧版“截断后去重”的漏买差异。仅检查接口、账本和覆盖，不代表实盘收益。
+
+```{r small-regression}
+mock_matches <- tibble::tibble(fixture_id=c("F01","F02","F03"),
+  win=.55,draw=.23,lose=.22)
+mock_ranked <- beidan::rank_outcome_selections(
+  beidan::prepare_outcome_selections(mock_matches),cutoff,"coverage")
+mock_sp <- tidyr::expand_grid(fixture_id=mock_matches$fixture_id,outcome=c("W","D","L")) |>
+  dplyr::mutate(quote_at=cutoff$cutoff_utc-60,sp_raw=6,
+                source_url="synthetic://select-groups-regression")
+mock_settings <- beidan::parlay_settings()
+mock_settings$n_legs <- 2L
+mock_pool <- beidan::parlay_construct_role_groups(mock_ranked,mock_settings,
+  pattern=c(1L,1L),max_candidates=NULL,prematch_sp=mock_sp)
+small <- beidan::parlay_select_groups(mock_pool,"coverage",group_budget_cny=4)
+small_evaluation <- small$evaluation
+stopifnot(sum(small_evaluation$purchases$cost_cny)==small$summary$cost_cny,
+  nrow(small_evaluation$purchases)==sum(small$selection$new_ticket_count),
+  !anyDuplicated(small_evaluation$purchases$ticket_id))
+beidan:::.parlay_ranked_validate_evaluation(small_evaluation)
+knitr::kable(small$summary)
+knitr::kable(small$selection)
+partial <- beidan::parlay_select_groups(mock_pool,"coverage",
+  budget_cny=5,group_budget_cny=4)
+stopifnot(partial$summary$cost_cny==4,
+          partial$evaluation$summary$unspent_cny==1)
+knitr::kable(partial$summary)
+```
+
+## 6. 接口、边界与验收
+
+- 输入：有cutoff/概率/赛前SP/代码绑定的候选池；目标、CNY预算和限制显式传入。
+- 输出：evaluation、selection、summary、excluded、receipt、diagnostics。旧pool输出删除，不保留兼容层。
+- NULL总预算不限；NULL单组额度取全合法票空间；0额度返回typed-empty；不足2元余款保留。
+- 当前不执行选后微调，以免改变边际选择的目标；普通`parlay_evaluate_portfolio()`仍支持原微调参数。
+- 所有角色计入每场复用；仅两组均全三选的共同场次免计重叠。
+- `ended_by`只说明候选耗尽或已无可准入组；各组拒绝原因在excluded。没有假装遇到某组就立即停止。
+- 参数、cutoff、原池、实际票与冻结计划、公开生产入口及传递代码身份记录在收据中；下游核验不能接受变更后的票账本。
+
+实现与函数测试对应：`.StageSelectedGroup`（缺SP/EV门槛/部分资金/限制），`.SelectRankedFunding`（共享票补额、实际边际排名、拒绝不影响状态、完整分区），`.EmptySelectedGroups`（0额度），`.PrepareRankedFunding`（普通评估器和选择器共同枚举），`.FinalizeRankedEvaluation`（原入口/新入口的风险校验及冻结账本），`parlay_select_groups`（全部公开契约）。测试位于包内`test-parlay-select-groups.R`和`test-parlay-select-groups-mixed-ev.R`；新增混合EV对照保证同时存在入选和拒绝候选，再逐轮独立重算所有可入选组的覆盖增量，避免全拒绝案例导致空循环自证。两份选择器测试共16个test block、350条断言。原`test-parlay-ranked-portfolio.R`和相关消费者套件验证评估器回归。
+
+命令：
+
+```text
+Rscript -e 'devtools::load_all("packages/beidan",quiet=TRUE);testthat::test_file("packages/beidan/tests/testthat/test-parlay-select-groups.R",stop_on_failure=TRUE)'
+quarto render quarto/parlay_select_groups_contract.qmd --to html --no-cache
+```
+
+运行需环境已有依赖；不在函数或渲染中安装。完整本地检查结果与Codex review命令、评审哈希、发现及修复记录在下方收据。本页模型对照不授权生产参数更改。
+
+```{r reviewed-evidence}
+review_path <- file.path(root,parameters$review_record)
+if (file.exists(review_path)) {
+  review <- jsonlite::read_json(review_path,simplifyVector=TRUE)
+  cat("Review / PI状态：",review$status,"\n")
+  cat("命令：",review$review_command,"\n")
+  knitr::kable(tibble::as_tibble(review$reviewed_files))
+  knitr::kable(tibble::as_tibble(review$findings))
+} else {
+  cat("尚未验收，评审收据待生成。\n")
+}
+```
