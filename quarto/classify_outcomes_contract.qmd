@@ -84,6 +84,10 @@ knitr::kable(dplyr::mutate(dplyr::select(rank_comparison,
 
 ## 循环构组与购买：同预设模式、不同实际成本
 
+`parlay_select_groups()`返回外层选择结果和内层`evaluation`。外层`selection`按实际提交顺序记录新增票数、成本、净EV、边际覆盖与累计值；外层`summary`记录目标、参数和`ended_by`，`excluded`记录未准入组。内层`evaluation`包含最终冻结`plan`、`purchases`及资金汇总，直接供结算和风险接口消费，不再对选中子池二次购买。
+
+本页显式使用`objective="coverage"`，按实际新增物理票的联合概率增益逐轮贪心选择，同分按`group_id`确定；不宣称全局最优。每轮复用权威购买事务，先剔除已买物理票，再从剩余票补充组额度。覆盖目标且`min_group_ev_cny=NULL`时不设EV门槛，负EV或缺SP不因此剔除，缺失EV保留NA。接口默认目标为`ev`，其默认门槛要求每组新增票净EV严格大于0，不能省略目标后把它当作本页覆盖方案。
+
 本次合成链路统一预设3332221。按3→2→1逐轮给各组取项，各榜游标连续、到末尾循环；组内同场不重复。NULL不设候选数上限，有限状态重复停止，不代表穷举所有组合。单选位置选保护双选时，实际模式变为3332222；216注和432注分别需要全覆盖432元和864元，均以每组最多256元购买。
 
 ```{r synthetic-construction}
@@ -104,35 +108,39 @@ knitr::kable(pool$substitutions)
 ```
 
 ```{r synthetic-purchase}
-evaluation <- beidan::parlay_evaluate_portfolio(pool,
+synthetic_selection <- beidan::parlay_select_groups(pool,objective="coverage",
   budget_cny=NULL,group_budget_cny=256,
-  reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+  reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=NULL))
+evaluation <- synthetic_selection$evaluation
+knitr::kable(synthetic_selection$summary)
+knitr::kable(synthetic_selection$selection)
 knitr::kable(tibble::as_tibble(evaluation$summary))
 knitr::kable(evaluation$group_selection)
-knitr::kable(evaluation$rejections)
+knitr::kable(synthetic_selection$excluded)
 knitr::kable(dplyr::slice_head(evaluation$purchases,n=12))
 ```
 
-三选仍计入每场复用；只有两组都实际全三选的共同场次不计入重叠。base_role1的保护双选仍计入重叠并按两个赛果计算票空间。完整账本为evaluation$purchases，组内赛果为pool$role_legs。下节展示实际购买的保护方向，不要求每个可选变种都被购买。
+本例候选池共12组、纳入8个合格场次，统一预设3332221。选择器按每轮实际新增物理票的边际覆盖贪心排序，因此与固定名义序的旧评估器不同：总预算与重叠均不设限时选出4组、512票、1024元，实际覆盖0.457916，其余8组因`reuse_cap_exceeded`被拒；每轮只提交边际覆盖最大的可准入组，被拒候选不影响后续排序与资金。`max_overlap=NULL`表示不限制两组共同场次；本页不再施加旧口径的“非共同三选重叠3”。复用上限4仍适用于全部场次，因此资金不是约束，复用才是。完整账本为evaluation$purchases，组内赛果为pool$role_legs。下节展示实际购买的保护方向，不要求每个可选变种都被购买。
 
 ## 增组时：允许方向与实际购买方向
 
-以下仍是同一合成候选池，只改变总预算以观察购入组数；每组上限仍256元，复用4、非共同实际三选重叠3。最后一行总预算NULL。展示允许掩码和实际购买票中出现的赛果，避免把“可选保护”误读为“已经保护”。组数不一定随预算增加，因为还有复用、重叠和合法票约束。
+以下仍是同一合成候选池，总预算与重叠均不设限，只逐步放宽复用上限以观察购入组数；每组上限仍256元。展示允许掩码和实际购买票中出现的赛果，避免把“可选保护”误读为“已经保护”。组数不随资金增加，只随复用放宽而增加：复用1→1组，复用2→2组，复用3→3组，复用4→4组；进一步放宽可继续增组。复用4时可准入的4组之后已无候选能通过复用上限，选择器以`no_admissible_groups`结束。
 
 ```{r protection-trace}
 trace_scenarios <- tibble::tibble(
-  scenario=c("256元","512元","1024元","总预算NULL"),
-  budget_cny=c(256,512,1024,NA_real_))
+  scenario=c("复用1","复用2","复用3","复用4","复用6"),
+  max_reuse=c(1L,2L,3L,4L,6L))
 trace_summaries <- vector("list",nrow(trace_scenarios))
 trace_directions <- vector("list",nrow(trace_scenarios))
 for (i in seq_len(nrow(trace_scenarios))) {
-  trace_budget <- trace_scenarios$budget_cny[[i]]
-  trace_result <- beidan::parlay_evaluate_portfolio(pool,
-    budget_cny=if(is.na(trace_budget)) NULL else trace_budget,
-    group_budget_cny=256,reuse_policy=list(max_reuse=4L),
-    overlap_policy=list(max_overlap=3L),improve=FALSE)
+  trace_selection <- beidan::parlay_select_groups(pool,objective="coverage",
+    budget_cny=NULL,group_budget_cny=256,
+    reuse_policy=list(max_reuse=trace_scenarios$max_reuse[[i]]),
+    overlap_policy=list(max_overlap=NULL))
+  trace_result <- trace_selection$evaluation
   trace_summaries[[i]] <- dplyr::mutate(tibble::as_tibble(trace_result$summary),
-    scenario=trace_scenarios$scenario[[i]])
+    scenario=trace_scenarios$scenario[[i]],
+    ended_by=trace_selection$summary$ended_by)
   bought_groups <- dplyr::distinct(trace_result$purchases,group_id)
   selected_masks <- dplyr::semi_join(pool$role_legs,bought_groups,by="group_id")
   bought_directions <- dplyr::inner_join(
@@ -148,7 +156,7 @@ for (i in seq_len(nrow(trace_scenarios))) {
     dplyr::mutate(scenario=trace_scenarios$scenario[[i]])
 }
 knitr::kable(dplyr::select(dplyr::bind_rows(trace_summaries),
-  scenario,selected_groups,tickets,spent_cny,actual_coverage))
+  scenario,selected_groups,tickets,spent_cny,actual_coverage,ended_by))
 knitr::kable(dplyr::bind_rows(trace_directions) |>
   dplyr::select(scenario,group_id,fixture_id,base_role,selection_id,n_outcomes,
     allowed_outcomes,purchased_outcomes,actual_outcome_count) |>
@@ -158,7 +166,7 @@ knitr::kable(dplyr::bind_rows(trace_directions) |>
 
 ## 真实冻结数据：新规则小链路
 
-复用26101期已保存概率与赛前SP，参数real_snapshot声明路径。不联网、不读赛后结果、不重新校准；保持原冻结cutoff，不将旧输入伪装成当前决策。与合成例分开运行，本段统一预设3332222，关闭微调展示原始构组。
+复用26101期已保存概率与赛前SP，参数real_snapshot声明路径。不联网、不读赛后结果、不重新校准；保持原冻结cutoff，不将旧输入伪装成当前决策。与合成例分开运行，本段统一预设3332222，选择器直接购买原始候选组；当前公开接口不提供微调参数。
 
 ```{r real-inputs}
 real_snapshot_path <- file.path(root,parameters$real_snapshot)
@@ -201,16 +209,19 @@ knitr::kable(real_pool$substitutions)
 ```
 
 ```{r real-purchase}
-real_evaluation <- beidan::parlay_evaluate_portfolio(real_pool,
+real_selection <- beidan::parlay_select_groups(real_pool,objective="coverage",
   budget_cny=NULL,group_budget_cny=256,
-  reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+  reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=NULL))
+real_evaluation <- real_selection$evaluation
+knitr::kable(real_selection$summary)
+knitr::kable(real_selection$selection)
 knitr::kable(tibble::as_tibble(real_evaluation$summary))
 knitr::kable(real_evaluation$group_selection)
-knitr::kable(real_evaluation$rejections)
+knitr::kable(real_selection$excluded)
 knitr::kable(dplyr::slice_head(real_evaluation$purchases,n=12))
 ```
 
-本例12场中，26101:26和26101:28分别因Top1 SP为1.96和1.69被排除，剩余8场双选、2场单选，没有三选。3332222位置因此按已批准的3→2规则全部成为2222222；23个候选最终只购买1组128注、256元。七场组从8场双选中取场，任意两组至少共同6场，超过非三选重叠上限3，所以增加总预算不能多买组。模型覆盖为14.48491%，不是命中复盘结果。
+本例12场中，26101:26和26101:28分别因Top1 SP为1.96和1.69被排除，剩余8场双选、2场单选，没有三选。3332222位置因此按已批准的3→2规则全部成为2222222；23个候选中，总预算与重叠均不设限时购买4组512注、1024元，模型覆盖0.378098，其余19组因`reuse_cap_exceeded`被拒。七场组从8场双选中取场，任意两组至少共同6场；旧口径的非共同三选重叠上限3会在此把方案压到1组，本页不再施加该上限，因此复用上限4成为唯一约束。
 
 收益字段是冻结概率、原始赛前SP和一次0.65票级系数的模型估值，缺SP保留NA，不是结算返奖。本段不生成正式下注单，不筛掉负预期结果来美化报告。下方历史章节只展示归档旧规则及其冻结身份，与本轮新分类结果分开。
 
@@ -537,7 +548,7 @@ knitr::kable(tibble::tibble(command=names(accept333$commands),invocation=paste0(
 
 ## #553开发验收状态
 
-本节记录新规则链路的开发与验收证据；旧回测保持各自冻结源码身份。测试在QMD之外运行。
+本节展示#553原集成记录及测试映射。下方历史收据的PASS与PI结论只适用于其原审阅版本；更新后的选择器、参数和本页须单独验收。测试在QMD之外运行。
 
 |函数或内部阶段|对应外部自动测试|
 |---|---|
@@ -546,18 +557,23 @@ knitr::kable(tibble::tibble(command=names(accept333$commands),invocation=paste0(
 |prepare_outcome_selections及typed empty/schema|test-prepare-outcome-selections.R|
 |rank_outcome_selections及过滤重放/变种排名|test-rank-outcome-selections.R|
 |parlay_construct_role_groups及游标/循环/物理组去重|test-parlay-role-groups.R、test-parlay-ranked-portfolio.R|
-|parlay_evaluate_portfolio及资金/复用/重叠/微调|test-parlay-ranked-portfolio.R|
+|parlay_select_groups及边际选组/购票去重/资金/复用/重叠/EV门槛|test-parlay-select-groups.R、test-parlay-select-groups-mixed-ev.R|
 |独立手算收益、actual_pattern、精确union、源码改写拒绝与概率和容差贯通|test-role-variants-acceptance.R|
 |ReplayRankedOutcomes、DiagnoseRankedReplay、VerifyRankedReplayReceipt|tests/testthat/test-ranked-outcome-replay.R|
 
-除最后一行外，测试均位于packages/beidan/tests/testthat。构组只允许3→2替补，缺少单选不改用双选榜；单选榜内的保护双选仍是合法条目。同一物理场次与掩码仅因排列不同不重复产生候选。构组收据绑定实现及依赖版本，购买拒绝缺失或过期的构组身份。分类与购买均承认1e-9概率和容差，不修改或归一化原始输入。默认CLI的ChatGPT登录现已恢复；此前401日志保留。早期开发工作树源码第二轮及产物审阅通过，但不替代此次main集成验收。早期全仓runner发现的跨测试持久设置泄漏和旧score-table调用已修复或迁移；本次完整runner状态、当前源码及产物审阅、PI结论分别由下方收据记录。专项通过不表示全仓通过。
+除最后一行外，测试均位于packages/beidan/tests/testthat。构组只允许3→2替补，缺少单选不改用双选榜；单选榜内的保护双选仍是合法条目。同一物理场次与掩码仅因排列不同不重复产生候选。构组收据绑定实现及依赖版本，购买拒绝缺失或过期的构组身份。分类与购买均承认1e-9概率和容差，不修改或归一化原始输入。默认CLI的ChatGPT登录现已恢复；此前401日志保留。早期开发工作树源码第二轮及产物审阅通过，但不替代此次main集成验收。早期全仓runner发现的跨测试持久设置泄漏和旧score-table调用已修复或迁移；原集成的完整runner状态、源码及产物审阅、PI结论保留在下方历史收据中，不用于证明当前选择器已通过验收。专项通过不表示全仓通过。
 
 ```{r outcome-variants-development-evidence}
 variants_evidence <- jsonlite::read_json(file.path(root,"docs/reviews/outcome-role-variants.json"))
-for(relative in names(variants_evidence$hashes)) {
-  stopifnot(identical(digest::digest(file.path(root,relative),file=TRUE,algo="sha256"),
-    unname(variants_evidence$hashes[[relative]])))
-}
+recorded_identities <- tibble::tibble(
+  file=names(variants_evidence$hashes),
+  recorded_sha256=unlist(variants_evidence$hashes),
+  current_sha256=purrr::map_chr(names(variants_evidence$hashes),
+    ~if(file.exists(file.path(root,.x)))
+      digest::digest(file.path(root,.x),file=TRUE,algo="sha256") else NA_character_)) |>
+  dplyr::mutate(matches_recorded_bytes=recorded_sha256==current_sha256)
+# Historical manifest comparison is diagnostic; current delivery bindings are below.
+knitr::kable(recorded_identities)
 knitr::kable(tibble::tibble(check=names(variants_evidence$checks),
   result=unlist(variants_evidence$checks)))
 knitr::kable(tibble::tibble(file=names(variants_evidence$hashes),
@@ -576,7 +592,7 @@ knitr::kable(tibble::tibble(
 
 ## #553接口集成与验收
 
-本次集成同步串场实验台到分类→过滤→prepare→rank→构组→购买链路，购买返回portfolio来源、冻结plan、summary及purchases账本。上方专项测试、全仓失败和历史审阅描述属于各自保存版本的证据，不表示此次集成已通过；历史冻结输入及归档源码身份不改写。具体集成检查、审阅输入哈希、发现和修复、PI状态以上方机器可读收据为准。完整runner与专项检查分别报告，未通过检查不标为通过。
+本次集成同步串场实验台到分类→过滤→prepare→rank→构组→购买链路，购买返回portfolio来源、冻结plan、summary及purchases账本。上方专项测试、全仓失败和历史审阅描述属于各自保存版本的证据，不表示此次集成已通过；历史冻结输入及归档源码身份不改写。上方机器可读收据是原集成证据；后续hash_refresh不重新授予源码审阅、产物审阅或PI通过状态。当前QMD一致性更新以末节独立收据为准。完整runner与专项检查分别报告，未通过检查不标为通过。
 
 
 新增消费接口的自动测试映射：
@@ -590,3 +606,29 @@ knitr::kable(tibble::tibble(
 |独立构组/资金/时点/真实QMD块与测试辅助函数|540/541/542/544、budget-sweep-independent、role-strategy-independent|
 
 复盘：完整runner启动后须保持被测源码和测试文件稳定。此次有一轮运行期间补了review回归测试，旧进程已加载的实现与新测试不属同一版本，因此主动终止并另启稳定版本验证；该中间日志不作为最终验收证据。原始HTML与旧源码归档保留原始空白、编码及字节哈希，不为格式检查改写。
+
+
+## 2026-10-04：选择器迁移后的一致性更新
+
+本次只更新本页及其独立验收收据，不修改购买实现和函数测试，不重写历史决策或旧验收结论。新增外层边际选择账本、目标参数与停止原因，修正微调职责，并将原集成收据改为历史哈希对照。当前输入仍为上方显式声明的合成数据与26101冻结快照。
+
+迁移核查发现的测试缺口仍未修复：`test-parlay-select-groups.R`有一项继续调用已删除的`parlay_evaluate_portfolio()`；`test-classify-chain-qmd-path.R`仍寻找未命名的setup块；`test-classify-chain-real-qmd.R`未初始化`parameters`。这些检查未通过，不能标为通过，也不能据此宣称策略数值失败。本次不以旧版PASS替代这些检查，不宣称完整函数验收或PI接受。
+
+下方独立收据绑定本次QMD、当前选择器及其传递实现、测试和数据边界源码的字节身份，记录实际检查命令、渲染结果、审阅命令、发现及处理。渲染时验证该清单；审阅尚未完成时显示待审，不将进程成功视为验收。
+
+```{r selector-consistency-evidence}
+consistency_evidence <- jsonlite::read_json(file.path(root,
+  "docs/reviews/classify-qmd-selector-consistency.json"),simplifyVector=TRUE)
+for(relative in names(consistency_evidence$hashes)) {
+  stopifnot(identical(digest::digest(file.path(root,relative),file=TRUE,algo="sha256"),
+    unname(consistency_evidence$hashes[[relative]])))
+}
+knitr::kable(tibble::tibble(check=names(consistency_evidence$checks),
+  result=unlist(consistency_evidence$checks)))
+knitr::kable(tibble::tibble(command=names(consistency_evidence$commands),
+  invocation=paste0("<code>",htmltools::htmlEscape(unlist(consistency_evidence$commands)),"</code>")),
+  format="html",escape=FALSE)
+knitr::kable(tibble::as_tibble(consistency_evidence$reviews))
+knitr::kable(tibble::tibble(file=names(consistency_evidence$hashes),
+  sha256=unlist(consistency_evidence$hashes)))
+```
