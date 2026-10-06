@@ -78,6 +78,142 @@ def write_json_atomically(value, path: Path) -> None:
     os.replace(temporary, path)
 
 
+# --------------------------------------------------------------------------- #
+# Versioned publication
+# --------------------------------------------------------------------------- #
+#
+# A derived artifact is archived per cutoff/date rather than overwritten in
+# place: each publication lands in its own immutable directory under
+# ``<base>/versions/<label_version>/`` and ``<base>/current.json`` points at the
+# newest one. Re-running with the same inputs and the same label version is a
+# no-op; re-running with different content under an already-published label
+# version fails, because a published cutoff must not be rewritten.
+
+VERSIONS_DIR = "versions"
+CURRENT_FILE = "current.json"
+VERSION_SCHEMA = "beijing_lot_derived_version_v1"
+
+
+def version_directory(base: Path, label_version: str) -> Path:
+    """``<base>/versions/<label_version>`` for a derived artifact."""
+    if not label_version or "/" in label_version or label_version in {".", ".."}:
+        raise BackfillError(f"invalid label version: {label_version!r}")
+    return Path(base) / VERSIONS_DIR / label_version
+
+
+def list_versions(base: Path) -> list[str]:
+    """Published label versions, oldest name first (lexicographic)."""
+    directory = Path(base) / VERSIONS_DIR
+    if not directory.is_dir():
+        return []
+    return sorted(p.name for p in directory.iterdir() if p.is_dir())
+
+
+def read_current(base: Path) -> dict | None:
+    """The ``current.json`` pointer, or ``None`` when nothing is published."""
+    path = Path(base) / CURRENT_FILE
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise BackfillError(f"current pointer is unreadable: {path}: {error}") from error
+
+
+def publish_version(base: Path, label_version: str, table, receipt: dict, *,
+                    artifact_name: str = "labels.parquet") -> dict:
+    """Publish ``table`` + ``receipt`` as one immutable label version.
+
+    @return A record with ``label_version``, ``artifact`` (path, rows, sha256),
+    ``receipt`` path, ``status`` of ``"published"`` or ``"unchanged"``, and the
+    ``versions`` list after the call.
+    @raises BackfillError when the label version is already published with
+        different content: a finalized cutoff is never rewritten.
+    """
+    base = Path(base)
+    directory = version_directory(base, label_version)
+    artifact = directory / artifact_name
+    existing = list_versions(base)
+
+    if label_version in existing:
+        if not artifact.is_file():
+            raise BackfillError(
+                f"label version {label_version!r} exists but has no artifact: {artifact}")
+        # Compare content by hash, not by receipt: the stored receipt carries
+        # fields that are added at publish time, so a receipt comparison would
+        # never match. Writing to a temporary name and hashing it answers the
+        # real question - is this the same bytes?
+        incoming = write_parquet_atomically(
+            table, directory / f".{artifact_name}.incoming")
+        prior_sha = sha256_file(artifact)
+        same = incoming["sha256"] == prior_sha and incoming["rows"] == table.num_rows
+        (directory / f".{artifact_name}.incoming").unlink(missing_ok=True)
+        if same:
+            record = {
+                "label_version": label_version,
+                "status": "unchanged",
+                "artifact": {"path": str(artifact), "rows": incoming["rows"],
+                             "sha256": prior_sha},
+                "receipt": str(directory / "receipt.json"),
+                "versions": existing,
+            }
+            # Refreshing an older label must not move the pointer backwards:
+            # `current` always means the newest published label.
+            _point_current_at_newest(base)
+            return record
+        raise BackfillError(
+            f"label version {label_version!r} is already published with different content "
+            f"(recorded {prior_sha[:12]}, incoming {incoming['sha256'][:12]}); "
+            f"publish under a new label version instead of rewriting a finalized cutoff")
+
+    published = write_parquet_atomically(table, artifact)
+    receipt = {**receipt, "label_version": label_version,
+               "version_schema": VERSION_SCHEMA,
+               "artifact": artifact_name,
+               "output": {"path": str(artifact), "rows": published["rows"],
+                          "sha256": published["sha256"]}}
+    write_json_atomically(receipt, directory / "receipt.json")
+    record = {
+        "label_version": label_version,
+        "status": "published",
+        "artifact": {"path": str(artifact), "rows": published["rows"],
+                     "sha256": published["sha256"]},
+        "receipt": str(directory / "receipt.json"),
+        "versions": list_versions(base),
+    }
+    _point_current_at_newest(base)
+    return record
+
+
+def _point_current_at_newest(base: Path) -> None:
+    """Point ``current.json`` at the newest published label version.
+
+    Label versions are ISO dates, so lexicographic order is chronological.
+    """
+    base = Path(base)
+    versions = list_versions(base)
+    if not versions:
+        return
+    newest = versions[-1]
+    directory = version_directory(base, newest)
+    artifact = directory / "labels.parquet"
+    if not artifact.is_file():
+        raise BackfillError(f"newest label version {newest!r} has no artifact: {artifact}")
+    receipt_path = directory / "receipt.json"
+    rows = None
+    if receipt_path.is_file():
+        try:
+            rows = json.loads(receipt_path.read_text(encoding="utf-8")).get("output", {}).get("rows")
+        except (OSError, json.JSONDecodeError):
+            rows = None
+    write_json_atomically({
+        "schema": VERSION_SCHEMA,
+        "label_version": newest,
+        "artifact": {"path": str(artifact), "rows": rows,
+                     "sha256": sha256_file(artifact)},
+    }, base / CURRENT_FILE)
+
+
 @dataclass(frozen=True)
 class CrossSource:
     """A ``(issue_code, issue_slot) -> handicap_line`` cross source with a hash."""

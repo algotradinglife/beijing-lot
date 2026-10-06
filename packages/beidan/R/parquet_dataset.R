@@ -190,13 +190,34 @@ dataset_table_source <- function(dataset, table, version = NULL, root = NULL,
   if (!is.null(issue_year)) {
     stop("read_dataset: derived '", table, "' is not partitioned (issue_year is not valid)")
   }
-  path <- resolve_location_token(derived$location, root)
-  if (!file.exists(path)) stop("read_dataset: derived file is missing: ", path)
-  hashes <- if (is.null(derived$sha256)) character(0) else
-    stats::setNames(derived$sha256, basename(path))
+  # A derived artifact may be versioned: its location then names a
+  # `current.json` pointer, and the artifact path/hash live in that pointer so a
+  # new label version becomes visible without editing the catalog.
+  pointer <- resolve_location_token(derived$location, root)
+  if (!file.exists(pointer)) stop("read_dataset: derived location is missing: ", pointer)
+  label_version <- NULL
+  if (identical(basename(pointer), "current.json")) {
+    current <- jsonlite::fromJSON(pointer, simplifyVector = FALSE)
+    artifact <- current$artifact$path
+    if (is.null(artifact) || !startsWith(artifact, root)) {
+      stop("read_dataset: current pointer does not name an artifact under the root: ", pointer)
+    }
+    if (!file.exists(artifact)) stop("read_dataset: current artifact is missing: ", artifact)
+    label_version <- current$label_version
+    path <- artifact
+    recorded_sha <- current$artifact$sha256
+    rows <- current$artifact$rows
+  } else {
+    path <- pointer
+    recorded_sha <- derived$sha256
+    rows <- derived$rows
+  }
+  hashes <- if (is.null(recorded_sha)) character(0) else
+    stats::setNames(recorded_sha, basename(path))
   list(kind = "derived", files = path, hashes = hashes,
-       rows = if (is.null(derived$rows)) NULL else as.integer(derived$rows),
-       version = manifest$version, receipt = derived$receipt)
+       rows = if (is.null(rows)) NULL else as.integer(rows),
+       version = manifest$version, receipt = derived$receipt,
+       label_version = label_version)
 }
 
 # Resolve the on-disk files for one table; `issue_year` restricts partitions.
@@ -343,6 +364,7 @@ read_dataset <- function(dataset, table, version = NULL, root = NULL,
   attr(out, "table") <- table
   attr(out, "version") <- source$version
   attr(out, "kind") <- source$kind
+  if (!is.null(source$label_version)) attr(out, "label_version") <- source$label_version
   if (!is.null(source$receipt)) attr(out, "receipt") <- source$receipt
   out
 }

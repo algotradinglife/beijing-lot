@@ -256,3 +256,57 @@ test_that("dataset_query can aggregate a derived artifact", {
   expect_identical(nrow(out), 2L)
   expect_identical(sum(out$n), 2)
 })
+
+test_that("read_dataset follows a versioned derived pointer", {
+  root <- parquet_fixture()
+  version_dir <- file.path(root, "datasets", "demo", "versions", "v1")
+  derived_dir <- file.path(version_dir, "derived")
+
+  # Replace the flat artifact with a versioned layout + current pointer.
+  unlink(file.path(derived_dir, "labels.parquet"))
+  for (label in c("2026-10-06", "2026-10-07")) {
+    dir.create(file.path(derived_dir, "labels", "versions", label),
+               recursive = TRUE, showWarnings = FALSE)
+    arrow::write_parquet(
+      arrow::arrow_table(issue = arrow::Array$create(rep("26011", if (label == "2026-10-06") 2L else 3L)),
+                         handicap = arrow::Array$create(1L)),
+      file.path(derived_dir, "labels", "versions", label, "labels.parquet"))
+  }
+  newest <- file.path(derived_dir, "labels", "versions", "2026-10-07", "labels.parquet")
+  writeLines(jsonlite::toJSON(list(
+    schema = "beijing_lot_derived_version_v1", label_version = "2026-10-07",
+    artifact = list(path = newest, rows = 3L,
+                    sha256 = digest::digest(file = newest, algo = "sha256"))), auto_unbox = TRUE),
+    file.path(derived_dir, "labels", "current.json"))
+
+  catalog <- jsonlite::fromJSON(file.path(root, "registry", "catalog.json"), simplifyVector = FALSE)
+  catalog$datasets$demo$derived$labels <- list(
+    format = "parquet",
+    location = "frozen:datasets/demo/versions/v1/derived/labels/current.json")
+  writeLines(jsonlite::toJSON(catalog, auto_unbox = TRUE, pretty = TRUE),
+             file.path(root, "registry", "catalog.json"))
+
+  d <- read_dataset("demo", "labels", root = root)
+  expect_identical(nrow(d), 3L)                       # the newest version
+  expect_identical(attr(d, "label_version"), "2026-10-07")
+  expect_identical(attr(d, "kind"), "derived")
+})
+
+test_that("a versioned derived pointer fails closed on a missing artifact", {
+  root <- parquet_fixture()
+  derived_dir <- file.path(root, "datasets", "demo", "versions", "v1", "derived")
+  dir.create(file.path(derived_dir, "labels", "versions", "2026-10-06"),
+             recursive = TRUE, showWarnings = FALSE)
+  writeLines(jsonlite::toJSON(list(
+    label_version = "2026-10-06",
+    artifact = list(path = file.path(derived_dir, "labels", "versions", "2026-10-06", "gone.parquet"),
+                    rows = 1L, sha256 = "00")), auto_unbox = TRUE),
+    file.path(derived_dir, "labels", "current.json"))
+  catalog <- jsonlite::fromJSON(file.path(root, "registry", "catalog.json"), simplifyVector = FALSE)
+  catalog$datasets$demo$derived$labels <- list(
+    format = "parquet",
+    location = "frozen:datasets/demo/versions/v1/derived/labels/current.json")
+  writeLines(jsonlite::toJSON(catalog, auto_unbox = TRUE),
+             file.path(root, "registry", "catalog.json"))
+  expect_error(read_dataset("demo", "labels", root = root), "current artifact is missing")
+})

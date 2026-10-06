@@ -252,3 +252,80 @@ def test_receipt_reports_label_counts_and_source_counts_separately(tmp_path):
     assert source_rows["none"] == 0
     # the two views must not be confused: labels < source use for the cross source
     assert counts["handicap_from_cross_source"] < source_rows["cross_source"]
+
+
+# --- versioned publication ---------------------------------------------------
+
+def _table(rows):
+    import pyarrow as pa
+    return pa.table({"issue": [f"2600{i}" for i in range(rows)],
+                     "handicap": list(range(rows))})
+
+
+def test_publish_version_creates_pointer_and_listing(tmp_path):
+    import json
+
+    base = tmp_path / "labels"
+    record = bf.publish_version(base, "2026-10-06", _table(2), {"schema": "r1"})
+
+    assert record["status"] == "published"
+    assert record["versions"] == ["2026-10-06"]
+    assert (base / "versions/2026-10-06/labels.parquet").is_file()
+    assert (base / "versions/2026-10-06/receipt.json").is_file()
+    current = json.loads((base / "current.json").read_text())
+    assert current["label_version"] == "2026-10-06"
+    assert current["artifact"]["rows"] == 2
+    assert current["artifact"]["sha256"] == bf.sha256_file(base / "versions/2026-10-06/labels.parquet")
+    assert bf.list_versions(base) == ["2026-10-06"]
+    assert bf.read_current(base)["label_version"] == "2026-10-06"
+
+
+def test_publish_version_is_idempotent_for_identical_content(tmp_path):
+    base = tmp_path / "labels"
+    bf.publish_version(base, "2026-10-06", _table(3), {"schema": "r1"})
+    again = bf.publish_version(base, "2026-10-06", _table(3), {"schema": "r1"})
+
+    assert again["status"] == "unchanged"
+    assert again["versions"] == ["2026-10-06"]
+    # the artifact was not rewritten
+    assert bf.sha256_file(base / "versions/2026-10-06/labels.parquet") == again["artifact"]["sha256"]
+
+
+def test_publish_version_refuses_to_rewrite_a_finalized_cutoff(tmp_path):
+    base = tmp_path / "labels"
+    bf.publish_version(base, "2026-10-06", _table(3), {"schema": "r1"})
+    with pytest.raises(bf.BackfillError, match="already published with different content"):
+        bf.publish_version(base, "2026-10-06", _table(4), {"schema": "r1"})
+    # the published version is untouched
+    assert bf.list_versions(base) == ["2026-10-06"]
+
+
+def test_publish_version_pointer_does_not_move_backwards(tmp_path):
+    base = tmp_path / "labels"
+    bf.publish_version(base, "2026-10-06", _table(3), {"schema": "r1"})
+    bf.publish_version(base, "2026-10-07", _table(5), {"schema": "r1"})
+    assert bf.read_current(base)["label_version"] == "2026-10-07"
+
+    # refreshing the older label must not repoint current at it
+    record = bf.publish_version(base, "2026-10-06", _table(3), {"schema": "r1"})
+    assert record["status"] == "unchanged"
+    assert bf.read_current(base)["label_version"] == "2026-10-07"
+
+
+def test_publish_version_rejects_bad_label_and_missing_artifact(tmp_path):
+    base = tmp_path / "labels"
+    for bad in ("", "../escape", "a/b"):
+        with pytest.raises(bf.BackfillError, match="invalid label version"):
+            bf.publish_version(base, bad, _table(1), {})
+    # a version directory without an artifact fails on refresh rather than guessing
+    (base / "versions/2026-01-01").mkdir(parents=True)
+    with pytest.raises(bf.BackfillError, match="has no artifact"):
+        bf.publish_version(base, "2026-01-01", _table(1), {})
+
+
+def test_publish_version_lists_multiple_versions(tmp_path):
+    base = tmp_path / "labels"
+    for label in ("2026-10-06", "2026-10-07", "2026-10-08"):
+        bf.publish_version(base, label, _table(2), {"schema": "r1"})
+    assert bf.list_versions(base) == ["2026-10-06", "2026-10-07", "2026-10-08"]
+    assert bf.read_current(base)["label_version"] == "2026-10-08"

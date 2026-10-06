@@ -49,18 +49,30 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cross", default=DEFAULT_CROSS, help="cross-source CSV, relative to the frozen root")
     parser.add_argument("--generated-at", default=None)
+    parser.add_argument("--label-version", default=None,
+                        help="immutable label version for this publication; defaults to today's date")
+    parser.add_argument("--list-versions", action="store_true",
+                        help="list published label versions and exit")
     args = parser.parse_args(argv)
 
     frozen = catalog.root_path("frozen")
     entry = catalog.catalog_entry("settlement")
     version_dir = catalog.dataset_path("settlement", entry["version"])
+    base = version_dir / "derived" / "spf_labels"
 
+    if args.list_versions:
+        current = backfill.read_current(base)
+        for name in backfill.list_versions(base):
+            marker = "  * " if current and current.get("label_version") == name else "    "
+            print(marker + name)
+        return 0
+
+    label_version = args.label_version or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     cross = backfill.load_cross_source(frozen / args.cross)
     rows = observation_rows(version_dir)
     derived, receipt = backfill.backfill_spf(rows, cross)
+    receipt["generated_at"] = args.generated_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    out_dir = frozen / "datasets/settlement/versions" / entry["version"] / "derived"
-    out_dir.mkdir(parents=True, exist_ok=True)
     table = pa.Table.from_pylist([
         {"issue": r["issue"], "slot": r["slot"],
          "handicap": r.get("handicap_backfilled"),
@@ -68,22 +80,21 @@ def main(argv: list[str] | None = None) -> int:
          "expected_option": r.get("expected_option_backfilled")}
         for r in derived
     ])
-    parquet_path = out_dir / "spf_labels.parquet"
-    # Atomic publish: an in-place overwrite on this CIFS mount produced a
-    # truncated, unreadable file, so the writer verifies a temp file first.
-    receipt["output"] = backfill.write_parquet_atomically(table, parquet_path)
-    receipt["generated_at"] = args.generated_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
-    backfill.write_json_atomically(receipt, out_dir / "spf_labels.receipt.json")
+    # Each publication is archived under its own immutable label version; a
+    # finalized cutoff is never rewritten in place.
+    record = backfill.publish_version(base, label_version, table, receipt)
 
     c = receipt["counts"]; x = receipt["cross_check"]
     resolved = c["handicap_from_archive"] + c["handicap_from_cross_source"]
+    print(f"label version       : {record['label_version']} ({record['status']})")
     print(f"spf rows            : {c['total_spf']:,}")
     print(f"  handicap from archive : {c['handicap_from_archive']:,}")
     print(f"  handicap from cross   : {c['handicap_from_cross_source']:,}")
     print(f"  unresolved            : {c['unresolved']:,}")
     print(f"  resolved              : {resolved:,} ({100*resolved/c['total_spf']:.1f}%)")
     print(f"cross-check contradictions: {x['contradictions']} / {x['compared']:,}")
-    print(f"output              : {parquet_path}")
+    print(f"artifact            : {record['artifact']['path']}")
+    print(f"versions            : {', '.join(record['versions'])}")
     return 0
 
 

@@ -59,6 +59,13 @@ suppressMessages(devtools::load_all(file.path(repository_root, "packages/beidan"
 root <- beidan::parquet_root(params$root)
 dataset <- params$dataset
 table <- params$table
+dataset_version <- beidan::dataset_registry(dataset, root = root)$version
+derived_base <- file.path(root, "datasets", dataset, "versions", dataset_version, "derived", table)
+current <- jsonlite::read_json(file.path(derived_base, "current.json"), simplifyVector = FALSE)
+versions <- sort(list.dirs(file.path(derived_base, "versions"), recursive = FALSE, full.names = FALSE))
+receipt <- jsonlite::read_json(
+  file.path(derived_base, "versions", current$label_version, "receipt.json"),
+  simplifyVector = FALSE)
 ```
 
 ```{r}
@@ -76,22 +83,26 @@ knitr::kable(tibble::tibble(
     as.character(utils::packageVersion("beidan")), R.version.string)))
 ```
 
-## 4. 登记与回执
+## 4. 登记、版本化与回执
 
-派生表由 catalog 登记（**不在**版本 manifest 的 `tables` 内），并用回执绑定来源与规则。
+派生表由 catalog 登记（**不在**版本 manifest 的 `tables` 内）。它**按 label 版本留档**，
+不就地覆盖：每次发布写入 `derived/spf_labels/versions/<label_version>/`，`current.json`
+指向最新版本；同 label 同内容重跑为幂等，**已发布的 label 内容不同则拒绝改写**。
 
 ```{r}
 #| label: spf-registry
-catalog <- jsonlite::fromJSON(file.path(root, "registry", "catalog.json"), simplifyVector = FALSE)
-derived <- catalog$datasets[[dataset]]$derived[[table]]
-receipt <- jsonlite::fromJSON(
-  beidan::read_dataset(dataset, table, verify = FALSE) |> attr("receipt") |>
-    sub("^frozen:", paste0(root, "/"), x = _), simplifyVector = FALSE)
+catalog <- jsonlite::read_json(file.path(root, "registry", "catalog.json"), simplifyVector = FALSE)
+registered <- catalog$datasets[[dataset]]$derived[[table]]
 knitr::kable(tibble::tibble(
-  `项` = c("派生清单", "登记行数", "登记 sha256", "回执 schema", "规则"),
+  `label 版本` = versions,
+  `当前` = ifelse(versions == current$label_version, "*", "")),
+  caption = "已发布的 label 版本（不可变；current.json 指向最新）")
+knitr::kable(tibble::tibble(
+  `项` = c("派生清单", "catalog 指针", "当前 label 版本", "行数", "sha256", "回执 schema", "规则"),
   `值` = c(paste(beidan::dataset_derived_tables(dataset), collapse = ", "),
-    format(derived$rows, big.mark = ","), derived$sha256,
-    receipt$schema, derived$rule)))
+    registered$location, current$label_version,
+    format(current$artifact$rows, big.mark = ","), current$artifact$sha256,
+    receipt$schema, registered$rule)))
 ```
 
 ## 5. R 侧读取
@@ -206,8 +217,9 @@ knitr::kable(by_handicap, caption = "让球分布")
 
 限制：
 
-- **派生表按策略覆盖更新**（当前不保留版本历史）。base 表的内容寻址与 manifest 机制
-  不适用于它；其完整性依据是 catalog 记录的 sha256 与回执，重新生成会改变两者。
+- **派生表按 label 版本留档，不就地覆盖**：`versions/<label_version>/` 不可变，
+  `current.json` 指向最新；同 label 同内容重跑为幂等，内容不同则拒绝改写。
+  这与 base 表的版本 manifest 是两套机制，但都保证"已发布内容不被静默改写"。
 - `known_disagreements` 的 10 条**无第三源可判定**：本仓库 Titan 亚盘不覆盖这些场次
   （`market_odds_v1` 无亚盘表，`three_in_one_v1.quote` 不含相关 fixture），
   `markets/market-record` 的期号范围自 101121 起，也不含 100103。是否采纳 500 的取值
