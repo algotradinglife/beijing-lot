@@ -136,3 +136,88 @@ def test_backfill_rule_is_recorded(tmp_path):
     _derived, receipt = bf.backfill_spf([], cross)
     assert "never inferred" in receipt["rule"]
     assert receipt["schema"] == "beijing_lot_spf_backfill_receipt_v1"
+
+
+# --- atomic publish (regression: in-place parquet overwrite on CIFS) ---------
+
+def test_write_parquet_atomically_publishes_and_verifies(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    target = tmp_path / "labels.parquet"
+    table = pa.table({"issue": ["26001", "26002"], "handicap": [0, -1]})
+    info = bf.write_parquet_atomically(table, target)
+
+    assert target.is_file()
+    assert info["rows"] == 2 and info["path"] == str(target)
+    assert info["sha256"] == bf.sha256_file(target)
+    assert pq.read_table(target).num_rows == 2
+    # no temporary file is left behind
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_write_parquet_atomically_overwrites_an_existing_file(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    target = tmp_path / "labels.parquet"
+    first = pa.table({"issue": ["26001"], "handicap": [0]})
+    bf.write_parquet_atomically(first, target)
+    first_digest = bf.sha256_file(target)
+
+    # A plain pq.write_table on this mount produced a truncated file; the
+    # atomic writer must publish a readable replacement every time.
+    second = pa.table({"issue": ["26001", "26002", "26003"], "handicap": [0, -1, 2]})
+    info = bf.write_parquet_atomically(second, target)
+
+    assert info["rows"] == 3
+    assert bf.sha256_file(target) != first_digest
+    assert pq.read_table(target).num_rows == 3
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_write_parquet_atomically_replaces_a_truncated_file(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    target = tmp_path / "labels.parquet"
+    # Reproduce the observed corruption: header present, footer is zeroed.
+    target.write_bytes(b"PAR1" + b"\x00" * 600 + b"\x00\x00\x00\x00")
+    with pytest.raises(Exception):
+        pq.read_table(target)
+
+    info = bf.write_parquet_atomically(pa.table({"issue": ["26001"]}), target)
+    assert info["rows"] == 1
+    assert pq.read_table(target).num_rows == 1  # the corrupt file was replaced
+
+
+def test_write_parquet_atomically_fails_closed_and_keeps_the_previous_file(tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    target = tmp_path / "labels.parquet"
+    good = pa.table({"issue": ["26001"], "handicap": [0]})
+    bf.write_parquet_atomically(good, target)
+    before = target.read_bytes()
+
+    class NotATable:
+        num_rows = 1
+
+    # A non-Table object cannot be written; the previous file must survive and
+    # no partial file may remain.
+    with pytest.raises(bf.BackfillError):
+        bf.write_parquet_atomically(NotATable(), target)
+    assert target.read_bytes() == before
+    assert pq.read_table(target).num_rows == 1
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_write_json_atomically_writes_and_replaces(tmp_path):
+    import json
+
+    target = tmp_path / "receipt.json"
+    bf.write_json_atomically({"b": 1, "a": 2}, target)
+    assert json.loads(target.read_text()) == {"a": 2, "b": 1}
+    bf.write_json_atomically({"a": 3}, target)
+    assert json.loads(target.read_text()) == {"a": 3}
+    assert not list(tmp_path.glob("*.partial"))

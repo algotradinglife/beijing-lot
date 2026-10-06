@@ -17,6 +17,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,6 +34,48 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def write_parquet_atomically(table, path: Path, *, compression: str = "snappy") -> dict:
+    """Write ``table`` to ``path`` atomically, verifying it reads back first.
+
+    An in-place overwrite of an existing file on the CIFS persistent mount
+    produced a truncated Parquet file (zero footer, unreadable by pyarrow) that
+    reproduced on every run. The file is therefore written to a sibling
+    temporary name, read back and row-counted, and only renamed over the
+    destination once it verifies.
+
+    @return ``{"path", "rows", "sha256"}`` for the published file.
+    @raises BackfillError when the written file cannot be read back or its row
+        count differs; the previous destination is left untouched either way.
+    """
+    import pyarrow.parquet as pq
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".partial")
+    try:
+        pq.write_table(table, temporary, compression=compression)
+        reread = pq.read_table(temporary)
+    except Exception as error:  # noqa: BLE001 - report the cause, then fail closed
+        temporary.unlink(missing_ok=True)
+        raise BackfillError(f"written parquet failed verification: {error}") from error
+    if reread.num_rows != table.num_rows:
+        temporary.unlink(missing_ok=True)
+        raise BackfillError(
+            f"written parquet row count {reread.num_rows} != {table.num_rows}")
+    os.replace(temporary, path)
+    return {"path": str(path), "rows": table.num_rows, "sha256": sha256_file(path)}
+
+
+def write_json_atomically(value, path: Path) -> None:
+    """Write ``value`` as JSON to ``path`` atomically (temp file, then rename)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".partial")
+    temporary.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
 
 
 @dataclass(frozen=True)

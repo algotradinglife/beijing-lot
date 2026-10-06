@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,7 +22,6 @@ for candidate in (ROOT, ROOT / "packages/beidan/inst/python"):
         sys.path.insert(0, str(candidate))
 
 import pyarrow as pa  # noqa: E402
-import pyarrow.parquet as pq  # noqa: E402
 
 from beidan_backend import catalog, settlement_backfill as backfill  # noqa: E402
 
@@ -71,12 +69,11 @@ def main(argv: list[str] | None = None) -> int:
         for r in derived
     ])
     parquet_path = out_dir / "spf_labels.parquet"
-    pq.write_table(table, parquet_path, compression="snappy")
+    # Atomic publish: an in-place overwrite on this CIFS mount produced a
+    # truncated, unreadable file, so the writer verifies a temp file first.
+    receipt["output"] = backfill.write_parquet_atomically(table, parquet_path)
     receipt["generated_at"] = args.generated_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
-    receipt["output"] = {"path": str(parquet_path), "rows": table.num_rows,
-                         "sha256": backfill.sha256_file(parquet_path)}
-    (out_dir / "spf_labels.receipt.json").write_text(
-        json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    backfill.write_json_atomically(receipt, out_dir / "spf_labels.receipt.json")
 
     c = receipt["counts"]; x = receipt["cross_check"]
     resolved = c["handicap_from_archive"] + c["handicap_from_cross_source"]
