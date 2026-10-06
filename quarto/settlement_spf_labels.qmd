@@ -1,0 +1,217 @@
+---
+title: "settlement 派生交付：spf_labels（让球胜平负标签）"
+date: "2026-10-06"
+params:
+  root: !expr Sys.getenv("BEIDAN_PARQUET_ROOT", unset = "/mnt/nas/Data/beijing-lot")
+  dataset: "settlement"
+  table: "spf_labels"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: false
+execute:
+  echo: true
+  warning: true
+  cache: false
+  freeze: false
+  error: false
+---
+
+本报告是 **`settlement` 派生产物 `spf_labels`** 的交付与验收入口：说明它为什么存在、
+取数规则、**可用率**，以及在 **R 侧**经 `beidan::read_dataset()` 的读取方式。
+
+`spf_labels` 不是原始采集，也不是 source SQLite 的直接转写，而是**用独立交叉源补全
+旧纪元让球后派生的标签表**；因此本报告把"规则、来源、可用率、分歧"作为验收对象，
+而不是把行数当作唯一证据。
+
+## 1. 为什么需要它
+
+`settlement` 的 `observation.expected_option` 是标签列。对 `spf`（让球胜平负），
+该列依赖**让球数**：
+
+```python
+expected_option = outcome(home_goals + handicap, away_goals)   # 仅 spf 依赖 handicap
+```
+
+而 2009–2019 的归档页面对约 57% 的场次**完全不渲染让球单元格**（不是解析缺陷：
+源 HTML 里没有括号可匹配）。按 `observation` 原生口径，旧纪元 spf 可用率仅 42.7%。
+`spf_labels` 通过**独立交叉源**补全，不改变原始表，也不从归档自身的渲染推断。
+
+## 2. 取数规则
+
+| 项 | 规则 |
+|---|---|
+| 让球来源（主） | **500.com 结算表** `settlement_500.settlement_merged.handicap_line`（显式含 0） |
+| 让球来源（兜底） | 归档页渲染的让球（仅当 500 无该行） |
+| 标签 | `outcome(home_goals + handicap, away_goals)` |
+| 不解析即不明 | 两源都无让球，或比分不能解析 → `handicap/expected_option` 为 `NA`，**不推断** |
+
+回执字段 `rule` 与 catalog 登记逐字一致，避免文档与实现漂移。
+
+## 3. 输入与运行身份
+
+```{r}
+#| label: spf-config
+#| include: false
+repository_root <- rprojroot::find_root(rprojroot::has_file("config/parquet_layout.json"))
+suppressMessages(devtools::load_all(file.path(repository_root, "packages/beidan"), quiet = TRUE))
+root <- beidan::parquet_root(params$root)
+dataset <- params$dataset
+table <- params$table
+```
+
+```{r}
+#| label: spf-identity
+impl_files <- c(
+  file.path(repository_root, "packages/beidan/R/parquet_dataset.R"),
+  file.path(repository_root, "packages/beidan/inst/python/beidan_backend/settlement_backfill.py"),
+  file.path(repository_root, "scripts/backfill_settlement_spf.py"))
+knitr::kable(tibble::tibble(
+  `实现文件` = substring(impl_files, nchar(repository_root) + 2L),
+  `sha256` = vapply(impl_files, function(p) digest::digest(file = p, algo = "sha256"), character(1))))
+knitr::kable(tibble::tibble(
+  `项` = c("持久根", "数据集", "派生表", "包版本", "R"),
+  `值` = c(root, dataset, table,
+    as.character(utils::packageVersion("beidan")), R.version.string)))
+```
+
+## 4. 登记与回执
+
+派生表由 catalog 登记（**不在**版本 manifest 的 `tables` 内），并用回执绑定来源与规则。
+
+```{r}
+#| label: spf-registry
+catalog <- jsonlite::fromJSON(file.path(root, "registry", "catalog.json"), simplifyVector = FALSE)
+derived <- catalog$datasets[[dataset]]$derived[[table]]
+receipt <- jsonlite::fromJSON(
+  beidan::read_dataset(dataset, table, verify = FALSE) |> attr("receipt") |>
+    sub("^frozen:", paste0(root, "/"), x = _), simplifyVector = FALSE)
+knitr::kable(tibble::tibble(
+  `项` = c("派生清单", "登记行数", "登记 sha256", "回执 schema", "规则"),
+  `值` = c(paste(beidan::dataset_derived_tables(dataset), collapse = ", "),
+    format(derived$rows, big.mark = ","), derived$sha256,
+    receipt$schema, derived$rule)))
+```
+
+## 5. R 侧读取
+
+读取路径与 base 表一致：`read_dataset()` 解析名称 → 从 catalog 取路径与 sha256 →
+Arrow 零拷贝读取 → 按类型契约转换 → 校验。
+
+```{r}
+#| label: spf-read
+spf <- beidan::read_dataset(dataset, table)
+knitr::kable(tibble::tibble(
+  `项` = c("行数", "列数", "kind", "version"),
+  `值` = c(format(nrow(spf), big.mark = ","), ncol(spf),
+    attr(spf, "kind"), attr(spf, "version"))))
+knitr::kable(beidan::dataset_contract(dataset, table), caption = "列类型契约（Arrow -> R）")
+knitr::kable(utils::head(spf, 6))
+```
+
+## 6. 可用率
+
+"可用"= `score` 可解析 **且** `expected_option` 非空。未解析的行保留 `NA`，与"根缺失"
+这类错误区分开。
+
+```{r}
+#| label: spf-usability
+resolved <- sum(!is.na(spf$expected_option))
+knitr::kable(tibble::tibble(
+  `项` = c("总行数", "已解析", "可用率", "未解析"),
+  `值` = c(format(nrow(spf), big.mark = ","), format(resolved, big.mark = ","),
+    sprintf("%.1f%%", 100 * resolved / nrow(spf)),
+    format(nrow(spf) - resolved, big.mark = ","))))
+```
+
+**两个口径必须分清**（回执分别记录）：
+
+- `counts.*`：**产出标签**的行数（让球可解析 **且** 比分可解析）；
+- `handicap_source_rows.*`：**让球取值来源**的行数，含比分未解析（取消/推迟）的行。
+  派生表的 `handicap_source` 列对应后者。
+
+```{r}
+#| label: spf-source-rows
+counts <- unlist(receipt$counts)
+src_rows <- receipt$handicap_source_rows
+knitr::kable(tibble::tibble(
+  `口径` = c("产出标签 counts.from_archive", "产出标签 counts.from_cross_source",
+    "让球来源 handicap_source_rows.archive", "让球来源 handicap_source_rows.cross_source",
+    "无让球 handicap_source_rows.none", "未解析 counts.unresolved"),
+  `行数` = c(counts[["handicap_from_archive"]], counts[["handicap_from_cross_source"]],
+    src_rows$archive, src_rows$cross_source, src_rows$none, counts[["unresolved"]])),
+  caption = "两种口径并列，避免相加为总行数的误解")
+```
+
+**分纪元可用率**（`issue_year` 由期号前两位推导，仅用于此处展示）：
+
+```{r}
+#| label: spf-era
+spf$issue_year <- as.integer(paste0("20", substr(spf$issue, 1, 2)))
+era <- dplyr::mutate(spf, era = ifelse(issue_year <= 2019, "旧纪元 2009-2019", "新纪元 2020+")) |>
+  dplyr::group_by(era) |>
+  dplyr::summarise(rows = dplyr::n(), resolved = sum(!is.na(expected_option)), .groups = "drop") |>
+  dplyr::mutate(rate = sprintf("%.1f%%", 100 * resolved / rows))
+knitr::kable(era, caption = "按纪元可用率")
+```
+
+对照：**若不补全**（直接用 `observation.expected_option`），旧纪元 spf 可用率约 42.7%；
+`spf_labels` 将其提升到上表数值。
+
+## 7. 分歧与交叉核对
+
+两类问题**口径不同**，分开陈述，都不静默择一：
+
+- `cross_check.contradictions`：用 500 让球反算的赛果 ≠ 归档彩果（3 条）；
+- `known_disagreements`：**两源都给出让球且数值不同**（10 条），按策略一律采用 500，
+  归档取值仅记录。
+
+```{r}
+#| label: spf-disagreements
+knitr::kable(tibble::tibble(
+  `项` = c("交叉核对样本", "矛盾", "源间分歧", "分歧处置"),
+  `值` = c(format(receipt$cross_check$compared, big.mark = ","),
+    as.character(receipt$cross_check$contradictions),
+    as.character(receipt$known_disagreements$count),
+    receipt$known_disagreements$resolution)))
+dis <- do.call(rbind, lapply(receipt$known_disagreements$rows, function(r) {
+  tibble::tibble(issue = r$issue, slot = r$slot, score = r$score,
+    archive = r$archive_handicap, cross = r$cross_handicap, applied = r$applied)
+}))
+knitr::kable(dis, caption = "源间让球分歧（10 条，采用 500）")
+```
+
+## 8. 聚合（DuckDB）
+
+跨行聚合与 base 表同一入口。
+
+```{r}
+#| label: spf-aggregate
+by_source <- beidan::dataset_query(dataset,
+  "SELECT handicap_source, count(*) AS n FROM spf_labels GROUP BY 1 ORDER BY 2 DESC", table)
+knitr::kable(by_source, caption = "按让球来源聚合")
+by_handicap <- beidan::dataset_query(dataset,
+  "SELECT handicap, count(*) AS n FROM spf_labels WHERE handicap IS NOT NULL
+   GROUP BY 1 ORDER BY 1", table)
+knitr::kable(by_handicap, caption = "让球分布")
+```
+
+## 9. 验证与限制
+
+- 回填：`PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/backfill_settlement_spf.py`
+- 包测试：`packages/beidan/tests/python/test_settlement_backfill.py`（12 例）与
+  `packages/beidan/tests/testthat/test-parquet-dataset.R`（58 断言）
+- 渲染：`quarto render quarto/settlement_spf_labels.qmd --execute --no-cache`
+
+限制：
+
+- **派生表按策略覆盖更新**（当前不保留版本历史）。base 表的内容寻址与 manifest 机制
+  不适用于它；其完整性依据是 catalog 记录的 sha256 与回执，重新生成会改变两者。
+- `known_disagreements` 的 10 条**无第三源可判定**：本仓库 Titan 亚盘不覆盖这些场次
+  （`market_odds_v1` 无亚盘表，`three_in_one_v1.quote` 不含相关 fixture），
+  `markets/market-record` 的期号范围自 101121 起，也不含 100103。是否采纳 500 的取值
+  是策略选择，不是数据判定。
+- 4,897 条未解析中，包含归档无彩果的取消/推迟场次，以及归档未渲染且 500 无记录的近年场次。
+- `issue_year` 仅用于本报告的分纪元展示，不是派生表的列，也不能作为 `read_dataset()` 的
+  `issue_year` 参数（派生表非分区，传该参数会 `stop()`）。

@@ -221,3 +221,34 @@ def test_write_json_atomically_writes_and_replaces(tmp_path):
     bf.write_json_atomically({"a": 3}, target)
     assert json.loads(target.read_text()) == {"a": 3}
     assert not list(tmp_path.glob("*.partial"))
+
+
+def test_receipt_reports_label_counts_and_source_counts_separately(tmp_path):
+    """`counts` counts labels produced; `handicap_source_rows` counts source use.
+
+    A postponed fixture has a handicap from the cross source but no parsable
+    score, so it must appear in handicap_source_rows and NOT in counts.
+    """
+    cross = bf.load_cross_source(_cross(tmp_path, [("090918", 4, -1), ("090918", 7, 0)]))
+    rows = [
+        {"issue": "090918", "slot": 4, "play": "spf", "score": "1-0",
+         "handicap": None, "archive_result_raw": "平"},          # labelled, cross
+        {"issue": "090918", "slot": 7, "play": "spf", "score": "推迟",
+         "handicap": None, "archive_result_raw": None},          # cross, no label
+        {"issue": "090918", "slot": 9, "play": "spf", "score": "2-0",
+         "handicap": -2, "archive_result_raw": "胜"},            # labelled, archive
+    ]
+    _derived, receipt = bf.backfill_spf(rows, cross)
+
+    counts = receipt["counts"]
+    assert counts["total_spf"] == 3
+    assert counts["handicap_from_cross_source"] == 1   # only the labelled one
+    assert counts["handicap_from_archive"] == 1
+    assert counts["unresolved"] == 1
+
+    source_rows = receipt["handicap_source_rows"]
+    assert source_rows["cross_source"] == 2            # includes the unlabelled one
+    assert source_rows["archive"] == 1
+    assert source_rows["none"] == 0
+    # the two views must not be confused: labels < source use for the cross source
+    assert counts["handicap_from_cross_source"] < source_rows["cross_source"]

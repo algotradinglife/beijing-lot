@@ -26,6 +26,7 @@ project:
     - quarto/288_outcome_set_selection.qmd
     - quarto/collection_ledger.qmd
     - quarto/parquet_settlement_delivery.qmd
+    - quarto/settlement_spf_labels.qmd
 
 execute:
   freeze: false

@@ -215,11 +215,23 @@ def backfill_spf(rows: list[dict], cross: CrossSource) -> tuple[list[dict], dict
                  "no row; never inferred from the archive's own rendering"),
         "cross_source": {"path": str(cross.path), "sha256": cross.sha256,
                          "rows": len(cross.values)},
+        # Two different questions, deliberately reported separately:
+        #   `counts.*`            rows that yielded a label (handicap resolved
+        #                         AND the score parsed), i.e. usability;
+        #   `handicap_source_rows` rows whose handicap came from each source,
+        #                         including rows whose score did not parse.
+        # The derived table's `handicap_source` column matches the latter.
         "counts": {
             "total_spf": sum(1 for r in rows if r.get("play") == "spf"),
             "handicap_from_archive": from_archive,
             "handicap_from_cross_source": from_cross,
             "unresolved": unresolved,
+        },
+        "handicap_source_rows": {
+            "note": "rows carrying each handicap_source value, including rows with an unparsable score",
+            "archive": sum(1 for r in derived if r.get("handicap_source") == "archive"),
+            "cross_source": sum(1 for r in derived if r.get("handicap_source") == "cross_source"),
+            "none": sum(1 for r in derived if r.get("handicap_source") is None),
         },
         "cross_check": {
             "compared": from_archive + from_cross,
