@@ -67,3 +67,34 @@ def test_cancelled_all_options_one_is_observed_not_predicted(tmp_path):
         assert not call(tmp_path, body=invalid)['settlements']
     schedule = [dict(issue_id='25053', slot=1, fixture_key='25053:1', provider_id_nowscore='999', handicap=0)]
     assert not call(tmp_path, body=body, schedule=schedule)['settlements']
+
+
+@pytest.mark.parametrize('values', [{}, {'胜':'2','平':'3','负':'4'}, {'胜':'bad'}])
+def test_final_score_precedes_financial_sp(tmp_path, values):
+    result = call(tmp_path, body=page(5, values=values))
+    assert result['settlements'] == []
+    assert result['match_results'] == [{'issue_id':'25053', 'fixture_id':'25053:1',
+        'outcome':'W', 'result_available_at':'2026-09-26T10:00:00+08:00',
+        'source_url':result['match_results'][0]['source_url']}]
+    assert 'settled_sp' not in result['match_results'][0]
+
+
+@pytest.mark.parametrize('body', [page(5,status='22:25'),page(5,status='取消'),
+    page(5,ft='-',values={}),page(5,values={'负':'2.5'})])
+def test_unconfirmed_or_conflicting_results_are_not_observations(tmp_path,body):
+    assert call(tmp_path,body=body)['match_results'] == []
+
+
+def test_native_identity_binds_both_result_and_sp(tmp_path):
+    roster=[dict(issue_id='25053',slot=1,fixture_key='25053:1',provider_id_nowscore='999',handicap=0)]
+    result=call(tmp_path,schedule=roster)
+    assert result['match_results']==[] and result['settlements']==[]
+    settled=call(tmp_path)
+    assert settled['match_results'][0]['outcome']==settled['settlements'][0]['outcome']
+
+
+@pytest.mark.parametrize('values', [{'胜':'bad','负':'2.5'}, {'平':'bad','负':'2.5'}])
+def test_parse_error_does_not_hide_contradictory_unique_sp(tmp_path,values):
+    result=call(tmp_path,body=page(5,values=values))
+    assert result['settlements']==[] and result['match_results']==[]
+    assert result['diagnostics'][0]['reason']=='invalid_source_contract'

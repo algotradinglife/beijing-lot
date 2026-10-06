@@ -105,9 +105,33 @@ parlay_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_t
     stop("parlay_value_tickets: every ticket must have the same positive leg count")
   }
   plan_legs <- widths
+  # Resolve only referenced directions, once per call. Conflicts in unrelated
+  # fixtures remain irrelevant; every historical instant for a used direction
+  # retains the original contradiction check before its latest quote is chosen.
+  directions <- dplyr::distinct(ticket_legs, fixture_id, outcome)
+  direction_keys <- paste0(directions$fixture_id, "|", directions$outcome)
+  quote_indices <- split(seq_len(nrow(usable_sp)),
+    paste0(usable_sp$fixture_id, "|", usable_sp$outcome))
+  direction_sp <- rep(NA_real_, nrow(directions))
+  for (j in seq_len(nrow(directions))) {
+    row <- usable_sp[quote_indices[[direction_keys[j]]], , drop = FALSE]
+    if (nrow(row)) {
+      by_instant <- split(row$sp_raw, as.numeric(row$quote_at))
+      conflicting <- vapply(by_instant, function(v) length(unique(v)) > 1L, logical(1))
+      if (any(conflicting)) {
+        stop("parlay_value_tickets: conflicting SP quotes at one instant for fixture ",
+             directions$fixture_id[j], " outcome ", directions$outcome[j])
+      }
+      row <- row[order(row$quote_at), , drop = FALSE]
+      direction_sp[j] <- row$sp_raw[nrow(row)]
+    }
+  }
+  # Outcome codes have fixed one-character W/D/L values, so the suffix makes
+  # these direction keys injective even when a fixture identifier contains '|'.
+  leg_indices <- split(seq_len(nrow(ticket_legs)), ticket_legs$ticket_id)
   for (i in seq_len(nrow(out))) {
     ticket_id <- out$ticket_id[i]
-    legs <- ticket_legs[ticket_legs$ticket_id == ticket_id, , drop = FALSE]
+    legs <- ticket_legs[leg_indices[[ticket_id]], , drop = FALSE]
     if (nrow(legs) != plan_legs) {
       stop("parlay_value_tickets: ticket ", ticket_id, " has ", nrow(legs),
            " legs, expected ", plan_legs)
@@ -117,26 +141,8 @@ parlay_value_tickets <- function(tickets, ticket_legs, prematch_sp, cutoff, sp_t
     if (!identical(ticket_id, physical_id)) {
       stop("parlay_value_tickets: ticket legs do not match the physical ticket identity")
     }
-    sps <- rep(NA_real_, nrow(legs))
-    for (leg_index in seq_len(nrow(legs))) {
-      row <- usable_sp[usable_sp$fixture_id == legs$fixture_id[leg_index] &
-                         usable_sp$outcome == legs$outcome[leg_index], , drop = FALSE]
-      if (nrow(row)) {
-        # Latest quote wins, but two quotes for the SAME (fixture, outcome) at the
-        # SAME instant are a contradiction: choosing by row order would change the
-        # valuation, so it is refused rather than silently resolved.
-        # ANY instant carrying two different quotes is a contradiction, not just the
-        # latest one: an older conflict would otherwise stay silently admitted.
-        by_instant <- split(row$sp_raw, as.numeric(row$quote_at))
-        conflicting <- vapply(by_instant, function(v) length(unique(v)) > 1L, logical(1))
-        if (any(conflicting)) {
-          stop("parlay_value_tickets: conflicting SP quotes at one instant for fixture ",
-               legs$fixture_id[leg_index], " outcome ", legs$outcome[leg_index])
-        }
-        row <- row[order(row$quote_at), , drop = FALSE]
-        sps[leg_index] <- row$sp_raw[nrow(row)]
-      }
-    }
+    sps <- direction_sp[match(paste0(legs$fixture_id, "|", legs$outcome),
+                              direction_keys)]
     adjusted <- parlay_transform_sp(sps, sp_threshold, sp_replacement)
     if (anyNA(adjusted)) {
       out$sp_product_est[i] <- NA_real_
@@ -1526,6 +1532,8 @@ parlay_validate_prior_state <- function(prior_purchases) {
 #' @param projected List containing cutoff, fixtures, probabilities, prematch_sp and match_status.
 #' @return Invisibly a list containing the validated cutoff; errors on missing or mismatched issue identity.
 parlay_projection_context <- function(projected) {
+  if (is.list(projected) && (!is.null(projected$probability_base) ||
+      !is.null(projected$probability_base_receipt))) .ValidateProbabilityBaseProjection(projected)
   if (!is.list(projected)) {
     stop("parlay_projection_context: projected must be a projection object")
   }

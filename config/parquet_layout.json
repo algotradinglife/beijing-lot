@@ -1,0 +1,79 @@
+{
+  "schema": "beijing_lot_parquet_layout_v1",
+  "scope": "persistent analytical datasets; acquisition-time raw receipts stay with their existing collectors",
+  "persistent_root": "/mnt/nas/Data/beijing-lot",
+  "persistent_fstype": "cifs",
+  "hot_root": "results",
+  "datasets_dir": "datasets",
+  "registry_dir": "registry",
+  "staging_dir": "tmp",
+  "quarantine_dir": "quarantine",
+  "unavailable_policy": "fail_closed",
+  "partitioning": {
+    "by": ["issue_year"],
+    "file_template": "part-issue-year={year}.parquet",
+    "rationale": "issue_year keys the mix of 5-digit (2020+) and 6-digit (2007-2019) issue codes and matches the existing issue_year helper"
+  },
+  "write": {
+    "compression": "snappy",
+    "row_group_size": 250000,
+    "use_dictionary": true,
+    "version": "2.6",
+    "atomic_publish": "write to staging_dir, fsync file, rename within the same filesystem"
+  },
+  "read": {
+    "primary": "arrow",
+    "aggregate": "duckdb",
+    "tz": "UTC",
+    "note": "arrow::read_parquet for zero-copy tibbles; duckdb read_parquet for cross-partition aggregation"
+  },
+  "datasets": {
+    "settlement": {
+      "source_registry": "/run/media/drwho1985/Sandisk/data/beijing-lot/registry/settlement-current.json",
+      "source_database": "settlement/releases/20260907_history_five_play_v2/nowscore_history_replay.sqlite",
+      "version_field": "version",
+      "tables": [
+        "capture",
+        "finding",
+        "finding_supersession",
+        "finding_supersession_batch",
+        "half_full_correction",
+        "half_full_correction_batch",
+        "halftime_correction",
+        "halftime_correction_batch",
+        "issue_addition",
+        "issue_addition_batch",
+        "issue_addition_capture",
+        "issue_recovery_batch",
+        "issue_recovery_capture",
+        "issue_recovery_gap",
+        "observation",
+        "option_sp",
+        "receipt",
+        "sp_correction",
+        "sp_correction_batch"
+      ],
+      "partitioned_tables": ["observation", "option_sp"],
+      "unpartitioned_tables": [
+        "capture",
+        "finding",
+        "finding_supersession",
+        "finding_supersession_batch",
+        "half_full_correction",
+        "half_full_correction_batch",
+        "halftime_correction",
+        "halftime_correction_batch",
+        "issue_addition",
+        "issue_addition_batch",
+        "issue_addition_capture",
+        "issue_recovery_batch",
+        "issue_recovery_capture",
+        "issue_recovery_gap",
+        "receipt",
+        "sp_correction",
+        "sp_correction_batch"
+      ],
+      "notes": "observation and option_sp carry the bulk (2.9 GB of 3.3 GB) and are keyed by issue; everything else is a small batch/receipt table written whole."
+    }
+  }
+}

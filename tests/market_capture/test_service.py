@@ -175,3 +175,34 @@ def test_slot57_same_minute_uses_newest_source_row():
     changed = parse_markets(fixture, reordered, {})
     winner = next(r for r in changed["euro"] if r["company_id"] == "281" and r["quote_at"] == stamp)
     assert winner["odds_home"] == 1.5
+
+
+def test_receipt_preserves_replay_provenance_without_duplicating_history(tmp_path,fixture,pages):
+    result = fetch_markets([fixture],str(tmp_path),['8'],pages=pages)
+    receipt = json.loads(Path(result['receipt_path']).read_text())
+    assert result['euro'] and result['totals']
+    assert 'euro' not in receipt and 'totals' not in receipt
+    assert receipt['schema'] == 'beidan_market_capture_receipt_v1'
+    assert receipt['euro_rows'] == len(result['euro'])
+    assert receipt['totals_rows'] == len(result['totals'])
+    assert receipt['captures'] == result['captures']
+    assert receipt['coverage'] == result['coverage']
+    assert all(Path(c['raw_path']).read_bytes()==pages[c['source_url']]['body'] for c in receipt['captures'])
+    assert not list(Path(result['receipt_path']).parent.glob('*.tmp'))
+    assert Path(result['receipt_path']).stat().st_size < len(json.dumps(result,ensure_ascii=False,indent=2).encode('utf-8')) / 2
+
+
+def test_receipt_atomic_failure_keeps_last_raw_inventory(tmp_path,monkeypatch):
+    import beidan_backend.market_capture.service as service
+    before={'euro':[], 'totals':[], 'captures':[{'sha256':'old'}]}
+    service._write_market_receipt(tmp_path,before)
+    original=(tmp_path/'receipt.json').read_bytes()
+    real_replace=Path.replace
+    def fail_receipt(path,target):
+        if path.name=='receipt.json.tmp':
+            raise OSError('publication failure')
+        return real_replace(path,target)
+    monkeypatch.setattr(Path,'replace',fail_receipt)
+    with pytest.raises(OSError,match='publication failure'):
+        service._write_market_receipt(tmp_path,{'euro':[{'value':1}]*10000,'totals':[],'captures':[]})
+    assert (tmp_path/'receipt.json').read_bytes()==original

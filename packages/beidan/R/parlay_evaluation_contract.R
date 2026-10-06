@@ -1,5 +1,5 @@
 #' Validate a current ranked evaluation before downstream analysis
-#' @param evaluation Result of parlay_evaluate_portfolio().
+#' @param evaluation Result of parlay_select_groups().
 #' @return Validated normalized source pool; no IO or mutation.
 #' @details Source, code, cutoff, purchased ledger and frozen-plan bindings fail closed.
 #' @noRd
@@ -12,7 +12,7 @@
       !identical(receipt$cutoff_hash, pool$cutoff_hash)) stop("evaluation cutoff binding mismatch")
   producer <- receipt$producer
   if (!is.character(producer) || length(producer) != 1L || is.na(producer) ||
-      !producer %in% c("parlay_evaluate_portfolio", "parlay_select_groups")) {
+      !producer %in% c("parlay_select_groups", "AllocateParlayBudget")) {
     stop("evaluation producer binding missing or invalid")
   }
   expected <- list(portfolio_hash=rlang::hash(evaluation$portfolio),
@@ -22,6 +22,29 @@
     code_hash=.rank_outcome_code_hash(roots=c("parlay_construct_role_groups",producer)))
   for (field in names(expected)) {
     if (!identical(receipt[[field]], expected[[field]])) stop("evaluation binding mismatch: ",field)
+  }
+  if (identical(producer,"AllocateParlayBudget")) {
+    policy <- receipt$selection_policy
+    source_pool <- .parlay_ranked_validate_evaluation(policy$source_evaluation)
+    if (!identical(policy$source_evaluation$receipt$producer,"parlay_select_groups") ||
+        !identical(policy$source_hash,rlang::hash(policy$source_evaluation)) ||
+        !identical(source_pool,pool) ||
+        !identical(policy$group_ids,sort(unique(policy$source_evaluation$purchases$group_id),method="radix"))) {
+      stop("allocation source binding mismatch")
+    }
+    checkmate::assert_choice(policy$method,c("equal","probability"))
+    checkmate::assert_choice(policy$triple_ranking,c("beidan","uniform"))
+    budget <- .parlay_role_validate_budget(receipt$budget_cny,"budget_cny")
+    if (is.null(budget)) stop("allocation requires finite budget")
+    cap <- .parlay_role_validate_budget(receipt$group_budget_cny,"group_budget_cny")
+    replay <- .AllocateFrozenTickets(pool,policy$group_ids,budget,cap,policy$method,policy$triple_ranking)
+    if (!identical(replay$purchases,evaluation$purchases) ||
+        !identical(replay$ticket_legs,evaluation$plan$ticket_legs) ||
+        !identical(replay$selection,evaluation$selection)) stop("allocation replay mismatch")
+    summary <- .parlay_ranked_summary(replay,pool,budget,cap)
+    if (!identical(summary$group_selection,evaluation$group_selection) ||
+        !identical(evaluation$allocation,evaluation$group_selection) ||
+        !identical(summary$summary,evaluation$summary)) stop("allocation summary binding mismatch")
   }
   if (!identical(evaluation$plan$constants, pool$settings)) stop("evaluation frozen settings mismatch")
   ledger <- evaluation$purchases
@@ -49,10 +72,11 @@
     stop("evaluation frozen issue/cutoff ledger mismatch")
   }
   final_legs <- evaluation$final$role_legs
+  if (nrow(final_legs)) .parlay_ranked_validate_masks(final_legs,
+    pool$ranked_selections, parlay_probability_wide(pool$probabilities))
   for (group in unique(final_legs$group_id)) {
     block <- final_legs[final_legs$group_id==group,,drop=FALSE]
     if (nrow(block)!=pool$settings$n_legs || anyDuplicated(block$fixture_id)) stop("evaluation invalid final group legs")
-    .parlay_ranked_validate_masks(block,pool$ranked_selections,pool$probabilities,group)
   }
   for (group in unique(ledger$group_id)) {
     block <- final_legs[final_legs$group_id==group,,drop=FALSE]

@@ -1,8 +1,12 @@
-"""The only module here that touches the network: a bounded, explicit fetch.
+"""The package-wide HTTP transport: a bounded, explicit fetch.
 
 Nothing is retried blindly and nothing is fetched implicitly on import. The
 caller names the URL, the timeout and the retry budget, and every response's raw
 bytes are returned so they can be persisted before any parsing happens.
+
+This is the single shared network layer for the backend. The issue-schedule,
+settlement, prematch-SP and market-capture services all fetch through
+``fetch_issue_page`` rather than reimplementing timeouts, retries or headers.
 """
 
 from __future__ import annotations
@@ -22,7 +26,15 @@ DEFAULT_RETRIES = 2
 
 
 class FetchError(RuntimeError):
-    """A bounded fetch attempt failed and the retry budget is exhausted."""
+    """A bounded fetch attempt failed and the retry budget is exhausted.
+
+    ``status`` carries the last HTTP status code observed, when there was one,
+    so callers can record it in diagnostics without parsing the message.
+    """
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass(frozen=True)
@@ -46,6 +58,7 @@ def fetch_issue_page(
     user_agent: str = DEFAULT_USER_AGENT,
     referer: str | None = None,
     backoff_sec: float = 0.5,
+    headers: dict | None = None,
     opener=None,
 ) -> FetchResponse:
     """Fetch one page with an explicit timeout and transient retry budget.
@@ -56,6 +69,8 @@ def fetch_issue_page(
     @param user_agent User-Agent header.
     @param referer Optional Referer header.
     @param backoff_sec Sleep between attempts; >= 0.
+    @param headers Optional extra request headers, merged over the defaults; used
+        by sources that need their own Accept / Accept-Language / Cache-Control.
     @param opener Injection point for tests: a callable ``(request, timeout)``
         returning a context manager with ``read()``, ``status`` and ``headers``.
         Defaults to ``urllib.request.urlopen``. This is how the retry/timeout
@@ -73,12 +88,14 @@ def fetch_issue_page(
     if not math.isfinite(backoff_sec) or backoff_sec < 0:
         raise ValueError("backoff_sec must be non-negative")
     call = opener or urllib.request.urlopen
-    headers = {"User-Agent": user_agent, "Accept-Encoding": "identity"}
+    request_headers = {"User-Agent": user_agent, "Accept-Encoding": "identity"}
     if referer:
-        headers["Referer"] = referer
+        request_headers["Referer"] = referer
+    if headers:
+        request_headers.update({str(key): str(value) for key, value in headers.items()})
     last_error: Exception | None = None
     for attempt in range(1, retries + 2):
-        request = urllib.request.Request(url, headers=headers)
+        request = urllib.request.Request(url, headers=request_headers)
         started = time.time()
         try:
             with call(request, timeout=timeout) as response:
@@ -89,7 +106,7 @@ def fetch_issue_page(
                 if response_headers is not None:
                     content_type = response_headers.get("Content-Type")
             if status != 200:
-                raise FetchError(f"HTTP {status} from {url}")
+                raise FetchError(f"HTTP {status} from {url}", status=status)
             return FetchResponse(
                 url=url,
                 status=status,
@@ -103,7 +120,7 @@ def fetch_issue_page(
             raise
         except urllib.error.HTTPError as error:
             if error.code not in {408, 429, 500, 502, 503, 504}:
-                raise FetchError(f"HTTP {error.code} from {url}") from error
+                raise FetchError(f"HTTP {error.code} from {url}", status=error.code) from error
             last_error = error
             if attempt <= retries and backoff_sec:
                 time.sleep(backoff_sec)
@@ -112,7 +129,8 @@ def fetch_issue_page(
             if attempt <= retries and backoff_sec:
                 time.sleep(backoff_sec)
     raise FetchError(
-        f"fetching {url} failed after {retries + 1} attempt(s): {last_error}"
+        f"fetching {url} failed after {retries + 1} attempt(s): {last_error}",
+        status=getattr(last_error, "code", None),
     ) from last_error
 
 

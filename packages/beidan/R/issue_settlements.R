@@ -13,6 +13,8 @@
 #'   普通未完场或未有唯一开奖SP不产生结算行；取消且停售、来源明确列出
 #'   胜平负三个SP均为1时输出 status=all_options_one、outcome=ALL，
 #'   不计预测命中。空结果保持列类型。
+#'   match_results 属性为独立赛果 tibble：issue_id、fixture_id、outcome(W/D/L)、
+#'   result_available_at(实际观测北京时间)、source_url；SP未发布也可有赛果。
 #'   diagnostics 属性记录未接纳原因，receipt_path 属性记录原始证据回执位置。
 #' @details 不推断开奖发布时间；label_available_at 为实际观测时刻。
 #'   原始响应先持久化再解析。调用会联网及写文件，导入无副作用。
@@ -60,6 +62,15 @@ fetch_issue_settlements <- function(schedule, raw_dir, backend, timeout = 25,
       lubridate::ymd_hms(out$label_available_at, quiet = TRUE), "Asia/Shanghai")
     if (anyNA(out$label_available_at)) stop("invalid observed timestamp")
   }
+  observed_results <- match_typed_empty("match_results")
+  if (length(payload$match_results)) {
+    observed_results <- dplyr::bind_rows(payload$match_results)
+    observed_results$result_available_at <- lubridate::with_tz(
+      lubridate::ymd_hms(observed_results$result_available_at, quiet = TRUE), "Asia/Shanghai")
+    if (anyNA(observed_results$result_available_at)) stop("invalid result observed timestamp")
+  }
+  match_validate_table(observed_results,"match_results")
+  attr(out, "match_results") <- observed_results
   attr(out, "diagnostics") <- if (length(payload$diagnostics)) dplyr::bind_rows(payload$diagnostics) else
     tibble::tibble(issue_id = character(), fixture_id = character(), reason = character())
   attr(out, "receipt_path") <- payload$receipt_path

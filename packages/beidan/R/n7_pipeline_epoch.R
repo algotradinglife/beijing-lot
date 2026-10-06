@@ -269,6 +269,7 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #' @param cutoff         temporal_learning 对象，经 match_require_cutoff 校验。
 #' @param euro_policy    欧赔策略，语义见 match_euro_mean。
 #' @param totals_policy  大小球策略，语义见 match_totals_selected。
+#' @param probability_base Exact beidan/dc/mixed basis; Beidan skips euro/totals admission.
 #' @param window_hours   长度 2 的数值向量 c(start, end)，滚动决策窗口的经过小时
 #'   边界；默认 c(4, 28)。转发给权威 match_decision_window()：设为 c(2, 26)
 #'   只改变窗口边界，不移动 cutoff，也不改变报价/状态的严格 as-of 时刻。非法边界报错。
@@ -279,7 +280,7 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #'   · status_selected  被采纳的那条 scheduled 报告，每场一行
 #' @details 窗口是 cutoff 加上显式经过小时边界，左闭右开；默认 4–28 小时。
 #'   只有当开赛落在该窗口内、cutoff 之前存在可用欧赔报价、**且 cutoff 当时可见的
-#'   最新状态是 scheduled** 时，比赛才会被保留。被剔除的比赛连同原因记入
+#'   最新状态是 scheduled** 时，比赛才会被保留。Beidan only uses window/status, not euro.被剔除的比赛连同原因记入
 #'   exclusions 表，因此剔除是可审计的而不是静默的。
 #'
 #'   期号绑定：一个 epoch 就是一期。携带其它 issue_id 的比赛会被拒绝，
@@ -293,21 +294,31 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #'   构造 cutoff、把选中 SP 暴露为 prematch_sp 并附上解析后的窗口凭证，两者不重复算法。
 .PrepareMatchInputs <- function(inputs, cutoff, euro_policy, totals_policy,
                                 window_hours = c(MATCH_WINDOW_START_HOURS,
-                                                 MATCH_WINDOW_END_HOURS)) {
+                                                 MATCH_WINDOW_END_HOURS),
+                                probability_base = "dc") {
+  checkmate::assert_choice(probability_base, c("beidan", "dc", "mixed"))
   match_require_cutoff(cutoff)
   cutoff_utc <- match_cutoff_utc(cutoff)
-  fixtures_all <- match_validate_table(inputs$fixtures, "fixtures",
-                                    keys = c("issue_id", "fixture_id"))
-  euro <- match_validate_table(inputs$euro, "euro")
-  totals <- match_validate_table(inputs$totals, "totals")
-  sp <- match_validate_table(inputs$prematch_sp, "prematch_sp")
+  fixtures_all <- tibble::as_tibble(match_validate_table(inputs$fixtures, "fixtures",
+                                    keys = c("issue_id", "fixture_id")))
+  euro <- if (probability_base == "beidan") match_typed_empty("euro") else
+    tibble::as_tibble(match_validate_table(inputs$euro, "euro"))
+  totals <- if (probability_base == "beidan") match_typed_empty("totals") else
+    tibble::as_tibble(match_validate_table(inputs$totals, "totals"))
+  sp <- tibble::as_tibble(match_validate_table(inputs$prematch_sp, "prematch_sp"))
+  if (any(!is.finite(as.numeric(fixtures_all$kickoff_at))) ||
+      any(!is.finite(as.numeric(sp$quote_at))) ||
+      (probability_base != "beidan" &&
+       (any(!is.finite(as.numeric(euro$quote_at))) || any(!is.finite(as.numeric(totals$quote_at)))))) {
+    stop("prepare_match_inputs: source event/quote times must be finite")
+  }
   # Missing is an input-contract error; an empty ledger is a legitimate observation
   # of "nothing was visible" and must not be confused with the former.
   if (is.null(inputs$match_status)) {
     stop(".PrepareMatchInputs: inputs$match_status is required; a missing status ledger ",
          "is an input-contract error, not an empty one")
   }
-  match_status <- match_validate_status(inputs$match_status, fixtures = fixtures_all)
+  match_status <- tibble::as_tibble(match_validate_status(inputs$match_status, fixtures = fixtures_all))
 
   exclusions <- list()
   note <- function(fixture_id, reason) {
@@ -355,16 +366,22 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
   }
   fixtures <- status$fixtures
 
-  euro_mean <- match_euro_mean(euro, cutoff_utc, euro_policy, fixtures)
-  usable <- !is.na(euro_mean$prob_home)
-  for (fixture_id in euro_mean$fixture_id[!usable]) {
-    n_members <- euro_mean$n_members[match(fixture_id, euro_mean$fixture_id)]
-    note(fixture_id, if (n_members > 0L) "fewer than two euro companies before cutoff" else "no euro quote before cutoff")
-  }
-  fixtures <- fixtures[usable, , drop = FALSE]
-  euro_mean <- euro_mean[usable, , drop = FALSE]
+  if (probability_base == "beidan") {
+    euro_mean <- tibble::tibble(fixture_id=character(),prob_home=double(),
+      prob_draw=double(),prob_away=double(),n_members=integer())
+    selected_totals <- match_typed_empty("totals")
+  } else {
+    euro_mean <- match_euro_mean(euro, cutoff_utc, euro_policy, fixtures)
+    usable <- !is.na(euro_mean$prob_home)
+    for (fixture_id in euro_mean$fixture_id[!usable]) {
+      n_members <- euro_mean$n_members[match(fixture_id, euro_mean$fixture_id)]
+      note(fixture_id, if (n_members > 0L) "fewer than two euro companies before cutoff" else "no euro quote before cutoff")
+    }
+    fixtures <- fixtures[usable, , drop = FALSE]
+    euro_mean <- euro_mean[usable, , drop = FALSE]
 
-  selected_totals <- match_totals_selected(totals, cutoff_utc, totals_policy, fixtures)
+    selected_totals <- match_totals_selected(totals, cutoff_utc, totals_policy, fixtures)
+  }
   selected_sp <- match_latest_quote_before(sp, cutoff_utc, c("sp_raw"))
 
   list(window = window, fixtures = fixtures, euro_mean = euro_mean,
@@ -388,7 +405,7 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #' 从整期输入推导一期决策上下文
 #'
 #' @param inputs list，含 fixtures/euro/totals/prematch_sp/match_status 五张表
-#'   （通常来自 read_match_inputs）。
+#'   （通常来自 read_match_inputs）；beidan 仅要求 fixtures/prematch_sp/match_status。
 #' @param decision_at 带时区的 POSIXct 标量，用户决策时点；**任何显式时区**都接受，
 #'   内部归一化为同一瞬时的 UTC 表示。
 #'   · 非 POSIXct / 长度 != 1 / NA -> stop()
@@ -396,19 +413,25 @@ match_totals_selected <- function(totals, cutoff_utc, policy, fixtures) {
 #'   match_euro_mean，market_policy$totals 传给 match_totals_selected。
 #'   · 缺 euro 或 totals -> stop()
 #'   · 未知顶层名字 -> stop()
+#' @param probability_base Exact beidan/dc/mixed basis (default dc). Beidan
+#'   ignores market_policy and requires no euro/totals tables.
 #' @param window_hours 长度 2 的数值向量 c(start, end)，滚动决策窗口的经过小时
 #'   边界；默认 c(4, 28)。转发给 .PrepareMatchInputs() 与权威
 #'   match_decision_window()：设为 c(2, 26) 只改变窗口边界，不移动 decision_at
 #'   对应的 cutoff，也不改变报价/状态的严格 as-of 时刻。非法边界报错。
 #' @return list(cutoff, market_policy, decision_at, window, fixtures, euro_mean,
-#'   totals_selected, prematch_sp, match_status, status_selected, exclusions)。
+#'   totals_selected, prematch_sp, match_status, status_selected, exclusions,
+#'   probability_base, preparation_receipt)。收据绑定原始输入、基座、cutoff、
+#'   参数、输出与传递实现；验证器从原始输入独立重放，拒绝改字段复用。
 #'   cutoff 由 fixtures 的期号与 decision_at 归一化后的 UTC 瞬时构成；window
 #'   为 list(window_hours, start_utc, end_utc)，即解析后的窗口凭证。
 #' @details 决策窗口与可见性规则全部委托给权威内部实现 .PrepareMatchInputs；
-#'   本入口只负责"从输入推导唯一期号"这一件事。
-prepare_match_inputs <- function(inputs, decision_at, market_policy,
+#'   本入口推导唯一期号并绑定可重放的准备收据。切换基座或cutoff需重新准备。
+prepare_match_inputs <- function(inputs, decision_at, market_policy = NULL,
                                  window_hours = c(MATCH_WINDOW_START_HOURS,
-                                                  MATCH_WINDOW_END_HOURS)) {
+                                                  MATCH_WINDOW_END_HOURS),
+                                 probability_base = "dc") {
+  checkmate::assert_choice(probability_base, c("beidan", "dc", "mixed"))
   checkmate::assert_posixct(decision_at, len = 1L, any.missing = FALSE,
                             .var.name = "decision_at")
   if (length(attr(decision_at, "tzone")) != 1L ||
@@ -417,15 +440,19 @@ prepare_match_inputs <- function(inputs, decision_at, market_policy,
       !is.finite(as.numeric(decision_at))) {
     stop("prepare_match_inputs: decision_at must carry an explicit timezone")
   }
-  checkmate::assert_list(market_policy, names = "unique",
-                         .var.name = "market_policy")
-  unknown <- setdiff(names(market_policy), c("euro", "totals"))
-  if (length(unknown)) {
-    stop("prepare_match_inputs: unknown market_policy field(s) ",
-         paste(unknown, collapse = ", "), "; expected euro and totals")
-  }
-  if (is.null(market_policy$euro) || is.null(market_policy$totals)) {
-    stop("prepare_match_inputs: market_policy must declare both euro and totals policies")
+  if (probability_base == "beidan") {
+    market_policy <- list()
+  } else {
+    checkmate::assert_list(market_policy, names = "unique",
+                           .var.name = "market_policy")
+    unknown <- setdiff(names(market_policy), c("euro", "totals"))
+    if (length(unknown)) {
+      stop("prepare_match_inputs: unknown market_policy field(s) ",
+           paste(unknown, collapse = ", "), "; expected euro and totals")
+    }
+    if (is.null(market_policy$euro) || is.null(market_policy$totals)) {
+      stop("prepare_match_inputs: market_policy must declare both euro and totals policies")
+    }
   }
   # The issue comes from the fixtures, not from the caller. An empty slate names no
   # issue (there is nothing to decide) and a multi-issue read names several; both are
@@ -446,10 +473,27 @@ prepare_match_inputs <- function(inputs, decision_at, market_policy,
   cutoff <- list(cutoff_utc = lubridate::with_tz(decision_at, "UTC"),
                  issue_id = issues)
   prepared <- .PrepareMatchInputs(inputs, cutoff, market_policy$euro,
-                                  market_policy$totals, window_hours)
-  c(list(cutoff = cutoff, market_policy = market_policy,
-         decision_at = lubridate::with_tz(decision_at, "UTC")),
+                                  market_policy$totals, window_hours, probability_base)
+  out <- c(list(cutoff = cutoff, market_policy = market_policy,
+         decision_at = lubridate::with_tz(decision_at, "UTC"), probability_base = probability_base),
     prepared)
+  parameters <- list(decision_at=out$decision_at,market_policy=market_policy,
+    window_hours=window_hours,probability_base=probability_base)
+  snapshot <- list(inputs=inputs,parameters=parameters)
+  euro_prior <- if (probability_base == "beidan") match_typed_empty("euro") else
+    inputs$euro |> dplyr::filter(.data$fixture_id %in% out$fixtures$fixture_id,
+      .data$company_id %in% market_policy$euro$members, .data$quote_at < cutoff$cutoff_utc)
+  euro_max <- if (nrow(euro_prior)) max(euro_prior$quote_at) else
+    as.POSIXct(NA_real_,origin="1970-01-01",tz="UTC")
+  code_hash <- .rank_outcome_code_hash(roots=c("prepare_match_inputs",".ValidatePreparedProbabilityInputs"))
+  out$preparation_receipt <- list(cutoff=cutoff,cutoff_hash=.rank_outcome_cutoff_hash(cutoff),
+    probability_base=probability_base,input_snapshot=snapshot,input_hash=rlang::hash(snapshot),
+    parameters=parameters,implementation_hash=code_hash,output_hash=rlang::hash(out),
+    cache_key=rlang::hash(list(cutoff,rlang::hash(snapshot),code_hash,probability_base)),
+    max_prior_eligible_euro_quote_at=euro_max,
+    euro_time_scope="Upper bound of prior eligible raw euro quotes, including superseded rows; unused for Beidan",
+    historical_learning_inventory="NONE: fixed current-market preparation; no historical fitting or tuning")
+  return(out)
 }
 
 # .EstimateMatchProbabilities(epoch_inputs, cutoff, rho, total_bounds, tail_tolerance)
@@ -662,6 +706,8 @@ estimate_match_probabilities <- function(
   }
   cutoff <- epoch$cutoff
   match_require_cutoff(cutoff)
+  .ValidatePreparedProbabilityInputs(epoch)
+  if (identical(epoch$probability_base,"beidan")) stop("DC estimator requires a dc or mixed prepared epoch")
   checkmate::assert_list(model_config, names = "unique", .var.name = "model_config")
   allowed <- c("rho", "total_bounds", "tail_tolerance")
   unknown <- setdiff(names(model_config), allowed)

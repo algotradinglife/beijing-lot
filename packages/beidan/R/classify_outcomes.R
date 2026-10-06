@@ -7,6 +7,8 @@
 #' three independent scalar arguments: the caller's argument order is not an
 #' ordering and never changes the result.
 #'
+#' @param single_threshold Finite numeric scalar in `[1/3, 1]`; single choice
+#'   requires Top1 strictly above this fixed threshold (default 0.50).
 #' @param win Numeric scalar, finite and within `[0, 1]`: the win probability.
 #' @param draw Numeric scalar, finite and within `[0, 1]`: the draw probability.
 #' @param lose Numeric scalar, finite and within `[0, 1]`: the lose probability.
@@ -16,7 +18,7 @@
 #' @return An unnamed list of unnamed character vectors whose values are drawn
 #'   from `"win"`, `"draw"` and `"lose"`. With `ranked` the decreasing
 #'   probability order:
-#'   * `list(ranked[1])` plus the protected pairs below when `ranked[1] > 0.50`
+#'   * `list(ranked[1])` plus the protected pairs below when `ranked[1] > single_threshold`
 #'     strictly (single choice);
 #'   * `list(c("win", "draw", "lose"))` when the largest minus the smallest
 #'     probability is at most `0.10` plus a `1e-15` numerical boundary
@@ -29,7 +31,7 @@
 #'
 #'   The list carries one attribute, `base_role`, an integer scalar `1`, `2` or
 #'   `3` describing the fixture's base category, not its selection count:
-#'   * `1`: single choice. `ranked[1] > 0.50` strictly. Every protected entry is
+#'   * `1`: single choice. `ranked[1] > single_threshold` strictly. Every protected entry is
 #'     built ON TOP OF the base `ranked[1]`, which is never emitted alone as a
 #'     disjoint alternative: the result is always `list(ranked[1])`, plus
 #'     `c(ranked[1], ranked[2])` when `ranked[2] > 0.20` strictly, plus
@@ -45,8 +47,8 @@
 #'
 #'   A single-choice fixture can therefore return one, two or three vectors, and
 #'   `2`/`3` label the base category a later stage ranks into, not the number of
-#'   rows returned. Both `0.50` and `0.20` are boundaries of strict `>`
-#'   comparisons: exactly `0.50` is not a single and exactly `0.20` adds
+#'   rows returned. Both `single_threshold` and `0.20` are boundaries of strict `>`
+#'   comparisons: exactly `single_threshold` is not a single and exactly `0.20` adds
 #'   nothing. The base entry is emitted once and each protected pair is unique,
 #'   so returns are deduplicated and in a stable order.
 #' @section Errors:
@@ -69,7 +71,8 @@
 #' classify_outcomes(0.38, 0.31, 0.31)
 #' classify_outcomes(0.55, 0.23, 0.22)
 #' @export
-classify_outcomes <- function(win, draw, lose) {
+classify_outcomes <- function(win, draw, lose, single_threshold = 0.50) {
+  checkmate::assert_number(single_threshold, lower = 1/3, upper = 1, finite = TRUE)
   checkmate::assert_number(win, lower = 0, upper = 1, finite = TRUE)
   checkmate::assert_number(draw, lower = 0, upper = 1, finite = TRUE)
   checkmate::assert_number(lose, lower = 0, upper = 1, finite = TRUE)
@@ -80,7 +83,7 @@ classify_outcomes <- function(win, draw, lose) {
   ranknames <- c("win", "draw", "lose")[order(-probabilities, c(1L, 2L, 3L))]
   ranked <- probabilities[order(-probabilities, c(1L, 2L, 3L))]
   tripled <- max(probabilities) - min(probabilities) <= 0.10 + 1e-15
-  if (!tripled && ranked[1L] > 0.50) {
+  if (!tripled && ranked[1L] > single_threshold) {
     # Single choice: the base Top1 is always protected, so every extra entry
     # keeps it and is a pair. The base is never emitted as a standalone
     # alternative to its own protected pairs.
@@ -95,6 +98,6 @@ classify_outcomes <- function(win, draw, lose) {
   } else {
     result <- list(ranknames[1:2])
   }
-  attr(result, "base_role") <- if (tripled) 3L else if (ranked[1L] > 0.50) 1L else 2L
+  attr(result, "base_role") <- if (tripled) 3L else if (ranked[1L] > single_threshold) 1L else 2L
   result
 }

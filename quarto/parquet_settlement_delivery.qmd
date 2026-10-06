@@ -1,0 +1,234 @@
+---
+title: "持久层交付：settlement 数据集（NAS Parquet）"
+date: "2026-10-05"
+params:
+  root: !expr Sys.getenv("BEIDAN_PARQUET_ROOT", unset = "/mnt/nas/Data/beijing-lot")
+  dataset: "settlement"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: false
+execute:
+  echo: true
+  warning: true
+  cache: false
+  freeze: false
+  error: false
+---
+
+本报告是**持久化 Parquet 层**的交付与验收入口：把一个来源 SQLite release 转成 NAS 上
+带 manifest 的 Parquet 版本，并用 `beidan` 包内的读取器按类型契约读回、跨分区聚合。
+
+三层职责分离：**转换器**（`beidan_backend.datasets.settlement_parquet`）只做
+来源 → Parquet + manifest；**读取器**（`beidan::read_dataset`）只做契约校验与读取；
+本报告只声明输入、调用二者并把结果与来源身份对账，不自己实现转换或解析规则。
+
+## 1. 输入与运行身份
+
+显式输入：持久根、数据集名。根是 **CIFS 自动挂载**，可能未挂载——读取器此时
+`stop()`（fail-closed），本报告的 `error: false` 会如实暴露该失败，而不是显示空数据集。
+
+```{r}
+#| label: pq-config
+#| include: false
+repository_root <- rprojroot::find_root(rprojroot::has_file("config/parquet_layout.json"))
+suppressMessages(devtools::load_all(file.path(repository_root, "packages/beidan"), quiet = TRUE))
+layout_path <- file.path(repository_root, "config/parquet_layout.json")
+root <- beidan::parquet_root(params$root)
+dataset <- params$dataset
+```
+
+```{r}
+#| label: pq-identity
+implementation_files <- sort(list.files(
+  file.path(repository_root, "packages/beidan/R"), pattern = "[.]R$", full.names = TRUE))
+converter_files <- sort(list.files(
+  file.path(repository_root, "packages/beidan/inst/python/beidan_backend/datasets"),
+  pattern = "[.]py$", full.names = TRUE))
+knitr::kable(tibble::tibble(
+  `项` = c("仓库根", "持久根", "数据集", "布局契约", "包版本", "R"),
+  `值` = c(repository_root, root, dataset, "config/parquet_layout.json",
+    as.character(utils::packageVersion("beidan")), R.version.string)))
+knitr::kable(tibble::tibble(
+  `实现文件` = substring(c(implementation_files, converter_files),
+    nchar(repository_root) + 2L),
+  `sha256` = vapply(c(implementation_files, converter_files),
+    function(p) digest::digest(file = p, algo = "sha256"), character(1))))
+```
+
+## 2. 布局与 registry 指针
+
+Tibble 只读 registry 与 manifest 的**指针**，不扫描数据目录：版本由 registry 决定，
+目录结构由布局契约决定。
+
+```{r}
+#| label: pq-registry
+registry <- beidan::dataset_registry(dataset, root = root)
+manifest <- beidan::dataset_manifest(dataset, root = root)
+knitr::kable(tibble::tibble(
+  `项` = c("schema", "dataset", "version", "converted_at", "partition_by"),
+  `值` = c(registry$schema, registry$dataset, registry$version,
+    manifest$converted_at, manifest$partition_by)))
+knitr::kable(tibble::tibble(
+  `表` = beidan::dataset_tables(dataset, root = root)))
+```
+
+## 3. 来源身份绑定
+
+Parquet 版本必须绑定到它来自的 SQLite release：manifest 的 `source$sha256` 应与
+Sandisk registry 记录的 release sha256 **完全一致**。这是"Parquet 与来源同一份数据"的
+机器可核对证据，而不是口头声明。
+
+```{r}
+#| label: pq-source-binding
+# The manifest embeds the source registry snapshot, so this report is
+# self-contained: it never reads the (retired) source disk at render time.
+source_snapshot <- manifest$source$registry
+knitr::kable(tibble::tibble(
+  `项` = c("来源库（历史路径）", "manifest source sha256",
+    "registry 快照 source sha256", "一致"),
+  `值` = c(manifest$source$database, manifest$source$sha256,
+    source_snapshot$sha256,
+    as.character(identical(manifest$source$sha256, source_snapshot$sha256)))))
+knitr::kable(tibble::tibble(
+  `项` = c("registry 快照 schema", "版本", "修正批次数"),
+  `值` = c(source_snapshot$schema, source_snapshot$version,
+    as.character(length(source_snapshot$corrections)))))
+```
+
+## 4. 行数对账
+
+每张表的 Parquet 行数必须等于来源 SQLite 的行数；转换器在写盘时已强制，这里再次核对
+来源与 manifest 的记录。
+
+```{r}
+#| label: pq-rowcounts
+counts <- tibble::tibble(
+  table = names(manifest$row_counts),
+  parquet_rows = as.numeric(unlist(manifest$row_counts)),
+  source_rows = as.numeric(unlist(source_snapshot[["parquet_row_counts"]] %||% NA)))
+knitr::kable(counts, caption = "manifest 记录的各表行数")
+total_rows <- sum(counts$parquet_rows)
+cat("表数：", nrow(counts), " 总行数：", format(total_rows, big.mark = ","), "\n")
+```
+
+## 5. 类型契约
+
+读取器的类型契约由**文件自身的 Arrow schema** 决定并映射到 R 类型；
+契约之外的类型会让读取器 `stop()`，不做静默强转。
+
+```{r}
+#| label: pq-contract
+knitr::kable(as.data.frame(beidan::parquet_type_map()),
+  caption = "Arrow -> R 类型映射")
+contract_obs <- beidan::dataset_contract(dataset, "observation", root = root)
+knitr::kable(tibble::tibble(
+  column = names(contract_obs), r_type = unname(contract_obs)),
+  caption = "observation 的列契约")
+contract_sp <- beidan::dataset_contract(dataset, "option_sp", root = root)
+knitr::kable(tibble::tibble(
+  column = names(contract_sp), r_type = unname(contract_sp)),
+  caption = "option_sp 的列契约")
+```
+
+## 6. 分区
+
+`observation` 与 `option_sp` 按 `issue_year` 分区；分区键恰好分离两个期号纪元
+（六位为 2007–2019，五位为 2020+）。
+
+```{r}
+#| label: pq-partitions
+version_dir <- file.path(root, "datasets", dataset, "versions", manifest$version)
+partitions <- sort(as.integer(sub(".*issue-year=([0-9]+)\\.parquet",
+  "\\1", list.files(file.path(version_dir, "tables", "observation")))))
+knitr::kable(tibble::tibble(
+  issue_year = partitions,
+  era = ifelse(partitions <= 2019, "六位期号", "五位期号")),
+  caption = "observation 分区")
+```
+
+## 7. 读取（Arrow，零拷贝单分区）
+
+```{r}
+#| label: pq-read-partition
+d <- beidan::read_dataset(dataset, "observation", root = root, issue_year = 2026)
+cat("行:", nrow(d), " 列:", ncol(d), "\n")
+knitr::kable(utils::head(d[c("issue", "slot", "play", "status", "score")], 5))
+cat("列类型（前 6）:",
+  paste(names(d)[1:6], vapply(d[1:6], function(x) class(x)[1], ""), sep = ":", collapse = ", "), "\n")
+```
+
+## 8. 读取（整表，行数与 manifest 对账）
+
+`read_dataset` 默认对每个文件核对 manifest 记录的 sha256；返回值行数也必须等于
+manifest 行数，否则 `stop()`。
+
+```{r}
+#| label: pq-read-whole
+whole <- beidan::read_dataset(dataset, "option_sp", root = root)
+knitr::kable(tibble::tibble(
+  `项` = c("option_sp 行数", "manifest 行数", "一致", "列类型 sp"),
+  `值` = c(format(nrow(whole), big.mark = ","),
+    format(as.integer(manifest$row_counts$option_sp), big.mark = ","),
+    as.character(nrow(whole) == as.integer(manifest$row_counts$option_sp)),
+    class(whole$sp)[1])))
+```
+
+## 9. 聚合（DuckDB，跨分区）
+
+单分区零拷贝读取用 `read_dataset`；跨分区聚合走 `dataset_query`，在只读连接上对
+`read_parquet(<全部分区>)` 建视图后执行 SQL。
+
+```{r}
+#| label: pq-aggregate
+by_play <- beidan::dataset_query(dataset,
+  "SELECT play, count(*) AS n FROM observation GROUP BY play ORDER BY play",
+  "observation", root = root)
+knitr::kable(by_play, caption = "按玩法聚合（跨 18 个分区）")
+by_year <- beidan::dataset_query(dataset,
+  "SELECT issue_year, count(*) AS n FROM observation GROUP BY issue_year ORDER BY issue_year",
+  "observation", root = root)
+knitr::kable(by_year, caption = "按分区年聚合")
+```
+
+## 10. 治理链保全
+
+settlement 的价值不只在主表，还在**已审计修正**的记录。这些表必须随数据集一并持久化，
+否则修正无从追溯。
+
+```{r}
+#| label: pq-corrections
+correction_tables <- intersect(
+  c("sp_correction", "sp_correction_batch", "halftime_correction",
+    "half_full_correction", "finding_supersession", "issue_addition",
+    "issue_recovery_gap"),
+  beidan::dataset_tables(dataset, root = root))
+knitr::kable(tibble::tibble(
+  table = correction_tables,
+  rows = as.numeric(unlist(manifest$row_counts[correction_tables]))),
+  caption = "修正与治理表")
+```
+
+## 11. 验证与限制
+
+- 转换器：`PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/convert_settlement_parquet.py`
+- manifest 校验：同上加 `--verify`（复算全部文件 sha256）
+- 包测试：`testthat` 的 `tests/testthat/test-parquet-dataset.R`（离线 fixture + NAS 一致性），
+  以及 Python 的 `packages/beidan/tests/python/test_settlement_parquet.py`
+- 渲染：`quarto render quarto/parquet_settlement_delivery.qmd --execute --no-cache`
+
+限制：
+
+- 本报告只读 Parquet，**不重新转换**；重新发布版本是转换器 CLI 的显式动作。
+- **数据集自包含**：来源身份来自 manifest 内嵌的 registry 快照，不依赖来源磁盘。
+  manifest 的 `source$database` 只是历史路径，Sandisk 退役后它不再存在，也不被读取。
+- `read_dataset(verify = TRUE)` 会对读到的每个文件复算 sha256；NAS 是 `cache=strict,actimeo=1`
+  的 CIFS 挂载，重复读取可能回源，大表校验有额外开销。
+- 分区键 `issue_year` 由期号前两位推导，不是来源字段；它只用于分区与聚合便利，不作为时间语义。
+- `source_rows` 列依赖来源 registry 是否记录 Parquet 行数，未记录时为 `NA`（不推断）。
+- **已知不一致**：`observation.slot` 等源 `INTEGER` 列在 Parquet 中是 `int64`，按
+  [beidan::parquet_type_map()] 映射为 R `double`，而包内既有惯例（`issue_schedule_types()`）
+  把 `slot` 定为 `integer`。这是"避免 32 位溢出"的保守映射与"语义为整数"之间的取舍：
+  若要统一为 `integer`，需要在转换器里对取值范围可容于 int32 的列显式降级为 `int32`，
+  并作为新版本重新发布。当前版本保持保守映射，不做隐式降级。

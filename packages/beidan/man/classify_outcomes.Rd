@@ -4,7 +4,7 @@
 \alias{classify_outcomes}
 \title{Classify North single-handicap win/draw/lose probabilities}
 \usage{
-classify_outcomes(win, draw, lose)
+classify_outcomes(win, draw, lose, single_threshold = 0.5)
 }
 \arguments{
 \item{win}{Numeric scalar, finite and within \verb{[0, 1]}: the win probability.}
@@ -14,13 +14,16 @@ classify_outcomes(win, draw, lose)
 \item{lose}{Numeric scalar, finite and within \verb{[0, 1]}: the lose probability.
 For every argument, \code{NA}, empty, vector, character and logical values are
 errors.}
+
+\item{single_threshold}{Finite numeric scalar in \verb{[1/3, 1]}; single choice
+requires Top1 strictly above this fixed threshold (default 0.50).}
 }
 \value{
 An unnamed list of unnamed character vectors whose values are drawn
 from \code{"win"}, \code{"draw"} and \code{"lose"}. With \code{ranked} the decreasing
 probability order:
 \itemize{
-\item \code{list(ranked[1])} plus the protected pairs below when \code{ranked[1] > 0.50}
+\item \code{list(ranked[1])} plus the protected pairs below when \code{ranked[1] > single_threshold}
 strictly (single choice);
 \item \code{list(c("win", "draw", "lose"))} when the largest minus the smallest
 probability is at most \code{0.10} plus a \code{1e-15} numerical boundary
@@ -35,7 +38,7 @@ classification text.
 The list carries one attribute, \code{base_role}, an integer scalar \code{1}, \code{2} or
 \code{3} describing the fixture's base category, not its selection count:
 \itemize{
-\item \code{1}: single choice. \code{ranked[1] > 0.50} strictly. Every protected entry is
+\item \code{1}: single choice. \code{ranked[1] > single_threshold} strictly. Every protected entry is
 built ON TOP OF the base \code{ranked[1]}, which is never emitted alone as a
 disjoint alternative: the result is always \code{list(ranked[1])}, plus
 \code{c(ranked[1], ranked[2])} when \code{ranked[2] > 0.20} strictly, plus
@@ -52,8 +55,8 @@ the canonical \code{c("win", "draw", "lose")}.
 
 A single-choice fixture can therefore return one, two or three vectors, and
 \code{2}/\code{3} label the base category a later stage ranks into, not the number of
-rows returned. Both \code{0.50} and \code{0.20} are boundaries of strict \code{>}
-comparisons: exactly \code{0.50} is not a single and exactly \code{0.20} adds
+rows returned. Both \code{single_threshold} and \code{0.20} are boundaries of strict \code{>}
+comparisons: exactly \code{single_threshold} is not a single and exactly \code{0.20} adds
 nothing. The base entry is emitted once and each protected pair is unique,
 so returns are deduplicated and in a stable order.
 }

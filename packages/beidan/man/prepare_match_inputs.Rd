@@ -4,12 +4,17 @@
 \alias{prepare_match_inputs}
 \title{从整期输入推导一期决策上下文}
 \usage{
-prepare_match_inputs(inputs, decision_at, market_policy,
-  window_hours = c(MATCH_WINDOW_START_HOURS, MATCH_WINDOW_END_HOURS))
+prepare_match_inputs(
+  inputs,
+  decision_at,
+  market_policy = NULL,
+  window_hours = c(MATCH_WINDOW_START_HOURS, MATCH_WINDOW_END_HOURS),
+  probability_base = "dc"
+)
 }
 \arguments{
 \item{inputs}{list，含 fixtures/euro/totals/prematch_sp/match_status 五张表
-（通常来自 read_match_inputs）。}
+（通常来自 read_match_inputs）；beidan 仅要求 fixtures/prematch_sp/match_status。}
 
 \item{decision_at}{带时区的 POSIXct 标量，用户决策时点；\strong{任何显式时区}都接受，
 内部归一化为同一瞬时的 UTC 表示。
@@ -19,11 +24,20 @@ prepare_match_inputs(inputs, decision_at, market_policy,
 match_euro_mean，market_policy$totals 传给 match_totals_selected。
 · 缺 euro 或 totals -> stop()
 · 未知顶层名字 -> stop()}
-\item{window_hours}{Length-2 finite unclassed numeric elapsed-hour bounds, non-negative and strictly increasing. Defaults to c(4, 28); changing these bounds never shifts the quote/status cutoff.}
+
+\item{window_hours}{长度 2 的数值向量 c(start, end)，滚动决策窗口的经过小时
+边界；默认 c(4, 28)。转发给 .PrepareMatchInputs() 与权威
+match_decision_window()：设为 c(2, 26) 只改变窗口边界，不移动 decision_at
+对应的 cutoff，也不改变报价/状态的严格 as-of 时刻。非法边界报错。}
+
+\item{probability_base}{Exact beidan/dc/mixed basis (default dc). Beidan
+ignores market_policy and requires no euro/totals tables.}
 }
 \value{
 list(cutoff, market_policy, decision_at, window, fixtures, euro_mean,
-totals_selected, prematch_sp, match_status, status_selected, exclusions)。
+totals_selected, prematch_sp, match_status, status_selected, exclusions,
+probability_base, preparation_receipt)。收据绑定原始输入、基座、cutoff、
+参数、输出与传递实现；验证器从原始输入独立重放，拒绝改字段复用。
 cutoff 由 fixtures 的期号与 decision_at 归一化后的 UTC 瞬时构成；window
 为 list(window_hours, start_utc, end_utc)，即解析后的窗口凭证。
 }
@@ -32,5 +46,5 @@ cutoff 由 fixtures 的期号与 decision_at 归一化后的 UTC 瞬时构成；
 }
 \details{
 决策窗口与可见性规则全部委托给权威内部实现 .PrepareMatchInputs；
-本入口只负责"从输入推导唯一期号"这一件事。
+本入口推导唯一期号并绑定可重放的准备收据。切换基座或cutoff需重新准备。
 }

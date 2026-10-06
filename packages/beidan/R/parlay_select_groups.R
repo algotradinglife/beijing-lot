@@ -145,14 +145,15 @@
 #' @param objective ev (default) or coverage; marginal objective in each round.
 #' @param budget_cny Total CNY cap, NULL for unlimited. Remaining whole ticket
 #'   units may partially fund the last group; cash below one unit remains unspent.
-#' @param min_group_ev_cny Strict floor for each group's NEW ticket net EV in CNY.
+#' @param min_group_ev_cny Unclassed numeric scalar: strict floor for each group's
+#'   NEW ticket net EV in CNY; classed or dimensioned values are rejected.
 #'   NULL means 0 for ev and no gate for coverage. Missing SP blocks an EV gate,
 #'   but coverage without a gate retains tickets and reports unknown EV as NA.
 #' @param group_budget_cny Per-group CNY cap, default 256; NULL for full support.
 #'   Zero allows no purchases and returns typed empty ledgers.
 #' @param reuse_policy List(max_reuse); NULL limit means unlimited, all roles count.
-#' @param overlap_policy List(max_overlap); NULL limit means unlimited. Shared
-#'   actual full triples are exempt, other shared fixtures count.
+#' @param overlap_policy List(max_overlap); NULL limit means unlimited. Every
+#'   shared fixture counts, including actual full triples.
 #' @return List(evaluation, selection, summary, excluded, receipt, diagnostics).
 #'   evaluation is the standard frozen evaluation accepted by settlement/risk APIs.
 #'   selection is a tibble of actual marginal/cumulative costs, EV and coverage;
@@ -169,15 +170,19 @@ parlay_select_groups <- function(portfolio, objective = c("ev", "coverage"),
   group_budget_cny <- .parlay_role_validate_budget(group_budget_cny, "group_budget_cny")
   reuse <- .parlay_ranked_validate_reuse_policy(reuse_policy)
   overlap <- .parlay_ranked_validate_overlap_policy(overlap_policy)
-  if (!is.null(min_group_ev_cny)) checkmate::assert_number(min_group_ev_cny,
-    finite = TRUE, .var.name = "min_group_ev_cny")
+  if (!is.null(min_group_ev_cny)) {
+    checkmate::assert_number(min_group_ev_cny, finite = TRUE,
+      .var.name = "min_group_ev_cny")
+    checkmate::assert_true(!is.object(min_group_ev_cny) && is.null(dim(min_group_ev_cny)),
+      .var.name = "min_group_ev_cny must be an unclassed numeric scalar")
+  }
   floor <- if (is.null(min_group_ev_cny)) {
     if (identical(objective, "ev")) 0 else -Inf
   } else min_group_ev_cny
   selected <- .SelectRankedFunding(pool, objective, budget_cny, group_budget_cny,
                                    reuse, overlap, floor)
   evaluation <- .FinalizeRankedEvaluation(portfolio, pool, selected$fund,
-    budget_cny, group_budget_cny, reuse, overlap, improve = FALSE,
+    budget_cny, group_budget_cny, reuse, overlap,
     producer = "parlay_select_groups", objective = objective,
     order_rule = "dynamic marginal objective of actual new purchases; group_id tie",
     dynamic_resort = TRUE, selection_policy = list(min_group_ev_cny = floor))

@@ -28,9 +28,9 @@ missing when unavailable. Zero scenarios return the same typed empty summary
 and an empty named list; all pools and input schemas are still validated.
 }
 \description{
-Evaluate every scenario without local improvement, using the existing portfolio
-evaluator. Nothing is fitted, fetched, persisted, or purchased. Coverage is the
-exact union probability that at least one purchased ticket wins; EV uses raw SP.
+Evaluate every scenario using the marginal-coverage group selector. Nothing is
+fitted, fetched, persisted, or purchased. Coverage is the exact union probability
+that at least one purchased ticket wins; EV uses raw SP.
 }
 \details{
 Invalid schemas, conflicting metric names, altered pool hashes, or
@@ -39,6 +39,6 @@ finite amounts when supplied; omit the total budget column for unlimited
 spending. Summary then reports budget_cny = NA_real_ and
 budget_unlimited = TRUE (FALSE when a cap is supplied). Group budgets
 remain finite; full coverage is expressed as its numeric cost. Pool
-validation delegates to a zero-budget evaluation, avoiding duplicate chronology
-rules. Results preserve evaluator receipts and always have improve = FALSE.
+validation delegates to a zero-budget selection, avoiding duplicate chronology
+rules. Results preserve selector receipts and never run local improvement.
 }

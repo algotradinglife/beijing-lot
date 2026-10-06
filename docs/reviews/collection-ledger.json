@@ -1,0 +1,132 @@
+{
+  "status": "accepted",
+  "scope": "new read-only data-collection master ledger and drift report; QMD delivery entry point, R boundary helper, and offline test suites",
+  "review_command": "codex review - < .run-control/collection-ledger-review{,2,3}-prompt.txt",
+  "review_log": [
+    ".run-control/collection-ledger-review.log",
+    ".run-control/collection-ledger-review2.log",
+    ".run-control/collection-ledger-review3.log"
+  ],
+  "review_rounds": [
+    {
+      "round": 1,
+      "blocking_findings": 14,
+      "key_findings": [
+        "R helper passed NULL for registry/external paths, silently disabling external inventory while the QMD displayed those paths as inputs",
+        "timer-scheduled services without their own wants link were not counted as scheduled",
+        "repository unit definitions were mixed into the host inventory, masking repo_unit_not_scheduled",
+        "a live store beside its .bak backup was wrongly classified retired; a prefix glob accepted unrelated -other.bak names",
+        "registry-declared store references were never reconciled with filesystem evidence",
+        "unavailable requested inputs were indistinguishable from genuinely empty inputs",
+        "wants detection used a hard-coded target list and accepted dangling symlinks",
+        "unit paths with systemd specifiers or bare ~ were mishandled",
+        "collectors matched units by script basename, allowing a foreign same-named script to mark a collector running",
+        "retirement evidence accepted any schema containing 'retirement'",
+        "invalid UTF-8 registry bytes raised instead of recording an unreadable input",
+        "the R boundary coerced values instead of validating declared column types",
+        "the R boundary tests read live data and converted all errors to skips",
+        "store_stale_days was accepted but ignored"
+      ]
+    },
+    {
+      "round": 2,
+      "blocking_findings": 7,
+      "key_findings": [
+        "R host unit defaults still included the repository ops/systemd/user directory",
+        "a scheduled timer with an explicit Unit= also scheduled the same-basename service",
+        "the R boundary still coerced character/integer/numeric values",
+        "provenance recorded paths, not input evidence identities",
+        "timestamp parsing ignored timezone offsets",
+        "collection_ledger_run never returned repo_units",
+        "nested store state was not extracted into the store_state column"
+      ]
+    },
+    {
+      "round": 3,
+      "blocking_findings": 2,
+      "key_findings": [
+        "evidence digests omitted store observations, so a newly available store left the digest unchanged",
+        "wants-directory identity was lost, so moving an unchanged link between target directories produced the same digest"
+      ],
+      "resolutions": [
+        "moved evidence binding into the authoritative Python ledger as a bounded observation manifest (plan file hash, unit files and wants links by absolute path, registry file hashes, external-root direct children, collector store observations)",
+        "removed the unbounded R-side directory digesting"
+      ]
+    }
+  ],
+  "findings": {
+    "initial_blocking": 23,
+    "final_blocking": 0,
+    "resolutions": [
+      "resolve Python module defaults instead of passing NULL from R, and default host unit dirs to the host only",
+      "count timer-scheduled services, honoring an explicit Unit= without also scheduling the basename service",
+      "keep the repository unit inventory separate from the host inventory and reconcile by name",
+      "retire a store only when the registered file is absent and an exact <name><marker> sibling exists",
+      "reconcile registry-declared stores with filesystem availability and require a validated retirement schema",
+      "distinguish unavailable inputs (available/unavailable states and findings) from empty results",
+      "discover *.target.wants directories and reject dangling links",
+      "expand supported systemd specifiers and treat unresolved paths as unknown, not absent",
+      "match collectors by resolved code identity rather than script basename",
+      "catch invalid UTF-8 as an unreadable registry input",
+      "validate declared R column types and reject incompatible source values while preserving typed empties",
+      "make R boundary tests deterministic on temp fixtures with no catch-all error-to-skip",
+      "bind provenance to a bounded input observation manifest computed by the Python ledger",
+      "honor the store_stale_days parameter through to store classification",
+      "return repo_units and extract nested store state into the collector table"
+    ]
+  },
+  "tests": {
+    "python": {
+      "command": "PYTHONPATH=packages/beidan/inst/python:src:$PWD .venv/bin/python -m pytest tests/test_collection_ledger.py -q",
+      "passed": 30,
+      "failed": 0,
+      "skipped": 0
+    },
+    "r": {
+      "command": "R --no-save --slave -e 'library(testthat); testthat::test_file(\"tests/testthat/test-collection-ledger.R\", reporter=\"summary\")'",
+      "assertions": 88,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "render": {
+    "command": "quarto render quarto/collection_ledger.qmd --execute --no-cache",
+    "exit_code": 0,
+    "tables": 17,
+    "execution_errors": 0,
+    "output": "quarto/_output/quarto/collection_ledger.html"
+  },
+  "host_run": {
+    "command": ".venv/bin/python scripts/collection_ledger.py",
+    "collectors": 15,
+    "collectors_running": 0,
+    "units": 28,
+    "units_running": 7,
+    "stores": 13,
+    "retirements": 968,
+    "findings": 68,
+    "errors": 6,
+    "warnings": 62,
+    "inputs_unavailable": 0
+  },
+  "hashes": {
+    "src/collection_ledger/__init__.py": "e59588595db638bcb2b7b4168598272d9ba9588b19d8d917375c559aeb5d2ed6",
+    "src/collection_ledger/readers.py": "4308466c5e50c4bfaf8fed551abbd99d30a3c1aa1a55e34379b050acc224071f",
+    "src/collection_ledger/ledger.py": "d903bf02b1a735a164dd280b06801c087ad9df491def6fcbfcc7b5ad34a80b13",
+    "scripts/collection_ledger.py": "5e70331c35f194deeea2ff024980346e138d389f8bd7de104346e2223a3b5be2",
+    "r/collection_ledger.R": "b67eb2e7a029ae53c0cd99f549fc55d1868141c15ff15408537d0610d5f2a0a4",
+    "quarto/collection_ledger.qmd": "33d687ba26d1561248f656fe2c3dadaca837711665d8d856cb67bd0bc6cbb307",
+    "tests/test_collection_ledger.py": "f766255797a0f1234c3b20eded1122d5659e58e2ecd3d4dd07ff4ba6db9f28e8",
+    "tests/testthat/test-collection-ledger.R": "0571929aae25c14404472ffcbd16c0c59a3351db269185f54cf001847b3c85e7",
+    "_quarto.yml": "0441da0efb896c1cab8ab27ab26edd2f073d15ac664131360568f15cb529f230"
+  },
+  "reviewed_qmd_note": "The recorded quarto/collection_ledger.qmd hash is the revision reviewed in round 3; the acceptance section appended to the document afterwards is a review record only and does not change the reviewed implementation.",
+  "limitations": [
+    "Read-only file-evidence classification; live systemctl runtime state is not queried ('running' means scheduled, not last-run-successful)",
+    "Evidence digests are bounded observation manifests (file hashes, direct-child metadata, store observations), not recursive hashes of the data tree",
+    "The host unit directory, external registry and external data root are out-of-repository inputs; cross-host replay requires the same host unit directory and an equivalent external-disk snapshot",
+    "An unmounted external disk yields 'unavailable' inputs with findings, not missing objects",
+    "No CI configuration was added and no CI status is claimed as acceptance"
+  ],
+  "created_at": "2026-10-04T11:50:00+00:00"
+}

@@ -22,7 +22,8 @@ parlay_select_groups(
 \item{budget_cny}{Total CNY cap, NULL for unlimited. Remaining whole ticket
 units may partially fund the last group; cash below one unit remains unspent.}
 
-\item{min_group_ev_cny}{Strict floor for each group's NEW ticket net EV in CNY.
+\item{min_group_ev_cny}{Unclassed numeric scalar: strict floor for each group's
+NEW ticket net EV in CNY; classed or dimensioned values are rejected.
 NULL means 0 for ev and no gate for coverage. Missing SP blocks an EV gate,
 but coverage without a gate retains tickets and reports unknown EV as NA.}
 
@@ -31,8 +32,8 @@ Zero allows no purchases and returns typed empty ledgers.}
 
 \item{reuse_policy}{List(max_reuse); NULL limit means unlimited, all roles count.}
 
-\item{overlap_policy}{List(max_overlap); NULL limit means unlimited. Shared
-actual full triples are exempt, other shared fixtures count.}
+\item{overlap_policy}{List(max_overlap); NULL limit means unlimited. Every
+shared fixture counts, including actual full triples.}
 }
 \value{
 List(evaluation, selection, summary, excluded, receipt, diagnostics).

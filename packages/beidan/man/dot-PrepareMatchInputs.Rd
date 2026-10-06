@@ -9,7 +9,8 @@
   cutoff,
   euro_policy,
   totals_policy,
-  window_hours = c(MATCH_WINDOW_START_HOURS, MATCH_WINDOW_END_HOURS)
+  window_hours = c(MATCH_WINDOW_START_HOURS, MATCH_WINDOW_END_HOURS),
+  probability_base = "dc"
 )
 }
 \arguments{
@@ -27,6 +28,8 @@ match_status 是\strong{必填}台账：缺失即输入契约错误（stop()）�
 \item{window_hours}{长度 2 的数值向量 c(start, end)，滚动决策窗口的经过小时
 边界；默认 c(4, 28)。转发给权威 match_decision_window()：设为 c(2, 26)
 只改变窗口边界，不移动 cutoff，也不改变报价/状态的严格 as-of 时刻。非法边界报错。}
+
+\item{probability_base}{Exact beidan/dc/mixed basis; Beidan skips euro/totals admission.}
 }
 \value{
 list(fixtures, euro_mean, totals_selected, prematch_sp, match_status,
@@ -40,7 +43,7 @@ status_selected, exclusions, window)。除 window 凭证外，每项为 tibble�
 \details{
 窗口是 cutoff 加上显式经过小时边界，左闭右开；默认 4–28 小时。
 只有当开赛落在该窗口内、cutoff 之前存在可用欧赔报价、\strong{且 cutoff 当时可见的
-最新状态是 scheduled} 时，比赛才会被保留。被剔除的比赛连同原因记入
+最新状态是 scheduled} 时，比赛才会被保留。Beidan only uses window/status, not euro.被剔除的比赛连同原因记入
 exclusions 表，因此剔除是可审计的而不是静默的。
 
 期号绑定：一个 epoch 就是一期。携带其它 issue_id 的比赛会被拒绝，
@@ -51,5 +54,5 @@ exclusions 表，因此剔除是可审计的而不是静默的。
 是否发生是两件事，用前者替代后者会在比赛被取消时仍然开卖。
 
 这是显式表的权威内部实现；公共入口 prepare_match_inputs() 负责从输入推导期号、
-构造 cutoff 并把选中 SP 暴露为 prematch_sp，两者不重复算法。
+构造 cutoff、把选中 SP 暴露为 prematch_sp 并附上解析后的窗口凭证，两者不重复算法。
 }

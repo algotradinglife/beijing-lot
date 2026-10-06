@@ -14,8 +14,6 @@ import re
 import sqlite3
 import sys
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
+from beidan_backend.transport import fetch_issue_page  # noqa: E402
 
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 NOWSCORE_URL = "https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum={issue}"
@@ -233,20 +232,21 @@ def create_schema(conn: sqlite3.Connection) -> None:
     )
 
 
+# The Jiebao endpoints are happiest with a browser-like Accept set and no
+# cache; these are passed through the shared transport rather than hand-rolled.
+NOWSCORE_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "Cache-Control": "no-cache",
+}
+
+
 def fetch_url(url: str, timeout: int, user_agent: str) -> tuple[int, bytes, float]:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            "Cache-Control": "no-cache",
-        },
+    """Fetch one page through the package transport (bounded retries + timeout)."""
+    response = fetch_issue_page(
+        url, timeout=timeout, user_agent=user_agent, headers=NOWSCORE_HEADERS
     )
-    started = time.time()
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        data = response.read()
-        return int(response.status), data, time.time() - started
+    return response.status, response.body, response.elapsed_sec
 
 
 def insert_fetch_log(
@@ -436,7 +436,7 @@ def scrape_issue(conn: sqlite3.Connection, issue: str, args: argparse.Namespace)
             fetched_at=fetched_at,
             issue=issue,
             url=url,
-            status=getattr(exc, "code", None) if isinstance(exc, urllib.error.HTTPError) else None,
+            status=getattr(exc, "status", None),
             ok=False,
             elapsed_sec=None,
             bytes_len=0,

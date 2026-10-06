@@ -1,8 +1,8 @@
 #' Explore explicit budget scenarios over frozen role candidate pools
 #'
-#' Evaluate every scenario without local improvement, using the existing portfolio
-#' evaluator. Nothing is fitted, fetched, persisted, or purchased. Coverage is the
-#' exact union probability that at least one purchased ticket wins; EV uses raw SP.
+#' Evaluate every scenario using the marginal-coverage group selector. Nothing is
+#' fitted, fetched, persisted, or purchased. Coverage is the exact union probability
+#' that at least one purchased ticket wins; EV uses raw SP.
 #'
 #' @param portfolios Nonempty uniquely named list of objects returned by
 #'   [parlay_construct_role_groups()]. Every pool must have valid bound inputs and
@@ -26,8 +26,8 @@
 #'   spending. Summary then reports budget_cny = NA_real_ and
 #'   budget_unlimited = TRUE (FALSE when a cap is supplied). Group budgets
 #'   remain finite; full coverage is expressed as its numeric cost. Pool
-#'   validation delegates to a zero-budget evaluation, avoiding duplicate chronology
-#'   rules. Results preserve evaluator receipts and always have improve = FALSE.
+#'   validation delegates to a zero-budget selection, avoiding duplicate chronology
+#'   rules. Results preserve selector receipts and never run local improvement.
 #' @export
 parlay_explore_portfolios <- function(portfolios, scenarios) {
   checkmate::assert_list(portfolios, min.len = 1L, any.missing = FALSE)
@@ -56,12 +56,12 @@ parlay_explore_portfolios <- function(portfolios, scenarios) {
       stop(column, " must contain whole integers")
     }
   }
-  # Reuse the authoritative evaluator even for unused pools and zero scenarios.
-  # Probability objective here validates structure without requiring optional SP.
+  # Reuse the authoritative selector even for unused pools and zero scenarios.
+  # Coverage objective here validates structure without requiring optional SP.
   probes <- lapply(portfolios, function(pool) {
-    parlay_evaluate_portfolio(pool, group_budget_cny = 0, budget_cny = 0,
-      reuse_policy = list(max_reuse = 1L), overlap_policy = list(max_overlap = 0L),
-      improve = FALSE)
+    parlay_select_groups(pool, objective = "coverage", group_budget_cny = 0,
+      budget_cny = 0, reuse_policy = list(max_reuse = 1L),
+      overlap_policy = list(max_overlap = 0L))$evaluation
   })
   cutoff <- portfolios[[1L]][["cutoff"]]
   if (any(!vapply(portfolios, function(pool) {
@@ -85,10 +85,11 @@ parlay_explore_portfolios <- function(portfolios, scenarios) {
   rows <- vector("list", nrow(scenarios))
   for (i in seq_len(nrow(scenarios))) {
     row <- scenarios[i, , drop = FALSE]
-    evaluation <- parlay_evaluate_portfolio(portfolios[[row$pattern]],
+    evaluation <- parlay_select_groups(portfolios[[row$pattern]],
+      objective = "coverage",
       group_budget_cny = row$group_budget_cny, budget_cny = if (budget_unlimited) NULL else row$budget_cny,
       reuse_policy = list(max_reuse = row$max_reuse),
-      overlap_policy = list(max_overlap = row$max_overlap), improve = FALSE)
+      overlap_policy = list(max_overlap = row$max_overlap))$evaluation
     results[[i]] <- evaluation
     metrics <- tibble::as_tibble(evaluation$summary[names(template)])
     rows[[i]] <- dplyr::bind_cols(row, metrics)

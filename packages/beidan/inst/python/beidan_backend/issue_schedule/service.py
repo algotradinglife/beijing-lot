@@ -34,7 +34,7 @@ from .contract import (
 )
 from .crosscheck import build_canonical_rows, identity_summary
 from .decode import decode_response, declared_charset
-from .fetch import fetch_issue_page
+from ..transport import fetch_issue_page
 from .sources import ProviderRow, parse_500_rows, parse_nowscore_rows
 from .store import new_fetch_directory, persist_issue_meta, persist_issue_raw
 

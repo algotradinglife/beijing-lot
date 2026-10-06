@@ -21,6 +21,15 @@
 #' Expand every row of a validated matches tibble into one row per outcome
 #' choice allowed by the authoritative [classify_outcomes()] classifier.
 #'
+#' @param role_allocation Optional cutoff-bound artifact from
+#'   AdaptiveRoleAllocation(). Replayed against the supplied probabilities.
+#'   Changed fixtures use primary TopN of their allocated role; unchanged fixtures
+#'   retain their classifier choices. Native roles remain in the allocation ledger.
+#' @param dc_protection Optional complete DC W/D/L probability tibble on exactly
+#'   the admitted fixture universe. Adds optional primary-set protection via
+#'   [DcProtectionChoices()], retaining original BD choices and base categories.
+#' @param single_threshold Fixed scalar single-choice threshold, passed to
+#'   [classify_outcomes()]; default 0.50. Invalid values fail even for empty input.
 #' @param matches A `tibble` with one row per fixture. It must contain a
 #'   unique, non-missing, non-empty character `fixture_id` column (leading zeros
 #'   are preserved) and numeric `win`, `draw` and `lose` columns. Every other
@@ -43,7 +52,7 @@
 #'   * `outcomes`: list column of unnamed character vectors naming the selected
 #'     outcomes, taken verbatim from [classify_outcomes()].
 #'   * `base_role`: integer base category of the fixture, `1`, `2` or `3`, read
-#'     from the classifier's `base_role` attribute. It is the fixture's category,
+#'     from the classifier's `base_role` attribute (or the explicit allocated role). It is the fixture's category,
 #'     not the number of rows it produced: a base-role-`1` fixture emits one, two
 #'     or three rows that all carry `1`.
 #'   * `n_outcomes`: integer number of selected outcomes in this row, that is
@@ -83,7 +92,9 @@
 #' )
 #' prepare_outcome_selections(matches)
 #' @export
-prepare_outcome_selections <- function(matches) {
+prepare_outcome_selections <- function(matches, single_threshold = 0.50, dc_protection = NULL,
+                                       role_allocation = NULL) {
+  checkmate::assert_number(single_threshold, lower = 1/3, upper = 1, finite = TRUE)
   if (!tibble::is_tibble(matches)) {
     stop("`matches` must be a tibble.", call. = FALSE)
   }
@@ -125,6 +136,14 @@ prepare_outcome_selections <- function(matches) {
     stop("`matches$fixture_id` must be unique.", call. = FALSE)
   }
 
+  if (!is.null(dc_protection)) {
+    # Authoritative complete-triple validation; non-empty protected universes.
+    BlendMatchProbabilities(dc_protection, dc_protection, 0)
+    if (!setequal(dc_protection$fixture_id, fixture_id)) {
+      stop("dc_protection must match the admitted fixture universe")
+    }
+  }
+
   n <- nrow(matches)
   for (column in c("win", "draw", "lose")) {
     values <- matches[[column]]
@@ -140,6 +159,21 @@ prepare_outcome_selections <- function(matches) {
   draw <- matches[["draw"]]
   lose <- matches[["lose"]]
 
+  if (!is.null(role_allocation)) {
+    if (!is.list(role_allocation) || is.null(role_allocation$cutoff) ||
+        is.null(role_allocation$pattern)) stop("malformed role_allocation", call. = FALSE)
+    match_require_cutoff(role_allocation$cutoff)
+    if (!identical(role_allocation$cutoff_hash,
+                   .rank_outcome_cutoff_hash(role_allocation$cutoff))) {
+      stop("role_allocation cutoff binding is missing or inconsistent", call. = FALSE)
+    }
+    fresh <- AdaptiveRoleAllocation(matches, role_allocation$cutoff,
+                                    role_allocation$pattern, single_threshold, role_allocation$role_minimums)
+    if (!identical(role_allocation, fresh)) {
+      stop("role_allocation does not match its source, policy or implementation", call. = FALSE)
+    }
+  }
+
   row_index <- integer(0)
   selection_id <- integer(0)
   base_role <- integer(0)
@@ -152,11 +186,33 @@ prepare_outcome_selections <- function(matches) {
     choices <- classify_outcomes(
       probabilities[["win"]],
       probabilities[["draw"]],
-      probabilities[["lose"]]
+      probabilities[["lose"]], single_threshold = single_threshold
     )
+    if (!is.null(dc_protection)) {
+      rows <- dc_protection[dc_protection$fixture_id == fixture_id[[i]], ]
+      dc <- stats::setNames(rows$probability[match(c("W","D","L"),rows$outcome)],
+                            c("win","draw","lose"))
+      choices <- DcProtectionChoices(probabilities, dc, single_threshold)
+    }
     # The fixture's base category is the classifier's own attribute; the
     # thresholds that produced it are never restated here.
     role <- attr(choices, "base_role")
+    if (!is.null(role_allocation)) {
+      ledger <- role_allocation$ledger
+      k <- match(fixture_id[[i]], ledger$fixture_id)
+      allocated <- ledger$allocated_role[[k]]
+      if (allocated != role) {
+        direction <- names(probabilities)[order(-probabilities, seq_along(probabilities))]
+        primary <- direction[seq_len(allocated)]
+        choices <- list(primary)
+        if (!is.null(dc_protection) && allocated < 3L) {
+          dc_direction <- names(dc)[order(-dc, seq_along(dc))]
+          protection <- unique(c(primary, dc_direction[seq_len(allocated)]))
+          if (length(protection) > length(primary)) choices <- c(choices, list(protection))
+        }
+        role <- allocated
+      }
+    }
     for (j in seq_along(choices)) {
       row_index <- c(row_index, i)
       selection_id <- c(selection_id, j)
@@ -203,5 +259,8 @@ prepare_outcome_selections <- function(matches) {
                             c("names", "row.names", "class"))) {
     attr(result, attribute) <- attr(matches, attribute)
   }
+  attr(result, "single_threshold") <- single_threshold
+  attr(result, "dc_protection") <- dc_protection
+  attr(result, "role_allocation") <- role_allocation
   result
 }

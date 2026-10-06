@@ -546,35 +546,37 @@ parlay_enumerate_tickets <- function(group_legs, probabilities, cutoff, supports
       stop("parlay_enumerate_tickets: supported ticket count exceeds the representable integer count")
     }
     grid <- expand.grid(options_per_leg, KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-    for (combo_index in seq_len(nrow(grid))) {
-      combo <- as.character(unlist(grid[combo_index, ]))
-      combo_codes <- parlay_outcome_codes(combo)
-      ticket_key <- parlay_physical_ticket_key(legs$fixture_id, combo_codes)
-      ticket_id <- ticket_key
-      if (!exists(ticket_id, envir = seen, inherits = FALSE)) {
-        assign(ticket_id, TRUE, envir = seen)
-        # Raw probability: the product of the leg probabilities, declaring the
-        # independence approximation rather than hiding it.
-        probability <- 1
-        for (leg_index in seq_len(nrow(legs))) {
-          outcome <- combo[leg_index]
-          row <- wide[wide$fixture_id == legs$fixture_id[leg_index], , drop = FALSE]
-          probability <- probability * as.numeric(row[1, outcome])
-        }
-        # group_id stays the fixture set so ticket identity is one row per physical
-        # ticket; candidate_tickets records which structures support it.
-        ticket_rows[[length(ticket_rows) + 1L]] <- tibble::tibble(
-          ticket_id = ticket_id, group_id = group_id, probability = probability,
-          sp_product_est = NA_real_, ev_net_est = NA_real_)
-        for (leg_index in seq_len(nrow(legs))) {
-          leg_rows[[length(leg_rows) + 1L]] <- tibble::tibble(
-            ticket_id = ticket_id, fixture_id = legs$fixture_id[leg_index],
-            outcome = combo[leg_index])
-        }
+    if (!nrow(grid)) next
+    combinations <- as.matrix(grid)
+    codes <- matrix(parlay_outcome_codes(as.vector(combinations)),
+      nrow = nrow(combinations), ncol = ncol(combinations))
+    ticket_ids <- vapply(seq_len(nrow(codes)), function(i) {
+      parlay_physical_ticket_key(legs$fixture_id, codes[i, ])
+    }, character(1))
+    fresh <- !vapply(ticket_ids, exists, logical(1), envir = seen,
+      inherits = FALSE)
+    if (any(fresh)) {
+      fresh_ids <- ticket_ids[fresh]
+      list2env(stats::setNames(as.list(rep(TRUE, length(fresh_ids))), fresh_ids),
+        envir = seen)
+      # Preserve the declared leg multiplication order and first-owner identity.
+      # Build complete candidate blocks instead of one tibble per ticket/leg.
+      probability <- rep(1, length(fresh_ids))
+      for (leg_index in seq_len(nrow(legs))) {
+        row <- wide[wide$fixture_id == legs$fixture_id[leg_index], , drop = FALSE]
+        values <- as.numeric(unlist(row[1, match_outcomes()], use.names = FALSE))
+        probability <- probability * values[codes[fresh, leg_index]]
       }
-      link_rows[[length(link_rows) + 1L]] <- tibble::tibble(
-        candidate_id = candidate_id, ticket_id = ticket_id)
+      ticket_rows[[length(ticket_rows) + 1L]] <- tibble::tibble(
+        ticket_id = fresh_ids, group_id = group_id, probability = probability,
+        sp_product_est = NA_real_, ev_net_est = NA_real_)
+      leg_rows[[length(leg_rows) + 1L]] <- tibble::tibble(
+        ticket_id = rep(fresh_ids, each = nrow(legs)),
+        fixture_id = rep(legs$fixture_id, times = length(fresh_ids)),
+        outcome = as.vector(t(combinations[fresh, , drop = FALSE])))
     }
+    link_rows[[length(link_rows) + 1L]] <- tibble::tibble(
+      candidate_id = candidate_id, ticket_id = ticket_ids)
   }
   # An all-exhausted structure leaves every list empty; bind_rows on an empty list has
   # no columns at all, so fall back to the typed-empty tables rather than failing

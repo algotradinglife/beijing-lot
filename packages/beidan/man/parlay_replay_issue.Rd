@@ -15,7 +15,10 @@ and a mixed-issue sequence is refused rather than silently split.}
 \item{strategy_config}{One explicit strategy configuration applied to every
 decision in the sequence.}
 
-\item{settlements}{Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.}
+\item{settlements}{Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+Explicit status all_options_one requires outcome ALL and SP=1, and is a
+neutral parlay leg, not a prediction hit. Single-leg and all-neutral tickets
+remain SPECIAL; refunds are not inferred.}
 
 \item{as_of}{UTC POSIXct instant limiting visible settlement labels.}
 }

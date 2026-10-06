@@ -4,7 +4,7 @@
 \alias{filter_outcome_matches}
 \title{Filter matches to fixtures whose Top1 has an admissible pre-cutoff SP}
 \usage{
-filter_outcome_matches(matches, prematch_sp, cutoff)
+filter_outcome_matches(matches, prematch_sp, cutoff, sp_threshold = 2)
 }
 \arguments{
 \item{matches}{A \code{tibble} with one row per fixture: a unique, non-missing,
@@ -23,6 +23,9 @@ cutoff; both are ignored rather than silently used.}
 \code{cutoff_utc} and exactly one \code{issue_id}. It is never inferred from the
 clock, a hidden global or the quotes themselves. Only quotes strictly
 before it compete; a later observation can never change the selection.}
+
+\item{sp_threshold}{Finite plain scalar minimum Top1 decimal SP, at least 1;
+default 2. Equality is retained. Bound into the replay receipt.}
 }
 \value{
 A list with:
@@ -37,7 +40,7 @@ columns \code{fixture_id}, \code{top1_outcome}, \code{top1_probability}, \code{t
 columns plus a trailing \code{missing_sp} logical flag. \code{retained} is \code{TRUE}
 for every kept fixture; \code{missing_sp} is additionally \code{TRUE} for a kept
 fixture that had no usable pre-cutoff Top1 quote. A removed fixture has
-both flags \code{FALSE} and \code{reason} \code{"sp_below_2"}; a kept fixture has
+both flags \code{FALSE} and \code{reason} \code{"sp_below_threshold"}; a kept fixture has
 \code{reason} \code{"retained"} or \code{"missing_sp"}.
 \item \code{cutoff}: the validated cutoff object, unchanged.
 \item \code{receipt}: a list binding the frozen evidence: \code{cutoff}, \code{cutoff_hash}
@@ -45,8 +48,9 @@ both flags \code{FALSE} and \code{reason} \code{"sp_below_2"}; a kept fixture ha
 \code{input_snapshot} (the exact supplied \code{matches}, in caller order),
 \code{prematch_sp_hash} and \code{prematch_sp_snapshot} (the quote evidence in the
 canonical schema column order, whose \code{rlang::hash()} equals
-\code{prematch_sp_hash}), and \code{sp_threshold} (\code{2}),
+\code{prematch_sp_hash}), and \code{sp_threshold} (the explicit minimum),
 \code{sp_strict_below} (\code{TRUE}), \code{missing_sp_reason} (\code{"missing_sp"}) and
+\code{policy_hash} (hash of minimum, comparison and missing-SP policy) and
 \code{code_hash} (transitive hash of the loaded implementation). The receipt
 records no wall-clock time and reads no global, so repeated calls over the
 same inputs are identical.
@@ -60,7 +64,7 @@ The pipeline's admission gate. Each row of a validated matches tibble is
 classified with the authoritative \code{\link[=classify_outcomes]{classify_outcomes()}} and the fixture is
 removed only when the latest quote for its model Top1 outcome observed
 strictly before the explicit cutoff has a raw starting price strictly below
-\code{2}. A fixture whose valid Top1 quote is \code{2} or higher is KEPT; so is a
+\code{sp_threshold}. A fixture whose valid Top1 quote meets the threshold is KEPT; so is a
 fixture with no valid Top1 quote at all, which is kept and flagged as
 missing. Only the Top1 outcome's quote is consulted; other outcomes' prices
 never admit or remove a fixture.

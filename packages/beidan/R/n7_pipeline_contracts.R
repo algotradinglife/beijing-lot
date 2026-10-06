@@ -34,7 +34,7 @@
 #' 下游某处才暴露非法状态。S7 对象不得出现在模块的公开返回结构中。
 #'
 #' @section 表类型契约:
-#' 16 张表由 `match_table_schemas()` 唯一声明，边界处由
+#' 17 张表由 `match_table_schemas()` 唯一声明，边界处由
 #' `match_validate_table()` 校验列集合、列序、列类型与主键。
 #'
 #' @details 本模块只定义函数；导入时不触发任何 I/O，不联网，不写库。
@@ -49,7 +49,7 @@ NULL
 
 # --- table schemas ----------------------------------------------------------
 
-#' 本管道 16 张表的唯一权威声明
+#' 本管道 17 张表的唯一权威声明
 #'
 #' 都对着它校验，因此契约漂移会在边界处变成错误，而不是下游的静默列错位。
 #'
@@ -157,6 +157,10 @@ match_table_schemas <- function() {
       types = c(issue_id = "character", ticket_id = "character",
                 epoch_at = "POSIXct", group_id = "character",
                 candidate_id = "character", stake_cny = "double")),
+    match_results = list(
+      columns = c("issue_id", "fixture_id", "outcome", "result_available_at", "source_url"),
+      types = c(issue_id = "character", fixture_id = "character", outcome = "character",
+                result_available_at = "POSIXct", source_url = "character")),
     settlements = list(
       columns = c("issue_id", "fixture_id", "outcome", "settled_sp",
                   "label_available_at", "status", "source_url"),

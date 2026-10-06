@@ -12,12 +12,13 @@ if str(ROOT) not in sys.path:
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
+from beidan_backend.sources.five_hundred_betting import MARKET_OUTCOMES  # noqa: E402
 from scripts import live_sp_refresh_loop as refresh  # noqa: E402
 from scripts import scrape_500_bjdc as scraper  # noqa: E402
 
 
 def xml(playid: int) -> bytes:
-    _, outcomes = scraper.MARKET_OUTCOMES[playid]
+    _, outcomes = MARKET_OUTCOMES[playid]
     attributes = " ".join(f'{attribute}="{index + 1}.25"' for index, (_, _, attribute) in enumerate(outcomes))
     payload = (
         f'<root updatetime="2026-07-16 20:00:00">'
@@ -33,7 +34,7 @@ def test_multimarket_outcome_maps_are_complete_and_stable() -> None:
         source_at, rows = scraper.parse_live_market_sp("X", playid, xml(playid), "2026-07-16 12:00:00")
         assert source_at == "2026-07-16 20:00:00"
         assert len(rows) == outcome_count
-        assert {row["market_key"] for row in rows} == {scraper.MARKET_OUTCOMES[playid][0]}
+        assert {row["market_key"] for row in rows} == {MARKET_OUTCOMES[playid][0]}
         assert all(row["sp"] is not None for row in rows)
 
     _, total_goals = scraper.parse_live_market_sp("X", 40, xml(40), "now")

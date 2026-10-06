@@ -129,7 +129,7 @@
 #' classified with the authoritative [classify_outcomes()] and the fixture is
 #' removed only when the latest quote for its model Top1 outcome observed
 #' strictly before the explicit cutoff has a raw starting price strictly below
-#' `2`. A fixture whose valid Top1 quote is `2` or higher is KEPT; so is a
+#' `sp_threshold`. A fixture whose valid Top1 quote meets the threshold is KEPT; so is a
 #' fixture with no valid Top1 quote at all, which is kept and flagged as
 #' missing. Only the Top1 outcome's quote is consulted; other outcomes' prices
 #' never admit or remove a fixture.
@@ -149,6 +149,8 @@
 #'   clock, a hidden global or the quotes themselves. Only quotes strictly
 #'   before it compete; a later observation can never change the selection.
 #'
+#' @param sp_threshold Finite plain scalar minimum Top1 decimal SP, at least 1;
+#'   default 2. Equality is retained. Bound into the replay receipt.
 #' @return A list with:
 #'   * `matches`: the admitted subset of the input tibble, original columns and
 #'     types preserved, original row order preserved, never carrying any audit
@@ -160,7 +162,7 @@
 #'     columns plus a trailing `missing_sp` logical flag. `retained` is `TRUE`
 #'     for every kept fixture; `missing_sp` is additionally `TRUE` for a kept
 #'     fixture that had no usable pre-cutoff Top1 quote. A removed fixture has
-#'     both flags `FALSE` and `reason` `"sp_below_2"`; a kept fixture has
+#'     both flags `FALSE` and `reason` `"sp_below_threshold"`; a kept fixture has
 #'     `reason` `"retained"` or `"missing_sp"`.
 #'   * `cutoff`: the validated cutoff object, unchanged.
 #'   * `receipt`: a list binding the frozen evidence: `cutoff`, `cutoff_hash`
@@ -168,8 +170,9 @@
 #'     `input_snapshot` (the exact supplied `matches`, in caller order),
 #'     `prematch_sp_hash` and `prematch_sp_snapshot` (the quote evidence in the
 #'     canonical schema column order, whose `rlang::hash()` equals
-#'     `prematch_sp_hash`), and `sp_threshold` (`2`),
+#'     `prematch_sp_hash`), and `sp_threshold` (the explicit minimum),
 #'     `sp_strict_below` (`TRUE`), `missing_sp_reason` (`"missing_sp"`) and
+#'     `policy_hash` (hash of minimum, comparison and missing-SP policy) and
 #'     `code_hash` (transitive hash of the loaded implementation). The receipt
 #'     records no wall-clock time and reads no global, so repeated calls over the
 #'     same inputs are identical.
@@ -219,7 +222,11 @@
 #' filtered$matches
 #' filtered$excluded
 #' @export
-filter_outcome_matches <- function(matches, prematch_sp, cutoff) {
+filter_outcome_matches <- function(matches, prematch_sp, cutoff, sp_threshold = 2) {
+  checkmate::assert_number(sp_threshold, lower = 1, finite = TRUE)
+  if (is.object(sp_threshold) || !is.null(dim(sp_threshold))) {
+    stop("`sp_threshold` must be a plain numeric scalar.", call. = FALSE)
+  }
   match_require_cutoff(cutoff)
 
   if (!tibble::is_tibble(matches)) {
@@ -323,10 +330,10 @@ filter_outcome_matches <- function(matches, prematch_sp, cutoff) {
     ]
     quote <- .filter_outcome_latest_quote(prior)
 
-    if (quote$usable && quote$sp_raw < 2) {
+    if (quote$usable && quote$sp_raw < sp_threshold) {
       retained <- FALSE
       missing_sp <- FALSE
-      reason <- "sp_below_2"
+      reason <- "sp_below_threshold"
     } else if (quote$usable) {
       retained <- TRUE
       missing_sp <- FALSE
@@ -376,7 +383,8 @@ filter_outcome_matches <- function(matches, prematch_sp, cutoff) {
     # One snapshot, in canonical column and evidence row order, so
     # `rlang::hash(prematch_sp_snapshot)` reproduces `prematch_sp_hash` exactly.
     prematch_sp_snapshot = .filter_outcome_sp_order(quote_ledger),
-    sp_threshold = 2,
+    policy_hash = rlang::hash(list(sp_threshold, TRUE, "missing_sp")),
+    sp_threshold = sp_threshold,
     sp_strict_below = TRUE,
     missing_sp_reason = "missing_sp",
     # Reuses the pool's existing transitive implementation-hash helper: the

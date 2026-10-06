@@ -56,3 +56,27 @@ test_that("explicit all-one cancellation survives the R/Python boundary without 
   expect_equal(lubridate::tz(x$label_available_at),"Asia/Shanghai")
   expect_equal(nrow(attr(x,"diagnostics")),0)
 })
+
+test_that("finished score crosses R boundary before SP is settled", {
+ python <- Sys.getenv("RETICULATE_PYTHON")
+ skip_if(!nzchar(python),"explicit Python interpreter required")
+ path <- test_path("fixtures","settlement","finished.html")
+ body <- paste(readLines(path,warn=FALSE),collapse="\n")
+ body <- sub('id="sp_1_3">2.5','id="sp_1_3">',body,fixed=TRUE)
+ schedule <- tibble::tibble(issue_id="25053",slot=1L,fixture_key="25053:1",provider_id_nowscore="123",handicap=0)
+ result <- fetch_issue_settlements(schedule,tempfile(),python_backend(python),
+  pages=list(body=charToRaw(body),observed_at="2026-10-04T10:00:00+08:00"))
+ expect_equal(nrow(result),0L)
+ observed <- attr(result,"match_results")
+ expect_s3_class(observed,"tbl_df")
+ expect_silent(match_validate_table(observed,"match_results"))
+ expect_identical(observed$outcome,"W")
+ expect_identical(observed$fixture_id,"25053:1")
+ expect_equal(lubridate::tz(observed$result_available_at),"Asia/Shanghai")
+ expect_false("settled_sp" %in% names(observed))
+ schedule$provider_id_nowscore <- "999"
+ rejected <- fetch_issue_settlements(schedule,tempfile(),python_backend(python),
+  pages=list(body=charToRaw(body),observed_at="2026-10-04T10:00:00+08:00"))
+ expect_equal(nrow(attr(rejected,"match_results")),0L)
+ expect_s3_class(attr(rejected,"match_results")$result_available_at,"POSIXct")
+})

@@ -7,8 +7,8 @@ outcomes_of <- function(...) {
   result
 }
 
-test_that("signature exposes only win, draw and lose and matches by name", {
-  expect_identical(names(formals(classify_outcomes)), c("win", "draw", "lose"))
+test_that("signature exposes probabilities and fixed threshold and matches by name", {
+  expect_identical(names(formals(classify_outcomes)), c("win", "draw", "lose", "single_threshold"))
   expected <- list(c("win", "lose"), c("win", "draw"))
   expect_identical(outcomes_of(lose = .33, win = .45, draw = .22), expected)
   expect_identical(outcomes_of(draw = .22, lose = .33, win = .45), expected)

@@ -29,7 +29,7 @@
   # internals they rely on. `getNamespaceExports` is deliberately not used, so a
   # private helper cannot be silently omitted from the receipt.
   roots <- c("parlay_role_scores", "parlay_construct_role_groups",
-             "parlay_evaluate_portfolio", ".parlay_role_code_hash",
+             "parlay_select_groups", ".parlay_role_code_hash",
              ".parlay_role_triple_key", ".parlay_role_definition",
              ".parlay_role_score")
   parts <- c("beidan-schema:2")

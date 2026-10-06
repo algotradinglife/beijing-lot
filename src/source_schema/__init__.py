@@ -1,23 +1,21 @@
-"""Issue #234 — unified data source schema contract package (candidate mode)."""
+"""Data-source utilities and shared vocabulary.
+
+The former "unified data source schema contract" (BJ-234 ``ddl``/``builder``/
+``identity``/``feasibility``/``plan``/``handoff``/``manifest``) was a candidate
+schema that production never adopted; its authoritative replacement is
+``beidan_backend.catalog``. What remains:
+
+* ``contract``     shared constants (time semantics, source families) still used
+                   by the census; the table definitions it once paired with are
+                   gone.
+* ``census``, ``sources``  legacy-database census and hash verification used by
+                   the BJ-252 temporal chain.
+* ``publication``  crash-durable atomic writers (32 call sites).
+"""
 
 from . import contract  # noqa: F401
 from . import census  # noqa: F401
-from . import identity  # noqa: F401
-from . import feasibility  # noqa: F401
-from . import plan  # noqa: F401
-from . import builder  # noqa: F401
-from . import handoff  # noqa: F401
-from . import manifest  # noqa: F401
 from . import publication  # noqa: F401
+from . import sources  # noqa: F401
 
-__all__ = [
-    "contract",
-    "census",
-    "identity",
-    "feasibility",
-    "plan",
-    "builder",
-    "handoff",
-    "manifest",
-    "publication",
-]
+__all__ = ["contract", "census", "publication", "sources"]

@@ -200,6 +200,18 @@
            "recomputation via rank_outcome_selections/prepare_outcome_selections: ",
            conditionMessage(e), call. = FALSE)
     })
+  if (!identical(attr(ranked_selections, "single_threshold", exact = TRUE),
+                 attr(recomputed, "single_threshold", exact = TRUE))) {
+    stop("parlay_construct_role_groups: single_threshold does not match the bound snapshot")
+  }
+  if (!identical(attr(ranked_selections, "dc_protection", exact = TRUE),
+                 attr(recomputed, "dc_protection", exact = TRUE))) {
+    stop("parlay_construct_role_groups: dc_protection does not match the bound snapshot")
+  }
+  if (!identical(attr(ranked_selections, "role_allocation", exact = TRUE),
+                 attr(recomputed, "role_allocation", exact = TRUE))) {
+    stop("parlay_construct_role_groups: role_allocation does not match the bound snapshot")
+  }
   observed_rank <- ranked_selections$rank
   if (!is.numeric(observed_rank) || length(observed_rank) != nrow(ranked_selections) ||
       anyNA(observed_rank) || any(!is.finite(observed_rank)) ||
@@ -409,21 +421,23 @@
   trace_rows <- list()
   substitution_rows <- list()
 
+  # Board validation and explicit scalar casts establish these one-row schemas.
+  # new_tibble avoids repeated tidy evaluation/name repair for each audited turn.
   add_trace <- function(round, turn, slot, role, fixture_id, action, reason) {
-    trace_rows[[length(trace_rows) + 1L]] <<- tibble::tibble(
+    trace_rows[[length(trace_rows) + 1L]] <<- tibble::new_tibble(list(
       round = as.integer(round), turn = as.integer(turn),
       group_slot = as.integer(slot), role = as.integer(role),
-      fixture_id = fixture_id, action = action, reason = reason)
+      fixture_id = fixture_id, action = action, reason = reason), nrow = 1L)
   }
   add_leg <- function(slot, round, chosen, base_role) {
-    leg_rows[[length(leg_rows) + 1L]] <<- tibble::tibble(
+    leg_rows[[length(leg_rows) + 1L]] <<- tibble::new_tibble(list(
       group_slot = as.integer(slot), group_id = NA_character_,
       fixture_id = as.character(chosen$fixture_id[[1]]),
       selection_id = as.integer(chosen$selection_id[[1]]),
       round = as.integer(round), base_role = as.integer(base_role),
       n_outcomes = as.integer(chosen$n_outcomes[[1]]),
       allowed_outcomes = list(.parlay_ranked_mask(chosen$outcomes[[1]])),
-      retained_probability = as.numeric(chosen$coverage_probability[[1]]))
+      retained_probability = as.numeric(chosen$coverage_probability[[1]])), nrow = 1L)
   }
 
   for (round in seq_len(n_legs)) {
@@ -462,14 +476,14 @@
       sets[[slot]] <- sort(c(sets[[slot]], as.character(chosen$fixture_id[[1]])))
       add_leg(slot, round, chosen, base_role)
       if (substitution) {
-        substitution_rows[[length(substitution_rows) + 1L]] <- tibble::tibble(
+        substitution_rows[[length(substitution_rows) + 1L]] <- tibble::new_tibble(list(
           group_slot = as.integer(slot), group_id = NA_character_,
           round = as.integer(round),
           fixture_id = as.character(chosen$fixture_id[[1]]),
           selection_id = as.integer(chosen$selection_id[[1]]),
           target_role = as.integer(target), base_role = as.integer(base_role),
           n_outcomes = as.integer(chosen$n_outcomes[[1]]),
-          reason = "target_role_shortage_board_fallback")
+          reason = "target_role_shortage_board_fallback"), nrow = 1L)
         add_trace(round, turn, slot, target, as.character(chosen$fixture_id[[1]]),
                   "selected", "target_role_shortage_board_fallback")
       } else {
@@ -552,7 +566,7 @@
 #' records the board actually used, `n_outcomes` its real outcome count and the
 #' fallback is recorded in `substitutions`. The chosen direction's mask is kept
 #' exactly as ranked and is never upgraded, so a base-1 protected double is neither
-#' mistaken for a single nor granted a triple's overlap exemption. Every board has
+#' mistaken for a single; all shared fixtures count toward overlap. Every board has
 #' its own continuous cursor that wraps at the tail and is carried to the next group
 #' rather than reset. Fewer distinct fixtures than legs stops with
 #' `insufficient_fixtures`; an empty ranked table stops with `empty_inputs`. An incomplete slot is recorded in `shortages` and `trace`,

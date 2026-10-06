@@ -43,9 +43,9 @@ test_that("exploration reproduces direct evaluation for every structure and cons
   expect_identical(actual$cutoff, pools$p21$cutoff)
   for (i in seq_len(nrow(scenarios))) {
     row <- scenarios[i, ]
-    direct <- parlay_evaluate_portfolio(pools[[row$pattern]], budget_cny=row$budget_cny,
+    direct <- parlay_select_groups(pools[[row$pattern]], objective="coverage", budget_cny=row$budget_cny,
       group_budget_cny=row$group_budget_cny, reuse_policy=list(max_reuse=row$max_reuse),
-      overlap_policy=list(max_overlap=row$max_overlap), improve=FALSE)
+      overlap_policy=list(max_overlap=row$max_overlap))$evaluation
     metric <- direct$summary
     expect_equal(actual$summary$spent_cny[i], metric$spent_cny)
     expect_equal(actual$summary$actual_coverage[i], metric$actual_coverage)

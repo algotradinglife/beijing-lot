@@ -22,6 +22,8 @@
 #'   independently observed Beijing handicap SP, with diagnostics in its attributes.
 #'   Public timestamps use Asia/Shanghai. Euro prices are decimal;
 #'   total Hong Kong prices are converted to decimal by adding one. No SP is inferred.
+#'   receipt_path points to atomic raw provenance/coverage metadata; full parsed
+#'   euro/totals rows are returned here, not duplicated in the JSON receipt.
 #'   Empty schedule returns typed empty tables without requests. Missing data is
 #'   never synthesized. Source quote time is distinct from actual observed_at.
 #' @export

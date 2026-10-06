@@ -8,19 +8,25 @@
 #' @param retries Nonnegative integer extra transient retries, default2.
 #' @param pages NULL for live fetch; or list(body=raw, observed_at=timezone-aware
 #'   ISO timestamp) for offline replay. Replay must retain actual observation time.
+#' @param research_only Scalar logical, default FALSE. TRUE admits closed-sale
+#'   reference quotes for paper tests only, requiring same-page native scheduled
+#'   state. Identity, handicap, complete prices and pre-kickoff time still apply.
 #' @return Validated prematch_sp tibble: fixture_id, outcome(W/D/L), quote_at
 #'   (Beijing POSIXct observation time), sp_raw(double), source_url. Empty results
-#'   retain types. Attributes diagnostics and receipt_path explain exclusions.
+#'   retain types. Attributes diagnostics, receipt_path and research_only explain
+#'   exclusions and bind the explicitly requested research policy.
 #' @details Uses only the labelled Beijing handicap W/D/L SP cells. No European
 #'   odds, payout predictions or settlement SP are substituted. Incomplete vectors,
-#'   closed/in-play/finished fixtures, mismatched identity/handicap and kickoff at
+#'   in-play/finished fixtures, mismatched identity/handicap and kickoff at
 #'   or before observation are excluded with reasons. Parser failures error.
+#'   Closed sale is excluded by default; research_only permits its reference SP
+#'   only with the source's explicit native scheduled-state evidence.
 #'   These are floating reference SP, not locked payout odds. Values above10 remain
 #'   unchanged here; apply the existing valuation transform downstream. Current
 #'   captures cannot serve an earlier decision cutoff. No network on import.
 #' @export
 fetch_issue_prematch_sp <- function(schedule, raw_dir, backend, timeout = 25,
-                                    retries = 2L, pages = NULL) {
+                                    retries = 2L, pages = NULL, research_only = FALSE) {
   if (!tibble::is_tibble(schedule)) stop("schedule must be a tibble")
   required <- c("issue_id", "slot", "fixture_key", "provider_id_nowscore", "handicap", "kickoff_at")
   checkmate::assert_subset(required, names(schedule))
@@ -34,6 +40,7 @@ fetch_issue_prematch_sp <- function(schedule, raw_dir, backend, timeout = 25,
   checkmate::assert_string(raw_dir, min.chars = 1, na.ok = FALSE)
   checkmate::assert_number(timeout, lower = .Machine$double.eps, finite = TRUE)
   checkmate::assert_count(retries)
+  checkmate::assert_flag(research_only)
   if (!inherits(backend, "python_backend")) stop("backend must be a python_backend")
   if (!is.null(pages)) {
     checkmate::assert_names(names(pages), permutation.of = c("body", "observed_at"))
@@ -53,7 +60,8 @@ fetch_issue_prematch_sp <- function(schedule, raw_dir, backend, timeout = 25,
     row
   })
   result <- module$fetch_issue_prematch_sp(rows, raw_dir, timeout = timeout,
-    retries = as.integer(retries), pages = if (is.null(pages)) NULL else issue_schedule_pages_dict(pages))
+    retries = as.integer(retries), pages = if (is.null(pages)) NULL else issue_schedule_pages_dict(pages),
+    research_only = research_only)
   payload <- reticulate::py_to_r(result)
   out <- match_typed_empty("prematch_sp")
   out$quote_at <- lubridate::with_tz(out$quote_at, "Asia/Shanghai")
@@ -67,6 +75,7 @@ fetch_issue_prematch_sp <- function(schedule, raw_dir, backend, timeout = 25,
   attr(out, "diagnostics") <- if (length(payload$diagnostics)) dplyr::bind_rows(payload$diagnostics) else
     tibble::tibble(issue_id = character(), fixture_id = character(), reason = character())
   attr(out, "receipt_path") <- payload$receipt_path
+  attr(out, "research_only") <- research_only
   match_validate_table(out, "prematch_sp", keys=c("fixture_id","outcome","quote_at"))
   return(out)
 }

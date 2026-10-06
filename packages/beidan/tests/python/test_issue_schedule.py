@@ -33,7 +33,7 @@ from beidan_backend.issue_schedule.crosscheck import (
     reconcile_identity,
 )
 from beidan_backend.issue_schedule.decode import DecodeError, decode_response
-from beidan_backend.issue_schedule.fetch import FetchError, fetch_issue_page
+from beidan_backend.transport import FetchError, fetch_issue_page
 from beidan_backend.issue_schedule.service import fetch_issue_schedule
 from beidan_backend.issue_schedule.sources import (
     ProviderRow,
@@ -471,6 +471,74 @@ def test_fetch_rejects_invalid_arguments():
         fetch_issue_page("https://example/", retries=-1)
 
 
+def test_fetch_merges_extra_headers_over_defaults():
+    captured = {}
+
+    class Response:
+        status = 200
+        headers = {"Content-Type": "text/html"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"<html></html>"
+
+    def opener(request, timeout):
+        captured.update(dict(request.header_items()))
+        return Response()
+
+    response = fetch_issue_page(
+        "https://example/", timeout=1.0, retries=0, backoff_sec=0,
+        user_agent="ua-1", referer="https://ref/",
+        headers={"Accept-Language": "zh-CN", "Cache-Control": "no-cache"},
+        opener=opener,
+    )
+    assert response.status == 200
+    # Header names are capitalized by urllib; match case-insensitively.
+    folded = {key.lower(): value for key, value in captured.items()}
+    assert folded["user-agent"] == "ua-1"
+    assert folded["referer"] == "https://ref/"
+    assert folded["accept-language"] == "zh-CN"
+    assert folded["cache-control"] == "no-cache"
+
+
+def test_fetch_error_carries_http_status():
+    import urllib.error
+
+    def opener(request, timeout):
+        raise urllib.error.HTTPError("https://example/", 403, "Forbidden", {}, None)
+
+    with pytest.raises(FetchError) as info:
+        fetch_issue_page("https://example/", timeout=1.0, retries=0, backoff_sec=0, opener=opener)
+    assert info.value.status == 403
+
+
+def test_fetch_error_carries_non_200_status():
+    class Response:
+        status = 503
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b""
+
+    def opener(request, timeout):
+        return Response()
+
+    with pytest.raises(FetchError) as info:
+        fetch_issue_page("https://example/", timeout=1.0, retries=0, backoff_sec=0, opener=opener)
+    assert info.value.status == 503
+
+
 def test_persist_requires_an_explicit_directory():
     with pytest.raises(PersistError):
         new_fetch_directory("", "26098", "f")
@@ -624,7 +692,7 @@ def test_observation_max_compares_instants_not_strings(tmp_path):
 
 def test_successful_first_source_preserved_when_second_fails(tmp_path, monkeypatch):
     from beidan_backend.issue_schedule import service
-    from beidan_backend.issue_schedule.fetch import FetchResponse
+    from beidan_backend.transport import FetchResponse
     def fail_second(url, **kwargs):
         if "nowscore" in url:
             raise TimeoutError("second source unavailable")
@@ -651,7 +719,7 @@ def test_missing_rows_are_not_a_successful_empty_issue():
 
 def test_only_transient_http_errors_are_retried():
     import urllib.error
-    from beidan_backend.issue_schedule.fetch import fetch_issue_page, FetchError
+    from beidan_backend.transport import fetch_issue_page, FetchError
     calls = []
     def forbidden(req, timeout):
         calls.append(req.full_url)

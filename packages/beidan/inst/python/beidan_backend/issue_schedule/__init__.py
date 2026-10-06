@@ -7,7 +7,7 @@ persistence never blur together:
 ``sources``    one parser per provider; returns raw-faithful provider rows.
 ``crosscheck`` cross-source identity reconciliation with explicit evidence.
 ``contract``   the canonical per-match schema and its validators.
-``fetch``      the only module that touches the network (bounded, explicit).
+Network access lives in the package-wide ``beidan_backend.transport`` module.
 ``store``      explicit raw-byte / parsed-row / metadata persistence.
 
 Importing any module here performs no I/O and no network access.
@@ -32,7 +32,7 @@ from .crosscheck import (
     reconcile_identity,
 )
 from .decode import DecodeError, decode_response, declared_charset
-from .fetch import FetchError, FetchResponse, fetch_issue_page
+from ..transport import FetchError, FetchResponse, fetch_issue_page
 from .service import IssueScheduleResult, fetch_issue_schedule
 from .sources import (
     SourceParseError,

@@ -11,7 +11,10 @@ parlay_diagnose_plan(result, settlements, as_of)
 the bound cutoff and the tables the diagnostic consumes, so nothing is
 reassembled by the caller.}
 
-\item{settlements}{Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.}
+\item{settlements}{Validated settlement tibble with actual SP and label_available_at; only labels visible at as_of are consumed.
+Explicit status all_options_one requires outcome ALL and SP=1, and is a
+neutral parlay leg, not a prediction hit. Single-leg and all-neutral tickets
+remain SPECIAL; refunds are not inferred.}
 
 \item{as_of}{UTC POSIXct instant limiting visible settlement labels.}
 }

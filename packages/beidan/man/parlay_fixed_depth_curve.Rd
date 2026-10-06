@@ -7,7 +7,7 @@
 parlay_fixed_depth_curve(plans, group_budgets_cny)
 }
 \arguments{
-\item{plans}{Uniquely named list of current \code{\link[=parlay_evaluate_portfolio]{parlay_evaluate_portfolio()}} results.
+\item{plans}{Uniquely named list of current \code{\link[=parlay_select_groups]{parlay_select_groups()}} evaluation results.
 Source, cutoff, code, purchased ledger and frozen plan bindings are checked.
 Names label patterns; selected groups and actual outcome masks remain fixed.}
 

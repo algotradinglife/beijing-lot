@@ -3,8 +3,8 @@
 # classifier's own base category. The thresholds are the classifier's business
 # and are never restated here.
 
-test_that("signature exposes only matches with no ranking argument", {
-  expect_identical(names(formals(prepare_outcome_selections)), "matches")
+test_that("signature exposes matches and fixed threshold", {
+  expect_identical(names(formals(prepare_outcome_selections)), c("matches", "single_threshold", "dc_protection", "role_allocation"))
 })
 
 test_that("fixture A expands to win/lose then win/draw with reference entropy", {

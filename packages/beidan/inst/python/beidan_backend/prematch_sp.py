@@ -4,18 +4,24 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 import math
 from .settlement import parser, labels
-from .issue_schedule import fetch, store
+from . import transport
+from .issue_schedule import store
+from .issue_schedule import decode, sources
 
 
-def parse_prematch_sp(body, schedule, observed_at):
+def parse_prematch_sp(body, schedule, observed_at, *, research_only=False):
     """Return (quotes, diagnostics); W/D/L refer to Beijing handicap outcomes.
 
     Schedule supplies issue_id, slot, fixture_key, native identity, handicap and
     timezone-aware kickoff_at. Observation is the earliest evidenced availability,
-    not a guessed source update time. Only complete live pre-kickoff vectors pass.
+    not a guessed source update time. Default requires live pre-kickoff vectors.
+    Explicit research_only ignores sale closure but requires same-page native
+    M[slot][4] scheduled state bound to M[slot][0]; never admits in-play/results.
     No SP cap/transformation or probability calculation is applied here.
     """
     at = datetime.fromisoformat(observed_at.replace('Z', '+00:00'))
+    if type(research_only) is not bool:
+        raise ValueError('research_only must be boolean')
     if at.tzinfo is None:
         raise ValueError('observed_at requires timezone')
     if not schedule:
@@ -38,6 +44,9 @@ def parse_prematch_sp(body, schedule, observed_at):
         if datetime.fromisoformat(r['kickoff_at']).tzinfo is None:
             raise ValueError('kickoff_at requires timezone')
     rows = parser.parse_page(bytes(body), issue, 5)
+    # This source's prematch-SP contract is UTF-8-sig, as in parser.parse_page.
+    states = sources.parse_nowscore_status_codes(decode.decode_response(
+        bytes(body), "text/html; charset=utf-8")) if research_only else {}
     by_slot = {r['slot']:r for r in rows}
     if len(by_slot) != len(rows):
         raise ValueError('duplicate source slots')
@@ -51,7 +60,11 @@ def parse_prematch_sp(body, schedule, observed_at):
             reason = 'identity_or_handicap_mismatch'
         elif at >= datetime.fromisoformat(fixture['kickoff_at']):
             reason = 'already_kicked_off'
-        elif r['status'] not in ('', '未', '未开', '未开赛') or r['can_sale'].lower() != 'true':
+        elif research_only and states.get(fixture['slot']) != (fixture['provider_id_nowscore'], 0):
+            reason = 'not_observed_scheduled'
+        elif research_only and r['status'] not in ('', '未', '未开', '未开赛', '截止', '停售'):
+            reason = 'not_live_prematch'
+        elif not research_only and (r['status'] not in ('', '未', '未开', '未开赛') or r['can_sale'].lower() != 'true'):
             reason = 'not_live_prematch'
         elif r['parse_errors'] or len(r['options']) != 3 or {o['option'] for o in r['options']} != {'胜','平','负'}:
             reason = 'invalid_source_contract'
@@ -67,7 +80,7 @@ def parse_prematch_sp(body, schedule, observed_at):
     return quotes, diagnostics
 
 
-def fetch_issue_prematch_sp(schedule, raw_dir, timeout=25, retries=2, pages=None):
+def fetch_issue_prematch_sp(schedule, raw_dir, timeout=25, retries=2, pages=None, *, research_only=False):
     """Fetch once using the shared bounded client; persist bytes before parsing.
 
     Offline pages={body:bytes, observed_at:timezone-aware ISO} preserves original
@@ -76,6 +89,8 @@ def fetch_issue_prematch_sp(schedule, raw_dir, timeout=25, retries=2, pages=None
     """
     if not isinstance(schedule,list) or not schedule:
         raise ValueError('schedule must not be empty')
+    if type(research_only) is not bool:
+        raise ValueError('research_only must be boolean')
     issue = schedule[0]['issue_id']; url = parser.source_url(issue,5)
     if not isinstance(raw_dir,str) or not raw_dir.strip():
         raise ValueError('raw_dir required')
@@ -84,7 +99,7 @@ def fetch_issue_prematch_sp(schedule, raw_dir, timeout=25, retries=2, pages=None
     if type(retries) is not int or retries < 0:
         raise ValueError('invalid retries')
     if pages is None:
-        response = fetch.fetch_issue_page(url,timeout=timeout,retries=retries)
+        response = transport.fetch_issue_page(url,timeout=timeout,retries=retries)
         body, observed_at = response.body, response.observed_at
     else:
         if not isinstance(pages,dict) or set(pages) != {'body','observed_at'} or not isinstance(pages['body'],(bytes,bytearray)):
@@ -98,11 +113,11 @@ def fetch_issue_prematch_sp(schedule, raw_dir, timeout=25, retries=2, pages=None
     paths = store.persist_issue_raw(directory=folder,issue_id=issue,bodies=bodies)
     meta = dict(issue_id=issue,source_url=url,observed_at=observed_at,
         market='beidan_handicap_sp_reference',quote_time_basis='observed_availability',
-        encoding='utf-8-sig',schedule=schedule,raw_paths=paths,
+        encoding='utf-8-sig',schedule=schedule,raw_paths=paths,research_only=research_only,
         implementation_sha256={str(Path(p).name):parser.digest(Path(p).read_bytes()) for p in
-            (__file__,parser.__file__,labels.__file__,fetch.__file__,store.__file__)})
+            (__file__,parser.__file__,labels.__file__,transport.__file__,store.__file__,decode.__file__,sources.__file__)})
     try:
-        quotes, diagnostics = parse_prematch_sp(body,schedule,observed_at)
+        quotes, diagnostics = parse_prematch_sp(body,schedule,observed_at,research_only=research_only)
         meta['parse'] = {'status':'parsed'}
         meta['diagnostics'] = diagnostics
     except Exception as error:

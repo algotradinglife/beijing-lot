@@ -4,7 +4,12 @@
 \alias{prepare_outcome_selections}
 \title{Prepare outcome selections from match probabilities}
 \usage{
-prepare_outcome_selections(matches)
+prepare_outcome_selections(
+  matches,
+  single_threshold = 0.5,
+  dc_protection = NULL,
+  role_allocation = NULL
+)
 }
 \arguments{
 \item{matches}{A \code{tibble} with one row per fixture. It must contain a
@@ -19,6 +24,18 @@ Any receipt attributes of \code{matches} (for example the \code{filter_receipt} 
 \code{\link[=filter_outcome_matches]{filter_outcome_matches()}}) are preserved unchanged on the result, so the
 provenance of the admitted fixtures is carried explicitly into every
 expanded row.}
+
+\item{single_threshold}{Fixed scalar single-choice threshold, passed to
+\code{\link[=classify_outcomes]{classify_outcomes()}}; default 0.50. Invalid values fail even for empty input.}
+
+\item{dc_protection}{Optional complete DC W/D/L probability tibble on exactly
+the admitted fixture universe. Adds optional primary-set protection via
+\code{\link[=DcProtectionChoices]{DcProtectionChoices()}}, retaining original BD choices and base categories.}
+
+\item{role_allocation}{Optional cutoff-bound artifact from
+AdaptiveRoleAllocation(). Replayed against the supplied probabilities.
+Changed fixtures use primary TopN of their allocated role; unchanged fixtures
+retain their classifier choices. Native roles remain in the allocation ledger.}
 }
 \value{
 A \code{tibble} with one row per \verb{(fixture_id, selection_id)} pair, where
@@ -31,7 +48,7 @@ returned columns are the input columns followed by:
 \item \code{outcomes}: list column of unnamed character vectors naming the selected
 outcomes, taken verbatim from \code{\link[=classify_outcomes]{classify_outcomes()}}.
 \item \code{base_role}: integer base category of the fixture, \code{1}, \code{2} or \code{3}, read
-from the classifier's \code{base_role} attribute. It is the fixture's category,
+from the classifier's \code{base_role} attribute (or the explicit allocated role). It is the fixture's category,
 not the number of rows it produced: a base-role-\code{1} fixture emits one, two
 or three rows that all carry \code{1}.
 \item \code{n_outcomes}: integer number of selected outcomes in this row, that is

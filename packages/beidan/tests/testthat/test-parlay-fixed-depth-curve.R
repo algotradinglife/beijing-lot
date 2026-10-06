@@ -19,8 +19,8 @@ fixed_depth_plan <- function(quotes = TRUE, budget = 2, tie = FALSE, issue_budge
   ranked <- rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
   pool <- parlay_construct_role_groups(ranked, settings, c(2L, 1L),
     max_candidates = 1L, prematch_sp = sp)
-  return(parlay_evaluate_portfolio(pool, group_budget_cny=budget, budget_cny=NULL,
-    reuse_policy=list(max_reuse=2L), overlap_policy=list(max_overlap=2L), improve = FALSE))
+  return(parlay_select_groups(pool, objective="coverage", group_budget_cny=budget, budget_cny=NULL,
+    reuse_policy=list(max_reuse=2L), overlap_policy=list(max_overlap=2L))$evaluation)
 }
 
 test_that("fixed depth curves match frozen prefixes, unit floors and saturation", {
@@ -88,8 +88,8 @@ test_that("probability sum tolerance survives one and multiple full-triple legs"
     ranked <- rank_outcome_selections(prepare_outcome_selections(matches),cutoff)
     settings <- parlay_constant_defaults();settings$n_legs <- as.integer(n)
     pool <- parlay_construct_role_groups(ranked,settings,rep(3L,n),max_candidates=1L)
-    result <- parlay_evaluate_portfolio(pool,group_budget_cny=NULL,
-      reuse_policy=list(max_reuse=1L),overlap_policy=list(max_overlap=0L),improve=FALSE)
+    result <- parlay_select_groups(pool, objective="coverage",group_budget_cny=NULL,
+      reuse_policy=list(max_reuse=1L),overlap_policy=list(max_overlap=0L))$evaluation
     curve <- parlay_fixed_depth_curve(list(p=result),2*3^n)
     expect_equal(curve$support_size,as.integer(3^n))
     expect_equal(curve$structure_probability,(1.0000000005)^n,tolerance=1e-12)

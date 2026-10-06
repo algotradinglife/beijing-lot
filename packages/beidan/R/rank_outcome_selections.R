@@ -47,7 +47,7 @@
     roots
   ))
   dependency_versions <- vapply(
-    c("R", "tibble", "dplyr", "tidyr", "rlang", "checkmate",
+    c("R", "Rcpp", "tibble", "dplyr", "tidyr", "rlang", "checkmate",
       "lubridate", "S7"),
     function(package) {
       version <- if (package == "R") as.character(getRversion()) else
@@ -125,7 +125,7 @@
   }
   required <- c("cutoff", "cutoff_hash", "input_hash", "input_snapshot",
                 "prematch_sp_hash", "prematch_sp_snapshot",
-                "sp_threshold", "sp_strict_below", "missing_sp_reason",
+                "sp_threshold", "sp_strict_below", "missing_sp_reason", "policy_hash",
                 "code_hash")
   missing_fields <- setdiff(required, names(receipt))
   if (length(missing_fields) > 0L) {
@@ -146,7 +146,7 @@
   # hashes to the receipt's `prematch_sp_hash`.
   replay <- tryCatch(
     filter_outcome_matches(receipt$input_snapshot, receipt$prematch_sp_snapshot,
-                           receipt$cutoff),
+                           receipt$cutoff, sp_threshold = receipt$sp_threshold),
     error = function(e) {
       stop(
         paste0("`selections` filter_receipt failed independent filter replay: ",
@@ -199,7 +199,8 @@
   #    carried `filter_receipt` nor any other attribute of either tibble can
   #    decide the verdict.
   policy_fields <- c("sp_threshold", "sp_strict_below", "missing_sp_reason")
-  if (!identical(receipt[policy_fields], fresh[policy_fields])) {
+  if (!identical(receipt$policy_hash, fresh$policy_hash) ||
+      !identical(receipt[policy_fields], fresh[policy_fields])) {
     stop("`selections` filter_receipt policy does not match independent replay.",
          call. = FALSE)
   }
@@ -473,7 +474,20 @@ rank_outcome_selections <- function(selections, cutoff,
 
   unique_rows <- selections[!duplicated(fixture_values), source_columns,
                             drop = FALSE]
-  recomputed <- prepare_outcome_selections(unique_rows)
+  single_threshold <- attr(selections, "single_threshold", exact = TRUE)
+  if (is.null(single_threshold)) stop("missing single_threshold classification context", call. = FALSE)
+  dc_protection <- attr(selections, "dc_protection", exact = TRUE)
+  role_allocation <- attr(selections, "role_allocation", exact = TRUE)
+  if (!is.null(role_allocation)) {
+    match_require_cutoff(role_allocation$cutoff)
+    if (!identical(.rank_outcome_cutoff_hash(role_allocation$cutoff),
+                   .rank_outcome_cutoff_hash(cutoff))) {
+      stop("role_allocation cutoff does not match ranking cutoff", call. = FALSE)
+    }
+  }
+  recomputed <- prepare_outcome_selections(unique_rows, single_threshold = single_threshold,
+                                           dc_protection = dc_protection,
+    role_allocation = role_allocation)
 
   sort_keys <- function(table) {
     table[order(table[["fixture_id"]], table[["selection_id"]],
@@ -541,6 +555,9 @@ rank_outcome_selections <- function(selections, cutoff,
     input_hash = input_hash,
     input_snapshot = selections,
     priority = priority,
+    single_threshold = single_threshold,
+    dc_protection = dc_protection,
+    role_allocation = role_allocation,
     filter_receipt = filter_receipt,
     code_hash = .rank_outcome_code_hash(filter_roots)
   )

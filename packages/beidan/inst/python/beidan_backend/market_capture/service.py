@@ -13,7 +13,7 @@ import uuid
 from zoneinfo import ZoneInfo
 
 import json5
-from beidan_backend.issue_schedule.fetch import fetch_issue_page
+from beidan_backend.transport import fetch_issue_page
 from .history import (_js_array, euro_history_url, over_under_history_url,
                       parse_euro_history_js, parse_over_under_history_json)
 
@@ -118,6 +118,23 @@ def parse_markets(fixture: dict, euro_body: bytes, totals_bodies: dict[str, byte
                 identity={**identity,"kickoff_at":identity["kickoff_at"].isoformat()})
 
 
+def _write_market_receipt(directory: Path, result: dict) -> None:
+    """Atomically persist raw provenance and coverage, without duplicating quotes.
+
+    Parsed quotes are returned to the caller; raw bytes remain replayable through
+    captures. Keep receipt size independent of the number of history quote rows.
+    Interrupted publication leaves the previous complete receipt intact.
+    """
+    receipt = {key: value for key, value in result.items()
+               if key not in {"euro", "totals"}}
+    receipt["schema"] = "beidan_market_capture_receipt_v1"
+    receipt["euro_rows"] = len(result["euro"])
+    receipt["totals_rows"] = len(result["totals"])
+    temporary = directory / "receipt.json.tmp"
+    temporary.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(directory / "receipt.json")
+
+
 def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[str],
                   timeout: float = 25, retries: int = 2, pages: dict | None = None) -> dict:
     """Capture selected fixtures with >=1s request spacing, persist before parsing.
@@ -170,7 +187,7 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
                 result['captures'].append(dict(fixture_id=fixture['fixture_id'],market=market,
                     source_url=url,observed_at=stamp.astimezone(BJT).isoformat(),raw_path=str(path),
                     sha256=hashlib.sha256(body).hexdigest()))
-                (directory/'receipt.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+                _write_market_receipt(directory, result)
                 bodies[market]=body
             parsed=parse_markets(fixture,bodies['euro'],{c:bodies[f'total_{c}'] for c in totals_company_ids})
             result['identities'].append(dict(fixture))
@@ -184,7 +201,7 @@ def fetch_markets(fixtures: list[dict], raw_dir: str, totals_company_ids: list[s
                 euro_rows=len(parsed['euro']),totals_rows=len(parsed['totals'])))
         except (ValueError,KeyError,RuntimeError,OSError) as exc:
             result['coverage'].append(dict(fixture_id=fixture['fixture_id'],status='error',detail=str(exc),euro_rows=0,totals_rows=0))
-        (directory/'receipt.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
-    (directory/'receipt.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+        _write_market_receipt(directory, result)
+    _write_market_receipt(directory, result)
     result['receipt_path']=str(directory/'receipt.json')
     return result

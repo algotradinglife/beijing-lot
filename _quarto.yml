@@ -24,6 +24,8 @@ project:
     - quarto/262_settlement_issue_addition.qmd
     - quarto/272_selection_allocation_audit.qmd
     - quarto/288_outcome_set_selection.qmd
+    - quarto/collection_ledger.qmd
+    - quarto/parquet_settlement_delivery.qmd
 
 execute:
   freeze: false

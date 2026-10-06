@@ -34,6 +34,8 @@ settled_sp、label_available_at(北京时间POSIXct)、status、source_url。
 普通未完场或未有唯一开奖SP不产生结算行；取消且停售、来源明确列出
 胜平负三个SP均为1时输出 status=all_options_one、outcome=ALL，
 不计预测命中。空结果保持列类型。
+match_results 属性为独立赛果 tibble：issue_id、fixture_id、outcome(W/D/L)、
+result_available_at(实际观测北京时间)、source_url；SP未发布也可有赛果。
 diagnostics 属性记录未接纳原因，receipt_path 属性记录原始证据回执位置。
 }
 \description{

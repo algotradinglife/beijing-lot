@@ -195,3 +195,14 @@ test_that("rebound frozen stakes still reconcile with physical purchase ledger",
   e$results$a$receipt$plan_hash <- rlang::hash(e$results$a$plan)
   expect_error(parlay_compare_risk(e),"ledger")
 })
+
+test_that("implementation receipt is stable across fresh processes with S7 defaults", {
+  path <- system.file(package="beidan")
+  independent <- callr::r(function(path) {
+    pkgload::load_all(path,quiet=TRUE,compile=FALSE)
+    return(beidan:::.ParlayRiskCodeHash())
+  }, args=list(path=path),libpath=.libPaths(),user_profile=FALSE,system_profile=FALSE)
+  expect_identical(.ParlayRiskCodeHash(),independent)
+  expect_identical(.ParlayRiskCodeHash(),.ParlayRiskCodeHash())
+  expect_identical(.ParlayRiskCodeHash(),withr::with_locale(c(LC_COLLATE="C"),.ParlayRiskCodeHash()))
+})

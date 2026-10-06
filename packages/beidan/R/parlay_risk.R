@@ -21,17 +21,21 @@
 
 #' Bind loaded implementation and dependency versions
 #' @return Character hash of all loaded package functions and dependency versions.
-#' @details Conservative superset of transitive helpers; no filesystem reads or I/O.
+#' @details Conservative superset of transitive helpers. Generated S7 defaults
+#'   can contain closures whose captured namespace environments differ between
+#'   processes; signatures and bodies are bound as code, not serialized closure
+#'   environments. Binding order uses locale-independent radix sorting.
+#'   Runtime/dependency versions remain bound. No file reads or IO.
 #' @noRd
 .ParlayRiskCodeHash <- function() {
   ns <- asNamespace("beidan")
-  ids <- sort(ls(ns, all.names = TRUE))
+  ids <- sort(ls(ns, all.names = TRUE), method = "radix")
   code <- lapply(ids, function(id) {
     fn <- get(id, envir = ns, inherits = FALSE)
-    if (is.function(fn)) return(list(name = id, arguments = formals(fn), body = deparse(body(fn))))
+    if (is.function(fn)) return(list(name = id, arguments = deparse(formals(fn)), body = deparse(body(fn))))
     return(NULL)
   })
-  deps <- c("tibble", "dplyr", "tidyr", "rlang", "checkmate", "lubridate")
+  deps <- c("tibble", "dplyr", "tidyr", "rlang", "checkmate", "lubridate", "S7", "Rcpp")
   versions <- stats::setNames(vapply(deps, function(pkg) as.character(utils::packageVersion(pkg)), character(1)), deps)
   return(rlang::hash(list(code = code, R = as.character(getRversion()), dependencies = versions)))
 }

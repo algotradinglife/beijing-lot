@@ -9,6 +9,10 @@ data/
 !apps/decision-dashboard/src/data/
 !apps/decision-dashboard/src/data/**
 datasets/
+# `datasets/` above targets exported data roots; the packaged backend module of
+# the same name is source code and must stay tracked.
+!packages/beidan/inst/python/beidan_backend/datasets/
+!packages/beidan/inst/python/beidan_backend/datasets/**
 derived/
 knowledge-base/
 wiki/
@@ -223,3 +227,8 @@ evidence/bj_freeze_review_001/.publish.lock
 
 # Local scratch for research QMD inputs (rendered artifacts live in quarto/_output)
 .tmpwork/
+
+# Compiled local package artifacts (source and kernel identity are tracked).
+packages/beidan/src/*.o
+packages/beidan/src/*.so
+packages/beidan/src/*.dll

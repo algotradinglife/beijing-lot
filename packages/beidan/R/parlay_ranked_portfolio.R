@@ -16,8 +16,7 @@
 #   3. at admission a group is checked against the ALREADY-SELECTED groups under the
 #      explicit reuse/overlap policies; a refused group consumes no constraint and
 #      no cash, and the walk continues. Reuse counts EVERY actual fixture with no
-#      exemption; pairwise overlap exempts a fixture that is a role-3 leg in BOTH
-#      groups and counts every other shared fixture;
+#      exemption; pairwise overlap counts every shared fixture, including triples;
 #   4. an admitted group buys its legal tickets in rank order, SKIPPING physical
 #      tickets already bought anywhere in this decision, and continues DOWN the rank
 #      until the wanted units, the remaining total budget or the legal space is
@@ -47,9 +46,8 @@
 #' Validate the overlap policy
 #'
 #' Internal. `overlap_policy` is a named list with exactly `max_overlap`: a single
-#' non-negative whole number, or `NULL` for unlimited pairwise overlap. A fixture
-#' that is a role-3 leg in BOTH compared groups is exempt and does not count toward
-#' the limit; every other shared fixture counts.
+#' non-negative whole number, or `NULL` for unlimited pairwise overlap.
+#' Every shared fixture counts, including actual triples.
 #' @param overlap_policy Named list with `max_overlap`.
 #' @return A list with `max_overlap` as an integer or `NULL`.
 #' @noRd
@@ -73,19 +71,19 @@
 .parlay_ranked_validate_limit_policy <- function(policy, name, field,
                                                  positive) {
   if (!is.list(policy) || is.null(names(policy)) || any(!nzchar(names(policy)))) {
-    stop("parlay_evaluate_portfolio: ", name, " must be a named list with the ",
+    stop("parlay_select_groups: ", name, " must be a named list with the ",
          "single field '", field, "'")
   }
   if (anyDuplicated(names(policy))) {
-    stop("parlay_evaluate_portfolio: ", name, " has duplicate field names")
+    stop("parlay_select_groups: ", name, " has duplicate field names")
   }
   unknown <- setdiff(names(policy), field)
   if (length(unknown)) {
-    stop("parlay_evaluate_portfolio: unknown ", name, " field(s) ",
+    stop("parlay_select_groups: unknown ", name, " field(s) ",
          paste(unknown, collapse = ", "), "; allowed field is '", field, "'")
   }
   if (!field %in% names(policy)) {
-    stop("parlay_evaluate_portfolio: ", name, " is missing '", field, "'")
+    stop("parlay_select_groups: ", name, " is missing '", field, "'")
   }
   value <- policy[[field]]
   if (is.null(value)) return(stats::setNames(list(NULL), field))
@@ -94,7 +92,7 @@
       length(value) != 1L || is.na(value) ||
       !is.finite(value) || value != trunc(value) || value < lower ||
       value > .Machine$integer.max) {
-    stop("parlay_evaluate_portfolio: ", name, "$", field, " must be NULL or a ",
+    stop("parlay_select_groups: ", name, "$", field, " must be NULL or a ",
          if (positive) "positive whole number" else "non-negative whole number")
   }
   stats::setNames(list(as.integer(value)), field)
@@ -124,7 +122,7 @@
   if (!is.list(portfolio) || is.null(portfolio$role_legs) ||
       is.null(portfolio$settings) || is.null(portfolio$group_patterns) ||
       is.null(portfolio$ranked_selections)) {
-    stop("parlay_evaluate_portfolio: portfolio must be the result of ",
+    stop("parlay_select_groups: portfolio must be the result of ",
          "parlay_construct_role_groups() over a ranked selection table")
   }
   cutoff <- portfolio[["cutoff"]]
@@ -132,13 +130,13 @@
   cutoff_hash <- .rank_outcome_cutoff_hash(cutoff)
   if (is.null(portfolio[["cutoff_hash"]]) ||
       !identical(portfolio[["cutoff_hash"]], cutoff_hash)) {
-    stop("parlay_evaluate_portfolio: the embedded cutoff does not match the ",
+    stop("parlay_select_groups: the embedded cutoff does not match the ",
          "construction cutoff recorded in the portfolio")
   }
 
   if (!identical(portfolio[["construction_code_hash"]],
       .rank_outcome_code_hash(roots = "parlay_construct_role_groups"))) {
-    stop("parlay_evaluate_portfolio: construction implementation binding is ",
+    stop("parlay_select_groups: construction implementation binding is ",
          "missing or stale; rebuild the candidate pool")
   }
 
@@ -148,15 +146,15 @@
   ranked_receipt <- tryCatch(
     .parlay_ranked_validate_receipt(ranked),
     error = function(e) {
-      stop("parlay_evaluate_portfolio: the portfolio ranked_selections receipt ",
+      stop("parlay_select_groups: the portfolio ranked_selections receipt ",
            "is invalid: ", conditionMessage(e), call. = FALSE)
     })
   if (!identical(ranked_receipt$cutoff, cutoff)) {
-    stop("parlay_evaluate_portfolio: the ranked-selection cutoff differs from the ",
+    stop("parlay_select_groups: the ranked-selection cutoff differs from the ",
          "pool cutoff")
   }
   if (!identical(portfolio[["ranked_selections_hash"]], rlang::hash(ranked))) {
-    stop("parlay_evaluate_portfolio: the portfolio ranked_selections do not match ",
+    stop("parlay_select_groups: the portfolio ranked_selections do not match ",
          "the hash it recorded")
   }
 
@@ -169,21 +167,21 @@
   }
   if (!identical(probability_order(probabilities),
                  probability_order(expected_probabilities))) {
-    stop("parlay_evaluate_portfolio: the portfolio probabilities do not match ",
+    stop("parlay_select_groups: the portfolio probabilities do not match ",
          "the ranked selections they were derived from")
   }
   if (!identical(portfolio[["probability_hash"]], rlang::hash(probabilities))) {
-    stop("parlay_evaluate_portfolio: the portfolio probabilities do not match ",
+    stop("parlay_select_groups: the portfolio probabilities do not match ",
          "the hash it recorded")
   }
 
   prematch_sp <- match_validate_table(portfolio[["prematch_sp"]], "prematch_sp")
   if (!identical(portfolio[["prematch_sp_hash"]], rlang::hash(prematch_sp))) {
-    stop("parlay_evaluate_portfolio: the portfolio prematch_sp does not match ",
+    stop("parlay_select_groups: the portfolio prematch_sp does not match ",
          "the hash it recorded")
   }
   if (nrow(prematch_sp) && any(prematch_sp$quote_at >= cutoff$cutoff_utc)) {
-    stop("parlay_evaluate_portfolio: every prematch_sp quote must be strictly ",
+    stop("parlay_select_groups: every prematch_sp quote must be strictly ",
          "before the embedded cutoff")
   }
 
@@ -191,7 +189,7 @@
   n_legs <- as.integer(portfolio$settings$n_legs)
   pattern <- .parlay_role_validate_pattern(portfolio$pattern, n_legs)
   if (!identical(as.integer(pattern), sort(as.integer(pattern), decreasing = TRUE))) {
-    stop("parlay_evaluate_portfolio: the pool pattern must be stored descending")
+    stop("parlay_select_groups: the pool pattern must be stored descending")
   }
 
   legs <- portfolio$role_legs
@@ -204,11 +202,11 @@
                 "base_role", "n_outcomes", "allowed_outcomes",
                 "retained_probability")
   if (!all(required %in% names(legs))) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs is missing required ",
+    stop("parlay_select_groups: portfolio role_legs is missing required ",
          "column(s) ", paste(setdiff(required, names(legs)), collapse = ", "))
   }
   if (!is.list(legs$allowed_outcomes)) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs$allowed_outcomes must be ",
+    stop("parlay_select_groups: portfolio role_legs$allowed_outcomes must be ",
          "a list column")
   }
   .parlay_ranked_validate_legs(legs, portfolio, probabilities, pattern, n_legs)
@@ -247,33 +245,33 @@
   if (!nrow(legs)) return(invisible(TRUE))
   if (anyNA(legs$group_slot) || anyNA(legs$group_id) || anyNA(legs$fixture_id) ||
       anyNA(legs$base_role) || anyNA(legs$n_outcomes) || anyNA(legs$round)) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs contains missing keys")
+    stop("parlay_select_groups: portfolio role_legs contains missing keys")
   }
   if (anyDuplicated(paste(legs$group_id, legs$round))) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs has a duplicated ",
+    stop("parlay_select_groups: portfolio role_legs has a duplicated ",
          "(group_id, round) leg")
   }
   if (any(legs$round < 1L) || any(legs$round > n_legs)) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs$round must lie in 1..",
+    stop("parlay_select_groups: portfolio role_legs$round must lie in 1..",
          n_legs)
   }
   # `base_role` is the CLASSIFIER board that selected the leg: 1, 2 or 3. A base-1
   # protected double is a real, allowed leg even though it carries two outcomes.
   if (any(!legs$base_role %in% c(1L, 2L, 3L))) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs$base_role must be 1, 2 or 3")
+    stop("parlay_select_groups: portfolio role_legs$base_role must be 1, 2 or 3")
   }
   # `n_outcomes` is the realized outcome count of the chosen direction and must
   # equal the frozen mask length exactly: a protected double is never reported as a
   # single and a true triple is never reported as a double.
   if (anyNA(legs$n_outcomes) ||
       any(as.integer(legs$n_outcomes) != lengths(legs$allowed_outcomes))) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs$n_outcomes must equal ",
+    stop("parlay_select_groups: portfolio role_legs$n_outcomes must equal ",
          "the number of retained outcomes in each leg's mask")
   }
   if (any(!is.finite(legs$retained_probability)) ||
       any(legs$retained_probability < 0) ||
       any(legs$retained_probability > 1 + 1e-9)) {
-    stop("parlay_evaluate_portfolio: portfolio role_legs$retained_probability ",
+    stop("parlay_select_groups: portfolio role_legs$retained_probability ",
          "must lie in [0, 1] within the accepted 1e-9 probability-sum tolerance")
   }
 
@@ -282,39 +280,50 @@
   patterns <- portfolio$group_patterns
   if (!all(c("group_slot", "group_id", "target_pattern", "actual_pattern") %in%
            names(patterns))) {
-    stop("parlay_evaluate_portfolio: portfolio group_patterns is missing required ",
+    stop("parlay_select_groups: portfolio group_patterns is missing required ",
          "columns")
   }
+  if (anyNA(patterns$group_id)) stop("parlay_select_groups: portfolio group_patterns contains missing group keys")
+  if (anyNA(portfolio$substitutions$group_id)) stop("parlay_select_groups: substitution records must exactly match fallback legs")
+  leg_indices <- split(seq_len(nrow(legs)), as.character(legs$group_id))
+  pattern_indices <- split(seq_len(nrow(patterns)), as.character(patterns$group_id))
+  substitution_indices <- split(seq_len(nrow(portfolio$substitutions)),
+                                as.character(portfolio$substitutions$group_id))
+  # All fields consumed by the mask validator participate in this exact dedup.
+  # Repeated directions are checked once; changed masks/probabilities stay distinct.
+  mask_legs <- dplyr::distinct(legs, fixture_id, selection_id, base_role,
+    n_outcomes, allowed_outcomes, retained_probability, .keep_all = TRUE)
+  .parlay_ranked_validate_masks(mask_legs, portfolio$ranked_selections,
+                                parlay_probability_wide(probabilities))
   target_of <- function(group_id) {
-    row <- patterns[as.character(patterns$group_id) == as.character(group_id), ,
-                    drop = FALSE]
+    row <- patterns[pattern_indices[[as.character(group_id)]], , drop = FALSE]
     if (nrow(row) != 1L) {
-      stop("parlay_evaluate_portfolio: portfolio group_patterns must have exactly ",
+      stop("parlay_select_groups: portfolio group_patterns must have exactly ",
            "one row per emitted group; group_id ", group_id, " has ", nrow(row))
     }
     values <- row$target_pattern[[1L]]
     actual <- row$actual_pattern[[1L]]
     if (length(values) != n_legs || length(actual) != n_legs ||
         anyNA(values) || anyNA(actual)) {
-      stop("parlay_evaluate_portfolio: portfolio group_patterns must carry an ",
+      stop("parlay_select_groups: portfolio group_patterns must carry an ",
            n_legs, "-round target and actual pattern")
     }
     list(target = as.integer(values), actual = as.integer(actual))
   }
   for (group_id in unique(as.character(legs$group_id))) {
-    block <- legs[as.character(legs$group_id) == group_id, , drop = FALSE]
+    block <- legs[leg_indices[[group_id]], , drop = FALSE]
     spec <- target_of(group_id)
     if (nrow(block) != n_legs) {
-      stop("parlay_evaluate_portfolio: complete group ", group_id, " has ",
+      stop("parlay_select_groups: complete group ", group_id, " has ",
            nrow(block), " legs, expected ", n_legs)
     }
     block <- block[order(block$round), , drop = FALSE]
     if (!identical(as.integer(block$round), seq_len(n_legs))) {
-      stop("parlay_evaluate_portfolio: complete group ", group_id,
+      stop("parlay_select_groups: complete group ", group_id,
            " must fill every round 1..", n_legs)
     }
     if (!identical(as.integer(block$n_outcomes), spec$actual)) {
-      stop("parlay_evaluate_portfolio: group ", group_id, " selected outcome counts disagree ",
+      stop("parlay_select_groups: group ", group_id, " selected outcome counts disagree ",
            "with its recorded actual_pattern")
     }
     # The target board and the realized board: a leg fills its target board exactly,
@@ -325,28 +334,25 @@
       block$base_role[i] %in% fallbacks[[i]]
     }, logical(1))
     if (!identical(spec$target, as.integer(pattern)) || !all(legal_actual)) {
-      stop("parlay_evaluate_portfolio: target pattern or fallback boards disagree")
+      stop("parlay_select_groups: target pattern or fallback boards disagree")
     }
     replaced <- which(spec$target != block$base_role)
-    records <- portfolio$substitutions[
-      as.character(portfolio$substitutions$group_id) == group_id, , drop = FALSE]
+    records <- portfolio$substitutions[substitution_indices[[group_id]], , drop = FALSE]
     if (nrow(records) != length(replaced) ||
         !identical(sort(as.integer(records$round)), as.integer(replaced))) {
-      stop("parlay_evaluate_portfolio: substitution records must exactly match fallback legs")
+      stop("parlay_select_groups: substitution records must exactly match fallback legs")
     }
     if (anyDuplicated(as.character(block$fixture_id))) {
-      stop("parlay_evaluate_portfolio: group ", group_id,
+      stop("parlay_select_groups: group ", group_id,
            " repeats a fixture inside one group")
     }
-    .parlay_ranked_validate_masks(block, portfolio$ranked_selections,
-                                  probabilities, group_id)
     expected_suffix <- substr(
       rlang::hash(.parlay_ranked_candidate_signature(block)), 1L, 12L)
     expected_prefix <- paste0(.parlay_role_group_id(as.character(block$fixture_id)),
                               "@", as.numeric(portfolio$cutoff$cutoff_utc), ":P")
     if (!startsWith(group_id, expected_prefix) ||
         !endsWith(group_id, paste0(":", expected_suffix))) {
-      stop("parlay_evaluate_portfolio: constructor group identity does not match incoming legs")
+      stop("parlay_select_groups: constructor group identity does not match incoming legs")
     }
   }
 
@@ -359,11 +365,11 @@
                        "selection_id", "target_role", "base_role", "n_outcomes",
                        "reason")
     if (!all(required_subs %in% names(subs))) {
-      stop("parlay_evaluate_portfolio: portfolio substitutions is missing ",
+      stop("parlay_select_groups: portfolio substitutions is missing ",
            "required columns")
     }
     if (any(!subs$reason %in% "target_role_shortage_board_fallback")) {
-      stop("parlay_evaluate_portfolio: unknown substitution reason")
+      stop("parlay_select_groups: unknown substitution reason")
     }
     for (i in seq_len(nrow(subs))) {
       group_id <- as.character(subs$group_id[i])
@@ -371,7 +377,7 @@
       target <- as.integer(subs$target_role[i])
       actual <- as.integer(subs$base_role[i])
       if (!actual %in% .parlay_ranked_fallback_boards(target) || actual == target) {
-        stop("parlay_evaluate_portfolio: substitution for group ", group_id,
+        stop("parlay_select_groups: substitution for group ", group_id,
              " round ", round, " names an illegal board fallback")
       }
       leg <- legs[as.character(legs$group_id) == group_id & legs$round == round, ,
@@ -379,7 +385,7 @@
       if (nrow(leg) != 1L || as.integer(leg$base_role) != actual ||
           as.integer(leg$n_outcomes) != as.integer(subs$n_outcomes[i]) ||
           !identical(as.character(leg$fixture_id), as.character(subs$fixture_id[i]))) {
-        stop("parlay_evaluate_portfolio: substitution for group ", group_id,
+        stop("parlay_select_groups: substitution for group ", group_id,
              " round ", round, " does not match its fallback leg")
       }
       directions <- portfolio$ranked_selections
@@ -390,7 +396,7 @@
       if (nrow(direction) != 1L ||
           !setequal(unname(codes[direction$outcomes[[1L]]]),
                     leg$allowed_outcomes[[1L]])) {
-        stop("parlay_evaluate_portfolio: substitution direction disagrees with fallback mask")
+        stop("parlay_select_groups: substitution direction disagrees with fallback mask")
       }
       ranked_board <- portfolio$ranked_selections$base_role[
         as.character(portfolio$ranked_selections$fixture_id) ==
@@ -398,7 +404,7 @@
           as.integer(portfolio$ranked_selections$selection_id) ==
             as.integer(subs$selection_id[i])]
       if (length(ranked_board) != 1L || as.integer(ranked_board) != actual) {
-        stop("parlay_evaluate_portfolio: substitution fixture ",
+        stop("parlay_select_groups: substitution fixture ",
              subs$fixture_id[i], " is not a ranked base-role-", actual,
              " direction")
       }
@@ -416,22 +422,22 @@
 # rule that the same target pattern admits heterogeneous actual structures.
 
 #'
-#' Validate one group's retained masks against the ranked selections
+#' Validate retained masks against the ranked selections
 #'
 #' Internal. The allowed set of a leg must be exactly the outcomes of the ranked
 #' selection named by the leg's own `(fixture_id, selection_id)` key, and the
 #' retained probability must be their probability sum. The evaluator therefore
 #' cannot consume a mask that the ranking stage never produced.
-#' @param block Legs of one group, ordered by round.
+#' @param block Leg tibble carrying group_id and all mask fields; may contain
+#'   different groups or exact direction representatives. Group shape and round
+#'   constraints are validated separately by the caller.
 #' @param ranked Ranked selections tibble.
-#' @param probabilities Derived probability table.
-#' @param group_id Group identity used in error messages.
+#' @param wide Validated W/D/L tibble from [parlay_probability_wide()].
 #' @return `TRUE` invisibly.
 #' @noRd
-.parlay_ranked_validate_masks <- function(block, ranked, probabilities,
-                                          group_id) {
-  wide <- parlay_probability_wide(probabilities)
+.parlay_ranked_validate_masks <- function(block, ranked, wide) {
   for (i in seq_len(nrow(block))) {
+    group_id <- as.character(block$group_id[i])
     fixture_id <- as.character(block$fixture_id[i])
     selection_id <- as.integer(block$selection_id[i])
     board <- as.integer(block$base_role[i])
@@ -439,14 +445,14 @@
                      as.integer(ranked$selection_id) == selection_id, ,
                    drop = FALSE]
     if (nrow(rows) != 1L) {
-      stop("parlay_evaluate_portfolio: group ", group_id, " leg ", fixture_id,
+      stop("parlay_select_groups: group ", group_id, " leg ", fixture_id,
            " selection ", selection_id, " has no unique ranked selection")
     }
     # The leg's named direction must belong to the board the leg records, so a
     # base-1 protected double can never masquerade as a base-2 or base-3 choice.
     if (as.integer(rows$base_role[[1L]]) != board ||
         as.integer(rows$n_outcomes[[1L]]) != as.integer(block$n_outcomes[i])) {
-      stop("parlay_evaluate_portfolio: group ", group_id, " leg ", fixture_id,
+      stop("parlay_select_groups: group ", group_id, " leg ", fixture_id,
            " selection ", selection_id, " base_role/n_outcomes disagree with ",
            "the ranked selection")
     }
@@ -458,7 +464,7 @@
     ranked_mask <- sort(unname(names_out[as.character(rows$outcomes[[1L]])]))
     observed <- sort(as.character(block$allowed_outcomes[[i]]))
     if (!identical(ranked_mask, observed)) {
-      stop("parlay_evaluate_portfolio: group ", group_id, " leg ", fixture_id,
+      stop("parlay_select_groups: group ", group_id, " leg ", fixture_id,
            " allowed mask is not the ranked direction set for selection ",
            selection_id)
     }
@@ -467,7 +473,7 @@
     expected_probability <- sum(as.numeric(row[1, expected]))
     if (!isTRUE(all.equal(as.numeric(block$retained_probability[i]),
                           expected_probability, tolerance = 1e-12))) {
-      stop("parlay_evaluate_portfolio: group ", group_id, " leg ", fixture_id,
+      stop("parlay_select_groups: group ", group_id, " leg ", fixture_id,
            " retained_probability disagrees with the ranked directions")
     }
   }
@@ -513,10 +519,10 @@
     ordered <- match_outcomes()[match_outcomes() %in%
                                   as.character(block$allowed_outcomes[[i]])]
     for (j in seq_along(ordered)) {
-      support_rows[[length(support_rows) + 1L]] <- tibble::tibble(
+      support_rows[[length(support_rows) + 1L]] <- tibble::new_tibble(list(
         candidate_id = candidate_id,
         fixture_id = as.character(block$fixture_id[i]),
-        outcome = ordered[j], allowed = TRUE, preference = as.integer(j))
+        outcome = ordered[j], allowed = TRUE, preference = as.integer(j)), nrow = 1L)
     }
   }
   supports <- match_validate_table(dplyr::bind_rows(support_rows), "supports")
@@ -534,11 +540,7 @@
     valued$sp_product_est[match(ranked$ticket_id, valued$ticket_id)])
   list(group_legs = group_legs, supports = supports, tickets = tickets,
        ranked = ranked, fixture_set = sort(unique(as.character(block$fixture_id))),
-       # The ACTUAL full-triple fixtures of this group: a fixture exempted from the
-       # pairwise overlap must ACTUALLY select all three outcomes in this group
-       # (`n_outcomes == 3`), not merely sit on the base-role-3 board. A base-1
-       # protected double and a base-2 pair therefore never qualify, and a target-3
-       # round that fell back to a double never grants the exemption.
+       # Realized triple fixtures, retained for descriptive auditing.
        triple_fixtures = sort(unique(as.character(
          block$fixture_id[as.integer(block$n_outcomes) == 3L]))),
        legal_space = nrow(ranked), candidate_id = candidate_id)
@@ -570,23 +572,22 @@
 #' sorted, named integer vector makes tickets comparable and de-duplicable without
 #' reference to the order their legs happen to be stored in.
 #' @param ticket_id Physical ticket id.
-#' @param ticket_legs Validated ticket_legs table.
-#' @param outcomes Canonical outcome codes, `match_outcomes()`.
+#' @param rows Integer indices for this ticket, or NULL when absent.
+#' @param fixture_ids Character fixture identities for all indexed ledger rows.
+#' @param codes Integer outcome codes for all indexed ledger rows.
 #' @return Named integer vector, `fixture_id -> code`, sorted by fixture id.
 #' @noRd
-.parlay_ranked_ticket_event <- function(ticket_id, ticket_legs, outcomes) {
-  legs <- ticket_legs[as.character(ticket_legs$ticket_id) == ticket_id, ,
-                      drop = FALSE]
-  if (!nrow(legs)) {
-    stop("parlay_evaluate_portfolio: ticket ", ticket_id,
+.parlay_ranked_ticket_event <- function(ticket_id, rows, fixture_ids, codes) {
+  if (!length(rows)) {
+    stop("parlay_select_groups: ticket ", ticket_id,
          " has no legs in the purchased ledger")
   }
-  codes <- match(as.character(legs$outcome), outcomes)
-  if (anyNA(codes)) {
-    stop("parlay_evaluate_portfolio: ticket ", ticket_id,
+  selected_codes <- codes[rows]
+  if (anyNA(selected_codes)) {
+    stop("parlay_select_groups: ticket ", ticket_id,
          " carries an unknown outcome code")
   }
-  event <- stats::setNames(as.integer(codes), as.character(legs$fixture_id))
+  event <- stats::setNames(as.integer(selected_codes), fixture_ids[rows])
   event[order(names(event))]
 }
 
@@ -615,8 +616,7 @@
     rb <- find(b)
     if (ra != rb) parent[[rb]] <<- ra
   }
-  for (event in events) {
-    members <- names(event)
+  for (members in unique(lapply(events, names))) {
     if (length(members) > 1L) {
       anchor <- members[1L]
       for (member in members[-1L]) union(anchor, member)
@@ -651,88 +651,23 @@
 #'     narrower event is ever decomposed.
 #'
 #' The residual state is canonicalized (events sorted and de-duplicated) and
-#' memoized, so a state reached by different branches is computed once. The
-#' component has at most `3^|component|` states in principle, but only the states
-#' the actual event support reaches are ever built -- the global `3^F` grid is
-#' never materialized.
+#' memoized for sparse components. Components of 10--15 normalized fixtures use
+#' a bounded ternary grid; other sizes use sparse Shannon decomposition. No
+#' unbounded global outcome grid is materialized.
 #' @param events List of canonical ticket events over `fixtures`.
 #' @param fixtures Fixtures of this component.
 #' @param probability_of Function `(fixture_id, code) -> probability`.
-#' @param memo Environment used as the state cache.
 #' @return A single probability in `[0, 1]`.
 #' @noRd
-.parlay_ranked_component_union <- function(events, fixtures, probability_of,
-                                           memo) {
-  canonical <- function(state) {
-    if (!length(state)) return(list())
-    keys <- vapply(state, function(event) {
-      paste(names(event), event, sep = "=", collapse = "|")
-    }, character(1))
-    state[order(keys)][!duplicated(sort(keys))]
-  }
-  state_key <- function(state) {
-    rlang::hash(state)
-  }
-  decompose <- function(state) {
-    # The base case is "no surviving event can cover the remaining fixtures", so the
-    # probability of coverage is ZERO. Satisfaction is handled explicitly below and
-    # never reaches this branch, so pruning the last incompatible event must not be
-    # confused with being covered.
-    if (!length(state)) return(0)
-    key <- state_key(state)
-    if (!is.null(memo[[key]])) return(memo[[key]])
-    # The pivot is the FIRST fixture in canonical (sorted) fixture order that any
-    # surviving event still constrains. Satisfied events never reach a residual
-    # state, so an unconstrained fixture is never chosen and every branch makes
-    # real progress.
-    constrained <- unique(unlist(lapply(state, names), use.names = FALSE))
-    pivot <- constrained[order(match(constrained, fixtures))][1L]
-    if (is.null(pivot) || is.na(pivot)) {
-      stop("parlay_evaluate_portfolio: internal union state has no pivot fixture")
-    }
-    total <- 0
-    for (code in seq_along(match_outcomes())) {
-      residual <- list()
-      satisfied <- FALSE
-      for (event in state) {
-        position <- match(pivot, names(event))
-        if (!is.na(position)) {
-          if (event[[position]] == code) {
-            # This event AGREEES with the case on the pivot. It is satisfied only
-            # when the pivot was its LAST unassigned fixture; otherwise the pivot is
-            # discharged and the event continues as a smaller event over the
-            # remaining fixtures, so the case is not yet covered.
-            reduced <- event[-position]
-            if (!length(reduced)) {
-              satisfied <- TRUE
-              break
-            }
-            residual[[length(residual) + 1L]] <- reduced
-          }
-          # INCOMPATIBLE with the case: discarded, but the case is NOT covered.
-          next
-        }
-        # Does not mention the pivot: survives whole into the residual state.
-        residual[[length(residual) + 1L]] <- event
-      }
-      value <- if (satisfied) 1 else decompose(canonical(residual))
-      total <- total + probability_of(pivot, code) * value
-    }
-    memo[[key]] <- total
-    total
-  }
-  events <- canonical(events)
-  if (length(events) && all(vapply(events, function(event) {
-    identical(names(event), names(events[[1L]]))
-  }, logical(1)))) {
-    # Distinct full assignments on the same fixture set are mutually exclusive.
-    return(sum(vapply(events, function(event) {
-      prod(vapply(seq_along(event), function(i) {
-        probability_of(names(event)[i], event[[i]])
-      }, numeric(1)))
-    }, numeric(1))))
-  }
-  return(decompose(events))
+.parlay_ranked_component_union <- function(events, fixtures, probability_of) {
+  keys <- vapply(events,function(event) paste(names(event),event,sep="=",collapse="|"),character(1))
+  events <- events[order(keys)][!duplicated(sort(keys))]
+  if (!identical(ComponentUnionKernelIdentity(),.ParlayKernelSourceHash()))
+    stop("Compiled probability kernel identity mismatch; rebuild package")
+  probabilities <- matrix(numeric(length(fixtures)*3L),nrow=length(fixtures),ncol=3L)
+  for(i in seq_along(fixtures)) for(code in 1:3)
+    probabilities[i,code] <- probability_of(fixtures[i],code)
+  ComponentUnionKernel(events,fixtures,probabilities)
 }
 
 #' Exact coverage of the whole owned portfolio across every selected group
@@ -744,24 +679,32 @@
 #'   * physically identical tickets are harmless duplicates and are collapsed;
 #'   * tickets spanning DISJOINT fixture sets are independent and combine as
 #'     `1 - prod(1 - p)`;
-#'   * tickets OVERLAPPING on a fixture are resolved by the weighted recursive
-#'     Shannon decomposition in [.parlay_ranked_component_union()].
+#'   * tickets OVERLAPPING on a fixture use the exact weighted component kernel
+#'     in [.parlay_ranked_component_union()].
 #'
-#' Used by both the per-group coverage and the improvement stage's strict
-#' whole-portfolio union gain. It never materializes the global `3^F` outcome grid,
-#' so disjoint components with 20+ fixtures remain practical. Highly overlapping
-#' portfolios may still require many recursive states.
+#' Used for per-group coverage and the selector's marginal
+#' whole-portfolio union gain. It bounds dense grids to individual components of
+#' 10--15 fixtures, so disjoint components with 20+ total fixtures remain practical.
+#' Larger overlapping components may still require many recursive states.
 #' @param tickets Character vector of owned physical ticket ids.
 #' @param ticket_legs Validated ticket_legs table.
 #' @param probabilities Derived probability table.
 #' @return A single probability in `[0, 1]`; `0` when nothing is owned.
+#' @details Owned ticket rows are indexed within this call; missing ticket
+#'   identities fail before indexing. No index is reused across calls or inputs.
 #' @noRd
 .parlay_ranked_union_coverage <- function(tickets, ticket_legs, probabilities) {
   if (!length(tickets)) return(0)
+  if (anyNA(ticket_legs$ticket_id)) stop("parlay_select_groups: missing ticket identities")
   outcomes <- match_outcomes()
   wide <- parlay_probability_wide(probabilities)
-  owned <- lapply(unique(as.character(tickets)), .parlay_ranked_ticket_event,
-                  ticket_legs, outcomes)
+  ticket_indices <- split(seq_len(nrow(ticket_legs)), as.character(ticket_legs$ticket_id))
+  fixture_ids <- as.character(ticket_legs$fixture_id)
+  codes <- match(as.character(ticket_legs$outcome), outcomes)
+  owned <- lapply(unique(as.character(tickets)), function(ticket_id) {
+    .parlay_ranked_ticket_event(ticket_id, ticket_indices[[ticket_id]],
+                               fixture_ids, codes)
+  })
   fixtures <- sort(unique(unlist(lapply(owned, names), use.names = FALSE)))
   probability_cache <- new.env(parent = emptyenv())
   probability_of <- function(fixture_id, code) {
@@ -769,7 +712,7 @@
     if (!is.null(probability_cache[[key]])) return(probability_cache[[key]])
     row <- wide[wide$fixture_id == fixture_id, , drop = FALSE]
     if (nrow(row) != 1L) {
-      stop("parlay_evaluate_portfolio: fixture ", fixture_id,
+      stop("parlay_select_groups: fixture ", fixture_id,
            " has no unique probability row")
     }
     value <- as.numeric(row[1, outcomes[code]])
@@ -777,14 +720,16 @@
     value
   }
   components <- .parlay_ranked_components(owned, fixtures)
+  # Condition shared group variables first; the exact kernel and masses are unchanged.
+  incidence <- table(unlist(unique(lapply(owned, names)), use.names = FALSE))
   # Independent components: the union is one minus the probability that no
   # component is covered. Within a component, tickets may overlap and are resolved
   # exactly by the recursive decomposition.
   miss <- 1
   for (component in components) {
+    component <- component[order(-as.integer(incidence[component]), component)]
     local <- Filter(function(event) all(names(event) %in% component), owned)
-    coverage <- .parlay_ranked_component_union(local, component, probability_of,
-                                               new.env(parent = emptyenv()))
+    coverage <- .parlay_ranked_component_union(local, component, probability_of)
     miss <- miss * (1 - coverage)
   }
   as.numeric(1 - miss)
@@ -792,29 +737,13 @@
 
 # --- admission ---------------------------------------------------------------
 
-#' Pairwise fixture overlap that ignores a shared ACTUAL triple fixture
-#'
-#' Internal. A fixture that ACTUALLY selects all three outcomes in BOTH groups never
-#' counts toward the pairwise overlap: admitting one group does not spend the
-#' triple-guarantee of a fixture the other group also funds as a real triple. Any
-#' other shared fixture (an ordinary double, a base-1 protected double, or a
-#' target-3 fallback double) still counts. The exemption is keyed on the realized
-#' outcome combination (`n_outcomes == 3`), never on `base_role`, so a base-1
-#' protected double is never granted a triple's exemption. Fixture sets must be
-#' explicit character vectors; character(0) means no actual triples.
-#' @param candidate_fixtures Candidate group's actual fixtures.
-#' @param candidate_triples Character vector of candidate actual-triple fixture IDs.
-#' @param record_fixtures Admitted group's actual fixtures.
-#' @param record_triples Character vector of admitted actual-triple fixture IDs.
-#' @return Non-negative whole number of counted shared fixtures.
+#' Count all shared fixture IDs, including actual triples
+#' @param candidate_fixtures Candidate fixture IDs.
+#' @param record_fixtures Admitted fixture IDs.
+#' @return Integer intersection size.
 #' @noRd
-.parlay_ranked_counted_overlap <- function(candidate_fixtures, candidate_triples,
-                                           record_fixtures, record_triples) {
-  checkmate::assert_character(candidate_triples, any.missing = FALSE, min.chars = 1)
-  checkmate::assert_character(record_triples, any.missing = FALSE, min.chars = 1)
-  shared <- intersect(candidate_fixtures, record_fixtures)
-  shared_triples <- intersect(candidate_triples, record_triples)
-  return(length(setdiff(shared, shared_triples)))
+.parlay_ranked_counted_overlap <- function(candidate_fixtures, record_fixtures) {
+  return(length(intersect(candidate_fixtures, record_fixtures)))
 }
 
 #' Check one candidate group against the already-admitted groups
@@ -823,12 +752,7 @@
 #' across every admitted group and pairwise overlap between the candidate and each
 #' admitted group -- but with the explicit policies.
 #'
-#' Reuse has NO exemption: `max_reuse` counts EVERY actual fixture of every actual
-#' group, including a fixture that is an actual triple. Overlap has exactly ONE
-#' exemption: a fixture that ACTUALLY selects all three outcomes in BOTH groups is
-#' exempt and does not count toward `max_overlap`. Any other shared fixture counts.
-#' The exemption is derived from the realized outcome combination, so a base-1
-#' protected double and a target-3 fallback double never qualify.
+#' Reuse and pairwise overlap count all actual fixtures, including triples.
 #'
 #' A group whose fixtures all already appear, but which would still buy a new
 #' physical ticket, is NOT refused here; the caller refuses an all-already-bought
@@ -838,11 +762,10 @@
 #'   and an explicit character vector `triple_fixtures` (possibly empty).
 #' @param reuse_policy Validated reuse policy.
 #' @param overlap_policy Validated overlap policy.
-#' @param triple_fixtures Explicit character vector of candidate actual triples.
 #' @return A list(allowed, reason). `reason` is `""` when allowed.
 #' @noRd
 .parlay_ranked_admit <- function(fixture_set, admitted, reuse_policy,
-                                 overlap_policy, triple_fixtures) {
+                                 overlap_policy) {
   max_reuse <- reuse_policy$max_reuse
   max_overlap <- overlap_policy$max_overlap
   if (!is.null(max_reuse)) {
@@ -855,7 +778,7 @@
   if (!is.null(max_overlap)) {
     for (record in admitted) {
       counted <- .parlay_ranked_counted_overlap(
-        fixture_set, triple_fixtures, record$fixture_set, record$triple_fixtures)
+        fixture_set, record$fixture_set)
       if (counted > max_overlap) {
         return(list(allowed = FALSE, reason = "overlap_cap_exceeded"))
       }
@@ -874,7 +797,7 @@
 #' @param pool Explicit normalized decision pool with cutoff and probabilities.
 #' @param budget_cny Explicit total CNY cap or NULL.
 #' @param reuse_policy Explicit reuse cap; all actual roles count.
-#' @param overlap_policy Explicit overlap cap; shared actual triples are exempt.
+#' @param overlap_policy Explicit overlap cap; all shared fixtures count.
 #' @return List(state,reason). Pure tentative transaction, no IO/labels/fitting.
 #'   Tickets follow descending probability; physical duplicates never repurchased.
 #' @noRd
@@ -885,7 +808,7 @@
   fresh <- space$ranked[!space$ranked$ticket_id %in% state$bought,,drop=FALSE]
   if(!nrow(fresh) || wanted==0L) return(list(state=state,reason="no_new_tickets"))
   verdict <- .parlay_ranked_admit(space$fixture_set,state$admitted,reuse_policy,
-    overlap_policy,space$triple_fixtures)
+    overlap_policy)
   if(!verdict$allowed) return(list(state=state,reason=verdict$reason))
   units <- if(is.null(budget_cny)) wanted else min(wanted,
     max(0,floor((budget_cny-state$spent+1e-9)/pool$settings$unit_cny)))
@@ -1191,229 +1114,8 @@
     policies = list(objective = "coverage",
                     max_reuse = reuse_policy$max_reuse,
                     max_overlap = overlap_policy$max_overlap,
-                    # The ONE overlap exemption: a fixture that ACTUALLY selects all
-                    # three outcomes in BOTH groups. Keyed on the realized outcome
-                    # combination, never on base_role, so a base-1 protected double
-                    # is never exempted.
-                    overlap_actual_triple_exemption = TRUE,
+                    overlap_scope = "all_shared_fixtures",
                     budget_cny = budget_cny))
-}
-
-# --- improvement stage -------------------------------------------------------
-
-#' Re-evaluate the exact owned purchase ledger
-#'
-#' Internal. Given a set of owned physical ticket ids (the exact funded ledger),
-#' recomputes the actual whole-portfolio union coverage and returns the ledger
-#' joined back to its group and candidate attribution. The join is on the
-#' composite (candidate_id, ticket_id) key where group ranking is needed, so a
-#' shared physical ticket is attributed to the group that actually bought it.
-#' @param tickets Character vector of owned physical ticket ids.
-#' @param pool Validated pool list.
-#' @param fund Baseline fund result providing per-ticket attribution.
-#' @return A list(purchases, unique_tickets, coverage, spent).
-#' @noRd
-.parlay_ranked_evaluate_ledger <- function(tickets, pool, fund) {
-  ledger <- fund$purchases[as.character(fund$purchases$ticket_id) %in% tickets, ,
-                           drop = FALSE]
-  unique_tickets <- unique(as.character(ledger$ticket_id))
-  list(purchases = ledger, unique_tickets = unique_tickets,
-       coverage = .parlay_ranked_union_coverage(unique_tickets, fund$ticket_legs,
-                                                pool$probabilities),
-       spent = as.numeric(sum(ledger$cost_cny)))
-}
-
-#' Bounded improvement over legal same-role fixture replacements
-#'
-#' Internal. A meaningfully bounded first-improvement stage whose move space is
-#' REACHABLE on a real pool. The ranking stage emits exactly ONE authoritative
-#' direction or two complementary directions per `(fixture, role)`. Legal moves
-#' include switching complementary directions or a single-fixture
-#' REPLACEMENT / reallocation inside an admitted group:
-#'
-#'   * a leg's fixture is replaced by a DIFFERENT fixture whose authoritative
-#'     ranked selection carries the SAME ACTUAL role (2 stays 2, 3 stays 3);
-#'   * the replacement fixture's mask is that fixture's own authoritative ranked
-#'     mask for that role -- never a mask this function invents, and never a
-#'     target-role UPGRADE (a role-2 fallback leg is never promoted to role 3);
-#'   * within-group uniqueness holds: the replacement fixture must not already be
-#'     a leg of the same group;
-#'   * each group's own actual pattern is preserved; different groups may retain
-#'     different actual patterns under the same target pattern;
-#'   * all final reuse/overlap, cost and physical-ticket de-duplication, frozen
-#'     probabilities, SP and cutoff are re-applied by the full funding walk.
-#'
-#' A move is accepted only when its ACTUAL whole-portfolio union coverage is
-#' strictly greater than the incumbent's. The union is exact (see
-#' [.parlay_ranked_union_coverage()]); summing per-ticket masses across different
-#' fixtures is deliberately NOT used, because that is a different quantity. Every
-#' candidate is re-funded from the exact purchase ledger under the SAME group cap,
-#' total budget and reuse/overlap policies. The pass structure is the existing
-#' bounded one: `improve=TRUE` is a single deterministic pass in the pool's
-#' initial nominal group order with a stable fixture-id tie, so the stage is
-#' bounded by the emitted move space and selects no optimizer or budget.
-#' @param pool Validated pool list.
-#' @param fund Baseline fund result.
-#' @param group_budget_cny Validated per-group budget or `NULL`.
-#' @param budget_cny Validated total budget or `NULL`.
-#' @param reuse_policy Validated reuse policy.
-#' @param overlap_policy Validated overlap policy.
-#' @param improve Logical scalar; `FALSE` returns the baseline untouched.
-#' @return A list(fund, changes, evaluations, accepted).
-#' @noRd
-.parlay_ranked_improve <- function(pool, fund, group_budget_cny, budget_cny,
-                                   reuse_policy, overlap_policy, improve) {
-  changes <- .parlay_ranked_empty_changes()
-  if (!improve || !length(fund$selected_groups) || !nrow(fund$purchases)) {
-    return(list(pool = pool, fund = fund, changes = changes, evaluations = 0L, accepted = 0L))
-  }
-  baseline <- .parlay_ranked_evaluate_ledger(
-    unique(as.character(fund$purchases$ticket_id)), pool, fund)
-  best_coverage <- baseline$coverage
-  best_fund <- fund
-  # The incumbent POOL as well as the incumbent fund: an accepted move must compose
-  # with the moves before it, so the next candidate replaces a leg of the incumbent
-  # structure rather than restarting from the untouched baseline.
-  best_pool <- pool
-  evaluations <- 0L
-  accepted <- 0L
-  ranked <- pool$ranked_selections
-  # The pool's complete legal fixture pool per role, in stable fixture-id order, so
-  # the move order is deterministic and independent of discovery order.
-  # A fixed, bounded traversal: the pool's initial nominal group order, then the
-  # group's round order. It is never re-sorted after a move is accepted.
-  for (group_id in fund$selected_groups) {
-    for (round_index in seq_len(nrow(pool$legs[as.character(pool$legs$group_id) ==
-                                               group_id, , drop = FALSE]))) {
-      # The round layout of a group is fixed by its contract, so the round position
-      # is stable across the whole walk; only the fixture behind it may change.
-      layout <- best_pool$legs[as.character(best_pool$legs$group_id) == group_id, ,
-                               drop = FALSE]
-      layout <- layout[order(layout$round), , drop = FALSE]
-      if (round_index > nrow(layout)) next
-      # The leg's realized structure is the pair (board, outcome count): an
-      # alternative must carry the SAME base_role AND the same n_outcomes, so a
-      # replacement never silently changes the group's realized structure and a
-      # base-1 protected double can never be swapped for a base-3 triple.
-      board <- as.integer(layout$base_role[round_index])
-      n_outcomes <- as.integer(layout$n_outcomes[round_index])
-      current_fixture <- as.character(layout$fixture_id[round_index])
-      current_mask <- sort(as.character(layout$allowed_outcomes[[round_index]]))
-      alternatives <- ranked[as.integer(ranked$base_role) == board &
-                               as.integer(ranked$n_outcomes) == n_outcomes, ,
-                             drop = FALSE]
-      alternatives <- alternatives[order(alternatives$fixture_id, alternatives$selection_id), , drop=FALSE]
-      for (k in seq_len(nrow(alternatives))) {
-        layout <- best_pool$legs[as.character(best_pool$legs$group_id) == group_id, , drop=FALSE]
-        layout <- layout[order(layout$round), , drop=FALSE]
-        current_fixture <- as.character(layout$fixture_id[round_index])
-        current_mask <- sort(as.character(layout$allowed_outcomes[[round_index]]))
-        candidate_fixture <- as.character(alternatives$fixture_id[k])
-        proposed <- sort(.parlay_ranked_mask(alternatives$outcomes[[k]]))
-        if (candidate_fixture == current_fixture && identical(proposed, current_mask)) next
-        if (candidate_fixture %in% as.character(layout$fixture_id[-round_index])) next
-        evaluations <- evaluations + 1L
-        moved <- .parlay_ranked_replace_leg(
-          best_pool, group_id, layout, round_index, candidate_fixture, board,
-          n_outcomes, group_budget_cny, budget_cny, reuse_policy, overlap_policy,
-          selection_id=alternatives$selection_id[k])
-        candidate_ledger <- .parlay_ranked_evaluate_ledger(
-          unique(as.character(moved$fund$purchases$ticket_id)), moved$pool, moved$fund)
-        if (candidate_ledger$coverage > best_coverage + 1e-12) {
-          changes <- dplyr::bind_rows(changes, tibble::tibble(
-            group_id=group_id, round=as.integer(layout$round[round_index]),
-            fixture_id=current_fixture, base_role=board, n_outcomes=n_outcomes,
-            old_fixture_id=current_fixture, new_fixture_id=candidate_fixture,
-            old_mask=paste(current_mask,collapse=","),
-            new_mask=paste(proposed,collapse=","),
-            coverage_before=as.numeric(best_coverage),
-            coverage_after=as.numeric(candidate_ledger$coverage),
-            delta=as.numeric(candidate_ledger$coverage-best_coverage)))
-          best_coverage <- candidate_ledger$coverage
-          best_fund <- moved$fund
-          best_pool <- moved$pool
-          accepted <- accepted + 1L
-        }
-      }
-    }
-  }
-  list(pool = best_pool, fund = best_fund, changes = changes, evaluations = as.integer(evaluations),
-       accepted = as.integer(accepted))
-}
-
-#' Re-fund the pool with one group leg replaced by a same-role fixture
-#'
-#' Internal. Rebuilds the pool legs so one (group, round) leg points at a different
-#' fixture with the SAME actual role and carries that fixture's own authoritative
-#' ranked mask. The target role, round position and the group's actual pattern are
-#' preserved; nothing is upgraded and no mask is invented. The rebuilt pool is
-#' re-validated against the ranked directions and then re-funded by the full walk,
-#' so reuse/overlap, cost, de-duplication and cutoffs are re-applied.
-#' @param pool Validated pool list.
-#' @param group_id Group to move.
-#' @param block The group's legs, ordered by round.
-#' @param round_index 1-based position of the leg inside the group.
-#' @param fixture_id Replacement fixture.
-#' @param base_role The leg's base_role board, which the replacement must match.
-#' @param n_outcomes The leg's realized outcome count, which the replacement must
-#'   match so the group's actual structure is preserved exactly.
-#' @param selection_id Authoritative direction id for the replacement fixture.
-#' @param group_budget_cny Validated per-group budget or `NULL`.
-#' @param budget_cny Validated total budget or `NULL`.
-#' @param reuse_policy Validated reuse policy.
-#' @param overlap_policy Validated overlap policy.
-#' @return A list(pool = the moved pool, fund = its funding walk result).
-#' @noRd
-.parlay_ranked_replace_leg <- function(pool, group_id, block, round_index,
-                                       fixture_id, base_role, n_outcomes,
-                                       group_budget_cny, budget_cny,
-                                       reuse_policy, overlap_policy,
-                                       selection_id = 1L) {
-  ranked <- pool$ranked_selections
-  mask_row <- ranked[as.character(ranked$fixture_id) == fixture_id &
-                       as.integer(ranked$selection_id) == selection_id, ,
-                     drop = FALSE]
-  if (nrow(mask_row) != 1L ||
-      as.integer(mask_row$base_role[[1L]]) != base_role ||
-      as.integer(mask_row$n_outcomes[[1L]]) != n_outcomes) {
-    stop("parlay_evaluate_portfolio: replacement fixture ", fixture_id,
-         " has no unique ranked base-role-", base_role, ", n_outcomes-",
-         n_outcomes, " selection")
-  }
-  codes <- sort(.parlay_ranked_mask(mask_row$outcomes[[1L]]))
-  moved <- pool
-  rows <- which(as.character(moved$legs$group_id) == group_id)
-  rows <- rows[order(moved$legs$round[rows])]
-  target <- rows[round_index]
-  moved$legs$fixture_id[target] <- fixture_id
-  moved$legs$selection_id[target] <- as.integer(selection_id)
-  moved$legs$allowed_outcomes[[target]] <- codes
-  wide <- parlay_probability_wide(moved$probabilities)
-  row <- wide[wide$fixture_id == fixture_id, , drop = FALSE]
-  if (nrow(row) != 1L) {
-    stop("parlay_evaluate_portfolio: replacement fixture ", fixture_id,
-         " has no unique probability row")
-  }
-  moved$legs$retained_probability[target] <- sum(as.numeric(row[1, codes]))
-  # The moved group's legs must still be exactly n_legs rows over the SAME realized
-  # board pattern and outcome counts, with unique fixtures and masks the ranking
-  # produced.
-  moved_block <- moved$legs[rows, , drop = FALSE]
-  moved_block <- moved_block[order(moved_block$round), , drop = FALSE]
-  if (anyDuplicated(as.character(moved_block$fixture_id))) {
-    stop("parlay_evaluate_portfolio: replacement repeats a fixture inside group ",
-         group_id)
-  }
-  if (!identical(as.integer(moved_block$base_role), as.integer(block$base_role)) ||
-      !identical(as.integer(moved_block$n_outcomes),
-                 as.integer(block$n_outcomes))) {
-    stop("parlay_evaluate_portfolio: replacement must preserve the actual pattern")
-  }
-  .parlay_ranked_validate_masks(moved_block, moved$ranked_selections,
-                                moved$probabilities, group_id)
-  list(pool = moved,
-       fund = .parlay_ranked_fund(moved, group_budget_cny, budget_cny,
-                                  reuse_policy, overlap_policy))
 }
 
 #' Typed-empty accepted-change table
@@ -1429,120 +1131,7 @@
                  delta = numeric(0))
 }
 
-# --- exported entry point ----------------------------------------------------
-
-#' Evaluate a ranked role candidate pool into a funded delivery plan
-#'
-#' Successor to the obsolete score-table evaluator (#537). It consumes the ranked
-#' candidate pool from [parlay_construct_role_groups()] and performs the bounded,
-#' deterministic funding walk described in the file header: per-group enumeration
-#' inside the authoritative mask, nominal priority by legal top-N mass, admission
-#' under explicit reuse/overlap policies, physical-ticket de-duplication with
-#' down-rank continuation, and ACTUAL coverage recomputed from the owned tickets.
-#'
-#' @param portfolio Ranked candidate pool from [parlay_construct_role_groups()]. Its
-#'   embedded cutoff, hashes, ranked-selection receipt, masks, group patterns and
-#'   substitutions are all re-validated; a tampered leg, mask, rank, hash or cutoff
-#'   fails closed.
-#' @param budget_cny Total decision budget in CNY, or `NULL` (default) for
-#'   unlimited. A finite value is used in whole ticket units; a zero or sub-unit
-#'   budget buys nothing and consumes no constraint. With `NULL`, `unspent_cny` is
-#'   `NA_real_`, never a fake zero.
-#' @param group_budget_cny Per-group budget in CNY, default `256`. `NULL` means the
-#'   group buys its FULL legal support space; otherwise the cap is the smaller of
-#'   the given amount and the group's full-support cost, floored to whole units.
-#' @param reuse_policy Named list with exactly `max_reuse`: a single positive whole
-#'   number, or `NULL` for unlimited. It governs every actual fixture in every
-#'   actual group; there is no role exemption.
-#' @param overlap_policy Named list with exactly `max_overlap`: a single
-#'   non-negative whole number, or `NULL` for unlimited pairwise overlap. A fixture
-#'   that is a role-3 leg in BOTH compared groups is exempt from the count; every
-#'   other shared fixture counts.
-#' @param improve Logical scalar (default `TRUE`). `TRUE` runs the bounded
-#'   improvement stage over legal single-fixture replacements inside the admitted
-#'   groups: a leg may take a different fixture whose authoritative ranked
-#'   selection carries the SAME `base_role` board and the SAME `n_outcomes`
-#'   realized count, keeping that fixture's own ranked mask and the group's actual
-#'   pattern, respecting within-group fixture uniqueness and re-applying every
-#'   reuse/overlap, cost and de-duplication rule. A move is accepted only for a
-#'   strict whole-portfolio union-coverage gain. `FALSE` returns the unimproved walk
-#'   with a typed-empty `changes` table.
-#'
-#' @return A named list:
-#'   * `summary` -- actual selected group count, new ticket count, spent cash,
-#'     `unspent_cny` (`NA_real_` under an unlimited total budget), nominal and
-#'     ACTUAL union coverage, and a nullable EV availability flag;
-#'   * `group_selection` -- one row per candidate group in the initial nominal
-#'     order with its target/actual pattern, nominal and actual coverage, tickets
-#'     and spend;
-#'   * `purchases` -- the actual purchase ledger (one row per owned physical
-#'     ticket, charged exactly once);
-#'   * `funded_ledger` -- the ledger joined to its group attribution;
-#'   * `rejections` -- every refused candidate with its exact reason
-#'     (`no_new_tickets`, `reuse_cap_exceeded`, `overlap_cap_exceeded`);
-#'   * `selection` -- the full per-candidate audit including `nominal_coverage`,
-#'     `actual_coverage` and `reason`;
-#'   * `changes` -- accepted improvement moves, one row per accepted single-fixture
-#'     replacement (`old_fixture_id`/`new_fixture_id`, the leg's authoritative
-#'     masks, and the exact union coverage before/after); typed-empty when
-#'     `improve = FALSE`;
-#'   * `plan` -- the frozen plan consumable by [parlay_settle_plan()];
-#'   * `tickets` -- the per-ticket table of the actual purchases;
-#'   * `diagnostics`, `receipt`, `cutoff`, `initial`, `final` -- provenance and the
-#'     source-pool vs improved views, preserved separately without hidden mutation.
-#'
-#' @section Protective variants are selectable, never mandatory:
-#' A protected double (a base-1 variant that retains two outcomes) is an ordinary
-#' selectable candidate. It is never forced into a pair and no group owes a
-#' complement: the walk simply buys the rank-ordered tickets of each admitted group
-#' under the explicit budget, reuse and overlap policies. All protective variants
-#' whose third outcome probability is strictly above `0.20` are eligible,
-#' regardless of which outcome is third (the obsolete draw-only rule is deleted).
-#' A group's own purchases are what realize its coverage; nothing is back-filled
-#' from another group or from a label.
-#'
-#' @section Provenance:
-#' The receipt binds the exact input hashes (portfolio, ranked selections,
-#' probabilities, pre-match SP, settings), the resolved policies and budgets, the
-#' embedded cutoff and a transitive code hash. Nothing is fitted, no EV parameter
-#' is learned and the `portfolio` argument is never mutated.
-#' @examples
-#' cutoff <- list(issue_id = "26098",
-#'                cutoff_utc = as.POSIXct("2026-09-26 12:00:00", tz = "UTC"))
-#' matches <- tibble::tibble(
-#'   fixture_id = c("A", "B", "C", "D"),
-#'   win = c(0.45, 0.40, 0.50, 0.30),
-#'   draw = c(0.27, 0.30, 0.30, 0.30),
-#'   lose = c(0.28, 0.30, 0.20, 0.40))
-#' ranked <- rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
-#' settings <- parlay_settings()
-#' settings$n_legs <- 2L
-#' pool <- parlay_construct_role_groups(ranked, settings, pattern = c(3L, 2L),
-#'                                      max_candidates = 2L)
-#' evaluation <- parlay_evaluate_portfolio(
-#'   pool, group_budget_cny = 4, budget_cny = 8,
-#'   reuse_policy = list(max_reuse = 1L),
-#'   overlap_policy = list(max_overlap = 0L), improve = FALSE)
-#' evaluation$summary
-#' @export
-parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
-                                      group_budget_cny = 256, reuse_policy,
-                                      overlap_policy, improve = TRUE) {
-  pool <- .parlay_ranked_validate_pool(portfolio)
-  checkmate::assert_flag(improve, .var.name = "improve")
-  budget_cny <- .parlay_role_validate_budget(budget_cny, "budget_cny")
-  group_budget_cny <- .parlay_role_validate_budget(group_budget_cny,
-                                                   "group_budget_cny")
-  reuse <- .parlay_ranked_validate_reuse_policy(reuse_policy)
-  overlap <- .parlay_ranked_validate_overlap_policy(overlap_policy)
-
-  fund <- .parlay_ranked_fund(pool, group_budget_cny, budget_cny, reuse, overlap)
-  return(.FinalizeRankedEvaluation(portfolio, pool, fund, budget_cny,
-    group_budget_cny, reuse, overlap, improve,
-    producer = "parlay_evaluate_portfolio", objective = "coverage",
-    order_rule = "initial nominal legal-topN mass, descending; stable group_id tie",
-    dynamic_resort = FALSE))
-}
+# --- internal funding helpers ------------------------------------------------
 
 #' Freeze and summarize one authoritative funding ledger
 #' @param portfolio Original candidate pool with bound inputs.
@@ -1552,23 +1141,18 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
 #' @param group_budget_cny Per-group CNY ceiling or NULL.
 #' @param reuse Validated fixture reuse policy.
 #' @param overlap Validated pair overlap policy.
-#' @param improve Whether to apply the existing bounded improvement step.
 #' @param producer Public decision entry point bound into the receipt.
 #' @param objective Declared selection objective.
 #' @param order_rule Human-readable group ordering rule.
 #' @param dynamic_resort Whether ordering uses the actual admitted ledger.
-#' @param selection_policy Explicit selector gate parameters; empty for the ordinary evaluator.
+#' @param selection_policy Explicit selector gate parameters.
 #' @return Evaluation with frozen plan, purchases, summaries and code receipt.
 #' @noRd
 .FinalizeRankedEvaluation <- function(portfolio, pool, fund, budget_cny,
-  group_budget_cny, reuse, overlap, improve, producer, objective,
+  group_budget_cny, reuse, overlap, producer, objective,
   order_rule, dynamic_resort, selection_policy = list()) {
-  initial_summary <- .parlay_ranked_summary(fund, pool, budget_cny,
-                                            group_budget_cny)
-  improvement <- .parlay_ranked_improve(pool, fund, group_budget_cny, budget_cny,
-                                        reuse, overlap, improve)
-  best <- improvement$fund
-  final_pool <- improvement$pool
+  best <- fund
+  final_pool <- pool
   final_summary <- .parlay_ranked_summary(best, final_pool, budget_cny,
                                           group_budget_cny)
   frozen_plan <- .parlay_ranked_freeze(final_pool, best, best$purchases, budget_cny,
@@ -1588,13 +1172,13 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
       "parlay_construct_role_groups", producer)),
     producer = producer, selection_policy = selection_policy,
     budget_cny = budget_cny, group_budget_cny = group_budget_cny,
-    reuse_policy = reuse, overlap_policy = overlap, improve = improve,
+    reuse_policy = reuse, overlap_policy = overlap, improve = FALSE,
     objective = objective,
     # The only overlap concession is an ACTUAL shared triple (all three outcomes
     # selected in BOTH groups); it is keyed on the realized outcome combination, not
     # on base_role. Protective variants are selectable and never mandatory, so no
     # complement obligation is recorded.
-    overlap_exemption = "shared_actual_triple_only",
+    overlap_scope = "all_shared_fixtures",
     sp_policy = "raw pre-match SP; no >10 replacement; missing SP leaves EV NA")
   diagnostics <- list(
     objective = objective,
@@ -1607,9 +1191,9 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
     ev_available = final_summary$summary$ev_available,
     unspent_cny = final_summary$summary$unspent_cny,
     planned_groups = as.integer(nrow(fund$nominal)),
-    evaluations = improvement$evaluations,
-    accepted_moves = improvement$accepted,
-    improvement_enabled = isTRUE(improve))
+    evaluations = 0L,
+    accepted_moves = 0L,
+    improvement_enabled = FALSE)
   return(list(portfolio = portfolio,
        summary = final_summary$summary,
        group_selection = final_summary$group_selection,
@@ -1617,12 +1201,12 @@ parlay_evaluate_portfolio <- function(portfolio, budget_cny = NULL,
        funded_ledger = best$purchases,
        rejections = best$rejections,
        selection = best$selection,
-       changes = improvement$changes,
+       changes = .parlay_ranked_empty_changes(),
        plan = frozen_plan,
        tickets = best$purchases,
        diagnostics = diagnostics, receipt = receipt, cutoff = pool$cutoff,
-       initial = list(summary = initial_summary$summary,
-                      group_selection = initial_summary$group_selection,
+       initial = list(summary = final_summary$summary,
+                      group_selection = final_summary$group_selection,
                       purchases = fund$purchases, selection = fund$selection,
                       rejections = fund$rejections),
        final = list(role_legs = final_pool$legs,

@@ -1,11 +1,11 @@
 # Role round-robin (#537), stage 3: shared internal helpers.
 #
 # The rank-table evaluator that used to live here is OBSOLETE and has been deleted.
-# Its successor is parlay_evaluate_portfolio() in parlay_ranked_portfolio.R, which
-# consumes the ranked candidate pool and the mature ticket/freeze APIs. The two
-# helpers kept here are the ones other package stages and the entry point still use:
-# the optional-CNY budget validator and the frozen-mask refresh used to rebuild a
-# leg's retained outcomes from the authoritative probabilities.
+# Its successor is parlay_select_groups() in parlay_select_groups.R, which consumes
+# the ranked candidate pool and the mature ticket/freeze APIs. The two helpers kept
+# here are the ones other package stages and the entry points still use: the
+# optional-CNY budget validator and the frozen-mask refresh used to rebuild a leg's
+# retained outcomes from the authoritative probabilities.
 
 #' Validate an optional CNY budget
 #'

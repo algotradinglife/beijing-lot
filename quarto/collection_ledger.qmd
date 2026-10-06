@@ -1,0 +1,186 @@
+---
+title: "数据采集与整合总台账 · drift 报告"
+date: "2026-10-04"
+params:
+  project_root: null
+  python: null
+  plan_path: null
+  repo_root: null
+  unit_dir: null
+  registry_dir: null
+  external_data_root: null
+  generated_at: null
+execute:
+  freeze: false
+  cache: false
+  error: false
+  warning: true
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: false
+---
+
+本报告是**数据采集与整合功能维护**的可复现交付入口。它只读地清点占用采集/整合职责的对象——仓库采集登记、systemd 调度单元、外部数据 registry、数据 store——把它们归入三态（`running` / `archived` / `retired` / `unknown`，外部输入另有 `available` / `unavailable`），并列出仓库登记、调度主机、外部 registry 与数据 store 之间的 **drift（账实不符）**。
+
+本报告不采集、不写库、不联网：底层 `src/collection_ledger` 仅读取文件证据——单元是否被 `*.target.wants` 软链（含经由 timer 的间接调度）启用、代码入口是否真实存在、store 是否被**精确命名**的退役文件取代。所有输入显式声明，结果可离线复现、可对 fixture 做确定性测试。
+
+## 1. 输入与运行身份
+
+输入显式声明：仓库根、项目 Python、采集登记、被解析代码所在的仓库树、**主机** systemd 单元目录。仓库内 `ops/systemd/user` 是版本化定义，**不作为主机调度证据**；主机目录默认 `~/.config/systemd/user`，不在仓库内，属必须声明的输入。
+
+```{r}
+#| label: ledger-config
+#| include: false
+repository_root <- rprojroot::find_root(rprojroot::has_file("config/data_collection_plan.json"))
+source(file.path(repository_root, "r/python_bridge.R"))
+source(file.path(repository_root, "r/collection_ledger.R"))
+project_root <- params$project_root
+if (is.null(project_root) || !nzchar(project_root)) project_root <- repository_root
+project_root <- normalizePath(project_root)
+repo_root <- params$repo_root
+if (is.null(repo_root) || !nzchar(repo_root)) repo_root <- project_root
+python <- params$python
+if (is.null(python) || !nzchar(python)) python <- file.path(project_root, ".venv/bin/python")
+plan_path <- params$plan_path
+if (is.null(plan_path) || !nzchar(plan_path)) plan_path <- file.path(project_root, "config/data_collection_plan.json")
+stopifnot(dir.exists(project_root), file.exists(python), file.exists(plan_path))
+
+module_dir <- file.path(project_root, "src/collection_ledger")
+module_files <- sort(list.files(module_dir, pattern = "[.]py$", full.names = TRUE))
+module_hashes <- tibble::tibble(
+  file = substring(module_files, nchar(project_root) + 2L),
+  sha256 = purrr::map_chr(module_files, ~ digest::digest(file = .x, algo = "sha256")))
+helper_hash <- digest::digest(file = file.path(project_root, "r/collection_ledger.R"), algo = "sha256")
+qmd_hash <- digest::digest(file = file.path(project_root, "quarto/collection_ledger.qmd"), algo = "sha256")
+knitr::kable(tibble::tibble(
+  `输入` = c("仓库根", "解析代码仓库树", "项目 Python", "采集登记", "登记 schema"),
+  `值` = c(project_root, repo_root, python, plan_path, "data_collection_plan_v1")))
+```
+
+## 2. 三态与输入可用性口径
+
+| 状态 | 判定 |
+|---|---|
+| `running` | 采集器：其**精确代码文件**被一个已调度单元执行；单元：被目标目录 wants 软链启用，或被已启用 timer 间接调度 |
+| `archived` | 代码/单元存在但无调度证据 |
+| `retired` | store 名以退役标记结尾，或原文件缺失且存在**同名 + 标记**的精确替代文件 |
+| `unknown` | 登记代码入口缺失、单元引用代码缺失，或单元使用无法展开的 systemd 说明符（无法证明其在或不在） |
+| `available` / `unavailable` | 外部对象：声明的 registry/store 实际存在与否 |
+
+**输入可用性与对象状态分开**：未挂载外盘时，registry 与 store 会记为 `unavailable` 并产生 finding，而不是静默显示为 0 个对象。
+
+## 3. 输入可用性与总览
+
+```{r}
+#| label: ledger-summary
+report <- collection_ledger_run(
+  project_root = project_root, python = python, plan_path = plan_path,
+  unit_dirs = params$unit_dir, registry_dir = params$registry_dir,
+  external_data_root = params$external_data_root, generated_at = params$generated_at,
+  repo_root = repo_root)
+knitr::kable(report$inputs, caption = "输入可用性")
+knitr::kable(report$summary, caption = "台账计数")
+knitr::kable(report$plan, caption = "采集登记状态")
+cat("生成时间：", report$generated_at, "\n")
+```
+
+## 4. 采集器登记
+
+登记表把每个生产采集器映射到代码入口、调度进程、数据源与落库表。`code_exists` 与 `store_state` 揭示登记的代码与数据是否仍在。
+
+```{r}
+#| label: ledger-collectors
+collectors <- report$collectors |>
+  dplyr::arrange(state, id) |>
+  dplyr::select(id, state, importance, owner_process, enabled_in_plan,
+    code_exists, store_state, units)
+knitr::kable(collectors, caption = "登记采集器三态", row.names = FALSE)
+```
+
+## 5. 调度单元与仓库一致性
+
+主机实际调度的单元见下；`scheduled_by_timer` 显示经 timer 的间接调度，`in_repo_units` 显示是否入库。
+
+```{r}
+#| label: ledger-units
+units <- report$units |>
+  dplyr::arrange(state, id) |>
+  dplyr::select(id, unit_kind, state, scheduled, scheduled_by_timer, in_repo_units, missing_code)
+knitr::kable(units, caption = "主机调度单元三态", row.names = FALSE)
+knitr::kable(dplyr::filter(units, !in_repo_units) |> dplyr::select(id, state),
+  caption = "主机定义但未入库的单元", row.names = FALSE)
+knitr::kable(dplyr::filter(units, nzchar(missing_code)) |> dplyr::select(id, missing_code),
+  caption = "引用代码缺失的单元", row.names = FALSE)
+```
+
+仓库内已版本化、但主机未调度的单元单列（不使用它们作为主机证据）：
+
+```{r}
+#| label: ledger-repo-units
+knitr::kable(report$repo_units, caption = "仓库内已定义的单元", row.names = FALSE)
+```
+
+## 6. Drift findings
+
+findings 是维护待办：`error` 表示账实不符已影响可信度（代码入口缺失、单元代码不存在、registry 声明 store 缺失、退役缺归档回执、registry 不可解析）；`warning` 表示口径漂移（登记陈旧、启用却无调度、单元未入库、登记指向已退役 store、输入不可用）。
+
+```{r}
+#| label: ledger-findings
+findings <- report$findings |>
+  dplyr::count(code, severity, name = "count") |>
+  dplyr::arrange(dplyr::desc(severity), dplyr::desc(count))
+knitr::kable(findings, caption = "findings 按代码汇总", row.names = FALSE)
+knitr::kable(report$findings |> dplyr::filter(severity == "error"),
+  caption = "error findings（必须处理）", row.names = FALSE)
+```
+
+## 7. 数据 store 与退役账本
+
+store 一览含外部数据根的直接子目录（排除 registry 目录），以及 registry 声明路径的实际可用性。`source-retirement.json` 记录**已移除**的原始目录及其归档 sha256。
+
+```{r}
+#| label: ledger-stores
+knitr::kable(report$stores, caption = "数据 store 与 registry 声明路径", row.names = FALSE)
+knitr::kable(utils::head(report$retirements, 20),
+  caption = "退役原始目录（前 20 条）", row.names = FALSE)
+```
+
+## 8. 运行身份与可复现性
+
+结果绑定到**实现哈希**与**被分类所依据的输入证据摘要**：采集登记文件内容、主机单元目录（单元文件与 wants 目标）、registry 目录内容、外部数据根目录内容各取 sha256。改变任一同路径输入的内容会改变其摘要，因此 `generated_at` 固定也不代表结果可重放。
+
+**跨主机复现需要相同的输入快照**：主机单元目录、外盘 registry 与数据根不在仓库内，仅凭本仓库无法重放。
+
+```{r}
+#| label: ledger-provenance
+knitr::kable(report$evidence, caption = "输入证据摘要（分类依据）", row.names = FALSE)
+knitr::kable(module_hashes, caption = "台账实现文件 sha256", row.names = FALSE)
+knitr::kable(tibble::tibble(
+  `实现/输入` = c("台账 schema", "R helper", "QMD", "采集登记路径"),
+  `值/哈希` = c(report$schema, helper_hash, qmd_hash, plan_path)))
+knitr::kable(tibble::tibble(
+  `项` = c("Python", "R", "Quarto"),
+  `版本` = c(as.character(reticulate::py_version()), R.version.string,
+    as.character(quarto::quarto_version()))))
+```
+
+## 9. 验证与限制
+
+- 渲染：`quarto render quarto/collection_ledger.qmd --execute --no-cache`。
+- 底层实现测试：`.venv/bin/python -m pytest tests/test_collection_ledger.py`（27 个离线确定性用例）；R 边界测试 `tests/testthat/test-collection-ledger.R`。
+- 台账只读、无网络、无写入；写入仅发生在其 CLI 的 JSON 输出，本 QMD 只调用内存中的 `build_ledger`。
+- 三态基于**文件证据**（wants 软链、代码存在、store 命名、timer→service 关系），不查询 `systemctl` 运行时状态；`running` 仅表示"被调度"，不代表最近一次运行成功。
+- 主机单元目录、外盘 registry 与数据根是**显式输入但不可由仓库重放**；换主机或未挂载外盘时相关对象退化为 `unavailable` 并产生 finding，这被记为"输入不可用"，不是"对象不存在"。
+- 预期运行警告：本机部分单元引用仓库外 vendored 代码（`unit_runs_external_code`），以及主机单元未入库（`unit_not_in_repo`），均为已知且有意暴露的 drift。
+
+## 10. 审查与验收证据
+
+- 审查工具：`codex review`（`codex-cli 0.160.0`），只读、仅审查下方文件集；工作树中其他未提交改动不在本次范围。
+- 审查命令与日志：`codex review - < .run-control/collection-ledger-review{,2,3}-prompt.txt`，日志见 `.run-control/collection-ledger-review*.log`。
+- 三轮共记录 **23 条阻断项**，最终 **0 条未决**；完整清单、逐项修正与限制见 `docs/reviews/collection-ledger.json`。
+- 关键修正：R 侧不再传 `NULL` 关闭外部盘点；host 与仓库单元分账；timer 显式 `Unit=` 不误调度同名 service；`running` 需精确代码身份；store 退役需“原文件缺失 + 精确同名标记”；registry 声明 store 与磁盘对账；输入不可用独立成态；证据摘要改由 Python 侧有界观测清单生成。
+- 被审查修订（追加本记录之前的版本）：`quarto/collection_ledger.qmd` `33d687ba…`、`r/collection_ledger.R` `b67eb2e7…`、`src/collection_ledger/ledger.py` `d903bf02…`、`src/collection_ledger/readers.py` `4308466c…`、`src/collection_ledger/__init__.py` `e5958859…`、`scripts/collection_ledger.py` `5e70331c…`、`tests/test_collection_ledger.py` `f7662557…`、`tests/testthat/test-collection-ledger.R` `0571929a…`、`_quarto.yml` `0441da0e…`（完整哈希见审查记录）。
+- 测试：Python `28→30` 用例全过（`tests/test_collection_ledger.py`，含证据摘要两项回归）；R 边界 `88` 断言全过（`tests/testthat/test-collection-ledger.R`）。
+- 渲染：`quarto render quarto/collection_ledger.qmd --execute --no-cache` 退出码 0，17 张表、0 执行错误。

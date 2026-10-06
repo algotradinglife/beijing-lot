@@ -7,9 +7,9 @@ import json
 import math
 
 from . import parser, labels
-from ..issue_schedule import fetch as fetch_module
+from .. import transport
 from .parser import parse_page, source_url, expected_option, digest
-from ..issue_schedule.fetch import fetch_issue_page
+from ..transport import fetch_issue_page
 
 
 def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None):
@@ -22,7 +22,9 @@ def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None
     produces all_options_one, never a predicted W/D/L result or inferred refund.
     label_available_at is observation time, never inferred kickoff/end time.
     Offline pages requires body bytes and its original observed_at timestamp.
-    Returns settlements, diagnostics, and a durable receipt path.
+    Returns settlements, independently observed match_results, diagnostics, and receipt.
+    Final scores may be observed before financial SP; their observation time is
+    result_available_at. Missing/reference SP never produces financial settlement.
     """
     if not isinstance(schedule, list) or not schedule:
         raise ValueError('schedule must contain at least one fixture')
@@ -67,7 +69,7 @@ def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None
     schedule_path = folder / 'schedule.json'
     schedule_path.write_text(json.dumps(schedule, ensure_ascii=False, sort_keys=True, allow_nan=False), encoding='utf8')
     implementation = {str(p.relative_to(Path(__file__).parents[1])): digest(p.read_bytes())
-        for p in (Path(__file__), Path(parser.__file__), Path(labels.__file__), Path(fetch_module.__file__))}
+        for p in (Path(__file__), Path(parser.__file__), Path(labels.__file__), Path(transport.__file__))}
     receipt = {'schedule_path': str(schedule_path), 'schedule_sha256': digest(schedule_path.read_bytes()),
                'implementation_sha256': implementation, 'parameters': {'timeout': timeout, 'retries': retries},
                'issue_id': issue, 'source_url': url, 'observed_at': observed,
@@ -78,9 +80,10 @@ def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None
     by_slot = {r['slot']: r for r in parsed}
     if len(by_slot) != len(parsed):
         raise ValueError('duplicate source slots')
-    settlements, diagnostics = [], []
+    settlements, match_results, diagnostics = [], [], []
     for fixture in schedule:
         row = by_slot.get(fixture['slot']); reason = None
+        available_sp = [] if row is None else [o for o in row['options'] if o['sp'] is not None]
         if row is None:
             reason = 'missing_source_fixture'
         elif row['native_match_id'] != fixture['provider_id_nowscore'] or row['handicap'] != fixture['handicap']:
@@ -98,11 +101,22 @@ def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None
         elif row['can_sale'] != 'false' or row['parse_errors']:
             reason = 'invalid_source_contract'
         else:
-            filled = [o for o in row['options'] if o['sp'] is not None]
+            filled = available_sp
             if len(filled) != 1:
                 reason = 'settled_sp_not_unique'
             elif expected_option(row) != filled[0]['option']:
                 reason = 'score_outcome_mismatch'
+        # Observe final score separately; reference/missing SP does not erase it.
+        # A contradictory unique settlement option or identity remains fail closed.
+        if (row is not None and row['native_match_id'] == fixture['provider_id_nowscore']
+                and row['handicap'] == fixture['handicap'] and row['status'] == '完场'
+                and row['can_sale'] == 'false'
+                and set(row['parse_errors']) <= {'invalid_sp', 'option_domain_mismatch'}
+                and expected_option(row) is not None
+                and (len(available_sp) != 1 or expected_option(row) == available_sp[0]['option'])):
+            match_results.append({'issue_id': issue, 'fixture_id': fixture['fixture_key'],
+                'outcome': {'胜': 'W', '平': 'D', '负': 'L'}[expected_option(row)],
+                'result_available_at': observed, 'source_url': url})
         if reason:
             diagnostics.append({'issue_id': issue, 'fixture_id': fixture['fixture_key'], 'reason': reason})
             continue
@@ -110,6 +124,6 @@ def fetch_issue_settlements(schedule, raw_dir, timeout=25, retries=2, pages=None
             'outcome': {'胜':'W', '平':'D', '负':'L'}[filled[0]['option']],
             'settled_sp': float(filled[0]['sp']), 'label_available_at': observed,
             'status': 'settled', 'source_url': url})
-    result = {'settlements': settlements, 'diagnostics': diagnostics, 'receipt_path': str(receipt_path)}
+    result = {'settlements': settlements, 'match_results': match_results, 'diagnostics': diagnostics, 'receipt_path': str(receipt_path)}
     (folder / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf8')
     return result

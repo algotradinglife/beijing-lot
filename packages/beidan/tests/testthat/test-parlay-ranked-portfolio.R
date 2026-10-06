@@ -1,8 +1,8 @@
-# Package tests for the outcome-role ranked construction and portfolio evaluator
+# Package tests for the outcome-role ranked construction and purchase selector
 # (#553 unit 3).
 #
 # The chain under test is the real classify -> prepare -> rank -> construct ->
-# evaluate pipeline reached only through the public entry points. The tests bind the
+# select pipeline reached only through the public entry points. The tests bind the
 # OBSERVABLE contract:
 #   * construction selects each round from the board named by `base_role` (always
 #     listing `base_role` and `n_outcomes` with their distinct meanings), carries an
@@ -66,13 +66,20 @@ rp_pool <- function(kinds, n_legs = 2L, pattern = c(3L, 2L), max_candidates = 3L
     max_candidates = max_candidates, prematch_sp = prematch_sp)
 }
 
+#' Select and freeze a deterministic coverage test plan
+#' @param portfolio Bound candidate pool from the test fixture.
+#' @param budget_cny Total CNY cap; NULL is unlimited.
+#' @param group_budget_cny Per-group CNY cap; NULL buys full support.
+#' @param reuse_policy Explicit fixture reuse limit.
+#' @param overlap_policy Explicit shared-fixture limit.
+#' @return Frozen evaluation; missing SP keeps EV as NA, no side effects.
 rp_evaluate <- function(portfolio, budget_cny = NULL, group_budget_cny = 256,
                         reuse_policy = list(max_reuse = NULL),
-                        overlap_policy = list(max_overlap = NULL), improve = FALSE) {
-  parlay_evaluate_portfolio(portfolio, budget_cny = budget_cny,
+                        overlap_policy = list(max_overlap = NULL)) {
+  return(parlay_select_groups(portfolio, objective="coverage", budget_cny = budget_cny,
                             group_budget_cny = group_budget_cny,
                             reuse_policy = reuse_policy,
-                            overlap_policy = overlap_policy, improve = improve)
+                            overlap_policy = overlap_policy)$evaluation)
 }
 
 # The reference construction fixture: three true triples, three genuine doubles and
@@ -300,21 +307,17 @@ test_that("a group cap of 256 buys exactly 128 rank-ordered tickets", {
 })
 
 # ---------------------------------------------------------------------------
-# Overlap and reuse: the exemption is an ACTUAL shared triple
+# Overlap and reuse: all actual fixtures count
 # ---------------------------------------------------------------------------
 
-test_that("the overlap exemption requires an actual triple in BOTH groups", {
+test_that("overlap counts all shared fixtures including triples", {
   counted <- beidan:::.parlay_ranked_counted_overlap
-  # Both sides carry A as an ACTUAL triple: exempt, counted 0.
-  expect_identical(counted(c("A", "C"), "A", c("A", "B"), "A"), 0L)
-  # A is an actual triple on one side only: it counts.
-  expect_identical(counted(c("A", "C"), "A", c("A", "B"), "B"), 1L)
-  # A base-1 protected double is never a triple, even when listed as a fixture.
-  expect_identical(counted(c("A", "C"), character(0), c("A", "B"), character(0)), 1L)
-  expect_identical(counted(c("A", "B"), "A", c("A", "B"), "A"), 1L)
+  expect_identical(counted(c("A","C"),c("A","B")),1L)
+  expect_identical(counted(c("A","B"),c("A","B")),2L)
+  expect_identical(counted(character(),c("A")),0L)
 })
 
-test_that("the overlap exemption keys on n_outcomes, not on base_role", {
+test_that("actual triple metadata keys on n_outcomes, not on base_role", {
   # Two groups over the same fixture set where the shared fixture P1 is a base-1
   # protected double in BOTH groups: the exemption must NOT apply.
   pool <- parlay_construct_role_groups(
@@ -335,33 +338,34 @@ test_that("reuse admits exactly 4 and refuses 5", {
   # A fifth appearance of A reaches the cap of 4 only: A appears once in the
   # candidate and once in the admitted group, so the total count matters.
   four <- admit(c("A"), admitted, list(max_reuse = 2L),
-                list(max_overlap = NULL), triple_fixtures = character(0))
+                list(max_overlap = NULL))
   expect_true(four$allowed)
   five <- admit(c("A"), list(
-      list(fixture_set = c("A", "A2"), group_id = "g1", triple_fixtures = character(0)),
-      list(fixture_set = c("A", "A3"), group_id = "g2", triple_fixtures = character(0)),
-      list(fixture_set = c("A", "A4"), group_id = "g3", triple_fixtures = character(0)),
-      list(fixture_set = c("A", "A5"), group_id = "g4", triple_fixtures = character(0))),
-    list(max_reuse = 4L), list(max_overlap = NULL), triple_fixtures = character(0))
+      list(fixture_set = c("A", "A2"), group_id = "g1"),
+      list(fixture_set = c("A", "A3"), group_id = "g2"),
+      list(fixture_set = c("A", "A4"), group_id = "g3"),
+      list(fixture_set = c("A", "A5"), group_id = "g4")),
+    list(max_reuse = 4L), list(max_overlap = NULL))
   expect_false(five$allowed)
   expect_identical(five$reason, "reuse_cap_exceeded")
 })
 
-test_that("a shared actual triple is exempt from overlap but never from reuse", {
+test_that("a shared actual triple counts toward overlap and reuse", {
   counted <- beidan:::.parlay_ranked_counted_overlap
   admit <- beidan:::.parlay_ranked_admit
   admitted <- list(list(fixture_set = c("A", "B"), group_id = "g1",
                         triple_fixtures = "A"))
-  # Overlap cap 0 admits the candidate because A is an actual triple on both sides.
+  # Overlap cap 0 refuses shared A, including when both select all outcomes.
   exempt <- admit(c("A", "C"), admitted, list(max_reuse = NULL),
-                  list(max_overlap = 0L), triple_fixtures = "A")
-  expect_true(exempt$allowed)
+                  list(max_overlap = 0L))
+  expect_false(exempt$allowed)
+  expect_identical(exempt$reason,"overlap_cap_exceeded")
   # Reuse still counts A, so a cap of 1 refuses it.
   reused <- admit(c("A", "C"), admitted, list(max_reuse = 1L),
-                  list(max_overlap = NULL), triple_fixtures = "A")
+                  list(max_overlap = NULL))
   expect_false(reused$allowed)
   expect_identical(reused$reason, "reuse_cap_exceeded")
-  expect_identical(counted(c("A", "B"), "A", c("A", "B"), "A"), 1L)
+  expect_identical(counted(c("A", "B"), c("A", "B")), 2L)
 })
 
 # ---------------------------------------------------------------------------
@@ -482,18 +486,18 @@ test_that("the evaluator never mutates the source portfolio", {
   expect_identical(rlang::hash(pool), before)
 })
 
-test_that("the frozen plan records the actual-triple overlap exemption only", {
+test_that("the frozen plan records all-shared-fixture overlap scope", {
   pool <- parlay_construct_role_groups(
     rp_ranked(rp_reference_matches()), rp_settings(7L),
     pattern = c(3, 3, 3, 2, 2, 2, 1), max_candidates = 1L)
   evaluation <- rp_evaluate(pool, budget_cny = 32, group_budget_cny = 8,
                             reuse_policy = list(max_reuse = 4L),
                             overlap_policy = list(max_overlap = 3L))
-  expect_identical(evaluation$plan$policies$overlap_actual_triple_exemption, TRUE)
+  expect_identical(evaluation$plan$policies$overlap_scope, "all_shared_fixtures")
   expect_null(evaluation$plan$policies$forced_complement)
   expect_null(evaluation$receipt$forced_complement)
-  expect_identical(evaluation$receipt$overlap_exemption,
-                   "shared_actual_triple_only")
+  expect_identical(evaluation$receipt$overlap_scope,
+                   "all_shared_fixtures")
   expect_identical(evaluation$receipt$issue_id, "26098")
 })
 

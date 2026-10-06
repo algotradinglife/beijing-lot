@@ -1,0 +1,152 @@
+---
+format:
+  html:
+    embed-resources: true
+    toc: false
+lang: zh-CN
+execute:
+  echo: false
+  cache: false
+  freeze: false
+  error: false
+params:
+  bundle_path: null
+---
+
+```{r frozen-input}
+suppressPackageStartupMessages(library(dplyr))
+bundle <- readRDS(params$bundle_path)
+view <- bundle$view
+groups <- view$groups
+tickets <- view$tickets
+legs <- view$legs
+duplex <- bundle$duplex
+cn <- c(W="胜",D="平",L="负")
+```
+
+# `r htmltools::htmlEscape(bundle$title)`
+
+**`r nrow(groups)`组 · `r format(nrow(tickets),big.mark=",",trim=TRUE)`注 · 总额`r format(sum(tickets$cost_cny),big.mark=",",trim=TRUE)`元**
+
+**本单用于模拟验证，不代表实际购买。**
+
+赛前冻结截止（UTC）：`r format(view$receipt$cutoff$cutoff_utc,tz="UTC",usetz=TRUE)`。
+
+
+**总组数 `r nrow(view$depth)` · 死票 `r sum(view$depth$group_status=="DEAD")`组 · 待结算 `r sum(view$depth$group_status=="PENDING")`组 · 命中 `r sum(view$depth$group_status=="HIT")`组**
+
+死票指组内全部实购票均已有不符赛果；命中指至少一张实购票全部赛果符合。其余组计入待结算；命中但 SP 未发布的组，奖金仍待结算。
+
+## 下注组总览
+
+```{r group-summary}
+knitr::kable(groups |> transmute(组别=sprintf("G%02d",order),实际结构=actual_pattern,
+ 理论注数=theoretical,实购注数=new_ticket_count,本组金额=new_cost_cny,
+ 累计金额=cumulative_cost_cny,累计覆盖概率=sprintf("%.2f%%",100*cumulative_coverage)),
+ table.attr='class="group-summary"',format="html",escape=TRUE)
+```
+
+覆盖概率为模型估计。理论注数为该组完整选项组合数，实购注数为实际选取的唯一票数量。
+
+<style>
+.selection-table{width:100%;table-layout:fixed;min-width:640px}
+.selection-table th,.selection-table td{box-sizing:border-box;text-align:center;vertical-align:middle;overflow-wrap:anywhere}
+.selection-table th:nth-child(3),.selection-table td:nth-child(3){text-align:left}
+.selection-wrapper{overflow-x:auto}
+.selection-table td:first-child,.selection-table td:nth-child(3){background:#e0f2fe;color:#0c4a6e;font-weight:600}
+.selection-table td.pick{background:#d1fae5;color:#065f46;font-weight:700}
+.selection-table td.result{color:#b91c1c!important;font-weight:700}
+.selection-table td{border:1px solid #cbd5e1;padding:9px}
+.ticket-table td,.ticket-table th{padding:6px;border:1px solid #e2e8f0}
+details{margin:1rem 0}summary{cursor:pointer;font-weight:600}
+@media print{details>*{display:block!important}.selection-table{print-color-adjust:exact;-webkit-print-color-adjust:exact}.ticket-table{font-size:9pt}}
+</style>
+
+## 分组选择表
+
+胜、平、负均指北单让球结果，让球为主队让球数。绿底表示实购票中的选项；单元格数值为赛前冻结北单 SP。赛果确定后标红；结算 SP 未发布时显示“待结算”，发布后追加实际结算 SP。准确组合以逐注清单为准。
+
+```{r group-sheets, results='asis'}
+for(k in groups$order) {
+ g <- filter(groups,order==k)
+ options <- filter(view$options,order==k)
+ cat(sprintf("\n\n### G%02d · %d注 · %g元\n\n",k,g$new_ticket_count,g$new_cost_cny))
+ trs <- list()
+ for(id in unique(options$fixture_id[order(options$slot)])) {
+  rows <- filter(options,fixture_id==id)
+  first <- rows[1,]
+  kickoff <- lubridate::ymd_hms(first$kickoff_beijing,tz="Asia/Shanghai",quiet=TRUE)
+  stopifnot(!is.na(kickoff))
+  cells <- list(htmltools::tags$td(first$slot),htmltools::tags$td(format(kickoff,"%m-%d %H:%M")),
+   htmltools::tags$td(paste(first$home_name,"vs",first$away_name)),htmltools::tags$td(first$handicap))
+  for(outcome in c("W","D","L")) {
+   row <- filter(rows,.data$outcome==.env$outcome)
+   stopifnot(nrow(row)==1L)
+   label <- if(is.na(row$sp_raw)) "缺失" else sprintf("%.2f",row$sp_raw)
+   if(row$result) label <- paste(label,"· 结算SP",if(is.na(row$settled_sp)) "待结算" else sprintf("%.2f",row$settled_sp))
+   cells <- append(cells,list(htmltools::tags$td(class=paste(c(if(row$selected) "pick",if(row$result) "result"),collapse=" "),
+    `data-outcome`=outcome,label)))
+  }
+  trs <- append(trs,list(htmltools::tags$tr(cells)))
+ }
+ table <- htmltools::tags$table(class="selection-table",`data-group`=sprintf("G%02d",k),
+  htmltools::tags$colgroup(htmltools::tags$col(style="width:7%"),htmltools::tags$col(style="width:16%"),htmltools::tags$col(style="width:33%"),htmltools::tags$col(style="width:8%"),htmltools::tags$col(style="width:12%"),htmltools::tags$col(style="width:12%"),htmltools::tags$col(style="width:12%")),
+  htmltools::tags$thead(htmltools::tags$tr(lapply(c("场次","开赛时间","对阵","让球","胜","平","负"),htmltools::tags$th))),
+  htmltools::tags$tbody(trs))
+ cat(as.character(htmltools::tags$div(class="selection-wrapper",table)),"\n")
+}
+```
+
+## 逐注清单
+
+CSV 已无损压缩为复式，每行按各场选项组合投注，注明串关、注数和金额；展开后与下面逐注清单完全相同。
+
+```{r exact-tickets, results='asis'}
+for(k in groups$order) {
+ owned <- filter(tickets,order==k) |> arrange(rank)
+ rows <- filter(legs,order==k) |> arrange(slot)
+ slots <- rows |> distinct(slot) |> arrange(slot)
+ wide <- rows |> mutate(场次=paste0("场",slot),赛果=unname(cn[outcome])) |>
+  select(ticket_id,场次,赛果) |> tidyr::pivot_wider(names_from=场次,values_from=赛果)
+ detail <- owned |> select(ticket_id,rank,cost_cny) |>
+  left_join(wide,by="ticket_id",relationship="one-to-one") |> arrange(rank) |>
+  mutate(序号=row_number()) |> select(序号,all_of(paste0("场",slots$slot)),金额=cost_cny)
+ stopifnot(!anyNA(detail),nrow(detail)==nrow(owned))
+ if(!is.null(view$returns)) {
+  matched <- view$returns[match(owned$ticket_id,view$returns$ticket_id),]
+  detail$命中 <- ifelse(matched$status=="WON","是",ifelse(matched$status=="LOST","否","待结算"))
+  detail$奖金 <- ifelse(matched$status %in% c("WON","LOST"),sprintf("%.2f",matched$payout_cny),"待结算")
+ }
+ slips <- filter(duplex$slips,order==k)
+ duplex_wide <- filter(duplex$legs,order==k) |>
+  mutate(场次=paste0("场",slot),选项=vapply(outcomes,
+   function(x) paste(unname(cn[x]),collapse="/"),character(1))) |>
+  select(slip_id,场次,选项) |> tidyr::pivot_wider(names_from=场次,values_from=选项)
+ download <- slips |> left_join(duplex_wide,by="slip_id",relationship="one-to-one") |>
+  mutate(序号=row_number(),串关=paste0(nrow(slots),"串1")) |>
+  select(序号,all_of(paste0("场",slots$slot)),串关,单注金额=unit_cny,注数=ticket_count,金额=cost_cny)
+ stopifnot(!anyNA(download),sum(download$注数)==nrow(owned),sum(download$金额)==sum(owned$cost_cny))
+ csv <- paste0("data:text/csv;charset=utf-8,",utils::URLencode(paste0("\ufeff",readr::format_csv(download)),reserved=TRUE))
+ table <- knitr::kable(detail,format="html",escape=TRUE,
+  table.attr=sprintf('class="ticket-table" data-group="G%02d"',k))
+ block <- htmltools::tags$details(class="ticket-details",
+  htmltools::tags$summary(sprintf("G%02d 逐注清单 · %d注",k,nrow(detail))),
+  htmltools::tags$a(href=csv,download=sprintf("G%02d-duplex.csv",k),
+   sprintf("下载复式 CSV · %d行",nrow(download))),htmltools::HTML(table))
+ cat(as.character(block),"\n")
+}
+```
+
+## 各组命中深度
+
+命中深度为真实赛果组合在该组冻结排序中的名次 / 结构理论总注数，包含未购买的组合；结构未覆盖时分子为0，赛果不足以确定时显示待定。命中场数另列实购单票最佳值，不拼接不同票。
+
+```{r depth}
+knitr::kable(view$depth |> transmute(组别=sprintf("G%02d",order),已确认=observed,
+ 命中场数=best_hits,命中深度=paste0(if_else(is.na(winner_depth),"待定",as.character(winner_depth)),"/",theoretical),
+ 命中注数=if_else(is.na(winning_tickets),"待结算",as.character(winning_tickets))),
+ format="html",table.attr='class="depth-table"',escape=TRUE)
+```
+
+
+选项并集仅用于展示；准确购票组合以逐注清单及无损复式 CSV 为准。

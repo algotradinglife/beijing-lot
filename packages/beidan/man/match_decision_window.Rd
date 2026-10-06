@@ -19,14 +19,14 @@ therefore denotes the same instants in every timezone.}
 
 \item{window_hours}{Length-2 finite numeric vector of non-negative, strictly
 increasing elapsed hours \code{c(start, end)} bounding the half-open window
-\code{[decision + start, decision + end)}. Defaults to the contract's
-\code{c(4, 28)}. Classed values (\code{Date}, \code{difftime}, \code{POSIXct})
-and arrays are rejected.}
+\verb{[decision + start, decision + end)}. Defaults to the contract's
+\code{c(4, 28)}. Classed values (\code{Date}, \code{difftime}, \code{POSIXct}) and arrays are
+rejected.}
 }
 \value{
 A list with \code{window_hours} (the resolved bounds) and the UTC POSIXct
 instants \code{start_utc} and \code{end_utc}, defining the half-open interval
-\code{[decision + window_hours[1], decision + window_hours[2])}.
+\verb{[decision + window_hours[1], decision + window_hours[2])}.
 }
 \description{
 Build a rolling decision window

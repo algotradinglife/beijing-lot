@@ -16,9 +16,9 @@ test_that("raw SP and the one ticket payout factor reproduce hand-computed EV", 
   ranked <- rank_outcome_selections(prepare_outcome_selections(matches), cutoff)
   pool <- parlay_construct_role_groups(ranked, settings, pattern = c(3L, 2L),
     max_candidates = 1L, prematch_sp = sp)
-  full <- parlay_evaluate_portfolio(pool, budget_cny = NULL,
+  full <- parlay_select_groups(pool, objective="coverage", budget_cny = NULL,
     group_budget_cny = NULL, reuse_policy = list(max_reuse = 4L),
-    overlap_policy = list(max_overlap = 3L), improve = FALSE)
+    overlap_policy = list(max_overlap = 3L))$evaluation
   expect_identical(nrow(full$purchases), 6L)
   expect_equal(full$summary$spent_cny, 12)
   expect_equal(full$summary$actual_coverage, .8, tolerance = 1e-12)
@@ -26,9 +26,9 @@ test_that("raw SP and the one ticket payout factor reproduce hand-computed EV", 
   # 12 CNY stake yields 8.592 net. A per-leg .65 factor or SP replacement fails.
   expect_equal(full$summary$ev_net_cny, 8.592, tolerance = 1e-12)
   expect_equal(max(full$purchases$sp_product_est), 36)
-  top <- parlay_evaluate_portfolio(pool, budget_cny = NULL,
+  top <- parlay_select_groups(pool, objective="coverage", budget_cny = NULL,
     group_budget_cny = 4, reuse_policy = list(max_reuse = 4L),
-    overlap_policy = list(max_overlap = 3L), improve = FALSE)
+    overlap_policy = list(max_overlap = 3L))$evaluation
   expect_equal(top$purchases$probability, c(.20, .15), tolerance = 1e-12)
   expect_equal(top$summary$actual_coverage, .35, tolerance = 1e-12)
   expect_equal(top$summary$ev_net_cny, 7.115, tolerance = 1e-12)
@@ -37,16 +37,16 @@ test_that("raw SP and the one ticket payout factor reproduce hand-computed EV", 
   sp <- sp[!(sp$fixture_id == "D" & sp$outcome == "D"), ]
   missing <- parlay_construct_role_groups(ranked, settings, pattern = c(3L, 2L),
     max_candidates = 1L, prematch_sp = sp)
-  missing <- parlay_evaluate_portfolio(missing, budget_cny = NULL,
+  missing <- parlay_select_groups(missing, objective="coverage", budget_cny = NULL,
     group_budget_cny = NULL, reuse_policy = list(max_reuse = 4L),
-    overlap_policy = list(max_overlap = 3L), improve = FALSE)
+    overlap_policy = list(max_overlap = 3L))$evaluation
   expect_false(missing$summary$ev_available)
   expect_true(is.na(missing$summary$ev_net_cny))
   expect_equal(missing$summary$actual_coverage, .8, tolerance = 1e-12)
   changed <- pool
   changed$cutoff$cutoff_utc <- changed$cutoff$cutoff_utc + 60
-  expect_error(parlay_evaluate_portfolio(changed, reuse_policy = list(max_reuse = 4L),
-    overlap_policy = list(max_overlap = 3L), improve = FALSE), "cutoff")
+  expect_error(parlay_select_groups(changed, objective="coverage", reuse_policy = list(max_reuse = 4L),
+    overlap_policy = list(max_overlap = 3L))$evaluation, "cutoff")
 })
 
 test_that("exact union handles overlaps, duplicate and nested ticket events", {
@@ -95,7 +95,7 @@ test_that("actual_pattern reports selected outcome counts and single cannot fall
   expect_identical(nrow(pool$groups),0L)
 })
 
-test_that("default improvement changes legal legs and raises real purchased coverage", {
+test_that("selection freezes original candidate legs without post-selection changes", {
   cutoff <- list(issue_id="26098",
     cutoff_utc=as.POSIXct("2026-09-26 12:00:00",tz="UTC"))
   matches <- tibble::tibble(fixture_id=c("T1","T2","D1","D2"),
@@ -105,17 +105,21 @@ test_that("default improvement changes legal legs and raises real purchased cove
   pool <- parlay_construct_role_groups(
     rank_outcome_selections(prepare_outcome_selections(matches),cutoff),
     settings,pattern=c(3L,2L),max_candidates=1L)
-  initial <- parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=2,
-    reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
-  improved <- parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=2,
+  selected <- parlay_select_groups(pool, objective="coverage", group_budget_cny=2,
     reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L))
-  expect_lt(initial$summary$actual_coverage,.20)
-  expect_equal(improved$summary$actual_coverage,.20,tolerance=1e-12)
-  expect_gt(nrow(improved$changes),0L)
-  expect_identical(nrow(initial$changes),0L)
-  expect_setequal(improved$plan$group_legs$fixture_id,c("T1","D1"))
-  expect_equal(improved$summary$spent_cny,2)
-  expect_identical(nrow(improved$purchases),1L)
+  evaluation <- selected$evaluation
+  expect_identical(evaluation$final$role_legs,pool$role_legs)
+  expect_false(evaluation$diagnostics$improvement_enabled)
+  expect_equal(evaluation$summary$spent_cny,2)
+  expect_identical(nrow(evaluation$purchases),1L)
+  block <- pool$role_legs
+  probabilities <- tidyr::pivot_wider(pool$probabilities,
+    names_from=outcome,values_from=probability)
+  top_mass <- prod(vapply(seq_len(nrow(block)),function(i) {
+    row <- probabilities[probabilities$fixture_id==block$fixture_id[i],]
+    max(as.numeric(row[block$allowed_outcomes[[i]]]))
+  },numeric(1)))
+  expect_equal(evaluation$summary$actual_coverage,top_mass,tolerance=1e-12)
 })
 
 
@@ -136,9 +140,9 @@ test_that("permuting leg order does not emit duplicate physical groups", {
   prefix <- parlay_construct_role_groups(ranked,settings,
     pattern=c(2L,2L),max_candidates=1L)
   expect_identical(prefix$role_legs,pool$role_legs)
-  evaluation <- parlay_evaluate_portfolio(pool,budget_cny=NULL,
+  evaluation <- parlay_select_groups(pool, objective="coverage",budget_cny=NULL,
     group_budget_cny=NULL,reuse_policy=list(max_reuse=4L),
-    overlap_policy=list(max_overlap=3L),improve=FALSE)
+    overlap_policy=list(max_overlap=3L))$evaluation
   expect_identical(nrow(evaluation$purchases),4L)
   expect_equal(evaluation$summary$spent_cny,8)
   expect_equal(evaluation$summary$actual_coverage,.64,tolerance=1e-12)
@@ -159,10 +163,10 @@ test_that("dimensioned and classed numeric controls are not valid planning vecto
   }
   pool <- parlay_construct_role_groups(ranked,settings,pattern=2L,max_candidates=1L)
   for (bad in list(matrix(1,1,1),structure(1,class="custom_control"))) {
-    expect_error(parlay_evaluate_portfolio(pool,reuse_policy=list(max_reuse=bad),
-      overlap_policy=list(max_overlap=1L),improve=FALSE),"whole number")
-    expect_error(parlay_evaluate_portfolio(pool,reuse_policy=list(max_reuse=4L),
-      overlap_policy=list(max_overlap=bad),improve=FALSE),"whole number")
+    expect_error(parlay_select_groups(pool, objective="coverage",reuse_policy=list(max_reuse=bad),
+      overlap_policy=list(max_overlap=1L))$evaluation,"whole number")
+    expect_error(parlay_select_groups(pool, objective="coverage",reuse_policy=list(max_reuse=4L),
+      overlap_policy=list(max_overlap=bad))$evaluation,"whole number")
   }
 })
 
@@ -175,8 +179,8 @@ test_that("purchase refuses missing or stale construction identity", {
   ranked <- rank_outcome_selections(prepare_outcome_selections(
     tibble::tibble(fixture_id="A",win=.50,draw=.30,lose=.20)),cutoff)
   pool <- parlay_construct_role_groups(ranked,settings,pattern=2L,max_candidates=1L)
-  evaluate <- function(value) parlay_evaluate_portfolio(value,
-    reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+  evaluate <- function(value) parlay_select_groups(value, objective="coverage",
+    reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L))$evaluation
   missing <- pool
   missing$construction_code_hash <- NULL
   expect_error(evaluate(missing),"construction implementation binding")
@@ -204,8 +208,8 @@ test_that("accepted probability-sum tolerance survives construction and purchase
     rank_outcome_selections(prepare_outcome_selections(matches),cutoff),
     settings,pattern=3L,max_candidates=1L)
   expect_equal(pool$role_legs$retained_probability,1.0000000005,tolerance=1e-12)
-  result <- parlay_evaluate_portfolio(pool,budget_cny=NULL,group_budget_cny=NULL,
-    reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L),improve=FALSE)
+  result <- parlay_select_groups(pool, objective="coverage",budget_cny=NULL,group_budget_cny=NULL,
+    reuse_policy=list(max_reuse=4L),overlap_policy=list(max_overlap=3L))$evaluation
   expect_identical(nrow(result$purchases),3L)
   expect_equal(result$summary$spent_cny,6)
   expect_equal(result$summary$actual_coverage,1.0000000005,tolerance=1e-12)

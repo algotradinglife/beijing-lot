@@ -1,15 +1,14 @@
 # Package tests for the EV- and coverage-ordered group selector (#553 follow-up).
 #
-# The selector sits in front of the authoritative evaluator. These tests bind the
+# The selector owns one authoritative purchase transaction. These tests bind the
 # OBSERVABLE contract:
 #   * it orders constructed candidate groups by the declared objective and stops
 #     on an explicit budget cap / EV floor;
 #   * an unvaluable group (missing SP) is never treated as zero EV -- the EV
 #     objective fails closed while the coverage objective, which is not an EV
 #     statement, still selects;
-#   * the emitted restricted pool still satisfies the evaluator's own pool
-#     validation and buys exactly the selected groups' distinct physical tickets,
-#     so the priced ledger reconciles with the selector's running ledger.
+#   * the frozen evaluation buys exactly the selected groups' distinct physical
+#     tickets, so its ledger reconciles with the selector's running ledger.
 #
 # Expectations are hand-derived from the group spaces, never from the selector's
 # own output.
@@ -335,13 +334,36 @@ test_that("selector evaluation receipts reject changed physical ledgers and prod
   expect_error(.parlay_ranked_validate_evaluation(e), "producer")
 })
 
-test_that("default evaluator still uses nominal order through shared finalizer", {
+test_that("selector evaluations bind the producer and preserve the candidate masks", {
   p <- ps_protected_pool()
-  e <- parlay_evaluate_portfolio(p, group_budget_cny = 4,
-    reuse_policy = list(max_reuse = NULL),overlap_policy = list(max_overlap = NULL),
-    improve = FALSE)
-  expect_identical(e$receipt$producer, "parlay_evaluate_portfolio")
-  expect_false(e$diagnostics$dynamic_resort)
+  before <- rlang::hash(p)
+  selected <- parlay_select_groups(p, "coverage", group_budget_cny = 4)
+  e <- selected$evaluation
+  expect_identical(e$receipt$producer, "parlay_select_groups")
+  expect_true(e$diagnostics$dynamic_resort)
+  expect_false(e$diagnostics$improvement_enabled)
+  expect_identical(e$final$role_legs, p$role_legs)
+  expect_identical(rlang::hash(p), before)
   expect_silent(.parlay_ranked_validate_evaluation(e))
   expect_equal(e$summary$actual_coverage, ps_exact_coverage(e))
+  expect_error(parlay_select_groups(p, improve = TRUE), "unused argument")
+})
+
+
+test_that("EV floors are strict and reject classed or dimensioned controls", {
+  pool <- ps_pool("double", n_legs=1L, pattern=2L, max_candidates=1L,
+    prematch_sp=ps_sp("F01", sp=6))
+  floor <- .5 * 2 * .65 * 6 - 2
+  refused <- parlay_select_groups(pool, "ev", group_budget_cny=2,
+    min_group_ev_cny=floor)
+  expect_identical(refused$summary$selected_groups,0L)
+  expect_identical(refused$excluded$reason,"group_ev_floor")
+  accepted <- parlay_select_groups(pool, "ev", group_budget_cny=2,
+    min_group_ev_cny=floor-1e-6)
+  expect_identical(accepted$summary$selected_groups,1L)
+  expect_equal(accepted$summary$model_ev_cny,floor,tolerance=1e-12)
+  for (bad in list(matrix(0,1,1),as.Date("1970-01-01"),
+                  as.difftime(0,units="days"),structure(0,class="custom_control"))) {
+    expect_error(parlay_select_groups(pool,min_group_ev_cny=bad),"scalar")
+  }
 })

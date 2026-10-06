@@ -128,7 +128,7 @@ board has no unused choice the round falls back through the ordered boards of
 records the board actually used, \code{n_outcomes} its real outcome count and the
 fallback is recorded in \code{substitutions}. The chosen direction's mask is kept
 exactly as ranked and is never upgraded, so a base-1 protected double is neither
-mistaken for a single nor granted a triple's overlap exemption. Every board has
+mistaken for a single; all shared fixtures count toward overlap. Every board has
 its own continuous cursor that wraps at the tail and is carried to the next group
 rather than reset. Fewer distinct fixtures than legs stops with
 \code{insufficient_fixtures}; an empty ranked table stops with \code{empty_inputs}. An incomplete slot is recorded in \code{shortages} and \code{trace},

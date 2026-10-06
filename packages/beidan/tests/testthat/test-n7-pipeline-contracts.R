@@ -194,7 +194,7 @@ testthat::test_that('the synthetic fixture is internally consistent and determin
 testthat::test_that('match_table_schemas 自身不变量：列无重复且 types 与 columns 对齐', {
   schemas <- match_table_schemas()
   testthat::expect_type(schemas, 'list')
-  testthat::expect_length(schemas, 16L)
+  testthat::expect_length(schemas, 17L)
   for (name in names(schemas)) {
     schema <- schemas[[name]]
     testthat::expect_true(length(schema$columns) > 0L)
@@ -211,7 +211,7 @@ testthat::test_that('match_table_schemas 覆盖合同要求的全部表', {
   expected <- c('fixtures','euro','totals','prematch_sp','match_status',
                 'candidate_tickets','ranked',
                 'probabilities','fit','group_legs','supports','tickets','ticket_legs',
-                'purchases','settlements','exclusions')
+                'purchases','settlements','match_results','exclusions')
   testthat::expect_setequal(names(match_table_schemas()), expected)
 })
 

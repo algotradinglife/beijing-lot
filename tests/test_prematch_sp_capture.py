@@ -16,7 +16,7 @@ def test_labels_raw_values_and_receipts(tmp_path):
     receipt=json.loads(Path(x['receipt_path']).read_text())
     assert receipt['market']=='beidan_handicap_sp_reference'
     assert Path(receipt['raw_paths']['nowscore_beidan_sp_raw']).read_bytes()==BODY
-    assert len(receipt['implementation_sha256'])==5
+    assert len(receipt['implementation_sha256'])==7
     assert x['receipt_path']!=fetch_issue_prematch_sp(SCHEDULE,str(tmp_path),pages=dict(body=BODY,observed_at=AT))['receipt_path']
 
 
@@ -48,7 +48,38 @@ def test_live_transport_uses_shared_fetch_and_observation(tmp_path,monkeypatch):
     def fake(url,**kwargs):
         calls.append((url,kwargs))
         return SimpleNamespace(body=BODY,observed_at=AT)
-    monkeypatch.setattr(prematch_sp.fetch,'fetch_issue_page',fake)
+    monkeypatch.setattr(prematch_sp.transport,'fetch_issue_page',fake)
     out=fetch_issue_prematch_sp(SCHEDULE,str(tmp_path),timeout=12,retries=1)
     assert len(out['prematch_sp'])==3
     assert 'TypeID=5' in calls[0][0] and calls[0][1]==dict(timeout=12,retries=1)
+
+
+def test_research_reference_keeps_closed_prices_and_binds_policy(tmp_path):
+    body = b'<script>M[1][4]=0;</script>' + BODY.replace(b'cansale="true"',b'cansale="false"').replace(b'00:55','截止'.encode())
+    assert parse_prematch_sp(body,SCHEDULE,AT)[0] == []
+    quotes,diagnostics = parse_prematch_sp(body,SCHEDULE,AT,research_only=True)
+    assert diagnostics == []
+    assert {q['outcome']:q['sp_raw'] for q in quotes} == {'W':2.5,'D':3.4,'L':12}
+    out = fetch_issue_prematch_sp(SCHEDULE,str(tmp_path),pages=dict(body=body,observed_at=AT),research_only=True)
+    receipt = json.loads(Path(out['receipt_path']).read_text())
+    assert receipt['research_only'] is True
+    assert all(q['quote_at'] == AT for q in out['prematch_sp'])
+    assert len(receipt['implementation_sha256']) == 7
+
+
+@pytest.mark.parametrize('state',[None,1,-1,4])
+def test_research_still_requires_observed_scheduled_state(state):
+    prefix = b'' if state is None else f'<script>M[1][4]={state};</script>'.encode()
+    quotes,diag = parse_prematch_sp(prefix+BODY,SCHEDULE,AT,research_only=True)
+    assert quotes == [] and diag[0]['reason'] == 'not_observed_scheduled'
+
+
+def test_research_never_admits_finished_incomplete_or_post_kickoff():
+    body = b'<script>M[1][4]=0;</script>'+BODY
+    for altered,at,reason in [(body.replace(b'00:55','完场'.encode()),AT,'not_live_prematch'),
+                              (body.replace(b'>12<',b'><'),AT,'incomplete_sp_vector'),
+                              (body,'2026-09-27T01:00:00+08:00','already_kicked_off')]:
+        quotes,diag=parse_prematch_sp(altered,SCHEDULE,at,research_only=True)
+        assert quotes == [] and diag[0]['reason'] == reason
+    with pytest.raises(ValueError,match='boolean'):
+        parse_prematch_sp(body,SCHEDULE,AT,research_only=1)

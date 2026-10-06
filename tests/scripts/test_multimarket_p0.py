@@ -15,12 +15,13 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from beidan_backend.sources.five_hundred_betting import MARKET_OUTCOMES  # noqa: E402
 from scripts import scrape_500_bjdc as scraper  # noqa: E402
 from src import multimarket_p0 as p0  # noqa: E402
 
 
 def market_xml(playid: int, *, winner_only: str | None = None, winner_sp: float = 5.25) -> bytes:
-    _, outcomes = scraper.MARKET_OUTCOMES[playid]
+    _, outcomes = MARKET_OUTCOMES[playid]
     attributes = []
     for index, (code, _label, attribute) in enumerate(outcomes):
         value = winner_sp if winner_only == code else "" if winner_only else 2.25 + index

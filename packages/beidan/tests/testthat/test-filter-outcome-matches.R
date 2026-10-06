@@ -31,9 +31,9 @@ filter_test_sp <- function() {
   )
 }
 
-test_that("signature exposes matches, prematch_sp and cutoff only", {
+test_that("signature exposes explicit minimum SP policy", {
   expect_identical(names(formals(filter_outcome_matches)),
-                   c("matches", "prematch_sp", "cutoff"))
+                   c("matches", "prematch_sp", "cutoff", "sp_threshold"))
 })
 
 test_that("Top1 below 2 is excluded, Top1 at or above 2 is retained with audit", {
@@ -54,14 +54,14 @@ test_that("Top1 below 2 is excluded, Top1 at or above 2 is retained with audit",
   expect_equal(result$excluded$top1_probability, c(0.60, 0.45))
   expect_equal(result$excluded$top1_sp, c(1.85, 1.20))
   expect_identical(result$excluded$retained, c(FALSE, FALSE))
-  expect_identical(result$excluded$reason, c("sp_below_2", "sp_below_2"))
+  expect_identical(result$excluded$reason, c("sp_below_threshold", "sp_below_threshold"))
 
   expect_identical(nrow(result$audit), 3L)
   expect_identical(result$audit$fixture_id, c("001", "002", "003"))
   expect_identical(result$audit$retained, c(FALSE, TRUE, FALSE))
   expect_identical(result$audit$missing_sp, c(FALSE, FALSE, FALSE))
   expect_identical(result$audit$reason,
-                   c("sp_below_2", "retained", "sp_below_2"))
+                   c("sp_below_threshold", "retained", "sp_below_threshold"))
   expect_identical(result$audit$top1_outcome, c("W", "W", "W"))
   expect_type(result$audit$missing_sp, "logical")
 })
@@ -81,7 +81,7 @@ test_that("the 2 boundary is strict: exactly 2 is kept, just below is removed", 
   result <- filter_outcome_matches(matches, sp, filter_test_cutoff())
   expect_identical(result$matches$fixture_id, "a")
   expect_identical(result$excluded$fixture_id, "b")
-  expect_identical(result$excluded$reason, "sp_below_2")
+  expect_identical(result$excluded$reason, "sp_below_threshold")
 
   # Both are comfortably at or above 2 and are retained.
   sp$sp_raw <- c(2.5, 2.0)
@@ -110,7 +110,7 @@ test_that("only the Top1 outcome's quote can exclude a fixture", {
   sp$sp_raw <- c(1.50, 5.00, 5.00)
   excluded <- filter_outcome_matches(matches, sp, filter_test_cutoff())
   expect_identical(nrow(excluded$matches), 0L)
-  expect_identical(excluded$excluded$reason, "sp_below_2")
+  expect_identical(excluded$excluded$reason, "sp_below_threshold")
 })
 
 test_that("the Top1 outcome follows the ranked probabilities, not the column order", {
@@ -496,7 +496,7 @@ test_that("the receipt binds cutoff, both inputs and code without a clock", {
                    sort(c("cutoff", "cutoff_hash", "input_hash", "input_snapshot",
                           "prematch_sp_hash", "prematch_sp_snapshot",
                           "sp_threshold", "sp_strict_below",
-                          "missing_sp_reason", "code_hash")))
+                          "missing_sp_reason", "policy_hash", "code_hash")))
   expect_identical(result$cutoff, cutoff)
   expect_identical(result$receipt$cutoff, cutoff)
   expect_identical(result$receipt$cutoff_hash,
@@ -547,7 +547,7 @@ test_that("classification is unaffected by quotes and cutoff", {
   expect_identical(cheap$audit$top1_outcome, expensive$audit$top1_outcome)
   expect_identical(cheap$audit$top1_probability, expensive$audit$top1_probability)
   expect_false(identical(names(formals(classify_outcomes)),
-                         c("matches", "prematch_sp", "cutoff")))
+                         c("matches", "prematch_sp", "cutoff", "sp_threshold")))
 })
 
  test_that("filter receipt binds source identity independently of price", {
@@ -576,3 +576,20 @@ test_that("quote source ties hash independently of row order and extra columns f
   sp$undeclared <- "must not silently disappear"
   expect_error(filter_outcome_matches(matches, sp, cutoff), "columns must be exactly")
 })
+
+ test_that("minimum SP 1.9 admits equality and binds independently replayed policy", {
+  m <- filter_test_matches(); q <- filter_test_sp(); q$sp_raw <- c(1.89,1.9,1.99)
+  x <- filter_outcome_matches(m,q,filter_test_cutoff(),sp_threshold=1.9)
+  expect_identical(x$matches$fixture_id,c("002","003"))
+  expect_identical(x$receipt$sp_threshold,1.9)
+  attr(x$matches,"filter_receipt") <- x$receipt
+  ranked <- rank_outcome_selections(prepare_outcome_selections(x$matches),filter_test_cutoff())
+  expect_s3_class(ranked,"tbl_df")
+  for (bad in list(NA_real_,Inf,0,c(1.9,2),"1.9"))
+    expect_error(filter_outcome_matches(m,q,filter_test_cutoff(),sp_threshold=bad))
+  empty <- filter_outcome_matches(m[0,],q,filter_test_cutoff(),sp_threshold=1.9)
+  expect_s3_class(empty$audit,"tbl_df")
+  expect_equal(nrow(empty$audit),0)
+  q$quote_at <- q$quote_at + 864000
+  expect_true(all(filter_outcome_matches(m,q,filter_test_cutoff(),sp_threshold=1.9)$audit$missing_sp))
+ })

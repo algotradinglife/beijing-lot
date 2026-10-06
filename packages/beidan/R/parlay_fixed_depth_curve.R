@@ -4,7 +4,7 @@
 #' fixtures, outcome masks, selected groups, or ranking. This is a fixed-group
 #' diagnostic, not a portfolio allocation or a probability of any portfolio hit.
 #'
-#' @param plans Uniquely named list of current [parlay_evaluate_portfolio()] results.
+#' @param plans Uniquely named list of current [parlay_select_groups()] evaluation results.
 #'   Source, cutoff, code, purchased ledger and frozen plan bindings are checked.
 #'   Names label patterns; selected groups and actual outcome masks remain fixed.
 #' @param group_budgets_cny Plain finite nonnegative numeric vector of CNY caps.
