@@ -2,7 +2,7 @@
 % Please edit documentation in R/unified_sources.R
 \name{SourceMarkets}
 \alias{SourceMarkets}
-\title{Read Titan Euro and total-goal history using the shared resource cache}
+\title{Read dual-source Euro and Titan totals through one cache}
 \usage{
 SourceMarkets(
   client,
@@ -15,18 +15,24 @@ SourceMarkets(
 \arguments{
 \item{client}{Handle from OpenSourceAPI.}
 
-\item{fixtures}{Contracted fixture tibble for ExtractTitanMarkets.}
+\item{fixtures}{Tibble with fixture_id, provider_id_nowscore, home_nowscore,
+away_nowscore and explicit POSIXct kickoff_at.}
 
-\item{totals_company_ids}{Explicit native company ID strings; no implicit mapping.}
+\item{totals_company_ids}{Explicit native Titan total-goal company ID strings.}
 
 \item{max_age}{Maximum live-cache age in seconds; zero explicitly refreshes.}
 
 \item{cache_only}{TRUE never fetches, allowing old saved captures.}
 }
 \value{
-Euro/totals/company/diagnostic tibbles and raw receipts. These markets
-  have Titan coverage only; fundamentals agreement does not verify odds.
+Typed tibbles euro (effective), euro_observations, euro_ledger,
+  euro_current (source-published current price snapshots), euro_latest_history,
+  totals, companies,
+  diagnostics, receipts and gaps. Conflicts retain original source prices in
+  ledger; valid primary history does not absorb extra secondary observations.
+  Titan unavailable Euro may use Nowscore with SUPPLEMENTED provenance.
+  Source identity conflicts fail closed. Totals has Titan coverage only.
 }
 \description{
-Read Titan Euro and total-goal history using the shared resource cache
+Read dual-source Euro and Titan totals through one cache
 }
