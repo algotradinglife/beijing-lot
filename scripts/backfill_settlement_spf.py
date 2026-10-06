@@ -38,7 +38,8 @@ def observation_rows(version_dir: Path) -> list[dict]:
         payload = json.loads(record["payload_json"]) if record.get("payload_json") else {}
         rows.append({
             "issue": record["issue"], "slot": record["slot"], "play": record["play"],
-            "score": record["score"], "expected_option": record["expected_option"],
+            "score": record["score"], "halftime_score": record["halftime_score"],
+            "observed_option": record["expected_option"],
             "handicap": payload.get("handicap"),
             "archive_result_raw": payload.get("archive_result_raw"),
         })
@@ -58,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     frozen = catalog.root_path("frozen")
     entry = catalog.catalog_entry("settlement")
     version_dir = catalog.dataset_path("settlement", entry["version"])
-    base = version_dir / "derived" / "spf_labels"
+    base = version_dir / "derived" / "play_labels"
 
     if args.list_versions:
         current = backfill.read_current(base)
@@ -70,29 +71,33 @@ def main(argv: list[str] | None = None) -> int:
     label_version = args.label_version or datetime.now(timezone.utc).strftime("%Y-%m-%d")
     cross = backfill.load_cross_source(frozen / args.cross)
     rows = observation_rows(version_dir)
-    derived, receipt = backfill.backfill_spf(rows, cross)
+    labels, receipt = backfill.derive_play_labels(rows, cross)
     receipt["generated_at"] = args.generated_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     table = pa.Table.from_pylist([
-        {"issue": r["issue"], "slot": r["slot"],
-         "handicap": r.get("handicap_backfilled"),
-         "handicap_source": r.get("handicap_source"),
-         "expected_option": r.get("expected_option_backfilled")}
-        for r in derived
+        {"issue": r["issue"], "slot": r["slot"], "play": r["play"],
+         "handicap": r["handicap"], "option": r["option"],
+         "option_source": r["option_source"], "observed_option": r["observed_option"]}
+        for r in labels
     ])
     # Each publication is archived under its own immutable label version; a
     # finalized cutoff is never rewritten in place.
     record = backfill.publish_version(base, label_version, table, receipt)
 
     c = receipt["counts"]; x = receipt["cross_check"]
-    resolved = c["handicap_from_archive"] + c["handicap_from_cross_source"]
+    resolved = c["derived"] + c["observed"]
     print(f"label version       : {record['label_version']} ({record['status']})")
-    print(f"spf rows            : {c['total_spf']:,}")
-    print(f"  handicap from archive : {c['handicap_from_archive']:,}")
-    print(f"  handicap from cross   : {c['handicap_from_cross_source']:,}")
-    print(f"  unresolved            : {c['unresolved']:,}")
-    print(f"  resolved              : {resolved:,} ({100*resolved/c['total_spf']:.1f}%)")
-    print(f"cross-check contradictions: {x['contradictions']} / {x['compared']:,}")
+    print(f"fixtures            : {c['fixtures']:,}  labels: {c['total_labels']:,}")
+    for play, t in receipt["per_play"].items():
+        usable = t["derived"] + t["observed"]
+        print(f"  {play:4} rows {t['rows']:>7,}  usable {usable:>7,} "
+              f"({100*usable/t['rows']:5.1f}%)  derived {t['derived']:>7,}  observed {t['observed']:>7,}")
+    print(f"total usable        : {resolved:,} / {c['total_labels']:,} "
+          f"({100*resolved/c['total_labels']:.1f}%)")
+    print(f"observed mismatches : {receipt['observed_agreement']['mismatches']} / "
+          f"{receipt['observed_agreement']['compared']:,}")
+    print(f"spf contradictions  : {x['contradictions']} / {x['compared']:,}")
+    print(f"disagreements       : {receipt['known_disagreements']['count']}")
     print(f"artifact            : {record['artifact']['path']}")
     print(f"versions            : {', '.join(record['versions'])}")
     return 0

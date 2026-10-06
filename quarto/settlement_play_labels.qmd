@@ -1,10 +1,10 @@
 ---
-title: "settlement 派生交付：spf_labels（让球胜平负标签）"
+title: "settlement 派生交付：play_labels（五玩法统一标签）"
 date: "2026-10-06"
 params:
   root: !expr Sys.getenv("BEIDAN_PARQUET_ROOT", unset = "/mnt/nas/Data/beijing-lot")
   dataset: "settlement"
-  table: "spf_labels"
+  table: "play_labels"
 format:
   html:
     toc: true
@@ -18,34 +18,43 @@ execute:
   error: false
 ---
 
-本报告是 **`settlement` 派生产物 `spf_labels`** 的交付与验收入口：说明它为什么存在、
-取数规则、**可用率**，以及在 **R 侧**经 `beidan::read_dataset()` 的读取方式。
+本报告是 **`settlement` 派生产物 `play_labels`** 的交付与验收入口。
 
-`spf_labels` 不是原始采集，也不是 source SQLite 的直接转写，而是**用独立交叉源补全
-旧纪元让球后派生的标签表**；因此本报告把"规则、来源、可用率、分歧"作为验收对象，
-而不是把行数当作唯一证据。
+它对**五个玩法（spf 让球胜平负、jq 总进球、ds 上下单双、bf 比分、bq 半全场）给出同一读取方式**：
+每场每玩法一行，一个 `option` 列，一个 `option_source` 列说明该标签是推导所得还是与归档
+结算一致。这样消费者不必为 spf 用一套、为其余四玩法用另一套。
+
+`play_labels` 不是原始采集，也不是 source SQLite 的直接转写：它是**用独立交叉源补全旧纪元
+让球后派生的标签表**；因此本报告把"规则、来源、可用率、分歧"作为验收对象，而不是把行数
+当作唯一证据。
 
 ## 1. 为什么需要它
 
-`settlement` 的 `observation.expected_option` 是标签列。对 `spf`（让球胜平负），
-该列依赖**让球数**：
+`settlement` 的 `observation.expected_option` 是标签列，五玩法各有口径：
 
-```python
-expected_option = outcome(home_goals + handicap, away_goals)   # 仅 spf 依赖 handicap
-```
+| 玩法 | 依赖 | 原生可用率 |
+|---|---|---:|
+| spf 让球胜平负 | 比分 **+ 让球** | 63.3% |
+| jq 总进球 | 比分 | 98.9% |
+| ds 上下单双 | 比分 | 98.9% |
+| bf 比分 | 比分 | 98.9% |
+| bq 半全场 | 半场 + 全场比分 | 98.9% |
 
-而 2009–2019 的归档页面对约 57% 的场次**完全不渲染让球单元格**（不是解析缺陷：
-源 HTML 里没有括号可匹配）。按 `observation` 原生口径，旧纪元 spf 可用率仅 42.7%。
-`spf_labels` 通过**独立交叉源**补全，不改变原始表，也不从归档自身的渲染推断。
+**只有 spf 依赖让球**，而 2009–2019 的归档页面对约 57% 的场次**完全不渲染让球单元格**
+（不是解析缺陷：源 HTML 里没有括号可匹配）。因此原生口径下旧纪元 spf 仅 42.7%。
+
+`play_labels` 用**独立交叉源**补全让球，并把五玩法整理成统一形状——它不改变
+`observation` 原始表，也不从归档自身的渲染推断。
 
 ## 2. 取数规则
 
 | 项 | 规则 |
 |---|---|
-| 让球来源（主） | **500.com 结算表** `settlement_500.settlement_merged.handicap_line`（显式含 0） |
-| 让球来源（兜底） | 归档页渲染的让球（仅当 500 无该行） |
-| 标签 | `outcome(home_goals + handicap, away_goals)` |
-| 不解析即不明 | 两源都无让球，或比分不能解析 → `handicap/expected_option` 为 `NA`，**不推断** |
+| 标签推导 | 全部经包内权威函数 `settlement.parser.expected_option`，五个玩法共用一条路径 |
+| 让球来源（主） | **500.com 结算表** `settlement_500.settlement_merged.handicap_line`（显式含 0）|
+| 让球来源（兜底） | 归档页渲染的让球（仅当 500 无该行）|
+| `option_source` | `observed` = 推导值与归档自身结算选项**一致**；`derived` = 不一致或归档无该值 |
+| 不解析即不明 | 所需输入缺失（spf 无让球、比分不可解析）→ `option` 为 `NA`，**不推断** |
 
 回执字段 `rule` 与 catalog 登记逐字一致，避免文档与实现漂移。
 
@@ -73,7 +82,7 @@ receipt <- jsonlite::read_json(
 impl_files <- c(
   file.path(repository_root, "packages/beidan/R/parquet_dataset.R"),
   file.path(repository_root, "packages/beidan/inst/python/beidan_backend/settlement_backfill.py"),
-  file.path(repository_root, "scripts/backfill_settlement_spf.py"))
+  file.path(repository_root, "scripts/backfill_settlement_spf.py"))  # five-play CLI
 knitr::kable(tibble::tibble(
   `实现文件` = substring(impl_files, nchar(repository_root) + 2L),
   `sha256` = vapply(impl_files, function(p) digest::digest(file = p, algo = "sha256"), character(1))))
@@ -86,8 +95,9 @@ knitr::kable(tibble::tibble(
 ## 4. 登记、版本化与回执
 
 派生表由 catalog 登记（**不在**版本 manifest 的 `tables` 内）。它**按 label 版本留档**，
-不就地覆盖：每次发布写入 `derived/spf_labels/versions/<label_version>/`，`current.json`
+不就地覆盖：每次发布写入 `derived/play_labels/versions/<label_version>/`，`current.json`
 指向最新版本；同 label 同内容重跑为幂等，**已发布的 label 内容不同则拒绝改写**。
+（旧的单玩法 `spf_labels` 已归入 `derived/superseded/` 保留，不再读取。）
 
 ```{r}
 #| label: spf-registry
@@ -118,6 +128,8 @@ knitr::kable(tibble::tibble(
   `值` = c(format(nrow(spf), big.mark = ","), ncol(spf),
     attr(spf, "kind"), attr(spf, "version"))))
 knitr::kable(beidan::dataset_contract(dataset, table), caption = "列类型契约（Arrow -> R）")
+knitr::kable(spf |> dplyr::count(play, name = "rows"),
+  caption = "每玩法行数（形状统一：每场每玩法一行）")
 knitr::kable(utils::head(spf, 6))
 ```
 
@@ -128,31 +140,41 @@ knitr::kable(utils::head(spf, 6))
 
 ```{r}
 #| label: spf-usability
-resolved <- sum(!is.na(spf$expected_option))
+resolved <- sum(!is.na(spf$option))
 knitr::kable(tibble::tibble(
   `项` = c("总行数", "已解析", "可用率", "未解析"),
   `值` = c(format(nrow(spf), big.mark = ","), format(resolved, big.mark = ","),
     sprintf("%.1f%%", 100 * resolved / nrow(spf)),
     format(nrow(spf) - resolved, big.mark = ","))))
+knitr::kable(spf |> dplyr::group_by(play) |>
+  dplyr::summarise(usable = sum(!is.na(option)), rows = dplyr::n(), .groups = "drop") |>
+  dplyr::mutate(rate = sprintf("%.1f%%", 100 * usable / rows)),
+  caption = "五玩法可用率（同一读取方式）")
 ```
 
-**两个口径必须分清**（回执分别记录）：
+回执区分三种来源，避免把"归档已给"与"本次推导"混为一谈：
 
-- `counts.*`：**产出标签**的行数（让球可解析 **且** 比分可解析）；
-- `handicap_source_rows.*`：**让球取值来源**的行数，含比分未解析（取消/推迟）的行。
-  派生表的 `handicap_source` 列对应后者。
+| 口径 | 含义 |
+|---|---|
+| `counts.observed` | 推导值与归档自身结算选项一致 |
+| `counts.derived` | 推导值与归档不一致，或归档未给出该选项 |
+| `counts.unresolved` | 所需输入缺失（spf 无让球、比分不可解析）|
 
 ```{r}
 #| label: spf-source-rows
-counts <- unlist(receipt$counts)
-src_rows <- receipt$handicap_source_rows
+counts <- receipt$counts
+per <- do.call(rbind, lapply(names(receipt$per_play), function(pl) {
+  x <- receipt$per_play[[pl]]
+  tibble::tibble(play = pl, rows = x$rows, derived = x$derived,
+                 observed = x$observed, unresolved = x$unresolved)
+}))
+knitr::kable(per, caption = "各玩法：推导 / 与归档一致 / 未解析")
 knitr::kable(tibble::tibble(
-  `口径` = c("产出标签 counts.from_archive", "产出标签 counts.from_cross_source",
-    "让球来源 handicap_source_rows.archive", "让球来源 handicap_source_rows.cross_source",
-    "无让球 handicap_source_rows.none", "未解析 counts.unresolved"),
-  `行数` = c(counts[["handicap_from_archive"]], counts[["handicap_from_cross_source"]],
-    src_rows$archive, src_rows$cross_source, src_rows$none, counts[["unresolved"]])),
-  caption = "两种口径并列，避免相加为总行数的误解")
+  `口径` = c("总标签数", "与归档一致 observed", "本次推导 derived", "未解析 unresolved",
+    "其中 spf 让球来自 500", "其中 spf 让球来自归档"),
+  `行数` = c(counts$total_labels, counts$observed, counts$derived, counts$unresolved,
+    counts$handicap_from_cross_source, counts$handicap_from_archive)),
+  caption = "口径并列，避免相加为总行数的误解")
 ```
 
 **分纪元可用率**（`issue_year` 由期号前两位推导，仅用于此处展示）：
@@ -161,8 +183,8 @@ knitr::kable(tibble::tibble(
 #| label: spf-era
 spf$issue_year <- as.integer(paste0("20", substr(spf$issue, 1, 2)))
 era <- dplyr::mutate(spf, era = ifelse(issue_year <= 2019, "旧纪元 2009-2019", "新纪元 2020+")) |>
-  dplyr::group_by(era) |>
-  dplyr::summarise(rows = dplyr::n(), resolved = sum(!is.na(expected_option)), .groups = "drop") |>
+  dplyr::group_by(era, play) |>
+  dplyr::summarise(rows = dplyr::n(), resolved = sum(!is.na(option)), .groups = "drop") |>
   dplyr::mutate(rate = sprintf("%.1f%%", 100 * resolved / rows))
 knitr::kable(era, caption = "按纪元可用率")
 ```
@@ -200,12 +222,11 @@ knitr::kable(dis, caption = "源间让球分歧（10 条，采用 500）")
 ```{r}
 #| label: spf-aggregate
 by_source <- beidan::dataset_query(dataset,
-  "SELECT handicap_source, count(*) AS n FROM spf_labels GROUP BY 1 ORDER BY 2 DESC", table)
-knitr::kable(by_source, caption = "按让球来源聚合")
-by_handicap <- beidan::dataset_query(dataset,
-  "SELECT handicap, count(*) AS n FROM spf_labels WHERE handicap IS NOT NULL
-   GROUP BY 1 ORDER BY 1", table)
-knitr::kable(by_handicap, caption = "让球分布")
+  "SELECT play, option_source, count(*) AS n FROM play_labels GROUP BY 1,2 ORDER BY 1,2", table)
+knitr::kable(by_source, caption = "按玩法 × option_source 聚合")
+by_option <- beidan::dataset_query(dataset,
+  "SELECT play, count(DISTINCT option) AS options FROM play_labels GROUP BY 1 ORDER BY 1", table)
+knitr::kable(by_option, caption = "各玩法标签取值数（spf 3、jq 8、ds 4、bf 25、bq 9）")
 ```
 
 ## 9. 验证与限制
@@ -220,6 +241,9 @@ knitr::kable(by_handicap, caption = "让球分布")
 - **派生表按 label 版本留档，不就地覆盖**：`versions/<label_version>/` 不可变，
   `current.json` 指向最新；同 label 同内容重跑为幂等，内容不同则拒绝改写。
   这与 base 表的版本 manifest 是两套机制，但都保证"已发布内容不被静默改写"。
+- 旧的单玩法 `spf_labels` 已停止读取，文件保留在 `derived/superseded/spf_labels/`。
+- 四玩法的 `option` 与归档自身结算**完全一致**（0 处不符）；spf 有 5 处不符，
+  全部来自那 10 条已知让球分歧。
 - `known_disagreements` 的 10 条**无第三源可判定**：本仓库 Titan 亚盘不覆盖这些场次
   （`market_odds_v1` 无亚盘表，`three_in_one_v1.quote` 不含相关 fixture），
   `markets/market-record` 的期号范围自 101121 起，也不含 100103。是否采纳 500 的取值

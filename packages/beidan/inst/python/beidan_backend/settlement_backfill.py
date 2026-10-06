@@ -23,6 +23,10 @@ from pathlib import Path
 
 EMPTY = {"", "--", "-"}
 
+# The five plays, in the repository's canonical order. Every fixture gets one
+# row per play so consumers read all five the same way.
+PLAYS = ("spf", "jq", "ds", "bf", "bq")
+
 
 class BackfillError(RuntimeError):
     """The cross source is missing or cannot be trusted."""
@@ -269,115 +273,173 @@ def parse_score(score: str) -> tuple[int, int] | None:
     return (int(match.group(1)), int(match.group(2))) if match else None
 
 
-def backfill_spf(rows: list[dict], cross: CrossSource) -> tuple[list[dict], dict]:
-    """Derive SPF ``expected_option`` from the 500.com handicap, archive fallback.
+def play_label(play: str, score_text: str, halftime_text: str | None,
+               handicap: int | None) -> str | None:
+    """The label for one observation, for every play.
 
-    @param rows Observation rows (dicts) with ``issue``, ``slot``, ``play``,
-        ``score``, ``handicap`` and ``archive_result_raw``.
-    @param cross The 500.com ``(issue, slot) -> handicap_line`` source, used
-        first because it states the handicap explicitly (including 0); the
-        archive's rendered handicap is the fallback.
-    @return ``(derived_rows, receipt)``; a row keeps ``source=None`` when neither
-        source states a handicap, so it is never guessed. Fixtures where both
-        sources state a handicap but disagree are listed under
-        ``known_disagreements`` — the 500 value is applied and the archive's is
-        recorded.
+    Delegates to the settlement parser's authoritative ``expected_option`` so
+    the derived table cannot drift from the labels the collector would compute;
+    only the handicap is supplied from the cross source first. Returns ``None``
+    when the play's inputs are not stated, never a guess.
     """
-    derived: list[dict] = []
-    from_archive = from_cross = unresolved = 0
+    from .settlement.parser import expected_option
+
+    return expected_option({
+        "play": play, "score": score_text,
+        "halftime_score": halftime_text, "handicap": handicap,
+    })
+
+
+def _resolve_handicap(row: dict, cross: CrossSource):
+    """The handicap for one row: 500 first, archive fallback, else unknown.
+
+    Both sources may state one; they are compared so a disagreement is recorded
+    even when the score does not parse.
+    """
+    cross_line = cross.handicap(row["issue"], row["slot"])
+    archive_line = row.get("handicap")
+    if cross_line is not None:
+        return cross_line, "cross_source", archive_line, cross_line
+    if archive_line is not None:
+        return archive_line, "archive", archive_line, None
+    return None, None, archive_line, None
+
+
+def derive_play_labels(rows: list[dict], cross: CrossSource) -> tuple[list[dict], dict]:
+    """Derive one label per (issue, slot, play) for all five plays, uniformly.
+
+    The point of the uniform shape is that a consumer reads every play the same
+    way: one row per play per fixture, a single ``option`` column, and an
+    explicit ``option_source`` telling whether the label was derived here or
+    taken from the archive's own settlement.
+
+    @param rows Observation rows with ``issue``, ``slot``, ``play``, ``score``,
+        ``halftime_score``, ``handicap`` and ``archive_result_raw``. A fixture
+        absent from ``rows`` for a play is emitted as an unresolved row, so every
+        fixture has five rows.
+    @param cross The 500.com ``(issue, slot) -> handicap_line`` source, preferred
+        for the handicap because it states it explicitly, including 0.
+    @return ``(labels, receipt)``. Fixtures where both sources state a handicap
+        and the values differ are listed under ``known_disagreements``.
+    """
+    fixtures: dict[tuple[str, int], dict] = {}
+    for row in rows:
+        key = (str(row["issue"]), int(row["slot"]))
+        fixtures.setdefault(key, {})[row.get("play")] = row
+
+    labels: list[dict] = []
+    derived_count = observed_count = unresolved = 0
+    from_archive = from_cross = 0
+    observed_mismatch: list[dict] = []
     contradicted: list[dict] = []
     disagreements: list[dict] = []
-    for row in rows:
-        if row.get("play") != "spf":
-            continue
-        # 500.com is the preferred source: it states the handicap explicitly,
-        # including 0, while the archive renders it only for some fixtures and
-        # leaves the rest blank. The archive is the fallback, never a silent
-        # override of an explicit 500 statement.
-        cross_line = cross.handicap(row["issue"], row["slot"])
-        archive_line = row.get("handicap")
-        # Both sources state a handicap for this fixture and they differ. This
-        # is a source disagreement in its own right, independent of whether the
-        # score parses or whether the derived outcome matches the archive's
-        # labelled result, so it is recorded before either check.
+    per_play: dict[str, dict[str, int]] = {}
+
+    for (issue, slot), by_play in fixtures.items():
+        reference = by_play.get("spf") or next(iter(by_play.values()))
+        cross_line = cross.handicap(issue, slot)
+        archive_line = reference.get("handicap")
         if cross_line is not None and archive_line is not None and cross_line != archive_line:
             disagreements.append({
-                "issue": str(row["issue"]), "slot": int(row["slot"]),
-                "score": row.get("score"),
+                "issue": issue, "slot": slot, "score": reference.get("score"),
                 "archive_handicap": archive_line, "cross_handicap": cross_line,
                 "applied": cross_line, "applied_source": "cross_source",
-                "archive_result": row.get("archive_result_raw"),
+                "archive_result": reference.get("archive_result_raw"),
             })
+        for play in PLAYS:
+            row = by_play.get(play)
+            tally = per_play.setdefault(
+                play, {"rows": 0, "derived": 0, "observed": 0, "unresolved": 0})
+            tally["rows"] += 1
+            if row is None:
+                unresolvable = True
+                handicap_resolved = None
+                handicap_source = None
+                score_text = halftime_text = None
+                observed = archive_result = None
+                mismatch = None
+            else:
+                handicap_resolved, handicap_source, _, _ = _resolve_handicap(row, cross) \
+                    if play == "spf" else (row.get("handicap"), "archive", None, None)
+                score_text = row.get("score")
+                halftime_text = row.get("halftime_score")
+                observed = row.get("observed_option")
+                archive_result = row.get("archive_result_raw")
+                unresolvable = parse_score(score_text) is None or (
+                    play == "spf" and handicap_resolved is None)
+                mismatch = None
 
-        parsed = parse_score(row.get("score"))
-        if cross_line is not None:
-            line, source = cross_line, "cross_source"
-        elif archive_line is not None:
-            line, source = archive_line, "archive"
-        else:
-            line = source = None
-        if parsed is None or line is None:
-            unresolved += 1
-            derived.append({**row, "expected_option_backfilled": None,
-                            "handicap_source": source})
-            continue
-        home, away = parsed
-        if source == "archive":
-            from_archive += 1
-        else:
-            from_cross += 1
-        expected = outcome(home + line, away)
-        archive_result = row.get("archive_result_raw")
-        record = {
-            **row,
-            "handicap_backfilled": line,
-            "handicap_source": source,
-            "expected_option_backfilled": expected,
-        }
-        if archive_result in {"胜", "平", "负"} and expected != archive_result:
-            contradicted.append({
-                "issue": str(row["issue"]), "slot": int(row["slot"]),
-                "score": row.get("score"), "handicap": line,
-                "archive_result": archive_result, "derived": expected,
-                "resolved_by": source,
+            option = None if unresolvable else play_label(
+                play, score_text, halftime_text, handicap_resolved)
+
+            if option is not None and observed is not None and option != observed:
+                mismatch = {"derived": option, "observed": observed}
+                observed_mismatch.append({"issue": issue, "slot": slot, "play": play, **mismatch})
+            if option is not None and archive_result in {"胜", "平", "负"} and play == "spf" \
+                    and option != archive_result:
+                contradicted.append({
+                    "issue": issue, "slot": slot, "score": score_text,
+                    "handicap": handicap_resolved, "archive_result": archive_result,
+                    "derived": option, "resolved_by": handicap_source,
+                })
+
+            if option is None:
+                unresolved += 1
+                tally["unresolved"] += 1
+            elif observed is not None and option == observed:
+                observed_count += 1
+                tally["observed"] += 1
+            else:
+                derived_count += 1
+                tally["derived"] += 1
+                if play == "spf" and handicap_source == "archive":
+                    from_archive += 1
+                elif play == "spf":
+                    from_cross += 1
+
+            labels.append({
+                "issue": issue, "slot": slot, "play": play,
+                "handicap": handicap_resolved if play == "spf" else None,
+                "option": option,
+                "option_source": None if option is None else
+                    ("observed" if (observed is not None and option == observed) else "derived"),
+                "observed_option": observed,
+                "archive_result": archive_result,
             })
-        derived.append(record)
 
     receipt = {
-        "schema": "beijing_lot_spf_backfill_receipt_v1",
-        "rule": ("expected_option = outcome(home_goals + handicap, away_goals); the handicap "
-                 "comes from the 500.com settlement table first (an explicit statement, "
-                 "including 0), falling back to the archive's rendered handicap when 500 has "
-                 "no row; never inferred from the archive's own rendering"),
+        "schema": "beijing_lot_play_labels_receipt_v1",
+        "rule": ("one row per (issue, slot, play) for plays "
+                 f"{list(PLAYS)}; `option` is derived by the settlement parser's "
+                 "play_label(), with the spf handicap taken from the 500.com "
+                 "settlement table first (an explicit statement, including 0) "
+                 "and the archive's rendered handicap as fallback; "
+                 "`observed_option` records the archive's own settled option. "
+                 "`option_source` is 'observed' when the two agree and 'derived' "
+                 "otherwise, so a disagreement is visible rather than silently "
+                 "resolved"),
         "cross_source": {"path": str(cross.path), "sha256": cross.sha256,
                          "rows": len(cross.values)},
-        # Two different questions, deliberately reported separately:
-        #   `counts.*`            rows that yielded a label (handicap resolved
-        #                         AND the score parsed), i.e. usability;
-        #   `handicap_source_rows` rows whose handicap came from each source,
-        #                         including rows whose score did not parse.
-        # The derived table's `handicap_source` column matches the latter.
         "counts": {
-            "total_spf": sum(1 for r in rows if r.get("play") == "spf"),
+            "total_labels": len(labels),
+            "fixtures": len(fixtures),
+            "derived": derived_count,
+            "observed": observed_count,
+            "unresolved": unresolved,
             "handicap_from_archive": from_archive,
             "handicap_from_cross_source": from_cross,
-            "unresolved": unresolved,
         },
-        "handicap_source_rows": {
-            "note": "rows carrying each handicap_source value, including rows with an unparsable score",
-            "archive": sum(1 for r in derived if r.get("handicap_source") == "archive"),
-            "cross_source": sum(1 for r in derived if r.get("handicap_source") == "cross_source"),
-            "none": sum(1 for r in derived if r.get("handicap_source") is None),
+        "per_play": per_play,
+        "observed_agreement": {
+            "compared": derived_count + observed_count,
+            "mismatches": len(observed_mismatch),
+            "examples": observed_mismatch[:10],
         },
         "cross_check": {
-            "compared": from_archive + from_cross,
+            "compared": derived_count + observed_count,
             "contradictions": len(contradicted),
             "examples": contradicted[:10],
         },
-        # Explicitly recorded source disagreements: both sources state a
-        # handicap for the same fixture and they differ. 500 is used as the data
-        # source by policy; the archive's value is recorded, not applied, and no
-        # third source in this repository covers these fixtures.
         "known_disagreements": {
             "policy": "500.com is the data source; the archive's differing handicap is recorded, not applied",
             "resolution": "unresolved_pending_third_source",
@@ -386,4 +448,4 @@ def backfill_spf(rows: list[dict], cross: CrossSource) -> tuple[list[dict], dict
             "rows": disagreements,
         },
     }
-    return derived, receipt
+    return labels, receipt
