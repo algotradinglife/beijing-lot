@@ -108,7 +108,7 @@ test_that("the dataset's own current.json pointer takes precedence", {
   # registry snapshot says v1; the dataset pointer names a different version
   pointer <- file.path(root, "datasets", "demo", "current.json")
   dir.create(dirname(pointer), recursive = TRUE, showWarnings = FALSE)
-  writeLines(jsonlite::toJSON(list(schema = "beijing_lot_derived_version_v1",
+  writeLines(jsonlite::toJSON(list(schema = "beijing_lot_version_v1",
     label_version = "v2"), auto_unbox = TRUE), pointer)
   reg <- dataset_registry("demo", root = root)
   expect_identical(reg$label_version, "v2")
@@ -286,7 +286,7 @@ test_that("read_dataset follows a versioned derived pointer", {
   }
   newest <- file.path(derived_dir, "labels", "versions", "2026-10-07", "labels.parquet")
   writeLines(jsonlite::toJSON(list(
-    schema = "beijing_lot_derived_version_v1", label_version = "2026-10-07",
+    schema = "beijing_lot_version_v1", label_version = "2026-10-07",
     artifact = list(path = newest, rows = 3L,
                     sha256 = digest::digest(file = newest, algo = "sha256"))), auto_unbox = TRUE),
     file.path(derived_dir, "labels", "current.json"))
@@ -321,4 +321,63 @@ test_that("a versioned derived pointer fails closed on a missing artifact", {
   writeLines(jsonlite::toJSON(catalog, auto_unbox = TRUE),
              file.path(root, "registry", "catalog.json"))
   expect_error(read_dataset("demo", "labels", root = root), "current artifact is missing")
+})
+
+test_that("a base table rejects a play argument", {
+  root <- parquet_fixture()
+  expect_error(read_dataset("demo", "obs", root = root, play = "spf"),
+               "base table 'obs' is not partitioned by play")
+})
+
+test_that("read_dataset reads a single play partition and matches the full table", {
+  root <- parquet_fixture()
+  derived_dir <- file.path(root, "datasets", "demo", "versions", "v1", "derived")
+  labels_dir <- file.path(derived_dir, "labels")
+  dir.create(file.path(labels_dir, "versions", "v1", "by_play"),
+             recursive = TRUE, showWarnings = FALSE)
+
+  full_df <- data.frame(
+    issue = c("26011", "26011", "26012", "26012"),
+    play = c("spf", "jq", "spf", "jq"),
+    option = c("胜", "3球", "平", "1球"),
+    stringsAsFactors = FALSE)
+  full_path <- file.path(labels_dir, "versions", "v1", "labels.parquet")
+  arrow::write_parquet(full_df, full_path)
+
+  parts <- list()
+  for (pl in c("spf", "jq")) {
+    # a shard drops the partition key column and holds only that play's rows
+    part_df <- full_df[full_df$play == pl, setdiff(names(full_df), "play"), drop = FALSE]
+    p <- file.path(labels_dir, "versions", "v1", "by_play", sprintf("play=%s.parquet", pl))
+    arrow::write_parquet(part_df, p)
+    parts[[pl]] <- list(file = basename(p), rows = nrow(part_df),
+                        sha256 = digest::digest(file = p, algo = "sha256"))
+  }
+  writeLines(jsonlite::toJSON(list(
+    label_version = "v1",
+    artifact = list(path = full_path, rows = 4L,
+                    sha256 = digest::digest(file = full_path, algo = "sha256")),
+    partition = list(key = "play", directory = "by_play", parts = parts)),
+    auto_unbox = TRUE), file.path(labels_dir, "current.json"))
+
+  catalog <- jsonlite::fromJSON(file.path(root, "registry", "catalog.json"), simplifyVector = FALSE)
+  catalog$datasets$demo$derived$labels <- list(
+    format = "parquet",
+    location = "frozen:datasets/demo/versions/v1/derived/labels/current.json")
+  writeLines(jsonlite::toJSON(catalog, auto_unbox = TRUE, pretty = TRUE),
+             file.path(root, "registry", "catalog.json"))
+
+  a <- read_dataset("demo", "labels", root = root, play = "spf")
+  expect_identical(attr(a, "partition"), "play")
+  expect_identical(nrow(a), 2L)
+  # the shard omits the partition key itself
+  expect_false("play" %in% names(a))
+  expect_identical(a$issue, c("26011", "26012"))
+
+  whole <- read_dataset("demo", "labels", root = root)
+  expect_identical(nrow(whole), 4L)
+  expect_identical(dplyr::filter(whole, play == "spf")$issue, a$issue)
+
+  expect_error(read_dataset("demo", "labels", root = root, play = "nope"),
+               "no partition for play")
 })

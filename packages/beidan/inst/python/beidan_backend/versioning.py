@@ -24,7 +24,10 @@ from typing import Callable
 
 VERSIONS_DIR = "versions"
 CURRENT_FILE = "current.json"
-VERSION_SCHEMA = "beijing_lot_derived_version_v1"
+VERSION_SCHEMA = "beijing_lot_version_v1"
+# The schema name used before base datasets shared this lifecycle; still read
+# so an older pointer keeps working.
+LEGACY_VERSION_SCHEMAS = ("beijing_lot_derived_version_v1",)
 
 
 class VersionError(RuntimeError):

@@ -68,7 +68,9 @@ suppressMessages(devtools::load_all(file.path(repository_root, "packages/beidan"
 root <- beidan::parquet_root(params$root)
 dataset <- params$dataset
 table <- params$table
-dataset_version <- beidan::dataset_registry(dataset, root = root)$version
+registry <- beidan::dataset_registry(dataset, root = root)
+# the shared lifecycle names it label_version; older pointers used version
+dataset_version <- registry$version %||% registry$label_version
 derived_base <- file.path(root, "datasets", dataset, "versions", dataset_version, "derived", table)
 current <- jsonlite::read_json(file.path(derived_base, "current.json"), simplifyVector = FALSE)
 versions <- sort(list.dirs(file.path(derived_base, "versions"), recursive = FALSE, full.names = FALSE))
@@ -97,7 +99,6 @@ knitr::kable(tibble::tibble(
 派生表由 catalog 登记（**不在**版本 manifest 的 `tables` 内）。它**按 label 版本留档**，
 不就地覆盖：每次发布写入 `derived/play_labels/versions/<label_version>/`，`current.json`
 指向最新版本；同 label 同内容重跑为幂等，**已发布的 label 内容不同则拒绝改写**。
-（旧的单玩法 `spf_labels` 已归入 `derived/superseded/` 保留，不再读取。）
 
 ```{r}
 #| label: spf-registry
@@ -117,20 +118,89 @@ knitr::kable(tibble::tibble(
 
 ## 5. R 侧读取
 
-读取路径与 base 表一致：`read_dataset()` 解析名称 → 从 catalog 取路径与 sha256 →
-Arrow 零拷贝读取 → 按类型契约转换 → 校验。
+读取路径与 base 表一致：`read_dataset()` 解析名称 → 取指针与 sha256 → Arrow 零拷贝读取
+→ 按类型契约转换 → 校验。
 
 ```{r}
 #| label: spf-read
-spf <- beidan::read_dataset(dataset, table)
+full <- beidan::read_dataset(dataset, table)
 knitr::kable(tibble::tibble(
-  `项` = c("行数", "列数", "kind", "version"),
-  `值` = c(format(nrow(spf), big.mark = ","), ncol(spf),
-    attr(spf, "kind"), attr(spf, "version"))))
+  `项` = c("行数", "列数", "kind", "version", "label_version", "partition"),
+  `值` = c(format(nrow(full), big.mark = ","), ncol(full),
+    attr(full, "kind"), attr(full, "version"),
+    attr(full, "label_version"), attr(full, "partition"))))
 knitr::kable(beidan::dataset_contract(dataset, table), caption = "列类型契约（Arrow -> R）")
-knitr::kable(spf |> dplyr::count(play, name = "rows"),
-  caption = "每玩法行数（形状统一：每场每玩法一行）")
-knitr::kable(utils::head(spf, 6))
+knitr::kable(utils::head(full, 6))
+```
+
+### 5.1 按 play 分片读取
+
+派生产物按 `play` 分区：每个版本内 `by_play/play=<play>.parquet` 各带自己的 sha256 与行数。
+`read_dataset(..., play = )` 只读该玩法的一个文件，不扫描其余四个。
+
+```{r}
+#| label: spf-by-play
+per_play <- do.call(rbind, lapply(c("spf", "jq", "ds", "bf", "bq"), function(pl) {
+  x <- beidan::read_dataset(dataset, table, play = pl)
+  tibble::tibble(play = pl, rows = nrow(x), usable = sum(!is.na(x$option)),
+                 partition = attr(x, "partition"), columns = ncol(x))
+}))
+knitr::kable(per_play, caption = "按 play 读取（每行读一个分片）")
+```
+
+分片**不含 `play` 列**——它就是分区键；其余列与全表一致：
+
+```{r}
+#| label: spf-fragment-columns
+knitr::kable(tibble::tibble(
+  `读取方式` = c("全表", "分片"),
+  `列` = c(paste(names(full), collapse = ", "),
+    paste(names(beidan::read_dataset(dataset, table, play = "spf")), collapse = ", "))))
+```
+
+分片与全表过滤必须一致（本报告据此自证）：
+
+```{r}
+#| label: spf-fragment-consistency
+same <- vapply(c("spf", "jq", "ds", "bf", "bq"), function(pl) {
+  fragment <- beidan::read_dataset(dataset, table, play = pl)
+  filtered <- dplyr::filter(full, play == pl)
+  nrow(fragment) == nrow(filtered) && identical(fragment$issue, filtered$issue) &&
+    identical(fragment$option, filtered$option)
+}, logical(1))
+knitr::kable(tibble::tibble(play = names(same), `与全表一致` = unname(same)),
+  caption = "分片读取结果 = 全表按 play 过滤")
+```
+
+### 5.2 base 表按 issue_year 分区
+
+base 表的分区键是 `issue_year`（`observation`、`option_sp`），用法与 `play` 同形但参数不同：
+
+```{r}
+#| label: base-issue-year
+base_part <- do.call(rbind, lapply(c(2009L, 2026L), function(y) {
+  x <- beidan::read_dataset(dataset, "observation", issue_year = y)
+  tibble::tibble(issue_year = y, rows = nrow(x), columns = ncol(x))
+}))
+all_rows <- nrow(beidan::read_dataset(dataset, "observation"))
+knitr::kable(base_part, caption = "base 按 issue_year 读取（仅该年分区）")
+cat("observation 全表:", format(all_rows, big.mark = ","), "行\n")
+```
+
+分区键与用法需对应：`play` 用于派生产物，`issue_year` 用于 base 分区表；用错会 fail-closed：
+
+```{r}
+#| label: partition-misuse
+wrong <- vapply(list(
+  function() beidan::read_dataset(dataset, table, issue_year = 2026),
+  function() beidan::read_dataset(dataset, "observation", play = "spf"),
+  function() beidan::read_dataset(dataset, table, play = "nope")
+), function(f) {
+  tryCatch({ f(); "未报错（异常）" }, error = function(e) substr(conditionMessage(e), 1, 52))
+}, character(1))
+knitr::kable(tibble::tibble(
+  `误用` = c("派生产物传 issue_year", "base 表传 play", "未知 play"),
+  `结果` = wrong), caption = "分区参数误用一律 fail-closed")
 ```
 
 ## 6. 可用率
@@ -140,13 +210,13 @@ knitr::kable(utils::head(spf, 6))
 
 ```{r}
 #| label: spf-usability
-resolved <- sum(!is.na(spf$option))
+resolved <- sum(!is.na(full$option))
 knitr::kable(tibble::tibble(
   `项` = c("总行数", "已解析", "可用率", "未解析"),
-  `值` = c(format(nrow(spf), big.mark = ","), format(resolved, big.mark = ","),
-    sprintf("%.1f%%", 100 * resolved / nrow(spf)),
-    format(nrow(spf) - resolved, big.mark = ","))))
-knitr::kable(spf |> dplyr::group_by(play) |>
+  `值` = c(format(nrow(full), big.mark = ","), format(resolved, big.mark = ","),
+    sprintf("%.1f%%", 100 * resolved / nrow(full)),
+    format(nrow(full) - resolved, big.mark = ","))))
+knitr::kable(full |> dplyr::group_by(play) |>
   dplyr::summarise(usable = sum(!is.na(option)), rows = dplyr::n(), .groups = "drop") |>
   dplyr::mutate(rate = sprintf("%.1f%%", 100 * usable / rows)),
   caption = "五玩法可用率（同一读取方式）")
@@ -181,8 +251,9 @@ knitr::kable(tibble::tibble(
 
 ```{r}
 #| label: spf-era
-spf$issue_year <- as.integer(paste0("20", substr(spf$issue, 1, 2)))
-era <- dplyr::mutate(spf, era = ifelse(issue_year <= 2019, "旧纪元 2009-2019", "新纪元 2020+")) |>
+era <- full |>
+  dplyr::mutate(year = as.integer(paste0("20", substr(issue, 1, 2))),
+                era = ifelse(year <= 2019, "旧纪元 2009-2019", "新纪元 2020+")) |>
   dplyr::group_by(era, play) |>
   dplyr::summarise(rows = dplyr::n(), resolved = sum(!is.na(option)), .groups = "drop") |>
   dplyr::mutate(rate = sprintf("%.1f%%", 100 * resolved / rows))
@@ -190,7 +261,7 @@ knitr::kable(era, caption = "按纪元可用率")
 ```
 
 对照：**若不补全**（直接用 `observation.expected_option`），旧纪元 spf 可用率约 42.7%；
-`spf_labels` 将其提升到上表数值。
+本派生表将其提升到上表数值。
 
 ## 7. 分歧与交叉核对
 
@@ -234,14 +305,13 @@ knitr::kable(by_option, caption = "各玩法标签取值数（spf 3、jq 8、ds 
 - 回填：`PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/backfill_settlement_spf.py`
 - 包测试：`packages/beidan/tests/python/test_settlement_backfill.py`（12 例）与
   `packages/beidan/tests/testthat/test-parquet-dataset.R`（58 断言）
-- 渲染：`quarto render quarto/settlement_spf_labels.qmd --execute --no-cache`
+- 渲染：`quarto render quarto/settlement_play_labels.qmd --execute --no-cache`
 
 限制：
 
 - **派生表按 label 版本留档，不就地覆盖**：`versions/<label_version>/` 不可变，
   `current.json` 指向最新；同 label 同内容重跑为幂等，内容不同则拒绝改写。
   这与 base 表的版本 manifest 是两套机制，但都保证"已发布内容不被静默改写"。
-- 旧的单玩法 `spf_labels` 已停止读取，文件保留在 `derived/superseded/spf_labels/`。
 - 四玩法的 `option` 与归档自身结算**完全一致**（0 处不符）；spf 有 5 处不符，
   全部来自那 10 条已知让球分歧。
 - `known_disagreements` 的 10 条**无第三源可判定**：本仓库 Titan 亚盘不覆盖这些场次
@@ -249,5 +319,7 @@ knitr::kable(by_option, caption = "各玩法标签取值数（spf 3、jq 8、ds 
   `markets/market-record` 的期号范围自 101121 起，也不含 100103。是否采纳 500 的取值
   是策略选择，不是数据判定。
 - 4,897 条未解析中，包含归档无彩果的取消/推迟场次，以及归档未渲染且 500 无记录的近年场次。
-- `issue_year` 仅用于本报告的分纪元展示，不是派生表的列，也不能作为 `read_dataset()` 的
-  `issue_year` 参数（派生表非分区，传该参数会 `stop()`）。
+- 派生产物按 **`play`** 分区（`read_dataset(..., play = )`），base 表按 **`issue_year`** 分区
+  （`read_dataset(..., issue_year = )`）。两者参数不可互换，用错会 `stop()`。
+- 分片列不含分区键（`play`），因此分片读取的列数与全表相差一列；这是刻意的，避免同一信息
+  存两份。

@@ -189,6 +189,11 @@ dataset_table_source <- function(dataset, table, version = NULL, root = NULL,
   version_dir <- file.path(root, "datasets", dataset, "versions", manifest$version)
 
   if (!is.null(manifest$tables[[table]])) {
+    # A base table is partitioned by issue_year, never by play; accepting a
+    # play argument silently would hide a caller's mistake.
+    if (!is.null(play)) {
+      stop("read_dataset: base table '", table, "' is not partitioned by play")
+    }
     entry <- manifest$tables[[table]]
     files <- dataset_table_files(manifest, version_dir, table, issue_year = issue_year)
     hashes <- stats::setNames(
