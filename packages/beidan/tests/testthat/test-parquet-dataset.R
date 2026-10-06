@@ -50,6 +50,18 @@ parquet_fixture <- function() {
       ))
     )
   )
+  # A derived artifact registered in the catalog, not in the version manifest.
+  derived_dir <- file.path(version_dir, "derived")
+  dir.create(derived_dir, recursive = TRUE, showWarnings = FALSE)
+  labels <- arrow::arrow_table(
+    issue = arrow::Array$create(c("26011", "26011")),
+    slot = arrow::Array$create(c(1L, 2L), type = arrow::int16()),
+    handicap = arrow::Array$create(c(0L, -1L), type = arrow::int64()),
+    handicap_source = arrow::Array$create(c("cross_source", "archive"))
+  )
+  derived_path <- file.path(derived_dir, "labels.parquet")
+  arrow::write_parquet(labels, derived_path)
+
   dir.create(file.path(root, "registry"), showWarnings = FALSE)
   writeLines(jsonlite::toJSON(manifest, auto_unbox = TRUE, pretty = TRUE),
              file.path(version_dir, "manifest.json"))
@@ -57,6 +69,20 @@ parquet_fixture <- function() {
                    version = "v1", root = version_dir, partitions = 2L, files = 3L)
   writeLines(jsonlite::toJSON(registry, auto_unbox = TRUE),
              file.path(root, "registry", "demo-parquet-current.json"))
+  catalog <- list(
+    schema = "beijing_lot_catalog_v1",
+    datasets = list(demo = list(
+      kind = "dataset", format = "parquet", version = "v1",
+      location = "frozen:datasets/demo", tables = 2L, rows = 5L,
+      derived = list(labels = list(
+        format = "parquet", rows = 2L,
+        location = paste0("frozen:datasets/demo/versions/v1/derived/labels.parquet"),
+        sha256 = digest::digest(file = derived_path, algo = "sha256")
+      ))
+    ))
+  )
+  writeLines(jsonlite::toJSON(catalog, auto_unbox = TRUE, pretty = TRUE),
+             file.path(root, "registry", "catalog.json"))
   root
 }
 
@@ -109,7 +135,7 @@ test_that("read_dataset refuses an invalid partition or table selection", {
                "partition issue_year=2020 is not published")
   expect_error(read_dataset("demo", "small", root = root, issue_year = 2026),
                "not partitioned")
-  expect_error(read_dataset("demo", "missing", root = root), "not in the version manifest")
+  expect_error(read_dataset("demo", "missing", root = root), "neither a base table")
   expect_error(read_dataset("demo", "obs", root = root, columns = c("nope")),
                "unknown column")
 })
@@ -165,4 +191,68 @@ test_that("real NAS dataset reads consistently when available", {
   # the whole table reconciles with the manifest row count
   expect_identical(as.integer(manifest$row_counts$option_sp),
                    as.integer(nrow(read_dataset("settlement", "option_sp", root = root))))
+})
+
+test_that("derived artifacts are listed from the catalog, base tables from the manifest", {
+  root <- parquet_fixture()
+  expect_setequal(dataset_tables("demo", root = root), c("obs", "small"))
+  expect_identical(dataset_derived_tables("demo", root = root), "labels")
+  # a dataset with no catalog entry yields an empty, not an error
+  expect_identical(dataset_derived_tables("absent", root = root), character(0))
+})
+
+test_that("read_dataset reads a catalog-registered derived artifact", {
+  root <- parquet_fixture()
+  d <- read_dataset("demo", "labels", root = root)
+  expect_s3_class(d, "tbl_df")
+  expect_identical(nrow(d), 2L)
+  expect_identical(names(d), c("issue", "slot", "handicap", "handicap_source"))
+  expect_type(d$issue, "character")
+  expect_type(d$slot, "integer")       # int16 -> integer
+  expect_type(d$handicap, "double")    # int64 -> double
+  expect_identical(attr(d, "kind"), "derived")
+  expect_identical(attr(d, "dataset"), "demo")
+  expect_identical(attr(d, "version"), "v1")
+})
+
+test_that("read_dataset supports projection on a derived artifact", {
+  root <- parquet_fixture()
+  d <- read_dataset("demo", "labels", root = root, columns = c("issue", "handicap"))
+  expect_identical(names(d), c("issue", "handicap"))
+  expect_error(read_dataset("demo", "labels", root = root, columns = "nope"),
+               "unknown column")
+})
+
+test_that("read_dataset verifies a derived artifact against the catalog sha256", {
+  root <- parquet_fixture()
+  expect_identical(nrow(read_dataset("demo", "labels", root = root, verify = TRUE)), 2L)
+  # rewrite with different content; the catalog hash no longer matches
+  target <- file.path(root, "datasets", "demo", "versions", "v1", "derived", "labels.parquet")
+  arrow::write_parquet(
+    arrow::arrow_table(issue = arrow::Array$create(c("26011", "26011", "26011"))), target)
+  expect_error(read_dataset("demo", "labels", root = root, verify = TRUE),
+               "sha256 mismatch|row count")
+})
+
+test_that("read_dataset fails closed for derived misuse", {
+  root <- parquet_fixture()
+  # issue_year is a base-partition concept only
+  expect_error(read_dataset("demo", "labels", root = root, issue_year = 2026),
+               "not partitioned")
+  # a derived artifact is registered in the catalog, not in the version manifest
+  expect_null(dataset_manifest("demo", root = root)$tables$labels)
+  expect_identical(dataset_derived_tables("demo", root = root), "labels")
+  # unknown names are neither base tables nor registered derived artifacts
+  expect_error(read_dataset("demo", "ghost", root = root),
+               "neither a base table")
+})
+
+test_that("dataset_query can aggregate a derived artifact", {
+  skip_if_not_installed("duckdb")
+  root <- parquet_fixture()
+  out <- dataset_query("demo",
+    "SELECT handicap_source, count(*) AS n FROM labels GROUP BY 1 ORDER BY 1",
+    "labels", root = root)
+  expect_identical(nrow(out), 2L)
+  expect_identical(sum(out$n), 2)
 })

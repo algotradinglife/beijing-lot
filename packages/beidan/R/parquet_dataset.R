@@ -109,6 +109,96 @@ dataset_tables <- function(dataset, version = NULL, root = NULL) {
   names(dataset_manifest(dataset, version, root)$tables)
 }
 
+# The catalog is the authoritative list of what data exists; the version
+# manifest describes the base tables only.
+dataset_catalog_entry <- function(dataset, root = NULL) {
+  path <- file.path(parquet_root(root), "registry", "catalog.json")
+  if (!file.exists(path)) return(NULL)
+  catalog <- jsonlite::fromJSON(path, simplifyVector = FALSE)
+  if (!identical(catalog$schema, "beijing_lot_catalog_v1")) {
+    stop("catalog schema must be 'beijing_lot_catalog_v1'; got ", catalog$schema)
+  }
+  catalog$datasets[[dataset]]
+}
+
+#' 列出一个数据集版本的派生产物
+#'
+#' @inheritParams dataset_manifest
+#' @return 字符向量：catalog 登记的派生产物名（排序后）；无登记时为空向量。
+#' @details 派生产物（如 `spf_labels`）由 catalog 登记，不在版本 manifest 的
+#'   `tables` 内。它们与 base 表一样可用 [read_dataset()] 读取。
+#' @export
+dataset_derived_tables <- function(dataset, version = NULL, root = NULL) {
+  entry <- dataset_catalog_entry(dataset, root)
+  if (is.null(entry) || is.null(entry$derived)) return(character(0))
+  sort(names(entry$derived))
+}
+
+# Resolve a `tier:relative/path` token against an already-resolved root.
+resolve_location_token <- function(token, root) {
+  if (!is.character(token) || length(token) != 1L || !grepl(":", token, fixed = TRUE)) {
+    stop("read_dataset: malformed location token: ", paste(token, collapse = ", "))
+  }
+  tier <- sub(":.*$", "", token)
+  relative <- sub("^[^:]*:", "", token)
+  if (!identical(tier, "frozen")) {
+    stop("read_dataset: unsupported location tier '", tier, "' (only 'frozen' is readable)")
+  }
+  file.path(root, relative)
+}
+
+# Resolve one derived artifact registered in the catalog for this version.
+dataset_derived_entry <- function(dataset, table, version = NULL, root = NULL) {
+  entry <- dataset_catalog_entry(dataset, root)
+  if (is.null(entry) || is.null(entry$derived)) return(NULL)
+  derived <- entry$derived[[table]]
+  if (is.null(derived)) return(NULL)
+  if (!is.null(version)) {
+    # A stale catalog would point at another version's file; fail closed.
+    expected <- paste0("versions/", version, "/")
+    if (!grepl(expected, derived$location, fixed = TRUE)) {
+      stop("read_dataset: catalog entry for derived '", table,
+           "' does not belong to version ", version, ": ", derived$location)
+    }
+  }
+  derived
+}
+
+# One resolution path for base tables and derived artifacts: files plus the
+# hashes to verify and the expected total row count.
+dataset_table_source <- function(dataset, table, version = NULL, root = NULL,
+                                 issue_year = NULL) {
+  root <- parquet_root(root)
+  manifest <- dataset_manifest(dataset, version, root)
+  version_dir <- file.path(root, "datasets", dataset, "versions", manifest$version)
+
+  if (!is.null(manifest$tables[[table]])) {
+    entry <- manifest$tables[[table]]
+    files <- dataset_table_files(manifest, version_dir, table, issue_year = issue_year)
+    hashes <- stats::setNames(
+      vapply(entry$files, function(f) f$sha256, character(1)),
+      vapply(entry$files, function(f) f$name, character(1)))
+    return(list(kind = "base", files = files, hashes = hashes,
+                rows = as.integer(entry$rows), version = manifest$version))
+  }
+
+  derived <- dataset_derived_entry(dataset, table, version = manifest$version, root = root)
+  if (is.null(derived)) {
+    stop("read_dataset: table '", table, "' is neither a base table of dataset '",
+         dataset, "' nor a catalog-registered derived artifact")
+  }
+  if (!is.null(issue_year)) {
+    stop("read_dataset: derived '", table, "' is not partitioned (issue_year is not valid)")
+  }
+  path <- resolve_location_token(derived$location, root)
+  if (!file.exists(path)) stop("read_dataset: derived file is missing: ", path)
+  hashes <- if (is.null(derived$sha256)) character(0) else
+    stats::setNames(derived$sha256, basename(path))
+  list(kind = "derived", files = path, hashes = hashes,
+       rows = if (is.null(derived$rows)) NULL else as.integer(derived$rows),
+       version = manifest$version, receipt = derived$receipt)
+}
+
 # Resolve the on-disk files for one table; `issue_year` restricts partitions.
 dataset_table_files <- function(manifest, version_dir, table, issue_year = NULL) {
   entry <- manifest$tables[[table]]
@@ -133,17 +223,12 @@ dataset_table_files <- function(manifest, version_dir, table, issue_year = NULL)
   files
 }
 
-# Verify the selected files against the manifest's recorded size and sha256.
-verify_table_files <- function(manifest, table, files) {
-  entry <- manifest$tables[[table]]
-  recorded <- stats::setNames(
-    vapply(entry$files, function(f) f$sha256, character(1)),
-    vapply(entry$files, function(f) f$name, character(1))
-  )
+# Verify the selected files against the recorded sha256 for each name.
+verify_table_files <- function(files, hashes, table) {
   for (path in files) {
     name <- basename(path)
-    expected <- recorded[[name]]
-    if (is.null(expected)) stop("read_dataset: file '", name, "' is not in the manifest")
+    expected <- hashes[[name]]
+    if (is.null(expected)) stop("read_dataset: file '", name, "' has no recorded sha256")
     actual <- digest::digest(file = path, algo = "sha256")
     if (!identical(actual, expected)) {
       stop("read_dataset: sha256 mismatch for ", path)
@@ -178,10 +263,8 @@ assert_supported_schema <- function(schema) {
 #' @export
 dataset_contract <- function(dataset, table, version = NULL, root = NULL) {
   root <- parquet_root(root)
-  manifest <- dataset_manifest(dataset, version, root)
-  version_dir <- file.path(root, "datasets", dataset, "versions", manifest$version)
-  files <- dataset_table_files(manifest, version_dir, table)
-  schema <- arrow::read_parquet(files[[1]], as_data_frame = FALSE)$schema
+  source <- dataset_table_source(dataset, table, version = version, root = root)
+  schema <- arrow::read_parquet(source$files[[1]], as_data_frame = FALSE)$schema
   assert_supported_schema(schema)
   type_map <- parquet_type_map()
   names_out <- character(schema$num_fields)
@@ -197,14 +280,16 @@ dataset_contract <- function(dataset, table, version = NULL, root = NULL) {
 #' 读取一个 Parquet 数据集表
 #'
 #' @inheritParams dataset_contract
-#' @param issue_year 可选整数年份，仅对分区表有效；给出时只读该年分区文件。
+#' @param issue_year 可选整数年份，仅对分区 base 表有效；给出时只读该年分区文件。
 #' @param columns 可选字符向量，指定要读的列子集；`NULL` 读全部列。
-#' @param verify 逻辑值；`TRUE`（默认）时对读到的每个文件核对 manifest 记录的
-#'   sha256，防止读到被替换或损坏的分区。大文件读取会增加哈希开销。
-#' @return 类型化 tibble。行数与列类型受 manifest 与 [parquet_type_map()] 约束；
-#'   空结果是合法的 0 行 tibble（与"根缺失"错误区分）。
+#' @param verify 逻辑值；`TRUE`（默认）时对读到的每个文件核对记录的 sha256，
+#'   防止读到被替换或损坏的文件。大文件读取会增加哈希开销。
+#' @return 类型化 tibble。行数与列类型受 manifest / catalog 与
+#'   [parquet_type_map()] 约束；空结果是合法的 0 行 tibble（与"根缺失"错误区分）。
 #' @details 读取路径是 **Arrow**（零拷贝）；跨分区聚合请用 [dataset_query()]。
-#'   读到的每个文件的 sha256 与 manifest 绑定，且 `int64` 列映射为 `double`。
+#'   `table` 可以是版本 manifest 里的 base 表，也可以是 catalog 登记的派生产物
+#'   （例如 `settlement` 的 `spf_labels`，见 [dataset_derived_tables()]）；派生产物
+#'   不做分区，其 sha256 与行数取自 catalog 登记，读取时同样校验。
 #'   未在此契约内的 Arrow 类型会 `stop()`，不做静默转换。
 #' @export
 read_dataset <- function(dataset, table, version = NULL, root = NULL,
@@ -212,19 +297,18 @@ read_dataset <- function(dataset, table, version = NULL, root = NULL,
   checkmate::assert_string(table, min.chars = 1L, na.ok = FALSE)
   checkmate::assert_flag(verify)
   root <- parquet_root(root)
-  manifest <- dataset_manifest(dataset, version, root)
-  version_dir <- file.path(root, "datasets", dataset, "versions", manifest$version)
-  files <- dataset_table_files(manifest, version_dir, table, issue_year = issue_year)
+  source <- dataset_table_source(dataset, table, version = version, root = root,
+                                 issue_year = issue_year)
+  files <- source$files
   missing_files <- files[!file.exists(files)]
   if (length(missing_files) > 0L) {
     stop("read_dataset: published file(s) missing: ", paste(missing_files, collapse = ", "))
   }
-  if (verify) verify_table_files(manifest, table, files)
 
   # `columns` selects a projection; `include` is not used, so unknown names error.
   if (!is.null(columns)) {
     checkmate::assert_character(columns, min.len = 1L, any.missing = FALSE, unique = TRUE)
-    available <- names(dataset_contract(dataset, table, version = manifest$version, root = root))
+    available <- names(dataset_contract(dataset, table, version = source$version, root = root))
     unknown <- setdiff(columns, available)
     if (length(unknown) > 0L) {
       stop("read_dataset: unknown column(s): ", paste(unknown, collapse = ", "))
@@ -241,16 +325,25 @@ read_dataset <- function(dataset, table, version = NULL, root = NULL,
     assert_supported_schema(table_schema)
     reader(path)
   })
-  contract <- dataset_contract(dataset, table, version = manifest$version, root = root)
+  contract <- dataset_contract(dataset, table, version = source$version, root = root)
   out <- cast_dataset_columns(tibble::as_tibble(dplyr::bind_rows(tables)), contract)
   out <- tibble::as_tibble(out)
 
-  expected <- manifest$row_counts[[table]]
-  if (!is.null(expected) && is.null(issue_year)) {
-    if (nrow(out) != as.integer(expected)) {
-      stop("read_dataset: row count ", nrow(out), " != manifest ", expected, " for table '", table, "'")
+  # Verify after reading so a corrupt file is reported as corruption, not as a
+  # row-count mismatch.
+  if (verify) verify_table_files(files, source$hashes, table)
+
+  if (!is.null(source$rows) && is.null(issue_year)) {
+    if (nrow(out) != source$rows) {
+      stop("read_dataset: row count ", nrow(out), " != recorded ", source$rows,
+           " for table '", table, "'")
     }
   }
+  attr(out, "dataset") <- dataset
+  attr(out, "table") <- table
+  attr(out, "version") <- source$version
+  attr(out, "kind") <- source$kind
+  if (!is.null(source$receipt)) attr(out, "receipt") <- source$receipt
   out
 }
 
@@ -262,17 +355,16 @@ read_dataset <- function(dataset, table, version = NULL, root = NULL,
 #' @param memory_limit 可选 DuckDB 内存上限（如 `"2GB"`）；`NULL` 用默认。
 #' @param threads 可选整数线程数；`NULL` 用默认。
 #' @return 查询结果 tibble。
-#' @details 在只读连接上对 `read_parquet(<表全部分区 glob>)` 建视图再执行 `sql`，
-#'   适合跨分区聚合；单分区零拷贝读取请用 [read_dataset()]。运行时不写任何文件。
+#' @details 在只读连接上对 `read_parquet(<表全部文件>)` 建视图再执行 `sql`，
+#'   适合跨分区聚合；单分区零拷贝读取请用 [read_dataset()]。`table` 可以是 base
+#'   表或 catalog 登记的派生产物。运行时不写任何文件。
 #' @export
 dataset_query <- function(dataset, sql, table, version = NULL, root = NULL,
                           memory_limit = NULL, threads = NULL) {
   checkmate::assert_string(sql, min.chars = 1L, na.ok = FALSE)
   checkmate::assert_string(table, min.chars = 1L, na.ok = FALSE)
-  root <- parquet_root(root)
-  manifest <- dataset_manifest(dataset, version, root)
-  version_dir <- file.path(root, "datasets", dataset, "versions", manifest$version)
-  files <- dataset_table_files(manifest, version_dir, table)
+  source <- dataset_table_source(dataset, table, version = version, root = root)
+  files <- source$files
   con <- DBI::dbConnect(duckdb::duckdb())
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
   if (!is.null(memory_limit)) DBI::dbExecute(con, paste0("SET memory_limit='", memory_limit, "'"))
