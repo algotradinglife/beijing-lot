@@ -381,3 +381,20 @@ test_that("read_dataset reads a single play partition and matches the full table
   expect_error(read_dataset("demo", "labels", root = root, play = "nope"),
                "no partition for play")
 })
+
+test_that("read_dataset filters rows by issue and fails on an absent one", {
+  root <- parquet_fixture()
+  full <- read_dataset("demo", "obs", root = root)
+  one <- read_dataset("demo", "obs", root = root, issue = "26011")
+  expect_true(nrow(one) < nrow(full))
+  expect_setequal(unique(one$issue), "26011")
+  expect_identical(one$issue, dplyr::filter(full, issue == "26011")$issue)
+
+  # issue is a column filter and can combine with a partition selection
+  expect_identical(nrow(read_dataset("demo", "obs", root = root,
+                                     issue = "26011", issue_year = 2026)), nrow(one))
+
+  # an issue the table does not hold is an error, not an empty tibble
+  expect_error(read_dataset("demo", "obs", root = root, issue = "999999"),
+               "issue\\(s\\) not present")
+})

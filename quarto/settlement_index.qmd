@@ -1,0 +1,247 @@
+---
+title: "settlement 数据索引：位置、函数与巡检"
+date: "2026-10-06"
+params:
+  root: !expr Sys.getenv("BEIDAN_PARQUET_ROOT", unset = "/mnt/nas/Data/beijing-lot")
+  dataset: "settlement"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: false
+execute:
+  echo: true
+  warning: true
+  cache: false
+  freeze: false
+  error: false
+---
+
+本报告是 `settlement` 的**索引与巡检入口**：存储位置在哪、用哪些函数读写、以及一次
+用 `read_dataset()` 与 `dataset_query()` 做的**全表完整性巡检**。
+
+分工：**位置与函数清单**说明"东西在哪、怎么用"；**巡检**用同一套读取函数核对
+"读出来的东西是否与登记一致"。两者都用公开接口，不绕过 `beidan` 直接读文件。
+
+## 1. 存储位置
+
+```{r}
+#| label: idx-config
+#| include: false
+repository_root <- rprojroot::find_root(rprojroot::has_file("config/parquet_layout.json"))
+suppressMessages(devtools::load_all(file.path(repository_root, "packages/beidan"), quiet = TRUE))
+root <- beidan::parquet_root(params$root)
+dataset <- params$dataset
+registry <- beidan::dataset_registry(dataset, root = root)
+dataset_version <- registry$version %||% registry$label_version
+version_dir <- file.path(root, "datasets", dataset, "versions", dataset_version)
+```
+
+```{r}
+#| label: idx-locations
+base_tables <- beidan::dataset_tables(dataset, root = root)
+derived <- beidan::dataset_derived_tables(dataset, root = root)
+pointer <- file.path(root, "datasets", dataset, "current.json")
+knitr::kable(tibble::tibble(
+  `用途` = c("数据根", "数据集指针", "版本目录", "base 表目录", "base 分区目录",
+    "派生指针", "派生版本目录", "唯一清单", "schema 契约", "交叉源快照", "退役账本"),
+  `路径` = c(root,
+    substring(pointer, nchar(root) + 2L),
+    file.path("datasets", dataset, "versions", dataset_version),
+    file.path("datasets", dataset, "versions", dataset_version, "tables"),
+    file.path("datasets", dataset, "versions", dataset_version, "tables/observation"),
+    file.path("datasets", dataset, "versions", dataset_version, "derived/play_labels/current.json"),
+    file.path("datasets", dataset, "versions", dataset_version, "derived/play_labels/versions"),
+    "registry/catalog.json",
+    paste0("schemas/", registry$schema_id %||% "beijing_lot_settlement_v1.json"),
+    "backfill/settlement_500/handicap_line.csv",
+    "registry/parquet-retirement.json")),
+  caption = "settlement 的全部存储位置（相对数据根）")
+```
+
+## 2. 分区结构
+
+base 表按 **`issue_year`** 物理分区（`observation`、`option_sp`），其余 17 张为整表；
+派生产物按 **`play`** 分区（`by_play/play=<play>.parquet`）。
+
+```{r}
+#| label: idx-partitions
+years <- sort(as.integer(sub(".*issue-year=([0-9]+)\\.parquet", "\\1",
+  list.files(file.path(version_dir, "tables/observation")))))
+knitr::kable(tibble::tibble(
+  `对象` = c("base observation", "base option_sp", "base 其余表", "derived play_labels"),
+  `分区键` = c("issue_year", "issue_year", "无", "play"),
+  `分区数` = c(length(years),
+    length(list.files(file.path(version_dir, "tables/option_sp"))),
+    length(base_tables) - 2L,
+    length(list.files(file.path(version_dir, "derived/play_labels/versions",
+      jsonlite::read_json(file.path(version_dir, "derived/play_labels/current.json"),
+                          simplifyVector = FALSE)$label_version, "by_play")))),
+  `范围` = c(paste(range(years), collapse = "–"), paste(range(years), collapse = "–"), "", "spf/jq/ds/bf/bq")))
+```
+
+## 3. 函数清单
+
+### 3.1 R 调用（`beidan` 包）
+
+```{r}
+#| label: idx-r-functions
+knitr::kable(tibble::tibble(
+  `函数` = c("parquet_root", "dataset_registry", "dataset_manifest", "dataset_tables",
+    "dataset_derived_tables", "dataset_contract", "read_dataset", "dataset_query",
+    "parquet_type_map"),
+  `用途` = c("解析数据根（未挂载即 stop）",
+    "读数据集指针（优先 current.json，回退 registry 快照）",
+    "读版本 manifest（来源身份、行数、逐文件 sha256）",
+    "列 base 表名", "列派生产物名", "列类型契约（Arrow→R）",
+    "读表：base 传 issue_year、派生传 play、按期过滤传 issue",
+    "DuckDB 聚合（只读，单表）", "Arrow→R 类型映射")),
+  caption = "R 侧公开接口")
+```
+
+### 3.2 包内 Python 管理函数
+
+```{r}
+#| label: idx-py-functions
+knitr::kable(tibble::tibble(
+  `模块` = c("catalog/paths.py", "catalog/registry.py", "versioning.py",
+    "datasets/settlement_parquet.py", "settlement_backfill.py"),
+  `函数` = c("root_path, location, catalog_root, dataset_path, schema_path",
+    "load_catalog, catalog_entry(s), schema_entry, catalog_path",
+    "publish_version, list_versions, read_current, point_current_at_newest, content_digest",
+    "convert_settlement, verify_manifest, write_whole_table, write_partitioned_table",
+    "derive_play_labels, play_label, load_cross_source, publish_version, write_parquet_atomically")),
+  caption = "包内 Python 管理接口")
+```
+
+### 3.3 命令行入口
+
+```{r}
+#| label: idx-cli
+knitr::kable(tibble::tibble(
+  `脚本` = c("scripts/convert_settlement_parquet.py", "scripts/backfill_settlement_spf.py"),
+  `作用` = c("base 转换与校验", "派生标签生成与发布"),
+  `关键参数` = c("--registry(必填), --root, --version, --verify",
+    "--label-version, --cross, --list-versions")),
+  caption = "命令行入口")
+```
+
+### 3.4 用法
+
+```{r}
+#| label: idx-usage
+#| eval: false
+# base：整表、按年分区、按期过滤
+beidan::read_dataset("settlement", "observation")
+beidan::read_dataset("settlement", "observation", issue_year = 2026)
+beidan::read_dataset("settlement", "observation", issue = "26011")
+
+# derived：全表、按玩法分片、分片内按期过滤
+beidan::read_dataset("settlement", "play_labels")
+beidan::read_dataset("settlement", "play_labels", play = "spf")
+beidan::read_dataset("settlement", "play_labels", play = "spf", issue = "26011")
+
+# 聚合（DuckDB，只读）
+beidan::dataset_query("settlement",
+  "SELECT play, count(*) AS n FROM play_labels GROUP BY 1 ORDER BY 1", "play_labels")
+```
+
+## 4. 全表完整性巡检
+
+巡检用 `read_dataset()` 读**每一张**表，与版本 manifest 登记的行数比对；再用
+`dataset_query()` 做跨行聚合核对。读取默认校验逐文件 sha256。
+
+```{r}
+#| label: idx-audit-base
+manifest <- beidan::dataset_manifest(dataset, root = root)
+audit <- dplyr::bind_rows(lapply(base_tables, function(t) {
+  d <- beidan::read_dataset(dataset, t, root = root)
+  tibble::tibble(table = t, rows = nrow(d),
+                 recorded = as.integer(manifest$row_counts[[t]]),
+                 columns = ncol(d),
+                 matches = nrow(d) == as.integer(manifest$row_counts[[t]]))
+}))
+knitr::kable(audit, caption = "base 19 表：读取行数 vs manifest 登记")
+cat("表数:", nrow(audit), "| 全部一致:", all(audit$matches),
+    "| 总行数:", format(sum(audit$rows), big.mark = ","), "\n")
+```
+
+```{r}
+#| label: idx-audit-derived
+labels <- beidan::read_dataset(dataset, derived[[1]], root = root)
+per_play <- dplyr::bind_rows(lapply(c("spf", "jq", "ds", "bf", "bq"), function(p) {
+  a <- beidan::read_dataset(dataset, derived[[1]], root = root, play = p)
+  b <- dplyr::filter(labels, play == p)
+  tibble::tibble(play = p, rows = nrow(a), usable = sum(!is.na(a$option)),
+                 matches_full = nrow(a) == nrow(b) && identical(a$issue, b$issue))
+}))
+knitr::kable(per_play, caption = "派生表：分片读取 vs 全表过滤")
+cat("每场每玩法一行:", nrow(labels) == 5L * length(unique(labels$slot[labels$play == "spf"])),
+    "| 分片全部一致:", all(per_play$matches_full), "\n")
+```
+
+```{r}
+#| label: idx-audit-cross
+obs_counts <- beidan::dataset_query(dataset,
+  "SELECT play, count(*) AS n FROM observation GROUP BY play ORDER BY play", "observation")
+knitr::kable(obs_counts, caption = "dataset_query：observation 每玩法行数")
+key_counts <- beidan::dataset_query(dataset,
+  "SELECT count(*) AS rows, count(DISTINCT observation_id) AS ids FROM observation", "observation")
+knitr::kable(key_counts, caption = "dataset_query：主键唯一性")
+```
+
+```{r}
+#| label: idx-audit-keys
+obs <- beidan::read_dataset(dataset, "observation", root = root)
+osp <- beidan::read_dataset(dataset, "option_sp", root = root)
+o_ids <- unique(obs$observation_id); s_ids <- unique(osp$observation_id)
+knitr::kable(tibble::tibble(
+  `检查` = c("observation 唯一 observation_id", "option_sp 唯一 observation_id",
+    "observation 无对应选项", "option_sp 有而 observation 无",
+    "option_sp 重复 (observation_id, option)", "option_sp sp 为 NA"),
+  `值` = c(format(length(o_ids), big.mark = ","), format(length(s_ids), big.mark = ","),
+    format(length(setdiff(o_ids, s_ids)), big.mark = ","),
+    format(length(setdiff(s_ids, o_ids)), big.mark = ","),
+    sum(duplicated(osp[c("observation_id", "option")])),
+    format(sum(is.na(osp$sp)), big.mark = ","))),
+  caption = "observation × option_sp 键完整性")
+```
+
+### 4.1 巡检发现的两处，及其定性
+
+```{r}
+#| label: idx-audit-findings
+no_opt <- obs |> dplyr::filter(!observation_id %in% s_ids)
+knitr::kable(no_opt |> dplyr::count(score, name = "rows") |>
+  dplyr::arrange(dplyr::desc(rows)), caption = "无选项的 observation：按比分形态")
+
+era_of <- function(x) ifelse(as.integer(paste0("20", substr(x, 1, 2))) <= 2019, "旧纪元", "新纪元")
+# option_sp has no issue column of its own, so the era comes from observation
+sp_era <- osp |>
+  dplyr::left_join(obs |> dplyr::select(observation_id, issue), by = "observation_id") |>
+  dplyr::mutate(era = era_of(issue))
+knitr::kable(tibble::tibble(
+  `项` = c("sp 为 NA 且 raw_sp 为空", "sp 为 NA 但 raw_sp 有值",
+    "sp 为 NA：旧纪元", "sp 为 NA：新纪元"),
+  `值` = c(format(sum(is.na(osp$sp) & osp$raw_sp == "", na.rm = TRUE), big.mark = ","),
+    format(sum(is.na(osp$sp) & !is.na(osp$raw_sp) & osp$raw_sp != ""), big.mark = ","),
+    format(sum(is.na(sp_era$sp) & sp_era$era == "旧纪元"), big.mark = ","),
+    format(sum(is.na(sp_era$sp) & sp_era$era == "新纪元"), big.mark = ","))),
+  caption = "sp 为 NA 的构成")
+```
+
+
+两处都**不是损坏**：
+
+- **无选项的 9,645 行**：全是 `取消 / 推迟 / 中断 / 腰斩`（旧纪元每玩法 1,879、新纪元 50），
+  比赛未发生，本就没有选项向量。
+- **`sp` 为 NA 的 4,617,131 行**：其中 4,606,733 行的 `raw_sp` 为空——归档**未提供**该选项的
+  赔率（新纪元各玩法只保留结算向量，未结算项无值），不是解析失败。旧纪元仅 9,049 行。
+
+## 5. 验证与限制
+
+- 巡检命令：`quarto render quarto/settlement_index.qmd --execute --no-cache`
+- 每次读取默认校验逐文件 sha256；行数与 manifest 不一致会 `stop()`。
+- `dataset_query()` 一次只注册**一张表**，跨表联接需在 R 侧完成（本报告第 4 节即如此）。
+- `issue` 是**列过滤**，`issue_year` 是**物理分区选择**；两者可叠加，用错会 `stop()`。
+- 巡检为**读取一致性**检查，不重算来源 SQLite；来源身份绑定在 manifest 的 `source$sha256`。

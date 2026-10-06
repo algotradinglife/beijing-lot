@@ -12,7 +12,8 @@ read_dataset(
   issue_year = NULL,
   columns = NULL,
   verify = TRUE,
-  play = NULL
+  play = NULL,
+  issue = NULL
 )
 }
 \arguments{
@@ -33,6 +34,10 @@ read_dataset(
 
 \item{play}{可选字符串，仅对按 \code{play} 分区的派生产物有效（如 \code{play_labels}）；
 给出时只读该玩法的分片文件，避免扫描全部五个玩法。}
+
+\item{issue}{可选字符向量，按期号过滤行（\code{issue} 是各表的列，不是物理分区）。
+给出时只返回这些期号的行；请求了不存在的期号会 \code{stop()}，不静默返回空表。
+与 \code{issue_year} 的区别：\code{issue_year} 选物理分区文件，\code{issue} 过滤分区内的行。}
 }
 \value{
 类型化 tibble。行数与列类型受 manifest / catalog 与

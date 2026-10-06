@@ -348,6 +348,9 @@ dataset_contract <- function(dataset, table, version = NULL, root = NULL) {
 #' @param columns 可选字符向量，指定要读的列子集；`NULL` 读全部列。
 #' @param play 可选字符串，仅对按 `play` 分区的派生产物有效（如 `play_labels`）；
 #'   给出时只读该玩法的分片文件，避免扫描全部五个玩法。
+#' @param issue 可选字符向量，按期号过滤行（`issue` 是各表的列，不是物理分区）。
+#'   给出时只返回这些期号的行；请求了不存在的期号会 `stop()`，不静默返回空表。
+#'   与 `issue_year` 的区别：`issue_year` 选物理分区文件，`issue` 过滤分区内的行。
 #' @param verify 逻辑值；`TRUE`（默认）时对读到的每个文件核对记录的 sha256，
 #'   防止读到被替换或损坏的文件。大文件读取会增加哈希开销。
 #' @return 类型化 tibble。行数与列类型受 manifest / catalog 与
@@ -360,9 +363,12 @@ dataset_contract <- function(dataset, table, version = NULL, root = NULL) {
 #' @export
 read_dataset <- function(dataset, table, version = NULL, root = NULL,
                          issue_year = NULL, columns = NULL, verify = TRUE,
-                         play = NULL) {
+                         play = NULL, issue = NULL) {
   checkmate::assert_string(table, min.chars = 1L, na.ok = FALSE)
   checkmate::assert_flag(verify)
+  if (!is.null(issue)) {
+    checkmate::assert_character(issue, min.len = 1L, any.missing = FALSE)
+  }
   root <- parquet_root(root)
   source <- dataset_table_source(dataset, table, version = version, root = root,
                                  issue_year = issue_year, play = play)
@@ -400,7 +406,19 @@ read_dataset <- function(dataset, table, version = NULL, root = NULL,
   # row-count mismatch.
   if (verify) verify_table_files(files, source$hashes, table)
 
-  if (!is.null(source$rows) && is.null(issue_year)) {
+  # `issue` filters rows (it is a column, not a partition). Requesting an issue
+  # the table does not hold fails rather than returning an empty tibble, which
+  # would be indistinguishable from "this issue has no rows".
+  if (!is.null(issue)) {
+    absent <- setdiff(issue, unique(out$issue))
+    if (length(absent) > 0L) {
+      stop("read_dataset: issue(s) not present: ", paste(absent, collapse = ", "))
+    }
+    out <- dplyr::filter(out, .data$issue %in% .env$issue)
+    out <- tibble::as_tibble(out)
+  }
+
+  if (!is.null(source$rows) && is.null(issue_year) && is.null(issue)) {
     if (nrow(out) != source$rows) {
       stop("read_dataset: row count ", nrow(out), " != recorded ", source$rows,
            " for table '", table, "'")
