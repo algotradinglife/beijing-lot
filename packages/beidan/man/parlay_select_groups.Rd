@@ -11,8 +11,7 @@ parlay_select_groups(
   min_group_ev_cny = NULL,
   group_budget_cny = 256,
   reuse_policy = list(max_reuse = NULL),
-  overlap_policy = list(max_overlap = NULL),
-  triple_ranking = "beidan"
+  overlap_policy = list(max_overlap = NULL)
 )
 }
 \arguments{
@@ -35,11 +34,6 @@ Zero allows no purchases and returns typed empty ledgers.}
 
 \item{overlap_policy}{List(max_overlap); NULL limit means unlimited. Every
 shared fixture counts, including actual full triples.}
-
-\item{triple_ranking}{beidan, uniform, or uniform_balanced. Uniform policies
-use equal weights on actual triples; balanced greedily spreads single/pair
-outcomes within exact score ties. Probabilities/EV unchanged. Deduplication
-and unequal score tiers can prevent balance; no optimality guarantee.}
 }
 \value{
 List(evaluation, selection, summary, excluded, receipt, diagnostics).

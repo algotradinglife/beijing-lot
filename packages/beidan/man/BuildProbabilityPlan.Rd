@@ -7,11 +7,9 @@ BuildProbabilityPlan(inputs, cutoff, settings, group_budget_cny,
  model_config = list(rho = -.14, total_bounds = c(.1, 16), tail_tolerance = 1e-10),
  single_threshold = .45, top1_sp_threshold = 2, pattern = NULL, window_hours = c(4, 28),
  max_candidates = NULL, objective = "coverage", min_group_ev_cny = NULL,
- reuse_policy = list(max_reuse = NULL), overlap_policy = list(max_overlap = NULL),
- triple_ranking = "beidan")
+ reuse_policy = list(max_reuse = NULL), overlap_policy = list(max_overlap = NULL))
 }
 \arguments{
-\item{triple_ranking}{beidan, uniform or uniform_balanced. Balanced greedily spreads single and pair triple outcomes within exact score ties; probabilities and EV unchanged. Deduplication may disrupt balance.}
 \item{inputs}{Raw match input list from \code{read_match_inputs()}. Beidan requires fixtures, prematch_sp and match_status; euro/totals are unused and optional.}
 \item{cutoff}{Explicit issue decision context with character issue_id and UTC POSIXct cutoff_utc. Mismatched issue/source chronology fails closed.}
 \item{settings}{Explicit validated \code{parlay_settings()} list, including n_legs, issue_budget_cny, unit_cny, payout_factor and SP valuation policy. Not mutated.}

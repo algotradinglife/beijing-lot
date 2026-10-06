@@ -11,8 +11,7 @@ read_dataset(
   root = NULL,
   issue_year = NULL,
   columns = NULL,
-  verify = TRUE,
-  play = NULL
+  verify = TRUE
 )
 }
 \arguments{
@@ -24,27 +23,22 @@ read_dataset(
 
 \item{root}{见 \code{\link[=parquet_root]{parquet_root()}}。}
 
-\item{issue_year}{可选整数年份，仅对分区 base 表有效；给出时只读该年分区文件。}
+\item{issue_year}{可选整数年份，仅对分区表有效；给出时只读该年分区文件。}
 
 \item{columns}{可选字符向量，指定要读的列子集；\code{NULL} 读全部列。}
 
-\item{verify}{逻辑值；\code{TRUE}（默认）时对读到的每个文件核对记录的 sha256，
-防止读到被替换或损坏的文件。大文件读取会增加哈希开销。}
-
-\item{play}{可选字符串，仅对按 \code{play} 分区的派生产物有效（如 \code{play_labels}）；
-给出时只读该玩法的分片文件，避免扫描全部五个玩法。}
+\item{verify}{逻辑值；\code{TRUE}（默认）时对读到的每个文件核对 manifest 记录的
+sha256，防止读到被替换或损坏的分区。大文件读取会增加哈希开销。}
 }
 \value{
-类型化 tibble。行数与列类型受 manifest / catalog 与
-\code{\link[=parquet_type_map]{parquet_type_map()}} 约束；空结果是合法的 0 行 tibble（与"根缺失"错误区分）。
+类型化 tibble。行数与列类型受 manifest 与 \code{\link[=parquet_type_map]{parquet_type_map()}} 约束；
+空结果是合法的 0 行 tibble（与"根缺失"错误区分）。
 }
 \description{
 读取一个 Parquet 数据集表
 }
 \details{
 读取路径是 \strong{Arrow}（零拷贝）；跨分区聚合请用 \code{\link[=dataset_query]{dataset_query()}}。
-\code{table} 可以是版本 manifest 里的 base 表，也可以是 catalog 登记的派生产物
-（例如 \code{settlement} 的 \code{spf_labels}，见 \code{\link[=dataset_derived_tables]{dataset_derived_tables()}}）；派生产物
-不做分区，其 sha256 与行数取自 catalog 登记，读取时同样校验。
+读到的每个文件的 sha256 与 manifest 绑定，且 \code{int64} 列映射为 \code{double}。
 未在此契约内的 Arrow 类型会 \code{stop()}，不做静默转换。
 }
