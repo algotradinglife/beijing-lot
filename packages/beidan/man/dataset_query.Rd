@@ -36,6 +36,7 @@ dataset_query(
 用 DuckDB 对数据集表做聚合
 }
 \details{
-在只读连接上对 \verb{read_parquet(<表全部分区 glob>)} 建视图再执行 \code{sql}，
-适合跨分区聚合；单分区零拷贝读取请用 \code{\link[=read_dataset]{read_dataset()}}。运行时不写任何文件。
+在只读连接上对 \verb{read_parquet(<表全部文件>)} 建视图再执行 \code{sql}，
+适合跨分区聚合；单分区零拷贝读取请用 \code{\link[=read_dataset]{read_dataset()}}。\code{table} 可以是 base
+表或 catalog 登记的派生产物。运行时不写任何文件。
 }
