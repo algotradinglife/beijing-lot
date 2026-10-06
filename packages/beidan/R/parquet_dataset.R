@@ -78,11 +78,19 @@ cast_dataset_columns <- function(data, contract) {
 #' @export
 dataset_registry <- function(dataset, root = NULL) {
   checkmate::assert_string(dataset, min.chars = 1L, na.ok = FALSE)
-  path <- file.path(parquet_root(root), "registry", paste0(dataset, "-parquet-current.json"))
-  if (!file.exists(path)) {
-    stop("dataset_registry: no registry for dataset '", dataset, "': ", path)
+  root <- parquet_root(root)
+  # The dataset's own pointer is authoritative and is what the converter
+  # maintains; the registry copy is a snapshot kept for older readers.
+  pointer <- file.path(root, "datasets", dataset, "current.json")
+  if (file.exists(pointer)) {
+    current <- jsonlite::fromJSON(pointer, simplifyVector = FALSE)
+    return(c(current, list(path = pointer)))
   }
-  jsonlite::fromJSON(path, simplifyVector = FALSE)
+  path <- file.path(root, "registry", paste0(dataset, "-parquet-current.json"))
+  if (!file.exists(path)) {
+    stop("dataset_registry: no registry or pointer for dataset '", dataset, "': ", path)
+  }
+  c(jsonlite::fromJSON(path, simplifyVector = FALSE), list(path = path))
 }
 
 #' 读一个已发布版本的 manifest
@@ -94,7 +102,15 @@ dataset_registry <- function(dataset, root = NULL) {
 #' @export
 dataset_manifest <- function(dataset, version = NULL, root = NULL) {
   root <- parquet_root(root)
-  if (is.null(version)) version <- dataset_registry(dataset, root)$version
+  if (is.null(version)) {
+    registry <- dataset_registry(dataset, root)
+    # The dataset pointer uses the shared `label_version` vocabulary; the older
+    # registry snapshot uses `version`. Accept either.
+    version <- registry$version %||% registry$label_version
+    if (is.null(version)) {
+      stop("dataset_manifest: registry names no version for dataset '", dataset, "'")
+    }
+  }
   path <- file.path(root, "datasets", dataset, "versions", version, "manifest.json")
   if (!file.exists(path)) stop("dataset_manifest: version is not published: ", path)
   jsonlite::fromJSON(path, simplifyVector = FALSE)
@@ -167,7 +183,7 @@ dataset_derived_entry <- function(dataset, table, version = NULL, root = NULL) {
 # One resolution path for base tables and derived artifacts: files plus the
 # hashes to verify and the expected total row count.
 dataset_table_source <- function(dataset, table, version = NULL, root = NULL,
-                                 issue_year = NULL) {
+                                 issue_year = NULL, play = NULL) {
   root <- parquet_root(root)
   manifest <- dataset_manifest(dataset, version, root)
   version_dir <- file.path(root, "datasets", dataset, "versions", manifest$version)
@@ -188,7 +204,7 @@ dataset_table_source <- function(dataset, table, version = NULL, root = NULL,
          dataset, "' nor a catalog-registered derived artifact")
   }
   if (!is.null(issue_year)) {
-    stop("read_dataset: derived '", table, "' is not partitioned (issue_year is not valid)")
+    stop("read_dataset: derived '", table, "' is not partitioned by issue_year")
   }
   # A derived artifact may be versioned: its location then names a
   # `current.json` pointer, and the artifact path/hash live in that pointer so a
@@ -196,6 +212,7 @@ dataset_table_source <- function(dataset, table, version = NULL, root = NULL,
   pointer <- resolve_location_token(derived$location, root)
   if (!file.exists(pointer)) stop("read_dataset: derived location is missing: ", pointer)
   label_version <- NULL
+  partition_files <- NULL
   if (identical(basename(pointer), "current.json")) {
     current <- jsonlite::fromJSON(pointer, simplifyVector = FALSE)
     artifact <- current$artifact$path
@@ -207,17 +224,38 @@ dataset_table_source <- function(dataset, table, version = NULL, root = NULL,
     path <- artifact
     recorded_sha <- current$artifact$sha256
     rows <- current$artifact$rows
+    partition_files <- current$partition
   } else {
     path <- pointer
     recorded_sha <- derived$sha256
     rows <- derived$rows
+  }
+  # A play-partitioned artifact: a `play` argument selects one file, so taking a
+  # single play does not read all five. Verified against the partition's own
+  # recorded sha256.
+  if (!is.null(play) && is.list(partition_files) &&
+      identical(partition_files$key, "play")) {
+    parts <- partition_files$parts
+    if (is.null(parts[[play]])) {
+      stop("read_dataset: no partition for play '", play, "'; available: ",
+           paste(names(parts), collapse = ", "))
+    }
+    wanted <- file.path(dirname(path), partition_files$directory, parts[[play]]$file)
+    if (!file.exists(wanted)) {
+      stop("read_dataset: play partition is missing: ", wanted)
+    }
+    return(list(kind = "derived", files = wanted,
+                hashes = stats::setNames(parts[[play]]$sha256, basename(wanted)),
+                rows = as.integer(parts[[play]]$rows),
+                version = manifest$version, receipt = derived$receipt,
+                label_version = label_version, partition = "play", play = play))
   }
   hashes <- if (is.null(recorded_sha)) character(0) else
     stats::setNames(recorded_sha, basename(path))
   list(kind = "derived", files = path, hashes = hashes,
        rows = if (is.null(rows)) NULL else as.integer(rows),
        version = manifest$version, receipt = derived$receipt,
-       label_version = label_version)
+       label_version = label_version, partition = if (is.null(partition_files)) NULL else "play")
 }
 
 # Resolve the on-disk files for one table; `issue_year` restricts partitions.
@@ -303,6 +341,8 @@ dataset_contract <- function(dataset, table, version = NULL, root = NULL) {
 #' @inheritParams dataset_contract
 #' @param issue_year 可选整数年份，仅对分区 base 表有效；给出时只读该年分区文件。
 #' @param columns 可选字符向量，指定要读的列子集；`NULL` 读全部列。
+#' @param play 可选字符串，仅对按 `play` 分区的派生产物有效（如 `play_labels`）；
+#'   给出时只读该玩法的分片文件，避免扫描全部五个玩法。
 #' @param verify 逻辑值；`TRUE`（默认）时对读到的每个文件核对记录的 sha256，
 #'   防止读到被替换或损坏的文件。大文件读取会增加哈希开销。
 #' @return 类型化 tibble。行数与列类型受 manifest / catalog 与
@@ -314,12 +354,13 @@ dataset_contract <- function(dataset, table, version = NULL, root = NULL) {
 #'   未在此契约内的 Arrow 类型会 `stop()`，不做静默转换。
 #' @export
 read_dataset <- function(dataset, table, version = NULL, root = NULL,
-                         issue_year = NULL, columns = NULL, verify = TRUE) {
+                         issue_year = NULL, columns = NULL, verify = TRUE,
+                         play = NULL) {
   checkmate::assert_string(table, min.chars = 1L, na.ok = FALSE)
   checkmate::assert_flag(verify)
   root <- parquet_root(root)
   source <- dataset_table_source(dataset, table, version = version, root = root,
-                                 issue_year = issue_year)
+                                 issue_year = issue_year, play = play)
   files <- source$files
   missing_files <- files[!file.exists(files)]
   if (length(missing_files) > 0L) {
@@ -365,6 +406,7 @@ read_dataset <- function(dataset, table, version = NULL, root = NULL,
   attr(out, "version") <- source$version
   attr(out, "kind") <- source$kind
   if (!is.null(source$label_version)) attr(out, "label_version") <- source$label_version
+  if (!is.null(source$partition)) attr(out, "partition") <- source$partition
   if (!is.null(source$receipt)) attr(out, "receipt") <- source$receipt
   out
 }

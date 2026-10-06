@@ -98,12 +98,24 @@ def test_verify_detects_tampering(tmp_path):
     assert any(p.endswith("receipt.parquet") for p in result["mismatches"])
 
 
-def test_reconversion_refuses_to_overwrite(tmp_path):
+def test_reconversion_is_idempotent_and_refuses_new_content(tmp_path):
     _manifest, version_dir = _convert(tmp_path)
     database = tmp_path / "source.sqlite"
-    with pytest.raises(sp.DatasetConversionError, match="already published"):
-        sp.convert_settlement(
-            database=database, output_root=tmp_path / "root", version="fixture-v1")
+    root = tmp_path / "root"
+
+    # identical content: republishing the same label is a no-op, not an error
+    again = sp.convert_settlement(
+        database=database, output_root=root, version="fixture-v1")
+    assert again["version"] == "fixture-v1"
+    assert version_dir.is_dir()
+
+    # different content under a finalized label is refused
+    conn = sqlite3.connect(database)
+    conn.execute("INSERT INTO receipt VALUES ('{\"k\":2}')")
+    conn.commit()
+    conn.close()
+    with pytest.raises(sp.DatasetConversionError, match="already published with different content"):
+        sp.convert_settlement(database=database, output_root=root, version="fixture-v1")
 
 
 def test_missing_source_and_missing_root_fail_closed(tmp_path):

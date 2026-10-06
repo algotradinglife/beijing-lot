@@ -26,7 +26,9 @@ NULL allows the full legal support. Cash below one unit remains unspent.}
 
 \item{triple_ranking}{beidan (original probabilities) or uniform (1/3 scoring
 weights for actual triple legs only). Ticket probabilities/EV stay original.
-Equal scores use canonical ticket_id and can concentrate triple outcomes.}
+uniform uses ticket_id ties; uniform_balanced greedily balances single/pair
+triple outcomes within exact score ties, then uses ticket_id. Deduplication
+may disrupt balance; neither policy guarantees exact balance.}
 }
 \value{
 Standard frozen evaluation with allocation tibble and replay-bound

@@ -235,8 +235,14 @@ def test_write_json_atomically_writes_and_replaces(tmp_path):
 # --- versioned publication -------------------------------------------------
 
 def _table(rows):
+    """A minimal play-partitioned fixture: one row per play per fixture."""
     import pyarrow as pa
-    return pa.table({"issue": [f"2600{i}" for i in range(rows)]})
+    issues, plays = [], []
+    for i in range(rows):
+        for play in bf.PLAYS:
+            issues.append(f"2600{i}")
+            plays.append(play)
+    return pa.table({"issue": issues, "play": plays})
 
 
 def test_publish_version_creates_pointer_and_listing(tmp_path):
@@ -248,7 +254,12 @@ def test_publish_version_creates_pointer_and_listing(tmp_path):
     assert record["versions"] == ["2026-10-06"]
     current = json.loads((base / "current.json").read_text())
     assert current["label_version"] == "2026-10-06"
-    assert current["artifact"]["rows"] == 2
+    assert current["artifact"]["rows"] == 2 * len(bf.PLAYS)
+    # one partition file per play, each with its own hash and row count
+    parts = current["partition"]["parts"]
+    assert sorted(parts) == sorted(bf.PLAYS)
+    assert all(v["rows"] == 2 for v in parts.values())
+    assert (base / "versions/2026-10-06/by_play/play=spf.parquet").is_file()
     assert bf.list_versions(base) == ["2026-10-06"]
 
 
@@ -280,6 +291,80 @@ def test_publish_version_rejects_bad_label_and_missing_artifact(tmp_path):
     for bad in ("", "../escape", "a/b"):
         with pytest.raises(bf.BackfillError, match="invalid label version"):
             bf.publish_version(base, bad, _table(1), {})
+    # a version directory with no content cannot be digested or republished
     (base / "versions/2026-01-01").mkdir(parents=True)
-    with pytest.raises(bf.BackfillError, match="has no artifact"):
+    with pytest.raises(bf.BackfillError, match="no content files"):
         bf.publish_version(base, "2026-01-01", _table(1), {})
+
+
+# --- shared versioning -------------------------------------------------------
+
+def test_content_digest_ignores_volatile_metadata(tmp_path):
+    from beidan_backend import versioning as vg
+
+    d = tmp_path / "v"
+    d.mkdir()
+    (d / "data.parquet").write_bytes(b"DATA")
+    (d / "receipt.json").write_text('{"generated_at": "2026-10-06T00:00:00Z"}')
+    first = vg.content_digest(d)
+    (d / "receipt.json").write_text('{"generated_at": "2026-10-07T12:00:00Z"}')
+    assert vg.content_digest(d) == first          # metadata does not decide identity
+    (d / "data.parquet").write_bytes(b"OTHER")
+    assert vg.content_digest(d) != first          # data does
+
+
+def test_publish_version_rebases_paths_out_of_staging(tmp_path):
+    from beidan_backend import versioning as vg
+
+    base = tmp_path / "art"
+
+    def write(directory):
+        target = directory / "labels.parquet"
+        target.write_bytes(b"PAR1DATA")
+        return {"artifact": {"path": str(target), "rows": 1},
+                "receipt": str(directory / "receipt.json")}
+
+    result = vg.publish_version(base, "2026-10-06", write)
+    published = str(base / "versions/2026-10-06")
+    assert ".staging" not in result["record"]["artifact"]["path"]
+    assert result["record"]["artifact"]["path"].startswith(published)
+    assert result["record"]["receipt"].startswith(published)
+    assert (base / "versions/2026-10-06/labels.parquet").is_file()
+    assert not list(base.glob(".*.staging"))
+
+
+def test_publish_version_shared_semantics(tmp_path):
+    from beidan_backend import versioning as vg
+
+    base = tmp_path / "art"
+
+    def write_factory(payload):
+        def write(directory):
+            (directory / "d.bin").write_bytes(payload)
+            return {"payload": payload.decode()}
+        return write
+
+    first = vg.publish_version(base, "2026-10-06", write_factory(b"A"))
+    assert first["status"] == "published"
+    assert vg.list_versions(base) == ["2026-10-06"]
+
+    again = vg.publish_version(base, "2026-10-06", write_factory(b"A"))
+    assert again["status"] == "unchanged"       # identical data is idempotent
+
+    with pytest.raises(vg.VersionError, match="already published with different content"):
+        vg.publish_version(base, "2026-10-06", write_factory(b"B"))
+
+    # a later label moves the pointer; refreshing an older one does not
+    vg.publish_version(base, "2026-10-07", write_factory(b"C"))
+    assert vg.read_current(base)["label_version"] == "2026-10-07"
+    vg.publish_version(base, "2026-10-06", write_factory(b"A"))
+    assert vg.read_current(base)["label_version"] == "2026-10-07"
+
+
+def test_publish_version_rejects_bad_labels(tmp_path):
+    from beidan_backend import versioning as vg
+
+    base = tmp_path / "art"
+    for bad in ("", "../escape", "a/b"):
+        with pytest.raises(vg.VersionError, match="invalid label version"):
+            vg.publish_version(base, bad, lambda d: {})

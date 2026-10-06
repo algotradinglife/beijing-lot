@@ -22,6 +22,7 @@ for candidate in (ROOT, ROOT / "packages/beidan/inst/python"):
         sys.path.insert(0, str(candidate))
 
 import pyarrow as pa  # noqa: E402
+import pyarrow.parquet as pq  # noqa: E402
 
 from beidan_backend import catalog, settlement_backfill as backfill  # noqa: E402
 
@@ -81,7 +82,8 @@ def main(argv: list[str] | None = None) -> int:
         for r in labels
     ])
     # Each publication is archived under its own immutable label version; a
-    # finalized cutoff is never rewritten in place.
+    # finalized cutoff is never rewritten in place. The publisher writes the
+    # whole table plus one file per play.
     record = backfill.publish_version(base, label_version, table, receipt)
 
     c = receipt["counts"]; x = receipt["cross_check"]

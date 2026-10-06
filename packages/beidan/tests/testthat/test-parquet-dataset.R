@@ -100,7 +100,19 @@ test_that("registry and manifest are read from the persistent root", {
   man <- dataset_manifest("demo", root = root)
   expect_identical(man$version, "v1")
   expect_setequal(dataset_tables("demo", root = root), c("obs", "small"))
-  expect_error(dataset_registry("nope", root = root), "no registry for dataset")
+  expect_error(dataset_registry("nope", root = root), "no registry or pointer for dataset")
+})
+
+test_that("the dataset's own current.json pointer takes precedence", {
+  root <- parquet_fixture()
+  # registry snapshot says v1; the dataset pointer names a different version
+  pointer <- file.path(root, "datasets", "demo", "current.json")
+  dir.create(dirname(pointer), recursive = TRUE, showWarnings = FALSE)
+  writeLines(jsonlite::toJSON(list(schema = "beijing_lot_derived_version_v1",
+    label_version = "v2"), auto_unbox = TRUE), pointer)
+  reg <- dataset_registry("demo", root = root)
+  expect_identical(reg$label_version, "v2")
+  expect_true(grepl("datasets/demo/current.json", reg$path, fixed = TRUE))
 })
 
 test_that("dataset_contract maps Arrow types to the declared R types", {

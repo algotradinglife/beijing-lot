@@ -21,6 +21,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from ..versioning import VersionError, publish_version
+
 WRITE_COMPRESSION = "snappy"
 ROW_GROUP_SIZE = 250_000
 PARQUET_VERSION = "2.6"
@@ -207,9 +209,11 @@ def convert_settlement(
 ) -> dict[str, Any]:
     """Convert the settlement SQLite release into a versioned Parquet dataset.
 
-    Publishes atomically: everything is written under ``<output_root>/tmp`` first
-    and only renamed into ``datasets/settlement/versions/<version>`` once complete.
-    An existing destination version is never overwritten.
+    Publication goes through the shared versioning module, so the base dataset
+    follows the same lifecycle as a derived artifact: written into a staging
+    directory, and published under ``datasets/settlement/versions/<version>/``
+    with ``datasets/settlement/current.json`` pointing at the newest version.
+    A label already published with different content is refused.
     """
     database = Path(database)
     output_root = Path(output_root)
@@ -217,14 +221,32 @@ def convert_settlement(
         raise DatasetConversionError(f"source database is absent: {database}")
     if not output_root.is_dir():
         raise DatasetConversionError(f"output root is not available: {output_root}")
-    destination = output_root / "datasets" / "settlement" / "versions" / version
-    if destination.exists():
-        raise DatasetConversionError(f"version already published: {destination}")
 
-    staging = output_root / "tmp" / f"settlement-{version}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}"
-    staging.mkdir(parents=True, exist_ok=False)
+    base = output_root / "datasets" / "settlement"
+
+    def build(staging: Path) -> dict[str, Any]:
+        return _convert_into(database, staging, version, source_registry, generated_at)
+
+    try:
+        published = publish_version(base, version, build)
+    except VersionError as error:
+        raise DatasetConversionError(str(error)) from error
+    # Callers expect the manifest, which the publisher wrote into the version.
+    return json.loads((base / "versions" / version / "manifest.json").read_text(encoding="utf-8"))
+
+
+def _convert_into(
+    database: Path,
+    staging: Path,
+    version: str,
+    source_registry: dict[str, Any] | None,
+    generated_at: str | None,
+) -> dict[str, Any]:
+    """Write one version's tables and manifest into ``staging``.
+
+    @return The version record for the publisher (row counts and the manifest).
+    """
     tables_dir = staging / "tables"
-
     conn = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
@@ -268,15 +290,20 @@ def convert_settlement(
         "row_counts": counts,
         "tables": described,
     }
-    (staging / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    _fsync(staging / "manifest.json")
+    write_json_atomically_local(manifest, staging / "manifest.json")
+    return {"rows": sum(counts.values()), "tables": len(described),
+            "manifest": "manifest.json", "row_counts": counts}
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    staging.rename(destination)
-    return manifest
+
+def write_json_atomically_local(value, path: Path) -> None:
+    """Write JSON atomically; kept local so the converter has no other dependency."""
+    import os
+
+    path = Path(path)
+    temporary = path.with_name(path.name + ".partial")
+    temporary.write_text(
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
 
 
 def verify_manifest(version_dir: Path) -> dict[str, Any]:
