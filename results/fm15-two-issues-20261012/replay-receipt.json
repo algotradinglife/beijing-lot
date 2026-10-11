@@ -1,0 +1,9 @@
+{
+  "status": "FULL_IDENTICAL_REPLAY",
+  "fixtures": 260,
+  "forecast_sha256": "b20091548ff0385fb5b2a33f05f9994625a7f4dd7014e8d7fc17a9f45dc9faeb",
+  "snapshot_inventory_sha256": "e11430fba51660d0aaa1ac03e50b81a34519ae40316718367ab2af9356fd5b14",
+  "replay_code_sha256": "0b3b4ddac665cc90da97b172445f87f360d223cb9b4263bf2bbf6993fa250d63",
+  "replayed_at_utc": "2026-10-11T17:49:39Z",
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC"
+}

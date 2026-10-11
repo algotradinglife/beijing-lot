@@ -1,0 +1,22 @@
+{
+  "forecast_sha256": "b20091548ff0385fb5b2a33f05f9994625a7f4dd7014e8d7fc17a9f45dc9faeb",
+  "forecast_object_hash": "e548adf3cb6ef74f4698532255e89132d5970cbe7c41b97c8c66a12dc26c6ed6",
+  "forecast_write_observed_utc": "2026-10-11T17:28:51.826169+00:00",
+  "receipt_recorded_at_utc": "2026-10-11T17:38:47.256337+00:00",
+  "time_evidence": "Filesystem final batch write time; diagnostic provenance only, never source availability authorization",
+  "code_base": "8e56d8bcfeaf610efda0fbd5c4c3b63c00ef494a",
+  "model": "FM-1.5.0",
+  "issues": [
+    "26098",
+    "26101"
+  ],
+  "parameters": {
+    "alpha": 0.5,
+    "recent_n": 8,
+    "rho": -0.1,
+    "max_radius": 2,
+    "threshold": 0.1,
+    "exterior_weight": 0.3
+  },
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC"
+}

@@ -1,0 +1,43 @@
+{
+  "model_id": "FM-1.5.0",
+  "issues": [
+    "26098",
+    "26101"
+  ],
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "roster_rows": 261,
+  "native_estimates": 260,
+  "missing_cutoff_rows": 1,
+  "native_policy": {
+    "recent_n": 8,
+    "alpha": 0.5,
+    "minimum_matches": 12,
+    "minimum_ess": 8
+  },
+  "tail_policy": {
+    "max_radius": 2,
+    "threshold": 0.1,
+    "coefficient": 0.3,
+    "tie_tolerance": 1e-12
+  },
+  "rho": -0.1,
+  "market_policy": "Independent qualitative review, no automatic lambda replacement; unidentified shifts retained and disclosed",
+  "forecast_inputs": [
+    {
+      "path": "results/fm15-two-issues-20261012/native-stage.rds",
+      "sha256": "c631a69e0a4e0c491e53ed181d8271700f85a9bcb7a1e6722c8c9eb50546ecec"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/review-inputs.json",
+      "sha256": "095151b739796df69c08c4cdd4979bbd47b444d7e052760f18e15ef649489c84"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/coverage.csv",
+      "sha256": "b92ee32cad85b07c294a26cb5fee0a7108ee7882a0ed405885921fb771eda773"
+    }
+  ],
+  "source_commit": "8e56d8bcfeaf610efda0fbd5c4c3b63c00ef494a",
+  "declared_at_utc": "2026-10-11T17:00:04.894037+00:00",
+  "known_targets_have_informed_rule_discussion": true,
+  "new_run_has_not_opened_target_settlement": true
+}

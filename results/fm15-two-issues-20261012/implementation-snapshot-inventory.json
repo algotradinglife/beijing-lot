@@ -1,0 +1,77 @@
+{
+  "model": "FM-1.5.0",
+  "reason": "Original receipt-bound code retained for independent historical replay; never used for new decisions",
+  "files": [
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/__init__.py",
+      "sha256": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamental_issue.py",
+      "sha256": "c9e6d433565ccdfa88b35081655acb352ba85066028c6774f53e0e0f6ceb245e",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py",
+      "sha256": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py",
+      "sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py",
+      "sha256": "ccd29d150d00fd8e8ce5874b52bd394b792d80fdc33a01ebd42fc206ed5ec735",
+      "recovered_from": "git:8e56d8bc"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py",
+      "sha256": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py",
+      "sha256": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/recent_venue_goals.py",
+      "sha256": "424a35b7d4b68a6a04a76f7b844152f59a078f41211b8b77f12257e2c7526578",
+      "recovered_from": "git:8e56d8bc"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamental_probability.py",
+      "sha256": "b3d2ed65a43908188918d48a6f795b4f1893d25ed670358356d274b53147f33c",
+      "recovered_from": "frozen_installed_package"
+    },
+    {
+      "path": "packages/beidan/R/recent_venue_goals.R",
+      "sha256": "915fdfd371a0772aea43e1867b327480b5d551cf9f716b009049affa8bd60198",
+      "recovered_from": "git:8e56d8bc"
+    },
+    {
+      "path": "packages/beidan/R/fm15_tail_judgement.R",
+      "sha256": "a82f0374d8b5254c8b216dd0da6cc8e5d5bbdaf2535cbaf453fa94a85a5e350f",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/R/score_margin_direction.R",
+      "sha256": "65432d8005b75c52708c37b393dfdc5ca66fc81907d9e29f1d9efa95954e468c",
+      "recovered_from": "current_byte_match"
+    },
+    {
+      "path": "packages/beidan/R/fundamental_probability.R",
+      "sha256": "27a55daee98bf0702c9aaea7bceab43e374b33d9d3dacb88e4260c25d027d43c",
+      "recovered_from": "current_byte_match"
+    }
+  ],
+  "status": "RETIRED_IMPLEMENTATION_EVIDENCE_ONLY",
+  "allow_new_decisions": false,
+  "target_issues": [
+    "26098",
+    "26101"
+  ]
+}

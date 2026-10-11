@@ -1,0 +1,69 @@
+{
+  "status": "LOCAL_DIAGNOSTIC_DELIVERY_VERIFIED",
+  "model": "FM-1.5.0",
+  "issues": [
+    "26098",
+    "26101"
+  ],
+  "roster": 261,
+  "forecast_count": 260,
+  "missing_cutoff": 1,
+  "settled_later_sp_cohort": 259,
+  "same_cutoff_sp_cohort": 194,
+  "forecast_sha256": "b20091548ff0385fb5b2a33f05f9994625a7f4dd7014e8d7fc17a9f45dc9faeb",
+  "r_contract_assertions": 5280,
+  "python_contract_tests": 10,
+  "tail_contract_assertions": 50,
+  "recent_contract_assertions": 16,
+  "full_receipt_replay": {
+    "status": "PASS",
+    "fixtures": 260,
+    "exit_code": 0,
+    "command": "R_LIBS_USER=\"$PWD/results/fm15-version-20261012/library:$PWD/r_lib\" /opt/R/4.6.1/bin/Rscript --vanilla r/fm15_two_issue_replay.R \"$PWD\""
+  },
+  "standard_r_entry": {
+    "status": "FAILED",
+    "exit_code": 1,
+    "command": "FM_NATIVE_TEST_ROOT=\"$PWD\" R_LIBS_USER=\"$PWD/results/fm15-version-20261012/library\" /opt/R/4.6.1/bin/Rscript tests/testthat.R",
+    "package": {
+      "passed": 7820,
+      "failed": 2,
+      "errors": 18
+    },
+    "repository": {
+      "passed": 22576,
+      "failed": 9,
+      "errors": 49
+    },
+    "failure_blocks": 78,
+    "classification": "Old r_lib selected via .Rprofile; other failures not individually attributed. No assertion that entire suite passed."
+  },
+  "fresh_render": {
+    "status": "PASS",
+    "exit_code": 0,
+    "command": "quarto render quarto/fm15_two_issues_20261012.qmd --no-cache",
+    "html_sha256": "c68023382cb81cba9206129455c0cd2aa5d35315335d1654dad39c687274cde6",
+    "table_rows": [
+      5,
+      4,
+      2,
+      16,
+      12,
+      8,
+      6,
+      260,
+      1,
+      3,
+      1
+    ]
+  },
+  "independent_review": {
+    "status": "PASS_NO_BLOCKERS",
+    "file_hashes": 61,
+    "command": "codex review - < results/fm15-two-issues-20261012/review-prompt-final.txt; codex review - < results/fm15-two-issues-20261012/review-prompt-whitespace.txt",
+    "receipt_replay_gap": "RESOLVED"
+  },
+  "pi_status": "PENDING_OWNER_REVIEW",
+  "validity": "POSTHOC_ONLY_BOTH_TARGETS_INFORMED_RULES",
+  "generated_at_utc": "2026-10-11T17:51:29.441592+00:00"
+}

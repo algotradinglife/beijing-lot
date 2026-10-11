@@ -1,0 +1,255 @@
+{
+  "status": "PASS_NO_BLOCKERS",
+  "command": "codex review - < results/fm15-two-issues-20261012/review-prompt-final.txt; codex review - < results/fm15-two-issues-20261012/review-prompt-whitespace.txt",
+  "reviewed_at_utc": "2026-10-11T17:50:23.727722+00:00",
+  "findings": "Initial independent review could not certify original native receipts against concurrently modified source. No remaining blocking findings after follow-up. Standard suite remains FAILED and prospective/holdout validity is unsupported.",
+  "resolutions": "Recovered13 receipt-matching original implementation files as retired evidence; fresh unchanged-script replay exited0 with260 exact native/policy/final receipt/projection matches. Independent reviewer authenticated13 hashes, independently replayed2 fixtures and checked evaluation score means. Final EOF-only test normalization independently verified byte-normalized and AST identical; all57 other reviewed hashes unchanged, Python10passed again.",
+  "files": [
+    {
+      "path": "r/fm15_two_issue_prepare.R",
+      "sha256": "66ada7cb3ed56ac7b043926e3658b1ca90b3a590212a57cd137c679e720ac198"
+    },
+    {
+      "path": "r/fm15_two_issue_freeze.R",
+      "sha256": "1e431bf09f8d56ca5d002e63262b533679c4d62efbb97e91a9f853cc0a9a6208"
+    },
+    {
+      "path": "scripts/fm15_two_issue_pa.py",
+      "sha256": "4bddfaac7e8848373a18751c8cafe9986203c40f7c4ca39dbbda2d502d9a8475"
+    },
+    {
+      "path": "scripts/fm15_review_first_batch.py",
+      "sha256": "c5be061d6fb254ec4c03ff930fee934528e51e9dcbbfabf535c2b2c513bd59e4"
+    },
+    {
+      "path": "scripts/fm15_bind_pa_prompts.py",
+      "sha256": "d4846298e077f594e1285219ad3c7c3b49c35687d1919da3847b41c57557e741"
+    },
+    {
+      "path": "tests/testthat/test-fm15-two-issue-contract.R",
+      "sha256": "8f68f8d87f02d91e09dabab94b9feb4262513bbcb03bfa96b8727280dbe2d7eb"
+    },
+    {
+      "path": "tests/test_fm15_two_issue_pa_contract.py",
+      "sha256": "fe0bd2809407a1fc9ddb3112ab7d04d0dc5557fb1256e3da30a94c2d2e1a2318"
+    },
+    {
+      "path": "quarto/fm15_two_issues_20261012.qmd",
+      "sha256": "69b6cbfd128c141a94866c5cec8edcf397e12e7ef5059530f2a06eca46c7d4b9"
+    },
+    {
+      "path": "packages/beidan/R/recent_venue_goals.R",
+      "sha256": "a4a7ff199308314d8c37e665f29e119f1d61255bce1dfcf9a659eb42903d38ab"
+    },
+    {
+      "path": "packages/beidan/R/fm15_tail_judgement.R",
+      "sha256": "a82f0374d8b5254c8b216dd0da6cc8e5d5bbdaf2535cbaf453fa94a85a5e350f"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/recent_venue_goals.py",
+      "sha256": "ed988580326bb35baf0295c28907b1de465a9421905c88156901af91577842db"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamental_issue.py",
+      "sha256": "c9e6d433565ccdfa88b35081655acb352ba85066028c6774f53e0e0f6ceb245e"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamental_probability.py",
+      "sha256": "9b5a146eabf84c526a3976e08be710494f80f316225f5e26bb7aa03e9926bfc8"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py",
+      "sha256": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py",
+      "sha256": "ae29042dc9c960c491df56fbd6b18c90e57dab194e6bfacb5226eb24e97c8991"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/issue_partitions.py",
+      "sha256": "c7a8f85e7ce09ba0587ff5146477fbcfc661c3a67a8d9e6024c7dc6744ae5e2b"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py",
+      "sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/predictor_clock.py",
+      "sha256": "1556153ef70fd0d875d3eee2932c8deccaccc29a226bc8f3ac73086b0b8dd01a"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/admitted_replay.py",
+      "sha256": "d4d21a7b3d1d68230854325577cc215f725a6d73a8fe0f6171fd9d88b716081d"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/diagnostic_labels.py",
+      "sha256": "7902947518b0567d8cd7b35a4a51f8118d8ef7b29539a9cdd551ca8b59d41e73"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/replay.py",
+      "sha256": "ff9a3890404a87484283ddd10b3960762397942c92af9231b9417cf081ddb61a"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py",
+      "sha256": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py",
+      "sha256": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/manifest.json",
+      "sha256": "2782a4f093ea942fbc3172f4b985245008460967c4e86c7c43525bfbe6c343e9"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/generation-receipt.json",
+      "sha256": "e525ee95a5e7e76ececfa565a240e734871a8c2aaef9dd6b00110609d3ea6fbe"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/scope.json",
+      "sha256": "8ab4b9426928ed65d27eeba88ef815e78b9ae54ff943516a200be269f6487f09"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/evaluation-inputs.json",
+      "sha256": "fc6f3bb51b2f723b024087f9bd95459bf4b2281d7f463dc8b1a6df8cba57e820"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/metrics.csv",
+      "sha256": "1f4127657b40e664a854f3e9606f0cb97c59323b018e9cab704146f783a5a21f"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/metrics-all-native-coverage.csv",
+      "sha256": "df7b58c93cef1e6cd927b12f3dc4ab08c64413d147f22c9dd772162439b98bbe"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/metrics-pooled-common.csv",
+      "sha256": "2f3c9d198bf3c62764aa2f1de76d91a15923f0b90cbbe300cbba2dab4522a56a"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/metrics-pooled-expanded.csv",
+      "sha256": "88edf9d7a7b355aa70ef21cd97f5938184d9d0819244f312dc21a29c6ada51c7"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/review-prompt.txt",
+      "sha256": "e7488714a724781e26a1fe4f4f714886402a7e76cbcf73ff624fe2185108bead"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/prompt-inventory.json",
+      "sha256": "d5c7710a44fc634090c99ea5fd4f98ca6be5303ffeedb33fbdf8823183b72b3b"
+    },
+    {
+      "path": "packages/beidan/R/score_margin_direction.R",
+      "sha256": "65432d8005b75c52708c37b393dfdc5ca66fc81907d9e29f1d9efa95954e468c"
+    },
+    {
+      "path": "packages/beidan/R/dc_accuracy_diagnostic.R",
+      "sha256": "371cb42c60a4920fa122283f309a1151b0319959db892daa4fbc3bb92e61970d"
+    },
+    {
+      "path": "packages/beidan/R/dixon_coles_grid.R",
+      "sha256": "2f52fbaee5408508c2180200a991e959b16cbac599766fdb541e6d201b7d5e9e"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-fm15-tail-judgement.R",
+      "sha256": "402049566df1cb5a78536dbb097922b920e40928b063e579e9788e941a980aa0"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-recent-venue-goals.R",
+      "sha256": "0c3ec28c611e4494161c11de9f76e6fb2eea6a893a6c8474b9ac07f8dbea3994"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_recent_venue_goals.py",
+      "sha256": "f8e2cd5334850b567f3096a12e0793bbd9c31e0f3ea900039e28d417871a247e"
+    },
+    {
+      "path": "r/fm15_two_issue_replay.R",
+      "sha256": "0b3b4ddac665cc90da97b172445f87f360d223cb9b4263bf2bbf6993fa250d63"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot-inventory.json",
+      "sha256": "e11430fba51660d0aaa1ac03e50b81a34519ae40316718367ab2af9356fd5b14"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/replay-receipt.json",
+      "sha256": "680c831e0371f586c3c3615bb007b5b520f5846f484bd70862843fb97d311859"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/replay-ledger.csv",
+      "sha256": "db29e794f11b620a589fa9978f86f90250144c658e8f4667e2f393b5918768c0"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/review-prompt-final.txt",
+      "sha256": "b579aec77db854336202afda98ca3b46a41352193b55a89702f892bfe54fddfe"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/R/score_margin_direction.R",
+      "sha256": "65432d8005b75c52708c37b393dfdc5ca66fc81907d9e29f1d9efa95954e468c"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/R/recent_venue_goals.R",
+      "sha256": "915fdfd371a0772aea43e1867b327480b5d551cf9f716b009049affa8bd60198"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/R/fm15_tail_judgement.R",
+      "sha256": "a82f0374d8b5254c8b216dd0da6cc8e5d5bbdaf2535cbaf453fa94a85a5e350f"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/R/fundamental_probability.R",
+      "sha256": "27a55daee98bf0702c9aaea7bceab43e374b33d9d3dacb88e4260c25d027d43c"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/fundamental_issue.py",
+      "sha256": "c9e6d433565ccdfa88b35081655acb352ba85066028c6774f53e0e0f6ceb245e"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/recent_venue_goals.py",
+      "sha256": "424a35b7d4b68a6a04a76f7b844152f59a078f41211b8b77f12257e2c7526578"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/__init__.py",
+      "sha256": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/fundamental_probability.py",
+      "sha256": "b3d2ed65a43908188918d48a6f795b4f1893d25ed670358356d274b53147f33c"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py",
+      "sha256": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/temporal_learning/core.py",
+      "sha256": "ccd29d150d00fd8e8ce5874b52bd394b792d80fdc33a01ebd42fc206ed5ec735"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py",
+      "sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py",
+      "sha256": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/implementation-snapshot/packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py",
+      "sha256": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/codex-review-final.log",
+      "sha256": "0118a5b894701d4fed11063dd2855a8bd5ac8fa302aeff20056958b6e05ebb42"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/review-evidence/python-contract-before-eof-normalization.py",
+      "sha256": "e4fecda7eb081049dd943e69b6f288a96a213acd71ac9b746e29856470aefee0"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/review-prompt-whitespace.txt",
+      "sha256": "d0f5beb6d145d13bb550a691d0fdcfa17b84a96b7411dc3a95290b86c3907b15"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/codex-review-whitespace.log",
+      "sha256": "3af9aac3c5bb98579fd33cac86ed617d5e084f99cee7e7bb5096791b07f778cb"
+    }
+  ],
+  "pi_status": "PENDING_OWNER_REVIEW",
+  "scope": "BOUNDED_POSTHOC_DIAGNOSTIC"
+}

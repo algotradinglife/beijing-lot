@@ -1,0 +1,118 @@
+---
+title: "FM-1.5.0：26098及26101期重新评估"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  root: ".."
+---
+
+两期已参与规则讨论，本报告是事后历史诊断，不能作为独立样本外验证。输入沿用冻结历史和严格早于逐场T−24小时截止的盘口代理记录。近期状态原生进入λ（长期与最近8场同场地攻防各0.5），ρ固定−0.1；市场帮助独立复核，不自动覆盖λ。明确但未能量化的基本面形状冲突保留原分布并披露。唯一净胜球众数为中心，两侧等距扩展最多2档，任一侧达到10%纳入整对，首个双侧不足10%的边距停止，外围权重0.3。比分冻结后才映射实际北单让球。
+
+本次没有形成整体改进：在与旧版共同的后期SP样本中，FM-1.5.0的Top1低于FM-1.4.0；扩大覆盖后也未在后期SP对照中取得概率评分优势。尾部校正改善了部分Top2覆盖，却未改善Top1。原生λ来源的改变和尾部校正贡献分别列出，不能把整体差异归因于单个系数。国家队、年龄组和杯赛尤其缺少对手强度、阵容及可比赛事层级信息；这次不会用目标赛果反调参数。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(jsonlite)
+root <- normalizePath(params$root,mustWork=TRUE)
+out <- file.path(root,'results/fm15-two-issues-20261012')
+library(beidan,lib.loc=file.path(root,'results/fm15-version-20261012/library'))
+m <- fromJSON(file.path(out,'manifest.json'))
+bp <- file.path(out,m$batch_file)
+stopifnot(digest::digest(file=bp,algo='sha256')==m$sha256)
+x <- readRDS(bp)
+stopifnot(identical(beidan:::.score_margin_hash(x),m$object_hash),nrow(x$input_ledger)>0)
+stopifnot(all(map_chr(file.path(root,x$input_ledger$path),~digest::digest(file=.x,algo='sha256'))==x$input_ledger$sha256))
+for(e in x$entries) stopifnot(identical(readRDS(file.path(root,e$score_path)),e$final),max(e$base$max_source_available_utc)<e$base$cutoff$cutoff_utc)
+knitr::kable(x$coverage |> count(issue_id,status),caption='全期覆盖：不以已知赛果筛选预测场次')
+knitr::kable(x$audit |> mutate(issue_id=str_extract(fixture_id,'^[0-9]+')) |> count(issue_id,market_action,branch),caption='定性审查与市场信息处理')
+knitr::kable(x$audit |> count(reviewer),caption='审查者披露；部分因PA证书/输出限制由主代理逐场审查，原始失败收据保留')
+```
+
+原生估计暂未对近期对手强度建模。预测阵容、伤停覆盖不足；日期次日UTC和历史盘口时间是诊断代理，不能证明当时实际获取。盘口不完整者以“原生诊断”列出，主比较使用盘口完整的共同场次。后期SP比较是不同决策时点的辅助诊断，并不保证开赛前15分钟。
+
+```{r}
+# Settlement access begins only after authenticated immutable forecasts above.
+fm <- x$probabilities |> select(fixture_id,model,outcome,probability)
+native <- x$before |> select(fixture_id,model,outcome,probability)
+old <- list(); rosters <- list()
+for(issue in c('26098','26101')) {
+  directory <- file.path(root,paste0('results/fm14-',issue,'-20261011'))
+  om <- fromJSON(file.path(directory,'manifest.json'))
+  op <- file.path(directory,om$batch_file)
+  stopifnot(digest::digest(file=op,algo='sha256')==om$batch_sha256)
+  ob <- readRDS(op);stopifnot(beidan:::.score_margin_hash(ob)==om$batch_hash)
+  old[[issue]] <- ob$probabilities |> transmute(fixture_id,model='FM-1.4.0',outcome,probability)
+  roster <- readRDS(file.path(root,'results/fundamental-issues-20261011/run-20261011T011533.304058Z',paste0(issue,'-frozen.rds')))$fixtures
+  rosters[[issue]] <- roster |> select(fixture_id,handicap,cutoff_utc)
+}
+old <- bind_rows(old); roster <- bind_rows(rosters)
+label_path <- file.path(root,'results/fundamental-issues-20261011/inputs/labels.rds')
+sp_path <- file.path(root,'results/fundamental-beidan-history-20261011/analysis-20261011T024028.510576Z/selected-sp.csv')
+label_source <- readRDS(label_path)
+labels <- bind_rows(label_source[['26098']]$matches,label_source[['26101']]$matches) |> transmute(fixture_id=paste0(issue_id,':',slot),status,score) |> filter(status=='完场',!is.na(score),str_detect(score,'^[0-9]+[-:][0-9]+$')) |> mutate(home_goals=as.integer(str_extract(score,'^[0-9]+')),away_goals=as.integer(str_extract(score,'[0-9]+$'))) |> inner_join(roster,by='fixture_id',relationship='one-to-one') |> transmute(fixture_id,score,actual_outcome=case_when(home_goals-away_goals+handicap>0~'W',home_goals-away_goals+handicap==0~'D',TRUE~'L'))
+sp <- read_csv(sp_path,show_col_types=FALSE) |> filter(str_extract(fixture_id,'^[0-9]+') %in% c('26098','26101')) |> inner_join(roster |> select(fixture_id,cutoff_utc),by='fixture_id',relationship='many-to-one')
+stopifnot(!anyDuplicated(sp[c('fixture_id','mode')]),all(sp$sp_w>0 & sp$sp_d>0 & sp$sp_l>0),all(sp$quote_at<sp$selection_cutoff),all(sp$quote_at<sp$kickoff_utc),all(sp$selection_cutoff[sp$mode=='same_cutoff']==sp$cutoff_utc[sp$mode=='same_cutoff']))
+bd <- sp |> transmute(fixture_id,mode,W=1/sp_w,D=1/sp_d,L=1/sp_l) |> mutate(mass=W+D+L,across(c(W,D,L),~.x/mass)) |> select(-mass) |> pivot_longer(c(W,D,L),names_to='outcome',values_to='probability') |> mutate(model=if_else(mode=='same_cutoff','北单-T24','北单-后期SP'))
+metrics <- list(); scores <- list()
+for(issue in c('26098','26101')) for(mode in c('same_cutoff','near_sale')) {
+  ids <- Reduce(intersect,list(fm$fixture_id,old$fixture_id,bd$fixture_id[bd$mode==mode],labels$fixture_id,x$coverage$fixture_id[x$coverage$status=='READY_FOR_REVIEW']))
+  ids <- ids[startsWith(ids,paste0(issue,':'))]
+  stopifnot(length(ids)>0)
+  probabilities <- bind_rows(fm,native,old,bd |> filter(.data$mode==.env$mode) |> select(-mode)) |> filter(fixture_id %in% ids)
+  diagnostic <- beidan:::DcAccuracyDiagnostic(probabilities,labels |> filter(fixture_id %in% ids) |> select(fixture_id,actual_outcome))
+  key <- paste(issue,mode,sep='-')
+  metrics[[key]] <- diagnostic$summary |> mutate(issue_id=issue,comparison=mode,.before=1)
+  scores[[key]] <- diagnostic$scores |> mutate(issue_id=issue,comparison=mode,.before=1)
+}
+metrics <- bind_rows(metrics);scores <- bind_rows(scores)
+wide_metrics <- list()
+for(issue in c('26098','26101')) for(mode in c('same_cutoff','near_sale')) {
+  ids <- Reduce(intersect,list(fm$fixture_id,bd$fixture_id[bd$mode==mode],labels$fixture_id))
+  ids <- ids[startsWith(ids,paste0(issue,':'))]
+  probabilities <- bind_rows(fm,native,bd |> filter(.data$mode==.env$mode) |> select(-mode)) |> filter(fixture_id %in% ids)
+  diagnostic <- beidan:::DcAccuracyDiagnostic(probabilities,labels |> filter(fixture_id %in% ids) |> select(fixture_id,actual_outcome))
+  wide_metrics[[paste(issue,mode,sep='-')]] <- diagnostic$summary |> mutate(issue_id=issue,comparison=mode,.before=1)
+}
+wide_metrics <- bind_rows(wide_metrics)
+write_csv(wide_metrics,file.path(out,'metrics-all-native-coverage.csv'))
+pooled <- metrics |> group_by(comparison,model) |> summarise(hits1=sum(hits1),hits2=sum(hits2),brier=weighted.mean(brier,n),logloss=weighted.mean(logloss,n),n=sum(n),.groups='drop') |> mutate(top1=hits1/n,top2=hits2/n)
+wide_pooled <- wide_metrics |> group_by(comparison,model) |> summarise(hits1=sum(hits1),hits2=sum(hits2),brier=weighted.mean(brier,n),logloss=weighted.mean(logloss,n),n=sum(n),.groups='drop') |> mutate(top1=hits1/n,top2=hits2/n)
+write_csv(pooled,file.path(out,'metrics-pooled-common.csv'));write_csv(wide_pooled,file.path(out,'metrics-pooled-expanded.csv'))
+write_csv(metrics,file.path(out,'metrics.csv'));write_csv(scores,file.path(out,'scores.csv'))
+write_csv(labels,file.path(out,'labels.csv'))
+write_json(list(label_path=substring(label_path,nchar(root)+2),label_sha256=digest::digest(file=label_path,algo='sha256'),sp_path=substring(sp_path,nchar(root)+2),sp_sha256=digest::digest(file=sp_path,algo='sha256'),forecast_sha256=m$sha256),file.path(out,'evaluation-inputs.json'),auto_unbox=TRUE,pretty=TRUE)
+knitr::kable(metrics |> select(issue_id,comparison,model,n,hits1,hits2,top1,top2,brier,logloss),digits=4,caption='同场比较；Brier为三类平方误差之和，log loss为自然对数，均越低越好')
+knitr::kable(wide_metrics |> select(issue_id,comparison,model,n,hits1,hits2,top1,top2,brier,logloss),digits=4,caption='扩大覆盖诊断：含第三方盘口不完整者，使用共同北单与已结算场次；不能称为全维度FM覆盖')
+knitr::kable(pooled |> select(comparison,model,n,hits1,hits2,top1,top2,brier,logloss),digits=4,caption='两期合并共同样本：按场数加权评分，不比较不同分母')
+knitr::kable(wide_pooled |> select(comparison,model,n,hits1,hits2,top1,top2,brier,logloss),digits=4,caption='两期合并扩大覆盖：含盘口不完整的原生诊断')
+```
+
+Top1为最高概率类别是否命中，Top2为前两类别覆盖；不表示串关收益。概率评分保留三个类别的全部概率，不能用选中类别的命中率替代。FM15原生未压尾的行用于识别尾部校正贡献，与旧版整体变更分别评价。
+
+```{r}
+knitr::kable(x$audit |> select(fixture_id,lambda_home,lambda_away,center,radius,core,branch,reason,market_review),digits=3,caption='逐场审查账本；未量化形状偏差不自动调整参数')
+```
+
+本次验收入口为本QMD，执行使用R 4.6.1、项目`.venv/bin/python`及已安装的FM-1.5.0包（`results/fm15-version-20261012/library`）。不在渲染时安装依赖。准备客户端调用原生λ函数；冻结客户端验证原始输入、审查收据、截止上下文，独立重算260场原生与校正输出；本QMD在认证冻结分布后才读取标签和SP。每期完整名单含失败场次，不能把失败者当作预测正确或错误。
+
+自动化映射：`tests/testthat/test-fm15-two-issue-contract.R`覆盖准备输入、260场冻结产物及44批审查收据，四块5280断言通过（包括实现快照与完整重放契约）；`tests/test_fm15_two_issue_pa_contract.py`覆盖批次/单场审查解析、错误拒绝及提示词字节恢复，10测试通过。执行命令为`FM_NATIVE_TEST_ROOT=$PWD Rscript -e 'library(beidan,lib.loc=normalizePath("results/fm15-version-20261012/library")); testthat::test_file("tests/testthat/test-fm15-two-issue-contract.R",env=new.env(parent=asNamespace("beidan")),load_helpers=FALSE)'`与`.venv/bin/python -m pytest tests/test_fm15_two_issue_pa_contract.py -q`。版本函数测试和49文件独立审查记录保留在FM-1.5.0版本交付目录。共享源码随后被其他会话更新，该旧记录不能证明当前文件仍匹配；本次依据冻结收据恢复原字节到只用于历史重放的`implementation-snapshot`，不改写当前源码。明确指定安装包的新检查：尾部50断言、λ接口16断言通过。独立完整重放命令为`R_LIBS_USER="$PWD/results/fm15-version-20261012/library:$PWD/r_lib" /opt/R/4.6.1/bin/Rscript --vanilla r/fm15_two_issue_replay.R "$PWD"`；其显式环境设置仅将快照中的解释器链接到传入仓库的`.venv`，不安装依赖。原生参数及全部收据、核心判定、完整比分及收据和北单投影均须逐场严格一致。这个旧实现快照只能重放原冻结诊断，不授权新期使用。标准`Rscript tests/testthat.R`另行运行；项目`.Rprofile`优先加载`r_lib/beidan`旧包，不能用其未定义新函数的错误推断冻结数值不正确。标准入口完成但失败：包阶段7820断言通过、2失败/18错误，仓库阶段22576断言通过、9失败/49错误，合计78个失败或错误块；原日志保存在`validation-logs/standard-r.log`。已证实新函数未定义由旧包加载引起，其他失败未逐一归因，不宣称整套通过。明确安装包的相关契约通过及逐场严格重放是本次数值验收证据；未实施其他会话的R修复。
+
+干净渲染命令为`quarto render quarto/fm15_two_issues_20261012.qmd --no-cache`，执行开启、错误致命。读取生成收据中的文件写入观察时间只用于诊断来源，不作为任何赛前可用性授权。独立审查命令为`codex review - < results/fm15-two-issues-20261012/review-prompt-final.txt`；最终审查内容、文件哈希、发现与解决见下面机器记录。PI由用户验收；本次没有CI、发布或合并。
+
+```{r}
+replay <- fromJSON(file.path(out,'replay-receipt.json'))
+replay_ledger <- read_csv(file.path(out,'replay-ledger.csv'),show_col_types=FALSE)
+stopifnot(replay$status=='FULL_IDENTICAL_REPLAY',replay$forecast_sha256==m$sha256,nrow(replay_ledger)==260L,all(as.matrix(select(replay_ledger,-fixture_id))),replay$replay_code_sha256==digest::digest(file=file.path(root,'r/fm15_two_issue_replay.R'),algo='sha256'))
+knitr::kable(tibble(status=replay$status,fixtures=replay$fixtures),caption='独立重放：原生及最终收据和投影逐场严格一致')
+generation <- fromJSON(file.path(out,'generation-receipt.json'))
+stopifnot(generation$forecast_sha256==m$sha256,generation$forecast_object_hash==m$object_hash)
+knitr::kable(tibble(item=c('forecast_write_observed_utc','receipt_recorded_at_utc','intended_use'),value=c(generation$forecast_write_observed_utc,generation$receipt_recorded_at_utc,generation$intended_use)),caption='生成来源收据，时间不授权历史决策')
+review_path <- file.path(out,'review.json')
+if(file.exists(review_path)) {
+  review <- fromJSON(review_path)
+  stopifnot(all(map_chr(file.path(root,review$files$path),~digest::digest(file=.x,algo='sha256'))==review$files$sha256))
+  knitr::kable(tibble(status=review$status,command=review$command,findings=review$findings,resolutions=review$resolutions),caption='独立审查及解决记录；PI验收仍待用户')
+} else cat('独立审查尚未完成，本预览不代表验收通过。')
+```
