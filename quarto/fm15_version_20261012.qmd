@@ -1,0 +1,126 @@
+---
+title: "FM-1.5.0：原生近期λ与中心等距尾部规则"
+format: html
+params:
+  root: null
+execute:
+  echo: false
+  error: false
+  cache: false
+---
+
+此次交付将beidan-strategy完整工作流约定为FM-1.5.0，并交付可执行的原生近期λ函数、中心等距目标函数与测试。不是已经完成的FM15整期估算或独立回测。旧FM14比分/预测不改标签；旧规则只作冻结证据，TAILR和固定Top3不叠加到新算法。
+
+原生λ默认长期同场地与近期8场同场地分布各50%，两个组件各自归一化后混合，攻防交叉均值生成主客λ；长期包含近期样本，显式披露。至少12场历史、近期8场、ESS>=8，否则失败。对手强度及阵容伤停目前尚未量化，有信息时以显式依据评估，不能伪造已完成。α=0.5为专家起点，可基于新增信息更改并重建，不能凭已知结果择优。
+
+市场只提供有依据的复核和补充；联合市场反解单列对照，不自动替换原生λ。没有新增信息就保持参数并记录分歧。ρ暂显式−0.1，未历史校准。
+
+核心：冻结最高概率的唯一净胜球单档c，逐层成对检查距离1和2。任一侧>=10%则两侧纳入；两侧都<10%立即停止（不能跨过失败层），最多半径2。核心权重1、外围0.3，完整归一化后才映射北单。中心并列（1e-12容差）或审查retain保留原分布；北单线和希望的Top1/Top2都不能参与核心选择。强弱/均衡只作解释，不再选择不同尾部算法。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(jsonlite)
+stopifnot(length(params$root)==1L,dir.exists(params$root))
+root<-normalizePath(params$root);out<-file.path(root,'results/fm15-version-20261012')
+library(beidan,lib.loc=normalizePath(file.path(out,'library')))
+stopifnot(is.loaded('_beidan_ComponentUnionKernelIdentity'))
+policy<-fromJSON(file.path(out,'policy.json'),simplifyVector=FALSE)
+stopifnot(policy$model_id=='FM-1.5.0',policy$native_lambda$alpha==.5,policy$tail$max_radius==2,policy$tail$threshold==.1,policy$tail$coefficient==.3)
+tail_policy<-policy$tail;tail_policy$max_radius<-as.integer(tail_policy$max_radius)
+sync<-fromJSON(file.path(out,'skill-sync.json'),simplifyVector=FALSE)
+stopifnot(sync$status=='PASS',length(sync$hashes)==15L)
+for(p in names(sync$hashes)) {
+ repo<-file.path(root,'skills/beidan-strategy',p);installed<-file.path('/home/drwho1985/.codex/skills/beidan-strategy',p)
+ stopifnot(digest::digest(file=repo,algo='sha256')==sync$hashes[[p]],identical(readBin(repo,'raw',n=file.info(repo)$size),readBin(installed,'raw',n=file.info(installed)$size)))
+}
+stopifnot(!file.exists('/home/drwho1985/.codex/skills/beidan-strategy/references/nonwin-tail-ratio.md'))
+cat('技能同步：',sync$files,'文件；包与Rcpp加载通过。\n')
+knitr::kable(tibble(item=c('model','recent alpha','recent matches','minimum history','minimum ESS','core max radius','shell threshold','outside weight','rho'),value=c(policy$model_id,.5,8,12,8,2,.1,.3,-.1)))
+```
+
+## 已知场次的目标构造核验
+
+这些例子已知结果，只核验政策执行。#20/52/103/107使用旧联合市场网格作为输入，不冒充重新完成原生λ的FM15预测。#65使用已经单独冻结、含近期50%的原生网格。所有例子沿用原比赛T−24截止和原源身份；专家政策在目标之后制定，因此只标事后情景。
+
+```{r}
+src<-file.path(root,'results/fm14-26101-20261011')
+manifest<-fromJSON(file.path(src,'stage-manifest.json'));stage_path<-file.path(src,manifest$stage_file)
+stopifnot(digest::digest(file=stage_path,algo='sha256')==manifest$sha256)
+stage<-readRDS(stage_path)
+native_src<-file.path(root,'results/fm-native-65-20261011')
+nr<-fromJSON(file.path(native_src,'review.json'))
+stopifnot(nrow(nr$files)>0L,all(map_chr(nr$files$path,~digest::digest(file=file.path(root,.x),algo='sha256'))==nr$files$sha256))
+trial_path<-list.files(native_src,pattern='^trial-.*[.]rds$',full.names=TRUE)
+stopifnot(length(trial_path)==1L)
+trial<-readRDS(trial_path)
+native_input<-fromJSON(file.path(native_src,'input.json'),simplifyVector=FALSE)
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(root,'packages/beidan/inst/python'))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE)
+native_replay<-beidan:::estimate_recent_venue_goals(bind_rows(native_input$rows),native_input$fixture,unlist(native_input$target_ids),shared$Cutoff$decision_epoch('26101',native_input$cutoff),trial$input_hashes,root,list(recent_n=8L,alpha=.5,minimum_matches=12L,minimum_ess=8))
+stopifnot(identical(native_replay,trial$native))
+native_grid<-beidan:::market_score_projection(unlist(native_replay$parameters),0,1e-10,-.1)$grid |> select(home_goals,away_goals,probability)
+examples<-list();objects<-list()
+for(slot in c(20L,52L,65L,103L,107L)) {
+ i<-match(paste0('26101:',slot),stage$ledger$fixture_id)
+ grid<-if(slot==65L) native_grid else stage$markets[[i]]$grid
+ cutoff<-list(issue_id='26101',cutoff_utc=stage$ledger$cutoff_utc[i])
+ base<-list(grid=grid,cutoff=cutoff)
+ review<-list(decision='apply',base_hash=beidan:::.score_margin_hash(grid),cutoff_utc=format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),reason='Known-outcome expert policy execution',counterevidence='Not independent validation')
+ z<-beidan:::build_fm15_tail_judgement(base,review,'source-asian-8',cutoff,tail_policy)
+ stopifnot(z$radius==2L,z$judgement$model_id=='FM-1.5.0')
+ if(slot==107L) stopifnot(z$center==2L,identical(z$core_margins,0:4)) else stopifnot(z$center==0L,identical(z$core_margins,-2:2))
+ examples[[length(examples)+1L]]<-tibble(slot=slot,source=if(slot==65L)'native recent50' else 'legacy market diagnostic',center=z$center,radius=z$radius,core=paste(z$core_margins,collapse=','),core_mass=z$core_mass,normalizer=z$normalizer)
+ objects[[as.character(slot)]]<-list(base=base,review=review,targets=z)
+}
+knitr::kable(bind_rows(examples),digits=5,caption='规则例子：均满足两层扩展，来源阶段明确区分')
+write_csv(bind_rows(examples),file.path(out,'examples.csv'))
+```
+
+## 新原生λ→完整比分调整→北单投影
+
+本例只展示#65原生近期λ加新尾部的可运行链路，没有额外市场新增信息调整。使用原先准入的截止前亚盘记录作为诊断证据锚点；这不意味着新专家政策在历史截止前已经存在。政策事后性明示，不能据此授权实战或作为独立效果证据。
+
+```{r}
+backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+i<-match('26101:65',stage$ledger$fixture_id)
+o<-objects[['65']];quote<-stage$selected_quotes[[i]]$asian
+source_sha<-digest::digest(file=stage_path,algo='sha256')
+o$base<-modifyList(o$base,list(model_id='FM-1.5.0_NATIVE',source_hashes=list(raw=source_sha,native_trial=digest::digest(file=trial_path,algo='sha256'),native_receipt=beidan:::.score_margin_hash(trial$native),tail_policy=digest::digest(file=file.path(out,'policy.json'),algo='sha256'),fm15_implementation=digest::digest(file=file.path(root,'packages/beidan/R/fm15_tail_judgement.R'),algo='sha256')),max_source_available_utc=quote$quote_at[1],intended_use='HISTORICAL_DIAGNOSTIC'))
+z<-beidan:::build_fm15_tail_judgement(o$base,o$review,'source-asian-8',o$base$cutoff,tail_policy)
+fixture<-stage$ledger |> filter(fixture_id=='26101:65') |> select(fixture_id) |> mutate(issue_id='26101',home='阿尔瓦塞特',away='埃瓦尔')
+rows<-list(list(evidence_id='source-asian-8',fixture_id='26101:65',source_hash=source_sha,row_key='source-asian-8',issue_code='MARKET_PRIOR_65',issue_year=2026L,label_available_ts=format(quote$quote_at[1],'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),data_available_ts=format(quote$quote_at[1],'%Y-%m-%dT%H:%M:%SZ',tz='UTC')))
+hashes<-c(o$base$source_hashes,list(base_artifact=beidan:::.score_margin_hash(o$base),margin_judgement=beidan:::.score_margin_hash(z$judgement),direction_implementation=beidan:::.score_margin_code(root),fm15_binding=z$binding_hash))
+context<-backend$build_adjustment_evidence_context(rows,as.list(fixture),shared$Cutoff$decision_epoch('26101',o$review$cutoff_utc),hashes,shared$AvailabilityPolicy$historical_proxy('POSTHOC_EXPERT_SCENARIO_QUOTE_PROXY'),'HISTORICAL_DIAGNOSTIC',root)
+final<-adjust_score_margin_distribution(o$base,z$judgement,context,fixture,o$base$cutoff,root)
+stopifnot(identical(final,adjust_score_margin_distribution(o$base,z$judgement,context,fixture,o$base$cutoff,root)))
+projected<-project_score_outcomes(final,0,root)
+knitr::kable(projected,digits=6,caption='#65：新原生λ加中心等距尾部；完整类别投影')
+artifact<-list(model='FM-1.5.0_POSTHOC_CASE65',policy=policy,base=o$base,targets=z,final=final,projected=projected)
+id<-digest::digest(artifact,algo='sha256');ap<-file.path(out,paste0('case65-',substr(id,1,12),'.rds'))
+if(file.exists(ap)) stopifnot(identical(readRDS(ap),artifact)) else saveRDS(artifact,ap)
+write_csv(projected,file.path(out,'case65-probabilities.csv'))
+```
+
+## 函数、测试、技能和历史边界
+
+原生R函数`estimate_recent_venue_goals()`与Python领域函数由同名专项testthat/pytest覆盖；共享temporal_learning负责准入、分区、权重、ESS、传递实现收据及重放。本次不复制时间工具。新`build_fm15_tail_judgement()`只构造目标，test-fm15-tail-judgement.R覆盖10%边界、单侧接纳、内层停止、半径上限、并列中心、稀疏支持、非法输入、反射/平移、实际比分调整和不同让球投影，以及目标/未来证据变异不影响输出。
+
+旧`build_fm14_tail_judgement()`及FM14有界脚本明确列于policy.json历史清单，仅冻结重放证据，不是FM15兼容接口。旧技能完整存于fm14-evidence，安装副本更新前保存在installed-skill-before；当前技能删除旧TAILR参考页。旧结果文件未改，旧报告若要求当前源码政策完全一致，应使用其旧政策快照进行隔离重放，不能把更新后的技能当原输入。未声称旧报告可在当前政策下无修改重放。
+
+没有通用FM15全期执行器或新全期结果。本次不合并、提交、发布网站或参加CI。原生函数与核心函数是包内接口，未新增公开NAMESPACE；整期迁移需要新运行而非旧产物改标签。
+
+```{r}
+cat(readLines(file.path(out,'r-tests.log')),sep='\n')
+cat(readLines(file.path(out,'python-tests.log')),sep='\n')
+cat(readLines(file.path(out,'skill-validation.log')),sep='\n')
+cat('R:',R.version.string,'\nPython:',reticulate::py_config()$version_string,'\n')
+knitr::kable(tibble(package=c('beidan','tibble','dplyr','reticulate','jsonlite','digest'),version=map_chr(package,~as.character(packageVersion(.x)))))
+rp<-file.path(out,'review.json')
+if(file.exists(rp)) {
+ r<-fromJSON(rp)
+ stopifnot(nrow(r$files)>0L,all(map_chr(r$files$path,~digest::digest(file=file.path(root,.x),algo='sha256'))==r$files$sha256))
+ cat('\n独立审查：',r$status,'\n',r$findings)
+}
+```
+
+本地安装命令：`/opt/R/4.6.1/bin/R CMD INSTALL -l results/fm15-version-20261012/library packages/beidan`；专项R测试使用该已安装库、`FM_NATIVE_TEST_ROOT=$PWD`，50条新尾部、10条原生、45条旧政策断言均通过。pytest命令：`PYTHONPATH=packages/beidan/inst/python .venv/bin/python -m pytest packages/beidan/tests/python/test_recent_venue_goals.py -q`，8项通过。技能验证：`.venv/bin/python /home/drwho1985/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/beidan-strategy`。全仓历史客户端基线与CI不在本次范围。独立审查命令：`codex review - < results/fm15-version-20261012/review-prompt.txt`；最终文件哈希、发现及修复记录在review.json。干净复现：`quarto render quarto/fm15_version_20261012.qmd --execute --no-cache -P root:$PWD`。PI待负责人验收。

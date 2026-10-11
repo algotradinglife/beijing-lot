@@ -1,0 +1,6 @@
+interface:
+  display_name: "北单策略、基本面与回测"
+  short_description: "整合基本面和盘口变化，报告让球胜平负与比分概率，支持回测与模拟单结算"
+  default_prompt: "使用 $beidan-strategy，按本次要求执行基本面概率分析、历史回测诊断或冻结模拟单与结算流程。"
+policy:
+  allow_implicit_invocation: true
