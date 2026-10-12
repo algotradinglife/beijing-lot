@@ -1,0 +1,9 @@
+{
+  "status": "PASS clean-session no-cache",
+  "html_sha256": "db1a920cd3d8159eed3492c53552c6437ebb9438f097bfa612eae9045057fa55",
+  "qmd_sha256": "01978de31f223a07c5788799141ae7debe90d11b35616def51c3089e012b6afd",
+  "tables_checked": true,
+  "forecast_example_rows": 5,
+  "probability_rows": 15,
+  "original_fm15_forecast_unchanged": true
+}

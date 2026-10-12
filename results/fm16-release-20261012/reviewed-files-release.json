@@ -1,0 +1,202 @@
+[
+  {
+    "path": "packages/beidan/R/fm_probability_source.R",
+    "sha256": "16822061ab81095f60a6f9beed468c0d7f6b88b3ca1173bea66c06bbc37b9b77"
+  },
+  {
+    "path": "packages/beidan/R/fm_tail_judgement.R",
+    "sha256": "0e629ec2dd3609ce611335b1d2effc8176f0d66803d9e58e18d0deb45c465204"
+  },
+  {
+    "path": "packages/beidan/R/score_margin_direction.R",
+    "sha256": "65432d8005b75c52708c37b393dfdc5ca66fc81907d9e29f1d9efa95954e468c"
+  },
+  {
+    "path": "packages/beidan/R/fundamental_probability.R",
+    "sha256": "27a55daee98bf0702c9aaea7bceab43e374b33d9d3dacb88e4260c25d027d43c"
+  },
+  {
+    "path": "packages/beidan/inst/python/beidan_backend/fundamental_probability.py",
+    "sha256": "9b5a146eabf84c526a3976e08be710494f80f316225f5e26bb7aa03e9926bfc8"
+  },
+  {
+    "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py",
+    "sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6"
+  },
+  {
+    "path": "packages/beidan/tests/testthat/test-fm-probability-source.R",
+    "sha256": "51595b21db94af4ff8f66b64b33c0dabd9d9e78a36f31b19a9c1ba99d011e73f"
+  },
+  {
+    "path": "packages/beidan/tests/testthat/test-fm-tail-judgement.R",
+    "sha256": "f03aa9746586c76d8233cd0842283d0bba16a1523bb2db3502c46eab51463272"
+  },
+  {
+    "path": "packages/beidan/tests/testthat/test-score-margin-direction.R",
+    "sha256": "02e88d7fa0efa5d70cc1bacbd449592e2e33283bf9ecbb32ec8a2cde1d3979cb"
+  },
+  {
+    "path": "packages/beidan/tests/testthat/test-fundamental-probability.R",
+    "sha256": "cd2084fcd8f44387db2f7ac0d0741f1fd4f8b91f4bad75b13ec54ec833f26f1a"
+  },
+  {
+    "path": "packages/beidan/tests/python/test_fundamental_probability.py",
+    "sha256": "10c68cfdee4cf8f0b540dce31c17d10d290263ca1117b0d8fc23b3bd4d0229c0"
+  },
+  {
+    "path": "quarto/fm16_release_20261012.qmd",
+    "sha256": "01978de31f223a07c5788799141ae7debe90d11b35616def51c3089e012b6afd"
+  },
+  {
+    "path": "skills/beidan-strategy/SKILL.md",
+    "sha256": "5ee588334b8c28b6de4a95787f8a97a701b2736194660a28d25a9555070a4e73"
+  },
+  {
+    "path": "skills/beidan-strategy/references/operations.md",
+    "sha256": "4ae7bb9dbfdc5a2ed5459d8f2bbeab212cec9ba6358dfb45b4c598a2f8cd72af"
+  },
+  {
+    "path": "skills/beidan-strategy/references/fundamental-probability.md",
+    "sha256": "7809b91f4e435d5726b8d8386586143292900aca8f0dc655aff561a186a4c620"
+  },
+  {
+    "path": "skills/beidan-strategy/references/fundamental-workflow.md",
+    "sha256": "5cac9ade73900cf97dd661d7d7b884d01d18228b2a7f902b5d35aee8ce619f70"
+  },
+  {
+    "path": "skills/beidan-strategy/references/diagnostic-methodology.md",
+    "sha256": "28993770245cacc1fb885dd07f85c37e30e7b3bb6ac6da8274a822ffc24a9f4a"
+  },
+  {
+    "path": "skills/beidan-strategy/references/planning.md",
+    "sha256": "3d15340ac008f22bcde0036a9741f9e04753bdaa57940e498b97a0b816180f2b"
+  },
+  {
+    "path": "skills/beidan-strategy/references/probabilities.md",
+    "sha256": "8953904eedf28e3199398933c39e9a708fccd230d6c52801c3369e3b4ec4b490"
+  },
+  {
+    "path": "skills/beidan-strategy/references/direction-score-adjustment.md",
+    "sha256": "31aa0173639967c777ec2219144becbd80a969a0c16212521bad34ab819ec6f4"
+  },
+  {
+    "path": "skills/beidan-strategy/references/diagnostic-functions.md",
+    "sha256": "6c356f7b096a76a59979b0aa80a60bf87a0388c9839401a0d283ba25ca61134b"
+  },
+  {
+    "path": "skills/beidan-strategy/references/vfootball-research.md",
+    "sha256": "9ac1d929ad20c3e3186a30080ba10585addc32ce40f3cfefd714597f7181cc6a"
+  },
+  {
+    "path": "skills/beidan-strategy/references/mixed-round-replay.md",
+    "sha256": "e8c45739f521640da8c582ec60536435c8f3fc8630311791ac2260e973293beb"
+  },
+  {
+    "path": "skills/beidan-strategy/references/competition-strength-market.md",
+    "sha256": "eae8ab13739c7f13fce9bf0a8c452586a6a65d2ed534b1a4f9fd593da8afe03c"
+  },
+  {
+    "path": "skills/beidan-strategy/references/prediction-report.md",
+    "sha256": "bc213dce0a33ff5b5acd0622fe8b7e0b68eac71141af063957596f69689bdad1"
+  },
+  {
+    "path": "skills/beidan-strategy/references/confidence-market-switch.md",
+    "sha256": "c67c3d2eaa773b180d7a486566ec6253a7dc4f594a25851e7c46429fa876ece6"
+  },
+  {
+    "path": "skills/beidan-strategy/references/scenario-tail-adjustment.md",
+    "sha256": "dca954d85d9003fba171b34c1d567e085593e793d9c277963f39eb89eafc21e7"
+  },
+  {
+    "path": "packages/beidan/man/BuildFmTailJudgement.Rd",
+    "sha256": "b226f1341b2c28c6dfb67d6e5ec252d853a08b645f20889d9d5231abe85d3d13"
+  },
+  {
+    "path": "packages/beidan/man/SelectFmProbabilitySource.Rd",
+    "sha256": "55cecb15be34b3b9021a3281bc855e4b8ea94e56cb00e77060eb04cc6dd1d982"
+  },
+  {
+    "path": "packages/beidan/man/adjust_score_margin_distribution.Rd",
+    "sha256": "ba9b206ce4702e4fc35294e69973c10f577968214c96a5633b9c32d92ea9668c"
+  },
+  {
+    "path": "packages/beidan/man/project_dc_market_handicap.Rd",
+    "sha256": "ea329468624116533b68fc523d6a076f24197fc3f0bbe2406612e552a86cb332"
+  },
+  {
+    "path": "packages/beidan/man/project_score_outcomes.Rd",
+    "sha256": "c3e226c5e470dbfacb1a334dd27617ebac3cca8e75242fa0dd280196cb1c00dc"
+  },
+  {
+    "path": "packages/beidan/man/fundamental_goal_baseline.Rd",
+    "sha256": "724a5fd814535fb9018280838979967d4da1d0254c5adaf8f5b0ae70835d310d"
+  },
+  {
+    "path": "packages/beidan/man/apply_goal_adjustments.Rd",
+    "sha256": "331049c5d5acc611a022936f75ec293f3234b915de5e90de4aa2e67517cfefb2"
+  },
+  {
+    "path": "results/fm16-release-20261012/namespace-stage.json",
+    "sha256": "dfb466aa8c32e695023ea6fe5b4da0dd911abb03747204a90fb9b96c72696f9b"
+  },
+  {
+    "path": "results/fm16-release-20261012/tests.log",
+    "sha256": "b2a2e87eb88ea972f31c384ac437856bfa6d7869d6297c0fb347fce5094220cc"
+  },
+  {
+    "path": "results/fm16-release-20261012/dependency-tests.log",
+    "sha256": "4c11641b6707e84cf14aee676695a73d2ae0af3210921bf095ee07c8abbceb5a"
+  },
+  {
+    "path": "results/fm16-release-20261012/python-tests.log",
+    "sha256": "355d583096898400ff1643fe30852895cda708d83caf4db3d5eadae37184c8d1"
+  },
+  {
+    "path": "results/fm16-release-20261012/install.log",
+    "sha256": "284bfe7adf837164418d26b810135275b04f3cb385655733dbe7c0553f2626c9"
+  },
+  {
+    "path": "results/fm16-release-20261012/skill-sync.json",
+    "sha256": "9c92ff60254b4f8124ed96d7a67ba88849bd59b7864c46884f83db1da84b7c7d"
+  },
+  {
+    "path": "results/fm16-release-20261012/skill-validation.log",
+    "sha256": "db349825903d66adffea3ecf1bd8e1803043e8a71cf1a051235dabc5371f5bb0"
+  },
+  {
+    "path": "results/fm16-release-20261012/skill-validation-installed.log",
+    "sha256": "db349825903d66adffea3ecf1bd8e1803043e8a71cf1a051235dabc5371f5bb0"
+  },
+  {
+    "path": "results/fm16-release-20261012/audit.csv",
+    "sha256": "235f39a84d3e06a5025fd569c61c57c040535c59244c27c8384c62dc438390a7"
+  },
+  {
+    "path": "results/fm16-release-20261012/probabilities.csv",
+    "sha256": "cf30385c8c725072438508771ddff26388592247e04197d7f45f13e34ce39b49"
+  },
+  {
+    "path": "results/fm16-release-20261012/margins.csv",
+    "sha256": "0ebf52b9f86837359397ba4adc22f2838bd3abd8e2f67bc7eef372f79fcb8339"
+  },
+  {
+    "path": "packages/beidan/inst/python/beidan_backend/fundamental_issue.py",
+    "sha256": "c9e6d433565ccdfa88b35081655acb352ba85066028c6774f53e0e0f6ceb245e"
+  },
+  {
+    "path": "packages/beidan/tests/python/test_fundamental_issue.py",
+    "sha256": "a52a1865913fad99df296483aec5b5f8ae394d5f06a3a4b914d49a9ac5f8daaa"
+  },
+  {
+    "path": "results/fm16-release-20261012/python-tests-complete-dependencies.log",
+    "sha256": "dcb4ea5848d79eb525b7a8f47307714e4805e876129411c2599c5f4ed1e46d93"
+  },
+  {
+    "path": "results/fm16-release-20261012/acceptance.json",
+    "sha256": "eeb837063a80214419b3ca28e78c4de1422d7b1ccd420572880e60eb49d46e70"
+  },
+  {
+    "path": "results/fm16-release-20261012/standard-r.log",
+    "sha256": "694c35737cf073e773e413a1ccc627b5f24a56eb6d0191f278a0dc456e22385b"
+  }
+]

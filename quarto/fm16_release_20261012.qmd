@@ -1,0 +1,77 @@
+---
+title: "FM-1.6.0：可靠性来源切换与单／双中心扩展"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本版将讨论形成的两条规则实现到R package并更新beidan-strategy。基本面low/uncertain、市场充分且一致时直接选市场网格，不固定混合原生；单／双中心自动阈值为相邻最高两档差≤0.01（1个百分点，包含等号），专家起始值，非标定结果。扩展最多2层、任侧≥0.10整对保留、外围0.3。#4/#11/#59/#23/#24已知赛果，只作端到端规则验收，不是独立回测。正式FM15冻结输出不改写，尚无FM16整期效果或前瞻准入证据。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));root<-normalizePath('..');out<-file.path(root,'results/fm15-26102-20261012');dest<-file.path(root,'results/fm16-release-20261012');impl<-file.path(out,'implementation')
+library(beidan,lib.loc=file.path(dest,'library'))
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE);backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+m<-jsonlite::fromJSON(file.path(out,'manifest.json'));dm<-jsonlite::fromJSON(file.path(out,'market-diagnostic-manifest.json'));nm<-jsonlite::fromJSON(file.path(out,'native-manifest.json'))
+stopifnot(digest::digest(file=file.path(out,m$batch_file),algo='sha256')==m$sha256,digest::digest(file=file.path(out,dm$diagnostic_file),algo='sha256')==dm$sha256,digest::digest(file=file.path(out,nm$native_file),algo='sha256')==nm$sha256)
+x<-readRDS(file.path(out,m$batch_file));d<-readRDS(file.path(out,dm$diagnostic_file));native<-readRDS(file.path(out,nm$native_file))
+coverage<-read_csv(file.path(out,'coverage-corrected.csv'),show_col_types=FALSE)
+policy<-list(max_radius=2L,threshold=.1,coefficient=.3,tie_tolerance=1e-12,dual_gap=.01)
+audit<-probabilities<-margins<-list();artifacts<-list()
+for(id in paste0('26102:',c(4,11,59,23,24))) {
+ e<-x$entries[[id]];f<-native$entries[[id]]$fixture
+ fixture<-tibble(fixture_id=id,issue_id='26102',home=f$home,away=f$away);cutoff<-e$base$cutoff
+ native_base<-e$base;market_base<-NULL;ref<-d$references[[id]]
+ if(!is.null(ref))market_base<-list(grid=ref$model$grid,cutoff=cutoff,model_id='FROZEN_JOINT_MARKET_DC',source_hashes=list(market_diagnostic=dm$sha256,market_receipt=beidan:::.score_margin_hash(ref$model$receipt)),max_source_available_utc=max(ref$model$euro$quote_at,ref$model$asian$quote_at,lubridate::ymd_hms(map_chr(ref$evidence_rows,'data_available_ts'),tz='UTC')),intended_use='HISTORICAL_DIAGNOSTIC')
+ sufficient<-!is.null(market_base)
+ reason<-if(id=='26102:23')'Retrospective review: three available Euro companies all favor away, all three channels prior, joint residuals small; partial basket accepted for diagnostic only'else if(sufficient)'Retrospective review: no opponent-strength/lineup modelling; full Euro basket plus Asian/total support market scale'else'Retrospective review: missing Euro and totals prevents joint-market switch'
+ review<-list(confidence='uncertain',market_sufficient=sufficient,market_consistent=sufficient,reason=reason,counterevidence='Not a measured numerical confidence score; target results already known; no prospective claim',evidence_ids='native-review',cutoff_utc=format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),native_hash=beidan:::.score_margin_hash(native_base),market_hash=if(is.null(market_base))'ABSENT'else beidan:::.score_margin_hash(market_base),author='ROOT_POST_RESULT',review_version='FM-1.6.0_RULE_ACCEPTANCE')
+ selection_hashes<-list(original_forecast=m$sha256,market_snapshot=dm$sha256,fm_source_selection_inputs=beidan:::.score_margin_hash(list(native=native_base,market=market_base,review=review,fixture=fixture,cutoff=cutoff)),fm_source_selection_code=digest::digest(paste(deparse(beidan:::SelectFmProbabilitySource),collapse='\n'),algo='sha256'),fm_source_selection_dependencies=beidan:::.score_margin_code(impl))
+ rows<-e$evidence_rows
+ ctx<-backend$build_adjustment_evidence_context(rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',review$cutoff_utc),selection_hashes,shared$AvailabilityPolicy$historical_proxy('FM16_POST_RESULT_RULE_ACCEPTANCE_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+ selected<-beidan:::SelectFmProbabilitySource(native_base,market_base,review,ctx,fixture,cutoff,impl)
+ stopifnot(identical(selected,beidan:::SelectFmProbabilitySource(native_base,market_base,review,ctx,fixture,cutoff,impl)))
+ base<-selected$base
+ tail_review<-list(decision='apply',center_mode='auto',base_hash=beidan:::.score_margin_hash(base$grid),cutoff_utc=review$cutoff_utc,reason='FM16 explicit source and auto adjacent centers',counterevidence='Expert policy; no independent accuracy validation')
+ pol<-beidan:::BuildFmTailJudgement(base,tail_review,'native-review',cutoff,policy)
+ hashes<-c(selection_hashes,list(source_selection_receipt=beidan:::.score_margin_hash(selected$receipt),base_artifact=beidan:::.score_margin_hash(base),margin_judgement=beidan:::.score_margin_hash(pol$judgement),direction_implementation=beidan:::.score_margin_code(impl),tail_binding=pol$binding_hash))
+ ctx2<-backend$build_adjustment_evidence_context(rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',review$cutoff_utc),hashes,shared$AvailabilityPolicy$historical_proxy('FM16_POST_RESULT_RULE_ACCEPTANCE_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+ final<-beidan::adjust_score_margin_distribution(base,pol$judgement,ctx2,fixture,cutoff,impl)
+ stopifnot(identical(final,beidan::adjust_score_margin_distribution(base,pol$judgement,ctx2,fixture,cutoff,impl)))
+ # Seal score distribution before the actual Beidan line is supplied.
+ saveRDS(list(selection=selected,policy=pol,final=final),file.path(dest,paste0('score-',gsub(':','-',id),'.rds')))
+ p<-beidan::project_score_outcomes(final,f$handicap,impl)
+ stopifnot(abs(sum(p$probability)-1)<1e-12)
+ probabilities[[id]]<-p |> mutate(fixture_id=id,.before=1)
+ margins[[id]]<-final$margins |> mutate(fixture_id=id,.before=1)
+ audit[[id]]<-tibble(fixture_id=id,home=f$home,away=f$away,handicap=f$handicap,confidence=review$confidence,market_sufficient=sufficient,selected_source=selected$selected_source,center_mode=pol$branch,centers=paste(pol$centers,collapse=','),radius=pol$radius,euro_companies=coverage$euro_company_count[match(id,coverage$fixture_id)])
+ artifacts[[id]]<-list(selection=selected,policy=pol,final=final,probabilities=p,selection_hashes=selection_hashes,tail_hashes=hashes)
+}
+audit<-bind_rows(audit);probabilities<-bind_rows(probabilities);margins<-bind_rows(margins)
+stopifnot(nrow(audit)==5L,nrow(probabilities)==15L,audit$selected_source[audit$fixture_id=='26102:24']=='native',all(audit$selected_source[audit$fixture_id!='26102:24']=='market'))
+for(id in names(artifacts)){canonical<-artifacts[[id]]$selection$base;canonical$source_hashes$selection_receipt<-NULL;stopifnot(beidan:::.score_margin_hash(canonical)==artifacts[[id]]$selection$receipt$output_hash,beidan:::.score_margin_hash(artifacts[[id]]$selection$receipt)==artifacts[[id]]$selection$base$source_hashes$selection_receipt)}
+write_csv(audit,file.path(dest,'audit.csv'));write_csv(probabilities,file.path(dest,'probabilities.csv'));write_csv(margins,file.path(dest,'margins.csv'));saveRDS(artifacts,file.path(dest,'artifacts.rds'))
+knitr::kable(audit,caption='实际裁决为ROOT的事后规则验收，未调用JEV')
+knitr::kable(probabilities |> select(fixture_id,outcome,probability,rank,tied_rank) |> mutate(probability=100*probability),digits=2,caption='FM16让球类别概率，单位%，按最终完整类别排序')
+knitr::kable(margins |> filter(between(margin,-3,5)) |> mutate(across(c(base_probability,probability),~100*.x)),digits=2,caption='净胜球原始及重加权概率，单位%；完整支持未删除')
+```
+
+真实JEV调用及数值置信评分尚未接入；这次实现的是可执行、绑定证据的等级裁决接口。传递学习/决策清单：原生estimate_recent_venue_goals与原市场project_dc_market_handicap是先前已冻结输入，其原收据与实现身份保留；本次SelectFmProbabilitySource与BuildFmTailJudgement是显式专家决策，之后adjust_score_margin_distribution、project_score_outcomes消费共享准入；build_adjustment_evidence_context/export_adjustment_evidence_context及prepare_learning_context/verify_learning_context承担全部时序、分区、权重和独立重放，未复制学习框架。新裁决正文、作者/版本、输入/函数体/依赖哈希均绑定到收据。
+
+三路市场一致并非保证赛果：#23三家欧赔均偏客只是部分篮子充分性示例，不能把本例理由当通用自动准入。报告须给出实际残差、报价年龄、篮子覆盖及冻结充分/一致理由。基本面不确定但市场缺失时保留原生、标明诊断限制，不伪造高置信。原生近期权重、ρ及其他未讨论参数不改变。
+
+权威实现：`SelectFmProbabilitySource`直接选用已验证网格，`BuildFmTailJudgement`构造单／双中心整数分区目标，既有`adjust_score_margin_distribution`重加权及`project_score_outcomes`冻结后投影。旧FM15函数移出当前源树，不加兼容包装；原FM15安装库、输入快照及已盘点实现仍只供原冻结诊断重放，不作为FM16接口。当前source选择不学习阈值或历史拟合，仅消费已共享准入的证据及显式审查。此前必要的score_margin_direction、fundamental_probability、历史准入fundamental_issue及共享context_replay模块尚未跟踪，本次连同其测试/文档纳入提交以补齐新接口的运行依赖；这些既有文件不改行为。NAMESPACE仅暂存5个必需FM导出，其他会话的导出与Nova工作不纳入提交。
+
+函数／测试映射：`packages/beidan/tests/testthat/test-fm-probability-source.R`覆盖全部12种来源门控、无市场、截止/哈希变更、未来/目标污染、缺失/空/重复/非法支持及证据绑定；`test-fm-tail-judgement.R`覆盖单中心旧行为、双中心、反射、1个百分点边界、并列/非相邻/三档模糊、停止/半径上限、分区归一化及共享调整/投影。两项新专项合计192断言通过；既有市场/比分与基本面适配依赖的两项R测试合计130断言、Python适配/原生/历史准入18项测试通过。R CMD INSTALL到声明私有库验证实际可加载；不以load_all替代。依赖不新增，来自项目配置；R4.6.1、项目Python .venv、Quarto，渲染不安装依赖。
+
+复现：`R CMD INSTALL -l results/fm16-release-20261012/library packages/beidan`；设`FM_NATIVE_TEST_ROOT=$PWD`后用声明库运行两项专项测试（load_helpers=FALSE）；`quarto render quarto/fm16_release_20261012.qmd --no-cache`。所有来源及原批次SHA在选择/调整收据内，改截止、来源或实现须重建；不跨截止缓存。全套测试、专项结果、审查及未通过项记录如下，不以专项通过替代全仓。
+
+```{r}
+ap<-file.path(dest,'acceptance.json')
+if(file.exists(ap)){acceptance<-jsonlite::fromJSON(ap);knitr::kable(tibble(check=names(acceptance),result=map_chr(acceptance,~paste(unlist(.x),collapse='; '))))}else cat('验收收据待生成。')
+rp<-file.path(dest,'review.json')
+if(file.exists(rp)){rr<-jsonlite::fromJSON(rp);stopifnot(all(map_chr(file.path(root,rr$files$path),~digest::digest(file=.x,algo='sha256'))==rr$files$sha256));knitr::kable(tibble(status=rr$status,command=rr$command,findings=rr$findings,resolutions=rr$resolutions),caption='独立codex review；owner PI待验收')}else cat('独立审查尚未完成，当前仅预览。')
+```

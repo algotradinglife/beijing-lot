@@ -1,0 +1,6 @@
+fixture_id,home,away,handicap,confidence,market_sufficient,selected_source,center_mode,centers,radius,euro_companies
+26102:4,瑞典U21,北马其顿U21,-1,uncertain,TRUE,market,dual_center_tail,"1,2",1,4
+26102:11,意大利,土耳其,-1,uncertain,TRUE,market,single_center_tail,1,2,4
+26102:59,英格兰,捷克,-2,uncertain,TRUE,market,single_center_tail,2,2,4
+26102:23,赖于福斯,斯达,1,uncertain,TRUE,market,dual_center_tail,"-1,0",2,3
+26102:24,德国U21,格鲁吉亚U21,-3,uncertain,FALSE,native,dual_center_tail,"0,1",2,0

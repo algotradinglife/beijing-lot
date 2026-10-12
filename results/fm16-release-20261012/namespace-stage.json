@@ -1,0 +1,6 @@
+{
+  "path": "packages/beidan/NAMESPACE",
+  "staged_sha256": "e32edb78a8bc244f2350c202d794585e50bdb6f59c9d767a0a3510cf01bad62e",
+  "runtime_working_sha256": "4a6e58657d102cfc96e58dc74cb2f0ce7f42e63260189ac7dca249ce251b4058",
+  "scope": "Only five required FM exports staged; other authors runtime NAMESPACE changes remain unstaged"
+}

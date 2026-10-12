@@ -1,0 +1,16 @@
+{
+  "model": "FM-1.6.0",
+  "new_r_assertions": 192,
+  "dependency_r_assertions": 130,
+  "python_tests": 18,
+  "install": "PASS R CMD INSTALL to declared private library; two public APIs loaded",
+  "skill": "VALIDATED canonical and synced installed copies",
+  "standard_r": "FAILED: package 8223 passed assertions / 2 error blocks; repository 37396 passed / 2 failed assertions / 9 error blocks; 13 aggregate failing/errored blocks",
+  "standard_scope": "Run launched before canonical receipt fix; new final receipt tested by final targeted tests/review. Older-library attempt interrupted; same private library was reinstalled during full run, with DESCRIPTION read warning. Full run not accepted as final-revision full-suite validation.",
+  "standard_command": "FM_NATIVE_TEST_ROOT=$PWD R_PROFILE_USER=/dev/null R_ENVIRON_USER=/dev/null R_LIBS_USER=$PWD/results/fm16-release-20261012/library:$PWD/r_lib /opt/R/4.6.1/bin/Rscript tests/testthat.R",
+  "targeted_command": "FM_NATIVE_TEST_ROOT=$PWD Rscript targeted testthat::test_file with explicit installed lib.loc, namespace env, load_helpers=FALSE",
+  "python_command": "PYTHONPATH=packages/beidan/inst/python:$PWD .venv/bin/python -m pytest packages/beidan/tests/python/test_fundamental_probability.py packages/beidan/tests/python/test_fundamental_issue.py packages/beidan/tests/python/test_recent_venue_goals.py -q",
+  "purpose": "POST_RESULT_RULE_ACCEPTANCE_ONLY; not independent backtest or prospective validation",
+  "jev": "No JEV call or numerical confidence score; structured review interface implemented",
+  "pi": "OWNER_PENDING"
+}

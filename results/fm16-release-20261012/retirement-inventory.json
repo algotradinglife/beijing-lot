@@ -1,0 +1,14 @@
+[
+  {
+    "path": "packages/beidan/R/fm15_tail_judgement.R",
+    "sha256": "a82f0374d8b5254c8b216dd0da6cc8e5d5bbdaf2535cbaf453fa94a85a5e350f",
+    "git_revision": "764927b70d3d840703cf334f6f7d0a78f34fb800",
+    "classification": "RETIRED_FROM_ACTIVE_SOURCE; prior installed library and frozen implementation retain historical replay only"
+  },
+  {
+    "path": "packages/beidan/tests/testthat/test-fm15-tail-judgement.R",
+    "sha256": "402049566df1cb5a78536dbb097922b920e40928b063e579e9788e941a980aa0",
+    "git_revision": "764927b70d3d840703cf334f6f7d0a78f34fb800",
+    "classification": "RETIRED_FROM_ACTIVE_SOURCE; prior installed library and frozen implementation retain historical replay only"
+  }
+]
