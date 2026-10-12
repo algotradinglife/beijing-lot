@@ -1,0 +1,16 @@
+Shell stderr: (anon):setopt:7: can't change option: monitor
+
+[[31mERROR[39m]: gitstatus failed to initialize.
+
+
+  Add the following parameter to [4m~/.zshrc[24m for extra diagnostics on error:
+
+    [1mGITSTATUS_LOG_LEVEL=DEBUG[0m
+
+  Restart Zsh to retry gitstatus initialization:
+
+    [32m[4mexec[24m[32m zsh[39m
+Shell environment resolution complete: 24 variables resolved
+2026-10-12T15:19:11.412Z [positassistant-headless:WARN] [lmstudio] API fetch failed: Unable to connect. Is the computer able to access the url?, using fallback
+2026-10-12T15:19:11.414Z [positassistant-headless:WARN] [ollama] API fetch failed: Unable to connect. Is the computer able to access the url?, using fallback
+2026-10-12T15:19:14.491Z [positassistant-headless:WARN] [opencode] API fetch failed: unknown certificate verification error, using fallback

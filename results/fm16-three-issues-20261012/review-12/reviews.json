@@ -1,0 +1,122 @@
+[
+  {
+    "fixture_id": "26098:133",
+    "cutoff_utc": "2026-09-26T23:10:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "美职业: home : n= 30 , recent= 8 , ESS= 17.8; away : n= 30 , recent= 8 , ESS= 17.8. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH 0.25; OU-based mean 3.735; max Euro residual 1.12 pp, AH residual 0.46 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:134",
+    "cutoff_utc": "2026-09-27T01:00:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "墨西联: home : n= 30 , recent= 8 , ESS= 17.8; away : n= 30 , recent= 8 , ESS= 17.8. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH -1; OU-based mean 3.066; max Euro residual 1.5 pp, AH residual 0.61 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:136",
+    "cutoff_utc": "2026-09-27T10:25:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "国际友谊: home : n= 45 , recent= 8 , ESS= 20.9; away : n= 38 , recent= 8 , ESS= 19.6. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH -1.5; OU-based mean 2.782; max Euro residual 1.73 pp, AH residual 0.54 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:137",
+    "cutoff_utc": "2026-09-27T11:00:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "国际友谊: home : n= 37 , recent= 8 , ESS= 19.4; away : n= 38 , recent= 8 , ESS= 19.6. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH -0.25; OU-based mean 2.327; max Euro residual 1.58 pp, AH residual 0.4 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:138",
+    "cutoff_utc": "2026-09-27T16:00:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": false,
+    "reason": "欧国联: home : n= 32 , recent= 8 , ESS= 18.3; away : n= 33 , recent= 8 , ESS= 18.5. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH 0.5; OU-based mean 2.372; max Euro residual 5.91 pp, AH residual 3.58 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale. ROOT rejects cross-channel consistency: AH away +0.5 strength exceeds near-balanced Euro view; residual compromise masks channel disagreement.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:139",
+    "cutoff_utc": "2026-09-27T16:00:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "欧国联: home : n= 35 , recent= 8 , ESS= 19; away : n= 35 , recent= 8 , ESS= 19. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH 0; OU-based mean 2.327; max Euro residual 1.07 pp, AH residual 0.03 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:140",
+    "cutoff_utc": "2026-09-27T18:30:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": false,
+    "market_consistent": false,
+    "reason": "西乙: home : n= 30 , recent= 8 , ESS= 17.8; away : n= 30 , recent= 8 , ESS= 17.8. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. No validated joint reference: length(total) == 1L is not TRUE",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations"]
+  },
+  {
+    "fixture_id": "26098:141",
+    "cutoff_utc": "2026-09-27T18:45:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "欧国联: home : n= 36 , recent= 8 , ESS= 19.2; away : n= 34 , recent= 8 , ESS= 18.8. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 3 Euro firms; AH -0.25; OU-based mean 2.534; max Euro residual 0.65 pp, AH residual 0.05 pp. Partial three-firm basket, diagnostic sufficiency accepted from cross-firm and AH/OU agreement; not complete.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:142",
+    "cutoff_utc": "2026-09-27T18:45:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "欧国联: home : n= 34 , recent= 8 , ESS= 18.8; away : n= 32 , recent= 8 , ESS= 18.3. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH -0.25; OU-based mean 2.934; max Euro residual 0.5 pp, AH residual 0.17 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:143",
+    "cutoff_utc": "2026-09-27T18:45:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "欧国联: home : n= 32 , recent= 8 , ESS= 18.3; away : n= 33 , recent= 8 , ESS= 18.5. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH 0; OU-based mean 2.174; max Euro residual 1.09 pp, AH residual 0.25 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:144",
+    "cutoff_utc": "2026-09-27T18:45:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "欧国联: home : n= 35 , recent= 8 , ESS= 19; away : n= 33 , recent= 8 , ESS= 18.5. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH 0.5; OU-based mean 3.253; max Euro residual 0.79 pp, AH residual 0.43 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  },
+  {
+    "fixture_id": "26098:145",
+    "cutoff_utc": "2026-09-27T18:45:00Z",
+    "confidence": "uncertain",
+    "market_sufficient": true,
+    "market_consistent": true,
+    "reason": "欧国联: home : n= 34 , recent= 8 , ESS= 18.8; away : n= 35 , recent= 8 , ESS= 19. Opponent-strength, roster/cohort continuity and window stability are unverified; no affirmative adequate-confidence evidence. 4 Euro firms; AH 0; OU-based mean 2.908; max Euro residual 0.35 pp, AH residual 0.12 pp. Complete specified basket; quotation evidence inspected for compatible direction/scale.",
+    "counterevidence": "ROOT retrospective expert judgment; systematic missing-variable uncertainty is a cohort-level limitation, not a calibrated confidence score. Partial coverage and old prior quotes can miss new information. No outcome-based threshold tuning.",
+    "evidence_ids": ["native_rates", "confidence_limitations", "market_ordinary", "market_asian"]
+  }
+]

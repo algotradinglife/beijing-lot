@@ -1,0 +1,12 @@
+{
+  "status": "FULL_IDENTICAL_REPLAY",
+  "fixtures": 346,
+  "sha256": "59c4256106c4f638a7325c8aa0d0a9a45a8b320ca5540e5cc994f5b65827548f",
+  "shard_receipts": [
+    "replay-1.json",
+    "replay-2.json",
+    "replay-3.json"
+  ],
+  "scheduler_sha256": "9e0264221b6d4a11b125d492050b0f59f00a66da5d70e8c271c9ea00c5816df2",
+  "client_sha256": "4dff2e3579425619c2a7b6e97cd57170fd198b5c5b84209c036d89f159190b65"
+}

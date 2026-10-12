@@ -1,0 +1,80 @@
+{
+  "status": "NO_BLOCKING_P1_P2_FINDINGS",
+  "command": "codex review - < results/fm16-three-issues-20261012/review-prompt-final.txt",
+  "findings": "Initial review: two P2 artifact bindings; final review: no remaining blockers.",
+  "resolutions": "QMD binds evaluation forecast/stage identities; evaluation reads hash-verified frozen comparator paths; actual corrupted-receipt/render and changed-comparator subprocess tests pass.",
+  "review_log": "results/fm16-three-issues-20261012/review-final.log",
+  "review_log_sha256": "1451af19f62b7f514436b48c6c6f9b3a175f37640b8cff01744d492f61504f68",
+  "reviewed_at_utc": "2026-10-12T15:46:25.954458+00:00",
+  "files": [
+    {
+      "path": "r/fm16_three_issue_prepare.R",
+      "sha256": "02e2e23bbd92dcacfef53acf88b8a54ad373f763e6abcc1afa76f4f4aba575f0"
+    },
+    {
+      "path": "r/fm16_three_issue_root_review.R",
+      "sha256": "c1a87fce467ab32f7eaade2171995542145240e45298905fafbcfd2d5b4416bb"
+    },
+    {
+      "path": "r/fm16_three_issue_freeze.R",
+      "sha256": "4dff2e3579425619c2a7b6e97cd57170fd198b5c5b84209c036d89f159190b65"
+    },
+    {
+      "path": "r/fm16_three_issue_evaluate.R",
+      "sha256": "7fc4761b5e1338719e6ce1785983586f33b706f49a89dd7159553cc5dde70629"
+    },
+    {
+      "path": "scripts/fm16_three_issue_pa.py",
+      "sha256": "475b59397e329935a3a07d61d2e2fefa1e2fd2e09d48082149b327e2dc7d6f82"
+    },
+    {
+      "path": "scripts/fm16_three_issue_replay.py",
+      "sha256": "9e0264221b6d4a11b125d492050b0f59f00a66da5d70e8c271c9ea00c5816df2"
+    },
+    {
+      "path": "tests/testthat/test-fm16-three-issue-backtest.R",
+      "sha256": "a275335ecebbc17ccbe9f9288fa03168ce6095ea6855631604270ca3bc80cb5f"
+    },
+    {
+      "path": "quarto/fm16_three_issues_20261012.qmd",
+      "sha256": "4388e3f89bba7eaa1f0f48339c58e776d0b3a1cc6009b674a6ff3e36d04f1b84"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/implementation.json",
+      "sha256": "a13afe72d08e335223167c925dbdcbb02d81dcccd9cb60f049a14f4aa3902ae4"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/acceptance.json",
+      "sha256": "c8f784821954b29483e5b71bd31c250a90c8cca251180b543735ec36b81c59ba"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/check-commands.json",
+      "sha256": "2083aceeb82e67fc7e569aac2f3e6f59d4848a30c2526ca15f1b89ff9736cd99"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/stage-manifest.json",
+      "sha256": "06beb78be539327b62f0c88a510d50f3a757002713a16a366cd23205ac8c8a46"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/manifest.json",
+      "sha256": "4f4deb680cf673b5b387738a8fe5a06c06d49373c0dfaeeaddc4139385e4d352"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/evaluation.json",
+      "sha256": "575a1b5552cbd98ca3e61520d66622e4a317885b09b8f5931aaaf7fa9ed20560"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/replay.json",
+      "sha256": "bb052cc5ed1ecc3b125bc42ee38ee0fe3a78700356abaf3fc8f1e8d8934bd19f"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/metrics.csv",
+      "sha256": "a2abcaf9b71931854c1c9cd72856b646ca53a1520652ccc3c4f6471c7647ef46"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/audit.csv",
+      "sha256": "f26ff21958347b415b889e7c7fa9b5e74fac24f163ad18b8dd957201a134fe7a"
+    }
+  ],
+  "PI": "Owner acceptance pending"
+}

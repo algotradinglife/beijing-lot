@@ -1,0 +1,363 @@
+{
+  "model": "FM-1.6.0",
+  "forecasts": 346,
+  "stage_sha256": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68",
+  "forecast_sha256": "59c4256106c4f638a7325c8aa0d0a9a45a8b320ca5540e5cc994f5b65827548f",
+  "review_ledger": [
+    {
+      "path": "results/fm16-three-issues-20261012/review-1/reviews.json",
+      "sha256": "f081c96de57e073b1cb7c5bc056ca5d76add144cde480e9c43415ec47c39f419"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-10/reviews.json",
+      "sha256": "3756fb3fd854a33fdeee0ad37ca3c01448581c2aa9eff2ad90aecb8d6cfbd284"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-11/reviews.json",
+      "sha256": "45441e169979743d8b3a50b671443e71cd7f87685a8b33670dbff35f7c7bcc9b"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-12/reviews.json",
+      "sha256": "5bb03d9d681512ea949c12670ec4c6eaa380e216c47cea3ede172cb830340788"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-13/reviews.json",
+      "sha256": "f999289b768cecd8ec914f76344b2bd9f68b8243b76c52ddf72de90bbe6169b8"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-14/reviews.json",
+      "sha256": "ad5a030ea5a3c9b7457056c7a879e8c5e7f5a3e4e45e3e23e96dd7b2ec9a0a7a"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-15/reviews.json",
+      "sha256": "6a29eec5da502948accf6b0474b613c3716a7bc6cb8bf26102680ddf22fabc99"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-16/reviews.json",
+      "sha256": "fe2e8bbe488b4c884444364bc16b9cacadd1247d99316e59cedad7a0dddf4c6e"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-17/reviews.json",
+      "sha256": "83321229207cfe63852b5ab59b5243cedd56752d9a12eff185a9006372fef211"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-18/reviews.json",
+      "sha256": "7fa44e74208878b9fdf0976d8945f60893308354f87dee8ff59d450e0c9d4af4"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-19/reviews.json",
+      "sha256": "8ccb9e4c16f4d73ae8852237065146fe27d9c4fca6ff07b198de538be6ded288"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-2/reviews.json",
+      "sha256": "f867c9607208d103725b9d6a232848bd79851a508d5a06d5cc1416ff79facb81"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-20/reviews.json",
+      "sha256": "35dfb0d042ca0e81191b072fea308fe8741ecec931ec2b9946537ca061fa840d"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-21/reviews.json",
+      "sha256": "fb9500fd6ff1f0718adb9b9d83a311530b5758ff945ce1c5b92f028229546713"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-22/reviews.json",
+      "sha256": "f856e65cbab3bf666074e0dbe1206442b6b4ea0d97718cbde9fc850d4d6ac763"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-23/reviews.json",
+      "sha256": "3fcf1812da8563ed00d55f3e02a762b40914e6075da3558fab1d63ff831d9922"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-24/reviews.json",
+      "sha256": "ab45aa5a6505841d11f45a1d6771f8f84965ded281acf3bba32365de2de6c87f"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-25/reviews.json",
+      "sha256": "d867af4d9b13ec9478264ded6a109f202547c3a1ce85a0c60a4606ef4d16178a"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-26/reviews.json",
+      "sha256": "2330d3b07ce060cc0fd666a354ef16fcfaeea332c0bbedf6acb92a3ba203e45b"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-27/reviews.json",
+      "sha256": "196b82b858ce17eb65b89e68a0e6e8fbcd7e16d8c4bdb5fadd4e936c2ce060ed"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-28/reviews.json",
+      "sha256": "f5d753cf146cc35627f8957c0f204a11482b4af132d392a5588271bb50ed60d7"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-29/reviews.json",
+      "sha256": "fe038b2a48a9eaceff523a066f90e4947d92bce6bad71240855c8296d0cd0213"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-3/reviews.json",
+      "sha256": "b16767795b155399d617a02226a0a31d0b963cd1f5629a12c77a61ee273c643f"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-4/reviews.json",
+      "sha256": "c4c6e23f71a9929162466e503c012ffe1c234cc85655ed60792306804aa5bf47"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-5/reviews.json",
+      "sha256": "d8dbfba8760ec584a518f36d1b03bae52923a14598fb3e022a34dc61b01a14ed"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-6/reviews.json",
+      "sha256": "988226298bd085b591fc27ea49d47a25e74fcf334e1c7749b50c8bf13741ad3b"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-7/reviews.json",
+      "sha256": "609d48d4e6f5fa70a44fe3e10b0bd69b63652c3d3b0ba040ce00254d1141d922"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-8/reviews.json",
+      "sha256": "dd8850e03b97ec8a4ab96ed39f9e9bd1d472d97ef65861de611959ba608c7d3b"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-9/reviews.json",
+      "sha256": "5647b5d77d987fa25c3ce77ce9f53c3e2d8cee191a072d09a8c92dbd7f43ab65"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-1/input.json",
+      "sha256": "1dec942edc4e3e245213a383cde25026d546c6c7db65232877328368bbf06bfd"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-10/input.json",
+      "sha256": "b2d66369e862bfd7e6dc5ca418bece3485430bc5bc191b3f169ccbc88df37e2e"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-11/input.json",
+      "sha256": "f08bec3bdcf06182f5b74870089a7f21cf7682f6b287bfb0f8a902e4cd9e7a64"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-12/input.json",
+      "sha256": "aee987638e538742bd3351b8015896c80a5319e70eb1df075f6567b1f5b3c12b"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-13/input.json",
+      "sha256": "2d228c1cf12acb7c4811d4305ae98d55eabb371f796a7949fa6236d0b60286ac"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-14/input.json",
+      "sha256": "4b39ef67fd25ca4f8daebc5f7d6e96cfe15f17f326306922084572bc8b8d541d"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-15/input.json",
+      "sha256": "08bfea393e889e5b9de4ecc67e6ad30f7e05af102a5f5e1225284fa32c26ce32"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-16/input.json",
+      "sha256": "eaa7c88aeb002763efd314b50ff31139923a1e87af07afc807349793cc25a042"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-17/input.json",
+      "sha256": "999bf8a701a76faa596e3d007900f6da8e9be709e1f28018430ebdcab4519cd1"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-18/input.json",
+      "sha256": "e96cf5c100ab9fe9c988799630e3de4eef3dbfce57a7d4e467b1f7f0dfbc8e42"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-19/input.json",
+      "sha256": "ec3b737b5b067f1b5e78c7e65f1d7a73b0fe2f921a29535f210c067f6b75cf61"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-2/input.json",
+      "sha256": "65ea8222b01381ae956a37893a80eb6e662519c8792090cc7e4abb553102c562"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-20/input.json",
+      "sha256": "e642599590e24c8e76ae1fc4aad2fe7f0879507844aaae39de33f991ca685ae1"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-21/input.json",
+      "sha256": "b79e3280d896d27e50e72904c408c8637d8341164c0f7e0b6aa5f710602e2cde"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-22/input.json",
+      "sha256": "60b3dfe4c62e3cc5f18e38dd6c1069115dfc2d809c83c348e37b729f9f772160"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-23/input.json",
+      "sha256": "1a266aa76a8602e937f0eaed0987506cf9605b08352fae60cdf74d6a44c8db54"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-24/input.json",
+      "sha256": "870ca4c16403dcb92b588e0751d64821a89f95e141003a60f6b0ff54580aca90"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-25/input.json",
+      "sha256": "ea9a5d087607968e7162fe8d8e4a50d1f1c65bd22e5d6f341bd401f41b952f59"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-26/input.json",
+      "sha256": "d19cac8efd38d7537184778a155d97e5c4cf895e5ec10958f7dfdd3f7bd739d0"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-27/input.json",
+      "sha256": "b090d452266c75343bedec4ac44e76cef1ae074dd85ad1184ede6931cc226edd"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-28/input.json",
+      "sha256": "2872db5482dbedf0235ecaa2aa05c2d366b159f5dc802e65ca89d52089a3176f"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-29/input.json",
+      "sha256": "c8e3d02ee62db7a75a6328400e5d3617e267c3548d832bcc7b9ef03627b18f12"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-3/input.json",
+      "sha256": "671b837b18f683a817b7abfe72f8de5d198bc53b9d9fd5cba0165e5659cd7171"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-4/input.json",
+      "sha256": "75a8c8e3bc07f3584ca4884ed495d3239ac73c2b1fcd6a983394df9b76745ed2"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-5/input.json",
+      "sha256": "eb398725699b79e8cfe1ec857bb6cdf3e6a48326a1ea12374f132b0805a9c532"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-6/input.json",
+      "sha256": "307e12c0a93432be79855370609fe34845b633e8c3fceefab92f66c953379ca0"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-7/input.json",
+      "sha256": "33a2d411ea97d549274f837a9c45e505cc17203a89125c46fed31c23f776ba86"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-8/input.json",
+      "sha256": "d960569ac68ab6a29cba372bf49bcbe0f9cc160b3d094dd68bba55f338e2c0fb"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-9/input.json",
+      "sha256": "b08acddabd250ca5683fbb266c1b90893a271f533df2974cf3fc3e9a253dd00f"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-1/root-receipt.json",
+      "sha256": "1fe779fc78f93a87c23facea9b9eeb2ec4a7080387332771b997c1ae250f47e5"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-10/root-receipt.json",
+      "sha256": "e6c1aa94e860369ada3df13785abd04072ea7ff476a3a12a60be92e91196c8c5"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-11/root-receipt.json",
+      "sha256": "de31332784f6f8926ac93ec22f43c88192509eeacb02f0f3b315c3cc49f63c1d"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-12/root-receipt.json",
+      "sha256": "40ca7d0d9156d7202f8097b9bc1c187397819e054df1c0956798ab852dd8bf44"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-13/root-receipt.json",
+      "sha256": "8ec64e6b694973566ea6d68f016d20fe05da5d1d1b8c3e7df1653bed9bc63e47"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-14/root-receipt.json",
+      "sha256": "045b11cc6f24cc3dfb16853c61febd0f092f65665eba70e42bd893c97165ff8a"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-15/root-receipt.json",
+      "sha256": "c797fd507daf267de44e20f680795c42619a3dc9e9cc4c98cf7bb1162e527e47"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-16/root-receipt.json",
+      "sha256": "95ad8bdf0e5ac2a556ac67e54e0e8d4b452b5f4b1119863fb1a758a3e082c363"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-17/root-receipt.json",
+      "sha256": "b225cd6fc916ddaf30e20144d5dea2195e7bd331d4c89aedac95ddde0a1043dd"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-18/root-receipt.json",
+      "sha256": "c110fb70d2e6ffca13e4ef9de8eae6413f75a0322ab502440ab3d0fd82cd10a6"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-19/root-receipt.json",
+      "sha256": "e78a31fe92e665ea9f5b3de83a924d82e549c65722e7ce1be289b9b3ccfd7097"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-2/root-receipt.json",
+      "sha256": "8741d1629cba153a9306af31536a5ea11d16af9bffd3a6bee0531fc914547dbc"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-20/root-receipt.json",
+      "sha256": "3da531a530de0532a83c366df457f5c2571f6cc061658fc2e637af1fc329df66"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-21/root-receipt.json",
+      "sha256": "df9af12ffd4788b9395c3d97fd28bc0abbc5007168e56f52464a36da994b4541"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-22/root-receipt.json",
+      "sha256": "0606071972a2c60dc770d1ee1bbc9c216586599f243e4bb5cf65ba64ea2d0c5b"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-23/root-receipt.json",
+      "sha256": "8545ca1a48e08a9881227688c6ae23d3b1bafb9f10546ecbb92a59f04f78508f"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-24/root-receipt.json",
+      "sha256": "b06cf706aa2c98cb163fbaf32b6dbcf686dd4ce375fa4176a05e1602b9696e91"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-25/root-receipt.json",
+      "sha256": "d00b94e9758ca0443d614892c9167f4994da545973b146429b47585521e382ac"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-26/root-receipt.json",
+      "sha256": "86594ad09e84776af29c46ed1f7c82ad02169b7c532674ed2f023af580143972"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-27/root-receipt.json",
+      "sha256": "ed35ae7e6d23ecf8d8d87d4912cab8f2bc09a6fd672882acb04b104d5e2b6142"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-28/root-receipt.json",
+      "sha256": "75094657aaf31fd27831f8e928c5d3a00de1c4337865a34c49efa7357a380371"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-29/root-receipt.json",
+      "sha256": "52c0bfeef8468426500c51352b8cc49575fa9f7fcf0bd6cc87574846a8e36a70"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-3/root-receipt.json",
+      "sha256": "945084c92185076005cff74b7dfafa863656ecd8e8e6da577165ef02b6a36b79"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-4/root-receipt.json",
+      "sha256": "4612f7c209e6f7922e2c22946ebc3546ece3bfed9a565010d62eb2e687fab57d"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-5/root-receipt.json",
+      "sha256": "65640b2c5599a39ba1bbc0f8a369ea99a80b991328a5438f01a6f2330070ca5a"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-6/root-receipt.json",
+      "sha256": "8437b4009890b8fd8e75fb64b18ec0997a03bf5021ffdf8d1acd31de8752344c"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-7/root-receipt.json",
+      "sha256": "8ada6f021464b60379855a1b262b9ec346e76fdafc644ba4e909a236f4031fac"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-8/root-receipt.json",
+      "sha256": "c233b4b4383397b18a4a5233814258b83dbe0c1eddff4b17b36a3a8ff05d4991"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/review-9/root-receipt.json",
+      "sha256": "f41958f54daa4f48045f323a7af50813cfe7cfa619536fa6970e0cf1629bf6a8"
+    }
+  ],
+  "generated_at_utc": "2026-10-12T15:31:22Z",
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "root_prior_outcome_knowledge": true,
+  "root_csv_schema_preview_before_freeze": true,
+  "PA_inputs_label_free": true,
+  "writer_recovery": true,
+  "client_sha256": "4dff2e3579425619c2a7b6e97cd57170fd198b5c5b84209c036d89f159190b65"
+}

@@ -1,0 +1,41 @@
+                                                                                  test
+1        FM16 uses exact market grid only when confidence and both market gates permit
+2                   FM16 absent market preserves native only when market gate is false
+3                              FM16 rejects stale, changed or unbound source decisions
+4                          FM16 extends equal-distance shells by either-side threshold
+5    FM16 stops inner failed shells, respects cap and treats exact ten percent as core
+6                  FM16 rejects broken bindings and preserves unresolved or tied grids
+7       FM16 targets integrate with shared evidence and authoritative score projection
+8                         FM16 adjacent dual centers expand the interval symmetrically
+9                    FM16 auto dual threshold, ambiguous modes and retain are explicit
+10            margin targets preserve score conditionals and deliver ranked protection
+11          ticket handicap changes projection only, not calibration or frozen receipt
+12           invalid support, chronology, partitions and conflicting roles fail closed
+13                    shared-admitted venue baseline is sealed, typed and cutoff bound
+14          adjustment ledger replays qualitative then market stages without rho edits
+15      market comparison preserves ordinary scope, time exclusions and stale evidence
+16    paired ranks, scores, precision and recall have independent numeric expectations
+17 rho scenarios refit the authoritative production model and reject chronology errors
+18                prepared epochs with no admitted fixtures fail as no fitted universe
+19                               the projection engine still enforces quote chronology
+   nb failed error skipped
+1  99      0 FALSE   FALSE
+2   3      0 FALSE   FALSE
+3  15      0 FALSE   FALSE
+4  17      0 FALSE   FALSE
+5   9      0 FALSE   FALSE
+6  16      0 FALSE   FALSE
+7   9      0 FALSE   FALSE
+8  14      0 FALSE   FALSE
+9  10      0 FALSE   FALSE
+10 23      0 FALSE   FALSE
+11 31      0 FALSE   FALSE
+12 11      0 FALSE   FALSE
+13 23      0 FALSE   FALSE
+14 24      0 FALSE   FALSE
+15 18      0 FALSE   FALSE
+16 22      0 FALSE   FALSE
+17 12      0 FALSE   FALSE
+18  3      0 FALSE   FALSE
+19  1      0 FALSE   FALSE
+assertions 360 

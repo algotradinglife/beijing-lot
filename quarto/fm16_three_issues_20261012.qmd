@@ -1,0 +1,59 @@
+---
+title: "FM-1.6.0 三期回测诊断：26098／26101／26102"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+比较FM16、原冻结FM15和纯北单归一化SP，使用同场分母。三期原始名单347场；26098#135缺少明确截止时点，失败关闭；346场有冻结预测，其中1场未结算，因此后期SP同场比较345场，T−24同场214场。参数不按赛果调整：相邻最高两档差≤1个百分点启用双中心，最多两层、任侧≥10%成对保留，外围权重0.3；原生近期权重0.5、ρ=-0.1不变。基本面不确定且市场充分一致时直接选择联合欧赔／大小球／亚盘DC网格；北单让球和SP不参与来源判断或尾部调整。
+
+这是**事后诊断**：规则由已讨论案例形成；控制侧已有赛果知识，本次检查CSV格式时也预览了旧标签的前两行，不能声称完全盲测或独立验证。报价／历史日期是后采集的可用性代理，不能据此取得前瞻准入。PA请求的DeepSeek模型因证书校验失败，实际未产生审查，原失败收据保留；本次裁决均为ROOT，不计作DeepSeek结果。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));root<-normalizePath('..');out<-file.path(root,'results/fm16-three-issues-20261012')
+library(beidan,lib.loc=file.path(root,'results/fm16-release-20261012/library'))
+m<-jsonlite::fromJSON(file.path(out,'manifest.json'));ev<-jsonlite::fromJSON(file.path(out,'evaluation.json'));rp<-jsonlite::fromJSON(file.path(out,'replay.json'))
+stopifnot(ev$forecast_sha256==m$forecast_sha256,ev$stage_sha256==m$stage_sha256,digest::digest(file=file.path(out,'forecasts.rds'),algo='sha256')==m$forecast_sha256,rp$sha256==m$forecast_sha256,rp$status=='FULL_IDENTICAL_REPLAY',digest::digest(file=file.path(out,'metrics.csv'),algo='sha256')==ev$metrics_sha256,digest::digest(file=file.path(root,ev$label_path),algo='sha256')==ev$label_sha256,digest::digest(file=file.path(root,ev$sp_path),algo='sha256')==ev$sp_sha256)
+x<-readRDS(file.path(out,'forecasts.rds'));a<-x$audit;metrics<-read_csv(file.path(out,'metrics.csv'),show_col_types=FALSE);coverage<-read_csv(file.path(out,'coverage.csv'),show_col_types=FALSE)
+stopifnot(length(x$entries)==346L,ev$settled==345L,nrow(a)==346L,!anyDuplicated(a$fixture_id))
+knitr::kable(metrics |> filter(issue_id=='ALL',cohort=='all') |> select(comparison,model,n,hits1,hits2,top1,top2,brier,logloss),digits=4,caption='三期合并，同场比较；Top1/Top2为让球类别命中率（0–1），Brier为三类平方误差之和，log loss为自然对数，越低越好')
+knitr::kable(metrics |> filter(issue_id!='ALL',cohort=='all',model%in%c('FM-1.6.0','FM-1.5.0','北单-T24','北单-后期SP')) |> select(issue_id,comparison,model,n,hits1,hits2,top1,top2,brier,logloss),digits=4,caption='各期结果；T−24与后期SP单列，不混用时间点')
+```
+
+结果：FM16相对FM15的后期同场Top1增加12场（31场改对、19场改错），Top2增加9场（37场补回、28场漏掉）。对后期北单Top1少1场、Top2多3场，Brier和log loss仍更差。T−24的214场四项指标均优于北单。只改单双中心时Top1反少1场、Top2不变，主要改善来自来源切换；完整尾部相对仅切换来源补回3个Top2，但Brier和log loss略变差。不能把全部提升归因于双中心。
+
+消融：`native-before-tail`为原冻结原生网格；`FM16-native-auto`只改单双中心、保留原生来源及原有定性暂停；`FM16-source-before-tail`执行新来源判断但不压缩尾部；FM16执行完整的新来源和尾部规则。源切换收益不可归因于双中心。北单相同三项SP产生等概率，原指标并列按W/D/L固定排序；另列剔除等概率SP的同场敏感性，不悄悄改主分母。Top2指两个完整北单类别覆盖，不是净胜球Top2，也不涉及串关收益。
+
+```{r}
+knitr::kable(a |> count(issue_id,confidence,selected_source,center_mode),caption='来源及中心覆盖')
+knitr::kable(coverage |> mutate(issue_id=str_extract(fixture_id,'^[0-9]+'),basket=case_when(euro_companies==4~'完整四家',euro_companies>0~'部分篮子',TRUE~'无欧赔')) |> count(issue_id,market_available,basket),caption='联合盘口可计算性不等于已审查一致性')
+knitr::kable(metrics |> filter(issue_id=='ALL',comparison=='near_sale',cohort%in%c('market-selected','native-retained','known-discussed','not-listed-as-discussed','non-uniform-SP'),model%in%c('FM-1.6.0','FM-1.5.0','北单-后期SP')) |> select(cohort,model,n,hits1,hits2,top1,top2,brier,logloss),digits=4,caption='分层诊断；已讨论案例清单不完整，未列入者也不是独立验证集')
+```
+
+本批原生输入统一缺少对手强度、阵容／伤停、年龄组连续性和窗口稳定性的可靠证据，因此ROOT审查统一给uncertain；这不是自动JEV分数，也不是产品规定所有基本面一律不可靠。市场不足保持原生；三家欧赔是部分篮子，仅在逐场方向／规模与亚盘及OU相容时接受诊断充分性；一／两家本批保守审查保持原生，并非新增通用最低家数规则。ROOT明确拒绝26098#2、#5、#138的跨渠道一致性：前两场极强欧赔胜率无法由OU约束网格充分再现；#138亚盘强度与欧赔接近平衡的格局有冲突。裁决正文与证据哈希冻结，不按本次命中修改。
+
+输入合同：346个唯一fixture_id，3个完整W/D/L概率每模型；345场完场有效标签，未结算场不按零值计分；SP严格早于对应选择时点和开赛，倒数归一化；对比分布先封存后传北单整数让球线。每个新来源/尾部决定通过共享`temporal_learning`证据上下文与明确截止，绑定原生/市场、审查、函数完整签名、实现及输入；缓存复用NONE。原冻结FM15与原生估计仅作固定输入，不重拟合近期权重。联合市场参考通过已有`project_dc_market_handicap`在共享证据上下文中计算；不复制时序、分区或拟合实现。
+
+复现入口按顺序运行（不安装依赖、不联网）：
+
+```bash
+/opt/R/4.6.1/bin/Rscript r/fm16_three_issue_prepare.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm16_three_issue_root_review.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm16_three_issue_freeze.R "$PWD"
+.venv/bin/python scripts/fm16_three_issue_replay.py "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm16_three_issue_evaluate.R "$PWD"
+quarto render quarto/fm16_three_issues_20261012.qmd --no-cache
+```
+
+运行记录：初次封存已完成346场及批次RDS，随后CSV写出因运行期间编辑客户端而中断；原执行脚本及失败日志保存。`finalize`仅核验全部逐场封存与批次一致后补齐CSV/manifest，不改概率；新清洁R进程完整重放作为最终科学验收，不将原退出码视作通过。
+
+R4.6.1、项目`.venv/bin/python`、既有依赖配置；声明FM16私有安装库及原26102共享后端快照，安装库不在执行时覆盖。分析表为tibble、连接声明cardinality、关键哈希变更拒绝。新代码均为薄研究客户端，不新增业务函数；来源、尾部、联合盘口、比分投影及准确性函数由包提供。
+
+```{r}
+if(file.exists(file.path(out,'acceptance.json'))){v<-jsonlite::fromJSON(file.path(out,'acceptance.json'));knitr::kable(tibble(check=names(v),result=map_chr(v,~paste(unlist(.x),collapse='; '))))}
+if(file.exists(file.path(out,'review.json'))){r<-jsonlite::fromJSON(file.path(out,'review.json'));stopifnot(all(map_chr(file.path(root,r$files$path),~digest::digest(file=.x,algo='sha256'))==r$files$sha256));knitr::kable(tibble(command=r$command,status=r$status,findings=r$findings,resolutions=r$resolutions),caption='独立codex review；owner PI待验收')}
+```
+
+前一FM16交付的全套R入口存在13个未通过测试块，包含安装／源码后端路径和旧客户端契约等，未声称全仓绿色。本次不修改这些无关实现；验收覆盖本次相关函数、数据合同、全部346场独立重放及新的QMD执行。新增研究客户端测试验证268场联合报价证据哈希、346场来源/网格/封存、同场指标汇总，并用真实QMD渲染和评价子进程回归验证错配的预测收据和被更改的FM15比较快照会拒绝。没有启动或修改CI。

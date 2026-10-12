@@ -1,0 +1,17 @@
+{
+  "package_function_tests": "19 blocks / 360 assertions / 0 failures / 0 errors / 0 skips",
+  "client_contract_tests": "4 blocks / 8268 assertions / 0 failures / 0 errors / 0 skips",
+  "independent_replay": "346 / 346 identical, three clean R processes; all sources, policies, full score grids, receipts, projections",
+  "package_test_command": "FM_NATIVE_TEST_ROOT=$PWD /opt/R/4.6.1/bin/Rscript -e: absolute FM16 lib.loc, explicit helper-n7-fixtures.R for accuracy tests; test_file(load_helpers=FALSE)",
+  "client_test_command": "FM16_BACKTEST_ROOT=$PWD /opt/R/4.6.1/bin/Rscript -e: test_file(tests/testthat/test-fm16-three-issue-backtest.R), absolute FM16 lib.loc",
+  "replay_command": ".venv/bin/python scripts/fm16_three_issue_replay.py \"$PWD\"",
+  "full_suite": "Not rerun: no package/backend implementation changed; previous standard entry had 13 failing blocks. This is not full-repository acceptance.",
+  "python_tests": "Not rerun: backend snapshot unchanged and independently hash-verified; actual shared Python admission/replay exercised by R tests and every fixture.",
+  "PA": "1 failed provider call / certificate verification; 0 PA review artifacts; ROOT 346 source decisions",
+  "initial_failed_attempts": "Relative lazy-load path, missing explicit fixture helper, temp subprocess missing R_LIBS_USER, test hashed augmented AH output; all corrected and final checks rerun.",
+  "writer_recovery": "Initial freeze completed scores and forecasts.rds; CSV step interrupted by editing running client. Original script/log kept; finalize verified 346 per-fixture seals, final independent replay passed.",
+  "CI": "Not configured or run",
+  "PI": "Owner acceptance pending",
+  "implementation_inventory_sha256": "a13afe72d08e335223167c925dbdcbb02d81dcccd9cb60f049a14f4aa3902ae4",
+  "QMD": "R_LIBS_USER=\"$PWD/r_lib\" quarto render quarto/fm16_three_issues_20261012.qmd --no-cache: PASS, fresh execution/errors fatal, 6 tables inspected"
+}

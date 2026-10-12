@@ -1,0 +1,11 @@
+                                                                     test   nb
+1      FM16 historical inputs and canonical quote contracts are preserved 2342
+2 FM16 sealed forecasts, reviews and same-fixture metric accounting agree 5915
+3                  rendering rejects evaluation from a different forecast    3
+4        evaluation rejects a changed comparator before labels are opened    8
+  failed error skipped
+1      0 FALSE   FALSE
+2      0 FALSE   FALSE
+3      0 FALSE   FALSE
+4      0 FALSE   FALSE
+assertions 8268 

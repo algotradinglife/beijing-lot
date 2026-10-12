@@ -1,0 +1,1359 @@
+[
+  {
+    "fixture_id": "26098:25",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "黑山",
+    "away": "塞浦路斯",
+    "competition": "欧国联",
+    "native_parameters": [
+      {
+        "lambda_home": 1.7309523809523808,
+        "lambda_away": 1.2663690476190474
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 36,
+        "recent_matches": 8,
+        "long_for": 1.4166666666666665,
+        "long_against": 1.3333333333333333,
+        "recent_for": 1.75,
+        "recent_against": 1.5,
+        "goals_for": 1.5833333333333333,
+        "goals_against": 1.4166666666666667,
+        "ess": 19.199999999999999
+      },
+      {
+        "role": "away",
+        "matches": 35,
+        "recent_matches": 8,
+        "long_for": 0.8571428571428571,
+        "long_against": 2.2571428571428567,
+        "recent_for": 1.375,
+        "recent_against": 1.5,
+        "goals_for": 1.1160714285714284,
+        "goals_against": 1.8785714285714283,
+        "ess": 18.983050847457626
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:25",
+        "quote_at": "2026-09-24T08:53:00",
+        "odds_home": 1.7,
+        "odds_draw": 3.3999999999999999,
+        "odds_away": 4.5999999999999996
+      },
+      {
+        "company_id": "281",
+        "fixture_id": "26098:25",
+        "quote_at": "2026-09-24T18:06:00",
+        "odds_home": 1.6499999999999999,
+        "odds_draw": 3.7000000000000002,
+        "odds_away": 5.25
+      },
+      {
+        "company_id": "432",
+        "fixture_id": "26098:25",
+        "quote_at": "2026-09-24T04:01:00",
+        "odds_home": 1.6000000000000001,
+        "odds_draw": 3.4500000000000002,
+        "odds_away": 4.5499999999999998
+      },
+      {
+        "company_id": "82",
+        "fixture_id": "26098:25",
+        "quote_at": "2026-09-23T14:13:00",
+        "odds_home": 1.75,
+        "odds_draw": 3.7000000000000002,
+        "odds_away": 4.5999999999999996
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:25",
+        "quote_at": "2026-09-24T17:58:38",
+        "handicap": -0.75,
+        "home_decimal": 1.8300000000000001,
+        "away_decimal": 1.98
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:25",
+        "company_id": "8",
+        "quote_at": "2026-09-24T17:03:24",
+        "line": 2.5,
+        "over_decimal": 1.98,
+        "under_decimal": 1.8300000000000001
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.7323454458433407,
+        "lambda_away": 0.86265647564579928,
+        "rho": -0.10000000000000001,
+        "total_mean": 2.59500192148914,
+        "lambda_difference": 0.86968897019754143
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.54834380852095133,
+        "model": 0.5685904161824259,
+        "residual": 0.020246607661474569
+      },
+      {
+        "outcome": "D",
+        "market": 0.25785972365252807,
+        "model": 0.25779135724732316,
+        "residual": -6.8366405204911551e-05
+      },
+      {
+        "outcome": "L",
+        "market": 0.19379646782652052,
+        "model": 0.17361822657025089,
+        "residual": -0.02017824125626963
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:25",
+        "quote_at": "2026-09-24T17:58:38",
+        "handicap": -0.75,
+        "home_decimal": 1.8300000000000001,
+        "away_decimal": 1.98,
+        "target_share": 0.51968503937007871,
+        "model_share": 0.50918211283765413,
+        "win_mass": 0.44755101460674213,
+        "loss_mass": 0.43140958381757405,
+        "fair_home_decimal": 1.9639338751061679,
+        "residual": -0.010502926532424572
+      }
+    ],
+    "euro_companies": 4
+  },
+  {
+    "fixture_id": "26098:26",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "戈尔韦联",
+    "away": "谢尔伯恩",
+    "competition": "爱超",
+    "native_parameters": [
+      {
+        "lambda_home": 1.529166666666667,
+        "lambda_away": 1.2041666666666666
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.5000000000000002,
+        "long_against": 1.2666666666666671,
+        "recent_for": 1.625,
+        "recent_against": 1,
+        "goals_for": 1.5625000000000007,
+        "goals_against": 1.1333333333333333,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.3000000000000003,
+        "long_against": 1.3666666666666669,
+        "recent_for": 1.25,
+        "recent_against": 1.625,
+        "goals_for": 1.2750000000000001,
+        "goals_against": 1.4958333333333333,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:26",
+        "quote_at": "2026-09-22T18:46:00",
+        "odds_home": 2.6000000000000001,
+        "odds_draw": 3.2999999999999998,
+        "odds_away": 2.5
+      },
+      {
+        "company_id": "281",
+        "fixture_id": "26098:26",
+        "quote_at": "2026-09-24T09:16:00",
+        "odds_home": 2.5,
+        "odds_draw": 3.3999999999999999,
+        "odds_away": 2.5
+      },
+      {
+        "company_id": "82",
+        "fixture_id": "26098:26",
+        "quote_at": "2026-09-22T19:24:00",
+        "odds_home": 2.5,
+        "odds_draw": 3.2999999999999998,
+        "odds_away": 2.3700000000000001
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:26",
+        "quote_at": "2026-09-24T09:05:24",
+        "handicap": -0,
+        "home_decimal": 1.9300000000000002,
+        "away_decimal": 1.8799999999999999
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:26",
+        "company_id": "8",
+        "quote_at": "2026-09-24T09:05:24",
+        "line": 2.75,
+        "over_decimal": 1.8799999999999999,
+        "under_decimal": 1.9300000000000002
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.4555897268507363,
+        "lambda_away": 1.478123092056832,
+        "rho": -0.10000000000000001,
+        "total_mean": 2.9337128189075683,
+        "lambda_difference": -0.022533365206095723
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.35825933065319554,
+        "model": 0.36049702249878646,
+        "residual": 0.0022376918455909167
+      },
+      {
+        "outcome": "D",
+        "market": 0.27226519738061489,
+        "model": 0.26899594878650912,
+        "residual": -0.003269248594105767
+      },
+      {
+        "outcome": "L",
+        "market": 0.36947547196618957,
+        "model": 0.37050702871470442,
+        "residual": 0.0010315567485148502
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:26",
+        "quote_at": "2026-09-24T09:05:24",
+        "handicap": -0,
+        "home_decimal": 1.9300000000000002,
+        "away_decimal": 1.8799999999999999,
+        "target_share": 0.49343832020997369,
+        "model_share": 0.49315324846743253,
+        "win_mass": 0.36049702249878646,
+        "loss_mass": 0.37050702871470442,
+        "fair_home_decimal": 2.0277672368735074,
+        "residual": -0.0002850717425411653
+      }
+    ],
+    "euro_companies": 3
+  },
+  {
+    "fixture_id": "26098:27",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "阿布罗斯",
+    "away": "女王FC",
+    "competition": "苏冠",
+    "native_parameters": [
+      {
+        "lambda_home": 1.3062499999999999,
+        "lambda_away": 1.2312499999999997
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.5000000000000004,
+        "long_against": 1.1333333333333335,
+        "recent_for": 1.25,
+        "recent_against": 1.25,
+        "goals_for": 1.375,
+        "goals_against": 1.1916666666666664,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.166666666666667,
+        "long_against": 1.6000000000000005,
+        "recent_for": 1.375,
+        "recent_against": 0.875,
+        "goals_for": 1.2708333333333333,
+        "goals_against": 1.2374999999999998,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:27",
+        "quote_at": "2026-09-24T08:14:00",
+        "odds_home": 1.8300000000000001,
+        "odds_draw": 3.2000000000000002,
+        "odds_away": 4.4000000000000004
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:27",
+        "quote_at": "2026-09-22T18:48:22",
+        "handicap": -0.5,
+        "home_decimal": 1.8300000000000001,
+        "away_decimal": 1.98
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:27",
+        "company_id": "8",
+        "quote_at": "2026-09-23T06:25:25",
+        "line": 2.25,
+        "over_decimal": 1.98,
+        "under_decimal": 1.8300000000000001
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.5010239429796475,
+        "lambda_away": 0.84857098228480798,
+        "rho": -0.10000000000000001,
+        "total_mean": 2.3495949252644555,
+        "lambda_difference": 0.65245296069483949
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.50307274546234093,
+        "model": 0.51373661823547068,
+        "residual": 0.010663872773129746
+      },
+      {
+        "outcome": "D",
+        "market": 0.28769472631127629,
+        "model": 0.28586821384656008,
+        "residual": -0.0018265124647162123
+      },
+      {
+        "outcome": "L",
+        "market": 0.20923252822638275,
+        "model": 0.20039516791796924,
+        "residual": -0.0088373603084135055
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:27",
+        "quote_at": "2026-09-22T18:48:22",
+        "handicap": -0.5,
+        "home_decimal": 1.8300000000000001,
+        "away_decimal": 1.98,
+        "target_share": 0.51968503937007871,
+        "model_share": 0.51373661823547068,
+        "win_mass": 0.51373661823547068,
+        "loss_mass": 0.48626338176452932,
+        "fair_home_decimal": 1.9465227209901768,
+        "residual": -0.0059484211346080285
+      }
+    ],
+    "euro_companies": 1
+  },
+  {
+    "fixture_id": "26098:28",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "艾尔联",
+    "away": "斯坦豪斯摩尔",
+    "competition": "苏冠",
+    "native_parameters": [
+      {
+        "lambda_home": 1.3508064516129032,
+        "lambda_away": 1.2223118279569893
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.5000000000000004,
+        "long_against": 1.0666666666666669,
+        "recent_for": 2.25,
+        "recent_against": 0.75,
+        "goals_for": 1.8750000000000002,
+        "goals_against": 0.90833333333333377,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 31,
+        "recent_matches": 8,
+        "long_for": 1.32258064516129,
+        "long_against": 0.90322580645161255,
+        "recent_for": 1.75,
+        "recent_against": 0.75,
+        "goals_for": 1.536290322580645,
+        "goals_against": 0.82661290322580627,
+        "ess": 18.036363636363635
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": {},
+    "asian": {},
+    "totals": {},
+    "market_available": false,
+    "market_error": "length(total) == 1L is not TRUE",
+    "market_parameters": {},
+    "market_ordinary": {},
+    "market_asian": {},
+    "euro_companies": 0
+  },
+  {
+    "fixture_id": "26098:29",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "因弗内斯",
+    "away": "格里诺克摩顿",
+    "competition": "苏冠",
+    "native_parameters": [
+      {
+        "lambda_home": 1.8124999999999996,
+        "lambda_away": 0.89583333333333348
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 2.0000000000000004,
+        "long_against": 0.76666666666666661,
+        "recent_for": 0.75,
+        "recent_against": 1.125,
+        "goals_for": 1.3750000000000002,
+        "goals_against": 0.94583333333333353,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.0666666666666667,
+        "long_against": 2.0000000000000009,
+        "recent_for": 0.625,
+        "recent_against": 2.5,
+        "goals_for": 0.84583333333333355,
+        "goals_against": 2.2499999999999991,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": {},
+    "asian": {},
+    "totals": {},
+    "market_available": false,
+    "market_error": "length(total) == 1L is not TRUE",
+    "market_parameters": {},
+    "market_ordinary": {},
+    "market_asian": {},
+    "euro_companies": 0
+  },
+  {
+    "fixture_id": "26098:30",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "拉茨流浪",
+    "away": "利文斯顿",
+    "competition": "苏冠",
+    "native_parameters": [
+      {
+        "lambda_home": 1.6416666666666666,
+        "lambda_away": 1
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 2.0666666666666673,
+        "long_against": 0.99999999999999989,
+        "recent_for": 2.125,
+        "recent_against": 0.625,
+        "goals_for": 2.0958333333333332,
+        "goals_against": 0.81250000000000011,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 40,
+        "recent_matches": 8,
+        "long_for": 1.25,
+        "long_against": 1.4999999999999998,
+        "recent_for": 1.125,
+        "recent_against": 0.875,
+        "goals_for": 1.1874999999999998,
+        "goals_against": 1.1874999999999998,
+        "ess": 20
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": {},
+    "asian": {},
+    "totals": {},
+    "market_available": false,
+    "market_error": "length(total) == 1L is not TRUE",
+    "market_parameters": {},
+    "market_ordinary": {},
+    "market_asian": {},
+    "euro_companies": 0
+  },
+  {
+    "fixture_id": "26098:31",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "凯里",
+    "away": "韦克斯福德",
+    "competition": "爱甲",
+    "native_parameters": [
+      {
+        "lambda_home": 1.5854166666666667,
+        "lambda_away": 0.99583333333333357
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.3666666666666669,
+        "long_against": 1.2333333333333334,
+        "recent_for": 1.75,
+        "recent_against": 0.875,
+        "goals_for": 1.5583333333333333,
+        "goals_against": 1.0541666666666669,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 0.99999999999999989,
+        "long_against": 1.6000000000000005,
+        "recent_for": 0.875,
+        "recent_against": 1.625,
+        "goals_for": 0.93750000000000011,
+        "goals_against": 1.6124999999999998,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:31",
+        "quote_at": "2026-09-23T12:19:00",
+        "odds_home": 2.2999999999999998,
+        "odds_draw": 3.2999999999999998,
+        "odds_away": 2.6000000000000001
+      },
+      {
+        "company_id": "281",
+        "fixture_id": "26098:31",
+        "quote_at": "2026-09-23T15:16:00",
+        "odds_home": 2.4500000000000002,
+        "odds_draw": 3.3999999999999999,
+        "odds_away": 2.6000000000000001
+      },
+      {
+        "company_id": "82",
+        "fixture_id": "26098:31",
+        "quote_at": "2026-09-23T12:19:00",
+        "odds_home": 2.2999999999999998,
+        "odds_draw": 3.2999999999999998,
+        "odds_away": 2.6000000000000001
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:31",
+        "quote_at": "2026-09-24T00:33:12",
+        "handicap": -0,
+        "home_decimal": 1.8,
+        "away_decimal": 2
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:31",
+        "company_id": "8",
+        "quote_at": "2026-09-23T09:33:09",
+        "line": 2.75,
+        "over_decimal": 1.95,
+        "under_decimal": 1.8500000000000001
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.4709705751632898,
+        "lambda_away": 1.3864727791219762,
+        "rho": -0.10000000000000001,
+        "total_mean": 2.857443354285266,
+        "lambda_difference": 0.084497796041313578
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.38341628133404682,
+        "model": 0.38246595670926242,
+        "residual": -0.00095032462478439328
+      },
+      {
+        "outcome": "D",
+        "market": 0.2701860272734305,
+        "model": 0.27303707165997848,
+        "residual": 0.0028510443865479851
+      },
+      {
+        "outcome": "L",
+        "market": 0.34639769139252269,
+        "model": 0.34449697163075915,
+        "residual": -0.0019007197617635363
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:31",
+        "quote_at": "2026-09-24T00:33:12",
+        "handicap": -0,
+        "home_decimal": 1.8,
+        "away_decimal": 2,
+        "target_share": 0.52631578947368418,
+        "model_share": 0.52611480145569678,
+        "win_mass": 0.38246595670926242,
+        "loss_mass": 0.34449697163075915,
+        "fair_home_decimal": 1.900725843928206,
+        "residual": -0.0002009880179874024
+      }
+    ],
+    "euro_companies": 3
+  },
+  {
+    "fixture_id": "26098:32",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "条约联",
+    "away": "费恩哈普",
+    "competition": "爱甲",
+    "native_parameters": [
+      {
+        "lambda_home": 1.9437499999999996,
+        "lambda_away": 1.2312499999999997
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.3,
+        "long_against": 1.4000000000000006,
+        "recent_for": 1.125,
+        "recent_against": 1.375,
+        "goals_for": 1.2125000000000001,
+        "goals_against": 1.3874999999999997,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 0.90000000000000002,
+        "long_against": 2.1000000000000005,
+        "recent_for": 1.25,
+        "recent_against": 3.25,
+        "goals_for": 1.075,
+        "goals_against": 2.6749999999999989,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:32",
+        "quote_at": "2026-09-24T12:28:00",
+        "odds_home": 1.7,
+        "odds_draw": 3.5,
+        "odds_away": 4
+      },
+      {
+        "company_id": "281",
+        "fixture_id": "26098:32",
+        "quote_at": "2026-09-24T01:27:00",
+        "odds_home": 1.7,
+        "odds_draw": 3.7999999999999998,
+        "odds_away": 4.2000000000000002
+      },
+      {
+        "company_id": "82",
+        "fixture_id": "26098:32",
+        "quote_at": "2026-09-23T14:34:00",
+        "odds_home": 1.6699999999999999,
+        "odds_draw": 3.7000000000000002,
+        "odds_away": 3.8999999999999999
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:32",
+        "quote_at": "2026-09-24T09:31:48",
+        "handicap": -0.75,
+        "home_decimal": 1.8999999999999999,
+        "away_decimal": 1.8999999999999999
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:32",
+        "company_id": "8",
+        "quote_at": "2026-09-23T09:39:15",
+        "line": 2.75,
+        "over_decimal": 1.8999999999999999,
+        "under_decimal": 1.8999999999999999
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.8504245166051569,
+        "lambda_away": 1.0577691866490209,
+        "rho": -0.10000000000000001,
+        "total_mean": 2.9081937032541778,
+        "lambda_difference": 0.79265532995613608
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.53177456839406501,
+        "model": 0.54845762151335942,
+        "residual": 0.016683053119294411
+      },
+      {
+        "outcome": "D",
+        "market": 0.24529513022415902,
+        "model": 0.24790071378784939,
+        "residual": 0.0026055835636903668
+      },
+      {
+        "outcome": "L",
+        "market": 0.22293030138177597,
+        "model": 0.20364166469879116,
+        "residual": -0.019288636682984805
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:32",
+        "quote_at": "2026-09-24T09:31:48",
+        "handicap": -0.75,
+        "home_decimal": 1.8999999999999999,
+        "away_decimal": 1.8999999999999999,
+        "target_share": 0.5,
+        "model_share": 0.49059329094250897,
+        "win_mass": 0.43486600691151878,
+        "loss_mass": 0.45154237848664053,
+        "fair_home_decimal": 2.0383482988094652,
+        "residual": -0.009406709057491025
+      }
+    ],
+    "euro_companies": 3
+  },
+  {
+    "fixture_id": "26098:33",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "都柏林",
+    "away": "布雷流浪者",
+    "competition": "爱甲",
+    "native_parameters": [
+      {
+        "lambda_home": 1.875,
+        "lambda_away": 1.3604166666666666
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.8333333333333337,
+        "long_against": 1.4000000000000006,
+        "recent_for": 2.5,
+        "recent_against": 1.75,
+        "goals_for": 2.1666666666666661,
+        "goals_against": 1.5749999999999997,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.166666666666667,
+        "long_against": 1.666666666666667,
+        "recent_for": 1.125,
+        "recent_against": 1.5,
+        "goals_for": 1.1458333333333335,
+        "goals_against": 1.5833333333333337,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:33",
+        "quote_at": "2026-09-24T09:26:00",
+        "odds_home": 2.75,
+        "odds_draw": 3.5,
+        "odds_away": 2.1499999999999999
+      },
+      {
+        "company_id": "281",
+        "fixture_id": "26098:33",
+        "quote_at": "2026-09-24T12:32:00",
+        "odds_home": 2.8799999999999999,
+        "odds_draw": 3.7000000000000002,
+        "odds_away": 2.1000000000000001
+      },
+      {
+        "company_id": "82",
+        "fixture_id": "26098:33",
+        "quote_at": "2026-09-24T10:54:00",
+        "odds_home": 2.75,
+        "odds_draw": 3.6000000000000001,
+        "odds_away": 2.1000000000000001
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:33",
+        "quote_at": "2026-09-24T13:06:59",
+        "handicap": 0.25,
+        "home_decimal": 1.8999999999999999,
+        "away_decimal": 1.8999999999999999
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:33",
+        "company_id": "8",
+        "quote_at": "2026-09-24T09:51:32",
+        "line": 3.25,
+        "over_decimal": 1.95,
+        "under_decimal": 1.8500000000000001
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.5421264602850093,
+        "lambda_away": 1.8202492118939619,
+        "rho": -0.10000000000000001,
+        "total_mean": 3.3623756721789713,
+        "lambda_difference": -0.27812275160895261
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.32304608151920772,
+        "model": 0.31950546721343809,
+        "residual": -0.0035406143057696293
+      },
+      {
+        "outcome": "D",
+        "market": 0.25067846855373432,
+        "model": 0.24512191047356902,
+        "residual": -0.0055565580801653081
+      },
+      {
+        "outcome": "L",
+        "market": 0.4262754499270579,
+        "model": 0.4353726223129929,
+        "residual": 0.0090971723859349929
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:33",
+        "quote_at": "2026-09-24T13:06:59",
+        "handicap": 0.25,
+        "home_decimal": 1.8999999999999999,
+        "away_decimal": 1.8999999999999999,
+        "target_share": 0.5,
+        "model_share": 0.50381439609804246,
+        "win_mass": 0.4420664224502226,
+        "loss_mass": 0.4353726223129929,
+        "fair_home_decimal": 1.9848579313033361,
+        "residual": 0.0038143960980424607
+      }
+    ],
+    "euro_companies": 3
+  },
+  {
+    "fixture_id": "26098:34",
+    "cutoff_utc": "2026-09-24T18:45:00Z",
+    "home": "科夫漫步者",
+    "away": "阿斯隆城",
+    "competition": "爱甲",
+    "native_parameters": [
+      {
+        "lambda_home": 1.6437500000000003,
+        "lambda_away": 0.98333333333333361
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.7000000000000004,
+        "long_against": 0.99999999999999989,
+        "recent_for": 1.5,
+        "recent_against": 0.875,
+        "goals_for": 1.6000000000000003,
+        "goals_against": 0.93750000000000033,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 0.93333333333333324,
+        "long_against": 2,
+        "recent_for": 1.125,
+        "recent_against": 1.375,
+        "goals_for": 1.029166666666667,
+        "goals_against": 1.6875000000000004,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:34",
+        "quote_at": "2026-09-24T10:05:00",
+        "odds_home": 2.7999999999999998,
+        "odds_draw": 3.25,
+        "odds_away": 2.2000000000000002
+      },
+      {
+        "company_id": "281",
+        "fixture_id": "26098:34",
+        "quote_at": "2026-09-24T17:18:00",
+        "odds_home": 2.5499999999999998,
+        "odds_draw": 3.3999999999999999,
+        "odds_away": 2.4500000000000002
+      },
+      {
+        "company_id": "82",
+        "fixture_id": "26098:34",
+        "quote_at": "2026-09-24T16:45:00",
+        "odds_home": 2.5,
+        "odds_draw": 3.25,
+        "odds_away": 2.3999999999999999
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:34",
+        "quote_at": "2026-09-24T12:53:28",
+        "handicap": 0.25,
+        "home_decimal": 1.8799999999999999,
+        "away_decimal": 1.9300000000000002
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:34",
+        "company_id": "8",
+        "quote_at": "2026-09-23T22:27:29",
+        "line": 2.75,
+        "over_decimal": 2,
+        "under_decimal": 1.8
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.2958434947224691,
+        "lambda_away": 1.5113618590701907,
+        "rho": -0.10000000000000001,
+        "total_mean": 2.8072053537926598,
+        "lambda_difference": -0.21551836434772165
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.34437678643059388,
+        "model": 0.31406241547388486,
+        "residual": -0.030314370956709025
+      },
+      {
+        "outcome": "D",
+        "market": 0.27242535540361767,
+        "model": 0.27442356439583393,
+        "residual": 0.0019982089922162549
+      },
+      {
+        "outcome": "L",
+        "market": 0.3831978581657885,
+        "model": 0.41151402013028127,
+        "residual": 0.02831616196449277
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:34",
+        "quote_at": "2026-09-24T12:53:28",
+        "handicap": 0.25,
+        "home_decimal": 1.8799999999999999,
+        "away_decimal": 1.9300000000000002,
+        "target_share": 0.50656167979002631,
+        "model_share": 0.5230416785493478,
+        "win_mass": 0.45127419767180177,
+        "loss_mass": 0.41151402013028127,
+        "fair_home_decimal": 1.9118935278226634,
+        "residual": 0.01647999875932149
+      }
+    ],
+    "euro_companies": 3
+  },
+  {
+    "fixture_id": "26098:35",
+    "cutoff_utc": "2026-09-24T19:00:00Z",
+    "home": "多德雷赫特",
+    "away": "阿尔梅勒城",
+    "competition": "荷乙",
+    "native_parameters": [
+      {
+        "lambda_home": 1.7083333333333335,
+        "lambda_away": 1.7479166666666668
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.5000000000000009,
+        "long_against": 1.5333333333333337,
+        "recent_for": 2,
+        "recent_against": 1.875,
+        "goals_for": 1.7499999999999998,
+        "goals_against": 1.7041666666666668,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.8333333333333337,
+        "long_against": 1.8333333333333339,
+        "recent_for": 1.75,
+        "recent_against": 1.5,
+        "goals_for": 1.791666666666667,
+        "goals_against": 1.6666666666666674,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "281",
+        "fixture_id": "26098:35",
+        "quote_at": "2026-09-24T05:19:00",
+        "odds_home": 2.8999999999999999,
+        "odds_draw": 4.0999999999999996,
+        "odds_away": 2.1000000000000001
+      },
+      {
+        "company_id": "432",
+        "fixture_id": "26098:35",
+        "quote_at": "2026-09-24T04:01:00",
+        "odds_home": 2.7000000000000002,
+        "odds_draw": 3.7000000000000002,
+        "odds_away": 2.0299999999999998
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:35",
+        "quote_at": "2026-09-24T10:35:53",
+        "handicap": 0.25,
+        "home_decimal": 1.98,
+        "away_decimal": 1.8300000000000001
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:35",
+        "company_id": "8",
+        "quote_at": "2026-09-24T16:15:19",
+        "line": 3.5,
+        "over_decimal": 1.9100000000000001,
+        "under_decimal": 1.8
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.6279292471167277,
+        "lambda_away": 1.973912773401729,
+        "rho": -0.10000000000000001,
+        "total_mean": 3.6018420205184567,
+        "lambda_difference": -0.34598352628500129
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.32531346621187812,
+        "model": 0.31337979431799651,
+        "residual": -0.011933671893881614
+      },
+      {
+        "outcome": "D",
+        "market": 0.23376223209039537,
+        "model": 0.23374450785973258,
+        "residual": -1.7724230662791163e-05
+      },
+      {
+        "outcome": "L",
+        "market": 0.44092430169772645,
+        "model": 0.45287569782227094,
+        "residual": 0.011951396124544489
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:35",
+        "quote_at": "2026-09-24T10:35:53",
+        "handicap": 0.25,
+        "home_decimal": 1.98,
+        "away_decimal": 1.8300000000000001,
+        "target_share": 0.48031496062992129,
+        "model_share": 0.48719117948955742,
+        "win_mass": 0.43025204824786278,
+        "loss_mass": 0.45287569782227094,
+        "fair_home_decimal": 2.0525823169617428,
+        "residual": 0.0068762188596361296
+      }
+    ],
+    "euro_companies": 2
+  },
+  {
+    "fixture_id": "26098:36",
+    "cutoff_utc": "2026-09-24T22:30:00Z",
+    "home": "新奥里藏蒂诺",
+    "away": "圣贝尔纳多",
+    "competition": "巴西乙",
+    "native_parameters": [
+      {
+        "lambda_home": 1.3854166666666667,
+        "lambda_away": 1.0479166666666666
+      }
+    ],
+    "native_rates": [
+      {
+        "role": "home",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.7333333333333336,
+        "long_against": 0.83333333333333326,
+        "recent_for": 1.75,
+        "recent_against": 0.75,
+        "goals_for": 1.7416666666666667,
+        "goals_against": 0.79166666666666696,
+        "ess": 17.777777777777779
+      },
+      {
+        "role": "away",
+        "matches": 30,
+        "recent_matches": 8,
+        "long_for": 1.2333333333333338,
+        "long_against": 0.93333333333333335,
+        "recent_for": 1.375,
+        "recent_against": 1.125,
+        "goals_for": 1.3041666666666663,
+        "goals_against": 1.0291666666666668,
+        "ess": 17.777777777777779
+      }
+    ],
+    "confidence_limitations": "Venue goals only: no opponent-strength adjustment, no lineup/injury correction, no verified cohort continuity; recent 8 games, alpha .5. Judge uncertainty from these evidence limitations, never from market disagreement.",
+    "article_facts": [],
+    "euro": [
+      {
+        "company_id": "115",
+        "fixture_id": "26098:36",
+        "quote_at": "2026-09-24T13:32:00",
+        "odds_home": 1.55,
+        "odds_draw": 3.75,
+        "odds_away": 5.5
+      },
+      {
+        "company_id": "281",
+        "fixture_id": "26098:36",
+        "quote_at": "2026-09-24T16:49:00",
+        "odds_home": 1.53,
+        "odds_draw": 3.8999999999999999,
+        "odds_away": 6.25
+      },
+      {
+        "company_id": "432",
+        "fixture_id": "26098:36",
+        "quote_at": "2026-09-23T20:46:00",
+        "odds_home": 1.48,
+        "odds_draw": 3.6499999999999999,
+        "odds_away": 5.4000000000000004
+      },
+      {
+        "company_id": "82",
+        "fixture_id": "26098:36",
+        "quote_at": "2026-09-24T17:50:00",
+        "odds_home": 1.5,
+        "odds_draw": 4,
+        "odds_away": 5.25
+      }
+    ],
+    "asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:36",
+        "quote_at": "2026-09-24T21:34:14",
+        "handicap": -1,
+        "home_decimal": 1.8999999999999999,
+        "away_decimal": 1.8999999999999999
+      }
+    ],
+    "totals": [
+      {
+        "fixture_id": "26098:36",
+        "company_id": "8",
+        "quote_at": "2026-09-24T13:29:47",
+        "line": 2.75,
+        "over_decimal": 2,
+        "under_decimal": 1.8
+      }
+    ],
+    "market_available": true,
+    "market_error": "",
+    "market_parameters": [
+      {
+        "lambda_home": 1.9378270248827059,
+        "lambda_away": 0.86937832890995392,
+        "rho": -0.10000000000000001,
+        "total_mean": 2.8072053537926598,
+        "lambda_difference": 1.0684486959727519
+      }
+    ],
+    "market_ordinary": [
+      {
+        "outcome": "W",
+        "market": 0.59957449951466824,
+        "model": 0.61402934394000575,
+        "residual": 0.01445484442533751
+      },
+      {
+        "outcome": "D",
+        "market": 0.23767368336817019,
+        "model": 0.23418863489711192,
+        "residual": -0.0034850484710582663
+      },
+      {
+        "outcome": "L",
+        "market": 0.16275181711716155,
+        "model": 0.15178202116288234,
+        "residual": -0.010969795954279216
+      }
+    ],
+    "market_asian": [
+      {
+        "company_id": "8",
+        "fixture_id": "26098:36",
+        "quote_at": "2026-09-24T21:34:14",
+        "handicap": -1,
+        "home_decimal": 1.8999999999999999,
+        "away_decimal": 1.8999999999999999,
+        "target_share": 0.5,
+        "model_share": 0.49395882165951666,
+        "win_mass": 0.37675513105035596,
+        "loss_mass": 0.38597065605999425,
+        "fair_home_decimal": 2.0244602508370524,
+        "residual": -0.0060411783404833441
+      }
+    ],
+    "euro_companies": 4
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "stage_sha256": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68",
+  "inputs": [
+    {
+      "path": "results/fm15-two-issues-20261012/batch-e548adf3cb6e.rds",
+      "sha256": "b20091548ff0385fb5b2a33f05f9994625a7f4dd7014e8d7fc17a9f45dc9faeb"
+    },
+    {
+      "path": "results/fm15-two-issues-20261012/native-stage.rds",
+      "sha256": "c631a69e0a4e0c491e53ed181d8271700f85a9bcb7a1e6722c8c9eb50546ecec"
+    },
+    {
+      "path": "results/fm15-26102-20261012/batch-a2e2554e88eb.rds",
+      "sha256": "1446cd10810c7e44dc5ef5e9ca43b274258581797cb881d56175ccf63c8872d0"
+    },
+    {
+      "path": "results/fm15-26102-20261012/native-7fab65d83593.rds",
+      "sha256": "9edae74fbac14d7ace954647263f30d7969c1cf4621fe1c2d5defe5400c3c3be"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-7453a1237185.rds",
+      "sha256": "7f3ba2b881dd6d680e116201a5fa305acd04d387c351d0b430f9168d14ff1fc6"
+    }
+  ],
+  "model": "FM-1.6.0",
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "native_parameters_reused": true,
+  "parameter_tuning": false
+}

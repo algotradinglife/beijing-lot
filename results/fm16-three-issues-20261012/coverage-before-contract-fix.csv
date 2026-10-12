@@ -1,0 +1,347 @@
+fixture_id,market_available,euro_companies,error
+26098:1,TRUE,4,
+26098:2,TRUE,3,
+26098:3,TRUE,4,
+26098:4,TRUE,4,
+26098:5,TRUE,3,
+26098:6,TRUE,4,
+26098:7,TRUE,4,
+26098:8,TRUE,4,
+26098:9,TRUE,4,
+26098:10,TRUE,2,
+26098:11,TRUE,4,
+26098:12,TRUE,4,
+26098:13,FALSE,0,length(total) == 1L is not TRUE
+26098:14,TRUE,3,
+26098:15,TRUE,4,
+26098:16,TRUE,1,
+26098:17,TRUE,4,
+26098:18,TRUE,4,
+26098:19,TRUE,3,
+26098:20,TRUE,4,
+26098:21,TRUE,4,
+26098:22,TRUE,4,
+26098:23,FALSE,0,length(total) == 1L is not TRUE
+26098:24,TRUE,4,
+26098:25,TRUE,4,
+26098:26,TRUE,3,
+26098:27,TRUE,1,
+26098:28,FALSE,0,length(total) == 1L is not TRUE
+26098:29,FALSE,0,length(total) == 1L is not TRUE
+26098:30,FALSE,0,length(total) == 1L is not TRUE
+26098:31,TRUE,3,
+26098:32,TRUE,3,
+26098:33,TRUE,3,
+26098:34,TRUE,3,
+26098:35,TRUE,2,
+26098:36,TRUE,4,
+26098:37,FALSE,0,length(total) == 1L is not TRUE
+26098:38,TRUE,4,
+26098:39,TRUE,3,
+26098:40,FALSE,0,length(total) == 1L is not TRUE
+26098:41,TRUE,3,
+26098:42,FALSE,0,length(total) == 1L is not TRUE
+26098:43,FALSE,0,length(total) == 1L is not TRUE
+26098:44,FALSE,0,length(total) == 1L is not TRUE
+26098:45,TRUE,2,
+26098:46,TRUE,4,
+26098:47,FALSE,0,length(total) == 1L is not TRUE
+26098:48,FALSE,0,length(total) == 1L is not TRUE
+26098:49,TRUE,2,
+26098:50,FALSE,0,length(total) == 1L is not TRUE
+26098:51,TRUE,4,
+26098:52,TRUE,4,
+26098:53,FALSE,0,length(total) == 1L is not TRUE
+26098:54,TRUE,4,
+26098:55,TRUE,2,
+26098:56,FALSE,0,length(total) == 1L is not TRUE
+26098:57,TRUE,4,
+26098:58,TRUE,2,
+26098:59,FALSE,0,length(total) == 1L is not TRUE
+26098:60,TRUE,4,
+26098:61,FALSE,0,length(total) == 1L is not TRUE
+26098:62,FALSE,0,length(total) == 1L is not TRUE
+26098:63,FALSE,0,length(total) == 1L is not TRUE
+26098:64,TRUE,4,
+26098:65,TRUE,4,
+26098:66,TRUE,4,
+26098:67,TRUE,4,
+26098:68,FALSE,0,length(total) == 1L is not TRUE
+26098:69,TRUE,3,
+26098:70,TRUE,3,
+26098:71,TRUE,4,
+26098:72,TRUE,4,
+26098:73,TRUE,4,
+26098:74,TRUE,4,
+26098:75,TRUE,3,
+26098:76,TRUE,3,
+26098:77,TRUE,3,
+26098:78,TRUE,3,
+26098:79,TRUE,4,
+26098:80,TRUE,4,
+26098:81,FALSE,0,length(total) == 1L is not TRUE
+26098:82,TRUE,4,
+26098:83,TRUE,4,
+26098:84,TRUE,3,
+26098:85,TRUE,4,
+26098:86,TRUE,3,
+26098:87,TRUE,4,
+26098:88,FALSE,0,length(total) == 1L is not TRUE
+26098:89,TRUE,4,
+26098:90,TRUE,4,
+26098:91,TRUE,4,
+26098:92,FALSE,0,length(total) == 1L is not TRUE
+26098:93,FALSE,0,length(total) == 1L is not TRUE
+26098:94,TRUE,4,
+26098:95,TRUE,4,
+26098:96,TRUE,2,
+26098:97,TRUE,4,
+26098:98,TRUE,4,
+26098:99,TRUE,4,
+26098:100,TRUE,4,
+26098:101,FALSE,0,length(total) == 1L is not TRUE
+26098:102,TRUE,4,
+26098:103,TRUE,4,
+26098:104,TRUE,3,
+26098:105,TRUE,3,
+26098:106,TRUE,4,
+26098:107,TRUE,4,
+26098:108,TRUE,4,
+26098:109,TRUE,4,
+26098:110,TRUE,3,
+26098:111,TRUE,4,
+26098:112,TRUE,3,
+26098:113,TRUE,4,
+26098:114,FALSE,0,length(total) == 1L is not TRUE
+26098:115,TRUE,1,
+26098:116,TRUE,4,
+26098:117,TRUE,3,
+26098:118,TRUE,2,
+26098:119,TRUE,3,
+26098:120,TRUE,3,
+26098:121,TRUE,4,
+26098:122,TRUE,4,
+26098:123,TRUE,4,
+26098:124,TRUE,4,
+26098:125,TRUE,4,
+26098:126,TRUE,3,
+26098:127,TRUE,2,
+26098:128,TRUE,4,
+26098:129,TRUE,4,
+26098:130,TRUE,3,
+26098:131,TRUE,3,
+26098:132,FALSE,0,length(total) == 1L is not TRUE
+26098:133,TRUE,4,
+26098:134,TRUE,4,
+26098:136,TRUE,4,
+26098:137,TRUE,4,
+26098:138,TRUE,4,
+26098:139,TRUE,4,
+26098:140,FALSE,0,length(total) == 1L is not TRUE
+26098:141,TRUE,3,
+26098:142,TRUE,4,
+26098:143,TRUE,4,
+26098:144,TRUE,4,
+26098:145,TRUE,4,
+26098:146,TRUE,3,
+26101:1,TRUE,3,
+26101:2,TRUE,4,
+26101:3,FALSE,0,length(total) == 1L is not TRUE
+26101:4,FALSE,0,length(total) == 1L is not TRUE
+26101:5,FALSE,0,length(total) == 1L is not TRUE
+26101:6,FALSE,0,length(total) == 1L is not TRUE
+26101:7,FALSE,0,length(total) == 1L is not TRUE
+26101:8,FALSE,0,length(total) == 1L is not TRUE
+26101:9,FALSE,0,length(total) == 1L is not TRUE
+26101:10,FALSE,0,length(total) == 1L is not TRUE
+26101:11,TRUE,4,
+26101:12,TRUE,4,
+26101:13,TRUE,4,
+26101:14,TRUE,4,
+26101:15,TRUE,3,
+26101:16,TRUE,4,
+26101:17,TRUE,4,
+26101:18,TRUE,4,
+26101:19,TRUE,4,
+26101:20,TRUE,3,
+26101:21,TRUE,4,
+26101:22,TRUE,4,
+26101:23,TRUE,4,
+26101:24,TRUE,4,
+26101:25,FALSE,0,length(total) == 1L is not TRUE
+26101:26,TRUE,4,
+26101:27,TRUE,4,
+26101:28,TRUE,4,
+26101:29,TRUE,4,
+26101:30,TRUE,4,
+26101:31,TRUE,4,
+26101:32,TRUE,4,
+26101:33,FALSE,0,length(total) == 1L is not TRUE
+26101:34,TRUE,4,
+26101:35,TRUE,4,
+26101:36,FALSE,0,length(total) == 1L is not TRUE
+26101:37,TRUE,4,
+26101:38,FALSE,0,length(total) == 1L is not TRUE
+26101:39,TRUE,4,
+26101:40,TRUE,4,
+26101:41,TRUE,3,
+26101:42,TRUE,3,
+26101:43,TRUE,1,
+26101:44,TRUE,3,
+26101:45,TRUE,4,
+26101:46,FALSE,0,length(total) == 1L is not TRUE
+26101:47,TRUE,3,
+26101:48,TRUE,2,
+26101:49,FALSE,0,length(total) == 1L is not TRUE
+26101:50,TRUE,3,
+26101:51,FALSE,0,length(total) == 1L is not TRUE
+26101:52,TRUE,2,
+26101:53,TRUE,2,
+26101:54,TRUE,4,
+26101:55,TRUE,2,
+26101:56,FALSE,0,length(total) == 1L is not TRUE
+26101:57,TRUE,4,
+26101:58,TRUE,4,
+26101:59,FALSE,0,length(total) == 1L is not TRUE
+26101:60,TRUE,2,
+26101:61,FALSE,0,length(total) == 1L is not TRUE
+26101:62,FALSE,0,length(total) == 1L is not TRUE
+26101:63,TRUE,4,
+26101:64,FALSE,0,length(total) == 1L is not TRUE
+26101:65,TRUE,4,
+26101:66,TRUE,2,
+26101:67,TRUE,4,
+26101:68,TRUE,3,
+26101:69,TRUE,4,
+26101:70,FALSE,0,length(total) == 1L is not TRUE
+26101:71,FALSE,0,length(total) == 1L is not TRUE
+26101:72,TRUE,2,
+26101:73,TRUE,3,
+26101:74,TRUE,2,
+26101:75,TRUE,4,
+26101:76,TRUE,3,
+26101:77,FALSE,0,length(total) == 1L is not TRUE
+26101:78,FALSE,0,length(total) == 1L is not TRUE
+26101:79,FALSE,0,length(total) == 1L is not TRUE
+26101:80,TRUE,1,
+26101:81,FALSE,0,length(total) == 1L is not TRUE
+26101:82,TRUE,1,
+26101:83,TRUE,4,
+26101:84,FALSE,0,length(total) == 1L is not TRUE
+26101:85,FALSE,0,length(total) == 1L is not TRUE
+26101:86,TRUE,3,
+26101:87,TRUE,4,
+26101:88,TRUE,4,
+26101:89,TRUE,3,
+26101:90,TRUE,2,
+26101:91,TRUE,3,
+26101:92,TRUE,3,
+26101:93,TRUE,4,
+26101:94,TRUE,3,
+26101:95,TRUE,4,
+26101:96,TRUE,3,
+26101:97,TRUE,3,
+26101:98,FALSE,0,length(total) == 1L is not TRUE
+26101:99,FALSE,0,length(total) == 1L is not TRUE
+26101:100,TRUE,4,
+26101:101,FALSE,0,length(total) == 1L is not TRUE
+26101:102,FALSE,0,length(total) == 1L is not TRUE
+26101:103,TRUE,1,
+26101:104,FALSE,0,length(total) == 1L is not TRUE
+26101:105,TRUE,2,
+26101:106,FALSE,0,length(total) == 1L is not TRUE
+26101:107,TRUE,3,
+26101:108,TRUE,1,
+26101:109,FALSE,0,length(total) == 1L is not TRUE
+26101:110,TRUE,4,
+26101:111,TRUE,4,
+26101:112,TRUE,3,
+26101:113,TRUE,3,
+26101:114,TRUE,3,
+26101:115,TRUE,4,
+26102:1,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:2,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:3,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:4,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:5,FALSE,1,Selected quote evidence unavailable or hash differs
+26102:6,FALSE,0,nrow(q$euro) > 0 is not TRUE
+26102:7,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:8,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:9,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:10,FALSE,3,nrow(q$totals) > 0 is not TRUE
+26102:11,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:12,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:13,FALSE,1,nrow(q$asian) > 0 is not TRUE
+26102:14,FALSE,1,nrow(q$asian) > 0 is not TRUE
+26102:15,FALSE,2,Selected quote evidence unavailable or hash differs
+26102:16,FALSE,1,Selected quote evidence unavailable or hash differs
+26102:17,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:18,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:19,FALSE,3,nrow(q$asian) > 0 is not TRUE
+26102:20,FALSE,4,nrow(q$asian) > 0 is not TRUE
+26102:21,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:22,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:23,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:24,FALSE,0,nrow(q$euro) > 0 is not TRUE
+26102:25,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:26,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:27,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:28,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:29,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:30,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:31,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:32,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:33,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:34,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:35,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:36,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:37,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:38,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:39,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:40,FALSE,2,Selected quote evidence unavailable or hash differs
+26102:41,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:42,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:43,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:44,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:45,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:46,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:47,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:48,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:49,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:50,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:51,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:52,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:53,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:54,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:55,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:56,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:57,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:58,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:59,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:60,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:61,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:62,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:63,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:64,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:65,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:66,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:67,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:68,FALSE,3,nrow(q$totals) > 0 is not TRUE
+26102:69,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:70,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:71,FALSE,3,nrow(q$totals) > 0 is not TRUE
+26102:72,FALSE,3,nrow(q$totals) > 0 is not TRUE
+26102:73,FALSE,3,nrow(q$asian) > 0 is not TRUE
+26102:74,FALSE,3,nrow(q$totals) > 0 is not TRUE
+26102:75,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:76,FALSE,4,Selected quote evidence unavailable or hash differs
+26102:77,FALSE,2,Selected quote evidence unavailable or hash differs
+26102:78,FALSE,2,nrow(q$totals) > 0 is not TRUE
+26102:79,FALSE,2,Selected quote evidence unavailable or hash differs
+26102:80,FALSE,0,nrow(q$euro) > 0 is not TRUE
+26102:81,FALSE,1,Selected quote evidence unavailable or hash differs
+26102:82,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:83,FALSE,1,nrow(q$asian) > 0 is not TRUE
+26102:84,FALSE,3,Selected quote evidence unavailable or hash differs
+26102:85,FALSE,2,Selected quote evidence unavailable or hash differs
+26102:86,FALSE,2,Selected quote evidence unavailable or hash differs

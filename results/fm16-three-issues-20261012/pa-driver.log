@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/scripts/fm16_three_issue_pa.py", line 15, in <module>
+    assert receipt['exit_code']==0 and not receipt['timed_out'],'Stop: failed call, do not repeat'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Stop: failed call, do not repeat

@@ -1,0 +1,10 @@
+{
+  "author": "ROOT_CODEX",
+  "input_sha256": "aee987638e538742bd3351b8015896c80a5319e70eb1df075f6567b1f5b3c12b",
+  "review_sha256": "5bb03d9d681512ea949c12670ec4c6eaa380e216c47cea3ede172cb830340788",
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "target_labels_used_for_decisions": false,
+  "root_prior_outcome_knowledge": true,
+  "confidence_basis": "shared missing opponent/cohort/lineup/stability evidence; not market disagreement",
+  "market_conflict_cases": ["26098:2", "26098:5", "26098:138"]
+}

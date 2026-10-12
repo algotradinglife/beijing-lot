@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "command": "R_LIBS_USER=\"$PWD/r_lib\" quarto render quarto/fm16_three_issues_20261012.qmd --no-cache",
+  "HTML_sha256": "9b1bfed63ef8380b7f49d5efac8db9e7625b7b2689b3977b0e43aecb0968eb0b",
+  "tables": 7,
+  "error_outputs": 0,
+  "review_hash_validation": true
+}

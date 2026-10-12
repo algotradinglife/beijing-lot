@@ -1,0 +1,23 @@
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:purrr’:
+
+    flatten
+
+# A tibble: 12 × 14
+   issue_id comparison  cohort model       n hits1 hits2  top1  top2  top3 rank2
+   <chr>    <chr>       <chr>  <chr>   <int> <int> <int> <dbl> <dbl> <dbl> <dbl>
+ 1 ALL      same_cutoff all    FM-1.5…   214    68   144 0.318 0.673     1 0.355
+ 2 ALL      same_cutoff all    FM-1.6…   214    80   151 0.374 0.706     1 0.332
+ 3 ALL      same_cutoff all    FM16-n…   214    68   144 0.318 0.673     1 0.355
+ 4 ALL      same_cutoff all    FM16-s…   214    80   143 0.374 0.668     1 0.294
+ 5 ALL      same_cutoff all    native…   214    71   143 0.332 0.668     1 0.336
+ 6 ALL      same_cutoff all    北单-T24…   214    71   149 0.332 0.696     1 0.364
+ 7 ALL      near_sale   all    FM-1.5…   345   117   238 0.339 0.690     1 0.351
+ 8 ALL      near_sale   all    FM-1.6…   345   129   247 0.374 0.716     1 0.342
+ 9 ALL      near_sale   all    FM16-n…   345   116   238 0.336 0.690     1 0.354
+10 ALL      near_sale   all    FM16-s…   345   129   244 0.374 0.707     1 0.333
+11 ALL      near_sale   all    native…   345   120   248 0.348 0.719     1 0.371
+12 ALL      near_sale   all    北单-后期S…   345   130   244 0.377 0.707     1 0.330
+# ℹ 3 more variables: rank3 <dbl>, brier <dbl>, logloss <dbl>
