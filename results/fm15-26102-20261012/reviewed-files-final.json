@@ -1,0 +1,298 @@
+[
+  {
+    "path": "r/fm15_26102_native.R",
+    "sha256": "83e962751d87191501126ce87be40d1bb9cebffff25ddd023b0ff8c5c2fcd1af"
+  },
+  {
+    "path": "r/fm15_26102_market.R",
+    "sha256": "890a192371a756134d365550555fceea2c2e1472759410ffc6b7056c493af6ef"
+  },
+  {
+    "path": "r/fm15_26102_market_diagnostic.R",
+    "sha256": "001f0b771ea7305146a2a9e8bcad639822a553e4d8ce4f4a264158e4de0a22ca"
+  },
+  {
+    "path": "r/fm15_26102_freeze.R",
+    "sha256": "8cb91f39e7ae08e9ed44310bdac4a480ada01631a5cb604ac4290e84ffbb8137"
+  },
+  {
+    "path": "r/fm15_26102_replay.R",
+    "sha256": "495cff0b6510427ae7ab0407066bc03485232d72749fbf9197da32a45fc3f7e5"
+  },
+  {
+    "path": "scripts/fm15_26102_pa.py",
+    "sha256": "352993e7efad43bd979b2f57d7f725c0818cc726d786785b26181571024ec2f3"
+  },
+  {
+    "path": "tests/test_fm15_26102_pa_contract.py",
+    "sha256": "6b3e936be390285e9c4fd07f627bc5f11146d4a360cf9ffa524792438283b4d3"
+  },
+  {
+    "path": "tests/testthat/test-fm15-26102-contract.R",
+    "sha256": "4f499422b4648dd97accced9baa0e8da951f3e8d744bfd3d3b092a26c06e482c"
+  },
+  {
+    "path": "quarto/fm15_26102_20261012.qmd",
+    "sha256": "017c4ecbd7dc98056cc34c91a3cc32ed5e2d417729d9a869f4bbe00ae2642bb4"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/R/score_margin_direction.R",
+    "sha256": "65432d8005b75c52708c37b393dfdc5ca66fc81907d9e29f1d9efa95954e468c"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/R/recent_venue_goals.R",
+    "sha256": "a4a7ff199308314d8c37e665f29e119f1d61255bce1dfcf9a659eb42903d38ab"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/R/fm15_tail_judgement.R",
+    "sha256": "a82f0374d8b5254c8b216dd0da6cc8e5d5bbdaf2535cbaf453fa94a85a5e350f"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/R/fundamental_probability.R",
+    "sha256": "27a55daee98bf0702c9aaea7bceab43e374b33d9d3dacb88e4260c25d027d43c"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/betting_sheet_html.py",
+    "sha256": "e4231ea6c9bdfa618816a8a692b3037cf27f3500bcfe642342f550afa801ac78"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/versioning.py",
+    "sha256": "d825697bc0d08de0de4b91a6fce9bc4842b49d90a2f5c355f84f56f594830079"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/vfootball_results.py",
+    "sha256": "1a0076c8f3e8fb3e236aec0e62cf0ba77c8a362bffaab98afa7a3d62b91fe04e"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/nova_api.py",
+    "sha256": "65f12aa8cf9291e569c77feda98a84e060ce40e4bfe9a6ff3a88cefc1c8c771c"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/extraction_cache.py",
+    "sha256": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/prematch_sp.py",
+    "sha256": "b7568a69db9a93b2aaf47e9d790d3babef2212f23646576ec6879d7d92a3cff5"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/fundamentals.py",
+    "sha256": "d699b60b43ee4213fc5c0dcff264ebf4b0be418bccda2f6b4c5de3308215c995"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/fundamental_issue.py",
+    "sha256": "c9e6d433565ccdfa88b35081655acb352ba85066028c6774f53e0e0f6ceb245e"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/source_extraction.py",
+    "sha256": "ff93a180e4f0b09a1bc9431e690134c29ac039e6bc51c7fc5ae85117a9162054"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/unified_sources.py",
+    "sha256": "f5a46b2f960898c0013c6449d52213b307dd6311d55ee31be497e1aac34e28aa"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/transport.py",
+    "sha256": "8b68fbc2dc43418a488365416d60f9d719ebb1c6df0980353fb1692b4987a955"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/dual_euro.py",
+    "sha256": "6ab8af507ed794f3c683494d0cb4cdbd84f11b3e08506971fc47f2cf77eb4b94"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/recent_venue_goals.py",
+    "sha256": "ed988580326bb35baf0295c28907b1de465a9421905c88156901af91577842db"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/__init__.py",
+    "sha256": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/settlement_backfill.py",
+    "sha256": "27a55b53d265e603c250d9e6b29f62c21b6da8a7daeed241822b79bedf8e37e7"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/fundamental_tables.py",
+    "sha256": "a94aaf7cf0274dd165595059874da6a2193aa93d891035ab3e09015e0cc25d38"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/source_issue_update.py",
+    "sha256": "82a7d856f7df2ea43f7104fb32ac0a8e15043c2b6806e407e451c795c1cedac8"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/fundamental_probability.py",
+    "sha256": "9b5a146eabf84c526a3976e08be710494f80f316225f5e26bb7aa03e9926bfc8"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/datasets/settlement_parquet.py",
+    "sha256": "ca0317e70df88174f8b67f3eb69bf416f1884b37fb31cbf6d3c4960a5499f7c4"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/datasets/__init__.py",
+    "sha256": "6937ba355dc8c01521b853f5ba6d350a9088d510e99f0346af153a32ddfc5387"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/settlement/parser.py",
+    "sha256": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/settlement/labels.py",
+    "sha256": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/settlement/__init__.py",
+    "sha256": "598d64815532582b6238a7ed045f352c66ae995a048a7bd2125c95250b98a67b"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py",
+    "sha256": "1467def1bb9bde7c7d55a3f9277a70eba8471231276d2859df4ede0011b93b85"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/issue_schedule/service.py",
+    "sha256": "188f33db69df43048e41647bd39ef576411d46aed9205eb0ea49a325af3ddca0"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py",
+    "sha256": "0abfc13be1592d82a0acf4ad224fbb58147a39d108938c48f46edcc64f0852d2"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/issue_schedule/__init__.py",
+    "sha256": "a54fddadc2e45d5923d3f0c3cee41e5568d661ba8c6ea1df72db1c54fdee4270"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/issue_schedule/store.py",
+    "sha256": "a455839715c3fa790359e33ed4c07f6145f60cf41354fe1e1fadf390ed09bfdc"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/issue_schedule/decode.py",
+    "sha256": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py",
+    "sha256": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/market_capture/service.py",
+    "sha256": "98f7c2112583adaa1091fabfac3202bb4b5ba3d84531030a887628e493fefa8c"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/market_capture/__init__.py",
+    "sha256": "0284ed1a85a2ba7c614f574f0b4a8f9ed03173348c6644aa3b3eb1dbc0e60265"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/market_capture/history.py",
+    "sha256": "ee6b14e5904e0e0aa31fd0325e22ef4a0a2e7db860d9ba6f3ed952b7592b9f43"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/catalog/paths.py",
+    "sha256": "5a4d6a01dc454478d7520d47e32f7a2b77b327beb9f00a0cbe9d7353a5faac9a"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/catalog/registry.py",
+    "sha256": "34c771f70b3af863e50a84d7fa3e05e41879d20bbf6e8d31cc40da95e3f2369c"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/catalog/__init__.py",
+    "sha256": "9350beae1bdd1de5411f55ac2581a10bca33411628b0a723ea331dd86c00b1c9"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/sources/five_hundred_betting.py",
+    "sha256": "9cfe60858a177f0e7eee34119d300d23a6caa1a329670301892842e053a3abb6"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/sources/__init__.py",
+    "sha256": "c2f2c58c3f126c4c9f153e337ee474e2654ce0fae8496ab9aee02ab83db049c7"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py",
+    "sha256": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/core.py",
+    "sha256": "ae29042dc9c960c491df56fbd6b18c90e57dab194e6bfacb5226eb24e97c8991"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/issue_partitions.py",
+    "sha256": "c7a8f85e7ce09ba0587ff5146477fbcfc661c3a67a8d9e6024c7dc6744ae5e2b"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py",
+    "sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/predictor_clock.py",
+    "sha256": "1556153ef70fd0d875d3eee2932c8deccaccc29a226bc8f3ac73086b0b8dd01a"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/admitted_replay.py",
+    "sha256": "d4d21a7b3d1d68230854325577cc215f725a6d73a8fe0f6171fd9d88b716081d"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/diagnostic_labels.py",
+    "sha256": "7902947518b0567d8cd7b35a4a51f8118d8ef7b29539a9cdd551ca8b59d41e73"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/replay.py",
+    "sha256": "ff9a3890404a87484283ddd10b3960762397942c92af9231b9417cf081ddb61a"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py",
+    "sha256": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation/packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py",
+    "sha256": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee"
+  },
+  {
+    "path": "results/fm15-26102-20261012/scope.json",
+    "sha256": "3c661912b4c22aed2dacfd3e4a0131f39715272660d8468b852aa5c377c16822"
+  },
+  {
+    "path": "results/fm15-26102-20261012/native-manifest.json",
+    "sha256": "cab55942ea800580e4deaa03370d604a92e86b07879860d82e87daec61f06159"
+  },
+  {
+    "path": "results/fm15-26102-20261012/market-manifest.json",
+    "sha256": "e808191416892765103d3d1c3960df9fb251b46735bc1825c122a0aeeae2f25a"
+  },
+  {
+    "path": "results/fm15-26102-20261012/market-diagnostic-manifest.json",
+    "sha256": "a96946e484dc473a53edff28a13b4e3f23ad0e7bb0db27dadd618d9d30caaf94"
+  },
+  {
+    "path": "results/fm15-26102-20261012/manifest.json",
+    "sha256": "57610ab135618a55bce1aa94a3c73c7f53c430885afb1d9d52b92cb62426c71b"
+  },
+  {
+    "path": "results/fm15-26102-20261012/implementation-inventory.json",
+    "sha256": "cf9aee428448103f3abf7f2acd4f891cb3dc7b3380c7249db28866893de25cdf"
+  },
+  {
+    "path": "results/fm15-26102-20261012/replay-receipt.json",
+    "sha256": "179d811eaabdf1d63bc29bcf533b1bf99a7a6df7e626f4e97a328494f16e9928"
+  },
+  {
+    "path": "results/fm15-26102-20261012/replay-ledger.csv",
+    "sha256": "c1989ade9d3c2aa921cc14b7acf31647c34bdffb93f955421abb9810f849870c"
+  },
+  {
+    "path": "results/fm15-26102-20261012/metrics.csv",
+    "sha256": "bf2b3e3e72e28a2e32db68155e13d2679c095076e716fa53499c2f8d580e70e8"
+  },
+  {
+    "path": "results/fm15-26102-20261012/comparison-cohorts.csv",
+    "sha256": "e7f88a6eebf562267ff650f43bffdff48db3e39f0f7b0d75cbe124a360805959"
+  },
+  {
+    "path": "r/fm15_26102_coverage.R",
+    "sha256": "2379c45ad42a962b0587a073711286579e0b6af0c226e77429579414644dfc78"
+  },
+  {
+    "path": "results/fm15-26102-20261012/coverage-manifest.json",
+    "sha256": "43e09d4d75936bc1876bd9cba2e28013a23ad95da81a871838cda8bc53a11964"
+  },
+  {
+    "path": "results/fm15-26102-20261012/coverage-corrected.csv",
+    "sha256": "14e93b360f5b2af4a6d386e6de9ed8317eb416b11dbc61a1156cce7b8dd4913d"
+  }
+]

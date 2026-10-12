@@ -1,0 +1,122 @@
+---
+title: "26102期：FM-1.5.0与北单概率比较"
+format: html
+params:
+  root: ".."
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本报告固定26102期全86场，复用既有基本面历史与逐场提前24小时截止。模型采用FM-1.5.0：长期和最近8场同场地攻防各占0.5，ρ固定−0.1；市场独立复核，不自动替换λ；净胜球唯一众数为中心，等距两侧最多扩展2档，任一侧达到10%整对保留、双侧不足停止，外围权重0.3。比分冻结后才映射实际北单让球。既往讨论包含这期个别场次，历史时间代理也不等于实际赛前观察，因此不宣称独立盲测或前瞻准入。
+
+本期没有取得整体优势。在全部86场较晚SP共同样本中，FM-1.5.0的Top1为33场（38.37%）、Top2为60场（69.77%）；北单分别36场（41.86%）、68场（79.07%）。FM的Brier为0.7216、log loss为1.1840，均高于北单0.6396、1.0607。固定四公司欧赔篮子完整的对照另行列出，不能用该子集代替整期结论。
+
+压尾前同一原生模型Top1仍为33场，Top2为72场（83.72%）；压尾后Top2减少12场，Brier由0.7008升至0.7216、log loss由1.1434升至1.1840。当前均匀外围0.3规则在这一期不支持提升Top2。目标结果不用于返调本期α、ρ或系数。
+
+提前24小时仅20场有可对照SP：FM Top1 7场、北单5场，Top2均14场；FM概率评分更好。这一小样本不代表全86场的同截止优势。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(jsonlite)
+root <- normalizePath(params$root,mustWork=TRUE)
+out <- file.path(root,'results/fm15-26102-20261012')
+library(beidan,lib.loc=file.path(root,'results/fm15-version-20261012/library'))
+scope <- fromJSON(file.path(out,'scope.json'))
+nm <- fromJSON(file.path(out,'native-manifest.json'));np<-file.path(out,nm$native_file)
+stopifnot(digest::digest(file=np,algo='sha256')==nm$sha256)
+native <- readRDS(np);stopifnot(beidan:::.score_margin_hash(native)==nm$object_hash)
+inv <- fromJSON(file.path(out,'implementation-inventory.json'))
+stopifnot(all(map_chr(file.path(out,'implementation',inv$files$path),~digest::digest(file=.x,algo='sha256'))==inv$files$sha256))
+knitr::kable(count(native$ledger,state),caption='全期原生估计覆盖；不以赛果筛选场次')
+knitr::kable(bind_rows(map(native$entries,~mutate(.x$native$parameters,fixture_id=.x$fixture$fixture_id,.before=1))),digits=3,caption='原生预期进球，单位：球')
+```
+
+当前可执行实现未纳入近期对手强度、阵容伤停或国家队排名校正。缺失不能解释成已通过定性审查。实现文件在本期开始即固定，复现使用本期实现副本；不复用上一期标为退役的历史重放快照。
+
+原生λ不直接等于尾部重加权后的期望进球；最终网格不返拟合λ/ρ。ρ−0.1为未校准专家值，长期样本包含近期8场，组件分别归一化后混合。历史比分90分钟口径未逐场独立确认，不能把这些进球均值称为平台xG。
+
+```{r}
+m <- fromJSON(file.path(out,'manifest.json'));bp<-file.path(out,m$batch_file)
+stopifnot(digest::digest(file=bp,algo='sha256')==m$sha256)
+x<-readRDS(bp);stopifnot(beidan:::.score_margin_hash(x)==m$object_hash)
+stopifnot(all(map_chr(file.path(root,x$input_ledger$path),~digest::digest(file=.x,algo='sha256'))==x$input_ledger$sha256))
+for(e in x$entries)stopifnot(identical(e$final,readRDS(file.path(root,e$score_path))),e$base$max_source_available_utc<e$base$cutoff$cutoff_utc)
+knitr::kable(count(x$audit,reviewer,market_action,branch),caption='审查者与采纳账本；PA证书错误后10场由主代理按相同标准审查')
+cm<-fromJSON(file.path(out,'coverage-manifest.json'));cp<-file.path(out,cm$coverage_file)
+stopifnot(digest::digest(file=cp,algo='sha256')==cm$sha256,!cm$probabilities_changed,cm$forecast_sha256==m$sha256)
+corrected<-readRDS(cp);stopifnot(beidan:::.score_margin_hash(corrected)==cm$object_hash,corrected$forecast_sha256==m$sha256)
+coverage<-corrected$coverage
+stopifnot(all(map_chr(file.path(root,corrected$inputs$path),~digest::digest(file=.x,algo='sha256'))==corrected$inputs$sha256))
+knitr::kable(count(coverage,market_state,channels_complete),caption='完整固定四公司篮子43场；三通道齐全但缺欧赔公司28场；三通道缺项15场，最多48小时报价年龄')
+md<-fromJSON(file.path(out,'market-diagnostic-manifest.json'));mp<-file.path(out,md$diagnostic_file)
+stopifnot(digest::digest(file=mp,algo='sha256')==md$sha256)
+market_diag<-readRDS(mp);stopifnot(beidan:::.score_margin_hash(market_diag)==md$object_hash)
+knitr::kable(tibble(eligible_complete_basket=length(corrected$market_references),retired_variable_basket_references=length(market_diag$references)-length(corrected$market_references)),caption='市场DC资格修正；部分篮子原反解仅保留执行证据，不作为完整市场诊断')
+market_parameters<-bind_rows(map(corrected$market_references,~mutate(.x$model$parameters,fixture_id=.x$fixture$fixture_id,.before=1)))
+knitr::kable(market_parameters,digits=3,caption='市场DC参数对照；总量来自大小球Poisson反解，ρ固定−0.1')
+```
+
+```{r}
+# Only after authenticated immutable forecasts above: open target outcomes/SP.
+label_path<-file.path(root,'results/fundamental-issues-20261011/inputs/labels.rds')
+sp_path<-file.path(root,'results/fundamental-beidan-history-20261011/analysis-20261011T024028.510576Z/selected-sp.csv')
+label_data<-readRDS(label_path)[['26102']]$matches
+roster<-bind_rows(map(native$entries,~as_tibble(.x$fixture))) |> select(fixture_id,handicap,cutoff_utc)
+labels<-as_tibble(label_data) |> transmute(fixture_id=paste0(issue_id,':',slot),status,score) |> filter(status=='完场',!is.na(score),str_detect(score,'^[0-9]+[-:][0-9]+$')) |> mutate(home_goals=as.integer(str_extract(score,'^[0-9]+')),away_goals=as.integer(str_extract(score,'[0-9]+$'))) |> inner_join(roster,by='fixture_id',relationship='one-to-one') |> transmute(fixture_id,score,actual_outcome=case_when(home_goals-away_goals+handicap>0~'W',home_goals-away_goals+handicap==0~'D',TRUE~'L'))
+sp<-read_csv(sp_path,show_col_types=FALSE) |> filter(startsWith(fixture_id,'26102:')) |> inner_join(roster |> select(fixture_id,cutoff_utc),by='fixture_id',relationship='many-to-one')
+stopifnot(!anyDuplicated(sp[c('fixture_id','mode')]),all(is.finite(sp$sp_w)&is.finite(sp$sp_d)&is.finite(sp$sp_l)),all(sp$sp_w>0&sp$sp_d>0&sp$sp_l>0),all(sp$quote_at<sp$selection_cutoff),all(sp$quote_at<sp$kickoff_utc),all(sp$selection_cutoff[sp$mode=='same_cutoff']==sp$cutoff_utc[sp$mode=='same_cutoff']))
+bd<-sp |> transmute(fixture_id,mode,W=1/sp_w,D=1/sp_d,L=1/sp_l) |> mutate(mass=W+D+L,across(c(W,D,L),~.x/mass)) |> select(-mass) |> pivot_longer(c(W,D,L),names_to='outcome',values_to='probability') |> mutate(model=if_else(mode=='same_cutoff','北单-T24','北单-较晚SP'))
+fm<-x$probabilities |> select(fixture_id,model,outcome,probability);before<-x$before |> select(fixture_id,model,outcome,probability)
+metrics<-scores<-cohorts<-list()
+for(mode in c('same_cutoff','near_sale'))for(coverage in c('all_native','complete_market')) {
+  ids<-Reduce(intersect,list(fm$fixture_id,bd$fixture_id[bd$mode==mode],labels$fixture_id))
+  if(coverage=='complete_market')ids<-intersect(ids,corrected$coverage$fixture_id[corrected$coverage$market_state=='COMPLETE'])
+  stopifnot(length(ids)>0)
+  probs<-bind_rows(fm,before,bd |> filter(.data$mode==.env$mode) |> select(-mode)) |> filter(fixture_id %in% ids)
+  result<-beidan:::DcAccuracyDiagnostic(probs,labels |> filter(fixture_id %in% ids) |> select(fixture_id,actual_outcome))
+  key<-paste(mode,coverage,sep=':');metrics[[key]]<-result$summary |> mutate(comparison=mode,coverage=coverage,.before=1);scores[[key]]<-result$scores |> mutate(comparison=mode,coverage=coverage,.before=1);cohorts[[key]]<-tibble(comparison=mode,coverage=coverage,fixture_id=ids)
+}
+metrics<-bind_rows(metrics);scores<-bind_rows(scores);cohorts<-bind_rows(cohorts)
+write_csv(metrics,file.path(out,'metrics.csv'));write_csv(scores,file.path(out,'scores.csv'));write_csv(cohorts,file.path(out,'comparison-cohorts.csv'));write_csv(labels,file.path(out,'labels.csv'))
+write_json(list(forecast_sha256=m$sha256,label_path=substring(label_path,nchar(root)+2),label_sha256=digest::digest(file=label_path,algo='sha256'),sp_path=substring(sp_path,nchar(root)+2),sp_sha256=digest::digest(file=sp_path,algo='sha256'),forecast_generated_at_utc=m$generated_at_utc,evaluation_generated_at_utc=format(Sys.time(),'%Y-%m-%dT%H:%M:%SZ',tz='UTC')),file.path(out,'evaluation-inputs.json'),auto_unbox=TRUE,pretty=TRUE)
+knitr::kable(metrics |> mutate(Top1=sprintf('%.2f%%',100*top1),Top2=sprintf('%.2f%%',100*top2)) |> select(comparison,coverage,model,n,hits1,hits2,Top1,Top2,brier,logloss),digits=4,caption='相同场次分母的比较：Brier为三类平方误差之和，log loss自然对数，两者越低越好')
+knitr::kable(tibble(roster=86L,forecasts=n_distinct(fm$fixture_id),settled=nrow(labels),unsettled_or_unusable=86L-nrow(labels)),caption='全期覆盖及结果可评估数量')
+```
+
+提前24h为同截止比较；较晚SP是在更晚信息集上的辅助诊断，不保证距开赛15分钟。北单概率是SP倒数归一化的相对定价，不使用0.65回款系数。Top1/Top2是类别命中/覆盖，不是串关收益。盘口不完整者保留为原生诊断；完整市场子集要求四家欧赔公司全部在截止前且48小时内有报价，并具备亚洲盘与大小球。最初71场“完整”实际只代表三通道存在，独立审查发现其中28场欧赔篮子不全；现在以43场为完整固定篮子。此次纠正发生在标签接入后，只更正覆盖及诊断资格、重算对照子集，86场原冻结概率与逐场审查未改变，原输入和执行客户端仅作已盘点历史证据，不是新的干净采集接口。
+
+```{r}
+knitr::kable(x$audit,digits=3,caption='逐场原生λ、核心判据与独立审查账本')
+final_grids<-bind_rows(map(x$entries,~mutate(.x$final$grid,fixture_id=.x$final$receipt$fixture$fixture_id,stage='FM-1.5.0',scenario='frozen',.before=1)))
+write_csv(final_grids,file.path(out,'full-score-grid.csv'))
+top_scores<-final_grids |> group_by(fixture_id) |> arrange(desc(probability),home_goals,away_goals,.by_group=TRUE) |> slice_head(n=5L) |> mutate(percentage=100*probability) |> ungroup()
+knitr::kable(top_scores |> select(fixture_id,home_goals,away_goals,percentage),digits=2,caption='每场前5个比分；单位%，完整分布见CSV，剩余质量并未删除')
+```
+
+```{r}
+plot_metrics<-metrics |> filter(coverage=='all_native') |> select(comparison,model,n,top1,top2) |> pivot_longer(c(top1,top2),names_to='metric',values_to='rate')
+ggplot(plot_metrics,aes(x=model,y=100*rate,fill=model))+geom_col(width=.65)+geom_text(aes(label=sprintf('%.1f%%',100*rate)),vjust=-.25,size=3)+facet_grid(metric~comparison,scales='free_x',space='free_x')+scale_y_continuous(limits=c(0,100))+labs(x=NULL,y='命中/覆盖率（%）',caption='同一面板使用同场分母：T24 n=20，较晚SP n=86；较晚SP信息集不同')+theme_minimal()+theme(legend.position='none',axis.text.x=element_text(angle=20,hjust=1))
+example_grid<-final_grids |> filter(fixture_id=='26102:1',home_goals<=6L,away_goals<=6L)
+ggplot(example_grid,aes(x=away_goals,y=home_goals,fill=100*probability))+geom_tile()+scale_fill_viridis_c(name='概率（%）')+labs(x='客队进球',y='主队进球',title='26102#1最终比分分布示例：完整网格保留',caption='图仅显示0–6球区域，CSV包含完整支持；未展示质量没有删除')+theme_minimal()
+```
+
+实际预测用新R进程、指定安装包和项目`.venv/bin/python`；依赖在环境设置阶段已有，不在函数或渲染时安装。可复现顺序：`Rscript r/fm15_26102_native.R <root>` → 专用市场采集/校验 → `Rscript r/fm15_26102_market.R <root>` → `Rscript r/fm15_26102_market_diagnostic.R <root>` → 完成43批审查及收据 → `Rscript r/fm15_26102_freeze.R <root>` → `Rscript r/fm15_26102_replay.R <root>` → `quarto render quarto/fm15_26102_20261012.qmd --no-cache`。重放只读取原冻结输入及收据，不再次请求PA或市场数据。`r/fm15_26102_coverage.R <root>` 是此次完整篮子资格的权威入口；此前市场执行客户端只用于原冻结版本证据，不授权其71场旧分类作为完整篮子接口。
+
+自动测试映射：`tests/testthat/test-fm15-26102-contract.R`覆盖原生组件/截止、盘口身份与报价年龄、作者收据与冻结支持、相同分母评分及独立市场DC；6842断言通过（含完整四公司篮子的回归检查）。`tests/test_fm15_26102_pa_contract.py`覆盖离线重用、非法输出/认证字段/输入哈希拒绝和有界恢复范围，13测试通过。当前冻结后端原生函数的15项测试通过。标准全套R入口另行执行，其结果记录在验收收据，不以专项通过替代全套结果。
+
+```{r}
+replay<-fromJSON(file.path(out,'replay-receipt.json'));rl<-read_csv(file.path(out,'replay-ledger.csv'),show_col_types=FALSE)
+stopifnot(replay$status=='FULL_IDENTICAL_REPLAY',replay$forecast_sha256==m$sha256,nrow(rl)==86L,all(as.matrix(select(rl,-fixture_id))),replay$replay_code_sha256==digest::digest(file=file.path(root,'r/fm15_26102_replay.R'),algo='sha256'))
+knitr::kable(tibble(status=replay$status,fixtures=replay$fixtures),caption='独立完整重放：原生及最终收据、核心目标、投影逐场严格一致')
+review_path<-file.path(out,'review.json')
+if(file.exists(review_path)) {
+ review<-fromJSON(review_path)
+ stopifnot(all(map_chr(file.path(root,review$files$path),~digest::digest(file=.x,algo='sha256'))==review$files$sha256))
+ knitr::kable(tibble(status=review$status,command=review$command,findings=review$findings,resolutions=review$resolutions),caption='独立codex review；PI仍待用户验收')
+} else cat('独立审查尚未完成，本预览不构成最终验收。')
+```
+
+本轮是历史诊断，缺阵容伤停、对手强度和可比较排名等信息；不能据表格宣称这些维度已量化。λ与专家规则没有根据本期结果重新优化。本报告不生成或发布实际票单。
+
+

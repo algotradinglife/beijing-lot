@@ -1,0 +1,214 @@
+{
+  "status": "RUN_BOUND_CURRENT_IMPLEMENTATION",
+  "issue_id": "26102",
+  "files": [
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/betting_sheet_html.py",
+      "sha256": "e4231ea6c9bdfa618816a8a692b3037cf27f3500bcfe642342f550afa801ac78"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/versioning.py",
+      "sha256": "d825697bc0d08de0de4b91a6fce9bc4842b49d90a2f5c355f84f56f594830079"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/vfootball_results.py",
+      "sha256": "1a0076c8f3e8fb3e236aec0e62cf0ba77c8a362bffaab98afa7a3d62b91fe04e"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/nova_api.py",
+      "sha256": "65f12aa8cf9291e569c77feda98a84e060ce40e4bfe9a6ff3a88cefc1c8c771c"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/extraction_cache.py",
+      "sha256": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/prematch_sp.py",
+      "sha256": "b7568a69db9a93b2aaf47e9d790d3babef2212f23646576ec6879d7d92a3cff5"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamentals.py",
+      "sha256": "d699b60b43ee4213fc5c0dcff264ebf4b0be418bccda2f6b4c5de3308215c995"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamental_issue.py",
+      "sha256": "c9e6d433565ccdfa88b35081655acb352ba85066028c6774f53e0e0f6ceb245e"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/source_extraction.py",
+      "sha256": "ff93a180e4f0b09a1bc9431e690134c29ac039e6bc51c7fc5ae85117a9162054"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/unified_sources.py",
+      "sha256": "f5a46b2f960898c0013c6449d52213b307dd6311d55ee31be497e1aac34e28aa"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/transport.py",
+      "sha256": "8b68fbc2dc43418a488365416d60f9d719ebb1c6df0980353fb1692b4987a955"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/dual_euro.py",
+      "sha256": "6ab8af507ed794f3c683494d0cb4cdbd84f11b3e08506971fc47f2cf77eb4b94"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/recent_venue_goals.py",
+      "sha256": "ed988580326bb35baf0295c28907b1de465a9421905c88156901af91577842db"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/__init__.py",
+      "sha256": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/settlement_backfill.py",
+      "sha256": "27a55b53d265e603c250d9e6b29f62c21b6da8a7daeed241822b79bedf8e37e7"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamental_tables.py",
+      "sha256": "a94aaf7cf0274dd165595059874da6a2193aa93d891035ab3e09015e0cc25d38"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/source_issue_update.py",
+      "sha256": "82a7d856f7df2ea43f7104fb32ac0a8e15043c2b6806e407e451c795c1cedac8"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/fundamental_probability.py",
+      "sha256": "9b5a146eabf84c526a3976e08be710494f80f316225f5e26bb7aa03e9926bfc8"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/datasets/settlement_parquet.py",
+      "sha256": "ca0317e70df88174f8b67f3eb69bf416f1884b37fb31cbf6d3c4960a5499f7c4"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/datasets/__init__.py",
+      "sha256": "6937ba355dc8c01521b853f5ba6d350a9088d510e99f0346af153a32ddfc5387"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/settlement/parser.py",
+      "sha256": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/settlement/labels.py",
+      "sha256": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/settlement/__init__.py",
+      "sha256": "598d64815532582b6238a7ed045f352c66ae995a048a7bd2125c95250b98a67b"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py",
+      "sha256": "1467def1bb9bde7c7d55a3f9277a70eba8471231276d2859df4ede0011b93b85"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/issue_schedule/service.py",
+      "sha256": "188f33db69df43048e41647bd39ef576411d46aed9205eb0ea49a325af3ddca0"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py",
+      "sha256": "0abfc13be1592d82a0acf4ad224fbb58147a39d108938c48f46edcc64f0852d2"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/issue_schedule/__init__.py",
+      "sha256": "a54fddadc2e45d5923d3f0c3cee41e5568d661ba8c6ea1df72db1c54fdee4270"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/issue_schedule/store.py",
+      "sha256": "a455839715c3fa790359e33ed4c07f6145f60cf41354fe1e1fadf390ed09bfdc"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/issue_schedule/decode.py",
+      "sha256": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py",
+      "sha256": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/market_capture/service.py",
+      "sha256": "98f7c2112583adaa1091fabfac3202bb4b5ba3d84531030a887628e493fefa8c"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/market_capture/__init__.py",
+      "sha256": "0284ed1a85a2ba7c614f574f0b4a8f9ed03173348c6644aa3b3eb1dbc0e60265"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/market_capture/history.py",
+      "sha256": "ee6b14e5904e0e0aa31fd0325e22ef4a0a2e7db860d9ba6f3ed952b7592b9f43"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/catalog/paths.py",
+      "sha256": "5a4d6a01dc454478d7520d47e32f7a2b77b327beb9f00a0cbe9d7353a5faac9a"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/catalog/registry.py",
+      "sha256": "34c771f70b3af863e50a84d7fa3e05e41879d20bbf6e8d31cc40da95e3f2369c"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/catalog/__init__.py",
+      "sha256": "9350beae1bdd1de5411f55ac2581a10bca33411628b0a723ea331dd86c00b1c9"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/sources/five_hundred_betting.py",
+      "sha256": "9cfe60858a177f0e7eee34119d300d23a6caa1a329670301892842e053a3abb6"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/sources/__init__.py",
+      "sha256": "c2f2c58c3f126c4c9f153e337ee474e2654ce0fae8496ab9aee02ab83db049c7"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py",
+      "sha256": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py",
+      "sha256": "ae29042dc9c960c491df56fbd6b18c90e57dab194e6bfacb5226eb24e97c8991"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/issue_partitions.py",
+      "sha256": "c7a8f85e7ce09ba0587ff5146477fbcfc661c3a67a8d9e6024c7dc6744ae5e2b"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py",
+      "sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/predictor_clock.py",
+      "sha256": "1556153ef70fd0d875d3eee2932c8deccaccc29a226bc8f3ac73086b0b8dd01a"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/admitted_replay.py",
+      "sha256": "d4d21a7b3d1d68230854325577cc215f725a6d73a8fe0f6171fd9d88b716081d"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/diagnostic_labels.py",
+      "sha256": "7902947518b0567d8cd7b35a4a51f8118d8ef7b29539a9cdd551ca8b59d41e73"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/replay.py",
+      "sha256": "ff9a3890404a87484283ddd10b3960762397942c92af9231b9417cf081ddb61a"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py",
+      "sha256": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py",
+      "sha256": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee"
+    },
+    {
+      "path": "packages/beidan/R/recent_venue_goals.R",
+      "sha256": "a4a7ff199308314d8c37e665f29e119f1d61255bce1dfcf9a659eb42903d38ab"
+    },
+    {
+      "path": "packages/beidan/R/fm15_tail_judgement.R",
+      "sha256": "a82f0374d8b5254c8b216dd0da6cc8e5d5bbdaf2535cbaf453fa94a85a5e350f"
+    },
+    {
+      "path": "packages/beidan/R/score_margin_direction.R",
+      "sha256": "65432d8005b75c52708c37b393dfdc5ca66fc81907d9e29f1d9efa95954e468c"
+    },
+    {
+      "path": "packages/beidan/R/fundamental_probability.R",
+      "sha256": "27a55daee98bf0702c9aaea7bceab43e374b33d9d3dacb88e4260c25d027d43c"
+    }
+  ]
+}

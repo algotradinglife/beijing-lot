@@ -1,0 +1,8 @@
+{
+  "status": "FULL_IDENTICAL_REPLAY",
+  "fixtures": 86,
+  "forecast_sha256": "1446cd10810c7e44dc5ef5e9ca43b274258581797cb881d56175ccf63c8872d0",
+  "implementation_inventory_sha256": "cf9aee428448103f3abf7f2acd4f891cb3dc7b3380c7249db28866893de25cdf",
+  "replay_code_sha256": "495cff0b6510427ae7ab0407066bc03485232d72749fbf9197da32a45fc3f7e5",
+  "generated_at_utc": "2026-10-12T01:06:32Z"
+}

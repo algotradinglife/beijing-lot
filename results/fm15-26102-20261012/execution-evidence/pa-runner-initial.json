@@ -1,0 +1,5 @@
+{
+  "path": "results/fm15-26102-20261012/execution-evidence/pa-runner-initial.py",
+  "sha256": "9532462f64cffbf5bb8d86d5d138a6cda01622c4f8c606d90d7dc15f2403f942",
+  "reason": "Initial workers used these bytes; new CLI minimum batch allows bounded recovery without rewriting completed attempts"
+}

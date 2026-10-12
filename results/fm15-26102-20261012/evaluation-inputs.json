@@ -1,0 +1,9 @@
+{
+  "forecast_sha256": "1446cd10810c7e44dc5ef5e9ca43b274258581797cb881d56175ccf63c8872d0",
+  "label_path": "results/fundamental-issues-20261011/inputs/labels.rds",
+  "label_sha256": "eac0ecae9057a30074b6d43f24b029ae5273618691352ed5d3dedd4c62888b1d",
+  "sp_path": "results/fundamental-beidan-history-20261011/analysis-20261011T024028.510576Z/selected-sp.csv",
+  "sp_sha256": "f29da4a474382b78912635c9ee53790bd33c7064a0dbbed1491cc3ce3c3ea1da",
+  "forecast_generated_at_utc": "2026-10-12T01:03:38Z",
+  "evaluation_generated_at_utc": "2026-10-12T01:40:43Z"
+}

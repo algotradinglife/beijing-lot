@@ -1,0 +1,23 @@
+{
+  "status": "DELIVERED_LOCAL_CHECKS_WITH_FULL_SUITE_GAP; owner PI pending",
+  "forecast_sha256": "1446cd10810c7e44dc5ef5e9ca43b274258581797cb881d56175ccf63c8872d0",
+  "forecasts": 86,
+  "exact_replay": 86,
+  "r_assertions": 6842,
+  "pa_tests": 13,
+  "backend_tests": 15,
+  "standard_r": {
+    "status": "FAILED",
+    "package_error_blocks": 18,
+    "repository_failed_blocks": 2,
+    "repository_error_blocks": 50,
+    "total_failing_or_errored_blocks": 70,
+    "command": "FM_NATIVE_TEST_ROOT=$PWD R_LIBS_USER=$PWD/results/fm15-version-20261012/library:$PWD/r_lib /opt/R/4.6.1/bin/Rscript tests/testthat.R"
+  },
+  "review": "PASS_NO_BLOCKERS",
+  "historical_diagnostic_only": true,
+  "probabilities_changed_after_labels": false,
+  "qmd_render": "PASS clean session --no-cache",
+  "html_sha256": "1592877440adaeb2f4af030acc72edebbe01d07b075ffd4b9784f018f2bb4e14",
+  "rendered_content_checked": true
+}

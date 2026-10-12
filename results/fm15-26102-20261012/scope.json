@@ -1,0 +1,25 @@
+{
+  "model_id": "FM-1.5.0",
+  "issue_id": "26102",
+  "roster": 86,
+  "forecast_inputs": [
+    {
+      "path": "results/fundamental-issues-20261011/run-20261011T011533.304058Z/26102-frozen.rds",
+      "sha256": "e2ea1df9044265f5b56972b72c309318edd120f38751f0a8519e5209225d708a"
+    }
+  ],
+  "policy": {
+    "recent_n": 8,
+    "alpha": 0.5,
+    "minimum_matches": 12,
+    "minimum_ess": 8,
+    "rho": -0.1,
+    "max_radius": 2,
+    "threshold": 0.1,
+    "exterior_weight": 0.3
+  },
+  "new_run_target_settlement_opened": false,
+  "prior_discussion_includes_target_fixture": true,
+  "intended_use": "HISTORICAL_DIAGNOSTIC",
+  "created_at_utc": "2026-10-12T00:09:29Z"
+}
