@@ -1,0 +1,28 @@
+
+
+processing file: fm16_errors_20261013.qmd
+1/5                  
+2/5 [unnamed-chunk-1]
+3/5                  
+4/5 [unnamed-chunk-2]
+5/5                  
+output file: fm16_errors_20261013.knit.md
+
+pandoc 
+  to: html
+  output-file: fm16_errors_20261013.html
+  standalone: true
+  section-divs: true
+  html-math-method: mathjax
+  wrap: none
+  default-image-extension: png
+  
+metadata
+  document-css: false
+  link-citations: true
+  date-format: long
+  lang: en
+  title: FM-1.6.0：三期主要误判排查
+  
+Output created: fm16_errors_20261013.html
+

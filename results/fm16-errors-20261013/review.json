@@ -1,0 +1,9 @@
+{
+  "qmd": "quarto/fm16_errors_20261013.qmd",
+  "sha256": "3c601fd8f42370aee9f622202a820ec147bb492a3042b2174049dff6fcbd9edb",
+  "command": "codex review - < results/fm16-errors-20261013/review-final-prompt.txt",
+  "findings": "First review: P2 prose mislabeled #54/#44 as +1; final review: no blocking P1/P2 findings.",
+  "resolution": "Both corrected to handicap0 and HTML regenerated; counts, mappings and tail-rank comparisons verified. No model changes or repeated full-suite claim.",
+  "review_log_sha256": "d0fdb06da5878ec25cce701bb3fb1a6d5e7599dadfe6387489ae0ce593745201",
+  "PI": "Owner acceptance pending"
+}
