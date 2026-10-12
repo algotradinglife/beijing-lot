@@ -1,0 +1,95 @@
+{
+  "schema": "fundamental-model-version/v1",
+  "model_id": "FM-1.7.0",
+  "parent_model": "FM-1.6.0",
+  "registered_at": "2026-10-12T17:33:08.028444+00:00",
+  "status": "implemented_expert_workflow",
+  "discussion_default": true,
+  "prospective_performance_validated": false,
+  "tail_policy": {
+    "coverage": 0.9,
+    "coefficient": 0.3,
+    "tie_tolerance": 1e-12
+  },
+  "tail_algorithm": "Descending net-margin probability; strictly cross coverage; retain all boundary ties; normalize full score support",
+  "review_decision": "apply normally; explicit independently evidenced retain uses coefficient one",
+  "inherited_stages": {
+    "native_lambda": "FM16 long/recent same-venue blend alpha 0.5; rho explicitly fixed -0.1",
+    "source_selection": "SelectFmProbabilitySource unchanged FM16 stage identity; low/uncertain and sufficient consistent joint market selects market exactly"
+  },
+  "stage_order": [
+    "explicit_cutoff",
+    "native_and_joint_market_DC",
+    "confidence_market_source_selection",
+    "ranked_margin_core",
+    "shared_evidence_score_reweight_and_seal",
+    "actual_Beidan_handicap_projection_and_rank"
+  ],
+  "forbidden_tail_inputs": [
+    "Beidan_SP",
+    "Beidan_handicap",
+    "target_outcome",
+    "desired_Top1",
+    "old_center_policy"
+  ],
+  "implementation_hashes": [
+    {
+      "path": "packages/beidan/R/fm_tail_judgement.R",
+      "sha256": "f3559a0dbbef8e44e30c224bf2cedf494d41b062bfa0c713de28e73cc38d9d54"
+    },
+    {
+      "path": "packages/beidan/man/BuildFmTailJudgement.Rd",
+      "sha256": "e72c8a8290d5ff86386327918e731bd834c0caa098305825dcc7bb2267f976ed"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-fm-tail-judgement.R",
+      "sha256": "608b5609ecad3014c9e257889b98e89ffe31d523ead836479554ad2aac4c864d"
+    },
+    {
+      "path": "quarto/fm17_release_20261013.qmd",
+      "sha256": "daffaba70d46882fbff57a90f894e39f2f4dc633402d5fd180bdc5f901ba4c5d"
+    },
+    {
+      "path": "skills/beidan-strategy/SKILL.md",
+      "sha256": "4d80efe54388ecd858a29b89407a11a61f18c033ea72282b8b0fdb091c971a48"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-probability.md",
+      "sha256": "36b54127a79939a65e7087a06a2fd7ff3216e180daa12368241345e0f061e1fd"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-workflow.md",
+      "sha256": "c8ae3d0323b9632154e704201e249abce840b5c4ececc5ec515be9b2e2019817"
+    },
+    {
+      "path": "skills/beidan-strategy/references/direction-score-adjustment.md",
+      "sha256": "ccf571eb2178efd7d020bf739ec7d990093f5c66c97cfb40365d4e572c8db50e"
+    },
+    {
+      "path": "skills/beidan-strategy/references/competition-strength-market.md",
+      "sha256": "e0b9c8a67718636cca275d01b2c59251cd91815804ebda18449d8286fd3e4a37"
+    },
+    {
+      "path": "skills/beidan-strategy/references/prediction-report.md",
+      "sha256": "b99c7b07b2537b278db1cfa738fe21a95ec0f4589c3ec29142493b6570a8b630"
+    },
+    {
+      "path": "skills/beidan-strategy/references/confidence-market-switch.md",
+      "sha256": "8f2c3a84b2d5a61ddc65ed51dbe7bcacd6298fc2583c2d9862b2cdef6ffc06eb"
+    },
+    {
+      "path": "skills/beidan-strategy/references/scenario-tail-adjustment.md",
+      "sha256": "5bafbf5ef94c207d084db05f08451aaccdf2b91b9a6f4a1a6bc1d43afbc6690c"
+    },
+    {
+      "path": "tests/testthat/test-fm17-release.R",
+      "sha256": "3978afa5329f74b446a3af24b3bebe7f87bdd0660198d4a41272bd0e17e86c15"
+    }
+  ],
+  "limitations": [
+    "Known-outcome case10 is diagnostic only",
+    "FM17 whole-issue performance not yet evaluated",
+    "Existing frozen predictions and tickets remain bound to original implementation",
+    "Historical timestamp proxies do not authorize prospective use"
+  ]
+}

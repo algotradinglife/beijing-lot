@@ -1,0 +1,81 @@
+---
+title: "FM-1.7.0版本验收：累计90%净胜球核心"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+FM-1.7.0替换FM-1.6.0尾部阶段：净胜球各档按概率降序累加，纳入使累计严格超过90%的档位；边界同概率（绝对容差1e−12）整组纳入。核心权重1，外围0.3；核心不强制对称、连续、档数或半径。恰好90%继续，浮点跨界使用同一数值容差。明确独立定性retain审查全部权重1，不由类别排名决定暂停。这是用户固定专家政策，不是从目标赛果学习的参数。
+
+完整流程：显式截止 → 原生长期/近期λ及DC → 同截止联合欧赔/大小球/亚盘DC → 置信与市场充分一致审查 → 直接选择原生/市场网格 → 排名累计90%核心 → 完整比分重加权及封存 → 实际北单整数让球投影 → Top1/Top2/Top3。λ长期/近期各0.5、ρ固定−0.1、来源选择逻辑沿用FM16；来源子模块收据身份仍为FM16，最终分档及完整工作流为FM17。不以北单线或SP校正比分。旧单双中心规则和研究私有helper已删除，无兼容分支；旧冻结重放使用其原私有安装及实现快照。
+
+验收使用26102#10声明快照。formal_selected重用FM16已冻结来源判断及定性暂停决定（该场保留原生）；native是原生敏感性；partial_market沿用既有固定总量3.397616的部分盘口假设，因缺大小球不是正式来源切换结果。这是已知赛果的诊断，不能作为独立前瞻/整期性能证据，现有冻结模拟单不改写。
+
+数据契约：输入score grid为tibble，每行唯一home_goals/away_goals，非负整数、概率有限且和为1。排名表每行一个整数净胜球margin，probability/cumulative是0–1质量，core为逻辑；完整整数分档含缺档零质量及无穷两端。非法/空/NA/重复/非归一化/截止错配输入失败关闭。完整比分归一化，档内条件比例保留；截止变更需要重建证据，不复用缓存。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));root<-normalizePath('..');out<-file.path(root,'results/fm17-release-20261013')
+library(beidan,lib.loc=file.path(out,'library'))
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+impl<-file.path(root,'results/fm15-26102-20261012/implementation');reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE);backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+src<-file.path(root,'results/fm16-three-issues-20261012');m<-jsonlite::fromJSON(file.path(src,'manifest.json'));stopifnot(digest::digest(file=file.path(src,'forecasts.rds'),algo='sha256')==m$forecast_sha256)
+f<-readRDS(file.path(src,'forecasts.rds'));z<-f$entries[['26102:10']]
+dp<-file.path(root,'results/fm16-26102-10-20261013/diagnostics.rds');diag<-readRDS(dp)[['HYPOTHESIS_TOTAL_3.397616']]
+spec_path<-file.path(root,'config/fundamental-models/FM-1.7.0.json')
+spec<-jsonlite::fromJSON(spec_path)
+stopifnot(spec$model_id=='FM-1.7.0',all(map_chr(file.path(root,spec$implementation_hashes$path),~digest::digest(file=.x,algo='sha256'))==spec$implementation_hashes$sha256))
+policy<-spec$tail_policy
+inputs<-list(formal_selected=list(base=z$selection$base,rows=z$evidence_rows),native=list(base=z$native,rows=z$evidence_rows),partial_market=list(base=diag$base,rows=diag$evidence_rows))
+results<-ranked<-projections<-masses<-list()
+for(name in names(inputs)) {
+ b<-inputs[[name]]$base;rows<-inputs[[name]]$rows;cutoff<-b$cutoff;fixture<-z$fixture;ct<-format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC');eid<-rows[[1]]$evidence_id
+ review<-list(decision=if(name=='formal_selected')z$results[['FM-1.6.0']]$review$decision else 'apply',base_hash=beidan:::.score_margin_hash(b$grid),cutoff_utc=ct,reason='User fixed probability-ranked cumulative mass core',counterevidence='Expert coverage/coefficient and known-outcome diagnostic; not independently calibrated')
+ core<-BuildFmTailJudgement(b,review,eid,cutoff,policy)
+ hashes<-list(model_spec=digest::digest(file=spec_path,algo='sha256'),base_artifact=beidan:::.score_margin_hash(b),margin_judgement=beidan:::.score_margin_hash(core$judgement),direction_implementation=beidan:::.score_margin_code(impl),tail_binding=core$binding_hash,client=digest::digest(file=file.path(root,'quarto/fm17_release_20261013.qmd'),algo='sha256'),frozen_forecast=m$forecast_sha256,partial_diagnostic=digest::digest(file=dp,algo='sha256'))
+ ctx<-backend$build_adjustment_evidence_context(rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',ct),hashes,shared$AvailabilityPolicy$historical_proxy('FM17_RELEASE_DIAGNOSTIC_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+ final<-adjust_score_margin_distribution(b,core$judgement,ctx,fixture,cutoff,impl)
+ stopifnot(identical(final,adjust_score_margin_distribution(b,core$judgement,ctx,fixture,cutoff,impl)))
+ saveRDS(final,file.path(out,paste0(name,'-sealed.rds')))
+ # Project Beidan integer line only after sealing full score distribution.
+ p<-project_score_outcomes(final,-1L,impl)
+ p0<-project_score_outcomes(final,0L,impl)
+ stopifnot(abs(sum(p$probability)-1)<1e-12,abs(sum(p0$probability)-1)<1e-12,
+   identical(final,readRDS(file.path(out,paste0(name,'-sealed.rds')))),
+   core$judgement$model_id=='FM-1.7.0',
+   identical(final$receipt$source_context$source_hashes$tail_binding,core$binding_hash))
+ expected_margin<-b$grid |> mutate(margin=home_goals-away_goals) |>
+   group_by(margin) |> summarise(probability=sum(probability),.groups='drop') |>
+   mutate(probability=probability*if_else(margin %in% core$core_margins,1,core$effective_coefficient)/core$normalizer)
+ stopifnot(isTRUE(all.equal(expected_margin$probability,final$margins$probability[match(expected_margin$margin,final$margins$margin)],tolerance=1e-12)))
+ projections[[name]]<-p |> mutate(source=name,.before=1)
+ ranked[[name]]<-core$ranked_margins |> mutate(source=name,.before=1)
+ masses[[name]]<-tibble(source=name,core_margins=paste(core$core_margins,collapse=','),core_mass=core$core_mass,final_core_mass=core$final_core_mass,normalizer=core$normalizer,mean_margin_before=sum((b$grid$home_goals-b$grid$away_goals)*b$grid$probability),mean_margin_after=sum(final$margins$margin*final$margins$probability))
+ results[[name]]<-list(core=core,final=final,projection=p,zero_projection=p0,bindings=hashes)
+}
+ranked<-bind_rows(ranked);masses<-bind_rows(masses);projections<-bind_rows(projections)
+knitr::kable(ranked |> filter(core) |> mutate(across(c(probability,cumulative),~100*.x)),digits=2,caption='按概率排名实际纳入的档位及累计质量，单位%')
+knitr::kable(masses |> mutate(across(c(core_mass,final_core_mass),~100*.x)),digits=3,caption='覆盖、归一化及净胜球均值；质量单位%，均值单位球')
+knitr::kable(projections |> select(source,outcome,probability,rank) |> mutate(probability=100*probability),digits=2,caption='90%核心重加权后的北单−1投影，概率%；W/D/L为让胜/让平/让负')
+write_csv(ranked,file.path(out,'ranked-margins.csv'));write_csv(masses,file.path(out,'core-summary.csv'));write_csv(projections,file.path(out,'probabilities.csv'));saveRDS(results,file.path(out,'results.rds'))
+```
+
+公开函数BuildFmTailJudgement()在packages/beidan/R/fm_tail_judgement.R，是唯一现行核心构造实现；测试对应test-fm-tail-judgement.R。原研究.BuildFmMassCoreJudgement及旧中心测试删除。policy只接受coverage/coefficient/tie_tolerance；review必含apply/retain及哈希、截止、理由和反证，旧center_mode/centers和旧政策明确拒绝。核心目标先构造，再由现有adjust_score_margin_distribution及共享temporal_learning执行实际调整与机器收据；tail_binding纳入source_hashes，包含完整核心函数签名/体、输入及专家政策。共享框架承担时序，不新增时序函数或学习；源网格和来源决定为旧冻结证据，不重新学习，全部模式为历史代理诊断。
+
+隔离构建从本次父提交跟踪的package源码取得，只替换本次模块/帮助/测试，并删除原私有helper，未包含其他会话未跟踪源码、不覆盖共享库。R CMD INSTALL到results/fm17-release-20261013/library，验证真实DLL加载。声明R4.6.1、项目.venv/bin/python、现有r_lib依赖、旧后端results/fm15-26102-20261012/implementation及两个输入RDS；渲染不安装依赖。模型身份与实现/政策/技能文件哈希在config/fundamental-models/FM-1.7.0.json登记；安装技能同步仓库维护源。
+
+验收命令：
+- R_LIBS_USER="$PWD/r_lib" /opt/R/4.6.1/bin/R CMD INSTALL -l "$PWD/results/fm17-release-20261013/library" results/fm17-release-20261013/build-copy/packages/beidan
+- 安装后testthat::test_file("packages/beidan/tests/testthat/test-fm-tail-judgement.R", env=new.env(parent=asNamespace("beidan")), load_helpers=FALSE, stop_on_failure=TRUE)，实际命令和结果保留于tests.log。
+- R_LIBS_USER="$PWD/r_lib" quarto render quarto/fm17_release_20261013.qmd --no-cache，干净进程错误致命。
+- 新进程重新执行并断言完整results.rds相同；同进程重复断言不是独立重放的替代。审查命令/哈希/发现及独立重放结论见下方receipt。
+
+专项函数37项断言通过。tests/testthat/test-fm17-release.R验证真实三模式归一化、全比分封存、0/−1投影、tail_binding收据、无缓存复用、正式原生选择不冒充部分盘口，以及部分盘口示例的独立数值预期；命令FM17_RELEASE_ROOT="$PWD" R_LIBS_USER="$PWD/r_lib" Rscript调用testthat::test_file，记录delivery-tests.log。
+
+未运行全仓旧客户端套件（已知旧漂移基线，不声明全仓绿色）或整期FM17回测；本交付验证升级实现、数据合同及真实三模式比分封存/投影，不宣称准确性改善，不参加CI。PI待用户验收，没有请求合并。
+
+```{r}
+if(file.exists(file.path(out,'review.json'))){r<-jsonlite::fromJSON(file.path(out,'review.json'));stopifnot(all(map_chr(file.path(root,r$files$path),~digest::digest(file=.x,algo='sha256'))==r$files$sha256));knitr::kable(tibble(command=r$command,findings=r$findings,resolution=r$resolution))}
+```

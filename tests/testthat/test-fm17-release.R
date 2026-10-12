@@ -1,0 +1,26 @@
+testthat::test_that('FM17 real frozen outputs obey score and projection contracts', {
+ root<-Sys.getenv('FM17_RELEASE_ROOT')
+ stopifnot(nzchar(root))
+ x<-readRDS(file.path(root,'results/fm17-release-20261013/results.rds'))
+ spec<-jsonlite::fromJSON(file.path(root,'config/fundamental-models/FM-1.7.0.json'))
+ testthat::expect_identical(names(x),c('formal_selected','native','partial_market'))
+ testthat::expect_identical(spec$model_id,'FM-1.7.0')
+ for(z in x){
+  testthat::expect_s3_class(z$core$ranked_margins,'tbl_df')
+  testthat::expect_s3_class(z$final$grid,'tbl_df')
+  testthat::expect_equal(sum(z$final$grid$probability),1,tolerance=1e-12)
+  testthat::expect_true(all(z$final$grid$probability>=0))
+  testthat::expect_equal(sum(z$projection$probability),1,tolerance=1e-12)
+  testthat::expect_equal(sum(z$zero_projection$probability),1,tolerance=1e-12)
+  testthat::expect_identical(z$final$receipt$source_context$source_hashes$tail_binding,z$core$binding_hash)
+  testthat::expect_identical(z$final$receipt$cache_reuse,'NONE')
+  testthat::expect_identical(z$core$judgement$model_id,'FM-1.7.0')
+  testthat::expect_true(z$core$core_mass>.9)
+ }
+ testthat::expect_identical(x$formal_selected$final$grid,x$native$final$grid)
+ testthat::expect_identical(x$partial_market$core$core_margins,-2:4)
+ p<-x$partial_market$projection
+ testthat::expect_identical(p$outcome,c('W','L','D'))
+ testthat::expect_equal(p$probability,c(.40170367349401437,.37291066140321294,.22538566510277275),tolerance=1e-10)
+ testthat::expect_equal(x$partial_market$core$core_mass,.941905023008,tolerance=1e-10)
+})

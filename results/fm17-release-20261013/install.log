@@ -1,0 +1,22 @@
+* installing *source* package ‘beidan’ ...
+** this is package ‘beidan’ version ‘0.2.0’
+** using staged installation
+** libs
+specified C++17
+using C++ compiler: ‘g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0’
+using C++17
+g++ -std=gnu++17 -I"/opt/R/4.6.1/lib/R/include" -DNDEBUG  -I'/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib/Rcpp/include' -I/usr/local/include   -ffp-contract=off -fpic  -g -O2   -c RcppExports.cpp -o RcppExports.o
+g++ -std=gnu++17 -I"/opt/R/4.6.1/lib/R/include" -DNDEBUG  -I'/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib/Rcpp/include' -I/usr/local/include   -ffp-contract=off -fpic  -g -O2   -c component_union.cpp -o component_union.o
+g++ -std=gnu++17 -shared -L/opt/R/4.6.1/lib/R/lib -L/usr/local/lib -o beidan.so RcppExports.o component_union.o -L/opt/R/4.6.1/lib/R/lib -lR
+installing to /home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-release-20261013/library/00LOCK-beidan/00new/beidan/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (beidan)

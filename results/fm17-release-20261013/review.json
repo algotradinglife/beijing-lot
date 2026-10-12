@@ -1,0 +1,64 @@
+{
+  "command": "codex review - < results/fm17-release-20261013/review-prompt.txt",
+  "findings": "No blocking findings. Ranked core/ties/retain/full support/cutoff receipts/obsolete-code removal and FM16 inherited stage identity consistent.",
+  "resolution": "No blocking changes required. Package 37 assertions and delivery 37 assertions passed; registered hashes checked. Read-only reviewer independently reproduced full result exactly. Final clean render and independent full results replay passed (replay.log). PI pending owner acceptance.",
+  "files": [
+    {
+      "path": "packages/beidan/R/fm_tail_judgement.R",
+      "sha256": "f3559a0dbbef8e44e30c224bf2cedf494d41b062bfa0c713de28e73cc38d9d54"
+    },
+    {
+      "path": "packages/beidan/man/BuildFmTailJudgement.Rd",
+      "sha256": "e72c8a8290d5ff86386327918e731bd834c0caa098305825dcc7bb2267f976ed"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-fm-tail-judgement.R",
+      "sha256": "608b5609ecad3014c9e257889b98e89ffe31d523ead836479554ad2aac4c864d"
+    },
+    {
+      "path": "quarto/fm17_release_20261013.qmd",
+      "sha256": "daffaba70d46882fbff57a90f894e39f2f4dc633402d5fd180bdc5f901ba4c5d"
+    },
+    {
+      "path": "skills/beidan-strategy/SKILL.md",
+      "sha256": "4d80efe54388ecd858a29b89407a11a61f18c033ea72282b8b0fdb091c971a48"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-probability.md",
+      "sha256": "36b54127a79939a65e7087a06a2fd7ff3216e180daa12368241345e0f061e1fd"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-workflow.md",
+      "sha256": "c8ae3d0323b9632154e704201e249abce840b5c4ececc5ec515be9b2e2019817"
+    },
+    {
+      "path": "skills/beidan-strategy/references/direction-score-adjustment.md",
+      "sha256": "ccf571eb2178efd7d020bf739ec7d990093f5c66c97cfb40365d4e572c8db50e"
+    },
+    {
+      "path": "skills/beidan-strategy/references/competition-strength-market.md",
+      "sha256": "e0b9c8a67718636cca275d01b2c59251cd91815804ebda18449d8286fd3e4a37"
+    },
+    {
+      "path": "skills/beidan-strategy/references/prediction-report.md",
+      "sha256": "b99c7b07b2537b278db1cfa738fe21a95ec0f4589c3ec29142493b6570a8b630"
+    },
+    {
+      "path": "skills/beidan-strategy/references/confidence-market-switch.md",
+      "sha256": "8f2c3a84b2d5a61ddc65ed51dbe7bcacd6298fc2583c2d9862b2cdef6ffc06eb"
+    },
+    {
+      "path": "skills/beidan-strategy/references/scenario-tail-adjustment.md",
+      "sha256": "5bafbf5ef94c207d084db05f08451aaccdf2b91b9a6f4a1a6bc1d43afbc6690c"
+    },
+    {
+      "path": "tests/testthat/test-fm17-release.R",
+      "sha256": "3978afa5329f74b446a3af24b3bebe7f87bdd0660198d4a41272bd0e17e86c15"
+    },
+    {
+      "path": "config/fundamental-models/FM-1.7.0.json",
+      "sha256": "157f90e9d5e972b484fedef5b10a3ac4607e4e00182763759056b614c4ef8a77"
+    }
+  ],
+  "pi_status": "Pending owner acceptance; no merge requested."
+}

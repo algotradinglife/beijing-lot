@@ -1,12 +1,12 @@
 # 工作流与函数边界
 
-当前完整流程版本 **FM-1.6.0**，主选/保护与比分校正按[方向与比分校正](direction-score-adjustment.md)执行。旧函数用于基础和市场证据处理，不能用旧market_review阶段代替新最终分布。
+当前完整流程版本 **FM-1.7.0**，主选/保护与比分校正按[方向与比分校正](direction-score-adjustment.md)执行。旧函数用于基础和市场证据处理，不能用旧market_review阶段代替新最终分布。
 
 ## 顺序与产物
 
-原生λ默认长期/近期各0.5。JEV或明确署名审查按[可靠性契约](confidence-market-switch.md)裁决来源；低置信且市场充分一致直接选择市场DC，不做固定混合。自动相邻双中心阈值0.01，最多向区间两端扩展2层，任侧≥0.1整对保留、外围0.3。
+原生λ默认长期/近期各0.5。JEV或明确署名审查按[可靠性契约](confidence-market-switch.md)裁决来源；低置信且市场充分一致直接选择市场DC，不做固定混合。累计90%概率排名核心，边界同概率整组保留，外围0.3；不限制对称或半径。
 
-场次/截止 → 原生λ与DC及独立联合市场DC → 可靠性及市场充分/一致性审查 → 来源选择收据 → 单／双中心扩展 → 比分重加权并冻结 → 投影北单排名 → 独立反馈。
+场次/截止 → 原生λ与DC及独立联合市场DC → 可靠性及市场充分/一致性审查 → 来源选择收据 → 累计90%核心 → 比分重加权并冻结 → 投影北单排名 → 独立反馈。
 
 保留数据基准、市场复核和方向校正视图。最终为专家重加权网格，不报告伪造的新DC参数。ρ显式固定，0.65是票级回款因子，不参与概率。
 
@@ -27,7 +27,7 @@
 | 职责 | 现有实现 | 边界 |
 |---|---|---|
 | 原生近期λ | recent_venue_goals.R / beidan_backend.recent_venue_goals | 同场地历史与近期分布混合，共享截止/权重/ESS/收据；未量化对手强度和阵容 |
-| 中心等距目标 | fm_tail_judgement.R：BuildFmTailJudgement | 构造单／双中心完整分区目标；现有score调整与投影执行 |
+| 累计90%核心目标 | fm_tail_judgement.R：BuildFmTailJudgement | 构造概率降序累计完整分区目标；现有score调整与投影执行 |
 | 原始市场抓取/解析 | beidan_backend.market_capture.service.fetch_markets / parse_markets；history中的Euro与OU解析 | 固定间隔、超时重试、保留字节；公司命名空间分离 |
 | DC比分与概率 | packages/beidan/R/dixon_coles_grid.R：dixon_coles_score_grid | 显式λ、ρ、让球、尾部界；不学习 |
 | 普通/让球及比分诊断 | fundamentals_market_comparison.R：market_score_projection | 纯算术；不把模型均值等同真实xG |

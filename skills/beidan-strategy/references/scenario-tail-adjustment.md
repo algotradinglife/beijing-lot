@@ -1,25 +1,23 @@
-# FM-1.6.0：单／双中心等距扩展与外围
+# FM-1.7.0：累计90%核心与外围
 
-先按[可靠性裁决](confidence-market-switch.md)选定原生或市场比分网格，冻结尾部前p(d)。北单线、角色及目标比分均不参与中心选择。旧FM15单中心、TAILR及固定Top3只保留为已盘点冻结证据，不叠加到当前接口。
+先按[可靠性裁决](confidence-market-switch.md)选定原生或市场比分网格，冻结尾部前p(d)，d=主队进球−客队进球。北单线、SP、目标比分和希望的Top1不参与核心选择。
 
-## 中心模式
+## 核心选择与质量
 
-现行自动模式auto：若最高两档可以唯一确定、整数净胜球相邻、概率差≤0.01（1个百分点，含等号），用双中心区间[a,b]，b=a+1；否则唯一众数用单中心[c,c]。阈值0.01是用户批准的专家起始值，不是历史训练或置信评分。三档最高并列、非相邻并列等无法确定中心则保留完整原网格并披露，不按盘口或希望角色破并列。
+按p(d)从高到低累计，纳入使累计概率首次严格超过0.90的档位；恰好90%继续。边界概率并列（绝对容差1e−12）整组保留，不依据左右侧或盘口破并列。累计跨界比较也使用该数值容差。核心可以不对称、不连续，没有固定档数或最大半径。不再叠加旧单双中心、10%单档门槛和等距扩展。
 
-可显式single用于敏感性对照，单中心最高档并列时保留。可显式dual并提供centers，但必须是可唯一确定的相邻最高两档；不支持任意指定范围。参数与审查均绑定尾部前网格哈希及UTC截止，禁止用重加权后的概率循环选中心。
+核心权重1、外围0.3；Z=sum p(d)w(d)，p'(d)=p(d)w(d)/Z。0.3是外围原质量保留系数，不是最终外围概率。比分按净胜球档倍率重加权，档内条件比例不变，不删除外围支持。高概率档相对强化不保证让胜总概率上升；需查看全部类别汇总。
 
-## 成对扩展
+## 函数与审查
 
-中心区间[a,b]（单中心a=b）。从r=1到r=2，检查p(a-r)、p(b+r)；任一侧≥0.10则两端整对纳入；两侧均<0.10停止，不跳过内层。最大2层意味着单中心至多5档，双中心至多6档，不把双中心偷偷截成5档。缺少支持的整数档概率为0；不造比分。等距指相对区间两端的距离，不要求概率相等。
+使用包公开入口 `BuildFmTailJudgement(base,review,evidence_id,cutoff,policy)`。policy严格按顺序给出coverage=0.9、coefficient=0.3、tie_tolerance=1e-12；无旧政策兼容层。review包含decision=apply/retain、base_hash、cutoff_utc、reason和counterevidence，不接受center_mode或centers。apply为本版正常规则；明确的独立定性暂停沿用retain（全部权重1），记录理由，不根据目标赛果或下注类别排序暂停。
 
-C=[a-r,b+r]，核心权重1、外围0.3；Z=sum p(d)w(d)，p'(d)=p(d)w(d)/Z。完整比分按净胜球对应倍率重加权，档内条件比例不变、外围支持不删除。0.3是原权重保留系数，不是最终尾部概率。
+返回完整整数分区judgement、branch、effective_coefficient、ranked_margins（margin/probability/cumulative/core）、boundary_rank、core_margins、原/最终核心质量、Z、policy及binding_hash。cutoff可省略并取显式base$cutoff，仍与审查和共享证据上下文一致。binding_hash包含基底、审查、截止、政策及完整函数签名/体；共享source_hashes还须纳入tail_binding，不能只绑定最终分档表。
 
-`BuildFmTailJudgement(base,review,evidence_id,cutoff,policy)`构造完整整数分区目标。policy显式max_radius=2、threshold=0.1、coefficient=0.3、tie_tolerance=1e-12、dual_gap=0.01；review含decision apply/retain、center_mode auto/single/dual、必要时centers、base_hash、cutoff_utc、理由及反证。auto缺dual_gap报错，未知中心不伪造确定选择。随后复用`adjust_score_margin_distribution()`及共享证据上下文执行调整，不返拟合λ/ρ。
+随后复用`adjust_score_margin_distribution()`及共享temporal_learning证据上下文执行调整，不返拟合λ/ρ。完整比分及收据先冻结，最后`project_score_outcomes()`映射实际北单整数让球（包括0），按完整三类排名Top1/Top2/Top3；并列披露。
 
-## 报告与投影
+## 报告与版本边界
 
-展示来源裁决、模式、中心区间、概率差、逐层两端概率、停止原因、核心/外围质量及Z。提供单／双中心敏感性并保存尾部前后网格；双中心不会自动保证让胜第一，也不为拟合赛果调整阈值。
+展示来源裁决、排名累计表、跨界档及并列、核心集合、前后核心/外围质量、Z、尾部前后比分和类别概率。保留市场一致性残差及调整后的偏离，不以尾部后的结果循环重新选择核心。
 
-最终网格冻结后才代入实际北单整数让球，完整类别概率排名Top1/Top2/Top3并披露并列与失手路径。重点检查类别汇总：真实净胜球在核心内，也可能因同类其他档被压缩而失去Top2；不能只看单档众数。旧客户端及安装包用于原冻结重放，不能改标签冒充FM16。当前新函数与规则验收不等同整期准确性验证。
-
-cutoff可省略并取显式传入base$cutoff；与审查截止及共享调整上下文仍须一致，不使用当前时钟。函数签名与函数体共同纳入目标绑定。
+FM17只替换尾部规则，λ、ρ、可靠性与来源选择沿用FM16，选择阶段收据保留其原FM16子模块身份。旧客户端、安装包和预测仅作绑定原实现的冻结证据，不能用新版包重跑旧参数或改标签。当前已知结果的#10仅为规则形成及验收例子；未完成FM17整期重新冻结评估，不宣称比旧版/北单更准确，不改写现有前瞻模拟单。

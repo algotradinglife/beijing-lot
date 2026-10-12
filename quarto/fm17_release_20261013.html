@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>FM-1.7.0版本验收：累计90%净胜球核心</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="fm17_release_20261013_files/libs/clipboard/clipboard.min.js"></script>
+<script src="fm17_release_20261013_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="fm17_release_20261013_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="fm17_release_20261013_files/libs/quarto-html/popper.min.js"></script>
+<script src="fm17_release_20261013_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="fm17_release_20261013_files/libs/quarto-html/anchor.min.js"></script>
+<link href="fm17_release_20261013_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="fm17_release_20261013_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="fm17_release_20261013_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="fm17_release_20261013_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="fm17_release_20261013_files/libs/bootstrap/bootstrap-8bdf4a79c329363aa5e64002b720c5c5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">FM-1.7.0版本验收：累计90%净胜球核心</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>FM-1.7.0替换FM-1.6.0尾部阶段：净胜球各档按概率降序累加，纳入使累计严格超过90%的档位；边界同概率（绝对容差1e−12）整组纳入。核心权重1，外围0.3；核心不强制对称、连续、档数或半径。恰好90%继续，浮点跨界使用同一数值容差。明确独立定性retain审查全部权重1，不由类别排名决定暂停。这是用户固定专家政策，不是从目标赛果学习的参数。</p>
+<p>完整流程：显式截止 → 原生长期/近期λ及DC → 同截止联合欧赔/大小球/亚盘DC → 置信与市场充分一致审查 → 直接选择原生/市场网格 → 排名累计90%核心 → 完整比分重加权及封存 → 实际北单整数让球投影 → Top1/Top2/Top3。λ长期/近期各0.5、ρ固定−0.1、来源选择逻辑沿用FM16；来源子模块收据身份仍为FM16，最终分档及完整工作流为FM17。不以北单线或SP校正比分。旧单双中心规则和研究私有helper已删除，无兼容分支；旧冻结重放使用其原私有安装及实现快照。</p>
+<p>验收使用26102#10声明快照。formal_selected重用FM16已冻结来源判断及定性暂停决定（该场保留原生）；native是原生敏感性；partial_market沿用既有固定总量3.397616的部分盘口假设，因缺大小球不是正式来源切换结果。这是已知赛果的诊断，不能作为独立前瞻/整期性能证据，现有冻结模拟单不改写。</p>
+<p>数据契约：输入score grid为tibble，每行唯一home_goals/away_goals，非负整数、概率有限且和为1。排名表每行一个整数净胜球margin，probability/cumulative是0–1质量，core为逻辑；完整整数分档含缺档零质量及无穷两端。非法/空/NA/重复/非归一化/截止错配输入失败关闭。完整比分归一化，档内条件比例保留；截止变更需要重建证据，不复用缓存。</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressPackageStartupMessages</span>(<span class="fu">library</span>(tidyverse));root<span class="ot">&lt;-</span><span class="fu">normalizePath</span>(<span class="st">'..'</span>);out<span class="ot">&lt;-</span><span class="fu">file.path</span>(root,<span class="st">'results/fm17-release-20261013'</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(beidan,<span class="at">lib.loc=</span><span class="fu">file.path</span>(out,<span class="st">'library'</span>))</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>reticulate<span class="sc">::</span><span class="fu">use_python</span>(<span class="fu">file.path</span>(root,<span class="st">'.venv/bin/python'</span>),<span class="at">required=</span><span class="cn">TRUE</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>impl<span class="ot">&lt;-</span><span class="fu">file.path</span>(root,<span class="st">'results/fm15-26102-20261012/implementation'</span>);reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">'sys'</span>,<span class="at">convert=</span><span class="cn">FALSE</span>)<span class="sc">$</span>path<span class="sc">$</span><span class="fu">insert</span>(<span class="dv">0</span>L,<span class="fu">file.path</span>(impl,<span class="st">'packages/beidan/inst/python'</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>None</code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>shared<span class="ot">&lt;-</span>reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">'beidan_backend.temporal_learning'</span>,<span class="at">convert=</span><span class="cn">FALSE</span>);backend<span class="ot">&lt;-</span>reticulate<span class="sc">::</span><span class="fu">import</span>(<span class="st">'beidan_backend.fundamental_probability'</span>,<span class="at">convert=</span><span class="cn">FALSE</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>src<span class="ot">&lt;-</span><span class="fu">file.path</span>(root,<span class="st">'results/fm16-three-issues-20261012'</span>);m<span class="ot">&lt;-</span>jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(<span class="fu">file.path</span>(src,<span class="st">'manifest.json'</span>));<span class="fu">stopifnot</span>(digest<span class="sc">::</span><span class="fu">digest</span>(<span class="at">file=</span><span class="fu">file.path</span>(src,<span class="st">'forecasts.rds'</span>),<span class="at">algo=</span><span class="st">'sha256'</span>)<span class="sc">==</span>m<span class="sc">$</span>forecast_sha256)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>f<span class="ot">&lt;-</span><span class="fu">readRDS</span>(<span class="fu">file.path</span>(src,<span class="st">'forecasts.rds'</span>));z<span class="ot">&lt;-</span>f<span class="sc">$</span>entries[[<span class="st">'26102:10'</span>]]</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>dp<span class="ot">&lt;-</span><span class="fu">file.path</span>(root,<span class="st">'results/fm16-26102-10-20261013/diagnostics.rds'</span>);diag<span class="ot">&lt;-</span><span class="fu">readRDS</span>(dp)[[<span class="st">'HYPOTHESIS_TOTAL_3.397616'</span>]]</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>spec_path<span class="ot">&lt;-</span><span class="fu">file.path</span>(root,<span class="st">'config/fundamental-models/FM-1.7.0.json'</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>spec<span class="ot">&lt;-</span>jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(spec_path)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">stopifnot</span>(spec<span class="sc">$</span>model_id<span class="sc">==</span><span class="st">'FM-1.7.0'</span>,<span class="fu">all</span>(<span class="fu">map_chr</span>(<span class="fu">file.path</span>(root,spec<span class="sc">$</span>implementation_hashes<span class="sc">$</span>path),<span class="sc">~</span>digest<span class="sc">::</span><span class="fu">digest</span>(<span class="at">file=</span>.x,<span class="at">algo=</span><span class="st">'sha256'</span>))<span class="sc">==</span>spec<span class="sc">$</span>implementation_hashes<span class="sc">$</span>sha256))</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>policy<span class="ot">&lt;-</span>spec<span class="sc">$</span>tail_policy</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>inputs<span class="ot">&lt;-</span><span class="fu">list</span>(<span class="at">formal_selected=</span><span class="fu">list</span>(<span class="at">base=</span>z<span class="sc">$</span>selection<span class="sc">$</span>base,<span class="at">rows=</span>z<span class="sc">$</span>evidence_rows),<span class="at">native=</span><span class="fu">list</span>(<span class="at">base=</span>z<span class="sc">$</span>native,<span class="at">rows=</span>z<span class="sc">$</span>evidence_rows),<span class="at">partial_market=</span><span class="fu">list</span>(<span class="at">base=</span>diag<span class="sc">$</span>base,<span class="at">rows=</span>diag<span class="sc">$</span>evidence_rows))</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>results<span class="ot">&lt;-</span>ranked<span class="ot">&lt;-</span>projections<span class="ot">&lt;-</span>masses<span class="ot">&lt;-</span><span class="fu">list</span>()</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(name <span class="cf">in</span> <span class="fu">names</span>(inputs)) {</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a> b<span class="ot">&lt;-</span>inputs[[name]]<span class="sc">$</span>base;rows<span class="ot">&lt;-</span>inputs[[name]]<span class="sc">$</span>rows;cutoff<span class="ot">&lt;-</span>b<span class="sc">$</span>cutoff;fixture<span class="ot">&lt;-</span>z<span class="sc">$</span>fixture;ct<span class="ot">&lt;-</span><span class="fu">format</span>(cutoff<span class="sc">$</span>cutoff_utc,<span class="st">'%Y-%m-%dT%H:%M:%SZ'</span>,<span class="at">tz=</span><span class="st">'UTC'</span>);eid<span class="ot">&lt;-</span>rows[[<span class="dv">1</span>]]<span class="sc">$</span>evidence_id</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a> review<span class="ot">&lt;-</span><span class="fu">list</span>(<span class="at">decision=</span><span class="cf">if</span>(name<span class="sc">==</span><span class="st">'formal_selected'</span>)z<span class="sc">$</span>results[[<span class="st">'FM-1.6.0'</span>]]<span class="sc">$</span>review<span class="sc">$</span>decision <span class="cf">else</span> <span class="st">'apply'</span>,<span class="at">base_hash=</span>beidan<span class="sc">:::</span><span class="fu">.score_margin_hash</span>(b<span class="sc">$</span>grid),<span class="at">cutoff_utc=</span>ct,<span class="at">reason=</span><span class="st">'User fixed probability-ranked cumulative mass core'</span>,<span class="at">counterevidence=</span><span class="st">'Expert coverage/coefficient and known-outcome diagnostic; not independently calibrated'</span>)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a> core<span class="ot">&lt;-</span><span class="fu">BuildFmTailJudgement</span>(b,review,eid,cutoff,policy)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a> hashes<span class="ot">&lt;-</span><span class="fu">list</span>(<span class="at">model_spec=</span>digest<span class="sc">::</span><span class="fu">digest</span>(<span class="at">file=</span>spec_path,<span class="at">algo=</span><span class="st">'sha256'</span>),<span class="at">base_artifact=</span>beidan<span class="sc">:::</span><span class="fu">.score_margin_hash</span>(b),<span class="at">margin_judgement=</span>beidan<span class="sc">:::</span><span class="fu">.score_margin_hash</span>(core<span class="sc">$</span>judgement),<span class="at">direction_implementation=</span>beidan<span class="sc">:::</span><span class="fu">.score_margin_code</span>(impl),<span class="at">tail_binding=</span>core<span class="sc">$</span>binding_hash,<span class="at">client=</span>digest<span class="sc">::</span><span class="fu">digest</span>(<span class="at">file=</span><span class="fu">file.path</span>(root,<span class="st">'quarto/fm17_release_20261013.qmd'</span>),<span class="at">algo=</span><span class="st">'sha256'</span>),<span class="at">frozen_forecast=</span>m<span class="sc">$</span>forecast_sha256,<span class="at">partial_diagnostic=</span>digest<span class="sc">::</span><span class="fu">digest</span>(<span class="at">file=</span>dp,<span class="at">algo=</span><span class="st">'sha256'</span>))</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a> ctx<span class="ot">&lt;-</span>backend<span class="sc">$</span><span class="fu">build_adjustment_evidence_context</span>(rows,<span class="fu">as.list</span>(fixture),shared<span class="sc">$</span>Cutoff<span class="sc">$</span><span class="fu">decision_epoch</span>(<span class="st">'26102'</span>,ct),hashes,shared<span class="sc">$</span>AvailabilityPolicy<span class="sc">$</span><span class="fu">historical_proxy</span>(<span class="st">'FM17_RELEASE_DIAGNOSTIC_ONLY'</span>),<span class="st">'HISTORICAL_DIAGNOSTIC'</span>,impl)</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a> final<span class="ot">&lt;-</span><span class="fu">adjust_score_margin_distribution</span>(b,core<span class="sc">$</span>judgement,ctx,fixture,cutoff,impl)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a> <span class="fu">stopifnot</span>(<span class="fu">identical</span>(final,<span class="fu">adjust_score_margin_distribution</span>(b,core<span class="sc">$</span>judgement,ctx,fixture,cutoff,impl)))</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a> <span class="fu">saveRDS</span>(final,<span class="fu">file.path</span>(out,<span class="fu">paste0</span>(name,<span class="st">'-sealed.rds'</span>)))</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a> <span class="co"># Project Beidan integer line only after sealing full score distribution.</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a> p<span class="ot">&lt;-</span><span class="fu">project_score_outcomes</span>(final,<span class="sc">-</span><span class="dv">1</span>L,impl)</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a> p0<span class="ot">&lt;-</span><span class="fu">project_score_outcomes</span>(final,<span class="dv">0</span>L,impl)</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a> <span class="fu">stopifnot</span>(<span class="fu">abs</span>(<span class="fu">sum</span>(p<span class="sc">$</span>probability)<span class="sc">-</span><span class="dv">1</span>)<span class="sc">&lt;</span><span class="fl">1e-12</span>,<span class="fu">abs</span>(<span class="fu">sum</span>(p0<span class="sc">$</span>probability)<span class="sc">-</span><span class="dv">1</span>)<span class="sc">&lt;</span><span class="fl">1e-12</span>,</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>   <span class="fu">identical</span>(final,<span class="fu">readRDS</span>(<span class="fu">file.path</span>(out,<span class="fu">paste0</span>(name,<span class="st">'-sealed.rds'</span>)))),</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>   core<span class="sc">$</span>judgement<span class="sc">$</span>model_id<span class="sc">==</span><span class="st">'FM-1.7.0'</span>,</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>   <span class="fu">identical</span>(final<span class="sc">$</span>receipt<span class="sc">$</span>source_context<span class="sc">$</span>source_hashes<span class="sc">$</span>tail_binding,core<span class="sc">$</span>binding_hash))</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a> expected_margin<span class="ot">&lt;-</span>b<span class="sc">$</span>grid <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">margin=</span>home_goals<span class="sc">-</span>away_goals) <span class="sc">|&gt;</span></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>   <span class="fu">group_by</span>(margin) <span class="sc">|&gt;</span> <span class="fu">summarise</span>(<span class="at">probability=</span><span class="fu">sum</span>(probability),<span class="at">.groups=</span><span class="st">'drop'</span>) <span class="sc">|&gt;</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>   <span class="fu">mutate</span>(<span class="at">probability=</span>probability<span class="sc">*</span><span class="fu">if_else</span>(margin <span class="sc">%in%</span> core<span class="sc">$</span>core_margins,<span class="dv">1</span>,core<span class="sc">$</span>effective_coefficient)<span class="sc">/</span>core<span class="sc">$</span>normalizer)</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a> <span class="fu">stopifnot</span>(<span class="fu">isTRUE</span>(<span class="fu">all.equal</span>(expected_margin<span class="sc">$</span>probability,final<span class="sc">$</span>margins<span class="sc">$</span>probability[<span class="fu">match</span>(expected_margin<span class="sc">$</span>margin,final<span class="sc">$</span>margins<span class="sc">$</span>margin)],<span class="at">tolerance=</span><span class="fl">1e-12</span>)))</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a> projections[[name]]<span class="ot">&lt;-</span>p <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">source=</span>name,<span class="at">.before=</span><span class="dv">1</span>)</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a> ranked[[name]]<span class="ot">&lt;-</span>core<span class="sc">$</span>ranked_margins <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">source=</span>name,<span class="at">.before=</span><span class="dv">1</span>)</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a> masses[[name]]<span class="ot">&lt;-</span><span class="fu">tibble</span>(<span class="at">source=</span>name,<span class="at">core_margins=</span><span class="fu">paste</span>(core<span class="sc">$</span>core_margins,<span class="at">collapse=</span><span class="st">','</span>),<span class="at">core_mass=</span>core<span class="sc">$</span>core_mass,<span class="at">final_core_mass=</span>core<span class="sc">$</span>final_core_mass,<span class="at">normalizer=</span>core<span class="sc">$</span>normalizer,<span class="at">mean_margin_before=</span><span class="fu">sum</span>((b<span class="sc">$</span>grid<span class="sc">$</span>home_goals<span class="sc">-</span>b<span class="sc">$</span>grid<span class="sc">$</span>away_goals)<span class="sc">*</span>b<span class="sc">$</span>grid<span class="sc">$</span>probability),<span class="at">mean_margin_after=</span><span class="fu">sum</span>(final<span class="sc">$</span>margins<span class="sc">$</span>margin<span class="sc">*</span>final<span class="sc">$</span>margins<span class="sc">$</span>probability))</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a> results[[name]]<span class="ot">&lt;-</span><span class="fu">list</span>(<span class="at">core=</span>core,<span class="at">final=</span>final,<span class="at">projection=</span>p,<span class="at">zero_projection=</span>p0,<span class="at">bindings=</span>hashes)</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>ranked<span class="ot">&lt;-</span><span class="fu">bind_rows</span>(ranked);masses<span class="ot">&lt;-</span><span class="fu">bind_rows</span>(masses);projections<span class="ot">&lt;-</span><span class="fu">bind_rows</span>(projections)</span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(ranked <span class="sc">|&gt;</span> <span class="fu">filter</span>(core) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">c</span>(probability,cumulative),<span class="sc">~</span><span class="dv">100</span><span class="sc">*</span>.x)),<span class="at">digits=</span><span class="dv">2</span>,<span class="at">caption=</span><span class="st">'按概率排名实际纳入的档位及累计质量，单位%'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>按概率排名实际纳入的档位及累计质量，单位%</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">source</th>
+<th style="text-align: right;">margin</th>
+<th style="text-align: right;">probability</th>
+<th style="text-align: right;">cumulative</th>
+<th style="text-align: left;">core</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">24.58</td>
+<td style="text-align: right;">24.58</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">18.15</td>
+<td style="text-align: right;">42.73</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: right;">17.77</td>
+<td style="text-align: right;">60.50</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">11.75</td>
+<td style="text-align: right;">72.25</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: right;">-2</td>
+<td style="text-align: right;">11.27</td>
+<td style="text-align: right;">83.52</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">5.54</td>
+<td style="text-align: right;">89.06</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: right;">-3</td>
+<td style="text-align: right;">5.21</td>
+<td style="text-align: right;">94.28</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">native</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">24.58</td>
+<td style="text-align: right;">24.58</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">native</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">18.15</td>
+<td style="text-align: right;">42.73</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">native</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: right;">17.77</td>
+<td style="text-align: right;">60.50</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">native</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">11.75</td>
+<td style="text-align: right;">72.25</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">native</td>
+<td style="text-align: right;">-2</td>
+<td style="text-align: right;">11.27</td>
+<td style="text-align: right;">83.52</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">native</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">5.54</td>
+<td style="text-align: right;">89.06</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">native</td>
+<td style="text-align: right;">-3</td>
+<td style="text-align: right;">5.21</td>
+<td style="text-align: right;">94.28</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">21.62</td>
+<td style="text-align: right;">21.62</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">20.72</td>
+<td style="text-align: right;">42.34</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">18.96</td>
+<td style="text-align: right;">61.30</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">12.16</td>
+<td style="text-align: right;">73.46</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: right;">10.05</td>
+<td style="text-align: right;">83.51</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">6.22</td>
+<td style="text-align: right;">89.73</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: right;">-2</td>
+<td style="text-align: right;">4.46</td>
+<td style="text-align: right;">94.19</td>
+<td style="text-align: left;">TRUE</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(masses <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">c</span>(core_mass,final_core_mass),<span class="sc">~</span><span class="dv">100</span><span class="sc">*</span>.x)),<span class="at">digits=</span><span class="dv">3</span>,<span class="at">caption=</span><span class="st">'覆盖、归一化及净胜球均值；质量单位%，均值单位球'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>覆盖、归一化及净胜球均值；质量单位%，均值单位球</caption>
+<colgroup>
+<col style="width: 14%">
+<col style="width: 15%">
+<col style="width: 9%">
+<col style="width: 14%">
+<col style="width: 10%">
+<col style="width: 17%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">source</th>
+<th style="text-align: left;">core_margins</th>
+<th style="text-align: right;">core_mass</th>
+<th style="text-align: right;">final_core_mass</th>
+<th style="text-align: right;">normalizer</th>
+<th style="text-align: right;">mean_margin_before</th>
+<th style="text-align: right;">mean_margin_after</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: left;">-3,-2,-1,0,1,2,3</td>
+<td style="text-align: right;">94.276</td>
+<td style="text-align: right;">98.211</td>
+<td style="text-align: right;">0.960</td>
+<td style="text-align: right;">0.035</td>
+<td style="text-align: right;">0.028</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">native</td>
+<td style="text-align: left;">-3,-2,-1,0,1,2,3</td>
+<td style="text-align: right;">94.276</td>
+<td style="text-align: right;">98.211</td>
+<td style="text-align: right;">0.960</td>
+<td style="text-align: right;">0.035</td>
+<td style="text-align: right;">0.028</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: left;">-2,-1,0,1,2,3,4</td>
+<td style="text-align: right;">94.191</td>
+<td style="text-align: right;">98.183</td>
+<td style="text-align: right;">0.959</td>
+<td style="text-align: right;">1.178</td>
+<td style="text-align: right;">1.112</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(projections <span class="sc">|&gt;</span> <span class="fu">select</span>(source,outcome,probability,rank) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">probability=</span><span class="dv">100</span><span class="sc">*</span>probability),<span class="at">digits=</span><span class="dv">2</span>,<span class="at">caption=</span><span class="st">'90%核心重加权后的北单−1投影，概率%；W/D/L为让胜/让平/让负'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>90%核心重加权后的北单−1投影，概率%；W/D/L为让胜/让平/让负</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">source</th>
+<th style="text-align: left;">outcome</th>
+<th style="text-align: right;">probability</th>
+<th style="text-align: right;">rank</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: left;">L</td>
+<td style="text-align: right;">62.14</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">18.95</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">formal_selected</td>
+<td style="text-align: left;">D</td>
+<td style="text-align: right;">18.91</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">native</td>
+<td style="text-align: left;">L</td>
+<td style="text-align: right;">62.14</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">native</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">18.95</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">native</td>
+<td style="text-align: left;">D</td>
+<td style="text-align: right;">18.91</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">40.17</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: left;">L</td>
+<td style="text-align: right;">37.29</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">partial_market</td>
+<td style="text-align: left;">D</td>
+<td style="text-align: right;">22.54</td>
+<td style="text-align: right;">3</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(ranked,<span class="fu">file.path</span>(out,<span class="st">'ranked-margins.csv'</span>));<span class="fu">write_csv</span>(masses,<span class="fu">file.path</span>(out,<span class="st">'core-summary.csv'</span>));<span class="fu">write_csv</span>(projections,<span class="fu">file.path</span>(out,<span class="st">'probabilities.csv'</span>));<span class="fu">saveRDS</span>(results,<span class="fu">file.path</span>(out,<span class="st">'results.rds'</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>公开函数BuildFmTailJudgement()在packages/beidan/R/fm_tail_judgement.R，是唯一现行核心构造实现；测试对应test-fm-tail-judgement.R。原研究.BuildFmMassCoreJudgement及旧中心测试删除。policy只接受coverage/coefficient/tie_tolerance；review必含apply/retain及哈希、截止、理由和反证，旧center_mode/centers和旧政策明确拒绝。核心目标先构造，再由现有adjust_score_margin_distribution及共享temporal_learning执行实际调整与机器收据；tail_binding纳入source_hashes，包含完整核心函数签名/体、输入及专家政策。共享框架承担时序，不新增时序函数或学习；源网格和来源决定为旧冻结证据，不重新学习，全部模式为历史代理诊断。</p>
+<p>隔离构建从本次父提交跟踪的package源码取得，只替换本次模块/帮助/测试，并删除原私有helper，未包含其他会话未跟踪源码、不覆盖共享库。R CMD INSTALL到results/fm17-release-20261013/library，验证真实DLL加载。声明R4.6.1、项目.venv/bin/python、现有r_lib依赖、旧后端results/fm15-26102-20261012/implementation及两个输入RDS；渲染不安装依赖。模型身份与实现/政策/技能文件哈希在config/fundamental-models/FM-1.7.0.json登记；安装技能同步仓库维护源。</p>
+<p>验收命令： - R_LIBS_USER=“<span class="math inline">\(PWD/r_lib" /opt/R/4.6.1/bin/R CMD INSTALL -l "\)</span>PWD/results/fm17-release-20261013/library” results/fm17-release-20261013/build-copy/packages/beidan - 安装后testthat::test_file(“packages/beidan/tests/testthat/test-fm-tail-judgement.R”, env=new.env(parent=asNamespace(“beidan”)), load_helpers=FALSE, stop_on_failure=TRUE)，实际命令和结果保留于tests.log。 - R_LIBS_USER=“$PWD/r_lib” quarto render quarto/fm17_release_20261013.qmd –no-cache，干净进程错误致命。 - 新进程重新执行并断言完整results.rds相同；同进程重复断言不是独立重放的替代。审查命令/哈希/发现及独立重放结论见下方receipt。</p>
+<p>专项函数37项断言通过。tests/testthat/test-fm17-release.R验证真实三模式归一化、全比分封存、0/−1投影、tail_binding收据、无缓存复用、正式原生选择不冒充部分盘口，以及部分盘口示例的独立数值预期；命令FM17_RELEASE_ROOT=“<span class="math inline">\(PWD" R_LIBS_USER="\)</span>PWD/r_lib” Rscript调用testthat::test_file，记录delivery-tests.log。</p>
+<p>未运行全仓旧客户端套件（已知旧漂移基线，不声明全仓绿色）或整期FM17回测；本交付验证升级实现、数据合同及真实三模式比分封存/投影，不宣称准确性改善，不参加CI。PI待用户验收，没有请求合并。</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span>(<span class="fu">file.exists</span>(<span class="fu">file.path</span>(out,<span class="st">'review.json'</span>))){r<span class="ot">&lt;-</span>jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(<span class="fu">file.path</span>(out,<span class="st">'review.json'</span>));<span class="fu">stopifnot</span>(<span class="fu">all</span>(<span class="fu">map_chr</span>(<span class="fu">file.path</span>(root,r<span class="sc">$</span>files<span class="sc">$</span>path),<span class="sc">~</span>digest<span class="sc">::</span><span class="fu">digest</span>(<span class="at">file=</span>.x,<span class="at">algo=</span><span class="st">'sha256'</span>))<span class="sc">==</span>r<span class="sc">$</span>files<span class="sc">$</span>sha256));knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">tibble</span>(<span class="at">command=</span>r<span class="sc">$</span>command,<span class="at">findings=</span>r<span class="sc">$</span>findings,<span class="at">resolution=</span>r<span class="sc">$</span>resolution))}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 29%">
+<col style="width: 57%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">command</th>
+<th style="text-align: left;">findings</th>
+<th style="text-align: left;">resolution</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">codex review - &lt; results/fm17-release-20261013/review-prompt.txt</td>
+<td style="text-align: left;">No blocking findings. Ranked core/ties/retain/full support/cutoff receipts/obsolete-code removal and FM16 inherited stage identity consistent.</td>
+<td style="text-align: left;">No blocking changes required. Package 37 assertions and delivery 37 assertions passed; registered hashes checked. Read-only reviewer independently reproduced full result exactly. Final clean render and independent full results replay passed (replay.log). PI pending owner acceptance.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
