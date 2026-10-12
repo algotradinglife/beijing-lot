@@ -1,0 +1,32 @@
+{
+  "scope_inventory_path": "results/beidan-full-issues-26092-26102-20261007/raw/inventory.json",
+  "scope_inventory_sha256": "b49d71c61aadec8296d5e776e45aa4ab6b9bcef2557ecdd2c909711bf83e3988",
+  "scope_csv_sha256": "65710c8de1674f08cc99b0e5fd13c22b0c4db1f22381fe4f1dadbb31fc73d6ce",
+  "label_path": "results/fundamental-issues-20261011/inputs/labels.rds",
+  "label_sha256": "eac0ecae9057a30074b6d43f24b029ae5273618691352ed5d3dedd4c62888b1d",
+  "sp_path": "results/fundamental-beidan-history-20261011/analysis-20261011T024028.510576Z/selected-sp.csv",
+  "sp_sha256": "f29da4a474382b78912635c9ee53790bd33c7064a0dbbed1491cc3ce3c3ea1da",
+  "forecast_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+  "parent_stage_sha256": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68",
+  "comparator_inputs": [
+    {
+      "path": "results/fm15-two-issues-20261012/batch-e548adf3cb6e.rds",
+      "sha256": "b20091548ff0385fb5b2a33f05f9994625a7f4dd7014e8d7fc17a9f45dc9faeb"
+    },
+    {
+      "path": "results/fm15-26102-20261012/batch-a2e2554e88eb.rds",
+      "sha256": "1446cd10810c7e44dc5ef5e9ca43b274258581797cb881d56175ccf63c8872d0"
+    }
+  ],
+  "evaluation_client_sha256": "13d4fcdbead440834412c1e672cc48a5d4aaf2778779b8867f6d2cc5f6f45245",
+  "settled": 345,
+  "forecast_count": 346,
+  "known_case_inventory": ["26098:4", "26098:74", "26098:79", "26098:96", "26098:104", "26101:20", "26101:52", "26102:4", "26102:10", "26102:11", "26102:23", "26102:24", "26102:59"],
+  "inventory_complete": false,
+  "not_listed_cohort_independent": false,
+  "metrics_sha256": "da020f398a06e15791fe5718ede5085d24ee196f4c629ee84bfed31f89ac1de6",
+  "scores_sha256": "d6d928c1b83707bb974f5a34b9623a03ad6e19240a5447af646fc6fa1a333251",
+  "changes_sha256": "b0f3f2f05bed57789a7298d5b13a7e79bc06d289ffdfa666adeb079b32fe2685",
+  "labels_csv_sha256": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e",
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC"
+}

@@ -1,0 +1,16 @@
+{
+  "model": "FM-1.7.0",
+  "forecast_count": 346,
+  "settled_late_pair_count": 345,
+  "same_cutoff_pair_count": 214,
+  "complete_independent_replay": "346 fixtures x 2 sealed modes; full R object identical",
+  "client_tests": "6 blocks / 10667 assertions passed",
+  "package_and_release_tests": "Earlier version delivery: 37 + 37 assertions passed",
+  "test_command": "FM17_BACKTEST_ROOT=\"$PWD\" R_LIBS_USER=\"$PWD/r_lib\" /opt/R/4.6.1/bin/Rscript -e 'root<-normalizePath(\".\");library(beidan,lib.loc=file.path(root,\"results/fm17-release-20261013/library\"));rs<-testthat::test_file(file.path(root,\"tests/testthat/test-fm17-three-issue-backtest.R\"),env=new.env(parent=asNamespace(\"beidan\")),load_helpers=FALSE,stop_on_failure=TRUE,reporter=\"summary\");saveRDS(rs,file.path(root,\"results/fm17-three-issues-20261013/tests.rds\"));print(tibble::as_tibble(as.data.frame(rs))[,c(\"test\",\"nb\",\"failed\",\"error\",\"passed\")])'",
+  "mutation_invariance": "Post-cutoff and exact target-issue injection excluded; full grid/margins/projection identical",
+  "negative_paths": "Changed seal cutoff, mismatched evaluation forecast, parent forecast and altered changes CSV rejected",
+  "ci": "Not invoked",
+  "full_repository_suite": "Not run; existing unrelated baseline not claimed fixed",
+  "pi": "Pending owner acceptance",
+  "mode": "Posthoc historical diagnostic; not independent prospective validation"
+}

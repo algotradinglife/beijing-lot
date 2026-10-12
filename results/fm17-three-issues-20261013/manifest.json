@@ -1,0 +1,23 @@
+{
+  "model_id": "FM-1.7.0",
+  "fixtures": 346,
+  "issues": ["26098", "26101", "26102"],
+  "forecast_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+  "parent_forecast_path": "results/fm16-three-issues-20261012/forecasts.rds",
+  "parent_stage_path": "results/fm16-three-issues-20261012/stage.rds",
+  "source_hashes": {
+    "parent_forecast": "59c4256106c4f638a7325c8aa0d0a9a45a8b320ca5540e5cc994f5b65827548f",
+    "parent_stage": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68",
+    "model_spec": "157f90e9d5e972b484fedef5b10a3ac4607e4e00182763759056b614c4ef8a77",
+    "client": "1792eafe6f1b4aad215ac06dcfdc58a97c148e7f893d164cee2b6a2e5c7a1e1d"
+  },
+  "rule_parameters": {
+    "coverage": 0.9,
+    "coefficient": 0.3,
+    "tie_tolerance": 1e-12
+  },
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "source_decisions_reused": true,
+  "target_labels_opened_by_client": false,
+  "root_prior_outcome_knowledge": true
+}

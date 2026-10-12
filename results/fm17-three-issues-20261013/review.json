@@ -1,0 +1,41 @@
+{
+  "command": "codex review - < results/fm17-three-issues-20261013/review-prompt.txt; codex review - < results/fm17-three-issues-20261013/review-delta-prompt.txt",
+  "findings": "No blocking findings in full review or final delta. Full review independently replayed346 fixtures/two modes and recomputed evaluation CSVs; final review verified final code/receipts/artifact hashes and rendered scope/results.",
+  "resolutions": "CSV scores/changes/labels SHA256 guards added and regression tested; #102 accurately disclosed as cancelled. Six client test blocks/10667 assertions pass, including post-cutoff/target invariance and negative receipt/hash cases. Initial reviewer read-only replay harness corrected CSV issue_id inference without modifying artifacts. Final delta required no further changes. Historical diagnostic only; PI pending owner acceptance.",
+  "files": [
+    {
+      "path": "r/fm17_three_issue_freeze.R",
+      "sha256": "1792eafe6f1b4aad215ac06dcfdc58a97c148e7f893d164cee2b6a2e5c7a1e1d"
+    },
+    {
+      "path": "r/fm17_three_issue_evaluate.R",
+      "sha256": "13d4fcdbead440834412c1e672cc48a5d4aaf2778779b8867f6d2cc5f6f45245"
+    },
+    {
+      "path": "tests/testthat/test-fm17-three-issue-backtest.R",
+      "sha256": "ca379216fc266eff8668ea70298ec5b818f175612bb62bb3965ad83be65c60ab"
+    },
+    {
+      "path": "quarto/fm17_three_issues_20261013.qmd",
+      "sha256": "d43dd48f92291e2f901632e7bca32f01b1ce8a86381e7c3b40c334979a87565a"
+    },
+    {
+      "path": "packages/beidan/R/fm_tail_judgement.R",
+      "sha256": "f3559a0dbbef8e44e30c224bf2cedf494d41b062bfa0c713de28e73cc38d9d54"
+    },
+    {
+      "path": "config/fundamental-models/FM-1.7.0.json",
+      "sha256": "157f90e9d5e972b484fedef5b10a3ac4607e4e00182763759056b614c4ef8a77"
+    }
+  ],
+  "review_logs": [
+    {
+      "path": "results/fm17-three-issues-20261013/codex-review-initial.log",
+      "sha256": "c0c8e3c99d7718a754bc8274a4dd4027b2d66348ae2c3bd369a56f3a6d88ce63"
+    },
+    {
+      "path": "results/fm17-three-issues-20261013/codex-review-final.log",
+      "sha256": "5e309f51230d266a589fc00b43057083e4724f13e99677ffed91c10c2f83a67f"
+    }
+  ]
+}

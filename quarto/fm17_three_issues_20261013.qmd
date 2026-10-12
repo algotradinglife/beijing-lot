@@ -1,0 +1,80 @@
+---
+title: "FM-1.7.0：26098–26102命中率与概率准确性"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+范围内源站已列26098、26101、26102；26099/26100在9份有效源页选择器中未列出，旧有界请求也失败。详见原整期名单核验报告quarto/beidan_full_issues_26092_26102.qmd；不把请求失败当官方不存在的证明，不补造两个空期。三期原始347场，26098#135缺明确截止无法估算；冻结346场，26098#102取消不计分。北单较晚赛前SP同场345场、T−24同场214场，早时点缺失不以晚SP代替。
+
+FM17继承已冻结FM16的原生λ、市场DC和逐场可靠性/来源裁决，不重新判断已知赛果；只替换尾部政策：净胜球概率降序累计首次严格超过90%，边界同概率整组纳入，核心1、外围0.3。明确的原定性retain决定保留。这不是独立验证：用户和分析侧已看过部分赛果、规则来自已讨论样本，历史时钟/报价仍是后采集代理；只能说明当前三期事后诊断表现。历史比分为source-published full-time，未逐场独立认证90分钟；原生对手强度、阵容/伤停尚未量化，ρ=-0.1未标定，新尾部规则不修复这些输入缺口。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath('..');out<-file.path(root,'results/fm17-three-issues-20261013')
+library(beidan,lib.loc=file.path(root,'results/fm17-release-20261013/library'))
+m<-jsonlite::fromJSON(file.path(out,'manifest.json'))
+ev<-jsonlite::fromJSON(file.path(out,'evaluation.json'));rp<-jsonlite::fromJSON(file.path(out,'replay.json'))
+stopifnot(ev$forecast_sha256==m$forecast_sha256,rp$forecast_sha256==m$forecast_sha256,
+ digest::digest(file=file.path(out,'forecasts.rds'),algo='sha256')==m$forecast_sha256,
+ rp$status=='FULL_IDENTICAL_REPLAY',rp$fixtures==346L,
+ digest::digest(file=file.path(out,'metrics.csv'),algo='sha256')==ev$metrics_sha256,
+ digest::digest(file=file.path(root,ev$label_path),algo='sha256')==ev$label_sha256,
+ digest::digest(file=file.path(root,ev$sp_path),algo='sha256')==ev$sp_sha256,
+ digest::digest(file=file.path(root,'config/fundamental-models/FM-1.7.0.json'),algo='sha256')==m$source_hashes$model_spec,
+ digest::digest(file=file.path(root,'r/fm17_three_issue_freeze.R'),algo='sha256')==m$source_hashes$client,
+ digest::digest(file=file.path(root,'r/fm17_three_issue_evaluate.R'),algo='sha256')==ev$evaluation_client_sha256)
+stopifnot(digest::digest(file=file.path(out,'scope.csv'),algo='sha256')==ev$scope_csv_sha256,digest::digest(file=file.path(root,ev$scope_inventory_path),algo='sha256')==ev$scope_inventory_sha256)
+knitr::kable(read_csv(file.path(out,'scope.csv'),show_col_types=FALSE),caption='期号范围及源站覆盖；缺失期号场数为NA，不置零')
+stopifnot(digest::digest(file=file.path(out,'scores.csv'),algo='sha256')==ev$scores_sha256,digest::digest(file=file.path(out,'labels.csv'),algo='sha256')==ev$labels_csv_sha256)
+if(digest::digest(file=file.path(out,'changes.csv'),algo='sha256')!=ev$changes_sha256)stop('Report changes hash differs')
+x<-readRDS(file.path(out,'forecasts.rds'));metrics<-read_csv(file.path(out,'metrics.csv'),show_col_types=FALSE)
+scores<-read_csv(file.path(out,'scores.csv'),show_col_types=FALSE)
+stopifnot(length(x$entries)==346L,ev$settled==345L,
+ all(metrics$n[metrics$issue_id=='ALL'&metrics$cohort=='all'&metrics$comparison=='near_sale']==345L),
+ all(metrics$n[metrics$issue_id=='ALL'&metrics$cohort=='all'&metrics$comparison=='same_cutoff']==214L))
+knitr::kable(metrics |> filter(issue_id=='ALL',cohort=='all') |>
+ select(comparison,model,n,hits1,hits2,top1,top2,brier,logloss) |>
+ mutate(across(c(top1,top2),~100*.x)),digits=4,
+ caption='合并同场比较：Top1/Top2单位%；Brier为三类平方误差之和、log loss为自然对数，两者越低越好')
+knitr::kable(metrics |> filter(issue_id!='ALL',cohort=='all') |>
+ select(issue_id,comparison,model,n,hits1,hits2,top1,top2,brier,logloss) |>
+ mutate(across(c(top1,top2),~100*.x)),digits=4,caption='分期；早/晚SP独立分母，命中率单位%')
+```
+
+结果解释：较晚SP同场345场，FM17为131个Top1、250个Top2，FM16为129/247，北单为130/244。相对FM16，Top1有6场改对、4场改错；Top2有26场补回、23场丢失，净增不代表逐场稳定改善。FM17相对不压尾129/244多2/6场，但Brier略差（0.683364对0.683083）、log loss略好（1.120218对1.120975）。北单较晚SP的Brier/log loss仍更低。T−24的214场，FM17四指标优于北单；相对FM16，Top1多1场、Top2少1场，概率误差两项改善。26098和26102仍有命中劣势，不能只展示26101收益。
+
+北单概率为SP倒数归一化；不乘票级回款0.65。所有概率均映射实际北单让球的完整W/D/L类别，Top2是类别覆盖，不是净胜球Top2，不评价串关收益。类别完全并列沿既有指标W/D/L固定排序，同时披露并剔除全等SP做敏感性；不得将并列计作已确定方向。
+
+FM17-source-before-tail在同一已选来源上全权重1，供尾部收益归因；FM16为原冻结对照，既不更改旧概率也不重新贴FM17标签。来源不重新优化，所以FM17相对FM16差异只来自新尾部规则。
+
+```{r}
+changes<-read_csv(file.path(out,'changes.csv'),show_col_types=FALSE)
+knitr::kable(x$audit |> count(issue_id,selected_source,branch),caption='各期来源和apply/retain覆盖')
+knitr::kable(metrics |> filter(issue_id=='ALL',((comparison=='near_sale'&cohort%in%c('market-selected','native-retained'))|cohort=='non-uniform-SP')) |> select(comparison,cohort,model,n,hits1,hits2,brier,logloss),digits=4,caption='来源及排除全等SP敏感性')
+knitr::kable(changes |> select(fixture_id,issue_id,selected_source,starts_with('top1_'),starts_with('top2_')) |> filter(`top1_FM-1.7.0`!=`top1_FM-1.6.0`),caption='相对FM16改变Top1命中的场次：改善和损失同时披露')
+```
+
+输入与数据合同：每个fixture/model有且仅有三条W/D/L，概率非负且归一化；fixture_id保留字符串身份。完场有效标签只用于封存后的描述评分；未结算和无法估算单列。SP报价严格早于对应选择时点及开赛，T−24明确等于模型场次cutoff；较晚赛前SP并非同截止的信息公平比较。全部连接声明one-to-one/many-to-one，同场分母和缺失清单不靠静默删除冲突实现。
+
+传递历史学习函数盘点：原生estimate_recent_venue_goals的截止、混合权重/ESS及历史账本仅由旧冻结收据复用；市场project_dc_market_handicap与SelectFmProbabilitySource的先验报价/来源收据同样复用，不新拟合。BuildFmTailJudgement为用户固定政策构造，显式base cutoff并验证审查；adjust_score_margin_distribution实际执行新重权，仍用共享temporal_learning证据上下文及历史代理准入、传递实现/政策/基底/专家审查绑定。每场比分先落盘封存，才传实际北单线给project_score_outcomes。无跨截止缓存，receipt cache_reuse=NONE；本次不选择alpha、rho、阈值或渠道权重。DcAccuracyDiagnostic仅描述封存预测/标签，不反馈改变预测。
+
+复现（无联网或依赖安装，使用已声明私有库和旧后端实现快照）：
+
+```bash
+R_LIBS_USER="$PWD/r_lib" /opt/R/4.6.1/bin/Rscript r/fm17_three_issue_freeze.R "$PWD"
+R_LIBS_USER="$PWD/r_lib" /opt/R/4.6.1/bin/Rscript r/fm17_three_issue_freeze.R "$PWD" replay
+R_LIBS_USER="$PWD/r_lib" /opt/R/4.6.1/bin/Rscript r/fm17_three_issue_evaluate.R "$PWD"
+R_LIBS_USER="$PWD/r_lib" quarto render quarto/fm17_three_issues_20261013.qmd --no-cache
+```
+
+R4.6.1、显式项目.venv/bin/python、现有r_lib依赖和results/fm17-release-20261013/library。来源参数均来自声明不可变快照，旧后端results/fm15-26102-20261012/implementation负责既有实际比分调整/投影。客户端没有新业务函数或时序实现。函数/测试映射：新核心包test-fm-tail-judgement.R（37断言）及版本真实输入test-fm17-release.R（37断言）；批量客户端test-fm17-three-issue-backtest.R验证全场分档与网格、原来源不变、投影/收据、同场指标汇总和坏收据拒绝。批量六个测试块共10667项断言通过，包含截止后/目标期记录突变下网格、净胜球和下注投影不变；错配截止封印、报告预测身份和父输入身份及被改动的变更CSV均失败关闭。两处初次测试预期的错误文案与实际拒绝路径不符，已改为精确验证封印拒绝及明确父输入哈希错误，概率结果不变。全部346场两个模式在新进程完整重放，不能仅以进程成功证明复现。全仓旧客户端基线未修复/未重跑，不启动CI。PI待用户验收，不请求发布或合并。
+
+```{r}
+if(file.exists(file.path(out,'acceptance.json'))){v<-jsonlite::fromJSON(file.path(out,'acceptance.json'));knitr::kable(tibble(check=names(v),result=map_chr(v,~paste(unlist(.x),collapse='; '))))}
+if(file.exists(file.path(out,'review.json'))){r<-jsonlite::fromJSON(file.path(out,'review.json'));stopifnot(all(map_chr(file.path(root,r$files$path),~digest::digest(file=.x,algo='sha256'))==r$files$sha256));knitr::kable(tibble(command=r$command,findings=r$findings,resolutions=r$resolutions))}
+```
