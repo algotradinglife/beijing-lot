@@ -1,0 +1,58 @@
+---
+title: "净胜球累计90%核心：26102 #10诊断"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+规则试算：净胜球各档按概率从高到低累加，纳入使累计概率严格超过90%的档位；边界概率相同（容差1e−12）整组纳入，避免随意选择左右侧。核心权重1，外围仍为0.3，保留全部比分支持并归一化。核心不强制对称、连续或固定半径。90%和0.3是用户专家规则，不从目标赛果标定。
+
+仅对已知赛果的26102#10做诊断，正式FM16和来源选择不改写。这里“强者”指高概率档位；让胜类别包含多个档位，整体概率仍可能因外围削减而下降。原生与部分盘口输入、历史时钟代理和部分市场总量假设沿用此前报告的限制。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));root<-normalizePath('..');out<-file.path(root,'results/fm-mass-core-20261013')
+library(beidan,lib.loc=file.path(out,'library'))
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+impl<-file.path(root,'results/fm15-26102-20261012/implementation');reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE);backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+src<-file.path(root,'results/fm16-three-issues-20261012');m<-jsonlite::fromJSON(file.path(src,'manifest.json'));stopifnot(digest::digest(file=file.path(src,'forecasts.rds'),algo='sha256')==m$forecast_sha256)
+f<-readRDS(file.path(src,'forecasts.rds'));z<-f$entries[['26102:10']]
+dp<-file.path(root,'results/fm16-26102-10-20261013/diagnostics.rds');diag<-readRDS(dp)[['HYPOTHESIS_TOTAL_3.397616']]
+policy<-list(coverage=.9,coefficient=.3,tie_tolerance=1e-12)
+inputs<-list(native=list(base=z$native,rows=z$evidence_rows),partial_market=list(base=diag$base,rows=diag$evidence_rows))
+results<-ranked<-projections<-masses<-list()
+for(name in names(inputs)) {
+ b<-inputs[[name]]$base;rows<-inputs[[name]]$rows;cutoff<-b$cutoff;fixture<-z$fixture;ct<-format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC');eid<-rows[[1]]$evidence_id
+ review<-list(base_hash=beidan:::.score_margin_hash(b$grid),cutoff_utc=ct,reason='User fixed probability-ranked cumulative mass core',counterevidence='Expert coverage/coefficient and known-outcome diagnostic; not independently calibrated')
+ core<-beidan:::.BuildFmMassCoreJudgement(b,review,eid,policy,cutoff)
+ hashes<-list(base_artifact=beidan:::.score_margin_hash(b),margin_judgement=beidan:::.score_margin_hash(core$judgement),direction_implementation=beidan:::.score_margin_code(impl),mass_core_binding=core$binding_hash,client=digest::digest(file=file.path(root,'quarto/fm_mass_core_20261013.qmd'),algo='sha256'),frozen_forecast=m$forecast_sha256,partial_diagnostic=digest::digest(file=dp,algo='sha256'))
+ ctx<-backend$build_adjustment_evidence_context(rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',ct),hashes,shared$AvailabilityPolicy$historical_proxy('MASS_CORE_RULE_DIAGNOSTIC_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+ final<-adjust_score_margin_distribution(b,core$judgement,ctx,fixture,cutoff,impl)
+ stopifnot(identical(final,adjust_score_margin_distribution(b,core$judgement,ctx,fixture,cutoff,impl)))
+ saveRDS(final,file.path(out,paste0(name,'-sealed.rds')))
+ # Project Beidan integer line only after sealing full score distribution.
+ p<-project_score_outcomes(final,-1L,impl)
+ stopifnot(abs(sum(p$probability)-1)<1e-12)
+ projections[[name]]<-p |> mutate(source=name,.before=1)
+ ranked[[name]]<-core$ranked_margins |> mutate(source=name,.before=1)
+ masses[[name]]<-tibble(source=name,core_margins=paste(core$core_margins,collapse=','),core_mass=core$core_mass,final_core_mass=core$final_core_mass,normalizer=core$normalizer,mean_margin_before=sum((b$grid$home_goals-b$grid$away_goals)*b$grid$probability),mean_margin_after=sum(final$margins$margin*final$margins$probability))
+ results[[name]]<-list(core=core,final=final,projection=p,bindings=hashes)
+}
+ranked<-bind_rows(ranked);masses<-bind_rows(masses);projections<-bind_rows(projections)
+knitr::kable(ranked |> filter(core) |> mutate(across(c(probability,cumulative),~100*.x)),digits=2,caption='按概率排名实际纳入的档位及累计质量，单位%')
+knitr::kable(masses |> mutate(across(c(core_mass,final_core_mass),~100*.x)),digits=3,caption='覆盖、归一化及净胜球均值；质量单位%，均值单位球')
+knitr::kable(projections |> select(source,outcome,probability,rank) |> mutate(probability=100*probability),digits=2,caption='90%核心重加权后的北单−1投影，概率%；W/D/L为让胜/让平/让负')
+write_csv(ranked,file.path(out,'ranked-margins.csv'));write_csv(masses,file.path(out,'core-summary.csv'));write_csv(projections,file.path(out,'probabilities.csv'));saveRDS(results,file.path(out,'results.rds'))
+```
+
+新研究函数 `.BuildFmMassCoreJudgement()` 放在R package，当前为未导出的内部研究API。现有FM16中心函数仍用于冻结正式版本和对照，尚未替换；本次没有引入旧行为兼容接口。输入/输出/单位、严格跨界、并列、非连续核心、失败与绑定在函数注释和自动测试中声明；不把北单线或期望角色用于核心选择。
+
+从HEAD跟踪的package源码隔离构建，再加入本次新模块，R CMD INSTALL到本报告私有库通过，不包含其他会话未跟踪源码，不覆盖共享库。执行共享证据准入、收据和比分调整，不复制时序实现。源判断、固定λ/ρ和比分网格均来自声明输入；重加权后不返拟合λ。每个输出有cutoff、输入/代码/专家规则绑定，缓存复用NONE，完整比分先封存后投影。
+
+验收：`test-fm-mass-core.R`覆盖累计恰好90%继续、边界同概率、反射、非连续核心、全支持归一化、系数1、空/NA/重复/非归一化数据、截止和哈希错配、禁止让球输入及非法政策。无新Python或Rcpp实现。原全仓失败不声明已修复，不启动CI。复现：`R_LIBS_USER="$PWD/r_lib" quarto render quarto/fm_mass_core_20261013.qmd --no-cache`；已有输入快照及私有安装库为显式运行依赖，渲染不安装包。
+
+```{r}
+if(file.exists(file.path(out,'review.json'))){r<-jsonlite::fromJSON(file.path(out,'review.json'));stopifnot(all(map_chr(file.path(root,r$files$path),~digest::digest(file=.x,algo='sha256'))==r$files$sha256));knitr::kable(tibble(command=r$command,findings=r$findings,resolution=r$resolution))}
+```

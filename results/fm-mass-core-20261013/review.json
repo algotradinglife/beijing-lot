@@ -1,0 +1,20 @@
+{
+  "command": "codex review - < results/fm-mass-core-20261013/review-prompt.txt",
+  "findings": "No concrete blocking findings. 28 targeted assertions; core, ties, normalization, sealed outputs and cutoff/input/implementation receipts consistent.",
+  "resolution": "No blocking changes required. Diagnostic only; historical timestamp proxies and no calibration disclosed. Final no-cache fresh-process render passed; full results.rds independently replayed identically (replay.log).",
+  "pi_status": "Pending owner acceptance; no merge requested.",
+  "files": [
+    {
+      "path": "packages/beidan/R/fm_mass_core.R",
+      "sha256": "21e385d8fc98f178612b98c3e2c8fdf2deb81c1d1655aa107d4b9f4e60a72f1d"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-fm-mass-core.R",
+      "sha256": "ec5f36b3bf5afc087c434f3ab322250ee99ed69ac557e0b64792400814fb5224"
+    },
+    {
+      "path": "quarto/fm_mass_core_20261013.qmd",
+      "sha256": "45f61f14fdd0b821b2b9438df8a76b3c202eb8fa6389da221ab9b3df0f9468fb"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+source,outcome,handicap,probability,rank,tied_rank
+native,L,-1,0.6213893575279107,1,FALSE
+native,W,-1,0.18948269113634164,2,FALSE
+native,D,-1,0.18912795133574778,3,FALSE
+partial_market,W,-1,0.40170367349401437,1,FALSE
+partial_market,L,-1,0.37291066140321294,2,FALSE
+partial_market,D,-1,0.22538566510277275,3,FALSE
