@@ -1,0 +1,26 @@
+
+
+processing file: fm15_26102_cases_20261012.qmd
+1/3                  
+2/3 [unnamed-chunk-1]
+3/3                  
+output file: fm15_26102_cases_20261012.knit.md
+
+pandoc 
+  to: html
+  output-file: fm15_26102_cases_20261012.html
+  standalone: true
+  section-divs: true
+  html-math-method: mathjax
+  wrap: none
+  default-image-extension: png
+  
+metadata
+  document-css: false
+  link-citations: true
+  date-format: long
+  lang: en
+  title: 26102期典型误差：原生强弱、审查与尾部投影
+  
+Output created: fm15_26102_cases_20261012.html
+

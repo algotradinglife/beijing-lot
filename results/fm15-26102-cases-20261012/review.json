@@ -1,0 +1,8 @@
+{
+  "status": "PASS_NO_BLOCKERS",
+  "command": "codex review - (bounded retrospective case review)",
+  "qmd_sha256": "4c53703790f4481a290040954a99c6c80bec77347d54ff9a7d2b6bede25a0714",
+  "review_log_sha256": "d72e2bbaf0a3d0bebd6351db798cac8242ac9b3b2a1987335218f507ee5511ea",
+  "findings": "None blocking; independently verified 17 losses / 5 gains, projections and coverage",
+  "resolutions": "No model or frozen forecast changes"
+}

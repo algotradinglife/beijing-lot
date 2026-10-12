@@ -1,0 +1,63 @@
+---
+title: "26102期典型误差：原生强弱、审查与尾部投影"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本次按已知赛果挑选典型案例，属于事后归因；不改写86场冻结预测、不拟合新规则，也不宣称代表所有比赛。复用FM-1.5.0整期输入，场次仍使用原逐场T−24截止；北单采用较晚赛前SP，信息时点不同。W/D/L均为实际北单让胜/让平/让负。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath('..');out<-file.path(root,'results/fm15-26102-20261012')
+m<-jsonlite::fromJSON(file.path(out,'manifest.json'))
+stopifnot(digest::digest(file=file.path(out,m$batch_file),algo='sha256')==m$sha256)
+x<-readRDS(file.path(out,m$batch_file));n<-readRDS(file.path(out,'native-7fab65d83593.rds'))
+ids<-paste0('26102:',c(4,11,23,59,24))
+labels<-read_csv(file.path(out,'labels.csv'),show_col_types=FALSE)
+scores<-read_csv(file.path(out,'scores.csv'),show_col_types=FALSE) |> filter(comparison=='near_sale',coverage=='all_native')
+wide<-scores |> mutate(model=recode(model,'FM-1.5.0'='fm','FM15-native-before-tail'='raw','北单-较晚SP'='bd')) |> select(fixture_id,model,top1,top2,actual_probability,brier) |> pivot_wider(names_from=model,values_from=c(top1,top2,actual_probability,brier))
+losses<-wide |> filter(top2_raw,!top2_fm);gains<-wide |> filter(!top2_raw,top2_fm)
+stopifnot(nrow(wide)==86L,nrow(losses)==17L,nrow(gains)==5L,nrow(losses)-nrow(gains)==12L)
+knitr::kable(tibble(change=c('原Top2覆盖→压尾后漏掉','原Top2漏掉→压尾后覆盖','净损失'),matches=c(nrow(losses),nrow(gains),nrow(losses)-nrow(gains))))
+fixtures<-bind_rows(map(n$entries,~as_tibble(.x$fixture)))
+summary<-fixtures |> filter(fixture_id %in% ids) |> select(fixture_id,home,away,handicap) |> left_join(labels,by='fixture_id',relationship='one-to-one') |> left_join(x$audit |> select(fixture_id,lambda_home,lambda_away,center,radius),by='fixture_id',relationship='one-to-one')
+knitr::kable(summary,digits=3)
+bd<-read_csv(file.path(root,'results/fundamental-beidan-history-20261011/analysis-20261011T024028.510576Z/selected-sp.csv'),show_col_types=FALSE) |> filter(mode=='near_sale',fixture_id %in% ids) |> transmute(fixture_id,model='北单-较晚SP',W=1/sp_w,D=1/sp_d,L=1/sp_l) |> mutate(mass=W+D+L,across(c(W,D,L),~.x/mass)) |> select(-mass) |> pivot_longer(c(W,D,L),names_to='outcome',values_to='probability')
+p<-bind_rows(x$before,x$probabilities,bd) |> filter(fixture_id %in% ids) |> select(fixture_id,model,outcome,probability)
+stopifnot(nrow(p)==45L,all(abs((p |> group_by(fixture_id,model) |> summarise(mass=sum(probability)))$mass-1)<1e-12))
+knitr::kable(p |> mutate(probability=100*probability) |> pivot_wider(names_from=outcome,values_from=probability),digits=2,caption='三类概率，单位%')
+margin<-list()
+for(id in ids){e<-x$entries[[match(id,x$audit$fixture_id)]];margin[[id]]<-bind_rows(e$base$grid |> mutate(stage='压尾前'),e$final$grid |> select(home_goals,away_goals,probability) |> mutate(stage='压尾后')) |> mutate(fixture_id=id,margin=home_goals-away_goals) |> group_by(fixture_id,stage,margin) |> summarise(probability=sum(probability),.groups='drop')}
+margin<-bind_rows(margin)
+stopifnot(all(abs((margin |> group_by(fixture_id,stage) |> summarise(mass=sum(probability)))$mass-1)<1e-12))
+knitr::kable(margin |> filter(between(margin,-3L,4L)) |> mutate(probability=100*probability) |> pivot_wider(names_from=stage,values_from=probability),digits=2,caption='主队净胜球分档；完整支持仍保留，表仅展示−3至4球，单位%')
+coverage<-read_csv(file.path(out,'coverage-corrected.csv'),show_col_types=FALSE)
+stopifnot(coverage$euro_company_count[match('26102:4',coverage$fixture_id)]==4L)
+knitr::kable(coverage |> filter(fixture_id %in% ids),caption='权威报价覆盖，不能以审查文字替代')
+```
+
+**#4 瑞典U21—北马其顿U21，北单−1，结果2:0。** λ1.90/1.244，平局档24.4%高于净胜1球21.5%；中心0、核心−2至+2。主队净胜3球及以上被乘0.3，净胜2球却保留，所以让胜由30.2%降至23.1%，被让平24.5%挤到第三。赛前欧赔主胜72.4%、亚盘−1.5、大小球3球与模型总λ3.14接近：冲突主要是强弱分配，而非总进球。冻结审查称“仅单公司”是事实错误：权威覆盖显示欧赔四家齐全；亚洲盘报价公司数不能概括欧赔覆盖。这不证明应全跟市场，但其拒绝理由不足。
+
+**#11 意大利—土耳其，北单−1，结果3:1。** λ1.641/1.438近乎均衡，审查已记录未含国际排名、对手强度及阵容。欧赔主胜65.5%、亚盘−1.25反对该强弱尺度，总进球量级却接近。中心0、核心−2至+2同样压缩3球以上，让胜21.8%降至17.2%，让平由19.7%升至21.9%；第二和第三轮换，造成Top2漏掉。不能将此类损失概括为“真实比分落在被压缩的尾部”：实际净胜2球就在核心里，受影响的是让胜类别的其他组成档位。
+
+**#59 英格兰—捷克，北单−2，结果3:0。** λ1.599/1.140仅支持小优势，原生让胜10.3%。审查记录欧赔主胜83.8%、亚盘−2.5和大小球3.5三路一致，并标记重大中心移位；最终retain，压尾前后完全相同。这是原生强弱及总量不充分、审查没有可执行裁决的案例，不应归咎尾部。国际排名和近期对手强度缺失值得补查；当前数据只能定位缺口，无法判定应调整多少。
+
+**#23 赖于福斯—斯达，北单+1，结果1:5。** 原生λ1.72/1.47反而略看好主队；欧赔主胜20.7%、客胜56.0%及主受让0.75方向相反，大小球与原生总量接近。让负由15.3%压至12.7%，但压尾前已是第三，主因是方向与攻防强弱分配。冻结文字将此称杯赛跨级别差异，仅作为当时审查意见引用，尚未核实，不作为本次事实结论。
+
+**#24 德国U21—格鲁吉亚U21，北单−3，结果2:0。** 原生λ2.225/1.159、中心+1，核心−1至+3。净胜4球以上全部在外围，让胜9.2%降至3.1%，让负79.4%升至84.0%，此场FM Top1命中、较晚北单Top1未中。这说明保持原生并压尾也有正确场景；但其欧赔及大小球缺失，只有亚盘，不能拿它证明三路市场一致时也应一概拒绝校正。
+
+上述案例指向两件独立事情：原生λ及定性审查能否正确识别强弱尺度；中心对称压尾后，类别所包含的不同净胜球档位能否保持合适的相对质量。17场Top2覆盖丢失、5场新增覆盖，净损失12场。下一步应先核实#4审查事实错误及#11/#59国家队强弱信息缺口，再评估尾部规则；不能仅据本期赛果拍新系数。所有新版本参数须在另一期或严格截止的历史训练窗口验证。
+
+复现：`quarto render quarto/fm15_26102_cases_20261012.qmd --no-cache`。无新增业务函数；使用已有冻结收据、tibble/tidyverse及显式质量检查。既有整期相关测试6842断言、13项PA契约和15项后端测试通过；标准全套R70个失败/报错块未在本次修复。历史日粒度代理、不完整维度和较晚SP时点差异继续适用。审查与渲染收据位于`results/fm15-26102-cases-20261012/`；owner PI待验收。
+
+```{r}
+receipt_path<-file.path(root,'results/fm15-26102-cases-20261012/review.json')
+if(file.exists(receipt_path)) {
+ receipt<-jsonlite::fromJSON(receipt_path)
+ stopifnot(receipt$qmd_sha256==digest::digest(file=file.path(root,'quarto/fm15_26102_cases_20261012.qmd'),algo='sha256'))
+ knitr::kable(as_tibble(receipt),caption='独立审查及已审查QMD身份；owner PI待验收')
+} else cat('审查收据尚未生成，当前渲染为预览。')
+```
