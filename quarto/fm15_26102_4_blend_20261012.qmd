@@ -1,0 +1,58 @@
+---
+title: "26102#4：低基本面置信的市场校正诊断"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本次为已知2:0赛果之后的敏感性诊断，不是新赛前预测或独立回测。基本面保留权重c=0.3是明确拍定的演示假设，不是测得的置信分数、也未根据赛果优化。比较c=0、0.3、0.5、0.7、1；保持ρ=−0.1及FM-1.5.0尾部规则。输入复用原T−24截止及已冻结市场反解，不修改原预测。真实置信评分及权重映射尚未实现。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));root<-normalizePath('..');out<-file.path(root,'results/fm15-26102-20261012');impl<-file.path(out,'implementation');dest<-file.path(root,'results/fm15-26102-4-blend-20261012')
+library(beidan,lib.loc=file.path(root,'results/fm15-version-20261012/library'))
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE);backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+m<-jsonlite::fromJSON(file.path(out,'manifest.json'));dm<-jsonlite::fromJSON(file.path(out,'market-diagnostic-manifest.json'))
+stopifnot(digest::digest(file=file.path(out,m$batch_file),algo='sha256')==m$sha256,digest::digest(file=file.path(out,dm$diagnostic_file),algo='sha256')==dm$sha256)
+x<-readRDS(file.path(out,m$batch_file));d<-readRDS(file.path(out,dm$diagnostic_file));id<-'26102:4';e<-x$entries[[id]];market<-d$references[[id]]
+a<-x$audit |> filter(fixture_id==id);mp<-market$model$parameters
+knitr::kable(bind_rows(tibble(stage='原生',lambda_home=a$lambda_home,lambda_away=a$lambda_away),mp |> transmute(stage='市场联合反解',lambda_home,lambda_away)),digits=4)
+fixture<-market$fixture;cutoff<-market$cutoff;cutoff$cutoff_utc<-lubridate::ymd_hms(cutoff$cutoff_utc,tz='UTC')
+summary<-margins<-grids<-list();receipts<-list()
+for(c in c(0,.3,.5,.7,1)) {
+ lh<-c*a$lambda_home+(1-c)*mp$lambda_home;la<-c*a$lambda_away+(1-c)*mp$lambda_away
+ g<-beidan:::dixon_coles_score_grid(lh,la,0L,1e-10,-.1)$grid |> select(home_goals,away_goals,probability)
+ bindings<-list(original_forecast=m$sha256,market_diagnostic=dm$sha256,scenario=beidan:::.score_margin_hash(list(c=c,lh=lh,la=la,rho=-.1,cutoff=cutoff)),implementation=beidan:::.score_margin_code(impl))
+ base<-list(grid=g,cutoff=cutoff,model_id='POST_RESULT_CONFIDENCE_BLEND_DIAGNOSTIC',source_hashes=bindings,max_source_available_utc=e$base$max_source_available_utc,intended_use='HISTORICAL_DIAGNOSTIC')
+ review<-list(decision='apply',base_hash=beidan:::.score_margin_hash(g),cutoff_utc='2026-10-04T16:30:00Z',reason='Explicit hypothetical native confidence weight; not learned',counterevidence='Outcome already known; youth lineup and opponent-strength uncertainty unresolved')
+ pol<-beidan:::build_fm15_tail_judgement(base,review,'native-review',cutoff,list(max_radius=2L,threshold=.1,coefficient=.3,tie_tolerance=1e-12))
+ bindings<-c(bindings,list(base_artifact=beidan:::.score_margin_hash(base),margin_judgement=beidan:::.score_margin_hash(pol$judgement),direction_implementation=beidan:::.score_margin_code(impl)))
+ ctx<-backend$build_adjustment_evidence_context(e$evidence_rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',review$cutoff_utc),bindings,shared$AvailabilityPolicy$historical_proxy('POST_RESULT_WEIGHT_SCENARIO_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+ final<-adjust_score_margin_distribution(base,pol$judgement,ctx,fixture,cutoff,impl)
+ for(stage in c('尾部前','尾部后')) {
+  gg<-if(stage=='尾部前')g else final$grid
+  mm<-gg |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(probability=sum(probability),.groups='drop')
+  pp<-gg |> mutate(outcome=case_when(home_goals-away_goals-1>0~'W',home_goals-away_goals-1==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability),.groups='drop')
+  summary[[length(summary)+1L]]<-pp |> mutate(c=c,stage=stage,lambda_home=lh,lambda_away=la,center=pol$center,radius=pol$radius,.before=1)
+  margins[[length(margins)+1L]]<-mm |> mutate(c=c,stage=stage,.before=1)
+  grids[[length(grids)+1L]]<-gg |> select(home_goals,away_goals,probability) |> mutate(c=c,stage=stage,.before=1)
+ }
+ receipts[[as.character(c)]]<-list(policy=pol,receipt=final$receipt,scenario_bindings=bindings)
+}
+summary<-bind_rows(summary);margins<-bind_rows(margins);grids<-bind_rows(grids)
+stopifnot(nrow(summary)==30L,all(is.finite(summary$probability)),all(abs((summary |> group_by(c,stage) |> summarise(mass=sum(probability)))$mass-1)<1e-12),all(abs((grids |> group_by(c,stage) |> summarise(mass=sum(probability)))$mass-1)<1e-12))
+write_csv(summary,file.path(dest,'probabilities.csv'));write_csv(margins,file.path(dest,'margins.csv'));saveRDS(list(summary=summary,margins=margins,grids=grids,receipts=receipts),file.path(dest,'diagnostic.rds'))
+knitr::kable(summary |> mutate(probability=100*probability) |> pivot_wider(names_from=outcome,values_from=probability),digits=3,caption='北单−1：W让胜、D让平、L让负，单位%；c为基本面保留权重')
+knitr::kable(margins |> filter(c==.3,between(margin,-3L,5L)) |> mutate(probability=100*probability) |> pivot_wider(names_from=stage,values_from=probability),digits=3,caption='c=0.3的净胜球分布，单位%；表外支持未删除')
+knitr::kable(grids |> filter(c==.3,stage=='尾部后') |> arrange(desc(probability)) |> slice_head(n=6L) |> mutate(probability=100*probability),digits=3,caption='c=0.3前6比分，单位%')
+```
+
+市场反解使用原冻结欧赔四家公司、亚盘−1.5与大小球反推总量，欧赔/亚盘损失权重各1；不是直接照搬北单价格。实际北单−1仅用于最终类别映射，未参与λ混合或核心选择。市场参数与欧赔、亚盘存在残差，不是精确同时满足全部报价。此前标准全套R70失败/报错块仍未修复；本次无新增业务函数，调用既有函数并执行网格及概率质量检查。
+
+```{r}
+rp<-file.path(dest,'review.json')
+if(file.exists(rp)){rr<-jsonlite::fromJSON(rp);stopifnot(rr$qmd_sha256==digest::digest(file=file.path(root,'quarto/fm15_26102_4_blend_20261012.qmd'),algo='sha256'));knitr::kable(as_tibble(rr),caption='独立审查及QMD身份；owner PI待验收')}else cat('审查未完成，当前是预览。')
+```

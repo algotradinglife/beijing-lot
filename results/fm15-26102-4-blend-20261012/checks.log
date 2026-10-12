@@ -1,0 +1,11 @@
+# A tibble: 1 × 2
+  check                                   max_error
+  <chr>                                       <dbl>
+1 c=1 reproduces original frozen forecast         0
+`summarise()` has regrouped the output.
+ℹ Summaries were computed grouped by c and stage.
+ℹ Output is grouped by c.
+ℹ Use `summarise(.groups = "drop_last")` to silence this message.
+ℹ Use `summarise(.by = c(c, stage))` for per-operation grouping
+  (`?dplyr::dplyr_by`) instead.
+PASS normalization; complete 5x2x3 support; original endpoint unchanged
