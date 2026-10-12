@@ -1,0 +1,6 @@
+{
+  "status": "ALL_3_MODELS_AND_6_SEALED_ADJUSTMENTS_IDENTICAL_IN_FRESH_R_PROCESS",
+  "diagnostic_sha256": "0688939d2fa67e9b06850b15e3bc797df5cacbe220b3b958966c1c7e8fd489e1",
+  "command": "R_LIBS_USER=$PWD/r_lib quarto render quarto/fm16_26102_10_20261013.qmd --no-cache",
+  "model_changed": false
+}

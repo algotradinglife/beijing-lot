@@ -1,0 +1,9 @@
+{
+  "qmd": "quarto/fm16_26102_10_20261013.qmd",
+  "sha256": "2a806a7501d7e005c6fc86c230b861a5c07b6d9fb07781f0e16b8deb0ba8e886",
+  "command": "codex review - < results/fm16-26102-10-20261013/review-final-prompt.txt",
+  "findings": "Initial and final reviews: no blocking P1/P2. Independent factual correction to exact SOURCE_PUBLISHED_FULL_TIME enum rechecked in final review.",
+  "resolution": "Verified frozen hashes, admitted16row ledger, cutoff/quote arithmetic, partial fixed-total assumptions, score seals, probabilities and market-share reversal. Formal FM16 unchanged.",
+  "review_log_sha256": "b38a8bc53e3e889b70c252507ae37bc92113757edd09c48fb42eae2f38947fa0",
+  "PI": "Owner acceptance pending"
+}

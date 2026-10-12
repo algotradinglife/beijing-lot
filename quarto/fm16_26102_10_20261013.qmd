@@ -1,0 +1,123 @@
+---
+title: "26102 #10 法国—比利时：原生λ、部分市场与尾部诊断"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本报告是已知赛果后的诊断，不更新FM-1.6.0或其冻结账本。比赛决策截止为2026-10-04 18:45 UTC（开赛前24小时）；北单主−1。使用此前冻结历史与严格早于截止的欧赔、亚盘；大小球在此快照为空，不能捏造。后期北单报价只作对照，不参与校正。ρ固定−0.1，非标定结果。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));root<-normalizePath('..');src<-file.path(root,'results/fm16-three-issues-20261012');out<-file.path(root,'results/fm16-26102-10-20261013')
+library(beidan,lib.loc=file.path(root,'results/fm16-release-20261012/library'))
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+impl<-file.path(root,'results/fm15-26102-20261012/implementation');reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE);backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+m<-jsonlite::fromJSON(file.path(src,'manifest.json'));stopifnot(digest::digest(file=file.path(src,'forecasts.rds'),algo='sha256')==m$forecast_sha256,digest::digest(file=file.path(src,'stage.rds'),algo='sha256')==m$stage_sha256)
+s<-readRDS(file.path(src,'stage.rds'));f<-readRDS(file.path(src,'forecasts.rds'));id<-'26102:10';e<-s$native[[id]];p<-s$packets[[id]];z<-f$entries[[id]]
+knitr::kable(e$native$rates,digits=3,caption='长期与近期分别归一化后各占0.5；进球单位球／场，ESS单位场')
+knitr::kable(e$native$parameters,digits=4,caption='原生λ，单位球／场')
+parent_path<-names(e$source_hashes)[endsWith(names(e$source_hashes),'26102-frozen.rds')]
+stopifnot(length(parent_path)==1L,digest::digest(file=file.path(root,parent_path),algo='sha256')==e$source_hashes[[parent_path]])
+history<-as_tibble(readRDS(file.path(root,parent_path))$history)
+recent<-list()
+for(component in e$native$components) {
+ ledger<-as_tibble(jsonlite::fromJSON(component$ledger)) |> filter(recent_mass>0)
+ scope_name<-if(component$role=='home')'home_recent'else'away_recent'
+ recent[[component$role]]<-history |> filter(fixture_id==id,scope==scope_name,match_id%in%ledger$match_id) |> mutate(role=component$role,opponent_id=if(component$role=='home')away_id else home_id,goals_for=if(component$role=='home')home_score else away_score,goals_against=if(component$role=='home')away_score else home_score) |> select(role,match_id,event_date,opponent_id,goals_for,goals_against,score_scope)
+}
+recent<-bind_rows(recent)
+stopifnot(nrow(recent)==16L,!anyDuplicated(recent[c('role','match_id')]))
+recent_check<-recent |> group_by(role) |> summarise(gf=mean(goals_for),ga=mean(goals_against),.groups='drop') |> left_join(e$native$rates |> select(role,recent_for,recent_against),by='role',relationship='one-to-one')
+stopifnot(all(abs(recent_check$gf-recent_check$recent_for)<1e-12),all(abs(recent_check$ga-recent_check$recent_against)<1e-12))
+team_ids<-unique(recent$opponent_id)
+team_names<-bind_rows(map_dfr(s$native,~tibble(opponent_id=.x$fixture$home_id,opponent=.x$fixture$home)),map_dfr(s$native,~tibble(opponent_id=.x$fixture$away_id,opponent=.x$fixture$away))) |> filter(opponent_id%in%team_ids) |> distinct()
+stopifnot(!anyDuplicated(team_names$opponent_id))
+recent<-recent |> left_join(team_names,by='opponent_id',relationship='many-to-one') |> mutate(opponent=coalesce(opponent,paste0('未映射ID:',opponent_id)))
+knitr::kable(recent,digits=2,caption='原生收据中recent_mass>0的实际16行；日期为来源事件日期，对手名称来自同源冻结名单，比分口径未确认90分钟')
+write_csv(recent,file.path(out,'recent-history.csv'))
+euro<-p$euro |> select(company_id,fixture_id,quote_at,odds_home,odds_draw,odds_away)
+asian<-p$asian |> select(company_id,fixture_id,quote_at,handicap,home_decimal,away_decimal)
+stopifnot(nrow(euro)==3L,nrow(asian)==1L,nrow(p$totals)==0L,all(euro$quote_at<z$cutoff$cutoff_utc),all(asian$quote_at<z$cutoff$cutoff_utc))
+knitr::kable(euro,digits=2,caption='部分三家欧赔篮子，不称为完整四家；UTC报价时点')
+knitr::kable(asian,digits=2,caption='独立亚盘−1，非北单线；decimal含本金')
+ordinary<-euro |> transmute(W=1/odds_home,D=1/odds_draw,L=1/odds_away) |> mutate(mass=W+D+L,across(c(W,D,L),~.x/mass)) |> summarise(across(c(W,D,L),mean))
+asian_share<-(1/asian$home_decimal)/(1/asian$home_decimal+1/asian$away_decimal)
+native_margin<-z$native$grid |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(probability=sum(probability),.groups='drop')
+native_share<-sum(native_margin$probability[native_margin$margin>=2])/sum(native_margin$probability[native_margin$margin!=1])
+knitr::kable(ordinary |> mutate(across(everything(),~100*.x)),digits=2,caption='各公司倒数归一化后平均的普通胜平负，单位%')
+knitr::kable(tibble(source=c('独立亚盘定价','原生比分模型'),settled_home_share=c(asian_share,native_share)*100),digits=2,caption='−1亚盘剔除赢1球走盘后的主队胜份额；不是无条件让胜概率，单位%')
+```
+
+原生λ计算：法国混合主场进球约2.363与比利时混合客场失球约1.069取平均，得到1.716；比利时混合客场进球约2.229与法国混合主场失球约1.133取平均，得到1.681。近期已经包含，不能再重复加成。近期比利时客场进球2.625推动了接近平衡的结果，但现有实现没有对手强度、阵容、国际排名校正，不能仅凭这组均值断定战力接近。
+
+原生近期样本还有两个具体疑点：法国4:6英格兰这一行贡献了近期11个失球中的6个；比利时两场对美国分别进4球和5球，占近期21个进球的9个。它们是已准入数据的事实，尚不能直接认定为异常或删除：score_scope为SOURCE_PUBLISHED_FULL_TIME，仅有来源终场标记，未独立核验90分钟；对手等级和重复对手影响也未调整。应先核验口径与可比性，不依据本场4:1去挑选删样本。
+
+下面使用现有`project_dc_market_handicap`做**固定总进球敏感性**：总量2.5、原生总量、4.0均是显式假设，不是大小球提供的约束，也不是从4:1选择的数值。原生总量为主对照，另外两项只检验结论对总量是否敏感。联合目标使用等权欧赔与亚盘、固定ρ；不声称两个渠道完全一致，不将小残差当正式自动准入。全部时间治理、证据准入和收据由共享temporal_learning提供，不自行复制。
+
+```{r}
+fixture<-z$fixture;cutoff<-z$cutoff;ct<-format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC')
+market_policy<-list(euro_weight=1,asian_weight=1,lambda_floor=.01,tail_tolerance=1e-10,max_quote_age_hours=48)
+tail_policy<-list(max_radius=2L,threshold=.1,coefficient=.3,tie_tolerance=1e-12,dual_gap=.01)
+rows<-list()
+for(kind in c('euro','asian')) {
+ q<-if(kind=='euro')euro else asian
+ for(j in seq_len(nrow(q))) {
+  qt<-format(q$quote_at[j],'%Y-%m-%dT%H:%M:%SZ',tz='UTC');eid<-paste0(kind,'-',q$company_id[j])
+  rows[[length(rows)+1L]]<-list(evidence_id=eid,fixture_id=id,source_hash=beidan:::.score_margin_hash(q[j,]),row_key=eid,issue_code='QUOTE_PROXY',issue_year=as.integer(substr(qt,1,4)),label_available_ts=qt,data_available_ts=qt)
+ }
+}
+totals<-c(2.5,sum(unlist(e$native$parameters)),4)
+results<-summaries<-probabilities<-margins<-list()
+for(total in totals) {
+ name<-sprintf('HYPOTHESIS_TOTAL_%.6f',total)
+ binds<-list(dc_market_input=beidan:::.score_margin_hash(list(euro=euro,asian=asian,total_mean=total,rho=-.1,policy=market_policy,fixture=fixture,cutoff=cutoff)),direction_implementation=beidan:::.score_margin_code(impl),frozen_input=m$stage_sha256,client=digest::digest(file=file.path(root,'quarto/fm16_26102_10_20261013.qmd'),algo='sha256'))
+ ctx<-backend$build_adjustment_evidence_context(rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',ct),binds,shared$AvailabilityPolicy$historical_proxy('PARTIAL_MARKET_ASSUMED_TOTAL_DIAGNOSTIC_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+ model<-project_dc_market_handicap(euro,asian,total,-.1,market_policy,ctx,fixture,cutoff,impl,'HISTORICAL_DIAGNOSTIC')
+ base<-list(grid=model$grid,cutoff=cutoff,model_id=name,source_hashes=list(stage=m$stage_sha256,market_receipt=beidan:::.score_margin_hash(model$receipt)),max_source_available_utc=max(euro$quote_at,asian$quote_at),intended_use='HISTORICAL_DIAGNOSTIC')
+ parts<-list()
+ for(mode in c('before_tail','after_tail')) {
+  review<-list(decision=if(mode=='before_tail')'retain'else'apply',center_mode='auto',base_hash=beidan:::.score_margin_hash(base$grid),cutoff_utc=ct,reason='Explicit partial-market fixed-total diagnostic only',counterevidence='No OU quote; assumed scale and retrospective scenario; not a formal FM source review')
+  pol<-BuildFmTailJudgement(base,review,'euro-281',cutoff,tail_policy)
+  hashes<-c(binds,list(base_artifact=beidan:::.score_margin_hash(base),margin_judgement=beidan:::.score_margin_hash(pol$judgement),direction_implementation=beidan:::.score_margin_code(impl),tail_binding=pol$binding_hash))
+  ctx2<-backend$build_adjustment_evidence_context(rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',ct),hashes,shared$AvailabilityPolicy$historical_proxy('PARTIAL_MARKET_ASSUMED_TOTAL_DIAGNOSTIC_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+  final<-adjust_score_margin_distribution(base,pol$judgement,ctx2,fixture,cutoff,impl)
+  stopifnot(identical(final,adjust_score_margin_distribution(base,pol$judgement,ctx2,fixture,cutoff,impl)))
+  saveRDS(final,file.path(out,paste0(name,'-',mode,'-sealed.rds')))
+  # Introduce actual integer Beidan line only after score sealing.
+  proj<-project_score_outcomes(final,-1L,impl)
+  probabilities[[paste(name,mode)]]<-proj |> mutate(scenario=name,phase=mode,.before=1)
+  margins[[paste(name,mode)]]<-final$margins |> mutate(scenario=name,phase=mode,.before=1)
+  parts[[mode]]<-list(policy=pol,final=final,projection=proj)
+ }
+ summaries[[name]]<-model$parameters |> mutate(scenario=name,max_euro_residual_pp=100*max(abs(model$ordinary$residual)),asian_residual_pp=100*model$asian$residual,.before=1)
+ results[[name]]<-list(model=model,base=base,parts=parts,evidence_rows=rows,bindings=binds)
+}
+parameters<-bind_rows(summaries);probabilities<-bind_rows(probabilities);margins<-bind_rows(margins)
+stopifnot(nrow(parameters)==3L,nrow(probabilities)==18L,all(is.finite(probabilities$probability)))
+knitr::kable(parameters,digits=3,caption='敏感性λ及实际拟合残差：λ单位球／场，残差单位百分点')
+knitr::kable(probabilities |> select(scenario,phase,outcome,probability,rank) |> mutate(probability=100*probability),digits=2,caption='固定假设总量下的北单−1投影；不是更新后的正式FM16，概率%')
+main<-names(results)[2]
+net<-bind_rows(z$results[['FM-1.6.0']]$final$margins |> mutate(scenario='FM16_FROZEN_NATIVE',phase='after_tail'),margins |> filter(scenario==main)) |> filter(between(margin,-4,5))
+knitr::kable(net |> mutate(across(c(base_probability,probability),~100*.x)),digits=2,caption='主对照的净胜球分布；正数为法国净胜，概率%')
+share_check<-probabilities |> filter(scenario==main) |> select(phase,outcome,probability) |> pivot_wider(names_from=outcome,values_from=probability) |> mutate(settled_home_share=W/(W+L),asian_target=asian_share,residual_pp=100*(settled_home_share-asian_target))
+knitr::kable(share_check |> select(phase,settled_home_share,asian_target,residual_pp) |> mutate(across(c(settled_home_share,asian_target),~100*.x)),digits=2,caption='尾部后的市场约束复核：剔除+1走盘的让胜份额，单位%；残差百分点')
+write_csv(share_check,file.path(out,'market-share-check.csv'))
+write_csv(parameters,file.path(out,'parameters.csv'));write_csv(probabilities,file.path(out,'probabilities.csv'));write_csv(net,file.path(out,'margins.csv'));saveRDS(results,file.path(out,'diagnostics.rds'))
+```
+
+冻结原生中心0、半径2保留−2到+2，因此+3及以上被乘0.3，而−2、−1、0仍全部保留。映射北单−1后，让胜是+2及以上，让平是+1，让负是0及以下；这解释了为何尾部压缩特别削弱让胜。它是该输入分布下的规则效应，不证明应当知道法国赢3球。
+
+主对照的尾部还把剔除走盘后的让胜份额从约52.73%降到48.86%，相对亚盘52.59%由略高变成略低，令让胜从第一退到第二。因此两种错误应分开：缺OU的硬门控未利用已有方向信息；后续尾部可能返向破坏前一步市场约束。它不是“总量换一个值就保证让胜第一”：三种总量下压缩前让胜都第一，压缩后有两种让负第一。
+
+市场信息缺OU不等于毫无修正信息。普通欧赔提供方向及平局信息，亚盘约束净胜幅度；可以研究显式的部分渠道模型或质量分层，但本次三个总量假设没有独立OU验证，不能替换正式预测或从命中该场推断方法有效。优先修复赛前信息利用与对手强度，而非根据赛果改变尾部系数。
+
+已冻结比分为4:1，让胜；赛果仅用于解释原预测误差，不参与拟合输入、参数、中心或门控。前次已见赛果，因此全部新对照仍为事后诊断。国家队排名、阵容、真实盘口轨迹尚未补采，不虚构。
+
+复现：`R_LIBS_USER="$PWD/r_lib" quarto render quarto/fm16_26102_10_20261013.qmd --no-cache`。只调用既有已测试包函数，不新增业务函数或依赖，不在渲染中安装包。每个敏感性输出有cutoff、报价证据、输入/客户端/传递实现哈希和完整比分收据；每个调整重复调用一致。执行错误致命、cache/freeze关闭；全仓既有失败不声明已修复，不启动CI，owner PI待验收。
+
+```{r}
+if(file.exists(file.path(out,'review.json'))){r<-jsonlite::fromJSON(file.path(out,'review.json'));stopifnot(digest::digest(file=file.path(root,r$qmd),algo='sha256')==r$sha256);knitr::kable(tibble(command=r$command,findings=r$findings,resolution=r$resolution))}
+```
