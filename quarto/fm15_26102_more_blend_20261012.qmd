@@ -1,0 +1,76 @@
+---
+title: "26102#11、#59、#23：同一权重的市场校正复盘"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本次为已知赛果之后的三场敏感性诊断，不是新赛前预测或独立回测。基本面保留权重c=0.3是明确拍定的演示假设，不是测得的置信分数、也未根据赛果优化。比较c=0、0.3、0.5、0.7、1；保持ρ=−0.1及FM-1.5.0尾部规则。输入复用原T−24截止及已冻结市场反解，不修改原预测。真实置信评分及权重映射尚未实现。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));root<-normalizePath('..');out<-file.path(root,'results/fm15-26102-20261012');impl<-file.path(out,'implementation');dest<-file.path(root,'results/fm15-26102-more-blend-20261012')
+library(beidan,lib.loc=file.path(root,'results/fm15-version-20261012/library'))
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE);backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+m<-jsonlite::fromJSON(file.path(out,'manifest.json'));dm<-jsonlite::fromJSON(file.path(out,'market-diagnostic-manifest.json'))
+stopifnot(digest::digest(file=file.path(out,m$batch_file),algo='sha256')==m$sha256,digest::digest(file=file.path(out,dm$diagnostic_file),algo='sha256')==dm$sha256)
+x<-readRDS(file.path(out,m$batch_file));d<-readRDS(file.path(out,dm$diagnostic_file));native<-readRDS(file.path(out,'native-7fab65d83593.rds'))
+coverage<-read_csv(file.path(out,'coverage-corrected.csv'),show_col_types=FALSE)
+summary<-margins<-grids<-list();receipts<-list();parameters<-list()
+for(id in paste0('26102:',c(11,59,23))) {
+ e<-x$entries[[id]];market<-d$references[[id]];stopifnot(!is.null(market))
+ a<-x$audit |> filter(fixture_id==id);mp<-market$model$parameters
+ parameters[[id]]<-bind_rows(tibble(stage='原生',lambda_home=a$lambda_home,lambda_away=a$lambda_away),mp |> transmute(stage='市场联合反解',lambda_home,lambda_away)) |> mutate(fixture_id=id,.before=1)
+ fixture<-market$fixture;cutoff<-market$cutoff;cutoff$cutoff_utc<-lubridate::ymd_hms(cutoff$cutoff_utc,tz='UTC')
+ cutoff_iso<-format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC')
+ h<-native$entries[[id]]$fixture$handicap
+for(c in c(0,.3,.5,.7,1)) {
+ lh<-c*a$lambda_home+(1-c)*mp$lambda_home;la<-c*a$lambda_away+(1-c)*mp$lambda_away
+ g<-beidan:::dixon_coles_score_grid(lh,la,0L,1e-10,-.1)$grid |> select(home_goals,away_goals,probability)
+ bindings<-list(original_forecast=m$sha256,market_diagnostic=dm$sha256,scenario=beidan:::.score_margin_hash(list(c=c,lh=lh,la=la,rho=-.1,cutoff=cutoff)),implementation=beidan:::.score_margin_code(impl))
+ base<-list(grid=g,cutoff=cutoff,model_id='POST_RESULT_CONFIDENCE_BLEND_DIAGNOSTIC',source_hashes=bindings,max_source_available_utc=e$base$max_source_available_utc,intended_use='HISTORICAL_DIAGNOSTIC')
+ review<-list(decision=if(c==1)e$review$decision else 'apply',base_hash=beidan:::.score_margin_hash(g),cutoff_utc=cutoff_iso,reason='Explicit hypothetical native confidence weight; not learned',counterevidence='Outcome already known; youth lineup and opponent-strength uncertainty unresolved')
+ pol<-beidan:::build_fm15_tail_judgement(base,review,'native-review',cutoff,list(max_radius=2L,threshold=.1,coefficient=.3,tie_tolerance=1e-12))
+ bindings<-c(bindings,list(base_artifact=beidan:::.score_margin_hash(base),margin_judgement=beidan:::.score_margin_hash(pol$judgement),direction_implementation=beidan:::.score_margin_code(impl)))
+ ctx<-backend$build_adjustment_evidence_context(e$evidence_rows,as.list(fixture),shared$Cutoff$decision_epoch('26102',review$cutoff_utc),bindings,shared$AvailabilityPolicy$historical_proxy('POST_RESULT_WEIGHT_SCENARIO_ONLY'),'HISTORICAL_DIAGNOSTIC',impl)
+ final<-adjust_score_margin_distribution(base,pol$judgement,ctx,fixture,cutoff,impl)
+ for(stage in c('尾部前','尾部后')) {
+  gg<-if(stage=='尾部前')g else final$grid
+  mm<-gg |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(probability=sum(probability),.groups='drop')
+  pp<-gg |> mutate(outcome=case_when(home_goals-away_goals+h>0~'W',home_goals-away_goals+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability),.groups='drop')
+  summary[[length(summary)+1L]]<-pp |> mutate(fixture_id=id,c=c,stage=stage,lambda_home=lh,lambda_away=la,center=pol$center,radius=pol$radius,.before=1)
+  margins[[length(margins)+1L]]<-mm |> mutate(fixture_id=id,c=c,stage=stage,.before=1)
+  grids[[length(grids)+1L]]<-gg |> select(home_goals,away_goals,probability) |> mutate(fixture_id=id,c=c,stage=stage,.before=1)
+ }
+ receipts[[paste(id,c,sep=':')]]<-list(policy=pol,receipt=final$receipt,scenario_bindings=bindings)
+}
+}
+summary<-bind_rows(summary);margins<-bind_rows(margins);grids<-bind_rows(grids)
+stopifnot(nrow(summary)==90L,all(is.finite(summary$probability)),all(abs((summary |> group_by(fixture_id,c,stage) |> summarise(mass=sum(probability)))$mass-1)<1e-12),all(abs((grids |> group_by(fixture_id,c,stage) |> summarise(mass=sum(probability)))$mass-1)<1e-12))
+for(id in paste0('26102:',c(11,59,23))) {aa<-summary |> filter(fixture_id==id,c==1,stage=='尾部后') |> arrange(outcome);bb<-x$probabilities |> filter(fixture_id==id) |> arrange(outcome);stopifnot(max(abs(aa$probability-bb$probability))<1e-12)}
+write_csv(summary,file.path(dest,'probabilities.csv'));write_csv(margins,file.path(dest,'margins.csv'));saveRDS(list(summary=summary,margins=margins,grids=grids,receipts=receipts),file.path(dest,'diagnostic.rds'))
+knitr::kable(bind_rows(parameters),digits=4)
+knitr::kable(coverage |> filter(fixture_id %in% paste0('26102:',c(11,59,23,24))))
+knitr::kable(summary |> mutate(probability=100*probability) |> pivot_wider(names_from=outcome,values_from=probability),digits=3,caption='按各场实际北单让球投影：W让胜、D让平、L让负，单位%；c为基本面保留权重')
+knitr::kable(margins |> filter(c==.3,between(margin,-3L,5L)) |> mutate(probability=100*probability) |> pivot_wider(names_from=stage,values_from=probability),digits=3,caption='c=0.3的净胜球分布，单位%；表外支持未删除')
+knitr::kable(grids |> filter(c==.3,stage=='尾部后') |> group_by(fixture_id) |> arrange(desc(probability),.by_group=TRUE) |> slice_head(n=6L) |> ungroup() |> mutate(probability=100*probability),digits=3,caption='c=0.3各场前6比分，单位%')
+```
+
+市场反解复用原冻结欧赔、亚洲让球与大小球总量，欧赔/亚盘损失权重各1。#11与#59四公司篮子完整；#23仅三家公司，因此只是明确标注的部分市场诊断，不授权作为完整篮子的自动校正案例。实际北单让球仅用于类别投影，未参与λ混合或核心选择。市场拟合存在残差，不能宣称精确同时满足全部报价。
+
+#24德国U21—格鲁吉亚U21作为控制：北单−3、最终2:0，原FM让负84.0%为Top1且命中；只有亚盘、缺欧赔与大小球，不进行缺输入的联合市场反解，更不能套用70%市场权重。
+
+#11：原生λ近乎均衡，未调整对手强度及国家队阵容；市场指向明显主队优势，而大小球总量接近。#59：市场三通道同时支持主队强优势及更高总进球，原审查标记重大移位但retain，故没有压尾。这两场校正解决的是不同尺度问题。#23：原生略看好主队，市场偏向客队，校正涉及方向翻转；原审查中的杯赛跨级别说法未核实，不作为事实依据。
+
+c=1保留原冻结审查动作，包括#59的retain，并检查逐类概率重现原模型；c<1才假设启动校正并应用同一尾部规则。
+
+固定c=0.3后，#11让胜27.9%、让平25.8%、让负46.3%，原来第三的让胜升为第二；尾部前让胜37.0%，中心仍0导致外围抑制大胜。#59让胜32.6%、让平24.4%、让负43.0%，让胜由第三升第二但未成为Top1。#23让胜54.0%、让平24.2%、让负21.8%，实际让负仍第三；其尾部前让负28.3%为第二，压尾重新将它挤出。这是统一混合与尾部规则仍不足的反例，不能因为#4改善就宣布规则有效。
+
+本次不生成JEV实测置信分数，不按赛果优化c，不更改正式FM版本；三场输入不足及市场分歧需要后续独立核查。原套件70失败/报错块未修复；无新增业务函数，调用既有实现并执行质量检查。
+```{r}
+rp<-file.path(dest,'review.json')
+if(file.exists(rp)){rr<-jsonlite::fromJSON(rp);stopifnot(rr$qmd_sha256==digest::digest(file=file.path(root,'quarto/fm15_26102_more_blend_20261012.qmd'),algo='sha256'));knitr::kable(as_tibble(rr),caption='独立审查及QMD身份；owner PI待验收')}else cat('审查未完成，当前是预览。')
+```
