@@ -1,0 +1,9 @@
+{
+  "mode": "DEFAULT_ACCEPTANCE_REQUIRED",
+  "tables": 11,
+  "figures": 1,
+  "errors": 0,
+  "warnings": 0,
+  "html_sha256": "8636e356bb97447c286ab9d26588a49e3749107ef2193c0e9dfcebbf9cb7c866",
+  "source_sha256": "3cd90a372bc1bddecf39cae51b53c73a4c88d921daa8a1ffe6de03a2e5ff5229"
+}

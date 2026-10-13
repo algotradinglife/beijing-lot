@@ -1,0 +1,15 @@
+# A tibble: 24 × 14
+   cohort    issue_id comparison model     n hits1 hits2  top1  top2  top3 rank2
+   <chr>     <chr>    <chr>      <chr> <int> <int> <int> <dbl> <dbl> <dbl> <dbl>
+ 1 ESTIMATE… ALL      same_cuto… BEID…    77    26    55 0.338 0.714     1 0.377
+ 2 ESTIMATE… ALL      same_cuto… FM-1…    77    21    51 0.273 0.662     1 0.390
+ 3 ESTIMATE… ALL      same_cuto… FM17…    77    22    53 0.286 0.688     1 0.403
+ 4 ESTIMATE… ALL      same_cuto… OPPO…    77    24    50 0.312 0.649     1 0.338
+ 5 ESTIMATE… ALL      same_cuto… OPPO…    77    23    51 0.299 0.662     1 0.364
+ 6 ESTIMATE… ALL      same_cuto… SAME…    77    29    52 0.377 0.675     1 0.299
+ 7 ESTIMATE… ALL      same_cuto… SAME…    77    28    52 0.364 0.675     1 0.312
+ 8 ESTIMATE… ALL      near_sale  BEID…    94    39    71 0.415 0.755     1 0.340
+ 9 ESTIMATE… ALL      near_sale  FM-1…    94    27    66 0.287 0.702     1 0.415
+10 ESTIMATE… ALL      near_sale  FM17…    94    28    67 0.298 0.713     1 0.415
+# ℹ 14 more rows
+# ℹ 3 more variables: rank3 <dbl>, brier <dbl>, logloss <dbl>

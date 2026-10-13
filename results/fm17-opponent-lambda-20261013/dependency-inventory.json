@@ -1,0 +1,12 @@
+{
+  "python": {
+    "pandas": "3.0.3",
+    "numpy": "2.4.6",
+    "json5": "0.15.0",
+    "beautifulsoup4": "4.15.0",
+    "pyarrow": "24.0.0",
+    "filelock": "3.32.3"
+  },
+  "configured_model_runtime": "config/fm17_opponent_lambda_runtime.json",
+  "publication_distributions_are_also_bound_in_NAS_receipt": true
+}

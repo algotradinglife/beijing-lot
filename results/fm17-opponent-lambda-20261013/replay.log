@@ -1,0 +1,20 @@
+None
+None
+Estimated 10 / 16 processed
+Estimated 20 / 26 processed
+Estimated 30 / 39 processed
+Estimated 40 / 58 processed
+Estimated 50 / 68 processed
+Estimated 60 / 79 processed
+Estimated 70 / 90 processed
+Estimated 80 / 102 processed
+Estimated 90 / 113 processed
+# A tibble: 6 × 3
+  issue_id state           n
+  <chr>    <chr>       <int>
+1 26098    ESTIMATED      34
+2 26098    UNESTIMATED     9
+3 26101    ESTIMATED      38
+4 26101    UNESTIMATED    12
+5 26102    ESTIMATED      22
+6 26102    UNESTIMATED     2

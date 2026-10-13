@@ -1,0 +1,48 @@
+{
+  "checks": [
+    {
+      "check": "Python functions/contracts",
+      "command": "PYTHONPATH=packages/beidan/inst/python:$PWD .venv/bin/python -m pytest packages/beidan/tests/python/test_opponent_history.py packages/beidan/tests/python/test_opponent_goals.py packages/beidan/tests/python/test_opponent_roster.py packages/beidan/tests/python/test_opponent_metadata_client.py packages/beidan/tests/python/test_serialized_opponent_fit.py packages/beidan/tests/python/test_opponent_publication.py -q",
+      "result": "41 passed"
+    },
+    {
+      "check": "Installed R model/invariance",
+      "command": "FM17_OPPONENT_ROOT=\"$PWD\" /opt/R/4.6.1/bin/Rscript -e 'library(beidan,lib.loc=normalizePath(\"results/fm17-opponent-lambda-20261013/package-library\")); testthat::test_file(\"packages/beidan/tests/testthat/test-opponent-goals.R\",env=new.env(parent=asNamespace(\"beidan\")),load_helpers=FALSE,stop_on_failure=TRUE)'",
+      "result": "22 assertions, zero failures/warnings/skips"
+    },
+    {
+      "check": "NAS v2 delivery/mutation",
+      "command": "FM17_OPPONENT_ROOT=\"$PWD\" /opt/R/4.6.1/bin/Rscript -e 'library(beidan,lib.loc=normalizePath(\"results/fm17-opponent-lambda-20261013/package-library\")); testthat::test_file(\"tests/testthat/test-fm17-opponent-delivery.R\",env=new.env(parent=asNamespace(\"beidan\")),load_helpers=FALSE,stop_on_failure=TRUE)'",
+      "result": "91 assertions, zero failures/warnings/skips; typed columns and provenance verified"
+    },
+    {
+      "check": "Independent forecast replay",
+      "command": "/opt/R/4.6.1/bin/Rscript r/fm17_opponent_freeze.R \"$PWD\" replay",
+      "result": "94 objects exactly identical; forecast SHA5a539868d8edd063a071b97a43e42074174dfcefa138d99673f7c47aa3d036e0"
+    },
+    {
+      "check": "Package installation",
+      "command": "R_LIBS=<recorded .libPaths()> R_LIBS_USER=\"$PWD/results/fm17-opponent-lambda-20261013/package-library\" /opt/R/4.6.1/bin/R CMD INSTALL -l \"$PWD/results/fm17-opponent-lambda-20261013/package-library\" results/fm17-opponent-lambda-20261013/validation-package/packages/beidan",
+      "result": "Passed on HEAD094bbb86+owned overlays; installed function body matches source; Rcpp loaded"
+    },
+    {
+      "check": "Quarto acceptance",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm17_opponent_lambda_20261013.qmd --no-cache",
+      "result": "PASSED default acceptance_required=true; clean execution;11tables/1figure/zero errors or warnings; reviewed source hashes checked"
+    },
+    {
+      "check": "Legacy layout checker",
+      "command": ".venv/bin/python scripts/check_persistent_data_layout.py --contract config/persistent_data_layout.json",
+      "result": "FAILED legacy Sandisk daily-paper path, Errno19. Owner2026-10-06 NAS/NVMe roots verified through catalog/package; retired disk not used."
+    },
+    {
+      "check": "Scope exclusions",
+      "command": "Local scoped checks only",
+      "result": "No whole-repository pass claimed: existing unrelated legacy-client drift; CI not requested and not run."
+    }
+  ],
+  "status": "ALL_REQUIRED_LOCAL_ACCEPTANCE_PASSED",
+  "R_assertions": 113,
+  "Python_tests": 41,
+  "NAS_version": "20261013-v2"
+}

@@ -1,0 +1,13 @@
+{
+  "base": "094bbb86",
+  "files": {
+    "packages/beidan/DESCRIPTION": "879e3885d66f9b527976739634d1d9c8298d9e27724e77cb4f8d12166db5758d",
+    "packages/beidan/R/opponent_goals.R": "fb78c1d76763053eee9d05a520ba8402cc7cd62f181b2f7161f6619e63a38e05",
+    "packages/beidan/inst/python/beidan_backend/opponent_goals.py": "da4b1720786457e06418e92b1dfa755f2dfb0a07fe0fffbd13bb6a0546c47c9a",
+    "packages/beidan/inst/python/beidan_backend/opponent_history.py": "1e87e1598ed6e0e90f5b279f4653cda81a737c6fe9e423ea8e62c38f33752c64",
+    "packages/beidan/inst/python/beidan_backend/opponent_roster.py": "2961e09875fbcbf8c42221d919e0aedb6e2063c53c64e838c4ac787d5ac84bc5",
+    "packages/beidan/inst/python/beidan_backend/opponent_publication.py": "c7505f057a4deb85fe25b85a512afa1b5762011b1b0b6d1dee857a028fa42f93",
+    "packages/beidan/inst/python/beidan_backend/temporal_learning/serialized_opponent_fit.py": "b3f76a1c48b4210be97684f125de35cc95904c0314b19ace816771131568f782",
+    "packages/beidan/man/FitOpponentGoals.Rd": "441515f131881516277ea16b9437fd118582b15fe08a05af422a65db3fd74ed3"
+  }
+}

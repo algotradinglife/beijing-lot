@@ -1,0 +1,26 @@
+{
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "candidate_forecast_sha256": "5a539868d8edd063a071b97a43e42074174dfcefa138d99673f7c47aa3d036e0",
+  "source_hashes": {
+    "labels": "eac0ecae9057a30074b6d43f24b029ae5273618691352ed5d3dedd4c62888b1d",
+    "beidan": "f29da4a474382b78912635c9ee53790bd33c7064a0dbbed1491cc3ce3c3ea1da",
+    "parent_stage": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68",
+    "client": "990f820a7e6ea28dc4a9ede9fb58bf562942775e5464a4cce577ebcef5b7beb6"
+  },
+  "outputs": {
+    "metrics": "51730ed95b3cfd8fc62b23f50acd2d964c8313d7867655325dc27c9c4fda8d21",
+    "scores": "3dbdde5f7eaad6e0ae7b80e7d0fb8f3e90baffdf5476508ca0fc92db17a20e24",
+    "calibration": "e102847d50080792469d2097cabe6c8a164cfb196625c343522d5ec138b575aa",
+    "lambdas": "34c6882277dbe2ba09b1f8d1f03cd8a4a0cdff48da381f54d70c1f3ead1c1139",
+    "margins": "b4a9d66dda7492a6b774d27a9d539f3b838a6f0b1d27859a77269dbdde198c52",
+    "coefficients": "1ef83317768798c8633be3993f0ae66a8ca70e6b9a6e0511bf390e9123b1494f",
+    "observations": "857107cbd009406839f917f7b16c3a084bf1d4ca8d73c6cf9ea42ab4434cf6f0",
+    "support": "bc06962c7f96863c29047196000b655b32593bbbcc2a9d92a745713b31cb8d83",
+    "labels": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e"
+  },
+  "estimated": 94,
+  "unestimated": 23,
+  "full_settled": 345,
+  "overlay_definition": "Candidate replaces only estimated native fixtures; all other frozen FM17 probabilities carried unchanged. Not a fully re-estimated issue.",
+  "causal_comparison": "Fixed policy historical proxy diagnostic; known outcomes, not independent prospective evidence."
+}

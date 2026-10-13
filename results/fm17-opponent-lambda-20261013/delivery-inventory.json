@@ -1,0 +1,107 @@
+{
+  "files": [
+    {
+      "path": "packages/beidan/DESCRIPTION",
+      "sha256": "879e3885d66f9b527976739634d1d9c8298d9e27724e77cb4f8d12166db5758d"
+    },
+    {
+      "path": "packages/beidan/R/opponent_goals.R",
+      "sha256": "fb78c1d76763053eee9d05a520ba8402cc7cd62f181b2f7161f6619e63a38e05"
+    },
+    {
+      "path": "packages/beidan/man/FitOpponentGoals.Rd",
+      "sha256": "441515f131881516277ea16b9437fd118582b15fe08a05af422a65db3fd74ed3"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/opponent_goals.py",
+      "sha256": "da4b1720786457e06418e92b1dfa755f2dfb0a07fe0fffbd13bb6a0546c47c9a"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/opponent_history.py",
+      "sha256": "1e87e1598ed6e0e90f5b279f4653cda81a737c6fe9e423ea8e62c38f33752c64"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/opponent_roster.py",
+      "sha256": "2961e09875fbcbf8c42221d919e0aedb6e2063c53c64e838c4ac787d5ac84bc5"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/opponent_publication.py",
+      "sha256": "c7505f057a4deb85fe25b85a512afa1b5762011b1b0b6d1dee857a028fa42f93"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/serialized_opponent_fit.py",
+      "sha256": "b3f76a1c48b4210be97684f125de35cc95904c0314b19ace816771131568f782"
+    },
+    {
+      "path": "r/fm17_opponent_inputs.R",
+      "sha256": "5079bc6fe495ebe71f928c0f78d6a2e398bc73fdfd161283469bcb598140fcd3"
+    },
+    {
+      "path": "r/fm17_opponent_freeze.R",
+      "sha256": "25d2b3583e5d4c9c0bfbb4d63d2aa9a5a0dc0671047144d01851be387f5fdfb3"
+    },
+    {
+      "path": "r/fm17_opponent_evaluate.R",
+      "sha256": "990f820a7e6ea28dc4a9ede9fb58bf562942775e5464a4cce577ebcef5b7beb6"
+    },
+    {
+      "path": "r/fm17_opponent_publish.R",
+      "sha256": "45b84ca5f81eac7400cf6a69bda6e57cdf4859d589ab0c64f2df3845552a0807"
+    },
+    {
+      "path": "scripts/replay_fm17_opponent_metadata.py",
+      "sha256": "0881fbec3a0c18dd541e0e3eaf8c4631f24ac47f9d3d5e94da2f9af6a90dff58"
+    },
+    {
+      "path": "scripts/replay_fm17_exclusion_rosters.py",
+      "sha256": "34c83307618f65724468f51abd2d1aaa14e3b086aa008a346f55c39a8ac71513"
+    },
+    {
+      "path": "scripts/publish_fm17_opponent_research.py",
+      "sha256": "549910115b75494f9b910ef452c44415d325971fa8305c4fd0e28b21df4102b5"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_opponent_history.py",
+      "sha256": "986f754d60115dde3af31cf9300206e9db57c3b1b8c972c001420ed744eaad55"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_opponent_goals.py",
+      "sha256": "e6a9d5dd5b5203bbc80308e87a3bcba250fe254793fe13680e3e205d2895e5cc"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_opponent_roster.py",
+      "sha256": "2d057718efce62128e14fc74d6a39a0ad4632ce32da4f7248b7c09a0bbc8f4ae"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_opponent_metadata_client.py",
+      "sha256": "e19931b8b7b3905efaeeb1fb8f086eb2c9f8a7036244617ee76c2aecf48da8a2"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_serialized_opponent_fit.py",
+      "sha256": "de3a2f2b648f76e69b821c1df213b0bc8ddb6adb951eebd6c4c25bdd5d7818cb"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_opponent_publication.py",
+      "sha256": "dade977f35152df4ef203ec61b84a82a9f4a1df933c75b9a78b1570a06b2ff91"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-opponent-goals.R",
+      "sha256": "5fe242bd23c2a59ee1fa7d3148782f8d2eb45c3b5d8d926415e2efdd22241528"
+    },
+    {
+      "path": "tests/testthat/test-fm17-opponent-delivery.R",
+      "sha256": "b0f598443283b85e464938e2080b713c336bba2370e9cd749d2094dbe1339d9f"
+    },
+    {
+      "path": "config/fm17_opponent_lambda_runtime.json",
+      "sha256": "7f9bca623d8a3294530b6fae3d215eadb5e1f31d3bddd8ea037c9aca2398aad2"
+    },
+    {
+      "path": "quarto/fm17_opponent_lambda_20261013.qmd",
+      "sha256": "3cd90a372bc1bddecf39cae51b53c73a4c88d921daa8a1ffe6de03a2e5ff5229"
+    }
+  ],
+  "mode": "BOUNDED_HISTORICAL_RESEARCH",
+  "formal_model": "FM-1.7.0_UNCHANGED",
+  "research_model": "OPPONENT_POISSON_RIDGE_RESEARCH_1"
+}

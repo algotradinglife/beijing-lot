@@ -1,0 +1,143 @@
+---
+title: "对手强度归一化攻防 λ：三期固定 FM17 对照"
+format:
+  html:
+    embed-resources: true
+    html-math-method: mathml
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  acceptance_required: true
+---
+
+本报告研究原生进球率的构造方式，正式 **FM-1.7.0 保持不变**。对照期号为26098、26101、26102，使用原冻结的T−24h截止、来源路由、ρ=−0.1、90%概率核心和外围0.3系数。北单让球只用于投影，不参与λ拟合；北单SP只用于比较。
+
+历史页面是事后采集，比分可用时间采用“比赛日期＋1天UTC”的代理。目标结果此前已经讨论过，本次是固定政策的历史诊断，不能视作独立前瞻验证。进球率来自历史实际进失球，不是射门质量数据提供的真实xG。
+
+本轮最明确的发现是**同赛事样本整理的收益大于当前对手模型的增量**。在345场整期局部替换中，原FM17的Top1/Top2为131/250，联合对手模型为135/250，同样本交叉均值控制为140/250。对手模型改善部分方向和概率评分，但没有稳定增加Top2覆盖，尚不支持正式升级。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root,mustWork=TRUE)
+out <- file.path(root,"results/fm17-opponent-lambda-20261013")
+runtime <- jsonlite::fromJSON(file.path(root,"config/fm17_opponent_lambda_runtime.json"))
+library(beidan,lib.loc=file.path(root,runtime$package_library_input))
+publication <- jsonlite::fromJSON(file.path(out,"publication.json"))
+evaluation <- jsonlite::fromJSON(file.path(out,"evaluation.json"))
+manifest <- jsonlite::fromJSON(file.path(out,"manifest.json"))
+stopifnot(publication$dataset=="fm17_opponent_research")
+tables <- set_names(map(c("audit","probabilities","metrics","lambdas","margins","coefficients","observations","support"),
+  ~read_dataset(publication$dataset,.x,version=publication$version)),
+  c("audit","probabilities","metrics","lambdas","margins","coefficients","observations","support"))
+stopifnot(all(map_lgl(tables,tibble::is_tibble)),nrow(tables$audit)==117L,
+  sum(tables$audit$state=="ESTIMATED")==manifest$estimated,
+  !anyDuplicated(tables$audit$fixture_id))
+metrics <- tables$metrics;lambda <- tables$lambdas;margins <- tables$margins
+```
+
+## 数据和估算覆盖
+
+冻结原生来源共117场。346个Titan及346个Nowscore页面完成离线解析；在原始历史数组中恢复赛事ID、赛事名称和中立场标记，并与冻结比分、主客ID、日期逐行核对。Nowscore新版名称为空时保留明确缺失，赛事ID不被填补成猜测值。原始来源选择继续使用原事实账本。
+
+独立解析来源的实际期号选择器和整期名单，补齐来源已列出的26103、26104期排除ID，不从三期评估子集推导未来名单。未列出的26099、26100不被补造，也不据此断言它们在所有渠道不存在。这份来源名单是历史身份排除凭证，不是赛前可获得性的证明。
+
+```{r}
+knitr::kable(tables$audit |> count(issue_id,state),caption="逐期原生候选覆盖")
+knitr::kable(tables$audit |> filter(state!="ESTIMATED") |> count(reason),caption="未估算原因；保留原记录，不强行生成新λ")
+knitr::kable(lambda |> count(competition_name,neutral_reported,name="estimated"),caption="实际赛事类别与来源中立场标记")
+```
+
+## 模型与控制项
+
+只在目标赛事ID内拟合球队网络，避免把不同赛事进球环境混成同一个均值。本次样本来自已覆盖球队的历史快照，**不是完整联赛逐轮数据库**。移除与目标球队无连通路径的网络；目标双方不连通或相应场地支持不足12场时不估算。
+
+每场历史比赛产生双方各一条进球观察。球队／场地组的长期和最近8场权重由共享`temporal_learning`生成，α=0.5，两个组件分别归一化；至少12场且ESS≥8时启用近期混合，稀疏对手组只使用长期等权。攻击、对方防守和场地效应联合进入Poisson模型：
+
+\[
+\log\lambda_{i,j,v}=\beta_0+\beta_H h_v+a_i+d_j.
+\]
+
+`h_v`为主场1、客场0、来源报告中立场0.5；未报告中立场不代表已独立证实非中立。`d_j`越大表示对手更容易失球。使用已安装的`glmnet` Poisson ridge，λ罚项固定0.05；截距与场地项不罚，攻击和防守系数向0收缩。该值在目标评估前固定，不按这三期赛果搜索。`stats::glm`不能直接提供这套稀疏收缩，因此复用成熟的glmnet、Matrix和igraph。
+
+三份原生参数同时保留：原FM17λ、相同赛事／场地样本的进失球交叉均值、联合对手归一化λ。第二项帮助区分“改变历史样本”与“联合估计对手”的效果。所有新λ经过相同DC、原apply/retain审查及FM17尾部规则，再映射北单让球。
+
+```{r}
+knitr::kable(tibble(item=c("近期α","近期窗口","Ridge罚项","ρ","核心质量","外围系数"),
+  value=c("0.5","8场","0.05","−0.1（专家固定）","首次严格超过90%，边界并列整组纳入","0.3")))
+knitr::kable(lambda |> select(fixture_id,league,old_lambda_home,old_lambda_away,
+  raw_same_support_home,raw_same_support_away,lambda_home,lambda_away,direction_changed),digits=4,
+  caption="全部成功估算场次：λ顺序为主队／客队")
+```
+
+## 同场命中与概率评分
+
+Top1为第一选择命中；Top2为前两类覆盖。Brier是三类平方误差之和，log loss使用自然对数，均越低越好。并列沿用包内W、D、L排序。赛前同截止SP和较晚SP分别报告，样本不混用。
+
+```{r}
+knitr::kable(metrics |> filter(cohort=="ESTIMATED_PAIRED",issue_id=="ALL",comparison%in%c("same_cutoff","near_sale")) |>
+  select(comparison,model,n,hits1,hits2,top1,top2,brier,logloss),digits=6,
+  caption="成功估算的严格同场比较；含同样本控制与尾部前后")
+knitr::kable(metrics |> filter(cohort=="ESTIMATED_PAIRED",issue_id!="ALL",comparison=="near_sale",
+  model%in%c("OPPONENT_NATIVE","SAME_SUPPORT_RAW","FM-1.7.0","BEIDAN_LATER")) |>
+  select(issue_id,model,n,hits1,hits2,brier,logloss),digits=6,caption="逐期同场表现")
+```
+
+94场候选同场中，原FM17为27/66，联合对手模型为31/66，同样本控制为36/66，而较晚北单SP为39/71。对手模型的Top1提升不能掩盖保护覆盖仍落后较晚北单。T−24同场只有77场：原FM17为21/51、对手模型24/50、同样本控制29/52，北单26/55；对手校正增加主选，却损失一场保护。
+
+## 整期影响
+
+本表把成功估算的原生场次替换为候选概率，其余原生场次和全部市场来源维持原冻结预测。因此它是**固定来源路由的局部替换对照**，不是宣称所有场次都已重新拟合对手模型。取消场26098#102不计分；#135原截止缺失，沿用原排除。
+
+```{r}
+knitr::kable(metrics |> filter(cohort=="FULL_FROZEN_ROUTING_OVERLAY",issue_id=="ALL",
+  comparison%in%c("same_cutoff","near_sale")) |> select(comparison,model,n,hits1,hits2,top1,top2,brier,logloss),
+  digits=6,caption="完整已结算样本的局部替换影响")
+```
+
+整期T−24严格同场214场，原FM17为81/150，对手局部替换为84/149，同样本控制为89/151，北单为71/149。整期较晚SP345场中，候选仍未在Brier和log loss上稳定超过北单。命中排名与概率准确度需要分别评价，不能只看Top1增加。
+
+## λ与净胜球分布
+
+下图选用此前已讨论的26102#6及同类诊断场次，案例选择是事后展示，不能据此裁定整体效果。
+
+```{r}
+case_ids <- intersect(c("26102:6","26101:52","26101:98","26102:74"),lambda$fixture_id)
+knitr::kable(lambda |> filter(fixture_id%in%case_ids) |> select(fixture_id,home,away,
+  old_lambda_home,old_lambda_away,raw_same_support_home,raw_same_support_away,lambda_home,lambda_away),digits=4)
+margins |> filter(fixture_id%in%case_ids,stage=="base",between(margin,-5,5)) |>
+  ggplot(aes(margin,probability,color=model)) + geom_line() + geom_point(size=1) +
+  facet_wrap(~fixture_id) + scale_y_continuous(labels=scales::percent) +
+  labs(x="主队净胜球",y="档位概率（尾部校正前）",color="方法") + theme_minimal()
+```
+
+图中展示−5至+5档，完整分布仍用于北单投影。26102#6的原生λ由1.11/1.56变为约1.36/1.01，方向从客强变为主强；须结合“同样本控制”列判断其中多少来自剔除其他赛事历史，不能把全部变化记作对手归一化效果。
+
+## 验证与复现
+
+模型返回共享截止、最大源／标签时间、传递实现身份、权重账本和ESS；按实际目标／未来原生ID排除，并额外使用严格时间过滤。独立重跑全批必须逐对象完全相同。自动测试包括未来／错误早日期的目标ID变动不影响估计、错截止拒绝、稀疏组长期收缩、权重政策替换拒绝、无关网络不影响目标λ、归一化质量、NAS幂等和注册失败回滚。
+
+冻结脚本没有读取独立评估标签文件；历史源本身含有比分，且部分赛果此前已知，因此manifest的打开标签标记仅描述程序边界，不表示本次是盲测。原始派生输入、元数据、身份名单及评估/SP快照作为有哈希的Parquet快照行保存，可从包读取后恢复本地重放输入；不依赖退役磁盘。
+
+```{r}
+validation <- jsonlite::fromJSON(file.path(out,"validation.json"))
+review <- jsonlite::fromJSON(file.path(out,"review-acceptance.json"),simplifyVector=FALSE)
+knitr::kable(bind_rows(validation$checks),format="html",escape=TRUE,caption="实际执行的本地验收；不声称全仓检查或CI通过")
+knitr::kable(bind_rows(review$reviews),format="html",escape=TRUE,caption="Codex审查命令、发现和处理；退出码本身不是验收")
+if(isTRUE(params$acceptance_required))stopifnot(review$status=="ACCEPTED",review$blocking_findings==0L)
+for(file in review$files)stopifnot(digest::digest(file=file.path(root,file$path),algo="sha256")==file$sha256)
+```
+
+执行入口：`r/fm17_opponent_inputs.R`、`scripts/replay_fm17_opponent_metadata.py`、`scripts/replay_fm17_exclusion_rosters.py`、`r/fm17_opponent_freeze.R`（含`replay`模式）、`r/fm17_opponent_evaluate.R`、`r/fm17_opponent_publish.R`及`scripts/publish_fm17_opponent_research.py`。运行环境和固定政策在`config/fm17_opponent_lambda_runtime.json`中声明。R包内部研究入口为`FitOpponentGoals()`，统计实现不在QMD中。
+
+NAS数据通过包的`read_dataset()`读取并核验哈希；本报告未直接打开NAS Parquet。旧存储检查仍引用已退役Sandisk，失败记录与本次实际NAS/NVMe路径验证分别保存，未创建替代磁盘路径。
+
+## 研究边界与后续
+
+本次只能检验已有同赛事网络中的原生λ。跨级别杯赛、国家队及年龄组样本不足时仍需更广的同级比赛历史和独立实力证据；不能把稀疏对手系数当作高置信战力。阵容、伤停、战意和对手阵容强度尚未量化，历史全场比分也没有全部核实为严格90分钟。ρ未校准，Poisson进球方差及固定近期α仍是限制。
+
+正式升级须在新的冻结期号上核验增益，并解决真实赛前可获得性。当前结果用于选择下一步研究方向，不能从这些已知结果中追选参数或宣称前瞻优势。
+
+建议下一轮先冻结“同赛事样本整理”候选，再用独立期号检验；对手模型继续研究更完整的联赛网络、独立对手支持深度与收缩强度。当前0.05不按本期好坏改拍新值，若调参，应在目标截止前的历史窗口内完成。

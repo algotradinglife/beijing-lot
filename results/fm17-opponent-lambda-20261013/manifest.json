@@ -1,0 +1,15 @@
+{
+  "forecast_sha256": "5a539868d8edd063a071b97a43e42074174dfcefa138d99673f7c47aa3d036e0",
+  "bindings": {
+    "input_sha256": "5fb6724a769fb35e14b0aed8b1d0f52b2dcc77e097f8d400be26bf02f3b9f5c4",
+    "metadata_sha256": "b7a9a3e7acf3346068e89c893f563c97ec3322bdf873eb1cf25a809e50f4bf28",
+    "runtime_sha256": "7f9bca623d8a3294530b6fae3d215eadb5e1f31d3bddd8ea037c9aca2398aad2",
+    "client_sha256": "25d2b3583e5d4c9c0bfbb4d63d2aa9a5a0dc0671047144d01851be387f5fdfb3",
+    "parent_forecast_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "exclusion_rosters_sha256": "d13f033ecf041feeb5bb94778fff430053fce7c5f8064a929fcb0da7fdaf6b60"
+  },
+  "estimated": 94,
+  "native_scope": 117,
+  "target_labels_opened": false,
+  "formal_FM_unchanged": true
+}

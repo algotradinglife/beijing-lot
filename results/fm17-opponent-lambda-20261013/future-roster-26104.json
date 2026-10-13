@@ -1,0 +1,570 @@
+{
+  "identities": [
+    {
+      "issue_id": "26104",
+      "provider_id": "3068865",
+      "slot": 1
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3068868",
+      "slot": 2
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3068867",
+      "slot": 3
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3068866",
+      "slot": 4
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3068869",
+      "slot": 5
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073175",
+      "slot": 6
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073209",
+      "slot": 7
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2914714",
+      "slot": 8
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008261",
+      "slot": 9
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008262",
+      "slot": 10
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008265",
+      "slot": 11
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008266",
+      "slot": 12
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008264",
+      "slot": 13
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008267",
+      "slot": 14
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3002275",
+      "slot": 15
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073093",
+      "slot": 16
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073124",
+      "slot": 17
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073105",
+      "slot": 18
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073178",
+      "slot": 19
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073182",
+      "slot": 20
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073103",
+      "slot": 21
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073134",
+      "slot": 22
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008260",
+      "slot": 23
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008263",
+      "slot": 24
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2940225",
+      "slot": 25
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3092420",
+      "slot": 26
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3069041",
+      "slot": 27
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3099684",
+      "slot": 28
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3068872",
+      "slot": 29
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3068871",
+      "slot": 30
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3099687",
+      "slot": 31
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3099691",
+      "slot": 32
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3099689",
+      "slot": 33
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3099688",
+      "slot": 34
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3099685",
+      "slot": 35
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913176",
+      "slot": 36
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3039866",
+      "slot": 37
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073199",
+      "slot": 38
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073122",
+      "slot": 39
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913170",
+      "slot": 40
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913171",
+      "slot": 41
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913172",
+      "slot": 42
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913173",
+      "slot": 43
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913174",
+      "slot": 44
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913175",
+      "slot": 45
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2913177",
+      "slot": 46
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008269",
+      "slot": 47
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008270",
+      "slot": 48
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008271",
+      "slot": 49
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073074",
+      "slot": 50
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073084",
+      "slot": 51
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073156",
+      "slot": 52
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073140",
+      "slot": 53
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073150",
+      "slot": 54
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073212",
+      "slot": 55
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3008268",
+      "slot": 56
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3092421",
+      "slot": 57
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2962665",
+      "slot": 58
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908836",
+      "slot": 59
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908834",
+      "slot": 60
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908835",
+      "slot": 61
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908837",
+      "slot": 62
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908833",
+      "slot": 63
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908838",
+      "slot": 64
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3092416",
+      "slot": 65
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908839",
+      "slot": 66
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908840",
+      "slot": 67
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908841",
+      "slot": 68
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908842",
+      "slot": 69
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908843",
+      "slot": 70
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908844",
+      "slot": 71
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908846",
+      "slot": 72
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908845",
+      "slot": 73
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2908847",
+      "slot": 74
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073765",
+      "slot": 75
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073793",
+      "slot": 76
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073750",
+      "slot": 77
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075291",
+      "slot": 78
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073740",
+      "slot": 79
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073769",
+      "slot": 80
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075310",
+      "slot": 81
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073868",
+      "slot": 82
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073870",
+      "slot": 83
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073863",
+      "slot": 84
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075325",
+      "slot": 85
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075322",
+      "slot": 86
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075344",
+      "slot": 87
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073841",
+      "slot": 88
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073852",
+      "slot": 89
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075354",
+      "slot": 90
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073719",
+      "slot": 91
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073727",
+      "slot": 92
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073734",
+      "slot": 93
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073744",
+      "slot": 94
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075295",
+      "slot": 95
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073756",
+      "slot": 96
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075313",
+      "slot": 97
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073731",
+      "slot": 98
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073771",
+      "slot": 99
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073789",
+      "slot": 100
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073828",
+      "slot": 101
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073846",
+      "slot": 102
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3073811",
+      "slot": 103
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075329",
+      "slot": 104
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075331",
+      "slot": 105
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3075341",
+      "slot": 106
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3007155",
+      "slot": 107
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "2962691",
+      "slot": 108
+    },
+    {
+      "issue_id": "26104",
+      "provider_id": "3092417",
+      "slot": 109
+    }
+  ],
+  "receipt": {
+    "cache_hit": false,
+    "cache_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/source-extraction/raw.sqlite",
+    "capture_id": 1574,
+    "content_type": "text/html; charset=utf-8",
+    "implementation_sha256": {
+      "contract.py": "0abfc13be1592d82a0acf4ad224fbb58147a39d108938c48f46edcc64f0852d2",
+      "decode.py": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c",
+      "extraction_cache.py": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422",
+      "source_extraction.py": "ff93a180e4f0b09a1bc9431e690134c29ac039e6bc51c7fc5ae85117a9162054",
+      "sources.py": "1467def1bb9bde7c7d55a3f9277a70eba8471231276d2859df4ede0011b93b85",
+      "transport.py": "8b68fbc2dc43418a488365416d60f9d719ebb1c6df0980353fb1692b4987a955"
+    },
+    "network_attempts": 1,
+    "observed_at": "2026-10-13T13:47:51.852358+00:00",
+    "processed_at": "2026-10-13T13:47:51.861279+00:00",
+    "request_key": "2c988dd35e36bd44272c98fa1a0e0b47cc45baf98f4df5b2f3976578a71f8e81",
+    "sha256": "48fe85cbc87a2a97cc73aeb202dafe73ab010f9b886d75cc3c7681bf2037c1db",
+    "source": "nowscore",
+    "url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=5&all=1&issueNum=26104"
+  }
+}

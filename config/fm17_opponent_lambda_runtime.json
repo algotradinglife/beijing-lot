@@ -1,0 +1,42 @@
+{
+  "R_runtime": "4.6.1",
+  "R_interpreter": "/opt/R/4.6.1/bin/Rscript",
+  "python_runtime": "3.14.4",
+  "python_interpreter": ".venv/bin/python",
+  "Quarto": "1.10.18",
+  "R_dependencies": {
+    "beidan": "0.2.0",
+    "glmnet": "5.1",
+    "Matrix": "1.7.6",
+    "igraph": "2.3.3",
+    "tidyverse": "2.0.0",
+    "reticulate": "1.46.0",
+    "testthat": "3.3.2",
+    "jsonlite": "2.0.0",
+    "digest": "0.6.39"
+  },
+  "python_dependencies": {
+    "pandas": "3.0.3",
+    "numpy": "2.4.6",
+    "json5": "0.15.0",
+    "beautifulsoup4": "4.15.0"
+  },
+  "native_policy": {
+    "recent_n": 8,
+    "alpha": 0.5,
+    "minimum_recent_matches": 12,
+    "minimum_recent_ess": 8
+  },
+  "fit_policy": {
+    "ridge": 0.05,
+    "minimum_target_matches": 12,
+    "convergence_tolerance": 1e-10,
+    "maximum_iterations": 100000
+  },
+  "fixed_FM_policy": {"version": "FM-1.7.0", "rho": -0.1, "tail_coverage": 0.9, "tail_coefficient": 0.3},
+  "package_library_input": "results/fm17-diagnostic-iterations-20261013/library",
+  "study_id": "OPPONENT_POISSON_RIDGE_RESEARCH_1",
+  "target_label_optimization": false,
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "setup_rule": "Existing dependencies verified locally. R setup uses pak; no installs during functions or Quarto rendering. Ridge 0.05 is fixed before target evaluation, not fitted from outcomes."
+}
