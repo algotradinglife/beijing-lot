@@ -1,0 +1,9 @@
+recaptured-market-comparison: .................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+# A tibble: 3 × 5
+  test                                                    nb failed error passed
+  <chr>                                                <int>  <int> <lgl>  <int>
+1 older overlapping prices quarantine a better-covere…     5      0 FALSE      5
+2 duplicate occurrences are reconciled as sets and fu…     7      0 FALSE      7
+3 comparison rejects detached objects and incompatibl…     5      0 FALSE      5

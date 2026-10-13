@@ -1,0 +1,12 @@
+# Bind source-native team IDs from the original frozen pre-match fixture registry.
+root<-normalizePath(commandArgs(TRUE)[1],mustWork=TRUE)
+suppressPackageStartupMessages(library(tidyverse));library(jsonlite)
+out<-file.path(root,'results/fm17-market-recapture-20261013')
+s<-readRDS(file.path(root,'results/fm16-three-issues-20261012/stage.rds'))
+stopifnot(digest::digest(file=file.path(root,'results/fm16-three-issues-20261012/stage.rds'),algo='sha256')=='39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68')
+scope<-read_csv(file.path(out,'scope.csv'),col_types=cols(.default=col_character(),cutoff_utc=col_datetime()))
+x<-map_dfr(scope$fixture_id,~tibble(fixture_id=.x,home_id=s$native[[.x]]$fixture$home_id,away_id=s$native[[.x]]$fixture$away_id))
+stopifnot(nrow(x)==117L,!anyDuplicated(x$fixture_id),!anyNA(x),all(nchar(x$home_id)>0),all(nchar(x$away_id)>0))
+write_csv(x,file.path(out,'team-identity-scope.csv'))
+write_json(map(seq_len(nrow(x)),~as.list(x[.x,])),file.path(out,'team-identity-scope.json'),auto_unbox=TRUE,pretty=TRUE)
+write_json(list(frozen_stage_sha256='39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68',scope_sha256=digest::digest(file=file.path(out,'scope.json'),algo='sha256'),client_sha256=digest::digest(file=file.path(root,'r/fm17_market_identity_scope.R'),algo='sha256'),identity_scope_sha256=digest::digest(file=file.path(out,'team-identity-scope.json'),algo='sha256'),identity_csv_sha256=digest::digest(file=file.path(out,'team-identity-scope.csv'),algo='sha256')),file.path(out,'team-identity-manifest.json'),auto_unbox=TRUE,pretty=TRUE)

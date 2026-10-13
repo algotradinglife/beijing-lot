@@ -1,0 +1,8 @@
+{
+  "primary_selected_sha256": "570dabe6a46820c976f0c441420280156401a98e722b6e872dee99786cb3b396",
+  "probe_audit_sha256": "9ab2914e1514d3ba9d960b1022fcfb4e8919ec563003b2b4439d62ccd541f84c",
+  "final_sha256": "89cc29f65253ef728b60c164b06e02c14232a069c984c5acbacb967aebf6190f",
+  "client_sha256": "8d5b75594a0673c61717a8836b4932f5a47624cf56e13c8ec39b556ab4919798",
+  "historical_admitted": false,
+  "selection": "Distinct source-company keys appended; no replacement of original same-key prices; same frozen cutoffs and shared evidence receipts."
+}

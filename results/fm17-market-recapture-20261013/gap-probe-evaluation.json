@@ -1,0 +1,9 @@
+{
+  "probe_sha256": "e1281e7bd25d17b1fa2aa324073953181b0dd8d8e4be8f3ea932465fa90ecbe2",
+  "client_sha256": "8e86023bed6f8c8598fdf9913115248b9e4c761b2f5142458c4253e66326c60a",
+  "auditor_sha256": "26c29e900c0afad6417baad679304bc6535c5895e068edf7ed5efd4e71a4df1c",
+  "prior_company3_rows": 4,
+  "qualified_company3_rows": 4,
+  "fixture_scope": ["26101:10", "26101:3", "26101:4", "26101:5", "26101:6", "26101:7", "26101:8", "26101:9", "26102:19", "26102:20"],
+  "audit_sha256": "9ab2914e1514d3ba9d960b1022fcfb4e8919ec563003b2b4439d62ccd541f84c"
+}

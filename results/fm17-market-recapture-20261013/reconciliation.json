@@ -1,0 +1,10 @@
+{
+  "intended_use": "HISTORICAL_DIAGNOSTIC_ONLY",
+  "formal_FM17_changed": false,
+  "selection": "Whole capture only; reject overlapping timestamp price conflicts; prefer more qualified channels then companies; ties retain original. No target scores used.",
+  "source_parent_hashes": ["676ae640ee4fb32f83b21d774ea551843b86890f13e7bc592e33fa11747aca4e", "607137fd42081f28c5d5324e3910e15f351080591986e714fd6ec4ec959be23c"],
+  "selected_hash": "570dabe6a46820c976f0c441420280156401a98e722b6e872dee99786cb3b396",
+  "client_sha256": "7d3904d0615b450caaceaf05660c5116f349e56af4e3f6c9ee6985d5f2bdd237",
+  "new_capture_chosen": 2,
+  "price_conflict_rows": 0
+}

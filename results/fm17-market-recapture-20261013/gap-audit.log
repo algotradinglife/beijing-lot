@@ -1,0 +1,23 @@
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:purrr’:
+
+    flatten
+
+# A tibble: 4 × 6
+  fixture_id market company_id quote_at            age_hours qualified
+  <chr>      <chr>  <chr>      <dttm>                  <dbl> <lgl>    
+1 26101:10   asian  3          2026-09-28 04:05:06      6.42 TRUE     
+2 26101:10   totals 3          2026-09-28 04:05:06      6.42 TRUE     
+3 26102:20   asian  3          2026-10-05 11:33:44      2.19 TRUE     
+4 26102:20   totals 3          2026-10-05 09:09:08      4.60 TRUE     
+# A tibble: 6 × 3
+  market status              n
+  <chr>  <chr>           <int>
+1 asian  NO_PRIOR_QUOTES     8
+2 asian  QUALIFIED_PROXY     2
+3 euro   NO_PRIOR_QUOTES     7
+4 euro   QUALIFIED_PROXY     3
+5 totals NO_PRIOR_QUOTES     8
+6 totals QUALIFIED_PROXY     2

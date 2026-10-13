@@ -1,0 +1,150 @@
+---
+title: "FM17：同一冻结截止盘口补齐与来源核验"
+params:
+  root: ".."
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本次范围是三期FM17选择原生λ的全部117场（26098：43、26101：50、26102：24），没有按命中或赛果挑补采对象。使用各场原冻结截止（原期开球前24小时），不移动截止、不用较晚报价补早时点。正式FM17及原预测不变，没有重算命中率或概率准确性。
+
+最终109场能找到截止前三类盘口历史；43场三类均有符合原48小时/四家欧赔过滤条件且身份核验通过的报价。这里“报价齐全”不代表已通过完整市场DC残差、一致性或来源路由审查。剩余8场仍未在所查来源找到某类截止前报价，不证明全市场当时没有报价；还有较旧报价、固定欧赔篮子外报价，以及1场钟点差异需核验。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+library(testthat)
+root<-normalizePath(params$root,mustWork=TRUE)
+out<-file.path(root,'results/fm17-market-recapture-20261013')
+library(beidan,lib.loc=file.path(root,'results/fm17-diagnostic-iterations-20261013/library'))
+pub<-jsonlite::fromJSON(file.path(out,'publication.json'))
+stopifnot(pub$publication$version=='20261013-v4',pub$idempotent_republish$status=='unchanged',!pub$receipt$historical_admitted)
+for(paths in list(pub$receipt$input_hashes,pub$receipt$implementation_hashes))for(path in names(paths))stopifnot(digest::digest(file=file.path(root,path),algo='sha256')==paths[[path]])
+stopifnot(digest::digest(file=file.path(root,'results/fm17-three-issues-20261013/forecasts.rds'),algo='sha256')==pub$receipt$formal_forecast_sha256)
+dataset<-pub$publication$dataset;version<-pub$publication$version;store<-pub$publication$root
+history<-read_dataset(dataset,'history',version=version,root=store)
+latest<-read_dataset(dataset,'latest',version=version,root=store)
+coverage<-read_dataset(dataset,'coverage',version=version,root=store)
+provenance<-read_dataset(dataset,'provenance',version=version,root=store)
+stopifnot(nrow(coverage)==351L,nrow(provenance)==371L,length(unique(coverage$fixture_id))==117L)
+fixture_coverage<-coverage |> group_by(fixture_id) |> summarise(prior_all=all(prior_rows>0),qualified_all=all(qualified_companies>0),.groups='drop')
+stopifnot(sum(fixture_coverage$prior_all)==109L,sum(fixture_coverage$qualified_all)==43L)
+knitr::kable(fixture_coverage |> dplyr::summarise(fixtures=dplyr::n(),prior_histories_complete=sum(prior_all),qualified_quote_complete=sum(qualified_all),incomplete_prior=sum(!prior_all)),caption='同截止覆盖：原生模型117场，不等同于整期346场')
+knitr::kable(coverage |> count(market,status),caption='逐市场缺口；总计351个场次×市场键')
+```
+
+## 补齐过程与实际新增
+
+先校验原文件哈希并离线重放全部117场，逐通道保存成功与失败，避免欧赔失败或旧流程提前退出把其他有效盘口也清零。原初名字逐字匹配会隔离很多记录，因此从冻结Nowscore场次登记取双方球队ID，与Titan原始欧赔JS的比赛ID、双方ID及UTC开球时间精确核验。仅ID和时钟全部相符时允许中文译名差异，不建立全局球队别名。原始名字和各来源身份仍保留。
+
+在原过滤规则下仍缺某个通道的77场，使用已有有界采集器补取231个场次×市场页面；每键1次采集任务，超时15秒、最多1次重试、请求间隔至少1秒。响应和失败凭证全部保存，HTTP成功不冒充解析或报价成功。比较完整截止前历史的同键同时间价格集合（重复出现单独计数），没有发现冲突；整份捕获覆盖更差时保留原记录，不用新失败替换旧成功。
+
+两场新响应恢复了原失败欧赔页：26098#13、26102#24。其余大多不是请求缺失，而是早时点没有报价、报价较旧或篮子限制。第一版三类符合条件共41场，按原切口存在三类历史107场。
+
+```{r}
+choice<-read_csv(file.path(out,'source-choice.csv'),show_col_types=FALSE)
+knitr::kable(choice |> count(selected,reason))
+knitr::kable(choice |> filter(selected=='recaptured'))
+knitr::kable(provenance |> count(market,response_state),caption='已选原始响应分类；空历史、请求失败、解析失败与可解析历史分开')
+```
+
+对仍无截止前亚盘/大小球的10场，再查询来源接口公司ID3，共20个页面。共享截止模块只承认截止前报价，其中4条来自26101#10、26102#20，补全两场亚盘和大小球，最终三类符合条件达到43场；其余8场没有因此补出原截止前报价。公司ID只在各自来源/市场命名空间内有效，不能把欧赔ID3和亚盘ID3直接当同一家公司。
+
+```{r}
+knitr::kable(latest |> filter(market!='euro',company_id=='3') |> select(fixture_id,market,quote_at,age_hours,handicap,line,home_decimal,away_decimal,over_decimal,under_decimal,qualified),digits=4,caption='实际新增：同一原截止前的第二来源公司报价')
+knitr::kable(coverage |> filter(prior_rows==0) |> select(fixture_id,market,status),caption='最终仍缺原截止前报价的市场键；不能用开赛前更晚报价补齐')
+```
+
+## #6不是没有欧赔，而是固定篮子没有足够新的欧赔
+
+26102#6原响应包含很多公司的截止前欧赔；原模型四家（281、115、82、432）的最后报价都超过48小时，全部被过滤。其他公司有更接近截止的报价。因此“篮子内无合格报价”与“来源没有欧赔”必须分开。原来的48小时和固定四家公司政策没有修改；先保存宽口径市场历史，后续再讨论是否改变模型篮子或较旧报价使用政策。
+
+```{r}
+knitr::kable(latest |> filter(fixture_id=='26102:6',market=='euro',company_id %in% c('281','115','82','432')) |> select(company_id,quote_at,age_hours,odds_home,odds_draw,odds_away,fresh,supported,qualified),digits=4)
+knitr::kable(latest |> filter(fixture_id=='26102:6',market=='euro',fresh,!supported) |> arrange(age_hours) |> slice_head(n=8) |> select(company_id,quote_at,age_hours,odds_home,odds_draw,odds_away),digits=4,caption='篮子外确有截止前较新欧赔；仅诊断展示，不已加入模型')
+```
+
+## 尚未裁决的时钟差异
+
+26101#48条约联—都柏林：冻结Nowscore计划为2026-10-02 18:45 UTC，Titan欧赔页为19:10 UTC，比赛ID及双方球队ID一致，差25分钟。可能包含改期或延迟，但目前没有独立证据裁决。保持原cutoff，三类数据可检查，qualified=false；不通过改钟点或名称映射自动放行。
+
+```{r}
+knitr::kable(coverage |> filter(identity_status=='NAME_OR_CLOCK_CONFLICT'))
+```
+
+## 数据位置、契约与复现
+
+持久化数据已通过共享versioning.publish_version发布到NAS，catalog登记`fm17_replayed_markets`，最终版本`20261013-v4`。`20261013-v1`是保留的主源补采版本，最终版增加不同公司的报价键。v1/v2均保留不可变；v2是补公司3的审查前数据版，v3修复全历史冲突检查及共享准入实现收据绑定，数值覆盖未变化。全部版本都不可变；v2重复发布验证为unchanged。旧版发布函数及收据另存为primary-v1-implementation，只作历史实现证据，不作为兼容接口。
+
+消费入口：
+
+```{r}
+knitr::kable(tibble(dataset=dataset,version=version,table=c('history','latest','coverage','provenance'),rows=c(nrow(history),nrow(latest),nrow(coverage),nrow(provenance))))
+knitr::kable(latest |> select(fixture_id,market,company_id,quote_at,age_hours,fresh,supported,qualified) |> slice_head(n=8))
+```
+
+```r
+beidan::read_dataset("fm17_replayed_markets", "latest",
+  version="20261013-v4", root=Sys.getenv("BEIDAN_PARQUET_ROOT"))
+```
+
+history是一条已解析来源报价/顺序记录，键为fixture_id/market/sequence；latest是每场每市场每公司的最后一条共享模块准入报价；coverage每场每市场一行；provenance每场每市场每URL一行，保存采集时间、原URL/响应SHA、解析器身份、原始路径及错误。未使用的市场价格列为类型化NA。Euro解析器已有同一分钟保留第一源行的规则，诊断计数及原字节保留；history.sequence是解析输出顺序，不能冒称已保留全部原始重复行。没有删除原始响应。
+
+AH是加到主队的让球，来源PanKou的主让正值必须取负；价格全部含本金。欧赔/亚盘/大小球的公司编号命名空间不混用。quote_at是历史报价钟点，collected_at是本次或旧捕获时点，cutoff_utc是原决策截止；不得混淆。history包含截止后历史行供核查，prior=false；latest严格早于cutoff。报价较旧标记而不从原历史删除。
+
+R表全为tibble。来源解析、采集、准入审计、来源比较、NAS发布分离。复用已有传输和Titan解析器，新增离线重放、R审计与薄发布适配器；时间准入、缓存/权重/ESS和收据全部使用共享temporal_learning。没有历史攻防拟合、校准、ρ训练或策略路由。来源比较只根据数据字段完整性，额外公司用不同键扩展，无目标赛果参与。
+
+所有捕获发生在原截止之后，历史钟点只是代理；全部historical_admitted=false，只供历史诊断，不能当作已经证明实时可得。新原字节在声明的NVMe hot根；持久化分析表在NAS，通过包接口读取，不依赖Sandisk。旧daily-paper布局检查仍引用已退役Sandisk，收尾时因设备不存在失败，完整失败日志保留；该检查的声明范围是日常纸面单，不是本数据族。已用catalog根解析、NAS版本注册和437个包接口交付断言验证本任务的NAS/NVMe路径，没有创建替代数据根或将旧检查标为通过。原117场冻结名单、原始捕获和输入实现的哈希在plan/scope及各轮manifest绑定，NAS版本manifest绑定每个Parquet哈希。
+
+复现使用项目Python `.venv/bin/python`、R4.6.1及config/fm17_market_recapture_runtime.json。R包库是声明的FM17私有安装输入，审计函数用明确的项目文件加载。依赖安装只在环境准备进行，R安装用pak；渲染不安装、不抓网、不写NAS。
+
+```bash
+/opt/R/4.6.1/bin/Rscript r/fm17_market_recapture_plan.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_market_identity_scope.R "$PWD"
+PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/replay_fm17_market_captures.py --root "$PWD" --scope results/fm17-market-recapture-20261013/scope.json --identity-scope results/fm17-market-recapture-20261013/team-identity-scope.json --output results/fm17-market-recapture-20261013/offline-replay-v2
+/opt/R/4.6.1/bin/Rscript r/fm17_market_recapture_audit.R "$PWD" offline
+# Capture phase (already completed; existing receipts are reused, no requests on render):
+# source config/source-extraction.env
+# PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/capture_fm_issue_markets.py --fixtures results/fm17-market-recapture-20261013/recapture-fixtures.json --output "$BEIDAN_HOT_ROOT/fm17-market-recapture/20261013-capture-v1"
+/opt/R/4.6.1/bin/Rscript r/fm17_market_recap_scope.R "$PWD"
+PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/replay_fm17_market_captures.py --root "$PWD" --scope results/fm17-market-recapture-20261013/recaptured-scope.json --identity-scope results/fm17-market-recapture-20261013/team-identity-scope.json --output results/fm17-market-recapture-20261013/recaptured-replay
+/opt/R/4.6.1/bin/Rscript r/fm17_market_recapture_audit.R "$PWD" recaptured
+/opt/R/4.6.1/bin/Rscript r/fm17_market_reconcile.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_market_gap_queue.R "$PWD"
+# Additional source acquisition: source config/source-extraction.env;
+# PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/probe_fm17_market_gaps.py --queue results/fm17-market-recapture-20261013/gap-probe-queue.json --output results/fm17-market-recapture-20261013/gap-probe.json
+/opt/R/4.6.1/bin/Rscript r/fm17_market_gap_audit.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_market_augment.R "$PWD"
+source config/source-extraction.env
+PYTHONPATH=packages/beidan/inst/python .venv/bin/python scripts/publish_fm17_market_snapshot.py --root "$PWD" --label 20261013-v4
+PYTHONPATH=packages/beidan/inst/python .venv/bin/python -m pytest packages/beidan/tests/python/test_market_capture_replay.py packages/beidan/tests/python/test_market_capture_publication.py -q
+FM17_MARKET_ROOT="$PWD" /opt/R/4.6.1/bin/Rscript -e 'library(beidan,lib.loc=normalizePath("results/fm17-diagnostic-iterations-20261013/library"));testthat::test_file("packages/beidan/tests/testthat/test-recaptured-market-audit.R",env=new.env(parent=asNamespace("beidan")),load_helpers=FALSE,stop_on_failure=TRUE)'
+FM17_MARKET_ROOT="$PWD" /opt/R/4.6.1/bin/Rscript -e 'library(beidan,lib.loc=normalizePath("results/fm17-diagnostic-iterations-20261013/library"));testthat::test_file("tests/testthat/test-fm17-market-recapture-delivery.R",env=new.env(parent=asNamespace("beidan")),load_helpers=FALSE,stop_on_failure=TRUE)'
+quarto render quarto/fm17_market_recapture_20261013.qmd --execute --no-cache
+```
+
+## 验证及审查
+
+初次codex review指出仅比较latest会漏掉更早同时间的冲突，以及发布收据未显式包含共享准入的完整实现闭包。现已增加封印对象比较函数，检查全部截止前历史、重复报价集合，未来价格不参与来源选择；NAS收据保存117场共享准入收据及每个导入文件SHA，并在发布和报告中核验。随后复审要求对非空准入验证内层共享截止/期次/实现，而不能仅检查外层信封；已在共享temporal_learning/quote_receipt.py新增验证函数，并补充缺shared、错内层cutoff/issue、超截止最大时钟、缺缓存或实现以及显式零准入的回归测试。对应回归测试通过。
+
+Python离线重放和NAS发布适配器测试覆盖原始哈希/URL/原生ID、译名匹配、单通道失败不清零其他市场、缺环境拒绝、重复发布、绑定不一致拒绝、注册失败回滚。R审计测试覆盖类型化空表、篮子与年龄、价格单位和四分之一盘口、截止及未来报价不影响先前选择。交付测试通过包接口读取NAS，与R结果逐列核对，并核验原生117场、351市场键、371个来源响应、原预测哈希未变，以及v1在v2发布后仍可独立读取。先前追加读CSV的空字符串误成NA，发布检查拒绝；已修正显式NA口径并重新通过。
+
+```{r}
+for(f in c('r-tests.rds','comparison-tests.rds','delivery-tests.rds')) {
+ rs<-as_tibble(as.data.frame(readRDS(file.path(out,f))))
+ stopifnot(all(rs$failed==0),!any(rs$error))
+ knitr::kable(rs |> select(test,nb,failed,error,passed))
+}
+review_file<-file.path(out,'review-acceptance.json')
+if(file.exists(review_file)) {
+ review<-jsonlite::fromJSON(review_file)
+ for(i in seq_len(nrow(review$files)))stopifnot(digest::digest(file=file.path(root,review$files$path[i]),algo='sha256')==review$files$sha256[i])
+ knitr::kable(as_tibble(review[c('command','findings','resolution','pi_status')]))
+} else cat('codex review尚待执行；本预览不是最终验收。')
+```
+
+未运行完整仓库旧客户测试或CI，不声称通过。补数据不等于升级FM；下一步可以基于明确的v2快照复核新增四场及原生方向分歧，先过市场一致性，再考虑是否重新生成诊断概率。

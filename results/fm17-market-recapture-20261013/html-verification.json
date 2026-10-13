@@ -1,0 +1,15 @@
+{
+  "render_command": "quarto render quarto/fm17_market_recapture_20261013.qmd --execute --no-cache",
+  "html_sha256": "f7fdb0194750da59a3182ab82e564752a5532b8f8ef21a5d5f095075b92a1633",
+  "tables": 13,
+  "execution_errors": 0,
+  "verified_summary": [
+    "117",
+    "109",
+    "43",
+    "8"
+  ],
+  "review_table_present": true,
+  "NAS_dataset": "fm17_replayed_markets",
+  "NAS_version": "20261013-v4"
+}

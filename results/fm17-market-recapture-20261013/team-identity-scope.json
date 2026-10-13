@@ -1,0 +1,587 @@
+[
+  {
+    "fixture_id": "26098:2",
+    "home_id": "1933",
+    "away_id": "4413"
+  },
+  {
+    "fixture_id": "26098:5",
+    "home_id": "2696",
+    "away_id": "10390"
+  },
+  {
+    "fixture_id": "26098:10",
+    "home_id": "8120",
+    "away_id": "2223"
+  },
+  {
+    "fixture_id": "26098:13",
+    "home_id": "869",
+    "away_id": "837"
+  },
+  {
+    "fixture_id": "26098:16",
+    "home_id": "2408",
+    "away_id": "397"
+  },
+  {
+    "fixture_id": "26098:23",
+    "home_id": "637",
+    "away_id": "782"
+  },
+  {
+    "fixture_id": "26098:27",
+    "home_id": "1465",
+    "away_id": "1482"
+  },
+  {
+    "fixture_id": "26098:28",
+    "home_id": "17137",
+    "away_id": "1483"
+  },
+  {
+    "fixture_id": "26098:29",
+    "home_id": "78",
+    "away_id": "1467"
+  },
+  {
+    "fixture_id": "26098:30",
+    "home_id": "1464",
+    "away_id": "80"
+  },
+  {
+    "fixture_id": "26098:35",
+    "home_id": "287",
+    "away_id": "2596"
+  },
+  {
+    "fixture_id": "26098:37",
+    "home_id": "1972",
+    "away_id": "1942"
+  },
+  {
+    "fixture_id": "26098:40",
+    "home_id": "4934",
+    "away_id": "5198"
+  },
+  {
+    "fixture_id": "26098:42",
+    "home_id": "3165",
+    "away_id": "3164"
+  },
+  {
+    "fixture_id": "26098:43",
+    "home_id": "25121",
+    "away_id": "3193"
+  },
+  {
+    "fixture_id": "26098:44",
+    "home_id": "1988",
+    "away_id": "3162"
+  },
+  {
+    "fixture_id": "26098:45",
+    "home_id": "9944",
+    "away_id": "3415"
+  },
+  {
+    "fixture_id": "26098:47",
+    "home_id": "3196",
+    "away_id": "43469"
+  },
+  {
+    "fixture_id": "26098:48",
+    "home_id": "20515",
+    "away_id": "1612"
+  },
+  {
+    "fixture_id": "26098:49",
+    "home_id": "184",
+    "away_id": "19176"
+  },
+  {
+    "fixture_id": "26098:50",
+    "home_id": "25126",
+    "away_id": "3195"
+  },
+  {
+    "fixture_id": "26098:53",
+    "home_id": "2485",
+    "away_id": "31754"
+  },
+  {
+    "fixture_id": "26098:55",
+    "home_id": "2416",
+    "away_id": "2594"
+  },
+  {
+    "fixture_id": "26098:56",
+    "home_id": "1187",
+    "away_id": "3545"
+  },
+  {
+    "fixture_id": "26098:58",
+    "home_id": "359",
+    "away_id": "353"
+  },
+  {
+    "fixture_id": "26098:59",
+    "home_id": "1192",
+    "away_id": "66"
+  },
+  {
+    "fixture_id": "26098:61",
+    "home_id": "1202",
+    "away_id": "340"
+  },
+  {
+    "fixture_id": "26098:62",
+    "home_id": "3902",
+    "away_id": "1203"
+  },
+  {
+    "fixture_id": "26098:63",
+    "home_id": "3427",
+    "away_id": "1193"
+  },
+  {
+    "fixture_id": "26098:68",
+    "home_id": "1182",
+    "away_id": "48"
+  },
+  {
+    "fixture_id": "26098:81",
+    "home_id": "233",
+    "away_id": "241"
+  },
+  {
+    "fixture_id": "26098:88",
+    "home_id": "761",
+    "away_id": "750"
+  },
+  {
+    "fixture_id": "26098:92",
+    "home_id": "13086",
+    "away_id": "2108"
+  },
+  {
+    "fixture_id": "26098:93",
+    "home_id": "1944",
+    "away_id": "4176"
+  },
+  {
+    "fixture_id": "26098:96",
+    "home_id": "1341",
+    "away_id": "1263"
+  },
+  {
+    "fixture_id": "26098:101",
+    "home_id": "5530",
+    "away_id": "26530"
+  },
+  {
+    "fixture_id": "26098:114",
+    "home_id": "1265",
+    "away_id": "1338"
+  },
+  {
+    "fixture_id": "26098:115",
+    "home_id": "9945",
+    "away_id": "497"
+  },
+  {
+    "fixture_id": "26098:118",
+    "home_id": "243",
+    "away_id": "258"
+  },
+  {
+    "fixture_id": "26098:127",
+    "home_id": "1334",
+    "away_id": "2669"
+  },
+  {
+    "fixture_id": "26098:132",
+    "home_id": "2001",
+    "away_id": "42255"
+  },
+  {
+    "fixture_id": "26098:138",
+    "home_id": "748",
+    "away_id": "5282"
+  },
+  {
+    "fixture_id": "26098:140",
+    "home_id": "992",
+    "away_id": "978"
+  },
+  {
+    "fixture_id": "26101:3",
+    "home_id": "3195",
+    "away_id": "9024"
+  },
+  {
+    "fixture_id": "26101:4",
+    "home_id": "3165",
+    "away_id": "196"
+  },
+  {
+    "fixture_id": "26101:5",
+    "home_id": "43469",
+    "away_id": "206"
+  },
+  {
+    "fixture_id": "26101:6",
+    "home_id": "9944",
+    "away_id": "188"
+  },
+  {
+    "fixture_id": "26101:7",
+    "home_id": "198",
+    "away_id": "199"
+  },
+  {
+    "fixture_id": "26101:8",
+    "home_id": "19176",
+    "away_id": "193"
+  },
+  {
+    "fixture_id": "26101:9",
+    "home_id": "3164",
+    "away_id": "200"
+  },
+  {
+    "fixture_id": "26101:10",
+    "home_id": "2698",
+    "away_id": "2696"
+  },
+  {
+    "fixture_id": "26101:25",
+    "home_id": "9814",
+    "away_id": "381"
+  },
+  {
+    "fixture_id": "26101:33",
+    "home_id": "630",
+    "away_id": "647"
+  },
+  {
+    "fixture_id": "26101:36",
+    "home_id": "42255",
+    "away_id": "4176"
+  },
+  {
+    "fixture_id": "26101:38",
+    "home_id": "5110",
+    "away_id": "269"
+  },
+  {
+    "fixture_id": "26101:43",
+    "home_id": "2290",
+    "away_id": "2252"
+  },
+  {
+    "fixture_id": "26101:46",
+    "home_id": "1345",
+    "away_id": "180"
+  },
+  {
+    "fixture_id": "26101:48",
+    "home_id": "53028",
+    "away_id": "1256"
+  },
+  {
+    "fixture_id": "26101:49",
+    "home_id": "5216",
+    "away_id": "322"
+  },
+  {
+    "fixture_id": "26101:51",
+    "home_id": "295",
+    "away_id": "731"
+  },
+  {
+    "fixture_id": "26101:52",
+    "home_id": "16426",
+    "away_id": "3954"
+  },
+  {
+    "fixture_id": "26101:53",
+    "home_id": "453",
+    "away_id": "337"
+  },
+  {
+    "fixture_id": "26101:55",
+    "home_id": "371",
+    "away_id": "13086"
+  },
+  {
+    "fixture_id": "26101:56",
+    "home_id": "261",
+    "away_id": "5096"
+  },
+  {
+    "fixture_id": "26101:59",
+    "home_id": "178",
+    "away_id": "3196"
+  },
+  {
+    "fixture_id": "26101:60",
+    "home_id": "19176",
+    "away_id": "1612"
+  },
+  {
+    "fixture_id": "26101:61",
+    "home_id": "3162",
+    "away_id": "9944"
+  },
+  {
+    "fixture_id": "26101:62",
+    "home_id": "43469",
+    "away_id": "20515"
+  },
+  {
+    "fixture_id": "26101:64",
+    "home_id": "340",
+    "away_id": "363"
+  },
+  {
+    "fixture_id": "26101:66",
+    "home_id": "2282",
+    "away_id": "2774"
+  },
+  {
+    "fixture_id": "26101:70",
+    "home_id": "1179",
+    "away_id": "1202"
+  },
+  {
+    "fixture_id": "26101:71",
+    "home_id": "67",
+    "away_id": "1190"
+  },
+  {
+    "fixture_id": "26101:72",
+    "home_id": "1356",
+    "away_id": "54"
+  },
+  {
+    "fixture_id": "26101:74",
+    "home_id": "1193",
+    "away_id": "1196"
+  },
+  {
+    "fixture_id": "26101:77",
+    "home_id": "1467",
+    "away_id": "1464"
+  },
+  {
+    "fixture_id": "26101:78",
+    "home_id": "80",
+    "away_id": "17137"
+  },
+  {
+    "fixture_id": "26101:79",
+    "home_id": "1462",
+    "away_id": "1465"
+  },
+  {
+    "fixture_id": "26101:80",
+    "home_id": "2822",
+    "away_id": "475"
+  },
+  {
+    "fixture_id": "26101:81",
+    "home_id": "1287",
+    "away_id": "479"
+  },
+  {
+    "fixture_id": "26101:82",
+    "home_id": "1285",
+    "away_id": "2235"
+  },
+  {
+    "fixture_id": "26101:84",
+    "home_id": "141",
+    "away_id": "976"
+  },
+  {
+    "fixture_id": "26101:85",
+    "home_id": "281",
+    "away_id": "290"
+  },
+  {
+    "fixture_id": "26101:90",
+    "home_id": "1092",
+    "away_id": "243"
+  },
+  {
+    "fixture_id": "26101:98",
+    "home_id": "15516",
+    "away_id": "3415"
+  },
+  {
+    "fixture_id": "26101:99",
+    "home_id": "13537",
+    "away_id": "3164"
+  },
+  {
+    "fixture_id": "26101:101",
+    "home_id": "25126",
+    "away_id": "1988"
+  },
+  {
+    "fixture_id": "26101:102",
+    "home_id": "11499",
+    "away_id": "999"
+  },
+  {
+    "fixture_id": "26101:103",
+    "home_id": "3220",
+    "away_id": "121"
+  },
+  {
+    "fixture_id": "26101:104",
+    "home_id": "277",
+    "away_id": "233"
+  },
+  {
+    "fixture_id": "26101:105",
+    "home_id": "1273",
+    "away_id": "482"
+  },
+  {
+    "fixture_id": "26101:106",
+    "home_id": "113",
+    "away_id": "3197"
+  },
+  {
+    "fixture_id": "26101:108",
+    "home_id": "991",
+    "away_id": "123"
+  },
+  {
+    "fixture_id": "26101:109",
+    "home_id": "5283",
+    "away_id": "5106"
+  },
+  {
+    "fixture_id": "26102:5",
+    "home_id": "1279",
+    "away_id": "1277"
+  },
+  {
+    "fixture_id": "26102:6",
+    "home_id": "146",
+    "away_id": "138"
+  },
+  {
+    "fixture_id": "26102:10",
+    "home_id": "649",
+    "away_id": "645"
+  },
+  {
+    "fixture_id": "26102:13",
+    "home_id": "17947",
+    "away_id": "22451"
+  },
+  {
+    "fixture_id": "26102:14",
+    "home_id": "269",
+    "away_id": "18029"
+  },
+  {
+    "fixture_id": "26102:15",
+    "home_id": "276",
+    "away_id": "5110"
+  },
+  {
+    "fixture_id": "26102:16",
+    "home_id": "728",
+    "away_id": "293"
+  },
+  {
+    "fixture_id": "26102:19",
+    "home_id": "896",
+    "away_id": "884"
+  },
+  {
+    "fixture_id": "26102:20",
+    "home_id": "842",
+    "away_id": "32364"
+  },
+  {
+    "fixture_id": "26102:24",
+    "home_id": "843",
+    "away_id": "868"
+  },
+  {
+    "fixture_id": "26102:40",
+    "home_id": "3545",
+    "away_id": "1183"
+  },
+  {
+    "fixture_id": "26102:68",
+    "home_id": "3820",
+    "away_id": "7429"
+  },
+  {
+    "fixture_id": "26102:71",
+    "home_id": "4175",
+    "away_id": "1942"
+  },
+  {
+    "fixture_id": "26102:72",
+    "home_id": "13086",
+    "away_id": "9814"
+  },
+  {
+    "fixture_id": "26102:73",
+    "home_id": "462",
+    "away_id": "7344"
+  },
+  {
+    "fixture_id": "26102:74",
+    "home_id": "467",
+    "away_id": "456"
+  },
+  {
+    "fixture_id": "26102:77",
+    "home_id": "383",
+    "away_id": "2226"
+  },
+  {
+    "fixture_id": "26102:78",
+    "home_id": "1986",
+    "away_id": "2228"
+  },
+  {
+    "fixture_id": "26102:79",
+    "home_id": "1298",
+    "away_id": "4847"
+  },
+  {
+    "fixture_id": "26102:80",
+    "home_id": "177",
+    "away_id": "329"
+  },
+  {
+    "fixture_id": "26102:81",
+    "home_id": "337",
+    "away_id": "356"
+  },
+  {
+    "fixture_id": "26102:83",
+    "home_id": "2108",
+    "away_id": "352"
+  },
+  {
+    "fixture_id": "26102:85",
+    "home_id": "469",
+    "away_id": "350"
+  },
+  {
+    "fixture_id": "26102:86",
+    "home_id": "465",
+    "away_id": "1979"
+  }
+]

@@ -1,0 +1,23 @@
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:purrr’:
+
+    flatten
+
+# A tibble: 13 × 3
+   market status                        n
+   <chr>  <chr>                     <int>
+ 1 asian  IDENTITY_REVIEW_REQUIRED      1
+ 2 asian  NO_PRIOR_QUOTES              10
+ 3 asian  ONLY_OLDER_QUOTES            34
+ 4 asian  QUALIFIED_PROXY              72
+ 5 euro   IDENTITY_REVIEW_REQUIRED      1
+ 6 euro   NO_PARSED_QUOTES              3
+ 7 euro   NO_PRIOR_QUOTES               7
+ 8 euro   ONLY_OUTSIDE_FIXED_BASKET     7
+ 9 euro   QUALIFIED_PROXY              99
+10 totals IDENTITY_REVIEW_REQUIRED      3
+11 totals NO_PRIOR_QUOTES              10
+12 totals ONLY_OLDER_QUOTES            40
+13 totals QUALIFIED_PROXY              64

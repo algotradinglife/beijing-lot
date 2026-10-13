@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Publish R-validated NVMe tables through catalog and shared versioning."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import pyarrow.parquet as pq
+from beidan_backend.market_capture.publication import publish_market_snapshot
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--root',type=Path,required=True);p.add_argument('--label',required=True)
+a=p.parse_args();root=a.root.resolve();out=root/'results/fm17-market-recapture-20261013'
+reconciliation=json.loads((out/'reconciliation.json').read_bytes())
+assert hashlib.sha256((out/'selected-audit.rds').read_bytes()).hexdigest()==reconciliation['selected_hash']
+tables={k:pq.read_table(out/f'selected-{k}.parquet') for k in ('history','latest','coverage','provenance')}
+coverage=tables['coverage'].to_pandas()
+cutoffs={r.fixture_id:r.cutoff_utc.isoformat() for r in coverage.itertuples()}
+inputs=[out/f'selected-{k}.parquet' for k in tables]+[out/n for n in ('scope.json','team-identity-scope.json','offline-manifest.json','recaptured-manifest.json','reconciliation.json','source-choice.csv')]
+code=[root/p for p in ('packages/beidan/inst/python/beidan_backend/market_capture/publication.py','packages/beidan/inst/python/beidan_backend/market_capture/replay.py','packages/beidan/inst/python/beidan_backend/market_capture/history.py','packages/beidan/inst/python/beidan_backend/market_capture/service.py','packages/beidan/R/recaptured_market_audit.R','r/fm17_market_recapture_audit.R','r/fm17_market_reconcile.R','scripts/publish_fm17_market_snapshot.py')]
+receipt=dict(historical_admitted=False,scope_sha256=hashlib.sha256((out/'scope.json').read_bytes()).hexdigest(),input_hashes={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},implementation_hashes={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in code},cutoffs=cutoffs,formal_forecast_sha256='e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786',intended_use='HISTORICAL_DIAGNOSTIC',time_evidence='HISTORICAL_QUOTE_PROXY_COLLECTED_AFTER_CUTOFF')
+first=publish_market_snapshot(tables,receipt,a.label,environ=dict(os.environ))
+second=publish_market_snapshot(tables,receipt,a.label,environ=dict(os.environ))
+assert second['status']=='unchanged' and first['binding_sha256']==second['binding_sha256']
+result=dict(publication=first,idempotent_republish=second,receipt=receipt)
+p=(out/'publication.json');p.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
+print(json.dumps(first,ensure_ascii=False))

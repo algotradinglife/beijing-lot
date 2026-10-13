@@ -1,0 +1,20 @@
+{
+  "roots": {
+    "frozen": "/mnt/nas/Data/beijing-lot",
+    "hot": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot"
+  },
+  "dataset": {
+    "format": "parquet",
+    "kind": "dataset",
+    "location": "frozen:datasets/fm17_replayed_markets",
+    "owner": "collector:fm17-market-replay",
+    "retention": "retained",
+    "schema_id": "fm17_replayed_markets_v2",
+    "tables": 4,
+    "version": "20261013-v4"
+  },
+  "legacy_layout_check": "FAIL: daily-paper-only contract still references physically retired Sandisk; no new task data uses it",
+  "new_raw_layer": "hot:fm17-market-recapture",
+  "read_api": "read_dataset",
+  "readback_assertions": 437
+}

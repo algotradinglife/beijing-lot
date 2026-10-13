@@ -1,0 +1,7 @@
+root<-normalizePath(commandArgs(TRUE)[1],mustWork=TRUE)
+suppressPackageStartupMessages(library(tidyverse));library(jsonlite)
+out<-file.path(root,'results/fm17-market-recapture-20261013')
+a<-readRDS(file.path(out,'selected-audit.rds'));scope<-read_csv(file.path(out,'scope.csv'),col_types=cols(.default=col_character(),cutoff_utc=col_datetime()))
+q<-a$coverage |> filter(prior_rows==0,market!='euro') |> select(fixture_id,market) |> left_join(scope,by='fixture_id',relationship='many-to-one')
+stopifnot(nrow(q)==20L,!anyNA(q$provider_id_nowscore))
+write_json(map(seq_len(nrow(q)),~as.list(q[.x,])),file.path(out,'gap-probe-queue.json'),auto_unbox=TRUE,pretty=TRUE,POSIXt='ISO8601')

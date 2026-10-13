@@ -1,0 +1,13 @@
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:purrr’:
+
+    flatten
+
+# A tibble: 3 × 2
+  issue_id     n
+  <chr>    <int>
+1 26098       43
+2 26101       50
+3 26102       24

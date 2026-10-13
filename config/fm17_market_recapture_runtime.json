@@ -1,0 +1,38 @@
+{
+  "python": "3.14.4",
+  "python_interpreter": ".venv/bin/python",
+  "R_runtime": "4.6.1",
+  "R_interpreter": "/opt/R/4.6.1/bin/Rscript",
+  "quarto_command": "quarto",
+  "python_dependencies": {
+    "pyarrow": "24.0.0",
+    "pandas": "3.0.3",
+    "numpy": "2.4.6",
+    "filelock": "3.32.3",
+    "json5": "0.15.0"
+  },
+  "R_dependencies": [
+    "beidan",
+    "tidyverse",
+    "arrow",
+    "reticulate",
+    "jsonlite",
+    "digest",
+    "checkmate",
+    "vctrs",
+    "testthat"
+  ],
+  "package_library_input": "results/fm17-diagnostic-iterations-20261013/library",
+  "setup_rule": "Install Python requirements during setup; R dependencies via pak; no install during capture, tests or rendering.",
+  "R_versions": {
+    "beidan": "0.2.0",
+    "tidyverse": "2.0.0",
+    "arrow": "25.0.1",
+    "reticulate": "1.46.0",
+    "jsonlite": "2.0.0",
+    "digest": "0.6.39",
+    "checkmate": "2.3.4",
+    "vctrs": "0.7.3",
+    "testthat": "3.3.2"
+  }
+}

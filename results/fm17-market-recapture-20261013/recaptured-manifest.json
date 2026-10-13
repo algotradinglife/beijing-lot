@@ -1,0 +1,24 @@
+{
+  "phase": "recaptured",
+  "scope_sha256": "218a9f7eeadf651a4a50ce40271501f35d507c4efa7c706972aa0bd3ba4b1376",
+  "client_sha256": "a206622fbb1506f83c16b305331f8db285fc70ed46d4b337abf81cab9aa0ce00",
+  "audit_R_sha256": "26c29e900c0afad6417baad679304bc6535c5895e068edf7ed5efd4e71a4df1c",
+  "outputs": [
+    {
+      "path": "recaptured-coverage.csv",
+      "sha256": "fd30f691853ff46cd72885028fd7fc83e0f4bb839aaeeb90547c38eab5a9a07c"
+    },
+    {
+      "path": "recaptured-latest.csv",
+      "sha256": "38447b3979f246854fc4eed57e4c8302a966b4e1aab735b6b26ad5140a23e9e7"
+    },
+    {
+      "path": "recaptured-audit.rds",
+      "sha256": "607137fd42081f28c5d5324e3910e15f351080591986e714fd6ec4ec959be23c"
+    },
+    {
+      "path": "recaptured-cutoff-receipts.json",
+      "sha256": "f158a7cdde8cd092a1d25ac7ce044b4587db51599b46cb4ea1a8c69f95558664"
+    }
+  ]
+}

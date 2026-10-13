@@ -1,0 +1,24 @@
+{
+  "phase": "offline",
+  "scope_sha256": "218a9f7eeadf651a4a50ce40271501f35d507c4efa7c706972aa0bd3ba4b1376",
+  "client_sha256": "a206622fbb1506f83c16b305331f8db285fc70ed46d4b337abf81cab9aa0ce00",
+  "audit_R_sha256": "26c29e900c0afad6417baad679304bc6535c5895e068edf7ed5efd4e71a4df1c",
+  "outputs": [
+    {
+      "path": "offline-coverage.csv",
+      "sha256": "569d88e94e6ba60ac8f58835ca763013952eb14481ec9abcd4404b5cbe56cb8c"
+    },
+    {
+      "path": "offline-latest.csv",
+      "sha256": "cefc6b473042f9fd87f70f2b6fb635d2172f785cb12c3094bbd1531ebeb820e9"
+    },
+    {
+      "path": "offline-audit.rds",
+      "sha256": "676ae640ee4fb32f83b21d774ea551843b86890f13e7bc592e33fa11747aca4e"
+    },
+    {
+      "path": "offline-cutoff-receipts.json",
+      "sha256": "893ca012a20061d7e8300808e4f9ac147f94ffa64adde89bcf8abde53edbdba0"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+recaptured-market-audit: ...................................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+Nice code.
+# A tibble: 4 × 5
+  test                                                    nb failed error passed
+  <chr>                                                <int>  <int> <lgl>  <int>
+1 market audit separates age, basket and identity wit…    14      0 FALSE     14
+2 a missing market preserves typed independently vali…     7      0 FALSE      7
+3 cutoff and future quote mutations cannot replace pr…     6      0 FALSE      6
+4 data contracts reject malformed scope, prices and c…     8      0 FALSE      8

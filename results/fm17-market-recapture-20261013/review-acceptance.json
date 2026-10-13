@@ -1,0 +1,143 @@
+{
+  "command": "codex review - < /tmp/fm17-market-review.txt; codex review - < /tmp/fm17-market-final-review.txt; codex review - < /tmp/fm17-market-receipt-review.txt; codex review - < /tmp/fm17-market-summary-review.txt",
+  "findings": "Initial reviews found latest-only conflict detection and incomplete transitive/inner admission binding. Final receipt and artifact reviews: no blocking findings.",
+  "resolution": "Full prior history value-set comparison with duplicate/future regression; shared quote_receipt validator; complete transitive inventories and117 per-fixture receipts; QMD masking regression. Python31 cases; R493 assertions; independent raw-source replay identical; NAS publish same-content no-op.",
+  "pi_status": "ROOT verifies final reviewed hashes and rendered data; owner PI acceptance pending, no merge requested.",
+  "reviewed_at": "2026-10-13T05:19:58.665092+00:00",
+  "files": [
+    {
+      "path": "config/fm17_market_recapture_runtime.json",
+      "sha256": "80e922771e8ad2c504ecbb463867f5cf4a864aac03c713d1e51a8b55494679cd"
+    },
+    {
+      "path": "quarto/fm17_market_recapture_20261013.qmd",
+      "sha256": "1b58c9e4eb380ed0a3897e29d5a0208a6727ce9e46ff980fe180390b71bb3a75"
+    },
+    {
+      "path": "packages/beidan/R/recaptured_market_audit.R",
+      "sha256": "b4a9617cd3d34ec8847065b01a084222e012849479c084ee8f9339db73851f89"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/market_capture/replay.py",
+      "sha256": "445f9297c5135ee4a6b1b29fc6f1e04bdc55f27124781561fe9ecab985b6f954"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/market_capture/publication.py",
+      "sha256": "54dbdffa11ab1d557a13149bae8ce3b431c84cd5b10aec0b2bb3383025c79a57"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/temporal_learning/quote_receipt.py",
+      "sha256": "6179110bf44769d53ca6e457219306a5606b5910b0cf01989504a2dd75f1a911"
+    },
+    {
+      "path": "r/fm17_market_augment.R",
+      "sha256": "8d5b75594a0673c61717a8836b4932f5a47624cf56e13c8ec39b556ab4919798"
+    },
+    {
+      "path": "r/fm17_market_gap_audit.R",
+      "sha256": "8e86023bed6f8c8598fdf9913115248b9e4c761b2f5142458c4253e66326c60a"
+    },
+    {
+      "path": "r/fm17_market_gap_queue.R",
+      "sha256": "e2d72015e5cdaa40f74969894a9b975f646157a4ebecaa8154560686c38a1714"
+    },
+    {
+      "path": "r/fm17_market_identity_scope.R",
+      "sha256": "6dd397098681bdc0d91d9d1674a97aac75daad7ca56d5448353e1670868a5275"
+    },
+    {
+      "path": "r/fm17_market_recap_scope.R",
+      "sha256": "a26c362c70607d4e081bc15c01153d29f4f6e31dccc01522141ffd4d4bab52ca"
+    },
+    {
+      "path": "r/fm17_market_recapture_audit.R",
+      "sha256": "a206622fbb1506f83c16b305331f8db285fc70ed46d4b337abf81cab9aa0ce00"
+    },
+    {
+      "path": "r/fm17_market_recapture_plan.R",
+      "sha256": "915efb1c558b88714f4edff8d2878d55578465a4317e999c82c5fb9dfec46e08"
+    },
+    {
+      "path": "r/fm17_market_reconcile.R",
+      "sha256": "7d3904d0615b450caaceaf05660c5116f349e56af4e3f6c9ee6985d5f2bdd237"
+    },
+    {
+      "path": "scripts/replay_fm17_market_captures.py",
+      "sha256": "8e1cf165cb3f071b07b5a8b498988da0e140720a2736b35125163e238db6d2cf"
+    },
+    {
+      "path": "scripts/probe_fm17_market_gaps.py",
+      "sha256": "2769af55a36d3a81ba932336f0bf7c965fdbe09440097a59b106f2e74136c9a8"
+    },
+    {
+      "path": "scripts/publish_fm17_market_snapshot.py",
+      "sha256": "5516d4f3d746e431f985cb78b629289ae80b6df32281fa9e93d22a5ae7965d1d"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-recaptured-market-audit.R",
+      "sha256": "348135c7dd09a3fa243b5b6f03871f3debfe973a604de377cb81fa705ded2aea"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-recaptured-market-comparison.R",
+      "sha256": "49cc5c9aa538034e8f2f503557e11be105873426a2468d781708a18f970f9e2f"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_market_capture_replay.py",
+      "sha256": "24a8511cd94ef8cc92ffc01265a6c85c4e50a4df8b6b6c5bbda973f9ee1b8b65"
+    },
+    {
+      "path": "packages/beidan/tests/python/test_market_capture_publication.py",
+      "sha256": "40c84655babe4f225ad90b19919efb0a56ec887698fabc3cf2d5a36863f8120d"
+    },
+    {
+      "path": "tests/testthat/test-fm17-market-recapture-delivery.R",
+      "sha256": "67b2c96ca5e95ad6c254d78c56b582a2d408d2e6ac36013fbcbf46f7832fa48e"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/publication.json",
+      "sha256": "7a80aacb5982176365661626acb5808b8b386b0c5f72f7f4193c145ece9911a1"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/storage-verification.json",
+      "sha256": "f2092789abdc4b322933f26429d2dc1070dd756b4b9b9e58d574b2c7fe4a68f1"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/r-tests.log",
+      "sha256": "40419a10322816354e43869119ce5e7e1fc01e87fc7ae517a313b97c71eeebe1"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/comparison-tests.log",
+      "sha256": "a29073cf29871cbacf650d80b31c70f5badfee022546e5dcb17e96a6bcce167c"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/delivery-tests.log",
+      "sha256": "dfc00befb6769964575f00429edbee782cad330351a079995ee3472032a08a1e"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/python-tests.log",
+      "sha256": "73e002dbfd2312381dc190886c280091c23f2cb54a1617173e334aaf95fb3bca"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/codex-review.log",
+      "sha256": "d4fd25b1752ea467eddfeafb9d057e14f05b677a1fc901959f67f972c540b767"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/codex-final-review.log",
+      "sha256": "7f614d1ef8893b9fe188c8b0190ea2f69ca1d66ab9c62d0c9f5fd2a3e1beb66f"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/codex-receipt-review.log",
+      "sha256": "30f72ce95eba7197a95594e64d0c9289ead70cd9e94db7bb2124e465371d9f13"
+    },
+    {
+      "path": "results/fm17-market-recapture-20261013/codex-summary-review.log",
+      "sha256": "311dc518cff46d2a590852ca1f89a2303bb98865f7a0bc0e3b5ab377f70b0d6a"
+    }
+  ],
+  "review_prompts": {
+    "fm17-market-review.txt": "Review ONLY FM17 same-cutoff market data recapture delivery, read-only, no CI/no edits. Scope: packages/beidan/R/recaptured_market_audit.R; packages/beidan/inst/python/beidan_backend/market_capture/replay.py and publication.py; their tests test-recaptured-market-audit.R and Python test_market_capture_replay.py/test_market_capture_publication.py; tests/testthat/test-fm17-market-recapture-delivery.R; r/fm17_market_{recapture_plan,identity_scope,recapture_audit,recap_scope,reconcile,gap_queue,gap_audit,augment}.R; scripts/replay_fm17_market_captures.py, probe_fm17_market_gaps.py, publish_fm17_market_snapshot.py; config/fm17_market_recapture_runtime.json; quarto/fm17_market_recapture_20261013.qmd. Results receipts results/fm17-market-recapture-20261013/. 117 native-source fixtures, original cutoff T-24 preserved; 77 fixtures/231 request keys plus 20 company3 keys. 109 complete prior histories, 43 fully old-policy quote eligible; one25min clock difference quarantined. No model refit or performance claim; all quotes HISTORICAL_PROXY, historical_admitted=false; shared temporal_learning handles quote cutoff admission. NAS catalog dataset fm17_replayed_markets v2 immutably published via shared versioning and atomic helpers, repeated published content unchanged; v1 inputs/implementation preserved separately. Python20tests passed, R helper35assertions, delivery99assertions passed through read_dataset, clean render pending/final check. Check temporal/cutoff/transitive receipt contracts, native fixture/team IDs and names, independent parser failure handling, data boundary/price/time contracts, source conflicts/alternative selection/augment company namespaces, publisher rollback/idempotency/catalog race safety, QMD/test reproducibility. Do not review unrelated dirty changes. Report concrete blocking bugs or no blocking findings, distinguish inherited limitations.\n",
+    "fm17-market-final-review.txt": "Final scoped FM17 same-cutoff data review. Previous results/fm17-market-recapture-20261013/codex-review.log had two P2 findings; both fixed. R package now .CompareRecapturedMarkets requires bound audit envelopes with embedded matching cutoffs/code, compares ALL shared-admitted prior history by fixture/market/company/timestamp/field, handles duplicates as value sets, excludes future prices. r/fm17_market_reconcile.R delegates to it. New comparison test passed17assertions for older overlap/newer latest, duplicates, future invariance, detached cutoff rejection. Publication client preserves117 full shared cutoff receipts and verifies/unions transitive implementation files and R fundamental binding; publisher requires these receipts and verifies fixture/cutoff/closure; QMD verifies bound source/code hashes. NAS immutable version20261013-v3, v1/v2 retained; coverage unchanged109/43. Python23tests pass; R35+17+437assertions pass; clean QMD renders. Inspect final packages/beidan/R/recaptured_market_audit.R, r/fm17_market_reconcile.R, scripts/publish_fm17_market_snapshot.py, packages/beidan/inst/python/beidan_backend/market_capture/publication.py, tests, final QMD and receipts. Other prior reviewed collector/audit unchanged. Diagnostic-only, no FM17 or forecast changes. Read-only/no edits/no CI; report remaining concrete blockers or no findings. Don't rerun network harvest. External review-acceptance will bind exact hashes and be rendered by unchanged QMD.\n",
+    "fm17-market-receipt-review.txt": "Final validation review, same narrow FM17 data task; read-only, no edits/network/CI. Earlier reviews in codex-review.log and codex-final-review.log. Prior repairs: full prior-history conflict comparison with duplicate sets; complete transitive implementation inventories. Second review found missing/mismatched inner shared context still accepted. Fixed now in packages/beidan/inst/python/beidan_backend/temporal_learning/quote_receipt.py (shared layer, one new tested function): nonempty admitted prior rows require complete inner receipt, original shared Cutoff identity/kind/time/target issue, diagnostic-only proxy availability, source/label maxima strictly before cutoff, matching implementation maps, nonempty SHA256 source/cache/history IDs. Only explicitly empty admission can omit successful context. market_capture/publication.py computes admitted prior counts and calls validator before any storage. Publication client binds new helper file. Tests test_market_capture_publication.py now add missing_shared, wrong inner cutoff/issue, future max, malformed availability, missing cache/files and explicit empty admission cases; 31 Python cases passed. R35+17+437assertions passed; NAS immutable20261013-v4 and idempotent same-content publication; prior versions retained, 109/43 coverage unchanged. Review final shared helper, publisher, client, regression tests, QMD and receipts; ensure previous findings resolved and no introduced blockers. Do not rerun whole data harvest; QMD clean render latest log. Legacy daily-paper layout check failed after Sandisk retirement; this task's data uses explicit existing NAS/hot catalog roots, tested read_dataset and recorded storage verification. That obsolete unrelated scope not marked passed. External final review-acceptance will bind current hashes. Report concrete remaining findings or no blocking findings.\n",
+    "fm17-market-summary-review.txt": "Final small artifact delta after no-blocking codex-receipt-review.log: source implementation and NAS v4 remain unchanged. Corrected QMD's summary to avoid dplyr sequential variable masking (prior_all aggregate name overwrote logical column causing incomplete_prior=0 instead of8). New test at end tests/testthat/test-fm17-market-recapture-delivery.R evaluates the actual QMD summary expression and asserts117/109/43/8; 4 new assertions, total delivery441, R493 overall, Python31 still pass. Inspect final QMD summary and that regression, current clean-render log. Read prior review conclusion for other unchanged scope. Read-only/no edits/no CI/network. Report concrete issues or no blocking findings. Final review-acceptance binds source hashes, checks and logs; QMD source will not be modified further.\n"
+  }
+}

@@ -1,0 +1,1418 @@
+{
+  "scope": "ALL_117_FM17_NATIVE_SOURCE_FIXTURES",
+  "intended_use": "HISTORICAL_DIAGNOSTIC_ONLY",
+  "availability": "HISTORICAL_QUOTE_PROXY",
+  "original_forecast_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+  "stage_sha256": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68",
+  "plan_client_sha256": "915efb1c558b88714f4edff8d2878d55578465a4317e999c82c5fb9dfec46e08",
+  "scope_sha256": "218a9f7eeadf651a4a50ce40271501f35d507c4efa7c706972aa0bd3ba4b1376",
+  "original_sources": [
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094457-euro.raw",
+      "sha256": "b128323221da8277e50a447c6eb250a5a4c3afcac7a42aecfded2f161f85f41d"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094457-total.raw",
+      "sha256": "da5d2d116e0ba67674f99e123f960a06f2f1f4a3bf25b041b4003584d66b3b21"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094457-asian.raw",
+      "sha256": "e1c1bd301bf36e3393254dd87657275a10b657ad32e075385a86f850dff0ac33"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094459-euro.raw",
+      "sha256": "d5b20740e2041bfd64c8b00aecc4b9f0c5a834d059052a79cc81ab6446e7c977"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094459-total.raw",
+      "sha256": "a38e09f1267496ff5009f624bdb4f715ab8d3bf2c4fc4f1f144493944ad380ba"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094459-asian.raw",
+      "sha256": "cb0ba784001957fc035848751206d37cb249456ee6d0a8b2cf62bfbed1d7fcf8"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921942-euro.raw",
+      "sha256": "445e40c8e5b0961837335b0a7ca3a26b542775e6d45c3a7184ebdfd19d698d12"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921942-total.raw",
+      "sha256": "4d318de26e7bbae37f8133bd8222901d7e1bb766f8a271ac876f2a7f4423d09b"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921942-asian.raw",
+      "sha256": "e34bce0335aa241ca472a8d2f2d29cd873d45d76d15072fb3117fc976b87588a"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2781223-total.raw",
+      "sha256": "1644d3fc1bf21ce6e6c7f25705491301f42a895c46b3d64cc691aef245789502"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2781223-asian.raw",
+      "sha256": "9685046f761611487bfe68a9b9cceeaac180880714dba01cb1417acbf096e65b"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921943-euro.raw",
+      "sha256": "f9ca8e16f579574749127f72209595893ad4400380f327d6b243d1ea14866c98"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921943-total.raw",
+      "sha256": "7cddee18f090a93311b57107372db663910fef2af85dbc967401a515de885a32"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921943-asian.raw",
+      "sha256": "bb46a831eec6e3e7e6644b0bb2229cc607c3d0f3b7ccd44818a4f708a9c26218"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981479-euro.raw",
+      "sha256": "2dd4eb0d85794a4791958f4cff57cc0a6940ce8abe196c89c30d87793153c73d"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981479-total.raw",
+      "sha256": "dcbfab431484a72cdc5fd0cadc7f5fbb47ca4f3e4c841d250953201e721ec65c"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981479-asian.raw",
+      "sha256": "97598f32392d2c2789b585a201c7cfd46983c8743a29966e06e098ee629aa8ef"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002267-euro.raw",
+      "sha256": "86be4c3c6215bce27975af4cc5c0f1af6812605c0dec348ab3f6d0d5c58a6878"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002267-total.raw",
+      "sha256": "b34c47b206f090d0c0ce0699e5af98ed7687f956fc9897490ecfa4e7bd1d1300"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002267-asian.raw",
+      "sha256": "b031ed2aff0d9381fd130d3304580992ef0e95c5243f18ba06290a69d258f3ea"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002268-euro.raw",
+      "sha256": "357d93060fa9294090aac2b84ef8f3ee48a3b4e746b3aea10704b480c7bee51c"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002268-total.raw",
+      "sha256": "d5cdf471b124489b7b1cb39411c694edde354f30b271adf690cf66c98c4aef0c"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002268-asian.raw",
+      "sha256": "4efdf0f76f954f41ca26e8506091119303392456e83fde722528384e5e1e4afe"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002270-euro.raw",
+      "sha256": "ef3d6f152a0cdc69c5a0803f4ae36beb518d17824e9041febfbcd7dbc4903250"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002270-total.raw",
+      "sha256": "0e0992f4f0a67b58ce52657aa0a98d1eb726e1fb897debefbeadf6495138a090"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002270-asian.raw",
+      "sha256": "63cc53a44cfda27a61a36c1b8ef85c77b0ecae5bd0c3a0a82bdc596a7b1b7361"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002271-euro.raw",
+      "sha256": "396de172006a238a3878f1fde77cfe2b52525173e8b762516d1fee7cc3494a1c"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002271-total.raw",
+      "sha256": "1b57541fa83b6e7e57023668aed77dd18624e81f1a481f7ccbaa54fb4f861d48"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3002271-asian.raw",
+      "sha256": "92a1bf86ff65c5d442c365d4ee81c551cf68e69c784ba28da563be1642f2fd84"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996476-euro.raw",
+      "sha256": "b954eb56b974447f4a18ee4d64727f5df3a11c4eb395912fa3e2acb81e6b6013"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996476-total.raw",
+      "sha256": "55b4de14b86b990913576eaf3b773b955d809e2398803724a0ae6c322bd75c7f"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996476-asian.raw",
+      "sha256": "cefb7e77c013aaf8a54b8c43f13d9ab6a543b756d15a68a31fdd9598c4680dee"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940204-euro.raw",
+      "sha256": "255ff33d4f4a52802fefab3d24554e8a4dd138226719cfe6c74956eb6e537e53"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940204-total.raw",
+      "sha256": "0a85a7a291d95144e93f741c411fa56ed401ad2d63f5ec011ccba3cd2cf7c77e"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940204-asian.raw",
+      "sha256": "ed39c04ab2a51c0d76d3311441e7f09772568efc3ab6c3c687a8670b8a7b5d5c"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094823-euro.raw",
+      "sha256": "66c4bbeb314e1b34fe9dd555b250ced1435c8197ec3af08ccb143b0f3a4bab4d"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094823-total.raw",
+      "sha256": "7727d1944a104dc47c2843afcebcf6abed5f5addbefcc3cc5ccdb36f9526a856"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3094823-asian.raw",
+      "sha256": "999be3292367e9a35d0a308115605ebf29b31e266562ec48f8cc2d62f079e1bf"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000087-euro.raw",
+      "sha256": "790a84fab3458c0f1b02ea1e9b79bae1c45416272f879c9ddf6975a5b15c8513"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000087-total.raw",
+      "sha256": "814de83e7ae33c97c577236e560a71de22ae9ca669774c597f8494471474edd5"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000087-asian.raw",
+      "sha256": "8da1c01b94fc29523b8db4a06a37b088ac5c1fcc4a06cbb835a43f97343698d0"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000085-euro.raw",
+      "sha256": "fdfe615c0eb8a4b1876ee3fe07c8314c8fdc861b2ce598cdba953086e08a862a"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000085-total.raw",
+      "sha256": "a32d8d120a4d4c70f6d99a062cd0a5106707d96adf85bbbae4b22c66b31650a0"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000085-asian.raw",
+      "sha256": "0f7dea3995d4cb27a81bcfd1580fbe0c7aab3f21a2f40b2c2ec311c224a18111"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000089-euro.raw",
+      "sha256": "e33a5b4311b5c3aba561c9f931eb08516b8eb134d86f0c947fa9335348d408dd"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000089-total.raw",
+      "sha256": "30d97162b917ef167dec9b08be0800705030c3c4688fd6b689ca36479f1bf6bf"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000089-asian.raw",
+      "sha256": "c712da7ae96ce43a71a378650487aadf357b0a070980c938817744eae75dc111"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000092-euro.raw",
+      "sha256": "5d791264911cb16cd79b14c5c94783b439d0b62c79892c9ae4edcbac8ca71e6b"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000092-total.raw",
+      "sha256": "1453c050ba272f1ab294fc33aba715b304528b66bf3351c24b0b85e52bd64de8"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000092-asian.raw",
+      "sha256": "32fa7760726ce6f6cda2662bc36136208d09c9e747d6e126d322b8792a8ec3a9"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000091-euro.raw",
+      "sha256": "346f032f98208be1eebbb43256acf3db9904ba53ac83eb298ca4535f4f050081"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000091-total.raw",
+      "sha256": "d897b167f005a426005915ff852fbf0aa7c4758359f94a81cc6041f5af0c0305"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000091-asian.raw",
+      "sha256": "7201d2bdb068f71abd2d16f704cfea25a1ca1b3dfbe2d06f73ca14d4893bdc60"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000084-euro.raw",
+      "sha256": "907f55768ee0c40efcbd5803a87f395cfd95f397074501b73de220e44384fc63"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000084-total.raw",
+      "sha256": "2202fe9921eec5535e413c9f09836ec6a7219f751df40c302d86908e00c28a82"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000084-asian.raw",
+      "sha256": "ad2c8539aba3119d52a37d6a6a930237a3bc12053c27f62d2bb30a4ed6546ce5"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000088-euro.raw",
+      "sha256": "9af21e782cd419de8d63026c0e8f6814a5a7ce70934bea6693a4adbb644ca341"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000088-total.raw",
+      "sha256": "cdd5e7f7810341d1627ca9e269f2723fbe6cf485425e10907fac4610a5b813a5"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000088-asian.raw",
+      "sha256": "0185edaaf1aeefa319fda7b375c9172f643862b2f517986acfc23373619d1c7d"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000090-euro.raw",
+      "sha256": "6fbf0f042b0d7b685c4342759c89afebe9fd18dee4b5a04a513da02a0eab02fc"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000090-total.raw",
+      "sha256": "4d6f29d3e564113173595ed9d6e5b37d3bc9c3bbca601697e6cde73a00ddcc83"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3000090-asian.raw",
+      "sha256": "426a06d0ac114d0e9a29ef4c5bc27d96fd6a466672a12daff0481b442cca3b28"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921944-euro.raw",
+      "sha256": "bb25b9182ca619de6e41797536c60554912aa069cc906c9d0e05e459836ea928"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921944-total.raw",
+      "sha256": "d8a059b07bf9b6a46982c2d8f30607528cc3826745b8a3fc0097c0fe785a303f"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921944-asian.raw",
+      "sha256": "d4f9af55a40bd90c5a6b85f8aa1d57820648c6ef27a99f78e4c1073c3221fcbc"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921945-euro.raw",
+      "sha256": "f9a9fdf67339a7147876973d2c0e171f42dd1116c589e8bc826bc3e5ec552d3d"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921945-total.raw",
+      "sha256": "aa353c16d5872f1285eb483f83ff6203098a4504fd1005e521772fc0433b3802"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2921945-asian.raw",
+      "sha256": "291b90fecf55d8444853b42c1aa9868ae67daab61599821f1721f2a822b268f4"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007116-euro.raw",
+      "sha256": "531aaa406f1dd2145493da91be9b1c343bfed4e6a2d3ded7b7e8b3bc53b76014"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007116-total.raw",
+      "sha256": "84b152ecca6049fd6f5b7488046480750cae77f2c522b5873bbff4dc7c6aced9"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007116-asian.raw",
+      "sha256": "dccce11aea9c9db0f235737a6b4ef90d5e974ff311d34073306d434358dfb28b"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007125-euro.raw",
+      "sha256": "dd0d07378f0ff07548343b6151f1e69577e0c1d68f8e97fd8a9f4891ea22f832"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007125-total.raw",
+      "sha256": "0d53d87dbefd9bc149833d62be53e94eab3baeefe791d0569c2e33f2ae821fc9"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007125-asian.raw",
+      "sha256": "d38e3674d77bdbc5b97e20842dad5766d50caf0d5785a8825cabeaf950e6f8d2"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007126-euro.raw",
+      "sha256": "fc6d434b10fa07c59ce87460918292f6d6a98557776c9ecdede0af01f247a3fd"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007126-total.raw",
+      "sha256": "934ee92d481af973af6aef6ec7fcf563daf00c76e95cb4af6315883178e7a3d3"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007126-asian.raw",
+      "sha256": "13e2e1ab1d24ecc1b695d06d2fe7b7e9c5c1ebcddfab013b20525c7fd58aa020"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007675-euro.raw",
+      "sha256": "bd513e78565ab85605296e17ecbf7853cdde25ea915d34490d08a2660d4b52c0"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007675-total.raw",
+      "sha256": "c2990f469517db72214d21aa5879fc41313121b38f3ba20bc3be7afd0bc34273"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007675-asian.raw",
+      "sha256": "bb65334a7dc95378090d518d19325cb9419ba4348973c4b6a4a1600ebdae5488"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007677-euro.raw",
+      "sha256": "c950e6cc20751a60c51b0045d00b4efa22e48a1466616ee8ac29d4ef603d5597"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007677-total.raw",
+      "sha256": "47ef45f6dcd828533e736360a2aa1a9a67256cedccb8737045d7b03514ceb6fc"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007677-asian.raw",
+      "sha256": "2672628fcb24bab21d9debeb30d49df24bbb9287228d4174518a44bcabdea2b1"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007685-euro.raw",
+      "sha256": "c0ff8f171989550f7def7203736cb4297b3446fc81da26be021f04123f010545"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007685-total.raw",
+      "sha256": "e1ca52d2842e002117d3c01aa72e948b57bb3cc8980eb145246f4b2af309fc08"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007685-asian.raw",
+      "sha256": "23e6555640aab6c69c31704932eb2248490f1e1bb38f1e9659193c0ec17c3893"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007684-euro.raw",
+      "sha256": "dee57061decc44ad6b5790ac659711ec35fa417165f7dc90ba02c8495279e402"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007684-total.raw",
+      "sha256": "0a65ecf8a1d4cf1693ee054dc231c826389651e81254641ef8eab65684662e40"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3007684-asian.raw",
+      "sha256": "0d4d19b57446606542571f940619427f051c4757833962ee463c5cb3540ba2ff"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996482-euro.raw",
+      "sha256": "e2dd2a402acd03c0ba1c898161b13f96bce4dc624599935bbfd396d2131aa79e"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996482-total.raw",
+      "sha256": "1216d7d3627d92653e873b16438d3d90acb0c62f8e856bdd9fce7423daed8445"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996482-asian.raw",
+      "sha256": "32539d6e3712a52ee2af7e6b7a6ca33c6ed63a7e6629a455e8bdc06f00fe66cd"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981529-euro.raw",
+      "sha256": "c67b3fbb98ff6396e6ad2285d4abb01c112fadd8bda97c1b30e590df9367577a"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981529-total.raw",
+      "sha256": "9669721c6f9c3175995ff765ec4d409f272e588e4913f17d96ffd14c1c2371d3"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981529-asian.raw",
+      "sha256": "880490df0b599d91ac4b0316fdaf901dd0bb97ff86a1a6edd479bed5226841f0"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940203-euro.raw",
+      "sha256": "24cd60ab4dd280de9278a2b4d0f87f517423509d80aad512e5afff601051c85f"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940203-total.raw",
+      "sha256": "d08c627ae50274017328ffba4c4bfa3f046aed0571309268a3784ccbc1d69ba6"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940203-asian.raw",
+      "sha256": "192e536f0a36d49da4cbd7ad1d914dc33318f6c2d75919bf1000dd22b677ec72"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940201-euro.raw",
+      "sha256": "c59dd8d9ef746be7919d3a803f12094702a5cbd1abc63f096cae7bee6874bef2"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940201-total.raw",
+      "sha256": "8dd66c5ce0d62f081676aeec7b7283175498866511c04a24e7e9ad496eaf0583"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940201-asian.raw",
+      "sha256": "ae2fe4d513f052037172941fe945658a5a3e6dbdf03d8187095a573b522b2e69"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997425-euro.raw",
+      "sha256": "4cb271b0bf6e17a9018c118102ef3c1cd04f5c0624024c52fd2640d125796680"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997425-total.raw",
+      "sha256": "b687e9152fc13ce92cbd71bfa270045f9fb84659f1517ab3d10427e6e684b222"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997425-asian.raw",
+      "sha256": "0eefa07b792a0620b458ded264580e81b842b4730293221fed799d487033e801"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2908804-euro.raw",
+      "sha256": "b7d82e6f728fe3107bcb53b4a5c8df37ada5aed71fb23762a783b2b993ba95a2"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2908804-total.raw",
+      "sha256": "6914c35bc5594edf09c817968691da929f559cdd59bfe89316cb793fe3d7a50e"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2908804-asian.raw",
+      "sha256": "196c82e10289e86cc7fe50b8071f170290bbe340d81e1da9e39155c37ec55fce"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997424-euro.raw",
+      "sha256": "4065f82798336c0b6c029290377e3e504eff6fe864eb3e816f28206052096193"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997424-total.raw",
+      "sha256": "0fb6f669518f7ec2b06c2588da6e44defd794d9ec8377ee116e356206d936c88"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997424-asian.raw",
+      "sha256": "c3c9db57a2f6a1886d7c981004fce2e9d14e83652b323b08d7b584577b48d218"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2929683-euro.raw",
+      "sha256": "424743edcc37a9b036961677f54c23de8121f817bb86179b10a45e765b94bdd5"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2929683-total.raw",
+      "sha256": "727a92d665eb2046b6ec7b35b13aba043b470940c96971fe8729700f5c13e88d"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2929683-asian.raw",
+      "sha256": "e49b86bb61d3219f21e2ca3c0f0afadf42687e48582f863950d9a876e4234f49"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996483-euro.raw",
+      "sha256": "3a1289f9738267e30771a998c89b2de12a13c0c4b170b423a829a3ac126810e6"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996483-total.raw",
+      "sha256": "a1b0e907b7ada7e7f070bc4915dae125563b2d022e46c7d61a7ebe4ea0b63450"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2996483-asian.raw",
+      "sha256": "864b913a9a077a8905b08fc7ca7b7809ddbd625df6b0d9c51b51cce3f1fe9643"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997426-euro.raw",
+      "sha256": "fcd7e96ea3008c75f8d2c8fbcab20c4f040c6802e0fbde1e392bbc6c95167a77"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997426-total.raw",
+      "sha256": "096c9b547d70c8151397afda3552f89249a9972f7e78657c3a4bc7c75d2a317b"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2997426-asian.raw",
+      "sha256": "9a5585841c09136b764979eefe3843d1bd2f9b501aa8412f7801edef0594c7ac"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940199-euro.raw",
+      "sha256": "d635c6761350129815efdfe237d089d7faa670becac4444b5515304fd51ebdff"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940199-total.raw",
+      "sha256": "ab4d4f5c2af0133fd28f4ecaf074e4e8ccbae24e161eb1196d6cc53c8438c40f"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2940199-asian.raw",
+      "sha256": "65f493cad4b2ed635134eb4c439e81ec86a6cac80a46935fae3fec8d45fac238"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981531-euro.raw",
+      "sha256": "0335880c92bf1794e33a894a087e551ce4253289fcd888413fbcde8df6614b1c"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981531-total.raw",
+      "sha256": "dcc3497b7b147ddd3d0d084c00fd23b33c4e28b83bcd93f227c6fe03e6aa8e3e"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/2981531-asian.raw",
+      "sha256": "df158fcedeb9c5540c6f8770f3cc2fbad3485f6e761dadd97f21f2fdf4de40df"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3014093-euro.raw",
+      "sha256": "8c46082c82cca747c372a613cce2df3d30d745e842cf36d39abf8b3f24384701"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3014093-total.raw",
+      "sha256": "62489f5df0faefc95a71d69876c63b4a5087ecd7abc2302196bd0543ddf88703"
+    },
+    {
+      "path": "results/fm13-26098-20261011/market-captures/raw/3014093-asian.raw",
+      "sha256": "396a0c9961543fc37523bb1cc9005508e4f884f3dcd8370d06499045568402db"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_3-00953a9fcc614a759fc45c8034e709fc/3094964-euro.raw",
+      "sha256": "abe9faca562497c80c1f3e06162b0c6c998896360a11c4006e0032868d65edb4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_3-00953a9fcc614a759fc45c8034e709fc/3094964-total.raw",
+      "sha256": "02b918246f3d7201b3cd7a15f8c9d63914cb064d3875fc7af11d514163cde327"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_3-00953a9fcc614a759fc45c8034e709fc/3094964-asian.raw",
+      "sha256": "2d649d056eabf8687e808a90100229a5f372d1f941709dbb194033fac209e079"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_4-f7923d18fa044c5dbc0633504f50a286/3094977-euro.raw",
+      "sha256": "a81d763a2ea38afa4c706459051dcb978286b4a35ac2a88879eac6ca42765312"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_4-f7923d18fa044c5dbc0633504f50a286/3094977-total.raw",
+      "sha256": "18f74d33c820fed8024b47eea47b7b97fd77e7126b0a2116c194f74998fda356"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_4-f7923d18fa044c5dbc0633504f50a286/3094977-asian.raw",
+      "sha256": "52e3f8187cd4c6ddc8fe4071f0e13ff5b3b7da4967855b30609c23ae3be510b4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_5-4756abdf926b473c8a5108abde1bbc0a/3094969-euro.raw",
+      "sha256": "e67df283be0820ed7d77a65c3a5eae27b0e0ab1543edf72969a2fef9a127068e"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_5-4756abdf926b473c8a5108abde1bbc0a/3094969-total.raw",
+      "sha256": "d26e69ae62b80c4610aa3f6f698f066e296b47ed609f089aa34801aef4da78bc"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_5-4756abdf926b473c8a5108abde1bbc0a/3094969-asian.raw",
+      "sha256": "4b850856f8f8fe2a885032470794fb7467399486e0121a2ed78486b4a9ce9149"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_6-4b40c2670c6e4483882148ff5538db7d/3094970-euro.raw",
+      "sha256": "5a48750742c5083f8c4a84ea01e5ef813658511f2bef6d281c1388836c3b9426"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_6-4b40c2670c6e4483882148ff5538db7d/3094970-total.raw",
+      "sha256": "f0b710c813b90ed42c2f3dffb76b78a808d61fb3d4b9b6e166c621c11ea02a02"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_6-4b40c2670c6e4483882148ff5538db7d/3094970-asian.raw",
+      "sha256": "a2f227a75030adf5cad7a95fb46b987366102b412d6d275481cc5e1d1b92cb59"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_7-419a583053d34364891e07b585e19f93/3094972-euro.raw",
+      "sha256": "26ea0dc672205e884d34f5597f902701649e7f53cda798de5862bbfa461b56b6"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_7-419a583053d34364891e07b585e19f93/3094972-total.raw",
+      "sha256": "509787890cee5a4e66f88d44d056805c3fe52915e0f913a52b113615552f535f"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_7-419a583053d34364891e07b585e19f93/3094972-asian.raw",
+      "sha256": "47c51df2f094d27501cf4358320b2912c672e4e9b15d72ba5b34c39d00a4bc0b"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_8-6da8c5ca039e4464bf2545c85f20275a/3094963-euro.raw",
+      "sha256": "5a956ad18e2f4e8fbb320498c98112cc6baca991adb709a4dba8e04e0ba6ff85"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_8-6da8c5ca039e4464bf2545c85f20275a/3094963-total.raw",
+      "sha256": "74c16c098f601d872a6f1136f49246ef0cb5f5c829089be81ee506ed1b6f16db"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_8-6da8c5ca039e4464bf2545c85f20275a/3094963-asian.raw",
+      "sha256": "28952a2e60f73e58f9ffed2d05ab8197c7e34d6f1162584fd96cf86c3066b571"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_9-939ca4eef1714496bcafcb623ca80a9a/3094974-euro.raw",
+      "sha256": "ff49dd337ba4c58d183a2520f2e6611ce72caff80d7ad4f12665267a42ca5f20"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_9-939ca4eef1714496bcafcb623ca80a9a/3094974-total.raw",
+      "sha256": "4415426591a0e899bb08f6a225d1bbe8f6500abd4dc1601cb445440529a7f27e"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_9-939ca4eef1714496bcafcb623ca80a9a/3094974-asian.raw",
+      "sha256": "94a054fb76959b66933f1bb110e940ce5ee35d5e6bc55ea67a6bfee11aff5081"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_10-5c982f4548984f0cae8dc56b8ce97d89/3095430-euro.raw",
+      "sha256": "ff2db073ef4f2489f7e2840378547bde7e275d51e8db4105f8bbb1202fdbc7bf"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_10-5c982f4548984f0cae8dc56b8ce97d89/3095430-total.raw",
+      "sha256": "6ed646ea47ccc1d5b7d942e071cf6438f04e71cb64b0af5fc87007c2ea4aa54b"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_10-5c982f4548984f0cae8dc56b8ce97d89/3095430-asian.raw",
+      "sha256": "48b63fb7c934970582d40d043b32298b9d05a11e89985aa52394812f3290e705"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_25-63de1ee8296c4a3090a9f220d64b44ef/2940196-euro.raw",
+      "sha256": "fa6e36a6b8ee877fa259a8b2b0d51374cd5e797075abbc44e3e9a8c4e94b10ef"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_25-63de1ee8296c4a3090a9f220d64b44ef/2940196-total.raw",
+      "sha256": "ba7007fd8a99de6d7a9ddbce69e9e492bdc2aa68b5d0a7d6ed457904e1c395a0"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_25-63de1ee8296c4a3090a9f220d64b44ef/2940196-asian.raw",
+      "sha256": "9b1afd60bc108b01c38106e6527f9de8dbffaf42deedbf7a7952f7b1c29d3aa7"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_33-0256e73e171748d485ba84e1c0dd536e/2981492-euro.raw",
+      "sha256": "ddb4f96c4b1266a418694e30caa19098b8d373220c0d77fc27e4cb1bafc57a71"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_33-0256e73e171748d485ba84e1c0dd536e/2981492-total.raw",
+      "sha256": "72907987bd37ec738fddf94d7fe77dd7615075642b5018f3d5e1f845b0d382f4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_33-0256e73e171748d485ba84e1c0dd536e/2981492-asian.raw",
+      "sha256": "a3d6f2bcde8dc6da2c56c31be1de6007a0ddc897bf2fe6fb739d6137b58f27d5"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_36-006dd66a7b974f24accd976945421753/2940205-euro.raw",
+      "sha256": "88894875b7be6ee40c3f1bfdd6dbd0e0666fcd3fa59a972a96a023ec279244c6"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_36-006dd66a7b974f24accd976945421753/2940205-total.raw",
+      "sha256": "e88c040c5884ecb7e7ba9f6c7fb442546baf6c9004aa01a8c5a68235668c364c"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_36-006dd66a7b974f24accd976945421753/2940205-asian.raw",
+      "sha256": "9d49ec9ac7bfee075e07fb85afad6f6b528e6a1069623e91d998f50993cc560b"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_38-22716096a3bc4cf285889b8b964fc696/3085729-euro.raw",
+      "sha256": "601fc71ca56aa4b84afa11fad70d773da6b1a7a5f4a30b2300e9934f8e8341fc"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_38-22716096a3bc4cf285889b8b964fc696/3085729-total.raw",
+      "sha256": "ca22b0e565b7799349f8a63859b44f1f71897d432fe6684967560e82211f83af"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_38-22716096a3bc4cf285889b8b964fc696/3085729-asian.raw",
+      "sha256": "fe5c5e21789500290d9c927e99276a1a206db2a25ccad8898eaadbe42684d824"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_43-43bf0bbddb6843fcb03ab4fa475875b3/2913158-euro.raw",
+      "sha256": "d1bd5f46d392a691faadf1256bfb54d30df12a9ccbdfdbc8ecfd9b35f2e12cbf"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_43-43bf0bbddb6843fcb03ab4fa475875b3/2913158-total.raw",
+      "sha256": "67e1f89b58e36999b808166a5fe45e1005bcc9885d8bf27c785e6a28c878cbca"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_43-43bf0bbddb6843fcb03ab4fa475875b3/2913158-asian.raw",
+      "sha256": "46d9f1b385b21e7a172f2ef3187abb9fed7f39b56ba793bd4a536bb71b708321"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_46-fd0be53015fd4e48992e65c9cc456aa8/2914412-euro.raw",
+      "sha256": "f00328d2c8d58fe764ac30bb580d74563d1bf951952a015c5014128c39029e6c"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_46-fd0be53015fd4e48992e65c9cc456aa8/2914412-total.raw",
+      "sha256": "ad5b99fd422094ff3a1311d1bb3380356b51682c459541da7c85f6bce5ac4b46"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_46-fd0be53015fd4e48992e65c9cc456aa8/2914412-asian.raw",
+      "sha256": "637f00036d58634200c6e7701be2c3782a3a915658e542bd104912ef8b415d5d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_48-6142c0ff032f4a9592113b0d62d98a5a/2939066-euro.raw",
+      "sha256": "9eec11aea4ea97e74737eea97092b680471efd8f741222fc80d4af2645bd35f4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_48-6142c0ff032f4a9592113b0d62d98a5a/2939066-total.raw",
+      "sha256": "c277787e4420437e327cfe115723a9c1688087543fcdecd1d5a218dd1d465e1d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_48-6142c0ff032f4a9592113b0d62d98a5a/2939066-asian.raw",
+      "sha256": "3666a08ad6f244aeaee5390772214c7cb0bbd84c421daaab2582491ddef2eff4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_49-5f048dbb6d3d4fcea5ce558bebb3f586/2939067-euro.raw",
+      "sha256": "53deb84a0d183edacfc7706f6544d72cdd3e90b10feea2be1229f160a43e3216"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_49-5f048dbb6d3d4fcea5ce558bebb3f586/2939067-total.raw",
+      "sha256": "cb07ef94c6195acb2ba4cf75731f56d89c6206e8a6c1149aaef0fd14a0a52a20"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_49-5f048dbb6d3d4fcea5ce558bebb3f586/2939067-asian.raw",
+      "sha256": "3fc47713d3c82083d922d3c0e9839843a785b64290e56cc424124f414d3f5bab"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_51-49e87c0080534e69b9b1bf1ee57c689c/2962662-euro.raw",
+      "sha256": "1b468140c77bfc3c4eb5e4d71920acb8dd44e4a659e2caed1961a22fa3fbf1fa"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_51-49e87c0080534e69b9b1bf1ee57c689c/2962662-total.raw",
+      "sha256": "93f12ed6252beccad8bcff5e62df90bcd8be0d64da6909f54ebe0704dc47f936"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_51-49e87c0080534e69b9b1bf1ee57c689c/2962662-asian.raw",
+      "sha256": "bc8da602f2c2a7f1a2d82f83131e51d723f3f463ae9c588abd53b92f2fab19d9"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_52-ef3005080da2408cb2c4cc55c9658113/2940214-euro.raw",
+      "sha256": "4cdb32d07b3a0294189af3ca6cc26286149e3058740618dfab6162e6654054fb"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_52-ef3005080da2408cb2c4cc55c9658113/2940214-total.raw",
+      "sha256": "881c4f373604279f3fa6063637706f3314f03cfc7ea133df5c18c6cc26490c25"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_52-ef3005080da2408cb2c4cc55c9658113/2940214-asian.raw",
+      "sha256": "58d4a73aa37aaa9853d8e3d2dbe1a5eef3522d41b2a347e546bb4a1c7326b2a2"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_53-34f60d50f580423f8ac1d35cc725216e/2910835-euro.raw",
+      "sha256": "a6912d3bc37c41cdf3af4979e51dde1bfe56f9e78647810dd5ee98a1145387de"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_53-34f60d50f580423f8ac1d35cc725216e/2910835-total.raw",
+      "sha256": "684d1152f69baa9f92937a55dfc1c388b1fc2b9229948eb0917eab0b57d4bc99"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_53-34f60d50f580423f8ac1d35cc725216e/2910835-asian.raw",
+      "sha256": "a970462c912f4f2a5435a103e572540fc61a858b10e69d7ae4721e204efe3bed"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_55-4363d395f7334a9981466babd7f30322/2940211-euro.raw",
+      "sha256": "5ff9bc8c8d43ce09932a9628055fadf1ee53974d3584d7205a8ecb894a6c3804"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_55-4363d395f7334a9981466babd7f30322/2940211-total.raw",
+      "sha256": "8a53095e57e4377632e494aa401d77165053da94ce988705230f08a19bc13f9d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_55-4363d395f7334a9981466babd7f30322/2940211-asian.raw",
+      "sha256": "cb7d9e4f699e34ad34183599a7051fdb34d838e78f42cae95ad4c69ccc38bb78"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_56-04b9ac9063ed484cb8249740e39d073a/2962656-euro.raw",
+      "sha256": "b67ce9265b485df4d127bba3d3644c09aff78b5942114e6e8a76adaacc9ea2cd"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_56-04b9ac9063ed484cb8249740e39d073a/2962656-total.raw",
+      "sha256": "eeca3bdb5efbb8a942bd5655d49e9e163a7bd3acfd422f0e54b3812c2615b9a4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_56-04b9ac9063ed484cb8249740e39d073a/2962656-asian.raw",
+      "sha256": "77e705144fbe440a55ea64e99cd92635a23478247ca9d6a55f197d293d8534e0"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_59-b088a233751f4c0983d92dc07be57fd1/3000093-euro.raw",
+      "sha256": "cdffbd68e8efa6a77afa7330e91ba65b05abf60d2815f7964ebbd39c496fb916"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_59-b088a233751f4c0983d92dc07be57fd1/3000093-total.raw",
+      "sha256": "954c802834942a5815ef3e087aea6729e3b63e238f031a80f7151e23d6dc83fa"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_59-b088a233751f4c0983d92dc07be57fd1/3000093-asian.raw",
+      "sha256": "7b16c7d088627e1566d6fabb3ef942ef63d47292e0a657e53aa390637eb96d1d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_60-33a564cd0489458183be4e49bf6e51c2/3000095-euro.raw",
+      "sha256": "4f3945c2542a82d9f33e152ab6e073587d92bb9316b34378c6b61004a04e8bbd"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_60-33a564cd0489458183be4e49bf6e51c2/3000095-total.raw",
+      "sha256": "5ab779b8a33a7de64463996e05733cc6fbc4a69be6dd532a72b10ff0bbeadf77"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_60-33a564cd0489458183be4e49bf6e51c2/3000095-asian.raw",
+      "sha256": "85541b5e6a0996cba3414ad90764db33392c3b570d1e3464018591fd2882805e"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_61-b63d28c0021c4e6f9f996f67221866c5/3000097-euro.raw",
+      "sha256": "228fef9bfa9f83dd08d141f0345fa7d0509105d20724c199a78bec2c2c365974"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_61-b63d28c0021c4e6f9f996f67221866c5/3000097-total.raw",
+      "sha256": "a9e9cc1d246686205d8f62f13ee5d71ecee2e8f7b7f353bf7db32065661c4373"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_61-b63d28c0021c4e6f9f996f67221866c5/3000097-asian.raw",
+      "sha256": "a390fe9cf2ddb7ea9c1c9d9c653d91ada77afd2c0b6080b56f651c0fcfac2389"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_62-0838313ac9f3423fa3673f332526da0a/3000100-euro.raw",
+      "sha256": "a2c837c6f65a6faf654abeddad2e243483c78be563e8deaad47ceb2501407829"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_62-0838313ac9f3423fa3673f332526da0a/3000100-total.raw",
+      "sha256": "61c96ff27e9032ac83f8fcf9db763fcd66d5acdd33a4cb661090d776755dff61"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_62-0838313ac9f3423fa3673f332526da0a/3000100-asian.raw",
+      "sha256": "cd8bb0ae3fd8d08f0f8683889e7cc3ab396a6abcede80beb5f389eaae26a80c3"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_64-d8ed0c0c9bf14dcabc025f9aee831c53/3007688-euro.raw",
+      "sha256": "7cd69147f9e6fa6757b36a9f7b772156b6598084658ce368e630298864ba95cd"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_64-d8ed0c0c9bf14dcabc025f9aee831c53/3007688-total.raw",
+      "sha256": "cb38b8f8e55c5454cb267109d4b56f63a50d5415e910bb9ec27beacc591dc107"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_64-d8ed0c0c9bf14dcabc025f9aee831c53/3007688-asian.raw",
+      "sha256": "0d4421394f7dda870a1f0d52a08e1dbb06fbefc659e4de33244cdc5af52c3338"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_66-5fdc92cdb00a4bd3b3b01bf6dad4068f/2913160-euro.raw",
+      "sha256": "19d743fcc78c3ec9ac3166e8ab259fd2815ebbd6f8a5e9a9e8e9a15714280d9e"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_66-5fdc92cdb00a4bd3b3b01bf6dad4068f/2913160-total.raw",
+      "sha256": "fea090f0fa5dcf3a2b8fb25a947383b4d8e25fec682a47d978507b72683d6610"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_66-5fdc92cdb00a4bd3b3b01bf6dad4068f/2913160-asian.raw",
+      "sha256": "fac2cc504149b52c20844508efb547074259e92748d10d3abad32487b1f048b5"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_70-6d158f0cd865496e96a4ea5d31eaf074/3007686-euro.raw",
+      "sha256": "f77b5c964dadef31e0c67a7137b8ff39ddb44d6836b0235562dee967b16cd330"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_70-6d158f0cd865496e96a4ea5d31eaf074/3007686-total.raw",
+      "sha256": "e3f97cd22af86576ce3e38f00f43a3d03687e661d476ca6e49e4363c5c58831a"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_70-6d158f0cd865496e96a4ea5d31eaf074/3007686-asian.raw",
+      "sha256": "2a06aaf395231c387695e44f4a5ac9c65de68e15caad25a07c7a33d06166281b"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_71-5fcf2bbbc8304e32afc296f32f671da5/3007690-euro.raw",
+      "sha256": "6d6875f0b0798f8b77a0d9173b7d1631f2e533db3a81938f630be6c4a1110633"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_71-5fcf2bbbc8304e32afc296f32f671da5/3007690-total.raw",
+      "sha256": "f31f4c561f57a2c532ebf2188671f79e337f1cce1b93ef9e6ab2a03d82f0fad2"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_71-5fcf2bbbc8304e32afc296f32f671da5/3007690-asian.raw",
+      "sha256": "cb58c8630f6e78ca02b3c767ea50911f877c5126453a1df765ac9b1d8a1ab38d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_72-dc24f49dcba7428293a68bb5a7b5d93b/3007691-euro.raw",
+      "sha256": "c1cf1500b9503c79e57f83d3c65e06a0aacf0c606441fd1b7d1f8085e62e9d64"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_72-dc24f49dcba7428293a68bb5a7b5d93b/3007691-total.raw",
+      "sha256": "a6ccecee24926f0d6a7223c17d4d14de069ec24bf44d0fba0695bfbf4e4f0f8f"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_72-dc24f49dcba7428293a68bb5a7b5d93b/3007691-asian.raw",
+      "sha256": "f800e4876db9a8fed882246fce29725900252b6cdcbe1065ed974f3e370c7dc4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_74-634afef9c70543c7b33281e3ff97aadc/3007692-euro.raw",
+      "sha256": "31950a6945ff1359c496ec0042e542bca21d2e51a1d1ac27d9fc70661a3bef7e"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_74-634afef9c70543c7b33281e3ff97aadc/3007692-total.raw",
+      "sha256": "69f0248cd9a00fa17c617d4a9a466b66895df292a99facaab77cf72172bb6fde"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_74-634afef9c70543c7b33281e3ff97aadc/3007692-asian.raw",
+      "sha256": "2f8a4a53870d613fb1f74f0db92dbcb5eef148e0a4ac1aaabdf1a6f8087a359a"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_77-2ff3d088058545329e2857dc0d3e90b1/3002272-euro.raw",
+      "sha256": "a11e08b24d0c6a78010631df247d09584d0b7eef4664e55e8eb34887c1fe10b1"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_77-2ff3d088058545329e2857dc0d3e90b1/3002272-total.raw",
+      "sha256": "68b456e30bf13689309f276e4f2764dc2062e3f4b9b0976a4d88fbe792500b66"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_77-2ff3d088058545329e2857dc0d3e90b1/3002272-asian.raw",
+      "sha256": "240f2086f088926291a4d93876e547ce8dacee1f8eadd9f48ee69a495702abc6"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_78-860bcaf1d9f4462c88ecbfdf1a449ad7/3002273-euro.raw",
+      "sha256": "d8a90d8cdd050eb5790fa5755c82de718c880054e33a68cf3aed335629eb2ea2"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_78-860bcaf1d9f4462c88ecbfdf1a449ad7/3002273-total.raw",
+      "sha256": "c51cb0eac35e9dd495f6e78dfa4314f3210f2078a1606063e0f3d22d5cc20e71"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_78-860bcaf1d9f4462c88ecbfdf1a449ad7/3002273-asian.raw",
+      "sha256": "e46cb3115a68106df1057a464fb5d736c42124f63b6f2bc0dd6bde59677e06d0"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_79-20171c3aec53447596e589c686742e71/3002274-euro.raw",
+      "sha256": "ec7d0a23aca4053e8df251c4634f58e0f43f8e3ddc30b7a977836f59b4e54b04"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_79-20171c3aec53447596e589c686742e71/3002274-total.raw",
+      "sha256": "3f6e6ae636d0a85cfc0b4061447858f2795d3ba2876ca22efa1da85cc3dbe965"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_79-20171c3aec53447596e589c686742e71/3002274-asian.raw",
+      "sha256": "08d64fe7e7a492f7994f49498353cd3de4e0e7c37389b7cd4ef0ec813145e42a"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_80-22532c9560414449aaeeed074f250e8b/2913155-euro.raw",
+      "sha256": "0677f68c13bbf5d98984f3673fe8d677e8af13602c20466bf869be2761959a21"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_80-22532c9560414449aaeeed074f250e8b/2913155-total.raw",
+      "sha256": "12bd8095e42313f2078f8cd0cf6184142f5235e4cbcfa5b672467b3e55354c5d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_80-22532c9560414449aaeeed074f250e8b/2913155-asian.raw",
+      "sha256": "7f782ff335aa7be4cc556533f2538f1a4fc50d1b99f0958a23e00c980aab3c4b"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_81-38255c6ee3b848c599f4c68be4b4bcb0/2913156-euro.raw",
+      "sha256": "ff31104a50874e0ecefd8e83bfa54c552ab952de991245ab605f06d82780d741"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_81-38255c6ee3b848c599f4c68be4b4bcb0/2913156-total.raw",
+      "sha256": "f92da8b60008c989c680ae6b869df7386e192082b5ead161201d775120edd062"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_81-38255c6ee3b848c599f4c68be4b4bcb0/2913156-asian.raw",
+      "sha256": "105bb7521a96ef33c15740705b344125d6343457b7ad032afa7753651fbc13c1"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_82-e17d55730a1a4fcea1f54db8e9cf0f83/2913161-euro.raw",
+      "sha256": "3dd1fa4d21b2dc27af7718a211a5fe2919e32d1692c84dbe19f52ffb3f6173b3"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_82-e17d55730a1a4fcea1f54db8e9cf0f83/2913161-total.raw",
+      "sha256": "98bc67e0e9c4a90243c6da808d4d8c61923a93aa78ac9314dd33bf7f37f61631"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_82-e17d55730a1a4fcea1f54db8e9cf0f83/2913161-asian.raw",
+      "sha256": "bbd91a16220173f146f6907cbdbdd2a89f8f02228fdc1901d822da2c83a18da1"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_84-8fd82c25d5e04fd683275bb98ff3b903/3014100-euro.raw",
+      "sha256": "d4899b8bcf0be15a8dbd5414dd396e88a4e589b2a9923d53a99bc6b936399fca"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_84-8fd82c25d5e04fd683275bb98ff3b903/3014100-total.raw",
+      "sha256": "100627857c595ae5e4edc53098e87fe4526fc2d2368a4e9fc8682da866919887"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_84-8fd82c25d5e04fd683275bb98ff3b903/3014100-asian.raw",
+      "sha256": "6adc8a6ce710ceff2970fe8caec71a7cb1ff4dec6083c3af1d62d2684f8c28c9"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_85-7b348795cd554db4bed08b5c277c7a1c/2996491-euro.raw",
+      "sha256": "9fc4ad2686dace04463139349fca77171b3ee870adece7857e8e68282bb1c864"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_85-7b348795cd554db4bed08b5c277c7a1c/2996491-total.raw",
+      "sha256": "1295a91ff2694236e27935e89d302d8000674585ec5c1d05aa2a8eec86a9a0f7"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_85-7b348795cd554db4bed08b5c277c7a1c/2996491-asian.raw",
+      "sha256": "8304769ea8bf742561e2a344a0d4439483873b8f86b956410a8a22fcd7edb6f0"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_90-a37fe9882c1647d6939ce8ea86420377/2996490-euro.raw",
+      "sha256": "530328771175c5c66f61b322a5437427e65f40912760659ca842b75528d2f137"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_90-a37fe9882c1647d6939ce8ea86420377/2996490-total.raw",
+      "sha256": "f5b990d51644a214708c031f7cd764dceb7f39fde18de7442bdfdb80fd3fef26"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_90-a37fe9882c1647d6939ce8ea86420377/2996490-asian.raw",
+      "sha256": "eae69228f1af56f061134ca47e20f636adb943277a3019c2d8ef20a8e2ee8d73"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_98-6941324f06724990ad500b03a4f0d4ec/3000101-euro.raw",
+      "sha256": "b70293614c0c80234237ff247adb529834d189cd1b6c3b8d5f1bf1b473350a7e"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_98-6941324f06724990ad500b03a4f0d4ec/3000101-total.raw",
+      "sha256": "e42645302eaa484b6c71196d6b7373539b52ad3e6174c27e7dcfc45173f6a646"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_98-6941324f06724990ad500b03a4f0d4ec/3000101-asian.raw",
+      "sha256": "2dc05fb60b3cd4bc140c4f043c8ab73e0d90f2a5b9715906f3a2a998ab863a16"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_99-71ab17eb26df47f394ad405a6c42c574/3000094-euro.raw",
+      "sha256": "f75a67bc02ccc27e3634f3671712f80a61b13020e9eb4bab5c9fd1ae60394a3d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_99-71ab17eb26df47f394ad405a6c42c574/3000094-total.raw",
+      "sha256": "ec5341fe4b4470c0d4b963e5291eb4aab10e30a07cd26dac681ed8336c0050af"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_99-71ab17eb26df47f394ad405a6c42c574/3000094-asian.raw",
+      "sha256": "8de65095655643821a71b18495b67337db31d3a2d418d2b29e4244a54d6109ea"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_101-f180d84542604a248810409055daae11/3000099-euro.raw",
+      "sha256": "1fcfb6616767bfaf35d644f3269160a2c2a3fa6ab3f7d3c0d2192619e5ddea1d"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_101-f180d84542604a248810409055daae11/3000099-total.raw",
+      "sha256": "723a127d322bc3953488f5a06037bde8c14e6120fa998f71249cae370cb385f4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_101-f180d84542604a248810409055daae11/3000099-asian.raw",
+      "sha256": "a66e3ad711e5f3efb6e534f6aff0c0a040a06e5a9288a416a9089e046e39b5e4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_102-61621ab41c2048a79452f4f5df25a7fc/3023779-euro.raw",
+      "sha256": "16b89ccee4f569c11eba3046131aafd48162b1d8bff2e89f73918e1bc045df6e"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_102-61621ab41c2048a79452f4f5df25a7fc/3023779-total.raw",
+      "sha256": "13b510d5090aed5199d00866dbe098a0f40fd86408c3d9d472d7450fe7592b42"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_102-61621ab41c2048a79452f4f5df25a7fc/3023779-asian.raw",
+      "sha256": "69c32b06ab7d0b0c6ebdaa28f1a672b97bbf754b848e5b7ebda05f25b7d16283"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_103-e00ac26c6efb44e890c621b15bccaef4/3014107-euro.raw",
+      "sha256": "6270983297ae67c4c8675025d85c26822c129557f956e36db3fe8c36d454ff4b"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_103-e00ac26c6efb44e890c621b15bccaef4/3014107-total.raw",
+      "sha256": "6597731d8fc3df756a48720a8d5946b6e2d69fae9a4e082bbf9068f6797f0deb"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_103-e00ac26c6efb44e890c621b15bccaef4/3014107-asian.raw",
+      "sha256": "ccc9e810ca127643af54351e1d49fc5a99ee9a59ad82154392d126e4b44480cc"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_104-d702db8ab37b49cdb15880aa507afdc5/2996493-euro.raw",
+      "sha256": "096e871fb65f70670719d2d119c08f1eae617657b9704858ca976a46ac90fe2c"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_104-d702db8ab37b49cdb15880aa507afdc5/2996493-total.raw",
+      "sha256": "b6a223c2ee8b56c0f23f583d3c3ecc3c5741e1e08c64e82f35eb42b361ca0544"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_104-d702db8ab37b49cdb15880aa507afdc5/2996493-asian.raw",
+      "sha256": "c858ed61714076b2643558ac7ba52882b8043d7c56a4180eaf33491f9473e4cc"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_105-c0e97934e45a440b983746bfb7165e2c/2913154-euro.raw",
+      "sha256": "c03fe4087961ba9c78f90dd32b62b75e0cde1d77d2f784e5835b3bf837790519"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_105-c0e97934e45a440b983746bfb7165e2c/2913154-total.raw",
+      "sha256": "8e87991897ed9ceb8a50ece71c8234375edb681eed0e65db86e66cbc18b6a8d7"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_105-c0e97934e45a440b983746bfb7165e2c/2913154-asian.raw",
+      "sha256": "615509842d82edf082ad588db351e1c90a0c122bc2bcd22ae04cd6f040b3fc3f"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_106-66e25320fb364e26aa25e0af33d5fecf/3014108-euro.raw",
+      "sha256": "0f1701bce8c3351943c8591821ad6e81aab42fd900b1285196df90957ed19538"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_106-66e25320fb364e26aa25e0af33d5fecf/3014108-total.raw",
+      "sha256": "27badbae1dff7b47a68a32416bccfa867dbc19853835f6cb5a65ce99c4bdcba4"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_106-66e25320fb364e26aa25e0af33d5fecf/3014108-asian.raw",
+      "sha256": "10bb43181f9ffd1d3b3d5a643f37e8a24deb11c9c322ab700e8578af01a068ce"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_108-61b73199c917415b8ab97ce9f707f206/3014106-euro.raw",
+      "sha256": "7cfb4d8ed50d9d1f2b8efe4976574e71a40761f0ba21b433f70b6e4881f006bb"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_108-61b73199c917415b8ab97ce9f707f206/3014106-total.raw",
+      "sha256": "ef5791e8a5379f06784f7733e5053ff81107ebe637cd3dd36b56b02733348197"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_108-61b73199c917415b8ab97ce9f707f206/3014106-asian.raw",
+      "sha256": "e3f626f9df9225aa9c056ca1bf521a45258f1f2e63d63b116753f13c5293b5ba"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_109-5540bc8e02f64ab59e5594aeb06661e2/2962661-euro.raw",
+      "sha256": "90cf5b75f267ef87cc19f0c251fb28b75942ef43d57158bd193cea30f2c18131"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_109-5540bc8e02f64ab59e5594aeb06661e2/2962661-total.raw",
+      "sha256": "3d3c4f455528f1925a99c891b949a5fe82703f78cceb480d50eda1094bd010ac"
+    },
+    {
+      "path": "results/fm14-26101-20261011/market-captures/raw/26101_109-5540bc8e02f64ab59e5594aeb06661e2/2962661-asian.raw",
+      "sha256": "2e6f87bef998e8814d330c5a3b86f78c3754233724561e67805f2f02b512222e"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_5-f85fa8f6a22f4bc3ac989613297e3889/2913157-euro.raw",
+      "sha256": "027f51ec5010c95a17b9bda43b6dad2a7a72c874606470df1110a95739e5db59"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_5-f85fa8f6a22f4bc3ac989613297e3889/2913157-total.raw",
+      "sha256": "eaf436b8b9d7095c2d7a89860f15600c442055639d871a69833391afb220a979"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_5-f85fa8f6a22f4bc3ac989613297e3889/2913157-asian.raw",
+      "sha256": "d9514ca73e4852e99a0842fc2b328abae718fb23bccf434f5b54ff94b5b7899d"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_6-e48c67927c2e4ba5b2f27d9250e730cb/3014103-euro.raw",
+      "sha256": "ff896995d53a08f4871999d40b58f6b926e5b6119b23acd0204090762a15bbd8"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_6-e48c67927c2e4ba5b2f27d9250e730cb/3014103-total.raw",
+      "sha256": "19788c245cde5edb871d98477c7ca6c9412300f3305efacd45a39d31315d76e8"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_6-e48c67927c2e4ba5b2f27d9250e730cb/3014103-asian.raw",
+      "sha256": "751388fb8f6ec0a58f5b6bcf2610db8ebc717757d8539dc0c4448b8c6bd28c68"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_10-a01592ce11b94bd4879bcb00794bbfae/2981453-euro.raw",
+      "sha256": "133a7cfa7386a918747456442733e702b5fe5ee548d9dcc9d8d2c7f108884c25"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_10-a01592ce11b94bd4879bcb00794bbfae/2981453-total.raw",
+      "sha256": "1149466814c647860ad1f840c7d38740126b8f0f5b70d27a559a76833d6473cf"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_10-a01592ce11b94bd4879bcb00794bbfae/2981453-asian.raw",
+      "sha256": "182912ee54ef108688f65732e82657531ae9b46ad23f3d986a17ee14dc7cb07f"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_13-ddd18aeeda18410ab28ffc7a5730318d/2962658-euro.raw",
+      "sha256": "fbf054ded0e669da43ddbb9e561229f186d3ee58e6e9231c37cbeef8fbd46230"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_13-ddd18aeeda18410ab28ffc7a5730318d/2962658-total.raw",
+      "sha256": "a4317e9dd3ac1174514abd3374bc78b6f8f40e24c0ac8c847400ec7afb8d489e"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_13-ddd18aeeda18410ab28ffc7a5730318d/2962658-asian.raw",
+      "sha256": "5f73aaabcd146cccb407a603d981af134b7874c2b3b05285c87c64781772c056"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_14-caa76e12882847189a1d355e33068791/2962659-euro.raw",
+      "sha256": "39e4e262765403e44120f029d57526c88568b9aa2cacfd6ad43d541bca970aa3"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_14-caa76e12882847189a1d355e33068791/2962659-total.raw",
+      "sha256": "81be83f0063370d4023567091bb1df7f29397d767ce71622aa23fa6455044399"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_14-caa76e12882847189a1d355e33068791/2962659-asian.raw",
+      "sha256": "fe5e86b730585575ac2f7b3d6051179279d82150b00c46e6c570c54ba6305965"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_15-9a47abddbba94cf685f8684c1a1dce94/2962667-euro.raw",
+      "sha256": "67f806eca973077b2be712cacd75e6ce2341f62c00f8e58237d0740f876491b5"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_15-9a47abddbba94cf685f8684c1a1dce94/2962667-total.raw",
+      "sha256": "055ffe1ffa38b060551a7947aee89866fb85a6b4aa3b42da79002566f868d2cc"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_15-9a47abddbba94cf685f8684c1a1dce94/2962667-asian.raw",
+      "sha256": "374878fd5f5c6a9cbad823b86037dd181aa7e00010f4d5832a19ad3e0d1c0931"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_16-2d3f866c05e74d82b32e1fd593902380/2962655-euro.raw",
+      "sha256": "cef00fc033f668359728e3678bd50eb441aab8ca0f7a53f0f4b7172b4d123232"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_16-2d3f866c05e74d82b32e1fd593902380/2962655-total.raw",
+      "sha256": "5c7635148c42e1bd3e45116bd9148f71eb84294632c42ed80d705ab33f9af847"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_16-2d3f866c05e74d82b32e1fd593902380/2962655-asian.raw",
+      "sha256": "966de8ec57e855f6a45ca8addc2b18b1e6fde504b964cd9609eca56146cb1fb5"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_19-897ae6da77e444d9a2dffad1842c0d49/3091499-euro.raw",
+      "sha256": "dfb0e541638cb71f709690e2f68214adc767097e99ff3b8d7e7e6e8f7c206afa"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_19-897ae6da77e444d9a2dffad1842c0d49/3091499-total.raw",
+      "sha256": "a76ff7a5504f7b338522d9e608067df3f59322a13b2513b55bf5f88ce913c4b3"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_19-897ae6da77e444d9a2dffad1842c0d49/3091499-asian.raw",
+      "sha256": "c5288acc4f0bd40238f867429c8797db2efc4c3c9f31ba5e74fccf5973c37dea"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_20-7295fe3119f74bc583fe1b4f64df96c8/2781258-euro.raw",
+      "sha256": "d39f4eb55c95b335a2a93464e25f308cab13728e53b1c2b13e2c398fad5096eb"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_20-7295fe3119f74bc583fe1b4f64df96c8/2781258-total.raw",
+      "sha256": "3036eb42fd32f94598bb2d74c672f1541d2baa919891af3d50c989c97ff67917"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_20-7295fe3119f74bc583fe1b4f64df96c8/2781258-asian.raw",
+      "sha256": "3fff5dedb4e8915bcf76938d671cb25632174749d9d9b2a84b37140d5757f87d"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_24-a29b40d5fe75411593b3dc1455f5ebb1/2781350-total.raw",
+      "sha256": "04c4b62a3c2f7ed98ed08a1f5770da5413ed809816030faa8c6fc1c9f263e34b"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_24-a29b40d5fe75411593b3dc1455f5ebb1/2781350-asian.raw",
+      "sha256": "565afabd2fba20241605209a8cd7007fc6245fef1371d18dd81e880d75113b30"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_40-e030b15ecadf4c7586b31334a8390fe6/3012984-euro.raw",
+      "sha256": "463cbfaf92ed7627dcb3625b9a6a2cf62e48e0c4ae1eb14f15f0e6075df70796"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_40-e030b15ecadf4c7586b31334a8390fe6/3012984-total.raw",
+      "sha256": "843d33aac7d3b34c4168faf5d71988c84d0a57635b068521767debafa0d0d261"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_40-e030b15ecadf4c7586b31334a8390fe6/3012984-asian.raw",
+      "sha256": "095836fc0ce2a451ca139c84d683920e515b622555c6b4001bcf7e504094cf3e"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_68-645b6e34e7884322931ac47c76dc1bf9/2910909-euro.raw",
+      "sha256": "6b45d93ca547bdd535f995a4282e689e188c45af8ec2325a7d0f3e25cf52b8a1"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_68-645b6e34e7884322931ac47c76dc1bf9/2910909-total.raw",
+      "sha256": "f059a63fa625f73cca05903d02f4b68cfe917e69505aa72cfa44d6dbf7bba551"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_68-645b6e34e7884322931ac47c76dc1bf9/2910909-asian.raw",
+      "sha256": "0c05b524c61925bb295d55ccbe6db7df1912e7d8e2740a8d6db3cef9262cd17e"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_71-3ad8d6e2ac964ad5a47b48a1aad4a1dd/2940216-euro.raw",
+      "sha256": "381c6ffe140481889cb35f05abbf6ea319c3a0f1568134a985c88609a635afc4"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_71-3ad8d6e2ac964ad5a47b48a1aad4a1dd/2940216-total.raw",
+      "sha256": "f435bf89d1d7ba7a06c45ca9438b48afe3bc7f26dd11fc02f10cf694811549a2"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_71-3ad8d6e2ac964ad5a47b48a1aad4a1dd/2940216-asian.raw",
+      "sha256": "9dd98997b723a756d58c349d578fccf592cbdba89d38c0ae6e266cc70bb51c98"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_72-2c440d06a4f844f895a048649c1c6823/2940221-euro.raw",
+      "sha256": "8e4cc939840b29da4df6f88b1f71680cc8066a55109286887ee9e423623d4827"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_72-2c440d06a4f844f895a048649c1c6823/2940221-total.raw",
+      "sha256": "07cc5419af603e3a0f2f41a5858f32d20d692780659ddb5eceb8ac588f083a5d"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_72-2c440d06a4f844f895a048649c1c6823/2940221-asian.raw",
+      "sha256": "6abfa78536bdffe89371f4187f86064ccc99b54215a57bcedb86036103b4e19f"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_73-79c024c2251f4755862292f5797ab058/2910916-euro.raw",
+      "sha256": "c6d4f4de9d1f6de479ff64c8d70abb8938777243f41480a41c31d3280e34fb08"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_73-79c024c2251f4755862292f5797ab058/2910916-total.raw",
+      "sha256": "08159c0e5f29fbe03229039cd0469d4e6493b95be627e0525f98e09e555e13fe"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_73-79c024c2251f4755862292f5797ab058/2910916-asian.raw",
+      "sha256": "c86b66f53fa8500cc726fab5e7e7088c9273570bc319da61c97147abd47d8558"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_74-8cd2f76ceb274a9b8e265fc98f11916e/2910908-euro.raw",
+      "sha256": "4b962c676a98ec0dfb4f1df9120865e1a6e9242b9a0533bc269c2962f06d1dba"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_74-8cd2f76ceb274a9b8e265fc98f11916e/2910908-total.raw",
+      "sha256": "8359341bb9a4a2236e9dfccc6ffbee0d7c5df6d2aab1443dac8eddbaea0f9bde"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_74-8cd2f76ceb274a9b8e265fc98f11916e/2910908-asian.raw",
+      "sha256": "3b24e9c83e411fbad4bab17afb20905b30e0558eee9488352daec456e3cc28ff"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_77-b65f6f202adf47a28307771451b17a18/3085211-euro.raw",
+      "sha256": "396b91c6e9d5e7213967128e977bb6432272ba263931f561181f5b56f4c22da1"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_77-b65f6f202adf47a28307771451b17a18/3085211-total.raw",
+      "sha256": "e3c2f7f52c50a52c698ca17c163cd42776810ebf65edbf087ef0defd64355d62"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_77-b65f6f202adf47a28307771451b17a18/3085211-asian.raw",
+      "sha256": "35fe3fa11551d8f2a51da42e8d616b925874eb7573330bdb54234fb618ddb46d"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_78-54d224cd9891490e908079f9ed21cdb3/3085212-euro.raw",
+      "sha256": "8c3f30fa75cee1bc1053857c2d78739adc5ac0bd1ffa8febd95f2c442ecc66d9"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_78-54d224cd9891490e908079f9ed21cdb3/3085212-total.raw",
+      "sha256": "067b86597f1597a4454cdedede815987abbeb554deea6cf407bcac738556155a"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_78-54d224cd9891490e908079f9ed21cdb3/3085212-asian.raw",
+      "sha256": "07601dcd7d3bff3d7f8c959e80ba0adb1b407d50ea9737c4fec53eb099a40dbc"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_79-11c7a1ecb2634dbfbc5598b2a58e351f/3010378-euro.raw",
+      "sha256": "95bdb1992dbcc3c4f4d209eeab5f2e4b2a01daf1ebb5362a1a47173ba2875265"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_79-11c7a1ecb2634dbfbc5598b2a58e351f/3010378-total.raw",
+      "sha256": "4bb2b1d8840756d6143aae2b2fcb45c86d4bc499c85eaecc8ec883032fba1294"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_79-11c7a1ecb2634dbfbc5598b2a58e351f/3010378-asian.raw",
+      "sha256": "49850802a892314f2cff548061ec4f3b15020d775429a5a9e57c447fd7911ac0"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_80-5ad994557b3b4189a3ebe98ad30d6bf9/2914415-euro.raw",
+      "sha256": "2891686a9a733a78c4231fd554f2bbaae0daff77a48cb7b6cf44df8cc75c0ee4"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_80-5ad994557b3b4189a3ebe98ad30d6bf9/2914415-total.raw",
+      "sha256": "ce0b973168a281388a0c4f7614da44f3ce3d70b977160767f9bffd0353bdc6b8"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_80-5ad994557b3b4189a3ebe98ad30d6bf9/2914415-asian.raw",
+      "sha256": "f55942e12418b4bf853f34182a5867ce2b0deb1356928fa4a986718823c52d5c"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_81-6b7e6e8e36514bf58d531c223611babe/2910915-euro.raw",
+      "sha256": "f0d295ba582ffac8e970ee0db03b0301eff64c6d3b8ffe0ac0a7bb1d24584d0a"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_81-6b7e6e8e36514bf58d531c223611babe/2910915-total.raw",
+      "sha256": "93843fb68dff7307a67770e23ce49f8b9cb0f7f75ee3ab9ebdbfb45de8d16034"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_81-6b7e6e8e36514bf58d531c223611babe/2910915-asian.raw",
+      "sha256": "549c1a8653996fe728d082f79d5f3e3304e8d99645020f70addb4ceeff8d79b0"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_83-8253d2979b624e4581525312de699a6b/2940217-euro.raw",
+      "sha256": "71f0616642f1df27172543f414b6aed65f48266171c43ea34be0362834e11d2a"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_83-8253d2979b624e4581525312de699a6b/2940217-total.raw",
+      "sha256": "361964b96f20ac03011a1c2499b34ebfd5737d869a8a067a7286146b8455fb78"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_83-8253d2979b624e4581525312de699a6b/2940217-asian.raw",
+      "sha256": "f4a72ab30c87475f9eaa721913354fb2cdc9cfa9c358b24773af549cf58d58bc"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_85-263b6894623049f0ade923cc0f3da06f/2910911-euro.raw",
+      "sha256": "1e0cd42aa77ff2b8b79aa06f35fb70fe606e98aa683029029d8bae2c00709c28"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_85-263b6894623049f0ade923cc0f3da06f/2910911-total.raw",
+      "sha256": "7801bc2a0ae985eb6838a23a23da55db17b39c5e8576774350f832519af782b8"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_85-263b6894623049f0ade923cc0f3da06f/2910911-asian.raw",
+      "sha256": "e49a806e5c25f9ab819896dc51f1e0187c0a2c20e0b655f34fb1dc6853442580"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_86-0059abb3fb7f40f9a3c92d8e41719735/2910913-euro.raw",
+      "sha256": "1b400c1efe96925a3d92a72f7bbc4b473fb79fd759e3fc49e13e2c840dabe14d"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_86-0059abb3fb7f40f9a3c92d8e41719735/2910913-total.raw",
+      "sha256": "81a56fea1e61f53cf97208bdd5e766cc5bff219ceee489b68098b66ada3cbd22"
+    },
+    {
+      "path": "results/fm15-26102-20261012/market-captures/raw/26102_86-0059abb3fb7f40f9a3c92d8e41719735/2910913-asian.raw",
+      "sha256": "15a39c0ffbe812d9ae273aa5e4997eb08e17c1c2687eecc0511f4c560f835f8e"
+    }
+  ],
+  "unchanged_model_policy": {
+    "max_quote_age_hours": 48,
+    "euro_companies": ["281", "115", "82", "432"]
+  },
+  "new_capture_policy": {
+    "min_request_spacing_seconds": 1,
+    "timeout_seconds": 15,
+    "retries": 1,
+    "max_attempts_per_key": 1
+  },
+  "formal_FM17_changed": false
+}

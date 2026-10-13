@@ -1,0 +1,9 @@
+{
+  "raw_location": "hot:fm17-market-recapture/20261013-capture-v1",
+  "fixtures": 77,
+  "market_keys": 231,
+  "scope_sha256": "9201f0d84c621865b2ffeb1523f44fd662f860767a7894b9ea812de8abc30779",
+  "ledger_sha256": "6013ff2cef76b60ca4d4b8c595430fab0d13e3dac3ba514c94b825c120492b37",
+  "client_sha256": "a26c362c70607d4e081bc15c01153d29f4f6e31dccc01522141ffd4d4bab52ca",
+  "collector_sha256": "3a6ffbe9c23fc5003789480fca88a0a4e0a62d729f120c98b5b90968f4148b9f"
+}
