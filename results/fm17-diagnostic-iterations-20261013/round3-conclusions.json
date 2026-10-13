@@ -1,0 +1,60 @@
+{
+  "round": 3,
+  "mode": "POSTHOC_NO_FORMAL_ADOPTION",
+  "native_alpha": {
+    "scope": 117,
+    "baseline": [
+      33,
+      85
+    ],
+    "alpha25": [
+      31,
+      82
+    ],
+    "alpha75": [
+      35,
+      86
+    ],
+    "reason_not_promoted": "Alpha75 improves counts slightly but aggregate logloss1.19838 is worse than1.19624;26098 worsens while26101 improves. No prior-fold alpha selection performed.",
+    "prediction_only_stability": {
+      "direction_sign_changes": 15,
+      "top1_changes": 16,
+      "top2_set_changes": 23
+    }
+  },
+  "partial_market": {
+    "scanned": 346,
+    "ready": 60,
+    "scored": 59,
+    "native_scored": 9,
+    "market_controls_scored": 50,
+    "overall_counts_FM17": [
+      26,
+      41
+    ],
+    "overall_counts_partial_tail": [
+      27,
+      41
+    ],
+    "native_counts_FM17": [
+      2,
+      6
+    ],
+    "native_counts_partial_tail": [
+      3,
+      6
+    ],
+    "case6_lambda_native": [
+      1.1111111111,
+      1.5618055556
+    ],
+    "case6_lambda_partial": [
+      1.6460335893,
+      1.0547264781
+    ],
+    "reason_not_promoted": "One extra hit on9 native cases is insufficient; one-company half-goal-only shadow inference with no Euro consistency; full-market controls do not justify dropping Euro."
+  },
+  "ordinary_draw": "Market draw matches large descriptive cohorts reasonably; native conventional-name cohort slightly high, cup/age samples sparse. No uniform rho correction supported.",
+  "governance": "Prior-history refits and weight/ESS receipts exist; target-label optimization not performed. Initial ambiguous native metadata archived and all117x3 authoritative objects rebuilt/replayed with corrected identity. Pinned per-match weight JSON has10decimal precision, exact distribution components and receipt masses preserved; rounding envelope explicitly tested.",
+  "formal_model_changed": false
+}

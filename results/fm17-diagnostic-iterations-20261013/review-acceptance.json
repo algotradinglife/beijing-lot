@@ -1,0 +1,248 @@
+{
+  "command": "codex review - < /tmp/fm17-review-prompt.txt; codex review - < /tmp/fm17-final-review.txt",
+  "findings": "Both scoped reviews: no blocking findings. Final reviewer observed tests still running; completed final suite now passes 15,520 assertions, partial helper suite 27.",
+  "resolution": "No implementation findings. Relative-library verification-command failure corrected with absolute lib.loc and final suite rerun; failure log retained.",
+  "pi_status": "ROOT verified reviewed hashes, completed tests/replays and final rendered output; owner PI acceptance pending, no merge requested.",
+  "reviewed_at": "2026-10-13T01:24:00.479293+00:00",
+  "assertions_passed": 15547,
+  "files": [
+    {
+      "path": "packages/beidan/R/partial_market_diagnostic.R",
+      "sha256": "53a0845f3db10fc190a979598d923ab504a05d5692b8832a539589f9bd517c35"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-partial-market-diagnostic.R",
+      "sha256": "2527afbcb76f8798c62229012943ba834ba764be62cd54029d15249979174fa4"
+    },
+    {
+      "path": "tests/testthat/test-fm17-diagnostic-iterations.R",
+      "sha256": "25cd5278d519b3b46a185921aa7370e3a8535823fff95de8046a2165f3d2ca85"
+    },
+    {
+      "path": "quarto/fm17_diagnostic_iterations_20261013.qmd",
+      "sha256": "5acb8c0312925be2eb1ce70afe210aa3818595c7d112519e17aefaee52459745"
+    },
+    {
+      "path": "r/fm17_diagnostic_case_notes.R",
+      "sha256": "04ac69775039213dc1a17af6f5c1fefd4cbcc2a03f8cd863f2a5842cc6c5e1d6"
+    },
+    {
+      "path": "r/fm17_diagnostic_round1.R",
+      "sha256": "94f06c9d1093f23e0fd61861c01dd66b9ad673f6bec86b97d74c017ea4d6ad3b"
+    },
+    {
+      "path": "r/fm17_diagnostic_round2_evaluate.R",
+      "sha256": "ab6942c2d11087a33d13d073f74dfa9c01760786e36da20cfbc449221101bcbd"
+    },
+    {
+      "path": "r/fm17_diagnostic_round2_freeze.R",
+      "sha256": "e6c3aed5306a649d1429045197b6eecc660baf5de51bae3180895f85a5308351"
+    },
+    {
+      "path": "r/fm17_diagnostic_round3_evaluate.R",
+      "sha256": "02d5a1a657c90a1b0ba5bfec03b416385027947c28cae85a5e9abd6f7a5fe212"
+    },
+    {
+      "path": "r/fm17_diagnostic_round3_native.R",
+      "sha256": "57014a9af035ba205212b0ccd266fdcac4706b654b21756d5bfe4d9aa32e422f"
+    },
+    {
+      "path": "r/fm17_diagnostic_round3_partial.R",
+      "sha256": "8190bfc1a77e6d971e9d6a29443f40834f58cf2b0140a9cde845f3e7921fe19a"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/case-notes-receipt.json",
+      "sha256": "bdf72d3c9244f9bc5edc0f227ea6f6f243ba8bbce1ffbd4183690ef2605d52a7"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/case-notes.csv",
+      "sha256": "18831bf4bcca3a29aff07a5725fa438d5c867f0c71ee4798e795fedf91ed989d"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/ordinary-draw-diagnostic.csv",
+      "sha256": "46c0253aac3ff3835b01cb5b17381c093e15ec09d0814f51152d4daab6f11ff9"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/recommendations.json",
+      "sha256": "81fbf3cc8d6f12be219934f2d6b794ca8c61b6611213129f1d06493c46a4572b"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round1-conclusions.json",
+      "sha256": "c1b3b0c3b8f466617ea24fa94973cddffc0f08021157b4a6c22c42fb5f14dcd8"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round1-fixtures.csv",
+      "sha256": "b35bfa0a2bc77e4d183baec240a5802e22bd7109870bd98d83c145d1b2393ddc"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round1-margins.csv",
+      "sha256": "aed20a7ffc4a1629ecd3e815960b692c82eb86dce688afdab0704983110cba64"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round1-native-rates.csv",
+      "sha256": "185265ca4f6bc4c57a6434719480f3457bc844a9c61c82b26388470b6e7d46f5"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round1-receipt.json",
+      "sha256": "3594050a74dd77a44d065a129189e4c193aee17e5dd96c3e841a3bbfd75c07c9"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round1-shortlist.csv",
+      "sha256": "ffe15b9c5ad1418da227b2dbd1be08ace559f92a6d77151937b927d2e4857ff6"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round1-summary.csv",
+      "sha256": "d3e2ae39df2af68458d3c46e15bbbcdd89af3e321d1fd55868f644594786c2bb"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-audit.csv",
+      "sha256": "ed36bd8cea9c2631f9fe715fe3da3664a1ee334e62395c27ab56048391153c3f"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-conclusions.json",
+      "sha256": "2d41f4e82ff210242e242f45c4bc97d532c3e69b57438bc84dd160ccae621f85"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-evaluation.json",
+      "sha256": "008c888c03fca2af2ab66be37c75d6967b18d1f164d5cffd25adb7918cbd1deb"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-manifest.json",
+      "sha256": "15e4c1277b5271b9381053447dcd68c10252f5ff949a830319e46088204ef766"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-market-component-ledger.csv",
+      "sha256": "218fe10bf36a5789828e7640c777ee5f06e7655c07e0b1116c9e9ead35cbb14b"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-metrics.csv",
+      "sha256": "672843c3fd35b479437dc8ca2ebbbce9f055339dbbb45290674e6d87470e9491"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-native-component-ledger.csv",
+      "sha256": "aa89450af12e9929a5732292e5684b2a8041374c4a77212592f60fc878c3c2e8"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-plan.json",
+      "sha256": "a2f57fa5d8fc580ed004babdfa71f6e83fac1c2cd77457772113dbaa0a810ba7"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-prediction-only-flags.csv",
+      "sha256": "c3c32d18033b76a55231f8d8d391d4dd85572e055aa0536bb8bb0789767ba117"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-probabilities.csv",
+      "sha256": "ea56acc7fe9337e383d2745d9a8feb3f817f596f1d52b9f64bbc51a9d6f247ea"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-ranks.csv",
+      "sha256": "715a5b4563994d4f3969db328ee9503bd34f8993eddeaa6987b18fccce4abcf5"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-replay.json",
+      "sha256": "faf6723fa402045af1459cce0c0695fe28660ca4848f57661f72d5e8c871fa73"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-scores.csv",
+      "sha256": "f8e36e0e5eef22ea4976d904623e8d23c594b83b4d4b7a8e38016ec8a44b5e52"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round2-warning-evaluation.csv",
+      "sha256": "fc04e60c0de27bea5184e6790217ad42759a0a3394a2042c97411b8a85961c02"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-case-margins.csv",
+      "sha256": "c073f60573fe6f892f4e037fe21d30f266c41b8932716d0f091721ae8e07c129"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-case-probabilities.csv",
+      "sha256": "072050fb57aa2abe4b81f35cc89d3cf9c630a1b8c6b79006733f1b0a37e0f393"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-conclusions.json",
+      "sha256": "429eaf1abe584be87c1b608e92f32e90fefcfc9289dd355fe6a03aadf2109a2e"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-evaluation.json",
+      "sha256": "38a08ecc14021566249ecf4d102118e6b523ce9166f8b707f897cb3690185f34"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-metrics.csv",
+      "sha256": "45cdfee4568c66b585fd0b949db7e836964383d7beb7bd734d629c2c7bab4c15"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-native-audit.csv",
+      "sha256": "68ddefdc1c19b803540962793a224f5a13e0438cb978856a400a7e73036638d4"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-native-history-ages.csv",
+      "sha256": "b64a59a07084082a2b9b795db8f5c40a8c970b9807d062a3eafcb45a4b56e271"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-native-manifest.json",
+      "sha256": "6470c163ed5087f1c5d0b2ad93a2b732976dea38c448b28c55e568a11ced51f0"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-native-probabilities.csv",
+      "sha256": "a0d413541be0c0c4d8f890b3aae0bd9e019cba8499f2763930d0797bc2728e00"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-native-replay.json",
+      "sha256": "1f8dcbcd8a8e9a6ca7d0d826a1cb79cd79f1bcdc0a3e6fd8f0c7613ab7c388ae"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-native-stability.csv",
+      "sha256": "bce5022cf5bc8d96f1a255757336c017d844aaeb3ddb2b021f1d6b63f26a7e60"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-partial-audit.csv",
+      "sha256": "12af3a3774e92c60844983b91839dd6b5a140e7f36a56826cc4c4d0bd70427ad"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-partial-coverage.csv",
+      "sha256": "4906b2603bbab3456a6fdfbc53cee08e14eaaacd1c61579002a2c86f7a7611da"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-partial-manifest.json",
+      "sha256": "88af6db0587c757c6e13d1da0d82b33cf026682dbce352a0a2c2ef085f8c75df"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-partial-probabilities.csv",
+      "sha256": "4585bd4489958bb2ebff409a9b9c78b5ba7766812bed2858c358c127abf756ff"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-partial-replay.json",
+      "sha256": "256f1a95d4a09d5da80311e788cd704e7d73fa1e295f819fa9eac2e65f3cebd2"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-plan.json",
+      "sha256": "b63d87d95efb677ee73d9fd86b85909f1c28f9955ae523edcb043781a2a72113"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/round3-scores.csv",
+      "sha256": "a4739bf4012bac1329029fbdfa73d642535c41b1a41516456ab2bd3460c4757a"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/codex-review.log",
+      "sha256": "af348ed537129435a75e07872bb0a77ae1785f2c5862870081479fcb4baa2949"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/codex-final-review.log",
+      "sha256": "82e0c2242a09abdcdea08d201329917961d4f50ada82475b265c7cbfc9dda37d"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/partial-tests.log",
+      "sha256": "ee17af82f4e4b64b91a41e044ef36b7deccf0824007996013032d490482e70e4"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/client-tests.log",
+      "sha256": "e6ba306854174b37471fa0b5e4cb6f5c8f1e50bee446a510f11dab7243cebe9f"
+    },
+    {
+      "path": "results/fm17-diagnostic-iterations-20261013/delivery-inventory.json",
+      "sha256": "9929c2b8351e04d5241ecd057e334959f8f207fbad93ef36c8abc17ddfb5c485"
+    }
+  ],
+  "review_prompt_original": "Review ONLY this task's FM17 three-round diagnostic delivery, not unrelated dirty changes. Read packages/beidan/R/partial_market_diagnostic.R, packages/beidan/tests/testthat/test-partial-market-diagnostic.R, r/fm17_diagnostic_round1.R, r/fm17_diagnostic_round2_freeze.R, r/fm17_diagnostic_round2_evaluate.R, r/fm17_diagnostic_round3_native.R, r/fm17_diagnostic_round3_partial.R, r/fm17_diagnostic_round3_evaluate.R, r/fm17_diagnostic_case_notes.R, tests/testthat/test-fm17-diagnostic-iterations.R and quarto/fm17_diagnostic_iterations_20261013.qmd. Inspect results/fm17-diagnostic-iterations-20261013 receipts/replays/tests/recommendations. No edits, no CI. Review executable cutoff/target exclusion/cache/source bindings and transitive historical learning, partial AH/OU sign/payoff/DC/data contracts, test coverage, same-fixture score comparisons, truthful posthoc conclusions, QMD reproducibility. Tests passed 27+15517 assertions, all three full-object replays identical, clean QMD rendered. Formal FM17 unchanged. Report concrete blocking findings or no findings; distinguish prior limitations from introduced bugs. Do not rescan whole repository unrelated work.\n",
+  "review_prompt_final": "Final revision review for FM17 diagnostic delivery. Previous scoped review is results/fm17-diagnostic-iterations-20261013/codex-review.log (no blocking findings; two scoped suites independently passed). Read that conclusion, then inspect final quarto/fm17_diagnostic_iterations_20261013.qmd, results/fm17-diagnostic-iterations-20261013/delivery-inventory.json and final block of tests/testthat/test-fm17-diagnostic-iterations.R. Since previous review, only added QMD hash checks (54-file delivery inventory, round1 input/output/client hashes, case notes hashes, evaluation clients), explicit exact test commands, and a 3-assertion regression test that executes QMD's actual inventory guard on valid/mutated temporary input. Final scoped suite is rerunning, results in client-tests.log. QMD clean rendered without errors. No implementation or numerical results changed since previous review. Review final checks/contracts/reproducibility and any blocking concern. Read-only; no edits, no CI, don't repeat whole diagnostic reconstruction. Report concrete findings or no blocking findings. Final review-acceptance.json will bind reviewed files and log; QMD includes this external receipt with hashes to avoid modifying its reviewed source afterward.\n"
+}

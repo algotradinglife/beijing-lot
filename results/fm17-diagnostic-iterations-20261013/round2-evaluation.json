@@ -1,0 +1,38 @@
+{
+  "round": 2,
+  "formal_model_changed": false,
+  "parameter_selection": false,
+  "forecast_sha256": "c8f01ab8eaa3dbf76226f7d9507320fdcc60c5651af222c01ea446c52494f60b",
+  "parent_forecast_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+  "client_sha256": "ab6942c2d11087a33d13d073f74dfa9c01760786e36da20cfbc449221101bcbd",
+  "outputs": [
+    {
+      "path": "round2-metrics.csv",
+      "sha256": "672843c3fd35b479437dc8ca2ebbbce9f055339dbbb45290674e6d87470e9491"
+    },
+    {
+      "path": "round2-scores.csv",
+      "sha256": "f8e36e0e5eef22ea4976d904623e8d23c594b83b4d4b7a8e38016ec8a44b5e52"
+    },
+    {
+      "path": "round2-prediction-only-flags.csv",
+      "sha256": "c3c32d18033b76a55231f8d8d391d4dd85572e055aa0536bb8bb0789767ba117"
+    },
+    {
+      "path": "round2-warning-evaluation.csv",
+      "sha256": "fc04e60c0de27bea5184e6790217ad42759a0a3394a2042c97411b8a85961c02"
+    },
+    {
+      "path": "round2-ranks.csv",
+      "sha256": "715a5b4563994d4f3969db328ee9503bd34f8993eddeaa6987b18fccce4abcf5"
+    },
+    {
+      "path": "round2-market-component-ledger.csv",
+      "sha256": "218fe10bf36a5789828e7640c777ee5f06e7655c07e0b1116c9e9ead35cbb14b"
+    },
+    {
+      "path": "round2-native-component-ledger.csv",
+      "sha256": "aa89450af12e9929a5732292e5684b2a8041374c4a77212592f60fc878c3c2e8"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+partial-market-diagnostic: ...........................
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+# A tibble: 2 × 5
+  test                                                    nb failed error passed
+  <chr>                                                <int>  <int> <lgl>  <int>
+1 half Asian plus total identifies a fresh DC mean wi…    13      0 FALSE     13
+2 partial market refuses unsupported, stale and detac…    14      0 FALSE     14

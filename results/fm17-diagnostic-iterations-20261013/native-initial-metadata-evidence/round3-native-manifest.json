@@ -1,0 +1,15 @@
+{
+  "round": 3,
+  "fixtures": 117,
+  "models": ["NATIVE_ALPHA_25", "NATIVE_ALPHA_50", "NATIVE_ALPHA_75"],
+  "forecast_sha256": "e78cbf5f7a75cb8116a83c2c53817298ca16df316fd888d04fb31cd1bbe7572f",
+  "bindings": {
+    "parent_forecast": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "client": "94ca2f6d4c457d57d82fec2481534be41aa0bbea3a78c46b5b431f30aed5016d",
+    "native_R_code": "192f9e425bc9338521791cf7ec8a5a30d152cf270f543d9a4b8f40237a9133aa",
+    "history_26098": "76aa99df52dbe59dfc15b6e166077911ae5c950da3c0e464826fa7fdd47e3c25",
+    "history_26101": "bde46a53a778f931fc646c59d144afaf3e3a80261848bbb2162fbf09bc2f1686",
+    "history_26102": "e2ea1df9044265f5b56972b72c309318edd120f38751f0a8519e5209225d708a"
+  },
+  "training_or_parameter_selection": false
+}

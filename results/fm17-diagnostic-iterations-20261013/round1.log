@@ -1,0 +1,102 @@
+
+Attaching package: ‘jsonlite’
+
+The following object is masked from ‘package:purrr’:
+
+    flatten
+
+# A tibble: 6 × 11
+  issue_id selected_source     n bd1_fm1_loss bd1_fm2_loss raw1_tail_loss
+     <dbl> <chr>           <int>        <int>        <int>          <int>
+1    26098 market            101            7            1              1
+2    26098 native             43            7            1              0
+3    26101 market             65            0            0              1
+4    26101 native             50            7            2              1
+5    26102 market             62            3            0              0
+6    26102 native             24            8            3              0
+  raw2_tail_loss reversed_direction actual_outside_core mean_delta_ll_bd
+           <int>              <int>               <int>            <dbl>
+1              2                 26                   7          0.00191
+2              1                 12                   1         -0.00303
+3              4                  8                   4         -0.0492 
+4              3                 17                   5          0.130  
+5              1                 10                   9          0.00976
+6              2                  5                   3          0.0711 
+  mean_delta_ll_tail
+               <dbl>
+1           -0.00687
+2            0.00554
+3           -0.00550
+4           -0.00136
+5            0.00542
+6            0.0119 
+# A tibble: 21 × 10
+   fixture_id home         away             competition selected_source
+   <chr>      <chr>        <chr>            <chr>       <chr>          
+ 1 26098:137  韩国         乌拉圭           国际友谊    market         
+ 2 26098:140  莱加内斯     卡斯特利翁       西乙        native         
+ 3 26101:103  皇家社会B队  格拉纳达         西乙        native         
+ 4 26101:98   八户云罗里   横滨FC           日职乙      native         
+ 5 26102:6    科尔多瓦     特内里费         西乙        native         
+ 6 26102:73   维多利亚     沙佩科恩斯       巴西甲      native         
+ 7 26102:74   博塔弗戈     瓦斯科达         巴西甲      native         
+ 8 26101:103  皇家社会B队  格拉纳达         西乙        native         
+ 9 26101:56   博卡青年     圣菲联合         阿甲        native         
+10 26102:74   博塔弗戈     瓦斯科达         巴西甲      native         
+11 26098:21   意大利       比利时           欧国联      market         
+12 26098:106  休斯顿迪纳摩 堪萨斯城体育     美职业      market         
+13 26098:36   新奥里藏蒂诺 圣贝尔纳多       巴西乙      market         
+14 26101:74   格里姆斯比   什鲁斯伯里       英乙        native         
+15 26102:9    黑山         亚美尼亚         欧国联      market         
+16 26101:5    枥木城       广岛三箭         日联杯      native         
+17 26098:5    韩国女足     乌兹别克斯坦女足 亚运女足    native         
+18 26101:8    藤枝MYFC     大阪樱花         日联杯      native         
+19 26101:82   斯托姆加斯特 奥桑内           挪甲        native         
+20 26102:24   德国U21      格鲁吉亚U21      欧青U21外   native         
+21 26102:78   库普斯       AC奥卢           芬超        native         
+   stratum                delta_ll_bd delta_ll_tail actual_in_core
+   <chr>                        <dbl>         <dbl> <lgl>         
+ 1 BD_TOP1_FM_TOP2_MISS        0.271        0.0151  FALSE         
+ 2 BD_TOP1_FM_TOP2_MISS        0.574        0.0477  TRUE          
+ 3 BD_TOP1_FM_TOP2_MISS        0.411        0.0571  TRUE          
+ 4 BD_TOP1_FM_TOP2_MISS        1.01         0.202   TRUE          
+ 5 BD_TOP1_FM_TOP2_MISS        0.701        0.0430  TRUE          
+ 6 BD_TOP1_FM_TOP2_MISS        0.432        0.0528  FALSE         
+ 7 BD_TOP1_FM_TOP2_MISS        0.201        0.0566  TRUE          
+ 8 RAW_TOP2_TAIL_MISS          0.411        0.0571  TRUE          
+ 9 RAW_TOP2_TAIL_MISS          0.375        0.0568  TRUE          
+10 RAW_TOP2_TAIL_MISS          0.201        0.0566  TRUE          
+11 RAW_TOP2_TAIL_MISS         -0.166        0.0558  TRUE          
+12 FM16_TOP1_FM17_MISS         0.111        0.0462  FALSE         
+13 FM16_TOP1_FM17_MISS        -0.0540       0.0418  TRUE          
+14 FM16_TOP1_FM17_MISS        -0.0768       0.0397  TRUE          
+15 FM16_TOP1_FM17_MISS        -0.402        0.0423  TRUE          
+16 CONFIDENT_MISS              0.805       -0.0709  TRUE          
+17 CONFIDENT_MISS              0.518        0       TRUE          
+18 CONFIDENT_MISS              0.524       -0.0412  TRUE          
+19 SUCCESS_COUNTEREXAMPLE     -0.813       -0.00475 TRUE          
+20 SUCCESS_COUNTEREXAMPLE     -0.811       -0.0212  TRUE          
+21 SUCCESS_COUNTEREXAMPLE     -0.752        0.00583 TRUE          
+   direction_reversed
+   <lgl>             
+ 1 TRUE              
+ 2 TRUE              
+ 3 TRUE              
+ 4 FALSE             
+ 5 TRUE              
+ 6 FALSE             
+ 7 TRUE              
+ 8 TRUE              
+ 9 FALSE             
+10 TRUE              
+11 TRUE              
+12 TRUE              
+13 FALSE             
+14 TRUE              
+15 FALSE             
+16 TRUE              
+17 FALSE             
+18 TRUE              
+19 FALSE             
+20 FALSE             
+21 TRUE              

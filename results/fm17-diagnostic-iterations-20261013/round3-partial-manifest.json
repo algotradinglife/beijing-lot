@@ -1,0 +1,11 @@
+{
+  "round": 3,
+  "fixtures": 60,
+  "covered": 346,
+  "forecast_sha256": "71a9058c272e07ed0707c575bae4781fb4d9393eae6c3a6fcbec5e8e9bc25809",
+  "bindings": {
+    "parent_forecast": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "client": "8190bfc1a77e6d971e9d6a29443f40834f58cf2b0140a9cde845f3e7921fe19a"
+  },
+  "training_or_source_admission": false
+}

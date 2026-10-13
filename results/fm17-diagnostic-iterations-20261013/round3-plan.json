@@ -1,0 +1,13 @@
+{
+  "round":3,
+  "mode":"POSTHOC_EXPLORATORY_NOT_ADOPTION",
+  "native_alpha_candidates":[0.25,0.5,0.75],
+  "native_scope":"All117 native-source fixtures, including successful controls",
+  "native_estimation":"Prior historical labels are re-admitted/refit through shared temporal_learning, with explicit fixture-relative cutoff, target roster exclusion, weight ledgers and ESS",
+  "target_label_optimization":false,
+  "parameter_choice":"Fixed diagnostic contrasts, not winning-alpha search or prospective policy selection",
+  "partial_market_scope":"All346 fixtures inspected, every supported fresh one-company half-goal Asian and total>=2.5 quote pair shadow-projected, with full-market controls",
+  "partial_market_policy":"Fixed rho=-0.1, actual OU-derived total, no synthetic Euro, no Beidan price/line used to fit parameters; half-goal no-push only",
+  "formal_model_changes":false,
+  "limitations":["Historical availability proxies do not authorize prospective use","No opponent strength/lineup adjustments fitted","Single-company partial source is not sufficient market admission","No alpha selection trained inside prior folds; only fixed sensitivity results reported"]
+}

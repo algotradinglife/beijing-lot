@@ -1,0 +1,10 @@
+{
+  "render_command": "quarto render quarto/fm17_diagnostic_iterations_20261013.qmd --execute --no-cache",
+  "html_sha256": "e63e939ab3c16866a6b4a02bf2e7d5c5f6ce0387322a07d72f668e6bb6decc04",
+  "tables": 9,
+  "figures": 1,
+  "execution_errors": 0,
+  "review_table_present": true,
+  "figure_visually_inspected": true,
+  "formal_parent_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786"
+}

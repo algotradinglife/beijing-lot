@@ -1,0 +1,17 @@
+{
+  "round": 1,
+  "mode": "POSTHOC_EXPLORATORY_NOT_CAUSAL",
+  "observations": [
+    "7 BD-top1-correct/FM17-top2-missed cases, 6 native and 1 market",
+    "13 raw-top2-correct/tail-top2-missed cases; final top2-top3 gaps at most 2.55 percentage points",
+    "A realized margin inside the retained core does not guarantee its whole Beidan category stays top2",
+    "Cup/youth and missing channels appear in native error examples, but successful native counterexamples are retained"
+  ],
+  "hypotheses": [
+    {"id":"H1","claim":"Tail weighting can create unstable category protection near ties","next_test":"Uniform coefficient0.6 and coverage0.95, all fixtures; compare gains/losses and proper scores"},
+    {"id":"H2","claim":"Missing market/competition/opponent-strength evidence may matter more than tail choice for confident native errors","next_test":"If tail changes are not consistently beneficial, audit frozen native histories and fixed recent-weight sensitivities with good-case controls"},
+    {"id":"H3","claim":"Rank stability warning may be useful without modifying probabilities","next_test":"Compare raw/FM17/candidate Top2 sets using prediction-only flags, and report how many warnings also occur on correct cases"}
+  ],
+  "prohibited_conclusions": ["A favorite losing proves wrong strength","Selecting winning cases validates a calibrated rule","Use Beidan line/SP or score to adjust lambda"],
+  "formal_model_changed": false
+}

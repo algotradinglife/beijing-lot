@@ -1,0 +1,41 @@
+{
+  "reason": "Clarify prior-history refit vs target-label optimization metadata; preserve initial full identical replay evidence; authoritative run rebuilt with corrected client identity",
+  "files": [
+    {
+      "original": "results/fm17-diagnostic-iterations-20261013/round3-native-forecasts.rds",
+      "archived": "results/fm17-diagnostic-iterations-20261013/native-initial-metadata-evidence/round3-native-forecasts.rds",
+      "sha256": "e78cbf5f7a75cb8116a83c2c53817298ca16df316fd888d04fb31cd1bbe7572f"
+    },
+    {
+      "original": "results/fm17-diagnostic-iterations-20261013/round3-native-probabilities.csv",
+      "archived": "results/fm17-diagnostic-iterations-20261013/native-initial-metadata-evidence/round3-native-probabilities.csv",
+      "sha256": "a0d413541be0c0c4d8f890b3aae0bd9e019cba8499f2763930d0797bc2728e00"
+    },
+    {
+      "original": "results/fm17-diagnostic-iterations-20261013/round3-native-audit.csv",
+      "archived": "results/fm17-diagnostic-iterations-20261013/native-initial-metadata-evidence/round3-native-audit.csv",
+      "sha256": "68ddefdc1c19b803540962793a224f5a13e0438cb978856a400a7e73036638d4"
+    },
+    {
+      "original": "results/fm17-diagnostic-iterations-20261013/round3-native-manifest.json",
+      "archived": "results/fm17-diagnostic-iterations-20261013/native-initial-metadata-evidence/round3-native-manifest.json",
+      "sha256": "b7cc93acc7e2c1f0a803625f32c89aa965ade324c7dbc755050963546cbfd24f"
+    },
+    {
+      "original": "results/fm17-diagnostic-iterations-20261013/round3-native-replay.json",
+      "archived": "results/fm17-diagnostic-iterations-20261013/native-initial-metadata-evidence/round3-native-replay.json",
+      "sha256": "5ab69bb8a708a828676e2c3a6151e3882b5f339fe9057c050c431aea489b2326"
+    },
+    {
+      "original": "results/fm17-diagnostic-iterations-20261013/round3-native-freeze.log",
+      "archived": "results/fm17-diagnostic-iterations-20261013/native-initial-metadata-evidence/round3-native-freeze.log",
+      "sha256": "73dd950224600f935f4bd99b5bc8154db6bfc48edb5a4e64c4454fb4672493fa"
+    },
+    {
+      "original": "results/fm17-diagnostic-iterations-20261013/round3-native-replay.log",
+      "archived": "results/fm17-diagnostic-iterations-20261013/native-initial-metadata-evidence/round3-native-replay.log",
+      "sha256": "3cc276b02c17d2b38f4630db84798a1b22d0d75fb68653618dfae77d66a909a7"
+    }
+  ],
+  "original_client_sha256": "94ca2f6d4c457d57d82fec2481534be41aa0bbea3a78c46b5b431f30aed5016d"
+}

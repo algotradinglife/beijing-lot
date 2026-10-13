@@ -1,0 +1,24 @@
+{
+  "round": 2,
+  "fixtures": 346,
+  "candidates": [
+    {
+      "model": "C90_COEF60",
+      "coverage": 0.9,
+      "coefficient": 0.6
+    },
+    {
+      "model": "C95_COEF30",
+      "coverage": 0.95,
+      "coefficient": 0.3
+    }
+  ],
+  "forecast_sha256": "c8f01ab8eaa3dbf76226f7d9507320fdcc60c5651af222c01ea446c52494f60b",
+  "bindings": {
+    "parent_forecast": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "plan": "a2f57fa5d8fc580ed004babdfa71f6e83fac1c2cd77457772113dbaa0a810ba7",
+    "client": "e6c3aed5306a649d1429045197b6eecc660baf5de51bae3180895f85a5308351"
+  },
+  "intended_use": "FIXED_POLICY_POSTHOC_SENSITIVITY_ONLY",
+  "parameter_selection": false
+}

@@ -1,0 +1,13 @@
+issue_id,selected_source,top2_set_changed,n,fm17_top2,raw_top2,raw_tail_losses
+26098,market,FALSE,87,57,57,0
+26098,market,TRUE,14,12,7,2
+26098,native,FALSE,39,30,30,0
+26098,native,TRUE,4,3,3,1
+26101,market,FALSE,50,38,38,0
+26101,market,TRUE,15,11,9,4
+26101,native,FALSE,40,27,27,0
+26101,native,TRUE,10,7,8,3
+26102,market,FALSE,58,44,44,0
+26102,market,TRUE,4,3,3,1
+26102,native,FALSE,20,16,16,0
+26102,native,TRUE,4,2,2,2

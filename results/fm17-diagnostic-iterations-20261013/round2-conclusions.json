@@ -1,0 +1,15 @@
+{
+  "round": 2,
+  "mode": "EXPLORATORY_NOT_ADOPTION",
+  "rejected_global_changes": [
+    {"candidate":"C90_COEF60","reason":"Late345 Top1 unchanged131, Top2 drops250 to249; T24 Top2 drops150 to148; proper scores mixed"},
+    {"candidate":"C95_COEF30","reason":"Late345 Top1/Top2 drop131/250 to129/243; T24 also worse"},
+    {"candidate":"MARKET_RETAIN","reason":"Late345 declines to128/243 and both proper scores worsen; not justified by markets already pricing information"}
+  ],
+  "worth_further_testing": [
+    {"candidate":"NATIVE_RETAIN","reason":"Late345132/251, T2482/152, better aggregate proper scores; only+1/+1 late, gain concentrated26101 and its late logloss worsens slightly; not a proven default"},
+    {"candidate":"RANK_STABILITY_WARNING","reason":"51 changed Top2 sets:13 losses,19 gains,19 both covered. Prediction-only signal; do not reject all flagged cases or invent probability adjustment"}
+  ],
+  "round3_focus": ["Fixed-alpha fresh native cutoff/receipt fits with good controls","Missing Euro despite available AH+OU: constrained half-goal prototype and matched complete-market controls","Cross-period rather than best pooled metric"],
+  "formal_model_changed": false
+}

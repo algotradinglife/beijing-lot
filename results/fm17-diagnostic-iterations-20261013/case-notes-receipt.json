@@ -1,0 +1,9 @@
+{
+  "author": "ROOT_CODEX_FROZEN_EVIDENCE_DIAGNOSIS",
+  "phase": "KNOWN_OUTCOME_MANUAL_REVIEW",
+  "case_count": 13,
+  "verified_lineup_or_opponent_rating_claims": false,
+  "source_case_sha256": "4bd48fe90d421cd09babd1e517638979520cc25d8a3c77775b6e6a462c0afbce",
+  "client_sha256": "04ac69775039213dc1a17af6f5c1fefd4cbcc2a03f8cd863f2a5842cc6c5e1d6",
+  "notes_sha256": "18831bf4bcca3a29aff07a5725fa438d5c867f0c71ee4798e795fedf91ed989d"
+}

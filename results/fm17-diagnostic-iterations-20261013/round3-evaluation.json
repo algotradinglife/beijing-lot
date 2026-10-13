@@ -1,0 +1,42 @@
+{
+  "round": 3,
+  "formal_FM17_changed": false,
+  "target_label_optimization": false,
+  "prior_history_refit": true,
+  "native_population": 117,
+  "partial_population": 60,
+  "parent_forecast_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+  "native_forecast_sha256": "0eff01aae592e0177876e37ffe116f1b8257b448c04059ce798fa4a326d6e4d7",
+  "partial_forecast_sha256": "71a9058c272e07ed0707c575bae4781fb4d9393eae6c3a6fcbec5e8e9bc25809",
+  "client_sha256": "02d5a1a657c90a1b0ba5bfec03b416385027947c28cae85a5e9abd6f7a5fe212",
+  "outputs": [
+    {
+      "path": "round3-metrics.csv",
+      "sha256": "45cdfee4568c66b585fd0b949db7e836964383d7beb7bd734d629c2c7bab4c15"
+    },
+    {
+      "path": "round3-scores.csv",
+      "sha256": "a4739bf4012bac1329029fbdfa73d642535c41b1a41516456ab2bd3460c4757a"
+    },
+    {
+      "path": "round3-native-stability.csv",
+      "sha256": "bce5022cf5bc8d96f1a255757336c017d844aaeb3ddb2b021f1d6b63f26a7e60"
+    },
+    {
+      "path": "round3-case-probabilities.csv",
+      "sha256": "072050fb57aa2abe4b81f35cc89d3cf9c630a1b8c6b79006733f1b0a37e0f393"
+    },
+    {
+      "path": "ordinary-draw-diagnostic.csv",
+      "sha256": "46c0253aac3ff3835b01cb5b17381c093e15ec09d0814f51152d4daab6f11ff9"
+    },
+    {
+      "path": "round3-case-margins.csv",
+      "sha256": "c073f60573fe6f892f4e037fe21d30f266c41b8932716d0f091721ae8e07c129"
+    },
+    {
+      "path": "round3-native-history-ages.csv",
+      "sha256": "b64a59a07084082a2b9b795db8f5c40a8c970b9807d062a3eafcb45a4b56e271"
+    }
+  ]
+}

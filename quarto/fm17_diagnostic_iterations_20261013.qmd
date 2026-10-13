@@ -1,0 +1,148 @@
+---
+title: "FM17 误判诊断：三轮迭代与改进建议"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本次完成三轮探索，正式 FM-1.7.0 与原冻结预测保持不变。样本为26098、26101、26102：346场预测、345场已结算，T−24同场214场。26098#102取消不计分，#135缺明确截止未估算；未补造26099/26100。案例按已知赛果筛选，候选方案也是已知结果后的探索，不构成独立前瞻验证，不能据此宣布升级胜出。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath('..')
+out <- file.path(root,'results/fm17-diagnostic-iterations-20261013')
+library(beidan,lib.loc=file.path(out,'library'))
+inv <- jsonlite::fromJSON(file.path(out,'delivery-inventory.json'))
+for(i in seq_len(nrow(inv$files))) stopifnot(digest::digest(file=file.path(root,inv$files$path[i]),algo='sha256')==inv$files$sha256[i])
+Sys.setenv(RETICULATE_PYTHON=file.path(root,'.venv/bin/python'))
+r1 <- jsonlite::fromJSON(file.path(out,'round1-receipt.json'))
+for(i in seq_len(nrow(r1$inputs))) stopifnot(digest::digest(file=file.path(root,r1$inputs$path[i]),algo='sha256')==r1$inputs$sha256[i])
+for(i in seq_len(nrow(r1$outputs))) stopifnot(digest::digest(file=file.path(out,r1$outputs$path[i]),algo='sha256')==r1$outputs$sha256[i])
+stopifnot(digest::digest(file=file.path(root,'r/fm17_diagnostic_round1.R'),algo='sha256')==r1$client_sha256)
+nr <- jsonlite::fromJSON(file.path(out,'case-notes-receipt.json'))
+stopifnot(digest::digest(file=file.path(out,'case-notes.csv'),algo='sha256')==nr$notes_sha256,
+ digest::digest(file=file.path(root,'r/fm17_diagnostic_case_notes.R'),algo='sha256')==nr$client_sha256,
+ nr$source_case_sha256==r1$outputs$sha256[r1$outputs$path=='round1-cases.rds'])
+for (f in c('round2-evaluation.json','round3-evaluation.json')) {
+  e <- jsonlite::fromJSON(file.path(out,f))
+  cl <- if(f=='round2-evaluation.json') 'r/fm17_diagnostic_round2_evaluate.R' else 'r/fm17_diagnostic_round3_evaluate.R'
+  stopifnot(digest::digest(file=file.path(root,cl),algo='sha256')==e$client_sha256)
+  for(i in seq_len(nrow(e$outputs))) stopifnot(digest::digest(file=file.path(out,e$outputs$path[i]),algo='sha256')==e$outputs$sha256[i])
+}
+rp2 <- jsonlite::fromJSON(file.path(out,'round2-replay.json'))
+rpn <- jsonlite::fromJSON(file.path(out,'round3-native-replay.json'))
+rpp <- jsonlite::fromJSON(file.path(out,'round3-partial-replay.json'))
+stopifnot(rp2$status=='FULL_IDENTICAL_REPLAY',rpn$status=='FULL_IDENTICAL_REPLAY',rpp$status=='FULL_IDENTICAL_REPLAY')
+for (pair in list(c('round2-forecasts.rds',rp2$sha256),c('round3-native-forecasts.rds',rpn$sha256),c('round3-partial-forecasts.rds',rpp$sha256))) {
+  stopifnot(digest::digest(file=file.path(out,pair[1]),algo='sha256')==pair[2])
+}
+a <- read_csv(file.path(out,'round2-metrics.csv'),show_col_types=FALSE)
+b <- read_csv(file.path(out,'round3-metrics.csv'),show_col_types=FALSE)
+notes <- read_csv(file.path(out,'case-notes.csv'),show_col_types=FALSE)
+```
+
+## 第一轮：先区分来源问题和保护排序问题
+
+北单Top1正确而FM17 Top2未覆盖的7场中，6场使用原生λ；117场原生来源里，64场冻结快照没有欧赔/亚盘/大小球，另39场三通道可计算但没有被完整市场一致性流程采用。快照缺失不等于当时没有盘口，优先检查采集覆盖、公司篮子、身份和时间，而不是直接追随北单SP。
+
+不压尾Top2正确而压尾遗漏的13场，最终第二、第三选择差距均不超过2.55个百分点。单一实际净胜球落在核心里也不保证北单整类概率增加：让胜或让负包含多个净胜球档，外围被压缩可能降低整类质量。这是排名边界问题，不能只盯实际比分所在一档。
+
+```{r}
+knitr::kable(read_csv(file.path(out,'round1-summary.csv'),show_col_types=FALSE),digits=4)
+knitr::kable(notes,caption='人工逐场事实复核：ROOT_CODEX；未使用PA，不虚构外部阵容、排名或JEV证据')
+```
+
+## 第二轮：固定压尾候选与来源消融
+
+固定测试90%核心/0.6外部系数、95%核心/0.3外部系数，以及只保留市场或原生来源的不压尾组件。没有按目标结果搜索参数。Brier为三类平方误差之和，log loss用自然对数，两者越低越好。
+
+```{r}
+knitr::kable(a |> filter(issue_id=='ALL',cohort=='all') |> select(comparison,model,n,hits1,hits2,brier,logloss),digits=6)
+knitr::kable(a |> filter(issue_id!='ALL',cohort=='all',model %in% c('FM-1.7.0','NATIVE_RETAIN')) |> select(issue_id,comparison,model,n,hits1,hits2,brier,logloss),digits=6)
+```
+
+全局放松系数或扩大核心没有稳定收益。仅原生来源暂不压尾，较晚SP同场由131/250提高到132/251，T−24由81/150到82/152，但收益小且集中，26101的log loss还略差，不能马上推广为正式规则。它适合作为“证据不确定时是否暂停压尾”的预先冻结候选；裁决应基于数据质量，不能只凭与市场不一致倒推置信度。
+
+预测内不压尾/压尾Top2集合变化共有51场：13次覆盖损失、19次收益、19次共同覆盖。因此它是稳定性提示，不是误判报警，不能全部剔除，也不能人为改概率确保Top2；三选还须比较同预算策略成本与收益。
+
+## 第三轮：原生近期权重与部分盘口约束
+
+117场原生λ在原明确截止的先前历史上重拟合近期混合权重0.25/0.5/0.75；0.5完全复现原参数和概率。近期与长期分别归一化，使用共享时间模块、权重账本、ESS与长期收缩。没有根据目标赛果选最佳权重。0.75多两个Top1，但总体log loss变差，26098表现退化，不采用全局调整。
+
+有半球亚盘且大小球至少2.5的60场，试验固定ρ=-0.1的AH+OU单公司影子反解；其中59场可计分（取消场剔除），包括50个原市场来源控制和9个原生来源。只支持半球无走盘，不能代表整数、四分之一盘口或完整多公司市场准入。
+
+```{r}
+knitr::kable(b |> filter(issue_id=='ALL',cohort=='all') |> select(experiment,comparison,model,n,hits1,hits2,brier,logloss),digits=6)
+```
+
+26102#6原生λ为1.11/1.56，三种近期权重均保持客强；同截止主让0.5两侧1.90、大小球2.5两侧1.88/1.93，影子反解λ约1.646/1.055，总进球2.701，原始主胜50%、平26.86%、客胜23.14%。这是盘口与原生方向的真实冲突，不是压尾或简单增加近期权重能修复的。仍需复核来源身份、主客和符号；缺欧赔不能伪造欧赔参与模型。
+
+9场原生影子样本Top1由2到3，Top2仍6；59场整体Top1由26到27，Top2仍41。证据不足正式准入，先作为影子层保存。完整市场控制下去掉欧赔可能损失保护，不能用部分约束替换完整渠道。
+
+```{r}
+margins <- read_csv(file.path(out,'round3-case-margins.csv'),show_col_types=FALSE)
+margins |> filter(fixture_id %in% c('26102:6','26101:98','26101:103','26102:74'),between(margin,-5,5)) |>
+ ggplot(aes(margin,probability,color=stage)) + geom_line() + geom_point(size=1) + facet_wrap(~fixture_id) +
+ scale_y_continuous(labels=scales::percent) + labs(x='主队净胜球',y='档位概率',color='诊断阶段') + theme_minimal()
+knitr::kable(read_csv(file.path(out,'round3-native-stability.csv'),show_col_types=FALSE),digits=4)
+```
+
+主客方向随近期权重变化的15场、Top1变化16场、Top2集合变化23场，应披露敏感性。方向稳定也不代表可信：杯赛#5/#8的对手级别、阵容连续性未验证，不能仅从队名认定实力。原生同主客场历史最后比分中位距截止12.5天，最大主191/客180天；这是同主客场代理滞后，并非缺赛证据，国家队长间隔可正常。
+
+```{r}
+knitr::kable(read_csv(file.path(out,'ordinary-draw-diagnostic.csv'),show_col_types=FALSE),digits=4)
+```
+
+赛事类型是名称规则的粗分组，杯赛等小样本不足支持全局调整ρ；市场来源的普通联赛平局也未系统高估。未经对手、赛事级别与阵容归一化的攻防均值，是更值得研究的原生λ结构问题。
+
+## 汇总建议与下一步验证
+
+```{r}
+knitr::kable(as_tibble(jsonlite::fromJSON(file.path(out,'recommendations.json'))))
+```
+
+优先补齐同截止盘口与报价序列，随后研究对手/赛事归一化攻防λ及证据质量置信分数；原生暂停压尾与AH+OU层只进入候选验证。全局系数0.6、核心95%、市场停止压尾、近期权重0.75或直接改ρ，本轮不采用。正式FM17保持不变，后续候选须在先前可用历史确定政策，并用未参与讨论的冻结期检验。
+
+## 可复现契约、测试与审查
+
+输入为已有冻结FM17/FM16快照与各期先前历史RDS，路径/哈希绑定在round1收据和round2/3清单。后采集历史时间是诊断代理，不能证明原始实时可用性。目标结果仅用于评估，目标期标识与时间同时排除于原生拟合；注入未来比分及伪早时间目标标签后参数不变，输入变化导致缓存键变化。
+
+传递函数清单：共享temporal_learning处理截止、可用性、分区、近期权重、ESS、缓存和收据；原生近期均值函数供应领域拟合；DC及尾部函数在绑定源网格上运行；组件消融重用截止绑定封印；新私有.ProjectHalfAsianTotalDc通过固定真实报价约束构建λ，不学习历史参数。北单让球仅封印后映射，不参与λ反解。固定专家ρ没有联赛拟合依据。
+
+新增私有函数对应test-partial-market-diagnostic.R，27断言；研究客户/契约对应test-fm17-diagnostic-iterations.R，15,520断言，共15,547通过（含报告输入哈希负例）。已有pandas权重JSON每行保留10位小数，测试采用显式每行半单位舍入误差界；未舍入组件归一化仍按1e−12检查，收据绑定原全精度权重哈希，独立全对象重放完全一致。没有把舍入误差当参数差异。
+
+首版原生元数据“training_or_parameter_selection=false”不够明确，已归档原文件及原客户哈希，重新构建117×3，现明确prior_history_refit=true、target_label_optimization=false；数值未变化。没有篡改旧收据。
+
+复现顺序（项目根目录，已有依赖环境与声明快照）：
+
+```bash
+export R_LIBS_USER="$PWD/r_lib"
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round1.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round2_freeze.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round2_freeze.R "$PWD" replay
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round2_evaluate.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round3_native.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round3_native.R "$PWD" replay
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round3_partial.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round3_partial.R "$PWD" replay
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_round3_evaluate.R "$PWD"
+/opt/R/4.6.1/bin/Rscript r/fm17_diagnostic_case_notes.R "$PWD"
+FM17_DIAG_BACKEND="$PWD/results/fm15-26102-20261012/implementation" /opt/R/4.6.1/bin/Rscript -e 'library(beidan,lib.loc=normalizePath("results/fm17-diagnostic-iterations-20261013/library"));testthat::test_file("packages/beidan/tests/testthat/test-partial-market-diagnostic.R",env=new.env(parent=asNamespace("beidan")),load_helpers=FALSE,stop_on_failure=TRUE)'
+FM17_DIAG_ROOT="$PWD" /opt/R/4.6.1/bin/Rscript -e 'library(beidan,lib.loc=normalizePath("results/fm17-diagnostic-iterations-20261013/library"));testthat::test_file("tests/testthat/test-fm17-diagnostic-iterations.R",env=new.env(parent=asNamespace("beidan")),load_helpers=FALSE,stop_on_failure=TRUE)'
+quarto render quarto/fm17_diagnostic_iterations_20261013.qmd --execute --no-cache
+```
+
+使用本次私有安装库results/fm17-diagnostic-iterations-20261013/library，基于已安装FM17构建拷贝并加入新私有函数，不加载其他作者当前工作树改动。安装只在环境准备发生，render不安装依赖。重建环境需保留声明的冻结实现及历史输入；CSV不能代替封印RDS。完整仓库旧客户测试和CI未运行，不声称通过。追加测试首次重跑因安装库使用相对路径而在testthat临时切换目录时打不开lazy-load数据库；改用绝对库路径后重跑，原函数与数值不变。
+
+```{r}
+review_path <- file.path(out,'review-acceptance.json')
+if(file.exists(review_path)) {
+ review <- jsonlite::fromJSON(review_path)
+ for(i in seq_len(nrow(review$files))) stopifnot(digest::digest(file=file.path(root,review$files$path[i]),algo='sha256')==review$files$sha256[i])
+ knitr::kable(as_tibble(review[c('command','findings','resolution','pi_status')]))
+} else cat('codex review尚待执行；此预览不是最终验收。')
+```

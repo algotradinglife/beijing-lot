@@ -1,0 +1,30 @@
+{
+  "selection": "NONE_FIXED_UNIFORM_POLICIES",
+  "phase": "POSTHOC_DIAGNOSTIC_NOT_TRAINING",
+  "hypotheses": [
+    "H1: whole tail weakening may reduce false confidence but lose directional gains",
+    "H2: 95pct core may reduce category distortion without eliminating tail suppression"
+  ],
+  "candidates": [
+    {
+      "model": "C90_COEF60",
+      "coverage": 0.9,
+      "coefficient": 0.6
+    },
+    {
+      "model": "C95_COEF30",
+      "coverage": 0.95,
+      "coefficient": 0.3
+    }
+  ],
+  "unchanged": [
+    "lambda",
+    "rho",
+    "source_selection",
+    "qualitative_apply_retain",
+    "input_cutoffs"
+  ],
+  "parameters_chosen_from_target_scores": false,
+  "known_outcome_context": true,
+  "formal_FM17_changes": false
+}

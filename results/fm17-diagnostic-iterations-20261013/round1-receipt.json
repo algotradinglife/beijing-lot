@@ -1,0 +1,61 @@
+{
+  "round": 1,
+  "intended_use": "OUTCOME_SELECTED_POSTHOC_DIAGNOSTIC",
+  "prediction_updates": false,
+  "case_count": 19,
+  "case_ids": ["26098:137", "26098:140", "26101:103", "26101:98", "26102:6", "26102:73", "26102:74", "26101:56", "26098:21", "26098:106", "26098:36", "26101:74", "26102:9", "26101:5", "26098:5", "26101:8", "26101:82", "26102:24", "26102:78"],
+  "selection_policy": "All BD-top1/FM-top2 misses; top4 raw-top2 losses by deltaLL; all FM16-top1 losses; top3 >=.6 confident misses; top3 successful counterexamples. No rule training.",
+  "inputs": [
+    {
+      "path": "results/fm17-three-issues-20261013/forecasts.rds",
+      "sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786"
+    },
+    {
+      "path": "results/fm17-three-issues-20261013/changes.csv",
+      "sha256": "b0f3f2f05bed57789a7298d5b13a7e79bc06d289ffdfa666adeb079b32fe2685"
+    },
+    {
+      "path": "results/fm17-three-issues-20261013/labels.csv",
+      "sha256": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e"
+    },
+    {
+      "path": "results/fm17-three-issues-20261013/scores.csv",
+      "sha256": "d6d928c1b83707bb974f5a34b9623a03ad6e19240a5447af646fc6fa1a333251"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/stage.rds",
+      "sha256": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68"
+    },
+    {
+      "path": "results/fm16-three-issues-20261012/forecasts.rds",
+      "sha256": "59c4256106c4f638a7325c8aa0d0a9a45a8b320ca5540e5cc994f5b65827548f"
+    }
+  ],
+  "client_sha256": "94f06c9d1093f23e0fd61861c01dd66b9ad673f6bec86b97d74c017ea4d6ad3b",
+  "outputs": [
+    {
+      "path": "round1-fixtures.csv",
+      "sha256": "b35bfa0a2bc77e4d183baec240a5802e22bd7109870bd98d83c145d1b2393ddc"
+    },
+    {
+      "path": "round1-summary.csv",
+      "sha256": "d3e2ae39df2af68458d3c46e15bbbcdd89af3e321d1fd55868f644594786c2bb"
+    },
+    {
+      "path": "round1-shortlist.csv",
+      "sha256": "ffe15b9c5ad1418da227b2dbd1be08ace559f92a6d77151937b927d2e4857ff6"
+    },
+    {
+      "path": "round1-margins.csv",
+      "sha256": "aed20a7ffc4a1629ecd3e815960b692c82eb86dce688afdab0704983110cba64"
+    },
+    {
+      "path": "round1-native-rates.csv",
+      "sha256": "185265ca4f6bc4c57a6434719480f3457bc844a9c61c82b26388470b6e7d46f5"
+    },
+    {
+      "path": "round1-cases.rds",
+      "sha256": "4bd48fe90d421cd09babd1e517638979520cc25d8a3c77775b6e6a462c0afbce"
+    }
+  ]
+}
