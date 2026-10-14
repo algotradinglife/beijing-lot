@@ -1,0 +1,17 @@
+issue_id,event_type,roster_n,scored_n,native_n,market_n,estimated_n,unestimated_native_n,no_forecast_n
+26098,cup,1,1,0,1,0,0,0
+26098,league,90,88,36,53,32,4,1
+26098,national,38,38,5,33,1,4,0
+26098,youth,17,17,2,15,1,1,0
+26101,cup,8,8,8,0,0,8,0
+26101,league,75,75,40,35,37,3,0
+26101,national,26,26,2,24,1,1,0
+26101,youth,6,6,0,6,0,0,0
+26102,cup,16,16,1,15,0,1,0
+26102,league,30,30,19,11,19,0,0
+26102,national,20,20,2,18,1,1,0
+26102,youth,20,20,2,18,2,0,0
+ALL,cup,25,25,9,16,0,9,0
+ALL,league,195,193,95,99,88,7,1
+ALL,national,84,84,9,75,3,6,0
+ALL,youth,43,43,4,39,3,1,0

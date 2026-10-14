@@ -1,0 +1,59 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "r/fm17_event_type_diagnosis.R",
+      "sha256": "a8b37c6fa34247cc23482c3f63ff443cb074b242881605c534a85355d9c1689f"
+    },
+    {
+      "path": "config/fm17_event_types_20261015.csv",
+      "sha256": "8be096c17925e215d5d3ef6ecc0e11f9414fe81b8d70028b6b795f6ce365fad9"
+    },
+    {
+      "path": "tests/testthat/test-fm17-event-types-20261015.R",
+      "sha256": "323a6e69e16bfbc26f5a5f1bde41f13a6da0f2c4b447b7a5a9e7a5c34397426c"
+    },
+    {
+      "path": "quarto/fm17_event_type_diagnosis_20261015.qmd",
+      "sha256": "2a318e7a5b072978f9a6787454e19f1cb0eb8f2e4b7e8dda79583dcc8b19eebd"
+    }
+  ],
+  "checks": [
+    {
+      "check": "R diagnostic integration",
+      "command": "/opt/R/4.6.1/bin/Rscript -e 'testthat::test_file(...,stop_on_failure=TRUE)'",
+      "result": "46 passed; zero failure/error/skip"
+    },
+    {
+      "check": "Independent replay",
+      "command": "Rscript r/fm17_event_type_diagnosis.R ROOT OUTPUT CLASSIFICATION_CSV",
+      "result": "12 tables byte-identical; inputs and implementation equal"
+    },
+    {
+      "check": "Initial codex review",
+      "command": "codex review scoped prompt; review.log",
+      "result": "P2 named JSON hash map fixed; roundtrip and tamper regression passed"
+    },
+    {
+      "check": "Final codex re-review",
+      "command": "codex review scoped prompt; review-final.log, review-retry.log",
+      "result": "Service routing discovery timeout; review NOT passed"
+    },
+    {
+      "check": "Clean Quarto preview",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render ... --no-cache -P acceptance_required:false",
+      "result": "Executed preview; not final acceptance"
+    },
+    {
+      "check": "Final codex review",
+      "command": "codex review scoped prompt; review-retry2.log",
+      "result": "No blocking findings; scoped 46 assertions independently rerun"
+    },
+    {
+      "check": "Acceptance-mode clean QMD",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm17_event_type_diagnosis_20261015.qmd --no-cache",
+      "result": "PASS: 17 nonempty tables; no execution error; acceptance gate and hashes verified"
+    }
+  ]
+}

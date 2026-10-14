@@ -1,0 +1,43 @@
+{
+  "mode": "POSTHOC_DESCRIPTIVE_NO_MODEL_UPDATE",
+  "issues": ["26098", "26101", "26102"],
+  "classification": "Explicit event-name map; youth precedence; mixed senior/U21 cup flagged separately",
+  "input_paths": {
+    "scores": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-opponent-lambda-20261013/scores.csv",
+    "labels": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-opponent-lambda-20261013/labels.csv",
+    "roster": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/beidan-full-issues-26092-26102-20261007/full-issue-fixtures.csv",
+    "stage": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm16-three-issues-20261012/stage.rds",
+    "parent": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-three-issues-20261013/forecasts.rds",
+    "candidate": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-opponent-lambda-20261013/forecasts.rds",
+    "classification": "/home/drwho1985/workspace/algotradinglife/beijing-lot/config/fm17_event_types_20261015.csv"
+  },
+  "input_hashes": {
+    "scores": "3dbdde5f7eaad6e0ae7b80e7d0fb8f3e90baffdf5476508ca0fc92db17a20e24",
+    "labels": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e",
+    "roster": "0197c01db5ebe5926153c647c4b5c9c4c44f36483cb619e0d9f09286bf06aae4",
+    "stage": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68",
+    "parent": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "candidate": "5a539868d8edd063a071b97a43e42074174dfcefa138d99673f7c47aa3d036e0",
+    "classification": "8be096c17925e215d5d3ef6ecc0e11f9414fe81b8d70028b6b795f6ce365fad9"
+  },
+  "dataset": "fm17_opponent_research",
+  "dataset_version": "20261013-v2",
+  "implementation_sha256": "a8b37c6fa34247cc23482c3f63ff443cb074b242881605c534a85355d9c1689f",
+  "output_hashes": {
+    "metrics": "0470125954ff2e7dcb5cf4b56d868cb303e12b15a3cb2ac96a31b2d01cacb388",
+    "coverage": "678dc4d670e3befc804e247cfc7b74fe0af8741b1fa58bdf8541b62495add593",
+    "coverage_summary": "727491c40d883e4f276ee9148ac907d5db2df86d8c2e5dd07a15628ebf466dd7",
+    "effects": "cf0794ccedd1e7a14ad8b44e06a81168fd5ee0f7f1ae96361d3f779ac0841ae8",
+    "cases": "34ff75a273b52b5e8231fa803a176f16b8de5ae360337c4688c1e5ee30edd120",
+    "original_rates": "215406d504a7432c2479a8231ecc4e7a84fc13494839f32a3b57339f4e4c189f",
+    "stage_probabilities": "7dc55840044a94d8805eefa0aad5313f8f5b2abee008d44f5eca338e42f27b77",
+    "market_evidence": "4f41b389851b2de3e527298c4af0a0a051f65521d55ede8dda6dd8234613f9f0",
+    "support": "8626f876038d87c15eb4fd89329db095218179c37b491f16e8a0dfedc2294c95",
+    "observations": "203cd777cb678cbdb23bf0437930a7b98857adc148093d516bcf8477a44d0674",
+    "support_summary": "618b3d992d760dd0f30ad5e81f6311d31eb4badbc9fb62d35e1133bd0c30c895",
+    "stage_effects": "a172cb66e281bf8fd9337f497bedb4dd6cded2e231a5381e17edbb1d6563ee85"
+  },
+  "generated_at": "2026-10-14 16:30:43 UTC",
+  "transitive_learning_inventory": "No fit/tune/selection/ranking/decision function called; reads frozen scores, probabilities and receipts only. Existing native history proxies retain diagnostic-only status.",
+  "cutoff_binding": "Original per-fixture cutoff_utc retained in coverage/cases; no new learned artifacts or cross-cutoff cache."
+}

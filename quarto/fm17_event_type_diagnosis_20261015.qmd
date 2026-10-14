@@ -1,0 +1,177 @@
+---
+title: "FM17 原生 λ 研究：赛事类型拆分与杯赛／26102诊断"
+format:
+  html:
+    embed-resources: true
+    html-math-method: mathml
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  output_directory: "results/fm17-event-types-20261015"
+  classification_file: "config/fm17_event_types_20261015.csv"
+  acceptance_required: true
+---
+
+本次完成用户指定的第1—2步：拆分26098、26101、26102三期赛事类型，并诊断全部杯赛和26102全部成功替换场次。正式FM-1.7.0、原来源路由、截止、ρ、市场和尾部政策保持不变。所有案例均是已知赛果的事后诊断，不拟合新λ、不搜索阈值、不生成下注建议或新模型版本。
+
+结论：**同赛事候选覆盖主要在联赛，杯赛没有成功估算；26102主要退步位于λ／DC阶段，尾部仅小幅放大。** 联赛三期累计改善不能外推到杯赛、国家队和青年赛事。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+out <- file.path(root, params$output_directory)
+classification <- file.path(root, params$classification_file)
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+execution_log <- file.path(out, "qmd-execution.log")
+status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(
+  file.path(root, "r/fm17_event_type_diagnosis.R"), root, out, classification)),
+  env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))),
+  stdout = execution_log, stderr = execution_log)
+if (status != 0L) stop(paste(readLines(execution_log), collapse = "\n"))
+receipt <- jsonlite::fromJSON(file.path(out, "receipt.json"))
+stopifnot(length(names(receipt$output_hashes)) == 12L,
+  length(names(receipt$input_hashes)) == 7L)
+for (name in names(receipt$output_hashes)) {
+  stopifnot(digest::digest(file = file.path(out, paste0(name, ".csv")), algo = "sha256") == receipt$output_hashes[[name]])
+}
+metrics <- read_csv(file.path(out, "metrics.csv"), show_col_types = FALSE)
+coverage <- read_csv(file.path(out, "coverage_summary.csv"), show_col_types = FALSE)
+cases <- read_csv(file.path(out, "cases.csv"), show_col_types = FALSE)
+effects <- read_csv(file.path(out, "effects.csv"), show_col_types = FALSE)
+rates <- read_csv(file.path(out, "original_rates.csv"), show_col_types = FALSE)
+stages <- read_csv(file.path(out, "stage_effects.csv"), show_col_types = FALSE)
+market <- read_csv(file.path(out, "market_evidence.csv"), show_col_types = FALSE)
+support <- read_csv(file.path(out, "support_summary.csv"), show_col_types = FALSE)
+```
+
+## 范围、合同及可复现性
+
+赛事映射为显式CSV，逐个来源赛事名称审核，未识别名称或重复映射立即失败，不写结果。青年／年龄组优先于国家队类别；亚运女足列成年女子国家队，亚运男足列年龄组，欧青U21外列青年赛事。英锦赛列俱乐部杯赛，保留球队年龄组标记，不声称所有参赛队均为成年队。女子／男子不是额外排除条件。
+
+名单347场，取消场26098#102和无冻结截止的#135不评分，最终345场。覆盖表以完整名单为分母；评分表以每个比较时点的共同已评分场次为分母。同截止T−24h与较晚SP完全分开。北单概率仍为SP倒数归一化。Top1／Top2沿用冻结评分中的排名，未重新排序。
+
+输入：SHA256核验的名单、原FM17及候选RDS、逐场评分和标签CSV，NAS `fm17_opponent_research/20261013-v2` 的audit、lambdas、margins、support、observations通过包`read_dataset()`读取。CSV是已核验报告快照，不直接读取NAS Parquet。变量类型：标识符字符、概率与λ为double、计数为integer、原截止UTC为POSIXct，写CSV时使用带UTC的时间；NA表示未知／不可用，零覆盖与缺失分开。
+
+关键唯一键：名单fixture_id；评分comparison/model/fixture_id；阶段概率fixture_id/stage/model/outcome；赛事映射league。连接显式声明一对一或多对一。边界拒绝未知赛事、重复键、非整数让球、输入哈希变动及概率质量不为1。目标赛果仅供评分和事后展示，不进入估计、路由、核心或参数。
+
+本次无新增历史学习函数；只读已冻结结果并汇总。已有历史学习上下文的截止、源哈希、权重及可用性代理不被升级为真实赛前证据。传递历史学习库存见receipt；原生代理和已知赛果限制仍有效。客户端是线性有界脚本，不引入新项目函数、包API或依赖。
+
+```{r}
+knitr::kable(read_csv(classification, show_col_types = FALSE), caption = "显式赛事分类账本；不按赛果分类")
+knitr::kable(coverage, caption = "逐期与合计覆盖：名单、评分、来源及新λ成功数")
+```
+
+## 分类型评分：同截止与较晚SP
+
+FM17_OVERLAY_OPPONENT_NATIVE为对手归一化局部替换；FM17_OVERLAY_SAME_SUPPORT_RAW为同赛事／场地样本交叉均值局部替换。未成功估算及原市场来源维持原FM。Brier为三类平方误差之和、log loss为自然对数负实际概率，均越低越好；Top1为单选命中，Top2为前二覆盖，不等同收益。
+
+```{r}
+knitr::kable(metrics |> filter(issue_id == "ALL", comparison == "near_sale"), digits = 5,
+  caption = "三期合计、分赛事类型、较晚SP共同样本")
+knitr::kable(metrics |> filter(issue_id == "ALL", comparison == "same_cutoff"), digits = 5,
+  caption = "三期合计、分赛事类型、T−24h共同样本；与上一表分母不同")
+knitr::kable(metrics |> filter(issue_id != "ALL"), digits = 5,
+  caption = "全部逐期类型和时点评分；包含未改善的类别")
+knitr::kable(effects, digits = 6, caption = "相同场次的变化；Brier差为候选减原FM，负数改善")
+```
+
+联赛193场中88场成功替换：原FM Top1/Top2=70/134，对手=74/135，同赛事控制=76/134，较晚北单=75/138。同赛事和对手候选的Brier分别约0.681和0.682，仍高于较晚北单约0.668。
+
+国家队84场仅替换3场，青年43场仅替换3场，不能从全类排名改善归因于新λ覆盖全面。对手候选的三期Brier差：联赛−0.00525、国家队+0.00204、青年+0.01163；杯赛零变化。国家队／青年样本与联赛不能简单共享准入结论。
+
+## 杯赛：当前无法评价新λ的收益
+
+25场杯赛全部已评分：16场市场来源、9场原生来源。**新候选成功数为0**，9场原生全部因目标赛事／场地支持不足而拒绝；候选概率完全沿用原FM，所以不能称新方法改善或恶化杯赛。
+
+```{r}
+knitr::kable(cases |> filter(event_type == "cup") |> select(fixture_id, league, home, away,
+  handicap, score, selected_source, state, reason, original_lambda_home, original_lambda_away,
+  `top1_FM-1.7.0`, `top2_FM-1.7.0`), digits = 4, caption = "全部25场杯赛；不是只挑失败场")
+knitr::kable(cases |> filter(event_type == "cup") |> group_by(selected_source) |>
+  summarise(n = n(), hits1 = sum(`top1_FM-1.7.0`), hits2 = sum(`top2_FM-1.7.0`),
+    brier = mean(`brier_FM-1.7.0`), logloss = mean(`logloss_FM-1.7.0`), .groups = "drop"),
+  digits = 5, caption = "杯赛原来源分层；两组不同场次，不是来源因果比较")
+```
+
+杯赛原FM为6/25主选、21/25保护，较晚北单为6/25、14/25；FM Brier≈0.806，北单≈0.740。保护覆盖较好并未带来更好的完整概率。原生9场为1/9、8/9，市场16场为5/16、13/16；来源组资格与场次不同，不据此证明市场替换因果收益。
+
+典型原生失败26101#5（枥木城—广岛三箭）：原λ1.680/1.552接近均势，北单主+2，实际0–2为让平。模型给实际让平10.50%（尾部前）／11.27%（尾部后），较晚北单25.19%。主队原历史近期进球2.38、长期1.74，但这些均值未证明对手级别相当。这里首先暴露混合竞争环境与实力证据缺口，不能把主队进球较多解释成对强对手同样能进很多球；本轮没有完成两队当期联赛级别、阵容及轮换独立核验，不能将跨级或轮换写成已证实原因。
+
+26101#8（藤枝MYFC—大阪樱花）：原λ1.462/1.046竟给主队较强，主+1、实际1–2为让平，实际类别概率16.33%，较晚北单27.58%。尾部前15.67%，说明低估让平已存在于原生阶段，尾部没有制造这个方向偏差。
+
+成功／相对改善对照：26101#7原生主选命中；26102#40实际0–0，原FM给平局30.79%，较晚北单22.07%，但平局仍未列主选。后者有冻结欧赔、亚盘和大小球证据行，却未通过原市场充分／一致审查，不能把“存在盘口”写成“市场足以直接替换”。
+
+## 26102：同场22场的λ与尾部定位
+
+22场原生成功替换；Top1救回#6、#80，丢失#5、#78，净变化0。其余64场原概率不变。杯赛16场不贡献本期候选退步。本期类型内Brier差：联赛30场均值+0.01162（实际替换19场），国家队20场+0.00781（替换1场），青年20场+0.01970（替换2场）。
+
+```{r}
+estimated_26102 <- cases |> filter(issue_id == "26102", candidate_estimated)
+knitr::kable(estimated_26102 |> arrange(desc(opponent_brier_delta)) |>
+  select(fixture_id, league, home, away, handicap, score, old_lambda_home, old_lambda_away,
+    raw_same_support_home, raw_same_support_away, lambda_home, lambda_away,
+    opponent_brier_delta, raw_brier_delta, opponent_lost_top1, opponent_saved_top1),
+  digits = 5, caption = "26102全部22场替换，按事后Brier损失排列；完整保留改善反例")
+knitr::kable(stages |> filter(fixture_id %in% estimated_26102$fixture_id) |>
+  group_by(model) |> summarise(n = n(), brier_before_tail = mean(brier_base),
+    brier_after_tail = mean(brier_final), tail_change = mean(tail_brier_delta), .groups = "drop"),
+  digits = 6, caption = "严格相同22场的尾部前后对照；不能用包含杯赛的原FM分母")
+focus <- c("26102:78", "26102:20", "26102:14", "26102:5", "26102:6", "26102:80")
+knitr::kable(stages |> filter(fixture_id %in% focus), digits = 5,
+  caption = "典型失败与成功：实际类别概率、Brier和尾部贡献")
+knitr::kable(rates |> filter(fixture_id %in% c(focus, "26101:5", "26101:8")), digits = 4,
+  caption = "原长期／近期攻防：近期已进入原生λ，不再额外叠加状态")
+knitr::kable(support |> filter(fixture_id %in% focus), digits = 3,
+  caption = "候选球队／场地网络支持；稀疏组含中立／另一场地，不等于目标场地准入失败")
+knitr::kable(market |> filter(fixture_id %in% c(focus, "26101:5", "26101:8", "26102:40")), digits = 4,
+  caption = "最终冻结证据账本的盘口行与市场审查；不拿早期空采集字段冒充最终缺失")
+```
+
+同22场尾部前平均Brier原FM约0.654、对手约0.694；尾部后原FM约0.661、对手约0.702。候选相对原FM增加约0.041，其中约0.040在尾部前，尾部差约0.0009。此为固定组件的算术定位，不是轮换或对手强度的因果证据。
+
+**#78 库普斯—AC奥卢（主−1，实际0–1）**：λ由1.319/1.152→同赛事1.740/0.959→对手1.967/0.605。实际让负概率60.48%→46.36%→30.67%。Brier损失+0.501，同赛事控制也损失+0.198；既有样本变化，又有回归额外强化主队。尾部只把候选实际概率31.17%压到30.67%。原最近8场双方进球分别1.00/0.50，近期并不单独支持主队约1.97。对手组中位仅9场、最少2场，部分组只能长期收缩；但稀疏性同样出现在成功场，不能仅用这个指标判定可靠性。冻结有欧赔／亚盘而无大小球证据，市场审查未充分，未进入新λ校正。较晚北单也只给实际让负28.51%，接近候选30.67%；这可能是共同未中或一次意外实现，不是已证实应将λ压回旧值的证据。
+
+**#20 阿塞拜疆U21—直布罗陀U21（主−2，实际3–0）**：λ2.690/0.849→同赛事2.666/1.275→对手2.309/1.243。原客队历史进球仅长期0.138／近期0.125，失球3.83／4.88。回归大幅抬高客进球和压低主进球，削弱大胜：实际让胜概率33.35%→24.53%→19.39%。样本变化和回归均有不利贡献，尾部进一步压低。青年跨届／阵容连续性未知；只能确认回归输出与球队直接历史均值存在明显差异，尚未证明应以哪一方为真。冻结4条欧赔证据，无亚盘／大小球，不能声称有完整市场校正。
+
+**#14 拉普拉塔大学生—门多萨体操（主−1，实际3–0）**：原1.517/0.877，同赛事1.472/0.805接近，对手却1.220/0.881。实际让胜概率25.36%→同赛事26.32%→对手15.79%。主要不利变化来自回归，而非同赛事筛选；尾部前候选19.43%，尾部后15.79%，这里尾部确实放大损失。原主队近期进球1.88高于长期1.50，客队近期失球1.62高于长期1.07；仅这些状态均值不支持额外压低主进球，但对手调整有可能改变解释，需要独立完整对手网络验证。
+
+**#5 莫斯—孔斯温厄尔（主+1，实际0–2）**：原客λ2.710降至对手2.322，同赛事2.062；降低客优势丢失主选。提示“同赛事整理”同样可能损失正确信号，不只回归有问题。
+
+**改善反例#6、#80**：#6原1.111/1.562客强，同赛事1.426/1.057和对手1.362/1.005均变主强，实际3–2，两个候选都救回主选；改善主要已由同样本控制实现。#80原1.696/1.142→对手1.872/0.725，实际3–1（主−1），对手救回主选而同赛事控制未救回。归一化不是全部失效，但效应不稳定，不能按事后成功/失败裁决未来使用。
+
+## 诊断裁决及局限
+
+| 问题 | 裁决 | 可验证证据／缺口 | 下一步研究，未在本轮实施 |
+|---|---|---|---|
+| 同赛事改善能否推广杯赛 | 证据不足 | 0/9原生杯赛成功，新候选无覆盖 | 联赛基础＋跨级对手＋杯赛赛制，另行研究 |
+| 26102退步主要由尾部造成 | 本轮不支持 | 相同22场大部分Brier差已在尾部前 | 先查λ和样本，避免继续拍尾部系数 |
+| 当前联合回归总优于直接均值 | 本轮不支持 | #14等控制改善而回归退步；#80是成功反例 | 完整赛事网络、可识别性和收缩方法，截止前验证 |
+| 国家队／青年沿用联赛准入 | 证据不足 | 覆盖各仅3场，青年回归评分退步 | 年龄／届次、同级对手和独立实力证据 |
+| 有欧赔就已充分市场校正 | 否 | 冻结有证据行但充分／一致审查未通过 | 同截止完整盘口及可解释充分性标准 |
+
+“同赛事”仍不等于同等级对手、同阵容或同赛制；本轮没有新增现场／新闻核验，也没有量化轮换、战意和伤停。目标赛果已知，少数场次偶然实现不能证明λ必错；分类型小样本不做显著性或前瞻优势声明。旧历史比分日粒度可用性代理、未全部确认严格90分钟等限制不变。三期的净收益未重放，命中与概率评分不能转换为串关收益结论。
+
+## 测试、独立复现和审查验收
+
+客户端端到端对应`tests/testthat/test-fm17-event-types-20261015.R`：整体345与94覆盖对账、杯赛零覆盖及来源分层、原指标加权重建、26102救回／丢失、阶段质量、最终盘口证据，以及未知／重复映射失败且不写输出。未新增项目函数，不声称旧历史学习实现全仓测试通过。常规全仓测试入口`Rscript tests/testthat.R`未重跑，因本轮只新增诊断客户端且已记录全仓基线漂移；专项使用`testthat::test_file(...,stop_on_failure=TRUE)`新进程，输出在tests.log。
+
+复现：`/opt/R/4.6.1/bin/Rscript r/fm17_event_type_diagnosis.R "$PWD" results/fm17-event-types-20261015 config/fm17_event_types_20261015.csv`；QMD从干净进程执行并关闭cache/freeze。输出目录显式传入、无需安装依赖，无网络采集、无NAS写入。
+
+```{r}
+if (isTRUE(params$acceptance_required)) {
+  acceptance <- jsonlite::fromJSON(file.path(out, "acceptance.json"), simplifyVector = FALSE)
+  stopifnot(acceptance$status == "ACCEPTED", acceptance$blocking_findings == 0L)
+  for (file in acceptance$files) {
+    stopifnot(digest::digest(file = file.path(root, file$path), algo = "sha256") == file$sha256)
+  }
+  knitr::kable(bind_rows(acceptance$checks), format = "html", escape = TRUE,
+    caption = "实际测试、独立重放及Codex审查；绑定最终文件哈希")
+} else {
+  cat("预览模式，尚不是审查验收。\n")
+}
+knitr::kable(tibble(input = names(receipt$input_hashes), sha256 = unlist(receipt$input_hashes)),
+  caption = "源快照和分类身份；输出哈希见receipt.json")
+```

@@ -1,0 +1,18 @@
+{
+  "status": "IDENTICAL_TABLE_REPLAY",
+  "tables": 12,
+  "checks": {
+    "metrics": true,
+    "coverage": true,
+    "coverage_summary": true,
+    "effects": true,
+    "cases": true,
+    "original_rates": true,
+    "stage_probabilities": true,
+    "market_evidence": true,
+    "support": true,
+    "observations": true,
+    "support_summary": true,
+    "stage_effects": true
+  }
+}

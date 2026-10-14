@@ -1,0 +1,30 @@
+{
+  "files": [
+    "r/fm17_event_type_diagnosis.R",
+    "config/fm17_event_types_20261015.csv",
+    "tests/testthat/test-fm17-event-types-20261015.R",
+    "quarto/fm17_event_type_diagnosis_20261015.qmd",
+    "quarto/fm17_event_type_diagnosis_20261015.html",
+    "results/fm17-event-types-20261015/metrics.csv",
+    "results/fm17-event-types-20261015/coverage_summary.csv",
+    "results/fm17-event-types-20261015/effects.csv",
+    "results/fm17-event-types-20261015/cases.csv",
+    "results/fm17-event-types-20261015/original_rates.csv",
+    "results/fm17-event-types-20261015/stage_probabilities.csv",
+    "results/fm17-event-types-20261015/market_evidence.csv",
+    "results/fm17-event-types-20261015/support_summary.csv",
+    "results/fm17-event-types-20261015/stage_effects.csv",
+    "results/fm17-event-types-20261015/receipt.json",
+    "results/fm17-event-types-20261015/acceptance.json",
+    "results/fm17-event-types-20261015/html-verification.json",
+    "results/fm17-event-types-20261015/replay-verification.json",
+    "results/fm17-event-types-20261015/test-results.json",
+    "results/fm17-event-types-20261015/tests.log",
+    "results/fm17-event-types-20261015/review.log",
+    "results/fm17-event-types-20261015/review-final.log",
+    "results/fm17-event-types-20261015/review-retry.log",
+    "results/fm17-event-types-20261015/review-retry2.log",
+    "results/fm17-event-types-20261015/render-final.log"
+  ],
+  "not_committed": "Raw observations/support/coverage/replay remain NVMe staging; authoritative inputs retained in existing immutable NAS dataset."
+}
