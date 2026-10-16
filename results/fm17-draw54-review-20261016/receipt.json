@@ -1,0 +1,39 @@
+{
+  "mode": "POSTHOC_DRAW54_MARGIN_AND_FROZEN_FUNDAMENTAL_REVIEW",
+  "sources": {
+    "rank_facts": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-rank3-scenes-20261016/fixtures.csv",
+    "forecast": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-three-issues-20261013/forecasts.rds",
+    "stage": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm16-three-issues-20261012/stage.rds"
+  },
+  "source_hashes": {
+    "rank_facts": "e8ceef1e24002d76088bea50ee9aa37ba70ccdd89b222497f22f1ce3454dceb5",
+    "forecast": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "stage": "39579898babb99215d9b298dfcedaffcfcd34de63d22de2debad2d81d61dcb68"
+  },
+  "client_sha256": "c1d70ce4e13316f3174f4d4e09ef4bb5082e13b84b31c3fdf75d5385d875747a",
+  "output_hashes": {
+    "all_fixtures": "c65d1fa739e08013ff4bdfbbaf266bd12b00b915095efaaf786620f695844489",
+    "cases54": "856aba490d9d6b74a4f4dc45a61b7e7262d9dd1ea6c7f3b679f2402a51063c22",
+    "margin_features": "722d3709e3ef0190827f031bd34a284cf6490bd4c0889347e408f5d7781f7f5a",
+    "case_margins": "149c2e8d5fda65d4d25453015faa6ec4dceb56957a847b3be11dbedc7990342a",
+    "case_forms": "5d7ff8eb9be7947fde1bf8db68a933985f275725340d9328a0c7214101a8836b",
+    "case_quotes": "73f61cec0416b92ac4b0933dcd7d925ff8d9181eeba0cab105ad389eee65b036",
+    "case_review": "1098f1a36a6a873dfa98afae70e2896cf03e7d781bec6ad98f80d4bf11d31948",
+    "case_article_facts": "ae61cd9747b7c44eb266de7b03415fedb1f2ac3dfd5a6e9e294be5753b953663",
+    "asian_alignment": "dd60ed6c9a6e4328d95b0fea6cd7622268b0ebe6a6aa6263c36b7c1e985f6cb3",
+    "asian_controls": "2b3657a1c0142f8a9bf2ef11a0112f703826f3c82a14db459f3ddcc6a4f9496d",
+    "controls": "aac6aac5d47b754542991436de38b9b64d3660416a54944d13c1bd297a2bf924"
+  },
+  "sample": {
+    "all": 345,
+    "final_draw_third": 197,
+    "cases": 54,
+    "ordinary_draw": 17,
+    "exact_handicap": 37,
+    "article_rows_all": 10,
+    "article_rows_cases": 0
+  },
+  "support_interpretation": "Modal/top2 margin and mean proximity describe geometry, not a recommendation to promote D over aggregate W/L. Realized 54 selected by outcome; compare 197 final-D-third controls.",
+  "cutoff_governance": "No fitting, threshold selection or decisions. Frozen fixture cutoff preserved. Quotes strictly before cutoff; proxy article evidence not upgraded to observed availability.",
+  "generated_at": "2026-10-16 15:58:08 UTC"
+}

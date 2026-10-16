@@ -1,0 +1,45 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "r/fm17_draw54_review.R",
+      "sha256": "c1d70ce4e13316f3174f4d4e09ef4bb5082e13b84b31c3fdf75d5385d875747a"
+    },
+    {
+      "path": "tests/testthat/test-fm17-draw54-review-20261016.R",
+      "sha256": "ec7eab1931894eaa6a8e6cfecca0ba63e64574192bfdfbe325521bc43a34afa3"
+    },
+    {
+      "path": "quarto/fm17_draw54_review_20261016.qmd",
+      "sha256": "486795c257a49e5f8718e3cbb853689d0c71fe6ef22b3d6935128dacf7664d48"
+    }
+  ],
+  "checks": [
+    {
+      "check": "R integration tests",
+      "command": "Rscript -e testthat::test_file(tests/testthat/test-fm17-draw54-review-20261016.R,stop_on_failure=TRUE)",
+      "result": "54 assertions passed; zero failures/errors"
+    },
+    {
+      "check": "Independent replay",
+      "command": "Rscript r/fm17_draw54_review.R ROOT OUTPUT",
+      "result": "11 tables byte-identical; input and implementation identities equal"
+    },
+    {
+      "check": "Codex review",
+      "command": "codex review scoped prompt; review.log",
+      "result": "No blockers; 54 assertions independently rerun; final acceptance render next separate check"
+    },
+    {
+      "check": "Preview render",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render ... --no-cache -P acceptance_required:false",
+      "result": "Rendered; initial chunk-option syntax corrected before successful render and review"
+    },
+    {
+      "check": "Clean acceptance QMD",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm17_draw54_review_20261016.qmd --no-cache",
+      "result": "10 nonempty tables;2 figures;no execution errors;final source hashes verified"
+    }
+  ]
+}

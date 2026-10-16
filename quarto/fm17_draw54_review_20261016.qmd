@@ -1,0 +1,157 @@
+---
+title: "54次让平漏保：净胜球分布、基本面及盘口逐场审查"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  output_directory: "results/fm17-draw54-review-20261016"
+  acceptance_required: true
+---
+
+本报告检查完整FM-1.7.0三期345场中54次“最终让平排第三且实际让平”的漏保：17场零让球实际平局、37场非零让球恰好到线。用户问净胜球分布和其他基本面是否支持平局选择。本报告逐场输出分布、原生／市场／最终参数、近期与长期攻防、冻结盘口和审查说明，**并以全部197场最终让平第三的比赛（含143场未发生）作对照**，不根据已知赛果重新调整模型。
+
+结论：几何上支持将让平保留为合理场景，但没有证明应全部升到前二。54场对应净胜球全部是单档前二；27场是众数。相同性质在未发生的143场也很常见，不能把“中心附近”直接当更高命中证据。阵容／伤停／战意等文章证据未补齐，不能伪造定性审查完成。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+out <- file.path(root, params$output_directory)
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+log <- file.path(out, "qmd-execution.log")
+status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(file.path(root, "r/fm17_draw54_review.R"), root, out)),
+  env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))), stdout = log, stderr = log)
+if (status != 0L) stop(paste(readLines(log), collapse = "\n"))
+receipt <- jsonlite::fromJSON(file.path(out, "receipt.json"))
+stopifnot(length(names(receipt$output_hashes)) == 11L)
+for (name in names(receipt$output_hashes)) stopifnot(
+  digest::digest(file = file.path(out, paste0(name, ".csv")), algo = "sha256") == receipt$output_hashes[[name]])
+all <- read_csv(file.path(out, "all_fixtures.csv"), show_col_types = FALSE)
+cases <- read_csv(file.path(out, "cases54.csv"), show_col_types = FALSE)
+margins <- read_csv(file.path(out, "case_margins.csv"), show_col_types = FALSE)
+review <- read_csv(file.path(out, "case_review.csv"), show_col_types = FALSE)
+controls <- read_csv(file.path(out, "controls.csv"), show_col_types = FALSE)
+```
+
+## 范围、时间和数据字典
+
+原冻结期26098、26101、26102，最终评分345场；取消26098#102、无截止#135沿用排除。54场是按已知结果选择的案例，不是独立回测；197场对照也仍是历史诊断，不能用于直接训练新下注规则。所有原生、选用来源尾部前和最终网格都从冻结产物读取，无新拟合、权重、阈值或路由。
+
+目标净胜球d*=−h，h为主队有符号北单让球。d*处单档质量就是让平概率；左侧和右侧分别投影为让负／让胜。不能把非零让平解释为实际平局，也不能将单档排名与三个北单类别排名混为一谈。原生／市场网格均值用于解释λ，尾部后网格均值称预期进球，不称重新拟合的DC参数。亚盘主h_a对应大致净胜中线−h_a；它不是精确的概率中位数，价格、四分之一结算及返还率也会影响含义。
+
+行单位：all_fixtures为345场；cases54/case_review为54场；margin_features为场×分布；case_margins为场×分布×净胜球；case_forms为场×主客角色（108行）；报价为源公司／市场／时点；article表是有类型的空表，表示本54场无冻结文章事实。ID字符、概率double且0—1、整数净胜球和计数、UTC cutoff/quote POSIXct，CSV保持UTC；未获得市场参考为NA，不能当概率0。
+
+输入哈希绑定上一轮rank3表、完整FM预测RDS和stage；stage绑定原生历史与市场来源。报价和文章代理时间严格早于各场原cutoff；这是历史记录代理，不升级为真实赛前观测可用性。所有连接声明一对一／多对一，拒绝重复关键身份、网格不归一、缺时钟或跨截止报价。无更改原文件，无缓存复用或学习决策函数；所有阶段和输出独立重放。
+
+诊断半球距离／2和5个百分点间距固定用于解释，不是优化得出的准入门槛。对照按赛前概率和结构分组，不按实际比分定义“有利特征”；未做显著性检验，多组和三期小样本不当成确认性证据。
+
+## 分布总体：支持保留场景，不能直接提升类别排名
+
+```{r}
+knitr::kable(cases |> group_by(draw_type) |> summarise(n = n(), line_modal = sum(line_is_mode),
+  line_margin_top2 = sum(margin_top2), within_half_goal_mean = sum(within_half_goal_mean),
+  mean_draw_probability = mean(line_probability), mean_selected_total = mean(before_expected_total),
+  mean_tail_draw_increase = mean(tail_draw_delta), .groups = "drop"), digits = 4)
+knitr::kable(cases |> select(fixture_id, league, home, away, handicap, score,
+  modal_margins, target_margin, expected_margin, line_probability, line_margin_rank,
+  probability_line_minus1, probability_line_plus1, probability_radius1, draw_gap_to_second),
+  digits = 4, caption = "54场完整净胜球位置账本；邻近三档和是局部质量，不是让平概率")
+```
+
+零让球17场：0档全部为众数，16场距最终均值≤0.5球，平均平局概率约28.0%；选用来源尾部前总进球均值约3.01，因此虽然实力较接近，左右获胜的多档质量仍可各大于平局单档。不能只用“均势”推导低进球或平局应第一。
+
+非零37场：让平对应档位10场为众数、27场第二，29场距均值≤0.5球，平均让平概率约23.3%，尾部前总进球约3.09。它们多数是胜差中心附近，而不是极端尾部。54场实际目标净胜球均在核心，且尾部调整全部提高让平概率；这不是“压尾直接把平局质量削掉”的案例集。
+
+## 每场净胜球分布
+
+横轴以让平线为0，即实际净胜球−让平所需净胜球，正数对应让胜侧，负数对应让负侧。图展示−4至+4，未重归一化；完整分布和外围仍保存在CSV和所有统计中。
+
+```{r, fig.width=12, fig.height=8}
+ids0 <- cases$fixture_id[cases$handicap == 0]
+margins |> filter(fixture_id %in% ids0, distribution %in% c("native", "final"), between(relative_margin, -4, 4)) |>
+  ggplot(aes(relative_margin, probability, colour = distribution)) + geom_line() + geom_point(size = .7) +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey40") + facet_wrap(~fixture_id, ncol = 4) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "主队净胜球相对让平线的距离（球）", y = "单档概率", colour = "冻结分布",
+    title = "17场零让球：原生与最终分布") + theme_minimal()
+```
+
+```{r, fig.width=12, fig.height=14}
+ids1 <- cases$fixture_id[cases$handicap != 0]
+margins |> filter(fixture_id %in% ids1, distribution %in% c("native", "final"), between(relative_margin, -4, 4)) |>
+  ggplot(aes(relative_margin, probability, colour = distribution)) + geom_line() + geom_point(size = .7) +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey40") + facet_wrap(~fixture_id, ncol = 4) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "主队净胜球相对让平线的距离（球）", y = "单档概率", colour = "冻结分布",
+    title = "37场非零让球：恰好落线的分布位置") + theme_minimal()
+```
+
+## 近期攻防与市场：有支持，也有明确缺口
+
+原生λ按已有历史和α构建，近期状态原本已进入λ，不能在本次解释中再叠加一次。54场原生目标线距均值≤0.5球只有24场；最终45场，说明后续市场来源／分布调整在不少比赛上改变了对胜差的判断。原生与最终不是独立证据，市场采用后不能再将同一盘口算作第二份新增支持。
+
+```{r}
+knitr::kable(cases |> select(fixture_id, selected_source, native_home, native_away,
+  market_home, market_away, before_expected_margin, before_expected_total,
+  native_line_probability, before_line_probability, line_probability, tail_draw_delta),
+  digits = 4, caption = "原生、已冻结市场参考、选用来源和尾部后对照；NA不代表反对平局")
+knitr::kable(cases |> select(fixture_id, matches_home, matches_away,
+  long_for_home, recent_for_home, long_against_home, recent_against_home,
+  long_for_away, recent_for_away, long_against_away, recent_against_away),
+  digits = 3, caption = "逐场近期／长期攻防，单位球／场；原始108行和ESS另见case_forms.csv")
+knitr::kable(read_csv(file.path(out, "asian_alignment.csv"), show_col_types = FALSE), digits = 3,
+  caption = "48场有冻结亚盘，均在目标线半球内；缺6场保持未知")
+knitr::kable(read_csv(file.path(out, "asian_controls.csv"), show_col_types = FALSE), digits = 4,
+  caption = "完整197场的亚盘位置对照，不能只用命中54场证明盘口支持有效")
+```
+
+54场43场最终选用市场、11场保留原生。48场有冻结亚盘，其隐含净胜中线与北单让平目标相距≤0.5球；这支持“赢多少球的量级相近”，不能推出恰好到线比两侧总质量更大，也未必支持改掉Top2。
+
+54场冻结文章事实均为空（整个345场账本有10条，均在其他比赛）。所以没有据此完成阵容、伤停、战意、排名和对手等级的独立核验；不能说海外主力回归、保级或轮换等理由已得到支持。当前“基本面”证据主要是主客历史进失球和近期趋势，缺少的定性维度如实保留。本轮不以当前新闻回填历史赛前信息。
+
+## 对照：中心支持没有变成清晰的选择优势
+
+```{r}
+knitr::kable(controls, digits = 4,
+  caption = "全部197场最终让平第三：54发生／143未发生；预设几何与基本面分组")
+```
+
+197场让平第三全部都是净胜球单档前二。因此54场的这个共性无法筛出它们。117场让平线为众数，其中27场发生（23.1%）；80场不是众数，其中27场发生（33.8%）。不能把众数资格直接当成提升让平排序的证据。
+
+零让球对照63场，平均平局预测27.9%、实际发生17/63=27.0%，并没有显示这一子组整体低估。非零134场，平均让平预测23.7%、实际37/134=27.6%，约低估3.9个百分点，有研究价值但不支持全体硬性上调。第二名差距不足5个百分点的111场出现35次（31.5%），其余86场19次（22.1%）；这是探索性差异，尚未在新期检验，不据此形成新保护门槛。
+
+## 54场逐场解释与代表案例
+
+```{r}
+knitr::kable(review |> select(fixture_id, structure_note, fundamental_note, market_note,
+  conclusion, qualitative_gap), caption = "逐场证据说明；为字段驱动的可复现解释，不冒充独立人工定性裁决")
+```
+
+**26098#104 奥斯汀FC—圣迭戈FC（0）**：原生预期进球1.64/1.07偏主，市场1.60/1.51更均衡，已实际采用市场；0档为众数，最终平局27.74%，目标线±1球合计67.1%，和第二名差4.83个百分点。近期主攻2.00、客攻0.875有主队状态优势，但未经对手调整且已经进入原生λ；市场总量3.11不属于典型低比分。可以支持保留平局情景，但不证明应将平局升为主选。
+
+**26101#91 邓伯什—多德雷赫特（0）**：市场预期进球2.15/1.53，主队仍较强、总进球约3.67；0档是众数，平局23.58%与第二名只差0.88个百分点。其近并列保护很不稳定，但原生近期攻防仍倾向主队，不能据实际1–1反推赛前强平预期。
+
+**26101#81 赫德—奥德（主+1）**：原生1.99/2.11，总量约4.09，胜差均值仅略偏客；让平需客胜1球，目标距最终均值约0.91球，单档第二而非众数。近期双方进球2.25/3.125，提示高进球环境，不是低比分平局逻辑；本场无完整市场参考。让平18.60%与第二名差3.32个百分点，可以讨论保护，但支持弱于“净胜中心恰好落线”的叙述。
+
+## 裁决与交付
+
+本轮支持把“单档净胜球位置”加入报告，解释类别排名为何与中心直觉不同；不支持仅凭众数／前二／半球接近就统一提升让平。要改变选择还需可验证的额外信息，以及对同类未发生场次的代价评估。不能以本54场已知结果返调λ、ρ或尾部系数；不将场景中心固定为北单给定线。
+
+R4.6.1，依赖现有tidyverse/jsonlite/digest，运行时不安装。线性研究客户端无新增项目函数；对应tests/testthat/test-fm17-draw54-review-20261016.R验证完整345／197／54分母、17／37分拆、网格质量与让平投影、单档排名、盘口48及时间检查、近期表108行、文章空表、字段驱动说明和输出哈希。无新增拟合／决策／Rcpp，不重复安装包。全仓旧客户端测试未重跑，不声称全仓通过。
+
+```{r}
+if (isTRUE(params$acceptance_required)) {
+  acceptance <- jsonlite::fromJSON(file.path(out, "acceptance.json"), simplifyVector = FALSE)
+  stopifnot(acceptance$status == "ACCEPTED", acceptance$blocking_findings == 0L)
+  for (file in acceptance$files) stopifnot(
+    digest::digest(file = file.path(root, file$path), algo = "sha256") == file$sha256)
+  knitr::kable(bind_rows(acceptance$checks), format = "html", escape = TRUE,
+    caption = "实际测试、独立重放和Codex审查；绑定最终文件哈希")
+} else cat("预览，尚非验收。\n")
+knitr::kable(tibble(source = names(receipt$source_hashes), sha256 = unlist(receipt$source_hashes)),
+  caption = "输入身份；完整输出及其哈希见receipt.json")
+```

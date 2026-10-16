@@ -1,0 +1,8 @@
+{
+  "status": "PASS",
+  "tables": 10,
+  "figures": 2,
+  "errors": 0,
+  "zero_handicap_figure": "Visually inspected: labels, scales, cases, legend and line position present",
+  "html_sha256": "c41e4c35f8bf5d07e70f66fbf83c559981388b95e1cff6446b1131b13413d95d"
+}
