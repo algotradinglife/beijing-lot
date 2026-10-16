@@ -1,0 +1,77 @@
+---
+title: "FM-1.8.0-alpha.1：前三档让平校正候选"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  output_directory: "results/fm18-alpha1-20261017"
+  acceptance_required: true
+---
+
+根据用户批准，登记 **FM-1.8.0-alpha.1**。正式FM-1.7.0保持原状态；alpha独立、诊断限定、未验证命中或收益，不接生产路由。不把这次版本登记当成整期回测。
+
+## 固定规则
+
+1. 完整FM来源审查及原生／市场选择保持不变，读取选用来源的DC比分网格，阶段必须是尾部处理之前；不更改初始λ、ρ，不使用北单SP。
+2. 取消FM17的90%核心／外围0.3压缩，原定性tail retain不再另外控制本alpha阶段；不与旧尾部叠加。
+3. 让平目标净胜球c=−h的正质量档位竞争排名≤2时，qD=P(c)/前三档质量和。前三档边界并列按绝对容差1e−12整组纳入；少于三档用全部正质量支持。零质量档位不算前三，目标无质量不触发。
+4. 剩余质量按完整原分布右侧／左侧比值分配，qW=(1−qD)R/(R+L)、qL=(1−qD)L/(R+L)。只有D质量时维持D=1；缺一侧时该侧仍为零，不能创造源分布没有的比分。
+5. 未触发时，原样保留尾部前网格。触发时每个W/D/L类内部按同一倍数缩放，完整比分与三分类一致。
+
+alpha输出是**指定让球线下的专家重加权分布**，不是重新拟合DC参数；更换让球必须从原source网格重建，不能把alpha网格当一般战力分布重复校正。和正式FM“北单线只用于最后投影”的约定不同，本alpha明确把北单整数让球用于候选分布重权；这是本次获批的实验范围，不改变正式版本。
+
+例如原W/D/L=.42/.25/.33，前三净胜球质量为.25/.22/.20且.25是让平，则新D=.25/.67=37.31%，W=35.10%、L=27.58%。这一规则通常提高触发场次的让平概率，不能假定会提高总命中。
+
+## 合同、截止与收据
+
+内部包函数`AlphaTop3Draw()`，输入base、整数handicap、fixture、显式cutoff、共享temporal_learning evidence context和repository_root。base需要带来源hash及最大可用时钟，cutoff必须完全一致。只允许HISTORICAL_DIAGNOSTIC，拒绝既有receipt／投影绑定的重权输出及非SOURCE_NATIVE／SOURCE_MARKET阶段。
+
+网格一行一个非负整数主客比分，键home_goals/away_goals唯一；概率double 0—1且和为1；fixture一行字符fixture_id/issue_id/home/away；截止UTC POSIXct。空、重复、非法质量、错截止、错输入／实现绑定失败。输出grid和margins为最终分布，before_margins明确保留原分布；probabilities为W,D,L三行，projection_handicap绑定本次让球。
+
+固定算术不拟合历史参数，但作为决策面对的候选变换，仍通过共享证据context验证截止及可用性，不复制时序工具。alpha_input绑定完整base、h、fixture、cutoff；alpha_code绑定本函数及导入hash／cutoff校验器和传递character-ID校验器函数体；导出的共享context验证Python传递实现和源快照。初审指出传递character-ID校验器遗漏，已补绑定并测试修改其函数体时旧context被拒绝。收据记录最大源时钟、策略、输入、输出、实现、cutoff和无缓存复用；cache_key依赖cutoff/input/code。修改截止或输入必须重建context和结果，不可只改字段。
+
+历史源时间代理继续限定为诊断，不支持前瞻下注。无新增学习函数、无阈值搜索；未来如做参数／规则选优仍需在截止前共享历史窗口学习。源路由与此前人工审查可能含已知赛果判断，本候选没有把它升级为独立证据。
+
+## 可执行检查
+
+下列仅重放三场已知案例以检查工程行为，不读取目标labels、不比较命中或宣称效果；案例先前已讨论，不是盲测。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+out <- file.path(root, params$output_directory)
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+log <- file.path(out, "qmd-execution.log")
+status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(file.path(root, "r/fm18_alpha_smoke.R"), root, out)),
+  env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))), stdout = log, stderr = log)
+if (status != 0L) stop(paste(readLines(log), collapse = "\n"))
+receipt <- jsonlite::fromJSON(file.path(out, "receipt.json"))
+stopifnot(receipt$model_id == "FM-1.8.0-alpha.1", !receipt$labels_opened_by_client,
+  digest::digest(file = file.path(out, "smoke.rds"), algo = "sha256") == receipt$output_sha256)
+x <- readRDS(file.path(out, "smoke.rds"))
+knitr::kable(read_csv(file.path(out, "probabilities.csv"), show_col_types = FALSE), digits = 5,
+  caption = "仅实现烟雾检查；不是整期预测或命中验证")
+knitr::kable(bind_rows(lapply(x, function(z) tibble(fixture_id = z$receipt$fixture_id,
+  target_margin = z$receipt$target_margin, draw_atom_rank = z$receipt$draw_atom_rank,
+  core_mass = z$receipt$core_mass, core_margins = paste(z$receipt$core_margins, collapse = ","))), .id = NULL),
+  caption = "触发及前三档边界并列记录")
+```
+
+无新依赖：R4.6.1、既有beidan、dplyr/tibble/checkmate/digest/jsonlite/reticulate及项目.venv的共享后端。内部函数源码在私有环境显式加载，复用已安装beidan校验／hash工具；不改共享NAMESPACE。从前轮已验证隔离包加入本次函数／帮助文件后R CMD INSTALL，检查安装函数体与源码一致；历史包DLL需显式dyn.load后检查注册，不宣称自动加载问题已修复。不混入工作区其他作者代码。
+
+对应测试：packages/beidan/tests/testthat/test-alpha-top3-draw.R验证手算、非零h、并列、非触发、缺目标、单档、双档、类内比分比、精确整数支持及输入／截止／阶段拒绝；tests/testthat/test-fm18-alpha-smoke.R验证独立进程重放和比分投影一致。专项使用test_file(...,load_helpers=FALSE,stop_on_failure=TRUE)：默认仓库helper初始化另一安装位置的Python后端，与本专项共享context路径冲突；不加载无关helper后通过（实际数见验收表），未修改该helper。未重跑已有基线漂移的全仓tests/testthat.R；不声称全仓通过，不参与CI。
+
+```{r}
+if (isTRUE(params$acceptance_required)) {
+  acceptance <- jsonlite::fromJSON(file.path(out, "acceptance.json"), simplifyVector = FALSE)
+  stopifnot(acceptance$status == "ACCEPTED", acceptance$blocking_findings == 0L)
+  for (file in acceptance$files) stopifnot(digest::digest(file = file.path(root, file$path), algo = "sha256") == file$sha256)
+  knitr::kable(bind_rows(acceptance$checks), format = "html", escape = TRUE,
+    caption = "实际测试、审查及修复；绑定最终文件哈希")
+} else cat("预览，非验收。\n")
+```

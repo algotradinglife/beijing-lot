@@ -1,0 +1,20 @@
+* installing *source* package ‘beidan’ ...
+** this is package ‘beidan’ version ‘0.2.0’
+** using staged installation
+** libs
+specified C++17
+using C++ compiler: ‘g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0’
+using C++17
+make: Nothing to be done for 'all'.
+installing to /home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm18-alpha1-20261017/library/00LOCK-beidan/00new/beidan/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (beidan)

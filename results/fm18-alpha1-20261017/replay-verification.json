@@ -1,0 +1,6 @@
+{
+  "status": "IDENTICAL_REPLAY",
+  "fixtures": 3,
+  "forecast_sha256": "10943b6427a8d8546d9ee861b8f1c658af15965c0d254f3b9fb12cbe419b029e",
+  "performance_validation": false
+}

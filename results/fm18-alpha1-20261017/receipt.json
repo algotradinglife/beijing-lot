@@ -1,0 +1,27 @@
+{
+  "status": "IMPLEMENTATION_SMOKE_NOT_PERFORMANCE_VALIDATION",
+  "model_id": "FM-1.8.0-alpha.1",
+  "formal_model": "FM-1.7.0",
+  "labels_opened_by_client": false,
+  "prior_outcomes_known": true,
+  "parent_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+  "config_sha256": "97d57eed7d3691df55f3f41e65eb8c2a3ed2dce09616da1265e15e2a0168906a",
+  "alpha_sha256": "c54f7346ee5fb7864a5b364a5508813875302e8968ab302d8b05fb84174391b7",
+  "client_sha256": "8d3a3ac0b0765019ef6f16c7008636df0943d83ed8a5278a822d0a16803fa730",
+  "output_sha256": "10943b6427a8d8546d9ee861b8f1c658af15965c0d254f3b9fb12cbe419b029e",
+  "code_binding": "Alpha body + imported hash and cutoff bodies; shared context transitive implementation receipt",
+  "fixture_cutoffs": {
+    "26098:104": {
+      "issue_id": "26098",
+      "cutoff_utc": "2026-09-26T00:40:00.000000Z"
+    },
+    "26101:81": {
+      "issue_id": "26101",
+      "cutoff_utc": "2026-10-02T14:00:00.000000Z"
+    },
+    "26101:91": {
+      "issue_id": "26101",
+      "cutoff_utc": "2026-10-02T18:00:00.000000Z"
+    }
+  }
+}

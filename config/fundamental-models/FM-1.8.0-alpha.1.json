@@ -1,0 +1,20 @@
+{
+  "schema": "fundamental-model-version/v1",
+  "model_id": "FM-1.8.0-alpha.1",
+  "parent_model": "FM-1.7.0",
+  "status": "experimental_alpha",
+  "discussion_default": false,
+  "prospective_performance_validated": false,
+  "intended_use": "HISTORICAL_DIAGNOSTIC",
+  "source": "Unchanged FM17 source selection, DC lambda and rho; use selected grid BEFORE tail adjustment",
+  "tail_compression": false,
+  "trigger": "Draw target margin -handicap has competition rank <=2 among positive margin atoms",
+  "draw_probability": "P(target)/sum(top three margin atoms including all boundary ties)",
+  "win_loss_probability": "Remaining mass split in full original right:left mass ratio",
+  "no_trigger": "Retain selected BEFORE-tail grid exactly",
+  "ties": "Absolute tolerance 1e-12, include entire top-three boundary tie group; no arbitrary side preference",
+  "few_atoms": "Use all available positive atoms if fewer than three",
+  "score_sync": "Preserve within-W/D/L score proportions; output is handicap-specific expert reweighting, not a newly fitted DC distribution",
+  "cutoff": "Explicit cutoff and shared temporal_learning evidence context binding alpha_input and alpha_code required",
+  "formal_model_unchanged": "FM-1.7.0"
+}

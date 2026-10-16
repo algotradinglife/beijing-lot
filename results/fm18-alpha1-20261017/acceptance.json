@@ -1,0 +1,66 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "packages/beidan/R/alpha_top3_draw.R",
+      "sha256": "c54f7346ee5fb7864a5b364a5508813875302e8968ab302d8b05fb84174391b7"
+    },
+    {
+      "path": "packages/beidan/man/AlphaTop3Draw.Rd",
+      "sha256": "6ce39890eda414ec87a88a669bd41947ed74c6f5969618430a0af483fe2c360f"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-alpha-top3-draw.R",
+      "sha256": "3b9e70763828a4855b027838b956b1881cf54cc488e8f4928333f385d2bd12b7"
+    },
+    {
+      "path": "r/fm18_alpha_smoke.R",
+      "sha256": "8d3a3ac0b0765019ef6f16c7008636df0943d83ed8a5278a822d0a16803fa730"
+    },
+    {
+      "path": "tests/testthat/test-fm18-alpha-smoke.R",
+      "sha256": "1ee87ac5cae263a39c013f634638421d65f03457b4e9d6e0a38bd1dc09112920"
+    },
+    {
+      "path": "config/fundamental-models/FM-1.8.0-alpha.1.json",
+      "sha256": "97d57eed7d3691df55f3f41e65eb8c2a3ed2dce09616da1265e15e2a0168906a"
+    },
+    {
+      "path": "quarto/fm18_alpha1_20261017.qmd",
+      "sha256": "15ca7d37a5d4abe95eb9fcb7dc14712438a083fedd71d09cf7981692d42ae168"
+    }
+  ],
+  "checks": [
+    {
+      "check": "Scoped unit and client tests",
+      "command": "testthat::test_file(two scoped files,load_helpers=FALSE,stop_on_failure=TRUE)",
+      "result": "75 assertions pass, zero failures/errors; unrelated repo helper Python-location conflict isolated and documented"
+    },
+    {
+      "check": "Independent processes",
+      "command": "tests/testthat/test-fm18-alpha-smoke.R: two Rscript invocations",
+      "result": "Three source-artifact transformations identical across processes; normalized grids/projections"
+    },
+    {
+      "check": "Isolated package installation",
+      "command": "R CMD INSTALL -l results/fm18-alpha1-20261017/library .../install-source/beidan",
+      "result": "PASS; installed alpha body equals final source; DLL explicitly loaded and registered (historical base limitation disclosed)"
+    },
+    {
+      "check": "Initial review",
+      "command": "codex review scoped prompt; review.log",
+      "result": "P2 transitive character-ID validator omitted; fixed code/context binding, added private-env mutation rejection test"
+    },
+    {
+      "check": "Final review",
+      "command": "codex review final scoped prompt; review-release.log",
+      "result": "No blockers; 75 assertions independently rerun, includes precise integer support rejection"
+    },
+    {
+      "check": "Final clean QMD",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm18_alpha1_20261017.qmd --no-cache",
+      "result": "3 nonempty tables; no execution error; acceptance SHA gates verified"
+    }
+  ]
+}
