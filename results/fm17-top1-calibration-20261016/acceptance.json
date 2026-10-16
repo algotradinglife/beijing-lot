@@ -1,0 +1,62 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "packages/beidan/R/top1_reliability.R",
+      "sha256": "f10734c62df1973da800bba54616d562991200103da83780a6d50b0c81a599f3"
+    },
+    {
+      "path": "packages/beidan/man/Top1Reliability.Rd",
+      "sha256": "faf4364d05709589769f0102d02f0042dde04519a67c5c518bc80d84f2a50aef"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-top1-reliability.R",
+      "sha256": "4cce634d26dd09ecfd34fa57b01aa80008c3741e8a30bc0930c84630dae64fed"
+    },
+    {
+      "path": "r/fm17_top1_calibration.R",
+      "sha256": "aa3184dde661c234c9fadc1cf577b4dc9bc9e306db24992b8f14c13cd8c4e6f8"
+    },
+    {
+      "path": "tests/testthat/test-fm17-top1-calibration-20261016.R",
+      "sha256": "080802bc2e09635bde9210b1a02c212b512f9bda4d130c1bb27d5be4058c10e8"
+    },
+    {
+      "path": "quarto/fm17_top1_calibration_20261016.qmd",
+      "sha256": "82d41b43b1cb52b5e72e7291f756107ca7425e6e048f6fdf4ead00eca266ff87"
+    }
+  ],
+  "checks": [
+    {
+      "check": "Function and client tests",
+      "command": "Rscript: installed beidan absolute library; testthat::test_file(two scoped files,stop_on_failure=TRUE)",
+      "result": "41 assertions passed, no failures/errors"
+    },
+    {
+      "check": "Independent replay",
+      "command": "Rscript r/fm17_top1_calibration.R ROOT OUTPUT",
+      "result": "3 CSV tables byte-identical, source/implementation hashes equal"
+    },
+    {
+      "check": "Installed package",
+      "command": "R CMD INSTALL -l results/fm17-top1-calibration-20261016/library .../install-source/beidan; installed-package-check.log",
+      "result": "Install passed; helper body equals source; 345/131 result reproduced. Historical DLL requires explicit dyn.load; registered DLL checked."
+    },
+    {
+      "check": "Initial review",
+      "command": "codex review scoped prompt; review.log",
+      "result": "No blocking findings; tests independently rerun"
+    },
+    {
+      "check": "Final review",
+      "command": "codex review six scoped files; review-final.log",
+      "result": "No blockers; 41 assertions independently rerun; runtime and installed-helper documentation reviewed"
+    },
+    {
+      "check": "Clean final QMD acceptance",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm17_top1_calibration_20261016.qmd --no-cache",
+      "result": "10 nonempty tables, 1 figure image, no execution error, acceptance SHA gate passed"
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+---
+title: "FM-1.7.0：Top1概率与实际命中率"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  output_directory: "results/fm17-top1-calibration-20261016"
+  acceptance_required: true
+---
+
+本报告仅描述26098、26101、26102三期冻结预测，回答高Top1概率是否对应高命中，以及预测概率是否校准。不估计新参数、不按赛果选择下注阈值、不改FM来源路由、尾部政策或预测。目标赛果已知，不能当作独立前瞻证据。
+
+**当前样本未支持“FM Top1概率越大，越容易命中”。** 总体平均预测45.8%，实际38.0%；来源分层显示原生过度自信明显，市场来源整体接近校准，但高概率组不足。结论限于这三期，不说明长期一定无效，也不支持反向下注。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+out <- file.path(root, params$output_directory)
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+log <- file.path(out, "qmd-execution.log")
+status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(
+  file.path(root, "r/fm17_top1_calibration.R"), root, out)),
+  env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))), stdout = log, stderr = log)
+if (status != 0L) stop(paste(readLines(log), collapse = "\n"))
+receipt <- jsonlite::fromJSON(file.path(out, "receipt.json"))
+stopifnot(length(names(receipt$output_hashes)) == 3L)
+for (name in names(receipt$output_hashes)) stopifnot(
+  digest::digest(file = file.path(out, paste0(name, ".csv")), algo = "sha256") == receipt$output_hashes[[name]])
+bins <- read_csv(file.path(out, "bins.csv"), show_col_types = FALSE)
+summary <- read_csv(file.path(out, "summary.csv"), show_col_types = FALSE)
+fixtures <- read_csv(file.path(out, "fixtures.csv"), show_col_types = FALSE)
+```
+
+## 数据、分箱与分析合同
+
+原FM17冻结共346场，完整名单347场：26098#135无截止无预测、#102取消不评分，最终345场。较晚赛前SP共同样本345场；同T−24h SP共同样本214场。北单概率为SP倒数归一化，不使用结算SP。北单按自己的Top1概率分箱，各模型同箱的场次不一定相同；总体比较使用相同场次。来源分层始终指FM冻结来源，不表示北单也有原生／市场路由。
+
+预设分箱为[1/3,40%)、[40%,50%)、[50%,60%)、[60%,70%)、[70%,80%)、[80%,90%)、[90%,100%]，左闭右开且最后包括100%，没有为改善结果重新合箱。空箱保留n=0、均值NA。此处“Top1概率”是三分类最大概率，**不是定性基本面置信分数**。
+
+数据键：fixture_id/model/outcome为概率唯一键，每组W/D/L三行且和为1；labels以fixture_id唯一。同模型、时点、分层中的每场仅计一次；分层分别展示，不能重复累加。输出fixtures每行是一场／模型／比较时点，bins每行是分层／模型／分箱，summary每行是分层／模型。概率double、命中logical、计数integer，标识符character，截止随原输入保留ISO UTC文本；R中SP时钟显式转为POSIXct UTC比较。空／缺失／非法概率、重复或不完整键失败。
+
+原预测RDS、赛果、SP和来源／赛事分类coverage均核验既有SHA256。跨期冻结时点不变，不重放任何新的学习／策略决策函数。可复用内部函数`Top1Reliability()`调用已安装包的`DcAccuracyDiagnostic()`验证概率合同并沿用W,D,L并列排序；返回描述性分箱、总体和逐场表，无估计变换或阈值优化。收据记录实际评分函数体哈希、实现哈希、输入输出哈希与学习库存；没有复用跨截止模型缓存。原始历史页面及时间代理的事后诊断限制不变。
+
+## 总体分箱与校准
+
+区分能力看高概率组是否命中更多；校准看实际命中率是否接近组内平均预测概率。校准差=实际−预测，负数表示过度自信。相关系数是逐场最大概率与Top1命中0/1的Pearson描述性相关，不做显著性检验；退化组输出NA。
+
+```{r}
+knitr::kable(bins |> filter(comparison == "near_sale", dimension == "all", model == "FM-1.7.0") |>
+  select(lower, upper, n, hits1, mean_p1, hit_rate, calibration_gap, mean_p12, top2_rate, rank2_rate, rank3_rate),
+  digits = 4, caption = "345场原FM17：Top1分箱及同箱Top2／排名分布；均为比例0—1")
+bins |> filter(comparison == "near_sale", dimension == "all", n > 0) |>
+  ggplot(aes(mean_p1, hit_rate, colour = model)) + geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  geom_line() + geom_point(aes(size = n)) +
+  scale_x_continuous(labels = scales::percent) + scale_y_continuous(labels = scales::percent) +
+  labs(x = "组内平均Top1预测概率", y = "实际Top1命中率", size = "场数", colour = "冻结版本",
+    caption = "较晚SP共同样本；小样本点不代表稳定规律，线仅连接描述性分箱") + theme_minimal()
+knitr::kable(summary |> filter(comparison == "near_sale", dimension == "all"), digits = 5,
+  caption = "整体与尾部前对照；相关不是因果或显著性结论")
+```
+
+FM 40%—50%组186场命中75场（40.3%）；50%—60%组54场命中19场（35.2%），60%—70%组14场命中4场（28.6%）。70%以上总计仅8场，不能声称更高概率必然更差。90%以上为空箱。
+
+整体预测45.77%、命中37.97%，高估7.80个百分点；命中场的平均预测45.56%左右，未中场约45.90%，相关约−0.019。尾部前相关约0.0001，说明本样本区分能力不足不是仅由尾部产生。较晚北单总体同样偏高（45.64%预测、37.68%实际），但相关约+0.111；该弱正相关不能当显著稳定优势。
+
+## 逐期、来源与赛事类型
+
+```{r}
+knitr::kable(summary |> filter(comparison == "near_sale", dimension == "issue"), digits = 5,
+  caption = "逐期平均预测、命中及相关；三期不能视作大量独立窗口")
+knitr::kable(bins |> filter(comparison == "near_sale", dimension == "issue", model == "FM-1.7.0"), digits = 4,
+  caption = "原FM逐期分箱，包含空箱；用于观察总体是否掩盖期差异")
+knitr::kable(summary |> filter(comparison == "near_sale", dimension %in% c("source", "event_type")), digits = 5,
+  caption = "来源与赛事类型分别分层；不解释为替换来源的因果效应")
+knitr::kable(bins |> filter(comparison == "near_sale", dimension %in% c("source", "event_type"), model == "FM-1.7.0"), digits = 4,
+  caption = "原FM按来源／类型的全部固定分箱；稀疏保留，不根据命中重设边界")
+```
+
+逐期相关约+0.126、−0.241、+0.147，26101明显不同，不能把合计接近零直接外推未来每一期。原生117场平均预测48.82%、实际28.21%，高估20.62个百分点；市场来源228场平均44.20%、实际42.98%，只高估1.22个百分点。原生的50%以上高概率场更多，而命中较差，会影响整体；但原生和市场各自也未显示很强的正相关，不能只用来源混合解释全部问题。
+
+杯赛25场平均预测50.06%、实际24.00%，相关约−0.325，但样本少且阵容／跨级证据缺口，不能凭此制定杯赛反向规则。青年43场整体平均47.17%、命中48.84%，不能因青年标签一刀切否定。赛事大类内部仍混合赛制、让球及强弱程度，现阶段不继续扫描大量细分寻找“最佳子集”。
+
+## 同T−24h北单对照
+
+```{r}
+knitr::kable(summary |> filter(comparison == "same_cutoff"), digits = 5,
+  caption = "同截止共同样本214场的总体和预设分层；与345场不能直接比较增减")
+knitr::kable(bins |> filter(comparison == "same_cutoff", dimension == "all"), digits = 4,
+  caption = "T−24h共同场次，各模型按自己的概率分箱")
+```
+
+## 对串关覆盖估算的含义和局限
+
+目前**不能因为FM给某场更高Top1，就断定该场更适合单选或双选**，也不能直接将七场预测概率相乘当作经过验证的真实命中概率。理论上的独立乘积可以保留，但必须标为模型估计，且有过度自信及场间相关风险。上文各Top1箱也展示实际第二／第三名发生率与Top2覆盖，便于识别保护质量，并非选场规则或下注阈值。
+
+这三期是此前已知赛果的历史样本，部分定性来源审查亦事后完成；没有独立验证。样本仅三期、来源和赛事构成不同，高概率箱稀疏；不提供假定各比赛独立的二项置信区间，也不作显著性声明。价格、回款、票序深度、重复中奖和多组相关都未进入本轮分析，因此不能计算盈利概率或推荐组数。观察到的负相关不授权反向下注。任何概率校准函数、选场门槛或置信路由更新需另行在目标截止前的共享temporal_learning窗口内训练及冻结，新一期独立验证。
+
+## 运行、函数测试及审查
+
+R4.6.1，既有tidyverse、testthat、jsonlite、digest及beidan0.2.0；函数执行／渲染不安装依赖。新函数在`packages/beidan/R/top1_reliability.R`，对应`packages/beidan/tests/testthat/test-top1-reliability.R`：手算概率、分箱边界、概率1、并列、空箱、非法输入及退化相关；客户端对应`tests/testthat/test-fm17-top1-calibration-20261016.R`：完整／同截止分母、源分层重建、已知分箱、哈希JSON往返及截止字段。
+
+客户端显式加载内部函数源码到以已安装beidan命名空间为父的私有环境；复用已安装权威评分器，不改命名空间或全局状态，无Rcpp变更。同时从前轮已验证的隔离包源码加入本次函数／帮助文件后执行R CMD INSTALL，检查安装函数体等于本次源码，并在安装入口重算345场结果；不把共享工作区其他作者的改动混入安装。该历史包基座未自动加载DLL，最初is.loaded检查失败；显式dyn.load已安装beidan.so后注册检查通过。这是基座加载限制，不宣称自动DLL加载已修复；本轮R描述函数不调用Rcpp。专项测试使用绝对已安装库路径，避免testthat改变工作目录影响lazy-load。运行版本闭包记录在receipt$runtime。未重跑存在已记录旧客户端漂移的全仓`Rscript tests/testthat.R`，不声称全仓通过。
+
+入口：`/opt/R/4.6.1/bin/Rscript r/fm17_top1_calibration.R ROOT OUTPUT`；QMD每次在干净子进程重新分析，不读取手工工作区。表输出逐字节独立重放验证，generated_at不参与内容一致性判断。
+
+```{r}
+if (isTRUE(params$acceptance_required)) {
+  acceptance <- jsonlite::fromJSON(file.path(out, "acceptance.json"), simplifyVector = FALSE)
+  stopifnot(acceptance$status == "ACCEPTED", acceptance$blocking_findings == 0L)
+  for (file in acceptance$files) stopifnot(
+    digest::digest(file = file.path(root, file$path), algo = "sha256") == file$sha256)
+  knitr::kable(bind_rows(acceptance$checks), format = "html", escape = TRUE,
+    caption = "实际检查及Codex审查命令／发现／修复；绑定最终文件哈希")
+} else cat("预览，非最终验收。\n")
+knitr::kable(tibble(source = names(receipt$source_hashes), sha256 = unlist(receipt$source_hashes)),
+  caption = "输入身份；逐场输出保留原始截止和来源")
+```

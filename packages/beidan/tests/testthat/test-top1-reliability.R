@@ -1,0 +1,31 @@
+testthat::test_that("Top1 reliability describes bins, ties, empty bins and exact calibration", {
+  env <- new.env(parent = asNamespace("beidan"))
+  root <- rprojroot::find_root(rprojroot::has_file("AGENTS.md"))
+  sys.source(file.path(root, "packages/beidan/R/top1_reliability.R"), env)
+  p <- tibble::tibble(fixture_id = rep(c("a", "b", "c", "d"), each = 3),
+    model = "m", outcome = rep(c("W", "D", "L"), 4),
+    probability = c(.4, .3, .3, .6, .2, .2, 1/3, 1/3, 1/3, 1, 0, 0))
+  y <- tibble::tibble(fixture_id = c("a", "b", "c", "d"), actual_outcome = c("W", "D", "L", "W"))
+  x <- env$Top1Reliability(p, y, c(1/3, .4, .5, .6, .8, 1))
+  testthat::expect_s3_class(x$bins, "tbl_df")
+  testthat::expect_equal(x$fixtures$bin[match(c("a", "b", "c", "d"), x$fixtures$fixture_id)], c(2L, 4L, 1L, 5L))
+  testthat::expect_equal(x$fixtures$predicted_outcome[x$fixtures$fixture_id == "c"], "W")
+  testthat::expect_equal(x$summary$hits1, 2L)
+  testthat::expect_equal(x$summary$hits2, 3L)
+  testthat::expect_equal(x$summary$mean_p1, (.4 + .6 + 1/3 + 1)/4)
+  testthat::expect_equal(x$summary$calibration_gap, .5 - x$summary$mean_p1)
+  testthat::expect_equal(x$bins$n[x$bins$bin == 3], 0L)
+  testthat::expect_true(is.na(x$bins$mean_p1[x$bins$bin == 3]))
+  testthat::expect_equal(sum(x$bins$n), 4L)
+  testthat::expect_equal(sum(x$bins$hits1), 2L)
+  for (bad in list(c(.4, 1), c(0, .5, .5, 1), c(0, NA, 1), c(0, .9), "bad")) {
+    testthat::expect_error(env$Top1Reliability(p, y, bad), "Invalid explicit")
+  }
+  testthat::expect_error(env$Top1Reliability(p[-1, ], y, c(0, 1)))
+  testthat::expect_error(env$Top1Reliability(p[0, ], y[0, ], c(0, 1)))
+  testthat::expect_error(env$Top1Reliability(dplyr::bind_rows(p, p[1, ]), y, c(0, 1)))
+  z <- p |> dplyr::filter(fixture_id == "d")
+  single <- env$Top1Reliability(z, y[4, ], c(0, 1))
+  testthat::expect_true(is.na(single$summary$confidence_hit_correlation))
+  testthat::expect_true(is.na(single$summary$miss_confidence))
+})

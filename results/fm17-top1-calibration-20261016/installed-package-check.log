@@ -1,0 +1,7 @@
+# A tibble: 1 × 12
+  model        n hits1 hits2 mean_p1 hit_rate mean_p12 top2_rate calibration_gap
+  <chr>    <int> <int> <int>   <dbl>    <dbl>    <dbl>     <dbl>           <dbl>
+1 FM-1.7.0   345   131   250   0.458    0.380    0.755     0.725         -0.0780
+# ℹ 3 more variables: hit_confidence <dbl>, miss_confidence <dbl>,
+#   confidence_hit_correlation <dbl>
+PASS installed helper identity, registered DLL (explicit dyn.load), 345/131 replay
