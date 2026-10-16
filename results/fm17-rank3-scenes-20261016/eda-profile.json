@@ -1,0 +1,732 @@
+{
+  "analysis": {
+    "column_count": 19,
+    "columns": [
+      {
+        "column_id": "column_1d9c78dfe6b7055d",
+        "column_index": 0,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 2,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 1035,
+            "value_token": "value_53952542f53c002d"
+          },
+          {
+            "count": 642,
+            "value_token": "value_559218c329e2005d"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 11,
+          "mean_character_count": 9.765652951699463
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_c7e0d10040050781",
+        "column_index": 1,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 4,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 559,
+            "value_token": "value_c222fc78b978bb2b"
+          },
+          {
+            "count": 559,
+            "value_token": "value_d034c9b41fcb05e0"
+          },
+          {
+            "count": 345,
+            "value_token": "value_37257fb41bcf3bc4"
+          },
+          {
+            "count": 214,
+            "value_token": "value_f262c584390cfe9d"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 23,
+          "mean_character_count": 14.078115682766846
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_39e757d1a897bef3",
+        "column_index": 2,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 345,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 6,
+            "value_token": "value_01860b7e88331361"
+          },
+          {
+            "count": 6,
+            "value_token": "value_0329d55473384857"
+          },
+          {
+            "count": 6,
+            "value_token": "value_0461a19701f41546"
+          },
+          {
+            "count": 6,
+            "value_token": "value_0590a46a5f07ee56"
+          },
+          {
+            "count": 6,
+            "value_token": "value_060934ef441de9e2"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 9,
+          "mean_character_count": 8.16994633273703
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_6699c9f7e12c4e4f",
+        "column_index": 3,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 3,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 621,
+            "value_token": "value_7b58d2ac542ed34b"
+          },
+          {
+            "count": 549,
+            "value_token": "value_06e74263f19a69c3"
+          },
+          {
+            "count": 507,
+            "value_token": "value_1940d7b23eedd3e6"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 1,
+          "mean_character_count": 1.0
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_aa36f65d61e4cded",
+        "column_index": 4,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 3,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 890,
+            "value_token": "value_7b58d2ac542ed34b"
+          },
+          {
+            "count": 756,
+            "value_token": "value_1940d7b23eedd3e6"
+          },
+          {
+            "count": 31,
+            "value_token": "value_06e74263f19a69c3"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 1,
+          "mean_character_count": 1.0
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_c4216ec3d86659ee",
+        "column_index": 5,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 3,
+        "inferred_kind": "integer",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 622,
+            "value_token": "value_d11015b966c44696"
+          },
+          {
+            "count": 558,
+            "value_token": "value_4b2dd5566bf1eea4"
+          },
+          {
+            "count": 497,
+            "value_token": "value_a9065080f34dc675"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 3.0,
+          "mean": 1.9254621347644592,
+          "median": 2.0,
+          "minimum": 1.0,
+          "q1": 1.0,
+          "q3": 3.0,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 0.813696435733861
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_79e4b2a50b6d5027",
+        "column_index": 6,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 1157,
+        "inferred_kind": "numeric",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 4,
+            "value_token": "value_3a0e63db85737716"
+          },
+          {
+            "count": 4,
+            "value_token": "value_47e70991a0e1ad6b"
+          },
+          {
+            "count": 4,
+            "value_token": "value_ed10cd80404ff683"
+          },
+          {
+            "count": 3,
+            "value_token": "value_79a869ddc8ce657f"
+          },
+          {
+            "count": 2,
+            "value_token": "value_01599046bcc8d740"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 0.983119425321678,
+          "mean": 0.34173074500134415,
+          "median": 0.3237433241008752,
+          "minimum": 0.0056334713578265,
+          "q1": 0.2655532267816314,
+          "q3": 0.42580432218966635,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 0.12108703682170086
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_a9cbb5685e4248f0",
+        "column_index": 7,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 1156,
+        "inferred_kind": "numeric",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 4,
+            "value_token": "value_1f8be9f500e28af9"
+          },
+          {
+            "count": 4,
+            "value_token": "value_34394a9569191c3b"
+          },
+          {
+            "count": 4,
+            "value_token": "value_380c68fd3793cf3d"
+          },
+          {
+            "count": 3,
+            "value_token": "value_7cb0cd51123e3c36"
+          },
+          {
+            "count": 2,
+            "value_token": "value_00023b7ba28d82ff"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 1.9568605252123001,
+          "mean": 0.6931252552011068,
+          "median": 0.7017120793795534,
+          "minimum": 0.00043908553788231603,
+          "q1": 0.5124506499910318,
+          "q3": 0.8332584984121182,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 0.255188690121696
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_c02c85fb78452059",
+        "column_index": 8,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 1157,
+        "inferred_kind": "numeric",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 4,
+            "value_token": "value_05fcc5d4e9b3c845"
+          },
+          {
+            "count": 4,
+            "value_token": "value_3d14c1d3d95e8ff9"
+          },
+          {
+            "count": 4,
+            "value_token": "value_f5f9bb457c304010"
+          },
+          {
+            "count": 3,
+            "value_token": "value_df04e47425b74dfe"
+          },
+          {
+            "count": 2,
+            "value_token": "value_00456e4194730fa8"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 5.179029444632054,
+          "mean": 1.1461558590583552,
+          "median": 1.1506845681296562,
+          "minimum": 0.017024675551415343,
+          "q1": 0.8845465271716303,
+          "q3": 1.347530910070214,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 0.4334928519031379
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_e26dad4911933add",
+        "column_index": 9,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 2,
+        "inferred_kind": "boolean",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 1055,
+            "value_token": "value_8b45d9341722f5af"
+          },
+          {
+            "count": 622,
+            "value_token": "value_34b9a6ba8bb87018"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 5,
+          "mean_character_count": 4.629099582587955
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_b007f0cd736f2a8c",
+        "column_index": 10,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 2,
+        "inferred_kind": "boolean",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 1180,
+            "value_token": "value_34b9a6ba8bb87018"
+          },
+          {
+            "count": 497,
+            "value_token": "value_8b45d9341722f5af"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 5,
+          "mean_character_count": 4.296362552176506
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_af84638cc2c6884c",
+        "column_index": 11,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 1,
+        "inferred_kind": "boolean",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 1677,
+            "value_token": "value_34b9a6ba8bb87018"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 4,
+          "mean_character_count": 4.0
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_514a213316158cda",
+        "column_index": 12,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 1154,
+        "inferred_kind": "numeric",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 4,
+            "value_token": "value_a190485525bc5734"
+          },
+          {
+            "count": 4,
+            "value_token": "value_e8d26da280a92110"
+          },
+          {
+            "count": 4,
+            "value_token": "value_f1c3b03e52097763"
+          },
+          {
+            "count": 3,
+            "value_token": "value_6947e133237b55c4"
+          },
+          {
+            "count": 3,
+            "value_token": "value_79a869ddc8ce657f"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 0.9863654301139902,
+          "mean": 0.4635156228747166,
+          "median": 0.4416606018162477,
+          "minimum": 0.33631284916201115,
+          "q1": 0.3986766899923499,
+          "q3": 0.49186937480471254,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 0.1009987175980972
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_d933933b9948d293",
+        "column_index": 13,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 1154,
+        "inferred_kind": "numeric",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 4,
+            "value_token": "value_179628286b4badf9"
+          },
+          {
+            "count": 4,
+            "value_token": "value_cb4b76bc044e4668"
+          },
+          {
+            "count": 4,
+            "value_token": "value_cd229629f21d1336"
+          },
+          {
+            "count": 3,
+            "value_token": "value_4507ed46af9e21fe"
+          },
+          {
+            "count": 3,
+            "value_token": "value_66debe7f86da5cd8"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 0.9964478552711562,
+          "mean": 0.7600910841699466,
+          "median": 0.7525354792161772,
+          "minimum": 0.6681564245810057,
+          "q1": 0.7238545715997741,
+          "q3": 0.7783591363479856,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 0.05243531352261567
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_29ac8a4bc0080c2c",
+        "column_index": 14,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 7,
+        "inferred_kind": "integer",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 859,
+            "value_token": "value_4b2dd5566bf1eea4"
+          },
+          {
+            "count": 429,
+            "value_token": "value_d11015b966c44696"
+          },
+          {
+            "count": 274,
+            "value_token": "value_a9065080f34dc675"
+          },
+          {
+            "count": 62,
+            "value_token": "value_a0e95fe33f7fbd67"
+          },
+          {
+            "count": 26,
+            "value_token": "value_63045a028b75cba5"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 7.0,
+          "mean": 2.114490161001783,
+          "median": 2.0,
+          "minimum": 1.0,
+          "q1": 1.0,
+          "q3": 2.0,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 1.0664155743704873
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_51e7f51cb85465cd",
+        "column_index": 15,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 3,
+        "inferred_kind": "integer",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 747,
+            "value_token": "value_92d90a97fa8bceb8"
+          },
+          {
+            "count": 612,
+            "value_token": "value_8c03bf0d6ca9c4b3"
+          },
+          {
+            "count": 318,
+            "value_token": "value_060a1e4b24d5e290"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_aggregates": {
+          "count": 1677,
+          "maximum": 26102.0,
+          "mean": 26099.8533094812,
+          "median": 26101.0,
+          "minimum": 26098.0,
+          "q1": 26098.0,
+          "q3": 26101.0,
+          "quantile_sample_count": 512,
+          "quantiles_from_bounded_sample": true,
+          "sample_standard_deviation": 1.6986436629805022
+        },
+        "numeric_parse_count": 1677,
+        "text_parse_count": 0
+      },
+      {
+        "column_id": "column_d8c832522e5f0ef3",
+        "column_index": 16,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 4,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 1074,
+            "value_token": "value_855047c952313c30"
+          },
+          {
+            "count": 372,
+            "value_token": "value_63da7b6e3caa6f25"
+          },
+          {
+            "count": 150,
+            "value_token": "value_5d81f570eb2e2388"
+          },
+          {
+            "count": 81,
+            "value_token": "value_235b8cbf686d5952"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 8,
+          "mean_character_count": 6.209302325581396
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_05ecdb9d6df43df8",
+        "column_index": 17,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 2,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 1071,
+            "value_token": "value_bbb46117b934b929"
+          },
+          {
+            "count": 606,
+            "value_token": "value_dbc5c54997d8783f"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 6,
+          "mean_character_count": 6.0
+        },
+        "text_parse_count": 1677
+      },
+      {
+        "column_id": "column_fce0f19d75e3bf55",
+        "column_index": 18,
+        "distinct_count_is_lower_bound": false,
+        "distinct_value_count_or_lower_bound": 162,
+        "inferred_kind": "text",
+        "missing_count": 0,
+        "missing_fraction": 0.0,
+        "most_frequent_value_tokens": [
+          {
+            "count": 102,
+            "value_token": "value_1e4d5495577ec49f"
+          },
+          {
+            "count": 78,
+            "value_token": "value_e8e052ced5b2579c"
+          },
+          {
+            "count": 60,
+            "value_token": "value_250709b40c20b667"
+          },
+          {
+            "count": 42,
+            "value_token": "value_578e8404583344a4"
+          },
+          {
+            "count": 42,
+            "value_token": "value_dca381cb9126139a"
+          }
+        ],
+        "non_missing_count": 1677,
+        "numeric_parse_count": 0,
+        "text_aggregates": {
+          "count": 1677,
+          "maximum_character_count": 20,
+          "mean_character_count": 20.0
+        },
+        "text_parse_count": 1677
+      }
+    ],
+    "duplicate_row_count_in_scanned_rows": 0,
+    "duplicate_tracking_truncated": false,
+    "identifier_redaction": "tokenized",
+    "limitations": [
+      "Dtypes are inferred from scanned text and are not a data dictionary.",
+      "Quantiles use a deterministic bounded sample when numeric counts exceed the sample limit.",
+      "Duplicate counts use exact hashes only until the documented tracking cap."
+    ],
+    "missing_code_policy": {
+      "additional_token_count": 1,
+      "empty_or_whitespace_is_missing": true,
+      "tokens_are_not_emitted": true
+    },
+    "profile_type": "tabular_schema_and_aggregate_profile",
+    "raw_values_emitted": false,
+    "row_limit_reached": false,
+    "rows_scanned": 1677
+  },
+  "capability": {
+    "dependency": "Python standard library",
+    "depth": "bounded schema, aggregate profile, missingness, and sensitivity audit",
+    "format": "CSV",
+    "reference": "references/general_scientific_formats.md",
+    "suffix": ".csv",
+    "tier": "automated_core"
+  },
+  "schema_version": "1.1",
+  "security": {
+    "embedded_instructions_followed": false,
+    "file_text_is_untrusted_data": true,
+    "local_only": true,
+    "raw_values_and_full_paths_emitted": false
+  }
+}

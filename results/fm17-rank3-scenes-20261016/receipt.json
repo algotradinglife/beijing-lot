@@ -1,0 +1,47 @@
+{
+  "mode": "POSTHOC_FROZEN_FINAL_RANK3_EDA",
+  "summary": {
+    "n": 345,
+    "rank3_hits": 95,
+    "mean_p3": 0.245,
+    "actual_rank3_rate": 0.2754,
+    "before_tail_rank3": 101,
+    "already_third": 82,
+    "tail_new_third": 13,
+    "tail_rescued": 19
+  },
+  "sources": {
+    "fixtures": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-top1-calibration-20261016/fixtures.csv",
+    "forecast": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-three-issues-20261013/forecasts.rds",
+    "labels": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-three-issues-20261013/labels.csv",
+    "coverage": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-event-types-20261015/coverage.csv",
+    "sp": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fundamental-beidan-history-20261011/analysis-20261011T024028.510576Z/selected-sp.csv"
+  },
+  "source_hashes": {
+    "fixtures": "687a6bcf5342b6338c9827334c4383fdf6599f2a7a7906e296a00e2f19737fd7",
+    "forecast": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "labels": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e",
+    "coverage": "678dc4d670e3befc804e247cfc7b74fe0af8741b1fa58bdf8541b62495add593",
+    "sp": "f29da4a474382b78912635c9ee53790bd33c7064a0dbbed1491cc3ce3c3ea1da"
+  },
+  "client_sha256": "79c52601cd69ec969697780e97bc996a8fc352e17b1ec2b5053206824143581f",
+  "output_hashes": {
+    "fixtures": "e8ceef1e24002d76088bea50ee9aa37ba70ccdd89b222497f22f1ce3454dceb5",
+    "strata": "f587d74d59d7afe1b2a1a753efa2d925b2ed39e5f17e80aeac1e349a6c9b6225",
+    "transitions": "f715116f15990fa427a63a61f269b309cfe251c0e43c2942ab82416d00a0b282",
+    "market_cross": "9dbbd8858bff119588f20481dcde6b393b6962b5ff12814f25440c97c1b16864",
+    "source_type": "b6857df507dd992186f7255f88ca5c2a4fbb1500f79d6407b608752676acf2ab",
+    "cases": "e9dec94769c671173814ee90a01e8b177d478b282a4f634a8e5442a1d8fa30df",
+    "market_signal": "6f032a378d3afeb24bbaa396a06440fb6ed5b515f7985679c1a23adf7867a6f8"
+  },
+  "cutoff_governance": "No new fit, threshold, selection or routing; preserve original cutoff_utc and frozen rank tie order. Source historical proxies remain diagnostic-only.",
+  "runtime": {
+    "R": "4.6.1",
+    "tidyverse": "2.0.0",
+    "dplyr": "1.2.1",
+    "readr": "2.2.0"
+  },
+  "case_rule": "Posthoc lowest-p3 example per realized goal-difference scene; not independent evidence.",
+  "missingness": "same_cutoff BD missing for 131 fixtures (not imputed); near_sale BD complete; quote-row absence denotes frozen ledger absence, not universal market absence.",
+  "generated_at": "2026-10-16 15:47:11 UTC"
+}

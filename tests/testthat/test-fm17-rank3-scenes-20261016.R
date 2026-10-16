@@ -1,0 +1,65 @@
+testthat::test_that("third-ranked scene diagnosis preserves denominators, mappings and frozen ranks", {
+  root <- rprojroot::find_root(rprojroot::has_file("AGENTS.md"))
+  out <- tempfile("rank3-scenes-")
+  log <- tempfile()
+  status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(file.path(root,
+    "r/fm17_rank3_scenes.R"), root, out)),
+    env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))), stdout = log, stderr = log)
+  testthat::expect_equal(status, 0L, info = paste(readLines(log), collapse = "\n"))
+  f <- readr::read_csv(file.path(out, "fixtures.csv"), show_col_types = FALSE)
+  s <- readr::read_csv(file.path(out, "strata.csv"), show_col_types = FALSE)
+  t <- readr::read_csv(file.path(out, "transitions.csv"), show_col_types = FALSE)
+  c <- readr::read_csv(file.path(out, "market_cross.csv"), show_col_types = FALSE)
+  testthat::expect_s3_class(f, "tbl_df")
+  testthat::expect_equal(nrow(f), 345L)
+  testthat::expect_equal(sum(f$rank3_hit), 95)
+  testthat::expect_false(anyDuplicated(f$fixture_id) > 0)
+  testthat::expect_equal(sum(f$actual_outcome[f$rank3_hit] == "D"), 54)
+  testthat::expect_equal(sum(f$rank3_hit & f$goal_difference_case == "giving_side_win_exact_handicap"), 37)
+  testthat::expect_equal(sum(f$rank3_hit & f$goal_difference_case == "zero_handicap_away_win"), 27)
+  testthat::expect_equal(sum(f$rank3_hit & f$goal_difference_case == "zero_handicap_actual_draw"), 17)
+  testthat::expect_equal(sum(f$rank3_hit & f$actual_margin_in_core), 88)
+  testthat::expect_equal(sum(f$before_actual_rank == 3 & f$rank3_hit), 82)
+  testthat::expect_equal(sum(f$before_actual_rank == 2 & f$rank3_hit), 13)
+  testthat::expect_equal(sum(f$before_actual_rank == 3 & !f$rank3_hit), 19)
+  testthat::expect_equal(sum(t$n), 345)
+  testthat::expect_equal(sum(c$n[c$comparison == "same_cutoff"]), 214)
+  testthat::expect_equal(sum(c$n[c$comparison == "near_sale"]), 345)
+  testthat::expect_equal(sum(is.na(f$same_cutoff_bd_actual_rank)), 131)
+  testthat::expect_equal(sum(f$rank3_hit & f$near_sale_bd_actual_rank == 3), 56)
+  testthat::expect_equal(sum(f$rank3_hit & f$near_sale_bd_actual_rank == 1), 7)
+  testthat::expect_true(all(f$p3 <= f$probability_2))
+  testthat::expect_true(all(f$gap23 >= 0))
+  testthat::expect_true(all(is.na(s$calibration_gap[s$dimension %in% c(
+    "goal_difference_case", "model_direction_reversed", "actual_margin_in_core")])))
+  testthat::expect_equal(sum(f$rank3_hit & f$p3 >= .2), 86)
+  testthat::expect_true(all(abs(f$p1 + f$probability_2 + f$p3 - 1) < 1e-8))
+  testthat::expect_equal(f$near_sale_bd_top1_is_fm_third, f$near_sale_bd_predicted_outcome == f$outcome_3)
+  testthat::expect_equal(f$near_sale_bd_probability_fm_third[f$rank3_hit], f$near_sale_bd_actual_probability[f$rank3_hit], tolerance = 1e-12)
+  for (d in unique(s$dimension)) {
+    z <- dplyr::filter(s, dimension == d)
+    testthat::expect_equal(sum(z$n), 345)
+    testthat::expect_equal(sum(z$rank3_hits), 95)
+  }
+  r <- jsonlite::fromJSON(file.path(out, "receipt.json"))
+  testthat::expect_equal(length(names(r$output_hashes)), 7L)
+  for (n in names(r$output_hashes)) testthat::expect_equal(
+    digest::digest(file = file.path(out, paste0(n, ".csv")), algo = "sha256"), r$output_hashes[[n]])
+  testthat::expect_equal(r$summary$rank3_hits, 95)
+})
+
+testthat::test_that("modified frozen input fails before creating output", {
+  root <- rprojroot::find_root(rprojroot::has_file("AGENTS.md"))
+  sandbox <- tempfile("rank3-bad-source-")
+  dir.create(file.path(sandbox, "results/fm17-top1-calibration-20261016"), recursive = TRUE)
+  for (name in c("receipt.json", "fixtures.csv")) file.copy(
+    file.path(root, "results/fm17-top1-calibration-20261016", name),
+    file.path(sandbox, "results/fm17-top1-calibration-20261016", name))
+  cat("tampered", file = file.path(sandbox, "results/fm17-top1-calibration-20261016/fixtures.csv"), append = TRUE)
+  out <- file.path(sandbox, "output")
+  log <- tempfile()
+  status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(file.path(root, "r/fm17_rank3_scenes.R"), sandbox, out)),
+    env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))), stdout = log, stderr = log)
+  testthat::expect_true(status != 0L)
+  testthat::expect_false(dir.exists(out))
+})

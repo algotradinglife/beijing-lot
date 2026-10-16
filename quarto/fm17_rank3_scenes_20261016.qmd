@@ -1,0 +1,160 @@
+---
+title: "完整FM17的第三赛果：场景、漏保与尾部前后"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  output_directory: "results/fm17-rank3-scenes-20261016"
+  acceptance_required: true
+---
+
+本报告研究26098、26101、26102三期 **FM-1.7.0最终概率**的第三名实际发生，即Top2未覆盖。不是比分第三档、也不是原生λ单独预测；对手归一化实验未进入正式版本。冻结流程含原生／市场来源审查与切换、apply／retain尾部裁决、最终北单让球投影。阵容、战意等信息不保证逐场补齐，不能把流程版本等同于所有维度充分执行。
+
+**95/345场第三名实际发生（27.54%），其中大部分不是极低概率尾部或受让方爆冷，而是让平及零让球下的方向偏差。** 本轮只描述场景，不修改模型，不生成反向下注／保护规则。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+out <- file.path(root, params$output_directory)
+dir.create(out, recursive = TRUE, showWarnings = FALSE)
+log <- file.path(out, "qmd-execution.log")
+status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(file.path(root, "r/fm17_rank3_scenes.R"), root, out)),
+  env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))), stdout = log, stderr = log)
+if (status != 0L) stop(paste(readLines(log), collapse = "\n"))
+receipt <- jsonlite::fromJSON(file.path(out, "receipt.json"))
+stopifnot(length(names(receipt$output_hashes)) == 7L)
+for (name in names(receipt$output_hashes)) stopifnot(
+  digest::digest(file = file.path(out, paste0(name, ".csv")), algo = "sha256") == receipt$output_hashes[[name]])
+facts <- read_csv(file.path(out, "fixtures.csv"), show_col_types = FALSE)
+strata <- read_csv(file.path(out, "strata.csv"), show_col_types = FALSE)
+transitions <- read_csv(file.path(out, "transitions.csv"), show_col_types = FALSE)
+market_cross <- read_csv(file.path(out, "market_cross.csv"), show_col_types = FALSE)
+signals <- read_csv(file.path(out, "market_signal.csv"), show_col_types = FALSE)
+cases <- read_csv(file.path(out, "cases.csv"), show_col_types = FALSE)
+```
+
+## 范围、字典和探索边界
+
+观察单位是已结算比赛，每场一行，345个唯一fixture_id；95场Top2漏保；不是对95场单独拟合。较晚SP完整345场，同截止214场，另131场同截止缺失保留NA。名单347场中无截止的26098#135无预测，#102取消不评分，沿用原排除。按期号重复展示同一场的前后阶段，不把重复行当独立样本。
+
+字典：W/D/L指主队北单让胜／让平／让负；有符号让球h和主队净胜球m按m+h正／零／负映射，h不是独立实力测量。p1/p2/p3为最终三类概率按降序排名，W,D,L打破并列；gap23=p2−p3，单位为概率点比例，0.02=2个百分点。排名third不代表冷门，也不等于净胜球分布外围。比分和整数让球是赛后事实／结算合同；base_expected_margin为选用来源的尾部前比分网格均值，model_direction_reversed表示该均值方向与实际净胜球相反，实际平局不计反向。
+
+来源、赛事类别、让球、最终概率、gap及冻结盘口分歧可作为历史赛前描述；比分场景、方向反转、实际净胜球是否在核心中均要打开赛果才知道，**只能事后归因，不能当选场特征**。对这些赛后分组不报告所谓校准差。所有分箱提前固定在客户端，未搜索“最优”分箱；不做p值、显著性、置信区间或确认性推断，也不多重扫描寻找最佳门槛。
+
+输入CSV与预测RDS来自上轮已验收产物，核验已存SHA256；RDS属于项目专用格式，由beidan流程的R客户端使用，不交给通用EDA解析器。`exploratory-data-analysis`在此仅用于已授权根目录内CSV的有界格式清单／脱敏结构profile（不推断足球含义）；核心统计仍遵守项目R/tibble/Quarto合同。通用profile输入1677行（三模型、两时点），不是1677场，全部扫描、无截断；缺失NA显式传入。原数据不改写，缺失盘口不填0，原始评分／源快照不覆盖。
+
+输入表唯一键、类型：冻结fixtures为comparison/model/fixture_id，probabilities为fixture_id/model/outcome，labels和coverage为fixture_id；连接显式一对一／多对一。ID、来源、类别及UTC截止文本为character，rank/goal/count为integer，概率double、命中logical。验证原有截止，SP报价严格早于selection_cutoff和开赛，同截止模式selection_cutoff等于原fixture cutoff。无时点推断，无拟合／阈值选择／新路由，无新增历史学习缓存；原历史页面时间代理和已知赛果的限制不变。
+
+## 第三名究竟是哪一类赛果
+
+```{r}
+knitr::kable(strata |> filter(dimension %in% c("outcome_3", "event_type", "selected_source", "handicap_group", "issue_id")),
+  digits = 4, caption = "完整分母、第三名实际发生次数及比例；不能只看95场的占比")
+```
+
+95场中实际让平54场（56.8%）、让负28场、让胜13场。第三名本身为让平的比赛共197场，实际发生54场（27.4%）；故不能仅凭54场就断言所有平局被系统性低估。
+
+按实际比分和让球拆解，下面各场景互斥且完整覆盖345场。它们是赛后标签，不能提前据此选择保护。
+
+```{r}
+knitr::kable(strata |> filter(dimension == "goal_difference_case") |>
+  select(stratum, n, rank3_hits, rank3_rate, share_of_95), digits = 4,
+  caption = "让球方／受让方由北单h定义，不等于独立强弱；赛后场景仅作描述")
+```
+
+主要漏保为：让球方恰好赢到让球数37场；零让球客胜27场、零让球平局17场、零让球主胜8场；让球方超过让球数6场。非零让球中，受让方实际赢球16场、实际平局26场，在本批没有出现“最终第三名命中”，但这不等于这种风险为零或可以放弃保护。
+
+## 概率与第二／第三名间距
+
+```{r}
+knitr::kable(strata |> filter(dimension %in% c("p3_band", "gap23_band", "top1_band")), digits = 4,
+  caption = "预设概率分箱；不从本结果选择阈值")
+strata |> filter(dimension == "gap23_band") |>
+  ggplot(aes(stratum, rank3_rate)) + geom_col(fill = "#377c9e") +
+  geom_text(aes(label = paste0(rank3_hits, "/", n)), vjust = -.4) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, .4)) +
+  labs(x = "第二名−第三名概率差（0.02=2个百分点）", y = "第三名实际发生率",
+    caption = "完整组分母；描述性比较，未选择保护门槛") + theme_minimal()
+```
+
+平均p3=24.50%，实际27.54%，平均低估约3.03个百分点。95场中86场的p3至少20%，仅9场在10%—20%，低于10%的共5场、没有发生。**绝大部分第三名并非模型认为极不可能的结果。**
+
+第二／第三差距不足2个百分点91场，第三名发生24场（26.4%）；差2—5个百分点114场，发生37场（32.5%）；差5—10个百分点89场，发生22场（24.7%）；差至少10个百分点51场，发生12场（23.5%）。没有单调关系，不支持简单“只保护最接近第二名的第三名”。差不足5个百分点的205场贡献61次漏保，也包含大量未漏保场次。
+
+## 来源与赛事：Top1差异不等于Top2差异
+
+原生117场第三名发生32次（27.4%），市场来源228场63次（27.6%），几乎相同；此前原生Top1较差，并不能直接推出它更容易出现Top3。因此研究保护时应看Top2漏保，与主选命中分开。
+
+联赛59/193（30.6%）、国家队27/84（32.1%）、杯赛4/25（16.0%）、青年5/43（11.6%）。这些比例受三期赛事构成、来源路由、让球分布影响；不代表长期赛事风险排序。具体联赛全部列出，不只挑最差者；小于10场的单联赛不能据此制定规则。
+
+```{r}
+knitr::kable(read_csv(file.path(out, "source_type.csv"), show_col_types = FALSE), digits = 4,
+  caption = "赛事×来源联合分母：检查来源与赛事构成混杂")
+knitr::kable(strata |> filter(dimension == "league"), digits = 4,
+  caption = "所有来源赛事，含稀疏和零发生；探索性，不构成联赛黑名单")
+```
+
+## 尾部是否制造第三名
+
+```{r}
+knitr::kable(transitions, caption = "实际赛果从尾部前排名到最终排名的完整转移")
+knitr::kable(strata |> filter(dimension %in% c("actual_margin_in_core", "model_direction_reversed", "market_evidence")),
+  digits = 4, caption = "实际核心／反向为事后描述；冻结盘口证据为历史赛前代理")
+```
+
+尾部前第三名实际发生101场，最终95场。82场始终第三，13场由第二掉到第三，19场由第三抬入前二，净减少6场漏保。没有由第一直接掉第三。**尾部不是多数漏保的起点，但13场局部负贡献必须保留。**
+
+95场中88场的实际净胜球仍在累计90%核心内，仅7场在外围；这证明“第三赛果”与“被压缩的净胜球尾部”是两个概念，不能把95场统称极端尾部风险。核心成员由比分分布定义，投影后的北单类别仍可能排第三。
+
+## 市场能否识别这些第三名
+
+```{r}
+knitr::kable(market_cross, caption = "FM实际排名×北单实际排名；同截止与较晚SP分开")
+knitr::kable(signals, digits = 4,
+  caption = "历史报价Top1是否等于FM第三名：使用完整准入组分母，不只挑已发生场次")
+```
+
+95场FM漏保中，较晚北单也排第三56场，排第二32场，排第一仅7场。这说明简单改用北单Top1只能覆盖少部分这批漏保，不能据此保证套利。同截止有64场FM漏保可比较，其中北单排第一10场、第二23场、第三31场；另外31场FM漏保无同截止报价（整个345场有131场缺失），不能混用分母或补造报价。
+
+signals表进一步按报价本身的分歧定义分组：北单Top1是否为FM第三名，不使用实际赛果划分。较晚报价含更多信息，仅作诊断，不能搬回T−24h决策；同截止分歧也未在独立新期验证，不能据此优化保护掩码。
+
+## 代表场景（事后例证）
+
+为避免只报一个最差案例，按每个实际场景取p3最小的一场（固定、事后展示规则），不把它当独立证据。完整95场可由fixtures.csv的rank3_hit筛得，原始完整分母保留。
+
+```{r}
+knitr::kable(cases |> select(fixture_id, league, home, away, handicap, score, ranked_order,
+  probability_1, probability_2, p3, before_actual_rank, goal_difference_case,
+  selected_source, near_sale_bd_actual_rank), digits = 4,
+  caption = "W/D/L均为北单让球类别；非普通胜平负，除非h=0")
+```
+
+例如26101#81赫德—奥德，主+1、实际2–3，实际让平排第三（18.60%），尾部前已第三；属于“让球方刚好赢到让球数”。26101#98八户云罗里—横滨FC，主+1、实际0–2，FM让负第三（14.31%），较晚北单却排第一，是确有市场分歧的例子。26102#60苏格兰—斯洛文，零让球、实际1–2，客胜第三（15.26%），较晚北单也排第三，是双方共同漏保，不能只归因于未用盘口。
+
+## 可用结论与边界
+
+优先研究“让平质量与零让球方向”的识别，而不是默认第三名等于弱方爆冷；保护组需要比较第三名与被换掉的第二名，不能只看p3绝对大小。当前gap23和p3没有给出简单、单调的事前识别规律，因此本轮不新增三选／切换阈值、不指定推荐保护场、不计算串关收益。
+
+已知赛果历史诊断、三期样本、定性缺口和来源时间代理不变；赛后场景有标签依赖，不能用于训练前瞻规则。比分口径未全部独立核实为90分钟。假设家族为本报告15个预设维度及两个时点市场分歧，未做显著性检验或多重比较挑选；若以后变为下注规则，必须在截止前共享temporal_learning历史窗口学习并冻结，独立新期检验。
+
+## 验证、重放和审查
+
+客户端无新项目函数或新增依赖。`tests/testthat/test-fm17-rank3-scenes-20261016.R`覆盖全部345／95、每维分母、54让平／37正好到线、尾部82／13／19、同截止缺失、北单分歧概率、哈希JSON往返、修改冻结输入拒绝且不写输出。使用R4.6.1与既有tidyverse，Rscript入口为`r/fm17_rank3_scenes.R ROOT OUTPUT`；依赖版本记录receipt。未运行存在已记录旧客户端漂移的全仓tests/testthat.R，不声称全仓通过。无新Rcpp／包代码，不重复包安装。
+
+```{r}
+if (isTRUE(params$acceptance_required)) {
+  acceptance <- jsonlite::fromJSON(file.path(out, "acceptance.json"), simplifyVector = FALSE)
+  stopifnot(acceptance$status == "ACCEPTED", acceptance$blocking_findings == 0L)
+  for (file in acceptance$files) stopifnot(
+    digest::digest(file = file.path(root, file$path), algo = "sha256") == file$sha256)
+  knitr::kable(bind_rows(acceptance$checks), format = "html", escape = TRUE,
+    caption = "实际本地检查、独立重放和Codex审查；绑定最终文件哈希")
+} else cat("预览，尚非最终验收。\n")
+knitr::kable(tibble(source = names(receipt$source_hashes), sha256 = unlist(receipt$source_hashes)),
+  caption = "输入快照身份；输出哈希与原截止记录在receipt和fixtures")
+```

@@ -1,0 +1,50 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "r/fm17_rank3_scenes.R",
+      "sha256": "79c52601cd69ec969697780e97bc996a8fc352e17b1ec2b5053206824143581f"
+    },
+    {
+      "path": "tests/testthat/test-fm17-rank3-scenes-20261016.R",
+      "sha256": "74272e0d638778cf01ac941f153a4a74ce9fc11b650bda9d4da91c289b746ca2"
+    },
+    {
+      "path": "quarto/fm17_rank3_scenes_20261016.qmd",
+      "sha256": "225620516c4956330554a719af7126d8082de3cc0afac0a357cd3a55b860fad1"
+    }
+  ],
+  "checks": [
+    {
+      "check": "R client integration and tamper regression",
+      "command": "Rscript -e testthat::test_file(tests/testthat/test-fm17-rank3-scenes-20261016.R,stop_on_failure=TRUE)",
+      "result": "67 assertions pass; zero failures/errors"
+    },
+    {
+      "check": "Independent replay",
+      "command": "Rscript r/fm17_rank3_scenes.R ROOT OUTPUT",
+      "result": "Seven CSV outputs byte-identical; source and client identity equal"
+    },
+    {
+      "check": "CSV profile scope",
+      "command": "EDA capability_manifest.py inspect; tabular_profile.py --max-rows 100000 --missing-token NA",
+      "result": "1677 input rows fully scanned; no truncation; only aggregate redacted profile, no row values"
+    },
+    {
+      "check": "Initial codex review",
+      "command": "codex review scoped prompt; review.log",
+      "result": "No blockers, 65 assertions independently rerun"
+    },
+    {
+      "check": "Final codex review",
+      "command": "codex review scoped prompt; review-final.log",
+      "result": "No code blockers, 67 assertions independently rerun; final QMD gate render is next separate local check"
+    },
+    {
+      "check": "Clean acceptance render",
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm17_rank3_scenes_20261016.qmd --no-cache",
+      "result": "12 nonempty tables, one figure, no execution errors, SHA acceptance gate passed"
+    }
+  ]
+}
