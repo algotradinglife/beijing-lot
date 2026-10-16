@@ -1,0 +1,28 @@
+# A tibble: 8 × 14
+  comparison  dimension stratum model                       n hits1 hits2  top1
+  <chr>       <chr>     <chr>   <chr>                   <int> <int> <int> <dbl>
+1 same_cutoff all       ALL     BEIDAN_T24                214    71   149 0.332
+2 same_cutoff all       ALL     FM-1.7.0                  214    81   150 0.379
+3 same_cutoff all       ALL     FM-1.8.0-alpha.1          214    64   153 0.299
+4 same_cutoff all       ALL     FM17-source-before-tail   214    80   143 0.374
+5 near_sale   all       ALL     BEIDAN_LATER              345   130   244 0.377
+6 near_sale   all       ALL     FM-1.7.0                  345   131   250 0.380
+7 near_sale   all       ALL     FM-1.8.0-alpha.1          345   106   239 0.307
+8 near_sale   all       ALL     FM17-source-before-tail   345   129   244 0.374
+   top2  top3 rank2 rank3 brier logloss
+  <dbl> <dbl> <dbl> <dbl> <dbl>   <dbl>
+1 0.696     1 0.364 0.304 0.780    1.34
+2 0.701     1 0.322 0.299 0.683    1.12
+3 0.715     1 0.416 0.285 0.681    1.12
+4 0.668     1 0.294 0.332 0.685    1.12
+5 0.707     1 0.330 0.293 0.670    1.10
+6 0.725     1 0.345 0.275 0.683    1.12
+7 0.693     1 0.386 0.307 0.686    1.13
+8 0.707     1 0.333 0.293 0.683    1.12
+# A tibble: 4 × 5
+  model                       n draw_top1_count draw_top1_hits missed_draws_top2
+  <chr>                   <int>           <int>          <int>             <int>
+1 BEIDAN_LATER              345               8              0                50
+2 FM-1.7.0                  345               5              3                54
+3 FM-1.8.0-alpha.1          345             211             61                 0
+4 FM17-source-before-tail   345               0              0                73

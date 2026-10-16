@@ -1,0 +1,121 @@
+---
+title: "FM-1.8.0-alpha.1、FM-1.7.0与纯北单：三期固定规则比较"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  repository_root: ".."
+  output_directory: "results/fm18-three-issues-20261017"
+  acceptance_required: true
+---
+
+本报告比较用户批准的FM-1.8.0-alpha.1、正式FM-1.7.0与纯北单。另保留FM17-source-before-tail为组件对照：它取消尾部但不做让平重权，避免把两个改动混为同一收益。
+
+**三期完整345场不支持升级alpha**：Top1为106/345、Top2为239/345，低于FM17的131/250和较晚北单130/244；Brier/log loss也略差。同截止214场中Top2和整体概率评分略有改善，但Top1明显下降。保留为已登记实验，不据结果修改参数或替换正式版本。
+
+**原生λ取样／对手归一化实验没有整合进来**。alpha继承FM17的同一原生／联合市场来源裁决、λ和ρ，再按已登记规则校正；不重做定性审查、不新增阵容、伤停、战意或对手等级信息。已有完整流程版本不等于逐场这些维度都补齐。正式FM保持不变，不根据本次结果调整规则。
+
+## 冻结、对照和合同
+
+26098、26101、26102完整来源名单347场；无截止26098#135无预测，取消#102仍冻结预测但不评分；346场冻结、345场评分。alpha对全部346场执行，不只对54次已知让平漏保执行。源网格均为尾部前：触发时让平概率是它在净胜球前三档的占比，完整两侧分配剩余质量；不触发维持尾部前网格。边界并列整组纳入，定义保持alpha登记版本不变。
+
+每场显式UTC截止绑定原source网格、fixture、整数北单让球、源证据和传递实现；共享temporal_learning负责证据准入和receipt核验。alpha_input与alpha_code绑定原始输入及导入校验器，cache_key区分cutoff/input/code。先完整冻结，再独立新进程重建346场并逐对象identical，之后评估脚本才读取标签／SP。此前赛果已知、规则由历史复盘启发，故这个程序边界不是独立盲测证据。源可用性仍为历史代理，不能自动取得前瞻准入。
+
+冻结输出forecast artifact含完整比分、前后净胜球、三类概率和共享receipt；预测三行／fixture/model，比分一行／整数主客比分；所有概率为double 0—1且归一。审计一行／fixture，ID/期号字符、cutoff UTC POSIXct、trigger逻辑、让球整数。标签一行／fixture/score/actual_outcome，W/D/L按实际净胜球加有符号北单h映射，沿用原已核验标签，不重新改变比分口径。
+
+纯北单为SP倒数归一化，未乘0.65。same_cutoff用严格早于T−24h的报价且selection_cutoff等于原fixture cutoff；near_sale为较晚赛前SP，不能冒充同截止。共同样本分别214、345，每个模型同一宇宙，另缺131场T−24h报价不补造。Top1/Top2沿用包W,D,L并列排序；Brier是三类平方误差和，log loss用自然对数，均越低越好。只比较预测，不计算票单收益或串关命中概率。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root, mustWork = TRUE)
+out <- file.path(root, params$output_directory)
+manifest <- jsonlite::fromJSON(file.path(out, "manifest.json"))
+replay <- jsonlite::fromJSON(file.path(out, "replay.json"))
+stopifnot(replay$status == "FULL_IDENTICAL_REPLAY", replay$fixtures == 346L,
+  digest::digest(file = file.path(out, "forecasts.rds"), algo = "sha256") == manifest$forecast_sha256)
+log <- file.path(out, "qmd-evaluation.log")
+status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(c(file.path(root, "r/fm18_three_issue_evaluate.R"), root, out)),
+  env = paste0("R_LIBS=", shQuote(paste(.libPaths(), collapse = ":"))), stdout = log, stderr = log)
+if (status != 0L) stop(paste(readLines(log), collapse = "\n"))
+evaluation <- jsonlite::fromJSON(file.path(out, "evaluation.json"))
+for (name in names(evaluation$output_hashes)) stopifnot(
+  digest::digest(file = file.path(out, paste0(name, ".csv")), algo = "sha256") == evaluation$output_hashes[[name]])
+metrics <- read_csv(file.path(out, "metrics.csv"), show_col_types = FALSE)
+draw <- read_csv(file.path(out, "draw_calibration.csv"), show_col_types = FALSE)
+changes <- read_csv(file.path(out, "changes.csv"), show_col_types = FALSE)
+audit <- read_csv(file.path(out, "audit.csv"), col_types = cols(.default = col_guess(), issue_id = col_character()))
+knitr::kable(audit |> count(issue_id, triggered), caption = "完整346场触发覆盖；含取消场，评分另行排除")
+```
+
+## 同场总体及逐期表现
+
+```{r}
+knitr::kable(metrics |> filter(dimension == "all") |> select(comparison, model, n, hits1, hits2, top1, top2, brier, logloss),
+  digits = 6, caption = "共同样本：三模型及不压尾组件对照；两时点分开")
+knitr::kable(metrics |> filter(dimension == "issue") |> select(comparison, stratum, model, n, hits1, hits2, brier, logloss),
+  digits = 6, caption = "逐期全部结果，不只挑改善期")
+metrics |> filter(dimension == "issue", comparison == "near_sale", model != "FM17-source-before-tail") |>
+  ggplot(aes(stratum, top1, colour = model, group = model)) + geom_point() + geom_line() +
+  scale_y_continuous(labels = scales::percent) + labs(x = "期号", y = "Top1命中率", colour = "冻结版本",
+    caption = "同场较晚SP对照；只有三期，连线不是时间趋势推断") + theme_minimal()
+```
+
+## 赛事、来源及触发分层
+
+```{r}
+knitr::kable(metrics |> filter(dimension %in% c("event_type", "source", "trigger", "draw_type")), digits = 5,
+  caption = "预设分层全部列出；来源是FM17路由，不表示北单也有相同路由")
+```
+
+同赛事均值与对手归一化没有加入，因此不能把本表变化归因于它们。原生／市场组比赛不同，也不能仅凭两组命中差推导来源切换的因果效果。触发规则在大部分场次生效，不能把它解释成只对少量失误的补丁。
+
+## 让平概率与选择代价
+
+已评分345场中330场触发。让平被选为Top1的场次从FM17的5场升至alpha的211场，其中命中61场。实际让平110场（31.88%），alpha平均给38.03%，由FM17的低估转为高估。让平二元Brier从0.22201升至0.22819，不能因漏保归零就认为让平概率更准确。
+
+Top2救回54场全部是让平；与此同时丢失让胜42场、让负23场，净少11场。Top1新增58场让平命中，丢失让胜57场、让负26场，净少25场。仅取消尾部的控制组129/244，alpha再变为106/239，说明退步不能全部归因于取消尾部；按前三档相对占比提高让平是另一个主要变化。
+
+```{r}
+knitr::kable(draw |> filter(dimension %in% c("all", "draw_type", "issue")), digits = 6,
+  caption = "让平预测概率、实际发生率和二元Brier；零让球／非零让球分开")
+knitr::kable(read_csv(file.path(out, "draw_selection.csv"), show_col_types = FALSE),
+  caption = "让平主选数量、实际主选命中及Top2漏掉让平数量；排名变化不等于概率校准")
+knitr::kable(changes |> group_by(actual_outcome) |> summarise(n = n(), saved_top1 = sum(saved_top1),
+  lost_top1 = sum(lost_top1), saved_top2 = sum(saved_top2), lost_top2 = sum(lost_top2),
+  mean_brier_delta = mean(brier_delta), .groups = "drop"), digits = 6,
+  caption = "alpha相对FM17：按实际W/D/L列出救回与损失，正Brier差表示退步")
+knitr::kable(changes |> group_by(issue_id) |> summarise(n = n(), saved_top1 = sum(saved_top1),
+  lost_top1 = sum(lost_top1), saved_top2 = sum(saved_top2), lost_top2 = sum(lost_top2), .groups = "drop"),
+  caption = "逐期救回／损失完整账本")
+knitr::kable(changes |> filter(saved_top1 | lost_top1 | saved_top2 | lost_top2) |>
+  select(fixture_id, home, away, league, handicap, actual_outcome, fm_rank, alpha_rank,
+    triggered, saved_top1, lost_top1, saved_top2, lost_top2, brier_delta), digits = 5,
+  caption = "所有排名救回或损失场次，非只展示典型成功")
+```
+
+## 局限与复现
+
+三期已知结果，规则由此前54次漏保研究启发；即使本批改善，也不能宣称新一期稳定优势。α是经验概率变换，不是拟合的发生频率；加强让平可能牺牲正确让胜／让负。Brier/log loss与命中分别评价，二元让平评分改善不自动代表完整三类评分改善。未新增基本面定性信息、对手强度归一化或同赛事取样，未核验全部90分钟比分口径，历史时钟代理与原来源审查的事后性质不变。价格较晚含更多信息；同T−24h缺失使214场不代表完整345场。无串关票序、资金或收益重放。
+
+R4.6.1和既有tidyverse、beidan、reticulate；项目.venv、共享context模块和被登记alpha保持原实现，不运行时安装包。没有新增包函数或学习工具；新客户端只供固定策略重放／评分。传递历史学习库存：AlphaTop3Draw固定专家变换→build_adjustment_evidence_context→共享temporal_learning准入/verify→export；从原冻结来源继承的λ和市场拟合未重训。每场收据随forecasts.rds保存，audit记录cutoff/input/cache/output哈希。
+
+复现顺序：Rscript r/fm18_three_issue_freeze.R ROOT OUT freeze；同入口replay；Rscript r/fm18_three_issue_evaluate.R ROOT OUT；最后QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm18_three_issues_20261017.qmd --no-cache。冻结RDS存在且内容不同则拒绝覆盖。渲染执行评分但不重建预测，预测依赖明确声明并核验，不使用knitr cache/freeze。
+
+tests/testthat/test-fm18-three-issue-comparison.R核对346／345／214、注册alpha触发、原FM和北单已知总数、分层加权对账、救回损失恒等式、全部网格／投影质量、输出哈希与修改冻结结果后拒绝评分且不改旧输出。包alpha算术和截止变异专项复用原验收；不声称全仓旧客户端测试通过。无新Rcpp／包实现，不重复包安装；不参与CI。
+
+```{r}
+if (isTRUE(params$acceptance_required)) {
+  acceptance <- jsonlite::fromJSON(file.path(out, "acceptance.json"), simplifyVector = FALSE)
+  stopifnot(acceptance$status == "ACCEPTED", acceptance$blocking_findings == 0L)
+  for (file in acceptance$files) stopifnot(
+    digest::digest(file = file.path(root, file$path), algo = "sha256") == file$sha256)
+  knitr::kable(bind_rows(acceptance$checks), format = "html", escape = TRUE,
+    caption = "实际执行命令、审查发现／修复与最终实现哈希")
+} else cat("预览，非最终验收。\n")
+knitr::kable(tibble(source = names(evaluation$source_hashes), sha256 = unlist(evaluation$source_hashes)),
+  caption = "源快照身份；候选与重放身份见manifest/replay")
+```

@@ -1,0 +1,5 @@
+model,n,draw_top1_count,draw_top1_hits,missed_draws_top2
+BEIDAN_LATER,345,8,0,50
+FM-1.7.0,345,5,3,54
+FM-1.8.0-alpha.1,345,211,61,0
+FM17-source-before-tail,345,0,0,73

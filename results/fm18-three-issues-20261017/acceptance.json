@@ -1,0 +1,40 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "r/fm18_three_issue_freeze.R",
+      "sha256": "4045687c803dba71bc8b558eb96f0d06dd4933528caff081e5f7489c70161f2f"
+    },
+    {
+      "path": "r/fm18_three_issue_evaluate.R",
+      "sha256": "1fa61ed3401414509050841623a23b799a284825509916386d8d327cc6b64f69"
+    },
+    {
+      "path": "tests/testthat/test-fm18-three-issue-comparison.R",
+      "sha256": "239b434ebbeb5ddc9687d6c5ab83252620f31d346ee01758c65e59c30becde79"
+    },
+    {
+      "path": "quarto/fm18_three_issues_20261017.qmd",
+      "sha256": "9f2ef96c252af0d1c4c6bd76a33a998afbf26fa67c28e87e187e091c746a8f76"
+    }
+  ],
+  "checks": [
+    {
+      "command": "Rscript r/fm18_three_issue_freeze.R ROOT OUT freeze; Rscript r/fm18_three_issue_freeze.R ROOT OUT replay",
+      "result": "346 frozen; FULL_IDENTICAL_REPLAY; cutoff and implementation receipts verified"
+    },
+    {
+      "command": "testthat::test_file(\"tests/testthat/test-fm18-three-issue-comparison.R\", load_helpers=FALSE)",
+      "result": "1085 passed; 0 failed, 0 errors; independent evaluator replay and tamper rejection"
+    },
+    {
+      "command": "codex review scoped FM18 three-issue delivery (full invocation in review.log)",
+      "result": "No concrete blockers found; reviewed four source file hashes below and frozen artifacts; final acceptance rendering checked separately"
+    },
+    {
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm18_three_issues_20261017.qmd --no-cache",
+      "result": "Final acceptance render passed; no execution errors; populated tables and figure verified; rerendered with final evidence"
+    }
+  ]
+}

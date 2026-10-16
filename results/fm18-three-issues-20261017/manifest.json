@@ -1,0 +1,23 @@
+{
+  "model_id": "FM-1.8.0-alpha.1",
+  "fixtures": 346,
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "target_labels_opened_by_client": false,
+  "prior_outcomes_known": true,
+  "forecast_sha256": "7a7d60306a6bb04e9a8b5a370d22cf340305d534ea01276f6050bb363078a567",
+  "parent_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+  "registered_policy_hashes": [
+    {
+      "path": "packages/beidan/R/alpha_top3_draw.R",
+      "sha256": "c54f7346ee5fb7864a5b364a5508813875302e8968ab302d8b05fb84174391b7"
+    },
+    {
+      "path": "config/fundamental-models/FM-1.8.0-alpha.1.json",
+      "sha256": "97d57eed7d3691df55f3f41e65eb8c2a3ed2dce09616da1265e15e2a0168906a"
+    }
+  ],
+  "client_sha256": "4045687c803dba71bc8b558eb96f0d06dd4933528caff081e5f7489c70161f2f",
+  "probabilities_sha256": "3b18b96598ffcda260dc56a6c84c56b0e06b2ce82cbd0ee0aa064c8fa3d3198d",
+  "audit_sha256": "98bb647efc7b91ba59069f2ef429437442cd1606fb208bc85f44c464a42c6958",
+  "generated_at": "2026-10-16 16:17:18 UTC"
+}
