@@ -1,0 +1,25 @@
+{
+  "status": "REVIEWED",
+  "render_exit": 0,
+  "verdict": "The QMD and rendered HTML agree with the hash-bound forecasts and euro snapshots on TV ranking, #308 selection, handicap mapping, lambdas, recent rates, euro normalization, and Top2 coverage. Timing differences and unavailable Asian/totals evidence are clearly distinguished from available euro evidence; the render log shows successful execution.\nThe QMD and rendered HTML agree with the hash-bound forecasts and euro snapshots on TV ranking, #308 selection, handicap mapping, lambdas, recent rates, euro normalization, and Top2 coverage. Timing differences and unavailable Asian/totals evidence are clearly distinguished from available euro evidence; the render log shows successful execution.",
+  "selection": "Maximum total variation between frozen FM171 and observed later prematch BD, labels excluded from selection",
+  "prediction_modified": false,
+  "files": [
+    {
+      "path": "quarto/fm171_26103_case308_20261017.qmd",
+      "sha256": "097abcdb6bf35bd2a1fc5f6bb448dc7e5b6f30942abe0ac8d92a8110824e0130"
+    },
+    {
+      "path": "quarto/fm171_26103_case308_20261017.html",
+      "sha256": "dff717bc03ad54a827abf3889ed6510ee6593aba1c2adf7416f59e4f8cf2fbbd"
+    },
+    {
+      "path": "results/fm171-26103-case308-20261017/render.log",
+      "sha256": "dec556f28f99b27215e464f7004ae7757f5ed93463e9998fbf11d5c3596cd8f7"
+    },
+    {
+      "path": "results/fm171-26103-case308-20261017/review.log",
+      "sha256": "9c2879d154b00707f1f0eece8bfead4073f3653103ee6b86160079c96838ec81"
+    }
+  ]
+}

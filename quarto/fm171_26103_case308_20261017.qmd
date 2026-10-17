@@ -1,0 +1,106 @@
+---
+title: "26103期最大FM—北单概率分歧：#308"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: ".."
+---
+
+本报告使用冻结FM-1.7.1与较晚赛前北单SP，按三类概率的总变差距离（绝对差之和的一半）选最大分歧。筛选不使用赛果。不是同截止回测，也不以单场赛果修改规则。没有新增函数、学习或网络采集；R断言验证输入与映射。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+out <- file.path(root,'results/fm171-26103-draw-20261017')
+stopifnot(digest::digest(file=file.path(out,'native-forecasts.rds'),algo='sha256')=='c22be3e3a9be3c8776c3cbdc96d1c57023901c2879620aa06822cdbd231a1aee',
+ digest::digest(file=file.path(out,'sp-forecasts.rds'),algo='sha256')=='ec420734727eb140190496a03d9c04dcd396661074f91b3ef80d1aa128ccda58',
+ digest::digest(file=file.path(out,'euro-selected.rds'),algo='sha256')=='dbe132c3793be36463d40c8815014709e5160afb760ee4f9f46d66411d9673fa')
+n <- readRDS(file.path(out,'native-forecasts.rds'))
+s <- readRDS(file.path(out,'sp-forecasts.rds'))
+p <- n$probabilities |> filter(model=='FM171') |> select(fixture_id,outcome,fm=probability) |>
+ inner_join(s$probabilities |> filter(model=='BD_LATER_PREMATCH') |> select(fixture_id,outcome,bd=probability),
+            by=c('fixture_id','outcome'),relationship='one-to-one')
+stopifnot(!anyDuplicated(p[c('fixture_id','outcome')]),all(p$fm>=0),all(p$bd>=0))
+ranks <- p |> group_by(fixture_id) |>
+ summarise(tv=sum(abs(fm-bd))/2,fm_top=outcome[which.max(fm)],bd_top=outcome[which.max(bd)],mass_fm=sum(fm),mass_bd=sum(bd),.groups='drop') |>
+ left_join(n$audit |> select(fixture_id,slot,home,away,league,handicap),by='fixture_id',relationship='one-to-one') |>
+ arrange(desc(tv),fixture_id)
+stopifnot(all(abs(ranks$mass_fm-1)<1e-10),all(abs(ranks$mass_bd-1)<1e-10),ranks$fixture_id[1]=='26103:308')
+id <- ranks$fixture_id[1]; e <- n$entries[[id]]
+sp <- s$receipts[[paste(id,'later_prematch')]]$selected
+case <- p |> filter(fixture_id==id) |> left_join(sp |> select(outcome,sp_raw),by='outcome',relationship='one-to-one') |>
+ mutate(赛果=recode(outcome,W='让胜：主队赢2球以上',D='让平：主队赢1球',L='让负：主队不胜'),
+        FM百分比=round(fm*100,2),北单百分比=round(bd*100,2))
+before <- e$native_base$grid |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(before=sum(probability),.groups='drop')
+after <- e$final$grid |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(after=sum(probability),.groups='drop')
+m <- before |> inner_join(after,by='margin',relationship='one-to-one')
+stopifnot(abs(sum(m$after[m$margin>=2])-case$fm[case$outcome=='W'])<1e-10,
+ abs(sum(m$after[m$margin==1])-case$fm[case$outcome=='D'])<1e-10,
+ abs(sum(m$after[m$margin<=0])-case$fm[case$outcome=='L'])<1e-10)
+```
+
+最大的五场（概率差异，而非主选方向差异）：
+
+```{r}
+#| echo: false
+ranks |> head(5) |> select(slot,home,away,league,handicap,tv,fm_top,bd_top) |> knitr::kable(digits=4)
+```
+
+#308阿尔梅里亚—莱加内斯，西乙，北单主让1球。两者Top1均为让负；相差约51个百分点主要是确信程度。若专看Top1方向相反，最大是#263阿德米拉—禾斯贝治。
+
+```{r}
+#| echo: false
+case |> select(赛果,sp_raw,FM百分比,北单百分比) |> knitr::kable(digits=2)
+s$audit |> filter(fixture_id==id) |> select(quote_at,kickoff_at,lead_hours) |> knitr::kable(digits=3)
+```
+
+SP为29.09／46.66／1.05。原始缓存HTML的row_308含同一provider3014110、主客team141/992、polygoal=-1、cansale=true，三项值按胜平负列分别读取。该原文核验已用SHA验证5087864788be793b497b063d040a34d1fb913ab73169720c8fc1b0f7acef77f4。不是倒数归一化算错或明显场次错配，但SP资金定价不等于已标定的赛果概率。SP观察在开赛前23.62小时，比FM截止晚约22分38秒，仍非同截止。
+
+```{r}
+#| echo: false
+e$native$same_support_raw |> knitr::kable(digits=4)
+obs <- e$native$observations |> filter((team_id=='141'&venue=='home')|(team_id=='992'&venue=='away'))
+obs |> group_by(team_id,venue) |>
+ summarise(历史场数=n(),长期场均进球=sum(goals*long_mass)/sum(long_mass),长期场均失球=sum(against*long_mass)/sum(long_mass),
+  近期场数=sum(recent_mass>0),近期场均进球=sum(goals*recent_mass)/sum(recent_mass),近期场均失球=sum(against*recent_mass)/sum(recent_mass),.groups='drop') |>
+ knitr::kable(digits=3)
+```
+
+原生λ主1.886、客0.954，支持主队优势；同赛事同场地历史里主队近期8个主场场均进2球失1.125，客队近期8个客场仅进0.375失1.75。近期8场跨赛季，长期历史更长，未做对手强度归一化；这些是已冻结样本，不把赛后排名、伤停或战意当作已知赛前事实。
+
+```{r}
+#| echo: false
+eu <- readRDS(file.path(out,'euro-selected.rds')) |> filter(fixture_id==id,tied_vectors==1L) |>
+ mutate(W=1/odds_home,D=1/odds_draw,L=1/odds_away,mass=W+D+L,across(c(W,D,L),~.x/mass))
+stopifnot(nrow(eu)==3L)
+eu |> select(company_id,quote_at,odds_home,odds_draw,odds_away) |> knitr::kable(digits=2)
+eu |> summarise(主胜=mean(W)*100,平局=mean(D)*100,客胜=mean(L)*100) |> knitr::kable(digits=2)
+```
+
+三家公司普通欧赔主胜约55.5%、平24.2%、客胜20.2%；原生0让球主胜58.2%、平24.2%、客胜17.6%，接近。欧赔支持主队优势，不能单独确定赢1球还是2球；本场没有已准入的同截止亚盘/大小球，尚不能完成三路盘口裁决。
+
+```{r}
+#| echo: false
+m |> filter(abs(margin)<=5) |> mutate(across(c(before,after),~round(.x*100,2))) |> knitr::kable()
+```
+
+原生最可能的单档是平局，其次赢1球、赢2球；尾部校正后仍如此。映射主让1球后，让负包含平局与客胜多个档位，所以虽然主队普通胜率较高，让负仍排第一。尾部从原生让胜约34.9%压至32.1%，让负由约41.8%增至43.1%；它不是94%的来源。
+
+```{r}
+#| include: false
+evaluation <- jsonlite::fromJSON(file.path(out,'evaluation.json'))
+# Freeze-before-label scoring separation: labels enter only this final diagnostic section.
+stopifnot(digest::digest(file=file.path(root,evaluation$label_path),algo='sha256')==evaluation$label_sha256)
+label <- as_tibble(jsonlite::fromJSON(file.path(root,evaluation$label_path))$data) |> filter(slot==308)
+stopifnot(nrow(label)==1L,label$native_id=='3014110',label$handicap==-1,label$score=='3-0')
+```
+
+实际3:0，北单让胜。该结果FM给约32.1%，位列第二；北单折算约3.4%，位列第二。两者Top1均错、Top2均覆盖，FM给实际类别的概率更合理，但一场不能证明模型普遍更好。核心判断：已有基本面不支持让负94%的确信程度；也没有足够独立盘口证据将让胜强行改成Top1。
+
+本次不改变λ、尾部规则或正式模型。数据是既有赛后采集与日期代理历史诊断，不代表前瞻验证。可复现命令：`QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_26103_case308_20261017.qmd --no-cache`。检查包括哈希、唯一键、归一化、固定排序第一、净胜球到北单线的完整映射、已冻结标签身份；无新增项目函数，包实现和测试未变。
