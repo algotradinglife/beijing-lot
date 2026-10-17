@@ -1,0 +1,21 @@
+{
+  "forecast_sha256": "ae910c7905f6d9ea35271d79afa34cd62119d38273047c52cc804078e866292e",
+  "bindings": {
+    "input_sha256": "5fb6724a769fb35e14b0aed8b1d0f52b2dcc77e097f8d400be26bf02f3b9f5c4",
+    "metadata_sha256": "b7a9a3e7acf3346068e89c893f563c97ec3322bdf873eb1cf25a809e50f4bf28",
+    "runtime_sha256": "7f9bca623d8a3294530b6fae3d215eadb5e1f31d3bddd8ea037c9aca2398aad2",
+    "client_sha256": "d2eb700425e520f34332763f1fda94a5c8d3da3deda4008158684e4595ac7c9f",
+    "parent_forecast_sha256": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "old_alpha_sha256": "7a7d60306a6bb04e9a8b5a370d22cf340305d534ea01276f6050bb363078a567",
+    "R_fit_sha256": "fb78c1d76763053eee9d05a520ba8402cc7cd62f181b2f7161f6619e63a38e05",
+    "alpha_R_sha256": "c54f7346ee5fb7864a5b364a5508813875302e8968ab302d8b05fb84174391b7",
+    "exclusion_rosters_sha256": "d13f033ecf041feeb5bb94778fff430053fce7c5f8064a929fcb0da7fdaf6b60",
+    "previous_fit_sha256": "5a539868d8edd063a071b97a43e42074174dfcefa138d99673f7c47aa3d036e0"
+  },
+  "frozen": 346,
+  "estimated": 95,
+  "native_changed": 94,
+  "native_scope": 117,
+  "target_labels_opened": false,
+  "formal_FM_unchanged": true
+}

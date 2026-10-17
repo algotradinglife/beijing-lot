@@ -1,6 +1,6 @@
 # 工作流与函数边界
 
-当前完整流程版本 **FM-1.7.0**，主选/保护与比分校正按[方向与比分校正](direction-score-adjustment.md)执行。旧函数用于基础和市场证据处理，不能用旧market_review阶段代替新最终分布。
+当前完整流程版本 **FM-1.7.1**，主选/保护与比分校正按[方向与比分校正](direction-score-adjustment.md)执行。旧函数用于基础和市场证据处理，不能用旧market_review阶段代替新最终分布。
 
 ## 顺序与产物
 

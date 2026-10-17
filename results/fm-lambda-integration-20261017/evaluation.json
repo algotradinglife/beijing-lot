@@ -1,0 +1,28 @@
+{
+  "mode": "POSTHOC_FIXED_INTEGRATED_LAMBDA_COMPARISON",
+  "model_id": "FM17_ALPHA_SAME_COMPETITION_OPPONENT",
+  "candidate_sha256": "ae910c7905f6d9ea35271d79afa34cd62119d38273047c52cc804078e866292e",
+  "source_hashes": {
+    "parent": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "labels": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e",
+    "sp": "f29da4a474382b78912635c9ee53790bd33c7064a0dbbed1491cc3ce3c3ea1da",
+    "coverage": "678dc4d670e3befc804e247cfc7b74fe0af8741b1fa58bdf8541b62495add593"
+  },
+  "client_sha256": "5b2a1e3ceecd8a9ae92536f183f0d06a72d3b1647093785482110d4955898332",
+  "output_hashes": {
+    "metrics": "81cc9cd7a5c7d53cc66d71ed7b96d5478a2701aadfe03abfbb3d2528b881b941",
+    "scores": "f20a49d9141146d2a1e9afb0fe933fc091c9ce3300409e72c405f646a6fb7208",
+    "draw_calibration": "d9e1518d0b0b5a44363c4d2af5e25f7a06e820fc3e2fb88fcba6eaa5ced9339b",
+    "changes": "f161f6a734a9efa7c147a5c99ac8719e9c9c2ed90fba2f9ca58f04a0d8369906",
+    "draw_selection": "4377122ae75bdf77339cdfc94bc4a24bea196243498853762370c418f4460729",
+    "exclusions": "c99052f954d2bd0196129ad434dc47c1b70f12d18be90ffbed13948368f34724"
+  },
+  "native_lambda_experiments_included": true,
+  "interpretation": "Frozen routing unchanged. New same-competition and opponent lambdas replace only estimable native-selected grids before each registered FM17/alpha transform. Market-selected and unestimated native rows explicitly retain parent. Raw same-support control separates competition sampling from normalization; known outcomes diagnostic only.",
+  "runtime": {
+    "R": "4.6.1",
+    "beidan": "0.2.0",
+    "dplyr": "1.2.1"
+  },
+  "generated_at": "2026-10-17 03:24:07 UTC"
+}

@@ -1,0 +1,59 @@
+---
+title: "FM-1.7.1版本登记：同赛事取样"
+format:
+  html:
+    embed-resources: true
+params:
+  repository_root: ".."
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+用户选择保留同赛事取样，将FM-1.7.0升级为FM-1.7.1。只采用同赛事、同场地原生长期/近期进球经验分布的lambda，近期8场与长期各0.5，最少12场、ESS至少8，rho固定−0.1。来源选择、联合市场DC、累计超过90%核心和外围0.3、完整比分重加权与实际北单映射保持原流程。对手强度归一化及1.8.0-alpha.1继续实验。
+
+本次是固定策略的版本登记；已知赛果三期诊断是采用依据，不能冒充样本外验证。预测标签仍保留原分支身份，不改写旧版本产物。原生替换94场，市场来源229场不变，原生不足23场仍是父版对照，不称新版全覆盖。新场必须按显式cutoff重新获取同赛事输入、共享准入及封存；缺赛事或支持不足直接报告未估计，不跨赛事补足。
+
+可执行实现复用现有prepare_opponent_goals/FitOpponentGoals的same_support_raw；其网络支持/拟合仍会执行，但归一化parameters不用于本版本。未新增公共免拟合API。函数、网格、cutoff及变异不变性测试见整合验收报告；本QMD额外执行版本登记、源码身份及同场结果回归断言。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root,mustWork=TRUE)
+reg_path <- file.path(root,"config/fundamental-models/FM-1.7.1.json")
+spec <- jsonlite::fromJSON(reg_path)
+stopifnot(spec$model_id=="FM-1.7.1",spec$parent_model=="FM-1.7.0",
+  spec$discussion_default,!spec$prospective_performance_validated,
+  spec$native_policy$lambda_output=="same_support_raw",
+  !spec$native_policy$opponent_strength_normalization,
+  spec$native_policy$alpha==0.5,spec$native_policy$recent_n==8L,
+  spec$native_policy$minimum_recent_matches==12L,spec$native_policy$minimum_recent_ess==8,
+  spec$native_policy$rho==-.1,spec$tail_policy$coverage==.9,spec$tail_policy$coefficient==.3)
+identities <- as_tibble(spec$implementation_hashes)
+for(i in seq_len(nrow(identities))) stopifnot(
+  digest::digest(file=file.path(root,identities$path[i]),algo="sha256")==identities$sha256[i])
+out <- file.path(root,spec$historical_release_binding$directory)
+manifest <- jsonlite::fromJSON(file.path(out,"manifest.json"))
+replay <- jsonlite::fromJSON(file.path(out,"replay.json"))
+stopifnot(spec$historical_release_binding$forecast_sha256==manifest$forecast_sha256,
+  replay$status=="FULL_IDENTICAL_REPLAY",replay$sha256==manifest$forecast_sha256,
+  digest::digest(file=file.path(out,"forecasts.rds"),algo="sha256")==manifest$forecast_sha256)
+eval <- jsonlite::fromJSON(file.path(out,"evaluation.json"))
+for(n in names(eval$output_hashes))stopifnot(
+  digest::digest(file=file.path(out,paste0(n,".csv")),algo="sha256")==eval$output_hashes[[n]])
+m <- read_csv(file.path(out,"metrics.csv"),show_col_types=FALSE)
+z <- m |> filter(dimension=="all",stratum=="ALL",model %in% c("FM-1.7.0","FM17+SAME_SUPPORT_RAW","BEIDAN_LATER","BEIDAN_T24"))
+a <- z |> filter(comparison=="near_sale",model=="FM17+SAME_SUPPORT_RAW")
+stopifnot(nrow(a)==1L,a$n==345L,a$hits1==140L,a$hits2==250L)
+knitr::kable(z |> select(comparison,model,n,hits1,hits2,brier,logloss),digits=6,
+ caption="冻结历史分支原身份；FM17+SAME_SUPPORT_RAW被采用为FM-1.7.1政策")
+knitr::kable(m |> filter(comparison=="near_sale",dimension=="issue",model %in% c("FM-1.7.0","FM17+SAME_SUPPORT_RAW","BEIDAN_LATER")) |>
+ select(stratum,model,n,hits1,hits2,brier,logloss),digits=6,caption="逐期同场比较")
+knitr::kable(identities,caption="登记实现SHA256，渲染时逐项验证")
+```
+
+评分越低越好。同赛事分支Top1改善，Top2未变；Brier和log loss仍逊于较晚北单，不能称全面优于市场。近期与长期样本有重叠，rho未校准；历史时间代理、原置信路由、23场缺口及已知结果都限制推广结论。
+
+完整学习函数清单、cutoff/实现/输入收据、独立重放、测试修复及完整本地测试命令见[整合验收](fm_lambda_integration_20261017.html)。入口：`QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_release_20261017.qmd --no-cache`。不触发CI、不改写冻结票单。
+
+版本登记审查使用 `codex review 'Final review of FM-1.7.1 registration: …'`，完整命令、逐项源码SHA256、审查原文和渲染证据记录在 `results/fm-lambda-integration-20261017/release-acceptance.json`、`release-review.log` 与 `release-html-validation.json`；审查发现必须解决后才提交。已执行首轮登记审查无可操作缺陷，最终修订另行复核。上述实现哈希表在干净渲染中逐项断言；完整工作流测试收据由整合报告提供，未运行/跳过的用例不算通过。

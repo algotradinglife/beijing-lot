@@ -1,0 +1,51 @@
+{
+  "model_id": "FM-1.7.1",
+  "review_command": "codex review 'Final review of FM-1.7.1 registration: config/fundamental-models/FM-1.7.1.json, quarto/fm171_release_20261017.qmd, skills/beidan-strategy/SKILL.md and references/{fundamental-probability,prediction-report,same-competition-release,fundamental-workflow,competition-strength-market}.md. Only these release documents/config are new scope. Cross-check existing r/fm_lambda_integration_freeze.R/evaluate.R and frozen results/fm-lambda-integration-20261017; same_support_raw only, no opponent normalized parameters adopted, no chronology weakening, old forecasts/registration unchanged, 23 unsupported parent rows honestly excluded from new native coverage. Check hashes and executable QMD assertions, do not edit. Report actionable findings or no actionable defects; do not certify unfinished full R suite.'",
+  "review_findings": "No actionable defects; hashes and executable assertions verified. Complete R suite is independently checked in integration acceptance.",
+  "files": [
+    {
+      "path": "config/fundamental-models/FM-1.7.1.json",
+      "sha256": "f63e06561034b95f96e57d2983db29fd73af5f876f0e687e3a1f4e54cec265d2"
+    },
+    {
+      "path": "quarto/fm171_release_20261017.qmd",
+      "sha256": "d184014a9ae7ca0d8e9bba7e4cddd651b5073ae43f0d978c64a99eaf6dbee125"
+    },
+    {
+      "path": "skills/beidan-strategy/SKILL.md",
+      "sha256": "7e4cd07452079d36c6028fe921c2117b8687eda23d93ee7f39a51f7fb7598eb2"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-probability.md",
+      "sha256": "7725eef870d9d64b2c66135cbe3808721c4efb373c5018a30b8a133d0205f160"
+    },
+    {
+      "path": "skills/beidan-strategy/references/prediction-report.md",
+      "sha256": "31cf9184a218b8e2a606f860f74ad290f624af6cfa91f876d79b867f3ea23e3f"
+    },
+    {
+      "path": "skills/beidan-strategy/references/same-competition-release.md",
+      "sha256": "eb2b469a356250b2f406896b58ee940591506d172091503d17f9965cc4374671"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-workflow.md",
+      "sha256": "b175caa3ff1bbcc73a1c72bffe07f8775f4ea048eba670ee1f95ed05e45be911"
+    },
+    {
+      "path": "skills/beidan-strategy/references/competition-strength-market.md",
+      "sha256": "d7ddc2497bacd9ed782be7aa28b9228b1e1da8b3af48bc17e8bd86e863152cbf"
+    }
+  ],
+  "render_command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_release_20261017.qmd --no-cache",
+  "status": "ACCEPTED",
+  "integration_acceptance": "acceptance.json",
+  "R_checks": {
+    "package_passed": 9153,
+    "repository_passed": 83491,
+    "repository_skipped": 2
+  },
+  "Python_checks": {
+    "passed": 590,
+    "skipped": 1
+  }
+}

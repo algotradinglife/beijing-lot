@@ -1,6 +1,6 @@
 # 基本面战力预测报告
 
-当前完整流程版本 **FM-1.7.0**，以[方向与比分校正](direction-score-adjustment.md)为最终阶段；比赛类型和近期对手强度继续按[专项证据契约](competition-strength-market.md)审查。
+当前完整流程版本 **FM-1.7.1**（同赛事原生取样，见[版本说明](same-competition-release.md)），以[方向与比分校正](direction-score-adjustment.md)为最终阶段；比赛类型和近期对手强度继续按[专项证据契约](competition-strength-market.md)审查。
 
 用户要求“预测报告”“战力概率”“让球胜平负和比分概率”时使用。输出可读 HTML、可执行 QMD 与概率/证据 CSV。单场报告不需要预算，批次每场保留独立证据与参数。生成报告不自动生成票单、发布远程网页或开启更新服务。
 

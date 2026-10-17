@@ -51,13 +51,24 @@ test_that('native sensitivities preserve chronology and separately reconciled mi
     c<-z$native$components[[i]];rec<-z$native$receipts[[i]]
     w<-tibble::as_tibble(jsonlite::fromJSON(c$ledger))
     d<-dplyr::bind_rows(c$distributions)
-    # Existing pinned backend exports per-match ledger with pandas10 decimal places.
-    # Check the explicit rounding envelope, and exact unrounded distributions/receipt.
-    ledger_tol<-nrow(w)*.5e-10+1e-14
-    expect_equal(sum(w$long_mass),1-alpha,tolerance=ledger_tol)
-    expect_equal(sum(w$recent_mass),alpha,tolerance=ledger_tol)
-    expect_equal(sum(w$total_mass),1,tolerance=ledger_tol)
-    expect_equal(w$total_mass,w$long_mass+w$recent_mass,tolerance=2e-10)
+    # Prove each serialized 10-decimal row equals its exact policy weight;
+    # use the exact weights for mass/ESS assertions rather than a relative
+    # comparison of rounded aggregate masses. No tolerance is widened.
+    n<-nrow(w);recent<-w$recent_mass>0
+    expect_equal(n,rec$weight_receipt$rows)
+    expect_equal(sum(recent),z$native$policy$recent_n)
+    exact_long<-rep((1-alpha)/n,n)
+    exact_recent<-ifelse(recent,alpha/z$native$policy$recent_n,0)
+    exact_total<-exact_long+exact_recent
+    expect_equal(w$long_mass,round(exact_long,10),tolerance=1e-14)
+    expect_equal(w$recent_mass,round(exact_recent,10),tolerance=1e-14)
+    expect_equal(w$total_mass,round(exact_total,10),tolerance=1e-14)
+    expect_equal(sum(exact_long),1-alpha,tolerance=1e-12)
+    expect_equal(sum(exact_recent),alpha,tolerance=1e-12)
+    expect_equal(sum(exact_total),1,tolerance=1e-12)
+    expect_equal(1/sum(exact_total^2),rec$weight_receipt$effective_sample_size,tolerance=1e-12)
+    available<-as.POSIXct(w$label_available_ts,format='%Y-%m-%dT%H:%M:%S',tz='UTC')
+    expect_gte(min(as.numeric(available[recent])),max(as.numeric(available[!recent])))
     expect_equal(rec$weight_receipt$long_history_mass,1-alpha,tolerance=1e-12)
     expect_equal(rec$weight_receipt$recent_state_mass,alpha,tolerance=1e-12)
     expect_equal(sum(d$long),1,tolerance=1e-12);expect_equal(sum(d$recent),1,tolerance=1e-12)
@@ -119,7 +130,8 @@ test_that('native prior fits ignore future scores and target identity even with 
  e<-x$entries[['26102:6']];f<-s$native[['26102:6']]$fixture;impl<-s$implementation
  parent<-readRDS(file.path(root,'results/fundamental-issues-20261011/run-20261011T011533.304058Z/26102-frozen.rds'))
  h<-tibble::as_tibble(parent$history) |> dplyr::filter(fixture_id=='26102:6') |> dplyr::mutate(row_key=paste(scope,match_id,sep=':'),event_date=as.character(event_date))
- ns<-new.env(parent=asNamespace('beidan'));sys.source(file.path(impl,'packages/beidan/R/recent_venue_goals.R'),envir=ns)
+ # The current installed wrapper selects its own backend; old source wrappers
+ # cannot be imported into a process already initialized from the installed package.
  reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
  reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
  shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE)
@@ -133,7 +145,7 @@ test_that('native prior fits ignore future scores and target identity even with 
   row$event_date<-format(e$cutoff$cutoff_utc+if(kind=='future')86400 else -2*86400,'%Y-%m-%d',tz='UTC')
   hm<-h |> dplyr::filter(match_id!=row$match_id) |> dplyr::bind_rows(row)
   hashes<-x$bindings;hashes$mutation_test<-beidan:::.score_margin_hash(hm)
-  n<-ns$estimate_recent_venue_goals(hm,f[c('fixture_id','issue_id','provider_id','home_id','away_id')],as.character(parent$fixtures$provider_id),shared$Cutoff$decision_epoch('26102',ct),hashes,impl,r$native$policy,'HISTORICAL_DIAGNOSTIC')
+  n<-beidan:::estimate_recent_venue_goals(hm,f[c('fixture_id','issue_id','provider_id','home_id','away_id')],as.character(parent$fixtures$provider_id),shared$Cutoff$decision_epoch('26102',ct),hashes,root,r$native$policy,'HISTORICAL_DIAGNOSTIC')
   expect_equal(n$parameters,r$native$parameters,tolerance=1e-10)
   expect_equal(n$rates,r$native$rates,tolerance=1e-10)
   expect_false(identical(n$admission_receipt$cache_key,r$native$admission_receipt$cache_key))

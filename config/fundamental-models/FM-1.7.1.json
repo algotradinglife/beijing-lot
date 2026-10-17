@@ -1,0 +1,85 @@
+{
+  "schema": "fundamental-model-version/v1",
+  "model_id": "FM-1.7.1",
+  "parent_model": "FM-1.7.0",
+  "registered_at": "2026-10-17T03:14:45.135184+00:00",
+  "status": "implemented_expert_workflow",
+  "discussion_default": true,
+  "prospective_performance_validated": false,
+  "native_policy": {
+    "competition_scope": "exact_target_competition_id",
+    "venue_scope": "same_venue",
+    "lambda_output": "same_support_raw",
+    "opponent_strength_normalization": false,
+    "recent_n": 8,
+    "alpha": 0.5,
+    "minimum_recent_matches": 12,
+    "minimum_recent_ess": 8,
+    "rho": -0.1,
+    "insufficient_support": "UNESTIMATED_EXPLICIT_NO_CROSS_COMPETITION_FILL"
+  },
+  "tail_policy": {
+    "coverage": 0.9,
+    "coefficient": 0.3,
+    "tie_tolerance": 1e-12
+  },
+  "source_selection": "Inherited FM17 native/market confidence review, joint market grid selected exactly when admitted",
+  "historical_release_binding": {
+    "directory": "results/fm-lambda-integration-20261017",
+    "model_column": "FM17+SAME_SUPPORT_RAW",
+    "forecast_sha256": "ae910c7905f6d9ea35271d79afa34cd62119d38273047c52cc804078e866292e",
+    "native_replacements": 94,
+    "parent_native_retained_unestimated": 23,
+    "market_routes_unchanged": 229,
+    "purpose": "POSTHOC_HISTORICAL_DIAGNOSTIC"
+  },
+  "alpha_status": "FM-1.8.0-alpha.1 remains experimental, not promoted",
+  "implementation_hashes": [
+    {
+      "path": "r/fm_lambda_integration_freeze.R",
+      "sha256": "d2eb700425e520f34332763f1fda94a5c8d3da3deda4008158684e4595ac7c9f"
+    },
+    {
+      "path": "r/fm_lambda_integration_evaluate.R",
+      "sha256": "5b2a1e3ceecd8a9ae92536f183f0d06a72d3b1647093785482110d4955898332"
+    },
+    {
+      "path": "packages/beidan/R/opponent_goals.R",
+      "sha256": "fb78c1d76763053eee9d05a520ba8402cc7cd62f181b2f7161f6619e63a38e05"
+    },
+    {
+      "path": "packages/beidan/inst/python/beidan_backend/opponent_goals.py",
+      "sha256": "da4b1720786457e06418e92b1dfa755f2dfb0a07fe0fffbd13bb6a0546c47c9a"
+    },
+    {
+      "path": "skills/beidan-strategy/SKILL.md",
+      "sha256": "7e4cd07452079d36c6028fe921c2117b8687eda23d93ee7f39a51f7fb7598eb2"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-probability.md",
+      "sha256": "7725eef870d9d64b2c66135cbe3808721c4efb373c5018a30b8a133d0205f160"
+    },
+    {
+      "path": "skills/beidan-strategy/references/prediction-report.md",
+      "sha256": "31cf9184a218b8e2a606f860f74ad290f624af6cfa91f876d79b867f3ea23e3f"
+    },
+    {
+      "path": "skills/beidan-strategy/references/same-competition-release.md",
+      "sha256": "eb2b469a356250b2f406896b58ee940591506d172091503d17f9965cc4374671"
+    },
+    {
+      "path": "skills/beidan-strategy/references/fundamental-workflow.md",
+      "sha256": "b175caa3ff1bbcc73a1c72bffe07f8775f4ea048eba670ee1f95ed05e45be911"
+    },
+    {
+      "path": "skills/beidan-strategy/references/competition-strength-market.md",
+      "sha256": "d7ddc2497bacd9ed782be7aa28b9228b1e1da8b3af48bc17e8bd86e863152cbf"
+    }
+  ],
+  "limitations": [
+    "Known outcomes; historical availability proxies do not authorize prospective decisions",
+    "No standalone new public same-competition raw API: uses existing same-support output and its network support gates",
+    "Historical retained-parent rows are not successful new native forecasts",
+    "No new confidence reviews or target-result tuning"
+  ]
+}

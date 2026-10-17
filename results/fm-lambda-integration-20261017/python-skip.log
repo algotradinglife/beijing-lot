@@ -1,0 +1,4 @@
+s                                                                        [100%]
+=========================== short test summary info ============================
+SKIPPED [1] packages/beidan/tests/python/test_issue_schedule.py:626: frozen 26098 control snapshot is not present in this checkout
+1 skipped in 0.07s

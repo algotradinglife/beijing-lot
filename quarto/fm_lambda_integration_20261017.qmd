@@ -1,0 +1,134 @@
+---
+title: "同赛事与对手强度λ接入FM17及alpha：三期固定策略对照"
+format:
+  html:
+    embed-resources: true
+params:
+  repository_root: ".."
+  output_dir: "results/fm-lambda-integration-20261017"
+  acceptance_required: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本研究按用户要求，将既有同赛事样本和对手强度归一化接入FM-1.7.0及FM-1.8.0-alpha.1原生λ阶段。正式模型不替换，规则不根据已知赛果调整。三期26098、26101、26102属于已知结果历史诊断，不是独立样本外或前瞻验证。
+
+## 输入、契约与流程
+
+冻结父FM17及alpha、历史比分/赛事元数据、独立目标及未来期名单、固定运行策略，均由客户端核验哈希。一个fixture/cutoff对应一套预测；比分网格每行是一个主客进球组合，净胜球为主减客；W/D/L是实际北单让胜/让平/让负。UTC决策截止为逐场T−24h，日粒度历史可用时间date+1 UTC仅为诊断代理。精确目标及未来比赛身份排除，实际标签严格晚于冻结与独立重放才在评分程序打开；本会话先前已看过部分结果，不能称盲测。
+
+流程：同赛事筛选 → 全队网络、共享截止准入及近期0.5混合 → 同支持raw或攻防Poisson ridge 0.05 → 原生DC（ρ固定−0.1）→ **继承原置信审查及原生/市场选择** → FM17累计90%核心/外围0.3，或alpha无尾压缩/前三档让平校正 → 实际北单让球映射。固定参数未拟合本批标签。94个此前冻结的同cutoff拟合按原输入、策略、源/实现身份和独立重放收据复用；23个同cutoff稀疏支持裁决同样保留。不会跨截止、源或实现复用模型；法国U21样例另行估计。原生估计失败明确列入覆盖台账，仍保留原冻结模型；不得把未估计说成已整合。市场来源的完整流程保留市场网格，无需重复估计不生效的λ；法国U21按预先指定样例另给出新原生λ供诊断，不能把市场网格称为新基本面。
+
+四个候选：FM17+SAME_SUPPORT_RAW、ALPHA+SAME_SUPPORT_RAW隔离同赛事取样；FM17+OPPONENT_NATIVE、ALPHA+OPPONENT_NATIVE再加入对手归一化。两种原生λ使用完全相同的同赛事支持集，保留原生近期权重；glmnet采用固定ridge和网络连通性检查，不增加新依赖。FitOpponentGoals、prepare_opponent_goals和共享temporal_learning为唯一实现。新增研究客户端只编排既有函数，无包实现变化。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root,mustWork=TRUE)
+out <- file.path(root,params$output_dir)
+manifest <- jsonlite::fromJSON(file.path(out,"manifest.json"))
+replay <- jsonlite::fromJSON(file.path(out,"replay.json"))
+stopifnot(replay$status=="FULL_IDENTICAL_REPLAY",replay$forecasts==346L,
+  replay$sha256==manifest$forecast_sha256,
+  digest::digest(file=file.path(out,"forecasts.rds"),algo="sha256")==manifest$forecast_sha256)
+status <- system2("/opt/R/4.6.1/bin/Rscript",shQuote(c(file.path(root,"r/fm_lambda_integration_evaluate.R"),root,out)),
+  env=paste0("R_LIBS=",shQuote(paste(.libPaths(),collapse=":"))),
+  stdout=file.path(out,"qmd-evaluation.log"),stderr=file.path(out,"qmd-evaluation.log"))
+stopifnot(status==0L)
+evaluation <- jsonlite::fromJSON(file.path(out,"evaluation.json"))
+for(name in names(evaluation$output_hashes)) stopifnot(
+  digest::digest(file=file.path(out,paste0(name,".csv")),algo="sha256")==evaluation$output_hashes[[name]])
+x <- readRDS(file.path(out,"forecasts.rds"))
+metrics <- read_csv(file.path(out,"metrics.csv"),show_col_types=FALSE)
+changes <- read_csv(file.path(out,"changes.csv"),show_col_types=FALSE)
+knitr::kable(x$audit |> count(issue_id,state,selected_source,changed_native),
+  caption="估计覆盖与完整流程实际改变范围；市场选择不变，失败不冒充成功")
+knitr::kable(x$audit |> filter(state!="ESTIMATED") |> count(state,reason,sort=TRUE),
+  caption="所有未估计原因及数量")
+```
+
+## 命中与概率评分
+
+Brier为三类别平方误差和，log loss为实际类别负对数概率，均越低越好。Top2只评价覆盖，不代表串关收益。同T−24h与较晚赛前SP分别取严格共同样本；北单概率是SP倒数归一化。
+
+```{r}
+knitr::kable(metrics |> filter(dimension=="all"),digits=6,
+  caption="完整共同样本：四个候选、两父版本、原始网格及纯北单")
+knitr::kable(metrics |> filter(dimension=="issue"),digits=6,caption="逐期结果完整列出")
+knitr::kable(metrics |> filter(dimension%in%c("event_type","source","changed_native","fit_state")),digits=6,
+  caption="赛事类型、原来源、实际替换和可估计性分层；不只挑改善组")
+metrics |> filter(dimension=="all",comparison=="near_sale") |>
+  ggplot(aes(reorder(model,top1),top1)) + geom_col() + coord_flip() +
+  scale_y_continuous(labels=scales::percent) + labs(x=NULL,y="Top1命中率",caption="345场共同样本；不是收益") + theme_minimal()
+knitr::kable(changes |> group_by(model) |> summarise(n=n(),changed=sum(changed_native),
+  saved_top1=sum(saved_top1),lost_top1=sum(lost_top1),saved_top2=sum(saved_top2),lost_top2=sum(lost_top2),
+  mean_brier_delta=mean(brier_delta),mean_logloss_delta=mean(logloss_delta),.groups="drop"),digits=6,
+  caption="相对各自父版本的救回与损失；正概率评分差为退步")
+```
+
+## 本批诊断结论
+
+345场较晚SP共同样本中，FM17父版本131/250；同赛事raw为140/250，Brier从0.683364降到0.679412，log loss从1.120218降到1.114894；加入对手归一化为135/250、0.682373和1.118936。支持同赛事取样对本批Top1及评分有所帮助，归一化未显示额外改善。二者都仍逊于较晚北单的概率评分0.670167／1.103727，不能仅凭Top1高于北单130场就宣称概率更准确。
+
+alpha父版本106/239；同赛事raw为106/242，归一化为104/241。raw略改善评分和Top2，归一化Brier/log loss反而略差，未修复alpha偏重让平的主要问题。T−24h的214场中FM17同赛事raw89/151、归一化84/149、父版本81/150；alpha同赛事raw64/156、归一化62/153、父版本64/153。两时点分别报告，不能把子集效果外推到全期。
+
+以上均是固定规则的事后诊断；正式版本不因本批排名自动升级。94场替换只来自原生来源，市场来源保持父版本，缺失支持场次也保持父版本。
+
+## 法国U21对瑞士U21
+
+该场父版本因青年队阵容/换届、对手质量未核验而选择市场。新增λ不会自动解决阵容连续性缺口，因此保持原来源裁决；以下将原生λ变化与最终概率是否实际变化分开。
+
+```{r}
+id <- "26102:34"
+e <- x$entries[[id]]
+stage_path <- file.path(root,"results/fm16-three-issues-20261012/stage.rds")
+parent_manifest <- jsonlite::fromJSON(file.path(root,"results/fm17-three-issues-20261013/manifest.json"))
+stopifnot(digest::digest(file=stage_path,algo="sha256")==parent_manifest$source_hashes$parent_stage)
+stage <- readRDS(stage_path)
+old <- stage$native[[id]]$native$parameters
+knitr::kable(old,caption="原生旧λ（此前讨论的2.17／1.39）")
+knitr::kable(x$audit |> filter(fixture_id==id),digits=6,caption="该场新λ、估计状态与实际来源")
+knitr::kable(read_csv(file.path(out,"scores.csv"),show_col_types=FALSE) |> filter(fixture_id==id),digits=6,
+  caption="该场各候选最终结果；市场来源保持不变是流程约束")
+if(!is.null(e$fit)) {
+  knitr::kable(e$fit$support |> filter(team_id%in%c(e$fit$receipt$fixture$home_id,e$fit$receipt$fixture$away_id)),
+    digits=5,caption="目标两队同赛事主客场支持、近期激活与ESS")
+  knitr::kable(e$fit$parameters,caption="对手强度归一化新原生λ")
+  knitr::kable(e$fit$same_support_raw,caption="同赛事同支持raw对照λ")
+  library(beidan,lib.loc=file.path(root,"results/fm17-diagnostic-iterations-20261013/library"))
+  rates <- bind_rows(old |> mutate(source="旧原生"),e$fit$same_support_raw |> mutate(source="同赛事raw"),
+    e$fit$parameters |> mutate(source="同赛事+对手归一化"),
+    stage$packets[[id]]$market_parameters |> select(lambda_home,lambda_away) |> mutate(source="冻结联合市场"))
+  france_diagnostics <- list()
+  for(i in seq_len(nrow(rates))) {
+    g <- beidan:::dixon_coles_score_grid(rates$lambda_home[i],rates$lambda_away[i],-1L,1e-10,-.1)$grid |>
+      as_tibble() |> mutate(margin=home_goals-away_goals)
+    france_diagnostics[[i]] <- g |> summarise(win=sum(probability[margin>0]),
+      win1=sum(probability[margin==1]),win2plus=sum(probability[margin>=2]),win3plus=sum(probability[margin>=3])) |>
+      mutate(source=rates$source[i],.before=1)
+  }
+  knitr::kable(bind_rows(france_diagnostics),digits=6,caption="法国样例：新旧原生及市场DC的胜幅判断；不是最终来源切换")
+}
+```
+
+## 局限、复现与验收
+
+同赛事严格取样可能使杯赛/国家队/青年队支持不足。失败保持父版本，完整期效果属于带覆盖缺口的候选叠加，不是每场λ都更新。固定原来源选择隔离λ贡献，也使市场组不会改善；不能将零变化解释为新λ无信息。未新增伤停、预计阵容、战意事实，也未验证青年队跨届球员同一性。ρ、ridge、近期权重均为固定研究参数。对手网络来自已存有限历史而非完整全联赛赛季，日期代理/90分钟口径限制继承原实验。较晚SP信息更丰富，同截止缺失使子集不代表全部；未作下注、资金或收益模拟。
+
+完整客户端验收同时修复五份旧历史测试：FM14两份测试分别验证当前闭包可准入、过期历史闭包被拒绝及被篡改闭包被拒绝；FM17诊断逐行核对10位小数账本对应的精确策略权重、精确分量质量和ESS，并通过当前正常安装的后端执行截止变异；FM17回放在原截止和原输入上重建当前实现上下文后验证变异不变性，不改写旧封存收据；混合串场回放对照其冻结实现登记，并确认当前实现拒绝复用旧实现结果。未放宽误差阈值、删减测试或重写旧预测。原文件及SHA保存在test-repair-originals/和test-repair-recovery.json，避免覆盖既有未提交工作。所有变化位于仓库客户端测试，未修改packages/beidan/。
+
+共享历史学习库存：prepare_opponent_goals→prepare_learning_context→AvailabilityFilter/PartitionPolicy/WeightingPolicy/verify_learning_context→FitOpponentGoals→temporal_cache_key；尾部和alpha只通过build_adjustment_evidence_context与共享验证器输出。每场收据绑定截止、排除名单、源哈希、R fit/后端传递实现、完整权重账本、ESS、固定参数及缓存键。新客户端不复制时序工具；跨cutoff不可复用。预测文件不可被非相同重放覆盖。
+
+精确命令及结果见下方验收表和日志。复现：Rscript r/fm_lambda_integration_freeze.R ROOT；同命令追加replay；Rscript r/fm_lambda_integration_evaluate.R ROOT OUT；QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm_lambda_integration_20261017.qmd --no-cache。渲染在新进程执行评分并验证输出哈希；不安装依赖、不重训预测。
+
+```{r}
+if(isTRUE(params$acceptance_required)) {
+  acceptance <- jsonlite::fromJSON(file.path(out,"acceptance.json"),simplifyVector=FALSE)
+  stopifnot(acceptance$status=="ACCEPTED",acceptance$blocking_findings==0L)
+  for(file in acceptance$files) stopifnot(digest::digest(file=file.path(root,file$path),algo="sha256")==file$sha256)
+  knitr::kable(bind_rows(acceptance$checks),format="html",escape=TRUE,
+    caption="最终实现身份、命令、测试、审查发现及处理")
+} else cat("预览，尚未最终验收。\n")
+knitr::kable(tibble(input=names(manifest$bindings),sha256=unlist(manifest$bindings)),caption="冻结输入与代码身份")
+```

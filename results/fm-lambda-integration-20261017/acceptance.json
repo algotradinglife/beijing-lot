@@ -1,0 +1,124 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "r/fm_lambda_integration_freeze.R",
+      "sha256": "d2eb700425e520f34332763f1fda94a5c8d3da3deda4008158684e4595ac7c9f"
+    },
+    {
+      "path": "r/fm_lambda_integration_evaluate.R",
+      "sha256": "5b2a1e3ceecd8a9ae92536f183f0d06a72d3b1647093785482110d4955898332"
+    },
+    {
+      "path": "tests/testthat/test-fm-lambda-integration.R",
+      "sha256": "fd8e138ee89d77f641b68463a4758227f373a0b8c399c5db0617f1d3d1d6713f"
+    },
+    {
+      "path": "quarto/fm_lambda_integration_20261017.qmd",
+      "sha256": "f85ad0a55f1ee8390005bde52fe9949df8b338108499ad910244db39b90df1d1"
+    },
+    {
+      "path": "tests/testthat/test-fm14-26101.R",
+      "sha256": "522412386dba80c63aa8e048f70d9455e4841c42007f17469bf87c310a801384"
+    },
+    {
+      "path": "tests/testthat/test-fm14-issue.R",
+      "sha256": "3b0a22e0ccc07ae6fdbfef959261ccfec8023352aea4a3543240fd6cd9ae2e94"
+    },
+    {
+      "path": "tests/testthat/test-fm17-diagnostic-iterations.R",
+      "sha256": "f3cbd571805ffe9ac949025ee5a58930ec9866cc36918bd8d442a244a7e29156"
+    },
+    {
+      "path": "tests/testthat/test-fm17-three-issue-backtest.R",
+      "sha256": "3c94ea57839647224df43d2847fc7d78923747ef5c3f6af8c0d090034495d1fc"
+    },
+    {
+      "path": "tests/testthat/test-mixed-round-replay.R",
+      "sha256": "1cda05f833865a4d5708bb3cba18da9195a2a9cc99c5eb62b27c10d131b037b5"
+    }
+  ],
+  "checks": [
+    {
+      "command": "Rscript r/fm_lambda_integration_freeze.R ROOT; same command with replay",
+      "result": "346 fixtures FULL_IDENTICAL_REPLAY; 94 replaced native, 23 insufficient native, 229 unchanged market; France extra native diagnostic"
+    },
+    {
+      "command": "Rscript r/fm_lambda_integration_evaluate.R ROOT OUT; independent temp-directory replay",
+      "result": "All six CSV outputs byte-identical; same345 late and214 T24 paired cohorts; exact hashes in evaluation-replay.json"
+    },
+    {
+      "command": "testthat::test_file(\"tests/testthat/test-fm-lambda-integration.R\", load_helpers=FALSE)",
+      "result": "5347 passed; no failures/errors/skips; child R_LIBS explicitly inherited"
+    },
+    {
+      "command": "Five repaired historical test files, normally installed beidan and explicit test-environment.json",
+      "result": "25 test blocks, 34813 passed assertions, no failures/errors/skips; originals preserved"
+    },
+    {
+      "command": "/opt/R/4.6.1/bin/Rscript tests/testthat.R; complete explicit environment in test-environment.json",
+      "result": "{\"package\": {\"tests\": 948, \"passed\": 9153, \"failed\": 0, \"errors\": 0, \"warnings\": 0, \"skipped\": 0}, \"repository\": {\"tests\": 785, \"passed\": 83491, \"failed\": 0, \"errors\": 0, \"warnings\": 0, \"skipped\": 2}}"
+    },
+    {
+      "command": "PYTHONPATH=packages/beidan/inst/python:$PWD .venv/bin/python -m pytest packages/beidan/tests/python -q",
+      "result": "590 passed, 1 skipped; exact unavailable case/reason in python-skip.log; not counted as passed"
+    },
+    {
+      "command": "codex review scoped nine source files, frozen outputs and historical-test repair recovery inventory; full prompt in review-repaired.log",
+      "result": "No actionable defects. Stale-artifact rejection and weight/chronology/replay checks strengthened, no relaxed thresholds. Full-suite outcomes independently verified after review"
+    },
+    {
+      "command": "Source/runtime scope",
+      "result": "No packages/beidan files changed in this delivery, so no package rebuild introduced. Unified entry exercises normally installed r_lib/beidan including DLL wrappers; no manual dyn.load or load_all used to obtain acceptance. Analysis uses declared historical research library."
+    },
+    {
+      "command": "Availability gaps (unverified, not passed)",
+      "result": "Python full26098 independent schedule golden snapshot absent. R #408 integration bundle not materialized: two integration cases unavailable. Frozen FM integration and cutoff mutation cases all executed."
+    },
+    {
+      "command": "Initial check failures and resolutions",
+      "result": "Explicit complete R_LIBS and all project/NAS roots supplied; stale historical identity checks rebuilt current contexts without changing frozen evidence; 10-decimal ledgers checked against exact per-row policy and unrounded receipt mass/ESS. No tests removed or failures turned into skips."
+    },
+    {
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm_lambda_integration_20261017.qmd --no-cache",
+      "result": "Exit 0; clean session, no cache; HTML has no execution errors, 12 tables and one figure. All source SHA256 gates verified."
+    },
+    {
+      "command": "Reviewed SHA256: r/fm_lambda_integration_freeze.R",
+      "result": "d2eb700425e520f34332763f1fda94a5c8d3da3deda4008158684e4595ac7c9f"
+    },
+    {
+      "command": "Reviewed SHA256: r/fm_lambda_integration_evaluate.R",
+      "result": "5b2a1e3ceecd8a9ae92536f183f0d06a72d3b1647093785482110d4955898332"
+    },
+    {
+      "command": "Reviewed SHA256: tests/testthat/test-fm-lambda-integration.R",
+      "result": "fd8e138ee89d77f641b68463a4758227f373a0b8c399c5db0617f1d3d1d6713f"
+    },
+    {
+      "command": "Reviewed SHA256: quarto/fm_lambda_integration_20261017.qmd",
+      "result": "f85ad0a55f1ee8390005bde52fe9949df8b338108499ad910244db39b90df1d1"
+    },
+    {
+      "command": "Reviewed SHA256: tests/testthat/test-fm14-26101.R",
+      "result": "522412386dba80c63aa8e048f70d9455e4841c42007f17469bf87c310a801384"
+    },
+    {
+      "command": "Reviewed SHA256: tests/testthat/test-fm14-issue.R",
+      "result": "3b0a22e0ccc07ae6fdbfef959261ccfec8023352aea4a3543240fd6cd9ae2e94"
+    },
+    {
+      "command": "Reviewed SHA256: tests/testthat/test-fm17-diagnostic-iterations.R",
+      "result": "f3cbd571805ffe9ac949025ee5a58930ec9866cc36918bd8d442a244a7e29156"
+    },
+    {
+      "command": "Reviewed SHA256: tests/testthat/test-fm17-three-issue-backtest.R",
+      "result": "3c94ea57839647224df43d2847fc7d78923747ef5c3f6af8c0d090034495d1fc"
+    },
+    {
+      "command": "Reviewed SHA256: tests/testthat/test-mixed-round-replay.R",
+      "result": "1cda05f833865a4d5708bb3cba18da9195a2a9cc99c5eb62b27c10d131b037b5"
+    }
+  ]
+}

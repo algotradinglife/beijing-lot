@@ -1,0 +1,8 @@
+{
+  "status": "UNCHANGED_REGISTERED_POLICIES",
+  "hashes": {
+    "packages/beidan/R/alpha_top3_draw.R": "c54f7346ee5fb7864a5b364a5508813875302e8968ab302d8b05fb84174391b7",
+    "config/fundamental-models/FM-1.8.0-alpha.1.json": "97d57eed7d3691df55f3f41e65eb8c2a3ed2dce09616da1265e15e2a0168906a",
+    "config/fundamental-models/FM-1.7.0.json": "157f90e9d5e972b484fedef5b10a3ac4607e4e00182763759056b614c4ef8a77"
+  }
+}

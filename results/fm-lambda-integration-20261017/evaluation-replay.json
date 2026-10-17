@@ -1,0 +1,11 @@
+{
+  "status": "ALL_CSV_BYTE_IDENTICAL",
+  "files": {
+    "metrics": "81cc9cd7a5c7d53cc66d71ed7b96d5478a2701aadfe03abfbb3d2528b881b941",
+    "scores": "f20a49d9141146d2a1e9afb0fe933fc091c9ce3300409e72c405f646a6fb7208",
+    "draw_calibration": "d9e1518d0b0b5a44363c4d2af5e25f7a06e820fc3e2fb88fcba6eaa5ced9339b",
+    "changes": "f161f6a734a9efa7c147a5c99ac8719e9c9c2ed90fba2f9ca58f04a0d8369906",
+    "draw_selection": "4377122ae75bdf77339cdfc94bc4a24bea196243498853762370c418f4460729",
+    "exclusions": "c99052f954d2bd0196129ad434dc47c1b70f12d18be90ffbed13948368f34724"
+  }
+}

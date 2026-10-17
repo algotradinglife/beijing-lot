@@ -1,0 +1,49 @@
+None
+None
+Processed 10
+Processed 20
+Processed 30
+Processed 40
+Processed 50
+Processed 60
+Processed 70
+Processed 80
+Processed 90
+Processed 100
+Processed 110
+Processed 120
+Processed 130
+Processed 140
+Processed 150
+Processed 160
+Processed 170
+Processed 180
+Processed 190
+Processed 200
+Processed 210
+Processed 220
+Processed 230
+Processed 240
+Processed 250
+Processed 260
+Processed 270
+Processed 280
+Processed 290
+Processed 300
+Processed 310
+Processed 320
+Processed 330
+Processed 340
+# A tibble: 10 × 5
+   issue_id state                       selected_source changed_native     n
+   <chr>    <chr>                       <chr>           <lgl>          <int>
+ 1 26098    ESTIMATED                   native          TRUE              34
+ 2 26098    NOT_REQUIRED_MARKET_ROUTING market          FALSE            102
+ 3 26098    UNESTIMATED                 native          FALSE              9
+ 4 26101    ESTIMATED                   native          TRUE              38
+ 5 26101    NOT_REQUIRED_MARKET_ROUTING market          FALSE             65
+ 6 26101    UNESTIMATED                 native          FALSE             12
+ 7 26102    ESTIMATED                   market          FALSE              1
+ 8 26102    ESTIMATED                   native          TRUE              22
+ 9 26102    NOT_REQUIRED_MARKET_ROUTING market          FALSE             61
+10 26102    UNESTIMATED                 native          FALSE              2

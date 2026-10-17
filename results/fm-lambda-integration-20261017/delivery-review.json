@@ -1,0 +1,11 @@
+{
+  "findings": "No actionable defects",
+  "log": "review-delivery.log",
+  "log_sha256": "72d1c69198e2af8c1f1470f4caf42e211b0dca57b9abab3dee45cf5d939c94a6",
+  "reviewed_files_receipts": [
+    "acceptance.json",
+    "release-acceptance.json"
+  ],
+  "required_checks": "full-test-results.json",
+  "unverified_cases": "2 R integration bundle cases; 1 Python frozen26098 golden snapshot case"
+}

@@ -68,20 +68,27 @@ test_that('post-cutoff/target mutation cannot change sealed core score or projec
  out<-file.path(root,'results/fm17-three-issues-20261013')
  e<-readRDS(file.path(out,'forecasts.rds'))$entries[['26102:10']]
  r<-e$results[['FM-1.7.0']]
- impl<-file.path(root,'results/fm15-26102-20261012/implementation')
+ impl<-root
  reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
  reticulate::import('sys',convert=FALSE)$path$insert(0L,file.path(impl,'packages/beidan/inst/python'))
  backend<-reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
  shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE)
  ct<-format(e$cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC')
+ # Rebuild the evidence context for the current implementation, preserving the
+ # original cutoff and inputs. Never edit a sealed historical receipt in place.
+ bindings<-r$bindings;bindings$direction_implementation<-beidan:::.score_margin_code(impl)
+ baseline_ctx<-backend$build_adjustment_evidence_context(e$evidence_rows,as.list(e$fixture),shared$Cutoff$decision_epoch(e$fixture$issue_id,ct),bindings,shared$AvailabilityPolicy$historical_proxy('FM17_POSTHOC_RULE_DIAGNOSTIC'),'HISTORICAL_DIAGNOSTIC',impl)
+ baseline<-adjust_score_margin_distribution(r$base,r$core$judgement,baseline_ctx,e$fixture,e$cutoff,impl)
+ expect_identical(baseline$grid,r$final$grid)
+ expect_identical(baseline$margins,r$final$margins)
  for(kind in c('future','target')) {
   row<-e$evidence_rows[[1]];row$evidence_id<-paste0('excluded-',kind);row$row_key<-row$evidence_id;row$source_hash<-'changed-excluded-source'
   if(kind=='future'){row$data_available_ts<-ct;row$label_available_ts<-ct}else row$issue_code<-e$fixture$issue_id
-  ctx<-backend$build_adjustment_evidence_context(c(e$evidence_rows,list(row)),as.list(e$fixture),shared$Cutoff$decision_epoch(e$fixture$issue_id,ct),r$bindings,shared$AvailabilityPolicy$historical_proxy('FM17_POSTHOC_RULE_DIAGNOSTIC'),'HISTORICAL_DIAGNOSTIC',impl)
+  ctx<-backend$build_adjustment_evidence_context(c(e$evidence_rows,list(row)),as.list(e$fixture),shared$Cutoff$decision_epoch(e$fixture$issue_id,ct),bindings,shared$AvailabilityPolicy$historical_proxy('FM17_POSTHOC_RULE_DIAGNOSTIC'),'HISTORICAL_DIAGNOSTIC',impl)
   adjusted<-adjust_score_margin_distribution(r$base,r$core$judgement,ctx,e$fixture,e$cutoff,impl)
   expect_identical(adjusted$grid,r$final$grid)
   expect_identical(adjusted$margins,r$final$margins)
-  expect_identical(project_score_outcomes(adjusted,-1L,impl),project_score_outcomes(r$final,-1L,impl))
+  expect_identical(project_score_outcomes(adjusted,-1L,impl),project_score_outcomes(baseline,-1L,impl))
   expect_false(row$evidence_id %in% adjusted$evidence$evidence_id)
  }
  bad<-r$final;bad$cutoff$cutoff_utc<-bad$cutoff$cutoff_utc+1

@@ -1,0 +1,27 @@
+[
+  {
+    "path": "tests/testthat/test-fm14-26101.R",
+    "original_sha256": "70b27eb18d73651a5937637b0b9007bee6e9fb905389861878ff5e0c8377037b",
+    "backup": "results/fm-lambda-integration-20261017/test-repair-originals/test-fm14-26101.R.before"
+  },
+  {
+    "path": "tests/testthat/test-fm14-issue.R",
+    "original_sha256": "eb87bcbae5a8127985e5b90e9fc7bffa7c7a2d24cb9d7abc49eea3618c77dd31",
+    "backup": "results/fm-lambda-integration-20261017/test-repair-originals/test-fm14-issue.R.before"
+  },
+  {
+    "path": "tests/testthat/test-fm17-diagnostic-iterations.R",
+    "original_sha256": "25cd5278d519b3b46a185921aa7370e3a8535823fff95de8046a2165f3d2ca85",
+    "backup": "results/fm-lambda-integration-20261017/test-repair-originals/test-fm17-diagnostic-iterations.R.before"
+  },
+  {
+    "path": "tests/testthat/test-fm17-three-issue-backtest.R",
+    "original_sha256": "ca379216fc266eff8668ea70298ec5b818f175612bb62bb3965ad83be65c60ab",
+    "backup": "results/fm-lambda-integration-20261017/test-repair-originals/test-fm17-three-issue-backtest.R.before"
+  },
+  {
+    "path": "tests/testthat/test-mixed-round-replay.R",
+    "original_sha256": "88a7c8dc7891685076bb40ed902bdc8842b0fc03bf8f12d4c77651443e0dbd66",
+    "backup": "results/fm-lambda-integration-20261017/test-repair-originals/test-mixed-round-replay.R.before"
+  }
+]

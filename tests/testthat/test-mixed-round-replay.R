@@ -1,0 +1,59 @@
+test_that("real eleven-round replay binds original pools, ranks, tickets and budgets", {
+  root <- Sys.getenv("BEIDAN_REPOSITORY_ROOT")
+  expect_true(nzchar(root))
+  out <- file.path(root, "results/mixed-package-replay-20261011/replay")
+  checks <- readr::read_csv(file.path(out, "replay-checks.csv"), show_col_types = FALSE)
+  expect_true(tibble::is_tibble(checks))
+  expect_equal(nrow(checks), 11L)
+  expect_false(any(vapply(checks, is.list, logical(1))))
+  expect_false(any(vapply(checks, is.matrix, logical(1))))
+  expect_true(all(checks$fixture_pool_exact & checks$group_legs_exact &
+                    checks$full_ranks_exact & checks$purchased_tickets_exact))
+  expect_true(all(checks$groups == 8L & checks$tickets == 1400L & checks$stake_cny == 2800))
+  receipt <- jsonlite::fromJSON(file.path(out, "replay-receipt.json"))
+  expect_identical(receipt$status, "PASS")
+  expect_identical(names(receipt$source_paths), c("upcoming", "upcoming_expected", "original", "past_expected"))
+  expect_identical(names(receipt$source_hashes), names(receipt$source_paths))
+  expect_length(receipt$source_paths, 4L)
+  for (key in names(receipt$source_paths))
+    expect_identical(digest::digest(file = file.path(root, receipt$source_paths[[key]]), algo = "sha256"),
+                     receipt$source_hashes[[key]])
+  for (name in c("upcoming-five.rds", "past-six-150324.rds")) {
+    result <- readRDS(file.path(out, name))
+    payload <- result; payload$receipt <- NULL
+    expect_identical(result$receipt$output_hash, rlang::hash(payload))
+    expect_identical(result$receipt$input_hash, rlang::hash(result$inputs))
+    expect_identical(result$receipt$policy_hash, rlang::hash(result$policy))
+    expect_identical(result$receipt$cutoff_hash, beidan:::.rank_outcome_cutoff_hash(result$cutoff))
+    # The immutable replay is evidence for the implementation recorded at
+    # freeze time. A changed current implementation must reject its reuse.
+    expect_identical(result$receipt$implementation_hash, receipt$implementation)
+    current_code <- beidan:::.rank_outcome_code_hash("BuildMixedRoundPlans")
+    if (!identical(result$receipt$implementation_hash, current_code)) {
+      expect_error(beidan::ValidateMixedRoundPlans(result), "mixed plan replay mismatch")
+    } else expect_true(isTRUE(beidan::ValidateMixedRoundPlans(result)))
+    expect_equal(sum(result$summary$stake_cny), result$spent_cny)
+    expect_equal(result$unspent_cny, 0)
+    expect_equal(sum(result$summary$tickets) * result$policy$unit_cny, result$spent_cny)
+    expect_identical(result$policy$start_rank, 150L)
+    expect_identical(result$policy$end_rank, 324L)
+    for (plan in result$plans) for (id in names(plan$spaces)) {
+      expect_equal(nrow(plan$spaces[[id]]), 432L)
+      expect_identical(dplyr::filter(plan$purchases, group_id == id), plan$spaces[[id]][150:324, ])
+    }
+  }
+})
+
+test_that("thin offline client refuses to overwrite existing evidence", {
+  root <- Sys.getenv("BEIDAN_REPOSITORY_ROOT")
+  out <- tempfile("mixed-existing-"); dir.create(out)
+  writeLines("keep me", file.path(out, "existing.txt"))
+  log <- tempfile("mixed-cli-log-")
+  status <- system2("/opt/R/4.6.1/bin/Rscript", shQuote(file.path(root, "r/mixed_round_replay.R")),
+    env = c(paste0("BEIDAN_REPOSITORY_ROOT=", shQuote(root)),
+            paste0("MIXED_REPLAY_OUTPUT=", shQuote(out)),
+            paste0("R_LIBS_USER=", shQuote(paste(.libPaths(), collapse = .Platform$path.sep)))), stdout = log, stderr = log)
+  expect_equal(status, 1L)
+  expect_identical(readLines(file.path(out, "existing.txt")), "keep me")
+  expect_true(any(grepl("new or empty", readLines(log), fixed = TRUE)))
+})
