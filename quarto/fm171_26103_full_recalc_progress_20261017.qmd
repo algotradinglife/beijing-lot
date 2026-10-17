@@ -28,6 +28,16 @@ reticulate::use_python(python,required=TRUE)
 invisible(beidan::python_backend(python))
 paths <- reticulate::import('beidan_backend.catalog.paths',convert=FALSE)
 work <- reticulate::py_str(paths$location('hot:fm171-26103-full-recalc-20261017'))
+recovery <- jsonlite::fromJSON(file.path(evidence,'progress-recovery.json'))
+native_runtime <- recovery$native_recovery
+native_chunks <- file.path(work,'native-chunks-v2')
+stopifnot(digest::digest(file=file.path(native_chunks,'run-native-chunks.sh'),algo='sha256')==native_runtime$script_sha256,
+ native_runtime$total_fixtures==407L,native_runtime$chunks==41L,!native_runtime$full_fm_analysis_accepted)
+native_checkpoints <- list.files(native_chunks,pattern='^recent-receipt[.]json$',recursive=TRUE,full.names=TRUE)
+for(p in native_checkpoints) {
+ checkpoint <- jsonlite::fromJSON(p)
+ stopifnot(digest::digest(file=file.path(dirname(p),'native-repair.rds'),algo='sha256')==checkpoint$sha256)
+}
 market_dir <- reticulate::py_str(paths$location(x$market_process$output_token))
 binding <- jsonlite::fromJSON(file.path(market_dir,'input-binding.json'))
 stopifnot(binding$client_sha256==x$collector_source_sha256,length(binding$slots)==407L,
@@ -48,7 +58,7 @@ stopifnot(!anyDuplicated(progress[c('fixture_id','kind')]),nrow(progress)<=814L)
 ```{r}
 #| echo: false
 tibble(任务=c('原生阶段重新拟合','亚洲盘/大小球历史补采','完整FM最终概率及对照'),
- 状态=c(paste0('已启动，PID ',x$native_process$pid),paste0('已启动，PID ',x$market_process$pid),'尚未完成，禁止当作验收结果')) |> knitr::kable()
+ 状态=c(paste0('分批恢复，PID ',native_runtime$pid,'；已落盘',length(native_checkpoints),'/41批'),paste0('已启动，PID ',x$market_process$pid),'尚未完成，禁止当作验收结果')) |> knitr::kable()
 progress |> count(kind,state,name='已完成通道数') |> knitr::kable(caption='本次渲染时的动态快照；不是407场全部完成')
 ```
 
@@ -59,6 +69,8 @@ progress |> count(kind,state,name='已完成通道数') |> knitr::kable(caption=
 开发审查发现原“JSON正文与SHA侧文件分开发布”存在中断窗口，已停止旧采集进程、保留旧工作目录及哈希清单；活动格式只保留单文件信封，不加旧格式兼容层。新任务使用独立markets-v2令牌，复用共享缓存已取得的原始响应。两个回归情况分别模拟原子替换前及替换后中断，均能继续完成；不是仅凭正常运行推断安全续跑。
 
 原生阶段的现有已验收客户端遍历407场，对原可估分支实际重新准备与拟合；原104场未估分支目前仍保留原因，不能将其说成全部重新拟合成功。证据补齐后的全期来源裁决尚待完成；不填造概率，不以北单线改变lambda。原生阶段完成也不等于完整FM完成。
+
+进度复查发现原生进程已中断，旧日志停在80/407，未写出结果；这80场是日志遍历进度，不能算已保存的计算成果。未确认具体中断原因，不凭进程消失断言OOM。现已用脱离会话的任务恢复：分成41批、每批最多10场、两个工作进程，继续调用原已验收R客户端；每批独立写出原生结果和SHA回执，续跑先核验已完成批次。旧输出目录保持原样。重启后的进程、命令、脚本哈希和状态见progress-recovery.json；本页只核对已落盘批次，不把正在执行当作成功。
 
 仍需完成原文遍历及失败审查、身份/时钟和严格截止准入、逐场定性可靠性与市场充分性审查、联合市场及来源选择、已有FM171尾部和实际北单让球映射，再独立重放与验收。以上新数据都是事后采集，只能用于明确标注的历史诊断。目标标签不能用于公司选择、截止修订或模型调整。
 

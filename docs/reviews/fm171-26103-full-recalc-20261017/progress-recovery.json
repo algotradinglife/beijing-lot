@@ -1,0 +1,31 @@
+{
+  "as_of_utc": "2026-10-17T13:14:14.790212+00:00",
+  "market_channels_completed": 48,
+  "market_expected_channels": 814,
+  "market_states": {
+    "PARSED": 48
+  },
+  "native_recovery": {
+    "state": "NATIVE_RECOVERY_RUNNING",
+    "pid": 1092332,
+    "started_at_utc": "2026-10-17T13:13:51.491149+00:00",
+    "command": [
+      "/usr/bin/flock",
+      "-n",
+      "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/fm171-26103-full-recalc-20261017/native-chunks-v2/runner.lock",
+      "/usr/bin/bash",
+      "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/fm171-26103-full-recalc-20261017/native-chunks-v2/run-native-chunks.sh"
+    ],
+    "chunk_plan_token": "hot:fm171-26103-full-recalc-20261017/native-chunks-v2/plan.json",
+    "log_token": "hot:fm171-26103-full-recalc-20261017/native-chunks-v2/orchestrator.log",
+    "script_sha256": "ce18b28686db2412e89a7f6e445ff8c9c2abe8f66676ba6d686f381cfd6255be",
+    "total_fixtures": 407,
+    "chunks": 41,
+    "max_parallel_workers": 2,
+    "previous_native_interrupted": true,
+    "interruption_cause": "UNDETERMINED; prior PID absent and no final result; no verified OOM evidence",
+    "previous_progress_not_checkpointed": 80,
+    "full_fm_analysis_accepted": false
+  },
+  "full_fm_analysis_accepted": false
+}

@@ -2205,7 +2205,7 @@ vertical-align: -.125em;
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">原生阶段重新拟合</td>
-<td style="text-align: left;">已启动，PID 1034118</td>
+<td style="text-align: left;">分批恢复，PID 1092332；已落盘0/41批</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">亚洲盘/大小球历史补采</td>
@@ -2232,12 +2232,12 @@ vertical-align: -.125em;
 <tr class="odd">
 <td style="text-align: left;">asian</td>
 <td style="text-align: left;">PARSED</td>
-<td style="text-align: right;">3</td>
+<td style="text-align: right;">24</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">total</td>
 <td style="text-align: left;">PARSED</td>
-<td style="text-align: right;">3</td>
+<td style="text-align: right;">24</td>
 </tr>
 </tbody>
 </table>
@@ -2247,6 +2247,7 @@ vertical-align: -.125em;
 <p>补采输出区分PARSED、OBSERVED_EMPTY、CACHE_MISS、FETCH_FAILED、PARSE_FAILED和INTEGRITY_FAILURE。只有原文为有效JSON空数组时才记录observed empty；WAF、解析失败及未采集均不当作空数据。原始响应在权威共享SQLite缓存中，旧25场原文按原哈希重放；新结果把规范JSON正文及SHA放在一个回执文件内，用已有write_json_atomically整体验证、原子发布，断点续跑逐个验证。源HTTP重试、频率、原文保存均复用现有包，不新写传输或解析器。</p>
 <p>开发审查发现原“JSON正文与SHA侧文件分开发布”存在中断窗口，已停止旧采集进程、保留旧工作目录及哈希清单；活动格式只保留单文件信封，不加旧格式兼容层。新任务使用独立markets-v2令牌，复用共享缓存已取得的原始响应。两个回归情况分别模拟原子替换前及替换后中断，均能继续完成；不是仅凭正常运行推断安全续跑。</p>
 <p>原生阶段的现有已验收客户端遍历407场，对原可估分支实际重新准备与拟合；原104场未估分支目前仍保留原因，不能将其说成全部重新拟合成功。证据补齐后的全期来源裁决尚待完成；不填造概率，不以北单线改变lambda。原生阶段完成也不等于完整FM完成。</p>
+<p>进度复查发现原生进程已中断，旧日志停在80/407，未写出结果；这80场是日志遍历进度，不能算已保存的计算成果。未确认具体中断原因，不凭进程消失断言OOM。现已用脱离会话的任务恢复：分成41批、每批最多10场、两个工作进程，继续调用原已验收R客户端；每批独立写出原生结果和SHA回执，续跑先核验已完成批次。旧输出目录保持原样。重启后的进程、命令、脚本哈希和状态见progress-recovery.json；本页只核对已落盘批次，不把正在执行当作成功。</p>
 <p>仍需完成原文遍历及失败审查、身份/时钟和严格截止准入、逐场定性可靠性与市场充分性审查、联合市场及来源选择、已有FM171尾部和实际北单让球映射，再独立重放与验收。以上新数据都是事后采集，只能用于明确标注的历史诊断。目标标签不能用于公司选择、截止修订或模型调整。</p>
 <p>采集客户端新增测试覆盖：导入不抓取不写库；离线采集与方向转换；续跑不重复取数；回执篡改拒绝；缺缓存产生失败账本及非零退出；来源真实空数组与WAF解析失败分开；原子发布前后中断恢复。七个测试用例全部执行通过，命令为<code>PYTHONPATH=packages/beidan/inst/python .venv/bin/python -m pytest tests/test_fm171_26103_market_client.py -q</code>。只新增研究客户端和相应测试，包实现、R客户端、现有正式规则未改；未重跑无关完整套件，不宣称它们本轮通过。</p>
 <p>完整采集仍在运行，不发布新FM概率或命中率，不恢复原HOLD。本报告的执行记录、命令和原始日志见配套execution.json与审查回执。复现进度页：加载config/source-extraction.env，指定项目Python、R4.6.1，用<code>quarto render quarto/fm171_26103_full_recalc_progress_20261017.qmd --no-cache -P project_root:$PWD</code>执行。采集任务命令在execution.json内；同一输出令牌续跑会拒绝输入、代码、范围变化或回执篡改，不能通过移动截止字段重用旧缓存。</p>
