@@ -1,0 +1,97 @@
+---
+title: "26103期FM漏保复盘：#383亚特兰大—威尼斯"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: ".."
+---
+
+按用户要求，事后选FM Top2漏保、北单Top1命中的场次；其中按概率总变差距离取最大。不是前瞻选场测试。只诊断已有冻结结果，不修改模型、截止或预测。无新函数或历史拟合。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+out <- file.path(root,'results/fm171-26103-draw-20261017')
+stopifnot(digest::digest(file=file.path(out,'native-forecasts.rds'),algo='sha256')=='c22be3e3a9be3c8776c3cbdc96d1c57023901c2879620aa06822cdbd231a1aee',
+ digest::digest(file=file.path(out,'sp-forecasts.rds'),algo='sha256')=='ec420734727eb140190496a03d9c04dcd396661074f91b3ef80d1aa128ccda58')
+acceptance <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ep <- acceptance$files |> filter(path=='results/fm171-26103-draw-20261017/evaluation.json')
+stopifnot(nrow(ep)==1L,digest::digest(file=file.path(out,'evaluation.json'),algo='sha256')==ep$sha256)
+evaluation <- jsonlite::fromJSON(file.path(out,'evaluation.json'))
+sp <- evaluation$outputs |> filter(path=='scores.csv')
+stopifnot(nrow(sp)==1L,digest::digest(file=file.path(out,'scores.csv'),algo='sha256')==sp$sha256)
+n <- readRDS(file.path(out,'native-forecasts.rds'))
+s <- readRDS(file.path(out,'sp-forecasts.rds'))
+p <- n$probabilities |> filter(model=='FM171') |> select(fixture_id,outcome,fm=probability) |>
+ inner_join(s$probabilities |> filter(model=='BD_LATER_PREMATCH') |> select(fixture_id,outcome,bd=probability),
+            by=c('fixture_id','outcome'),relationship='one-to-one')
+tv <- p |> group_by(fixture_id) |> summarise(tv=sum(abs(fm-bd))/2,.groups='drop')
+selection <- read_csv(file.path(out,'scores.csv'),show_col_types=FALSE) |>
+ filter(cohort=='PAIRED_LATER_PREMATCH',model %in% c('FM171','BD_LATER_PREMATCH')) |>
+ select(fixture_id,model,top1,top2,actual_outcome) |> pivot_wider(names_from=model,values_from=c(top1,top2)) |>
+ filter(!top2_FM171,top1_BD_LATER_PREMATCH) |> left_join(tv,by='fixture_id',relationship='one-to-one') |>
+ arrange(desc(tv),fixture_id)
+stopifnot(nrow(selection)>0L,selection$fixture_id[1]=='26103:383')
+id <- selection$fixture_id[1];e <- n$entries[[id]]
+stopifnot(e$identities$provider_id=='2993805',e$identities$home_id=='154',e$identities$away_id=='557')
+case <- p |> filter(fixture_id==id) |>
+ left_join(s$receipts[[paste(id,'later_prematch')]]$selected |> select(outcome,sp_raw),by='outcome',relationship='one-to-one') |>
+ mutate(赛果=recode(outcome,W='让胜：主队赢至少2球',D='让平：主队赢1球',L='让负：主队不胜'))
+before <- e$native_base$grid |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(before=sum(probability),.groups='drop')
+after <- e$final$grid |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(after=sum(probability),.groups='drop')
+m <- before |> inner_join(after,by='margin',relationship='one-to-one')
+stopifnot(abs(sum(m$after)-1)<1e-10,
+ abs(sum(m$after[m$margin>=2])-case$fm[case$outcome=='W'])<1e-10,
+ abs(sum(m$after[m$margin==1])-case$fm[case$outcome=='D'])<1e-10,
+ abs(sum(m$after[m$margin<=0])-case$fm[case$outcome=='L'])<1e-10)
+stopifnot(sum(m$before[m$margin>=2])>sum(m$before[m$margin==1]),
+ sum(m$after[m$margin>=2])<sum(m$after[m$margin==1]),
+ setequal(e$core$core_margins,-2:3))
+stopifnot(digest::digest(file=file.path(root,evaluation$label_path),algo='sha256')==evaluation$label_sha256)
+label <- as_tibble(jsonlite::fromJSON(file.path(root,evaluation$label_path))$data) |> filter(slot==383)
+stopifnot(nrow(label)==1L,label$native_id=='2993805',label$handicap==-1,label$score=='3-1')
+obs <- e$native$observations |> filter((team_id=='154'&venue=='home')|(team_id=='557'&venue=='away'))
+```
+
+亚特兰大—威尼斯，意甲，北单主让1球，实际3:1（让胜）。FM顺序为让负、让平、让胜；北单为让胜、让平、让负。FM Top2确实漏保，北单Top1命中。这里选北单Top1命中这一更强条件，避免选到#307那种北单仅靠两个极低概率类别的微小差距而Top2覆盖的场次。
+
+```{r}
+#| echo: false
+case |> transmute(赛果,SP=sp_raw,FM百分比=round(fm*100,2),北单百分比=round(bd*100,2)) |> knitr::kable(digits=2)
+s$audit |> filter(fixture_id==id) |> select(quote_at,kickoff_at,lead_hours) |> knitr::kable(digits=3)
+```
+
+北单SP为1.92／3.71／4.72，来自开赛前约26分钟；FM输入截止提前24小时，不能归因为同信息条件下北单胜出。此处采用冻结记录，不重抓当前页面。
+
+```{r}
+#| echo: false
+m |> filter(abs(margin)<=5) |> mutate(across(c(before,after),~round(.x*100,2))) |> knitr::kable()
+```
+
+校正后平局30.5%、主赢1球25.2%、赢2球16.0%、赢3球7.0%，主赢4球以上约1.0%，客胜约20.3%。让负把平局及客胜合并到50.8%；让胜只有24.0%。原生让胜25.4%、让平24.3%，原生Top2其实含让胜；尾部后变成让胜24.0%、让平25.2%，发生第二、第三名轮换。这是本场漏保的直接机制。
+
+累计90%核心包含-2至+3，+4及更远的主胜尾部也被乘0.3。外围并非只有弱侧：本场压缩了大胜端，令让胜类别损失质量；让平单档保留并归一化上升。这解释了排序变化，但不能因为已知3:1就证明应保留所有大胜尾部。
+
+```{r}
+#| echo: false
+e$native$same_support_raw |> knitr::kable(digits=4)
+obs |> group_by(team_id,venue) |>
+ summarise(历史场数=n(),长期进球=sum(goals*long_mass)/sum(long_mass),长期失球=sum(against*long_mass)/sum(long_mass),
+  近期场数=sum(recent_mass>0),近期进球=sum(goals*recent_mass)/sum(recent_mass),近期失球=sum(against*recent_mass)/sum(recent_mass),
+  近期最早=min(event_date[recent_mass>0]),近期最晚=max(event_date[recent_mass>0]),.groups='drop') |> knitr::kable(digits=3)
+obs |> filter(recent_mass>0) |> select(team_id,event_date,goals,against) |> arrange(team_id,event_date) |> knitr::kable()
+```
+
+λ约1.434／0.844，本身只把主队定为温和优势。主队近期8个同赛事主场仅场均进0.875球；客队近期8个同赛事客场失1.625球。更值得注意的是时间跨度：主队这8场从2026-03到2026-09，客队从2025-03到2026-09，跨约18个月。“近期8场同赛事同场地”不等于近期状态，升降级或赛事间隔可能令旧阵容样本占比过大；具体原因尚未额外核验。
+
+冻结审查已标基本面uncertain；本场没有已准入的同截止欧赔篮子与完整亚盘/大小球组合，market_sufficient=false，因此没有切换为联合市场。不能把缺失说成盘口支持FM，也不能拿北单本身反校准后再声称胜过北单。本场不是完成独立盘口补齐后的预测验证。
+
+诊断分两层：第一，原生让胜和让平接近，尾部将两者排序交换，导致Top2漏保；第二，原生λ的近期窗口时间跨度过长，且缺失独立同截止盘口，主队大胜能力是否被低估仍待证。优先补相同截止欧赔、亚盘及大小球并核对样本跨度，再判断需不需要改变λ或尾部；不在这一已知赛果上拍参数。
+
+无新项目函数、包代码或预测改动。本QMD内检查输入SHA、事后选择条件、唯一联接、概率归一化、净胜球投影和标签身份；干净执行无缓存，错误致命。复现命令：`QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_26103_case383_20261017.qmd --no-cache`。限制：历史采集及日期代理、北单时点较晚、跨赛季窗口和独立盘口缺口；该单场不用于改版验收。
