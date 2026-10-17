@@ -1,0 +1,265 @@
+{
+  "status": "MATCHED_INSTALLED_IMPORT_CLOSURE",
+  "closure": {
+    "root_modules": [
+      "beidan_backend.fundamental_probability",
+      "beidan_backend.opponent_goals",
+      "beidan_backend.prematch_sp",
+      "beidan_backend.temporal_learning.diagnostic_labels",
+      "beidan_backend.temporal_learning.issue_partitions",
+      "beidan_backend.unified_sources"
+    ],
+    "files": {
+      "packages/beidan/inst/python/beidan_backend/__init__.py": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b",
+      "packages/beidan/inst/python/beidan_backend/catalog/__init__.py": "9350beae1bdd1de5411f55ac2581a10bca33411628b0a723ea331dd86c00b1c9",
+      "packages/beidan/inst/python/beidan_backend/catalog/paths.py": "5a4d6a01dc454478d7520d47e32f7a2b77b327beb9f00a0cbe9d7353a5faac9a",
+      "packages/beidan/inst/python/beidan_backend/catalog/registry.py": "34c771f70b3af863e50a84d7fa3e05e41879d20bbf6e8d31cc40da95e3f2369c",
+      "packages/beidan/inst/python/beidan_backend/dual_euro.py": "6ab8af507ed794f3c683494d0cb4cdbd84f11b3e08506971fc47f2cf77eb4b94",
+      "packages/beidan/inst/python/beidan_backend/extraction_cache.py": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422",
+      "packages/beidan/inst/python/beidan_backend/fundamental_probability.py": "9b5a146eabf84c526a3976e08be710494f80f316225f5e26bb7aa03e9926bfc8",
+      "packages/beidan/inst/python/beidan_backend/fundamental_tables.py": "a94aaf7cf0274dd165595059874da6a2193aa93d891035ab3e09015e0cc25d38",
+      "packages/beidan/inst/python/beidan_backend/fundamentals.py": "d699b60b43ee4213fc5c0dcff264ebf4b0be418bccda2f6b4c5de3308215c995",
+      "packages/beidan/inst/python/beidan_backend/issue_schedule/__init__.py": "a54fddadc2e45d5923d3f0c3cee41e5568d661ba8c6ea1df72db1c54fdee4270",
+      "packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py": "0abfc13be1592d82a0acf4ad224fbb58147a39d108938c48f46edcc64f0852d2",
+      "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497",
+      "packages/beidan/inst/python/beidan_backend/issue_schedule/decode.py": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c",
+      "packages/beidan/inst/python/beidan_backend/issue_schedule/service.py": "188f33db69df43048e41647bd39ef576411d46aed9205eb0ea49a325af3ddca0",
+      "packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py": "1467def1bb9bde7c7d55a3f9277a70eba8471231276d2859df4ede0011b93b85",
+      "packages/beidan/inst/python/beidan_backend/issue_schedule/store.py": "a455839715c3fa790359e33ed4c07f6145f60cf41354fe1e1fadf390ed09bfdc",
+      "packages/beidan/inst/python/beidan_backend/market_capture/__init__.py": "0284ed1a85a2ba7c614f574f0b4a8f9ed03173348c6644aa3b3eb1dbc0e60265",
+      "packages/beidan/inst/python/beidan_backend/market_capture/history.py": "ee6b14e5904e0e0aa31fd0325e22ef4a0a2e7db860d9ba6f3ed952b7592b9f43",
+      "packages/beidan/inst/python/beidan_backend/market_capture/service.py": "98f7c2112583adaa1091fabfac3202bb4b5ba3d84531030a887628e493fefa8c",
+      "packages/beidan/inst/python/beidan_backend/opponent_goals.py": "da4b1720786457e06418e92b1dfa755f2dfb0a07fe0fffbd13bb6a0546c47c9a",
+      "packages/beidan/inst/python/beidan_backend/prematch_sp.py": "b7568a69db9a93b2aaf47e9d790d3babef2212f23646576ec6879d7d92a3cff5",
+      "packages/beidan/inst/python/beidan_backend/settlement/__init__.py": "598d64815532582b6238a7ed045f352c66ae995a048a7bd2125c95250b98a67b",
+      "packages/beidan/inst/python/beidan_backend/settlement/labels.py": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712",
+      "packages/beidan/inst/python/beidan_backend/settlement/parser.py": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b",
+      "packages/beidan/inst/python/beidan_backend/source_extraction.py": "ff93a180e4f0b09a1bc9431e690134c29ac039e6bc51c7fc5ae85117a9162054",
+      "packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6",
+      "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py": "ae29042dc9c960c491df56fbd6b18c90e57dab194e6bfacb5226eb24e97c8991",
+      "packages/beidan/inst/python/beidan_backend/temporal_learning/diagnostic_labels.py": "7902947518b0567d8cd7b35a4a51f8118d8ef7b29539a9cdd551ca8b59d41e73",
+      "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee",
+      "packages/beidan/inst/python/beidan_backend/temporal_learning/issue_partitions.py": "c7a8f85e7ce09ba0587ff5146477fbcfc661c3a67a8d9e6024c7dc6744ae5e2b",
+      "packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919",
+      "packages/beidan/inst/python/beidan_backend/transport.py": "8b68fbc2dc43418a488365416d60f9d719ebb1c6df0980353fb1692b4987a955",
+      "packages/beidan/inst/python/beidan_backend/unified_sources.py": "f5a46b2f960898c0013c6449d52213b307dd6311d55ee31be497e1aac34e28aa"
+    },
+    "distributions": {
+      "beautifulsoup4": "4.15.0",
+      "json5": "0.15.0",
+      "numpy": "2.4.6",
+      "pandas": "3.0.3"
+    },
+    "closure_sha256": "709d98012e293bee0ccc4bbb9676ff35a1d18d7fe57a11750863b3280e71f168"
+  },
+  "files": [
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/__init__.py",
+      "installed": "r_lib/beidan/python/beidan_backend/__init__.py",
+      "source_sha256": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b",
+      "installed_sha256": "82e46d7c7d99ae65edb52592a571cecdb5200be3225b169dd15504b866261d5b"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/catalog/__init__.py",
+      "installed": "r_lib/beidan/python/beidan_backend/catalog/__init__.py",
+      "source_sha256": "9350beae1bdd1de5411f55ac2581a10bca33411628b0a723ea331dd86c00b1c9",
+      "installed_sha256": "9350beae1bdd1de5411f55ac2581a10bca33411628b0a723ea331dd86c00b1c9"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/catalog/paths.py",
+      "installed": "r_lib/beidan/python/beidan_backend/catalog/paths.py",
+      "source_sha256": "5a4d6a01dc454478d7520d47e32f7a2b77b327beb9f00a0cbe9d7353a5faac9a",
+      "installed_sha256": "5a4d6a01dc454478d7520d47e32f7a2b77b327beb9f00a0cbe9d7353a5faac9a"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/catalog/registry.py",
+      "installed": "r_lib/beidan/python/beidan_backend/catalog/registry.py",
+      "source_sha256": "34c771f70b3af863e50a84d7fa3e05e41879d20bbf6e8d31cc40da95e3f2369c",
+      "installed_sha256": "34c771f70b3af863e50a84d7fa3e05e41879d20bbf6e8d31cc40da95e3f2369c"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/dual_euro.py",
+      "installed": "r_lib/beidan/python/beidan_backend/dual_euro.py",
+      "source_sha256": "6ab8af507ed794f3c683494d0cb4cdbd84f11b3e08506971fc47f2cf77eb4b94",
+      "installed_sha256": "6ab8af507ed794f3c683494d0cb4cdbd84f11b3e08506971fc47f2cf77eb4b94"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/extraction_cache.py",
+      "installed": "r_lib/beidan/python/beidan_backend/extraction_cache.py",
+      "source_sha256": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422",
+      "installed_sha256": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/fundamental_probability.py",
+      "installed": "r_lib/beidan/python/beidan_backend/fundamental_probability.py",
+      "source_sha256": "9b5a146eabf84c526a3976e08be710494f80f316225f5e26bb7aa03e9926bfc8",
+      "installed_sha256": "9b5a146eabf84c526a3976e08be710494f80f316225f5e26bb7aa03e9926bfc8"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/fundamental_tables.py",
+      "installed": "r_lib/beidan/python/beidan_backend/fundamental_tables.py",
+      "source_sha256": "a94aaf7cf0274dd165595059874da6a2193aa93d891035ab3e09015e0cc25d38",
+      "installed_sha256": "a94aaf7cf0274dd165595059874da6a2193aa93d891035ab3e09015e0cc25d38"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/fundamentals.py",
+      "installed": "r_lib/beidan/python/beidan_backend/fundamentals.py",
+      "source_sha256": "d699b60b43ee4213fc5c0dcff264ebf4b0be418bccda2f6b4c5de3308215c995",
+      "installed_sha256": "d699b60b43ee4213fc5c0dcff264ebf4b0be418bccda2f6b4c5de3308215c995"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/issue_schedule/__init__.py",
+      "installed": "r_lib/beidan/python/beidan_backend/issue_schedule/__init__.py",
+      "source_sha256": "a54fddadc2e45d5923d3f0c3cee41e5568d661ba8c6ea1df72db1c54fdee4270",
+      "installed_sha256": "a54fddadc2e45d5923d3f0c3cee41e5568d661ba8c6ea1df72db1c54fdee4270"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py",
+      "installed": "r_lib/beidan/python/beidan_backend/issue_schedule/contract.py",
+      "source_sha256": "0abfc13be1592d82a0acf4ad224fbb58147a39d108938c48f46edcc64f0852d2",
+      "installed_sha256": "0abfc13be1592d82a0acf4ad224fbb58147a39d108938c48f46edcc64f0852d2"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/issue_schedule/crosscheck.py",
+      "installed": "r_lib/beidan/python/beidan_backend/issue_schedule/crosscheck.py",
+      "source_sha256": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497",
+      "installed_sha256": "e787065b668fa49fcccc0da847122a480dc191815d9be695ee25b7faf53e2497"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/issue_schedule/decode.py",
+      "installed": "r_lib/beidan/python/beidan_backend/issue_schedule/decode.py",
+      "source_sha256": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c",
+      "installed_sha256": "f502e84c0eb5c932aa62b9be0710bf38282c405ae4cac0dda42ce9d3b9cb197c"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/issue_schedule/service.py",
+      "installed": "r_lib/beidan/python/beidan_backend/issue_schedule/service.py",
+      "source_sha256": "188f33db69df43048e41647bd39ef576411d46aed9205eb0ea49a325af3ddca0",
+      "installed_sha256": "188f33db69df43048e41647bd39ef576411d46aed9205eb0ea49a325af3ddca0"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py",
+      "installed": "r_lib/beidan/python/beidan_backend/issue_schedule/sources.py",
+      "source_sha256": "1467def1bb9bde7c7d55a3f9277a70eba8471231276d2859df4ede0011b93b85",
+      "installed_sha256": "1467def1bb9bde7c7d55a3f9277a70eba8471231276d2859df4ede0011b93b85"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/issue_schedule/store.py",
+      "installed": "r_lib/beidan/python/beidan_backend/issue_schedule/store.py",
+      "source_sha256": "a455839715c3fa790359e33ed4c07f6145f60cf41354fe1e1fadf390ed09bfdc",
+      "installed_sha256": "a455839715c3fa790359e33ed4c07f6145f60cf41354fe1e1fadf390ed09bfdc"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/market_capture/__init__.py",
+      "installed": "r_lib/beidan/python/beidan_backend/market_capture/__init__.py",
+      "source_sha256": "0284ed1a85a2ba7c614f574f0b4a8f9ed03173348c6644aa3b3eb1dbc0e60265",
+      "installed_sha256": "0284ed1a85a2ba7c614f574f0b4a8f9ed03173348c6644aa3b3eb1dbc0e60265"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/market_capture/history.py",
+      "installed": "r_lib/beidan/python/beidan_backend/market_capture/history.py",
+      "source_sha256": "ee6b14e5904e0e0aa31fd0325e22ef4a0a2e7db860d9ba6f3ed952b7592b9f43",
+      "installed_sha256": "ee6b14e5904e0e0aa31fd0325e22ef4a0a2e7db860d9ba6f3ed952b7592b9f43"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/market_capture/service.py",
+      "installed": "r_lib/beidan/python/beidan_backend/market_capture/service.py",
+      "source_sha256": "98f7c2112583adaa1091fabfac3202bb4b5ba3d84531030a887628e493fefa8c",
+      "installed_sha256": "98f7c2112583adaa1091fabfac3202bb4b5ba3d84531030a887628e493fefa8c"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/opponent_goals.py",
+      "installed": "r_lib/beidan/python/beidan_backend/opponent_goals.py",
+      "source_sha256": "da4b1720786457e06418e92b1dfa755f2dfb0a07fe0fffbd13bb6a0546c47c9a",
+      "installed_sha256": "da4b1720786457e06418e92b1dfa755f2dfb0a07fe0fffbd13bb6a0546c47c9a"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/prematch_sp.py",
+      "installed": "r_lib/beidan/python/beidan_backend/prematch_sp.py",
+      "source_sha256": "b7568a69db9a93b2aaf47e9d790d3babef2212f23646576ec6879d7d92a3cff5",
+      "installed_sha256": "b7568a69db9a93b2aaf47e9d790d3babef2212f23646576ec6879d7d92a3cff5"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/settlement/__init__.py",
+      "installed": "r_lib/beidan/python/beidan_backend/settlement/__init__.py",
+      "source_sha256": "598d64815532582b6238a7ed045f352c66ae995a048a7bd2125c95250b98a67b",
+      "installed_sha256": "598d64815532582b6238a7ed045f352c66ae995a048a7bd2125c95250b98a67b"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/settlement/labels.py",
+      "installed": "r_lib/beidan/python/beidan_backend/settlement/labels.py",
+      "source_sha256": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712",
+      "installed_sha256": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/settlement/parser.py",
+      "installed": "r_lib/beidan/python/beidan_backend/settlement/parser.py",
+      "source_sha256": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b",
+      "installed_sha256": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/source_extraction.py",
+      "installed": "r_lib/beidan/python/beidan_backend/source_extraction.py",
+      "source_sha256": "ff93a180e4f0b09a1bc9431e690134c29ac039e6bc51c7fc5ae85117a9162054",
+      "installed_sha256": "ff93a180e4f0b09a1bc9431e690134c29ac039e6bc51c7fc5ae85117a9162054"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/temporal_learning/__init__.py",
+      "installed": "r_lib/beidan/python/beidan_backend/temporal_learning/__init__.py",
+      "source_sha256": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d",
+      "installed_sha256": "bcd95bc71c4b32c2ceedb47e42d2de7bf3ed1609e0b3d0392f695090bc318d4d"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/temporal_learning/context_replay.py",
+      "installed": "r_lib/beidan/python/beidan_backend/temporal_learning/context_replay.py",
+      "source_sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6",
+      "installed_sha256": "032fd0f6d0e574bcec74bcc2a862e04d36c21976f60a30246b00130bf5f923a6"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/temporal_learning/core.py",
+      "installed": "r_lib/beidan/python/beidan_backend/temporal_learning/core.py",
+      "source_sha256": "ae29042dc9c960c491df56fbd6b18c90e57dab194e6bfacb5226eb24e97c8991",
+      "installed_sha256": "ae29042dc9c960c491df56fbd6b18c90e57dab194e6bfacb5226eb24e97c8991"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/temporal_learning/diagnostic_labels.py",
+      "installed": "r_lib/beidan/python/beidan_backend/temporal_learning/diagnostic_labels.py",
+      "source_sha256": "7902947518b0567d8cd7b35a4a51f8118d8ef7b29539a9cdd551ca8b59d41e73",
+      "installed_sha256": "7902947518b0567d8cd7b35a4a51f8118d8ef7b29539a9cdd551ca8b59d41e73"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/temporal_learning/example_selector.py",
+      "installed": "r_lib/beidan/python/beidan_backend/temporal_learning/example_selector.py",
+      "source_sha256": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee",
+      "installed_sha256": "854dd8efd8d53f61b9ade9edd80c263fdfa5e33cb3ef52908383670ad1229fee"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/temporal_learning/issue_partitions.py",
+      "installed": "r_lib/beidan/python/beidan_backend/temporal_learning/issue_partitions.py",
+      "source_sha256": "c7a8f85e7ce09ba0587ff5146477fbcfc661c3a67a8d9e6024c7dc6744ae5e2b",
+      "installed_sha256": "c7a8f85e7ce09ba0587ff5146477fbcfc661c3a67a8d9e6024c7dc6744ae5e2b"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/temporal_learning/provenance.py",
+      "installed": "r_lib/beidan/python/beidan_backend/temporal_learning/provenance.py",
+      "source_sha256": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919",
+      "installed_sha256": "1d62a5d8896fe2e9c5506582d85bd715ae09a4e02429684b6b5ff6e02b5c3919"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/transport.py",
+      "installed": "r_lib/beidan/python/beidan_backend/transport.py",
+      "source_sha256": "8b68fbc2dc43418a488365416d60f9d719ebb1c6df0980353fb1692b4987a955",
+      "installed_sha256": "8b68fbc2dc43418a488365416d60f9d719ebb1c6df0980353fb1692b4987a955"
+    },
+    {
+      "source": "packages/beidan/inst/python/beidan_backend/unified_sources.py",
+      "installed": "r_lib/beidan/python/beidan_backend/unified_sources.py",
+      "source_sha256": "f5a46b2f960898c0013c6449d52213b307dd6311d55ee31be497e1aac34e28aa",
+      "installed_sha256": "f5a46b2f960898c0013c6449d52213b307dd6311d55ee31be497e1aac34e28aa"
+    }
+  ],
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "library": "r_lib/beidan/python",
+  "comment": "R clients initialize normally installed backend; every required transitive repository-local Python module byte matches declared source closure. R fit function is explicitly sourced with its SHA in native bindings."
+}

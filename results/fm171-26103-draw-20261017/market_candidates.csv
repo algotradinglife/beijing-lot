@@ -1,0 +1,4 @@
+fixture_id,available,sufficient,consistent,euro_companies,max_euro_residual,max_asian_residual,reason,native_state,native_reason,selected_source
+26103:391,TRUE,TRUE,TRUE,3,0.00997700343756347,0.004393245722670858,THREE_CHANNEL_PRIOR_CRITERIA_PASSED,UNESTIMATED,Sparse target competition/venue support,NA
+26103:394,TRUE,TRUE,TRUE,3,0.0016687842470096692,2.6688998490970173e-4,THREE_CHANNEL_PRIOR_CRITERIA_PASSED,UNESTIMATED,Sparse target competition/venue support,NA
+26103:405,TRUE,TRUE,TRUE,3,0.011489699657712127,0.005137132019300994,THREE_CHANNEL_PRIOR_CRITERIA_PASSED,ESTIMATED,Formal same-support native; source market ; fixed FM171 tail,market

@@ -1,0 +1,19 @@
+{
+  "study_id": "FM171_26103_APPEND_20261017",
+  "target_issue": "26103",
+  "prior_issues": ["26098", "26101", "26102"],
+  "mode": "POSTHOC_DIAGNOSTIC_NOT_PROSPECTIVE",
+  "decision_hours_before_kickoff": 24,
+  "fundamentals": {"dataset": "source_issue_26103", "version": "20261014T225500527903Z"},
+  "euro": {"dataset": "source_euro_issue_26103", "version": "20261016T011524878555Z"},
+  "formal_model": "config/fundamental-models/FM-1.7.1.json",
+  "calibration_policy": "config/fm171_draw_history_study.json",
+  "calibration_models": ["GLOBAL"],
+  "diagnostic_label_delays_hours": [48,72],
+  "pseudocount_matches": 50,
+  "target_parameter_tuning": false,
+  "routing_review": "Evidence reliability reviewed before opening target labels; absent three-channel market cannot be marked sufficient. Never substitute euro-only model.",
+  "training": "Only eligible frozen same-version prior forecasts; shared temporal_learning admits rows strictly before each fixture cutoff and excludes target identities.",
+  "comparison": "Matched fixtures and separately disclosed matched timing SP; later prematch SP is a separate diagnostic cohort, not same-cutoff comparison.",
+  "official_version_change": false
+}

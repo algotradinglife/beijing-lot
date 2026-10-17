@@ -1,0 +1,10 @@
+{
+  "status": "ISSUE_NOT_PRESENT_IN_REGISTERED_SETTLEMENT_LABELS",
+  "dataset": "settlement",
+  "base_version": "20260907_history_five_play_v2",
+  "play_partition": "spf",
+  "issue": "26103",
+  "lookup_success": false,
+  "expected_missing_reason": "Public package reader explicitly rejects absent26103; no label was fabricated or treated as a zero-row successful read",
+  "scoring_source_unchanged": "Accepted issue roster SOURCE_PUBLISHED_FULL_TIME; regulation90min remains unverified"
+}

@@ -1,0 +1,7 @@
+None
+None
+# A tibble: 2 × 5
+  mode           fixtures uniform min_lead max_lead
+  <chr>             <int>   <int>    <dbl>    <dbl>
+1 later_prematch      196       0    0.194     24.9
+2 same_cutoff          20       0   24.1       24.9

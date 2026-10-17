@@ -1,0 +1,8 @@
+None
+# A tibble: 4 × 5
+  available sufficient consistent reason                                       n
+  <lgl>     <lgl>      <lgl>      <chr>                                    <int>
+1 FALSE     FALSE      FALSE      MISSING_STALE_TIED_OR_UNSUPPORTED_SAME_…    18
+2 FALSE     FALSE      FALSE      NO_SAVED_ASIAN_TOTAL_CHANNEL               382
+3 TRUE      FALSE      TRUE       PARTIAL_EURO_OR_RESIDUAL_ABOVE_PRIOR_5P…     4
+4 TRUE      TRUE       TRUE       THREE_CHANNEL_PRIOR_CRITERIA_PASSED          3

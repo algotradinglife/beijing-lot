@@ -1,0 +1,139 @@
+---
+title: "26103期：FM-1.7.1与历史让平率校正追加诊断"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: ".."
+  acceptance_required: true
+---
+
+本研究固定上一轮GLOBAL候选，不以26103赛果调参，不升级正式FM。原生λ只用目标同赛事、同场地历史，长期与近期各0.5、近期8场，最低12场及ESS8；ρ固定−0.1。共同三路盘口未就绪时不能用欧赔单独冒充联合市场，按现有来源规则保留原生并披露uncertain。原生支持不足及时间冲突逐场留空。其后使用累计严格超过90%的净胜球核心、外围0.3，冻结完整比分，最后映射实际北单线。
+
+本期按实际证据执行来源裁决：旧目录另有末段25场亚洲/大小球原文，经重放只有3场通过固定市场标准，最终是否切换还取决于原生身份/样本准入。其余分支不能用欧赔单独代替完整市场。未经同版估计的旧FM15/16预测不混入。未据希望的Top1、让球线或目标比分返调λ。没有逐场已标定置信分数；可靠性账本由Codex根据可用事实填写，未调用JEV。
+
+```{r}
+#| include: false
+root<-normalizePath(params$project_root,mustWork=TRUE)
+suppressPackageStartupMessages(library(tidyverse))
+out<-file.path(root,'results/fm171-26103-draw-20261017')
+evaluation<-jsonlite::fromJSON(file.path(out,'evaluation.json'))
+for(i in seq_len(nrow(evaluation$outputs)))stopifnot(digest::digest(file=file.path(out,evaluation$outputs$path[i]),algo='sha256')==evaluation$outputs$sha256[i])
+scope<-read_csv(file.path(out,'scope.csv'),show_col_types=FALSE)
+metrics<-read_csv(file.path(out,'metrics.csv'),show_col_types=FALSE)
+gains<-read_csv(file.path(out,'gains.csv'),show_col_types=FALSE)
+calibration<-read_csv(file.path(out,'calibration.csv'),show_col_types=FALSE)
+groups<-read_csv(file.path(out,'groups.csv'),show_col_types=FALSE)
+sp<-readRDS(file.path(out,'sp-forecasts.rds'))$audit
+ca<-readRDS(file.path(out,'calibrated-forecasts.rds'))$audit
+changes<-read_csv(file.path(out,'changes.csv'),show_col_types=FALSE)
+ordinary<-read_csv(file.path(out,'ordinary_euro.csv'),show_col_types=FALSE)
+market_candidates<-read_csv(file.path(out,'market_candidates.csv'),show_col_types=FALSE)
+clocks<-read_csv(file.path(out,'clock_audit.csv'),show_col_types=FALSE)
+native_manifest<-jsonlite::fromJSON(file.path(out,'native-manifest.json'))
+cal_manifest<-jsonlite::fromJSON(file.path(out,'calibration-manifest.json'))
+stopifnot(nrow(scope)==407L,native_manifest$sha256==evaluation$bindings$native,
+ cal_manifest$sha256==evaluation$bindings$calibration)
+for(kind in c('native','calibration','sp','market')) {
+ m<-jsonlite::fromJSON(file.path(out,paste0(kind,'-manifest.json')))
+ r<-jsonlite::fromJSON(file.path(out,paste0(kind,'-replay.json')))
+ filename<-switch(kind,native='native-forecasts.rds',calibration='calibrated-forecasts.rds',sp='sp-forecasts.rds',market='market-stage.rds')
+ stopifnot(r$status=='FULL_IDENTICAL_REPLAY',r$sha256==m$sha256,digest::digest(file=file.path(out,filename),algo='sha256')==m$sha256)
+}
+```
+
+本期407场为固定分母。目标名单本身包含已知比分，源历史采集在赛后，本项目也有既往赛果知识；不能声称盲测或严格前瞻样本外验证。当前目标比分仅进入独立评分客户端，不进入原生、来源裁决、尾部或历史校正拟合。下列完成数与排除均来自实际账本。
+
+```{r}
+#| echo: false
+knitr::kable(scope |> count(state,reason,name='fixtures'),caption='全407场估计/排除；失败不是零概率')
+knitr::kable(scope |> count(state,selected_source,market_sufficient,market_consistent),caption='实际来源路由；uncertain不等于胜率低')
+knitr::kable(market_candidates,caption='三个市场合格候选及实际来源；市场支持与原生准入分开')
+knitr::kable(tibble(fixture_count=407L,estimated=sum(scope$state=='ESTIMATED'),settled=sum(scope$label_usable),estimated_settled=sum(scope$state=='ESTIMATED'&scope$label_usable),observed_SP_T24=sum(scope$sp_t24),observed_SP_later=sum(scope$sp_later)),caption='估计、结算及SP覆盖的独立分母')
+```
+
+本轮有效FM赛果301场：未校正FM171的Top1/Top2为120/209，全局48h校正为118/202，72h为115/202。主校正救回29次Top2、误伤36次，净减少7次；三类Brier从0.670275升至0.673254，log loss从1.104194升至1.111281，二元让平Brier也变差。这次追加诊断没有复制上一轮全局校正的小幅收益，正式FM不升级。
+
+本期让平实际发生率24.58%，尾部前模型均值25.40%，FM171尾部后26.81%，GLOBAL48再升到30.38%。因此本期原模型已略高估让平，历史全局上调把偏差进一步扩大。训练样本多数走市场分支，而本期仅1场实际走市场，存在明显来源构成变化；当前结果不能把退化唯一归因于路线、赛事构成或某个参数。尾部前Top2为213次，高于FM171的209次，也作为既定对照完整保留，不据此临时停止尾部规则。
+
+较晚赛前SP的151场配对中，北单Top1/Top2为69/120，FM171为56/103，GLOBAL48为54/107。北单排序更准；其Brier/log loss为0.736408/1.303919，FM171为0.666149/1.096919，概率评分则较差。排名命中与概率评分必须分别评价，不能互相替代。严格T−24h配对只剩1场，无法判断该时点的整体表现。
+
+固定均匀概率（每类1/3）的Brier参考值为2/3≈0.666667，log loss为log(3)≈1.098612。全301场FM171在这两项上也未优于此参考；151场配对里FM的改善幅度则很小。因此“相对北单折算概率评分较好”不能直接解释为已具有明显概率预测能力。这个常数仅用于评价解释，不作为新增预测路线或参数选择。
+
+冻结候选仅有GLOBAL；K=50等价样本，最低历史ESS50，每类至少5次。只提名26098、26101、26102已冻结且同版有效的322个赛果。每个目标fixture都传入T−24h显式UTC截止，由共享`temporal_learning`选择真正早于截止的源与标签，不按期号推断全部历史当时可用。原始日粒度历史沿用共享date+1day代理；校准标签沿用decision+48h（主分析）/72h（敏感性）代理，均为诊断钟，不是观察可用性证明。
+
+预测器本身也在赛后重算，训练预测的“源可用时间”仍是诊断代理。真实标签观察时间早于截止，不能把事后生成的预测包变成前瞻训练样本；实际观察钟的支持数另存审计表，不与代理支持数混同。
+
+对于截止准入的n场，令r为让平实际比例、m为历史FM让平平均值：
+
+\[
+r_s=(nr+50m)/(n+50),\quad \delta=\operatorname{logit}(r_s)-\operatorname{logit}(m),\quad
+q=\operatorname{logit}^{-1}(\operatorname{logit}(p_D)+\delta).
+\]
+
+完整比分里让平对应净胜球档乘q/pD，所有其他档乘(1−q)/(1−pD)，保留让胜/让负完整两侧的比例及各分组内部比分条件比例。不是强制让平进入Top2；也不再压缩一次尾部。本研究是在实际北单线条件下的校准，不证明构建了与北单线无关的通用比分校准器。公式是固定矩收缩，不是逻辑回归MLE或独立贝叶斯先验估计。
+
+```{r}
+#| echo: false
+knitr::kable(ca |> group_by(model) |> summarise(fixtures=n(),min_history=min(training_n),max_history=max(training_n),min_observed_label_support=min(observed_prior_labels_before_cutoff),max_observed_label_support=max(observed_prior_labels_before_cutoff),min_logodds_shift=min(delta),max_logodds_shift=max(delta),.groups='drop'),digits=5,caption='代理准入支持、真实标签观察支持及校正幅度；无目标期调参')
+knitr::kable(metrics |> select(cohort,model,n,hits1,hits2,top1,top2,brier,logloss,binary_draw_brier),digits=5,caption='Top1/Top2为命中率；Brier、log loss及二元让平Brier越低越好，所有比较均在同场次内')
+knitr::kable(gains,caption='相对未校正FM的救回与误伤：净增量=save−lose')
+```
+
+ALL_FM是有效同版估计且已完场的样本；PAIRED_T24还要求真实观察SP严格早于T−24h；PAIRED_LATER_PREMATCH容许较晚但严格早于开赛的SP，不能冒称同截止。SP取倒数、归一化为W/D/L相对价格，不乘回款系数。三份原始赛前观察快照由现有prematch解析器离线重放，逐场核对原生ID、让球及开赛时间，不采用结算SP。身份/钟面变化在`sp-identity-rejections.csv`，不静默对齐。
+
+```{r}
+#| echo: false
+knitr::kable(sp |> group_by(mode) |> summarise(n=n(),uniform=sum(uniform),min_lead_hours=min(lead_hours),median_lead_hours=median(lead_hours),max_lead_hours=max(lead_hours),.groups='drop'),digits=2,caption='真实SP观察时间距开赛的小时数；两种截止分开')
+knitr::kable(calibration |> filter(cohort=='ALL_FM'),digits=5,caption='预测平均质量与实际比例；均值接近不保证逐场排序好')
+ggplot(calibration |> filter(cohort=='ALL_FM'),aes(x=outcome,y=predicted_mass,colour=model,group=model))+
+ geom_point(position=position_dodge(width=.4),size=2)+
+ geom_point(aes(y=observed_mass),shape=4,colour='black',size=3)+
+ scale_y_continuous(labels=scales::label_percent())+
+ labs(x='北单让球类别（W让胜 / D让平 / L让负）',y='平均概率；黑叉为实际比例',colour='模型')+theme_minimal()
+knitr::kable(groups,digits=5,caption='按零/非零让球及决策日描述；不在这些分组上择优调参')
+knitr::kable(ordinary |> slice_head(n=12),digits=4,caption='前12个有效原生模型：0让球概率与同截止固定公司篮子欧赔去水均值；非联合市场λ')
+```
+
+源数据版本固定为`source_issue_26103/20261014T225500527903Z`及`source_euro_issue_26103/20261016T011524878555Z`。通过`beidan::read_dataset()`/`dataset_query()`读取，单表读取后在R明确连接。metadata取接受事实来源Titan的原文，必须与NAS provenance哈希相同，parser绑定主客ID。场地中立标志是来源报告，不证明未标者确非中立。各重复赛果在共享准入后由现有opponent准备函数裁决冲突及去重；同赛事完整网络只用于支持/连通性门槛和已有raw输出，归一化λ不进入FM。
+
+大部分场次缺少亚洲/大小球，伤停/阵容也不可用；可靠性全为uncertain并不表示全部球队实力相近。25场旧行情按固定48h报价年龄、欧赔至少3家/4家篮子、欧赔与亚洲最大残差均不超5个百分点进行审查；这沿用既有审查门槛，不在本期择优。历史对照的市场路线较多，本期市场稀疏，存在模型来源构成变化，不能把全局校准均值直接外推所有情景。输入比分口径是来源公布全场，90分钟及杯赛加时口径尚未独立认证。时钟争议场排除，不能自动择有利时钟。所有预测、源/实现哈希、权重账本及收据留在输出RDS，冷启动/支持不足不使用旧版顶替。407并非407个成功预测。
+
+现有来源切换接口要求先有合格的原生网格。#391、#394虽有合格联合市场，却因原生同赛事支持不足留空；#405实际切换。这是当前实现的覆盖局限，不表示前两场市场不支持，也不通过伪造原生网格绕过接口。若将来支持“原生完全不可估但联合市场充分”的直接市场路线，应单独更新接口及验证版本，本轮不静默扩大FM范围。
+
+```{r}
+#| echo: false
+knitr::kable(scope |> filter(state!='ESTIMATED') |> select(slot,home,away,league,reason),caption='逐场排除明细')
+knitr::kable(clocks |> filter(str_detect(reason,'kickoff disagreement')) |> select(fixture_id,analysis_utc,roster_utc,market_titan,market_nowscore,roster_delta_minutes,titan_delta_minutes,nowscore_delta_minutes),caption='时间冲突原值及差值（分钟）；不按结果择钟或默认为零')
+knitr::kable(changes |> filter(top2_FM171!=top2_GLOBAL_D48) |> select(fixture_id,home,away,league,actual_outcome,top2_FM171,top2_GLOBAL_D48,brier_FM171,brier_GLOBAL_D48),digits=5,caption='全局主时钟校正改变Top2命中的全部场次；事后归因，不用于再调参')
+```
+
+复现顺序：加载`config/source-extraction.env`和已声明R_LIBS，使用`.venv/bin/python`及`/opt/R/4.6.1/bin/Rscript`。先运行`r/fm171_26103_intake.R ROOT`，`src/fm171_26103_metadata.py ROOT`（再次加replay），`src/fm171_26103_sp_intake.py ROOT`及`src/fm171_26103_market_intake.py ROOT`；运行`r/fm171_26103_market_freeze.R ROOT`及`replay`，再运行原生冻结客户端的`ROOT shard i 4`（i=1…4）。分片是固定取模的计算分工，各分片仍使用完整407场目标名单与全部已知未来名单，不是学习分区。默认`ROOT`核对缓存身份后组装全期；`ROOT replay-shard i 4`逐场全新计算、忽略缓存并与全期快照精确比较，再由`r/fm171_26103_native_replay_accept.R ROOT`验证四份互斥清单合计407。也可使用未分片的`ROOT replay`整批精确重算。随后`r/fm171_26103_sp_freeze.R ROOT`及`replay`、`r/fm171_26103_calibrate.R ROOT`及`replay`，最后`r/fm171_26103_evaluate.R ROOT`。`run-build.py`保存上述实际argv、退出码及明确环境。不可变预测存在时只接受完全一致对象，不覆盖不同内容。安装依赖属于环境设置，渲染不安装、不下载、不写NAS。
+
+本轮新增的是有界研究客户端，没有修改包内函数。复用函数、客户端与验证的对应关系如下；所有历史准入、分区、权重、ESS、缓存键及模型收据仍由共享`temporal_learning`提供，没有复制时间学习工具。
+
+| 环节与复用函数 | 本轮验证 |
+|---|---|
+| NAS读取、赛事metadata与原文解析客户端 | 六份输入独立读回字节一致；407包metadata重放；传递解析器及原文哈希；物理Parquet哈希 |
+| `prepare_opponent_goals`、`FitOpponentGoals`的`same_support_raw` | 全407场重新计算；测试逐场独立重算主客λ、12场门槛与完整未来ID排除 |
+| `SelectFmProbabilitySource` | 测试逐场按审查条件核对来源及所选网格；完整来源收据重放 |
+| `BuildFmTailJudgement`、`adjust_score_margin_distribution` | 测试逐格核心/外围权重、归一化、完整两侧质量及比分条件比例 |
+| 共享截止/权重与GLOBAL固定拟合表达式 | 测试严格标签/源截止、实际拟合表达式的目标/未来标签变动不变性、不同输入缓存隔离 |
+| 原生缓存与评分标签绑定 | 实际缓存断言的赛程哈希变动拒绝；实际评分断言的让球变动拒绝 |
+| `parse_prematch_sp`及SP准入/折算客户端 | 三份原始观察收据离线解析；ID/让球/时间一致；196/20覆盖、严格截止及倒数归一化测试 |
+| `DcAccuracyDiagnostic`与评分客户端 | 独立评分CSV字节一致；逐模型命中数、三类及二元Brier、log loss独立核算 |
+| QMD交付入口 | 新进程无缓存渲染、数据/源码哈希门禁、表格图形与执行错误检查；预览标量遮蔽问题由修复后的实际渲染验证 |
+
+```{r}
+#| echo: false
+if(isTRUE(params$acceptance_required)) {
+ a<-jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ stopifnot(a$status=='ACCEPTED',a$blocking_findings==0L)
+ for(i in seq_len(nrow(a$files)))stopifnot(digest::digest(file=file.path(root,a$files$path[i]),algo='sha256')==a$files$sha256[i])
+ knitr::kable(tibble(command=a$checks$command,result=a$checks$result),caption='实际自动测试、完整回归、重放、codex review及源码身份验收')
+}else cat('开发预览：验收未完成，不作为正式交付。')
+```

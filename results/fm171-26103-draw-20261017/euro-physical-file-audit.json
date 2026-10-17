@@ -1,0 +1,8 @@
+{
+  "status": "ALL_EURO_PARQUET_SHA256_MATCHED",
+  "files": "euro_history.parquet",
+  "hashes": {
+    "euro_history.parquet": "2f877e64549d98607bb3aa7875c26ea8915f81afcda95ec19aad2ba54be868cf"
+  },
+  "version": "20261016T011524878555Z"
+}

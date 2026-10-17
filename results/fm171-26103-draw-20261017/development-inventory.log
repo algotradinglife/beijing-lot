@@ -1,0 +1,139 @@
+
+TABLE match 407 
+# A tibble: 2 × 10
+  fixture_id provider_id home    away  home_id away_id kickoff_at          venue
+  <chr>      <chr>       <chr>   <chr> <chr>   <chr>   <dttm>              <chr>
+1 26103:1    2929735     大田市民…… 全北现代… 488     484     2026-10-09 05:00:00 大田世界…
+2 26103:2    2925542     水原FC  华城FC… 5586    21244   2026-10-09 05:00:00 水原综合…
+# ℹ 2 more variables: weather <chr>, temperature_text <chr>
+ [1] "fixture_id"       "provider_id"      "home"             "away"            
+ [5] "home_id"          "away_id"          "kickoff_at"       "venue"           
+ [9] "weather"          "temperature_text"
+
+TABLE history 50099 
+# A tibble: 2 × 13
+  fixture_id scope     match_id event_date home_id away_id home_score away_score
+  <chr>      <chr>     <chr>    <date>     <chr>   <chr>        <int>      <int>
+1 26103:1    home_rec… 2929733  2026-09-20 497     488              1          1
+2 26103:1    home_rec… 3068857  2026-09-15 488     3163             1          0
+# ℹ 5 more variables: halftime_home_score <int>, halftime_away_score <int>,
+#   score_scope <chr>, state <chr>, selected_source <chr>
+ [1] "fixture_id"          "scope"               "match_id"           
+ [4] "event_date"          "home_id"             "away_id"            
+ [7] "home_score"          "away_score"          "halftime_home_score"
+[10] "halftime_away_score" "score_scope"         "state"              
+[13] "selected_source"    
+
+TABLE standings 814 
+# A tibble: 2 × 13
+  fixture_id side  team_id team_name played  wins draws losses goals_for
+  <chr>      <chr> <chr>   <chr>      <int> <int> <int>  <int>     <int>
+1 26103:1    home  488     大田市民      30    10    10     10        46
+2 26103:1    away  484     全北现代      30    11    11      8        38
+# ℹ 4 more variables: goals_against <int>, goal_difference <int>, points <int>,
+#   rank <int>
+ [1] "fixture_id"      "side"            "team_id"         "team_name"      
+ [5] "played"          "wins"            "draws"           "losses"         
+ [9] "goals_for"       "goals_against"   "goal_difference" "points"         
+[13] "rank"           
+
+TABLE coverage 2442 
+# A tibble: 2 × 6
+  fixture_id resource    state    observed_count returned_count selected_source
+  <chr>      <chr>       <chr>             <int>          <int> <chr>          
+1 26103:1    home_recent CONFLICT             NA             46 <NA>           
+2 26103:1    away_recent CONFLICT             NA             47 <NA>           
+[1] "fixture_id"      "resource"        "state"           "observed_count" 
+[5] "returned_count"  "selected_source"
+
+TABLE fixture_schedule 1221 
+# A tibble: 2 × 15
+  fixture_id source   resource provider_id kickoff_at          kickoff_date
+  <chr>      <chr>    <chr>    <chr>       <dttm>              <date>      
+1 26103:1    nowscore roster   2929735     NA                  2026-10-09  
+2 26103:1    titan    analysis 2929735     2026-10-09 05:00:00 2026-10-09  
+# ℹ 9 more variables: kickoff_hhmm <chr>, kickoff_js_date <date>,
+#   sale_end_at <dttm>, fixture_status <chr>, score <chr>, state <chr>,
+#   url <chr>, observed_at <dttm>, sha256 <chr>
+ [1] "fixture_id"      "source"          "resource"        "provider_id"    
+ [5] "kickoff_at"      "kickoff_date"    "kickoff_hhmm"    "kickoff_js_date"
+ [9] "sale_end_at"     "fixture_status"  "score"           "state"          
+[13] "url"             "observed_at"     "sha256"         
+
+TABLE status 407 
+# A tibble: 2 × 8
+  issue  slot fixture_id state     conflicts  gaps missing_fields error_type
+  <chr> <int> <chr>      <chr>         <int> <int>          <int> <chr>     
+1 26103     1 26103:1    COLLECTED         5     0              0 <NA>      
+2 26103     2 26103:2    COLLECTED         3     0              0 <NA>      
+[1] "issue"          "slot"           "fixture_id"     "state"         
+[5] "conflicts"      "gaps"           "missing_fields" "error_type"    
+
+TABLE conflicts 1577 
+# A tibble: 2 × 5
+  fixture_id field                   state    titan_json nowscore_json
+  <chr>      <chr>                   <chr>    <chr>      <chr>        
+1 26103:1    history:a_data:coverage CONFLICT 47         30           
+2 26103:1    history:h_data:coverage CONFLICT 46         30           
+[1] "fixture_id"    "field"         "state"         "titan_json"   
+[5] "nowscore_json"
+
+TABLE provenance 1222 
+# A tibble: 2 × 5
+  fixture_id   source   url                           observed_at         sha256
+  <chr>        <chr>    <chr>                         <dttm>              <chr> 
+1 26103:roster nowscore https://cp.nowscore.com/buy/… 2026-10-13 04:55:48 a0558…
+2 26103:1      titan    https://zq.titan007.com/anal… 2026-10-13 04:56:19 c55f2…
+[1] "fixture_id"  "source"      "url"         "observed_at" "sha256"     
+
+EURO contexts 814 
+# A tibble: 2 × 12
+  fixture_id source   native_id home_id away_id home   away  kickoff_at         
+  <chr>      <chr>    <chr>     <chr>   <chr>   <chr>  <chr> <dttm>             
+1 26103:1    titan    2929735   488     484     大田市民…… 全北现代… 2026-10-09 05:00:00
+2 26103:1    nowscore 2929735   488     484     大田市民…… 全北现代… 2026-10-09 05:00:00
+# ℹ 4 more variables: analysis_kickoff_at <dttm>, clock_state <chr>,
+#   analysis_url <chr>, analysis_sha256 <chr>
+ [1] "fixture_id"          "source"              "native_id"          
+ [4] "home_id"             "away_id"             "home"               
+ [7] "away"                "kickoff_at"          "analysis_kickoff_at"
+[10] "clock_state"         "analysis_url"        "analysis_sha256"    
+
+EURO status 407 
+# A tibble: 2 × 8
+  issue  slot fixture_id titan_state nowscore_state history_rows current_rows
+  <chr> <int> <chr>      <chr>       <chr>                 <int>        <int>
+1 26103     1 26103:1    VERIFIED    VERIFIED               4346          310
+2 26103     2 26103:2    VERIFIED    VERIFIED               3866          274
+# ℹ 1 more variable: conflicts <int>
+[1] "issue"          "slot"           "fixture_id"     "titan_state"   
+[5] "nowscore_state" "history_rows"   "current_rows"   "conflicts"     
+
+EURO companies 262860 
+# A tibble: 2 × 5
+  fixture_id source company_id record_id company_name
+  <chr>      <chr>  <chr>      <chr>     <chr>       
+1 26103:1    titan  281        158478690 Bet 365     
+2 26103:1    titan  80         158483159 Macauslot   
+[1] "fixture_id"   "source"       "company_id"   "record_id"    "company_name"
+
+EURO CONTRACT
+     fixture_id          source      company_id       record_id    company_name 
+    "character"     "character"     "character"     "character"     "character" 
+   source_order        quote_at source_time_raw           phase       odds_home 
+      "integer"       "POSIXct"     "character"     "character"        "double" 
+      odds_draw       odds_away   valid_decimal      source_url  raw_row_sha256 
+       "double"        "double"       "logical"     "character"     "character" 
+
+SETTLEMENT TABLES
+ [1] "capture"                    "finding"                   
+ [3] "finding_supersession"       "finding_supersession_batch"
+ [5] "half_full_correction"       "half_full_correction_batch"
+ [7] "halftime_correction"        "halftime_correction_batch" 
+ [9] "issue_addition"             "issue_addition_batch"      
+[11] "issue_addition_capture"     "issue_recovery_batch"      
+[13] "issue_recovery_capture"     "issue_recovery_gap"        
+[15] "observation"                "option_sp"                 
+[17] "receipt"                    "sp_correction"             
+[19] "sp_correction_batch"       
+[1] "play_labels"

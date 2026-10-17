@@ -1,0 +1,355 @@
+{
+  "rows": [
+    {
+      "fixture_id": "26103:383",
+      "kind": "asian",
+      "expected": "20261013003000",
+      "requested": "20261013003000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:383",
+      "kind": "total",
+      "expected": "20261013003000",
+      "requested": "20261013003000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:384",
+      "kind": "asian",
+      "expected": "20261013003000",
+      "requested": "20261013003000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:384",
+      "kind": "total",
+      "expected": "20261013003000",
+      "requested": "20261013003000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:385",
+      "kind": "asian",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:385",
+      "kind": "total",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:386",
+      "kind": "asian",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:386",
+      "kind": "total",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:387",
+      "kind": "asian",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:387",
+      "kind": "total",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:388",
+      "kind": "asian",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:388",
+      "kind": "total",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:389",
+      "kind": "asian",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:389",
+      "kind": "total",
+      "expected": "20261013010000",
+      "requested": "20261013010000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:390",
+      "kind": "asian",
+      "expected": "20261013020000",
+      "requested": "20261013020000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:390",
+      "kind": "total",
+      "expected": "20261013020000",
+      "requested": "20261013020000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:391",
+      "kind": "asian",
+      "expected": "20261013023000",
+      "requested": "20261013023000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:391",
+      "kind": "total",
+      "expected": "20261013023000",
+      "requested": "20261013023000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:392",
+      "kind": "asian",
+      "expected": "20261013024500",
+      "requested": "20261013024500",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:392",
+      "kind": "total",
+      "expected": "20261013024500",
+      "requested": "20261013024500",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:393",
+      "kind": "asian",
+      "expected": "20261013024500",
+      "requested": "20261013024500",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:393",
+      "kind": "total",
+      "expected": "20261013024500",
+      "requested": "20261013024500",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:394",
+      "kind": "asian",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:394",
+      "kind": "total",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:395",
+      "kind": "asian",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:395",
+      "kind": "total",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:396",
+      "kind": "asian",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:396",
+      "kind": "total",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:397",
+      "kind": "asian",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:397",
+      "kind": "total",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:398",
+      "kind": "asian",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:398",
+      "kind": "total",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:399",
+      "kind": "asian",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:399",
+      "kind": "total",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:400",
+      "kind": "asian",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:400",
+      "kind": "total",
+      "expected": "20261013030000",
+      "requested": "20261013030000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:401",
+      "kind": "asian",
+      "expected": "20261013031500",
+      "requested": "20261013031500",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:401",
+      "kind": "total",
+      "expected": "20261013031500",
+      "requested": "20261013031500",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:402",
+      "kind": "asian",
+      "expected": "20261013040000",
+      "requested": "20261013040000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:402",
+      "kind": "total",
+      "expected": "20261013040000",
+      "requested": "20261013040000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:403",
+      "kind": "asian",
+      "expected": "20261013053000",
+      "requested": "20261013053000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:403",
+      "kind": "total",
+      "expected": "20261013053000",
+      "requested": "20261013053000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:404",
+      "kind": "asian",
+      "expected": "20261013060000",
+      "requested": "20261013060000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:404",
+      "kind": "total",
+      "expected": "20261013060000",
+      "requested": "20261013060000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:405",
+      "kind": "asian",
+      "expected": "20261013063000",
+      "requested": "20261013063000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:405",
+      "kind": "total",
+      "expected": "20261013063000",
+      "requested": "20261013063000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:406",
+      "kind": "asian",
+      "expected": "20261013063000",
+      "requested": "20261013063000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:406",
+      "kind": "total",
+      "expected": "20261013063000",
+      "requested": "20261013063000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:407",
+      "kind": "asian",
+      "expected": "20261013080000",
+      "requested": "20261013080000",
+      "matches": true
+    },
+    {
+      "fixture_id": "26103:407",
+      "kind": "total",
+      "expected": "20261013080000",
+      "requested": "20261013080000",
+      "matches": true
+    }
+  ],
+  "mismatches": 0
+}

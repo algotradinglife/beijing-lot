@@ -1,0 +1,92 @@
+{
+  "status": "EVALUATED",
+  "commands": [
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_native_freeze.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_native_freeze.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+        "replay-shard",
+        "1",
+        "4"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_native_freeze.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+        "replay-shard",
+        "2",
+        "4"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_native_freeze.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+        "replay-shard",
+        "3",
+        "4"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_native_freeze.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+        "replay-shard",
+        "4",
+        "4"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_native_replay_accept.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_calibrate.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_calibrate.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+        "replay"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_evaluate.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "runner_sha256": "8bac2baca97962915c7e25bb6cc5a0d2e29b2a2de6d9038dd18bcf20bfd4c6cc",
+  "wall_seconds": 2360.4397748280317
+}

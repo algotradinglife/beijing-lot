@@ -1,0 +1,8 @@
+{
+  "status": "FULL_IDENTICAL_REPLAY",
+  "forecasts": 303,
+  "scope": 407,
+  "sha256": "c22be3e3a9be3c8776c3cbdc96d1c57023901c2879620aa06822cdbd231a1aee",
+  "method": "Four disjoint fresh recomputations compared exact entries/audit/probabilities/bindings to frozen full batch; complete407-ID union verified",
+  "client_sha256": "31d23b54c8b2bc073ef65f9989e54d75018592f88616cb8ebd4d8eee1e2d87df"
+}

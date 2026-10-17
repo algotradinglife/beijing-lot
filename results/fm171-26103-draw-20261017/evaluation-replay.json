@@ -1,0 +1,20 @@
+{
+  "status": "ALL_SCORING_CSV_BYTE_IDENTICAL",
+  "files": {
+    "metrics.csv": "92bbae19270d9dc2d8b6e8318a135aaf453d094771cfcaf569819b5d1f2007a9",
+    "scores.csv": "a3b14c439160a29b4f569f1606fc7b290c0b9d069f6bdeeea832540693064ff9",
+    "calibration.csv": "13c16c94635fc862a77814b8a09b22cbb0c10c0f29dcca77debc280a6a87c6ed",
+    "recall.csv": "0203f293bcbb6491786f8e147228f40f354eb22460ecc045bc57c3937ba28221",
+    "changes.csv": "4fe5a622ebbfc19f513a3b6cbc44c8ccf60b7b90dfb03543e15c054a089c989d",
+    "gains.csv": "a812e16749a1d4f9800ee4b678e18948ea7ca3f59810c6ad11b39658f627e3cf",
+    "groups.csv": "4c3c772cb6a2608a547a5311031ac04c2a51d4745400726e2a0dfef430cb04d3",
+    "scope.csv": "b5ad4198e5b127002f932a9cbd6dd1f8717307455d72df84b607cbcf76e56011",
+    "margins.csv": "36a6ba2a0db564222be388f14c7212ad96e4e785970cf84364fb0876ab245514",
+    "ordinary_euro.csv": "3768a1433edcf77de2219a0119d471b24cb3bd420c1052607069d8c6860e42de",
+    "market_candidates.csv": "35bff8e094c2e430d63d51de5ab92464785e0b5069b5cb71ffc2a74223ab514f",
+    "clock_audit.csv": "6c8ed8ed5c1441fdd01faa57252d9a5c29ea7767f6c85c11489ed4d19dd5d074",
+    "labels.csv": "bf7c34a73f6f588139f4fd8cfedce58dcd4c7517cdfebe054244a5cbe492cafd",
+    "label-exclusions.csv": "728c1f5e9b06c71f1bd8bd319d091407e81a5cfada1bce28004973e6a047c040"
+  },
+  "backup": "/home/drwho1985/.cache/tmp/fm171-26103-verification-vem2hhrp"
+}

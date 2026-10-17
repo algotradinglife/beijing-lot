@@ -1,0 +1,15 @@
+None
+# A tibble: 2 × 3
+  state       reason                                                           n
+  <chr>       <chr>                                                        <int>
+1 ESTIMATED   Formal same-support native; insufficient three-channel mark…     1
+2 UNESTIMATED Sparse target competition/venue support                          1
+# A tibble: 2 × 18
+  fixture_id  slot home     away     league handicap cutoff_utc     state reason
+  <chr>      <int> <chr>    <chr>    <chr>     <int> <chr>          <chr> <chr> 
+1 26103:1        1 大田市民 全北现代 韩K联         0 2026-10-08T05… ESTI… Forma…
+2 26103:2        2 水原FC   华城FC   韩K2联        0 2026-10-08T05… UNES… Spars…
+# ℹ 9 more variables: confidence <chr>, market_sufficient <lgl>,
+#   market_consistent <lgl>, market_gap <chr>, lambda_home <dbl>,
+#   lambda_away <dbl>, competition_id <chr>, fit_rows <int>,
+#   metadata_missing <int>

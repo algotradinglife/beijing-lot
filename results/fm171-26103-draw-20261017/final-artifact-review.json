@@ -1,0 +1,29 @@
+{
+  "status": "NO_ACTIONABLE_DEFECTS",
+  "reviewer": "codex review",
+  "verdict": "No actionable defects. Scoped delivery hashes, replay receipts, command records, numerical conclusions, and final HTML reconcile. Retrospective/proxy-clock and source-routing limitations and two unverified integration skips are disclosed; full tests were not rerun.\nNo actionable defects. Scoped delivery hashes, replay receipts, command records, numerical conclusions, and final HTML reconcile. Retrospective/proxy-clock and source-routing limitations and two unverified integration skips are disclosed; full tests were not rerun.",
+  "review_log_sha256": "84c1b6eaf69c53e06a87a983c6d180a3f1e7710ab3a3e573367f2e5d6607e36c",
+  "reviewed_artifacts": [
+    {
+      "path": "results/fm171-26103-draw-20261017/acceptance.json",
+      "sha256": "d2814f5d4fcf1fb14d1983cee3f67c76157b65af2d8a2f2035d6fb1a50b58696"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/full-test-results.json",
+      "sha256": "7efc6d16e7e213b474ef2264078ec9f3b9abff3816f42439042a0f7d69e53bdc"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/html-validation.json",
+      "sha256": "76e1ac051260b08ddd964ab7f4e82881be6714bd44539c6f5549dc730ec87a88"
+    },
+    {
+      "path": "quarto/fm171_26103_draw_20261017.qmd",
+      "sha256": "d8ac648f8ba351e2fc8915abe5a4451597e9c726caf11690856deca36ea574de"
+    },
+    {
+      "path": "quarto/fm171_26103_draw_20261017.html",
+      "sha256": "eb708896b1e387e8197a880ede75526d40f287e9cbaa2ad216dc8611e4a0e5cf"
+    }
+  ],
+  "pi_verification": "All acceptance-bound files verified; final numeric conclusions and render receipt reconciled. Two missing integration fixtures remain unverified."
+}

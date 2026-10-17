@@ -1,0 +1,38 @@
+{
+  "status": "COMPLETE_R_ENTRY_PASSED",
+  "commands": [
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_intake.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "r/fm171_26103_evaluate.R",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "-e",
+        "library(testthat);library(beidan);beidan::python_backend(Sys.getenv(\"BEIDAN_TEST_PYTHON\"));x<-test_file(\"tests/testthat/test-fm171-26103-draw.R\",package=\"beidan\",load_helpers=FALSE,reporter=\"summary\",stop_on_failure=FALSE);d<-as.data.frame(x);totals<-list(tests=nrow(d),passed=sum(d$passed),failed=sum(d$failed),errors=sum(d$error),warnings=sum(d$warning),skipped=sum(d$skipped));jsonlite::write_json(totals,\"results/fm171-26103-draw-20261017/targeted-tests.json\",auto_unbox=TRUE,pretty=TRUE);stopifnot(totals$failed==0,totals$errors==0,totals$warnings==0,totals$skipped==0)"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/opt/R/4.6.1/bin/Rscript",
+        "tests/testthat.R"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "runner_sha256": "696accdbc2c59052a719be39748246154371344098eb29aaed7347ae6438b125",
+  "wall_seconds": 2279.7367175698746
+}

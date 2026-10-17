@@ -1,0 +1,62 @@
+None
+None
+Attempt 10/407 estimated 7
+Attempt 20/407 estimated 14
+Attempt 30/407 estimated 21
+Attempt 40/407 estimated 30
+Attempt 50/407 estimated 38
+Attempt 60/407 estimated 47
+Attempt 70/407 estimated 56
+Attempt 80/407 estimated 66
+Attempt 90/407 estimated 75
+Attempt 100/407 estimated 83
+Attempt 110/407 estimated 91
+Attempt 120/407 estimated 98
+Attempt 130/407 estimated 105
+Attempt 140/407 estimated 111
+Attempt 150/407 estimated 117
+Attempt 160/407 estimated 123
+Attempt 170/407 estimated 132
+Attempt 180/407 estimated 139
+Attempt 190/407 estimated 141
+Attempt 200/407 estimated 151
+Attempt 210/407 estimated 159
+Attempt 220/407 estimated 166
+Attempt 230/407 estimated 173
+Attempt 240/407 estimated 180
+Attempt 250/407 estimated 182
+Attempt 260/407 estimated 191
+Attempt 270/407 estimated 200
+Attempt 280/407 estimated 210
+Attempt 290/407 estimated 217
+Attempt 300/407 estimated 226
+Attempt 310/407 estimated 235
+Attempt 320/407 estimated 239
+Attempt 330/407 estimated 239
+Attempt 340/407 estimated 245
+Attempt 350/407 estimated 253
+Attempt 360/407 estimated 262
+Attempt 370/407 estimated 272
+Attempt 380/407 estimated 279
+Attempt 390/407 estimated 288
+Attempt 400/407 estimated 295
+# A tibble: 4 × 3
+  state       reason                                                           n
+  <chr>       <chr>                                                        <int>
+1 ESTIMATED   Formal same-support native; source market ; fixed FM171 tail     1
+2 ESTIMATED   Formal same-support native; source native ; fixed FM171 tail   302
+3 UNESTIMATED Sparse target competition/venue support                         57
+4 UNESTIMATED Unresolved roster/analysis/market kickoff disagreement          47
+# A tibble: 5 × 21
+  fixture_id  slot home     away     league handicap cutoff_utc     state reason
+  <chr>      <int> <chr>    <chr>    <chr>     <int> <chr>          <chr> <chr> 
+1 26103:1        1 大田市民 全北现代 韩K联         0 2026-10-08T05… ESTI… Forma…
+2 26103:2        2 水原FC   华城FC   韩K2联        0 2026-10-08T05… UNES… Spars…
+3 26103:3        3 江原FC   富川FC   韩K联        -1 2026-10-08T07… ESTI… Forma…
+4 26103:4        4 仁川联   浦项制铁 韩K联         0 2026-10-08T07… ESTI… Forma…
+5 26103:5        5 忠北清州 城南FC   韩K2联        0 2026-10-08T07… ESTI… Forma…
+# ℹ 12 more variables: confidence <chr>, market_sufficient <lgl>,
+#   market_consistent <lgl>, market_gap <chr>, lambda_home <dbl>,
+#   lambda_away <dbl>, competition_id <chr>, fit_rows <int>,
+#   metadata_missing <int>, selected_source <chr>, native_lambda_home <dbl>,
+#   native_lambda_away <dbl>

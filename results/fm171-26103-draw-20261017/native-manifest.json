@@ -1,0 +1,23 @@
+{
+  "forecasts": 303,
+  "scope": 407,
+  "sha256": "c22be3e3a9be3c8776c3cbdc96d1c57023901c2879620aa06822cdbd231a1aee",
+  "bindings": {
+    "inputs": "2c5b602d2b5c7a7560c661b7a31d19d1643f73111b2860798eb31f8aeb695fc1",
+    "metadata": "67408da0b1c8b21a7a9adb7c9ae1373e717dfbf308ff7f37d4109d8c716d5b50",
+    "fundamentals_snapshot": "b0c05b635702d6c88fd8ef18c0facc0868404815a6ccf118099f208733eb995d",
+    "policy": "f63e06561034b95f96e57d2983db29fd73af5f876f0e687e3a1f4e54cec265d2",
+    "study": "1b0d41ee25b4e823e2624119a9e969b40f76e801bcb302f9a3fbade2b5333e17",
+    "client": "f8dd42ce02bb6173b0d11fbf93d0fd1d9ba186941b4d762e1abf1f060f72eba5",
+    "fit_R": "fb78c1d76763053eee9d05a520ba8402cc7cd62f181b2f7161f6619e63a38e05",
+    "runtime": "7f9bca623d8a3294530b6fae3d215eadb5e1f31d3bddd8ea037c9aca2398aad2",
+    "exclusions": "8c3d061468600ef829bbbae7f70f1ae9de79953f0c6f92721cf2baf8acafdbcc",
+    "market_stage": "66fa72f21472c1b693aa73b0b2a6a553b04da68c0ce67ce76a5ddf404ae62666",
+    "direction_implementation": "a0da1e5f0550ab82f6fa7342e2f75cf3126b475de0039a6b85d20a1db0900fb4"
+  },
+  "target_parameter_tuning": false,
+  "target_roster_contains_known_settlement": true,
+  "intended_use": "POSTHOC_DIAGNOSTIC",
+  "prospective_validated": false,
+  "market_note": "Available saved three-channel quotes reviewed using fixed prior criteria; no euro-only substitution; others explicitly retain uncertain native"
+}

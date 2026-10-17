@@ -1,0 +1,20 @@
+{
+  "sha256": "07f18f5af310ec9e46bce32a195cca38ca30cedfc6eed0755bc2988d95809930",
+  "bindings": {
+    "native": "c22be3e3a9be3c8776c3cbdc96d1c57023901c2879620aa06822cdbd231a1aee",
+    "prior_forecasts": "c1a1540557d38248967b6428632c3df3e221889005d0d7c7e26c3fe2de5dbdb2",
+    "prior_labels": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e",
+    "client": "7b347caa9ad476ed301d77aa06d114f67a6d847ccb83e617a3b7c4bda79f7f62",
+    "policy": "26292611dc3eaca6db6bce8e09bb9e39c565dfe0c7ed9710080a11d2c8f995d7",
+    "study": "1b0d41ee25b4e823e2624119a9e969b40f76e801bcb302f9a3fbade2b5333e17",
+    "prior_client": "92d2434567d433b7ea8bca5cd4473215506b46e95310c6d175321b1221916851",
+    "observed_label_sources": "796fd27e0127212aebac8761d088c0f554fb7d025fed599a3b0ea70cdad8f456",
+    "direction_implementation": "a0da1e5f0550ab82f6fa7342e2f75cf3126b475de0039a6b85d20a1db0900fb4"
+  },
+  "forecasts": 303,
+  "prior_issues": ["26098", "26101", "26102"],
+  "target_labels_admitted": false,
+  "retrospective_label_catalog_opened": true,
+  "observed_availability_validated": false,
+  "versions_modified": false
+}

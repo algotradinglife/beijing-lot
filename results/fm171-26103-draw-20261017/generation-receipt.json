@@ -1,0 +1,41 @@
+{
+  "receipt_generated_at_utc": "2026-10-17T07:24:39.328599+00:00",
+  "times_are_observed_filesystem_metadata_not_prospective_availability_proof": true,
+  "artifacts": [
+    {
+      "path": "results/fm171-26103-draw-20261017/native-forecasts.rds",
+      "sha256": "c22be3e3a9be3c8776c3cbdc96d1c57023901c2879620aa06822cdbd231a1aee",
+      "observed_mtime_utc": "2026-10-17T06:36:39.178494+00:00"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/calibrated-forecasts.rds",
+      "sha256": "07f18f5af310ec9e46bce32a195cca38ca30cedfc6eed0755bc2988d95809930",
+      "observed_mtime_utc": "2026-10-17T06:56:30.033424+00:00"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/sp-forecasts.rds",
+      "sha256": "ec420734727eb140190496a03d9c04dcd396661074f91b3ef80d1aa128ccda58",
+      "observed_mtime_utc": "2026-10-17T06:13:58.167904+00:00"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/market-stage.rds",
+      "sha256": "66fa72f21472c1b693aa73b0b2a6a553b04da68c0ce67ce76a5ddf404ae62666",
+      "observed_mtime_utc": "2026-10-17T06:08:40.110955+00:00"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/metadata.json",
+      "sha256": "67408da0b1c8b21a7a9adb7c9ae1373e717dfbf308ff7f37d4109d8c716d5b50",
+      "observed_mtime_utc": "2026-10-17T06:10:34.347014+00:00"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/inputs.json",
+      "sha256": "2c5b602d2b5c7a7560c661b7a31d19d1643f73111b2860798eb31f8aeb695fc1",
+      "observed_mtime_utc": "2026-10-17T07:00:19.805578+00:00"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/evaluation.json",
+      "sha256": "f760142a5059d6d8dbdf9720c38a8cfd265b5b0b993a339e40cda4560b8cc960",
+      "observed_mtime_utc": "2026-10-17T07:00:32.876954+00:00"
+    }
+  ]
+}

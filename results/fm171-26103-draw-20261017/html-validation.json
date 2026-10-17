@@ -1,0 +1,17 @@
+{
+  "status": "FINAL_ACCEPTANCE_RENDER_PASSED",
+  "exit_status": 0,
+  "tables": 16,
+  "figures": 1,
+  "execution_errors": 0,
+  "html_sha256": "eb708896b1e387e8197a880ede75526d40f287e9cbaa2ad216dc8611e4a0e5cf",
+  "all_acceptance_source_hashes_verified": true,
+  "command": [
+    "quarto",
+    "render",
+    "quarto/fm171_26103_draw_20261017.qmd",
+    "--no-cache"
+  ],
+  "run": 2,
+  "figure_inspected": "Chinese axes/legend/points and actual-rate crosses inspected in identical-data clean preview"
+}

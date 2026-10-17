@@ -1,0 +1,12 @@
+{
+  "status": "ALL_PINNED_INPUTS_BYTE_IDENTICAL",
+  "files": {
+    "fundamentals.rds": "b0c05b635702d6c88fd8ef18c0facc0868404815a6ccf118099f208733eb995d",
+    "fixtures.csv": "1451935300974406086af369167541c954fa928267a3f44e2ad9a00c27cc79c3",
+    "inputs.json": "2c5b602d2b5c7a7560c661b7a31d19d1643f73111b2860798eb31f8aeb695fc1",
+    "euro-contexts.rds": "2c97df803ffd2b0b1a7fc5e0b5b5686b8eaad63c89cd02980efe3d47138f42b2",
+    "euro-selected.rds": "dbe132c3793be36463d40c8815014709e5160afb760ee4f9f46d66411d9673fa",
+    "exclusion-rosters.json": "8c3d061468600ef829bbbae7f70f1ae9de79953f0c6f92721cf2baf8acafdbcc"
+  },
+  "backup": "/home/drwho1985/.cache/tmp/fm171-26103-verification-vem2hhrp"
+}

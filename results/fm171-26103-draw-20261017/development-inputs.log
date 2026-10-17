@@ -1,0 +1,16 @@
+observation 
+ observation_id           issue            slot            play native_match_id 
+       "double"     "character"        "double"     "character"     "character" 
+         status           score  halftime_score expected_option   source_sha256 
+    "character"     "character"     "character"     "character"     "character" 
+     source_url     received_at    payload_json      issue_year 
+    "character"     "character"     "character"       "integer" 
+option_sp 
+observation_id         option         raw_sp             sp        cell_id 
+      "double"    "character"    "character"       "double"    "character" 
+    issue_year 
+     "integer" 
+Error in beidan::dataset_contract("settlement", "play_labels", play = "handicap_result") : 
+  unused argument (play = "handicap_result")
+Calls: print
+Execution halted

@@ -1,0 +1,43 @@
+{
+  "R": "4.6.1",
+  "R_executable": "/opt/R/4.6.1/bin/Rscript",
+  "beidan_library": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib/beidan",
+  "DLL_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib/beidan/libs/beidan.so",
+  "R_dependencies": {
+    "beidan": "0.2.0",
+    "tidyverse": "2.0.0",
+    "tibble": "3.3.1",
+    "dplyr": "1.2.1",
+    "readr": "2.2.0",
+    "purrr": "1.2.2",
+    "glmnet": "5.1",
+    "Matrix": "1.7.6",
+    "igraph": "2.3.3",
+    "reticulate": "1.46.0",
+    "testthat": "3.3.2",
+    "jsonlite": "2.0.0",
+    "digest": "0.6.39",
+    "lubridate": "1.9.5",
+    "ggplot2": "4.0.3",
+    "scales": "1.4.0",
+    "knitr": "1.51",
+    "rprojroot": "2.1.1"
+  },
+  "library_paths": [
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-diagnostic-iterations-20261013/library",
+    "/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6",
+    "/opt/R/4.6.1/lib/R/library"
+  ],
+  "TZ": "UTC",
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "python_executable": ".venv/bin/python",
+  "Python_dependencies": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "beautifulsoup4": "4.15.0",
+    "json5": "0.15.0"
+  },
+  "Quarto": "1.10.18",
+  "setup": "Existing dependencies only; no installs in analysis/functions/render. R package setup uses pak, not part of rendering. Explicit full library/interpreter environment in test-environment.json."
+}

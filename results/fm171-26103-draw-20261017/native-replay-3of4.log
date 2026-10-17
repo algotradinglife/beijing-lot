@@ -1,0 +1,39 @@
+None
+None
+Attempt 10/102 estimated 9
+Processed 10 estimated 10
+Attempt 20/102 estimated 19
+Processed 20 estimated 20
+Attempt 30/102 estimated 28
+Processed 30 estimated 29
+Attempt 40/102 estimated 33
+Processed 40 estimated 34
+Attempt 50/102 estimated 40
+Processed 50 estimated 41
+Attempt 60/102 estimated 48
+Attempt 70/102 estimated 54
+Processed 70 estimated 55
+Attempt 80/102 estimated 62
+Attempt 90/102 estimated 67
+Processed 90 estimated 68
+Attempt 100/102 estimated 74
+Processed 100 estimated 75
+# A tibble: 3 × 3
+  state       reason                                                           n
+  <chr>       <chr>                                                        <int>
+1 ESTIMATED   Formal same-support native; source native ; fixed FM171 tail    77
+2 UNESTIMATED Sparse target competition/venue support                         10
+3 UNESTIMATED Unresolved roster/analysis/market kickoff disagreement          15
+# A tibble: 5 × 21
+  fixture_id  slot home     away         league handicap cutoff_utc state reason
+  <chr>      <int> <chr>    <chr>        <chr>     <int> <chr>      <chr> <chr> 
+1 26103:3        3 江原FC   富川FC       韩K联        -1 2026-10-0… ESTI… Forma…
+2 26103:7        7 鹿岛鹿角 大阪钢巴     日职联        0 2026-10-0… ESTI… Forma…
+3 26103:11      11 兹林     布拉格斯拉维亚…… 捷甲          2 2026-10-0… ESTI… Forma…
+4 26103:15      15 克鲁比04 EIF埃克纳斯  芬甲         -1 2026-10-0… ESTI… Forma…
+5 26103:19      19 布伦瑞克 荷尔斯泰因   德乙          0 2026-10-0… ESTI… Forma…
+# ℹ 12 more variables: confidence <chr>, market_sufficient <lgl>,
+#   market_consistent <lgl>, market_gap <chr>, lambda_home <dbl>,
+#   lambda_away <dbl>, competition_id <chr>, fit_rows <int>,
+#   metadata_missing <int>, selected_source <chr>, native_lambda_home <dbl>,
+#   native_lambda_away <dbl>

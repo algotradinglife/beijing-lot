@@ -1,0 +1,12 @@
+None
+Calibrated 50
+Calibrated 100
+Calibrated 150
+Calibrated 200
+Calibrated 250
+Calibrated 300
+# A tibble: 2 × 6
+  model      fixtures min_history max_history min_delta max_delta
+  <chr>         <int>       <dbl>       <dbl>     <dbl>     <dbl>
+1 GLOBAL_D48      303         302         322     0.164     0.181
+2 GLOBAL_D72      303         254         322     0.164     0.239
