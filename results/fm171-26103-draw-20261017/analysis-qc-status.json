@@ -1,0 +1,13 @@
+{
+  "status": "HOLD_INCOMPLETE_MARKET_REVIEW",
+  "analysis_quality_accepted": false,
+  "original_acceptance_sha256": "d2814f5d4fcf1fb14d1983cee3f67c76157b65af2d8a2f2035d6fb1a50b58696",
+  "scope": "26103 frozen study only",
+  "frozen_numeric_results_preserved": true,
+  "full_workflow_efficacy_claim_withdrawn": true,
+  "forecast_modified": false,
+  "formal_model_modified": false,
+  "quality_report": "quarto/fm171_26103_analysis_qc_hold_20261017.qmd",
+  "trigger_evidence": "quarto/fm171_26103_case383_20261017.qmd",
+  "reason": "Empty fixed-company Euro basket was not distinguished sufficiently from source coverage; full issue market and recent-sample evidence review incomplete. Procedural tests do not establish analytical QC."
+}

@@ -1,0 +1,58 @@
+---
+title: "26103期分析质控：撤回完整FM流程验收认定"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: ".."
+---
+
+本文件优先于该期原交付中“已完成FM完整流程分析”的认定。原测试、复现及冻结统计不删除，也不修改原始数据或预测；本次撤回的是完整分析质控验收与相应效能外推。正式模型版本未改。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+out <- file.path(root,'results/fm171-26103-draw-20261017')
+status <- jsonlite::fromJSON(file.path(out,'analysis-qc-status.json'))
+stopifnot(status$analysis_quality_accepted==FALSE,status$status=='HOLD_INCOMPLETE_MARKET_REVIEW')
+stopifnot(digest::digest(file=file.path(out,'acceptance.json'),algo='sha256')==status$original_acceptance_sha256)
+a <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+for (name in c('native-forecasts.rds','market-stage.rds','ordinary_euro.csv')) {
+  expected <- a$files |> filter(path==paste0('results/fm171-26103-draw-20261017/',name))
+  stopifnot(nrow(expected)==1L,digest::digest(file=file.path(out,name),algo='sha256')==expected$sha256)
+}
+native <- readRDS(file.path(out,'native-forecasts.rds'))$audit
+market <- readRDS(file.path(out,'market-stage.rds'))$audit
+euro <- read_csv(file.path(out,'ordinary_euro.csv'),show_col_types=FALSE)
+stopifnot(nrow(native)==407L,nrow(market)==407L,nrow(euro)==303L,
+ sum(native$state=='ESTIMATED')==303L,
+ sum(native$selected_source=='market',na.rm=TRUE)==1L,
+ sum(is.na(euro$companies))==31L,
+ sum(market$reason=='NO_SAVED_ASIAN_TOTAL_CHANNEL')==382L)
+```
+
+分析质控状态：**未通过；不得将本期作为已完成逐场证据审查的FM完整流程效能验收。** 原本“ACCEPTED”收据只保留为当时程序、重放及数值检查的历史记录，现由analysis-qc-status.json明确补充并覆盖分析验收语义。该限制只针对本期交付，不自动推翻其他期的独立证据。
+
+```{r}
+#| echo: false
+tibble(检查项目=c('整期名单','生成预测','联合市场实际选用','固定四家欧赔篮子为空','无本次已保存亚洲盘/大小球输入'),
+       场数=c(nrow(native),sum(native$state=='ESTIMATED'),sum(native$selected_source=='market',na.rm=TRUE),sum(is.na(euro$companies)),sum(market$reason=='NO_SAVED_ASIAN_TOTAL_CHANNEL'))) |>
+ knitr::kable()
+```
+
+31场只确认“固定四家篮子筛空”，尚未逐场核查全部已有欧赔。#383已经证实：原四家最近报价距截止均超过48小时，但相同版本和相同截止前，另有256个公司ID满足时窗，普通主胜均值约60.6%，原生FM仅49.7%。因此，原样本篮子不能代表全部市场证据的可得性。详见case383报告的追加欧赔复核。
+
+382场“无已保存输入”是本次研究客户端的缓存覆盖状态，不是来源无数据的证据；须区分未核查、采集失败、解析失败、篮子筛除、时间拒绝与核验后确实缺失。302场最终选择native这一数字本身不能证明模型不合格，但也不能证明全部完成了独立市场审查。
+
+另有“近期8场”跨18个月的问题：场数与ESS达标不能代替样本时效及阵容可比性的审查。#383中尾部将让胜从第二换到第三是可复现事实；但在其他证据未审清前，不据此单独断言尾部就是全部误判原因。
+
+保留的结论：冻结预测的301场评分、151场较晚SP配对评分，以及该冻结流程内GLOBAL校正的救回/误伤统计，仍可作为可复现的描述性基线。撤回的认定：这些数字已代表充分整合赛前定性、欧赔、亚盘及大小球的完整FM效能；也不能据此认定完整模型已经优于或劣于北单。原GLOBAL候选继续不升级，不利用本期已知赛果挑参数。
+
+恢复验收前需要：逐场完成数据源到筛选到来源裁决的证据账本；明确公司集合及报价时间的解释，不把固定篮子筛空当缺失；核查近期样本日期跨度及队伍可比性；区分完成市场审查后的原生保留与尚未完成审查；冻结修正输入、截止及规则后重新估算并按相同场次/时点比较。规则变更须按共享temporal_learning和显式cutoff研究，不在此文添加未经验证的阈值。
+
+本次没有新增项目函数、包实现、参数学习或预测修改。以上执行断言检查原收据绑定、范围及状态；干净进程无缓存渲染，错误致命。复现：`QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_26103_analysis_qc_hold_20261017.qmd --no-cache`。具体修复与全期重跑尚未完成，不将该状态报告当作修复验收。

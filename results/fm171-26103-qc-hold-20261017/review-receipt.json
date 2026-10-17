@@ -1,0 +1,29 @@
+{
+  "status_report_review": "PASSED",
+  "underlying_full_analysis_qc": "NOT_ACCEPTED",
+  "underlying_forecasts_modified": false,
+  "render_exit": 0,
+  "review_verdict": "The final QMD and HTML preserve and hash-bind the original acceptance receipt, correctly scope the 303/1/31/382 counts, and avoid generalizing quote availability or invalidating all 302 native selections. Descriptive frozen metrics are clearly separated from withdrawn full-analysis acceptance; the final render log reports successful HTML generation.\nThe final QMD and HTML preserve and hash-bind the original acceptance receipt, correctly scope the 303/1/31/382 counts, and avoid generalizing quote availability or invalidating all 302 native selections. Descriptive frozen metrics are clearly separated from withdrawn full-analysis acceptance; the final render log reports successful HTML generation.",
+  "files": [
+    {
+      "path": "quarto/fm171_26103_analysis_qc_hold_20261017.qmd",
+      "sha256": "9da47690d7427fb745b95f4187fa955f42660b827802a56cfce46b2ca7abb6e3"
+    },
+    {
+      "path": "quarto/fm171_26103_analysis_qc_hold_20261017.html",
+      "sha256": "f3556be02f81f3c1d870b1a201578aedf3211a76374c0980fc39c1feb68ab91a"
+    },
+    {
+      "path": "results/fm171-26103-draw-20261017/analysis-qc-status.json",
+      "sha256": "7b72e75c088e9bb0f0d5a7c645326212f4deba109d445fd3cdd72be523586091"
+    },
+    {
+      "path": "results/fm171-26103-qc-hold-20261017/render.log",
+      "sha256": "435d13838a38ac83666a1ae6925757848c9b3df12b06ea01a561f6d9a1d8b12c"
+    },
+    {
+      "path": "results/fm171-26103-qc-hold-20261017/review.log",
+      "sha256": "675274c9f98e9d3fec35fc987ea58311c769bae787b01ee083dec5af9c4c834d"
+    }
+  ]
+}
