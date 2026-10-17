@@ -1,0 +1,26 @@
+{
+  "study_id": "FM171_MARGIN_SHAPE_20261017",
+  "mode": "POSTHOC_FIXED_POLICY_DIAGNOSTIC",
+  "base_model": "FM-1.7.1",
+  "versions_modified": false,
+  "candidate_policies": [
+    {"model": "SOURCE_FULL", "coverage": 0.9, "coefficient": 1.0},
+    {"model": "FM171", "coverage": 0.9, "coefficient": 0.3},
+    {"model": "CORE80_C03", "coverage": 0.8, "coefficient": 0.3},
+    {"model": "CORE90_C01", "coverage": 0.9, "coefficient": 0.1}
+  ],
+  "tie_tolerance": 1e-12,
+  "shape_policy": {
+    "interval_mass": 0.8,
+    "narrow_max_integer_positions": 3,
+    "medium_max_integer_positions": 5,
+    "local_radius": 1,
+    "local_mass_high": 0.6,
+    "local_mass_low": 0.4
+  },
+  "selection_policy": "None; all fixed candidates reported. No outcome-based threshold fitting or model promotion.",
+  "primary_cohort": "Successful native same-competition replacements plus frozen market routes; exclude 23 unsupported native rows",
+  "secondary_cohort": "All 345 settled rows, with unsupported-parent provenance explicit",
+  "availability": "Inherited historical proxies, diagnostic only",
+  "parameters_selected_from_target_labels": false
+}

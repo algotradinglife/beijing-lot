@@ -1,0 +1,88 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "config/fm171_margin_shape_study.json",
+      "sha256": "37b9d95e905db55b63e8a8d8f6425dd8f5c7923667abc7cdd93c48de46599bbd"
+    },
+    {
+      "path": "r/fm171_margin_shape_freeze.R",
+      "sha256": "af16c00f8d06fe33b808df81eaee245850232db0e7a7d08af8123acddfdd6471"
+    },
+    {
+      "path": "r/fm171_margin_shape_evaluate.R",
+      "sha256": "6c6a192cf7fdca2fad40dd6841ea98763eb3fea894649fdf29aa512ae7c5b487"
+    },
+    {
+      "path": "tests/testthat/test-fm171-margin-shape.R",
+      "sha256": "d91bcbdc4327dbf3cf0f32bc634d3400bd567d58fc479f5bae971ca9076b7b83"
+    },
+    {
+      "path": "quarto/fm171_margin_shape_20261017.qmd",
+      "sha256": "93354471de8006bd2e50523663295d434ecbc924945c3e6e37d698d72f81c2e9"
+    },
+    {
+      "path": "results/fm171-margin-shape-20261017/verification-runner.py",
+      "sha256": "8d81cb6f03b930432e1ee016670033c4ce1180a422a472b0c391d2f6775c97a8"
+    }
+  ],
+  "checks": [
+    {
+      "command": "/opt/R/4.6.1/bin/Rscript r/fm171_margin_shape_freeze.R ROOT OUTPUT; repeat with replay (R_LIBS from runtime.json)",
+      "result": "Both exit0; 346 fixtures FULL_IDENTICAL_REPLAY, source hashes and explicit cutoffs bound; labels unopened"
+    },
+    {
+      "command": "/opt/R/4.6.1/bin/Rscript r/fm171_margin_shape_evaluate.R ROOT OUTPUT",
+      "result": "Exit0; 322 eligible and345 mixed settled rows, all preset policies; no model selection or version modification"
+    },
+    {
+      "command": "testthat::test_file(\"tests/testthat/test-fm171-margin-shape.R\", package=\"beidan\", load_helpers=FALSE, stop_on_failure=TRUE)",
+      "result": "{\"tests\": 3, \"passed\": 57717, \"failed\": 0, \"errors\": 0, \"skipped\": 0}; exact execution: SHAPE_TARGETED=1 .venv/bin/python results/fm171-margin-shape-20261017/verification-runner.py; includes independent eight-CSV replay, tamper/cutoff rejection, every grid/aggregation/interval contract"
+    },
+    {
+      "command": "/opt/R/4.6.1/bin/Rscript tests/testthat.R; launched by .venv/bin/python results/fm171-margin-shape-20261017/verification-runner.py with explicit test-environment.json",
+      "result": "{\"package\": {\"tests\": 948, \"passed\": 9153, \"failed\": 0, \"errors\": 0, \"warnings\": 0, \"skipped\": 0}, \"repository\": {\"tests\": 788, \"passed\": 141208, \"failed\": 0, \"errors\": 0, \"warnings\": 0, \"skipped\": 2}}; 2 repository integration cases skipped, not passed"
+    },
+    {
+      "command": "Skipped cases, missing evidence",
+      "result": "test-fundamentals-pipeline.R lines6 and44: integration bundle must be materialized by test setup; no #408 integration bundle supplied. All new study tests executed"
+    },
+    {
+      "command": "Package scope/runtime",
+      "result": "No packages/beidan change in this delivery; no new installation or Python suite required. Full R entry uses normally installed r_lib/beidan and installed backend/DLL wrappers. No manual dyn.load/load_all, no CI"
+    },
+    {
+      "command": "codex review 'Final review only fixed FM171 margin shape study after QMD core/tail audit addition: config/fm171_margin_shape_study.json, r/fm171_margin_shape_freeze.R, r/fm171_margin_shape_evaluate.R, tests/testthat/test-fm171-margin-shape.R, quarto/fm171_margin_shape_20261017.qmd and results/fm171-margin-shape-20261017. Core/tail audit added only to descriptive QMD, not candidate selection: d vs A+cT, zero draw-tail checked, coefficient boundary predictions validated against frozen CORE90_C01 ranks for all183. Verify147 core-dominant and36 tail-addressable,22 promoted atc.1 with10actualdraws vs14with2; no coefficient fitting, no c=0 prediction and no production update. All prior claims reconciled in preceding review. Targeted57717 assertions passed, 346full forecasts replay-identical, 8CSV independently byte-identical; final full R suite still running. Check current exact source/provenance/reproducibility/test contracts and all numerical statements. Ignore unrelated workspace, do not edit; report actionable findings or No actionable defects; do not certify unfinished acceptance.'",
+      "result": "No actionable defects; final hashes in this table/receipt; final complete test outcomes verified separately"
+    },
+    {
+      "command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_margin_shape_20261017.qmd --no-cache",
+      "result": "Exit0; clean session/no cache, source hash gates pass; 13tables,2figures, no execution errors; final figures visually inspected, HTML hash in html-validation.json"
+    },
+    {
+      "command": "Reviewed SHA256: config/fm171_margin_shape_study.json",
+      "result": "37b9d95e905db55b63e8a8d8f6425dd8f5c7923667abc7cdd93c48de46599bbd"
+    },
+    {
+      "command": "Reviewed SHA256: r/fm171_margin_shape_freeze.R",
+      "result": "af16c00f8d06fe33b808df81eaee245850232db0e7a7d08af8123acddfdd6471"
+    },
+    {
+      "command": "Reviewed SHA256: r/fm171_margin_shape_evaluate.R",
+      "result": "6c6a192cf7fdca2fad40dd6841ea98763eb3fea894649fdf29aa512ae7c5b487"
+    },
+    {
+      "command": "Reviewed SHA256: tests/testthat/test-fm171-margin-shape.R",
+      "result": "d91bcbdc4327dbf3cf0f32bc634d3400bd567d58fc479f5bae971ca9076b7b83"
+    },
+    {
+      "command": "Reviewed SHA256: quarto/fm171_margin_shape_20261017.qmd",
+      "result": "93354471de8006bd2e50523663295d434ecbc924945c3e6e37d698d72f81c2e9"
+    },
+    {
+      "command": "Reviewed SHA256: results/fm171-margin-shape-20261017/verification-runner.py",
+      "result": "8d81cb6f03b930432e1ee016670033c4ce1180a422a472b0c391d2f6775c97a8"
+    }
+  ]
+}

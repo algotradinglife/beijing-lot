@@ -1,0 +1,17 @@
+{
+  "status": "EIGHT_CSV_BYTE_IDENTICAL",
+  "forecast_sha256": "cc9263ccb7e0e686cf5ae717ab57907864cba48502babbb3a4e05f03158557a3",
+  "evaluator_sha256": "6c6a192cf7fdca2fad40dd6841ea98763eb3fea894649fdf29aa512ae7c5b487",
+  "command": "/opt/R/4.6.1/bin/Rscript r/fm171_margin_shape_evaluate.R ROOT TEMP_OUTPUT; copied forecasts/manifest/replay only",
+  "exit_status": 0,
+  "output_hashes": {
+    "metrics": "e0debf051829f156ae145ef8933a72b4645b9eb69fbbeeece3466c44fb93ca3c",
+    "scores": "7f8799a20cec30ce92eebeb18f161fe8dfee7b76524228c017e553f70daa6839",
+    "shape_cells": "9d8fd9f56294e7d07063649fc2532c74a170e8e67ce20e0eb03fb47c9407083b",
+    "cases": "df5bab2ee84aa34183e55393bb14d22dd79504328da933b113ebd0976795995a",
+    "features_labeled": "08fcd6897cd6f79fbd0d6732c09cdba8f77268f8bc3141aaad45fa1e46feee4e",
+    "contributions": "a5b61cf33da6d4511b1d37182938d593c2c198fd6486ca8478460948527e9bbd",
+    "shape_summary": "dba8eddcca852a1b7f10d4b5dea6b822050882b5ad2780b9fc49a1d757f6a543",
+    "draw_ranks": "f032160c747f2ced1fb1bcef26b2adee9cdc4276ffe761614b7e06885c9694c4"
+  }
+}

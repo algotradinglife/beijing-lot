@@ -1,0 +1,17 @@
+{
+  "sha256": "cc9263ccb7e0e686cf5ae717ab57907864cba48502babbb3a4e05f03158557a3",
+  "bindings": {
+    "source": "ae910c7905f6d9ea35271d79afa34cd62119d38273047c52cc804078e866292e",
+    "parent": "e537428c0a43f966542c703d3edf6264722c95a7551dbabf7853aa909354e786",
+    "roster": "7a7d60306a6bb04e9a8b5a370d22cf340305d534ea01276f6050bb363078a567",
+    "policy": "37b9d95e905db55b63e8a8d8f6425dd8f5c7923667abc7cdd93c48de46599bbd",
+    "client": "af16c00f8d06fe33b808df81eaee245850232db0e7a7d08af8123acddfdd6471",
+    "direction_implementation": "a0da1e5f0550ab82f6fa7342e2f75cf3126b475de0039a6b85d20a1db0900fb4",
+    "tail_function": "47c83bde7840f9ae4587b5adbc0768f21f101d045510d7a66ce3299d998bf4eb"
+  },
+  "forecasts": 346,
+  "eligible": 323,
+  "target_labels_opened": false,
+  "mode": "POSTHOC_FIXED_POLICY_DIAGNOSTIC",
+  "versions_modified": false
+}

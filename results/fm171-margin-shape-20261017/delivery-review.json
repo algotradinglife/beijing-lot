@@ -1,0 +1,9 @@
+{
+  "findings": "No actionable defects in final acceptance",
+  "log": "review-acceptance.log",
+  "log_sha256": "13ab7f5740b13d9407d2c6ed24702d6526c8506e5fabd4e42271a03c841fbbfd",
+  "reviewed_source_receipt": "acceptance.json",
+  "html_receipt": "html-validation.json",
+  "full_tests": "full-test-results.json",
+  "unverified_cases": "Two unrelated #408 integration-bundle cases; not counted as passed"
+}

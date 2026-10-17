@@ -1,0 +1,188 @@
+---
+title: "FM-1.7.1净胜球形态与让平保护：固定方案探索"
+format:
+  html:
+    embed-resources: true
+params:
+  repository_root: ".."
+  output_dir: "results/fm171-margin-shape-20261017"
+  acceptance_required: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 问题与预先固定的对照
+
+目标不是让让平必然进入Top2，而是检验：让平单档排前二却在三分类排第三时，两侧累计是否主要由尾部堆积形成；集中/分散、集中位置不同，是否对应不同的保护价值。
+
+基座为FM-1.7.1：同赛事原生lambda、冻结原生/市场来源决策、rho−0.1。四个固定方案为：完整选定来源分布SOURCE_FULL；正式FM171累计严格超过90%核心、外围0.3；核心80%外围0.3（CORE80_C03）；核心90%外围0.1（CORE90_C01）。前者减少核心档位，后者加重外围压缩。边界概率并列整组纳入，原独立retain审查保持原分布。所有方案都先重加权完整比分，再按北单线映射，不直接抬让平、不返拟合lambda、不强制排序。另展示冻结同赛事alpha及较晚北单对照。
+
+所有参数在本轮评分前写入config/fm171_margin_shape_study.json，未用本轮目标标签择优；前述三期结果已知，本轮仍是事后探索，不能解释为盲测/滚动样本外。正式版本不变。没有新增采集、拟合、下注或线上发布。
+
+## 输入、截止与合同
+
+346个冻结fixture/cutoff，其中345场有标签。主分析排除23场同赛事原生支持不足而留存父版的行，共322场；混合345场仅作敏感性对照。229场市场路由仍按原冻结决策，原生成功替换94场；原生是否使用与是否已算出原生参数分别披露。
+
+净胜球D=主进球−客进球；有符号北单让球h，让平档为−h；让胜=P(D>−h)、让平=P(D=−h)、让负=P(D<−h)。概率0–1，图示百分比。比分网格每行唯一主客进球组合；feature每fixture唯一；projection每fixture/model/outcome唯一且三类归一化；margin每fixture/model/integer margin唯一。critical输入哈希、截止或归一化失败立即停止。
+
+逐场显式T−24h从父冻结包继承。Shared temporal_learning负责所有来源准入、最大时间、上下文/实现绑定、收据与重放，无客户端时序复制。新敏感性网格经build_adjustment_evidence_context、BuildFmTailJudgement、adjust_score_margin_distribution、project_score_outcomes形成；原生lambda只从封存same_support_raw重建。日粒度/盘口可用性含历史代理，不能授权前瞻使用。已有原生学习链prepare_opponent_goals、FitOpponentGoals及共享learning上下文不重新拟合；本次不选择参数、不训练分组阈值，来源切换也不重新裁决。输入源、模型、客户端及传递实现身份在manifest和逐场收据中绑定，换cutoff须重建，禁止缓存跨cutoff复用。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root,mustWork=TRUE)
+out <- file.path(root,params$output_dir)
+manifest <- jsonlite::fromJSON(file.path(out,"manifest.json"))
+replay <- jsonlite::fromJSON(file.path(out,"replay.json"))
+stopifnot(replay$status=="FULL_IDENTICAL_REPLAY",replay$sha256==manifest$sha256,
+ digest::digest(file=file.path(out,"forecasts.rds"),algo="sha256")==manifest$sha256)
+status <- system2("/opt/R/4.6.1/bin/Rscript",shQuote(c(file.path(root,"r/fm171_margin_shape_evaluate.R"),root,out)),
+ env=paste0("R_LIBS=",shQuote(paste(.libPaths(),collapse=":"))),stdout=file.path(out,"qmd-evaluation.log"),stderr=file.path(out,"qmd-evaluation.log"))
+stopifnot(status==0L)
+evaluation <- jsonlite::fromJSON(file.path(out,"evaluation.json"))
+for(n in names(evaluation$output_hashes))stopifnot(digest::digest(file=file.path(out,paste0(n,".csv")),algo="sha256")==evaluation$output_hashes[[n]])
+x <- readRDS(file.path(out,"forecasts.rds"))
+metrics <- read_csv(file.path(out,"metrics.csv"),show_col_types=FALSE)
+f <- read_csv(file.path(out,"features_labeled.csv"),show_col_types=FALSE)
+cases <- read_csv(file.path(out,"cases.csv"),show_col_types=FALSE)
+knitr::kable(x$features |> count(eligible,selected_source,native_changed),caption="估计覆盖；eligible排除父版留存原生")
+```
+
+## 整体、逐期与误伤
+
+Top1/Top2计数越高越好；Brier和log loss越低越好。saved/lost相对FM171逐场配对，净增等于救回减误伤；不能只展示救回。较晚北单不是同T−24h证据。
+
+```{r}
+knitr::kable(metrics |> filter(dimension=="all") |> select(cohort,model,n,hits1,hits2,brier,logloss,saved_top2,lost_top2),digits=6)
+knitr::kable(metrics |> filter(cohort=="ELIGIBLE_322",dimension=="issue_id") |>
+ select(stratum,model,n,hits1,hits2,brier,logloss),digits=6,caption="主队列逐期表现")
+```
+
+## 集中程度与集中位置分别看
+
+覆盖80%概率的最短连续整数区间，以整数档位数计宽；不强制围绕众数对称。相同宽度先取覆盖质量较大者，再按距均值、左端顺序确定。宽≤3为NARROW，4–5为MEDIUM，≥6为BROAD。让平及左右各一球合计质量≥0.6为HIGH，0.4–0.6为MEDIUM，低于0.4为LOW。这些仅是预先固定的描述分组，不作为新生产路由。让平单档名次用高于其概率1e−12的档位数加一，边界并列同名次；三类别排序并列按W、D、L，与既有诊断一致。
+
+```{r}
+knitr::kable(f |> filter(eligible) |> count(shape,line_locality,draw_group),caption="主队列分布形态及让平位置支持数")
+knitr::kable(metrics |> filter(cohort=="ELIGIBLE_322",dimension=="shape") |>
+ select(stratum,model,n,hits1,hits2,saved_top2,lost_top2,brier,logloss),digits=5)
+knitr::kable(metrics |> filter(cohort=="ELIGIBLE_322",dimension=="line_locality") |>
+ select(stratum,model,n,hits1,hits2,saved_top2,lost_top2,brier,logloss),digits=5)
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 4
+f |> filter(eligible) |>
+ ggplot(aes(interval80_positions,local_mass,colour=draw_group)) +
+ geom_point(alpha=.45,position=position_jitter(width=.06,height=0,seed=171)) +
+ scale_y_continuous(labels=scales::percent) + scale_x_continuous(breaks=c(4,5,6)) +
+ scale_colour_discrete(labels=c(DRAW_BIN_OUTSIDE_TOP2="让平单档未进前二",DRAW_BIN_TOP2_ALREADY_INCLUDED="单档前二，类别已覆盖",DRAW_BIN_TOP2_CATEGORY3="单档前二，类别排第三")) +
+ labs(x="覆盖80%质量的最短连续区间：整数档数",y="让平±1球合计概率",colour="让平位置") + theme_minimal()
+```
+
+## 核心问题：单档前二、类别第三
+
+这里只能解释预先固定的敏感性方案是否改变了保护；样本少时不从一两场净增推导通用规则。两侧完整质量、核心/外围贡献CSV可逐场复核；相同精确胜差的不同比分条件比例保持不变。
+
+```{r}
+knitr::kable(metrics |> filter(cohort=="ELIGIBLE_322",dimension=="draw_group") |>
+ select(stratum,model,n,hits1,hits2,saved_top2,lost_top2,brier,logloss),digits=5)
+knitr::kable(cases |> filter(eligible,model %in% c("FM171","SOURCE_FULL","CORE80_C03","CORE90_C01")) |>
+ select(fixture_id,home,away,handicap,model,actual_outcome,actual_rank,shape,interval80_positions,
+ local_mass,draw_probability,raw_w,raw_l,top2,saved_top2,lost_top2),digits=4,caption="全部目标冲突场，含未改善/误伤")
+```
+
+## 让平保护与净胜球图核对
+
+```{r}
+scores <- read_csv(file.path(out,"scores.csv"),show_col_types=FALSE)
+draw_ranks <- read_csv(file.path(out,"draw_ranks.csv"),show_col_types=FALSE)
+knitr::kable(draw_ranks |> inner_join(f |> filter(eligible,target_conflict) |> select(fixture_id),
+ by="fixture_id",relationship="many-to-one") |> group_by(model) |>
+ summarise(n=n(),draw_in_top2=sum(draw_category_rank<=2),.groups="drop"),caption="目标冲突场中，让平真正进入Top2的场数")
+knitr::kable(scores |> filter(eligible,model %in% c("CORE80_C03","CORE90_C01"),saved_top2|lost_top2) |>
+ count(model,actual_outcome,saved_top2,lost_top2),caption="救回与误伤的实际类别；不把全部改善归功于让平")
+knitr::kable(scores |> filter(eligible,model %in% c("FM171","CORE80_C03","CORE90_C01")) |>
+ group_by(model,interval80_positions) |> summarise(n=n(),hits1=sum(top1),hits2=sum(top2),
+ saved=sum(saved_top2),lost=sum(lost_top2),brier=mean(brier),.groups="drop"),digits=6,
+ caption="按实际连续区间宽度描述，不另行选择阈值")
+```
+
+图例取目标冲突场按fixture_id字符顺序前3场，不按命中/失手挑例。只显示让平线左右各5球，纵轴保持原始质量，显示窗外尾部不归一化、不删除。
+
+```{r}
+#| fig-width: 11
+#| fig-height: 4
+examples <- f |> filter(eligible,target_conflict) |> arrange(fixture_id) |> slice_head(n=3)
+mg <- read_csv(file.path(out,"margins.csv"),show_col_types=FALSE) |>
+ inner_join(examples |> select(fixture_id,draw_margin),by="fixture_id",relationship="many-to-one") |>
+ filter(abs(margin-draw_margin)<=5)
+ggplot(mg,aes(margin,probability,colour=model)) + geom_line() + geom_point(size=1) +
+ geom_vline(data=examples,aes(xintercept=draw_margin),inherit.aes=FALSE,linetype=2,colour="grey35") +
+ facet_wrap(~fixture_id,scales="free_x") + scale_x_continuous(breaks=scales::breaks_width(2)) + scale_y_continuous(labels=scales::percent) +
+ labs(x="净胜球（主−客）；虚线为让平档",y="完整分布中的概率",colour="固定方案") + theme_minimal()
+```
+
+## 排序差异究竟来自核心还是尾部
+
+在FM171的90%核心中，把让平质量记作d，两侧核心质量记作A，让胜/让负各自外围质量记作T。此批目标组的让平档都位于核心，因此让平外围质量为零。统一外围系数c后，比较的是d与A+cT，共同归一化因子不影响排序。如果两侧核心各自已经超过d，即使把外围趋近于零，让平也不会进入Top2；这属于核心分布的含义，不能靠继续压尾解决。
+
+下面只作现有固定方案的代数解释，不据结果拟合或选择新系数。对每一侧计算临界c=(d−A)/T，至少一侧达到时让平可能进Top2；与已封存0.1方案的实际排序逐场核验。这里没有执行c=0预测，也不删除比分尾部。
+
+```{r}
+contributions <- read_csv(file.path(out,"contributions.csv"),show_col_types=FALSE) |>
+ group_by(fixture_id,outcome) |> summarise(core_mass=sum(mass[core]),tail_mass=sum(mass[!core]),.groups="drop") |>
+ pivot_wider(names_from=outcome,values_from=c(core_mass,tail_mass),values_fill=0)
+tail_audit <- f |> filter(eligible,target_conflict) |>
+ left_join(contributions,by="fixture_id",relationship="one-to-one") |>
+ mutate(core_blocks_draw=core_mass_D<=pmin(core_mass_W,core_mass_L)+1e-12,
+  w_boundary=if_else(tail_mass_W>0,(core_mass_D-core_mass_W)/tail_mass_W,-Inf),
+  l_boundary=if_else(tail_mass_L>0,(core_mass_D-core_mass_L)/tail_mass_L,-Inf),
+  coefficient_boundary=pmax(w_boundary,l_boundary),
+  predicted_draw_top2=review_decision=="apply" & coefficient_boundary>=.1-1e-12,
+  tail_case=case_when(core_blocks_draw~"CORE_DOMINANT",
+   coefficient_boundary>=.1~"C01_SUFFICIENT",TRUE~"NEEDS_C_BELOW_01")) |>
+ left_join(draw_ranks |> filter(model=="CORE90_C01") |> select(fixture_id,c01_rank=draw_category_rank),
+ by="fixture_id",relationship="one-to-one")
+stopifnot(nrow(tail_audit)==183L,all(tail_audit$tail_mass_D==0),
+ all(tail_audit$predicted_draw_top2==(tail_audit$c01_rank<=2L)))
+knitr::kable(tail_audit |> group_by(tail_case) |> summarise(n=n(),actual_draws=sum(actual_outcome=="D"),
+ actual_draw_rate=mean(actual_outcome=="D"),.groups="drop"),digits=4,caption="核心主导与尾部可改变的场景；临界系数不作拟合")
+```
+
+183场中147场属于核心两侧质量本已压过让平，继续统一压尾不能改变这件事；其余36场才具有由外围压缩将让平推入Top2的空间。固定0.1能触及其中22场，实际让平10场；另外14场实际让平2场。这是已知结果的解释性分层，不能据此重新挑系数或称其为独立验证。
+
+## 结论及局限
+
+主队列322场中，FM171为134/231（Top1/Top2）；完整分布130/225；80%核心外围0.3为133/234，救回9场、误伤6场，Brier由0.666947降至0.664851；90%核心外围0.1为135/236，救回11场、误伤6场，但Brier升至0.667127。混合345场对应FM171 140/250、80%核心139/252、90%外围0.1为141/253。不同方案在选择覆盖与概率评分间存在取舍，尚不能确定单一优势规则。
+
+让平单档前二但类别第三的183场中，80%核心让27场的让平进入Top2，90%外围0.1让22场进入；并非普遍抬平。整个主队列的救回均为让平：前者救回9场、误伤4场让胜和2场让负，后者救回11场、误伤5场让胜和1场让负。80%核心在连续宽度4的105场净少1场Top2，在宽度5的211场净多4场；较集中并不自动意味着更适合加强压尾，许多较集中的让平本已在保护内。
+
+本轮不登记赢家、不更新FM版本。各方案全部报告，分组阈值不根据结果调优。分散分布中的单档前二不必然值得保护；整体集中也不等于质量集中在让平附近。应检查精确胜差概率与两侧累计质量是否真实失衡，再决定后续假设。若要形成实际决策规则，必须冻结候选后，用标签在截止前可用的新期历史通过共享学习上下文确定/验证阈值，再作未见期验证。此次三期只支持探索。
+
+本批主要为单组DC/联合市场lambda产生的单峰或相邻峰分布，缺少明显集中（宽≤3）样本，明显分散样本也很少，不能代表一般双峰混合赛况。rho为专家固定值、原置信路由未重审、23场原生不足、历史可用时间代理、部分已知结果、细分小样本、同一三期多次讨论等，均限制因果与推广解释。没有票单与收益重放，不报告ROI。
+
+## 可复现验收
+
+环境沿用既有显式项目解释器：R4.6.1、项目.venv/bin/python，依赖版本和库路径记录于runtime.json/test-environment.json；不在函数或渲染时安装。核心复现命令：
+
+```bash
+/opt/R/4.6.1/bin/Rscript r/fm171_margin_shape_freeze.R ROOT OUTPUT
+/opt/R/4.6.1/bin/Rscript r/fm171_margin_shape_freeze.R ROOT OUTPUT replay
+/opt/R/4.6.1/bin/Rscript r/fm171_margin_shape_evaluate.R ROOT OUTPUT
+/opt/R/4.6.1/bin/Rscript tests/testthat.R
+QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_margin_shape_20261017.qmd --no-cache
+```
+
+无新包实现或项目函数：R客户端仅顶层编排现有包函数与tidyverse描述统计。对应test-fm171-margin-shape.R执行比分到三类聚合、集中宽度最短性、档内比例、质量/排名、独立评分重放、哈希篡改拒绝、cutoff/网格变异拒绝、救回误伤与加权分组对账；原函数自身边界测试仍由完整包套件执行。固定形态分组使用显式政策和逐场cutoff，未拟合或选择阈值。正式源码/策略不变。本轮无包文件修改，不要求重新安装包；完整仓库入口使用正常安装包及其DLL，不手工dyn.load或load_all。
+
+```{r}
+if(isTRUE(params$acceptance_required)) {
+ a <- jsonlite::fromJSON(file.path(out,"acceptance.json"))
+ stopifnot(a$status=="ACCEPTED",a$blocking_findings==0L)
+ for(i in seq_len(nrow(a$files)))stopifnot(digest::digest(file=file.path(root,a$files$path[i]),algo="sha256")==a$files$sha256[i])
+ knitr::kable(as_tibble(a$checks),caption="最终源码身份、完整测试与审查证据")
+} else cat("预览：完整验收尚未完成，不能据此宣称交付通过。")
+```

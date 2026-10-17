@@ -1,0 +1,17 @@
+# A tibble: 12 × 17
+   cohort    dimension model stratum     n hits1 hits2  top1  top2 brier logloss
+   <chr>     <chr>     <chr> <chr>   <int> <int> <int> <dbl> <dbl> <dbl>   <dbl>
+ 1 ELIGIBLE… all       ALPH… ALL       322   100   226 0.311 0.702 0.672    1.11
+ 2 ELIGIBLE… all       BEID… ALL       322   127   236 0.394 0.733 0.661    1.09
+ 3 ELIGIBLE… all       CORE… ALL       322   133   234 0.413 0.727 0.665    1.10
+ 4 ELIGIBLE… all       CORE… ALL       322   135   236 0.419 0.733 0.667    1.10
+ 5 ELIGIBLE… all       FM171 ALL       322   134   231 0.416 0.717 0.667    1.10
+ 6 ELIGIBLE… all       SOUR… ALL       322   130   225 0.404 0.699 0.667    1.10
+ 7 ALL_MIXE… all       ALPH… ALL       345   106   242 0.307 0.701 0.684    1.12
+ 8 ALL_MIXE… all       BEID… ALL       345   130   244 0.377 0.707 0.670    1.10
+ 9 ALL_MIXE… all       CORE… ALL       345   139   252 0.403 0.730 0.678    1.11
+10 ALL_MIXE… all       CORE… ALL       345   141   253 0.409 0.733 0.680    1.12
+11 ALL_MIXE… all       FM171 ALL       345   140   250 0.406 0.725 0.679    1.11
+12 ALL_MIXE… all       SOUR… ALL       345   136   244 0.394 0.707 0.679    1.12
+# ℹ 6 more variables: saved_top1 <int>, lost_top1 <int>, saved_top2 <int>,
+#   lost_top2 <int>, brier_delta <dbl>, logloss_delta <dbl>
