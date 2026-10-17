@@ -1,0 +1,49 @@
+{
+  "reason": "Two-file publication interruption issue; retained, inactive, not promoted",
+  "files": [
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_1-asian.json",
+      "sha256": "47c37f84780df81c1ecdb3f465021b4481f34e4c5b1b76579445522c8fc60860"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_1-asian.json.sha256",
+      "sha256": "1b8bd03c6e2dee90a8a75334734f4113d0aff7b9922ce54be2e6c6e6b8c1c3c4"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_1-total.json",
+      "sha256": "1a4746b812ae728ecb807669d136ab2a59414594eaf8750d9a5d67973cf8894d"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_1-total.json.sha256",
+      "sha256": "9c1835ad21a73a906ea9cc083d8b598384c14b95b517c938533bf123fb9250a7"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_2-asian.json",
+      "sha256": "bac17d00b94d6d337a02f1a892579788d6d2ce8963a4500480a5368a8d30b96e"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_2-asian.json.sha256",
+      "sha256": "6e885746fa267357b0f72493240b0dd5b296227f20c432c76d7d6423c952d625"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_2-total.json",
+      "sha256": "d4569f8ff91fafb6231379ef310ca10c92809f45428a07cc9c42ee385b838250"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_2-total.json.sha256",
+      "sha256": "19d8334a9490b4a5779b33ccf282062d0f024078ad8957e2032173e7d66498c5"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_3-total.json",
+      "sha256": "de79df751e026220a65dbe94fb93a5485775a47a14932b680b39cc1804b95d9d"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/26103_3-total.json.sha256",
+      "sha256": "416977760cf58011aaac44c2f1ff3cb78f5ad62284e2df491f705322debe4c98"
+    },
+    {
+      "path_token": "hot:fm171-26103-full-recalc-20261017/markets/input-binding.json",
+      "sha256": "09477ba90536a84ca7f5f42da4d0c8d7198e566b2f8ecc46d19e02ad52951e1d"
+    }
+  ]
+}

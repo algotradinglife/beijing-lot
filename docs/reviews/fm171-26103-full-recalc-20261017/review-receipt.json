@@ -1,0 +1,70 @@
+{
+  "delivery_status": "REVIEWED_PROGRESS_ONLY__FULL_FM_PENDING",
+  "task_complete": false,
+  "full_fm_analysis_accepted": false,
+  "model_comparison_ready": false,
+  "collector_active_pid": 1046740,
+  "native_active_pid": 1034118,
+  "tests": {
+    "command": "PYTHONPATH=packages/beidan/inst/python .venv/bin/python -m pytest tests/test_fm171_26103_market_client.py -q",
+    "passed": 7,
+    "failed": 0
+  },
+  "render_exit_status": 0,
+  "review_verdict": "No actionable findings in the scoped artifacts. All seven offline tests passed, including interruptions immediately before and after atomic publication; the report correctly presents task progress and leaves full-FM integration and final acceptance pending.\nNo actionable findings in the scoped artifacts. All seven offline tests passed, including interruptions immediately before and after atomic publication; the report correctly presents task progress and leaves full-FM integration and final acceptance pending.",
+  "resolved_findings": [
+    {
+      "priority": "P2",
+      "issue": "Separate JSON/checksum publication could prevent interruption recovery",
+      "resolution": "Single checksummed payload envelope with existing write_json_atomically; before/after replace interruption regressions passed. V1 preserved outside active v2 scope."
+    }
+  ],
+  "package_modified": false,
+  "full_suites_rerun": false,
+  "files": [
+    {
+      "path": "src/fm171_26103_collect_full_markets.py",
+      "sha256": "b9599476f3f4f1d1e56c6570d89c688aef0fbde9a5ac36033b947dfbe6d70014"
+    },
+    {
+      "path": "tests/test_fm171_26103_market_client.py",
+      "sha256": "86fa6fba919cb0c4a87ad14c3c6ce17181168f2a65ae91c9010a27e6c40ce808"
+    },
+    {
+      "path": "quarto/fm171_26103_full_recalc_progress_20261017.qmd",
+      "sha256": "fabf1700988af66121e0aa7c1409aa47bd7b42f112fa7ae21f8c4aea378dd65e"
+    },
+    {
+      "path": "quarto/fm171_26103_full_recalc_progress_20261017.html",
+      "sha256": "2c7c0d2b7187dd1cea9ae78dc54e0558788e5b1502accc971780b765ff1b797a"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-full-recalc-20261017/client-tests.log",
+      "sha256": "3e6d2207ba6456365ccbd713842f298197330684803b6c8e93e40a57269b970a"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-full-recalc-20261017/development-review.log",
+      "sha256": "1232a1212e328f885e2f6e582122e38175caae72843e23f8c37f9785367ac8f1"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-full-recalc-20261017/execution.json",
+      "sha256": "f022775e2cc57cea3f47cf749bd6249a642589f1102fbf0614039d35a0c042fe"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-full-recalc-20261017/final-review.log",
+      "sha256": "918020eeef74cf07630c20337ed7e4e1740369f280f03bef8daba03746d1904b"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-full-recalc-20261017/render.log",
+      "sha256": "6248a7dd3bc6c3aee05114cc9c7402acf3256ca3f6fc9b0df1f7a71af344eff9"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-full-recalc-20261017/superseded-process-v1.json",
+      "sha256": "ddcadd7bd589d263359d15fb6732a8999d7c64800c6b258932259d704c4f8f32"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-full-recalc-20261017/superseded-v1-inventory.json",
+      "sha256": "063328cc2807e983de634169e94236367e768c4f8a84797be9ff5d3773586206"
+    }
+  ]
+}

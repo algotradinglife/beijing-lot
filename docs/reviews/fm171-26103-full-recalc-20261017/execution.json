@@ -1,0 +1,52 @@
+{
+  "state": "IN_PROGRESS_NOT_FULL_FM_ACCEPTED",
+  "scope": 407,
+  "cutoff": "FROZEN_FIXTURE_KICKOFF_MINUS_24H_UTC",
+  "recent_n": 8,
+  "alpha": 0.5,
+  "calendar_age_limit": "NONE",
+  "native_process": {
+    "pid": 1034118,
+    "command_line": "/opt/R/4.6.1/lib/R/bin/exec/R --no-echo --no-restore --file=r/fm171_26103_recent_repair.R --args /home/drwho1985/workspace/algotradinglife/beijing-lot /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/fm171-26103-full-recalc-20261017/native hot:fm171-26103-repair-20261017-v3/coverage-census.rds config/fm171_26103_count_recent_policy.json ",
+    "log": "/tmp/fm171-full-native-recalc.log",
+    "output_token": "hot:fm171-26103-full-recalc-20261017/native/native-repair.rds",
+    "scope_note": "Existing reviewed native client traverses407 and refits original estimable branches; original unestimated branches remain explicit pending evidence review."
+  },
+  "market_process": {
+    "pid": 1046740,
+    "started_at_utc": "2026-10-17T12:31:45.370397+00:00",
+    "command": [
+      "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python",
+      "-u",
+      "/home/drwho1985/workspace/algotradinglife/beijing-lot/src/fm171_26103_collect_full_markets.py",
+      "--root",
+      "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "--output",
+      "hot:fm171-26103-full-recalc-20261017/markets-v2"
+    ],
+    "output_token": "hot:fm171-26103-full-recalc-20261017/markets-v2",
+    "log_token": "hot:fm171-26103-full-recalc-20261017/market-collection-v2.log",
+    "source_min_interval_seconds": 60,
+    "expected_scope_fixtures": 407,
+    "expected_channels": 814,
+    "full_fm_analysis_accepted": false
+  },
+  "previous_inventory": {
+    "channels": 814,
+    "existing_parsed_channels": 51,
+    "missing_channels": 763,
+    "minimum_seconds_at_60s": 45780
+  },
+  "remaining_full_fm_stages": [
+    "Complete and review full raw-market traversal including observed-empty/failure states",
+    "Reconcile market clocks, source identity and same-cutoff eligibility",
+    "Freeze Euro-company policy and qualitative/source review before target scoring",
+    "Build accepted joint market/native grid, apply existing FM171 tail, project actual Beidan line",
+    "Independent replay, tests, QMD, review; only then score matched fixtures and SP timings"
+  ],
+  "final_probabilities_ready": false,
+  "full_fm_analysis_accepted": false,
+  "snapshot_at_utc": "2026-10-17T12:31:45.370575+00:00",
+  "collector_source_sha256": "b9599476f3f4f1d1e56c6570d89c688aef0fbde9a5ac36033b947dfbe6d70014",
+  "interruption_regression_tests": 2
+}

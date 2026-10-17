@@ -1,0 +1,20 @@
+{
+  "pid": 1040074,
+  "started_at_utc": "2026-10-17T12:27:23.492760+00:00",
+  "command": [
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python",
+    "-u",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot/src/fm171_26103_collect_full_markets.py",
+    "--root",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "--output",
+    "hot:fm171-26103-full-recalc-20261017/markets"
+  ],
+  "log_token": "hot:fm171-26103-full-recalc-20261017/market-collection.log",
+  "source_min_interval_seconds": 60,
+  "expected_scope_fixtures": 407,
+  "expected_channels": 814,
+  "currently_missing_raw_channels": 763,
+  "full_fm_analysis_accepted": false,
+  "superseded_reason": "Atomic receipt/checksum pair interrupted-resume issue; raw captures preserved and reused by v2"
+}
