@@ -90,8 +90,38 @@ obs |> filter(recent_mass>0) |> select(team_id,event_date,goals,against) |> arra
 
 λ约1.434／0.844，本身只把主队定为温和优势。主队近期8个同赛事主场仅场均进0.875球；客队近期8个同赛事客场失1.625球。更值得注意的是时间跨度：主队这8场从2026-03到2026-09，客队从2025-03到2026-09，跨约18个月。“近期8场同赛事同场地”不等于近期状态，升降级或赛事间隔可能令旧阵容样本占比过大；具体原因尚未额外核验。
 
-冻结审查已标基本面uncertain；本场没有已准入的同截止欧赔篮子与完整亚盘/大小球组合，market_sufficient=false，因此没有切换为联合市场。不能把缺失说成盘口支持FM，也不能拿北单本身反校准后再声称胜过北单。本场不是完成独立盘口补齐后的预测验证。
+冻结审查已标基本面uncertain；原流程固定四家公司欧赔篮子为空，完整三路市场没有准入，market_sufficient=false，因此没有切换为联合市场。四家篮子为空不代表欧赔数据源缺失；下面补查已有全量报价。不能拿北单本身反校准后再声称胜过北单。本场不是完成独立盘口校正后的预测验证。
 
-诊断分两层：第一，原生让胜和让平接近，尾部将两者排序交换，导致Top2漏保；第二，原生λ的近期窗口时间跨度过长，且缺失独立同截止盘口，主队大胜能力是否被低估仍待证。优先补相同截止欧赔、亚盘及大小球并核对样本跨度，再判断需不需要改变λ或尾部；不在这一已知赛果上拍参数。
+用户追问后的补查：欧赔确实存在，包括提前24小时截止之前的有效报价。查询同一已发布版本，不采集新页面，不改变冻结篮子或原预测。
+
+```{r}
+#| echo: false
+library(beidan,lib.loc=file.path(root,'r_lib'))
+reticulate::use_python(file.path(root,'.venv/bin/python'),required=TRUE)
+euro_source <- beidan:::dataset_table_source('source_euro_issue_26103','euro_history',version='20261016T011524878555Z')
+beidan:::verify_table_files(euro_source$files,euro_source$hashes,'euro_history')
+euro_all <- beidan::dataset_query('source_euro_issue_26103',
+ "SELECT source, company_id, quote_at, odds_home, odds_draw, odds_away, valid_decimal FROM euro_history WHERE fixture_id='26103:383' AND source='titan'",
+ 'euro_history',version='20261016T011524878555Z',memory_limit='1GB',threads=2L)
+stopifnot(tibble::is_tibble(euro_all),inherits(euro_all$quote_at,'POSIXct'))
+cutoff <- as.POSIXct('2026-10-11 16:30:00',tz='UTC')
+latest <- euro_all |> filter(valid_decimal,quote_at<cutoff) |>
+ group_by(company_id) |> filter(quote_at==max(quote_at)) |> ungroup() |> distinct() |>
+ mutate(age_hours=as.numeric(difftime(cutoff,quote_at,units='hours')))
+basket <- latest |> filter(company_id %in% c('281','115','82','432'))
+stopifnot(nrow(basket)==4L,all(basket$age_hours>48))
+basket |> select(company_id,quote_at,odds_home,odds_draw,odds_away,age_hours) |> knitr::kable(digits=2)
+eligible <- latest |> filter(age_hours<=48) |> group_by(company_id) |>
+ mutate(vectors=n()) |> ungroup()
+stopifnot(nrow(eligible)==256L,all(eligible$vectors==1L),all(eligible$quote_at<cutoff))
+eligible <- eligible |> mutate(W=1/odds_home,D=1/odds_draw,L=1/odds_away,total=W+D+L,across(c(W,D,L),~.x/total))
+eligible |> summarise(公司ID数=n(),主胜百分比=mean(W)*100,平局百分比=mean(D)*100,客胜百分比=mean(L)*100) |> knitr::kable(digits=2)
+```
+
+固定四家最近报价距截止分别约49.4、52.5、77.0和119.7小时，均被48小时限制排除。其他256个公司ID满足原时间与有效赔率要求，且最新时刻无冲突赔率向量；每家公司先倒数归一化再等权平均，普通主胜约60.6%、平22.8%、客胜16.6%，原生模型为49.7%、29.4%、20.9%。该描述性全量均值说明已有欧赔比原生更支持主队，不能再把本场称为欧赔缺失。公司ID不保证独立资金来源，也不等同于经质量筛选的正式篮子；这次没有更换冻结预测的公司集合。
+
+单靠0让球欧赔不能唯一推导净胜2球以上概率，仍需同截止亚盘/大小球辨别胜幅。应优先修正“固定公司筛空即市场无数据”的诊断口径，再研究有明确公司质量和时间契约的市场覆盖策略；不以该已知赛果直接修改λ。
+
+诊断分两层：第一，原生让胜和让平接近，尾部将两者排序交换，导致Top2漏保；第二，原生λ的近期窗口时间跨度过长，已有同截止欧赔更看好主队，但独立联合市场未就绪，主队大胜能力是否被低估仍待证。优先核对同截止欧赔篮子策略、亚盘及大小球和样本跨度，再判断需不需要改变λ或尾部；不在这一已知赛果上拍参数。
 
 无新项目函数、包代码或预测改动。本QMD内检查输入SHA、事后选择条件、唯一联接、概率归一化、净胜球投影和标签身份；干净执行无缓存，错误致命。复现命令：`QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_26103_case383_20261017.qmd --no-cache`。限制：历史采集及日期代理、北单时点较晚、跨赛季窗口和独立盘口缺口；该单场不用于改版验收。

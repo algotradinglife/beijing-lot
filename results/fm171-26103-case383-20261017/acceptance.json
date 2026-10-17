@@ -1,17 +1,17 @@
 {
   "status": "REVIEWED",
   "render_exit": 0,
-  "review_verdict": "The QMD checks passed against the named hash-bound snapshots, and the rendered HTML agrees with the selection criterion, handicap mapping, 3–1 result, tail-rank reversal, core margins, and recent-sample dates. The timing mismatch and missing same-cutoff market evidence are explicitly qualified; no actionable defects were found within scope.\nThe QMD checks passed against the named hash-bound snapshots, and the rendered HTML agrees with the selection criterion, handicap mapping, 3–1 result, tail-rank reversal, core margins, and recent-sample dates. The timing mismatch and missing same-cutoff market evidence are explicitly qualified; no actionable defects were found within scope.",
+  "review_verdict": "The clarification distinguishes an empty fixed-company basket from absent Euro odds, applies the explicit cutoff and 48-hour window, and normalizes each company's odds before averaging. The rendered HTML matches the QMD and clearly separates ordinary probabilities from handicap outcomes while retaining the diagnostic limitations and unchanged frozen prediction.\nThe clarification distinguishes an empty fixed-company basket from absent Euro odds, applies the explicit cutoff and 48-hour window, and normalizes each company's odds before averaging. The rendered HTML matches the QMD and clearly separates ordinary probabilities from handicap outcomes while retaining the diagnostic limitations and unchanged frozen prediction.",
   "selection": "Retrospective FM Top2 miss and BD Top1 hit, largest TV within that cohort",
   "prediction_modified": false,
   "files": [
     {
       "path": "quarto/fm171_26103_case383_20261017.qmd",
-      "sha256": "5329652f86502c50dff79eb0d10b601c961b31af85dd84c3b84add48aea44b0a"
+      "sha256": "a73bf7edfe9682223ba13fa234e30988fc89e5418119a6d93ec9cbbde1d689ba"
     },
     {
       "path": "quarto/fm171_26103_case383_20261017.html",
-      "sha256": "6271e27502ff3e9e048de0d103b701743d470209ffe01cc0fcea658829d0543e"
+      "sha256": "925299f9131747921b8474a55c1b4dbe6bd69fa877243fe7d71a010f7990273a"
     },
     {
       "path": "results/fm171-26103-case383-20261017/render.log",
@@ -20,6 +20,23 @@
     {
       "path": "results/fm171-26103-case383-20261017/review.log",
       "sha256": "8a51eb320a0f9742f5c196b7381204aa8fa50f20589a94b39da0c23732c60921"
+    },
+    {
+      "path": "results/fm171-26103-case383-20261017/euro-render.log",
+      "sha256": "4e991d643f1092f3824901a8ff311f8533d64345c5c744f8132943897ad3cff8"
+    },
+    {
+      "path": "results/fm171-26103-case383-20261017/euro-review.log",
+      "sha256": "20c8e3a675f3166ef3c69b9af02b56a8c536b4d0eb347b69c056d29ff9f746df"
     }
-  ]
+  ],
+  "prior_review_verdict": "The QMD checks passed against the named hash-bound snapshots, and the rendered HTML agrees with the selection criterion, handicap mapping, 3–1 result, tail-rank reversal, core margins, and recent-sample dates. The timing mismatch and missing same-cutoff market evidence are explicitly qualified; no actionable defects were found within scope.\nThe QMD checks passed against the named hash-bound snapshots, and the rendered HTML agrees with the selection criterion, handicap mapping, 3–1 result, tail-rank reversal, core margins, and recent-sample dates. The timing mismatch and missing same-cutoff market evidence are explicitly qualified; no actionable defects were found within scope.",
+  "euro_clarification": {
+    "cutoff_utc": "2026-10-11T16:30:00Z",
+    "dataset": "source_euro_issue_26103",
+    "version": "20261016T011524878555Z",
+    "eligible_company_ids": 256,
+    "frozen_company_basket_changed": false,
+    "same_cutoff_euro_exists": true
+  }
 }
