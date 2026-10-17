@@ -1,0 +1,80 @@
+---
+title: "26103期开赛时间异常快速复核"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: ".."
+---
+
+本次只诊断已冻结的47场排除原因，不修改原始数据、截止、预测或上一轮命中率。没有新采集或历史调参。分析用R/tibble，无新增函数；下列断言为本报告的数据契约和边界检查。
+
+```{r}
+#| include: false
+root <- normalizePath(params$project_root, mustWork=TRUE)
+suppressPackageStartupMessages(library(tidyverse))
+out <- file.path(root, 'results/fm171-26103-draw-20261017')
+acceptance <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+for (p in c('inputs.json','clock_audit.csv')) {
+  target <- paste0('results/fm171-26103-draw-20261017/',p)
+  expected <- acceptance$files |> filter(path == target)
+  stopifnot(nrow(expected)==1L,
+    digest::digest(file=file.path(out,p),algo='sha256')==expected$sha256)
+}
+# Immutable snapshot identity from the preceding committed native manifest.
+stopifnot(digest::digest(file=file.path(out,'fundamentals.rds'),algo='sha256')=='b0c05b635702d6c88fd8ef18c0facc0868404815a6ccf118099f208733eb995d')
+f <- readRDS(file.path(out,'fundamentals.rds'))
+x <- jsonlite::fromJSON(file.path(out,'inputs.json'))
+fixtures <- as_tibble(x$fixtures)
+contexts <- as_tibble(x$contexts)
+clocks <- read_csv(file.path(out,'clock_audit.csv'),show_col_types=FALSE) |>
+  filter(reason=='Unresolved roster/analysis/market kickoff disagreement')
+schedule <- as_tibble(f$fixture_schedule) |>
+  filter(fixture_id %in% clocks$fixture_id)
+stopifnot(nrow(clocks)==47L,!anyDuplicated(clocks$fixture_id),
+  all(schedule$provider_id == fixtures$provider_id[match(schedule$fixture_id,fixtures$fixture_id)]))
+roster <- schedule |> filter(resource=='roster')
+stopifnot(nrow(roster)==47L,!anyDuplicated(roster$fixture_id))
+triage <- roster |>
+  left_join(clocks |> select(fixture_id,analysis_utc,market_titan,market_nowscore),
+            by='fixture_id',relationship='one-to-one') |>
+  mutate(candidate=lubridate::ymd_hms(paste(coalesce(kickoff_date,kickoff_js_date),kickoff_hhmm,'00'),tz='Asia/Shanghai',quiet=TRUE),
+    delta_minutes=as.numeric(difftime(candidate,analysis_utc,units='mins')),
+    category=case_when(is.na(kickoff_date) ~ '名单日期不可用，JS日期晚一天',
+                       delta_minutes==0 ~ '名单与分析一致，市场相差10分钟',
+                       TRUE ~ '名单与分析相差10分钟'))
+analysis <- schedule |> filter(resource=='analysis') |>
+  left_join(clocks |> select(fixture_id,analysis_utc),by='fixture_id',relationship='many-to-one')
+stopifnot(nrow(analysis)==94L,all(analysis$kickoff_at==analysis$analysis_utc),
+  all(triage$delta_minutes[is.na(triage$kickoff_date)]==1440),
+  sum(is.na(triage$kickoff_date))==32L,
+  sum(!is.na(triage$kickoff_date)&triage$delta_minutes==0)==9L,
+  sum(!is.na(triage$kickoff_date)&abs(triage$delta_minutes)==10)==6L)
+ct <- contexts |> filter(fixture_id %in% clocks$fixture_id) |>
+  left_join(fixtures |> select(fixture_id,provider_id,home_id,away_id),
+            by='fixture_id',relationship='many-to-one',suffix=c('_market','_fixture'))
+stopifnot(nrow(ct)==94L,all(ct$native_id==ct$provider_id),
+  all(ct$home_id_market==ct$home_id_fixture),all(ct$away_id_market==ct$away_id_fixture))
+triage |> count(category,name='场数') |> knitr::kable()
+```
+
+47场的名单、分析页和市场上下文provider ID一致，市场两队ID与已冻结事实的主客顺序一致；Titan及Nowscore两分析页时间在47场均一致。这支持同场匹配，但两站可能共享数据，不能视为完全独立的改时证明。
+
+32场：名单规范日期缺失，JS日期结合HH:mm比分析页恰好晚24小时。属于来源内部日期证据矛盾，不能说已经证实改期，也不能直接把JS日期当比赛日期。可以暂保留事实用于历史诊断，但不能解除决策截止准入隔离。
+
+15场：差异均为10分钟。6场是名单对分析，另9场名单与分析一致而市场页面不同。没有8小时时区偏移或主客倒置证据。这与计划/实际开球时间差、页面更新不同步相容；尚未核实具体原因。建议历史诊断有条件接受，改时标签保持“未证实”。
+
+接受比赛身份与允许使用其盘口是两项判断。重跑时须显式冻结裁决及截止：对这些相近时间取已确认候选中的较早时间，重建24小时前的输入和收据，排除截止之后的赔率；不得直接解除旧缓存的门禁。32场的早日期候选仍需额外来源确认，不能仅用最小值猜日期。原301场指标保持原样，扩展样本另报。
+
+```{r}
+#| echo: false
+triage |> left_join(fixtures |> select(fixture_id,home,away),by='fixture_id',relationship='one-to-one') |>
+  select(fixture_id,home,away,category,kickoff_date,kickoff_js_date,kickoff_hhmm,analysis_utc,delta_minutes) |>
+  knitr::kable()
+```
+
+输入SHA256由上一轮acceptance.json逐项复验；分析代码即本QMD，干净进程执行、缓存关闭、错误致命。未新增函数，无需运行未受影响的包全套测试。复现命令：`QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_26103_clock_triage_20261017.qmd --no-cache`。审查要求：核对输入绑定、47=32+6+9、身份匹配、只给条件性建议而非证明改时、不改旧冻结预测。

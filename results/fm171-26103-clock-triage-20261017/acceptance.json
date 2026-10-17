@@ -1,0 +1,31 @@
+{
+  "status": "REVIEWED",
+  "counts": {
+    "total": 47,
+    "date_unavailable_js_one_day_later": 32,
+    "roster_analysis_10_minutes": 6,
+    "roster_analysis_agree_market_10_minutes": 9
+  },
+  "render_exit": 0,
+  "review_verdict": "The hash-bound inputs support the 47=32+6+9 classification and identity assertions. The rendered HTML preserves the conditional, unproven-rescheduling interpretation, and the analysis neither modifies frozen forecasts nor relaxes cutoff admission.\nThe hash-bound inputs support the 47=32+6+9 classification and identity assertions. The rendered HTML preserves the conditional, unproven-rescheduling interpretation, and the analysis neither modifies frozen forecasts nor relaxes cutoff admission.",
+  "source_prediction_modified": false,
+  "cutoff_admission_relaxed": false,
+  "files": [
+    {
+      "path": "quarto/fm171_26103_clock_triage_20261017.qmd",
+      "sha256": "7682e0ea2ba4786c59edc5dd95fe69028fea5ac365abf9f471bc12846de3d58c"
+    },
+    {
+      "path": "quarto/fm171_26103_clock_triage_20261017.html",
+      "sha256": "29588a2eaf4e9c527227678dc2f23daf2a2cb1185a63095c2452eb6e35f37179"
+    },
+    {
+      "path": "results/fm171-26103-clock-triage-20261017/render.log",
+      "sha256": "86b3e93ae0a1eafeaea2059e7d1fb5a60381fa07fdcf47629553ba93edd58bf2"
+    },
+    {
+      "path": "results/fm171-26103-clock-triage-20261017/review.log",
+      "sha256": "3bb22d21afc725775c4818bfd47eed996dbbebc1fb40acd1284912a1dd72351c"
+    }
+  ]
+}
