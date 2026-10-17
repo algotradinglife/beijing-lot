@@ -1,0 +1,10 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "scripts/check_persistent_data_layout.py",
+    "--contract",
+    "config/persistent_data_layout.json"
+  ],
+  "exit_status": 1,
+  "result": "FAILED_LEGACY_RETIRED_DEVICE"
+}

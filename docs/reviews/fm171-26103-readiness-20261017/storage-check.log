@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/scripts/check_persistent_data_layout.py", line 15, in <module>
+    print('PASS',domain,check_storage(args.contract,domain))
+                        ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/src/daily_paper.py", line 35, in check_storage
+    return validate_settlement_storage(root,[root / relative],mountpoint=contract.get('mountpoint'))[0]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/src/settlement_storage.py", line 12, in validate_settlement_storage
+    root = Path(data_root).resolve(strict=True)
+  File "/usr/lib/python3.14/pathlib/__init__.py", line 939, in resolve
+    return self.with_segments(os.path.realpath(self, strict=strict))
+                              ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen posixpath>", line 457, in realpath
+OSError: [Errno 19] No such device: '/run/media/drwho1985/Sandisk/data'

@@ -1,0 +1,129 @@
+{
+  "status": "FULL_COLLECTION_AND_FM_ACCEPTANCE_NOT_COMPLETE",
+  "collection_snapshot_acceptance": "ACCEPTED_WITH_LIMITATIONS",
+  "full_fm_analysis_accepted": false,
+  "comparison_conclusions_resumed": false,
+  "frozen_predictions_changed": false,
+  "fundamentals_version": "20261014T225500527903Z",
+  "euro_version": "20261016T011524878555Z",
+  "roster": 407,
+  "euro_source_rows": 814,
+  "euro_history_rows": 2888332,
+  "euro_inventory_rows": 814,
+  "fresh_company_evidence_all_fixtures": true,
+  "injuries_rows": 0,
+  "lineup_rows": 0,
+  "native_regression_fixtures": ["26103:1", "26103:352", "26103:383"],
+  "current_recent_policy": {
+    "recent_n": 8,
+    "calendar_age_limit": "NONE",
+    "alpha": 0.5
+  },
+  "later_repair_receipt_files_verified": [
+    {
+      "path": "quarto/fm171_26103_recent_count_20261017.qmd",
+      "sha256": "9042174cc3731892adb94165411588928a0ef4a7b01e7df2e3a60a0a1378bc1d"
+    },
+    {
+      "path": "quarto/fm171_26103_recent_count_20261017.html",
+      "sha256": "7ceff0abc0bf5f1557ffa95b170e0afdc2ceb61d6ab2b0abf92d0f9e7a70fc59"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/checks.json",
+      "sha256": "8781f5d6c8ce9481c20d392a5d8d77cd80e61420d4bd64062f80b65ea8ad5042"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/source-identity.json",
+      "sha256": "607808724acec3a521284d59c2002ec0aeec1a17ce958217c4119043119672f3"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/function-test-map.json",
+      "sha256": "f4532751c0efeb340260e83493cd9990a9c7e47a46845014d69ca90bff6757cb"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/policy-decision.json",
+      "sha256": "dc2d64c871f7b1631361502654fa06c3bfa69f1d0ed331ad89cd31396fa07531"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/runtime-versions.log",
+      "sha256": "40926d166078856a612959d900e12cf87e24ab5b2366381c504d7e202b794c75"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/html-inspection.json",
+      "sha256": "03b0ce97b3d53afe1b2ab7d7a590ddd35b18761ec5113e48866e2fc7b91cff88"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/codex-final-offline.log",
+      "sha256": "f77235d611c92b401395c84e738044aeb249c91dd9a9ae3a9263ed8be1fed852"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/superseded-calendar-source.json",
+      "sha256": "fdc1f1a093f33dddedf96a677b9ab59221029f7b994a858a3925a162a52ac15b"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/real-parity-and-span.log",
+      "sha256": "a9afcd664c9d9431f4258aec36ef0839fe1b114906372fb80844c7e586c1545b"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/real-native-replay.log",
+      "sha256": "8dbc1d9a78b88018e4dfa84c3a0c80aeed6d4e45dc97f2025721643cb667ad8f"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/real-native-sha-before-replay.log",
+      "sha256": "c15f1665ab89fe54b918f2b3a5eb8ba45421247009a7b4a169cdff8e141bbfa7"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/real-native-sha-after-replay.log",
+      "sha256": "c15f1665ab89fe54b918f2b3a5eb8ba45421247009a7b4a169cdff8e141bbfa7"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-count-policy-20261017/weight-scale-contract.json",
+      "sha256": "3df40bc832fea2539825014ccb9c4bfc05f885333b53e599bdc2f4b31943ca6a"
+    },
+    {
+      "path": "quarto/fm171_26103_qc_repair_20261017.qmd",
+      "sha256": "b05a154e202d9a70e7b1cb580df6d425f42339fb39d3fa41fb1f38971145df01"
+    },
+    {
+      "path": "quarto/fm171_26103_qc_repair_20261017.html",
+      "sha256": "cd0eaeaf85a7fa8de0d37183e2209d5ed8919f264ce0810cfe1792a70c9c16f1"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/checks.json",
+      "sha256": "2db9a6cc0c734e13041c8f05ad635e44ecfe40b5e02da3a404ceccf80d843e36"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/source-identity.json",
+      "sha256": "a37f412013a2389e8eae7b9cf1eb143786dc50e743e302603842de710b57fec9"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/codex-final-artifact.log",
+      "sha256": "995ff53595f5a024083fb5e0f87ee6190039652c9967f15881e055182f77c771"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/html-final-inspection.json",
+      "sha256": "656d48a5d4486252634e0a482a835a34ff6873698c92d3d5c3008e13d43edb6e"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/review.json",
+      "sha256": "e87ef472f10c4936a0b6de8e429e8706135525fbb825118f9a93adc7927603a5"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/function-test-map.json",
+      "sha256": "b0225865e46fa38f8b9d75d1190b4fcd8458cb804b1fd2e24703057463bf4e6e"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/frozen-baseline-inventory.json",
+      "sha256": "a05da968ca2566b9f6d2704bb94894c89f0547ef7580b579dd9d0c48e6233f94"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-qc-repair-20261017/fundamentals-integration-bundle.json",
+      "sha256": "ec82768c6a1557252dc7fa68a6393bdc17ba27f508ef0ff7432fe73a183fd2f4"
+    }
+  ],
+  "required_storage_check_passed": false,
+  "storage_failure": "Legacy contract references retired Sandisk; NAS public readers succeeded",
+  "new_collection": false,
+  "package_or_function_changes": false,
+  "full_test_suites_rerun": false
+}

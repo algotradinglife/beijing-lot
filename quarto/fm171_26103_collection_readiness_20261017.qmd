@@ -1,0 +1,119 @@
+---
+title: "26103补全验收状态：采集覆盖与完整FM分开核查"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+用户要求：后续讨论和比较必须基于完整采集。本文核对当前持久化版本、既有全期采集验收及后续修复回执，不估算新概率，不比较模型优劣，不补抓页面，不改写旧预测。缺失的核心证据不能由未核查缓存、固定公司篮子或测试通过代替。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'r_lib'))
+python <- file.path(root,'.venv/bin/python')
+reticulate::use_python(python,required=TRUE)
+invisible(beidan::python_backend(python))
+stopifnot(reticulate::py_config()$python==python)
+ev <- file.path(root,'docs/reviews/fm171-26103-readiness-20261017')
+stopifnot(dir.exists(ev))
+source <- file.path(root,'docs/reviews/source-26103')
+production <- jsonlite::fromJSON(file.path(source,'production.json'))
+pi <- jsonlite::fromJSON(file.path(source,'pi-acceptance.json'))
+readback <- jsonlite::fromJSON(file.path(source,'readback-acceptance.json'))
+count_dir <- file.path(root,'docs/reviews/fm171-26103-count-policy-20261017')
+repair_dir <- file.path(root,'docs/reviews/fm171-26103-qc-repair-20261017')
+count <- jsonlite::fromJSON(file.path(count_dir,'acceptance.json'))
+repair <- jsonlite::fromJSON(file.path(repair_dir,'acceptance.json'))
+verified <- list()
+for (receipt in list(count,repair)) {
+  for (p in names(receipt$files_sha256)) {
+    actual <- digest::digest(file=file.path(root,p),algo='sha256')
+    stopifnot(actual==receipt$files_sha256[[p]])
+    verified[[p]] <- tibble(path=p,sha256=actual)
+  }
+}
+verified <- bind_rows(verified)
+stopifnot(count$local_policy_correction_accepted,!count$full_fm_analysis_accepted,
+ !count$overall_fm_analysis_repair_complete,count$recent_n==8L,count$current_alpha==.5,
+ count$calendar_age_limit=='NONE',pi$accepted,pi$verdict=='ACCEPTED_WITH_LIMITATIONS',
+ readback$verified_count==23L,readback$exit_code==0L)
+fm <- beidan::dataset_manifest('source_issue_26103')
+em <- beidan::dataset_manifest('source_euro_issue_26103')
+stopifnot(fm$version==production$fundamentals$publication$version,
+ em$version==production$euro$publication$version)
+fs <- beidan::read_dataset('source_issue_26103','status',version=fm$version)
+fr <- beidan::read_dataset('source_issue_26103','resources',version=fm$version)
+injuries <- beidan::read_dataset('source_issue_26103','injuries',version=fm$version)
+lineup <- beidan::read_dataset('source_issue_26103','lineup',version=fm$version)
+es <- beidan::read_dataset('source_euro_issue_26103','status',version=em$version)
+er <- beidan::read_dataset('source_euro_issue_26103','resources',version=em$version)
+stopifnot(tibble::is_tibble(fs),tibble::is_tibble(injuries),tibble::is_tibble(lineup),
+ nrow(fs)==407L,nrow(es)==407L,!anyDuplicated(fs$fixture_id),!anyDuplicated(es$fixture_id),
+ all(fs$state=='COLLECTED'),nrow(fr)==1221L,all(fr$state=='VERIFIED'),
+ nrow(er)==814L,all(er$state=='VERIFIED'),
+ sum(es$history_rows)==2888332L,nrow(injuries)==0L,nrow(lineup)==0L)
+paths <- reticulate::import('beidan_backend.catalog.paths',convert=FALSE)
+census_token <- 'hot:fm171-26103-repair-20261017-v3/coverage-census.rds'
+native_token <- 'hot:fm171-26103-count-policy-regression/native-repair.rds'
+census_path <- reticulate::py_str(paths$location(census_token))
+native_path <- reticulate::py_str(paths$location(native_token))
+stopifnot(digest::digest(file=census_path,algo='sha256')==count$inputs_sha256[[census_token]],
+ digest::digest(file=native_path,algo='sha256')==count$inputs_sha256[[native_token]])
+census <- readRDS(census_path)
+native <- readRDS(native_path)
+stopifnot(nrow(census$coverage)==814L,!anyDuplicated(census$coverage[c('fixture_id','source')]),
+ n_distinct(census$coverage$fixture_id)==407L,all(census$coverage$fresh_company_ids>0),
+ all(census$coverage$source_status=='PARSED'),
+ length(native$fits)==3L,setequal(names(native$fits),c('26103:1','26103:352','26103:383')),
+ all(native$status$state=='ESTIMATED_NATIVE_REPAIR'),all(!native$status$full_fm_analysis_accepted))
+```
+
+当前结论：**全期基本面与欧赔页面采集、发布和读回已有有条件验收；全维度采集及完整FM分析验收仍未完成。** 最新NAS引用仍是基本面20261014T225500527903Z、欧赔20261016T011524878555Z；后续主要完成机制修复及工作账本，没有发布补齐全部维度的新版本。
+
+```{r}
+#| echo: false
+tibble(项目=c('基本面采集遍历','欧赔采集遍历','原发布表逐值读回','全公司欧赔覆盖审查','伤停和阵容结构化表','亚盘和大小球全期采集验收','修复后真实原生拟合','完整FM逐场整合及整期重算'),
+       已核对证据=c('407场，1221个资源均VERIFIED','407场，两源814个资源均VERIFIED；2888332行历史报价','既有回执23/23表通过；本轮只重读状态及资源等小表','814条比赛/来源记录，全407场均有时间合格报价','当前已发布版本均为0行；不能标全字段完整','尚未找到全407场验收凭证；旧分析只使用25场缓存','仅#1、#352、#383三场完成','最新回执明确FULL_FM_REMAINS_HOLD')) |>
+ knitr::kable()
+census$coverage |> count(source,state) |> knitr::kable(caption='同一冻结截止下的报价覆盖，非正式新市场篮子')
+```
+
+全407场逐来源核对后，每来源368场有原固定公司篮子内报价，39场只有篮子外报价；这39场包含旧303场预测中的31场。原先31场“空篮子”均查到其他符合时间条件的公司ID，每场58至264个。不能再把篮子空、未检查缓存或过滤拒绝标成来源无数据。公司ID并非独立来源；是否进入正式市场篮子还需明确证据与规则。
+
+基本面及欧赔的来源收据仍保留complete=false。伤停、阵容结构化表为空，来源字段差异保留，不代表所有信息均可用于赛前定性分析。预测阵容及已知伤停应按决策时点核验，不要求拿赛后首发来补赛前信息。只有确有证据的“不提供”才可记为已核验缺失；抓取/解析失败与未核查均不能充当此状态。
+
+近期政策遵循用户后续明确指令：最近8场，不设6/12个月日历上限；跨度仅作证据描述，不以日期跨度直接拒绝。当前alpha仍为0.5。旧月份拒绝方案已经被取代，不能继续作为未通过理由。三个真实样本已重新执行，原生数值与冻结基线相符，但这不是407场完整流程重跑。
+
+本轮复核后续两份修复验收绑定的25个不同文件SHA256及两份工作RDS输入身份；回执记录的完整测试通过只证明相应实现范围。本轮没有改包、函数或测试，没有重新运行完整测试套件，不把历史通过冒称本轮重跑。
+
+比较的恢复条件：先对目标整期全部应采维度建立逐场覆盖账本，完成必要补采及核验；绑定全部输入、UTC截止、公司政策及定性裁决；确定各场是否达到完整流程所需证据条件；再重新生成整期概率，报告全名单与合格/排除明细，并在相同场次和明确时点上与北单比较。未完成场次不混作“完整FM”，也不默默缩小分母。本报告不恢复任何模型优劣结论。
+
+历史页面采集与其报价时间不是同一时间。现有序列可用于明确标注的历史诊断，不能因完整遍历就声称已证明真实赛前可用性。旧提前24小时SP共同样本仅1场，不能把较晚SP比较冒充同截止实战比较。
+
+本轮通用持久化目录检查实际失败：旧契约仍引用退役Sandisk的`/run/media/drwho1985/Sandisk/data`，报Errno19；本轮没有恢复旧盘或添加备用路径。上述NAS版本通过包接口成功读取，两者分开记录，不声称目录检查通过。原始命令日志见本报告配套核查回执。
+
+```{r}
+#| include: false
+summary <- list(status='FULL_COLLECTION_AND_FM_ACCEPTANCE_NOT_COMPLETE',
+  collection_snapshot_acceptance='ACCEPTED_WITH_LIMITATIONS',full_fm_analysis_accepted=FALSE,
+  comparison_conclusions_resumed=FALSE,frozen_predictions_changed=FALSE,
+  fundamentals_version=fm$version,euro_version=em$version,
+  roster=407L,euro_source_rows=814L,euro_history_rows=sum(es$history_rows),
+  euro_inventory_rows=nrow(census$coverage),fresh_company_evidence_all_fixtures=TRUE,
+  injuries_rows=nrow(injuries),lineup_rows=nrow(lineup),native_regression_fixtures=names(native$fits),
+  current_recent_policy=list(recent_n=8L,calendar_age_limit='NONE',alpha=.5),
+  later_repair_receipt_files_verified=verified,
+  required_storage_check_passed=FALSE,storage_failure='Legacy contract references retired Sandisk; NAS public readers succeeded',
+  new_collection=FALSE,package_or_function_changes=FALSE,full_test_suites_rerun=FALSE)
+jsonlite::write_json(summary,file.path(ev,'status.json'),auto_unbox=TRUE,pretty=TRUE,dataframe='rows',digits=NA)
+```
+
+本页的自动断言验证状态、输入哈希、唯一键、全期分母、来源状态和修复范围。只读取已登记数据与已验收工作制品，未自行读取NAS Parquet文件。执行入口：仓库根目录加载`config/source-extraction.env`，指定项目Python、R4.6.1，用`quarto render quarto/fm171_26103_collection_readiness_20261017.qmd --no-cache -P project_root:$PWD`干净执行。原23表全值核对、本轮资源状态读回和后续实现测试为不同证据，不互相替代。

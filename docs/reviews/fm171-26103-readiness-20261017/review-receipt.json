@@ -1,0 +1,45 @@
+{
+  "task": "26103 collection and acceptance readiness verification",
+  "status": "STATUS_AUDIT_REVIEWED__FULL_FM_NOT_ACCEPTED",
+  "review_verdict": "The QMD, rendered HTML, and status JSON consistently preserve the requested acceptance distinctions and limitations. All 25 recorded file hashes match; the report distinguishes historical evidence from current readback, retains the incomplete-FM hold, and explicitly reports the failed legacy storage check without claiming all checks passed.\nThe QMD, rendered HTML, and status JSON consistently preserve the requested acceptance distinctions and limitations. All 25 recorded file hashes match; the report distinguishes historical evidence from current readback, retains the incomplete-FM hold, and explicitly reports the failed legacy storage check without claiming all checks passed.",
+  "render_exit_status": 0,
+  "storage_check_exit_status": 1,
+  "full_suites_rerun": false,
+  "model_or_collection_code_changed": false,
+  "goal_created": false,
+  "exact_render_command": "source config/source-extraction.env; RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_26103_collection_readiness_20261017.qmd --no-cache -P project_root:\"$PWD\"",
+  "live_github_lookup": {
+    "command": "gh issue list --state all --limit 60 --search 26103 --json number,title,state,updatedAt,url",
+    "result": []
+  },
+  "files": [
+    {
+      "path": "quarto/fm171_26103_collection_readiness_20261017.qmd",
+      "sha256": "b7eea5286c28756ae24aec4b3b7127a16e84bc8c08ce0cd2eb17ca23727894a6"
+    },
+    {
+      "path": "quarto/fm171_26103_collection_readiness_20261017.html",
+      "sha256": "2f3be85b736232a0f72302abebaf0dcb1e266b5cdca768291ad4ea2ef4eb4bff"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-readiness-20261017/render.log",
+      "sha256": "9bc45abcd3ecd2a432d7a3c1dbd32cf20f6fc7ff0363e736b4f11eaf2c86a538"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-readiness-20261017/review.log",
+      "sha256": "dab028fba92cfd1a42c6fecc4eb9dd9c9630dceb24a14ef6a2ce7795fc53aa48"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-readiness-20261017/status.json",
+      "sha256": "7354833824d8bebcbcd79849d2d10aa34d95d200a75dd392e177c9cf88908407"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-readiness-20261017/storage-check.json",
+      "sha256": "9eea25f94f3ab50d93492086fb7a890ce839e2e4ff00f019d3bffb3bee7eb8fa"
+    },
+    {
+      "path": "docs/reviews/fm171-26103-readiness-20261017/storage-check.log",
+      "sha256": "43037508bd1d303a50107cec715e7c7bf0dc67b4bc981a61c7fc5031377ce86c"
+    }
+  ]
+}
