@@ -1,0 +1,4 @@
+issue_id,forecasts,estimated,with_any_observed_label_history,maximum_observed_labels,first_cutoff,last_cutoff
+26098,136,0,0,0,2026-09-24T05:00:00Z,2026-09-29T23:30:00Z
+26101,103,103,0,0,2026-09-28T06:00:00Z,2026-10-04T00:30:00Z
+26102,84,84,10,238,2026-10-04T14:30:00Z,2026-10-08T00:30:00Z

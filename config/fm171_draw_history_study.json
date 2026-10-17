@@ -1,0 +1,30 @@
+{
+  "study_id": "FM171_HISTORICAL_DRAW_CALIBRATION_20261017",
+  "mode": "POSTHOC_DIAGNOSTIC_NOT_PROSPECTIVE",
+  "base_model": "FM-1.7.1",
+  "versions_modified": false,
+  "issue_plan": [
+    {"target_issue": "26098", "prior_issues": []},
+    {"target_issue": "26101", "prior_issues": ["26098"]},
+    {"target_issue": "26102", "prior_issues": ["26098", "26101"]}
+  ],
+  "clock_horizon": "2026-10-20T00:00:00Z",
+  "diagnostic_label_delays_hours": [48, 72],
+  "primary_delay_hours": 48,
+  "models": ["GLOBAL", "LINE", "WIDTH"],
+  "pseudocount_matches": 50,
+  "minimum_global_ess": 50,
+  "minimum_group_ess": 30,
+  "minimum_global_class_count": 5,
+  "group_definitions": {
+    "LINE": "ZERO versus NONZERO handicap; sign orientation absorbed by model event probability",
+    "WIDTH": "Shortest 80%-mass integer interval at most4 positions versus5or more",
+    "GLOBAL": "All nominated prior eligible FM171 fixtures"
+  },
+  "weighting": "EXPANDING_EQUAL; no decay or fitted recency policy",
+  "calibration": "Shrunk historical event-rate residual on log-odds; local residual shrinks to global calibrated predictions",
+  "tuning": "None. All three candidates and both diagnostic clocks reported; no target-label selection.",
+  "cold_start": "No estimated correction; keep frozen FM171 and report not calibrated",
+  "scope": "Only eligible same-version 323 forecasts/322 settled; unsupported23 never train or evaluate",
+  "limitations": "Only3known issues, no earlier same-version history; clocks are proxies and observed-label admission must be reported separately"
+}

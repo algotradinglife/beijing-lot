@@ -1,0 +1,113 @@
+{
+  "status": "ACCEPTED",
+  "blocking_findings": 0,
+  "files": [
+    {
+      "path": "config/fm171_draw_history_study.json",
+      "sha256": "26292611dc3eaca6db6bce8e09bb9e39c565dfe0c7ed9710080a11d2c8f995d7"
+    },
+    {
+      "path": "r/fm171_draw_history_freeze.R",
+      "sha256": "92d2434567d433b7ea8bca5cd4473215506b46e95310c6d175321b1221916851"
+    },
+    {
+      "path": "r/fm171_draw_history_evaluate.R",
+      "sha256": "161041d14f3c5c1478b51d7d30961ca56e79760ad1ac88293340068a76f9aee7"
+    },
+    {
+      "path": "tests/testthat/test-fm171-draw-history.R",
+      "sha256": "80d467967ae2822297fd1fad02b8b5ce87d0d82be8bb2244cc652beee37b3e91"
+    },
+    {
+      "path": "quarto/fm171_draw_history_20261017.qmd",
+      "sha256": "21b4a53db8d225ccd30ee64b668044d7515b1d0237d0f91c6c0633390456b8e4"
+    },
+    {
+      "path": "results/fm171-draw-calibration-20261017/verification-runner.py",
+      "sha256": "3059a20f32441b1702d6f37b3d4c7ffe9f75a5f9c6f8f40f7414eac7244daf6f"
+    },
+    {
+      "path": "packages/beidan/R/dc_accuracy_diagnostic.R",
+      "sha256": "371cb42c60a4920fa122283f309a1151b0319959db892daa4fbc3bb92e61970d"
+    }
+  ],
+  "checks": [
+    {
+      "command": "TZ=UTC /opt/R/4.6.1/bin/Rscript r/fm171_draw_history_freeze.R ROOT OUTPUT; repeat with replay; R_LIBS in runtime.json",
+      "result": "Both exit0;323 fixtures FULL_IDENTICAL_REPLAY; only nominated prior snapshots/shared-admitted rows fitted. Forecasts frozen before this evaluator. Retrospective label catalog was opened; no blind-test claim"
+    },
+    {
+      "command": "TZ=UTC /opt/R/4.6.1/bin/Rscript r/fm171_draw_history_evaluate.R ROOT OUTPUT",
+      "result": "Exit0; ALL322 and primary estimated cohorts; all3models x2proxyclocks; no selected production rule. Six CSV independent replay verified by targeted tests"
+    },
+    {
+      "command": "DRAW_TARGETED=1 .venv/bin/python results/fm171-draw-calibration-20261017/verification-runner.py",
+      "result": "{\"tests\": 3, \"passed\": 31664, \"failed\": 0, \"errors\": 0, \"warnings\": 0, \"skipped\": 0}; covers full-grid contracts, independently recalculated shrinkage, source nomination, actual clock audit, shared post-cutoff/target mutation invariance and changed-input cache isolation, score replay/tamper rejection"
+    },
+    {
+      "command": ".venv/bin/python results/fm171-draw-calibration-20261017/verification-runner.py -> /opt/R/4.6.1/bin/Rscript tests/testthat.R; exact env in test-environment.json",
+      "result": "{\"package\": {\"tests\": 948, \"passed\": 9153, \"failed\": 0, \"errors\": 0, \"warnings\": 0, \"skipped\": 0}, \"repository\": {\"tests\": 791, \"passed\": 172872, \"failed\": 0, \"errors\": 0, \"warnings\": 0, \"skipped\": 2}}"
+    },
+    {
+      "command": "Unverified cases, not passed",
+      "result": "Two unrelated #408 integration-bundle cases, test-fundamentals-pipeline.R lines6 and44: integration bundle must be materialized by test setup. All new draw-history cases executed"
+    },
+    {
+      "command": "Source/runtime scope",
+      "result": "No packages/beidan code change in this delivery; normally installed r_lib/beidan used throughout, full R tests cover installed DLL wrappers. No manual dyn.load/load_all. No new package installation or unaffected standalone Python suite required; no CI"
+    },
+    {
+      "command": "codex review 'Final source/numerical review only historical draw calibration study: config/fm171_draw_history_study.json, r/fm171_draw_history_freeze.R, r/fm171_draw_history_evaluate.R, tests/testthat/test-fm171-draw-history.R, quarto/fm171_draw_history_20261017.qmd, results/fm171-draw-calibration-20261017. 323forecasts fully replay identical, targeted3blocks31664assertions0fail/error/warning/skip. Actual calibrated187: FM17177/135, GLOBAL_D4878/139 saves19draws loses15others Brier.674716 vs.678261; D72Top2137. GroupsLINE/WIDTH Top2133/134. Core-dominant79targetcases net+2Top2 but slightly worse Brier; all strata reported. Check current hashes, shrinkage and clock/model receipts and typed conversions, future/source nomination and postcutoff mutation/cache tests, predictive/proxy limits and retrospective source-open disclosure, accurate numeric claims/no tuning/no version upgrade, QMD reproducibility including writable XDG cache. Full R suite still running; do not certify it. Ignore unrelated dirty workspace and excluded development prototype in /tmp. Do not edit. Report actionable findings or No actionable defects.'",
+      "result": "No actionable defects; exact current source hashes recorded below. Full-suite outcomes verified separately"
+    },
+    {
+      "command": "TZ=UTC XDG_CACHE_HOME=/tmp/fm171-draw-quarto-cache QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_draw_history_20261017.qmd --no-cache",
+      "result": "Exit0; clean-session render;9 tables,1 inspected figure,0 execution errors; source and forecast hashes verified; final HTML SHA256 in html-validation.json"
+    },
+    {
+      "command": "Availability and research limitation",
+      "result": "Three already-discussed issues; no older same-version ready history. Proxy decision+48h/+72h admission is diagnostic only. Observed label clocks audited separately; historical predictor availability and independent prospective validation not established. Formal FM unchanged."
+    },
+    {
+      "command": "Development conversion/recovery",
+      "result": "Pandas3 Arrow strings converted via records JSON(15 decimals/ISO) into typed validated R tibbles; integer Python API arguments explicit. Excluded development prototype preserved outside active source via prototype-recovery.json; never used as a fit source/cache."
+    },
+    {
+      "command": "Reviewed/imported SHA256: config/fm171_draw_history_study.json",
+      "result": "26292611dc3eaca6db6bce8e09bb9e39c565dfe0c7ed9710080a11d2c8f995d7"
+    },
+    {
+      "command": "Reviewed/imported SHA256: r/fm171_draw_history_freeze.R",
+      "result": "92d2434567d433b7ea8bca5cd4473215506b46e95310c6d175321b1221916851"
+    },
+    {
+      "command": "Reviewed/imported SHA256: r/fm171_draw_history_evaluate.R",
+      "result": "161041d14f3c5c1478b51d7d30961ca56e79760ad1ac88293340068a76f9aee7"
+    },
+    {
+      "command": "Reviewed/imported SHA256: tests/testthat/test-fm171-draw-history.R",
+      "result": "80d467967ae2822297fd1fad02b8b5ce87d0d82be8bb2244cc652beee37b3e91"
+    },
+    {
+      "command": "Reviewed/imported SHA256: quarto/fm171_draw_history_20261017.qmd",
+      "result": "21b4a53db8d225ccd30ee64b668044d7515b1d0237d0f91c6c0633390456b8e4"
+    },
+    {
+      "command": "Reviewed/imported SHA256: results/fm171-draw-calibration-20261017/verification-runner.py",
+      "result": "3059a20f32441b1702d6f37b3d4c7ffe9f75a5f9c6f8f40f7414eac7244daf6f"
+    },
+    {
+      "command": "Reviewed/imported SHA256: packages/beidan/R/dc_accuracy_diagnostic.R",
+      "result": "371cb42c60a4920fa122283f309a1151b0319959db892daa4fbc3bb92e61970d"
+    },
+    {
+      "command": "Normal-permission complete R rerun after sandbox failure",
+      "result": "Exit0. Prior sandbox run failed solely on Quarto cache and repository-external temporary directory permissions; no code/test changes. Full rerun passed; see full-R-tests.log"
+    }
+  ],
+  "generated_at_utc": "2026-10-17T05:48:18.555552+00:00",
+  "forecast_first_write_observed_mtime_utc": "2026-10-17T04:53:22.746258+00:00",
+  "forecast_sha256": "c1a1540557d38248967b6428632c3df3e221889005d0d7c7e26c3fe2de5dbdb2",
+  "prospective_availability_validated": false,
+  "formal_versions_modified": false
+}

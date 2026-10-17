@@ -1,0 +1,6 @@
+{
+  "findings": "No actionable defects",
+  "log_sha256": "8e5f8b89c273c7824b9654a4b0aff063713eb24475a86aedfc460b9ec7b28f56",
+  "review_scope": "Final scoped source, QMD, numerical results, receipts and limitations; complete R results separately checked by acceptance.json",
+  "full_regression": "948 package blocks,9153 assertions;791 repository blocks,172872 assertions;0fail/error/warnings,2 unavailable integration cases"
+}

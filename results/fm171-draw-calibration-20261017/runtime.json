@@ -1,0 +1,24 @@
+{
+  "R": "4.6.1",
+  "dependencies": {
+    "beidan": "0.2.0",
+    "tidyverse": "2.0.0",
+    "dplyr": "1.2.1",
+    "readr": "2.2.0",
+    "reticulate": "1.46.0",
+    "jsonlite": "2.0.0",
+    "digest": "0.6.39",
+    "testthat": "3.3.2",
+    "checkmate": "2.3.4",
+    "rprojroot": "2.1.1",
+    "ggplot2": "4.0.3",
+    "scales": "1.4.0",
+    "stats": "4.6.1"
+  },
+  "libraries": ["/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib", "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-diagnostic-iterations-20261013/library", "/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6", "/opt/R/4.6.1/lib/R/library"],
+  "python": ".venv/bin/python",
+  "Quarto": "1.10.18",
+  "TZ": "UTC",
+  "XDG_CACHE_HOME": "/tmp/fm171-draw-quarto-cache",
+  "scorer_body_sha256": "e605a2a65ccca41875cbda9cb0f3bf5e2eeda1ab18306abfb3858f42e5831865"
+}

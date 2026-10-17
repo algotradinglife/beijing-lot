@@ -1,0 +1,19 @@
+{
+  "mode": "POSTHOC_PRIOR_ISSUE_CALIBRATION_DIAGNOSTIC",
+  "forecast_sha256": "c1a1540557d38248967b6428632c3df3e221889005d0d7c7e26c3fe2de5dbdb2",
+  "evaluator_sha256": "161041d14f3c5c1478b51d7d30961ca56e79760ad1ac88293340068a76f9aee7",
+  "output_hashes": {
+    "metrics": "5119b1caf9a6b7d6cea8e1421f35f437c077e61e15e005f6fb0a587612be08b7",
+    "scores": "aafd533949968157dddc92ac2e05927123469afa87c2b368890c1037a1c7277c",
+    "calibration": "7949284cb280c637294f40571877b97fc82a3b16b1d5976ba38ce9e7bd89455f",
+    "changes": "89df11368a2e43a014910cae7d3242902818f154248696be74ff0492418c5528",
+    "support": "8ad34dfc60f94a3da82aed46997ed4d1427a799c5e15eb055972b1fb62febe85",
+    "clocks": "aab3537db6801d2e0cd88b37e050f8ee429600830d71ce086a722f98c61a0e90"
+  },
+  "primary_n": 187,
+  "all_n": 322,
+  "observed_availability_validated": false,
+  "versions_modified": false,
+  "selected_model": {},
+  "interpretation": "Only nominated prior issues and shared admitted proxy label times; all preset models/clocks reported, no tuning. First issue has no fitted correction; observed label coverage separate, predictor availability remains retrospective proxy."
+}

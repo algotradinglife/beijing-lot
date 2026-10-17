@@ -1,0 +1,33 @@
+# A tibble: 14 × 10
+   cohort            model          n hits1 hits2 brier logloss draw_brier
+   <chr>             <chr>      <int> <int> <int> <dbl>   <dbl>      <dbl>
+ 1 ALL_322           FM171        322   134   231 0.667    1.10      0.215
+ 2 ALL_322           GLOBAL_D48   322   135   235 0.665    1.10      0.214
+ 3 ALL_322           GLOBAL_D72   322   135   233 0.665    1.10      0.215
+ 4 ALL_322           LINE_D48     322   133   229 0.665    1.10      0.215
+ 5 ALL_322           LINE_D72     322   132   227 0.665    1.10      0.215
+ 6 ALL_322           WIDTH_D48    322   133   230 0.666    1.10      0.215
+ 7 ALL_322           WIDTH_D72    322   134   230 0.666    1.10      0.215
+ 8 PRIMARY_ESTIMATED FM171        187    77   135 0.678    1.11      0.217
+ 9 PRIMARY_ESTIMATED GLOBAL_D48   187    78   139 0.675    1.11      0.215
+10 PRIMARY_ESTIMATED GLOBAL_D72   187    78   137 0.675    1.11      0.216
+11 PRIMARY_ESTIMATED LINE_D48     187    76   133 0.675    1.11      0.216
+12 PRIMARY_ESTIMATED LINE_D72     187    75   131 0.675    1.11      0.216
+13 PRIMARY_ESTIMATED WIDTH_D48    187    76   134 0.677    1.11      0.217
+14 PRIMARY_ESTIMATED WIDTH_D72    187    77   134 0.676    1.11      0.217
+   mean_draw_probability actual_draw_rate
+                   <dbl>            <dbl>
+ 1                 0.268            0.311
+ 2                 0.288            0.311
+ 3                 0.287            0.311
+ 4                 0.292            0.311
+ 5                 0.291            0.311
+ 6                 0.292            0.311
+ 7                 0.292            0.311
+ 8                 0.266            0.310
+ 9                 0.299            0.310
+10                 0.299            0.310
+11                 0.306            0.310
+12                 0.305            0.310
+13                 0.306            0.310
+14                 0.306            0.310

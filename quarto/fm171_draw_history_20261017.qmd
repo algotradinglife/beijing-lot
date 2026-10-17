@@ -1,0 +1,161 @@
+---
+title: "历史让平发生率能否校正FM-1.7.1：三期滚动诊断"
+format:
+  html:
+    embed-resources: true
+params:
+  repository_root: ".."
+  output_dir: "results/fm171-draw-calibration-20261017"
+  acceptance_required: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+## 研究范围与因果限制
+
+检验历史让平发生率能否修正FM-1.7.1对让平的系统性偏差，并返调完整比分，使让胜、让负比例与完整净胜球分布保持一致。不是要求让平必进Top2，也不只用漏保让平作训练。
+
+可复用的FM-1.7.1同版历史仅有26098、26101、26102三期323场预测、322场有效赛果。23场原生同赛事支持不足的父版留存行不训练、不评分；取消场次有预测但无标签、不入训练或评分。其他旧版或未调教底座不能直接冒充同版校准样本。更早期需要先生成同版、逐场截止绑定的可用预测。
+
+明确源快照提名：26098不提名任何先验期；26101仅提名26098；26102提名26098、26101。源快照集合为固定研究合同，不按结果或数值期号动态择优，不能含目标/未来期；即使对方伪造提前结算时间，提名身份检查也拒绝。集合内仍由共享temporal_learning进行逐场严格截止过滤、权重、ESS、分区、收据与缓存绑定，重叠赛程中未过标签可用时间的先前期比赛不能训练。
+
+目标三期赛果已多次讨论，整个研究属于事后、固定候选的时序诊断，不是独立样本外或盲测。标签目录为历史学习来源而被读取，但没有目标期标签进入该期拟合；manifest明确记录已打开回顾标签目录和既有赛果知识，不伪称从未看过目标结果。正式FM-1.7.1及alpha不变。
+
+## 本轮结果
+
+实际估计校正的187场（26101/26102）中，48h全局收缩使Top1从77增至78、Top2从135增至139，救回19场让平、误伤10场让胜和5场让负。全三类Brier由0.678261降至0.674716，log loss由1.113717降至1.109740，二元让平Brier由0.216877降至0.215484。平均让平概率由约26.6%升至29.9%，实际发生率31.0%。两期Top2分别净增3场和1场；72h全局方案净增2场，方向仍正但幅度变化。
+
+包含最早期未估计校正的全部322场：原版134/231，全局48h为135/235；Brier从0.666947降至0.664889。LINE/WIDTH虽使全三类评分改善，但187场Top2分别133/134，低于原版135；细分并未带来稳定的选择收益。候选仅探索，不升级正式版本。
+
+## 标签与特征可用时间
+
+两种预先固定的诊断时钟：源预测决策时间加48小时、加72小时。决策为T−24h，分别相当于计划开球后24h、48h；它们是明确的历史代理，不能证明实际完成或当时已知结果，延期比赛尤需谨慎。时间仅由共享diagnostic_label_clock生成，显式clock_horizon用于构造源时钟，不参与拟合准入；实际准入仍用每个目标fixture/cutoff。没有用当前时间、固定训练年或后一期模型代替前期拟合。
+
+原始标签收据的observed_at另行盘点。部分较晚目标场次已有可观测的先前期标签；然而FM-1.7.1预测是在事后生成、其预测输入也含历史代理，不能把这种局部标签可用性变成前瞻证据。此报告不宣称所有标签当时都不可见，也不把代理称作真实可用时间。生产准入仍未满足。
+
+## 预先固定的收缩模型
+
+所有训练都纳入完整的提名、共享准入后的历史，而非仅让平排第三或已漏保场次。原始参考p是该历史场次的FM171最终让平概率。全局训练量n、实际让平率r、原预测均值m，用固定K=50场伪样本收缩：
+
+\[
+ r_s=\frac{nr+Km}{n+K},\quad \delta_g=\operatorname{logit}(r_s)-\operatorname{logit}(m).
+\]
+
+预测q=logistic(logit(p_target)+δ)。全局ESS至少50且两类各至少5场；否则不估计校正，保留原冻结预测并列出状态。K是本轮事先固定的专家强度，不由目标标签选择。全局经验/先验质量n/(n+K)、K/(n+K)与参数、完整共享权重账本一起封存。
+
+三个候选：GLOBAL只用全局δ；LINE按零让球/非零让球分组；WIDTH按80%最短连续区间≤4档/≥5档分组。后两者先作全局校正，组内ESS至少30时，以全局校正后的组内预测均值为先验、同样K=50作残差收缩，再叠加局部log-odds偏移；不足时明确向全局模型收缩。分组不交叉堆叠，避免135–238场历史被细切；未按联赛/球队大量拟合参数。没有衰减、阈值搜索或选择赢家。
+
+全局估计本身包含局部组的数据，局部阶段是向全局收缩的经验方法，不是两份独立证据，不能由此宣称独立后验置信区间。
+
+这是以历史均值为参考的收缩残差法，不是精确logistic最大似然校准，个体概率变化后组内均值不保证精确等于发生率。评估其效果而不是仅看定义。检查过stats::glm的截距/offset校准和glmnet岭回归；本轮不需要迭代优化或大量特征，固定伪样本均值与stats::qlogis/plogis足够，不引入依赖或重写库的数值算法。客户端只提供此域拟合/预测计算，时序均复用共享层。
+
+本研究新增的校正层以实际北单h定义事件D=−h；h不进入原生lambda、来源选择或FM171核心构造，也不使用北单SP拟合。若原让平为p、校正为q，让平对应比分乘q/p，其余比分乘(1−q)/(1−p)，完整比分与三分类同步，W/L比例及两个事件各自内部比分比例不变。实际复用adjust_score_margin_distribution的完整整数分档引擎，不篡改原冻结网格。它输出的通用expert-reweighted分布类型不表示本轮目标来自专家拍值；目标来自单独封存的历史拟合收据。不强制排序、不返拟合lambda/rho、不删除尾部。
+
+## 输入与数据合同
+
+源为上轮346场形态冻结包，逐项核验源forecast/replay/标签哈希。feature每fixture唯一；每model/fixture有完整W/D/L且和为1；比分每主客进球组合唯一。source_history仅由明确提名的先前期快照组成。R与Python边界将Pandas Arrow扩展字符串通过records JSON转换成验证后的tibble，数值传输15位小数、时间ISO UTC；拟合时间均秒精度，ID不转数值。实际拟合权重从共享numpy数组提取；账本额外保存15位传输表示。独立重放验证完整模型、参数、概率与账本。
+
+可传递历史学习清单：共享prepare_learning_context（严格时间、目标排除、FIXED_PRIOR_FIT分区、等权ESS、源/实现/缓存收据）、diagnostic_label_clock、effective_sample_size、bind_model_receipt；R客户端全局/局部经验收缩拟合及预测；build_adjustment_evidence_context、adjust_score_margin_distribution、project_score_outcomes。上游FM171预测及来源裁决作为不可变输入，本轮不重新拟合原生lambda、不重审来源。拟合参数、K、分组、源提名、R运行时/客户端与传递Python实现、cutoff身份、最大准入时间、权重账本和缓存身份全部绑定。不同cutoff不能复用缓存，即使碰巧得到相同δ。源码或cutoff变化必须重建。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$repository_root,mustWork=TRUE);out <- file.path(root,params$output_dir)
+m <- jsonlite::fromJSON(file.path(out,"manifest.json"));rp <- jsonlite::fromJSON(file.path(out,"replay.json"))
+stopifnot(rp$status=="FULL_IDENTICAL_REPLAY",rp$sha256==m$sha256,
+ digest::digest(file=file.path(out,"forecasts.rds"),algo="sha256")==m$sha256)
+status <- system2("/opt/R/4.6.1/bin/Rscript",shQuote(c(file.path(root,"r/fm171_draw_history_evaluate.R"),root,out)),
+ env=c(paste0("R_LIBS=",shQuote(paste(.libPaths(),collapse=":"))),"TZ=UTC"),stdout=file.path(out,"qmd-evaluation.log"),stderr=file.path(out,"qmd-evaluation.log"))
+stopifnot(status==0L)
+ev <- jsonlite::fromJSON(file.path(out,"evaluation.json"))
+for(n in names(ev$output_hashes))stopifnot(digest::digest(file=file.path(out,paste0(n,".csv")),algo="sha256")==ev$output_hashes[[n]])
+metrics <- read_csv(file.path(out,"metrics.csv"),show_col_types=FALSE)
+support <- read_csv(file.path(out,"support.csv"),show_col_types=FALSE)
+clocks <- read_csv(file.path(out,"clocks.csv"),show_col_types=FALSE)
+audit <- read_csv(file.path(out,"audit.csv"),show_col_types=FALSE)
+knitr::kable(clocks,caption="拟合覆盖与实际观察标签的范围；预测可用性仍是历史代理")
+knitr::kable(support,caption="完整状态/样本支持，不将未估计记录说成成功校正")
+```
+
+## 命中、概率准确度与让平校准
+
+ALL_322为完整有效工作流，包含最早期未估计的原预测；PRIMARY_ESTIMATED仅按48h时钟的训练支持判定，分组完全不看目标赛果。72h候选在同样场次比较，个别未估计状态仍保留并披露。Brier/log loss越低越好；Top1/Top2越高越好。二元让平Brier单独衡量让平校准，全三类评分仍需同步考察。
+
+```{r}
+knitr::kable(metrics |> filter(dimension=="all") |>
+ select(cohort,model,n,hits1,hits2,brier,logloss,draw_brier,mean_draw_probability,actual_draw_rate,saved_top2,lost_top2),digits=6)
+knitr::kable(metrics |> filter(cohort=="PRIMARY_ESTIMATED",dimension=="issue_id") |>
+ select(stratum,model,n,hits1,hits2,brier,logloss,draw_brier,saved_top2,lost_top2),digits=6,caption="逐期滚动诊断，不合并最早期冷启动掩盖效果")
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 4
+cal <- read_csv(file.path(out,"calibration.csv"),show_col_types=FALSE)
+cal |> filter(primary_estimated,model %in% c("FM171","GLOBAL_D48","LINE_D48","WIDTH_D48")) |>
+ ggplot(aes(predicted,observed,colour=model,size=n)) + geom_abline(slope=1,intercept=0,linetype=2,colour="grey50") +
+ geom_point(alpha=.8) + scale_colour_discrete(labels=c(FM171="原版",GLOBAL_D48="全局收缩",LINE_D48="让球分组",WIDTH_D48="分布宽度分组")) + scale_x_continuous(labels=scales::percent) + scale_y_continuous(labels=scales::percent) +
+ labs(x="分箱平均让平概率",y="实际让平发生率",colour="固定方案",size="支持场数") + theme_minimal()
+```
+
+## 救回、误伤与分布位置
+
+```{r}
+knitr::kable(metrics |> filter(cohort=="PRIMARY_ESTIMATED",dimension=="draw_group") |>
+ select(stratum,model,n,hits1,hits2,saved_top2,lost_top2,brier,draw_brier),digits=6)
+knitr::kable(metrics |> filter(cohort=="PRIMARY_ESTIMATED",dimension=="handicap_zero") |>
+ select(stratum,model,n,hits1,hits2,saved_top2,lost_top2,brier,draw_brier),digits=6)
+changes <- read_csv(file.path(out,"changes.csv"),show_col_types=FALSE)
+knitr::kable(changes |> filter(grepl("D48$",model)),digits=4,caption="48h主时钟全部Top2救回/误伤；未挑选有利场次")
+```
+
+## 核心质量已支持两侧的场景
+
+用上轮固定90%核心的两侧质量定义core_blocks_draw：两侧核心各自已超过让平时，继续统一压尾不能将让平推入Top2。这只是解释性分层，不参与本轮拟合或选择阈值。
+
+```{r}
+scores <- read_csv(file.path(out,"scores.csv"),show_col_types=FALSE)
+parent_eval <- jsonlite::fromJSON(file.path(root,"results/fm171-margin-shape-20261017/evaluation.json"))
+contribution_path <- file.path(root,"results/fm171-margin-shape-20261017/contributions.csv")
+stopifnot(digest::digest(file=contribution_path,algo="sha256")==parent_eval$output_hashes$contributions)
+core_masses <- read_csv(contribution_path,show_col_types=FALSE) |> filter(core) |>
+ select(fixture_id,outcome,mass) |> pivot_wider(names_from=outcome,values_from=mass,values_fill=0) |>
+ mutate(core_blocks_draw=D<=pmin(W,L)+1e-12)
+knitr::kable(scores |> filter(primary_estimated,model %in% c("FM171","GLOBAL_D48"),draw_group=="DRAW_BIN_TOP2_CATEGORY3") |>
+ left_join(core_masses,by="fixture_id",relationship="many-to-one") |> group_by(core_blocks_draw,model) |>
+ summarise(n=n(),hits1=sum(top1),hits2=sum(top2),saved=sum(saved_top2),lost=sum(lost_top2),brier=mean(brier),.groups="drop"),digits=6)
+```
+
+核心主导的79场中，全局校正救回9场、误伤7场，Top2净增2场，但该子组全三类Brier略变差。历史校正能改变核心内质量，数学上不受纯尾压缩的限制；不过选择改善不等于该子组概率更准确。尾部可改变排序的25场则净增1场。两个子组全部展示，不将有利子组当作独立验证。
+
+## 局限与后续判据
+
+本轮校正针对一条实际北单让球线定义的事件。虽然校正后仍有完整比分网格、可作任意让球的数学投影，但尚未验证其他让球线上的校准；更换目标h后重新拟合会得到另一份条件分布，不能把它当作与h无关的统一战力校准。这是新增研究层的局限，原FM171的lambda/核心仍不使用北单线。若要升级为统一比分校准，需另行检验多个净胜球档的联合一致性，而非逐线反复抬让平。
+
+此数据量只能检验低维收缩，不足以研究联赛×让球×阵容×总进球等细粒度条件发生率。后验收缩强度、分组与48h/72h代理并非已验证的业务参数；所有方案全部报告，没有根据这三期挑最佳升级正式版本。候选分组来自此前已知结果的讨论与形态探索，固定参数并不使其成为独立的事前研究。分布形态分组粗糙、期际状态不同、同期比赛相关、已有多次复盘及历史代理都会限制推广。没有声称显著性或独立置信区间。
+
+如果只在个别期改善，或Top2改善却整体概率评分恶化，不足以形成通用校正。下一阶段需更长的同版、截止绑定预测与真实标签可用性，再用独立未来期验证；不能用更多纯赛果替代缺失的同版预测，也不能把旧版概率直接混作同版校准样本。未生成票单，不评价收益。
+
+## 复现与验收
+
+精确R/Python/依赖版本和测试环境在runtime.json、test-environment.json；受限环境下Quarto样式缓存显式放在可写的/tmp/fm171-draw-quarto-cache，未改HOME。不在函数或渲染时安装依赖。R4.6.1、项目.venv/bin/python，正常安装的r_lib/beidan；本轮无packages/beidan变更，无须新装包或重跑未受影响的独立Python套件。完整仓库入口同时检查正常安装包及其DLL，无手工dyn.load/load_all。没有CI操作。
+
+```bash
+TZ=UTC Rscript r/fm171_draw_history_freeze.R ROOT OUTPUT
+TZ=UTC Rscript r/fm171_draw_history_freeze.R ROOT OUTPUT replay
+TZ=UTC Rscript r/fm171_draw_history_evaluate.R ROOT OUTPUT
+TZ=UTC Rscript tests/testthat.R
+TZ=UTC XDG_CACHE_HOME=/tmp/fm171-draw-quarto-cache QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_draw_history_20261017.qmd --no-cache
+```
+
+新测试test-fm171-draw-history.R映射：域收缩计算与分组→独立重算全体参数、模型/经验质量、权重与支持；时序/来源→提名快照拒绝伪提前目标/未来期，实际共享上下文排除目标/截止后数据，并从客户端真实拟合表达式证明后截止标签变异不改变参数/预测、但缓存key变化；比分映射→每场完整网格、W/L及条件比分比率；评分→六CSV独立重放、配对误伤/救回对账及篡改拒绝。无新项目函数或复制时序工具，只有有界客户端域拟合/预测编排。Pandas扩展字符串转换在实际全量冻结及重放中覆盖；早期开发发现的转换问题已在最终实现修复，不靠跳过断言。
+
+```{r}
+if(isTRUE(params$acceptance_required)) {
+ a <- jsonlite::fromJSON(file.path(out,"acceptance.json"))
+ stopifnot(a$status=="ACCEPTED",a$blocking_findings==0L)
+ for(i in seq_len(nrow(a$files)))stopifnot(digest::digest(file=file.path(root,a$files$path[i]),algo="sha256")==a$files$sha256[i])
+ knitr::kable(as_tibble(a$checks),caption="最终源码SHA256、精确检查命令、退出状态与审查证据")
+} else cat("预览：完整验收未完成。")
+```

@@ -1,0 +1,10 @@
+{
+  "exit_status": 0,
+  "tables": 9,
+  "figures": 1,
+  "execution_errors": 0,
+  "html_sha256": "e8df1115d0c964a847e97885b05b6b7e94bd4f658650aca055d2c3b9cd2667ae",
+  "source_hashes_verified": true,
+  "forecast_hash_verified": true,
+  "figure_inspection": "Chinese labels, all plotted points and identity line inspected in clean-session preview; final same plot"
+}

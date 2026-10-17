@@ -1,0 +1,38 @@
+{
+  "findings": "No actionable defects",
+  "review_command": "Final acceptance audit only of quarto/fm171_draw_history_20261017.qmd and html, results/fm171-draw-calibration-20261017/acceptance.json, full-test-results.json, html-validation.json, delivery-review.json, replay.json, evaluation-replay.json. Scoped sources already reviewed with no actionable defects. Full rerun now passed:948 package blocks9153 assertions,791 repository blocks172872 assertions,zero failure/error/warning,two missing-bundle integration skips; final clean render9tables1figure0errors. Verify consistency and disclosed diagnostic limits, no production promotion. Do not inspect unrelated changes or rerun tests. Return actionable findings or No actionable defects.",
+  "files": [
+    {
+      "path": "quarto/fm171_draw_history_20261017.qmd",
+      "sha256": "21b4a53db8d225ccd30ee64b668044d7515b1d0237d0f91c6c0633390456b8e4"
+    },
+    {
+      "path": "quarto/fm171_draw_history_20261017.html",
+      "sha256": "e8df1115d0c964a847e97885b05b6b7e94bd4f658650aca055d2c3b9cd2667ae"
+    },
+    {
+      "path": "results/fm171-draw-calibration-20261017/acceptance.json",
+      "sha256": "3d07c10d66111226605f71062e214322916572f8f1c3cd7f27186a36f44e99cf"
+    },
+    {
+      "path": "results/fm171-draw-calibration-20261017/full-test-results.json",
+      "sha256": "b1859ee26e432f82adac2e3b6c0d2cfccf00d6ab0b4b0f0c86e204da570d211a"
+    },
+    {
+      "path": "results/fm171-draw-calibration-20261017/html-validation.json",
+      "sha256": "8a5ab5069b1522d66b7a9c85be824a93c916dba45cfe9b84259947270f49f8cd"
+    },
+    {
+      "path": "results/fm171-draw-calibration-20261017/delivery-review.json",
+      "sha256": "b251b148fcb1d38612394554f3f2d17e3924feff1734358b3119dc9c13f2f719"
+    },
+    {
+      "path": "results/fm171-draw-calibration-20261017/replay.json",
+      "sha256": "2d941c81d2220d66e22c05d9df1062baaaa466678ac33efebd7fe29317fd1f82"
+    },
+    {
+      "path": "results/fm171-draw-calibration-20261017/evaluation-replay.json",
+      "sha256": "4dec8a5084ee5a35e58e50ac7f79e4eecd7510ffd6b6ffaba03c89857209e7bb"
+    }
+  ]
+}
