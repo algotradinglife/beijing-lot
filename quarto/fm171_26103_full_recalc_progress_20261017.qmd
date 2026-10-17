@@ -19,6 +19,10 @@ suppressPackageStartupMessages(library(tidyverse))
 root <- normalizePath(params$project_root,mustWork=TRUE)
 evidence <- file.path(root,'docs/reviews/fm171-26103-full-recalc-20261017')
 x <- jsonlite::fromJSON(file.path(evidence,'execution.json'))
+cadence <- jsonlite::fromJSON(file.path(evidence,'cadence-5s.json'))
+x$collector_source_sha256 <- cadence$collector_sha256
+x$market_process <- cadence
+stopifnot(cadence$source_min_interval_seconds==5,cadence$last_attempt_preserved)
 stopifnot(x$scope==407L,x$recent_n==8L,x$alpha==.5,x$calendar_age_limit=='NONE',
  !x$full_fm_analysis_accepted,!x$final_probabilities_ready,
  digest::digest(file=file.path(root,'src/fm171_26103_collect_full_markets.py'),algo='sha256')==x$collector_source_sha256)
@@ -62,11 +66,11 @@ tibble(任务=c('原生阶段重新拟合','亚洲盘/大小球历史补采','�
 progress |> count(kind,state,name='已完成通道数') |> knitr::kable(caption='本次渲染时的动态快照；不是407场全部完成')
 ```
 
-原始盘口预检：共814个比赛/通道，现存可重放51个，缺763个。公司ID8沿用既有亚洲盘及大小球研究口径；不代表所有庄家的全部盘口。如果该公司缺少截止前报价或出现冲突，仍需核查其他公司，不能判为整个盘口来源无数据。补采通过既有SourceClient共享缓存，Titan每次请求至少60秒；缺失请求仅按间隔计算至少45780秒，即约12小时43分钟，实际可能更久。欧赔复用已有全407场、全公司原始底座；正式使用的公司政策仍须先冻结，不能因某场结果更合预期而选公司。
+原始盘口预检：共814个比赛/通道，现存可重放51个，缺763个。公司ID8沿用既有亚洲盘及大小球研究口径；不代表所有庄家的全部盘口。如果该公司缺少截止前报价或出现冲突，仍需核查其他公司，不能判为整个盘口来源无数据。补采复用既有ExtractionCache共享缓存，按用户明确授权改为每次至少5秒。保留原last_attempt，未重置请求历史、缓存或命名空间。停止60秒旧进程后，将76个已验证通道复制至markets-v3-5s继续；剩余738个通道仅间隔约61.5分钟，网络耗时与重试另计。agent-reach的Jina Reader试抓返回149行可解析JSON；其完整原始输出保存在hot工作目录，仅为渠道试验，不替换批量来源或授权历史准入。欧赔复用已有全407场、全公司原始底座；正式使用的公司政策仍须先冻结，不能因某场结果更合预期而选公司。
 
 补采输出区分PARSED、OBSERVED_EMPTY、CACHE_MISS、FETCH_FAILED、PARSE_FAILED和INTEGRITY_FAILURE。只有原文为有效JSON空数组时才记录observed empty；WAF、解析失败及未采集均不当作空数据。原始响应在权威共享SQLite缓存中，旧25场原文按原哈希重放；新结果把规范JSON正文及SHA放在一个回执文件内，用已有write_json_atomically整体验证、原子发布，断点续跑逐个验证。源HTTP重试、频率、原文保存均复用现有包，不新写传输或解析器。
 
-开发审查发现原“JSON正文与SHA侧文件分开发布”存在中断窗口，已停止旧采集进程、保留旧工作目录及哈希清单；活动格式只保留单文件信封，不加旧格式兼容层。新任务使用独立markets-v2令牌，复用共享缓存已取得的原始响应。两个回归情况分别模拟原子替换前及替换后中断，均能继续完成；不是仅凭正常运行推断安全续跑。
+开发审查发现原“JSON正文与SHA侧文件分开发布”存在中断窗口，已停止旧采集进程、保留旧工作目录及哈希清单；活动格式只保留单文件信封，不加旧格式兼容层。此前恢复任务使用独立markets-v2令牌，复用共享缓存已取得的原始响应。两个回归情况分别模拟原子替换前及替换后中断，均能继续完成；不是仅凭正常运行推断安全续跑。
 
 原生阶段的现有已验收客户端遍历407场，对原可估分支实际重新准备与拟合；原104场未估分支目前仍保留原因，不能将其说成全部重新拟合成功。证据补齐后的全期来源裁决尚待完成；不填造概率，不以北单线改变lambda。原生阶段完成也不等于完整FM完成。
 
@@ -74,6 +78,10 @@ progress |> count(kind,state,name='已完成通道数') |> knitr::kable(caption=
 
 仍需完成原文遍历及失败审查、身份/时钟和严格截止准入、逐场定性可靠性与市场充分性审查、联合市场及来源选择、已有FM171尾部和实际北单让球映射，再独立重放与验收。以上新数据都是事后采集，只能用于明确标注的历史诊断。目标标签不能用于公司选择、截止修订或模型调整。
 
-采集客户端新增测试覆盖：导入不抓取不写库；离线采集与方向转换；续跑不重复取数；回执篡改拒绝；缺缓存产生失败账本及非零退出；来源真实空数组与WAF解析失败分开；原子发布前后中断恢复。七个测试用例全部执行通过，命令为`PYTHONPATH=packages/beidan/inst/python .venv/bin/python -m pytest tests/test_fm171_26103_market_client.py -q`。只新增研究客户端和相应测试，包实现、R客户端、现有正式规则未改；未重跑无关完整套件，不宣称它们本轮通过。
+采集客户端新增测试覆盖：导入不抓取不写库；离线采集与方向转换；续跑不重复取数；回执篡改拒绝；缺缓存产生失败账本及非零退出；来源真实空数组与WAF解析失败分开；原子发布前后中断恢复。八个测试用例全部执行通过（新增5秒参数传入共享缓存及收据绑定测试），命令为`PYTHONPATH=packages/beidan/inst/python .venv/bin/python -m pytest tests/test_fm171_26103_market_client.py -q`。只新增研究客户端和相应测试，包实现、R客户端、现有正式规则未改；未重跑无关完整套件，不宣称它们本轮通过。
 
 完整采集仍在运行，不发布新FM概率或命中率，不恢复原HOLD。本报告的执行记录、命令和原始日志见配套execution.json与审查回执。复现进度页：加载config/source-extraction.env，指定项目Python、R4.6.1，用`quarto render quarto/fm171_26103_full_recalc_progress_20261017.qmd --no-cache -P project_root:$PWD`执行。采集任务命令在execution.json内；同一输出令牌续跑会拒绝输入、代码、范围变化或回执篡改，不能通过移动截止字段重用旧缓存。
+
+本次调整仅修改研究客户端及其测试，包代码未改。显式参数`--min-interval-seconds 5`记录于输入绑定。测试：8 passed in 2.89s。局限：其他共享采集任务如再次要求更长间隔，缓存会采用更保守的间隔；5秒不是请求完成时间保证。完整FM仍未验收。
+
+本次`codex review`限定采集客户端、测试、本QMD及cadence-5s收据，结论为无阻断发现，8个测试通过；审查日志为`docs/reviews/fm171-26103-full-recalc-20261017/cadence-5s-review.log`。Jina输出去除Reader包装后，149行JSON与原直接采集缓存逐项相等。实际请求记录证实约5秒间隔；此为发起频率，不是响应完成间隔。

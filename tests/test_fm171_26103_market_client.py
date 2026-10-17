@@ -136,3 +136,25 @@ def test_interrupted_atomic_publication_resumes(monkeypatch,tmp_path,interruptio
     for kind in ['total','asian']:
         envelope=json.loads((hot/f'atomic/26103_1-{kind}.json').read_text())
         assert hashlib.sha256(envelope['payload'].encode()).hexdigest()==envelope['sha256']
+
+
+def test_explicit_five_second_cadence_uses_shared_cache(monkeypatch, tmp_path):
+    hot = tmp_path / 'hot'
+    hot.mkdir()
+    monkeypatch.setenv('BEIDAN_HOT_ROOT', str(hot))
+    intervals = []
+    class Cache:
+        def extract(self, source, url, parser, **kwargs):
+            assert source == 'titan' and kwargs['reuse_raw']
+            intervals.append(kwargs['min_interval'])
+            return dict(data=b'[]', receipt=dict(network_attempts=0))
+    class Client:
+        cache = Cache()
+    monkeypatch.setattr(unified_sources, 'SourceClient', Client)
+    monkeypatch.setattr(sys, 'argv', [str(CLIENT), '--root', str(ROOT),
+        '--output', 'hot:five-second-test', '--slots', '1', '--cache-only',
+        '--min-interval-seconds', '5'])
+    runpy.run_path(str(CLIENT), run_name='__main__')
+    assert intervals == [5.0, 5.0]
+    binding = json.loads((hot/'five-second-test/input-binding.json').read_bytes())
+    assert binding['min_interval_seconds'] == 5

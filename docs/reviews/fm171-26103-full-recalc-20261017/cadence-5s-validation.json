@@ -1,0 +1,14 @@
+{
+  "tests": "8 passed in 2.89s",
+  "test_exit": 0,
+  "review": "No blocking findings",
+  "review_command": "codex review (four explicitly scoped files; full prompt in review log)",
+  "jina_rows": 149,
+  "jina_equals_direct_cache": true,
+  "files": {
+    "src/fm171_26103_collect_full_markets.py": "4245a3af56ac50970d65ae386bd46e732c1a93d7aabe8bf5205f54b38839ea70",
+    "tests/test_fm171_26103_market_client.py": "39235115f6a69fe8eaa9ea05ef2a55f3dc046c871fd9ade6ff081a158ac3f9cc",
+    "quarto/fm171_26103_full_recalc_progress_20261017.qmd": "bba151426263649207acdefdb15be74c05fbd8775f378c96bc2cecdb640910ce",
+    "docs/reviews/fm171-26103-full-recalc-20261017/cadence-5s.json": "f82ea735e5937032aa856af9fe492991478fdfdd44bce3666553bedd01174222"
+  }
+}

@@ -1,6 +1,6 @@
 """Thin 26103 raw-history collection client; no estimation or cutoff admission.
 
-Uses the authoritative shared cache and Titan60s rate limit. Existing original
+Uses the authoritative shared cache and an explicit optional source cadence. Existing original
 captures are replayed; new raw bytes remain in that cache. One immutable receipt
 per fixture/channel. Interrupted jobs resume without replacing completed work.
 """
@@ -19,7 +19,7 @@ from beidan_backend.market_capture.history import (
     parse_asian_handicap_history_json,
 )
 from beidan_backend.temporal_learning import implementation_closure, verify_implementation_closure
-from beidan_backend.unified_sources import SourceClient, canonical
+from beidan_backend.unified_sources import SourceClient, canonical, document_bytes
 from beidan_backend.versioning import write_json_atomically
 
 
@@ -29,6 +29,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True, help="Explicit hot: catalog token")
     parser.add_argument("--slots", help="Optional bounded smoke-test slots")
     parser.add_argument("--cache-only", action="store_true")
+    parser.add_argument("--min-interval-seconds", type=float, choices=[5.0, 60.0],
+                        help="Explicit owner-authorized Titan request interval")
     args = parser.parse_args()
     root = args.root.resolve(strict=True)
     if not args.output.startswith("hot:"):
@@ -59,7 +61,7 @@ if __name__ == "__main__":
     binding = dict(inputs_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
         client_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         implementation=implementation, company_id="8", slots=[f["slot"] for f in fixtures],
-        cache_only=args.cache_only, purpose="RAW_POSTEVENT_CAPTURE_NOT_DECISION_ADMISSION")
+        cache_only=args.cache_only, min_interval_seconds=args.min_interval_seconds, purpose="RAW_POSTEVENT_CAPTURE_NOT_DECISION_ADMISSION")
     with FileLock(str(out / "run.lock"), timeout=0):
         manifest = out / "input-binding.json"
         if manifest.exists():
@@ -113,8 +115,13 @@ if __name__ == "__main__":
                         result["raw_receipt"] = cap
                         result["origin"] = "EXISTING_PINNED_CAPTURE"
                     else:
-                        cap = client.request("titan", url, max_age=0,
-                            cache_only=args.cache_only, reuse_raw=True)
+                        if args.min_interval_seconds is None:
+                            cap = client.request("titan", url, max_age=0,
+                                cache_only=args.cache_only, reuse_raw=True)
+                        else:
+                            cap = client.cache.extract("titan", url, document_bytes,
+                                max_age=0, min_interval=args.min_interval_seconds,
+                                cache_only=args.cache_only, reuse_raw=True)
                         raw = cap["data"]
                         result["raw_receipt"] = cap["receipt"]
                         result["network_attempts"] = cap["receipt"]["network_attempts"]

@@ -1,0 +1,33 @@
+{
+  "agent_reach_backend": "Jina Reader",
+  "collector_sha256": "4245a3af56ac50970d65ae386bd46e732c1a93d7aabe8bf5205f54b38839ea70",
+  "command": [
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python",
+    "-u",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot/src/fm171_26103_collect_full_markets.py",
+    "--root",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "--output",
+    "hot:fm171-26103-full-recalc-20261017/markets-v3-5s",
+    "--min-interval-seconds",
+    "5"
+  ],
+  "copied_verified_channels": 76,
+  "full_fm_analysis_accepted": false,
+  "last_attempt_preserved": true,
+  "output_token": "hot:fm171-26103-full-recalc-20261017/markets-v3-5s",
+  "pid": 1146718,
+  "probe_bytes": 19483,
+  "probe_json_rows": 149,
+  "probe_sha256": "a0eb18c2099c9aed4e867a896daf15b3eba3e09662e6f3a0b5b832f91310777e",
+  "rate_after": [
+    1792244686.1481586,
+    5.0
+  ],
+  "rate_before": [
+    1792244686.1481586,
+    60.0
+  ],
+  "source_min_interval_seconds": 5,
+  "started_at_utc": "2026-10-17T13:45:07.829041+00:00"
+}
