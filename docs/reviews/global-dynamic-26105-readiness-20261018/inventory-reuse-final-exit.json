@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/opt/R/4.6.1/bin/Rscript",
+    "r/global_dynamic_26105_readiness_20261018.R",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "results/global-dynamic-26105-readiness-20261018-v4",
+    "results/fm171-check-20261019/raw-schedule/26105/26105/20261018T142406.548863Z/26105.source.json",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-readiness-20261018-control/raw-packet-inputs.json"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T14:44:31.037166+00:00",
+  "finished_at_utc": "2026-10-18T14:48:21.662274+00:00"
+}

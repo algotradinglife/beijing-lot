@@ -1,0 +1,9 @@
+{
+  "wrapper_pid": 3856829,
+  "job": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-readiness-20261018-control/titan-gap-capture-job.json",
+  "started_at_utc": "2026-10-18T15:00:15.345566+00:00",
+  "source_binding": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-readiness-20261018-control/source-manifest.json",
+  "scope": 308,
+  "issue_id": "26105",
+  "goal_complete": false
+}

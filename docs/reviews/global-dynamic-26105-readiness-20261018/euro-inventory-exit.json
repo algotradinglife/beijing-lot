@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/opt/R/4.6.1/bin/Rscript",
+    "r/global_dynamic_26105_market_readiness_20261018.R",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "results/global-dynamic-26105-euro-readiness-20261018",
+    "results/fm171-check-20261019/raw-schedule/26105/26105/20261018T142406.548863Z/26105.source.json"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 1,
+  "started_at_utc": "2026-10-18T14:47:52.546458+00:00",
+  "finished_at_utc": "2026-10-18T14:47:52.740276+00:00"
+}

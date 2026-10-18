@@ -1,0 +1,6 @@
+# A tibble: 3 × 3
+  source   state          n
+  <chr>    <chr>      <int>
+1 nowscore CACHE_MISS   365
+2 titan    CACHE_MISS   154
+3 titan    CAPTURED     211

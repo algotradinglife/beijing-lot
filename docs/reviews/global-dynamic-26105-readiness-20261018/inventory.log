@@ -1,0 +1,5 @@
+Error in py_call_impl(callable, call_args$unnamed, call_args$named) : 
+  beidan_backend.extraction_cache.CacheMissError: no validated cached capture for request
+Run `reticulate::py_last_error()` for details.
+Calls: <Anonymous> -> py_call_impl
+Execution halted

@@ -1,0 +1,23 @@
+{
+  "output_sha256": "9c7e0d80340a201d13d936571fc929c0de9b432f747b20f262e1ad4c3e800b6e",
+  "source_client": {
+    "path": "r/global_dynamic_26105_capture_queue_20261018.R",
+    "sha256": "353aab0d21b829745605dd0a8fa9e01eb8c1d4f3da7091f12b85e56e25f98fd4"
+  },
+  "input_files": [
+    {
+      "path": "results/global-dynamic-26105-readiness-20261018-v4/slots.csv",
+      "sha256": "6bb1c2dc12dca91b513baf33f461b6e94bbec56eb912c7aa498ed43ca86e4d2d"
+    },
+    {
+      "path": "results/global-dynamic-26105-readiness-20261018-v4/base-resources.csv",
+      "sha256": "b286892baebb682e83f5bf3e6f8fd3bb67e266b2c85d718496f42fd4d07ffc46"
+    },
+    {
+      "path": "results/global-dynamic-26105-euro-readiness-20261018-v2/euro-resources.csv",
+      "sha256": "c820f443126c814a4a66d4e87029b1a895d6685347250b741e16b5eca3e2c8c9"
+    }
+  ],
+  "rows": 308,
+  "fixtures": 154
+}

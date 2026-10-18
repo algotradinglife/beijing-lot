@@ -1,0 +1,45 @@
+{
+  "status": "READINESS_REVIEW_PASSED_CAPTURE_IN_PROGRESS",
+  "reviewed_inputs": [
+    {
+      "path": "r/global_dynamic_26105_readiness_20261018.R",
+      "sha256": "3ea0141d92f69f0b8b401c77b960bc9827653e1698a8431d0e1dfc26df7211bd"
+    },
+    {
+      "path": "r/global_dynamic_26105_market_readiness_20261018.R",
+      "sha256": "97d2476c41e0e9107a110c41e7ab701f20988081256adb69751a6ff542624f17"
+    },
+    {
+      "path": "r/global_dynamic_26105_capture_queue_20261018.R",
+      "sha256": "41813c4a5b2637a4fe5d5dabafb57b17d030e077b24c049eb50f1bd45cfb6623"
+    },
+    {
+      "path": "src/global_dynamic_26105_capture_missing_20261018.py",
+      "sha256": "20f766b0a46af0f1ac7a9de7f8e324f2de875ac35dc1eb02ef37f029d143c1f9"
+    },
+    {
+      "path": "tests/test_global_dynamic_26105_capture_missing.py",
+      "sha256": "4ff8d69b04ef2281aac958abd8276726756d6fa7e1783369def11d55fb14ae2b"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_readiness_20261018.qmd",
+      "sha256": "a23286e910dd97a002061b8b096e77e1fc5cfac31f295584723865d30d13edc4"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_readiness_20261018.html",
+      "sha256": "6802f13df09b48f45c6d45ba0cf48eaad5470d1f7903522287394846b28728aa"
+    }
+  ],
+  "review_exit": 0,
+  "review_log_sha256": "941b78bbb88d8f8043ead03007151929c57b25f41248b5d31c2264f0bea9c843",
+  "tests": {
+    "qmd_assertions": 1309,
+    "python_tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0
+  },
+  "goal_complete": false,
+  "scope": "Readiness+raw-reuse completed; live capture/furtherqualification/final26105evaluation pending. No packagechanges, noCI.",
+  "generated_at_utc": "2026-10-18T15:01:25.099799+00:00"
+}

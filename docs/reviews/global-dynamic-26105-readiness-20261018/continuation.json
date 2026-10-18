@@ -1,0 +1,41 @@
+{
+  "goal_status": "active",
+  "previous_turn_classification": "PROGRESS",
+  "capture_wrapper_pid": 3856829,
+  "capture_child_pid": 3856830,
+  "capture_job": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-readiness-20261018-control/titan-gap-capture-job.json",
+  "capture_output": "hot:global-dynamic-26105-titan-gaps-20261018",
+  "capture_exit_receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-readiness-20261018-control/titan-gap-capture-exit.json",
+  "must_verify_actual_live_process_before_wait_or_restart": true,
+  "completed": [
+    "Original roster offline imported with original observed time/hash",
+    "848 original raw observations from424explicit packets reused, no HTTP in inventory",
+    "365fixturecache-only base census211COLLECTED154MISS; both sources tracked",
+    "730Euro raw-resource census:211Titan present;154Titan+365Nowscore missing",
+    "37oldFM171rows36distinctfixtures unchanged",
+    "308Titan analysis+Euro gap queue/source closure frozen; repeated execution tested",
+    "1309QMD assertions and5offlinePython tests passed; clean render and finalreview passed",
+    "LiveTitan5secondraw-onlycapture started, lastobserved9success0failure"
+  ],
+  "remaining": [
+    "Finish raw308Titan capture; inspect real terminal exit/receipts; no restart on observation timeout",
+    "Independently parse/validate raw resources before model use",
+    "Nowscore365analysis+365Euro missing; additionalauxiliaryURLs discovered only from saved pages. Observed shared source interval120s; not altered; explicit user5s preference still needs authoritative handling, no ad hoc SQL/rate reset",
+    "Complete full26105base+Euro publication andsame-cutoffAsian/total coverage; rawpresence is not qualification",
+    "Extend prior frozenRAW/GLOBAL workflow to26105using same eligibility, clocks, groups/budget; use only earlieravailable labels; no target5fit",
+    "Final26105metrics/returns await allmatchfinish andverifiedSP",
+    "Recheck26106newcompleteissues; record prospective gaps"
+  ],
+  "superseded": [
+    "v1inventorycachemiss before roster offline import",
+    "v2pre-importcensus:365CACHEMISS; diagnostic evidence only",
+    "v3interrupted deliberately before fixing an output-path typo; verified bytes persisted via atomic sharedcache",
+    "initialEuroinventorymissing explicit R library; final accepted rerun0",
+    "initialQMDrelativepathfailure; declaredknitroot fix andfresh full1309assertionrender passed",
+    "initialcapturetestwrongpublicatomicwriterargumentorder; fixed,5tests pass",
+    "v1queue receipt prettyJSON comparison rejected replay; immutable v2queue fixes line comparison, explicit columnwise identities andpassed replay"
+  ],
+  "changed_existing_forecasts": false,
+  "whole_goal_complete": false,
+  "recorded_at_utc": "2026-10-18T15:01:25.095736+00:00"
+}

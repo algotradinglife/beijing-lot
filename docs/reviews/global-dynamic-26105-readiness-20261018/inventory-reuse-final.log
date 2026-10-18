@@ -1,0 +1,16 @@
+None
+# A tibble: 2 × 2
+  state          n
+  <chr>      <int>
+1 CACHE_MISS   154
+2 COLLECTED    211
+# A tibble: 3 × 3
+  source   state          n
+  <chr>    <chr>      <int>
+1 nowscore CACHE_MISS   365
+2 titan    CACHE_MISS   154
+3 titan    VERIFIED     211
+# A tibble: 1 × 4
+  frozen_snapshots frozen_rows unique_frozen_fixtures whole_issue
+             <int>       <int>                  <int>       <int>
+1                2          37                     36         365

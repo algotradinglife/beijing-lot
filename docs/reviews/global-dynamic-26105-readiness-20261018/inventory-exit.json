@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/opt/R/4.6.1/bin/Rscript",
+    "r/global_dynamic_26105_readiness_20261018.R",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "results/global-dynamic-26105-readiness-20261018"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 1,
+  "started_at_utc": "2026-10-18T14:41:46.295419+00:00",
+  "finished_at_utc": "2026-10-18T14:41:48.363999+00:00"
+}

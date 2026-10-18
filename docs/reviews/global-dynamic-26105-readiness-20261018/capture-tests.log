@@ -1,0 +1,146 @@
+..FF                                                                     [100%]
+=================================== FAILURES ===================================
+______ test_bounded_resume_preserves_failures_successes_and_binding[True] ______
+
+queue = PosixPath('/home/drwho1985/.cache/tmp/pytest-of-drwho1985/pytest-907/test_bounded_resume_preserves_0/queue.csv')
+tmp_path = PosixPath('/home/drwho1985/.cache/tmp/pytest-of-drwho1985/pytest-907/test_bounded_resume_preserves_0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d4e981f0cb0>
+recover = True
+
+    @pytest.mark.parametrize('recover',[True,False])
+    def test_bounded_resume_preserves_failures_successes_and_binding(queue,tmp_path,monkeypatch,recover):
+        import beidan_backend.unified_sources as source
+        import beidan_backend.catalog.paths as paths
+        from beidan_backend.transport import FetchError
+        work=tmp_path/'work';calls=[];first=[]
+        def extract(provider,url,parser,**kw):
+            assert provider=='titan' and kw==dict(max_age=0,min_interval=5,retries=1,reuse_raw=True)
+            calls.append(url)
+            if not first:first.append(url)
+            if url==first[0] and (calls.count(url)==1 or not recover):
+                e=FetchError('timeout');e.network_attempts=2;raise e
+            return dict(receipt=dict(network_attempts=0,capture_id=len(calls),sha256='a'*64,url=url))
+        monkeypatch.setattr(source,'SourceClient',lambda:SimpleNamespace(cache=SimpleNamespace(extract=extract)))
+        monkeypatch.setattr(paths,'location',lambda *a,**kw:work)
+        monkeypatch.setattr(sys,'argv',[str(CLIENT),'--input',str(queue),'--output','hot:test','--min-interval-seconds','5'])
+>       with pytest.raises(SystemExit) as first_run:runpy.run_path(str(CLIENT),run_name='__main__')
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_global_dynamic_26105_capture_missing.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<frozen runpy>:287: in run_path
+    ???
+<frozen runpy>:98: in _run_module_code
+    ???
+<frozen runpy>:88: in _run_code
+    ???
+src/global_dynamic_26105_capture_missing_20261018.py:30: in <module>
+    else:write_json_atomically(bp,binding)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+results/margin-combination-study-20261018/library/beidan/python/beidan_backend/versioning.py:99: in write_json_atomically
+    path = Path(path)
+           ^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <[AttributeError("'pathlib.PosixPath' object has no attribute '_raw_paths'") raised in repr()] PosixPath object at 0x7d4e982234c0>
+args = ({'client_sha256': 'f78e5b24ef9c260626117bfbe90c49c12413e6566955b2a2df13f94647bccfa2', 'input_sha256': '14ee714019fd240ff91734a6b16614e7c75d5ea259696b3f9557918727191a48', 'maximum_passes': 2, 'maximum_transport_attempts_per_pass': 2, ...},)
+paths = []
+arg = {'client_sha256': 'f78e5b24ef9c260626117bfbe90c49c12413e6566955b2a2df13f94647bccfa2', 'input_sha256': '14ee714019fd240ff91734a6b16614e7c75d5ea259696b3f9557918727191a48', 'maximum_passes': 2, 'maximum_transport_attempts_per_pass': 2, ...}
+path = {'client_sha256': 'f78e5b24ef9c260626117bfbe90c49c12413e6566955b2a2df13f94647bccfa2', 'input_sha256': '14ee714019fd240ff91734a6b16614e7c75d5ea259696b3f9557918727191a48', 'maximum_passes': 2, 'maximum_transport_attempts_per_pass': 2, ...}
+
+    def __init__(self, *args):
+        paths = []
+        for arg in args:
+            if isinstance(arg, PurePath):
+                if arg.parser is not self.parser:
+                    # GH-103631: Convert separators for backwards compatibility.
+                    paths.append(arg.as_posix())
+                else:
+                    paths.extend(arg._raw_paths)
+            else:
+                try:
+                    path = os.fspath(arg)
+                except TypeError:
+                    path = arg
+                if not isinstance(path, str):
+>                   raise TypeError(
+                        "argument should be a str or an os.PathLike "
+                        "object where __fspath__ returns a str, "
+                        f"not {type(path).__name__!r}")
+E                   TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'dict'
+
+/usr/lib/python3.14/pathlib/__init__.py:149: TypeError
+_____ test_bounded_resume_preserves_failures_successes_and_binding[False] ______
+
+queue = PosixPath('/home/drwho1985/.cache/tmp/pytest-of-drwho1985/pytest-907/test_bounded_resume_preserves_1/queue.csv')
+tmp_path = PosixPath('/home/drwho1985/.cache/tmp/pytest-of-drwho1985/pytest-907/test_bounded_resume_preserves_1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7d4e98225f20>
+recover = False
+
+    @pytest.mark.parametrize('recover',[True,False])
+    def test_bounded_resume_preserves_failures_successes_and_binding(queue,tmp_path,monkeypatch,recover):
+        import beidan_backend.unified_sources as source
+        import beidan_backend.catalog.paths as paths
+        from beidan_backend.transport import FetchError
+        work=tmp_path/'work';calls=[];first=[]
+        def extract(provider,url,parser,**kw):
+            assert provider=='titan' and kw==dict(max_age=0,min_interval=5,retries=1,reuse_raw=True)
+            calls.append(url)
+            if not first:first.append(url)
+            if url==first[0] and (calls.count(url)==1 or not recover):
+                e=FetchError('timeout');e.network_attempts=2;raise e
+            return dict(receipt=dict(network_attempts=0,capture_id=len(calls),sha256='a'*64,url=url))
+        monkeypatch.setattr(source,'SourceClient',lambda:SimpleNamespace(cache=SimpleNamespace(extract=extract)))
+        monkeypatch.setattr(paths,'location',lambda *a,**kw:work)
+        monkeypatch.setattr(sys,'argv',[str(CLIENT),'--input',str(queue),'--output','hot:test','--min-interval-seconds','5'])
+>       with pytest.raises(SystemExit) as first_run:runpy.run_path(str(CLIENT),run_name='__main__')
+                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_global_dynamic_26105_capture_missing.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+<frozen runpy>:287: in run_path
+    ???
+<frozen runpy>:98: in _run_module_code
+    ???
+<frozen runpy>:88: in _run_code
+    ???
+src/global_dynamic_26105_capture_missing_20261018.py:30: in <module>
+    else:write_json_atomically(bp,binding)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+results/margin-combination-study-20261018/library/beidan/python/beidan_backend/versioning.py:99: in write_json_atomically
+    path = Path(path)
+           ^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <[AttributeError("'pathlib.PosixPath' object has no attribute '_raw_paths'") raised in repr()] PosixPath object at 0x7d4e980cc040>
+args = ({'client_sha256': 'f78e5b24ef9c260626117bfbe90c49c12413e6566955b2a2df13f94647bccfa2', 'input_sha256': '14ee714019fd240ff91734a6b16614e7c75d5ea259696b3f9557918727191a48', 'maximum_passes': 2, 'maximum_transport_attempts_per_pass': 2, ...},)
+paths = []
+arg = {'client_sha256': 'f78e5b24ef9c260626117bfbe90c49c12413e6566955b2a2df13f94647bccfa2', 'input_sha256': '14ee714019fd240ff91734a6b16614e7c75d5ea259696b3f9557918727191a48', 'maximum_passes': 2, 'maximum_transport_attempts_per_pass': 2, ...}
+path = {'client_sha256': 'f78e5b24ef9c260626117bfbe90c49c12413e6566955b2a2df13f94647bccfa2', 'input_sha256': '14ee714019fd240ff91734a6b16614e7c75d5ea259696b3f9557918727191a48', 'maximum_passes': 2, 'maximum_transport_attempts_per_pass': 2, ...}
+
+    def __init__(self, *args):
+        paths = []
+        for arg in args:
+            if isinstance(arg, PurePath):
+                if arg.parser is not self.parser:
+                    # GH-103631: Convert separators for backwards compatibility.
+                    paths.append(arg.as_posix())
+                else:
+                    paths.extend(arg._raw_paths)
+            else:
+                try:
+                    path = os.fspath(arg)
+                except TypeError:
+                    path = arg
+                if not isinstance(path, str):
+>                   raise TypeError(
+                        "argument should be a str or an os.PathLike "
+                        "object where __fspath__ returns a str, "
+                        f"not {type(path).__name__!r}")
+E                   TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'dict'
+
+/usr/lib/python3.14/pathlib/__init__.py:149: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_global_dynamic_26105_capture_missing.py::test_bounded_resume_preserves_failures_successes_and_binding[True]
+FAILED tests/test_global_dynamic_26105_capture_missing.py::test_bounded_resume_preserves_failures_successes_and_binding[False]
+2 failed, 2 passed in 0.13s

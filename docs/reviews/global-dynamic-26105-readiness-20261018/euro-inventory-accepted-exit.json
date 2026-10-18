@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport R_PROFILE_USER=/dev/null\nexport R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\nexec /opt/R/4.6.1/bin/Rscript r/global_dynamic_26105_market_readiness_20261018.R \"/home/drwho1985/workspace/algotradinglife/beijing-lot\" results/global-dynamic-26105-euro-readiness-20261018-v2 results/fm171-check-20261019/raw-schedule/26105/26105/20261018T142406.548863Z/26105.source.json"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T14:48:35.837282+00:00",
+  "finished_at_utc": "2026-10-18T14:48:39.175716+00:00"
+}

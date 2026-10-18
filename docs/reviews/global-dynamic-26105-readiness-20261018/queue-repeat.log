@@ -1,0 +1,7 @@
+# A tibble: 2 × 2
+  kind         n
+  <chr>    <int>
+1 analysis   154
+2 euro       154
+Error: identical(readLines(receipt_path, warn = FALSE), as.character(text)) is not TRUE
+Execution halted

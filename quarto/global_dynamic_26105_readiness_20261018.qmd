@@ -1,0 +1,118 @@
+---
+title: "26105整期对照准备：原始证据复用与采集缺口"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  input: "results/global-dynamic-26105-readiness-20261018-v4"
+  market_input: "results/global-dynamic-26105-euro-readiness-20261018-v2"
+---
+
+26105尚未全部完赛，保持待验证状态，不计算整期最终命中率或回款。本轮只准备全365场的赛前输入，复用已有事实和盘口原文；不改写任何旧预测、票单、FM规则或整体校准参数。26103、26104已验收对照仍以提交933707d6为准。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse));library(testthat)
+root<-normalizePath(params$project_root,mustWork=TRUE);setwd(root);knitr::opts_knit$set(root.dir=root);input<-params$input
+m<-jsonlite::fromJSON(file.path(input,'manifest.json'))
+for(name in names(m$files))stopifnot(m$files[[name]]==digest::digest(file=file.path(input,name),algo='sha256'))
+slots<-read_csv(file.path(input,'slots.csv'),col_types=cols(.default=col_character(),slot=col_integer()))
+status<-read_csv(file.path(input,'base-status.csv'),col_types=cols(.default=col_character(),slot=col_integer(),conflicts=col_integer(),gaps=col_integer(),missing_fields=col_integer()))
+resources<-read_csv(file.path(input,'base-resources.csv'),col_types=cols(.default=col_character()))
+existing<-read_csv(file.path(input,'existing-fm171.csv'),col_types=cols(.default=col_character(),cutoff_utc=col_datetime(),full100_source_available=col_logical()))
+raw<-read_csv(file.path(input,'raw-reuse-ledger.csv'),col_types=cols(.default=col_character(),observed_at=col_datetime(),capture_id=col_integer()))
+metadata<-jsonlite::fromJSON(m$metadata_input$path)
+roster<-jsonlite::fromJSON(file.path(input,'frozen-roster.json'))
+market_manifest<-jsonlite::fromJSON(file.path(params$market_input,'manifest.json'))
+euro_resources<-read_csv(file.path(params$market_input,'euro-resources.csv'),col_types=cols(.default=col_character(),slot=col_integer()))
+queue_path<-'results/global-dynamic-26105-readiness-20261018-control/titan-missing-v2.csv'
+queue<-read_csv(queue_path,col_types=cols(.default=col_character()))
+queue_receipt<-jsonlite::fromJSON(paste0(queue_path,'.json'))
+```
+
+本报告的输入快照时间：`r m$generated_at_utc`。后续补采不会改写这些快照。
+
+复用原则
+
+统一缓存原先没有26105名单。使用既有`extract_nowscore_issue(offline=...)`导入已保存的名单字节，验证原始SHA256，保留原始观察时间。事实和盘口原文也经既有`ExtractionCache.extract(offline=...)`登记；没有重新请求网页，没有复制抓取、解析或存储算法，没有降低或重置共享请求限额。未保留的原文独立列为缺口，不凭旧模型输出补造来源。
+
+已有原文来自显式输入清单，不按目录中的“最新版本”推断。每份包及原文字节分别绑定哈希，所有导入观察时间沿用原采集凭证。原HTTP响应头并非全部保留，本次复用只证明正文、URL与观察时间。原文包含事后可见信息，因此后续整期估算仍必须逐场按原始截止准入，并排除目标及未来期身份；本轮不授权前瞻使用，也不拟合任何模型。
+
+```{r}
+#| echo: false
+raw |> count(state,name='原文记录') |> knitr::kable()
+raw |> filter(state=='IMPORTED_OR_REUSED_VERIFIED_RAW') |> summarise(不同URL=n_distinct(url),涉及比赛=n_distinct(fixture_id),不同字节=n_distinct(sha256)) |> knitr::kable()
+status |> count(state,name='场次') |> knitr::kable(caption='全365场在统一事实采集器中的当前状态；COLLECTED不等于字段齐备或模型可估')
+resources |> count(source,state,name='资源') |> knitr::kable()
+euro_resources |> count(source,state,name='欧赔原文资源') |> knitr::kable(caption='CAPTURED仅表示正文存在，尚未验证价格、身份、同截止和公司覆盖')
+```
+
+已有预测与全期的区别
+
+```{r}
+#| echo: false
+existing |> group_by(snapshot,cutoff_utc) |> summarise(冻结场次=n(),.groups='drop') |> knitr::kable()
+tibble(全期场次=nrow(slots),已有冻结记录=nrow(existing),已有不同比赛=n_distinct(existing$fixture_id),未在这两份冻结中出现=nrow(slots)-n_distinct(existing$fixture_id)) |> knitr::kable()
+as_tibble(m$dataset_registration) |> knitr::kable(caption='登记状态不是比赛是否完赛的证据')
+```
+
+已有两份冻结结果只能证明其覆盖的场次有可复用的来源网格，不能冒充365场整期模型完成，也不能把尾部调整后的旧概率直接当作本研究的full100分布。后续仍须使用来源网格、同截止盘口和逐场准入账本，固定RAW与GLOBAL相同的比赛、组数及每轮2,000元预算；校准训练仅接纳截止前已可用的前期标签。
+
+下一步是补齐缺失资源并独立解析核验，然后生成全期预测及配对票单。最终评分另等比赛结束和结算SP；缺失数据不按0处理。26106目前未登记，不能宣称已完成规则冻结后的新增整期验证。
+
+自动验收
+
+```{r}
+#| echo: false
+test_that('whole-issue readiness preserves provenance and frozen forecasts without target scoring',{
+ expect_equal(nrow(queue),308L)
+ expect_equal(n_distinct(queue$fixture_id),154L)
+ expect_type(queue$provider_id,'character')
+ expect_false(anyDuplicated(queue$url)>0L)
+ expect_identical(queue_receipt$output_sha256,digest::digest(file=queue_path,algo='sha256'))
+ expect_identical(queue_receipt$source_client$sha256,digest::digest(file=queue_receipt$source_client$path,algo='sha256'))
+ for(i in seq_len(nrow(queue_receipt$input_files)))expect_identical(queue_receipt$input_files$sha256[i],digest::digest(file=queue_receipt$input_files$path[i],algo='sha256'))
+ expect_equal(nrow(euro_resources),730L)
+ expect_equal(n_distinct(euro_resources$fixture_id),365L)
+ expect_false(anyDuplicated(euro_resources[c('fixture_id','source')])>0L)
+ expect_equal(market_manifest$network_attempts,0L)
+ expect_false(market_manifest$prices_validated)
+ expect_identical(market_manifest$resources_sha256,digest::digest(file=file.path(params$market_input,'euro-resources.csv'),algo='sha256'))
+ expect_identical(market_manifest$client_sha256,digest::digest(file='r/global_dynamic_26105_market_readiness_20261018.R',algo='sha256'))
+ expect_type(slots$provider_id,'character')
+ expect_type(status$issue,'character')
+ expect_type(euro_resources$issue,'character')
+ expect_equal(nrow(slots),365L)
+ expect_false(anyDuplicated(slots$fixture_id)>0L)
+ expect_false(anyDuplicated(slots$provider_id)>0L)
+ expect_equal(nrow(status),365L)
+ expect_setequal(status$fixture_id,slots$fixture_id)
+ expect_setequal(resources$fixture_id,slots$fixture_id)
+ expect_true(all(existing$fixture_id%in%slots$fixture_id))
+ expect_true(all(existing$full100_source_available))
+ expect_equal(m$network_attempts,0L)
+ expect_equal(m$collection_receipt$network_attempts,0L)
+ expect_false(m$target_labels_evaluated)
+ expect_false(m$all_matches_finished)
+ expect_identical(m$metadata_input$raw_sha256,roster$receipt$sha256)
+ expect_equal(lubridate::ymd_hms(m$metadata_input$original_observed_at,tz='UTC'),lubridate::ymd_hms(roster$receipt$observed_at,tz='UTC'))
+ expect_identical(m$client_sha256,digest::digest(file='r/global_dynamic_26105_readiness_20261018.R',algo='sha256'))
+ expect_identical(m$raw_packet_inputs$sha256,digest::digest(file=m$raw_packet_inputs$path,algo='sha256'))
+ for(i in seq_len(nrow(m$reused_forecasts)))expect_identical(m$reused_forecasts$sha256[i],digest::digest(file=m$reused_forecasts$path[i],algo='sha256'))
+ for(p in names(m$raw_packet_inputs$packet_sha256))expect_identical(m$raw_packet_inputs$packet_sha256[[p]],digest::digest(file=p,algo='sha256'))
+ for(i in which(raw$state=='IMPORTED_OR_REUSED_VERIFIED_RAW'))expect_identical(raw$sha256[i],digest::digest(file=raw$raw_path[i],algo='sha256'))
+})
+```
+
+采集与导入运行命令、退出状态见`results/global-dynamic-26105-readiness-20261018-control/inventory-reuse-final-job.json`及对应`-exit.json`；QMD以干净R会话、显式R库、关闭缓存且错误致命执行。原始名单及包索引作为显式输入，哈希绑定在manifest中。初次缺少统一缓存名单的失败及修复前中止尝试保留在control目录，不计为通过；只有最终完整执行和本QMD验收作为当前证据。该客户端没有新增项目函数，只编排已安装beidan的既有采集、校验和缓存接口；未改包，无CI操作。
+
+缺口补采与后续验收
+
+缺口队列由独立R客户端从这两份冻结资源表生成，308行、154场，provider_id按字符保留；CSV、生成器及三份输入表均由队列回执绑定。原文采集CLI只允许这批Titan URL，以既有缓存API执行min_interval=5、成功原文直接复用，每轮最多两次传输尝试、最多两轮，保留失败回执。独立5项离线测试验证导入无副作用、错误范围拒绝、前导零ID、失败恢复／重试上限、成功不重复请求、并发写入拒绝以及来源绑定改变时拒绝，见control目录capture-tests-final.log。
+
+这次离线复用与清点的network_attempts为0；后续实际补采单独记录网络次数，不计入本报告的离线统计。共享限速账本只读检查显示Titan为5秒、Nowscore为120秒。本轮不修改Nowscore限额，不把它标为已按5秒执行。原文抓取完成后还须独立解析、身份和时间核验，才能计入整期模型；任务保持未完成状态。

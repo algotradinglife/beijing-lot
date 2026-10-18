@@ -1,0 +1,16 @@
+{
+  "cache_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/source-extraction/raw.sqlite",
+  "rows": [
+    {
+      "source": "nowscore",
+      "last_attempt": 1792204651.0115244,
+      "interval_sec": 120.0
+    },
+    {
+      "source": "titan",
+      "last_attempt": 1792331795.052111,
+      "interval_sec": 5.0
+    }
+  ],
+  "mutated": false
+}
