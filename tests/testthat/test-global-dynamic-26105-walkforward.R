@@ -1,0 +1,11 @@
+test_that('26105 forecasts reject missing arguments, another issue, or invalid mode before SDK use', {
+ root <- rprojroot::find_root(rprojroot::has_file('packages/beidan/DESCRIPTION'))
+ path <- file.path(root,'r/global_dynamic_26105_walkforward_20261019.R')
+ context <- new.env(parent=globalenv())
+ context$commandArgs <- function(...) character()
+ expect_error(sys.source(path,envir=context),'length(args)',fixed=TRUE)
+ context$commandArgs <- function(...) c(root,root,'26104','forecast')
+ expect_error(sys.source(path,envir=context),'args[3]',fixed=TRUE)
+ context$commandArgs <- function(...) c(root,root,'26105','evaluate')
+ expect_error(sys.source(path,envir=context),'args[4]',fixed=TRUE)
+})

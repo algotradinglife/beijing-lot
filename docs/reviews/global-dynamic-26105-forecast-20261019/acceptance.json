@@ -1,0 +1,78 @@
+{
+  "checks": [
+    {
+      "check": "full_R",
+      "command": "/bin/zsh -c . docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-cutoff-acceptance-20261019/verification-source",
+      "exit_status": 0,
+      "job_file": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/full-R-job.json",
+      "receipt_file": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/full-R-exit.json"
+    },
+    {
+      "check": "upstream_Euro_SDK_51",
+      "command": "/bin/zsh -c export PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python -m pytest -q /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-cutoff-acceptance-20261019/verification-source/packages/beidan/tests/python/test_source_issue_markets.py /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-cutoff-acceptance-20261019/verification-source/packages/beidan/tests/python/test_source_market_publication.py /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-cutoff-acceptance-20261019/verification-source/packages/beidan/tests/python/test_euro_coverage.py",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "job_file": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-sdk-python-tests-job.json",
+      "receipt_file": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-sdk-python-tests-exit.json"
+    },
+    {
+      "check": "forecast_and_selection_replays",
+      "command": "/bin/zsh -c . config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library/beidan/python\nexport R_PROFILE_USER=/dev/null\nexport R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-intake-native-20261019-control/run-freeze-pipeline-v10.py",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "job_file": "results/global-dynamic-26105-intake-native-20261019-control/pipeline-v10-job.json",
+      "receipt_file": "results/global-dynamic-26105-intake-native-20261019-control/pipeline-v10-exit.json"
+    },
+    {
+      "check": "same_source_QMD_render1",
+      "command": "/bin/zsh -c . config/source-extraction.env\nexport R_PROFILE_USER=/dev/null\nexport R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\nexport QUARTO_R=/opt/R/4.6.1/bin/R\nexec quarto render quarto/global_dynamic_26105_walkforward_20261019.qmd -P project_root:/home/drwho1985/workspace/algotradinglife/beijing-lot --execute --no-cache",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "job_file": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/forecast-QA-render1-job.json",
+      "receipt_file": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/forecast-QA-render1-exit.json"
+    }
+  ],
+  "R_suites": [
+    {
+      "suite": "package",
+      "blocks": 992,
+      "assertions": 9664,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "repository",
+      "blocks": 838,
+      "assertions": 183469,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "goal_complete": false,
+  "target_evaluation_complete": false,
+  "scope": {
+    "issue": "26105",
+    "audited_fixtures": 365,
+    "estimated": 165,
+    "rounds": 13,
+    "budget_per_round_model_policy_cny": 2000
+  },
+  "post_test_report_only_delta": {
+    "path": "quarto/global_dynamic_26105_walkforward_20261019.qmd",
+    "tested_sha256": "849fbd995f57d3ac6df7e61c46a5eaa993a9bcbf9e644b75ff3078d9ec77ad9c",
+    "delivered_sha256": "16d7083f3d4ee8df84e756776422014ff050ebebfdc3c13360a31d14e3516cce",
+    "reason": "Added acceptance command/hash display only;all23 other tested files unchanged;business implementation/tests unchanged"
+  },
+  "source_verification": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/current-source-verification.json",
+  "pending_labels": {
+    "whole": 40,
+    "estimated": 14,
+    "selected": 11
+  },
+  "no_target_metrics_published": true
+}

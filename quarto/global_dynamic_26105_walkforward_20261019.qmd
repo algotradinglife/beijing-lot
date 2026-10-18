@@ -1,0 +1,100 @@
+---
+title: "26105：RAW与GLOBAL同预算冻结预测及选票"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+本报告验收26105全期输入审查、合格比赛的RAW／GLOBAL预测与同预算选票。该阶段不读取26105赛果，不报告全期命中率或回款；结算比较须等待真实完整赛果及可核验结算SP。未能估计的比赛留在全365场审计分母，不能用合格子样本替代整期覆盖。发布数据中开赛时间仍冲突的8场保留为未估计，不赋予虚构截止、不进入时序拟合或选票；其余357场继续接受完整准入审查。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(testthat)
+root <- normalizePath(params$project_root,mustWork=TRUE)
+out <- file.path(root,'results/global-dynamic-walkforward-20261018/26105')
+forecast_path <- file.path(out,'frozen-forecasts.rds');round_path <- file.path(out,'frozen-rounds.rds')
+fr <- jsonlite::fromJSON(file.path(out,'forecast-replay.json'))
+sr <- jsonlite::fromJSON(file.path(out,'selection-replay.json'))
+expect_identical(fr$status,'FULL_IDENTICAL_REPLAY');expect_identical(sr$status,'FULL_IDENTICAL_REPLAY')
+expect_identical(fr$sha256,digest::digest(file=forecast_path,algo='sha256'))
+expect_identical(sr$sha256,digest::digest(file=round_path,algo='sha256'))
+x <- readRDS(forecast_path);rounds <- readRDS(round_path)
+expect_false(x$target_labels_opened);expect_false(rounds$target_labels_opened)
+expect_false(x$prospective_admission);expect_false(rounds$prospective_admission)
+expect_identical(rounds$forecast_sha256,fr$sha256)
+expect_equal(nrow(x$audit),365L);expect_equal(n_distinct(x$audit$fixture_id),365L)
+expect_setequal(x$audit$fixture_id,paste0('26105:',seq_len(365L)))
+expect_identical(x$policy$models,c('RAW','GLOBAL'))
+expect_equal(x$policy$rounds$groups*x$policy$rounds$tickets_per_group*x$policy$rounds$unit_cny,2000)
+for(name in names(x$source_paths)) {
+ path <- x$source_paths[[name]]
+ if(!startsWith(path,'/'))path <- file.path(root,path)
+ expect_identical(x$source_hashes[[name]],digest::digest(file=path,algo='sha256'))
+}
+knitr::kable(count(x$audit,state,reason))
+knitr::kable(as_tibble(x$prior_label_audit))
+future_scope <- x$entries[[1]]$native$future_exclusion_scope
+knitr::kable(tibble(future_coverage_state=future_scope$state,exact_target_exclusions=future_scope$exact_target_fixtures,known_future_exclusions=future_scope$known_future_fixtures))
+```
+
+基础模型仍为FM-1.7.1的完整净胜球分布，不压缩尾部。原生λ采用同赛事／场地支持和recent8、alpha=0.5、最低样本12、ESS8、rho=-0.1。盘口使用同截止、48小时内有效且无歧义的Titan欧赔公司（至少3家），以及公司8亚盘和大小球。证据不足与原生支持不足均列明，不虚构阵容、战意或原生参数。
+
+整体校准保持无额外特征的原规则。26098、26101、26102作为初始历史；26103和26104仅贡献实际已观察到的已结算标签。每场仍由共享时间学习模块在原定T−24h内筛选，不能整批加入后来才可见的标签。
+
+```{r}
+training <- map_dfr(names(x$calibration),function(key) {
+ f <- x$calibration[[key]]
+ last_label <- lubridate::ymd_hms(f$receipt$maximum_training_label_timestamp,tz='UTC')
+ last_source <- lubridate::ymd_hms(f$receipt$maximum_source_time,tz='UTC')
+ expect_true(last_label<f$cutoff$cutoff_utc);expect_true(last_source<f$cutoff$cutoff_utc)
+ expect_true(all(f$admitted$issue_code %in% c('26098','26101','26102','26103','26104')))
+ tibble(cutoff_utc=f$cutoff$cutoff_utc,admitted_rows=nrow(f$admitted),maximum_label_utc=last_label,maximum_source_utc=last_source)
+})
+knitr::kable(training)
+q <- imap_dfr(x$entries,function(e,id) bind_rows(e$RAW |> mutate(model='RAW'),e$GLOBAL |> mutate(model='GLOBAL')) |> mutate(fixture_id=id))
+expect_true(all(is.finite(q$probability)&q$probability>=0&q$probability<=1))
+masses <- q |> group_by(fixture_id,model) |> summarise(mass=sum(probability),.groups='drop')
+expect_true(all(abs(masses$mass-1)<1e-10))
+knitr::kable(q |> group_by(model,outcome) |> summarise(fixtures=n_distinct(fixture_id),mean_probability=mean(probability),.groups='drop'))
+```
+
+每日UTC00共同下注时点、数字场次分池、8个轮换组、每组7场及125注、每注2元、每轮每模型2,000元均保持原规则。仅按本期比赛日期补齐日历；不依据本期赛果挑选时段、比赛或策略。首次净胜球映射去重仍是独立实验，不替换本对照的原选票算法。
+
+```{r}
+knitr::kable(as_tibble(rounds$partitions))
+selection_counts <- map_dfr(rounds$rounds,function(z) {
+ imap_dfr(z$outputs,function(o,model) {
+  expect_equal(n_distinct(z$groups$group_id),8L)
+  o$selection$purchases |> count(policy,group_id) |> mutate(round=z$index,model=model)
+ })
+})
+expect_true(all(selection_counts$n==125L))
+knitr::kable(selection_counts |> group_by(round,model,policy) |> summarise(groups=n(),tickets=sum(n),cost_cny=2*sum(n),.groups='drop'))
+```
+
+这里的候选概率和选票覆盖来自历史诊断。部分原始采集晚于比赛，报价时间代理不能证明事前观察，因此不能将本报告称为盲测或前瞻验证。26106名单两次有界请求均返回HTTP500，失败退出收据与末行请求身份按哈希验证；这不表示该期为空或不存在。原生模型保留目标26105全部比赛的精确ID排除，以及共享模块的严格历史时间准入；目前没有已验证的26106名单，未来期精确ID覆盖范围未核实，不能称为完整未来覆盖或前瞻验证。最终仍须验收真实集成、完整回归、最终代码审查及结算比较；本阶段不宣称整个goal完成。
+
+
+验收身份与命令：完整R检查针对冻结源码快照执行；之后仅增加本报告的验收展示，业务实现与测试未变。本报告当前版本另外执行干净渲染与代码审查。下表绑定实际检查命令、退出状态和当前审查文件哈希；未完成的整期结算不记为通过。
+
+```{r}
+qa_dir <- file.path(root,'docs/reviews/global-dynamic-26105-forecast-20261019')
+qa <- jsonlite::fromJSON(file.path(qa_dir,'acceptance.json'))
+checks <- as_tibble(qa$checks)
+expect_true(all(checks$exit_status==0L))
+expect_identical(qa$goal_complete,FALSE)
+expect_identical(qa$target_evaluation_complete,FALSE)
+knitr::kable(checks |> select(check,command,cwd,exit_status))
+knitr::kable(as_tibble(qa$R_suites))
+review <- jsonlite::fromJSON(file.path(qa_dir,'code-review.json'))
+expect_identical(review$status,'NO_BLOCKING_FINDINGS')
+review_files <- as_tibble(review$files)
+for(i in seq_len(nrow(review_files)))expect_identical(review_files$sha256[i],digest::digest(file=file.path(root,review_files$path[i]),algo='sha256'))
+knitr::kable(review_files)
+knitr::kable(tibble(review_command=review$command,review_exit_status=review$exit_status,findings=review$findings))
+```

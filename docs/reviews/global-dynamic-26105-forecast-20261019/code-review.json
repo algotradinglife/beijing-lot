@@ -1,0 +1,36 @@
+{
+  "status": "NO_BLOCKING_FINDINGS",
+  "command": "/bin/zsh -c exec codex review 'Review final26105 frozen forecast delivery source before finalQA render: r/global_dynamic_26105_{intake,native,walkforward,select,settlement,evaluate}_20261019.R;theirtests/testthat andtwo authentic metadata fixtures;quarto/global_dynamic_26105_walkforward_20261019.qmd;docs/reviews/global-dynamic-26105-forecast-20261019/acceptance.json;actual frozen-forecasts/rounds manifests and independentreplays. No edits/CI. Full365 audit,165 complete forecasts,13rounds same8groups125tickets/unit2/budget2000 permodelpolicy,RAW/GLOBAL sharematches/groups/algorithms;native284,unsupported81;no tails;initial322 plusonlyeligible actual observed3/4 labels before eachcutoff;sharedtemporal receipts/cache closure. Whole fullR992/9664+838/183469 zero failures/errors/warn/skips;matching24snapshot;afterwardonly reportQA display added,23 other files unchanged. Forecast and selection FULL_IDENTICAL_REPLAY actualexit0. Freshpostfreeze source:325finished40unended;165forecast151finished14pending,selected152/141/11,quantityreconciled;no targetmetrics or settled snapshot. Cache settlement guard exit1 expectedunknown terminal,not success. Evaluateclient normaltargetintegration notclaimed. Check chronology,365unestimated dispositions,prior exclusions/sourcecoverage unknown6,actual fullR scope,source/test contract,reportidentity,commands/hash evidence,manifestbindings,budgets/no double.65;reportfooter code-review file intentionally awaits this real verdict before render,do not claim finalrender already done. Report blocking/actionablefindings.'",
+  "exit_status": 0,
+  "findings": "No blocking/actionable defects in scoped source review;normal forecast and13round selection replays passed;whole target scoring remains unavailable with40 unconfirmed terminal source statuses. FinalQA-display render pending at review time.",
+  "files": [
+    {
+      "path": "r/global_dynamic_26105_intake_20261019.R",
+      "sha256": "892047b6bc1298487b231d4ed4b099ac79c5d4ec148b35a7521ad49849395b68"
+    },
+    {
+      "path": "r/global_dynamic_26105_native_20261019.R",
+      "sha256": "5cb21852ca3d754898efd327decfb2f8cd345498e355ed40013b37c66b1470dc"
+    },
+    {
+      "path": "r/global_dynamic_26105_walkforward_20261019.R",
+      "sha256": "f75c4098526cffddbb6dc60cf51b0bccd9de0ec30bc03d9090fb8338e04859eb"
+    },
+    {
+      "path": "r/global_dynamic_26105_select_20261019.R",
+      "sha256": "37721c1e9f19d89020f763c1898aaeb31cd5ff7501b23616971d1da641419be2"
+    },
+    {
+      "path": "r/global_dynamic_26105_settlement_20261019.R",
+      "sha256": "b5fc22464ac109ead552edb05f822085d351e57635065f6982fa266c89241abe"
+    },
+    {
+      "path": "r/global_dynamic_26105_evaluate_20261019.R",
+      "sha256": "11ef6410ab71b7fc4192ad890b799a97bd4e3a432ea459108e610784a88c1516"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_walkforward_20261019.qmd",
+      "sha256": "16d7083f3d4ee8df84e756776422014ff050ebebfdc3c13360a31d14e3516cce"
+    }
+  ]
+}

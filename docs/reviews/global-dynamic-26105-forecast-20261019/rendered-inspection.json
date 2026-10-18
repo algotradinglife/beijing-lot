@@ -1,0 +1,21 @@
+{
+  "observed_at_utc": "2026-10-18T20:38:49.789871+00:00",
+  "html_sha256": "512898a93453f45a87bc0c97118c32806b9b34cb890e4d09eaf87198406ae25c",
+  "tables": 11,
+  "rows_per_table": [
+    8,
+    3,
+    2,
+    63,
+    7,
+    17,
+    105,
+    6,
+    3,
+    8,
+    2
+  ],
+  "execution_error_nodes": 0,
+  "reviewed_source_hashes_verified": 7,
+  "target_evaluation_performed": false
+}

@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "source": "results/global-dynamic-26105-readiness-20261018-v4/frozen-roster.json",
+    "source_sha256": "bb6355e04281cb3b980bdf19477a89b309b1380fcfc37fd31b0c0716acc8feed",
+    "extraction": "Two authentic records, five metadata columns only; unused kickoff_date string versus structured object;no scores or labels"
+  },
+  "data": [
+    {
+      "issue_id": "26105",
+      "slot": 1,
+      "league": "澳超",
+      "handicap": 0,
+      "kickoff_date": "2026-10-16"
+    },
+    {
+      "issue_id": "26105",
+      "slot": 2,
+      "league": "罗甲",
+      "handicap": -1,
+      "kickoff_date": {}
+    }
+  ]
+}

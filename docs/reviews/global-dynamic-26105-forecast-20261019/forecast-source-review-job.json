@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    "exec codex review 'Review final26105 frozen forecast delivery source before finalQA render: r/global_dynamic_26105_{intake,native,walkforward,select,settlement,evaluate}_20261019.R;theirtests/testthat andtwo authentic metadata fixtures;quarto/global_dynamic_26105_walkforward_20261019.qmd;docs/reviews/global-dynamic-26105-forecast-20261019/acceptance.json;actual frozen-forecasts/rounds manifests and independentreplays. No edits/CI. Full365 audit,165 complete forecasts,13rounds same8groups125tickets/unit2/budget2000 permodelpolicy,RAW/GLOBAL sharematches/groups/algorithms;native284,unsupported81;no tails;initial322 plusonlyeligible actual observed3/4 labels before eachcutoff;sharedtemporal receipts/cache closure. Whole fullR992/9664+838/183469 zero failures/errors/warn/skips;matching24snapshot;afterwardonly reportQA display added,23 other files unchanged. Forecast and selection FULL_IDENTICAL_REPLAY actualexit0. Freshpostfreeze source:325finished40unended;165forecast151finished14pending,selected152/141/11,quantityreconciled;no targetmetrics or settled snapshot. Cache settlement guard exit1 expectedunknown terminal,not success. Evaluateclient normaltargetintegration notclaimed. Check chronology,365unestimated dispositions,prior exclusions/sourcecoverage unknown6,actual fullR scope,source/test contract,reportidentity,commands/hash evidence,manifestbindings,budgets/no double.65;reportfooter code-review file intentionally awaits this real verdict before render,do not claim finalrender already done. Report blocking/actionablefindings.'"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/forecast-source-review.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/forecast-source-review-exit.json"
+}
