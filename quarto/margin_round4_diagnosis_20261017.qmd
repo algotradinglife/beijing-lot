@@ -1,0 +1,64 @@
+---
+title: "第04轮七场排名为何靠后"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+仅诊断固定第04轮原七场组合与封存赛果。使用100%阈值，即原FM来源裁决后、尾部压缩前完整网格投影的让球胜平负概率。不是新调参、选场或阈值建议，不修改冻结预测。组内概率乘积依赖场间独立近似；组间重叠，不是八次独立尝试。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath(params$project_root,mustWork=TRUE)
+p<-readRDS(file.path(root,'results/fm17-upcoming-20261017/plans.rds'))$plans[[4]]
+s<-jsonlite::fromJSON(file.path(root,'results/margin-ranking-20261017-review/settlement-state.json'))
+label_path<-file.path(s$run_directory,s$plans$output[4],'results.json')
+a<-as_tibble(jsonlite::fromJSON(label_path)$fixture_results) |> select(fixture_id,actual=outcome)
+stopifnot(nrow(a)==11L,!anyDuplicated(a$fixture_id),all(a$actual %in% c('W','D','L')))
+prob_path<-file.path(root,'results/margin-truncated-rank-20261017/conditional-probabilities.csv')
+q<-readr::read_csv(prob_path,show_col_types=FALSE) |> filter(threshold==1) |> group_by(fixture_id) |> arrange(desc(probability),outcome,.by_group=TRUE) |> mutate(actual_rank=row_number(),top_probability=max(probability),ratio=probability/top_probability) |> ungroup()
+reuse<-p$legs |> as_tibble() |> count(fixture_id,name='groups')
+v<-q |> inner_join(a,by=c('fixture_id','outcome'='actual'),relationship='many-to-one') |> left_join(p$cohort,by='fixture_id',relationship='many-to-one') |> left_join(reuse,by='fixture_id',relationship='one-to-one') |> arrange(probability)
+stopifnot(nrow(v)==11L,sum(v$actual_rank==1)==5L,sum(v$actual_rank==2)==4L,sum(v$actual_rank==3)==2L,all(v$probability>0),all(v$probability<=v$top_probability),all(v$groups>=1L))
+groups<-p$legs |> as_tibble() |> left_join(v |> select(fixture_id,actual_rank,probability,ratio,top_probability),by='fixture_id',relationship='many-to-one') |> group_by(group_slot) |> summarise(legs=n(),top1=sum(actual_rank==1),top2=sum(actual_rank==2),top3=sum(actual_rank==3),actual_probability=prod(probability),modal_probability=prod(top_probability),ratio_to_mode=prod(ratio),.groups='drop')
+rank_path<-file.path(root,'results/margin-truncated-rank-20261017/groups.csv')
+ranks<-readr::read_csv(rank_path,show_col_types=FALSE) |> filter(round==4,threshold==1) |> select(group_slot=group,winning_rank,theory)
+groups<-groups |> left_join(ranks,by='group_slot',relationship='one-to-one')
+stopifnot(nrow(groups)==8L,all(groups$legs==7L),all(groups$top1+groups$top2+groups$top3==7L),all(groups$theory==2187L),all(groups$winning_rank>154L),all(abs(groups$actual_probability/groups$modal_probability-groups$ratio_to_mode)<1e-12))
+common<-v |> filter(groups==8L) |> select(slot,home_name,away_name,handicap,outcome,probability,actual_rank,ratio)
+stopifnot(all(c(51L,124L) %in% common$slot))
+out<-file.path(root,'results/margin-round4-diagnosis-20261017');dir.create(out,showWarnings=FALSE,recursive=TRUE)
+readr::write_csv(v |> select(slot,fixture_id,home_name,away_name,handicap,outcome,probability,actual_rank,groups,ratio),file.path(out,'fixtures.csv'))
+readr::write_csv(groups,file.path(out,'groups.csv'))
+```
+
+实际结果对应模型类别排序（W=让胜、D=让平、L=让负；概率使用完整分布）：
+
+```{r}
+knitr::kable(v |> select(slot,home_name,away_name,handicap,outcome,actual_rank,probability,groups) |> mutate(probability=round(100*probability,2)))
+```
+
+八组的实际结果组成及中奖排名：
+
+```{r}
+knitr::kable(groups |> select(group_slot,top1,top2,top3,winning_rank,actual_probability,ratio_to_mode),digits=6)
+knitr::kable(common,digits=4)
+```
+
+这里Top2指实际类别在单场概率中排名第二，Top3指第三。不是Top2覆盖数量。11场中5个第一、4个第二、2个第三，各个实际结果概率都在约20.7%–51.3%，没有单场小于10%的极端低估。组合则每组至少有一个第三赛果以及2–4个第二赛果，联合排名自然后移；不能把多场各自合理的保护项等同于七场组合也排在前列。
+
+全部八组共同包含#51与#124：前者实际让平约20.7%、第三，后者实际主胜约24.6%、第二。相对各自主选，两场实际组合概率只约为主选组合的24%，但这不是让八组独立损失76%命中率。其他次选结果继续拉低组合排序。G08尤其是2个第一+4个第二+1个第三，实际组合概率约为最高概率组合的7.14%。
+
+这说明固定125注浅覆盖遇到多个次选共同发生时会失效；全三选只能保证完整空间存在实际票，不能保证买到它。此次诊断不能证明基本面模型无可改进，也不能据已知赛果要求扩大购买区间。需跨更多轮比较固定预算、场次复用与排序策略，才可评估是否有可推广改进。
+
+```{r}
+inputs<-c(file.path(root,'results/fm17-upcoming-20261017/plans.rds'),file.path(root,'results/margin-ranking-20261017-review/settlement-state.json'),prob_path,rank_path,label_path)
+knitr::kable(tibble(input=inputs,sha256=vapply(inputs,digest::digest,character(1),file=TRUE,algo='sha256')))
+```
+
+验证：11个唯一标签、5/4/2单场排序计数、8个七场固定组合、每组7腿、概率乘积及相对众数组合比值恒等式、2187票空间、实际排名均大于154、共同场次及连接基数检查。不新增函数或包实现；没有重训或采用新策略。输入来自此前已验收的完整分布排名对照与固定标签。审查、渲染和文件SHA记录保存于results/margin-round4-diagnosis-20261017/。

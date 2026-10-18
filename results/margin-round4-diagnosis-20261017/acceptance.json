@@ -1,0 +1,22 @@
+{
+  "status": "POSTEVENT_ROUND4_DIAGNOSIS_REVIEWED",
+  "review_command": "codex review, bounded prompt and independent replay in review.log",
+  "findings": "No blocking issues; independently enumerated eight winning ranks",
+  "render_command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/margin_round4_diagnosis_20261017.qmd --no-cache -P project_root:$PWD",
+  "render_exit": 0,
+  "checks": [
+    "11 unique actual categories; ranks5/4/2",
+    "eight seven-leg groups",
+    "joint and modal product identities",
+    "shared #51 and #124 all8",
+    "all8 winning ranks independently verified",
+    "four rendered tables; no error blocks"
+  ],
+  "no_package_function_or_model_change": true,
+  "files": {
+    "quarto/margin_round4_diagnosis_20261017.qmd": "e3950d2b6e5df1cab2f3f12b68f3f7f68dae2918cf679f8404f475187943f6ed",
+    "quarto/margin_round4_diagnosis_20261017.html": "31ad043e8d7abb2b9080b487d9634889c21ce9bf7b0a69da7005ab07508f8241",
+    "results/margin-round4-diagnosis-20261017/fixtures.csv": "bc4284deb86ab5f4bdba69dca1602a8332ec1777d3a857645c01a9f1536f9128",
+    "results/margin-round4-diagnosis-20261017/groups.csv": "3a63b5e2f813de77d70ced8ebaf2064844500206b41c11a5c3bca907e4263661"
+  }
+}

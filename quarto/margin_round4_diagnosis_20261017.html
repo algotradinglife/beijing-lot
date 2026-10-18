@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>第04轮七场排名为何靠后</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="margin_round4_diagnosis_20261017_files/libs/clipboard/clipboard.min.js"></script>
+<script src="margin_round4_diagnosis_20261017_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="margin_round4_diagnosis_20261017_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="margin_round4_diagnosis_20261017_files/libs/quarto-html/popper.min.js"></script>
+<script src="margin_round4_diagnosis_20261017_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="margin_round4_diagnosis_20261017_files/libs/quarto-html/anchor.min.js"></script>
+<link href="margin_round4_diagnosis_20261017_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="margin_round4_diagnosis_20261017_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="margin_round4_diagnosis_20261017_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="margin_round4_diagnosis_20261017_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="margin_round4_diagnosis_20261017_files/libs/bootstrap/bootstrap-8bdf4a79c329363aa5e64002b720c5c5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">第04轮七场排名为何靠后</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>仅诊断固定第04轮原七场组合与封存赛果。使用100%阈值，即原FM来源裁决后、尾部压缩前完整网格投影的让球胜平负概率。不是新调参、选场或阈值建议，不修改冻结预测。组内概率乘积依赖场间独立近似；组间重叠，不是八次独立尝试。</p>
+<p>实际结果对应模型类别排序（W=让胜、D=让平、L=让负；概率使用完整分布）：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(v <span class="sc">|&gt;</span> <span class="fu">select</span>(slot,home_name,away_name,handicap,outcome,actual_rank,probability,groups) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">probability=</span><span class="fu">round</span>(<span class="dv">100</span><span class="sc">*</span>probability,<span class="dv">2</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 16%">
+<col style="width: 14%">
+<col style="width: 11%">
+<col style="width: 10%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 9%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">slot</th>
+<th style="text-align: left;">home_name</th>
+<th style="text-align: left;">away_name</th>
+<th style="text-align: right;">handicap</th>
+<th style="text-align: left;">outcome</th>
+<th style="text-align: right;">actual_rank</th>
+<th style="text-align: right;">probability</th>
+<th style="text-align: right;">groups</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">51</td>
+<td style="text-align: left;">贝雷达比</td>
+<td style="text-align: left;">维京古</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">D</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">20.73</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">39</td>
+<td style="text-align: left;">波希米亚人</td>
+<td style="text-align: left;">沃特福德FC</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: left;">D</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">21.89</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">124</td>
+<td style="text-align: left;">汉堡</td>
+<td style="text-align: left;">斯图加特</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">24.63</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">148</td>
+<td style="text-align: left;">维冈竞技</td>
+<td style="text-align: left;">雷丁</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">26.42</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">21</td>
+<td style="text-align: left;">兰斯</td>
+<td style="text-align: left;">第戎</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">31.28</td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">30</td>
+<td style="text-align: left;">莱加内斯</td>
+<td style="text-align: left;">科尔多瓦</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">L</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">32.02</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">26</td>
+<td style="text-align: left;">海尔蒙德体育</td>
+<td style="text-align: left;">布雷达</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">L</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">39.76</td>
+<td style="text-align: right;">8</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">138</td>
+<td style="text-align: left;">斯旺西</td>
+<td style="text-align: left;">西汉姆联</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">L</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">42.18</td>
+<td style="text-align: right;">7</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">84</td>
+<td style="text-align: left;">凯泽斯劳</td>
+<td style="text-align: left;">波鸿</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">43.02</td>
+<td style="text-align: right;">4</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">96</td>
+<td style="text-align: left;">弗利特伍</td>
+<td style="text-align: left;">罗瑟汉姆联</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">43.46</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">105</td>
+<td style="text-align: left;">卢布林莫托</td>
+<td style="text-align: left;">史拉斯科</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">51.29</td>
+<td style="text-align: right;">6</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>八组的实际结果组成及中奖排名：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(groups <span class="sc">|&gt;</span> <span class="fu">select</span>(group_slot,top1,top2,top3,winning_rank,actual_probability,ratio_to_mode),<span class="at">digits=</span><span class="dv">6</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 6%">
+<col style="width: 18%">
+<col style="width: 26%">
+<col style="width: 19%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">group_slot</th>
+<th style="text-align: right;">top1</th>
+<th style="text-align: right;">top2</th>
+<th style="text-align: right;">top3</th>
+<th style="text-align: right;">winning_rank</th>
+<th style="text-align: right;">actual_probability</th>
+<th style="text-align: right;">ratio_to_mode</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">514</td>
+<td style="text-align: right;">0.000605</td>
+<td style="text-align: right;">0.192113</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1035</td>
+<td style="text-align: right;">0.000369</td>
+<td style="text-align: right;">0.128841</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1474</td>
+<td style="text-align: right;">0.000258</td>
+<td style="text-align: right;">0.098409</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">946</td>
+<td style="text-align: right;">0.000363</td>
+<td style="text-align: right;">0.088873</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">0.000440</td>
+<td style="text-align: right;">0.128841</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">509</td>
+<td style="text-align: right;">0.000591</td>
+<td style="text-align: right;">0.160273</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">496</td>
+<td style="text-align: right;">0.000597</td>
+<td style="text-align: right;">0.160273</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1284</td>
+<td style="text-align: right;">0.000276</td>
+<td style="text-align: right;">0.071443</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(common,<span class="at">digits=</span><span class="dv">4</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 17%">
+<col style="width: 13%">
+<col style="width: 11%">
+<col style="width: 10%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 9%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">slot</th>
+<th style="text-align: left;">home_name</th>
+<th style="text-align: left;">away_name</th>
+<th style="text-align: right;">handicap</th>
+<th style="text-align: left;">outcome</th>
+<th style="text-align: right;">probability</th>
+<th style="text-align: right;">actual_rank</th>
+<th style="text-align: right;">ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">51</td>
+<td style="text-align: left;">贝雷达比</td>
+<td style="text-align: left;">维京古</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">D</td>
+<td style="text-align: right;">0.2073</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">0.5122</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">124</td>
+<td style="text-align: left;">汉堡</td>
+<td style="text-align: left;">斯图加特</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">W</td>
+<td style="text-align: right;">0.2463</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0.4665</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">26</td>
+<td style="text-align: left;">海尔蒙德体育</td>
+<td style="text-align: left;">布雷达</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">L</td>
+<td style="text-align: right;">0.3976</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1.0000</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>这里Top2指实际类别在单场概率中排名第二，Top3指第三。不是Top2覆盖数量。11场中5个第一、4个第二、2个第三，各个实际结果概率都在约20.7%–51.3%，没有单场小于10%的极端低估。组合则每组至少有一个第三赛果以及2–4个第二赛果，联合排名自然后移；不能把多场各自合理的保护项等同于七场组合也排在前列。</p>
+<p>全部八组共同包含#51与#124：前者实际让平约20.7%、第三，后者实际主胜约24.6%、第二。相对各自主选，两场实际组合概率只约为主选组合的24%，但这不是让八组独立损失76%命中率。其他次选结果继续拉低组合排序。G08尤其是2个第一+4个第二+1个第三，实际组合概率约为最高概率组合的7.14%。</p>
+<p>这说明固定125注浅覆盖遇到多个次选共同发生时会失效；全三选只能保证完整空间存在实际票，不能保证买到它。此次诊断不能证明基本面模型无可改进，也不能据已知赛果要求扩大购买区间。需跨更多轮比较固定预算、场次复用与排序策略，才可评估是否有可推广改进。</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>inputs<span class="ot">&lt;-</span><span class="fu">c</span>(<span class="fu">file.path</span>(root,<span class="st">'results/fm17-upcoming-20261017/plans.rds'</span>),<span class="fu">file.path</span>(root,<span class="st">'results/margin-ranking-20261017-review/settlement-state.json'</span>),prob_path,rank_path,label_path)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">tibble</span>(<span class="at">input=</span>inputs,<span class="at">sha256=</span><span class="fu">vapply</span>(inputs,digest<span class="sc">::</span>digest,<span class="fu">character</span>(<span class="dv">1</span>),<span class="at">file=</span><span class="cn">TRUE</span>,<span class="at">algo=</span><span class="st">'sha256'</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 73%">
+<col style="width: 26%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">input</th>
+<th style="text-align: left;">sha256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-upcoming-20261017/plans.rds</td>
+<td style="text-align: left;">35074add6622ee83fbd181bc3799e63ea509ca5f57a406227227cc34feaa022a</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-ranking-20261017-review/settlement-state.json</td>
+<td style="text-align: left;">9f22323ba8df599c62aee2926d4519b6b53cd8dc18f871f5b773905e009cfe48</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-truncated-rank-20261017/conditional-probabilities.csv</td>
+<td style="text-align: left;">3df22a68046bc8f8e736dd855fffee3e53b456ed049945b4f74a5e532ea3fd5c</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-truncated-rank-20261017/groups.csv</td>
+<td style="text-align: left;">df057f0fa87f298ccaa042bac627a2462fe96dc0db9656c43b2fe29eae793e02</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/betting-sheet-results-fm17-20261017/runs/20261018T001502438748Z/upcoming_26105_20261017_fm170_04.html/results.json</td>
+<td style="text-align: left;">3b408e523523f748ae93a64a77f16d9a52c0d4aa57e9c76bac1906cd5e47ff12</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>验证：11个唯一标签、5/4/2单场排序计数、8个七场固定组合、每组7腿、概率乘积及相对众数组合比值恒等式、2187票空间、实际排名均大于154、共同场次及连接基数检查。不新增函数或包实现；没有重训或采用新策略。输入来自此前已验收的完整分布排名对照与固定标签。审查、渲染和文件SHA记录保存于results/margin-round4-diagnosis-20261017/。</p>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
