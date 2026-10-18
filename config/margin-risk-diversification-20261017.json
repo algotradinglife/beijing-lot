@@ -1,0 +1,31 @@
+{
+  "purpose": "POSTEVENT_FIXED_POLICY_DIAGNOSTIC",
+  "runtime": {
+    "R": "4.6.1",
+    "lpSolve": "5.6.23"
+  },
+  "groups_per_round": 8,
+  "legs_per_group": 7,
+  "tickets_per_group": 125,
+  "unit_cny": 2,
+  "round_budget_cny": 2000,
+  "uniform_start": 30,
+  "staggered_starts": [
+    1,
+    126,
+    251,
+    376
+  ],
+  "pool": "original selected unique fixtures per round",
+  "probability": "full pre-tail source-selected projection, threshold=1",
+  "reuse": "floor(56/N)..ceiling(56/N)",
+  "solver_objective": "maximize sum log top1 probability across selected groups",
+  "nonuniqueness": "When exposure counts fix the objective, lpSolve returns one deterministic feasible design; not an optimal-diversification claim.",
+  "setup": {
+    "R_packages": [
+      "lpSolve@5.6.23"
+    ],
+    "command": "pak::pkg_install('lpSolve@5.6.23')",
+    "when": "Environment setup only; never during QMD render"
+  }
+}

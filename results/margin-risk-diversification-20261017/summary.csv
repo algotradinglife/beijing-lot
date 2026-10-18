@@ -1,0 +1,17 @@
+round,construction,window,groups,hits,pending,round_hit,cost_cny,model_mass_sum
+1,balanced,staggered,8,2,0,TRUE,2000,0.9918594516548589
+1,balanced,uniform,8,1,0,TRUE,2000,1.237835935332963
+1,original,staggered,8,2,0,TRUE,2000,1.025348134017844
+1,original,uniform,8,5,0,TRUE,2000,1.3189464924296175
+2,balanced,staggered,8,0,0,FALSE,2000,0.9852439958831797
+2,balanced,uniform,8,1,1,TRUE,2000,1.1950174336260968
+2,original,staggered,8,0,1,NA,2000,0.9989205849465275
+2,original,uniform,8,0,0,FALSE,2000,1.2811105982991866
+3,balanced,staggered,8,4,0,TRUE,2000,1.013999812777246
+3,balanced,uniform,8,3,0,TRUE,2000,1.2511198285698464
+3,original,staggered,8,0,0,FALSE,2000,1.028291333628645
+3,original,uniform,8,4,0,TRUE,2000,1.3513501754490043
+4,balanced,staggered,8,0,0,FALSE,2000,1.0391414949945756
+4,balanced,uniform,8,0,0,FALSE,2000,1.3200463418877328
+4,original,staggered,8,0,0,FALSE,2000,1.057929817463397
+4,original,uniform,8,0,0,FALSE,2000,1.3568342488390144

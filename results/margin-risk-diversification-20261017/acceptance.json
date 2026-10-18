@@ -1,0 +1,40 @@
+{
+  "status": "POSTEVENT_FIXED_BUDGET_DIVERSIFICATION_DIAGNOSTIC_REVIEWED",
+  "review_command": "codex review; bounded prompt, independent replay and findings in review-final.log",
+  "initial_findings": [
+    "Bind cached probabilities to actual frozen source grids",
+    "Declare pinned solver setup dependency"
+  ],
+  "resolutions": [
+    "Independently recompute and use 52x3 base-grid projections; validate cached projections within1e-12; bind RDS and all source receipts to cutoffs",
+    "Pin R4.6.1/lpSolve5.6.23 in dedicated research config with pak setup command and render-time version validation"
+  ],
+  "final_review": "Both blockers resolved; no blocking issues",
+  "render_command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/margin_risk_diversification_20261017.qmd --no-cache -P project_root:$PWD",
+  "render_exit": 0,
+  "validation": {
+    "group_policy_records": 128,
+    "purchased_ticket_records": 16000,
+    "round_budget_cny": 2000,
+    "original_parity_groups": 32,
+    "rendered_tables": 4,
+    "error_blocks": 0,
+    "cutoff_and_source_binding": true
+  },
+  "limitations": [
+    "Single deterministic feasible balanced construction; not optimal diversification proof",
+    "Three fully settled rounds and partially known round2",
+    "No payouts or league-risk/stress-test evaluation",
+    "Research policy proposed after seeing outcomes, not independent prospective evidence"
+  ],
+  "files": {
+    "quarto/margin_risk_diversification_20261017.qmd": "33c303a99ae12729ab63f1d8bd5f72310b689fa94738ed338530dad09eb2ec90",
+    "quarto/margin_risk_diversification_20261017.html": "56ec04011280f1c29bfab231ec735220a513489723375605f509f5481c46a98b",
+    "config/margin-risk-diversification-20261017.json": "c876a726049a99a9c323554278997ea7c780c07f6dbc794a92987fc07440647a",
+    "results/margin-risk-diversification-20261017/frozen-comparison-plan.rds": "13d58779e9afe314077abd97b18c37cc7ed60bec64f8a88b1bfb57ead4cfa6ce",
+    "results/margin-risk-diversification-20261017/groups.csv": "3c843bcb944ecd4bdd2da556bcb72398955e1ee4b0580fbcc784e78cba73ac01",
+    "results/margin-risk-diversification-20261017/summary.csv": "f9d0a157c9e6c54d915c3bb941cba0a76ae17d1225a29b9fcc838e7abbe5f1b5",
+    "results/margin-risk-diversification-20261017/reuse.csv": "ad4e164b96d18a5880df27d0587203888b0fe725f504548019ba975c053872ee",
+    "results/margin-risk-diversification-20261017/risk.csv": "017138ee9ccbb10c76b8688f437f63a0bc182b5b7c1d303f25f213008df9bd3d"
+  }
+}

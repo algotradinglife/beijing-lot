@@ -1,0 +1,165 @@
+---
+title: "固定2000元：场次复用均衡与排名区间分散对照"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+事后固定政策诊断，不是前瞻检验。沿用原四轮实际用过的去重场次池14/14/13/11场，固定8个不同七场组合、每组125注、单注2元、每轮2000元；不扩池，避免新增标签可用性偏差。概率固定为100%完整、尾部压缩前的原FM来源裁决分布。比较两个因素：原构组/复用均衡构组 × 统一30–154名/错开1–125、126–250、251–375、376–500名（各2组）。不使用实际SP，不推算收益。
+
+均衡组要求每场出现floor(56/N)到ceiling(56/N)次；在该约束下用成熟lpSolve二元整数规划选择8个不同七场组，最大化全部组的单场Top1对数概率之和。该质量分数只作固定破平偏好，不是拟合或调优，不保证最优票单概率质量。区间错开时按各组Top1对数概率之和降序、组内ID破平，将较高模型信心组分配较浅区间。四项政策事先写在本文件，未按目标赛果挑种子/方案/阈值。执行先冻结构组及票单，再读取固定赛果。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'r_lib'))
+stopifnot(requireNamespace('lpSolve',quietly=TRUE))
+config_path<-file.path(root,'config/margin-risk-diversification-20261017.json')
+policy_config<-jsonlite::fromJSON(config_path)
+stopifnot(as.character(getRversion())==policy_config$runtime$R,as.character(packageVersion('lpSolve'))==policy_config$runtime$lpSolve,policy_config$groups_per_round==8L,policy_config$legs_per_group==7L,policy_config$tickets_per_group==125L,policy_config$round_budget_cny==2000L,policy_config$unit_cny==2,policy_config$uniform_start==30L,identical(as.integer(policy_config$staggered_starts),c(1L,126L,251L,376L)))
+w<-file.path(root,'results/fm17-upcoming-20261017')
+f<-readRDS(file.path(w,'frozen-probabilities.rds'));b<-readRDS(file.path(w,'plans.rds'))
+source_probs<-file.path(root,'results/margin-truncated-rank-20261017/conditional-probabilities.csv')
+q<-readr::read_csv(source_probs,show_col_types=FALSE) |> filter(threshold==1) |> select(fixture_id,outcome,probability)
+stopifnot(!anyDuplicated(q[c('fixture_id','outcome')]))
+# Independently bind cached projections to the actual checked frozen score grids.
+canonical_rows<-list();pool_ids<-sort(unique(unlist(lapply(b$plans,function(p)p$legs$fixture_id))))
+for(id in pool_ids){
+ h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id]);stopifnot(length(h)==1,is.finite(h))
+ grid<-f$entries[[id]]$base$grid |> as_tibble()
+ stopifnot(all(grid$probability>=0),abs(sum(grid$probability)-1)<1e-9)
+ projected<-grid |> mutate(outcome=case_when(home_goals-away_goals+h>0~'W',home_goals-away_goals+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability)/sum(grid$probability),.groups='drop')
+ canonical_rows[[length(canonical_rows)+1L]]<-tibble(fixture_id=id,outcome=c('W','D','L')) |> left_join(projected,by='outcome',relationship='one-to-one') |> mutate(probability=replace_na(probability,0))
+}
+canonical_q<-bind_rows(canonical_rows)
+comparison<-canonical_q |> full_join(q,by=c('fixture_id','outcome'),suffix=c('_canonical','_cached'),relationship='one-to-one')
+stopifnot(nrow(comparison)==156L,!anyNA(comparison),max(abs(comparison$probability_canonical-comparison$probability_cached))<1e-12)
+q<-canonical_q
+frozen_probability_sha256<-digest::digest(file=file.path(w,'frozen-probabilities.rds'),algo='sha256')
+
+output<-file.path(root,'results/margin-risk-diversification-20261017');dir.create(output,recursive=TRUE,showWarnings=FALSE)
+group_records<-list();ticket_records<-list();membership<-list();policy_receipts<-list()
+for(i in 1:4){
+ p<-b$plans[[i]];cutoff<-p$selection_receipt$cutoff
+ stopifnot(inherits(cutoff$cutoff_utc,'POSIXct'),!is.na(cutoff$cutoff_utc))
+ ids<-sort(unique(p$legs$fixture_id));n<-length(ids);minimum<-floor(56/n);maximum<-ceiling(56/n)
+ for(id in ids){
+  entry<-f$entries[[id]]$base
+  stopifnot(identical(as.numeric(entry$cutoff$cutoff_utc),as.numeric(cutoff$cutoff_utc)),entry$max_source_available_utc<cutoff$cutoff_utc)
+ }
+ quality<-q |> filter(fixture_id %in% ids) |> group_by(fixture_id) |> summarise(log_top=log(max(probability)),.groups='drop') |> arrange(fixture_id)
+ stopifnot(identical(quality$fixture_id,ids))
+ combinations<-utils::combn(seq_len(n),7L)
+ incidence<-matrix(0,nrow=n,ncol=ncol(combinations))
+ for(k in seq_len(ncol(combinations)))incidence[combinations[,k],k]<-1
+ scores<-as.numeric(crossprod(quality$log_top,incidence))
+ fit<-lpSolve::lp('max',scores,rbind(rep(1,ncol(incidence)),incidence,incidence),c('=',rep('>=',n),rep('<=',n)),c(8,rep(minimum,n),rep(maximum,n)),all.bin=TRUE)
+ stopifnot(fit$status==0L)
+ chosen<-which(fit$solution>.5)
+ stopifnot(length(chosen)==8L,all(rowSums(incidence[,chosen,drop=FALSE])>=minimum),all(rowSums(incidence[,chosen,drop=FALSE])<=maximum))
+ balanced<-list()
+ for(k in seq_along(chosen))balanced[[k]]<-ids[combinations[,chosen[k]]]
+ original<-list()
+ for(g in 1:8) original[[g]]<-sort(p$legs$fixture_id[p$legs$group_slot==g])
+ for(construction in c('original','balanced')){
+  groups<-if(construction=='original')original else balanced
+  keys<-vapply(groups,paste,character(1),collapse='|')
+  stopifnot(length(unique(keys))==8L,all(lengths(groups)==7L))
+  group_quality<-numeric(8)
+  for(g in 1:8)group_quality[g]<-sum(quality$log_top[match(groups[[g]],quality$fixture_id)])
+  priority<-order(-group_quality,keys)
+  # Two groups per interval, assigned before opening labels.
+  depth_start<-integer(8);depth_start[priority]<-rep(c(1L,126L,251L,376L),each=2L)
+  for(g in 1:8){
+   group_ids<-groups[[g]];gid<-paste0('R',i,':',construction,':G',g);cid<-paste0(gid,'|7')
+   gl<-tibble(group_id=gid,fixture_id=group_ids,leg_order=1:7)
+   supports<-q |> filter(fixture_id %in% group_ids) |> transmute(candidate_id=cid,fixture_id,outcome,allowed=TRUE,preference=match(outcome,c('W','D','L')))
+   space<-beidan::parlay_enumerate_tickets(gl,q,cutoff=cutoff,supports=supports,n_legs=7L)
+   ranked<-beidan::parlay_rank_tickets(space$tickets,space$candidate_tickets,cutoff=cutoff,ranking='probability_desc') |> as_tibble()
+   stopifnot(nrow(ranked)==2187L,abs(sum(ranked$probability)-1)<1e-9,!anyDuplicated(ranked$ticket_id))
+   for(window in c('uniform','staggered')){
+    lo<-if(window=='uniform')30L else depth_start[g]
+    bought<-ranked |> filter(rank>=lo,rank<=lo+124L)
+    stopifnot(nrow(bought)==125L)
+    ticket_records[[length(ticket_records)+1L]]<-bought |> transmute(round=i,construction,window,group=g,ticket_id,rank,probability)
+    group_records[[length(group_records)+1L]]<-tibble(round=i,construction,window,group=g,rank_start=lo,rank_end=lo+124L,model_mass=sum(bought$probability),cost_cny=250,fixtures=paste(group_ids,collapse='|'))
+   }
+   membership[[length(membership)+1L]]<-tibble(round=i,construction,group=g,fixture_id=group_ids)
+  }
+ }
+ source_receipts<-list()
+ for(id in ids)source_receipts[[id]]<-list(cutoff=f$entries[[id]]$base$cutoff,max_source_available_utc=f$entries[[id]]$base$max_source_available_utc,source_hashes=f$entries[[id]]$base$source_hashes)
+ policy_receipts[[i]]<-list(round=i,frozen_probability_sha256=frozen_probability_sha256,source_receipts=source_receipts,projection_validated=TRUE,policy_config_sha256=digest::digest(file=config_path,algo='sha256'),cutoff=cutoff,pool=ids,minimum_reuse=minimum,maximum_reuse=maximum,solver='lpSolve',solver_version=as.character(packageVersion('lpSolve')),solver_status=fit$status,candidate_groups=ncol(combinations),objective=fit$objval,chosen_indices=chosen,source_probabilities_sha256=digest::digest(file=source_probs,algo='sha256'))
+}
+group_plan<-bind_rows(group_records);tickets<-bind_rows(ticket_records);members<-bind_rows(membership)
+stopifnot(nrow(group_plan)==128L,nrow(tickets)==16000L)
+freeze<-list(groups=group_plan,tickets=tickets,membership=members,receipts=policy_receipts,probability_sha256=digest::digest(file=source_probs,algo='sha256'),plans_sha256=digest::digest(file=file.path(w,'plans.rds'),algo='sha256'),implementation_sha256=digest::digest(file=file.path(root,'quarto/margin_risk_diversification_20261017.qmd'),algo='sha256'),generated_at_utc=format(Sys.time(),tz='UTC',format='%Y-%m-%dT%H:%M:%SZ'),purpose='POSTEVENT_FIXED_POLICY_NO_OUTCOME_SELECTION')
+saveRDS(freeze,file.path(output,'frozen-comparison-plan.rds'))
+# Only now open target labels. This order does not make a retrospectively designed experiment prospective.
+s<-jsonlite::fromJSON(file.path(root,'results/margin-ranking-20261017-review/settlement-state.json'))
+actual_rows<-list();labels<-character()
+for(i in 1:4){
+ path<-file.path(s$run_directory,s$plans$output[i],'results.json');labels<-c(labels,path)
+ actual_rows[[i]]<-as_tibble(jsonlite::fromJSON(path)$fixture_results) |> transmute(round=i,fixture_id,actual=outcome)
+}
+a<-bind_rows(actual_rows);stopifnot(!anyDuplicated(a[c('round','fixture_id')]))
+evaluated<-list()
+for(j in seq_len(nrow(group_plan))){
+ row<-group_plan[j,];ids<-members |> filter(round==row$round,construction==row$construction,group==row$group) |> pull(fixture_id)
+ labels_for_group<-tibble(fixture_id=ids) |> left_join(a |> filter(round==row$round) |> select(-round),by='fixture_id',relationship='one-to-one')
+ purchases<-tickets |> filter(round==row$round,construction==row$construction,window==row$window,group==row$group)
+ # Authoritative physical ticket key uses source outcome codes W/D/L=1/2/3.
+ possible<-rep(TRUE,nrow(purchases))
+ for(k in seq_len(nrow(labels_for_group))){
+  if(is.na(labels_for_group$actual[k]))next
+  token<-paste0(labels_for_group$fixture_id[k],':',match(labels_for_group$actual[k],c('W','D','L')))
+  parts<-strsplit(purchases$ticket_id,'|',fixed=TRUE)
+  possible<-possible & vapply(parts,`%in%`,logical(1),x=token)
+ }
+ known<-sum(!is.na(labels_for_group$actual))
+ hit<-if(known==7L)any(possible) else if(any(possible))NA else FALSE
+ evaluated[[j]]<-row |> mutate(known=known,hit=hit)
+}
+x<-bind_rows(evaluated)
+stopifnot(all(x$known[x$round!=2]==7L))
+summary<-x |> group_by(round,construction,window) |> summarise(groups=n(),hits=sum(hit,na.rm=TRUE),pending=sum(is.na(hit)),round_hit=if(any(hit %in% TRUE))TRUE else if(any(is.na(hit)))NA else FALSE,cost_cny=sum(cost_cny),model_mass_sum=sum(model_mass),.groups='drop')
+stopifnot(nrow(summary)==16L,all(summary$cost_cny==2000L),all(summary$groups==8L))
+prior<-readr::read_csv(file.path(root,'results/margin-truncated-rank-20261017/groups.csv'),show_col_types=FALSE) |> filter(threshold==1) |> select(round,group,old_hit=hit_30_154)
+parity<-x |> filter(construction=='original',window=='uniform') |> left_join(prior,by=c('round','group'),relationship='one-to-one')
+stopifnot(identical(parity$hit,parity$old_hit))
+reuse<-members |> count(round,construction,fixture_id,name='reuse')
+risk<-reuse |> group_by(round,construction) |> summarise(fixtures=n(),min_reuse=min(reuse),max_reuse=max(reuse),shared_all8=sum(reuse==8L),.groups='drop')
+stopifnot(all((risk |> filter(construction=='balanced'))$shared_all8==0L))
+readr::write_csv(x,file.path(output,'groups.csv'));readr::write_csv(summary,file.path(output,'summary.csv'));readr::write_csv(reuse,file.path(output,'reuse.csv'));readr::write_csv(risk,file.path(output,'risk.csv'))
+```
+
+相同预算下的实际买中组数与待定情况：
+
+```{r}
+knitr::kable(summary)
+```
+
+场次复用是否真正下降：
+
+```{r}
+knitr::kable(risk)
+```
+
+已结算三轮的汇总（组间相关，不把24组当独立样本）：
+
+```{r}
+knitr::kable(summary |> filter(round!=2) |> group_by(construction,window) |> summarise(hits=sum(hits),winning_rounds=sum(round_hit),zero_hit_rounds=sum(!round_hit),cost_cny=sum(cost_cny),.groups='drop'))
+inputs<-c(config_path,file.path(w,'frozen-probabilities.rds'),file.path(w,'plans.rds'),source_probs,labels)
+knitr::kable(tibble(input=inputs,sha256=vapply(inputs,digest::digest,character(1),file=TRUE,algo='sha256')))
+```
+
+局限：仅原已选场次池、四轮，其中第二轮标签仍不全；均衡复用可能牺牲模型优势，不能把分散程度改善当作买中改善。按8×7/N均衡，可行上限分别4/4/5/6，而不是统一每场最多4组。没有联赛/盘口等风险因子分层测试，没有场次结果压力测试，没有收益比较；本次仅检验复用与窗口两因素。所有规则在事后已知坏轮背景下提出，执行未用标签不等于独立前瞻证据。当前不升级正式策略。无新增函数、无包修改；整数规划复用已安装lpSolve，版本收据落盘。验证包含解状态、8唯一组、每组7场、复用约束、128组政策记录、16000注、每轮2000元、原政策32组买中逐项重现、标签缺失处理、源数据时间严格早于原cutoff与分布归一。冻结计划先落盘再加载标签，RDS与输入/代码身份绑定，审查与渲染记录在results/margin-risk-diversification-20261017/。
+
+非唯一性：当复用次数固定时，模型质量目标可能成为常数，整数规划会返回一个可行划分。本次只测试这一个确定性设计，不将它称为最优分散方案；未对不同划分做结果寻优。运行依赖及固定政策在config/margin-risk-diversification-20261017.json记录并执行校验。模型质量和平均命中数不等于组合间联合覆盖概率；本次没有计算整轮理论联合命中概率。
+
+独立来源绑定：从冻结base网格及原让球重新投影全部52场，和缓存100%投影逐项核对（156个类别概率，误差<1e-12），构组与排序实际使用重新投影结果；冻结收据另绑定原概率RDS SHA、每场source_hashes/max_source_available_utc/cutoff。环境设置时通过pak安装固定lpSolve版本，命令在研究配置setup字段；渲染只验证版本，不安装依赖。
