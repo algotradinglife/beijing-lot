@@ -1,0 +1,23 @@
+dataset,fixture_id,state,reason,lambda_home,lambda_away
+fm15-upcoming-20261012,26103:353,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.0232371794871795,1.248397435897436
+fm15-upcoming-20261012,26103:354,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm15-upcoming-20261012,26103:361,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",0.8839285714285714,1.1607142857142858
+fm15-upcoming-20261012,26103:355,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.192559523809524,1.0107142857142857
+fm15-upcoming-20261012,26103:356,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.58125,0.8760416666666667
+fm15-upcoming-20261012,26103:363,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm15-upcoming-20261012,26103:369,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm15-upcoming-20261012,26103:364,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm15-upcoming-20261012,26103:367,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.5300245098039216,1.1666666666666665
+fm15-upcoming-20261012,26103:368,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm15-upcoming-20261012,26103:371,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",2.098878205128205,1.2685897435897435
+fm15-upcoming-20261012,26103:372,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.9759615384615385,1.2908653846153846
+fm15-upcoming-20261012,26103:373,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm15-upcoming-20261012,26103:374,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.0333333333333332,1.255357142857143
+fm16-upcoming-20261013,26103:384,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm16-upcoming-20261013,26103:399,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",0.9508928571428572,1.0625
+fm16-upcoming-20261013,26103:403,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.4182692307692308,0.9423076923076923
+fm16-upcoming-20261013,26103:407,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.4990196078431373,1.2736519607843138
+fm16-upcoming-20261013,26103:396,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm16-upcoming-26104-20261013,26104:15,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm16-upcoming-26104-20261013,26104:26,UNESTIMATED_SUPPORT_OR_FIT,Sparse target competition/venue support,NA,NA
+fm16-upcoming-26104-20261013,26104:14,ESTIMATED_FM171_NATIVE,"same_support_raw, exact competition/venue, recent8 alpha0.5, no calendar-age veto",1.3708333333333333,1.1691666666666667

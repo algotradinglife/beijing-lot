@@ -1,0 +1,32 @@
+duckdb is storing downloaded extensions and secrets under ~/.duckdb:
+ℹ /home/drwho1985/.duckdb
+This persists across sessions and is shared with the DuckDB CLI and other clients.
+ℹ Run duckdb(shared_home = FALSE) to use a temporary directory instead.
+ℹ See ?duckdb_storage for details and alternatives.
+duckdb is storing downloaded extensions and secrets under ~/.duckdb:
+ℹ /home/drwho1985/.duckdb
+This persists across sessions and is shared with the DuckDB CLI and other clients.
+ℹ Run duckdb(shared_home = FALSE) to use a temporary directory instead.
+ℹ See ?duckdb_storage for details and alternatives.
+26103:353 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:354 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26103:361 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:355 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:356 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26103:363 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:369 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26103:364 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26103:367 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:368 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:371 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26103:372 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26103:373 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26103:374 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:384 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:399 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:403 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:407 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26103:396 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26104:15 PROJECTED Prior fixed three-company and five-percentage-point criteria
+26104:26 UNAVAILABLE all(tq$line >= 2.5) is not TRUE
+26104:14 UNAVAILABLE all(tq$line >= 2.5) is not TRUE

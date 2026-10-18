@@ -1,0 +1,117 @@
+dataset,sheet,fixture_id,old_source,source,reason
+fm15-upcoming-20261012,1,26103:353,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm15-upcoming-20261012,1,26103:354,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm15-upcoming-20261012,1,26103:355,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm15-upcoming-20261012,1,26103:356,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm15-upcoming-20261012,1,26103:361,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm15-upcoming-20261012,1,26103:363,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm15-upcoming-20261012,1,26103:364,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm15-upcoming-20261012,1,26103:367,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm15-upcoming-20261012,1,26103:368,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm15-upcoming-20261012,1,26103:369,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm15-upcoming-20261012,1,26103:371,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm15-upcoming-20261012,1,26103:372,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm15-upcoming-20261012,1,26103:373,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm15-upcoming-20261012,1,26103:374,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm16-upcoming-20261013,1,26103:384,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm16-upcoming-20261013,1,26103:396,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm16-upcoming-20261013,1,26103:397,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-20261013,1,26103:399,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm16-upcoming-20261013,1,26103:400,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-20261013,1,26103:403,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm16-upcoming-20261013,1,26103:404,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-20261013,1,26103:406,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-20261013,1,26103:407,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm16-upcoming-26104-20261013,1,26104:1,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:10,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:11,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:12,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:14,native,FM171_REFIT_NATIVE,"Original score facts, retrospective competition annotation, exact same-support raw lambda"
+fm16-upcoming-26104-20261013,1,26104:15,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm16-upcoming-26104-20261013,1,26104:16,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:17,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:19,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:2,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:20,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:22,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:23,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm16-upcoming-26104-20261013,1,26104:26,native,UNESTIMATED,No qualified market grid and no supported FM171 native fit; no parent-native fallback
+fm17-upcoming-20261015,1,26104:37,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:39,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:44,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:48,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:67,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:68,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:71,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:73,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,1,26104:74,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:40,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:41,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:49,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:50,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:51,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:53,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:55,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:56,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:60,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261015,2,26104:69,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:104,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:105,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:106,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:107,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:91,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:92,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:94,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261016,1,26104:95,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:10,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:101,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:127,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:129,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:134,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:14,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:143,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:15,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:156,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:182,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:19,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:22,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:42,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,1,26105:6,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:111,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:112,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:135,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:144,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:149,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:158,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:16,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:160,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:162,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:27,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:28,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:32,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:54,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,2,26105:57,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:125,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:133,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:24,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:35,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:38,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:47,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:48,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:58,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:64,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:73,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:78,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:90,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,3,26105:98,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:105,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:124,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:138,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:148,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:21,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:26,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:30,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:39,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:51,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:84,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route
+fm17-upcoming-20261017,4,26105:96,market,FM171_INHERITED_MARKET,FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route

@@ -1,0 +1,11 @@
+dataset,sheet,eligible_groups,unestimated_groups,confirmed_hits,pending_groups,full_round_hits,requested_stake_cny,estimable_stake_cny,payout_cny,net_cny,monetary_complete,original_hits,old_full100_hits,original_payout,old_full100_payout
+fm15-upcoming-20261012,1,0,8,0,0,NA,2800,0,NA,NA,FALSE,0,4,0,13077.550760272285
+fm16-upcoming-20261013,1,1,7,0,0,NA,2800,350,NA,NA,FALSE,0,0,0,0
+fm16-upcoming-26104-20261013,1,0,8,0,0,NA,2800,0,NA,NA,FALSE,0,0,0,0
+fm17-upcoming-20261015,1,8,0,4,0,4,2000,2000,2900.522531305936,900.5225313059359,TRUE,1,4,1002.7934751152168,2900.522531305936
+fm17-upcoming-20261015,2,8,0,0,0,0,2000,2000,0,-2000,TRUE,1,0,1009.7121417529344,0
+fm17-upcoming-20261016,1,8,0,0,0,0,2000,2000,0,-2000,TRUE,1,0,3241.345114903334,0
+fm17-upcoming-20261017,1,8,0,5,0,5,2000,2000,NA,NA,FALSE,3,5,NA,NA
+fm17-upcoming-20261017,2,8,0,0,0,0,2000,2000,0,-2000,TRUE,0,0,NA,0
+fm17-upcoming-20261017,3,8,0,4,0,4,2000,2000,NA,NA,FALSE,4,4,NA,NA
+fm17-upcoming-20261017,4,8,0,0,0,0,2000,2000,0,-2000,TRUE,0,0,0,0

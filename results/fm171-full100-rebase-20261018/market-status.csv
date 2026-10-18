@@ -1,0 +1,23 @@
+dataset,fixture_id,state,sufficient,consistent,reason
+fm15-upcoming-20261012,26103:353,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm15-upcoming-20261012,26103:354,PROJECTED,TRUE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm15-upcoming-20261012,26103:361,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm15-upcoming-20261012,26103:355,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm15-upcoming-20261012,26103:356,PROJECTED,TRUE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm15-upcoming-20261012,26103:363,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm15-upcoming-20261012,26103:369,PROJECTED,TRUE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm15-upcoming-20261012,26103:364,PROJECTED,TRUE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm15-upcoming-20261012,26103:367,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm15-upcoming-20261012,26103:368,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm15-upcoming-20261012,26103:371,PROJECTED,TRUE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm15-upcoming-20261012,26103:372,PROJECTED,TRUE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm15-upcoming-20261012,26103:373,PROJECTED,TRUE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm15-upcoming-20261012,26103:374,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm16-upcoming-20261013,26103:384,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm16-upcoming-20261013,26103:399,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm16-upcoming-20261013,26103:403,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm16-upcoming-20261013,26103:407,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm16-upcoming-20261013,26103:396,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm16-upcoming-26104-20261013,26104:15,PROJECTED,FALSE,TRUE,Prior fixed three-company and five-percentage-point criteria
+fm16-upcoming-26104-20261013,26104:26,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE
+fm16-upcoming-26104-20261013,26104:14,UNAVAILABLE,FALSE,FALSE,all(tq$line >= 2.5) is not TRUE

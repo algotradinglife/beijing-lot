@@ -1,0 +1,73 @@
+{
+  "model_id": "FM-1.7.1",
+  "coverage": "100% goal-margin mass; original seven-fixture groups, ranks and budgets",
+  "intended_use": "HISTORICAL_DIAGNOSTIC",
+  "prospective_admission": false,
+  "generated_at": "2026-10-18T07:09:13.059649+00:00",
+  "r_test_exit_status": 0,
+  "r_tests": [
+    {
+      "phase": "package",
+      "tests": 966,
+      "passed": 9361,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "phase": "repository",
+      "tests": 798,
+      "passed": 183247,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "commands": {
+    "test": "source docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh; R_LIBS_USER=\"$PWD/results/fm-qc-report-010/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R",
+    "native_replay": "source config/source-extraction.env; RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" /opt/R/4.6.1/bin/Rscript r/fm171_full100_historical_native.R \"$PWD\" \"$PWD/results/fm171-full100-rebase-20261018/independent-replay\"",
+    "market_replay": "source config/source-extraction.env; RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" /opt/R/4.6.1/bin/Rscript r/fm171_full100_historical_market.R \"$PWD\" \"$PWD/results/fm171-full100-rebase-20261018/independent-replay\"",
+    "render": "source config/source-extraction.env; QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_full100_historical_20261018.qmd --no-cache -P project_root:\"$PWD\""
+  },
+  "independent_replay": {
+    "native_exit": 0,
+    "market_exit": 0,
+    "strict_object_identity": true
+  },
+  "code_hashes": {
+    "r/fm171_full100_historical_native.R": "55c0d61ef6628469198d4a4ae3984247fb2f5f97683c29ee06e8a4ea56d841a7",
+    "r/fm171_full100_historical_market.R": "ce73ca8c087b78b146fee6d0edbbd2521296d0203aa042d2bf7a51de5f27c09a",
+    "quarto/fm171_full100_historical_20261018.qmd": "1f815f1429398fa3a14a2f4b466f96e2887bdc377608284533ddc05087ba5354",
+    "config/fundamental-models/FM-1.7.1.json": "f63e06561034b95f96e57d2983db29fd73af5f876f0e687e3a1f4e54cec265d2"
+  },
+  "package_changes": false,
+  "package_install_and_python_suite": "Not required: no package changes in this delivery",
+  "skip_reasons": [],
+  "render_exit_status": 0,
+  "rendered_tables_verified": true,
+  "review": {
+    "command": "codex review [scoped final acceptance prompt recorded in review-final.log]",
+    "exit_status": 0,
+    "findings": "No blocking findings; previous confidence/receipt/hash findings resolved",
+    "log_sha256": "dfa1797bd4789f2a5f6b2c08848360924d96dd6b3ebe08de3bd31bb60a654b96"
+  },
+  "artifact_hashes": {
+    "results/fm171-full100-rebase-20261018/full-r-tests.log": "2680f705f42a64c594256ada346e3e30dbc275eb06fab5058f1d833564e2543f",
+    "results/fm171-full100-rebase-20261018/render.log": "a0b1ed27c7314957deb778e5c56a3d241d48afb49fb07a43220d6222b20a06aa",
+    "results/fm171-full100-rebase-20261018/frozen-latest-replay.rds": "7675663a3c9cb7a5077ba90378f0c7591502dccf13d504f959c0d5f3731c6d49",
+    "results/fm171-full100-rebase-20261018/fixture-inventory.csv": "97d3af24950725ae7f0b721314635ba7965196fdd4b6212d501137ab078c3302",
+    "results/fm171-full100-rebase-20261018/comparison.csv": "5636bd005b9a4a128c024f571c4fdbf93aba2ff4c0c0f0eb87df28df39c14df6",
+    "results/fm171-full100-rebase-20261018/routing.csv": "f624b5c7b46149ec98401bff985ca69ebb93a627f4666990da72d149987d53d7",
+    "results/fm171-full100-rebase-20261018/groups.csv": "8b835d0c95413879decf6d8b15e0f892aebbd3d4df1f98973d605aebb8b96f07",
+    "results/fm171-full100-rebase-20261018/native-rebase.rds": "8d7ce4d5e433a58d899d6d42a27b68b57febeb58502ea33780427a55bf465836",
+    "results/fm171-full100-rebase-20261018/review-final.log": "dfa1797bd4789f2a5f6b2c08848360924d96dd6b3ebe08de3bd31bb60a654b96",
+    "results/fm171-full100-rebase-20261018/metadata-extra.json": "c66511c43cb9a196ca8bdeaa9915a89cd0c48514af181cda94f4789051d7692c",
+    "results/fm171-full100-rebase-20261018/market-rebase.rds": "771f8db18233c5e6ea0b73222f4f228ff69286d5e7a806a48139afc8ec57a959"
+  },
+  "validation_notes": [
+    "Independent replay and source/implementation bindings verified during clean QMD render.",
+    "Code diff whitespace check passes; unmodified raw process logs retain terminal trailing whitespace."
+  ]
+}

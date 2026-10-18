@@ -1,0 +1,161 @@
+---
+title: "统一FM-1.7.1：100%净胜球历史轮次对照"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+本报告只将100%实验分支统一到FM-1.7.1模型规则，不改变原七场组、购买区间、每组注数、预算；不套用10月18日新单的SP筛选等新构组条件。原方案和旧混合版本100%结果保留为固定对照。市场路由继承的联合市场规则在1.7.1未改变；原生路由重新使用同赛事ID、同主客场、近期8场/长期各0.5、至少12场、ESS≥8、rho−0.1的same_support_raw。市场充分且一致时按既有uncertain来源规则采用市场；其余只有新版原生确实估计成功才可使用，绝不沿用旧原生概率填空。
+
+重要：原生比分事实只用各轮原native-stage里的冻结历史；赛事ID元数据可由较晚页面回溯补标，且仅在match_id、日期、双方ID、比分完全匹配时合并。新补市场只取原截止前48小时内赛前报价，采集时间可能较晚。这两类都明确标为历史诊断代理，不能宣称当时已有新版预测或前瞻准入；共享temporal_learning负责排除目标/未来issue、日期准入、权重及回执。没有按目标赛果选择路由、参数、窗口或补样。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'results/fm-qc-report-010/library'))
+old_out<-file.path(root,'results/full100-historical-rounds-20261018');out<-file.path(root,'results/fm171-full100-rebase-20261018')
+inputs<-jsonlite::fromJSON(file.path(old_out,'input-manifest.json')) |> as_tibble()
+old_plan<-readRDS(file.path(old_out,'frozen-replay.rds'))
+native_path<-file.path(out,'native-rebase.rds');market_path<-file.path(out,'market-rebase.rds')
+native<-readRDS(native_path);markets<-readRDS(market_path)
+replay_native<-readRDS(file.path(out,'independent-replay/native-rebase.rds'))
+replay_market<-readRDS(file.path(out,'independent-replay/market-rebase.rds'))
+stopifnot(identical(native,replay_native),identical(markets,replay_market))
+invisible(beidan::python_backend(file.path(root,'.venv/bin/python')))
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE)
+for(result in native$results){
+ implementation<-result$implementation;implementation$root_modules<-as.list(implementation$root_modules)
+ shared$verify_implementation_closure(reticulate::import('pathlib')$Path(root),implementation)
+ stopifnot(result$fit$receipt$R_code_sha256==digest::digest(file=file.path(root,'packages/beidan/R/opponent_goals.R'),algo='sha256'),result$fit$receipt$observations_sha256==digest::digest(result$fit$observations,algo='sha256'),result$fit$receipt$parameters_sha256==digest::digest(result$fit$parameters,algo='sha256'))
+}
+for(result in markets$results)stopifnot(result$source_bindings$client==digest::digest(file=file.path(root,'r/fm171_full100_historical_market.R'),algo='sha256'),identical(result$source_bindings$direction_implementation,beidan:::.score_margin_code(root)))
+
+stopifnot(native$model_id=='FM-1.7.1',identical(native$source_bindings$client,digest::digest(file=file.path(root,'r/fm171_full100_historical_native.R'),algo='sha256')),identical(native$source_bindings$metadata_extra,digest::digest(file=file.path(out,'metadata-extra.json'),algo='sha256')))
+registry_path<-file.path(root,'config/fundamental-models/FM-1.7.1.json');registry<-jsonlite::fromJSON(registry_path)
+stopifnot(registry$model_id=='FM-1.7.1',registry$native_policy$lambda_output=='same_support_raw',registry$native_policy$recent_n==8L,registry$native_policy$alpha==.5,registry$native_policy$rho==-.1)
+route_rows<-list();route_grids<-list();plans<-list()
+for(i in seq_len(nrow(inputs))){
+ row<-inputs[i,];w<-file.path(root,'results',row$dataset)
+ stopifnot(digest::digest(file=file.path(w,'plans.rds'),algo='sha256')==row$plans_sha256,digest::digest(file=file.path(w,'frozen-probabilities.rds'),algo='sha256')==row$frozen_probability_sha256)
+ f<-readRDS(file.path(w,'frozen-probabilities.rds'));b<-readRDS(file.path(w,'plans.rds'));p<-b$plans[[row$sheet_index]];cutoff<-p$selection_receipt$cutoff
+ ids<-sort(unique(p$legs$fixture_id));qs<-list();missing<-character()
+ for(id in ids){
+  e<-f$entries[[id]];key<-paste(row$dataset,id,sep='|');old_source<-if(is.null(e$selection$selected_source))'native' else e$selection$selected_source
+  source<-'UNESTIMATED';grid<-NULL;reason<-NA_character_;bindings<-NULL
+  if(old_source=='market'){
+   stopifnot(e$review$confidence %in% c('low','uncertain'),e$review$market_sufficient,e$review$market_consistent,as.numeric(e$base$cutoff$cutoff_utc)==as.numeric(cutoff$cutoff_utc),as.numeric(e$base$max_source_available_utc)<as.numeric(cutoff$cutoff_utc))
+   grid<-e$base$grid;source<-'FM171_INHERITED_MARKET';reason<-'FM171 inherits the qualified three-channel market component; native stage not claimed refitted on this route';bindings<-e$selection$receipt
+  }else{
+   m<-markets$results[[key]];n<-native$results[[key]]
+   if(!is.null(e$review$confidence)&&e$review$confidence %in% c('low','uncertain')&&!is.null(m)&&isTRUE(m$sufficient)&&isTRUE(m$consistent)){
+    stopifnot(as.numeric(m$cutoff$cutoff_utc)==as.numeric(cutoff$cutoff_utc));grid<-m$model$grid;source<-'FM171_RECONSTRUCTED_MARKET';reason<-'Existing explicitly bound low/uncertain review plus prior 3-company/5pp market criteria passed; source quote clock proxy';bindings<-m$source_bindings
+   }else if(!is.null(n)){
+    stopifnot(n$model_id=='FM-1.7.1',as.numeric(n$cutoff$cutoff_utc)==as.numeric(cutoff$cutoff_utc),n$native_policy$recent_n==8L,n$native_policy$alpha==.5,abs(n$parameters[['lambda_home']]-unlist(n$fit$same_support_raw)[['lambda_home']])<1e-12,abs(n$parameters[['lambda_away']]-unlist(n$fit$same_support_raw)[['lambda_away']])<1e-12)
+    grid<-n$grid;source<-'FM171_REFIT_NATIVE';reason<-'Original score facts, retrospective competition annotation, exact same-support raw lambda';bindings<-n$source_bindings
+   }else{
+    missing<-c(missing,id);reason<-'No qualified market grid and no supported FM171 native fit; no parent-native fallback'
+   }
+  }
+  route_rows[[length(route_rows)+1L]]<-tibble(dataset=row$dataset,sheet=row$sheet_index,fixture_id=id,old_source,source,reason)
+  if(is.null(grid))next
+  grid<-as_tibble(grid);stopifnot(all(is.finite(grid$probability)),all(grid$probability>=0),abs(sum(grid$probability)-1)<1e-9)
+  h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id]);stopifnot(length(h)==1,is.finite(h))
+  qs[[id]]<-grid |> mutate(outcome=case_when(home_goals-away_goals+h>0~'W',home_goals-away_goals+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability)/sum(grid$probability),.groups='drop') |> mutate(fixture_id=id) |> select(fixture_id,outcome,probability)
+  route_grids[[paste(i,id,sep='|')]]<-list(grid=grid,source=source,cutoff=cutoff,input_bindings=bindings)
+ }
+ q<-bind_rows(qs);buys<-list();legs_list<-list();group_states<-list()
+ for(g in 1:8){
+  legs<-p$legs |> as_tibble() |> filter(group_slot==g) |> arrange(round);gid<-unique(legs$group_id)
+  miss<-intersect(legs$fixture_id,missing)
+  if(length(miss)){group_states[[g]]<-tibble(group=g,state='UNESTIMATED',missing_fixtures=paste(miss,collapse=','));next}
+  old<-old_plan$plans[[i]]$windows |> filter(group==g);stopifnot(nrow(old)==1L)
+  gl<-legs |> transmute(group_id,fixture_id,leg_order=as.integer(round))
+  supports<-q |> filter(fixture_id %in% legs$fixture_id) |> transmute(candidate_id=paste0(gid,'|7'),fixture_id,outcome,allowed=TRUE,preference=match(outcome,c('W','D','L')))
+  space<-beidan::parlay_enumerate_tickets(gl,q,cutoff=cutoff,supports=supports,n_legs=7L)
+  ranked<-beidan::parlay_rank_tickets(space$tickets,space$candidate_tickets,cutoff=cutoff,ranking='probability_desc') |> as_tibble()
+  stopifnot(nrow(ranked)==2187L,abs(sum(ranked$probability)-1)<1e-9)
+  chosen<-ranked |> filter(rank>=old$lo,rank<=old$hi) |> mutate(group=g)
+  stopifnot(nrow(chosen)==old$n)
+  buys[[length(buys)+1L]]<-chosen;legs_list[[length(legs_list)+1L]]<-space$ticket_legs |> as_tibble() |> filter(ticket_id %in% chosen$ticket_id)
+  group_states[[g]]<-tibble(group=g,state='ESTIMATED',missing_fixtures=NA_character_)
+ }
+ plans[[i]]<-list(dataset=row$dataset,sheet=row$sheet_index,output=row$output,model_id='FM-1.7.1',cutoff=cutoff,tickets=if(length(buys))bind_rows(buys) else beidan::parlay_rank_tickets(beidan:::match_typed_empty('tickets'),tibble(candidate_id=character(),ticket_id=character()),cutoff=cutoff) |> mutate(group=integer()),ticket_legs=if(length(legs_list))bind_rows(legs_list)else beidan:::match_typed_empty('ticket_legs'),groups=bind_rows(group_states),probabilities=q,requested_stake_cny=row$baseline_stake_cny,source_identity=list(native=digest::digest(file=native_path,algo='sha256'),market=digest::digest(file=market_path,algo='sha256'),parent=row$frozen_probability_sha256))
+}
+routes<-bind_rows(route_rows)
+saveRDS(list(model_id='FM-1.7.1',plans=plans,routes=routes,grids=route_grids,registry_sha256=digest::digest(file=registry_path,algo='sha256'),qmd_sha256=digest::digest(file=file.path(root,'quarto/fm171_full100_historical_20261018.qmd'),algo='sha256'),prospective_admission=FALSE),file.path(out,'frozen-latest-replay.rds'))
+# Settlement begins only after all target selections and missing forecasts are frozen.
+rows<-list();group_rows<-list()
+for(i in seq_len(nrow(inputs))){
+ row<-inputs[i,];p<-plans[[i]];path<-file.path(root,row$label_snapshot);stopifnot(digest::digest(file=path,algo='sha256')==row$label_sha256)
+ r<-if(row$label_kind=='json')jsonlite::fromJSON(path)else readRDS(path)$settlement
+ at<-r$fixture_results$result_available_at;if(inherits(at,'POSIXct'))at<-lubridate::with_tz(at,'UTC')else at<-as.POSIXct(as.character(at),tz='UTC',format='%Y-%m-%d %H:%M:%OS')
+ a<-r$fixture_results |> as_tibble() |> transmute(issue_id=as.character(issue_id),fixture_id,actual=outcome,settled_sp=as.numeric(settled_sp),label_available_at=at,source_url)
+ as_of<-r$as_of_utc;if(inherits(as_of,'POSIXct'))as_of<-lubridate::with_tz(as_of,'UTC')else as_of<-as.POSIXct(as.character(as_of),tz='UTC',format='%Y-%m-%d %H:%M:%OS')
+ stopifnot(!anyDuplicated(a$fixture_id),all(a$actual %in% c('W','D','L')),all(a$label_available_at<=as_of),all(as.numeric(a$label_available_at)>as.numeric(p$cutoff$cutoff_utc)))
+ states<-p$groups |> mutate(hit=NA,pending=NA)
+ payout<-net<-NA_real_;complete<-FALSE;estimated_cost<-2*nrow(p$tickets)
+ if(nrow(p$tickets)){
+  checks<-p$ticket_legs |> left_join(a |> select(fixture_id,actual),by='fixture_id',relationship='many-to-one') |> group_by(ticket_id) |> summarise(known=sum(!is.na(actual)),misses=sum(!is.na(actual)&outcome!=actual),.groups='drop')
+  result<-p$tickets |> left_join(checks,by='ticket_id',relationship='one-to-one') |> group_by(group) |> summarise(hit=any(known==7L&misses==0L),pending=any(known<7L&misses==0L),.groups='drop')
+  states<-states |> select(-hit,-pending) |> left_join(result,by='group',relationship='one-to-one')
+  settlement_plan<-list(constants=list(unit_cny=2,payout_factor=.65,n_legs=7L),issue_id=p$cutoff$issue_id,funded=p$tickets |> select(ticket_id,group_id),ticket_legs=p$ticket_legs)
+  settlements<-a |> transmute(issue_id,fixture_id,outcome=actual,settled_sp,label_available_at,status='settled',source_url)
+  cash<-beidan::parlay_settle_plan(settlement_plan,settlements,as_of=as_of)$ticket_returns
+  complete<-all(!cash$status %in% c('PENDING','SPECIAL'))&&all(states$state=='ESTIMATED')
+  if(complete){payout<-sum(cash$payout_cny);net<-payout-p$requested_stake_cny}
+ }
+ rows[[i]]<-tibble(dataset=row$dataset,sheet=row$sheet_index,eligible_groups=sum(states$state=='ESTIMATED'),unestimated_groups=sum(states$state=='UNESTIMATED'),confirmed_hits=sum(states$hit,na.rm=TRUE),pending_groups=sum(states$pending,na.rm=TRUE),full_round_hits=if(all(states$state=='ESTIMATED'))sum(states$hit,na.rm=TRUE)else NA_integer_,requested_stake_cny=p$requested_stake_cny,estimable_stake_cny=estimated_cost,payout_cny=payout,net_cny=net,monetary_complete=complete)
+ group_rows[[i]]<-states |> mutate(dataset=row$dataset,sheet=row$sheet_index)
+}
+x<-bind_rows(rows);gs<-bind_rows(group_rows)
+prior<-readr::read_csv(file.path(old_out,'comparison.csv'),show_col_types=FALSE) |> select(dataset,sheet,original_hits=hit_groups_original,old_full100_hits=hit_groups_full100,original_payout=payout_cny_original,old_full100_payout=payout_cny_full100)
+comparison<-x |> left_join(prior,by=c('dataset','sheet'),relationship='one-to-one')
+stopifnot(nrow(x)==10L,nrow(gs)==80L,all(x$eligible_groups+x$unestimated_groups==8L),all(x$estimable_stake_cny<=x$requested_stake_cny))
+readr::write_csv(routes,file.path(out,'routing.csv'));readr::write_csv(comparison,file.path(out,'comparison.csv'));readr::write_csv(gs,file.path(out,'groups.csv'))
+```
+
+统一版本后的对照；full_round_hits为空表示有组无法按新版估算，不能当零命中：
+
+```{r}
+knitr::kable(comparison |> select(dataset,sheet,original_hits,old_full100_hits,eligible_groups,unestimated_groups,full_round_hits,pending_groups,requested_stake_cny,payout_cny,net_cny),digits=2)
+```
+
+原生与市场路线：
+
+```{r}
+knitr::kable(routes |> distinct(dataset,fixture_id,.keep_all=TRUE) |> count(dataset,source))
+knitr::kable(native$status |> count(dataset,state))
+knitr::kable(gs |> filter(state=='UNESTIMATED') |> select(dataset,sheet,group,missing_fixtures))
+inputs_hash<-c(native_path,market_path,registry_path,file.path(old_out,'input-manifest.json'))
+knitr::kable(tibble(input=inputs_hash,sha256=vapply(inputs_hash,digest::digest,character(1),file=TRUE,algo='sha256')))
+```
+
+复现准备命令：`Rscript r/fm171_full100_historical_native.R ROOT OUTPUT`和`Rscript r/fm171_full100_historical_market.R ROOT OUTPUT`，先设置项目Python与数据根；两者均无网络请求、无目标标签读取，依赖已安装beidan及项目现有Python。元数据补标使用已有parse_opponent_history，原始文件SHA及解析器SHA绑定在metadata-extra.json；已有旧分布和目标结果不被重写。共享近期权重、支持评估、完整目标/未来issue排除、拟合回执来自现有包，未复制时序工具。部分cup/新升班队可能无法满足同赛事12场门槛；不能靠旧版概率混入或把被排除组视作失败。OU低于2.5的旧市场逆推兼容性门槛仍保留，不为补齐结果放宽模型。此报告不采用新策略，且不同轮次有重复比赛，不能当独立样本。
+
+FM15旧审查只有KEEP_NATIVE，没有FM16/17式confidence字段，因此不能仅凭新补市场充分/一致就声称其满足uncertain市场切换条件。该轮只使用成功重估的FM171原生；失败保持未估计，不虚构新置信审查。
+
+独立重放验收：在independent-replay目录按相同原始输入重新执行两个准备客户端，要求native-rebase.rds和market-rebase.rds对象逐项identical；另检查原生Python传递实现闭包、R拟合实现/观测/参数SHA、市场客户端与方向实现绑定。任一失配停止渲染，不能读取过期模型给出新报告。零可估计组使用包提供的typed-empty表，不伪造空表列类型。
+
+完整估算的七轮共56组：新版100%确认命中13组，原方案确认10组、另1组待定。前三个旧轮次只有0/8、1/8、0/8组满足新版条件，因此整轮命中及收益均为缺失，不记作零；旧版10月12日的13,077.55元回款不能视为FM-1.7.1表现。后七轮全为继承市场路线，故与旧100%方案相同，不代表新版原生lambda带来提升。
+
+七轮中10月17日第1/3轮仍缺中奖场次的官方结算SP，不能报告七轮总收益。仅10月15日两轮和16日一轮已具完整共同收益：投入6,000元，原方案回款5,253.85元，新版100%回款2,900.52元；确认命中增加并未在这三个轮次转化为收益增加。不同轮次的重复比赛和重复票保留，按原资金口径结算。
+
+验收证据由本目录acceptance.json和完整日志保存。两个准备客户端均已在独立目录全量重跑，对象严格一致；QMD执行了归一化、2187个完整组合、原排名注数、原预算、缺失模型与typed-empty边界、标签开启顺序、目标时间及实现绑定断言。此交付未修改包或新增项目函数；脚本只编排既有已测试接口，函数行为的完整本地测试通过标准入口`Rscript tests/testthat.R`执行，不使用CI。
+
+复现时先复制fixture-inventory.csv及metadata-extra.json到新的输出目录，再依次运行两个R客户端；比较其RDS与本报告绑定对象，最后用`QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fm171_full100_historical_20261018.qmd --no-cache -P project_root:ROOT`重渲染。数据根来自config/source-extraction.env，解释器必须为项目.venv/bin/python。准备与渲染无网络调用。
+
+本地完整测试验收（详细命令、退出状态、源文件与结果SHA见acceptance.json；full-r-tests.log保存完整断言输出）：
+
+```{r}
+acceptance<-jsonlite::fromJSON(file.path(out,'acceptance.json'))
+stopifnot(acceptance$r_test_exit_status==0L)
+knitr::kable(as_tibble(acceptance$r_tests))
+stopifnot(all(acceptance$r_tests$failed==0L),all(acceptance$r_tests$errors==0L))
+```
+
+审查记录：review-initial.log的置信准入及缓存验证问题已修复；review-intermediate.log的渲染中间态QMD哈希问题已通过最终完整重渲染修复；review-final.log保存最终审查结论和受审文件证据。最终代码与产物身份由acceptance.json列出。本次只提交研究客户端、QMD及对应输出，不包含其他会话的包改动。
