@@ -1,0 +1,145 @@
+{
+  "observed_at": "2026-10-18T20:07:11.031097+00:00",
+  "status": "CURRENT24_FILES_MATCH_FRESH_FULL_R_PASS",
+  "files": [
+    {
+      "path": "tests/fixtures/global-dynamic-26105-intake-roster-excerpt.json",
+      "sha256": "b2e2dd2976037784e0aaca14da641d88c987754599f86560d7ba8e67415f40d8",
+      "binding": "copied-before-test snapshot fixture"
+    },
+    {
+      "path": "tests/fixtures/global-dynamic-26105-unresolved-kickoffs.csv",
+      "sha256": "18de9413cf640440dc57fdf4a09f9fce2f0d298f3ee5e14de2c98f78de0496b1",
+      "binding": "copied-before-test snapshot fixture"
+    },
+    {
+      "path": "r/global_dynamic_26105_base_publish_20261019.R",
+      "sha256": "264148dfcad586df3b56f04df1690598a46a6caf27c53a48e2c3b6a1fa24b695",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "r/global_dynamic_26105_euro_publish_20261019.R",
+      "sha256": "e3cad2bd1ff558172d06e0e19527353603319ddc4befc392bd80cba3c7a0f7dc",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "r/global_dynamic_26105_evaluate_20261019.R",
+      "sha256": "11ef6410ab71b7fc4192ad890b799a97bd4e3a432ea459108e610784a88c1516",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "r/global_dynamic_26105_intake_20261019.R",
+      "sha256": "892047b6bc1298487b231d4ed4b099ac79c5d4ec148b35a7521ad49849395b68",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "r/global_dynamic_26105_native_20261019.R",
+      "sha256": "5cb21852ca3d754898efd327decfb2f8cd345498e355ed40013b37c66b1470dc",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "r/global_dynamic_26105_select_20261019.R",
+      "sha256": "37721c1e9f19d89020f763c1898aaeb31cd5ff7501b23616971d1da641419be2",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "r/global_dynamic_26105_settlement_20261019.R",
+      "sha256": "b5fc22464ac109ead552edb05f822085d351e57635065f6982fa266c89241abe",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "r/global_dynamic_26105_walkforward_20261019.R",
+      "sha256": "f75c4098526cffddbb6dc60cf51b0bccd9de0ec30bc03d9090fb8338e04859eb",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-base-census.R",
+      "sha256": "1a5cd122e147efb84a01b374b69499d8fec038b49c00cdd2920df8e28e55efc1",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-base-publish.R",
+      "sha256": "a4d790e33f7d54ee2005ab6ccc94a201de1dea565a55b2bebc66f31e9ea32a0a",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-euro-publish.R",
+      "sha256": "d188e243774b9c8c0e7963020b076ef4580a0b45ac3aa0dd1aeef1fc4bcb3b8a",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-intake.R",
+      "sha256": "a49e7adf525c556783dbdb95d26e9288778b7227cea8d1770b6c462d8b0fb8e9",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-native.R",
+      "sha256": "2dbd87a2275b2b3cb88db59c6ea8e7d21f95f287ca88bb0c8ff3f45daf90fd7b",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-select.R",
+      "sha256": "d09ee5b437ba46a60784e471ec6141522d60954017d015f0f89d652d927a5cef",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-settlement.R",
+      "sha256": "066503fe0a07161138ddc37c5b48da8b96b495eae3bcebbb9cc94cf14fda1c06",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-walkforward.R",
+      "sha256": "b4d2ee5a86fc687babef50963440b87843a302cef094398199e93b685c5c9f3b",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_base_publish_20261019.qmd",
+      "sha256": "e958b59c3c279c2b89d0e5f3dd7e76cfb66d91355556b682292aa22a2310fc0c",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_euro_publish_20261019.qmd",
+      "sha256": "5eddf8dd497b08e7925754b645329e5d8c2e7c387b976da48ff6c7e85b2c213b",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_evaluation_20261019.qmd",
+      "sha256": "76f680f71c106d2397161ef3f91ce374946eada0e00815d5ee88cee9882998e2",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_line_cutoff_20261019.qmd",
+      "sha256": "501331ea6a99c287561c96a2850660fc1b4ecb9950063bee4552b5303deb9fd4",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_walkforward_20261019.qmd",
+      "sha256": "849fbd995f57d3ac6df7e61c46a5eaa993a9bcbf9e644b75ff3078d9ec77ad9c",
+      "binding": "frozen-source-manifest"
+    },
+    {
+      "path": "quarto/global_dynamic_cutoff_mutation_20261019.qmd",
+      "sha256": "a3f0f2cba43230a502c36ac6cd6cf2c0b26aa0d63ec30e7b0fb59eacecb8397d",
+      "binding": "frozen-source-manifest"
+    }
+  ],
+  "package": {
+    "blocks": 992,
+    "assertions": 9664,
+    "failed": 0,
+    "errors": 0,
+    "warnings": 0,
+    "skipped": 0
+  },
+  "repository": {
+    "blocks": 838,
+    "assertions": 183469,
+    "failed": 0,
+    "errors": 0,
+    "warnings": 0,
+    "skipped": 0
+  },
+  "full_R_log_sha256": "e6235ffde806f0a044cf012a7da68f56d190fa3d74df2f0cb43844b333d62afd",
+  "fixture_inventory_note": "Original scan inventories tests/testthat but not tests/fixtures;both authentic fixture paths were explicitly copied/hash-checked before testing by freeze-and-check-command.py. Verified bytes directly against the actual executed private snapshot;original scan manifest preserved. This24-file verification binds both fixture bytes.",
+  "limitation": "Final whole-issue forecast/selection replay and target evaluation pending. Python package unchanged this phase."
+}

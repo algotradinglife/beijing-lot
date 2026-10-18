@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    "exec codex review 'Review only final Euro delivery:quarto/global_dynamic_26105_euro_publish_20261019.qmd;results/global-dynamic-26105-euro-publish-20261019-control/{parse-batches-v1.py,assemble-batches-v1.py,parse-batches-parallel-v4.py};docs/reviews/global-dynamic-26105-euro-publish-20261019/acceptance.json;actual publication/assembly receipts,37 checkpoint receipts,fixed scheduler replay exit0;unchanged existing SDK publisher/tests. No edits/CI. NAS source_euro_issue_26105 version20261018T193151373411Z actual publish exit0,365fixtures730verified sources3019459history;price/clock conflicts retained,completeFALSE/modeladmissionFALSE. Full R final24 source snapshot:992blocks9664 assertions+838blocks183469,allzero errors/fail/warn/skip;actual normal installed DLL registered wrapper verified. Original scan omits fixture paths but actual24 copied beforetest and exact private/current bytes verified with explicit fixture note. Existing publisher21 tests passed,final365 integration+independent37checkpoint replay passed. QMD preliminary render actual exit0 onpublished data;fresh final default render after actual review receipt still pending,do not invent completed acceptance. Check identities,contracts,sources,correct failure recovery/idempotent branch,memory limits(report queries512MB only,publisher observed16.1GiBpeak),no future labels,no false wholegoal completion. Report blocking/actionable findings.'"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-delivery-review.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-delivery-review-exit.json"
+}

@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport R_PROFILE_USER=/dev/null\nexport R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\nexport QUARTO_R=/opt/R/4.6.1/bin/R\nexec quarto render quarto/global_dynamic_26105_euro_publish_20261019.qmd -P project_root:/home/drwho1985/workspace/algotradinglife/beijing-lot --execute --no-cache"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-corrected-QA-render.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-corrected-QA-render-exit.json"
+}

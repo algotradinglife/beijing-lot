@@ -1,0 +1,26 @@
+{
+  "status": "NO_BLOCKING_FINDINGS",
+  "scope": "Final Euro delivery only;goal forecasting/scoring remains pending",
+  "review_job": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-delivery-review-job.json",
+  "review_exit_status": 0,
+  "findings": "No blocking or actionable defects in scoped review;all37checkpoint hashes,publication identities,current24files and NAS manifest counts verified. Final default render pending at time of review.",
+  "files": [
+    {
+      "path": "quarto/global_dynamic_26105_euro_publish_20261019.qmd",
+      "sha256": "5eddf8dd497b08e7925754b645329e5d8c2e7c387b976da48ff6c7e85b2c213b"
+    },
+    {
+      "path": "results/global-dynamic-26105-euro-publish-20261019-control/parse-batches-v1.py",
+      "sha256": "8340e5cb0f1b58cfae85a904c5e95b96a963a4dfa7b1e80f70cb963445879cae"
+    },
+    {
+      "path": "results/global-dynamic-26105-euro-publish-20261019-control/assemble-batches-v1.py",
+      "sha256": "7a7dac1b44bc006c8c30c6022ee1b0bb4d470b1a787050365c70ddeaaebf425c"
+    }
+  ],
+  "additional_reviewed_execution_file": {
+    "path": "results/global-dynamic-26105-euro-publish-20261019-control/parse-batches-parallel-v4.py",
+    "sha256": "be7a5461f5a132c8fe7cbc4b540dea2c20f5bec278f7455d48353a533f606edc"
+  },
+  "goal_complete": false
+}

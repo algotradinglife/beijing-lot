@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    "exec codex review 'Corrected final Euro artifact review only:quarto/global_dynamic_26105_euro_publish_20261019.qmd/.html;docs/reviews/global-dynamic-26105-euro-publish-20261019/acceptance.json,final-review-receipt.json,corrected-QA-render evidence,actual Euro SDK Python test job/log/exit;current24-source proof,DLL evidence,and previously reviewed core3 source files+fixed scheduler. No edits/CI. Important QA attribution correction:previous21 tests belonged to fundamentals_audit_bundle archive publisher,NOT Euro SDK. Acceptance now explicitly corrects that attribution and cites actual51passing tests from test_source_issue_markets.py,test_source_market_publication.py,test_euro_coverage.py,installed SDK and frozen/current matching test files,no conftest/path injection. Tests include actual rollback/idempotence/tamper/whole-roster/cutoff invariance. Corrected default require_acceptanceTRUE render actuallyexit0;R992blocks9664+838blocks183469 allzero fail/error/warn/skip. All37checkpointSHA andfull365 publication/replay stillverified;NASversion20261018T193151373411Z. Check rendered counts/identities,no stale QA attribution,no false allPython/prospective/modeladmission/wholegoal claims. Actual publisherpeak16.1GiB,512MB refersreportSQL only. Report blocking/actionable findings.'"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-corrected-final-review.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-corrected-final-review-exit.json"
+}

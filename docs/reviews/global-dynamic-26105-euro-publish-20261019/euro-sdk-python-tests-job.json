@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    "export PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python -m pytest -q /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-cutoff-acceptance-20261019/verification-source/packages/beidan/tests/python/test_source_issue_markets.py /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-cutoff-acceptance-20261019/verification-source/packages/beidan/tests/python/test_source_market_publication.py /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-cutoff-acceptance-20261019/verification-source/packages/beidan/tests/python/test_euro_coverage.py"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-sdk-python-tests.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/euro-sdk-python-tests-exit.json"
+}

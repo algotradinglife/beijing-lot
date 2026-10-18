@@ -1,0 +1,59 @@
+{
+  "observations": [
+    {
+      "pid": 849088,
+      "first": 31,
+      "start": "166305547",
+      "exit_status": null,
+      "availability": "reaped by init;exit status unavailable"
+    },
+    {
+      "pid": 849089,
+      "first": 41,
+      "start": "166305547",
+      "exit_status": null,
+      "availability": "reaped by init;exit status unavailable"
+    },
+    {
+      "pid": 849090,
+      "first": 51,
+      "start": "166305547",
+      "exit_status": null,
+      "availability": "reaped by init;exit status unavailable"
+    }
+  ],
+  "independent_validation": [
+    {
+      "first_slot": 1,
+      "pickle_sha256": "33627542b0b4c0bb09d9a125321ce1b46ffda2de5e5dd71ed835bf21dc8e4597",
+      "validation": "SDK_CONTRACT_REPLAY_PASSED"
+    },
+    {
+      "first_slot": 11,
+      "pickle_sha256": "3002fc1109a9ab13576aa1defd708dfc5f42033c2d142bf08063ed90a5fd2f94",
+      "validation": "SDK_CONTRACT_REPLAY_PASSED"
+    },
+    {
+      "first_slot": 21,
+      "pickle_sha256": "93316dce8dcc8483332d0077aea73788f5e2941d51324675f6ea2df56c87a3c7",
+      "validation": "SDK_CONTRACT_REPLAY_PASSED"
+    },
+    {
+      "first_slot": 31,
+      "pickle_sha256": "f5091c917b6a6dac684c7d14dcdc1d57e56782f92ca840cd2ae1a04c7c39764d",
+      "validation": "SDK_CONTRACT_REPLAY_PASSED"
+    },
+    {
+      "first_slot": 41,
+      "pickle_sha256": "f460148ed387754289768b1079c47f2ebd512a1f62848d33e5b02e0bb182cb66",
+      "validation": "SDK_CONTRACT_REPLAY_PASSED"
+    },
+    {
+      "first_slot": 51,
+      "pickle_sha256": "361663ee362836c4d2f357445494efd7f421e324c72ebd2a5c770dfcc1881f41",
+      "validation": "SDK_CONTRACT_REPLAY_PASSED"
+    }
+  ],
+  "original_exit_status_inferred": false,
+  "generated_at": "2026-10-18T19:01:36.636363+00:00"
+}

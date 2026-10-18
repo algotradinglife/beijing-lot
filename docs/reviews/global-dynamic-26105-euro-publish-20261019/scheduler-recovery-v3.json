@@ -1,0 +1,23 @@
+{
+  "observed_at": "2026-10-18T18:59:13.327485+00:00",
+  "orphan_workers": [
+    {
+      "pid": 849088,
+      "first": 31,
+      "start": "166305547"
+    },
+    {
+      "pid": 849089,
+      "first": 41,
+      "start": "166305547"
+    },
+    {
+      "pid": 849090,
+      "first": 51,
+      "start": "166305547"
+    }
+  ],
+  "previous_scheduler_exit": -15,
+  "original21_exit_status": "not observed;checkpoint validation will be replayed,not inferred from file existence",
+  "policy": "Wait all live inherited workers;then independently validate every completed checkpoint with existing full SDK contract;record original exit status unknown if reaped;future children have normal subprocess wait receipts;no duplicate parsing"
+}

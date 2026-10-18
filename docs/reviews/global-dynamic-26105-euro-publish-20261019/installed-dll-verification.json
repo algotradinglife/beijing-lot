@@ -1,0 +1,9 @@
+{
+  "package_library": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library/beidan",
+  "dll_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library/beidan/libs/beidan.so",
+  "dll_sha256": "a1deef1b18fca032cf97b6c4cd95bf69bffcc71c924645bfa065afe23b2e1fe9",
+  "kernel_identity": "cf4b647d04b6ec212ad95ccc0b1891801717358602c8b8886a6559fd38128822",
+  "registered_call_names": ["_beidan_ComponentUnionKernelIdentity", "_beidan_ComponentUnionKernel"],
+  "identity_wrapper_call": "PASSED",
+  "manual_dyn_load": false
+}

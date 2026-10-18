@@ -1,0 +1,96 @@
+---
+title: "26105欧赔：全期价格解析、来源质控与版本入库"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  publication: "results/global-dynamic-26105-euro-publish-20261019-v3/publication.json"
+  require_acceptance: true
+---
+
+本报告为RAW／GLOBAL同预算对照准备26105全365场的两来源欧赔数据。只解析已有原文缓存，不请求网络，不估计概率、不选择票单、不读取目标赛果进行评分。资源完整、解析快照完整与模型准入分别记录；公司或时钟冲突保留，不因已入库就将比赛视为可用于预测。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse));library(testthat);library(beidan)
+root <- normalizePath(params$project_root,mustWork=TRUE)
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+setwd(root);knitr::opts_knit$set(root.dir=root)
+input <- jsonlite::fromJSON(params$publication,simplifyVector=FALSE)
+expect_identical(input$publication$dataset,'source_euro_issue_26105')
+expect_identical(input$model_admission,FALSE)
+expect_equal(input$receipt$expected_slots,365L)
+expect_equal(input$receipt$roster_slots,365L)
+expect_equal(input$receipt$network_attempts,0L)
+expect_identical(input$client_sha256,digest::digest(file='results/global-dynamic-26105-euro-publish-20261019-control/assemble-batches-v1.py',algo='sha256'))
+assembly_path <- file.path(dirname(params$publication),'assembly-receipt.json')
+expect_identical(input$assembly_receipt_sha256,digest::digest(file=assembly_path,algo='sha256'))
+assembly <- jsonlite::fromJSON(assembly_path,simplifyVector=FALSE)
+expect_equal(length(assembly$batches),37L)
+expect_identical(assembly$roster_input_sha256,input$roster_input_sha256)
+version <- input$publication$version
+resources <- read_dataset('source_euro_issue_26105','resources',version=version)
+status <- read_dataset('source_euro_issue_26105','status',version=version)
+contexts <- read_dataset('source_euro_issue_26105','contexts',version=version)
+quote_summary <- dataset_query('source_euro_issue_26105',
+ 'SELECT source, phase, valid_decimal, count(*) AS rows, count(DISTINCT fixture_id) AS fixtures FROM euro_history GROUP BY source, phase, valid_decimal ORDER BY source, phase, valid_decimal',
+ table='euro_history',version=version,memory_limit='512MB',threads=1L)
+quote_types <- dataset_query('source_euro_issue_26105',
+ 'SELECT company_id, quote_at FROM euro_history LIMIT 1',table='euro_history',version=version,memory_limit='512MB',threads=1L)
+conflict_summary <- dataset_query('source_euro_issue_26105',
+ 'SELECT state, count(*) AS rows FROM conflicts GROUP BY state ORDER BY state',
+ table='conflicts',version=version,memory_limit='512MB',threads=1L)
+diagnostic_summary <- dataset_query('source_euro_issue_26105',
+ 'SELECT source, reason, sum(count) AS rows FROM diagnostics GROUP BY source, reason ORDER BY source, rows DESC',
+ table='diagnostics',version=version,memory_limit='512MB',threads=1L)
+expect_s3_class(resources,'tbl_df');expect_s3_class(status,'tbl_df')
+expect_s3_class(contexts,'tbl_df');expect_s3_class(quote_summary,'tbl_df')
+expect_s3_class(diagnostic_summary,'tbl_df');expect_s3_class(conflict_summary,'tbl_df')
+expect_equal(nrow(resources),730L);expect_equal(nrow(status),365L)
+expect_equal(n_distinct(status$fixture_id),365L)
+expect_setequal(status$fixture_id,paste0('26105:',seq_len(365L)))
+expect_equal(nrow(distinct(resources,fixture_id,source)),730L)
+expect_true(all(resources$state %in% c('VERIFIED','EMPTY')))
+expect_true(is.character(quote_types$company_id));expect_s3_class(quote_types$quote_at,'POSIXct')
+expect_equal(sum(quote_summary$rows),sum(status$history_rows))
+expect_equal(sum(conflict_summary$rows[conflict_summary$state=='CONFLICT']),sum(status$conflicts))
+```
+
+名单按原始字节一次读取并冻结SHA，解析后及发布前再次检查文件未变，两份输出收据使用同一冻结身份。缺失来源SHA、名单不满365场或采集中被替换时，客户端在发布前停止。数据通过已有 `collect_euro_issue` 分37批解析，每批保存来源收据与字节哈希；整期汇总核对365场及全部后端实现哈希，发布仍调用既有 `publish_market_issue` 完成全量 `validate_market_tables`，由版本生命周期和原子写入流程落到NAS。
+
+```{r}
+knitr::kable(tibble(dataset=input$publication$dataset,version=version,
+  generated_at_utc=input$receipt$generated_at,parsed_snapshot_complete=input$receipt$complete,
+  model_admission=input$model_admission))
+knitr::kable(count(resources,source,state))
+knitr::kable(quote_summary)
+knitr::kable(count(contexts,source,clock_state))
+knitr::kable(conflict_summary)
+knitr::kable(diagnostic_summary)
+```
+
+报告通过包内DuckDB只读查询汇总大表，每次只注册一张表，内存上限512MB；不将整期报价及冲突JSON全部载入R。包接口仍按版本清单核验文件SHA，报价行数与逐场状态表核对。
+
+报价原始顺序、时间、公司身份、来源哈希与冲突记录均保留。此处不删除赛后报价，也不按赛果挑选公司；后续模型在每场原定开赛前24小时截止上筛选报价。实际采集晚于部分比赛，报价自身时间不能证明当时已经观察到该信息，仍属于历史诊断。完整记录不保证每场有足够的同截止公司，也不保证基本面样本支持充分。
+
+```{r}
+if(params$require_acceptance) {
+ acceptance <- jsonlite::fromJSON('docs/reviews/global-dynamic-26105-euro-publish-20261019/acceptance.json')
+ expect_identical(acceptance$status,'LOCAL_CHECKS_PASSED_GOAL_PENDING')
+ expect_equal(acceptance$full_R_exit_status,0L)
+ expect_true(all(acceptance$R_suites$failed==0L & acceptance$R_suites$errors==0L & acceptance$R_suites$warnings==0L & acceptance$R_suites$skipped==0L))
+ review <- jsonlite::fromJSON('docs/reviews/global-dynamic-26105-euro-publish-20261019/final-review-receipt.json')
+ review$files <- as_tibble(review$files)
+ expect_identical(review$status,'NO_BLOCKING_FINDINGS')
+ expect_equal(nrow(review$files),3L)
+ for(i in seq_len(nrow(review$files))) expect_identical(review$files$sha256[i],digest::digest(file=review$files$path[i],algo='sha256'))
+ knitr::kable(as_tibble(acceptance$R_suites))
+}
+```
+
+代码、测试与完整检查身份将在验收目录记录。初次开发版本因修复输入绑定而主动终止，后续整期R进程因系统OOM终止（内核记录匿名常驻内存15,053,836KiB）；两次原始退出证据均保留。替代流程分批解析并在纯Python进程中调用原发布入口；中断发布目录保留为独立尝试，已完成版本重复执行须通过身份与版本核验。替换后的客户端需重新运行正常集成、完整仓库检查、干净渲染与最终审查。此阶段完成也不等于整个goal完成：基本面与辅助数据、亚盘／大小球、原生λ、RAW／GLOBAL冻结重放及全期结算比较仍须继续。

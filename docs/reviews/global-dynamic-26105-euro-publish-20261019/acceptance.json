@@ -1,0 +1,43 @@
+{
+  "status": "LOCAL_CHECKS_PASSED_GOAL_PENDING",
+  "scope": "Euro full365 capture/semantic publication only;whole forecast/evaluation goal still pending",
+  "full_R_exit_status": 0,
+  "R_suites": [
+    {
+      "suite": "package",
+      "tests": 992,
+      "passed": 9664,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "repository",
+      "tests": 838,
+      "passed": 183469,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "source_verification": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/current-source-verification.json",
+  "source_verification_sha256": "b02eb261259efb20cb6b4f0719101f58dc71363aeb6c9eea9e307eef7b224f8b",
+  "normal_installed_DLL_receipt": "results/global-dynamic-26105-cutoff-acceptance-20261019-control/installed-dll-verification.json",
+  "euro_publication": "results/global-dynamic-26105-euro-publish-20261019-v3/publication.json",
+  "euro_dataset_version": "20261018T193151373411Z",
+  "parse_and_replay": "All37 cache-only batches successful;fixed scheduler independent checkpoint replay exit0",
+  "publisher_tests": "51 passed:actual Euro collection,source_market_publication,and cutoff coverage tests;installed SDK;matching frozen/current test bytes.",
+  "publication_complete_for_model_admission": false,
+  "goal_complete": false,
+  "python_SDK_tests": {
+    "passed": 51,
+    "failed": 0,
+    "skipped": 0,
+    "job": "docs/reviews/global-dynamic-26105-euro-publish-20261019/euro-sdk-python-tests-job.json",
+    "receipt": "docs/reviews/global-dynamic-26105-euro-publish-20261019/euro-sdk-python-tests-exit.json",
+    "log_sha256": "54832cb3782da2c73794926845a818ee0765e8107bdd8ff2b5fca501a236a91d"
+  },
+  "qa_attribution_correction": "Earlier21 referred to fundamentals_audit_bundle archive tests and were incorrectly described as Euro SDK tests. Those archive tests do not support Euro publication acceptance;replaced here by actual51 Euro SDK tests. Prior review logs retained as superseded attribution evidence."
+}
