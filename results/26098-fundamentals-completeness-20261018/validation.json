@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "fixtures": 146,
+  "history_rows_bound_to_metadata": 17407,
+  "source_history_rows_bound_to_actual_bytes": 28375,
+  "cup_table_fixtures": 43,
+  "cup_team_rows": 195,
+  "cup_tables_with_both_target_teams": 43,
+  "qmd_sha256": "349c0acdff1cc6108e079e187f5cfe20d8572d4c29503ca017c26a760104fa5e"
+}

@@ -1,0 +1,219 @@
+{
+  "status": "AUDIT_RECOVERY_STAGE_VERIFIED",
+  "goal_complete": false,
+  "base_dataset_modified": false,
+  "dataset_version": "20261008T143545725496Z",
+  "raw_evidence_relative": "reports/26098-fundamentals-raw-evidence/versions/20261018T140528319250Z",
+  "raw_manifest_sha256": "9f65dd92363b4ebe6cc3e0dd37484c801f0b4277b7ec178951d271cf2440ee6f",
+  "data_report_relative": "reports/26098-fundamentals-completeness/versions/20261018T141412892597Z",
+  "data_report_manifest_sha256": "78ee4266ad04992db2d4da09f0f2eaeebd2b4e2c6854ab932381f9b835c52cf5",
+  "files": [
+    {
+      "path": "quarto/26098_fundamentals_completeness_20261018.qmd",
+      "sha256": "349c0acdff1cc6108e079e187f5cfe20d8572d4c29503ca017c26a760104fa5e"
+    },
+    {
+      "path": "quarto/26098_fundamentals_completeness_20261018.html",
+      "sha256": "186a884313a436fdeb5d5d5caaa6ede53b5d0b09b7111b6904c68f340db66703"
+    },
+    {
+      "path": "quarto/26098_fundamentals_acceptance_20261018.qmd",
+      "sha256": "13040e8208a0c6c230bdcbded487e781194dee9e6a528842e4aabe76b29fa502"
+    },
+    {
+      "path": "tests/test_26098_fundamentals_audit_contract.py",
+      "sha256": "b51dd3621e6a908eef2f682731262cacc8942d81a6633334a856d984306fb561"
+    },
+    {
+      "path": "docs/research/26098-fundamentals-completeness-20261018.md",
+      "sha256": "01d28c38ac5733aa742ba8c0701228d7bd2dab3e84f8c0f999e76a326a9eba58"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/tests.log",
+      "sha256": "cbfbbafafa987503aa8a79c219e0afc899623232b3a898ee5a8c6c6c3a69b08e"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/qmd-contract-tests.log",
+      "sha256": "86029e4668d7e6cee6d9903c44fb079a760f9b8e734ecaef2cb55eb82db7ff0d"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/render-accepted-candidate.log",
+      "sha256": "40c7599f5ea850d800439f21c3cbf240eecbee2cfc40dea90a133b40880e40af"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/storage-check.log",
+      "sha256": "5eaa9c6d0aecb56e253c9f34c7dd531c8c09ff3bba4ea8e890d9c5285f170a96"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/review.log",
+      "sha256": "52e09f067d93d1d3d760fde1d7f7fd31eb6b7a50c1ceadb9951e4473906871bb"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/review-final.log",
+      "sha256": "774a487b237e30b24b28cc902d0d24fb734f740254988ae45fae4f3d05d3c1d0"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/review-accepted-candidate.log",
+      "sha256": "28c5060ad5759ce72b79aa9547e6c2965cad5fe3eba5ba16804d551507369dbf"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/nas-raw-publication.json",
+      "sha256": "777e9612fcfe874e592b5f1d824df42517fbea00fc1401c6c3a566f2d16e3f06"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/nas-report-publication.json",
+      "sha256": "1c6f2e676db1924243524b97af0ed36aade35f07535bc73dd9e96f02055c7d74"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/validation.json",
+      "sha256": "55e02923d9842e16028b90ed17e659432677733920796199540fdcddb29efc63"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/acceptance-render.log",
+      "sha256": "3c517ee8fb483e744c74c83e514a824ff74f1a398dd22a29cda4b8022c0a7f06"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/final-review-prompt.txt",
+      "sha256": "1992d3c88e3be4bb43f02e4f8c184ce3b50373c9259eb8a7726745702be19476"
+    },
+    {
+      "path": "results/26098-fundamentals-completeness-20261018/final-delivery-review.log",
+      "sha256": "f7b1101a8307fa34acebc33a7743e0288cff14c6d65fd6d23756f786e71607b5"
+    }
+  ],
+  "checks": [
+    {
+      "check": "source_parser_and_tables",
+      "command": "PYTHONPATH=packages/beidan/inst/python:$PWD .venv/bin/python -m pytest packages/beidan/tests/python/test_fundamental_tables.py packages/beidan/tests/python/test_unified_sources.py -q",
+      "exit_status": 0,
+      "status": "PASS",
+      "detail": "87 passed; 0 skipped"
+    },
+    {
+      "check": "offline_input_mutation",
+      "command": ".venv/bin/python -m pytest tests/test_26098_fundamentals_audit_contract.py -q",
+      "exit_status": 0,
+      "status": "PASS",
+      "detail": "3 passed; 0 skipped; isolated R startup environment"
+    },
+    {
+      "check": "clean_main_render",
+      "command": "source config/source-extraction.env; R_LIBS_USER=\"$PWD/r_lib\" quarto render quarto/26098_fundamentals_completeness_20261018.qmd -P project_root:\"$PWD\"",
+      "exit_status": 0,
+      "status": "PASS",
+      "detail": "cache/freeze disabled; fixed NAS raw evidence; QMD/parser mutation guards"
+    },
+    {
+      "check": "storage_contract",
+      "command": ".venv/bin/python scripts/check_persistent_data_layout.py --contract config/persistent_data_layout.json",
+      "exit_status": 0,
+      "status": "PASS",
+      "detail": "both configured persistent domains PASS"
+    },
+    {
+      "check": "raw_publication",
+      "command": "beidan_backend.versioning.publish_version; per-file read-back sha256 verification",
+      "exit_status": 0,
+      "status": "PASS",
+      "detail": "439 responses plus receipt index verified; immutable NAS version"
+    },
+    {
+      "check": "recovered_report_publication",
+      "command": "beidan_backend.versioning.publish_version; per-file read-back sha256 verification",
+      "exit_status": 0,
+      "status": "PASS",
+      "detail": "41 report/data members verified; base catalog unmodified"
+    },
+    {
+      "check": "independent_acceptance_QMD_replay",
+      "command": "source config/source-extraction.env; R_LIBS_USER=\"$PWD/r_lib\" quarto render quarto/26098_fundamentals_acceptance_20261018.qmd -P project_root:\"$PWD\"",
+      "exit_status": 0,
+      "status": "PASS",
+      "detail": "Full raw/report member checks; 17,407 effective history metadata links; 28,375 source links; 195 cup rows/43 two-team tables"
+    }
+  ],
+  "summary": [
+    {
+      "metric": "fixtures",
+      "value": 146
+    },
+    {
+      "metric": "both_recent",
+      "value": 146
+    },
+    {
+      "metric": "head_to_head",
+      "value": 140
+    },
+    {
+      "metric": "both_standings_in_base",
+      "value": 91
+    },
+    {
+      "metric": "recoverable_cup_group_tables",
+      "value": 43
+    },
+    {
+      "metric": "cup_team_rows",
+      "value": 195
+    },
+    {
+      "metric": "friendlies_no_league_table",
+      "value": 6
+    },
+    {
+      "metric": "Asian_Games_stage_review",
+      "value": 6
+    },
+    {
+      "metric": "kickoff_conflicts",
+      "value": 1
+    }
+  ],
+  "review": [
+    {
+      "scope": "main QMD static intermediate audit",
+      "command": "codex review (full prompt recorded in review-accepted-candidate.log)",
+      "result": "No blocking findings; prior provenance findings resolved",
+      "log": "results/26098-fundamentals-completeness-20261018/review-accepted-candidate.log"
+    },
+    {
+      "scope": "main and acceptance QMD, tests, contracts and executed evidence",
+      "command": "codex review - < results/26098-fundamentals-completeness-20261018/final-review-prompt.txt",
+      "result": "No blocking findings within audit/recovery stage; reviewer independently checked all bound NAS members and source hashes, did not rerun tests or renders",
+      "log": "results/26098-fundamentals-completeness-20261018/final-delivery-review.log"
+    }
+  ],
+  "remaining": [
+    {
+      "item": "cup_standings",
+      "status": "OPEN",
+      "next_action": "standardize both-source cup tables, enforce contracts, publish authoritative data version"
+    },
+    {
+      "item": "Asian_Games",
+      "status": "OPEN",
+      "next_action": "verify stage/group applicability and available evidence"
+    },
+    {
+      "item": "empty_head_to_head",
+      "status": "OPEN",
+      "next_action": "verify six source-empty results without inventing earlier meetings"
+    },
+    {
+      "item": "kickoff_135",
+      "status": "OPEN",
+      "next_action": "verify full independent evidence; preserve frozen cutoff"
+    },
+    {
+      "item": "package_changes",
+      "status": "OPEN",
+      "next_action": "if implementation changes, fresh normal installation and full required suites"
+    },
+    {
+      "item": "full_goal",
+      "status": "OPEN",
+      "next_action": "remains active; no full FM rerun or completion claim"
+    }
+  ]
+}

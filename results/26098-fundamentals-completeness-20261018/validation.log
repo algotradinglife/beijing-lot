@@ -1,0 +1,24 @@
+$status
+[1] "PASS"
+
+$fixtures
+[1] 146
+
+$history_rows_bound_to_metadata
+[1] 17407
+
+$source_history_rows_bound_to_actual_bytes
+[1] 28375
+
+$cup_table_fixtures
+[1] 43
+
+$cup_team_rows
+[1] 195
+
+$cup_tables_with_both_target_teams
+[1] 43
+
+$qmd_sha256
+[1] "349c0acdff1cc6108e079e187f5cfe20d8572d4c29503ca017c26a760104fa5e"
+

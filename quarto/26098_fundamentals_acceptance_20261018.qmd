@@ -1,0 +1,85 @@
+---
+title: "26098基本面证据恢复：阶段验收"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  acceptance_relative: "results/26098-fundamentals-completeness-20261018/acceptance.json"
+---
+
+本入口验收完备度盘点和原始证据恢复，不代表整期数据已补全。43场杯赛积分原表尚待规范解析及发布；完整goal仍在推进。基础数据版本和冻结预测未更改。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+a <- jsonlite::fromJSON(file.path(root,params$acceptance_relative))
+stopifnot(a$status=="AUDIT_RECOVERY_STAGE_VERIFIED",!a$goal_complete,!a$base_dataset_modified)
+files <- as_tibble(a$files)
+for(i in seq_len(nrow(files))) stopifnot(digest::digest(file=file.path(root,files$path[i]),algo="sha256")==files$sha256[i])
+checks <- as_tibble(a$checks)
+stopifnot(all(checks$exit_status==0L),all(checks$status=="PASS"))
+raw_root <- file.path(Sys.getenv("BEIDAN_PARQUET_ROOT"),a$raw_evidence_relative)
+stopifnot(digest::digest(file=file.path(raw_root,"asset-manifest.json"),algo="sha256")==a$raw_manifest_sha256)
+raw_manifest <- jsonlite::fromJSON(file.path(raw_root,"asset-manifest.json"))
+for(name in names(raw_manifest$members)) stopifnot(digest::digest(file=file.path(raw_root,name),algo="sha256")==raw_manifest$members[[name]])
+data_root <- file.path(Sys.getenv("BEIDAN_PARQUET_ROOT"),a$data_report_relative)
+stopifnot(digest::digest(file=file.path(data_root,"asset-manifest.json"),algo="sha256")==a$data_report_manifest_sha256)
+data_manifest <- jsonlite::fromJSON(file.path(data_root,"asset-manifest.json"))
+for(name in names(data_manifest$members)) stopifnot(digest::digest(file=file.path(data_root,name),algo="sha256")==data_manifest$members[[name]])
+library(beidan,lib.loc=file.path(root,"r_lib"))
+h <- read_dataset("source_issue_26098","history",version=a$dataset_version,root=Sys.getenv("BEIDAN_PARQUET_ROOT"))
+m <- read_dataset("source_issue_26098","match",version=a$dataset_version,root=Sys.getenv("BEIDAN_PARQUET_ROOT"))
+provenance <- read_dataset("source_issue_26098","provenance",version=a$dataset_version,root=Sys.getenv("BEIDAN_PARQUET_ROOT"))
+metadata <- as_tibble(jsonlite::fromJSON(file.path(data_root,"data/history-metadata.json"))) |> mutate(scope=recode(block,h_data="home_recent",a_data="away_recent",v_data="head_to_head"))
+stopifnot(!anyDuplicated(metadata[c("fixture_id","source","scope","match_id")]))
+joined <- h |> left_join(metadata,by=c("fixture_id","selected_source"="source","scope","match_id"),relationship="one-to-one")
+stopifnot(nrow(joined)==17407L,all(!is.na(joined$competition)),all(!is.na(joined$data_sha256)))
+source_bound <- metadata |> left_join(provenance |> select(fixture_id,source,url,sha256),by=c("fixture_id","source","data_url"="url"),relationship="many-to-one")
+stopifnot(nrow(source_bound)==28375L,all(source_bound$data_sha256==source_bound$sha256))
+cups <- jsonlite::fromJSON(file.path(data_root,"data/cup-table-evidence.json"),simplifyVector=FALSE)$rows
+cup_team_rows <- list()
+for(row in cups) {
+ if(row$row_index==0L) {stopifnot(identical(unlist(row$cells,use.names=FALSE),c("排名","球队","总","胜","平","负","得","失","净","积分")));next}
+ cells <- unlist(row$cells,use.names=FALSE)
+ stopifnot(length(cells)==10L,length(row$links)==1L)
+ rawnum <- cells[c(1L,3:10)]
+ stopifnot(all(str_detect(rawnum,"^-?[0-9]+$")))
+ nums <- as.integer(rawnum)
+ stopifnot(!anyNA(nums),nums[1]>0L,nums[2]==sum(nums[3:5]),nums[6]-nums[7]==nums[8])
+ href <- row$links[[1]]$href
+ stopifnot(str_detect(href,"^//zq[.]titan007[.]com/cn/team/Summary/[1-9][0-9]*[.]html$"))
+ cup_team_rows[[length(cup_team_rows)+1L]] <- tibble(fixture_id=row$fixture_id,team_id=str_match(href,"/([0-9]+)[.]html$")[,2])
+}
+ct <- bind_rows(cup_team_rows)
+stopifnot(!anyDuplicated(ct),nrow(ct)==195L,n_distinct(ct$fixture_id)==43L)
+cup_coverage <- ct |> left_join(m |> select(fixture_id,home_id,away_id),by="fixture_id",relationship="many-to-one") |> group_by(fixture_id) |> summarise(target_teams=sum(team_id%in%c(first(home_id),first(away_id))),.groups="drop")
+stopifnot(all(cup_coverage$target_teams==2L))
+
+```
+
+## 检查结果
+
+```{r}
+checks |> select(check,command,exit_status,status,detail)
+as_tibble(a$summary)
+```
+
+87项现有解析/表结构测试和3项离线QMD输入篡改回归测试分开报告。测试只验证本阶段：未修改包实现，因此未将这些检查描述成包级完整安装与全套验收。NAS原始证据的440个成员（439份正文加采集清单）在此再次逐文件验证；asset-manifest自身另行绑定SHA。恢复结果的41个成员也逐文件核验；随后独立检查17,407条有效历史的赛事元数据关联、28,375条逐来源历史的实际正文绑定，以及43张杯赛积分表195行球队数据的数字关系和双方原生ID覆盖。
+
+## 审查及局限
+
+```{r}
+as_tibble(a$review)
+files
+as_tibble(a$remaining)
+```
+
+首次审查的JS来源绑定、报告自身代码绑定，以及第二次审查的采集清单哈希验证问题已修复；最终审查记录必须与所列文件哈希共同阅读。原始登记时间只有秒精度，原始缓存的微秒时间另外保留并通过冻结清单哈希绑定。早期两个离线负例因R启动时读取项目`.Renviron`而命中错误的测试根，已通过显式隔离R启动环境修正并重跑，不能算作最初已通过。
+
+全部后采证据保持历史代理，不能当作赛前已知信息。#135只有独立搜索片段支持Titan的计划时间，正文抓取未成功，实际开球时间仍未裁决。

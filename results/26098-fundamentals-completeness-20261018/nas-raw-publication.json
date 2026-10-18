@@ -1,0 +1,28 @@
+{
+  "publication": {
+    "label_version": "20261018T140528319250Z",
+    "status": "published",
+    "record": {
+      "raw_responses": 439,
+      "files": 441,
+      "asset_manifest_sha256": "9f65dd92363b4ebe6cc3e0dd37484c801f0b4277b7ec178951d271cf2440ee6f",
+      "label_version": "20261018T140528319250Z",
+      "content_digest": "5d40f9b31d7b13af690aed61e11c2967da00e2071a0d9625bcfce1ce1d2a9dd7",
+      "directory": "/mnt/nas/Data/beijing-lot/reports/26098-fundamentals-raw-evidence/versions/20261018T140528319250Z"
+    },
+    "versions": [
+      "20261018T140528319250Z"
+    ],
+    "current": {
+      "schema": "beijing_lot_version_v1",
+      "label_version": "20261018T140528319250Z",
+      "asset_manifest_sha256": "9f65dd92363b4ebe6cc3e0dd37484c801f0b4277b7ec178951d271cf2440ee6f",
+      "content_digest": "5d40f9b31d7b13af690aed61e11c2967da00e2071a0d9625bcfce1ce1d2a9dd7",
+      "directory": "/mnt/nas/Data/beijing-lot/reports/26098-fundamentals-raw-evidence/versions/20261018T140528319250Z",
+      "files": 441,
+      "raw_responses": 439
+    }
+  },
+  "verified_members": 440,
+  "directory": "/mnt/nas/Data/beijing-lot/reports/26098-fundamentals-raw-evidence/versions/20261018T140528319250Z"
+}

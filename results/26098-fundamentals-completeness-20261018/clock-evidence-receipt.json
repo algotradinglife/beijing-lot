@@ -1,0 +1,23 @@
+{
+  "fixture_id": "26098:135",
+  "target_url": "https://futnsoccer.com/2026/09/26/where-to-watch-necaxa-vs-club-america/",
+  "retrieval": "agent-reach/Exa web_search_exa",
+  "query": "Necaxa Club America September 27 2026 kickoff 2997428",
+  "search_response_sha256": "c8e8eb0de4df58bcdf9574483aa3aec221b8a94a819a5052ca7ca8aa6efae166",
+  "search_response_written_at_utc": "2026-10-18T14:03:09.758815+00:00",
+  "reported_scheduled_time": "2026-09-27T23:10:00 America/New_York",
+  "converted_scheduled_utc": "2026-09-28T03:10:00+00:00",
+  "jina_page_fetch": {
+    "exit_status": 28,
+    "reason": "Connection timed out after 45002 milliseconds"
+  },
+  "web_reader_fallback": {
+    "exit_status": 1,
+    "reason": "Unknown MCP server 'web-reader'",
+    "response_sha256": "7c4440d6f3e19a624b1b34c574b16eb39977daea391df868050f3f3ec0dcaada"
+  },
+  "disposition": "SEARCH_EXCERPT_CORROBORATES_TITAN_SCHEDULE_FULL_PAGE_NOT_VERIFIED_KEEP_BASE_CONFLICT",
+  "actual_kickoff_verified": false,
+  "prospective_admission": false,
+  "base_dataset_modified": false
+}

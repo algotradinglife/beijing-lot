@@ -1,0 +1,7 @@
+Read-only final review of ONLY these delivery files and explicitly bound receipts:
+- quarto/26098_fundamentals_completeness_20261018.qmd
+- quarto/26098_fundamentals_acceptance_20261018.qmd
+- tests/test_26098_fundamentals_audit_contract.py
+- docs/research/26098-fundamentals-completeness-20261018.md
+- results/26098-fundamentals-completeness-20261018/acceptance.json and logs
+No editing, agents, broad filesystem searches, full-period parser replays, or unrelated changes. Check source and auxiliary provenance, immutable manifest/receipt binding, source/QMD hashes, data contracts, honest scope, offline negative regressions, and executed/render evidence. The acceptance QMD independently validates NAS members and recovered histories/cup table facts. Full goal remains incomplete: 43 cup tables are recovered evidence, not yet authoritative normalized base data; no package changes or frozen model updates. Identify concrete blocking findings or explicitly state no blocking findings within this audit/recovery-stage scope. Distinguish static review from observed execution evidence. Preserve all unrelated work.

@@ -1,0 +1,191 @@
+---
+title: "26098期核心基本面完备度及缓存恢复"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  version: "20261008T143545725496Z"
+  manifest_sha256: "8150ae2bf03bbb28bc7c012b0f1271bd81ce05de341e00630c50de7b0fdcfe00"
+  output_relative: "26098-fundamentals-completeness-20261018"
+  raw_evidence_relative: "reports/26098-fundamentals-raw-evidence/versions/20261018T140528319250Z"
+  raw_manifest_sha256: "9f65dd92363b4ebe6cc3e0dd37484c801f0b4277b7ec178951d271cf2440ee6f"
+---
+
+本报告检查26098整期146场的核心事实，而非重新预测。输入固定为NAS已登记版本；伤停、阵容为次要项。历史页面是在比赛之后采集，所有恢复字段仍为历史代理证据，不证明赛前可用，不修改冻结预测。读取基本面Parquet通过包接口；原始响应由原SQLite缓存按既有溯源记录的URL、来源、采集时间（登记表为秒精度）与SHA导出并冻结在NAS。本报告按固定NAS证据版本回放，不依赖工作缓存，不选择后来页面替换旧证据。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root, mustWork=TRUE)
+qmd_path <- file.path(root,"quarto/26098_fundamentals_completeness_20261018.qmd")
+qmd_hash_before <- digest::digest(file=qmd_path,algo="sha256")
+parser_path <- file.path(root,"packages/beidan/inst/python/beidan_backend/fundamentals.py")
+parser_hash_before <- digest::digest(file=parser_path,algo="sha256")
+library(beidan, lib.loc=file.path(root,"r_lib"))
+stopifnot(nzchar(Sys.getenv("BEIDAN_PARQUET_ROOT")),nzchar(Sys.getenv("BEIDAN_HOT_ROOT")))
+nas <- normalizePath(Sys.getenv("BEIDAN_PARQUET_ROOT"),mustWork=TRUE)
+output <- file.path(Sys.getenv("BEIDAN_HOT_ROOT"),params$output_relative)
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+manifest_path <- file.path(nas,"datasets/source_issue_26098/versions",params$version,"manifest.json")
+stopifnot(digest::digest(file=manifest_path,algo="sha256")==params$manifest_sha256)
+raw_input <- file.path(nas,params$raw_evidence_relative)
+stopifnot(digest::digest(file=file.path(raw_input,"asset-manifest.json"),algo="sha256")==params$raw_manifest_sha256)
+raw_manifest <- jsonlite::fromJSON(file.path(raw_input,"asset-manifest.json"))
+stopifnot(raw_manifest$dataset=="source_issue_26098",raw_manifest$version==params$version,raw_manifest$base_manifest_sha256==params$manifest_sha256,digest::digest(file=file.path(raw_input,"raw-receipts.json"),algo="sha256")==raw_manifest$members[["raw-receipts.json"]])
+manifest <- dataset_manifest("source_issue_26098",version=params$version,root=nas)
+tables <- list()
+for(table in names(manifest$tables)) {
+ tables[[table]] <- read_dataset("source_issue_26098",table,version=params$version,root=nas,verify=TRUE)
+ stopifnot(is_tibble(tables[[table]]),nrow(tables[[table]])==manifest$tables[[table]]$rows)
+}
+m <- tables$match; h <- tables$history; coverage <- tables$coverage
+stopifnot(nrow(m)==146L,!anyDuplicated(m$fixture_id),!anyDuplicated(h[c("fixture_id","scope","match_id")] ),all(!is.na(h$home_score)),all(!is.na(h$away_score)))
+write_csv(tables$provenance,file.path(output,"provenance.csv"))
+write_csv(m,file.path(output,"identities.csv"))
+Sys.setenv(RETICULATE_PYTHON=file.path(root,".venv/bin/python"))
+reticulate::use_python(Sys.getenv("RETICULATE_PYTHON"),required=TRUE)
+```
+
+## 核心覆盖
+
+```{r}
+history_summary <- h |> group_by(scope) |> summarise(rows=n(),fixtures=n_distinct(fixture_id),minimum=min(table(fixture_id)),median=median(as.numeric(table(fixture_id))),maximum=max(table(fixture_id)),.groups="drop")
+history_summary
+history_counts <- h |> count(fixture_id,scope) |> pivot_wider(names_from=scope,values_from=n,values_fill=0L)
+standing_counts <- tables$standings |> count(fixture_id,name="standing_sides")
+fixture_audit <- m |> left_join(history_counts,by="fixture_id",relationship="one-to-one") |> left_join(standing_counts,by="fixture_id",relationship="one-to-one") |> mutate(standing_sides=replace_na(standing_sides,0L))
+stopifnot(nrow(fixture_audit)==146L,all(fixture_audit$home_recent>0L),all(fixture_audit$away_recent>0L),sum(fixture_audit$standing_sides==2L)==91L)
+fixture_audit |> summarise(fixtures=n(),complete_team_identity=sum(!is.na(provider_id)&!is.na(home_id)&!is.na(away_id)),kickoff_present=sum(!is.na(kickoff_at)),both_recent=sum(home_recent>0&away_recent>0),head_to_head_present=sum(head_to_head>0),both_standings=sum(standing_sides==2L))
+```
+
+双方近期战绩均已保存。覆盖CONFLICT与历史比分冲突分别统计，不能因两源条数不同将整场已有历史一概视作缺失。没有交锋记录也不能直接认定采集失败。
+
+```{r}
+conflict_summary <- tables$conflicts |> mutate(category=case_when(str_detect(field,"^history:.*:coverage$")~"history_count",str_detect(field,"^history:")~"history_row",TRUE~field)) |> count(category)
+conflict_summary
+h |> count(scope,state)
+coverage |> count(resource,state)
+```
+
+## 原始缓存核验与恢复字段
+
+使用包内权威分析页解析器，核验同场provider及主客队ID；保留精确来源版本，不写回基础表。恢复赛事标签/链接和中立场标记为逐来源证据；缺少标记不填false。历史赛事ID/标签来自已解析blocks的原始列，中立场只接受显式“(中)”或“（中）”标记，其余为未知而非已证实非中立场。
+
+```{python}
+#| include: false
+import csv, hashlib, json, sqlite3, sys
+from pathlib import Path
+sys.path.insert(0,str(Path(r.root)/'packages/beidan/inst/python'))
+from beidan_backend.fundamentals import analysis_record, plain_text
+from bs4 import BeautifulSoup
+out=Path(r.output)
+with (out/'provenance.csv').open() as f: provenance=list(csv.DictReader(f))
+with (out/'identities.csv').open() as f: identities={row['fixture_id']:row for row in csv.DictReader(f)}
+raw_root=Path(r.raw_input)/'raw'
+raw_receipts=json.loads((Path(r.raw_input)/'raw-receipts.json').read_text())
+archive_index={(p['fixture_id'],p['source'],p['url'],p['sha256']):p for p in raw_receipts}
+assert len(archive_index)==len(raw_receipts)==len(provenance)==439
+bodies={}; source_context=[]; history_metadata=[]; parse_failures=[]; cup_summary=[]; cup_rows=[]
+from datetime import datetime
+for p in provenance:
+ key=(p['fixture_id'],p['source'],p['url'],p['sha256'])
+ archived=archive_index[key]
+ assert archived['path']=='raw/'+p['sha256']+'.bin'
+ assert datetime.fromisoformat(archived['capture_observed_at']).replace(microsecond=0)==datetime.fromisoformat(p['observed_at'].replace('Z','+00:00'))
+ body=(Path(r.raw_input)/archived['path']).read_bytes()
+ assert len(body)==archived['bytes'] and hashlib.sha256(body).hexdigest()==p['sha256']
+ bodies[(p['fixture_id'],p['source'],p['url'])]=body
+for fixture,identity in identities.items():
+ for source in ('titan','nowscore'):
+  url=(f"https://zq.titan007.com/analysis/{identity['provider_id']}cn.htm" if source=='titan' else f"https://live.nowscore.com/analysis/{identity['provider_id']}cn.html")
+  p=next(x for x in provenance if (x['fixture_id'],x['source'],x['url'])==(fixture,source,url))
+  body=bodies[(fixture,source,url)]
+  auxiliary=bodies.get((fixture,source,f"https://live.nowscore.com/analysisJs/data{identity['provider_id']}.js"))
+  try:
+   record=analysis_record(body,source=source,provider_id=identity['provider_id'],auxiliary_raw=auxiliary)
+  except (ValueError,KeyError,TypeError) as error:
+   parse_failures.append({'fixture_id':fixture,'source':source,'error':str(error),'sha256':p['sha256']}); continue
+  assert (record['home_id'],record['away_id'])==(identity['home_id'],identity['away_id'])
+  soup=BeautifulSoup(body,'html.parser')
+  if source=='titan':
+   cup_block=soup.find(id='cupScore')
+   cup_tables=cup_block.find_all('table') if cup_block else []
+   cup_summary.append({'fixture_id':fixture,'cup_table_count':len(cup_tables),'analysis_sha256':p['sha256']})
+   for ti,table in enumerate(cup_tables):
+    for ri,tr in enumerate(table.find_all('tr')):
+     cup_rows.append({'fixture_id':fixture,'table_index':ti,'row_index':ri,'cells':[td.get_text(' ',strip=True) for td in tr.find_all(['td','th'],recursive=False)],'links':[{'text':a.get_text(' ',strip=True),'href':a['href']} for a in tr.find_all('a',href=True)],'analysis_sha256':p['sha256']})
+  links=soup.select('a.LName[href]') if source=='titan' else []
+  competition=plain_text(str(links[0])) if len(links)==1 else None
+  competition_url=links[0]['href'] if len(links)==1 else None
+  header=soup.find('a',href=f"//zq.titan007.com/cn/team/Summary/{identity['home_id']}.html") if source=='titan' else soup.find('a',href=f"//info.nowscore.com/cn/team/Summary.aspx?teamid={identity['home_id']}")
+  header_text=header.get_text(' ',strip=True) if header else None
+  explicit_neutral=bool(header_text and ('(中)' in header_text or '（中）' in header_text))
+  explicit_home=bool(header_text and ('(主)' in header_text or '（主）' in header_text))
+  route=('CUP_ROUTE' if competition_url and '/cup_match/' in competition_url else 'LEAGUE_ROUTE' if competition_url and '/league_match/' in competition_url else 'UNKNOWN')
+  source_context.append({'fixture_id':fixture,'source':source,'competition':competition,'competition_url':competition_url,'source_route':route,'home_header':header_text,'neutral':True if explicit_neutral else False if explicit_home else None,'kickoff_utc':record['kickoff_utc'],'url':url,'observed_at':p['observed_at'],'sha256':p['sha256'],'availability_class':'HISTORICAL_PROXY','prospective_admission':False})
+  data_url=f"https://live.nowscore.com/analysisJs/data{identity['provider_id']}.js" if record['blocks_from_auxiliary'] else url
+  data_receipt=next(x for x in provenance if (x['fixture_id'],x['source'],x['url'])==(fixture,source,data_url))
+  for item in record['history']:
+   row=record['blocks'][item['block']][item['ordinal']]
+   history_metadata.append({'fixture_id':fixture,'source':source,'block':item['block'],'match_id':item['history_id'],'competition_id':str(row[1]),'competition':plain_text(str(row[2])) or None,'explicit_neutral':True if ('(中)' in str(row[5]) or '（中）' in str(row[5])) else None,'analysis_sha256':p['sha256'],'data_url':data_url,'data_sha256':data_receipt['sha256'],'data_observed_at':data_receipt['observed_at'],'availability_class':'HISTORICAL_PROXY','prospective_admission':False})
+(out/'raw-receipts.json').write_text(json.dumps(raw_receipts,ensure_ascii=False,indent=2))
+(out/'source-context.json').write_text(json.dumps(source_context,ensure_ascii=False,indent=2))
+(out/'history-metadata.json').write_text(json.dumps(history_metadata,ensure_ascii=False,indent=2))
+(out/'cup-table-evidence.json').write_text(json.dumps({'summary':cup_summary,'rows':cup_rows},ensure_ascii=False,indent=2))
+(out/'parse-failures.json').write_text(json.dumps(parse_failures,ensure_ascii=False,indent=2))
+assert len(raw_receipts)==439
+assert not parse_failures,parse_failures
+assert len(source_context)==292
+```
+
+```{r}
+context <- jsonlite::fromJSON(file.path(output,"source-context.json")) |> as_tibble()
+metadata <- jsonlite::fromJSON(file.path(output,"history-metadata.json")) |> as_tibble()
+stopifnot(nrow(context)==292L,!anyDuplicated(context[c("fixture_id","source")]))
+context |> group_by(source) |> summarise(fixtures=n(),competition_labels=sum(!is.na(competition)),explicit_neutral=sum(neutral%in%TRUE),explicit_home=sum(neutral%in%FALSE),venue_unknown=sum(is.na(neutral)),.groups="drop")
+cup_evidence <- jsonlite::fromJSON(file.path(output,"cup-table-evidence.json"))
+cup_summary <- as_tibble(cup_evidence$summary)
+stopifnot(nrow(cup_summary)==146L,!anyDuplicated(cup_summary$fixture_id),sum(cup_summary$cup_table_count>0L)==43L)
+fixture_audit <- fixture_audit |> left_join(cup_summary |> select(fixture_id,cup_table_count),by="fixture_id",relationship="one-to-one")
+fixture_audit <- fixture_audit |> left_join(context |> filter(source=="titan") |> select(fixture_id,competition,source_route,neutral),by="fixture_id",relationship="one-to-one") |> mutate(standing_review=case_when(standing_sides==2L~"PRESENT",cup_table_count>0L~"PARSER_OMITTED_CUP_TABLE",competition=="国际友谊"~"LEAGUE_TABLE_NOT_APPLICABLE",source_route=="CUP_ROUTE"~"CUP_ROUTE_REVIEW_STAGE_AND_GROUP_TABLE",TRUE~"MISSING_REQUIRES_REVIEW"))
+fixture_audit |> count(source_route,standing_review)
+missing_standings <- fixture_audit |> filter(standing_sides<2L) |> select(fixture_id,home,away,competition,source_route,standing_review)
+missing_standings
+```
+
+43场已有杯赛积分原表却未进入标准表（欧国联30场、欧青U21外13场），这是可恢复的解析缺口。其余6场国际友谊不适用联赛表，6场亚运赛事仍待赛制与分组资料核验。杯赛入口中另有1场保留了双方联赛排名，不能将其视作杯赛小组积分。原表证据留存，但本轮没有改写基础表。
+
+## 时间与交锋缺口
+
+```{r}
+tables$fixture_schedule |> filter(fixture_id=="26098:135") |> select(fixture_id,source,resource,kickoff_at,kickoff_date,kickoff_hhmm,state)
+fixture_audit |> filter(head_to_head==0L) |> select(fixture_id,home,away,competition)
+tables$conflicts |> filter(field=="kickoff_utc")
+```
+
+时间差异保留原值，不因比赛已结束而移动原截止点。日期早于开球日只作为粗检查，不代表标签已在赛前可用，也不能证明90分钟口径。杯赛加时/点球范围须继续核验。
+
+```{r}
+chronology_diagnostic <- h |> left_join(m |> select(fixture_id,kickoff_at),by="fixture_id",relationship="many-to-one") |> mutate(before_fixture_day=event_date<as.Date(kickoff_at,tz="Asia/Shanghai")) |> count(scope,before_fixture_day)
+chronology_diagnostic
+metadata |> group_by(source) |> summarise(rows=n(),competition_ids=sum(!is.na(competition_id)),competition_labels=sum(!is.na(competition)),explicit_neutral=sum(explicit_neutral%in%TRUE),.groups="drop")
+write_csv(fixture_audit,file.path(output,"fixture-audit.csv"))
+write_csv(missing_standings,file.path(output,"missing-standings.csv"))
+write_csv(conflict_summary,file.path(output,"conflict-summary.csv"))
+write_csv(history_summary,file.path(output,"history-summary.csv"))
+write_csv(context,file.path(output,"source-context.csv"))
+write_csv(metadata,file.path(output,"history-metadata.csv"))
+write_csv(chronology_diagnostic,file.path(output,"chronology-diagnostic.csv"))
+stopifnot(digest::digest(file=qmd_path,algo="sha256")==qmd_hash_before,digest::digest(file=parser_path,algo="sha256")==parser_hash_before)
+input_receipt <- list(dataset="source_issue_26098",version=params$version,manifest_sha256=params$manifest_sha256,raw_receipts=439L,parsed_sources=292L,source_code_sha256=digest::digest(file=file.path(root,"packages/beidan/inst/python/beidan_backend/fundamentals.py"),algo="sha256"),schema_code_sha256=digest::digest(file=file.path(root,"packages/beidan/inst/python/beidan_backend/fundamental_tables.py"),algo="sha256"),qmd_sha256=digest::digest(file=file.path(root,"quarto/26098_fundamentals_completeness_20261018.qmd"),algo="sha256"),parameters=params,raw_evidence_relative=params$raw_evidence_relative,raw_manifest_sha256=params$raw_manifest_sha256,scope="READ_ONLY_BASE_DATASET_NAS_EVIDENCE_RECOVERY",prospective_admission=FALSE,generated_at=format(Sys.time(),tz="UTC",usetz=TRUE))
+jsonlite::write_json(input_receipt,file.path(output,"input-receipt.json"),auto_unbox=TRUE,pretty=TRUE)
+```
+
+## 当前验收边界
+
+本报告恢复逐来源赛事及历史赛事元数据证据，不覆盖既有基础表，也未将后采字段准入赛前预测。尚待核验：43场杯赛积分原表的标准化入库及6场亚运资料、6场空交锋的来源含义、#135时间冲突、完整中立场判定与历史比分常规时间口径。NAS发布与最终审查凭证单独记录；未完成前不宣称整期补全验收通过。

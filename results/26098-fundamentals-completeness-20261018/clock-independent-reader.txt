@@ -1,0 +1,11 @@
+[mcporter] Unknown MCP server 'web-reader'.
+Error: Unknown MCP server 'web-reader'.
+    at McpRuntime.connect (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/runtime.js:184:19)
+    at McpRuntime.callTool (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/runtime.js:133:43)
+    at KeepAliveRuntime.callTool (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/daemon/runtime-wrapper.js:56:26)
+    at attemptCall (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/cli/call-command.js:299:50)
+    at invokeWithAutoCorrection (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/cli/call-command.js:295:12)
+    at invokePreparedCall (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/cli/call-command.js:101:28)
+    at handleCall (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/cli/call-command.js:21:30)
+    at async runCli (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/cli.js:136:13)
+    at async main (file:///home/drwho1985/.local/lib/node_modules/mcporter/dist/cli.js:194:5)

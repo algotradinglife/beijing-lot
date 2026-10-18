@@ -1,0 +1,14 @@
+
+
+processing file: audit.qmd
+1/15                  
+2/15 [unnamed-chunk-1]
+Error:
+! digest::digest(file = manifest_path, algo = "sha256") == params$manifest_sha256 is not TRUE
+Backtrace:
+    ▆
+ 1. └─base::stopifnot(...)
+
+Quitting from audit.qmd:21-46 [unnamed-chunk-1]
+Execution halted
+WARN: Error encountered when rendering files

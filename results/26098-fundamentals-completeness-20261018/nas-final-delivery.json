@@ -1,0 +1,29 @@
+{
+  "directory": "/mnt/nas/Data/beijing-lot/reports/26098-fundamentals-acceptance/versions/20261018T141729645304Z",
+  "asset_manifest_sha256": "e8a3e5b2c902baa902119fcee9c5745a0adeec0fa2abe31fd9265a4b6869ea3c",
+  "verified_members": 37,
+  "publication": {
+    "label_version": "20261018T141729645304Z",
+    "status": "published",
+    "record": {
+      "files": 38,
+      "asset_manifest_sha256": "e8a3e5b2c902baa902119fcee9c5745a0adeec0fa2abe31fd9265a4b6869ea3c",
+      "goal_complete": false,
+      "label_version": "20261018T141729645304Z",
+      "content_digest": "9a78a4eb66f71a82b57de4ce217aea15897241fc6337e1d3b4c4ad64d49149b8",
+      "directory": "/mnt/nas/Data/beijing-lot/reports/26098-fundamentals-acceptance/versions/20261018T141729645304Z"
+    },
+    "versions": [
+      "20261018T141729645304Z"
+    ],
+    "current": {
+      "schema": "beijing_lot_version_v1",
+      "label_version": "20261018T141729645304Z",
+      "asset_manifest_sha256": "e8a3e5b2c902baa902119fcee9c5745a0adeec0fa2abe31fd9265a4b6869ea3c",
+      "content_digest": "9a78a4eb66f71a82b57de4ce217aea15897241fc6337e1d3b4c4ad64d49149b8",
+      "directory": "/mnt/nas/Data/beijing-lot/reports/26098-fundamentals-acceptance/versions/20261018T141729645304Z",
+      "files": 38,
+      "goal_complete": false
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "status": "PASS",
+  "files": [
+    {
+      "path": "quarto/26098_fundamentals_completeness_20261018.html",
+      "sha256": "186a884313a436fdeb5d5d5caaa6ede53b5d0b09b7111b6904c68f340db66703",
+      "rendered_tibbles": 13,
+      "required_labels": [
+        "26098",
+        "43",
+        "home_recent",
+        "17407"
+      ],
+      "required_labels_present": true,
+      "presentation": "tibble console tables in preformatted output"
+    },
+    {
+      "path": "quarto/26098_fundamentals_acceptance_20261018.html",
+      "sha256": "317945b6061629b9966a3ea58a78ed97283586ab7c87e4bc5d8490ad2226db67",
+      "rendered_tibbles": 5,
+      "required_labels": [
+        "26098",
+        "43",
+        "195",
+        "87",
+        "3"
+      ],
+      "required_labels_present": true,
+      "presentation": "tibble console tables in preformatted output"
+    }
+  ]
+}
