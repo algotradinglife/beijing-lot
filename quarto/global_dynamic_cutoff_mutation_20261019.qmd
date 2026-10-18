@@ -1,0 +1,122 @@
+---
+title: "冻结轮次：截止后数据扰动至选票的不变性验收"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  issue: "26103"
+  round_index: 1
+  artifact_version: "v3"
+  implementation_root: null
+---
+
+本验收使用一个真实冻结轮次，不读取该轮赛果。向整体校准历史注入敌对概率／标签：标签晚于截止、数据晚于截止、恰在截止、目标／未来期号但伪报早时间。随后通过共享时间学习模块重拟合，传播到概率、组合排序和同预算选票。该检查覆盖整体校准至选票；不替代原生λ及盘口解析的独立质控，也不代表全部轮次已完成扰动实验。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(beidan);library(testthat)
+root <- normalizePath(params$project_root,mustWork=TRUE)
+client_path <- file.path(root,'quarto/global_dynamic_cutoff_mutation_20261019.qmd')
+client_sha <- digest::digest(file=client_path,algo='sha256')
+expect_identical(params$artifact_version,'v3')
+implementation <- normalizePath(params$implementation_root,mustWork=TRUE)
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+out <- file.path(root,'results/global-dynamic-walkforward-20261018',params$issue)
+fpath <- file.path(out,'frozen-forecasts.rds');rpath <- file.path(out,'frozen-rounds.rds')
+fr <- jsonlite::fromJSON(file.path(out,'forecast-replay.json'));sr <- jsonlite::fromJSON(file.path(out,'selection-replay.json'))
+expect_identical(fr$sha256,digest::digest(file=fpath,algo='sha256'))
+expect_identical(sr$sha256,digest::digest(file=rpath,algo='sha256'))
+expect_identical(fr$status,'FULL_IDENTICAL_REPLAY');expect_identical(sr$status,'FULL_IDENTICAL_REPLAY')
+x <- readRDS(fpath);batch <- readRDS(rpath);z <- batch$rounds[[params$round_index]]
+expect_false(x$target_labels_opened);expect_false(batch$target_labels_opened)
+expect_identical(batch$forecast_sha256,fr$sha256)
+mutated <- list();checks <- list();fits <- list();histories <- list();clean_fits <- list()
+keys <- unique(map_chr(x$entries[z$fixture_ids],'calibration_key'))
+for(key in keys) {
+ old <- x$calibration[[key]];history <- as_tibble(old$admitted)
+ before <- format(old$cutoff$cutoff_utc-60,'%Y-%m-%dT%H:%M:%OS3Z',tz='UTC')
+ after <- format(old$cutoff$cutoff_utc+60,'%Y-%m-%dT%H:%M:%OS3Z',tz='UTC')
+ boundary <- format(old$cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%OS3Z',tz='UTC')
+ extras <- list()
+ for(scenario in c('late_label','late_data','at_boundary','target_future')) {
+  a <- head(history,3L) |> mutate(fixture_id=paste0('probe_',scenario,'_',row_number()),W=.98,D=.01,L=.01,actual_outcome='W',label_available_ts=before,data_available_ts=before)
+  if(scenario=='late_label')a$label_available_ts <- after
+  if(scenario=='late_data')a$data_available_ts <- after
+  if(scenario=='at_boundary')a$label_available_ts <- boundary
+  if(scenario=='target_future')a$issue_code <- as.character(as.integer(params$issue)+c(0L,1L,3L))
+  extras[[scenario]] <- a
+ }
+ hostile <- bind_rows(history,bind_rows(extras))
+ bindings <- list(frozen_forecasts=fr$sha256,frozen_rounds=sr$sha256,client=client_sha,counterfactual_history=digest::digest(hostile,algo='sha256'))
+ clean_bindings <- bindings;clean_bindings$counterfactual_history <- digest::digest(history,algo='sha256')
+ clean <- beidan:::FitMarginShapeCalibration(history,old$cutoff,old$policy,clean_bindings,implementation,file.path(root,'.venv/bin/python'))
+ fit <- beidan:::FitMarginShapeCalibration(hostile,old$cutoff,old$policy,bindings,implementation,file.path(root,'.venv/bin/python'))
+ expect_equal(fit$admitted |> arrange(fixture_id),history |> arrange(fixture_id),tolerance=1e-12)
+ expect_equal(clean$admitted |> arrange(fixture_id),history |> arrange(fixture_id),tolerance=1e-12)
+ checkmate::assert_string(old$receipt$cache_key,pattern='^[0-9a-f]{64}$')
+ checkmate::assert_string(clean$receipt$cache_key,pattern='^[0-9a-f]{64}$')
+ checkmate::assert_string(fit$receipt$cache_key,pattern='^[0-9a-f]{64}$')
+ expect_false(identical(fit$receipt$cache_key,old$receipt$cache_key))
+ expect_false(identical(fit$receipt$cache_key,clean$receipt$cache_key))
+ expect_false(identical(fit$receipt$source_hashes,clean$receipt$source_hashes))
+ expect_false(identical(fit$receipt$model_cache_binding,clean$receipt$model_cache_binding))
+ clean_fits[[key]] <- clean
+ expect_equal(fit$coefficients,old$coefficients,tolerance=1e-12)
+ expect_equal(fit$coefficients,clean$coefficients,tolerance=1e-12)
+ expect_false(identical(fit$binding,old$binding))
+ fits[[key]] <- fit;histories[[key]] <- hostile
+ for(id in z$fixture_ids) {
+  e <- x$entries[[id]]
+  if(e$calibration_key!=key)next
+  decision <- list(cutoff=e$cutoff,features=e$features,receipt=list(cutoff=e$cutoff,feature_hash=rlang::hash(e$features),max_source_available_utc=e$base$max_source_available_utc))
+  q <- beidan:::PredictMarginShapeCalibration(fit,decision)
+  expect_equal(q,e$GLOBAL,tolerance=1e-12)
+  mutated[[id]] <- q
+ }
+ checks[[key]] <- tibble(calibration_key=key,original_rows=nrow(history),injected_rows=nrow(hostile)-nrow(history),admitted_rows=nrow(fit$admitted),new_binding=fit$binding,original_cache_key=old$receipt$cache_key,clean_cache_key=clean$receipt$cache_key,mutated_cache_key=fit$receipt$cache_key)
+}
+q <- bind_rows(mutated)
+o <- z$outputs$GLOBAL;d <- o$decision;p <- x$policy$rounds
+expect_equal(q |> arrange(fixture_id,outcome),d$probabilities |> arrange(fixture_id,outcome),tolerance=1e-12)
+blocks <- list()
+for(g in unique(z$groups$group_id)) {
+ legs <- z$groups |> filter(group_id==g)
+ support <- q |> filter(fixture_id%in%legs$fixture_id) |> transmute(candidate_id=paste0(g,'|7'),fixture_id,outcome,allowed=TRUE,preference=match(outcome,c('W','D','L')))
+ space <- parlay_enumerate_tickets(legs,q,cutoff=d$cutoff,supports=support,n_legs=7L)
+ blocks[[g]] <- parlay_rank_tickets(space$tickets,space$candidate_tickets,cutoff=d$cutoff,ranking='probability_desc') |> as_tibble() |> select(group_id,ticket_id,probability,rank)
+}
+d$probabilities <- q;d$candidates <- bind_rows(blocks)
+expect_equal(d$candidates,o$decision$candidates,tolerance=1e-12)
+d$source_bindings$counterfactual <- digest::digest(bind_rows(checks),algo='sha256')
+d$source_receipt$probability_hash <- rlang::hash(q)
+d$source_receipt$candidate_hash <- rlang::hash(d$candidates)
+d$source_receipt$source_snapshots <- d$source_bindings[setdiff(names(d$source_bindings),'model')]
+d$input_hash <- NULL;d$input_hash <- rlang::hash(d)
+s <- beidan:::SelectJointOutcomeTickets(d,p$tickets_per_group,p$fixed_start,p$unit_cny,3^p$maximum_pool)
+expect_equal(s$purchases,o$selection$purchases,tolerance=1e-12)
+expect_equal(s$trace,o$selection$trace,tolerance=1e-12)
+artifact_dir <- file.path(root,'results/global-dynamic-cutoff-mutation-20261019',paste0(params$issue,'-round-',params$round_index,'-',params$artifact_version))
+dir.create(artifact_dir,recursive=TRUE,showWarnings=FALSE)
+proof <- list(issue=params$issue,round_index=params$round_index,forecast_sha256=fr$sha256,rounds_sha256=sr$sha256,
+ client_sha256=client_sha,
+ implementation_root=implementation,fits=fits,clean_fits=clean_fits,histories=histories,checks=bind_rows(checks),decision=d,selection=s)
+expect_identical(client_sha,digest::digest(file=client_path,algo='sha256'))
+proof_path <- file.path(artifact_dir,'proof.rds')
+if(file.exists(proof_path))expect_identical(proof,readRDS(proof_path)) else saveRDS(proof,proof_path)
+receipt <- list(status='REAL_ROUND_POST_CUTOFF_MUTATION_INVARIANT',issue=params$issue,round_index=params$round_index,
+ proof_sha256=digest::digest(file=proof_path,algo='sha256'),forecast_sha256=fr$sha256,rounds_sha256=sr$sha256,
+ client_sha256=proof$client_sha256,models=length(fits),fixtures=length(z$fixture_ids),target_labels_opened=FALSE)
+receipt_path <- file.path(artifact_dir,'receipt.json')
+encoded <- as.character(jsonlite::toJSON(receipt,auto_unbox=TRUE,pretty=TRUE,digits=NA))
+if(file.exists(receipt_path))expect_identical(paste(readLines(receipt_path,warn=FALSE),collapse='\n'),encoded) else writeLines(encoded,receipt_path)
+
+knitr::kable(bind_rows(checks))
+knitr::kable(s$purchases |> count(policy,group_id) |> group_by(policy) |> summarise(groups=n(),tickets=sum(n),cost_cny=2*sum(n),.groups='drop'))
+knitr::kable(tibble(issue=params$issue,round=params$round_index,forecast_sha256=fr$sha256,rounds_sha256=sr$sha256,probability_rank_and_purchase_invariance=TRUE))
+```
+
+输入缓存身份会因扰动改变，这是必要行为；不能跨来源身份复用拟合缓存。验收要求的是已准入历史、系数、预测、组合排序、策略选票和轨迹保持一致，而不是不同输入的整份收据字节相同。所有拟合、截止与时间准入均调用现有包及共享时间学习实现，没有复制时间学习逻辑。

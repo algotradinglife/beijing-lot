@@ -1,0 +1,39 @@
+{
+  "status": "TWO_REAL_ROUND_MUTATION_TESTS_REPLAYED_REVIEWED",
+  "scope": "Calibration-to-probabilities,complete7-leg ranking,and four actual selection policies; does not certify native lambda or full-issue prospective validity",
+  "source": {
+    "path": "quarto/global_dynamic_cutoff_mutation_20261019.qmd",
+    "sha256": "a3f0f2cba43230a502c36ac6cd6cf2c0b26aa0d63ec30e7b0fb59eacecb8397d"
+  },
+  "proofs": [
+    {
+      "local_path": "results/global-dynamic-cutoff-mutation-20261019/26103-round-1-v3/proof.rds",
+      "sha256": "6f2b396084db8efcd164391d294d3143f0e967f58c4e2099d5f3a00bed5ea9ee",
+      "models": 6,
+      "fixtures": 12,
+      "NAS_persistence": "PENDING"
+    },
+    {
+      "local_path": "results/global-dynamic-cutoff-mutation-20261019/26104-round-2-v3/proof.rds",
+      "sha256": "9525ffa93b9bf399b49c67c95b24d5f70c7941f6928b7d6fb46972bc9e0ae1ea",
+      "models": 4,
+      "fixtures": 12,
+      "NAS_persistence": "PENDING"
+    }
+  ],
+  "assertions": [
+    "complete sorted admitted history equality",
+    "hostile coefficients equal original and same-implementation clean refit",
+    "probabilities/candidate ranks/purchases/traces unchanged",
+    "clean and hostile source hashes/cache keys/model cache bindings differ",
+    "entire proof RDS identical on fresh replay"
+  ],
+  "target_labels_opened": false,
+  "new_package_changes": false,
+  "goal_complete": false,
+  "remaining": [
+    "archive model proof artifacts to NAS through existing publisher",
+    "finish26105 Euro semantic intake and forecasts/selection/evaluation",
+    "final current-client full-suite validation"
+  ]
+}

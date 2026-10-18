@@ -1,0 +1,12 @@
+{
+  "status": "REAL_ROUND_POST_CUTOFF_MUTATION_INVARIANT",
+  "issue": "26104",
+  "round_index": 2,
+  "proof_sha256": "9525ffa93b9bf399b49c67c95b24d5f70c7941f6928b7d6fb46972bc9e0ae1ea",
+  "forecast_sha256": "3efd5c242960acbb4ba3d985641e1854b1fb038343d649ebaa21ae9d37941a21",
+  "rounds_sha256": "6b40f6bc2ee40561d5950be1c86d07c24851d4436b4daa4d12d5d09abc21e846",
+  "client_sha256": "a3f0f2cba43230a502c36ac6cd6cf2c0b26aa0d63ec30e7b0fb59eacecb8397d",
+  "models": 4,
+  "fixtures": 12,
+  "target_labels_opened": false
+}
