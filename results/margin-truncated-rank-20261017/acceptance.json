@@ -1,0 +1,31 @@
+{
+  "status": "POSTEVENT_TRUNCATED_MARGIN_RANK_DIAGNOSTIC_REVIEWED",
+  "review_command": "codex review; scope and full command preserved in review.log",
+  "review_findings": "No blocking findings; independently verified conditional probabilities and ranks",
+  "render_command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/margin_truncated_rank_20261017.qmd --no-cache -P project_root:$PWD",
+  "render_exit": 0,
+  "checks": {
+    "fixtures": 52,
+    "thresholds": 9,
+    "conditional_rows": 1404,
+    "seven_leg_evaluations": 288,
+    "settled_groups_per_threshold": 24,
+    "rendered_tables": 4,
+    "error_blocks": 0
+  },
+  "limits": [
+    "Postevent descriptive fixed-policy comparison",
+    "Conditional probabilities after margin truncation, not calibrated unconditional forecasts",
+    "Frozen round02 label incomplete",
+    "Original seven-leg fixture groups retained for comparison only",
+    "No new purchases, payouts or model policy adoption"
+  ],
+  "files": {
+    "quarto/margin_truncated_rank_20261017.qmd": "127bae8f97e6ef12c799400da2d4956c87ff5c1943e76e99b7adec747276832a",
+    "quarto/margin_truncated_rank_20261017.html": "d9510b2bc3b0cbb4a058d176812a5d30fc57b745581c8aa5c16ae0cf8323c4e2",
+    "results/margin-truncated-rank-20261017/groups.csv": "d71657f59aa1dd8966aaa438aa2004f8392a3cb9c3c0e2c1d12c261701020d63",
+    "results/margin-truncated-rank-20261017/summary.csv": "16a48960d7dfcfddfe86b010098958547aaebca405cc388c195ba45d17df6e11",
+    "results/margin-truncated-rank-20261017/conditional-probabilities.csv": "864bf5084528f64c4abae1058ffe40fde30a26ab6f0140d419d30d92b262d83d",
+    "results/margin-truncated-rank-20261017/pending-ranks.csv": "00da36ca8e785eb4560156a5cf34b8875d49abea2b14c05eff48fd5ce55ba572"
+  }
+}
