@@ -1,0 +1,39 @@
+{
+  "status": "DESCRIPTIVE_AUDIT_REVIEWED_GOAL_PENDING",
+  "review": "No actionable findings; independently reconciled all730 audit rows and both source hashes",
+  "review_exit": 0,
+  "render_exit": 0,
+  "render_command": "R_PROFILE_USER=/dev/null R_LIBS_USER=\"$PWD/results/margin-first-mapping-20261018/library:$PWD/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\" QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/global_dynamic_26105_line_cutoff_20261019.qmd -P project_root:\"$PWD\" -P hot_root:/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot --execute --no-cache",
+  "html_sha256": "dd9e4b3bad6b60bfe6a2e655bdc7e63bcd07563d4fb5baceafa008ae4592a49d",
+  "files": [
+    {
+      "path": "quarto/global_dynamic_26105_line_cutoff_20261019.qmd",
+      "sha256": "501331ea6a99c287561c96a2850660fc1b4ecb9950063bee4552b5303deb9fd4"
+    },
+    {
+      "path": "results/global-dynamic-26105-line-cutoff-20261019/audit.R",
+      "sha256": "33f55e9a61aa38556db05f8629fe61bcd480fc8efcc43d5f3bad050c3cf73d2b"
+    },
+    {
+      "path": "results/global-dynamic-26105-line-cutoff-20261019/receipt.json",
+      "sha256": "9efd32c95096cc915f8c269aff1f17deaf1c3abfb524f84278fad1e9b409f288"
+    },
+    {
+      "path": "results/global-dynamic-26105-line-cutoff-20261019/fixture-audit.csv",
+      "sha256": "e89d35d508455d9c3fa44176923f73b57b1432b4309787089ed250f99cb8fd19"
+    },
+    {
+      "path": "results/global-dynamic-26105-line-cutoff-20261019/summary.csv",
+      "sha256": "7e406100b4b065f3248d56b7a0054b22248a4a3066571f769fa2f3d784d6ed7b"
+    },
+    {
+      "path": "results/global-dynamic-26105-line-cutoff-20261019/joint-availability.csv",
+      "sha256": "4645a126d64c175239b85675e77abdedef0e27c7d470561af998263e52f56be6"
+    }
+  ],
+  "limits": [
+    "No model admission",
+    "No calibration or ticket selection",
+    "No whole issue settlement evaluation"
+  ]
+}

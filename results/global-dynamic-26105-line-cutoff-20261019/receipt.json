@@ -1,0 +1,7 @@
+{
+  "parsed_sha256": "e67c7fadce7f267d8189594a32fc6a6e7357f85aa9d672e2795bf21dd931f151",
+  "inventory_sha256": "99d9d6763e43d66f49bdf81d4c952d4ac52e558de12effdaef76e860b3152c0a",
+  "client_sha256": "33f55e9a61aa38556db05f8629fe61bcd480fc8efcc43d5f3bad050c3cf73d2b",
+  "historical_admission": false,
+  "rule": "Original fixture T-24h; quote at or before cutoff; freshness48h; source quote clocks diagnostic only"
+}

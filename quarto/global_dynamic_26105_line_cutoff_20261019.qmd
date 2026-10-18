@@ -1,0 +1,48 @@
+---
+title: "26105亚盘与大小球：原定T−24h可用性核验"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  hot_root: null
+---
+
+本阶段只核验公司8的亚盘和大小球报价时间。输入为已冻结的365场名单和730份离线解析记录；每场使用名单原定开赛前24小时，报价须不晚于该截止，并在截止前48小时内。该规则与原RAW／GLOBAL对照保持一致，没有因本期结果调整阈值。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+knitr::opts_knit$set(root.dir=root)
+stopifnot(is.character(params$hot_root),length(params$hot_root)==1L,dir.exists(params$hot_root))
+parsed_path <- file.path(params$hot_root,'global-dynamic-26105-channel-parsed-20261019-v4/parsed.json')
+inventory_path <- file.path(params$hot_root,'global-dynamic-26105-channel-inventory-20261018/inventory.json')
+p <- jsonlite::fromJSON(parsed_path,simplifyVector=FALSE)
+i <- jsonlite::fromJSON(inventory_path,simplifyVector=FALSE)
+f <- bind_rows(i$fixtures) |> select(fixture_id,cutoff_utc) |> mutate(cutoff_utc=lubridate::ymd_hms(cutoff_utc,tz='UTC'))
+s <- map_dfr(p$records, ~map_dfr(.x$snapshots, ~tibble(snapshot_ts_hkt=.x$snapshot_ts_hkt)) |> mutate(fixture_id=.x$fixture_id,kind=.x$kind)) |>
+ mutate(quote_utc=lubridate::ymd_hms(snapshot_ts_hkt,tz='UTC')) |>
+ left_join(f,by='fixture_id',relationship='many-to-one') |>
+ mutate(prior_quote=quote_utc<=cutoff_utc,fresh_prior=prior_quote & quote_utc>=cutoff_utc-lubridate::hours(48))
+stopifnot(nrow(f)==365L,!anyDuplicated(f$fixture_id),!anyNA(s[c('quote_utc','cutoff_utc')]),p$network_attempts==0L)
+a <- s |> group_by(fixture_id,kind) |> summarise(quotes=n(),prior_quotes=sum(prior_quote),fresh_prior_quotes=sum(fresh_prior),.groups='drop')
+stopifnot(nrow(a)==730L)
+z <- a |> group_by(kind) |> summarise(fixtures=n(),quotes=sum(quotes),fixtures_with_prior=sum(prior_quotes>0),fixtures_with_fresh_prior=sum(fresh_prior_quotes>0),.groups='drop')
+joint <- a |> select(fixture_id,kind,fresh_prior_quotes) |> mutate(available=fresh_prior_quotes>0L) |> select(-fresh_prior_quotes) |> pivot_wider(names_from=kind,values_from=available) |> count(asian,total,name='fixtures')
+stopifnot(sum(joint$fixtures)==365L,sum(a$quotes)==nrow(s),nrow(s)==sum(lengths(map(p$records,'snapshots'))))
+receipt <- jsonlite::fromJSON(file.path(root,'results/global-dynamic-26105-line-cutoff-20261019/receipt.json'))
+stopifnot(receipt$parsed_sha256==digest::digest(file=parsed_path,algo='sha256'),receipt$inventory_sha256==digest::digest(file=inventory_path,algo='sha256'))
+stopifnot(isTRUE(all.equal(a,readr::read_csv(file.path(root,'results/global-dynamic-26105-line-cutoff-20261019/fixture-audit.csv'),show_col_types=FALSE),check.attributes=FALSE)))
+knitr::kable(z)
+knitr::kable(joint)
+```
+
+以上“可用”只表示存在满足时间条件的记录，不代表报价数值、双方水位、盘口一致性及基本面已经通过模型准入。263场同时具备两种盘口的时间支持，也不能直接当作最终可评分样本。
+
+报价自身时间不能证明本次研究曾在那个时间观察到数据；这些缓存用于历史诊断，不构成事前冻结证明。报告不读取目标赛果，不训练或校准，不生成票单，不评估收益。欧赔与基本面仍须分别完成整期质控，26105全期结算亦未在此验收。
+
+本文件为阶段研究记录；整体验收仍须纳入最终QMD及代码审查。

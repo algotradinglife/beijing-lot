@@ -1,0 +1,10 @@
+{
+  "command": [
+    "codex",
+    "review",
+    "Review only quarto/global_dynamic_26105_line_cutoff_20261019.qmd and its frozen inputs/fixture audit referenced under results/global-dynamic-26105-line-cutoff-20261019. No edits and no CI. Check snapshot-count reconciliation, source hashes, original per-fixture T-24h/48h logic, one quote one row despite nested odds, full365/730 denominator, reproducibility via explicit project_root/hot_root, and honest separation of quote-clock diagnostics from observed availability and model admission. This is a descriptive no-fit/no-selection audit, not a learned artifact. Report actionable findings only. Ignore unrelated worktree changes."
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-line-cutoff-20261019/review.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-line-cutoff-20261019/review-exit.json"
+}
