@@ -1,0 +1,54 @@
+{
+  "first": {
+    "publication": {
+      "label_version": "20261018T203949868640Z-frozen-forecast-audit",
+      "status": "published",
+      "record": {
+        "files": 80,
+        "asset_manifest_sha256": "cc88492c10074136ce5000ac1cd3a07ea959305544b7893f5ed22cebd360de64",
+        "label_version": "20261018T203949868640Z-frozen-forecast-audit",
+        "content_digest": "62db4bafab26501884afad199739e50965b84b6f72aeff52c085f8fdc4284b57",
+        "directory": "/mnt/nas/Data/beijing-lot/reports/26105-fundamentals-final/versions/20261018T203949868640Z-frozen-forecast-audit"
+      },
+      "versions": [
+        "20261018T203949868640Z-frozen-forecast-audit"
+      ],
+      "current": {
+        "schema": "beijing_lot_version_v1",
+        "label_version": "20261018T203949868640Z-frozen-forecast-audit",
+        "asset_manifest_sha256": "cc88492c10074136ce5000ac1cd3a07ea959305544b7893f5ed22cebd360de64",
+        "content_digest": "62db4bafab26501884afad199739e50965b84b6f72aeff52c085f8fdc4284b57",
+        "directory": "/mnt/nas/Data/beijing-lot/reports/26105-fundamentals-final/versions/20261018T203949868640Z-frozen-forecast-audit",
+        "files": 80
+      }
+    },
+    "relative": "reports/26105-fundamentals-final/versions/20261018T203949868640Z-frozen-forecast-audit",
+    "asset_manifest_sha256": "cc88492c10074136ce5000ac1cd3a07ea959305544b7893f5ed22cebd360de64",
+    "verified_members": 80
+  },
+  "repeat": {
+    "publication": {
+      "label_version": "20261018T203949868640Z-frozen-forecast-audit",
+      "status": "unchanged",
+      "record": {
+        "files": 80,
+        "asset_manifest_sha256": "cc88492c10074136ce5000ac1cd3a07ea959305544b7893f5ed22cebd360de64"
+      },
+      "versions": [
+        "20261018T203949868640Z-frozen-forecast-audit"
+      ],
+      "current": {
+        "schema": "beijing_lot_version_v1",
+        "label_version": "20261018T203949868640Z-frozen-forecast-audit",
+        "asset_manifest_sha256": "cc88492c10074136ce5000ac1cd3a07ea959305544b7893f5ed22cebd360de64",
+        "content_digest": "62db4bafab26501884afad199739e50965b84b6f72aeff52c085f8fdc4284b57",
+        "directory": "/mnt/nas/Data/beijing-lot/reports/26105-fundamentals-final/versions/20261018T203949868640Z-frozen-forecast-audit",
+        "files": 80
+      }
+    },
+    "relative": "reports/26105-fundamentals-final/versions/20261018T203949868640Z-frozen-forecast-audit",
+    "asset_manifest_sha256": "cc88492c10074136ce5000ac1cd3a07ea959305544b7893f5ed22cebd360de64",
+    "verified_members": 80
+  },
+  "goal_complete": false
+}

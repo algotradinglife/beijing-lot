@@ -1,0 +1,347 @@
+{
+  "issue": "26105",
+  "label": "20261018T203949868640Z-frozen-forecast-audit",
+  "files": {
+    "assets/ec0fcd046b6e1b4e127b4d1bfc369bb6090946dc3d34884bb956e930ab02a399/global_dynamic_walkforward_20261018.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/config/global_dynamic_walkforward_20261018.json",
+      "sha256": "ec0fcd046b6e1b4e127b4d1bfc369bb6090946dc3d34884bb956e930ab02a399"
+    },
+    "assets/47269b34da6fc8e529e99cb906104472411854e9e8b223077c5340ead2014dda/acceptance.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/acceptance.json",
+      "sha256": "47269b34da6fc8e529e99cb906104472411854e9e8b223077c5340ead2014dda"
+    },
+    "assets/760f0402372067b638272905458a11d973c7769360c6f835c7c332f064264bcd/code-review.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/code-review.json",
+      "sha256": "760f0402372067b638272905458a11d973c7769360c6f835c7c332f064264bcd"
+    },
+    "assets/c0237b27afca3a1beef2e29577075c61ee9ee2f78641905ed05f7cad8b33b3ee/final-artifact-review.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/final-artifact-review.json",
+      "sha256": "c0237b27afca3a1beef2e29577075c61ee9ee2f78641905ed05f7cad8b33b3ee"
+    },
+    "assets/7f83ea7cc8ac221abf3f972e712e18d017cb084dd045a6bf80b8868147174c11/forecast-final-artifact-review.log": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/forecast-final-artifact-review.log",
+      "sha256": "7f83ea7cc8ac221abf3f972e712e18d017cb084dd045a6bf80b8868147174c11"
+    },
+    "assets/acf38124a019bbc8cf7d26876ed5e1bb806cbd02a4e5fa3b329df03b7f5ed2c7/forecast-source-review-exit.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/forecast-source-review-exit.json",
+      "sha256": "acf38124a019bbc8cf7d26876ed5e1bb806cbd02a4e5fa3b329df03b7f5ed2c7"
+    },
+    "assets/754f3134353756dd3c4781f4b2c568e20213c0018bd4237bb35485acdb8f0809/forecast-source-review-job.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/forecast-source-review-job.json",
+      "sha256": "754f3134353756dd3c4781f4b2c568e20213c0018bd4237bb35485acdb8f0809"
+    },
+    "assets/0600c6ce619e6fc0e6a782b77c6d2279c944b052084c55270b4bcd1c6109701f/forecast-source-review.log": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/forecast-source-review.log",
+      "sha256": "0600c6ce619e6fc0e6a782b77c6d2279c944b052084c55270b4bcd1c6109701f"
+    },
+    "assets/ed6946b283909b0db1bbfc8b3d3addff0e3bbb51b30aeaaabffcd15f449871c3/rendered-inspection.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/global-dynamic-26105-forecast-20261019/rendered-inspection.json",
+      "sha256": "ed6946b283909b0db1bbfc8b3d3addff0e3bbb51b30aeaaabffcd15f449871c3"
+    },
+    "assets/10874f1edd8dc84e5cf34e5683494902b19ca74aa818377a89138d39687ade58/roster.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/source-26103/roster.json",
+      "sha256": "10874f1edd8dc84e5cf34e5683494902b19ca74aa818377a89138d39687ade58"
+    },
+    "assets/3cde4e1e74e643319e966e1a313f79dd343041b16f5af21968666fdf5dfbdcf2/roster.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/docs/reviews/source-26104/roster.json",
+      "sha256": "3cde4e1e74e643319e966e1a313f79dd343041b16f5af21968666fdf5dfbdcf2"
+    },
+    "assets/512898a93453f45a87bc0c97118c32806b9b34cb890e4d09eaf87198406ae25c/global_dynamic_26105_walkforward_20261019.html": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/quarto/global_dynamic_26105_walkforward_20261019.html",
+      "sha256": "512898a93453f45a87bc0c97118c32806b9b34cb890e4d09eaf87198406ae25c"
+    },
+    "assets/16d7083f3d4ee8df84e756776422014ff050ebebfdc3c13360a31d14e3516cce/global_dynamic_26105_walkforward_20261019.qmd": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/quarto/global_dynamic_26105_walkforward_20261019.qmd",
+      "sha256": "16d7083f3d4ee8df84e756776422014ff050ebebfdc3c13360a31d14e3516cce"
+    },
+    "assets/11ef6410ab71b7fc4192ad890b799a97bd4e3a432ea459108e610784a88c1516/global_dynamic_26105_evaluate_20261019.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r/global_dynamic_26105_evaluate_20261019.R",
+      "sha256": "11ef6410ab71b7fc4192ad890b799a97bd4e3a432ea459108e610784a88c1516"
+    },
+    "assets/892047b6bc1298487b231d4ed4b099ac79c5d4ec148b35a7521ad49849395b68/global_dynamic_26105_intake_20261019.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r/global_dynamic_26105_intake_20261019.R",
+      "sha256": "892047b6bc1298487b231d4ed4b099ac79c5d4ec148b35a7521ad49849395b68"
+    },
+    "assets/5cb21852ca3d754898efd327decfb2f8cd345498e355ed40013b37c66b1470dc/global_dynamic_26105_native_20261019.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r/global_dynamic_26105_native_20261019.R",
+      "sha256": "5cb21852ca3d754898efd327decfb2f8cd345498e355ed40013b37c66b1470dc"
+    },
+    "assets/37721c1e9f19d89020f763c1898aaeb31cd5ff7501b23616971d1da641419be2/global_dynamic_26105_select_20261019.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r/global_dynamic_26105_select_20261019.R",
+      "sha256": "37721c1e9f19d89020f763c1898aaeb31cd5ff7501b23616971d1da641419be2"
+    },
+    "assets/b5fc22464ac109ead552edb05f822085d351e57635065f6982fa266c89241abe/global_dynamic_26105_settlement_20261019.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r/global_dynamic_26105_settlement_20261019.R",
+      "sha256": "b5fc22464ac109ead552edb05f822085d351e57635065f6982fa266c89241abe"
+    },
+    "assets/f75c4098526cffddbb6dc60cf51b0bccd9de0ec30bc03d9090fb8338e04859eb/global_dynamic_26105_walkforward_20261019.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/r/global_dynamic_26105_walkforward_20261019.R",
+      "sha256": "f75c4098526cffddbb6dc60cf51b0bccd9de0ec30bc03d9090fb8338e04859eb"
+    },
+    "assets/eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e/labels.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-three-issues-20261013/labels.csv",
+      "sha256": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e"
+    },
+    "assets/796fd27e0127212aebac8761d088c0f554fb7d025fed599a3b0ea70cdad8f456/label-source-observations.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm171-draw-calibration-20261017/label-source-observations.csv",
+      "sha256": "796fd27e0127212aebac8761d088c0f554fb7d025fed599a3b0ea70cdad8f456"
+    },
+    "assets/cc9263ccb7e0e686cf5ae717ab57907864cba48502babbb3a4e05f03158557a3/forecasts.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm171-margin-shape-20261017/forecasts.rds",
+      "sha256": "cc9263ccb7e0e686cf5ae717ab57907864cba48502babbb3a4e05f03158557a3"
+    },
+    "assets/87614f529089c074013c00df0d02e91174039b8432686dff50de7de8bd5d86a2/manifest.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm171-margin-shape-20261017/manifest.json",
+      "sha256": "87614f529089c074013c00df0d02e91174039b8432686dff50de7de8bd5d86a2"
+    },
+    "assets/b02eb261259efb20cb6b4f0719101f58dc71363aeb6c9eea9e307eef7b224f8b/current-source-verification.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/current-source-verification.json",
+      "sha256": "b02eb261259efb20cb6b4f0719101f58dc71363aeb6c9eea9e307eef7b224f8b"
+    },
+    "assets/a36b43f55c5adaed084f30da68173c96cfc985df31ac5067ed496c3f73fc2374/forecast-QA-render2-exit.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/forecast-QA-render2-exit.json",
+      "sha256": "a36b43f55c5adaed084f30da68173c96cfc985df31ac5067ed496c3f73fc2374"
+    },
+    "assets/72e9ed14fcc965deef627528e2181e1767c103eabba0e6795e8453e96dd83fdc/forecast-QA-render2.log": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/forecast-QA-render2.log",
+      "sha256": "72e9ed14fcc965deef627528e2181e1767c103eabba0e6795e8453e96dd83fdc"
+    },
+    "assets/44ddc8302522d9b2c22a82dd5007b08e1273f16e323f97909d107e5b6b1fa6e6/full-R-exit.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/full-R-exit.json",
+      "sha256": "44ddc8302522d9b2c22a82dd5007b08e1273f16e323f97909d107e5b6b1fa6e6"
+    },
+    "assets/70151cd180ffca1de1057889fecfbd41a5e4581ea6fb756864c78173a2abcc81/full-R-job.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/full-R-job.json",
+      "sha256": "70151cd180ffca1de1057889fecfbd41a5e4581ea6fb756864c78173a2abcc81"
+    },
+    "assets/e6235ffde806f0a044cf012a7da68f56d190fa3d74df2f0cb43844b333d62afd/full-R.log": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/full-R.log",
+      "sha256": "e6235ffde806f0a044cf012a7da68f56d190fa3d74df2f0cb43844b333d62afd"
+    },
+    "assets/4292aac1be28aab3da131dadccc79ebb473688fc1532ff8c5bf769c29861aedc/installed-dll-verification.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-cutoff-acceptance-20261019-control/installed-dll-verification.json",
+      "sha256": "4292aac1be28aab3da131dadccc79ebb473688fc1532ff8c5bf769c29861aedc"
+    },
+    "assets/8851ec0387498297121a783b578a578b0c3f639ee03db3491493890fa7d20a1a/readiness-summary-superseded-shadowed-counts.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-postfreeze-status-20261019-v1/readiness-summary-superseded-shadowed-counts.csv",
+      "sha256": "8851ec0387498297121a783b578a578b0c3f639ee03db3491493890fa7d20a1a"
+    },
+    "assets/cc6e9e5d312d6594c9614b1862eafff6b77394bc4fc8a37ed944d03fa72908a4/readiness-summary.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-postfreeze-status-20261019-v1/readiness-summary.csv",
+      "sha256": "cc6e9e5d312d6594c9614b1862eafff6b77394bc4fc8a37ed944d03fa72908a4"
+    },
+    "assets/38e5898798b17d1e362099b15a898d6ad5b9940def7a2263d133ba243d7939d7/receipt.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-postfreeze-status-20261019-v1/receipt.json",
+      "sha256": "38e5898798b17d1e362099b15a898d6ad5b9940def7a2263d133ba243d7939d7"
+    },
+    "assets/46341a04fea7cafc7298ee4b995ab34653331430492ee516ee67aa63a777a3b3/round-readiness-superseded-shadowed-counts.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-postfreeze-status-20261019-v1/round-readiness-superseded-shadowed-counts.csv",
+      "sha256": "46341a04fea7cafc7298ee4b995ab34653331430492ee516ee67aa63a777a3b3"
+    },
+    "assets/204ab8b25610899e7c94456403caec841587cb5226805e01ed062c631a895c12/round-readiness.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-postfreeze-status-20261019-v1/round-readiness.csv",
+      "sha256": "204ab8b25610899e7c94456403caec841587cb5226805e01ed062c631a895c12"
+    },
+    "assets/8694d082e549c8b565181ee62581541969954d7708327b358d0b38681de7297e/statuses.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-postfreeze-status-20261019-v1/statuses.csv",
+      "sha256": "8694d082e549c8b565181ee62581541969954d7708327b358d0b38681de7297e"
+    },
+    "assets/6010e48599a29e95d2ed606036e73983875cdfb85fed214dd8ad6dbd259b766a/summary.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-postfreeze-status-20261019-v1/summary.csv",
+      "sha256": "6010e48599a29e95d2ed606036e73983875cdfb85fed214dd8ad6dbd259b766a"
+    },
+    "assets/198eda41d7efbcab96fffcad881a25760ddabb449b9da6045a5b1a03bf2631cc/forecast-manifest.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26103/forecast-manifest.json",
+      "sha256": "198eda41d7efbcab96fffcad881a25760ddabb449b9da6045a5b1a03bf2631cc"
+    },
+    "assets/beac36d352d9f21e879003ae1683deb9ce325cb1d344d215508c52fef7bf53d7/frozen-forecasts.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26103/frozen-forecasts.rds",
+      "sha256": "beac36d352d9f21e879003ae1683deb9ce325cb1d344d215508c52fef7bf53d7"
+    },
+    "assets/2accaa4b7a034d186f0bd6bdfc4583b0fe7122b18b22723522c786f292923e7c/forecast-manifest.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26104/forecast-manifest.json",
+      "sha256": "2accaa4b7a034d186f0bd6bdfc4583b0fe7122b18b22723522c786f292923e7c"
+    },
+    "assets/3efd5c242960acbb4ba3d985641e1854b1fb038343d649ebaa21ae9d37941a21/frozen-forecasts.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26104/frozen-forecasts.rds",
+      "sha256": "3efd5c242960acbb4ba3d985641e1854b1fb038343d649ebaa21ae9d37941a21"
+    },
+    "assets/00b892de95072762f42f3ca7e8689b09b6fecfee30c92325ae316f11d72cd2c0/forecast-audit.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/forecast-audit.csv",
+      "sha256": "00b892de95072762f42f3ca7e8689b09b6fecfee30c92325ae316f11d72cd2c0"
+    },
+    "assets/9c2956c3908566e16698d1ebbf6063e096904de0ba20baaeb1a4a1d712db64d2/forecast-manifest.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/forecast-manifest.json",
+      "sha256": "9c2956c3908566e16698d1ebbf6063e096904de0ba20baaeb1a4a1d712db64d2"
+    },
+    "assets/951f0eb597c5b78e064cd82f0845145cfe55ae82a1b279f94fa1ef05863eb93d/forecast-replay.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/forecast-replay.json",
+      "sha256": "951f0eb597c5b78e064cd82f0845145cfe55ae82a1b279f94fa1ef05863eb93d"
+    },
+    "assets/fb4ec982eec48e58a9c98e2330df787cddcb6ee57f1282f7e39ee374167b79c1/frozen-forecasts.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/frozen-forecasts.rds",
+      "sha256": "fb4ec982eec48e58a9c98e2330df787cddcb6ee57f1282f7e39ee374167b79c1"
+    },
+    "assets/74c76ceae5ad04a202c5c25bfd73af7636de8cb4b490d8d92cf26486d8853196/frozen-rounds.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/frozen-rounds.rds",
+      "sha256": "74c76ceae5ad04a202c5c25bfd73af7636de8cb4b490d8d92cf26486d8853196"
+    },
+    "assets/90303deb741ee8dde0117102a15789ab4ddd384c9e5196feb0560981129881f4/round-partitions.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/round-partitions.csv",
+      "sha256": "90303deb741ee8dde0117102a15789ab4ddd384c9e5196feb0560981129881f4"
+    },
+    "assets/e572d9fcfb801b65e669e9c2be7ad60f9c876906f4d6b84220d81b351db65803/selection-manifest.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/selection-manifest.json",
+      "sha256": "e572d9fcfb801b65e669e9c2be7ad60f9c876906f4d6b84220d81b351db65803"
+    },
+    "assets/7301eb1ea30140a64ecd3727f52469bf58dca8ecd1eafcae08f8a8c2a4f07b7e/selection-replay.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/selection-replay.json",
+      "sha256": "7301eb1ea30140a64ecd3727f52469bf58dca8ecd1eafcae08f8a8c2a4f07b7e"
+    },
+    "assets/5d510c0b070cbde1128800e60aafffa20954b01f43696450b87ca39cbca92a1b/source-manifest.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26105/source-manifest.csv",
+      "sha256": "5d510c0b070cbde1128800e60aafffa20954b01f43696450b87ca39cbca92a1b"
+    },
+    "assets/b2e2dd2976037784e0aaca14da641d88c987754599f86560d7ba8e67415f40d8/global-dynamic-26105-intake-roster-excerpt.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/fixtures/global-dynamic-26105-intake-roster-excerpt.json",
+      "sha256": "b2e2dd2976037784e0aaca14da641d88c987754599f86560d7ba8e67415f40d8"
+    },
+    "assets/18de9413cf640440dc57fdf4a09f9fce2f0d298f3ee5e14de2c98f78de0496b1/global-dynamic-26105-unresolved-kickoffs.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/fixtures/global-dynamic-26105-unresolved-kickoffs.csv",
+      "sha256": "18de9413cf640440dc57fdf4a09f9fce2f0d298f3ee5e14de2c98f78de0496b1"
+    },
+    "assets/1a5cd122e147efb84a01b374b69499d8fec038b49c00cdd2920df8e28e55efc1/test-global-dynamic-26105-base-census.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-base-census.R",
+      "sha256": "1a5cd122e147efb84a01b374b69499d8fec038b49c00cdd2920df8e28e55efc1"
+    },
+    "assets/a4d790e33f7d54ee2005ab6ccc94a201de1dea565a55b2bebc66f31e9ea32a0a/test-global-dynamic-26105-base-publish.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-base-publish.R",
+      "sha256": "a4d790e33f7d54ee2005ab6ccc94a201de1dea565a55b2bebc66f31e9ea32a0a"
+    },
+    "assets/d188e243774b9c8c0e7963020b076ef4580a0b45ac3aa0dd1aeef1fc4bcb3b8a/test-global-dynamic-26105-euro-publish.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-euro-publish.R",
+      "sha256": "d188e243774b9c8c0e7963020b076ef4580a0b45ac3aa0dd1aeef1fc4bcb3b8a"
+    },
+    "assets/a49e7adf525c556783dbdb95d26e9288778b7227cea8d1770b6c462d8b0fb8e9/test-global-dynamic-26105-intake.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-intake.R",
+      "sha256": "a49e7adf525c556783dbdb95d26e9288778b7227cea8d1770b6c462d8b0fb8e9"
+    },
+    "assets/2dbd87a2275b2b3cb88db59c6ea8e7d21f95f287ca88bb0c8ff3f45daf90fd7b/test-global-dynamic-26105-native.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-native.R",
+      "sha256": "2dbd87a2275b2b3cb88db59c6ea8e7d21f95f287ca88bb0c8ff3f45daf90fd7b"
+    },
+    "assets/d09ee5b437ba46a60784e471ec6141522d60954017d015f0f89d652d927a5cef/test-global-dynamic-26105-select.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-select.R",
+      "sha256": "d09ee5b437ba46a60784e471ec6141522d60954017d015f0f89d652d927a5cef"
+    },
+    "assets/066503fe0a07161138ddc37c5b48da8b96b495eae3bcebbb9cc94cf14fda1c06/test-global-dynamic-26105-settlement.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-settlement.R",
+      "sha256": "066503fe0a07161138ddc37c5b48da8b96b495eae3bcebbb9cc94cf14fda1c06"
+    },
+    "assets/b4d2ee5a86fc687babef50963440b87843a302cef094398199e93b685c5c9f3b/test-global-dynamic-26105-walkforward.R": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/tests/testthat/test-global-dynamic-26105-walkforward.R",
+      "sha256": "b4d2ee5a86fc687babef50963440b87843a302cef094398199e93b685c5c9f3b"
+    },
+    "assets/687f15b8fcdc428e5670c600fbe60484d2b9a65d8a23803f24dd8da1fb2a3151/coverage-census.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/coverage-census.rds",
+      "sha256": "687f15b8fcdc428e5670c600fbe60484d2b9a65d8a23803f24dd8da1fb2a3151"
+    },
+    "assets/07aeaee83305249128a5f01117fc96ab4726801f2b7947dce17447bb41a2688a/fixtures.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/fixtures.csv",
+      "sha256": "07aeaee83305249128a5f01117fc96ab4726801f2b7947dce17447bb41a2688a"
+    },
+    "assets/a586647d0e141fa3dd248decc46ee8ee9fe5abafec7ed1e1f5826962be7aebce/inputs.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/inputs.json",
+      "sha256": "a586647d0e141fa3dd248decc46ee8ee9fe5abafec7ed1e1f5826962be7aebce"
+    },
+    "assets/651d684d3f4f322272b8d8ef728e1198dcbd8ade86e7b4e084e32b63a620725e/intake-receipt.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/intake-receipt.json",
+      "sha256": "651d684d3f4f322272b8d8ef728e1198dcbd8ade86e7b4e084e32b63a620725e"
+    },
+    "assets/2dfdb4ab55d3fc0d6027940e16551bc228442f090badb9fdc76cbe7241be1019/native-repair.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-chunks/native-repair.rds",
+      "sha256": "2dfdb4ab55d3fc0d6027940e16551bc228442f090badb9fdc76cbe7241be1019"
+    },
+    "assets/ac699f56796e96607a74e2034cb1928c459329976751f70e305df04c1e377bd5/recent-receipt.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-chunks/recent-receipt.json",
+      "sha256": "ac699f56796e96607a74e2034cb1928c459329976751f70e305df04c1e377bd5"
+    },
+    "assets/bfbd1ac87a857234befded2047755ee5e2abcf8fb8d54fc2e34bb0c4f12e71f3/fits.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-fit-shards/shard-1/fits.rds",
+      "sha256": "bfbd1ac87a857234befded2047755ee5e2abcf8fb8d54fc2e34bb0c4f12e71f3"
+    },
+    "assets/84709ef2705f67f05d6c48a64e299fe3d861820e5452c4900158878be111b512/receipt.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-fit-shards/shard-1/receipt.json",
+      "sha256": "84709ef2705f67f05d6c48a64e299fe3d861820e5452c4900158878be111b512"
+    },
+    "assets/6b49659b7dbba10080ec16bb4a95f27df32da817ab953a398edbb037e9afcde2/fits.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-fit-shards/shard-2/fits.rds",
+      "sha256": "6b49659b7dbba10080ec16bb4a95f27df32da817ab953a398edbb037e9afcde2"
+    },
+    "assets/8414e0cff8f061e0e4baa0672f10fbdf255e8dadc27b8fd16f0de0ecb6ae30ef/receipt.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-fit-shards/shard-2/receipt.json",
+      "sha256": "8414e0cff8f061e0e4baa0672f10fbdf255e8dadc27b8fd16f0de0ecb6ae30ef"
+    },
+    "assets/6b96cf3549e8696528994ecfaa547d7f85eafe91ea83ccd0644f41664ca2b915/fits.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-fit-shards/shard-3/fits.rds",
+      "sha256": "6b96cf3549e8696528994ecfaa547d7f85eafe91ea83ccd0644f41664ca2b915"
+    },
+    "assets/16b4657d079dd1ffade5d73491e971a4f42cbb8e194623516c7fa4d475090211/receipt.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-fit-shards/shard-3/receipt.json",
+      "sha256": "16b4657d079dd1ffade5d73491e971a4f42cbb8e194623516c7fa4d475090211"
+    },
+    "assets/4ab46c010d5cd3631ab3747e3556d240c023766b2bbcedf9edaf09c768d180a4/native-forecasts.rds": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-forecasts.rds",
+      "sha256": "4ab46c010d5cd3631ab3747e3556d240c023766b2bbcedf9edaf09c768d180a4"
+    },
+    "assets/0734c90cf9cfe1b547d0b1f3179becfa1e56173cb4ec4cbb3d11c8691b418a44/native-manifest.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-manifest.json",
+      "sha256": "0734c90cf9cfe1b547d0b1f3179becfa1e56173cb4ec4cbb3d11c8691b418a44"
+    },
+    "assets/b239dc9df4aca12a1741f42d164f5e4b839c39aa96480cd77eac03c158b9799c/native-status.csv": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-20261019/native-status.csv",
+      "sha256": "b239dc9df4aca12a1741f42d164f5e4b839c39aa96480cd77eac03c158b9799c"
+    },
+    "assets/99d9d6763e43d66f49bdf81d4c952d4ac52e558de12effdaef76e860b3152c0a/inventory.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-channel-inventory-20261018/inventory.json",
+      "sha256": "99d9d6763e43d66f49bdf81d4c952d4ac52e558de12effdaef76e860b3152c0a"
+    },
+    "assets/e67c7fadce7f267d8189594a32fc6a6e7357f85aa9d672e2795bf21dd931f151/parsed.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-channel-parsed-20261019-v4/parsed.json",
+      "sha256": "e67c7fadce7f267d8189594a32fc6a6e7357f85aa9d672e2795bf21dd931f151"
+    },
+    "assets/545c885280deb2b40ae1b3901a8f095e15702023746bda64aad5a1355bba82a7/metadata.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-history-metadata-20261018-v2/metadata.json",
+      "sha256": "545c885280deb2b40ae1b3901a8f095e15702023746bda64aad5a1355bba82a7"
+    },
+    "assets/0a77211d10760405aac9fa8914a78a55330fdfbbfd5e01bb85839adf685934ff/future-exclusions.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26106-probe-20261019/future-exclusions.json",
+      "sha256": "0a77211d10760405aac9fa8914a78a55330fdfbbfd5e01bb85839adf685934ff"
+    },
+    "input-locators.json": {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-nas-audit-20261019/input-locators.json",
+      "sha256": "9eadaf1ad1bb2db34aaf4c0ada7c4f435427449dc82591bacebb46393a623ec2"
+    }
+  },
+  "receipt": {
+    "scope": "26105 frozen forecasts, same-budget rounds, direct input bindings and QA evidence; supplementary archive, not complete standalone runtime",
+    "source_commit": "b117573e51083f0350e320aba0fb25d44949e5df",
+    "forecast_count": 165,
+    "rounds": 13,
+    "forecast_sha256": "fb4ec982eec48e58a9c98e2330df787cddcb6ee57f1282f7e39ee374167b79c1",
+    "selection_sha256": "74c76ceae5ad04a202c5c25bfd73af7636de8cb4b490d8d92cf26486d8853196",
+    "target_evaluation_performed": false,
+    "pending_whole_issue": 40,
+    "goal_complete": false,
+    "source_datasets": {
+      "source_issue_26105": "20261018T180729878589Z",
+      "source_euro_issue_26105": "20261018T193151373411Z"
+    },
+    "prior_runtime_archive": "reports/26103-fundamentals-final/versions/20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+    "limitations": [
+      "Historical diagnostic availability proxies; not prospective verification",
+      "Whole terminal status and valid settlement SP still required",
+      "Runtime and transitive dependency closure require prior archive and declared installed environment; this supplement does not claim standalone restoration"
+    ]
+  }
+}

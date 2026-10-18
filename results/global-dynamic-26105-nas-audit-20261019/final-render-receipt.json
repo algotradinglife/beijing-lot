@@ -1,0 +1,9 @@
+{
+  "observed_at_utc": "2026-10-18T20:41:42.115409+00:00",
+  "command": "quarto render quarto/global_dynamic_26105_nas_audit_20261019.qmd -P project_root:$PWD --execute --no-cache",
+  "exit_status": 0,
+  "qmd_sha256": "04b574312d5e91200dd358fd99a906b28bdb743026a6df7148240b507198c804",
+  "html_sha256": "6c799cc8b71540e449aef5ee59ba219bc6c2d3562b189c49f6b10957f31915c1",
+  "tables": 3,
+  "error_nodes": 0
+}

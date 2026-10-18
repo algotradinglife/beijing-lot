@@ -1,0 +1,7 @@
+{
+  "command": "codex review (read-only scoped NAS supplementary archive review; full transcript in review.log)",
+  "exit_status": 0,
+  "findings": "All80 member hashes and19 direct bindings verified; identical repeat and source identity match; no actionable findings.",
+  "reviewed_qmd_sha256": "5733708d57ef19c9c91d4d23bab78f56685f9db5c5069da95c7dfeafb49f9e83",
+  "review_log_sha256": "75c0fccf120f9a71365f70957e7d9613389fe84af698978dbbbd0ee1851ec4c5"
+}

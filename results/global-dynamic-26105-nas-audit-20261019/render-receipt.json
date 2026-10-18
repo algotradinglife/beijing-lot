@@ -1,0 +1,13 @@
+{
+  "observed_at_utc": "2026-10-18T20:40:38.757472+00:00",
+  "render_command": "quarto render quarto/global_dynamic_26105_nas_audit_20261019.qmd -P project_root:$PWD --execute --no-cache",
+  "render_exit_status": 0,
+  "R_PROFILE_USER": "/dev/null",
+  "QUARTO_R": "/opt/R/4.6.1/bin/R",
+  "R_LIBS_USER": "results/margin-first-mapping-20261018/library:r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6",
+  "qmd_sha256": "5733708d57ef19c9c91d4d23bab78f56685f9db5c5069da95c7dfeafb49f9e83",
+  "html_sha256": "1433dc6a4f92c012c1a8e7a09df355c2b6fb81f3f60e0e132cc2907c2dd425d6",
+  "tables": 2,
+  "execution_error_nodes": 0,
+  "goal_complete": false
+}

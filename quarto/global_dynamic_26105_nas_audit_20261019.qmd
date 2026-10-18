@@ -1,0 +1,68 @@
+---
+title: "26105 冻结预测及同预算选票：NAS 补充归档验收"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+保存已审查提交 `b117573e` 的165场预测、13轮同预算选票、直接输入与验收证据。每模型、每策略、每轮预算为2,000元。此归档补充既有26103／26104及原7轮证据，不替换已冻结的比较规则。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+library(beidan)
+library(testthat)
+root <- normalizePath(params$project_root, mustWork = TRUE)
+invisible(python_backend(file.path(root, '.venv/bin/python')))
+control <- file.path(root, 'results/global-dynamic-26105-nas-audit-20261019')
+publication <- jsonlite::fromJSON(file.path(control, 'publication.json'), simplifyVector = FALSE)
+expect_identical(publication[['repeat']]$publication$status, 'unchanged')
+expect_identical(publication$first$asset_manifest_sha256, publication[['repeat']]$asset_manifest_sha256)
+paths <- reticulate::import('beidan_backend.catalog.paths', convert = FALSE)
+archive <- reticulate::py_str(paths$location(paste0('frozen:', publication$first$relative)))
+manifest_path <- file.path(archive, 'asset-manifest.json')
+expect_identical(digest::digest(file = manifest_path, algo = 'sha256'), publication$first$asset_manifest_sha256)
+manifest <- jsonlite::fromJSON(manifest_path, simplifyVector = FALSE)
+expect_identical(manifest$issue, '26105')
+expect_false(manifest$receipt$target_evaluation_performed)
+expect_false(manifest$receipt$goal_complete)
+expect_equal(manifest$receipt$forecast_count, 165)
+expect_equal(manifest$receipt$rounds, 13)
+members <- enframe(unlist(manifest$members), name = 'member', value = 'expected_sha256')
+expect_equal(nrow(members), publication$first$verified_members)
+expect_equal(anyDuplicated(members$member), 0L)
+members$actual_sha256 <- rep(NA_character_, nrow(members))
+for (i in seq_len(nrow(members))) {
+  members$actual_sha256[i] <- digest::digest(file = file.path(archive, members$member[i]), algo = 'sha256')
+}
+expect_identical(members$actual_sha256, members$expected_sha256)
+locators <- as_tibble(jsonlite::fromJSON(file.path(archive, 'input-locators.json')))
+expect_equal(anyDuplicated(locators$original_path), 0L)
+linked <- left_join(locators, members, by = 'member', relationship = 'many-to-one')
+expect_false(anyNA(linked$actual_sha256))
+expect_identical(linked$sha256, linked$actual_sha256)
+expect_true(manifest$receipt$forecast_sha256 %in% members$actual_sha256)
+expect_true(manifest$receipt$selection_sha256 %in% members$actual_sha256)
+knitr::kable(tibble(archive = publication$first$relative, verified_members = nrow(members), original_locations = nrow(locators), repeat_status = publication[['repeat']]$publication$status))
+knitr::kable(tibble(forecasts = 165L, rounds = 13L, budget_cny_per_model_policy_round = 2000L, last_observed_pending_whole_issue = 40L, whole_issue_evaluation = '尚未执行'))
+```
+
+使用既有 `src/fundamentals_audit_bundle.py::publish_fundamentals_audit`；目录检查在发布前后执行，重复发布必须返回 unchanged。本QMD独立读取NAS清单，逐一读回全部成员并检查SHA256及原路径映射。这里的哈希验收不替代模型与截止时间验收；后者见已审查的预测报告及随归档保存的完整R测试凭证。
+
+归档是补充证据，不是独立可恢复的完整运行环境。运行仍需此前归档的运行身份、声明的R／Python依赖与路径映射。长期基础数据保持在已登记NAS版本：source_issue_26105 `20261018T180729878589Z`、source_euro_issue_26105 `20261018T193151373411Z`。本次不复制活动SQLite或凭证，不删除原始文件。
+
+最后一次来源观察仍有40场未确认终场。该数字是观察时点状态，不是当前实时断言；赛果与有效结算SP齐备前，不报告整期命中率、概率准确性或回款。26106尚无可验证完整数据，本研究仍为历史诊断，goal未完成。
+
+实际执行的产物审查及所审查版本身份如下；后续仅补入本展示块，未改动归档、模型或选票。
+
+```{r}
+review <- jsonlite::fromJSON(file.path(control, 'review-receipt.json'))
+expect_equal(review$exit_status, 0L)
+expect_identical(digest::digest(file = file.path(control, 'review.log'), algo = 'sha256'), review$review_log_sha256)
+knitr::kable(as_tibble(review))
+```
