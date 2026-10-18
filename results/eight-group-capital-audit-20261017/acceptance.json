@@ -1,0 +1,35 @@
+{
+  "status": "LABEL_FREE_MODEL_COVERAGE_AUDIT_REVIEWED",
+  "review_command": "codex review; bounded scope, command and replay evidence in review.log",
+  "review_findings": "No blocking findings; exact unions, exclusive probabilities, Shapley and frontiers verified",
+  "render_command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/eight_group_capital_audit_20261017.qmd --no-cache -P project_root:$PWD",
+  "render_exit": 0,
+  "validation": {
+    "contexts": 8,
+    "subsets_per_context": 256,
+    "group_contribution_rows": 64,
+    "pair_rows": 224,
+    "subset_frontier_rows": 64,
+    "depth_frontier_rows": 40,
+    "rendered_tables": 5,
+    "error_blocks": 0,
+    "canonical_duplicate_and_analytic_union_checks": true
+  },
+  "limitations": [
+    "Model-based event coverage under cross-fixture independence",
+    "Two distinct probability bases audited separately",
+    "No labels or payout data opened; not returns or future effectiveness",
+    "Model-best subset frontier not adopted as allocation policy",
+    "Repeat wins carry value; overlap is not classified as wasted money"
+  ],
+  "files": {
+    "quarto/eight_group_capital_audit_20261017.qmd": "7e5b80f419c2c3dbab4504c3191418317e7e54ca9e1bd7895b806915d312286d",
+    "quarto/eight_group_capital_audit_20261017.html": "9ca597946de57d8ee5742a3d3f802573668261b55b4fd3326f66069589c7bbf2",
+    "results/eight-group-capital-audit-20261017/summary.csv": "6996be02594fdc34bc50087760fc4853842d8594de31d3d0ef83829adc455a5a",
+    "results/eight-group-capital-audit-20261017/group-contributions.csv": "caff5e7b5e68dea84e016e34d26d0ee05bcc79562b668510722b0d8514cf0068",
+    "results/eight-group-capital-audit-20261017/subset-frontier.csv": "54bcc0dc43534cc7a779d2b60656d7abb631887309d2a333680e4e00e3ef7a47",
+    "results/eight-group-capital-audit-20261017/depth-frontier.csv": "0f73515fd00d9b50630927f430e68fc994112d0a1a7e988357c3d0258beda19a",
+    "results/eight-group-capital-audit-20261017/pair-overlap.csv": "ccf7727078bccdaee8777c14acd8255fd41046e70bea9540d9685140345d88e5",
+    "results/eight-group-capital-audit-20261017/receipt.rds": "f6d52d3d8f4bb066e41a5f37587735068458b82700ea3f16f4547d7e549eb0af"
+  }
+}

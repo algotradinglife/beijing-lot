@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>八组资金利用率：重复票、独有覆盖与边际投入</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="eight_group_capital_audit_20261017_files/libs/clipboard/clipboard.min.js"></script>
+<script src="eight_group_capital_audit_20261017_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="eight_group_capital_audit_20261017_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="eight_group_capital_audit_20261017_files/libs/quarto-html/popper.min.js"></script>
+<script src="eight_group_capital_audit_20261017_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="eight_group_capital_audit_20261017_files/libs/quarto-html/anchor.min.js"></script>
+<link href="eight_group_capital_audit_20261017_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="eight_group_capital_audit_20261017_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="eight_group_capital_audit_20261017_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="eight_group_capital_audit_20261017_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="eight_group_capital_audit_20261017_files/libs/bootstrap/bootstrap-8bdf4a79c329363aa5e64002b720c5c5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">八组资金利用率：重复票、独有覆盖与边际投入</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>只审计固定10月17日四轮8组，区分original_frozen（原3332222冻结实购票、冻结最终概率）和full100（相同七场组、100%压缩前概率、30–154名实验票）。每场结果在所有组中共享；不同比赛独立是假设。精确联合概率复用已安装beidan Rcpp内核，不把各组独立相乘。这里“覆盖效率”仅指至少一票中奖，重复中奖与潜在回款不是浪费；没有完整赔率，不比较EV/ROI。无历史拟合，不采用新规则，不按赛果选择组。</p>
+<p>票面重复与联合中奖覆盖（均为模型概率，非实际频率）：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(summary <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">c</span>(any_hit,exactly_one_group_hit,multiple_groups_hit),<span class="sc">~</span><span class="dv">100</span><span class="sc">*</span>.x)),<span class="at">digits=</span><span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 3%">
+<col style="width: 8%">
+<col style="width: 4%">
+<col style="width: 7%">
+<col style="width: 13%">
+<col style="width: 9%">
+<col style="width: 4%">
+<col style="width: 13%">
+<col style="width: 11%">
+<col style="width: 12%">
+<col style="width: 11%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">round</th>
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">cost_cny</th>
+<th style="text-align: right;">paid_tickets</th>
+<th style="text-align: right;">unique_physical_tickets</th>
+<th style="text-align: right;">duplicate_copies</th>
+<th style="text-align: right;">any_hit</th>
+<th style="text-align: right;">expected_winning_tickets</th>
+<th style="text-align: right;">expected_wins_if_any</th>
+<th style="text-align: right;">exactly_one_group_hit</th>
+<th style="text-align: right;">multiple_groups_hit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">original_frozen</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">47.614</td>
+<td style="text-align: right;">0.893</td>
+<td style="text-align: right;">1.875</td>
+<td style="text-align: right;">22.595</td>
+<td style="text-align: right;">25.019</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">36.926</td>
+<td style="text-align: right;">1.319</td>
+<td style="text-align: right;">3.572</td>
+<td style="text-align: right;">5.711</td>
+<td style="text-align: right;">31.214</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">original_frozen</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">45.807</td>
+<td style="text-align: right;">0.911</td>
+<td style="text-align: right;">1.989</td>
+<td style="text-align: right;">19.950</td>
+<td style="text-align: right;">25.857</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">35.672</td>
+<td style="text-align: right;">1.281</td>
+<td style="text-align: right;">3.591</td>
+<td style="text-align: right;">4.949</td>
+<td style="text-align: right;">30.723</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">original_frozen</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">45.067</td>
+<td style="text-align: right;">1.028</td>
+<td style="text-align: right;">2.281</td>
+<td style="text-align: right;">15.065</td>
+<td style="text-align: right;">30.001</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">35.685</td>
+<td style="text-align: right;">1.351</td>
+<td style="text-align: right;">3.787</td>
+<td style="text-align: right;">6.216</td>
+<td style="text-align: right;">29.469</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">original_frozen</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">49.329</td>
+<td style="text-align: right;">0.910</td>
+<td style="text-align: right;">1.845</td>
+<td style="text-align: right;">24.169</td>
+<td style="text-align: right;">25.160</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">44.145</td>
+<td style="text-align: right;">1.357</td>
+<td style="text-align: right;">3.074</td>
+<td style="text-align: right;">10.710</td>
+<td style="text-align: right;">33.435</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>100%分布方案：各组单独覆盖、只有这组命中时的独有覆盖、顺序无关的Shapley覆盖分摊（单位百分比点）。独有覆盖低并不代表重复中奖回款无价值。</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(contributions <span class="sc">|&gt;</span> <span class="fu">filter</span>(model<span class="sc">==</span><span class="st">'full100'</span>) <span class="sc">|&gt;</span> <span class="fu">select</span>(round,group,standalone_hit,exclusive_hit,shapley_hit) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">c</span>(standalone_hit,exclusive_hit,shapley_hit),<span class="sc">~</span><span class="dv">100</span><span class="sc">*</span>.x)),<span class="at">digits=</span><span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">round</th>
+<th style="text-align: right;">group</th>
+<th style="text-align: right;">standalone_hit</th>
+<th style="text-align: right;">exclusive_hit</th>
+<th style="text-align: right;">shapley_hit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">16.871</td>
+<td style="text-align: right;">1.410</td>
+<td style="text-align: right;">5.725</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">16.246</td>
+<td style="text-align: right;">0.227</td>
+<td style="text-align: right;">4.006</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">17.497</td>
+<td style="text-align: right;">2.877</td>
+<td style="text-align: right;">7.089</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">16.136</td>
+<td style="text-align: right;">0.170</td>
+<td style="text-align: right;">3.848</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">15.963</td>
+<td style="text-align: right;">0.114</td>
+<td style="text-align: right;">3.705</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">16.087</td>
+<td style="text-align: right;">0.153</td>
+<td style="text-align: right;">3.802</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">16.363</td>
+<td style="text-align: right;">0.413</td>
+<td style="text-align: right;">4.418</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">16.732</td>
+<td style="text-align: right;">0.348</td>
+<td style="text-align: right;">4.334</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">15.629</td>
+<td style="text-align: right;">0.088</td>
+<td style="text-align: right;">3.642</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">15.941</td>
+<td style="text-align: right;">0.312</td>
+<td style="text-align: right;">4.161</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">16.760</td>
+<td style="text-align: right;">2.200</td>
+<td style="text-align: right;">6.318</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">15.680</td>
+<td style="text-align: right;">0.115</td>
+<td style="text-align: right;">3.719</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">16.218</td>
+<td style="text-align: right;">0.790</td>
+<td style="text-align: right;">4.852</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">15.737</td>
+<td style="text-align: right;">0.120</td>
+<td style="text-align: right;">3.742</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">16.361</td>
+<td style="text-align: right;">1.139</td>
+<td style="text-align: right;">5.333</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">15.784</td>
+<td style="text-align: right;">0.184</td>
+<td style="text-align: right;">3.905</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">17.032</td>
+<td style="text-align: right;">0.335</td>
+<td style="text-align: right;">4.216</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">16.789</td>
+<td style="text-align: right;">0.187</td>
+<td style="text-align: right;">3.841</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">16.520</td>
+<td style="text-align: right;">0.160</td>
+<td style="text-align: right;">3.686</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">17.183</td>
+<td style="text-align: right;">1.021</td>
+<td style="text-align: right;">4.969</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">16.599</td>
+<td style="text-align: right;">0.170</td>
+<td style="text-align: right;">3.725</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">17.011</td>
+<td style="text-align: right;">0.582</td>
+<td style="text-align: right;">4.468</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">17.073</td>
+<td style="text-align: right;">0.678</td>
+<td style="text-align: right;">4.606</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">16.928</td>
+<td style="text-align: right;">3.083</td>
+<td style="text-align: right;">6.173</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">16.552</td>
+<td style="text-align: right;">1.477</td>
+<td style="text-align: right;">5.466</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">16.001</td>
+<td style="text-align: right;">1.743</td>
+<td style="text-align: right;">5.778</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">15.774</td>
+<td style="text-align: right;">3.238</td>
+<td style="text-align: right;">6.758</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">17.918</td>
+<td style="text-align: right;">0.737</td>
+<td style="text-align: right;">5.461</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">17.034</td>
+<td style="text-align: right;">0.406</td>
+<td style="text-align: right;">4.603</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">17.287</td>
+<td style="text-align: right;">0.593</td>
+<td style="text-align: right;">4.871</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">17.246</td>
+<td style="text-align: right;">1.104</td>
+<td style="text-align: right;">5.260</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">17.872</td>
+<td style="text-align: right;">1.411</td>
+<td style="text-align: right;">5.948</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>100%方案，仅减少组数、保留各组125注。每个组数下穷举所有子集，展示给定模型下覆盖最高的子集，不使用目标赛果：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(subsets <span class="sc">|&gt;</span> <span class="fu">filter</span>(model<span class="sc">==</span><span class="st">'full100'</span>,n_groups<span class="sc">&gt;=</span><span class="dv">5</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">any_hit=</span><span class="dv">100</span><span class="sc">*</span>any_hit),<span class="at">digits=</span><span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 8%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 10%">
+<col style="width: 17%">
+<col style="width: 8%">
+<col style="width: 8%">
+<col style="width: 19%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">round</th>
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">n_groups</th>
+<th style="text-align: right;">cost_cny</th>
+<th style="text-align: right;">saved_cny</th>
+<th style="text-align: left;">retained_groups</th>
+<th style="text-align: right;">any_hit</th>
+<th style="text-align: right;">lost_pp</th>
+<th style="text-align: right;">retained_fraction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">1250</td>
+<td style="text-align: right;">750</td>
+<td style="text-align: left;">1,3,6,7,8</td>
+<td style="text-align: right;">36.076</td>
+<td style="text-align: right;">0.849</td>
+<td style="text-align: right;">0.977</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">1500</td>
+<td style="text-align: right;">500</td>
+<td style="text-align: left;">1,2,3,6,7,8</td>
+<td style="text-align: right;">36.565</td>
+<td style="text-align: right;">0.360</td>
+<td style="text-align: right;">0.990</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1750</td>
+<td style="text-align: right;">250</td>
+<td style="text-align: left;">1,2,3,4,6,7,8</td>
+<td style="text-align: right;">36.812</td>
+<td style="text-align: right;">0.114</td>
+<td style="text-align: right;">0.997</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1,2,3,4,5,6,7,8</td>
+<td style="text-align: right;">36.926</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">1250</td>
+<td style="text-align: right;">750</td>
+<td style="text-align: left;">2,3,5,6,7</td>
+<td style="text-align: right;">34.909</td>
+<td style="text-align: right;">0.763</td>
+<td style="text-align: right;">0.979</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">1500</td>
+<td style="text-align: right;">500</td>
+<td style="text-align: left;">2,3,4,5,7,8</td>
+<td style="text-align: right;">35.380</td>
+<td style="text-align: right;">0.292</td>
+<td style="text-align: right;">0.992</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1750</td>
+<td style="text-align: right;">250</td>
+<td style="text-align: left;">2,3,4,5,6,7,8</td>
+<td style="text-align: right;">35.584</td>
+<td style="text-align: right;">0.088</td>
+<td style="text-align: right;">0.998</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1,2,3,4,5,6,7,8</td>
+<td style="text-align: right;">35.672</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">1250</td>
+<td style="text-align: right;">750</td>
+<td style="text-align: left;">4,5,6,7,8</td>
+<td style="text-align: right;">34.744</td>
+<td style="text-align: right;">0.941</td>
+<td style="text-align: right;">0.974</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">1500</td>
+<td style="text-align: right;">500</td>
+<td style="text-align: left;">1,4,5,6,7,8</td>
+<td style="text-align: right;">35.252</td>
+<td style="text-align: right;">0.433</td>
+<td style="text-align: right;">0.988</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1750</td>
+<td style="text-align: right;">250</td>
+<td style="text-align: left;">1,2,4,5,6,7,8</td>
+<td style="text-align: right;">35.525</td>
+<td style="text-align: right;">0.160</td>
+<td style="text-align: right;">0.996</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1,2,3,4,5,6,7,8</td>
+<td style="text-align: right;">35.685</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">1250</td>
+<td style="text-align: right;">750</td>
+<td style="text-align: left;">1,2,3,7,8</td>
+<td style="text-align: right;">41.652</td>
+<td style="text-align: right;">2.493</td>
+<td style="text-align: right;">0.944</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">1500</td>
+<td style="text-align: right;">500</td>
+<td style="text-align: left;">1,2,3,6,7,8</td>
+<td style="text-align: right;">42.902</td>
+<td style="text-align: right;">1.243</td>
+<td style="text-align: right;">0.972</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1750</td>
+<td style="text-align: right;">250</td>
+<td style="text-align: left;">1,2,3,4,6,7,8</td>
+<td style="text-align: right;">43.739</td>
+<td style="text-align: right;">0.406</td>
+<td style="text-align: right;">0.991</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1,2,3,4,5,6,7,8</td>
+<td style="text-align: right;">44.145</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>100%方案，保持8组，仅降低各组从原购买起点开始的购买深度：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(depths <span class="sc">|&gt;</span> <span class="fu">filter</span>(model<span class="sc">==</span><span class="st">'full100'</span>) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">any_hit=</span><span class="dv">100</span><span class="sc">*</span>any_hit),<span class="at">digits=</span><span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 8%">
+<col style="width: 10%">
+<col style="width: 8%">
+<col style="width: 12%">
+<col style="width: 13%">
+<col style="width: 10%">
+<col style="width: 10%">
+<col style="width: 24%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">round</th>
+<th style="text-align: left;">model</th>
+<th style="text-align: right;">depth</th>
+<th style="text-align: right;">cost_cny</th>
+<th style="text-align: right;">saved_cny</th>
+<th style="text-align: right;">any_hit</th>
+<th style="text-align: right;">lost_pp</th>
+<th style="text-align: right;">retained_fraction</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">17.616</td>
+<td style="text-align: right;">19.310</td>
+<td style="text-align: right;">0.477</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">24.463</td>
+<td style="text-align: right;">12.462</td>
+<td style="text-align: right;">0.663</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">75</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">29.354</td>
+<td style="text-align: right;">7.572</td>
+<td style="text-align: right;">0.795</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">33.339</td>
+<td style="text-align: right;">3.587</td>
+<td style="text-align: right;">0.903</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">125</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">36.926</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">16.334</td>
+<td style="text-align: right;">19.338</td>
+<td style="text-align: right;">0.458</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">23.154</td>
+<td style="text-align: right;">12.518</td>
+<td style="text-align: right;">0.649</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">75</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">27.793</td>
+<td style="text-align: right;">7.879</td>
+<td style="text-align: right;">0.779</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">32.122</td>
+<td style="text-align: right;">3.550</td>
+<td style="text-align: right;">0.900</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">125</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">35.672</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">15.859</td>
+<td style="text-align: right;">19.826</td>
+<td style="text-align: right;">0.444</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">23.474</td>
+<td style="text-align: right;">12.211</td>
+<td style="text-align: right;">0.658</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">75</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">28.188</td>
+<td style="text-align: right;">7.497</td>
+<td style="text-align: right;">0.790</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">32.227</td>
+<td style="text-align: right;">3.458</td>
+<td style="text-align: right;">0.903</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">125</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">35.685</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">25</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">19.762</td>
+<td style="text-align: right;">24.383</td>
+<td style="text-align: right;">0.448</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">29.084</td>
+<td style="text-align: right;">15.061</td>
+<td style="text-align: right;">0.659</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">75</td>
+<td style="text-align: right;">1200</td>
+<td style="text-align: right;">800</td>
+<td style="text-align: right;">35.579</td>
+<td style="text-align: right;">8.566</td>
+<td style="text-align: right;">0.806</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">100</td>
+<td style="text-align: right;">1600</td>
+<td style="text-align: right;">400</td>
+<td style="text-align: right;">40.446</td>
+<td style="text-align: right;">3.699</td>
+<td style="text-align: right;">0.916</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">full100</td>
+<td style="text-align: right;">125</td>
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">44.145</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.000</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>inputs<span class="ot">&lt;-</span><span class="fu">c</span>(<span class="fu">file.path</span>(w,<span class="st">'frozen-probabilities.rds'</span>),<span class="fu">file.path</span>(w,<span class="st">'plans.rds'</span>),plan_path)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">tibble</span>(<span class="at">input=</span>inputs,<span class="at">sha256=</span><span class="fu">vapply</span>(inputs,digest<span class="sc">::</span>digest,<span class="fu">character</span>(<span class="dv">1</span>),<span class="at">file=</span><span class="cn">TRUE</span>,<span class="at">algo=</span><span class="st">'sha256'</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 65%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">input</th>
+<th style="text-align: left;">sha256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-upcoming-20261017/frozen-probabilities.rds</td>
+<td style="text-align: left;">accd554f6869d1fb7e2758bca45d0612c1adc6d5b065ce5a9f40c514637cfbde</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-upcoming-20261017/plans.rds</td>
+<td style="text-align: left;">35074add6622ee83fbd181bc3799e63ea509ca5f57a406227227cc34feaa022a</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-risk-diversification-20261017/frozen-comparison-plan.rds</td>
+<td style="text-align: left;">13d58779e9afe314077abd97b18c37cc7ed60bec64f8a88b1bfb57ead4cfa6ce</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>验证：正常安装包的规范化事件联合包装调用（含其Rcpp内核）及5/9小联合事件、重复事件守恒；每场概率归一、每票概率与冻结购买概率逐项重建一致、来源时间/截止绑定、8个环境各256子集、Shapley之和等于联合概率、单组精确概率一致、独有≤分摊≤单组质量、子集/深度前沿单调、完整前沿回归原方案。无新增项目函数或包实现，无蒙特卡洛抽样误差，无读取标签或赔率。子集筛选只针对已冻结概率，不拟合历史、不因实际结果挑组；不发布新购买方案。内核与加载包代码身份、输入及每轮显式截止均写入receipt.rds。概率模型的失准及跨比赛相关性仍可能使估计偏差；百分比点覆盖损失不能换算成收益损失，缺赔率时不声称资金浪费或推荐删组。报告审查与渲染记录在results/eight-group-capital-audit-20261017/。</p>
+<p>两种审计口径各用自己的概率底座，不能通过横向比较其绝对联合概率来认定哪个真实命中率更高。original_frozen概率另外从final比分网格按原让球重新投影并与冻结类别表核对；full100直接从base网格投影。两者均逐票重建概率与原购买记录一致。</p>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

@@ -1,0 +1,146 @@
+---
+title: "八组资金利用率：重复票、独有覆盖与边际投入"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+只审计固定10月17日四轮8组，区分original_frozen（原3332222冻结实购票、冻结最终概率）和full100（相同七场组、100%压缩前概率、30–154名实验票）。每场结果在所有组中共享；不同比赛独立是假设。精确联合概率复用已安装beidan Rcpp内核，不把各组独立相乘。这里“覆盖效率”仅指至少一票中奖，重复中奖与潜在回款不是浪费；没有完整赔率，不比较EV/ROI。无历史拟合，不采用新规则，不按赛果选择组。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'r_lib'))
+ns<-asNamespace('beidan')
+component<-get('.parlay_ranked_component_union',envir=ns)
+identity<-get('ComponentUnionKernelIdentity',envir=ns)()
+stopifnot(identical(identity,get('.ParlayKernelSourceHash',envir=ns)()))
+# Normal installed wrapper and analytic tiny union/duplicate regression checks.
+tiny<-matrix(1/3,nrow=2,ncol=3)
+stopifnot(abs(component(list(c('001'=1L),c('002'=2L)),c('001','002'),function(id,code)tiny[match(id,c('001','002')),code])-5/9)<1e-12,abs(component(list(c('001'=1L),c('001'=1L)),c('001','002'),function(id,code)tiny[match(id,c('001','002')),code])-1/3)<1e-12)
+w<-file.path(root,'results/fm17-upcoming-20261017')
+f<-readRDS(file.path(w,'frozen-probabilities.rds'));b<-readRDS(file.path(w,'plans.rds'))
+plan_path<-file.path(root,'results/margin-risk-diversification-20261017/frozen-comparison-plan.rds')
+research<-readRDS(plan_path)
+stopifnot(research$plans_sha256==digest::digest(file=file.path(w,'plans.rds'),algo='sha256'))
+out<-file.path(root,'results/eight-group-capital-audit-20261017');dir.create(out,recursive=TRUE,showWarnings=FALSE)
+summary_rows<-list();group_rows<-list();subset_rows<-list();depth_rows<-list();pair_rows<-list();receipts<-list()
+for(i in 1:4){
+ p<-b$plans[[i]];cutoff<-p$selection_receipt$cutoff
+ stopifnot(inherits(cutoff$cutoff_utc,'POSIXct'),!is.na(cutoff$cutoff_utc))
+ ids<-sort(unique(p$legs$fixture_id));groups<-1:8
+ sources<-list()
+ for(id in ids){entry<-f$entries[[id]]$base;stopifnot(as.numeric(entry$cutoff$cutoff_utc)==as.numeric(cutoff$cutoff_utc),entry$max_source_available_utc<cutoff$cutoff_utc);sources[[id]]<-entry[c('cutoff','source_hashes','max_source_available_utc')]}
+ for(model in c('original_frozen','full100')){
+  if(model=='original_frozen'){
+   t<-p$purchases |> as_tibble() |> left_join(p$legs |> as_tibble() |> distinct(group_id,group=group_slot),by='group_id',relationship='many-to-one') |> select(ticket_id,group,rank,probability)
+   cached<-f$probabilities |> as_tibble() |> filter(fixture_id %in% ids) |> select(fixture_id,outcome,probability)
+   canon<-list()
+   for(id in ids){
+    final<-f$entries[[id]]$final;stopifnot(as.numeric(final$cutoff$cutoff_utc)==as.numeric(cutoff$cutoff_utc))
+    h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id]);stopifnot(length(h)==1,is.finite(h))
+    g<-final$grid |> as_tibble();stopifnot(all(g$probability>=0),abs(sum(g$probability)-1)<1e-9)
+    canon[[id]]<-g |> mutate(outcome=case_when(home_goals-away_goals+h>0~'W',home_goals-away_goals+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability),.groups='drop') |> mutate(fixture_id=id)
+   }
+   q<-bind_rows(canon)
+   check<-q |> full_join(cached,by=c('fixture_id','outcome'),suffix=c('_canonical','_cached'),relationship='one-to-one')
+   stopifnot(!anyNA(check),max(abs(check$probability_canonical-check$probability_cached))<1e-12)
+
+  }else{
+   t<-research$tickets |> filter(round==i,construction=='original',window=='uniform') |> select(ticket_id,group,rank,probability)
+   canon<-list()
+   for(id in ids){h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id]);stopifnot(length(h)==1,is.finite(h));g<-f$entries[[id]]$base$grid |> as_tibble();canon[[id]]<-g |> mutate(outcome=case_when(home_goals-away_goals+h>0~'W',home_goals-away_goals+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability)/sum(g$probability),.groups='drop') |> mutate(fixture_id=id)}
+   q<-bind_rows(canon)
+  }
+  stopifnot(nrow(t)==1000L,all((t |> count(group))$n==125L),!anyDuplicated(t[c('group','ticket_id')]))
+  pm<-matrix(0,nrow=length(ids),ncol=3)
+  for(j in seq_along(ids))pm[j,]<-q$probability[match(paste(ids[j],c('W','D','L')),paste(q$fixture_id,q$outcome))]
+  stopifnot(!anyNA(pm),all(pm>=0),all(abs(rowSums(pm)-1)<1e-9))
+  events<-list();ticket_mass<-numeric(nrow(t))
+  for(j in seq_len(nrow(t))){
+   z<-strsplit(t$ticket_id[j],'|',fixed=TRUE)[[1]]
+   events[[j]]<-setNames(as.integer(sub('.*:','',z)),sub(':[^:]+$','',z))
+   stopifnot(length(events[[j]])==7L,!anyDuplicated(names(events[[j]])),all(names(events[[j]]) %in% ids))
+   ticket_mass[j]<-prod(pm[cbind(match(names(events[[j]]),ids),unname(events[[j]]))])
+  }
+  stopifnot(max(abs(ticket_mass-t$probability))<1e-12)
+  group_mass<-numeric(8)
+  for(g in groups)group_mass[g]<-sum(ticket_mass[t$group==g])
+  unions<-numeric(256);memberships<-matrix(FALSE,nrow=256,ncol=8)
+  for(mask in 0:255){
+   chosen<-which(as.logical(intToBits(mask)[1:8]));memberships[mask+1L,chosen]<-TRUE
+   if(mask>0)unions[mask+1L]<-component(events[t$group %in% chosen],ids,function(id,code)pm[match(id,ids),code])
+  }
+  full<-unions[256]
+  phi<-numeric(8);unique_mass<-numeric(8)
+  for(g in groups){
+   unique_mass[g]<-full-unions[256L-2^(g-1L)]
+   for(mask in 0:255){if(memberships[mask+1L,g])next;k<-sum(memberships[mask+1L,]);phi[g]<-phi[g]+(unions[mask+2^(g-1L)+1L]-unions[mask+1L])/(8*choose(7,k))}
+   stopifnot(abs(unions[2^(g-1L)+1L]-group_mass[g])<1e-10,unique_mass[g]>=-1e-10,phi[g]>=unique_mass[g]-1e-10,phi[g]<=group_mass[g]+1e-10)
+   group_rows[[length(group_rows)+1L]]<-tibble(round=i,model,group=g,cost_cny=250,standalone_hit=group_mass[g],exclusive_hit=unique_mass[g],shapley_hit=phi[g],exclusive_pp_per_100cny=unique_mass[g]*40,shapley_pp_per_100cny=phi[g]*40)
+  }
+  stopifnot(abs(sum(phi)-full)<1e-10,full<=sum(group_mass)+1e-10,full>=max(group_mass)-1e-10,full<=1+1e-10)
+  for(a in 1:7)for(bb in (a+1):8){
+   joint<-group_mass[a]+group_mass[bb]-unions[2^(a-1L)+2^(bb-1L)+1L]
+   pair_rows[[length(pair_rows)+1L]]<-tibble(round=i,model,group_a=a,group_b=bb,joint_hit=joint,conditional_b_given_a=joint/group_mass[a],conditional_a_given_b=joint/group_mass[bb])
+  }
+  summary_rows[[length(summary_rows)+1L]]<-tibble(round=i,model,cost_cny=2000,paid_tickets=1000L,unique_physical_tickets=n_distinct(t$ticket_id),duplicate_copies=1000L-n_distinct(t$ticket_id),any_hit=full,expected_winning_tickets=sum(group_mass),expected_wins_if_any=sum(group_mass)/full,exactly_one_group_hit=sum(unique_mass),multiple_groups_hit=full-sum(unique_mass))
+  # Model-optimal retained subsets are diagnostic savings frontiers, not adopted allocations.
+  for(k in 1:8){
+   candidates<-which(rowSums(memberships)==k);idx<-candidates[which.max(unions[candidates])]
+   chosen<-which(memberships[idx,]);subset_rows[[length(subset_rows)+1L]]<-tibble(round=i,model,n_groups=k,cost_cny=250*k,saved_cny=2000-250*k,retained_groups=paste(chosen,collapse=','),any_hit=unions[idx],lost_pp=100*(full-unions[idx]),retained_fraction=unions[idx]/full)
+  }
+  for(depth in c(25L,50L,75L,100L,125L)){
+   chosen<-rep(FALSE,nrow(t))
+   for(g in groups){idx<-which(t$group==g);idx<-idx[order(t$rank[idx])];chosen[idx[seq_len(depth)]]<-TRUE}
+   u<-component(events[chosen],ids,function(id,code)pm[match(id,ids),code])
+   stopifnot(u<=full+1e-10)
+   depth_rows[[length(depth_rows)+1L]]<-tibble(round=i,model,depth,cost_cny=16*depth,saved_cny=2000-16*depth,any_hit=u,lost_pp=100*(full-u),retained_fraction=u/full)
+  }
+  receipts[[length(receipts)+1L]]<-list(round=i,model,cutoff=cutoff,source_receipts=sources,kernel_identity=identity,probability_matrix_sha256=rlang::hash(list(ids,pm)),ticket_event_hash=rlang::hash(list(t,events)),all_subset_union_hash=rlang::hash(unions),source_rds_sha256=digest::digest(file=file.path(w,'frozen-probabilities.rds'),algo='sha256'),plans_sha256=digest::digest(file=file.path(w,'plans.rds'),algo='sha256'),research_plan_sha256=digest::digest(file=plan_path,algo='sha256'),code_identity=get('.ParlayRiskCodeHash',envir=ns)())
+ }
+}
+summary<-bind_rows(summary_rows);contributions<-bind_rows(group_rows);subsets<-bind_rows(subset_rows);depths<-bind_rows(depth_rows);pairs<-bind_rows(pair_rows)
+stopifnot(nrow(summary)==8L,nrow(contributions)==64L,nrow(subsets)==64L,nrow(depths)==40L,nrow(pairs)==224L)
+for(i in 1:4)for(m in unique(summary$model)){
+ a<-subsets |> filter(round==i,model==m) |> arrange(n_groups);d<-depths |> filter(round==i,model==m) |> arrange(depth)
+ stopifnot(all(diff(a$any_hit)>=-1e-10),all(diff(d$any_hit)>=-1e-10),abs(tail(a$any_hit,1)-tail(d$any_hit,1))<1e-10)
+}
+readr::write_csv(summary,file.path(out,'summary.csv'));readr::write_csv(contributions,file.path(out,'group-contributions.csv'));readr::write_csv(subsets,file.path(out,'subset-frontier.csv'));readr::write_csv(depths,file.path(out,'depth-frontier.csv'));readr::write_csv(pairs,file.path(out,'pair-overlap.csv'))
+saveRDS(list(receipts=receipts,input_code_sha256=digest::digest(file=file.path(root,'quarto/eight_group_capital_audit_20261017.qmd'),algo='sha256'),purpose='LABEL_FREE_MODEL_COVERAGE_DIAGNOSTIC_NOT_POLICY_ADOPTION'),file.path(out,'receipt.rds'))
+```
+
+票面重复与联合中奖覆盖（均为模型概率，非实际频率）：
+
+```{r}
+knitr::kable(summary |> mutate(across(c(any_hit,exactly_one_group_hit,multiple_groups_hit),~100*.x)),digits=3)
+```
+
+100%分布方案：各组单独覆盖、只有这组命中时的独有覆盖、顺序无关的Shapley覆盖分摊（单位百分比点）。独有覆盖低并不代表重复中奖回款无价值。
+
+```{r}
+knitr::kable(contributions |> filter(model=='full100') |> select(round,group,standalone_hit,exclusive_hit,shapley_hit) |> mutate(across(c(standalone_hit,exclusive_hit,shapley_hit),~100*.x)),digits=3)
+```
+
+100%方案，仅减少组数、保留各组125注。每个组数下穷举所有子集，展示给定模型下覆盖最高的子集，不使用目标赛果：
+
+```{r}
+knitr::kable(subsets |> filter(model=='full100',n_groups>=5) |> mutate(any_hit=100*any_hit),digits=3)
+```
+
+100%方案，保持8组，仅降低各组从原购买起点开始的购买深度：
+
+```{r}
+knitr::kable(depths |> filter(model=='full100') |> mutate(any_hit=100*any_hit),digits=3)
+inputs<-c(file.path(w,'frozen-probabilities.rds'),file.path(w,'plans.rds'),plan_path)
+knitr::kable(tibble(input=inputs,sha256=vapply(inputs,digest::digest,character(1),file=TRUE,algo='sha256')))
+```
+
+验证：正常安装包的规范化事件联合包装调用（含其Rcpp内核）及5/9小联合事件、重复事件守恒；每场概率归一、每票概率与冻结购买概率逐项重建一致、来源时间/截止绑定、8个环境各256子集、Shapley之和等于联合概率、单组精确概率一致、独有≤分摊≤单组质量、子集/深度前沿单调、完整前沿回归原方案。无新增项目函数或包实现，无蒙特卡洛抽样误差，无读取标签或赔率。子集筛选只针对已冻结概率，不拟合历史、不因实际结果挑组；不发布新购买方案。内核与加载包代码身份、输入及每轮显式截止均写入receipt.rds。概率模型的失准及跨比赛相关性仍可能使估计偏差；百分比点覆盖损失不能换算成收益损失，缺赔率时不声称资金浪费或推荐删组。报告审查与渲染记录在results/eight-group-capital-audit-20261017/。
+
+两种审计口径各用自己的概率底座，不能通过横向比较其绝对联合概率来认定哪个真实命中率更高。original_frozen概率另外从final比分网格按原让球重新投影并与冻结类别表核对；full100直接从base网格投影。两者均逐票重建概率与原购买记录一致。
