@@ -1,5 +1,7 @@
 # 构造与冻结
 
+当前发布方案按[BS-0.1.0下注策略](betting-strategy-version.md)及仓库`config/betting-strategies/BS-0.1.0.json`取显式参数；模型版本单独记录。下文150–300等历史例子仅供旧冻结重放，不是当前默认。净胜球前三档扩展、取消固定结构等探索尚未纳入BS-0.1.0。
+
 可复用入口见packages/beidan/R：SelectProbabilityBase、BuildProbabilityPlan、BuildJointProtectionPlan、BuildDiversifiedProtectionPlan、ValidateDiversifiedProtectionPlan、parlay_settings、rank_outcome_selections、parlay_construct_role_groups、parlay_settle_plan。混合分池公开入口另见[mixed-round-replay.md](mixed-round-replay.md)：PrepareMixedRoundInputs、PartitionMixedRoundFixtures、BuildMixedRoundPlans、ValidateMixedRoundPlans。先读当前函数签名及相应testthat，不凭历史参数猜调用。
 
 BuildProbabilityPlan负责prepared epoch的欧赔DC/北单等现有路径，不能认为它已统一支持V球研究客户端。对3332222，已验收的原生基座选组/联合保护/共享≤6实现可参考：

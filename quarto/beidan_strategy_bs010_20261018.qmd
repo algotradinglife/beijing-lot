@@ -1,0 +1,57 @@
+---
+title: "beidan-strategy技能：下注策略BS-0.1.0与发布流程"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+范围：文档与策略参数定义，概率模型和下注策略版本独立；不修改R包、共享函数、概率或旧冻结票单。仓库skills/beidan-strategy为唯一技能维护源，同步到用户安装目录。当前搭配FM-1.7.1＋BS-0.1.0，未来模型升级不自动改变下注策略号。10/19参考单发布后才定义策略版本，用新标注收据确认实际参数，不改原截止/manifest或声称该标签在原冻结前已经存在。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath(Sys.getenv('BEIDAN_REPOSITORY_ROOT'),mustWork=TRUE)
+w<-file.path(root,'results/strategy-bs010-skill-20261018')
+p<-jsonlite::fromJSON(file.path(root,'config/betting-strategies/BS-0.1.0.json'))
+b<-readRDS(file.path(root,p$reference$plans));f<-readRDS(file.path(root,p$reference$probabilities))
+s<-p$per_round;policy<-b$policy
+stopifnot(p$strategy_id=='BS-0.1.0',p$version=='0.1.0',p$reference_probability_model_id=='FM-1.7.1',f$model_id==p$reference_probability_model_id)
+stopifnot(s$rank_end-s$rank_start+1L==s$tickets_per_group,s$tickets_per_group*s$unit_cny==s$stake_per_group_cny,s$groups*s$tickets_per_group==s$tickets,s$groups*s$stake_per_group_cny==s$stake_cny,prod(as.integer(strsplit(s$structure,'')[[1]]))==s$theoretical_combinations_per_group)
+stopifnot(s$groups==policy$n_groups,s$rank_start==policy$start_rank,s$rank_end==policy$end_rank,s$unit_cny==policy$unit_cny,s$payout_factor==policy$payout_factor,s$stake_cny==b$spent_cny)
+stopifnot(p$fixture_selection$target_pool_size==policy$target_pool_size,p$fixture_selection$max_pair_shared_fixtures==policy$max_overlap,p$fixture_selection$max_fixture_group_reuse==policy$max_reuse,p$fixture_selection$triple_min_top3_exclusive==policy$triple_min_top3,p$fixture_selection$minimum_all_three_prematch_sp==policy$core_sp_threshold,p$selection_internal_budgets$basket_cny==policy$selection_budget_cny,p$selection_internal_budgets$group_cny==policy$selection_group_budget_cny)
+stopifnot(length(b$plans)==1L,nrow(b$plans[[1]]$purchases)==s$tickets,!anyDuplicated(b$plans[[1]]$purchases$ticket_id))
+roles<-b$plans[[1]]$legs |> group_by(group_slot) |> summarise(legs=n(),triples=sum(n_outcomes==3L),doubles=sum(n_outcomes==2L),.groups='drop')
+stopifnot(all(roles$legs==s$legs_per_group),all(roles$triples==p$fixture_selection$triples_per_group),all(roles$doubles==p$fixture_selection$doubles_per_group))
+sp<-readRDS(file.path(root,'results/fm171-check-20261019/prematch-sp.rds')) |> filter(fixture_id%in%b$plans[[1]]$legs$fixture_id)
+stopifnot(all(sp$sp_raw>=p$fixture_selection$minimum_all_three_prematch_sp))
+knitr::kable(as_tibble(s))
+knitr::kable(roles)
+knitr::kable(tibble(probability_model_id=f$model_id,betting_strategy_id=p$strategy_id,betting_strategy_version=p$version,reference_cutoff_utc=format(f$cutoff$cutoff_utc,tz='UTC')))
+label<-jsonlite::fromJSON(file.path(w,'version-label-receipt.json'))
+stopifnot(label$defined_after_freeze,lubridate::ymd_hms(label$annotation_at,tz='UTC')>f$cutoff$cutoff_utc)
+for(path in names(label$inputs))stopifnot(digest::digest(file=file.path(root,path),algo='sha256')==label$inputs[[path]])
+r<-jsonlite::fromJSON(file.path(w,'dashboard.json'),simplifyVector=FALSE);old<-jsonlite::fromJSON(file.path(w,'before-dashboard.json'),simplifyVector=FALSE)
+stopifnot(length(r$batches)==length(old$batches),identical(r$history,old$history))
+for(i in seq_along(r$batches)){
+ if(r$batches[[i]]$config=='config/betting-sheet-results-fm171-20261019.json')stopifnot(r$batches[[i]]$probability_model_id==f$model_id,r$batches[[i]]$betting_strategy_id==p$strategy_id,r$batches[[i]]$betting_strategy_version==p$version,str_detect(r$batches[[i]]$label,fixed(p$strategy_id)),str_detect(r$batches[[i]]$algorithm,fixed(p$strategy_id)))
+ else stopifnot(identical(r$batches[[i]],old$batches[[i]]))
+}
+files<-c('skills/beidan-strategy/SKILL.md','skills/beidan-strategy/references/betting-strategy-version.md','skills/beidan-strategy/references/operations.md','skills/beidan-strategy/references/planning.md','config/betting-strategies/BS-0.1.0.json')
+stopifnot(all(file.exists(file.path(root,files))))
+entry<-read_file(file.path(root,files[1]));stopifnot(str_detect(entry,fixed('BS-0.1.0')),str_detect(entry,fixed('betting-strategy-version.md')))
+for(path in files[1:4]){
+ body<-read_file(file.path(root,path));links<-str_match_all(body,'\\]\\(([^)]+[.]md)\\)')[[1]]
+ if(nrow(links))for(link in links[,2])stopifnot(file.exists(file.path(dirname(file.path(root,path)),link)))
+}
+knitr::kable(tibble(path=files,sha256=map_chr(files,~digest::digest(file=file.path(root,.x),algo='sha256'))))
+stopifnot(grepl('Skill is valid',read_file(file.path(w,'skill-validation.log')),fixed=TRUE))
+```
+
+策略明确：窗口准入、三项SP最小值≥2、基本面不确定的市场复核例外、混合分池（不是按时间硬切）、三选Top3>20%且Top2−Top3差最小、双选底组覆盖排序、8个保护掩码、共享≤6和复用≤8、零重复发布门槛、原概率排名30–154与内部/实际预算区别。概率模型的同赛事λ/ρ/尾部流程由模型版本合同控制，未复制进策略实现。策略JSON是定义，现有包不自动读取或识别版本字段；技能要求客户端显式传参、写入版本与配置哈希并验收。
+
+发布步骤补全：生成HTML/CSV/support、逐票复解析、独立runtime与绑定、预检集中观察/离线结算、QMD及审查、锁/备份/事务发布、首页登记、systemd及ExecStartPost、真实UPDATED/queried=true且时间前进（不能把BUSY退出0当成功）、远程字节/准确票/旧记录核对。检查场次与授权发布区别保留，已有授权不重复询问。
+
+本次无函数或包变更；自动化验收为上述R/tibble参数/算术/版本/原冻结/链接/旧登记保留断言，skill-creator的quick_validate.py，以及干净Quarto渲染和codex review。精确命令与退出状态保存在results/strategy-bs010-skill-20261018，审查回执绑定最终QMD/技能/JSON/拟显示配置哈希，发现与修复记review.log及review-receipt.json。没有运行或声称通过包全套测试；未改包不触发包变更门禁。同步保留before-installed-skill与before-repository-skill备份及恢复库存，完成后逐文件核对源与安装副本哈希。面板只给10/19当前参考轮追加两个版本显示，不改概率/票单，旧轮次不追认；发布后远程核验见deployment.json。

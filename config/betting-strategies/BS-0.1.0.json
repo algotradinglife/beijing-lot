@@ -1,0 +1,96 @@
+{
+  "schema": "betting_strategy_definition_v1",
+  "strategy_id": "BS-0.1.0",
+  "version": "0.1.0",
+  "reference_probability_model_id": "FM-1.7.1",
+  "status": "defined_from_published_reference",
+  "per_round": {
+    "groups": 8,
+    "legs_per_group": 7,
+    "structure": "3332222",
+    "theoretical_combinations_per_group": 432,
+    "rank_start": 30,
+    "rank_end": 154,
+    "rank_inclusive": true,
+    "tickets_per_group": 125,
+    "unit_cny": 2,
+    "stake_per_group_cny": 250,
+    "tickets": 1000,
+    "stake_cny": 2000,
+    "payout_factor": 0.65
+  },
+  "fixture_selection": {
+    "timezone": "Asia/Shanghai",
+    "window": "[start,end)",
+    "minimum_all_three_prematch_sp": 2,
+    "prematch_provider": "nowscore",
+    "uncertainty_policy": "native_uncertain_only_with_sufficient_consistent_three_channel_market",
+    "native_support_policy": "probability_model_contract",
+    "target_pool_size": 20,
+    "automatic_round_count": "ceiling(eligible_fixtures / target_pool_size); every round must be feasible",
+    "pool_partition": "top1_minus_top3_ascending_then_fixture_id_round_robin",
+    "disjoint_round_pools": true,
+    "triple_min_top3_exclusive": 0.2,
+    "triples_per_group": 3,
+    "triple_order": "top2_minus_top3_ascending_then_fixture_id",
+    "doubles_per_group": 4,
+    "base_order": "primary_double_coverage_product_descending_then_canonical_fixture_key",
+    "double_protection": "original_eight_Top12_Top13_masks_across_distinct_seven_fixture_bases",
+    "mask_selection": "exact_maximum_structural_probability_mass_on_original_joint_base_then_original_mask_order",
+    "max_pair_shared_fixtures": 6,
+    "max_fixture_group_reuse": 8,
+    "single_selections": false,
+    "duplicate_physical_tickets": "must_be_zero_for_publication; do_not_silently_deduplicate",
+    "planning_minimum_lead_minutes": 15,
+    "publish_only_future_fixtures": true
+  },
+  "market_admission": {
+    "euro_company_basket": [
+      "281",
+      "115",
+      "82",
+      "432"
+    ],
+    "minimum_euro_companies": 3,
+    "minimum_asian_companies": 1,
+    "minimum_totals_companies": 1,
+    "supported_totals_line_minimum": 2.5,
+    "maximum_quote_age_hours": 48,
+    "maximum_euro_residual": 0.05,
+    "maximum_asian_residual": 0.05,
+    "identity_and_chronology_verified": true
+  },
+  "purchase_ranking": {
+    "order": "original_probability_product_descending",
+    "equivalent_score": "sum(log(p))",
+    "tie_rule": "authoritative_package_deterministic_ties",
+    "sp_sorting": false,
+    "probability_flattening": false
+  },
+  "selection_internal_budgets": {
+    "basket_cny": 2048,
+    "group_cny": 256,
+    "purpose": "selection_only_not_final_purchase_stake"
+  },
+  "publication": {
+    "hourly_results": true,
+    "timer_minute": 15,
+    "dashboard_refresh_seconds": 60,
+    "results_and_settlement_provider": "nowscore",
+    "stop_network_when_all_results_and_financial_statistics_complete": true,
+    "missing_settlement_sp": "pending_not_zero",
+    "postponement": "official_rule_or_explicit_manual_instruction_separately_disclosed"
+  },
+  "version_fields": [
+    "probability_model_id",
+    "betting_strategy_id",
+    "betting_strategy_version"
+  ],
+  "reference": {
+    "manifest": "results/fm171-check-20261019/manifest.json",
+    "plans": "results/fm171-check-20261019/plans.rds",
+    "probabilities": "results/fm171-check-20261019/frozen-probabilities.rds",
+    "publication_receipt": "results/fm171-check-20261019/deployment-receipt.json",
+    "note": "Version label defined after this reference was frozen; do not rewrite its frozen inputs or treat the label as a pre-freeze artifact."
+  }
+}
