@@ -1,17 +1,18 @@
 {
   "status": "POSTEVENT_TRUNCATED_MARGIN_RANK_DIAGNOSTIC_REVIEWED",
   "review_command": "codex review; scope and full command preserved in review.log",
-  "review_findings": "No blocking findings; independently verified conditional probabilities and ranks",
+  "review_findings": "100% full-support boundary verified; direct pre-tail mapping error <=1.12e-16; prior nine CSV rows unchanged; 320 combinations and correct pending states verified",
   "render_command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/margin_truncated_rank_20261017.qmd --no-cache -P project_root:$PWD",
   "render_exit": 0,
   "checks": {
     "fixtures": 52,
-    "thresholds": 9,
-    "conditional_rows": 1404,
-    "seven_leg_evaluations": 288,
+    "thresholds": 10,
+    "conditional_rows": 1560,
+    "seven_leg_evaluations": 320,
     "settled_groups_per_threshold": 24,
     "rendered_tables": 4,
-    "error_blocks": 0
+    "error_blocks": 0,
+    "prior_nine_threshold_outputs_exactly_unchanged": true
   },
   "limits": [
     "Postevent descriptive fixed-policy comparison",
@@ -21,11 +22,11 @@
     "No new purchases, payouts or model policy adoption"
   ],
   "files": {
-    "quarto/margin_truncated_rank_20261017.qmd": "127bae8f97e6ef12c799400da2d4956c87ff5c1943e76e99b7adec747276832a",
-    "quarto/margin_truncated_rank_20261017.html": "d9510b2bc3b0cbb4a058d176812a5d30fc57b745581c8aa5c16ae0cf8323c4e2",
-    "results/margin-truncated-rank-20261017/groups.csv": "d71657f59aa1dd8966aaa438aa2004f8392a3cb9c3c0e2c1d12c261701020d63",
-    "results/margin-truncated-rank-20261017/summary.csv": "16a48960d7dfcfddfe86b010098958547aaebca405cc388c195ba45d17df6e11",
-    "results/margin-truncated-rank-20261017/conditional-probabilities.csv": "864bf5084528f64c4abae1058ffe40fde30a26ab6f0140d419d30d92b262d83d",
-    "results/margin-truncated-rank-20261017/pending-ranks.csv": "00da36ca8e785eb4560156a5cf34b8875d49abea2b14c05eff48fd5ce55ba572"
+    "quarto/margin_truncated_rank_20261017.qmd": "0713e77deabad7dca883f85704c7fa1a3a63d99a814029641e26b059a7a7797b",
+    "quarto/margin_truncated_rank_20261017.html": "8d2d6028d2806ad4d8e4ef63e7357f3ec431249620963477f5608a4507ad0dec",
+    "results/margin-truncated-rank-20261017/groups.csv": "df057f0fa87f298ccaa042bac627a2462fe96dc0db9656c43b2fe29eae793e02",
+    "results/margin-truncated-rank-20261017/summary.csv": "75224744fe77354d8d76b5b20bb4e9ec8ce9c71d4d417bdd5231c3a03447d513",
+    "results/margin-truncated-rank-20261017/conditional-probabilities.csv": "3df22a68046bc8f8e736dd855fffee3e53b456ed049945b4f74a5e532ea3fd5c",
+    "results/margin-truncated-rank-20261017/pending-ranks.csv": "a704558097d46a46363cdabecb1b2e4ea9e7c5a80d20b5f718ac036bf931d9f8"
   }
 }

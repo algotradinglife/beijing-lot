@@ -9,7 +9,7 @@ params:
   project_root: "."
 ---
 
-使用原四轮七场组合（每轮8个固定场次组合），只为和此前直接对照，不把8组作为新策略要求。来源是冻结FM尾部压缩前base网格。按20/30/40/50/60/70/80/90/95%阈值累计选择高概率净胜球档，边界同概率一起保留，**核心外概率置零，核心内重新归一化**，再映射北单让球W/D/L，按七场类别概率乘积排序、票号破同分。不保留旧允许集合，不复用旧最终概率。固定封存赛果，第二轮未知标签保留待定；实际类别被截掉则为未覆盖而非给一个排名。
+使用原四轮七场组合（每轮8个固定场次组合），只为和此前直接对照，不把8组作为新策略要求。来源是冻结FM尾部压缩前base网格。按20/30/40/50/60/70/80/90/95/100%阈值累计选择高概率净胜球档，边界同概率一起保留，**核心外概率置零，核心内重新归一化**，再映射北单让球W/D/L，按七场类别概率乘积排序、票号破同分。不保留旧允许集合，不复用旧最终概率。固定封存赛果，第二轮未知标签保留待定；实际类别被截掉则为未覆盖而非给一个排名。
 
 ```{r}
 #| include: false
@@ -20,7 +20,7 @@ w <- file.path(root,'results/fm17-upcoming-20261017')
 f <- readRDS(file.path(w,'frozen-probabilities.rds'));b <- readRDS(file.path(w,'plans.rds'))
 s <- jsonlite::fromJSON(file.path(root,'results/margin-ranking-20261017-review/settlement-state.json'))
 classification <- readr::read_csv(file.path(root,'results/margin-support-classification-20261017/fixtures.csv'),show_col_types=FALSE)
-thresholds <- c(.2,.3,.4,.5,.6,.7,.8,.9,.95)
+thresholds <- c(.2,.3,.4,.5,.6,.7,.8,.9,.95,1)
 prob_rows <- list()
 ids <- unique(unlist(lapply(b$plans, function(p)p$legs$fixture_id)))
 for(id in ids){
@@ -29,13 +29,15 @@ for(id in ids){
  stopifnot(abs(sum(m$probability)-1)<1e-9,all(m$probability>=0))
  blocks <- m |> group_by(probability) |> summarise(mass=sum(probability),.groups='drop') |> arrange(desc(probability)) |> mutate(cumulative=cumsum(mass))
  for(t in thresholds){
-  boundary <- blocks$probability[which(blocks$cumulative>=t)[1]]
+  boundary <- if(t==1) min(m$probability) else blocks$probability[which(blocks$cumulative>=t)[1]]
   core <- m |> filter(probability>=boundary)
   mass <- sum(core$probability)
   mapped <- core |> mutate(outcome=case_when(margin+h>0~'W',margin+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability)/mass,.groups='drop')
   mapped <- tibble(outcome=c('W','D','L')) |> left_join(mapped,by='outcome',relationship='one-to-one') |> mutate(probability=replace_na(probability,0),fixture_id=id,threshold=t)
   original_class <- classification |> filter(fixture_id==id,threshold==t)
-  stopifnot(nrow(original_class)==1,sum(mapped$probability>0)==original_class$n_choices,abs(sum(mapped$probability)-1)<1e-12,mass>=t-1e-12)
+  stopifnot(abs(sum(mapped$probability)-1)<1e-12,mass>=t-1e-12)
+  if(t<1) stopifnot(nrow(original_class)==1,sum(mapped$probability>0)==original_class$n_choices)
+  if(t==1) stopifnot(nrow(core)==nrow(m),abs(mass-1)<1e-9)
   prob_rows[[length(prob_rows)+1L]] <- mapped
  }
 }
@@ -71,7 +73,7 @@ for(i in 1:4){
  }
 }
 x <- bind_rows(rows)
-stopifnot(nrow(x)==288L,!anyDuplicated(x[c('round','group','threshold')]),all(is.na(x$winning_rank[x$state!='RANKED'])),all(x$winning_rank[x$state=='RANKED']<=x$theory[x$state=='RANKED']))
+stopifnot(nrow(x)==320L,!anyDuplicated(x[c('round','group','threshold')]),all(is.na(x$winning_rank[x$state!='RANKED'])),all(x$winning_rank[x$state=='RANKED']<=x$theory[x$state=='RANKED']))
 summary <- x |> filter(round!=2) |> group_by(threshold) |> summarise(groups=n(),covered=sum(state=='RANKED'),excluded=sum(state=='EXCLUDED'),rank_1_125=sum(hit_1_125),rank_30_154=sum(hit_30_154),rank_126_250=sum(winning_rank>=126&winning_rank<=250,na.rm=TRUE),rank_251_500=sum(winning_rank>=251&winning_rank<=500,na.rm=TRUE),rank_501_1000=sum(winning_rank>=501&winning_rank<=1000,na.rm=TRUE),rank_1001_2187=sum(winning_rank>=1001,na.rm=TRUE),.groups='drop')
 stopifnot(all(summary$groups==24L),all(summary$covered+summary$excluded==24L),all(summary$covered==summary$rank_1_125+summary$rank_126_250+summary$rank_251_500+summary$rank_501_1000+summary$rank_1001_2187))
 for(t in thresholds){
@@ -101,4 +103,6 @@ knitr::kable(x |> filter(round==2) |> group_by(threshold) |> summarise(known_hit
 knitr::kable(tibble(input=input_files,sha256=vapply(input_files,digest::digest,character(1),file=TRUE,algo='sha256')))
 ```
 
-验收检查：52场×9阈值每场三类别概率归一、支持数与前次分类逐场一致；32个固定组合×9阈值完整唯一；每个组合票数等于允许类别数乘积、无重复、票概率和为1、排名递减、确定结果唯一且在范围内、缺失标签不伪造排名、24组区间计数守恒。不新增函数、不修改包；调用既有已安装包枚举和排序并传入原显式截止。截断后的概率是核心条件分布，不能冒充已校准的无条件实际概率；组间重叠且非独立。本分析是事后政策对照，不据目标赛果选择阈值或窗口，不发布票单、不报告收益。审查/渲染和输入输出SHA记录在results/margin-truncated-rank-20261017/。
+验收检查：52场×10阈值每场三类别概率归一、支持数与前次分类逐场一致；32个固定组合×10阈值完整唯一；每个组合票数等于允许类别数乘积、无重复、票概率和为1、排名递减、确定结果唯一且在范围内、缺失标签不伪造排名、24组区间计数守恒。不新增函数、不修改包；调用既有已安装包枚举和排序并传入原显式截止。截断后的概率是核心条件分布，不能冒充已校准的无条件实际概率；组间重叠且非独立。本分析是事后政策对照，不据目标赛果选择阈值或窗口，不发布票单、不报告收益。审查/渲染和输入输出SHA记录在results/margin-truncated-rank-20261017/。
+
+100%专门保留全部净胜球档，避免浮点累计略小于1时误判无边界；检验完整核心与原网格质量一致。它是尾部压缩前的原分布，不是FM17压缩后的冻结概率。

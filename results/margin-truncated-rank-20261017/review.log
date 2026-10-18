@@ -7,13 +7,70 @@ approval: never
 sandbox: danger-full-access
 reasoning effort: low
 reasoning summaries: none
-session id: 01a14d05-0d59-71d1-b2cd-76186318e8db
+session id: 01a14d21-6c59-79f1-b4a9-a90202a32086
 --------
 user
-Review only quarto/margin_truncated_rank_20261017.qmd and its results/margin-truncated-rank-20261017 outputs and HTML once available. User explicitly requests ranks based on cumulative threshold TRUNCATED margin distribution: use precompression selected base, descending masses boundary ties, zero outside core and normalize, project to handicap WDL, use conditional projected probabilities and supports for seven-leg enumeration/rank. Existing 32 frozen seven-leg fixture sets retained only for comparison, nine thresholds .2 .3 .4 .5 .6 .7 .8 .9 .95, fixed original cutoff. Three settled rounds24 groups and frozen pending round2 separated, no label-based tuning, no purchase or payout claims. Check algorithm, pending handling, interval totals, probability and source contracts, any new functions/package changes. Report blocking findings only; do not edit unrelated work. Render running initially, do not treat temporarily absent outputs as a final finding.
+Review only addition of 100% threshold in quarto/margin_truncated_rank_20261017.qmd and its HTML/results/margin-truncated-rank-20261017 generated CSVs. Previously reviewed9 thresholds; now10,320 combinations. At t=1 retain every margin via min mass boundary, normalize and map original PRE-tail grid, not frozen final compressed probabilities. Existing cutoff/known labels remain unchanged. Rendering currently running. Check full-support boundary including floating rounding, mapping/normalization, prior9-output invariance if available, totals and pending states. No new functions/package changes; report blocking findings only. Do not inspect unrelated dirty work.
 exec
-/usr/bin/zsh -lc 'cat /home/drwho1985/.codex/skills/gstack-review/SKILL.md' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+/usr/bin/zsh -lc 'git diff -- quarto/margin_truncated_rank_20261017.qmd; cat /home/drwho1985/.codex/skills/gstack-review/SKILL.md' in /home/drwho1985/workspace/algotradinglife/beijing-lot
  succeeded in 0ms:
+diff --git a/quarto/margin_truncated_rank_20261017.qmd b/quarto/margin_truncated_rank_20261017.qmd
+index 9eb0f83c..72a0b39b 100644
+--- a/quarto/margin_truncated_rank_20261017.qmd
++++ b/quarto/margin_truncated_rank_20261017.qmd
+@@ -9,7 +9,7 @@ params:
+   project_root: "."
+ ---
+ 
+-使用原四轮七场组合（每轮8个固定场次组合），只为和此前直接对照，不把8组作为新策略要求。来源是冻结FM尾部压缩前base网格。按20/30/40/50/60/70/80/90/95%阈值累计选择高概率净胜球档，边界同概率一起保留，**核心外概率置零，核心内重新归一化**，再映射北单让球W/D/L，按七场类别概率乘积排序、票号破同分。不保留旧允许集合，不复用旧最终概率。固定封存赛果，第二轮未知标签保留待定；实际类别被截掉则为未覆盖而非给一个排名。
++使用原四轮七场组合（每轮8个固定场次组合），只为和此前直接对照，不把8组作为新策略要求。来源是冻结FM尾部压缩前base网格。按20/30/40/50/60/70/80/90/95/100%阈值累计选择高概率净胜球档，边界同概率一起保留，**核心外概率置零，核心内重新归一化**，再映射北单让球W/D/L，按七场类别概率乘积排序、票号破同分。不保留旧允许集合，不复用旧最终概率。固定封存赛果，第二轮未知标签保留待定；实际类别被截掉则为未覆盖而非给一个排名。
+ 
+ ```{r}
+ #| include: false
+@@ -20,7 +20,7 @@ w <- file.path(root,'results/fm17-upcoming-20261017')
+ f <- readRDS(file.path(w,'frozen-probabilities.rds'));b <- readRDS(file.path(w,'plans.rds'))
+ s <- jsonlite::fromJSON(file.path(root,'results/margin-ranking-20261017-review/settlement-state.json'))
+ classification <- readr::read_csv(file.path(root,'results/margin-support-classification-20261017/fixtures.csv'),show_col_types=FALSE)
+-thresholds <- c(.2,.3,.4,.5,.6,.7,.8,.9,.95)
++thresholds <- c(.2,.3,.4,.5,.6,.7,.8,.9,.95,1)
+ prob_rows <- list()
+ ids <- unique(unlist(lapply(b$plans, function(p)p$legs$fixture_id)))
+ for(id in ids){
+@@ -29,13 +29,15 @@ for(id in ids){
+  stopifnot(abs(sum(m$probability)-1)<1e-9,all(m$probability>=0))
+  blocks <- m |> group_by(probability) |> summarise(mass=sum(probability),.groups='drop') |> arrange(desc(probability)) |> mutate(cumulative=cumsum(mass))
+  for(t in thresholds){
+-  boundary <- blocks$probability[which(blocks$cumulative>=t)[1]]
++  boundary <- if(t==1) min(m$probability) else blocks$probability[which(blocks$cumulative>=t)[1]]
+   core <- m |> filter(probability>=boundary)
+   mass <- sum(core$probability)
+   mapped <- core |> mutate(outcome=case_when(margin+h>0~'W',margin+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability)/mass,.groups='drop')
+   mapped <- tibble(outcome=c('W','D','L')) |> left_join(mapped,by='outcome',relationship='one-to-one') |> mutate(probability=replace_na(probability,0),fixture_id=id,threshold=t)
+   original_class <- classification |> filter(fixture_id==id,threshold==t)
+-  stopifnot(nrow(original_class)==1,sum(mapped$probability>0)==original_class$n_choices,abs(sum(mapped$probability)-1)<1e-12,mass>=t-1e-12)
++  stopifnot(abs(sum(mapped$probability)-1)<1e-12,mass>=t-1e-12)
++  if(t<1) stopifnot(nrow(original_class)==1,sum(mapped$probability>0)==original_class$n_choices)
++  if(t==1) stopifnot(nrow(core)==nrow(m),abs(mass-1)<1e-9)
+   prob_rows[[length(prob_rows)+1L]] <- mapped
+  }
+ }
+@@ -71,7 +73,7 @@ for(i in 1:4){
+  }
+ }
+ x <- bind_rows(rows)
+-stopifnot(nrow(x)==288L,!anyDuplicated(x[c('round','group','threshold')]),all(is.na(x$winning_rank[x$state!='RANKED'])),all(x$winning_rank[x$state=='RANKED']<=x$theory[x$state=='RANKED']))
++stopifnot(nrow(x)==320L,!anyDuplicated(x[c('round','group','threshold')]),all(is.na(x$winning_rank[x$state!='RANKED'])),all(x$winning_rank[x$state=='RANKED']<=x$theory[x$state=='RANKED']))
+ summary <- x |> filter(round!=2) |> group_by(threshold) |> summarise(groups=n(),covered=sum(state=='RANKED'),excluded=sum(state=='EXCLUDED'),rank_1_125=sum(hit_1_125),rank_30_154=sum(hit_30_154),rank_126_250=sum(winning_rank>=126&winning_rank<=250,na.rm=TRUE),rank_251_500=sum(winning_rank>=251&winning_rank<=500,na.rm=TRUE),rank_501_1000=sum(winning_rank>=501&winning_rank<=1000,na.rm=TRUE),rank_1001_2187=sum(winning_rank>=1001,na.rm=TRUE),.groups='drop')
+ stopifnot(all(summary$groups==24L),all(summary$covered+summary$excluded==24L),all(summary$covered==summary$rank_1_125+summary$rank_126_250+summary$rank_251_500+summary$rank_501_1000+summary$rank_1001_2187))
+ for(t in thresholds){
+@@ -101,4 +103,6 @@ knitr::kable(x |> filter(round==2) |> group_by(threshold) |> summarise(known_hit
+ knitr::kable(tibble(input=input_files,sha256=vapply(input_files,digest::digest,character(1),file=TRUE,algo='sha256')))
+ ```
+ 
+-验收检查：52场×9阈值每场三类别概率归一、支持数与前次分类逐场一致；32个固定组合×9阈值完整唯一；每个组合票数等于允许类别数乘积、无重复、票概率和为1、排名递减、确定结果唯一且在范围内、缺失标签不伪造排名、24组区间计数守恒。不新增函数、不修改包；调用既有已安装包枚举和排序并传入原显式截止。截断后的概率是核心条件分布，不能冒充已校准的无条件实际概率；组间重叠且非独立。本分析是事后政策对照，不据目标赛果选择阈值或窗口，不发布票单、不报告收益。审查/渲染和输入输出SHA记录在results/margin-truncated-rank-20261017/。
++验收检查：52场×10阈值每场三类别概率归一、支持数与前次分类逐场一致；32个固定组合×10阈值完整唯一；每个组合票数等于允许类别数乘积、无重复、票概率和为1、排名递减、确定结果唯一且在范围内、缺失标签不伪造排名、24组区间计数守恒。不新增函数、不修改包；调用既有已安装包枚举和排序并传入原显式截止。截断后的概率是核心条件分布，不能冒充已校准的无条件实际概率；组间重叠且非独立。本分析是事后政策对照，不据目标赛果选择阈值或窗口，不发布票单、不报告收益。审查/渲染和输入输出SHA记录在results/margin-truncated-rank-20261017/。
++
++100%专门保留全部净胜球档，避免浮点累计略小于1时误判无边界；检验完整核心与原网格质量一致。它是尾部压缩前的原分布，不是FM17压缩后的冻结概率。
 ---
 name: review
 description: |
@@ -1128,1510 +1185,8 @@ If the review exits early before a real review completes (for example, no diff a
 - **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence. Never post vague replies.
 
 exec
-/usr/bin/zsh -lc 'git status --short; find .. -name AGENTS.md -o -name AGENTS.override.md' in /home/drwho1985/workspace/algotradinglife/beijing-lot
- succeeded in 309ms:
- M AGENTS.md
- M DESCRIPTION
- M docs/research-notes/Research-Wiki.md
- M docs/reviews/outcome-role-variants.json
- M packages/beidan/NAMESPACE
- M packages/beidan/R/RcppExports.R
- M packages/beidan/R/adapt_outcome_selections.R
- M packages/beidan/R/beidan-package.R
- M packages/beidan/R/build_probability_plan.R
- M packages/beidan/R/component_union_identity.R
- M packages/beidan/R/dixon_coles_grid.R
- M packages/beidan/R/frozen_budget_allocation.R
- M packages/beidan/R/match_probability_blend.R
- M packages/beidan/R/n7_pipeline_value.R
- M packages/beidan/R/parlay_coverage_attribution.R
- M packages/beidan/R/parlay_evaluation_contract.R
- M packages/beidan/R/parlay_select_groups.R
- M packages/beidan/R/recent_venue_goals.R
- M packages/beidan/inst/python/beidan_backend/issue_schedule/contract.py
- M packages/beidan/inst/python/beidan_backend/issue_schedule/sources.py
- M packages/beidan/inst/python/beidan_backend/market_capture/history.py
- M packages/beidan/inst/python/beidan_backend/market_capture/service.py
- M packages/beidan/inst/python/beidan_backend/recent_venue_goals.py
- M packages/beidan/inst/python/beidan_backend/temporal_learning/core.py
- M packages/beidan/inst/python/beidan_backend/versioning.py
- M packages/beidan/inst/python/pyproject.toml
- M packages/beidan/inst/quarto/betting_sheet.qmd
- M packages/beidan/man/AdaptOutcomeSelections.Rd
- D packages/beidan/man/AllocateParlayBudget.Rd
- D packages/beidan/man/BettingSheetDepth.Rd
- D packages/beidan/man/BlendMatchProbabilities.Rd
- D packages/beidan/man/BuildBettingSheetView.Rd
- D packages/beidan/man/BuildEvaluationBettingSheetView.Rd
- M packages/beidan/man/BuildProbabilityPlan.Rd
- D packages/beidan/man/CompressParlayTickets.Rd
- D packages/beidan/man/DcAccuracyDiagnostic.Rd
- D packages/beidan/man/DcProtectionChoices.Rd
- D packages/beidan/man/DcRhoScenarios.Rd
- D packages/beidan/man/DiagnoseParlayDependence.Rd
- D packages/beidan/man/DiagnoseParlayDepth.Rd
- D packages/beidan/man/FreezeResearchBudgetPrefixes.Rd
- D packages/beidan/man/RenderBettingSheet.Rd
- D packages/beidan/man/ReplaceDcDrawProbability.Rd
- D packages/beidan/man/ReplaceZeroHandicapProbability.Rd
- D packages/beidan/man/SettleResearchBudgetPrefixes.Rd
- D packages/beidan/man/SummarizeBudgetAllocations.Rd
- D packages/beidan/man/asian_total_probability.Rd
- D packages/beidan/man/beidan-package.Rd
- D packages/beidan/man/bounded_market_lambdas.Rd
- D packages/beidan/man/classify_outcomes.Rd
- D packages/beidan/man/dataset_contract.Rd
- D packages/beidan/man/dataset_derived_tables.Rd
- D packages/beidan/man/dataset_manifest.Rd
- D packages/beidan/man/dataset_query.Rd
- D packages/beidan/man/dataset_registry.Rd
- D packages/beidan/man/dataset_tables.Rd
- D packages/beidan/man/dot-BuildDecisionTables.Rd
- D packages/beidan/man/dot-DiagnoseParlayPlan.Rd
- D packages/beidan/man/dot-EstimateMatchProbabilities.Rd
- D packages/beidan/man/dot-FreezeParlayPlan.Rd
- D packages/beidan/man/dot-FundGroups.Rd
- D packages/beidan/man/dot-PrepareMatchInputs.Rd
- D packages/beidan/man/dot-ReplayIssue.Rd
- D packages/beidan/man/dot-ValidatePriorBinding.Rd
- D packages/beidan/man/estimate_match_probabilities.Rd
- D packages/beidan/man/example_match_source.Rd
- D packages/beidan/man/example_source_url.Rd
- D packages/beidan/man/fetch_issue_prematch_sp.Rd
- D packages/beidan/man/fetch_issue_schedule.Rd
- D packages/beidan/man/fetch_issue_settlements.Rd
- D packages/beidan/man/fetch_match_markets.Rd
- D packages/beidan/man/filter_outcome_matches.Rd
- D packages/beidan/man/issue_schedule.Rd
- D packages/beidan/man/issue_schedule_attach.Rd
- D packages/beidan/man/issue_schedule_character.Rd
- D packages/beidan/man/issue_schedule_coerce.Rd
- D packages/beidan/man/issue_schedule_column_vector.Rd
- D packages/beidan/man/issue_schedule_columns.Rd
- D packages/beidan/man/issue_schedule_double.Rd
- D packages/beidan/man/issue_schedule_empty.Rd
- D packages/beidan/man/issue_schedule_integer.Rd
- D packages/beidan/man/issue_schedule_module.Rd
- D packages/beidan/man/issue_schedule_pages_dict.Rd
- D packages/beidan/man/issue_schedule_rows_to_tibble.Rd
- D packages/beidan/man/issue_schedule_timestamp.Rd
- D packages/beidan/man/issue_schedule_types.Rd
- D packages/beidan/man/jev_schedule_answers.Rd
- D packages/beidan/man/jev_schedule_judge.Rd
- D packages/beidan/man/jev_schedule_request.Rd
- D packages/beidan/man/judge_schedule_identity.Rd
- D packages/beidan/man/learning_cutoff.Rd
- D packages/beidan/man/make_example_issue.Rd
- D packages/beidan/man/market_score_projection.Rd
- D packages/beidan/man/match_check_character_id.Rd
- D packages/beidan/man/match_check_probability_sum.Rd
- D packages/beidan/man/match_check_slot.Rd
- D packages/beidan/man/match_coerce_source_table.Rd
- D packages/beidan/man/match_convert_water.Rd
- D packages/beidan/man/match_cutoff_utc.Rd
- D packages/beidan/man/match_decision_window.Rd
- D packages/beidan/man/match_domain_table.Rd
- D packages/beidan/man/match_domain_table_class.Rd
- D packages/beidan/man/match_domain_table_data.Rd
- D packages/beidan/man/match_euro_mean.Rd
- D packages/beidan/man/match_hk_to_decimal.Rd
- D packages/beidan/man/match_inputs_from_capture.Rd
- D packages/beidan/man/match_latest_quote_before.Rd
- D packages/beidan/man/match_market_schedule.Rd
- D packages/beidan/man/match_normalise_outcome.Rd
- D packages/beidan/man/match_outcomes.Rd
- D packages/beidan/man/match_parse_utc.Rd
- D packages/beidan/man/match_read_fixture_source.Rd
- D packages/beidan/man/match_require_cutoff.Rd
- D packages/beidan/man/match_select_status.Rd
- D packages/beidan/man/match_source_csv_columns.Rd
- D packages/beidan/man/match_sp_quote_class.Rd
- D packages/beidan/man/match_sp_quote_from_row.Rd
- D packages/beidan/man/match_sp_quotes_to_tibble.Rd
- D packages/beidan/man/match_status_levels.Rd
- D packages/beidan/man/match_table_schemas.Rd
- D packages/beidan/man/match_totals_selected.Rd
- D packages/beidan/man/match_typed_empty.Rd
- D packages/beidan/man/match_validate_rho.Rd
- D packages/beidan/man/match_validate_status.Rd
- D packages/beidan/man/match_validate_table.Rd
- D packages/beidan/man/parlay-contracts.Rd
- D packages/beidan/man/parlay_allocate_budget_units.Rd
- D packages/beidan/man/parlay_allocate_portfolio.Rd
- D packages/beidan/man/parlay_apply_structure.Rd
- D packages/beidan/man/parlay_betting_sheet.Rd
- D packages/beidan/man/parlay_budget_state.Rd
- D packages/beidan/man/parlay_build_plan.Rd
- D packages/beidan/man/parlay_candidate_support_grid.Rd
- D packages/beidan/man/parlay_check_saved_result.Rd
- D packages/beidan/man/parlay_check_unit_caps.Rd
- D packages/beidan/man/parlay_compare_risk.Rd
- D packages/beidan/man/parlay_construct_groups.Rd
- D packages/beidan/man/parlay_construct_role_groups.Rd
- D packages/beidan/man/parlay_coverage_frontier.Rd
- D packages/beidan/man/parlay_diagnose_plan.Rd
- D packages/beidan/man/parlay_diagnose_settlement.Rd
- D packages/beidan/man/parlay_enumerate_tickets.Rd
- D packages/beidan/man/parlay_explore_portfolios.Rd
- D packages/beidan/man/parlay_fixed_depth_curve.Rd
- D packages/beidan/man/parlay_frontier.Rd
- D packages/beidan/man/parlay_fund_admitted_groups.Rd
- D packages/beidan/man/parlay_generate_candidates.Rd
- D packages/beidan/man/parlay_group_identity.Rd
- D packages/beidan/man/parlay_outcome_codes.Rd
- D packages/beidan/man/parlay_outcome_rank.Rd
- D packages/beidan/man/parlay_payout_for_candidate.Rd
- D packages/beidan/man/parlay_plan_summary.Rd
- D packages/beidan/man/parlay_probability_wide.Rd
- D packages/beidan/man/parlay_projection_context.Rd
- D packages/beidan/man/parlay_rank_tickets.Rd
- D packages/beidan/man/parlay_read_result.Rd
- D packages/beidan/man/parlay_replay_issue.Rd
- D packages/beidan/man/parlay_resolve_allocations.Rd
- D packages/beidan/man/parlay_restructure_plan.Rd
- D packages/beidan/man/parlay_role_scores.Rd
- D packages/beidan/man/parlay_save_result.Rd
- D packages/beidan/man/parlay_select_funding_candidates.Rd
- D packages/beidan/man/parlay_select_groups.Rd
- D packages/beidan/man/parlay_settings.Rd
- D packages/beidan/man/parlay_settle_plan.Rd
- D packages/beidan/man/parlay_strategy_config.Rd
- D packages/beidan/man/parlay_structure_legs.Rd
- D packages/beidan/man/parlay_suggest_pattern.Rd
- D packages/beidan/man/parlay_validate_prior_state.Rd
- D packages/beidan/man/parlay_value_tickets.Rd
- D packages/beidan/man/parlay_visible_settlements.Rd
- D packages/beidan/man/parquet_root.Rd
- D packages/beidan/man/parquet_type_map.Rd
- D packages/beidan/man/prepare_match_inputs.Rd
- D packages/beidan/man/prepare_outcome_selections.Rd
- D packages/beidan/man/python_backend.Rd
- D packages/beidan/man/python_table.Rd
- D packages/beidan/man/r_table.Rd
- D packages/beidan/man/rank_outcome_selections.Rd
- D packages/beidan/man/read_dataset.Rd
- D packages/beidan/man/read_match_inputs.Rd
- D packages/beidan/man/replay_schedule_identity.Rd
- D packages/beidan/man/schedule_alias_exact.Rd
- D packages/beidan/man/schedule_identity_iso.Rd
- D packages/beidan/man/schedule_identity_items.Rd
- D packages/beidan/man/schedule_identity_scalar.Rd
- D packages/beidan/man/schedule_identity_validate_answers.Rd
- D packages/beidan/man/total_constrained_projection.Rd
- D packages/beidan/man/total_market_constraint.Rd
- M packages/beidan/src/component_union.cpp
- M packages/beidan/src/component_union_identity.h
- M packages/beidan/tests/python/test_issue_schedule.py
- M packages/beidan/tests/python/test_recent_venue_goals.py
- M packages/beidan/tests/testthat/test-adapt-outcome-selections.R
- M packages/beidan/tests/testthat/test-dc-accuracy-diagnostic.R
- M packages/beidan/tests/testthat/test-fm-probability-source.R
- M packages/beidan/tests/testthat/test-match-probability-blend.R
- M packages/beidan/tests/testthat/test-n7-pipeline-epoch.R
- M packages/beidan/tests/testthat/test-parlay-risk.R
- M packages/beidan/tests/testthat/test-partial-market-diagnostic.R
- M packages/beidan/tests/testthat/test-python-backend.R
- M packages/beidan/tests/testthat/test-recaptured-market-audit.R
- M packages/beidan/tests/testthat/test-recaptured-market-comparison.R
- M packages/beidan/tests/testthat/test-recent-venue-goals.R
- M packages/beidan/tests/testthat/test-session-constants.R
- M quarto/493_n7_experiment_baseline.qmd
- M quarto/classify_outcomes_contract.qmd
- M quarto/parlay_combination_lab.qmd
- M quarto/parlay_select_groups_contract.qmd
- D r/fundamentals_ev_returns.R
- D r/fundamentals_market_comparison.R
- D r/fundamentals_total_market.R
- M r/joint_basket_dc_fit.R
- M r/n7_experiment_replay.R
- M r/n7_market_projection.R
- M r/ranked_outcome_replay.R
- M r/recent_sp_replay.R
- M renv.lock
- D scripts/build_bj234_source_schema.py
- D scripts/build_bj253_physical_schema.py
- D scripts/build_bj254_schema_integration.py
- M scripts/check_cutoff_governance.py
- D scripts/execute_bj253_notebook.py
- D scripts/execute_bj254_notebook.py
- M scripts/run_n7_market_projection.R
- M skills/beidan-strategy/references/operations.md
- M skills/beidan-strategy/references/probabilities.md
- M skills/beidan-strategy/references/vfootball-research.md
- M src/fundamentals_census.py
- M src/nowscore_bjdc_sp_history.py
- D src/physical_schema/__init__.py
- D src/physical_schema/builder.py
- D src/physical_schema/contract.py
- D src/schema_integration/__init__.py
- D src/schema_integration/builder.py
- D src/source_schema/builder.py
- D src/source_schema/ddl.py
- D src/source_schema/feasibility.py
- D src/source_schema/handoff.py
- D src/source_schema/identity.py
- D src/source_schema/manifest.py
- D src/source_schema/plan.py
- M tests/scripts/test_cutoff_governance.py
- D tests/test_bj234_source_schema.py
- D tests/test_bj253_physical_schema.py
- D tests/test_bj254_schema_integration.py
- M tests/test_fundamentals_census.py
- M tests/testthat.R
- M tests/testthat/helper-ranked-independent.R
- M tests/testthat/test-26098-walkthrough-progress.R
- M tests/testthat/test-540-portfolio-interface-independent.R
- M tests/testthat/test-541-embedded-cutoff-independent.R
- M tests/testthat/test-542-exploration-independent.R
- M tests/testthat/test-544-portfolio-risk-independent.R
- M tests/testthat/test-analysis-interfaces.R
- M tests/testthat/test-budget-sweep-independent.R
- M tests/testthat/test-dixon-coles-grid.R
- D tests/testthat/test-fundamentals-market-comparison.R
- D tests/testthat/test-fundamentals-total-market.R
- M tests/testthat/test-joint-basket-dc-fit.R
- M tests/testthat/test-joint-basket-leg-edge.R
- M tests/testthat/test-n7-493-probe-report.R
- M tests/testthat/test-n7-experiment-inputs.R
- M tests/testthat/test-n7-experiment-replay.R
- M tests/testthat/test-n7-market-projection.R
- M tests/testthat/test-ou-total-market.R
- M tests/testthat/test-outcome-role-command-tables.R
- M tests/testthat/test-parlay-interface-regressions.R
- M tests/testthat/test-ranked-outcome-replay.R
- M tests/testthat/test-role-strategy-independent.R
-?? .Renviron
-?? .development/
-?? .github/workflows/nowscore-settlement.yml
-?? .github/workflows/qmd-incremental-mvp.yml
-?? .posit/
-?? .rox_tmp/
-?? .run-control/
-?? .scratch/
-?? config/active-rounds-dashboard.json
-?? config/beidan_26093_identity_policy.json
-?? config/betting-sheet-results-26104.json
-?? config/betting-sheet-results-fm17-20261015.json
-?? config/betting-sheet-results-fm17-20261016.json
-?? config/betting-sheet-results-fm17-20261017.json
-?? config/betting-sheet-results-fm171-20261018.json
-?? config/betting-sheet-results-identity-26103.json
-?? config/betting-sheet-results.json
-?? config/daily-paper/
-?? config/fm-qc-report-0.1.0.json
-?? config/fm171_26103_count_recent_policy.json
-?? config/fundamental-models/FM-1.0.0.json
-?? config/fundamental-models/FM-1.1.0.json
-?? config/fundamental-models/FM-1.2.0.json
-?? config/fundamental-models/FM-1.3.0.json
-?? config/handicap-wdl-history.json
-?? config/hdc_arg_2026_official_group_crosswalk.json
-?? config/hdc_fundamentals_candidate.json
-?? config/hdc_mls_2026_official_group_crosswalk.json
-?? config/hdc_official_group_rank_protocol.json
-?? config/hdc_post_cutoff_downstream_mutation_protocol.json
-?? config/hdc_ranking_candidate.json
-?? config/hdc_ranking_candidate_cutoff_repair.json
-?? config/hdc_ranking_cutoff_repair_protocol.json
-?? config/hdc_ranking_increment_protocol.json
-?? config/hdc_season_reconstruction.json
-?? config/historical_dc_trial.json
-?? config/parlay-kernel-runtime.json
-?? config/persistent_data_layout.json
-?? config/public-site/
-?? config/qmd_incremental_mvp/
-?? config/source-extraction.env
-?? config/source_extraction.json
-?? config/systemd/
-?? config/vfootball_26093_fundamentals.json
-?? config/vfootball_h2h_policy.json
-?? config/vfootball_rho_policy.json
-?? config/vfootball_rho_recency_policy.json
-?? config/vfootball_window_fundamentals.json
-?? docs/contracts/
-?? docs/operations/betting_result_snapshots.md
-?? docs/operations/persistent_data_layout.md
-?? docs/references/dc_rebase_handicap_line_gap/
-?? docs/research-notes/Todo-Third-Outcome-Calibration.md
-?? docs/research/fundamentals-data-quality-register.md
-?? docs/research/qmd_incremental_mvp/
-?? docs/research/source_acquisition_costs_20260922/
-?? docs/reviews/26101-amendment.json
-?? docs/reviews/26101-current-plans.json
-?? docs/reviews/26101-double-reuse.json
-?? docs/reviews/26101-settlement.json
-?? docs/reviews/26101-totals-audit.json
-?? docs/reviews/3332222-artifact-review-auth-restored.json
-?? docs/reviews/3332222-artifact-review-auth-restored.txt
-?? docs/reviews/3332222-final-acceptance.json
-?? docs/reviews/adaptive-prematch-return/
-?? docs/reviews/adaptive-role-adjustment/
-?? docs/reviews/adaptive-settlement-update/
-?? docs/reviews/anchor-four-masks.json
-?? docs/reviews/anchor-gate-review.json
-?? docs/reviews/anchor-other-plans.json
-?? docs/reviews/anchor-unrestricted.json
-?? docs/reviews/balanced-triple-plan/
-?? docs/reviews/bd-3333222/
-?? docs/reviews/bd-dc-protection/
-?? docs/reviews/betting-combination-depth/
-?? docs/reviews/betting-sheet-category-status/
-?? docs/reviews/betting-sheet-dead-groups-20261005/
-?? docs/reviews/betting-sheet-duplex/
-?? docs/reviews/betting-sheet-group-status/
-?? docs/reviews/betting-sheet-loss-diagnostic/
-?? docs/reviews/betting-sheet-results/
-?? docs/reviews/betting-sheet-sp-delay/
-?? docs/reviews/betting-sheet-template/
-?? docs/reviews/budget-allocation/
-?? docs/reviews/classify-chain-path.json
-?? docs/reviews/classify-chain-real.json
-?? docs/reviews/classify-outcomes-named.json
-?? docs/reviews/classify-qmd-selector-consistency-final.json
-?? docs/reviews/classify-qmd-selector-consistency.json
-?? docs/reviews/dc-bd-accuracy/
-?? docs/reviews/dc-bd-draw-replacement/
-?? docs/reviews/double-reuse-historical-source-20261011/
-?? docs/reviews/draw-protection-replay.json
-?? docs/reviews/fm171-26103-count-policy-20261017/
-?? docs/reviews/fm171-26103-qc-recheck-20261017/
-?? docs/reviews/fm171-26103-qc-repair-20261017/
-?? docs/reviews/fundamentals-framework/
-?? docs/reviews/group-coverage-attribution/
-?? docs/reviews/hdc-adaptive-comparison/
-?? docs/reviews/hdc-fundamentals-expansion/
-?? docs/reviews/hdc-ranking-goal/
-?? docs/reviews/historical-dc-comparison/
-?? docs/reviews/hourly-html-results-20261006/
-?? docs/reviews/html-sheet-update-20261006/
-?? docs/reviews/issue-493-review-prompt-round10.txt
-?? docs/reviews/issue-493-review-prompt-round11.txt
-?? docs/reviews/issue-493-review-prompt-round12.txt
-?? docs/reviews/issue-493-review-prompt-round13.txt
-?? docs/reviews/issue-493-review-prompt-round14.txt
-?? docs/reviews/issue-493-review-prompt-round15.txt
-?? docs/reviews/issue-493-review-prompt-round16.txt
-?? docs/reviews/issue-493-review-prompt-round17.txt
-?? docs/reviews/issue-493-review-prompt-round18.txt
-?? docs/reviews/issue-493-review-prompt-round19.txt
-?? docs/reviews/issue-493-review-prompt-round2.txt
-?? docs/reviews/issue-493-review-prompt-round20.txt
-?? docs/reviews/issue-493-review-prompt-round21.txt
-?? docs/reviews/issue-493-review-prompt-round22.txt
-?? docs/reviews/issue-493-review-prompt-round23.txt
-?? docs/reviews/issue-493-review-prompt-round24.txt
-?? docs/reviews/issue-493-review-prompt-round3.txt
-?? docs/reviews/issue-493-review-prompt-round4.txt
-?? docs/reviews/issue-493-review-prompt-round5.txt
-?? docs/reviews/issue-493-review-prompt-round6.txt
-?? docs/reviews/issue-493-review-prompt-round7.txt
-?? docs/reviews/issue-493-review-prompt-round8.txt
-?? docs/reviews/issue-493-review-prompt-round9.txt
-?? docs/reviews/issue-493-review-prompt.txt
-?? docs/reviews/mixed-prematch-plan-replay/
-?? docs/reviews/no-anchor-3332222.json
-?? docs/reviews/nonreuse-upgrade.json
-?? docs/reviews/outcome-gap-review.json
-?? docs/reviews/paired-double-strategy.json
-?? docs/reviews/parlay-dependence/
-?? docs/reviews/parlay-public-access-acceptance.json
-?? docs/reviews/parlay-select-groups.json
-?? docs/reviews/prematch-sp-plan-replay/
-?? docs/reviews/prematch-sp-top-coverage/
-?? docs/reviews/prepare-outcome-selections.json
-?? docs/reviews/probability-backtest/
-?? docs/reviews/probability-base-selector/
-?? docs/reviews/probability-model-versions/
-?? docs/reviews/public-site-path/
-?? docs/reviews/pure-beidan-adaptive-round-summary-20261006/
-?? docs/reviews/pure-beidan-rounds-page-20261006/
-?? docs/reviews/ranked-purchase-chain-before-compression.json
-?? docs/reviews/ranked-purchase-chain.json
-?? docs/reviews/ranked-recent-replay.json
-?? docs/reviews/recent-constraint-replay-evidence/
-?? docs/reviews/recent-constraint-replay-final.json
-?? docs/reviews/recent-constraint-replay-input.json
-?? docs/reviews/recent-constraint-replay.json
-?? docs/reviews/recent-double-reuse.json
-?? docs/reviews/retired-gap-upgrade-clients-20261011/
-?? docs/reviews/retired-market-clients-20261011/
-?? docs/reviews/retired-research-role-clients-20261011/
-?? docs/reviews/retired-role-clients-20261011/
-?? docs/reviews/selective-double-strategy.json
-?? docs/reviews/selector-chain-acceptance-final.json
-?? docs/reviews/selector-chain-acceptance.json
-?? docs/reviews/selector-chain-enumeration-performance.json
-?? docs/reviews/selector-chain-enumeration-prior-source/
-?? docs/reviews/selector-chain-evidence/
-?? docs/reviews/selector-chain-prior-source/
-?? docs/reviews/settled-fundamentals-audit/
-?? docs/reviews/settled-fundamentals-probe/
-?? docs/reviews/settlement-scope-supplement/
-?? docs/reviews/single-match-gap-diagnostic.json
-?? docs/reviews/single45-plan-replay-rejected-context/
-?? docs/reviews/single45-plan-replay/
-?? docs/reviews/source-26098-26101/
-?? docs/reviews/source-26102/
-?? docs/reviews/source-26103/
-?? docs/reviews/source-26104/
-?? docs/reviews/source-extraction/
-?? docs/reviews/source-issue-update/
-?? docs/reviews/source-live-issue/
-?? docs/reviews/source-schedule-reacceptance/
-?? docs/reviews/structure-compression-dsh-rejected.R.txt
-?? docs/reviews/structure-sheet-template/
-?? docs/reviews/top2-disagreement-replay/
-?? docs/reviews/triple-overlap-original-portfolio.R.txt
-?? docs/reviews/triple-overlap-quota-before-compression.json
-?? docs/reviews/triple-reuse-comparison.json
-?? docs/reviews/unified-probability-plan/
-?? docs/reviews/unified-sources/
-?? docs/reviews/uniform-triple-depth/
-?? docs/reviews/uniform-triple-ranking/
-?? docs/reviews/upcoming-20261004-3322221-acceptance.json
-?? docs/reviews/upcoming-20261004-3322221-evidence/
-?? docs/reviews/upcoming-20261004-3322221-input.json
-?? docs/reviews/upcoming-20261004-3322221-view-input.json
-?? docs/reviews/upcoming-20261004-acceptance.json
-?? docs/reviews/upcoming-20261004-betting-html-evidence/
-?? docs/reviews/upcoming-20261004-betting-html.json
-?? docs/reviews/upcoming-20261004-current-chain.json
-?? docs/reviews/upcoming-20261004-evidence/
-?? docs/reviews/upcoming-20261004-final.json
-?? docs/reviews/upcoming-20261004-input.json
-?? docs/reviews/upcoming-20261004-prior-source/
-?? docs/reviews/upcoming-20261006-index/
-?? docs/reviews/upcoming-20261006-mixed75/
-?? docs/reviews/upcoming-20261006-sp19/
-?? docs/reviews/upcoming-20261006-window2-26/
-?? docs/reviews/upcoming-20261006/
-?? docs/reviews/zero-handicap-euro/
-?? inputs/26097_eu_odds.json
-?? inputs/26097_open_legs.rds
-?? inputs/26098_walkthrough/market_raw/
-?? inputs/26098_walkthrough/markets-before-530.rds
-?? inputs/26098_walkthrough/markets-before-532.rds
-?? inputs/26098_walkthrough/markets.rds
-?? inputs/26098_walkthrough/plans/
-?? inputs/26098_walkthrough/prematch_sp_raw/
-?? inputs/26098_walkthrough/print/26098-195204-3333222-256.rds
-?? inputs/26098_walkthrough/print/prematch-sp-20260926-231551-replayed.rds
-?? inputs/26098_walkthrough/print/prematch-sp-20260926-231551.rds
-?? inputs/26098_walkthrough/print/settlement-20260927-210244-neutral.rds
-?? inputs/26098_walkthrough/print/settlement-20260927-210244.rds
-?? inputs/26098_walkthrough/print/settlement-20260927-222927.rds
-?? inputs/26098_walkthrough/print/settlement-20260928-002148.rds
-?? inputs/26098_walkthrough/print/settlement-20260928-192221.rds
-?? inputs/26098_walkthrough/print/settlement-source-20260927-210244.json
-?? inputs/26098_walkthrough/print/settlement-source-20260927-222927.json
-?? inputs/26098_walkthrough/print/settlement-source-20260928-002148.json
-?? inputs/26098_walkthrough/print/settlement-source-20260928-192221.json
-?? inputs/26098_walkthrough/raw/
-?? inputs/26098_walkthrough/schedule.rds
-?? inputs/26098_walkthrough/settlement-research-546-offline-20260928-204413.rds
-?? inputs/26098_walkthrough/settlement_raw/
-?? inputs/26098_walkthrough/settlements.rds
-?? inputs/26098_walkthrough/three_plans_20260928/capture_selection.rds
-?? inputs/26098_walkthrough/three_plans_20260928/code-snapshot.tar.gz
-?? inputs/26098_walkthrough/three_plans_20260928/frozen_inputs.rds
-?? inputs/26098_walkthrough/three_plans_20260928/market_raw/
-?? inputs/26098_walkthrough/three_plans_20260928/markets.rds
-?? inputs/26098_walkthrough/three_plans_20260928/plans.rds.3222221.evaluated.rds
-?? inputs/26098_walkthrough/three_plans_20260928/plans.rds.3322221.evaluated.rds
-?? inputs/26098_walkthrough/three_plans_20260928/plans.rds.3333222.evaluated.rds
-?? inputs/26098_walkthrough/three_plans_20260928/raw/
-?? inputs/26098_walkthrough/three_plans_20260928/schedule.rds
-?? inputs/26098_walkthrough/three_plans_20260928/settlement-20260928-204413.rds
-?? inputs/26101_plans_20260930/half_hour/capture_selection.rds
-?? inputs/26101_plans_20260930/half_hour/double_reuse_replay/
-?? inputs/26101_plans_20260930/half_hour/market_raw/
-?? inputs/26101_plans_20260930/half_hour/markets.rds
-?? inputs/26101_plans_20260930/half_hour/plans.rds
-?? inputs/26101_plans_20260930/half_hour/plans_revised.rds
-?? inputs/26101_plans_20260930/half_hour/raw/
-?? inputs/26101_plans_20260930/half_hour/schedule.rds
-?? inputs/26101_plans_20260930/half_hour/settlement-20260930-203715.rds
-?? inputs/26101_plans_20260930/half_hour/settlement_raw/
-?? inputs/26101_plans_20260930/previous_schedule.rds
-?? inputs/26101_plans_20260930/raw/
-?? inputs/26101_plans_20260930/schedule.rds
-?? inputs/26101_plans_20260930/window_check.rds
-?? inputs/26101_plans_20261002_1_25h/capture_selection.rds
-?? inputs/26101_plans_20261002_1_25h/market_raw/
-?? inputs/26101_plans_20261002_1_25h/markets.rds
-?? inputs/26101_plans_20261002_1_25h/schedule_raw/
-?? inputs/3332222_comparison/09d76f094c4f1b5b/
-?? inputs/3332222_comparison/6fcbffad1fc0c499/
-?? inputs/3332222_comparison/f989887167bd041f/2026-09-26-settlement.rds
-?? inputs/3332222_comparison/f989887167bd041f/2026-09-28-settlement.rds
-?? inputs/3332222_comparison/f989887167bd041f/2026-09-30-settlement.rds
-?? inputs/3332222_comparison/f989887167bd041f/all-decisions-before-labels.rds
-?? inputs/anchor_four_masks/
-?? inputs/anchor_other_plans/
-?? inputs/anchor_review/
-?? inputs/anchor_unrestricted/
-?? inputs/compressed_structure_comparison/2026-09-26-3322222-decision.rds
-?? inputs/compressed_structure_comparison/2026-09-26-3322222-settlement.rds
-?? inputs/compressed_structure_comparison/2026-09-26-3332221-decision.rds
-?? inputs/compressed_structure_comparison/2026-09-26-3332221-settlement.rds
-?? inputs/compressed_structure_comparison/2026-09-28-3322222-decision.rds
-?? inputs/compressed_structure_comparison/2026-09-28-3322222-settlement.rds
-?? inputs/compressed_structure_comparison/2026-09-28-3332221-decision.rds
-?? inputs/compressed_structure_comparison/2026-09-28-3332221-settlement.rds
-?? inputs/compressed_structure_comparison/2026-09-30-3322222-decision.rds
-?? inputs/compressed_structure_comparison/2026-09-30-3322222-settlement.rds
-?? inputs/compressed_structure_comparison/2026-09-30-3332221-decision.rds
-?? inputs/compressed_structure_comparison/2026-09-30-3332221-settlement.rds
-?? inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-26-3322222-settlement.rds
-?? inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-26-3332221-settlement.rds
-?? inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-28-3322222-settlement.rds
-?? inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-28-3332221-settlement.rds
-?? inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-30-3322222-settlement.rds
-?? inputs/compressed_structure_comparison/c04b4288946bcf14/2026-09-30-3332221-settlement.rds
-?? inputs/compressed_structure_comparison/results.rds
-?? inputs/draw_protection/
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-26-3322222-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-26-3332221-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-26-3333221-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-28-3322222-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-28-3332221-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-28-3333221-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-30-3322222-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-30-3332221-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/2026-09-30-3333221-settlement.rds
-?? inputs/forced_complement_replay/5016d3412782bcbb/all-decisions-before-labels.rds
-?? inputs/forced_complement_replay/9775f546fa15cf5c/
-?? inputs/market_capture_probe/
-?? inputs/no_anchor_3332222/
-?? inputs/nonreuse_upgrade/
-?? inputs/nowscore_raw/
-?? inputs/outcome_gap_review/
-?? inputs/paired_double/
-?? inputs/ranked_recent_replay/2026-09-26-decision.rds
-?? inputs/ranked_recent_replay/2026-09-26-settlement.rds
-?? inputs/ranked_recent_replay/2026-09-28-settlement.rds
-?? inputs/ranked_recent_replay/2026-09-30-settlement.rds
-?? inputs/ranked_recent_replay/all_roles_overlap_evidence/2026-09-26-settlement.rds
-?? inputs/ranked_recent_replay/all_roles_overlap_evidence/2026-09-28-settlement.rds
-?? inputs/ranked_recent_replay/all_roles_overlap_evidence/2026-09-30-settlement.rds
-?? inputs/ranked_recent_replay/all_roles_overlap_evidence/inventory.json
-?? inputs/ranked_recent_replay/all_roles_overlap_evidence/results.rds
-?? inputs/ranked_recent_replay/results.rds
-?? inputs/ranked_recent_replay/role3_exempt_reuse2_evidence/
-?? inputs/recent_double_reuse/
-?? inputs/selective_double/decisions.rds
-?? inputs/selective_double/raw/
-?? inputs/selective_double/results.rds
-?? inputs/selective_double/settlements/26101.rds
-?? inputs/selective_double/three_gap_baseline/
-?? inputs/triple_reuse/
-?? ops/systemd/user/beidanlot-500-play-bf-collect.service
-?? ops/systemd/user/beidanlot-500-play-bq-collect.service
-?? ops/systemd/user/beidanlot-500-play-ds-collect.service
-?? ops/systemd/user/beidanlot-500-play-jq-collect.service
-?? ops/systemd/user/beidanlot-500-settlement-collect.service
-?? ops/systemd/user/beidanlot-historical-id-map.service
-?? ops/systemd/user/beidanlot-titan-historical-collect.service
-?? packages/beidan/R/betting_sheet_html.R
-?? packages/beidan/R/betting_sheet_support_depth.R
-?? packages/beidan/R/distinct_single_plan.R
-?? packages/beidan/R/diversified_protection_plan.R
-?? packages/beidan/R/double_ranking_weights.R
-?? packages/beidan/R/fm14_tail_judgement.R
-?? packages/beidan/R/fm15_reader_page.R
-?? packages/beidan/R/fm_qc_report.R
-?? packages/beidan/R/fm_qc_report_output.R
-?? packages/beidan/R/fundamental_issue.R
-?? packages/beidan/R/joint_depth_window.R
-?? packages/beidan/R/joint_protection_plan.R
-?? packages/beidan/R/joint_sp_window.R
-?? packages/beidan/R/joint_triple_weights.R
-?? packages/beidan/R/mixed_round_plans.R
-?? packages/beidan/R/outcome_protection_plan.R
-?? packages/beidan/R/source_extraction.R
-?? packages/beidan/R/source_issue_euro.R
-?? packages/beidan/R/top1_consensus_diagnostic.R
-?? packages/beidan/R/unified_sources.R
-?? packages/beidan/inst/python/beidan_backend/betting_sheet_html.py
-?? packages/beidan/inst/python/beidan_backend/dual_euro.py
-?? packages/beidan/inst/python/beidan_backend/euro_coverage.py
-?? packages/beidan/inst/python/beidan_backend/extraction_cache.py
-?? packages/beidan/inst/python/beidan_backend/fundamental_tables.py
-?? packages/beidan/inst/python/beidan_backend/fundamentals.py
-?? packages/beidan/inst/python/beidan_backend/nova_api.py
-?? packages/beidan/inst/python/beidan_backend/reviewed_opponent_goals.py
-?? packages/beidan/inst/python/beidan_backend/source_extraction.py
-?? packages/beidan/inst/python/beidan_backend/source_issue_markets.py
-?? packages/beidan/inst/python/beidan_backend/source_issue_update.py
-?? packages/beidan/inst/python/beidan_backend/source_market_publication.py
-?? packages/beidan/inst/python/beidan_backend/temporal_learning/admitted_replay.py
-?? packages/beidan/inst/python/beidan_backend/temporal_learning/quote_audit.py
-?? packages/beidan/inst/python/beidan_backend/temporal_learning/recent_support.py
-?? packages/beidan/inst/python/beidan_backend/unified_sources.py
-?? packages/beidan/inst/python/beidan_backend/vfootball_results.py
-?? packages/beidan/inst/quarto/fm_qc_report.css
-?? packages/beidan/inst/quarto/fm_qc_report.qmd
-?? packages/beidan/man/BuildDistinctSinglePlan.Rd
-?? packages/beidan/man/BuildDiversifiedProtectionPlan.Rd
-?? packages/beidan/man/BuildFmQcReport.Rd
-?? packages/beidan/man/BuildJointProtectionPlan.Rd
-?? packages/beidan/man/BuildMixedRoundPlans.Rd
-?? packages/beidan/man/BuildOutcomeProtectionPlan.Rd
-?? packages/beidan/man/DiagnoseTop1Consensus.Rd
-?? packages/beidan/man/EstimateFundamentalIssue.Rd
-?? packages/beidan/man/PartitionMixedRoundFixtures.Rd
-?? packages/beidan/man/PrepareMixedRoundInputs.Rd
-?? packages/beidan/man/ReadBettingSheetHTML.Rd
-?? packages/beidan/man/ReplayJointDepthWindow.Rd
-?? packages/beidan/man/ReplayJointSpWindow.Rd
-?? packages/beidan/man/ReplayJointTripleWeights.Rd
-?? packages/beidan/man/ReviewFundamentalIssue.Rd
-?? packages/beidan/man/SettleHTMLBettingSheet.Rd
-?? packages/beidan/man/SourceEuro.Rd
-?? packages/beidan/man/SummariseFmQcReports.Rd
-?? packages/beidan/man/UpdateSourceIssue.Rd
-?? packages/beidan/man/ValidateDistinctSinglePlan.Rd
-?? packages/beidan/man/ValidateDiversifiedProtectionPlan.Rd
-?? packages/beidan/man/ValidateJointDepthWindow.Rd
-?? packages/beidan/man/ValidateJointProtectionPlan.Rd
-?? packages/beidan/man/ValidateJointSpWindow.Rd
-?? packages/beidan/man/ValidateJointTripleWeights.Rd
-?? packages/beidan/man/ValidateMixedRoundPlans.Rd
-?? packages/beidan/man/ValidateOutcomeProtectionPlan.Rd
-?? packages/beidan/man/WriteFmQcReport.Rd
-?? packages/beidan/man/compare_fundamental_market.Rd
-?? packages/beidan/tests/fixtures/component_union_large_selector_before.rds
-?? packages/beidan/tests/fixtures/schedule_26098_control/
-?? packages/beidan/tests/python/fixtures/nova_api/
-?? packages/beidan/tests/python/fixtures/unified_sources/
-?? packages/beidan/tests/python/test_asian_handicap_history.py
-?? packages/beidan/tests/python/test_betting_sheet_html.py
-?? packages/beidan/tests/python/test_dual_euro.py
-?? packages/beidan/tests/python/test_euro_coverage.py
-?? packages/beidan/tests/python/test_fundamental_tables.py
-?? packages/beidan/tests/python/test_issue_slot_fundamentals.py
-?? packages/beidan/tests/python/test_observed_recent_context.py
-?? packages/beidan/tests/python/test_recent_support.py
-?? packages/beidan/tests/python/test_reviewed_opponent_goals.py
-?? packages/beidan/tests/python/test_source_26098_26101_acceptance.py
-?? packages/beidan/tests/python/test_source_26102_acceptance.py
-?? packages/beidan/tests/python/test_source_26103_acceptance.py
-?? packages/beidan/tests/python/test_source_26104_acceptance.py
-?? packages/beidan/tests/python/test_source_extraction.py
-?? packages/beidan/tests/python/test_source_issue_markets.py
-?? packages/beidan/tests/python/test_source_issue_update.py
-?? packages/beidan/tests/python/test_source_market_publication.py
-?? packages/beidan/tests/python/test_source_schedule_reacceptance.py
-?? packages/beidan/tests/python/test_temporal_quote_audit.py
-?? packages/beidan/tests/python/test_unified_sources.py
-?? packages/beidan/tests/testthat/test-balanced-triple-ranking.R
-?? packages/beidan/tests/testthat/test-betting-sheet-html.R
-?? packages/beidan/tests/testthat/test-betting-sheet-support-depth.R
-?? packages/beidan/tests/testthat/test-component-union-residual-factor.R
-?? packages/beidan/tests/testthat/test-dc-market-handicap.R
-?? packages/beidan/tests/testthat/test-distinct-single-native-source.R
-?? packages/beidan/tests/testthat/test-distinct-single-open-pool.R
-?? packages/beidan/tests/testthat/test-distinct-single-plan.R
-?? packages/beidan/tests/testthat/test-distinct-single-structures.R
-?? packages/beidan/tests/testthat/test-diversified-protection-plan.R
-?? packages/beidan/tests/testthat/test-dixon-coles-feasible-rho.R
-?? packages/beidan/tests/testthat/test-double-ranking-weights.R
-?? packages/beidan/tests/testthat/test-euro-coverage.R
-?? packages/beidan/tests/testthat/test-fm-qc-report-output.R
-?? packages/beidan/tests/testthat/test-fm-qc-report.R
-?? packages/beidan/tests/testthat/test-fm14-tail-judgement.R
-?? packages/beidan/tests/testthat/test-fm15-reader-page.R
-?? packages/beidan/tests/testthat/test-fundamental-issue.R
-?? packages/beidan/tests/testthat/test-joint-depth-window.R
-?? packages/beidan/tests/testthat/test-joint-protection-plan.R
-?? packages/beidan/tests/testthat/test-joint-sp-window.R
-?? packages/beidan/tests/testthat/test-joint-triple-weights.R
-?? packages/beidan/tests/testthat/test-mixed-round-plans.R
-?? packages/beidan/tests/testthat/test-native-package-load.R
-?? packages/beidan/tests/testthat/test-outcome-protection-plan.R
-?? packages/beidan/tests/testthat/test-parlay-select-group-limit.R
-?? packages/beidan/tests/testthat/test-recent-preparation.R
-?? packages/beidan/tests/testthat/test-source-acceptance-receipts.R
-?? packages/beidan/tests/testthat/test-source-batch-acceptance-receipts.R
-?? packages/beidan/tests/testthat/test-source-euro.R
-?? packages/beidan/tests/testthat/test-source-extraction.R
-?? packages/beidan/tests/testthat/test-source-issue-update.R
-?? packages/beidan/tests/testthat/test-top1-consensus-diagnostic.R
-?? packages/beidan/tests/testthat/test-unified-sources.R
-?? packages/beidan/tests/testthat/test-valuation-vectorization.R
-?? quarto/26098_walkthrough_files/
-?? quarto/26101_double_reuse_backtest.qmd
-?? quarto/26101_second_group_diagnostic.qmd
-?? quarto/26101_settlement.qmd
-?? quarto/26101_totals_quote_audit.qmd
-?? quarto/26101_window_check.qmd
-?? quarto/263_source_parsers_index_files/
-?? quarto/275_bj_decision_epoch_odds_cache/
-?? quarto/275_bj_decision_epoch_odds_files/
-?? quarto/493_n7_experiment_baseline_files/
-?? quarto/active_rounds_dashboard_20261017.qmd
-?? quarto/actual_handicap_reversal_20261011.qmd
-?? quarto/actual_handicap_strata_20261011.qmd
-?? quarto/adaptive_prematch_return.qmd
-?? quarto/adaptive_prematch_return_files/
-?? quarto/adaptive_role_adjustment.qmd
-?? quarto/adaptive_role_adjustment_files/
-?? quarto/adaptive_settlement_update.qmd
-?? quarto/anchor_gate_review.qmd
-?? quarto/balanced_triple_plan.qmd
-?? quarto/balanced_triple_plan_files/
-?? quarto/bd_3333222.qmd
-?? quarto/bd_3333222_files/
-?? quarto/bd_dc_protection.qmd
-?? quarto/bd_dc_protection_files/
-?? quarto/beidan01_depth_20261010.qmd
-?? quarto/beidan01_depth_20261010_files/
-?? quarto/beidan02_depth_20261010.qmd
-?? quarto/beidan02_depth_20261010_files/
-?? quarto/beidan03_depth_20261010.qmd
-?? quarto/beidan03_depth_20261010_files/
-?? quarto/beidan03_final_depth_20261010.qmd
-?? quarto/beidan03_final_depth_20261010_files/
-?? quarto/beidan04_depth_20261010.qmd
-?? quarto/beidan04_depth_20261010_files/
-?? quarto/beidan07_conflict_update_20261011.qmd
-?? quarto/beidan07_conflict_update_20261011_files/
-?? quarto/beidan07_current_settlement_20261011.qmd
-?? quarto/beidan07_current_settlement_20261011_files/
-?? quarto/beidan_26093_date_leagues.qmd
-?? quarto/beidan_26093_dc_sp_accuracy.qmd
-?? quarto/beidan_26093_league_discovery.qmd
-?? quarto/beidan_26093_prematch_inputs.qmd
-?? quarto/beidan_full_issues_26092_26102.qmd
-?? quarto/beidan_strategy_prompts_20261007.qmd
-?? quarto/beidan_strategy_skill_20261007.qmd
-?? quarto/betting_combination_depth.qmd
-?? quarto/betting_sheet_category_status.qmd
-?? quarto/betting_sheet_dead_groups_20261005.qmd
-?? quarto/betting_sheet_display_discussion.qmd
-?? quarto/betting_sheet_duplex_compression.qmd
-?? quarto/betting_sheet_group_status.qmd
-?? quarto/betting_sheet_loss_diagnostic.qmd
-?? quarto/betting_sheet_result_sp_delay.qmd
-?? quarto/betting_sheet_results_automation.qmd
-?? quarto/clermont104_fundamental_report_20261011.qmd
-?? quarto/covered_probability_mass_20261010.qmd
-?? quarto/covered_probability_mass_20261010_files/
-?? quarto/covered_rank_distribution_20261010.qmd
-?? quarto/covered_rank_prospective_20261010.qmd
-?? quarto/curve_shape_rank_20261010.qmd
-?? quarto/curve_shape_rank_20261010_files/
-?? quarto/dashboard_multibatch_20261017.qmd
-?? quarto/dc_bd_accuracy.qmd
-?? quarto/dc_bd_draw_replacement.qmd
-?? quarto/depth_start101_20261007.qmd
-?? quarto/double60_40_20261009.qmd
-?? quarto/double_ratio_cap_20261009.qmd
-?? quarto/draw_protection_replay.qmd
-?? quarto/eightgroups_window150324_20261010.qmd
-?? quarto/eightgroups_window150324_20261010_files/
-?? quarto/figures/
-?? quarto/five_round_bases_20261007.qmd
-?? quarto/five_tail_scenarios_20261011.qmd
-?? quarto/fm103_core_20261012.qmd
-?? quarto/fm103_core_20261012_files/
-?? quarto/fm107_center_20261012.qmd
-?? quarto/fm107_center_20261012_files/
-?? quarto/fm12_case4_asian_20261011.qmd
-?? quarto/fm12_case4_deep_20261011.qmd
-?? quarto/fm12_case4_motivation_20261011.qmd
-?? quarto/fm12_case4_scorequal_20261011.qmd
-?? quarto/fm12_five_cases_20261011.qmd
-?? quarto/fm13_104_top3_tail03_20261011.qmd
-?? quarto/fm13_104_top3_tail03_20261011_files/
-?? quarto/fm13_26098_comparison_20261011.qmd
-?? quarto/fm13_case4_24h_20261011.qmd
-?? quarto/fm13_case4_ah_history_20261011.qmd
-?? quarto/fm13_case4_evidence_audit_20261011.qmd
-?? quarto/fm13_case4_line_adjust_20261011.qmd
-?? quarto/fm13_case4_parameter_audit_20261011.qmd
-?? quarto/fm13_case4_ratio03_20261011.qmd
-?? quarto/fm13_case4_stability_20261011.qmd
-?? quarto/fm13_case4_tail_scenarios_20261011.qmd
-?? quarto/fm13_case74_asian_20261011.qmd
-?? quarto/fm13_case74_audit_20261011.qmd
-?? quarto/fm13_case74_direction_magnitude_20261011.qmd
-?? quarto/fm13_direction_policy_20261011.qmd
-?? quarto/fm13_pa_six_20261011.qmd
-?? quarto/fm13_six_hit_comparison_20261011.qmd
-?? quarto/fm13_six_line_review_20261011.qmd
-?? quarto/fm13_six_margin_top3_20261011.qmd
-?? quarto/fm13_six_tailr02_20261011.qmd
-?? quarto/fm13_tailr_policy_20261011.qmd
-?? quarto/fm14_26098_test_20261011.qmd
-?? quarto/fm14_26098_test_20261011_files/
-?? quarto/fm14_26101_tail_diagnostic_20261011.qmd
-?? quarto/fm14_26101_tail_diagnostic_20261011_files/
-?? quarto/fm14_26101_test_20261011.qmd
-?? quarto/fm14_26101_test_20261011_files/
-?? quarto/fm14_version_20261011.qmd
-?? quarto/fm14_version_20261011_files/
-?? quarto/fm15_26102_20261012_files/
-?? quarto/fm15_26102_4_blend_20261012_files/
-?? quarto/fm15_26102_cases_20261012_files/
-?? quarto/fm15_26102_more_blend_20261012_files/
-?? quarto/fm15_369_fundamental_review_20261012.qmd
-?? quarto/fm15_depth_status_20261012.qmd
-?? quarto/fm15_round_errors_20261012.qmd
-?? quarto/fm15_three_fundamental_review_20261012.qmd
-?? quarto/fm15_two_issues_20261012_cache/
-?? quarto/fm15_two_issues_20261012_files/
-?? quarto/fm15_upcoming_20261012.qmd
-?? quarto/fm15_version_20261012_files/
-?? quarto/fm16_26102_10_20261013_files/
-?? quarto/fm16_26104_depth30_154_20261014.qmd
-?? quarto/fm16_26104_depth30_154_20261014_files/
-?? quarto/fm16_26104_depth50_174_20261014.qmd
-?? quarto/fm16_26104_depth50_174_20261014_files/
-?? quarto/fm16_26104_progress_20261014.qmd
-?? quarto/fm16_26104_progress_20261014_files/
-?? quarto/fm16_26104_upcoming_20261013.qmd
-?? quarto/fm16_errors_20261013_files/
-?? quarto/fm16_hypothetical_payout_20261013.qmd
-?? quarto/fm16_hypothetical_payout_20261013_files/
-?? quarto/fm16_release_20261012_files/
-?? quarto/fm16_settlement_check_20261013.qmd
-?? quarto/fm16_three_issues_20261012_files/
-?? quarto/fm16_upcoming_20261013.qmd
-?? quarto/fm171_26103_qc_recheck_20261017.qmd
-?? quarto/fm171_26103_qc_repair_20261017.qmd
-?? quarto/fm171_26103_recent_count_20261017.qmd
-?? quarto/fm171_upcoming_20261018.qmd
-?? quarto/fm17_release_20261013_files/
-?? quarto/fm17_upcoming_20261015.qmd
-?? quarto/fm17_upcoming_20261015_files/
-?? quarto/fm17_upcoming_20261016.qmd
-?? quarto/fm17_upcoming_20261016_files/
-?? quarto/fm17_upcoming_20261017.qmd
-?? quarto/fm17_upcoming_20261017_files/
-?? quarto/fm_mass_core_20261013_files/
-?? quarto/fm_native_65_20261011.qmd
-?? quarto/fm_native_65_20261011_files/
-?? quarto/fm_native_65_core_stability_20261012.qmd
-?? quarto/fm_native_65_core_stability_20261012_files/
-?? quarto/fm_qc_report_010.qmd
-?? quarto/fm_qc_report_010_publication.qmd
-?? quarto/football_fundamentals_skill_review_20261007.qmd
-?? quarto/football_fundamentals_skill_review_20261007_files/
-?? quarto/four-stage-tests-20261011.qmd
-?? quarto/four-stage-tests-20261011_files/
-?? quarto/fundamental_26102_59_market_review_20261011.qmd
-?? quarto/fundamental_26102_59_market_review_20261011_files/
-?? quarto/fundamental_74_market_review_20261011.qmd
-?? quarto/fundamental_74_market_review_20261011_files/
-?? quarto/fundamental_90_market_review_20261011.qmd
-?? quarto/fundamental_90_market_review_20261011_files/
-?? quarto/fundamental_beidan_case_review_20261011.qmd
-?? quarto/fundamental_beidan_case_review_20261011_files/
-?? quarto/fundamental_beidan_comparison_20261011.qmd
-?? quarto/fundamental_beidan_comparison_20261011_files/
-?? quarto/fundamental_beidan_full_issue_history_20261011.qmd
-?? quarto/fundamental_beidan_full_issue_history_20261011_files/
-?? quarto/fundamental_full_workflow_version_20261011.qmd
-?? quarto/fundamental_issues_review_20261011.qmd
-?? quarto/fundamental_issues_review_20261011_files/
-?? quarto/fundamental_model_version_20261011.qmd
-?? quarto/fundamental_model_version_20261011_files/
-?? quarto/fundamental_source_reuse_20261011.qmd
-?? quarto/fundamental_source_reuse_20261011_files/
-?? quarto/fundamental_workflow_1_2_20261011.qmd
-?? quarto/fundamentals_analysis_framework.qmd
-?? quarto/group_coverage_attribution.qmd
-?? quarto/group_coverage_attribution_files/
-?? quarto/hdc_adaptive_comparison.qmd
-?? quarto/hdc_arg_group_rank_delta.qmd
-?? quarto/hdc_arg_group_rank_delta_files/
-?? quarto/hdc_arg_group_standings.qmd
-?? quarto/hdc_arg_group_standings_files/
-?? quarto/hdc_betting_baseline_reconciliation.qmd
-?? quarto/hdc_fundamentals_expansion.qmd
-?? quarto/hdc_fundamentals_ranking_delivery.qmd
-?? quarto/hdc_fundamentals_ranking_delivery_v2.qmd
-?? quarto/hdc_historical_rank_covariate_acceptance.qmd
-?? quarto/hdc_historical_rank_covariates.qmd
-?? quarto/hdc_historical_rank_covariates_cutoff_repair.qmd
-?? quarto/hdc_historical_rank_covariates_cutoff_repair_replay.qmd
-?? quarto/hdc_historical_rank_feature_acceptance.qmd
-?? quarto/hdc_historical_rank_features.qmd
-?? quarto/hdc_mls_group_rank_delta.qmd
-?? quarto/hdc_mls_group_rank_delta_files/
-?? quarto/hdc_mls_group_standings.qmd
-?? quarto/hdc_mls_group_standings_files/
-?? quarto/hdc_mls_official_group_crosswalk.qmd
-?? quarto/hdc_mls_official_group_crosswalk_files/
-?? quarto/hdc_official_group_crosswalk.qmd
-?? quarto/hdc_official_group_crosswalk_files/
-?? quarto/hdc_original_policy_adaptive_comparison.qmd
-?? quarto/hdc_original_policy_comparison_acceptance.qmd
-?? quarto/hdc_original_policy_ticket_alignment.qmd
-?? quarto/hdc_post_cutoff_model_projection_mutation.qmd
-?? quarto/hdc_rank_availability_repair.qmd
-?? quarto/hdc_rank_availability_replay.qmd
-?? quarto/hdc_rank_covariates.qmd
-?? quarto/hdc_rank_design_contract.qmd
-?? quarto/hdc_rank_feature_training_coverage.qmd
-?? quarto/hdc_rank_history_contexts.qmd
-?? quarto/hdc_rank_target_covariates_cutoff_repair.qmd
-?? quarto/hdc_rank_training_coverage.qmd
-?? quarto/hdc_ranking_accuracy.qmd
-?? quarto/hdc_ranking_accuracy_cutoff_repair.qmd
-?? quarto/hdc_ranking_comparison_acceptance.qmd
-?? quarto/hdc_ranking_context_intake.qmd
-?? quarto/hdc_ranking_context_intake_cutoff_repair.qmd
-?? quarto/hdc_ranking_dc_probabilities.qmd
-?? quarto/hdc_ranking_dc_probabilities_cutoff_repair.qmd
-?? quarto/hdc_ranking_dc_probabilities_cutoff_repair_replay.qmd
-?? quarto/hdc_ranking_dc_probabilities_replay.qmd
-?? quarto/hdc_ranking_fit_contract.qmd
-?? quarto/hdc_ranking_goal.qmd
-?? quarto/hdc_ranking_increment_protocol.qmd
-?? quarto/hdc_ranking_increment_strata_cutoff_repair.qmd
-?? quarto/hdc_ranking_native_training_join.qmd
-?? quarto/hdc_ranking_native_training_join_cutoff_repair.qmd
-?? quarto/hdc_ranking_original_policy_comparison.qmd
-?? quarto/hdc_ranking_original_policy_comparison_cutoff_repair.qmd
-?? quarto/hdc_ranking_original_policy_comparison_cutoff_repair_replay.qmd
-?? quarto/hdc_ranking_original_policy_comparison_v2.qmd
-?? quarto/hdc_ranking_paired_rates.qmd
-?? quarto/hdc_ranking_paired_rates_cutoff_repair.qmd
-?? quarto/hdc_ranking_paired_rates_cutoff_repair_replay.qmd
-?? quarto/hdc_ranking_paired_rates_replay.qmd
-?? quarto/hdc_ranking_projection_contract.qmd
-?? quarto/hdc_reference_adaptive_comparison.qmd
-?? quarto/hdc_reference_baseline_replay.qmd
-?? quarto/hdc_season_completeness_acceptance.qmd
-?? quarto/hdc_season_completeness_acceptance_files/
-?? quarto/hdc_season_cutoff.qmd
-?? quarto/hdc_season_source.qmd
-?? quarto/hdc_season_standings.qmd
-?? quarto/hdc_three_batch_accuracy.qmd
-?? quarto/hdc_three_batch_adaptive.qmd
-?? quarto/hdc_transitive_file_bindings.qmd
-?? quarto/hdc_transitive_file_bindings_files/
-?? quarto/hdc_unrestricted_adaptive_comparison.qmd
-?? quarto/head_tail_20261009.qmd
-?? quarto/historical_dc_beidan_comparison.qmd
-?? quarto/homepage_history_20261017.qmd
-?? quarto/hourly_correction_20261011.qmd
-?? quarto/hourly_correction_20261011_files/
-?? quarto/hourly_html_results_20261006.qmd
-?? quarto/html_sheet_update_20261006.qmd
-?? quarto/issue_schedule_fetch_files/
-?? quarto/live_results_check_20261010.qmd
-?? quarto/live_sheet_publication_20261007.qmd
-?? quarto/margin_ranking_20261017.qmd
-?? quarto/margin_ranking_20261017_files/
-?? quarto/margin_support_20261017.qmd
-?? quarto/margin_support_20261017_files/
-?? quarto/margin_support_budget_20261017_files/
-?? quarto/margin_support_classification_20261017_files/
-?? quarto/margin_truncated_rank_20261017.qmd
-?? quarto/margin_truncated_rank_20261017.rmarkdown
-?? quarto/mix50_window150300_20261007.qmd
-?? quarto/mix50_window150300_20261007_files/
-?? quarto/mixed_availability_20261011.qmd
-?? quarto/mixed_prematch_plan_replay.qmd
-?? quarto/mixed_publication_20261011.qmd
-?? quarto/mixed_round_package_replay.qmd
-?? quarto/mixed_six_current_returns_20261011.qmd
-?? quarto/mixed_six_returns_20261011.qmd
-?? quarto/multiround_availability_20261009.qmd
-?? quarto/multiround_hourly_20261009.qmd
-?? quarto/multiround_sheets_reuse8_20261009.qmd
-?? quarto/n7_lubridate_files/
-?? quarto/native-package-load-fix-20261011.qmd
-?? quarto/opponent_basis_comparison_20261007.qmd
-?? quarto/overlap6_20261007.qmd
-?? quarto/overlap6_20261007_files/
-?? quarto/overlap6_3333221_20261007.qmd
-?? quarto/overlap6_native3333221_20261007.qmd
-?? quarto/overlap6_native_rolefirst_20261007.qmd
-?? quarto/overlap6_native_rolefirst_20261007_files/
-?? quarto/overlap6_structure_depth_20261007.qmd
-?? quarto/overlap6_structure_depth_20261007_files/
-?? quarto/overlap6_triple433_20261007.qmd
-?? quarto/overlap6_triple433_20261007_files/
-?? quarto/overlap6_window150300_20261007.qmd
-?? quarto/overlap6_window150300_20261007_files/
-?? quarto/overlap6_window173300_20261007.qmd
-?? quarto/overlap6_window173300_20261007_files/
-?? quarto/package-health-20261017.qmd
-?? quarto/package-health-20261017_files/
-?? quarto/package-repair-20261017.qmd
-?? quarto/package-repair-20261017_files/
-?? quarto/paired_double_strategy_comparison.qmd
-?? quarto/paju79_dc_adjustment_20261010.qmd
-?? quarto/paju79_dc_scenario_20261010.qmd
-?? quarto/paju79_final_manual_20261010.qmd
-?? quarto/paju79_fundamentals_20261010.qmd
-?? quarto/paju79_fusion_methods_20261010.qmd
-?? quarto/paju79_h2h_20261010.qmd
-?? quarto/paju79_league_20261010.qmd
-?? quarto/paju79_lineups_20261010.qmd
-?? quarto/paju79_market_check_20261010.qmd
-?? quarto/paju79_motivation_20261010.qmd
-?? quarto/paju79_odds_20261010.qmd
-?? quarto/paju79_probability_package_20261010.qmd
-?? quarto/paju79_probability_workflow_20261010.qmd
-?? quarto/paju79_remaining_20261010.qmd
-?? quarto/paju79_role_check_20261010.qmd
-?? quarto/paju79_role_check_20261010_files/
-?? quarto/parlay_api_contract_files/
-?? quarto/parlay_budget_allocation.qmd
-?? quarto/parlay_combination_lab_coverage.png
-?? quarto/parlay_dependence_risk.qmd
-?? quarto/parlay_public_access.qmd
-?? quarto/parlay_public_access_files/
-?? quarto/prematch_sp_plan_replay.qmd
-?? quarto/prematch_sp_top_coverage.qmd
-?? quarto/probability_backtest_summary.qmd
-?? quarto/probability_backtest_summary_files/
-?? quarto/probability_base_selector.qmd
-?? quarto/probability_base_selector_files/
-?? quarto/probability_model_versions.qmd
-?? quarto/public_site_paths.qmd
-?? quarto/pure_beidan_adaptive_round_summary_20261006.qmd
-?? quarto/pure_beidan_rounds_page_20261006.qmd
-?? quarto/r-package-audit-20261011.qmd
-?? quarto/recent_3333221_comparison_20261007.qmd
-?? quarto/recent_3333221_gap_comparison_20261007.qmd
-?? quarto/recent_bd8singles_comparison_20261007.qmd
-?? quarto/recent_constraint_relaxation.qmd
-?? quarto/recent_constraint_relaxation_settlement.qmd
-?? quarto/recent_double_reuse_backtest.qmd
-?? quarto/recent_returns_20261018.qmd
-?? quarto/recent_returns_20261018_files/
-?? quarto/remaining26102_seven_bd_one_dc_20261007.qmd
-?? quarto/remaining26102_seven_bd_one_dc_20261007_files/
-?? quarto/round_returns_20261017.qmd
-?? quarto/schedule_identity_files/
-?? quarto/selective_double_strategy_comparison.qmd
-?? quarto/settled_fundamentals_collection_probe.qmd
-?? quarto/settled_fundamentals_data_audit.qmd
-?? quarto/settlement_scope_supplement.qmd
-?? quarto/shared_result_snapshots_20261010.qmd
-?? quarto/single45_plan_replay.qmd
-?? quarto/single45_plan_replay_files/
-?? quarto/single_match_gap_diagnostic.png
-?? quarto/single_match_gap_diagnostic.qmd
-?? quarto/sixgroups_window108324_20261010.qmd
-?? quarto/sixgroups_window108324_20261010_files/
-?? quarto/sixgroups_window108324_settled_20261010.qmd
-?? quarto/sixgroups_window108324_settled_20261010_files/
-?? quarto/slot_authority_20261010.qmd
-?? quarto/slot_authority_20261010_files/
-?? quarto/source_26102_acceptance.qmd
-?? quarto/source_26102_acceptance_files/
-?? quarto/source_26103_acceptance.qmd
-?? quarto/source_26103_acceptance_files/
-?? quarto/source_26104_acceptance.qmd
-?? quarto/source_batch_issue_acceptance.qmd
-?? quarto/source_batch_issue_acceptance_files/
-?? quarto/source_extraction.qmd
-?? quarto/source_issue_update_acceptance.qmd
-?? quarto/source_issue_update_acceptance_files/
-?? quarto/source_live_issue_acceptance.qmd
-?? quarto/source_live_issue_acceptance_files/
-?? quarto/source_schedule_reacceptance.qmd
-?? quarto/source_schedule_reacceptance_files/
-?? quarto/sp_window165_20261007.qmd
-?? quarto/strategy_depth_misses_20261007.qmd
-?? quarto/strategy_depth_misses_20261007_files/
-?? quarto/strategy_prediction_report_skill_20261011.qmd
-?? quarto/strategy_prediction_report_skill_20261011_files/
-?? quarto/strategy_skill_merge_20261011.qmd
-?? quarto/strategy_skill_merge_20261011_files/
-?? quarto/structure_coverage_20261007.qmd
-?? quarto/swansea96_fundamental_report_20261011.qmd
-?? quarto/templates/
-?? quarto/top2_disagreement_replay.qmd
-?? quarto/triple433_20261007.qmd
-?? quarto/triple433_20261007_files/
-?? quarto/triple_reuse_comparison.qmd
-?? quarto/uncovered_ranks_20261007.qmd
-?? quarto/uncovered_ranks_20261007_files/
-?? quarto/unified_probability_plan.qmd
-?? quarto/unified_probability_plan_files/
-?? quarto/unified_sources.qmd
-?? quarto/unified_sources_acceptance.qmd
-?? quarto/uniform_triple_depth.qmd
-?? quarto/uniform_triple_ranking.qmd
-?? quarto/unsegmented_progress_20261010_1423.qmd
-?? quarto/unsegmented_progress_20261010_1531.qmd
-?? quarto/unsegmented_progress_20261011_0034.qmd
-?? quarto/unsegmented_rounds_20261010.qmd
-?? quarto/upcoming_20261004_1_25h_plan.qmd
-?? quarto/upcoming_20261004_3322221_plan.qmd
-?? quarto/upcoming_20261004_betting_sheet.qmd
-?? quarto/upcoming_20261006_analysis.qmd
-?? quarto/upcoming_20261006_index_update.qmd
-?? quarto/upcoming_20261006_index_update_files/
-?? quarto/upcoming_20261006_mixed75_diagnostic_analysis.qmd
-?? quarto/upcoming_20261006_sp19_analysis.qmd
-?? quarto/upcoming_20261006_window2_26_analysis.qmd
-?? quarto/vfootball-dc-212673-20261006/
-?? quarto/vfootball-dc-212676-20261006/
-?? quarto/vfootball_26093_dc_ablation.qmd
-?? quarto/vfootball_26093_fundamentals_dc_comparison.qmd
-?? quarto/vfootball_adaptive_comparison_20261007.qmd
-?? quarto/vfootball_adaptive_settlement_20261007.qmd
-?? quarto/vfootball_domain_20261017.qmd
-?? quarto/vfootball_domain_20261017_files/
-?? quarto/vfootball_league_context_current_20261007.qmd
-?? quarto/vfootball_month_22_backtest.qmd
-?? quarto/vfootball_month_archive.qmd
-?? quarto/vfootball_other_windows.qmd
-?? quarto/vfootball_recent_dc_comparison_20261007.qmd
-?? quarto/vfootball_recent_prediction_xg.qmd
-?? quarto/vfootball_rho_optimization.qmd
-?? quarto/vfootball_rho_recency.qmd
-?? quarto/vfootball_rho_reconciliation.qmd
-?? quarto/vfootball_sp_dc_comparison_20261007.qmd
-?? quarto/vfootball_sp_xg_disagreements.qmd
-?? quarto/vfootball_window_fundamentals.qmd
-?? quarto/vfootball_window_h2h.qmd
-?? quarto/vfootball_xg_comparison_20261007.qmd
-?? quarto/window2_prematch_xg_dc_20261007.qmd
-?? quarto/window2_prematch_xg_dc_3332221_20261007.qmd
-?? quarto/window2_prematch_xg_dc_3332221_distinct_20261007.qmd
-?? quarto/window2_prematch_xg_dc_bd8singles_20261007.qmd
-?? quarto/window2_prematch_xg_dc_doublecoverage_20261007.qmd
-?? quarto/window2_prematch_xg_dc_fixed8_20261007.qmd
-?? quarto/window2_prematch_xg_dc_fixed8_nosingle_20261007.qmd
-?? quarto/window2_prematch_xg_dc_paired4_20261007.qmd
-?? quarto/window2_prematch_xg_dc_protection_cap3_20261007.qmd
-?? quarto/window2_prematch_xg_dc_protection_cap3_fourmask_20261007.qmd
-?? quarto/window2_prematch_xg_dc_protection_v3_20261007.qmd
-?? quarto/window2_prematch_xg_dc_protection_v3_20261007.rmarkdown
-?? quarto/winner_rank_density_20261010.qmd
-?? quarto/winner_rank_density_20261010_files/
-?? quarto/zero_handicap_euro.qmd
-?? quarto/zero_handicap_euro_files/
-?? quarto/zero_handicap_odds_20261010.qmd
-?? quarto/zero_handicap_odds_20261010_files/
-?? r/betting_sheet_results.R
-?? r/constraint_policy_replay.R
-?? r/daily_paper.R
-?? r/fm13_six_tailr02.R
-?? r/fm14_26101_blind.R
-?? r/fm14_26101_market.R
-?? r/fm14_26101_prepare.R
-?? r/fm14_26101_run.R
-?? r/fm14_issue_run.R
-?? r/fm14_prepare_inputs.R
-?? r/fm15_upcoming_freeze.R
-?? r/fm15_upcoming_plan.R
-?? r/fm15_upcoming_prepare.R
-?? r/fm15_upcoming_render.R
-?? r/fm16_upcoming_freeze.R
-?? r/fm16_upcoming_market.R
-?? r/fm16_upcoming_plan.R
-?? r/fm16_upcoming_prepare.R
-?? r/fm16_upcoming_render.R
-?? r/fm171_26103_coverage_census.R
-?? r/fm171_26103_recent_repair.R
-?? r/hdc_artifact_bindings.R
-?? r/hdc_fundamentals_model.R
-?? r/hdc_group_standings.R
-?? r/hdc_rank_covariate_scope.R
-?? r/hdc_rank_covariates.R
-?? r/hdc_rank_native_join.R
-?? r/hdc_rank_target_features.R
-?? r/hdc_ranking_projection.R
-?? r/hdc_season_standings.R
-?? r/historical_dc_trial.R
-?? r/mixed_round_replay.R
-?? r/parlay_anchor_catalog.R
-?? r/parlay_anchor_four_masks.R
-?? r/parlay_anchor_review.R
-?? r/parlay_draw_protection.R
-?? r/parlay_no_anchor_templates.R
-?? r/parlay_paired_double_groups.R
-?? r/parlay_selective_classification.R
-?? r/parlay_selective_double_groups.R
-?? r/parlay_structure_compression.R
-?? r/prematch_sp_replay.R
-?? r/settled_fundamentals_evidence.R
-?? r/single_match_gap_diagnostic.R
-?? r/top2_disagreement_replay.R
-?? r/vfootball_disagreements.R
-?? r/vfootball_fixed_dc.R
-?? r/vfootball_fundamentals.R
-?? r/vfootball_h2h.R
-?? r/vfootball_month_backtest.R
-?? r/vfootball_month_day.R
-?? r/vfootball_platform_fundamentals.R
-?? r/vfootball_rho_optimization.R
-?? r/vfootball_rho_recency.R
-?? r/vfootball_xg_blend.R
-?? scripts/accept_vfootball_month_results.R
-?? scripts/audit_settled_fundamentals.py
-?? scripts/capture_fm_issue_markets.py
-?? scripts/capture_fundamental_beidan_history.py
-?? scripts/capture_fundamentals_issue_probe.py
-?? scripts/check_anchor_other_plans.R
-?? scripts/check_betting_sheet_dead_groups_html.py
-?? scripts/check_dc_accuracy_admission.py
-?? scripts/check_persistent_data_layout.py
-?? scripts/collect_betting_sheet_results.R
-?? scripts/complete_paired_double_settlements.R
-?? scripts/diagnose_bd_dc_protection_pools.R
-?? scripts/diagnose_dc_bd_accuracy.R
-?? scripts/diagnose_dc_draw_replacement.R
-?? scripts/diagnose_zero_handicap_euro.R
-?? scripts/evaluate_historical_dc_trial.R
-?? scripts/export_vfootball_month_results.R
-?? scripts/fm14_26101_accept.py
-?? scripts/fm14_26101_pa.py
-?? scripts/fm14_accept_pa.py
-?? scripts/freeze_beidan_issue_inputs.py
-?? scripts/freeze_vfootball_month.py
-?? scripts/generate_fm_qc_report.R
-?? scripts/prepare_beidan_issue_inputs.py
-?? scripts/prepare_fm14_inputs.R
-?? scripts/prepare_fm_pa_inputs.R
-?? scripts/prepare_historical_dc_trial.py
-?? scripts/profile_forced_complement.R
-?? scripts/publish_active_rounds.py
-?? scripts/publish_vfootball_month_results.py
-?? scripts/refresh_betting_sheet_results.R
-?? scripts/replay_3332222_comparison.R
-?? scripts/replay_adaptive_roles.R
-?? scripts/replay_anchor_four_masks.R
-?? scripts/replay_anchor_review.R
-?? scripts/replay_anchor_unrestricted.R
-?? scripts/replay_bd_3333222.R
-?? scripts/replay_bd_dc_protection.R
-?? scripts/replay_compressed_structures.R
-?? scripts/replay_draw_protection.R
-?? scripts/replay_hdc_historical_rank_covariates.R
-?? scripts/replay_hdc_historical_rank_covariates_cutoff_repair.R
-?? scripts/replay_hdc_historical_rank_features.R
-?? scripts/replay_hdc_season_contexts.py
-?? scripts/replay_hdc_standings.R
-?? scripts/replay_mixed_prematch_plans.R
-?? scripts/replay_no_anchor_3332222.R
-?? scripts/replay_paired_double.R
-?? scripts/replay_prematch_sp_plans.R
-?? scripts/replay_prospective_beidan.R
-?? scripts/replay_recent_ranked_outcomes.R
-?? scripts/replay_selective_double.R
-?? scripts/replay_single45_plans.R
-?? scripts/replay_triple_reuse.R
-?? scripts/replay_vfootball_month.R
-?? scripts/report_bd_dc_protection_masks.R
-?? scripts/report_mixed_prematch_plans.R
-?? scripts/revise_26101_plans.R
-?? scripts/run_daily_paper.py
-?? scripts/run_daily_paper_stage.R
-?? scripts/run_fm14_issue.R
-?? scripts/run_historical_dc_trial.R
-?? scripts/select_upcoming_3322221.R
-?? scripts/setup_parlay_kernel.R
-?? scripts/stage_selective_double_settlements.R
-?? scripts/update_betting_sheet_results.py
-?? scripts/verify_parlay_budget_allocation.R
-?? scripts/verify_probability_backtest.R
-?? scripts/verify_probability_base_selector.R
-?? scripts/verify_unified_probability_plan.R
-?? src/betting_sheet_results.py
-?? src/daily_paper.py
-?? src/draw_recalibration/
-?? src/fundamentals_issue_probe.py
-?? src/hdc_fundamentals_intake.py
-?? src/hdc_fundamentals_model.py
-?? src/hdc_group_crosswalk.py
-?? src/hdc_mutation_context.py
-?? src/hdc_rank_design.py
-?? src/hdc_rank_history.py
-?? src/hdc_ranking_context.py
-?? src/hdc_ranking_model.py
-?? src/hdc_season_context.py
-?? src/hdc_season_source.py
-?? src/historical_dc_trial.py
-?? src/multiround_results.py
-?? src/settled_fundamentals_audit.py
-?? src/vfootball_dc_intake.py
-?? src/vfootball_fundamentals.py
-?? src/vfootball_h2h.py
-?? src/vfootball_issue_identity.py
-?? src/vfootball_month_capture.py
-?? src/vfootball_month_intake.py
-?? src/vfootball_month_results.py
-?? src/vfootball_month_snapshot.py
-?? src/vfootball_rho_context.py
-?? src/vfootball_rho_recency.py
-?? src/vfootball_xg_intake.py
-?? tests/dixon_coles_rho/
-?? tests/draw_recalibration/
-?? tests/fixtures/anchor_gate_pool.rds
-?? tests/fixtures/draw_protection_pools.rds
-?? tests/fixtures/historical-availability-compression-20261011.json
-?? tests/fixtures/historical-betting-sheet-evidence-20261011.json
-?? tests/fixtures/historical-overlap-evidence-20261011.json
-?? tests/fixtures/historical-remaining-deliveries-20261011.json
-?? tests/fixtures/settled_fundamentals_audit/
-?? tests/fixtures/shared-result-sheets-20261011.json
-?? tests/fixtures/source_26098_26101/
-?? tests/fixtures/source_26102/
-?? tests/fixtures/source_26103/
-?? tests/fixtures/source_26104/
-?? tests/fixtures/source_live_issue/
-?? tests/handicap_rebase/
-?? tests/hdc_ranking_projection_fixture.py
-?? tests/integration/
-?? tests/market_capture/test_fm_issue_collector.py
-?? tests/test_active_rounds_dashboard.py
-?? tests/test_betting_combination_depth.py
-?? tests/test_betting_sheet_results.py
-?? tests/test_betting_sheet_template.py
-?? tests/test_fm14_26101_accept.py
-?? tests/test_fm14_accept_pa.py
-?? tests/test_fm15_publication_20261012.py
-?? tests/test_fm16_26104_publication.py
-?? tests/test_fm16_depth_revision.py
-?? tests/test_fm16_publication_20261013.py
-?? tests/test_fundamental_beidan_history_capture.py
-?? tests/test_fundamentals_issue_probe.py
-?? tests/test_hdc_admitted_replay.py
-?? tests/test_hdc_fundamentals_expansion.py
-?? tests/test_hdc_group_crosswalk.py
-?? tests/test_hdc_learning_context_replay.py
-?? tests/test_hdc_mutation_context.py
-?? tests/test_hdc_rank_availability_audit.py
-?? tests/test_hdc_rank_design.py
-?? tests/test_hdc_rank_history.py
-?? tests/test_hdc_ranking_context.py
-?? tests/test_hdc_ranking_model.py
-?? tests/test_hdc_season_context.py
-?? tests/test_hdc_season_source.py
-?? tests/test_historical_dc_trial.py
-?? tests/test_issue_inputs_commands.py
-?? tests/test_live_sheet_registration.py
-?? tests/test_mixed_publication_20261011.py
-?? tests/test_multiround_availability_delivery.py
-?? tests/test_multiround_hourly_registration.py
-?? tests/test_multiround_results.py
-?? tests/test_multiround_sheet_publication.py
-?? tests/test_public_site_paths.py
-?? tests/test_settled_fundamentals_audit.py
-?? tests/test_structure_sheet_template.py
-?? tests/test_upcoming_betting_html.py
-?? tests/test_vfootball_dc_intake.py
-?? tests/test_vfootball_fundamentals.py
-?? tests/test_vfootball_h2h.py
-?? tests/test_vfootball_issue_identity.py
-?? tests/test_vfootball_month_capture.py
-?? tests/test_vfootball_month_intake.py
-?? tests/test_vfootball_month_results.py
-?? tests/test_vfootball_month_snapshot.py
-?? tests/test_vfootball_rho_context.py
-?? tests/test_vfootball_rho_recency.py
-?? tests/test_vfootball_xg_intake.py
-?? tests/testthat/_problems/
-?? tests/testthat/helper-historical-overlap.R
-?? tests/testthat/helper-historical-remaining.R
-?? tests/testthat/helper-repository-context.R
-?? tests/testthat/test-3332222-comparison.R
-?? tests/testthat/test-beidan07-conflict-update-20261011.R
-?? tests/testthat/test-beidan07-current-settlement-20261011.R
-?? tests/testthat/test-betting-sheet-results.R
-?? tests/testthat/test-betting-sheet-view.R
-?? tests/testthat/test-classify-chain-qmd-path.R
-?? tests/testthat/test-classify-chain-real-qmd.R
-?? tests/testthat/test-compressed-replay-freeze.R
-?? tests/testthat/test-constraint-policy-replay.R
-?? tests/testthat/test-current-market-primitives.R
-?? tests/testthat/test-current-role-variants.R
-?? tests/testthat/test-double-ratio-cap-delivery.R
-?? tests/testthat/test-draw-protection.R
-?? tests/testthat/test-five-round-bases-delivery.R
-?? tests/testthat/test-fm-case4-ah-history.R
-?? tests/testthat/test-fm-case4-line-adjust.R
-?? tests/testthat/test-fm-case4-ratio.R
-?? tests/testthat/test-fm-case4-tail-scenarios.R
-?? tests/testthat/test-fm-qc-report-command.R
-?? tests/testthat/test-fm-six-line-review.R
-?? tests/testthat/test-fm-six-margin-top3.R
-?? tests/testthat/test-fm-tailr-policy.R
-?? tests/testthat/test-fm13-104-top3-tail03.R
-?? tests/testthat/test-fm13-six-hit-comparison.R
-?? tests/testthat/test-fm13-six-tailr02.R
-?? tests/testthat/test-fm15-upcoming-20261012.R
-?? tests/testthat/test-fm16-upcoming-20261013.R
-?? tests/testthat/test-fm171-qc-repair-inputs.R
-?? tests/testthat/test-forced-complement-archive.R
-?? tests/testthat/test-hdc-artifact-bindings.R
-?? tests/testthat/test-hdc-fundamentals-expansion.R
-?? tests/testthat/test-hdc-group-standings.R
-?? tests/testthat/test-hdc-rank-covariate-scope.R
-?? tests/testthat/test-hdc-rank-covariates.R
-?? tests/testthat/test-hdc-rank-native-join.R
-?? tests/testthat/test-hdc-rank-target-features.R
-?? tests/testthat/test-hdc-ranking-projection.R
-?? tests/testthat/test-hdc-season-standings.R
-?? tests/testthat/test-head-tail-delivery.R
-?? tests/testthat/test-historical-dc-trial.R
-?? tests/testthat/test-historical-double-reuse-qmd.R
-?? tests/testthat/test-historical-double-reuse-source.R
-?? tests/testthat/test-hourly-correction-20261011.R
-?? tests/testthat/test-live-sheet-publication.R
-?? tests/testthat/test-mix50-window-delivery.R
-?? tests/testthat/test-mixed-availability-20261011.R
-?? tests/testthat/test-mixed-publication-20261011.R
-?? tests/testthat/test-mixed-six-current-returns-20261011.R
-?? tests/testthat/test-mixed-six-returns-20261011.R
-?? tests/testthat/test-multiround-availability-delivery.R
-?? tests/testthat/test-multiround-sheets-delivery.R
-?? tests/testthat/test-overlap6-3333221-delivery.R
-?? tests/testthat/test-overlap6-native-rolefirst-delivery.R
-?? tests/testthat/test-overlap6-native3333221-delivery.R
-?? tests/testthat/test-overlap6-settlement-binding.R
-?? tests/testthat/test-overlap6-structure-depth-delivery.R
-?? tests/testthat/test-overlap6-triple433-delivery.R
-?? tests/testthat/test-overlap6-window-delivery.R
-?? tests/testthat/test-overlap6-window150300-delivery.R
-?? tests/testthat/test-parlay-anchor-catalog.R
-?? tests/testthat/test-parlay-anchor-four-masks.R
-?? tests/testthat/test-parlay-anchor-review.R
-?? tests/testthat/test-parlay-no-anchor-templates.R
-?? tests/testthat/test-parlay-paired-double-groups.R
-?? tests/testthat/test-parlay-selective-classification.R
-?? tests/testthat/test-parlay-selective-double-groups.R
-?? tests/testthat/test-parlay-structure-compression.R
-?? tests/testthat/test-prematch-sp-replay.R
-?? tests/testthat/test-remaining26102-delivery.R
-?? tests/testthat/test-retired-gap-upgrade-archive.R
-?? tests/testthat/test-retired-research-role-archive.R
-?? tests/testthat/test-settled-fundamentals-evidence.R
-?? tests/testthat/test-shared-result-snapshot.R
-?? tests/testthat/test-single-match-gap-diagnostic.R
-?? tests/testthat/test-strategy-depth-misses-delivery.R
-?? tests/testthat/test-top2-disagreement-replay.R
-?? tests/testthat/test-triple433-depth-delivery.R
-?? tests/testthat/test-uncovered-ranks-delivery.R
-?? tests/testthat/test-unsegmented-progress-20261010-1531.R
-?? tests/testthat/test-unsegmented-progress-20261011-0034.R
-?? tests/testthat/test-unsegmented-rounds-delivery.R
-?? tests/testthat/test-vfootball-disagreements.R
-?? tests/testthat/test-vfootball-fundamentals.R
-?? tests/testthat/test-vfootball-h2h.R
-?? tests/testthat/test-vfootball-month-acceptance.R
-?? tests/testthat/test-vfootball-month-archive-boundary.R
-?? tests/testthat/test-vfootball-month-backtest.R
-?? tests/testthat/test-vfootball-month-day.R
-?? tests/testthat/test-vfootball-observed-labels.R
-?? tests/testthat/test-vfootball-platform-fundamentals.R
-?? tests/testthat/test-vfootball-rho-optimization.R
-?? tests/testthat/test-vfootball-rho-recency.R
-?? tests/testthat/test-vfootball-xg-blend.R
-?? tests/testthat/test-zero-handicap-odds-delivery.R
-?? tests/testthat/testthat-problems.rds
+/usr/bin/zsh -lc 'find .. -name AGENTS.md -o -name AGENTS.override.md | head -40; git status --short -- quarto/margin_truncated_rank_20261017.qmd quarto/margin_truncated_rank_20261017.html results/margin-truncated-rank-20261017' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 240ms:
 ../beijing-lot-status/AGENTS.md
 ../beijing-lot-triple-weight-eval/AGENTS.md
 ../beijing-lot-464/AGENTS.md
@@ -2665,9 +1220,10 @@ exec
 ../beijing-lot/.development/outcome-role-variants/.run-control/unit1/codex-home/.tmp/plugins/plugins/data-analytics/AGENTS.md
 ../beijing-lot/.development/outcome-role-integration/AGENTS.md
 ../beijing-lot-identity/AGENTS.md
+ M quarto/margin_truncated_rank_20261017.qmd
 
 exec
-/usr/bin/zsh -lc 'cat quarto/margin_truncated_rank_20261017.qmd' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+/usr/bin/zsh -lc 'cat quarto/margin_truncated_rank_20261017.qmd; ls -la results/margin-truncated-rank-20261017; for d in . quarto results results/margin-truncated-rank-20261017; do for n in AGENTS.override.md AGENTS.md; do test ! -f "$d/$n" || { echo "$d/$n"; cat "$d/$n"; }; done; done' in /home/drwho1985/workspace/algotradinglife/beijing-lot
  succeeded in 0ms:
 ---
 title: "净胜球阈值截断后：七场组合中奖排名"
@@ -2680,7 +1236,7 @@ params:
   project_root: "."
 ---
 
-使用原四轮七场组合（每轮8个固定场次组合），只为和此前直接对照，不把8组作为新策略要求。来源是冻结FM尾部压缩前base网格。按20/30/40/50/60/70/80/90/95%阈值累计选择高概率净胜球档，边界同概率一起保留，**核心外概率置零，核心内重新归一化**，再映射北单让球W/D/L，按七场类别概率乘积排序、票号破同分。不保留旧允许集合，不复用旧最终概率。固定封存赛果，第二轮未知标签保留待定；实际类别被截掉则为未覆盖而非给一个排名。
+使用原四轮七场组合（每轮8个固定场次组合），只为和此前直接对照，不把8组作为新策略要求。来源是冻结FM尾部压缩前base网格。按20/30/40/50/60/70/80/90/95/100%阈值累计选择高概率净胜球档，边界同概率一起保留，**核心外概率置零，核心内重新归一化**，再映射北单让球W/D/L，按七场类别概率乘积排序、票号破同分。不保留旧允许集合，不复用旧最终概率。固定封存赛果，第二轮未知标签保留待定；实际类别被截掉则为未覆盖而非给一个排名。
 
 ```{r}
 #| include: false
@@ -2691,7 +1247,7 @@ w <- file.path(root,'results/fm17-upcoming-20261017')
 f <- readRDS(file.path(w,'frozen-probabilities.rds'));b <- readRDS(file.path(w,'plans.rds'))
 s <- jsonlite::fromJSON(file.path(root,'results/margin-ranking-20261017-review/settlement-state.json'))
 classification <- readr::read_csv(file.path(root,'results/margin-support-classification-20261017/fixtures.csv'),show_col_types=FALSE)
-thresholds <- c(.2,.3,.4,.5,.6,.7,.8,.9,.95)
+thresholds <- c(.2,.3,.4,.5,.6,.7,.8,.9,.95,1)
 prob_rows <- list()
 ids <- unique(unlist(lapply(b$plans, function(p)p$legs$fixture_id)))
 for(id in ids){
@@ -2700,13 +1256,15 @@ for(id in ids){
  stopifnot(abs(sum(m$probability)-1)<1e-9,all(m$probability>=0))
  blocks <- m |> group_by(probability) |> summarise(mass=sum(probability),.groups='drop') |> arrange(desc(probability)) |> mutate(cumulative=cumsum(mass))
  for(t in thresholds){
-  boundary <- blocks$probability[which(blocks$cumulative>=t)[1]]
+  boundary <- if(t==1) min(m$probability) else blocks$probability[which(blocks$cumulative>=t)[1]]
   core <- m |> filter(probability>=boundary)
   mass <- sum(core$probability)
   mapped <- core |> mutate(outcome=case_when(margin+h>0~'W',margin+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability)/mass,.groups='drop')
   mapped <- tibble(outcome=c('W','D','L')) |> left_join(mapped,by='outcome',relationship='one-to-one') |> mutate(probability=replace_na(probability,0),fixture_id=id,threshold=t)
   original_class <- classification |> filter(fixture_id==id,threshold==t)
-  stopifnot(nrow(original_class)==1,sum(mapped$probability>0)==original_class$n_choices,abs(sum(mapped$probability)-1)<1e-12,mass>=t-1e-12)
+  stopifnot(abs(sum(mapped$probability)-1)<1e-12,mass>=t-1e-12)
+  if(t<1) stopifnot(nrow(original_class)==1,sum(mapped$probability>0)==original_class$n_choices)
+  if(t==1) stopifnot(nrow(core)==nrow(m),abs(mass-1)<1e-9)
   prob_rows[[length(prob_rows)+1L]] <- mapped
  }
 }
@@ -2742,7 +1300,7 @@ for(i in 1:4){
  }
 }
 x <- bind_rows(rows)
-stopifnot(nrow(x)==288L,!anyDuplicated(x[c('round','group','threshold')]),all(is.na(x$winning_rank[x$state!='RANKED'])),all(x$winning_rank[x$state=='RANKED']<=x$theory[x$state=='RANKED']))
+stopifnot(nrow(x)==320L,!anyDuplicated(x[c('round','group','threshold')]),all(is.na(x$winning_rank[x$state!='RANKED'])),all(x$winning_rank[x$state=='RANKED']<=x$theory[x$state=='RANKED']))
 summary <- x |> filter(round!=2) |> group_by(threshold) |> summarise(groups=n(),covered=sum(state=='RANKED'),excluded=sum(state=='EXCLUDED'),rank_1_125=sum(hit_1_125),rank_30_154=sum(hit_30_154),rank_126_250=sum(winning_rank>=126&winning_rank<=250,na.rm=TRUE),rank_251_500=sum(winning_rank>=251&winning_rank<=500,na.rm=TRUE),rank_501_1000=sum(winning_rank>=501&winning_rank<=1000,na.rm=TRUE),rank_1001_2187=sum(winning_rank>=1001,na.rm=TRUE),.groups='drop')
 stopifnot(all(summary$groups==24L),all(summary$covered+summary$excluded==24L),all(summary$covered==summary$rank_1_125+summary$rank_126_250+summary$rank_251_500+summary$rank_501_1000+summary$rank_1001_2187))
 for(t in thresholds){
@@ -2772,130 +1330,20 @@ knitr::kable(x |> filter(round==2) |> group_by(threshold) |> summarise(known_hit
 knitr::kable(tibble(input=input_files,sha256=vapply(input_files,digest::digest,character(1),file=TRUE,algo='sha256')))
 ```
 
-验收检查：52场×9阈值每场三类别概率归一、支持数与前次分类逐场一致；32个固定组合×9阈值完整唯一；每个组合票数等于允许类别数乘积、无重复、票概率和为1、排名递减、确定结果唯一且在范围内、缺失标签不伪造排名、24组区间计数守恒。不新增函数、不修改包；调用既有已安装包枚举和排序并传入原显式截止。截断后的概率是核心条件分布，不能冒充已校准的无条件实际概率；组间重叠且非独立。本分析是事后政策对照，不据目标赛果选择阈值或窗口，不发布票单、不报告收益。审查/渲染和输入输出SHA记录在results/margin-truncated-rank-20261017/。
+验收检查：52场×10阈值每场三类别概率归一、支持数与前次分类逐场一致；32个固定组合×10阈值完整唯一；每个组合票数等于允许类别数乘积、无重复、票概率和为1、排名递减、确定结果唯一且在范围内、缺失标签不伪造排名、24组区间计数守恒。不新增函数、不修改包；调用既有已安装包枚举和排序并传入原显式截止。截断后的概率是核心条件分布，不能冒充已校准的无条件实际概率；组间重叠且非独立。本分析是事后政策对照，不据目标赛果选择阈值或窗口，不发布票单、不报告收益。审查/渲染和输入输出SHA记录在results/margin-truncated-rank-20261017/。
 
-exec
-/usr/bin/zsh -lc "find quarto results -maxdepth 2 -name 'AGENTS*'; ls -lh results/margin-truncated-rank-20261017; ls -l quarto/margin_truncated_rank_20261017.html" in /home/drwho1985/workspace/algotradinglife/beijing-lot
- exited 2 in 0ms:
-results/package-repair-20261017-094115/AGENTS.before.md
-total 72K
--rw-rw-r-- 1 drwho1985 drwho1985  44K Oct 18 11:19 conditional-probabilities.csv
--rw-rw-r-- 1 drwho1985 drwho1985  15K Oct 18 11:19 groups.csv
--rw-rw-r-- 1 drwho1985 drwho1985 5.7K Oct 18 11:19 pending-ranks.csv
--rw-rw-r-- 1 drwho1985 drwho1985  329 Oct 18 11:19 summary.csv
-ls: cannot access 'quarto/margin_truncated_rank_20261017.html': No such file or directory
-
-exec
-/usr/bin/zsh -lc "cat results/margin-truncated-rank-20261017/summary.csv; cat results/margin-ranking-20261017-review/settlement-state.json | head -c 4000; rg -n 'parlay_rank_tickets|parlay_enumerate_tickets' packages/beidan/R/* | head; find . -path '*margin_truncated_rank*html' -o -path '*margin-truncated-rank*' | head -25; cat AGENTS.md | head -12" in /home/drwho1985/workspace/algotradinglife/beijing-lot
- succeeded in 262ms:
-threshold,groups,covered,excluded,rank_1_125,rank_30_154,rank_126_250,rank_251_500,rank_501_1000,rank_1001_2187
-0.2,24,0,24,0,0,0,0,0,0
-0.3,24,0,24,0,0,0,0,0,0
-0.4,24,0,24,0,0,0,0,0,0
-0.5,24,16,8,1,3,2,5,8,0
-0.6,24,24,0,4,4,2,6,4,8
-0.7,24,24,0,7,7,7,2,3,5
-0.8,24,24,0,6,8,8,2,3,5
-0.9,24,24,0,7,8,8,1,3,5
-0.95,24,24,0,8,9,7,1,4,4
-{
-  "schema": "published_html_results_v1",
-  "spec_sha256": "3962bcf4109e71570c22ff241d783629c7b3442123be832027ba81da8e2d37b6",
-  "frozen_inputs": {
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_01/source.html": "b3b306ebb40b48b235f53c6b5566bde100c4e61db2dad87dd112ca891774daa8",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_01/schedule.rds": "b6d9e6882c94d79d7bce492d7abf5c6707d89506e460eaf8c81a5158d95f7434",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_01/full-support.rds": "5ce964954183e0457e90c738ca511f98fa2cc2da91a88d5d86a7e6e240264028",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_02/source.html": "8e267006df2e167990dbb4e7f309b64bbf24e2771b72dcef5cb11248e528470d",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_02/schedule.rds": "edf0994689d15b9f3ece480ef482e2d08807e3212551cfaf0ba778ed096d9c00",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_02/full-support.rds": "81c783a6ceef57270c17dec1227aefb6b1bcb7461f446889423eda2ebd0f9313",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_03/source.html": "3c15447f3d06585030449b713c17595ad6775d825daf7b287f430b425b066a02",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_03/schedule.rds": "f123c4acdf85e8a039d48a5bbfcc56b3991d718501da84614dff38f65000177b",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_03/full-support.rds": "21febfd45dbf1d492285eeeb18970600aee6eeadfd59075b73efc8dfe3e0ac35",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_04/source.html": "6bd5926628207331f21d385247d9d970a693e9bba6a42b2d9f6ff856941ad937",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_04/schedule.rds": "f24ebc14da7ccf24781de2c1e627fc4aee1df13a6f7856ef309e7a9d2c67fa60",
-    "hot:betting-sheet-results-fm17-20261017/FM17_MIX_04/full-support.rds": "380c543b9aac6efc682a8996d9a20f4e2b6cb904a812b174d4daaf8f7cac8118"
-  },
-  "plans": [
-    {
-      "output": "upcoming_26105_20261017_fm170_01.html",
-      "status": "PENDING",
-      "observed_fixtures": 8,
-      "confirmed_fixtures": 14,
-      "required_fixtures": 14,
-      "total_groups": 8,
-      "dead_groups": 5,
-      "pending_groups": 0,
-      "hit_groups": 3,
-      "stake_cny": 2000,
-      "payout_cny": null,
-      "net_cny": null
-    },
-    {
-      "output": "upcoming_26105_20261017_fm170_02.html",
-      "status": "PENDING",
-      "observed_fixtures": 6,
-      "confirmed_fixtures": 13,
-      "required_fixtures": 14,
-      "total_groups": 8,
-      "dead_groups": 7,
-      "pending_groups": 1,
-      "hit_groups": 0,
-      "stake_cny": 2000,
-      "payout_cny": null,
-      "net_cny": null
-    },
-    {
-      "output": "upcoming_26105_20261017_fm170_03.html",
-      "status": "PENDING",
-      "observed_fixtures": 11,
-      "confirmed_fixtures": 13,
-      "required_fixtures": 13,
-      "total_groups": 8,
-      "dead_groups": 4,
-      "pending_groups": 0,
-      "hit_groups": 4,
-      "stake_cny": 2000,
-      "payout_cny": null,
-      "net_cny": null
-    },
-    {
-      "output": "upcoming_26105_20261017_fm170_04.html",
-      "status": "PENDING",
-      "observed_fixtures": 7,
-      "confirmed_fixtures": 11,
-      "required_fixtures": 11,
-      "total_groups": 8,
-      "dead_groups": 8,
-      "pending_groups": 0,
-      "hit_groups": 0,
-      "stake_cny": 2000,
-      "payout_cny": null,
-      "net_cny": null
-    }
-  ],
-  "as_of": "2026-10-18T00:15:13.711849Z",
-  "settlement_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/betting-sheet-results-fm17-20261017/runs/20261018T001502438748Z/settlements.rds",
-  "run_directory": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/betting-sheet-results-fm17-20261017/runs/20261018T001502438748Z",
-  "observations": {
-    "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/betting-sheet-results-fm17-20261017/observations/20261018T001502438748Z/observations.rds",
-    "sha256": "411095c35a9780a068edd22b063ff8b186406fd84982d13a42cd4a6b085286ad",
-    "manifest_path": "/home/drwho1985/workspace/algotradinglife/bpackages/beidan/R/parlay_budget_allocation.R:504:  tickets <- parlay_enumerate_tickets(group_legs, projected$probabilities, cutoff,
-packages/beidan/R/parlay_budget_allocation.R:510:  ranked <- parlay_rank_tickets(valued, tickets$candidate_tickets, cutoff, ranking)
-packages/beidan/R/parlay_restructure_plan.R:43:  tickets <- parlay_enumerate_tickets(legs, source$probabilities, cutoff,
-packages/beidan/R/parlay_restructure_plan.R:48:  ranked <- parlay_rank_tickets(valued, tickets$candidate_tickets, cutoff,
-packages/beidan/R/n7_pipeline_candidates.R:6:#'   parlay_enumerate_tickets     把受支撑的空间展开成物理票
-packages/beidan/R/n7_pipeline_candidates.R:465:# parlay_enumerate_tickets(group_legs, probabilities, cutoff, supports, n_legs)
-packages/beidan/R/n7_pipeline_candidates.R:491:parlay_enumerate_tickets <- function(group_legs, probabilities, cutoff, supports,
-packages/beidan/R/n7_pipeline_candidates.R:501:      stop("parlay_enumerate_tickets: n_legs must be one whole number of at least 1")
-packages/beidan/R/n7_pipeline_candidates.R:505:      stop("parlay_enumerate_tickets: n_legs ", n_legs,
-packages/beidan/R/n7_pipeline_candidates.R:530:      stop("parlay_enumerate_tickets: candidate ", candidate_id, " has no support")
-./results/margin-truncated-rank-20261017
-./results/margin-truncated-rank-20261017/conditional-probabilities.csv
-./results/margin-truncated-rank-20261017/pending-ranks.csv
-./results/margin-truncated-rank-20261017/groups.csv
-./results/margin-truncated-rank-20261017/summary.csv
-./quarto/margin_truncated_rank_20261017.html
-./quarto/margin_truncated_rank_20261017_files/libs/quarto-html
+100%专门保留全部净胜球档，避免浮点累计略小于1时误判无边界；检验完整核心与原网格质量一致。它是尾部压缩前的原分布，不是FM17压缩后的冻结概率。
+total 332
+drwxrwxr-x   2 drwho1985 drwho1985   4096 Oct 18 11:20 .
+drwxrwxr-x 446 drwho1985 drwho1985  28672 Oct 18 11:19 ..
+-rw-rw-r--   1 drwho1985 drwho1985   1744 Oct 18 11:20 acceptance.json
+-rw-rw-r--   1 drwho1985 drwho1985  44211 Oct 18 11:19 conditional-probabilities.csv
+-rw-rw-r--   1 drwho1985 drwho1985  15187 Oct 18 11:19 groups.csv
+-rw-rw-r--   1 drwho1985 drwho1985   5764 Oct 18 11:19 pending-ranks.csv
+-rw-rw-r--   1 drwho1985 drwho1985    692 Oct 18 11:19 render.log
+-rw-rw-r--   1 drwho1985 drwho1985 217451 Oct 18 11:20 review.log
+-rw-rw-r--   1 drwho1985 drwho1985    329 Oct 18 11:19 summary.csv
+./AGENTS.md
 # Repository Agent Governance
 
 ## Local synchronization after merge (owner-mandated default)
@@ -2908,511 +1356,326 @@ packages/beidan/R/n7_pipeline_candidates.R:530:      stop("parlay_enumerate_tick
 ## Engineering principles (owner-mandated)
 
 - Delete obsolete code; no compatibility layers, migrations for old behavior, or fallback paths.
+- Implement the simplest solution for current needs; avoid speculative abstractions and configuration.
+- Build a minimal end-to-end version first, then extend it; preserve working code until its replacement works.
+- Keep components decoupled, single-purpose, and independently testable.
+- R and Python must use mainstream, mature, maintained libraries when suitable; do not recreate their capabilities.
+- Check existing dependencies and public APIs before adding packages or implementing functionality.
+- If no library fits, document evaluated options and the gap; implement only the missing capability.
+- Make durable architecture decisions; avoid temporary designs that require later repair.
+- Learn from mature products and proven patterns.
+- Every project function requires corresponding automated tests.
+- Preserve raw data, enforce executable data contracts, and make analysis reproducible.
+- Require relevant automated checks to pass before merging.
+
+## R / Quarto and code organization
+
+- Every delivery must include a reproducible Quarto (`.qmd`) document as its delivery and acceptance entry point.
+- Use R for analysis; the delivery QMD records scope, inputs, results, validation evidence, and limitations.
+- All R analysis tables must use `tibble`; manipulate them with tidyverse and appropriate related libraries.
+- Convert database, Python, and Rcpp tabular outputs to validated tibbles at the R boundary, including typed empty tables.
+- Follow tidy data: variables in columns, observations in rows, each type of observational unit in its own table.
+- Put reusable package R functions in `packages/beidan/R/` and the bundled Python backend in `packages/beidan/inst/python/beidan_backend/`. Keep repository research clients in `r/` and `src/`, QMD in `quarto/`, and command entry points thin.
+- QMD declares inputs, organizes analysis, and presents results; extract reusable functions into modules.
+- Develop reusable functions in R, Python called through `reticulate`, or C++ exposed through `Rcpp` wrappers.
+- Keep reusable implementations outside QMD; use one authoritative implementation per business/storage contract.
+- Rcpp wrappers follow the same mainstream-library, data-contract, testing, and chronology requirements as R and Python functions.
+- Module imports must not trigger scraping or database writes.
+- Document function inputs, outputs, units, missing values, errors, and side effects where applicable.
+- Pass paths, connections, and parameters explicitly; avoid hidden mutable session state.
+
+## Dependencies and reproducibility
+
+- Record direct dependencies, reproducible versions, and required R/Python/Quarto runtimes in project configuration.
+- Install dependencies during environment setup, never during function execution or QMD rendering.
+- Use `pak` for R package installation, updates, and dependency management. Use other installers only to bootstrap `pak` itself when it is unavailable.
+- Select the project Python interpreter explicitly for R/Python calls; fail clearly on incorrect environments.
+- Render QMD from a clean session with declared inputs and parameters, independent of RStudio globals or manual execution order.
+- Do not depend on undeclared local files, personal paths, or restored workspaces.
+
+## Data contracts and provenance
+
+- Define row meaning, columns, types, unique keys, nullable fields, categories, units, and relationship cardinalities.
+- Validate contracts at data boundaries; stop on critical failures.
+- Preserve identifiers and leading zeros; distinguish missing values, zero, empty strings, and empty results.
+- Make conversions explicit; never silently turn parsing failures into missing values.
+- Use typed dates/timestamps and explicit timezones; distinguish event, collection, and label-availability times.
+- Declare join keys/cardinality; check unmatched keys and unexpected row multiplication.
+- Record filtering/deduplication reasons and counts; do not silently choose between conflicting records.
+- Test database/R/Python/Rcpp conversions for nulls, integer precision, identifiers, timestamps, column types, and empty tibble schemas.
+- Preserve original bytes, encoding, source identity, and collection timestamps separately from cleaned data.
+- Bind derived outputs to input identities/hashes, code identity, parameters, and generation time.
+- Apply the stronger cutoff receipt rules below to historical-learning outputs.
+
+## Scraping and database interaction
+
+- Separate fetching, parsing, validation, and persistence into testable functions.
+- Use explicit timeouts, bounded transient retries, and existing source-specific rate limits.
+- Preserve raw responses for offline parsing replay; distinguish empty results from request/parser failures.
+- Inject credentials through environment configuration; exclude them from code, QMD, logs, and fixtures.
+- Parameterize SQL values; use the authoritative storage API for writes.
+- Use transactions; define conflicts, duplicate handling, repeated-run behavior, and rollback.
+- Test rollback and repeated execution; release connections/resources on both success and failure.
+
+## CI participation (owner-mandated default)
+
+- Agents do not participate in CI by default. Do not configure, add, trigger, monitor, retry, repair, or optimize CI workflows unless the user explicitly requests CI work.
+- Do not introduce CI coverage gaps or CI status as agent-imposed acceptance/merge gates, create CI follow-up issues, or repeatedly remind the user about CI.
+- Continue required local tests, reproducible QMD rendering, code review, and PI acceptance. Never report unrun or failed CI as passed.
+- Respect enforced GitHub branch protection. If it actually prevents an authorized merge, report that concrete blocker once; do not bypass protection or start CI remediation without explicit instruction.
+
+## Tests and acceptance
+
+### R package changes: completion gate (owner-mandated, 2026-10-17)
+
+- Any change to `packages/beidan/` (R, Python backend, Rcpp, namespace/dependencies, or tests) must be followed by a fresh normal package installation and the complete package R test suite against that installed package before the work can be considered finished. Run the complete bundled Python backend suite as well; run the repository-client phase through `Rscript tests/testthat.R` when repository-client code or that shared entry point is modified.
+- Targeted tests are for development only. After the final implementation/test change, rerun the complete required suites; earlier green runs and a collection of targeted reruns do not satisfy final acceptance. Existing failures, environment/path errors, and test-order conflicts must be resolved rather than dismissed as baseline debt.
+- Verify DLL registration and actual Rcpp wrapper calls after normal installation, using explicitly declared R libraries and the project Python interpreter. Do not use manual `dyn.load()` or mix `devtools::load_all()` with the installed package to obtain a passing result.
+- Any failed assertion, errored test, failed installation, or failed required check prevents completion. A skipped test is not a passed test: record its exact reason and missing evidence, and do not claim all cases verified or mark a required unavailable case complete. Never delete tests, weaken assertions, fabricate fixtures, or turn failures into skips to satisfy this gate.
+- Record final source identity, exact commands, exit statuses, full-suite totals, skip reasons, and corresponding regression tests in the delivery QMD. Complete clean-session rendering and `codex review` of the final artifact before reporting completion. Preserve unrelated work; do not trigger CI as part of these local checks.
+
+- Use `testthat` in `packages/beidan/tests/testthat/` for package functions and `tests/testthat/` for repository clients; use `pytest` in the relevant `tests/` area.
+- Map every project function to tests, including helpers and functions defined in QMD; untested existing functions remain gaps.
+- Add/update and run corresponding tests with each function change; bug fixes require regression tests.
+- Test observable behavior and contracts: normal inputs, relevant boundaries/missing/empty inputs, and failure paths.
+- Test third-party integration contracts; dependency internals remain the dependency's responsibility.
+- Exercise test helpers through the tests they support; avoid recursive tests of tests.
+- Keep routine tests deterministic with saved responses and temporary databases; separate live integration checks.
+- Run R tests with `Rscript tests/testthat.R`; run Python tests with the project interpreter's `-m pytest`.
+- Test Rcpp functions through their exported R wrappers, including conversion boundaries and failure paths.
+- Verify key QMD in a fresh process with declared inputs, execution enabled, cache/freeze bypassed, and errors fatal.
+- Rendering does not replace function tests; HTML containing execution errors fails acceptance.
+- Inspect key rendered tables/figures for missing content, units, and labels; identify input snapshots and parameters.
+- Verify affected function tests, data contracts, key QMD renders, and applicable cutoff governance checks locally.
+- Report changed behavior, function/test mapping, exact check commands/results, and reasons for skipped checks.
+- Every delivery must pass `codex review` covering its QMD, reusable implementation, tests, and data contracts before PI acceptance.
+- Record the reviewed revision or file hashes, review command, findings, and resolutions in the delivery QMD; a successful process exit alone is not acceptance.
+- Fix blocking findings and rerun review after relevant changes; PI verifies the final reviewed artifact before merge.
+- Skipped or failed required checks do not pass; documentation alone does not prove implementation or enforcement.
+- Report compliance gaps with evidence.
+
+## Cutoff-driven historical learning (owner-mandated)
+
+### Scope and chronology
+
+- Every decision-facing historical learning, calibration, tuning, selection, ranking, gate, or optimization function must receive an explicit cutoff, either as a standalone cutoff object or embedded in an explicitly passed decision object (for example, `portfolio$cutoff`). An embedded cutoff satisfies this requirement; do not require a redundant standalone cutoff argument.
+- Validate the embedded cutoff and its binding to the object's input snapshots and derived artifacts. Missing, malformed, or inconsistent cutoff context must fail closed; never infer it from the current clock, hidden globals, or mutable session state. Changing the cutoff requires rebuilding the affected decision artifacts, not merely editing their cutoff field. All chronology, receipt, and cache requirements below apply equally to both forms.
+- This includes preprocessing, thresholds, support depth, hyperparameters, seeds, expert admission, routing, allocation, bankroll gates, league/team effects, regimes, embeddings, priors, shrinkage, imputation, normalization, and availability gates.
+- Admit actual source data and available labels strictly before cutoff; derive every fit/tune/calibration partition within that prior window.
+- Fail closed on missing chronology or insufficient history.
+- Use issue-level walk-forward with the target fixture-relative decision epoch as cutoff.
+- Admit prior-year history and current-year issues only when their labels were actually available before cutoff.
+- Exclude target/future issues and unsettled labels by both timestamp and exact target-issue identity, even if a bad source claims early target settlement.
+- Freeze an immutable cutoff-keyed artifact before opening target settlement; later labels must never rewrite it.
+- Name availability evidence classes: observed availability or documented conservative safe boundaries may authorize prospective use; historical timestamp proxies are diagnostic only.
+- Hidden globals such as `FIT_END`, `TUNE_YEAR`, `CALIBRATION_YEAR`, or detached acceptance booleans must not control new target periods.
+- Pre-rule historical packages may remain only as inventoried evidence, not reusable clean interfaces.
+- Pass business constants explicitly: fixed N, CNY1,024, CNY2 units, and one ticket-level 0.65 payout factor.
+
+### Receipts, caches, and review
+
+- Return the learned artifact with a machine-readable receipt; independent replay is mandatory.
+- Bind cutoff identity/time, maximum source/label-availability times, partitions, selected parameters, metrics, and gate predicates.
+- Bind source hashes, transitive implementation hashes, model identity, imported helpers, and a cutoff-bound cache key.
+- Never reuse caches across cutoffs, sources, or implementations; later issue models/caches cannot serve earlier issues.
+- Every research contract and PI/adversarial review must inventory transitive historical-learning functions.
+- Review cutoff receipt, maximum admitted times, partition derivation, cross-cutoff cache exclusion, and imported-helper bindings.
+- Verify post-cutoff mutation invariance through selection, support, tickets, and routing; label-free final output alone does not prove causality.
+
+### Recency and shared implementation
+
+- Treat recency weighting as learning: pass policies explicitly and select them only inside prior cutoff windows.
+- Policies include equal expansion, time/issue decay, bounded recent-state blends, change detectors, refit cadence, half-life, window, blend, threshold, and ESS floors.
+- Receipts must bind the full weight ledger, effective sample size (ESS), long-history shrinkage, and policy parameters.
+- Sparse recent evidence must fail closed or shrink to the frozen long-history prior.
+- Recent-state blends must equal `(1-alpha) * long_history + alpha * recent_state`, with both distributions normalized and component masses reconciled separately.
+- Multiplying recent rows within one global normalization is not an accepted blend.
+- All chronology machinery must come from `packages/beidan/inst/python/beidan_backend/temporal_learning`, including R/QMD and imported-function usage.
+- Research clients supply domain fit/predict/select callbacks only; do not copy cutoff, availability, partition, weighting, ESS, cache, receipt, runner, or replay utilities.
+- New direct historical fitting outside shared learning contexts and duplicated temporal helpers fail governance checks.
+- Replace/delete obsolete implementations without compatibility wrappers.
+- Static enforcement scans `src/` and `scripts/`; allow legacy debt only by exact AST occurrence fingerprint and count, never whole-file exemptions.
+
+## Persistent data layer (recorded 2026-10-06)
+
+- Analytical datasets are Parquet on the NAS at `/mnt/nas/Data/beijing-lot` (CIFS automount; env `BEIDAN_PARQUET_ROOT`); short-lived data stays on NVMe. Read through the package, never by opening files directly: `beidan::read_dataset()` (Arrow, typed, per-file sha256 verified) and `beidan::dataset_query()` (DuckDB, read-only). `dataset_query()` registers **one table per call**, so cross-table joins go in R.
+- Single data entry: `beidan_backend.catalog` — `paths.py` resolves roots and `tier:relative/path` tokens, `registry.py` reads `registry/catalog.json` and `schemas/<schema_id>.json`. Roots fail closed when unset or absent; do not add a machine default or a second path convention.
+- One version lifecycle for base datasets and derived artifacts: `beidan_backend.versioning.publish_version()` writes `versions/<label>/` and points `current.json` at the newest. Identical content is a no-op; a label already published with different content is refused; refreshing an older label never moves the pointer backwards. `content_digest()` hashes data files only, so a new `generated_at` does not change identity.
+- `settlement` = base dataset (19 tables, registered in the version manifest) plus derived `play_labels` (one row per issue/slot/play for all five plays, registered in the catalog, partitioned by `play`). Partition arguments are not interchangeable: `issue_year` selects a base partition, `play` selects a derived shard, `issue` filters rows; misuse stops.
+- **This CIFS mount corrupts in-place overwrites.** Writing over an existing file produced zero-padded/truncated results: a Parquet with a zeroed footer, and twice a JSON with trailing NULs. Always write to a temp name, read it back, then rename. `versioning.write_json_atomically()` and `settlement_backfill.write_parquet_atomically()` exist for this; never use a plain `write_text`/`write_parquet` onto an existing path here.
+- Sandisk is being physically retired by the owner; the raw capture layer is not retained (derived layers carry sha256 references). Do not add work that depends on the Sandisk disk.
+
+## Local verification environment (recorded 2026-10-03)
+
+- This workspace is worked on over remote SSH: the Positron client is local, but the workspace, R/Python sessions, and the Posit Assistant extension host run on the server (`~/.positron-server`). Assistant configuration therefore lives on the server — global `~/.posit/assistant/settings.json` and project `.posit/assistant/settings.json` — not on the local machine. `modelTiers` (which also selects the conversation-summary/compaction model, on the `low` tier) is config-file-only; there is no `assistant.*` VS Code setting for it.
+- Project Python interpreter is `.venv/bin/python` (pytest 9.0.3); R is `/opt/R/4.6.1/bin/R`. Python code imports `beidan_backend`, so run Python tests with `PYTHONPATH=packages/beidan/inst/python:$PWD`; some `tests/` areas additionally need `src/` and their own subdirectory on `sys.path`. Several `tests/` directories fail collection for lack of a root `conftest.py`; this is a pre-existing harness gap, not a code failure.
+- Verify a suspected regression with an A/B swap of the changed implementation (restore the pre-change files, rerun, restore, hash-check) instead of assuming any failing suite is new.
+
+## Known test baseline (recorded 2026-10-03)
+
+Observed before the `parlay_select_groups` repair and unchanged by it; treat as baseline rather than regressions:
+
+- Package phase (`test_local("packages/beidan")`) is green (approx. 698 blocks / 3990 assertions, 13 skipped integration cases).
+- Repo-client phase (`test_dir("tests/testthat")`) has approx. 25 failures + 83 errors across ~26 files, all unrelated legacy-client drift: obsolete `parlay_construct_role_groups(n_candidates=, probabilities=)` arguments; removed `ou_devig`/`ou_p_over`/`n7_probe_*`; legacy portfolio expectations in `test-3332222-comparison.R`; undeclared fixtures such as `market_schedule` in `test-26098-walkthrough-progress.R`.
+- Package Python backend (`packages/beidan/tests/python`) passes with the backend on `PYTHONPATH` (approx. 128 passed, 1 skipped).
+
+### Baseline update (2026-10-06)
+
+- `packages/beidan/tests/python` is now **278 passed, 1 skipped** (the 128 figure above is stale).
+- `packages/beidan/tests/testthat/test-parquet-dataset.R` passes 77 assertions and `tests/testthat/test-collection-ledger.R` 88, both green.
+- `load_all()` does **not** load `packages/beidan/src/beidan.so` in this checkout, so any test calling an Rcpp entry point errors with `"_beidan_ComponentUnionKernelIdentity" not available for .Call()`. That is environmental, not a regression: loading the `.so` directly turns those files green. Use `R CMD INSTALL -l <lib> packages/beidan` (with `R_LIBS_USER` set) as the authoritative loadability check — `load_all()` tolerates a missing definition and will not surface it.
+- Another author's in-progress work (`packages/beidan/R/unified_sources.R`, `packages/beidan/R/source_extraction.R` and their roxygen man pages — the Nova football-data API reverse engineering) is intentionally untracked. **Do not commit it**: avoid `git add -A` under `packages/beidan`, which is what dragged those files and their NAMESPACE exports into an unrelated commit.
 
 exec
-/usr/bin/zsh -lc "/opt/R/4.6.1/bin/Rscript -e 'f<-readRDS(\"results/fm17-upcoming-20261017/frozen-probabilities.rds\"); b<-readRDS(\"results/fm17-upcoming-20261017/plans.rds\"); str(f"'$entries[[1]],max.level=2); print(names(f)); print(lapply(b$plans,function(p)p$selection_receipt$cutoff));'"'" in /home/drwho1985/workspace/algotradinglife/beijing-lot
- succeeded in 735ms:
-List of 11
- $ native            :List of 6
-  ..$ grid                    :Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	256 obs. of  3 variables:
-  .. ..- attr(*, "out.attrs")=List of 2
-  ..$ cutoff                  :List of 2
-  ..$ model_id                : chr "FM16_NATIVE"
-  ..$ source_hashes           :List of 988
-  ..$ max_source_available_utc: POSIXct[1:1], format: "2026-10-16 15:48:42"
-  ..$ intended_use            : chr "PROSPECTIVE_DECISION"
- $ market            :List of 6
-  ..$ grid                    :Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	285 obs. of  3 variables:
-  .. ..- attr(*, "out.attrs")=List of 2
-  ..$ cutoff                  :List of 2
-  ..$ model_id                : chr "FM16_JOINT_MARKET"
-  ..$ source_hashes           :List of 3
-  ..$ max_source_available_utc: POSIXct[1:1], format: "2026-10-16 15:37:23"
-  ..$ intended_use            : chr "PROSPECTIVE_DECISION"
- $ selection         :List of 3
-  ..$ base           :List of 6
-  ..$ selected_source: chr "market"
-  ..$ receipt        :List of 12
- $ base              :List of 6
-  ..$ grid                    :Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	285 obs. of  3 variables:
-  .. ..- attr(*, "out.attrs")=List of 2
-  ..$ cutoff                  :List of 2
-  ..$ model_id                : chr "FM-1.6.0_SOURCE_MARKET"
-  ..$ source_hashes           :List of 4
-  ..$ max_source_available_utc: POSIXct[1:1], format: "2026-10-16 15:37:23"
-  ..$ intended_use            : chr "PROSPECTIVE_DECISION"
- $ review            :List of 11
-  ..$ confidence       : chr "uncertain"
-  ..$ market_sufficient: logi TRUE
-  ..$ market_consistent: logi TRUE
-  ..$ reason           : chr "原生场地历史未调整对手强度、阵容；已隔离交锋采样，仍缺联赛/对手强度及阵容周期可比性，可靠性uncertain。已核验三"| __truncated__
-  ..$ counterevidence  : chr "专家来源裁决，未调用JEV、无已标定数值置信；长期历史代表性与90分钟口径未独立逐场认证。单家公司亚洲/大小球与部分"| __truncated__
-  ..$ evidence_ids     : chr [1:6] "native-evidence" "euro-115" "euro-281" "euro-82" ...
-  ..$ cutoff_utc       : chr "2026-10-16T15:48:46.000000Z"
-  ..$ native_hash      : chr "eb9d7108500d52a37d9e15bcc070186eb60f24841d21ddd73835123c6992a82d"
-  ..$ market_hash      : chr "d03997e852f07a16439172bc051a1351e0a1dd4221f4bb7a7813a99bf1300748"
-  ..$ author           : chr "ROOT_CODEX_PREMATCH_REVIEW"
-  ..$ review_version   : chr "FM-1.7.0_PROSPECTIVE_EXPERT_RULE"
- $ tail_review       :List of 5
-  ..$ decision       : chr "apply"
-  ..$ base_hash      : chr "b6f3b28907d0e6ff70a83242105be8ee315bb9def83820139e1ad743c226d5aa"
-  ..$ cutoff_utc     : chr "2026-10-16T15:48:46.000000Z"
-  ..$ reason         : chr "Fixed FM17 strictly over90percent cumulative margin core, boundarytiesincluded, outsideweight0.3, independent of bettingline."
-  ..$ counterevidence: chr "Expert90percentcoverage and0.3outerweight, no prospective performancevalidation."
- $ policy            :List of 11
-  ..$ judgement            :List of 3
-  ..$ branch               : chr "ranked_mass_core"
-  ..$ effective_coefficient: num 0.3
-  ..$ ranked_margins       :Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	33 obs. of  4 variables:
-  ..$ boundary_rank        : int 7
-  ..$ core_margins         : int [1:7] -2 -1 0 1 2 3 4
-  ..$ core_mass            : num 0.937
-  ..$ final_core_mass      : num 0.98
-  ..$ normalizer           : num 0.956
-  ..$ policy               :List of 3
-  ..$ binding_hash         : chr "8ca766e74923ba47b4bfd83d95d8e35d7603e87ab4eab975c013b375fd2e85a0"
- $ final             :List of 7
-  ..$ grid    :Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	285 obs. of  7 variables:
-  .. ..- attr(*, "out.attrs")=List of 2
-  ..$ margins :Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	33 obs. of  3 variables:
-  ..$ ledger  :Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	35 obs. of  8 variables:
-  ..$ evidence:Classes ‘tbl_df’, ‘tbl’ and 'data.frame':	6 obs. of  3 variables:
-  ..$ receipt :List of 15
-  ..$ cutoff  :List of 2
-  ..$ seal    : chr "7fe7d10d87fdab1bf65c1979c4be4c2552de77550a1638ae9f71cce8cabe20b0"
-  ..- attr(*, "class")= chr [1:2] "score_margin_scenario" "list"
- $ rows              :List of 6
-  ..$ :List of 8
-  ..$ :List of 8
-  ..$ :List of 8
-  ..$ :List of 8
-  ..$ :List of 8
-  ..$ :List of 8
- $ selection_bindings:List of 991
-  ..$ results/fm17-upcoming-20261017/archived-history.rds                                                            : chr "8277432761dd595d1f1a6a932abd8febe7a740247272144ac8c325c6180782b6"
-  ..$ results/fm17-upcoming-20261017/schedule.rds                                                                    : chr "ac70cf0285c03291f3a67ba1c3acbfeef3d4e26db29c405decfbf0c054f98abe"
-  ..$ results/fm17-upcoming-20261017/window.rds                                                                      : chr "149668881b66f8ca8c3a26c0d266f91d58c3c95c6dc9c7792ab906a1624a0d2e"
-  ..$ results/fm17-upcoming-20261017/prematch-sp.rds                                                                 : chr "393ba7cfd36b942f016b60fa28f5c314e11790497401bcda72d40149f75abf8c"
-  ..$ /home/drwho1985/workspace/algotradinglife/beijing-lot/r/fm16_upcoming_prepare.R                                : chr "df1c94b0c346b175da938e0f81d85c6fa7e438fcd74463392bcd2f4547223474"
-  ..$ /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/fm15_reader_page.R                     : chr "33db9eec4126296d8eeaac0dcc085bc9ed0489619d7106b5f85107fb9874f807"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2910934-receipt.json                                               : chr "a97a4b5345a60cb46f49eb66ecb708387575533002d3ca86d9f3a966e79915ad"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2910934.txt                                                        : chr "c72fc8b75501a76dfa0988e6de26e3ebf2cf645f2aa652289b1614f2c61fa10b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912291-receipt.json                                               : chr "7b7e04b510249f81dda9b745f0ae4f00b8a5397c07e6c491ae91b4ac3f7a5874"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912291.txt                                                        : chr "fee8cce00f6ab3d24dfb139c08bf316a77a749bbe8c2bceba007ca1e803274e2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912292-receipt.json                                               : chr "1fd3d7c0ceae8ea66aaedc7b11d9b97e97bc919daf32bb6ce8e2d1cfaa5930f3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912292.txt                                                        : chr "912f6428903fcc62f083633b47e12777dc58130568147d439ebae0b513f473d8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912915-receipt.json                                               : chr "08bf7a7e0fd805de34447412aed227a6b0850b415cb6ff52d1dda326b75b752a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912915.txt                                                        : chr "9a6411ddf1fa184851464923b7b057fd454b302ba14ab97964145ae42d90b8a2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914416-receipt.json                                               : chr "15154ea1cf733f7498caff1ab0a9e55d9d18c81576a6d928e0fb0b17d6fd0fe5"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914416.txt                                                        : chr "7b02b3ab2728cb0480489038b96c0792868d0105f7a5d6b2639ddf6a3593a8d4"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914417-receipt.json                                               : chr "5a48ece2db815c5aed07286bc1188f2e774645f2c746c91830000e0dd5e30640"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914417.txt                                                        : chr "b49ee8f32f79279821e3e0eda3675190ec03e308e00d16f980859697b2c19a34"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914418-receipt.json                                               : chr "72923cc8089b3fde8e16c6c0dd2a1453828870ac82ba3cbb6769450ab504a5b4"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914418.txt                                                        : chr "01c734f2ba72e6301e5df044794d844377944cdc9c9c8ecb116a97a413ee4ebe"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914419-receipt.json                                               : chr "26b2268cbfd22b8c07a9ebb8bd7108cad04e94cc290dccc6c3f9aa27b7c3a9de"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914419.txt                                                        : chr "22fc63d0a3c025641d3c3b13227325c0dc08e60362fd089e5016ec564b04e6bc"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914719-receipt.json                                               : chr "73c0fc37788862c667e36771d1c10292238eea944dcf0faaf6c89738a792e37c"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914719.txt                                                        : chr "55848b6cc6cd9427fb647e0699fef3132f7d929ed0edbacd55129204afa51c77"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914720-receipt.json                                               : chr "65f33c2a6126af3b32d94512aa38d8020f26b78bc66c11d75df7c7f0dbb4be9b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914720.txt                                                        : chr "a0b34f8e54f784ca399ecde9b6bd8f91c9ceb02abb3c9c9b289dcae644c4445c"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914723-receipt.json                                               : chr "7bc75087b6a9be895820647f3d236e7b993fbb8375a07d101939c1a6c8ff4386"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914723.txt                                                        : chr "2741b2478a0623af2f8449b8b5484c06f9ba22f62f591042e1bd21c29b5d2728"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914724-receipt.json                                               : chr "23a8ce7f15f140c304969cdd716d8d043ee203713a51b5deec173ecb6803aec8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914724.txt                                                        : chr "6b1303c3a9432fa2919a924a5c4bc7ba84e19009f2d1d2f3dc4790b735016875"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921952-receipt.json                                               : chr "22f7beb134328aabfe187ef470b19db724c7cab6d63a7c1995d7c877ad9a0afb"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921952.txt                                                        : chr "83a1bd5fcc37b85e86acd53ed3cf008c1c083a450d730c1c5dc09cf2f3e71192"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921953-receipt.json                                               : chr "804be958e5de7ebde6185908becff7e2996287462a74df3802bec961162fe5fd"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921953.txt                                                        : chr "fd5add1485dd5b2392a7b6a2ecb6480a52f4da0fe90bbc789a8acfedfa6e71f0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921954-receipt.json                                               : chr "622910529e1e57d93c8768bcdc0660c037bffe825a7ff2c3c5a29bcdf6fd1d6a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921954.txt                                                        : chr "55313d1f37ceda7f9886e8260057e50d39908450d09c40a69da1dbac05ca0852"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921955-receipt.json                                               : chr "641dc5f45a53192346dc57e7f900f89ba533ea908baf6dbd341277102fe67bf5"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921955.txt                                                        : chr "98de15514dd06dfdc73085dad44af7892e890b478be9740eb4b556ef2e7cbc89"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2925553-receipt.json                                               : chr "8abc78a1d031a7d7bee7c3db6584d3c8a30a3f3cbb11d354580557314da6c113"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2925553.txt                                                        : chr "9b46c1056ea789f515722e36b4ebabf4354ea804db78a63f1af7f59da29145a5"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939073-receipt.json                                               : chr "6c4922ec97b533d57a2f4c4b5cc6cdfd0eff3c699c53345da17b7adcebcb22ef"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939073.txt                                                        : chr "a6f75914cd883eb53fb984773ceac02af0a5098fdf7d1d5c99cd2adee9579db6"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939074-receipt.json                                               : chr "778be549774a1874a55f4ce1de7e2ae1275f0eb42c6894a5120377a24c40f103"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939074.txt                                                        : chr "fb4547d997bcdd61d82fad7d61d2ed947ac4a3d4494064155c2ef3407572eafd"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939075-receipt.json                                               : chr "46b94decd67b40ff2f913b89e41fe41cf2f66267da39d68ad03dd640a718afe1"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939075.txt                                                        : chr "4d8674d83dacd80cb5e2be997954f4aa247c230be60ed9e5a28668e37de686b3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939077-receipt.json                                               : chr "938ea527e902c446679042014a6f41b6f63c0531c8e7e9c577c6d9e73150d1e3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939077.txt                                                        : chr "c57157d1333bf76ac0884ac46bcb9b871837300d7b0227eeb90f416370060f0e"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2940243-receipt.json                                               : chr "f28e1b440054f823c384b588c036d75d9f55f9104a3d500c410b267568106f5a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2940243.txt                                                        : chr "2e2649d294b7b59080bf4767af137181ef4ba72d5e96b0b277ea98bce98e247b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962686-receipt.json                                               : chr "8bd7c0ae2c8f1a3cdfb1b57e6899b34bf94998fef37600132e11c9950f9595f3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962686.txt                                                        : chr "785a2b7692cd4bb83a38e52c61c347c867252ca9952a93dc4c69d10ae4b8dbaf"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962687-receipt.json                                               : chr "ac3bd82a5a5ede0d03e3643b2ec4ed6b9e788031d0fb92feadade0a602f977ff"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962687.txt                                                        : chr "70471eb0b78106bf44f702bf1fecbb312d53a05d7be433252e0f09f947c9b6b9"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2993818-receipt.json                                               : chr "df8dbf38551592f2e3328ce182d83999efb4902ff476fd845c638b12a6294f70"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2993818.txt                                                        : chr "5cc387013f58d274ad63477dbc3eb606a2e5a4532d49bc6a197899ee62cf26f8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2995364-receipt.json                                               : chr "2802c4e382d57252042b18cecea26468984eabd7dae263f5a1a9e7927c5bb6e7"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2995364.txt                                                        : chr "d4c896c47854ff80e8c4b8b27ee0c9b06b19522c2a85633b1b0f533bbd9fd435"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996170-receipt.json                                               : chr "d04a31d5638225e07aa6be763d4b0bdd99320a2e6fa28b7ab435bd1248608c45"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996170.txt                                                        : chr "93182e92799c3b8e6c16fc1676d3d5eca92afec5eb9749055a4e5a08dea787b0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996504-receipt.json                                               : chr "690e2ac583cc835f005dd4ff73d0f88bd80b2ef3e8c25d84d59b2420589a7dc8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996504.txt                                                        : chr "44247b920e726a60ef26d34fa05d1acb811b08c9abcd9393650355c650b032c2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996506-receipt.json                                               : chr "a2e559dbdf56214105d04d11fd20f27c01ff282893e2828ae189a15701a625d3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996506.txt                                                        : chr "7a182b00ceff221d82cca846f13bbad11b7c13e074554368accbd23cfbfe79db"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996508-receipt.json                                               : chr "ab2d08315e36af1b125bda7718beadc45ed3a31ca3d60c40a120513871365a37"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996508.txt                                                        : chr "55544fc17349859074f172b89ee13c35b2ab29de34eb3384c5b8db803f98a360"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997744-receipt.json                                               : chr "6a6214d580cab7ddd2c6af45678682eaccd3f9f5f0483e44c54a3ff19b0befc7"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997744.txt                                                        : chr "896a54dcc48c20e077c68fae29c6595f3a60378d8a7b7a9fb670ca1f63d16772"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997745-receipt.json                                               : chr "a5d98ddd5b7e5562fe947b0ade659548559e098e2953b4c7a24346aa6c18278e"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997745.txt                                                        : chr "e221604d6cf05219b4546a048949d6754da94df34805df958740ccad67ceaabd"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997746-receipt.json                                               : chr "2ef365c5bb8c66f397d66fd7937821c41bb35ead2a6a1ac7e03b8c54c9564244"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997746.txt                                                        : chr "ed720c7deb5d96817712ca0f26d03251d3a3c5fbac3c414e073a23d5a5dbaa17"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997747-receipt.json                                               : chr "362c4f571148de3939a9e18623b491fd4e70fc6e339c9e6ea46a613b0c47b5f2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997747.txt                                                        : chr "03756696aa73890c88dfc65216ff4deb00c78064e03e977d0d95a8f50c2f9bd0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997748-receipt.json                                               : chr "6e6bd4f5a523b9b76b65ae64468c6782bde24f64156d9c4c65e998173936abb9"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997748.txt                                                        : chr "6a4d9fcf2ee8776f8bfae87739e5310234211219cfccca5c8202a75e5dd2f637"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997751-receipt.json                                               : chr "16a97bc68df39a3e1dcea3a3103810da082da338d6012c68afb2376d9ee6d5d3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997751.txt                                                        : chr "dc2658d0f38c6a297810a47e1f9ca946d90204829e70c144959c94a3e0ab3e59"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998128-receipt.json                                               : chr "0bae50b714a7a4bc95afdd1599bcd3b19198d36f61e6453f60e425f93c08fa1c"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998128.txt                                                        : chr "f365cbd0f7a9c93eb9e8b73061d876b2b94cc57909609f27c5d35e8082becb3b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998129-receipt.json                                               : chr "fdb46cdc173787d15a67042270cc2d5b5ba4b68e17a7134cec09eb37abc5c4f0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998129.txt                                                        : chr "92b399319baea53eaae3bdcf59fcb740743f56208c5d60d3785a4319d0660913"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998132-receipt.json                                               : chr "fce8df667005a9f104e800b32cfda935132070b000e1fdd041f3ca0cd79b8f35"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998132.txt                                                        : chr "a46ced4696c97f30fe0da573aa4ceb59c990ecae46786415919a8176745c2e7a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998261-receipt.json                                               : chr "fb2c70deb738178be45b7f8a27b461b54c8d38c2b06228e4a9f08d11d15988c2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998261.txt                                                        : chr "51c57e50022e6e60a8c1cad31ef86b06762f12370a19fbb2dfd8defcf2e79cad"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000113-receipt.json                                               : chr "3ce808bde69d1c59fceb2a44fc940b08e6b08d4056dfb51951e11c0f7399c26d"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000113.txt                                                        : chr "5cb64d6b1140309c77cf181379efaa16a60ed704f2e302d8c0878e8823b1f62d"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000114-receipt.json                                               : chr "af108dc00dde2fa7ce9c9a61ff4ba754b838a94da148555443aae63d77bc59bb"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000114.txt                                                        : chr "9e7e44f43a01278ffcbda7488543aa08b0cc41b564dc8ef167a01c03c94bc8d1"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000115-receipt.json                                               : chr "096a7218a73e64dde7832f0982ac9d841e97ac31dcf026e8eb35ffc794ed7652"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000115.txt                                                        : chr "bcfa8ee55b5d86d46f7f375e258ac37b186bb8213e22f2bff0b9e59b35671e3e"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000117-receipt.json                                               : chr "d6f59c982f34e04101be85fa7459fc399f25511fe7bea1ddea0577b36250d8fb"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000117.txt                                                        : chr "f2c1f11de92d556699f4474ed892ecfadcd393c7deb6985e5f6e3e551539ac0d"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000118-receipt.json                                               : chr "f8f78e5c6b6392ce61c30d3e619bf3766b339705bf95e547885aa592e2e352c4"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000118.txt                                                        : chr "a387b224c8e917f106e28e03e8dcaf3754a6af1b8b7205d31c8fa0eb0bfd9609"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000119-receipt.json                                               : chr "b0962ffb815489d72854899b16546b33137c854ddb5d93a416bfb91ece682309"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000119.txt                                                        : chr "21202514bc6bd83e9d8afef0416b4bf167ea3ca07163df7563fd7b5528008eb3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000120-receipt.json                                               : chr "f86a9a5b741441a062aade5066beee959cba38204aca031116dc229bd78ee8c0"
-  .. [list output truncated]
- $ tail_bindings     :List of 995
-  ..$ results/fm17-upcoming-20261017/archived-history.rds                                                            : chr "8277432761dd595d1f1a6a932abd8febe7a740247272144ac8c325c6180782b6"
-  ..$ results/fm17-upcoming-20261017/schedule.rds                                                                    : chr "ac70cf0285c03291f3a67ba1c3acbfeef3d4e26db29c405decfbf0c054f98abe"
-  ..$ results/fm17-upcoming-20261017/window.rds                                                                      : chr "149668881b66f8ca8c3a26c0d266f91d58c3c95c6dc9c7792ab906a1624a0d2e"
-  ..$ results/fm17-upcoming-20261017/prematch-sp.rds                                                                 : chr "393ba7cfd36b942f016b60fa28f5c314e11790497401bcda72d40149f75abf8c"
-  ..$ /home/drwho1985/workspace/algotradinglife/beijing-lot/r/fm16_upcoming_prepare.R                                : chr "df1c94b0c346b175da938e0f81d85c6fa7e438fcd74463392bcd2f4547223474"
-  ..$ /home/drwho1985/workspace/algotradinglife/beijing-lot/packages/beidan/R/fm15_reader_page.R                     : chr "33db9eec4126296d8eeaac0dcc085bc9ed0489619d7106b5f85107fb9874f807"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2910934-receipt.json                                               : chr "a97a4b5345a60cb46f49eb66ecb708387575533002d3ca86d9f3a966e79915ad"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2910934.txt                                                        : chr "c72fc8b75501a76dfa0988e6de26e3ebf2cf645f2aa652289b1614f2c61fa10b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912291-receipt.json                                               : chr "7b7e04b510249f81dda9b745f0ae4f00b8a5397c07e6c491ae91b4ac3f7a5874"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912291.txt                                                        : chr "fee8cce00f6ab3d24dfb139c08bf316a77a749bbe8c2bceba007ca1e803274e2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912292-receipt.json                                               : chr "1fd3d7c0ceae8ea66aaedc7b11d9b97e97bc919daf32bb6ce8e2d1cfaa5930f3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912292.txt                                                        : chr "912f6428903fcc62f083633b47e12777dc58130568147d439ebae0b513f473d8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912915-receipt.json                                               : chr "08bf7a7e0fd805de34447412aed227a6b0850b415cb6ff52d1dda326b75b752a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2912915.txt                                                        : chr "9a6411ddf1fa184851464923b7b057fd454b302ba14ab97964145ae42d90b8a2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914416-receipt.json                                               : chr "15154ea1cf733f7498caff1ab0a9e55d9d18c81576a6d928e0fb0b17d6fd0fe5"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914416.txt                                                        : chr "7b02b3ab2728cb0480489038b96c0792868d0105f7a5d6b2639ddf6a3593a8d4"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914417-receipt.json                                               : chr "5a48ece2db815c5aed07286bc1188f2e774645f2c746c91830000e0dd5e30640"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914417.txt                                                        : chr "b49ee8f32f79279821e3e0eda3675190ec03e308e00d16f980859697b2c19a34"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914418-receipt.json                                               : chr "72923cc8089b3fde8e16c6c0dd2a1453828870ac82ba3cbb6769450ab504a5b4"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914418.txt                                                        : chr "01c734f2ba72e6301e5df044794d844377944cdc9c9c8ecb116a97a413ee4ebe"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914419-receipt.json                                               : chr "26b2268cbfd22b8c07a9ebb8bd7108cad04e94cc290dccc6c3f9aa27b7c3a9de"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914419.txt                                                        : chr "22fc63d0a3c025641d3c3b13227325c0dc08e60362fd089e5016ec564b04e6bc"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914719-receipt.json                                               : chr "73c0fc37788862c667e36771d1c10292238eea944dcf0faaf6c89738a792e37c"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914719.txt                                                        : chr "55848b6cc6cd9427fb647e0699fef3132f7d929ed0edbacd55129204afa51c77"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914720-receipt.json                                               : chr "65f33c2a6126af3b32d94512aa38d8020f26b78bc66c11d75df7c7f0dbb4be9b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914720.txt                                                        : chr "a0b34f8e54f784ca399ecde9b6bd8f91c9ceb02abb3c9c9b289dcae644c4445c"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914723-receipt.json                                               : chr "7bc75087b6a9be895820647f3d236e7b993fbb8375a07d101939c1a6c8ff4386"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914723.txt                                                        : chr "2741b2478a0623af2f8449b8b5484c06f9ba22f62f591042e1bd21c29b5d2728"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914724-receipt.json                                               : chr "23a8ce7f15f140c304969cdd716d8d043ee203713a51b5deec173ecb6803aec8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2914724.txt                                                        : chr "6b1303c3a9432fa2919a924a5c4bc7ba84e19009f2d1d2f3dc4790b735016875"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921952-receipt.json                                               : chr "22f7beb134328aabfe187ef470b19db724c7cab6d63a7c1995d7c877ad9a0afb"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921952.txt                                                        : chr "83a1bd5fcc37b85e86acd53ed3cf008c1c083a450d730c1c5dc09cf2f3e71192"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921953-receipt.json                                               : chr "804be958e5de7ebde6185908becff7e2996287462a74df3802bec961162fe5fd"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921953.txt                                                        : chr "fd5add1485dd5b2392a7b6a2ecb6480a52f4da0fe90bbc789a8acfedfa6e71f0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921954-receipt.json                                               : chr "622910529e1e57d93c8768bcdc0660c037bffe825a7ff2c3c5a29bcdf6fd1d6a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921954.txt                                                        : chr "55313d1f37ceda7f9886e8260057e50d39908450d09c40a69da1dbac05ca0852"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921955-receipt.json                                               : chr "641dc5f45a53192346dc57e7f900f89ba533ea908baf6dbd341277102fe67bf5"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2921955.txt                                                        : chr "98de15514dd06dfdc73085dad44af7892e890b478be9740eb4b556ef2e7cbc89"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2925553-receipt.json                                               : chr "8abc78a1d031a7d7bee7c3db6584d3c8a30a3f3cbb11d354580557314da6c113"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2925553.txt                                                        : chr "9b46c1056ea789f515722e36b4ebabf4354ea804db78a63f1af7f59da29145a5"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939073-receipt.json                                               : chr "6c4922ec97b533d57a2f4c4b5cc6cdfd0eff3c699c53345da17b7adcebcb22ef"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939073.txt                                                        : chr "a6f75914cd883eb53fb984773ceac02af0a5098fdf7d1d5c99cd2adee9579db6"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939074-receipt.json                                               : chr "778be549774a1874a55f4ce1de7e2ae1275f0eb42c6894a5120377a24c40f103"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939074.txt                                                        : chr "fb4547d997bcdd61d82fad7d61d2ed947ac4a3d4494064155c2ef3407572eafd"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939075-receipt.json                                               : chr "46b94decd67b40ff2f913b89e41fe41cf2f66267da39d68ad03dd640a718afe1"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939075.txt                                                        : chr "4d8674d83dacd80cb5e2be997954f4aa247c230be60ed9e5a28668e37de686b3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939077-receipt.json                                               : chr "938ea527e902c446679042014a6f41b6f63c0531c8e7e9c577c6d9e73150d1e3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2939077.txt                                                        : chr "c57157d1333bf76ac0884ac46bcb9b871837300d7b0227eeb90f416370060f0e"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2940243-receipt.json                                               : chr "f28e1b440054f823c384b588c036d75d9f55f9104a3d500c410b267568106f5a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2940243.txt                                                        : chr "2e2649d294b7b59080bf4767af137181ef4ba72d5e96b0b277ea98bce98e247b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962686-receipt.json                                               : chr "8bd7c0ae2c8f1a3cdfb1b57e6899b34bf94998fef37600132e11c9950f9595f3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962686.txt                                                        : chr "785a2b7692cd4bb83a38e52c61c347c867252ca9952a93dc4c69d10ae4b8dbaf"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962687-receipt.json                                               : chr "ac3bd82a5a5ede0d03e3643b2ec4ed6b9e788031d0fb92feadade0a602f977ff"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2962687.txt                                                        : chr "70471eb0b78106bf44f702bf1fecbb312d53a05d7be433252e0f09f947c9b6b9"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2993818-receipt.json                                               : chr "df8dbf38551592f2e3328ce182d83999efb4902ff476fd845c638b12a6294f70"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2993818.txt                                                        : chr "5cc387013f58d274ad63477dbc3eb606a2e5a4532d49bc6a197899ee62cf26f8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2995364-receipt.json                                               : chr "2802c4e382d57252042b18cecea26468984eabd7dae263f5a1a9e7927c5bb6e7"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2995364.txt                                                        : chr "d4c896c47854ff80e8c4b8b27ee0c9b06b19522c2a85633b1b0f533bbd9fd435"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996170-receipt.json                                               : chr "d04a31d5638225e07aa6be763d4b0bdd99320a2e6fa28b7ab435bd1248608c45"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996170.txt                                                        : chr "93182e92799c3b8e6c16fc1676d3d5eca92afec5eb9749055a4e5a08dea787b0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996504-receipt.json                                               : chr "690e2ac583cc835f005dd4ff73d0f88bd80b2ef3e8c25d84d59b2420589a7dc8"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996504.txt                                                        : chr "44247b920e726a60ef26d34fa05d1acb811b08c9abcd9393650355c650b032c2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996506-receipt.json                                               : chr "a2e559dbdf56214105d04d11fd20f27c01ff282893e2828ae189a15701a625d3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996506.txt                                                        : chr "7a182b00ceff221d82cca846f13bbad11b7c13e074554368accbd23cfbfe79db"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996508-receipt.json                                               : chr "ab2d08315e36af1b125bda7718beadc45ed3a31ca3d60c40a120513871365a37"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2996508.txt                                                        : chr "55544fc17349859074f172b89ee13c35b2ab29de34eb3384c5b8db803f98a360"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997744-receipt.json                                               : chr "6a6214d580cab7ddd2c6af45678682eaccd3f9f5f0483e44c54a3ff19b0befc7"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997744.txt                                                        : chr "896a54dcc48c20e077c68fae29c6595f3a60378d8a7b7a9fb670ca1f63d16772"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997745-receipt.json                                               : chr "a5d98ddd5b7e5562fe947b0ade659548559e098e2953b4c7a24346aa6c18278e"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997745.txt                                                        : chr "e221604d6cf05219b4546a048949d6754da94df34805df958740ccad67ceaabd"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997746-receipt.json                                               : chr "2ef365c5bb8c66f397d66fd7937821c41bb35ead2a6a1ac7e03b8c54c9564244"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997746.txt                                                        : chr "ed720c7deb5d96817712ca0f26d03251d3a3c5fbac3c414e073a23d5a5dbaa17"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997747-receipt.json                                               : chr "362c4f571148de3939a9e18623b491fd4e70fc6e339c9e6ea46a613b0c47b5f2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997747.txt                                                        : chr "03756696aa73890c88dfc65216ff4deb00c78064e03e977d0d95a8f50c2f9bd0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997748-receipt.json                                               : chr "6e6bd4f5a523b9b76b65ae64468c6782bde24f64156d9c4c65e998173936abb9"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997748.txt                                                        : chr "6a4d9fcf2ee8776f8bfae87739e5310234211219cfccca5c8202a75e5dd2f637"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997751-receipt.json                                               : chr "16a97bc68df39a3e1dcea3a3103810da082da338d6012c68afb2376d9ee6d5d3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2997751.txt                                                        : chr "dc2658d0f38c6a297810a47e1f9ca946d90204829e70c144959c94a3e0ab3e59"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998128-receipt.json                                               : chr "0bae50b714a7a4bc95afdd1599bcd3b19198d36f61e6453f60e425f93c08fa1c"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998128.txt                                                        : chr "f365cbd0f7a9c93eb9e8b73061d876b2b94cc57909609f27c5d35e8082becb3b"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998129-receipt.json                                               : chr "fdb46cdc173787d15a67042270cc2d5b5ba4b68e17a7134cec09eb37abc5c4f0"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998129.txt                                                        : chr "92b399319baea53eaae3bdcf59fcb740743f56208c5d60d3785a4319d0660913"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998132-receipt.json                                               : chr "fce8df667005a9f104e800b32cfda935132070b000e1fdd041f3ca0cd79b8f35"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998132.txt                                                        : chr "a46ced4696c97f30fe0da573aa4ceb59c990ecae46786415919a8176745c2e7a"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998261-receipt.json                                               : chr "fb2c70deb738178be45b7f8a27b461b54c8d38c2b06228e4a9f08d11d15988c2"
-  ..$ results/fm17-upcoming-20261017/reader-pages/2998261.txt                                                        : chr "51c57e50022e6e60a8c1cad31ef86b06762f12370a19fbb2dfd8defcf2e79cad"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000113-receipt.json                                               : chr "3ce808bde69d1c59fceb2a44fc940b08e6b08d4056dfb51951e11c0f7399c26d"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000113.txt                                                        : chr "5cb64d6b1140309c77cf181379efaa16a60ed704f2e302d8c0878e8823b1f62d"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000114-receipt.json                                               : chr "af108dc00dde2fa7ce9c9a61ff4ba754b838a94da148555443aae63d77bc59bb"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000114.txt                                                        : chr "9e7e44f43a01278ffcbda7488543aa08b0cc41b564dc8ef167a01c03c94bc8d1"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000115-receipt.json                                               : chr "096a7218a73e64dde7832f0982ac9d841e97ac31dcf026e8eb35ffc794ed7652"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000115.txt                                                        : chr "bcfa8ee55b5d86d46f7f375e258ac37b186bb8213e22f2bff0b9e59b35671e3e"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000117-receipt.json                                               : chr "d6f59c982f34e04101be85fa7459fc399f25511fe7bea1ddea0577b36250d8fb"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000117.txt                                                        : chr "f2c1f11de92d556699f4474ed892ecfadcd393c7deb6985e5f6e3e551539ac0d"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000118-receipt.json                                               : chr "f8f78e5c6b6392ce61c30d3e619bf3766b339705bf95e547885aa592e2e352c4"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000118.txt                                                        : chr "a387b224c8e917f106e28e03e8dcaf3754a6af1b8b7205d31c8fa0eb0bfd9609"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000119-receipt.json                                               : chr "b0962ffb815489d72854899b16546b33137c854ddb5d93a416bfb91ece682309"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000119.txt                                                        : chr "21202514bc6bd83e9d8afef0416b4bf167ea3ca07163df7563fd7b5528008eb3"
-  ..$ results/fm17-upcoming-20261017/reader-pages/3000120-receipt.json                                               : chr "f86a9a5b741441a062aade5066beee959cba38204aca031116dc229bd78ee8c0"
-  .. [list output truncated]
-[1] "model_id"      "cutoff"        "entries"       "probabilities"
-[5] "audit"         "source_hashes" "stage_hash"   
-$MIX_01
-$MIX_01$issue_id
-[1] "26105"
-
-$MIX_01$cutoff_utc
-[1] "2026-10-16 15:48:46 UTC"
-
-
-$MIX_02
-$MIX_02$issue_id
-[1] "26105"
-
-$MIX_02$cutoff_utc
-[1] "2026-10-16 15:48:46 UTC"
-
-
-$MIX_03
-$MIX_03$issue_id
-[1] "26105"
-
-$MIX_03$cutoff_utc
-[1] "2026-10-16 15:48:46 UTC"
-
-
-$MIX_04
-$MIX_04$issue_id
-[1] "26105"
-
-$MIX_04$cutoff_utc
-[1] "2026-10-16 15:48:46 UTC"
-
-
-
-exec
-/usr/bin/zsh -lc "sed -n '491,610p' packages/beidan/R/n7_pipeline_candidates.R; rg -n 'parlay_rank_tickets <-|order\\(' packages/beidan/R/n7_pipeline*; ls -lh quarto/margin_truncated_rank_20261017.html; rg -n 'Error|待定|known_hits' quarto/margin_truncated_rank_20261017.html | tail -8" in /home/drwho1985/workspace/algotradinglife/beijing-lot
+/usr/bin/zsh -lc "cat results/margin-truncated-rank-20261017/summary.csv; cat results/margin-truncated-rank-20261017/render.log; ls -l quarto/margin_truncated_rank_20261017.html; git ls-files results/margin-truncated-rank-20261017; find quarto results -maxdepth 2 -name AGENTS\\*" in /home/drwho1985/workspace/algotradinglife/beijing-lot
  succeeded in 0ms:
-parlay_enumerate_tickets <- function(group_legs, probabilities, cutoff, supports,
-                                     n_legs = parlay_structure_legs(group_legs)) {
-  match_require_cutoff(cutoff)
-  match_validate_table(group_legs, "group_legs")
-  match_validate_table(supports, "supports")
-  # One plan, one width. The declared n_legs must equal the width of the legs it
-  # expands, so a caller cannot enumerate a 7-leg group while claiming 6.
-  if (nrow(group_legs) || !missing(n_legs)) {
-    if (length(n_legs) != 1L || !is.numeric(n_legs) || is.na(n_legs) || n_legs < 1 ||
-        n_legs != trunc(n_legs)) {
-      stop("parlay_enumerate_tickets: n_legs must be one whole number of at least 1")
-    }
-    n_legs <- as.integer(n_legs)
-    if (nrow(group_legs) && n_legs != parlay_structure_legs(group_legs)) {
-      stop("parlay_enumerate_tickets: n_legs ", n_legs,
-           " does not match the group width ", parlay_structure_legs(group_legs))
-    }
-  }
-  if (!nrow(group_legs)) {
-    return(list(tickets = match_typed_empty("tickets"),
-                ticket_legs = match_typed_empty("ticket_legs"),
-                candidate_tickets = tibble::tibble(candidate_id = character(0),
-                                                   ticket_id = character(0))))
-  }
-  wide <- parlay_probability_wide(probabilities)
-  ticket_rows <- list()
-  leg_rows <- list()
-  link_rows <- list()
-  seen <- new.env(parent = emptyenv())
+threshold,groups,covered,excluded,rank_1_125,rank_30_154,rank_126_250,rank_251_500,rank_501_1000,rank_1001_2187
+0.2,24,0,24,0,0,0,0,0,0
+0.3,24,0,24,0,0,0,0,0,0
+0.4,24,0,24,0,0,0,0,0,0
+0.5,24,16,8,1,3,2,5,8,0
+0.6,24,24,0,4,4,2,6,4,8
+0.7,24,24,0,7,7,7,2,3,5
+0.8,24,24,0,6,8,8,2,3,5
+0.9,24,24,0,7,8,8,1,3,5
+0.95,24,24,0,8,9,7,1,4,4
 
-  # Iterate CANDIDATES, not groups. Several structures may share one fixture set, so
-  # one group_id can carry several candidate_ids and each must expand separately.
-  for (candidate_id in unique(supports$candidate_id)) {
-    group_id <- sub("[|].*$", "", candidate_id)
-    legs <- group_legs[group_legs$group_id == group_id, , drop = FALSE]
-    legs <- legs[order(legs$leg_order), , drop = FALSE]
-    legs <- legs[!duplicated(legs$fixture_id), , drop = FALSE]
-    group_supports <- supports[supports$candidate_id == candidate_id, , drop = FALSE]
-    if (!nrow(group_supports)) {
-      stop("parlay_enumerate_tickets: candidate ", candidate_id, " has no support")
-    }
-    options_per_leg <- list()
-    for (leg_index in seq_len(nrow(legs))) {
-      fixture_id <- legs$fixture_id[leg_index]
-      allowed <- group_supports$outcome[group_supports$fixture_id == fixture_id &
-                                          group_supports$allowed]
-      if (!length(allowed)) {
-        stop("parlay_enumerate_tickets: candidate ", candidate_id,
-             " has an empty leg at ", fixture_id)
-      }
-      # Hold the declared outcome order so enumeration is deterministic.
-      options_per_leg[[leg_index]] <- match_outcomes()[match_outcomes() %in% allowed]
-    }
-    supported_size <- prod(lengths(options_per_leg))
-    if (!is.finite(supported_size) || supported_size > .Machine$integer.max) {
-      stop("parlay_enumerate_tickets: supported ticket count exceeds the representable integer count")
-    }
-    grid <- expand.grid(options_per_leg, KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE)
-    if (!nrow(grid)) next
-    combinations <- as.matrix(grid)
-    codes <- matrix(parlay_outcome_codes(as.vector(combinations)),
-      nrow = nrow(combinations), ncol = ncol(combinations))
-    ticket_ids <- vapply(seq_len(nrow(codes)), function(i) {
-      parlay_physical_ticket_key(legs$fixture_id, codes[i, ])
-    }, character(1))
-    fresh <- !vapply(ticket_ids, exists, logical(1), envir = seen,
-      inherits = FALSE)
-    if (any(fresh)) {
-      fresh_ids <- ticket_ids[fresh]
-      list2env(stats::setNames(as.list(rep(TRUE, length(fresh_ids))), fresh_ids),
-        envir = seen)
-      # Preserve the declared leg multiplication order and first-owner identity.
-      # Build complete candidate blocks instead of one tibble per ticket/leg.
-      probability <- rep(1, length(fresh_ids))
-      for (leg_index in seq_len(nrow(legs))) {
-        row <- wide[wide$fixture_id == legs$fixture_id[leg_index], , drop = FALSE]
-        values <- as.numeric(unlist(row[1, match_outcomes()], use.names = FALSE))
-        probability <- probability * values[codes[fresh, leg_index]]
-      }
-      ticket_rows[[length(ticket_rows) + 1L]] <- tibble::tibble(
-        ticket_id = fresh_ids, group_id = group_id, probability = probability,
-        sp_product_est = NA_real_, ev_net_est = NA_real_)
-      leg_rows[[length(leg_rows) + 1L]] <- tibble::tibble(
-        ticket_id = rep(fresh_ids, each = nrow(legs)),
-        fixture_id = rep(legs$fixture_id, times = length(fresh_ids)),
-        outcome = as.vector(t(combinations[fresh, , drop = FALSE])))
-    }
-    link_rows[[length(link_rows) + 1L]] <- tibble::tibble(
-      candidate_id = candidate_id, ticket_id = ticket_ids)
-  }
-  # An all-exhausted structure leaves every list empty; bind_rows on an empty list has
-  # no columns at all, so fall back to the typed-empty tables rather than failing
-  # validation. Zero tickets is a legitimate outcome, not an error.
-  list(
-    tickets = if (length(ticket_rows)) {
-      match_validate_table(dplyr::bind_rows(ticket_rows), "tickets", keys = "ticket_id")
-    } else {
-      match_typed_empty("tickets")
-    },
-    ticket_legs = if (length(leg_rows)) {
-      match_validate_table(dplyr::bind_rows(leg_rows), "ticket_legs")
-    } else {
-      match_typed_empty("ticket_legs")
-    },
-    candidate_tickets = if (length(link_rows)) {
-      dplyr::bind_rows(link_rows)
-    } else {
-      tibble::tibble(candidate_id = character(0), ticket_id = character(0))
-    })
-}
-packages/beidan/R/n7_pipeline_match_status.R:164:    latest <- latest[order(latest$issue_id, latest$fixture_id, latest$available_at), ,
-packages/beidan/R/n7_pipeline_match_status.R:168:    latest <- latest[order(latest$..parlay_order), , drop = FALSE]
-packages/beidan/R/n7_pipeline_match_status.R:181:  verdict <- verdict[order(verdict$..parlay_order), , drop = FALSE]
-packages/beidan/R/n7_pipeline_epoch.R:99:  admitted <- admitted[order(admitted$quote_at), , drop = FALSE]
-packages/beidan/R/n7_pipeline_candidates.R:206:  ordered <- ordered[order(ordered$fixture_id), , drop = FALSE]
-packages/beidan/R/n7_pipeline_candidates.R:273:  order(-values, match(names(values), match_outcomes()))
-packages/beidan/R/n7_pipeline_candidates.R:342:    legs <- legs[order(legs$leg_order), , drop = FALSE]
-packages/beidan/R/n7_pipeline_candidates.R:373:      ranked <- ranked[order(ranked$rank), , drop = FALSE]
-packages/beidan/R/n7_pipeline_candidates.R:526:    legs <- legs[order(legs$leg_order), , drop = FALSE]
-packages/beidan/R/n7_pipeline_value.R:125:      row <- row[order(row$quote_at), , drop = FALSE]
-packages/beidan/R/n7_pipeline_value.R:254:parlay_rank_tickets <- function(tickets, candidate_tickets, cutoff,
-packages/beidan/R/n7_pipeline_value.R:285:  ordering <- order(merged$candidate_id, -score, merged$ticket_id)
-packages/beidan/R/n7_pipeline_value.R:392:    reference <- reference[order(reference$leg_order), , drop = FALSE]
-packages/beidan/R/n7_pipeline_value.R:817:    candidate_labels <- candidate_labels[order(is.na(priority), priority,
-packages/beidan/R/n7_pipeline_value.R:1778:    legs <- legs[order(legs$leg_order), , drop = FALSE]
-packages/beidan/R/n7_pipeline_value.R:1797:      realised[fixture_id] <- row$outcome[order(row$label_available_at)][nrow(row)]
-packages/beidan/R/n7_pipeline_value.R:1893:      pair_table[order(pair_table$score, pair_table$ticket_id), , drop = FALSE]
-packages/beidan/R/n7_pipeline_value.R:1895:      pair_table[order(-pair_table$score, pair_table$ticket_id), , drop = FALSE]
-packages/beidan/R/n7_pipeline_value.R:1909:      match(occupied, combo_strings[order(-combo_prob, combo_strings)])
-packages/beidan/R/n7_pipeline_value.R:2023:      order_ref <- order_ref[order(order_ref$leg_order), , drop = FALSE]
-packages/beidan/R/n7_pipeline_value.R:2058:  order_index <- order(vapply(projected_decisions,
--rw-rw-r-- 1 drwho1985 drwho1985 50K Oct 18 11:19 quarto/margin_truncated_rank_20261017.html
-487:<td style="text-align: left;">待定 31–222</td>
-488:<td style="text-align: left;">待定 61–223</td>
-489:<td style="text-align: left;">待定 189–525</td>
-490:<td style="text-align: left;">待定 578–653</td>
-491:<td style="text-align: left;">待定 656–911</td>
-492:<td style="text-align: left;">待定 745–992</td>
-708:<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(x <span class="sc">|&gt;</span> <span class="fu">filter</span>(round<span class="sc">==</span><span class="dv">2</span>) <span class="sc">|&gt;</span> <span class="fu">group_by</span>(threshold) <span class="sc">|&gt;</span> <span class="fu">summarise</span>(<span class="at">known_hits=</span><span class="fu">sum</span>(hit_30_154,<span class="at">na.rm=</span><span class="cn">TRUE</span>),<span class="at">pending=</span><span class="fu">sum</span>(<span class="fu">is.na</span>(hit_30_154)),<span class="at">excluded_or_outside=</span><span class="fu">sum</span>(<span class="sc">!</span>hit_30_154,<span class="at">na.rm=</span><span class="cn">TRUE</span>),<span class="at">.groups=</span><span class="st">'drop'</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-714:<th style="text-align: right;">known_hits</th>
+
+processing file: margin_truncated_rank_20261017.qmd
+1/9                  
+2/9 [unnamed-chunk-1]
+3/9                  
+4/9 [unnamed-chunk-2]
+5/9                  
+6/9 [unnamed-chunk-3]
+7/9                  
+8/9 [unnamed-chunk-4]
+9/9                  
+output file: margin_truncated_rank_20261017.knit.md
+
+pandoc 
+  to: html
+  output-file: margin_truncated_rank_20261017.html
+  standalone: true
+  section-divs: true
+  html-math-method: mathjax
+  wrap: none
+  default-image-extension: png
+  
+metadata
+  document-css: false
+  link-citations: true
+  date-format: long
+  lang: en
+  title: 净胜球阈值截断后：七场组合中奖排名
+  
+Output created: margin_truncated_rank_20261017.html
+
+-rw-rw-r-- 1 drwho1985 drwho1985 50403 Oct 18 11:19 quarto/margin_truncated_rank_20261017.html
+results/margin-truncated-rank-20261017/acceptance.json
+results/margin-truncated-rank-20261017/conditional-probabilities.csv
+results/margin-truncated-rank-20261017/groups.csv
+results/margin-truncated-rank-20261017/pending-ranks.csv
+results/margin-truncated-rank-20261017/render.log
+results/margin-truncated-rank-20261017/review.log
+results/margin-truncated-rank-20261017/summary.csv
+results/package-repair-20261017-094115/AGENTS.before.md
 
 exec
-/usr/bin/zsh -lc "/opt/R/4.6.1/bin/Rscript - <<'RS'
-library(jsonlite)
-f<-readRDS(\"results/fm17-upcoming-20261017/frozen-probabilities.rds\"); b<-readRDS(\"results/fm17-upcoming-20261017/plans.rds\")
-z<-read.csv(\"results/margin-truncated-rank-20261017/conditional-probabilities.csv\")
-x<-read.csv(\"results/margin-truncated-rank-20261017/groups.csv\")
-s<-fromJSON(\"results/margin-ranking-20261017-review/settlement-state.json\")
-stopifnot(nrow(z)==52*9*3,nrow(x)==288)
-for(id in unique(z"'$fixture_id)){
- e<-f$entries[[id]];stopifnot(identical(e$base,e$selection$base),identical(e$base$cutoff,f$cutoff),e$base$max_source_available_utc<f$cutoff$cutoff_utc)
- h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id])
- m<-tapply(e$base$grid$probability,e$base$grid$home_goals-e$base$grid$away_goals,sum)
- for(t in unique(z$threshold)){
-  sm<-sort(m,decreasing=TRUE); boundary<-sm[which(cumsum(sm)>=t)[1]]
-  keep<-m>=boundary; v<-setNames(rep(0,3),c("W","D","L"))
-  for(j in which(keep)){a<-as.numeric(names(m)[j])+h;o<-if(a>0)"W" else if(a==0)"D" else "L";v[o]<-v[o]+m[j]/sum(m[keep])}
-  r<-z[z$fixture_id==id & z$threshold==t,];stopifnot(max(abs(r$probability-v[r$outcome]))<1e-12)
- }
-}
-for(i in 1:4){
- actual<-fromJSON(file.path(s$run_directory,s$plans$output[i],"results.json"))$fixture_results
- for(g in 1:8){
-  legs<-b$plans[[i]]$legs;legs<-legs[legs$group_slot==g,];legs<-legs[order(legs$round),]
-  obs<-actual$outcome[match(legs$fixture_id,actual$fixture_id)]
-  for(t in unique(z$threshold)){
-   ps<-lapply(legs$fixture_id,function(id){r<-z[z$fixture_id==id & z$threshold==t & z$probability>0,];setNames(r$probability,r$outcome)})
-   gr<-expand.grid(lapply(ps,names),stringsAsFactors=FALSE)
-   prob<-rep(1,nrow(gr));ok<-rep(TRUE,nrow(gr))
-   for(j in 1:7){prob<-prob*ps[[j]][gr[[j]]];if(!is.na(obs[j]))ok<-ok & gr[[j]]==obs[j]}
-   r<-x[x$round==i & x$group==g & x$threshold==t,]
-   stopifnot(nrow(gr)==r$theory)
-   if(all(!is.na(obs)) && any(ok)){
-    # Verify rank except exact ties, whose canonical key ordering belongs to package.
-    pwin<-prob[ok];stopifnot(r$winning_rank>sum(prob>pwin),r$winning_rank<=sum(prob>=pwin))
-   }
-   stopifnot(r$state==if(!any(ok))"EXCLUDED" else if(anyNA(obs))"PENDING" else "RANKED")
-  }
- }
-}
-cat("Independent checks passed: selected precompression bases, fixed cutoffs, source chronology, 1404 conditional rows and 288 enumerations/states/ranks.'"\\n\")
-RS" in /home/drwho1985/workspace/algotradinglife/beijing-lot
- succeeded in 961ms:
-Independent checks passed: selected precompression bases, fixed cutoffs, source chronology, 1404 conditional rows and 288 enumerations/states/ranks.
+/usr/bin/zsh -lc 'R_LIBS_USER="$PWD/r_lib" /opt/R/4.6.1/bin/Rscript -e '"'library(tidyverse); f<-readRDS(\"results/fm17-upcoming-20261017/frozen-probabilities.rds\"); p<-readRDS(\"results/fm17-upcoming-20261017/plans.rds\"); ids<-unique(unlist(lapply(p"'$plans,function(p)p$legs$fixture_id))); masses<-sapply(ids,function(id)sum(f$entries[[id]]$base$grid$probability)); print(range(masses)); print(sum(masses<1)); z<-map_dfr(ids,function(id){g<-as_tibble(f$entries[[id]]$base$grid); h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id]);g |> mutate(outcome=case_when(home_goals-away_goals+h>0~"W",home_goals-away_goals+h==0~"D",TRUE~"L")) |> group_by(outcome) |> summarise(probability=sum(probability)/sum(g$probability),.groups="drop") |> mutate(fixture_id=id)}); q<-read_csv("results/margin-truncated-rank-20261017/conditional-probabilities.csv",show_col_types=FALSE) |> filter(threshold==1); print(nrow(q)); if(nrow(q)){j<-left_join(z,q,by=c("fixture_id","outcome"));stopifnot(max(abs(j$probability.x-j$probability.y))<1e-14); print("direct pre-tail mapping matches")}'"'" in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 1600ms:
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.2.1     ✔ readr     2.2.0
+✔ forcats   1.0.1     ✔ stringr   1.6.0
+✔ ggplot2   4.0.3     ✔ tibble    3.3.1
+✔ lubridate 1.9.5     ✔ tidyr     1.3.2
+✔ purrr     1.2.2     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+[1] 1 1
+[1] 2
+[1] 0
+
+exec
+/usr/bin/zsh -lc "ps -eo pid,etime,args | grep -E 'quarto render.*margin_truncated|exec.*margin_truncated|R.*margin_truncated' | grep -v grep; git diff --stat -- quarto/margin_truncated_rank_20261017.html results/margin-truncated-rank-20261017; date" in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 0ms:
+2078940       00:25 bash /home/drwho1985/.local/bin/quarto render quarto/margin_truncated_rank_20261017.qmd --no-cache -P project_root:/home/drwho1985/workspace/algotradinglife/beijing-lot
+2079308       00:19 codex review Review only addition of 100% threshold in quarto/margin_truncated_rank_20261017.qmd and its HTML/results/margin-truncated-rank-20261017 generated CSVs. Previously reviewed9 thresholds; now10,320 combinations. At t=1 retain every margin via min mass boundary, normalize and map original PRE-tail grid, not frozen final compressed probabilities. Existing cutoff/known labels remain unchanged. Rendering currently running. Check full-support boundary including floating rounding, mapping/normalization, prior9-output invariance if available, totals and pending states. No new functions/package changes; report blocking findings only. Do not inspect unrelated dirty work.
+Sun Oct 18 11:50:17 HKT 2026
+
+exec
+/usr/bin/zsh -lc 'git show HEAD:results/margin-truncated-rank-20261017/groups.csv | sha256sum; git show HEAD:results/margin-truncated-rank-20261017/conditional-probabilities.csv | sha256sum' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 0ms:
+d71657f59aa1dd8966aaa438aa2004f8392a3cb9c3c0e2c1d12c261701020d63  -
+864bf5084528f64c4abae1058ffe40fde30a26ab6f0140d419d30d92b262d83d  -
+
+exec
+/usr/bin/zsh -lc "sleep 35; tail -4 results/margin-truncated-rank-20261017/summary.csv; ps -eo pid,etime,args | grep 'quarto render quarto/margin_truncated' | grep -v grep" in /home/drwho1985/workspace/algotradinglife/beijing-lot
+exec
+/usr/bin/zsh -lc 'ls -lt results/margin-truncated-rank-20261017 | head -10; ls -l quarto/margin_truncated_rank_20261017.html' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 0ms:
+total 308
+-rw-rw-r-- 1 drwho1985 drwho1985   6515 Oct 18 11:50 pending-ranks.csv
+-rw-rw-r-- 1 drwho1985 drwho1985  49317 Oct 18 11:50 conditional-probabilities.csv
+-rw-rw-r-- 1 drwho1985 drwho1985    351 Oct 18 11:50 summary.csv
+-rw-rw-r-- 1 drwho1985 drwho1985  16829 Oct 18 11:50 groups.csv
+-rw-rw-r-- 1 drwho1985 drwho1985   1744 Oct 18 11:20 acceptance.json
+-rw-rw-r-- 1 drwho1985 drwho1985 217451 Oct 18 11:20 review.log
+-rw-rw-r-- 1 drwho1985 drwho1985    692 Oct 18 11:19 render.log
+-rw-rw-r-- 1 drwho1985 drwho1985 52620 Oct 18 11:50 quarto/margin_truncated_rank_20261017.html
+
+exec
+/usr/bin/zsh -lc ".venv/bin/python - <<'PY'
+import csv,subprocess,io,collections,math
+from pathlib import Path
+root=Path('results/margin-truncated-rank-20261017')
+for name in ['groups.csv','summary.csv','conditional-probabilities.csv','pending-ranks.csv']:
+ old=list(csv.DictReader(io.StringIO(subprocess.check_output(['git','show','HEAD:'+str(root/name)],text=True))))
+ new=list(csv.DictReader((root/name).open()))
+ assert old==[r for r in new if float(r['threshold'])<1],name
+ print(name,len(new),'prior 9 identical')
+g=list(csv.DictReader((root/'groups.csv').open())); assert len(g)==320
+print('100% states',collections.Counter((r['round'],r['state']) for r in g if r['threshold']=='1'))
+for r in g:
+ if r['threshold']=='1':
+  assert r['theory']=='2187'
+  assert (r['state']=='PENDING' and r['winning_rank']=='NA') if r['round']=='2' else r['state']=='RANKED'
+p=list(csv.DictReader((root/'conditional-probabilities.csv').open())); assert len(p)==1560
+s=collections.defaultdict(float)
+for r in p:s[r['fixture_id'],r['threshold']]+=float(r['probability'])
+assert all(abs(v-1)<1e-12 for v in s.values())
+print('probability totals verified',len(s))
+print((root/'summary.csv').read_text())
+h=Path('quarto/margin_truncated_rank_20261017.html').read_text(); assert '95/100%' in h;print('HTML includes 100%')
+PY" in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 0ms:
+groups.csv 320 prior 9 identical
+summary.csv 10 prior 9 identical
+conditional-probabilities.csv 1560 prior 9 identical
+pending-ranks.csv 196 prior 9 identical
+100% states Counter({('1', 'RANKED'): 8, ('2', 'PENDING'): 8, ('3', 'RANKED'): 8, ('4', 'RANKED'): 8})
+probability totals verified 520
+threshold,groups,covered,excluded,rank_1_125,rank_30_154,rank_126_250,rank_251_500,rank_501_1000,rank_1001_2187
+0.2,24,0,24,0,0,0,0,0,0
+0.3,24,0,24,0,0,0,0,0,0
+0.4,24,0,24,0,0,0,0,0,0
+0.5,24,16,8,1,3,2,5,8,0
+0.6,24,24,0,4,4,2,6,4,8
+0.7,24,24,0,7,7,7,2,3,5
+0.8,24,24,0,6,8,8,2,3,5
+0.9,24,24,0,7,8,8,1,3,5
+0.95,24,24,0,8,9,7,1,4,4
+1,24,24,0,8,9,7,2,4,3
+
+HTML includes 100%
+
+exec
+/usr/bin/zsh -lc 'R_LIBS_USER="$PWD/r_lib" /opt/R/4.6.1/bin/Rscript -e '"'suppressPackageStartupMessages(library(tidyverse)); f<-readRDS(\"results/fm17-upcoming-20261017/frozen-probabilities.rds\"); q<-read_csv(\"results/margin-truncated-rank-20261017/conditional-probabilities.csv\",show_col_types=FALSE) |> filter(threshold==1); z<-map_dfr(unique(q"'$fixture_id),function(id){g<-as_tibble(f$entries[[id]]$base$grid);h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id]);g |> mutate(outcome=case_when(home_goals-away_goals+h>0~"W",home_goals-away_goals+h==0~"D",TRUE~"L")) |> group_by(outcome) |> summarise(probability=sum(probability)/sum(g$probability),.groups="drop") |> mutate(fixture_id=id)});j<-left_join(z,q,by=c("fixture_id","outcome"));stopifnot(nrow(j)==156,max(abs(j$probability.x-j$probability.y))<1e-14);print(max(abs(j$probability.x-j$probability.y)))'"'" in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 1484ms:
+[1] 1.110223e-16
 
 codex
-No blocking findings in the scoped QMD, generated CSVs, or completed HTML. Independent checks confirmed precompression selected bases, fixed cutoff and source chronology, truncated conditional probabilities, seven-leg enumeration and ranks, pending handling, and interval-total consistency.
-No blocking findings in the scoped QMD, generated CSVs, or completed HTML. Independent checks confirmed precompression selected bases, fixed cutoff and source chronology, truncated conditional probabilities, seven-leg enumeration and ranks, pending handling, and interval-total consistency.
+The 100% boundary retains all margins despite cumulative floating-point rounding, and normalized probabilities match direct PRE-tail grid mapping within 1.12e-16. All prior-nine CSV rows are unchanged; outputs contain 320 combinations, with 24 ranked and eight pending at 100%, and the updated HTML includes the new threshold.
+The 100% boundary retains all margins despite cumulative floating-point rounding, and normalized probabilities match direct PRE-tail grid mapping within 1.12e-16. All prior-nine CSV rows are unchanged; outputs contain 320 combinations, with 24 ranked and eight pending at 100%, and the updated HTML includes the new threshold.
