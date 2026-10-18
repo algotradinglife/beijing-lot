@@ -1,0 +1,27 @@
+{
+  "status": "POSTEVENT_FIXED_BUDGET_DIAGNOSTIC_REVIEWED",
+  "review_command": "codex review (bounded prompt preserved in review.log)",
+  "review_findings": "No blocking findings",
+  "render_exit": 0,
+  "validation": {
+    "original_group_ordering_parity": 32,
+    "group_policy_window_rows": 128,
+    "round_policy_window_rows": 16,
+    "tickets_per_group": 125,
+    "cost_per_round_cny": 2000,
+    "rendered_tables": 4,
+    "rendered_error_blocks": 0
+  },
+  "limits": [
+    "Postevent diagnostic, not prospective strategy validation",
+    "Frozen round 02 settlement remains incomplete",
+    "No new purchase or return claim",
+    "top3_union only, not pure top3 replacement"
+  ],
+  "files": {
+    "quarto/margin_support_budget_20261017.qmd": "c6234c66fae8eae9156a78ec4a4b11b73caa0ee738399ef52d4717a08a376b29",
+    "quarto/margin_support_budget_20261017.html": "55e64e75aa5e4fc529db21a9e7dd51f171d3390151fae9fcfe0eda9d3f0def97",
+    "results/margin-support-budget-20261017/groups.csv": "97942aa24491b22912aa36ecf2aef2339650c08647b30e447bc3290ba8f49232",
+    "results/margin-support-budget-20261017/summary.csv": "eedd82007c7184b83715876e8784154edd1bf85f3f9f9d35d6b6d8a7b18115a7"
+  }
+}

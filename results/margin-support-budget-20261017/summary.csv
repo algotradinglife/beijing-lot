@@ -1,0 +1,17 @@
+round,policy,window,structure_hits,structure_pending,bought_hits,bought_pending,cost_cny
+1,original,1-125,4,0,3,0,2000
+1,original,30-154,4,0,3,0,2000
+1,top3_union,1-125,8,0,3,0,2000
+1,top3_union,30-154,8,0,3,0,2000
+2,original,1-125,0,2,0,0,2000
+2,original,30-154,0,2,0,1,2000
+2,top3_union,1-125,0,8,0,0,2000
+2,top3_union,30-154,0,8,0,0,2000
+3,original,1-125,4,0,3,0,2000
+3,original,30-154,4,0,4,0,2000
+3,top3_union,1-125,8,0,4,0,2000
+3,top3_union,30-154,8,0,4,0,2000
+4,original,1-125,1,0,0,0,2000
+4,original,30-154,1,0,0,0,2000
+4,top3_union,1-125,5,0,0,0,2000
+4,top3_union,30-154,5,0,0,0,2000

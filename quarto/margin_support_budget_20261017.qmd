@@ -1,0 +1,108 @@
+---
+title: "10月17日净胜球扩展覆盖：每轮2000元排名复核"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+事后诊断：冻结原四轮七场八组、原FM概率、原决策截止及封存赛果。比较原允许集合与保留原选择再补入净胜球概率前三档对应类别的集合。每轮预算2000元，每组125注、每注2元，不跨组去重；区间预先固定为原30–154名及对照1–125名。不拟合、调参或重选场次，不生成实购单，不估计收益。自然单/双/三选完整替换属于另一政策，本报告仅验证扩展覆盖。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'r_lib'))
+w <- file.path(root,'results/fm17-upcoming-20261017')
+f <- readRDS(file.path(w,'frozen-probabilities.rds'))
+b <- readRDS(file.path(w,'plans.rds'))
+s <- jsonlite::fromJSON(file.path(root,'results/margin-ranking-20261017-review/settlement-state.json'))
+stopifnot(length(b$plans)==4L)
+rows <- list(); hashes <- c(file.path(w,'frozen-probabilities.rds'),file.path(w,'plans.rds'))
+for(i in 1:4){
+ p <- b$plans[[i]]
+ cutoff <- p$selection_receipt$cutoff
+ stopifnot(inherits(cutoff$cutoff_utc,'POSIXct'),length(cutoff$cutoff_utc)==1L,!is.na(cutoff$cutoff_utc))
+ label_path <- file.path(s$run_directory,s$plans$output[i],'results.json')
+ hashes <- c(hashes,label_path)
+ actual <- jsonlite::fromJSON(label_path)$fixture_results |> as_tibble() |> select(fixture_id,actual=outcome)
+ stopifnot(!anyDuplicated(actual$fixture_id))
+ for(g in 1:8){
+  legs <- p$legs |> filter(group_slot==g) |> arrange(round)
+  stopifnot(nrow(legs)==7L,n_distinct(legs$fixture_id)==7L)
+  group_legs <- legs |> transmute(group_id,fixture_id,leg_order=as.integer(round))
+  gid <- unique(legs$group_id); stopifnot(length(gid)==1L)
+  cid <- paste0(gid,'|7')
+  for(policy in c('original','top3_union')){
+   allowed <- legs$allowed_outcomes
+   if(policy=='top3_union'){
+    for(j in 1:7){
+     id <- legs$fixture_id[j]
+     h <- unique(f$probabilities$handicap[f$probabilities$fixture_id==id])
+     stopifnot(length(h)==1L,is.finite(h))
+     m <- f$entries[[id]]$final$margins |> as_tibble() |> arrange(desc(probability),margin) |> slice_head(n=3)
+     stopifnot(nrow(m)==3L,all(is.finite(m$probability)))
+     mapped <- case_when(m$margin+h>0~'W',m$margin+h==0~'D',TRUE~'L')
+     allowed[[j]] <- union(allowed[[j]],mapped)
+     stopifnot(all(legs$allowed_outcomes[[j]] %in% allowed[[j]]))
+    }
+   }
+   support_rows <- list()
+   for(j in 1:7) support_rows[[j]] <- tibble(candidate_id=cid,fixture_id=legs$fixture_id[j],outcome=c('W','D','L'),allowed=c('W','D','L') %in% allowed[[j]],preference=1:3)
+   supports <- bind_rows(support_rows)
+   probs <- f$probabilities |> as_tibble() |> select(fixture_id,outcome,probability)
+   space <- beidan::parlay_enumerate_tickets(group_legs,probs,cutoff=cutoff,supports=supports,n_legs=7L)
+   ranked <- beidan::parlay_rank_tickets(space$tickets,space$candidate_tickets,cutoff=cutoff,ranking='probability_desc') |> as_tibble()
+   stopifnot(nrow(ranked)==prod(lengths(allowed)),!anyDuplicated(ranked$ticket_id),all(diff(ranked$probability)<=0),all(ranked$rank==seq_len(nrow(ranked))))
+   if(policy=='original'){
+    old <- p$spaces[[gid]] |> as_tibble() |> arrange(rank)
+    stopifnot(identical(ranked$ticket_id,old$ticket_id),max(abs(ranked$probability-old$probability))<1e-12)
+   }
+   checked <- space$ticket_legs |> as_tibble() |> left_join(actual,by='fixture_id',relationship='many-to-one') |> group_by(ticket_id) |> summarise(known=sum(!is.na(actual)),misses=sum(!is.na(actual)&outcome!=actual),.groups='drop')
+   ranked <- ranked |> left_join(checked,by='ticket_id',relationship='one-to-one')
+   possible <- ranked |> filter(misses==0)
+   win <- possible |> filter(known==7L)
+   stopifnot(nrow(win)<=1L)
+   for(window in c('30-154','1-125')){
+    lo <- if(window=='30-154')30L else 1L;hi <- lo+124L
+    bought <- ranked |> filter(rank>=lo,rank<=hi)
+    stopifnot(nrow(bought)==125L)
+    hit <- if(nrow(win))any(win$rank>=lo & win$rank<=hi) else if(any(possible$known<7L & possible$rank>=lo & possible$rank<=hi))NA else FALSE
+    rows[[length(rows)+1L]] <- tibble(round=i,group=g,policy,window,theory=nrow(ranked),structure=paste(sort(lengths(allowed),decreasing=TRUE),collapse=''),known=sum(legs$fixture_id %in% actual$fixture_id[!is.na(actual$actual)]),structure_covered=if(nrow(win))TRUE else if(nrow(possible))NA else FALSE,winning_rank=if(nrow(win))win$rank else NA_integer_,possible_rank_min=if(nrow(possible))min(possible$rank)else NA_integer_,possible_rank_max=if(nrow(possible))max(possible$rank)else NA_integer_,bought_hit=hit,tickets=125L,cost_cny=250,model_mass=sum(bought$probability))
+   }
+  }
+ }
+}
+x <- bind_rows(rows)
+stopifnot(nrow(x)==128L,all(x$cost_cny==250),all(x$tickets==125L))
+summary <- x |> group_by(round,policy,window) |> summarise(structure_hits=sum(structure_covered,na.rm=TRUE),structure_pending=sum(is.na(structure_covered)),bought_hits=sum(bought_hit,na.rm=TRUE),bought_pending=sum(is.na(bought_hit)),cost_cny=sum(cost_cny),.groups='drop')
+stopifnot(all(summary$cost_cny==2000))
+# A purchased hit implies structure support; missing labels never become wins.
+stopifnot(all(!x$bought_hit[x$structure_covered %in% FALSE],na.rm=TRUE),all(is.na(x$winning_rank[x$known<7L])))
+out <- file.path(root,'results/margin-support-budget-20261017');dir.create(out,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(x,file.path(out,'groups.csv'));readr::write_csv(summary,file.path(out,'summary.csv'))
+```
+
+每轮覆盖与125注实际覆盖：
+
+```{r}
+knitr::kable(summary)
+```
+
+已确认赛果组合排名（无结构覆盖时没有中奖排名；未知赛果保持缺失）：
+
+```{r}
+knitr::kable(x |> filter(window=='30-154') |> select(round,group,policy,structure,theory,known,structure_covered,winning_rank,bought_hit))
+```
+
+待定场次在各个可能结果下，尚存活组合的排名范围：
+
+```{r}
+knitr::kable(x |> filter(known<7L) |> select(round,group,policy,window,possible_rank_min,possible_rank_max,bought_hit))
+knitr::kable(tibble(input=hashes,sha256=vapply(hashes,digest::digest,character(1),file=TRUE,algo='sha256')))
+```
+
+验证：使用现有已安装包的枚举和排名接口，显式传入原决策截止。原结构32组的完整票号次序及概率与封存空间逐项一致；检查所有128个组/政策/区间记录的125注、每轮2000元、结构空间、唯一性、概率排序、未知标签及命中蕴含结构支持。不新增项目函数或修改包。输入表在R边界转换为tibble；输出组级与轮级CSV。各组可能重叠，命中组数不是独立命中概率；固定概率乘积排序包含场间独立假设。单日已知结果仅能用于事后对照，不可作为未来表现验证或据此选择最佳排名窗口。收益需独立结算SP与真实票单，本报告不推算。
