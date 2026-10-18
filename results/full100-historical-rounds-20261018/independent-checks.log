@@ -1,0 +1,5 @@
+# A tibble: 1 × 6
+  rounds stake old_payout full100_payout old_net full100_net
+   <int> <dbl>      <dbl>          <dbl>   <dbl>       <dbl>
+1      7 16400      5254.         15978. -11146.       -422.
+PASS 10 paired rounds,160 group rows, curated FM16 baseline parity, counts, partial labels and common settled budget

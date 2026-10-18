@@ -1,0 +1,129 @@
+---
+title: "100%净胜球方案：原赛前轮次同预算重放"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+覆盖10月12–17日10个原始赛前FM轮次，固定每轮原七场组、组数、购买排名区间、注数、预算。100%方案使用当时冻结的来源裁决后base比分网格，不压缩尾部，投影实际北单让球、全三选并按乘积概率排序。原方案保留真正冻结票单。早期150–324名每组175注、2800元，后期30–154名每组125注、2000元；不统一改窗口。不采用10月14日赛中调单的选票/概率，只允许引用其相同fixture的官方结算事实来结算原始赛前票。不是新概率回填、重训或前瞻验证。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'r_lib'))
+out<-file.path(root,'results/full100-historical-rounds-20261018')
+manifest_path<-file.path(out,'input-manifest.json')
+inputs<-jsonlite::fromJSON(manifest_path) |> as_tibble()
+stopifnot(nrow(inputs)==10L,!anyDuplicated(inputs[c('dataset','sheet_index')]))
+frozen_plans<-list();selection_receipts<-list()
+for(i in seq_len(nrow(inputs))){
+ row<-inputs[i,];w<-file.path(root,'results',row$dataset)
+ stopifnot(digest::digest(file=file.path(w,'frozen-probabilities.rds'),algo='sha256')==row$frozen_probability_sha256,digest::digest(file=file.path(w,'plans.rds'),algo='sha256')==row$plans_sha256,digest::digest(file=file.path(w,'manifest.json'),algo='sha256')==row$manifest_sha256)
+ f<-readRDS(file.path(w,'frozen-probabilities.rds'));b<-readRDS(file.path(w,'plans.rds'));p<-b$plans[[row$sheet_index]]
+ cutoff<-p$selection_receipt$cutoff
+ stopifnot(inherits(cutoff$cutoff_utc,'POSIXct'),!is.na(cutoff$cutoff_utc),identical(as.numeric(cutoff$cutoff_utc),as.numeric(b$cutoff$cutoff_utc)))
+ ids<-sort(unique(p$legs$fixture_id));q_rows<-list();sources<-list()
+ co<-p$cohort |> as_tibble() |> filter(fixture_id %in% ids)
+ stopifnot(nrow(co)==length(ids),all(as.numeric(co$kickoff)>as.numeric(cutoff$cutoff_utc)))
+ for(id in ids){
+  base<-f$entries[[id]]$base
+  stopifnot(!is.null(base),identical(as.numeric(base$cutoff$cutoff_utc),as.numeric(cutoff$cutoff_utc)),!is.na(base$max_source_available_utc),as.numeric(base$max_source_available_utc)<as.numeric(cutoff$cutoff_utc))
+  h<-unique(f$probabilities$handicap[f$probabilities$fixture_id==id]);stopifnot(length(h)==1L,is.finite(h))
+  grid<-base$grid |> as_tibble();stopifnot(all(is.finite(grid$probability)),all(grid$probability>=0),abs(sum(grid$probability)-1)<1e-9)
+  q_rows[[id]]<-grid |> mutate(outcome=case_when(home_goals-away_goals+h>0~'W',home_goals-away_goals+h==0~'D',TRUE~'L')) |> group_by(outcome) |> summarise(probability=sum(probability)/sum(grid$probability),.groups='drop') |> mutate(fixture_id=id)
+  sources[[id]]<-base[c('cutoff','source_hashes','max_source_available_utc')]
+ }
+ q<-bind_rows(q_rows) |> select(fixture_id,outcome,probability);stopifnot(nrow(q)==3L*length(ids))
+ original<-p$purchases |> as_tibble();group_lookup<-p$legs |> as_tibble() |> distinct(group_id,group=group_slot)
+ original<-original |> left_join(group_lookup,by='group_id',relationship='many-to-one')
+ stopifnot(nrow(original)==row$baseline_tickets,n_distinct(original$group)==row$baseline_groups,2*nrow(original)==row$baseline_stake_cny,!anyDuplicated(original$ticket_id),p$settings$unit_cny==2,p$settings$payout_factor==.65)
+ original_legs<-p$ticket_legs |> as_tibble() |> filter(ticket_id %in% original$ticket_id) |> select(ticket_id,fixture_id,outcome) |> distinct()
+ buys<-list();buy_legs<-list();rank_spaces<-list();windows<-list()
+ for(g in sort(unique(p$legs$group_slot))){
+  legs<-p$legs |> as_tibble() |> filter(group_slot==g) |> arrange(round)
+  gid<-unique(legs$group_id);stopifnot(length(gid)==1L,nrow(legs)==7L)
+  old<-original |> filter(group==g) |> arrange(rank);lo<-min(old$rank);hi<-max(old$rank)
+  stopifnot(nrow(old)==hi-lo+1L,identical(as.integer(old$rank),seq.int(lo,hi)))
+  gl<-legs |> transmute(group_id,fixture_id,leg_order=as.integer(round))
+  supports<-q |> filter(fixture_id %in% legs$fixture_id) |> transmute(candidate_id=paste0(gid,'|7'),fixture_id,outcome,allowed=TRUE,preference=match(outcome,c('W','D','L')))
+  space<-beidan::parlay_enumerate_tickets(gl,q,cutoff=cutoff,supports=supports,n_legs=7L)
+  ranked<-beidan::parlay_rank_tickets(space$tickets,space$candidate_tickets,cutoff=cutoff,ranking='probability_desc') |> as_tibble()
+  stopifnot(nrow(ranked)==2187L,abs(sum(ranked$probability)-1)<1e-9)
+  chosen<-ranked |> filter(rank>=lo,rank<=hi) |> mutate(group=g)
+  stopifnot(nrow(chosen)==nrow(old))
+  buys[[length(buys)+1L]]<-chosen
+  buy_legs[[length(buy_legs)+1L]]<-space$ticket_legs |> as_tibble() |> filter(ticket_id %in% chosen$ticket_id)
+  rank_spaces[[length(rank_spaces)+1L]]<-ranked |> mutate(group=g)
+  windows[[length(windows)+1L]]<-tibble(group=g,lo,hi,n=nrow(chosen))
+ }
+ full<-bind_rows(buys);full_legs<-bind_rows(buy_legs)
+ stopifnot(nrow(full)==nrow(original),!anyDuplicated(full$ticket_id),nrow(full_legs)==7L*nrow(full),nrow(original_legs)==7L*nrow(original))
+ frozen_plans[[i]]<-list(dataset=row$dataset,sheet_index=row$sheet_index,output=row$output,cutoff=cutoff,original=original,original_legs=original_legs,full100=full,full100_legs=full_legs,rank_spaces=bind_rows(rank_spaces),windows=bind_rows(windows),q=q)
+ selection_receipts[[i]]<-list(dataset=row$dataset,sheet_index=row$sheet_index,cutoff=cutoff,source_receipts=sources,frozen_probability_sha256=row$frozen_probability_sha256,plans_sha256=row$plans_sha256,manifest_sha256=row$manifest_sha256,projected_probability_hash=rlang::hash(q),selection_hash=rlang::hash(list(full,full_legs)),code_identity=get('.ParlayRiskCodeHash',envir=asNamespace('beidan'))())
+}
+# Persist all selections before opening settlement snapshots; design remains retrospective.
+saveRDS(list(plans=frozen_plans,receipts=selection_receipts,input_manifest_sha256=digest::digest(file=manifest_path,algo='sha256'),qmd_sha256=digest::digest(file=file.path(root,'quarto/full100_historical_rounds_20261018.qmd'),algo='sha256')),file.path(out,'frozen-replay.rds'))
+rows<-list();group_rows<-list();baseline_checks<-list()
+for(i in seq_len(nrow(inputs))){
+ row<-inputs[i,];frozen<-frozen_plans[[i]];path<-file.path(root,row$label_snapshot)
+ stopifnot(digest::digest(file=path,algo='sha256')==row$label_sha256)
+ r<-if(row$label_kind=='json')jsonlite::fromJSON(path)else readRDS(path)$settlement
+ label_times<-r$fixture_results$result_available_at
+ if(inherits(label_times,'POSIXct'))label_times<-lubridate::with_tz(label_times,'UTC') else label_times<-as.POSIXct(as.character(label_times),tz='UTC',format='%Y-%m-%d %H:%M:%OS')
+ a<-r$fixture_results |> as_tibble() |> transmute(issue_id=as.character(issue_id),fixture_id=as.character(fixture_id),actual=as.character(outcome),settled_sp=as.numeric(settled_sp),label_available_at=label_times,source_url=as.character(source_url))
+ stopifnot(!anyDuplicated(a[c('issue_id','fixture_id')]),all(a$actual %in% c('W','D','L')),all(is.na(a$settled_sp)|(is.finite(a$settled_sp)&a$settled_sp>0)),all(!is.na(a$label_available_at)),all(as.numeric(a$label_available_at)>as.numeric(frozen$cutoff$cutoff_utc)))
+ as_of<-r$as_of_utc;if(inherits(as_of,'POSIXct'))as_of<-lubridate::with_tz(as_of,'UTC')else as_of<-as.POSIXct(as.character(as_of),tz='UTC',format='%Y-%m-%d %H:%M:%OS');stopifnot(length(as_of)==1L,!is.na(as_of),all(a$label_available_at<=as_of))
+ settlements<-a |> transmute(issue_id,fixture_id,outcome=actual,settled_sp,label_available_at,status='settled',source_url)
+ for(policy in c('original','full100')){
+  tickets<-frozen[[policy]];ticket_legs<-frozen[[paste0(policy,'_legs')]]
+  monetary_plan<-list(constants=list(unit_cny=2,payout_factor=.65,n_legs=7L),issue_id=frozen$cutoff$issue_id,funded=tickets |> select(ticket_id,group_id),ticket_legs=ticket_legs)
+  money<-beidan::parlay_settle_plan(monetary_plan,settlements,as_of=as_of)
+  checks<-ticket_legs |> left_join(a |> select(fixture_id,actual),by='fixture_id',relationship='many-to-one') |> group_by(ticket_id) |> summarise(known=sum(!is.na(actual)),misses=sum(!is.na(actual)&outcome!=actual),.groups='drop')
+  scored<-tickets |> left_join(checks,by='ticket_id',relationship='one-to-one')
+  group_result<-scored |> group_by(group,group_id) |> summarise(hit=any(known==7L&misses==0L),pending=any(known<7L&misses==0L),.groups='drop')
+  stopifnot(all(!(group_result$hit&group_result$pending)))
+  m<-money$ticket_returns |> as_tibble();complete<-all(!m$status %in% c('PENDING','SPECIAL'))
+  payout<-if(complete)sum(m$payout_cny)else NA_real_;stake<-sum(m$stake_cny)
+  rows[[length(rows)+1L]]<-tibble(dataset=row$dataset,sheet=row$sheet_index,output=row$output,policy,rank_start=min(tickets$rank),rank_end=max(tickets$rank),groups=nrow(group_result),hit_groups=sum(group_result$hit),pending_groups=sum(group_result$pending),stake_cny=stake,payout_cny=payout,net_cny=if(complete)payout-stake else NA_real_,roi=if(complete)(payout-stake)/stake else NA_real_,monetary_complete=complete,labels_as_of=format(as_of,tz='UTC',format='%Y-%m-%dT%H:%M:%SZ'))
+  group_rows[[length(group_rows)+1L]]<-group_result |> mutate(dataset=row$dataset,sheet=row$sheet_index,policy)
+  if(policy=='original'&&row$label_kind=='json'){
+   published<-as_tibble(r$summary)
+   # Borrowed settlement run for26104 used adjusted tickets: never compare its ticket counts/payouts with original150–324.
+   same_ticket_run<-row$dataset!='fm16-upcoming-26104-20261013'
+   if(same_ticket_run){stopifnot(nrow(published)==1L,sum(group_result$hit)==published$hit_groups);if(!is.na(published$payout_cny)&&complete)stopifnot(abs(payout-published$payout_cny)<1e-6)}
+   baseline_checks[[length(baseline_checks)+1L]]<-tibble(dataset=row$dataset,sheet=row$sheet_index,published_ticket_run_same=same_ticket_run,hit_parity=if(same_ticket_run)sum(group_result$hit)==published$hit_groups else NA)
+  }
+ }
+}
+x<-bind_rows(rows);g<-bind_rows(group_rows)
+stopifnot(nrow(x)==20L,nrow(g)==160L)
+comparison<-x |> select(dataset,sheet,output,policy,rank_start,rank_end,hit_groups,pending_groups,stake_cny,payout_cny,net_cny,monetary_complete) |> pivot_wider(names_from=policy,values_from=c(hit_groups,pending_groups,payout_cny,net_cny,monetary_complete))
+stopifnot(nrow(comparison)==10L)
+readr::write_csv(x,file.path(out,'rounds.csv'));readr::write_csv(comparison,file.path(out,'comparison.csv'));readr::write_csv(g,file.path(out,'groups.csv'));readr::write_csv(bind_rows(baseline_checks),file.path(out,'baseline-checks.csv'))
+```
+
+每轮同场次、同组数、同预算结果：
+
+```{r}
+knitr::kable(comparison |> select(dataset,sheet,rank_start,rank_end,hit_groups_original,hit_groups_full100,pending_groups_original,pending_groups_full100,stake_cny,payout_cny_original,payout_cny_full100),digits=2)
+```
+
+两种策略均完成收益结算的共同轮次（缺SP或尚有存活未知票不填零）：
+
+```{r}
+matched<-comparison |> filter(monetary_complete_original,monetary_complete_full100)
+knitr::kable(matched |> summarise(rounds=n(),stake_cny=sum(stake_cny),original_hits=sum(hit_groups_original),full100_hits=sum(hit_groups_full100),original_payout=sum(payout_cny_original),full100_payout=sum(payout_cny_full100),original_net=sum(net_cny_original),full100_net=sum(net_cny_full100)),digits=2)
+knitr::kable(x |> select(dataset,sheet,policy,hit_groups,pending_groups,stake_cny,payout_cny,net_cny,roi,labels_as_of),digits=3)
+knitr::kable(inputs |> select(dataset,sheet_index,label_source,label_sha256))
+```
+
+范围与限制：10月12日前纯北单/xG-DC及其他混合单未作为同一FM全流程纳入，缺可比的来源裁决后base快照时不伪造；10月18日当日新轮次不纳入“先前轮次”。旧FM15/16只撤销其后处理，保留各自当时来源选择，不冒称统一FM17复算。10月17日使用本次固定的新结算快照，与此前只封存较早结果的阈值诊断不强制使用同一观察时间；更新标签只改变结算，不改变选择。借用赛中调单运行的fixture结算事实仅为原赛前票补标签，未借用其预测/购票。缺少正式SP的实际命中不能填回款零，已全灭票则可确定回款零。回款复用包结算器，2元×0.65×七场官方SP仅一次0.65，不用赛前估算赔率。未按实际赛果改窗口、阈值、组数；这仍是已知结果后提出的历史政策对照，不是独立前瞻表现证明。
+
+验收：10个源计划/概率/发布manifest和标签快照SHA核对；全部目标开赛及source最大可用时间在原显式cutoff之后/之前分别校验；每组2187空间、投影归一、实际购买数/预算与原计划一致；先保存重放票单和来源收据再打开标签；原票命中及有完整SP的回款重现原结算记录；20个轮次政策/160组记录、命中与未知标签分离、缺SP不伪造回款。无包或新增函数修改；干净QMD执行、包枚举/排名/结算接口与内置断言为本次自动检查，审查日志及输出SHA保存在results/full100-historical-rounds-20261018/。
+
+时间边界回归：旧RDS保存的是带时区POSIXct（部分显示为香港时间），保留其真实时间戳并用with_tz转UTC；JSON是原生产者声明的UTC文本，按明确格式解析。禁止将RDS先转本地显示字符串再当UTC解析，防止8小时时差。所有标签必须在原决策后、固定结算观察时刻前。100%与原方案同时变化允许集合和排序概率，本次不将差异单独归因于其中一个组件。

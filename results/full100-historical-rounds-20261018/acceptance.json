@@ -1,0 +1,56 @@
+{
+  "status": "HISTORICAL_FIXED_POLICY_FULL100_REPLAY_REVIEWED",
+  "review_command": "codex review; exact bounded prompts and independent checks in review-final.log",
+  "initial_findings": [
+    "RDS POSIXct display text was incorrectly reparsed as UTC"
+  ],
+  "resolutions": [
+    "Preserve POSIXct instants with with_tz UTC; parse only declared UTC JSON strings with explicit format; keep cutoff and as-of guards"
+  ],
+  "final_review": "No blocking findings; all10 replay contexts,source chronology,officialSP settlement and partial records verified",
+  "render_command": "QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/full100_historical_rounds_20261018.qmd --no-cache -P project_root:$PWD",
+  "render_exit": 0,
+  "independent_check_exit": 0,
+  "source_identity": "Per-context cutoff, source hashes and loaded package implementation identity in frozen-replay.rds",
+  "validation": {
+    "rounds": 10,
+    "policy_rows": 20,
+    "group_rows": 160,
+    "original_confirmed_hits": 10,
+    "original_pending_groups": 1,
+    "full100_confirmed_hits": 17,
+    "full100_pending_groups": 0,
+    "common_monetary_complete_rounds": 7,
+    "common_stake_cny": 16400,
+    "rendered_tables": 4,
+    "error_blocks": 0
+  },
+  "limitations": [
+    "Only published prematch FM rounds with retained base grid,Oct12-17",
+    "Preserves each original model source selection; not all refit to latestFM",
+    "Only known official SP pays; missing payouts remainNA",
+    "Later adjusted runtime used for samefixture settlement only,not forecasts or purchased tickets",
+    "Retrospective policy comparison with shared fixtures,not independent prospective validation",
+    "Both mask and sorting probabilities change together"
+  ],
+  "files": {
+    "quarto/full100_historical_rounds_20261018.qmd": "d66e6ed6bc12f41f40cef86872c2f78e940aeb24575260b75663f2feac8af3e4",
+    "quarto/full100_historical_rounds_20261018.html": "a11cac0e61b34bb1625c78ebe41464c4724b171269bae2e615e1bfa2f00f6237",
+    "results/full100-historical-rounds-20261018/input-manifest.json": "4080314435497565bdd5882df96e99d015e63d16bde2d2b49d25f68d2412aaf8",
+    "results/full100-historical-rounds-20261018/frozen-replay.rds": "20122f6170c8503d088162b200cca0f6f876daee196a561af7f89f80ae7f6576",
+    "results/full100-historical-rounds-20261018/rounds.csv": "458964afb4e803c713c595cf381376640d0ce0fe8a609ce036e9bc7d5d53d212",
+    "results/full100-historical-rounds-20261018/comparison.csv": "3515edbb018982db371a512cec612a2126318493bf3e3f927a763b1fb9bc37b3",
+    "results/full100-historical-rounds-20261018/groups.csv": "8ba33e26b6b2baefa0ccdda5ae2ed88287a630a257656a82322d16e6a316856b",
+    "results/full100-historical-rounds-20261018/baseline-checks.csv": "f8e6cd8d502bd0d5d2b6e3256a5d241862000ca776607450562f7856bb6ed572",
+    "results/full100-historical-rounds-20261018/inputs/fm15-upcoming-20261012-01-results.json": "4275b124df41fae09c57ac5ab313e23e04b4d82e2854249141ccb5b0412df558",
+    "results/full100-historical-rounds-20261018/inputs/fm16-upcoming-20261013-01-analysis.rds": "20859fabe142425d5cee015f3d0c136992993a02204dadb7d561584b45d1ba93",
+    "results/full100-historical-rounds-20261018/inputs/fm16-upcoming-26104-20261013-01-results.json": "349cd4e74d2fffd7c82d363832d35f85e12ba2dc309d05eebbec3e38fb8cba18",
+    "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261015-01-results.json": "636bd6ba0de78882fca19a653aa9799b5cf9338d677b40a037cbaa240cbe1116",
+    "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261015-02-results.json": "14b2f14d059b3330fcd3cc434a3966a3a2d7aee647ed3c5f5062254a73477a36",
+    "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261016-01-results.json": "dfb362ee98bddddb29b64307f0e8b4ed710350899a9eefa5e9c63785a98d7505",
+    "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-01-results.json": "24ad88b66c35b21d8810ef2b875f1cdd89ddab8ac57e03aca90989d9c639c24c",
+    "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-02-results.json": "7ffbaa74d2a136973dab85ecab791c62163982bc8b06c5eb8b59e5cd7d023631",
+    "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-03-results.json": "5e1139894810d1d777bcad8c861bfcda3742a6e229ea41bc459091fe2365ca8c",
+    "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-04-results.json": "da4db107d4a025625f69162607acfc7bca54907fad7b6726616a7f15b001a9bf"
+  }
+}

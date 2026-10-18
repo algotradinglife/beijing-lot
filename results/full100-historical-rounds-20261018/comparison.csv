@@ -1,0 +1,11 @@
+dataset,sheet,output,rank_start,rank_end,stake_cny,hit_groups_original,hit_groups_full100,pending_groups_original,pending_groups_full100,payout_cny_original,payout_cny_full100,net_cny_original,net_cny_full100,monetary_complete_original,monetary_complete_full100
+fm15-upcoming-20261012,1,upcoming_20261012_fm150_01.html,150,324,2800,0,4,0,0,0,13077.550760272283,-2800,10277.550760272283,TRUE,TRUE
+fm16-upcoming-20261013,1,upcoming_20261013_fm160_01.html,150,324,2800,0,0,0,0,0,0,-2800,-2800,TRUE,TRUE
+fm16-upcoming-26104-20261013,1,upcoming_26104_20261013_fm160_01.html,150,324,2800,0,0,0,0,0,0,-2800,-2800,TRUE,TRUE
+fm17-upcoming-20261015,1,upcoming_26104_20261015_fm170_01.html,30,154,2000,1,4,0,0,1002.7934751152167,2900.522531305936,-997.2065248847833,900.5225313059359,TRUE,TRUE
+fm17-upcoming-20261015,2,upcoming_26104_20261015_fm170_02.html,30,154,2000,1,0,0,0,1009.7121417529343,0,-990.2878582470657,-2000,TRUE,TRUE
+fm17-upcoming-20261016,1,upcoming_26104_20261016_fm170_01.html,30,154,2000,1,0,0,0,3241.345114903334,0,1241.345114903334,-2000,TRUE,TRUE
+fm17-upcoming-20261017,1,upcoming_26105_20261017_fm170_01.html,30,154,2000,3,5,0,0,NA,NA,NA,NA,FALSE,FALSE
+fm17-upcoming-20261017,2,upcoming_26105_20261017_fm170_02.html,30,154,2000,0,0,1,0,NA,0,NA,-2000,FALSE,TRUE
+fm17-upcoming-20261017,3,upcoming_26105_20261017_fm170_03.html,30,154,2000,4,4,0,0,NA,NA,NA,NA,FALSE,FALSE
+fm17-upcoming-20261017,4,upcoming_26105_20261017_fm170_04.html,30,154,2000,0,0,0,0,0,0,-2000,-2000,TRUE,TRUE
