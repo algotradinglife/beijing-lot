@@ -1,0 +1,14 @@
+{
+  "recorded_at_utc": "2026-10-18T13:50:04.873927+00:00",
+  "source": "USER_CORRECTION_IN_CURRENT_CONVERSATION",
+  "issues": [
+    {
+      "issue_id": "26105",
+      "all_matches_finished": false,
+      "final_issue_metrics_admitted": false,
+      "role": "PENDING_FULL_SETTLEMENT_VALIDATION",
+      "frozen_predictions_changed": false
+    }
+  ],
+  "note": "Absence of a registered whole-issue dataset is a separate data-catalog observation, not evidence that all matches have ended."
+}

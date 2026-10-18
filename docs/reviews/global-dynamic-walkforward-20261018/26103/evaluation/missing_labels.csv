@@ -1,0 +1,2 @@
+fixture_id,slot,cutoff_utc,handicap,native_supported,euro_companies,asian_rows,total_rows,three_channel_fit,market_consistent,selected_source,state,reason
+26103:103,103,2026-10-09T12:00:00Z,0,TRUE,323,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression

@@ -1,0 +1,7 @@
+{
+  "status": "BASE_PROBABILITIES_AND_FORECAST_CUTOFFS_UNCHANGED",
+  "fixtures": 155,
+  "maximum_absolute_difference": 0,
+  "before_sha256": "40fc1f4e3f00276a98656542c64d6fbf12501c155c30cb4feecf7d970eb7ff33",
+  "after_sha256": "beac36d352d9f21e879003ae1683deb9ce325cb1d344d215508c52fef7bf53d7"
+}

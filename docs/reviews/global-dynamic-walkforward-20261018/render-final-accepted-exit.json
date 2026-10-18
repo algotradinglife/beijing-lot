@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/usr/bin/env",
+    "R_PROFILE_USER=/dev/null",
+    "QUARTO_R=/opt/R/4.6.1/bin/R",
+    "R_LIBS_USER=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6",
+    "quarto",
+    "render",
+    "quarto/global_dynamic_walkforward_20261018.qmd",
+    "--no-cache",
+    "-P",
+    "project_root:/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "-P",
+    "require_acceptance:true"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T14:34:05.771225+00:00",
+  "finished_at_utc": "2026-10-18T14:34:13.211969+00:00"
+}

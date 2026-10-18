@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/opt/R/4.6.1/bin/Rscript",
+    "r/global_dynamic_26104_native_20261018.R",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "/tmp/beidan-margin-combinations-20261018",
+    "fit",
+    "1",
+    "3"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "evidence": "Unified exec session observed completed with exit0",
+  "tool_session": 61509,
+  "observed_at_utc": "2026-10-18T14:18:00.468689+00:00"
+}

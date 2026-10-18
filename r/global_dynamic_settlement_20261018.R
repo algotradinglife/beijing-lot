@@ -1,0 +1,38 @@
+# Rscript r/global_dynamic_settlement_20261018.R ROOT ISSUE
+# Post-freeze, cache-only SP observation; never enters calibration/selection.
+args<-commandArgs(TRUE);stopifnot(length(args)==2L,args[2]%in%c('26103','26104'))
+root<-normalizePath(args[1],mustWork=TRUE);setwd(root);issue<-args[2]
+suppressPackageStartupMessages(library(tidyverse));library(beidan,lib.loc='results/margin-combination-study-20261018/library')
+out<-file.path('results/global-dynamic-walkforward-20261018',issue)
+replay<-jsonlite::fromJSON(file.path(out,'selection-replay.json'))
+stopifnot(replay$status=='FULL_IDENTICAL_REPLAY',replay$sha256==digest::digest(file=file.path(out,'frozen-rounds.rds'),algo='sha256'))
+path<-file.path(out,'settlement-observation.rds')
+if(file.exists(path))stop('Immutable settlement observation exists; replay stored bytes instead')
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+client<-OpenSourceAPI(backend=python_backend(file.path(root,'.venv/bin/python')))
+observed<-SourceBeidan(client,issue,'handicap_result',max_age=0,cache_only=TRUE)
+stopifnot(observed$receipt$network_attempts==0L,!anyDuplicated(observed$events$slot))
+forecasts<-readRDS(file.path(out,'frozen-forecasts.rds'))
+fixtures<-read_csv(forecasts$source_paths[['fixtures']],col_types=cols(.default=col_character(),slot=col_integer(),handicap=col_integer(),kickoff_at=col_datetime(),cutoff_utc=col_datetime()))
+events<-observed$events |> mutate(fixture_id=paste0(issue_id,':',slot))
+# Source parser options are observations, not fabricated from summary SP.
+options<-observed$options |> filter(!is.na(sp)) |> group_by(issue_id,slot) |> mutate(filled_options=n()) |> ungroup()
+matched<-events |> inner_join(fixtures |> select(fixture_id,provider_id,expected_handicap=handicap),by='fixture_id',relationship='one-to-one')
+stopifnot(all(matched$native_id==matched$provider_id),all(matched$handicap==matched$expected_handicap))
+chosen<-matched |> inner_join(options |> filter(filled_options==1L),by=c('issue_id','slot','play'),relationship='one-to-one') |>
+ filter(status=='完场',grepl('^[0-9]+[-:][0-9]+$',score),option%in%c('胜','平','负'),sp>1)
+score_home<-as.integer(sub('[-:].*$','',chosen$score));score_away<-as.integer(sub('^.*[-:]','',chosen$score))
+expected<-case_when(score_home-score_away+chosen$handicap>0~'胜',score_home-score_away+chosen$handicap==0~'平',TRUE~'负')
+stopifnot(all(chosen$option==expected))
+chosen<-chosen |> transmute(issue_id,fixture_id,outcome=recode(option,'胜'='W','平'='D','负'='L'),
+ settled_sp=as.double(sp),label_available_at=lubridate::ymd_hms(observed$receipt$observed_at,tz='UTC'),status='settled',source_url=observed$receipt$url)
+stopifnot(!anyDuplicated(chosen$fixture_id))
+batch<-list(observation=observed,settlements=chosen,source_selection_sha256=replay$sha256,
+ client_sha256=digest::digest(file='r/global_dynamic_settlement_20261018.R',algo='sha256'))
+saveRDS(batch,path)
+write_csv(chosen,file.path(out,'settlements.csv'))
+sp_audit<-fixtures |> select(fixture_id) |> mutate(state=case_when(fixture_id%in%chosen$fixture_id~'VERIFIED_OBSERVED_SINGLE_OPTION_SP',!fixture_id%in%events$fixture_id~'NO_SOURCE_EVENT',TRUE~'NO_VALID_COMPLETED_SINGLE_OPTION_SP_GT1'))
+write_csv(sp_audit,file.path(out,'settlement-audit.csv'))
+jsonlite::write_json(list(sha256=digest::digest(file=path,algo='sha256'),source_receipt=observed$receipt,
+ observed_rows=nrow(events),accepted_sp_rows=nrow(chosen),source_selection_sha256=replay$sha256),file.path(out,'settlement-observation.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+print(tibble(observed_events=nrow(events),accepted_settlements=nrow(chosen)))

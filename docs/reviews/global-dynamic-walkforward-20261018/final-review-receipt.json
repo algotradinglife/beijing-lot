@@ -1,0 +1,85 @@
+{
+  "status": "FINAL_REVIEW_PASSED",
+  "review_command": [
+    "codex",
+    "review",
+    "Read-only final artifact follow-up. Do not edit, no CI or unrelated scans. Previous final review P2 was literal shell commands corrupted by Markdown math. QMD now uses escaped format=html table with code nodes. Fresh47 actual rendered command/evidence assertions pass (r/check_global_dynamic_report_20261018.R; log results/global-dynamic-walkforward-20261018/rendered-command-regression.log), and all original62 unit assertions freshly pass after this display-only change. Source functional clients/tests unchanged from COMPLETE fresh package991blocks9647assertions, repository808blocks183326assertions and Python647 tests, all0fail/error/skip/warn. Real3065 assertions pass. Inspect final QMD, HTML, new report acceptance checker and final artifact sourceSHA manifest results/global-dynamic-walkforward-20261018/final-artifact-inputs.json. Acceptance.json and final render-final-display-exit.json in same directory; clean uncached require_acceptance:true exit0. Prior source and artifact reviews already verified reported metrics and hashes; no need reread huge logs. Check all20 literal command rows and evidence mappings remain intact,47test totals visible, finalsource/evaluationbindings, denominators and user correction26105unfinished excluded. RAW/GLOBAL paired181scored (154 in26103,27 in26104),15rounds,14commoncashcomplete; historicdiagnostic notprospective. No forecast/ticket changes from presentation fix. Full R tests happened before final presentation fix, which received fresh62 unit and actual47HTMLregression, explicitly recorded; no package edits in this task. Report actionable blockers or No blocking final artifact findings, do not suggest new studies."
+  ],
+  "exit_status": 0,
+  "review_log_sha256": "e541b6927c643ef87b271ddd11175f2694b40582c6b16e0ea566751814add8c8",
+  "reviewed_inputs": [
+    {
+      "path": "config/global_dynamic_walkforward_20261018.json",
+      "sha256": "ec0fcd046b6e1b4e127b4d1bfc369bb6090946dc3d34884bb956e930ab02a399"
+    },
+    {
+      "path": "r/global_dynamic_census_20261018.R",
+      "sha256": "e8fbeb0a95584ad207e645816d010a342a52e6e3b87628934fcf2655ae305782"
+    },
+    {
+      "path": "r/global_dynamic_26104_intake_20261018.R",
+      "sha256": "0256424af4ccda786068b2d8d01ac787e3b2ab260680626cb74cd28bf4cc8412"
+    },
+    {
+      "path": "r/global_dynamic_26104_native_20261018.R",
+      "sha256": "152ccebba0de7bec44f00dfe76cb9d304a08b153a7fc8d4c588e09fd7a103d5e"
+    },
+    {
+      "path": "r/global_dynamic_walkforward_20261018.R",
+      "sha256": "97deb750a4308ced749f0c01f17f8476db2c7c4e5437050f4c7a5ffd379f9f91"
+    },
+    {
+      "path": "r/global_dynamic_select_20261018.R",
+      "sha256": "8501ed9cb63bb076365159f58c96d35fe94d46debb0c56714a39e20dac0d8cf1"
+    },
+    {
+      "path": "r/global_dynamic_settlement_20261018.R",
+      "sha256": "57b8f4a8801f5c805e0a843178fc8aab0e66629e01a5e85fcf342c9b6c29f7cf"
+    },
+    {
+      "path": "r/global_dynamic_evaluate_20261018.R",
+      "sha256": "2452f6e6a491fa32df8ad5012914f3b9fae175e084ecb49a0a355085e38e23da"
+    },
+    {
+      "path": "r/check_global_dynamic_artifacts_20261018.R",
+      "sha256": "46f09a49fda9e353fe9d201fadeaf71bb0a6f44a188175e96ea813eb45e9dd05"
+    },
+    {
+      "path": "src/global_dynamic_26104_capture_20261018.py",
+      "sha256": "62f42bdddf068b789928013c392be9c3e4a590104999422c8ff68dbaa4d74672"
+    },
+    {
+      "path": "src/global_dynamic_capture_replay_20261018.py",
+      "sha256": "a5b2c31236af8d38bcbc2969870b413c495ca60b4048e80bec17f3bb35d3f875"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-walkforward.R",
+      "sha256": "a3d875411fec06332c74027b9792f2b82067c2e620c47579ed7a37bf69577def"
+    },
+    {
+      "path": "tests/test_global_dynamic_capture_20261018.py",
+      "sha256": "e16f5cf6d1521347eac96e9154e0c5c6928cc28567cab54f94b88808e185e83e"
+    },
+    {
+      "path": "quarto/global_dynamic_walkforward_20261018.qmd",
+      "sha256": "7e4ac320e6010f73afca3ec5c3f0b1f7b8008cb5601bd02845f43a61b5b9cee2"
+    },
+    {
+      "path": "r/check_global_dynamic_report_20261018.R",
+      "sha256": "c6ac36c357959d75bd55aee504ca5dd8a2f4b3108f3ea4ea91914942df675b90"
+    },
+    {
+      "path": "quarto/global_dynamic_walkforward_20261018.html",
+      "sha256": "1447243487582d3c13b0edb692684c47bfd0cd5ca6c9ca7e6caeffc10e102315"
+    },
+    {
+      "path": "results/global-dynamic-walkforward-20261018/acceptance.json",
+      "sha256": "6344cd59635296c94abd1937bf38da0d537909aed401e9fc4708f12cb0d9b155"
+    }
+  ],
+  "findings": "No blocking final artifact findings; all17 input hashes and47 rendered command/evidence assertions verified",
+  "full_R_test_timing": "Completed before final QMD presentation-only fix; unchanged functional clients/tests plus fresh62unit and47HTML assertions after fix",
+  "scope": "26103 and26104 historical diagnostic.26105 unfinished, remains pending;26106 prospective validation not completed.",
+  "source_whitespace_check": "Owned15sourcefiles passed0. Unfiltered diff check reports CRLF/trailing spaces in byte-preserved generated evidence; archival bytes intentionally retained, not source defects.",
+  "recorded_at_utc": "2026-10-18T14:38:12.582218+00:00"
+}

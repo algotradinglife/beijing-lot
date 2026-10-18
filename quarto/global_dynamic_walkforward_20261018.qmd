@@ -1,0 +1,175 @@
+---
+title: "FM-1.7.1完整分布：整体校准与动态选票的整期滚动对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  require_acceptance: true
+---
+
+本研究比较“原概率＋动态选票”和“整体校准＋动态选票”。基座是FM-1.7.1的同赛事原生λ及既有置信／市场来源裁决，保留所选比分网格的100%分布，不做尾部压缩。**完整采集遍历、模型可估、七场可组成轮次、赛果可评分及现金可结算，是五个不同的分母。** 所有名单、排除和待定均保留。
+
+26105尚未全部完赛，保留为待完赛验证期；其数据登记状态与比赛状态分别记录。本次先完成26103、26104对照。
+
+这是历史诊断。已有历史赛果早已被研究过，现有基础事实及报价时间部分属于事后采集的历史时钟代理；本研究不宣称盲测、真实赛前可用性或实盘收益优势，也不自动升级正式FM规则。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root, mustWork = TRUE)
+setwd(root)
+out <- file.path(root, 'results/global-dynamic-walkforward-20261018')
+library(beidan, lib.loc = file.path(root, 'results/margin-combination-study-20261018/library'))
+policy <- jsonlite::fromJSON(file.path(root,'config/global_dynamic_walkforward_20261018.json'))
+issues <- c('26103','26104')
+forecasts <- decisions <- list()
+metrics <- rounds <- scores <- audits <- training <- partitions <- sp_audits <- list()
+for (issue in issues) {
+ w <- file.path(out,issue)
+ forecasts[[issue]] <- readRDS(file.path(w,'frozen-forecasts.rds'))
+ decisions[[issue]] <- readRDS(file.path(w,'frozen-rounds.rds'))
+ fr <- jsonlite::fromJSON(file.path(w,'forecast-replay.json'))
+ sr <- jsonlite::fromJSON(file.path(w,'selection-replay.json'))
+ er <- jsonlite::fromJSON(file.path(w,'evaluation-replay.json'))
+ stopifnot(fr$status=='FULL_IDENTICAL_REPLAY',sr$status=='FULL_IDENTICAL_REPLAY',
+  er$status=='FULL_IDENTICAL_EVALUATION_REPLAY',
+  fr$sha256==digest::digest(file=file.path(w,'frozen-forecasts.rds'),algo='sha256'),
+  sr$sha256==digest::digest(file=file.path(w,'frozen-rounds.rds'),algo='sha256'),
+  er$evaluation_sha256==digest::digest(file=file.path(w,'evaluation/evaluation.json'),algo='sha256'))
+ ev <- jsonlite::fromJSON(file.path(w,'evaluation/evaluation.json'))
+ stopifnot(identical(ev$forecast_sha256,fr$sha256),identical(ev$rounds_sha256,sr$sha256),identical(decisions[[issue]]$forecast_sha256,fr$sha256))
+ stopifnot(identical(policy,forecasts[[issue]]$policy))
+ for(name in names(ev$output_hashes))stopifnot(ev$output_hashes[[name]]==digest::digest(file=file.path(w,'evaluation',paste0(name,'.csv')),algo='sha256'))
+ metrics[[issue]] <- read_csv(file.path(w,'evaluation/metrics.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+ rounds[[issue]] <- read_csv(file.path(w,'evaluation/rounds.csv'),show_col_types=FALSE)
+ scores[[issue]] <- read_csv(file.path(w,'evaluation/scores.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+ audits[[issue]] <- forecasts[[issue]]$audit |> mutate(issue_id=issue,.before=1)
+ training[[issue]] <- read_csv(file.path(w,'evaluation/training.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+ partitions[[issue]] <- decisions[[issue]]$partitions |> mutate(issue_id=issue,.before=1)
+ sp_audits[[issue]] <- read_csv(file.path(w,'settlement-audit.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+}
+metrics <- bind_rows(metrics);rounds <- bind_rows(rounds);scores <- bind_rows(scores)
+audits <- bind_rows(audits);training <- bind_rows(training);partitions <- bind_rows(partitions)
+sp_audits <- bind_rows(sp_audits)
+datasets <- read_csv(file.path(out,'dataset-census.csv'),show_col_types=FALSE)
+tables <- read_csv(file.path(out,'table-census.csv'),show_col_types=FALSE)
+source_files <- read_csv(file.path(out,'delivery-source-manifest.csv'),show_col_types=FALSE)
+for(i in seq_len(nrow(source_files)))stopifnot(source_files$sha256[i]==digest::digest(file=file.path(root,source_files$path[i]),algo='sha256'))
+accepted <- file.exists(file.path(out,'acceptance.json'))
+if(params$require_acceptance) {
+ stopifnot(accepted)
+ acceptance <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ stopifnot(acceptance$status=='ACCEPTED',all(acceptance$checks$exit_status==0L),
+  all(acceptance$tests$failed==0L),all(acceptance$tests$errors==0L),all(acceptance$tests$skipped==0L))
+}
+```
+
+研究范围及分母
+
+```{r}
+#| echo: false
+datasets |> select(issue_id,kind,version,fixtures,state) |> knitr::kable(caption='已登记底座；登记状态与比赛是否完赛分别记录')
+audits |> count(issue_id,state,reason,name='场次') |> knitr::kable(caption='整期全名单与模型准入／排除')
+partitions |> group_by(issue_id,eligible) |> summarise(候选池数=n(),涉及比赛=sum(n),.groups='drop') |> knitr::kable(caption='共同决策时点的轮次池；不足8场不强行构造8个不同七场组')
+```
+
+26103复用已经完成的407场、814个亚洲盘／大小球通道补采，以及41批原生重算；26104复用109场基本面及欧赔版本，另补采218个公司8亚洲盘／大小球通道。所有原始通道均从固定原文独立重放；解析空数组、请求失败、截止前无报价及时间冲突分别记录。全源采集不等于每个截止前都有合格报价；公司8也不代表全部亚洲盘市场。
+
+原生支持遵循同赛事／同场地、近期8场、长期与近期各0.5、至少12场、ESS至少8，不设日历跨度上限，使用same_support_raw，不使用对手强度归一化参数。近期样本、赛事元数据及各UTC截止绑定在原生收据中。未估成功者不填回旧版概率。
+
+欧赔采用全部已验证、时间合格、同分钟无冲突的Titan公司，每公司先去水再平均；至少3家公司。亚洲盘和大小球采用公司8的同截止前48小时内最新完整报价，报价必须严格早于截止。缺少阵容／伤停及未量化对手强度使基本面置信保持uncertain；联合市场与欧赔、亚洲盘的最大残差均不超过5个百分点时，调用既有来源裁决函数直接采用市场网格，否则保留有支持的原生网格。ρ仍为专家固定−0.1。现有总进球反推在DC下对低于2.5的盘口未获准使用，本次不扩展该数学能力；因此样本存在低总进球比赛被排除的选择偏差。
+
+这与旧7轮的市场覆盖和公司篮子不完全相同。两种概率在本次比较中共享完全相同的基座与准入；旧轮次只作已看过的复现证据，不能混作新增验证样本。
+
+整体校准及时间顺序
+
+原概率RAW是完整网格映射至实际北单让球的W／D／L概率。GLOBAL分别以原三项logit为offset拟合三个只有截距的二项GLM，随后归一化；不加入分布形态特征，不重估λ、ρ，不重新压缩尾部。初始历史是26098、26101、26102的322个合格冻结样本。进入26104时追加本次冻结的26103原概率及已有赛果观察时间，只允许共享temporal_learning在各场原始T−24h截止前实际准入的行进入训练；不是把全155场无条件加入每场。
+
+```{r}
+#| echo: false
+training |> group_by(issue_id) |> summarise(截止数=n(),最少训练场次=min(training_rows),最多训练场次=max(training_rows),.groups='drop') |> knitr::kable()
+```
+
+GLOBAL所有超参数预先固定：等权扩展、ESS至少100、每类至少15场、epsilon为1e−8。没有用目标期选择窗口、收缩强度或校准方式。显式排除目标及未来期号，即使伪造了提前的标签时间也不能准入。每个截止有独立收据、实际准入行及权重账本、实现闭包、来源哈希和缓存键；源时钟代理只授权历史诊断。预测及选票客户端不读取目标标签，分别冻结并独立重放后，评价客户端才读取目标标签／SP。底层历史名单已包含已知赛果，故这种客户端隔离不构成盲测。
+
+单场概率表现
+
+```{r}
+#| echo: false
+metrics |> transmute(期号=issue_id,模型=model,评分场次=n,Top1=scales::percent(top1,accuracy=.01),Top2=scales::percent(top2,accuracy=.01),Brier=round(brier,4),LogLoss=round(logloss,4)) |> knitr::kable(caption='相同场次；Brier与log loss越低越好')
+scores |> group_by(model) |> summarise(n=n(),top1=mean(top1),top2=mean(top2),brier=mean(brier),logloss=mean(logloss),.groups='drop') |> knitr::kable(digits=4,caption='合并样本仅作描述；逐期结果优先')
+```
+
+Top1／Top2是类别排序是否包含实际让球赛果；Brier和log loss检查概率数值。不能用单场Top2上升推断七场购票改善，也不能把模型估计的组合覆盖概率当成真实命中率。
+
+动态购票对照
+
+RAW及GLOBAL均按各场原始T−24h截止冻结。后续共同决策时点不更新盘口、不重拟合校准器，比较的是相同已冻结信息下的选票。随后取预先列明的每日00:00 UTC中，第一个不早于该预测截止、且严格早于开赛的共同模拟决策时点。同一期、同一共同决策时点的合格比赛按数字场次号排序，每12场成一个候选池，尾池至少8场；以起点顺移1场的环形窗口构造8个不同七场组。该规则完全不读取目标标签，两模型使用相同组。每组枚举全部2187个让球赛果组合，125注×2元×8组，每轮2,000元；重复物理票仍计成本及可能的重复中奖。
+
+FIXED为30–154，TOP为1–125，作为固定对照。DYNAMIC_WINDOW逐步选择新增联合覆盖最大的连续125注区间；DYNAMIC_SET选择任意125注。每一步同时选择尚未购买的组，采用既有贪心算法，不宣称全局最优。不同比赛按独立假设，同一比赛在各组精确共享；完整世界积分结果另与Rcpp联合覆盖内核核对。
+
+```{r}
+#| echo: false
+rounds |> group_by(issue_id,model,policy) |> summarise(轮次=n(),确认命中轮数=sum(any_hit%in%TRUE),待定轮数=sum(is.na(any_hit)),确认中奖组数=sum(hit_groups),投入=sum(cost_cny),.groups='drop') |> knitr::kable()
+rounds |> filter(policy%in%c('DYNAMIC_WINDOW','DYNAMIC_SET')) |> select(issue_id,index,cutoff_utc,model,policy,hit_groups,pending_groups,any_hit,model_any_hit) |> knitr::kable(digits=4,caption='逐轮明细；model_any_hit是模型估计值')
+```
+
+结算与资金口径
+
+目标赛果沿用已验收名单公布的全场比分，其90分钟口径未全部获得独立认证。SP只接纳缓存来源中“完场、唯一实际报价选项、SP大于1”、身份／让球及比分方向一致的结算观察；不根据汇总SP或比分补造选项。SP=1、缺失、部分覆盖及特殊结算均不能据此当成已验证普通结算。结算调用包的统一入口，每张票只有一次0.65系数。评价输出先在临时目录构建、验证，再以目录重命名发布；不一致的重放不会覆盖已验收结果。
+
+```{r}
+#| echo: false
+sp_audits |> count(issue_id,state,name='场次') |> knitr::kable()
+common <- rounds |> group_by(issue_id,index) |> summarise(complete=all(monetary_complete),.groups='drop') |> filter(complete)
+cash <- rounds |> semi_join(common,by=c('issue_id','index')) |> group_by(model,policy) |>
+ summarise(共同现金完整轮数=n(),投入=sum(cost_cny),回款=sum(payout_cny),净额=sum(payout_cny-cost_cny),.groups='drop')
+cash |> knitr::kable(digits=2,caption='只比较所有方案共同现金完整的轮次；不得外推缺失轮次收益')
+```
+
+局限及判断边界
+
+- 26105尚未全部完赛（用户在本轮明确确认），不纳入整期最终命中率及收益比较；已有冻结预测保持不变，待全部完赛再验收。26106起仍需另做冻结规则后的验证。
+- 合格样本偏向历史支持及三通道齐备的比赛，排除了低大小球、时间冲突及样本稀疏场次；不能外推为整期所有比赛的准确率。
+- 按共同决策时点及候选池构组使部分单场预测不能进入七场实验；不以赛果补凑样本。
+- 只检验一种固定GLOBAL校准，不检验分布形态校准；较早训练样本的市场篮子／来源构成与本次不完全相同。
+- 8组及独立比赛假设保持固定；没有证明该组法、预算分配或贪心选票全局最优。
+- 没有用目标表现选最终政策，也没有修改任何既有正式模拟单、服务或正式模型版本。原概率＋动态选票仍是基准，GLOBAL是待验证挑战者。
+
+复现、测试及审查
+
+依赖现有R4.6.1、项目`.venv/bin/python`、Quarto及已正常安装的beidan包快照；没有渲染时安装依赖。库路径是上次已验证包快照的`results/margin-combination-study-20261018/library`。该包源快照身份、解释器及实际DLL调用记录在验收清单中，不认证其他作者的并行工作。
+
+执行顺序：读取`config/source-extraction.env`及已声明测试环境；运行census、26104 intake与capture；运行26104 native；对26103／26104分别运行forecast与replay、select freeze与replay、settlement、evaluate两次；执行显式真实数据验收脚本及完整例行测试，最后干净渲染本QMD并审查。命令、退出状态及源身份均见下表。`forecast`须传入声明的实现快照根；更换实现、截止或来源须新建研究版本，不能改已有收据字段继续复用。
+
+例行R测试使用临时小样本，覆盖实际共同决策时点分池／构组表达式、待定语义、结算列合同、拒绝不一致评价时保持旧文件。真实数据的因果准入、GLOBAL独立标量算式、无尾部压缩、两模型相同名单与预算、全部输出哈希及重放则由`r/check_global_dynamic_artifacts_20261018.R`单独执行，不能把尚未生成的研究数据当成已通过测试，也不通过skip掩盖缺口。Python客户端测试覆盖导入无副作用、参数与名单拒绝、失败通道有界恢复、保留失败回执和成功通道不重复抓取；814＋218个真实盘口通道另有原文重放。
+
+```{r}
+#| echo: false
+if(params$require_acceptance)knitr::kable(acceptance$tests,caption='本轮实际完成的测试统计')
+```
+
+```{r}
+#| echo: false
+if(params$require_acceptance) {
+ displayed_checks <- as_tibble(acceptance$checks) |>
+  mutate(across(where(is.character),htmltools::htmlEscape),
+   command=paste0('<code>',command,'</code>'))
+ knitr::kable(displayed_checks,format='html',escape=FALSE,caption='准确命令、退出状态及证据文件')
+}
+```
+
+```{r}
+#| echo: false
+if(params$require_acceptance)knitr::kable(as_tibble(acceptance$review),caption='审查发现与处置；最终HTML另作制品核查')
+```
+
+```{r}
+#| echo: false
+source_files |> knitr::kable(caption='本次交付源文件身份')
+```

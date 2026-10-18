@@ -1,0 +1,10 @@
+{
+  "command": [
+    "codex",
+    "review",
+    "Read-only final artifact follow-up. Do not edit, no CI or unrelated scans. Previous final review P2 was literal shell commands corrupted by Markdown math. QMD now uses escaped format=html table with code nodes. Fresh47 actual rendered command/evidence assertions pass (r/check_global_dynamic_report_20261018.R; log results/global-dynamic-walkforward-20261018/rendered-command-regression.log), and all original62 unit assertions freshly pass after this display-only change. Source functional clients/tests unchanged from COMPLETE fresh package991blocks9647assertions, repository808blocks183326assertions and Python647 tests, all0fail/error/skip/warn. Real3065 assertions pass. Inspect final QMD, HTML, new report acceptance checker and final artifact sourceSHA manifest results/global-dynamic-walkforward-20261018/final-artifact-inputs.json. Acceptance.json and final render-final-display-exit.json in same directory; clean uncached require_acceptance:true exit0. Prior source and artifact reviews already verified reported metrics and hashes; no need reread huge logs. Check all20 literal command rows and evidence mappings remain intact,47test totals visible, finalsource/evaluationbindings, denominators and user correction26105unfinished excluded. RAW/GLOBAL paired181scored (154 in26103,27 in26104),15rounds,14commoncashcomplete; historicdiagnostic notprospective. No forecast/ticket changes from presentation fix. Full R tests happened before final presentation fix, which received fresh62 unit and actual47HTMLregression, explicitly recorded; no package edits in this task. Report actionable blockers or No blocking final artifact findings, do not suggest new studies."
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/review-final-display.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/review-final-display-exit.json"
+}

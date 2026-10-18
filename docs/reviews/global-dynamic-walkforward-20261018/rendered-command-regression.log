@@ -1,0 +1,8 @@
+
+Attaching package: ‘testthat’
+
+The following objects are masked from ‘package:readr’:
+
+    edition_get, local_edition
+
+Test passed with 47 successes 😀.

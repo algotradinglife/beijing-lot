@@ -1,0 +1,64 @@
+{
+  "study_id": "FM171_GLOBAL_DYNAMIC_WALKFORWARD_20261018",
+  "base_model": "FM-1.7.1",
+  "distribution": "SOURCE_FULL_100_NO_TAIL_COMPRESSION",
+  "training_issues": [
+    "26098",
+    "26101",
+    "26102"
+  ],
+  "audit_issues": [
+    "26103",
+    "26104",
+    "26105",
+    "26106"
+  ],
+  "mode": "HISTORICAL_DIAGNOSTIC",
+  "prospective_admission": false,
+  "models": [
+    "RAW",
+    "GLOBAL"
+  ],
+  "calibration": {
+    "features": [],
+    "minimum_ess": 100,
+    "minimum_class_count": 15,
+    "epsilon": 1e-08
+  },
+  "market": {
+    "company_policy": "ALL_TITAN_VALID_UNAMBIGUOUS_FRESH_COMPANIES",
+    "minimum_euro_companies": 3,
+    "asian_company_id": "8",
+    "total_company_id": "8",
+    "maximum_age_hours": 48,
+    "maximum_residual": 0.05,
+    "rho": -0.1
+  },
+  "rounds": {
+    "rule": "UTC_DAILY00_FIRST_EPOCH_AT_OR_AFTER_FORECAST_AND_STRICTLY_BEFORE_KICKOFF_THEN_NUMERIC_SLOT_POOLS",
+    "maximum_pool": 12,
+    "minimum_pool": 8,
+    "groups": 8,
+    "legs": 7,
+    "rotation_step": 1,
+    "tickets_per_group": 125,
+    "fixed_start": 30,
+    "unit_cny": 2,
+    "budget_cny": 2000,
+    "payout_factor": 0.65,
+    "decision_epochs_utc": [
+      "2026-10-08T00:00:00Z",
+      "2026-10-09T00:00:00Z",
+      "2026-10-10T00:00:00Z",
+      "2026-10-11T00:00:00Z",
+      "2026-10-12T00:00:00Z",
+      "2026-10-13T00:00:00Z",
+      "2026-10-14T00:00:00Z",
+      "2026-10-15T00:00:00Z",
+      "2026-10-16T00:00:00Z"
+    ]
+  },
+  "decision_labels": "NEVER_OPEN_TARGET_LABELS_IN_FORECAST_OR_SELECTION",
+  "original_seven_rounds": "REPRODUCTION_ONLY_ALREADY_INSPECTED",
+  "validation": "NEW_COMPLETE_ISSUES_26106_ONWARD_REQUIRE_SEPARATE_OBSERVED_AVAILABILITY_AND_RULE_FREEZE"
+}

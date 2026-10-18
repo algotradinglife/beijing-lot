@@ -1,0 +1,6 @@
+root<-normalizePath('.')
+library(beidan,lib.loc=file.path(root,'results/margin-combination-study-20261018/library'))
+stopifnot(is.loaded('_beidan_ComponentUnionKernelIdentity'))
+print(beidan:::ComponentUnionKernelIdentity())
+print(names(getDLLRegisteredRoutines('beidan')$.Call))
+print(sessionInfo())

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "env",
+    "PYTHONPATH=packages/beidan/inst/python:$PWD",
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "packages/beidan/tests/python",
+    "tests/test_global_dynamic_capture_20261018.py",
+    "-q",
+    "-rs"
+  ],
+  "cwd": "/tmp/beidan-global-dynamic-20261018",
+  "exit_status": 0,
+  "evidence": "Unified exec session34676 returned exit0; full-python-tests.log records647 passed",
+  "observed_at_utc": "2026-10-18T14:18:16.616885+00:00"
+}

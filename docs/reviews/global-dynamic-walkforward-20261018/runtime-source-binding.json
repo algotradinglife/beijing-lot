@@ -1,0 +1,26 @@
+{
+  "implementation_snapshot": "/tmp/beidan-margin-combinations-20261018",
+  "parent_manifest_sha256": "3dfecf4ee81e6ed3cf04e84d5168ac9138e7d25c81d7842ff7085319bd816ad3",
+  "prior_snapshot_files_verified": 1977,
+  "prior_manifest_nontransitive_differences": [
+    {
+      "path": "r/margin_combination_study_20261018.R",
+      "recorded": "7bd8d8d7d588d63255e4e7e7ede0ee35c7c3baa7e56ab2f0e375e478defbc68e",
+      "actual": "9385113e68397f43318ac98e1446e9ef00b50bce4a03fbf3c84d0bf7644e047d",
+      "used_by_this_study": false
+    },
+    {
+      "path": "tests/testthat/test-margin-combination-study.R",
+      "recorded": "713c2d015a60a57be9a4eaddc9e488f8eeb0b7292240ff83d8c23175fb17a458",
+      "actual": "a2b13ed1cde48d165e17fd3d89d29c85da5a6b1e8c79fae947c137f6f2888975",
+      "used_by_this_study": false
+    }
+  ],
+  "package_implementation_files_verified": 433,
+  "package_sources_modified_by_this_task": false,
+  "test_snapshot": "/tmp/beidan-global-dynamic-20261018",
+  "installed_library": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library",
+  "r_entry": "tests/testthat.R",
+  "python_entry": "packages/beidan/tests/python tests/test_global_dynamic_capture_20261018.py",
+  "scope_note": "Owned research clients/tests and unchanged prior installed package implementation verified. Two older parent-manifest client/test hashes differ; inventoried, not transitive forecast implementations. Unrelated dirty checkout changes not certified."
+}

@@ -1,0 +1,1368 @@
+OpenAI Codex v0.163.0
+--------
+workdir: /home/drwho1985/workspace/algotradinglife/beijing-lot
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: low
+reasoning summaries: none
+session id: 01a14f59-807d-7ef3-aeea-88fc68a930f6
+--------
+user
+Read-only final source review. Read only the listed owned files, do not edit, no CI, no unrelated repository scans: config/global_dynamic_walkforward_20261018.json; r/global_dynamic_census_20261018.R; r/global_dynamic_26104_intake_20261018.R; r/global_dynamic_26104_native_20261018.R; r/global_dynamic_walkforward_20261018.R; r/global_dynamic_select_20261018.R; r/global_dynamic_settlement_20261018.R; r/global_dynamic_evaluate_20261018.R; r/check_global_dynamic_artifacts_20261018.R; src/global_dynamic_26104_capture_20261018.py; src/global_dynamic_capture_replay_20261018.py; tests/testthat/test-global-dynamic-walkforward.R; tests/test_global_dynamic_capture_20261018.py; quarto/global_dynamic_walkforward_20261018.qmd. This is a historical diagnostic, not prospective. FM171 same_support_raw no tail. Three prior-only intercept logit offsets then normalize. All chronology comes from existing installed beidan temporal_learning under frozen prior implementation root. 26104 native now sharded3 workers over target IDs only; all full factual domain/history identical, assembler requires full disjoint109 roster and all samebindings. Review cutoff receipts, target exclusion, market freshness, native rawlambda, paired groups/common-clock original prediction ledger, settlement one0.65factor, immutable publication, tests. 26105 unfinished confirmed by user, excluded; 26106 pending prospective. Prior P2 fixes: failed capture bounded retry2 with immutable failed receipts; atomic evaluation publishing; isolated unit tests plus explicit real-data acceptance; QMD enforces forecast/round/evaluation crossbindings. Unit62 R assertions pass and complete Python647 pass. Full R tests running; final26104 results not yet available, do not certify those. Report actionable blocking findings or no blocking source findings. Reviewed source SHA manifest results/global-dynamic-walkforward-20261018/review-source-inputs.json. Do not suggest generalized abstractions or extra studies.
+2026-10-18T14:10:33.081751Z ERROR codex_models_manager::manager: failed to refresh available models: request timed out
+exec
+/usr/bin/zsh -lc 'cat r/global_dynamic_{walkforward,select,settlement,evaluate}_20261018.R' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 0ms:
+# Rscript r/global_dynamic_walkforward_20261018.R ROOT IMPLEMENTATION_ROOT ISSUE forecast|replay
+# Domain orchestration only: shared package owns clocks, fits, DC and selection.
+args <- commandArgs(TRUE)
+stopifnot(length(args)==4L,args[3]%in%c('26103','26104'),args[4]%in%c('forecast','replay'))
+root <- normalizePath(args[1],mustWork=TRUE); implementation_root <- normalizePath(args[2],mustWork=TRUE)
+setwd(root); issue <- args[3]; mode <- args[4]
+suppressPackageStartupMessages(library(tidyverse))
+library(beidan,lib.loc=file.path(root,'results/margin-combination-study-20261018/library'))
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+shared <- reticulate::import('beidan_backend.temporal_learning',convert=FALSE)
+backend <- reticulate::import('beidan_backend.fundamental_probability',convert=FALSE)
+paths <- reticulate::import('beidan_backend.catalog.paths',convert=FALSE)
+out <- file.path(root,'results/global-dynamic-walkforward-20261018',issue)
+dir.create(out,recursive=TRUE,showWarnings=FALSE)
+policy_path <- 'config/global_dynamic_walkforward_20261018.json'
+policy <- jsonlite::fromJSON(policy_path,simplifyVector=TRUE)
+stopifnot(policy$base_model=='FM-1.7.1',!policy$prospective_admission,
+ identical(policy$models,c('RAW','GLOBAL')),policy$rounds$budget_cny==2000)
+if(issue=='26103') {
+ source <- 'results/fm171-26103-draw-20261017'
+ census_path <- reticulate::py_str(paths$location('hot:fm171-26103-repair-20261017-v3/coverage-census.rds'))
+ work <- reticulate::py_str(paths$location('hot:fm171-26103-full-recalc-20261017'))
+ market_dir <- file.path(work,'markets-v3-5s');chunk_dir<-file.path(work,'native-chunks-v2')
+ market_binding<-file.path(market_dir,'input-binding.json');market_status<-file.path(market_dir,'collection-status.json')
+}else {
+ source <- reticulate::py_str(paths$location('hot:global-dynamic-26104-20261018'))
+ census_path<-file.path(source,'coverage-census.rds');market_dir<-source;chunk_dir<-file.path(source,'native-chunks')
+ market_binding<-file.path(source,'capture-binding.json');market_status<-file.path(source,'capture-status.json')
+}
+chunks <- sort(list.files(chunk_dir,pattern='native-repair.rds',recursive=TRUE,full.names=TRUE))
+stopifnot(length(chunks)==if(issue=='26103')41L else 1L)
+source_paths <- c(policy=policy_path,client='r/global_dynamic_walkforward_20261018.R',
+ fixtures=file.path(source,'fixtures.csv'),old_native=file.path(source,'native-forecasts.rds'),
+ native_manifest=file.path(source,'native-manifest.json'),census=census_path,
+ market_binding=market_binding,market_status=market_status,
+ training='results/fm171-margin-shape-20261017/forecasts.rds',
+ training_manifest='results/fm171-margin-shape-20261017/manifest.json',
+ prior_labels='results/fm17-three-issues-20261013/labels.csv',
+ prior_observed='results/fm171-draw-calibration-20261017/label-source-observations.csv')
+source_paths <- c(source_paths,set_names(chunks,paste0('chunk',seq_along(chunks))))
+market_files <- sort(list.files(market_dir,pattern='-(asian|total)[.]json$',full.names=TRUE))
+stopifnot(length(market_files)==if(issue=='26103')814L else 218L)
+source_paths <- c(source_paths,set_names(market_files,paste0('channel',seq_along(market_files))))
+if(issue=='26104')source_paths<-c(source_paths,prior_issue_forecasts='results/global-dynamic-walkforward-20261018/26103/frozen-forecasts.rds',prior_issue_labels='results/fm171-26103-draw-20261017/labels.csv',prior_issue_observations='docs/reviews/source-26103/roster.json')
+hashes <- map_chr(source_paths,~digest::digest(file=.x,algo='sha256'))
+if(mode=='forecast'&&file.exists(file.path(out,'frozen-forecasts.rds')))stop('immutable forecast already exists')
+status <- jsonlite::fromJSON(source_paths[['market_status']])
+stopifnot(status$collection_complete)
+if(issue=='26103')stopifnot(status$parsed_channels==814L,status$failed_or_missing_channels==0L)else stopifnot(status$channels==218L)
+binding <- jsonlite::fromJSON(source_paths[['market_binding']])
+old <- readRDS(source_paths[['old_native']]); nm <- jsonlite::fromJSON(source_paths[['native_manifest']])
+stopifnot(hashes[['old_native']]==nm$sha256)
+fixtures <- read_csv(source_paths[['fixtures']],col_types=cols(.default=col_character(),slot=col_integer(),handicap=col_integer(),kickoff_at=col_datetime(),cutoff_utc=col_datetime()))
+scope_n<-if(issue=='26103')407L else 109L
+stopifnot(nrow(fixtures)==scope_n,!anyDuplicated(fixtures$fixture_id),!nrow(problems(fixtures)))
+census <- readRDS(census_path)
+stopifnot(nrow(census$coverage)==2L*scope_n,all(census$coverage$source_status=='PARSED'))
+latest <- census$latest |> filter(source=='titan',valid_decimal,tied_vectors==1L,
+ age_hours>=0,age_hours<=policy$market$maximum_age_hours) |>
+ select(company_id,fixture_id,quote_at,odds_home,odds_draw,odds_away)
+stopifnot(!anyDuplicated(latest[c('fixture_id','company_id')]))
+fits <- list(); native_status <- list()
+for(p in chunks) {
+ z <- readRDS(p); receipt <- jsonlite::fromJSON(file.path(dirname(p),'recent-receipt.json'))
+ stopifnot(receipt$sha256==digest::digest(file=p,algo='sha256'),!z$analysis_quality_accepted,
+ z$native_policy$recent_n==8L,z$native_policy$alpha==.5)
+ stopifnot(!any(names(z$fits)%in%names(fits)))
+ fits <- c(fits,z$fits);native_status[[p]]<-z$status
+}
+ns <- bind_rows(native_status)
+stopifnot(nrow(ns)==scope_n,!anyDuplicated(ns$fixture_id),length(fits)>0L)
+train <- readRDS(source_paths[['training']]);tm<-jsonlite::fromJSON(source_paths[['training_manifest']])
+stopifnot(hashes[['training']]==tm$sha256)
+prior_labels <- read_csv(source_paths[['prior_labels']],col_types=cols(.default=col_character()))
+observed <- read_csv(source_paths[['prior_observed']],col_types=cols(.default=col_character()))
+training_prob <- train$probabilities |> filter(model=='SOURCE_FULL') |> select(fixture_id,outcome,probability) |> pivot_wider(names_from=outcome,values_from=probability)
+history <- train$features |> filter(eligible) |> select(fixture_id,issue_code=issue_id,data_available_ts=cutoff_utc,entropy,local_mass) |>
+ inner_join(training_prob,by='fixture_id',relationship='one-to-one') |>
+ inner_join(prior_labels |> select(fixture_id,actual_outcome),by='fixture_id',relationship='one-to-one') |>
+ left_join(observed |> rename(issue_code=issue_id,label_available_ts=observed_label_ts),by='issue_code',relationship='many-to-one') |> mutate(issue_year=2026L)
+stopifnot(nrow(history)==322L,!anyNA(history),all(history$issue_code%in%policy$training_issues))
+prior_issues<-policy$training_issues
+if(issue=='26104') {
+ prior<-readRDS(source_paths[['prior_issue_forecasts']])
+ labels3<-read_csv(source_paths[['prior_issue_labels']],col_types=cols(.default=col_character()))
+ observations3<-bind_rows(jsonlite::fromJSON(source_paths[['prior_issue_observations']],simplifyVector=FALSE)$data) |>
+  transmute(fixture_id=paste0(issue_id,':',slot),label_available_ts=observed_at)
+ prior_rows<-list()
+ for(id in names(prior$entries)) {
+  e3<-prior$entries[[id]]
+  prior_rows[[id]]<-e3$features |> mutate(issue_code='26103',issue_year=2026L,
+    data_available_ts=format(e3$cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'))
+ }
+ extra<-bind_rows(prior_rows) |> inner_join(labels3 |> select(fixture_id,actual_outcome),by='fixture_id',relationship='one-to-one') |>
+  left_join(observations3,by='fixture_id',relationship='one-to-one') |> select(all_of(names(history)))
+ history<-bind_rows(history,extra);prior_issues<-c(prior_issues,'26103')
+ stopifnot(!anyNA(history),!anyDuplicated(history$fixture_id),!issue%in%history$issue_code)
+}
+
+market_policy <- list(euro_weight=1,asian_weight=1,lambda_floor=.01,tail_tolerance=1e-10,max_quote_age_hours=48)
+entries <- audit <- calibration <- list()
+for(id in fixtures$fixture_id) {
+ f <- fixtures |> filter(fixture_id==id); e <- old$entries[[id]]; n <- fits[[id]]
+ row <- tibble(fixture_id=id,slot=f$slot,cutoff_utc=f$cutoff_utc,handicap=f$handicap,
+ native_supported=!is.null(n),euro_companies=0L,asian_rows=0L,total_rows=0L,
+ three_channel_fit=FALSE,market_consistent=FALSE,selected_source=NA_character_,
+ state='UNESTIMATED',reason=ns$reason[match(id,ns$fixture_id)])
+ if(is.null(n)||is.null(e)) {audit[[id]]<-row;next}
+ cutoff <- e$cutoff
+ stopifnot(identical(cutoff$cutoff_utc,f$cutoff_utc),e$identities$home_id==f$home_id,e$identities$away_id==f$away_id)
+ eq <- latest |> filter(fixture_id==id)
+ row$euro_companies<-nrow(eq)
+ snapshots <- list(); channel_bindings <- list()
+ for(kind in c('asian','total')) {
+  name<-paste0(gsub(':','_',id),'-',kind,'.json');path<-file.path(market_dir,name)
+  envelope<-jsonlite::fromJSON(path);stopifnot(digest::digest(enc2utf8(envelope$payload),algo='sha256',serialize=FALSE)==envelope$sha256)
+  cap<-jsonlite::fromJSON(envelope$payload,simplifyVector=FALSE)
+  stopifnot(cap$state%in%c('PARSED','OBSERVED_EMPTY'),cap$fixture_id==id,cap$provider_id==f$provider_id,
+    cap$home_id==f$home_id,cap$away_id==f$away_id,cap$inputs_sha256==binding$inputs_sha256)
+  if(!length(cap$snapshots)) {snapshots[[kind]]<-tibble();channel_bindings[[kind]]<-digest::digest(file=path,algo='sha256');next}
+  price_names<-if(kind=='asian')c('home','away')else c('over','under')
+  z<-tibble(line_value=map_dbl(cap$snapshots,'line_value'),
+   home_price=map_dbl(cap$snapshots,~.x$odds[[price_names[1]]] %||% NA_real_),
+   away_price=map_dbl(cap$snapshots,~.x$odds[[price_names[2]]] %||% NA_real_),
+   complete=map_lgl(cap$snapshots,'complete'),phase=map_chr(cap$snapshots,'phase'),
+   quote_at=lubridate::ymd_hms(map_chr(cap$snapshots,'snapshot_ts_hkt'),tz='UTC')) |>
+   filter(complete,phase=='pregame',quote_at<cutoff$cutoff_utc,
+     as.numeric(difftime(cutoff$cutoff_utc,quote_at,units='hours'))<=48)
+  if(nrow(z))z<-z |> filter(quote_at==max(quote_at)) |> distinct(line_value,home_price,away_price,quote_at,.keep_all=TRUE)
+  snapshots[[kind]]<-z;channel_bindings[[kind]]<-digest::digest(file=path,algo='sha256')
+ }
+ row$asian_rows<-nrow(snapshots$asian);row$total_rows<-nrow(snapshots$total)
+ if(nrow(eq)<3L||nrow(snapshots$asian)!=1L||nrow(snapshots$total)!=1L) {
+  row$reason<-'Missing/stale/ambiguous admitted three-channel evidence';audit[[id]]<-row;next
+ }
+ aq<-snapshots$asian |> transmute(company_id='8',fixture_id=id,quote_at,handicap=line_value,home_decimal=1+home_price,away_decimal=1+away_price)
+ tq<-snapshots$total |> transmute(company_id='8',fixture_id=id,quote_at,line=line_value,over_decimal=1+home_price,under_decimal=1+away_price)
+ if(tq$line<2.5) {row$reason<-'DC total inversion not admitted below2.5 under existing implementation';audit[[id]]<-row;next}
+ if(any(!is.finite(c(aq$home_decimal,aq$away_decimal,tq$over_decimal,tq$under_decimal)))||
+ any(c(aq$home_decimal,aq$away_decimal,tq$over_decimal,tq$under_decimal)<=1))stop('invalid admitted prices')
+ total<-beidan:::total_market_constraint(tq |> transmute(company=company_id,line,over_hk=over_decimal-1,under_hk=under_decimal-1),c(.1,12))
+ ft<-tibble(fixture_id=id,issue_id=issue,home=f$home,away=f$away)
+ evidence<-list()
+ for(kind in c('euro','asian','totals')) {
+  selected<-switch(kind,euro=eq,asian=aq,totals=tq)
+  for(j in seq_len(nrow(selected))) {
+   z<-selected[j,];eid<-paste0(kind,'-',z$company_id);time<-format(z$quote_at,'%Y-%m-%dT%H:%M:%SZ',tz='UTC')
+   evidence[[length(evidence)+1L]]<-list(evidence_id=eid,fixture_id=id,source_hash=beidan:::.score_margin_hash(z),row_key=eid,
+    issue_code='HISTORICAL_QUOTE_PROXY',issue_year=2026L,label_available_ts=time,data_available_ts=time)
+  }
+ }
+ b<-c(as.list(hashes[c('policy','client','old_native','census')]),channel_bindings,list(
+ dc_market_input=beidan:::.score_margin_hash(list(euro=eq,asian=aq,total_mean=total$lambda_total,rho=-.1,policy=market_policy,fixture=ft,cutoff=cutoff)),
+ direction_implementation=beidan:::.score_margin_code(implementation_root)))
+ epoch<-shared$Cutoff$decision_epoch(issue,format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'))
+ ctx<-backend$build_adjustment_evidence_context(evidence,as.list(ft),epoch,b,
+ shared$AvailabilityPolicy$historical_proxy('POSTEVENT_CAPTURE_PRIOR_QUOTE_CLOCK'),'HISTORICAL_DIAGNOSTIC',implementation_root)
+ market<-project_dc_market_handicap(eq,aq,total$lambda_total,-.1,market_policy,ctx,ft,cutoff,implementation_root,'HISTORICAL_DIAGNOSTIC')
+ row$three_channel_fit<-TRUE
+ row$market_consistent<-max(abs(market$ordinary$residual))<=.05&&max(abs(market$asian$residual))<=.05
+ # The existing uncertain-native policy directly selects a sufficient consistent market.
+ # Missing lineups/opponent adjustment remains an explicit uncertainty, not fabricated evidence.
+ params<-n$native$same_support_raw
+ native_grid<-beidan:::dixon_coles_score_grid(params$lambda_home,params$lambda_away,0L,1e-10,-.1)$grid |> select(home_goals,away_goals,probability)
+ native_at<-e$native_base$max_source_available_utc
+ native_base<-list(grid=native_grid,cutoff=cutoff,model_id='FM171_SAME_SUPPORT_RAW',source_hashes=b,max_source_available_utc=native_at,intended_use='HISTORICAL_DIAGNOSTIC')
+ market_base<-list(grid=market$grid,cutoff=cutoff,model_id='FM171_JOINT_MARKET',source_hashes=b,
+   max_source_available_utc=max(eq$quote_at,aq$quote_at,tq$quote_at),intended_use='HISTORICAL_DIAGNOSTIC')
+ native_time<-format(native_at,'%Y-%m-%dT%H:%M:%SZ',tz='UTC')
+ evidence<-c(evidence,list(list(evidence_id='native-support',fixture_id=id,source_hash=beidan:::.score_margin_hash(n),
+  row_key='native-support',issue_code='PRIOR_NATIVE_EVIDENCE',issue_year=2026L,label_available_ts=native_time,data_available_ts=native_time)))
+ review<-list(confidence='uncertain',market_sufficient=TRUE,market_consistent=row$market_consistent,
+  reason='Same-competition native support reviewed; all fresh unambiguous Titan Euro companies plus company8 Asian and total; fixed5pp residual criterion',
+  counterevidence='Known lineups/injuries and opponent adjustment not quantified; later captures and date proxies authorize historical diagnostics only',
+  evidence_ids=map_chr(evidence,'evidence_id'),cutoff_utc=format(cutoff$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'),
+  native_hash=beidan:::.score_margin_hash(native_base),market_hash=beidan:::.score_margin_hash(market_base),
+  author='Codex fixed evidence audit',review_version='GLOBAL_DYNAMIC_20261018')
+ sb<-c(b,list(fm_source_selection_inputs=beidan:::.score_margin_hash(list(native=native_base,market=market_base,review=review,fixture=ft,cutoff=cutoff)),
+  fm_source_selection_code=digest::digest(paste(deparse(SelectFmProbabilitySource),collapse='\n'),algo='sha256'),fm_source_selection_dependencies=beidan:::.score_margin_code(implementation_root)))
+ sc<-backend$build_adjustment_evidence_context(evidence,as.list(ft),epoch,sb,
+  shared$AvailabilityPolicy$historical_proxy('POSTEVENT_FM_EVIDENCE_REVIEW'),'HISTORICAL_DIAGNOSTIC',implementation_root)
+ selection<-SelectFmProbabilitySource(native_base,market_base,review,sc,ft,cutoff,implementation_root)
+ row$selected_source<-selection$selected_source;base<-selection$base;grid<-base$grid;max_at<-base$max_source_available_utc
+ judgement<-list(model_id='FM171_FULL100',rationale='Full distribution retained; no tail compression',
+  bins=tibble(bin_id='all',min_margin=-Inf,max_margin=Inf,target_mass=1,evidence_id='native-support',reason='Explicit full100 research branch'))
+ ab<-c(b,list(base_artifact=beidan:::.score_margin_hash(base),margin_judgement=beidan:::.score_margin_hash(judgement)))
+ ac<-backend$build_adjustment_evidence_context(evidence,as.list(ft),epoch,ab,
+  shared$AvailabilityPolicy$historical_proxy('POSTEVENT_FULL100_NO_TAIL'),'HISTORICAL_DIAGNOSTIC',implementation_root)
+ final<-adjust_score_margin_distribution(base,judgement,ac,ft,cutoff,implementation_root)
+ stopifnot(max(abs(final$grid$probability-grid$probability))<1e-12)
+ q<-project_score_outcomes(final,f$handicap,implementation_root) |> select(outcome,probability) |> mutate(fixture_id=id,.before=1)
+ margins<-grid |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(probability=sum(probability),.groups='drop')
+ feature<-q |> pivot_wider(names_from=outcome,values_from=probability) |>
+  mutate(entropy=-sum(margins$probability*log(margins$probability)),local_mass=sum(margins$probability[abs(margins$margin+f$handicap)<=1]))
+ fd<-list(cutoff=cutoff,features=feature,receipt=list(cutoff=cutoff,feature_hash=rlang::hash(feature),max_source_available_utc=max_at))
+ key<-format(cutoff$cutoff_utc,'%Y%m%dT%H%M%SZ',tz='UTC')
+ if(is.null(calibration[[key]])) {
+  cp<-list(prior_issues=prior_issues,features=character(),minimum_ess=100,minimum_class_count=15L,epsilon=1e-8)
+  calibration[[key]]<-beidan:::FitMarginShapeCalibration(history,cutoff,cp,as.list(hashes),implementation_root,file.path(root,'.venv/bin/python'))
+ }
+ calibrated<-beidan:::PredictMarginShapeCalibration(calibration[[key]],fd)
+ entries[[id]]<-list(cutoff=cutoff,base=base,final=final,selection=selection,market=market,native=n,features=feature,
+   RAW=q,GLOBAL=calibrated,calibration_key=key,source_receipt=list(quote_bindings=b,evidence=evidence),margins=margins)
+ row$state<-'ESTIMATED_FULL100';row$reason<-'All three admitted quote channels reviewed; native supported; no tail compression'
+ audit[[id]]<-row
+ if(length(entries)%%10L==0L)message('frozen candidates ',length(entries),' / examined ',match(id,fixtures$fixture_id))
+}
+stopifnot(identical(map_chr(source_paths,~digest::digest(file=.x,algo='sha256')),hashes))
+batch<-list(entries=entries,audit=bind_rows(audit),calibration=calibration,source_paths=source_paths,source_hashes=hashes,
+ policy=policy,training_rows=nrow(history),source_implementation_root=implementation_root,prospective_admission=FALSE,target_labels_opened=FALSE)
+path<-file.path(out,'frozen-forecasts.rds')
+if(mode=='replay') {
+ stopifnot(identical(batch,readRDS(path)))
+ jsonlite::write_json(list(status='FULL_IDENTICAL_REPLAY',sha256=digest::digest(file=path,algo='sha256')),file.path(out,'forecast-replay.json'),auto_unbox=TRUE,pretty=TRUE)
+}else {
+ saveRDS(batch,path);write_csv(batch$audit,file.path(out,'forecast-audit.csv'))
+ write_csv(tibble(name=names(source_paths),path=unname(source_paths),sha256=unname(hashes)),file.path(out,'source-manifest.csv'))
+ jsonlite::write_json(list(sha256=digest::digest(file=path,algo='sha256'),scope=scope_n,estimated=length(entries),
+  target_labels_opened=FALSE,prospective_admission=FALSE),file.path(out,'forecast-manifest.json'),auto_unbox=TRUE,pretty=TRUE)
+}
+print(batch$audit |> count(state,reason),n=Inf)
+# Rscript r/global_dynamic_select_20261018.R ROOT ISSUE freeze|replay
+# Frozen forecasts only. No settlement/labels are read by this command.
+args<-commandArgs(TRUE);stopifnot(length(args)==3L,args[2]%in%c('26103','26104'),args[3]%in%c('freeze','replay'))
+root<-normalizePath(args[1],mustWork=TRUE);setwd(root);issue<-args[2];mode<-args[3]
+suppressPackageStartupMessages(library(tidyverse))
+library(beidan,lib.loc=file.path(root,'results/margin-combination-study-20261018/library'))
+out<-file.path('results/global-dynamic-walkforward-20261018',issue)
+source<-file.path(out,'frozen-forecasts.rds');x<-readRDS(source);p<-x$policy$rounds
+stopifnot(!x$target_labels_opened,!x$prospective_admission,
+ digest::digest(file='config/global_dynamic_walkforward_20261018.json',algo='sha256')==x$source_hashes[['policy']])
+actual<-map_chr(x$source_paths,~digest::digest(file=.x,algo='sha256'))
+stopifnot(identical(actual,x$source_hashes),p$minimum_pool>=8L,p$rotation_step==1L,
+ p$groups*p$tickets_per_group*p$unit_cny==p$budget_cny)
+if(mode=='freeze'&&file.exists(file.path(out,'frozen-rounds.rds')))stop('immutable rounds already exist')
+fixtures<-read_csv(x$source_paths[['fixtures']],col_types=cols(.default=col_character(),slot=col_integer(),handicap=col_integer(),kickoff_at=col_datetime(),cutoff_utc=col_datetime()))
+epochs<-lubridate::ymd_hms(p$decision_epochs_utc,tz='UTC')
+stopifnot(!anyNA(epochs),!anyDuplicated(epochs))
+scope<-x$audit |> filter(state=='ESTIMATED_FULL100') |>
+ left_join(fixtures |> select(fixture_id,kickoff_at),by='fixture_id',relationship='one-to-one') |>
+ mutate(decision_epoch=lubridate::ceiling_date(cutoff_utc,unit='day',change_on_boundary=FALSE)) |>
+ arrange(decision_epoch,slot) |> group_by(decision_epoch) |>
+ mutate(pool=(row_number()-1L)%/%p$maximum_pool+1L) |> ungroup()
+stopifnot(!anyNA(scope$kickoff_at),all(scope$decision_epoch%in%epochs),all(scope$cutoff_utc<=scope$decision_epoch),all(scope$decision_epoch<scope$kickoff_at))
+partitions<-scope |> group_by(decision_epoch,pool) |> summarise(n=n(),.groups='drop') |>
+ mutate(eligible=n>=p$minimum_pool,reason=if_else(eligible,'ADMITTED','FEWER_THAN8_FIXTURES_AT_COMMON_EPOCH'))
+rounds<-list();number<-0L
+for(i in which(partitions$eligible)) {
+ r<-partitions[i,];ids<-scope |> filter(decision_epoch==r$decision_epoch,pool==r$pool) |> pull(fixture_id)
+ number<-number+1L;cutoff<-list(issue_id=issue,cutoff_utc=r$decision_epoch)
+ forecast_cutoffs<-scope |> filter(fixture_id%in%ids) |> select(fixture_id,cutoff_utc,decision_epoch,kickoff_at)
+ stopifnot(all(forecast_cutoffs$cutoff_utc<=cutoff$cutoff_utc),all(cutoff$cutoff_utc<forecast_cutoffs$kickoff_at))
+ gl<-list()
+ for(g in seq_len(p$groups)) {
+  indices<-((seq_len(p$legs)-1L+(g-1L)*p$rotation_step)%%length(ids))+1L
+  fx<-sort(ids[indices],method='radix')
+  gl[[g]]<-tibble(group_id=sprintf('g%02d',g),fixture_id=fx,leg_order=seq_len(p$legs))
+ }
+ groups<-bind_rows(gl)
+ signatures<-groups |> group_by(group_id) |> summarise(signature=paste(fixture_id,collapse='|'),.groups='drop')
+ stopifnot(!anyDuplicated(signatures$signature))
+ outputs<-list()
+ for(model in x$policy$models) {
+  q<-bind_rows(map(x$entries[ids],model));blocks<-list()
+  for(g in unique(groups$group_id)) {
+   legs<-groups |> filter(group_id==g)
+   support<-q |> filter(fixture_id%in%legs$fixture_id) |> transmute(candidate_id=paste0(g,'|7'),fixture_id,outcome,allowed=TRUE,preference=match(outcome,c('W','D','L')))
+   space<-parlay_enumerate_tickets(legs,q,cutoff=cutoff,supports=support,n_legs=7L)
+   blocks[[g]]<-parlay_rank_tickets(space$tickets,space$candidate_tickets,cutoff=cutoff,ranking='probability_desc') |>
+    as_tibble() |> select(group_id,ticket_id,probability,rank)
+  }
+  candidates<-bind_rows(blocks)
+  times<-map_dbl(x$entries[ids],~as.numeric(.x$base$max_source_available_utc))
+  source_at<-as.POSIXct(max(times),origin='1970-01-01',tz='UTC')
+  if(model=='GLOBAL') {
+   fits<-x$calibration[unique(map_chr(x$entries[ids],'calibration_key'))]
+   for(f in fits)source_at<-max(source_at,lubridate::ymd_hms(f$receipt$maximum_source_time,tz='UTC'))
+  }
+  d<-list(cutoff=cutoff,probabilities=q,candidates=candidates,
+   source_bindings=list(forecasts=digest::digest(file=source,algo='sha256'),
+    client=digest::digest(file='r/global_dynamic_select_20261018.R',algo='sha256'),policy=x$source_hashes[['policy']],forecast_cutoffs=digest::digest(forecast_cutoffs,algo='sha256'),model=model))
+  d$source_receipt<-list(cutoff=cutoff,probability_hash=rlang::hash(q),candidate_hash=rlang::hash(candidates),
+   max_source_available_utc=source_at,source_snapshots=d$source_bindings[setdiff(names(d$source_bindings),"model")])
+  d$input_hash<-rlang::hash(d)
+  message('round ',number,' ',model,' ',length(ids),' fixtures')
+  outputs[[model]]<-list(decision=d,selection=beidan:::SelectJointOutcomeTickets(d,p$tickets_per_group,p$fixed_start,p$unit_cny,3^p$maximum_pool))
+ }
+ rounds[[as.character(number)]]<-list(index=number,cutoff=cutoff,fixture_ids=ids,forecast_cutoffs=forecast_cutoffs,groups=groups,outputs=outputs)
+}
+batch<-list(rounds=rounds,partitions=partitions,forecast_sha256=digest::digest(file=source,algo='sha256'),
+ client_sha256=digest::digest(file='r/global_dynamic_select_20261018.R',algo='sha256'),target_labels_opened=FALSE,
+ prospective_admission=FALSE,policy=x$policy)
+path<-file.path(out,'frozen-rounds.rds')
+if(mode=='replay') {
+ stopifnot(identical(batch,readRDS(path)))
+ jsonlite::write_json(list(status='FULL_IDENTICAL_REPLAY',sha256=digest::digest(file=path,algo='sha256')),file.path(out,'selection-replay.json'),auto_unbox=TRUE,pretty=TRUE)
+}else {
+ saveRDS(batch,path);write_csv(partitions,file.path(out,'round-partitions.csv'))
+ jsonlite::write_json(list(sha256=digest::digest(file=path,algo='sha256'),rounds=length(rounds),
+  forecasts=batch$forecast_sha256,target_labels_opened=FALSE),file.path(out,'selection-manifest.json'),auto_unbox=TRUE,pretty=TRUE)
+}
+print(partitions |> count(eligible))
+# Rscript r/global_dynamic_settlement_20261018.R ROOT ISSUE
+# Post-freeze, cache-only SP observation; never enters calibration/selection.
+args<-commandArgs(TRUE);stopifnot(length(args)==2L,args[2]%in%c('26103','26104'))
+root<-normalizePath(args[1],mustWork=TRUE);setwd(root);issue<-args[2]
+suppressPackageStartupMessages(library(tidyverse));library(beidan,lib.loc='results/margin-combination-study-20261018/library')
+out<-file.path('results/global-dynamic-walkforward-20261018',issue)
+replay<-jsonlite::fromJSON(file.path(out,'selection-replay.json'))
+stopifnot(replay$status=='FULL_IDENTICAL_REPLAY',replay$sha256==digest::digest(file=file.path(out,'frozen-rounds.rds'),algo='sha256'))
+path<-file.path(out,'settlement-observation.rds')
+if(file.exists(path))stop('Immutable settlement observation exists; replay stored bytes instead')
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+client<-OpenSourceAPI(backend=python_backend(file.path(root,'.venv/bin/python')))
+observed<-SourceBeidan(client,issue,'handicap_result',max_age=0,cache_only=TRUE)
+stopifnot(observed$receipt$network_attempts==0L,!anyDuplicated(observed$events$slot))
+forecasts<-readRDS(file.path(out,'frozen-forecasts.rds'))
+fixtures<-read_csv(forecasts$source_paths[['fixtures']],col_types=cols(.default=col_character(),slot=col_integer(),handicap=col_integer(),kickoff_at=col_datetime(),cutoff_utc=col_datetime()))
+events<-observed$events |> mutate(fixture_id=paste0(issue_id,':',slot))
+# Source parser options are observations, not fabricated from summary SP.
+options<-observed$options |> filter(!is.na(sp)) |> group_by(issue_id,slot) |> mutate(filled_options=n()) |> ungroup()
+matched<-events |> inner_join(fixtures |> select(fixture_id,provider_id,expected_handicap=handicap),by='fixture_id',relationship='one-to-one')
+stopifnot(all(matched$native_id==matched$provider_id),all(matched$handicap==matched$expected_handicap))
+chosen<-matched |> inner_join(options |> filter(filled_options==1L),by=c('issue_id','slot','play'),relationship='one-to-one') |>
+ filter(status=='完场',grepl('^[0-9]+[-:][0-9]+$',score),option%in%c('胜','平','负'),sp>1)
+score_home<-as.integer(sub('[-:].*$','',chosen$score));score_away<-as.integer(sub('^.*[-:]','',chosen$score))
+expected<-case_when(score_home-score_away+chosen$handicap>0~'胜',score_home-score_away+chosen$handicap==0~'平',TRUE~'负')
+stopifnot(all(chosen$option==expected))
+chosen<-chosen |> transmute(issue_id,fixture_id,outcome=recode(option,'胜'='W','平'='D','负'='L'),
+ settled_sp=as.double(sp),label_available_at=lubridate::ymd_hms(observed$receipt$observed_at,tz='UTC'),status='settled',source_url=observed$receipt$url)
+stopifnot(!anyDuplicated(chosen$fixture_id))
+batch<-list(observation=observed,settlements=chosen,source_selection_sha256=replay$sha256,
+ client_sha256=digest::digest(file='r/global_dynamic_settlement_20261018.R',algo='sha256'))
+saveRDS(batch,path)
+write_csv(chosen,file.path(out,'settlements.csv'))
+sp_audit<-fixtures |> select(fixture_id) |> mutate(state=case_when(fixture_id%in%chosen$fixture_id~'VERIFIED_OBSERVED_SINGLE_OPTION_SP',!fixture_id%in%events$fixture_id~'NO_SOURCE_EVENT',TRUE~'NO_VALID_COMPLETED_SINGLE_OPTION_SP_GT1'))
+write_csv(sp_audit,file.path(out,'settlement-audit.csv'))
+jsonlite::write_json(list(sha256=digest::digest(file=path,algo='sha256'),source_receipt=observed$receipt,
+ observed_rows=nrow(events),accepted_sp_rows=nrow(chosen),source_selection_sha256=replay$sha256),file.path(out,'settlement-observation.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+print(tibble(observed_events=nrow(events),accepted_settlements=nrow(chosen)))
+# Rscript r/global_dynamic_evaluate_20261018.R ROOT ISSUE
+# Opens target labels only after independent forecast/selection replay.
+args<-commandArgs(TRUE);stopifnot(length(args)==2L,args[2]%in%c('26103','26104'))
+root<-normalizePath(args[1],mustWork=TRUE);setwd(root);issue<-args[2]
+suppressPackageStartupMessages(library(tidyverse))
+library(beidan,lib.loc=file.path(root,'results/margin-combination-study-20261018/library'))
+out<-file.path('results/global-dynamic-walkforward-20261018',issue)
+forecast_path<-file.path(out,'frozen-forecasts.rds');round_path<-file.path(out,'frozen-rounds.rds')
+x<-readRDS(forecast_path);rounds<-readRDS(round_path)
+fr<-jsonlite::fromJSON(file.path(out,'forecast-replay.json'));sr<-jsonlite::fromJSON(file.path(out,'selection-replay.json'))
+stopifnot(fr$status=='FULL_IDENTICAL_REPLAY',sr$status=='FULL_IDENTICAL_REPLAY',
+ fr$sha256==digest::digest(file=forecast_path,algo='sha256'),sr$sha256==digest::digest(file=round_path,algo='sha256'),
+ identical(rounds$forecast_sha256,fr$sha256))
+label_path<-file.path('docs/reviews',paste0('source-',issue),'roster.json')
+if(issue=='26103') {
+ prior_eval<-jsonlite::fromJSON('results/fm171-26103-draw-20261017/evaluation.json')
+ stopifnot(label_path==prior_eval$label_path,digest::digest(file=label_path,algo='sha256')==prior_eval$label_sha256)
+}
+roster<-bind_rows(jsonlite::fromJSON(label_path,simplifyVector=FALSE)$data)
+stopifnot(nrow(roster)==if(issue=='26103')407L else 109L,!anyDuplicated(roster$slot),all(roster$issue_id==issue))
+a<-roster |> filter(status=='完场',grepl('^[0-9]+-[0-9]+$',score)) |>
+ transmute(fixture_id=paste0(issue_id,':',slot),handicap=as.integer(handicap),score,
+  home_goals=as.integer(sub('-.*$','',score)),away_goals=as.integer(sub('^.*-','',score))) |>
+ mutate(actual_outcome=case_when(home_goals-away_goals+handicap>0~'W',home_goals-away_goals+handicap==0~'D',TRUE~'L'))
+stopifnot(!anyDuplicated(a$fixture_id),all(a$actual_outcome%in%c('W','D','L')))
+settlement_path<-file.path(out,'settlement-observation.rds');settlement<-readRDS(settlement_path)
+stopifnot(settlement$source_selection_sha256==sr$sha256)
+confirmed<-settlement$settlements |> inner_join(a |> select(fixture_id,actual_outcome),by='fixture_id',relationship='one-to-one')
+stopifnot(all(confirmed$outcome==confirmed$actual_outcome))
+as_of<-lubridate::ymd_hms(settlement$observation$receipt$observed_at,tz='UTC')
+all_scores<-list();probabilities<-list();margins<-list();training<-list()
+for(id in names(x$entries)) {
+ e<-x$entries[[id]]
+ for(model in x$policy$models)probabilities[[paste(id,model)]]<-e[[model]] |> mutate(model=model,cutoff_utc=e$cutoff$cutoff_utc)
+ margins[[id]]<-e$margins |> mutate(fixture_id=id,handicap=x$audit$handicap[match(id,x$audit$fixture_id)])
+}
+q<-bind_rows(probabilities)
+for(model in x$policy$models) {
+ p<-q |> filter(.data$model==.env$model) |> select(fixture_id,outcome,probability)
+ all_scores[[model]]<-beidan:::DcAccuracyDiagnostic(p |> semi_join(a,by='fixture_id') |> mutate(model=.env$model),
+  a |> semi_join(p,by='fixture_id') |> select(fixture_id,actual_outcome))$scores
+}
+ss<-bind_rows(all_scores)
+metrics<-ss |> group_by(model) |> summarise(n=n(),hits1=sum(top1),hits2=sum(top2),top1=mean(top1),top2=mean(top2),brier=mean(brier),logloss=mean(logloss),.groups='drop')
+for(key in names(x$calibration)) {
+ f<-x$calibration[[key]]
+ training[[key]]<-tibble(epoch=key,cutoff_utc=f$cutoff$cutoff_utc,training_rows=nrow(f$admitted),
+  maximum_source_time=f$receipt$maximum_source_time,maximum_label_time=f$receipt$maximum_training_label_timestamp,
+  issues=paste(sort(unique(f$admitted$issue_code)),collapse=','),cache_key=f$receipt$cache_key %||% NA_character_)
+}
+rows<-groups<-rank_rows<-list()
+for(z in rounds$rounds)for(model in x$policy$models) {
+ o<-z$outputs[[model]];qz<-o$decision$probabilities;s<-o$selection
+ for(policy in unique(s$purchases$policy)) {
+  tickets<-s$purchases |> filter(.data$policy==.env$policy)
+  tokens<-strsplit(tickets$ticket_id,'|',fixed=TRUE)
+  legs<-tibble(ticket_id=rep(tickets$ticket_id,each=7L),fixture_id=sub(':[^:]+$','',unlist(tokens)),
+    outcome=c('W','D','L')[as.integer(sub('.*:','',unlist(tokens)))]) |> distinct()
+  check<-legs |> left_join(a |> select(fixture_id,actual=actual_outcome),by='fixture_id',relationship='many-to-one') |>
+   group_by(ticket_id) |> summarise(known=sum(!is.na(actual)),misses=sum(!is.na(actual)&outcome!=actual),.groups='drop')
+  scored<-tickets |> left_join(check,by='ticket_id',relationship='many-to-one')
+  gs<-scored |> group_by(group_id) |> summarise(hit=any(known==7L&misses==0L),pending=any(known<7L&misses==0L),.groups='drop')
+  trace<-s$trace |> filter(.data$policy==.env$policy)
+  union<-beidan:::.parlay_ranked_union_coverage(tickets$ticket_id,legs,qz)
+  stopifnot(abs(union-tail(trace$cumulative_coverage,1))<1e-9,nrow(tickets)==1000L,nrow(gs)==8L)
+  cash<-parlay_settle_plan(list(constants=list(unit_cny=2,payout_factor=.65,n_legs=7L),
+   issue_id=issue,funded=tickets |> select(ticket_id,group_id),ticket_legs=legs),
+   settlement$settlements |> select(issue_id,fixture_id,outcome,settled_sp,label_available_at,status,source_url),as_of=as_of)$ticket_returns
+  monetary_complete<-all(!cash$status%in%c('PENDING','SPECIAL'))
+  payout<-if(monetary_complete)sum(cash$payout_cny)else NA_real_
+  rows[[paste(z$index,model,policy)]]<-tibble(index=z$index,issue_id=z$cutoff$issue_id,cutoff_utc=z$cutoff$cutoff_utc,
+   model,policy,cost_cny=2000,hit_groups=sum(gs$hit),pending_groups=sum(gs$pending),
+   any_hit=if(any(gs$hit))TRUE else if(any(gs$pending))NA else FALSE,
+   model_any_hit=union,expected_winning_groups=sum(tickets$probability),payout_cny=payout,monetary_complete=monetary_complete,cash_status=if(monetary_complete)'COMPLETE'else'INCOMPLETE_VERIFIED_SETTLEMENT_SP')
+  groups[[paste(z$index,model,policy)]]<-gs |> mutate(index=z$index,model,policy)
+ }
+ # Realized tickets follow the canonical sorted fixture/outcome-token contract.
+ if(all(z$fixture_ids%in%a$fixture_id)) {
+  actual<-z$groups |> left_join(a |> select(fixture_id,outcome=actual_outcome),by='fixture_id',relationship='many-to-one')
+  actual<-actual |> mutate(token=paste0(fixture_id,':',match(outcome,c('W','D','L')))) |>
+   group_by(group_id) |> summarise(ticket_id=paste(token[order(fixture_id,method='radix')],collapse='|'),.groups='drop')
+  rank_rows[[paste(z$index,model)]]<-actual |> left_join(o$decision$candidates,
+   by=c('group_id','ticket_id'),relationship='one-to-one') |> mutate(index=z$index,model)
+ }
+}
+results<-bind_rows(rows)
+summary<-results |> group_by(model,policy) |> summarise(rounds=n(),hit_rounds=sum(any_hit%in%TRUE),pending_rounds=sum(is.na(any_hit)),
+ hit_groups=sum(hit_groups),cost_cny=sum(cost_cny),cash_complete_rounds=sum(monetary_complete),mean_model_any_hit=mean(model_any_hit),.groups='drop')
+missing<-x$audit |> filter(state=='ESTIMATED_FULL100') |> anti_join(a,by='fixture_id')
+outputs<-list(metrics=metrics,scores=ss,probabilities=q,margins=bind_rows(margins),training=bind_rows(training),
+ rounds=results,summary=summary,groups=bind_rows(groups),realized_ranks=bind_rows(rank_rows),missing_labels=missing)
+stage<-tempfile('evaluation-stage-',tmpdir=out);dir.create(stage)
+tryCatch({
+for(name in names(outputs))write_csv(outputs[[name]],file.path(stage,paste0(name,'.csv')))
+receipt<-list(forecast_sha256=fr$sha256,rounds_sha256=sr$sha256,label_sha256=digest::digest(file=label_path,algo='sha256'),settlement_sha256=digest::digest(file=settlement_path,algo='sha256'),
+ client_sha256=digest::digest(file='r/global_dynamic_evaluate_20261018.R',algo='sha256'),
+ label_scope='SOURCE_PUBLISHED_FULL_TIME_NOT_INDEPENDENTLY_VERIFIED_90MIN',
+ target_labels_used_for_selection=FALSE,prospective_admission=FALSE,independent_union_agreement=TRUE,
+ output_hashes=as.list(map_chr(names(outputs),~digest::digest(file=file.path(stage,paste0(.x,'.csv')),algo='sha256')) |> set_names(names(outputs))))
+destination<-file.path(out,'evaluation')
+receipt_path<-file.path(destination,'evaluation.json')
+jsonlite::write_json(receipt,file.path(stage,'evaluation.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+if(dir.exists(destination)) {
+ stopifnot(identical(sort(list.files(stage)),sort(list.files(destination))))
+ for(file in list.files(stage))stopifnot(digest::digest(file=file.path(stage,file),algo='sha256')==digest::digest(file=file.path(destination,file),algo='sha256'))
+ jsonlite::write_json(list(status='FULL_IDENTICAL_EVALUATION_REPLAY',evaluation_sha256=digest::digest(file=receipt_path,algo='sha256')),file.path(out,'evaluation-replay.json'),auto_unbox=TRUE,pretty=TRUE)
+}else stopifnot(file.rename(stage,destination))
+},finally=unlink(stage,recursive=TRUE))
+print(metrics,width=Inf);print(summary,width=Inf)
+
+exec
+/usr/bin/zsh -lc 'cat config/global_dynamic_walkforward_20261018.json r/global_dynamic_26104_native_20261018.R r/global_dynamic_26104_intake_20261018.R r/global_dynamic_census_20261018.R r/check_global_dynamic_artifacts_20261018.R' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 0ms:
+{
+  "study_id": "FM171_GLOBAL_DYNAMIC_WALKFORWARD_20261018",
+  "base_model": "FM-1.7.1",
+  "distribution": "SOURCE_FULL_100_NO_TAIL_COMPRESSION",
+  "training_issues": [
+    "26098",
+    "26101",
+    "26102"
+  ],
+  "audit_issues": [
+    "26103",
+    "26104",
+    "26105",
+    "26106"
+  ],
+  "mode": "HISTORICAL_DIAGNOSTIC",
+  "prospective_admission": false,
+  "models": [
+    "RAW",
+    "GLOBAL"
+  ],
+  "calibration": {
+    "features": [],
+    "minimum_ess": 100,
+    "minimum_class_count": 15,
+    "epsilon": 1e-08
+  },
+  "market": {
+    "company_policy": "ALL_TITAN_VALID_UNAMBIGUOUS_FRESH_COMPANIES",
+    "minimum_euro_companies": 3,
+    "asian_company_id": "8",
+    "total_company_id": "8",
+    "maximum_age_hours": 48,
+    "maximum_residual": 0.05,
+    "rho": -0.1
+  },
+  "rounds": {
+    "rule": "UTC_DAILY00_FIRST_EPOCH_AT_OR_AFTER_FORECAST_AND_STRICTLY_BEFORE_KICKOFF_THEN_NUMERIC_SLOT_POOLS",
+    "maximum_pool": 12,
+    "minimum_pool": 8,
+    "groups": 8,
+    "legs": 7,
+    "rotation_step": 1,
+    "tickets_per_group": 125,
+    "fixed_start": 30,
+    "unit_cny": 2,
+    "budget_cny": 2000,
+    "payout_factor": 0.65,
+    "decision_epochs_utc": [
+      "2026-10-08T00:00:00Z",
+      "2026-10-09T00:00:00Z",
+      "2026-10-10T00:00:00Z",
+      "2026-10-11T00:00:00Z",
+      "2026-10-12T00:00:00Z",
+      "2026-10-13T00:00:00Z",
+      "2026-10-14T00:00:00Z",
+      "2026-10-15T00:00:00Z",
+      "2026-10-16T00:00:00Z"
+    ]
+  },
+  "decision_labels": "NEVER_OPEN_TARGET_LABELS_IN_FORECAST_OR_SELECTION",
+  "original_seven_rounds": "REPRODUCTION_ONLY_ALREADY_INSPECTED",
+  "validation": "NEW_COMPLETE_ISSUES_26106_ONWARD_REQUIRE_SEPARATE_OBSERVED_AVAILABILITY_AND_RULE_FREEZE"
+}
+# Rscript r/global_dynamic_26104_native_20261018.R ROOT IMPLEMENTATION_ROOT fit SHARD COUNT | ROOT IMPLEMENTATION_ROOT assemble
+# Replays published factual bytes/metadata; no labels, source collection or priors.
+args<-commandArgs(TRUE);stopifnot(length(args)%in%c(3L,5L),args[3]%in%c('fit','assemble'))
+mode<-args[3]
+if(mode=='fit'){stopifnot(length(args)==5L);shard<-as.integer(args[4]);shards<-as.integer(args[5]);stopifnot(!anyNA(c(shard,shards)),shards==3L,shard>=1L,shard<=shards)}else stopifnot(length(args)==3L)
+root<-normalizePath(args[1],mustWork=TRUE);implementation_root<-normalizePath(args[2],mustWork=TRUE);setwd(root)
+suppressPackageStartupMessages(library(tidyverse));library(beidan,lib.loc='results/margin-combination-study-20261018/library')
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+paths<-reticulate::import('beidan_backend.catalog.paths',convert=FALSE)
+shared<-reticulate::import('beidan_backend.temporal_learning',convert=FALSE)
+backend<-reticulate::import('beidan_backend.reviewed_opponent_goals',convert=FALSE)
+coverage_backend<-reticulate::import('beidan_backend.euro_coverage',convert=FALSE)
+pd<-reticulate::import('pandas',convert=FALSE)
+out<-reticulate::py_str(paths$location('hot:global-dynamic-26104-20261018'))
+input_path<-file.path(out,'inputs.json');metadata_path<-file.path(out,'metadata.json')
+input<-jsonlite::fromJSON(input_path,simplifyVector=FALSE);metadata<-jsonlite::fromJSON(metadata_path,simplifyVector=FALSE)
+stopifnot(metadata$inputs_sha256==digest::digest(file=input_path,algo='sha256'),input$issue_id=='26104')
+fixtures<-bind_rows(input$fixtures) |> mutate(kickoff_at=lubridate::ymd_hms(kickoff_at,tz='UTC'),cutoff_utc=lubridate::ymd_hms(cutoff_utc,tz='UTC'),handicap=as.integer(handicap))
+stopifnot(nrow(fixtures)==109L,!anyDuplicated(fixtures$fixture_id))
+# Whole-issue inputs stay identical across workers; only target identities are sharded.
+# Target and every known following issue ID are excluded regardless of source dates.
+future_path<-'results/fm17-upcoming-20261017/schedule-26105.rds';future<-readRDS(future_path)
+excluded<-unique(c(fixtures$provider_id,as.character(future$provider_id_nowscore)))
+stopifnot(nrow(future)==365L,all(future$issue_id=='26105'),!anyNA(excluded))
+policy<-list(recent_n=8L,alpha=.5,minimum_recent_matches=12L,minimum_recent_ess=8)
+fit_policy<-list(ridge=.05,minimum_target_matches=12L,convergence_tolerance=1e-10,maximum_iterations=100000L)
+bindings<-list(inputs=digest::digest(file=input_path,algo='sha256'),metadata=digest::digest(file=metadata_path,algo='sha256'),
+ future=digest::digest(file=future_path,algo='sha256'),client=digest::digest(file='r/global_dynamic_26104_native_20261018.R',algo='sha256'))
+meta_rows<-list();targets<-list()
+for(packet in metadata$packets) {
+ if(packet$state!='PARSED')next
+ targets[[packet$fixture_id]]<-packet$result
+ if(!length(packet$result$rows))next
+ meta_rows[[packet$fixture_id]]<-bind_rows(packet$result$rows) |> transmute(fixture_id=packet$fixture_id,
+ scope=recode(block,h_data='home_recent',a_data='away_recent',v_data='head_to_head'),match_id=history_id,
+ metadata_date=event_date,metadata_home_id=home_id,metadata_away_id=away_id,metadata_home_score=home_score,metadata_away_score=away_score,
+ competition_id,neutral_reported)
+}
+meta_rows<-bind_rows(meta_rows);history<-bind_rows(input$history)
+stopifnot(!anyDuplicated(meta_rows[c('fixture_id','scope','match_id')]))
+joined<-history |> left_join(meta_rows,by=c('fixture_id','scope','match_id'),relationship='one-to-one') |>
+ mutate(metadata_agrees=!is.na(competition_id)&event_date==metadata_date&home_id==metadata_home_id&away_id==metadata_away_id&home_score==metadata_home_score&away_score==metadata_away_score)
+status<-fits<-entries<-list()
+if(mode=='fit') {
+target_ids<-fixtures$fixture_id[(seq_len(nrow(fixtures))-1L)%%shards==shard-1L]
+for(id in target_ids) {
+ f<-fixtures |> filter(fixture_id==id);target<-targets[[id]]
+ row<-tibble(fixture_id=id,slot=as.integer(f$slot),state='UNESTIMATED',reason='Missing target competition metadata')
+ if(is.null(target)||is.null(target$target_competition_id)){status[[id]]<-row;next}
+ context<-bind_rows(input$contexts) |> filter(fixture_id==id) |> mutate(kickoff_at=lubridate::ymd_hms(kickoff_at,tz='UTC'))
+ schedule<-bind_rows(input$fixture_schedule) |> filter(fixture_id==id,resource=='roster')
+ roster_clock<-lubridate::ymd_hms(paste(schedule$kickoff_date,schedule$kickoff_hhmm,'00'),tz='Asia/Shanghai',quiet=TRUE)
+ if(nrow(context)!=2L||anyNA(context$kickoff_at)||any(context$kickoff_at!=f$kickoff_at)||length(roster_clock)!=1L||is.na(roster_clock)||roster_clock!=f$kickoff_at) {
+  row$reason<-'Unresolved roster/analysis/market kickoff disagreement';status[[id]]<-row;next
+ }
+ fixture<-as.list(f[1,c('fixture_id','provider_id','home_id','away_id')]);fixture$issue_id<-'26104'
+ fixture$competition_id<-target$target_competition_id;fixture$neutral_reported<-isTRUE(target$target_neutral_reported)
+ cutoff<-list(issue_id='26104',cutoff_utc=f$cutoff_utc)
+ epoch<-shared$Cutoff$decision_epoch('26104',format(f$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'))
+ h<-joined |> filter(metadata_agrees,competition_id==fixture$competition_id) |>
+ transmute(row_key=paste(fixture_id,scope,match_id,sep=':'),match_id,event_date,home_id,away_id,home_score,away_score,score_scope,competition_id,neutral_reported)
+ domain<-jsonlite::fromJSON(jsonlite::toJSON(h,dataframe='rows',auto_unbox=TRUE,na='null',digits=NA),simplifyVector=FALSE)
+ candidate<-tryCatch({
+  prepared<-backend$prepare_reviewed_opponent_goals(domain,fixture,as.list(excluded),epoch,bindings,implementation_root,policy)
+  if(reticulate::py_to_r(prepared$state)!='PREPARED')stop('Target venue support absent')
+  native<-beidan:::FitOpponentGoals(prepared$prepared,fixture,epoch,fit_policy,implementation_root)
+  list(native=native,recent_reviews=reticulate::py_to_r(prepared$reviews),policy=policy,preparation_implementation=reticulate::py_to_r(prepared$implementation))
+ },error=identity)
+ if(inherits(candidate,'error')) {
+  reason<-conditionMessage(candidate)
+  if(!grepl('Sparse target competition/venue support|Disconnected target strength network|No prior target-competition network|cutoff admits no prior observations|Nonempty unique factual rows required|Target venue support absent',reason))stop(candidate)
+  row$reason<-reason;status[[id]]<-row;next
+ }
+ fits[[id]]<-candidate
+ params<-candidate$native$same_support_raw
+ g<-beidan:::dixon_coles_score_grid(params$lambda_home,params$lambda_away,0L,1e-10,-.1)$grid |> select(home_goals,away_goals,probability)
+ latest<-lubridate::ymd_hms(candidate$native$receipt$admission$maximum_source_time,tz='UTC')
+ base<-list(grid=g,cutoff=cutoff,model_id='FM171_SAME_SUPPORT_RAW',source_hashes=bindings,max_source_available_utc=latest,intended_use='HISTORICAL_DIAGNOSTIC')
+ entries[[id]]<-list(identities=fixture,cutoff=cutoff,base=base,native_base=base)
+ row$state<-'ESTIMATED_NATIVE_REPAIR';row$reason<-'Same competition/venue raw lambda, recent8 alpha.5, no calendar-age limit';status[[id]]<-row
+ if(length(status)%%10L==0L)message('native shard ',shard,': ',length(status),' /',length(target_ids))
+}
+z<-list(status=bind_rows(status),fits=fits,native_policy=policy,source_hashes=bindings,analysis_quality_accepted=FALSE,historical_admission=FALSE)
+shard_dir<-file.path(out,'native-fit-shards',paste0('shard-',shard));dir.create(shard_dir,recursive=TRUE,showWarnings=FALSE)
+path<-file.path(shard_dir,'fits.rds')
+payload<-list(result=z,entries=entries,scope=target_ids,shard=shard,shards=shards)
+if(file.exists(path))stopifnot(identical(payload,readRDS(path)))else saveRDS(payload,path)
+jsonlite::write_json(list(sha256=digest::digest(file=path,algo='sha256'),scope=target_ids,shard=shard,shards=shards),file.path(shard_dir,'receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+print(z$status |> count(state,reason),n=Inf)
+quit(status=0L,save='no')
+}
+all_status<-list();fits<-entries<-list();seen<-character()
+for(shard in 1:3) {
+ shard_dir<-file.path(out,'native-fit-shards',paste0('shard-',shard));path<-file.path(shard_dir,'fits.rds')
+ receipt<-jsonlite::fromJSON(file.path(shard_dir,'receipt.json'));stopifnot(receipt$sha256==digest::digest(file=path,algo='sha256'))
+ payload<-readRDS(path);stopifnot(identical(payload$result$source_hashes,bindings),!any(payload$scope%in%seen),setequal(payload$scope,payload$result$status$fixture_id))
+ seen<-c(seen,payload$scope);all_status[[as.character(shard)]]<-payload$result$status
+ fits<-c(fits,payload$result$fits);entries<-c(entries,payload$entries)
+}
+stopifnot(setequal(seen,fixtures$fixture_id),!anyDuplicated(seen),!anyDuplicated(names(fits)))
+z<-list(status=bind_rows(all_status) |> arrange(slot),fits=fits,native_policy=policy,source_hashes=bindings,analysis_quality_accepted=FALSE,historical_admission=FALSE)
+write_csv(fixtures,file.path(out,'fixtures.csv'))
+chunk_dir<-file.path(out,'native-chunks');dir.create(chunk_dir,showWarnings=FALSE)
+path<-file.path(chunk_dir,'native-repair.rds');saveRDS(z,path)
+jsonlite::write_json(list(sha256=digest::digest(file=path,algo='sha256')),file.path(chunk_dir,'recent-receipt.json'),auto_unbox=TRUE,pretty=TRUE)
+path<-file.path(out,'native-forecasts.rds');saveRDS(list(entries=entries),path)
+jsonlite::write_json(list(sha256=digest::digest(file=path,algo='sha256')),file.path(out,'native-manifest.json'),auto_unbox=TRUE,pretty=TRUE)
+# Existing source-specific Euro coverage API owns freshness/tie/cutoff diagnostics.
+version<-input$source_versions$euro
+src<-beidan:::dataset_table_source('source_euro_issue_26104','euro_history',version=version)
+beidan:::verify_table_files(src$files,src$hashes,'euro_history')
+quotes<-dataset_query('source_euro_issue_26104',"SELECT fixture_id,source,company_id,source_order,quote_at,odds_home,odds_draw,odds_away,valid_decimal FROM euro_history ORDER BY fixture_id,source,company_id,source_order",'euro_history',version=version,memory_limit='1GB',threads=2L)
+latest<-coverage<-list();resources<-read_dataset('source_euro_issue_26104','resources',version=version)
+for(i in seq_len(nrow(fixtures)))for(provider in c('titan','nowscore')) {
+ f<-fixtures[i,];state<-resources |> filter(fixture_id==f$fixture_id,source==provider)
+ stopifnot(nrow(state)==1L,state$state=='VERIFIED')
+ rows<-quotes |> filter(fixture_id==f$fixture_id,source==provider) |> select(-fixture_id,-source)
+ frame<-reticulate::r_to_py(arrow::Table$create(rows))$to_pandas()
+ epoch<-shared$Cutoff$decision_epoch('26104',format(f$cutoff_utc,'%Y-%m-%dT%H:%M:%SZ',tz='UTC'))
+ a<-coverage_backend$inspect_euro_coverage(frame,list(fixture_id=f$fixture_id,issue_id='26104',source=provider),epoch,'PARSED',bindings,list('281','115','82','432'),48,implementation_root)
+ pa<-reticulate::import('pyarrow',convert=FALSE)
+ key<-paste(f$fixture_id,provider)
+ latest[[key]]<-as_tibble(arrow::as_arrow_table(pa$Table$from_pandas(a$latest,preserve_index=FALSE))) |> mutate(fixture_id=f$fixture_id,source=provider,.before=1)
+ coverage[[key]]<-as_tibble(arrow::as_arrow_table(pa$Table$from_pandas(a$coverage,preserve_index=FALSE)))
+}
+saveRDS(list(latest=bind_rows(latest),coverage=bind_rows(coverage),input_hashes=bindings),file.path(out,'coverage-census.rds'))
+write_csv(z$status,file.path(out,'native-status.csv'))
+print(z$status |> count(state,reason),n=Inf)
+# Rscript r/global_dynamic_26104_intake_20261018.R ROOT
+# Exact published109-fixture snapshot, no network or target-label extraction.
+root<-normalizePath(commandArgs(TRUE)[1],mustWork=TRUE);setwd(root)
+suppressPackageStartupMessages(library(tidyverse));library(beidan,lib.loc='results/margin-combination-study-20261018/library')
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+p<-reticulate::import('beidan_backend.catalog.paths',convert=FALSE)
+out<-reticulate::py_str(p$location('hot:global-dynamic-26104-20261018',require_exists=FALSE));dir.create(out,recursive=TRUE,showWarnings=FALSE)
+f<-list();for(t in c('match','history','provenance','fixture_schedule','resources','coverage'))f[[t]]<-read_dataset('source_issue_26104',t,version='20261017T024045080849Z')
+roster<-bind_rows(jsonlite::fromJSON('docs/reviews/source-26104/roster.json',simplifyVector=FALSE)$data)
+fixtures<-f$match |> left_join(roster |> transmute(fixture_id=paste0(issue_id,':',slot),slot,league,handicap),by='fixture_id',relationship='one-to-one') |>
+ mutate(cutoff_utc=kickoff_at-lubridate::hours(24))
+stopifnot(nrow(fixtures)==109L,!anyDuplicated(fixtures$fixture_id),!anyNA(fixtures[c('provider_id','home_id','away_id','cutoff_utc','handicap')]))
+euro_contexts<-read_dataset('source_euro_issue_26104','contexts',version='20261017T032619478898Z')
+input<-list(issue_id='26104',fixtures=fixtures,history=f$history,provenance=f$provenance,
+ fixture_schedule=f$fixture_schedule,contexts=euro_contexts,resources=f$resources,
+ source_versions=list(fundamentals='20261017T024045080849Z',euro='20261017T032619478898Z'))
+path<-file.path(out,'inputs.json')
+text<-jsonlite::toJSON(input,dataframe='rows',auto_unbox=TRUE,na='null',digits=NA,POSIXt='ISO8601')
+if(file.exists(path))stopifnot(identical(readLines(path,warn=FALSE),as.character(text)))else writeLines(text,path,useBytes=TRUE)
+print(tibble(fixtures=nrow(fixtures),history=nrow(f$history),inputs_sha256=digest::digest(file=path,algo='sha256')))
+# Rscript r/global_dynamic_census_20261018.R ROOT
+# Read-only catalog/Parquet/cache inventory. No network and no data publication.
+args<-commandArgs(TRUE);stopifnot(length(args)==1L)
+root<-normalizePath(args[1],mustWork=TRUE);setwd(root)
+suppressPackageStartupMessages(library(tidyverse))
+library(beidan,lib.loc=file.path(root,'results/margin-combination-study-20261018/library'))
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+registry<-reticulate::import('beidan_backend.catalog.registry',convert=FALSE)
+known<-names(reticulate::py_to_r(registry$catalog_entries()))
+rows<-tables<-list();manifests<-list()
+for(issue in c('26103','26104','26105','26106'))for(kind in c('fundamentals','euro')) {
+ dataset<-paste0(if(kind=='fundamentals')'source_issue_'else'source_euro_issue_',issue)
+ if(!dataset%in%known) {
+  rows[[dataset]]<-tibble(issue_id=issue,kind,dataset,version=NA_character_,fixtures=NA_integer_,verified_resources=NA_integer_,resources=NA_integer_,state='NOT_REGISTERED')
+  next
+ }
+ manifest<-dataset_manifest(dataset);version<-manifest$version
+ status<-read_dataset(dataset,'status',version=version)
+ resources<-read_dataset(dataset,'resources',version=version)
+ stopifnot(is_tibble(status),is_tibble(resources),!anyDuplicated(status$fixture_id))
+ manifests[[dataset]]<-manifest
+ rows[[dataset]]<-tibble(issue_id=issue,kind,dataset,version,fixtures=n_distinct(status$fixture_id),
+  verified_resources=sum(resources$state=='VERIFIED'),resources=nrow(resources),state='PUBLISHED_WITH_RECORDED_LIMITATIONS')
+ for(name in c('status','resources',if(kind=='fundamentals')c('injuries','lineup')else character())) {
+  data<-switch(name,status=status,resources=resources,read_dataset(dataset,name,version=version))
+  tables[[paste(dataset,name)]]<-tibble(dataset,version,table=name,rows=nrow(data),content_hash=digest::digest(data,algo='sha256'))
+ }
+}
+out<-'results/global-dynamic-walkforward-20261018'
+write_csv(bind_rows(rows),file.path(out,'dataset-census.csv'));write_csv(bind_rows(tables),file.path(out,'table-census.csv'))
+# Existing Asian/total raw bytes for26104 are inspected cache-only, not interpreted as complete source coverage.
+f<-read_dataset('source_issue_26104','match',version=manifests[['source_issue_26104']]$version)
+client<-reticulate::import('beidan_backend.unified_sources',convert=FALSE)$SourceClient()
+history<-reticulate::import('beidan_backend.market_capture.history',convert=FALSE)
+clock<-reticulate::import('datetime',convert=FALSE)
+cache<-list()
+for(i in seq_len(nrow(f))) {
+ z<-f[i,];kickoff<-clock$datetime$fromisoformat(format(z$kickoff_at,'%Y-%m-%dT%H:%M:%S+00:00',tz='UTC'))
+ total<-reticulate::py_to_r(history$over_under_history_url(z$provider_id,8L,kickoff))
+ for(kind in c('asian','total')) {
+  url<-if(kind=='asian')sub('oddskind=1','oddskind=0',total,fixed=TRUE)else total
+  cap<-tryCatch(client$request('titan',url,max_age=0,cache_only=TRUE,reuse_raw=TRUE),error=identity)
+  if(inherits(cap,'error')) {
+   # Only a genuine absent-cache exception is classified as a gap; integrity failures stop.
+   if(!grepl('CacheMissError',conditionMessage(cap),fixed=TRUE))stop(cap)
+   row<-tibble(fixture_id=z$fixture_id,kind,url,state='CACHE_MISS',capture_id=NA_integer_,raw_sha256=NA_character_,network_attempts=0L)
+  }else {
+   receipt<-reticulate::py_to_r(cap[['receipt']]);stopifnot(receipt$network_attempts==0L)
+   row<-tibble(fixture_id=z$fixture_id,kind,url,state='RAW_AVAILABLE_NOT_YET_REVIEWED',capture_id=as.integer(receipt$capture_id),raw_sha256=receipt$sha256,network_attempts=0L)
+  }
+  cache[[paste(z$fixture_id,kind)]]<-row
+ }
+}
+write_csv(bind_rows(cache),file.path(out,'26104-channel-cache-census.csv'))
+jsonlite::write_json(list(catalog=manifests,client_sha256=digest::digest(file='r/global_dynamic_census_20261018.R',algo='sha256'),
+ network_attempts=0,collection_not_requested_by_this_command=TRUE,prospective_admission=FALSE,
+ generated_at_utc=format(Sys.time(),'%Y-%m-%dT%H:%M:%SZ',tz='UTC')),
+ file.path(out,'dataset-census-receipt.json'),auto_unbox=TRUE,pretty=TRUE,digits=NA)
+print(bind_rows(rows));print(bind_rows(cache) |> count(kind,state))
+# Rscript r/check_global_dynamic_artifacts_20261018.R ROOT
+# Explicit required real-data acceptance; not a routine unit test or a skip.
+args<-commandArgs(TRUE);stopifnot(length(args)==1L)
+root<-normalizePath(args[1],mustWork=TRUE);setwd(root)
+Sys.setenv(BEIDAN_REPO_ROOT=root)
+suppressPackageStartupMessages(library(testthat))
+test_that('frozen full-issue forecasts retain causal scalar calibration and explicit exclusions', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ for(issue in c('26103','26104')) {
+  out<-file.path(root,'results/global-dynamic-walkforward-20261018',issue)
+  x<-readRDS(file.path(out,'frozen-forecasts.rds'))
+  manifest<-jsonlite::fromJSON(file.path(out,'forecast-manifest.json'))
+  replay<-jsonlite::fromJSON(file.path(out,'forecast-replay.json'))
+  expect_equal(nrow(x$audit),if(issue=='26103')407L else 109L)
+  expect_false(anyDuplicated(x$audit$fixture_id)>0L)
+  expect_equal(length(x$entries),sum(x$audit$state=='ESTIMATED_FULL100'))
+  expect_false(x$prospective_admission);expect_false(x$target_labels_opened)
+  expect_identical(replay$status,'FULL_IDENTICAL_REPLAY')
+  expect_identical(replay$sha256,manifest$sha256)
+  expect_identical(manifest$sha256,digest::digest(file=file.path(out,'frozen-forecasts.rds'),algo='sha256'))
+  keys<-character()
+  for(f in x$calibration) {
+   expect_true(all(as.integer(f$admitted$issue_code)<as.integer(issue)))
+   expect_true(all(lubridate::ymd_hms(f$admitted$label_available_ts,tz='UTC')<f$cutoff$cutoff_utc))
+   expect_true(all(lubridate::ymd_hms(f$admitted$data_available_ts,tz='UTC')<f$cutoff$cutoff_utc))
+   expect_gte(nrow(f$admitted),100L)
+   keys<-c(keys,f$receipt$cache_key)
+  }
+  expect_false(anyDuplicated(keys)>0L)
+  for(id in names(x$entries)) {
+   e<-x$entries[[id]];f<-x$calibration[[e$calibration_key]]
+   p<-e$RAW$probability[match(c('W','D','L'),e$RAW$outcome)]
+   intercepts<-vapply(f$coefficients,unname,numeric(1))
+   oracle<-stats::plogis(stats::qlogis(p)+intercepts[c('W','D','L')]);oracle<-oracle/sum(oracle)
+   expect_equal(e$GLOBAL$probability[match(c('W','D','L'),e$GLOBAL$outcome)],unname(oracle),tolerance=1e-12)
+   expect_identical(e$cutoff,f$cutoff)
+   expect_equal(sum(e$margins$probability),1,tolerance=1e-12)
+   expect_equal(e$final$grid$probability,e$base$grid$probability,tolerance=1e-12)
+   expect_lt(e$base$max_source_available_utc,e$cutoff$cutoff_utc)
+   native<-e$native$native;nf<-native$receipt$fixture;obs<-native$observations
+   home_venue<-if(nf$neutral_reported)'neutral'else'home';away_venue<-if(nf$neutral_reported)'neutral'else'away'
+   home<-obs[obs$team_id==nf$home_id & obs$venue==home_venue,];away<-obs[obs$team_id==nf$away_id & obs$venue==away_venue,]
+   oracle_home<-(stats::weighted.mean(home$goals,home$weight)+stats::weighted.mean(away$against,away$weight))/2
+   oracle_away<-(stats::weighted.mean(away$goals,away$weight)+stats::weighted.mean(home$against,home$weight))/2
+   expect_equal(native$same_support_raw$lambda_home,oracle_home,tolerance=1e-12)
+   expect_equal(native$same_support_raw$lambda_away,oracle_away,tolerance=1e-12)
+   expect_true(lubridate::ymd_hms(native$receipt$admission$maximum_source_time,tz='UTC')<e$cutoff$cutoff_utc)
+   a<-x$audit[x$audit$fixture_id==id,]
+   expect_gte(a$euro_companies,3L);expect_equal(a$asian_rows,1L);expect_equal(a$total_rows,1L)
+   expect_identical(a$selected_source,if(a$market_consistent)'market'else'native')
+  }
+ }
+})
+
+test_that('paired full-space purchases hold matches, physical budget and pending outcomes fixed', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ for(issue in c('26103','26104')) {
+  out<-file.path(root,'results/global-dynamic-walkforward-20261018',issue)
+  x<-readRDS(file.path(out,'frozen-rounds.rds'))
+  expect_false(x$target_labels_opened)
+  for(z in x$rounds) {
+   expect_gte(length(z$fixture_ids),8L);expect_lte(length(z$fixture_ids),x$policy$rounds$maximum_pool)
+   expect_true(all(z$forecast_cutoffs$cutoff_utc<=z$cutoff$cutoff_utc))
+   expect_true(all(z$cutoff$cutoff_utc<z$forecast_cutoffs$kickoff_at))
+   expect_equal(as.integer(table(z$groups$group_id)),rep(7L,8))
+   expect_equal(length(unique(z$groups$group_id)),8L)
+   expect_setequal(z$outputs$RAW$decision$probabilities$fixture_id,z$outputs$GLOBAL$decision$probabilities$fixture_id)
+   for(model in c('RAW','GLOBAL')) {
+    o<-z$outputs[[model]]
+    expect_identical(o$decision$cutoff,z$cutoff)
+    expect_equal(nrow(o$decision$candidates),8L*3^7)
+    for(policy in c('FIXED','TOP','DYNAMIC_WINDOW','DYNAMIC_SET')) {
+     t<-o$selection$purchases[o$selection$purchases$policy==policy,]
+     expect_equal(nrow(t),1000L)
+     expect_equal(as.integer(table(t$group_id)),rep(125L,8))
+     expect_equal(tail(o$selection$trace$cost_cny[o$selection$trace$policy==policy],1),2000)
+    }
+   }
+  }
+  scores<-readr::read_csv(file.path(out,'evaluation','scores.csv'),show_col_types=FALSE)
+  expect_setequal(scores$fixture_id[scores$model=='RAW'],scores$fixture_id[scores$model=='GLOBAL'])
+  results<-readr::read_csv(file.path(out,'evaluation','rounds.csv'),show_col_types=FALSE)
+  expect_true(all(results$cost_cny==2000));expect_true(all(is.na(results$payout_cny[!results$monetary_complete])));expect_true(all(is.finite(results$payout_cny[results$monetary_complete])))
+ }
+})
+
+exec
+/usr/bin/zsh -lc 'cat src/global_dynamic_26104_capture_20261018.py src/global_dynamic_capture_replay_20261018.py tests/test_global_dynamic_capture_20261018.py tests/testthat/test-global-dynamic-walkforward.R quarto/global_dynamic_walkforward_20261018.qmd' in /home/drwho1985/workspace/algotradinglife/beijing-lot
+ succeeded in 0ms:
+"""Bounded26104 cache metadata replay and source-specific5s Asian/total capture.
+
+Thin domain client: shared SourceClient owns transport/cache/retries; existing
+parsers own metadata and line conventions. Raw bytes never enter this repository.
+"""
+import argparse
+from dataclasses import asdict
+from datetime import datetime, timezone
+import hashlib
+import json
+from pathlib import Path
+from filelock import FileLock
+from beidan_backend.catalog.paths import location
+from beidan_backend.unified_sources import SourceClient, canonical, document_bytes
+from beidan_backend.fundamentals import analysis_record
+from beidan_backend.opponent_history import parse_opponent_history
+from beidan_backend.market_capture.history import (
+    over_under_history_url, parse_asian_handicap_history_json,
+    parse_over_under_history_json,
+)
+from beidan_backend.versioning import write_json_atomically
+from beidan_backend.temporal_learning import implementation_closure
+
+if __name__ == '__main__':
+    ap=argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--root',type=Path,required=True)
+    ap.add_argument('--output',required=True)
+    ap.add_argument('--min-interval-seconds',type=float,choices=[5.0],required=True)
+    ap.add_argument('--cache-only',action='store_true')
+    ap.add_argument('--maximum-channel-attempts',type=int,choices=[2],required=True)
+    a=ap.parse_args();root=a.root.resolve(strict=True)
+    if not a.output.startswith('hot:'): raise ValueError('Explicit hot: output required')
+    out=location(a.output);source=out/'inputs.json';x=json.loads(source.read_bytes())
+    fixtures=x['fixtures']
+    if x['issue_id']!='26104' or len(fixtures)!=109 or len({f['fixture_id'] for f in fixtures})!=109:
+        raise ValueError('Exact109-fixture26104 input required')
+    inputs_sha=hashlib.sha256(source.read_bytes()).hexdigest()
+    implementation=implementation_closure(root,('beidan_backend.unified_sources',
+        'beidan_backend.fundamentals','beidan_backend.opponent_history',
+        'beidan_backend.market_capture.history','beidan_backend.versioning'),
+        distributions=('beautifulsoup4','json5','filelock'))
+    binding=dict(inputs_sha256=inputs_sha,client_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        implementation=implementation,min_interval_seconds=a.min_interval_seconds,cache_only=a.cache_only,maximum_channel_attempts=a.maximum_channel_attempts)
+    client=SourceClient();packets=[];states=[]
+    with FileLock(str(out/'capture.lock'),timeout=0):
+        path=out/'capture-binding.json'
+        if path.exists():
+            if json.loads(path.read_bytes())!=binding: raise ValueError('Changed binding requires new output')
+        else: write_json_atomically(binding,path)
+        for f in fixtures:
+            pid=f['provider_id'];id=f['fixture_id'];refs=[r for r in x['provenance'] if r['fixture_id']==id and r['source']=='titan']
+            packet=dict(fixture_id=id,source='titan',state='NOT_CHECKED',receipts=[])
+            try:
+                analyses=[r for r in refs if '/analysis/' in r['url']]
+                if len(analyses)!=1: raise ValueError('Unique accepted analysis provenance required')
+                ref=analyses[0];cap=client.request('titan',ref['url'],max_age=0,cache_only=True,reuse_raw=True)
+                if cap['receipt']['sha256']!=ref['sha256']: raise ValueError('Published analysis SHA differs')
+                packet['receipts'].append(cap['receipt']);aux=None
+                auxiliaries=[r for r in refs if '/analysisJs/' in r['url']]
+                if auxiliaries:
+                    if len(auxiliaries)!=1: raise ValueError('Unique auxiliary provenance required')
+                    ac=client.request('titan',auxiliaries[0]['url'],max_age=0,cache_only=True,reuse_raw=True)
+                    if ac['receipt']['sha256']!=auxiliaries[0]['sha256']: raise ValueError('Published auxiliary SHA differs')
+                    aux=ac['data'];packet['receipts'].append(ac['receipt'])
+                head=analysis_record(cap['data'],source='titan',provider_id=pid,auxiliary_raw=aux,identity_only=True)
+                expected={k:head[k] for k in ['provider_id','home','away','home_id','away_id','kickoff_utc']}
+                if expected['home_id']!=f['home_id'] or expected['away_id']!=f['away_id']:
+                    raise ValueError('Published oriented identity differs')
+                packet.update(state='PARSED',result=parse_opponent_history(cap['data'],source='titan',provider_id=pid,expected_identity=expected,auxiliary_raw=aux))
+            except (ValueError,RuntimeError,OSError,KeyError) as exc:
+                packet.update(state='REJECTED',error_type=type(exc).__name__,error=str(exc))
+            packets.append(packet)
+            kickoff=datetime.fromisoformat(f['kickoff_at']).replace(tzinfo=timezone.utc)
+            total=over_under_history_url(pid,8,kickoff)
+            for kind,url,parse in [('asian',total.replace('oddskind=1','oddskind=0'),parse_asian_handicap_history_json),('total',total,parse_over_under_history_json)]:
+                target=out/(id.replace(':','_')+'-'+kind+'.json')
+                attempt=1;needs_capture=not target.exists()
+                if target.exists():
+                    envelope=json.loads(target.read_bytes());payload=envelope['payload']
+                    if hashlib.sha256(payload.encode()).hexdigest()!=envelope['sha256']: raise ValueError('Receipt corrupt')
+                    result=json.loads(payload)
+                    if result['inputs_sha256']!=inputs_sha or result['url']!=url: raise ValueError('Receipt binding differs')
+                    if result['state']=='FAILED' and result.get('attempt',1)<a.maximum_channel_attempts:
+                        history=out/'failed-attempts';history.mkdir(exist_ok=True)
+                        archive=history/(target.stem+'-'+envelope['sha256']+'.json')
+                        if not archive.exists(): write_json_atomically(envelope,archive)
+                        attempt=result.get('attempt',1)+1;needs_capture=True
+                if needs_capture:
+                    result=dict(fixture_id=id,provider_id=pid,home_id=f['home_id'],away_id=f['away_id'],kind=kind,url=url,
+                        cutoff_utc=f['cutoff_utc'],inputs_sha256=inputs_sha,state='NOT_CHECKED',historical_admission=False,network_attempts=0,attempt=attempt)
+                    try:
+                        cap=client.cache.extract('titan',url,document_bytes,max_age=0,min_interval=a.min_interval_seconds,
+                            cache_only=a.cache_only,reuse_raw=True)
+                        body=cap['data'];result['raw_receipt']=cap['receipt'];result['raw_sha256']=hashlib.sha256(body).hexdigest()
+                        result['network_attempts']=cap['receipt']['network_attempts']
+                        if json.loads(body)==[]: result.update(state='OBSERVED_EMPTY',snapshots=[],counters={'observed_empty':True})
+                        else:
+                            snapshots,counters=parse(body,kickoff_hkt=kickoff)
+                            result.update(state='PARSED',snapshots=[asdict(s) for s in snapshots],counters=counters)
+                    except (ValueError,RuntimeError,OSError,KeyError) as exc:
+                        result.update(state='FAILED',error_type=type(exc).__name__,error=str(exc),network_attempts=getattr(exc,'network_attempts',result['network_attempts']))
+                    payload=canonical(result)
+                    write_json_atomically(dict(payload=payload,sha256=hashlib.sha256(payload.encode()).hexdigest()),target)
+                states.append(dict(fixture_id=id,kind=kind,state=result['state']))
+                print(id,kind,result['state'],flush=True)
+        complete=all(s['state'] in {'PARSED','OBSERVED_EMPTY'} for s in states)
+        # Metadata is published only after full traversal; processing clocks are not facts.
+        for packet in packets:
+            for receipt in packet['receipts']:
+                receipt.pop('processed_at',None)
+        metadata=dict(packets=packets,inputs_sha256=inputs_sha,implementation=implementation)
+        metadata_path=out/'metadata.json'
+        if complete:
+            if metadata_path.exists():
+                if json.loads(metadata_path.read_bytes())!=metadata: raise ValueError('Immutable metadata differs')
+            else: write_json_atomically(metadata,metadata_path)
+        write_json_atomically(dict(fixtures=109,channels=len(states),states=states,
+            metadata_parsed=sum(p['state']=='PARSED' for p in packets),collection_complete=complete,
+            historical_admission=False,full_fm_analysis_accepted=False),out/'capture-status.json')
+        if not complete: raise SystemExit(2)
+"""Independently reparse every sealed Asian/total channel from pinned raw bytes."""
+import argparse
+from dataclasses import asdict
+from datetime import datetime, timezone
+import hashlib
+import json
+from pathlib import Path
+from beidan_backend.catalog.paths import location
+from beidan_backend.unified_sources import SourceClient
+from beidan_backend.market_capture.history import parse_asian_handicap_history_json, parse_over_under_history_json
+from beidan_backend.versioning import write_json_atomically
+
+if __name__=='__main__':
+    ap=argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--root',type=Path,required=True)
+    ap.add_argument('--issue',choices=['26103','26104'],required=True)
+    ap.add_argument('--output',type=Path,required=True)
+    a=ap.parse_args();root=a.root.resolve(strict=True)
+    if a.issue=='26103':
+        work=location('hot:fm171-26103-full-recalc-20261017')/'markets-v3-5s'
+        fixtures=json.loads((root/'results/fm171-26103-draw-20261017/inputs.json').read_bytes())['fixtures']
+    else:
+        work=location('hot:global-dynamic-26104-20261018')
+        fixtures=json.loads((work/'inputs.json').read_bytes())['fixtures']
+    expected={f['fixture_id']:f for f in fixtures};client=SourceClient();n=empty=0
+    for path in sorted(work.glob('*-*.json')):
+        if not path.name.endswith(('-asian.json','-total.json')): continue
+        envelope=json.loads(path.read_bytes());payload=envelope['payload']
+        if hashlib.sha256(payload.encode()).hexdigest()!=envelope['sha256']: raise ValueError('Corrupt parsed envelope')
+        x=json.loads(payload);f=expected[x['fixture_id']]
+        if x['state'] not in {'PARSED','OBSERVED_EMPTY'}: raise ValueError('Unresolved capture failure')
+        ref=x['raw_receipt']
+        if x.get('origin')=='EXISTING_PINNED_CAPTURE':
+            body=(root/ref['raw_path']).read_bytes()
+        else:
+            cap=client.request('titan',x['url'],max_age=0,cache_only=True,capture_id=ref['capture_id'])
+            if cap['receipt']['network_attempts']!=0: raise ValueError('Replay attempted network')
+            body=cap['data']
+        if hashlib.sha256(body).hexdigest()!=x['raw_sha256']: raise ValueError('Raw SHA differs')
+        if json.loads(body)==[]:
+            if x['state']!='OBSERVED_EMPTY' or x['snapshots']: raise ValueError('Empty/source failure conflation')
+            empty+=1
+        else:
+            kickoff=datetime.fromisoformat(f['kickoff_at']).replace(tzinfo=timezone.utc)
+            parse=parse_asian_handicap_history_json if x['kind']=='asian' else parse_over_under_history_json
+            snapshots,counters=parse(body,kickoff_hkt=kickoff)
+            if [asdict(s) for s in snapshots]!=x['snapshots'] or counters!=x['counters']:
+                raise ValueError('Independent raw parser replay differs: '+path.name)
+        n+=1
+    if n!=len(fixtures)*2: raise ValueError('Incomplete full-issue replay')
+    write_json_atomically(dict(status='FULL_RAW_PARSER_IDENTICAL_REPLAY',issue=a.issue,channels=n,
+        observed_empty=empty,network_attempts=0,client_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()),a.output)
+    print(n,'channels identical',flush=True)
+"""CLI/import boundary regressions; transport/parser algorithms use package tests."""
+import os
+from pathlib import Path
+import runpy
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+CLIENT = ROOT / 'src/global_dynamic_26104_capture_20261018.py'
+
+
+def test_import_does_not_capture_or_publish(monkeypatch):
+    """Importing a domain command must not construct a client or open storage."""
+    import beidan_backend.unified_sources as sources
+    import beidan_backend.versioning as versioning
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Import produced a source/storage side effect')
+    monkeypatch.setattr(sources, 'SourceClient', forbidden)
+    monkeypatch.setattr(versioning, 'write_json_atomically', forbidden)
+    module = runpy.run_path(str(CLIENT), run_name='import_contract_only')
+    assert module['__name__'] == 'import_contract_only'
+
+
+def test_cadence_and_required_inputs_fail_before_opening_source(tmp_path):
+    """Unsupported frequency is refused by argparse, without output creation."""
+    result = subprocess.run([sys.executable, str(CLIENT), '--root', str(ROOT),
+        '--output', 'hot:must-not-be-created', '--min-interval-seconds', '1','--maximum-channel-attempts','2'],
+        capture_output=True, text=True, env=os.environ.copy(), timeout=30)
+    assert result.returncode == 2
+    assert 'invalid choice' in result.stderr
+
+
+def test_fixture_scope_rejects_incomplete_input_without_network(tmp_path, monkeypatch):
+    """A malformed109-fixture roster cannot silently shrink the cohort."""
+    import beidan_backend.catalog.paths as paths
+    work = tmp_path / 'work'
+    work.mkdir()
+    (work / 'inputs.json').write_text('{"issue_id":"26104","fixtures":[]}')
+    monkeypatch.setattr(paths, 'location', lambda token: work)
+    monkeypatch.setattr(sys, 'argv', [str(CLIENT), '--root', str(ROOT),
+        '--output', 'hot:fixture', '--min-interval-seconds', '5', '--maximum-channel-attempts','2','--cache-only'])
+    import pytest
+    with pytest.raises(ValueError, match='Exact109-fixture26104 input required'):
+        runpy.run_path(str(CLIENT), run_name='__main__')
+    assert not (work / 'capture-binding.json').exists()
+
+
+def test_failed_channel_recovers_once_without_refetching_sealed_successes(tmp_path, monkeypatch):
+    """A transient failed receipt is retained while only that channel is retried."""
+    import json
+    from types import SimpleNamespace
+    import pytest
+    import beidan_backend.catalog.paths as paths
+    import beidan_backend.unified_sources as sources
+    import beidan_backend.temporal_learning as shared
+    work=tmp_path/'capture';work.mkdir()
+    fixtures=[dict(fixture_id=f'26104:{i}',provider_id=str(i),home_id='H',away_id='A',
+        kickoff_at='2026-10-14T12:00:00+00:00',cutoff_utc='2026-10-13T12:00:00+00:00') for i in range(1,110)]
+    (work/'inputs.json').write_text(json.dumps(dict(issue_id='26104',fixtures=fixtures,provenance=[])))
+    calls=[]
+    def extract(source,url,parser,**kwargs):
+        calls.append(url)
+        if len(calls)==1: raise RuntimeError('temporary timeout')
+        return dict(data=b'[]',receipt=dict(network_attempts=0))
+    monkeypatch.setattr(paths,'location',lambda token:work)
+    monkeypatch.setattr(sources,'SourceClient',lambda:SimpleNamespace(cache=SimpleNamespace(extract=extract)))
+    monkeypatch.setattr(shared,'implementation_closure',lambda *args,**kwargs:{})
+    monkeypatch.setattr(sys,'argv',[str(CLIENT),'--root',str(ROOT),'--output','hot:fixture',
+        '--min-interval-seconds','5','--maximum-channel-attempts','2','--cache-only'])
+    with pytest.raises(SystemExit) as exc: runpy.run_path(str(CLIENT),run_name='__main__')
+    assert exc.value.code==2
+    assert len(calls)==218
+    assert not (work/'metadata.json').exists()
+    runpy.run_path(str(CLIENT),run_name='__main__')
+    assert len(calls)==219
+    assert len(list((work/'failed-attempts').glob('*.json')))==1
+    assert json.loads((work/'capture-status.json').read_text())['collection_complete']
+    before=(work/'metadata.json').read_bytes()
+    runpy.run_path(str(CLIENT),run_name='__main__')
+    assert len(calls)==219
+    assert (work/'metadata.json').read_bytes()==before
+test_that('walk-forward commands reject invalid modes before opening inputs', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ for(command in c('global_dynamic_walkforward_20261018.R','global_dynamic_select_20261018.R','global_dynamic_evaluate_20261018.R')) {
+  log<-tempfile()
+  status<-suppressWarnings(system2(file.path(R.home('bin'),'Rscript'),shQuote(c(file.path(root,'r',command),root,'invalid')),stdout=log,stderr=log))
+  expect_equal(status,1L)
+  expect_match(paste(readLines(log),collapse='\n'),'not TRUE')
+ }
+})
+
+
+test_that('actual common-epoch pool and cyclic-group expressions keep seven unique legs', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ nodes<-as.list(parse(file=file.path(root,'r/global_dynamic_select_20261018.R')))
+ scope<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('<-'))&&identical(n[[2]],as.name('scope')),nodes)[[1]]
+ partitions<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('<-'))&&identical(n[[2]],as.name('partitions')),nodes)[[1]]
+ outer<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('for'))&&identical(n[[2]],as.name('i')),nodes)[[1]]
+ loop<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('for'))&&identical(n[[2]],as.name('g')),as.list(outer[[4]])[-1])[[1]]
+ e<-new.env(parent=asNamespace('dplyr'));e$p<-list(maximum_pool=14L,minimum_pool=8L,groups=8L,legs=7L,rotation_step=1L)
+ e$x<-list(audit=tibble::tibble(fixture_id=paste0('26103:',1:30),slot=1:30,state='ESTIMATED_FULL100',
+  cutoff_utc=as.POSIXct('2026-10-08 00:00:00',tz='UTC')+c(rep(0,23),rep(3600,7))))
+ e$fixtures<-e$x$audit |> dplyr::transmute(fixture_id,kickoff_at=cutoff_utc+86400)
+ eval(scope,e);eval(partitions,e)
+ expect_identical(e$partitions$n,c(14L,9L,7L));expect_identical(e$partitions$eligible,c(TRUE,TRUE,FALSE))
+ for(size in 8:14) {
+  e$ids<-paste0('26103:',seq_len(size));e$gl<-list();eval(loop,e)
+  groups<-dplyr::bind_rows(e$gl)
+  expect_equal(nrow(groups),56L)
+  expect_equal(as.integer(table(groups$group_id)),rep(7L,8))
+  expect_false(anyDuplicated(groups[c('group_id','fixture_id')])>0L)
+  signatures<-vapply(e$gl,function(x)paste(x$fixture_id,collapse='|'),character(1))
+  expect_equal(length(unique(signatures)),8L)
+  expect_setequal(groups$fixture_id,e$ids)
+ }
+})
+
+test_that('actual evaluator preserves pending hits and settlement column order', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ nodes<-as.list(parse(file=file.path(root,'r/global_dynamic_evaluate_20261018.R')))
+ zloop<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('for'))&&identical(n[[2]],as.name('z')),nodes)[[1]]
+ model_body<-as.list(zloop[[4]][[4]])[-1]
+ policy_loop<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('for'))&&identical(n[[2]],as.name('policy')),model_body)[[1]]
+ body<-as.list(policy_loop[[4]])[-1]
+ cash<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('<-'))&&identical(n[[2]],as.name('cash')),body)[[1]]
+ # cash <- parlay_settle_plan(...)$ticket_returns
+ call<-cash[[3]][[2]]
+ e<-new.env(parent=asNamespace('dplyr'))
+ e$settlement<-list(settlements=tibble::tibble(source_url='fixture',status='settled',label_available_at=as.POSIXct('2026-10-20',tz='UTC'),settled_sp=2,outcome='W',fixture_id='009:1',issue_id='009'))
+ table<-eval(call[[3]],e)
+ expect_identical(names(table),c('issue_id','fixture_id','outcome','settled_sp','label_available_at','status','source_url'))
+ expect_silent(beidan:::match_validate_table(table,'settlements'))
+ row<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('<-'))&&is.call(n[[2]])&&identical(n[[2]][[2]],as.name('rows')),body)[[1]][[3]]
+ e$gs<-tibble::tibble(hit=FALSE,pending=TRUE);expect_true(is.na(eval(row[['any_hit']],e)))
+ e$gs<-tibble::tibble(hit=FALSE,pending=FALSE);expect_false(eval(row[['any_hit']],e))
+ e$gs<-tibble::tibble(hit=TRUE,pending=TRUE);expect_true(eval(row[['any_hit']],e))
+})
+
+test_that('rejected actual evaluation publication leaves accepted artifact bytes intact', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ nodes<-as.list(parse(file=file.path(root,'r/global_dynamic_evaluate_20261018.R')))
+ guard<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('tryCatch')),nodes)[[1]]
+ branches<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('if')),as.list(guard[[2]])[-1])
+ publish<-tail(branches,1)[[1]]
+ out<-tempfile();dir.create(out);withr::defer(unlink(out,recursive=TRUE))
+ destination<-file.path(out,'evaluation');stage<-file.path(out,'stage');dir.create(destination);dir.create(stage)
+ writeLines('accepted',file.path(destination,'metrics.csv'));writeLines('rejected',file.path(stage,'metrics.csv'))
+ before<-readBin(file.path(destination,'metrics.csv'),'raw',100)
+ e<-new.env(parent=baseenv());e$out<-out;e$stage<-stage;e$destination<-destination;e$receipt_path<-file.path(destination,'evaluation.json')
+ expect_error(eval(publish,e),'not TRUE')
+ expect_identical(readBin(file.path(destination,'metrics.csv'),'raw',100),before)
+ expect_false(file.exists(file.path(out,'evaluation-replay.json')))
+ writeBin(before,file.path(stage,'metrics.csv'));writeLines('{}',e$receipt_path);file.copy(e$receipt_path,file.path(stage,'evaluation.json'))
+ expect_silent(eval(publish,e))
+ expect_identical(readBin(file.path(destination,'metrics.csv'),'raw',100),before)
+ expect_true(file.exists(file.path(out,'evaluation-replay.json')))
+})
+
+test_that('actual upstream snapshot receipt excludes descriptive model labels', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ nodes<-as.list(parse(file=file.path(root,'r/global_dynamic_select_20261018.R')))
+ outer<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('for'))&&identical(n[[2]],as.name('i')),nodes)[[1]]
+ model<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('for'))&&identical(n[[2]],as.name('model')),as.list(outer[[4]])[-1])[[1]]
+ assignment<-Filter(function(n)is.call(n)&&identical(n[[1]],as.name('<-'))&&identical(n[[2]],quote(d$source_receipt)),as.list(model[[4]])[-1])[[1]]
+ e<-new.env(parent=baseenv());sha<-paste(rep('a',64),collapse='')
+ e$d<-list(source_bindings=list(forecasts=sha,client=sha,policy=sha,model='RAW'))
+ e$cutoff<-list(issue_id='26103',cutoff_utc=as.POSIXct('2026-10-08',tz='UTC'))
+ e$q<-tibble::tibble(fixture_id='26103:1',outcome='W',probability=1)
+ e$candidates<-tibble::tibble(group_id='g01',ticket_id='26103:1:1',probability=1,rank=1L)
+ e$source_at<-e$cutoff$cutoff_utc-1
+ receipt<-eval(assignment[[3]],e)
+ expect_setequal(names(receipt$source_snapshots),c('forecasts','client','policy'))
+ expect_true(all(grepl('^[a-f0-9]{64}$',unlist(receipt$source_snapshots))))
+ expect_identical(receipt$probability_hash,rlang::hash(e$q))
+})
+
+test_that('actual report refuses internally valid but mismatched evaluation inputs', {
+ root<-Sys.getenv('BEIDAN_REPO_ROOT',unset=rprojroot::find_root(rprojroot::has_file('AGENTS.md')))
+ lines<-readLines(file.path(root,'quarto/global_dynamic_walkforward_20261018.qmd'))
+ line<-lines[grepl('stopifnot(identical(ev$forecast_sha256',lines,fixed=TRUE)]
+ expect_length(line,1L)
+ guard<-parse(text=line)
+ e<-new.env(parent=baseenv());e$issue<-'26103'
+ e$fr<-list(sha256='forecast-A');e$sr<-list(sha256='round-A')
+ e$ev<-list(forecast_sha256='forecast-A',rounds_sha256='round-A')
+ e$decisions<-list('26103'=list(forecast_sha256='forecast-A'))
+ expect_silent(eval(guard,e))
+ e$ev$forecast_sha256<-'forecast-B';expect_error(eval(guard,e),'not TRUE')
+ e$ev$forecast_sha256<-'forecast-A';e$ev$rounds_sha256<-'round-B';expect_error(eval(guard,e),'not TRUE')
+ e$ev$rounds_sha256<-'round-A';e$decisions[['26103']]$forecast_sha256<-'forecast-B';expect_error(eval(guard,e),'not TRUE')
+})
+---
+title: "FM-1.7.1完整分布：整体校准与动态选票的整期滚动对照"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  require_acceptance: true
+---
+
+本研究比较“原概率＋动态选票”和“整体校准＋动态选票”。基座是FM-1.7.1的同赛事原生λ及既有置信／市场来源裁决，保留所选比分网格的100%分布，不做尾部压缩。**完整采集遍历、模型可估、七场可组成轮次、赛果可评分及现金可结算，是五个不同的分母。** 所有名单、排除和待定均保留。
+
+26105尚未全部完赛，保留为待完赛验证期；其数据登记状态与比赛状态分别记录。本次先完成26103、26104对照。
+
+这是历史诊断。已有历史赛果早已被研究过，现有基础事实及报价时间部分属于事后采集的历史时钟代理；本研究不宣称盲测、真实赛前可用性或实盘收益优势，也不自动升级正式FM规则。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root, mustWork = TRUE)
+setwd(root)
+out <- file.path(root, 'results/global-dynamic-walkforward-20261018')
+library(beidan, lib.loc = file.path(root, 'results/margin-combination-study-20261018/library'))
+policy <- jsonlite::fromJSON(file.path(root,'config/global_dynamic_walkforward_20261018.json'))
+issues <- c('26103','26104')
+forecasts <- decisions <- list()
+metrics <- rounds <- scores <- audits <- training <- partitions <- sp_audits <- list()
+for (issue in issues) {
+ w <- file.path(out,issue)
+ forecasts[[issue]] <- readRDS(file.path(w,'frozen-forecasts.rds'))
+ decisions[[issue]] <- readRDS(file.path(w,'frozen-rounds.rds'))
+ fr <- jsonlite::fromJSON(file.path(w,'forecast-replay.json'))
+ sr <- jsonlite::fromJSON(file.path(w,'selection-replay.json'))
+ er <- jsonlite::fromJSON(file.path(w,'evaluation-replay.json'))
+ stopifnot(fr$status=='FULL_IDENTICAL_REPLAY',sr$status=='FULL_IDENTICAL_REPLAY',
+  er$status=='FULL_IDENTICAL_EVALUATION_REPLAY',
+  fr$sha256==digest::digest(file=file.path(w,'frozen-forecasts.rds'),algo='sha256'),
+  sr$sha256==digest::digest(file=file.path(w,'frozen-rounds.rds'),algo='sha256'),
+  er$evaluation_sha256==digest::digest(file=file.path(w,'evaluation/evaluation.json'),algo='sha256'))
+ ev <- jsonlite::fromJSON(file.path(w,'evaluation/evaluation.json'))
+ stopifnot(identical(ev$forecast_sha256,fr$sha256),identical(ev$rounds_sha256,sr$sha256),identical(decisions[[issue]]$forecast_sha256,fr$sha256))
+ stopifnot(identical(policy,forecasts[[issue]]$policy))
+ for(name in names(ev$output_hashes))stopifnot(ev$output_hashes[[name]]==digest::digest(file=file.path(w,'evaluation',paste0(name,'.csv')),algo='sha256'))
+ metrics[[issue]] <- read_csv(file.path(w,'evaluation/metrics.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+ rounds[[issue]] <- read_csv(file.path(w,'evaluation/rounds.csv'),show_col_types=FALSE)
+ scores[[issue]] <- read_csv(file.path(w,'evaluation/scores.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+ audits[[issue]] <- forecasts[[issue]]$audit |> mutate(issue_id=issue,.before=1)
+ training[[issue]] <- read_csv(file.path(w,'evaluation/training.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+ partitions[[issue]] <- decisions[[issue]]$partitions |> mutate(issue_id=issue,.before=1)
+ sp_audits[[issue]] <- read_csv(file.path(w,'settlement-audit.csv'),show_col_types=FALSE) |> mutate(issue_id=issue,.before=1)
+}
+metrics <- bind_rows(metrics);rounds <- bind_rows(rounds);scores <- bind_rows(scores)
+audits <- bind_rows(audits);training <- bind_rows(training);partitions <- bind_rows(partitions)
+sp_audits <- bind_rows(sp_audits)
+datasets <- read_csv(file.path(out,'dataset-census.csv'),show_col_types=FALSE)
+tables <- read_csv(file.path(out,'table-census.csv'),show_col_types=FALSE)
+source_files <- read_csv(file.path(out,'delivery-source-manifest.csv'),show_col_types=FALSE)
+for(i in seq_len(nrow(source_files)))stopifnot(source_files$sha256[i]==digest::digest(file=file.path(root,source_files$path[i]),algo='sha256'))
+accepted <- file.exists(file.path(out,'acceptance.json'))
+if(params$require_acceptance) {
+ stopifnot(accepted)
+ acceptance <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ stopifnot(acceptance$status=='ACCEPTED',all(acceptance$checks$exit_status==0L),
+  all(acceptance$tests$failed==0L),all(acceptance$tests$errors==0L),all(acceptance$tests$skipped==0L))
+}
+```
+
+研究范围及分母
+
+```{r}
+#| echo: false
+datasets |> select(issue_id,kind,version,fixtures,state) |> knitr::kable(caption='已登记底座；登记状态与比赛是否完赛分别记录')
+audits |> count(issue_id,state,reason,name='场次') |> knitr::kable(caption='整期全名单与模型准入／排除')
+partitions |> group_by(issue_id,eligible) |> summarise(候选池数=n(),涉及比赛=sum(n),.groups='drop') |> knitr::kable(caption='共同决策时点的轮次池；不足8场不强行构造8个不同七场组')
+```
+
+26103复用已经完成的407场、814个亚洲盘／大小球通道补采，以及41批原生重算；26104复用109场基本面及欧赔版本，另补采218个公司8亚洲盘／大小球通道。所有原始通道均从固定原文独立重放；解析空数组、请求失败、截止前无报价及时间冲突分别记录。全源采集不等于每个截止前都有合格报价；公司8也不代表全部亚洲盘市场。
+
+原生支持遵循同赛事／同场地、近期8场、长期与近期各0.5、至少12场、ESS至少8，不设日历跨度上限，使用same_support_raw，不使用对手强度归一化参数。近期样本、赛事元数据及各UTC截止绑定在原生收据中。未估成功者不填回旧版概率。
+
+欧赔采用全部已验证、时间合格、同分钟无冲突的Titan公司，每公司先去水再平均；至少3家公司。亚洲盘和大小球采用公司8的同截止前48小时内最新完整报价，报价必须严格早于截止。缺少阵容／伤停及未量化对手强度使基本面置信保持uncertain；联合市场与欧赔、亚洲盘的最大残差均不超过5个百分点时，调用既有来源裁决函数直接采用市场网格，否则保留有支持的原生网格。ρ仍为专家固定−0.1。现有总进球反推在DC下对低于2.5的盘口未获准使用，本次不扩展该数学能力；因此样本存在低总进球比赛被排除的选择偏差。
+
+这与旧7轮的市场覆盖和公司篮子不完全相同。两种概率在本次比较中共享完全相同的基座与准入；旧轮次只作已看过的复现证据，不能混作新增验证样本。
+
+整体校准及时间顺序
+
+原概率RAW是完整网格映射至实际北单让球的W／D／L概率。GLOBAL分别以原三项logit为offset拟合三个只有截距的二项GLM，随后归一化；不加入分布形态特征，不重估λ、ρ，不重新压缩尾部。初始历史是26098、26101、26102的322个合格冻结样本。进入26104时追加本次冻结的26103原概率及已有赛果观察时间，只允许共享temporal_learning在各场原始T−24h截止前实际准入的行进入训练；不是把全155场无条件加入每场。
+
+```{r}
+#| echo: false
+training |> group_by(issue_id) |> summarise(截止数=n(),最少训练场次=min(training_rows),最多训练场次=max(training_rows),.groups='drop') |> knitr::kable()
+```
+
+GLOBAL所有超参数预先固定：等权扩展、ESS至少100、每类至少15场、epsilon为1e−8。没有用目标期选择窗口、收缩强度或校准方式。显式排除目标及未来期号，即使伪造了提前的标签时间也不能准入。每个截止有独立收据、实际准入行及权重账本、实现闭包、来源哈希和缓存键；源时钟代理只授权历史诊断。预测及选票客户端不读取目标标签，分别冻结并独立重放后，评价客户端才读取目标标签／SP。底层历史名单已包含已知赛果，故这种客户端隔离不构成盲测。
+
+单场概率表现
+
+```{r}
+#| echo: false
+metrics |> transmute(期号=issue_id,模型=model,评分场次=n,Top1=scales::percent(top1,accuracy=.01),Top2=scales::percent(top2,accuracy=.01),Brier=round(brier,4),LogLoss=round(logloss,4)) |> knitr::kable(caption='相同场次；Brier与log loss越低越好')
+scores |> group_by(model) |> summarise(n=n(),top1=mean(top1),top2=mean(top2),brier=mean(brier),logloss=mean(logloss),.groups='drop') |> knitr::kable(digits=4,caption='合并样本仅作描述；逐期结果优先')
+```
+
+Top1／Top2是类别排序是否包含实际让球赛果；Brier和log loss检查概率数值。不能用单场Top2上升推断七场购票改善，也不能把模型估计的组合覆盖概率当成真实命中率。
+
+动态购票对照
+
+RAW及GLOBAL均按各场原始T−24h截止冻结。后续共同决策时点不更新盘口、不重拟合校准器，比较的是相同已冻结信息下的选票。随后取预先列明的每日00:00 UTC中，第一个不早于该预测截止、且严格早于开赛的共同模拟决策时点。同一期、同一共同决策时点的合格比赛按数字场次号排序，每12场成一个候选池，尾池至少8场；以起点顺移1场的环形窗口构造8个不同七场组。该规则完全不读取目标标签，两模型使用相同组。每组枚举全部2187个让球赛果组合，125注×2元×8组，每轮2,000元；重复物理票仍计成本及可能的重复中奖。
+
+FIXED为30–154，TOP为1–125，作为固定对照。DYNAMIC_WINDOW逐步选择新增联合覆盖最大的连续125注区间；DYNAMIC_SET选择任意125注。每一步同时选择尚未购买的组，采用既有贪心算法，不宣称全局最优。不同比赛按独立假设，同一比赛在各组精确共享；完整世界积分结果另与Rcpp联合覆盖内核核对。
+
+```{r}
+#| echo: false
+rounds |> group_by(issue_id,model,policy) |> summarise(轮次=n(),确认命中轮数=sum(any_hit%in%TRUE),待定轮数=sum(is.na(any_hit)),确认中奖组数=sum(hit_groups),投入=sum(cost_cny),.groups='drop') |> knitr::kable()
+rounds |> filter(policy%in%c('DYNAMIC_WINDOW','DYNAMIC_SET')) |> select(issue_id,index,cutoff_utc,model,policy,hit_groups,pending_groups,any_hit,model_any_hit) |> knitr::kable(digits=4,caption='逐轮明细；model_any_hit是模型估计值')
+```
+
+结算与资金口径
+
+目标赛果沿用已验收名单公布的全场比分，其90分钟口径未全部获得独立认证。SP只接纳缓存来源中“完场、唯一实际报价选项、SP大于1”、身份／让球及比分方向一致的结算观察；不根据汇总SP或比分补造选项。SP=1、缺失、部分覆盖及特殊结算均不能据此当成已验证普通结算。结算调用包的统一入口，每张票只有一次0.65系数。评价输出先在临时目录构建、验证，再以目录重命名发布；不一致的重放不会覆盖已验收结果。
+
+```{r}
+#| echo: false
+sp_audits |> count(issue_id,state,name='场次') |> knitr::kable()
+common <- rounds |> group_by(issue_id,index) |> summarise(complete=all(monetary_complete),.groups='drop') |> filter(complete)
+cash <- rounds |> semi_join(common,by=c('issue_id','index')) |> group_by(model,policy) |>
+ summarise(共同现金完整轮数=n(),投入=sum(cost_cny),回款=sum(payout_cny),净额=sum(payout_cny-cost_cny),.groups='drop')
+cash |> knitr::kable(digits=2,caption='只比较所有方案共同现金完整的轮次；不得外推缺失轮次收益')
+```
+
+局限及判断边界
+
+- 26105尚未全部完赛（用户在本轮明确确认），不纳入整期最终命中率及收益比较；已有冻结预测保持不变，待全部完赛再验收。26106起仍需另做冻结规则后的验证。
+- 合格样本偏向历史支持及三通道齐备的比赛，排除了低大小球、时间冲突及样本稀疏场次；不能外推为整期所有比赛的准确率。
+- 按共同决策时点及候选池构组使部分单场预测不能进入七场实验；不以赛果补凑样本。
+- 只检验一种固定GLOBAL校准，不检验分布形态校准；较早训练样本的市场篮子／来源构成与本次不完全相同。
+- 8组及独立比赛假设保持固定；没有证明该组法、预算分配或贪心选票全局最优。
+- 没有用目标表现选最终政策，也没有修改任何既有正式模拟单、服务或正式模型版本。原概率＋动态选票仍是基准，GLOBAL是待验证挑战者。
+
+复现、测试及审查
+
+依赖现有R4.6.1、项目`.venv/bin/python`、Quarto及已正常安装的beidan包快照；没有渲染时安装依赖。库路径是上次已验证包快照的`results/margin-combination-study-20261018/library`。该包源快照身份、解释器及实际DLL调用记录在验收清单中，不认证其他作者的并行工作。
+
+执行顺序：读取`config/source-extraction.env`及已声明测试环境；运行census、26104 intake与capture；运行26104 native；对26103／26104分别运行forecast与replay、select freeze与replay、settlement、evaluate两次；执行显式真实数据验收脚本及完整例行测试，最后干净渲染本QMD并审查。命令、退出状态及源身份均见下表。`forecast`须传入声明的实现快照根；更换实现、截止或来源须新建研究版本，不能改已有收据字段继续复用。
+
+例行R测试使用临时小样本，覆盖实际共同决策时点分池／构组表达式、待定语义、结算列合同、拒绝不一致评价时保持旧文件。真实数据的因果准入、GLOBAL独立标量算式、无尾部压缩、两模型相同名单与预算、全部输出哈希及重放则由`r/check_global_dynamic_artifacts_20261018.R`单独执行，不能把尚未生成的研究数据当成已通过测试，也不通过skip掩盖缺口。Python客户端测试覆盖导入无副作用、参数与名单拒绝、失败通道有界恢复、保留失败回执和成功通道不重复抓取；814＋218个真实盘口通道另有原文重放。
+
+```{r}
+#| echo: false
+if(params$require_acceptance)knitr::kable(acceptance$tests,caption='本轮实际完成的测试统计')
+```
+
+```{r}
+#| echo: false
+if(params$require_acceptance)knitr::kable(acceptance$checks,caption='准确命令、退出状态及证据文件')
+```
+
+```{r}
+#| echo: false
+if(params$require_acceptance)knitr::kable(as_tibble(acceptance$review),caption='审查发现与处置；最终HTML另作制品核查')
+```
+
+```{r}
+#| echo: false
+source_files |> knitr::kable(caption='本次交付源文件身份')
+```
+
+codex
+No blocking source findings identified in the listed owned files within the historical-diagnostic scope. This source-only verdict does not certify the unfinished 26104 results, running full R suite, real-data acceptance, or final QMD rendering.
+No blocking source findings identified in the listed owned files within the historical-diagnostic scope. This source-only verdict does not certify the unfinished 26104 results, running full R suite, real-data acceptance, or final QMD rendering.

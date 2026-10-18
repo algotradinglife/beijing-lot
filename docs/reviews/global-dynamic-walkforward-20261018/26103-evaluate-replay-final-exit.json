@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/opt/R/4.6.1/bin/Rscript",
+    "r/global_dynamic_evaluate_20261018.R",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "26103"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T14:10:05.969470+00:00",
+  "finished_at_utc": "2026-10-18T14:12:38.019906+00:00"
+}

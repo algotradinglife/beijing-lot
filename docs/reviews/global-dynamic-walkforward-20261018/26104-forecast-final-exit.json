@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/opt/R/4.6.1/bin/Rscript",
+    "r/global_dynamic_walkforward_20261018.R",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "/tmp/beidan-margin-combinations-20261018",
+    "26104",
+    "forecast"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T14:18:03.024197+00:00",
+  "finished_at_utc": "2026-10-18T14:18:54.381207+00:00"
+}

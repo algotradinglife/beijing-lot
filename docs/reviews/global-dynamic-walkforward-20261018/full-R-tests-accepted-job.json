@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R"
+  ],
+  "cwd": "/tmp/beidan-global-dynamic-20261018",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/full-R-tests-accepted.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/full-R-tests-accepted-exit.json"
+}

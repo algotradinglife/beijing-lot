@@ -1,0 +1,16 @@
+
+
+processing file: global_dynamic_walkforward_20261018.qmd
+1/21                   
+2/21 [unnamed-chunk-1] 
+Error in `library()`:
+! there is no package called 'tidyverse'
+Backtrace:
+    ▆
+ 1. ├─base::suppressPackageStartupMessages(library(tidyverse))
+ 2. │ └─base::withCallingHandlers(expr, packageStartupMessage = function(c) tryInvokeRestart("muffleMessage"))
+ 3. └─base::library(tidyverse)
+
+Quitting from global_dynamic_walkforward_20261018.qmd:21-70 [unnamed-chunk-1]
+Execution halted
+WARN: Error encountered when rendering files

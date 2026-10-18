@@ -1,0 +1,23 @@
+{
+  "historical_evidence_only_not_reusable_clean_interfaces": [
+    {
+      "path": "results/global-dynamic-walkforward-20261018/26103-development-exact-epoch",
+      "status": "Superseded grouping before target evaluation; original per-fixture probabilities unchanged, parity receipt retained"
+    },
+    {
+      "path": "hot:global-dynamic-26104-20261018-development",
+      "status": "Successful raw channels reused by hash; failed receipt recovery fixed before accepted full capture"
+    },
+    {
+      "path": "hot:global-dynamic-26104-20261018-development-02",
+      "status": "Preserved capture source evolution; final binding identifies accepted producer"
+    }
+  ],
+  "interrupted_attempts": [
+    "Monolithic native interrupted deliberately for3shards; full unchanged factual domain in all workers",
+    "Native shard3 tool session143; identical rerun completed0",
+    "Complete R tests attempt143; entirely fresh full normal installed-package suite completed0"
+  ],
+  "changed_frozen_predictions": false,
+  "accepted_new_grouping": "Explicit new common-clock decision artifacts; original T24 forecast probabilities unchanged; no old cutoff field edited"
+}

@@ -1,0 +1,216 @@
+{
+  "status": "ACCEPTED",
+  "generated_at_utc": "2026-10-18T14:34:05.743552+00:00",
+  "tests": [
+    {
+      "suite": "Installed beidan R: package",
+      "blocks": 991,
+      "passed": 9647,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Installed beidan R: repository",
+      "blocks": 808,
+      "passed": 183326,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Complete backend Python + capture client",
+      "blocks": 647,
+      "passed": 647,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Explicit real-artifact acceptance",
+      "blocks": 2,
+      "passed": 3065,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Rendered literal commands: independent HTML regression",
+      "blocks": 1,
+      "passed": 47,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "checks": [
+    {
+      "check": "full-R-tests-accepted",
+      "command": "[\"/bin/zsh\", \"-c\", \". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\\nR_LIBS_USER=\\\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library:$R_LIBS_USER\\\" /opt/R/4.6.1/bin/Rscript tests/testthat.R\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/full-R-tests-accepted-exit.json"
+    },
+    {
+      "check": "full-python-tests",
+      "command": "[\"env\", \"PYTHONPATH=packages/beidan/inst/python:$PWD\", \".venv/bin/python\", \"-m\", \"pytest\", \"packages/beidan/tests/python\", \"tests/test_global_dynamic_capture_20261018.py\", \"-q\", \"-rs\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/full-python-tests-exit.json"
+    },
+    {
+      "check": "review-source-final",
+      "command": "[\"codex\", \"review\", \"Read-only final source review. Read only the listed owned files, do not edit, no CI, no unrelated repository scans: config/global_dynamic_walkforward_20261018.json; r/global_dynamic_census_20261018.R; r/global_dynamic_26104_intake_20261018.R; r/global_dynamic_26104_native_20261018.R; r/global_dynamic_walkforward_20261018.R; r/global_dynamic_select_20261018.R; r/global_dynamic_settlement_20261018.R; r/global_dynamic_evaluate_20261018.R; r/check_global_dynamic_artifacts_20261018.R; src/global_dynamic_26104_capture_20261018.py; src/global_dynamic_capture_replay_20261018.py; tests/testthat/test-global-dynamic-walkforward.R; tests/test_global_dynamic_capture_20261018.py; quarto/global_dynamic_walkforward_20261018.qmd. This is a historical diagnostic, not prospective. FM171 same_support_raw no tail. Three prior-only intercept logit offsets then normalize. All chronology comes from existing installed beidan temporal_learning under frozen prior implementation root. 26104 native now sharded3 workers over target IDs only; all full factual domain/history identical, assembler requires full disjoint109 roster and all samebindings. Review cutoff receipts, target exclusion, market freshness, native rawlambda, paired groups/common-clock original prediction ledger, settlement one0.65factor, immutable publication, tests. 26105 unfinished confirmed by user, excluded; 26106 pending prospective. Prior P2 fixes: failed capture bounded retry2 with immutable failed receipts; atomic evaluation publishing; isolated unit tests plus explicit real-data acceptance; QMD enforces forecast/round/evaluation crossbindings. Unit62 R assertions pass and complete Python647 pass. Full R tests running; final26104 results not yet available, do not certify those. Report actionable blocking findings or no blocking source findings. Reviewed source SHA manifest results/global-dynamic-walkforward-20261018/review-source-inputs.json. Do not suggest generalized abstractions or extra studies.\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/review-source-final-exit.json"
+    },
+    {
+      "check": "real-data-validation-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/check_global_dynamic_artifacts_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/real-data-validation-final-exit.json"
+    },
+    {
+      "check": "render-preliminary-accepted",
+      "command": "[\"/usr/bin/env\", \"R_PROFILE_USER=/dev/null\", \"QUARTO_R=/opt/R/4.6.1/bin/R\", \"R_LIBS_USER=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\", \"quarto\", \"render\", \"quarto/global_dynamic_walkforward_20261018.qmd\", \"--no-cache\", \"-P\", \"project_root:/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"-P\", \"require_acceptance:false\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/render-preliminary-accepted-exit.json"
+    },
+    {
+      "check": "26103-evaluate-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_evaluate_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"26103\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26103-evaluate-final-exit.json"
+    },
+    {
+      "check": "26103-evaluate-replay-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_evaluate_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"26103\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26103-evaluate-replay-final-exit.json"
+    },
+    {
+      "check": "26104-native-shard-1-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_26104_native_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"/tmp/beidan-margin-combinations-20261018\", \"fit\", \"1\", \"3\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-native-shard-1-final-exit.json"
+    },
+    {
+      "check": "26104-native-shard-2-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_26104_native_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"/tmp/beidan-margin-combinations-20261018\", \"fit\", \"2\", \"3\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-native-shard-2-final-exit.json"
+    },
+    {
+      "check": "26104-native-shard-3-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_26104_native_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"/tmp/beidan-margin-combinations-20261018\", \"fit\", \"3\", \"3\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-native-shard-3-final-exit.json"
+    },
+    {
+      "check": "26104-native-assemble-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_26104_native_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"/tmp/beidan-margin-combinations-20261018\", \"assemble\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-native-assemble-final-exit.json"
+    },
+    {
+      "check": "26104-forecast-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_walkforward_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"/tmp/beidan-margin-combinations-20261018\", \"26104\", \"forecast\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-forecast-final-exit.json"
+    },
+    {
+      "check": "26104-forecast-replay-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_walkforward_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"/tmp/beidan-margin-combinations-20261018\", \"26104\", \"replay\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-forecast-replay-final-exit.json"
+    },
+    {
+      "check": "26104-select-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_select_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"26104\", \"freeze\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-select-final-exit.json"
+    },
+    {
+      "check": "26104-select-replay-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_select_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"26104\", \"replay\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-select-replay-final-exit.json"
+    },
+    {
+      "check": "26104-settlement-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_settlement_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"26104\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-settlement-final-exit.json"
+    },
+    {
+      "check": "26104-evaluate-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_evaluate_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"26104\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-evaluate-final-exit.json"
+    },
+    {
+      "check": "26104-evaluate-replay-final",
+      "command": "[\"/opt/R/4.6.1/bin/Rscript\", \"r/global_dynamic_evaluate_20261018.R\", \"/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"26104\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/26104-evaluate-replay-final-exit.json"
+    },
+    {
+      "check": "render-literal-accepted",
+      "command": "[\"/usr/bin/env\", \"R_PROFILE_USER=/dev/null\", \"QUARTO_R=/opt/R/4.6.1/bin/R\", \"R_LIBS_USER=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\", \"quarto\", \"render\", \"quarto/global_dynamic_walkforward_20261018.qmd\", \"--no-cache\", \"-P\", \"project_root:/home/drwho1985/workspace/algotradinglife/beijing-lot\", \"-P\", \"require_acceptance:true\"]",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/render-literal-accepted-exit.json"
+    },
+    {
+      "check": "rendered-command-regression",
+      "command": "R_PROFILE_USER=/dev/null R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\" /opt/R/4.6.1/bin/Rscript r/check_global_dynamic_report_20261018.R \"/home/drwho1985/workspace/algotradinglife/beijing-lot\"",
+      "exit_status": 0,
+      "evidence": "results/global-dynamic-walkforward-20261018/rendered-command-regression.log"
+    }
+  ],
+  "review": [
+    {
+      "finding": "Capture FAILED receipts prevented bounded recovery",
+      "resolution": "Preserved failed bytes; retry twice; offline regression",
+      "evidence": "tests/test_global_dynamic_capture_20261018.py"
+    },
+    {
+      "finding": "Rejected evaluation rerun could overwrite accepted outputs",
+      "resolution": "Atomic staged directory publish; preservation regression",
+      "evidence": "tests/testthat/test-global-dynamic-walkforward.R"
+    },
+    {
+      "finding": "Routine tests depended on unfinished real artifacts",
+      "resolution": "Temporary unit fixtures; separate mandatory3065assertion real check",
+      "evidence": "r/check_global_dynamic_artifacts_20261018.R"
+    },
+    {
+      "finding": "QMD evaluation was not bound to matching forecasts/rounds",
+      "resolution": "Explicit crossbindings and rejection regression",
+      "evidence": "tests/testthat/test-global-dynamic-walkforward.R"
+    },
+    {
+      "finding": "Final source review",
+      "resolution": "No blocking source findings; final artifact separately reviewed",
+      "evidence": "results/global-dynamic-walkforward-20261018/review-source-final.log"
+    },
+    {
+      "finding": "Markdown math corrupted command/evidence rows in HTML",
+      "resolution": "Escaped HTML table with literal code nodes;47 rendered command/evidence assertions passed;62 unchanged unit assertions freshly passed",
+      "evidence": "r/check_global_dynamic_report_20261018.R"
+    }
+  ],
+  "source_manifest_sha256": "e86348c529bc1e4b78f26a4c4c03280ab23090d119b6299587e37ae3133c3a06",
+  "implementation_binding_sha256": "0adade98a73b223a02060e77502e3102a2d28dd718f271da6e27dcf679728a5b",
+  "historical_learning_inventory_sha256": "8c9b61ede6d763d668e1205f7249e470104753004adc4b68a31fce855aea9a52",
+  "lifecycle_sha256": "5e7ebb8c562fcf231167c1aa98e50f17222164bd9277728b6ba1fd636a01063e",
+  "scope": "Historical paired26103/26104 only;26105unfinished and26106prospective not claimed complete",
+  "superseded_attempts": [
+    "full-R-tests-terminated.log: interrupted143; replaced by complete fresh accepted suite",
+    "render-preliminary-final.log: missing explicit R library path; replaced with declared R_LIBS_USER",
+    "26103-evaluate.log: wrong label-file binding rejected; repaired before any accepted output, full rerun and independent replay passed"
+  ],
+  "final_presentation_change": "QMD command table only; functional source and routine tests unchanged from complete accepted suites. Dedicated rendered HTML regression and fresh targeted62assertion test follow."
+}

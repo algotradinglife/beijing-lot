@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/opt/R/4.6.1/bin/Rscript",
+    "r/global_dynamic_26104_native_20261018.R",
+    "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+    "/tmp/beidan-margin-combinations-20261018",
+    "fit",
+    "3",
+    "3"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26104-native-shard-3-final.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-walkforward-20261018/26104-native-shard-3-final-exit.json"
+}

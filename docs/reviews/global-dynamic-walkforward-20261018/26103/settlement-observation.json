@@ -1,0 +1,32 @@
+{
+  "sha256": "57e668376eb552f929ea0d8c08d78bf7a8f1e3188710f3919981d070e0c3bfa0",
+  "source_receipt": {
+    "capture_id": 1137,
+    "request_key": "978970120971a9cf92059981ea19ee1901462e5711adafd8baa30c72ecf4e5f2",
+    "source": "nowscore",
+    "url": "https://cp.nowscore.com/buy/DanChang.aspx?TypeID=5&all=1&issueNum=26103",
+    "observed_at": "2026-10-13T04:55:48.900557+00:00",
+    "sha256": "a055835647c38d92de21d8f05bcefa44faeac314b212df6f6cceb4b3294db012",
+    "content_type": "text/html; charset=utf-8",
+    "cache_hit": true,
+    "network_attempts": 0,
+    "cache_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/source-extraction/raw.sqlite",
+    "processed_at": "2026-10-18T14:04:53.900179+00:00",
+    "implementation_sha256": {
+      "unified_sources.py": "f5a46b2f960898c0013c6449d52213b307dd6311d55ee31be497e1aac34e28aa",
+      "source_extraction.py": "ff93a180e4f0b09a1bc9431e690134c29ac039e6bc51c7fc5ae85117a9162054",
+      "parser.py": "ebfdaa3335a4fca5a71ed4b52ae35f539b07118b9401c5276efba42ee93e6e2b",
+      "labels.py": "96088e4d119d456ed8a1badc2f0be6147841ba646afa17b06e379d151c567712",
+      "extraction_cache.py": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422",
+      "transport.py": "8b68fbc2dc43418a488365416d60f9d719ebb1c6df0980353fb1692b4987a955"
+    },
+    "context": {
+      "issue_id": "26103",
+      "play": "handicap_result",
+      "typeid": 5
+    }
+  },
+  "observed_rows": 407,
+  "accepted_sp_rows": 405,
+  "source_selection_sha256": "de5d32986be3d1d43ef74be175e922780aa45782df28a83160f89dfc00beea62"
+}

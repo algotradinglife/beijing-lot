@@ -1,0 +1,50 @@
+{
+  "transitive_owner": "packages/beidan/inst/python/beidan_backend/temporal_learning",
+  "entries": [
+    {
+      "entry": "r/global_dynamic_26104_native_20261018.R",
+      "operations": [
+        "prepare_reviewed_opponent_goals",
+        "FitOpponentGoals"
+      ],
+      "purpose": "prior same-competition/venue raw lambda; recent8 equal blend alpha.5",
+      "chronology": "shared Cutoff and preparation context; full target/future exclusion; receipt admission/observations/groups/implementation bindings"
+    },
+    {
+      "entry": "r/global_dynamic_walkforward_20261018.R",
+      "operations": [
+        "FitMarginShapeCalibration",
+        "PredictMarginShapeCalibration",
+        "project_dc_market_handicap",
+        "SelectFmProbabilitySource",
+        "adjust_score_margin_distribution",
+        "project_score_outcomes"
+      ],
+      "purpose": "frozen full100 source probability and prior-only intercept calibration",
+      "chronology": "shared temporal_learning contexts, per-fixture T24 cutoff, partition/weight/source/label/cache/implementation receipts; historical proxy only"
+    },
+    {
+      "entry": "r/global_dynamic_select_20261018.R",
+      "operations": [
+        "parlay_enumerate_tickets",
+        "parlay_rank_tickets",
+        "SelectJointOutcomeTickets"
+      ],
+      "purpose": "fixed2000CNY paired exact-world greedy ticket selection",
+      "chronology": "new common cutoff with original per-fixture cutoff ledgerSHA; frozen forecast and input hashes; label-free selection; independent exact replay"
+    },
+    {
+      "entry": "r/global_dynamic_settlement_20261018.R; r/global_dynamic_evaluate_20261018.R",
+      "operations": [
+        "parlay_settle_plan",
+        "DcAccuracyDiagnostic",
+        ".parlay_ranked_union_coverage"
+      ],
+      "purpose": "observation-only scoring and single0.65 payout factor",
+      "chronology": "read labels only after selection replay; strict unique normal SP; incomplete settlement remains pending"
+    }
+  ],
+  "independent_replay_required": true,
+  "policy_changes_using_target_labels": false,
+  "prospective_admission": false
+}

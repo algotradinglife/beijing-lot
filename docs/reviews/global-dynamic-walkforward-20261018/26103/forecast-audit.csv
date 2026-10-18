@@ -1,0 +1,408 @@
+fixture_id,slot,cutoff_utc,handicap,native_supported,euro_companies,asian_rows,total_rows,three_channel_fit,market_consistent,selected_source,state,reason
+26103:1,1,2026-10-08T05:00:00Z,0,TRUE,85,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:2,2,2026-10-08T05:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:3,3,2026-10-08T07:30:00Z,-1,TRUE,88,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:4,4,2026-10-08T07:30:00Z,0,TRUE,81,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:5,5,2026-10-08T07:30:00Z,0,TRUE,77,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:6,6,2026-10-08T07:30:00Z,0,TRUE,82,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:7,7,2026-10-08T10:00:00Z,0,TRUE,135,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:8,8,2026-10-08T10:00:00Z,0,TRUE,88,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:9,9,2026-10-08T15:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:10,10,2026-10-08T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:11,11,2026-10-08T16:00:00Z,2,TRUE,118,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:12,12,2026-10-08T16:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:13,13,2026-10-08T16:00:00Z,-1,TRUE,116,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:14,14,2026-10-08T16:00:00Z,0,TRUE,92,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:15,15,2026-10-08T16:00:00Z,-1,TRUE,112,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:16,16,2026-10-08T16:00:00Z,0,TRUE,87,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:17,17,2026-10-08T16:00:00Z,1,TRUE,58,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:18,18,2026-10-08T16:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:19,19,2026-10-08T16:30:00Z,0,TRUE,116,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:20,20,2026-10-08T16:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:21,21,2026-10-08T16:30:00Z,0,TRUE,71,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:22,22,2026-10-08T17:00:00Z,0,TRUE,140,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:23,23,2026-10-08T17:00:00Z,-1,TRUE,137,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:24,24,2026-10-08T17:00:00Z,0,TRUE,130,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:25,25,2026-10-08T17:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:26,26,2026-10-08T17:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:27,27,2026-10-08T17:30:00Z,0,TRUE,99,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:28,28,2026-10-08T17:30:00Z,0,TRUE,83,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:29,29,2026-10-08T17:30:00Z,1,TRUE,88,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:30,30,2026-10-08T17:30:00Z,0,TRUE,101,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:31,31,2026-10-08T17:45:00Z,0,TRUE,126,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:32,32,2026-10-08T18:00:00Z,0,TRUE,90,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:33,33,2026-10-08T18:00:00Z,-1,TRUE,129,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:34,34,2026-10-08T18:00:00Z,0,TRUE,120,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:35,35,2026-10-08T18:00:00Z,0,TRUE,139,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:36,36,2026-10-08T18:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:37,37,2026-10-08T18:00:00Z,-2,TRUE,121,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:38,38,2026-10-08T18:00:00Z,1,TRUE,137,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:39,39,2026-10-08T18:00:00Z,0,TRUE,66,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:40,40,2026-10-08T18:00:00Z,-1,TRUE,58,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:41,41,2026-10-08T18:00:00Z,-1,TRUE,80,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:42,42,2026-10-08T18:00:00Z,-1,TRUE,86,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:43,43,2026-10-08T18:00:00Z,0,TRUE,74,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:44,44,2026-10-08T18:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:45,45,2026-10-08T18:00:00Z,-1,TRUE,72,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:46,46,2026-10-08T18:00:00Z,0,TRUE,94,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:47,47,2026-10-08T18:00:00Z,-1,TRUE,96,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:48,48,2026-10-08T18:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:49,49,2026-10-08T18:00:00Z,1,TRUE,64,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:50,50,2026-10-08T18:15:00Z,1,TRUE,120,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:51,51,2026-10-08T18:15:00Z,0,TRUE,64,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:52,52,2026-10-08T18:30:00Z,-2,TRUE,142,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:53,53,2026-10-08T18:30:00Z,0,TRUE,82,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:54,54,2026-10-08T18:30:00Z,0,TRUE,122,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:55,55,2026-10-08T18:30:00Z,0,TRUE,103,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:56,56,2026-10-08T18:45:00Z,0,TRUE,127,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:57,57,2026-10-08T18:45:00Z,-1,TRUE,118,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:58,58,2026-10-08T18:45:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:59,59,2026-10-08T18:45:00Z,-1,TRUE,83,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:60,60,2026-10-08T18:45:00Z,-1,TRUE,53,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:61,61,2026-10-08T18:45:00Z,0,TRUE,59,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:62,62,2026-10-08T18:45:00Z,-2,TRUE,89,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:63,63,2026-10-08T18:45:00Z,-1,TRUE,63,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:64,64,2026-10-08T19:00:00Z,0,TRUE,134,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:65,65,2026-10-08T19:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:66,66,2026-10-08T19:15:00Z,0,TRUE,142,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:67,67,2026-10-08T21:00:00Z,0,TRUE,102,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:68,68,2026-10-08T22:30:00Z,0,TRUE,122,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:69,69,2026-10-09T00:45:00Z,0,TRUE,109,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:70,70,2026-10-09T01:00:00Z,0,TRUE,93,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:71,71,2026-10-09T03:00:00Z,0,TRUE,116,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:72,72,2026-10-09T05:00:00Z,0,TRUE,112,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:73,73,2026-10-09T05:00:00Z,-1,TRUE,63,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:74,74,2026-10-09T05:00:00Z,-1,TRUE,76,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:75,75,2026-10-09T05:00:00Z,-1,TRUE,85,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:76,76,2026-10-09T05:00:00Z,0,TRUE,55,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:77,77,2026-10-09T05:00:00Z,0,TRUE,56,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:78,78,2026-10-09T05:00:00Z,0,TRUE,55,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:79,79,2026-10-09T05:00:00Z,0,TRUE,62,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:80,80,2026-10-09T06:00:00Z,-1,TRUE,77,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:81,81,2026-10-09T06:00:00Z,0,TRUE,98,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:82,82,2026-10-09T07:00:00Z,0,TRUE,88,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:83,83,2026-10-09T07:30:00Z,0,TRUE,252,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:84,84,2026-10-09T07:30:00Z,0,TRUE,249,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:85,85,2026-10-09T07:30:00Z,0,TRUE,216,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:86,86,2026-10-09T09:00:00Z,0,TRUE,62,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:87,87,2026-10-09T10:00:00Z,0,TRUE,307,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:88,88,2026-10-09T10:00:00Z,0,TRUE,223,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:89,89,2026-10-09T11:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:90,90,2026-10-09T11:00:00Z,0,TRUE,103,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:91,91,2026-10-09T11:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:92,92,2026-10-09T11:00:00Z,1,TRUE,243,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:93,93,2026-10-09T11:00:00Z,0,TRUE,250,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:94,94,2026-10-09T11:30:00Z,-1,TRUE,132,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:95,95,2026-10-09T11:30:00Z,0,TRUE,270,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:96,96,2026-10-09T11:30:00Z,0,TRUE,302,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:97,97,2026-10-09T11:30:00Z,0,TRUE,317,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:98,98,2026-10-09T11:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:99,99,2026-10-09T11:30:00Z,-1,TRUE,260,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:100,100,2026-10-09T11:30:00Z,-1,TRUE,294,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:101,101,2026-10-09T11:30:00Z,0,TRUE,271,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:102,102,2026-10-09T11:30:00Z,0,TRUE,257,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:103,103,2026-10-09T12:00:00Z,0,TRUE,323,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:104,104,2026-10-09T12:00:00Z,0,TRUE,114,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:105,105,2026-10-09T12:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:106,106,2026-10-09T12:45:00Z,0,TRUE,249,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:107,107,2026-10-09T13:00:00Z,0,TRUE,315,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:108,108,2026-10-09T13:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:109,109,2026-10-09T13:00:00Z,0,TRUE,259,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:110,110,2026-10-09T13:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:111,111,2026-10-09T13:00:00Z,0,TRUE,274,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:112,112,2026-10-09T13:00:00Z,-1,TRUE,264,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:113,113,2026-10-09T13:00:00Z,0,TRUE,251,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:114,114,2026-10-09T13:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:115,115,2026-10-09T13:00:00Z,0,TRUE,210,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:116,116,2026-10-09T13:00:00Z,0,TRUE,276,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:117,117,2026-10-09T13:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:118,118,2026-10-09T13:00:00Z,0,TRUE,240,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:119,119,2026-10-09T13:30:00Z,-1,TRUE,311,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:120,120,2026-10-09T13:30:00Z,2,TRUE,325,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:121,121,2026-10-09T13:30:00Z,0,TRUE,294,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:122,122,2026-10-09T13:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:123,123,2026-10-09T13:30:00Z,1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:124,124,2026-10-09T13:30:00Z,0,TRUE,204,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:125,125,2026-10-09T13:30:00Z,0,TRUE,184,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:126,126,2026-10-09T13:30:00Z,0,TRUE,212,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:127,127,2026-10-09T13:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:128,128,2026-10-09T14:00:00Z,0,TRUE,132,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:129,129,2026-10-09T14:00:00Z,-1,TRUE,139,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:130,130,2026-10-09T14:00:00Z,0,TRUE,125,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:131,131,2026-10-09T14:00:00Z,0,TRUE,281,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:132,132,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:133,133,2026-10-09T14:00:00Z,0,TRUE,304,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:134,134,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:135,135,2026-10-09T14:00:00Z,0,TRUE,292,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:136,136,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:137,137,2026-10-09T14:00:00Z,0,TRUE,317,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:138,138,2026-10-09T14:00:00Z,-1,TRUE,83,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:139,139,2026-10-09T14:10:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:140,140,2026-10-09T14:00:00Z,-1,TRUE,268,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:141,141,2026-10-09T14:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:142,142,2026-10-09T14:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:143,143,2026-10-09T14:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:144,144,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:145,145,2026-10-09T14:00:00Z,0,TRUE,114,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:146,146,2026-10-09T14:00:00Z,-1,TRUE,84,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:147,147,2026-10-09T14:00:00Z,0,TRUE,262,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:148,148,2026-10-09T14:00:00Z,0,TRUE,112,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:149,149,2026-10-09T14:00:00Z,0,TRUE,254,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:150,150,2026-10-09T14:00:00Z,1,TRUE,95,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:151,151,2026-10-09T14:00:00Z,0,TRUE,123,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:152,152,2026-10-09T14:00:00Z,0,TRUE,251,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:153,153,2026-10-09T14:00:00Z,0,TRUE,259,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:154,154,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:155,155,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:156,156,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:157,157,2026-10-09T14:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:158,158,2026-10-09T14:00:00Z,0,TRUE,287,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:159,159,2026-10-09T14:00:00Z,0,TRUE,268,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:160,160,2026-10-09T14:00:00Z,-1,TRUE,281,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:161,161,2026-10-09T14:00:00Z,-2,TRUE,314,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:162,162,2026-10-09T14:00:00Z,0,TRUE,302,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:163,163,2026-10-09T14:00:00Z,-3,TRUE,252,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:164,164,2026-10-09T14:00:00Z,0,TRUE,255,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:165,165,2026-10-09T14:00:00Z,-1,TRUE,243,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:166,166,2026-10-09T14:00:00Z,0,TRUE,213,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:167,167,2026-10-09T14:00:00Z,0,TRUE,224,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:168,168,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:169,169,2026-10-09T14:00:00Z,-1,TRUE,266,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:170,170,2026-10-09T14:00:00Z,0,TRUE,254,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:171,171,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:172,172,2026-10-09T14:00:00Z,0,TRUE,258,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:173,173,2026-10-09T14:00:00Z,-1,TRUE,233,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:174,174,2026-10-09T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:175,175,2026-10-09T14:00:00Z,0,TRUE,201,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:176,176,2026-10-09T14:15:00Z,1,TRUE,326,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:177,177,2026-10-09T14:15:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:178,178,2026-10-09T14:15:00Z,0,TRUE,267,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:179,179,2026-10-09T19:30:00Z,1,TRUE,287,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:180,180,2026-10-09T14:30:00Z,0,TRUE,315,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:181,181,2026-10-09T14:30:00Z,-1,TRUE,220,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:182,182,2026-10-09T15:00:00Z,1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:183,183,2026-10-09T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:184,184,2026-10-09T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:185,185,2026-10-09T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:186,186,2026-10-09T15:15:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:187,187,2026-10-09T15:15:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:188,188,2026-10-09T15:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:189,189,2026-10-09T15:30:00Z,1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:190,190,2026-10-09T16:00:00Z,-2,TRUE,323,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:191,191,2026-10-09T16:00:00Z,0,TRUE,280,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:192,192,2026-10-09T16:00:00Z,0,TRUE,302,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:193,193,2026-10-09T16:00:00Z,-1,TRUE,271,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:194,194,2026-10-09T16:00:00Z,0,TRUE,282,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:195,195,2026-10-09T16:00:00Z,-1,TRUE,99,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:196,196,2026-10-09T16:00:00Z,0,TRUE,167,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:197,197,2026-10-09T16:15:00Z,1,TRUE,283,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:198,198,2026-10-09T16:30:00Z,-1,TRUE,296,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:199,199,2026-10-09T16:30:00Z,-3,TRUE,330,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:200,200,2026-10-09T16:30:00Z,-1,TRUE,298,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:201,201,2026-10-09T16:30:00Z,0,TRUE,316,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:202,202,2026-10-09T16:30:00Z,0,TRUE,275,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:203,203,2026-10-09T16:30:00Z,-2,TRUE,284,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:204,204,2026-10-09T16:30:00Z,0,TRUE,235,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:205,205,2026-10-09T16:45:00Z,0,TRUE,136,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:206,206,2026-10-09T17:00:00Z,2,TRUE,169,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:207,207,2026-10-09T17:10:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:208,208,2026-10-09T17:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:209,209,2026-10-09T17:30:00Z,0,TRUE,311,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:210,210,2026-10-09T18:00:00Z,-1,TRUE,103,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:211,211,2026-10-09T18:00:00Z,1,TRUE,283,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:212,212,2026-10-09T18:00:00Z,-1,TRUE,80,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:213,213,2026-10-09T18:00:00Z,0,TRUE,276,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:214,214,2026-10-09T18:15:00Z,0,TRUE,249,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:215,215,2026-10-09T18:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:216,216,2026-10-09T18:30:00Z,-1,TRUE,295,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:217,217,2026-10-09T18:30:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:218,218,2026-10-09T18:45:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:219,219,2026-10-09T18:45:00Z,0,TRUE,313,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:220,220,2026-10-09T18:45:00Z,0,TRUE,322,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:221,221,2026-10-09T18:45:00Z,-1,TRUE,316,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:222,222,2026-10-09T18:45:00Z,-3,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:223,223,2026-10-09T18:45:00Z,-1,TRUE,315,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:224,224,2026-10-09T18:45:00Z,0,TRUE,121,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:225,225,2026-10-09T19:00:00Z,-2,TRUE,324,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:226,226,2026-10-09T19:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:227,227,2026-10-09T19:00:00Z,-2,TRUE,125,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:228,228,2026-10-09T19:15:00Z,0,TRUE,221,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:229,229,2026-10-09T19:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:230,230,2026-10-09T19:30:00Z,0,TRUE,76,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:231,231,2026-10-09T20:00:00Z,0,TRUE,154,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:232,232,2026-10-09T20:30:00Z,0,TRUE,276,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:233,233,2026-10-09T21:00:00Z,-2,TRUE,296,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:234,234,2026-10-09T22:15:00Z,-1,TRUE,114,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:235,235,2026-10-09T23:00:00Z,-1,TRUE,237,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:236,236,2026-10-09T23:00:00Z,0,TRUE,198,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:237,237,2026-10-09T23:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:238,238,2026-10-09T23:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:239,239,2026-10-09T23:40:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:240,240,2026-10-09T23:40:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:241,241,2026-10-09T23:40:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:242,242,2026-10-09T23:40:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:243,243,2026-10-09T23:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:244,244,2026-10-09T23:40:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:245,245,2026-10-10T00:00:00Z,-1,TRUE,300,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:246,246,2026-10-10T00:30:00Z,-2,TRUE,235,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:247,247,2026-10-10T00:40:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:248,248,2026-10-10T00:40:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:249,249,2026-10-10T00:40:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:250,250,2026-10-10T01:00:00Z,0,TRUE,161,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:251,251,2026-10-10T01:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:252,252,2026-10-10T02:40:00Z,0,TRUE,287,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:253,253,2026-10-10T03:10:00Z,0,TRUE,262,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:254,254,2026-10-10T04:05:00Z,1,TRUE,250,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:255,255,2026-10-10T05:00:00Z,0,TRUE,265,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:256,256,2026-10-10T05:00:00Z,1,TRUE,269,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:257,257,2026-10-10T05:00:00Z,0,TRUE,167,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:258,258,2026-10-10T05:00:00Z,-2,TRUE,159,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:259,259,2026-10-10T06:00:00Z,0,TRUE,283,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:260,260,2026-10-10T06:00:00Z,1,TRUE,255,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:261,261,2026-10-10T06:00:00Z,0,TRUE,228,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:262,262,2026-10-10T07:00:00Z,-1,TRUE,258,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:263,263,2026-10-10T08:30:00Z,0,TRUE,191,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:264,264,2026-10-10T09:00:00Z,0,TRUE,100,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:265,265,2026-10-10T10:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:266,266,2026-10-10T10:15:00Z,-1,TRUE,175,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:267,267,2026-10-10T10:30:00Z,0,TRUE,324,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:268,268,2026-10-10T11:00:00Z,-1,TRUE,272,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:269,269,2026-10-10T11:00:00Z,1,TRUE,274,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:270,270,2026-10-10T11:00:00Z,-1,TRUE,282,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:271,271,2026-10-10T11:00:00Z,0,TRUE,120,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:272,272,2026-10-10T11:30:00Z,-1,TRUE,83,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:273,273,2026-10-10T11:30:00Z,-1,TRUE,257,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:274,274,2026-10-10T11:30:00Z,0,TRUE,284,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:275,275,2026-10-10T11:30:00Z,0,TRUE,235,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:276,276,2026-10-10T12:00:00Z,0,TRUE,303,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:277,277,2026-10-10T12:00:00Z,0,TRUE,313,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:278,278,2026-10-10T12:00:00Z,1,TRUE,255,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:279,279,2026-10-10T12:00:00Z,0,TRUE,113,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:280,280,2026-10-10T12:00:00Z,0,TRUE,281,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:281,281,2026-10-10T12:00:00Z,-1,TRUE,205,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:282,282,2026-10-10T12:00:00Z,0,TRUE,299,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:283,283,2026-10-10T12:00:00Z,0,TRUE,248,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:284,284,2026-10-10T12:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:285,285,2026-10-10T12:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:286,286,2026-10-10T12:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:287,287,2026-10-10T12:30:00Z,0,TRUE,265,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:288,288,2026-10-10T12:30:00Z,0,TRUE,177,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:289,289,2026-10-10T12:45:00Z,0,TRUE,227,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:290,290,2026-10-10T13:00:00Z,0,TRUE,300,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:291,291,2026-10-10T13:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:292,292,2026-10-10T13:00:00Z,-1,TRUE,325,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:293,293,2026-10-10T13:00:00Z,0,TRUE,302,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:294,294,2026-10-10T13:00:00Z,0,TRUE,274,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:295,295,2026-10-10T13:00:00Z,0,TRUE,260,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:296,296,2026-10-10T13:00:00Z,0,TRUE,261,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:297,297,2026-10-10T13:00:00Z,0,TRUE,248,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:298,298,2026-10-10T13:00:00Z,-1,TRUE,270,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:299,299,2026-10-10T13:00:00Z,0,TRUE,158,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:300,300,2026-10-10T13:00:00Z,2,TRUE,168,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:301,301,2026-10-10T13:30:00Z,0,TRUE,275,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:302,302,2026-10-10T14:00:00Z,-2,TRUE,307,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:303,303,2026-10-10T14:00:00Z,0,TRUE,269,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:304,304,2026-10-10T14:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:305,305,2026-10-10T14:00:00Z,-1,TRUE,111,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:306,306,2026-10-10T14:00:00Z,-1,TRUE,65,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:307,307,2026-10-10T14:15:00Z,-1,TRUE,267,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:308,308,2026-10-10T14:15:00Z,-1,TRUE,296,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:309,309,2026-10-10T14:30:00Z,0,TRUE,188,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:310,310,2026-10-10T14:30:00Z,-1,TRUE,264,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:311,311,2026-10-10T14:30:00Z,0,TRUE,249,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:312,312,2026-10-10T14:30:00Z,-2,TRUE,120,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:313,313,2026-10-10T14:45:00Z,0,TRUE,144,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:314,314,2026-10-10T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:315,315,2026-10-10T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:316,316,2026-10-10T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:317,317,2026-10-10T15:00:00Z,2,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:318,318,2026-10-10T15:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:319,319,2026-10-10T15:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:320,320,2026-10-10T15:00:00Z,1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:321,321,2026-10-10T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:322,322,2026-10-10T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:323,323,2026-10-10T15:00:00Z,1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:324,324,2026-10-10T15:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:325,325,2026-10-10T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:326,326,2026-10-10T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:327,327,2026-10-10T15:15:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:328,328,2026-10-10T15:15:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:329,329,2026-10-10T15:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:330,330,2026-10-10T15:30:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:331,331,2026-10-10T15:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:332,332,2026-10-10T15:30:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:333,333,2026-10-10T16:00:00Z,1,TRUE,284,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:334,334,2026-10-10T16:00:00Z,-1,TRUE,308,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:335,335,2026-10-10T16:00:00Z,-2,TRUE,237,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:336,336,2026-10-10T16:00:00Z,0,TRUE,315,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:337,337,2026-10-10T16:30:00Z,-1,TRUE,321,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:338,338,2026-10-10T16:30:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:339,339,2026-10-10T16:30:00Z,0,TRUE,266,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:340,340,2026-10-10T17:00:00Z,-2,TRUE,317,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:341,341,2026-10-10T17:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:342,342,2026-10-10T17:15:00Z,0,TRUE,249,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:343,343,2026-10-10T17:15:00Z,0,TRUE,188,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:344,344,2026-10-10T17:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:345,345,2026-10-10T17:45:00Z,0,TRUE,315,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:346,346,2026-10-10T18:00:00Z,0,TRUE,313,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:347,347,2026-10-10T18:00:00Z,0,TRUE,224,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:348,348,2026-10-10T18:00:00Z,0,TRUE,255,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:349,349,2026-10-10T18:15:00Z,0,TRUE,264,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:350,350,2026-10-10T18:45:00Z,1,TRUE,292,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:351,351,2026-10-10T18:45:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:352,352,2026-10-10T19:00:00Z,0,TRUE,289,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:353,353,2026-10-10T19:00:00Z,0,TRUE,301,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:354,354,2026-10-10T19:00:00Z,0,TRUE,288,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:355,355,2026-10-10T19:00:00Z,-1,TRUE,270,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:356,356,2026-10-10T19:10:00Z,-1,TRUE,281,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:357,357,2026-10-10T19:15:00Z,-2,TRUE,237,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:358,358,2026-10-10T19:15:00Z,0,TRUE,210,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:359,359,2026-10-10T19:30:00Z,0,TRUE,318,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:360,360,2026-10-10T20:00:00Z,0,TRUE,276,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:361,361,2026-10-10T20:00:00Z,0,TRUE,240,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:362,362,2026-10-10T20:30:00Z,0,TRUE,297,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:363,363,2026-10-10T20:30:00Z,-1,TRUE,298,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:364,364,2026-10-10T20:30:00Z,-1,TRUE,302,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:365,365,2026-10-10T20:30:00Z,0,TRUE,271,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:366,366,2026-10-10T20:30:00Z,0,TRUE,284,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:367,367,2026-10-10T21:30:00Z,0,TRUE,285,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:368,368,2026-10-10T22:15:00Z,0,TRUE,248,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:369,369,2026-10-10T22:30:00Z,-1,TRUE,289,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:370,370,2026-10-10T23:00:00Z,0,TRUE,270,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:371,371,2026-10-10T23:00:00Z,-1,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:372,372,2026-10-10T23:00:00Z,0,TRUE,262,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:373,373,2026-10-10T23:15:00Z,-1,TRUE,260,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:374,374,2026-10-11T00:30:00Z,0,TRUE,288,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:375,375,2026-10-11T01:15:00Z,0,TRUE,272,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:376,376,2026-10-11T12:00:00Z,0,TRUE,209,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:377,377,2026-10-11T14:15:00Z,0,TRUE,273,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:378,378,2026-10-11T15:00:00Z,-2,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:379,379,2026-10-11T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:380,380,2026-10-11T15:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Unresolved roster/analysis/market kickoff disagreement
+26103:381,381,2026-10-11T16:00:00Z,0,TRUE,215,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:382,382,2026-10-11T16:00:00Z,0,TRUE,185,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:383,383,2026-10-11T16:30:00Z,-1,TRUE,256,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:384,384,2026-10-11T16:30:00Z,0,TRUE,240,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:385,385,2026-10-11T17:00:00Z,0,TRUE,202,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:386,386,2026-10-11T17:00:00Z,-1,TRUE,206,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:387,387,2026-10-11T17:00:00Z,-1,TRUE,212,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:388,388,2026-10-11T17:00:00Z,-2,TRUE,189,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:389,389,2026-10-11T17:00:00Z,0,TRUE,129,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:390,390,2026-10-11T18:00:00Z,0,TRUE,104,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:391,391,2026-10-11T18:30:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:392,392,2026-10-11T18:45:00Z,0,TRUE,219,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:393,393,2026-10-11T18:45:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:394,394,2026-10-11T19:00:00Z,0,FALSE,0,0,0,FALSE,FALSE,NA,UNESTIMATED,Sparse target competition/venue support
+26103:395,395,2026-10-11T19:00:00Z,0,TRUE,251,1,1,FALSE,FALSE,NA,UNESTIMATED,DC total inversion not admitted below2.5 under existing implementation
+26103:396,396,2026-10-11T19:00:00Z,0,TRUE,174,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:397,397,2026-10-11T19:00:00Z,0,TRUE,213,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:398,398,2026-10-11T19:00:00Z,0,TRUE,165,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:399,399,2026-10-11T19:00:00Z,0,TRUE,204,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:400,400,2026-10-11T19:00:00Z,-1,TRUE,139,0,1,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:401,401,2026-10-11T19:15:00Z,0,TRUE,150,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:402,402,2026-10-11T20:00:00Z,-1,TRUE,241,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:403,403,2026-10-11T21:30:00Z,0,TRUE,109,1,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence
+26103:404,404,2026-10-11T22:00:00Z,-2,TRUE,191,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:405,405,2026-10-11T22:30:00Z,0,TRUE,246,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:406,406,2026-10-11T22:30:00Z,-1,TRUE,168,1,1,TRUE,TRUE,market,ESTIMATED_FULL100,All three admitted quote channels reviewed; native supported; no tail compression
+26103:407,407,2026-10-12T00:00:00Z,0,TRUE,189,0,0,FALSE,FALSE,NA,UNESTIMATED,Missing/stale/ambiguous admitted three-channel evidence

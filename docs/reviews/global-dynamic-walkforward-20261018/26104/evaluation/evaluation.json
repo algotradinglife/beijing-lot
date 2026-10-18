@@ -1,0 +1,23 @@
+{
+  "forecast_sha256": "3efd5c242960acbb4ba3d985641e1854b1fb038343d649ebaa21ae9d37941a21",
+  "rounds_sha256": "6b40f6bc2ee40561d5950be1c86d07c24851d4436b4daa4d12d5d09abc21e846",
+  "label_sha256": "3cde4e1e74e643319e966e1a313f79dd343041b16f5af21968666fdf5dfbdcf2",
+  "settlement_sha256": "782d8a2ca8ff229d9a671696a9a17e20c99d798be46f8688526bd024bcdb59db",
+  "client_sha256": "2452f6e6a491fa32df8ad5012914f3b9fae175e084ecb49a0a355085e38e23da",
+  "label_scope": "SOURCE_PUBLISHED_FULL_TIME_NOT_INDEPENDENTLY_VERIFIED_90MIN",
+  "target_labels_used_for_selection": false,
+  "prospective_admission": false,
+  "independent_union_agreement": true,
+  "output_hashes": {
+    "metrics": "742ee969e29cf024c521dd6fb174db20a1605dda682b41e277ab2e6651ac64e8",
+    "scores": "6de0938fec768627d379559575cb2f130f78ae15b5c2596919bfe326a7fabb40",
+    "probabilities": "1b542295d15cc59634d1fb26b2d21a9efe67c2b10761ce3a18341b419fce0171",
+    "margins": "a56919ceb3761a0eda105768ffd6bdc683458a678bf35f6983a069d9bd35af71",
+    "training": "ef8477b454e0d61ca3093a8f01e79c4044fe86b882b433c898d59436daac3e8c",
+    "rounds": "76ab62d367a5ee5dd153e479cbe2b8ba239e78ba795fa7a4d59596fa4438617e",
+    "summary": "f6d8b060c7ab4ff32c39419c7aca76fa9bcd468dee2056bd23461e43e0a70355",
+    "groups": "de4d8342005ee52f86011e62f36cf2372b8f9d6e74c4ac077a9f1dcfb1148f1d",
+    "realized_ranks": "67d50be846ba0b9912f42e420b76028e8b6379c47a4b7e907d2776963dcfcc33",
+    "missing_labels": "cc79ce6bbdaa85aab5f6ebf114edcf3b0b40f9ebdc635ec1aea99082e26446d8"
+  }
+}
