@@ -1,0 +1,59 @@
+---
+title: "26105完整基本面：缓存解析、来源质控与版本入库"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  publication: "results/global-dynamic-26105-base-publish-20261019-v1/publication.json"
+---
+
+本阶段为RAW／GLOBAL对照准备26105整期基本面。只通过既有SDK解析已有缓存并调用权威发布接口，不采集网络、不拟合概率、不选票、不用目标赛果评分。资源完整、基本面字段完整和模型准入分开记录。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(beidan);library(testthat)
+root <- normalizePath(params$project_root,mustWork=TRUE)
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+input <- jsonlite::fromJSON(file.path(root,params$publication),simplifyVector=FALSE)
+expect_identical(input$publication$dataset,'source_issue_26105')
+expect_equal(input$receipt$expected_slots,365L)
+expect_equal(input$receipt$network_attempts,0L)
+expect_identical(input$model_admission,FALSE)
+expect_identical(input$client_sha256,digest::digest(file=file.path(root,'r/global_dynamic_26105_base_publish_20261019.R'),algo='sha256'))
+version <- input$publication$version
+status <- read_dataset('source_issue_26105','status',version=version)
+resources <- read_dataset('source_issue_26105','resources',version=version)
+provenance <- read_dataset('source_issue_26105','provenance',version=version)
+history <- read_dataset('source_issue_26105','history',version=version)
+conflicts <- read_dataset('source_issue_26105','conflicts',version=version)
+expect_s3_class(conflicts,'tbl_df')
+expect_s3_class(status,'tbl_df');expect_s3_class(resources,'tbl_df')
+expect_s3_class(provenance,'tbl_df');expect_s3_class(history,'tbl_df')
+expect_equal(nrow(status),365L);expect_equal(n_distinct(status$fixture_id),365L)
+expect_setequal(status$fixture_id,paste0('26105:',seq_len(365L)))
+expect_true(all(status$state=='COLLECTED'))
+expect_equal(nrow(resources),1095L)
+expect_equal(nrow(distinct(resources,fixture_id,source,url)),1095L)
+expect_true(all(resources$state=='VERIFIED'))
+resource_counts <- count(resources,fixture_id,source)
+expect_equal(sum(resource_counts$source=='titan' & resource_counts$n==1L),365L)
+expect_equal(sum(resource_counts$source=='nowscore' & resource_counts$n==2L),365L)
+expect_s3_class(provenance$observed_at,'POSIXct')
+knitr::kable(tibble(dataset=input$publication$dataset,version=version,
+ complete=input$receipt$complete,model_admission=input$model_admission))
+knitr::kable(count(status,state))
+knitr::kable(count(resources,source,state))
+knitr::kable(status |> summarise(fixtures=n(),with_conflicts=sum(conflicts>0),with_gaps=sum(gaps>0),with_missing_fields=sum(missing_fields>0)))
+knitr::kable(history |> count(scope))
+knitr::kable(conflicts |> count(field,state,sort=TRUE) |> slice_head(n=15))
+```
+
+名单读取时冻结原始字节SHA；解析完成及发布前再检查未变。资源须覆盖每场一份Titan和两份Nowscore记录，所有资源已通过既有解析及身份核验。缺失、失败或身份冲突阻止本客户端发布，审计CSV和解析收据保留。本版本365场均有来源差异记录：两侧近期战绩覆盖范围各365场、上一场阵容344场、伤停311场；140场缺少部分字段，8场存在开赛时间分歧。覆盖范围差异与逐行比分冲突分别审计。后续原生λ仅使用能与原文元数据核对的历史行；开赛时间冲突继续按既有规则拦截，字段缺失仍保留在逐场审计中。
+
+全表通过既有 `validate_tables` 和 `.SourceRows`，再交给 `publish_issue` 的Parquet、版本和目录流程。后续消费者仅通过包读取明确版本；不直接打开NAS数据文件。
+
+后续仍需同赛事／场地历史支持核验、欧赔与盘口同截止质控、原生λ重算，以及只用截止前已结算历史的整体校准。采集时间晚于部分目标比赛，历史报价／比赛时间代理不构成事前观察证据。此报告不能作为26105全期命中率或可用回款的结论。

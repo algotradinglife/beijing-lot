@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport R_PROFILE_USER=/dev/null\nexport R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\nexec codex review 'Review only r/global_dynamic_26105_base_publish_20261019.R, tests/testthat/test-global-dynamic-26105-base-publish.R, quarto/global_dynamic_26105_base_publish_20261019.qmd and actual results/global-dynamic-26105-base-publish-20261019-v1/{publication.json,status.csv,resources.csv}. No edits, no CI. Actual source_issue_26105 NAS version20261018T180729878589Z published through authoritative SDK;365 COLLECTED,1095 VERIFIED,no network/model admission. Complete=false is explicit:365 coverage conflicts,140 missing-field fixtures,8 kickoff conflicts, optional injuries/previous-lineup discrepancies. QMD displays these, future native gates unchanged. Full R run full-R-exit.json exit0 package992/9664 +repo819/183372 all failed/error/warn/skip0; verify source/test hashes against verification-source-manifest.json. No package modifications; matching normally installed first-mapping library declared. QMD fresh clean uncached render passed before final conflict table addition; final render now running, verify its HTML if available, otherwise do not certify final render. Read relevant authoritative table version via beidan only, no direct NAS parquet access. Check data contracts, roster source binding, mutation guard, publication identity and honest limits. Report actionable findings or no blocking artifact findings; do not certify whole goal complete.'"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T18:10:14.544688+00:00",
+  "finished_at_utc": "2026-10-18T18:10:47.491505+00:00"
+}

@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-base-publish-20261019/verification-source",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-base-publish-20261019-control/full-R.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-base-publish-20261019-control/full-R-exit.json"
+}

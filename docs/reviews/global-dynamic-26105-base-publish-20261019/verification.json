@@ -1,0 +1,56 @@
+{
+  "status": "BASE_SOURCE_PUBLISHED_REVIEWED_GOAL_PENDING",
+  "dataset": "source_issue_26105",
+  "version": "20261018T180729878589Z",
+  "published_resources": 1095,
+  "collected_fixtures": 365,
+  "model_admission": false,
+  "complete": false,
+  "full_R_suites": [
+    {
+      "suite": "package",
+      "blocks": 992,
+      "assertions": 9664,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "repository",
+      "blocks": 819,
+      "assertions": 183372,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "source_files": [
+    {
+      "path": "r/global_dynamic_26105_base_publish_20261019.R",
+      "sha256": "264148dfcad586df3b56f04df1690598a46a6caf27c53a48e2c3b6a1fa24b695"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-base-publish.R",
+      "sha256": "a4d790e33f7d54ee2005ab6ccc94a201de1dea565a55b2bebc66f31e9ea32a0a"
+    },
+    {
+      "path": "quarto/global_dynamic_26105_base_publish_20261019.qmd",
+      "sha256": "e958b59c3c279c2b89d0e5f3dd7e76cfb66d91355556b682292aa22a2310fc0c"
+    }
+  ],
+  "publication_sha256": "cad9294b84b12c4c4e901a5a742b75e3726471692dd87c8b58018ba518ee78b8",
+  "review": "No blocking findings; actual NAS version read via package; final conflict table and incomplete/model-exclusion limits verified",
+  "full_R_scope": "Frozen source/test files match current base client; final QMD rendered separately. Does not certify later native/forecast/selection changes or entire dirty worktree.",
+  "known_data_limits": {
+    "fixtures_with_source_conflicts": 365,
+    "fixtures_missing_fields": 140,
+    "fixtures_with_kickoff_conflicts": 8
+  },
+  "test_mapping": {
+    "CLI_and_roster_mutation": "test-global-dynamic-26105-base-publish.R,12 assertions",
+    "normal_integration": "NAS version365 COLLECTED/1095 VERIFIED; final clean-session QMD"
+  },
+  "goal_complete": false
+}
