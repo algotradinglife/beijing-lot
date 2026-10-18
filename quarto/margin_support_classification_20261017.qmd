@@ -1,0 +1,88 @@
+---
+title: "10月17日场次：净胜球累计覆盖与单选、双选、三选分类"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+固定10月17日原四轮涉及的52场不同比赛，使用冻结FM来源裁决后的base比分网格（尾部压缩前），不查看赛果、不保留旧允许集合。比较20%、30%、40%、50%、60%、70%、80%、90%、95%九个覆盖阈值，仅作描述，不据此调参或升级正式策略。按净胜球档概率降序，累计首次达到阈值的边界档整组同概率纳入；映射实际北单让球后去重，1/2/3类分别为单/双/三选。核心净胜球质量与完整类别质量不同，均保留。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+w <- file.path(root,'results/fm17-upcoming-20261017')
+f <- readRDS(file.path(w,'frozen-probabilities.rds'))
+b <- readRDS(file.path(w,'plans.rds'))
+scope <- list()
+for(i in 1:4) scope[[i]] <- b$plans[[i]]$legs |> as_tibble() |> distinct(fixture_id) |> mutate(round=i)
+scope <- bind_rows(scope)
+stopifnot(nrow(scope)==52L,n_distinct(scope$fixture_id)==52L)
+thresholds <- c(.2,.3,.4,.5,.6,.7,.8,.9,.95)
+rows <- list()
+for(i in seq_len(nrow(scope))){
+ id <- scope$fixture_id[i];entry <- f$entries[[id]]
+ stopifnot(!is.null(entry$base),!is.null(entry$base$cutoff),inherits(entry$base$cutoff$cutoff_utc,'POSIXct'),!is.na(entry$base$cutoff$cutoff_utc))
+ h <- unique(f$probabilities$handicap[f$probabilities$fixture_id==id])
+ stopifnot(length(h)==1L,is.finite(h))
+ grid <- entry$base$grid |> as_tibble()
+ stopifnot(all(is.finite(grid$probability)),all(grid$probability>=0),abs(sum(grid$probability)-1)<1e-9)
+ m <- grid |> mutate(margin=home_goals-away_goals) |> group_by(margin) |> summarise(probability=sum(probability),.groups='drop') |> arrange(desc(probability),margin) |> mutate(outcome=case_when(margin+h>0~'W',margin+h==0~'D',TRUE~'L'))
+ # Same-probability groups are indivisible at the boundary.
+ blocks <- m |> group_by(probability) |> summarise(mass=sum(probability),.groups='drop') |> arrange(desc(probability)) |> mutate(cumulative=cumsum(mass))
+ for(t in thresholds){
+  k <- which(blocks$cumulative>=t)[1];stopifnot(!is.na(k))
+  boundary <- blocks$probability[k]
+  core <- m |> filter(probability>=boundary)
+  outcomes <- c('W','D','L')[c('W','D','L') %in% core$outcome]
+  stopifnot(sum(core$probability)>=t-1e-12,sum(m$probability[m$probability>boundary])<t, length(outcomes)%in%1:3)
+  selected_mass <- sum(m$probability[m$outcome %in% outcomes])
+  rows[[length(rows)+1L]] <- tibble(round=scope$round[i],fixture_id=id,handicap=h,threshold=t,n_choices=length(outcomes),outcomes=paste(outcomes,collapse='/'),margin_support=paste(sort(core$margin),collapse=','),n_margins=nrow(core),core_mass=sum(core$probability),full_outcome_mass=selected_mass,cutoff_utc=format(entry$base$cutoff$cutoff_utc,tz='UTC',format='%Y-%m-%dT%H:%M:%SZ'))
+ }
+}
+x <- bind_rows(rows)
+stopifnot(nrow(x)==468L,all(x$full_outcome_mass>=x$core_mass-1e-12),all(abs(x$full_outcome_mass[x$n_choices==3L]-1)<1e-9),!anyDuplicated(x[c('fixture_id','threshold')]))
+for(id in scope$fixture_id){
+ block <- x |> filter(fixture_id==id) |> arrange(threshold)
+ stopifnot(all(diff(block$n_choices)>=0),all(diff(block$core_mass)>=-1e-12),all(diff(block$full_outcome_mass)>=-1e-12))
+}
+counts <- x |> count(threshold,n_choices) |> complete(threshold=thresholds,n_choices=1:3,fill=list(n=0L)) |> mutate(type=c('单选','双选','三选')[n_choices]) |> select(threshold,type,n) |> pivot_wider(names_from=type,values_from=n) |> arrange(threshold)
+stopifnot(all(rowSums(as.matrix(counts |> select(-threshold)))==52))
+by_round <- x |> count(round,threshold,n_choices) |> complete(round=1:4,threshold=thresholds,n_choices=1:3,fill=list(n=0L)) |> mutate(type=c('单选','双选','三选')[n_choices]) |> select(round,threshold,type,n) |> pivot_wider(names_from=type,values_from=n) |> arrange(round,threshold)
+# Known mapping boundary and tie contracts; no outcome labels are opened.
+stopifnot(identical(case_when(c(0,1,2)-1>0~'W',c(0,1,2)-1==0~'D',TRUE~'L'),c('L','D','W')))
+tie <- tibble(probability=c(.4,.3,.3));stopifnot(sum(tie$probability[tie$probability>=.3])==1)
+out <- file.path(root,'results/margin-support-classification-20261017');dir.create(out,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(x,file.path(out,'fixtures.csv'));readr::write_csv(counts,file.path(out,'counts.csv'));readr::write_csv(by_round,file.path(out,'round-counts.csv'))
+```
+
+52场去重统计：
+
+```{r}
+knitr::kable(counts |> mutate(threshold=paste0(100*threshold,'%')))
+```
+
+分轮统计（对应14、14、13、11场，非原8组重复计数）：
+
+```{r}
+knitr::kable(by_round |> mutate(threshold=paste0(100*threshold,'%')))
+```
+
+逐场分类，W=让胜、D=让平、L=让负：
+
+```{r}
+knitr::kable(x |> select(round,fixture_id,handicap,threshold,n_choices,outcomes) |> mutate(value=paste0(n_choices,'选 ',outcomes)) |> select(-n_choices,-outcomes) |> pivot_wider(names_from=threshold,values_from=value))
+```
+
+输入和校验：
+
+```{r}
+inputs <- c(file.path(w,'frozen-probabilities.rds'),file.path(w,'plans.rds'))
+knitr::kable(tibble(input=inputs,sha256=vapply(inputs,digest::digest,character(1),file=TRUE,algo='sha256')))
+```
+
+验证52场×9阈值完整且无重复、所有概率有效并归一、边界同概率纳入、映射边界方向、核心质量达到阈值、移除边界组则不足阈值、选择数与覆盖质量随阈值单调不减、每阈值分类合计52。无新函数、无包修改、无学习拟合；显式保存原输入截止。未读取赛果或结算数据，不报告命中率、收益或选择最优阈值。分类由压缩前网格推导，和此前压缩后前三档扩展诊断口径不同。每场选择数不确定如何组合七场和预算，不生成票单。审查与渲染记录及文件SHA256保存于results/margin-support-classification-20261017/。

@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>10月17日场次：净胜球累计覆盖与单选、双选、三选分类</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="margin_support_classification_20261017_files/libs/clipboard/clipboard.min.js"></script>
+<script src="margin_support_classification_20261017_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="margin_support_classification_20261017_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="margin_support_classification_20261017_files/libs/quarto-html/popper.min.js"></script>
+<script src="margin_support_classification_20261017_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="margin_support_classification_20261017_files/libs/quarto-html/anchor.min.js"></script>
+<link href="margin_support_classification_20261017_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="margin_support_classification_20261017_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="margin_support_classification_20261017_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="margin_support_classification_20261017_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="margin_support_classification_20261017_files/libs/bootstrap/bootstrap-8bdf4a79c329363aa5e64002b720c5c5.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">10月17日场次：净胜球累计覆盖与单选、双选、三选分类</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>固定10月17日原四轮涉及的52场不同比赛，使用冻结FM来源裁决后的base比分网格（尾部压缩前），不查看赛果、不保留旧允许集合。比较20%、30%、40%、50%、60%、70%、80%、90%、95%九个覆盖阈值，仅作描述，不据此调参或升级正式策略。按净胜球档概率降序，累计首次达到阈值的边界档整组同概率纳入；映射实际北单让球后去重，1/2/3类分别为单/双/三选。核心净胜球质量与完整类别质量不同，均保留。</p>
+<p>52场去重统计：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(counts <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">threshold=</span><span class="fu">paste0</span>(<span class="dv">100</span><span class="sc">*</span>threshold,<span class="st">'%'</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">threshold</th>
+<th style="text-align: right;">单选</th>
+<th style="text-align: right;">双选</th>
+<th style="text-align: right;">三选</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">20%</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">30%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">40%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">51</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">50%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">44</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">60%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">45</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">70%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">52</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">80%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">52</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">90%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">52</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">95%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">52</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>分轮统计（对应14、14、13、11场，非原8组重复计数）：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(by_round <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">threshold=</span><span class="fu">paste0</span>(<span class="dv">100</span><span class="sc">*</span>threshold,<span class="st">'%'</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: right;">round</th>
+<th style="text-align: left;">threshold</th>
+<th style="text-align: right;">单选</th>
+<th style="text-align: right;">双选</th>
+<th style="text-align: right;">三选</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">20%</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">30%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">40%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">50%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">60%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">70%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">80%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">90%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">95%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">20%</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">30%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">40%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">50%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">60%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">12</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">70%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">80%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">90%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">95%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">14</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">20%</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">30%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">40%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">50%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">60%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">70%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">80%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">90%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">95%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">20%</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">30%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">40%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">50%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">9</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">60%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">10</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">70%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">80%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">90%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">95%</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">11</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>逐场分类，W=让胜、D=让平、L=让负：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(x <span class="sc">|&gt;</span> <span class="fu">select</span>(round,fixture_id,handicap,threshold,n_choices,outcomes) <span class="sc">|&gt;</span> <span class="fu">mutate</span>(<span class="at">value=</span><span class="fu">paste0</span>(n_choices,<span class="st">'选 '</span>,outcomes)) <span class="sc">|&gt;</span> <span class="fu">select</span>(<span class="sc">-</span>n_choices,<span class="sc">-</span>outcomes) <span class="sc">|&gt;</span> <span class="fu">pivot_wider</span>(<span class="at">names_from=</span>threshold,<span class="at">values_from=</span>value))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 5%">
+<col style="width: 9%">
+<col style="width: 8%">
+<col style="width: 5%">
+<col style="width: 7%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 9%">
+<col style="width: 9%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">round</th>
+<th style="text-align: left;">fixture_id</th>
+<th style="text-align: right;">handicap</th>
+<th style="text-align: left;">0.2</th>
+<th style="text-align: left;">0.3</th>
+<th style="text-align: left;">0.4</th>
+<th style="text-align: left;">0.5</th>
+<th style="text-align: left;">0.6</th>
+<th style="text-align: left;">0.7</th>
+<th style="text-align: left;">0.8</th>
+<th style="text-align: left;">0.9</th>
+<th style="text-align: left;">0.95</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:127</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:129</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:134</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:10</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:101</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:22</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:6</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:14</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:143</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:15</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:156</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:182</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:19</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">26105:42</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:111</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:112</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:135</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:16</td>
+<td style="text-align: right;">-2</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:160</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:27</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:28</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:144</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:149</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:158</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:162</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:32</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:54</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">26105:57</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:35</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:38</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:47</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:125</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:133</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:24</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:73</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:48</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:58</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:64</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:78</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:90</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">26105:98</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:138</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:30</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:84</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:105</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:124</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:26</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:51</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">1选 W</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:21</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: left;">1选 L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:39</td>
+<td style="text-align: right;">-1</td>
+<td style="text-align: left;">1选 L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:148</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">2选 D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">26105:96</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">1选 D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">2选 W/D</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+<td style="text-align: left;">3选 W/D/L</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>输入和校验：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>inputs <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fu">file.path</span>(w,<span class="st">'frozen-probabilities.rds'</span>),<span class="fu">file.path</span>(w,<span class="st">'plans.rds'</span>))</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">tibble</span>(<span class="at">input=</span>inputs,<span class="at">sha256=</span><span class="fu">vapply</span>(inputs,digest<span class="sc">::</span>digest,<span class="fu">character</span>(<span class="dv">1</span>),<span class="at">file=</span><span class="cn">TRUE</span>,<span class="at">algo=</span><span class="st">'sha256'</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 62%">
+<col style="width: 37%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">input</th>
+<th style="text-align: left;">sha256</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-upcoming-20261017/frozen-probabilities.rds</td>
+<td style="text-align: left;">accd554f6869d1fb7e2758bca45d0612c1adc6d5b065ce5a9f40c514637cfbde</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fm17-upcoming-20261017/plans.rds</td>
+<td style="text-align: left;">35074add6622ee83fbd181bc3799e63ea509ca5f57a406227227cc34feaa022a</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>验证52场×9阈值完整且无重复、所有概率有效并归一、边界同概率纳入、映射边界方向、核心质量达到阈值、移除边界组则不足阈值、选择数与覆盖质量随阈值单调不减、每阈值分类合计52。无新函数、无包修改、无学习拟合；显式保存原输入截止。未读取赛果或结算数据，不报告命中率、收益或选择最优阈值。分类由压缩前网格推导，和此前压缩后前三档扩展诊断口径不同。每场选择数不确定如何组合七场和预算，不生成票单。审查与渲染记录及文件SHA256保存于results/margin-support-classification-20261017/。</p>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

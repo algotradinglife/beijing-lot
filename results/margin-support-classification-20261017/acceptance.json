@@ -1,0 +1,40 @@
+{
+  "status": "DESCRIPTIVE_NO_LABEL_CLASSIFICATION_REVIEWED",
+  "review_command": "codex review; bounded prompt and findings in review.log",
+  "review_findings": "No blocking issues",
+  "render_exit": 0,
+  "scope": 52,
+  "thresholds": [
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    0.95
+  ],
+  "validation_rows": 468,
+  "validated": [
+    "normalized grid probabilities",
+    "source-selected precompression stage",
+    "explicit frozen cutoff",
+    "exact boundary ties",
+    "handicap zero boundary mapping",
+    "category count and mass monotonicity",
+    "full category mass >= core mass",
+    "three categories mass=1",
+    "52 fixtures per threshold",
+    "four rendered tables and no errors"
+  ],
+  "no_package_or_function_changes": true,
+  "no_settlement_read": true,
+  "files": {
+    "quarto/margin_support_classification_20261017.qmd": "0b10323c066f5bb53b594e2c0ec48b0f9cd9497c90dff8ba1b8ed39871b8f2cf",
+    "quarto/margin_support_classification_20261017.html": "dd69975644b5071f7b8fb4bae8878d7b06025a060cfcc52b0e9ca1e155628a2c",
+    "results/margin-support-classification-20261017/fixtures.csv": "e1f11c6fe4d2a07f45f89e8d2db18ce607b4d980454b2ed94b7c728ce6e38bb4",
+    "results/margin-support-classification-20261017/counts.csv": "be7cb9239eb88c2e70bc5179f6bd4c0e843d371a3905724efde33975996db95a",
+    "results/margin-support-classification-20261017/round-counts.csv": "62adb18be7eb76da91d1ad5038b71ebd7a99ab73ae72641fa5bbcb5e168b867e"
+  }
+}
