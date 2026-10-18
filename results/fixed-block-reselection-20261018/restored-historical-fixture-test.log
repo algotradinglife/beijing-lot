@@ -1,0 +1,25 @@
+$module
+Module(beidan_backend.temporal_learning)
+
+$python
+[1] "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python"
+
+$root
+[1] "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/fixed-block-reselection-20261018/snapshot-library/beidan/python"
+
+attr(,"class")
+[1] "python_backend"
+historical-double-reuse-qmd: .....
+Attaching package: 'dplyr'
+
+The following objects are masked from 'package:stats':
+
+    filter, lag
+
+The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union
+
+..........
+
+══ DONE ════════════════════════════════════════════════════════════════════════

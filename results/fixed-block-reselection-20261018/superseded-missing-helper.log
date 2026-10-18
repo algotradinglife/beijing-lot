@@ -1,0 +1,5 @@
+Error in get(x, envir = ns, inherits = FALSE) : 
+  object '.fm_analysis_grids' not found
+Calls: qc_build_case ... BuildFmQcReport -> paste -> deparse -> getFromNamespace -> get
+Execution halted
+Ran 1/1 deferred expressions

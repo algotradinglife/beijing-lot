@@ -1,0 +1,13 @@
+{
+  "purpose": "FINAL_DELIVERY_SOURCE_IDENTITY",
+  "model_id": "FM-1.7.1",
+  "sources": {
+    "packages/beidan/R/select_fixed_ticket_groups.R": "e6a4d895f51bf67b0a4bad6dfaa76883ea19289e7f66412248c3de70d4291c8f",
+    "packages/beidan/tests/testthat/test-select-fixed-ticket-groups.R": "1d35e16386fe439d81401296f506895687e21d45a1b45a8362221dfea3980b34",
+    "r/fixed_block_reselection_20261018.R": "affefabd0a3e8a63587799ee5bf515988e4eb2062afc25299484159f06ddaba4",
+    "quarto/fixed_block_reselection_20261018.qmd": "63894a7998a57b2687e2314214b89818e46200e740e20194ad2edfca18ce005c",
+    "config/fundamental-models/FM-1.7.1.json": "f63e06561034b95f96e57d2983db29fd73af5f876f0e687e3a1f4e54cec265d2"
+  },
+  "test_snapshot_manifest_sha256": "21bcd4d13c51d63a2380ccdac4e7886ebc2cb2a627687031f9c9b36d693f7680",
+  "qmd_validation": "Final QMD rendered and reviewed separately; package/function/test/client sources match frozen test snapshot. Earlier documentation snapshot remains inventoried."
+}

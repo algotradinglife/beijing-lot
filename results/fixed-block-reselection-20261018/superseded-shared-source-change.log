@@ -1,0 +1,5 @@
+Error in BuildFmQcReport(case$entry, case$fixture, case$cutoff, case$model_policy,  : 
+  Installed report implementation differs from source; reinstall beidan
+Calls: qc_build_case -> BuildFmQcReport
+Execution halted
+Ran 1/1 deferred expressions

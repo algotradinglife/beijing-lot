@@ -1,0 +1,147 @@
+---
+title: "FM-1.7.1：主覆盖与新增覆盖选组实验"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+固定政策历史诊断，不是前瞻证明。使用上次可完整估算的七轮FM-1.7.1＋100%净胜球概率；原8组涉及的赛前场次并集为固定候选池，不扩到原cohort其他比赛。两种方案均8组、每组七场、全三选2187组合中按概率降序取30–154名125注，2元/注、250元/组、2000元/轮。保留跨组重复中奖的回款。比较“原8组”与“主覆盖最高，再按新增精确联合覆盖选后续组”；组内票单不因此前购买而补买或重排。所有七场子集穷举；不同场次独立为模型假设，同一比赛在所有组里共享赛果。算法为等成本固定块的lazy greedy，非全局最优。未优化收益，也未按实际赛果挑组、窗口、参数或种子。
+
+既有parlay_select_groups会去重并补齐组内配额，无法保持本次固定排名购买块，因此新增最小内部函数SelectFixedTicketGroups，复用现有精确联合Rcpp内核及规范化包装，不复制概率枚举、排序或结算。测试独立枚举27个小世界，对照逐步新增覆盖；另验证重复票、零增量、空表、概率/截止绑定篡改及不等成本拒绝。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'results/fixed-block-reselection-20261018/snapshot-library'))
+out <- file.path(root,'results/fixed-block-reselection-20261018')
+parts <- lapply(4:10,function(i)readRDS(file.path(out,paste0('round-',i),'frozen-reselection.rds')))
+stopifnot(all(vapply(parts,function(p)identical(p$source_bindings,parts[[1]]$source_bindings),logical(1))))
+frozen <- parts[[1]]; frozen$rounds <- unlist(lapply(parts,function(p)p$rounds),recursive=FALSE)
+path <- file.path(out,'frozen-reselection.rds');saveRDS(frozen,path)
+stopifnot(length(frozen$rounds)==7L,frozen$model_id=='FM-1.7.1',!frozen$prospective_admission)
+source_path <- file.path(root,'results/fm171-full100-rebase-20261018/frozen-latest-replay.rds')
+stopifnot(frozen$source_bindings$parent==digest::digest(file=source_path,algo='sha256'),frozen$source_bindings$client==digest::digest(file=file.path(root,'r/fixed_block_reselection_20261018.R'),algo='sha256'),frozen$source_bindings$selector==digest::digest(file=file.path(root,'packages/beidan/R/select_fixed_ticket_groups.R'),algo='sha256'))
+parent <- readRDS(source_path)
+stopifnot(parent$qmd_sha256==digest::digest(file=file.path(root,'quarto/fm171_full100_historical_20261018.qmd'),algo='sha256'))
+prior <- readr::read_csv(file.path(root,'results/fm171-full100-rebase-20261018/comparison.csv'),show_col_types=FALSE)
+rows <- list();frontiers <- list();groups <- list();fixtures <- list();receipts <- list()
+for(name in names(frozen$rounds)) {
+ z <- frozen$rounds[[name]]; i <- z$index; d <- z$decision; s <- z$selected; p <- z$baseline; q <- d$probabilities; cutoff <- d$cutoff
+ stopifnot(identical(cutoff,p$cutoff),identical(p,parent$plans[[i]]),identical(q,p$probabilities),identical(d$source_bindings$rank_window,c(30L,154L)),z$candidate_count==choose(z$fixture_count,7))
+ stopifnot(identical(d$input_hash,rlang::hash(d[c('cutoff','probabilities','candidates','source_bindings','source_receipt')])),identical(d$source_receipt$cutoff,cutoff),identical(d$source_receipt$probability_hash,rlang::hash(q)),identical(d$source_receipt$candidate_hash,rlang::hash(d$candidates)),d$source_receipt$max_source_available_utc<cutoff$cutoff_utc,identical(s$receipt$output_hash,rlang::hash(list(s$selection,s$purchases))))
+ stopifnot(identical(s,readRDS(file.path(out,paste0('round-',i),paste0('independent-selection-',i,'.rds')))),identical(s$receipt$input_hash,d$input_hash),identical(s$receipt$code_hash,beidan:::.rank_outcome_code_hash(roots='SelectFixedTicketGroups')))
+ # Freeze all selections before any label snapshot is opened (preparation script).
+ row <- z$manifest_row; lp <- file.path(root,row$label_snapshot)
+ stopifnot(digest::digest(file=lp,algo='sha256')==row$label_sha256)
+ r <- if(row$label_kind=='json')jsonlite::fromJSON(lp)else readRDS(lp)$settlement
+ at <- r$fixture_results$result_available_at
+ if(inherits(at,'POSIXct'))at <- lubridate::with_tz(at,'UTC')else at <- as.POSIXct(as.character(at),tz='UTC',format='%Y-%m-%d %H:%M:%OS')
+ a <- as_tibble(r$fixture_results) |> transmute(issue_id=as.character(issue_id),fixture_id,outcome,settled_sp=as.numeric(settled_sp),label_available_at=at,source_url)
+ as_of <- r$as_of_utc
+ if(inherits(as_of,'POSIXct'))as_of <- lubridate::with_tz(as_of,'UTC')else as_of <- as.POSIXct(as.character(as_of),tz='UTC',format='%Y-%m-%d %H:%M:%OS')
+ stopifnot(!anyDuplicated(a$fixture_id),all(a$label_available_at>cutoff$cutoff_utc),all(a$label_available_at<=as_of))
+ for(policy in c('original_groups','incremental_groups')) {
+  tickets <- if(policy=='original_groups')p$tickets else s$purchases
+  tickets <- as_tibble(tickets)
+  stopifnot(nrow(tickets)==1000L,all((tickets |> count(group))$n==125L),all(tickets$rank>=30L&tickets$rank<=154L))
+  pieces <- strsplit(tickets$ticket_id,'|',fixed=TRUE); stopifnot(all(lengths(pieces)==7L))
+  tokens <- unlist(pieces,use.names=FALSE)
+  legs <- tibble(ticket_id=rep(tickets$ticket_id,each=7L),fixture_id=sub(':[^:]+$','',tokens),outcome=c('W','D','L')[as.integer(sub('.*:','',tokens))]) |> distinct()
+  stopifnot(nrow(legs)==7000L)
+  expected <- sum(tickets$probability)
+  checks <- legs |> left_join(a |> select(fixture_id,actual=outcome),by='fixture_id',relationship='many-to-one') |> group_by(ticket_id) |> summarise(known=sum(!is.na(actual)),misses=sum(!is.na(actual)&outcome!=actual),.groups='drop')
+  scored <- tickets |> left_join(checks,by='ticket_id',relationship='one-to-one')
+  gs <- scored |> group_by(group,group_id) |> summarise(hit=any(known==7L&misses==0L),pending=any(known<7L&misses==0L),model_mass=sum(probability),.groups='drop')
+  cash <- beidan::parlay_settle_plan(list(constants=list(unit_cny=2,payout_factor=.65,n_legs=7L),issue_id=cutoff$issue_id,funded=tickets |> select(ticket_id,group_id),ticket_legs=legs),a |> mutate(status='settled') |> select(issue_id,fixture_id,outcome,settled_sp,label_available_at,status,source_url),as_of=as_of)$ticket_returns
+  complete <- all(!cash$status %in% c('PENDING','SPECIAL'))
+  payout <- if(complete)sum(cash$payout_cny)else NA_real_
+  union <- beidan:::.parlay_ranked_union_coverage(tickets$ticket_id,legs,q)
+  if(policy=='incremental_groups')stopifnot(abs(union-tail(s$selection$cumulative_coverage,1))<1e-10)
+  if(policy=='original_groups') {
+   ref <- prior |> filter(dataset==z$dataset,sheet==z$sheet)
+   stopifnot(nrow(ref)==1L,sum(gs$hit)==ref$full_round_hits,
+    is.na(payout)==is.na(ref$payout_cny))
+   if(!is.na(payout))stopifnot(abs(payout-ref$payout_cny)<1e-6)
+  }
+  rows[[length(rows)+1L]] <- tibble(index=i,dataset=z$dataset,sheet=z$sheet,policy,fixture_pool=z$fixture_count,candidate_groups=z$candidate_count,
+   groups=nrow(gs),cost_cny=2000,model_any_hit=union,model_expected_wins=expected,
+   hit_groups=sum(gs$hit),pending_groups=sum(gs$pending),any_hit=if(any(gs$hit))TRUE else if(any(gs$pending))NA else FALSE,
+   payout_cny=payout,net_cny=payout-2000,monetary_complete=complete,duplicate_copies=nrow(tickets)-n_distinct(tickets$ticket_id))
+  groups[[length(groups)+1L]] <- gs |> mutate(index=i,policy)
+  for(k in 1:8) {
+   subset <- tickets |> filter(group<=k)
+   u <- beidan:::.parlay_ranked_union_coverage(subset$ticket_id,legs,q)
+   gk <- gs |> filter(group<=k)
+   frontiers[[length(frontiers)+1L]] <- tibble(index=i,policy,n_groups=k,cost_cny=250*k,model_any_hit=u,
+    hit_groups=sum(gk$hit),pending_groups=sum(gk$pending),any_hit=if(any(gk$hit))TRUE else if(any(gk$pending))NA else FALSE)
+  }
+  # Candidate sets are distinct; physical duplicate retention remains part of the selector contract.
+  for(g in 1:8) {
+   tt <- tickets |> filter(group==g) |> slice_head(n=1)
+   fx <- sub(':[^:]+$','',strsplit(tt$ticket_id,'|',fixed=TRUE)[[1]])
+   fixtures[[length(fixtures)+1L]] <- tibble(index=i,policy,group=g,fixture_id=fx)
+  }
+ }
+ receipts[[name]] <- list(cutoff=cutoff,input_hash=d$input_hash,selection_receipt=s$receipt,label_sha256=row$label_sha256,label_as_of=as_of)
+}
+x <- bind_rows(rows);frontier <- bind_rows(frontiers);gs <- bind_rows(groups);members <- bind_rows(fixtures)
+stopifnot(nrow(x)==14L,nrow(frontier)==112L,nrow(gs)==112L,all(x$cost_cny==2000),all(x$groups==8L))
+comparison <- x |> select(index,dataset,sheet,policy,model_any_hit,model_expected_wins,hit_groups,pending_groups,any_hit,payout_cny,net_cny,monetary_complete) |> pivot_wider(names_from=policy,values_from=c(model_any_hit,model_expected_wins,hit_groups,pending_groups,any_hit,payout_cny,net_cny,monetary_complete))
+control <- comparison |> filter(index==6L)
+stopifnot(nrow(control)==1L,control$hit_groups_original_groups==control$hit_groups_incremental_groups,
+ control$pending_groups_original_groups==control$pending_groups_incremental_groups,
+ abs(control$model_any_hit_original_groups-control$model_any_hit_incremental_groups)<1e-10,
+ identical(control$payout_cny_original_groups,control$payout_cny_incremental_groups))
+monotone <- frontier |> arrange(index,policy,n_groups) |> group_by(index,policy) |> summarise(ok=all(diff(model_any_hit)>=-1e-10),.groups='drop')
+stopifnot(all(monotone$ok))
+matched <- comparison |> filter(monetary_complete_original_groups,monetary_complete_incremental_groups)
+readr::write_csv(x,file.path(out,'rounds.csv'));readr::write_csv(comparison,file.path(out,'comparison.csv'));readr::write_csv(frontier,file.path(out,'group-count-frontier.csv'));readr::write_csv(gs,file.path(out,'groups.csv'));readr::write_csv(members,file.path(out,'membership.csv'))
+saveRDS(list(receipts=receipts,source_sha256=digest::digest(file=path,algo='sha256'),qmd_sha256=digest::digest(file=file.path(root,'quarto/fixed_block_reselection_20261018.qmd'),algo='sha256'),kernel=beidan:::ComponentUnionKernelIdentity(),prospective_admission=FALSE),file.path(out,'evaluation-receipt.rds'))
+```
+
+原8组与新增覆盖选组，模型覆盖单位为概率：
+
+```{r}
+knitr::kable(comparison |> select(index,dataset,sheet,model_any_hit_original_groups,model_any_hit_incremental_groups,hit_groups_original_groups,hit_groups_incremental_groups,pending_groups_incremental_groups,any_hit_original_groups,any_hit_incremental_groups,payout_cny_original_groups,payout_cny_incremental_groups),digits=4)
+knitr::kable(x |> group_by(policy) |> summarise(rounds=n(),cost_cny=sum(cost_cny),mean_model_any_hit=mean(model_any_hit),mean_model_expected_wins=mean(model_expected_wins),model_wins_given_any=sum(model_expected_wins)/sum(model_any_hit),hit_groups=sum(hit_groups),pending_groups=sum(pending_groups),rounds_any_hit=sum(any_hit,na.rm=TRUE),rounds_pending=sum(is.na(any_hit)),.groups='drop'),digits=4)
+knitr::kable(matched |> summarise(rounds=n(),cost_cny=2000*n(),original_payout=sum(payout_cny_original_groups),incremental_payout=sum(payout_cny_incremental_groups)),digits=2)
+```
+
+逐组边际覆盖与固定购票深度的组数前沿；零增量仍选入直到8组，仅用于同预算对照，不代表建议买满：
+
+```{r}
+knitr::kable(bind_rows(lapply(frozen$rounds,function(z)z$selected$selection |> mutate(index=z$index))) |> select(index,group,standalone_coverage,marginal_coverage,cumulative_coverage,cumulative_expected_wins,cumulative_cost_cny),digits=4)
+knitr::kable(frontier |> filter(policy=='incremental_groups') |> group_by(n_groups) |> summarise(cost_per_round=first(cost_cny),mean_model_any_hit=mean(model_any_hit),hit_groups=sum(hit_groups),pending_groups=sum(pending_groups),rounds_any_hit=sum(any_hit,na.rm=TRUE),.groups='drop'),digits=4)
+```
+
+局限：候选池由原策略实际涉及的比赛决定，并非整个赛前cohort；没有扩大FM171原生支持不足场次。该历史设计已经讨论过目标赛果，程序不读标签选组仍不能变成独立验证。相同比赛跨轮重复，七轮不独立；不同比赛独立及基础概率失准会影响模型覆盖。最大化至少中一次可牺牲多中次数或高回款票，不等同收益优化。官方SP缺失时回款保持NA，未命中且无存活票可确定零回款。所有成本保留，0.65仅在票级结算使用一次。
+
+复现：正常安装包到本报告library；设置项目环境后运行`Rscript r/fixed_block_reselection_20261018.R ROOT OUTPUT ROUND_INDEX`，完成七轮冻结和逐轮独立选择重放，再从干净R进程执行本QMD（无cache/freeze）。package新函数及对应testthat为唯一选择实现；复用公开枚举/排名、既有精确联合与结算，不拟合历史、不复制时序工具。完整正常安装、R与Python测试、代码审查及源/结果SHA记录在本目录acceptance.json和对应日志。尚未通过的检查不得标成通过。
+
+输入合同补充：decision$source_receipt包含原始预测截止cutoff、probability_hash、candidate_hash、明确UTC的max_source_available_utc及非空64位SHA256的source_snapshots。生成器先验证父冻结预测与原预测文件SHA及逐场来源时间，再构建收据。只改截止并重新计算外层input_hash仍被拒绝；缺失时钟/源快照或载荷不一致均停止。后续标签文件不参与候选、购买区间或选组，仅由本QMD在全部七轮选择冻结后打开。安装与完整测试在隔离源快照进行，避免共享工作区其他会话继续修改报告模块；源快照清单绑定本次函数与测试的最终SHA。
+
+本次结果解读：原8组确认命中13组、覆盖3/7轮；新增覆盖选组确认命中8组、覆盖4/7轮，均无存活待定票。10月17日第四轮从0组变成1组，但第一轮5组降为1组，体现分散覆盖与集中多中的取舍。平均模型联合覆盖从40.35%升至55.38%，不代表长期真实命中率已提高15个百分点。
+
+共同可完成收益结算的4轮各投入8,000元，旧选组回款2,900.52元，新选组2,970.93元，仅增加70.41元；其余中奖轮次缺官方SP，不汇总全部七轮收益。新方案前6组在这个样本也覆盖4轮，投入每轮1,500元，模型覆盖50.14%；8组为55.38%。这是固定前缀的事后描述，不能据此采用“永远6组”，且6组只有5个中奖组，低于8组的8个，未证明收益相同。
+
+验收入口：以下读取最终机器收据，任何安装/完整测试未通过均停止渲染，不把定向测试代替完整套件：
+
+```{r}
+acceptance <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+stopifnot(identical(acceptance$normal_install_exit_status,0L),identical(acceptance$r_test_exit_status,0L),identical(acceptance$python_test_exit_status,0L),is.data.frame(acceptance$r_tests),nrow(acceptance$r_tests)==2L,is.data.frame(acceptance$python_tests),nrow(acceptance$python_tests)==1L)
+stopifnot(setequal(acceptance$r_tests$phase,c('package','repository')),all(c('tests','passed','failed','errors','warnings','skipped') %in% names(acceptance$r_tests)),all(c('passed','failed','skipped') %in% names(acceptance$python_tests)))
+knitr::kable(as_tibble(acceptance$r_tests))
+knitr::kable(as_tibble(acceptance$python_tests))
+stopifnot(all(acceptance$r_tests$failed==0L),all(acceptance$r_tests$errors==0L),all(acceptance$r_tests$skipped==0L),all(acceptance$python_tests$failed==0L),all(acceptance$python_tests$skipped==0L))
+```
+
+函数/测试映射：SelectFixedTicketGroups及其规范化Rcpp联合调用由test-select-fixed-ticket-groups.R的27项断言覆盖；其中独立27状态穷举验证贪心次序，重复副本验证成本与覆盖分离，重新哈希的改时点及不完整源收据验证失败关闭。CLI只编排既有公开枚举/排序及该唯一选择函数；每轮原购买票逐项复现、选择全量独立重放，QMD另执行数据/时间/预算/归一/单调前沿/无重选空间对照断言。没有改写原冻结单或开启CI。
+
+审查：review-initial.log指出外层哈希不能阻止重新标记截止，现已加入上游预测截止、载荷、快照及来源时钟验证与回归测试；review-corrected.log确认修复。渲染期间编辑文档造成的旧QMD哈希在最终干净渲染后重建；review-final.log保存最终文件与结果审查。最终delivery-source-manifest.json绑定实际交付QMD、实现和测试；verification-source-manifest.json记录隔离测试时的代码及现有输入字节。最终QMD单独通过完整执行验收，文档后续展示调整不冒称已存在于较早测试快照。
+
+复现完整检查的精确命令、安装库、退出状态、套件总数、源/输出SHA及先前未通过检查的修复均在acceptance.json和原始日志。源快照漏入既有HTML导致的一次完整测试错误，通过复制原始已有测试输入并重跑完整标准入口处理；没有跳过、删除、弱化断言或伪造夹具。恢复后的输入SHA也写入验证清单。

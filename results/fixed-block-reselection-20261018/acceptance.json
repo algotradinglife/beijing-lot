@@ -1,0 +1,148 @@
+{
+  "model_id": "FM-1.7.1",
+  "policy": "100%_MARGIN_FIXED_RANK_BLOCK_GREEDY_UNION",
+  "scope": "Seven fully estimable rounds, same original-used fixture pool, 8 groups x125 tickets xCNY2, ranks30-154",
+  "prospective_admission": false,
+  "intended_use": "POSTHOC_HISTORICAL_DIAGNOSTIC",
+  "generated_at_utc": "2026-10-18T10:20:28.514454+00:00",
+  "normal_install_exit_status": 0,
+  "r_test_exit_status": 0,
+  "python_test_exit_status": 0,
+  "r_tests": [
+    {
+      "phase": "package",
+      "tests": 989,
+      "passed": 9598,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "phase": "repository",
+      "tests": 798,
+      "passed": 183247,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "python_tests": [
+    {
+      "suite": "bundled_python_backend",
+      "tests": 643,
+      "passed": 643,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "targeted_assertions": 27,
+  "skip_reasons": [],
+  "runtime": {
+    "R": "4.6.1",
+    "Python": "3.14.4",
+    "Quarto": "1.10.18",
+    "beidan": "0.2.0",
+    "python_executable": "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python",
+    "R_executable": "/opt/R/4.6.1/bin/Rscript"
+  },
+  "commands": {
+    "normal_install": "source docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/fm-qc-report-010/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/R CMD INSTALL -l \"$PWD/results/fixed-block-reselection-20261018/snapshot-library\" /tmp/beidan-fixed-block-verification-20261018/packages/beidan",
+    "full_r": "cd /tmp/beidan-fixed-block-verification-20261018; source docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh; R_LIBS_USER=\"$PWD/results/fixed-block-reselection-20261018/snapshot-library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R",
+    "full_python": "cd /tmp/beidan-fixed-block-verification-20261018; PYTHONPATH=\"packages/beidan/inst/python:$PWD\" .venv/bin/python -m pytest packages/beidan/tests/python -q -rs",
+    "compute": "source config/source-extraction.env\nfor i in 4 5 6 7 8 9 10; do\n  mkdir -p \"results/fixed-block-reselection-20261018/round-$i\"\n  RETICULATE_PYTHON=\"$PWD/.venv/bin/python\" /opt/R/4.6.1/bin/Rscript r/fixed_block_reselection_20261018.R \"$PWD\" \"$PWD/results/fixed-block-reselection-20261018/round-$i\" \"$i\"\ndone",
+    "render": "source config/source-extraction.env; QUARTO_R=/opt/R/4.6.1/bin/R quarto render quarto/fixed_block_reselection_20261018.qmd --no-cache -P project_root:\"$PWD\""
+  },
+  "validation": {
+    "all_candidate_sets": 9074,
+    "seven_round_independent_replay": true,
+    "original_purchase_parity": true,
+    "normal_installed_Rcpp_registration_and_call": true,
+    "source_snapshot_root": "/tmp/beidan-fixed-block-verification-20261018",
+    "scope_note": "Frozen verification package/function/tests/client bytes; final delivery QMD validated separately by clean render and review. No unrelated source changes included in commit."
+  },
+  "resolved_checks": [
+    {
+      "problem": "Shared workspace gained/changed report helper during early installation",
+      "resolution": "Snapshot all source, install normally from isolated snapshot; no unrelated source edits."
+    },
+    {
+      "problem": "Initial complete R suite had one missing legacy raw HTML input",
+      "observed": "package989/9598 passed; repository798,183237 passed,1 error",
+      "resolution": "Copied existing original inputs byte-for-byte, recorded95 additional hashes; targeted existing test passed and complete standard entry rerun now989/9598 plus798/183247,zero errors."
+    },
+    {
+      "problem": "Outer hash permitted a rehashed changed cutoff",
+      "resolution": "Require bound upstream cutoff/probability/candidate/source hashes and source availability before cutoff; regression included in27 assertions."
+    },
+    {
+      "problem": "Settlement column order mismatch in draft QMD",
+      "resolution": "Select authoritative settlement schema order before calling package settlement; clean render verifies complete scoring."
+    },
+    {
+      "problem": "Draft report edited after intermediate render",
+      "resolution": "Final clean render recreates evaluation receipt and final review checks SHA equality."
+    }
+  ],
+  "render_exit_status": 0,
+  "rendered_validation_and_results_present": true,
+  "review": {
+    "command": "codex review (exact final acceptance prompt recorded in review-final.log)",
+    "exit_status": 0,
+    "findings": "No blocking findings. Final hashes, receipt, seven replays, cutoff/payload, budgets/ranks, reported hits and payouts verified.",
+    "log_sha256": "149fb7c8faab8e885b876fa69e070cfb58fd28fb938dbe02f4a228e0ee92d9d2"
+  },
+  "test_snapshot_manifest_sha256": "21bcd4d13c51d63a2380ccdac4e7886ebc2cb2a627687031f9c9b36d693f7680",
+  "delivery_manifest_sha256": "dc1deb46effb26e5d93d87ab7b25813bd0a43e98a45d7b8311782e81e4ae2645",
+  "artifact_hashes": {
+    "results/fixed-block-reselection-20261018/comparison.csv": "a1bafc3231cb0f992d1c18f3f969031e42934e9bc23c6437944e5954f61cfed1",
+    "results/fixed-block-reselection-20261018/rounds.csv": "324c5fceda03eb7fbd2cbaface66130e8314a237ebc6f5f4286dccf8357ff171",
+    "results/fixed-block-reselection-20261018/groups.csv": "eee843e2d8a2aaf130300b80de3eb8877bca423c290a232b3478281eb7fa5105",
+    "results/fixed-block-reselection-20261018/group-count-frontier.csv": "1c689ad805004aa5cd16066074da9ec8c15ed6f912303e3da7839bf4dfd57523",
+    "results/fixed-block-reselection-20261018/membership.csv": "707f0cfd73b72efcc6f6dfc934f74b92aa92b5091f0c2a3ed9edcdb1e5c15853",
+    "results/fixed-block-reselection-20261018/evaluation-receipt.rds": "4a0834cff572db722992980908318d88ea6aea3ec236a681ec4a034d003cba09",
+    "results/fixed-block-reselection-20261018/full-r-tests.log": "beb024d0dcf16bfe8556fa84ad4ddf7141b99eb55a43e2fcc165b8a8a5b42abc",
+    "results/fixed-block-reselection-20261018/full-python-tests.log": "fed81815a8ad79f7f48704dcffe8a7b3543a139f0e4de0918ca2dab2b90c7400",
+    "results/fixed-block-reselection-20261018/install.log": "4fbbf1e1e55531e0d484a354ac790c87d1e94c77848532a6935ca61c3698a6b5",
+    "results/fixed-block-reselection-20261018/targeted-tests.log": "bf5b95a931aad2347b8889e30c532d1e3fa6b8be28bffc1430adffb7bbe8529d",
+    "results/fixed-block-reselection-20261018/runtime.log": "e9fdfbcea4cc43f3b088b93e98bc1227e0b2c5201fe54c2cccd7a411cd150452",
+    "results/fixed-block-reselection-20261018/review-initial.log": "b279fecdf1fc4da3c03baf35e3d609691e25d5da13d32dd09bb3d14f387e06c8",
+    "results/fixed-block-reselection-20261018/review-corrected.log": "68485a6f0e60e37d3b0e36ab77d1d9129fc45128dff5201ef2cf551857038cb7",
+    "results/fixed-block-reselection-20261018/review-intermediate.log": "506fd11d65ccb34cc7a15140501b5d8720f9350b9afe2bbf364d8865116d613d",
+    "results/fixed-block-reselection-20261018/review-final.log": "149fb7c8faab8e885b876fa69e070cfb58fd28fb938dbe02f4a228e0ee92d9d2",
+    "results/fixed-block-reselection-20261018/restored-historical-fixture-test.log": "faa3e21e9534f0cbc7a172771549b50e9b33089d5c8b8c6ba9e0166bb47a316d",
+    "results/fixed-block-reselection-20261018/superseded-full-r-tests-missing-input.log": "ab09134ff7497ea7c92ed4bb12179bdbeed37ccda51edd4016143480e5f8c3ca",
+    "results/fixed-block-reselection-20261018/superseded-missing-helper.log": "c748ddaabe88b932a99f42750f059bd3526a08e7ad4bbca6b1f33796cb4e5fcc",
+    "results/fixed-block-reselection-20261018/superseded-shared-source-change.log": "e23c0811a230c182ab094d846dbf05fa4e3d7745955b1438f3c156d788e280ca",
+    "results/fixed-block-reselection-20261018/render.log": "af1549204fae4e4db55fa9494ddcac659590d7dc7e42d000637be7e5b9f65930",
+    "results/fixed-block-reselection-20261018/delivery-source-manifest.json": "dc1deb46effb26e5d93d87ab7b25813bd0a43e98a45d7b8311782e81e4ae2645",
+    "results/fixed-block-reselection-20261018/verification-source-manifest.json": "21bcd4d13c51d63a2380ccdac4e7886ebc2cb2a627687031f9c9b36d693f7680",
+    "results/fixed-block-reselection-20261018/round-4/frozen-reselection.rds": "31508162bf1b43b608601705a1fc94631d8ea672b2d2784cbe24723f08017230",
+    "results/fixed-block-reselection-20261018/round-4/independent-selection-4.rds": "2c6932878061675c7c94f6927f1fd002ecdcf7f864393f52ad79ff0600965cb5",
+    "results/fixed-block-reselection-20261018/round-4/compute.log": "546810d80ec7ff9d1a2bd2d3f54aac76c4ed86aa2f45a004e8b75a62abcfce8a",
+    "results/fixed-block-reselection-20261018/round-5/frozen-reselection.rds": "995cf84ec175fc5085783116148574e35c6f08298bcb211da516e27eabae9595",
+    "results/fixed-block-reselection-20261018/round-5/independent-selection-5.rds": "69e635c2ddfecfac0e72c00dad0e446d54a96dd2c8ab8f5fe55eb9853d2fe2cc",
+    "results/fixed-block-reselection-20261018/round-5/compute.log": "4b6cc6c4dcf14d7ee4316fdf6fc9558da3401cc352fba90b95c7bb856067de07",
+    "results/fixed-block-reselection-20261018/round-6/frozen-reselection.rds": "e7bfd148bdc4a94c4ef44e4ba3f346bac711cb28375c962ee2472ee693ce54a1",
+    "results/fixed-block-reselection-20261018/round-6/independent-selection-6.rds": "05d070015ec4ffd4038b0b9392aa59d9c731569552da3e5938db5a886bac081d",
+    "results/fixed-block-reselection-20261018/round-6/compute.log": "c7c2fe9fa5182023b53c4512ff85c75038eebf57f07bd932281f6557adabc56d",
+    "results/fixed-block-reselection-20261018/round-7/frozen-reselection.rds": "c3eddd9bd5b5f1e8a65b74640f52009c679de655fe2aa1bade44c96511ea7f21",
+    "results/fixed-block-reselection-20261018/round-7/independent-selection-7.rds": "60f96efe0c1991237cd710bd56e80968eaba396b87ec7f9a140e41a8dde67655",
+    "results/fixed-block-reselection-20261018/round-7/compute.log": "f7a9c1856e1247b3e0c36a1c8fc05baf8601558e777d269af9e86546ae32a9b6",
+    "results/fixed-block-reselection-20261018/round-8/frozen-reselection.rds": "647dc4b44cad5b2ec3611db32175c82ac5d31e1528f9fd1653c7234a3106326f",
+    "results/fixed-block-reselection-20261018/round-8/independent-selection-8.rds": "3c3d161973978c0c7dcbdce34d564dd0db53729a9482a3708e918f6509e0d572",
+    "results/fixed-block-reselection-20261018/round-8/compute.log": "730f0e9ae4a45e6fba84d62742346a83428f3629d7a4d8d6fad21f9f214c51d6",
+    "results/fixed-block-reselection-20261018/round-9/frozen-reselection.rds": "01006d6bdbd0dbdb1905a0901d612ce9fd7a0135783c4f89696d0131d0ec2111",
+    "results/fixed-block-reselection-20261018/round-9/independent-selection-9.rds": "261792df089a187fe353956f0310a3b172b70268a99b78ee9d17e4a2ce065306",
+    "results/fixed-block-reselection-20261018/round-9/compute.log": "78cb3f96b9c65b5ae3b1645e8f9300f9cc52385204336d7f7a62a957b8ea612e",
+    "results/fixed-block-reselection-20261018/round-10/frozen-reselection.rds": "f5318d376749dc4b698feadd9bdb6b8f67fa7f02950301911be98b1ddff5126a",
+    "results/fixed-block-reselection-20261018/round-10/independent-selection-10.rds": "33c8b819f3657fc047255906a53d76c05103a87ba7db2efbe500f599273263cd",
+    "results/fixed-block-reselection-20261018/round-10/compute.log": "c3ac8f7f0e59d56921b5b1234c3b591db1cb18659e630ae25e1a7f88d7ce6a3e"
+  },
+  "generated_aggregate_sha256": "be9bb473611761f48fa65339909bb1b93d899fc11c230eed6a5c11d2b2e879d1",
+  "generated_aggregate_note": "Derived afresh by QMD from committed round snapshots, not an undeclared input.",
+  "code_whitespace_check": "Passed for implementation, tests, research client and QMD. Raw process logs retain their original terminal whitespace."
+}
