@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library/beidan/python:/home/drwho1985/workspace/algotradinglife/beijing-lot/src\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python /home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-nas-audit-20261019/publish-corrected-command.py"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T18:45:37.634255+00:00",
+  "finished_at_utc": "2026-10-18T18:48:46.874994+00:00"
+}

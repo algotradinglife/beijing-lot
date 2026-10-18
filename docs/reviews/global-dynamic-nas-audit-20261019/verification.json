@@ -1,0 +1,23 @@
+{
+  "scope": "Historical evidence archive only; primary26103/26104, legacy original7 includes26104/26105. Not new26105 completion or prospective validation.",
+  "qmd_sha256": "222a58eccbab0c7b8fc47dd9696e9a5b8d7233977f36c6f71a8c4e6b33c4469f",
+  "html_sha256": "6a8651b4f42154df6f44a3c27b2a82ce5f5e94c81a166291ed8251ea597037ee",
+  "render_exit_status": 0,
+  "review_exit_status": 0,
+  "review_findings": "No actionable findings; independently verified2120 hashes/1101 locators, original7 scope and21 publisher tests.",
+  "goal_complete": false,
+  "package_changes": false,
+  "files": {
+    "corrected-publication-spec.json": "45aa7bce107a215ab2008476622fbbf53705be488024b67fe3e8a3ae554b7acb",
+    "scope-correction.json": "3f3f616cc6916843c91a3bd16dbb6689f0438655819012832eaba23bd5fb4f74",
+    "corrected-publication.json": "81ef0534a2cb72e91f86a3f063800230d27ffd3c28c950be32028b728d7cc57b",
+    "corrected-publication-exit.json": "f23b56ac63fad1baec1748235ab85c6a5a3ccdf250072586b283051da6226fcc",
+    "render-corrected-job.json": "02a011be0adb0ec345adf42ca0e972b4417e1043ae6595d1e427c3cf7af04783",
+    "render-corrected-exit.json": "5c3086677b042ab6f7f14c546e4de19798d2d3a7a0b336916099eaf40a8dc381",
+    "render-corrected.log": "267ecee1fc26b3e08fda0f1bd452c9534ce0217507fb5e3ded787afe2109e52d",
+    "review-corrected-job.json": "c4d9d1dadcea585ec3f36539f3a4509eb6f77c370180674b0dabcaeaca671808",
+    "review-corrected-exit.json": "6984e7e3ad2581cd53ee2e470e6212fb27232ec7f6a29cf540175e4f98cc048b",
+    "review-corrected.log": "fe21d1322d977ada92c0ebec4bc84ac1314cc9986113d2f5a4582bc8488f29b8",
+    "publisher-tests.log": "7610c788b785f7d340233d740fc00b53dd1c4bade1054bdae1b98a39ef43bb01"
+  }
+}

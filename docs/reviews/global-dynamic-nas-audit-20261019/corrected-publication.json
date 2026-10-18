@@ -1,0 +1,56 @@
+{
+  "first": {
+    "publication": {
+      "label_version": "20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+      "status": "published",
+      "record": {
+        "files": 2120,
+        "asset_manifest_sha256": "4823c6c815c9f58c6b0bc01d06ba17c378d0bf0924c4444b08f61f7a23a8061f",
+        "label_version": "20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+        "content_digest": "22447ccd518ddf107bc1951d7f4cbb49da4141742ff859a36fa6c2f28f132f5c",
+        "directory": "/mnt/nas/Data/beijing-lot/reports/26103-fundamentals-final/versions/20261018T184537609600Z-global-dynamic-audit-scope-corrected"
+      },
+      "versions": [
+        "20261018T183520066665Z-global-dynamic-audit",
+        "20261018T184537609600Z-global-dynamic-audit-scope-corrected"
+      ],
+      "current": {
+        "schema": "beijing_lot_version_v1",
+        "label_version": "20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+        "asset_manifest_sha256": "4823c6c815c9f58c6b0bc01d06ba17c378d0bf0924c4444b08f61f7a23a8061f",
+        "content_digest": "22447ccd518ddf107bc1951d7f4cbb49da4141742ff859a36fa6c2f28f132f5c",
+        "directory": "/mnt/nas/Data/beijing-lot/reports/26103-fundamentals-final/versions/20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+        "files": 2120
+      }
+    },
+    "relative": "reports/26103-fundamentals-final/versions/20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+    "asset_manifest_sha256": "4823c6c815c9f58c6b0bc01d06ba17c378d0bf0924c4444b08f61f7a23a8061f",
+    "verified_members": 2120
+  },
+  "repeat": {
+    "publication": {
+      "label_version": "20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+      "status": "unchanged",
+      "record": {
+        "files": 2120,
+        "asset_manifest_sha256": "4823c6c815c9f58c6b0bc01d06ba17c378d0bf0924c4444b08f61f7a23a8061f"
+      },
+      "versions": [
+        "20261018T183520066665Z-global-dynamic-audit",
+        "20261018T184537609600Z-global-dynamic-audit-scope-corrected"
+      ],
+      "current": {
+        "schema": "beijing_lot_version_v1",
+        "label_version": "20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+        "asset_manifest_sha256": "4823c6c815c9f58c6b0bc01d06ba17c378d0bf0924c4444b08f61f7a23a8061f",
+        "content_digest": "22447ccd518ddf107bc1951d7f4cbb49da4141742ff859a36fa6c2f28f132f5c",
+        "directory": "/mnt/nas/Data/beijing-lot/reports/26103-fundamentals-final/versions/20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+        "files": 2120
+      }
+    },
+    "relative": "reports/26103-fundamentals-final/versions/20261018T184537609600Z-global-dynamic-audit-scope-corrected",
+    "asset_manifest_sha256": "4823c6c815c9f58c6b0bc01d06ba17c378d0bf0924c4444b08f61f7a23a8061f",
+    "verified_members": 2120
+  },
+  "goal_complete": false
+}

@@ -1,0 +1,4 @@
+{
+  "previous_label": "20261018T183520066665Z-global-dynamic-audit",
+  "reason": "Original seven reproduction rounds include legacy26105 references; no completed new26105 full-issue prediction/evaluation is included. Legacy evidence is excluded from new calibration training."
+}

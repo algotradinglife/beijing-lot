@@ -1,0 +1,64 @@
+---
+title: "RAW／GLOBAL历史证据：NAS归档验收"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+---
+
+本次归档保存已完成的26103／26104历史比较、两个真实轮次的截止后扰动验收，以及仅用于复现的原7轮。新26105整期预测与评估尚未完成；原7轮含旧26105复现记录，按历史证据保留；26106前瞻验证仍未取得完整数据。归档锚定26103，清单明确包含26103与26104的研究证据。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(beidan);library(testthat)
+root <- normalizePath(params$project_root,mustWork=TRUE)
+invisible(python_backend(file.path(root,'.venv/bin/python')))
+control <- file.path(root,'results/global-dynamic-nas-audit-20261019')
+publication <- jsonlite::fromJSON(file.path(control,'corrected-publication.json'),simplifyVector=FALSE)
+job <- jsonlite::fromJSON(file.path(control,'corrected-publication-exit.json'))
+expect_equal(job$exit_status,0L)
+expect_identical(publication[["repeat"]]$publication$status,'unchanged')
+expect_identical(publication$first$asset_manifest_sha256,publication[["repeat"]]$asset_manifest_sha256)
+paths <- reticulate::import('beidan_backend.catalog.paths',convert=FALSE)
+archive <- reticulate::py_str(paths$location(paste0('frozen:',publication$first$relative)))
+manifest_path <- file.path(archive,'asset-manifest.json')
+expect_identical(publication$first$asset_manifest_sha256,digest::digest(file=manifest_path,algo='sha256'))
+manifest <- jsonlite::fromJSON(manifest_path,simplifyVector=FALSE)
+expect_identical(manifest$issue,'26103')
+expect_setequal(unlist(manifest$receipt$issues),c('26103','26104'))
+expect_false(manifest$receipt$new_26105_full_issue_prediction_included)
+expect_false(manifest$receipt$completed_26105_evaluation_included)
+expect_true(manifest$receipt$legacy_evidence_only)
+expect_setequal(unlist(manifest$receipt$legacy_reproduction_issues),c('26104','26105'))
+expect_false(manifest$receipt$prospective_validation)
+expect_false(manifest$receipt$goal_complete)
+members <- enframe(unlist(manifest$members),name='member',value='expected_sha256')
+expect_s3_class(members,'tbl_df');expect_equal(nrow(members),publication$first$verified_members)
+expect_false(anyDuplicated(members$member)>0L)
+members$actual_sha256 <- rep(NA_character_,nrow(members))
+for(i in seq_len(nrow(members)))members$actual_sha256[i] <- digest::digest(file=file.path(archive,members$member[i]),algo='sha256')
+expect_identical(members$actual_sha256,members$expected_sha256)
+expect_identical(manifest$receipt$original7_sha256,'2177a9eb060a3ceec5de8872a57a13a8c26fd59faae7efd5c9b93fc7594d2176')
+legacy_member <- 'workspace/results/margin-combination-study-20261018-v2/frozen-study.rds'
+expect_equal(members$actual_sha256[members$member==legacy_member],manifest$receipt$original7_sha256)
+legacy <- readRDS(file.path(archive,legacy_member))
+legacy_issues <- vapply(legacy$rounds,function(z) z$cutoff$issue_id,character(1))
+expect_equal(length(legacy_issues),7L)
+expect_setequal(unique(legacy_issues),unlist(manifest$receipt$legacy_reproduction_issues))
+knitr::kable(tibble(issue_id=legacy_issues) |> count(issue_id,name='reproduction_rounds'))
+knitr::kable(tibble(archive_relative=publication$first$relative,verified_files=nrow(members),repeat_publication=publication[["repeat"]]$publication$status))
+knitr::kable(members |> mutate(category=sub('/.*$','',member)) |> count(category))
+locators <- as_tibble(jsonlite::fromJSON(file.path(archive,'input-locators.json')))
+expect_false(anyDuplicated(locators[c('issue','input')])>0L)
+linked <- locators |> left_join(members,by='member',relationship='many-to-one')
+expect_false(anyNA(linked$actual_sha256));expect_identical(linked$sha256,linked$actual_sha256)
+knitr::kable(tibble(original_input_references=nrow(locators),content_addressed_members=n_distinct(locators$member),shared_references=nrow(locators)-n_distinct(locators$member)))
+```
+
+调用既有 `publish_fundamentals_audit`，由共享版本生命周期和原子写入维护NAS不可变版本。发布前后目录检查、逐文件读回及相同版本重复执行均须通过；本QMD再次逐一核验全部成员哈希。内容相同的冻结输入按SHA共享一份归档成员，全部原始路径引用保存在input-locators.json；上表列明引用数、实际内容成员数及复用数。原始文件和旧版本继续保留。
+
+这是历史证据归档，分析表继续通过已登记Parquet和包接口读取。实现快照及原7轮作为带身份的复现证据保留；恢复执行仍需声明的R／Python环境和路径映射，不将历史时间代理升级为真实赛前可用性。此阶段不代表整个goal完成。
