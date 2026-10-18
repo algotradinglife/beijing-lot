@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python src/global_dynamic_26105_history_metadata_20261018.py --inventory /home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-channel-inventory-20261018/inventory.json --output hot:global-dynamic-26105-history-metadata-20261018-v2"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T16:02:39.983875+00:00",
+  "finished_at_utc": "2026-10-18T16:06:33.015139+00:00"
+}

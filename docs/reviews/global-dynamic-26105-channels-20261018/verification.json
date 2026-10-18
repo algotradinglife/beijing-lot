@@ -1,0 +1,251 @@
+{
+  "status": "LOCAL_CHECKS_PASSED_GOAL_PENDING",
+  "package_changed_by_this_phase": false,
+  "implementation_files": [
+    {
+      "path": "src/global_dynamic_26105_channel_capture_20261018.py",
+      "sha256": "c8061c153eee8e06beab6163969f18c87a8d921a8e90d378440398439d6a8120"
+    },
+    {
+      "path": "src/global_dynamic_26105_channel_parse_20261018.py",
+      "sha256": "ccbbb5995ad3c647ecb8445dde386b00bf944e903e607f68743fe7e37a908119"
+    },
+    {
+      "path": "src/global_dynamic_26105_channel_inventory_20261018.py",
+      "sha256": "4814383d200e7c2558437d864da65955104e914cd21382594f562748cc3c5ead"
+    },
+    {
+      "path": "src/global_dynamic_26105_history_metadata_20261018.py",
+      "sha256": "3fe32f9e0bf5772ce4306ddeba96917ad02515e169c0c887725ec2dc48416f0d"
+    },
+    {
+      "path": "tests/test_global_dynamic_26105_channel_capture.py",
+      "sha256": "6f990fe20a4f55ed1426a501390378ed87576b988c639f66bb4897e40a7dd5cd"
+    },
+    {
+      "path": "tests/test_global_dynamic_26105_channel_parse.py",
+      "sha256": "7626262dfa129b30c04fa5051f53a87887fb84f9a57bdcb0f6fb1918f0805a65"
+    },
+    {
+      "path": "tests/test_global_dynamic_26105_channel_inventory.py",
+      "sha256": "b1e180cb7c9231b44c738eef3c5d7f8c20535d9d398e600df12bc665e3cad120"
+    },
+    {
+      "path": "tests/test_global_dynamic_26105_history_metadata.py",
+      "sha256": "0cf83f69700ed4d77359754581b1e3789ac4ed72c14c44d08e9811a8f85e3218"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-base-census.R",
+      "sha256": "1a5cd122e147efb84a01b374b69499d8fec038b49c00cdd2920df8e28e55efc1"
+    },
+    {
+      "path": "r/global_dynamic_26105_base_census_20261018.R",
+      "sha256": "9fc6e84707a5d66f1e68a1b09e66ed9058f33a9922fdcfb6c8b0790a1099cfd8"
+    }
+  ],
+  "matched_library": "results/margin-first-mapping-20261018/library",
+  "source_snapshot": "/tmp/beidan-source-rate-20261018",
+  "scope_note": "Existing independently successful full suite includes this phase current R client and its ten-assertion test; hashes verified. Failed old-library run remains rejected. No first-mapping implementation committed by this phase.",
+  "R_suites": [
+    {
+      "suite": "package",
+      "tests": 992,
+      "passed": 9664,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "repository",
+      "tests": 811,
+      "passed": 183348,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "full_R_exit_status": 0,
+  "full_python_passed": 674,
+  "full_python_exit_status": 0,
+  "own_python_passed": 17,
+  "own_python_exit_status": 0,
+  "runtime_resolution_assertions": 39,
+  "runtime_resolution_exit_status": 0,
+  "unchanged_backend_modules": [
+    {
+      "module": "unified_sources.py",
+      "sha256": "f5a46b2f960898c0013c6449d52213b307dd6311d55ee31be497e1aac34e28aa"
+    },
+    {
+      "module": "source_issue_update.py",
+      "sha256": "82a7d856f7df2ea43f7104fb32ac0a8e15043c2b6806e407e451c795c1cedac8"
+    },
+    {
+      "module": "fundamentals.py",
+      "sha256": "d699b60b43ee4213fc5c0dcff264ebf4b0be418bccda2f6b4c5de3308215c995"
+    },
+    {
+      "module": "market_capture/history.py",
+      "sha256": "ee6b14e5904e0e0aa31fd0325e22ef4a0a2e7db860d9ba6f3ed952b7592b9f43"
+    },
+    {
+      "module": "opponent_history.py",
+      "sha256": "1e87e1598ed6e0e90f5b279f4653cda81a737c6fe9e423ea8e62c38f33752c64"
+    },
+    {
+      "module": "source_rate_policy.py",
+      "sha256": "0d2fe95d3cff4871b1d387ea48588397f5aed246c4ee435d6cdc0295a408f5e0"
+    },
+    {
+      "module": "extraction_cache.py",
+      "sha256": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422"
+    }
+  ],
+  "prior_failed_run": {
+    "exit_status": 1,
+    "errors": 1,
+    "failures": 1,
+    "reason": "Test source contains RankFirstMarginTickets but explicitly selected older normal installation does not."
+  },
+  "full_R_source_receipt": "full-R-matched-library-exit.json",
+  "full_R_log": "full-R-matched-library.log",
+  "matched_snapshot_files": [
+    {
+      "path": "r/global_dynamic_26105_base_census_20261018.R",
+      "sha256": "9fc6e84707a5d66f1e68a1b09e66ed9058f33a9922fdcfb6c8b0790a1099cfd8",
+      "snapshot_sha256": "9fc6e84707a5d66f1e68a1b09e66ed9058f33a9922fdcfb6c8b0790a1099cfd8"
+    },
+    {
+      "path": "tests/testthat/test-global-dynamic-26105-base-census.R",
+      "sha256": "1a5cd122e147efb84a01b374b69499d8fec038b49c00cdd2920df8e28e55efc1",
+      "snapshot_sha256": "1a5cd122e147efb84a01b374b69499d8fec038b49c00cdd2920df8e28e55efc1"
+    },
+    {
+      "path": "packages/beidan/R/margin_first_mapping.R",
+      "sha256": "254302e79596d7c135d5755a07b855fb453bb70233f5bdcc1c7d213a3da9fe59",
+      "snapshot_sha256": "254302e79596d7c135d5755a07b855fb453bb70233f5bdcc1c7d213a3da9fe59"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-margin-first-mapping.R",
+      "sha256": "ea2e4a8369485d7c1dcfadd3b31d9818d88a3968c51eaee9d087d27b5a281a22",
+      "snapshot_sha256": "ea2e4a8369485d7c1dcfadd3b31d9818d88a3968c51eaee9d087d27b5a281a22"
+    },
+    {
+      "path": "tests/testthat/test-margin-first-mapping-manifest.R",
+      "sha256": "8e774e952db1cb8f756eb66005a26208b705781d94677fbde1b03f9bd49abfb6",
+      "snapshot_sha256": "8e774e952db1cb8f756eb66005a26208b705781d94677fbde1b03f9bd49abfb6"
+    }
+  ],
+  "evidence_files": [
+    {
+      "path": "26106-cache-observation.json",
+      "sha256": "3f722d7f500f5a590034e706f030db2cdccb39466e5141b43a9d921798c0a04c"
+    },
+    {
+      "path": "base-census-v2-exit.json",
+      "sha256": "15b003de38237be0a05c8ebdb4f254a57a02d4828aa6e061f28b423c96b81078"
+    },
+    {
+      "path": "base-gap-kinds.csv",
+      "sha256": "bfd910c18d3bb1cf05a5b7cea32d7db3308114f95dcf524e6a2464da15213508"
+    },
+    {
+      "path": "base-receipt.json",
+      "sha256": "28d74d6e4841aeb83494f96ce63ac1267993e9d56643b4d8acb7f5cb94703924"
+    },
+    {
+      "path": "base-resources.csv",
+      "sha256": "35376d4aa5ef6ed87c6c4f08934a082744b6667e716aadc68987f7dff9258db0"
+    },
+    {
+      "path": "base-status.csv",
+      "sha256": "5d93a30ab662d79bae9be6a4c34742d82c4548e9f19d8b61634df1ec7fb02744"
+    },
+    {
+      "path": "catalogue-observation.json",
+      "sha256": "f2ae8b6771a82684687e473b4e023ea99f1a7504c9f486e18ac9fcb6320ba39a"
+    },
+    {
+      "path": "census-boundary-tests.log",
+      "sha256": "195268d7a0606c12abae367d3e992b45a6fd66d366a065babefae06b36e4c5d9"
+    },
+    {
+      "path": "full-R-matched-library-exit.json",
+      "sha256": "81c4345a7a49e56649e6139acad1ec7b66354e5884c5f761e5f3d441a526fb5a"
+    },
+    {
+      "path": "full-R-matched-library.log",
+      "sha256": "aef87af0c3640143518da2098cd73dc25ae5b197614b51b0d2b3438601d6c854"
+    },
+    {
+      "path": "full-R-misbound-library-exit.json",
+      "sha256": "209d0fb80f1c4a47a18c386e6149d3e05401084f463bec9ccd9f09dfc92c1582"
+    },
+    {
+      "path": "full-R-misbound-library.log",
+      "sha256": "06df8d91c07bf3541bab79aae7327ea4ef2f6a54fdd743051935195819acb33f"
+    },
+    {
+      "path": "full-python-matched-library-exit.json",
+      "sha256": "42eebe5535285b187e7dbc11a6d90f4359e9aad4d2c20fcfe12792910a69621b"
+    },
+    {
+      "path": "full-python-matched-library.log",
+      "sha256": "73c5aefbc937343da439097dba45e22a5953743f3423279fb2f9399326aa3a31"
+    },
+    {
+      "path": "history-metadata-summary.csv",
+      "sha256": "cd746b96409aacc8270ab7275962185c0c99e59b4de97ca68b27094091cef183"
+    },
+    {
+      "path": "history-metadata-v2-exit.json",
+      "sha256": "107d2e9b18ccaf8bd66bff1cbddafb4368da4539f22ff91049079272c95f845c"
+    },
+    {
+      "path": "installed-library-resolution.log",
+      "sha256": "b466954ac634b9f356bf99678df76c2211887bf1ee7b3fd4416ded4bf7cd192a"
+    },
+    {
+      "path": "normal-install-matched-library.json",
+      "sha256": "806e46390a43b849e59262a6566a526c6a4dc5dd8818719a4b940471b898a7b2"
+    },
+    {
+      "path": "normal-install-matched-library.log",
+      "sha256": "21a18e1456676b84bfbdc84db82d69e74fe4b5ac6718ed7fd72ef44482bb533e"
+    },
+    {
+      "path": "original-seven-rounds-integrity.json",
+      "sha256": "242296b6c8712783832ea008714019c413aaeb3ade8eb46786553727a49d0eed"
+    },
+    {
+      "path": "prior-issues-integrity.json",
+      "sha256": "025d6ee3b31fd3d50209d06f5a92970023ee8d6c7a6bf7eea719ad4a30b4018e"
+    },
+    {
+      "path": "python-final-matched-library.log",
+      "sha256": "560b52fba8c9351e1a8f870f90e825e410d62f6e5ef44befae85d2d051ec3011"
+    },
+    {
+      "path": "render-with-census.log",
+      "sha256": "59048fc059650fb042e400a7038b7aca3069d54f192bdffedb650f02f1896d06"
+    },
+    {
+      "path": "review-census-history-v3.log",
+      "sha256": "56e68ab4c5d25ffbb97171ce2ae0252ff9d24572165706b3e976e863e1694e71"
+    },
+    {
+      "path": "review-final-artifact.log",
+      "sha256": "2c9b1232ee2d0a3511c1c71e463c19537b6d32b378f966da2b9b8e8ecbcdc90a"
+    },
+    {
+      "path": "review-v3.log",
+      "sha256": "427df2fbaf1319b1973884dd8906a9e60365b91a4e8425c8cb340e10de48b374"
+    },
+    {
+      "path": "tests-with-history.log",
+      "sha256": "53c4c94ca6df3e616665b9425ab916726499cd3e8d3cf4c4ad903b9258b7d164"
+    }
+  ]
+}

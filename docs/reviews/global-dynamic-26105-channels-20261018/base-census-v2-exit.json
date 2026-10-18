@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport R_PROFILE_USER=/dev/null\nexport R_LIBS_USER=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\nexec /opt/R/4.6.1/bin/Rscript r/global_dynamic_26105_base_census_20261018.R /home/drwho1985/workspace/algotradinglife/beijing-lot results/global-dynamic-26105-base-census-20261018-v2"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T16:02:39.994705+00:00",
+  "finished_at_utc": "2026-10-18T16:10:35.007960+00:00"
+}

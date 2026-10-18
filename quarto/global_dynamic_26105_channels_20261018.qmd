@@ -1,0 +1,154 @@
+---
+title: "26105亚盘与大小球：原始缓存及原定截止覆盖"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  inventory: "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-channel-inventory-20261018/inventory.json"
+  parsed: "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-channel-parsed-20261018-v3/parsed.json"
+  base_census: "results/global-dynamic-26105-base-census-20261018-v2"
+  history_metadata: "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/global-dynamic-26105-history-metadata-20261018-v2/metadata.json"
+  require_acceptance: true
+---
+
+本报告检查26105全365场公司8的亚盘和大小球原始记录，不学习参数、不更新FM或票单。26105尚未全部结束，最终概率及收益比较待全期结算。实际采集时间晚于部分比赛，报价自身时间仅是历史诊断证据，不能冒充当时已观察到的数据。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+library(testthat)
+root <- normalizePath(params$project_root, mustWork=TRUE)
+setwd(root);knitr::opts_knit$set(root.dir=root)
+inventory <- jsonlite::fromJSON(params$inventory, simplifyVector=FALSE)
+parsed <- jsonlite::fromJSON(params$parsed, simplifyVector=FALSE)
+stopifnot(parsed$inventory_sha256 == digest::digest(file=params$inventory,algo='sha256'),
+          inventory$scope == 365L, parsed$network_attempts == 0L,
+          identical(parsed$historical_admission,FALSE))
+fixtures <- map_dfr(inventory$fixtures, as_tibble) |>
+  mutate(cutoff=lubridate::ymd_hms(cutoff_utc,tz='UTC'))
+channels <- map_dfr(parsed$records, ~tibble(fixture_id=.x$fixture_id,kind=.x$kind,state=.x$state))
+quotes <- map_dfr(parsed$records, function(record) {
+  if(record$state != 'PARSED') return(tibble(fixture_id=character(),kind=character(),complete=logical(),phase=character(),quote_at=as.POSIXct(character(),tz='UTC')))
+  map_dfr(record$snapshots, ~tibble(fixture_id=record$fixture_id,kind=record$kind,
+    complete=.x$complete,phase=.x$phase,
+    quote_at=lubridate::ymd_hms(.x$snapshot_ts_hkt,tz='UTC')))
+})
+expect_equal(nrow(fixtures),365L);expect_equal(nrow(channels),730L)
+expect_equal(nrow(distinct(channels,fixture_id,kind)),730L)
+expect_false(anyNA(fixtures$cutoff));expect_false(anyNA(quotes$quote_at))
+quotes <- quotes |> left_join(select(fixtures,fixture_id,cutoff),by='fixture_id',relationship='many-to-one') |>
+  mutate(eligible=complete & phase=='pregame' & quote_at<=cutoff & quote_at>=cutoff-48*3600)
+counts <- quotes |> group_by(fixture_id,kind) |> summarise(snapshots=n(),eligible_quotes=sum(eligible),.groups='drop')
+coverage <- channels |> left_join(counts,by=c('fixture_id','kind'),relationship='one-to-one') |>
+  mutate(snapshots=replace_na(snapshots,0L),eligible_quotes=replace_na(eligible_quotes,0L))
+expect_equal(sum(coverage$snapshots),nrow(quotes))
+expect_true(all(coverage$eligible_quotes<=coverage$snapshots))
+expect_true(all(quotes$quote_at[quotes$eligible]<=quotes$cutoff[quotes$eligible]))
+```
+
+365场名单与Titan分析页的主客身份均已校验；下表中的“截止内”要求完整赛前报价、报价时间不晚于开赛前24小时，且距该截止不超过48小时。该检查尚未执行跨来源赛程冲突裁决、价格合理性与联合市场DC拟合，因此不等于模型最终准入。
+
+```{r}
+summary <- coverage |> group_by(kind) |> summarise(channels=n(),
+  parsed=sum(state=='PARSED'),missing=sum(state=='CACHE_MISS'),
+  snapshots=sum(snapshots),channels_with_cutoff_quotes=sum(eligible_quotes>0),
+  cutoff_quotes=sum(eligible_quotes),.groups='drop')
+knitr::kable(summary)
+knitr::kable(coverage |> count(kind,state))
+```
+
+原始数据由共享缓存API读取，身份清单与离线解析客户端均不发起HTTP请求；独立补采客户端使用已批准的5秒间隔与每渠道至多两轮重试。解析直接使用已安装后端的亚盘及大小球解析器，缺失原文、解析拒绝和空响应分别保留。缓存SHA变化会停止，而不会静默换入新版本。新增客户端测试覆盖导入无副作用、范围校验、主客身份不符、原文缺失、解析失败、SHA冲突及不可覆盖输出。
+
+```{r}
+#| echo: false
+knitr::kable(tibble(input=c('inventory','parsed'),sha256=c(digest::digest(file=params$inventory,algo='sha256'),digest::digest(file=params$parsed,algo='sha256'))))
+```
+
+复现顺序：运行 `src/global_dynamic_26105_channel_inventory_20261018.py`，再运行 `src/global_dynamic_26105_channel_parse_20261018.py`，为每次输出指定新的显式 `hot:` 位置；以上参数声明本次不可变输入。采集和模型分开，本次未修改package，也不代表整个goal完成。
+
+本轮审查发现并修复：解析前逐渠道核对比赛／公司／市场路由；正文拒绝与普通解析拒绝隔离且保留原始提取收据；正文拒绝仍核验原文SHA；补采也隔离正文拒绝、保持完整性错误立即停止。旧补采进程因修复主动终止（退出−15），零个渠道结果，源文件及日志保留于过程目录；新版使用独立v2目录，最多两轮且不重置限速。并行网络采集曾触发共享锁超时，已改为来源顺序补采；已保存记录不重抓，限速时间与已记录重试次数不重置。软件检查与整期数据完成分别验收。
+
+全期基础数据检查复用已有 `collect_issue` 和 `validate_tables`，不发布部分结果、不生成预测。R边界使用包内 `.SourceRows` 及后端声明的列类型，保留全空缺失值列与有类型的空表。新增回归直接执行客户端转换表达式，10个断言通过；包含历史元数据客户端的本地Python检查共17项通过。
+
+```{r}
+census_receipt <- jsonlite::fromJSON(file.path(params$base_census,'receipt.json'))
+expect_identical(census_receipt$target_labels_evaluated,FALSE)
+expect_equal(census_receipt$receipt$expected_slots,365L)
+expect_equal(census_receipt$receipt$network_attempts,0L)
+expect_identical(census_receipt$client_sha256,digest::digest(file='r/global_dynamic_26105_base_census_20261018.R',algo='sha256'))
+expect_length(census_receipt$outputs,2L)
+# Receipt hashes follow the declared status.csv, resources.csv order.
+for(name in c('status','resources')) expect_identical(unname(census_receipt$outputs[[match(name,c('status','resources'))]]),digest::digest(file=file.path(params$base_census,paste0(name,'.csv')),algo='sha256'))
+base_status <- read_csv(file.path(params$base_census,'status.csv'),col_types=cols(issue=col_character(),slot=col_integer(),fixture_id=col_character(),state=col_character(),conflicts=col_integer(),gaps=col_integer(),missing_fields=col_integer(),error_type=col_character()))
+base_resources <- read_csv(file.path(params$base_census,'resources.csv'),col_types=cols(.default=col_character()))
+expect_equal(nrow(base_status),365L)
+expect_setequal(base_status$fixture_id,fixtures$fixture_id)
+history_metadata <- jsonlite::fromJSON(params$history_metadata,simplifyVector=FALSE)
+expect_equal(history_metadata$scope,365L)
+expect_equal(history_metadata$network_attempts,0L)
+expect_identical(history_metadata$inventory_sha256,digest::digest(file=params$inventory,algo='sha256'))
+expect_identical(history_metadata$client_sha256,digest::digest(file='src/global_dynamic_26105_history_metadata_20261018.py',algo='sha256'))
+metadata_status <- map_dfr(history_metadata$packets,~tibble(fixture_id=.x$fixture_id,state=.x$state))
+metadata_support <- map_dfr(history_metadata$packets,~tibble(fixture_id=.x$fixture_id,
+  competition_id=.x$result$target_competition_id %||% NA_character_,
+  history_rows=length(.x$result$rows)))
+expect_equal(nrow(metadata_status),365L)
+expect_setequal(metadata_status$fixture_id,fixtures$fixture_id)
+expect_equal(nrow(metadata_support),365L)
+expect_false(anyDuplicated(metadata_support$fixture_id)>0L)
+knitr::kable(count(base_status,state))
+knitr::kable(count(base_resources,source,state))
+knitr::kable(count(metadata_status,state))
+knitr::kable(summarise(metadata_support,fixtures=n(),competition_present=sum(!is.na(competition_id)),history_rows=sum(history_rows)))
+```
+
+赛事与对手元数据只供后续同赛事样本匹配；尚未通过逐场截止准入、对手样本准备与原生λ估计。没有以26105目标赛果决定支持范围或模型参数。26106目录登记与本地赛程缓存检查均为空，只能记为本地未准备，不能据此断言线上不存在。
+
+历史记录行数按目标比赛页面计数，同一场历史比赛可能出现于多个页面或不同历史区块，不代表互异比赛数；去重与截止准入仍由后续共享样本准备流程执行。
+
+验收记录保存在 `docs/reviews/global-dynamic-26105-channels-20261018/`。本轮显式指定旧安装库的整套测试退出1：新增首次映射测试引用了旧安装包不存在的函数，分别产生1个错误和1个失败，该结果保留并拒绝计作通过。匹配安装库的并行独立整套运行已通过，日志也覆盖本轮新增的10断言；本轮核对相关源文件与测试哈希，并用匹配安装库重新执行原失败项及边界回归，共39断言通过。两安装库涉及本次采集与解析的7个Python模块字节相同，不改变既有采集绑定。没有提交其他会话的首次映射实现。
+
+```{r}
+verification_dir <- 'docs/reviews/global-dynamic-26105-channels-20261018'
+verification <- jsonlite::fromJSON(file.path(verification_dir,'verification.json'))
+verification$R_suites <- as_tibble(verification$R_suites)
+verification$implementation_files <- as_tibble(verification$implementation_files)
+expect_equal(nrow(verification$implementation_files),10L)
+expect_identical(verification$status,'LOCAL_CHECKS_PASSED_GOAL_PENDING')
+expect_equal(verification$full_R_exit_status,0L)
+expect_equal(verification$full_python_exit_status,0L)
+expect_equal(verification$own_python_exit_status,0L)
+expect_equal(verification$runtime_resolution_exit_status,0L)
+expect_equal(verification$prior_failed_run$exit_status,1L)
+expect_true(all(verification$R_suites$failed==0L & verification$R_suites$errors==0L & verification$R_suites$warnings==0L & verification$R_suites$skipped==0L))
+for(i in seq_len(nrow(verification$implementation_files))) expect_identical(
+ verification$implementation_files$sha256[i],digest::digest(file=verification$implementation_files$path[i],algo='sha256'))
+if(params$require_acceptance) {
+ review <- jsonlite::fromJSON(file.path(verification_dir,'final-review-receipt.json'))
+ review$files <- as_tibble(review$files)
+ expect_identical(review$status,'NO_BLOCKING_FINDINGS')
+ expect_equal(nrow(review$files),11L)
+ expect_true('quarto/global_dynamic_26105_channels_20261018.qmd' %in% review$files$path)
+ for(i in seq_len(nrow(review$files))) expect_identical(review$files$sha256[i],digest::digest(file=review$files$path[i],algo='sha256'))
+}
+knitr::kable(verification$R_suites)
+knitr::kable(tibble(check=c('完整Python后端与既有采集客户端独立套件','本轮4个Python客户端测试','匹配安装库修复复核'),passed=c(verification$full_python_passed,verification$own_python_passed,verification$runtime_resolution_assertions),exit_status=0L))
+knitr::kable(verification$implementation_files)
+```
+
+整套R记录对应隔离源码目录 `/tmp/beidan-source-rate-20261018`；该目录当时的标准入口实际执行包与仓库两个阶段。匹配正常安装库为 `results/margin-first-mapping-20261018/library`，正常安装退出0，完整Python套件674项通过。本轮17项Python测试以及39个R修复复核断言均重新运行并通过，零失败、警告或跳过。原7轮冻结文件、评分文件以及26103／26104的15项训练与策略绑定已核对当前哈希，与原独立重放证据一致；本轮没有伪称重新拟合或重放这些旧研究。
+
+```{r}
+#| echo: false
+#| results: asis
+full_R_receipt <- jsonlite::fromJSON(file.path(verification_dir,'full-R-matched-library-exit.json'))
+expect_equal(full_R_receipt$exit_status,0L)
+cat('<pre>',htmltools::htmlEscape(paste(full_R_receipt$command,collapse='\n')),'</pre>')
+```
+
+原始失败、匹配安装库的完整日志与退出记录、修复复核日志、实现哈希以及最终审查收据均保留。此次交付只证明本轮客户端及该输入快照通过软件检查；26105全期盘口补齐、逐场截止准入、RAW／GLOBAL估计与冻结重放、全期结算及最终比较仍未完成。

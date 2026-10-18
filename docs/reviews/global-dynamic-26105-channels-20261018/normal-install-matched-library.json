@@ -1,0 +1,6 @@
+{
+  "command": "R CMD INSTALL -l results/margin-first-mapping-20261018/library /tmp/beidan-source-rate-20261018/packages/beidan",
+  "exit_status": 0,
+  "evidence": "functions.write_stdin session5685 returned exit_code0",
+  "log": "results/margin-first-mapping-20261018/install.log"
+}

@@ -1,0 +1,13 @@
+{
+  "scope": "Original seven rounds evidence only; no new replay executed in this observation",
+  "base": "results/margin-combination-study-20261018-v2",
+  "frozen_sha256": "2177a9eb060a3ceec5de8872a57a13a8c26fd59faae7efd5c9b93fc7594d2176",
+  "evaluation_sha256": "7ab118c83b8724e955bf4a5c5b41376b34e87b49cf9d1fd64f478da60d7d0923",
+  "existing_selection_replay": "FULL_IDENTICAL_REPLAY",
+  "existing_evaluation_replay": "FULL_IDENTICAL_EVALUATION_REPLAY",
+  "existing_replay_exit_statuses": [
+    0,
+    0
+  ],
+  "verified_current_bytes": true
+}

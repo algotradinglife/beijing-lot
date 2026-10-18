@@ -1,0 +1,98 @@
+{
+  "scope": "Current bytes vs existing receipts only; no new fit, replay, selection or scoring performed",
+  "records": [
+    {
+      "issue": "26103",
+      "scope": 407,
+      "estimated": 155,
+      "frozen_forecast_sha256": "beac36d352d9f21e879003ae1683deb9ce325cb1d344d215508c52fef7bf53d7",
+      "existing_independent_replay": "FULL_IDENTICAL_REPLAY",
+      "checked_training_and_policy_inputs": [
+        {
+          "name": "policy",
+          "path": "config/global_dynamic_walkforward_20261018.json",
+          "sha256": "ec0fcd046b6e1b4e127b4d1bfc369bb6090946dc3d34884bb956e930ab02a399"
+        },
+        {
+          "name": "client",
+          "path": "r/global_dynamic_walkforward_20261018.R",
+          "sha256": "97deb750a4308ced749f0c01f17f8476db2c7c4e5437050f4c7a5ffd379f9f91"
+        },
+        {
+          "name": "training",
+          "path": "results/fm171-margin-shape-20261017/forecasts.rds",
+          "sha256": "cc9263ccb7e0e686cf5ae717ab57907864cba48502babbb3a4e05f03158557a3"
+        },
+        {
+          "name": "training_manifest",
+          "path": "results/fm171-margin-shape-20261017/manifest.json",
+          "sha256": "87614f529089c074013c00df0d02e91174039b8432686dff50de7de8bd5d86a2"
+        },
+        {
+          "name": "prior_labels",
+          "path": "results/fm17-three-issues-20261013/labels.csv",
+          "sha256": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e"
+        },
+        {
+          "name": "prior_observed",
+          "path": "results/fm171-draw-calibration-20261017/label-source-observations.csv",
+          "sha256": "796fd27e0127212aebac8761d088c0f554fb7d025fed599a3b0ea70cdad8f456"
+        }
+      ]
+    },
+    {
+      "issue": "26104",
+      "scope": 109,
+      "estimated": 27,
+      "frozen_forecast_sha256": "3efd5c242960acbb4ba3d985641e1854b1fb038343d649ebaa21ae9d37941a21",
+      "existing_independent_replay": "FULL_IDENTICAL_REPLAY",
+      "checked_training_and_policy_inputs": [
+        {
+          "name": "policy",
+          "path": "config/global_dynamic_walkforward_20261018.json",
+          "sha256": "ec0fcd046b6e1b4e127b4d1bfc369bb6090946dc3d34884bb956e930ab02a399"
+        },
+        {
+          "name": "client",
+          "path": "r/global_dynamic_walkforward_20261018.R",
+          "sha256": "97deb750a4308ced749f0c01f17f8476db2c7c4e5437050f4c7a5ffd379f9f91"
+        },
+        {
+          "name": "training",
+          "path": "results/fm171-margin-shape-20261017/forecasts.rds",
+          "sha256": "cc9263ccb7e0e686cf5ae717ab57907864cba48502babbb3a4e05f03158557a3"
+        },
+        {
+          "name": "training_manifest",
+          "path": "results/fm171-margin-shape-20261017/manifest.json",
+          "sha256": "87614f529089c074013c00df0d02e91174039b8432686dff50de7de8bd5d86a2"
+        },
+        {
+          "name": "prior_labels",
+          "path": "results/fm17-three-issues-20261013/labels.csv",
+          "sha256": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e"
+        },
+        {
+          "name": "prior_observed",
+          "path": "results/fm171-draw-calibration-20261017/label-source-observations.csv",
+          "sha256": "796fd27e0127212aebac8761d088c0f554fb7d025fed599a3b0ea70cdad8f456"
+        },
+        {
+          "name": "prior_issue_forecasts",
+          "path": "results/global-dynamic-walkforward-20261018/26103/frozen-forecasts.rds",
+          "sha256": "beac36d352d9f21e879003ae1683deb9ce325cb1d344d215508c52fef7bf53d7"
+        },
+        {
+          "name": "prior_issue_labels",
+          "path": "results/fm171-26103-draw-20261017/labels.csv",
+          "sha256": "bf7c34a73f6f588139f4fd8cfedce58dcd4c7517cdfebe054244a5cbe492cafd"
+        },
+        {
+          "name": "prior_issue_observations",
+          "path": "docs/reviews/source-26103/roster.json",
+          "sha256": "10874f1edd8dc84e5cf34e5683494902b19ca74aa818377a89138d39687ade58"
+        }
+      ]
+    }
+  ]
+}
