@@ -1,0 +1,61 @@
+---
+title: "验证环境前置检查"
+format: html
+execute:
+  cache: false
+  error: false
+params:
+  project_root: "."
+---
+
+环境预检在测试发现和长任务启动之前执行；不安装依赖，不访问网络，不修改数据。
+使用项目明确配置的数据根，不读取个人R启动配置。R包必须正常安装在
+`R_LIBS_USER`的第一个库中，依赖库依次放在后面。
+
+```{r}
+root <- normalizePath(params$project_root, mustWork = TRUE)
+source(file.path(root, "r/verification_environment.R"))
+runtime <- verification_environment(root)
+runtime
+```
+
+统一完整测试入口：
+
+```bash
+R_LIBS_USER="<正常安装的验证库>:<依赖库>" bash scripts/verification/run-r-tests.sh
+```
+
+入口读取`config/source-extraction.env`并以`Rscript --vanilla`启动。
+Python两个变量只缺一个时自动统一；显式冲突、解释器不存在、NAS或热数据根缺失、
+R库配置缺失、目标包未安装或依赖缺失都立即失败。启动后打印实际解释器、包位置和数据根。
+`.Rprofile`仅在交互会话中添加项目库，批处理不会再覆盖显式库顺序。
+旧研究测试使用的23个项目根别名统一由`verification_repository_roots()`提供；
+已有变量若指向其他checkout，预检即失败。仓库测试helper在发现测试前绑定这些别名。
+默认入口执行包及仓库两阶段；也可显式传入`--phase=package`或`--phase=repository`
+单独复核完整阶段。阶段选项不代表另一阶段通过，最终验收须有两阶段的实际通过证据。
+仓库阶段在发现测试前，复用已有离线生成器准备并核验密封的基本面集成夹具，
+向子进程显式传入已安装后端的Python路径；临时夹具在阶段结束后清理。
+显式提供但不存在或清单哈希错误的夹具立即报错，不以重新生成替代调用者输入。
+
+```{r}
+result <- testthat::test_file(file.path(root,
+  "tests/testthat/test-verification-environment.R"), reporter = "silent")
+checks <- tibble::as_tibble(as.data.frame(result))
+checks[c("test", "passed", "failed", "error", "skipped")]
+stopifnot(sum(checks$failed) == 0L, !any(checks$error), !any(checks$skipped))
+```
+
+回归检查覆盖成功回执、双Python变量一致性、缺失数据根、缺失解释器、错误库和未安装包。
+这是环境入口验收，不替代包全量测试和基本面数据入库验收；26098整体goal继续推进。
+
+```{r}
+receipt <- jsonlite::fromJSON(file.path(root,
+  "results/26098-cup-standings-20261018/environment-acceptance.json"))
+for (name in names(receipt$source_sha256)) {
+  stopifnot(digest::digest(file = file.path(root, name), algo = "sha256") ==
+    receipt$source_sha256[[name]])
+}
+tibble::as_tibble(receipt$checks)
+stopifnot(all(receipt$checks$exit_status == 0L))
+cat(receipt$review_command, "\n", receipt$review_resolution)
+```

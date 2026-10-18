@@ -1,0 +1,112 @@
+---
+title: "26098赛事与历史上下文：标准存储验收"
+format:
+  html:
+    embed-resources: true
+    html-math-method: plain
+    df-print: kable
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  library: null
+  publish: false
+  context_version: null
+---
+
+从固定NAS原始证据恢复赛事、中立场及历史比赛元数据，独立登记为六张表。
+原基础数据和冻结预测不变；缺失中立标记不推断为主场。全部资料仍为历史代理，
+不能因本次补全而声称目标赛前可获得。首次发布须先通过本次正常安装及完整测试。
+
+```{r}
+#| include: false
+root <- normalizePath(params$project_root,mustWork=TRUE)
+source(file.path(root,"r/verification_environment.R"))
+runtime <- verification_environment(root)
+stopifnot(!is.null(params$library),runtime$package==normalizePath(file.path(params$library,"beidan")))
+suppressPackageStartupMessages(library(tidyverse))
+cfg <- jsonlite::fromJSON(file.path(root,"config/26098-cup-standings-20261018.json"))
+checks_path <- file.path(root,"results/26098-cup-standings-20261018/context-final-checks.json")
+checks <- jsonlite::fromJSON(checks_path)
+stopifnot(all(checks$checks$exit_status==0L),all(checks$checks$skipped==0L))
+snapshot_path <- file.path(root,"results/26098-cup-standings-20261018/context-package-snapshot-v3.json")
+stopifnot(checks$package_snapshot_sha256==digest::digest(file=snapshot_path,algo="sha256"))
+snapshot <- jsonlite::fromJSON(snapshot_path,simplifyVector=FALSE)
+for(name in names(snapshot$files)) stopifnot(digest::digest(file=file.path(root,"packages/beidan",name),algo="sha256")==snapshot$files[[name]])
+stopifnot(digest::digest(file=file.path(runtime$package,"python/beidan_backend/fundamentals_context.py"),algo="sha256")==snapshot$files[["inst/python/beidan_backend/fundamentals_context.py"]])
+for(i in seq_len(nrow(checks$files))) stopifnot(digest::digest(file=file.path(root,checks$files$path[i]),algo="sha256")==checks$files$sha256[i])
+if(isTRUE(params$publish)) {
+ publication <- beidan::publish_fundamentals_context(issue=cfg$issue,
+  base_version=cfg$base_version,base_manifest_sha256=cfg$base_manifest_sha256,
+  raw_evidence_relative=cfg$raw_evidence_relative,raw_manifest_sha256=cfg$raw_manifest_sha256,
+  python=runtime$python,root=runtime$parquet_root,hot_root=runtime$hot_root)
+ version <- publication$version
+} else {
+ stopifnot(!is.null(params$context_version),nzchar(params$context_version))
+ version <- params$context_version
+}
+dataset <- "source_fundamentals_context_26098"
+tables <- list()
+for(name in c("source_fixture","fixture","source_history","history","reconciliation","provenance")) {
+ tables[[name]] <- beidan::read_dataset(dataset,name,version=version,root=runtime$parquet_root,verify=TRUE)
+ stopifnot(is_tibble(tables[[name]]))
+}
+manifest <- beidan::dataset_manifest(dataset,version=version,root=runtime$parquet_root)
+stopifnot(manifest$source$base_manifest_sha256==cfg$base_manifest_sha256,
+ manifest$source$raw_manifest_sha256==cfg$raw_manifest_sha256,
+ manifest$source$availability_class=="HISTORICAL_PROXY",!manifest$source$historical_admission)
+```
+
+## 登记表与来源核对
+
+```{r}
+expected <- tibble(table=c("source_fixture","fixture","source_history","history","reconciliation","provenance"),
+ expected_rows=c(292L,146L,28375L,17407L,52805L,438L))
+counts <- tibble(table=names(tables),rows=unname(vapply(tables,nrow,integer(1)))) |>
+ left_join(expected,by="table",relationship="one-to-one")
+stopifnot(all(counts$rows==counts$expected_rows))
+counts
+stopifnot(is.character(tables$source_history$competition_id),
+ is.logical(tables$source_history$explicit_neutral),
+ is.logical(tables$fixture$neutral),inherits(tables$provenance$observed_at,"POSIXct"),
+ !anyNA(tables$provenance$observed_at),all(tables$fixture$state=="RESOLVED"),
+ all(tables$history$state=="RESOLVED"),!anyNA(tables$fixture$competition),
+ !anyNA(tables$history$competition))
+tables$reconciliation |> count(state)
+tables$fixture |> count(source_route,neutral,.drop=FALSE)
+```
+
+90处显示名称差异来自同一原生赛事ID的标签写法，记为`LABEL_VARIANT`并保留两源原文；
+不当作原生赛事冲突。历史中立场仅明确标注时为TRUE，未知保持NA，不能把NA当FALSE。
+
+## 固定基础关联与幂等回放
+
+```{r}
+base <- beidan::read_dataset(cfg$base_dataset,"history",version=cfg$base_version,root=runtime$parquet_root)
+bound <- base |> select(fixture_id,scope,match_id,selected_source) |>
+ left_join(tables$history |> select(fixture_id,scope,match_id,base_selected_source),
+  by=c("fixture_id","scope","match_id"),relationship="one-to-one")
+stopifnot(nrow(bound)==17407L,!anyNA(bound$base_selected_source),all(bound$selected_source==bound$base_selected_source))
+if(isTRUE(params$publish)) {
+ replay <- beidan::publish_fundamentals_context(issue=cfg$issue,
+  base_version=cfg$base_version,base_manifest_sha256=cfg$base_manifest_sha256,
+  raw_evidence_relative=cfg$raw_evidence_relative,raw_manifest_sha256=cfg$raw_manifest_sha256,
+  python=runtime$python,root=runtime$parquet_root,hot_root=runtime$hot_root)
+ stopifnot(replay$status=="unchanged",replay$version==version)
+ jsonlite::write_json(list(publication=publication,repeated_publication=replay,
+  manifest_sha256=digest::digest(file=file.path(runtime$parquet_root,"datasets",dataset,"versions",version,"manifest.json"),algo="sha256"),
+  package_snapshot_sha256=checks$package_snapshot_sha256,goal_complete=FALSE),
+  file.path(root,"results/26098-cup-standings-20261018/context-publication.json"),auto_unbox=TRUE,pretty=TRUE)
+}
+tibble(dataset=dataset,version=version,base_history_rows=nrow(bound),historical_admission=FALSE)
+```
+
+本报告证明本次登记、类型、固定基础关联和重复发布；整期逐场限制及补全前后统计见
+`26098_fundamentals_final_20261018.qmd`，不能以单独存储报告代替完整目标验收。
+
+```{r}
+knitr::kable(as_tibble(checks$checks),format="html",escape=TRUE)
+cat(checks$review_command,"\n",checks$review_resolution,"\n")
+```

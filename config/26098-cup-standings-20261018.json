@@ -1,0 +1,16 @@
+{
+  "issue": "26098",
+  "base_dataset": "source_issue_26098",
+  "base_version": "20261008T143545725496Z",
+  "base_manifest_sha256": "8150ae2bf03bbb28bc7c012b0f1271bd81ce05de341e00630c50de7b0fdcfe00",
+  "raw_evidence_relative": "reports/26098-fundamentals-raw-evidence/versions/20261018T140528319250Z",
+  "raw_manifest_sha256": "9f65dd92363b4ebe6cc3e0dd37484c801f0b4277b7ec178951d271cf2440ee6f",
+  "previous_audit_relative": "reports/26098-fundamentals-completeness/versions/20261018T141412892597Z",
+  "previous_audit_manifest_sha256": "78ee4266ad04992db2d4da09f0f2eaeebd2b4e2c6854ab932381f9b835c52cf5",
+  "verification_snapshot": "results/26098-cup-standings-20261018/package-snapshot-v2.json",
+  "output_relative": "26098-cup-standings-20261018",
+  "availability_class": "HISTORICAL_PROXY",
+  "historical_admission": false,
+  "external_evidence_relative": "results/26098-cup-standings-20261018/external-evidence.json",
+  "external_evidence_sha256": "015efe29b8c06f11b49782bc4a96a9ab339109c04543131feabc35b8e7e14cc6"
+}

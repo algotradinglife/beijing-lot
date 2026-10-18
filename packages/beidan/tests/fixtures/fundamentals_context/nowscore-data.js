@@ -1,0 +1,1 @@
+var scheduleID=9;var hometeam='A';var guestteam='B';var h2h_home=1;var h2h_away=2;var strTime='2026-09-25 13:00:00';var h_data=[["26-01-01", "007", "历史联赛", "#fff", 1, "A(中)", 2, "B", 1, 0, "0-0", null, null, null, null, null, null, null, null, null, 9001]];var a_data=[];var v_data=[];

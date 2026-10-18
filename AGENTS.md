@@ -76,6 +76,8 @@
 
 ## Scraping and database interaction
 
+- 数据采集与补缺优先使用 `agent-reach` 技能：先读取其 `SKILL.md`，按目标网站选择已有后端及失败重试链。采集结果仍须进入本项目既有的解析、核验和权威存储流程，遵守来源限频，保留原始响应、来源身份、采集时间与哈希；长期数据统一保留在 NAS，不依赖已移除的 Sandisk。
+
 - Separate fetching, parsing, validation, and persistence into testable functions.
 - Use explicit timeouts, bounded transient retries, and existing source-specific rate limits.
 - Preserve raw responses for offline parsing replay; distinguish empty results from request/parser failures.

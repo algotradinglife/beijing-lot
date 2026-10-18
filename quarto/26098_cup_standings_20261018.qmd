@@ -1,0 +1,162 @@
+---
+title: "26098：杯赛小组积分标准化与NAS入库"
+format:
+  html:
+    embed-resources: true
+    df-print: kable
+    code-fold: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  library: null
+  publish: false
+  config_relative: "config/26098-cup-standings-20261018.json"
+---
+
+本轮将分析页已有的杯赛小组积分与联赛积分分开保存。输入为前轮冻结的原始响应，不重新抓取、不调整比赛时间、不更改原基础版本及冻结预测。两源可能共享上游；一致不等于独立证明。本轮所有数据保持历史代理，不证明目标决策时点可获得。
+
+```{r}
+#| include: false
+root <- normalizePath(params$project_root,mustWork=TRUE)
+stopifnot(!is.null(params$library),dir.exists(params$library))
+source(file.path(root,"r/verification_environment.R"))
+runtime <- verification_environment(root)
+stopifnot(runtime$package==normalizePath(file.path(params$library,"beidan")))
+suppressPackageStartupMessages(library(tidyverse))
+library(beidan,lib.loc=params$library)
+cfg <- jsonlite::fromJSON(file.path(root,params$config_relative))
+nas <- normalizePath(Sys.getenv("BEIDAN_PARQUET_ROOT"),mustWork=TRUE)
+hot <- normalizePath(Sys.getenv("BEIDAN_HOT_ROOT"),mustWork=TRUE)
+output <- file.path(hot,cfg$output_relative)
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+base_manifest_path <- file.path(nas,"datasets",cfg$base_dataset,"versions",cfg$base_version,"manifest.json")
+stopifnot(digest::digest(file=base_manifest_path,algo="sha256")==cfg$base_manifest_sha256)
+raw_input <- file.path(nas,cfg$raw_evidence_relative)
+stopifnot(digest::digest(file=file.path(raw_input,"asset-manifest.json"),algo="sha256")==cfg$raw_manifest_sha256)
+raw_manifest <- jsonlite::fromJSON(file.path(raw_input,"asset-manifest.json"))
+stopifnot(digest::digest(file=file.path(raw_input,"raw-receipts.json"),algo="sha256")==raw_manifest$members[["raw-receipts.json"]])
+previous <- file.path(nas,cfg$previous_audit_relative)
+stopifnot(digest::digest(file=file.path(previous,"asset-manifest.json"),algo="sha256")==cfg$previous_audit_manifest_sha256)
+previous_manifest <- jsonlite::fromJSON(file.path(previous,"asset-manifest.json"))
+stopifnot(digest::digest(file=file.path(previous,"data/fixture-audit.csv"),algo="sha256")==previous_manifest$members[["data/fixture-audit.csv"]])
+snapshot <- jsonlite::fromJSON(file.path(root,cfg$verification_snapshot),simplifyVector=FALSE)
+for(name in c("R/cup_standings.R","inst/python/beidan_backend/cup_standings.py","tests/python/test_cup_standings.py","tests/testthat/test-cup-standings-boundary.R")) stopifnot(digest::digest(file=file.path(root,"packages/beidan",name),algo="sha256")==snapshot$files[[name]])
+stopifnot(digest::digest(file=file.path(params$library,"beidan/python/beidan_backend/cup_standings.py"),algo="sha256")==snapshot$files[["inst/python/beidan_backend/cup_standings.py"]])
+base <- beidan::read_dataset(cfg$base_dataset,"match",version=cfg$base_version,root=nas)
+league <- beidan::read_dataset(cfg$base_dataset,"standings",version=cfg$base_version,root=nas)
+stopifnot(nrow(base)==146L,is_tibble(base),!anyDuplicated(base$fixture_id))
+jsonlite::write_json(base |> select(fixture_id,provider_id,home_id,away_id),file.path(output,"base-fixtures.json"),dataframe="rows",auto_unbox=TRUE)
+python <- runtime$python
+```
+
+## 解析、核对与字段契约
+
+杯赛每组以来源公开的完整球队成员集合哈希标识，不声称这是原生分组ID。每行由场次、组成员哈希、球队ID唯一确定。保留排名、赛胜平负、进失球、净胜球和积分；Nowscore未列净胜球时，以进球减失球显式推导并标注依据。缺页/缺表不补零，来源公开的零场次、零积分照实保存。
+
+```{python}
+#| include: false
+import json
+from pathlib import Path
+from beidan_backend.cup_standings import parse_cup_standings,reconcile_cup_standings
+raw_root=Path(r.raw_input);out=Path(r.output)
+receipts=json.loads((raw_root/'raw-receipts.json').read_text())
+fixtures=json.loads((out/'base-fixtures.json').read_text())
+parsed_sources=[]
+for fixture in fixtures:
+ for source in ('titan','nowscore'):
+  matches=[p for p in receipts if p['fixture_id']==fixture['fixture_id'] and p['source']==source and '/analysis/' in p['url']]
+  assert len(matches)==1
+  captured=matches[0]
+  receipt={k:captured[k] for k in ('source','url','sha256')}
+  receipt['observed_at']=captured['capture_observed_at']
+  parsed_sources.append(parse_cup_standings((raw_root/captured['path']).read_bytes(),fixture_id=fixture['fixture_id'],source=source,identity=fixture,receipt=receipt))
+preview=reconcile_cup_standings(parsed_sources)
+(out/'preview.json').write_text(json.dumps(preview,ensure_ascii=False,indent=2))
+assert len(preview['coverage'])==292
+```
+
+```{r}
+preview <- jsonlite::fromJSON(file.path(output,"preview.json"))
+source_rows <- as_tibble(preview$source_standings)
+effective <- as_tibble(preview$standings)
+coverage <- as_tibble(preview$coverage)
+reconciliation <- as_tibble(preview$reconciliation)
+stopifnot(nrow(source_rows)==390L,nrow(effective)==195L,n_distinct(effective$fixture_id)==43L,all(effective$state=="AGREEMENT"))
+coverage |> count(source,state)
+source_rows |> filter(source=="titan") |> select(fixture_id,team_id,team_name,rank,played,points,goal_difference) |> slice_head(n=6)
+source_rows |> filter(source=="nowscore") |> select(fixture_id,team_id,team_name,rank,played,points,goal_difference) |> slice_head(n=6)
+reconciliation |> count(state)
+```
+
+## 整期覆盖变化
+
+```{r}
+target_cup <- effective |> left_join(base |> select(fixture_id,home_id,away_id),by="fixture_id",relationship="many-to-one") |> filter(team_id==home_id|team_id==away_id)
+cup_count <- target_cup |> count(fixture_id)
+stopifnot(nrow(cup_count)==43L,all(cup_count$n==2L))
+ranked <- union(unique(league$fixture_id),cup_count$fixture_id)
+before_after <- tibble(metric=c("整期场次","既有双方联赛积分","可恢复杯赛小组积分","联赛或小组积分覆盖"),before=c(146L,n_distinct(league$fixture_id),0L,n_distinct(league$fixture_id)),after=c(146L,n_distinct(league$fixture_id),nrow(cup_count),length(ranked)))
+before_after
+stopifnot(length(ranked)==134L)
+audit <- readr::read_csv(file.path(previous,"data/fixture-audit.csv"),show_col_types=FALSE,col_types=cols(fixture_id=col_character(),provider_id=col_character(),home_id=col_character(),away_id=col_character()))
+stopifnot(nrow(problems(audit))==0L)
+remaining <- audit |> filter(!fixture_id%in%ranked) |> select(fixture_id,home,away,competition,standing_review)
+remaining
+write_csv(before_after,file.path(output,"coverage-before-after.csv"))
+write_csv(remaining,file.path(output,"remaining.csv"))
+```
+
+剩余12场中，6场国际友谊不适用联赛积分榜；6场亚运的阶段由下述独立材料补充。本轮只入库来源杯赛表，不把缺少当前阶段小组表解释为没有此前小组赛资料。阿根廷杯#131已有双方联赛排名，但不把它描述为杯赛小组积分。#135精确实际时间、本场及历史比赛的赛事/中立场标准化字段仍按原goal继续处理。
+
+## 亚运阶段及时间冲突的补充核验
+
+```{r}
+evidence_path <- file.path(root,cfg$external_evidence_relative)
+stopifnot(digest::digest(file=evidence_path,algo="sha256")==cfg$external_evidence_sha256)
+evidence <- jsonlite::fromJSON(evidence_path)
+for(i in seq_len(nrow(evidence$files))) stopifnot(digest::digest(file=file.path(root,evidence$files$path[i]),algo="sha256")==evidence$files$sha256[i])
+stages <- as_tibble(evidence$stages)
+stage_check <- stages |> left_join(base |> select(fixture_id,base_provider_id=provider_id),by="fixture_id",relationship="one-to-one")
+stopifnot(nrow(stage_check)==6L,!anyNA(stage_check$base_provider_id),all(stage_check$provider_id==stage_check$base_provider_id),all(stage_check$status=="SUPPORTED_BY_PRIMARY_REPORT"))
+stages |> select(fixture_id,stage,current_group_table_applicability,status)
+remaining_classified <- remaining |> left_join(stages |> select(fixture_id,stage,current_group_table_applicability),by="fixture_id",relationship="one-to-one")
+write_csv(remaining_classified,file.path(output,"remaining-classified.csv"))
+evidence$files |> as_tibble() |> select(path,content_state,availability_class)
+```
+
+三篇亚足联正文明确对应比赛为四分之一决赛，分别覆盖[男足首日](https://www.the-afc.com/en/more/asian_games.html/news/ag-m-uzbekistan-korea-republic-one-step-closer)、[男足次日](https://www.the-afc.com/en/more/asian_games.html/news/ag-m-china-pr-japan-march-into-semis)及[女足](https://www.the-afc.com/en/more/asian_games.html/news/ag-w-four-remain-in-the-hunt)。阶段映射是逐场证据，不是对所有杯赛的统一推断。官方汇总PDF的阅读代理返回上游404，已单列失败，不能当作成功取得积分或赛果。
+
+#135的[俱乐部官方日历](https://clubnecaxa.mx/partidos/calendario/APERTURA-2026)写当地21:00，另一篇[独立预告](https://futnsoccer.com/2026/09/26/where-to-watch-necaxa-vs-club-america/)给出的时间对应当地21:10。现在确认不同来源的计划时间口径确有差异，仍未裁决实际开球时间，不移动原冻结截止。女足#2的官方报道明确最后1–0发生于加时第109分钟，常规时间为0–0；该证据未用于修改结算或冻结预测。
+
+上述正文保留的是Jina代理原始文本响应，不声称保存了目标网站原始HTML。公布日期仅作来源声称，采集发生在赛后，全部仍为历史代理。
+
+## 发布及回读
+
+`publish=false`只做解析预览；`publish=true`必须读取与本次源快照匹配的完整验收收据，然后通过R包发布。正式数据集为`source_cup_standings_26098`，五张表分别保存来源、有效积分、覆盖、逐字段核对、溯源。源分组集合不一致时整组隔离；单元格不一致时仅该格为空。
+
+```{r}
+if (isTRUE(params$publish)) {
+ checks_path <- file.path(root,"results/26098-cup-standings-20261018/final-checks.json")
+ checks <- jsonlite::fromJSON(checks_path)
+ stopifnot(checks$package_snapshot_sha256==digest::digest(file=file.path(root,cfg$verification_snapshot),algo="sha256"),all(checks$checks$exit_status==0L),all(checks$checks$skipped==0L))
+ for(i in seq_len(nrow(checks$files))) stopifnot(digest::digest(file=file.path(root,checks$files$path[i]),algo="sha256")==checks$files$sha256[i])
+ result <- beidan::publish_cup_standings(reticulate::py$parsed_sources,issue=cfg$issue,base_version=cfg$base_version,base_manifest_sha256=cfg$base_manifest_sha256,raw_evidence_relative=cfg$raw_evidence_relative,raw_manifest_sha256=cfg$raw_manifest_sha256,python=python,root=nas,hot_root=hot)
+ published <- list()
+ for(table in c("source_standings","standings","coverage","reconciliation","provenance")) {
+  published[[table]] <- beidan::read_dataset(result$dataset,table,version=result$version,root=nas,verify=TRUE)
+  stopifnot(is_tibble(published[[table]]),nrow(published[[table]])==nrow(as_tibble(preview[[table]])))
+ }
+ stopifnot(nrow(published$standings)==195L,all(published$standings$state=="AGREEMENT"),is.integer(published$standings$points),inherits(published$provenance$observed_at,"POSIXct"),sum(is.na(published$coverage$team_rows))==206L)
+ replay <- beidan::publish_cup_standings(reticulate::py$parsed_sources,issue=cfg$issue,base_version=cfg$base_version,base_manifest_sha256=cfg$base_manifest_sha256,raw_evidence_relative=cfg$raw_evidence_relative,raw_manifest_sha256=cfg$raw_manifest_sha256,python=python,root=nas,hot_root=hot)
+ stopifnot(replay$status=="unchanged",replay$version==result$version)
+ jsonlite::write_json(list(publication=result,repeated_publication=replay,goal_complete=FALSE,base_dataset_modified=FALSE,package_snapshot_sha256=checks$package_snapshot_sha256,config_sha256=digest::digest(file=file.path(root,params$config_relative),algo="sha256")),file.path(root,"results/26098-cup-standings-20261018/publication.json"),auto_unbox=TRUE,pretty=TRUE)
+ tibble(dataset=result$dataset,version=result$version,rows=nrow(published$standings),fixtures=n_distinct(published$standings$fixture_id),repeated_status=replay$status)
+} else {
+ tibble(state="PREVIEW_ONLY_NOT_PUBLISHED",goal_complete=FALSE)
+}
+```
+
+本轮不重新预测、不声明完整goal完成。包安装、完整R/Python测试、DLL及Rcpp调用证据和最终审查在显式验收收据中记录。测试与报告的失败尝试保留原日志，修正后必须重跑相应检查。

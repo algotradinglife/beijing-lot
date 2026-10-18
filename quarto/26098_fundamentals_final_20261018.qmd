@@ -1,0 +1,252 @@
+---
+title: "26098核心基本面：补全结果与逐场未决项"
+format:
+  html:
+    embed-resources: true
+    html-math-method: plain
+    df-print: kable
+    code-fold: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  library: null
+  cup_version: null
+  context_version: null
+---
+
+本报告逐场核查146场核心基本面，使用固定基础版本、原始证据归档及独立发布的杯赛小组积分和赛事上下文。
+伤停阵容不作为本轮补全门槛。来源已公开为空、不适用和真实冲突分别保留，不能补零冒充资料。
+后采页面均为历史代理，不准入赛前预测；基础数据、冻结预测和原截止不改写。
+
+```{r}
+#| include: false
+root <- normalizePath(params$project_root, mustWork=TRUE)
+source(file.path(root,"r/verification_environment.R"))
+runtime <- verification_environment(root)
+stopifnot(!is.null(params$library),runtime$package==normalizePath(file.path(params$library,"beidan")),!is.null(params$cup_version),!is.null(params$context_version))
+suppressPackageStartupMessages(library(tidyverse))
+cfg <- jsonlite::fromJSON(file.path(root,"config/26098-cup-standings-20261018.json"))
+nas <- runtime$parquet_root
+output <- file.path(runtime$hot_root,"26098-fundamentals-final-20261018")
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+stopifnot(digest::digest(file=file.path(nas,"datasets",cfg$base_dataset,"versions",cfg$base_version,"manifest.json"),algo="sha256")==cfg$base_manifest_sha256)
+prior <- file.path(nas,cfg$previous_audit_relative)
+stopifnot(digest::digest(file=file.path(prior,"asset-manifest.json"),algo="sha256")==cfg$previous_audit_manifest_sha256)
+prior_manifest <- jsonlite::fromJSON(file.path(prior,"asset-manifest.json"))
+for(name in names(prior_manifest$members)) stopifnot(digest::digest(file=file.path(prior,name),algo="sha256")==prior_manifest$members[[name]])
+raw_root <- file.path(nas,cfg$raw_evidence_relative)
+stopifnot(digest::digest(file=file.path(raw_root,"asset-manifest.json"),algo="sha256")==cfg$raw_manifest_sha256)
+raw_manifest <- jsonlite::fromJSON(file.path(raw_root,"asset-manifest.json"))
+for(name in names(raw_manifest$members)) stopifnot(digest::digest(file=file.path(raw_root,name),algo="sha256")==raw_manifest$members[[name]])
+tables <- list()
+base_manifest <- beidan::dataset_manifest(cfg$base_dataset,version=cfg$base_version,root=nas)
+for(table in names(base_manifest$tables)) tables[[table]] <- beidan::read_dataset(cfg$base_dataset,table,version=cfg$base_version,root=nas,verify=TRUE)
+m <- tables$match
+h <- tables$history
+cup <- beidan::read_dataset("source_cup_standings_26098","standings",version=params$cup_version,root=nas,verify=TRUE)
+cup_manifest <- beidan::dataset_manifest("source_cup_standings_26098",version=params$cup_version,root=nas)
+stopifnot(cup_manifest$source$base_manifest_sha256==cfg$base_manifest_sha256,cup_manifest$source$raw_manifest_sha256==cfg$raw_manifest_sha256,!cup_manifest$source$historical_admission)
+cup_manifest_sha256 <- digest::digest(file=file.path(nas,"datasets/source_cup_standings_26098/versions",params$cup_version,"manifest.json"),algo="sha256")
+context_manifest <- beidan::dataset_manifest("source_fundamentals_context_26098",version=params$context_version,root=nas)
+stopifnot(context_manifest$source$base_manifest_sha256==cfg$base_manifest_sha256,context_manifest$source$raw_manifest_sha256==cfg$raw_manifest_sha256,!context_manifest$source$historical_admission)
+context_manifest_sha256 <- digest::digest(file=file.path(nas,"datasets/source_fundamentals_context_26098/versions",params$context_version,"manifest.json"),algo="sha256")
+context <- beidan::read_dataset("source_fundamentals_context_26098","source_fixture",version=params$context_version,root=nas,verify=TRUE)
+metadata <- beidan::read_dataset("source_fundamentals_context_26098","source_history",version=params$context_version,root=nas,verify=TRUE)
+effective_context <- beidan::read_dataset("source_fundamentals_context_26098","fixture",version=params$context_version,root=nas,verify=TRUE)
+effective_history_context <- beidan::read_dataset("source_fundamentals_context_26098","history",version=params$context_version,root=nas,verify=TRUE)
+context_provenance <- beidan::read_dataset("source_fundamentals_context_26098","provenance",version=params$context_version,root=nas,verify=TRUE)
+context_reconciliation <- beidan::read_dataset("source_fundamentals_context_26098","reconciliation",version=params$context_version,root=nas,verify=TRUE)
+stopifnot(!anyNA(context$observed_at),!anyNA(metadata$data_observed_at),is.character(metadata$competition_id),is.logical(metadata$explicit_neutral))
+stopifnot(nrow(m)==146L,nrow(context)==292L,nrow(h)==17407L,nrow(metadata)==28375L,nrow(cup)==195L)
+stopifnot(!anyDuplicated(m$fixture_id),!anyDuplicated(context[c("fixture_id","source")]),!anyDuplicated(metadata[c("fixture_id","source","scope","match_id")]))
+write_csv(m |> select(fixture_id,provider_id,home_id,away_id),file.path(output,"identities.csv"))
+```
+
+## 六场空交锋的原文回放
+
+```{python}
+#| include: false
+import csv, hashlib, json
+from pathlib import Path
+from beidan_backend.fundamentals import analysis_record
+receipts=json.loads((Path(r.raw_root)/'raw-receipts.json').read_text())
+fixtures=list(csv.DictReader((Path(r.output)/'identities.csv').open()))
+empty_h2h=[]
+for fixture in fixtures:
+ if fixture['fixture_id'] not in {f'26098:{x}' for x in (47,48,50,89,90,122)}: continue
+ for source in ('titan','nowscore'):
+  captured=next(p for p in receipts if p['fixture_id']==fixture['fixture_id'] and p['source']==source and '/analysis/' in p['url'])
+  body=(Path(r.raw_root)/captured['path']).read_bytes()
+  assert hashlib.sha256(body).hexdigest()==captured['sha256']
+  js=next((p for p in receipts if p['fixture_id']==fixture['fixture_id'] and p['source']==source and '/analysisJs/' in p['url']),None)
+  auxiliary=(Path(r.raw_root)/js['path']).read_bytes() if js else None
+  if js: assert hashlib.sha256(auxiliary).hexdigest()==js['sha256']
+  record=analysis_record(body,source=source,provider_id=fixture['provider_id'],auxiliary_raw=auxiliary)
+  assert all(record[k]==fixture[k] for k in ('provider_id','home_id','away_id'))
+  assert record['blocks']['v_data']==[]
+  data=js if record['blocks_from_auxiliary'] else captured
+  empty_h2h.append(dict(fixture_id=fixture['fixture_id'],source=source,state='SOURCE_PUBLISHED_EMPTY',rows=0,url=data['url'],sha256=data['sha256'],observed_at=data['capture_observed_at']))
+assert len(empty_h2h)==12
+(Path(r.output)/'empty-h2h-evidence.json').write_text(json.dumps(empty_h2h,ensure_ascii=False,indent=2))
+```
+
+```{r}
+empty <- as_tibble(jsonlite::fromJSON(file.path(output,"empty-h2h-evidence.json")))
+empty |> select(fixture_id,source,state,rows)
+```
+
+这六场的两源都明确公开空数组，归类为来源空结果，不是请求失败或解析失败；不据此断言双方历史上从未交手。
+
+## 元数据关联及逐场分类
+
+```{r}
+latest_observation <- metadata |> summarise(context_latest_observed_at=max(data_observed_at),context_source_count=n_distinct(source),.by=c(fixture_id,scope,match_id))
+history <- h |> left_join(effective_history_context |> rename(context_state=state),by=c("fixture_id","scope","match_id"),relationship="one-to-one") |>
+ left_join(latest_observation,by=c("fixture_id","scope","match_id"),relationship="one-to-one")
+stopifnot(nrow(history)==nrow(h),all(!is.na(history$competition)),all(!is.na(history$competition_id)),all(history$selected_source==history$base_selected_source))
+source_bound <- metadata |> left_join(context_provenance |> select(fixture_id,source,url,sha256,observed_at),by=c("fixture_id","source","data_url"="url"),relationship="many-to-one")
+stopifnot(nrow(source_bound)==nrow(metadata),all(source_bound$data_sha256==source_bound$sha256),all(source_bound$data_observed_at==source_bound$observed_at))
+raw_receipt_text <- as_tibble(jsonlite::fromJSON(file.path(raw_root,"raw-receipts.json"))) |>
+ transmute(fixture_id,source,data_url=url,data_sha256=sha256,data_observed_at_text=capture_observed_at)
+raw_bound <- metadata |> left_join(raw_receipt_text,
+ by=c("fixture_id","source","data_url","data_sha256"),relationship="many-to-one")
+stopifnot(nrow(raw_bound)==nrow(metadata),!anyNA(raw_bound$data_observed_at_text),
+ is.character(raw_bound$data_observed_at_text),
+ all(round(as.numeric(lubridate::ymd_hms(raw_bound$data_observed_at_text,quiet=TRUE,tz="UTC"))*1e6)==
+  round(as.numeric(raw_bound$data_observed_at)*1e6)))
+source_receipts <- raw_bound |>
+ select(fixture_id,scope,match_id,source,data_url,data_sha256,data_observed_at=data_observed_at_text,
+  source_competition_id=competition_id,source_competition=competition,source_explicit_neutral=explicit_neutral) |>
+ pivot_wider(names_from=source,values_from=c(data_url,data_sha256,data_observed_at,
+  source_competition_id,source_competition,source_explicit_neutral),names_glue="{source}_{.value}")
+field_receipts <- context_reconciliation |> filter(startsWith(field,"history:")) |>
+ separate_wider_delim(field,delim=":",names=c("unit","scope","match_id","context_field")) |>
+ select(fixture_id,scope,match_id,context_field,selected_source,state) |>
+ pivot_wider(names_from=context_field,values_from=c(selected_source,state),names_glue="context_{context_field}_{.value}")
+history <- history |>
+ left_join(source_receipts,by=c("fixture_id","scope","match_id"),relationship="one-to-one") |>
+ left_join(field_receipts,by=c("fixture_id","scope","match_id"),relationship="one-to-one")
+stopifnot(nrow(history)==17407L,
+ all(!is.na(history$titan_data_sha256)|!is.na(history$nowscore_data_sha256)),
+ !anyNA(history$context_competition_state),!anyNA(history$context_explicit_neutral_state))
+neutral <- context |> select(fixture_id,source,neutral) |> pivot_wider(names_from=source,values_from=neutral)
+stopifnot(!anyNA(neutral$titan),!anyNA(neutral$nowscore),all(neutral$titan==neutral$nowscore))
+counts <- h |> count(fixture_id,scope) |> pivot_wider(names_from=scope,values_from=n,values_fill=0L)
+league <- tables$standings |> count(fixture_id,name="league_sides")
+cup_sides <- cup |> inner_join(m |> select(fixture_id,home_id,away_id),by="fixture_id",relationship="many-to-one") |> filter(team_id==home_id|team_id==away_id) |> count(fixture_id,name="cup_sides")
+stopifnot(nrow(cup_sides)==43L,all(cup_sides$cup_sides==2L))
+evidence_path <- file.path(root,cfg$external_evidence_relative)
+stopifnot(digest::digest(file=evidence_path,algo="sha256")==cfg$external_evidence_sha256)
+external <- jsonlite::fromJSON(evidence_path)
+for(i in seq_len(nrow(external$files))) stopifnot(digest::digest(file=file.path(root,external$files$path[i]),algo="sha256")==external$files$sha256[i])
+stages <- as_tibble(external$stages)
+stopifnot(nrow(stages)==6L)
+audit <- m |> left_join(counts,by="fixture_id",relationship="one-to-one") |>
+ left_join(league,by="fixture_id",relationship="one-to-one") |>
+ left_join(cup_sides,by="fixture_id",relationship="one-to-one") |>
+ left_join(effective_context |> select(fixture_id,competition,competition_id,source_route,neutral),by="fixture_id",relationship="one-to-one") |>
+ left_join(stages |> select(fixture_id,stage),by="fixture_id",relationship="one-to-one") |>
+ mutate(league_sides=replace_na(league_sides,0L),cup_sides=replace_na(cup_sides,0L),
+  identity_state="VERIFIED_BOTH_SOURCES",kickoff_state=if_else(is.na(kickoff_at),"SOURCE_CONFLICT_UNRESOLVED","SOURCE_AGREEMENT"),
+  h2h_state=if_else(head_to_head>0L,"POPULATED","SOURCE_PUBLISHED_EMPTY"),
+  standings_state=case_when(league_sides==2L~"LEAGUE_TABLE_PRESENT",cup_sides==2L~"CUP_GROUP_TABLE_RECOVERED",competition=="国际友谊"~"NOT_APPLICABLE_FRIENDLY",stage=="QUARTER_FINAL"~"NO_CURRENT_STAGE_GROUP_TABLE",TRUE~"UNRESOLVED"),
+  availability_class="HISTORICAL_PROXY",historical_admission=FALSE)
+stopifnot(nrow(audit)==146L,!anyNA(audit$competition),all(audit$home_recent>0L),all(audit$away_recent>0L),!any(audit$standings_state=="UNRESOLVED"),sum(audit$h2h_state=="SOURCE_PUBLISHED_EMPTY")==6L,sum(is.na(audit$kickoff_at))==1L)
+summary <- tibble(dimension=c("双方原生身份","双方近期战绩","有交锋记录","明确来源空交锋","双方联赛积分","恢复杯赛小组积分","友谊赛不适用积分","亚运淘汰赛无当前小组表","本场赛事标签","双方来源中立/主场标记一致","开球时间一致","开球时间冲突"),fixtures=c(sum(audit$identity_state=="VERIFIED_BOTH_SOURCES"),sum(audit$home_recent>0L & audit$away_recent>0L),sum(audit$h2h_state=="POPULATED"),sum(audit$h2h_state=="SOURCE_PUBLISHED_EMPTY"),sum(audit$standings_state=="LEAGUE_TABLE_PRESENT"),sum(audit$standings_state=="CUP_GROUP_TABLE_RECOVERED"),sum(audit$standings_state=="NOT_APPLICABLE_FRIENDLY"),sum(audit$standings_state=="NO_CURRENT_STAGE_GROUP_TABLE"),sum(!is.na(audit$competition)),sum(neutral$titan==neutral$nowscore),sum(audit$kickoff_state=="SOURCE_AGREEMENT"),sum(audit$kickoff_state=="SOURCE_CONFLICT_UNRESOLVED")))
+stopifnot(identical(as.integer(summary$fixtures),c(146L,146L,140L,6L,91L,43L,6L,6L,146L,146L,145L,1L)))
+summary
+write_csv(audit,file.path(output,"fixture-audit.csv"))
+write_csv(summary,file.path(output,"summary.csv"))
+write_csv(history,file.path(output,"effective-history-with-context.csv"))
+receipt_roundtrip <- read_csv(file.path(output,"effective-history-with-context.csv"),
+ col_types=cols(.default=col_skip(),titan_data_observed_at=col_character(),nowscore_data_observed_at=col_character()),
+ show_col_types=FALSE)
+stopifnot(nrow(problems(receipt_roundtrip))==0L,
+ identical(receipt_roundtrip$titan_data_observed_at,history$titan_data_observed_at),
+ identical(receipt_roundtrip$nowscore_data_observed_at,history$nowscore_data_observed_at))
+stopifnot(!"competition"%in%names(m),!"competition"%in%names(h))
+coverage_change <- tibble(
+ dimension=c("双方近期战绩场次","有交锋记录场次","双方联赛或杯赛小组积分场次","登记本场赛事标签场次","登记本场来源主场/中立标记条数","登记有效历史赛事标签条数"),
+ before=c(146L,140L,91L,0L,0L,0L),
+ after=c(146L,140L,134L,nrow(effective_context),nrow(context),nrow(effective_history_context)))
+coverage_change
+write_csv(coverage_change,file.path(output,"coverage-before-after.csv"))
+```
+
+积分信息覆盖由91场增加至134场；余下12场已分别确认为国际友谊或亚运四分之一决赛。
+“登记”项的补全前0表示原标准业务表没有这些字段，不表示原网页没有提供这些资料。
+当前场次146个赛事标签、292份主场/中立场来源标记，以及17,407条有效历史的赛事标签均可关联到明确来源哈希。
+历史中立场只保存显式标记；未标记保持未知。本场两源一致也不代表两源独立。
+
+```{r}
+context_reconciliation |> count(state)
+stopifnot(sum(context_reconciliation$state=="LABEL_VARIANT")==90L,
+ all(effective_context$state=="RESOLVED"),all(effective_history_context$state=="RESOLVED"))
+```
+
+90处同一原生赛事ID的显示标签差异保留为`LABEL_VARIANT`；没有将它们当作原生赛事冲突。
+上述业务数据来自登记的六张上下文表，旧JSON/CSV只保留作前轮审计证据。
+有效历史导出保留Titan和Nowscore各自的正文URL、SHA、精确采集时间及原值；
+各元数据字段另列核对状态和选择来源。最大观察时间仅表示两源中较晚的观察，不能替代逐来源凭证。
+逐来源时间直接使用原始采集凭证的ISO字符串并与标准表UTC时间核对，避免CSV默认时间格式丢失微秒。
+
+## 未决项及适用限制
+
+```{r}
+audit |> filter(kickoff_state=="SOURCE_CONFLICT_UNRESOLVED") |> select(fixture_id,home,away,kickoff_state)
+audit |> filter(standings_state%in%c("NOT_APPLICABLE_FRIENDLY","NO_CURRENT_STAGE_GROUP_TABLE")) |> select(fixture_id,home,away,competition,stage,standings_state)
+tables$conflicts |> count(field,sort=TRUE) |> slice_head(n=10)
+historical_summary <- history |> summarise(rows=n(),competition_present=sum(!is.na(competition)),
+ explicit_neutral_rows=sum(explicit_neutral%in%TRUE),neutral_unknown=sum(is.na(explicit_neutral)))
+stopifnot(historical_summary$rows==17407L,historical_summary$explicit_neutral_rows==1562L,
+ historical_summary$neutral_unknown==15845L,
+ historical_summary$explicit_neutral_rows+historical_summary$neutral_unknown==historical_summary$rows)
+historical_summary
+neutral_limits <- history |> group_by(fixture_id) |> summarise(history_neutral_unknown=sum(is.na(explicit_neutral)),.groups="drop")
+coverage_limits <- tables$conflicts |> filter(startsWith(field,"history:"),endsWith(field,":coverage")) |>
+ count(fixture_id,name="history_source_coverage_differences")
+stopifnot(sum(coverage_limits$history_source_coverage_differences)==310L,
+ !any(startsWith(tables$conflicts$field,"history:") & !endsWith(tables$conflicts$field,":coverage")))
+limits <- audit |> select(fixture_id,home,away,kickoff_state,h2h_state,standings_state) |>
+ left_join(neutral_limits,by="fixture_id",relationship="one-to-one") |>
+ left_join(coverage_limits,by="fixture_id",relationship="one-to-one") |>
+ mutate(history_source_coverage_differences=replace_na(history_source_coverage_differences,0L)) |>
+ mutate(history_score_scope="NOT_UNIVERSALLY_VERIFIED_90_MINUTES",source_availability="HISTORICAL_PROXY_NOT_ADMITTED",kickoff_resolution=if_else(kickoff_state=="SOURCE_CONFLICT_UNRESOLVED","Actual kickoff unverified; retain both source values","No source clock disagreement"))
+stopifnot(nrow(limits)==146L,!anyDuplicated(limits$fixture_id))
+write_csv(limits,file.path(output,"fixture-limitations.csv"))
+```
+
+#135仍有计划时间03:00/03:10 UTC差异：俱乐部官方日历与独立预告的计划时间不同，实际开球尚未证实。
+保留冲突和原截止，不平均、不择一填值。310条历史差异均为来源范围覆盖数差异，逐场单列；该版本核对表没有历史比分冲突条目，不把覆盖范围不同误记为整场不可用。
+历史比分未普遍证明90分钟口径；女足#2官方报道明确含加时，证据单列而不改写结算。
+这些限制与未知字段保留在逐场清单，不能用完整性报告宣称历史数据已获赛前准入。
+
+## 实现与验收证据
+
+```{r}
+checks_path <- file.path(root,"results/26098-cup-standings-20261018/context-final-checks.json")
+checks <- jsonlite::fromJSON(checks_path)
+stopifnot(all(checks$checks$exit_status==0L),all(checks$checks$skipped==0L))
+for(i in seq_len(nrow(checks$files))) stopifnot(digest::digest(file=file.path(root,checks$files$path[i]),algo="sha256")==checks$files$sha256[i])
+knitr::kable(as_tibble(checks$checks),format="html",escape=TRUE)
+cat(checks$review_command,"\n",checks$review_resolution,"\n")
+as_tibble(checks$files) |> filter(grepl("context.*review|fundamentals_context|fundamentals_final|context_storage",path))
+smoke <- jsonlite::fromJSON(file.path(root,"results/26098-cup-standings-20261018/context-installed-smoke-v3.json"))
+stopifnot(smoke$status=="PASS",normalizePath(smoke$library)==runtime$package)
+tibble(package=smoke$library,dll=smoke$dll,rcpp_wrapper_identity=smoke$rcpp_wrapper_identity)
+```
+
+包实现和R边界分别由`test_cup_standings.py`、`test-cup-standings-boundary.R`、
+`test_fundamentals_context.py`及`test-fundamentals-context-boundary.R`验证；
+环境入口由`test-verification-environment.R`验证；NAS证据发布由`test_fundamentals_audit_bundle.py`验证。
+正常安装后的完整R/Python测试、实际Rcpp封装调用、最终审查与输入快照身份以收据中的命令、日志、哈希为准。
+失败尝试保留日志，不将中止或早期局部通过冒认为最终完整通过。无CI参与。
+最终成品审查的命令、文件哈希、发现与处理结论记录在
+[成品审查收据](../results/26098-cup-standings-20261018/context-final-artifact-review.json)。
+
+```{r}
+jsonlite::write_json(list(issue="26098",base_version=cfg$base_version,base_manifest_sha256=cfg$base_manifest_sha256,cup_version=params$cup_version,cup_manifest_sha256=cup_manifest_sha256,context_version=params$context_version,context_manifest_sha256=context_manifest_sha256,external_evidence_relative=cfg$external_evidence_relative,external_evidence_sha256=cfg$external_evidence_sha256,config_sha256=digest::digest(file=file.path(root,"config/26098-cup-standings-20261018.json"),algo="sha256"),raw_manifest_sha256=cfg$raw_manifest_sha256,previous_audit_manifest_sha256=cfg$previous_audit_manifest_sha256,qmd_sha256=digest::digest(file=file.path(root,"quarto/26098_fundamentals_final_20261018.qmd"),algo="sha256"),availability_class="HISTORICAL_PROXY",historical_admission=FALSE,base_dataset_modified=FALSE,generated_at=format(Sys.time(),tz="UTC",usetz=TRUE)),file.path(output,"input-receipt.json"),auto_unbox=TRUE,pretty=TRUE)
+```

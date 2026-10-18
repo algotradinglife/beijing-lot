@@ -1,5 +1,15 @@
 source(file.path("..", "..", "r", "fundamentals_pipeline.R"))
 
+test_that("repository setup provides the sealed offline integration bundle", {
+  bundle <- Sys.getenv("FUNDAMENTALS_PIPELINE_TEST_BUNDLE")
+  expect_true(nzchar(bundle))
+  expect_true(dir.exists(bundle))
+  manifest <- jsonlite::fromJSON(file.path(bundle,"bundle-manifest.json"))
+  expect_identical(manifest$schema,"bj407_census_bundle_v1")
+  expect_identical(manifest$historical_learning,"NONE")
+  expect_true(length(manifest$files)>0L)
+})
+
 test_that("reticulate runs #408 and R validates the frozen release", {
   python <- Sys.getenv("FUNDAMENTALS_PYTHON", unset = Sys.which("python3"))
   bundle <- Sys.getenv("FUNDAMENTALS_PIPELINE_TEST_BUNDLE")
