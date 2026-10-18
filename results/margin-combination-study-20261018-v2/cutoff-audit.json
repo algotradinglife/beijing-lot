@@ -1,0 +1,9 @@
+{
+  "status": "DECLARED_PROXY_CUTOFF_AND_IMPLEMENTATION_BINDINGS_VERIFIED",
+  "models": 14,
+  "unique_cutoffs": 3,
+  "unique_model_keys": 6,
+  "prospective_proof": false,
+  "source_snapshot": "/tmp/beidan-margin-combinations-20261018",
+  "frozen_sha256": "2177a9eb060a3ceec5de8872a57a13a8c26fd59faae7efd5c9b93fc7594d2176"
+}

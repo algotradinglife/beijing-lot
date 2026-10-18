@@ -1,0 +1,25 @@
+{
+  "frozen_sha256": "2177a9eb060a3ceec5de8872a57a13a8c26fd59faae7efd5c9b93fc7594d2176",
+  "source_hashes": {
+    "parent": "7675663a3c9cb7a5077ba90378f0c7591502dccf13d504f959c0d5f3731c6d49",
+    "training": "cc9263ccb7e0e686cf5ae717ab57907864cba48502babbb3a4e05f03158557a3",
+    "labels": "eb9cada49bd93eeed5df4592bb929a7ced1aeadcdf83d9971318f98388f8f89e",
+    "observed": "796fd27e0127212aebac8761d088c0f554fb7d025fed599a3b0ea70cdad8f456",
+    "manifest": "4080314435497565bdd5882df96e99d015e63d16bde2d2b49d25f68d2412aaf8",
+    "client": "ae3274d4888d944a542032ddeadd25639808492ea9a449424ced5404c124431f",
+    "implementation": "1105d86efc421f41cf95cfa879a91d41459981305cf7a66aa95c9f1e4d413324"
+  },
+  "evaluator_sha256": "44ad8f428d7a4c0c788efd6ae4981cf938ed23b13101c899c69a15c990dea929",
+  "outputs": {
+    "rounds": "386c7b918a1f4d9c4d73ed843ef388ff8efa8f328afeb13b24704376fabc7005",
+    "summary": "087590131ed79fd98c239f5f20d2b9d78082568431b05cfd47effcb4b36391a1",
+    "groups": "6990bc9a3689a9311661d74cf2c80bc88fec9a81f0e800940afaa2a3b5584d73",
+    "windows": "f2b1079cc20b3dac99ae986da6ee45ebe15ef546b57205a00fe44d9439a16ee7",
+    "scores": "6f52e9b01a329ea10025a42378da1b2ba21d0e8fb9e0c32ee4ace09f79b2377a",
+    "unique_scores": "6f52e9b01a329ea10025a42378da1b2ba21d0e8fb9e0c32ee4ace09f79b2377a",
+    "metrics": "d689ef788fd77097f9cc74b305206b1f40786e14048bbb17441064d331572c5c",
+    "issues": "79316ebf9f5f2fa9326d9f7eb00780cb00f74eaf716b9ecc4ef1d8f498fce7e3",
+    "missing_labels": "1d054d20220fd56a88cfad7f835aa110aceff20f8787045bd7bcae5cbf610b75"
+  },
+  "independent_kernel_union_agreement": true
+}

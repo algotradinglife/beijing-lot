@@ -1,0 +1,27 @@
+{
+  "generated_at_utc": "2026-10-18T12:23:24.375935+00:00",
+  "base_git_revision": "c85045343dc28e451a9119e025cdb38487bac615",
+  "source_hashes": {
+    "packages/beidan/R/margin_shape_research.R": "1105d86efc421f41cf95cfa879a91d41459981305cf7a66aa95c9f1e4d413324",
+    "packages/beidan/tests/testthat/test-margin-shape-research.R": "e7ce52a6c8504d76352015852cf88049f0eb5d75f6e8c013ae6984612720c841",
+    "r/margin_combination_study_20261018.R": "9385113e68397f43318ac98e1446e9ef00b50bce4a03fbf3c84d0bf7644e047d",
+    "r/evaluate_margin_combination_20261018.R": "44ad8f428d7a4c0c788efd6ae4981cf938ed23b13101c899c69a15c990dea929",
+    "tests/testthat/test-margin-combination-study.R": "a2b13ed1cde48d165e17fd3d89d29c85da5a6b1e8c79fae947c137f6f2888975",
+    "quarto/margin_combination_study_20261018.qmd": "7341f700a679399dc4986aa5dab2cc10d4cfe3c98bb27b3b8647cd895acd53ea",
+    "config/fundamental-models/FM-1.7.1.json": "f63e06561034b95f96e57d2983db29fd73af5f876f0e687e3a1f4e54cec265d2",
+    "results/margin-combination-study-20261018-v2/producer-source.R": "ae3274d4888d944a542032ddeadd25639808492ea9a449424ced5404c124431f",
+    "results/margin-combination-study-20261018-v2/cutoff-audit-command.R": "6fabc1a79bc054a86075ceabe61b949f58515bb7a37dfb246e2e79a441621101",
+    "results/margin-combination-study-20261018-v2/runtime-command.R": "5e1003a2dcf84962ad2b3f35b1f99cc5f60e0c4eb4fd90c284e2e793cdf137d8",
+    "results/margin-combination-study-20261018-v2/html-validation-command.py": "db903ccca0329af8d89d0e73ff5160e5f34254feb1f238946c761c2a93649278"
+  },
+  "verified_snapshot_manifest": "results/margin-combination-study-20261018-v2/verification-source-manifest-final.json",
+  "verified_snapshot_manifest_sha256": "1fdd0015ac0aa925873e892692a34919499f98059aeaa624123e596db6ea1d7d",
+  "source_capsule": {
+    "path": "results/margin-combination-study-20261018/tested-package-source.tar.gz",
+    "sha256": "6f97f8bdba47c988f32cef47c03282ef85000a258991ed21da65803f5c137cb2",
+    "committed": false,
+    "reason": "Contains other authors existing Nova implementation; local immutable reproducibility input only"
+  },
+  "QMD_verification": "Final QMD source is verified by separate clean render and final review, not claimed to be the earlier full-suite snapshot QMD.",
+  "forecast_origin": "Exact archived producer-source.R matching immutable manifest, independently replayed. Active producer decision-loop AST is tested identical; active evaluator separately source-bound."
+}

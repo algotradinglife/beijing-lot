@@ -1,0 +1,250 @@
+---
+title: "净胜球形态、完整赛果组合与动态购票"
+format:
+  html:
+    embed-resources: true
+params:
+  project_root: "."
+  require_acceptance: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本研究直接枚举七场让球胜平负的全部2187种组合，不设3332222等结果结构。采用FM-1.7.1选定来源的完整比分分布，不使用90%尾部压缩；不是更改正式FM171。为隔离购票与概率的作用，固定已有七轮各自原8组比赛，每组125注、2元/注、每轮2000元。所有赛果均可进入候选；8组只是本轮控制变量，不是最终策略约束。本轮不同时扩大选场池或优化组数。
+
+如果模型正确且各注同价，单组概率前125注最大化单组命中。动态窗口若仅最大化单组质量也应从第1名开始；本研究用其他组尚未覆盖的概率定义动态目标。比较FIXED（30–154）、TOP（1–125）、DYNAMIC_WINDOW（贪心选下一组及连续125注）、DYNAMIC_SET（贪心选下一组及任意125注）。后两者最大化当步新增联合覆盖，不宣称全局最优或收益最优；同一比赛在全部组中共享结果，不把8组视为独立。重复票保留成本和重复中奖的回款，但不增加联合覆盖。
+
+## 数据与时序
+
+训练集来自26098、26101、26102三期322场成功同赛事原生/合格市场预测，使用SOURCE_FULL而非尾部版本。标签时钟使用已记录的整期观察时间，分别为10月7日、7日、9日；预测来源时间仍含历史代理，后来的FM171重建不能冒称当时真实可用。故所有结果均为历史诊断。七轮目标为10月15–17日的26104/26105；每轮明确截止，shared temporal_learning只准入截止前、非目标期历史。训练特征仅熵entropy与让平净胜球±1档合计local_mass；不因目标赛果挑特征或幅度。
+
+三种概率：RAW为完整网格投影；GLOBAL为三类原始logit作为offset、仅截距的二项残差校准；SHAPE在相同offset上增加entropy/local_mass。三类各自拟合后归一化，以GLOBAL隔离整体校准贡献。固定等权、ESS≥100、每类至少15、epsilon=1e−8；不搜索超参数。默认全部322场历史，不加入目标期已结束比赛。每个目标截止独立构建共享上下文、拟合和收据，无跨截止模型缓存。
+
+这七轮赛果已被讨论，不能当盲测，也不能按其结果挑最佳生产方案；但规则不使用其标签拟合/选择，训练和评分跨期分离。各轮重复比赛，主概率指标仅保留每场首次截止，另存完整fixture/cutoff评分。回款缺SP则NA，不记零、不据此推断全期ROI。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+out <- file.path(root,'results/margin-combination-study-20261018-v2')
+library(beidan,lib.loc=file.path(root,'results/margin-combination-study-20261018/library'))
+manifest <- jsonlite::fromJSON(file.path(out,'manifest.json'))
+replay <- jsonlite::fromJSON(file.path(out,'replay.json'))
+stopifnot(replay$status=='FULL_IDENTICAL_REPLAY',replay$sha256==manifest$sha256,
+ digest::digest(file=file.path(out,'frozen-study.rds'),algo='sha256')==manifest$sha256)
+for(name in names(manifest$sources)) {
+ source_path <- if(name=='client')file.path(out,'producer-source.R')else file.path(root,manifest$sources[[name]])
+ stopifnot(digest::digest(file=source_path,algo='sha256')==manifest$source_hashes[[name]])
+}
+x <- readRDS(file.path(out,'frozen-study.rds'))
+evaluation <- jsonlite::fromJSON(file.path(out,'evaluation.json'))
+evaluation_replay <- jsonlite::fromJSON(file.path(out,'evaluation-replay.json'))
+stopifnot(evaluation$frozen_sha256==manifest$sha256,
+ evaluation_replay$status=='FULL_IDENTICAL_EVALUATION_REPLAY',
+ all(evaluation_replay$exit_statuses==0L),
+ evaluation_replay$evaluation_sha256==digest::digest(file=file.path(out,'evaluation.json'),algo='sha256'))
+for(z in x$rounds)stopifnot(digest::digest(file=file.path(root,z$label_manifest$label_snapshot),
+ algo='sha256')==z$label_manifest$label_sha256)
+stopifnot(evaluation$evaluator_sha256==digest::digest(file=file.path(root,
+ 'r/evaluate_margin_combination_20261018.R'),algo='sha256'))
+for(name in names(evaluation$outputs))stopifnot(digest::digest(file=file.path(out,paste0(name,'.csv')),
+ algo='sha256')==evaluation$outputs[[name]])
+rounds <- read_csv(file.path(out,'rounds.csv'),show_col_types=FALSE)
+summary <- read_csv(file.path(out,'summary.csv'),show_col_types=FALSE)
+metrics <- read_csv(file.path(out,'metrics.csv'),show_col_types=FALSE)
+issues <- read_csv(file.path(out,'issues.csv'),show_col_types=FALSE)
+windows <- read_csv(file.path(out,'windows.csv'),show_col_types=FALSE)
+scores <- read_csv(file.path(out,'unique_scores.csv'),show_col_types=FALSE)
+stopifnot(nrow(rounds)==84L,nrow(summary)==12L,nrow(metrics)==3L,
+ all(rounds$cost_cny==2000),all(rounds$pending_groups>=0L))
+missing_labels <- read_csv(file.path(out,'missing_labels.csv'),show_col_types=FALSE)
+```
+
+## 概率有没有变准
+
+```{r}
+round_lookup <- map_dfr(x$rounds,~tibble(index=.x$index,batch=.x$dataset,sheet=.x$sheet,
+ forecasts=nrow(.x$features),cutoff_utc=format(.x$cutoff$cutoff_utc,tz='UTC',usetz=TRUE)))
+knitr::kable(round_lookup,caption='本次七轮映射：各轮保留原8组，截止时间为UTC')
+write_csv(round_lookup,file.path(out,'round-lookup.csv'))
+```
+
+本次探索的主要观察：RAW固定窗口确认命中3轮、13组；动态连续窗口确认命中5轮、10组；动态任意125注确认命中6轮、6组，另1轮有1组待定。三者每轮均模拟投入2000元。动态选择扩大了轮次覆盖，同时改变了重复多中的分布，不能只用一种命中指标评价。
+
+在78场已确认赛果中，RAW的Top1/Top2为44.87%/74.36%，SHAPE为39.74%/70.51%；SHAPE的Brier和log loss也更差。这支持继续研究完整组合及组间互补选择，不支持据此将本次两特征形态校准升级为正式概率。三期训练、两期目标的跨期分离仍受历史重建、目标已知和小样本限制，不是盲测或前瞻效果证明。
+
+Brier为三类别平方误差之和，log loss为实际类别负对数概率；两者越低越好。Top2是让球胜平负前两类覆盖，不是净胜球前两档。
+
+```{r}
+knitr::kable(metrics,digits=6)
+knitr::kable(issues,digits=6,caption='逐期，重复比赛只保留首次截止')
+knitr::kable(missing_labels |> distinct(index,fixture_id,reason),caption='缺失标签逐项披露，不记成预测失败')
+```
+
+原结算快照缺26105:112（布尔诺阿特斯–波希米亚1905）的标签。该场保留全部预测及选票；概率评分仅在所有模型共同的已知标签场次上计算。相关票若被其他已知腿否决，可确认未中；尚存中奖可能的票/组保留pending。any_hit在已确认命中时为TRUE、已确认全未中时为FALSE、其余为NA；汇总列出确认命中与待定上界，不把NA当零。没有用当前SP或猜测比分补标签。
+
+agent-reach/Jina Reader核验的[球探现场页](https://live.titan007.com/detail/3039908.htm)显示该场“推迟”；原始读取内容保存在agent-reach持久目录，来源URL、采集时间与SHA见postponement-evidence.json。该状态仅解释缺标签，不进入拟合或补造结算。
+
+形态校准只检验两个连续特征。GLOBAL只有截距，不能排除形态特征只是帮助表达原三分类概率的非线性校准；这不是“发现独立于原概率的新信息”的充分证据。训练混合原生/市场路由，目标组以市场路由为主，也存在来源及赛事构成变化。本轮不根据目标表现改变特征、加入交互项或另挑模型。
+
+## 回到净胜球分布
+
+按RAW与SHAPE三分类概率的总变差距离降序选择前三场，并以fixture_id打破并列；先限于已知标签场次的每场首次截止，再取例，不按命中择例。图只展示原完整净胜球分布，不声称GLM重新估计了比分；虚线为让平档，横轴窗口为让平±5球，窗口外质量另外列出且不重新归一化。
+
+```{r}
+projections <- map_dfr(x$rounds,~map_dfr(names(.x$outputs),function(model)
+ .x$outputs[[model]]$decision$probabilities |> mutate(index=.x$index,model=model)))
+stopifnot(nrow(projections)==711L)
+write_csv(projections,file.path(out,'probabilities.csv'))
+forecast_context <- map_dfr(x$rounds,~.x$features |>
+ select(fixture_id,handicap,entropy,local_mass,mean_margin) |>
+ mutate(index=.x$index,issue_id=.x$cutoff$issue_id,cutoff_utc=.x$cutoff$cutoff_utc))
+stopifnot(nrow(forecast_context)==79L,!anyDuplicated(forecast_context[c('index','fixture_id')]),
+ !anyNA(forecast_context))
+write_csv(forecast_context,file.path(out,'forecast-context.csv'))
+raw_purchases <- map_dfr(x$rounds,~.x$outputs$RAW$selection$purchases |>
+ mutate(index=.x$index,issue_id=.x$cutoff$issue_id,
+  cutoff_utc=format(.x$cutoff$cutoff_utc,tz='UTC',usetz=TRUE)))
+stopifnot(nrow(raw_purchases)==28000L,
+ all((raw_purchases |> count(index,policy,group_id))$n==125L))
+write_csv(raw_purchases,file.path(out,'raw-ticket-selections.csv'))
+first_context <- scores |> filter(model=='RAW') |> select(fixture_id,index)
+changes <- projections |> inner_join(first_context,by=c('fixture_id','index'),relationship='many-to-one') |>
+ filter(model%in%c('RAW','SHAPE')) |> pivot_wider(names_from=model,values_from=probability) |>
+ group_by(index,fixture_id) |> summarise(total_variation=.5*sum(abs(RAW-SHAPE)),.groups='drop')
+examples <- changes |> arrange(desc(total_variation),fixture_id) |> slice_head(n=3)
+parent <- readRDS(file.path(root,manifest$sources$parent))
+example_margins <- list();example_windows <- list()
+for(j in seq_len(nrow(examples))) {
+ i <- examples$index[j];id <- examples$fixture_id[j]
+ f <- x$rounds[[as.character(i)]]$features |> filter(fixture_id==id)
+ g <- parent$grids[[paste(i,id,sep='|')]]$grid |> as_tibble()
+ m <- g |> mutate(margin=home_goals-away_goals) |> group_by(margin) |>
+  summarise(probability=sum(probability),.groups='drop') |> mutate(fixture_id=id,draw_margin=-f$handicap)
+ stopifnot(nrow(f)==1L,abs(sum(m$probability)-1)<1e-9)
+ example_windows[[id]] <- tibble(fixture_id=id,outside_display_mass=
+  sum(m$probability[abs(m$margin-m$draw_margin)>5]))
+ example_margins[[id]] <- m |> filter(abs(margin-draw_margin)<=5)
+}
+knitr::kable(examples |> left_join(bind_rows(example_windows),by='fixture_id',relationship='one-to-one'),digits=5)
+knitr::kable(scores |> semi_join(examples,by=c('fixture_id','index')) |>
+ select(fixture_id,model,actual_outcome,predicted_outcome,actual_rank,actual_probability,brier),digits=5)
+```
+
+```{r}
+#| fig-width: 11
+#| fig-height: 4
+bind_rows(example_margins) |> ggplot(aes(margin,probability))+
+ geom_col()+geom_vline(aes(xintercept=draw_margin),linetype=2,colour='red')+
+ facet_wrap(~fixture_id,scales='free_x')+scale_x_continuous(breaks=scales::breaks_width(1))+
+ scale_y_continuous(labels=scales::percent)+
+ labs(x='主队净胜球，虚线为让平档',y='原完整分布的概率质量')+theme_minimal()
+```
+
+```{r}
+#| fig-width: 11
+#| fig-height: 4
+projections |> semi_join(examples,by=c('fixture_id','index')) |>
+ ggplot(aes(factor(outcome,levels=c('W','D','L')),probability,fill=model))+
+ geom_col(position='dodge')+facet_wrap(~fixture_id)+scale_y_continuous(labels=scales::percent)+
+ labs(x='北单让球赛果 W让胜 / D让平 / L让负',y='预测概率',fill='概率版本')+theme_minimal()
+```
+
+## 固定预算购票
+
+model_any_hit是模型认为整轮至少中一注的概率，不是实测命中率；概率版本不同，其自身估计的覆盖不可直接当成真实收益比较。
+
+```{r}
+knitr::kable(summary,digits=5)
+knitr::kable(rounds |> select(index,model,policy,hit_groups,any_hit,model_any_hit,payout_cny),digits=5)
+```
+
+同价购买时，各组TOP最大化模型期望中奖组数；动态策略追求至少中一次的联合覆盖，两者目标不同。以下同时呈现，避免只提高覆盖却隐藏重复多中的损失。
+
+```{r}
+tradeoff <- rounds |> group_by(model,policy) |> summarise(
+ mean_any_hit=mean(model_any_hit),mean_expected_winning_groups=mean(model_expected_wins),
+ actual_hit_rounds=sum(any_hit%in%TRUE),pending_rounds=sum(is.na(any_hit)),
+ actual_winning_groups=sum(hit_groups),pending_groups=sum(pending_groups),.groups='drop')
+knitr::kable(tradeoff,digits=5)
+write_csv(tradeoff,file.path(out,'tradeoff.csv'))
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 4
+rounds |> ggplot(aes(factor(index),model_any_hit,colour=policy,group=policy))+
+ geom_point()+geom_line()+facet_wrap(~model)+scale_y_continuous(labels=scales::percent)+
+ labs(x='历史轮次索引',y='模型估计整轮至少中一注',colour='购票规则')+theme_minimal()
+```
+
+## 每组的区间是否真的不同
+
+DYNAMIC_SET的min/max只是所购注的排名跨度，不能解释成连续区间。下表给出全部动态连续窗口，便于核实是否存在“每组不同”的实际行为。
+
+```{r}
+knitr::kable(windows |> filter(policy=='DYNAMIC_WINDOW') |>
+ select(index,model,step,group_id,min_rank,max_rank,marginal_coverage),digits=5)
+knitr::kable(windows |> group_by(model,policy) |> summarise(groups=n(),
+ begins_after_first=sum(min_rank>1),minimum_rank=min(min_rank),maximum_rank=max(max_rank),.groups='drop'))
+```
+
+## 回款与成本
+
+只在12方案共同现金完整的轮次进行同预算现金比较；官方结算SP缺失的中奖票仍列命中，但回款不估算。结算只使用一次0.65票级系数。
+
+```{r}
+common <- rounds |> group_by(index) |> summarise(ok=all(monetary_complete),.groups='drop') |> filter(ok)
+cash <- rounds |> semi_join(common,by='index') |> group_by(model,policy) |>
+ summarise(rounds=n(),cost_cny=sum(cost_cny),payout_cny=sum(payout_cny),net_cny=sum(net_cny),.groups='drop')
+knitr::kable(cash,digits=2)
+write_csv(cash,file.path(out,'cash.csv'))
+```
+
+12种方案共同现金完整的仅3轮，各自模拟投入6000元。RAW固定、TOP、动态连续、动态任意的回款约为2900.52、1424.26、8931.57、4514.84元；这是部分轮次的描述，不能推断七轮总收益或据此选择收益最优策略。其余回款继续保留NA。
+
+## 证据、验收及复现
+
+新增包函数FitMarginShapeCalibration、PredictMarginShapeCalibration、SelectJointOutcomeTickets及测试test-margin-shape-research.R；客户端仅组织输入与结果。模型使用stats::glm；权重/截止/分区/ESS/实现闭包来自共享temporal_learning。完整组合沿用parlay_enumerate_tickets/parlay_rank_tickets；标量联合覆盖API不能返回每个候选票的未覆盖质量，故用base rowsum对≤3^14个共享世界精确积分，不新增依赖。全部84个最终覆盖另用既有Rcpp标量内核复核。
+
+测试以27个独立世界核验所有规则，覆盖格式、资源界限、缺失、支持不足、单类、奇异拟合、源/截止篡改和目标/未来标签变化经预测及购票不变性。旧接受快照加本次文件形成隔离测试源码，避免其他会话并行修改；只证明记录身份的交付，不声称未纳入的共享工作区改动通过。正常安装、完整R/Python套件、DLL实际调用、无缓存渲染及最终codex review均须在验收JSON中有证据。
+
+本地结果目录保留tested-package-source.tar.gz作为实际测试包的源码胶囊，不含编译产物；胶囊包含已有其他会话源码，故不纳入本次Git提交，SHA列入验收输入清单。在隔离研究目录解压并正常安装，可复现冻结版本。verification-source-manifest-final.json绑定完整测试源码身份；运行环境来自runtime-final.log，已有依赖不在函数或渲染期间安装。新实现不增加直接依赖。
+
+首轮代码审查指出：未来期可能因错误的早期时间戳进入共享准入。已增加明确的prior_issues域提名，要求期号严格早于目标，记录排除数；回归测试将未来标签时钟改早、概率改NA，确认模型、预测和购票均不变。独立GLM环境不适合冻结比较，故仅持久化系数、诊断、共享收据；增加RDS往返及独立重拟合一致性测试。初期中止的套件/计算不作为通过证据，最终套件以full-R-tests-final.log、full-python-tests-final.log为准；各项准确命令、状态及日志路径见验收JSON。最终审查结论及源文件SHA见验收记录。
+
+V1冻结及独立重放通过，但评分因结算列顺序不满足严格接口而停止，未形成可用对照表。V2显式排列结算列，并对实际客户端AST中的传参表达式作回归测试；原冻结包和生产它的精确源码作为证据保留。V2重新冻结并独立重放，不跨预测实现身份沿用V1缓存。评分随后拆为独立客户端；producer-source.R保存已重放的确切生产源码，评分明确核验此不可变输入证据及自身实现SHA，不将新评分代码冒充预测生产代码。当前生产客户端移除了失效的评分分支，新增AST回归验证其决策计算循环与冻结版本完全一致。概率、选票算法和参数没有因该接口修复而调整。实际运行包及源码胶囊位于原results/margin-combination-study-20261018目录，V2结果位于同名加-v2目录，均由验收SHA绑定。
+
+```{r}
+receipts <- map_dfr(x$rounds,~map_dfr(names(.x$fits),function(model) {
+ f <- .x$fits[[model]]
+ tibble(index=.x$index,model,cutoff=format(.x$cutoff$cutoff_utc,tz='UTC',usetz=TRUE),
+  training_n=nrow(f$admitted),maximum_source=f$receipt$maximum_source_time,
+  maximum_label=f$receipt$maximum_training_label_timestamp,cache_key=f$receipt$cache_key)
+}))
+knitr::kable(receipts)
+if(isTRUE(params$require_acceptance)) {
+ acceptance <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ stopifnot(acceptance$status=='ACCEPTED',all(acceptance$checks$exit_status==0L),
+  all(acceptance$tests$failed==0),all(acceptance$tests$errors==0),all(acceptance$tests$skipped==0))
+ for(path in names(acceptance$source_hashes))stopifnot(digest::digest(
+   file=file.path(root,path),algo='sha256')==acceptance$source_hashes[[path]])
+}
+if(isTRUE(params$require_acceptance))knitr::kable(acceptance$checks)
+if(isTRUE(params$require_acceptance))knitr::kable(acceptance$tests)
+if(isTRUE(params$require_acceptance))knitr::asis_output(paste0('审查结论：',acceptance$review$verdict,'。审查命令、日志和所审查源文件SHA记录如下；最终工件复核另见final-review-receipt.json。'))
+if(isTRUE(params$require_acceptance))knitr::kable(tibble(path=names(acceptance$source_hashes),sha256=unlist(acceptance$source_hashes)))
+if(!isTRUE(params$require_acceptance))knitr::asis_output('**阶段报告：完整验收尚未完成，不能将当前渲染视为最终交付。**')
+```
+
+复现：在隔离目录解压源码胶囊，提供manifest列出的冻结输入及本次客户端；设置config/source-extraction.env与显式项目Python/R库，正常安装到results/margin-combination-study-20261018/library；依次运行
+`Rscript r/margin_combination_study_20261018.R ROOT freeze`、同命令`replay`；评分使用独立的`Rscript r/evaluate_margin_combination_20261018.R ROOT`。
+freeze拒绝覆盖已有冻结包；独立重放不会改写模型。运行
+`quarto render quarto/margin_combination_study_20261018.qmd --no-cache -P project_root:ROOT`。
+原始输入与各层输出SHA在manifest/evaluation中；代码与环境身份及完整检查命令见验收记录。正式FM版本与已冻结模拟单不变。本轮只能提出待验证候选；任何据此挑选的规则需再冻结并等待新期验证。
+
+复现本次既有V2预测时，先在隔离研究根目录将producer-source.R还原到manifest所记的r/margin_combination_study_20261018.R路径，再运行该冻结版本的replay模式；不要覆盖正在使用的源码。当前生产客户端的freeze用于新的空输出目录上下文，拒绝重写已有冻结包。评分不执行或导入归档生产源码，只核验其字节SHA。
+
+报告渲染只读取已独立重算、按源数据/实现身份及SHA验收的派生表；所有汇总和图在干净R会话重新执行。knitr缓存和freeze关闭。完整评分独立重放的结果见evaluation-replay.json；复现先运行独立评分客户端，再渲染报告，无需因展示修改重复拟合或选票。

@@ -1,0 +1,59 @@
+{
+  "identifiers": "Read fixture_id, group_id, ticket_id, issue_id and model/policy/outcome as character; preserve leading zeros. CSV is typeless; the frozen RDS contains authoritative tibble types.",
+  "probabilities.csv": {
+    "row": "fixture/cutoff-index/model/outcome",
+    "key": [
+      "index",
+      "fixture_id",
+      "model",
+      "outcome"
+    ],
+    "probability_units": "0..1, complete W/D/L triple sums to1",
+    "context_join": [
+      "index",
+      "fixture_id"
+    ],
+    "rows": 711
+  },
+  "forecast-context.csv": {
+    "row": "fixture/cutoff-index",
+    "key": [
+      "index",
+      "fixture_id"
+    ],
+    "rows": 79,
+    "handicap_units": "signed integer home handicap goals",
+    "mean_margin_units": "home minus away goals, original complete grid expectation",
+    "entropy_units": "natural-log entropy of integer margin bins",
+    "local_mass_units": "probability within one integer goal of let-draw margin",
+    "cutoff_utc": "POSIXct UTC in frozen data; ISO UTC serialization in CSV"
+  },
+  "raw-ticket-selections.csv": {
+    "row": "one ticket copy per RAW policy/group/cutoff-index",
+    "key": [
+      "index",
+      "policy",
+      "group_id",
+      "ticket_id"
+    ],
+    "rows": 28000,
+    "ticket_price_cny": 2,
+    "ticket_id": "7 tokens separated by |; each token is fixture_id:last-colon outcome code",
+    "outcome_codes": {
+      "1": "W",
+      "2": "D",
+      "3": "L"
+    },
+    "rank": "rank in that group complete2187 space before incremental selection, 1-based",
+    "cutoff_utc": "explicit UTC string"
+  },
+  "round-lookup.csv": {
+    "row": "historical planning round",
+    "key": [
+      "index"
+    ],
+    "rows": 7
+  },
+  "classification": "W iff home margin+handicap>0; D iff=0; L iff<0. No result is imputed for postponed26105:112.",
+  "purpose": "Alternative historical research scenarios. Filter one index/policy for1000 simulated tickets at CNY2000; not a live purchase order."
+}

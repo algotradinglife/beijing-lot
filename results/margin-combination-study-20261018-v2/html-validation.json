@@ -1,0 +1,15 @@
+{
+  "status": "FINAL_ACCEPTANCE_RENDER_VERIFIED",
+  "generated_at_utc": "2026-10-18T12:34:44.074689+00:00",
+  "tables": 16,
+  "figures": 3,
+  "full_suite_evidence_table_verified": true,
+  "review_verdict_visible": true,
+  "no_execution_error_text": true,
+  "preliminary_notice_absent": true,
+  "source_and_output_hashes_verified": true,
+  "html_sha256": "0e2aa90d01087b0c26610330c4a4cba6e9f7ffa1ad9659df27805f1196fb2a4d",
+  "acceptance_sha256": "f10fef527f436532e22772e36a49da104e4589c400c4aa2788fe824e6e714bf4",
+  "validator_sha256": "db903ccca0329af8d89d0e73ff5160e5f34254feb1f238946c761c2a93649278",
+  "render_log_sha256": "7e2f62b3a2a855e0cb0177ff050225223bfd64928552be65bb4b800a77b48b22"
+}

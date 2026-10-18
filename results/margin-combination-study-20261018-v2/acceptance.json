@@ -1,0 +1,204 @@
+{
+  "status": "ACCEPTED",
+  "generated_at_utc": "2026-10-18T12:28:50.116182+00:00",
+  "tests": [
+    {
+      "suite": "package",
+      "tests": 991,
+      "passed": 9647,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "repository",
+      "tests": 802,
+      "passed": 183264,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Python backend",
+      "tests": 643,
+      "passed": 643,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "checks": [
+    {
+      "check": "normal installation",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/R CMD INSTALL -l \"$PWD/results/margin-combination-study-20261018/library\" packages/beidan",
+      "cwd": "/tmp/beidan-margin-combinations-20261018",
+      "exit_status": 0,
+      "log": "install-final.log"
+    },
+    {
+      "check": "installed full R entry",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R",
+      "cwd": "/tmp/beidan-margin-combinations-20261018",
+      "exit_status": 0,
+      "log": "full-R-tests-final.log"
+    },
+    {
+      "check": "full Python backend",
+      "command": "PYTHONPATH=\"packages/beidan/inst/python:$PWD\" .venv/bin/python -m pytest packages/beidan/tests/python -q -rs",
+      "cwd": "/tmp/beidan-margin-combinations-20261018",
+      "exit_status": 0,
+      "log": "full-python-tests-final.log"
+    },
+    {
+      "check": "frozen producer and independent replay",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript r/margin_combination_study_20261018.R \"$PWD\" freeze\n. docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript r/margin_combination_study_20261018.R \"$PWD\" replay",
+      "cwd": "/tmp/beidan-margin-combinations-20261018",
+      "exit_status": 0,
+      "log": "freeze-accepted.log; replay-accepted.log; replay.json",
+      "producer_source_sha256": "ae3274d4888d944a542032ddeadd25639808492ea9a449424ced5404c124431f",
+      "note": "Executed before separating scoring; reproduce in isolated root with archived producer restored to its recorded path."
+    },
+    {
+      "check": "independent scoring replay and compiled union",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript r/evaluate_margin_combination_20261018.R \"$PWD\"\nIndependent second call: clean Quarto child invoked /opt/R/4.6.1/bin/Rscript /home/drwho1985/workspace/algotradinglife/beijing-lot/r/evaluate_margin_combination_20261018.R /home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "evaluate-development.log; qmd-evaluate.log; evaluation-replay.json"
+    },
+    {
+      "check": "cutoff/implementation closure audit",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript results/margin-combination-study-20261018-v2/cutoff-audit-command.R \"$PWD\" /tmp/beidan-margin-combinations-20261018",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "cutoff-audit.log; cutoff-audit.json; cutoff-audit.csv"
+    },
+    {
+      "check": "targeted actual-AST regressions",
+      "command": "testthat::test_file(\"tests/testthat/test-margin-combination-study.R\",reporter=\"summary\") through normal installed beidan; all17 assertions also in full suite",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "targeted-evaluator.log"
+    },
+    {
+      "check": "preliminary current data report render",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" quarto render quarto/margin_combination_study_20261018.qmd --no-cache -P project_root:\"$PWD\" -P require_acceptance:false",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "render-source-verified.log"
+    },
+    {
+      "check": "source/data/test acceptance review",
+      "command": "codex review \"Final acceptance-source review, read only. Scope six owned source files: packages/beidan/R/margin_shape_research.R; packages/beidan/tests/testthat/test-margin-shape-research.R; r/margin_combination_study_20261018.R; r/evaluate_margin_combination_20261018.R; tests/testthat/test-margin-combination-study.R; quarto/margin_combination_study_20261018.qmd. Authoritative results in results/margin-combination-study-20261018-v2: acceptance.json (CHECKS_PASSED_FINAL_REVIEW_PENDING), frozen-study.rds, manifest/replay/evaluation/evaluation-replay.json, producer-source.R immutable input evidence, verification-source-manifest-final.json, delivery-source-manifest.json, cutoff-audit-command.R/json/csv, export-schema.json, postponement-evidence.json, final CSVs and current rendered HTML. Full installed R entry EXIT0: package991 tests9647 assertions; repository802 tests183264 assertions; both0 failures/errors/warnings/skips. Final Python643 passed0skip EXIT0. Normal installation and DLL wrapper check passed. Archived producer replay is identical;84 scoring schemes replay identical and agree with independent Rcpp union; V1/V2 q/coefficients/tickets/traces identical.14 learned models cutoffs/admission/implementation closures independently audited. Missing26105:112 verified postponed, no label/SP invented, paired78 fixtures; pending preserved. Source capsule local only, foreign Nova source NOT to be committed. Current producer decision-loop AST matches archived source, no active fallback/obsolete evaluation. Check exact commands, transitive source/cutoff/data binding, numeric results, three-model/four-policy equal-budget comparisons, monetary partial scope, all new regressions and newest QMD round/forecast/ticket exports/integer goal ticks. Ignore superseded accepted-named logs and progress JSONs; final logs have -final names. Current HTML is explicitly preliminary while acceptance awaits this review; default-true render will run after verdict. Report actionable blocking findings or No blocking findings; do not edit or certify an unexecuted final render.\"",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "review-acceptance-source.log",
+      "verdict": "No blocking findings"
+    },
+    {
+      "check": "fresh installed DLL registration/wrapper/runtime",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript results/margin-combination-study-20261018-v2/runtime-command.R \"$PWD\"",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "runtime-final.log",
+      "result": "Registered installed DLL; actual ComponentUnionKernel result0.84; compiled/source identity match; R/Python/dependency versions recorded."
+    },
+    {
+      "check": "clean acceptance-gated final QMD render",
+      "command": ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"$PWD/results/margin-combination-study-20261018/library:$R_LIBS_USER\" quarto render quarto/margin_combination_study_20261018.qmd --no-cache -P project_root:\"$PWD\"",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "render-final-first.log"
+    },
+    {
+      "check": "QMD evidence-table display regression review",
+      "command": "codex review \"Read-only focused final QMD display-fix review: quarto/margin_combination_study_20261018.qmd and existing acceptance/source reviews in results/margin-combination-study-20261018-v2. Prior full source/data/tests review found no blockers and all complete R/Python suites passed. Final HTML inspection caught kable/asis values inside an if block not displayed: checks/tests/review/source tables are now separate top-level conditional expressions, while all acceptance/source guards remain intact. No computation, model, client, tests or data changed. Check that this actually emits evidence in default require_acceptance=true branch and keeps preliminary warning in false branch. Check current source identity update is pending after this review; do not claim final render already passed. Report blockers or No blocking findings, do not edit.\"",
+      "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+      "exit_status": 0,
+      "log": "review-qmd-display.log",
+      "result": "Both top-level conditional print branches checked in memory; acceptance guards retained."
+    }
+  ],
+  "source_hashes": {
+    "packages/beidan/R/margin_shape_research.R": "1105d86efc421f41cf95cfa879a91d41459981305cf7a66aa95c9f1e4d413324",
+    "packages/beidan/tests/testthat/test-margin-shape-research.R": "e7ce52a6c8504d76352015852cf88049f0eb5d75f6e8c013ae6984612720c841",
+    "r/margin_combination_study_20261018.R": "9385113e68397f43318ac98e1446e9ef00b50bce4a03fbf3c84d0bf7644e047d",
+    "r/evaluate_margin_combination_20261018.R": "44ad8f428d7a4c0c788efd6ae4981cf938ed23b13101c899c69a15c990dea929",
+    "tests/testthat/test-margin-combination-study.R": "a2b13ed1cde48d165e17fd3d89d29c85da5a6b1e8c79fae947c137f6f2888975",
+    "quarto/margin_combination_study_20261018.qmd": "7341f700a679399dc4986aa5dab2cc10d4cfe3c98bb27b3b8647cd895acd53ea",
+    "config/fundamental-models/FM-1.7.1.json": "f63e06561034b95f96e57d2983db29fd73af5f876f0e687e3a1f4e54cec265d2",
+    "results/margin-combination-study-20261018-v2/producer-source.R": "ae3274d4888d944a542032ddeadd25639808492ea9a449424ced5404c124431f",
+    "results/margin-combination-study-20261018/tested-package-source.tar.gz": "6f97f8bdba47c988f32cef47c03282ef85000a258991ed21da65803f5c137cb2",
+    "results/margin-combination-study-20261018-v2/cutoff-audit-command.R": "6fabc1a79bc054a86075ceabe61b949f58515bb7a37dfb246e2e79a441621101",
+    "results/margin-combination-study-20261018-v2/runtime-command.R": "5e1003a2dcf84962ad2b3f35b1f99cc5f60e0c4eb4fd90c284e2e793cdf137d8",
+    "results/margin-combination-study-20261018-v2/html-validation-command.py": "db903ccca0329af8d89d0e73ff5160e5f34254feb1f238946c761c2a93649278"
+  },
+  "output_hashes": {
+    "frozen-study.rds": "2177a9eb060a3ceec5de8872a57a13a8c26fd59faae7efd5c9b93fc7594d2176",
+    "manifest.json": "c2c0c82ffb2f2220e5dbd1a88970a1d50f5f748154981ab9564ff0f80e33ff2f",
+    "replay.json": "de4b4fb8765ec7c936a769ebf33dceba5ddc0d3ec5daeb5feab27de4cbb6fed3",
+    "evaluation.json": "7ab118c83b8724e955bf4a5c5b41376b34e87b49cf9d1fd64f478da60d7d0923",
+    "evaluation-replay.json": "059922cfcc038e5999078855a80be1cd2c96bf24c503478f79b1913430b301ab",
+    "rounds.csv": "386c7b918a1f4d9c4d73ed843ef388ff8efa8f328afeb13b24704376fabc7005",
+    "summary.csv": "087590131ed79fd98c239f5f20d2b9d78082568431b05cfd47effcb4b36391a1",
+    "groups.csv": "6990bc9a3689a9311661d74cf2c80bc88fec9a81f0e800940afaa2a3b5584d73",
+    "windows.csv": "f2b1079cc20b3dac99ae986da6ee45ebe15ef546b57205a00fe44d9439a16ee7",
+    "scores.csv": "6f52e9b01a329ea10025a42378da1b2ba21d0e8fb9e0c32ee4ace09f79b2377a",
+    "unique_scores.csv": "6f52e9b01a329ea10025a42378da1b2ba21d0e8fb9e0c32ee4ace09f79b2377a",
+    "metrics.csv": "d689ef788fd77097f9cc74b305206b1f40786e14048bbb17441064d331572c5c",
+    "issues.csv": "79316ebf9f5f2fa9326d9f7eb00780cb00f74eaf716b9ecc4ef1d8f498fce7e3",
+    "missing_labels.csv": "1d054d20220fd56a88cfad7f835aa110aceff20f8787045bd7bcae5cbf610b75",
+    "probabilities.csv": "c6c90cedf2bc8790e5845508cdc51ca949b95bea13ac1f3062532d52c8d29712",
+    "forecast-context.csv": "08a0fb86356a51afa94e0ab7d751e9de7833011b777dddc3970a2439a1ecbf1e",
+    "raw-ticket-selections.csv": "434926e49af523960d35197a27ba13b4b8d73e81bbfcb4eb59ebb1218c70659e",
+    "round-lookup.csv": "56b51dfecc2859eec665b3002abb30b9093ea7bc088e76ae89bfe684d367ae0a",
+    "tradeoff.csv": "b2f59c668594665da4a18dffb0582eab7b76a28d571bde98b229d9b426ca1934",
+    "cash.csv": "5fc459dc14da9ef6b667ab4bd70180a96dea2aa9301212642ec79386a587cfa6",
+    "cutoff-audit.json": "58d8560bfab8ddfcc65369a77a5f5a3acfe55fbbc191a3d5a2bcadf648b721af",
+    "cutoff-audit.csv": "2c68624915ed5b9103e1eaab6664537ec6b3e481e9ac1459cea5fdfa4b80f640",
+    "postponement-evidence.json": "23ce6e04af5955e17ba4de43bec741da109c3430b403b76efa34da8e14b405be",
+    "export-schema.json": "18bf3160ddc3360aa4a0868a9a716c41065511a363ee7b1ed4ac14dad3e5030e",
+    "schema-fix-parity.json": "0fdf3e9d7c973de06ab47176ad46b0df54cf52bab165449b35c274c4c03771ac",
+    "cutoff-audit-command.R": "6fabc1a79bc054a86075ceabe61b949f58515bb7a37dfb246e2e79a441621101"
+  },
+  "review": {
+    "status": "SOURCE_DATA_TESTS_REVIEWED",
+    "prior_source_verdict": "No blocking findings; final source added round/forecast/selection CSV export and integer goal ticks after that review.",
+    "initial_findings": [
+      {
+        "finding": "Future issue with incorrectly early source clock could enter training",
+        "resolution": "Explicit strictly-prior issue nomination plus future-clock/NA mutation regression through predictions and purchases;49 package assertions and full-suite pass."
+      },
+      {
+        "finding": "Strict settlement column order; later missing label caused scorer failure",
+        "resolution": "Actual AST settlement contract regression; separate immutable producer/evaluator; paired-label scoring, missing ledger and pending semantics regression;17 client assertions and full-suite pass."
+      }
+    ],
+    "verdict": "No blocking findings; full source/data/test review plus QMD evidence-table display correction reviewed.",
+    "source_log_sha256": "4875129c589a145380653bea141324d76431fa08f6d688795158c9495fb56941",
+    "reviewed_source_hashes": {
+      "packages/beidan/R/margin_shape_research.R": "1105d86efc421f41cf95cfa879a91d41459981305cf7a66aa95c9f1e4d413324",
+      "packages/beidan/tests/testthat/test-margin-shape-research.R": "e7ce52a6c8504d76352015852cf88049f0eb5d75f6e8c013ae6984612720c841",
+      "r/margin_combination_study_20261018.R": "9385113e68397f43318ac98e1446e9ef00b50bce4a03fbf3c84d0bf7644e047d",
+      "r/evaluate_margin_combination_20261018.R": "44ad8f428d7a4c0c788efd6ae4981cf938ed23b13101c899c69a15c990dea929",
+      "tests/testthat/test-margin-combination-study.R": "a2b13ed1cde48d165e17fd3d89d29c85da5a6b1e8c79fae947c137f6f2888975",
+      "quarto/margin_combination_study_20261018.qmd": "6a464051fb0eb03db048d360a97827011591dca3aabfc19df67415e327b230b5"
+    },
+    "scope": "Six owned package/client/test/QMD source files plus authoritative frozen source/data/test receipts. Final artifact review also covers acceptance utility commands and rendered HTML.",
+    "display_review_log_sha256": "f51d2398a339cd9130abe7001f0d10d61ad3a6a98216c19806e55d2d35687532",
+    "final_artifact_note": "Final artifact review will bind the current QMD after presentation-only log-name corrections; prior full-source/data/test and print-fix reviews remain recorded."
+  },
+  "limitations": [
+    "Retrospective forecasts use historical timestamp proxies; no prospective evidence claim.",
+    "Known target outcomes and seven small selected rounds; no significance or production promotion.",
+    "One postponed fixture remains unscored and may leave tickets pending; no invented result orSP.",
+    "Cash comparison only3 mutually complete rounds; no seven-round total ROI.",
+    "Different fixtures independent, same fixture shared exactly; study holds8 groups and budget fixed; exact pool resource bound14 fixtures."
+  ],
+  "source_snapshot_scope": "Full suites cover the recorded immutable snapshot plus final package/client/tests; final QMD separately clean-rendered and reviewed. Unrelated concurrent working-tree changes are not certified.",
+  "source_capsule_note": "Local immutable input, not committed because it includes other authors existing Nova source.",
+  "skip_reasons": [],
+  "notes": "Initial final-render process exited0 but HTML inspection caught evidence tables not printed inside an if block. QMD printing was corrected and focused review passed; final render and HTML regression are rerun. Models, decisions, source clients and tested package did not change."
+}

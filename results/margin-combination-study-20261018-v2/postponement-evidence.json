@@ -1,0 +1,24 @@
+{
+  "fixture_id": "26105:112",
+  "provider_match_id": "3039908",
+  "home_provider_team_id": "6643",
+  "away_provider_team_id": "4493",
+  "page_status": "推迟",
+  "label_or_settlement_imputed": false,
+  "files": {
+    "titan-reader.txt": {
+      "source_url": "https://zq.titan007.com/analysis/3039908cn.htm",
+      "reader_url": "https://r.jina.ai/https://zq.titan007.com/analysis/3039908cn.htm",
+      "local_raw_path": "/home/drwho1985/.agent-reach/beidan-research/margin-study-20261018/titan-reader.txt",
+      "sha256": "604875029af01c7dc8122b90827b58725dd79e2f90907f719dfddb9980cc0cd0",
+      "observed_at_utc": "2026-10-18T11:58:16.650393+00:00"
+    },
+    "detail-reader.txt": {
+      "source_url": "https://live.titan007.com/detail/3039908.htm",
+      "reader_url": "https://r.jina.ai/https://live.titan007.com/detail/3039908.htm",
+      "local_raw_path": "/home/drwho1985/.agent-reach/beidan-research/margin-study-20261018/detail-reader.txt",
+      "sha256": "24f920e56882d30db7ab8e0b56d1e8ea51cf1132394ddccc868ef084edd84770",
+      "observed_at_utc": "2026-10-18T11:58:50.942617+00:00"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# A tibble: 14 × 5
+   index model  training_rows   ESS clock_class     
+   <int> <chr>          <int> <dbl> <chr>           
+ 1     4 GLOBAL           322   322 HISTORICAL_PROXY
+ 2     4 SHAPE            322   322 HISTORICAL_PROXY
+ 3     5 GLOBAL           322   322 HISTORICAL_PROXY
+ 4     5 SHAPE            322   322 HISTORICAL_PROXY
+ 5     6 GLOBAL           322   322 HISTORICAL_PROXY
+ 6     6 SHAPE            322   322 HISTORICAL_PROXY
+ 7     7 GLOBAL           322   322 HISTORICAL_PROXY
+ 8     7 SHAPE            322   322 HISTORICAL_PROXY
+ 9     8 GLOBAL           322   322 HISTORICAL_PROXY
+10     8 SHAPE            322   322 HISTORICAL_PROXY
+11     9 GLOBAL           322   322 HISTORICAL_PROXY
+12     9 SHAPE            322   322 HISTORICAL_PROXY
+13    10 GLOBAL           322   322 HISTORICAL_PROXY
+14    10 SHAPE            322   322 HISTORICAL_PROXY

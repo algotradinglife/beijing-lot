@@ -1,0 +1,25 @@
+{
+  "status": "FULL_IDENTICAL_EVALUATION_REPLAY",
+  "evaluated_schemes": 84,
+  "csv_sha256": {
+    "rounds": "386c7b918a1f4d9c4d73ed843ef388ff8efa8f328afeb13b24704376fabc7005",
+    "summary": "087590131ed79fd98c239f5f20d2b9d78082568431b05cfd47effcb4b36391a1",
+    "groups": "6990bc9a3689a9311661d74cf2c80bc88fec9a81f0e800940afaa2a3b5584d73",
+    "windows": "f2b1079cc20b3dac99ae986da6ee45ebe15ef546b57205a00fe44d9439a16ee7",
+    "scores": "6f52e9b01a329ea10025a42378da1b2ba21d0e8fb9e0c32ee4ace09f79b2377a",
+    "unique_scores": "6f52e9b01a329ea10025a42378da1b2ba21d0e8fb9e0c32ee4ace09f79b2377a",
+    "metrics": "d689ef788fd77097f9cc74b305206b1f40786e14048bbb17441064d331572c5c",
+    "issues": "79316ebf9f5f2fa9326d9f7eb00780cb00f74eaf716b9ecc4ef1d8f498fce7e3",
+    "missing_labels": "1d054d20220fd56a88cfad7f835aa110aceff20f8787045bd7bcae5cbf610b75"
+  },
+  "evaluation_sha256": "7ab118c83b8724e955bf4a5c5b41376b34e87b49cf9d1fd64f478da60d7d0923",
+  "evaluator_sha256": "44ad8f428d7a4c0c788efd6ae4981cf938ed23b13101c899c69a15c990dea929",
+  "commands": [
+    "Rscript r/evaluate_margin_combination_20261018.R ROOT",
+    "Rscript r/evaluate_margin_combination_20261018.R ROOT (clean Quarto preview child process)"
+  ],
+  "exit_statuses": [
+    0,
+    0
+  ]
+}

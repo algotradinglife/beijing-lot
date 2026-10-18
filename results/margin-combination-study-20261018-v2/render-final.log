@@ -1,0 +1,49 @@
+
+
+processing file: margin_combination_study_20261018.qmd
+1/25                   
+2/25 [unnamed-chunk-1] 
+3/25                   
+4/25 [unnamed-chunk-2] 
+5/25                   
+6/25 [unnamed-chunk-3] 
+7/25                   
+8/25 [unnamed-chunk-4] 
+9/25                   
+10/25 [unnamed-chunk-5] 
+11/25                   
+12/25 [unnamed-chunk-6] 
+13/25                   
+14/25 [unnamed-chunk-7] 
+15/25                   
+16/25 [unnamed-chunk-8] 
+17/25                   
+18/25 [unnamed-chunk-9] 
+19/25                   
+20/25 [unnamed-chunk-10]
+21/25                   
+22/25 [unnamed-chunk-11]
+23/25                   
+24/25 [unnamed-chunk-12]
+25/25                   
+output file: margin_combination_study_20261018.knit.md
+
+pandoc 
+  to: html
+  output-file: margin_combination_study_20261018.html
+  standalone: true
+  embed-resources: true
+  section-divs: true
+  html-math-method: mathjax
+  wrap: none
+  default-image-extension: png
+  
+metadata
+  document-css: false
+  link-citations: true
+  date-format: long
+  lang: en
+  title: 净胜球形态、完整赛果组合与动态购票
+  
+Output created: margin_combination_study_20261018.html
+

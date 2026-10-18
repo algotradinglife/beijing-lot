@@ -1,0 +1,7 @@
+{
+  "status": "NUMERIC_PROBABILITY_PURCHASE_TRACE_COEFFICIENT_PARITY",
+  "rounds": 7,
+  "probability_models": 3,
+  "source_v1_sha256": "a48db0ecdc4df55f8f4065ec243d7cd9c70b4939ca2599000d398f45da11fa03",
+  "source_v2_sha256": "2177a9eb060a3ceec5de8872a57a13a8c26fd59faae7efd5c9b93fc7594d2176"
+}

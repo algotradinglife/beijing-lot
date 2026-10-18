@@ -1,0 +1,24 @@
+{
+  "status": "FINAL_ARTIFACT_REVIEW_PASSED",
+  "generated_at_utc": "2026-10-18T12:37:12.488297+00:00",
+  "command": "codex review \"$(cat results/margin-combination-study-20261018-v2/final-review-prompt.txt)\"",
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "verdict": "No blocking findings. Current source/output and HTML/acceptance identities, reported results, pending semantics, monetary scope and scientific limits verified.",
+  "review_log": "review-final-artifact.log",
+  "review_log_sha256": "d7101ef7ac954a6b49afd79b24e14c810b6453b28b4225b55168a32537c2520d",
+  "prompt_sha256": "e1ca53159b7a6e5b24dbe8d7ab385ebdc0aeb1324f060ecd8b71ad34a54b5478",
+  "reviewed_current_source_hashes": {
+    "packages/beidan/R/margin_shape_research.R": "1105d86efc421f41cf95cfa879a91d41459981305cf7a66aa95c9f1e4d413324",
+    "packages/beidan/tests/testthat/test-margin-shape-research.R": "e7ce52a6c8504d76352015852cf88049f0eb5d75f6e8c013ae6984612720c841",
+    "r/margin_combination_study_20261018.R": "9385113e68397f43318ac98e1446e9ef00b50bce4a03fbf3c84d0bf7644e047d",
+    "r/evaluate_margin_combination_20261018.R": "44ad8f428d7a4c0c788efd6ae4981cf938ed23b13101c899c69a15c990dea929",
+    "tests/testthat/test-margin-combination-study.R": "a2b13ed1cde48d165e17fd3d89d29c85da5a6b1e8c79fae947c137f6f2888975",
+    "quarto/margin_combination_study_20261018.qmd": "7341f700a679399dc4986aa5dab2cc10d4cfe3c98bb27b3b8647cd895acd53ea"
+  },
+  "html_sha256": "0e2aa90d01087b0c26610330c4a4cba6e9f7ffa1ad9659df27805f1196fb2a4d",
+  "acceptance_sha256": "f10fef527f436532e22772e36a49da104e4589c400c4aa2788fe824e6e714bf4",
+  "html_validation_sha256": "eada89f36b452d74104ecbdd83bb0ff34af3d3eedd9b87e9e48e81e809da39bb",
+  "initial_source_review": "review-acceptance-source.log",
+  "display_fix_review": "review-qmd-display.log"
+}
