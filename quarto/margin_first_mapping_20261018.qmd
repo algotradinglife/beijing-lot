@@ -1,0 +1,158 @@
+---
+title: "净胜球首次映射去重：最近七轮同预算实验"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  require_acceptance: true
+---
+
+本实验保留原比赛和八组分组，比较净胜球首次映射去重与类别概率累加排序。每组125注、每注2元，每轮2000元；窗口为1–125和30–154。支持深度固定为前4档、前5档及完整分布，不依据目标赛果选择参数。前4/5档按概率降序、同概率净胜球从小到大截取；映射不到的类别不补入，不重新归一化截断质量。类别最高单档乘积是情景排序分数，不是票单总命中概率。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root <- normalizePath(params$project_root,mustWork=TRUE)
+setwd(root);knitr::opts_knit$set(root.dir=root)
+out <- file.path(root,'results/margin-first-mapping-20261018')
+manifest <- jsonlite::fromJSON(file.path(out,'input-manifest.json'))
+stopifnot(digest::digest(file=file.path(out,'inputs.rds'),algo='sha256')==manifest$input_sha256)
+inputs <- readRDS(file.path(out,'inputs.rds'))
+stopifnot(!inputs$target_labels_opened,!inputs$prospective_admission,
+          inputs$model_id=='FM-1.7.1',length(inputs$rounds)==7L)
+inventory <- read_csv(file.path(out,'input-inventory.csv'),col_types=cols(
+ index=col_integer(),dataset=col_character(),sheet=col_integer(),issue=col_character(),
+ cutoff_utc=col_datetime(),groups=col_integer(),leg_rows=col_integer(),
+ distinct_fixtures=col_integer(),cost_cny=col_integer()))
+stopifnot(nrow(inventory)==7L,sum(inventory$groups)==56L,
+          all(inventory$cost_cny==2000L))
+if(params$require_acceptance) {
+ acceptance <- jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ stopifnot(acceptance$status=='LOCAL_CHECKS_PASSED',all(acceptance$checks$exit_status==0L),
+   all(acceptance$tests$failed==0L),all(acceptance$tests$errors==0L),all(acceptance$tests$skipped==0L))
+}
+```
+
+```{r}
+knitr::kable(inventory)
+```
+
+输入制作客户端为 `r/margin_first_mapping_inputs_20261018.R`。它核验原预测、原计划的文件SHA、每场网格与计划的截止一致性，以及每场净胜球映射后的类别概率与原计划概率一致，随后冻结不含赛果的输入。历史来源可用性沿用原冻结证据，属于历史诊断，不构成前瞻准入。
+
+已实现并冻结票单，先重放全部选择并逐项确认一致后才打开结算快照。独立展开四档七场的测试已验证首次映射与类别最高单档快捷算法一致，包括同分排序；安装包下17条开发断言通过；完整测试结果由文末验收收据记录，开发断言不替代完整检查。评分首次审查发现结算清单未核对输入冻结哈希，已补上清单SHA及轮次身份检查，原评分运行终止、未接受其结果，修复后重新评分。
+
+```{r}
+support <- read_csv(file.path(out,'support.csv'),show_col_types=FALSE)
+stopifnot(nrow(support)==168L,all(support$supported_tickets==2187L))
+knitr::kable(support |> group_by(depth) |> summarise(groups=n(),min_space=min(supported_tickets),max_space=max(supported_tickets),.groups='drop'))
+selection_manifest <- jsonlite::fromJSON(file.path(out,'selection-manifest.json'))
+stopifnot(digest::digest(file=file.path(out,'frozen-selections.rds'),algo='sha256')==selection_manifest$sha256)
+selected <- readRDS(file.path(out,'frozen-selections.rds'))$selections
+keys <- c('index','depth','window_start','group_slot','ticket_id')
+first_rows <- selected |> filter(method=='FIRST') |> select(all_of(keys))
+sum_rows <- selected |> filter(method=='SUM') |> select(all_of(keys))
+common <- inner_join(first_rows,sum_rows,by=keys,relationship='one-to-one') |>
+ count(index,depth,window_start,group_slot,name='common_tickets')
+overlap <- first_rows |> distinct(index,depth,window_start,group_slot) |>
+ left_join(common,by=c('index','depth','window_start','group_slot'),relationship='one-to-one') |>
+ mutate(common_tickets=replace_na(common_tickets,0L))
+stopifnot(nrow(overlap)==336L,all(overlap$common_tickets>=0L),all(overlap$common_tickets<=125L))
+knitr::kable(overlap |> group_by(depth,window_start) |> summarise(mean_common=mean(common_tickets),min_common=min(common_tickets),max_common=max(common_tickets),.groups='drop'))
+```
+
+前4档已包含每类最强净胜球档位，因此首次映射方案在4档、5档和完整分布的票单一致；累计质量方案则随尾部纳入而改变。上表为每组125张票在两种排序间的重合数，排序差异不是命中提升的证据。
+
+```{r}
+draw_exposure <- selected |> filter(depth=='FULL') |>
+ mutate(draw_legs=stringr::str_count(ticket_id,':2(\\||$)'))
+stopifnot(nrow(draw_exposure)==28000L,all(draw_exposure$draw_legs>=0L),all(draw_exposure$draw_legs<=7L))
+knitr::kable(draw_exposure |> group_by(method,window_start) |>
+ summarise(tickets=n(),mean_draw_legs=mean(draw_legs),share_4plus_draws=mean(draw_legs>=4L),.groups='drop'))
+```
+
+首次映射方案每张七场票平均包含约4个让平，完整累加方案约0.6–0.8个。这里的让平是北单让球后的精确净胜球档位，不等于90分钟实际平局。两种方法形成了明显不同的票单赛果构成；这不是让平真实发生概率提高的证据，也不是已验证的收益改善。
+
+```{r}
+independent <- jsonlite::fromJSON(file.path(out,'independent-checks.json'))
+stopifnot(independent$status=='PASSED',independent$selection_sha256==selection_manifest$sha256,
+ independent$baseline_groups_identical==56L)
+knitr::kable(tibble(check=c('原56组购票基准一致','真实四档显式枚举','真实五档显式枚举'),
+ count=c(56L,4^7,5^7),passed=TRUE))
+```
+
+完整分布累加排序的30–154窗口与原FM-1.7.1基准56组逐张一致。显式枚举检查独立使用原始净胜球档位、概率乘积和首次映射去重，没有复用类别最高值作为对照计算。
+
+本次冻结结算快照下，首次映射方案两个窗口均为0轮确认命中、6轮确认未命中、1轮待定；完整累加方案两个窗口均已确认3轮命中。不能把待定轮次当作未命中，也不能把未公布的结算SP当作0。
+
+```{r}
+evaluation <- jsonlite::fromJSON(file.path(out,'evaluation.json'))
+stopifnot(evaluation$selections_sha256==selection_manifest$sha256,
+ evaluation$selection_replay=='IDENTICAL',
+ digest::digest(file=file.path(out,'round-evaluation.csv'),algo='sha256')==evaluation$output_hashes$rounds,
+ digest::digest(file=file.path(out,'group-evaluation.csv'),algo='sha256')==evaluation$output_hashes$groups)
+rounds <- read_csv(file.path(out,'round-evaluation.csv'),show_col_types=FALSE)
+groups <- read_csv(file.path(out,'group-evaluation.csv'),show_col_types=FALSE)
+stopifnot(nrow(rounds)==84L,nrow(groups)==672L,all(rounds$cost_cny==2000L))
+knitr::kable(rounds |> group_by(depth,method,window_start) |>
+ summarise(rounds=n(),confirmed_hits=sum(hit_round%in%TRUE),
+ confirmed_misses=sum(hit_round%in%FALSE),pending_rounds=sum(is.na(hit_round)),
+ hit_groups=sum(hit_groups),pending_groups=sum(pending_groups),.groups='drop'))
+```
+
+以下逐轮表只比较完整分布下的两种排序；截断方案作为固定敏感性对照，不按当前结果选择最优深度。
+
+```{r}
+knitr::kable(rounds |> filter(depth=='FULL') |>
+ select(index,method,window_start,hit_groups,pending_groups,hit_round,monetary_complete,payout_cny))
+knitr::kable(groups |> filter(depth=='FULL',window_start==1L) |> group_by(method) |>
+ summarise(known_winning_ranks=sum(!is.na(winning_rank)),
+ minimum=min(winning_rank,na.rm=TRUE),median=median(winning_rank,na.rm=TRUE),
+ maximum=max(winning_rank,na.rm=TRUE),.groups='drop'))
+```
+
+48个已知完整赛果组中，首次映射的中奖票排名最低为355，中位数1232；完整累加排序最低26、中位数264。因此当前差异并不是在125名附近的轻微换位。该现象与首次映射票单明显更偏向让平同时出现，但七轮样本不能识别因果或证明某种通用修正规则。
+
+回款只在四种完整分布方案均有确定结算的共同轮次比较。一个方案的票全部已错可以确认回款0，即使其他未购中的比赛尚未结束；另一个方案存在已中但SP未公布的票，回款仍为空。
+
+```{r}
+common_cash <- rounds |> filter(depth=='FULL') |> group_by(index) |>
+ summarise(complete=all(monetary_complete),.groups='drop') |> filter(complete)
+knitr::kable(rounds |> filter(depth=='FULL') |> semi_join(common_cash,by='index') |>
+ group_by(method,window_start) |> summarise(common_rounds=n(),cost_cny=sum(cost_cny),
+ payout_cny=sum(payout_cny),net_cny=payout_cny-cost_cny,.groups='drop'),digits=2)
+```
+
+冻结结算快照中缺失的场次保留待定状态，不作为完整期收益。目标赛果此前可能已被其他历史研究观察过，因此本实验不是盲测。比分网格和分组复用了原冻结；报价历史代理不构成真实前瞻准入。当前结果不支持用首次映射排序替换原累加排序，也不授权根据目标结果调整深度或购票窗口。是否通过完整测试和交付审查，以文末验收收据为准。
+
+实验函数 `RankFirstMarginTickets()` 在 `packages/beidan/R/margin_first_mapping.R`，对应测试 `packages/beidan/tests/testthat/test-margin-first-mapping.R`；研究客户端无自定义函数，负责声明输入、调用包、冻结及评分。显式枚举检查在 `r/margin_first_mapping_checks_20261019.R`，与开发测试共同检查快捷法。没有拟合、调参、近期加权或历史学习函数；输入截止验证复用已有 `match_require_cutoff()`，实现闭包哈希复用 `.rank_outcome_code_hash()`，没有复制共享时序工具。
+
+结算清单替换的回归测试为 `tests/testthat/test-margin-first-mapping-manifest.R`：使用冻结输入在临时工作目录重放，将清单替换成另一份内部自洽输入，验证评分在读取任何目标标签前拒绝该清单、不产生评分输出。开发运行8条断言通过，该测试也纳入完整repository阶段。首次审查P2发现已据此修复并通过后续审查；最终评分CSV与修复前相同输入下的结果逐字节一致。
+
+正常安装命令为 `R CMD INSTALL -l results/margin-first-mapping-20261018/library /tmp/beidan-source-rate-20261018/packages/beidan`，其中源码快照复用上次已验收基准、只加入本次函数及测试，保护工作树中其他作者修改。显式R库、项目Python和完整测试命令记录在同目录的 `full-R-job.json`、`full-python-job.json`；安装、测试、运行时及审查日志均保留。新安装DLL实际调用已验证组件联合概率0.7，没有手工加载DLL或使用load_all。
+
+复现依次运行 `r/margin_first_mapping_inputs_20261018.R`、`r/margin_first_mapping_freeze_20261018.R`、`r/margin_first_mapping_checks_20261019.R` 和 `r/margin_first_mapping_evaluate_20261018.R`，各传入项目绝对路径。冻结客户端拒绝覆盖已有RDS，重建须使用隔离目录；评分先验证完整票单重放再读目标标签。最终渲染默认要求验收收据，开发预览须显式设置 `require_acceptance: false`，预览不构成交付验收。
+
+```{r}
+if(params$require_acceptance) {
+ review <- jsonlite::fromJSON(file.path(out,'final-review-receipt.json'))
+ stopifnot(review$status=='NO_BLOCKING_FINDINGS',review$exit_status==0L)
+ reviewed_paths <- c('packages/beidan/R/margin_first_mapping.R',
+  'packages/beidan/tests/testthat/test-margin-first-mapping.R',
+  'r/margin_first_mapping_inputs_20261018.R','r/margin_first_mapping_freeze_20261018.R',
+  'r/margin_first_mapping_evaluate_20261018.R','r/margin_first_mapping_checks_20261019.R',
+  'tests/testthat/test-margin-first-mapping-manifest.R','quarto/margin_first_mapping_20261018.qmd')
+ stopifnot(is.data.frame(review$files),nrow(review$files)==length(reviewed_paths),
+  !anyDuplicated(review$files$path),setequal(review$files$path,reviewed_paths),
+  identical(review$files,acceptance$files))
+ current_hashes <- vapply(file.path(root,review$files$path),digest::digest,character(1),file=TRUE,algo='sha256')
+ stopifnot(identical(unname(current_hashes),review$files$sha256))
+ receipt_tables <- c(knitr::kable(as_tibble(review$files),format='html'),
+  knitr::kable(tibble(command=review$command,findings=review$findings,resolution=review$resolution),format='html'),
+  knitr::kable(as_tibble(acceptance$tests),format='html'),
+  knitr::kable(as_tibble(acceptance$checks),format='html'))
+ knitr::asis_output(paste(receipt_tables,collapse='\n\n'))
+}
+```

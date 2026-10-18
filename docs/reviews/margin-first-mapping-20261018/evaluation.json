@@ -1,0 +1,39 @@
+{
+  "selections_sha256": "403cc97ddbbcd2d7a05aba1bff96387b23f2de25b41eec008ca52a91c21c0b2c",
+  "labels": {
+    "4": {
+      "path": "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261015-01-results.json",
+      "sha256": "636bd6ba0de78882fca19a653aa9799b5cf9338d677b40a037cbaa240cbe1116"
+    },
+    "5": {
+      "path": "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261015-02-results.json",
+      "sha256": "14b2f14d059b3330fcd3cc434a3966a3a2d7aee647ed3c5f5062254a73477a36"
+    },
+    "6": {
+      "path": "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261016-01-results.json",
+      "sha256": "dfb362ee98bddddb29b64307f0e8b4ed710350899a9eefa5e9c63785a98d7505"
+    },
+    "7": {
+      "path": "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-01-results.json",
+      "sha256": "24ad88b66c35b21d8810ef2b875f1cdd89ddab8ac57e03aca90989d9c639c24c"
+    },
+    "8": {
+      "path": "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-02-results.json",
+      "sha256": "7ffbaa74d2a136973dab85ecab791c62163982bc8b06c5eb8b59e5cd7d023631"
+    },
+    "9": {
+      "path": "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-03-results.json",
+      "sha256": "5e1139894810d1d777bcad8c861bfcda3742a6e229ea41bc459091fe2365ca8c"
+    },
+    "10": {
+      "path": "results/full100-historical-rounds-20261018/inputs/fm17-upcoming-20261017-04-results.json",
+      "sha256": "da4db107d4a025625f69162607acfc7bca54907fad7b6726616a7f15b001a9bf"
+    }
+  },
+  "selection_replay": "IDENTICAL",
+  "output_hashes": {
+    "groups": "680a4ddf3bdc0f7d0301082d7eaf7ca62aeceb18ca6484f9efd50681a7f5d809",
+    "rounds": "170bbf9ce3243910a294195f531372da06e285897de3c3b00b76a2462b44c3cc"
+  },
+  "evaluator_sha256": "ca85463067ae08519f6e18d7085c280bd9f11e701f5157d4780622cfde246285"
+}

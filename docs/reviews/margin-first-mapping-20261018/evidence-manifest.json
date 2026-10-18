@@ -1,0 +1,138 @@
+[
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/acceptance.json",
+    "sha256": "b61a8408a78e0c11b5dc530401b93fc875c37a656bb6145693c943d7eb4a2542"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/evaluation.json",
+    "sha256": "2a74ba9364e541f1da1cf26062363b77b222bb0cfad0bff5abf00f787f27f86e"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/final-review-receipt.json",
+    "sha256": "f6c92d41408e2ae4739bd875d1b2eb80f84999cc36c4a17573f7f091eacb983c"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/final-source-manifest.json",
+    "sha256": "9b2da1f5bdb5b27162d58610d9b20ddf6e7da0291a036ffc0af50e451edd316f"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/finalize-receipts-command.py",
+    "sha256": "0db6483fe06a20687efc1516c150a3bb8d83f83a4cc2ea089c04be5116787fd7"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/full-R-exit.json",
+    "sha256": "81c4345a7a49e56649e6139acad1ec7b66354e5884c5f761e5f3d441a526fb5a"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/full-R-job.json",
+    "sha256": "9e97d45c7de4975eba3aa2339e1b352df5c65f446e0942b703a41c4646f26192"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/full-R.log",
+    "sha256": "aef87af0c3640143518da2098cd73dc25ae5b197614b51b0d2b3438601d6c854"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/full-python-exit.json",
+    "sha256": "42eebe5535285b187e7dbc11a6d90f4359e9aad4d2c20fcfe12792910a69621b"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/full-python-job.json",
+    "sha256": "bfc319e39ed1f8d6d9b424ef74ef5164e04fd3d6c8c610fcd4420c9ed7eb8a67"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/full-python.log",
+    "sha256": "73c5aefbc937343da439097dba45e22a5953743f3423279fb2f9399326aa3a31"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/group-evaluation.csv",
+    "sha256": "680a4ddf3bdc0f7d0301082d7eaf7ca62aeceb18ca6484f9efd50681a7f5d809"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/html-validation.json",
+    "sha256": "fd42fbefab865aa8591d5c27ee0b70eacda2b28f3b23475db7538d7cc9d30fbf"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/independent-checks.csv",
+    "sha256": "15e15c02e6c89b125752aa5791ddc20b17f9aa0b39ef803f43a7db6dbc482f40"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/independent-checks.json",
+    "sha256": "c9b954ad59a285ca70d42c3a7c9a26ca33ab368664fd2383881e7de599aa581d"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/independent-checks.log",
+    "sha256": "1d5a9dcb6719abb48c1d9cd559831d4973ce3a52b168a4972af58efd6bd5d6ce"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/input-inventory.csv",
+    "sha256": "a5b5fd69a7ae4128f43beb540c72e8712f72fda0a0ab4186b26c3cc588ad5fa5"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/input-manifest.json",
+    "sha256": "92ee1e521f8b60ef490cc01ec80ce5aa49188e56cd65295eca6e7ed8e96fe86c"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/install-observation.json",
+    "sha256": "806e46390a43b849e59262a6566a526c6a4dc5dd8818719a4b940471b898a7b2"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/install.log",
+    "sha256": "21a18e1456676b84bfbdc84db82d69e74fe4b5ac6718ed7fd72ef44482bb533e"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/margin_first_mapping_20261018.html",
+    "sha256": "2f04fa8f9b0eb2a5ce8b59852fd73e5eff29a5b8ecc197cb45301b04f70b9377"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/package-source-inventory.json",
+    "sha256": "3b69195ac2e46d4f1104b8f52348069b02eb33bb381bc17740936c60ad207150"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/render-final-exit.json",
+    "sha256": "d1a4f3303bb50a9c23d8a9ba598e0abbaeeb19b0bf125ee69e7682fce7d2243b"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/render-final-job.json",
+    "sha256": "a3ddd5889c17f555c8414af752a6af9f9cbbaafa16eedf2b315c676790554cea"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/render-final.log",
+    "sha256": "7883514fb3193d8202ca053241a054cec345ffdba95e612d6e9d0cccd77431da"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/rendered-artifact-review.json",
+    "sha256": "c926072f61c8e65e83a1b70f5a496363337800f1c580d26b78a31016ca0c9cc9"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/review-summaries.json",
+    "sha256": "e3516c2196ac5e6282576f54d2c6b109ac830d7b97f16125138e8b3a1250a860"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/round-evaluation.csv",
+    "sha256": "170bbf9ce3243910a294195f531372da06e285897de3c3b00b76a2462b44c3cc"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/runtime-command.R",
+    "sha256": "8a8b9eee1e051db0ce2dce4f9d8170163b00f8e98fccd954201f6efe4288a7a3"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/runtime-observation.json",
+    "sha256": "941fd21045553b4716311ff7e4f8a8985f38e19b6c95bef25dc7bbb6ef421977"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/runtime.log",
+    "sha256": "7da5798a41b80f7a5651e38237deb7301f6e3545199de478be67bc45b0951cdd"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/selection-counts.csv",
+    "sha256": "5b1e666a800a8acfe5037b7adf0d09277b40082f1ec03bdc193eeb02388b7657"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/selection-manifest.json",
+    "sha256": "225ab75d5925bf49ce351039c508b3e9e7a3ae03c4d0733f3453b65eae42aa68"
+  },
+  {
+    "path": "docs/reviews/margin-first-mapping-20261018/support.csv",
+    "sha256": "aa2941c11f36c1db68351fd6266ba9a27073062085d6c69dc934cb8ad5b7cce9"
+  }
+]

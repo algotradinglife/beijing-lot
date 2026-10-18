@@ -1,0 +1,6 @@
+{
+  "command": "Rscript results/margin-first-mapping-20261018/runtime-command.R",
+  "exit_status": 0,
+  "evidence": "functions.write_stdin session5600 returned exit_code0",
+  "log": "results/margin-first-mapping-20261018/runtime.log"
+}

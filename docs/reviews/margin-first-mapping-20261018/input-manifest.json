@@ -1,0 +1,12 @@
+{
+  "input_sha256": "5861b8908e6cca0c57230511ef213bd54a79d38b8b8cb7dc6d4f9247fbb8ca5c",
+  "source_hashes": {
+    "parent": "7675663a3c9cb7a5077ba90378f0c7591502dccf13d504f959c0d5f3731c6d49",
+    "manifest": "4080314435497565bdd5882df96e99d015e63d16bde2d2b49d25f68d2412aaf8",
+    "producer": "f836aeb91b3102a8ec350653933a59d5d87c0991d39e08b2d1a423a197bbd85d"
+  },
+  "target_labels_opened": false,
+  "rounds": 7,
+  "groups": 56,
+  "prospective_admission": false
+}

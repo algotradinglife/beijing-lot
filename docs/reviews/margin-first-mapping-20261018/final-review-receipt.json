@@ -1,0 +1,43 @@
+{
+  "status": "NO_BLOCKING_FINDINGS",
+  "exit_status": 0,
+  "files": [
+    {
+      "path": "packages/beidan/R/margin_first_mapping.R",
+      "sha256": "254302e79596d7c135d5755a07b855fb453bb70233f5bdcc1c7d213a3da9fe59"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-margin-first-mapping.R",
+      "sha256": "ea2e4a8369485d7c1dcfadd3b31d9818d88a3968c51eaee9d087d27b5a281a22"
+    },
+    {
+      "path": "r/margin_first_mapping_inputs_20261018.R",
+      "sha256": "f836aeb91b3102a8ec350653933a59d5d87c0991d39e08b2d1a423a197bbd85d"
+    },
+    {
+      "path": "r/margin_first_mapping_freeze_20261018.R",
+      "sha256": "6e349146c18ab607884b831d4918fde3ff9e16f5d47e1651e0a22e31e0c6b816"
+    },
+    {
+      "path": "r/margin_first_mapping_evaluate_20261018.R",
+      "sha256": "ca85463067ae08519f6e18d7085c280bd9f11e701f5157d4780622cfde246285"
+    },
+    {
+      "path": "r/margin_first_mapping_checks_20261019.R",
+      "sha256": "c9193f0d665c06fd1d5f895b025bdaa0429fd4fe5648ff9f686e04b5ddb5d447"
+    },
+    {
+      "path": "tests/testthat/test-margin-first-mapping-manifest.R",
+      "sha256": "8e774e952db1cb8f756eb66005a26208b705781d94677fbde1b03f9bd49abfb6"
+    },
+    {
+      "path": "quarto/margin_first_mapping_20261018.qmd",
+      "sha256": "3aae3cbcc0fe1052bb0b1180d3d53ad47d2872a80229934e42e889ee86d66de8"
+    }
+  ],
+  "command": "codex review: eight-source review plus QMD presentation-only follow-up; verify4 HTML receipt tables in one knit_asis output and preserved receipt gates.",
+  "findings": "No blocking findings; all12 receipt regression assertions pass; four HTML tables explicitly emitted.",
+  "resolution": "Initial manifest SHA/row binding and final review-inventory/current-SHA findings fixed; targeted regressions and review rerun. Final conditional-table emission finding fixed; presentation-only follow-up reviewed.",
+  "review_log_sha256": "837577bc0970aeb30a7253536d46c72b0919e326173bd81a9d2adec5287973f3",
+  "full_suite_certified_by_review": false
+}

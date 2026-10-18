@@ -1,0 +1,125 @@
+{
+  "producer_sha256": "0db6483fe06a20687efc1516c150a3bb8d83f83a4cc2ea089c04be5116787fd7",
+  "status": "LOCAL_CHECKS_PASSED",
+  "files": [
+    {
+      "path": "packages/beidan/R/margin_first_mapping.R",
+      "sha256": "254302e79596d7c135d5755a07b855fb453bb70233f5bdcc1c7d213a3da9fe59"
+    },
+    {
+      "path": "packages/beidan/tests/testthat/test-margin-first-mapping.R",
+      "sha256": "ea2e4a8369485d7c1dcfadd3b31d9818d88a3968c51eaee9d087d27b5a281a22"
+    },
+    {
+      "path": "r/margin_first_mapping_inputs_20261018.R",
+      "sha256": "f836aeb91b3102a8ec350653933a59d5d87c0991d39e08b2d1a423a197bbd85d"
+    },
+    {
+      "path": "r/margin_first_mapping_freeze_20261018.R",
+      "sha256": "6e349146c18ab607884b831d4918fde3ff9e16f5d47e1651e0a22e31e0c6b816"
+    },
+    {
+      "path": "r/margin_first_mapping_evaluate_20261018.R",
+      "sha256": "ca85463067ae08519f6e18d7085c280bd9f11e701f5157d4780622cfde246285"
+    },
+    {
+      "path": "r/margin_first_mapping_checks_20261019.R",
+      "sha256": "c9193f0d665c06fd1d5f895b025bdaa0429fd4fe5648ff9f686e04b5ddb5d447"
+    },
+    {
+      "path": "tests/testthat/test-margin-first-mapping-manifest.R",
+      "sha256": "8e774e952db1cb8f756eb66005a26208b705781d94677fbde1b03f9bd49abfb6"
+    },
+    {
+      "path": "quarto/margin_first_mapping_20261018.qmd",
+      "sha256": "3aae3cbcc0fe1052bb0b1180d3d53ad47d2872a80229934e42e889ee86d66de8"
+    }
+  ],
+  "tests": [
+    {
+      "suite": "package",
+      "tests": 992,
+      "passed": 9664,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "repository",
+      "tests": 811,
+      "passed": 183348,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Python backend and capture clients",
+      "tests": 674,
+      "passed": 674,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "checks": [
+    {
+      "check": "install",
+      "command": "R CMD INSTALL -l results/margin-first-mapping-20261018/library /tmp/beidan-source-rate-20261018/packages/beidan",
+      "exit_status": 0,
+      "evidence": "install-observation.json"
+    },
+    {
+      "check": "runtime",
+      "command": "Rscript results/margin-first-mapping-20261018/runtime-command.R",
+      "exit_status": 0,
+      "evidence": "runtime-observation.json"
+    },
+    {
+      "check": "full-R",
+      "command": "Project Python run-local-check.py full-R-job.json",
+      "exit_status": 0,
+      "evidence": "full-R-exit.json"
+    },
+    {
+      "check": "full-python",
+      "command": "Project Python run-local-check.py full-python-job.json",
+      "exit_status": 0,
+      "evidence": "full-python-exit.json"
+    },
+    {
+      "check": "source-review",
+      "command": "codex review: Final follow-up of the eight sources in final-source-manifest.json; receipt gate requires exact inventory/current SHA256 and both receipt inventories; verify valid, stale and missing inventory regression; report remaining blockers; no edits.",
+      "exit_status": 0,
+      "evidence": "final-review-receipt.json"
+    },
+    {
+      "check": "selection-and-scoring-replay",
+      "command": "Rscript r/margin_first_mapping_evaluate_20261018.R PROJECT_ROOT",
+      "exit_status": 0,
+      "evidence": "evaluation.json"
+    },
+    {
+      "check": "independent-enumeration-and-baseline",
+      "command": "Rscript r/margin_first_mapping_checks_20261019.R PROJECT_ROOT",
+      "exit_status": 0,
+      "evidence": "independent-checks.json"
+    },
+    {
+      "check": "receipt-table-output",
+      "command": "Review dynamic check: four HTML tables in knit_asis;12 related regression assertions",
+      "exit_status": 0,
+      "evidence": "review-table-display-source.log"
+    }
+  ],
+  "full_R_receipt_sha256": "81c4345a7a49e56649e6139acad1ec7b66354e5884c5f761e5f3d441a526fb5a",
+  "full_python_receipt_sha256": "42eebe5535285b187e7dbc11a6d90f4359e9aad4d2c20fcfe12792910a69621b",
+  "scoring_receipt_sha256": "2a74ba9364e541f1da1cf26062363b77b222bb0cfad0bff5abf00f787f27f86e",
+  "presentation_only_change": {
+    "path": "quarto/margin_first_mapping_20261018.qmd",
+    "reason": "Explicitly emit all four acceptance receipt tables; numerical and test implementations unchanged",
+    "related_regression_passed": 12
+  }
+}

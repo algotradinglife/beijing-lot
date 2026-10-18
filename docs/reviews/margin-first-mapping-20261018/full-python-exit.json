@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\nexport PYTHONPATH=\"packages/beidan/inst/python:$PWD\"\nexec .venv/bin/python -m pytest packages/beidan/tests/python tests/test_global_dynamic_capture_20261018.py tests/test_global_dynamic_26105_capture_missing.py tests/test_global_dynamic_nowscore_capture.py -q -rs"
+  ],
+  "cwd": "/tmp/beidan-source-rate-20261018",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T16:02:29.713167+00:00",
+  "finished_at_utc": "2026-10-18T16:10:26.111676+00:00"
+}

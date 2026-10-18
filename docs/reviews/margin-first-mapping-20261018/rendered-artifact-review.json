@@ -1,0 +1,37 @@
+{
+  "status": "NO_BLOCKING_FINDINGS",
+  "exit_status": 0,
+  "command": "codex review: final rendered-artifact follow-up;13 HTML tables, eight-source identities, complete suites, pending/cash wording; no edits",
+  "reviewed_artifacts": [
+    {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/acceptance.json",
+      "sha256": "b61a8408a78e0c11b5dc530401b93fc875c37a656bb6145693c943d7eb4a2542"
+    },
+    {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/final-review-receipt.json",
+      "sha256": "f6c92d41408e2ae4739bd875d1b2eb80f84999cc36c4a17573f7f091eacb983c"
+    },
+    {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/evaluation.json",
+      "sha256": "2a74ba9364e541f1da1cf26062363b77b222bb0cfad0bff5abf00f787f27f86e"
+    },
+    {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/html-validation.json",
+      "sha256": "fd42fbefab865aa8591d5c27ee0b70eacda2b28f3b23475db7538d7cc9d30fbf"
+    },
+    {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/render-final-exit.json",
+      "sha256": "d1a4f3303bb50a9c23d8a9ba598e0abbaeeb19b0bf125ee69e7682fce7d2243b"
+    },
+    {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/full-R-exit.json",
+      "sha256": "81c4345a7a49e56649e6139acad1ec7b66354e5884c5f761e5f3d441a526fb5a"
+    },
+    {
+      "path": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/full-python-exit.json",
+      "sha256": "42eebe5535285b187e7dbc11a6d90f4359e9aad4d2c20fcfe12792910a69621b"
+    }
+  ],
+  "html_sha256": "2f04fa8f9b0eb2a5ce8b59852fd73e5eff29a5b8ecc197cb45301b04f70b9377",
+  "review_log_sha256": "a9b254725873cf9d1ccd139510b0385b19986f510222a89c876d148926fdc900"
+}
