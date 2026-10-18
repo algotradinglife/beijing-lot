@@ -1,0 +1,46 @@
+{
+  "asset_manifest_sha256": "432a3c865ada02612f1e47089fc23244048333488fd91de603ea094a6efa4f2f",
+  "bytes": 127745450,
+  "directory": "/mnt/nas/Data/beijing-lot/reports/recent-data-completeness/versions/20261018T134405811490Z",
+  "files_verified": 1684,
+  "formal_market_dataset_published": false,
+  "http_bodies": 814,
+  "label": "20261018T134405811490Z",
+  "publication": {
+    "current": {
+      "asset_manifest_sha256": "432a3c865ada02612f1e47089fc23244048333488fd91de603ea094a6efa4f2f",
+      "bytes": 127745450,
+      "content_digest": "3692105f1adab1dd7de0b9e0bc10c20d8338edaf569d5f340a6d6abaa624a242",
+      "directory": "/mnt/nas/Data/beijing-lot/reports/recent-data-completeness/versions/20261018T134405811490Z",
+      "files": 1684,
+      "formal_market_dataset_published": false,
+      "http_bodies": 814,
+      "label_version": "20261018T134405811490Z",
+      "raw_envelopes": 814,
+      "rows": 1684,
+      "schema": "beijing_lot_version_v1"
+    },
+    "label_version": "20261018T134405811490Z",
+    "record": {
+      "asset_manifest_sha256": "432a3c865ada02612f1e47089fc23244048333488fd91de603ea094a6efa4f2f",
+      "bytes": 127745450,
+      "content_digest": "3692105f1adab1dd7de0b9e0bc10c20d8338edaf569d5f340a6d6abaa624a242",
+      "directory": "/mnt/nas/Data/beijing-lot/reports/recent-data-completeness/versions/20261018T134405811490Z",
+      "files": 1684,
+      "formal_market_dataset_published": false,
+      "http_bodies": 814,
+      "label_version": "20261018T134405811490Z",
+      "raw_envelopes": 814,
+      "rows": 1684
+    },
+    "status": "published",
+    "versions": [
+      "20261018T134105453952Z",
+      "20261018T134405811490Z"
+    ]
+  },
+  "raw_envelopes": 814,
+  "relative_html_assets_verified": 11,
+  "status": "PUBLISHED_AND_ALL_FILES_READBACK_VERIFIED",
+  "superseded_archive": "/mnt/nas/Data/beijing-lot/reports/recent-data-completeness/versions/20261018T134105453952Z"
+}

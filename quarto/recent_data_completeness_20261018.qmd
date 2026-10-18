@@ -1,0 +1,169 @@
+---
+title: "近期各期数据完备度与NAS持久化盘点"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  input_root: null
+  raw_market_root: null
+---
+
+本轮只读盘点，不补采、不改变数据版本、不重新估计FM。范围为已登记近期整期26098、26101–26104，另核查26105窗口和26106失败凭证；26099/26100未在当前catalog登记同类基本面整期版本，不据此声称所有其他来源都不存在。当前版本通过显式输入配置冻结。采集成功、字段完整、同截止准入、NAS持久化和完整FM验收分开判断。
+
+用户2026-10-18确认Sandisk已移除，后续长期保留数据统一NAS。本次修正旧daily-paper持久化契约至NAS；不改写历史凭证中的旧路径。NVMe上的工作结果不因文件存在就视作已持久化。NAS分析表仅通过包接口读取，不直接打开Parquet。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse))
+root<-normalizePath(params$project_root,mustWork=TRUE)
+library(beidan,lib.loc=file.path(root,'r_lib'))
+input_root<-if(is.null(params$input_root))root else normalizePath(params$input_root,mustWork=TRUE)
+config_path<-file.path(input_root,'config/recent-data-completeness-20261018.json')
+cfg<-jsonlite::fromJSON(config_path)
+stopifnot(Sys.getenv('BEIDAN_PARQUET_ROOT')==cfg$roots$frozen,Sys.getenv('BEIDAN_HOT_ROOT')==cfg$roots$hot)
+rows<-list();table_rows<-list();state_rows<-list();euro_rows<-list();version_rows<-list()
+for(j in seq_len(nrow(cfg$datasets))){
+ d<-cfg$datasets[j,];mp<-file.path(cfg$roots$frozen,'datasets',d$dataset,'versions',d$version,'manifest.json');cp<-file.path(cfg$roots$frozen,'datasets',d$dataset,'current.json')
+ stopifnot(digest::digest(file=mp,algo='sha256')==d$manifest_sha256)
+ pointer_now<-if(file.exists(cp))digest::digest(file=cp,algo='sha256')else NA_character_
+ m<-beidan::dataset_manifest(d$dataset,version=d$version,root=cfg$roots$frozen)
+ version_rows[[length(version_rows)+1L]]<-tibble(dataset=d$dataset,version=m$version,complete=if(is.null(m$source$complete))NA else m$source$complete,manifest_sha256=d$manifest_sha256,pointer_matches_snapshot=!is.na(pointer_now)&&pointer_now==d$pointer_sha256)
+ if(startsWith(d$dataset,'source_issue_')){
+  tables<-list()
+  for(t in names(m$tables)){
+   tables[[t]]<-beidan::read_dataset(d$dataset,t,version=d$version,root=cfg$roots$frozen,verify=TRUE)
+   stopifnot(is_tibble(tables[[t]]),nrow(tables[[t]])==m$tables[[t]]$rows)
+   table_rows[[length(table_rows)+1L]]<-tibble(dataset=d$dataset,table=t,rows=nrow(tables[[t]]),sha_verified=TRUE)
+  }
+  status<-tables$status;match<-tables$match;schedule<-tables$fixture_schedule |> filter(resource=='roster')
+  stopifnot(nrow(status)==m$source$expected_slots,!anyDuplicated(status$fixture_id),!anyDuplicated(match$fixture_id))
+  rows[[length(rows)+1L]]<-tibble(issue=m$source$issue,expected=m$source$expected_slots,collected=sum(status$state=='COLLECTED'),other_status=sum(status$state!='COLLECTED'),matches=nrow(match),history_rows=nrow(tables$history),fixtures_with_history=n_distinct(tables$history$fixture_id),injury_rows=nrow(tables$injuries),lineup_rows=nrow(tables$lineup),field_conflicts=nrow(tables$conflicts),missing_reconciled_kickoff=sum(is.na(match$kickoff_at)),roster_scored=sum(!is.na(schedule$score)&str_detect(schedule$score,'^[0-9]+[-:]')),complete=m$source$complete)
+  state_rows[[length(state_rows)+1L]]<-tables$source_states |> count(source,state) |> mutate(issue=m$source$issue)
+ }else if(startsWith(d$dataset,'source_euro_issue_')){
+  status<-beidan::read_dataset(d$dataset,'status',version=d$version,root=cfg$roots$frozen)
+  resources<-beidan::read_dataset(d$dataset,'resources',version=d$version,root=cfg$roots$frozen)
+  contexts<-beidan::read_dataset(d$dataset,'contexts',version=d$version,root=cfg$roots$frozen)
+  stopifnot(is_tibble(status),!anyDuplicated(status$fixture_id),sum(status$history_rows)==m$tables$euro_history$rows)
+  euro_rows[[length(euro_rows)+1L]]<-tibble(issue=sub('source_euro_issue_','',d$dataset),expected=m$source$expected_slots,status_rows=nrow(status),verified_source_resources=sum(resources$state=='VERIFIED'),raw_history_rows=m$tables$euro_history$rows,clock_conflict_fixtures=n_distinct(contexts$fixture_id[contexts$clock_state=='CONFLICT']),complete=m$source$complete)
+ }
+}
+base<-bind_rows(rows);euro<-bind_rows(euro_rows);verified_tables<-bind_rows(table_rows)
+stopifnot(nrow(base)==5L,sum(base$expected)==863L,nrow(verified_tables)==70L,nrow(euro)==2L)
+market_spec<-cfg$datasets |> filter(dataset=='fm17_replayed_markets')
+coverage<-beidan::read_dataset('fm17_replayed_markets','coverage',version=market_spec$version,root=cfg$roots$frozen)
+older<-coverage |> group_by(fixture_id) |> summarise(markets=n_distinct(market),prior_all=all(prior_rows>0),qualified_all=all(qualified_companies>0),.groups='drop') |> mutate(issue=sub(':.*','',fixture_id)) |> group_by(issue) |> summarise(research_fixtures=n(),three_prior=sum(markets==3&prior_all),three_qualified=sum(markets==3&qualified_all),.groups='drop')
+stopifnot(sum(older$research_fixtures)==117L,sum(older$three_prior)==109L,sum(older$three_qualified)==43L)
+# Completed26103 raw replay: per-envelope integrity, then strict original T-24h quote clock.
+market_dir<-if(is.null(params$raw_market_root))file.path(cfg$roots$hot,'fm171-26103-full-recalc-20261017/markets-v3-5s')else normalizePath(params$raw_market_root,mustWork=TRUE)
+binding<-jsonlite::fromJSON(file.path(market_dir,'input-binding.json'))
+original_inputs_path<-file.path(input_root,'results/fm171-26103-draw-20261017/inputs.json')
+original_acceptance<-jsonlite::fromJSON(file.path(input_root,'results/fm171-26103-draw-20261017/acceptance.json'))
+expected_input_hash<-original_acceptance$files |> filter(path=='results/fm171-26103-draw-20261017/inputs.json') |> pull(sha256)
+stopifnot(length(expected_input_hash)==1L,digest::digest(file=original_inputs_path,algo='sha256')==expected_input_hash,binding$inputs_sha256==expected_input_hash)
+frozen_inputs<-jsonlite::fromJSON(original_inputs_path)$fixtures
+stopifnot(nrow(frozen_inputs)==407L,!anyDuplicated(frozen_inputs$fixture_id))
+files<-list.files(market_dir,pattern='-(asian|total)[.]json$',full.names=TRUE)
+channel_rows<-list();envelope_hashes<-list()
+for(p in files){
+ e<-jsonlite::fromJSON(p);stopifnot(digest::digest(e$payload,algo='sha256',serialize=FALSE)==e$sha256)
+ x<-jsonlite::fromJSON(e$payload,simplifyVector=TRUE)
+ original<-frozen_inputs |> filter(fixture_id==x$fixture_id)
+ stopifnot(nrow(original)==1L,x$inputs_sha256==expected_input_hash,x$cutoff_utc==original$cutoff_utc,x$provider_id==original$provider_id,x$home_id==original$home_id,x$away_id==original$away_id)
+ cutoff<-lubridate::ymd_hms(x$cutoff_utc,tz='UTC',quiet=TRUE);stopifnot(!is.na(cutoff))
+ prior<-fresh<-invalid_time<-0L
+ if(length(x$snapshots)){
+  snaps<-x$snapshots;stopifnot(is.data.frame(snaps),is.data.frame(snaps$odds),ncol(snaps$odds)==2L)
+  ts<-lubridate::ymd_hms(snaps$snapshot_ts_hkt,tz='UTC',quiet=TRUE)
+  odds<-as.matrix(snaps$odds)
+  valid<-snaps$complete&snaps$phase=='pregame'&!is.na(ts)&is.finite(snaps$line_value)&rowSums(!is.finite(odds))==0L&rowSums(odds<=0)==0L
+  valid[is.na(valid)]<-FALSE
+  prior<-sum(valid&ts<cutoff,na.rm=TRUE)
+  fresh<-sum(valid&ts<cutoff&as.numeric(difftime(cutoff,ts,units='hours'))<=48,na.rm=TRUE)
+  invalid_time<-sum(is.na(ts))
+ }
+ channel_rows[[length(channel_rows)+1L]]<-tibble(fixture_id=x$fixture_id,kind=x$kind,state=x$state,prior_quotes=prior,fresh48_quotes=fresh,invalid_timestamp_rows=invalid_time)
+ envelope_hashes[[length(envelope_hashes)+1L]]<-tibble(path=p,sha256=digest::digest(file=p,algo='sha256'))
+}
+channels<-bind_rows(channel_rows)
+stopifnot(nrow(channels)==814L,!anyDuplicated(channels[c('fixture_id','kind')]),all(channels$state=='PARSED'),n_distinct(channels$fixture_id)==407L)
+channel_summary<-channels |> group_by(kind) |> summarise(collected=n(),with_prior=sum(prior_quotes>0),with_fresh48=sum(fresh48_quotes>0),.groups='drop')
+both<-channels |> group_by(fixture_id) |> summarise(both_prior=all(prior_quotes>0),both_fresh48=all(fresh48_quotes>0),.groups='drop')
+# Study SP ledger is a separate diagnostic snapshot, not full same-cutoff SP acceptance.
+sp_path<-file.path(input_root,'results/fm171-26103-draw-20261017/sp-audit.csv')
+sp_audit<-readr::read_csv(sp_path,show_col_types=FALSE) |> group_by(mode) |> summarise(fixtures=n_distinct(fixture_id),.groups='drop')
+# Latest forecast window is not an issue-wide release.
+live<-file.path(input_root,'results/fm171-upcoming-20261018')
+schedule<-readRDS(file.path(live,'schedule-26105.rds')) |> as_tibble();window<-readRDS(file.path(live,'window-schedule.rds')) |> as_tibble();sp<-readRDS(file.path(live,'prematch-sp.rds')) |> as_tibble();native<-readRDS(file.path(live,'native-stage.rds'));f<-readRDS(file.path(live,'frozen-probabilities.rds'));markets<-readr::read_csv(file.path(live,'market-ledger.csv'),show_col_types=FALSE)
+sp_check<-sp |> count(fixture_id)
+stopifnot(nrow(schedule)==365L,nrow(window)==126L,nrow(sp_check)==126L,all(sp_check$n==3L))
+live_summary<-tibble(issue='26105',roster=nrow(schedule),window=nrow(window),window_sp_complete=nrow(sp_check),native_intake=nrow(native$ledger),native_ready=sum(native$ledger$status=='NATIVE_READY'),market_reviewed=nrow(markets),market_available=sum(markets$available),final_forecasts=n_distinct(f$probabilities$fixture_id),issue_wide_registered=FALSE)
+stopifnot(str_detect(readr::read_file(file.path(live,'schedule.log')),'26106.*HTTP Error 500'))
+qc_path<-file.path(input_root,'results/fm171-26103-draw-20261017/analysis-qc-status.json');qc<-jsonlite::fromJSON(qc_path)
+out<-file.path(root,'results/recent-data-completeness-20261018');dir.create(out,recursive=TRUE,showWarnings=FALSE)
+readr::write_csv(base,file.path(out,'fundamentals.csv'));readr::write_csv(euro,file.path(out,'euro.csv'));readr::write_csv(older,file.path(out,'older-market-subsets.csv'));readr::write_csv(channels,file.path(out,'26103-channel-coverage.csv'));readr::write_csv(live_summary,file.path(out,'26105-window.csv'));readr::write_csv(verified_tables,file.path(out,'verified-tables.csv'));readr::write_csv(bind_rows(envelope_hashes),file.path(out,'raw-envelope-hashes.csv'));readr::write_csv(bind_rows(version_rows),file.path(out,'versions.csv'))
+report_tables<-setNames(list(base,euro,older,channels,live_summary,verified_tables,bind_rows(envelope_hashes),bind_rows(version_rows)),c('fundamentals','euro','older-market-subsets','26103-channel-coverage','26105-window','verified-tables','raw-envelope-hashes','versions'))
+contracts<-list()
+for(n in names(report_tables)){
+ stopifnot(is_tibble(report_tables[[n]]))
+ arrow::write_parquet(report_tables[[n]],file.path(out,paste0(n,'.parquet')),compression='snappy')
+ contracts[[n]]<-list(rows=nrow(report_tables[[n]]),columns=vapply(report_tables[[n]],typeof,character(1)))
+}
+jsonlite::write_json(contracts,file.path(out,'table-contracts.json'),auto_unbox=TRUE,pretty=TRUE)
+
+```
+
+整期基本面（本轮70张表均通过包接口读取并校验文件SHA，完整字段标记依然为false）：
+
+```{r}
+knitr::kable(base)
+knitr::kable(euro)
+```
+
+欧赔原始报价行数来自已发布manifest和status交叉核对，本轮读取验证status/resources/contexts，没有重做全部报价序列的逐值验收或全期T−24h欧赔准入。历史报价时间不等于历史实际可用性。时钟冲突不自动解释为改期，不移动原cutoff。
+
+26098/26101/26102的已登记三路市场研究子集，**不是整期覆盖**：
+
+```{r}
+knitr::kable(older)
+```
+
+26103补采的公司8亚洲盘/大小球已经814通道解析成功；以下按各场原冻结T−24h cutoff核对有效赛前报价，仅是quote-clock历史代理，不授权前瞻：
+
+```{r}
+knitr::kable(channel_summary)
+knitr::kable(both |> summarise(fixtures=n(),both_prior=sum(both_prior),both_fresh48=sum(both_fresh48)))
+knitr::kable(sp_audit)
+```
+
+补采盘口工作副本在hot层；本轮将814份完整解析序列、采集凭证信封及对应原始HTTP字节归档为NAS审计证据，但仍未登记为可经read_dataset读取的标准整期盘口数据集，不把证据复制称为正式数据集发布。SP表是既有研究截面的身份核验后快照，later_prematch不等于T−24h；没有据此确认整期同截止SP已补全。26103当前完整FM验收状态为`r qc$status`，full workflow效力结论尚未恢复。
+
+最新一期的窗口级采集：
+
+```{r}
+knitr::kable(live_summary)
+knitr::kable(native$ledger |> count(status))
+```
+
+26105有365场名单，但126场SP与基本面/市场流程来自固定24小时窗口及SP筛选，不可当365场整期完备。26106只确认既有赛程请求HTTP500，未获得整期名单，分母未知，本轮不重试。
+
+NAS与验收凭证：
+
+```{r}
+knitr::kable(bind_rows(version_rows))
+http_inventory<-jsonlite::fromJSON(file.path(input_root,'results/recent-data-completeness-20261018/http-inventory.json'))
+stopifnot(http_inventory$channels==814L,length(http_inventory$missing)==0L,http_inventory$unique_raw_bodies==814L)
+knitr::kable(tibble(http_channels=http_inventory$channels,raw_bodies=http_inventory$unique_raw_bodies,missing=length(http_inventory$missing),raw_bytes=http_inventory$raw_bytes))
+```
+
+当前Sandisk旧路径配置已经改为NAS，目录检查两个域通过，测试`PYTHONPATH=packages/beidan/inst/python:$PWD .venv/bin/python -m pytest tests/test_settlement_storage.py -q`为2 passed。这只验证现行目标根/挂载/边界，不证明旧hot成果已经迁移。本轮结果与报告按共享publish_version发布到NAS，发布回执另存；未归档的底层补采输入仍如实列为缺口，不擅自移动活跃缓存。
+
+限制与下一步：基本面“COLLECTED”不等于伤停、阵容、时钟和历史支持都完整；缺伤停不能解释为没有伤停。完场名单分数只是来源观察，未做正式结算SP和90分钟范围的全期重认证。只有补齐并验收三路同截止报价、赛前SP、身份/时钟和本版本模型支持后，才可比较完整FM。当前没有重训、联网、切换版本、部署服务或改写原数据。执行渲染含行数、唯一键、SHA、版本、截断时间、报价合法性、窗口SP三项完整性和失败凭证断言，无新增项目函数或包实现。审查与持久化发布证据在results/recent-data-completeness-20261018/。
+
+NAS归档保留本QMD实际使用的本地输入镜像及盘口信封，原路径与SHA映射见归档清单。NAS版本的QMD可用project_root指定代码工作区、input_root指定归档evidence/repository、raw_market_root指定归档evidence/hot中的markets-v3-5s目录重放；不会把归档临时当成新的数据根。信封之外另按SHA256归档814份对应HTTP原字节，并保留逐信封URL/原SHA/字节数映射；只覆盖本次26103补采，不声称归档了整个共享缓存。
+
+持久化报告分析表提供Parquet；CSV仅作便于查看的导出副本。表的行数与R边界列类型保存在table-contracts.json；源基础表仍只通过已登记的包读取接口读取，报告表不冒充新的生产数据集。
+
+版本重放不依赖可变current指针：配置里的原pointer SHA是盘点证据，实时是否相同仅作展示。不可变manifest SHA及明确version始终核验，后续发布新版本不会阻断旧报告重放；指针缺失也不替代固定版本读取。

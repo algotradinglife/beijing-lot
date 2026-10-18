@@ -29,3 +29,15 @@ def test_storage_boundaries_and_mount(tmp_path, monkeypatch):
     outside = tmp_path / 'other'; outside.mkdir()
     with pytest.raises(ValueError, match='mount'):
         validate_settlement_storage(root, [target], mountpoint=outside)
+
+
+def test_persistent_runtime_contract_uses_retained_nas():
+    import json
+    repo = Path(__file__).resolve().parents[1]
+    contract = json.loads((repo / 'config/persistent_data_layout.json').read_bytes())
+    assert contract['data_root'] == '/mnt/nas/Data/beijing-lot'
+    assert contract['mountpoint'] == '/mnt/nas/Data'
+    assert 'Sandisk' not in json.dumps(contract)
+    for relative in contract['paths'].values():
+        assert not Path(relative).is_absolute()
+        assert '..' not in Path(relative).parts

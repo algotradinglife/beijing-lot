@@ -1,0 +1,59 @@
+{
+  "scope": "registered recent FM issues26098,26101-26104; window26105; failed26106 evidence; registry gaps26099/26100",
+  "datasets": [
+    {
+      "dataset": "source_issue_26098",
+      "version": "20261008T143545725496Z",
+      "pointer_sha256": "d1d702874b8c61335bdf5befd094783c94b2c81219889d1c52e206e4b3fd3880",
+      "manifest_sha256": "8150ae2bf03bbb28bc7c012b0f1271bd81ce05de341e00630c50de7b0fdcfe00"
+    },
+    {
+      "dataset": "source_issue_26101",
+      "version": "20261008T143822089522Z",
+      "pointer_sha256": "4d69f7ab437dca5d2b69c3befa2a756a5cd9c7aef1c9300b6b54cf758fe41a99",
+      "manifest_sha256": "4261711b067b2c0eb32e5d8c76ac664e54014e359fc0f106a2e3af8c925b839b"
+    },
+    {
+      "dataset": "source_issue_26102",
+      "version": "20261009T205118193244Z",
+      "pointer_sha256": "0b1918b16ad66c1119823d6d9b958fe942d037b9f944764f183304bea1e9d7bc",
+      "manifest_sha256": "c2f2e044918e1cb06efdaa03e33f487c0095ebcfd660eeb7418f06840531dae0"
+    },
+    {
+      "dataset": "source_issue_26103",
+      "version": "20261014T225500527903Z",
+      "pointer_sha256": "a41e9990adcf5b830a066c742d9084514a0a62253576b74f5e132445275bfc92",
+      "manifest_sha256": "efee9a61c2031f414a528d51af2042b844fa262d0935394d0165e83cd68f3e5c"
+    },
+    {
+      "dataset": "source_issue_26104",
+      "version": "20261017T024045080849Z",
+      "pointer_sha256": "bcf0c375301777d127e4152e036f35b6d2aa9f235f86684a9d42259dc045615d",
+      "manifest_sha256": "a3541636a8dd2ba5323e2c1e23acd4407052e7b9f349b2bdef54ec59a00dca2d"
+    },
+    {
+      "dataset": "source_euro_issue_26103",
+      "version": "20261016T011524878555Z",
+      "pointer_sha256": "cfb4fac0e57dfd86d98d184cfa09f2e1f9fd40e59a787b853747223839ffe1aa",
+      "manifest_sha256": "4d8f7f386ab0e28754456807b95daa7006dd15eb782d69929f794c0fd2f93b4a"
+    },
+    {
+      "dataset": "source_euro_issue_26104",
+      "version": "20261017T032619478898Z",
+      "pointer_sha256": "6b5d19e5dc060f8131059d4d59dec4298ca30588f0de23958de08b6781c75867",
+      "manifest_sha256": "62561e542039cd592a2246c21ede9b8c6a2bd940b8f47376e5a0f72c68e18ff2"
+    },
+    {
+      "dataset": "fm17_replayed_markets",
+      "version": "20261013-v4",
+      "pointer_sha256": "06abfc4b212b0527f27bd89a799fb731cf17de66ad7ce2e762ecd8d1d0c96e3c",
+      "manifest_sha256": "f308ea5b3290ed2155f3c72c7b136e2f01a707e8fa323a48de747c0188ded2ee"
+    }
+  ],
+  "roots": {
+    "frozen": "/mnt/nas/Data/beijing-lot",
+    "hot": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot"
+  },
+  "catalog_sha256": "3208ebc1bb3636f77f7e27205ec5bb4c7b400212074459c66d6233d2da462b31",
+  "mode": "READ_ONLY_LOCAL_INVENTORY_NO_NETWORK_OR_PUBLICATION"
+}

@@ -1,0 +1,6 @@
+issue,expected,collected,other_status,matches,history_rows,fixtures_with_history,injury_rows,lineup_rows,field_conflicts,missing_reconciled_kickoff,roster_scored,complete
+26098,146,146,0,146,17407,146,0,0,516,1,145,FALSE
+26101,115,115,0,115,13170,115,0,0,425,0,115,FALSE
+26102,86,86,0,86,9968,86,0,0,289,0,86,FALSE
+26103,407,407,0,407,50099,407,0,0,1577,0,405,FALSE
+26104,109,109,0,109,11784,109,0,0,435,0,109,FALSE

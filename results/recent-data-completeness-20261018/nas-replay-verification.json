@@ -1,0 +1,20 @@
+{
+  "status": "IDENTICAL_NAS_INPUT_REPLAY",
+  "source_archive": "/mnt/nas/Data/beijing-lot/reports/recent-data-completeness/versions/20261018T134105453952Z",
+  "replay_output": "/tmp/recent-data-completeness-nas-replay-20261018T134105453952Z/results/recent-data-completeness-20261018",
+  "csv_tables_exactly_equal": [
+    "fundamentals.csv",
+    "euro.csv",
+    "older-market-subsets.csv",
+    "26103-channel-coverage.csv",
+    "26105-window.csv",
+    "verified-tables.csv",
+    "versions.csv"
+  ],
+  "raw_envelope_hashes_equal": 814,
+  "http_body_hashes_independently_verified": 814,
+  "all_analytical_inputs_from_nas": true,
+  "render_exit": 0,
+  "library_environment": "nas-replay-environment.json",
+  "initial_failed_replay_reason": "Scratch session did not inherit project R library environment; resolved by explicit recorded R_LIBS"
+}

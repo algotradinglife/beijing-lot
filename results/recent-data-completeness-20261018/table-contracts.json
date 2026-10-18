@@ -1,0 +1,34 @@
+{
+  "fundamentals": {
+    "rows": 5,
+    "columns": ["character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "logical"]
+  },
+  "euro": {
+    "rows": 2,
+    "columns": ["character", "integer", "integer", "integer", "integer", "integer", "logical"]
+  },
+  "older-market-subsets": {
+    "rows": 3,
+    "columns": ["character", "integer", "integer", "integer"]
+  },
+  "26103-channel-coverage": {
+    "rows": 814,
+    "columns": ["character", "character", "character", "integer", "integer", "integer"]
+  },
+  "26105-window": {
+    "rows": 1,
+    "columns": ["character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "logical"]
+  },
+  "verified-tables": {
+    "rows": 70,
+    "columns": ["character", "character", "integer", "logical"]
+  },
+  "raw-envelope-hashes": {
+    "rows": 814,
+    "columns": ["character", "character"]
+  },
+  "versions": {
+    "rows": 8,
+    "columns": ["character", "character", "logical", "character", "logical"]
+  }
+}

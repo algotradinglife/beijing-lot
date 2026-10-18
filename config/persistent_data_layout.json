@@ -1,0 +1,10 @@
+{
+  "schema": "beijing_lot_persistent_layout_v1",
+  "scope": "daily paper persistent runtime domains on NAS; analytical datasets use the authoritative catalog in the same NAS root",
+  "data_root": "/mnt/nas/Data/beijing-lot",
+  "mountpoint": "/mnt/nas/Data",
+  "paths": {
+    "daily_paper": "runtime/daily-paper-handicap-wdl",
+    "betting_sheet_results": "runtime/betting-sheet-results-handicap-wdl"
+  }
+}

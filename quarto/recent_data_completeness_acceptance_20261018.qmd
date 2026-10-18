@@ -1,0 +1,41 @@
+---
+title: "近期数据盘点：最终验收与NAS归档凭证"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  label: "20261018T134405811490Z"
+---
+
+本页为数据盘点的最终验收入口。主报告、分析表、原始证据及重放证明都从NAS读取；不读取Sandisk或NVMe输入，不改写数据或版本。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+nas<-Sys.getenv('BEIDAN_PARQUET_ROOT');stopifnot(nzchar(nas),dir.exists(nas))
+accepted<-file.path(nas,'reports/recent-data-completeness-acceptance/versions',params$label)
+a<-jsonlite::fromJSON(file.path(accepted,'acceptance.json'),simplifyVector=FALSE)
+p<-jsonlite::fromJSON(file.path(accepted,'nas-publication.json'))
+r<-jsonlite::fromJSON(file.path(accepted,'nas-replay-verification.json'))
+stopifnot(a$status=='REVIEWED_AND_NAS_ARCHIVED_WITH_IDENTICAL_NAS_REPLAY',r$status=='IDENTICAL_NAS_INPUT_REPLAY',p$files_verified==1684L,p$http_bodies==814L,p$raw_envelopes==814L,p$relative_html_assets_verified==11L)
+report<-file.path(p$directory,'evidence/repository/quarto/recent_data_completeness_20261018.qmd')
+expected<-a$files[['quarto/recent_data_completeness_20261018.qmd']]
+stopifnot(digest::digest(file=report,algo='sha256')==expected)
+knitr::kable(tibble(item=c('已审主报告SHA256','NAS报告版本','NAS逐文件读回','原始响应正文SHA核验','NAS输入独立重放'),value=c(expected,p$label,as.character(p$files_verified),as.character(p$http_bodies),r$status)))
+```
+
+审查命令为`codex review`，限定主QMD/HTML、数据完备度配置、NAS存储契约、操作文档及存储回归测试；完整指令和实际发现保存在NAS最终验收目录的`review-final.log`。实际发现“固定版本重放不应依赖可变current指针”已解决：不可变manifest和显式版本继续核验，指针差异只展示，不作为重放阻断条件。最终审查结论无剩余阻断项。被审主报告SHA见上表；其HTML、配置、测试与各分析输出SHA均绑定于该目录acceptance.json。
+
+实际本地命令及结果：
+
+- `quarto render quarto/recent_data_completeness_20261018.qmd --no-cache -P project_root:"$PWD"`：退出0；10张表、无执行错误。
+- `.venv/bin/python scripts/check_persistent_data_layout.py --contract config/persistent_data_layout.json`：两个NAS存储域PASS。
+- `PYTHONPATH=packages/beidan/inst/python:$PWD .venv/bin/python -m pytest tests/test_settlement_storage.py -q`：2 passed、退出0。
+- NAS输入重放：命令与显式R_LIBS保存在nas-replay-environment.json，重放退出0；7张数值表完全一致、814个信封哈希相等，814份HTTP正文在独立进程逐份核验。初次scratch进程未继承R库路径的失败日志保留；显式声明R_LIBS后已解决。
+
+本轮没有包实现变化，不声称重跑全仓套件。数据源版本未切换、运行中缓存未迁移。较早归档遗漏HTML静态资源，已被新的完整归档版本取代，两个版本及原因保留在nas-publication.json；最终11个相对资源引用全部存在。主数据盘点审查和NAS字节验证是不同证据，不把单纯目录检查当作数据完备度认证。
+
+原始正文/解析序列归档不等于标准盘口数据集已发布；仍须独立完成同截止准入与FM完整流程验收。

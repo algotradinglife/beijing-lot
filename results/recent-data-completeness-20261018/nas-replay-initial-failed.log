@@ -1,0 +1,16 @@
+
+
+processing file: report.qmd
+1/13                  
+2/13 [unnamed-chunk-1]
+Error in `library()`:
+! there is no package called 'tidyverse'
+Backtrace:
+    ▆
+ 1. ├─base::suppressPackageStartupMessages(library(tidyverse))
+ 2. │ └─base::withCallingHandlers(expr, packageStartupMessage = function(c) tryInvokeRestart("muffleMessage"))
+ 3. └─base::library(tidyverse)
+
+Quitting from report.qmd:18-116 [unnamed-chunk-1]
+Execution halted
+WARN: Error encountered when rendering files
