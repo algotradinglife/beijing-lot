@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R"
+  ],
+  "cwd": "/tmp/beidan-source-rate-20261018",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/full-R-v2-final.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/full-R-v2-final-exit.json"
+}

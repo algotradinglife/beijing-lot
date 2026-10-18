@@ -1,0 +1,23 @@
+{
+  "output_sha256": "1e48da57c61cb8077109affd6ec9a408d9edc2e7f942c356c80820c43aaafbe2",
+  "source_client": {
+    "path": "r/global_dynamic_nowscore_queue_20261018.R",
+    "sha256": "b936481ca0b9afee2edc60fa207d9cbc146a6c74bc82c7361228760959533bcd"
+  },
+  "input_files": [
+    {
+      "path": "results/global-dynamic-26105-readiness-20261018-v4/slots.csv",
+      "sha256": "6bb1c2dc12dca91b513baf33f461b6e94bbec56eb912c7aa498ed43ca86e4d2d"
+    },
+    {
+      "path": "results/global-dynamic-26105-readiness-20261018-v4/base-resources.csv",
+      "sha256": "b286892baebb682e83f5bf3e6f8fd3bb67e266b2c85d718496f42fd4d07ffc46"
+    },
+    {
+      "path": "results/global-dynamic-26105-euro-readiness-20261018-v2/euro-resources.csv",
+      "sha256": "c820f443126c814a4a66d4e87029b1a895d6685347250b741e16b5eca3e2c8c9"
+    }
+  ],
+  "rows": 730,
+  "fixtures": 365
+}

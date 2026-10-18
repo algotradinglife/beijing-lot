@@ -1,0 +1,125 @@
+{
+  "status": "LOCAL_CHECKS_PASSED_GOAL_PENDING",
+  "generated_at_utc": "2026-10-18T15:43:49.821939+00:00",
+  "tests": [
+    {
+      "suite": "Installed R package",
+      "blocks": 991,
+      "passed": 9647,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Installed R repository",
+      "blocks": 808,
+      "passed": 183326,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Complete Python backend + capture clients",
+      "blocks": 674,
+      "passed": 674,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Final administrative CLI",
+      "blocks": 3,
+      "passed": 3,
+      "failed": 0,
+      "errors": 0,
+      "warnings": 0,
+      "skipped": 0
+    }
+  ],
+  "checks": [
+    {
+      "check": "install-v2-final",
+      "command": [
+        "/usr/bin/env",
+        "R_PROFILE_USER=/dev/null",
+        "R_LIBS_USER=/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6",
+        "/opt/R/4.6.1/bin/R",
+        "CMD",
+        "INSTALL",
+        "-l",
+        "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final",
+        "packages/beidan"
+      ],
+      "exit_status": 0,
+      "evidence": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/install-v2-final-exit.json"
+    },
+    {
+      "check": "full-R-v2-final",
+      "command": [
+        "/bin/zsh",
+        "-c",
+        ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R"
+      ],
+      "exit_status": 0,
+      "evidence": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/full-R-v2-final-exit.json"
+    },
+    {
+      "check": "full-python-v2-final",
+      "command": [
+        "/bin/zsh",
+        "-c",
+        ". config/source-extraction.env\nexport R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final:/home/drwho1985/workspace/algotradinglife/beijing-lot/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\nexport PYTHONPATH=\"packages/beidan/inst/python:$PWD\"\nexec .venv/bin/python -m pytest packages/beidan/tests/python tests/test_global_dynamic_capture_20261018.py tests/test_global_dynamic_26105_capture_missing.py tests/test_global_dynamic_nowscore_capture.py -q -rs"
+      ],
+      "exit_status": 0,
+      "evidence": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/full-python-v2-final-exit.json"
+    },
+    {
+      "check": "review-source-v2",
+      "command": [
+        "codex",
+        "review",
+        "Read-only followup pre-operation source review, no edits/CI/unrelatedscans. Files in results/global-dynamic-source-rate-20261018/source-v2-manifest.json: source_rate_policy.py +19package tests; source_rateCLI; actualNowscorecaptureCLI;3actualcaptureCLI integrationtests;Rqueue producer. Previous P1 was SourceClient.request would re-raise120. Resolved by explicit acquisition caller using client.cache.extract(min_interval=5,retries=1,reuse_raw=True), NEVERSourceClient.request for live. Package API docs explicitly state conservative callers can re-raise. Newrealintegration test runsactualNowscoreCLI +realExtractionCache andsavedtransport, applied120->5last999 andnow1000; assertsactualsleep4 NOT119, outgoingURL, budget ledger1000/5, leadingzeroID preserved. Package19tests andCLI3tests+oldT5 all27PASS. SourceRate administration preserves last_attempt and otherdata, explicitexpected120 andauthorizationreason, atomictransaction/rollback/FileLock, no HTTP. ActualNowscoreCLI binds APPLIEDpolicy receipt/codehash andverifies existing5 by state-noop beforeallrawcalls; queue/source closure +exclusivewriter+max2passes. Rqueue365fixture730analysis/euro resources, no targetscores/learning. Currentnormalfreshinstall-v2-final-exit.json0 in library-final. NEW fullR/pkg+repoclient andcompletePython running afterfinalcode/testchange, notyetcertified; previous670Python pass/previousRdeliberatelyterminated superseded. Proposedapply userexplicit5seconds preferenceviaone-shotCLI Nowscoreexpected120to5 underauthoritativeAPI, thenstart730missingrawrequests. OldTitan308jobcontinuesusingoldimmutablelibrary/source, no competingjob edits. Review P1resolutionactualcaller/failure/receipt/transaction/sourcebindings. Reportactionableblockers or No blocking source findings. No approvalrequest or newstudies, no fullsuitecertification."
+      ],
+      "exit_status": 0,
+      "evidence": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/review-source-v2-exit.json"
+    },
+    {
+      "check": "review-lock-followup",
+      "command": [
+        "codex",
+        "review",
+        "Read-only narrow followup, no edits/CI. Previous review-source-v2.log no blocking and P1fixed by actual rawcaller5seconds. Current source-v3-manifest.json binds unchanged packagedpolicy+19tests and unchangedNowscorecaller. Only admin CLI refined +new3CLItests: src/global_dynamic_source_rate_20261018.py now pre-acquires SAME cache.lock with public acquire(timeout120,poll_interval.001), then authoritativeAPIreenters sameFileLock. Neededbecause firstapprovedoperation waited120s andFAILEDlocktimeout whileliveTitanloop occupiedsharedmutex; no DBmutation happened, prepared/failureJSONretained. Newattempt willuseaNEWoutputpath, expectedNowscore120->5 unchanged, neverresetlast_attempt.3freshCLItests execute realFileLock/reentrantrealAPI+tempSQLite, stale rejection and one-shotoutputs; combined25relevanttestsPASS. Packageimplementation/testfilesunchanged fromv2normalinstall; fullR/Python suitesstillrunningnotcertified. Review ONLY refinement andtests plus inspect priorfailure log ifneeded, report blockers or No blocking source findings. No newfeaturestudies, no CI, no requestpermissions; userauthorized5secondspreviously."
+      ],
+      "exit_status": 0,
+      "evidence": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/review-lock-followup-exit.json"
+    },
+    {
+      "check": "apply-nowscore-5s-v2",
+      "command": [
+        "/bin/zsh",
+        "-c",
+        ". config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python src/global_dynamic_source_rate_20261018.py --source nowscore --expected-seconds 120 --seconds 5 --reason 'User explicitly requested collection frequency5seconds; preserve prior request time and raw evidence' --output hot:global-dynamic-source-rate-20261018/nowscore-5s-v2.json"
+      ],
+      "exit_status": 0,
+      "evidence": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/apply-nowscore-5s-v2-exit.json"
+    },
+    {
+      "check": "nowscore-health",
+      "command": [
+        "/bin/zsh",
+        "-c",
+        ". config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python src/global_dynamic_nowscore_probe_20261018.py --input /home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/nowscore-missing.csv --output /home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/nowscore-health.json"
+      ],
+      "exit_status": 0,
+      "evidence": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/nowscore-health-exit.json"
+    }
+  ],
+  "source_manifest_sha256": "9aa438a5e6ae393d12266ebb4216e6f3ceb767f694d4bf831cbbb423075434aa",
+  "scope": "Operational5secondpolicy and bounded collection only;26105forecast/settlement and whole goal still pending",
+  "package_library": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final",
+  "test_snapshot": "/tmp/beidan-source-rate-20261018",
+  "other_authors_work_certified": false
+}

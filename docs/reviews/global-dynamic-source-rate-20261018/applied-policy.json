@@ -1,0 +1,23 @@
+{
+  "plan": {
+    "client_sha256": "956ec44d2fcdf626fe98eb07a85c7bd6d6d016d208c724a4ce162df13af13d53",
+    "expected_interval_seconds": 120.0,
+    "interval_seconds": 5.0,
+    "policy_sha256": "0d2fe95d3cff4871b1d387ea48588397f5aed246c4ee435d6cdc0295a408f5e0",
+    "reason": "User explicitly requested collection frequency5seconds; preserve prior request time and raw evidence",
+    "source": "nowscore"
+  },
+  "receipt": {
+    "cache_implementation_sha256": "4f0639948c624050c4de43bd461440a12d4f62b3f6d5517c58001c8be37fd422",
+    "changed": true,
+    "implementation_sha256": "0d2fe95d3cff4871b1d387ea48588397f5aed246c4ee435d6cdc0295a408f5e0",
+    "interval_seconds": 5.0,
+    "last_attempt": 1792204651.0115244,
+    "last_attempt_preserved": true,
+    "observed_at": "2026-10-18T15:27:46.884569+00:00",
+    "previous_interval_seconds": 120.0,
+    "reason": "User explicitly requested collection frequency5seconds; preserve prior request time and raw evidence",
+    "source": "nowscore"
+  },
+  "state": "APPLIED"
+}

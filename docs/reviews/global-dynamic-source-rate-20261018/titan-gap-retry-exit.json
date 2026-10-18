@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python src/global_dynamic_26105_capture_missing_20261018.py --input /home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-26105-readiness-20261018-control/titan-missing-v2.csv --output hot:global-dynamic-26105-titan-gaps-20261018 --min-interval-seconds 5"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T15:38:30.686418+00:00",
+  "finished_at_utc": "2026-10-18T15:38:41.948723+00:00"
+}

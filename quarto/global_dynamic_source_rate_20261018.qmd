@@ -1,0 +1,108 @@
+---
+title: "26105补采：共享5秒策略及调用链验收"
+format:
+  html:
+    embed-resources: true
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  require_acceptance: true
+---
+
+本次工作支持26103—26105的RAW／GLOBAL同预算对照，处理26105剩余原文采集的性能问题。**26105尚未全部完赛，整个goal仍未完成。** 本文不提供新的整期最终命中率、回款或模型升级结论，原有预测、票单及FM规则保持不变。
+
+```{r}
+#| include: false
+suppressPackageStartupMessages(library(tidyverse));library(testthat)
+root<-normalizePath(params$project_root,mustWork=TRUE);setwd(root);knitr::opts_knit$set(root.dir=root)
+out<-file.path(root,'results/global-dynamic-source-rate-20261018')
+library(beidan,lib.loc=file.path(out,'library-final'))
+a<-jsonlite::fromJSON(file.path(out,'applied-policy.json'))
+probe<-jsonlite::fromJSON(file.path(out,'nowscore-health.json'),simplifyVector=FALSE)
+q<-read_csv(file.path(out,'nowscore-missing.csv'),col_types=cols(.default=col_character()))
+qr<-jsonlite::fromJSON(file.path(out,'nowscore-missing.csv.json'))
+prior<-jsonlite::fromJSON(file.path(root,'results/global-dynamic-26105-readiness-20261018-control/rate-ledger-observation.json'))
+if(params$require_acceptance) {
+ acceptance<-jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ stopifnot(acceptance$status=='LOCAL_CHECKS_PASSED_GOAL_PENDING',all(acceptance$checks$exit_status==0L),
+  all(acceptance$tests$failed==0L),all(acceptance$tests$errors==0L),all(acceptance$tests$skipped==0L))
+}
+```
+
+已有共享原文缓存保存每个来源的间隔与最后请求时间。`ExtractionCache.extract()`取显式请求间隔与已保存间隔的较大值，所以单纯传入5秒不能降低原有120秒；默认`SourceClient.request()`也仍会传入保守的120秒。现有接口没有“显式授权变更已登记间隔”的入口，本次只补足这一能力，未修改另一作者未提交的原文缓存／来源门面代码。
+
+新函数`beidan_backend.source_rate_policy.set_source_interval()`接收明确的缓存对象、来源、新间隔、期望旧间隔和授权理由，使用原缓存的同一写锁与SQLite事务。前值过时、来源未登记、输入非法或最后请求时间异常时拒绝操作；事务异常回滚。它只更新该来源的间隔，保留最后请求时间、其他来源及原文字节。重复设置当前值为状态无操作，返回新的操作回执；不做HTTP请求，不属于历史拟合或概率校准。
+
+```{r}
+#| echo: false
+tibble(来源=a$receipt$source,原间隔秒=a$receipt$previous_interval_seconds,新间隔秒=a$receipt$interval_seconds,
+ 最后请求Unix秒=a$receipt$last_attempt,保留最后请求时间=a$receipt$last_attempt_preserved,
+ 实际变更=a$receipt$changed,观察时间=a$receipt$observed_at) |> knitr::kable(digits=6)
+```
+
+实际Nowscore采集直接调用共享原文接口并显式传入`min_interval=5`，不通过会重新抬高间隔的默认便利调用。新联动测试使用真实SQLite缓存与保存的传输响应：最后请求999秒、当前1000秒，120秒策略改为5秒后，实际采集等待4秒；验证完整调用链，而非只看配置行。项目函数测试还覆盖真实原文字节保留、前值拒绝、最小值边界、重复执行、并发锁、事务回滚与导入无I/O。
+
+首次配置尝试因Titan任务连续使用共享锁而在120秒后超时，未改变数据库。修正后的命令使用同一公开FileLock的1毫秒获取轮询，进入权威函数时重入同一个锁；实际请求时间不重置。第二次操作成功，失败回执仍保留。三个管理CLI测试覆盖真实锁重入、实际事务、过时前值拒绝及单次命令重复拒绝。
+
+真实来源预检
+
+```{r}
+#| echo: false
+probe_rows<-list()
+for(z in probe$results)probe_rows[[z$kind]]<-tibble(kind=z$kind,fixture_id=z$fixture_id,state=z$state,
+ native_id=z$identity$provider_id,observed_at=lubridate::ymd_hms(z$receipt$observed_at,tz='UTC'),
+ network_attempts=z$receipt$network_attempts,sha256=z$receipt$sha256,price_validation=z$price_validation)
+pr<-bind_rows(probe_rows)
+pr |> select(-sha256) |> knitr::kable()
+```
+
+两次真实请求分别检查分析页和欧赔JS，使用原生ID校验器；时间间隔约5秒。该预检只验证原文及原生身份，不等于价格、公司覆盖或赛前时点已经通过。完整365场的来源／价格／时间核验仍需继续。
+
+```{r}
+#| echo: false
+q |> count(kind,name='待补原文URL') |> knitr::kable()
+tibble(队列行数=nrow(q),不同比赛=n_distinct(q$fixture_id),不同URL=n_distinct(q$url)) |> knitr::kable()
+```
+
+730个Nowscore URL的队列来自已冻结的全期资源清单和365场原生ID映射，含365张分析页及365份欧赔原文。已成功的预检原文会通过同一个缓存复用，成功项不重新请求。Nowscore分析页若引用额外辅助JS，需要随后按明确引用补齐，不能把HTML下载当成事实完整。
+
+Titan原308个URL任务继续使用原冻结代码及库。为了减少共享网络写锁竞争，顺序命令等待其真实退出回执；仅当请求缺口导致退出2时执行一次有界补缺，再启动Nowscore任务。没有因观察超时重启活进程。所有采集均只产出原文／回执，后续还须独立解析、全期入库验收和同截止资格检查，之后才能冻结26105两模型概率与同预算票单。最终评分另等完整赛果及结算SP；26106的新增完整期验证仍待核验。
+
+软件验收及身份
+
+```{r}
+#| echo: false
+test_that('applied cadence, actual native probes and immutable queue bindings agree',{
+ expect_identical(a$state,'APPLIED')
+ expect_identical(a$receipt$source,'nowscore')
+ expect_equal(a$receipt$previous_interval_seconds,120)
+ expect_equal(a$receipt$interval_seconds,5)
+ expect_true(a$receipt$last_attempt_preserved)
+ old<-as_tibble(prior$rows) |> filter(source=='nowscore')
+ expect_equal(a$receipt$last_attempt,old$last_attempt)
+ expect_identical(a$receipt$implementation_sha256,digest::digest(file='packages/beidan/inst/python/beidan_backend/source_rate_policy.py',algo='sha256'))
+ expect_identical(a$plan$client_sha256,digest::digest(file='src/global_dynamic_source_rate_20261018.py',algo='sha256'))
+ expect_equal(nrow(q),730L);expect_equal(n_distinct(q$fixture_id),365L)
+ expect_type(q$provider_id,'character');expect_false(anyDuplicated(q$url)>0L)
+ expect_identical(qr$output_sha256,digest::digest(file=file.path(out,'nowscore-missing.csv'),algo='sha256'))
+ for(i in seq_len(nrow(qr$input_files)))expect_identical(qr$input_files$sha256[i],digest::digest(file=qr$input_files$path[i],algo='sha256'))
+ expect_true(all(pr$state=='RAW_AND_NATIVE_ID_VERIFIED'));expect_false(any(pr$price_validation))
+ expect_true(all(pr$network_attempts==1L))
+ expect_gte(as.numeric(difftime(pr$observed_at[2],pr$observed_at[1],units='secs')),5)
+ expect_true(is.loaded('_beidan_ComponentUnionKernel'))
+ p<-matrix(c(.4,.3,.3,.2,.5,.3),nrow=2,byrow=TRUE)
+ expect_equal(beidan:::ComponentUnionKernel(list(c(`001`=1L),c(`002`=2L)),c('001','002'),p),.7)
+})
+```
+
+```{r}
+#| echo: false
+if(params$require_acceptance)knitr::kable(as_tibble(acceptance$tests),caption='实际完成的本地检查；未运行项不计通过')
+```
+
+包改动需正常安装后完成完整包R测试、完整Python后端测试，仓库客户端阶段也通过标准入口执行。测试使用显式项目解释器与正常安装库，不使用load_all或手工加载DLL。Rcpp注册及真实包装器结果另作验收。测试在隔离且绑定来源的包快照执行，保护主目录并行工作；不认证其他作者未提交的修改。
+
+准确命令、退出状态、源身份、审查发现与处置记录于本报告输入目录的验收JSON及回执。首次源审查指出默认120秒调用问题，新增实际调用方和联动测试后复审通过；最初未完成的R测试及较早范围Python结果为留存证据，最终完成门槛只采用最终版本的完整运行。工作目录复制的配额错误通过删除本任务未完成的重复副本并复用既有隔离目录解决，未改动数据根或采集限额。没有CI操作。

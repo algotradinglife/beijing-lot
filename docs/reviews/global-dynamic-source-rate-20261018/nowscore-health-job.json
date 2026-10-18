@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python src/global_dynamic_nowscore_probe_20261018.py --input /home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/nowscore-missing.csv --output /home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/nowscore-health.json"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "log": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/nowscore-health.log",
+  "receipt": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/nowscore-health-exit.json"
+}

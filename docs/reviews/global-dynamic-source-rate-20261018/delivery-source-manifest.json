@@ -1,0 +1,38 @@
+[
+  {
+    "path": "packages/beidan/inst/python/beidan_backend/source_rate_policy.py",
+    "sha256": "0d2fe95d3cff4871b1d387ea48588397f5aed246c4ee435d6cdc0295a408f5e0"
+  },
+  {
+    "path": "packages/beidan/tests/python/test_source_rate_policy.py",
+    "sha256": "c7a6a25698308181aa2f8de0ae88d9a55f003539bd0ef5bf1831fcc55f14688c"
+  },
+  {
+    "path": "src/global_dynamic_source_rate_20261018.py",
+    "sha256": "956ec44d2fcdf626fe98eb07a85c7bd6d6d016d208c724a4ce162df13af13d53"
+  },
+  {
+    "path": "tests/test_global_dynamic_source_rate_cli.py",
+    "sha256": "2744e68c1c89b63fbe59bfc0bab543eda49f708a3493d360b5dfb67b989e3b40"
+  },
+  {
+    "path": "src/global_dynamic_nowscore_capture_20261018.py",
+    "sha256": "d7125335147c89bdbadba10d60d58e0b0c7bc11b1758369c6861e42defcc67a5"
+  },
+  {
+    "path": "tests/test_global_dynamic_nowscore_capture.py",
+    "sha256": "37f1ce1761557000adda4b87baa21cd7af15b26d53a4fc1fc676197e5b4c8c99"
+  },
+  {
+    "path": "r/global_dynamic_nowscore_queue_20261018.R",
+    "sha256": "b936481ca0b9afee2edc60fa207d9cbc146a6c74bc82c7361228760959533bcd"
+  },
+  {
+    "path": "src/global_dynamic_nowscore_probe_20261018.py",
+    "sha256": "90e59faa2d577192b539d5dd4ec8c9a746bfc46b5c8fad4b4d85a299dad3f71d"
+  },
+  {
+    "path": "quarto/global_dynamic_source_rate_20261018.qmd",
+    "sha256": "c4d745f7b660f62381324f21b6d9c5a58fe21dd9eab2408c435486d3e0bbccd0"
+  }
+]

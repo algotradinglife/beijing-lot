@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/src/global_dynamic_source_rate_20261018.py", line 24, in <module>
+    receipt=source_rate_policy.set_source_interval(client.cache,a.source,a.seconds,
+        expected_interval_seconds=a.expected_seconds,reason=a.reason)
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final/beidan/python/beidan_backend/source_rate_policy.py", line 37, in set_source_interval
+    with cache.lock, closing(sqlite3.connect(cache.path)) as con:
+         ^^^^^^^^^^
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/lib/python3.14/site-packages/filelock/_api.py", line 951, in __enter__
+    self.acquire()
+    ~~~~~~~~~~~~^^
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/lib/python3.14/site-packages/filelock/_api.py", line 1059, in acquire
+    self._poll_until_acquired(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        blocking=blocking,
+        ^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        start_time=start_time,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/lib/python3.14/site-packages/filelock/_api.py", line 1231, in _poll_until_acquired
+    raise Timeout(lock_filename)
+filelock._error.Timeout: The file lock '/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/source-extraction/raw.sqlite.lock' could not be acquired.

@@ -1,0 +1,258 @@
+[
+  {
+    "path": "acceptance.json",
+    "sha256": "b6919d3b7c8677d11e1c8ac8b5e92e9469726a4e21a6b94528e659eed857ad5a"
+  },
+  {
+    "path": "after-titan-command.log",
+    "sha256": "a9825c7b8e83d4e2c81d2b381c9d2955abb8646cba09ddffd3784d553e13f4f7"
+  },
+  {
+    "path": "after-titan-command.py",
+    "sha256": "ecab5743db19d0f6623ea2cde329c9d0ad2eebf1c3869bc4eddffed17a97ccb7"
+  },
+  {
+    "path": "after-titan-launch.json",
+    "sha256": "b3e5444e92787aaa5d0f955ce96f7e2a709edb85cf72162ab58673e4439ee365"
+  },
+  {
+    "path": "applied-policy.json",
+    "sha256": "84d6ad1c17aba48d32811e27911ea87e7cce15687f06b981d95b1ae4f4425c37"
+  },
+  {
+    "path": "apply-nowscore-5s-exit.json",
+    "sha256": "11d0f89234273854c54dc7f2390b327d9a27b7caca70d1b75ef3c4bcd1561f5d"
+  },
+  {
+    "path": "apply-nowscore-5s-job.json",
+    "sha256": "c30f9ef101329bdb837fc9343631dfd70a7a56294c9e748b446f7f3784aeccfe"
+  },
+  {
+    "path": "apply-nowscore-5s-v2-exit.json",
+    "sha256": "21b37cc24077d6e9a222dd25becb2fa28071db3d9e8c4f77ac0f01fd841d72b9"
+  },
+  {
+    "path": "apply-nowscore-5s-v2-job.json",
+    "sha256": "365fe30bd03f496b8eaad2a0b2121ac371838578a638df87169488186852134b"
+  },
+  {
+    "path": "apply-nowscore-5s-v2.log",
+    "sha256": "4f60efe4c6bb69e063b0a363be9b03eb4b653b7b1c984a735bddda352914f2f3"
+  },
+  {
+    "path": "apply-nowscore-5s.log",
+    "sha256": "c2ee6acb4c0ea35fbd5e4ae16c3695c0309a58f432ce1097aaf6bffc6b1cf3ea"
+  },
+  {
+    "path": "cli-tests-final.log",
+    "sha256": "a0ba7f2fb96adfb2c2564a1053a85160f60c5f008ba0c8c06a58a8cb23d1fc2b"
+  },
+  {
+    "path": "delivery-source-manifest.json",
+    "sha256": "9aa438a5e6ae393d12266ebb4216e6f3ceb767f694d4bf831cbbb423075434aa"
+  },
+  {
+    "path": "final-artifact-inputs.json",
+    "sha256": "7c08d2725af531baa56919b99f41b58df92aa8eda359d0d637932219da74fccf"
+  },
+  {
+    "path": "final-review-receipt.json",
+    "sha256": "db0c0e11df7ac6c21b04305f7c08f9d2507c5f1e2a8bdc0ef2e2b58d48302975"
+  },
+  {
+    "path": "full-R-final-exit.json",
+    "sha256": "f57262665e54563748b70cbf97a5101de2407113c5e1fb9ffcda6cc40139057e"
+  },
+  {
+    "path": "full-R-final-job.json",
+    "sha256": "19730e69007dd4a4b537395bdc901b28fff888e7294232d0d945ab0eebeddedd"
+  },
+  {
+    "path": "full-R-v2-final-exit.json",
+    "sha256": "852ec8126b2c23bbd224091185514a769a28c9f4f45045c1b9195a9b2dfe8f51"
+  },
+  {
+    "path": "full-R-v2-final-job.json",
+    "sha256": "1bc0c5b950cc893e8f4c78585d35b564e692f4839327f1cf1234fc2afe83639a"
+  },
+  {
+    "path": "full-R-v2-final.log",
+    "sha256": "aacd08bc95ae113060999f6eb3232de18bd4132175e3a1ae3afb2452276bec78"
+  },
+  {
+    "path": "full-python-final-exit.json",
+    "sha256": "b5e747ff511215ec6f128d4a5c43d6da38ca7e55b432389964435eda81411faf"
+  },
+  {
+    "path": "full-python-final-job.json",
+    "sha256": "764b21fb15f1fc3b0a1ede333e0be3095cc9ecc31702911dcda03b1a4c91f248"
+  },
+  {
+    "path": "full-python-v2-final-exit.json",
+    "sha256": "383e590fe5c2e0f8e5433bac46e855a0f8764e9320991281067ae0af28ebd9c2"
+  },
+  {
+    "path": "full-python-v2-final-job.json",
+    "sha256": "d747f9bf33a87c44253d8e85729257e964fc0262c3a168c63ddf8e66b82760e5"
+  },
+  {
+    "path": "full-python-v2-final.log",
+    "sha256": "04bba3b111d1db26abe89dc798698d2afbf932f2d286321ff4cfc07d0c3268d1"
+  },
+  {
+    "path": "function-test-map.json",
+    "sha256": "cff8be9826d1f62d96562d34305a6c75673c9bc6998f40f129fc1f2746c07725"
+  },
+  {
+    "path": "install-final-exit.json",
+    "sha256": "267ed3cc586410a279814b47c6192fee4e76b718a737d4b544ac132c7a399d42"
+  },
+  {
+    "path": "install-final-job.json",
+    "sha256": "d4ef15cf61317aaf02d5c7208b05dbd52bd2c92014997ec92cfd8049d2e47dcd"
+  },
+  {
+    "path": "install-v2-final-exit.json",
+    "sha256": "1b5d8b53b980afd6667c023cef2e4f7d5edf80b6bf9595bac8f507c82fdba423"
+  },
+  {
+    "path": "install-v2-final-job.json",
+    "sha256": "276e2ec5013f549f3e1730c57a893460bb4a0df8a7036c2e6b3cd6afc11e66d6"
+  },
+  {
+    "path": "install-v2-final.log",
+    "sha256": "49d1d81c79d23314f321ed32db0d6eb57683245e5c550cebc1f970ac9247c307"
+  },
+  {
+    "path": "nowscore-capture-launch.json",
+    "sha256": "5053b5b8b928f669464c73d27a8483044c6155b16edde0ff879adde019c14039"
+  },
+  {
+    "path": "nowscore-gap-capture-job.json",
+    "sha256": "1756caaac9be78fc8655a46a914381ca04f2c54b3c5e9d88ab5a1fea71719e7f"
+  },
+  {
+    "path": "nowscore-health-exit.json",
+    "sha256": "e7f7ac958436241ddf6d2c5eefc23ba74c34e9d5628442d62c39c682b0880b09"
+  },
+  {
+    "path": "nowscore-health-job.json",
+    "sha256": "32a3fd6de6c9cddb4dbcda4eed80bdb976973df1426ebf9bb5b4df5530a6ce44"
+  },
+  {
+    "path": "nowscore-health.json",
+    "sha256": "e58c7773de5d96a17ed3dd8ad0950f2d567d4cca6dd76c508b297220ee450846"
+  },
+  {
+    "path": "nowscore-missing.csv",
+    "sha256": "1e48da57c61cb8077109affd6ec9a408d9edc2e7f942c356c80820c43aaafbe2"
+  },
+  {
+    "path": "nowscore-missing.csv.json",
+    "sha256": "6e61308343f9dc70e777a05b6478ec9a13aa4afb7514099c1d0faa5d2558317c"
+  },
+  {
+    "path": "render-development-exit.json",
+    "sha256": "2d5b23f93cc4af774241ce8fac36f6c4b528015b36b009751cae61c9009748c9"
+  },
+  {
+    "path": "render-development-job.json",
+    "sha256": "9952a1c7bd51383a5557beacee648626b762dc83170db8bc89c5e672aa0da7be"
+  },
+  {
+    "path": "render-final-exit.json",
+    "sha256": "9b1e43357fe006b0a8a808d0b518911a58b09dfc50ba0e7a08a410ac5ef55d6a"
+  },
+  {
+    "path": "render-final-job.json",
+    "sha256": "e68f32df815471117910f1819996d54decdc0f6bdaabe269d27ff7d2289f460e"
+  },
+  {
+    "path": "render-final.log",
+    "sha256": "62da7013cf0b49978ce0e7dbda706ac7cb4ffc57fa2548abf85d99145046b84a"
+  },
+  {
+    "path": "report.html",
+    "sha256": "790cc28104a4221f458ae5a91eb47f5046d5fd91645185585511620bd638db91"
+  },
+  {
+    "path": "review-final-artifact-exit.json",
+    "sha256": "71fd45339558ae013324afa383fa562d68d5961ded6d82ad91aa13cd1aa7a8b7"
+  },
+  {
+    "path": "review-final-artifact-job.json",
+    "sha256": "1c137f97bec17a9b4d30cb22f98166ee325c6c11c74547e0347515d639e21eab"
+  },
+  {
+    "path": "review-final-artifact.log",
+    "sha256": "d7cc558dcd415dde41aee7c3a6fdfba620646ad82222c14f4b6549bb07e31401"
+  },
+  {
+    "path": "review-lock-followup-exit.json",
+    "sha256": "3ec448cc6e103323cfb67bb407e0093f4d2affbc808e905b6c91fc72f734639e"
+  },
+  {
+    "path": "review-lock-followup-job.json",
+    "sha256": "27faf3cdf13428d4fb605126ce49426758d4a23ac08c035f092065d0f548ab03"
+  },
+  {
+    "path": "review-lock-followup.log",
+    "sha256": "d25f8d043b1aa2d39ee94e2a2dccaeee6dc51ff683f82e82e23f693f537cd7f1"
+  },
+  {
+    "path": "review-source-exit.json",
+    "sha256": "d1eb6bbe64cb86811d7d87b7791dfc9a439c254236491dd5d77336c02387fb52"
+  },
+  {
+    "path": "review-source-job.json",
+    "sha256": "c1a9f5a4ae2eb7b06623d2722a90b0b0454a48b6f4131c42da29bed3a757751c"
+  },
+  {
+    "path": "review-source-v2-exit.json",
+    "sha256": "8c173329416d8314cee6b7682fe5df87443c05644f37e2bbfa3adeb480e7bdf0"
+  },
+  {
+    "path": "review-source-v2-job.json",
+    "sha256": "5bc4c44e7b33e28c3e81e14c1c0eaf12649b296b8a01e52c3233010204efd6f4"
+  },
+  {
+    "path": "review-source-v2.log",
+    "sha256": "cb58625952adaed5f994fd51c3ecf99e9e0dc3e9061a126a423a84b4cc3d8279"
+  },
+  {
+    "path": "review-source.log",
+    "sha256": "1756f70ceb4e9b779aa250a915e7147e3d3409b9b7118fb61f8b960ed5f044e4"
+  },
+  {
+    "path": "runtime-command.R",
+    "sha256": "a746e301560bd7cc3a131af8814ea81714aa194ae0d93dfa3900d3f046b6f27f"
+  },
+  {
+    "path": "runtime-v2-final.log",
+    "sha256": "33802ade1eab7f9dc2540af2af55bd4a1a9ba6ee177a237b2845e8b55d78a23e"
+  },
+  {
+    "path": "source-v2-manifest.json",
+    "sha256": "7ce1d81c56b7d24416a84e95e7fbebfc348d42d3213003a9fd2e2869bf2bd116"
+  },
+  {
+    "path": "source-v3-manifest.json",
+    "sha256": "562eaea302cd4b695f0b54f9bdf8caac80abfc2d6c284cf6b4cfa018a4fb41a7"
+  },
+  {
+    "path": "tested-package-source-manifest.json",
+    "sha256": "09f429fe5921afc26125331aaff4e040d1c9467829fd90351c307b7c54367367"
+  },
+  {
+    "path": "titan-gap-retry-exit.json",
+    "sha256": "fabfb8efd12cedc8599d8313a093ced652e2ca95ac32471cefcbe4fcfd799075"
+  },
+  {
+    "path": "titan-gap-retry-job.json",
+    "sha256": "0cc8351ba0d03a9e5e548d5a693375ee13731526c4c28ac5342df9ad44562bcc"
+  },
+  {
+    "path": "titan-gap-retry.log",
+    "sha256": "4cf326f3dcf097350a0d40e5b82b5c6268ce80a31ae81d1472d294171dd31d9f"
+  }
+]

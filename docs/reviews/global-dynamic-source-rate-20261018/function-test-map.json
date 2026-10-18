@@ -1,0 +1,20 @@
+{
+  "function": "beidan_backend.source_rate_policy.set_source_interval",
+  "package_tests": "packages/beidan/tests/python/test_source_rate_policy.py",
+  "package_cases": 19,
+  "tests_cover": [
+    "Registered expected interval change and state-idempotent repeat",
+    "Real nonempty original bytes preserved; other source and request times unchanged",
+    "Strict finite intervals and inclusive1/2.1floors; invalid/stale/missing policies fail closed",
+    "Chronology rejection and SQL-trigger rollback; connection and lock release",
+    "Concurrent writer exclusion; import without database I/O",
+    "Actual raw request waits4 not119seconds after120->5 with last999 and now1000"
+  ],
+  "caller_tests": {
+    "tests/test_global_dynamic_nowscore_capture.py": 3,
+    "tests/test_global_dynamic_source_rate_cli.py": 3
+  },
+  "normal_install": "install-v2-final-exit.json",
+  "full_package_suites": "full-R-v2-final and full-python-v2-final; final receipts required",
+  "reusable_project_functions_added": 1
+}

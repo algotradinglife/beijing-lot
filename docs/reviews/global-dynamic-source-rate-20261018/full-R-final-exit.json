@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\nR_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library:$R_LIBS_USER\" /opt/R/4.6.1/bin/Rscript tests/testthat.R"
+  ],
+  "cwd": "/tmp/beidan-source-rate-20261018",
+  "exit_status": -15,
+  "started_at_utc": "2026-10-18T15:06:38.068400+00:00",
+  "finished_at_utc": "2026-10-18T15:12:56.854101+00:00"
+}

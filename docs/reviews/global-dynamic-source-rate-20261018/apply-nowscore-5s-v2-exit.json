@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    ". config/source-extraction.env\nexport PYTHONPATH=/home/drwho1985/workspace/algotradinglife/beijing-lot/results/global-dynamic-source-rate-20261018/library-final/beidan/python\nexec /home/drwho1985/workspace/algotradinglife/beijing-lot/.venv/bin/python src/global_dynamic_source_rate_20261018.py --source nowscore --expected-seconds 120 --seconds 5 --reason 'User explicitly requested collection frequency5seconds; preserve prior request time and raw evidence' --output hot:global-dynamic-source-rate-20261018/nowscore-5s-v2.json"
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T15:27:43.300097+00:00",
+  "finished_at_utc": "2026-10-18T15:27:46.905933+00:00"
+}

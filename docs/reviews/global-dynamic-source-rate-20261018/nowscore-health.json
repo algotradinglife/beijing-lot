@@ -1,0 +1,58 @@
+{
+  "results": [
+    {
+      "fixture_id": "26105:1",
+      "identity": {
+        "away": "西悉尼流浪者",
+        "home": "悉尼FC",
+        "kickoff_utc": "2026-10-16T09:00:00+00:00",
+        "provider_id": "3041373"
+      },
+      "kind": "analysis",
+      "price_validation": false,
+      "provider_id": "3041373",
+      "receipt": {
+        "cache_hit": false,
+        "cache_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/source-extraction/raw.sqlite",
+        "capture_id": 5782,
+        "content_type": "text/html",
+        "network_attempts": 1,
+        "observed_at": "2026-10-18T15:29:31.897362+00:00",
+        "processed_at": "2026-10-18T15:29:31.899292+00:00",
+        "request_key": "90ed12c353f7fd42b07476032abac41d689be367406b84e459419857d62ca127",
+        "sha256": "be42673184d4f42ea5053c228dde0cd1721423f4fe628c9daba21da42a6c1290",
+        "source": "nowscore",
+        "url": "https://live.nowscore.com/analysis/3041373cn.html"
+      },
+      "state": "RAW_AND_NATIVE_ID_VERIFIED",
+      "url": "https://live.nowscore.com/analysis/3041373cn.html"
+    },
+    {
+      "fixture_id": "26105:1",
+      "identity": {
+        "away": "西悉尼流浪者",
+        "home": "悉尼FC",
+        "kickoff_utc": "2026-10-16T17:00:00+08:00",
+        "provider_id": "3041373"
+      },
+      "kind": "euro",
+      "price_validation": false,
+      "provider_id": "3041373",
+      "receipt": {
+        "cache_hit": false,
+        "cache_path": "/home/drwho1985/workspace/algotradinglife/beijing-lot-data/hot/source-extraction/raw.sqlite",
+        "capture_id": 5784,
+        "content_type": "application/javascript",
+        "network_attempts": 1,
+        "observed_at": "2026-10-18T15:29:36.986248+00:00",
+        "processed_at": "2026-10-18T15:29:36.989905+00:00",
+        "request_key": "ef198d3d902239ff09c258f50ef9644a7b7385a48629ff1e9348142bcf634993",
+        "sha256": "5a71cb7df123641f5ef1612ed565a002e163883245b553ef7ef9c4b2600ec7ac",
+        "source": "nowscore",
+        "url": "https://1x2.nowscore.com/3041373.js"
+      },
+      "state": "RAW_AND_NATIVE_ID_VERIFIED",
+      "url": "https://1x2.nowscore.com/3041373.js"
+    }
+  ]
+}

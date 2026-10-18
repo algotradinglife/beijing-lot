@@ -1,0 +1,11 @@
+{
+  "command": [
+    "codex",
+    "review",
+    "Read-only final acceptance review, no edits/CI/unrelated scans. Final11 source/artifact hashes results/global-dynamic-source-rate-20261018/final-artifact-inputs.json; read QMD/HTML, acceptance.json, sourcepolicy function+19tests and actualcaller/adminCLI/probeRqueue+tests as needed. Prior source reviews review-source-v2 and review-lock-followup no blockers, P1 default120resolved byexplicit rawcaller5 andactualintegration test sleeps4not119. Normalfreshinstall-v2-final0, actualregisteredDLL/Rcppkernel.7 andcorrectinstalledpythonmodule inruntime-v2-final.log. FINAL requiredcomplete standardRtests afterfinalPACKAGEDsource/testchange:991blocks9647assertions+808blocks183326assertions, allfail/error/warn/skip0. CompletePythonbackend+captureclients674pass0skip;finaladminCLI3additionaltests passafterCLI-onlylockpoll refinement;packagedfilesunchangedandmatchtestsnapshot/installed. RealNowscore120->5 applied viaAPI expectedvalue+reason, last_attempt1792204651.0115244 preserved, no manualSQLchanges. Actualanalysis+Euro originalbytes/nativeID probes0, observed5.088886s spacing, pricesNOTqualified. Initialadmin120secondlocktimeout noDBmutation retained, publicFileLocksameobjectfastpoll+reentrantAPI fixed3realCLItests. Titan308rawgaps nowall308success afterboundedretry;N730captureactualPID4149395livecurrently;rawpresence not prices/model qualification. Goalstillpending26105allfixtures, full sourcepublication/samecutoffAHOU/native/calibration/tickets/finalsettlement;26105unfinished, no newfinalmetrics/prospectiveclaims. Newpackageonlyownsource_rate_policy.py+testfile;untrackedExtractionCache/unified_sources belongotherauthor andnotdelivered/edited. Parentverifiedinstalledsnapshot usedforwholetests, doNOTcertifydirtyworkspaceothers. FinalHTML22executableassertions passed andfulltest totals visible. Check finaldisplay, code/test/receipt/sourcebinding, provenance, limits; report blockers or No blocking final artifact findings. No requestsfornewstudies orpermissions."
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T15:44:55.161329+00:00",
+  "finished_at_utc": "2026-10-18T15:45:32.119014+00:00"
+}

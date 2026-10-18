@@ -1,0 +1,11 @@
+{
+  "command": [
+    "codex",
+    "review",
+    "Read-only bounded pre-operation review, no edits/CI/unrelated scans. Files packages/beidan/inst/python/beidan_backend/source_rate_policy.py; packages/beidan/tests/python/test_source_rate_policy.py; src/global_dynamic_source_rate_20261018.py. SHA manifest results/global-dynamic-source-rate-20261018/review-inputs.json. Purpose honor explicit user instruction increase capture frequency to5s using authoritative package administration API. Existing SourceClient/ExtractionCache are otherauthor untracked code, DO NOT edit or commit them; parent unchanged verified source snapshot, extraction_cache byteSHA4f06399... matches installed. Newmodule only missing cadence configuration capability. Uses explicit cache, existing globalFileLock +BEGINIMMEDIATE transaction, expectedexistinginterval120 check beforeNowscore5 update, preserves last_attempt, raw captures, othersources, returns reason/codehash receipt. Rejects invalid/missing/stale/badchronology, rollbackandlocktested.18 targetedtests PASS including real nonempty originalrawpreserved, inclusive floors, concurrency, rollback, idempotentstate, importnoIO. Normalfresh R CMD INSTALL0 into results/global-dynamic-source-rate-20261018/library from isolated /tmp/beidan-source-rate-20261018; actual RcppKernel.7 and registeredDLLpass runtime-final.log. Fullpackage+repositoryR suite and fullbackendPython running, not yet certified. Proposed one-shotCLI Nowscore120->5 writespreparedplan beforeoperation, failure/successreceipts via existing atomicwriter; explicitreason user5seconds. No rawHTTPsourcecollection in admin API, no last-attempt reset, no manual SQL writes outside authoritative package method. ExistingliveTitanrawcapture on oldunchangedlibrary remains5seconds, codeimmutable. This is operationaladmin NOT historicallearning/calibration, no cutoff-fitting. Evaluate transaction/failure/locking/provenance and CLI contract; report blockers or No blocking source findings. No newstudies, no full-suite certification, no approval request; action already userauthorized."
+  ],
+  "cwd": "/home/drwho1985/workspace/algotradinglife/beijing-lot",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-18T15:09:24.073148+00:00",
+  "finished_at_utc": "2026-10-18T15:09:49.190537+00:00"
+}
