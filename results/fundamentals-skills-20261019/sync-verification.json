@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "files": [
+    {
+      "path": "skills/beijing-lot-data-cleaning/SKILL.md",
+      "sha256": "718953dbd63083163b9e736fdc45b48906bddb8dc98e2f12c78f7ec665038ade"
+    },
+    {
+      "path": "skills/beijing-lot-data-cleaning/references/implementation.md",
+      "sha256": "744b0eaabd54aae0d95e5063f1335278073aad633a7adef059a1759c9e9cf7a7"
+    },
+    {
+      "path": "skills/beijing-lot-data-cleaning/references/fundamentals-completeness.md",
+      "sha256": "bb67f4c27cfc01192940df8ef13ddcc86d7b68800c2d131341714ce9f6506888"
+    },
+    {
+      "path": "skills/beijing-lot-data-cleaning/references/cleaning-rules.md",
+      "sha256": "c398e9aa97380944b8effc24b114eb740464b6e23235751d755ba0b49ea809f7"
+    },
+    {
+      "path": "skills/beijing-lot-data-storage/SKILL.md",
+      "sha256": "3272fe3195ce870a08842a222ffe66cb58ada99953849a07a16db06d992780a1"
+    },
+    {
+      "path": "skills/beidan-strategy/SKILL.md",
+      "sha256": "bf4a9bd952389117e19643c5de55dc32a664c2d21e3804f96856a5f411167e84"
+    }
+  ]
+}

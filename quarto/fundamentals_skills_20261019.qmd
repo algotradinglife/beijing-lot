@@ -1,0 +1,31 @@
+---
+title: "基本面采集与验收技能更新"
+format: html
+execute:
+  cache: false
+  freeze: false
+  error: false
+---
+
+本次只更新工作流说明，不修改数据、FM算法或冻结结果。
+清洗技能增加逐场分项验收及下游采用检查；存储技能增加环境预检和NAS发布分阶段核验；
+策略技能明确采集覆盖、内容口径及赛前可用性独立判断。
+#135官方计划时间的授权只适用于该场，不建立全局来源优先规则。
+
+仓库 `skills/` 是维护源，三个技能已同步到本机发现目录。
+
+```{r}
+#| echo: false
+root <- normalizePath("..")
+if (!dir.exists(file.path(root,"skills"))) root <- normalizePath(".")
+names <- c("beijing-lot-data-cleaning","beijing-lot-data-storage","beidan-strategy")
+paths <- file.path(root,"skills",names,"SKILL.md")
+stopifnot(all(file.exists(paths)))
+knitr::kable(tibble::tibble(skill=names,sha256=vapply(paths, function(p) digest::digest(file=p,algo="sha256"),character(1))))
+```
+
+验收命令：项目Python执行 skill-creator 的 `quick_validate.py skills/<技能名>`，
+三个技能均通过；渲染本QMD须无执行错误。
+审查使用 `codex review`，限定三个技能、关联参考及本QMD；日志保存在
+`results/fundamentals-skills-20261019/review.log`，受审文件哈希由本表及该日志绑定。
+这属于文档更新，未修改包函数，无需重跑数据采集或完整包测试。
