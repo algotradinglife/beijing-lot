@@ -1,0 +1,42 @@
+{
+  "schema": "beidan_fixture_clock_adjudication_v1",
+  "adjudication_id": "26098-135-OFFICIAL-CALENDAR-20261019",
+  "issue": "26098",
+  "fixture_id": "26098:135",
+  "provider_id": "2997428",
+  "home_id": "15156",
+  "away_id": "1264",
+  "base_dataset": "source_issue_26098",
+  "base_version": "20261008T143545725496Z",
+  "base_manifest_sha256": "8150ae2bf03bbb28bc7c012b0f1271bd81ce05de341e00630c50de7b0fdcfe00",
+  "original_field": "kickoff_at",
+  "effective_field": "effective_scheduled_kickoff_at",
+  "original_effective_value": null,
+  "source_values": {
+    "titan": "2026-09-28T03:10:00+00:00",
+    "nowscore": "2026-09-28T03:00:00+00:00"
+  },
+  "selected_utc": "2026-09-28T03:00:00Z",
+  "selected_local": "2026-09-27T21:00:00-06:00",
+  "local_timezone": "America/Mexico_City",
+  "selected_source": "CLUB_OFFICIAL_CALENDAR",
+  "precision": "minute",
+  "state": "USER_ADJUDICATED_OFFICIAL_SCHEDULE",
+  "authorization": "以官方日历为准",
+  "authorization_recorded_at": "2026-10-19T00:25:57.103271+00:00",
+  "evidence": {
+    "url": "https://clubnecaxa.mx/partidos/calendario/APERTURA-2026",
+    "archive_relative": "reports/26098-fundamentals-final/versions/20261018T163750188186Z",
+    "archive_manifest_sha256": "ec1795784c7f08dee32e8d6cfb07f02138cf3a6c5d2a03ef03718b5c0961d094",
+    "member": "results/26098-cup-standings-20261018/clock-135-club-calendar.txt",
+    "sha256": "e2c35cc7edda89e3f6c13469e90482c94813127c291638f25915bdc5392dd84b"
+  },
+  "actual_kickoff_utc": null,
+  "actual_kickoff_verified": false,
+  "original_cutoff": null,
+  "cutoff_scope": "Original cutoff is not a source_issue.match field; preserve all existing frozen decision artifacts",
+  "frozen_cutoff_modified": false,
+  "historical_admission": false,
+  "availability_class": "HISTORICAL_PROXY",
+  "scope": "This fixture planned kickoff only; not a global source-priority rule"
+}

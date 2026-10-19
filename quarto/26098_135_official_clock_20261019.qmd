@@ -1,0 +1,87 @@
+---
+title: "26098 #135：官方日历计划时间裁决"
+format:
+  html:
+    embed-resources: true
+    html-math-method: plain
+    df-print: kable
+execute:
+  cache: false
+  freeze: false
+  error: false
+params:
+  project_root: "."
+  library: null
+---
+
+用户裁决：“以官方日历为准”。仅对26098:135内卡萨—墨西哥美洲的计划时间生效，
+采用墨西哥当地9月27日21:00，即UTC9月28日03:00、北京时间11:00。
+保留原来源冲突及固定基础版本；有效时间以裁决层投影，不覆盖源数据。
+实际开球仍未核实，既有冻结截止、预测及结算不变。后采证据仍不准入历史赛前预测。
+
+```{r}
+#| include: false
+root <- normalizePath(params$project_root,mustWork=TRUE)
+source(file.path(root,"r/verification_environment.R"))
+runtime <- verification_environment(root)
+stopifnot(!is.null(params$library),runtime$package==normalizePath(file.path(params$library,"beidan")))
+suppressPackageStartupMessages(library(tidyverse))
+policy_path <- file.path(root,"config/26098-135-official-clock.json")
+policy <- jsonlite::fromJSON(policy_path)
+nas <- runtime$parquet_root
+stopifnot(digest::digest(file=file.path(nas,"datasets",policy$base_dataset,"versions",policy$base_version,"manifest.json"),algo="sha256")==policy$base_manifest_sha256)
+archive <- file.path(nas,policy$evidence$archive_relative)
+stopifnot(digest::digest(file=file.path(archive,"asset-manifest.json"),algo="sha256")==policy$evidence$archive_manifest_sha256,
+ digest::digest(file=file.path(archive,policy$evidence$member),algo="sha256")==policy$evidence$sha256)
+base <- beidan::read_dataset(policy$base_dataset,"match",version=policy$base_version,root=nas)
+conflicts <- beidan::read_dataset(policy$base_dataset,"conflicts",version=policy$base_version,root=nas)
+target <- which(base$fixture_id==policy$fixture_id)
+stopifnot(is_tibble(base),nrow(base)==146L,length(target)==1L,
+ base$provider_id[target]==policy$provider_id,base$home_id[target]==policy$home_id,
+ base$away_id[target]==policy$away_id,is.na(base$kickoff_at[target]))
+clock <- conflicts |> filter(fixture_id==policy$fixture_id,field=="kickoff_utc")
+stopifnot(nrow(clock)==1L,jsonlite::fromJSON(clock$titan_json)==policy$source_values$titan,
+ jsonlite::fromJSON(clock$nowscore_json)==policy$source_values$nowscore)
+selected <- lubridate::ymd_hms(policy$selected_utc,tz="UTC")
+stopifnot(selected==lubridate::ymd_hms(policy$selected_local),
+ format(lubridate::with_tz(selected,policy$local_timezone),"%Y-%m-%d %H:%M",tz=policy$local_timezone)=="2026-09-27 21:00",
+ !policy$actual_kickoff_verified,!policy$frozen_cutoff_modified,!policy$historical_admission)
+effective <- base
+effective$effective_scheduled_kickoff_at <- base$kickoff_at
+effective$effective_scheduled_kickoff_at[target] <- selected
+effective$adjudication_id <- NA_character_
+effective$adjudication_id[target] <- policy$adjudication_id
+stopifnot(identical(effective[names(base)],base),
+ identical(effective$effective_scheduled_kickoff_at[-target],base$kickoff_at[-target]),
+ sum(is.na(base$kickoff_at))==1L,!anyNA(effective$effective_scheduled_kickoff_at),
+ sum(!is.na(effective$adjudication_id))==1L)
+output <- file.path(runtime$hot_root,"26098-135-official-clock-20261019")
+dir.create(output,recursive=TRUE,showWarnings=FALSE)
+write_csv(effective,file.path(output,"effective-match.csv"))
+jsonlite::write_json(list(policy_sha256=digest::digest(file=policy_path,algo="sha256"),
+ base_manifest_sha256=policy$base_manifest_sha256,fixture_id=policy$fixture_id,
+ effective_scheduled_kickoff_utc=policy$selected_utc,rows=146L,adjudicated_rows=1L,
+ other_rows_unchanged=145L,source_columns_unchanged=TRUE,
+ frozen_cutoff_modified=FALSE,actual_kickoff_verified=FALSE,historical_admission=FALSE,
+ qmd_sha256=digest::digest(file=file.path(root,"quarto/26098_135_official_clock_20261019.qmd"),algo="sha256")),
+ file.path(output,"receipt.json"),auto_unbox=TRUE,pretty=TRUE)
+```
+
+```{r}
+tibble(source=c("Titan原值","Nowscore原值","用户裁决：官方日历"),
+ utc=c(policy$source_values$titan,policy$source_values$nowscore,policy$selected_utc))
+effective |> filter(fixture_id==policy$fixture_id) |>
+ select(fixture_id,home,away,kickoff_at,effective_scheduled_kickoff_at,adjudication_id)
+tibble(total_rows=nrow(effective),adjudicated_rows=1L,other_rows_unchanged=145L,
+ original_columns_unchanged=TRUE,frozen_cutoff_modified=FALSE)
+```
+
+原始`source_issue_26098.match$kickoff_at`仍保留冲突空值。裁决记录与本报告的
+`effective_scheduled_kickoff_at`构成明确的有效计划时间层，不能将其宣称为实测开球。
+`original_cutoff`为空表示本输入没有该字段；不是将原冻结cutoff清空。
+
+验收方式：清洁会话执行本QMD，错误即停止；核对146行、唯一目标身份、两源原值、
+官方证据SHA256及跨时区换算，断言全部原字段和另外145场不变。
+本次未修改包函数。`codex review`仅审查本裁决JSON、QMD、HTML和执行回执；
+具体命令、受审文件哈希、发现与处理结果随本版本保存于
+`adjudications/26098-135/verification.json`和`review.log`。原始审查记录与本报告共同验收。
