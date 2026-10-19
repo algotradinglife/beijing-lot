@@ -1,0 +1,66 @@
+{
+  "status": "ACCEPTED",
+  "repository_tests": {
+    "blocks": 814,
+    "passed": 184780,
+    "failed": 0,
+    "errors": 0,
+    "warnings": 0,
+    "skipped": 0,
+    "exit_status": 0,
+    "command": "Rscript tests/testthat.R --phase=repository"
+  },
+  "standard_entry_receipt": {
+    "command": [
+      "/bin/zsh",
+      "-c",
+      "for budget_acceptance_wait in {1..300}\ndo\n  if [[ -f results/dynamic-budget-20261019/26103/evaluation.json && -f results/dynamic-budget-20261019/26104/evaluation.json && -f results/dynamic-budget-20261019/26105/evaluation.json ]]\n  then\n    . docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\n    export R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:$PWD/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\n    exec /opt/R/4.6.1/bin/Rscript tests/testthat.R --phase=repository\n  fi\n  sleep 5\ndone\nexit 1"
+    ],
+    "cwd": "/tmp/beidan-budget-20261019",
+    "exit_status": 0,
+    "started_at_utc": "2026-10-19T01:05:45.187908+00:00",
+    "finished_at_utc": "2026-10-19T01:25:54.626743+00:00"
+  },
+  "snapshot_root": "/tmp/beidan-budget-20261019",
+  "snapshot_source_inventory_sha256": "c81fef94945e970e4007fe8dfb9e27091f07e4e713232c507e4ace004184b86b",
+  "source_files": [
+    {
+      "path": "r/dynamic_budget_freeze_20261019.R",
+      "sha256": "b8bd684cb995c69c710de719733d0005309a52050a94ec49ef084065a07011e8"
+    },
+    {
+      "path": "r/dynamic_budget_evaluate_20261019.R",
+      "sha256": "77b271a3ff108f4a6045ee53b1ca5e8d5e5d62486836b78c42e496b35db9e2ca"
+    },
+    {
+      "path": "tests/testthat/test-dynamic-budget-study.R",
+      "sha256": "2b66811b0f894efc0b9a511cd4c4a4e19189b52802d09ced33141fb33ee87d67"
+    },
+    {
+      "path": "quarto/dynamic_budget_20261019.qmd",
+      "sha256": "16e8bc057fe0337af0b8309b977ac9d03a54196689d1b003910663a9d0e28668"
+    }
+  ],
+  "runtime_calculation": {
+    "library": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-combination-study-20261018/library/beidan",
+    "selector": "9f71180b04434477af95c4c5c49a4638",
+    "settlement": "aadf9255acd977e41db60a0bbe483742",
+    "kernel": "cf4b647d04b6ec212ad95ccc0b1891801717358602c8b8886a6559fd38128822"
+  },
+  "runtime_verification": {
+    "library": "/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library/beidan",
+    "selector": "9f71180b04434477af95c4c5c49a4638",
+    "settlement": "aadf9255acd977e41db60a0bbe483742",
+    "kernel": "cf4b647d04b6ec212ad95ccc0b1891801717358602c8b8886a6559fd38128822"
+  },
+  "package_changed": false,
+  "python_changed": false,
+  "baseline_2000_parity_issues": [
+    "26103",
+    "26104",
+    "26105"
+  ],
+  "review_results": "NO_BLOCKING_FINDINGS; final accepted-render artifact follow-up recorded separately",
+  "scope": "All repository tests on last accepted isolated base plus budget clients/tests/current standard entry. Unrelated dirty package work in shared checkout is excluded; no claim of testing all current WIP.",
+  "setup_recovery": "Initial private full-copy exceeded tmpfs quota; only that failed task copy was removed, baseline files hard-linked into a new isolated tree; changed source files detached before copying. Tests TMPDIR uses NVMe. No unrelated work removed."
+}

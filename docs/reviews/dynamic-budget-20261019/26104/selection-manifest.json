@@ -1,0 +1,20 @@
+{
+  "sha256": "437a0ead2eb8000e3af64d8af483e8254a0429d84e857e7e6f8ed542b330e450",
+  "source_rounds_sha256": "6b40f6bc2ee40561d5950be1c86d07c24851d4436b4daa4d12d5d09abc21e846",
+  "source_forecasts_sha256": "3efd5c242960acbb4ba3d985641e1854b1fb038343d649ebaa21ae9d37941a21",
+  "client_sha256": "b8bd684cb995c69c710de719733d0005309a52050a94ec49ef084065a07011e8",
+  "target_labels_opened": false,
+  "prospective_admission": false,
+  "rounds": 2,
+  "cutoffs": {
+    "1": {
+      "issue_id": "26104",
+      "cutoff_utc": "2026-10-13"
+    },
+    "2": {
+      "issue_id": "26104",
+      "cutoff_utc": "2026-10-14"
+    }
+  },
+  "code_hashes": "9f71180b04434477af95c4c5c49a4638"
+}

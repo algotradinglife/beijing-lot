@@ -1,0 +1,109 @@
+---
+title: "动态散选预算曲线：800–2,000元／轮"
+format: html
+execute:
+  echo: false
+  cache: false
+  error: false
+params:
+  project_root: "/home/drwho1985/workspace/algotradinglife/beijing-lot"
+  require_acceptance: true
+---
+
+预先固定四档预算：800／1,200／1,600／2,000元，对应8组各50／75／100／125注，每注2元。比赛与分组不变。每档独立调用既有SelectJointOutcomeTickets的DYNAMIC_SET，并非截取原125注。2,000元对照复用绑定收据的原票单；其余三档从原决策对象重新优化。RAW与GLOBAL均保留，GLOBAL对应FM-1.8.1-alpha历史校准概率，预算方案是BS-0.2.0-alpha的敏感性实验，不改正式下注配置。
+
+26103、26104共15轮为已完成期历史对照；26105是另外13轮阶段性快照，观察截至北京时间2026-10-19 04:24，不标记整期完成，不与前15轮合算最终收益。历史结果此前已看过，非盲测，来源部分只有历史时钟代理。预算档位不按目标表现调整，不把事后最好档自动定为新策略。
+
+```{r}
+library(tidyverse)
+root<-normalizePath(params$project_root,mustWork=TRUE)
+out<-file.path(root,'results/dynamic-budget-20261019')
+all_rows<-all_groups<-all_traces<-list();bindings<-list()
+for(issue in c('26103','26104','26105')) {
+ d<-file.path(out,issue);m<-jsonlite::fromJSON(file.path(d,'selection-manifest.json'));e<-jsonlite::fromJSON(file.path(d,'evaluation.json'))
+ stopifnot(m$sha256==digest::digest(file=file.path(d,'frozen-budget-selections.rds'),algo='sha256'),e$selection_sha256==m$sha256,
+ e$rounds_sha256==digest::digest(file=file.path(d,'rounds.csv'),algo='sha256'),e$baseline_2000_parity,
+ e$client_sha256==digest::digest(file=file.path(root,'r/dynamic_budget_evaluate_20261019.R'),algo='sha256'))
+ source_dir<-file.path(root,'results/global-dynamic-walkforward-20261018',issue)
+ stopifnot(m$source_rounds_sha256==digest::digest(file=file.path(source_dir,'frozen-rounds.rds'),algo='sha256'),m$source_forecasts_sha256==digest::digest(file=file.path(source_dir,'frozen-forecasts.rds'),algo='sha256'))
+ if(issue!='26105') {
+  stopifnot(e$source_hashes$labels==digest::digest(file=file.path(source_dir,'evaluation/scores.csv'),algo='sha256'),e$source_hashes$settlement==digest::digest(file=file.path(source_dir,'settlement-observation.rds'),algo='sha256'),e$source_hashes$evaluation==digest::digest(file=file.path(source_dir,'evaluation/evaluation.json'),algo='sha256'))
+ } else {
+  obs_path<-file.path(root,'results/dynamic-26105-partial-20261019/observation.rds')
+  stopifnot(e$source_hashes$observation==digest::digest(file=obs_path,algo='sha256'))
+  obs<-readRDS(obs_path);f<-readRDS(file.path(source_dir,'frozen-forecasts.rds'))
+  stopifnot(f$source_hashes[['fixtures']]==digest::digest(file=f$source_paths[['fixtures']],algo='sha256'))
+  fx<-read_csv(f$source_paths[['fixtures']],col_types=cols(.default=col_character(),handicap=col_integer()))
+  ev<-as_tibble(obs$events) |> mutate(fixture_id=paste0(issue_id,':',slot))
+  bound<-fx |> select(fixture_id,provider_id,expected_handicap=handicap) |> left_join(ev,by='fixture_id',relationship='one-to-one')
+  stopifnot(!anyNA(bound$native_id),all(bound$provider_id==bound$native_id),all(bound$expected_handicap==bound$handicap))
+ }
+ x<-readRDS(file.path(d,'frozen-budget-selections.rds'))
+ stopifnot(!x$target_labels_opened,x$client_sha256==digest::digest(file=file.path(root,'r/dynamic_budget_freeze_20261019.R'),algo='sha256'))
+ all_rows[[issue]]<-read_csv(file.path(d,'rounds.csv'),show_col_types=FALSE) |> mutate(issue_id=as.character(issue_id))
+ all_groups[[issue]]<-read_csv(file.path(d,'groups.csv'),show_col_types=FALSE)
+ all_traces[[issue]]<-as_tibble(x$traces) |> mutate(issue_id=issue)
+ bindings[[issue]]<-tibble(issue=issue,selections_sha256=m$sha256,rounds_sha256=e$rounds_sha256)
+}
+rows<-bind_rows(all_rows) |> mutate(scope=if_else(issue_id=='26105','26105阶段性','26103–26104历史'))
+traces<-bind_rows(all_traces) |> filter(step==8) |> mutate(scope=if_else(issue_id=='26105','26105阶段性','26103–26104历史'))
+stopifnot(nrow(rows)==28*2*4,!anyDuplicated(rows[c('issue_id','index','model','budget_cny')]),all(rows$copies*2==rows$budget_cny))
+coverage<-rows |> group_by(scope,model,budget_cny) |> summarise(rounds=n(),confirmed_hits=sum(any_hit%in%TRUE),confirmed_misses=sum(any_hit%in%FALSE),pending_rounds=sum(is.na(any_hit)),winning_groups=sum(hit_groups),.groups='drop')
+predicted<-traces |> group_by(scope,model,budget_cny) |> summarise(mean_model_coverage=mean(cumulative_coverage),.groups='drop')
+coverage<-coverage |> left_join(predicted,by=c('scope','model','budget_cny'),relationship='one-to-one')
+common<-rows |> group_by(scope,issue_id,index) |> summarise(complete=all(monetary_complete),.groups='drop') |> filter(complete)
+cash<-rows |> semi_join(common,by=c('scope','issue_id','index')) |> group_by(scope,model,budget_cny) |>
+ summarise(rounds=n(),cost=sum(budget_cny),payout=sum(payout_cny),net=sum(net_cny),roi=net/cost,profitable_rounds=sum(net_cny>0),.groups='drop')
+stopifnot(all(coverage$confirmed_hits+coverage$confirmed_misses+coverage$pending_rounds==coverage$rounds))
+# Compare adjacent budgets as paired rounds, retaining gains/losses separately.
+increments<-list()
+for(s in unique(rows$scope))for(mod in c('RAW','GLOBAL'))for(b in c(800,1200,1600)) {
+ low<-rows |> filter(scope==s,model==mod,budget_cny==b)
+ high<-rows |> filter(scope==s,model==mod,budget_cny==b+400)
+ paired<-inner_join(low,high,by=c('issue_id','index'),suffix=c('_low','_high'),relationship='one-to-one')
+ increments[[paste(s,mod,b)]]<-tibble(scope=s,model=mod,from=b,to=b+400,new_hit_rounds=sum(paired$any_hit_high%in%TRUE & paired$any_hit_low%in%FALSE),lost_hit_rounds=sum(paired$any_hit_low%in%TRUE & paired$any_hit_high%in%FALSE),unresolved_pairs=sum(is.na(paired$any_hit_low)|is.na(paired$any_hit_high)))
+}
+increments<-bind_rows(increments)
+write_csv(coverage,file.path(out,'coverage-summary.csv'));write_csv(cash,file.path(out,'cash-summary.csv'));write_csv(increments,file.path(out,'increment-summary.csv'));write_csv(rows,file.path(out,'all-rounds.csv'))
+```
+
+单轮覆盖比较：命中指整轮至少一组买中，待定单列。model coverage是模型估计覆盖，不能当成真实命中率。
+
+```{r}
+knitr::kable(coverage,digits=4)
+```
+
+资金比较在每个样本范围内，统一取两种概率×四种预算全部现金完整的相同轮次，缺失SP不补0。不同预算投入不同，回款和净收益均据实际物理票，跨组重复票照计成本和回款。2元票单位及一次票级0.65使用包统一结算；为节省计算，相同ticket_id只结算一次，再恢复各档／组的物理份数，非去重购票。
+
+```{r}
+knitr::kable(cash,digits=2)
+knitr::kable(increments)
+```
+
+完整逐轮结果（未现金完整仍保留NA）：
+
+```{r}
+knitr::kable(rows |> filter(model=='GLOBAL') |> select(scope,issue_id,index,budget_cny,hit_groups,pending_groups,payout_cny,net_cny),digits=2)
+```
+
+复现与测试
+
+先按期运行`Rscript r/dynamic_budget_freeze_20261019.R <root> <issue>`，freeze拒绝覆盖现有RDS，且不读目标标签；之后运行`Rscript r/dynamic_budget_evaluate_20261019.R <root> <issue>`，只用已冻结数据及观察快照评价。R为4.6.1，显式R_LIBS_USER指向项目r_lib和R4.6依赖库，package使用results/margin-combination-study-20261018/library的正常安装版本。没有package代码变更。冻结决策显式携带截止及源收据，校准未重训，既有共享temporal_learning收据不变。
+
+项目测试映射：tests/testthat/test-dynamic-budget-study.R验证预算／物理份数／cutoff收据、原125注一致性、独立实际决策重放、无关目标标签元数据变动不影响选择、cutoff变动拒绝、NA资金及结算勾稽。仓库客户端测试通过标准入口`Rscript tests/testthat.R --phase=repository`执行；隔离已验收源快照避免混入其他会话在写的package变化。准确命令、源身份、完整测试总数与审查结论记录于本目录acceptance.json、repository-tests.log及review-receipt.json。另以check-acceptance-gate.R执行实际QMD验收节点，核验真实有效来源账本可通过、过期哈希与缺项被拒绝。缺失或失败验收不视作完成。
+
+```{r}
+if(params$require_acceptance) {
+ acceptance<-jsonlite::fromJSON(file.path(out,'acceptance.json'))
+ stopifnot(acceptance$status=='ACCEPTED',acceptance$repository_tests$exit_status==0,acceptance$repository_tests$failed==0,acceptance$repository_tests$errors==0,acceptance$repository_tests$skipped==0)
+ ledger<-as_tibble(acceptance$source_files)
+ expected_paths<-c("r/dynamic_budget_freeze_20261019.R","r/dynamic_budget_evaluate_20261019.R","tests/testthat/test-dynamic-budget-study.R","quarto/dynamic_budget_20261019.qmd")
+ stopifnot(nrow(ledger)==length(expected_paths),!anyDuplicated(ledger$path),setequal(ledger$path,expected_paths))
+ for(i in seq_len(nrow(ledger)))stopifnot(ledger$sha256[i]==digest::digest(file=file.path(root,ledger$path[i]),algo='sha256'))
+ shown_tables<-c(as.character(knitr::kable(ledger,format="html")),as.character(knitr::kable(as_tibble(acceptance$repository_tests),format="html")))
+ knitr::asis_output(paste(shown_tables,collapse="\n\n"))
+}
+knitr::kable(bind_rows(bindings))
+```
+
+局限：固定原组，不研究减少组数；独立比赛假设及既有贪心算法未证明全局最优；预算不同可能改变先选哪一组，票集不必嵌套，因此增加资金不保证每个实际轮次都更好。小样本、相关轮次及高赔中奖集中均限制收益外推。正式模型／策略、票单和自动任务不变。后续应冻结预算后再用新轮次检验。

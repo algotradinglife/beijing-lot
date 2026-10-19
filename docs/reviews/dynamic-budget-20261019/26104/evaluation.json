@@ -1,0 +1,13 @@
+{
+  "selection_sha256": "437a0ead2eb8000e3af64d8af483e8254a0429d84e857e7e6f8ed542b330e450",
+  "source_hashes": {
+    "labels": "6de0938fec768627d379559575cb2f130f78ae15b5c2596919bfe326a7fabb40",
+    "settlement": "782d8a2ca8ff229d9a671696a9a17e20c99d798be46f8688526bd024bcdb59db",
+    "evaluation": "bcfcb756f81c26fcb40d843fd3331728c7df12246788ed690b73790a5334aeae"
+  },
+  "client_sha256": "77b271a3ff108f4a6045ee53b1ca5e8d5e5d62486836b78c42e496b35db9e2ca",
+  "as_of_utc": "2026-10-16T15:39:33Z",
+  "rounds_sha256": "f26f76c1c9aa673ab8dc67f412fd35e75a761a867f49f6248ea4fb41949b94b4",
+  "baseline_2000_parity": true,
+  "phase": "HISTORICAL_DIAGNOSTIC"
+}

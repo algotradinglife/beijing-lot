@@ -1,0 +1,20 @@
+[
+  {
+    "phase": "source",
+    "path": "results/dynamic-budget-20261019/review-source.log",
+    "sha256": "95300517649375e7333bf3a14dc88fd2d6a81134fc5410fd2668b09de02c8779",
+    "final_findings": "\ncodex\nNO_BLOCKING_FINDINGS in the four scoped source files. Source inspection found consistent cutoff and receipt checks, independent budget selection, physical-copy accounting, partial-result NA handling, and baseline parity checks. Final tests and artifact acceptance remain pending and were not assessed as failures.\nNO_BLOCKING_FINDINGS in the four scoped source files. Source inspection found consistent cutoff and receipt checks, independent budget selection, physical-copy accounting, partial-result NA handling, and baseline parity checks. Final tests and artifact acceptance remain pending and were not assessed as failures."
+  },
+  {
+    "phase": "results",
+    "path": "results/dynamic-budget-20261019/review-results.log",
+    "sha256": "a573d2f464f12d9741d88e2b8eadf54295fa16309e34675e77bf0c0a924c5d44",
+    "final_findings": "\ncodex\nNO_BLOCKING_FINDINGS within the requested scope. Independently reconciled coverage and cash summaries, including common cash denominators of 14 historical and 9 partial rounds; reviewed pending/NA handling, source bindings, physical-copy restoration, and claim limitations. Final acceptance remains pending.\nNO_BLOCKING_FINDINGS within the requested scope. Independently reconciled coverage and cash summaries, including common cash denominators of 14 historical and 9 partial rounds; reviewed pending/NA handling, source bindings, physical-copy restoration, and claim limitations. Final acceptance remains pending."
+  },
+  {
+    "phase": "final",
+    "path": "results/dynamic-budget-20261019/review-final.log",
+    "sha256": "7f8f2366f4e2baf089299203d55f71c79c802e65ebe8cf92de235e48d8a71e87",
+    "final_findings": "\ncodex\nNO_BLOCKING_FINDINGS within the final artifact scope. QMD/HTML hashes and displayed evidence match the acceptance/render receipts, including 814 blocks and 184780 passing assertions. Isolated-source scope is explicit; cash denominators remain 14 historical and 9 partial rounds, without universal-optimum, final-26105, or prospective claims.\nNO_BLOCKING_FINDINGS within the final artifact scope. QMD/HTML hashes and displayed evidence match the acceptance/render receipts, including 814 blocks and 184780 passing assertions. Isolated-source scope is explicit; cash denominators remain 14 historical and 9 partial rounds, without universal-optimum, final-26105, or prospective claims."
+  }
+]

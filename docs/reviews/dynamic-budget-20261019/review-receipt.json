@@ -1,0 +1,27 @@
+{
+  "status": "REVIEW_PASSED",
+  "command": "codex review [bounded final acceptance follow-up; exact prompt in review-final.log]",
+  "exit_status": 0,
+  "findings": "NO_BLOCKING_FINDINGS",
+  "resolutions": [],
+  "files": [
+    {
+      "path": "r/dynamic_budget_freeze_20261019.R",
+      "sha256": "b8bd684cb995c69c710de719733d0005309a52050a94ec49ef084065a07011e8"
+    },
+    {
+      "path": "r/dynamic_budget_evaluate_20261019.R",
+      "sha256": "77b271a3ff108f4a6045ee53b1ca5e8d5e5d62486836b78c42e496b35db9e2ca"
+    },
+    {
+      "path": "tests/testthat/test-dynamic-budget-study.R",
+      "sha256": "2b66811b0f894efc0b9a511cd4c4a4e19189b52802d09ced33141fb33ee87d67"
+    },
+    {
+      "path": "quarto/dynamic_budget_20261019.qmd",
+      "sha256": "16e8bc057fe0337af0b8309b977ac9d03a54196689d1b003910663a9d0e28668"
+    }
+  ],
+  "html_sha256": "79d317744d491a02811ba223cb3996ae94cbf679efcdfe42dcad4f4a529af705",
+  "review_log_sha256": "7f8f2366f4e2baf089299203d55f71c79c802e65ebe8cf92de235e48d8a71e87"
+}

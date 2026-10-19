@@ -1,0 +1,64 @@
+{
+  "sha256": "df1c27d91f2f5274eb76e7bc7af70e38d7f475607a420a9bdd24b861fb315383",
+  "source_rounds_sha256": "74c76ceae5ad04a202c5c25bfd73af7636de8cb4b490d8d92cf26486d8853196",
+  "source_forecasts_sha256": "fb4ec982eec48e58a9c98e2330df787cddcb6ee57f1282f7e39ee374167b79c1",
+  "client_sha256": "b8bd684cb995c69c710de719733d0005309a52050a94ec49ef084065a07011e8",
+  "target_labels_opened": false,
+  "prospective_admission": false,
+  "rounds": 13,
+  "cutoffs": {
+    "1": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-16"
+    },
+    "2": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-16"
+    },
+    "3": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-17"
+    },
+    "4": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-17"
+    },
+    "5": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-17"
+    },
+    "6": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-17"
+    },
+    "7": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-17"
+    },
+    "8": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-17"
+    },
+    "9": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-18"
+    },
+    "10": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-18"
+    },
+    "11": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-18"
+    },
+    "12": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-18"
+    },
+    "13": {
+      "issue_id": "26105",
+      "cutoff_utc": "2026-10-19"
+    }
+  },
+  "code_hashes": "9f71180b04434477af95c4c5c49a4638"
+}

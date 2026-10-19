@@ -1,0 +1,146 @@
+[
+  {
+    "path": "26103/evaluation.json",
+    "sha256": "fe1559e48d5fa27c499870bfa17dbd03f5c73d617b726678ec071eb6a2997687"
+  },
+  {
+    "path": "26103/groups.csv",
+    "sha256": "20ac1713cc735e07caacc958db86cb6a58d48e88d9e5c6b71d76974838cd6d28"
+  },
+  {
+    "path": "26103/rounds.csv",
+    "sha256": "d1c55c0747e45e004ee972864b2a7b62bfb0043c0d63ddd4f8dc6b67dd89589a"
+  },
+  {
+    "path": "26103/selection-manifest.json",
+    "sha256": "8b0041bfccc91ec288f833fad816adc1a538382d91e30d10dd482ab11c9a6775"
+  },
+  {
+    "path": "26103/traces.csv",
+    "sha256": "14e924c1e1a25b4cde9b924b4a7daa0332afa307fecd0ebd12ee93c5cd9b0d8c"
+  },
+  {
+    "path": "26104/evaluation.json",
+    "sha256": "10b6a516c88b7892c4cf9bb337dfe4e4538bd959f179b97bf0a01aed2a7add58"
+  },
+  {
+    "path": "26104/groups.csv",
+    "sha256": "79a7d9c26afd46e396b1e526e9d7e9a513decfa2a6764676bab7b223521e3c0f"
+  },
+  {
+    "path": "26104/rounds.csv",
+    "sha256": "f26f76c1c9aa673ab8dc67f412fd35e75a761a867f49f6248ea4fb41949b94b4"
+  },
+  {
+    "path": "26104/selection-manifest.json",
+    "sha256": "a4c79dbb3d485e7b1111c1afb50aa3abd4b0bd45132d0a9b1df16f65021f0e9f"
+  },
+  {
+    "path": "26104/traces.csv",
+    "sha256": "a793de45e0e302690bf1f507993b296f5e69c5747e5fddf2dd279827fa2d851c"
+  },
+  {
+    "path": "26105/evaluation.json",
+    "sha256": "42ab95da799d79b5a58bc556184336c86b272de103feb41cd2afbfdb90b7c923"
+  },
+  {
+    "path": "26105/groups.csv",
+    "sha256": "0012a7a32eefdfee59908c135cf1bc1eb59922eeb56fb8c8c15e3f1be3d8baff"
+  },
+  {
+    "path": "26105/rounds.csv",
+    "sha256": "e2902ca19fdde32bd52a8d78dcd8a6923857a89160a082f8ab1d27ac6a7815a3"
+  },
+  {
+    "path": "26105/selection-manifest.json",
+    "sha256": "2b4a2b5031d1637184d39f79d0379273d27e40aa01148fcb29ece6d9f040e8f0"
+  },
+  {
+    "path": "26105/traces.csv",
+    "sha256": "eab51ea67a6a2d2aa64748c69ec49c138f17335cd85b3c41c3b159c0700b617b"
+  },
+  {
+    "path": "acceptance.json",
+    "sha256": "801461218394ea092bdce821cdf5a77021d627bab10ae4e00d1dae7c61a9a983"
+  },
+  {
+    "path": "all-rounds.csv",
+    "sha256": "1a4c01fa52326ac1690f45263a047a7be6186c088b4dae1a923866ce289cf0d5"
+  },
+  {
+    "path": "cash-summary.csv",
+    "sha256": "b504ac86e13a3637a8118a996d993076e7f9a1f85a82567dac84d27843c49723"
+  },
+  {
+    "path": "check-acceptance-gate.R",
+    "sha256": "c6978d809af9c1e90f7d453630901066e318f13152a4244b4c086db06192a7df"
+  },
+  {
+    "path": "coverage-summary.csv",
+    "sha256": "a6cf9fad41bb25f40e2cdd1263e4d9a30047244ae2d973f0e20d5c9717d8546c"
+  },
+  {
+    "path": "finalize-acceptance.py",
+    "sha256": "72476b6bf302c73370e9d897491b1f21e4e8961cda0d1611ab7dc81be0f81ff9"
+  },
+  {
+    "path": "gate-check.log",
+    "sha256": "c650448b33246c6a92bf189a204e1321c6a617670076260a8148a17d5d79c31f"
+  },
+  {
+    "path": "html-validation.json",
+    "sha256": "b3939e2fce2bdc69f2ff1a99b20bab226755bb5f775311b1aeed2c1759361bc8"
+  },
+  {
+    "path": "increment-summary.csv",
+    "sha256": "378c0dd9712dfc8cab3d997a91d45812e374f6bb0e51ba28734f3056243722b3"
+  },
+  {
+    "path": "render-final-exit.json",
+    "sha256": "d5e066d051fa13e25f57fd3c8d75a0c7645568d9babdec15b4fd351a253b2ad6"
+  },
+  {
+    "path": "render-final-job.json",
+    "sha256": "8299988722241e42d027667bdff6223631b0ebc7acc02efd555df0d3adae8d9a"
+  },
+  {
+    "path": "render-final.log",
+    "sha256": "d654c876d8cebfac447e5034867bf9b4cc1f627d1a8ce0c024f24e3586fd3984"
+  },
+  {
+    "path": "replay-targeted.log",
+    "sha256": "79af85ee2c9cac64b790d99ae1e22b1153d1a87e3fe31676ccebeafecceb3eca"
+  },
+  {
+    "path": "repository-tests-exit.json",
+    "sha256": "f83254b6c3d741b300a26096ccef7eee78431738ef6fae9019f769cbbfb57fe9"
+  },
+  {
+    "path": "repository-tests-job.json",
+    "sha256": "d2cbb50091a055964d9d575365d81d3796910c533651da0a66c175d2a435fbfe"
+  },
+  {
+    "path": "repository-tests.log",
+    "sha256": "e74b09f84797689541bfec02233184edb2039155721676eb00b8b4350163ea8c"
+  },
+  {
+    "path": "review-receipt.json",
+    "sha256": "19fd23cf3645574cb924f5290c186c2d8cb2860476d3bebb92d252e6ce18a1f4"
+  },
+  {
+    "path": "review-summaries.json",
+    "sha256": "a04701684b16aec2681914f1d347097c55a0a1ef68da76ee1fcd4b91d0cb867f"
+  },
+  {
+    "path": "runtime-0.json",
+    "sha256": "506e479721f26ea391d074bcfea7aac5f41c5a3690ac93e3dded043f849ce176"
+  },
+  {
+    "path": "runtime-1.json",
+    "sha256": "298e1db9aec2266fcad31da33cb989917bfb5a9fcdf27ba4fb6def0381604121"
+  },
+  {
+    "path": "snapshot-source-inventory.json",
+    "sha256": "c81fef94945e970e4007fe8dfb9e27091f07e4e713232c507e4ace004184b86b"
+  }
+]

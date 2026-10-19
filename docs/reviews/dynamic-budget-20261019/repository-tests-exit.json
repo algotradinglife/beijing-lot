@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/bin/zsh",
+    "-c",
+    "for budget_acceptance_wait in {1..300}\ndo\n  if [[ -f results/dynamic-budget-20261019/26103/evaluation.json && -f results/dynamic-budget-20261019/26104/evaluation.json && -f results/dynamic-budget-20261019/26105/evaluation.json ]]\n  then\n    . docs/reviews/fm171-26103-count-policy-20261017/test-environment.sh\n    export R_LIBS_USER=\"/home/drwho1985/workspace/algotradinglife/beijing-lot/results/margin-first-mapping-20261018/library:$PWD/r_lib:/home/drwho1985/R/x86_64-pc-linux-gnu-library/4.6\"\n    exec /opt/R/4.6.1/bin/Rscript tests/testthat.R --phase=repository\n  fi\n  sleep 5\ndone\nexit 1"
+  ],
+  "cwd": "/tmp/beidan-budget-20261019",
+  "exit_status": 0,
+  "started_at_utc": "2026-10-19T01:05:45.187908+00:00",
+  "finished_at_utc": "2026-10-19T01:25:54.626743+00:00"
+}
