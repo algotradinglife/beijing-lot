@@ -1,0 +1,67 @@
+---
+title: "待核查初稿：MPR-1.1＋1200元原动态散选"
+params:
+  phase: report
+format:
+  gfm: default
+execute:
+  echo: false
+  cache: false
+  error: false
+---
+
+本 Markdown 仅提交2026年10月27日下注单对应的12场审核记录，不含历史54轮研究。本初稿供用户核查，未发布、未购买、未登记定时更新。窗口：香港时间10月26日22:00至27日22:00。采用MPR-1.1人工审查三分类直接选票，不再叠加GLOBAL；原生和市场比分网格只是参考，不能当作已被MPR校正的比分预测。策略使用1200元原DYNAMIC_SET动态散选、8组七串一、每组75注，不做保护票换入；参考BS-0.2.1-alpha的动态选择实现，本稿按当前窗口和新截止分组，不冒称完全复现其历史UTC日界线/T−24h规则，SP门槛按本次用户要求改为三项最低值严格>2；属于明确标识的草稿搭配。
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse));library(beidan)
+root<-normalizePath('../..');knitr::opts_knit$set(root.dir=root)
+```
+
+```{r, results='asis'}
+out<-'results/mpr-draft-20261026-1200';x<-readRDS(file.path(out,'inputs.rds'));f<-readRDS(file.path(out,'selection.rds'))
+for(k in names(x$source_paths))stopifnot(digest::digest(file=x$source_paths[[k]],algo='sha256')==x$source_hashes[[k]])
+stopifnot(!f$target_labels_opened,f$draft,identical(f$runtime_implementation,beidan:::.score_margin_code(root)),f$inputs_sha256==digest::digest(file=file.path(out,'inputs.rds'),algo='sha256'))
+manifest<-jsonlite::read_json(file.path(out,'manifest.json'),simplifyVector=FALSE)
+for(p in names(manifest$output_hashes))stopifnot(digest::digest(file=file.path(out,p),algo='sha256')==manifest$output_hashes[[p]])
+stopifnot(identical(f$selection$receipt$code_hash,beidan:::.rank_outcome_code_hash(roots='SelectJointOutcomeTickets')))
+cat('决策截止UTC：',format(f$cutoff$cutoff_utc,tz='UTC'),'。原基本面/盘口来源截止与专家审查生成时间分别保留，不将旧对象改写为新截止。\n\n')
+print(knitr::kable(tibble(fixtures=nrow(x$pool),groups=8,tickets=nrow(f$purchases),budget_cny=nrow(f$purchases)*2,replacement_tickets=0L,model_union_coverage=tail(f$trace$cumulative_coverage,1)),digits=5))
+cat('\n\n联合覆盖率仅为专家概率及比赛独立假设下的模型值，非实际命中率。预算全部用于原动态散选，无800元参考单、无保护票置换。\n\n')
+print(knitr::kable(as_tibble(read_csv(file.path(out,'group-summary.csv'),col_types=cols(.default=col_guess(),slots=col_character()),show_col_types=FALSE))))
+cat('\n\n**实际用于本初稿的概率（0–1）**：\n\n')
+print(knitr::kable(x$pool |> select(fixture_key,slot,home_name,away_name,handicap,kickoff_at,min_sp) |> left_join(x$probabilities |> pivot_wider(names_from=outcome,values_from=probability),by=c('fixture_key'='fixture_id')),digits=4))
+```
+
+```{r, results='asis'}
+for(id in x$pool$fixture_key) {
+ d<-x$details[[id]];r<-d$review;e<-x$entries[[id]];fixture<-filter(x$pool,fixture_key==id)
+ cat('\n\n## #',fixture$slot,' ',fixture$home_name,' — ',fixture$away_name,'\n\n',sep='')
+ cat('**基本面与定性落点**：',r$fundamental,'\n\n**平局/让平审查**：',r$draw,'\n\n**差距解释**：',r$gap12,' ',r$gap23,'\n\n**调整幅度**：',r$rationale,'\n\n')
+ if(!is.null(r$time_review))cat(r$time_review,'\n\n')
+ cat('排名、近期和攻防来自重叠样本，市场也可能已吸收，不按证据条数重复加成。首发、伤停、轮换、打法与战意未独立核验；不猜测其影响。\n\n')
+ text<-read_file(e$reader$path);facts_excerpt<-str_match(text,'(### 联赛积分[\\s\\S]*?)(?=### 近期战绩)')[,2]
+ if(!is.na(facts_excerpt))cat('<details><summary>展开冻结积分与交战原文（旧交锋不等权）</summary>\n\n',facts_excerpt,'\n\n</details>\n\n')
+ cat('**原生λ与实际取样**：同赛事同场地，长期/近期8场各0.5，不冒称本季60%；ρ=-0.1为未标定专家值。\n\n')
+ print(knitr::kable(e$native$parameters,digits=4));print(knitr::kable(e$native$rates,digits=4))
+ cat('\n\n**联合市场λ**：\n\n');print(knitr::kable(e$model$parameters,digits=4))
+ cat('\n\n**欧赔均价与逐公司去水后均值**：\n\n')
+ eo<-e$quotes$euro;iv<-1/as.matrix(eo[c('odds_home','odds_draw','odds_away')])
+ print(knitr::kable(tibble(outcome=c('主胜','平局','客胜'),mean_odds=colMeans(as.matrix(eo[c('odds_home','odds_draw','odds_away')])),devig_mean=colMeans(iv/rowSums(iv))),digits=4))
+ print(knitr::kable(e$quotes$asian,digits=3));print(knitr::kable(e$quotes$totals,digits=3))
+ cat('\n\n**冻结前同公司盘口记录**：\n\n',paste(d$trend,collapse='  \n'),'\n\n')
+ cat('**主队净胜球完整参考分布**：下列为原市场网格，未随MPR三分类改写。\n\n')
+ print(knitr::kable(d$market_margins |> filter(probability>.001),digits=4))
+ cat('\n\n**完整→核心条件参考→外围0.3参考→本稿实际概率**：\n\n')
+ print(knitr::kable(tibble(outcome=c('W','D','L'),market_full=unname(d$market_full[c('W','D','L')]),core_conditional=unname(d$core_conditional[c('W','D','L')]),soft90=unname(d$soft90[c('W','D','L')]),draft_ticket=unname(d$target[c('W','D','L')])),digits=4))
+ cat('\n\n核心保留',round(d$core_mass*100,2),'%；主正/负侧剔除',round(d$discard_positive*100,2),'/',round(d$discard_negative*100,2),'%。条件核心不能冒充无条件概率。\n\n')
+ cat('**审核定位**：',x$qualitative_scope[[id]],'\n\n实际赛果及吻合程度：待赛后独立叠加，本稿为空。\n\n')
+}
+```
+
+北单SP仅用于门槛和展示，不参与MPR概率校正。取消场次#372排除；#392仅在数值身份、双源和≤10分钟时间差及其他质控均通过后纳入。下一期26108未列出的限制仍保留，本稿不是整个窗口完整采集或n8n整期验收。历史公开全场比分的90分钟口径未独立认证；不同比赛独立和主观概率幅度均有限制。没有收益保证，未读取本轮目标结算。本稿不计算800元参考单，不执行票单换入；原带保护版本已另存为未交付的被替代草稿。
+
+复现入口：`r/mpr_draft_20261026.R`的inputs/freeze/replay/render阶段。冻结后票单不因报告渲染而改变；用户核查前不启动发布或自动更新。验收命令、收据和代码审查见docs/reviews/mpr-draft-20261026-1200/acceptance.json。本次没有修改包函数，不配置或触发CI。
+
+W/D/L分别表示实际北单让球后的让胜/让平/让负，均以主队为基准。所有概率沿用已冻结初稿，本次仅转换展示格式；没有重估或读取赛果。文中“未发布”指未发布为生效下注单，GitHub审核稿可公开查看。
+
+本QMD复现需要原工作区已冻结的 inputs.rds、selection.rds 及其源快照；这些二进制未随本审核文档提交，不宣称仅克隆本分支即可完整重建模型。

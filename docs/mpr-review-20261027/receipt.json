@@ -1,0 +1,21 @@
+{
+  "scope": "2026-10-27 12 fixtures; existing MPR-1.1 draft only",
+  "generated_utc": "2026-10-26T15:50:11.414469+00:00",
+  "checks": {
+    "clean_qmd_render": "PASS",
+    "exact_frozen_vectors": 12,
+    "normalized_vectors": 12,
+    "unchanged_seven_leg_groups": 8,
+    "codex_review": "No blocking findings"
+  },
+  "review_command": "codex review <documentation-only scoped prompt>",
+  "review_log_sha256": "c78eaaa402a938a32c643a75cd60a41123afec329a79e1d1627fd558dd8b7edd",
+  "files": {
+    "probabilities.csv": "d32a5fd9d889edcb059a48e959abf28e8e266017e204b50a95a0c575e50071ae",
+    "README.md": "835cf4556878edf0b145d9d1e838791f7bf3a7270c19550b0dcc65e0a049e21b",
+    "review.qmd": "1a2154850a9d7540d75e96f688a4761da03d7ba5ff082ee74ee5dc0788ed2353"
+  },
+  "inputs_sha256": "1b59db279a4e74f5db8fb33038b134930e07373046d6e90b67efd4f560444e9e",
+  "original_manifest_sha256": "3dc1ecc55f91b7d6034bd5e0f32316d4cd0ac61cdd00fbca583e4d2fbd1a6951",
+  "limitation": "Review draft; binary source snapshots not shipped; no new probabilities, settlement results, payment or live-sheet publication. Tables display rounded values; probabilities.csv retains full precision."
+}
